@@ -1,5 +1,5 @@
-"""Defines netCDF output for a specific variables, see `VorticityOutput` for details.
-Fields are $(TYPEDFIELDS)"""
+"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+Fields are: $(TYPEDFIELDS)"""
 @kwdef mutable struct ConvectivePrecipitationOutput{F, R} <: AbstractOutputVariable
     name::String = "precip_conv"
     unit::String = "mm"
@@ -21,8 +21,8 @@ finalize!(output::NetCDFOutput, variable::ConvectivePrecipitationOutput, args...
 
 abstract type AbstractRainRateOutputVariable <: AbstractOutputVariable end
 
-"""Defines netCDF output for a specific variables, see `VorticityOutput` for details.
-Fields are $(TYPEDFIELDS)"""
+"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+Fields are: $(TYPEDFIELDS)"""
 @kwdef mutable struct ConvectivePrecipitationRateOutput{F} <: AbstractRainRateOutputVariable
     name::String = "precip_conv_rate"
     unit::String = "mm/hr"
@@ -57,8 +57,8 @@ function output!(
     return nothing
 end
 
-"""Defines netCDF output for a specific variables, see `VorticityOutput` for details.
-Fields are $(TYPEDFIELDS)"""
+"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+Fields are: $(TYPEDFIELDS)"""
 @kwdef mutable struct LargeScalePrecipitationOutput{F, R} <: AbstractOutputVariable
     name::String = "precip_cond"
     unit::String = "mm"
@@ -78,8 +78,8 @@ path(::LargeScalePrecipitationOutput, simulation) =
 # at finalize step postprocess the convective precipitation to get the rate
 finalize!(output::NetCDFOutput, variable::LargeScalePrecipitationOutput, args...) = output!(output, variable.rate, variable)
 
-"""Defines netCDF output for a specific variables, see `VorticityOutput` for details.
-Fields are $(TYPEDFIELDS)"""
+"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+Fields are: $(TYPEDFIELDS)"""
 @kwdef mutable struct LargeScalePrecipitationRateOutput{F} <: AbstractRainRateOutputVariable
     name::String = "precip_cond_rate"
     unit::String = "mm/hr"
@@ -92,8 +92,8 @@ Fields are $(TYPEDFIELDS)"""
     transform::F = (x) -> 1000x     # [m] to [mm]
 end
 
-"""Defines netCDF output for a specific variables, see `VorticityOutput` for details.
-Fields are $(TYPEDFIELDS)"""
+"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+Fields are: $(TYPEDFIELDS)"""
 @kwdef mutable struct CloudTopOutput <: AbstractOutputVariable
     name::String = "cloud_top"
     unit::String = "m"

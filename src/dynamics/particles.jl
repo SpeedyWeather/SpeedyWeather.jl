@@ -79,7 +79,7 @@ function Base.isapprox(
     b = (active1 == active2)                    # both active or both inactive
     b &= isapprox(p1.lat, p2.lat; kwargs...)    # same latitude
     b &= isapprox(p1.σ, p2.σ; kwargs...)        # same elevation
-    c =  isapprox(p1.lon, p2.lon; kwargs...)    # same longitude OR
+    c =  isapprox(mod(p1.lon, 360), mod(p2.lon, 360); kwargs...)    # same longitude OR
     b &= c | isapprox(p1.lat * p2.lat, 8100; kwargs...) # both at the north/south pole
                                                         # because 90˚N, 0˚E == 90˚N, 10˚E
     return b

@@ -5,7 +5,7 @@ A new ocean model has to be defined as
 
     CustomOceanModel <: AbstractOcean
 
-and can have parameters like CustomOceanModel{T} and fields. They need to extend
+and can have parameters like `CustomOceanModel{T}` and fields. They need to extend
 the following functions
 
     function initialize!(ocean_model::CustomOceanModel, model::PrimitiveEquation)
@@ -13,7 +13,7 @@ the following functions
         # you can use other fields from model, e.g. model.geometry
     end
 
-    function initialize!(   
+    function initialize!(
         ocean::PrognosticVariablesOcean,
         progn::PrognosticVariables,
         diagn::DiagnosticVariables,
@@ -132,7 +132,7 @@ function initialize!(ocean::SeasonalOceanClimatology, model::PrimitiveEquation)
     return nothing
 end
 
-function initialize!(   
+function initialize!(
     ocean::PrognosticVariablesOcean,
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
@@ -141,7 +141,7 @@ function initialize!(
 )
     ocean_timestep!(progn, diagn, ocean_model, model)
 end
-    
+
 function ocean_timestep!(
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
@@ -180,7 +180,7 @@ To be created like
 
     ocean = SeasonalOceanClimatology(spectral_grid)
 
-and the ocean time is set with initialize!(model, time=time).
+and the ocean time is set with `initialize!(model, time=time)`.
 Fields and options are
 $(TYPEDFIELDS)"""
 @kwdef struct ConstantOceanClimatology <: AbstractOcean
@@ -208,8 +208,8 @@ end
 # nothing to initialize for model.ocean
 initialize!(::ConstantOceanClimatology, ::PrimitiveEquation) = nothing
 
-# initialize 
-function initialize!(   
+# initialize
+function initialize!(
     ocean::PrognosticVariablesOcean,
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
@@ -259,8 +259,8 @@ AquaPlanet(SG::SpectralGrid; kwargs...) = AquaPlanet{SG.NF}(; kwargs...)
 # nothing to initialize for AquaPlanet
 initialize!(::AquaPlanet, ::PrimitiveEquation) = nothing
 
-# initialize 
-function initialize!(   
+# initialize
+function initialize!(
     ocean::PrognosticVariablesOcean,
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
@@ -314,7 +314,7 @@ SlabOcean(SG::SpectralGrid; kwargs...) = SlabOcean{SG.NF}(; kwargs...)
 # nothing to initialize for SlabOcean
 initialize!(ocean_model::SlabOcean, model::PrimitiveEquation) = nothing
 
-# initialize 
+# initialize
 function initialize!(
     ocean::PrognosticVariablesOcean,
     progn::PrognosticVariables,

@@ -1,5 +1,5 @@
-"""Defines netCDF output for a specific variable, see `VorticityOutput` for details.
-Fields are $(TYPEDFIELDS)"""
+"""Defines netCDF output for a specific variable, see [`VorticityOutput`](@ref) for details.
+Fields are: $(TYPEDFIELDS)"""
 @kwdef mutable struct SoilTemperatureOutput{F} <: AbstractOutputVariable
     name::String = "st"
     unit::String = "degC"
@@ -16,8 +16,8 @@ end
 path(::SoilTemperatureOutput, simulation) =
     simulation.prognostic_variables.land.soil_temperature
 
-"""Defines netCDF output for a specific variable, see `VorticityOutput` for details.
-Fields are $(TYPEDFIELDS)"""
+"""Defines netCDF output for a specific variable, see [`VorticityOutput`](@ref) for details.
+Fields are: $(TYPEDFIELDS)"""
 @kwdef mutable struct SoilMoistureOutput <: AbstractOutputVariable
     name::String = "sm"
     unit::String = "1"
@@ -33,8 +33,8 @@ end
 path(::SoilMoistureOutput, simulation) =
     simulation.prognostic_variables.land.soil_moisture
 
-"""Defines netCDF output for a specific variable, see `VorticityOutput` for details.
-Fields are $(TYPEDFIELDS)"""
+"""Defines netCDF output for a specific variable, see [`VorticityOutput`](@ref) for details.
+Fields are: $(TYPEDFIELDS)"""
 @kwdef mutable struct SoilMoistureAvailabilityOutput <: AbstractOutputVariable
     name::String = "sma"
     unit::String = "1"
@@ -50,8 +50,8 @@ path(::SoilMoistureAvailabilityOutput, simulation) =
     simulation.diagnostic_variables.physics.land.soil_moisture_availability
 
 
-"""Defines netCDF output for a specific variable, see `VorticityOutput` for details.
-Fields are $(TYPEDFIELDS)"""
+"""Defines netCDF output for a specific variable, see [`VorticityOutput`](@ref) for details.
+Fields are: $(TYPEDFIELDS)"""
 @kwdef mutable struct LandSeaMaskOutput <: AbstractOutputVariable
     name::String = "lsm"
     unit::String = "1"
@@ -66,7 +66,7 @@ end
 path(::LandSeaMaskOutput, simulation) =
     simulation.model.land_sea_mask.mask
 
-    
+
 LandOutput() = (
     SoilTemperatureOutput(),
     SoilMoistureOutput(),

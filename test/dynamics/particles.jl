@@ -42,7 +42,7 @@ end
         end
     end
 
-    for NF in (Float32,Float64)
+    for NF in (Float32, Float64)
         for n in 1:1000
             # move particles 1-4x around the globe
             for k in 1:4
@@ -61,6 +61,11 @@ end
                 @test isapprox(p, mod(Particle(lon = p.lon - k*360, lat = p.lat - k*360, σ=p.σ)); atol, rtol)
             end
         end
+
+        # this test kept failing in CI
+        p = Particle{NF}(360.0,  0, 0)
+        @test mod(p) ≈ p
+        @test p ≈ mod(p)
     end
 end
 

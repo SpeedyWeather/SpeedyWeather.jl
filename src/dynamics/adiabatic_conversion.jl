@@ -3,13 +3,13 @@ abstract type AbstractAdiabaticConversion <: AbstractModelComponent end
 export AdiabaticConversion
 
 """Terms used to compute the adiabatic conversion term in the spectral model.
-Fields are $(TYPEDFIELDS)."""
+Fields are: $(TYPEDFIELDS)"""
 @kwdef struct AdiabaticConversion{NF, VectorType} <: AbstractAdiabaticConversion
     nlayers::Int
 
     "σ-related factor A needed for adiabatic conversion term"
     σ_lnp_A::VectorType = zeros(NF, nlayers)
-    
+
     "σ-related factor B needed for adiabatic conversion term"
     σ_lnp_B::VectorType = zeros(NF, nlayers)
 end
@@ -28,7 +28,7 @@ function initialize!(
     # precompute ln(σ_k+1/2) - ln(σ_k-1/2) but swap sign, include 1/Δσₖ
     σ_lnp_A .= log.(σ_levels_half[1:end-1]./σ_levels_half[2:end]) ./ σ_levels_thick
     σ_lnp_A[1] = 0  # the corresponding sum is 1:k-1 so 0 to replace log(0) from above
-    
+
     # precompute the αₖ = 1 - p_k-1/2/Δpₖ*log(p_k+1/2/p_k-1/2) term in σ coordinates
     σ_lnp_B .= 1 .- σ_levels_half[1:end-1]./σ_levels_thick .*
                     log.(σ_levels_half[2:end]./σ_levels_half[1:end-1])
