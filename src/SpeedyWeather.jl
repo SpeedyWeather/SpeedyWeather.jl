@@ -31,6 +31,10 @@ export DateTime, Millisecond, Second, Minute, Hour, Day, Week
 # export functions that have many cross-component methods
 export initialize!, finalize!
 
+# import device architectures
+include("Architectures.jl")
+using .Architectures
+
 # import utilities
 include("Utils/Utils.jl")
 using .Utils
@@ -83,10 +87,7 @@ import .SpeedyTransforms: prettymemory
 # to be defined in GeoMakie extension
 export globe
 function globe end
-
-# Utility for GPU / KernelAbstractions
-include("gpu.jl")                               
-
+                             
 # abstract types
 include("models/abstract_models.jl")
 include("dynamics/abstract_types.jl")

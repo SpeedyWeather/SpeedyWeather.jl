@@ -3,7 +3,7 @@ using KernelAbstractions
 @testset "KernelAbstractions tests" begin 
 
     # only on CPU (currently)
-    device_setup = SpeedyWeather.DeviceSetup(SpeedyWeather.CPU())
+    arch = SpeedyWeather.CPU()
 
     @kernel function mul_test!(A, @Const(B), @Const(C))
         i, j = @index(Global, NTuple)
@@ -14,7 +14,7 @@ using KernelAbstractions
     C = SpeedyWeather.DeviceArray(device_setup, rand(10, 10))
     A = zero(B)
 
-    SpeedyWeather.launch_kernel!(device_setup, mul_test!, size(B), A, B, C)
+    SpeedyWeather.launch!(arch, typeof(A), mul_test!, size(B), A, B, C)
 
     @test A ≈ B .* C 
 end 

@@ -5,30 +5,47 @@ import CUDA: CUDA, CUDAKernels, CuArray, CUFFT
 import AbstractFFTs
 using DocStringExtensions
 
+# DEVICE SETUP FOR CUDA
+# extend functions from main SpeedyWeather 
+ 
 # for RingGrids and LowerTriangularMatrices:
 # every Array needs this method to strip away the parameters
 RingGrids.nonparametric_type(::Type{<:CuArray}) = CuArray
 LowerTriangularMatrices.nonparametric_type(::Type{<:CuArray}) = CuArray
 
-SpeedyWeather.default_array_type(::Type{GPU}) = CuArray
+SpeedyWeather.array_type(::SpeedyWeather.GPU) = CuArray
+SpeedyWeather.array_type(::Type{SpeedyWeather.GPU}) = CuArray
 
-# DEVICE SETUP FOR CUDA
+SpeedyWeather.CUDAGPU() = SpeedyWeather.GPU(CUDA.CUDABackend(always_inline=true))
 
-"""$(TYPEDSIGNATURES)
-Return default used device for internal purposes, either `CPU` or `GPU` if a GPU is available."""
-Device() = CUDA.functional() ? GPU() : CPU()
-SpeedyWeather.DeviceSetup() = DeviceSetup(Device(), Device_KernelAbstractions(Device()), workgroup_size(Device()))
+const CUDAGPU = SpeedyWeather.GPU{<:CUDA.CUDABackend}
 
-"""$(TYPEDSIGNATURES)
-Return default used device for KernelAbstractions, either `CPU` or `CUDADevice` if a GPU is available."""
-SpeedyWeather.Device_KernelAbstractions() = CUDA.functional() ? KernelAbstractions.CUDADevice : KernelAbstractions.CPU
-SpeedyWeather.Device_KernelAbstractions(::GPU) = KernelAbstractions.CUDADevice
+function SpeedyWeather.GPU()
+    if CUDA.has_cuda_gpu()
+        return CUDAGPU()
+    else
+        msg = """We cannot make a GPU with the CUDA backend:
+                 a CUDA GPU was not found!"""
+        throw(ArgumentError(msg))
+    end
+end
 
-SpeedyWeather.DeviceArray(::GPU, x) = Adapt.adapt(CuArray, x)
+SpeedyWeather.array_type(::GPU) = CuArray
 
-"""$(TYPEDSIGNATURES)
-Returns a `CuArray` when `device<:GPU` is used. Doesn't uses `adapt`, therefore always returns CuArray."""
-SpeedyWeather.DeviceArrayNotAdapt(::GPU, x) = CuArray(x)
+SpeedyWeather.architecture(::CuArray) = CUDA
+
+SpeedyWeather.on_architecture(::CPU, a::CuArray) = Array(a)
+SpeedyWeather.on_architecture(::CUDAGPU, a::CuArray) = a
+SpeedyWeather.on_architecture(::CPU, a::SubArray{<:Any, <:Any, <:CuArray}) = Array(a)
+
+SpeedyWeather.on_architecture(::CUDAGPU, a::Array) = CuArray(a)
+SpeedyWeather.on_architecture(::CUDAGPU, a::BitArray) = CuArray(a)
+SpeedyWeather.on_architecture(::CUDAGPU, a::SubArray{<:Any, <:Any, <:CuArray}) = a
+SpeedyWeather.on_architecture(::CUDAGPU, a::SubArray{<:Any, <:Any, <:Array}) = CuArray(a)
+SpeedyWeather.on_architecture(::CUDAGPU, a::StepRangeLen) = a
+
+@inline SpeedyWeather.convert_to_device(::CUDAGPU, args) = CUDA.cudaconvert(args)
+@inline SpeedyWeather.convert_to_device(::CUDAGPU, args::Tuple) = map(CUDA.cudaconvert, args)
 
 include("spectral_transform.jl")
 include("fourier.jl")
