@@ -168,7 +168,7 @@ function SpectralTransform(
     # PLAN THE FFTs
     plan_FFTs!(
         rfft_plans, brfft_plans, rfft_plans_1D, brfft_plans_1D,
-        fake_grid_data, scratch_memory_north, rings, nlons
+        fake_grid_data, scratch_memory.north, rings, nlons
     )
     
     # PRECOMPUTE KJM INDICES FOR LEGENDRE TRANSFORM (0-based)
