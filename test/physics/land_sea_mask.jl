@@ -2,7 +2,7 @@
     @testset for Mask in (LandSeaMask, AquaPlanetMask, RockyPlanetMask)
         spectral_grid = SpectralGrid(trunc=31, nlayers=8)
         mask = Mask(spectral_grid)
-        model = PrimitiveWetModel(spectral_grid; land_sea_mask=mask)
+        model = PrimitiveWetModel(spectral_grid; land_sea_mask=mask, ocean=SlabOcean(spectral_grid))
         simulation = initialize!(model)
         model.feedback.verbose = false
         run!(simulation, period=Day(5))
