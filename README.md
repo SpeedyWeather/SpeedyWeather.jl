@@ -5,7 +5,7 @@
 [![status](https://joss.theoj.org/papers/515c81a4d6a69e31cc71ded65ac9c36a/status.svg)](https://joss.theoj.org/papers/515c81a4d6a69e31cc71ded65ac9c36a)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.6510139.svg)](https://doi.org/10.5281/zenodo.6510139)  
 [![docs](https://img.shields.io/badge/documentation-latest_release-blue.svg)](https://speedyweather.github.io/SpeedyWeather.jl/stable/)
-[![docs](https://img.shields.io/badge/documentation-main-blue.svg)](https://speedyweather.github.io/SpeedyWeather.jl/dev/)
+[![docs](https://img.shields.io/badge/documentation-main-blue.svg)](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/)
 
 SpeedyWeather.jl is a global atmospheric model with simple physics developed as a research playground
 with an everything-flexible attitude as long as it is speedy. It is easy to use and easy to extend, making 
