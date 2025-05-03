@@ -229,9 +229,9 @@ sums along the second dimension of the underlying vector, not of the full matrix
 
 `LowerTriangularArray`s are used to describe spherical harmonics. In that case each element
 represents the coefficient in fron of the respective harmonic describing a field on the sphere
-when transformed to grid space. We implement `rotate!` for `LowerTriangularArray` to
-rotate these coefficients in complex number space to represent a longitude rotation of
-the represented grid space field. For example start with
+when transformed to grid space. We implement `rotate!` (and `rotate` for an allocating version)
+for `LowerTriangularArray` to rotate these coefficients in complex number space to represent
+a longitude rotation of the represented grid space field. For example start with
 
 ```@repl LowerTriangularMatrices
 M = rand(LowerTriangularMatrix{ComplexF32}, 3, 3)
@@ -256,6 +256,28 @@ spherical harmonic, the zero-based column index). Rotating again by 315˚ yields
 
 ```@repl LowerTriangularMatrices
 rotate!(M, 315)
+```
+
+## Reverse of `LowerTriangularArray`
+
+A `LowerTriangularArray` is an `AbstractArray`, as such `reverse` and `reverse!` (in-place) are defined,
+reversing all elements of these arrays in the way how they are indexed with a single index.
+For `LowerTriangularArra` representing the coefficients of the spherical harmonics this does not make
+much sense, however, we describe here the functionality to `reverse` these arrays as they represent
+spherical harmonics, adding methods for `dims=:lat` for reversal in latitude direction and `dims=:lon` in
+longitude direction. Spherical harmonics are reversed in latitude by flipping the sign of the
+odd harmonics, which are the ones that are not symmetric around the equator. Spherical harmonics are
+reversed in longitude by taking the complex conjugate of every element as this flips the sign of the
+imaginary parts, which effectively mirrors the rotation of that harmonic around 0˚E.
+
+```@repl LowerTriangularMatrices
+reverse(M, dims=:lat)
+```
+
+and in longitude
+
+```@repl LowerTriangularMatrices
+reverse(M, dims=:lon)
 ```
 
 ## Broadcasting with `LowerTriangularArray`

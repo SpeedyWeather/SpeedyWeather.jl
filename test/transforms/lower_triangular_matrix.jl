@@ -753,3 +753,33 @@ end
         end
     end
 end
+
+@testset "Reverse LowerTriangularArray" begin
+    @testset for NF in (Float16, Float32, Float64)
+        @testset for trunc in (5, 10, 15)
+            @testset for k in 0:3
+                if k == 0
+                    L = rand(LowerTriangularArray{Complex{NF}}, trunc, trunc)
+                else
+                    L = rand(LowerTriangularArray{Complex{NF}}, trunc, trunc, k)
+                end
+
+                L2 = reverse(L, dims=:lat)
+                L3 = reverse(L, dims=:lon)
+
+                # reversing twice is back to the beginning
+                @test reverse(L2, dims=:lat) == L
+                @test reverse(L3, dims=:lon) == L
+
+                # order of reversals doesn't matter
+                @test reverse(L2, dims=:lon) == reverse(L3, dims=:lat)
+
+                # in place
+                reverse!(L2, dims=:lat)
+                reverse!(L3, dims=:lon)
+                @test L2 == L
+                @test L3 == L
+            end
+        end
+    end
+end
