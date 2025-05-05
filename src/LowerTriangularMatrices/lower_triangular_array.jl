@@ -188,6 +188,21 @@ only the lower triangle (the non-zero entries) of `L`."""
 @inline triangle_number(n::Integer) = n*(n+1)÷2
 nonzeros(m::Integer, n::Integer) = m*n - triangle_number(n-1)
 
+# To-Do this is assuming the +1 degree option, it's not universally true
+"""
+$(TYPEDSIGNATURES)
+range of the running indices lm in a l-column (degrees of spherical harmonics)
+given the column index m (order of harmonics) 
+"""
+get_lm_range(m, lmax) = ij2k(2*m - 1, m, lmax):ij2k(lmax+m, m, lmax)
+
+"""
+$(TYPEDSIGNATURES)
+range of the doubled running indices 2lm in a l-column (degrees of spherical harmonics)
+given the column index m (order of harmonics) 
+"""
+get_2lm_range(m, lmax) = 2*ij2k(2*m - 1, m, lmax)-1:2*ij2k(lmax+m, m, lmax)
+ 
 """
 $(TYPEDSIGNATURES)
 Converts the linear index `k` in the lower triangle into a pair `(i, j)` of indices 

@@ -17,4 +17,13 @@ import SpeedyWeather: on_architecture
     SpeedyWeather.launch!(arch, typeof(A), size(B), mul_test!, A, B, C)
 
     @test A ≈ B .* C 
+
+
+
+    @kernel ∇²_kernel!(∇²alms, alms, @Const(mode_func))
+        m, k = @index(Global, NTuple)
+
+
+        ∇²alms[lm, k] = mode_func(∇²alms[lm, k], alms[lm, k]*eigenvalues[l])
+    end 
 end 
