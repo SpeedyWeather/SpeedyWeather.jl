@@ -4,6 +4,7 @@ using SpeedyWeather
 import CUDA: CUDA, CUDAKernels, CuArray, CUFFT
 import AbstractFFTs
 using DocStringExtensions
+import SpeedyWeather: GPU
 
 # DEVICE SETUP FOR CUDA
 # extend functions from main SpeedyWeather 
@@ -13,12 +14,12 @@ using DocStringExtensions
 RingGrids.nonparametric_type(::Type{<:CuArray}) = CuArray
 LowerTriangularMatrices.nonparametric_type(::Type{<:CuArray}) = CuArray
 
-SpeedyWeather.array_type(::SpeedyWeather.GPU) = CuArray
-SpeedyWeather.array_type(::Type{SpeedyWeather.GPU}) = CuArray
+SpeedyWeather.array_type(::GPU) = CuArray
+SpeedyWeather.array_type(::Type{GPU}) = CuArray
 
-SpeedyWeather.CUDAGPU() = SpeedyWeather.GPU(CUDA.CUDABackend(always_inline=true))
+SpeedyWeather.CUDAGPU() = GPU(CUDA.CUDABackend(always_inline=true))
 
-const CUDAGPU = SpeedyWeather.GPU{<:CUDA.CUDABackend}
+const CUDAGPU = GPU{<:CUDA.CUDABackend}
 
 function SpeedyWeather.GPU()
     if CUDA.has_cuda_gpu()

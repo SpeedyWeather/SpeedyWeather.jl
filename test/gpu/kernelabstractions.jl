@@ -1,5 +1,5 @@
 using KernelAbstractions
-
+import SpeedyWeather: on_architecture
 @testset "KernelAbstractions tests" begin 
 
     # only on CPU (currently)
@@ -10,8 +10,8 @@ using KernelAbstractions
         A[i, j] = B[i, j] * C[i, j]
     end
     
-    B = SpeedyWeather.DeviceArray(device_setup, rand(10, 10))
-    C = SpeedyWeather.DeviceArray(device_setup, rand(10, 10))
+    B = on_architecture(arch, rand(10, 10))
+    C = on_architecture(arch, rand(10, 10))
     A = zero(B)
 
     SpeedyWeather.launch!(arch, typeof(A), mul_test!, size(B), A, B, C)
