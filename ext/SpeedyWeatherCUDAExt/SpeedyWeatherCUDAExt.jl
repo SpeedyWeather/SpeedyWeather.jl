@@ -31,8 +31,6 @@ function SpeedyWeather.GPU()
     end
 end
 
-SpeedyWeather.array_type(::GPU) = CuArray
-
 SpeedyWeather.architecture(::CuArray) = CUDA
 
 SpeedyWeather.on_architecture(::CPU, a::CuArray) = Array(a)
