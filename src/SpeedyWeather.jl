@@ -22,7 +22,6 @@ import NCDatasets: NCDatasets, NCDataset, defDim, defVar
 import JLD2: jldopen, jldsave, JLDFile 
 import CodecZlib
 import BitInformation: round, round!
-import UnicodePlots
 import ProgressMeter
 
 # to avoid a `using Dates` to pass on DateTime arguments

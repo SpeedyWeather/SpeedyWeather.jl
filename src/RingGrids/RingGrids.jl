@@ -1,8 +1,7 @@
 module RingGrids
 
-# DOCUMENTATION AND VISUALISATION
+# DOCUMENTATION
 using  DocStringExtensions
-import UnicodePlots
 
 # NUMERICS
 import Statistics: Statistics, mean
