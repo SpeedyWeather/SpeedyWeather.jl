@@ -3,7 +3,7 @@ module Architectures
     import KernelAbstractions 
 
     export AbstractArchitecture
-    export CPU, GPU
+    export CPU, GPU, CUDAGPU
     export array_type, on_architecture, architecture, device, convert_to_device
 
     """
