@@ -24,6 +24,9 @@ $(TYPEDFIELDS)
     "Adjust Δt_at_T31 with the output_dt to reach output_dt exactly in integer time steps"
     adjust_with_output::Bool = true
 
+    "Start integration with (1) Euler step with dt/2, (2) Leapfrog step with dt"
+    start_with_euler::Bool = true
+
     # NUMERICS
     "Robert (1966) time filter coefficeint to suppress comput. mode"
     robert_filter::NF = 0.1
@@ -77,7 +80,7 @@ function get_Δt_millisec(
         Δt_millisec_unadjusted = round(Int, 1000*Δt_at_trunc)
         Δt_ratio = Δt_millisec.value/Δt_millisec_unadjusted
 
-        if abs(Δt_ratio - 1) > 0.05     # only when +-5% changes
+        if abs(Δt_ratio - 1) > 0.05     # print info only when +-5% changes
             p = round(Int, (Δt_ratio - 1)*100)
             ps = p > 0 ? "+" : ""
             @info "Time step changed from $Δt_millisec_unadjusted to $Δt_millisec ($ps$p%) to match output frequency."
@@ -211,6 +214,27 @@ function leapfrog!(
 
     # evolve the random pattern in time
     random_process!(progn, model.random_process)
+    return nothing
+end
+
+function first_timesteps!(simulation::AbstractSimulation)
+    progn, diagn, model = unpack(simulation)
+    (; time_stepping) = model.simulation
+    (; Δt) = time_stepping
+
+    # decide whether to start with 1x Euler then 1x Leapfrog at Δt
+    if time_stepping.start_with_euler
+        first_timesteps!(progn, diagn, model)
+        time_stepping.start_with_euler = false      # disable for subsequent restarts
+        
+    else    # or continue with leaprog steps at 2Δt (e.g. restart)
+            # but make sure that implicit solver is initialized in that situation
+        initialize!(model.implicit, 2Δt, diagn, model)
+        later_timestep!(progn, diagn, model)
+    end
+
+    # only now initialise feedback for benchmark accuracy
+    initialize!(feedback, clock, model)
     return nothing
 end
 
@@ -367,25 +391,30 @@ possibly output and callbacks."""
 function timestep!(simulation::AbstractSimulation)
     progn, diagn, model = unpack(simulation)            # unpack the simulation
     (; clock) = progn
-    (; feedback, output) = model
-    (; Δt, Δt_millisec) = model.time_stepping
 
     if clock.timestep_counter == 0
-        first_timesteps!(progn, diagn, model)           # Euler forward then 1x leapfrog of Δt
-        initialize!(feedback, clock, model)             # only now initialise feedback for benchmark accuracy
-    
-    else                                                # 3rd and further timesteps after Δt as normal
-        timestep!(progn, diagn, 2Δt, model)             # calculate tendencies and leapfrog forward
-        timestep!(clock, Δt_millisec)                   # time of lf=2 and diagn after timestep!
-
-        progress!(feedback, progn)                      # updates the progress meter bar
-        output!(output, simulation)                     # do output?
-        callback!(model.callbacks, progn, diagn, model) # any callbacks?
+        first_timesteps!(simulation)
+    else
+        later_timestep!(simulation)
     end
 end
 
-"""
-$(TYPEDSIGNATURES)
+# 3rd and further timesteps after Δt as normal
+function later_timestep!(simulation::AbstractSimulation)
+    progn, diagn, model = unpack(simulation)
+    (; feedback, output) = model
+    (; Δt, Δt_millisec) = model.time_stepping
+
+    timestep!(progn, diagn, 2Δt, model)             # calculate tendencies and leapfrog forward
+    timestep!(clock, Δt_millisec)                   # time of lf=2 and diagn after timestep!
+
+    progress!(feedback, progn)                      # updates the progress meter bar
+    output!(output, simulation)                     # do output?
+    callback!(model.callbacks, progn, diagn, model) # any callbacks?
+    return nothing
+end
+
+"""$(TYPEDSIGNATURES)
 Main time loop that loops over all time steps."""
 function time_stepping!(simulation::AbstractSimulation)          
     (; clock) = simulation.prognostic_variables
