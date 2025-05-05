@@ -17,7 +17,9 @@ on `grid` that excludes peripheral nodes.
 The `workgroup` is a tuple specifying the threads per block in each
 dimension. The `worksize` specifies the range of the loop in each dimension.
 """
-function work_layout(data_type, worksize::NTuple{N, Int}) where N
+function work_layout(dims_type, worksize::NTuple{N, Int}) where N
+
+    # To-Do: introduce `dims_type` e.g: `:mk` for kernel over m, k or `:lmk` for kernel over lm, k, ....
     workgroup = heuristic_workgroup(worksize...)
     return workgroup, worksize
 end
@@ -31,13 +33,13 @@ the architecture `arch`.
 ============
 
 - `arch`: The architecture on which the kernel will be launched.
-- `data_type`: The data_type on which the kernel will be executed (TO-DO: in the future we might distinguish LTA/RingGrids here)
-- `workspec`: The workspec that defines the work distribution.
+- `dims_type`: The dimensions on which the kernel will be executed (TO-DO: in the future we might distinguish LTA/RingGrids here)
+- `worksize`: The size that defines the work distribution.
 - `kernel!`: The kernel function to be executed.
 """
-@inline function configure_kernel(arch, data_type, workspec, kernel!)
+@inline function configure_kernel(arch, dims_type, worksize, kernel!)
 
-    workgroup, worksize = work_layout(data_type, workspec)
+    workgroup, worksize = work_layout(dims_type, worksize)
 
     dev  = device(arch)
     loop = kernel!(dev, workgroup, worksize)
@@ -46,10 +48,10 @@ the architecture `arch`.
 end
   
 """
-launch!(arch, data_type, workspec, kernel!, kernel_args...)
+launch!(arch, dims_type, worksize, kernel!, kernel_args...)
 
 Launches `kernel!` with arguments `kernel_args`
-over the `dims` of `data_type` on the architecture `arch`.
+over the `dims_type` with `worksize` on the architecture `arch`.
 Kernels run on the default stream.
 
 See [configure_kernel](@ref) for more information.
@@ -57,9 +59,9 @@ See [configure_kernel](@ref) for more information.
 @inline launch!(args...; kwargs...) = _launch!(args...; kwargs...)
 
 # Inner interface
-@inline function _launch!(arch, data_type, workspec, kernel!, kernel_args...)
+@inline function _launch!(arch, dims_type, worksize, kernel!, kernel_args...)
 
-    loop!, worksize = configure_kernel(arch, data_type, workspec, kernel!)
+    loop!, worksize = configure_kernel(arch, dims_type, worksize, kernel!)
 
     # Don't launch kernels with no size
     haswork = if worksize isa Number
