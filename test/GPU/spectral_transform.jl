@@ -19,7 +19,7 @@ function get_test_data(; trunc, nlayers, Grid, NF)
     # We use dealiasing=3 to ensure that the transform is exact for both 
     # Clenshaw and Gaussian grids
     spectral_grid_cpu = SpectralGrid(; NF, trunc, nlayers, Grid, dealiasing=3)
-    spectral_grid_gpu = SpectralGrid(; NF, trunc, nlayers, Grid, device=SpeedyWeather.GPU(), dealiasing=3)
+    spectral_grid_gpu = SpectralGrid(; NF, trunc, nlayers, Grid, architecture=SpeedyWeather.GPU(), dealiasing=3)
     
     S_cpu = SpectralTransform(spectral_grid_cpu)
     S_gpu = SpectralTransform(spectral_grid_gpu)
