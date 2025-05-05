@@ -1,5 +1,8 @@
+import ..device
+
 # Support for 1D, To-DO: do we need higher dim workgroups like Oceananigans? Not in one horizontal level (because LTA/Rings), but maybe when we include vertical?
 heuristic_workgroup(Wx) = min(Wx, 256)
+heuristic_workgroup(Wx, Wy) = min(Wx*Wy, 256)
 
 # TO-DO: in the future we might want to distinguish between LTA/RingGrids/different grids in some way
 function work_layout(data_type, worksize::NTuple{N, Int}) where N
@@ -24,13 +27,8 @@ the architecture `arch`.
 
     workgroup, worksize = work_layout(data_type, workspec)
 
-    dev  = Architectures.device(arch)
+    dev  = device(arch)
     loop = kernel!(dev, workgroup, worksize)
-
-    # Map out the function to use active_cells_map as an index map
-    if !isnothing(active_cells_map)
-        loop = mapped_kernel(loop, dev, active_cells_map)
-    end
 
     return loop, worksize
 end

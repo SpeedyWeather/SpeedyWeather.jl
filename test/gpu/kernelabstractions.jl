@@ -14,7 +14,7 @@ import SpeedyWeather: on_architecture
     C = on_architecture(arch, rand(10, 10))
     A = zero(B)
 
-    SpeedyWeather.launch!(arch, typeof(A), mul_test!, size(B), A, B, C)
+    SpeedyWeather.launch!(arch, typeof(A), size(B), mul_test!, A, B, C)
 
     @test A ≈ B .* C 
 end 
