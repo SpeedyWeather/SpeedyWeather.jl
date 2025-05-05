@@ -18,7 +18,7 @@ orography = ZonalRidge(spectral_grid)
 initial_conditions = InitialConditions(
     vordiv = ZonalWind(),
     temp = JablonowskiTemperature(),
-    pres = ZeroInitially())
+    pres = ConstantPressure())
 
 model = PrimitiveDryModel(spectral_grid; orography, initial_conditions, physics=false)
 simulation = initialize!(model)
