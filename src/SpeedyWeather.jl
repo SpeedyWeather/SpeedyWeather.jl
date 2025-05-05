@@ -57,7 +57,7 @@ export  FullClenshawGrid, FullClenshawArray,
         HEALPixGrid, HEALPixArray,
         OctaHEALPixGrid, OctaHEALPixArray,
         OctaminimalGaussianGrid, OctaminimalGaussianArray,
-        eachring, eachgrid, plot
+        eachring, eachgrid
 export  AnvilInterpolator
 export  spherical_distance
 export  zonal_mean
@@ -154,7 +154,6 @@ include("output/schedule.jl")
 include("output/feedback.jl")
 include("output/netcdf_output.jl")
 include("output/restart_file.jl")
-include("output/plot.jl")
 include("output/callbacks.jl")
 include("output/particle_tracker.jl")
 include("output/jld2_output.jl")

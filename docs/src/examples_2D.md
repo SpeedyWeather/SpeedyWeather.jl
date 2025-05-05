@@ -60,16 +60,14 @@ model = BarotropicModel(spectral_grid; initial_conditions, planet=still_earth, f
 nothing # hide
 ```
 The `model` contains all the parameters, but isn't initialized yet, which we can do
-with and then run it. The `run!` command will always return a unicode plot
-(via [UnicodePlots.jl](https://github.com/JuliaPlots/UnicodePlots.jl))
-of the surface relative vorticity. This is just to get a quick idea of what was simulated.
-The resolution of the plot is not necessarily representative.
+with and then run it.
+
 ```@example barotropic_setup
 simulation = initialize!(model)
 run!(simulation, period=Day(20))
 ```
 
-Woohoo! Something is moving! You could pick up where this simulation stopped by simply
+Woohoo! You could pick up where this simulation stopped by simply
 doing `run!(simulation, period=Day(50))` again. We didn't store any output, which
 you can do by `run!(simulation, output=true)`, which will switch on NetCDF output
 with default settings. More options on output in [NetCDF output](@ref).
@@ -123,7 +121,7 @@ data is stored in the folder `/run_0001`. In general we can check this also via
 ```@example galewsky_setup
 id = model.output.id
 ```
-So let's plot that data properly (and not just using UnicodePlots.jl). `$id` in the following just means
+So let's plot that data. `$id` in the following just means
 that the string is interpolated to `run_0001` if this is the first unnamed run in your folder.
 ```@example galewsky_setup
 using NCDatasets
@@ -145,7 +143,6 @@ nothing # hide
 ```
 ![Galewsky jet](galewsky0.png)
 
-You see that in comparison the unicode plot heavily coarse-grains the simulation, well it's unicode after all!
 Here, we have unpacked the netCDF file using [NCDatasets.jl](https://github.com/Alexander-Barth/NCDatasets.jl)
 and then plotted via `heatmap(lon, lat, vor)`. While you can do that to give you more control
 on the plotting, SpeedyWeather.jl also defines an extension for Makie.jl, see [Extensions](@ref).
@@ -164,7 +161,7 @@ heatmap(vor_grid, title="Relative vorticity [1/s]")
 save("galewsky1.png", ans) # hide
 nothing # hide
 ```
-![Galewsky jet pyplot1](galewsky1.png)
+![Galewsky jet plot1](galewsky1.png)
 
 Note that here you need to know which grid the data comes on (an error is thrown if `FullGaussianGrid(vor)`
 is not size compatible). By default the output will be on the FullGaussianGrid, but if you
@@ -261,7 +258,7 @@ heatmap(u, title="Zonal wind [m/s]")
 save("polar_jets.png", ans) # hide
 nothing # hide
 ```
-![Polar jets pyplot](polar_jets.png)
+![Polar jets plot](polar_jets.png)
 
 
 ## Gravity waves on the sphere
@@ -323,7 +320,7 @@ heatmap(h, title="Dynamic layer thickness h", colormap=:oslo)
 save("gravity_waves.png", ans) # hide
 nothing # hide
 ```
-![Gravity waves pyplot](gravity_waves.png)
+![Gravity waves plot](gravity_waves.png)
 
 Mountains like the Himalayas or the Andes are quite obvious because the atmospheric layer
 is much thinner there. The pressure gradient is relative to ``z=0`` so in a fluid
