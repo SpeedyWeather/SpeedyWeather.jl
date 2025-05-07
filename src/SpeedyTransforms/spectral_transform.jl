@@ -8,14 +8,20 @@ to perform a spectral transform. Fields are
 $(TYPEDFIELDS)"""
 struct SpectralTransform{
     NF,
+    AR,                         # <: AbstractArchitecture
     ArrayType,                  # non-parametric array type
     VectorType,                 # <: ArrayType{NF, 1},
+    ArrayTypeIntMatrix,         # <: ArrayType{Int, 2},
     VectorComplexType,          # <: ArrayType{Complex{NF}, 1},
     MatrixComplexType,          # <: ArrayType{Complex{NF}, 2},
     ArrayComplexType,           # <: ArrayType{Complex{NF}, 3},
     LowerTriangularMatrixType,  # <: LowerTriangularArray{NF, 1, ArrayType{NF}},
     LowerTriangularArrayType,   # <: LowerTriangularArray{NF, 2, ArrayType{NF}},
 } <: AbstractSpectralTransform
+
+    # Architecture
+    architecture::AR
+
     # GRID
     Grid::Type{<:AbstractGridArray} # grid type used
     nlat_half::Int                  # resolution parameter of grid (# of latitudes on one hemisphere, Eq incl)
@@ -61,8 +67,9 @@ struct SpectralTransform{
     scratch_memory_column_north::VectorComplexType  # scratch memory for vertically batched Legendre transform
     scratch_memory_column_south::VectorComplexType  # scratch memory for vertically batched Legendre transform
 
-    jm_index_size::Int                              # number of indices per layer in kjm_indices
-    kjm_indices::ArrayType                          # precomputed kjm loop indices map
+    jm_index_size::Int                             # number of indices per layer in kjm_indices
+    kjm_indices::ArrayTypeIntMatrix                # precomputed kjm loop indices map for legendre transform
+    lm2ij_indices::ArrayTypeIntMatrix              # precomputed lm2ij indices for kernels
 
     # SOLID ANGLES ΔΩ FOR QUADRATURE
     # (integration for the Legendre polynomials, extra normalisation of π/nlat included)
@@ -105,6 +112,7 @@ function SpectralTransform(
     ArrayType::Type{<:AbstractArray} = Array,       # Array type used for spectral coefficients (can be parametric)
     nlayers::Integer = DEFAULT_NLAYERS,             # number of layers in the vertical (for scratch memory size)
     LegendreShortcut::Type{<:AbstractLegendreShortcut} = LegendreShortcutLinear,   # shorten Legendre loop over order m
+    architecture::AbstractArchitecture = architecture(ArrayType), # architecture that kernels are launched 
 ) where NF
 
     Grid = RingGrids.nonparametric_type(Grid)               # always use nonparametric concrete type
@@ -187,6 +195,17 @@ function SpectralTransform(
             end
         end
     end
+  
+    # PRECOMPUTE indices for GPU kernels
+    # lm is the single (flat) index 
+    # i, j are the matrix indices 
+    LM = LowerTriangularMatrices.triangle_number(lmax+1)
+    # LM might be one element larger than the number of saved elements in case one_more_degree==true
+    # -> don't use this as a bound for iterations
+    lm2ij_indices = zeros(Int, LM, 2)
+    for lm in 1:LM
+        lm2ij_indices[lm,:] .= LowerTriangularMatrices.k2ij(lm, lmax+1)
+    end 
 
     # SOLID ANGLES WITH QUADRATURE WEIGHTS (Gaussian, Clenshaw-Curtis, or Riemann depending on grid)
     # solid angles are ΔΩ = sinθ Δθ Δϕ for every grid point with
@@ -245,15 +264,17 @@ function SpectralTransform(
 
     return SpectralTransform{
         NF,
+        typeof(architecture),
         ArrayType_,
         ArrayType_{NF, 1},
+        ArrayType_{Int, 2},
         ArrayType_{Complex{NF}, 1},
         ArrayType_{Complex{NF}, 2},
         ArrayType_{Complex{NF}, 3},
         LowerTriangularArray{NF, 1, ArrayType_{NF, 1}},
         LowerTriangularArray{NF, 2, ArrayType_{NF, 2}},
     }(
-        Grid, nlat_half, nlayers,
+        architecture, Grid, nlat_half, nlayers,
         lmax, mmax, nfreq_max, 
         LegendreShortcut, mmax_truncation,
         nlon_max, nlons, nlat,
@@ -264,7 +285,7 @@ function SpectralTransform(
         scratch_memory_north, scratch_memory_south,
         scratch_memory_grid, scratch_memory_spec,
         scratch_memory_column_north, scratch_memory_column_south,
-        jm_index_size, kjm_indices,
+        jm_index_size, kjm_indices, lm2ij_indices,
         solid_angles, grad_y1, grad_y2,
         grad_y_vordiv1, grad_y_vordiv2, vordiv_to_uv_x,
         vordiv_to_uv1, vordiv_to_uv2,

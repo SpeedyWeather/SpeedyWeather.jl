@@ -44,6 +44,7 @@ module Architectures
     architecture() = nothing
     architecture(::Number) = nothing
     architecture(::Array) = CPU()
+    architecture(::Type{<:Array}) = CPU()
     architecture(a::SubArray) = architecture(parent(a))
 
     array_type(::CPU) = Array

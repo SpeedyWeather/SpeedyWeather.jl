@@ -188,7 +188,6 @@ only the lower triangle (the non-zero entries) of `L`."""
 @inline triangle_number(n::Integer) = n*(n+1)÷2
 nonzeros(m::Integer, n::Integer) = m*n - triangle_number(n-1)
 
-# To-Do this is assuming the +1 degree option, it's not universally true
 """
 $(TYPEDSIGNATURES)
 range of the running indices lm in a l-column (degrees of spherical harmonics)

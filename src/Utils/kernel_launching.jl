@@ -17,12 +17,21 @@ on `grid` that excludes peripheral nodes.
 The `workgroup` is a tuple specifying the threads per block in each
 dimension. The `worksize` specifies the range of the loop in each dimension.
 """
-function work_layout(dims_type, worksize::NTuple{N, Int}) where N
+function work_layout(dims_type::Symbol, worksize::NTuple{N, Int}) where N
 
     # To-Do: introduce `dims_type` e.g: `:mk` for kernel over m, k or `:lmk` for kernel over lm, k, ....
-    workgroup = heuristic_workgroup(worksize...)
+
+    if dims_type == :lmk # kernel over sph number 'm' and layers 
+        # compare how jack has done that in 
+        # number of (M, k) items?
+        workgroup = heuristic_workgroup(worksize...)
+    else 
+        error("Not yet implemented")
+    end 
     return workgroup, worksize
 end
+
+
 
 """
 $(TYPEDSIGNATURES)
