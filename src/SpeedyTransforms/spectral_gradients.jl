@@ -103,6 +103,76 @@ end
 
 """
 $(TYPEDSIGNATURES)
+Divergence of a vector `u, v` written into `div`, `div = ∇⋅(u, v)`. 
+`u, v` are expected to have a 1/coslat-scaling included, otherwise `div` is scaled.
+Acts on the unit sphere, i.e. it omits 1/radius scaling as all gradient operators,
+unless the `radius` keyword argument is provided. `flipsign` option calculates -∇⋅(u, v) instead.
+`add` option calculates `div += ∇⋅(u, v)` instead. `flipsign` and `add` can be combined.
+This functions only creates the kernel and calls the generic divergence function _divergence! subsequently."""
+function divergence_KA!(
+    div::LowerTriangularArray,
+    u::LowerTriangularArray,
+    v::LowerTriangularArray,
+    S::SpectralTransform;
+    flipsign::Bool=false,
+    add::Bool=false,
+    kwargs...,
+)
+    # = -(∂λ + ∂θ) or (∂λ + ∂θ), adding or overwriting the output div
+    kernel = flipsign ? (add ? (o, a, b, c) -> o-(a-b+c) : (o, a, b, c) -> -(a-b+c)) :
+                        (add ? (o, a, b, c) ->  o+(a-b+c) : (o, a, b, c) -> a-b+c)    
+    _divergence_KA!(kernel, div, u, v, S; kwargs...)
+end
+
+function _divergence_KA!(  
+    kernel,
+    div::LowerTriangularArray,
+    u::LowerTriangularArray,
+    v::LowerTriangularArray,
+    S::SpectralTransform;
+    radius = DEFAULT_RADIUS,
+)
+    (; grad_y_vordiv1, grad_y_vordiv2, lm2ij_indices) = S
+  
+    @boundscheck ismatching(S, div) || throw(DimensionMismatch(S, div))
+
+    launch!(S.architecture, :lmk, size(div), _divergence_kernel!, kernel, div, u, v, grad_y_vordiv1, grad_y_vordiv2, lm2ij_indices)
+
+    # /radius scaling if not unit sphere
+    if radius != 1
+        div .*= inv(radius)
+    end
+
+    return div
+end
+
+@kernel function _divergence_kernel!(kernel_func, div, u, v, @Const(grad_y_vordiv1), @Const(grad_y_vordiv2), @Const(lm2ij_indices))
+
+    I = @index(Global, Cartesian)
+    lm = I[1]
+    l = lm2ij_indices[lm, 1]
+    m = lm2ij_indices[lm, 2]
+
+    if l==size(div, 1, as=Matrix) # Last row, only vectors make use of the lmax+1 row, set to zero for scalars div, curl
+        div[I] = 0
+    else 
+        ∂u∂λ  = ((m-1)*im)*u[I]
+
+        # To-Do: converting back and forth to CartesianIndex isn't optimal
+        # so far it's the only possibilty I found to do it agnostic of the dimension
+        # otherwise we could also have a seperate kernel for 2D, 3D, 4D 
+        # the current version is slower than necessary due to this 
+        
+        # distinguish DIAGONAL (to avoid access to v[l-1, m])
+        ∂v∂θ1 = l==m ? 0 : grad_y_vordiv1[lm] * v[CartesianIndex(lm-1,I. I[2:end]...)] 
+
+        ∂v∂θ2 = grad_y_vordiv2[lm] * v[CartesianIndex(lm+1, I.I[2:end]...)]  
+        div[I] = kernel_func(div[I], ∂u∂λ, ∂v∂θ1, ∂v∂θ2)
+    end 
+end 
+
+"""
+$(TYPEDSIGNATURES)
 Divergence (∇⋅) of two vector components `u, v` which need to have size (n+1)xn,
 the last row will be set to zero in the returned `LowerTriangularMatrix`.
 This function requires both `u, v` to be transforms of fields that are scaled with
@@ -461,10 +531,12 @@ end
 
 @kernel function ∇²_kernel!(∇²alms, alms, @Const(eigenvalues), kernel_func, @Const(lm2ij_indices))
 
-    lm, k = @index(Global, NTuple)
-    l = lm2ij_indices[lm,1]
+    I = @index(Global, Cartesian) # I[1] == lm, I[2] == k
+                                  # we use cartesian index instead of NTuple here
+                                  # because this works for 2D and 3D matrices
+    l = lm2ij_indices[I[1],1]
 
-    ∇²alms[lm, k] = kernel_func(∇²alms[lm, k], alms[lm, k]*eigenvalues[l])
+    ∇²alms[I] = kernel_func(∇²alms[I], alms[I]*eigenvalues[l])
 end 
 
 """
