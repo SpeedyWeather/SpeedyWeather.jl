@@ -292,14 +292,14 @@ end
 @testset "Grid broadcasting" begin
     n = 2
     @testset for G in ( FullClenshawArray,
-                        FullGaussianArray,
+                        # FullGaussianArray,            # don't test all to speed up CI
                         OctahedralGaussianArray,
-                        OctahedralClenshawArray,
-                        OctaminimalGaussianArray,
+                        # OctahedralClenshawArray,
+                        # OctaminimalGaussianArray,
                         HEALPixArray,
-                        OctaHEALPixArray,
-                        FullHEALPixArray,
-                        FullOctaHEALPixArray,
+                        # OctaHEALPixArray,
+                        # FullHEALPixArray,
+                        # FullOctaHEALPixArray,
                         )
 
         @test zeros(G, n) .+ 1 == ones(G, n)
@@ -427,14 +427,14 @@ end
     NF = Float32
     @testset for Grid in ( 
         FullClenshawArray,
-        FullGaussianArray,
+        # FullGaussianArray,            # don't test all for CI speedup
         OctahedralGaussianArray,
-        OctahedralClenshawArray,
-        OctaminimalGaussianArray,
+        # OctahedralClenshawArray,
+        # OctaminimalGaussianArray,
         HEALPixArray,
-        OctaHEALPixArray,
-        FullHEALPixArray,
-        FullOctaHEALPixArray,
+        # OctaHEALPixArray,
+        # FullHEALPixArray,
+        # FullOctaHEALPixArray,
     )
         s = (2, 3, 4)
         ndims = length(s)

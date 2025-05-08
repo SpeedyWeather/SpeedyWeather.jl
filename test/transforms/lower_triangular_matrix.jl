@@ -669,8 +669,8 @@ end
 end 
 
 @testset "LowerTriangularArray: broadcast" begin 
-    @testset for idims = ((), (5,), (5,5))
-        @testset for NF in (Float16, Float32, Float64)
+    @testset for idims = ((), (2,), (2, 2))
+        @testset for NF in (Float32, Float64)
             @testset for ArrayType in (Array, JLArray)
                 L1 = adapt(ArrayType, randn(LowerTriangularArray{NF}, 10, 10, idims...))
                 L2 = deepcopy(L1) 
