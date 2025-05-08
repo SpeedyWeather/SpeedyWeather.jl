@@ -56,10 +56,13 @@ map = transform(alms)
 ```
 By default, the `transforms` transforms onto a [`FullGaussianGrid`](@ref FullGaussianGrid) unravelled here
 into a vector west to east, starting at the prime meridian, then north to south, see [RingGrids](@ref).
-We can visualize `map` quickly with a UnicodePlot via `plot` (see [Visualising RingGrid data](@ref))
+We can visualize `map` quickly with a UnicodePlot via `heatmap` (see [Visualising RingGrid data](@ref)),
+or alternatively in higher quality after `using CairoMakie` or `usin GLMakie`, see
+[Visualisation via Makie](@ref) too
+
 ```@example speedytransforms
-import SpeedyWeather.RingGrids: plot    # not necessary when `using SpeedyWeather`
-plot(map)
+using UnicodePlots
+heatmap(map)
 ```
 Yay! This is the what the ``l=m=1`` spherical harmonic is supposed to look like!
 Now let's go back to spectral space with `transform`
@@ -83,7 +86,7 @@ While the default grid for [SpeedyTransforms](@ref) is the [`FullGaussianGrid`](
 we can transform onto other grids by specifying `Grid` too
 ```@example speedytransforms
 map = transform(alms, Grid=HEALPixGrid)
-plot(map)
+heatmap(map)
 ```
 which, if transformed back, however, can yield a larger transform error as discussed above
 ```@example speedytransforms
@@ -142,7 +145,7 @@ alms = zeros(LowerTriangularMatrix{ComplexF64}, 7, 6)     # spectral coefficient
 alms[2, 2] = 1                                            # only l=1, m=1 harmonic
 
 map = transform(alms, S)
-plot(map)
+heatmap(map)
 ```
 
 Yay, this is again the ``l=m=1`` harmonic, but this time on a slightly higher resolution

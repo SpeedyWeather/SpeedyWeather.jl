@@ -69,18 +69,21 @@ and any element type `T` can be used for `OctahedralGaussianGrid{T}` and similar
 ## Visualising RingGrid data
 
 As only the full grids can be reshaped into a matrix, the underlying data structure of any `AbstractGrid`
-is a vector. As shown in the examples above, one can therefore inspect the data as if it was a vector.
+is a vector for consistency. As shown in the examples above, one can therefore inspect the data as if it was a vector.
 But as that data has, through its `<:AbstractGrid` type, all the geometric information available to plot
-it on a map, RingGrids also exports `plot` function,
-based on [UnicodePlots](https://github.com/JuliaPlots/UnicodePlots.jl)' `heatmap`.
+it on a map, SpeedyWeather also implements extensions for [Makie's](https://github.com/MakieOrg/Makie.jl)
+and [UnicodePlots's](https://github.com/JuliaPlots/UnicodePlots.jl)' `heatmap`, also see
+[Visualisation via Makie](@ref) and [Visualisation via UnicodePlots](@ref).
+
 ```@example ringgrids
+using CairoMakie    # triggers loading of Makie extension, or do using UnicodePlots instead!
 nlat_half = 24
 grid = randn(OctahedralGaussianGrid, nlat_half)
-RingGrids.plot(grid)
+heatmap(grid)
 ```
-(Note that to skip the `RingGrids.` in the last line you can do `import SpeedyWeather.RingGrids: plot`,
-`import SpeedyWeather: plot` or simply `using SpeedyWeather`. It's just that `LowerTriangularMatrices`
-also defines `plot` which otherwise causes naming conflicts.)
+
+Reduced grids are interpolated to the corresponding full grids so that they can be visualised as
+as matrix.
 
 ## Indexing RingGrids
 
