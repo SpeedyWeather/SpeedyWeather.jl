@@ -62,8 +62,6 @@ module Architectures
     on_architecture(::CPU, a::BitArray) = a
     on_architecture(::CPU, a::SubArray{<:Any, <:Any, <:Array}) = a
     on_architecture(::CPU, a::StepRangeLen) = a
-    on_architecture(arch::AbstractArchitecture, a::LowerTriangularArray) = adapt(array_type(arch), a)
-    on_architecture(arch::AbstractArchitecture, a::AbstractGridArray) = adapt(array_type(arch), a)
 
     # Convert arguments to GPU-compatible types
     @inline convert_to_device(arch, args)  = args

@@ -655,3 +655,5 @@ end
 
 Adapt.adapt_structure(to, L::LowerTriangularArray) =
     LowerTriangularArray(Adapt.adapt(to, L.data), L.m, L.n)
+
+on_architecture(arch::AbstractArchitecture, a::LowerTriangularArray) = Adapt.adapt(array_type(arch), a)

@@ -35,6 +35,9 @@ export initialize!, finalize!
 include("Architectures.jl")
 using .Architectures
 
+# export device functions 
+export on_architecture, architecture
+
 # import utilities
 include("Utils/Utils.jl")
 using .Utils

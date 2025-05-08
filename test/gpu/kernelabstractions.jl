@@ -4,13 +4,12 @@ import SpeedyWeather: on_architecture
 
     # To-Do write tests for each type of dims_type in the kernel launching util, 
     # the tests currently below will be removed when the KA becomes the only one
-    using SpeedyWeather, BenchmarkTools, Test
-
-    using CUDA 
+    using SpeedyWeather, BenchmarkTools, Test, CUDA
+  
     if CUDA.functional()
-        arch = CUDAGPU()
+        arch = SpeedyWeather.CUDAGPU()
     else 
-        arch = CPU()
+        arch = SpeedyWeather.CPU()
     end 
 
 

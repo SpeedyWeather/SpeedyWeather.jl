@@ -7,6 +7,7 @@ using DocStringExtensions
 import Adapt
 import GPUArrays
 import KernelAbstractions
+import ..Architectures: AbstractArchitecture, on_architecture, array_type
 
 # NUMERICS
 import LinearAlgebra: tril!
