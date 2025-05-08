@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Remove DocsPreviewCleanup workflow [#730](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/730)
 - Move UnicodePlots to extension [#728](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/728)
 - Baroclinic wave initial conditions ZonalWind divergence free [#729](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/729)
 - reverse and reverse! for LowerTriangularArray, in longitude or latitude [#720](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/720)
