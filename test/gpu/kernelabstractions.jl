@@ -5,10 +5,19 @@ import SpeedyWeather: on_architecture
     # To-Do write tests for each type of dims_type in the kernel launching util, 
     # the tests currently below will be removed when the KA becomes the only one
     using SpeedyWeather, BenchmarkTools, Test
+
+    using CUDA 
+    if CUDA.functional()
+        arch = CUDAGPU()
+    else 
+        arch = CPU()
+    end 
+
+
     # ∇²!
 
     NF= Float32
-    alms = rand(LowerTriangularArray{Complex{NF}},33, 32, 8)
+    alms = on_architecture(arch, rand(LowerTriangularArray{Complex{NF}},33, 32, 8))
     #alms = rand(LowerTriangularArray{Complex{NF}},33, 32)
 
     alms2 = copy(alms)
@@ -25,8 +34,8 @@ import SpeedyWeather: on_architecture
 
     # Divergence
 
-    alms = rand(LowerTriangularArray{Complex{NF}},33, 32, 8)
-    alms2 = rand(LowerTriangularArray{Complex{NF}},33, 32, 8)
+    alms = on_architecture(arch, rand(LowerTriangularArray{Complex{NF}},33, 32, 8))
+    alms2 = on_architecture(arch, rand(LowerTriangularArray{Complex{NF}},33, 32, 8))
 
     alms3 = copy(alms)
     alms4 = copy(alms)
@@ -38,7 +47,7 @@ import SpeedyWeather: on_architecture
     @test alms4 ≈ alms3
 
     # ∇! 
-    alms = rand(LowerTriangularArray{Complex{NF}},33, 32, 8)
+    alms = on_architecture(arch, rand(LowerTriangularArray{Complex{NF}},33, 32, 8))
     alms1 = copy(alms)
     alms2 = copy(alms)
     alms3 = copy(alms)

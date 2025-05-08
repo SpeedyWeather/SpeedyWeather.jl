@@ -2,8 +2,8 @@ module SpeedyWeatherCUDAExt
 
 using SpeedyWeather
 import CUDA: CUDA, CUDAKernels, CuArray, CUFFT
-import AbstractFFTs
-using DocStringExtensions
+import SpeedyWeather.AbstractFFTs
+using SpeedyWeather.DocStringExtensions
 import SpeedyWeather: GPU, CPU
 
 # DEVICE SETUP FOR CUDA
