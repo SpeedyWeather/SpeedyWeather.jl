@@ -150,6 +150,10 @@ end
 
     I = @index(Global, Cartesian)
     lm = I[1]
+
+    # To-Do: not really ideal, but I don't know how to do it better right now (except for two completely different kernels)
+    k = ndims(div) == 1 ? CartesianIndex() : I[2]
+
     l = lm2ij_indices[lm, 1]
     m = lm2ij_indices[lm, 2]
 
@@ -158,15 +162,10 @@ end
     else 
         ∂u∂λ  = ((m-1)*im)*u[I]
 
-        # To-Do: converting back and forth to CartesianIndex isn't optimal
-        # so far it's the only possibilty I found to do it agnostic of the dimension
-        # otherwise we could also have a seperate kernel for 2D, 3D, 4D 
-        # the current version is slower than necessary due to this 
-        
         # distinguish DIAGONAL (to avoid access to v[l-1, m])
-        ∂v∂θ1 = l==m ? 0 : grad_y_vordiv1[lm] * v[CartesianIndex(lm-1,I. I[2:end]...)] 
+        ∂v∂θ1 = l==m ? 0 : grad_y_vordiv1[lm] * v[lm-1, k] 
 
-        ∂v∂θ2 = grad_y_vordiv2[lm] * v[CartesianIndex(lm+1, I.I[2:end]...)]  
+        ∂v∂θ2 = grad_y_vordiv2[lm] * v[lm+1, k]  
         div[I] = kernel_func(div[I], ∂u∂λ, ∂v∂θ1, ∂v∂θ2)
     end 
 end 
