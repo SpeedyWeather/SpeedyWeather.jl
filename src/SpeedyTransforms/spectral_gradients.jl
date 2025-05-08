@@ -656,6 +656,55 @@ function ∇!(
     return dpdx, dpdy
 end
 
+"""$(TYPEDSIGNATURES) Applies the gradient operator ∇ applied to input `p` and stores the result
+in `dpdx` (zonal derivative) and `dpdy` (meridional derivative). The gradient operator acts
+on the unit sphere and therefore omits the 1/radius scaling unless `radius` keyword argument is provided."""
+function ∇_KA!(
+    dpdx::LowerTriangularArray,     # Output: zonal gradient
+    dpdy::LowerTriangularArray,     # Output: meridional gradient
+    p::LowerTriangularArray,        # Input: spectral coefficients
+    S::SpectralTransform;           # includes precomputed arrays
+    radius = DEFAULT_RADIUS,        # scale with radius if provided, otherwise unit sphere
+)
+    (; grad_y1, grad_y2, lm2ij_indices) = S
+    @boundscheck ismatching(S, p) || throw(DimensionMismatch(S, p))
+
+    launch!(S.architecture, :lmk, size(dpdx), ∇_kernel!, dpdx, dpdy, p, grad_y1, grad_y2, lm2ij_indices)
+
+    # 1/radius factor if not unit sphere
+    if radius != 1
+        R⁻¹ = inv(radius)
+        dpdx .*= R⁻¹
+        dpdy .*= R⁻¹
+    end
+
+    return dpdx, dpdy
+end
+
+@kernel function ∇_kernel!(dpdx, dpdy, p, @Const(grad_y1), @Const(grad_y2), @Const(lm2ij_indices))
+
+    I = @index(Global, Cartesian)
+    lm = I[1]
+    size_p = size(p, as=Matrix)
+
+    # To-Do: not really ideal, but I don't know how to do it better right now (except for two completely different kernels)
+    k = ndims(p) == 1 ? CartesianIndex() : I[2]
+
+    l = lm2ij_indices[lm, 1]
+    m = lm2ij_indices[lm, 2]
+
+    if l==m             # DIAGONAL (separated to avoid access to l-1, m which is above the diagonal)
+        dpdx[lm, k] = (m-1)*im*p[lm, k]         # zonal gradient: d/dlon = *i*m
+        dpdy[lm, k] = grad_y2[lm]*p[lm+1, k]    # meridional gradient: p[lm-1]=0 on diagonal
+    elseif l==size_p[1] # LAST ROW (separated to avoid out-of-bounds access to lmax+1)
+        dpdx[lm, k] = (m-1)*im*p[lm, k]
+        dpdy[lm, k] = grad_y1[lm]*p[lm-1, k]    # only first term from 2nd last row
+    else                # all other 
+        dpdx[lm, k] = (m-1)*im*p[lm, k]
+        dpdy[lm, k] = grad_y1[lm]*p[lm-1, k] + grad_y2[lm]*p[lm+1, k]
+    end 
+end 
+
 """$(TYPEDSIGNATURES) The zonal and meridional gradient of `p`
 using an existing `SpectralTransform` `S`. Acts on the unit sphere,
 i.e. it omits 1/radius scaling unless `radius` keyword argument is provided."""

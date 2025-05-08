@@ -37,6 +37,17 @@ import SpeedyWeather: on_architecture
 
     @test alms4 ≈ alms3
 
+    # ∇! 
+    alms = rand(LowerTriangularArray{Complex{NF}},33, 32, 8)
+    alms1 = copy(alms)
+    alms2 = copy(alms)
+    alms3 = copy(alms)
+    alms4 = copy(alms)
 
+    # so far KA 3x slower on CPU
+    SpeedyWeather.SpeedyTransforms.∇!(alms1, alms2, alms, S)
+    SpeedyWeather.SpeedyTransforms.∇_KA!(alms3, alms4, alms, S)
 
+    @test alms1 ≈ alms3 
+    @test alms2 ≈ alms4
 end 
