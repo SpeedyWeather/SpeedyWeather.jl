@@ -260,7 +260,7 @@ function initialize!(   progn::PrognosticVariables,
     f = coriolis(vor_grid; rotation)
 
     # includes 1/coslat/radius from above for curl!
-    # but *radius^2 for the ∇⁻²! operation below!
+    # but *radius^2 for the ∇⁻²! operation below! 
     vor_flux_grid = @. (vor_grid + f) * u_grid * radius^2
     vor_flux = transform(vor_flux_grid, model.spectral_transform)
     div = curl(vor_flux, v, model.spectral_transform)
@@ -295,20 +295,20 @@ $(TYPEDFIELDS)"""
     "conversion from σ to Jablonowski's ηᵥ-coordinates"
     η₀::Float64 = 0.252
 
-    "max amplitude of zonal wind [m/s]"
+    "[OPTION] max amplitude of zonal wind [m/s]"
     u₀::Float64 = 35
 
     # PERTURBATION
-    "perturbation centred at [˚N]"
+    "[OPTION] perturbation centred at [˚N]"
     perturb_lat::Float64 = 40
 
-    "perturbation centred at [˚E]"
+    "[OPTION] perturbation centred at [˚E]"
     perturb_lon::Float64 = 20
 
-    "perturbation strength [m/s]"
+    "[OPTION] perturbation strength [m/s]"
     perturb_uₚ::Float64 = 1
 
-    "radius of Gaussian perturbation in units of Earth's radius [1]"
+    "[OPTION] radius of Gaussian perturbation in units of Earth's radius [1]"
     perturb_radius::Float64 = 1/10
 end
 
@@ -320,56 +320,40 @@ function initialize!(   progn::PrognosticVariables{NF},
                         model::PrimitiveEquation) where NF
 
     (; u₀, η₀) = initial_conditions
-    (; perturb_lat, perturb_lon, perturb_uₚ, perturb_radius) = initial_conditions
-    (; radius, Grid, nlat_half, nlayers) = model.spectral_grid
-    (; σ_levels_full) = model.geometry
+    (; perturb_uₚ, perturb_radius) = initial_conditions
+    λc = initial_conditions.perturb_lon
+    sinφc, cosφc = sind(initial_conditions.perturb_lat), cosd(initial_conditions.perturb_lat)
+    (; radius) = model.spectral_grid
+    R = radius*perturb_radius           # spatial extent of perturbation
 
-    φ, λ = model.geometry.latds, model.geometry.londs
-    S = model.spectral_transform
+    function vor(λ, φ, η)               # longitude, latitude (degree), sigma coordinate
 
-    # VORTICITY
-    vor_grid = zeros(Grid{NF}, nlat_half, nlayers)     # relative vorticity
-    div_grid = zeros(Grid{NF}, nlat_half, nlayers)     # divergence (perturbation only)
+        # great circle distance to perturbation
+        X = clamp(sinφc*sind(φ) + cosφc*cosd(φ)*cosd(λ-λc), 0, 1)
+        r = radius*acos(X)
+        
+        # Eq (3), the unperturbed zonal wind
+        ζ = -4u₀/radius*cos((η - η₀)*π/2)^(3/2)*sind(φ)*cosd(φ)*(2 - 5sind(φ)^2)
 
-    for k in eachgrid(vor_grid, div_grid)
+        # Eq (12), the perturbation
+        perturbation = perturb_uₚ/radius * exp(-(r/R)^2) *
+            (tand(φ) - 2*(radius/R)^2*acos(X)*(sinφc*cosd(φ) - cosφc*sind(φ)*cosd(λ-λc))/sqrt(1-X^2))
 
-        η = σ_levels_full[k]    # Jablonowski and Williamson use η for σ coordinates
-        ηᵥ = (η - η₀)*π/2       # auxiliary variable for vertical coordinate
-
-        # amplitude with height
-        cos_ηᵥ = cos(ηᵥ)^(3/2)  # wind increases with height: 1 at model top, ~0.4 at surface
-
-        for (ij, (φij, λij)) in enumerate(zip(φ, λ))
-            sinφ = sind(φij)
-            cosφ = cosd(φij)
-            tanφ = tand(φij)
-
-            # Jablonowski and Williamson, eq. (3)
-            vor_grid[ij, k] = -4u₀/radius*cos_ηᵥ*sinφ*cosφ*(2 - 5sinφ^2)
-
-            # PERTURBATION
-            sinφc = sind(perturb_lat)       # location of centre
-            cosφc = cosd(perturb_lat)
-            λc = perturb_lon
-            R = radius*perturb_radius # spatial extent of perturbation
-
-            # great circle distance to perturbation
-            X = clamp(sinφc*sinφ + cosφc*cosφ*cosd(λij-λc), 0, 1)
-            X_norm = 1/sqrt(1-X^2)
-            r = radius*acos(X)
-            exp_decay = exp(-(r/R)^2)
-
-            # Jablonowski and Williamson, eq. (12)
-            vor_grid[ij, k] += perturb_uₚ/radius*exp_decay*
-                (tanφ - 2*(radius/R)^2*acos(X)*X_norm*(sinφc*cosφ - cosφc*sinφ*cosd(λij-λc)))
-
-            # Jablonowski and Williamson, eq. (13)
-            div_grid[ij, k] = -2perturb_uₚ*radius/R^2 * exp_decay * acos(X) * X_norm * cosφc*sind(λij-λc)
-        end
+        return ζ+perturbation
     end
 
-    set!(progn, model; vor=vor_grid, div=vor_grid, lf=1)
+    function div(λ, φ, η)               # longitude, latitude (degree), sigma coordinate
 
+        # great circle distance to perturbation
+        X = clamp(sinφc*sind(φ) + cosφc*cosd(φ)*cosd(λ-λc), 0, 1)
+        r = radius*acos(X)
+
+        # Eq (13)
+        return -2perturb_uₚ*radius/R^2 * exp(-(r/R)^2) * acos(X)/sqrt(1-X^2) * cosφc * sind(λ-λc)
+    end
+
+    # apply those to set the initial conditions for vor, div
+    set!(progn, model; vor=vor, div=div, lf=1)
     return nothing
 end
 
@@ -624,13 +608,9 @@ struct ConstantPressure <: AbstractInitialConditions end
 function initialize!(   progn::PrognosticVariables,
                         ::ConstantPressure,
                         model::PrimitiveEquation)
-    (;pres_ref) = model.atmosphere
-    (;norm_sphere) = model.spectral_transform
 
     # logarithm of reference surface pressure [log(Pa)]
-    # set the l=m=0 mode, normalize correctly
-    set!(progn, model; pres=log(pres_ref) * norm_sphere)
-
+    set!(progn, model; pres=log(model.atmosphere.pres_ref))
     return nothing
 end
 
