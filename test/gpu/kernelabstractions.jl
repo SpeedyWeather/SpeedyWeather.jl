@@ -8,7 +8,7 @@ import SpeedyWeather: on_architecture
     # ∇²!
 
     NF= Float32
-    alms = rand(LowerTriangularArray{Complex{NF}},33, 32, 2)
+    alms = rand(LowerTriangularArray{Complex{NF}},33, 32, 8)
     #alms = rand(LowerTriangularArray{Complex{NF}},33, 32)
 
     alms2 = copy(alms)
@@ -17,6 +17,7 @@ import SpeedyWeather: on_architecture
 
     S = SpectralTransform(alms)
 
+    # so far: KA 5x faster on CPU
     SpeedyWeather.SpeedyTransforms.∇²!(alms2, alms, S);
     SpeedyWeather.SpeedyTransforms.∇²_KA!(alms3, alms, S);
 
@@ -24,15 +25,18 @@ import SpeedyWeather: on_architecture
 
     # Divergence
 
-    alms = rand(LowerTriangularArray{Complex{NF}},33, 32, 2)
-    alms2 = rand(LowerTriangularArray{Complex{NF}},33, 32, 2)
+    alms = rand(LowerTriangularArray{Complex{NF}},33, 32, 8)
+    alms2 = rand(LowerTriangularArray{Complex{NF}},33, 32, 8)
 
     alms3 = copy(alms)
     alms4 = copy(alms)
 
+    # so far KA 4x slower on CPU
     SpeedyWeather.SpeedyTransforms.divergence!(alms3, alms, alms2, S)
     SpeedyWeather.SpeedyTransforms.divergence_KA!(alms4, alms, alms2, S)
 
     @test alms4 ≈ alms3
+
+
 
 end 
