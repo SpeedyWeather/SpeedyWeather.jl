@@ -3,6 +3,10 @@ module SpeedyWeatherUnicodePlotsExt
 using SpeedyWeather, UnicodePlots
 using DocStringExtensions
 
+"""$(TYPEDSIGNATURES)
+A UnicodePlots heatmap visualising the elements in a LowerTriangularMatrix.
+Takes by default the `mode=abs` absolute value of every element to show the magnitude
+of complex spherical harmonic coefficients."""
 function UnicodePlots.heatmap(L::LowerTriangularMatrix{T}; mode::Function=abs) where T
 
     l, m = size(L, as=Matrix)
@@ -34,12 +38,17 @@ function UnicodePlots.heatmap(L::LowerTriangularMatrix{T}; mode::Function=abs) w
     return UnicodePlots.heatmap(Lplot; plot_kwargs...)
 end
 
-
+"""$(TYPEDSIGNATURES)
+A UnicodePlots heatmap visualising the data on an `AbstractGrid`.
+General method that interpolates (from a reduced grid) onto a full grid
+so that it can be visualised as a matrix."""
 function UnicodePlots.heatmap(A::AbstractGrid; title::String="$(get_nlat(A))-ring $(typeof(A))")
     A_full = interpolate(full_grid_type(A), A.nlat_half, A)
     plot(A_full; title)
 end
 
+"""$(TYPEDSIGNATURES)
+A UnicodePlots heatmap visualising the data on an `AbstractFullGrid`."""
 function UnicodePlots.heatmap(A::AbstractFullGrid; title::String="$(get_nlat(A))-ring $(typeof(A))")
 
     A_matrix = Matrix(A)
@@ -65,8 +74,4 @@ function UnicodePlots.heatmap(A::AbstractFullGrid; title::String="$(get_nlat(A))
 
     return UnicodePlots.heatmap(A_view'; plot_kwargs...)
 end
-
-
-
-
 end # module

@@ -42,7 +42,7 @@ SpeedyWeatherFiniteDifferencesExt = "FiniteDifferences"
 SpeedyWeatherGeoMakieExt = "GeoMakie"
 SpeedyWeatherJLArraysExt = "JLArrays"
 SpeedyWeatherMakieExt = "Makie"
-SpeedyWeatherUnicodePlots = "UnicodePlots"
+SpeedyWeatherUnicodePlotsExt = "UnicodePlots"
 
 [compat]
 AbstractFFTs = "1"
