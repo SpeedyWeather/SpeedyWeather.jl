@@ -198,8 +198,24 @@ Similar to the Makie extension that is loaded automatically with `using CairoMak
 
 ```@example galewsky_setup
 using UnicodePlots
-heatmap(vor)
+UnicodePlots.heatmap(vor)       # UnicodePlots. only needed as CairoMakie was loaded first!
 ```
+
+Note that if you first load Makie and then UnicodePlots then calling `heatmap`
+without further specifying the scope like `UnicodePlots.heatmap` will continue
+to use the `heatmap` from Makie. Add `UnicodePlots.` or `CairoMakie.` if
+needed.
+
+UnicodePlots look good in the Julia REPL, especially with the more colours
+a terminal like [iTerm](https://iterm2.com/) provides. But these plots are
+literally made up of unicode characters so the most you can expect is somthing like
+
+<img src="https://github.com/SpeedyWeather/SpeedyWeather.jl/assets/25530332/a04fbb10-1cc1-4f77-93f2-7bdf047f277d" width="450"><br>
+
+However, here in the documentation they are usually vertically spaced as the line
+spacing is by default higher than in the REPL.
+A similar issue arises in Jupyter Notebooks by default. Well, they are unicode
+after all!
 
 ### Adding mountains
 

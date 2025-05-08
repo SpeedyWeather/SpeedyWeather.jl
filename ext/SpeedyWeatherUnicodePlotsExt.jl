@@ -24,9 +24,9 @@ function UnicodePlots.heatmap(L::LowerTriangularMatrix{T}; mode::Function=abs) w
     height = min(l, 33)
     width = min(m, 32)
 
-    plot_kwargs = pairs((   xlabel="degree m",
+    plot_kwargs = pairs((   xlabel="m",
                             xoffset=-1,
-                            ylabel="order l",
+                            ylabel="l",
                             yoffset=-1,
                             title=title,
                             colormap=:inferno,
