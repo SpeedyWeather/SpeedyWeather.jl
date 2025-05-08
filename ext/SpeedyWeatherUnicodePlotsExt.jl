@@ -18,9 +18,9 @@ function UnicodePlots.heatmap(L::LowerTriangularMatrix{T}; mode::Function=abs) w
     height = min(l, 33)
     width = min(m, 32)
 
-    plot_kwargs = pairs((   xlabel="m",
+    plot_kwargs = pairs((   xlabel="degree m",
                             xoffset=-1,
-                            ylabel="ℓ",
+                            ylabel="order l",
                             yoffset=-1,
                             title=title,
                             colormap=:inferno,
@@ -62,8 +62,10 @@ function UnicodePlots.heatmap(A::AbstractFullGrid; title::String="$(get_nlat(A))
                             colorbar=true,
                             width=width,
                             height=height))
+
     return UnicodePlots.heatmap(A_view'; plot_kwargs...)
 end
+
 
 
 

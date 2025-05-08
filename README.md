@@ -145,8 +145,8 @@ https://github.com/SpeedyWeather/SpeedyWeather.jl/assets/25530332/a6192374-24d9-
 
 Difficult to plot spherical data? SpeedyWeather also includes extensions for Makie and GeoMakie
 making it supereasy to create plots and interactively investigate a variables from a simulation.
-Two examples (screen recording those makes it a bit laggy, it's pretty smooth otherwise): Humidity plotted
-on a 50km HEALPix grid 
+Two examples (screen recording those makes it a bit laggy, it's pretty smooth otherwise):
+Humidity plotted on a 50km HEALPix grid 
 
 https://github.com/user-attachments/assets/b02b31eb-e139-4193-89d1-7e277a2af5cc
 

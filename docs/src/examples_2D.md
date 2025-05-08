@@ -117,10 +117,13 @@ run!(simulation, period=Day(6), output=true)
 ```
 The progress bar tells us that the simulation run got the identification "0001"
 (which just counts up, so yours might be higher), meaning that
-data is stored in the folder `/run_0001`. In general we can check this also via
+data is stored in the folder `run_0001`. In general we can check this also via
 ```@example galewsky_setup
 id = model.output.id
 ```
+
+### Visualisation (manually)
+
 So let's plot that data. `$id` in the following just means
 that the string is interpolated to `run_0001` if this is the first unnamed run in your folder.
 ```@example galewsky_setup
@@ -168,6 +171,8 @@ is not size compatible). By default the output will be on the FullGaussianGrid, 
 play around with other grids, you'd need to change this here,
 see [NetCDF output](@ref) and [Output grid](@ref).
 
+### Visualisation via Makie
+
 We did want to showcase the usage of [NetCDF output](@ref) here, but from now on
 we will use `heatmap` to plot data on our grids directly, without storing output first.
 So for our current simulation, that means at time = 12 days, vorticity on the grid
@@ -184,6 +189,20 @@ nothing # hide
 ![Galewsky jet](galewsky2.png)
 
 The jet broke up into many small eddies, but the turbulence is still confined to the northern hemisphere, cool!
+
+### Visualisation via UnicodePlots
+
+Similar to the Makie extension that is loaded automatically with `using CairoMakie`
+(or another backend like `using GLMakie`) we have defined an extension for
+[UnicodePlots.jl](https://github.com/JuliaPlots/UnicodePlots.jl)
+
+```@example galewsky_setup
+using UnicodePlots
+heatmap(vor)
+```
+
+### Adding mountains
+
 How this may change when we add mountains (we had `NoOrography` above!), say Earth's orography, you may ask?
 Let's try it out! We create an `EarthOrography` struct like so
 
@@ -212,10 +231,12 @@ id = model.output.id
 ds = NCDataset("run_$id/output.nc")
 ```
 
-You could plot the [NetCDF output](@ref) now as before, but we'll be plotting directly
-from the current state of the `simulation`
+While you could plot the [NetCDF output](@ref) manually as before, 
+we'll be plotting directly from the current state of the `simulation` using
+the Makie extension
 
 ```@example galewsky_setup
+using CairoMakie
 vor = simulation.diagnostic_variables.grid.vor_grid[:, 1]   # 1 to index surface
 heatmap(vor, title="Relative vorticity [1/s]")
 save("galewsky3.png", ans) # hide

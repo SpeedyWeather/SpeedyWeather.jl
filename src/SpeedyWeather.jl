@@ -7,6 +7,7 @@ using DocStringExtensions
 import Primes
 import Random
 import LinearAlgebra: LinearAlgebra, Diagonal
+export rotate!
 
 # GPU, PARALLEL
 import Base.Threads: Threads, @threads
