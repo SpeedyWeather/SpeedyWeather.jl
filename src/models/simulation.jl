@@ -42,10 +42,7 @@ function run!(
     initialize!(simulation; period, steps, output)      # scaling, initialize output, store initial conditions
     time_stepping!(simulation)                          # run it, yeah!
     finalize!(simulation)                               # unscale, finalize output, write restart file, finalize callbacks             
-
-    # return a UnicodePlot of surface vorticity
-    surface_vorticity = simulation.diagnostic_variables.grid.vor_grid[:, end]
-    return plot(surface_vorticity, title="Surface relative vorticity [1/s]")
+    return simulation
 end
 
 """$(TYPEDSIGNATURES)

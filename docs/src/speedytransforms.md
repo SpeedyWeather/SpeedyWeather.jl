@@ -56,10 +56,13 @@ map = transform(alms)
 ```
 By default, the `transforms` transforms onto a [`FullGaussianGrid`](@ref FullGaussianGrid) unravelled here
 into a vector west to east, starting at the prime meridian, then north to south, see [RingGrids](@ref).
-We can visualize `map` quickly with a UnicodePlot via `plot` (see [Visualising RingGrid data](@ref))
+We can visualize `map` quickly with a UnicodePlot via `heatmap` (see [Visualising RingGrid data](@ref)),
+or alternatively in higher quality after `using CairoMakie` or `usin GLMakie`, see
+[Visualisation via Makie](@ref) too
+
 ```@example speedytransforms
-import SpeedyWeather.RingGrids: plot    # not necessary when `using SpeedyWeather`
-plot(map)
+using UnicodePlots
+heatmap(map)
 ```
 Yay! This is the what the ``l=m=1`` spherical harmonic is supposed to look like!
 Now let's go back to spectral space with `transform`
@@ -83,7 +86,7 @@ While the default grid for [SpeedyTransforms](@ref) is the [`FullGaussianGrid`](
 we can transform onto other grids by specifying `Grid` too
 ```@example speedytransforms
 map = transform(alms, Grid=HEALPixGrid)
-plot(map)
+heatmap(map)
 ```
 which, if transformed back, however, can yield a larger transform error as discussed above
 ```@example speedytransforms
@@ -142,7 +145,7 @@ alms = zeros(LowerTriangularMatrix{ComplexF64}, 7, 6)     # spectral coefficient
 alms[2, 2] = 1                                            # only l=1, m=1 harmonic
 
 map = transform(alms, S)
-plot(map)
+heatmap(map)
 ```
 
 Yay, this is again the ``l=m=1`` harmonic, but this time on a slightly higher resolution
@@ -212,7 +215,10 @@ docstrings at `?SpectralTransform`.
 
 How to take some data and compute a power spectrum with SpeedyTransforms you may ask.
 Say you have some global data in a matrix `m` that looks, for example, like
-```@example speedytransforms
+```@example speedytransforms2
+using SpeedyWeather.RingGrids # hide
+using SpeedyWeather.LowerTriangularMatrices # hide
+using SpeedyWeather.SpeedyTransforms # hide
 alms = randn(LowerTriangularMatrix{Complex{Float32}}, 32, 32) # hide
 spectral_truncation!(alms, 10) # hide
 map = transform(alms, Grid=FullClenshawGrid) # hide
@@ -228,7 +234,7 @@ plus the equator (=47).
 We now wrap this matrix into a `FullClenshawGrid` (`input_as=Matrix` is required because all
 grids organise their data as vectors, see [Creating data on a RingGrid](@ref))
 therefore to associate it with the necessary grid information like its coordinates
-```@example speedytransforms
+```@example speedytransforms2
 map = FullClenshawGrid(m, input_as=Matrix)
 
 using CairoMakie
@@ -239,7 +245,7 @@ nothing # hide
 ![Random pattern](random_pattern.png)
 
 Now we transform into spectral space and call `power_spectrum(::LowerTriangularMatrix)`
-```@example speedytransforms
+```@example speedytransforms2
 alms = transform(map)
 power = power_spectrum(alms)
 nothing # hide
@@ -248,7 +254,7 @@ nothing # hide
 Which returns a vector of power at every wavenumber. By default this is normalized
 as average power per degree, you can change that with the keyword argument `normalize=false`.
 Plotting this yields
-```@example speedytransforms
+```@example speedytransforms2
 using UnicodePlots
 k = 0:length(power)-1
 lineplot(k, power, yscale=:log10, ylim=(1e-15, 10), xlim=extrema(k),
@@ -269,7 +275,7 @@ for T31, the spectral resolution we are interested in.
 Now create some normally distributed spectral coefficients but scale them down
 for higher wavenumbers with ``k^{-2}``
 
-```@example speedytransforms
+```@example speedytransforms2
 k = 1:32
 A = randn(Complex{Float32}, 32, 32)
 A .*= k.^-2
@@ -281,7 +287,7 @@ is correctly applied across dimensions of `A` and then convert to a
 
 Awesome. For higher degrees and orders the amplitude clearly decreases!
 Now to grid-point space and let us visualize the result
-```@example speedytransforms
+```@example speedytransforms2
 map = transform(alms)
 
 using CairoMakie
@@ -313,7 +319,8 @@ You get information about the size of that memory (both polynomials and required
 in the terminal "show" of a `SpectralTransform` object, e.g. at T127 resolution
 with 8 layers these are
 
-```@example speedytransforms
+```@example speedytransforms2
+using SpeedyWeather
 spectral_grid = SpectralGrid(trunc=127, nlayers=8)
 SpectralTransform(spectral_grid)
 ```
@@ -324,7 +331,7 @@ SpeedyTransforms also supports batched transforms. With batched input data the `
 is performed along the leading dimension, and all further dimensions are interpreted as
 batch dimensions. Take for example 
 
-```@example speedytransforms 
+```@example speedytransforms2
 alms = randn(LowerTriangularMatrix{Complex{Float32}}, 32, 32, 5) 
 grids = transform(alms)
 ```
@@ -340,14 +347,14 @@ to the leading spherical harmonic dimension (it is unravelled as a vector so the
 only, not the first two...). But the power spectrum is always calculated along that
 first spherical-harmonic dimension. For example
 
-```@example speedytransforms 
+```@example speedytransforms2 
 alms = randn(LowerTriangularMatrix{Complex{Float32}}, 5, 5, 2) 
 power_spectrum(alms)
 ```
 returns the power spectrum for `[..., 1]` in the first column and `[..., 2]` in the second.
 This avoids to loop over these additional dimensions, but the result would be the same:
 
-```@example speedytransforms
+```@example speedytransforms2
 power_spectrum(alms[:, 1])
 ```
 

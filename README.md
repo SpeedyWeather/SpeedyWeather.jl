@@ -88,18 +88,16 @@ model = PrimitiveWetModel(spectral_grid)            # construct model
 simulation = initialize!(model)                     # initialize all model components
 run!(simulation, period=Day(10), output=true)       # aaaand action!
 ```
-and you will see
+showing
+```
+Weather is speedy: run 0001 100%|█████████| Time: 0:00:02 (1000.22 years/day)
+```
 
-<img src="https://github.com/SpeedyWeather/SpeedyWeather.jl/assets/25530332/a04fbb10-1cc1-4f77-93f2-7bdf047f277d" width="450"><br>
-
-Hurray🥳 In a few seconds seconds we just simulated 10 days of the Earth's atmosphere at a speed of 440 years per day.
+Hurray🥳 In a few seconds seconds we just simulated 10 days of the Earth's atmosphere at a speed of 1000 years per day.
 This simulation used a T31 spectral resolution on an
 [octahedral Gaussian grid](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/grids/#Implemented-grids)
-(~400km resolution) solving the primitive equations on 8 vertical levels.
-The [UnicodePlot](https://github.com/JuliaPlots/UnicodePlots.jl) will give
-you a snapshot of surface vorticity at the last time step. The plotted resolution is not representative,
-but allows a quick check of what has been simulated.
-The [NetCDF output](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/output/) is independent of the unicode plot.
+(~400km resolution) solving the primitive equations on 8 vertical levels,
+storing [NetCDF output](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/output/).
 
 More examples in the [How to run SpeedyWeather](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/how_to_run_speedy/)
 section of the [documentation](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev).
@@ -147,8 +145,8 @@ https://github.com/SpeedyWeather/SpeedyWeather.jl/assets/25530332/a6192374-24d9-
 
 Difficult to plot spherical data? SpeedyWeather also includes extensions for Makie and GeoMakie
 making it supereasy to create plots and interactively investigate a variables from a simulation.
-Two examples (screen recording those makes it a bit laggy, it's pretty smooth otherwise): Humidity plotted
-on a 50km HEALPix grid 
+Two examples (screen recording those makes it a bit laggy, it's pretty smooth otherwise):
+Humidity plotted on a 50km HEALPix grid 
 
 https://github.com/user-attachments/assets/b02b31eb-e139-4193-89d1-7e277a2af5cc
 
