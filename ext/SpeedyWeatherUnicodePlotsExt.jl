@@ -42,14 +42,14 @@ end
 A UnicodePlots heatmap visualising the data on an `AbstractGrid`.
 General method that interpolates (from a reduced grid) onto a full grid
 so that it can be visualised as a matrix."""
-function UnicodePlots.heatmap(A::AbstractGrid; title::String="$(get_nlat(A))-ring $(typeof(A))")
-    A_full = interpolate(full_grid_type(A), A.nlat_half, A)
+function UnicodePlots.heatmap(A::RingGrids.AbstractGrid; title::String="$(get_nlat(A))-ring $(typeof(A))")
+    A_full = RingGrids.interpolate(full_grid_type(A), A.nlat_half, A)
     plot(A_full; title)
 end
 
 """$(TYPEDSIGNATURES)
 A UnicodePlots heatmap visualising the data on an `AbstractFullGrid`."""
-function UnicodePlots.heatmap(A::AbstractFullGrid; title::String="$(get_nlat(A))-ring $(typeof(A))")
+function UnicodePlots.heatmap(A::RingGrids.AbstractFullGrid; title::String="$(get_nlat(A))-ring $(typeof(A))")
 
     A_matrix = Matrix(A)
     nlon, nlat = size(A_matrix)
