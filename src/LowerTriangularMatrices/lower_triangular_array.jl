@@ -123,6 +123,18 @@ function Base.array_summary(io::IO, L::LowerTriangularMatrix{T}, inds::Tuple{Var
     print(io, Base.dims2string(length.(inds)), ", $(mn[1])x$(mn[2]) LowerTriangularMatrix{$T}")
 end
 
+function Base.show(io::IO, ::MIME"text/plain", L::LowerTriangularArray)
+    Base.array_summary(io, L, axes(L))
+
+    if get(io, :limit, false)::Bool && displaysize(io)[1]-4 <= 0
+        return print(io, " …")
+    else
+        println(io)
+    end
+    
+    Base.print_array(io, L.data)
+end
+
 @inline Base.dataids(L::LowerTriangularArray) = Base.dataids(L.data)
 
 # CREATE INSTANCES (ZEROS, ONES, UNDEF)
