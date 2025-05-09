@@ -103,6 +103,75 @@ end
 
 """
 $(TYPEDSIGNATURES)
+Divergence of a vector `u, v` written into `div`, `div = ∇⋅(u, v)`. 
+`u, v` are expected to have a 1/coslat-scaling included, otherwise `div` is scaled.
+Acts on the unit sphere, i.e. it omits 1/radius scaling as all gradient operators,
+unless the `radius` keyword argument is provided. `flipsign` option calculates -∇⋅(u, v) instead.
+`add` option calculates `div += ∇⋅(u, v)` instead. `flipsign` and `add` can be combined.
+This functions only creates the kernel and calls the generic divergence function _divergence! subsequently."""
+function divergence_KA!(
+    div::LowerTriangularArray,
+    u::LowerTriangularArray,
+    v::LowerTriangularArray,
+    S::SpectralTransform;
+    flipsign::Bool=false,
+    add::Bool=false,
+    kwargs...,
+)
+    # = -(∂λ + ∂θ) or (∂λ + ∂θ), adding or overwriting the output div
+    kernel = flipsign ? (add ? (o, a, b, c) -> o-(a-b+c) : (o, a, b, c) -> -(a-b+c)) :
+                        (add ? (o, a, b, c) ->  o+(a-b+c) : (o, a, b, c) -> a-b+c)    
+    _divergence_KA!(kernel, div, u, v, S; kwargs...)
+end
+
+function _divergence_KA!(  
+    kernel,
+    div::LowerTriangularArray,
+    u::LowerTriangularArray,
+    v::LowerTriangularArray,
+    S::SpectralTransform;
+    radius = DEFAULT_RADIUS,
+)
+    (; grad_y_vordiv1, grad_y_vordiv2, lm2ij_indices) = S
+  
+    @boundscheck ismatching(S, div) || throw(DimensionMismatch(S, div))
+
+    launch!(S.architecture, :lmk, size(div), _divergence_kernel!, kernel, div, u, v, grad_y_vordiv1, grad_y_vordiv2, lm2ij_indices)
+
+    # /radius scaling if not unit sphere
+    if radius != 1
+        div .*= inv(radius)
+    end
+
+    return div
+end
+
+@kernel function _divergence_kernel!(kernel_func, div, u, v, grad_y_vordiv1, grad_y_vordiv2, @Const(lm2ij_indices))
+
+    I = @index(Global, Cartesian)
+    lm = I[1]
+
+    # To-Do: not really ideal, but I don't know how to do it better right now (except for two completely different kernels)
+    k = ndims(div) == 1 ? CartesianIndex() : I[2]
+
+    l = lm2ij_indices[lm, 1]
+    m = lm2ij_indices[lm, 2]
+
+    if l==size(div, 1, as=Matrix) # Last row, only vectors make use of the lmax+1 row, set to zero for scalars div, curl
+        div[I] = 0
+    else 
+        ∂u∂λ  = ((m-1)*im)*u[I]
+
+        # distinguish DIAGONAL (to avoid access to v[l-1, m])
+        ∂v∂θ1 = l==m ? 0 : grad_y_vordiv1[lm] * v[lm-1, k] 
+
+        ∂v∂θ2 = grad_y_vordiv2[lm] * v[lm+1, k]  
+        div[I] = kernel_func(div[I], ∂u∂λ, ∂v∂θ1, ∂v∂θ2)
+    end 
+end 
+
+"""
+$(TYPEDSIGNATURES)
 Divergence (∇⋅) of two vector components `u, v` which need to have size (n+1)xn,
 the last row will be set to zero in the returned `LowerTriangularMatrix`.
 This function requires both `u, v` to be transforms of fields that are scaled with
@@ -431,6 +500,44 @@ function ∇²!(
     return ∇²alms
 end
 
+function ∇²_KA!(
+    ∇²alms::LowerTriangularArray,   # Output: (inverse) Laplacian of alms
+    alms::LowerTriangularArray,     # Input: spectral coefficients
+    S::SpectralTransform;           # precomputed eigenvalues
+    add::Bool=false,                # add to output array or overwrite
+    flipsign::Bool=false,           # -∇² or ∇²
+    inverse::Bool=false,            # ∇⁻² or ∇²
+    radius = DEFAULT_RADIUS,        # scale with radius if provided, otherwise unit sphere
+)
+    @boundscheck ismatching(S, ∇²alms) || throw(DimensionMismatch(S, ∇²alms))
+
+    # use eigenvalues⁻¹/eigenvalues for ∇⁻²/∇² based but name both eigenvalues
+    eigenvalues = inverse ? S.eigenvalues⁻¹ : S.eigenvalues
+
+    kernel = flipsign ? (add ? (o,a) -> (o-a) : (o, a) -> -a) : 
+                        (add ? (o,a) -> (o+a) : (o, a) -> a)
+    
+    launch!(S.architecture, :lmk, size(alms), ∇²_kernel!, ∇²alms, alms, eigenvalues, kernel, S.lm2ij_indices)
+
+    # /radius² or *radius² scaling if not unit sphere
+    if radius != 1
+        R_plusminus_squared = inverse ? radius^2 : inv(radius^2)
+        ∇²alms .*= R_plusminus_squared
+    end
+
+    return ∇²alms
+end
+
+@kernel function ∇²_kernel!(∇²alms, alms, @Const(eigenvalues), kernel_func, @Const(lm2ij_indices))
+
+    I = @index(Global, Cartesian) # I[1] == lm, I[2] == k
+                                  # we use cartesian index instead of NTuple here
+                                  # because this works for 2D and 3D matrices
+    l = lm2ij_indices[I[1],1]
+
+    ∇²alms[I] = kernel_func(∇²alms[I], alms[I]*eigenvalues[l])
+end 
+
 """
 $(TYPEDSIGNATURES)
 Laplace operator ∇² applied to input `alms`, using precomputed eigenvalues from `S`.
@@ -548,6 +655,115 @@ function ∇!(
 
     return dpdx, dpdy
 end
+
+"""$(TYPEDSIGNATURES) Applies the gradient operator ∇ applied to input `p` and stores the result
+in `dpdx` (zonal derivative) and `dpdy` (meridional derivative). The gradient operator acts
+on the unit sphere and therefore omits the 1/radius scaling unless `radius` keyword argument is provided."""
+function ∇_KA!(
+    dpdx::LowerTriangularArray,     # Output: zonal gradient
+    dpdy::LowerTriangularArray,     # Output: meridional gradient
+    p::LowerTriangularArray,        # Input: spectral coefficients
+    S::SpectralTransform;           # includes precomputed arrays
+    radius = DEFAULT_RADIUS,        # scale with radius if provided, otherwise unit sphere
+)
+    (; grad_y1, grad_y2, lm2ij_indices) = S
+    @boundscheck ismatching(S, p) || throw(DimensionMismatch(S, p))
+
+    launch!(S.architecture, :lmk, size(dpdx), ∇_kernel!, dpdx, dpdy, p, grad_y1, grad_y2, lm2ij_indices)
+
+    # 1/radius factor if not unit sphere
+    if radius != 1
+        R⁻¹ = inv(radius)
+        dpdx .*= R⁻¹
+        dpdy .*= R⁻¹
+    end
+
+    return dpdx, dpdy
+end
+
+@kernel function ∇_kernel!(dpdx, dpdy, p, grad_y1, grad_y2, @Const(lm2ij_indices))
+
+    I = @index(Global, Cartesian)
+    lm = I[1]
+
+    # To-Do: not really ideal, but I don't know how to do it better right now (except for two completely different kernels)
+    k = ndims(p) == 1 ? CartesianIndex() : I[2]
+    #k = I[2]
+    l = lm2ij_indices[lm, 1]
+    m = lm2ij_indices[lm, 2]
+
+    if l==m             # DIAGONAL (separated to avoid access to l-1, m which is above the diagonal)
+        dpdx[lm, k] = (m-1)*im*p[lm, k]         # zonal gradient: d/dlon = *i*m
+        dpdy[lm, k] = grad_y2[lm]*p[lm+1, k]    # meridional gradient: p[lm-1]=0 on diagonal
+    elseif l==p.m # LAST ROW (separated to avoid out-of-bounds access to lmax+1)
+        dpdx[lm, k] = (m-1)*im*p[lm, k]
+        dpdy[lm, k] = grad_y1[lm]*p[lm-1, k]    # only first term from 2nd last row
+    else                # all other 
+        dpdx[lm, k] = (m-1)*im*p[lm, k]
+        dpdy[lm, k] = grad_y1[lm]*p[lm-1, k] + grad_y2[lm]*p[lm+1, k]
+    end 
+end 
+
+# 3-kernel KA version (diagonal, last row, main part)
+"""$(TYPEDSIGNATURES) Applies the gradient operator ∇ applied to input `p` and stores the result
+in `dpdx` (zonal derivative) and `dpdy` (meridional derivative). The gradient operator acts
+on the unit sphere and therefore omits the 1/radius scaling unless `radius` keyword argument is provided."""
+function ∇_3KA!(
+    dpdx::LowerTriangularArray,     # Output: zonal gradient
+    dpdy::LowerTriangularArray,     # Output: meridional gradient
+    p::LowerTriangularArray,        # Input: spectral coefficients
+    S::SpectralTransform;           # includes precomputed arrays
+    radius = DEFAULT_RADIUS,        # scale with radius if provided, otherwise unit sphere
+)
+    (; grad_y1, grad_y2, lm2ij_indices, i2lm_indices) = S
+    @boundscheck ismatching(S, p) || throw(DimensionMismatch(S, p))
+
+    launch!(S.architecture, :diagonal, size(dpdx, as=Matrix), ∇_diagonal_kernel!, dpdx, dpdy, p, grad_y1, grad_y2, lm2ij_indices)
+    launch!(S.architecture, :lastrow, size(dpdx, as=Matrix), ∇_lastrow_kernel!, dpdx, dpdy, p, grad_y1, grad_y2, lm2ij_indices)
+    launch!(S.architecture, :lmk_main, size(dpdx, as=Matrix), ∇_main_kernel!, dpdx, dpdy, p, grad_y1, grad_y2, lm2ij_indices, i2lm_indices)
+
+    # 1/radius factor if not unit sphere
+    if radius != 1
+        R⁻¹ = inv(radius)
+        dpdx .*= R⁻¹
+        dpdy .*= R⁻¹
+    end
+
+    return dpdx, dpdy
+end
+
+@kernel function ∇_diagonal_kernel!(dpdx, dpdy, p, grad_y1, grad_y2, @Const(lm2ij_indices))
+
+    I = @index(Global, Cartesian)
+
+    i = I[1]
+    k = I[2]
+
+    dpdx[i, i, k] = (i-1)*im*p[i, i, k]         # zonal gradient: d/dlon = *i*m
+    dpdy[i, i, k] = grad_y2[i, i]*p[i+1, i, k]  
+end 
+
+@kernel function ∇_lastrow_kernel!(dpdx, dpdy, p, grad_y1, grad_y2, @Const(lm2ij_indices))
+
+    I = @index(Global, Cartesian)
+
+    m = I[1]
+    k = I[2]
+    l = p.m
+
+    dpdx[l, m, k] = (m-1)*im*p[l,m,k]
+    dpdy[l, m, k] = grad_y1[l,m]*p[l-1,m,k]    # only first term from 2nd last row
+end 
+
+@kernel function ∇_main_kernel!(dpdx, dpdy, p, grad_y1, grad_y2, @Const(lm2ij_indices), @Const(i2lm_indices))
+    i, k = @index(Global, NTuple)
+    
+    lm = i2lm_indices[i]
+    m = lm2ij_indices[lm, 2]
+
+    dpdx[lm, k] = (m-1)*im*p[lm, k]
+    dpdy[lm, k] = grad_y1[lm]*p[lm-1, k] + grad_y2[lm]*p[lm+1, k]
+end 
 
 """$(TYPEDSIGNATURES) The zonal and meridional gradient of `p`
 using an existing `SpectralTransform` `S`. Acts on the unit sphere,

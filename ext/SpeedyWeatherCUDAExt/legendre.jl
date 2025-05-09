@@ -1,11 +1,6 @@
 # convert i, j indices of a matrix (here 0-based l,m though...) to a single 1-based running index
-import SpeedyWeather.LowerTriangularMatrices: ij2k
+import SpeedyWeather.LowerTriangularMatrices: ij2k, get_lm_range, get_2lm_range
 
-# range of the running indices lm in a l-column (degrees of spherical harmonics)
-# given the column index m (order of harmonics) 
-get_lm_range(m, lmax) = ij2k(2*m - 1, m, lmax):ij2k(lmax+m, m, lmax)
-get_2lm_range(m, lmax) = 2*ij2k(2*m - 1, m, lmax)-1:2*ij2k(lmax+m, m, lmax)
- 
 # (inverse) legendre transform kernel, called from _legendre!
 function inverse_legendre_kernel!(
     g_north,                        # Scratch storage for legendre coefficients

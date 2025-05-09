@@ -11,7 +11,7 @@ passed on as keyword arguments, e.g. `planet=Earth(spectral_grid)`. Fields, repr
 model components, are
 $(TYPEDFIELDS)"""
 @kwdef mutable struct ShallowWaterModel{
-    DS,     # <:DeviceSetup,
+    AR,     # <:AbstractArchitecture,
     GE,     # <:AbstractGeometry,
     PL,     # <:AbstractPlanet,
     AT,     # <:AbstractAtmosphere,
@@ -31,7 +31,7 @@ $(TYPEDFIELDS)"""
 } <: ShallowWater
     
     spectral_grid::SpectralGrid
-    device_setup::DS = DeviceSetup(spectral_grid.device)
+    architecture::AR = spectral_grid.architecture()
 
     # DYNAMICS
     geometry::GE = Geometry(spectral_grid)

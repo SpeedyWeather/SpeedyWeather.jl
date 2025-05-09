@@ -2,7 +2,7 @@ abstract type AbstractSpectralGrid end
 
 # computing
 const DEFAULT_NF = Float32
-const DEFAULT_DEVICE = CPU()
+const DEFAULT_ARCHITECTURE = CPU
 const DEFAULT_ARRAYTYPE = Array
 
 # numerics
@@ -25,11 +25,11 @@ $(TYPEDFIELDS)
     "[OPTION] number format used throughout the model"
     NF::Type{<:AbstractFloat} = DEFAULT_NF
 
-    "[OPTION] device archictecture to run on"
-    device::AbstractDevice = DEFAULT_DEVICE
+    "[OPTION] device architecture to run on"
+    architecture::Type{<:AbstractArchitecture} = DEFAULT_ARCHITECTURE
 
     "[OPTION] array type to use for all variables"
-    ArrayType::Type{<:AbstractArray} = default_array_type(device)
+    ArrayType::Type{<:AbstractArray} = array_type(architecture)
 
     "[DERIVED] Type of vector"
     VectorType::Type{<:AbstractVector} = ArrayType{NF, 1}
@@ -100,7 +100,7 @@ end
 
 function Base.show(io::IO, SG::SpectralGrid)
     (; NF, trunc, Grid, radius, nlat, npoints, nlayers, nlayers_soil) = SG
-    (; device, ArrayType) = SG
+    (; architecture, ArrayType) = SG
     (; nparticles) = SG
 
     # resolution information
@@ -114,7 +114,7 @@ function Base.show(io::IO, SG::SpectralGrid)
     nparticles > 0 &&
     println(io, "├ Particles:  $nparticles")
     println(io, "├ Vertical:   $nlayers-layer atmosphere, $nlayers_soil-layer land")
-      print(io, "└ Device:     $(typeof(device)) using $ArrayType")
+      print(io, "└ Architecture:     $(typeof(architecture)) using $ArrayType")
 end
 
 # also allow spectral grid to be passed on as first an only positional argument to model constructors

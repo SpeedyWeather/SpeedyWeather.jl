@@ -123,6 +123,18 @@ function Base.array_summary(io::IO, L::LowerTriangularMatrix{T}, inds::Tuple{Var
     print(io, Base.dims2string(length.(inds)), ", $(mn[1])x$(mn[2]) LowerTriangularMatrix{$T}")
 end
 
+function Base.show(io::IO, ::MIME"text/plain", L::LowerTriangularArray)
+    Base.array_summary(io, L, axes(L))
+
+    if get(io, :limit, false)::Bool && displaysize(io)[1]-4 <= 0
+        return print(io, " …")
+    else
+        println(io)
+    end
+    
+    Base.print_array(io, L.data)
+end
+
 @inline Base.dataids(L::LowerTriangularArray) = Base.dataids(L.data)
 
 # CREATE INSTANCES (ZEROS, ONES, UNDEF)
@@ -188,6 +200,20 @@ only the lower triangle (the non-zero entries) of `L`."""
 @inline triangle_number(n::Integer) = n*(n+1)÷2
 nonzeros(m::Integer, n::Integer) = m*n - triangle_number(n-1)
 
+"""
+$(TYPEDSIGNATURES)
+range of the running indices lm in a l-column (degrees of spherical harmonics)
+given the column index m (order of harmonics) 
+"""
+get_lm_range(m, lmax) = ij2k(2*m - 1, m, lmax):ij2k(lmax+m, m, lmax)
+
+"""
+$(TYPEDSIGNATURES)
+range of the doubled running indices 2lm in a l-column (degrees of spherical harmonics)
+given the column index m (order of harmonics) 
+"""
+get_2lm_range(m, lmax) = 2*ij2k(2*m - 1, m, lmax)-1:2*ij2k(lmax+m, m, lmax)
+ 
 """
 $(TYPEDSIGNATURES)
 Converts the linear index `k` in the lower triangle into a pair `(i, j)` of indices 
@@ -641,3 +667,5 @@ end
 
 Adapt.adapt_structure(to, L::LowerTriangularArray) =
     LowerTriangularArray(Adapt.adapt(to, L.data), L.m, L.n)
+
+on_architecture(arch::AbstractArchitecture, a::LowerTriangularArray) = Adapt.adapt(array_type(arch), a)
