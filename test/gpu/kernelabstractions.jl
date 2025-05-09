@@ -12,11 +12,13 @@ import SpeedyWeather: on_architecture, CPU
         arch = SpeedyWeather.CPU()
     end 
 
-
+    L = 129
+    M = 128
+    N = 64
     # ∇²!
 
     NF= Float32
-    alms = on_architecture(arch, rand(LowerTriangularArray{Complex{NF}},33, 32, 8))
+    alms = on_architecture(arch, rand(LowerTriangularArray{Complex{NF}},L, M, N))
     #alms = rand(LowerTriangularArray{Complex{NF}},33, 32)
     alms_cpu = on_architecture(CPU(), alms)
 
@@ -33,8 +35,8 @@ import SpeedyWeather: on_architecture, CPU
     @test on_architecture(CPU(), alms3) ≈ alms2
 
     # Divergence
-    alms = on_architecture(arch, rand(LowerTriangularArray{Complex{NF}},33, 32, 8))
-    alms2 = on_architecture(arch, rand(LowerTriangularArray{Complex{NF}},33, 32, 8))
+    alms = on_architecture(arch, rand(LowerTriangularArray{Complex{NF}},L, M, N))
+    alms2 = on_architecture(arch, rand(LowerTriangularArray{Complex{NF}},L, M, N))
 
     alms_cpu = on_architecture(CPU(), alms)
     alms2_cpu = on_architecture(CPU(), alms2)
@@ -49,7 +51,7 @@ import SpeedyWeather: on_architecture, CPU
     @test on_architecture(CPU(), alms4) ≈ alms3
 
     # ∇! 
-    alms = on_architecture(arch, rand(LowerTriangularArray{Complex{NF}},33, 32, 8))
+    alms = on_architecture(arch, rand(LowerTriangularArray{Complex{NF}},L, M, N))
     alms_cpu = on_architecture(CPU(), alms)
     alms1 = copy(alms_cpu)
     alms2 = copy(alms_cpu)
