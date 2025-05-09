@@ -45,7 +45,7 @@ heatmap(vor, title="Surface relative vorticity")
 save("jablonowski.png", ans) # hide
 nothing # hide
 ```
-![Jablonowski pyplot](jablonowski.png)
+![Jablonowski plot](jablonowski.png)
 
 ## Held-Suarez forcing
 

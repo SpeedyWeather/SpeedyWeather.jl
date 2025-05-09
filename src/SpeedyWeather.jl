@@ -7,6 +7,7 @@ using DocStringExtensions
 import Primes
 import Random
 import LinearAlgebra: LinearAlgebra, Diagonal
+export rotate!
 
 # GPU, PARALLEL
 import Base.Threads: Threads, @threads
@@ -22,7 +23,6 @@ import NCDatasets: NCDatasets, NCDataset, defDim, defVar
 import JLD2: jldopen, jldsave, JLDFile 
 import CodecZlib
 import BitInformation: round, round!
-import UnicodePlots
 import ProgressMeter
 
 # to avoid a `using Dates` to pass on DateTime arguments
@@ -67,7 +67,7 @@ export  FullClenshawGrid, FullClenshawArray,
         HEALPixGrid, HEALPixArray,
         OctaHEALPixGrid, OctaHEALPixArray,
         OctaminimalGaussianGrid, OctaminimalGaussianArray,
-        eachring, eachgrid, plot
+        eachring, eachgrid
 export  AnvilInterpolator
 export  spherical_distance
 export  zonal_mean
@@ -161,7 +161,6 @@ include("output/schedule.jl")
 include("output/feedback.jl")
 include("output/netcdf_output.jl")
 include("output/restart_file.jl")
-include("output/plot.jl")
 include("output/callbacks.jl")
 include("output/particle_tracker.jl")
 include("output/jld2_output.jl")

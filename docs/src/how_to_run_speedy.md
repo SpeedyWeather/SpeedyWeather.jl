@@ -219,10 +219,8 @@ is to run the simulation.
 ```@example howto
 run!(simulation)
 ```
-By default this runs for 10 days without output and returns a
-[unicode plot](https://github.com/JuliaPlots/UnicodePlots.jl)
-of surface relative vorticity (see [Shallow water with mountains](@ref) for more
-on this). Now `period` and `output` are the only options to change, so with
+By default this runs for 10 days without output and returns the updated `simulation`.
+Now `period` and `output` are the only options to change, so with
 ```@example howto
 model.output.id = "test" # hide
 run!(simulation, period=Day(5), output=true)
