@@ -704,6 +704,7 @@ end
     end 
 end 
 
+# 3-kernel KA version (diagonal, last row, main part)
 """$(TYPEDSIGNATURES) Applies the gradient operator ∇ applied to input `p` and stores the result
 in `dpdx` (zonal derivative) and `dpdy` (meridional derivative). The gradient operator acts
 on the unit sphere and therefore omits the 1/radius scaling unless `radius` keyword argument is provided."""
