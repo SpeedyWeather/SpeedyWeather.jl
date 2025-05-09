@@ -11,6 +11,7 @@ struct SpectralTransform{
     AR,                         # <: AbstractArchitecture
     ArrayType,                  # non-parametric array type
     VectorType,                 # <: ArrayType{NF, 1},
+    ArrayTypeIntVector,         # <: ArrayType{Int, 1},
     ArrayTypeIntMatrix,         # <: ArrayType{Int, 2},
     VectorComplexType,          # <: ArrayType{Complex{NF}, 1},
     MatrixComplexType,          # <: ArrayType{Complex{NF}, 2},
@@ -70,7 +71,7 @@ struct SpectralTransform{
     jm_index_size::Int                             # number of indices per layer in kjm_indices
     kjm_indices::ArrayTypeIntMatrix                # precomputed kjm loop indices map for legendre transform
     lm2ij_indices::ArrayTypeIntMatrix              # precomputed lm2ij indices for kernels
-    i2lm_indices::AbstractVector{Int}              # precomputed indices for kernels over non-diagonal/last row elements
+    i2lm_indices::ArrayTypeIntVector               # precomputed indices for kernels over non-diagonal/last row elements
 
     # SOLID ANGLES ΔΩ FOR QUADRATURE
     # (integration for the Legendre polynomials, extra normalisation of π/nlat included)
@@ -279,6 +280,7 @@ function SpectralTransform(
         typeof(architecture),
         ArrayType_,
         ArrayType_{NF, 1},
+        ArrayType_{Int, 1},
         ArrayType_{Int, 2},
         ArrayType_{Complex{NF}, 1},
         ArrayType_{Complex{NF}, 2},
