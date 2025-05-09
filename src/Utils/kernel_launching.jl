@@ -21,10 +21,17 @@ function work_layout(dims_type::Symbol, worksize::NTuple{N, Int}) where N
 
     # To-Do: introduce `dims_type` e.g: `:mk` for kernel over m, k or `:lmk` for kernel over lm, k, ....
 
-    if dims_type == :lmk # kernel over sph number 'm' and layers 
+    if dims_type == :lmk # kernel over sph number 'lm' and layers 
         # compare how jack has done that in 
         # number of (M, k) items?
         workgroup = heuristic_workgroup(worksize...)
+    elseif dims_type == :diagonal # kernel just over the diagonal of a (m+1)x m or m x m LTA
+        return heuristic_workgroup(worksize[2], worksize[3:end]...), (worksize[2], worksize[3:end]...)
+    elseif dims_type == :lastrow # kernel just over the last row of a (m+1)x m or m x m LTA
+        return heuristic_workgroup(worksize[2], worksize[3:end]...), (worksize[2], worksize[3:end]...)
+    elseif dims_type == :lmk_main # kernel over everything in a LTA that's not the last row or diagonal
+        N_elements = worksize[2]*(worksize[2]+1)÷2 - worksize[2] 
+        return heuristic_workgroup(N_elements, worksize[3:end]...), (N_elements, worksize[3:end]...)
     else 
         error("Not yet implemented")
     end 

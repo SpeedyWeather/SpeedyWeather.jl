@@ -704,6 +704,66 @@ end
     end 
 end 
 
+"""$(TYPEDSIGNATURES) Applies the gradient operator ∇ applied to input `p` and stores the result
+in `dpdx` (zonal derivative) and `dpdy` (meridional derivative). The gradient operator acts
+on the unit sphere and therefore omits the 1/radius scaling unless `radius` keyword argument is provided."""
+function ∇_3KA!(
+    dpdx::LowerTriangularArray,     # Output: zonal gradient
+    dpdy::LowerTriangularArray,     # Output: meridional gradient
+    p::LowerTriangularArray,        # Input: spectral coefficients
+    S::SpectralTransform;           # includes precomputed arrays
+    radius = DEFAULT_RADIUS,        # scale with radius if provided, otherwise unit sphere
+)
+    (; grad_y1, grad_y2, lm2ij_indices, i2lm_indices) = S
+    @boundscheck ismatching(S, p) || throw(DimensionMismatch(S, p))
+
+    launch!(S.architecture, :diagonal, size(dpdx, as=Matrix), ∇_diagonal_kernel!, dpdx, dpdy, p, grad_y1, grad_y2, lm2ij_indices)
+    launch!(S.architecture, :lastrow, size(dpdx, as=Matrix), ∇_lastrow_kernel!, dpdx, dpdy, p, grad_y1, grad_y2, lm2ij_indices)
+    launch!(S.architecture, :lmk_main, size(dpdx, as=Matrix), ∇_main_kernel!, dpdx, dpdy, p, grad_y1, grad_y2, lm2ij_indices, i2lm_indices)
+
+    # 1/radius factor if not unit sphere
+    if radius != 1
+        R⁻¹ = inv(radius)
+        dpdx .*= R⁻¹
+        dpdy .*= R⁻¹
+    end
+
+    return dpdx, dpdy
+end
+
+@kernel function ∇_diagonal_kernel!(dpdx, dpdy, p, grad_y1, grad_y2, @Const(lm2ij_indices))
+
+    I = @index(Global, Cartesian)
+
+    i = I[1]
+    k = I[2]
+
+    dpdx[i, i, k] = (i-1)*im*p[i, i, k]         # zonal gradient: d/dlon = *i*m
+    dpdy[i, i, k] = grad_y2[i, i]*p[i+1, i, k]  
+end 
+
+@kernel function ∇_lastrow_kernel!(dpdx, dpdy, p, grad_y1, grad_y2, @Const(lm2ij_indices))
+
+    I = @index(Global, Cartesian)
+
+    m = I[1]
+    k = I[2]
+    l = p.m
+
+    dpdx[l, m, k] = (m-1)*im*p[l,m,k]
+    dpdy[l, m, k] = grad_y1[l,m]*p[l-1,m,k]    # only first term from 2nd last row
+end 
+
+@kernel function ∇_main_kernel!(dpdx, dpdy, p, grad_y1, grad_y2, @Const(lm2ij_indices), @Const(i2lm_indices))
+    i, k = @index(Global, NTuple)
+    
+    lm = i2lm_indices[i]
+    m = lm2ij_indices[lm, 2]
+
+    dpdx[lm, k] = (m-1)*im*p[lm, k]
+    dpdy[lm, k] = grad_y1[lm]*p[lm-1, k] + grad_y2[lm]*p[lm+1, k]
+end 
+
 """$(TYPEDSIGNATURES) The zonal and meridional gradient of `p`
 using an existing `SpectralTransform` `S`. Acts on the unit sphere,
 i.e. it omits 1/radius scaling unless `radius` keyword argument is provided."""
