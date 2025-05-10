@@ -38,13 +38,21 @@ end
 
                 model = Model(spectral_grid; albedo)
                 simulation = initialize!(model)
-                run!(simulation, steps=1)
 
-                a, b = extrema(simulation.diagnostic_variables.physics.albedo)
-                m = mean(simulation.diagnostic_variables.physics.albedo)
+                progn, diagn, model = SpeedyWeather.unpack(simulation)
+                SpeedyWeather.albedo!(diagn, progn, model)
+
+                a, b = extrema(simulation.diagnostic_variables.physics.land.albedo)
+                m = mean(simulation.diagnostic_variables.physics.land.albedo)
                 @test a >= 0
                 @test b <= 1
                 @test 0 < m < 1
+
+                a, b = extrema(simulation.diagnostic_variables.physics.ocean.albedo)
+                m = mean(simulation.diagnostic_variables.physics.ocean.albedo)
+                @test a >= 0
+                @test b <= 1
+                @test 0 < m < 1                
             end
         end
     end
