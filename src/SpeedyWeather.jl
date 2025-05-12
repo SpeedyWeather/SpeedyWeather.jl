@@ -11,7 +11,7 @@ export rotate!
 
 # GPU, PARALLEL
 import Base.Threads: Threads, @threads
-import KernelAbstractions
+import KernelAbstractions: KernelAbstractions, @kernel, @index, @Const
 import Adapt: Adapt, adapt, adapt_structure
 
 # INPUT OUTPUT
