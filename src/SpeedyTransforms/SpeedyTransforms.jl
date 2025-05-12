@@ -12,7 +12,7 @@ import Primes
 import Adapt: adapt
 
 # SPEEDYWEATHER MODULES
-using ..LowerTriangularMatrices
+using ..LowerTriangularArrays
 using ..RingGrids
 
 # TRANSFORM

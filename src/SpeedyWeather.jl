@@ -33,8 +33,8 @@ export initialize!, finalize!
 
 include("utility_functions.jl")
 
-# LowerTriangularMatrices for spherical harmonics
-export  LowerTriangularMatrices, 
+# LowerTriangularArrays for spherical harmonics
+export  LowerTriangularArrays, 
         LowerTriangularMatrix,
         LowerTriangularArray
 
@@ -42,8 +42,8 @@ export  LowerTriangularMatrices,
 export  OneBased, ZeroBased
 export  eachmatrix, eachharmonic
         
-include("LowerTriangularMatrices/LowerTriangularMatrices.jl")
-using .LowerTriangularMatrices
+include("LowerTriangularArrays/LowerTriangularArrays.jl")
+using .LowerTriangularArrays
 
 # RingGrids
 export  RingGrids

@@ -1,4 +1,4 @@
-module LowerTriangularMatrices
+module LowerTriangularArrays
 
 # STRUCTURE
 using DocStringExtensions

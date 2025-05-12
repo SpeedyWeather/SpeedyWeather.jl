@@ -46,7 +46,7 @@ end
                 A = randn(Complex{NF}, lmax, mmax, idims...)
 
                 # replaces spectraltrunction! here, we just set the elements zero manually
-                ind = LowerTriangularMatrices.lowertriangle_indices(A)
+                ind = LowerTriangularArrays.lowertriangle_indices(A)
                 ind = @. ~(ind)
                 A[ind] .= zero(Complex{NF})
 
@@ -55,7 +55,7 @@ end
                 @test size(L, as=Matrix) == size(A)
                 @test size(L.data) == size(L, as=Vector)
                 @test size(L)[2:end] == size(A)[3:end]
-                @test size(L)[1] == SpeedyWeather.LowerTriangularMatrices.nonzeros(size(A,1), size(A,2))
+                @test size(L)[1] == SpeedyWeather.LowerTriangularArrays.nonzeros(size(A,1), size(A,2))
                 
                 # with integer to request length of one specific dimension
                 @test size(L)[1] == size(L, 1)
@@ -133,7 +133,7 @@ end
         @test_throws BoundsError A[m, n+1]  # outside of i, j range
         @test_throws BoundsError A[m+1, n]  # outside of i, j range
 
-        mn = LowerTriangularMatrices.nonzeros(m, n)
+        mn = LowerTriangularArrays.nonzeros(m, n)
         @test_throws BoundsError A[mn+1]    # outside of k range
 
         # with @inbounds accessing [1,2] should return [5]
@@ -155,7 +155,7 @@ end
         @test_throws BoundsError A[m, n+1] = 1  # invalid
         @test_throws BoundsError A[1, 2] = 1    # upper triangle
 
-        mn = LowerTriangularMatrices.nonzeros(m, n)
+        mn = LowerTriangularArrays.nonzeros(m, n)
         @test_throws BoundsError A[mn+1] = 1
 
         # with @inbounds accessing [1,2] should return [5]
@@ -188,7 +188,7 @@ end
         @test_throws BoundsError A[m, n+1, p  ]  # outside or range
         @test_throws BoundsError A[m+1, n, p  ]  # outside or range
 
-        mnp = LowerTriangularMatrices.nonzeros(m, n)*p
+        mnp = LowerTriangularArrays.nonzeros(m, n)*p
         @test_throws BoundsError A[mnp+1]       # outside of k range
 
         # with @inbounds accessing [1,2] should return [5]
@@ -215,7 +215,7 @@ end
         @test_throws BoundsError A[m, n+1, p+1] = 1  # invalid
         @test_throws BoundsError A[1, 2,   1  ] = 1  # upper triangle
 
-        mnp = LowerTriangularMatrices.nonzeros(m, n)*p
+        mnp = LowerTriangularArrays.nonzeros(m, n)*p
         @test_throws BoundsError A[mnp+1] = 1
 
         # with @inbounds accessing [1,2] should return [5]
@@ -258,7 +258,7 @@ end
 end
 
 # only needed when the extension isn't loaded
-# LowerTriangularMatrices.nonparametric_type(::Type{<:JLArray}) = JLArray
+# LowerTriangularArrays.nonparametric_type(::Type{<:JLArray}) = JLArray
 
 @testset "Zeros, ones, rand, and randn constructors" begin
     for f in (ones, zeros, rand, randn)
@@ -317,7 +317,7 @@ end
                 A = randn(Complex{NF}, lmax, mmax, idims...)
 
                 # replaces spectraltrunction! here, we just set the elements zero manually
-                ind = SpeedyWeather.LowerTriangularMatrices.lowertriangle_indices(A)
+                ind = SpeedyWeather.LowerTriangularArrays.lowertriangle_indices(A)
                 ind = @. ~(ind)
                 A[ind] .= zero(Complex{NF})
 
@@ -504,7 +504,7 @@ end
             M = zeros(NF, 10, 10, idims...)
             copyto!(M, L1)
 
-            ind = SpeedyWeather.LowerTriangularMatrices.lowertriangle_indices(M)
+            ind = SpeedyWeather.LowerTriangularArrays.lowertriangle_indices(M)
             not_ind = @. ~(ind)
 
             @test all(M[not_ind] .== zero(NF))
@@ -648,23 +648,23 @@ end
     L2T = spectral_truncation(L2, (size(L1, ZeroBased; as=Matrix)[1:2])...)
     L3 = zeros(LowerTriangularArray{NF}, 33, 32, idims...)
 
-    SpeedyWeather.LowerTriangularMatrices._copyto_core!(L1, L2, 1:33, 1:32)     # size of smaller matrix
+    SpeedyWeather.LowerTriangularArrays._copyto_core!(L1, L2, 1:33, 1:32)     # size of smaller matrix
     @test L1 == L2T
 
     # test that GPU and CPU method yield the same
-    SpeedyWeather.LowerTriangularMatrices.copyto!(L3, L2, 1:33, 1:32)     # size of smaller matrix
+    SpeedyWeather.LowerTriangularArrays.copyto!(L3, L2, 1:33, 1:32)     # size of smaller matrix
     @test L1 == L3 
 
-    SpeedyWeather.LowerTriangularMatrices._copyto_core!(L1, L2, 1:65, 1:64)     # size of bigger matrix
+    SpeedyWeather.LowerTriangularArrays._copyto_core!(L1, L2, 1:65, 1:64)     # size of bigger matrix
     @test L1 == L2T
 
-    SpeedyWeather.LowerTriangularMatrices.copyto!(L3, L2, 1:65, 1:64)     # size of bigger matrix
+    SpeedyWeather.LowerTriangularArrays.copyto!(L3, L2, 1:65, 1:64)     # size of bigger matrix
     @test L1 == L3 
 
-    SpeedyWeather.LowerTriangularMatrices._copyto_core!(L1, L2, 1:50, 1:50)     # in between
+    SpeedyWeather.LowerTriangularArrays._copyto_core!(L1, L2, 1:50, 1:50)     # in between
     @test L1 == L2T
 
-    SpeedyWeather.LowerTriangularMatrices.copyto!(L3, L2, 1:50, 1:50)     # in between
+    SpeedyWeather.LowerTriangularArrays.copyto!(L3, L2, 1:50, 1:50)     # in between
     @test L3 == L1
 end 
 
@@ -724,7 +724,7 @@ end
 end 
 
 @testset "Rotate LowerTriangularArray" begin
-    import SpeedyWeather.LowerTriangularMatrices: rotate!
+    import SpeedyWeather.LowerTriangularArrays: rotate!
 
     @testset for NF in (Float16, Float32, Float64)
         @testset for trunc in (5, 10, 15)
