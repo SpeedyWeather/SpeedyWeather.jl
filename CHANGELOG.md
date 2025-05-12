@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Introduce Spectrum for LowerTriangularArrays [#734](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/734)
 - Reduce CI time [#731](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/731)
 - Remove DocsPreviewCleanup workflow [#730](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/730)
 - Move UnicodePlots to extension [#728](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/728)
