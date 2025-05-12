@@ -2,11 +2,11 @@ abstract type AbstractSpectrum end
 struct CPU end
 const DEFAULT_ARCHITECTURE = CPU
 
-struct Spectrum{A, D, DO} <: AbstractSpectrum
+struct Spectrum{A, O, DO} <: AbstractSpectrum
     lmax::Int
     mmax::Int
     architecture::A
-    degrees::D
+    orders::O
     degrees_orders::DO
 end
 
@@ -14,10 +14,10 @@ function Spectrum(
     lmax::Integer,
     mmax::Integer,
     architecture = DEFAULT_ARCHITECTURE(),
-    degrees = [m:lmax for m in 1:mmax],
+    orders = [m:lmax for m in 1:mmax],
     degrees_orders = degrees_orders(lmax, mmax),
 )
-    return Spectrum(lmax, mmax, architecture, degrees, degrees_orders)
+    return Spectrum(lmax, mmax, architecture, orders, degrees_orders)
 end
 
 triangle_number(m::Integer) = m*(m+1)÷2
