@@ -295,7 +295,7 @@ L + L
 
 ## GPU 
 
-`LowerTriangularArray{T, N, ArrayType}` wraps around an array of type `ArrayType`.
+`LowerTriangularArray{T, N, S, ArrayType}` wraps around an array of type `ArrayType`.
 If this array is a GPU array (e.g. `CuArray`), all operations are performed on GPU as well (work in progress).
 The implementation was written so that scalar indexing is avoided in almost all cases,
 so that GPU operation should be performant.

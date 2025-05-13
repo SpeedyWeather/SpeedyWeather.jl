@@ -139,7 +139,7 @@ end
                         map = transform(alms, S)
                         
                         # add singleton dimension for lower triangular matrix
-                        alms2 = zeros(LowerTriangularMatrix{Complex{NF}}, trunc+2, trunc+1, 1)
+                        alms2 = zeros(LowerTriangularArray{Complex{NF}}, trunc+2, trunc+1, 1)
                         alms2[:, 1] = alms
                         map2 = deepcopy(map)
                         transform!(map2, alms2, S)
@@ -296,7 +296,7 @@ end
                                      OctahedralClenshawGrid)
 
                 # clenshaw-curtis grids are only exact for cubic truncation
-                dealiasing = Grid in (FullGaussianGrid, OctahedralGaussianGrid) ? 2 : 3
+                dealiasing = Grid in (FullGaussianGrid, OctahedralGaussianGrid) ? 2.0 : 3.0
 
                 SG = SpectralGrid(; NF, trunc, Grid, dealiasing)
                 S = SpectralTransform(SG)

@@ -137,7 +137,7 @@ end
         @test_throws BoundsError A[mn+1]    # outside of k range
 
         # with @inbounds accessing [1,2] should return [5]
-        # because the j > 1 is skipped and ij2k(1, 2, 5) = 5
+        # because the j > 1 is skipped and lm2k(1, 2, 5) = 5
         # which isn't correct but would never be called without @inbounds
         f(A, i) = @inbounds A[i]             # wrap into function
         f(A, i, j) = @inbounds A[i, j]
@@ -159,7 +159,7 @@ end
         @test_throws BoundsError A[mn+1] = 1
 
         # with @inbounds accessing [1,2] should return [5]
-        # because the j > 1 is skipped and ij2k(1, 2, 5) = 5
+        # because the j > 1 is skipped and lm2k(1, 2, 5) = 5
         # which isn't correct but would never be called without @inbounds
         g!(A, i) = @inbounds A[i] = 1               # wrap into function
         g!(A, i, j) = @inbounds A[i, j] = 1
@@ -192,7 +192,7 @@ end
         @test_throws BoundsError A[mnp+1]       # outside of k range
 
         # with @inbounds accessing [1,2] should return [5]
-        # because the j > 1 boundscheck is skipped and ij2k(1, 2, 5) = 5
+        # because the j > 1 boundscheck is skipped and lm2k(1, 2, 5) = 5
         # which isn't correct but would never be called without @inbounds
         f(A, i) = @inbounds A[i]            # wrap into function
         f(A, i, j) = @inbounds A[i, j]
@@ -219,7 +219,7 @@ end
         @test_throws BoundsError A[mnp+1] = 1
 
         # with @inbounds accessing [1,2] should return [5]
-        # because the j > 1 is skipped and ij2k(1, 2, 5) = 5
+        # because the j > 1 is skipped and lm2k(1, 2, 5) = 5
         # which isn't correct but would never be called without @inbounds
         g!(A, i) = @inbounds A[i] = 1               # wrap into function
         g!(A, i, j) = @inbounds A[i, j] = 1
@@ -263,15 +263,26 @@ end
 @testset "Zeros, ones, rand, and randn constructors" begin
     for f in (ones, zeros, rand, randn)
         s = (5, 5)
+        spectrum = Spectrum(s...)
         
         # for 2D doesn't matter whether you say Matrix or Array, size is determined by s
         L = f(LowerTriangularMatrix, s...)
         L2 = f(LowerTriangularArray, s...)
         @test typeof(L) == typeof(L2)
         @test size(L) == size(L2)
+
+        L = f(LowerTriangularMatrix, spectrum)
+        L2 = f(LowerTriangularArray, spectrum)
+        @test typeof(L) == typeof(L2)
+        @test size(L) == size(L2)
         
         L = f(LowerTriangularMatrix{Float16}, s...)
         L2 = f(LowerTriangularArray{Float16}, s...)
+        @test typeof(L) == typeof(L2)
+        @test size(L) == size(L2)
+
+        L = f(LowerTriangularMatrix{Float16}, spectrum)
+        L2 = f(LowerTriangularArray{Float16}, spectrum)
         @test typeof(L) == typeof(L2)
         @test size(L) == size(L2)
         
@@ -281,8 +292,16 @@ end
         @test size(JL) == size(JL2) == size(zero(JL))
         
         L = f(LowerTriangularMatrix{Float16}, s...)
-        L2 = f(LowerTriangularArray{Float16, 1, Vector{Float16}}, s...)
-        JL = f(LowerTriangularArray{Float16, 1, JLArray{Float16, 1}}, s...)
+        L2 = f(LowerTriangularArray{Float16, 1, typeof(spectrum), Vector{Float16}}, s...)
+        JL = f(LowerTriangularArray{Float16, 1, typeof(spectrum), JLArray{Float16, 1}}, s...)
+        @test typeof(L) == typeof(L2)
+        @test size(L) == size(L2)
+        @test typeof(L) != typeof(JL)
+        @test size(L) == size(L2)
+
+        L = f(LowerTriangularMatrix{Float16}, spectrum)
+        L2 = f(LowerTriangularArray{Float16, 1, typeof(spectrum), Vector{Float16}}, spectrum)
+        JL = f(LowerTriangularArray{Float16, 1, typeof(spectrum), JLArray{Float16, 1}}, spectrum)
         @test typeof(L) == typeof(L2)
         @test size(L) == size(L2)
         @test typeof(L) != typeof(JL)
@@ -292,17 +311,32 @@ end
         for s in ((2, 3, 4), (2, 3, 4, 5))
             N = length(s)
             Random.seed!(123)
-            L =  f(LowerTriangularArray{Float16, N-1,   Array{Float16, N-1}}, s...)
+            L =  f(LowerTriangularArray{Float16, N-1, typeof(spectrum), Array{Float16, N-1}}, s...)
             Random.seed!(123)
-            JL = f(LowerTriangularArray{Float16, N-1, JLArray{Float16, N-1}}, s...)
+            JL = f(LowerTriangularArray{Float16, N-1, typeof(spectrum), JLArray{Float16, N-1}}, s...)
             JL2 = adapt(JLArray, L)
             @test all(JL2 .== JL)   # equality via broadcasting
             @test JL2 == JL         # checks for type and data equality
 
             Random.seed!(123)
-            L = f(LowerTriangularArray{Float16}, s...)
+            L2 = f(LowerTriangularArray{Float16}, s...)
+
+            @test L == L2
+        end
+
+        # higher dims - spectrum 
+        for s in ((2, ), (2, 3))
+            N = length(s)
             Random.seed!(123)
-            L2 = f(LowerTriangularMatrix{Float16}, s...)
+            L =  f(LowerTriangularArray{Float16, N+1, typeof(spectrum), Array{Float16, N+1}}, spectrum, s...)
+            Random.seed!(123)
+            JL = f(LowerTriangularArray{Float16, N+1, typeof(spectrum), JLArray{Float16, N+1}}, spectrum, s...)
+            JL2 = adapt(JLArray, L)
+            @test all(JL2 .== JL)   # equality via broadcasting
+            @test JL2 == JL         # checks for type and data equality
+
+            Random.seed!(123)
+            L2 = f(LowerTriangularArray{Float16}, spectrum, s...)
 
             @test L == L2
         end
@@ -314,6 +348,7 @@ end
         mmax = 32
         @testset for idims = ((), (5,), (5,5))
             @testset for lmax = (mmax, mmax+1)
+                spectrum = Spectrum(lmax, mmax)
                 A = randn(Complex{NF}, lmax, mmax, idims...)
 
                 # replaces spectraltrunction! here, we just set the elements zero manually
@@ -339,7 +374,7 @@ end
 
                 # convert
                 L = randn(LowerTriangularArray{NF}, lmax, mmax, idims...)
-                L3 = convert(LowerTriangularArray{Float16, 1+length(idims), Array{Float16,1+length(idims)}}, L)
+                L3 = convert(LowerTriangularArray{Float16, 1+length(idims), typeof(spectrum), Array{Float16,1+length(idims)}}, L)
                 for lm in SpeedyWeather.eachharmonic(L, L3)
                     @test Float16(L[lm, [1 for i=1:length(idims)]...]) == L3[lm, [1 for i=1:length(idims)]...] 
                 end
@@ -400,9 +435,11 @@ end
 
         @test size(similar(L)) == size(L)
         @test eltype(L) == eltype(similar(L, eltype(L)))
-    
-        @test (5, 7) == size(similar(L, 5, 7), as=Matrix)
-        @test (5, 7) == size(similar(L, (5, 7)), as=Matrix)
+        
+        # TODO: before this was (5, 7), but now it is (5, 5)
+        # why did we even do (5,7) in the first place?
+        @test (5, 5) == size(similar(L, 5, 5), as=Matrix)
+        @test (5, 5) == size(similar(L, (5, 5)), as=Matrix)
 
         @test similar(L) isa LowerTriangularMatrix
         @test similar(L, Float64) isa LowerTriangularMatrix{Float64}
@@ -427,8 +464,8 @@ end
             @test size(similar(L)) == size(L)
             @test eltype(L) == eltype(similar(L, eltype(L)))
 
-            @test (5, 7, idims...) == size(similar(L, 5, 7, idims...), as=Matrix)
-            @test (5, 7, idims...) == size(similar(L, (5, 7,  idims...)), as=Matrix)
+            @test (5, 5, idims...) == size(similar(L, 5, 5, idims...), as=Matrix)
+            @test (5, 5, idims...) == size(similar(L, (5, 5,  idims...)), as=Matrix)
 
             @test similar(L) isa LowerTriangularArray
             @test similar(L, Float64) isa LowerTriangularArray{Float64}
@@ -573,12 +610,13 @@ end
     # TODO: so far very basic GPU test, might integrate them into the other tests, as I already did with the broadcast test, but there are some key differences to avoid scalar indexing
     NF = Float32
     idims = (5,)
-
-    L_cpu = randn(LowerTriangularArray{NF}, 10, 10, 5)
+    spectrum = Spectrum(10, 10)
+    
+    L_cpu = randn(LowerTriangularArray{NF}, spectrum, idims...)
 
     # constructors/adapt
     L = adapt(JLArray, L_cpu)
-    L2 = LowerTriangularArray(adapt(JLArray, L_cpu.data), 10, 10)
+    L2 = LowerTriangularArray(adapt(JLArray, L_cpu.data), spectrum)
     @test all(L .== L2) 
 
     # getindex 
@@ -608,8 +646,8 @@ end
     @test all(L2[1,:] .== rand_array)
 
     # rand + convert
-    L3 = adapt(JLArray, randn(LowerTriangularArray{NF}, 10, 10, 5))
-    L4 = convert(LowerTriangularArray{Float16,2,JLArray{Float16,2}}, L3)
+    L3 = adapt(JLArray, randn(LowerTriangularArray{NF}, spectrum, idims...))
+    L4 = convert(LowerTriangularArray{Float16,2,typeof(spectrum),JLArray{Float16,2}}, L3)
 
     for lm in SpeedyWeather.eachharmonic(L, L3)
         @test all(Float16.(L3[lm, :]) .== L4[lm, :])
@@ -623,8 +661,8 @@ end
     @test size(similar(L)) == size(L)
     @test eltype(L) == eltype(similar(L, eltype(L)))
 
-    @test (5, 7, 5) == size(similar(L, 5, 7, idims...), as=Matrix)
-    @test (5, 7, 5) == size(similar(L, (5, 7,  idims...)), as=Matrix)
+    @test (5, 5, idims...) == size(similar(L, 5, 5, idims...), as=Matrix)
+    @test (5, 5, idims...) == size(similar(L, (5, 5,  idims...)), as=Matrix)
 
     @test similar(L) isa LowerTriangularArray
 

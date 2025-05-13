@@ -12,7 +12,7 @@ struct LowerTriangularArray{T, N, S<:AbstractSpectrum, ArrayType <: AbstractArra
     spectrum::S         # spectrum, that holds all spectral discretization information and the architecture the array is on
 
     LowerTriangularArray{T, N, S, ArrayType}(data, spectrum) where {T, N, S <: AbstractSpectrum, ArrayType<:AbstractArray{T}} =
-        check_lta_input_array(data, spectrum) ? 
+        check_lta_input_array(data, spectrum, N) ? 
         new(data, spectrum)  :
         error(lta_error_message(data, spectrum, T, N, ArrayType))
 end
@@ -31,14 +31,17 @@ const LowerTriangularMatrix{T, S} = LowerTriangularArray{T, 1, S, Vector{T}} whe
 LowerTriangularArray(data::ArrayType, spectrum::S) where {T, N, S<:AbstractSpectrum, ArrayType<:AbstractArray{T,N}} = LowerTriangularArray{T, N, S, ArrayType}(data, spectrum)
 
 LowerTriangularMatrix(data::Vector{T}, spectrum::S) where {T, S<:AbstractSpectrum} =
-    LowerTriangularMatrix{T}(data, spectrum)
+    LowerTriangularMatrix{T, typeof(spectrum)}(data, spectrum)
 
 function LowerTriangularArray(data::ArrayType, lmax::Integer, mmax::Integer) where {T, N, ArrayType<:AbstractArray{T,N}}
     spectrum = Spectrum(lmax, mmax)
     return LowerTriangularArray{T, N, typeof(spectrum), ArrayType}(data, spectrum)
 end
 
-LowerTriangularMatrix(data::Vector{T}, lmax::Integer, mmax::Integer) where T = LowerTriangularMatrix{T}(data, Spectrum(lmax, mmax))
+function LowerTriangularMatrix(data::Vector{T}, lmax::Integer, mmax::Integer) where T 
+    spectrum = Spectrum(lmax, mmax) 
+    return LowerTriangularMatrix{T, typeof(spectrum)}(data, spectrum)
+end 
 
 # SIZE ETC
 """$(TYPEDSIGNATURES)
@@ -165,6 +168,14 @@ for f in (:zeros, :ones, :rand, :randn)
         ) where {T, M}
             return LowerTriangularArray($f(T, nonzeros(lmax, mmax), I...), Spectrum(lmax, mmax))
         end
+
+        function Base.$f(
+            ::Type{LowerTriangularMatrix{T}},
+            lmax::Integer,
+            mmax::Integer, 
+        ) where T
+            return LowerTriangularMatrix($f(T, nonzeros(lmax, mmax)), Spectrum(lmax, mmax))
+        end
         
         function Base.$f(
             ::Type{LowerTriangularArray{T}},
@@ -172,6 +183,13 @@ for f in (:zeros, :ones, :rand, :randn)
             I::Vararg{Integer, M},
         ) where {T, M}
             return LowerTriangularArray($f(T, nonzeros(spectrum), I...), spectrum)
+        end
+
+        function Base.$f(
+            ::Type{LowerTriangularMatrix{T}},
+            spectrum::AbstractSpectrum,
+        ) where T
+            return LowerTriangularMatrix($f(T, nonzeros(spectrum)), spectrum)
         end
 
         # use Float64 as default if type T is not provided
@@ -197,11 +215,11 @@ function LowerTriangularArray{T, N, S, ArrayType}(
     return LowerTriangularArray(ArrayType(undef, nonzeros(I[1], I[2]), I[3:end]...), Spectrum(I[1], I[2]))
 end
 
-function LowerTriangularArray{T, N, ArrayType}(
+function LowerTriangularArray{T, N, SP, ArrayType}(
     ::UndefInitializer,
     size::S,
-) where {T, N, ArrayType<:AbstractArray{T}, S<:Tuple}
-    return LowerTriangularArray{T, N, ArrayType}(undef, size...)
+) where {T, N, SP<:AbstractSpectrum, ArrayType<:AbstractArray{T}, S<:Tuple}
+    return LowerTriangularArray{T, N, SP, ArrayType}(undef, size...)
 end
    
 function LowerTriangularMatrix{T}(::UndefInitializer, lmax::Integer, mmax::Integer) where T
@@ -269,10 +287,10 @@ Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray{T,N}, I::Cartesia
 Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray{T,N}, i::Integer) where {T,N} = getindex(L.data, i)
 
 # needed to remove ambigouities in 1D case 
-Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray{T,1,V}, i::Integer) where {T,V<:AbstractVector{T}} = getindex(L.data, i)
-Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray{T,1,V}, I::CartesianIndex{M}) where {T,V<:AbstractVector{T},M} = getindex(L, Tuple(I)...)
-Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray{T,1,V}, i::Integer, I::CartesianIndex{0}) where {T,V<:AbstractVector{T}} = getindex(L, i)
-Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray{T,1,V}, i::Integer, I::CartesianIndices{0}) where {T,V<:AbstractVector{T}} = getindex(L, i)
+Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray{T,1,S,V}, i::Integer) where {S<:AbstractSpectrum,V<:AbstractVector{T}} where T = getindex(L.data, i)
+Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray{T,1,S,V}, I::CartesianIndex{M}) where {T,S<:AbstractSpectrum,V<:AbstractVector{T},M} = getindex(L, Tuple(I)...)
+Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray{T,1,S,V}, i::Integer, I::CartesianIndex{0}) where {T,S<:AbstractSpectrum,V<:AbstractVector{T}} = getindex(L, i)
+Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray{T,1,S,V}, i::Integer, I::CartesianIndices{0}) where {T,S<:AbstractSpectrum,V<:AbstractVector{T}} = getindex(L, i)
 
 # setindex with lm, ..
 @inline Base.setindex!(L::LowerTriangularArray{T,N}, x, I::Vararg{Any, N}) where {T, N} = setindex!(L.data, x, I...)
@@ -282,23 +300,22 @@ Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray{T,1,V}, i::Intege
     @boundscheck N+1==M || throw(BoundsError(L, I))
     i, j = I[1:2] 
     @boundscheck i >= j || throw(BoundsError(L, I))
-    k = lm2k(i, j, L.S.lmax, L.S.mmax)
+    k = lm2k(i, j, L.spectrum.lmax, L.spectrum.mmax)
     setindex!(L.data, x, k, I[3:end]...)
 end
 
 # this is specifically here for the weird way in which AssociatedLegendrePolynomials.jl indexes with an empty CartesianIndex
 @inline Base.setindex!(L::LowerTriangularArray{T,N}, x, i::CartesianIndex{0}, I::Vararg{Any, M}) where {T,N, M} = setindex!(L, x, I)
 
-
 @inline Base.setindex!(L::LowerTriangularArray, x, I::CartesianIndex) = setindex!(L, x, Tuple(I)...)
 @inline Base.setindex!(L::LowerTriangularArray{T,N}, x, I::CartesianIndex{N}) where {T,N} = setindex!(L.data, x, I)
 @inline Base.setindex!(L::LowerTriangularArray{T,N}, x, i::Integer) where {T,N} = setindex!(L.data, x, i)
 
 # this is to avoid ambigouities
-@inline Base.setindex!(L::LowerTriangularArray{T,1,V}, x, i::Integer) where {T,V<:AbstractVector{T}} = setindex!(L.data, x, i)
-@inline Base.setindex!(L::LowerTriangularArray{T,1,V}, x, I::CartesianIndex{1}) where {T,V<:AbstractVector{T}} = setindex!(L.data, x, I)
-@inline Base.setindex!(L::LowerTriangularArray{T,1,V}, x, I::CartesianIndex{2}) where {T,V<:AbstractVector{T}} = setindex!(L, x, Tuple(I)...)
-@inline Base.setindex!(L::LowerTriangularArray{T,1,V}, x, i::Integer, I::CartesianIndex{0}) where {T,V<:AbstractVector{T}} = setindex!(L, x, i)
+@inline Base.setindex!(L::LowerTriangularArray{T,1,S,V}, x, i::Integer) where {T,S<:AbstractSpectrum,V<:AbstractVector{T}} = setindex!(L.data, x, i)
+@inline Base.setindex!(L::LowerTriangularArray{T,1,S,V}, x, I::CartesianIndex{1}) where {T,S<:AbstractSpectrum,V<:AbstractVector{T}} = setindex!(L.data, x, I)
+@inline Base.setindex!(L::LowerTriangularArray{T,1,S,V}, x, I::CartesianIndex{2}) where {T,S<:AbstractSpectrum,V<:AbstractVector{T}} = setindex!(L, x, Tuple(I)...)
+@inline Base.setindex!(L::LowerTriangularArray{T,1,S,V}, x, i::Integer, I::CartesianIndex{0}) where {T,S<:AbstractSpectrum,V<:AbstractVector{T}} = setindex!(L, x, i)
 
 # propagate index to data vector
 Base.eachindex(L ::LowerTriangularArray)    = eachindex(L.data)
@@ -561,15 +578,15 @@ function Base.convert(
 end
 
 function Base.convert(::Type{LowerTriangularMatrix{T}}, L::LowerTriangularMatrix) where T
-    return LowerTriangularMatrix{T}(L.data, L.spectrum)
+    return LowerTriangularMatrix{T,typeof(L.spectrum)}(L.data, L.spectrum)
 end
 
-function Base.similar(::LowerTriangularArray{T, N, S, ArrayType}, I::Integer...) where {T, N, S, ArrayType}
-    return LowerTriangularArray{T,N,S,ArrayType}(undef, I...)
+function Base.similar(::LowerTriangularArray{T, N, SP, ArrayType}, I::Integer...) where {T, N, SP, ArrayType}
+    return LowerTriangularArray{T,N,SP,ArrayType}(undef, I...)
 end
 
-function Base.similar(::LowerTriangularArray{T, N, S, ArrayType}, size::S) where {T, N, S, ArrayType}
-    return LowerTriangularArray{T,N,S,ArrayType}(undef, size...)
+function Base.similar(::LowerTriangularArray{T, N, SP, ArrayType}, size::S) where {T, N, SP, ArrayType, S <: Tuple}
+    return LowerTriangularArray{T,N,SP,ArrayType}(undef, size...)
 end
 
 function Base.similar(L::LowerTriangularArray{S, N, SP, ArrayType}, ::Type{T}) where {T, S, N, SP, ArrayType}

@@ -4,7 +4,7 @@ import FiniteDifferences: j′vp, grad, central_fdm
 import AbstractFFTs
 
 grid_types = [FullGaussianGrid, OctahedralGaussianGrid] # one full and one reduced grid, both Gaussian to have exact transforms 
-grid_dealiasing = [2, 3]
+grid_dealiasing = [2.0, 3.0]
 fd_tests = [true, true] 
 
 # currently there's an issue with EnzymeTestUtils not being able to work with structs with undefined fields like FFT plans

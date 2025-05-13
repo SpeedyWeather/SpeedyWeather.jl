@@ -64,10 +64,10 @@ both inputs are 0-based. If `ltrunc` or `mtrunc` is larger than the correspondin
 coefficients for higher wavenumbers."""
 function spectral_truncation(
     ::Type{NF},                 # number format NF (can be complex)
-    alms::LowerTriangularArray{T, N, ArrayType}, # spectral field to be truncated
+    alms::LowerTriangularArray{T, N, S, ArrayType}, # spectral field to be truncated
     ltrunc::Integer,            # truncate to max degree ltrunc
     mtrunc::Integer,            # truncate to max order mtrunc
-) where {NF, T, N, ArrayType}
+) where {NF, T, N, S, ArrayType}
     
     lmax, mmax, k... = size(alms, ZeroBased, as=Matrix)
     
@@ -76,7 +76,7 @@ function spectral_truncation(
 
     # preallocate new (smaller) array
     ArrayType_ = LowerTriangularArrays.nonparametric_type(ArrayType)
-    alms_trunc = zeros(LowerTriangularArray{NF, N, ArrayType_{NF, N}}, ltrunc+1, mtrunc+1, k...)  
+    alms_trunc = zeros(LowerTriangularArray{NF, N, S, ArrayType_{NF, N}}, Spectrum(ltrunc+1, mtrunc+1), k...)  
 
     # copy data over, copyto! copies the largest matching subset of harmonics
     copyto!(alms_trunc, alms)
@@ -94,10 +94,10 @@ corresponding size of`alms` than `spectral_truncation` is automatically called i
 LowerTriangularArray."""
 function spectral_interpolation(
     ::Type{NF},                 # number format NF (can be complex)
-    alms::LowerTriangularArray{T, N, ArrayType}, # spectral field to be truncated
+    alms::LowerTriangularArray{T, N, S, ArrayType}, # spectral field to be truncated
     ltrunc::Integer,            # truncate to max degree ltrunc
     mtrunc::Integer,            # truncate to max order mtrunc
-) where {NF, T, N, ArrayType}                
+) where {NF, T, N, S, ArrayType}                
     
     lmax, mmax, k... = size(alms, ZeroBased, as=Matrix)
     
@@ -106,7 +106,7 @@ function spectral_interpolation(
 
     # preallocate new (larger) array
     ArrayType_ = LowerTriangularArrays.nonparametric_type(ArrayType)
-    alms_interp = zeros(LowerTriangularArray{NF, N, ArrayType_{NF, N}}, ltrunc+1, mtrunc+1, k...)  
+    alms_interp = zeros(LowerTriangularArray{NF, N, S, ArrayType_{NF, N}}, Spectrum(ltrunc+1, mtrunc+1), k...)  
 
     # copy data over, copyto! copies the largest matching subset of harmonics
     copyto!(alms_interp, alms)

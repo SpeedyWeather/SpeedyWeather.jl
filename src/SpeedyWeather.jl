@@ -38,6 +38,8 @@ export  LowerTriangularArrays,
         LowerTriangularMatrix,
         LowerTriangularArray
 
+export  Spectrum
+
 # indexing styles for LowerTriangularArray/Matrix
 export  OneBased, ZeroBased
 export  eachmatrix, eachharmonic

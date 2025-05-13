@@ -109,6 +109,7 @@ function SpectralTransform(
 
     Grid = RingGrids.nonparametric_type(Grid)               # always use nonparametric concrete type
     ArrayType_ = RingGrids.nonparametric_type(ArrayType)    # drop parameters of ArrayType
+    spectrum = Spectrum(lmax+1, mmax+1)                     # TODO: the +1 here is how we've done it so far                       
 
     # RESOLUTION PARAMETERS
     nlat = get_nlat(Grid, nlat_half)            # 2nlat_half but one less if grids have odd # of lat rings
@@ -138,7 +139,7 @@ function SpectralTransform(
     lon_offsets = [cispi(m*lon1/π) for m in 0:mmax, lon1 in lon1s]
     
     # PRECOMPUTE LEGENDRE POLYNOMIALS, +1 for 1-based indexing
-    legendre_polynomials = zeros(LowerTriangularMatrix{NF}, lmax+1, mmax+1, nlat_half)
+    legendre_polynomials = zeros(LowerTriangularArray{NF}, spectrum, nlat_half)
     legendre_polynomials_j = zeros(NF, lmax+1, mmax+1)      # temporary for one latitude
     for j in 1:nlat_half                                    # only one hemisphere due to symmetry
         Legendre.λlm!(legendre_polynomials_j, lmax, mmax, cos_colat[j])             # precompute
@@ -200,8 +201,8 @@ function SpectralTransform(
 
     # GRADIENTS (on unit sphere, hence 1/radius-scaling is omitted)
     # meridional gradient for scalars (coslat scaling included)
-    grad_y1 = zeros(LowerTriangularMatrix, lmax+1, mmax+1)      # term 1, mul with harmonic l-1, m
-    grad_y2 = zeros(LowerTriangularMatrix, lmax+1, mmax+1)      # term 2, mul with harmonic l+1, m
+    grad_y1 = zeros(LowerTriangularMatrix, spectrum)      # term 1, mul with harmonic l-1, m
+    grad_y2 = zeros(LowerTriangularMatrix, spectrum)      # term 2, mul with harmonic l+1, m
 
     for m in 0:mmax                         # 0-based degree l, order m
         for l in m:lmax           
@@ -211,8 +212,8 @@ function SpectralTransform(
     end
 
     # meridional gradient used to get from u, v/coslat to vorticity and divergence
-    grad_y_vordiv1 = zeros(LowerTriangularMatrix, lmax+1, mmax+1)   # term 1, mul with harmonic l-1, m
-    grad_y_vordiv2 = zeros(LowerTriangularMatrix, lmax+1, mmax+1)   # term 2, mul with harmonic l+1, m
+    grad_y_vordiv1 = zeros(LowerTriangularMatrix, spectrum)   # term 1, mul with harmonic l-1, m
+    grad_y_vordiv2 = zeros(LowerTriangularMatrix, spectrum)   # term 2, mul with harmonic l+1, m
 
     for m in 0:mmax                         # 0-based degree l, order m
         for l in m:lmax          
@@ -226,8 +227,8 @@ function SpectralTransform(
     vordiv_to_uv_x[1, 1] = 0
 
     # meridional integration (sort of) to get from vorticity and divergence to u, v*coslat
-    vordiv_to_uv1 = zeros(LowerTriangularMatrix, lmax+1, mmax+1)    # term 1, to be mul with harmonic l-1, m
-    vordiv_to_uv2 = zeros(LowerTriangularMatrix, lmax+1, mmax+1)    # term 2, to be mul with harmonic l+1, m
+    vordiv_to_uv1 = zeros(LowerTriangularMatrix, spectrum)    # term 1, to be mul with harmonic l-1, m
+    vordiv_to_uv2 = zeros(LowerTriangularMatrix, spectrum)    # term 2, to be mul with harmonic l+1, m
 
     for m in 0:mmax                         # 0-based degree l, order m
         for l in m:lmax           
@@ -250,8 +251,8 @@ function SpectralTransform(
         ArrayType_{Complex{NF}, 1},
         ArrayType_{Complex{NF}, 2},
         ArrayType_{Complex{NF}, 3},
-        LowerTriangularArray{NF, 1, ArrayType_{NF, 1}},
-        LowerTriangularArray{NF, 2, ArrayType_{NF, 2}},
+        LowerTriangularArray{NF, 1, typeof(spectrum), ArrayType_{NF, 1}},
+        LowerTriangularArray{NF, 2, typeof(spectrum), ArrayType_{NF, 2}},
     }(
         Grid, nlat_half, nlayers,
         lmax, mmax, nfreq_max, 
@@ -277,11 +278,11 @@ Generator function for a `SpectralTransform` struct based on the size of the spe
 coefficients `specs`. Use keyword arguments `nlat_half`, `Grid` or `deliasing` (if `nlat_half`
 not provided) to define the grid."""
 function SpectralTransform(
-    specs::LowerTriangularArray{NF, N, ArrayType};  # spectral coefficients
+    specs::LowerTriangularArray{NF, N, S, ArrayType};  # spectral coefficients
     nlat_half::Integer = 0,                         # resolution parameter nlat_half
     dealiasing::Real = DEFAULT_DEALIASING,          # dealiasing factor
     kwargs...
-) where {NF, N, ArrayType}                          # number format NF (can be complex)
+) where {NF, N, S, ArrayType}                          # number format NF (can be complex)
     lmax, mmax = size(specs, ZeroBased, as=Matrix)  # 0-based degree l, order m
 
     # get nlat_half from dealiasing if not provided
@@ -311,9 +312,9 @@ end
 Generator function for a `SpectralTransform` struct to transform between `grids` and `specs`."""
 function SpectralTransform(
     grids::AbstractGridArray{NF1, N, ArrayType1},
-    specs::LowerTriangularArray{NF2, N, ArrayType2};
+    specs::LowerTriangularArray{NF2, N, S, ArrayType2};
     kwargs...
-) where {NF1, NF2, N, ArrayType1, ArrayType2}           # number formats 1 and 2
+) where {NF1, NF2, N, S, ArrayType1, ArrayType2}           # number formats 1 and 2
     
     # infer types for SpectralTransform
     NF = promote_type(real(eltype(grids)), real(eltype(specs)))

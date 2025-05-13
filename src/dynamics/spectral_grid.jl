@@ -21,7 +21,10 @@ $(TYPEDFIELDS)
 
 `nlat_half` and `npoints` should not be chosen but are derived from `trunc`,
 `Grid` and `dealiasing`."""
-@kwdef struct SpectralGrid <: AbstractSpectralGrid
+@kwdef struct SpectralGrid{
+    SP,          # <: AbstractSpectrum
+} <: AbstractSpectralGrid
+
     "[OPTION] number format used throughout the model"
     NF::Type{<:AbstractFloat} = DEFAULT_NF
 
@@ -44,14 +47,17 @@ $(TYPEDFIELDS)
     "[OPTION] horizontal resolution as the maximum degree of spherical harmonics"
     trunc::Int = DEFAULT_TRUNC
 
+    "[DERIVED] spectral spectrum"
+    spectrum::SP = Spectrum(trunc+2, trunc+1)
+
     "[DERIVED] Type of spectral variable in 2D (horizontal only, flattened into 1D vector)"
-    SpectralVariable2D::Type{<:AbstractArray} = LowerTriangularArray{Complex{NF}, 1, ArrayType{Complex{NF}, 1}}
+    SpectralVariable2D::Type{<:AbstractArray} = LowerTriangularArray{Complex{NF}, 1, typeof(spectrum), ArrayType{Complex{NF}, 1}}
 
     "[DERIVED] Type of spectral variable in 3D (horizontal only + e.g vertical, flattened into 2D matrix)"
-    SpectralVariable3D::Type{<:AbstractArray} = LowerTriangularArray{Complex{NF}, 2, ArrayType{Complex{NF}, 2}}
+    SpectralVariable3D::Type{<:AbstractArray} = LowerTriangularArray{Complex{NF}, 2, typeof(spectrum), ArrayType{Complex{NF}, 2}}
 
     "[DERIVED] Type of spectral variable in 4D (horizontal only + e.g. vertical and time, flattened into 3D array)"
-    SpectralVariable4D::Type{<:AbstractArray} = LowerTriangularArray{Complex{NF}, 3, ArrayType{Complex{NF}, 3}}
+    SpectralVariable4D::Type{<:AbstractArray} = LowerTriangularArray{Complex{NF}, 3, typeof(spectrum), ArrayType{Complex{NF}, 3}}
     
     # HORIZONTAL GRID
     "[OPTION] horizontal grid used for calculations in grid-point space"
@@ -67,7 +73,7 @@ $(TYPEDFIELDS)
     GridVariable4D::Type{<:AbstractArray} = RingGrids.nonparametric_type(Grid){NF, 3, ArrayType{NF, 3}}
 
     "[OPTION] how to match spectral with grid resolution: dealiasing factor, 1=linear, 2=quadratic, 3=cubic grid"
-    dealiasing::Float64 = 2
+    dealiasing::Float64 = 2.0
 
     # TODO move to planet?
     "[OPTION] radius of the sphere [m]"

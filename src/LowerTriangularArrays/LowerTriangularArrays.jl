@@ -11,7 +11,7 @@ import KernelAbstractions
 # NUMERICS
 import LinearAlgebra: tril!
 
-export Spectrum 
+export AbstractSpectrum, Spectrum
 export LowerTriangularMatrix, LowerTriangularArray
 export eachharmonic, eachmatrix
 export OneBased, ZeroBased
