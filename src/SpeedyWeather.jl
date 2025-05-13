@@ -47,18 +47,14 @@ using .LowerTriangularMatrices
 
 # RingGrids
 export  RingGrids
-export  AbstractGrid, AbstractGridArray,
-        AbstractFullGridarray, AbstractReducedGridArray
-export  FullClenshawGrid, FullClenshawArray,
-        FullGaussianGrid, FullGaussianArray,
-        FullHEALPixGrid, FullHEALPixArray,
-        FullOctaHEALPixGrid, FullOctaHEALPixArray,
-        OctahedralGaussianGrid, OctahedralGaussianArray,
-        OctahedralClenshawGrid, OctahedralClenshawArray,
-        HEALPixGrid, HEALPixArray,
-        OctaHEALPixGrid, OctaHEALPixArray,
-        OctaminimalGaussianGrid, OctaminimalGaussianArray,
-        eachring, eachgrid
+export  AbstractGrid, AbstractFullGrid, AbstractReducedGrid
+export  Field
+export  FullClenshawGrid, FullGaussianGrid,
+        FullHEALPixGrid, FullOctaHEALPixGrid,
+        OctahedralGaussianGrid, OctahedralClenshawGrid,
+        HEALPixGrid, OctaHEALPixGrid,
+        OctaminimalGaussianGrid
+        eachring, eachfield
 export  AnvilInterpolator
 export  spherical_distance
 export  zonal_mean

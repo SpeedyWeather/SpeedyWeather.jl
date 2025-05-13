@@ -1,4 +1,4 @@
-"""An `OctaHEALPixArray` is an array of OctaHEALPix grids, subtyping `AbstractReducedGridArray`.
+"""An `OctaHEALPixGrid` is an array of OctaHEALPix grids, subtyping `AbstractReducedGridGrid`.
 First dimension of the underlying `N`-dimensional `data` represents the horizontal dimension,
 in ring order (0 to 360˚E, then north to south), other dimensions are used for the vertical and/or
 time or other dimensions. The resolution parameter of the horizontal grid is `nlat_half`
@@ -19,33 +19,21 @@ HEALPix grids with Nθ = 1, Nφ = 4 but is not explicitly mentioned therein.
 it is `rings = [1:4, 5:12, 13:24, 25:32, 33:36]`. For efficient looping see `eachring` and `eachgrid`.
 Fields are
 $(TYPEDFIELDS)"""
-struct OctaHEALPixArray{T, N, ArrayType <: AbstractArray{T, N}} <: AbstractReducedGridArray{T, N, ArrayType}
-    data::ArrayType                 # data array, ring by ring, north to south
-    nlat_half::Int                  # number of latitudes on one hemisphere
-    rings::Vector{UnitRange{Int}}   # TODO make same array type as data?
-
-    OctaHEALPixArray(data::A, nlat_half, rings) where {A <: AbstractArray{T, N}} where {T, N} =
-        check_inputs(data, nlat_half, rings, OctaHEALPixArray) ?
-        new{T, N, A}(data, nlat_half, rings) :
-        error_message(data, nlat_half, rings, OctaHEALPixArray, T, N, A)
+struct OctaHEALPixGrid{A, V} <: AbstractReducedGrid
+    nlat_half::Int      # number of latitudes on one hemisphere
+    architecture::A     # information about device, CPU/GPU
+    rings::V            # precomputed ring indices
 end
 
-## TYPES
-const OctaHEALPixGrid{T} = OctaHEALPixArray{T, 1, Vector{T}}
-nonparametric_type(::Type{<:OctaHEALPixArray}) = OctaHEALPixArray
-horizontal_grid_type(::Type{<:OctaHEALPixArray}) = OctaHEALPixGrid
-full_array_type(::Type{<:OctaHEALPixArray}) = FullOctaHEALPixArray
-
-"""An `OctaHEALPixArray` but constrained to `N=1` dimensions (horizontal only) and data is a `Vector{T}`."""
-OctaHEALPixGrid
+nonparametric_type(::Type{<:OctaHEALPixGrid}) = OctaHEALPixGrid
 
 ## SIZE
-nlat_odd(::Type{<:OctaHEALPixArray}) = true
-get_npoints2D(::Type{<:OctaHEALPixArray}, nlat_half::Integer) = 4*nlat_half^2
-get_nlat_half(::Type{<:OctaHEALPixArray}, npoints2D::Integer) = round(Int, sqrt(npoints2D/4))
+nlat_odd(::Type{<:OctaHEALPixGrid}) = true
+get_npoints(::Type{<:OctaHEALPixGrid}, nlat_half::Integer) = 4*nlat_half^2
+get_nlat_half(::Type{<:OctaHEALPixGrid}, npoints::Integer) = round(Int, sqrt(npoints/4))
 
 # number of longitude 
-function get_nlon_per_ring(Grid::Type{<:OctaHEALPixArray}, nlat_half::Integer, j::Integer)
+function get_nlon_per_ring(Grid::Type{<:OctaHEALPixGrid}, nlat_half::Integer, j::Integer)
     nlat = get_nlat(Grid, nlat_half)
     @assert 0 < j <= nlat "Ring $j is outside P$nlat_half grid."
     # j = j > nlat_half ? nlat - j + 1 : j      # flip north south due to symmetry
@@ -55,8 +43,8 @@ end
 matrix_size(::Type{OctaHEALPixGrid}, nlat_half::Integer) = (2nlat_half, 2nlat_half)
 
 ## COORDINATES
-function get_latd(::Type{<:OctaHEALPixArray}, nlat_half::Integer)
-    nlat = get_nlat(OctaHEALPixArray, nlat_half)
+function get_latd(::Type{<:OctaHEALPixGrid}, nlat_half::Integer)
+    nlat = get_nlat(OctaHEALPixGrid, nlat_half)
     latd = zeros(nlat)
 
     # Górski et al. 2005 eq 4 but without the 1/3 and Nside=nlat_half
@@ -66,7 +54,7 @@ function get_latd(::Type{<:OctaHEALPixArray}, nlat_half::Integer)
     return latd
 end
 
-function get_lond_per_ring(Grid::Type{<:OctaHEALPixArray}, nlat_half::Integer, j::Integer)
+function get_lond_per_ring(Grid::Type{<:OctaHEALPixGrid}, nlat_half::Integer, j::Integer)
     nlon = get_nlon_per_ring(Grid, nlat_half, j)
     # equidistant longitudes with equal offsets from 0˚ and 360˚,
     # e.g. 45, 135, 225, 315 for nlon=4
@@ -74,7 +62,7 @@ function get_lond_per_ring(Grid::Type{<:OctaHEALPixArray}, nlat_half::Integer, j
 end
 
 ## INDEXING
-function each_index_in_ring(::Type{<:OctaHEALPixArray},     # function for OctaHEALPix grids
+function each_index_in_ring(::Type{<:OctaHEALPixGrid},     # function for OctaHEALPix grids
                             j::Integer,                     # ring index north to south
                             nlat_half::Integer)             # resolution param
 
@@ -91,8 +79,8 @@ function each_index_in_ring(::Type{<:OctaHEALPixArray},     # function for OctaH
     return index_1st:index_end                              # range of i's in ring
 end
 
-function each_index_in_ring!(   rings::Vector{<:UnitRange{<:Integer}},
-                                Grid::Type{<:OctaHEALPixArray},
+function each_index_in_ring!(   rings::AbstractVector{<:UnitRange{<:Integer}},
+                                Grid::Type{<:OctaHEALPixGrid},
                                 nlat_half::Integer) # resolution param
 
     nlat = length(rings)

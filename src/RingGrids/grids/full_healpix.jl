@@ -8,34 +8,23 @@ and/or time or other dimensions. The resolution parameter of the horizontal grid
 `nlat_half` (number of latitude rings on one hemisphere, Equator included) and the ring indices
 are precomputed in `rings`. Fields are
 $(TYPEDFIELDS)"""
-struct FullHEALPixArray{T, N, ArrayType <: AbstractArray{T, N}} <: AbstractFullGridArray{T, N, ArrayType}
-    data::ArrayType                 # data array, ring by ring, north to south
-    nlat_half::Int                  # number of latitudes on one hemisphere
-    rings::Vector{UnitRange{Int}}   # TODO make same array type as data?
-
-    FullHEALPixArray(data::A, nlat_half, rings) where {A <: AbstractArray{T, N}} where {T, N} =
-        check_inputs(data, nlat_half, rings, FullHEALPixArray) ?
-        new{T, N, A}(data, nlat_half, rings) :
-        error_message(data, nlat_half, rings, FullHEALPixArray, T, N, A)
+struct FullHEALPixGrid{A, V} <: AbstractFullGrid
+    nlat_half::Int      # number of latitudes on one hemisphere
+    architecture::A     # information about device, CPU/GPU
+    rings::V            # precomputed ring indices
 end
 
-# TYPES
-const FullHEALPixGrid{T} = FullHEALPixArray{T, 1, Vector{T}}
-nonparametric_type(::Type{<:FullHEALPixArray}) = FullHEALPixArray
-horizontal_grid_type(::Type{<:FullHEALPixArray}) = FullHEALPixGrid
-
-"""A `FullHEALPixArray` but constrained to `N=1` dimensions (horizontal only) and data is a `Vector{T}`."""
-FullHEALPixGrid
+nonparametric_type(::Type{<:FullHEALPixGrid}) = FullHEALPixGrid
 
 # SIZE
-nlat_odd(::Type{<:FullHEALPixArray}) = true
-get_npoints2D(::Type{<:FullHEALPixArray}, nlat_half::Integer) = 4nlat_half * (2nlat_half-1)
-get_nlat_half(::Type{<:FullHEALPixArray}, npoints2D::Integer) = round(Int, 1/4 + sqrt(1/16 + npoints2D/8))
-get_nlon(::Type{<:FullHEALPixArray}, nlat_half::Integer) = 4nlat_half
+nlat_odd(::Type{<:FullHEALPixGrid}) = true
+get_npoints(::Type{<:FullHEALPixGrid}, nlat_half::Integer) = 4nlat_half * (2nlat_half-1)
+get_nlat_half(::Type{<:FullHEALPixGrid}, npoints::Integer) = round(Int, 1/4 + sqrt(1/16 + npoints/8))
+get_nlon(::Type{<:FullHEALPixGrid}, nlat_half::Integer) = 4nlat_half
 
 ## COORDINATES
-get_latd(::Type{<:FullHEALPixArray}, nlat_half::Integer) = get_latd(HEALPixGrid, nlat_half)
-get_lond(::Type{<:FullHEALPixArray}, nlat_half::Integer) = get_lond(FullGaussianArray, nlat_half)
+get_latd(::Type{<:FullHEALPixGrid}, nlat_half::Integer) = get_latd(HEALPixGrid, nlat_half)
+get_lond(::Type{<:FullHEALPixGrid}, nlat_half::Integer) = get_lond(FullGaussianGrid, nlat_half)
 
 # QUADRATURE (use weights from reduced grids though!)
-get_quadrature_weights(::Type{<:FullHEALPixArray}, nlat_half::Integer) = equal_area_weights(HEALPixArray, nlat_half)
+get_quadrature_weights(::Type{<:FullHEALPixGrid}, nlat_half::Integer) = equal_area_weights(HEALPixGrid, nlat_half)

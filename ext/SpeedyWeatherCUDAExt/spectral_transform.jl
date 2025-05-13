@@ -4,7 +4,7 @@
 Spherical harmonic transform from `grids` to a newly allocated `specs::LowerTriangularArray`
 using the precomputed spectral transform `S`, for CuArrays specifically."""
 function SpeedyTransforms.transform(                         # GRID TO SPECTRAL
-    grids::AbstractGridArray{NF, N, <:CuArray},    # input grid
+    grids::AbstractField{NF, N, <:CuArray},    # input grid
     S::SpectralTransform{NF},               # precomputed spectral transform
 ) where {NF, N}
     ks = size(grids)[2:end]                 # the non-horizontal dimensions
@@ -15,7 +15,7 @@ end
 
 
 """$(TYPEDSIGNATURES)
-Spherical harmonic transform from `specs` to a newly allocated `grids::AbstractGridArray`
+Spherical harmonic transform from `specs` to a newly allocated `grids::AbstractField`
 using the precomputed spectral transform `S`, for CuArrays specifically."""
 function SpeedyTransforms.transform(                             # SPECTRAL TO GRID
     specs::LowerTriangularArray{Complex{NF}, N, <:CuArray},     # input spectral coefficients

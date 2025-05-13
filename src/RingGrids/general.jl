@@ -7,23 +7,40 @@ Parameter `T` is the `eltype` of the underlying data, held as in the array type 
 Ring grids have several consecuitive grid points share the same latitude (= a ring),
 grid points on a given ring are equidistant. Grid points are ordered 0 to 360˚E,
 starting around the north pole, ring by ring to the south pole. """
-abstract type AbstractGridArray{T, N, ArrayType <: AbstractArray{T, N}} <: AbstractArray{T, N} end
+# abstract type AbstractGridArray{T, N, ArrayType <: AbstractArray{T, N}} <: AbstractArray{T, N} end
 
 """Abstract supertype for all ring grids, representing 2-dimensional data on the
 sphere unravelled into a Julia `Vector`. Subtype of `AbstractGridArray` with
 `N=1` and `ArrayType=Vector{T}` of `eltype T`."""
-const AbstractGrid{T} = AbstractGridArray{T, 1, Vector{T}}
+# const AbstractGrid{T} = AbstractGridArray{T, 1, Vector{T}}
+
+abstract type AbstractGrid end
+
+"""An `AbstractFullGrid` is a horizontal grid with a constant number of longitude
+points across latitude rings. Different latitudes can be used, Gaussian latitudes,
+equi-angle latitudes (also called Clenshaw from Clenshaw-Curtis quadrature), or others."""
+"""Subtype of `AbstractGridArray` for all N-dimensional arrays of ring grids that have the
+same number of longitude points on every ring. As such these (horizontal) grids are representable
+as a matrix, with denser grid points towards the poles."""
+abstract type AbstractFullGrid <: AbstractGrid end
+
+"""Subtype of `AbstractGridArray` for arrays of rings grids that have a reduced number
+of longitude points towards the poles, i.e. they are not "full", see `AbstractFullGridArray`.
+Data on these grids cannot be represented as matrix and has to be unravelled into a vector,
+ordered 0 to 360˚E then north to south, ring by ring. Examples for reduced grids are 
+the octahedral Gaussian or Clenshaw grids, or the HEALPix grid."""
+abstract type AbstractReducedGrid <: AbstractGrid end
 
 ## TYPES
-"""$(TYPEDSIGNATURES) For any instance of `AbstractGridArray` type its n-dimensional type
+"""$(TYPEDSIGNATURES) For any instance of `AbstractGrid` type its n-dimensional type
 (*Grid{T, N, ...} returns *Array) but without any parameters `{T, N, ArrayType}`"""
-nonparametric_type(grid::AbstractGridArray) = nonparametric_type(typeof(grid))
+nonparametric_type(grid::AbstractGrid) = nonparametric_type(typeof(grid))
 
 # also needed for other array types, defined in extensions
 nonparametric_type(::Type{<:Array}) = Array
 
 # needed for unalias
-@inline Base.dataids(grid::AbstractGridArray) = Base.dataids(grid.data)
+@inline Base.dataids(grid::AbstractGrid) = Base.dataids(grid.data)
 
 """$(TYPEDSIGNATURES) Full grid array type for `grid`. Always returns the N-dimensional `*Array`
 not the two-dimensional (`N=1`) `*Grid`. For reduced grids the corresponding full grid that
@@ -63,7 +80,7 @@ get_nlat(grid::Grid) where {Grid<:AbstractGridArray} = get_nlat(Grid, grid.nlat_
 """$(TYPEDSIGNATURES) Total number of grid points in all dimensions of `grid`.
 Equivalent to length of the underlying data array."""
 get_npoints(grid::Grid) where {Grid<:AbstractGridArray} = get_npoints(Grid, grid.nlat_half)
-get_npoints(G::Type{<:AbstractGridArray}, nlat_half::Integer, k::Integer...) = prod(k) * get_npoints2D(G, nlat_half)
+get_npoints(G::Type{<:AbstractGridArray}, nlat_half::Integer, k::Integer...) = prod(k) * get_npoints(G, nlat_half)
 
 """$(TYPEDSIGNATURES) Number of grid points in the horizontal dimension only,
 even if `grid` is N-dimensional."""
@@ -313,24 +330,23 @@ function eachgrid(grid1::AbstractGridArray, grids::AbstractGridArray...; kwargs.
     return eachgrid(grid1)
 end
 
-"""
-$(TYPEDSIGNATURES)
-Vector{UnitRange} `rings` to loop over every ring of grid `grid`
+"""$(TYPEDSIGNATURES)
+Vector{UnitRange} `rings` to loop over every ring of `grid`
 and then each grid point per ring. To be used like
 
     rings = eachring(grid)
     for ring in rings
         for ij in ring
-            grid[ij]
+            field[ij]
 
 Accesses precomputed `grid.rings`."""
-@inline eachring(grid::AbstractGridArray) = grid.rings
+@inline eachring(grid::AbstractGrid) = grid.rings
 
 """$(TYPEDSIGNATURES)
 Computes the ring indices `i0:i1` for start and end of every longitudinal point
 on a given ring `j` of `Grid` at resolution `nlat_half`. Used to loop
 over rings of a grid. These indices are also precomputed in every `grid.rings`."""
-function eachring(Grid::Type{<:AbstractGridArray}, nlat_half::Integer)
+function eachring(Grid::Type{<:AbstractGrid}, nlat_half::Integer)
     rings = Vector{UnitRange{Int}}(undef, get_nlat(Grid, nlat_half))    # allocate
     each_index_in_ring!(rings, Grid, nlat_half)                         # calculate iteratively
     return rings
@@ -425,72 +441,4 @@ function whichring(ij::Integer, rings::Vector{UnitRange{Int}})
         j += 1
     end
     return j
-end
-
-## BROADCASTING
-# following https://docs.julialang.org/en/v1/manual/interfaces/#man-interfaces-broadcasting
-import Base.Broadcast: BroadcastStyle, Broadcasted, DefaultArrayStyle
-
-# {1} as grids are <:AbstractVector, Grid here is the non-parameteric Grid type!
-struct AbstractGridArrayStyle{N, Grid} <: Broadcast.AbstractArrayStyle{N} end
-
-# important to remove Grid{T} parameter T (eltype/number format) here to broadcast
-# automatically across the same grid type but with different T
-# e.g. FullGaussianGrid{Float32} and FullGaussianGrid{Float64}
-Base.BroadcastStyle(::Type{Grid}) where {Grid<:AbstractGridArray{T, N, ArrayType}} where {T, N, ArrayType} =
-    AbstractGridArrayStyle{N, nonparametric_type(Grid)}()
-
-# allocation for broadcasting, create a new Grid with undef of type/number format T
-function Base.similar(bc::Broadcasted{AbstractGridArrayStyle{N, Grid}}, ::Type{T}) where {N, Grid, T}
-    return Grid(Array{T}(undef, size(bc)))
-end
-
-# ::Val{0} for broadcasting with 0-dimensional, ::Val{1} for broadcasting with vectors, etc
-# when there's a dimension mismatch always choose the larger dimension
-AbstractGridArrayStyle{N, Grid}(::Val{N}) where {N, Grid} = AbstractGridArrayStyle{N, Grid}()
-AbstractGridArrayStyle{1, Grid}(::Val{2}) where {Grid} = AbstractGridArrayStyle{2, Grid}()
-AbstractGridArrayStyle{1, Grid}(::Val{0}) where {Grid} = AbstractGridArrayStyle{1, Grid}()
-AbstractGridArrayStyle{2, Grid}(::Val{3}) where {Grid} = AbstractGridArrayStyle{3, Grid}()
-AbstractGridArrayStyle{2, Grid}(::Val{1}) where {Grid} = AbstractGridArrayStyle{2, Grid}()
-AbstractGridArrayStyle{3, Grid}(::Val{4}) where {Grid} = AbstractGridArrayStyle{4, Grid}()
-AbstractGridArrayStyle{3, Grid}(::Val{2}) where {Grid} = AbstractGridArrayStyle{3, Grid}()
-
-## GPU
-struct AbstractGPUGridArrayStyle{N, ArrayType, Grid} <: GPUArrays.AbstractGPUArrayStyle{N} end
-
-function Base.BroadcastStyle(
-    ::Type{Grid}
-) where {Grid<:AbstractGridArray{T, N, ArrayType}} where {T, N, ArrayType <: GPUArrays.AbstractGPUArray}
-    return AbstractGPUGridArrayStyle{N, ArrayType, nonparametric_type(Grid)}()
-end
-
-# ::Val{0} for broadcasting with 0-dimensional, ::Val{1} for broadcasting with vectors, etc
-# when there's a dimension mismatch always choose the larger dimension
-AbstractGPUGridArrayStyle{N, ArrayType, Grid}(::Val{N}) where {N, ArrayType, Grid} =
-    AbstractGPUGridArrayStyle{N, ArrayType, Grid}()
-
-AbstractGPUGridArrayStyle{1, ArrayType, Grid}(::Val{2}) where {ArrayType, Grid} = AbstractGPUGridArrayStyle{2, ArrayType, Grid}()
-AbstractGPUGridArrayStyle{1, ArrayType, Grid}(::Val{0}) where {ArrayType, Grid} = AbstractGPUGridArrayStyle{1, ArrayType, Grid}()
-AbstractGPUGridArrayStyle{2, ArrayType, Grid}(::Val{3}) where {ArrayType, Grid} = AbstractGPUGridArrayStyle{3, ArrayType, Grid}()
-AbstractGPUGridArrayStyle{2, ArrayType, Grid}(::Val{1}) where {ArrayType, Grid} = AbstractGPUGridArrayStyle{2, ArrayType, Grid}()
-AbstractGPUGridArrayStyle{3, ArrayType, Grid}(::Val{4}) where {ArrayType, Grid} = AbstractGPUGridArrayStyle{4, ArrayType, Grid}()
-AbstractGPUGridArrayStyle{3, ArrayType, Grid}(::Val{2}) where {ArrayType, Grid} = AbstractGPUGridArrayStyle{3, ArrayType, Grid}()
-
-function KernelAbstractions.get_backend(
-    g::Grid
-) where {Grid <: AbstractGridArray{T, N, ArrayType}} where {T, N, ArrayType <: GPUArrays.AbstractGPUArray}
-    return KernelAbstractions.get_backend(g.data)
-end
-
-function Base.similar(
-    bc::Broadcasted{AbstractGPUGridArrayStyle{N, ArrayType, Grid}},
-    ::Type{T},
-) where {N, ArrayType, Grid, T}
-    ArrayType_ = nonparametric_type(ArrayType)
-    return Grid(ArrayType_{T}(undef, size(bc)))
-end
-
-function Adapt.adapt_structure(to, grid::Grid) where {Grid <: AbstractGridArray}
-    Grid_ = nonparametric_type(Grid)
-    return Grid_(Adapt.adapt(to, grid.data), grid.nlat_half, grid.rings)
 end

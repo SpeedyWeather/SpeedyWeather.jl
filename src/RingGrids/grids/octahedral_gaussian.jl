@@ -1,4 +1,4 @@
-"""An `OctahedralGaussianArray` is an array of octahedral grids, subtyping `AbstractReducedGridArray`,
+"""An `OctahedralGaussianGrid` is an array of octahedral grids, subtyping `AbstractReducedGridArray`,
 that use Gaussian latitudes for each ring. First dimension of the underlying `N`-dimensional `data`
 represents the horizontal dimension, in ring order (0 to 360˚E, then north to south),
 other dimensions are used for the vertical and/or time or other dimensions.
@@ -15,51 +15,33 @@ j = nlat. `rings` are the precomputed ring indices, the the example above
 `rings = [1:20, 21:44, 45:72, ...]`. For efficient looping see `eachring` and `eachgrid`.
 Fields are
 $(TYPEDFIELDS)"""
-struct OctahedralGaussianArray{T, N, ArrayType <: AbstractArray{T, N}} <: AbstractReducedGridArray{T, N, ArrayType}
-    data::ArrayType                 # data array, ring by ring, north to south
+struct OctahedralGaussianGrid{A, V} <: AbstractReducedGrid
     nlat_half::Int                  # number of latitudes on one hemisphere
-    rings::Vector{UnitRange{Int}}   # TODO make same array type as data?
-
-    OctahedralGaussianArray(data::A, nlat_half, rings) where {A <: AbstractArray{T, N}} where {T, N} =
-        check_inputs(data, nlat_half, rings, OctahedralGaussianArray) ?
-        new{T, N, A}(data, nlat_half, rings) :
-        error_message(data, nlat_half, rings, OctahedralGaussianArray, T, N, A)
+    architecture::A                 # information about device, CPU/GPU
+    rings::V                        # precomputed ring indices
 end
 
-# TYPES
-const OctahedralGaussianGrid{T} = OctahedralGaussianArray{T, 1, Vector{T}}
-nonparametric_type(::Type{<:OctahedralGaussianArray}) = OctahedralGaussianArray
-horizontal_grid_type(::Type{<:OctahedralGaussianArray}) = OctahedralGaussianGrid
-full_array_type(::Type{<:OctahedralGaussianArray}) = FullGaussianArray
-
-"""An `OctahedralGaussianArray` but constrained to `N=1` dimensions (horizontal only) and data is a `Vector{T}`."""
-OctahedralGaussianGrid
+nonparametric_type(::Type{<:OctahedralGaussianGrid}) = OctahedralGaussianGrid
 
 # SIZE
-nlat_odd(::Type{<:OctahedralGaussianArray}) = false
+nlat_odd(::Type{<:OctahedralGaussianGrid}) = false
+npoints_pole(::Type{<:OctahedralGaussianGrid}) = 16
+npoints_added_per_ring(::Type{<:OctahedralGaussianGrid}) = 4
 
-"""$(TYPEDSIGNATURES) [EXPERIMENTAL] additional number of longitude points on the first and last ring.
-Change to 0 to start with 4 points on the first ring."""
-npoints_pole(::Type{<:OctahedralGaussianArray}) = 16
-
-"""$(TYPEDSIGNATURES) [EVEN MORE EXPERIMENTAL] number of longitude points added (removed) for every ring
-towards the Equator (on the southern hemisphere towards the south pole)."""
-npoints_added_per_ring(::Type{<:OctahedralGaussianArray}) = 4
-
-function get_npoints2D(::Type{<:OctahedralGaussianArray}, nlat_half::Integer)
-    m, o = npoints_added_per_ring(OctahedralGaussianArray), npoints_pole(OctahedralGaussianArray)
+function get_npoints(::Type{<:OctahedralGaussianGrid}, nlat_half::Integer)
+    m, o = npoints_added_per_ring(OctahedralGaussianGrid), npoints_pole(OctahedralGaussianGrid)
     return m*nlat_half^2 + (2o+m)*nlat_half
 end
 
-function get_nlat_half(::Type{<:OctahedralGaussianArray}, npoints2D::Integer)
-    m, o = npoints_added_per_ring(OctahedralGaussianArray), npoints_pole(OctahedralGaussianArray)
+function get_nlat_half(::Type{<:OctahedralGaussianGrid}, npoints2D::Integer)
+    m, o = npoints_added_per_ring(OctahedralGaussianGrid), npoints_pole(OctahedralGaussianGrid)
     return round(Int, -(2o + m)/2m + sqrt(((2o+m)/2m)^2 + npoints2D/m))
 end
 
-function get_nlon_per_ring(Grid::Type{<:OctahedralGaussianArray}, nlat_half::Integer, j::Integer)
+function get_nlon_per_ring(Grid::Type{<:OctahedralGaussianGrid}, nlat_half::Integer, j::Integer)
     nlat = get_nlat(Grid, nlat_half)
     @assert 0 < j <= nlat "Ring $j is outside O$nlat_half grid."
-    m, o = npoints_added_per_ring(OctahedralGaussianArray), npoints_pole(OctahedralGaussianArray)
+    m, o = npoints_added_per_ring(OctahedralGaussianGrid), npoints_pole(OctahedralGaussianGrid)
     j = j > nlat_half ? nlat - j + 1 : j      # flip north south due to symmetry
     return o + m*j
 end
@@ -68,26 +50,26 @@ end
 # matrix_size(G::OctahedralGaussianGrid) = (2*(4+G.nlat_half), 2*(4+G.nlat_half+1))
 
 ## COORDINATES
-get_latd(::Type{<:OctahedralGaussianArray}, nlat_half::Integer) = get_latd(FullGaussianArray, nlat_half)
-function get_lond_per_ring(Grid::Type{<:OctahedralGaussianArray}, nlat_half::Integer, j::Integer)
+get_latd(::Type{<:OctahedralGaussianGrid}, nlat_half::Integer) = get_latd(FullGaussianGrid, nlat_half)
+function get_lond_per_ring(Grid::Type{<:OctahedralGaussianGrid}, nlat_half::Integer, j::Integer)
     nlon = get_nlon_per_ring(Grid, nlat_half, j)
     return collect(0:360/nlon:360-180/nlon)
 end
 
 ## QUADRATURE
-get_quadrature_weights(::Type{<:OctahedralGaussianArray}, nlat_half::Integer) = gaussian_weights(nlat_half)
+get_quadrature_weights(::Type{<:OctahedralGaussianGrid}, nlat_half::Integer) = gaussian_weights(nlat_half)
 
 ## INDEXING
 """$(TYPEDSIGNATURES) precompute a `Vector{UnitRange{Int}} to index grid points on
 every ring `j` (elements of the vector) of `Grid` at resolution `nlat_half`.
 See `eachring` and `eachgrid` for efficient looping over grid points."""
-function each_index_in_ring!(   rings::Vector{<:UnitRange{<:Integer}},
-                                Grid::Type{<:OctahedralGaussianArray},
+function each_index_in_ring!(   rings::AbstractVector,
+                                Grid::Type{<:OctahedralGaussianGrid},
                                 nlat_half::Integer) # resolution param
 
     nlat = length(rings)
     @boundscheck nlat == get_nlat(Grid, nlat_half) || throw(BoundsError)
-    m, o = npoints_added_per_ring(OctahedralGaussianArray), npoints_pole(OctahedralGaussianArray)
+    m, o = npoints_added_per_ring(OctahedralGaussianGrid), npoints_pole(OctahedralGaussianGrid)
 
     index_end = 0
     @inbounds for j in 1:nlat_half                  # North incl Eq only

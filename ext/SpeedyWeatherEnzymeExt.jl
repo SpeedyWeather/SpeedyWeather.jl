@@ -41,7 +41,7 @@ end
 
 ### Custom rule for _fourier!(f_north, f_north, grid, S)
 function augmented_primal(config::EnzymeRules.RevConfigWidth{1}, func::Const{typeof(_fourier!)}, ::Type{<:Const}, 
-    f_north::Duplicated, f_south::Duplicated, grids::Duplicated{<:AbstractGridArray}, S::Union{Const, MixedDuplicated}) 
+    f_north::Duplicated, f_south::Duplicated, grids::Duplicated{<:AbstractField}, S::Union{Const, MixedDuplicated}) 
 
     func.val(f_north.val, f_south.val, grids.val, S.val) # forward pass
 
@@ -57,7 +57,7 @@ function augmented_primal(config::EnzymeRules.RevConfigWidth{1}, func::Const{typ
 end 
 
 function reverse(config::EnzymeRules.RevConfigWidth{1}, func::Const{typeof(_fourier!)}, ::Type{<:Const}, tape,
-    f_north::Duplicated, f_south::Duplicated, grids::Duplicated{<:AbstractGridArray}, S::Union{Const, MixedDuplicated})
+    f_north::Duplicated, f_south::Duplicated, grids::Duplicated{<:AbstractField}, S::Union{Const, MixedDuplicated})
 
     # adjoint/jvp of FFT has a different scaling, compute it, apply it later to f_north, f_south
     scale = adjoint_scale(S.val)
@@ -80,7 +80,7 @@ end
 
 ### Custom rule for _fourier!(grid, f_north, f_south, S)
 function augmented_primal(config::EnzymeRules.RevConfigWidth{1}, func::Const{typeof(_fourier!)}, ::Type{<:Const}, 
-    grids::Duplicated{<:AbstractGridArray}, f_north::Duplicated, f_south::Duplicated, S::Union{Const, MixedDuplicated}) 
+    grids::Duplicated{<:AbstractField}, f_north::Duplicated, f_south::Duplicated, S::Union{Const, MixedDuplicated}) 
 
     func.val(grids.val, f_north.val, f_south.val, S.val) # forward pass
 
@@ -91,7 +91,7 @@ function augmented_primal(config::EnzymeRules.RevConfigWidth{1}, func::Const{typ
 end 
 
 function reverse(config::EnzymeRules.RevConfigWidth{1}, func::Const{typeof(_fourier!)}, ::Type{<:Const}, tape,
-    grids::Duplicated{<:AbstractGridArray}, f_north::Duplicated, f_south::Duplicated, S::Union{Const, MixedDuplicated})
+    grids::Duplicated{<:AbstractField}, f_north::Duplicated, f_south::Duplicated, S::Union{Const, MixedDuplicated})
 
     # adjoint/vjp of FFT has a different scaling, compute it, apply it later to f_north, f_south
     scale = adjoint_scale(S.val)
