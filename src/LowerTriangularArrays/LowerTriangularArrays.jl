@@ -11,10 +11,12 @@ import KernelAbstractions
 # NUMERICS
 import LinearAlgebra: tril!
 
+export Spectrum 
 export LowerTriangularMatrix, LowerTriangularArray
 export eachharmonic, eachmatrix
 export OneBased, ZeroBased
 
+include("spectrum.jl")
 include("lower_triangular_array.jl")
 include("rotate_reverse.jl")
 

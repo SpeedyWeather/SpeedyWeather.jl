@@ -22,6 +22,7 @@ end
 
 triangle_number(m::Integer) = m*(m+1)÷2
 nonzeros(l::Integer, m::Integer) = l*m - triangle_number(m-1)
+nonzeros(s::Spectrum) = nonzeros(s.lmax, s.mmax)
 
 function degrees_orders(lmax::Integer, mmax::Integer)
     degrees_orders = Vector{Tuple{Int, Int}}(undef, nonzeros(lmax, mmax))
@@ -35,10 +36,6 @@ function degrees_orders(lmax::Integer, mmax::Integer)
     return degrees_orders
 end
 
-struct LowerTriangularArray{T, N, S, ArrayType <: AbstractArray{T,N}} <: AbstractArray{T,N}
-    spectrum::S
-    data::ArrayType
-end
-
-Base.size(L::LowerTriangularArray) = size(L.data)
-Base.getindex(L::LowerTriangularArray, args...) = getindex(L.data, args...)
+# To-do: do we want to keep this as only comparing lmax and mmax?   
+Base.:(==)(s1::Spectrum, s2::Spectrum) = 
+    s1.lmax == s2.lmax && s1.mmax == s2.mmax
