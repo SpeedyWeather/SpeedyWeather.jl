@@ -24,6 +24,7 @@ end
 
 # TYPES
 nonparametric_type(::Type{<:OctaminimalGaussianGrid}) = OctaminimalGaussianGrid
+full_grid_type(::Type{<:OctaminimalGaussianGrid}) = FullGaussianGrid
 
 # SIZE
 nlat_odd(::Type{<:OctaminimalGaussianGrid}) = false

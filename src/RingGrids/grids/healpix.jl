@@ -111,7 +111,7 @@ function each_index_in_ring(::Type{<:HEALPixGrid},
     return index_1st:index_end                              # range of i's in ring
 end
 
-function each_index_in_ring!(   rings::AbstractVector{<:UnitRange{<:Integer}},
+function each_index_in_ring!(   rings::AbstractVector,
                                 Grid::Type{<:HEALPixGrid},
                                 nlat_half::Integer) # resolution param
 
@@ -119,7 +119,8 @@ function each_index_in_ring!(   rings::AbstractVector{<:UnitRange{<:Integer}},
     @boundscheck nlat == get_nlat(Grid, nlat_half) || throw(BoundsError)
     
     # HEALPix not defined for odd nlat_half, the last rings would not be written
-    @boundscheck iseven(nlat_half) || throw(BoundsError)
+    @boundscheck iseven(nlat_half) ||
+        throw(AssertionError("HEALPixGrids only defined for even nlat_half, nlat_half=$nlat_half provided."))
 
     index_end = 0
     nside = nside_healpix(nlat_half)                # side length of a basepixel

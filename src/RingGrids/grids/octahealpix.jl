@@ -26,6 +26,7 @@ struct OctaHEALPixGrid{A, V} <: AbstractReducedGrid
 end
 
 nonparametric_type(::Type{<:OctaHEALPixGrid}) = OctaHEALPixGrid
+full_grid_type(::Type{<:OctaHEALPixGrid}) = FullOctaHEALPixGrid
 
 ## SIZE
 nlat_odd(::Type{<:OctaHEALPixGrid}) = true
@@ -79,7 +80,7 @@ function each_index_in_ring(::Type{<:OctaHEALPixGrid},     # function for OctaHE
     return index_1st:index_end                              # range of i's in ring
 end
 
-function each_index_in_ring!(   rings::AbstractVector{<:UnitRange{<:Integer}},
+function each_index_in_ring!(   rings::AbstractVector,
                                 Grid::Type{<:OctaHEALPixGrid},
                                 nlat_half::Integer) # resolution param
 
@@ -101,87 +102,87 @@ function each_index_in_ring!(   rings::AbstractVector{<:UnitRange{<:Integer}},
     end
 end
 
-## CONVERSION
-Base.Matrix(G::OctaHEALPixGrid{T}; kwargs...) where T = Matrix!(zeros(T, matrix_size(G)...), G; kwargs...)
+# ## CONVERSION
+# Base.Matrix(G::OctaHEALPixGrid{T}; kwargs...) where T = Matrix!(zeros(T, matrix_size(G)...), G; kwargs...)
 
-"""
-    Matrix!(M::AbstractMatrix,
-            G::OctaHEALPixGrid;
-            quadrant_rotation=(0, 1, 2, 3),
-            matrix_quadrant=((2, 2), (1, 2), (1, 1), (2, 1)),
-            )
+# """
+#     Matrix!(M::AbstractMatrix,
+#             G::OctaHEALPixGrid;
+#             quadrant_rotation=(0, 1, 2, 3),
+#             matrix_quadrant=((2, 2), (1, 2), (1, 1), (2, 1)),
+#             )
 
-Sorts the gridpoints in `G` into the matrix `M` without interpolation.
-Every quadrant of the grid `G` is rotated as specified in `quadrant_rotation`,
-0 is no rotation, 1 is 90˚ clockwise, 2 is 180˚ etc. Grid quadrants are counted
-eastward starting from 0˚E. The grid quadrants are moved into the matrix quadrant
-(i, j) as specified. Defaults are equivalent to centered at 0˚E and a rotation
-such that the North Pole is at M's midpoint."""
-Matrix!(M::AbstractMatrix, G::OctaHEALPixGrid; kwargs...) = Matrix!((M, G); kwargs...)
+# Sorts the gridpoints in `G` into the matrix `M` without interpolation.
+# Every quadrant of the grid `G` is rotated as specified in `quadrant_rotation`,
+# 0 is no rotation, 1 is 90˚ clockwise, 2 is 180˚ etc. Grid quadrants are counted
+# eastward starting from 0˚E. The grid quadrants are moved into the matrix quadrant
+# (i, j) as specified. Defaults are equivalent to centered at 0˚E and a rotation
+# such that the North Pole is at M's midpoint."""
+# Matrix!(M::AbstractMatrix, G::OctaHEALPixGrid; kwargs...) = Matrix!((M, G); kwargs...)
 
-"""
-    Matrix!(MGs::Tuple{AbstractMatrix{T}, OctaHEALPixGrid}...; kwargs...)
+# """
+#     Matrix!(MGs::Tuple{AbstractMatrix{T}, OctaHEALPixGrid}...; kwargs...)
 
-Like `Matrix!(::AbstractMatrix, ::OctaHEALPixGrid)` but for simultaneous
-processing of tuples `((M1, G1), (M2, G2), ...)` with matrices `Mi` and grids `Gi`.
-All matrices and grids have to be of the same size respectively."""
-function Matrix!(   MGs::Tuple{AbstractMatrix{T}, OctaHEALPixGrid}...;
-                    quadrant_rotation::NTuple{4, Integer}=(0, 1, 2, 3),     # = 0˚, 90˚, 180˚, 270˚ anti-clockwise
-                    matrix_quadrant::NTuple{4, Tuple{Integer, Integer}}=((2, 2), (1, 2), (1, 1), (2, 1)),
-                    ) where T
+# Like `Matrix!(::AbstractMatrix, ::OctaHEALPixGrid)` but for simultaneous
+# processing of tuples `((M1, G1), (M2, G2), ...)` with matrices `Mi` and grids `Gi`.
+# All matrices and grids have to be of the same size respectively."""
+# function Matrix!(   MGs::Tuple{AbstractMatrix{T}, OctaHEALPixGrid}...;
+#                     quadrant_rotation::NTuple{4, Integer}=(0, 1, 2, 3),     # = 0˚, 90˚, 180˚, 270˚ anti-clockwise
+#                     matrix_quadrant::NTuple{4, Tuple{Integer, Integer}}=((2, 2), (1, 2), (1, 1), (2, 1)),
+#                     ) where T
                     
-    ntuples = length(MGs)
+#     ntuples = length(MGs)
 
-    # check that the first (matrix, grid) tuple has corresponding sizes
-    M, G = MGs[1]
-    m, n = size(M)
-    @boundscheck m == n || throw(BoundsError)
-    @boundscheck m == 2*G.nlat_half || throw(BoundsError)
+#     # check that the first (matrix, grid) tuple has corresponding sizes
+#     M, G = MGs[1]
+#     m, n = size(M)
+#     @boundscheck m == n || throw(BoundsError)
+#     @boundscheck m == 2*G.nlat_half || throw(BoundsError)
 
-    for MG in MGs   # check that all matrices and all grids are of same size
-        Mi, Gi = MG
-        @boundscheck size(Mi) == size(M) || throw(BoundsError)
-        @boundscheck size(Gi) == size(G) || throw(BoundsError)
-    end
+#     for MG in MGs   # check that all matrices and all grids are of same size
+#         Mi, Gi = MG
+#         @boundscheck size(Mi) == size(M) || throw(BoundsError)
+#         @boundscheck size(Gi) == size(G) || throw(BoundsError)
+#     end
 
-    for q in matrix_quadrant    # check always in 2x2
-        sr, sc = q
-        @boundscheck ((sr in (1, 2)) && (sc in (1, 2))) || throw(BoundsError)
-    end
+#     for q in matrix_quadrant    # check always in 2x2
+#         sr, sc = q
+#         @boundscheck ((sr in (1, 2)) && (sc in (1, 2))) || throw(BoundsError)
+#     end
 
-    rings = eachring(G)         # index ranges for all rings
-    nlat_half = G.nlat_half     # number of latitude rings on one hemisphere incl Equator
-    nside = nlat_half           # side length of a basepixel matrix
+#     rings = eachring(G)         # index ranges for all rings
+#     nlat_half = G.nlat_half     # number of latitude rings on one hemisphere incl Equator
+#     nside = nlat_half           # side length of a basepixel matrix
 
-    # sort grid indices from G into matrix M
-    # 1) loop over each grid point per ring
-    # 2) determine quadrant (0, 1, 2, 3) via modulo
-    # 3) get longitude index iq within quadrant
-    # 4) determine corresponding indices r, c in matrix M
+#     # sort grid indices from G into matrix M
+#     # 1) loop over each grid point per ring
+#     # 2) determine quadrant (0, 1, 2, 3) via modulo
+#     # 3) get longitude index iq within quadrant
+#     # 4) determine corresponding indices r, c in matrix M
 
-    @inbounds for (j, ring) in enumerate(rings)
-        nlon = length(ring)                         # number of grid points in ring
-        for ij in ring                              # continuous index in grid
-            i = ij-ring[1]                          # 0-based index in ring
-            grid_quadrant = floor(Int, mod(4*i/nlon, 4))  # either 0, 1, 2, 3
-            iq = i - grid_quadrant*(nlon÷4)             # 0-based index i relative to quadrant
-            r = min(j, nlat_half) - iq               # row in matrix m (1-based)
-            c = (iq+1) + max(0, j-nlat_half)         # column in matrix m (1-based)
+#     @inbounds for (j, ring) in enumerate(rings)
+#         nlon = length(ring)                         # number of grid points in ring
+#         for ij in ring                              # continuous index in grid
+#             i = ij-ring[1]                          # 0-based index in ring
+#             grid_quadrant = floor(Int, mod(4*i/nlon, 4))  # either 0, 1, 2, 3
+#             iq = i - grid_quadrant*(nlon÷4)             # 0-based index i relative to quadrant
+#             r = min(j, nlat_half) - iq               # row in matrix m (1-based)
+#             c = (iq+1) + max(0, j-nlat_half)         # column in matrix m (1-based)
 
-            # rotate indices in quadrant
-            r, c = rotate_matrix_indices(r, c, nside, quadrant_rotation[grid_quadrant+1])
+#             # rotate indices in quadrant
+#             r, c = rotate_matrix_indices(r, c, nside, quadrant_rotation[grid_quadrant+1])
 
-            # shift grid quadrant to matrix quadrant
-            sr, sc = matrix_quadrant[grid_quadrant+1]
-            r += (sr-1)*nside                       # shift row into matrix quadrant
-            c += (sc-1)*nside                       # shift column into matrix quadrant
+#             # shift grid quadrant to matrix quadrant
+#             sr, sc = matrix_quadrant[grid_quadrant+1]
+#             r += (sr-1)*nside                       # shift row into matrix quadrant
+#             c += (sc-1)*nside                       # shift column into matrix quadrant
 
-            for (Mi, Gi) in MGs                      # for every (matrix, grid) tuple
-                Mi[r, c] = convert(T, Gi[ij])         # convert data and copy over
-            end
-        end
-    end
+#             for (Mi, Gi) in MGs                      # for every (matrix, grid) tuple
+#                 Mi[r, c] = convert(T, Gi[ij])         # convert data and copy over
+#             end
+#         end
+#     end
 
-    ntuples == 1 && return M
-    return Tuple(Mi for (Mi, Gi) in MGs)
-end
+#     ntuples == 1 && return M
+#     return Tuple(Mi for (Mi, Gi) in MGs)
+# end

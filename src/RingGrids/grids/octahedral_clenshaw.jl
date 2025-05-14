@@ -23,6 +23,7 @@ struct OctahedralClenshawGrid{A, V} <: AbstractReducedGrid
 end
 
 nonparametric_type(::Type{<:OctahedralClenshawGrid}) = OctahedralClenshawGrid
+full_grid_type(::Type{<:OctahedralClenshawGrid}) = FullClenshawGrid
 
 # SIZE
 nlat_odd(::Type{<:OctahedralClenshawGrid}) = true
@@ -48,7 +49,7 @@ function get_nlon_per_ring(Grid::Type{<:OctahedralClenshawGrid}, nlat_half::Inte
 end
 
 matrix_size(grid::Grid) where {Grid<:OctahedralClenshawGrid} = matrix_size(Grid, grid.nlat_half)
-function matrix_size(::Type{OctahedralClenshawGrid}, nlat_half::Integer)
+function matrix_size(::Type{<:OctahedralClenshawGrid}, nlat_half::Integer)
     m, o = npoints_added_per_ring(OctahedralClenshawGrid), npoints_pole(OctahedralClenshawGrid)
     m != 4 && @warn "This algorithm has not been generalised for m!=4."
     N = (o + 4nlat_half)÷2

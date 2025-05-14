@@ -1,3 +1,5 @@
+full_grid_type(G::Type{<:AbstractFullGrid}) = G
+
 ## SIZE
 get_nlon_max(Grid::Type{<:AbstractFullGrid}, nlat_half::Integer) = get_nlon(Grid, nlat_half)
 get_nlon_per_ring(Grid::Type{<:AbstractFullGrid}, nlat_half::Integer, j::Integer) =
@@ -22,7 +24,7 @@ end
 
 # precompute ring indices for full grids
 function each_index_in_ring!(   
-    rings::AbstractVector{<:UnitRange{<:Integer}},
+    rings::AbstractVector,
     Grid::Type{<:AbstractFullGrid},
     nlat_half::Integer,
 )

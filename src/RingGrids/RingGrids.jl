@@ -2,15 +2,12 @@ module RingGrids
 
 # DOCUMENTATION
 using  DocStringExtensions
+import Printf
 
 # NUMERICS
 import Statistics: Statistics, mean
 import FastGaussQuadrature
 import LinearAlgebra
-
-# GPU
-struct DummyArchitecture end
-const DEFAULT_ARCHITECTURE = DummyArchitecture()
 
 import Adapt
 import GPUArrays
@@ -89,10 +86,14 @@ export  interpolate,
 export zonal_mean
 
 include("utility_functions.jl")
+include("architecture.jl")
 
 # GENERAL
-include("general.jl")
-include("field.jl")
+include("grid.jl")
+
+abstract type AbstractField end
+
+# include("field.jl")
 include("scaling.jl")
 include("geodesics.jl")
 include("reverse.jl")
@@ -115,7 +116,7 @@ include("grids/octaminimal_gaussian.jl")
 
 # INTEGRATION AND INTERPOLATION
 include("quadrature_weights.jl")
-include("interpolation.jl")
+# include("interpolation.jl")
 include("vertices.jl")
 include("statistics.jl")
 

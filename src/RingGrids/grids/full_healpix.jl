@@ -27,4 +27,5 @@ get_latd(::Type{<:FullHEALPixGrid}, nlat_half::Integer) = get_latd(HEALPixGrid, 
 get_lond(::Type{<:FullHEALPixGrid}, nlat_half::Integer) = get_lond(FullGaussianGrid, nlat_half)
 
 # QUADRATURE (use weights from reduced grids though!)
-get_quadrature_weights(::Type{<:FullHEALPixGrid}, nlat_half::Integer) = equal_area_weights(HEALPixGrid, nlat_half)
+get_quadrature_weights(::Type{<:FullHEALPixGrid}, nlat_half::Integer) =
+    equal_area_weights(HEALPixGrid, nlat_half)
