@@ -24,6 +24,7 @@ triangle_number(m::Integer) = m*(m+1)÷2
 nonzeros(l::Integer, m::Integer) = l*m - triangle_number(m-1)
 nonzeros(s::Spectrum) = nonzeros(s.lmax, s.mmax)
 resolution(s::Spectrum) = (s.lmax, s.mmax)
+truncation(s::Spectrum) = s.mmax - 1
 
 function degrees_orders(lmax::Integer, mmax::Integer)
     degrees_orders = Vector{Tuple{Int, Int}}(undef, nonzeros(lmax, mmax))
