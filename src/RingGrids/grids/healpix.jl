@@ -25,6 +25,10 @@ struct HEALPixGrid{A, V} <: AbstractReducedGrid
 end
 
 nonparametric_type(::Type{<:HEALPixGrid}) = HEALPixGrid
+full_grid_type(::Type{<:HEALPixGrid}) = FullHEALPixGrid
+
+const HEALPixField{T, N} = Field{T, N, A, G} where {A, G<:HEALPixGrid}
+Base.show(io::IO, F::Type{<:HEALPixField{T, N}}) where {T, N} = print(io, "HEALPixField{$T, $N}")
 
 ## SIZE
 nlat_odd(::Type{<:HEALPixGrid}) = true

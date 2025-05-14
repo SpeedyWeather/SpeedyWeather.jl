@@ -26,6 +26,10 @@ end
 nonparametric_type(::Type{<:OctaminimalGaussianGrid}) = OctaminimalGaussianGrid
 full_grid_type(::Type{<:OctaminimalGaussianGrid}) = FullGaussianGrid
 
+const OctaminimalGaussianField{T, N} = Field{T, N, A, G} where {A, G<:OctaminimalGaussianGrid}
+Base.show(io::IO, F::Type{<:OctaminimalGaussianField{T, N}}) where {T, N} =
+    print(io, "OctaminimalGaussianField{$T, $N}")
+
 # SIZE
 nlat_odd(::Type{<:OctaminimalGaussianGrid}) = false
 npoints_pole(::Type{<:OctaminimalGaussianGrid}) = 0

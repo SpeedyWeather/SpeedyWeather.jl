@@ -18,6 +18,9 @@ end
 # TYPES
 nonparametric_type(::Type{<:FullClenshawGrid}) = FullClenshawGrid
 
+const FullClenshawField{T, N} = Field{T, N, A, G} where {A, G<:FullClenshawGrid}
+Base.show(io::IO, F::Type{<:FullClenshawField{T, N}}) where {T, N} = print(io, "FullClenshawField{$T, $N}")
+
 # SIZE
 nlat_odd(::Type{<:FullClenshawGrid}) = true
 get_npoints(::Type{<:FullClenshawGrid}, nlat_half::Integer) = 8 * nlat_half^2 - 4nlat_half

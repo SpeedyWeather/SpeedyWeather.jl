@@ -14,6 +14,9 @@ end
 
 nonparametric_type(::Type{<:FullGaussianGrid}) = FullGaussianGrid
 
+const FullGaussianField{T, N} = Field{T, N, A, G} where {A, G<:FullGaussianGrid}
+Base.show(io::IO, F::Type{<:FullGaussianField{T, N}}) where {T, N} = print(io, "FullGaussianField{$T, $N}")
+
 # SIZE
 nlat_odd(::Type{<:FullGaussianGrid}) = false        # Gaussian latitudes always even
 get_npoints(::Type{<:FullGaussianGrid}, nlat_half::Integer) = 8 * nlat_half^2

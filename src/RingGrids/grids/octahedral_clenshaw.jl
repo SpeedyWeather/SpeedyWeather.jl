@@ -25,6 +25,10 @@ end
 nonparametric_type(::Type{<:OctahedralClenshawGrid}) = OctahedralClenshawGrid
 full_grid_type(::Type{<:OctahedralClenshawGrid}) = FullClenshawGrid
 
+const OctahedralClenshawField{T, N} = Field{T, N, A, G} where {A, G<:OctahedralClenshawGrid}
+Base.show(io::IO, F::Type{<:OctahedralClenshawField{T, N}}) where {T, N} =
+    print(io, "OctahedralClenshawField{$T, $N}")
+
 # SIZE
 nlat_odd(::Type{<:OctahedralClenshawGrid}) = true
 npoints_pole(::Type{<:OctahedralClenshawGrid}) = 16

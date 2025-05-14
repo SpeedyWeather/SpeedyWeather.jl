@@ -28,6 +28,9 @@ end
 nonparametric_type(::Type{<:OctaHEALPixGrid}) = OctaHEALPixGrid
 full_grid_type(::Type{<:OctaHEALPixGrid}) = FullOctaHEALPixGrid
 
+const OctaHEALPixField{T, N} = Field{T, N, A, G} where {A, G<:OctaHEALPixGrid}
+Base.show(io::IO, F::Type{<:OctaHEALPixField{T, N}}) where {T, N} = print(io, "OctaHEALPixField{$T, $N}")
+
 ## SIZE
 nlat_odd(::Type{<:OctaHEALPixGrid}) = true
 get_npoints(::Type{<:OctaHEALPixGrid}, nlat_half::Integer) = 4*nlat_half^2

@@ -16,6 +16,9 @@ end
 
 nonparametric_type(::Type{<:FullHEALPixGrid}) = FullHEALPixGrid
 
+const FullHEALPixField{T, N} = Field{T, N, A, G} where {A, G<:FullHEALPixGrid}
+Base.show(io::IO, F::Type{<:FullHEALPixField{T, N}}) where {T, N} = print(io, "FullHEALPixField{$T, $N}")
+
 # SIZE
 nlat_odd(::Type{<:FullHEALPixGrid}) = true
 get_npoints(::Type{<:FullHEALPixGrid}, nlat_half::Integer) = 4nlat_half * (2nlat_half-1)

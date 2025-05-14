@@ -30,6 +30,19 @@ export  OctahedralGaussianGrid,
         OctaHEALPixGrid,
         OctaminimalGaussianGrid
 
+# FIELDS (Data on grids)
+export  AbstractField,
+        Field
+
+export  FullGaussianField,
+        FullClenshawField,
+        FullHEALPixField,
+        FullOctaHEALPixField,
+        OctahedralGaussianField,
+        OctahedralClenshawField,
+        OctaHEALPixField,
+        OctaminimalGaussianField
+
 # SIZE
 export  grids_match,
         get_nlat,
@@ -89,11 +102,9 @@ include("utility_functions.jl")
 include("architecture.jl")
 
 # GENERAL
+include("abstract_types.jl")
+include("field.jl")
 include("grid.jl")
-
-abstract type AbstractField end
-
-# include("field.jl")
 include("scaling.jl")
 include("geodesics.jl")
 include("reverse.jl")

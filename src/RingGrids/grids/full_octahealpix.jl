@@ -16,6 +16,10 @@ end
 
 nonparametric_type(::Type{<:FullOctaHEALPixGrid}) = FullOctaHEALPixGrid
 
+const FullOctaHEALPixField{T, N} = Field{T, N, A, G} where {A, G<:FullOctaHEALPixGrid}
+Base.show(io::IO, F::Type{<:FullOctaHEALPixField{T, N}}) where {T, N} =
+    print(io, "FullOctaHEALPixField{$T, $N}")
+
 # SIZE
 nlat_odd(::Type{<:FullOctaHEALPixGrid}) = true
 get_npoints(::Type{<:FullOctaHEALPixGrid}, nlat_half::Integer) = 4nlat_half * (2nlat_half-1)

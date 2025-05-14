@@ -24,6 +24,10 @@ end
 nonparametric_type(::Type{<:OctahedralGaussianGrid}) = OctahedralGaussianGrid
 full_grid_type(::Type{<:OctahedralGaussianGrid}) = FullGaussianGrid
 
+const OctahedralGaussianField{T, N} = Field{T, N, A, G} where {A, G<:OctahedralGaussianGrid}
+Base.show(io::IO, F::Type{<:OctahedralGaussianField{T, N}}) where {T, N} =
+    print(io, "OctahedralGaussianField{$T, $N}")
+
 # SIZE
 nlat_odd(::Type{<:OctahedralGaussianGrid}) = false
 npoints_pole(::Type{<:OctahedralGaussianGrid}) = 16
