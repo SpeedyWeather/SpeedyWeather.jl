@@ -122,7 +122,7 @@ export JetDrag
 end
 
 function JetDrag(SG::SpectralGrid; kwargs...)
-    return JetDrag{SG.NF, SG.SpectralVariable2D}(; SG.spectrum, kwargs...)
+    return JetDrag{SG.NF, typeof(SG.spectrum), SG.SpectralVariable2D}(; SG.spectrum, kwargs...)
 end
 
 function initialize!(drag::JetDrag, model::AbstractModel)
