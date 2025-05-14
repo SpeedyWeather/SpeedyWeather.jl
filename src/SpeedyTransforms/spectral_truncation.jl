@@ -65,8 +65,8 @@ coefficients for higher wavenumbers."""
 function spectral_truncation(
     ::Type{NF},                 # number format NF (can be complex)
     alms::LowerTriangularArray{T, N, S, ArrayType}, # spectral field to be truncated
-    ltrunc::Integer,            # truncate to max degree ltrunc
-    mtrunc::Integer,            # truncate to max order mtrunc
+    ltrunc::Integer,            # truncate to max degree ltrunc (0-based)
+    mtrunc::Integer,            # truncate to max order mtrunc (0-based)
 ) where {NF, T, N, S, ArrayType}
     
     lmax, mmax, k... = size(alms, ZeroBased, as=Matrix)
@@ -95,8 +95,8 @@ LowerTriangularArray."""
 function spectral_interpolation(
     ::Type{NF},                 # number format NF (can be complex)
     alms::LowerTriangularArray{T, N, S, ArrayType}, # spectral field to be truncated
-    ltrunc::Integer,            # truncate to max degree ltrunc
-    mtrunc::Integer,            # truncate to max order mtrunc
+    ltrunc::Integer,            # truncate to max degree ltrunc (0-based)
+    mtrunc::Integer,            # truncate to max order mtrunc (0-based)
 ) where {NF, T, N, S, ArrayType}                
     
     lmax, mmax, k... = size(alms, ZeroBased, as=Matrix)

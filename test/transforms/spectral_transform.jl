@@ -54,7 +54,7 @@ spectral_resolutions_inexact = (127, 255)
                 SG = SpectralGrid(; NF, trunc, Grid)
                 S = SpectralTransform(SG)
 
-                alms = zeros(LowerTriangularMatrix{Complex{NF}}, trunc+2, trunc+1)
+                alms = zeros(LowerTriangularMatrix{Complex{NF}}, SG.spectrum)
                 fill!(alms, 0)
                 alms[1, 1] = 1
 
@@ -102,7 +102,7 @@ end
                 lmax = 3
                 for l in 1:lmax
                     for m in 1:l
-                        alms = zeros(LowerTriangularMatrix{Complex{NF}}, trunc+2, trunc+1)
+                        alms = zeros(LowerTriangularMatrix{Complex{NF}}, SG.spectrum)
                         alms[l, m] = 1
 
                         map = transform(alms, S)
@@ -133,13 +133,13 @@ end
                 lmax = 3
                 for l in 1:lmax
                     for m in 1:l
-                        alms = zeros(LowerTriangularMatrix{Complex{NF}}, trunc+2, trunc+1)
+                        alms = zeros(LowerTriangularMatrix{Complex{NF}}, SG.spectrum)
                         alms[l, m] = 1
 
                         map = transform(alms, S)
                         
                         # add singleton dimension for lower triangular matrix
-                        alms2 = zeros(LowerTriangularArray{Complex{NF}}, trunc+2, trunc+1, 1)
+                        alms2 = zeros(LowerTriangularArray{Complex{NF}}, SG.spectrum, 1)
                         alms2[:, 1] = alms
                         map2 = deepcopy(map)
                         transform!(map2, alms2, S)
@@ -174,7 +174,7 @@ end
         spectral_grid = SpectralGrid(; NF)
 
         # create real and complex otherwise identical
-        Lreal = randn(LowerTriangularMatrix{NF}, spectral_grid.trunc+2, spectral_grid.trunc+1)
+        Lreal = randn(LowerTriangularMatrix{NF}, spectral_grid.spectrum)
         Lcomplex = complex.(Lreal)
         
         grid1 = zeros(spectral_grid.GridVariable2D, spectral_grid.nlat_half)
@@ -195,7 +195,7 @@ end
 
     # test Float64 -> Float32
     spectral_grid = SpectralGrid()
-    L_f32 = randn(LowerTriangularMatrix{ComplexF32}, spectral_grid.trunc+2, spectral_grid.trunc+1)
+    L_f32 = randn(LowerTriangularMatrix{ComplexF32}, spectral_grid.spectrum)
     L_f64 = ComplexF64.(L_f32)
     
     grid1 = zeros(spectral_grid.GridVariable2D, spectral_grid.nlat_half)
@@ -235,8 +235,8 @@ end
     NF = spectral_grid.NF
     grid = randn(spectral_grid.Grid{NF}, spectral_grid.nlat_half)
     
-    L1 = zeros(LowerTriangularMatrix{Complex{Float32}}, spectral_grid.trunc+2, spectral_grid.trunc+1)
-    L2 = zeros(LowerTriangularMatrix{Complex{Float64}}, spectral_grid.trunc+2, spectral_grid.trunc+1)
+    L1 = zeros(LowerTriangularMatrix{Complex{Float32}}, spectral_grid.spectrum)
+    L2 = zeros(LowerTriangularMatrix{Complex{Float64}}, spectral_grid.spectrum)
     
     S = SpectralTransform(spectral_grid)
 
@@ -267,7 +267,7 @@ end
                 lmax = 3
                 for l in 1:lmax
                     for m in 1:l
-                        alms = zeros(LowerTriangularMatrix{Complex{NF}}, trunc+2, trunc+1)
+                        alms = zeros(LowerTriangularMatrix{Complex{NF}}, SG.spectrum)
                         alms[l, m] = 1
 
                         map = transform(alms, S)

@@ -47,7 +47,7 @@ $(TYPEDFIELDS)
     "[OPTION] horizontal resolution as the maximum degree of spherical harmonics"
     trunc::Int = DEFAULT_TRUNC
 
-    "[DERIVED] spectral spectrum"
+    "[DERIVED] spectral space"
     spectrum::SP = Spectrum(trunc+2, trunc+1)
 
     "[DERIVED] Type of spectral variable in 2D (horizontal only, flattened into 1D vector)"
@@ -129,8 +129,7 @@ end
 """$(TYPEDSIGNATURES)
 Generator function for a SpectralTransform struct pulling in parameters from a SpectralGrid struct."""
 function SpeedyTransforms.SpectralTransform(spectral_grid::SpectralGrid;
-                                            one_more_degree::Bool = true,
                                             kwargs...)
-    (; NF, Grid, trunc, nlat_half, nlayers, ArrayType) = spectral_grid
-    return SpectralTransform(NF, trunc+one_more_degree, trunc, nlat_half; Grid, ArrayType, nlayers, kwargs...)
+    (; NF, Grid, spectrum, nlat_half, nlayers, ArrayType) = spectral_grid
+    return SpectralTransform(NF, spectrum, nlat_half; Grid, ArrayType, nlayers, kwargs...)
 end
