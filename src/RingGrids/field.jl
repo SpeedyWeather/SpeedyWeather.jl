@@ -1,6 +1,42 @@
+const DEFAULT_NF = Float64
+
 struct Field{T, N, ArrayType <: AbstractArray{T, N}, Grid <: AbstractGrid} <: AbstractField{T, N, ArrayType, Grid}
     data::ArrayType
     grid::Grid
+
+    # Inner constructor to check for matching grid and data
+    function Field(data, grid)
+        data_matches_grid(data, grid) || throw(DimensionMismatch(data, grid))
+        return new{eltype(data), ndims(data), typeof(data), typeof(grid)}(data, grid)
+    end
+end
+
+# default constructors
+Field(grid::AbstractGrid, k...) = zeros(grid, k...)
+Field(::Type{T}, grid::AbstractGrid, k...) where T = zeros(T, grid, k...)
+
+grid_type( ::Type{Field{T, N, A, G}}) where {T, N, A, G} = G
+grid_type(field::AbstractField) = grid_type(typeof(field))
+array_type(::Type{Field{T, N, A, G}}) where {T, N, A, G} = A
+
+# test number of horizontal grid points matches
+data_matches_grid(data, grid) = size(data, 1) == get_npoints(grid)
+
+function Base.DimensionMismatch(data::AbstractArray, grid::AbstractGrid)
+    Grid_ = nonparametric_type(grid)
+    nlat = get_nlat(grid)
+    npoints = get_npoints(grid)
+    return DimensionMismatch("$(summary(data)) cannot be used to create a Field with a $npoints-element, $nlat-ring $Grid_")
+end
+
+Base.DimensionMismatch(f1::AbstractField, f2::AbstractField) = DimensionMismatch("$(summary(f1)) does not match $(summary(f2))")
+function Base.DimensionMismatch(f1::AbstractField, f2s::AbstractField...)
+    length(f2s) == 0 && return DimensionMismatch("$(summary(f1)) does not match any other field")
+    s = "$(summary(f1)) does not match either of "
+    for f2 in f2s
+        s *= "$(summary(f2)), "
+    end
+    DimensionMismatch(chop(s, tail=2))
 end
 
 # for fields, also add info about the number of rings
@@ -32,16 +68,27 @@ Base.@propagate_inbounds Base.getindex(field::AbstractField, ijk...) = getindex(
 Base.@propagate_inbounds Base.setindex!(field::AbstractField, x, ijk...) = setindex!(field.data, x, ijk...)
 Base.fill!(field::AbstractField, x) = fill!(field.data, x)
 
-# @inline function Base.getindex(
-#     G::GridArray,
-#     col::Colon,
-#     k...,
-# ) where {GridArray<:AbstractGridArray}
-#     GridArray_ = nonparametric_type(GridArray)  # obtain parameters from G.data
-#     return GridArray_(getindex(G.data, col, k...), G.nlat_half, G.rings)
-# end
+# make [:, k...] not escape the Field
+@inline Base.getindex(field::AbstractField, col::Colon, k...) = Field(field.data[col, k...], field.grid)
+@inline eachring(field::AbstractField) = eachring(field.grid)
 
-# # simply propagate all indices forward
+# ITERATORS
+
+"""$(TYPEDSIGNATURES)
+CartesianIndices for the 2nd to last dimension of an AbstractField,
+e.g. the vertical layer (or a time dimension, etc). To be used like
+
+    for k in eachlayer(field)
+        for (j, ring) in enumerate(eachring(field))
+            for ij in ring
+                field[ij, k]"""
+@inline eachlayer(field::AbstractField) = CartesianIndices(size(field)[2:end])
+
+# several arguments to check for matching grids
+function eachlayer(field1::AbstractField, fields::AbstractField...; kwargs...)
+    fields_match(field1, fields...; kwargs...) || throw(DimensionMismatch(field1, fields...))
+    return eachlayer(field1)
+end
 
 # ## CONSTRUCTORS
 # # if no nlat_half provided calculate it
@@ -58,26 +105,6 @@ Base.fill!(field::AbstractField, x) = fill!(field.data, x)
 # end
 
 
-# """$(TYPEDSIGNATURES) True for `data`, `nlat_half` and `rings` that all match in size
-# to construct a grid of type `Grid`."""
-# function check_inputs(data, nlat_half, rings, Grid)
-#     check = true
-#     check &= size(data, 1) == get_npoints2D(Grid, nlat_half)    # test number of 2D grid points
-#     check &= length(rings) == get_nlat(Grid, nlat_half)         # test number of rings == nlat
-#     # TODO also check that rings map to all and only valid grid points?
-#     return check
-# end
-
-# function error_message(data, nlat_half, rings, G, T, N, A)
-#     nlat = get_nlat(G, nlat_half)
-#     nrings = length(rings)
-#     if nlat != nrings
-#         return error("$nrings-element ring indices "*
-#             "cannot be used to create a $nlat-ring $G{$T, $N, $A}.")
-#     else
-#         return error("$(summary(data)) cannot be used to create a $nlat-ring $G{$T, $N, $A}")
-#     end
-# end
 
 # ## CONVERSION
 # # convert an AbstractMatrix to the full grids, and vice versa
@@ -99,59 +126,55 @@ Base.fill!(field::AbstractField, x) = fill!(field.data, x)
 # Base.Array(grid::AbstractFullGridArray) = Array(reshape(grid.data, :, get_nlat(grid), size(grid.data)[2:end]...))
 # Base.Matrix(grid::AbstractFullGridArray) = Array(grid)
 
-# ## INDEXING
-# # simply propagate all indices forward
-# Base.@propagate_inbounds Base.getindex(G::AbstractGridArray, ijk...) = getindex(G.data, ijk...)
+for f in (:zeros, :ones, :rand, :randn)
+    @eval begin
+        # zeros(grid, nlayers...)
+        function Base.$f(grid::AbstractGrid, k...)
+            data = array_type(grid.architecture)($f(DEFAULT_NF, get_npoints(grid), k...))
+            return Field(data, grid)
+        end
+            
+        # zeros(NF, grid, nlayers...)
+        function Base.$f(::Type{T}, grid::AbstractGrid, k...) where T
+            data = array_type(grid.architecture)($f(T, get_npoints(grid), k...))
+            return Field(data, grid)
+        end
 
-# @inline function Base.getindex(
-#     G::GridArray,
-#     col::Colon,
-#     k...,
-# ) where {GridArray<:AbstractGridArray}
-#     GridArray_ = nonparametric_type(GridArray)  # obtain parameters from G.data
-#     return GridArray_(getindex(G.data, col, k...), G.nlat_half, G.rings)
-# end
+        # zeros(Grid, nlat_half, nlayers...)
+        # ::Integer added here to avoid ambiguity with array.jl in Base
+        function Base.$f(Grid::Type{<:AbstractGrid}, nlat_half::Integer, k::Integer...; architecture=DEFAULT_ARCHITECTURE())
+            grid = Grid(nlat_half, architecture)
+            data = array_type(architecture)($f(DEFAULT_NF, get_npoints(grid), k...))
+            return Field(data, grid)
+        end
 
-# # simply propagate all indices forward
-# Base.@propagate_inbounds Base.setindex!(G::AbstractGridArray, x, ijk...) = setindex!(G.data, x, ijk...)
-# Base.fill!(G::AbstractGridArray, x) = fill!(G.data, x)
+        # zeros(NF, Grid, nlat_half, nlayers...)
+        function Base.$f(
+            ::Type{T},
+            Grid::Type{<:AbstractGrid},
+            nlat_half,
+            k...;
+            architecture=DEFAULT_ARCHITECTURE(),
+        ) where T
+            grid = Grid(nlat_half, architecture)
+            data = array_type(architecture)($f(T, get_npoints(grid), k...))
+            return Field(data, grid)
+        end
 
-# Base.@propagate_inbounds Base.getindex(f::Field, args...) = getindex(f.data, args...)
-
-# @inline eachring(field::AbstractField) = eachring(field.grid)
-
-
-
-# for f in (:zeros, :ones, :rand, :randn)
-#     @eval begin
-#         # general version with ArrayType(zeros(...)) conversion
-#         function Base.$f(
-#             ::Type{Grid},
-#             nlat_half::Integer,
-#             k::Integer...,
-#         ) where {Grid<:AbstractGridArray{T, N, ArrayType}} where {T, N, ArrayType}
-#             return Grid(ArrayType($f(T, get_npoints2D(Grid, nlat_half), k...)), nlat_half)
-#         end
-
-#         # CPU version with zeros(T, ...) producing Array
-#         function Base.$f(
-#             ::Type{Grid},
-#             nlat_half::Integer,
-#             k::Integer...,
-#         ) where {Grid<:AbstractGridArray{T}} where T
-#             return Grid($f(T, get_npoints2D(Grid, nlat_half), k...), nlat_half)
-#         end
-
-#         # use Float64 if no type provided
-#         function Base.$f(
-#             ::Type{Grid},
-#             nlat_half::Integer,
-#             k::Integer...,
-#         ) where {Grid<:AbstractGridArray}
-#             return $f(Grid{Float64}, nlat_half, k...)
-#         end
-#     end
-# end
+        # zeros(Field, nlat_half, nlayers...)
+        # function Base.$f(
+        #     ::Type{Field{T, N, ArrayType, Grid}},
+        #     nlat_half::Integer,
+        #     k::Integer...;
+        #     architecture=DEFAULT_ARCHITECTURE(),
+        # ) where {T, N, ArrayType, Grid}
+        #     Grid_ = nonparametric_type(Grid)
+        #     grid = Grid_(nlat_half, architecture)
+        #     data = ArrayType($f(T, get_npoints(grid), k...))
+        #     return Field(data, grid)
+        # end
+    end
+end
 
 # # zero element of an AbstractGridArray instance grid by creating new zero(grid.data)
 # Base.zero(grid::Grid) where {Grid<:AbstractGridArray} =
@@ -223,57 +246,37 @@ Base.fill!(field::AbstractField, x) = fill!(field.data, x)
 #     return Grid(ArrayType(grid.data))
 # end
 
-# # ITERATORS
-# eachring(field::AbstractField) = eachring(field.grid)
+# equality and comparison, somehow needed as not covered by broadcasting
+Base.:(==)(F1::AbstractField, F2::AbstractField) = fields_match(F1, F2) && F1.data == F2.data
+Base.all(F::AbstractField) = all(F.data)
+Base.any(F::AbstractField) = any(F.data)
 
-# """
-# $(TYPEDSIGNATURES)
-# CartesianIndices for the 2nd to last dimension of an AbstractField,
-# e.g. the vertical layer (or a time dimension, etc). This is
-# to be used like
+grids_match(A::AbstractField, Bs::AbstractField...) = grids_match(A.grid, (B.grid for B in Bs)...)
 
-# for k in eachlayer(field)
-#     for ring in eachring(field)
-#         for ij in ring
-#             field[ij, k]"""
-# @inline eachlayer(field::AbstractField) = CartesianIndices(size(field)[2:end])
+"""$(TYPEDSIGNATURES) True if both `A` and `B` are of the same nonparametric grid type
+(e.g. OctahedralGaussianArray, regardless type parameter `T` or underyling array type `ArrayType`)
+and of same resolution (`nlat_half`) and total grid points (`length`). Sizes of `(4,)` and `(4,1)`
+would match for example, but `(8,1)` and `(4,2)` would not (`nlat_half` not identical)."""
+function fields_match(
+    A::AbstractField,
+    B::AbstractField;
+    horizontal_only::Bool = false,
+    vertical_only::Bool = false,
+)
+    @assert ~(horizontal_only && vertical_only) "Conflicting options: horizontal_only = $horizontal_ony and vertical_only = $vertical_only"
 
-# # several arguments to check for matching grids
-# function eachlayer(field1::AbstractGrid, fields::AbstractField...; kwargs...)
-#     grids_match(field1, fields...; kwargs...) || throw(DimensionMismatch(field1, fields...))
-#     return eachlayer(field1)
-# end
+    horizontal_only && return grids_match(A, B)
+    vertical_only && return size(A)[2:end] == size(B)[2:end]
+    return grids_match(A, B) && size(A)[2:end] == size(B)[2:end]
+end
 
-# # equality and comparison, somehow needed as not covered by broadcasting
-# Base.:(==)(F1::AbstractField, F2::AbstractField) = grids_match(F1, F2) && F1.data == F2.data
-# Base.all(F::AbstractField) = all(F.data)
-# Base.any(F::AbstractField) = any(F.data)
-
-# """$(TYPEDSIGNATURES) True if both `A` and `B` are of the same nonparametric grid type
-# (e.g. OctahedralGaussianArray, regardless type parameter `T` or underyling array type `ArrayType`)
-# and of same resolution (`nlat_half`) and total grid points (`length`). Sizes of `(4,)` and `(4,1)`
-# would match for example, but `(8,1)` and `(4,2)` would not (`nlat_half` not identical)."""
-# function grids_match(
-#     A::AbstractGridArray,
-#     B::AbstractGridArray;
-#     horizontal_only::Bool = false,
-#     vertical_only::Bool = false,
-# )
-#     @assert ~(horizontal_only && vertical_only) "Conflicting options: horizontal_only = $horizontal_ony and vertical_only = $vertical_only"
-
-#     horizontal_match = get_nlat_half(A) == get_nlat_half(B)
-#     vertical_match = size(A)[2:end] == size(B)[2:end]
-#     type_match = grids_match(typeof(A), typeof(B))
-
-#     if horizontal_only
-#         # type also has to match as two different grid types can have the same nlat_half
-#         return horizontal_match && type_match
-#     elseif vertical_only
-#         return vertical_match
-#     else
-#         return horizontal_match && vertical_match && type_match
-#     end
-# end
+function fields_match(A::AbstractField, Bs::AbstractField...; kwargs...)
+    match = true    # single field A always matches itself
+    for B in Bs     # check for all matching respectively with A
+        match &= fields_match(A, B; kwargs...)
+    end
+    return match
+end
 
 # ## BROADCASTING
 # # following https://docs.julialang.org/en/v1/manual/interfaces/#man-interfaces-broadcasting

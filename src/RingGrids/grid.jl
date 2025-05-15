@@ -1,3 +1,5 @@
+architecture_type(grid::AbstractGrid) = typeof(grid.architecture)
+
 isreduced(::Type{<:AbstractGrid}) = true
 isreduced(::Type{<:AbstractFullGrid}) = false
 isreduced(grid) = isreduced(typeof(grid))
@@ -72,7 +74,7 @@ matrix_size(grid::Grid) where {Grid<:AbstractGrid} = matrix_size(Grid, get_nlat_
 # CONSTRUCTORS
 """$(TYPEDSIGNATURES) Create a new `grid` of type `Grid` with resolution parameter `nlat_half`.
 `architecture` is the device type (CPU/GPU). Precomputes the ring indices `rings`."""
-function (::Type{Grid})(nlat_half::Integer, architecture=DEFAULT_ARCHITECTURE) where {Grid<:AbstractGrid}
+function (::Type{Grid})(nlat_half::Integer, architecture=DEFAULT_ARCHITECTURE()) where {Grid<:AbstractGrid}
     Grid_ = nonparametric_type(Grid)    # strip away parameters of type, obtain from arguments
     rings = eachring(Grid, nlat_half)   # precompute indices to access the variable-length rings
     return Grid_(nlat_half, architecture, rings)

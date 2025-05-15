@@ -1,2 +1,4 @@
 struct DummyArchitecture end
-const DEFAULT_ARCHITECTURE = DummyArchitecture()
+const DEFAULT_ARCHITECTURE = DummyArchitecture
+array_type(::Type{DummyArchitecture}) = Array
+array_type(arch) = array_type(typeof(arch))
