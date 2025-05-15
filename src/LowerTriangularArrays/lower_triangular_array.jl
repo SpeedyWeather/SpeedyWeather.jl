@@ -192,6 +192,14 @@ for f in (:zeros, :ones, :rand, :randn)
             return LowerTriangularMatrix($f(T, nonzeros(spectrum)), spectrum)
         end
 
+        function Base.$f(
+            ::Type{T},
+            spectrum::AbstractSpectrum,
+            I::Vararg{Integer, M},
+        ) where {T <: Number, M}
+            return LowerTriangularArray($f(T, nonzeros(spectrum), I...), spectrum)
+        end
+
         # use Float64 as default if type T is not provided
         Base.$f(::Type{LowerTriangularArray}, lmax::Integer, mk::Integer...) =
             $f(LowerTriangularArray{Float64}, lmax, mk...)
