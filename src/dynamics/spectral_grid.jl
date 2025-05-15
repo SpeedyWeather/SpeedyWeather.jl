@@ -129,7 +129,12 @@ end
 """$(TYPEDSIGNATURES)
 Generator function for a SpectralTransform struct pulling in parameters from a SpectralGrid struct."""
 function SpeedyTransforms.SpectralTransform(spectral_grid::SpectralGrid;
+                                            one_more_degree::Bool=true,
                                             kwargs...)
     (; NF, Grid, spectrum, nlat_half, nlayers, ArrayType) = spectral_grid
-    return SpectralTransform(NF, spectrum, nlat_half; Grid, ArrayType, nlayers, kwargs...)
+    if one_more_degree == false 
+        return SpectralTransform(NF, Spectrum(spectrum.lmax-1, spectrum.mmax), nlat_half; Grid, ArrayType, nlayers, kwargs...)
+    else 
+        return SpectralTransform(NF, spectrum, nlat_half; Grid, ArrayType, nlayers, kwargs...)
+    end 
 end
