@@ -232,7 +232,7 @@ $(TYPEDSIGNATURES)
 Converts the index pair `l, m` of an `lmax`x`mmax` LowerTriangularMatrix `L` to a single
 index `k` that indexes the same element in the corresponding vector that stores
 only the lower triangle (the non-zero entries) of `L`."""
-@inline lm2k(l::Integer, m::Integer, lmax::Integer, mmax::Integer) = l + (m-1)*lmax - m*(m-1)÷2
+@inline lm2k(l::Integer, m::Integer, lmax::Integer) = l + (m-1)*lmax - m*(m-1)÷2
 
 """
 $(TYPEDSIGNATURES)

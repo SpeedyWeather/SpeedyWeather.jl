@@ -197,7 +197,7 @@ end
 
 """$(TYPEDSIGNATURES)
 Copies entries of `progn_old` into `progn_new`."""
-function Base.copy!(progn_new::PrognosticVariables, progn_old::PrognosticVariables)
+function Base.copy!(progn_new::P1, progn_old::P2) where {P1 <: PrognosticVariables, P2 <: PrognosticVariables}
 
     for i in eachindex(progn_new.vor)   # each leapfrog time step
         progn_new.vor[i] .= progn_old.vor[i]
