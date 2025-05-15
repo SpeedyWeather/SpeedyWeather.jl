@@ -264,7 +264,7 @@ end
     # to get a zero element in the correct shape, we just take the zero element of some valid element,
     # there are probably faster ways to do this, but I don't know how, and this is just a fallback anyway 
     @boundscheck m > l && return zero(getindex(L.data, 1, I[3:end]...)) 
-    k = lm2k(l, m, L.spectrum.lmax, L.spectrum.mmax)
+    k = lm2k(l, m, L.spectrum.lmax)
     return getindex(L.data, k, I[3:end]...)
 end
 
@@ -300,7 +300,7 @@ Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray{T,1,S,V}, i::Inte
     @boundscheck N+1==M || throw(BoundsError(L, I))
     i, j = I[1:2] 
     @boundscheck i >= j || throw(BoundsError(L, I))
-    k = lm2k(i, j, L.spectrum.lmax, L.spectrum.mmax)
+    k = lm2k(i, j, L.spectrum.lmax)
     setindex!(L.data, x, k, I[3:end]...)
 end
 
