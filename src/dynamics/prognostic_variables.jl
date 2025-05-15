@@ -64,7 +64,7 @@ export PrognosticVariables
 @kwdef struct PrognosticVariables{
     NF,                     # <: AbstractFloat
     ArrayType,              # Array, CuArray, ...
-    SP,                     # <: AbstractSpectrum
+    SpectrumType,           # <: AbstractSpectrum
     nsteps,                 # number of timesteps
     SpectralVariable2D,     # <: LowerTriangularArray
     SpectralVariable3D,     # <: LowerTriangularArray
@@ -75,7 +75,7 @@ export PrognosticVariables
 
     # DIMENSIONS
     "spectral resolution"
-    spectrum::SP
+    spectrum::SpectrumType
 
     "Number of latitude rings on one hemisphere (Equator excl.), resolution parameter of grids"
     nlat_half::Int
@@ -158,8 +158,8 @@ end
 
 function Base.show(
     io::IO,
-    progn::PrognosticVariables{NF, ArrayType, nsteps},
-) where {NF, ArrayType, nsteps}
+    progn::PrognosticVariables{NF, ArrayType, SpectrumType, nsteps},
+) where {NF, ArrayType, SpectrumType, nsteps}
     
     Grid = typeof(progn.ocean.sea_surface_temperature)
     tracer_names = [key for (key, value) in progn.tracers]
@@ -244,11 +244,11 @@ function Base.copy!(progn_new::PrognosticVariables, progn_old::PrognosticVariabl
     return nothing
 end
 
-function Base.zero(progn::PrognosticVariables{NF, ArrayType, nsteps, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, ParticleVector}) where {NF, ArrayType, nsteps, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, ParticleVector}
+function Base.zero(progn::PrognosticVariables{NF, ArrayType, SpectrumType, nsteps, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, ParticleVector}) where {NF, ArrayType, SpectrumType, nsteps, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, ParticleVector}
     (; spectrum, nlat_half, nlayers, nlayers_soil, nparticles) = progn
     
     # initialize regular progn variables 
-    progn_new = PrognosticVariables{NF, ArrayType, nsteps,
+    progn_new = PrognosticVariables{NF, ArrayType, SpectrumType, nsteps,
         SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, 
         ParticleVector}(;
             spectrum, nlat_half, nlayers, nlayers_soil, nparticles,
@@ -311,11 +311,12 @@ end
 """$(TYPEDSIGNATURES)
 Add `tracers` to the prognostic variables `progn` in `progn.tracers::Dict`."""
 function add!(
-    progn::PrognosticVariables{NF, ArrayType, nsteps, SpectralVariable2D, SpectralVariable3D},
+    progn::PrognosticVariables{NF, ArrayType, SpectrumType, nsteps, SpectralVariable2D, SpectralVariable3D},
     tracers::Tracer...
 ) where {
         NF,                     # number format
         ArrayType,
+        SpectrumType,
         nsteps,
         SpectralVariable2D,
         SpectralVariable3D,
