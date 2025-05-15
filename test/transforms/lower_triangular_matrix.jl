@@ -283,8 +283,9 @@ end
 
         L = f(LowerTriangularMatrix{Float16}, spectrum)
         L2 = f(LowerTriangularArray{Float16}, spectrum)
-        @test typeof(L) == typeof(L2)
-        @test size(L) == size(L2)
+        L3 = f(Float16, spectrum)
+        @test typeof(L) == typeof(L2) == typeof(L3)
+        @test size(L) == size(L2) == size(L3)
         
         JL = adapt(JLArray, L)
         JL2 = adapt(JLArray, L2)
@@ -339,6 +340,10 @@ end
             L2 = f(LowerTriangularArray{Float16}, spectrum, s...)
 
             @test L == L2
+
+            Random.seed!(123)
+            L3 = f(Float16, spectrum, s...)
+            @test L == L3
         end
     end
 end
