@@ -307,6 +307,24 @@ L = rand(LowerTriangularArray{Float32}, 5, 5, 5)
 L_gpu = adapt(CuArray, L)
 ```
 
+## The `Spectrum` type
+
+Internally, a `LowerTriangularArray` is represented by an array that holds all non-zero elements of the matrices and a `Spectrum` type that holds all spectral discretization information and the architecture the array is on. The `Spectrum` can also be used to create new `LowerTriangularArray`s with the same spectral discretization:
+
+```@repl LowerTriangularArrays
+spectrum = Spectrum(5, 5) # initailize 
+```
+
+```@repl LowerTriangularArrays
+L = rand(LowerTriangularArray{Float32}, spectrum)
+```
+
+```@repl LowerTriangularArrays
+L = rand(LowerTriangularArray{Float32}, spectrum, 5)
+```
+
+In the SpeedyWeather.jl model, the `Spectrum` is stored just once in the `SpectralGrid` type, and all `LowerTriangularArray`s are created with the same `Spectrum`. 
+
 ## Function and type index
 
 ```@autodocs
