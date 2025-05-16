@@ -42,7 +42,6 @@ export  spectral_truncation,
 export  power_spectrum
 
 include("aliasing.jl")
-include("legendrepolarray.jl")
 include("legendre_shortcuts.jl")
 include("spectral_transform.jl")
 include("fourier.jl")
