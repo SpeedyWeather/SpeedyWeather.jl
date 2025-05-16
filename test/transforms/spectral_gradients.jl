@@ -283,7 +283,7 @@ end
             progn = simulation.prognostic_variables
             diagn = simulation.diagnostic_variables
 
-            a = randn(LowerTriangularArray{Complex{NF}}, trunc+2, trunc+1, nlayers)
+            a = randn(LowerTriangularArray{Complex{NF}}, spectral_grid.spectrum, nlayers)
             spectral_truncation!(a)
             SpeedyTransforms.zero_imaginary_zonal_modes!(a)
 

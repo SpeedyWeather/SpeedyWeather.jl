@@ -51,13 +51,13 @@ $(TYPEDFIELDS)
     spectrum::SP = Spectrum(trunc+2, trunc+1)
 
     "[DERIVED] Type of spectral variable in 2D (horizontal only, flattened into 1D vector)"
-    SpectralVariable2D::Type{<:AbstractArray} = LowerTriangularArray{Complex{NF}, 1, typeof(spectrum), ArrayType{Complex{NF}, 1}}
+    SpectralVariable2D::Type{<:AbstractArray} = LowerTriangularArray{Complex{NF}, 1, ArrayType{Complex{NF}, 1}, typeof(spectrum)}
 
     "[DERIVED] Type of spectral variable in 3D (horizontal only + e.g vertical, flattened into 2D matrix)"
-    SpectralVariable3D::Type{<:AbstractArray} = LowerTriangularArray{Complex{NF}, 2, typeof(spectrum), ArrayType{Complex{NF}, 2}}
+    SpectralVariable3D::Type{<:AbstractArray} = LowerTriangularArray{Complex{NF}, 2, ArrayType{Complex{NF}, 2}, typeof(spectrum)}
 
     "[DERIVED] Type of spectral variable in 4D (horizontal only + e.g. vertical and time, flattened into 3D array)"
-    SpectralVariable4D::Type{<:AbstractArray} = LowerTriangularArray{Complex{NF}, 3, typeof(spectrum), ArrayType{Complex{NF}, 3}}
+    SpectralVariable4D::Type{<:AbstractArray} = LowerTriangularArray{Complex{NF}, 3, ArrayType{Complex{NF}, 3}, typeof(spectrum)}
     
     # HORIZONTAL GRID
     "[OPTION] horizontal grid used for calculations in grid-point space"

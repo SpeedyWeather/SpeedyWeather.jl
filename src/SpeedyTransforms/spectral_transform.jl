@@ -9,13 +9,13 @@ $(TYPEDFIELDS)"""
 struct SpectralTransform{
     NF,
     ArrayType,                  # non-parametric array type
-    SP,                         # <: AbstractSpectrum
+    SpectrumType,                         # <: AbstractSpectrum
     VectorType,                 # <: ArrayType{NF, 1},
     VectorComplexType,          # <: ArrayType{Complex{NF}, 1},
     MatrixComplexType,          # <: ArrayType{Complex{NF}, 2},
     ArrayComplexType,           # <: ArrayType{Complex{NF}, 3},
-    LowerTriangularMatrixType,  # <: LowerTriangularArray{NF, 1, S, ArrayType{NF}},
-    LowerTriangularArrayType,   # <: LowerTriangularArray{NF, 2, S, ArrayType{NF}},
+    LowerTriangularMatrixType,  # <: LowerTriangularArray{NF, 1, ArrayType{NF}, SpectrumType},
+    LowerTriangularArrayType,   # <: LowerTriangularArray{NF, 2, ArrayType{NF}, SpectrumType},
 } <: AbstractSpectralTransform
     # GRID
     Grid::Type{<:AbstractGridArray} # grid type used
@@ -23,7 +23,7 @@ struct SpectralTransform{
     nlayers::Int                    # number of layers in the vertical (for scratch memory size)
 
     # SPECTRAL RESOLUTION
-    spectrum::SP                    # spectral trunction 
+    spectrum::SpectrumType                    # spectral trunction 
     nfreq_max::Int                  # Maximum (at Equator) number of Fourier frequencies (real FFT)
     LegendreShortcut::Type{<:AbstractLegendreShortcut} # Legendre shortcut for truncation of m loop
     mmax_truncation::Vector{Int}    # Maximum order m to retain per latitude ring
@@ -251,8 +251,8 @@ function SpectralTransform(
         ArrayType_{Complex{NF}, 1},
         ArrayType_{Complex{NF}, 2},
         ArrayType_{Complex{NF}, 3},
-        LowerTriangularArray{NF, 1, typeof(spectrum), ArrayType_{NF, 1}},
-        LowerTriangularArray{NF, 2, typeof(spectrum), ArrayType_{NF, 2}},
+        LowerTriangularArray{NF, 1, ArrayType_{NF, 1}, typeof(spectrum)},
+        LowerTriangularArray{NF, 2, ArrayType_{NF, 2}, typeof(spectrum)},
     }(
         Grid, nlat_half, nlayers,
         spectrum, nfreq_max, 
@@ -288,7 +288,7 @@ Generator function for a `SpectralTransform` struct based on the size of the spe
 coefficients `specs`. Use keyword arguments `nlat_half`, `Grid` or `deliasing` (if `nlat_half`
 not provided) to define the grid."""
 function SpectralTransform(
-    specs::LowerTriangularArray{NF, N, S, ArrayType};  # spectral coefficients
+    specs::LowerTriangularArray{NF, N, ArrayType, S};  # spectral coefficients
     nlat_half::Integer = 0,                         # resolution parameter nlat_half
     dealiasing::Real = DEFAULT_DEALIASING,          # dealiasing factor
     kwargs...
@@ -322,7 +322,7 @@ end
 Generator function for a `SpectralTransform` struct to transform between `grids` and `specs`."""
 function SpectralTransform(
     grids::AbstractGridArray{NF1, N, ArrayType1},
-    specs::LowerTriangularArray{NF2, N, S, ArrayType2};
+    specs::LowerTriangularArray{NF2, N, ArrayType2, S};
     kwargs...
 ) where {NF1, NF2, N, S, ArrayType1, ArrayType2}           # number formats 1 and 2
     
