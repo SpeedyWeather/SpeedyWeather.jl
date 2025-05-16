@@ -9,7 +9,7 @@ time or other dimensions. The resolution parameter of the horizontal grid is `nl
 precomputed in `rings`. Note that a `Grid` does not contain any data, it only describes
 the discretization of the space, see `Field` for a data on a `Grid`.
 $(TYPEDFIELDS)"""
-struct FullClenshawGrid{A, V} <: AbstractFullGrid
+struct FullClenshawGrid{A, V} <: AbstractFullGrid{A}
     nlat_half::Int      # number of latitudes on one hemisphere
     architecture::A     # information about device, CPU/GPU
     rings::V            # precomputed ring indices
@@ -18,7 +18,9 @@ end
 # TYPES
 nonparametric_type(::Type{<:FullClenshawGrid}) = FullClenshawGrid
 
-const FullClenshawField{T, N} = Field{T, N, A, G} where {A, G<:FullClenshawGrid}
+# FIELD
+const FullClenshawField{T, N} = Field{T, N, Architecture, Grid} where {Architecture, Grid<:FullClenshawGrid}
+grid_type(::Type{<:FullClenshawField}) = FullClenshawGrid
 Base.show(io::IO, F::Type{<:FullClenshawField{T, N}}) where {T, N} = print(io, "FullClenshawField{$T, $N}")
 
 # SIZE

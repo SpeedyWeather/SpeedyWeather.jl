@@ -27,8 +27,8 @@
 # ordered 0 to 360˚E then north to south, ring by ring. Examples for reduced grids are 
 # the octahedral Gaussian or Clenshaw grids, or the HEALPix grid."""
 
-abstract type AbstractGrid end
-abstract type AbstractFullGrid <: AbstractGrid end
-abstract type AbstractReducedGrid <: AbstractGrid end
+abstract type AbstractGrid{Architecture} end
+abstract type AbstractFullGrid{Architecture} <: AbstractGrid{Architecture} end
+abstract type AbstractReducedGrid{Architecture} <: AbstractGrid{Architecture} end
 
 abstract type AbstractField{T, N, ArrayType, Grid} <: AbstractArray{T, N} end

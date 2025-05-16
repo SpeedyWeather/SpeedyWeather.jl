@@ -1,6 +1,6 @@
 const DEFAULT_NF = Float64
 
-struct Field{T, N, ArrayType <: AbstractArray{T, N}, Grid <: AbstractGrid} <: AbstractField{T, N, ArrayType, Grid}
+struct Field{T, N, ArrayType <: AbstractArray, Grid <: AbstractGrid} <: AbstractField{T, N, ArrayType, Grid}
     data::ArrayType
     grid::Grid
 
@@ -15,7 +15,6 @@ end
 Field(grid::AbstractGrid, k...) = zeros(grid, k...)
 Field(::Type{T}, grid::AbstractGrid, k...) where T = zeros(T, grid, k...)
 
-grid_type( ::Type{Field{T, N, A, G}}) where {T, N, A, G} = G
 grid_type(field::AbstractField) = grid_type(typeof(field))
 array_type(::Type{Field{T, N, A, G}}) where {T, N, A, G} = A
 
@@ -161,90 +160,145 @@ for f in (:zeros, :ones, :rand, :randn)
             return Field(data, grid)
         end
 
-        # zeros(Field, nlat_half, nlayers...)
-        # function Base.$f(
-        #     ::Type{Field{T, N, ArrayType, Grid}},
-        #     nlat_half::Integer,
-        #     k::Integer...;
-        #     architecture=DEFAULT_ARCHITECTURE(),
-        # ) where {T, N, ArrayType, Grid}
-        #     Grid_ = nonparametric_type(Grid)
-        #     grid = Grid_(nlat_half, architecture)
-        #     data = ArrayType($f(T, get_npoints(grid), k...))
-        #     return Field(data, grid)
-        # end
+        function Base.$f(
+            ::Type{F},
+            nlat_half::Integer,
+            k::Integer...;
+            architecture=DEFAULT_ARCHITECTURE(),
+        ) where {F<:AbstractField}
+            Grid_ = grid_type(F)
+            grid = nonparametric_type(Grid_)(nlat_half, architecture)
+            data = array_type(architecture)($f(get_npoints(grid), k...))
+            return Field(data, grid)
+        end
+
+        function Base.$f(
+            ::Type{F},
+            nlat_half::Integer,
+            k::Integer...;
+            architecture=DEFAULT_ARCHITECTURE(),
+        ) where {F<:AbstractField{T}} where T
+            Grid_ = grid_type(F)
+            grid = nonparametric_type(Grid_)(nlat_half, architecture)
+            data = array_type(architecture)($f(T, get_npoints(grid), k...))
+            return Field(data, grid)
+        end
     end
 end
 
-# # zero element of an AbstractGridArray instance grid by creating new zero(grid.data)
-# Base.zero(grid::Grid) where {Grid<:AbstractGridArray} =
-#     nonparametric_type(Grid)(zero(grid.data), grid.nlat_half, grid.rings)
+# zero element of a Field with new data but same grid
+Base.zero(field::AbstractField) = Field(zero(field.data), field.grid)
 
-# # similar data but everything else identical
-# function Base.similar(grid::Grid) where {Grid<:AbstractGridArray}
-#     return nonparametric_type(Grid)(similar(grid.data), grid.nlat_half, grid.rings)
-# end
+# similar data but share grid
+Base.similar(field::AbstractField) = Field(similar(field.data), field.grid)
 
-# # data with new type T but everything else identical
-# function Base.similar(grid::Grid, ::Type{T}) where {Grid<:AbstractGridArray, T}
-#     return nonparametric_type(Grid)(similar(grid.data, T), grid.nlat_half, grid.rings)
-# end
+# data with new type T but share grid
+Base.similar(field::AbstractField, ::Type{T}) where {T} = Field(similar(field.data, T), field.grid)
 
-# # data with same type T but new size
-# function Base.similar(
-#     grid::Grid,
-#     nlat_half::Integer,
-#     k::Integer...
-# ) where {Grid<:AbstractGridArray{T, N, ArrayType}} where {T, N, ArrayType}
-#     similar_data = similar(grid.data, get_npoints2D(Grid, nlat_half), k...)
-#     return nonparametric_type(Grid)(similar_data, nlat_half)
-# end
+# data with same type T but new size (=new grid)
+function Base.similar(
+    field::AbstractField,
+    nlat_half::Integer,
+    k::Integer...
+)
+    # use same architecture though
+    new_grid = typeof(field.grid)(nlat_half, field.grid.architecture)
+    similar_data = similar(field.data, get_npoints(new_grid), k...)
+    return Field(similar_data, new_grid)
+end
 
-# # data with new type T and new size
-# function Base.similar(
-#     grid::Grid,
-#     ::Type{Tnew},
-#     nlat_half::Integer,
-#     k::Integer...
-# ) where {Grid<:AbstractGridArray, Tnew}
-#     similar_data = similar(grid.data, Tnew, get_npoints2D(Grid, nlat_half), k...)
-#     return nonparametric_type(Grid)(similar_data, nlat_half)
-# end
+# data with new type T and new size
+function Base.similar(
+    field::AbstractField,
+    ::Type{Tnew},
+    nlat_half::Integer,
+    k::Integer...
+) where Tnew
+    # use same architecture though
+    new_grid = typeof(field.grid)(nlat_half, field.grid.architecture)
+    similar_data = similar(field.data, Tnew, get_npoints(new_grid), k...)
+    return Field(similar_data, new_grid)
+end
 
-# # general version with ArrayType{T, N}(undef, ...) generator
-# function (::Type{Grid})(
-#     ::UndefInitializer,
-#     nlat_half::Integer,
-#     k::Integer...,
-# ) where {Grid<:AbstractGridArray{T, N, ArrayType}} where {T, N, ArrayType}
-#     ArrayType_ = nonparametric_type(ArrayType)
-#     return Grid(ArrayType_{T, N}(undef, get_npoints2D(Grid, nlat_half), k...), nlat_half)
-# end
+# general version with ArrayType{T, N}(undef, ...) generator
+function (::Type{F})(
+    ::UndefInitializer,
+    nlat_half::Integer,
+    k::Integer...,
+) where {F<:AbstractField{T, N, ArrayType, Grid}} where {T, N, ArrayType, Grid<:AbstractGrid{Architecture}} where Architecture
+    # this (inevitably) creates a new grid and architecture instance
+    grid = nonparametric_type(Grid)(nlat_half, Architecture())
+    # TODO this should allocate on the device
+    data = nonparametric_type(ArrayType){T}(undef, get_npoints(grid), k...)
+    return Field(data, grid)
+end
 
-# # CPU version with Array{T, N}(undef, ...) generator
-# function (::Type{Grid})(
-#     ::UndefInitializer,
-#     nlat_half::Integer,
-#     k::Integer...,
-# ) where {Grid<:AbstractGridArray{T}} where T
-#     return Grid(Array{T}(undef, get_npoints2D(Grid, nlat_half), k...), nlat_half)
-# end
+# in case Architecture is not provided use DEFAULT_ARCHITECTURE
+function (::Type{F})(
+    ::UndefInitializer,
+    nlat_half::Integer,
+    k::Integer...,
+) where {F<:AbstractField{T, N, ArrayType, Grid}} where {T, N, ArrayType, Grid<:AbstractGrid}
+    grid = nonparametric_type(Grid)(nlat_half, DEFAULT_ARCHITECTURE())
+    data = nonparametric_type(ArrayType){T}(undef, get_npoints(grid), k...)
+    return Field(data, grid)
+end
 
-# # use Float64 if no type provided
-# function (::Type{Grid})(
-#     ::UndefInitializer,
-#     nlat_half::Integer,
-#     k::Integer...,
-# ) where {Grid<:AbstractGridArray}
-#     return Grid(Array{Float64}(undef, get_npoints2D(Grid, nlat_half), k...), nlat_half)
-# end
+# in case only grid is provided (e.g. FullGaussianField) use Float64, Array, DEFAULT_ARCHITECTURE
+function (::Type{F})(
+    ::UndefInitializer,
+    nlat_half::Integer,
+    k::Integer...,
+) where {F<:AbstractField}
+    Grid_ = grid_type(F)
+    grid = nonparametric_type(Grid_)(nlat_half, DEFAULT_ARCHITECTURE())
+    data = Array{Float64}(undef, get_npoints(grid), k...)
+    return Field(data, grid)
+end
 
-# function Base.convert(
-#     ::Type{Grid},
-#     grid::AbstractGridArray,
-# ) where {Grid<:AbstractGridArray{T, N, ArrayType}} where {T, N, ArrayType}
-#     return Grid(ArrayType(grid.data))
-# end
+# in case only number format is provided use Array and DEFAULT_ARCHITECTURE
+function (::Type{F})(
+    ::UndefInitializer,
+    nlat_half::Integer,
+    k::Integer...,
+) where {F<:AbstractField{T}} where T
+    Grid_ = grid_type(F)
+    grid = nonparametric_type(Grid_)(nlat_half, DEFAULT_ARCHITECTURE())
+    data = Array{T}(undef, get_npoints(grid), k...)
+    return Field(data, grid)
+end
+
+#  same as above but with N (ignored though as obtained from integer arguments)
+function (::Type{F})(
+    ::UndefInitializer,
+    nlat_half::Integer,
+    k::Integer...,
+) where {F<:AbstractField{T, N}} where {T, N}
+    Grid_ = grid_type(F)
+    grid = nonparametric_type(Grid_)(nlat_half, DEFAULT_ARCHITECTURE())
+    data = Array{T}(undef, get_npoints(grid), k...)
+    return Field(data, grid)
+end
+
+# in case ArrayType is provided use that!
+function (::Type{F})(
+    ::UndefInitializer,
+    nlat_half::Integer,
+    k::Integer...,
+) where {F<:AbstractField{T, N, ArrayType}} where {T, N, ArrayType}
+    Grid_ = grid_type(F)
+    grid = nonparametric_type(Grid_)(nlat_half, DEFAULT_ARCHITECTURE())
+    data = nonparametric_type(ArrayType){T}(undef, get_npoints(grid), k...)
+    return Field(data, grid)
+end
+
+# TODO is that all that's needed?
+function Base.convert(
+    ::Type{F},
+    field::AbstractField,
+) where {F<:AbstractField{T, N, ArrayType, Grid}} where {T, N, ArrayType, Grid}
+    return F(field.data, field.grid)
+end
 
 # equality and comparison, somehow needed as not covered by broadcasting
 Base.:(==)(F1::AbstractField, F2::AbstractField) = fields_match(F1, F2) && F1.data == F2.data
@@ -278,23 +332,23 @@ function fields_match(A::AbstractField, Bs::AbstractField...; kwargs...)
     return match
 end
 
-# ## BROADCASTING
-# # following https://docs.julialang.org/en/v1/manual/interfaces/#man-interfaces-broadcasting
-# import Base.Broadcast: BroadcastStyle, Broadcasted, DefaultArrayStyle
+## BROADCASTING
+# following https://docs.julialang.org/en/v1/manual/interfaces/#man-interfaces-broadcasting
+import Base.Broadcast: BroadcastStyle, Broadcasted, DefaultArrayStyle
 
-# # {1} as grids are <:AbstractVector, Grid here is the non-parameteric Grid type!
-# struct AbstractFieldStyle{N, Field} <: Broadcast.AbstractArrayStyle{N} end
 
-# # important to remove Field{T} parameter T (eltype/number format) here to broadcast
-# # automatically across the same grid type but with different T
-# # e.g. FullGaussianGrid{Float32} and FullGaussianGrid{Float64}
-# Base.BroadcastStyle(::Type{Grid}) where {Grid<:AbstractGridArray{T, N, ArrayType}} where {T, N, ArrayType} =
-#     AbstractGridArrayStyle{N, nonparametric_type(Grid)}()
+struct FieldStyle{N, ArrayType, Grid} <: Broadcast.AbstractArrayStyle{N} end
 
-# # allocation for broadcasting, create a new Grid with undef of type/number format T
-# function Base.similar(bc::Broadcasted{AbstractGridArrayStyle{N, Grid}}, ::Type{T}) where {N, Grid, T}
-#     return Grid(Array{T}(undef, size(bc)))
-# end
+# important to remove Field{T} parameter T (eltype/number format) here to broadcast
+# automatically across the same grid type but with different T
+# e.g. FullGaussianGrid{Float32} and FullGaussianGrid{Float64}
+Base.BroadcastStyle(::Type{F}) where {F<:AbstractField{T, N, ArrayType, Grid}} where {T, N, ArrayType, Grid} =
+    FieldStyle{N, nonparametric_type(ArrayType), Grid}()
+
+# allocation for broadcasting, create a new Grid with undef of type/number format T
+function Base.similar(bc::Broadcasted{FieldStyle{N, ArrayType, Grid}}, ::Type{T}) where {N, ArrayType, Grid, T}
+    return Grid(Array{T}(undef, size(bc)))
+end
 
 # # ::Val{0} for broadcasting with 0-dimensional, ::Val{1} for broadcasting with vectors, etc
 # # when there's a dimension mismatch always choose the larger dimension

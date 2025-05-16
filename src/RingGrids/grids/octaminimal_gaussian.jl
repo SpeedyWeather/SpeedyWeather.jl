@@ -16,7 +16,7 @@ j = nlat. `rings` are the precomputed ring indices, in the example above
 `rings = [1:4, 5:12, 13:24, ...]`. For efficient looping see `eachring` and `eachgrid`.
 Fields are
 $(TYPEDFIELDS)"""
-struct OctaminimalGaussianGrid{A, V} <: AbstractReducedGrid
+struct OctaminimalGaussianGrid{A, V} <: AbstractReducedGrid{A}
     nlat_half::Int                  # number of latitudes on one hemisphere
     architecture::A                 # information about device, CPU/GPU
     rings::V                        # precomputed ring indices
@@ -26,7 +26,9 @@ end
 nonparametric_type(::Type{<:OctaminimalGaussianGrid}) = OctaminimalGaussianGrid
 full_grid_type(::Type{<:OctaminimalGaussianGrid}) = FullGaussianGrid
 
-const OctaminimalGaussianField{T, N} = Field{T, N, A, G} where {A, G<:OctaminimalGaussianGrid}
+# FIELD
+const OctaminimalGaussianField{T, N} = Field{T, N, Architecture, Grid} where {Architecture, Grid<:OctaminimalGaussianGrid}
+grid_type(::Type{<:OctaminimalGaussianField}) = OctaminimalGaussianGrid
 Base.show(io::IO, F::Type{<:OctaminimalGaussianField{T, N}}) where {T, N} =
     print(io, "OctaminimalGaussianField{$T, $N}")
 

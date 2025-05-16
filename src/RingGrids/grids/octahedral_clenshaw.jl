@@ -16,7 +16,7 @@ ring `j = nlat`. `rings` are the precomputed ring indices, the the example above
 `rings = [1:20, 21:44, 45:72, ...]`. For efficient looping see `eachring` and `eachgrid`.
 Fields are
 $(TYPEDFIELDS)"""
-struct OctahedralClenshawGrid{A, V} <: AbstractReducedGrid
+struct OctahedralClenshawGrid{A, V} <: AbstractReducedGrid{A}
     nlat_half::Int                  # number of latitudes on one hemisphere
     architecture::A                 # information about device, CPU/GPU
     rings::V                        # precomputed ring indices
@@ -25,7 +25,9 @@ end
 nonparametric_type(::Type{<:OctahedralClenshawGrid}) = OctahedralClenshawGrid
 full_grid_type(::Type{<:OctahedralClenshawGrid}) = FullClenshawGrid
 
-const OctahedralClenshawField{T, N} = Field{T, N, A, G} where {A, G<:OctahedralClenshawGrid}
+# FIELD
+const OctahedralClenshawField{T, N} = Field{T, N, Architecture, Grid} where {Architecture, Grid<:OctahedralClenshawGrid}
+grid_type(::Type{<:OctahedralClenshawField}) = OctahedralClenshawGrid
 Base.show(io::IO, F::Type{<:OctahedralClenshawField{T, N}}) where {T, N} =
     print(io, "OctahedralClenshawField{$T, $N}")
 

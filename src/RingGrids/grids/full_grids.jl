@@ -1,4 +1,4 @@
-full_grid_type(G::Type{<:AbstractFullGrid}) = G
+full_grid_type(G::Type{<:AbstractFullGrid}) = nonparametric_type(G)
 
 ## SIZE
 get_nlon_max(Grid::Type{<:AbstractFullGrid}, nlat_half::Integer) = get_nlon(Grid, nlat_half)

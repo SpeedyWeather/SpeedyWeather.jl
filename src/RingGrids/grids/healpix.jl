@@ -18,7 +18,7 @@ Equator. For more details see Górski et al. 2005, DOI:10.1086/427976.
 1:4 in the unravelled first dimension, etc. For efficient looping see `eachring` and `eachgrid`.
 Fields are
 $(TYPEDFIELDS)"""
-struct HEALPixGrid{A, V} <: AbstractReducedGrid
+struct HEALPixGrid{A, V} <: AbstractReducedGrid{A}
     nlat_half::Int                  # number of latitudes on one hemisphere
     architecture::A                 # information about device, CPU/GPU
     rings::V                        # precomputed ring indices
@@ -27,7 +27,9 @@ end
 nonparametric_type(::Type{<:HEALPixGrid}) = HEALPixGrid
 full_grid_type(::Type{<:HEALPixGrid}) = FullHEALPixGrid
 
-const HEALPixField{T, N} = Field{T, N, A, G} where {A, G<:HEALPixGrid}
+# FIELD
+const HEALPixField{T, N} = Field{T, N, Architecture, Grid} where {Architecture, Grid<:HEALPixGrid}
+grid_type(::Type{<:HEALPixField}) = HEALPixGrid
 Base.show(io::IO, F::Type{<:HEALPixField{T, N}}) where {T, N} = print(io, "HEALPixField{$T, $N}")
 
 ## SIZE

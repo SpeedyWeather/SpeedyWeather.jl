@@ -8,7 +8,7 @@ and/or time or other dimensions. The resolution parameter of the horizontal grid
 `nlat_half` (number of latitude rings on one hemisphere, Equator included) and the ring indices
 are precomputed in `rings`. Fields are
 $(TYPEDFIELDS)"""
-struct FullHEALPixGrid{A, V} <: AbstractFullGrid
+struct FullHEALPixGrid{A, V} <: AbstractFullGrid{A}
     nlat_half::Int      # number of latitudes on one hemisphere
     architecture::A     # information about device, CPU/GPU
     rings::V            # precomputed ring indices
@@ -16,7 +16,9 @@ end
 
 nonparametric_type(::Type{<:FullHEALPixGrid}) = FullHEALPixGrid
 
-const FullHEALPixField{T, N} = Field{T, N, A, G} where {A, G<:FullHEALPixGrid}
+# FIELD
+const FullHEALPixField{T, N} = Field{T, N, Architecture, Grid} where {Architecture, Grid<:FullHEALPixGrid}
+grid_type(::Type{<:FullHEALPixField}) = FullHEALPixGrid
 Base.show(io::IO, F::Type{<:FullHEALPixField{T, N}}) where {T, N} = print(io, "FullHEALPixField{$T, $N}")
 
 # SIZE

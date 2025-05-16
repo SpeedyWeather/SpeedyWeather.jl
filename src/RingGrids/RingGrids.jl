@@ -40,6 +40,7 @@ export  FullGaussianField,
         FullOctaHEALPixField,
         OctahedralGaussianField,
         OctahedralClenshawField,
+        HEALPixField,
         OctaHEALPixField,
         OctaminimalGaussianField
 

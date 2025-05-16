@@ -6,7 +6,7 @@ horizontal grid is `nlat_half` (number of latitude rings on one hemisphere, Equa
 ring indices are precomputed in `rings`. Note that a `Grid` does not contain any data, it only describes
 the discretization of the space, see `Field` for a data on a `Grid`.
 $(TYPEDFIELDS)"""
-struct FullGaussianGrid{A, V} <: AbstractFullGrid
+struct FullGaussianGrid{A, V} <: AbstractFullGrid{A}
     nlat_half::Int              # number of latitudes on one hemisphere
     architecture::A             # information about device, CPU/GPU
     rings::V                    # precomputed ring indices
@@ -14,7 +14,9 @@ end
 
 nonparametric_type(::Type{<:FullGaussianGrid}) = FullGaussianGrid
 
-const FullGaussianField{T, N} = Field{T, N, A, G} where {A, G<:FullGaussianGrid}
+# FIELD
+const FullGaussianField{T, N} = Field{T, N, Architecture, Grid} where {Architecture, Grid<:FullGaussianGrid}
+grid_type(::Type{<:FullGaussianField}) = FullGaussianGrid
 Base.show(io::IO, F::Type{<:FullGaussianField{T, N}}) where {T, N} = print(io, "FullGaussianField{$T, $N}")
 
 # SIZE
