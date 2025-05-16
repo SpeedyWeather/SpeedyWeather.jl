@@ -193,13 +193,12 @@ function Base.show(
     print(io,   "└ clock: $(progn.clock.time)")
 end
 
-# has(::PrognosticVariables{NF, Grid, M}, var_name::Symbol) where {NF, Grid, M} = has(M, var_name)
-
 """$(TYPEDSIGNATURES)
 Copies entries of `progn_old` into `progn_new`."""
-function Base.copy!(progn_new::P1, progn_old::P2) where {P1 <: PrognosticVariables, P2 <: PrognosticVariables}
+function Base.copy!(progn_new::PrognosticVariables{NF,AT,ST,NSTEPS}, progn_old::PrognosticVariables{NF,AT,ST,NSTEPS}) where {NF,AT,ST,NSTEPS}
 
-    for i in eachindex(progn_new.vor)   # each leapfrog time step
+    # Core variables using broadcast
+    @inbounds for i in 1:NSTEPS
         progn_new.vor[i] .= progn_old.vor[i]
         progn_new.div[i] .= progn_old.div[i]
         progn_new.temp[i] .= progn_old.temp[i]
@@ -207,37 +206,34 @@ function Base.copy!(progn_new::P1, progn_old::P2) where {P1 <: PrognosticVariabl
         progn_new.pres[i] .= progn_old.pres[i]
     end
 
-    # ocean
+    # Ocean variables
     progn_new.ocean.sea_surface_temperature .= progn_old.ocean.sea_surface_temperature
     progn_new.ocean.sea_ice_concentration .= progn_old.ocean.sea_ice_concentration
     progn_new.ocean.sensible_heat_flux .= progn_old.ocean.sensible_heat_flux
     progn_new.ocean.evaporative_flux .= progn_old.ocean.evaporative_flux
- 
-    # land
+
+    # Land variables
     progn_new.land.soil_temperature .= progn_old.land.soil_temperature
     progn_new.land.snow_depth .= progn_old.land.snow_depth
     progn_new.land.soil_moisture .= progn_old.land.soil_moisture
     progn_new.land.sensible_heat_flux .= progn_old.land.sensible_heat_flux
     progn_new.land.evaporative_flux .= progn_old.land.evaporative_flux
 
-    # copy over tracers
+    # Tracers - using broadcast assignment
     for (key, value) in progn_old.tracers
-        progn_old.tracers[key] = value
-    end 
-
-    # copy largest subset of particles
-    if length(progn_new.particles) != length(progn_old.particles)
-        nnew = length(progn_new.particles)
-        nold = length(progn_old.particles)
-        nsub = min(nnew, nold)
-        @warn "Number of particles changed (origin: $nold, destination: $nnew), copying over only the largest subset ($nsub particles)"
-        progn_new.particles[1:nsub] .= progn_old.particles[1:nsub]
-    else
-        progn_new.particles .= progn_old.particles
+        progn_new.tracers[key] .= value
     end
 
-    progn_new.random_pattern .= progn_old.random_pattern.data
+    # Random pattern
+    progn_new.random_pattern .= progn_old.random_pattern
 
+    # Particles - copy only up to the minimum length
+    n = min(length(progn_new.particles), length(progn_old.particles))
+    if n > 0
+        progn_new.particles[1:n] .= progn_old.particles[1:n]
+    end
+
+    # Copy scale and clock
     copy!(progn_new.clock, progn_old.clock)
     progn_new.scale[] = progn_old.scale[]
 
