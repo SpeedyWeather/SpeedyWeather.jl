@@ -675,14 +675,14 @@ function initialize!(   progn::PrognosticVariables{NF},
                         model::ShallowWater) where NF
 
     (; A, lmin, lmax) = initial_conditions
-    (; trunc) = progn
+    (; spectrum) = progn
 
     # start with matrix to have matrix indexing
-    ηm = randn(Complex{NF}, trunc+2, trunc+1)
+    ηm = randn(Complex{NF}, spectrum.lmax, spectrum.mmax)
 
     # zero out other wavenumbers
-    ηm[1:min(lmin, trunc+2), :] .= 0
-    ηm[min(lmax+2, trunc+2):trunc+2, :] .= 0
+    ηm[1:min(lmin, spectrum.lmax), :] .= 0
+    ηm[min(lmax+2, spectrum.lmax):spectrum.lmax, :] .= 0
 
     # convert to LowerTriangularMatrix with vector indexing
     η = LowerTriangularArray(ηm)

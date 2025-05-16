@@ -157,7 +157,7 @@ into ``2l`` sectors in longitude ``\phi`` without a zero-crossing in latitude.
 For correctness it is mentioned here that SpeedyWeather.jl uses a `LowerTriangularMatrix` type to store
 the spherical harmonic coefficients. By doing so, the upper triangle is actually *not* explicitly stored
 and the data technically unravelled into a vector, but this is hidden as much as possible from the user.
-For more details see [`LowerTriangularMatrices`](@ref lowertriangularmatrices).
+For more details see [`LowerTriangularArrays`](@ref lowertriangularmatrices).
 
 !!! info "Array indices"
     For a spectral field `a` note that due to Julia's 1-based indexing the coefficient ``a_{lm}`` is obtained via

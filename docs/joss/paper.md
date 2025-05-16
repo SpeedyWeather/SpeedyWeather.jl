@@ -174,13 +174,13 @@ No distributed-memory parallelization is currently supported,
 GPU support is planned.
 
 SpeedyWeather.jl internally uses three sub-modules `RingGrids`,
-`LowerTriangularMatrices`, and `SpeedyTransforms`. `RingGrids` is a module that discretizes
+`LowerTriangularArrays`, and `SpeedyTransforms`. `RingGrids` is a module that discretizes
 the sphere on iso-latitude rings and implements interpolations between various such grids.
-`LowerTriangularMatrices` facilitates the implementation of the spherical harmonics by organizing
+`LowerTriangularArrays` facilitates the implementation of the spherical harmonics by organizing
 their coefficients in a lower triangular matrix representation.
 `SpeedyTransforms` implements the spectral transform between
 the grid-point space as defined by `RingGrids` and the spectral space defined in
-`LowerTriangularMatrices`. These three modules are independently usable
+`LowerTriangularArrays`. These three modules are independently usable
 and therefore support SpeedyWeather's library-like user interface.
 Output is stored as NetCDF files using NCDatasets.jl [@NCDatasets].
 

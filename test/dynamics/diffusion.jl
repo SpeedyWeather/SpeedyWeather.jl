@@ -22,10 +22,10 @@
 
             # diffusion tendency has opposite sign (real/imag respectively)
             # than prognostic variable to act as a dissipation 
-            (; lmax, mmax) = model.spectral_transform
+            (; spectrum) = model.spectral_transform
             for k in eachmatrix(vor, vor_tend)
-                for m in 1:mmax+1
-                    for l in max(2, m):lmax
+                for m in 1:spectrum.mmax
+                    for l in max(2, m):(spectrum.lmax-1)
                         @test -sign(real(vor[l, m, k])) == sign(real(vor_tend[l, m, k]))
                         @test -sign(imag(vor[l, m, k])) == sign(imag(vor_tend[l, m, k]))
                     end

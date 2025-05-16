@@ -5,7 +5,7 @@ independent (SpeedyWeather.jl however imports it) and can also be used without r
 It is just not put into its own respective repository for now.
 
 The SpeedyTransforms are based on [RingGrids](@ref) and
-[LowerTriangularMatrices](@ref lowertriangularmatrices) to hold
+[LowerTriangularArrays](@ref lowertriangularmatrices) to hold
 data in either grid-point space or in spectral space. So you want to read these sections first
 for clarifications how to work with these. We will also not discuss mathematical details
 of the [Spherical Harmonic Transform](@ref) here, but will focus on the usage of the
@@ -34,7 +34,7 @@ these are the modules required to load
 
 ```@example speedytransforms
 using SpeedyWeather.RingGrids
-using SpeedyWeather.LowerTriangularMatrices
+using SpeedyWeather.LowerTriangularArrays
 using SpeedyWeather.SpeedyTransforms
 ```
 
@@ -121,7 +121,7 @@ create a `SpectralTransform` is to start with a `SpectralGrid`, which already de
 which spectral resolution is supposed to be combined with a given grid.
 ```@example speedytransforms
 using SpeedyWeather
-spectral_grid = SpectralGrid(NF=Float32, trunc=5, Grid=OctahedralGaussianGrid, dealiasing=3)
+spectral_grid = SpectralGrid(NF=Float32, trunc=5, Grid=OctahedralGaussianGrid, dealiasing=3.)
 ```
 (We `using SpeedyWeather` here as `SpectralGrid` is exported therein).
 We also specify the number format `Float32` here to be used for the transform although this
@@ -129,9 +129,9 @@ is the default anyway. From `spectral_grid` we now construct a `SpectralTransfor
 ```@example speedytransforms
 S = SpectralTransform(spectral_grid)
 ```
-Note that because we chose `dealiasing=3` (cubic truncation) we now match a T5 spectral field
+Note that because we chose `dealiasing=3.` (cubic truncation) we now match a T5 spectral field
 with a 12-ring octahedral Gaussian grid, instead of the 8 rings as above. So going from
-`dealiasing=2` (default) to `dealiasing=3` increased our resolution on the grid while the
+`dealiasing=2.` (default) to `dealiasing=3.` increased our resolution on the grid while the
 spectral resolution remains the same.
 
 Passing on `S` the `SpectralTransform` now allows us to transform directly on the grid
@@ -185,7 +185,7 @@ SpectralTransform(alms)
 
 Now we have defined the resolution of the spectral space through `alms` but create
 a `SpectralTransform` by making assumption about the grid space. E.g. `Grid=FullGaussianGrid`
-by default, `dealiasing=2` and `nlat_half` correspondingly. But you can also pass them
+by default, `dealiasing=2.` and `nlat_half` correspondingly. But you can also pass them
 on as keyword arguments, for example
 
 ```@example speedytransforms
@@ -217,7 +217,7 @@ How to take some data and compute a power spectrum with SpeedyTransforms you may
 Say you have some global data in a matrix `m` that looks, for example, like
 ```@example speedytransforms2
 using SpeedyWeather.RingGrids # hide
-using SpeedyWeather.LowerTriangularMatrices # hide
+using SpeedyWeather.LowerTriangularArrays # hide
 using SpeedyWeather.SpeedyTransforms # hide
 alms = randn(LowerTriangularMatrix{Complex{Float32}}, 32, 32) # hide
 spectral_truncation!(alms, 10) # hide
@@ -332,11 +332,11 @@ is performed along the leading dimension, and all further dimensions are interpr
 batch dimensions. Take for example 
 
 ```@example speedytransforms2
-alms = randn(LowerTriangularMatrix{Complex{Float32}}, 32, 32, 5) 
+alms = randn(LowerTriangularArray{Complex{Float32}}, 32, 32, 5) 
 grids = transform(alms)
 ```
 
-In this case we first randomly generated five (32x32) `LowerTriangularMatrix` that hold the
+In this case we first randomly generated five (32x32) `LowerTriangularArray` that hold the
 coefficients and then transformed all five matrices batched to the grid space with the 
 transform command, yielding 5 `RingGrids` with each 48-rings. 
 
@@ -348,7 +348,7 @@ only, not the first two...). But the power spectrum is always calculated along t
 first spherical-harmonic dimension. For example
 
 ```@example speedytransforms2 
-alms = randn(LowerTriangularMatrix{Complex{Float32}}, 5, 5, 2) 
+alms = randn(LowerTriangularArray{Complex{Float32}}, 5, 5, 2) 
 power_spectrum(alms)
 ```
 returns the power spectrum for `[..., 1]` in the first column and `[..., 2]` in the second.

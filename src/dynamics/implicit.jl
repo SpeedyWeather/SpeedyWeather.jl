@@ -344,7 +344,7 @@ function implicit_correction!(
                 # in the δD = S⁻¹G calculation below
                 div_tend[lm, k] = 0
             end
-            lm += 1         # skip last row, LowerTriangularMatrices are of size lmax+2 x mmax+1
+            lm += 1         # skip last row, LowerTriangularArrays are of size lmax+2 x mmax+1
         end
     end
 

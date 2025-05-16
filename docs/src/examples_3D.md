@@ -12,7 +12,7 @@ See also [Examples 2D](@ref Examples) for examples with the
 
 ```@example jablonowski
 using SpeedyWeather
-spectral_grid = SpectralGrid(trunc=31, nlayers=8, Grid=FullGaussianGrid, dealiasing=3)
+spectral_grid = SpectralGrid(trunc=31, nlayers=8, Grid=FullGaussianGrid, dealiasing=3.)
 
 orography = ZonalRidge(spectral_grid)
 initial_conditions = InitialConditions(
