@@ -11,6 +11,11 @@ struct Field{T, N, ArrayType <: AbstractArray, Grid <: AbstractGrid} <: Abstract
     end
 end
 
+# horizontal dimension is always unravelled into a vector
+const Field2D = Field{T, 1} where T
+const Field3D = Field{T, 2} where T
+const Field4D = Field{T, 3} where T
+
 # default constructors
 Field(grid::AbstractGrid, k...) = zeros(grid, k...)
 Field(::Type{T}, grid::AbstractGrid, k...) where T = zeros(T, grid, k...)
@@ -51,12 +56,18 @@ isreduced(field::AbstractField) = isreduced(typeof(field))
 
 # SIZE
 Base.size(f::AbstractField, args...) = size(f.data, args...)
+# sizeof: don't count grid as possibly shared with other fields
+Base.sizeof(field::AbstractField) = sizeof(field.data)  
 
-for f in (:get_nlat, :get_nlat_half, :get_npoints)
+for f in (:get_nlat, :get_nlat_half)
     @eval begin
         $f(field::AbstractField) = $f(field.grid)
     end
 end
+
+# grid is inherently 2D, for field distinguish between get_npoints (3D+) and get_npoints2D
+get_npoints2D(field::AbstractField) = get_npoints(field.grid)
+get_npoints(field::AbstractField) = get_npoints(field.grid, size(field)[2:end]...)
 
 # needed for unalias
 @inline Base.dataids(field::AbstractField) = Base.dataids(field.data)
@@ -252,7 +263,7 @@ function (::Type{F})(
 ) where {F<:AbstractField}
     Grid_ = grid_type(F)
     grid = nonparametric_type(Grid_)(nlat_half, DEFAULT_ARCHITECTURE())
-    data = Array{Float64}(undef, get_npoints(grid), k...)
+    data = Array{DEFAULT_NF}(undef, get_npoints(grid), k...)
     return Field(data, grid)
 end
 
@@ -336,66 +347,70 @@ end
 # following https://docs.julialang.org/en/v1/manual/interfaces/#man-interfaces-broadcasting
 import Base.Broadcast: BroadcastStyle, Broadcasted, DefaultArrayStyle
 
-
+# new broadcasting style add additional parameters of Field
 struct FieldStyle{N, ArrayType, Grid} <: Broadcast.AbstractArrayStyle{N} end
 
-# important to remove Field{T} parameter T (eltype/number format) here to broadcast
-# automatically across the same grid type but with different T
-# e.g. FullGaussianGrid{Float32} and FullGaussianGrid{Float64}
+# define broadcast style for Field from its parameters
 Base.BroadcastStyle(::Type{F}) where {F<:AbstractField{T, N, ArrayType, Grid}} where {T, N, ArrayType, Grid} =
-    FieldStyle{N, nonparametric_type(ArrayType), Grid}()
+    FieldStyle{N, ArrayType, Grid}()
 
-# allocation for broadcasting, create a new Grid with undef of type/number format T
+# allocation for broadcasting via similar, reusing grid from the first field of the broadcast arguments
+# e.g. field1 + field2 creates a new field that share the grid of field1
+# 2 .+ field1 creates a new field that share the grid of field1
 function Base.similar(bc::Broadcasted{FieldStyle{N, ArrayType, Grid}}, ::Type{T}) where {N, ArrayType, Grid, T}
-    return Grid(Array{T}(undef, size(bc)))
+    for maybe_field in bc.args
+        if maybe_field isa AbstractField
+            return similar(maybe_field, T)
+        end
+    end
 end
 
-# # ::Val{0} for broadcasting with 0-dimensional, ::Val{1} for broadcasting with vectors, etc
-# # when there's a dimension mismatch always choose the larger dimension
-# AbstractGridArrayStyle{N, Grid}(::Val{N}) where {N, Grid} = AbstractGridArrayStyle{N, Grid}()
-# AbstractGridArrayStyle{1, Grid}(::Val{2}) where {Grid} = AbstractGridArrayStyle{2, Grid}()
-# AbstractGridArrayStyle{1, Grid}(::Val{0}) where {Grid} = AbstractGridArrayStyle{1, Grid}()
-# AbstractGridArrayStyle{2, Grid}(::Val{3}) where {Grid} = AbstractGridArrayStyle{3, Grid}()
-# AbstractGridArrayStyle{2, Grid}(::Val{1}) where {Grid} = AbstractGridArrayStyle{2, Grid}()
-# AbstractGridArrayStyle{3, Grid}(::Val{4}) where {Grid} = AbstractGridArrayStyle{4, Grid}()
-# AbstractGridArrayStyle{3, Grid}(::Val{2}) where {Grid} = AbstractGridArrayStyle{3, Grid}()
+# ::Val{0} for broadcasting with 0-dimensional, ::Val{1} for broadcasting with vectors, etc
+# when there's a dimension mismatch always choose the larger dimension
+FieldStyle{N, ArrayType, Grid}(::Val{N}) where {N, ArrayType, Grid} = FieldStyle{N, ArrayType, Grid}()
+FieldStyle{1, ArrayType, Grid}(::Val{2}) where {ArrayType, Grid} = FieldStyle{2, ArrayType, Grid}()
+FieldStyle{1, ArrayType, Grid}(::Val{0}) where {ArrayType, Grid} = FieldStyle{1, ArrayType, Grid}()
+FieldStyle{2, ArrayType, Grid}(::Val{3}) where {ArrayType, Grid} = FieldStyle{3, ArrayType, Grid}()
+FieldStyle{2, ArrayType, Grid}(::Val{1}) where {ArrayType, Grid} = FieldStyle{2, ArrayType, Grid}()
+FieldStyle{3, ArrayType, Grid}(::Val{4}) where {ArrayType, Grid} = FieldStyle{4, ArrayType, Grid}()
+FieldStyle{3, ArrayType, Grid}(::Val{2}) where {ArrayType, Grid} = FieldStyle{3, ArrayType, Grid}()
 
-# ## GPU
-# struct AbstractGPUFieldStyle{N, ArrayType, Field} <: GPUArrays.AbstractGPUArrayStyle{N} end
+## GPU (same but <: GPUArrays.AbstractGPUArrayStyle)
+struct FieldGPUStyle{N, ArrayType, Grid} <: GPUArrays.AbstractGPUArrayStyle{N} end
 
-# function Base.BroadcastStyle(
-#     ::Type{Field}
-# ) where {Field<:AbstractField{T, N, ArrayType}} where {T, N, ArrayType <: GPUArrays.AbstractGPUArray}
-#     return AbstractGPUFieldStyle{N, ArrayType, nonparametric_type(Field)}()
-# end
+# same as for FieldStyle but for constrain to ArrayType<:GPUArrays
+function Base.BroadcastStyle(
+    ::Type{F}
+) where {F<:AbstractField{T, N, ArrayType, Grid}} where {T, N, ArrayType <: GPUArrays.AbstractGPUArray, Grid}
+    return FieldGPUStyle{N, ArrayType, Grid}()
+end
 
-# # ::Val{0} for broadcasting with 0-dimensional, ::Val{1} for broadcasting with vectors, etc
-# # when there's a dimension mismatch always choose the larger dimension
-# AbstractGPUGridArrayStyle{N, ArrayType, Grid}(::Val{N}) where {N, ArrayType, Grid} =
-#     AbstractGPUGridArrayStyle{N, ArrayType, Grid}()
+function Base.similar(bc::Broadcasted{FieldGPUStyle{N, ArrayType, Grid}}, ::Type{T}) where {N, ArrayType, Grid, T}
+    for maybe_field in bc.args
+        if maybe_field isa AbstractField
+            return similar(maybe_field, T)
+        end
+    end
+end
 
-# AbstractGPUFieldStyle{1, ArrayType, Field}(::Val{2}) where {ArrayType, Field} = AbstractGPUGridArrayStyle{2, ArrayType, Grid}()
-# AbstractGPUFieldStyle{1, ArrayType, Field}(::Val{0}) where {ArrayType, Field} = AbstractGPUGridArrayStyle{1, ArrayType, Grid}()
-# AbstractGPUFieldStyle{2, ArrayType, Field}(::Val{3}) where {ArrayType, Field} = AbstractGPUGridArrayStyle{3, ArrayType, Grid}()
-# AbstractGPUFieldStyle{2, ArrayType, Field}(::Val{1}) where {ArrayType, Field} = AbstractGPUGridArrayStyle{2, ArrayType, Grid}()
-# AbstractGPUFieldStyle{3, ArrayType, Field}(::Val{4}) where {ArrayType, Field} = AbstractGPUGridArrayStyle{4, ArrayType, Grid}()
-# AbstractGPUFieldStyle{3, ArrayType, Field}(::Val{2}) where {ArrayType, Field} = AbstractGPUGridArrayStyle{3, ArrayType, Grid}()
 
-# function KernelAbstractions.get_backend(
-#     g::Grid
-# ) where {Grid <: AbstractGridArray{T, N, ArrayType}} where {T, N, ArrayType <: GPUArrays.AbstractGPUArray}
-#     return KernelAbstractions.get_backend(g.data)
-# end
+# ::Val{0} for broadcasting with 0-dimensional, ::Val{1} for broadcasting with vectors, etc
+# when there's a dimension mismatch always choose the larger dimension
+FieldGPUStyle{N, ArrayType, Grid}(::Val{N}) where {N, ArrayType, Grid} = FieldGPUStyle{N, ArrayType, Grid}()
+FieldGPUStyle{1, ArrayType, Grid}(::Val{2}) where {ArrayType, Grid}    = FieldGPUStyle{2, ArrayType, Grid}()
+FieldGPUStyle{1, ArrayType, Grid}(::Val{0}) where {ArrayType, Grid}    = FieldGPUStyle{1, ArrayType, Grid}()
+FieldGPUStyle{2, ArrayType, Grid}(::Val{3}) where {ArrayType, Grid}    = FieldGPUStyle{3, ArrayType, Grid}()
+FieldGPUStyle{2, ArrayType, Grid}(::Val{1}) where {ArrayType, Grid}    = FieldGPUStyle{2, ArrayType, Grid}()
+FieldGPUStyle{3, ArrayType, Grid}(::Val{4}) where {ArrayType, Grid}    = FieldGPUStyle{4, ArrayType, Grid}()
+FieldGPUStyle{3, ArrayType, Grid}(::Val{2}) where {ArrayType, Grid}    = FieldGPUStyle{3, ArrayType, Grid}()
 
-# function Base.similar(
-#     bc::Broadcasted{AbstractGPUGridArrayStyle{N, ArrayType, Grid}},
-#     ::Type{T},
-# ) where {N, ArrayType, Grid, T}
-#     ArrayType_ = nonparametric_type(ArrayType)
-#     return Grid(ArrayType_{T}(undef, size(bc)))
-# end
+function KernelAbstractions.get_backend(
+    field::F
+) where {F <: AbstractField{T, N, ArrayType}} where {T, N, ArrayType <: GPUArrays.AbstractGPUArray}
+    return KernelAbstractions.get_backend(field.data)
+end
 
-# function Adapt.adapt_structure(to, grid::Grid) where {Grid <: AbstractGridArray}
-#     Grid_ = nonparametric_type(Grid)
-#     return Grid_(Adapt.adapt(to, grid.data), grid.nlat_half, grid.rings)
-# end
+function Adapt.adapt_structure(to, field::F) where {F <: AbstractField}
+    # TODO this reuses the same grid but adapt can change the array type which should also change the architecture?
+    return Field(Adapt.adapt(to, field.data), field.grid)
+end

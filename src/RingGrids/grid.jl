@@ -29,27 +29,6 @@ nonparametric_type(grid::AbstractGrid) = nonparametric_type(typeof(grid))
 # also needed for other array types, defined in extensions
 nonparametric_type(::Type{<:Array}) = Array
 
-# """$(TYPEDSIGNATURES) Full grid array type for `grid`. Always returns the N-dimensional `*Array`
-# not the two-dimensional (`N=1`) `*Grid`. For reduced grids the corresponding full grid that
-# share the same latitudes."""
-# full_array_type(grid::AbstractGridArray) = full_array_type(typeof(grid))
-
-# """$(TYPEDSIGNATURES) Full (horizontal) grid type for `grid`. Always returns the two-dimensional
-# (`N=1`) `*Grid` type. For reduced grids the corresponding full grid that share the same latitudes."""
-# full_grid_type(grid::AbstractGridArray) = horizontal_grid_type(full_array_type(grid))
-# full_grid_type(Grid::Type{<:AbstractGridArray}) = horizontal_grid_type(full_array_type(Grid))
-
-# """$(TYPEDSIGNATURES) The two-dimensional (`N=1`) `*Grid` for `grid`, which can be an N-dimensional
-# `*GridArray`."""
-# horizontal_grid_type(grid::AbstractGridArray) = horizontal_grid_type(typeof(grid))
-
-# ## SIZE
-# Base.length(G::AbstractGridArray) = length(G.data)  # total number of grid points
-# Base.size(G::AbstractGridArray) = size(G.data)      # size of underlying data (horizontal is unravelled)
-
-# """$(TYPEDSIGNATURES) Size of underlying data array plus precomputed ring indices."""
-# Base.sizeof(G::AbstractGridArray) = sizeof(G.data) + sizeof(G.rings)
-
 """$(TYPEDSIGNATURES) Resolution paraemeters `nlat_half` of a `grid`.
 Number of latitude rings on one hemisphere, Equator included."""
 get_nlat_half(grid::AbstractGrid) = grid.nlat_half
@@ -66,7 +45,7 @@ get_nlat(grid::AbstractGrid) = get_nlat(typeof(grid), grid.nlat_half)
 
 """$(TYPEDSIGNATURES) Total number of grid points in all dimensions of `grid`.
 Equivalent to length of the underlying data array."""
-get_npoints(grid::Grid) where {Grid<:AbstractGrid} = get_npoints(Grid, grid.nlat_half)
+get_npoints(grid::Grid, args...) where {Grid<:AbstractGrid} = get_npoints(Grid, grid.nlat_half, args...)
 get_npoints(G::Type{<:AbstractGrid}, nlat_half::Integer, k::Integer...) = prod(k) * get_npoints(G, nlat_half)
 
 """$(TYPEDSIGNATURES) Size of the matrix of the horizontal grid if representable as such (not all grids)."""
