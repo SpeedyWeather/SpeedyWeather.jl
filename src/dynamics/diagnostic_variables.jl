@@ -8,7 +8,7 @@ function Base.show(io::IO, A::AbstractDiagnosticVariables)
         val = getfield(A, key)
         T = typeof(val)
 
-        if T <: AbstractGridArray
+        if T <: AbstractField
             NF = first_parameter(T)
             nlat = RingGrids.get_nlat(val)
             Grid = RingGrids.nonparametric_type(T)
@@ -37,8 +37,8 @@ $(TYPEDFIELDS)"""
     ArrayType,              # Array, CuArray, ...
     SpectralVariable2D,     # <: LowerTriangularArray
     SpectralVariable3D,     # <: LowerTriangularArray
-    GridVariable2D,         # <: AbstractGridArray
-    GridVariable3D,         # <: AbstractGridArray
+    GridVariable2D,         # <: AbstractField
+    GridVariable3D,         # <: AbstractField
 } <: AbstractDiagnosticVariables
 
     trunc::Int              # spectral resolution: maximum degree and order of spherical harmonics
@@ -100,8 +100,8 @@ $TYPEDFIELDS."""
 @kwdef struct GridVariables{
     NF,                     # <: AbstractFloat
     ArrayType,              # Array, CuArray, ...
-    GridVariable2D,         # <: AbstractGridArray
-    GridVariable3D,         # <: AbstractGridArray
+    GridVariable2D,         # <: AbstractField
+    GridVariable3D,         # <: AbstractField
 } <: AbstractDiagnosticVariables
 
     nlat_half::Int          # grid resolution: number of latitude rings on one hemisphere (Eq. incl.)
@@ -164,8 +164,8 @@ $(TYPEDFIELDS)"""
     ArrayType,              # Array, CuArray, ...
     SpectralVariable2D,     # <: LowerTriangularArray
     SpectralVariable3D,     # <: LowerTriangularArray
-    GridVariable2D,         # <: AbstractGridArray
-    GridVariable3D,         # <: AbstractGridArray
+    GridVariable2D,         # <: AbstractField
+    GridVariable3D,         # <: AbstractField
 } <: AbstractDiagnosticVariables
     
     trunc::Int              # spectral resolution: maximum degree and order of spherical harmonics
@@ -298,7 +298,7 @@ $(TYPEDFIELDS)"""
 @kwdef struct PhysicsVariables{
     NF,                     # <: AbstractFloat
     ArrayType,              # Array, CuArray, ...
-    GridVariable2D,         # <: AbstractGridArray
+    GridVariable2D,         # <: AbstractField
 } <: AbstractDiagnosticVariables
 
     nlat_half::Int          # resolution of grid

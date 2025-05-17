@@ -33,19 +33,19 @@ The weights are of length `nlat`, i.e. a vector for every latitude ring, pole to
 `sum(equal_area_weights(nlat_half))` is always `2` as int_0^π sin(x) dx = 2 (colatitudes),
 or equivalently int_-pi/2^pi/2 cos(x) dx (latitudes). Integration (and therefore the
 spectral transform) is not exact with these grids but errors reduce for higher resolution."""
-function equal_area_weights(Grid::Type{<:AbstractGridArray}, nlat_half::Integer)
+function equal_area_weights(Grid::Type{<:AbstractGrid}, nlat_half::Integer)
     nlat = get_nlat(Grid, nlat_half)
-    npoints2D = get_npoints2D(Grid, nlat_half)
+    npoints = get_npoints(Grid, nlat_half)
     weights = zeros(nlat)
     for j in 1:nlat
         nlon = get_nlon_per_ring(Grid, nlat_half, j)
-        weights[j] = 2nlon/npoints2D
+        weights[j] = 2nlon/npoints
     end
     return weights
 end
 
 # SOLID ANGLES ΔΩ = sinθ Δθ Δϕ
-get_solid_angles(Grid::Type{<:AbstractGridArray}, nlat_half::Integer) =
+get_solid_angles(Grid::Type{<:AbstractGrid}, nlat_half::Integer) =
     get_quadrature_weights(Grid, nlat_half) .* (2π./get_nlons(Grid, nlat_half))
-get_solid_angles(Grid::Type{<:Union{HEALPixArray, OctaHEALPixArray}}, nlat_half::Integer) =
-    4π/get_npoints2D(Grid, nlat_half)*ones(get_nlat(Grid, nlat_half))
+get_solid_angles(Grid::Type{<:Union{HEALPixGrid, OctaHEALPixGrid}}, nlat_half::Integer) =
+    4π/get_npoints(Grid, nlat_half)*ones(get_nlat(Grid, nlat_half))
