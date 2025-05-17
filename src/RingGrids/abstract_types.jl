@@ -32,3 +32,10 @@ abstract type AbstractFullGrid{Architecture} <: AbstractGrid{Architecture} end
 abstract type AbstractReducedGrid{Architecture} <: AbstractGrid{Architecture} end
 
 abstract type AbstractField{T, N, ArrayType, Grid} <: AbstractArray{T, N} end
+
+const AbstractFullField = AbstractField{T, N, ArrayType, Grid} where {T, N, ArrayType, Grid<:AbstractFullGrid}
+const AbstractReducedField = AbstractField{T, N, ArrayType, Grid} where {T, N, ArrayType, Grid<:AbstractReducedGrid}
+
+const AbstractField2D = AbstractField{T, 1} where T
+const AbstractField3D = AbstractField{T, 2} where T
+const AbstractField4D = AbstractField{T, 3} where T
