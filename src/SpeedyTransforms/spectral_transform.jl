@@ -12,6 +12,7 @@ struct SpectralTransform{
     ArrayType,                  # non-parametric array type
     VectorType,                 # <: ArrayType{NF, 1},
     ArrayTypeIntVector,         # <: ArrayType{Int, 1},
+    ArrayTypeIntMatrix,         # <: ArrayType{Int, 2}
     VectorComplexType,          # <: ArrayType{Complex{NF}, 1},
     MatrixComplexType,          # <: ArrayType{Complex{NF}, 2},
     ArrayComplexType,           # <: ArrayType{Complex{NF}, 3},
@@ -276,6 +277,7 @@ function SpectralTransform(
         ArrayType_,
         ArrayType_{NF, 1},
         ArrayType_{Int, 1},
+        ArrayType_{Int, 2},
         ArrayType_{Complex{NF}, 1},
         ArrayType_{Complex{NF}, 2},
         ArrayType_{Complex{NF}, 3},
