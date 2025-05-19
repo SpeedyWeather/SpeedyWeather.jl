@@ -5,7 +5,6 @@ Pkg.activate("test")
 
 using SpeedyWeather
 using BenchmarkTools
-using CUDA
 using KernelAbstractions
 using Printf
 
@@ -17,9 +16,9 @@ function old_∇²!(
     add::Bool=false,                # add to output array or overwrite
     flipsign::Bool=false,           # -∇² or ∇²
     inverse::Bool=false,            # ∇⁻² or ∇²
-    radius = DEFAULT_RADIUS,        # scale with radius if provided, otherwise unit sphere
+    radius = 1,        # scale with radius if provided, otherwise unit sphere
 )
-    @boundscheck ismatching(S, ∇²alms) || throw(DimensionMismatch(S, ∇²alms))
+    @boundscheck SpeedyWeather.SpeedyTransforms.ismatching(S, ∇²alms) || throw(DimensionMismatch(S, ∇²alms))
 
     # use eigenvalues⁻¹/eigenvalues for ∇⁻²/∇² based but name both eigenvalues
     eigenvalues = inverse ? S.eigenvalues⁻¹ : S.eigenvalues
@@ -81,8 +80,7 @@ sizes = [
     (513, 512, 8),
 ]
 
-# Choose architecture based on CUDA availability
-arch = CUDA.functional() ? SpeedyWeather.CUDAGPU() : SpeedyWeather.CPU()
+arch = SpeedyWeather.CPU()
 
 # Print header
 println("\nBenchmarking ∇² implementations")
