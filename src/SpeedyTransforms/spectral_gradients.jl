@@ -478,7 +478,7 @@ function ∇²!(
     kernel = flipsign ? (add ? (o,a) -> (o-a) : (o, a) -> -a) : 
                         (add ? (o,a) -> (o+a) : (o, a) -> a)
     
-    launch!(S.architecture, :lmk, size(alms), ∇²_kernel!, ∇²alms, alms, eigenvalues, kernel, S.lm2l_indices)
+    launch!(S.architecture, :lmk, size(∇²alms), ∇²_kernel!, ∇²alms, alms, eigenvalues, kernel, S.lm2l_indices)
 
     # /radius² or *radius² scaling if not unit sphere
     if radius != 1
