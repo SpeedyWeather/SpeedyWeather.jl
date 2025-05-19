@@ -78,5 +78,6 @@ module Architectures
     # Convert arguments to GPU-compatible types
     @inline convert_to_device(arch, args)  = args
     @inline convert_to_device(::CPU, args) = args
-  
+
+    KernelAbstractions.synchronize(arch::AbstractArchitecture) = arch.device
 end 

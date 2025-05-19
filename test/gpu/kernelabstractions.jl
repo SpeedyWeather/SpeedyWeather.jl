@@ -31,9 +31,8 @@ import SpeedyWeather: on_architecture, CPU, CPUStatic
         expected = B .* C
 
         # Run the kernel
-        kernel! = test_lta_kernel!(arch)
-        launch!(arch, :lmk, size(A), kernel!, A, B, C)
-        KernelAbstractions.synchronize(arch)
+        launch!(arch, :lmk, size(A), test_lta_kernel!, A, B, C)
+        synchronize(arch)
 
         # Verify results
         @test A ≈ expected

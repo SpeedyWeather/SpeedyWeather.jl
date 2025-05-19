@@ -70,8 +70,12 @@ struct SpectralTransform{
 
     jm_index_size::Int                             # number of indices per layer in kjm_indices
     kjm_indices::ArrayTypeIntMatrix                # precomputed kjm loop indices map for legendre transform
+
+    # TODO: these will go into the Spectrum type after #734 is merged
+    lm2l_indices::ArrayTypeIntVector   
+    lm2m_indices::ArrayTypeIntVector
     lm2ij_indices::ArrayTypeIntMatrix              # precomputed lm2ij indices for kernels
-    i2lm_indices::ArrayTypeIntVector               # precomputed indices for kernels over non-diagonal/last row elements
+    i2lm_indices::ArrayTypeIntVector               # TODO: might be deleted, precomputed indices for kernels over non-diagonal/last row elements
 
     # SOLID ANGLES ΔΩ FOR QUADRATURE
     # (integration for the Legendre polynomials, extra normalisation of π/nlat included)
@@ -206,8 +210,12 @@ function SpectralTransform(
     LM = lmax > mmax ? LM - 1 : LM 
     
     lm2ij_indices = zeros(Int, LM, 2)
+    lm2l_indices = zeros(Int, LM)
+    lm2m_indices = zeros(Int, LM)
     for lm in 1:LM
         lm2ij_indices[lm,:] .= LowerTriangularMatrices.k2ij(lm, lmax+1)
+        lm2l_indices[lm] = lm2ij_indices[lm, 1]
+        lm2m_indices[lm] = lm2ij_indices[lm, 2]
     end 
 
     # i2lm indices for kernels over elements that are not diagonal or last row, when splitting kernels
@@ -299,7 +307,8 @@ function SpectralTransform(
         scratch_memory_north, scratch_memory_south,
         scratch_memory_grid, scratch_memory_spec,
         scratch_memory_column_north, scratch_memory_column_south,
-        jm_index_size, kjm_indices, lm2ij_indices, i2lm_indices,
+        jm_index_size, kjm_indices, lm2l_indices, lm2m_indices, 
+        lm2ij_indices, i2lm_indices,
         solid_angles, grad_y1, grad_y2,
         grad_y_vordiv1, grad_y_vordiv2, vordiv_to_uv_x,
         vordiv_to_uv1, vordiv_to_uv2,

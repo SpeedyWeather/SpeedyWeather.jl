@@ -478,7 +478,7 @@ function ∇²!(
     kernel = flipsign ? (add ? (o,a) -> (o-a) : (o, a) -> -a) : 
                         (add ? (o,a) -> (o+a) : (o, a) -> a)
     
-    launch!(S.architecture, :lmk, size(alms), ∇²_kernel!, ∇²alms, alms, eigenvalues, kernel, S.lm2ij_indices)
+    launch!(S.architecture, :lmk, size(alms), ∇²_kernel!, ∇²alms, alms, eigenvalues, kernel, S.lm2l_indices)
 
     # /radius² or *radius² scaling if not unit sphere
     if radius != 1
@@ -489,12 +489,12 @@ function ∇²!(
     return ∇²alms
 end
 
-@kernel function ∇²_kernel!(∇²alms, alms, @Const(eigenvalues), kernel_func, @Const(lm2ij_indices))
+@kernel function ∇²_kernel!(∇²alms, alms, @Const(eigenvalues), kernel_func, @Const(lm2l_indices))
 
     I = @index(Global, Cartesian) # I[1] == lm, I[2] == k
                                   # we use cartesian index instead of NTuple here
                                   # because this works for 2D and 3D matrices
-    l = lm2ij_indices[I[1],1]
+    l = lm2l_indices[I[1]]
 
     ∇²alms[I] = kernel_func(∇²alms[I], alms[I]*eigenvalues[l])
 end 
