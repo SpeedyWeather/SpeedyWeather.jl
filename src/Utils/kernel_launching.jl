@@ -25,6 +25,9 @@ function work_layout(dims_type::Symbol, worksize::NTuple{N, Int}) where N
         # compare how jack has done that in 
         # number of (M, k) items?
         workgroup = heuristic_workgroup(worksize...)
+    elseif dims_type == :lmk_inner_points    # kernel over sph number 'lm' and layers, but leaving out the lm=1 element
+        # number of (M, k) items?
+        return heuristic_workgroup(worksize[1]-2, worksize[2:end]...), (worksize[1]-2, worksize[2:end]...)
     elseif dims_type == :diagonal # kernel just over the diagonal of a (m+1)x m or m x m LTA
         return heuristic_workgroup(worksize[2], worksize[3:end]...), (worksize[2], worksize[3:end]...)
     elseif dims_type == :lastrow # kernel just over the last row of a (m+1)x m or m x m LTA

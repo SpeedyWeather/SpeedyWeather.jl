@@ -72,7 +72,7 @@ import SpeedyWeather: on_architecture, CPU, CPUStatic
     # so far KA 3x slower on CPU
     SpeedyWeather.SpeedyTransforms.∇!(alms1, alms2, alms_cpu, S_cpu)
     SpeedyWeather.SpeedyTransforms.∇_3KA!(alms3, alms4, alms, S)
-    SpeedyWeather.SpeedyTransforms.∇_1KA!(alms3, alms4, alms, S)
+    SpeedyWeather.SpeedyTransforms.∇_KA!(alms3, alms4, alms, S)
 
     @test alms1 ≈ on_architecture(CPU(), alms3)
     @test alms2 ≈ on_architecture(CPU(), alms4)

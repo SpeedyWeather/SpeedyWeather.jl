@@ -12,7 +12,6 @@ struct SpectralTransform{
     ArrayType,                  # non-parametric array type
     VectorType,                 # <: ArrayType{NF, 1},
     ArrayTypeIntVector,         # <: ArrayType{Int, 1},
-    ArrayTypeIntMatrix,         # <: ArrayType{Int, 2},
     VectorComplexType,          # <: ArrayType{Complex{NF}, 1},
     MatrixComplexType,          # <: ArrayType{Complex{NF}, 2},
     ArrayComplexType,           # <: ArrayType{Complex{NF}, 3},
@@ -74,8 +73,6 @@ struct SpectralTransform{
     # TODO: these will go into the Spectrum type after #734 is merged
     lm2l_indices::ArrayTypeIntVector   
     lm2m_indices::ArrayTypeIntVector
-    lm2ij_indices::ArrayTypeIntMatrix              # precomputed lm2ij indices for kernels
-    i2lm_indices::ArrayTypeIntVector               # TODO: might be deleted, precomputed indices for kernels over non-diagonal/last row elements
 
     # SOLID ANGLES ΔΩ FOR QUADRATURE
     # (integration for the Legendre polynomials, extra normalisation of π/nlat included)
@@ -209,24 +206,13 @@ function SpectralTransform(
     # LM might be one element larger than the number of saved elements in case one_more_degree==true
     LM = lmax > mmax ? LM - 1 : LM 
     
-    lm2ij_indices = zeros(Int, LM, 2)
     lm2l_indices = zeros(Int, LM)
     lm2m_indices = zeros(Int, LM)
     for lm in 1:LM
-        lm2ij_indices[lm,:] .= LowerTriangularMatrices.k2ij(lm, lmax+1)
-        lm2l_indices[lm] = lm2ij_indices[lm, 1]
-        lm2m_indices[lm] = lm2ij_indices[lm, 2]
+        lm2ij_indices = LowerTriangularMatrices.k2ij(lm, lmax+1)
+        lm2l_indices[lm] = lm2ij_indices[1]
+        lm2m_indices[lm] = lm2ij_indices[2]
     end 
-
-    # i2lm indices for kernels over elements that are not diagonal or last row, when splitting kernels
-    i2lm_indices = zeros(Int, LM - 2*(mmax+1))
-    i = 0 
-    for lm in 1:size(lm2ij_indices,1)
-        if (lm2ij_indices[lm, 1] != lm2ij_indices[lm, 2]) && (lm2ij_indices[lm, 1] != (lmax+1))
-            i += 1 
-            i2lm_indices[i] = lm 
-        end 
-    end
 
     # SOLID ANGLES WITH QUADRATURE WEIGHTS (Gaussian, Clenshaw-Curtis, or Riemann depending on grid)
     # solid angles are ΔΩ = sinθ Δθ Δϕ for every grid point with
@@ -248,6 +234,7 @@ function SpectralTransform(
             grad_y1[l+1, m+1] = -(l-1)*ϵlms[l+1, m+1]
             grad_y2[l+1, m+1] = (l+2)*ϵlms[l+2, m+1]
         end
+        grad_y2[lmax+1, m+1] = 0
     end
 
     # meridional gradient used to get from u, v/coslat to vorticity and divergence
@@ -289,7 +276,6 @@ function SpectralTransform(
         ArrayType_,
         ArrayType_{NF, 1},
         ArrayType_{Int, 1},
-        ArrayType_{Int, 2},
         ArrayType_{Complex{NF}, 1},
         ArrayType_{Complex{NF}, 2},
         ArrayType_{Complex{NF}, 3},
@@ -308,7 +294,6 @@ function SpectralTransform(
         scratch_memory_grid, scratch_memory_spec,
         scratch_memory_column_north, scratch_memory_column_south,
         jm_index_size, kjm_indices, lm2l_indices, lm2m_indices, 
-        lm2ij_indices, i2lm_indices,
         solid_angles, grad_y1, grad_y2,
         grad_y_vordiv1, grad_y_vordiv2, vordiv_to_uv_x,
         vordiv_to_uv1, vordiv_to_uv2,
