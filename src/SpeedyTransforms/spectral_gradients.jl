@@ -478,45 +478,6 @@ function ∇²!(
     kernel = flipsign ? (add ? (o,a) -> (o-a) : (o, a) -> -a) : 
                         (add ? (o,a) -> (o+a) : (o, a) -> a)
     
-    # maximum degree l, order m of spherical harmonics (1-based)
-    lmax, mmax = size(alms, OneBased, as=Matrix)
-
-    for k in eachmatrix(∇²alms, alms)
-        lm = 0
-        @inbounds for m in 1:mmax
-            for l in m:lmax
-                lm += 1
-                ∇²alms[lm, k] = kernel(∇²alms[lm, k], alms[lm, k]*eigenvalues[l])
-            end
-        end
-    end
-
-    # /radius² or *radius² scaling if not unit sphere
-    if radius != 1
-        R_plusminus_squared = inverse ? radius^2 : inv(radius^2)
-        ∇²alms .*= R_plusminus_squared
-    end
-
-    return ∇²alms
-end
-
-function ∇²_KA!(
-    ∇²alms::LowerTriangularArray,   # Output: (inverse) Laplacian of alms
-    alms::LowerTriangularArray,     # Input: spectral coefficients
-    S::SpectralTransform;           # precomputed eigenvalues
-    add::Bool=false,                # add to output array or overwrite
-    flipsign::Bool=false,           # -∇² or ∇²
-    inverse::Bool=false,            # ∇⁻² or ∇²
-    radius = DEFAULT_RADIUS,        # scale with radius if provided, otherwise unit sphere
-)
-    @boundscheck ismatching(S, ∇²alms) || throw(DimensionMismatch(S, ∇²alms))
-
-    # use eigenvalues⁻¹/eigenvalues for ∇⁻²/∇² based but name both eigenvalues
-    eigenvalues = inverse ? S.eigenvalues⁻¹ : S.eigenvalues
-
-    kernel = flipsign ? (add ? (o,a) -> (o-a) : (o, a) -> -a) : 
-                        (add ? (o,a) -> (o+a) : (o, a) -> a)
-    
     launch!(S.architecture, :lmk, size(alms), ∇²_kernel!, ∇²alms, alms, eigenvalues, kernel, S.lm2ij_indices)
 
     # /radius² or *radius² scaling if not unit sphere

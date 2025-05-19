@@ -3,7 +3,7 @@ module Architectures
     import KernelAbstractions 
 
     export AbstractArchitecture
-    export CPU, GPU, CUDAGPU
+    export CPU, CPUStatic, GPU, CUDAGPU
     export array_type, on_architecture, architecture, device, convert_to_device
 
     """
@@ -14,11 +14,23 @@ module Architectures
     abstract type AbstractArchitecture end
 
     """
-    CPU <: AbstractArchitecture
+    AbstractCPU <: AbstractArchitecture
+
+    Abstract supertype for CPU architectures supported by SpeedyWeather.
+    """
+    abstract type AbstractCPU <: AbstractArchitecture end
+
+    """
+    CPU <: AbstractCPU
 
     Run SpeedyWeather on one CPU node.
     """
-    struct CPU <: AbstractArchitecture end
+    struct CPU{D} <: AbstractCPU
+        device::D
+    end
+
+    CPU() = CPU(KernelAbstractions.CPU())
+    CPUStatic() = CPU(KernelAbstractions.CPU(; static=true))
 
     """
         GPU(device)
@@ -38,7 +50,7 @@ module Architectures
     ##### These methods are extended in SpeedyWeatherCUDAExt
     #####
 
-    device(a::CPU) = KernelAbstractions.CPU()
+    device(a::CPU) = a.device
     device(a::GPU) = a.device
 
     architecture() = nothing
