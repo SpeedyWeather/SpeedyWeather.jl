@@ -235,6 +235,7 @@ function SpectralTransform(
             grad_y1[l+1, m+1] = -(l-1)*ϵlms[l+1, m+1]
             grad_y2[l+1, m+1] = (l+2)*ϵlms[l+2, m+1]
         end
+        # explicitly set the last row to zero, so that kernels yield correct gradient in last row 
         grad_y2[lmax+1, m+1] = 0
     end
 
@@ -243,10 +244,13 @@ function SpectralTransform(
     grad_y_vordiv2 = zeros(LowerTriangularMatrix, lmax+1, mmax+1)   # term 2, mul with harmonic l+1, m
 
     for m in 0:mmax                         # 0-based degree l, order m
-        for l in m:lmax          
+        for l in m:(lmax-1)          
             grad_y_vordiv1[l+1, m+1] = (l+1)*ϵlms[l+1, m+1]
             grad_y_vordiv2[l+1, m+1] = l*ϵlms[l+2, m+1]
         end
+        # explicitly set the last row to zero, so that kernels yield correct gradient in last row (zero)
+        grad_y_vordiv1[lmax+1, m+1] = 0
+        grad_y_vordiv2[lmax+1, m+1] = 0
     end
 
     # zonal integration (sort of) to get from vorticity and divergence to u, v*coslat

@@ -39,7 +39,7 @@ import SpeedyWeather: on_architecture, CPU, CPUStatic
     S_cpu = SpectralTransform(alms_cpu)
     S_static = SpectralTransform(alms, architecture=arch_static)
 
-    # so far: KA 5x faster on CPU
+    # so far: KA 5x-10x faster on CPU
     SpeedyWeather.SpeedyTransforms.∇²!(alms2, alms_cpu, S_cpu);
     SpeedyWeather.SpeedyTransforms.∇²_KA!(alms3, alms, S);
 
