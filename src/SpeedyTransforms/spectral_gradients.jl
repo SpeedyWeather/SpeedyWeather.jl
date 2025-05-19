@@ -103,75 +103,6 @@ end
 
 """
 $(TYPEDSIGNATURES)
-Divergence of a vector `u, v` written into `div`, `div = ∇⋅(u, v)`. 
-`u, v` are expected to have a 1/coslat-scaling included, otherwise `div` is scaled.
-Acts on the unit sphere, i.e. it omits 1/radius scaling as all gradient operators,
-unless the `radius` keyword argument is provided. `flipsign` option calculates -∇⋅(u, v) instead.
-`add` option calculates `div += ∇⋅(u, v)` instead. `flipsign` and `add` can be combined.
-This functions only creates the kernel and calls the generic divergence function _divergence! subsequently."""
-function divergence_KA!(
-    div::LowerTriangularArray,
-    u::LowerTriangularArray,
-    v::LowerTriangularArray,
-    S::SpectralTransform;
-    flipsign::Bool=false,
-    add::Bool=false,
-    kwargs...,
-)
-    # = -(∂λ + ∂θ) or (∂λ + ∂θ), adding or overwriting the output div
-    kernel = flipsign ? (add ? (o, a, b, c) -> o-(a-b+c) : (o, a, b, c) -> -(a-b+c)) :
-                        (add ? (o, a, b, c) ->  o+(a-b+c) : (o, a, b, c) -> a-b+c)    
-    _divergence_KA!(kernel, div, u, v, S; kwargs...)
-end
-
-function _divergence_KA!(  
-    kernel,
-    div::LowerTriangularArray,
-    u::LowerTriangularArray,
-    v::LowerTriangularArray,
-    S::SpectralTransform;
-    radius = DEFAULT_RADIUS,
-)
-    (; grad_y_vordiv1, grad_y_vordiv2, lm2ij_indices) = S
-  
-    @boundscheck ismatching(S, div) || throw(DimensionMismatch(S, div))
-
-    launch!(S.architecture, :lmk, size(div), _divergence_kernel!, kernel, div, u, v, grad_y_vordiv1, grad_y_vordiv2, lm2ij_indices)
-
-    # /radius scaling if not unit sphere
-    if radius != 1
-        div .*= inv(radius)
-    end
-
-    return div
-end
-
-@kernel function _divergence_kernel!(kernel_func, div, u, v, grad_y_vordiv1, grad_y_vordiv2, @Const(lm2ij_indices))
-
-    I = @index(Global, Cartesian)
-    lm = I[1]
-
-    # To-Do: not really ideal, but I don't know how to do it better right now (except for two completely different kernels)
-    k = ndims(div) == 1 ? CartesianIndex() : I[2]
-
-    l = lm2ij_indices[lm, 1]
-    m = lm2ij_indices[lm, 2]
-
-    if l==size(div, 1, as=Matrix) # Last row, only vectors make use of the lmax+1 row, set to zero for scalars div, curl
-        div[I] = 0
-    else 
-        ∂u∂λ  = ((m-1)*im)*u[I]
-
-        # distinguish DIAGONAL (to avoid access to v[l-1, m])
-        ∂v∂θ1 = l==m ? 0 : grad_y_vordiv1[lm] * v[lm-1, k] 
-
-        ∂v∂θ2 = grad_y_vordiv2[lm] * v[lm+1, k]  
-        div[I] = kernel_func(div[I], ∂u∂λ, ∂v∂θ1, ∂v∂θ2)
-    end 
-end 
-
-"""
-$(TYPEDSIGNATURES)
 Divergence (∇⋅) of two vector components `u, v` which need to have size (n+1)xn,
 the last row will be set to zero in the returned `LowerTriangularMatrix`.
 This function requires both `u, v` to be transforms of fields that are scaled with
@@ -615,55 +546,6 @@ function ∇!(
     end
 
     return dpdx, dpdy
-end
-
-"""$(TYPEDSIGNATURES) Applies the gradient operator ∇ applied to input `p` and stores the result
-in `dpdx` (zonal derivative) and `dpdy` (meridional derivative). The gradient operator acts
-on the unit sphere and therefore omits the 1/radius scaling unless `radius` keyword argument is provided."""
-function ∇_KA!(
-    dpdx::LowerTriangularArray,     # Output: zonal gradient
-    dpdy::LowerTriangularArray,     # Output: meridional gradient
-    p::LowerTriangularArray,        # Input: spectral coefficients
-    S::SpectralTransform;           # includes precomputed arrays
-    radius = DEFAULT_RADIUS,        # scale with radius if provided, otherwise unit sphere
-)
-    (; grad_y1, grad_y2, lm2l_indices, lm2m_indices) = S
-    @boundscheck ismatching(S, p) || throw(DimensionMismatch(S, p))
-
-    dpdx .= @. complex(0,(lm2m_indices - 1))*p
-    launch!(S.architecture, :lmk, size(dpdy), dpdy_kernel!, dpdy, p, grad_y1, grad_y2, lm2l_indices, lm2m_indices)
-
-    # 1/radius factor if not unit sphere
-    if radius != 1
-        R⁻¹ = inv(radius)
-        dpdx .*= R⁻¹
-        dpdy .*= R⁻¹
-    end
-
-    return dpdx, dpdy
-end
-
-@kernel inbounds=true function dpdy_kernel!(dpdy, p, @Const(grad_y1), @Const(grad_y2), @Const(lm2l_indices), @Const(lm2m_indices))
-    I = @index(Global, Cartesian)
-    lm = I[1]
-    k = ndims(p) == 1 ? CartesianIndex() : I[2]
-    
-    l = lm2l_indices[lm]
-    m = lm2m_indices[lm]
-    gy1 = grad_y1[lm]
-    gy2 = grad_y2[lm]
-    
-    if l == m
-        # DIAGONAL (separated to avoid access to l-1, m which is above the diagonal)
-        # meridional gradient: p[lm-1]=0 on diagonal
-        dpdy[I] = gy2*p[lm+1, k]
-    elseif l == p.m
-        # LAST ROW (separated to avoid out-of-bounds access to lmax+1)
-        dpdy[I] = gy1*p[lm-1, k]
-    else
-        # all other cases
-        dpdy[I] = gy1*p[lm-1, k] + gy2*p[lm+1, k]
-    end
 end
 
 """$(TYPEDSIGNATURES) The zonal and meridional gradient of `p`

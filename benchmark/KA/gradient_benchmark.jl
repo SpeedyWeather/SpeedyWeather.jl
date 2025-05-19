@@ -5,6 +5,7 @@ Pkg.activate("test")
 
 using SpeedyWeather
 using BenchmarkTools
+using CUDA
 using KernelAbstractions
 using Printf
 
