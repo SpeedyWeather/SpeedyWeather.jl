@@ -18,6 +18,7 @@ array_type(::GPU) = CuArray
 array_type(::Type{GPU}) = CuArray
 
 CUDAGPU() = GPU(CUDA.CUDABackend(always_inline=true))
+GPU() = CUDAGPU() # default to CUDA
 
 architecture(::CuArray) = CUDAGPU()
 architecture(::Type{<:CuArray}) = CUDAGPU()
