@@ -23,6 +23,10 @@ import SpeedyWeather: on_architecture, CPU, CPUStatic
     N = 8
     # ∇²!
 
+    L = 513
+    M = 512
+    N = 8
+
     NF= Float32
     alms = on_architecture(arch, rand(LowerTriangularArray{Complex{NF}},L, M, N))
     #alms = rand(LowerTriangularArray{Complex{NF}},33, 32)
@@ -33,6 +37,7 @@ import SpeedyWeather: on_architecture, CPU, CPUStatic
 
     S = SpectralTransform(alms)
     S_cpu = SpectralTransform(alms_cpu)
+    S_static = SpectralTransform(alms, architecture=arch_static)
 
     # so far: KA 5x faster on CPU
     SpeedyWeather.SpeedyTransforms.∇²!(alms2, alms_cpu, S_cpu);
@@ -66,9 +71,8 @@ import SpeedyWeather: on_architecture, CPU, CPUStatic
 
     # so far KA 3x slower on CPU
     SpeedyWeather.SpeedyTransforms.∇!(alms1, alms2, alms_cpu, S_cpu)
-    SpeedyWeather.SpeedyTransforms.∇_KA!(alms3, alms4, alms, S)
-    SpeedyWeather.SpeedyTransforms.∇_2KA!(alms3, alms4, alms, S)
     SpeedyWeather.SpeedyTransforms.∇_3KA!(alms3, alms4, alms, S)
+    SpeedyWeather.SpeedyTransforms.∇_1KA!(alms3, alms4, alms, S)
 
     @test alms1 ≈ on_architecture(CPU(), alms3)
     @test alms2 ≈ on_architecture(CPU(), alms4)

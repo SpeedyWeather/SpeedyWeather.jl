@@ -627,10 +627,11 @@ function ∇_KA!(
     S::SpectralTransform;           # includes precomputed arrays
     radius = DEFAULT_RADIUS,        # scale with radius if provided, otherwise unit sphere
 )
-    (; grad_y1, grad_y2, lm2ij_indices) = S
+    (; grad_y1, grad_y2, lm2l_indices, lm2m_indices) = S
     @boundscheck ismatching(S, p) || throw(DimensionMismatch(S, p))
 
-    launch!(S.architecture, :lmk, size(dpdx), ∇_kernel!, dpdx, dpdy, p, grad_y1, grad_y2, lm2ij_indices)
+    dpdx .= @. complex(0,(lm2m_indices - 1))*p
+    launch!(S.architecture, :lmk, size(dpdy), dpdy_kernel!, dpdy, p, grad_y1, grad_y2, lm2l_indices, lm2m_indices)
 
     # 1/radius factor if not unit sphere
     if radius != 1
@@ -642,146 +643,26 @@ function ∇_KA!(
     return dpdx, dpdy
 end
 
-@kernel function ∇_kernel!(dpdx, dpdy, p, grad_y1, grad_y2, @Const(lm2ij_indices))
-    # inbounds were added later, very slightly increase performance on CPU
+@kernel inbounds=true function dpdy_kernel!(dpdy, p, @Const(grad_y1), @Const(grad_y2), @Const(lm2l_indices), @Const(lm2m_indices))
     I = @index(Global, Cartesian)
-    lm = @inbounds I[1]
-
-    # To-Do: not really ideal, but I don't know how to do it better right now (except for two completely different kernels)
-    k = @inbounds ndims(p) == 1 ? CartesianIndex() : I[2]
-    #k = I[2]
-    l = @inbounds lm2ij_indices[lm, 1]
-    m = @inbounds lm2ij_indices[lm, 2]
-
-    if l==m             # DIAGONAL (separated to avoid access to l-1, m which is above the diagonal)
-        @inbounds dpdx[lm, k] = (m-1)*im*p[lm, k]         # zonal gradient: d/dlon = *i*m
-        @inbounds dpdy[lm, k] = grad_y2[lm]*p[lm+1, k]    # meridional gradient: p[lm-1]=0 on diagonal
-    elseif l==p.m       # LAST ROW (separated to avoid out-of-bounds access to lmax+1)
-        @inbounds dpdx[lm, k] = (m-1)*im*p[lm, k]
-        @inbounds dpdy[lm, k] = grad_y1[lm]*p[lm-1, k]    # only first term from 2nd last row
-    else                # all other 
-        @inbounds dpdx[lm, k] = (m-1)*im*p[lm, k]
-        @inbounds dpdy[lm, k] = grad_y1[lm]*p[lm-1, k] + grad_y2[lm]*p[lm+1, k]
-    end 
-end 
-
-# 3-kernel KA version (diagonal, last row, main part)
-"""$(TYPEDSIGNATURES) Applies the gradient operator ∇ applied to input `p` and stores the result
-in `dpdx` (zonal derivative) and `dpdy` (meridional derivative). The gradient operator acts
-on the unit sphere and therefore omits the 1/radius scaling unless `radius` keyword argument is provided."""
-function ∇_3KA!(
-    dpdx::LowerTriangularArray,     # Output: zonal gradient
-    dpdy::LowerTriangularArray,     # Output: meridional gradient
-    p::LowerTriangularArray,        # Input: spectral coefficients
-    S::SpectralTransform;           # includes precomputed arrays
-    radius = DEFAULT_RADIUS,        # scale with radius if provided, otherwise unit sphere
-)
-    (; grad_y1, grad_y2, lm2ij_indices, i2lm_indices) = S
-    @boundscheck ismatching(S, p) || throw(DimensionMismatch(S, p))
-
-    #launch!(S.architecture, :diagonal, size(dpdx, as=Matrix), ∇_diagonal_kernel!, dpdx, dpdy, p, grad_y1, grad_y2, lm2ij_indices)
-    #launch!(S.architecture, :lastrow, size(dpdx, as=Matrix), ∇_lastrow_kernel!, dpdx, dpdy, p, grad_y1, grad_y2, lm2ij_indices)
-    launch!(S.architecture, :lmk_main, size(dpdx, as=Matrix), ∇_main_kernel!, dpdx, dpdy, p, grad_y1, grad_y2, lm2ij_indices, i2lm_indices)
-
-    # 1/radius factor if not unit sphere
-    if radius != 1
-        R⁻¹ = inv(radius)
-        dpdx .*= R⁻¹
-        dpdy .*= R⁻¹
-    end
-
-    return dpdx, dpdy
-end
-
-@kernel function ∇_diagonal_kernel!(dpdx, dpdy, p, grad_y1, grad_y2, @Const(lm2ij_indices))
-
-    I = @index(Global, Cartesian)
-
-    i = I[1]
-    k = I[2]
-
-    dpdx[i, i, k] = (i-1)*im*p[i, i, k]         # zonal gradient: d/dlon = *i*m
-    dpdy[i, i, k] = grad_y2[i, i]*p[i+1, i, k]  
-end 
-
-@kernel function ∇_lastrow_kernel!(dpdx, dpdy, p, grad_y1, grad_y2, @Const(lm2ij_indices))
-
-    I = @index(Global, Cartesian)
-
-    m = I[1]
-    k = I[2]
-    l = p.m
-
-    dpdx[l, m, k] = (m-1)*im*p[l,m,k]
-    dpdy[l, m, k] = grad_y1[l,m]*p[l-1,m,k]    # only first term from 2nd last row
-end 
-
-@kernel function ∇_main_kernel!(dpdx, dpdy, p, grad_y1, grad_y2, @Const(lm2ij_indices), @Const(i2lm_indices))
-    i, k = @index(Global, NTuple)
+    lm = I[1]
+    k = ndims(p) == 1 ? CartesianIndex() : I[2]
     
-    lm = i2lm_indices[i]
-    m = lm2ij_indices[lm, 2]
-
-    dpdx[lm, k] = (m-1)*im*p[lm, k]
-    dpdy[lm, k] = grad_y1[lm]*p[lm-1, k] + grad_y2[lm]*p[lm+1, k]
-end 
-
-
-"""$(TYPEDSIGNATURES) Applies the gradient operator ∇ applied to input `p` and stores the result
-in `dpdx` (zonal derivative) and `dpdy` (meridional derivative). The gradient operator acts
-on the unit sphere and therefore omits the 1/radius scaling unless `radius` keyword argument is provided."""
-function ∇_2KA!(
-    dpdx::LowerTriangularArray,     # Output: zonal gradient
-    dpdy::LowerTriangularArray,     # Output: meridional gradient
-    p::LowerTriangularArray,        # Input: spectral coefficients
-    S::SpectralTransform;           # includes precomputed arrays
-    radius = DEFAULT_RADIUS,        # scale with radius if provided, otherwise unit sphere
-)
-    (; grad_y1, grad_y2, lm2ij_indices) = S
-    @boundscheck ismatching(S, p) || throw(DimensionMismatch(S, p))
-
-    launch!(S.architecture, :lmk, size(dpdx), dpdx_kernel!, dpdx, p, lm2ij_indices)
-    launch!(S.architecture, :lmk, size(dpdx), dpdy_kernel!, dpdy, p, grad_y1, grad_y2, lm2ij_indices)
-
-    # 1/radius factor if not unit sphere
-    if radius != 1
-        R⁻¹ = inv(radius)
-        dpdx .*= R⁻¹
-        dpdy .*= R⁻¹
-    end
-
-    return dpdx, dpdy
-end
-
-@kernel function dpdx_kernel!(dpdx, p, @Const(lm2ij_indices))
-    I = @index(Global, Cartesian)
-    lm = @inbounds I[1]
-   
-    # Extract m value for calculation
-    m = @inbounds lm2ij_indices[lm, 2]
-    
-    # Zonal gradient is the same in all cases: d/dlon = i*m
-    @inbounds dpdx[I] = (m-1)*im*p[I]
-end
-
-@kernel function dpdy_kernel!(dpdy, p, grad_y1, grad_y2, @Const(lm2ij_indices))
-    I = @index(Global, Cartesian)
-    lm = @inbounds I[1]
-    k = @inbounds ndims(p) == 1 ? CartesianIndex() : I[2]
-    
-    l = @inbounds lm2ij_indices[lm, 1]
-    m = @inbounds lm2ij_indices[lm, 2]
+    l = lm2l_indices[lm]
+    m = lm2m_indices[lm]
+    gy1 = grad_y1[lm]
+    gy2 = grad_y2[lm]
     
     if l == m
         # DIAGONAL (separated to avoid access to l-1, m which is above the diagonal)
         # meridional gradient: p[lm-1]=0 on diagonal
-        @inbounds dpdy[I] = grad_y2[lm]*p[lm+1, k]
+        dpdy[I] = gy2*p[lm+1, k]
     elseif l == p.m
         # LAST ROW (separated to avoid out-of-bounds access to lmax+1)
-        @inbounds dpdy[I] = grad_y1[lm]*p[lm-1, k]
+        dpdy[I] = gy1*p[lm-1, k]
     else
         # all other cases
-        @inbounds dpdy[I] = grad_y1[lm]*p[lm-1, k] + grad_y2[lm]*p[lm+1, k]
+        dpdy[I] = gy1*p[lm-1, k] + gy2*p[lm+1, k]
     end
 end
 
