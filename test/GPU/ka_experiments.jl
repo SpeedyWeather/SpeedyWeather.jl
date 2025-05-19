@@ -1,3 +1,6 @@
+# these tests are not used in any actual test scripts in the CI 
+# they are just for testing and experimenting with the KA kernels
+
 
 using KernelAbstractions
 import SpeedyWeather: on_architecture, CPU, CPUStatic

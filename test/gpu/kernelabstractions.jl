@@ -1,5 +1,5 @@
 using KernelAbstractions
-import SpeedyWeather: on_architecture, CPU, CPUStatic
+import SpeedyWeather: on_architecture, CPU, CPUStatic, launch!
 @testset "KernelAbstractions tests" begin 
 
     # To-Do write tests for each type of dims_type in the kernel launching util, 
