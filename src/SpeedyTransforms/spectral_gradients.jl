@@ -561,6 +561,33 @@ function ∇!(
     return dpdx, dpdy
 end
 
+function ∇!(
+    dpdx::LowerTriangularArray{NF,1},     # Output: zonal gradient
+    dpdy::LowerTriangularArray{NF,1},     # Output: meridional gradient
+    p::LowerTriangularArray{NF,1},        # Input: spectral coefficients
+    S::SpectralTransform;           # includes precomputed arrays
+    radius = DEFAULT_RADIUS,        # scale with radius if provided, otherwise unit sphere
+) where NF
+    (; grad_y1, grad_y2, lm2m_indices) = S
+    @boundscheck ismatching(S, p) || throw(DimensionMismatch(S, p))
+
+    @. dpdx = complex(0, lm2m_indices - 1)*p
+
+    # first and last element aren't covered by the kernel because they would access p[0], p[end+1]
+    dpdy[1:1] .= grad_y2[1] .* p[2:2]
+    launch!(S.architecture, :lmk_inner_points, size(dpdy), dpdy_kernel!, dpdy, p, grad_y1, grad_y2)
+    dpdy[end:end] .= grad_y1[end] .* p[end-1:end-1]
+
+    # 1/radius factor if not unit sphere
+    if radius != 1
+        R⁻¹ = inv(radius)
+        dpdx .*= R⁻¹
+        dpdy .*= R⁻¹
+    end
+
+    return dpdx, dpdy
+end
+
 @kernel inbounds=true function dpdy_kernel!(dpdy, @Const(p), @Const(grad_y1), @Const(grad_y2))
     I = @index(Global, Cartesian)
     lm = I[1] + 1   # +1 because we leave out the lm=1 element
