@@ -101,6 +101,50 @@ function _divergence!(
     return div
 end
 
+# KA / GPU version, called by the SpeedyWeatherCUDAExt when input with CuArrays
+function _divergence_KA!(  
+    kernel,
+    div::LowerTriangularArray,
+    u::LowerTriangularArray,
+    v::LowerTriangularArray,
+    S::SpectralTransform;
+    radius = DEFAULT_RADIUS,
+)
+    (; grad_y_vordiv1, grad_y_vordiv2, lm2m_indices) = S
+  
+    @boundscheck ismatching(S, div) || throw(DimensionMismatch(S, div))
+
+    # first element is special because it doesn't can't access v[0]
+    div[1, :] .= kernel.(div[1, :], 0, 0, grad_y_vordiv2[1]*v[2, :])
+
+    launch!(S.architecture, :lmk_inner_points, size(div), _divergence_kernel!, kernel, div, u, v, grad_y_vordiv1, grad_y_vordiv2, lm2m_indices)
+
+    # last element is always zero (and we can access v[lmax+1])
+    div[end,:] .= 0
+
+    # /radius scaling if not unit sphere
+    if radius != 1
+        div .*= inv(radius)
+    end
+
+    return div
+end
+
+@kernel function _divergence_kernel!(kernel_func, div, u, v, grad_y_vordiv1, grad_y_vordiv2, @Const(lm2m_indices))
+
+    I = @index(Global, Cartesian)
+    lm = I[1] + 1
+
+    k = ndims(div) == 1 ? CartesianIndex() : I[2]
+
+    m = lm2m_indices[lm]
+
+    ∂u∂λ  = ((m-1)*im)*u[I]
+    ∂v∂θ1 = grad_y_vordiv1[lm] * v[lm-1, k] 
+    ∂v∂θ2 = grad_y_vordiv2[lm] * v[lm+1, k]  
+    div[I] = kernel_func(div[I], ∂u∂λ, ∂v∂θ1, ∂v∂θ2)
+end 
+
 """
 $(TYPEDSIGNATURES)
 Divergence (∇⋅) of two vector components `u, v` which need to have size (n+1)xn,
@@ -497,46 +541,15 @@ function ∇!(
     S::SpectralTransform;           # includes precomputed arrays
     radius = DEFAULT_RADIUS,        # scale with radius if provided, otherwise unit sphere
 )
-    (; grad_y1, grad_y2) = S
+    (; grad_y1, grad_y2, lm2m_indices) = S
     @boundscheck ismatching(S, p) || throw(DimensionMismatch(S, p))
 
-    # maximum degree l, order m of spherical harmonics (1-based)
-    lmax, mmax = size(p, OneBased, as=Matrix)
+    @. dpdx = complex(0, lm2m_indices - 1)*p
 
-    for k in eachmatrix(dpdx, dpdy, p)      # also performs size checks
-        lm = 0
-        @inbounds for m in 1:mmax-1         # 1-based l, m, skip last column
-
-            # DIAGONAL (separated to avoid access to l-1, m which is above the diagonal)
-            lm += 1
-
-            dpdx[lm, k] = (m-1)*im*p[lm, k]         # zonal gradient: d/dlon = *i*m
-            dpdy[lm, k] = grad_y2[lm]*p[lm+1, k]    # meridional gradient: p[lm-1]=0 on diagonal
-        
-            # BELOW DIAGONAL (all terms)
-            for l in m+1:lmax-1                     # skip last row
-                lm += 1
-                dpdx[lm, k] = (m-1)*im*p[lm, k]
-                dpdy[lm, k] = grad_y1[lm]*p[lm-1, k] + grad_y2[lm]*p[lm+1, k]
-            end
-
-            # LAST ROW (separated to avoid out-of-bounds access to lmax+1
-            lm += 1
-            dpdx[lm, k] = (m-1)*im*p[lm, k]
-            dpdy[lm, k] = grad_y1[lm]*p[lm-1, k]    # only first term from 2nd last row
-        end
-
-        # LAST COLUMN
-        @inbounds begin
-            lm += 1                                 # second last row
-            dpdx[lm, k] = (mmax-1)*im*p[lm, k]
-            dpdy[lm, k] = grad_y2[lm]*p[lm+1, k]    # only 2nd term
-
-            lm += 1                                 # last row
-            dpdx[lm, k] = (mmax-1)*im*p[lm, k]
-            dpdy[lm, k] = grad_y1[lm]*p[lm-1, k]    # only 1st term
-        end
-    end
+    # first and last element aren't covered by the kernel because they would access p[0], p[end+1]
+    dpdy[1,:] .= grad_y2[1] .* p[2, :]
+    launch!(S.architecture, :lmk_inner_points, size(dpdy), dpdy_kernel!, dpdy, p, grad_y1, grad_y2)
+    dpdy[end,:] .= grad_y1[end] .* p[end-1,:]
 
     # 1/radius factor if not unit sphere
     if radius != 1
@@ -546,6 +559,19 @@ function ∇!(
     end
 
     return dpdx, dpdy
+end
+
+@kernel inbounds=true function dpdy_kernel!(dpdy, @Const(p), @Const(grad_y1), @Const(grad_y2))
+    I = @index(Global, Cartesian)
+    lm = I[1] + 1   # +1 because we leave out the lm=1 element
+    k = ndims(p) == 1 ? CartesianIndex() : I[2]
+
+    gy1 = grad_y1[lm]
+    gy2 = grad_y2[lm]
+    
+    # compared to the old CPU only version, some of the gy1 and gy2 are zero 
+    # that's why we don't need to check for l==m (diagonal) or l==p.m (last row)
+    dpdy[lm, k] = gy1*p[lm-1, k] + gy2*p[lm+1, k]
 end
 
 """$(TYPEDSIGNATURES) The zonal and meridional gradient of `p`
@@ -585,4 +611,68 @@ scaling in the gradient. Acts on the unit-sphere, i.e. it omits 1/radius scaling
 function ∇(grid::AbstractGridArray; kwargs...)
     S = SpectralTransform(grid, one_more_degree=true)
     return ∇(grid, S; kwargs...)
+end
+
+function _divergence_KA_veryold_typed!(  
+    ::Type{DivergenceOp{F, A}},
+    div::LowerTriangularArray,
+    u::LowerTriangularArray,
+    v::LowerTriangularArray,
+    S::SpectralTransform;
+    radius = DEFAULT_RADIUS,
+) where {F,A}
+    (; grad_y_vordiv1, grad_y_vordiv2, lm2m_indices) = S
+  
+    @boundscheck ismatching(S, div) || throw(DimensionMismatch(S, div))
+
+    div[1, :] .= apply_op.(DivergenceOp{F, A}, div[1, :], 0, 0, grad_y_vordiv2[1]*v[2, :])
+
+    launch!(S.architecture, :lmk_inner_points, size(div), _divergence_kernel_veryold_typed!, DivergenceOp{F, A}, div, u, v, grad_y_vordiv1, grad_y_vordiv2, lm2m_indices)
+    # /radius scaling if not unit sphere
+
+    div[end,:] .= 0
+
+    if radius != 1
+        div .*= inv(radius)
+    end
+
+    return div
+end
+
+@kernel function _divergence_kernel_veryold_typed!(::Type{DivergenceOp{F, A}}, div, u, v, grad_y_vordiv1, grad_y_vordiv2, @Const(lm2m_indices)) where {F,A}
+
+    I = @index(Global, Cartesian)
+    lm = I[1] + 1
+
+    # To-Do: not really ideal, but I don't know how to do it better right now (except for two completely different kernels)
+    k = ndims(div) == 1 ? CartesianIndex() : I[2]
+
+    m = lm2m_indices[lm]
+
+    ∂u∂λ  = ((m-1)*im)*u[I]
+    ∂v∂θ1 = grad_y_vordiv1[lm] * v[lm-1, k] 
+    ∂v∂θ2 = grad_y_vordiv2[lm] * v[lm+1, k]  
+    div[I] = apply_op(DivergenceOp{F, A}, div[I], ∂u∂λ, ∂v∂θ1, ∂v∂θ2)
+end 
+
+"""
+$(TYPEDSIGNATURES)
+Divergence of a vector `u, v` written into `div`, `div = ∇⋅(u, v)`. 
+`u, v` are expected to have a 1/coslat-scaling included, otherwise `div` is scaled.
+Acts on the unit sphere, i.e. it omits 1/radius scaling as all gradient operators,
+unless the `radius` keyword argument is provided. `flipsign` option calculates -∇⋅(u, v) instead.
+`add` option calculates `div += ∇⋅(u, v)` instead. `flipsign` and `add` can be combined.
+This functions only creates the kernel and calls the generic divergence function _divergence! subsequently."""
+function divergence_KA_veryold_typed!(
+    div::LowerTriangularArray,
+    u::LowerTriangularArray,
+    v::LowerTriangularArray,
+    S::SpectralTransform;
+    flipsign::Bool=false,
+    add::Bool=false,
+    kwargs...,
+)
+    # = -(∂λ + ∂θ) or (∂λ + ∂θ), adding or overwriting the output div
+    kernel = DivergenceOp{flipsign, add} 
+    _divergence_KA_veryold_typed!(kernel, div, u, v, S; kwargs...)
 end
