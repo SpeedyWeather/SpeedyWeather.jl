@@ -1,6 +1,43 @@
 const DEFAULT_RADIUS = 1
 
 """
+    KernelOP{mode, flipsign, add}
+
+Type for dispatching on kernel operations in spectral gradient calculations.
+- `mode`: `true` for curl, `false` for divergence
+- `flipsign`: `true` or `false` to negate the result
+- `add`: `true` or `false` to add to the output instead of overwriting
+"""
+struct KernelOP{mode, flipsign, add} end
+
+# Curl operations (mode == true): a+b-c
+# Standard curl (no flipsign, no add)
+@inline (::KernelOP{true, false, false})(o, a, b, c) = a+b-c
+
+# Curl with flipsign (no add)
+@inline (::KernelOP{true, true, false})(o, a, b, c) = -(a+b-c)
+
+# Curl with add (no flipsign)
+@inline (::KernelOP{true, false, true})(o, a, b, c) = o+(a+b-c)
+
+# Curl with flipsign and add
+@inline (::KernelOP{true, true, true})(o, a, b, c) = o-(a+b-c)
+
+# Divergence operations (mode == false): a-b+c
+# Standard divergence (no flipsign, no add)
+@inline (::KernelOP{false, false, false})(o, a, b, c) = a-b+c
+
+# Divergence with flipsign (no add)
+@inline (::KernelOP{false, true, false})(o, a, b, c) = -(a-b+c)
+
+# Divergence with add (no flipsign)
+@inline (::KernelOP{false, false, true})(o, a, b, c) = o+(a-b+c)
+
+# Divergence with flipsign and add
+@inline (::KernelOP{false, true, true})(o, a, b, c) = o-(a-b+c)
+
+
+"""
 $(TYPEDSIGNATURES)
 Curl of a vector `u, v` written into `curl`, `curl = ∇×(u, v)`.
 `u, v` are expected to have a 1/coslat-scaling included, otherwise `curl` is scaled.
@@ -19,8 +56,7 @@ function curl!(
     kwargs...,
 )
     # = -(∂λ - ∂θ) or (∂λ - ∂θ), adding or overwriting the output curl 
-    kernel = flipsign ? (add ? (o, a, b, c) -> o-(a+b-c) : (o, a, b, c) -> -(a+b-c)) :
-                        (add ? (o, a, b, c) -> o+(a+b-c) : (o, a, b, c) -> a+b-c)  
+    kernel = KernelOP{true, flipsign, add}()
     _divergence!(kernel, curl, v, u, S; kwargs...)      # flip u, v -> v, u
 end
 
@@ -42,9 +78,30 @@ function divergence!(
     kwargs...,
 )
     # = -(∂λ + ∂θ) or (∂λ + ∂θ), adding or overwriting the output div
-    kernel = flipsign ? (add ? (o, a, b, c) -> o-(a-b+c) : (o, a, b, c) -> -(a-b+c)) :
-                        (add ? (o, a, b, c) ->  o+(a-b+c) : (o, a, b, c) -> a-b+c)    
+    kernel = KernelOP{false, flipsign, add}()
     _divergence!(kernel, div, u, v, S; kwargs...)
+end
+
+"""
+$(TYPEDSIGNATURES)
+Divergence of a vector `u, v` written into `div`, `div = ∇⋅(u, v)`. 
+`u, v` are expected to have a 1/coslat-scaling included, otherwise `div` is scaled.
+Acts on the unit sphere, i.e. it omits 1/radius scaling as all gradient operators,
+unless the `radius` keyword argument is provided. `flipsign` option calculates -∇⋅(u, v) instead.
+`add` option calculates `div += ∇⋅(u, v)` instead. `flipsign` and `add` can be combined.
+This functions only creates the kernel and calls the generic divergence function _divergence! subsequently."""
+function divergence_KA!(
+    div::LowerTriangularArray,
+    u::LowerTriangularArray,
+    v::LowerTriangularArray,
+    S::SpectralTransform;
+    flipsign::Bool=false,
+    add::Bool=false,
+    kwargs...,
+)
+    # = -(∂λ + ∂θ) or (∂λ + ∂θ), adding or overwriting the output div
+    kernel = KernelOP{false, flipsign, add}()
+    _divergence_KA!(kernel, div, u, v, S; kwargs...)
 end
 
 """
@@ -101,6 +158,7 @@ function _divergence!(
     return div
 end
 
+
 # KA / GPU version, called by the SpeedyWeatherCUDAExt when input with CuArrays
 function _divergence_KA!(  
     kernel,
@@ -124,7 +182,7 @@ function _divergence_KA!(
     return div
 end
 
-@kernel function _divergence_kernel!(@Const(kernel_func), div, @Const(u), @Const(v), @Const(grad_y_vordiv1), @Const(grad_y_vordiv2), @Const(lm2m_indices))
+@kernel function _divergence_kernel!(kernel_func::KernelOP{mode, flipsign, add}, div, @Const(u), @Const(v), @Const(grad_y_vordiv1), @Const(grad_y_vordiv2), @Const(lm2m_indices)) where {mode, flipsign, add}
 
     I = @index(Global, Cartesian)
     lm = I[1]
