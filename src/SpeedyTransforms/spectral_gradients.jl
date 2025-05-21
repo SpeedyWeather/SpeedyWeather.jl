@@ -327,6 +327,7 @@ function UV_from_vor!(
     return U, V
 end
 
+
 """
 $(TYPEDSIGNATURES)
 Get U, V (=(u, v)*coslat) from vorticity ζ and divergence D in spectral space.
@@ -334,7 +335,8 @@ Two operations are combined into a single linear operation. First, invert the
 spherical Laplace ∇² operator to get stream function from vorticity and
 velocity potential from divergence. Then compute zonal and meridional gradients
 to get U, V.
-Acts on the unit sphere, i.e. it omits any radius scaling as all inplace gradient operators.
+Acts on the unit sphere, i.e. it omits any radius scaling as all inplace gradient operators,
+unless the `radius` keyword argument is provided.
 """
 function UV_from_vordiv!(   
     U::LowerTriangularArray,
@@ -365,10 +367,11 @@ function UV_from_vordiv!(
             # ∂Dλ = im*vordiv_to_uv_x[lm]*div[lm]       # divergence contribution to zonal gradient
             # ∂ζλ = im*vordiv_to_uv_x[lm]*vor[lm]       # vorticity contribution to zonal gradient
 
+            # this is the same, just make sure vordiv_to_uv1 is actually zero
             z = im*vordiv_to_uv_x[lm]
             U[lm, k] = muladd(z, div[lm, k], ∂ζθ)       # = ∂Dλ + ∂ζθ
             V[lm, k] = muladd(z, vor[lm, k], ∂Dθ)       # = ∂ζλ + ∂Dθ
-
+            
             # BELOW DIAGONAL (all terms)
             for l in m+1:lmax-2                         # skip last two rows (lmax-1, lmax)
                 lm += 1
@@ -387,12 +390,14 @@ function UV_from_vordiv!(
                 U[lm, k] = muladd(z, div[lm, k], ∂ζθ)   # = ∂Dλ + ∂ζθ
                 V[lm, k] = muladd(z, vor[lm, k], ∂Dθ)   # = ∂ζλ + ∂Dθ            
             end
-
+            
+            # this is the same -> div is zero in last row
             # SECOND LAST ROW (separated to imply that vor, div are zero in last row)
             lm += 1
             U[lm, k] = im*vordiv_to_uv_x[lm]*div[lm, k] - vordiv_to_uv1[lm]*vor[lm-1, k]
-            V[lm, k] = im*vordiv_to_uv_x[lm]*vor[lm, k] + vordiv_to_uv1[lm]*div[lm-1, k]
-
+            V[lm, k] = im*vordiv_to_uv_x[lm]*vor[lm, k]
+            
+            # this needs special care
             # LAST ROW (separated to avoid out-of-bounds access to lmax+1)
             lm += 1
             U[lm, k] = -vordiv_to_uv1[lm]*vor[lm-1, k]  # only last term from 2nd last row
@@ -435,7 +440,8 @@ Keyword arguments
   - `flipsign=true` computes -∇²(alms) instead
   - `inverse=true` computes ∇⁻²(alms) instead
 
-Default is `add=false`, `flipsign=false`, `inverse=false`. These options can be combined."""
+Default is `add=false`, `flipsign=false`, `inverse=false`. These options can be combined.
+"""
 function ∇²!(
     ∇²alms::LowerTriangularArray,   # Output: (inverse) Laplacian of alms
     alms::LowerTriangularArray,     # Input: spectral coefficients
@@ -561,22 +567,23 @@ function ∇!(
     return dpdx, dpdy
 end
 
+"""$(TYPEDSIGNATURES) Applies the gradient operator ∇ applied to input `p` and stores the result
+in `dpdx` (zonal derivative) and `dpdy` (meridional derivative). The gradient operator acts
+on the unit sphere and therefore omits the 1/radius scaling unless `radius` keyword argument is provided."""
 function ∇!(
-    dpdx::LowerTriangularArray{NF,1},     # Output: zonal gradient
-    dpdy::LowerTriangularArray{NF,1},     # Output: meridional gradient
-    p::LowerTriangularArray{NF,1},        # Input: spectral coefficients
+    dpdx::LowerTriangularArray,     # Output: zonal gradient
+    dpdy::LowerTriangularArray,     # Output: meridional gradient
+    p::LowerTriangularArray,        # Input: spectral coefficients
     S::SpectralTransform;           # includes precomputed arrays
     radius = DEFAULT_RADIUS,        # scale with radius if provided, otherwise unit sphere
-) where NF
+)
     (; grad_y1, grad_y2, lm2m_indices) = S
     @boundscheck ismatching(S, p) || throw(DimensionMismatch(S, p))
 
     @. dpdx = complex(0, lm2m_indices - 1)*p
 
     # first and last element aren't covered by the kernel because they would access p[0], p[end+1]
-    dpdy[1:1] .= grad_y2[1] .* p[2:2]
-    launch!(S.architecture, :lmk_inner_points, size(dpdy), dpdy_kernel!, dpdy, p, grad_y1, grad_y2)
-    dpdy[end:end] .= grad_y1[end] .* p[end-1:end-1]
+    launch!(S.architecture, :lmk, size(dpdy), dpdy_kernel_new!, dpdy, p, grad_y1, grad_y2)
 
     # 1/radius factor if not unit sphere
     if radius != 1
@@ -590,16 +597,24 @@ end
 
 @kernel inbounds=true function dpdy_kernel!(dpdy, @Const(p), @Const(grad_y1), @Const(grad_y2))
     I = @index(Global, Cartesian)
-    lm = I[1] + 1   # +1 because we leave out the lm=1 element
+    lm = I[1]
     k = ndims(p) == 1 ? CartesianIndex() : I[2]
+    lmmax = size(dpdy, 1)
 
     gy1 = grad_y1[lm]
     gy2 = grad_y2[lm]
-    
+
     # compared to the old CPU only version, some of the gy1 and gy2 are zero 
     # that's why we don't need to check for l==m (diagonal) or l==p.m (last row)
-    dpdy[lm, k] = gy1*p[lm-1, k] + gy2*p[lm+1, k]
+    if lm == 1
+        dpdy[lm, k] = gy2*p[lm+1, k]
+    elseif lm == lmmax
+        dpdy[lm, k] = gy1*p[lm-1, k]
+    else
+        dpdy[lm, k] = gy1*p[lm-1, k] + gy2*p[lm+1, k]
+    end
 end
+
 
 """$(TYPEDSIGNATURES) The zonal and meridional gradient of `p`
 using an existing `SpectralTransform` `S`. Acts on the unit sphere,
