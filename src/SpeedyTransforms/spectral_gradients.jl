@@ -158,7 +158,6 @@ function _divergence!(
     return div
 end
 
-
 # KA / GPU version, called by the SpeedyWeatherCUDAExt when input with CuArrays
 function _divergence_KA!(  
     kernel,
@@ -606,7 +605,7 @@ function ∇!(
     @. dpdx = complex(0, lm2m_indices - 1)*p
 
     # first and last element aren't covered by the kernel because they would access p[0], p[end+1]
-    launch!(S.architecture, :lmk, size(dpdy), dpdy_kernel_new!, dpdy, p, grad_y1, grad_y2)
+    launch!(S.architecture, :lmk, size(dpdy), dpdy_kernel!, dpdy, p, grad_y1, grad_y2)
 
     # 1/radius factor if not unit sphere
     if radius != 1
