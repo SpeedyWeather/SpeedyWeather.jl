@@ -553,36 +553,6 @@ function ∇!(
     @. dpdx = complex(0, lm2m_indices - 1)*p
 
     # first and last element aren't covered by the kernel because they would access p[0], p[end+1]
-    dpdy[1,:] .= grad_y2[1] .* p[2, :]
-    launch!(S.architecture, :lmk_inner_points, size(dpdy), dpdy_kernel!, dpdy, p, grad_y1, grad_y2)
-    dpdy[end,:] .= grad_y1[end] .* p[end-1,:]
-
-    # 1/radius factor if not unit sphere
-    if radius != 1
-        R⁻¹ = inv(radius)
-        dpdx .*= R⁻¹
-        dpdy .*= R⁻¹
-    end
-
-    return dpdx, dpdy
-end
-
-"""$(TYPEDSIGNATURES) Applies the gradient operator ∇ applied to input `p` and stores the result
-in `dpdx` (zonal derivative) and `dpdy` (meridional derivative). The gradient operator acts
-on the unit sphere and therefore omits the 1/radius scaling unless `radius` keyword argument is provided."""
-function ∇!(
-    dpdx::LowerTriangularArray,     # Output: zonal gradient
-    dpdy::LowerTriangularArray,     # Output: meridional gradient
-    p::LowerTriangularArray,        # Input: spectral coefficients
-    S::SpectralTransform;           # includes precomputed arrays
-    radius = DEFAULT_RADIUS,        # scale with radius if provided, otherwise unit sphere
-)
-    (; grad_y1, grad_y2, lm2m_indices) = S
-    @boundscheck ismatching(S, p) || throw(DimensionMismatch(S, p))
-
-    @. dpdx = complex(0, lm2m_indices - 1)*p
-
-    # first and last element aren't covered by the kernel because they would access p[0], p[end+1]
     launch!(S.architecture, :lmk, size(dpdy), dpdy_kernel_new!, dpdy, p, grad_y1, grad_y2)
 
     # 1/radius factor if not unit sphere
@@ -614,7 +584,6 @@ end
         dpdy[lm, k] = gy1*p[lm-1, k] + gy2*p[lm+1, k]
     end
 end
-
 
 """$(TYPEDSIGNATURES) The zonal and meridional gradient of `p`
 using an existing `SpectralTransform` `S`. Acts on the unit sphere,
