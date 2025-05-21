@@ -327,7 +327,6 @@ function UV_from_vor!(
     return U, V
 end
 
-
 """
 $(TYPEDSIGNATURES)
 Get U, V (=(u, v)*coslat) from vorticity ζ and divergence D in spectral space.
@@ -335,8 +334,7 @@ Two operations are combined into a single linear operation. First, invert the
 spherical Laplace ∇² operator to get stream function from vorticity and
 velocity potential from divergence. Then compute zonal and meridional gradients
 to get U, V.
-Acts on the unit sphere, i.e. it omits any radius scaling as all inplace gradient operators,
-unless the `radius` keyword argument is provided.
+Acts on the unit sphere, i.e. it omits any radius scaling as all inplace gradient operators.
 """
 function UV_from_vordiv!(   
     U::LowerTriangularArray,
@@ -367,11 +365,10 @@ function UV_from_vordiv!(
             # ∂Dλ = im*vordiv_to_uv_x[lm]*div[lm]       # divergence contribution to zonal gradient
             # ∂ζλ = im*vordiv_to_uv_x[lm]*vor[lm]       # vorticity contribution to zonal gradient
 
-            # this is the same, just make sure vordiv_to_uv1 is actually zero
             z = im*vordiv_to_uv_x[lm]
             U[lm, k] = muladd(z, div[lm, k], ∂ζθ)       # = ∂Dλ + ∂ζθ
             V[lm, k] = muladd(z, vor[lm, k], ∂Dθ)       # = ∂ζλ + ∂Dθ
-            
+
             # BELOW DIAGONAL (all terms)
             for l in m+1:lmax-2                         # skip last two rows (lmax-1, lmax)
                 lm += 1
@@ -390,14 +387,12 @@ function UV_from_vordiv!(
                 U[lm, k] = muladd(z, div[lm, k], ∂ζθ)   # = ∂Dλ + ∂ζθ
                 V[lm, k] = muladd(z, vor[lm, k], ∂Dθ)   # = ∂ζλ + ∂Dθ            
             end
-            
-            # this is the same -> div is zero in last row
+
             # SECOND LAST ROW (separated to imply that vor, div are zero in last row)
             lm += 1
             U[lm, k] = im*vordiv_to_uv_x[lm]*div[lm, k] - vordiv_to_uv1[lm]*vor[lm-1, k]
-            V[lm, k] = im*vordiv_to_uv_x[lm]*vor[lm, k]
-            
-            # this needs special care
+            V[lm, k] = im*vordiv_to_uv_x[lm]*vor[lm, k] + vordiv_to_uv1[lm]*div[lm-1, k]
+
             # LAST ROW (separated to avoid out-of-bounds access to lmax+1)
             lm += 1
             U[lm, k] = -vordiv_to_uv1[lm]*vor[lm-1, k]  # only last term from 2nd last row
