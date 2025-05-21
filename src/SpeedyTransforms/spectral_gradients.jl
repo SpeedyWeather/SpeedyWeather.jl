@@ -114,15 +114,9 @@ function _divergence_KA!(
   
     @boundscheck ismatching(S, div) || throw(DimensionMismatch(S, div))
 
-    # first element is special because it doesn't can't access v[0]
-    div[1, :] .= kernel.(div[1, :], 0, 0, grad_y_vordiv2[1]*v[2, :])
-
-    launch!(S.architecture, :lmk_inner_points, size(div), _divergence_kernel!, kernel, div, u, v, grad_y_vordiv1, grad_y_vordiv2, lm2m_indices)
-
-    # last element is always zero (and we can access v[lmax+1])
-    div[end,:] .= 0
-
-    # /radius scaling if not unit sphere
+    launch!(S.architecture, :lmk, size(div), _divergence_kernel!, kernel, div, u, v, grad_y_vordiv1, grad_y_vordiv2, lm2m_indices)
+    
+    # radius scaling if not unit sphere
     if radius != 1
         div .*= inv(radius)
     end
@@ -130,19 +124,25 @@ function _divergence_KA!(
     return div
 end
 
-@kernel function _divergence_kernel!(kernel_func, div, u, v, grad_y_vordiv1, grad_y_vordiv2, @Const(lm2m_indices))
+@kernel function _divergence_kernel!(@Const(kernel_func), div, @Const(u), @Const(v), @Const(grad_y_vordiv1), @Const(grad_y_vordiv2), @Const(lm2m_indices))
 
     I = @index(Global, Cartesian)
-    lm = I[1] + 1
-
+    lm = I[1]
+    lmmax = size(div, 1)
     k = ndims(div) == 1 ? CartesianIndex() : I[2]
 
     m = lm2m_indices[lm]
 
-    ∂u∂λ  = ((m-1)*im)*u[I]
-    ∂v∂θ1 = grad_y_vordiv1[lm] * v[lm-1, k] 
-    ∂v∂θ2 = grad_y_vordiv2[lm] * v[lm+1, k]  
-    div[I] = kernel_func(div[I], ∂u∂λ, ∂v∂θ1, ∂v∂θ2)
+    if lm == 1
+        div[I] = kernel_func(div[I], 0, 0, grad_y_vordiv2[1]*v[2, k])
+    elseif lm == lmmax    
+        div[I] = 0
+    else
+        ∂u∂λ  = ((m-1)*im)*u[I]
+        ∂v∂θ1 = grad_y_vordiv1[lm] * v[lm-1, k] 
+        ∂v∂θ2 = grad_y_vordiv2[lm] * v[lm+1, k]  
+        div[I] = kernel_func(div[I], ∂u∂λ, ∂v∂θ1, ∂v∂θ2)
+    end
 end 
 
 """
