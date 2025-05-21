@@ -17,6 +17,7 @@ struct SpectralTransform{
     MatrixComplexType,          # <: ArrayType{Complex{NF}, 2},
     ArrayComplexType,           # <: ArrayType{Complex{NF}, 3},
     LowerTriangularMatrixType,  # <: LowerTriangularArray{NF, 1, ArrayType{NF}},
+    ComplexLowerTriangularMatrixType, # <: LowerTriangularArray{Complex{NF}, 1, ArrayType{Complex{NF}}},
     LowerTriangularArrayType,   # <: LowerTriangularArray{NF, 2, ArrayType{NF}},
 } <: AbstractSpectralTransform
 
@@ -89,7 +90,7 @@ struct SpectralTransform{
     grad_y_vordiv2::LowerTriangularMatrixType
 
     # GRADIENT MATRICES FOR Vorticity, Divergence -> U, V
-    vordiv_to_uv_x::LowerTriangularMatrixType
+    vordiv_to_uv_x::ComplexLowerTriangularMatrixType
     vordiv_to_uv1::LowerTriangularMatrixType
     vordiv_to_uv2::LowerTriangularMatrixType
 
@@ -254,7 +255,7 @@ function SpectralTransform(
     end
 
     # zonal integration (sort of) to get from vorticity and divergence to u, v*coslat
-    vordiv_to_uv_x = LowerTriangularMatrix([-m/(l*(l+1)) for l in 0:lmax, m in 0:mmax])
+    vordiv_to_uv_x = LowerTriangularMatrix([-m/(l*(l+1))*im for l in 0:lmax, m in 0:mmax])
     vordiv_to_uv_x[1, 1] = 0
 
     # meridional integration (sort of) to get from vorticity and divergence to u, v*coslat
@@ -266,6 +267,9 @@ function SpectralTransform(
             vordiv_to_uv1[l+1, m+1] = ϵlms[l+1, m+1]/l
             vordiv_to_uv2[l+1, m+1] = ϵlms[l+2, m+1]/(l+1)
         end
+
+        # explicitly set the last row of vordiv_to_uv2 to zero, so that kernels yield correct gradient in last row 
+        vordiv_to_uv2[lmax+1, m+1] = 0
     end
 
     vordiv_to_uv1[1, 1] = 0                 # remove NaN from 0/0
@@ -286,6 +290,7 @@ function SpectralTransform(
         ArrayType_{Complex{NF}, 2},
         ArrayType_{Complex{NF}, 3},
         LowerTriangularArray{NF, 1, ArrayType_{NF, 1}},
+        LowerTriangularArray{Complex{NF}, 1, ArrayType_{Complex{NF}, 1}},   
         LowerTriangularArray{NF, 2, ArrayType_{NF, 2}},
     }(
         architecture, Grid, nlat_half, nlayers,

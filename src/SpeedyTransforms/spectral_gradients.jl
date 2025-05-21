@@ -340,7 +340,7 @@ function UV_from_vor!(
 
             # U = -∂/∂lat(Ψ) and V = V = ∂/∂λ(Ψ) combined with Laplace inversion ∇⁻², omit radius R scaling
             U[lm, k] = vordiv_to_uv2[lm] * vor[lm+1, k]     # - vordiv_to_uv1[lm]*vor[l-1, m] <- is zero
-            V[lm, k] = im*vordiv_to_uv_x[lm] * vor[lm, k]
+            V[lm, k] = vordiv_to_uv_x[lm] * vor[lm, k]
 
             # BELOW DIAGONAL
             for l in m+1:lmax-2                             # skip last two rows
@@ -349,13 +349,13 @@ function UV_from_vor!(
                 # U = -∂/∂lat(Ψ) and V = V = ∂/∂λ(Ψ) combined with Laplace inversion ∇⁻², omit radius R scaling
                 # U[lm] = vordiv_to_uv2[lm]*vor[lm+1] - vordiv_to_uv1[lm]*vor[lm-1]
                 U[lm, k] = muladd(vordiv_to_uv2[lm], vor[lm+1, k], -vordiv_to_uv1[lm]*vor[lm-1, k])
-                V[lm, k] = im*vordiv_to_uv_x[lm] * vor[lm, k]
+                V[lm, k] = vordiv_to_uv_x[lm] * vor[lm, k]
             end
 
             # SECOND LAST ROW
             lm += 1
             U[lm, k] = -vordiv_to_uv1[lm] * vor[lm-1, k]    # meridional gradient again (but only 2nd term from above)
-            V[lm, k] = im*vordiv_to_uv_x[lm] * vor[lm, k]   # zonal gradient again (as above)
+            V[lm, k] = vordiv_to_uv_x[lm] * vor[lm, k]   # zonal gradient again (as above)
 
             # LAST ROW (separated to avoid out-of-bounds access to l+2, m)
             lm += 1
@@ -367,7 +367,7 @@ function UV_from_vor!(
         @inbounds begin
             lm += 1                     # second last row
             U[lm, k] = 0
-            V[lm, k] = im*vordiv_to_uv_x[lm] * vor[lm, k]
+            V[lm, k] = vordiv_to_uv_x[lm] * vor[lm, k]
 
             lm += 1                     # last row
             U[lm, k] = -vordiv_to_uv1[lm] * vor[lm-1, k]
@@ -422,7 +422,7 @@ function UV_from_vordiv!(
             # ∂Dλ = im*vordiv_to_uv_x[lm]*div[lm]       # divergence contribution to zonal gradient
             # ∂ζλ = im*vordiv_to_uv_x[lm]*vor[lm]       # vorticity contribution to zonal gradient
 
-            z = im*vordiv_to_uv_x[lm]
+            z = vordiv_to_uv_x[lm]
             U[lm, k] = muladd(z, div[lm, k], ∂ζθ)       # = ∂Dλ + ∂ζθ
             V[lm, k] = muladd(z, vor[lm, k], ∂Dθ)       # = ∂ζλ + ∂Dθ
 
@@ -440,15 +440,15 @@ function UV_from_vordiv!(
                 # ∂Dλ = im*vordiv_to_uv_x[lm]*div[lm]   # divergence contribution to zonal gradient
                 # ∂ζλ = im*vordiv_to_uv_x[lm]*vor[lm]   # vorticity contribution to zonal gradient
 
-                z = im*vordiv_to_uv_x[lm]
+                z = vordiv_to_uv_x[lm]
                 U[lm, k] = muladd(z, div[lm, k], ∂ζθ)   # = ∂Dλ + ∂ζθ
                 V[lm, k] = muladd(z, vor[lm, k], ∂Dθ)   # = ∂ζλ + ∂Dθ            
             end
 
             # SECOND LAST ROW (separated to imply that vor, div are zero in last row)
             lm += 1
-            U[lm, k] = im*vordiv_to_uv_x[lm]*div[lm, k] - vordiv_to_uv1[lm]*vor[lm-1, k]
-            V[lm, k] = im*vordiv_to_uv_x[lm]*vor[lm, k] + vordiv_to_uv1[lm]*div[lm-1, k]
+            U[lm, k] = vordiv_to_uv_x[lm]*div[lm, k] - vordiv_to_uv1[lm]*vor[lm-1, k]
+            V[lm, k] = vordiv_to_uv_x[lm]*vor[lm, k] + vordiv_to_uv1[lm]*div[lm-1, k]
 
             # LAST ROW (separated to avoid out-of-bounds access to lmax+1)
             lm += 1
@@ -459,8 +459,8 @@ function UV_from_vordiv!(
         # LAST COLUMN
         @inbounds begin
             lm += 1                                         # second last row
-            U[lm, k] = im*vordiv_to_uv_x[lm]*div[lm, k]     # other terms are zero
-            V[lm, k] = im*vordiv_to_uv_x[lm]*vor[lm, k]     # other terms are zero
+            U[lm, k] = vordiv_to_uv_x[lm]*div[lm, k]     # other terms are zero
+            V[lm, k] = vordiv_to_uv_x[lm]*vor[lm, k]     # other terms are zero
 
             lm += 1                                         # last row
             U[lm, k] = -vordiv_to_uv1[lm]*vor[lm-1, k]      # other terms are zero
@@ -476,6 +476,128 @@ function UV_from_vordiv!(
 
     return U, V
 end
+
+function UV_from_vordiv_KA!(   
+    U::LowerTriangularArray,
+    V::LowerTriangularArray,
+    vor::LowerTriangularArray,
+    div::LowerTriangularArray,
+    S::SpectralTransform;
+    radius = DEFAULT_RADIUS,
+)
+    (; vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2 ) = S
+    @boundscheck ismatching(S, U) || throw(DimensionMismatch(S, U))
+
+    launch!(S.architecture, :lmk, size(U), _UV_from_vordiv_kernel!, U, V, vor, div, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)
+    
+    # *radius scaling if not unit sphere (*radius² for ∇⁻², then /radius to get from stream function to velocity)
+    if radius != 1
+        U .*= radius
+        V .*= radius
+    end
+
+    return U, V
+end
+
+"""
+$(TYPEDSIGNATURES)
+Compute U, V from vorticity and divergence using separate kernels for U and V.
+This version splits the computation into two separate kernel launches, one for U and one for V.
+Acts on the unit sphere, i.e. it omits any radius scaling as all inplace gradient operators.
+"""
+function UV_from_vordiv_KA_split!(   
+    U::LowerTriangularArray,
+    V::LowerTriangularArray,
+    vor::LowerTriangularArray,
+    div::LowerTriangularArray,
+    S::SpectralTransform;
+    radius = DEFAULT_RADIUS,
+)
+    (; vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2 ) = S
+    @boundscheck ismatching(S, U) || throw(DimensionMismatch(S, U))
+
+    # Launch separate kernels for U and V
+    launch!(S.architecture, :lmk, size(U), _U_from_vordiv_kernel!, U, vor, div, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)
+    launch!(S.architecture, :lmk, size(V), _V_from_vordiv_kernel!, V, vor, div, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)
+    
+    # *radius scaling if not unit sphere (*radius² for ∇⁻², then /radius to get from stream function to velocity)
+    if radius != 1
+        U .*= radius
+        V .*= radius
+    end
+
+    return U, V
+end
+
+@kernel inbounds=true function _UV_from_vordiv_kernel!(U, V, @Const(vor), @Const(div), @Const(vordiv_to_uv_x), @Const(vordiv_to_uv1), @Const(vordiv_to_uv2))    
+    I = @index(Global, Cartesian)
+    lm = I[1]
+    k = ndims(vor) == 1 ? CartesianIndex() : I[2]
+    lmmax = size(U, 1)
+    
+    vordiv_uv2 = vordiv_to_uv2[lm]
+    vordiv_uv1 = vordiv_to_uv1[lm]
+    z = vordiv_to_uv_x[lm]
+
+    if lm==1 
+        ∂ζθ =  vordiv_uv2*vor[2, k]       # lm-1 term is zero
+        ∂Dθ = -vordiv_uv2*div[2, k]       # lm-1 term is zero
+
+        U[I] = muladd(z, div[lm, k], ∂ζθ)   # = ∂Dλ + ∂ζθ
+        V[I] = muladd(z, vor[lm, k], ∂Dθ)   # = ∂ζλ + ∂Dθ            
+    elseif lm==lmmax  
+        U[I] = -vordiv_uv1*vor[lm-1, k]      # other terms are zero
+        V[I] =  vordiv_uv1*div[lm-1, k]       
+    else    
+        ∂ζθ = muladd(vordiv_uv2, vor[lm+1, k], -vordiv_uv1*vor[lm-1, k])
+        ∂Dθ = muladd(vordiv_uv1, div[lm-1, k], -vordiv_uv2*div[lm+1, k])
+
+        U[I] = muladd(z, div[lm, k], ∂ζθ)   # = ∂Dλ + ∂ζθ
+        V[I] = muladd(z, vor[lm, k], ∂Dθ)   # = ∂ζλ + ∂Dθ            
+    end    
+end 
+
+@kernel inbounds=true function _U_from_vordiv_kernel!(U, @Const(vor), @Const(div), @Const(vordiv_to_uv_x), @Const(vordiv_to_uv1), @Const(vordiv_to_uv2))    
+    I = @index(Global, Cartesian)
+    lm = I[1]
+    k = ndims(vor) == 1 ? CartesianIndex() : I[2]
+    lmmax = size(U, 1)
+    
+    vordiv_uv2 = vordiv_to_uv2[lm]
+    vordiv_uv1 = vordiv_to_uv1[lm]
+    z = vordiv_to_uv_x[lm]
+
+    if lm==1 
+        ∂ζθ = vordiv_uv2*vor[2, k]       # lm-1 term is zero
+        U[I] = muladd(z, div[lm, k], ∂ζθ)   # = ∂Dλ + ∂ζθ
+    elseif lm==lmmax  
+        U[I] = -vordiv_uv1*vor[lm-1, k]      # other terms are zero
+    else    
+        ∂ζθ = muladd(vordiv_uv2, vor[lm+1, k], -vordiv_uv1*vor[lm-1, k])
+        U[I] = muladd(z, div[lm, k], ∂ζθ)   # = ∂Dλ + ∂ζθ
+    end    
+end 
+
+@kernel inbounds=true function _V_from_vordiv_kernel!(V, @Const(vor), @Const(div), @Const(vordiv_to_uv_x), @Const(vordiv_to_uv1), @Const(vordiv_to_uv2))    
+    I = @index(Global, Cartesian)
+    lm = I[1]
+    k = ndims(vor) == 1 ? CartesianIndex() : I[2]
+    lmmax = size(V, 1)
+    
+    vordiv_uv2 = vordiv_to_uv2[lm]
+    vordiv_uv1 = vordiv_to_uv1[lm]
+    z = vordiv_to_uv_x[lm]
+
+    if lm==1 
+        ∂Dθ = -vordiv_uv2*div[2, k]       # lm-1 term is zero
+        V[I] = muladd(z, vor[lm, k], ∂Dθ)   # = ∂ζλ + ∂Dθ            
+    elseif lm==lmmax  
+        V[I] = vordiv_uv1*div[lm-1, k]       
+    else    
+        ∂Dθ = muladd(vordiv_uv1, div[lm-1, k], -vordiv_uv2*div[lm+1, k])
+        V[I] = muladd(z, vor[lm, k], ∂Dθ)   # = ∂ζλ + ∂Dθ            
+    end    
+end 
 
 """
 $(TYPEDSIGNATURES)
