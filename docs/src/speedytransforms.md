@@ -121,7 +121,7 @@ create a `SpectralTransform` is to start with a `SpectralGrid`, which already de
 which spectral resolution is supposed to be combined with a given grid.
 ```@example speedytransforms
 using SpeedyWeather
-spectral_grid = SpectralGrid(NF=Float32, trunc=5, Grid=OctahedralGaussianGrid, dealiasing=3.)
+spectral_grid = SpectralGrid(NF=Float32, trunc=5, Grid=OctahedralGaussianGrid, dealiasing=3)
 ```
 (We `using SpeedyWeather` here as `SpectralGrid` is exported therein).
 We also specify the number format `Float32` here to be used for the transform although this
@@ -129,9 +129,9 @@ is the default anyway. From `spectral_grid` we now construct a `SpectralTransfor
 ```@example speedytransforms
 S = SpectralTransform(spectral_grid)
 ```
-Note that because we chose `dealiasing=3.` (cubic truncation) we now match a T5 spectral field
+Note that because we chose `dealiasing=3` (cubic truncation) we now match a T5 spectral field
 with a 12-ring octahedral Gaussian grid, instead of the 8 rings as above. So going from
-`dealiasing=2.` (default) to `dealiasing=3.` increased our resolution on the grid while the
+`dealiasing=2` (default) to `dealiasing=3` increased our resolution on the grid while the
 spectral resolution remains the same.
 
 Passing on `S` the `SpectralTransform` now allows us to transform directly on the grid
@@ -185,7 +185,7 @@ SpectralTransform(alms)
 
 Now we have defined the resolution of the spectral space through `alms` but create
 a `SpectralTransform` by making assumption about the grid space. E.g. `Grid=FullGaussianGrid`
-by default, `dealiasing=2.` and `nlat_half` correspondingly. But you can also pass them
+by default, `dealiasing=2` and `nlat_half` correspondingly. But you can also pass them
 on as keyword arguments, for example
 
 ```@example speedytransforms

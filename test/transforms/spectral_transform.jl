@@ -296,7 +296,7 @@ end
                                      OctahedralClenshawGrid)
 
                 # clenshaw-curtis grids are only exact for cubic truncation
-                dealiasing = Grid in (FullGaussianGrid, OctahedralGaussianGrid) ? 2.0 : 3.0
+                dealiasing = Grid in (FullGaussianGrid, OctahedralGaussianGrid) ? 2 : 3
 
                 SG = SpectralGrid(; NF, trunc, Grid, dealiasing)
                 S = SpectralTransform(SG)

@@ -61,7 +61,7 @@ a larger factor increases the grid resolution that is matched with a given
 spectral resolution. You don't choose the resolution of the grid directly,
 but using the `Grid` argument you can change its type (see [Grids](@ref))
 ```@example howto
-spectral_grid = SpectralGrid(trunc=85, dealiasing=3., Grid=HEALPixGrid)
+spectral_grid = SpectralGrid(trunc=85, dealiasing=3, Grid=HEALPixGrid)
 ```
 
 ## Vertical coordinates and resolution
