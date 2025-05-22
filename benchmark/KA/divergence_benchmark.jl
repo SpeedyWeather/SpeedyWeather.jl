@@ -40,23 +40,23 @@ sizes = [
     (129, 128, 8),
     (257, 256, 8),
     (513, 512, 8),
+    (513, 512, 16),
 ]
 
-# Run benchmarks for CPU
-function run_cpu_benchmarks()
-    arch = SpeedyWeather.CPU()
-    
+# Function to run benchmarks with two different architectures
+function run_arch_benchmarks(std_arch, ka_arch)
     # Print header
     println("\nBenchmarking divergence implementations")
-    println("Architecture: ", typeof(arch))
-    println("\nSize (L×M×N)      standard divergence! (CPU)    KA divergence_KA! (", typeof(arch), ")     Speedup")
-    println("-" ^ 90)
+    println("Standard implementation architecture: ", typeof(std_arch))
+    println("KA implementation architecture: ", typeof(ka_arch))
+    println("\nSize (L×M×N)      standard divergence! (", typeof(std_arch), ")    KA divergence_KA! (", typeof(ka_arch), ")     Speedup")
+    println("-" ^ 100)
     
     # Run benchmarks for each size
     for (L, M, N) in sizes
-        # Run both implementations
-        b_std = run_benchmark(L, M, N, arch, false)  # Standard divergence!
-        b_ka = run_benchmark(L, M, N, arch, true)    # KA version divergence_KA!
+        # Run both implementations on their respective architectures
+        b_std = run_benchmark(L, M, N, std_arch, false)  # Standard divergence!
+        b_ka = run_benchmark(L, M, N, ka_arch, true)     # KA version divergence_KA!
         
         # Calculate median times in milliseconds
         t_std = median(b_std.times) / 1e6  # Convert ns to ms
@@ -69,4 +69,19 @@ function run_cpu_benchmarks()
     end
 end
 
-run_cpu_benchmarks()
+# CPU vs CPU benchmarks
+println("\n==== CPU vs CPU BENCHMARKS ====")
+run_arch_benchmarks(SpeedyWeather.CPU(), SpeedyWeather.CPU())
+
+# Run GPU benchmarks if available
+if CUDA.functional()
+    # CPU vs GPU benchmarks
+    println("\n==== CPU vs GPU BENCHMARKS ====")
+    run_arch_benchmarks(SpeedyWeather.CPU(), SpeedyWeather.GPU())
+    
+    # GPU vs GPU benchmarks
+    println("\n==== GPU vs GPU BENCHMARKS ====")
+    run_arch_benchmarks(SpeedyWeather.GPU(), SpeedyWeather.GPU())
+else
+    println("\nCUDA GPU not available for benchmarking")
+end
