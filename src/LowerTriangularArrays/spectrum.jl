@@ -12,7 +12,7 @@ end
 
 function Spectrum(
     lmax::Integer,
-    mmax::Integer,
+    mmax::Integer;
     architecture = DEFAULT_ARCHITECTURE(),
     orders = [m:lmax for m in 1:mmax],
     degrees_orders = degrees_orders(lmax, mmax),
@@ -38,7 +38,6 @@ function degrees_orders(lmax::Integer, mmax::Integer)
     return degrees_orders
 end
 
-# To-do: do we want to keep this as only comparing lmax and mmax?   
 Base.:(==)(s1::Spectrum, s2::Spectrum) = 
     s1.lmax == s2.lmax && s1.mmax == s2.mmax
 

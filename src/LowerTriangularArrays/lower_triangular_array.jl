@@ -11,7 +11,7 @@ struct LowerTriangularArray{T, N, ArrayType <: AbstractArray{T,N}, S<:AbstractSp
     data::ArrayType     # non-zero elements unravelled into an in which the lower triangle is flattened
     spectrum::S         # spectrum, that holds all spectral discretization information and the architecture the array is on
 
-    LowerTriangularArray{T, N, ArrayType, S}(data, spectrum::S) where {T, N, ArrayType <: AbstractArray{T,N}, S <: AbstractSpectrum} =
+    LowerTriangularArray{T, N, ArrayType, S}(data::AbstractArray, spectrum::S) where {T, N, ArrayType <: AbstractArray{T,N}, S <: AbstractSpectrum} =
         check_lta_input_array(data, spectrum, N) ? 
         new(data, spectrum)  :
         error(lta_error_message(data, spectrum, T, N, ArrayType))
@@ -223,6 +223,14 @@ function LowerTriangularArray{T, N, ArrayType, S}(
     return LowerTriangularArray(ArrayType(undef, nonzeros(I[1], I[2]), I[3:end]...), Spectrum(I[1], I[2]))
 end
 
+function LowerTriangularArray{T, N, ArrayType, S}(
+    ::UndefInitializer,
+    spectrum::AbstractSpectrum,
+    I::Vararg{Integer,M},
+) where {T, N, M, ArrayType<:AbstractArray{T}, S<:AbstractSpectrum}
+    return LowerTriangularArray(ArrayType(undef, nonzeros(spectrum), I...), spectrum)
+end
+
 function LowerTriangularArray{T, N, ArrayType, SP}(
     ::UndefInitializer,
     size::S,
@@ -232,6 +240,10 @@ end
    
 function LowerTriangularMatrix{T}(::UndefInitializer, lmax::Integer, mmax::Integer) where T
     return LowerTriangularMatrix(Vector{T}(undef, nonzeros(lmax, mmax)), lmax, mmax)
+end
+
+function LowerTriangularMatrix{T}(::UndefInitializer, spectrum::AbstractSpectrum) where T
+    return LowerTriangularMatrix(Vector{T}(undef, nonzeros(spectrum)), spectrum)
 end
 
 # INDEXING
@@ -589,21 +601,31 @@ function Base.convert(::Type{LowerTriangularMatrix{T}}, L::LowerTriangularMatrix
     return LowerTriangularMatrix{T,typeof(L.spectrum)}(L.data, L.spectrum)
 end
 
-function Base.similar(::LowerTriangularArray{T, N, ArrayType, SP}, I::Integer...) where {T, N, ArrayType, SP}
-    return LowerTriangularArray{T,N,ArrayType,SP}(undef, I...)
+function Base.similar(L::LowerTriangularArray{T, N, ArrayType, SP}, I::Integer...) where {T, N, ArrayType, SP}
+    if resolution(L.spectrum) != I[1:2]
+        new_spectrum = Spectrum(I[1], I[2], architecture=L.spectrum.architecture)
+        return LowerTriangularArray{T,N,ArrayType,SP}(undef, new_spectrum, I[3:end]...)
+    else
+        return LowerTriangularArray{T,N,ArrayType,SP}(undef, L.spectrum, I[3:end]...)
+    end 
 end
 
-function Base.similar(::LowerTriangularArray{T, N, ArrayType, SP}, size::S) where {T, N, ArrayType, SP, S <: Tuple}
-    return LowerTriangularArray{T,N,ArrayType,SP}(undef, size...)
+function Base.similar(L::LowerTriangularArray{T, N, ArrayType, SP}, size::S) where {T, N, ArrayType, SP, S <: Tuple}
+    if resolution(L.spectrum) != size[1:2]
+        new_spectrum = Spectrum(size[1], size[2], architecture=L.spectrum.architecture)
+        return LowerTriangularArray{T,N,ArrayType,SP}(undef, new_spectrum, size[3:end]...)
+    else
+        return LowerTriangularArray{T,N,ArrayType,SP}(undef, L.spectrum, size[3:end]...)
+    end
 end
 
 function Base.similar(L::LowerTriangularArray{S, N, ArrayType, SP}, ::Type{T}) where {T, S, N, SP, ArrayType}
     ArrayType_ = nonparametric_type(ArrayType) 
-    return LowerTriangularArray{T, N, ArrayType_{T,N}, SP}(undef, size(L; as=Matrix)...)
+    return LowerTriangularArray{T, N, ArrayType_{T,N}, SP}(similar(L.data, T), L.spectrum)
 end
 
 Base.similar(L::LowerTriangularArray{T, N, ArrayType, SP}, ::Type{T}) where {T, N, ArrayType, SP} =
-    LowerTriangularArray{T, N, ArrayType, SP}(undef, size(L; as=Matrix)...)
+    LowerTriangularArray{T, N, ArrayType, SP}(similar(L.data, T), L.spectrum)
 Base.similar(L::LowerTriangularArray{T}) where T = similar(L, T)
  
 Base.prod(L::LowerTriangularArray{NF}) where NF = zero(NF)
@@ -674,7 +696,7 @@ function Base.similar(
     ::Type{T},
 ) where {N, ArrayType, S, T}
     L = find_L(bc)
-    return LowerTriangularArray{T, N, ArrayType{T,N}, S}(undef, size(L; as=Matrix))
+    return LowerTriangularArray{T, N, ArrayType{T,N}, S}(similar(L.data, T), L.spectrum)
 end
 
 # same function as above, but needs to be defined for both CPU and GPU style
@@ -683,7 +705,7 @@ function Base.similar(
     ::Type{T},
 ) where {N, ArrayType, S, T}
     L = find_L(bc)
-    return LowerTriangularArray{T, N, ArrayType{T,N}, S}(undef, size(L; as=Matrix))
+    return LowerTriangularArray{T, N, ArrayType{T,N}, S}(similar(L.data, T), L.spectrum)
 end
 
 function KernelAbstractions.get_backend( 

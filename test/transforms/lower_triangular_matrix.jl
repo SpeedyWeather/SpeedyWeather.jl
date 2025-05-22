@@ -448,6 +448,9 @@ end
 
         @test similar(L) isa LowerTriangularMatrix
         @test similar(L, Float64) isa LowerTriangularMatrix{Float64}
+        
+        # spectrum should be the same
+        @test similar(L).spectrum === L.spectrum
     end
 end
 
@@ -474,6 +477,8 @@ end
 
             @test similar(L) isa LowerTriangularArray
             @test similar(L, Float64) isa LowerTriangularArray{Float64}
+
+            @test similar(L).spectrum === L.spectrum
         end
     end
 end
@@ -761,6 +766,10 @@ end
 
                 L2 .= 5L1
                 @test L2 == 5L1
+
+                # spectrum should be the same
+                @test L2.spectrum === L1.spectrum
+                @test (L1 .+ L2).spectrum === L1.spectrum
             end
         end
     end
