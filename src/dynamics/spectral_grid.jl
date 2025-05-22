@@ -131,8 +131,8 @@ function SpectralGrid(;
     ArrayType::Type{<:AbstractArray} = default_array_type(device),
     trunc::Int = DEFAULT_TRUNC,
     Grid::Type{<:AbstractGrid} = DEFAULT_GRID,
-    dealiasing::Number = 2.0,
-    radius::Number = DEFAULT_RADIUS,
+    dealiasing::Real = 2.0,
+    radius::Real = DEFAULT_RADIUS,
     nparticles::Int = 0,
     nlayers::Int = DEFAULT_NLAYERS,
     nlayers_soil::Int = DEFAULT_NLAYERS_SOIL
