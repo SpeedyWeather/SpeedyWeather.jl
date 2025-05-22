@@ -137,7 +137,7 @@ end
         @test_throws BoundsError A[mn+1]    # outside of k range
 
         # with @inbounds accessing [1,2] should return [5]
-        # because the j > 1 is skipped and lm2k(1, 2, 5) = 5
+        # because the j > 1 is skipped and lm2i(1, 2, 5) = 5
         # which isn't correct but would never be called without @inbounds
         f(A, i) = @inbounds A[i]             # wrap into function
         f(A, i, j) = @inbounds A[i, j]
@@ -159,7 +159,7 @@ end
         @test_throws BoundsError A[mn+1] = 1
 
         # with @inbounds accessing [1,2] should return [5]
-        # because the j > 1 is skipped and lm2k(1, 2, 5) = 5
+        # because the j > 1 is skipped and lm2i(1, 2, 5) = 5
         # which isn't correct but would never be called without @inbounds
         g!(A, i) = @inbounds A[i] = 1               # wrap into function
         g!(A, i, j) = @inbounds A[i, j] = 1
@@ -192,7 +192,7 @@ end
         @test_throws BoundsError A[mnp+1]       # outside of k range
 
         # with @inbounds accessing [1,2] should return [5]
-        # because the j > 1 boundscheck is skipped and lm2k(1, 2, 5) = 5
+        # because the j > 1 boundscheck is skipped and lm2i(1, 2, 5) = 5
         # which isn't correct but would never be called without @inbounds
         f(A, i) = @inbounds A[i]            # wrap into function
         f(A, i, j) = @inbounds A[i, j]
@@ -219,7 +219,7 @@ end
         @test_throws BoundsError A[mnp+1] = 1
 
         # with @inbounds accessing [1,2] should return [5]
-        # because the j > 1 is skipped and lm2k(1, 2, 5) = 5
+        # because the j > 1 is skipped and lm2i(1, 2, 5) = 5
         # which isn't correct but would never be called without @inbounds
         g!(A, i) = @inbounds A[i] = 1               # wrap into function
         g!(A, i, j) = @inbounds A[i, j] = 1

@@ -238,24 +238,24 @@ end
 """
 $(TYPEDSIGNATURES)
 Converts the index pair `l, m` of an `lmax`x`mmax` LowerTriangularMatrix `L` to a single
-index `k` that indexes the same element in the corresponding vector that stores
+index `i` that indexes the same element in the corresponding vector that stores
 only the lower triangle (the non-zero entries) of `L`."""
-@inline lm2k(l::Integer, m::Integer, lmax::Integer) = l + (m-1)*lmax - m*(m-1)÷2
+@inline lm2i(l::Integer, m::Integer, lmax::Integer) = l + (m-1)*lmax - m*(m-1)÷2
 
 """
 $(TYPEDSIGNATURES)
-Converts the linear index `k` in the lower triangle into a pair `(l, m)` of indices 
+Converts the linear index `i` in the lower triangle into a pair `(l, m)` of indices 
 of the matrix in column-major form. (Formula taken from 
 Angeletti et al, 2019, https://hal.science/hal-02047514/document)
 """
-@inline function k2lm(k::Integer, mmax::Integer) 
+@inline function i2lm(k::Integer, mmax::Integer) 
     kp = triangle_number(mmax) - k 
     p = Int(floor((sqrt(1 + 8*kp) - 1)/2))
     l = k - mmax*(mmax-1)÷2 + p*(p+1)÷2
     m = mmax - p
     return l, m
 end 
-k2lm(I::CartesianIndex, mmax::Int) = CartesianIndex(k2lm(I[1], mmax)...,I.I[2:end]...) 
+i2lm(I::CartesianIndex, mmax::Int) = CartesianIndex(i2lm(I[1], mmax)...,I.I[2:end]...) 
 
 # direct indexing, no. indices have to be equal to `N` for the correct dimensionality
 @inline Base.getindex(L::LowerTriangularArray{T, N}, I::Vararg{Any, N}) where {T, N} = getindex(L.data, I...) 
@@ -272,7 +272,7 @@ end
     # to get a zero element in the correct shape, we just take the zero element of some valid element,
     # there are probably faster ways to do this, but I don't know how, and this is just a fallback anyway 
     @boundscheck m > l && return zero(getindex(L.data, 1, I[3:end]...)) 
-    k = lm2k(l, m, L.spectrum.lmax)
+    k = lm2i(l, m, L.spectrum.lmax)
     return getindex(L.data, k, I[3:end]...)
 end
 
@@ -308,7 +308,7 @@ Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray{T,1,V,S}, i::Inte
     @boundscheck N+1==M || throw(BoundsError(L, I))
     i, j = I[1:2] 
     @boundscheck i >= j || throw(BoundsError(L, I))
-    k = lm2k(i, j, L.spectrum.lmax)
+    k = lm2i(i, j, L.spectrum.lmax)
     setindex!(L.data, x, k, I[3:end]...)
 end
 
