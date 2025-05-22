@@ -213,8 +213,8 @@ for f in (:zeros, :ones, :rand, :randn)
     end
 end
 
-Base.zero(L::LTA) where {LTA <: LowerTriangularArray} = zeros(LTA, size(L; as=Matrix)...)
-Base.one(L::LTA) where {LTA <: LowerTriangularArray} = ones(LTA, size(L; as=Matrix)...)
+Base.zero(L::LTA) where {LTA <: LowerTriangularArray} = zeros(LTA, L.spectrum, size(L)[2:end]...)
+Base.one(L::LTA) where {LTA <: LowerTriangularArray} = ones(LTA, L.spectrum, size(L)[2:end]...)
 
 function LowerTriangularArray{T, N, ArrayType, S}(
     ::UndefInitializer,
