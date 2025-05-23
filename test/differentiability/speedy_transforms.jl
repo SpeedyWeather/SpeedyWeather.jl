@@ -1,6 +1,6 @@
 # Tests for SpeedyTransforms
 grid_types = [FullGaussianGrid, OctahedralGaussianGrid] # one full and one reduced grid, both Gaussian to have exact transforms 
-grid_dealiasing = [2, 3]
+grid_dealiasing = [2., 3.]
 fd_tests = [true, true] 
 @testset "Differentiability: Complete Transform Enzyme" begin
     # make a high level finite difference test of the whole transform
@@ -8,7 +8,7 @@ fd_tests = [true, true]
     for (i_grid, grid_type) in enumerate(grid_types)
 
         spectral_grid = SpectralGrid(Grid=grid_type, trunc=10, nlayers=1, dealiasing=grid_dealiasing[i_grid])
-        S = SpectralTransform(spectral_grid, one_more_degree=true)
+        S = SpectralTransform(spectral_grid)
         dS = deepcopy(S)
 
         if fd_tests[i_grid]

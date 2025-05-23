@@ -8,11 +8,11 @@ import SpeedyWeather: GPU, CPU, CUDAGPU, array_type, architecture, on_architectu
 
 # DEVICE SETUP FOR CUDA
 # extend functions from main SpeedyWeather 
- 
-# for RingGrids and LowerTriangularMatrices:
+
+# for RingGrids and LowerTriangularArrays:
 # every Array needs this method to strip away the parameters
 RingGrids.nonparametric_type(::Type{<:CuArray}) = CuArray
-LowerTriangularMatrices.nonparametric_type(::Type{<:CuArray}) = CuArray
+LowerTriangularArrays.nonparametric_type(::Type{<:CuArray}) = CuArray
 
 array_type(::GPU) = CuArray
 array_type(::Type{GPU}) = CuArray

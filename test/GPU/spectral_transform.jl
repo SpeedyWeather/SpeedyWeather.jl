@@ -20,7 +20,7 @@ function get_test_data(; trunc, nlayers, Grid, NF)
     # Clenshaw and Gaussian grids
     spectral_grid_cpu = SpectralGrid(; NF, trunc, nlayers, Grid, dealiasing=3)
     spectral_grid_gpu = SpectralGrid(; NF, trunc, nlayers, Grid, architecture=SpeedyWeather.GPU, dealiasing=3)
-    
+
     S_cpu = SpectralTransform(spectral_grid_cpu)
     S_gpu = SpectralTransform(spectral_grid_gpu)
 
@@ -28,8 +28,7 @@ function get_test_data(; trunc, nlayers, Grid, NF)
                     spectral_grid_cpu.nlat_half, 
                     spectral_grid_cpu.nlayers)
     spec_cpu = rand(LowerTriangularArray{Complex{spectral_grid_cpu.NF}}, 
-                    spectral_grid_cpu.trunc+2, 
-                    spectral_grid_cpu.trunc+1, 
+                    spectral_grid_cpu.spectrum, 
                     spectral_grid_cpu.nlayers)
     
     grid_gpu = cu(grid_cpu)

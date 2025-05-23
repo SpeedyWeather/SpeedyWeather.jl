@@ -7,32 +7,41 @@ additional `N`-dimensional or "matrix-style" indexing.
 Supports n-dimensional lower triangular arrays, so that for all trailing dimensions `L[:, :, ..]`
 is a matrix in lower triangular form, e.g. a (5x5x3)-LowerTriangularArray would hold 3 lower
 triangular matrices."""
-struct LowerTriangularArray{T, N, ArrayType <: AbstractArray{T,N}} <: AbstractArray{T,N}
+struct LowerTriangularArray{T, N, ArrayType <: AbstractArray{T,N}, S<:AbstractSpectrum} <: AbstractArray{T,N}
     data::ArrayType     # non-zero elements unravelled into an in which the lower triangle is flattened
-    m::Int              # number of rows
-    n::Int              # number of columns
+    spectrum::S         # spectrum, that holds all spectral discretization information and the architecture the array is on
 
-    LowerTriangularArray{T, N, ArrayType}(data, m, n) where {T, N, ArrayType<:AbstractArray{T}} =
-        check_lta_input_array(data, m, n, N) ? 
-        new(data, m, n)  :
-        error(lta_error_message(data, m, n, T, N, ArrayType))
+    LowerTriangularArray{T, N, ArrayType, S}(data::AbstractArray, spectrum::S) where {T, N, ArrayType <: AbstractArray{T,N}, S <: AbstractSpectrum} =
+        check_lta_input_array(data, spectrum, N) ? 
+        new(data, spectrum)  :
+        error(lta_error_message(data, spectrum, T, N, ArrayType))
 end
 
-check_lta_input_array(data, m, n, N) =
-    (ndims(data) == N) & (length(data) == prod(size(data)[2:end]) * nonzeros(m, n)) 
+check_lta_input_array(data, spectrum, N) =
+    (ndims(data) == N) & (length(data) == prod(size(data)[2:end]) * nonzeros(spectrum)) 
 
-function lta_error_message(data, m, n, T, N, ArrayType) 
+function lta_error_message(data, spectrum, T, N, ArrayType) 
     return "$(Base.dims2string(size(data))) $(typeof(data)) cannot be used to create "*
-            "a $(Base.dims2string(matrix_size(data, m, n))) LowerTriangularArray{$T, $N, $ArrayType}"
+            "a $(Base.dims2string(matrix_size(data, spectrum))) LowerTriangularArray{$T, $N, $ArrayType}"
 end 
 
-"""2-dimensional `LowerTriangularArray` of type `T`` with its non-zero entries unravelled into a `Vector{T}`"""
-const LowerTriangularMatrix{T} = LowerTriangularArray{T, 1, Vector{T}}
+"""2-dimensional `LowerTriangularArray` of type `T` with specturm `S` with its non-zero entries unravelled into a `Vector{T}`"""
+const LowerTriangularMatrix{T, S} = LowerTriangularArray{T, 1, Vector{T}, S} where S <: AbstractSpectrum
 
-LowerTriangularArray(data::ArrayType, m::Integer, n::Integer) where {T, N, ArrayType<:AbstractArray{T,N}} = LowerTriangularArray{T, N, ArrayType}(data, m, n)
+LowerTriangularArray(data::ArrayType, spectrum::S) where {T, N, ArrayType <: AbstractArray{T,N}, S <: AbstractSpectrum} = LowerTriangularArray{T, N, ArrayType, S}(data, spectrum)
 
-LowerTriangularMatrix(data::Vector{T}, m::Integer, n::Integer) where T =
-    LowerTriangularMatrix{T}(data, m, n)
+LowerTriangularMatrix(data::Vector{T}, spectrum::S) where {T, S <: AbstractSpectrum} =
+    LowerTriangularMatrix{T, typeof(spectrum)}(data, spectrum)
+
+function LowerTriangularArray(data::ArrayType, lmax::Integer, mmax::Integer) where {T, N, ArrayType <: AbstractArray{T,N}}
+    spectrum = Spectrum(lmax, mmax)
+    return LowerTriangularArray{T, N, ArrayType, typeof(spectrum)}(data, spectrum)
+end
+
+function LowerTriangularMatrix(data::Vector{T}, lmax::Integer, mmax::Integer) where T 
+    spectrum = Spectrum(lmax, mmax) 
+    return LowerTriangularMatrix{T, typeof(spectrum)}(data, spectrum)
+end 
 
 # SIZE ETC
 """$(TYPEDSIGNATURES)
@@ -52,15 +61,17 @@ degree l and order m, i.e. l=m=1 is the mean, the zonal modes are m=1 etc.
 This indexing matches Julia's 1-based indexing for arrays."""
 abstract type OneBased <: IndexBasis end
 
-# get matrix size of LTA from its data array and m, n (number of rows and columns)
-matrix_size(data::AbstractArray, m::Integer, n::Integer) = (m, n, size(data)[2:end]...)
+# get matrix size of LTA from its data array and lmax, mmax (number of rows and columns)
+matrix_size(data::AbstractArray, spectrum::AbstractSpectrum) = matrix_size(data, spectrum.lmax, spectrum.mmax)
+matrix_size(data::AbstractArray, spectrum::AbstractSpectrum, i::Integer) = matrix_size(data, spectrum.lmax, spectrum.mmax, i)
+matrix_size(data::AbstractArray, lmax::Integer, mmax::Integer) = (lmax, mmax, size(data)[2:end]...)
 
 # extend to get the size of the i-th dimension, with 1 returned for any additional dimension
 # as it is also defined for Array
-function matrix_size(data::AbstractArray, m::Integer, n::Integer, i::Integer)
-    i == 1 && return m      # first dimension is the number of rows m
-    i == 2 && return n      # second dimension is the number of columns n
-    return size(data, i-1)  # -1 as m, n are collapsed into a vector in the data array
+function matrix_size(data::AbstractArray, lmax::Integer, mmax::Integer, i::Integer)
+    i == 1 && return lmax      # first dimension is the number of rows m
+    i == 2 && return mmax      # second dimension is the number of columns n
+    return size(data, i-1)  # -1 as lmax, mmax are collapsed into a vector in the data array
 end 
 
 """$(TYPEDSIGNATURES)
@@ -72,13 +83,13 @@ Base.size(L::LowerTriangularArray, i::Integer, base::Type{<:IndexBasis}=OneBased
 # use multiple dispatch to chose the right options of basis and vector/flat vs matrix indexing
 # matrix indexing can be zero based (natural for spherical harmonics) or one-based,
 # vector/flat indexing has only one-based indexing
-Base.size(L::LowerTriangularArray, base::Type{OneBased}, as::Type{Matrix}) = matrix_size(L.data, L.m, L.n)
-Base.size(L::LowerTriangularArray, base::Type{ZeroBased}, as::Type{Matrix}) = matrix_size(L.data, L.m-1, L.n-1)
+Base.size(L::LowerTriangularArray, base::Type{OneBased}, as::Type{Matrix}) = matrix_size(L.data, L.spectrum.lmax, L.spectrum.mmax)
+Base.size(L::LowerTriangularArray, base::Type{ZeroBased}, as::Type{Matrix}) = matrix_size(L.data, L.spectrum.lmax-1, L.spectrum.mmax-1)
 Base.size(L::LowerTriangularArray, base::Type{OneBased}, as::Type{Vector}) = size(L.data)
 
 # size(L, i, ...) to get the size of the i-th dimension, with 1 returned for any additional dimension 
-Base.size(L::LowerTriangularArray, i::Integer, base::Type{OneBased}, as::Type{Matrix}) = matrix_size(L.data, L.m, L.n, i)
-Base.size(L::LowerTriangularArray, i::Integer, base::Type{ZeroBased}, as::Type{Matrix}) = matrix_size(L.data, L.m-1, L.n-1, i)
+Base.size(L::LowerTriangularArray, i::Integer, base::Type{OneBased}, as::Type{Matrix}) = matrix_size(L.data, L.spectrum.lmax, L.spectrum.mmax, i)
+Base.size(L::LowerTriangularArray, i::Integer, base::Type{ZeroBased}, as::Type{Matrix}) = matrix_size(L.data, L.spectrum.lmax-1, L.spectrum.mmax-1, i)
 Base.size(L::LowerTriangularArray, i::Integer, base::Type{OneBased}, as::Type{Vector}) = size(L.data, i)
 
 # sizeof the underlying data vector
@@ -142,63 +153,118 @@ for f in (:zeros, :ones, :rand, :randn)
     @eval begin
         # use ArrayType from LowerTriangularArray parameter
         function Base.$f(
-            ::Type{LowerTriangularArray{T, N, ArrayType}}, 
-            m::Integer,
-            n::Integer,
+            ::Type{LowerTriangularArray{T, N, ArrayType, S}}, 
+            lmax::Integer,
+            mmax::Integer,
             I::Vararg{Integer, M},
-        ) where {T, N, M, ArrayType}
+        ) where {T, N, M, ArrayType, S<:AbstractSpectrum}
             ArrayType_ = nonparametric_type(ArrayType)
-            return LowerTriangularArray(ArrayType_($f(T, nonzeros(m, n), I...)), m, n)
+            return LowerTriangularArray(ArrayType_($f(T, nonzeros(lmax, mmax), I...)), Spectrum(lmax, mmax))
+        end
+
+        function Base.$f(
+            ::Type{LowerTriangularArray{T, N, ArrayType, S}}, 
+            spectrum::AbstractSpectrum,
+            I::Vararg{Integer, M},
+        ) where {T, N, M, ArrayType, S<:AbstractSpectrum}
+            ArrayType_ = nonparametric_type(ArrayType)
+            return LowerTriangularArray(ArrayType_($f(T, nonzeros(spectrum), I...)), spectrum)
         end
         
         # default CPU, use Array
         function Base.$f(
             ::Type{LowerTriangularArray{T}},
-            m::Integer,
-            n::Integer, 
+            lmax::Integer,
+            mmax::Integer, 
             I::Vararg{Integer, M},
         ) where {T, M}
-            return LowerTriangularArray($f(T, nonzeros(m, n), I...), m, n)
+            return LowerTriangularArray($f(T, nonzeros(lmax, mmax), I...), Spectrum(lmax, mmax))
+        end
+
+        function Base.$f(
+            ::Type{LowerTriangularMatrix{T}},
+            lmax::Integer,
+            mmax::Integer, 
+        ) where T
+            return LowerTriangularMatrix($f(T, nonzeros(lmax, mmax)), Spectrum(lmax, mmax))
         end
         
+        function Base.$f(
+            ::Type{LowerTriangularArray{T}},
+            spectrum::AbstractSpectrum,
+            I::Vararg{Integer, M},
+        ) where {T, M}
+            return LowerTriangularArray($f(T, nonzeros(spectrum), I...), spectrum)
+        end
+
+        function Base.$f(
+            ::Type{LowerTriangularMatrix{T}},
+            spectrum::AbstractSpectrum,
+        ) where T
+            return LowerTriangularMatrix($f(T, nonzeros(spectrum)), spectrum)
+        end
+
+        function Base.$f(
+            ::Type{T},
+            spectrum::AbstractSpectrum,
+            I::Vararg{Integer, M},
+        ) where {T <: Number, M}
+            return LowerTriangularArray($f(T, nonzeros(spectrum), I...), spectrum)
+        end
+
         # use Float64 as default if type T is not provided
-        Base.$f(::Type{LowerTriangularArray}, m::Integer, nk::Integer...) =
-            $f(LowerTriangularArray{Float64}, m, nk...)
-        Base.$f(::Type{LowerTriangularMatrix}, m::Integer, n::Integer) =
-            $f(LowerTriangularArray{Float64}, m, n)
+        Base.$f(::Type{LowerTriangularArray}, lmax::Integer, mk::Integer...) =
+            $f(LowerTriangularArray{Float64}, lmax, mk...)
+        Base.$f(::Type{LowerTriangularMatrix}, lmax::Integer, mmax::Integer) =
+            $f(LowerTriangularArray{Float64}, lmax, mmax)
+
+        Base.$f(::Type{LowerTriangularArray}, spectrum::AbstractSpectrum, I::Vararg{Integer, M}) where {M} =
+            $f(LowerTriangularArray{Float64}, spectrum, I...)
+        Base.$f(::Type{LowerTriangularMatrix}, spectrum::AbstractSpectrum) =
+            $f(LowerTriangularArray{Float64}, spectrum)
     end
 end
 
-Base.zero(L::LTA) where {LTA <: LowerTriangularArray} = zeros(LTA, size(L; as=Matrix)...)
-Base.one(L::LTA) where {LTA <: LowerTriangularArray} = ones(LTA, size(L; as=Matrix)...)
+Base.zero(L::LTA) where {LTA <: LowerTriangularArray} = zeros(LTA, L.spectrum, size(L)[2:end]...)
+Base.one(L::LTA) where {LTA <: LowerTriangularArray} = ones(LTA, L.spectrum, size(L)[2:end]...)
 
-function LowerTriangularArray{T, N, ArrayType}(
+function LowerTriangularArray{T, N, ArrayType, S}(
     ::UndefInitializer,
     I::Vararg{Integer,M},
-) where {T, N, M, ArrayType<:AbstractArray{T}}
-    return LowerTriangularArray(ArrayType(undef, nonzeros(I[1], I[2]), I[3:end]...), I[1], I[2])
+) where {T, N, M, ArrayType<:AbstractArray{T}, S<:AbstractSpectrum}
+    return LowerTriangularArray(ArrayType(undef, nonzeros(I[1], I[2]), I[3:end]...), Spectrum(I[1], I[2]))
 end
 
-function LowerTriangularArray{T, N, ArrayType}(
+function LowerTriangularArray{T, N, ArrayType, S}(
+    ::UndefInitializer,
+    spectrum::AbstractSpectrum,
+    I::Vararg{Integer,M},
+) where {T, N, M, ArrayType<:AbstractArray{T}, S<:AbstractSpectrum}
+    return LowerTriangularArray(ArrayType(undef, nonzeros(spectrum), I...), spectrum)
+end
+
+function LowerTriangularArray{T, N, ArrayType, SP}(
     ::UndefInitializer,
     size::S,
-) where {T, N, ArrayType<:AbstractArray{T}, S<:Tuple}
-    return LowerTriangularArray{T, N, ArrayType}(undef, size...)
+) where {T, N, SP<:AbstractSpectrum, ArrayType<:AbstractArray{T}, S<:Tuple}
+    return LowerTriangularArray{T, N, ArrayType, SP}(undef, size...)
 end
    
-function LowerTriangularMatrix{T}(::UndefInitializer, m::Integer, n::Integer) where T
-    return LowerTriangularMatrix(Vector{T}(undef, nonzeros(m, n)), m, n)
+function LowerTriangularMatrix{T}(::UndefInitializer, lmax::Integer, mmax::Integer) where T
+    return LowerTriangularMatrix(Vector{T}(undef, nonzeros(lmax, mmax)), lmax, mmax)
+end
+
+function LowerTriangularMatrix{T}(::UndefInitializer, spectrum::AbstractSpectrum) where T
+    return LowerTriangularMatrix(Vector{T}(undef, nonzeros(spectrum)), spectrum)
 end
 
 # INDEXING
 """
 $(TYPEDSIGNATURES)
-Converts the index pair `i, j` of an `m`x`n` LowerTriangularMatrix `L` to a single
-index `k` that indexes the same element in the corresponding vector that stores
+Converts the index pair `l, m` of an `lmax`x`mmax` LowerTriangularMatrix `L` to a single
+index `i` that indexes the same element in the corresponding vector that stores
 only the lower triangle (the non-zero entries) of `L`."""
-@inline ij2k(i::Integer, j::Integer, m::Integer) = i + (j-1)*m - j*(j-1)÷2
-@inline triangle_number(n::Integer) = n*(n+1)÷2
-nonzeros(m::Integer, n::Integer) = m*n - triangle_number(n-1)
+@inline lm2i(l::Integer, m::Integer, lmax::Integer) = l + (m-1)*lmax - m*(m-1)÷2
 
 """
 $(TYPEDSIGNATURES)
@@ -216,35 +282,35 @@ get_2lm_range(m, lmax) = 2*ij2k(2*m - 1, m, lmax)-1:2*ij2k(lmax+m, m, lmax)
  
 """
 $(TYPEDSIGNATURES)
-Converts the linear index `k` in the lower triangle into a pair `(i, j)` of indices 
+Converts the linear index `i` in the lower triangle into a pair `(l, m)` of indices 
 of the matrix in column-major form. (Formula taken from 
 Angeletti et al, 2019, https://hal.science/hal-02047514/document)
 """
-@inline function k2ij(k::Integer, m::Integer) 
-    kp = triangle_number(m) - k 
+@inline function i2lm(k::Integer, mmax::Integer) 
+    kp = triangle_number(mmax) - k 
     p = Int(floor((sqrt(1 + 8*kp) - 1)/2))
-    i = k - m*(m-1)÷2 + p*(p+1)÷2
-    j = m - p
-    return i, j
+    l = k - mmax*(mmax-1)÷2 + p*(p+1)÷2
+    m = mmax - p
+    return l, m
 end 
-k2ij(I::CartesianIndex, m::Int) = CartesianIndex(k2ij(I[1], m)...,I.I[2:end]...) 
+i2lm(I::CartesianIndex, mmax::Int) = CartesianIndex(i2lm(I[1], mmax)...,I.I[2:end]...) 
 
 # direct indexing, no. indices have to be equal to `N` for the correct dimensionality
 @inline Base.getindex(L::LowerTriangularArray{T, N}, I::Vararg{Any, N}) where {T, N} = getindex(L.data, I...) 
 
 # indexing with : + other indices, returns a LowerTriangularArray
 @inline function Base.getindex(L::LowerTriangularArray{T,N}, col::Colon, I...) where {T,N}
-    return LowerTriangularArray(getindex(L.data, col, I...), L.m, L.n)
+    return LowerTriangularArray(getindex(L.data, col, I...), L.spectrum.lmax, L.spectrum.mmax)
 end
 
 # l,m sph "matrix-style"  indexing with integer + other indices
 @inline function Base.getindex(L::LowerTriangularArray{T,N}, I::Vararg{Any, M}) where {T, N, M}
-    i, j = I[1:2]
-    @boundscheck (0 < i <= L.m && 0 < j <= L.n) || throw(BoundsError(L, (i, j)))
+    l, m = I[1:2]
+    @boundscheck (0 < l <= L.spectrum.lmax && 0 < m <= L.spectrum.mmax) || throw(BoundsError(L, (l, m)))
     # to get a zero element in the correct shape, we just take the zero element of some valid element,
     # there are probably faster ways to do this, but I don't know how, and this is just a fallback anyway 
-    @boundscheck j > i && return zero(getindex(L.data, 1, I[3:end]...)) 
-    k = ij2k(i, j, L.m)
+    @boundscheck m > l && return zero(getindex(L.data, 1, I[3:end]...)) 
+    k = lm2i(l, m, L.spectrum.lmax)
     return getindex(L.data, k, I[3:end]...)
 end
 
@@ -267,10 +333,10 @@ Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray{T,N}, I::Cartesia
 Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray{T,N}, i::Integer) where {T,N} = getindex(L.data, i)
 
 # needed to remove ambigouities in 1D case 
-Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray{T,1,V}, i::Integer) where {T,V<:AbstractVector{T}} = getindex(L.data, i)
-Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray{T,1,V}, I::CartesianIndex{M}) where {T,V<:AbstractVector{T},M} = getindex(L, Tuple(I)...)
-Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray{T,1,V}, i::Integer, I::CartesianIndex{0}) where {T,V<:AbstractVector{T}} = getindex(L, i)
-Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray{T,1,V}, i::Integer, I::CartesianIndices{0}) where {T,V<:AbstractVector{T}} = getindex(L, i)
+Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray{T,1,V,S}, i::Integer) where {S<:AbstractSpectrum,V<:AbstractVector{T}} where T = getindex(L.data, i)
+Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray{T,1,V,S}, I::CartesianIndex{M}) where {T,S<:AbstractSpectrum,V<:AbstractVector{T},M} = getindex(L, Tuple(I)...)
+Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray{T,1,V,S}, i::Integer, I::CartesianIndex{0}) where {T,S<:AbstractSpectrum,V<:AbstractVector{T}} = getindex(L, i)
+Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray{T,1,V,S}, i::Integer, I::CartesianIndices{0}) where {T,S<:AbstractSpectrum,V<:AbstractVector{T}} = getindex(L, i)
 
 # setindex with lm, ..
 @inline Base.setindex!(L::LowerTriangularArray{T,N}, x, I::Vararg{Any, N}) where {T, N} = setindex!(L.data, x, I...)
@@ -280,23 +346,22 @@ Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray{T,1,V}, i::Intege
     @boundscheck N+1==M || throw(BoundsError(L, I))
     i, j = I[1:2] 
     @boundscheck i >= j || throw(BoundsError(L, I))
-    k = ij2k(i, j, L.m)
+    k = lm2i(i, j, L.spectrum.lmax)
     setindex!(L.data, x, k, I[3:end]...)
 end
 
 # this is specifically here for the weird way in which AssociatedLegendrePolynomials.jl indexes with an empty CartesianIndex
 @inline Base.setindex!(L::LowerTriangularArray{T,N}, x, i::CartesianIndex{0}, I::Vararg{Any, M}) where {T,N, M} = setindex!(L, x, I)
 
-
 @inline Base.setindex!(L::LowerTriangularArray, x, I::CartesianIndex) = setindex!(L, x, Tuple(I)...)
 @inline Base.setindex!(L::LowerTriangularArray{T,N}, x, I::CartesianIndex{N}) where {T,N} = setindex!(L.data, x, I)
 @inline Base.setindex!(L::LowerTriangularArray{T,N}, x, i::Integer) where {T,N} = setindex!(L.data, x, i)
 
 # this is to avoid ambigouities
-@inline Base.setindex!(L::LowerTriangularArray{T,1,V}, x, i::Integer) where {T,V<:AbstractVector{T}} = setindex!(L.data, x, i)
-@inline Base.setindex!(L::LowerTriangularArray{T,1,V}, x, I::CartesianIndex{1}) where {T,V<:AbstractVector{T}} = setindex!(L.data, x, I)
-@inline Base.setindex!(L::LowerTriangularArray{T,1,V}, x, I::CartesianIndex{2}) where {T,V<:AbstractVector{T}} = setindex!(L, x, Tuple(I)...)
-@inline Base.setindex!(L::LowerTriangularArray{T,1,V}, x, i::Integer, I::CartesianIndex{0}) where {T,V<:AbstractVector{T}} = setindex!(L, x, i)
+@inline Base.setindex!(L::LowerTriangularArray{T,1,V,S}, x, i::Integer) where {T,S<:AbstractSpectrum,V<:AbstractVector{T}} = setindex!(L.data, x, i)
+@inline Base.setindex!(L::LowerTriangularArray{T,1,V,S}, x, I::CartesianIndex{1}) where {T,S<:AbstractSpectrum,V<:AbstractVector{T}} = setindex!(L.data, x, I)
+@inline Base.setindex!(L::LowerTriangularArray{T,1,V,S}, x, I::CartesianIndex{2}) where {T,S<:AbstractSpectrum,V<:AbstractVector{T}} = setindex!(L, x, Tuple(I)...)
+@inline Base.setindex!(L::LowerTriangularArray{T,1,V,S}, x, i::Integer, I::CartesianIndex{0}) where {T,S<:AbstractSpectrum,V<:AbstractVector{T}} = setindex!(L, x, i)
 
 # propagate index to data vector
 Base.eachindex(L ::LowerTriangularArray)    = eachindex(L.data)
@@ -310,7 +375,7 @@ eachharmonic(L::LowerTriangularArray) = axes(L.data, 1)
 
 """
 $(TYPEDSIGNATURES)
-creates `unit_range::UnitRange` to loop over all non-zeros in the LowerTriangularMatrices
+creates `unit_range::UnitRange` to loop over all non-zeros in the LowerTriangularArrays
 provided as arguments. Checks bounds first. All LowerTriangularMatrix's need to be of the same size.
 Like `eachindex` but skips the upper triangle with zeros in `L`."""
 function eachharmonic(L1::LowerTriangularArray, Ls::LowerTriangularArray...) 
@@ -335,6 +400,23 @@ function eachmatrix(L1::LowerTriangularArray, Ls::LowerTriangularArray...)
     return eachmatrix(L1)
 end
 
+"""$(TYPEDSIGNATURES) Iterator for the order m, for each m return all ls, 
+therefore the columns in the lower triangular matrix.
+
+    for lms in eachorder(L)
+        for lm in lms
+            L[lm] 
+        end
+    end
+    
+to loop over every order of L."""
+eachorder(L1::LowerTriangularArray) = eachorder(L1.spectrum)
+
+function eachorder(L1::LowerTriangularArray, Ls::LowerTriangularArray...)
+    lowertriangular_match(L1, Ls...) || throw(DimensionMismatch(L1, Ls...))
+    return eachorder(L1)
+end
+
 """$(TYPEDSIGNATURES) True if both `L1` and `L2` are of the same size (as matrix),
 but ignores singleton dimensions, e.g. 5x5 and 5x5x1 would match.
 With `horizontal_only=true` (default `false`) ignore the non-horizontal dimensions,
@@ -348,7 +430,6 @@ function lowertriangular_match(
     horizontal_only && return horizontal_match
     return horizontal_match && length(L1) == length(L2)     # ignores singleton dimensions
 end
-
 
 """$(TYPEDSIGNATURES) True if all lower triangular matrices provided as arguments
 match according to `lowertriangular_match` wrt to `L1` (and therefore all)."""
@@ -371,12 +452,12 @@ end
 $(TYPEDSIGNATURES)
 Create a LowerTriangularArray `L` from Matrix `M` by copying over the non-zero elements in `M`."""
 function LowerTriangularMatrix(M::Matrix{T}) where T # CPU version 
-    m, n = size(M)
-    L = LowerTriangularMatrix{T}(undef, size(M)...)
+    lmax, mmax = size(M)
+    L = LowerTriangularMatrix{T}(undef, lmax, mmax)
     
     k = 0
-    @inbounds for j in 1:n      # only loop over lower triangle
-        for i in j:m
+    @inbounds for j in 1:mmax      # only loop over lower triangle
+        for i in j:lmax
             k += 1              # next element in lower triangle
             L[k] = M[i, j]       # and copy data into vector
         end
@@ -403,16 +484,16 @@ $(TYPEDSIGNATURES)
 Create a LowerTriangularArray `L` from Array `M` by copying over the non-zero elements in `M`.
 """
 function LowerTriangularArray(M::ArrayType) where {T, N, ArrayType<:AbstractArray{T,N}} 
-    m, n = size(M)[1:2]
-    LowerTriangularArray(M[lowertriangle_indices(m,n),[Colon() for i=1:N-2]...], m, n)
+    lmax, mmax = size(M)[1:2]
+    LowerTriangularArray(M[lowertriangle_indices(lmax,mmax),[Colon() for i=1:N-2]...], lmax, mmax)
 end
 
-LowerTriangularArray(L::LowerTriangularArray) = LowerTriangularArray(L.data, L.m, L.n)
+LowerTriangularArray(L::LowerTriangularArray) = LowerTriangularArray(L.data, L.spectrum)
 LowerTriangularMatrix(M::AbstractMatrix) = LowerTriangularArray(M)
 
 function Base.Matrix(L::LowerTriangularMatrix{T}) where T
-    m, n = size(L, as=Matrix)
-    M = zeros(T, m, n)
+    lmax, mmax = size(L, as=Matrix)
+    M = zeros(T, lmax, mmax)
     copyto!(M, L)
 end
 
@@ -435,11 +516,11 @@ end
 
 # CPU version
 function Base.copyto!(  
-    L1::LowerTriangularArray{T,N,ArrayType1},   # copy to L1
-    L2::LowerTriangularArray{S,N,ArrayType2},   # copy from L2
+    L1::LowerTriangularArray{T,N,ArrayType1,SP1},   # copy to L1
+    L2::LowerTriangularArray{S,N,ArrayType2,SP2},   # copy from L2
     ls::AbstractUnitRange,                      # range of indices in 1st dim
     ms::AbstractUnitRange,                      # range of indices in 2nd dim
-) where {T, S, N, ArrayType1<:Array{T,N}, ArrayType2<:Array{S,N}}
+) where {T, S, N, SP1 <: AbstractSpectrum, SP2 <: AbstractSpectrum, ArrayType1<:Array{T,N}, ArrayType2<:Array{S,N}}
 
     lmax, mmax = size(L2; as=Matrix)            # use the size of L2 for boundscheck
     @boundscheck maximum(ls) <= lmax || throw(BoundsError)
@@ -461,20 +542,20 @@ end
 
 # Fallback / GPU version (the two versions _copyto! and copyto! are there to enable tests of this function with regular Arrays)
 function Base.copyto!(
-    L1::LowerTriangularArray{T, N, ArrayType1},
-    L2::LowerTriangularArray{S, N, ArrayType2},
+    L1::LowerTriangularArray{T, N, ArrayType1, SP1},
+    L2::LowerTriangularArray{S, N, ArrayType2, SP2},
     ls::AbstractUnitRange,
     ms::AbstractUnitRange
-) where {T, S, N, ArrayType1<:AbstractArray{T}, ArrayType2<:AbstractArray{S}}
+) where {T, S, N, SP1 <: AbstractSpectrum, SP2 <: AbstractSpectrum, ArrayType1<:AbstractArray{T}, ArrayType2<:AbstractArray{S}}
     return _copyto_core!(L1, L2, ls, ms)
 end
 
 function _copyto_core!( 
-    L1::LowerTriangularArray{T,N,ArrayType1},   # copy to L1
-    L2::LowerTriangularArray{S,N,ArrayType2},   # copy from L2
+    L1::LowerTriangularArray{T,N,ArrayType1,SP1},   # copy to L1
+    L2::LowerTriangularArray{S,N,ArrayType2,SP2},   # copy from L2
     ls::AbstractUnitRange,                      # range of indices in 1st dim
     ms::AbstractUnitRange,                      # range of indices in 2nd dim
-) where {T, S, N, ArrayType1<:AbstractArray{T}, ArrayType2<:AbstractArray{S}}
+) where {T, S, N, SP1 <: AbstractSpectrum, SP2 <: AbstractSpectrum, ArrayType1<:AbstractArray{T}, ArrayType2<:AbstractArray{S}}
 
     lmax_2, mmax_2 = size(L2, as=Matrix)     # use the size of L2 for boundscheck
     @boundscheck maximum(ls) <= lmax_2 || throw(BoundsError)
@@ -552,31 +633,41 @@ function LowerTriangularMatrix{T}(M::LowerTriangularMatrix{T2}) where {T,T2}
 end
 
 function Base.convert(
-    ::Type{LowerTriangularArray{T1, N, ArrayTypeT1}},
-    L::LowerTriangularArray{T2, N, ArrayTypeT2},
-) where {T1, T2, N, ArrayTypeT1<:AbstractArray{T1}, ArrayTypeT2<:AbstractArray{T2}}
-    return LowerTriangularArray{T1, N, ArrayTypeT1}(L.data, L.m, L.n)
+    ::Type{LowerTriangularArray{T1, N, ArrayTypeT1, S}},
+    L::LowerTriangularArray{T2, N, ArrayTypeT2, S},
+) where {T1, T2, N, S <: AbstractSpectrum, ArrayTypeT1<:AbstractArray{T1}, ArrayTypeT2<:AbstractArray{T2}}
+    return LowerTriangularArray{T1, N, ArrayTypeT1, S}(L.data, L.spectrum)
 end
 
 function Base.convert(::Type{LowerTriangularMatrix{T}}, L::LowerTriangularMatrix) where T
-    return LowerTriangularMatrix{T}(L.data, L.m, L.n)
+    return LowerTriangularMatrix{T,typeof(L.spectrum)}(L.data, L.spectrum)
 end
 
-function Base.similar(::LowerTriangularArray{T, N, ArrayType}, I::Integer...) where {T, N, ArrayType}
-    return LowerTriangularArray{T,N,ArrayType}(undef, I...)
+function Base.similar(L::LowerTriangularArray{T, N, ArrayType, SP}, I::Integer...) where {T, N, ArrayType, SP}
+    if resolution(L.spectrum) != I[1:2]
+        new_spectrum = Spectrum(I[1], I[2], architecture=L.spectrum.architecture)
+        return LowerTriangularArray{T,N,ArrayType,SP}(undef, new_spectrum, I[3:end]...)
+    else
+        return LowerTriangularArray{T,N,ArrayType,SP}(undef, L.spectrum, I[3:end]...)
+    end 
 end
 
-function Base.similar(::LowerTriangularArray{T, N, ArrayType}, size::S) where {T, N, ArrayType, S<:Tuple}
-    return LowerTriangularArray{T,N,ArrayType}(undef, size...)
+function Base.similar(L::LowerTriangularArray{T, N, ArrayType, SP}, size::S) where {T, N, ArrayType, SP, S <: Tuple}
+    if resolution(L.spectrum) != size[1:2]
+        new_spectrum = Spectrum(size[1], size[2], architecture=L.spectrum.architecture)
+        return LowerTriangularArray{T,N,ArrayType,SP}(undef, new_spectrum, size[3:end]...)
+    else
+        return LowerTriangularArray{T,N,ArrayType,SP}(undef, L.spectrum, size[3:end]...)
+    end
 end
 
-function Base.similar(L::LowerTriangularArray{S, N, ArrayType}, ::Type{T}) where {T, S, N, ArrayType}
-    ArrayType_ = nonparametric_type(ArrayType) # TODO: not sure how else to infer this type 
-    return LowerTriangularArray{T, N, ArrayType_{T, N}}(undef, size(L; as=Matrix)...)
+function Base.similar(L::LowerTriangularArray{S, N, ArrayType, SP}, ::Type{T}) where {T, S, N, SP, ArrayType}
+    ArrayType_ = nonparametric_type(ArrayType) 
+    return LowerTriangularArray{T, N, ArrayType_{T,N}, SP}(similar(L.data, T), L.spectrum)
 end
 
-Base.similar(L::LowerTriangularArray{T, N, ArrayType}, ::Type{T}) where {T, N, ArrayType} =
-    LowerTriangularArray{T, N, ArrayType}(undef, size(L; as=Matrix)...)
+Base.similar(L::LowerTriangularArray{T, N, ArrayType, SP}, ::Type{T}) where {T, N, ArrayType, SP} =
+    LowerTriangularArray{T, N, ArrayType, SP}(similar(L.data, T), L.spectrum)
 Base.similar(L::LowerTriangularArray{T}) where T = similar(L, T)
  
 Base.prod(L::LowerTriangularArray{NF}) where NF = zero(NF)
@@ -592,43 +683,43 @@ function Base.fill!(L::LowerTriangularArray, x)
 end
 
 Base.:(==)(L1::LowerTriangularArray, L2::LowerTriangularArray) = 
-    L1.m == L2.m && L1.n == L2.n && L1.data == L2.data
+    L1.spectrum == L2.spectrum && L1.data == L2.data
 Base.isapprox(L1::LowerTriangularArray, L2::LowerTriangularArray; kwargs...) =
     isapprox(L1.data, L2.data; kwargs...)
 Base.all(L::LowerTriangularArray) = all(L.data)
 Base.any(L::LowerTriangularArray) = any(L.data)
 
-Base.repeat(L::LowerTriangularArray, counts...) = LowerTriangularArray(repeat(L.data, counts...), L.m, L.n)
+Base.repeat(L::LowerTriangularArray, counts...) = LowerTriangularArray(repeat(L.data, counts...), L.spectrum)
 
 # Broadcast CPU/GPU
 import Base.Broadcast: BroadcastStyle, Broadcasted, DefaultArrayStyle
 import LinearAlgebra: isstructurepreserving, fzeropreserving
 
 # CPU with scalar indexing
-struct LowerTriangularStyle{N, ArrayType} <: Broadcast.AbstractArrayStyle{N} end
+struct LowerTriangularStyle{N, ArrayType, S} <: Broadcast.AbstractArrayStyle{N} end
 
 # GPU without scalar indexing
-struct LowerTriangularGPUStyle{N, ArrayType} <: GPUArrays.AbstractGPUArrayStyle{N} end
+struct LowerTriangularGPUStyle{N, ArrayType, S} <: GPUArrays.AbstractGPUArrayStyle{N} end
 
-function BroadcastStyle(::Type{LowerTriangularArray{T, N, ArrayType}}) where {T, N, ArrayType}
+function BroadcastStyle(::Type{LowerTriangularArray{T, N, ArrayType, S}}) where {T, N, ArrayType, S}
     # remove number format parameter for broadcasting with type promotion
     ArrayType_ = nonparametric_type(ArrayType)
-    return LowerTriangularStyle{N, ArrayType_}()
+    return LowerTriangularStyle{N, ArrayType_, S}()
 end
 
 function BroadcastStyle(
-    ::Type{LowerTriangularArray{T, N, ArrayType}},
-) where {T, N, ArrayType <: GPUArrays.AbstractGPUArray}
+    ::Type{LowerTriangularArray{T, N, ArrayType, S}},
+) where {T, N, ArrayType <: GPUArrays.AbstractGPUArray, S}
     # remove number format parameter for broadcasting with type promotion
     ArrayType_ = nonparametric_type(ArrayType)
-    return LowerTriangularGPUStyle{N, ArrayType_}()
+    return LowerTriangularGPUStyle{N, ArrayType_, S}()
 end
 
 # ::Val{0} for broadcasting with 0-dimensional, ::Val{1} for broadcasting with vectors, etc
-LowerTriangularStyle{N, ArrayType}(::Val{M}) where {N, ArrayType, M} =
-    LowerTriangularStyle{N, ArrayType}()
-LowerTriangularGPUStyle{N, ArrayType}(::Val{M}) where {N, ArrayType, M} =
-    LowerTriangularGPUStyle{N, ArrayType}()
+LowerTriangularStyle{N, ArrayType, S}(::Val{M}) where {N, ArrayType, S, M} =
+    LowerTriangularStyle{N, ArrayType, S}()
+LowerTriangularGPUStyle{N, ArrayType, S}(::Val{M}) where {N, ArrayType, S, M} =
+    LowerTriangularGPUStyle{N, ArrayType, S}()
 
 # also needed for other array types
 nonparametric_type(::Type{<:Array}) = Array
@@ -643,29 +734,30 @@ find_L(a::LowerTriangularArray, rest) = a
 find_L(::Any, rest) = find_L(rest)
 
 function Base.similar(
-    bc::Broadcasted{LowerTriangularStyle{N, ArrayType}},
+    bc::Broadcasted{LowerTriangularStyle{N, ArrayType, S}},
     ::Type{T},
-) where {N, ArrayType, T}
+) where {N, ArrayType, S, T}
     L = find_L(bc)
-    return LowerTriangularArray{T, N, ArrayType{T,N}}(undef, size(L; as=Matrix))
+    return LowerTriangularArray{T, N, ArrayType{T,N}, S}(similar(L.data, T), L.spectrum)
 end
 
 # same function as above, but needs to be defined for both CPU and GPU style
 function Base.similar(
-    bc::Broadcasted{LowerTriangularGPUStyle{N, ArrayType}},
+    bc::Broadcasted{LowerTriangularGPUStyle{N, ArrayType, S}},
     ::Type{T},
-) where {N, ArrayType, T}
+) where {N, ArrayType, S, T}
     L = find_L(bc)
-    return LowerTriangularArray{T, N, ArrayType{T,N}}(undef, size(L; as=Matrix))
+    return LowerTriangularArray{T, N, ArrayType{T,N}, S}(similar(L.data, T), L.spectrum)
 end
 
 function KernelAbstractions.get_backend( 
-    a::LowerTriangularArray{T, N, ArrayType} 
-) where {T, N, ArrayType <: GPUArrays.AbstractGPUArray} 
+    a::LowerTriangularArray{T, N, ArrayType, S} 
+) where {T, N, ArrayType <: GPUArrays.AbstractGPUArray, S} 
     return KernelAbstractions.get_backend(a.data) 
 end 
 
+# To-Do: Actually adapting might need an adapt for the `Spectrum` as well? 
 Adapt.adapt_structure(to, L::LowerTriangularArray) =
-    LowerTriangularArray(Adapt.adapt(to, L.data), L.m, L.n)
+    LowerTriangularArray(Adapt.adapt(to, L.data), L.spectrum)
 
 on_architecture(arch::AbstractArchitecture, a::LowerTriangularArray) = Adapt.adapt(array_type(arch), a)

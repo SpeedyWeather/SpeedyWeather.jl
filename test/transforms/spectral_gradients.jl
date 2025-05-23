@@ -116,11 +116,10 @@ end
         SG = SpectralGrid(; NF)
         S = SpectralTransform(SG)
 
-        lmax, mmax = S.lmax, S.mmax
-        A1 = randn(LowerTriangularMatrix{Complex{NF}}, lmax+1, mmax+1)
-        A2 = randn(LowerTriangularMatrix{Complex{NF}}, lmax+1, mmax+1)
-        B = zeros(LowerTriangularMatrix{Complex{NF}}, lmax+1, mmax+1)
-        C = zeros(LowerTriangularMatrix{Complex{NF}}, lmax+1, mmax+1)
+        A1 = randn(LowerTriangularMatrix{Complex{NF}}, S.spectrum)
+        A2 = randn(LowerTriangularMatrix{Complex{NF}}, S.spectrum)
+        B = zeros(LowerTriangularMatrix{Complex{NF}}, S.spectrum)
+        C = zeros(LowerTriangularMatrix{Complex{NF}}, S.spectrum)
 
         SpeedyWeather.divergence!(B, A1, A2, S, flipsign=true)
         SpeedyWeather.divergence!(C, A1, A2, S, flipsign=false)
@@ -138,11 +137,10 @@ end
         SG = SpectralGrid(; NF)
         S = SpectralTransform(SG)
 
-        lmax, mmax = S.lmax, S.mmax
-        A1 = randn(LowerTriangularMatrix{Complex{NF}}, lmax+1, mmax+1)
-        A2 = randn(LowerTriangularMatrix{Complex{NF}}, lmax+1, mmax+1)
-        B = zeros(LowerTriangularMatrix{Complex{NF}}, lmax+1, mmax+1)
-        C = zeros(LowerTriangularMatrix{Complex{NF}}, lmax+1, mmax+1)
+        A1 = randn(LowerTriangularMatrix{Complex{NF}}, S.spectrum)
+        A2 = randn(LowerTriangularMatrix{Complex{NF}}, S.spectrum)
+        B = zeros(LowerTriangularMatrix{Complex{NF}}, S.spectrum)
+        C = zeros(LowerTriangularMatrix{Complex{NF}}, S.spectrum)
 
         SpeedyWeather.divergence!(B, A1, A2, S, add=true)
         SpeedyWeather.divergence!(B, A1, A2, S, add=true)
@@ -285,7 +283,7 @@ end
             progn = simulation.prognostic_variables
             diagn = simulation.diagnostic_variables
 
-            a = randn(LowerTriangularArray{Complex{NF}}, trunc+2, trunc+1, nlayers)
+            a = randn(LowerTriangularArray{Complex{NF}}, spectral_grid.spectrum, nlayers)
             spectral_truncation!(a)
             SpeedyTransforms.zero_imaginary_zonal_modes!(a)
 

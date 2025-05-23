@@ -43,11 +43,14 @@ function _legendre!(
     unscale_coslat::Bool = false,           # unscale by cosine of latitude on the fly?
 )
     (; nlat_half) = S                       # dimensions    
-    (; lmax, mmax ) = S                     # 0-based max degree l, order m of spherical harmonics  
+    (; lmax, mmax ) = S.spectrum            # 1-based max degree l, order m of spherical harmonics  
     (; legendre_polynomials) = S            # precomputed Legendre polynomials    
-    (; mmax_truncation) = S                 # Legendre shortcut, shortens loop over m, 0-based  
+    (; mmax_truncation) = S                 # Legendre shortcut, shortens loop over m, 1-based  
     (; coslat⁻¹, lon_offsets ) = S
     nlayers = axes(specs, 2)                # get number of layers of specs for fewer layers than precomputed in S
+
+    lmax = lmax-1                           # 0-based max degree l of spherical harmonics
+    mmax = mmax-1                           # 0-based max order m of spherical harmonics
 
     @boundscheck ismatching(S, specs) || throw(DimensionMismatch(S, specs))
     @boundscheck size(g_north) == size(g_south) == (S.nfreq_max, S.nlayers, nlat_half) || throw(DimensionMismatch(S, specs))
@@ -125,11 +128,14 @@ function _legendre!(                        # GRID TO SPECTRAL
     S::SpectralTransform,                   # precomputed transform
 )
     (; nlat, nlat_half) = S                 # dimensions
-    (; lmax, mmax) = S                      # 0-based max degree l, order m of spherical harmonics  
+    (; lmax, mmax) = S.spectrum             # 1-based max degree l, order m of spherical harmonics  
     (; legendre_polynomials) = S            # precomputed Legendre polynomials    
-    (; mmax_truncation) = S                 # Legendre shortcut, shortens loop over m, 0-based  
+    (; mmax_truncation) = S                 # Legendre shortcut, shortens loop over m, 1-based  
     (; solid_angles, lon_offsets) = S
     nlayers = axes(specs, 2)                # get number of layers of specs for fewer layers than precomputed in S
+
+    lmax = lmax-1                           # 0-based max degree l of spherical harmonics
+    mmax = mmax-1                           # 0-based max order m of spherical harmonics
 
     @boundscheck ismatching(S, specs) || throw(DimensionMismatch(S, specs))
     @boundscheck size(f_north) == size(f_south) == (S.nfreq_max, S.nlayers, nlat_half) || throw(DimensionMismatch(S, specs))
