@@ -95,5 +95,3 @@ See [configure_kernel](@ref) for more information.
 
     return nothing
 end
-
-@inline _launch!(array::LowerTriangularArray, kernel!, kernel_args...) = _launch!(array.spectrum.architecture, :lmk, size(array), kernel!, kernel_args...)
