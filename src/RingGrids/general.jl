@@ -494,3 +494,5 @@ function Adapt.adapt_structure(to, grid::Grid) where {Grid <: AbstractGridArray}
     Grid_ = nonparametric_type(Grid)
     return Grid_(Adapt.adapt(to, grid.data), grid.nlat_half, grid.rings)
 end
+
+on_architecture(arch::AbstractArchitecture, a::AbstractGridArray) = Adapt.adapt(array_type(arch), a)

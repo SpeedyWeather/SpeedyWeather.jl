@@ -2,7 +2,7 @@ abstract type AbstractSpectralGrid end
 
 # computing
 const DEFAULT_NF = Float32
-const DEFAULT_DEVICE = CPU()
+const DEFAULT_ARCHITECTURE = CPU
 const DEFAULT_ARRAYTYPE = Array
 
 # numerics
@@ -22,17 +22,17 @@ $(TYPEDFIELDS)
 `nlat_half` and `npoints` should not be chosen but are derived from `trunc`,
 `Grid` and `dealiasing`."""
 struct SpectralGrid{
-    SP,          # <: AbstractSpectrum
+    SpectrumType,          # <: AbstractSpectrum
 } <: AbstractSpectralGrid
 
     "[OPTION] number format used throughout the model"
     NF::Type{<:AbstractFloat}
 
-    "[OPTION] device archictecture to run on"
-    device::AbstractDevice
+    "[OPTION] device architecture to run on"
+    architecture::Type{<:AbstractArchitecture} 
 
     "[OPTION] array type to use for all variables"
-    ArrayType::Type{<:AbstractArray}
+    ArrayType::Type{<:AbstractArray} 
 
     "[DERIVED] Type of vector"
     VectorType::Type{<:AbstractVector}
@@ -48,7 +48,7 @@ struct SpectralGrid{
     trunc::Int
 
     "[DERIVED] spectral space"
-    spectrum::SP
+    spectrum::SpectrumType
 
     "[DERIVED] Type of spectral variable in 2D (horizontal only, flattened into 1D vector)"
     SpectralVariable2D::Type{<:AbstractArray}
@@ -106,7 +106,7 @@ end
 
 function Base.show(io::IO, SG::SpectralGrid)
     (; NF, trunc, Grid, radius, nlat, npoints, nlayers, nlayers_soil) = SG
-    (; device, ArrayType) = SG
+    (; architecture, ArrayType) = SG
     (; nparticles) = SG
 
     # resolution information
@@ -114,21 +114,21 @@ function Base.show(io::IO, SG::SpectralGrid)
     s(x) = x > 1000 ? @sprintf("%i", x) : @sprintf("%.3g", x)
 
     println(io, "$(typeof(SG)):")
-    println(io, "├ Spectral:   T$trunc LowerTriangularMatrix{Complex{$NF}}, radius = $radius m")
-    println(io, "├ Grid:       $nlat-ring $Grid{$NF}, $npoints grid points")
-    println(io, "├ Resolution: $(s(average_resolution))km (average)")
+    println(io, "├ Spectral:     T$trunc LowerTriangularMatrix{Complex{$NF}}, radius = $radius m")
+    println(io, "├ Grid:         $nlat-ring $Grid{$NF}, $npoints grid points")
+    println(io, "├ Resolution:   $(s(average_resolution))km (average)")
     nparticles > 0 &&
-    println(io, "├ Particles:  $nparticles")
-    println(io, "├ Vertical:   $nlayers-layer atmosphere, $nlayers_soil-layer land")
-      print(io, "└ Device:     $(typeof(device)) using $ArrayType")
+    println(io, "├ Particles:    $nparticles")
+    println(io, "├ Vertical:     $nlayers-layer atmosphere, $nlayers_soil-layer land")
+    println(io, "└ Architecture: $architecture using $ArrayType")
 end
 
 # Constructor that takes all [OPTION] parameters as keyword arguments
 # and calculates all derived fields
 function SpectralGrid(;
     NF::Type{<:AbstractFloat} = DEFAULT_NF,
-    device::AbstractDevice = DEFAULT_DEVICE,
-    ArrayType::Type{<:AbstractArray} = default_array_type(device),
+    architecture::Type{<:AbstractArchitecture} = DEFAULT_ARCHITECTURE,
+    ArrayType::Type{<:AbstractArray} = array_type(architecture),
     trunc::Int = DEFAULT_TRUNC,
     Grid::Type{<:AbstractGrid} = DEFAULT_GRID,
     dealiasing::Real = 2.0,
@@ -147,7 +147,7 @@ function SpectralGrid(;
     TensorType = ArrayType{NF, 3}
     
     # Spectral space
-    spectrum = Spectrum(trunc+2, trunc+1)
+    spectrum = Spectrum(trunc+2, trunc+1, architecture=architecture())
     
     # Spectral variable types
     SpectralVariable2D = LowerTriangularArray{Complex{NF}, 1, ArrayType{Complex{NF}, 1}, typeof(spectrum)}
@@ -170,7 +170,7 @@ function SpectralGrid(;
     # Create the SpectralGrid with all fields
     return SpectralGrid{typeof(spectrum)}(
         NF,
-        device,
+        architecture,
         ArrayType,
         VectorType,
         MatrixType,

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Reworked GPU and utility code structure and added GPU versions of spectral gradients[#727](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/727)
 - Major rework of LowerTriangularArrays: Introduce Spectrum type, changes in indexing and constructors [#734](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/734)
 - Reduce CI time [#731](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/731)
 - Remove DocsPreviewCleanup workflow [#730](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/730)

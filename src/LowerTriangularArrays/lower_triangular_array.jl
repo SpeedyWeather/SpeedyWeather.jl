@@ -134,6 +134,18 @@ function Base.array_summary(io::IO, L::LowerTriangularMatrix{T}, inds::Tuple{Var
     print(io, Base.dims2string(length.(inds)), ", $(mn[1])x$(mn[2]) LowerTriangularMatrix{$T}")
 end
 
+function Base.show(io::IO, ::MIME"text/plain", L::LowerTriangularArray)
+    Base.array_summary(io, L, axes(L))
+
+    if get(io, :limit, false)::Bool && displaysize(io)[1]-4 <= 0
+        return print(io, " …")
+    else
+        println(io)
+    end
+    
+    Base.print_array(io, L.data)
+end
+
 @inline Base.dataids(L::LowerTriangularArray) = Base.dataids(L.data)
 
 # CREATE INSTANCES (ZEROS, ONES, UNDEF)
@@ -254,6 +266,20 @@ index `i` that indexes the same element in the corresponding vector that stores
 only the lower triangle (the non-zero entries) of `L`."""
 @inline lm2i(l::Integer, m::Integer, lmax::Integer) = l + (m-1)*lmax - m*(m-1)÷2
 
+"""
+$(TYPEDSIGNATURES)
+range of the running indices lm in a l-column (degrees of spherical harmonics)
+given the column index m (order of harmonics) 
+"""
+get_lm_range(m, lmax) = lm2i(2*m - 1, m, lmax):lm2i(lmax+m, m, lmax)
+
+"""
+$(TYPEDSIGNATURES)
+range of the doubled running indices 2lm in a l-column (degrees of spherical harmonics)
+given the column index m (order of harmonics) 
+"""
+get_2lm_range(m, lmax) = 2*lm2i(2*m - 1, m, lmax)-1:2*lm2i(lmax+m, m, lmax)
+ 
 """
 $(TYPEDSIGNATURES)
 Converts the linear index `i` in the lower triangle into a pair `(l, m)` of indices 
@@ -425,9 +451,9 @@ end
 """ 
 $(TYPEDSIGNATURES)
 Create a LowerTriangularArray `L` from Matrix `M` by copying over the non-zero elements in `M`."""
-function LowerTriangularMatrix(M::Matrix{T}) where T # CPU version 
-    lmax, mmax = size(M)
-    L = LowerTriangularMatrix{T}(undef, lmax, mmax)
+function LowerTriangularMatrix(M::Matrix{T}, spectrum::AbstractSpectrum) where T # CPU version 
+    (; lmax, mmax) = spectrum
+    L = LowerTriangularMatrix{T}(undef, spectrum)
     
     k = 0
     @inbounds for j in 1:mmax      # only loop over lower triangle
@@ -438,6 +464,15 @@ function LowerTriangularMatrix(M::Matrix{T}) where T # CPU version
     end
     return L
 end
+
+""" 
+$(TYPEDSIGNATURES)
+Create a LowerTriangularArray `L` from Matrix `M` by copying over the non-zero elements in `M`."""
+function LowerTriangularMatrix(M::Matrix{T}) where T # GPU version 
+    lmax, mmax = size(M)
+    spectrum = Spectrum(lmax, mmax)
+    return LowerTriangularMatrix(M, spectrum)
+end 
 
 # helper function for conversion etc on GPU, returns indices of the lower triangle
 lowertriangle_indices(M::AbstractMatrix) = lowertriangle_indices(size(M)...)
@@ -733,3 +768,5 @@ end
 # To-Do: Actually adapting might need an adapt for the `Spectrum` as well? 
 Adapt.adapt_structure(to, L::LowerTriangularArray) =
     LowerTriangularArray(Adapt.adapt(to, L.data), L.spectrum)
+
+on_architecture(arch::AbstractArchitecture, a::LowerTriangularArray) = Adapt.adapt(array_type(arch), a)
