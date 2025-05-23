@@ -208,8 +208,8 @@ function SpectralTransform(
 
     # GRADIENTS (on unit sphere, hence 1/radius-scaling is omitted)
     # meridional gradient for scalars (coslat scaling included)
-    grad_y1 = zeros(LowerTriangularMatrix, spectrum)      # term 1, mul with harmonic l-1, m
-    grad_y2 = zeros(LowerTriangularMatrix, spectrum)      # term 2, mul with harmonic l+1, m
+    grad_y1 = zeros(NF, spectrum)      # term 1, mul with harmonic l-1, m
+    grad_y2 = zeros(NF, spectrum)      # term 2, mul with harmonic l+1, m
 
     for m in 1:mmax                         # 1-based degree l, order m
         for l in m:lmax           
@@ -217,12 +217,12 @@ function SpectralTransform(
             grad_y2[l, m] = (l+1)*ϵlms[l+1, m]
         end
         # explicitly set the last row to zero, so that kernels yield correct gradient in last row 
-        grad_y2[lmax+1, m+1] = 0
+        grad_y2[lmax, m] = 0
     end
 
     # meridional gradient used to get from u, v/coslat to vorticity and divergence
-    grad_y_vordiv1 = zeros(LowerTriangularMatrix, spectrum)   # term 1, mul with harmonic l-1, m
-    grad_y_vordiv2 = zeros(LowerTriangularMatrix, spectrum)   # term 2, mul with harmonic l+1, m
+    grad_y_vordiv1 = zeros(NF, spectrum)   # term 1, mul with harmonic l-1, m
+    grad_y_vordiv2 = zeros(NF, spectrum)   # term 2, mul with harmonic l+1, m
 
     for m in 0:mmax                         # 0-based degree l, order m
         for l in m:(lmax-1)          
@@ -230,8 +230,8 @@ function SpectralTransform(
             grad_y_vordiv2[l+1, m+1] = l*ϵlms[l+2, m+1]
         end
         # explicitly set the last row to zero, so that kernels yield correct gradient in last row (zero)
-        grad_y_vordiv1[lmax+1, m+1] = 0
-        grad_y_vordiv2[lmax+1, m+1] = 0
+        grad_y_vordiv1[lmax, m+1] = 0
+        grad_y_vordiv2[lmax, m+1] = 0
     end
 
     # zonal integration (sort of) to get from vorticity and divergence to u, v*coslat
@@ -239,8 +239,8 @@ function SpectralTransform(
     vordiv_to_uv_x[1, 1] = 0
 
     # meridional integration (sort of) to get from vorticity and divergence to u, v*coslat
-    vordiv_to_uv1 = zeros(LowerTriangularMatrix, spectrum)    # term 1, to be mul with harmonic l-1, m
-    vordiv_to_uv2 = zeros(LowerTriangularMatrix, spectrum)    # term 2, to be mul with harmonic l+1, m
+    vordiv_to_uv1 = zeros(NF, spectrum)    # term 1, to be mul with harmonic l-1, m
+    vordiv_to_uv2 = zeros(NF, spectrum)    # term 2, to be mul with harmonic l+1, m
 
     for m in 1:mmax                         # 1-based degree l, order m
         for l in m:lmax           
@@ -249,7 +249,7 @@ function SpectralTransform(
         end
 
         # explicitly set the last row of vordiv_to_uv2 to zero, so that kernels yield correct gradient in last row 
-        vordiv_to_uv2[lmax+1, m+1] = 0
+        vordiv_to_uv2[lmax, m] = 0
     end
 
     vordiv_to_uv1[1, 1] = 0                 # remove NaN from 0/0
