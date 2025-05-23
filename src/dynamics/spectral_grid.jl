@@ -170,7 +170,7 @@ function SpectralGrid(;
     # Create the SpectralGrid with all fields
     return SpectralGrid{typeof(spectrum)}(
         NF,
-        device,
+        architecture,
         ArrayType,
         VectorType,
         MatrixType,
