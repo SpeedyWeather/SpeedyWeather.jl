@@ -22,17 +22,17 @@ $(TYPEDFIELDS)
 `nlat_half` and `npoints` should not be chosen but are derived from `trunc`,
 `Grid` and `dealiasing`."""
 struct SpectralGrid{
-    SP,          # <: AbstractSpectrum
+    SpectrumType,          # <: AbstractSpectrum
 } <: AbstractSpectralGrid
 
     "[OPTION] number format used throughout the model"
     NF::Type{<:AbstractFloat}
 
     "[OPTION] device architecture to run on"
-    architecture::Type{<:AbstractArchitecture} = DEFAULT_ARCHITECTURE
+    architecture::Type{<:AbstractArchitecture} 
 
     "[OPTION] array type to use for all variables"
-    ArrayType::Type{<:AbstractArray} = array_type(architecture)
+    ArrayType::Type{<:AbstractArray} 
 
     "[DERIVED] Type of vector"
     VectorType::Type{<:AbstractVector}
@@ -48,7 +48,7 @@ struct SpectralGrid{
     trunc::Int
 
     "[DERIVED] spectral space"
-    spectrum::SP
+    spectrum::SpectrumType
 
     "[DERIVED] Type of spectral variable in 2D (horizontal only, flattened into 1D vector)"
     SpectralVariable2D::Type{<:AbstractArray}
