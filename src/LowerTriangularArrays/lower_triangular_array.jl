@@ -451,9 +451,9 @@ end
 """ 
 $(TYPEDSIGNATURES)
 Create a LowerTriangularArray `L` from Matrix `M` by copying over the non-zero elements in `M`."""
-function LowerTriangularMatrix(M::Matrix{T}) where T # CPU version 
-    lmax, mmax = size(M)
-    L = LowerTriangularMatrix{T}(undef, lmax, mmax)
+function LowerTriangularMatrix(M::Matrix{T}, spectrum::AbstractSpectrum) where T # CPU version 
+    (; lmax, mmax) = spectrum
+    L = LowerTriangularMatrix{T}(undef, spectrum)
     
     k = 0
     @inbounds for j in 1:mmax      # only loop over lower triangle
@@ -464,6 +464,15 @@ function LowerTriangularMatrix(M::Matrix{T}) where T # CPU version
     end
     return L
 end
+
+""" 
+$(TYPEDSIGNATURES)
+Create a LowerTriangularArray `L` from Matrix `M` by copying over the non-zero elements in `M`."""
+function LowerTriangularMatrix(M::Matrix{T}) where T # GPU version 
+    lmax, mmax = size(M)
+    spectrum = Spectrum(lmax, mmax)
+    return LowerTriangularMatrix(M, spectrum)
+end 
 
 # helper function for conversion etc on GPU, returns indices of the lower triangle
 lowertriangle_indices(M::AbstractMatrix) = lowertriangle_indices(size(M)...)
