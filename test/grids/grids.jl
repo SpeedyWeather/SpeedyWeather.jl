@@ -130,9 +130,9 @@ end
             @test F1 == F7
             @test F1 == F8
 
-            @test_broken all(F1 .== F2)
+            @test all(F1 .== F2)
             @test all(F1 .== F3)
-            @test_broken all(F1 .== F4)
+            @test all(F1 .== F4)
             @test all(F1 .== F5)
             @test all(F1 .== F6)
             @test all(F1 .== F7)

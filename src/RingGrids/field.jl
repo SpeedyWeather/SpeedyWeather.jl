@@ -390,10 +390,19 @@ Base.BroadcastStyle(::Type{F}) where {F<:AbstractField{T, N, ArrayType, Grid}} w
 function Base.similar(bc::Broadcasted{FieldStyle{N, Grid}}, ::Type{T}) where {N, Grid, T}
     for maybe_field in bc.args
         if maybe_field isa AbstractField
-            return similar(maybe_field, T)
+            ArrayType_ = nonparametric_type(typeof(maybe_field.data))
+            new_data = ArrayType_{T}(undef, size(bc))
+            old_grid = maybe_field.grid
+            return Field(new_data, old_grid)
         end
     end
 end
+
+# allocation for broadcasting, create a new Grid with undef of type/number format T
+function Base.similar(bc::Broadcasted{AbstractGridArrayStyle{N, Grid}}, ::Type{T}) where {N, Grid, T}
+    return Grid(Array{T}(undef, size(bc)))
+end
+
 
 # ::Val{0} for broadcasting with 0-dimensional, ::Val{1} for broadcasting with vectors, etc
 # when there's a dimension mismatch always choose the larger dimension
@@ -418,7 +427,10 @@ end
 function Base.similar(bc::Broadcasted{FieldGPUStyle{N, Grid}}, ::Type{T}) where {N, Grid, T}
     for maybe_field in bc.args
         if maybe_field isa AbstractField
-            return similar(maybe_field, T)
+            ArrayType_ = nonparametric_type(typeof(maybe_field.data))
+            new_data = ArrayType_{T}(undef, size(bc))
+            old_grid = maybe_field.grid
+            return Field(new_data, old_grid)
         end
     end
 end
