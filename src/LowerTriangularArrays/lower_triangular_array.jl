@@ -271,14 +271,14 @@ $(TYPEDSIGNATURES)
 range of the running indices lm in a l-column (degrees of spherical harmonics)
 given the column index m (order of harmonics) 
 """
-get_lm_range(m, lmax) = ij2k(2*m - 1, m, lmax):ij2k(lmax+m, m, lmax)
+get_lm_range(m, lmax) = lm2i(2*m - 1, m, lmax):lm2i(lmax+m, m, lmax)
 
 """
 $(TYPEDSIGNATURES)
 range of the doubled running indices 2lm in a l-column (degrees of spherical harmonics)
 given the column index m (order of harmonics) 
 """
-get_2lm_range(m, lmax) = 2*ij2k(2*m - 1, m, lmax)-1:2*ij2k(lmax+m, m, lmax)
+get_2lm_range(m, lmax) = 2*lm2i(2*m - 1, m, lmax)-1:2*lm2i(lmax+m, m, lmax)
  
 """
 $(TYPEDSIGNATURES)
