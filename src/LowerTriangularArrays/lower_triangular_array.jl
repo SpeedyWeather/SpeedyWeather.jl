@@ -374,6 +374,23 @@ function eachmatrix(L1::LowerTriangularArray, Ls::LowerTriangularArray...)
     return eachmatrix(L1)
 end
 
+"""$(TYPEDSIGNATURES) Iterator for the order m, for each m return all ls, 
+therefore the columns in the lower triangular matrix.
+
+    for lms in eachorder(L)
+        for lm in lms
+            L[lm] 
+        end
+    end
+    
+to loop over every order of L."""
+eachorder(L1::LowerTriangularArray) = eachorder(L1.spectrum)
+
+function eachorder(L1::LowerTriangularArray, Ls::LowerTriangularArray...)
+    lowertriangular_match(L1, Ls...) || throw(DimensionMismatch(L1, Ls...))
+    return eachorder(L1)
+end
+
 """$(TYPEDSIGNATURES) True if both `L1` and `L2` are of the same size (as matrix),
 but ignores singleton dimensions, e.g. 5x5 and 5x5x1 would match.
 With `horizontal_only=true` (default `false`) ignore the non-horizontal dimensions,
@@ -387,7 +404,6 @@ function lowertriangular_match(
     horizontal_only && return horizontal_match
     return horizontal_match && length(L1) == length(L2)     # ignores singleton dimensions
 end
-
 
 """$(TYPEDSIGNATURES) True if all lower triangular matrices provided as arguments
 match according to `lowertriangular_match` wrt to `L1` (and therefore all)."""

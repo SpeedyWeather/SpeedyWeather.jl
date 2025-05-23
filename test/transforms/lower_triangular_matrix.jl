@@ -835,3 +835,20 @@ end
         end
     end
 end
+
+@testset "Spectrum" begin 
+    # truncation vs lmax, mmax constructors 
+    @test Spectrum(5,5) == Spectrum(4) 
+    @test Spectrum(5,5) == Spectrum(trunc=4)
+
+    s = Spectrum(5,5)
+    L = rand(Float32, s)
+    
+    for lms in eachorder(L)
+        for lm in lms
+            l, m = i2lm(lm, s.mmax)
+            @test l == s.l_indices[lm]
+            @test m == s.m_indices[lm]
+        end 
+    end 
+end 

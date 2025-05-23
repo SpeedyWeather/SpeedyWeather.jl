@@ -14,7 +14,7 @@ import LinearAlgebra: tril!
 export AbstractSpectrum, Spectrum, resolution, truncation
  
 export LowerTriangularMatrix, LowerTriangularArray
-export eachharmonic, eachmatrix
+export eachharmonic, eachmatrix, eachorder
 export OneBased, ZeroBased
 
 include("spectrum.jl")
