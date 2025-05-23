@@ -167,11 +167,12 @@ function _divergence_KA!(
     S::SpectralTransform;
     radius = DEFAULT_RADIUS,
 )
-    (; grad_y_vordiv1, grad_y_vordiv2, lm2m_indices) = S
+    (; grad_y_vordiv1, grad_y_vordiv2) = S
+    (; m_indices) = u.spectrum
   
     @boundscheck ismatching(S, div) || throw(DimensionMismatch(S, div))
 
-    launch!(S.architecture, :lmk, size(div), _divergence_kernel!, kernel, div, u, v, grad_y_vordiv1, grad_y_vordiv2, lm2m_indices)
+    launch!(S.architecture, :lmk, size(div), _divergence_kernel!, kernel, div, u, v, grad_y_vordiv1, grad_y_vordiv2, m_indices)
     
     # radius scaling if not unit sphere
     if radius != 1
@@ -633,7 +634,7 @@ function ∇²!(
     kernel = flipsign ? (add ? (o,a) -> (o-a) : (o, a) -> -a) : 
                         (add ? (o,a) -> (o+a) : (o, a) -> a)
     
-    launch!(S.architecture, :lmk, size(∇²alms), ∇²_kernel!, ∇²alms, alms, eigenvalues, kernel, S.lm2l_indices)
+    launch!(S.architecture, :lmk, size(∇²alms), ∇²_kernel!, ∇²alms, alms, eigenvalues, kernel, alms.spectrum.l_indices)
 
     # /radius² or *radius² scaling if not unit sphere
     if radius != 1
@@ -644,12 +645,12 @@ function ∇²!(
     return ∇²alms
 end
 
-@kernel function ∇²_kernel!(∇²alms, alms, @Const(eigenvalues), kernel_func, @Const(lm2l_indices))
+@kernel function ∇²_kernel!(∇²alms, alms, @Const(eigenvalues), kernel_func, @Const(l_indices))
 
     I = @index(Global, Cartesian) # I[1] == lm, I[2] == k
                                   # we use cartesian index instead of NTuple here
                                   # because this works for 2D and 3D matrices
-    l = lm2l_indices[I[1]]
+    l = l_indices[I[1]]
 
     ∇²alms[I] = kernel_func(∇²alms[I], alms[I]*eigenvalues[l])
 end 
@@ -721,10 +722,11 @@ function ∇!(
     S::SpectralTransform;           # includes precomputed arrays
     radius = DEFAULT_RADIUS,        # scale with radius if provided, otherwise unit sphere
 )
-    (; grad_y1, grad_y2, lm2m_indices) = S
+    (; grad_y1, grad_y2) = S
+    (; m_indices) = p.spectrum
     @boundscheck ismatching(S, p) || throw(DimensionMismatch(S, p))
 
-    @. dpdx = complex(0, lm2m_indices - 1)*p
+    @. dpdx = complex(0, m_indices - 1)*p
 
     # first and last element aren't covered by the kernel because they would access p[0], p[end+1]
     launch!(S.architecture, :lmk, size(dpdy), dpdy_kernel!, dpdy, p, grad_y1, grad_y2)

@@ -12,7 +12,6 @@ struct SpectralTransform{
     ArrayType,                  # non-parametric array type
     SpectrumType,                         # <: AbstractSpectrum
     VectorType,                 # <: ArrayType{NF, 1},
-    ArrayTypeIntVector,         # <: ArrayType{Int, 1},
     ArrayTypeIntMatrix,         # <: ArrayType{Int, 2}
     VectorComplexType,          # <: ArrayType{Complex{NF}, 1},
     MatrixComplexType,          # <: ArrayType{Complex{NF}, 2},
@@ -71,10 +70,6 @@ struct SpectralTransform{
 
     jm_index_size::Int                             # number of indices per layer in kjm_indices
     kjm_indices::ArrayTypeIntMatrix                # precomputed kjm loop indices map for legendre transform
-
-    # TODO: these will go into the Spectrum type after #734 is merged
-    lm2l_indices::ArrayTypeIntVector   
-    lm2m_indices::ArrayTypeIntVector
 
     # SOLID ANGLES ΔΩ FOR QUADRATURE
     # (integration for the Legendre polynomials, extra normalisation of π/nlat included)
@@ -201,21 +196,6 @@ function SpectralTransform(
         end
     end
   
-    # PRECOMPUTE indices for GPU kernels
-    # lm is the single (flat) index 
-    # i, j are the matrix indices 
-    LM = LowerTriangularArrays.triangle_number(lmax+1)
-    # LM might be one element larger than the number of saved elements in case one_more_degree==true
-    LM = lmax > mmax ? LM - 1 : LM 
-    
-    lm2l_indices = zeros(Int, LM)
-    lm2m_indices = zeros(Int, LM)
-    for lm in 1:LM
-        lm2ij_indices = LowerTriangularArrays.k2ij(lm, lmax+1)
-        lm2l_indices[lm] = lm2ij_indices[1]
-        lm2m_indices[lm] = lm2ij_indices[2]
-    end 
-
     # SOLID ANGLES WITH QUADRATURE WEIGHTS (Gaussian, Clenshaw-Curtis, or Riemann depending on grid)
     # solid angles are ΔΩ = sinθ Δθ Δϕ for every grid point with
     # sin(θ)dθ are the quadrature weights approximate the integration over latitudes
@@ -285,7 +265,6 @@ function SpectralTransform(
         ArrayType_,
         typeof(spectrum),
         ArrayType_{NF, 1},
-        ArrayType_{Int, 1},
         ArrayType_{Int, 2},
         ArrayType_{Complex{NF}, 1},
         ArrayType_{Complex{NF}, 2},
@@ -305,7 +284,7 @@ function SpectralTransform(
         scratch_memory_north, scratch_memory_south,
         scratch_memory_grid, scratch_memory_spec,
         scratch_memory_column_north, scratch_memory_column_south,
-        jm_index_size, kjm_indices, lm2l_indices, lm2m_indices, 
+        jm_index_size, kjm_indices, 
         solid_angles, grad_y1, grad_y2,
         grad_y_vordiv1, grad_y_vordiv2, vordiv_to_uv_x,
         vordiv_to_uv1, vordiv_to_uv2,

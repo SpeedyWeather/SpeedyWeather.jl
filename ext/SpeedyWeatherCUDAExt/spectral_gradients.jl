@@ -17,10 +17,12 @@ function ∇_KA!(
     S::SpectralTransform;           # includes precomputed arrays
     radius = DEFAULT_RADIUS,        # scale with radius if provided, otherwise unit sphere
 )
-    (; grad_y1, grad_y2, lm2m_indices) = S
+    (; grad_y1, grad_y2) = S
+    (; m_indices) = p.spectrum 
+
     @boundscheck ismatching(S, p) || throw(DimensionMismatch(S, p))
 
-    dpdx .= @. complex(0, lm2m_indices - 1)*p
+    dpdx .= @. complex(0, m_indices - 1)*p
 
     # first and last element aren't covered by the kernel because they would access p[0], p[end+1]
     dpdy[1,:] .= grad_y2[1] .* p[2, :]
