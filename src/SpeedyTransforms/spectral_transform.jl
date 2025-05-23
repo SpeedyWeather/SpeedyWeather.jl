@@ -268,9 +268,9 @@ function SpectralTransform(
         ArrayType_{Complex{NF}, 1},
         ArrayType_{Complex{NF}, 2},
         ArrayType_{Complex{NF}, 3},
-        LowerTriangularArray{NF, 1, ArrayType_{NF, 1}},
-        LowerTriangularArray{Complex{NF}, 1, ArrayType_{Complex{NF}, 1}},   
-        LowerTriangularArray{NF, 2, ArrayType_{NF, 2}},
+        LowerTriangularArray{NF, 1, ArrayType_{NF, 1}, typeof(spectrum)},
+        LowerTriangularArray{Complex{NF}, 1, ArrayType_{Complex{NF}, 1}, typeof(spectrum)},   
+        LowerTriangularArray{NF, 2, ArrayType_{NF, 2}, typeof(spectrum)},
     }(
         architecture, Grid, nlat_half, nlayers,
         spectrum, nfreq_max, 
