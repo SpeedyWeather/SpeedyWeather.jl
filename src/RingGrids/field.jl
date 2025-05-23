@@ -373,17 +373,21 @@ end
 # following https://docs.julialang.org/en/v1/manual/interfaces/#man-interfaces-broadcasting
 import Base.Broadcast: BroadcastStyle, Broadcasted, DefaultArrayStyle
 
-# new broadcasting style add additional parameters of Field
-struct FieldStyle{N, ArrayType, Grid} <: Broadcast.AbstractArrayStyle{N} end
+# new broadcasting style, AbstractArrays use just {N}, add additional parameter Grid to
+# not broadcast between different grids which have therefore different (incompatible) broadcast styles
+# important to not have parameter T (eltype/number format) here to broadcast
+# automatically across the same field type but with different T
+# e.g. FullGaussianField{Float32} and FullGaussianField{Float64}
+struct FieldStyle{N, Grid} <: Broadcast.AbstractArrayStyle{N} end
 
 # define broadcast style for Field from its parameters
 Base.BroadcastStyle(::Type{F}) where {F<:AbstractField{T, N, ArrayType, Grid}} where {T, N, ArrayType, Grid} =
-    FieldStyle{N, nonparametric_type(ArrayType), Grid}()
+    FieldStyle{N, nonparametric_type(Grid)}()
 
 # allocation for broadcasting via similar, reusing grid from the first field of the broadcast arguments
 # e.g. field1 + field2 creates a new field that share the grid of field1
 # 2 .+ field1 creates a new field that share the grid of field1
-function Base.similar(bc::Broadcasted{FieldStyle{N, ArrayType, Grid}}, ::Type{T}) where {N, ArrayType, Grid, T}
+function Base.similar(bc::Broadcasted{FieldStyle{N, Grid}}, ::Type{T}) where {N, Grid, T}
     for maybe_field in bc.args
         if maybe_field isa AbstractField
             return similar(maybe_field, T)
@@ -393,25 +397,25 @@ end
 
 # ::Val{0} for broadcasting with 0-dimensional, ::Val{1} for broadcasting with vectors, etc
 # when there's a dimension mismatch always choose the larger dimension
-FieldStyle{N, ArrayType, Grid}(::Val{N}) where {N, ArrayType, Grid} = FieldStyle{N, ArrayType, Grid}()
-FieldStyle{1, ArrayType, Grid}(::Val{2}) where {ArrayType, Grid} = FieldStyle{2, ArrayType, Grid}()
-FieldStyle{1, ArrayType, Grid}(::Val{0}) where {ArrayType, Grid} = FieldStyle{1, ArrayType, Grid}()
-FieldStyle{2, ArrayType, Grid}(::Val{3}) where {ArrayType, Grid} = FieldStyle{3, ArrayType, Grid}()
-FieldStyle{2, ArrayType, Grid}(::Val{1}) where {ArrayType, Grid} = FieldStyle{2, ArrayType, Grid}()
-FieldStyle{3, ArrayType, Grid}(::Val{4}) where {ArrayType, Grid} = FieldStyle{4, ArrayType, Grid}()
-FieldStyle{3, ArrayType, Grid}(::Val{2}) where {ArrayType, Grid} = FieldStyle{3, ArrayType, Grid}()
+FieldStyle{N, Grid}(::Val{N}) where {N, Grid} = FieldStyle{N, Grid}()
+FieldStyle{1, Grid}(::Val{2}) where {Grid} = FieldStyle{2, Grid}()
+FieldStyle{1, Grid}(::Val{0}) where {Grid} = FieldStyle{1, Grid}()
+FieldStyle{2, Grid}(::Val{3}) where {Grid} = FieldStyle{3, Grid}()
+FieldStyle{2, Grid}(::Val{1}) where {Grid} = FieldStyle{2, Grid}()
+FieldStyle{3, Grid}(::Val{4}) where {Grid} = FieldStyle{4, Grid}()
+FieldStyle{3, Grid}(::Val{2}) where {Grid} = FieldStyle{3, Grid}()
 
 ## GPU (same but <: GPUArrays.AbstractGPUArrayStyle)
-struct FieldGPUStyle{N, ArrayType, Grid} <: GPUArrays.AbstractGPUArrayStyle{N} end
+struct FieldGPUStyle{N, Grid} <: GPUArrays.AbstractGPUArrayStyle{N} end
 
 # same as for FieldStyle but for constrain to ArrayType<:GPUArrays
 function Base.BroadcastStyle(
     ::Type{F}
 ) where {F<:AbstractField{T, N, ArrayType, Grid}} where {T, N, ArrayType <: GPUArrays.AbstractGPUArray, Grid}
-    return FieldGPUStyle{N, ArrayType, Grid}()
+    return FieldGPUStyle{N, Grid}()
 end
 
-function Base.similar(bc::Broadcasted{FieldGPUStyle{N, ArrayType, Grid}}, ::Type{T}) where {N, ArrayType, Grid, T}
+function Base.similar(bc::Broadcasted{FieldGPUStyle{N, Grid}}, ::Type{T}) where {N, Grid, T}
     for maybe_field in bc.args
         if maybe_field isa AbstractField
             return similar(maybe_field, T)
@@ -421,13 +425,13 @@ end
 
 # ::Val{0} for broadcasting with 0-dimensional, ::Val{1} for broadcasting with vectors, etc
 # when there's a dimension mismatch always choose the larger dimension
-FieldGPUStyle{N, ArrayType, Grid}(::Val{N}) where {N, ArrayType, Grid} = FieldGPUStyle{N, ArrayType, Grid}()
-FieldGPUStyle{1, ArrayType, Grid}(::Val{2}) where {ArrayType, Grid}    = FieldGPUStyle{2, ArrayType, Grid}()
-FieldGPUStyle{1, ArrayType, Grid}(::Val{0}) where {ArrayType, Grid}    = FieldGPUStyle{1, ArrayType, Grid}()
-FieldGPUStyle{2, ArrayType, Grid}(::Val{3}) where {ArrayType, Grid}    = FieldGPUStyle{3, ArrayType, Grid}()
-FieldGPUStyle{2, ArrayType, Grid}(::Val{1}) where {ArrayType, Grid}    = FieldGPUStyle{2, ArrayType, Grid}()
-FieldGPUStyle{3, ArrayType, Grid}(::Val{4}) where {ArrayType, Grid}    = FieldGPUStyle{4, ArrayType, Grid}()
-FieldGPUStyle{3, ArrayType, Grid}(::Val{2}) where {ArrayType, Grid}    = FieldGPUStyle{3, ArrayType, Grid}()
+FieldGPUStyle{N, Grid}(::Val{N}) where {N, Grid} = FieldGPUStyle{N, Grid}()
+FieldGPUStyle{1, Grid}(::Val{2}) where {Grid}    = FieldGPUStyle{2, Grid}()
+FieldGPUStyle{1, Grid}(::Val{0}) where {Grid}    = FieldGPUStyle{1, Grid}()
+FieldGPUStyle{2, Grid}(::Val{3}) where {Grid}    = FieldGPUStyle{3, Grid}()
+FieldGPUStyle{2, Grid}(::Val{1}) where {Grid}    = FieldGPUStyle{2, Grid}()
+FieldGPUStyle{3, Grid}(::Val{4}) where {Grid}    = FieldGPUStyle{4, Grid}()
+FieldGPUStyle{3, Grid}(::Val{2}) where {Grid}    = FieldGPUStyle{3, Grid}()
 
 function KernelAbstractions.get_backend(
     field::F
