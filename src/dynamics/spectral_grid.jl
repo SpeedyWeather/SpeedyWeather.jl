@@ -120,7 +120,7 @@ function Base.show(io::IO, SG::SpectralGrid)
     nparticles > 0 &&
     println(io, "├ Particles:  $nparticles")
     println(io, "├ Vertical:   $nlayers-layer atmosphere, $nlayers_soil-layer land")
-      print(io, "└ Architecture:     $(typeof(architecture)) using $ArrayType")
+    println(io, "└ Architecture:     $architecture   using $ArrayType")
 end
 
 # Constructor that takes all [OPTION] parameters as keyword arguments
