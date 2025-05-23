@@ -38,9 +38,11 @@ end
 """
 $(TYPEDSIGNATURES)
 Create a `Spectrum` for the spectral truncation `trunc`. `trunc` is assumed to be 
-zero-based, i.e. `trunc=4` will create a `Spectrum` with T4 truncation. 
+zero-based, i.e. `trunc=4` will create a `Spectrum` with T4 truncation. With
+`one_degree_more==true` the `Spectrum` wil have an `lmax` increased by one, which 
+is needed for spectral gradients. 
 """
-Spectrum(trunc::Integer; one_degree_more=true, kwargs...) = 
+Spectrum(trunc::Integer; one_degree_more=false, kwargs...) = 
     Spectrum(trunc+1+one_degree_more, trunc+1; kwargs...)
 
 Spectrum(; trunc::Integer, kwargs...) = Spectrum(trunc; kwargs...)
