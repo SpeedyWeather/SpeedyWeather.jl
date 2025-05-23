@@ -846,7 +846,7 @@ end
     
     for lms in eachorder(L)
         for lm in lms
-            l, m = i2lm(lm, s.mmax)
+            l, m = SpeedyWeather.LowerTriangularArrays.i2lm(lm, s.mmax)
             @test l == s.l_indices[lm]
             @test m == s.m_indices[lm]
         end 
