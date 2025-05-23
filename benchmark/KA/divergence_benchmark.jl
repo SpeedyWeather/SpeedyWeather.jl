@@ -78,10 +78,6 @@ if CUDA.functional()
     # CPU vs GPU benchmarks
     println("\n==== CPU vs GPU BENCHMARKS ====")
     run_arch_benchmarks(SpeedyWeather.CPU(), SpeedyWeather.GPU())
-    
-    # GPU vs GPU benchmarks
-    println("\n==== GPU vs GPU BENCHMARKS ====")
-    run_arch_benchmarks(SpeedyWeather.GPU(), SpeedyWeather.GPU())
 else
     println("\nCUDA GPU not available for benchmarking")
 end
