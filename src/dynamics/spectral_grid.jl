@@ -114,13 +114,13 @@ function Base.show(io::IO, SG::SpectralGrid)
     s(x) = x > 1000 ? @sprintf("%i", x) : @sprintf("%.3g", x)
 
     println(io, "$(typeof(SG)):")
-    println(io, "├ Spectral:   T$trunc LowerTriangularMatrix{Complex{$NF}}, radius = $radius m")
-    println(io, "├ Grid:       $nlat-ring $Grid{$NF}, $npoints grid points")
-    println(io, "├ Resolution: $(s(average_resolution))km (average)")
+    println(io, "├ Spectral:     T$trunc LowerTriangularMatrix{Complex{$NF}}, radius = $radius m")
+    println(io, "├ Grid:         $nlat-ring $Grid{$NF}, $npoints grid points")
+    println(io, "├ Resolution:   $(s(average_resolution))km (average)")
     nparticles > 0 &&
-    println(io, "├ Particles:  $nparticles")
-    println(io, "├ Vertical:   $nlayers-layer atmosphere, $nlayers_soil-layer land")
-    println(io, "└ Architecture:     $architecture   using $ArrayType")
+    println(io, "├ Particles:    $nparticles")
+    println(io, "├ Vertical:     $nlayers-layer atmosphere, $nlayers_soil-layer land")
+    println(io, "└ Architecture: $architecture using $ArrayType")
 end
 
 # Constructor that takes all [OPTION] parameters as keyword arguments
