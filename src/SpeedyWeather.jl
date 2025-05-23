@@ -7,7 +7,7 @@ using DocStringExtensions
 import Primes
 import Random
 import LinearAlgebra: LinearAlgebra, Diagonal
-export rotate!
+export rotate, rotate!
 
 # GPU, PARALLEL
 import Base.Threads: Threads, @threads
@@ -48,13 +48,19 @@ using .LowerTriangularMatrices
 # RingGrids
 export  RingGrids
 export  AbstractGrid, AbstractFullGrid, AbstractReducedGrid
-export  Field
+export  AbstractField, AbstractField2D, AbstractField3D
+export  Field, Field2D, Field3D,
+        FullClenshawField, FullGaussianField,
+        FullHEALPixField, FullOctaHEALPixField,
+        OctahedralGaussianField, OctahedralClenshawField,
+        HEALPixField, OctaHEALPixField,
+        OctaminimalGaussianField
 export  FullClenshawGrid, FullGaussianGrid,
         FullHEALPixGrid, FullOctaHEALPixGrid,
         OctahedralGaussianGrid, OctahedralClenshawGrid,
         HEALPixGrid, OctaHEALPixGrid,
         OctaminimalGaussianGrid
-        eachring, eachfield
+export  eachring, eachlayer, eachgridpoint
 export  AnvilInterpolator
 export  spherical_distance
 export  zonal_mean

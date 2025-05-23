@@ -139,7 +139,7 @@ function timestep!(
     (; monthly_soil_moisture) = soil
     (; soil_moisture) = progn.land
 
-    for k in eachgrid(soil_moisture)
+    for k in eachlayer(soil_moisture)
         for ij in eachgridpoint(soil_moisture)
             soil_moisture[ij, k] = (1-weight) * monthly_soil_moisture[ij, k, this_month] +
                                     weight  * monthly_soil_moisture[ij, k, next_month]

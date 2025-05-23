@@ -54,7 +54,7 @@ function get_column!(
 
     (; u_grid_prev, v_grid_prev, temp_grid_prev, humid_grid_prev) = D.grid
 
-    @inbounds for k in eachgrid(u_grid_prev, v_grid_prev, temp_grid_prev, humid_grid_prev)
+    @inbounds for k in eachlayer(u_grid_prev, v_grid_prev, temp_grid_prev, humid_grid_prev)
         # read out prognostic variables on grid at previous time step
         # for numerical stability
         C.u[k] = u_grid_prev[ij, k]
@@ -124,7 +124,7 @@ function write_column_tendencies!(
     (; nlayers) = column
     @boundscheck nlayers == diagn.nlayers || throw(BoundsError)
 
-    @inbounds for k in eachgrid(diagn.grid.vor_grid)
+    @inbounds for k in eachlayer(diagn)
         diagn.tendencies.u_tend_grid[ij, k] = column.u_tend[k]
         diagn.tendencies.v_tend_grid[ij, k] = column.v_tend[k]
         diagn.tendencies.temp_tend_grid[ij, k] = column.temp_tend[k]

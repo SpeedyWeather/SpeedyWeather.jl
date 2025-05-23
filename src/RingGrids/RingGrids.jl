@@ -8,6 +8,7 @@ import Printf
 import Statistics: Statistics, mean
 import FastGaussQuadrature
 import LinearAlgebra
+export rotate, rotate!
 
 import Adapt
 import GPUArrays
@@ -31,8 +32,8 @@ export  OctahedralGaussianGrid,
         OctaminimalGaussianGrid
 
 # FIELDS (Data on grids)
-export  AbstractField,
-        Field
+export  AbstractField, AbstractField2D, AbstractField3D,
+        Field, Field2D, Field3D
 
 export  FullGaussianField,
         FullClenshawField,
@@ -67,7 +68,7 @@ export  get_quadrature_weights,
         get_solid_angles
 
 # ITERATORS
-export  eachgrid,
+export  eachlayer,
         eachring,
         whichring,
         eachgridpoint,

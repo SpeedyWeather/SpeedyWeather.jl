@@ -468,7 +468,7 @@ function initialize!(   progn::PrognosticVariables{NF},
     temp_grid = zeros(Grid{NF}, nlat_half, nlayers)     # temperature
     aΩ = radius*rotation
 
-    for k in eachgrid(temp_grid)
+    for k in eachlayer(temp_grid)
         η = σ_levels_full[k]    # Jablonowski and Williamson use η for σ coordinates
         ηᵥ = (η - η₀)*π/2       # auxiliary variable for vertical coordinate
 
@@ -638,7 +638,7 @@ function initialize!(
     temp_grid = transform(progn.temp[1], model.spectral_transform)
     humid_grid = zero(temp_grid)
 
-    for k in eachgrid(temp_grid, humid_grid)
+    for k in eachlayer(temp_grid, humid_grid)
         for ij in eachgridpoint(humid_grid)
             pₖ = σ_levels_full[k] * pres_grid[ij]
             q_sat = saturation_humidity(temp_grid[ij, k], pₖ, model.clausius_clapeyron)

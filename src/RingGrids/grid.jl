@@ -22,6 +22,8 @@ function Base.show(io::IO, grid::AbstractGrid)
 end
 
 ## TYPES
+grid_type(::Type{Grid}) where {Grid<:AbstractGrid} = nonparametric_type(Grid) 
+
 """$(TYPEDSIGNATURES) For any instance of `AbstractGrid` type its n-dimensional type
 (*Grid{T, N, ...} returns *Array) but without any parameters `{T, N, ArrayType}`"""
 nonparametric_type(grid::AbstractGrid) = nonparametric_type(typeof(grid))
@@ -154,9 +156,11 @@ function eachring(grid1::AbstractGrid, grids::AbstractGrid...)
 end
 
 function Base.DimensionMismatch(grid1::AbstractGrid, grids::AbstractGrid...)
-    s = "Grids do not match; $(size(grid1)) $(nonparametric_type(grid1))"
+    nlat = get_nlat_half(grid1)
+    s = "grids do not match; $nlat-ring $(nonparametric_type(grid1))"
     for grid in grids
-        s *= ", $(size(grid))-$(nonparametric_type(grid))"
+        nlat = get_nlat_half(grid)
+        s *= ", $nlat-ring $(nonparametric_type(grid))"
     end
     return DimensionMismatch(s)
 end
@@ -196,8 +200,7 @@ each_index_in_ring(grid::AbstractGrid, j::Integer) = grid.rings[j]
 For a `NxM` (`N` horizontal grid points, `M` vertical layers) `OneTo(N)` is returned."""
 eachgridpoint(grid::AbstractGrid) = Base.OneTo(get_npoints(grid))
 
-""" $(TYPEDSIGNATURES) Like `eachgridpoint(::AbstractGridArray)` but checks for
-equal size between input arguments first."""
+""" $(TYPEDSIGNATURES) Like `eachgridpoint(::AbstractGrid)` but checks `grids` match."""
 function eachgridpoint(grid1::AbstractGrid, grids::AbstractGrid...)
     grids_match(grid1, grids...) || throw(DimensionMismatch(grid1, grids...))
     return eachgridpoint(grid1)

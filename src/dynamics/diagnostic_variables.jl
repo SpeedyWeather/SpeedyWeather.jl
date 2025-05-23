@@ -374,9 +374,9 @@ $(TYPEDFIELDS)"""
 @kwdef struct ParticleVariables{
     NF,                     # <: AbstractFloat
     ArrayType,              # Array, CuArray, ...
-    ParticleVector,         # <: AbstractGridArray
+    ParticleVector,         # <: AbstractField
     VectorNF,               # Vector{NF} or CuVector{NF}
-    Grid,                   # <:AbstractGridArray
+    Grid,                   # <:AbstractGrid
 } <: AbstractDiagnosticVariables
     "Number of particles"
     nparticles::Int
@@ -416,12 +416,12 @@ $(TYPEDFIELDS)"""
 struct DiagnosticVariables{
     NF,                     # <: AbstractFloat
     ArrayType,              # Array, CuArray, ...
-    Grid,                   # <:AbstractGridArray
+    Grid,                   # <:AbstractGrid
     SpectralVariable2D,     # <: LowerTriangularArray
     SpectralVariable3D,     # <: LowerTriangularArray
-    GridVariable2D,         # <: AbstractGridArray
-    GridVariable3D,         # <: AbstractGridArray
-    ParticleVector,         # <: AbstractGridArray
+    GridVariable2D,         # <: AbstractField
+    GridVariable3D,         # <: AbstractField
+    ParticleVector,         # <: AbstractField
     VectorType,             # <: AbstractVector
     MatrixType,             # <: AbstractMatrix
 } <: AbstractDiagnosticVariables
@@ -528,21 +528,21 @@ end
 function add!(diagn::DiagnosticVariables{
     NF,                     # <: AbstractFloat
     ArrayType,              # Array, CuArray, ...
-    Grid,                   # <:AbstractGridArray
+    Grid,                   # <:AbstractGrid
     SpectralVariable2D,     # <: LowerTriangularArray
     SpectralVariable3D,     # <: LowerTriangularArray
-    GridVariable2D,         # <: AbstractGridArray
-    GridVariable3D,         # <: AbstractGridArray
+    GridVariable2D,         # <: AbstractField
+    GridVariable3D,         # <: AbstractField
 },
     tracers::Tracer...,
     ) where {
         NF,                     # <: AbstractFloat
         ArrayType,              # Array, CuArray, ...
-        Grid,                   # <:AbstractGridArray
+        Grid,                   # <:AbstractGrid
         SpectralVariable2D,     # <: LowerTriangularArray
         SpectralVariable3D,     # <: LowerTriangularArray
-        GridVariable2D,         # <: AbstractGridArray
-        GridVariable3D,         # <: AbstractGridArray
+        GridVariable2D,         # <: AbstractField
+        GridVariable3D,         # <: AbstractField
     }
     (; trunc, nlat_half, nlayers) = diagn
     for tracer in tracers
@@ -613,4 +613,6 @@ end
 Base.fill!(tendencies::Tendencies, x) = Base.fill!(tendencies, x, PrimitiveWet)
 Base.fill!(tendencies::Tendencies, x, model::AbstractModel) = Base.fill!(tendencies, x, typeof(model))
 
+RingGrids.eachlayer(diagn::DiagnosticVariables) = eachlayer(diagn.grid.vor_grid)
 RingGrids.eachgridpoint(diagn::DiagnosticVariables) = eachgridpoint(diagn.grid.vor_grid)
+RingGrids.eachindex(diagn::DiagnosticVariables) = eachindex(diagn.grid.vor_grid)

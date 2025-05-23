@@ -22,7 +22,7 @@ rotate!(field::AbstractField, ::LongitudeRotation{270}) = _rotate!(field, 3)
 function _rotate!(field::AbstractField, quarter::Integer)
     @assert quarter in (1, 2, 3) "Can only shift by 1, 2, or 3 quarters of a ring"
 
-    for k in eachgrid(field)
+    for k in eachlayer(field)
         for ring in eachring(field)
             v = view(field, ring, k)
             shift = quarter*(length(ring) ÷ 4)

@@ -8,7 +8,7 @@ export PrognosticVariablesOcean
 @kwdef struct PrognosticVariablesOcean{
     NF,                     # <: AbstractFloat
     ArrayType,              # Array, CuArray, ...
-    GridVariable2D,         # <: AbstractGridArray
+    GridVariable2D,         # <: AbstractField
 } <: AbstractPrognosticVariables
     # DIMENSION
     "Number of latitude rings on one hemisphere (Equator incl.), resolution parameter of grid"
@@ -32,7 +32,7 @@ export PrognosticVariablesLand
 @kwdef struct PrognosticVariablesLand{
     NF,                     # <: AbstractFloat
     ArrayType,              # Array, CuArray, ...
-    GridVariable2D,         # <: AbstractGridArray
+    GridVariable2D,         # <: AbstractField
     GridVariable3D,
 } <: AbstractPrognosticVariables
 
@@ -67,8 +67,8 @@ export PrognosticVariables
     nsteps,                 # number of timesteps
     SpectralVariable2D,     # <: LowerTriangularArray
     SpectralVariable3D,     # <: LowerTriangularArray
-    GridVariable2D,         # <: AbstractGridArray
-    GridVariable3D,         # <: AbstractGridArray
+    GridVariable2D,         # <: AbstractField
+    GridVariable3D,         # <: AbstractField
     ParticleVector,         # <: AbstractVector{Particle{NF}}
 } <: AbstractPrognosticVariables
 

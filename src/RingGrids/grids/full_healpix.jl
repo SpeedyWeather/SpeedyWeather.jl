@@ -18,7 +18,13 @@ nonparametric_type(::Type{<:FullHEALPixGrid}) = FullHEALPixGrid
 
 # FIELD
 const FullHEALPixField{T, N} = Field{T, N, Architecture, Grid} where {Architecture, Grid<:FullHEALPixGrid}
-grid_type(::Type{<:FullHEALPixField}) = FullHEALPixGrid
+
+# define grid_type (i) without T, N, (ii) with T, (iii) with T, N but not with <:?Field
+# to not have precendence over grid_type(::Type{Field{...})
+grid_type(::Type{FullHEALPixField}) = FullHEALPixGrid
+grid_type(::Type{FullHEALPixField{T}}) where T = FullHEALPixGrid
+grid_type(::Type{FullHEALPixField{T, N}}) where {T, N} = FullHEALPixGrid
+
 Base.show(io::IO, F::Type{<:FullHEALPixField{T, N}}) where {T, N} = print(io, "FullHEALPixField{$T, $N}")
 
 # SIZE

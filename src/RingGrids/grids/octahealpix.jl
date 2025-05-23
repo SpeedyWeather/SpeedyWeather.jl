@@ -30,7 +30,13 @@ full_grid_type(::Type{<:OctaHEALPixGrid}) = FullOctaHEALPixGrid
 
 # FIELD
 const OctaHEALPixField{T, N} = Field{T, N, Architecture, Grid} where {Architecture, Grid<:OctaHEALPixGrid}
-grid_type(::Type{<:OctaHEALPixField}) = OctaHEALPixGrid
+
+# define grid_type (i) without T, N, (ii) with T, (iii) with T, N but not with <:?Field
+# to not have precendence over grid_type(::Type{Field{...})
+grid_type(::Type{OctaHEALPixField}) = OctaHEALPixGrid
+grid_type(::Type{OctaHEALPixField{T}}) where T = OctaHEALPixGrid
+grid_type(::Type{OctaHEALPixField{T, N}}) where {T, N} = OctaHEALPixGrid
+
 Base.show(io::IO, F::Type{<:OctaHEALPixField{T, N}}) where {T, N} = print(io, "OctaHEALPixField{$T, $N}")
 
 ## SIZE

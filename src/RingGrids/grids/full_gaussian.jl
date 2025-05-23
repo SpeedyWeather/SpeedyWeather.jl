@@ -16,7 +16,13 @@ nonparametric_type(::Type{<:FullGaussianGrid}) = FullGaussianGrid
 
 # FIELD
 const FullGaussianField{T, N} = Field{T, N, Architecture, Grid} where {Architecture, Grid<:FullGaussianGrid}
-grid_type(::Type{<:FullGaussianField}) = FullGaussianGrid
+
+# define grid_type (i) without T, N, (ii) with T, (iii) with T, N but not with <:FullGaussianField
+# to not have precendence over grid_type(::Type{Field{...})
+grid_type(::Type{FullGaussianField}) = FullGaussianGrid
+grid_type(::Type{FullGaussianField{T}}) where T = FullGaussianGrid
+grid_type(::Type{FullGaussianField{T, N}}) where {T, N} = FullGaussianGrid
+
 Base.show(io::IO, F::Type{<:FullGaussianField{T, N}}) where {T, N} = print(io, "FullGaussianField{$T, $N}")
 
 # SIZE

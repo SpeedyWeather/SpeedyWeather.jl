@@ -92,7 +92,7 @@ function timestep!(
     end
 
     # set other layers to the same temperature?
-    # for k in eachgrid(soil_temperature)
+    # for k in eachlayer(soil_temperature)
     #     if k != k0
     #         soil_temperature[:, k] .= soil_temperature[:, k0]
     #     end

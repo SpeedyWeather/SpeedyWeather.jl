@@ -21,12 +21,19 @@ struct OctahedralGaussianGrid{A, V} <: AbstractReducedGrid{A}
     rings::V                        # precomputed ring indices
 end
 
+# TYPES
 nonparametric_type(::Type{<:OctahedralGaussianGrid}) = OctahedralGaussianGrid
 full_grid_type(::Type{<:OctahedralGaussianGrid}) = FullGaussianGrid
 
 # FIELD
 const OctahedralGaussianField{T, N} = Field{T, N, Architecture, Grid} where {Architecture, Grid<:OctahedralGaussianGrid}
-grid_type(::Type{<:OctahedralGaussianField}) = OctahedralGaussianGrid
+
+# define grid_type (i) without T, N, (ii) with T, (iii) with T, N but not with <:?Field
+# to not have precendence over grid_type(::Type{Field{...})
+grid_type(::Type{OctahedralGaussianField}) = OctahedralGaussianGrid
+grid_type(::Type{OctahedralGaussianField{T}}) where T = OctahedralGaussianGrid
+grid_type(::Type{OctahedralGaussianField{T, N}}) where {T, N} = OctahedralGaussianGrid
+
 Base.show(io::IO, F::Type{<:OctahedralGaussianField{T, N}}) where {T, N} =
     print(io, "OctahedralGaussianField{$T, $N}")
 

@@ -20,7 +20,13 @@ nonparametric_type(::Type{<:FullClenshawGrid}) = FullClenshawGrid
 
 # FIELD
 const FullClenshawField{T, N} = Field{T, N, Architecture, Grid} where {Architecture, Grid<:FullClenshawGrid}
-grid_type(::Type{<:FullClenshawField}) = FullClenshawGrid
+
+# define grid_type (i) without T, N, (ii) with T, (iii) with T, N but not with <:?Field
+# to not have precendence over grid_type(::Type{Field{...})
+grid_type(::Type{FullClenshawField}) = FullClenshawGrid
+grid_type(::Type{FullClenshawField{T}}) where T = FullClenshawGrid
+grid_type(::Type{FullClenshawField{T, N}}) where {T, N} = FullClenshawGrid
+
 Base.show(io::IO, F::Type{<:FullClenshawField{T, N}}) where {T, N} = print(io, "FullClenshawField{$T, $N}")
 
 # SIZE

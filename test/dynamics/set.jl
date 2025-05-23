@@ -124,8 +124,8 @@
 
     # functions 
     (; londs, latds, σ_levels_full) = model.geometry
-    for k in SpeedyWeather.RingGrids.eachgrid(A)
-        for ij in SpeedyWeather.RingGrids.eachgridpoint(A)
+    for k in RingGrids.eachlayer(A)
+        for ij in RingGrids.eachgridpoint(A)
             A[ij,k] = f(londs[ij], latds[ij], σ_levels_full[k])
         end 
     end 

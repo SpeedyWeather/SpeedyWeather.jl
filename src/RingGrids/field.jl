@@ -20,11 +20,20 @@ const Field4D = Field{T, 3} where T
 Field(grid::AbstractGrid, k...) = zeros(grid, k...)
 Field(::Type{T}, grid::AbstractGrid, k...) where T = zeros(T, grid, k...)
 
+# TYPES
+nonparametric_type(::Type{<:Field}) = Field
 grid_type(field::AbstractField) = grid_type(typeof(field))
+grid_type(::Type{Field{T, N, A, G}}) where {T, N, A, G} = G
+field_type(field::AbstractField) = typeof(field)
+field_type(::Type{F}) where {F<:AbstractField} = F
+field_type(grid::AbstractGrid) = field_type(typeof(grid))
+field_type(::Type{G}) where {G<:AbstractGrid} = Field{T, N, A, G} where {T, N, A}
+full_grid_type(field::AbstractField) = full_grid_type(typeof(field.grid))
+full_grid_type(::Type{F}) where {F<:AbstractField} = full_grid_type(grid_type(F))
 array_type(::Type{Field{T, N, A, G}}) where {T, N, A, G} = A
 
 # test number of horizontal grid points matches
-data_matches_grid(data, grid) = size(data, 1) == get_npoints(grid)
+data_matches_grid(data::AbstractArray, grid::AbstractGrid) = size(data, 1) == get_npoints(grid)
 
 function Base.DimensionMismatch(data::AbstractArray, grid::AbstractGrid)
     Grid_ = nonparametric_type(grid)
@@ -51,7 +60,7 @@ end
 
 # TYPE: reduced (fewer points around poles) or full (constant number of longitudes)
 isreduced(::Type{<:AbstractField}) = true
-isreduced(::Type{<:AbstractField{T, N, A, <:AbstractFullGrid}}) where {T, N, A} = false
+isreduced(::Type{<:AbstractFullField}) = false
 isreduced(field::AbstractField) = isreduced(typeof(field))
 
 # SIZE
@@ -82,6 +91,11 @@ Base.fill!(field::AbstractField, x) = fill!(field.data, x)
 @inline Base.getindex(field::AbstractField, col::Colon, k...) = Field(field.data[col, k...], field.grid)
 @inline eachring(field::AbstractField) = eachring(field.grid)
 
+function eachring(field1::AbstractField, fields::AbstractField...; horizontal_only=true, kwargs...)
+    fields_match(field1, fields...; horizontal_only, kwargs...) || throw(DimensionMismatch(field1, fields...))
+    return eachring(field1)
+end
+
 # ITERATORS
 
 """$(TYPEDSIGNATURES)
@@ -95,46 +109,58 @@ e.g. the vertical layer (or a time dimension, etc). To be used like
 @inline eachlayer(field::AbstractField) = CartesianIndices(size(field)[2:end])
 
 # several arguments to check for matching grids
-function eachlayer(field1::AbstractField, fields::AbstractField...; kwargs...)
-    fields_match(field1, fields...; kwargs...) || throw(DimensionMismatch(field1, fields...))
+function eachlayer(field1::AbstractField, fields::AbstractField...; vertical_only=true, kwargs...)
+    fields_match(field1, fields...; vertical_only, kwargs...) || throw(DimensionMismatch(field1, fields...))
     return eachlayer(field1)
 end
 
-# ## CONSTRUCTORS
-# # if no nlat_half provided calculate it
-# (::Type{Grid})(M::AbstractArray; input_as=Vector) where Grid<:AbstractGridArray = Grid(M, input_as)
+eachgridpoint(field::AbstractField) = eachgridpoint(field.grid)
+function eachgridpoint(field1::AbstractField, fields::AbstractField...; horizontal_only=true, kwargs...)
+    fields_match(field1, fields...; horizontal_only, kwargs...) || throw(DimensionMismatch(field1, fields...))
+    return eachgridpoint(field1)
+end
 
-# function (::Type{Grid})(data::AbstractArray, input_as::Type{Vector}) where Grid<:AbstractGridArray
-#     npoints2D = size(data, 1)                   # from 1st dim of data
-#     nlat_half = get_nlat_half(Grid, npoints2D)  # get nlat_half of Grid
-#     return Grid(data, nlat_half)
-# end
+## CONSTRUCTORS
 
-# function (::Type{Grid})(data::AbstractArray, input_as::Type{Matrix})  where Grid<:AbstractGridArray
-#     error("Only full grids can be created from matrix input")
-# end
+# from data array
+# pass keyword `input_as` on to positional argument for dispatch
+(::Type{F})(data::AbstractArray; input_as=Vector) where F<:AbstractField = F(data, input_as)
 
+# if no nlat_half provided calculate it
+function (::Type{F})(data::AbstractArray, input_as::Type{Vector}) where F<:AbstractField
+    npoints = size(data, 1)                     # from 1st dim of data
+    Grid = grid_type(F)                         # from type of field
+    nlat_half = get_nlat_half(Grid, npoints)    # get nlat_half of Grid
+    grid = Grid(nlat_half)
+    return Field(data, grid)
+end
 
+# reduced fields cannot be represented as matrix
+function (::Type{F})(data::AbstractArray, input_as::Type{Matrix})  where F<:AbstractReducedField
+    error("Only full fields can be created from a Matrix.")
+end
 
-# ## CONVERSION
-# # convert an AbstractMatrix to the full grids, and vice versa
-# """
-# ($TYPEDSIGNATURES)
-# Initialize an instance of the grid from an Array. For keyword argument `input_as=Vector` (default)
-# the leading dimension is interpreted as a flat vector of all horizontal entries in one layer.
-# For `input_as==Matrx` the first two leading dimensions are interpreted as longitute and latitude.
-# This is only possible for full grids that are a subtype of `AbstractFullGridArray`.
-# """
-# (Grid::Type{<:AbstractFullGridArray})(M::AbstractArray; input_as=Vector) = Grid(M, input_as)
+# full fields just need a reshape
+function (::Type{F})(data::AbstractArray, input_as::Type{Matrix}) where F<:AbstractFullField
+    # flatten the two horizontal dimensions into one, identical to vec(data) for data <: AbstractMatrix
+    data_flat = reshape(data, :, size(data)[3:end]...)
+    return F(data_flat, input_as=Vector)
+end 
 
-# function (Grid::Type{<:AbstractFullGridArray})(M::AbstractArray, input_as::Type{Matrix})
-#     # flatten the two horizontal dimensions into one, identical to vec(M) for M <: AbstractMatrix
-#     M_flat = reshape(M, :, size(M)[3:end]...)
-#     Grid(M_flat)
-# end 
+# CONVERSION to Array
 
-# Base.Array(grid::AbstractFullGridArray) = Array(reshape(grid.data, :, get_nlat(grid), size(grid.data)[2:end]...))
-# Base.Matrix(grid::AbstractFullGridArray) = Array(grid)
+# pass `as` keyword on to positional argument for dispatch
+Base.Array(field::AbstractField; as=Vector) = Array(field, as)
+
+# all horizontal data is stored as unravelled into a Vector
+Base.Array(field::AbstractField, as::Type{Vector}) = Array(field.data)
+
+# full grids can be reshaped into a matrix, reduced grids cannot
+Base.Array(field::AbstractFullField, as::Type{Matrix}) = Array(reshape(field.data, :, get_nlat(field), size(field)[2:end]...))
+Base.Array(field::AbstractReducedField, as::Type{Matrix}) = error("$(typeof(field)), i.e. data on a reduced grid, cannot be converted to a Matrix.")
+
+Base.Vector(field::AbstractField2D) = Array(field, as=Vector)
+Base.Matrix(field::AbstractField2D) = Array(field, as=Matrix)
 
 for f in (:zeros, :ones, :rand, :randn)
     @eval begin
@@ -177,8 +203,8 @@ for f in (:zeros, :ones, :rand, :randn)
             k::Integer...;
             architecture=DEFAULT_ARCHITECTURE(),
         ) where {F<:AbstractField}
-            Grid_ = grid_type(F)
-            grid = nonparametric_type(Grid_)(nlat_half, architecture)
+            Grid = grid_type(F)
+            grid = nonparametric_type(Grid)(nlat_half, architecture)
             data = array_type(architecture)($f(get_npoints(grid), k...))
             return Field(data, grid)
         end
@@ -189,8 +215,8 @@ for f in (:zeros, :ones, :rand, :randn)
             k::Integer...;
             architecture=DEFAULT_ARCHITECTURE(),
         ) where {F<:AbstractField{T}} where T
-            Grid_ = grid_type(F)
-            grid = nonparametric_type(Grid_)(nlat_half, architecture)
+            Grid = grid_type(F)
+            grid = nonparametric_type(Grid)(nlat_half, architecture)
             data = array_type(architecture)($f(T, get_npoints(grid), k...))
             return Field(data, grid)
         end
@@ -352,7 +378,7 @@ struct FieldStyle{N, ArrayType, Grid} <: Broadcast.AbstractArrayStyle{N} end
 
 # define broadcast style for Field from its parameters
 Base.BroadcastStyle(::Type{F}) where {F<:AbstractField{T, N, ArrayType, Grid}} where {T, N, ArrayType, Grid} =
-    FieldStyle{N, ArrayType, Grid}()
+    FieldStyle{N, nonparametric_type(ArrayType), Grid}()
 
 # allocation for broadcasting via similar, reusing grid from the first field of the broadcast arguments
 # e.g. field1 + field2 creates a new field that share the grid of field1
@@ -392,7 +418,6 @@ function Base.similar(bc::Broadcasted{FieldGPUStyle{N, ArrayType, Grid}}, ::Type
         end
     end
 end
-
 
 # ::Val{0} for broadcasting with 0-dimensional, ::Val{1} for broadcasting with vectors, etc
 # when there's a dimension mismatch always choose the larger dimension
