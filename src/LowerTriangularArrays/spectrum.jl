@@ -90,4 +90,4 @@ Base.:(==)(s1::Spectrum, s2::Spectrum) =
 
 Base.show(io::IO, s::Spectrum) = print(io, "Spectrum(T$(s.mmax-1): (lmax=$(s.lmax), mmax=$(s.mmax)) on $(typeof(s.architecture)))")
 
-eachorder(s::Spectrum) = s.orders
+eachorder(s::Spectrum) = s.lm_orders
