@@ -155,27 +155,27 @@ end
     end
 end
 
-@testset "Grid generators: ones" begin
+@testset "Field generators: ones" begin
     for NF in (Float32, Float64)
-        for G in (  FullClenshawGrid,
-                    FullGaussianGrid,
-                    OctahedralGaussianGrid,
-                    OctahedralClenshawGrid,
-                    OctaminimalGaussianGrid,
-                    HEALPixGrid,
-                    OctaHEALPixGrid,
-                    FullHEALPixGrid,
-                    FullOctaHEALPixGrid
+        for F in (  FullClenshawField,
+                    FullGaussianField,
+                    OctahedralGaussianField,
+                    OctahedralClenshawField,
+                    OctaminimalGaussianField,
+                    HEALPixField,
+                    OctaHEALPixField,
+                    FullHEALPixField,
+                    FullOctaHEALPixField,
                     )
 
             n = 4      # resolution parameter nlat_half
-            G1 = ones(G, n)
-            @test all(G1 .== 1)
-            @test eltype(G1) == Float64
+            f1 = ones(F, n)
+            @test all(f1 .== 1)
+            @test eltype(f1) == Float64
 
-            G2 = ones(G{NF}, n)
-            @test all(G2 .== 1)
-            @test eltype(G2) == NF
+            f2 = ones(F{NF}, n)
+            @test all(f2 .== 1)
+            @test eltype(f2) == NF
         end
     end
 end
@@ -211,19 +211,18 @@ end
 
 @testset "Field generators: undef" begin
     for NF in (Float32, Float64)
-        for G in (  FullClenshawGrid,
-                    FullGaussianGrid,
-                    OctahedralGaussianGrid,
-                    OctahedralClenshawGrid,
-                    OctaminimalGaussianGrid,
-                    HEALPixGrid,
-                    OctaHEALPixGrid,
-                    FullHEALPixGrid,
-                    FullOctaHEALPixGrid
+        for F in (  FullClenshawField,
+                    FullGaussianField,
+                    OctahedralGaussianField,
+                    OctahedralClenshawField,
+                    OctaminimalGaussianField,
+                    HEALPixField,
+                    OctaHEALPixField,
+                    FullHEALPixField,
+                    FullOctaHEALPixField,
                     )
 
             n = 4      # resolution parameter nlat_half
-            F = RingGrids.field_type(G)
             field1 = F(undef, n)
             @test eltype(field1) == Float64
             
@@ -381,18 +380,19 @@ end
 
         # promote types across grids
         @test all(ones(F{Float16}, n) + ones(F{Float32}, n) .=== 2f0)
-        # @test all(ones(G{Float16}, n) + ones(G{Float64}, n) .=== 2.0)
-        # @test all(ones(G{Float32}, n) + ones(G{Float64}, n) .=== 2.0)
+        @test all(ones(F{Float16}, n) + ones(F{Float64}, n) .=== 2.0)
+        @test all(ones(F{Float32}, n) + ones(F{Float64}, n) .=== 2.0)
 
-        # # promote types across grids
-        # @test all(ones(G{Float16}, n) - ones(G{Float32}, n) .=== 0f0)
-        # @test all(ones(G{Float16}, n) - ones(G{Float64}, n) .=== 0.0)
-        # @test all(ones(G{Float32}, n) - ones(G{Float64}, n) .=== 0.0)
+        # promote types across grids
+        @test all(ones(F{Float16}, n) - ones(F{Float32}, n) .=== 0f0)
+        @test all(ones(F{Float16}, n) - ones(F{Float64}, n) .=== 0.0)
+        @test all(ones(F{Float32}, n) - ones(F{Float64}, n) .=== 0.0)
 
-        # # promote types across grids
-        # @test all(ones(G{Float16}, n) .* ones(G{Float32}, n) .=== 1f0)
-        # @test all(ones(G{Float16}, n) .* ones(G{Float64}, n) .=== 1.0)
-        # @test all(ones(G{Float32}, n) .* ones(G{Float64}, n) .=== 1.0)
+        # promote types across grids
+        # f3 = ones(F{Float16}, n) .* ones(F{Float32}, n)
+        @test all((ones(F{Float16}, n) .* ones(F{Float32}, n)) .=== 1f0)
+        # @test all(ones(F{Float16}, n) .* ones(F{Float64}, n) .=== 1.0)
+        # @test all(ones(F{Float32}, n) .* ones(F{Float64}, n) .=== 1.0)
 
         # # promote types across grids
         # @test all(ones(G{Float16}, n) ./ ones(G{Float32}, n) .=== 1f0)

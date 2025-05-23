@@ -287,8 +287,8 @@ function (::Type{F})(
     nlat_half::Integer,
     k::Integer...,
 ) where {F<:AbstractField}
-    Grid_ = grid_type(F)
-    grid = nonparametric_type(Grid_)(nlat_half, DEFAULT_ARCHITECTURE())
+    Grid = grid_type(F)
+    grid = nonparametric_type(Grid)(nlat_half, DEFAULT_ARCHITECTURE())
     data = Array{DEFAULT_NF}(undef, get_npoints(grid), k...)
     return Field(data, grid)
 end
@@ -299,8 +299,8 @@ function (::Type{F})(
     nlat_half::Integer,
     k::Integer...,
 ) where {F<:AbstractField{T}} where T
-    Grid_ = grid_type(F)
-    grid = nonparametric_type(Grid_)(nlat_half, DEFAULT_ARCHITECTURE())
+    Grid = grid_type(F)
+    grid = nonparametric_type(Grid)(nlat_half, DEFAULT_ARCHITECTURE())
     data = Array{T}(undef, get_npoints(grid), k...)
     return Field(data, grid)
 end
@@ -311,8 +311,8 @@ function (::Type{F})(
     nlat_half::Integer,
     k::Integer...,
 ) where {F<:AbstractField{T, N}} where {T, N}
-    Grid_ = grid_type(F)
-    grid = nonparametric_type(Grid_)(nlat_half, DEFAULT_ARCHITECTURE())
+    Grid = grid_type(F)
+    grid = nonparametric_type(Grid)(nlat_half, DEFAULT_ARCHITECTURE())
     data = Array{T}(undef, get_npoints(grid), k...)
     return Field(data, grid)
 end
@@ -323,8 +323,8 @@ function (::Type{F})(
     nlat_half::Integer,
     k::Integer...,
 ) where {F<:AbstractField{T, N, ArrayType}} where {T, N, ArrayType}
-    Grid_ = grid_type(F)
-    grid = nonparametric_type(Grid_)(nlat_half, DEFAULT_ARCHITECTURE())
+    Grid = grid_type(F)
+    grid = nonparametric_type(Grid)(nlat_half, DEFAULT_ARCHITECTURE())
     data = nonparametric_type(ArrayType){T}(undef, get_npoints(grid), k...)
     return Field(data, grid)
 end
@@ -397,12 +397,6 @@ function Base.similar(bc::Broadcasted{FieldStyle{N, Grid}}, ::Type{T}) where {N,
         end
     end
 end
-
-# allocation for broadcasting, create a new Grid with undef of type/number format T
-function Base.similar(bc::Broadcasted{AbstractGridArrayStyle{N, Grid}}, ::Type{T}) where {N, Grid, T}
-    return Grid(Array{T}(undef, size(bc)))
-end
-
 
 # ::Val{0} for broadcasting with 0-dimensional, ::Val{1} for broadcasting with vectors, etc
 # when there's a dimension mismatch always choose the larger dimension
