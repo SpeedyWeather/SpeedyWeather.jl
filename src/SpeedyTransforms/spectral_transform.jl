@@ -204,14 +204,14 @@ function SpectralTransform(
     # PRECOMPUTE indices for GPU kernels
     # lm is the single (flat) index 
     # i, j are the matrix indices 
-    LM = LowerTriangularMatrices.triangle_number(lmax+1)
+    LM = LowerTriangularArrays.triangle_number(lmax+1)
     # LM might be one element larger than the number of saved elements in case one_more_degree==true
     LM = lmax > mmax ? LM - 1 : LM 
     
     lm2l_indices = zeros(Int, LM)
     lm2m_indices = zeros(Int, LM)
     for lm in 1:LM
-        lm2ij_indices = LowerTriangularMatrices.k2ij(lm, lmax+1)
+        lm2ij_indices = LowerTriangularArrays.k2ij(lm, lmax+1)
         lm2l_indices[lm] = lm2ij_indices[1]
         lm2m_indices[lm] = lm2ij_indices[2]
     end 

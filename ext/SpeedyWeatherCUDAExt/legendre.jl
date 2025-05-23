@@ -1,5 +1,5 @@
 # convert i, j indices of a matrix (here 0-based l,m though...) to a single 1-based running index
-import SpeedyWeather.LowerTriangularMatrices: ij2k, get_lm_range, get_2lm_range
+import SpeedyWeather.LowerTriangularArrays: ij2k, get_lm_range, get_2lm_range
  
 # (inverse) legendre transform kernel, called from _legendre!
 function inverse_legendre_kernel!(
