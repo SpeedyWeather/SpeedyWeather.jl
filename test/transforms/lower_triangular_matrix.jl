@@ -838,8 +838,9 @@ end
 
 @testset "Spectrum" begin 
     # truncation vs lmax, mmax constructors 
-    @test Spectrum(5,5) == Spectrum(4) 
-    @test Spectrum(5,5) == Spectrum(trunc=4)
+    @test Spectrum(5,5) == Spectrum(4, one_degree_more=false) 
+    @test Spectrum(5,5) == Spectrum(trunc=4, one_degree_more=false)
+    @test Spectrum(6,5) == Spectrum(trunc=4, one_degree_more=true) 
 
     s = Spectrum(5,5)
     L = rand(Float32, s)
