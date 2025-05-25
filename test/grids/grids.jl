@@ -131,6 +131,7 @@ end
             @test F1 == F8
 
             @test all(F1 .== F2)
+            @test all(F2 .== F1)
             @test all(F1 .== F3)
             @test all(F1 .== F4)
             @test all(F1 .== F5)

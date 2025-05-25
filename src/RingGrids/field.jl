@@ -397,7 +397,10 @@ find_field(::Any, rest) = find_field(rest)
 # 2 .+ field1 creates a new field that share the grid of field1
 function Base.similar(bc::Broadcasted{FieldStyle{N, Grid}}, ::Type{T}) where {N, Grid, T}
     field = find_field(bc)
-    return Field(similar(field.data, T), field.grid)
+    ArrayType_ = nonparametric_type(typeof(field.data))
+    new_data = ArrayType_{T}(undef, size(bc))
+    old_grid = field.grid
+    return Field(new_data, old_grid)
 end
 
 # ::Val{0} for broadcasting with 0-dimensional, ::Val{1} for broadcasting with vectors, etc
@@ -422,7 +425,10 @@ end
 
 function Base.similar(bc::Broadcasted{FieldGPUStyle{N, Grid}}, ::Type{T}) where {N, Grid, T}
     field = find_field(bc)
-    return Field(similar(field.data, T), field.grid)
+    ArrayType_ = nonparametric_type(typeof(field.data))
+    new_data = ArrayType_{T}(undef, size(bc))
+    old_grid = field.grid
+    return Field(new_data, old_grid)
 end
 
 # ::Val{0} for broadcasting with 0-dimensional, ::Val{1} for broadcasting with vectors, etc
