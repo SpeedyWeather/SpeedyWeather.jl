@@ -299,7 +299,7 @@ end
                 FullOctaHEALPixGrid,
                 )
 
-        @testset for n in [8, 16, 24, 32]      # resolution parameter nlat_half
+        for n in [8, 16, 24, 32]      # resolution parameter nlat_half
             grid = G(n)
 
             # precompute indices and boundscheck
@@ -392,177 +392,176 @@ end
         # promote types across grids
         # f3 = ones(F{Float16}, n) .* ones(F{Float32}, n)
         @test all((ones(F{Float16}, n) .* ones(F{Float32}, n)) .=== 1f0)
-        # @test all(ones(F{Float16}, n) .* ones(F{Float64}, n) .=== 1.0)
-        # @test all(ones(F{Float32}, n) .* ones(F{Float64}, n) .=== 1.0)
+        @test all(ones(F{Float16}, n) .* ones(F{Float64}, n) .=== 1.0)
+        @test all(ones(F{Float32}, n) .* ones(F{Float64}, n) .=== 1.0)
 
-        # # promote types across grids
-        # @test all(ones(G{Float16}, n) ./ ones(G{Float32}, n) .=== 1f0)
-        # @test all(ones(G{Float16}, n) ./ ones(G{Float64}, n) .=== 1.0)
-        # @test all(ones(G{Float32}, n) ./ ones(G{Float64}, n) .=== 1.0)
+        # promote types across grids
+        @test all(ones(F{Float16}, n) ./ ones(F{Float32}, n) .=== 1f0)
+        @test all(ones(F{Float16}, n) ./ ones(F{Float64}, n) .=== 1.0)
+        @test all(ones(F{Float32}, n) ./ ones(F{Float64}, n) .=== 1.0)
 
-        # # dimension mismatches, but still broadcasting
-        # g1 = rand(G, n)
-        # g2 = rand(G, n, 1)
-        # g2_2 = rand(G, n, 2)
-        # g3 = rand(G, n, 1, 1)
+        # dimension mismatches, but still broadcasting
+        field1 = rand(F, n)
+        field2 = rand(F, n, 1)
+        field2_2 = rand(F, n, 2)
+        field3 = rand(F, n, 1, 1)
 
-        # @test (g1 .* g2)[:,1] == (g1 .* g2[:,1])
-        # @test (g2 .* g1)[:,1] == (g1 .* g2[:,1])
-        # @test (g2 .* g3)[:,1,1] == (g2[:,1] .* g3[:,1,1])
-        # @test (g1 .* g2_2)[:,1] == (g1 .* g2_2[:,1])
-        # @test (g1 .* g2_2)[:,2] == (g1 .* g2_2[:,2])
+        @test (field1 .* field2)[:,1]   == (field1 .*      field2[:,1])
+        @test (field2 .* field1)[:,1]   == (field1 .*      field2[:,1])
+        @test (field2 .* field3)[:,1,1] == (field2[:,1] .* field3[:,1,1])
+        @test (field1 .* field2_2)[:,1] == (field1 .*      field2_2[:,1])
+        @test (field1 .* field2_2)[:,2] == (field1 .*      field2_2[:,2])
     end 
 end
 
 @testset "N-dimensional indexing" begin
     m, n, p = 2, 3, 4
-    @testset for G in ( FullClenshawGrid,
-                        FullGaussianGrid,
-                        OctahedralGaussianGrid,
-                        OctahedralClenshawGrid,
-                        OctaminimalGaussianGrid,
-                        HEALPixGrid,
-                        OctaHEALPixGrid,
-                        FullHEALPixGrid,
-                        FullOctaHEALPixGrid,
+    @testset for F in ( FullClenshawField,
+                        FullGaussianField,
+                        OctahedralGaussianField,
+                        OctahedralClenshawField,
+                        OctaminimalGaussianField,
+                        HEALPixField,
+                        OctaHEALPixField,
+                        FullHEALPixField,
+                        FullOctaHEALPixField,
                         )
 
-        grid = rand(G, m, n, p)
-        @test grid[:, 1, 1] isa G
-        @test grid[1] == grid.data[1]
-        @test grid[1, 1, 1] == grid.data[1, 1, 1]
+        field = rand(F, m, n, p)
+        @test field[:, 1, 1] isa F
+        @test field[1] == field.data[1]
+        @test field[1, 1, 1] == field.data[1, 1, 1]
 
-        @test grid[1:2, 1:2, 1:2] == grid.data[1:2, 1:2, 1:2]
-        @test grid[1, 1, :] == grid.data[1, 1, :]
-
-        @test SpeedyWeather.RingGrids.nonparametric_type(typeof(grid[:,1:2,1:2])) <: RingGrids.nonparametric_type(G)
-        @test grid[:, 1:2, 1:2].data == grid.data[:, 1:2, 1:2]
+        @test field[1:2, 1:2, 1:2] == field.data[1:2, 1:2, 1:2]
+        @test field[1, 1, :] == field.data[1, 1, :]
+        @test field[:, 1:2, 1:2].data == field.data[:, 1:2, 1:2]
 
         idx = CartesianIndex((1, 2, 3))
-        @test grid[idx] == grid.data[idx]
+        @test field[idx] == field.data[idx]
         
         ids = CartesianIndices((m, n, p))
-        @test grid[ids] == grid.data[ids]
-        @test grid[ids] isa Array
+        @test field[ids] == field.data[ids]
+        @test field[ids] isa Array
     end
 end
 
 @testset "Loop indexing" begin
     n = 2
-    @testset for G in ( FullClenshawArray,
-                        FullGaussianArray,
-                        OctahedralGaussianArray,
-                        OctahedralClenshawArray,
-                        OctaminimalGaussianArray,
-                        HEALPixArray,
-                        OctaHEALPixArray,
-                        FullHEALPixArray,
-                        FullOctaHEALPixArray,
+    @testset for F in ( FullClenshawField,
+                        FullGaussianField,
+                        OctahedralGaussianField,
+                        OctahedralClenshawField,
+                        OctaminimalGaussianField,
+                        HEALPixField,
+                        OctaHEALPixField,
+                        FullHEALPixField,
+                        FullOctaHEALPixField,
                         )
 
         for s in ((n,), (n, n), (n, n, n), (n, n, n, n))
-            grid = zeros(G, s...)
+            field = zeros(F, s...)
 
-            for k in eachlayer(grid)
-                for (j, ring) in enumerate(eachring(grid))
+            for k in eachlayer(field)
+                for (j, ring) in enumerate(eachring(field))
                     for ij in ring
-                        grid[ij, k] = 1
+                        field[ij, k] = 1
                     end
                 end
             end
-            @test all(grid .== 1)
+            @test all(field .== 1)
         end
     end
 end
 
 # needed when extension is not loaded (manual testing)
-# RingGrids.nonparametric_type(::Type{<:JLArray}) = JLArray
+RingGrids.nonparametric_type(::Type{<:JLArray}) = JLArray
 
 @testset "AbstractField: GPU (JLArrays)" begin 
     NF = Float32
-    @testset for Grid in ( 
-        FullClenshawArray,
-        # FullGaussianArray,            # don't test all for CI speedup
-        OctahedralGaussianArray,
-        # OctahedralClenshawArray,
-        # OctaminimalGaussianArray,
-        HEALPixArray,
-        # OctaHEALPixArray,
-        # FullHEALPixArray,
-        # FullOctaHEALPixArray,
+    @testset for F in ( 
+        FullClenshawField,
+        # FullGaussianField,            # don't test all for CI speedup
+        OctahedralGaussianField,
+        # OctahedralClenshawField,
+        # OctaminimalGaussianField,
+        HEALPixField,
+        # OctaHEALPixField,
+        # FullHEALPixField,
+        # FullOctaHEALPixField,
     )
         s = (2, 3, 4)
         ndims = length(s)
 
-        G_cpu = randn(Grid{NF}, s...)
+        field_cpu = randn(F{NF}, s...)
 
         # constructors/adapt
-        G = adapt(JLArray, G_cpu)
-        G2 = Grid(adapt(JLArray, G_cpu.data))
-        @test G == G2
+        field = adapt(JLArray, field_cpu)
+        field2 = Field(adapt(JLArray, field_cpu.data), field.grid)
+        @test field == field2
 
         # broadcasting doesn't escape
-        @test G  + G isa Grid{NF, ndims, JLArray{NF, ndims}}
-        @test G .+ G isa Grid{NF, ndims, JLArray{NF, ndims}}
-        @test G_cpu  + G_cpu isa Grid{NF, ndims, Array{NF, ndims}}
-        @test G_cpu .+ G_cpu isa Grid{NF, ndims, Array{NF, ndims}}
+        @test field  + field isa Field{NF, ndims, JLArray{NF, ndims}}
+        @test field .+ field isa Field{NF, ndims, JLArray{NF, ndims}}
+        @test field_cpu  + field_cpu isa Field{NF, ndims, Array{NF, ndims}}
+        @test field_cpu .+ field_cpu isa Field{NF, ndims, Array{NF, ndims}}
 
         # getindex 
-        @test G[1, :, :] isa JLArray{NF, 2}
-        @test G[:, 1, 1] isa Grid{NF, 1, JLArray{NF, 1}}
-        for k in eachlayer(G)
-            for (j, ring) in enumerate(eachring(G))
-                @test G[ring, k] == adapt(JLArray, G_cpu[ring, k])
-                @test Array(G[ring, k]) == G_cpu[ring, k]
+        @test field[1, :, :] isa JLArray{NF, 2}
+        @test field[:, 1, 1] isa Field{NF, 1, JLArray{NF, 1}}
+        for k in eachlayer(field)
+            for (j, ring) in enumerate(eachring(field))
+                @test field[ring, k] == adapt(JLArray, field_cpu[ring, k])
+                @test Array(field[ring, k]) == field_cpu[ring, k]
             end
         end
 
         # setindex! 
-        G_test = JLArray(rand(NF,s[3]))
-        G[1, 1, :] .= G_test                # with .
-        @test G[1, 1, :] == G_test
+        v = JLArray(rand(NF, s[3]))
+        field[1, 1, :] .= v                # with .
+        @test field[1, 1, :] == v
 
-        G_test = JLArray(rand(NF,s[3]))
-        G[1, 1, :] = G_test                 # without .
-        @test G[1, 1, :] == G_test
+        v = JLArray(rand(NF, s[3]))
+        field[2, 1, :] = v                 # without .
+        @test field[2, 1, :] == v
 
-        # with other grid {Array}
-        G_test = rand(Grid, s[1])
-        G[:, 1, 1] = G_test                 # conversion to float64 -> float32
-        @test Array(G[:, 1, 1].data) ≈ G_test
+        # with other field {Array}
+        v = rand(F, s[1])
+        field[:, 1, 1] = v                 # conversion to float64 -> float32
+        @test Array(field[:, 1, 1].data) ≈ v
 
-        # with other grid {JLArray}
-        G_test = adapt(JLArray,rand(Grid, s[1]))
-        G[:, 1, 1] = G_test
-        @test G[:, 1, 1].data ≈ G_test.data
+        # with other field {JLArray}
+        v = adapt(JLArray, rand(F, s[1]))
+        field[:, 1, 2] = v
+        @test field[:, 1, 2].data ≈ v.data
 
         # fill 
-        fill!(G, 2)
-        @test all(G .== 2)
+        fill!(field, 2)
+        @test all(field .== 2)
     end
 end
 
 @testset "Zonal mean" begin
     @testset for NF in (Int32, Int64, Float16, Float32, Float64)
         @testset for Grid in ( 
-            FullClenshawArray,
-            FullGaussianArray,
-            OctahedralGaussianArray,
-            OctahedralClenshawArray,
-            OctaminimalGaussianArray,
-            HEALPixArray,
-            OctaHEALPixArray,
-            FullHEALPixArray,
-            FullOctaHEALPixArray,
+            FullClenshawGrid,
+            FullGaussianGrid,
+            OctahedralGaussianGrid,
+            OctahedralClenshawGrid,
+            OctaminimalGaussianGrid,
+            HEALPixGrid,
+            OctaHEALPixGrid,
+            FullHEALPixGrid,
+            FullOctaHEALPixGrid,
         )
             nlat_half = 4
-            npoints = RingGrids.get_npoints(Grid, nlat_half)
-            grid = Grid{NF}(1:npoints, nlat_half)
+            grid = Grid(nlat_half)
+            npoints = RingGrids.get_npoints(grid)
+            field = Field(1:npoints, grid)
         
-            zm = zonal_mean(grid)
+            zm = zonal_mean(field)
 
-            for (j, m) in enumerate(zonal_mean(grid))
-                @test m == sum(RingGrids.eachring(grid)[j]) / RingGrids.get_nlon_per_ring(grid, j)
+            for (j, m) in enumerate(zonal_mean(field))
+                @test m == sum(RingGrids.eachring(field)[j]) / RingGrids.get_nlon_per_ring(grid, j)
             end
         end
     end
