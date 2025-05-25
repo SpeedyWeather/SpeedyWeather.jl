@@ -384,18 +384,20 @@ struct FieldStyle{N, Grid} <: Broadcast.AbstractArrayStyle{N} end
 Base.BroadcastStyle(::Type{F}) where {F<:AbstractField{T, N, ArrayType, Grid}} where {T, N, ArrayType, Grid} =
     FieldStyle{N, nonparametric_type(Grid)}()
 
+# find a field within Broadcasted to reuse its grid
+find_field(bc::Base.Broadcast.Broadcasted) = find_field(bc.args) 
+find_field(args::Tuple) = find_field(find_field(args[1]), Base.tail(args)) 
+find_field(x) = x 
+find_field(::Tuple{}) = nothing 
+find_field(a::AbstractField, rest) = a 
+find_field(::Any, rest) = find_field(rest) 
+
 # allocation for broadcasting via similar, reusing grid from the first field of the broadcast arguments
 # e.g. field1 + field2 creates a new field that share the grid of field1
 # 2 .+ field1 creates a new field that share the grid of field1
 function Base.similar(bc::Broadcasted{FieldStyle{N, Grid}}, ::Type{T}) where {N, Grid, T}
-    for maybe_field in bc.args
-        if maybe_field isa AbstractField
-            ArrayType_ = nonparametric_type(typeof(maybe_field.data))
-            new_data = ArrayType_{T}(undef, size(bc))
-            old_grid = maybe_field.grid
-            return Field(new_data, old_grid)
-        end
-    end
+    field = find_field(bc)
+    return Field(similar(field.data, T), field.grid)
 end
 
 # ::Val{0} for broadcasting with 0-dimensional, ::Val{1} for broadcasting with vectors, etc
@@ -419,14 +421,8 @@ function Base.BroadcastStyle(
 end
 
 function Base.similar(bc::Broadcasted{FieldGPUStyle{N, Grid}}, ::Type{T}) where {N, Grid, T}
-    for maybe_field in bc.args
-        if maybe_field isa AbstractField
-            ArrayType_ = nonparametric_type(typeof(maybe_field.data))
-            new_data = ArrayType_{T}(undef, size(bc))
-            old_grid = maybe_field.grid
-            return Field(new_data, old_grid)
-        end
-    end
+    field = find_field(bc)
+    return Field(similar(field.data, T), field.grid)
 end
 
 # ::Val{0} for broadcasting with 0-dimensional, ::Val{1} for broadcasting with vectors, etc
