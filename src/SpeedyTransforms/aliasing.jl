@@ -2,7 +2,7 @@ const DEFAULT_DEALIASING = 2.0
 
 """
 $(TYPEDSIGNATURES)
-For the spectral truncation `trunc` (e.g. 31 for T31) return the
+For the spectral truncation `trunc` (0-based, e.g. 31 for T31) return the
 grid resolution parameter `nlat_half` (number of latitude rings on one hemisphere
 including the Equator) following a dealiasing parameter (default 2)
 to match spectral and grid resolution."""
