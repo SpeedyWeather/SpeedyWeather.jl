@@ -644,6 +644,9 @@ Base.similar(L::LowerTriangularArray{T, N, ArrayType, SP}, ::Type{T}) where {T, 
     LowerTriangularArray{T, N, ArrayType, SP}(similar(L.data, T), L.spectrum)
 Base.similar(L::LowerTriangularArray{T}) where T = similar(L, T)
  
+array_type(::Type{<:LowerTriangularArray{T, N, ArrayType}}) where {T, N, ArrayType} = ArrayType
+array_type(L::LowerTriangularArray) = array_type(typeof(L))
+
 Base.prod(L::LowerTriangularArray{NF}) where NF = zero(NF)
 @inline Base.sum(L::LowerTriangularArray; dims=:, kw...) = sum(L.data; dims, kw...)
 

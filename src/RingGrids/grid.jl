@@ -124,6 +124,8 @@ function get_nlon_per_ring(grid::AbstractGrid, j::Integer)
     return get_nlon_per_ring(typeof(grid), grid.nlat_half, j)
 end
 
+get_solid_angles(grid::AbstractGrid) = get_solid_angles(typeof(grid), grid.nlat_half)
+
 ## ITERATOR
 
 """$(TYPEDSIGNATURES)

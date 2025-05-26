@@ -13,8 +13,10 @@ function prettymemory(b)
 end
 
 function Base.show(io::IO, S::SpectralTransform{NF, ArrayType}) where {NF, ArrayType}
-    (; spectrum, Grid, nlat_half, nlayers) = S
+    (; spectrum, grid, nlayers) = S
     (; lmax, mmax) = spectrum
+    (; nlat_half) = grid
+    Grid = RingGrids.nonparametric_type(grid)
 
     # add information about size of Legendre polynomials and scratch memory
     polysize_str = prettymemory(Base.summarysize(S.legendre_polynomials))
@@ -32,8 +34,8 @@ function Base.show(io::IO, S::SpectralTransform{NF, ArrayType}) where {NF, Array
 
     println(io, "SpectralTransform{$NF, $ArrayType}:")
     println(io, "├ Spectral:   T$(mmax-1), $(lmax)x$(mmax) LowerTriangularMatrix{Complex{$NF}}")
-    println(io, "├ Grid:       $(RingGrids.get_nlat(Grid, nlat_half))-ring $Grid{$NF}")
+    println(io, "├ Grid:       Field{$NF}, $(RingGrids.get_nlat(grid))-ring $Grid")
     println(io, "├ Truncation: dealiasing = $dealiasing ($truncation)")
     println(io, "├ Legendre:   Polynomials $polysize_str, shortcut: $(short_name(S.LegendreShortcut))")
-    println(io, "└ Memory:     for $nlayers layers ($memorysize_str)")
+    print(io,   "└ Memory:     for $nlayers layers ($memorysize_str)")
 end

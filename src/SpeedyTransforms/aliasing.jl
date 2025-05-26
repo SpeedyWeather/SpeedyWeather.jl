@@ -26,9 +26,9 @@ function get_truncation(nlat_half::Integer,
     return floor(Int, (4nlat_half-1)/(dealiasing+1))
 end
 
-# unpack nlat_half from provided map
-get_truncation(field::AbstractField, dealiasing::Real=DEFAULT_DEALIASING) =
-    get_truncation(field.nlat_half, dealiasing)
+# unpack nlat_half from provided grid
+get_truncation(grid::AbstractGrid, args...) = get_truncation(grid.nlat_half, args...)
+get_truncation(field::AbstractField, args...) = get_truncation(field.grid, args...)
 
 """
     m = roundup_fft(n::Int;

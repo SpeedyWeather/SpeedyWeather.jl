@@ -1,5 +1,7 @@
 const DEFAULT_NLAYERS = 1
 const DEFAULT_GRID = FullGaussianGrid
+const DEFAULT_NF = Float64
+const DEFAULT_ARRAYTYPE = Array
 
 abstract type AbstractSpectralTransform end
 
@@ -9,7 +11,8 @@ $(TYPEDFIELDS)"""
 struct SpectralTransform{
     NF,
     ArrayType,                  # non-parametric array type
-    SpectrumType,                         # <: AbstractSpectrum
+    SpectrumType,               # <: AbstractSpectrum
+    GridType,                   # <: AbstractGrid
     VectorType,                 # <: ArrayType{NF, 1},
     VectorComplexType,          # <: ArrayType{Complex{NF}, 1},
     MatrixComplexType,          # <: ArrayType{Complex{NF}, 2},
@@ -17,16 +20,16 @@ struct SpectralTransform{
     LowerTriangularMatrixType,  # <: LowerTriangularArray{NF, 1, ArrayType{NF}, SpectrumType},
     LowerTriangularArrayType,   # <: LowerTriangularArray{NF, 2, ArrayType{NF}, SpectrumType},
 } <: AbstractSpectralTransform
-    # GRID
-    Grid::Type{<:AbstractGrid}      # grid type used
-    nlat_half::Int                  # resolution parameter of grid (# of latitudes on one hemisphere, Eq incl)
-    nlayers::Int                    # number of layers in the vertical (for scratch memory size)
 
     # SPECTRAL RESOLUTION
-    spectrum::SpectrumType                    # spectral trunction 
+    spectrum::SpectrumType          # spectral trunction 
     nfreq_max::Int                  # Maximum (at Equator) number of Fourier frequencies (real FFT)
     LegendreShortcut::Type{<:AbstractLegendreShortcut} # Legendre shortcut for truncation of m loop
     mmax_truncation::Vector{Int}    # Maximum order m to retain per latitude ring
+    
+    # GRID
+    grid::GridType              # grid used, including nlat_half for resolution, indices for rings, etc.
+    nlayers::Int                # number of layers in the vertical (for scratch memory size)
 
     # CORRESPONDING GRID SIZE
     nlon_max::Int                   # Maximum number of longitude points (at Equator)
@@ -89,6 +92,7 @@ end
 
 # eltype of a transform is the number format used within
 Base.eltype(S::SpectralTransform{NF}) where NF = NF
+array_type(S::SpectralTransform{NF, A}) where {NF, A} = A
 
 """
 $(TYPEDSIGNATURES)
@@ -97,32 +101,31 @@ Generator function for a SpectralTransform struct. With `NF` the number format,
 necessary constants for the spetral transform. Also plans the Fourier transforms, retrieves the colatitudes,
 and preallocates the Legendre polynomials and quadrature weights."""
 function SpectralTransform(
-    ::Type{NF},                                     # Number format NF
     spectrum::AbstractSpectrum,                     # Spectral truncation
-    nlat_half::Integer;                             # grid resolution, latitude rings on one hemisphere incl equator
-    Grid::Type{<:AbstractGrid} = DEFAULT_GRID,      # type of spatial grid used
-    ArrayType::Type{<:AbstractArray} = Array,       # Array type used for spectral coefficients (can be parametric)
+    grid::AbstractGrid;                             # grid used and resolution, e.g. FullGaussianGrid
+    NF::Type{<:Real} = DEFAULT_NF,                  # Number format NF
+    ArrayType::Type{<:AbstractArray} = DEFAULT_ARRAYTYPE,   # Array type used for spectral coefficients (can be parametric)
     nlayers::Integer = DEFAULT_NLAYERS,             # number of layers in the vertical (for scratch memory size)
     LegendreShortcut::Type{<:AbstractLegendreShortcut} = LegendreShortcutLinear,   # shorten Legendre loop over order m
-) where NF
+)
 
-    Grid = RingGrids.nonparametric_type(Grid)               # always use nonparametric concrete type
+    (; nlat_half) = grid    # number of latitude rings on one hemisphere incl equator
     ArrayType_ = RingGrids.nonparametric_type(ArrayType)    # drop parameters of ArrayType
     (; lmax, mmax) = spectrum                               # 1-based spectral truncation order and degree
     
     # RESOLUTION PARAMETERS
-    nlat = get_nlat(Grid, nlat_half)            # 2nlat_half but one less if grids have odd # of lat rings
-    nlon_max = get_nlon_max(Grid, nlat_half)    # number of longitudes around the equator
-                                                # number of longitudes per latitude ring (one hemisphere only)
-    nlons = [RingGrids.get_nlon_per_ring(Grid, nlat_half, j) for j in 1:nlat_half]
-    nfreq_max = nlon_max÷2 + 1                      # maximum number of fourier frequencies (real FFTs)
+    nlat = get_nlat(grid)           # 2nlat_half but one less if grids have odd # of lat rings
+    nlon_max = get_nlon_max(grid)   # number of longitudes around the equator
+                                    # number of longitudes per latitude ring (one hemisphere only)
+    nlons = [RingGrids.get_nlon_per_ring(grid, j) for j in 1:nlat_half]
+    nfreq_max = nlon_max÷2 + 1              # maximum number of fourier frequencies (real FFTs)
 
     # LATITUDE VECTORS (based on Gaussian, equi-angle or HEALPix latitudes)
-    latd = RingGrids.get_latd(Grid, nlat_half)      # latitude in degrees (90˚Nto -90˚N)
-    colat = RingGrids.get_colat(Grid, nlat_half)    # colatitude in radians
-    cos_colat = cos.(colat)                         # cos(colat)
-    coslat = cosd.(latd)                            # cos(lat)
-    coslat⁻¹ = inv.(coslat)                         # 1/cos(lat)
+    latd = RingGrids.get_latd(grid)         # latitude in degrees (90˚Nto -90˚N)
+    colat = RingGrids.get_colat(grid)       # colatitude in radians
+    cos_colat = cos.(colat)                 # cos(colat)
+    coslat = cosd.(latd)                    # cos(lat)
+    coslat⁻¹ = inv.(coslat)                 # 1/cos(lat)
 
     # LEGENDRE SHORTCUT OVER ORDER M (0-based), truncate the loop over order m 
     mmax_truncation = [LegendreShortcut(nlons[j], latd[j]) for j in 1:nlat_half]
@@ -132,8 +135,8 @@ function SpectralTransform(
     norm_sphere = 2sqrt(π)  # norm_sphere at l=0, m=0 translates to 1s everywhere in grid space
     
     # LONGITUDE OFFSETS OF FIRST GRID POINT PER RING (0 for full and octahedral grids)
-    lons, _ = RingGrids.get_lonlats(Grid, nlat_half)
-    rings = eachring(Grid, nlat_half)                       # compute ring indices
+    lons, _ = RingGrids.get_lonlats(grid)
+    rings = eachring(grid)                                  # compute ring indices
     lon1s = [lons[rings[j].start] for j in 1:nlat_half]     # pick lons at first index for each ring
     lon_offsets = [cispi(m*lon1/π) for m in 0:mmax-1, lon1 in lon1s]
     
@@ -163,7 +166,7 @@ function SpectralTransform(
     rfft_plans_1D = Vector{AbstractFFTs.Plan}(undef, nlat_half)
     brfft_plans_1D = Vector{AbstractFFTs.Plan}(undef, nlat_half)
 
-    fake_grid_data = adapt(ArrayType_, zeros(Grid{NF}, nlat_half, nlayers))
+    fake_grid_data = adapt(ArrayType_, zeros(NF, grid, nlayers))
 
     # PLAN THE FFTs
     plan_FFTs!(
@@ -193,7 +196,7 @@ function SpectralTransform(
     # sin(θ)dθ are the quadrature weights approximate the integration over latitudes
     # and sum up to 2 over all latitudes as ∫sin(θ)dθ = 2 over 0...π.
     # Δϕ = 2π/nlon is the azimuth every grid point covers
-    solid_angles = get_solid_angles(Grid, nlat_half)
+    solid_angles = get_solid_angles(grid)
 
     # RECURSION FACTORS
     ϵlms = get_recursion_factors(spectrum)
@@ -247,6 +250,7 @@ function SpectralTransform(
         NF,
         ArrayType_,
         typeof(spectrum),
+        typeof(grid),
         ArrayType_{NF, 1},
         ArrayType_{Complex{NF}, 1},
         ArrayType_{Complex{NF}, 2},
@@ -254,9 +258,9 @@ function SpectralTransform(
         LowerTriangularArray{NF, 1, ArrayType_{NF, 1}, typeof(spectrum)},
         LowerTriangularArray{NF, 2, ArrayType_{NF, 2}, typeof(spectrum)},
     }(
-        Grid, nlat_half, nlayers,
         spectrum, nfreq_max, 
         LegendreShortcut, mmax_truncation,
+        grid, nlayers,
         nlon_max, nlons, nlat,
         coslat, coslat⁻¹, lon_offsets,
         norm_sphere,
@@ -273,6 +277,9 @@ function SpectralTransform(
     )
 end
 
+SpectralTransform(spectrum::AbstractSpectrum, grid::AbstractGrid; kwargs...) =
+    SpectralTransform(DEFAULT_NF, spectrum, grid; kwargs...)
+
 """$(TYPEDSIGNATURES)
 Generator function for a `SpectralTransform` struct based on the spectral truncation
 given by integers `lmax` and `mmax.""" 
@@ -288,17 +295,21 @@ Generator function for a `SpectralTransform` struct based on the size of the spe
 coefficients `specs`. Use keyword arguments `nlat_half`, `Grid` or `deliasing` (if `nlat_half`
 not provided) to define the grid."""
 function SpectralTransform(
-    specs::LowerTriangularArray{NF, N, ArrayType, S};  # spectral coefficients
+    specs::LowerTriangularArray;                    # spectral coefficients
+    Grid::Type{<:AbstractGrid} = DEFAULT_GRID,      # grid type, e.g. FullGaussianGrid
     nlat_half::Integer = 0,                         # resolution parameter nlat_half
     dealiasing::Real = DEFAULT_DEALIASING,          # dealiasing factor
     kwargs...
-) where {NF, N, S, ArrayType}                          # number format NF (can be complex)
-    (; spectrum) = specs    
+)
+    (; spectrum) = specs
+    NF = eltype(specs)                     # number format of the spectral coefficients
+    ArrayType = LowerTriangularArrays.array_type(specs)
 
     # get nlat_half from dealiasing if not provided
     nlat_half = nlat_half > 0 ? nlat_half : get_nlat_half(spectrum.mmax - 1, dealiasing)
+    grid = Grid(nlat_half)                  # create grid with nlat_half
     nlayers = size(specs, 2)
-    return SpectralTransform(real(NF), spectrum, nlat_half; ArrayType, nlayers, kwargs...)
+    return SpectralTransform(real(NF), spectrum, grid; ArrayType, nlayers, kwargs...)
 end
 
 """$(TYPEDSIGNATURES)
@@ -306,42 +317,46 @@ Generator function for a `SpectralTransform` struct based on the size and grid t
 Use keyword arugments `trunc`, `dealiasing` (ignored if `trunc` is used) or `one_more_degree`
 to define the spectral truncation. `trunc` is assumed to be zero-indexed (i.e. starting with l=0)"""
 function SpectralTransform(
-    grids::AbstractField{NF, N, ArrayType};     # gridded field
+    field::AbstractField;                       # gridded field
     trunc::Integer = 0,                         # spectral truncation (0-indexed)
     dealiasing::Real = DEFAULT_DEALIASING,      # dealiasing factor
     one_more_degree::Bool = false,              # returns a square LowerTriangularMatrix by default
     kwargs...
-) where {NF, N, ArrayType}                      # number format NF
-    Grid = RingGrids.nonparametric_type(typeof(grids))
-    trunc = trunc > 0 ? trunc : get_truncation(grids, dealiasing)
-    nlayers = size(grids, 2)
-    return SpectralTransform(NF, Spectrum(trunc+1+one_more_degree, trunc+1), grids.nlat_half; Grid, ArrayType, nlayers, kwargs...)
+)
+    NF = eltype(field)                          # number format of the spectral coefficients
+    ArrayType = RingGrids.array_type(field)
+
+    # get trunc from dealiasing if not provided
+    trunc = trunc > 0 ? trunc : get_truncation(field.grid, dealiasing)
+    spectrum = Spectrum(trunc+1+one_more_degree, trunc+1)
+    nlayers = size(field, 2)
+    return SpectralTransform(NF, spectrum, field.grid; ArrayType, nlayers, kwargs...)
 end
 
 """$(TYPEDSIGNATURES)
 Generator function for a `SpectralTransform` struct to transform between `field` and `specs`."""
 function SpectralTransform(
-    field::AbstractField{NF1, N, ArrayType1},
-    specs::LowerTriangularArray{NF2, N, ArrayType2, S};
+    field::AbstractField,
+    specs::LowerTriangularArray;
     kwargs...
-) where {NF1, NF2, N, ArrayType1, ArrayType2}           # number formats 1 and 2
-  
+) 
     # infer types for SpectralTransform
     NF = promote_type(real(eltype(field)), real(eltype(specs)))
-    Grid = RingGrids.nonparametric_type(typeof(field.grid))
-    _ArrayType1 = RingGrids.nonparametric_type(ArrayType1)
-    _ArrayType2 = RingGrids.nonparametric_type(ArrayType2)
-    @assert _ArrayType1 == _ArrayType2 "ArrayTypes of grids ($_ArrayType1) and specs ($_ArrayType2) do not match."
+    ArrayType = RingGrids.nonparametric_type(RingGrids.array_type(field))
+    ArrayType2 = LowerTriangularArrays.nonparametric_type(LowerTriangularArrays.array_type(specs))
+    @assert ArrayType == ArrayType2 "ArrayTypes of field ($_ArrayType1) and specs ($_ArrayType2) do not match."
 
     # get resolution
-    (; spectrum) = specs    
+    (; spectrum) = specs
+    (; grid) = field 
     nlayers = size(field, 2)
-    @assert nlayers == size(specs, 2) "Number of layers in grids ($nlayers) and lower triangular matrices ($(size(specs, 2))) do not match."
-    return SpectralTransform(NF, spectrum, grids.nlat_half; Grid, ArrayType=ArrayType1, nlayers, kwargs...)
+    @assert nlayers == size(specs, 2) "Number of layers in field ($nlayers) and specs ($(size(specs, 2))) do not match."
+    return SpectralTransform(NF, spectrum, grid; ArrayType, nlayers, kwargs...)
 end
 
 # make commutative
-SpectralTransform(specs::LowerTriangularArray, field::AbstractField) = SpectralTransform(field, specs)
+SpectralTransform(specs::LowerTriangularArray, field::AbstractField; kwargs...) =
+    SpectralTransform(field, specs; kwargs...)
 
 # CHECK MATCHING SIZES
 """$(TYPEDSIGNATURES)
@@ -359,10 +374,9 @@ Spectral transform `S` and `grid` match if the resolution `nlat_half` and the
 type of the grid match and the number of vertical layers is equal or larger in
 the transform (constraints due to allocated scratch memory size)."""
 function ismatching(S::SpectralTransform, field::AbstractField)
-    type_match = S.Grid == RingGrids.nonparametric_type(typeof(field.grid))
-    resolution_match = S.nlat_half == get_nlat_half(field)
+    grid_match = S.grid == field.grid   # grid type and resolution match
     vertical_match = size(field, 2) <= S.nlayers
-    return type_match && resolution_match && vertical_match
+    return grid_match && vertical_match
 end
 
 # make `ismatching` commutative
@@ -489,11 +503,11 @@ Spherical harmonic transform from `specs` to a newly allocated `field::AbstractF
 using the precomputed spectral transform `S`."""
 function transform(                 # SPECTRAL TO GRID
     specs::LowerTriangularArray,    # input spectral coefficients
-    S::SpectralTransform{NF};       # precomputed spectral transform
+    S::SpectralTransform;           # precomputed spectral transform
     kwargs...                       # pass on unscale_coslat=true/false(default)
-) where NF
+)
     ks = size(specs)[2:end]         # the non-horizontal dimensions
-    field = zeros(S.Grid{NF}, S.nlat_half, ks...)
+    field = zeros(eltype(S), S.grid, ks...)
     transform!(field, specs, S; kwargs...)
     return field
 end
@@ -514,9 +528,9 @@ end
 
 """
 $(TYPEDSIGNATURES)
-Spectral transform (grid to spectral space) from `grids` to a newly allocated `LowerTriangularArray`.
-Based on the size of `grids` and the keyword `dealiasing` the spectral resolution trunc is
-retrieved. SpectralTransform struct `S` is allocated to execute `transform(grids, S)`."""
+Spectral transform (grid to spectral space) from `field` to a newly allocated `LowerTriangularArray`.
+Based on the size of `field` and the keyword `dealiasing` the spectral resolution trunc is
+retrieved. SpectralTransform struct `S` is allocated to execute `transform(field, S)`."""
 function transform(field::AbstractField; kwargs...) # GRID TO SPECTRAL
     S = SpectralTransform(field; kwargs...)         # precompute transform
     return transform(field, S)                      # do the transform
