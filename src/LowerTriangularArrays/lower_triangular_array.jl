@@ -210,6 +210,8 @@ for f in (:zeros, :ones, :rand, :randn)
             $f(LowerTriangularArray{Float64}, spectrum, I...)
         Base.$f(::Type{LowerTriangularMatrix}, spectrum::AbstractSpectrum) =
             $f(LowerTriangularArray{Float64}, spectrum)
+        Base.$f(spectrum::AbstractSpectrum, I::Vararg{Integer, M}) where M =
+            $f(LowerTriangularArray{Float64}, spectrum, I...)
     end
 end
 
@@ -245,6 +247,8 @@ end
 function LowerTriangularMatrix{T}(::UndefInitializer, spectrum::AbstractSpectrum) where T
     return LowerTriangularMatrix(Vector{T}(undef, nonzeros(spectrum)), spectrum)
 end
+
+Base.eltype(L::LowerTriangularArray) = eltype(L.data)
 
 # INDEXING
 """
