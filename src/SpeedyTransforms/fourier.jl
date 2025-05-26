@@ -133,7 +133,8 @@ function _fourier_batched!(                 # GRID TO SPECTRAL
     field::AbstractField,                   # gridded input
     S::SpectralTransform;                   # precomputed transform
 )
-    (; nlat, nlons, nlat_half) = S          # dimensions
+    (; nlat, nlons) = S                     # dimensions
+    (; nlat_half) = S.grid
     nlayers = size(field, 2)                # number of vertical layers
 
     @assert eltype(field) == eltype(S) "Number format of grid $(eltype(field)) and SpectralTransform $(eltype(S)) need too match."
@@ -172,7 +173,8 @@ function _fourier_serial!(                  # GRID TO SPECTRAL
     field::AbstractField,                   # gridded input
     S::SpectralTransform;                   # precomputed transform
 )
-    (; nlat, nlons, nlat_half) = S          # dimensions
+    (; nlat, nlons) = S                     # dimensions
+    (; nlat_half) = S.grid
     nlayers = size(field, 2)                # number of vertical layers
 
     @assert eltype(field) == eltype(S) "Number format of grid $(eltype(field)) and SpectralTransform $(eltype(S)) need too match."
@@ -210,7 +212,8 @@ function _fourier_batched!(                 # SPECTRAL TO GRID
     g_south::AbstractArray{<:Complex, 3},   # and for southern latitudes
     S::SpectralTransform;                   # precomputed transform
 )
-    (; nlat, nlons, nlat_half) = S          # dimensions
+    (; nlat, nlons) = S                     # dimensions
+    (; nlat_half) = S
     nlayers = size(field, 2)                # number of vertical layers
 
     @boundscheck ismatching(S, field) || throw(DimensionMismatch(S, field))
@@ -246,7 +249,8 @@ function _fourier_serial!(                  # SPECTRAL TO GRID
     g_south::AbstractArray{<:Complex, 3},   # and for southern latitudes
     S::SpectralTransform;                   # precomputed transform
 )
-    (; nlat, nlons, nlat_half) = S          # dimensions          
+    (; nlat, nlons) = S                     # dimensions   
+    (; nlat_half) = S.grid       
     nlayers = size(field, 2)                # number of vertical layers
 
     @boundscheck ismatching(S, field) || throw(DimensionMismatch(S, field))
