@@ -31,8 +31,8 @@ function get_test_data(; trunc, nlayers, Grid, NF)
                     spectral_grid_cpu.spectrum, 
                     spectral_grid_cpu.nlayers)
     
-    grid_gpu = cu(grid_cpu)
-    spec_gpu = cu(spec_cpu)
+    grid_gpu = on_architecture(spectral_grid_gpu.architecture, grid_cpu)
+    spec_gpu = on_architecture(spectral_grid_gpu.architecture, spec_cpu)
     
     return S_cpu, S_gpu, grid_cpu, grid_gpu, spec_cpu, spec_gpu
 end
@@ -48,6 +48,9 @@ end
                         trunc=trunc, nlayers=nlayers, Grid=Grid, NF=NF
                     )
 
+                    gpu_arch = S_gpu.architecture
+                    cpu_arch = S_cpu.architecture
+                    
                     # Full return journey starting from grid
                     spec_ = SpeedyTransforms.transform(grid_cpu, S_cpu)
                     grid_cpu = SpeedyTransforms.transform(spec_, S_cpu)
@@ -63,21 +66,21 @@ end
                     # Copy to GPU and repeat the test. We use initally 
                     # transformed data so that the imaginary components of the 
                     # m=1 specs are zero. 
-                    grid_gpu = cu(grid_cpu)
-                    spec_gpu = cu(spec_cpu)
-                    grid_gpu_test = cu(grid_cpu)
-                    spec_gpu_test = cu(spec_cpu)
+                    grid_gpu = on_architecture(gpu_arch, grid_cpu)
+                    spec_gpu = on_architecture(gpu_arch, spec_cpu)
+                    grid_gpu_test = on_architecture(gpu_arch, grid_cpu)
+                    spec_gpu_test = on_architecture(gpu_arch, spec_cpu)
 
                     # Full return journey starting from grid on GPU
                     transform!(spec_gpu_test, grid_gpu, S_gpu)
                     transform!(grid_gpu_test, spec_gpu_test, S_gpu)
-                    grid_test = adapt(Array, grid_gpu_test)
+                    grid_test = on_architecture(cpu_arch, grid_gpu_test)
                     @test grid_cpu ≈ grid_test rtol=sqrt(eps(Float32))
 
                     # Full return journey starting from spec on GPU
                     transform!(grid_gpu_test, spec_gpu, S_gpu)
                     transform!(spec_gpu_test, grid_gpu_test, S_gpu)
-                    spec_test = adapt(Array, spec_gpu_test)
+                    spec_test = on_architecture(cpu_arch, spec_gpu_test)
                     @test spec_cpu ≈ spec_test rtol=sqrt(eps(Float32))
                 end
             end
@@ -95,6 +98,9 @@ end
                     S_cpu, S_gpu, grid_cpu, grid_gpu, spec_cpu, spec_gpu = get_test_data(
                         trunc=trunc, nlayers=nlayers, Grid=Grid, NF=NF
                     )
+
+                    cpu_arch = S_cpu.architecture
+                    gpu_arch = S_gpu.architecture
                     
                     # CPU forward transform
                     SpeedyTransforms._fourier_batched!(
@@ -112,7 +118,7 @@ end
                     )
 
                     # Convert GPU to CPU for comparison
-                    grid_gpu_compare = adapt(Array, grid_gpu)
+                    grid_gpu_compare = on_architecture(cpu_arch, grid_gpu)
 
                     # NOTE: This is probably unnecessary, we can do a coarser 
                     # check for broad comparison of equivalence 
@@ -136,6 +142,9 @@ end
                         trunc=trunc, nlayers=nlayers, Grid=Grid, NF=NF
                     )
 
+                    cpu_arch = S_cpu.architecture
+                    gpu_arch = S_gpu.architecture
+
                     # Use scratch memory to store mid-transform data, using the 
                     # CPU legendre transform to generate the intermediate data
                     # NOTE: assumption of working Legendre transform
@@ -156,7 +165,7 @@ end
                     )
 
                     # Copy back to CPU again for comparison
-                    grid_gpu_compare = adapt(Array, grid_gpu)
+                    grid_gpu_compare = on_architecture(cpu_arch, grid_gpu)
                     
                     # NOTE: again, not necessary to be so fine-grained here
                     # for ij in eachindex(grid_cpu, grid_gpu_compare)
@@ -179,6 +188,9 @@ end
                     S_cpu, S_gpu, grid_cpu, grid_gpu, spec_cpu, spec_gpu = get_test_data(
                         trunc=trunc, nlayers=nlayers, Grid=Grid, NF=NF
                     )
+
+                    gpu_arch = S_gpu.architecture
+                    cpu_arch = S_cpu.architecture
                     
                     # CPU forward transform
                     SpeedyTransforms._fourier_serial!(
@@ -196,7 +208,7 @@ end
                     )
 
                     # Convert GPU to CPU for comparison
-                    grid_gpu_compare = adapt(Array, grid_gpu)
+                    grid_gpu_compare = on_architecture(cpu_arch, grid_gpu)
 
                     @test grid_cpu ≈ grid_gpu_compare 
                 end
@@ -254,6 +266,9 @@ end
                     S_cpu, S_gpu, grid_cpu, grid_gpu, spec_cpu, spec_gpu = get_test_data(
                         trunc=trunc, nlayers=nlayers, Grid=Grid, NF=NF
                     )
+
+                    gpu_arch = S_gpu.architecture
+                    cpu_arch = S_cpu.architecture   
                     
                     # CPU inverse transform
                     SpeedyTransforms._legendre!(
@@ -270,11 +285,11 @@ end
 
                     # Convert GPU to CPU for comparison, result is stored in the 
                     # scratch memory
-                    result_gpu = adapt(Array, S_gpu.scratch_memory_north);
+                    result_gpu = on_architecture(cpu_arch, S_gpu.scratch_memory_north);
                     result_cpu = S_cpu.scratch_memory_north;
                     @test result_cpu ≈ result_gpu rtol=sqrt(eps(Float32))   # GPU error tolerance always Float32
 
-                    result_gpu = adapt(Array, S_gpu.scratch_memory_south);
+                    result_gpu = on_architecture(cpu_arch, S_gpu.scratch_memory_south);
                     result_cpu = S_cpu.scratch_memory_south;
                     @test result_cpu ≈ result_gpu rtol=sqrt(eps(Float32))
                 end
@@ -292,6 +307,9 @@ end
                     S_cpu, S_gpu, grid_cpu, grid_gpu, spec_cpu, spec_gpu = get_test_data(
                         trunc=trunc, nlayers=nlayers, Grid=Grid, NF=NF
                     )
+
+                    gpu_arch = S_gpu.architecture
+                    cpu_arch = S_cpu.architecture
 
                     # Use scratch memory to store mid-transform data, using the 
                     # CPU fourier transform to generate the intermediate data
@@ -318,7 +336,7 @@ end
                     )
 
                     # Convert GPU to CPU for comparison, result is stored spec
-                    result_gpu = adapt(Array, spec_gpu);
+                    result_gpu = on_architecture(cpu_arch, spec_gpu);
                     result_cpu = spec_cpu;
                     @test result_cpu ≈ result_gpu rtol=sqrt(eps(Float32))   # GPU error tolerance always Float32
                 end
