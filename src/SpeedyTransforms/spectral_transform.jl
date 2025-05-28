@@ -235,7 +235,7 @@ function SpectralTransform(
     end
 
     # zonal integration (sort of) to get from vorticity and divergence to u, v*coslat
-    vordiv_to_uv_x = LowerTriangularMatrix([-m/(l*(l+1)) for l in 0:(lmax-1), m in 0:(mmax-1)], spectrum)
+    vordiv_to_uv_x = LowerTriangularMatrix([-m/(l*(l+1))*im for l in 0:(lmax-1), m in 0:(mmax-1)], spectrum)
     vordiv_to_uv_x[1, 1] = 0
 
     # meridional integration (sort of) to get from vorticity and divergence to u, v*coslat
