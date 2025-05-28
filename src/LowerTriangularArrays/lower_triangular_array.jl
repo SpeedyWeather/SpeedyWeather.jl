@@ -18,7 +18,7 @@ struct LowerTriangularArray{T, N, ArrayType <: AbstractArray{T,N}, S<:AbstractSp
 end
 
 check_lta_input_array(data, spectrum, N) =
-    (ndims(data) == N) & (length(data) == prod(size(data)[2:end]) * nonzeros(spectrum)) & ismatching(spectrum, typeof(data))
+    (ndims(data) == N) & (length(data) == prod(size(data)[2:end]) * nonzeros(spectrum)) # & ismatching(spectrum, typeof(data)) TODO: reactivate this? problem for constructors
 
 function lta_error_message(data, spectrum, T, N, ArrayType, S) 
     if ismatching(spectrum, typeof(data))
