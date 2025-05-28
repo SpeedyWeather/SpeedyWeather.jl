@@ -14,15 +14,19 @@ struct LowerTriangularArray{T, N, ArrayType <: AbstractArray{T,N}, S<:AbstractSp
     LowerTriangularArray{T, N, ArrayType, S}(data::AbstractArray, spectrum::S) where {T, N, ArrayType <: AbstractArray{T,N}, S <: AbstractSpectrum} =
         check_lta_input_array(data, spectrum, N) ? 
         new(data, spectrum)  :
-        error(lta_error_message(data, spectrum, T, N, ArrayType))
+        error(lta_error_message(data, spectrum, T, N, ArrayType, S))
 end
 
 check_lta_input_array(data, spectrum, N) =
-    (ndims(data) == N) & (length(data) == prod(size(data)[2:end]) * nonzeros(spectrum)) 
+    (ndims(data) == N) & (length(data) == prod(size(data)[2:end]) * nonzeros(spectrum)) # & ismatching(spectrum, typeof(data)) TODO: reactivate this? problem for constructors
 
-function lta_error_message(data, spectrum, T, N, ArrayType) 
-    return "$(Base.dims2string(size(data))) $(typeof(data)) cannot be used to create "*
-            "a $(Base.dims2string(matrix_size(data, spectrum))) LowerTriangularArray{$T, $N, $ArrayType}"
+function lta_error_message(data, spectrum, T, N, ArrayType, S) 
+    if ismatching(spectrum, typeof(data))
+        return "Architecture mismatch: Spectrum has architecture $(spectrum.architecture), but array type $(typeof(data)) is used"
+    else 
+        return "$(Base.dims2string(size(data))) $(typeof(data)) cannot be used to create "*
+            "a $(Base.dims2string(matrix_size(data, spectrum))) LowerTriangularArray{$T, $N, $ArrayType, $S}"
+    end
 end 
 
 """2-dimensional `LowerTriangularArray` of type `T` with specturm `S` with its non-zero entries unravelled into a `Vector{T}`"""
@@ -34,7 +38,7 @@ LowerTriangularMatrix(data::Vector{T}, spectrum::S) where {T, S <: AbstractSpect
     LowerTriangularMatrix{T, typeof(spectrum)}(data, spectrum)
 
 function LowerTriangularArray(data::ArrayType, lmax::Integer, mmax::Integer) where {T, N, ArrayType <: AbstractArray{T,N}}
-    spectrum = Spectrum(lmax, mmax)
+    spectrum = Spectrum(lmax, mmax, architecture=architecture(ArrayType))
     return LowerTriangularArray{T, N, ArrayType, typeof(spectrum)}(data, spectrum)
 end
 
@@ -134,6 +138,18 @@ function Base.array_summary(io::IO, L::LowerTriangularMatrix{T}, inds::Tuple{Var
     print(io, Base.dims2string(length.(inds)), ", $(mn[1])x$(mn[2]) LowerTriangularMatrix{$T}")
 end
 
+function Base.show(io::IO, ::MIME"text/plain", L::LowerTriangularArray)
+    Base.array_summary(io, L, axes(L))
+
+    if get(io, :limit, false)::Bool && displaysize(io)[1]-4 <= 0
+        return print(io, " …")
+    else
+        println(io)
+    end
+    
+    Base.print_array(io, L.data)
+end
+
 @inline Base.dataids(L::LowerTriangularArray) = Base.dataids(L.data)
 
 # CREATE INSTANCES (ZEROS, ONES, UNDEF)
@@ -147,7 +163,7 @@ for f in (:zeros, :ones, :rand, :randn)
             I::Vararg{Integer, M},
         ) where {T, N, M, ArrayType, S<:AbstractSpectrum}
             ArrayType_ = nonparametric_type(ArrayType)
-            return LowerTriangularArray(ArrayType_($f(T, nonzeros(lmax, mmax), I...)), Spectrum(lmax, mmax))
+            return LowerTriangularArray(ArrayType_($f(T, nonzeros(lmax, mmax), I...)), Spectrum(lmax, mmax, architecture=architecture(ArrayType_)))
         end
 
         function Base.$f(
@@ -166,7 +182,7 @@ for f in (:zeros, :ones, :rand, :randn)
             mmax::Integer, 
             I::Vararg{Integer, M},
         ) where {T, M}
-            return LowerTriangularArray($f(T, nonzeros(lmax, mmax), I...), Spectrum(lmax, mmax))
+            return LowerTriangularArray($f(T, nonzeros(lmax, mmax), I...), Spectrum(lmax, mmax, architecture=architecture(Array)))
         end
 
         function Base.$f(
@@ -174,7 +190,7 @@ for f in (:zeros, :ones, :rand, :randn)
             lmax::Integer,
             mmax::Integer, 
         ) where T
-            return LowerTriangularMatrix($f(T, nonzeros(lmax, mmax)), Spectrum(lmax, mmax))
+            return LowerTriangularMatrix($f(T, nonzeros(lmax, mmax)), Spectrum(lmax, mmax, architecture=architecture(Array)))
         end
         
         function Base.$f(
@@ -220,7 +236,7 @@ function LowerTriangularArray{T, N, ArrayType, S}(
     ::UndefInitializer,
     I::Vararg{Integer,M},
 ) where {T, N, M, ArrayType<:AbstractArray{T}, S<:AbstractSpectrum}
-    return LowerTriangularArray(ArrayType(undef, nonzeros(I[1], I[2]), I[3:end]...), Spectrum(I[1], I[2]))
+    return LowerTriangularArray(ArrayType(undef, nonzeros(I[1], I[2]), I[3:end]...), Spectrum(I[1], I[2], architecture=architecture(ArrayType)))
 end
 
 function LowerTriangularArray{T, N, ArrayType, S}(
@@ -254,6 +270,20 @@ index `i` that indexes the same element in the corresponding vector that stores
 only the lower triangle (the non-zero entries) of `L`."""
 @inline lm2i(l::Integer, m::Integer, lmax::Integer) = l + (m-1)*lmax - m*(m-1)÷2
 
+"""
+$(TYPEDSIGNATURES)
+range of the running indices lm in a l-column (degrees of spherical harmonics)
+given the column index m (order of harmonics) 
+"""
+get_lm_range(m, lmax) = lm2i(2*m - 1, m, lmax):lm2i(lmax+m, m, lmax)
+
+"""
+$(TYPEDSIGNATURES)
+range of the doubled running indices 2lm in a l-column (degrees of spherical harmonics)
+given the column index m (order of harmonics) 
+"""
+get_2lm_range(m, lmax) = 2*lm2i(2*m - 1, m, lmax)-1:2*lm2i(lmax+m, m, lmax)
+ 
 """
 $(TYPEDSIGNATURES)
 Converts the linear index `i` in the lower triangle into a pair `(l, m)` of indices 
@@ -425,9 +455,9 @@ end
 """ 
 $(TYPEDSIGNATURES)
 Create a LowerTriangularArray `L` from Matrix `M` by copying over the non-zero elements in `M`."""
-function LowerTriangularMatrix(M::Matrix{T}) where T # CPU version 
-    lmax, mmax = size(M)
-    L = LowerTriangularMatrix{T}(undef, lmax, mmax)
+function LowerTriangularMatrix(M::Matrix{T}, spectrum::AbstractSpectrum) where T # CPU version 
+    (; lmax, mmax) = spectrum
+    L = LowerTriangularMatrix{T}(undef, spectrum)
     
     k = 0
     @inbounds for j in 1:mmax      # only loop over lower triangle
@@ -438,6 +468,15 @@ function LowerTriangularMatrix(M::Matrix{T}) where T # CPU version
     end
     return L
 end
+
+""" 
+$(TYPEDSIGNATURES)
+Create a LowerTriangularArray `L` from Matrix `M` by copying over the non-zero elements in `M`."""
+function LowerTriangularMatrix(M::Matrix{T}) where T # GPU version 
+    lmax, mmax = size(M)
+    spectrum = Spectrum(lmax, mmax)
+    return LowerTriangularMatrix(M, spectrum)
+end 
 
 # helper function for conversion etc on GPU, returns indices of the lower triangle
 lowertriangle_indices(M::AbstractMatrix) = lowertriangle_indices(size(M)...)
@@ -731,5 +770,13 @@ function KernelAbstractions.get_backend(
 end 
 
 # To-Do: Actually adapting might need an adapt for the `Spectrum` as well? 
-Adapt.adapt_structure(to, L::LowerTriangularArray) =
-    LowerTriangularArray(Adapt.adapt(to, L.data), L.spectrum)
+function Adapt.adapt_structure(to, L::LowerTriangularArray) 
+    adapted_data = Adapt.adapt(to, L.data)
+    if ismatching(L.spectrum, typeof(adapted_data))
+        return LowerTriangularArray(adapted_data, L.spectrum)
+    else 
+        return LowerTriangularArray(adapted_data, Spectrum(L.spectrum, architecture=architecture(typeof(adapted_data))))
+    end
+end
+
+on_architecture(arch::AbstractArchitecture, a::LowerTriangularArray) = Adapt.adapt(array_type(arch), a)

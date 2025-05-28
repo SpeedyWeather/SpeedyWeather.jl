@@ -1,6 +1,43 @@
 const DEFAULT_RADIUS = 1
 
 """
+    KernelOP{mode, flipsign, add}
+
+Type for dispatching on kernel operations in spectral gradient calculations.
+- `mode`: `true` for curl, `false` for divergence
+- `flipsign`: `true` or `false` to negate the result
+- `add`: `true` or `false` to add to the output instead of overwriting
+"""
+struct KernelOP{mode, flipsign, add} end
+
+# Curl operations (mode == true): a+b-c
+# Standard curl (no flipsign, no add)
+@inline (::KernelOP{true, false, false})(o, a, b, c) = a+b-c
+
+# Curl with flipsign (no add)
+@inline (::KernelOP{true, true, false})(o, a, b, c) = -(a+b-c)
+
+# Curl with add (no flipsign)
+@inline (::KernelOP{true, false, true})(o, a, b, c) = o+(a+b-c)
+
+# Curl with flipsign and add
+@inline (::KernelOP{true, true, true})(o, a, b, c) = o-(a+b-c)
+
+# Divergence operations (mode == false): a-b+c
+# Standard divergence (no flipsign, no add)
+@inline (::KernelOP{false, false, false})(o, a, b, c) = a-b+c
+
+# Divergence with flipsign (no add)
+@inline (::KernelOP{false, true, false})(o, a, b, c) = -(a-b+c)
+
+# Divergence with add (no flipsign)
+@inline (::KernelOP{false, false, true})(o, a, b, c) = o+(a-b+c)
+
+# Divergence with flipsign and add
+@inline (::KernelOP{false, true, true})(o, a, b, c) = o-(a-b+c)
+
+
+"""
 $(TYPEDSIGNATURES)
 Curl of a vector `u, v` written into `curl`, `curl = ∇×(u, v)`.
 `u, v` are expected to have a 1/coslat-scaling included, otherwise `curl` is scaled.
@@ -19,8 +56,7 @@ function curl!(
     kwargs...,
 )
     # = -(∂λ - ∂θ) or (∂λ - ∂θ), adding or overwriting the output curl 
-    kernel = flipsign ? (add ? (o, a, b, c) -> o-(a+b-c) : (o, a, b, c) -> -(a+b-c)) :
-                        (add ? (o, a, b, c) -> o+(a+b-c) : (o, a, b, c) -> a+b-c)  
+    kernel = KernelOP{true, flipsign, add}()
     _divergence!(kernel, curl, v, u, S; kwargs...)      # flip u, v -> v, u
 end
 
@@ -42,9 +78,30 @@ function divergence!(
     kwargs...,
 )
     # = -(∂λ + ∂θ) or (∂λ + ∂θ), adding or overwriting the output div
-    kernel = flipsign ? (add ? (o, a, b, c) -> o-(a-b+c) : (o, a, b, c) -> -(a-b+c)) :
-                        (add ? (o, a, b, c) ->  o+(a-b+c) : (o, a, b, c) -> a-b+c)    
+    kernel = KernelOP{false, flipsign, add}()
     _divergence!(kernel, div, u, v, S; kwargs...)
+end
+
+"""
+$(TYPEDSIGNATURES)
+Divergence of a vector `u, v` written into `div`, `div = ∇⋅(u, v)`. 
+`u, v` are expected to have a 1/coslat-scaling included, otherwise `div` is scaled.
+Acts on the unit sphere, i.e. it omits 1/radius scaling as all gradient operators,
+unless the `radius` keyword argument is provided. `flipsign` option calculates -∇⋅(u, v) instead.
+`add` option calculates `div += ∇⋅(u, v)` instead. `flipsign` and `add` can be combined.
+This functions only creates the kernel and calls the generic divergence function _divergence! subsequently."""
+function divergence_KA!(
+    div::LowerTriangularArray,
+    u::LowerTriangularArray,
+    v::LowerTriangularArray,
+    S::SpectralTransform;
+    flipsign::Bool=false,
+    add::Bool=false,
+    kwargs...,
+)
+    # = -(∂λ + ∂θ) or (∂λ + ∂θ), adding or overwriting the output div
+    kernel = KernelOP{false, flipsign, add}()
+    _divergence_KA!(kernel, div, u, v, S; kwargs...)
 end
 
 """
@@ -100,6 +157,51 @@ function _divergence!(
 
     return div
 end
+
+# KA / GPU version, called by the SpeedyWeatherCUDAExt when input with CuArrays
+function _divergence_KA!(  
+    kernel,
+    div::LowerTriangularArray,
+    u::LowerTriangularArray,
+    v::LowerTriangularArray,
+    S::SpectralTransform;
+    radius = DEFAULT_RADIUS,
+)
+    (; grad_y_vordiv1, grad_y_vordiv2) = S
+    (; m_indices) = u.spectrum
+  
+    @boundscheck ismatching(S, div) || throw(DimensionMismatch(S, div))
+
+    launch!(S.architecture, :lmk, size(div), _divergence_kernel!, kernel, div, u, v, grad_y_vordiv1, grad_y_vordiv2, m_indices)
+    
+    # radius scaling if not unit sphere
+    if radius != 1
+        div .*= inv(radius)
+    end
+
+    return div
+end
+
+@kernel function _divergence_kernel!(kernel_func::KernelOP{mode, flipsign, add}, div, u, v, grad_y_vordiv1, grad_y_vordiv2, lm2m_indices) where {mode, flipsign, add}
+
+    I = @index(Global, Cartesian)
+    lm = I[1]
+    lmmax = size(div, 1)
+    k = ndims(div) == 1 ? CartesianIndex() : I[2]
+
+    m = lm2m_indices[lm]
+
+    if lm == 1
+        div[I] = kernel_func(div[I], 0, 0, grad_y_vordiv2[1]*v[2, k])
+    elseif lm == lmmax    
+        div[I] = 0
+    else
+        ∂u∂λ  = ((m-1)*im)*u[I]
+        ∂v∂θ1 = grad_y_vordiv1[lm] * v[lm-1, k] 
+        ∂v∂θ2 = grad_y_vordiv2[lm] * v[lm+1, k]  
+        div[I] = kernel_func(div[I], ∂u∂λ, ∂v∂θ1, ∂v∂θ2)
+    end
+end 
 
 """
 $(TYPEDSIGNATURES)
@@ -239,7 +341,7 @@ function UV_from_vor!(
 
             # U = -∂/∂lat(Ψ) and V = V = ∂/∂λ(Ψ) combined with Laplace inversion ∇⁻², omit radius R scaling
             U[lm, k] = vordiv_to_uv2[lm] * vor[lm+1, k]     # - vordiv_to_uv1[lm]*vor[l-1, m] <- is zero
-            V[lm, k] = im*vordiv_to_uv_x[lm] * vor[lm, k]
+            V[lm, k] = vordiv_to_uv_x[lm] * vor[lm, k]
 
             # BELOW DIAGONAL
             for l in m+1:lmax-2                             # skip last two rows
@@ -248,13 +350,13 @@ function UV_from_vor!(
                 # U = -∂/∂lat(Ψ) and V = V = ∂/∂λ(Ψ) combined with Laplace inversion ∇⁻², omit radius R scaling
                 # U[lm] = vordiv_to_uv2[lm]*vor[lm+1] - vordiv_to_uv1[lm]*vor[lm-1]
                 U[lm, k] = muladd(vordiv_to_uv2[lm], vor[lm+1, k], -vordiv_to_uv1[lm]*vor[lm-1, k])
-                V[lm, k] = im*vordiv_to_uv_x[lm] * vor[lm, k]
+                V[lm, k] = vordiv_to_uv_x[lm] * vor[lm, k]
             end
 
             # SECOND LAST ROW
             lm += 1
             U[lm, k] = -vordiv_to_uv1[lm] * vor[lm-1, k]    # meridional gradient again (but only 2nd term from above)
-            V[lm, k] = im*vordiv_to_uv_x[lm] * vor[lm, k]   # zonal gradient again (as above)
+            V[lm, k] = vordiv_to_uv_x[lm] * vor[lm, k]   # zonal gradient again (as above)
 
             # LAST ROW (separated to avoid out-of-bounds access to l+2, m)
             lm += 1
@@ -266,7 +368,7 @@ function UV_from_vor!(
         @inbounds begin
             lm += 1                     # second last row
             U[lm, k] = 0
-            V[lm, k] = im*vordiv_to_uv_x[lm] * vor[lm, k]
+            V[lm, k] = vordiv_to_uv_x[lm] * vor[lm, k]
 
             lm += 1                     # last row
             U[lm, k] = -vordiv_to_uv1[lm] * vor[lm-1, k]
@@ -321,7 +423,7 @@ function UV_from_vordiv!(
             # ∂Dλ = im*vordiv_to_uv_x[lm]*div[lm]       # divergence contribution to zonal gradient
             # ∂ζλ = im*vordiv_to_uv_x[lm]*vor[lm]       # vorticity contribution to zonal gradient
 
-            z = im*vordiv_to_uv_x[lm]
+            z = vordiv_to_uv_x[lm]
             U[lm, k] = muladd(z, div[lm, k], ∂ζθ)       # = ∂Dλ + ∂ζθ
             V[lm, k] = muladd(z, vor[lm, k], ∂Dθ)       # = ∂ζλ + ∂Dθ
 
@@ -339,15 +441,15 @@ function UV_from_vordiv!(
                 # ∂Dλ = im*vordiv_to_uv_x[lm]*div[lm]   # divergence contribution to zonal gradient
                 # ∂ζλ = im*vordiv_to_uv_x[lm]*vor[lm]   # vorticity contribution to zonal gradient
 
-                z = im*vordiv_to_uv_x[lm]
+                z = vordiv_to_uv_x[lm]
                 U[lm, k] = muladd(z, div[lm, k], ∂ζθ)   # = ∂Dλ + ∂ζθ
                 V[lm, k] = muladd(z, vor[lm, k], ∂Dθ)   # = ∂ζλ + ∂Dθ            
             end
 
             # SECOND LAST ROW (separated to imply that vor, div are zero in last row)
             lm += 1
-            U[lm, k] = im*vordiv_to_uv_x[lm]*div[lm, k] - vordiv_to_uv1[lm]*vor[lm-1, k]
-            V[lm, k] = im*vordiv_to_uv_x[lm]*vor[lm, k] + vordiv_to_uv1[lm]*div[lm-1, k]
+            U[lm, k] = vordiv_to_uv_x[lm]*div[lm, k] - vordiv_to_uv1[lm]*vor[lm-1, k]
+            V[lm, k] = vordiv_to_uv_x[lm]*vor[lm, k] + vordiv_to_uv1[lm]*div[lm-1, k]
 
             # LAST ROW (separated to avoid out-of-bounds access to lmax+1)
             lm += 1
@@ -358,8 +460,8 @@ function UV_from_vordiv!(
         # LAST COLUMN
         @inbounds begin
             lm += 1                                         # second last row
-            U[lm, k] = im*vordiv_to_uv_x[lm]*div[lm, k]     # other terms are zero
-            V[lm, k] = im*vordiv_to_uv_x[lm]*vor[lm, k]     # other terms are zero
+            U[lm, k] = vordiv_to_uv_x[lm]*div[lm, k]     # other terms are zero
+            V[lm, k] = vordiv_to_uv_x[lm]*vor[lm, k]     # other terms are zero
 
             lm += 1                                         # last row
             U[lm, k] = -vordiv_to_uv1[lm]*vor[lm-1, k]      # other terms are zero
@@ -376,6 +478,128 @@ function UV_from_vordiv!(
     return U, V
 end
 
+function UV_from_vordiv_KA!(   
+    U::LowerTriangularArray,
+    V::LowerTriangularArray,
+    vor::LowerTriangularArray,
+    div::LowerTriangularArray,
+    S::SpectralTransform;
+    radius = DEFAULT_RADIUS,
+)
+    (; vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2 ) = S
+    @boundscheck ismatching(S, U) || throw(DimensionMismatch(S, U))
+
+    launch!(S.architecture, :lmk, size(U), _UV_from_vordiv_kernel!, U, V, vor, div, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)
+    
+    # *radius scaling if not unit sphere (*radius² for ∇⁻², then /radius to get from stream function to velocity)
+    if radius != 1
+        U .*= radius
+        V .*= radius
+    end
+
+    return U, V
+end
+
+"""
+$(TYPEDSIGNATURES)
+Compute U, V from vorticity and divergence using separate kernels for U and V.
+This version splits the computation into two separate kernel launches, one for U and one for V.
+Acts on the unit sphere, i.e. it omits any radius scaling as all inplace gradient operators.
+"""
+function UV_from_vordiv_KA_split!(   
+    U::LowerTriangularArray,
+    V::LowerTriangularArray,
+    vor::LowerTriangularArray,
+    div::LowerTriangularArray,
+    S::SpectralTransform;
+    radius = DEFAULT_RADIUS,
+)
+    (; vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2 ) = S
+    @boundscheck ismatching(S, U) || throw(DimensionMismatch(S, U))
+
+    # Launch separate kernels for U and V
+    launch!(S.architecture, :lmk, size(U), _U_from_vordiv_kernel!, U, vor, div, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)
+    launch!(S.architecture, :lmk, size(V), _V_from_vordiv_kernel!, V, vor, div, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)
+    
+    # *radius scaling if not unit sphere (*radius² for ∇⁻², then /radius to get from stream function to velocity)
+    if radius != 1
+        U .*= radius
+        V .*= radius
+    end
+
+    return U, V
+end
+
+@kernel inbounds=true function _UV_from_vordiv_kernel!(U, V, vor, div, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)    
+    I = @index(Global, Cartesian)
+    lm = I[1]
+    k = ndims(vor) == 1 ? CartesianIndex() : I[2]
+    lmmax = size(U, 1)
+    
+    vordiv_uv2 = vordiv_to_uv2[lm]
+    vordiv_uv1 = vordiv_to_uv1[lm]
+    z = vordiv_to_uv_x[lm]
+
+    if lm==1 
+        ∂ζθ =  vordiv_uv2*vor[2, k]       # lm-1 term is zero
+        ∂Dθ = -vordiv_uv2*div[2, k]       # lm-1 term is zero
+
+        U[I] = muladd(z, div[lm, k], ∂ζθ)   # = ∂Dλ + ∂ζθ
+        V[I] = muladd(z, vor[lm, k], ∂Dθ)   # = ∂ζλ + ∂Dθ            
+    elseif lm==lmmax  
+        U[I] = -vordiv_uv1*vor[lm-1, k]      # other terms are zero
+        V[I] =  vordiv_uv1*div[lm-1, k]       
+    else    
+        ∂ζθ = muladd(vordiv_uv2, vor[lm+1, k], -vordiv_uv1*vor[lm-1, k])
+        ∂Dθ = muladd(vordiv_uv1, div[lm-1, k], -vordiv_uv2*div[lm+1, k])
+
+        U[I] = muladd(z, div[lm, k], ∂ζθ)   # = ∂Dλ + ∂ζθ
+        V[I] = muladd(z, vor[lm, k], ∂Dθ)   # = ∂ζλ + ∂Dθ            
+    end    
+end 
+
+@kernel inbounds=true function _U_from_vordiv_kernel!(U, vor, div, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)    
+    I = @index(Global, Cartesian)
+    lm = I[1]
+    k = ndims(vor) == 1 ? CartesianIndex() : I[2]
+    lmmax = size(U, 1)
+    
+    vordiv_uv2 = vordiv_to_uv2[lm]
+    vordiv_uv1 = vordiv_to_uv1[lm]
+    z = vordiv_to_uv_x[lm]
+
+    if lm==1 
+        ∂ζθ = vordiv_uv2*vor[2, k]       # lm-1 term is zero
+        U[I] = muladd(z, div[lm, k], ∂ζθ)   # = ∂Dλ + ∂ζθ
+    elseif lm==lmmax  
+        U[I] = -vordiv_uv1*vor[lm-1, k]      # other terms are zero
+    else    
+        ∂ζθ = muladd(vordiv_uv2, vor[lm+1, k], -vordiv_uv1*vor[lm-1, k])
+        U[I] = muladd(z, div[lm, k], ∂ζθ)   # = ∂Dλ + ∂ζθ
+    end    
+end 
+
+@kernel inbounds=true function _V_from_vordiv_kernel!(V, vor, div, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)    
+    I = @index(Global, Cartesian)
+    lm = I[1]
+    k = ndims(vor) == 1 ? CartesianIndex() : I[2]
+    lmmax = size(V, 1)
+    
+    vordiv_uv2 = vordiv_to_uv2[lm]
+    vordiv_uv1 = vordiv_to_uv1[lm]
+    z = vordiv_to_uv_x[lm]
+
+    if lm==1 
+        ∂Dθ = -vordiv_uv2*div[2, k]       # lm-1 term is zero
+        V[I] = muladd(z, vor[lm, k], ∂Dθ)   # = ∂ζλ + ∂Dθ            
+    elseif lm==lmmax  
+        V[I] = vordiv_uv1*div[lm-1, k]       
+    else    
+        ∂Dθ = muladd(vordiv_uv1, div[lm-1, k], -vordiv_uv2*div[lm+1, k])
+        V[I] = muladd(z, vor[lm, k], ∂Dθ)   # = ∂ζλ + ∂Dθ            
+    end    
+end 
+
 """
 $(TYPEDSIGNATURES)
 Laplace operator ∇² applied to the spectral coefficients `alms` in spherical
@@ -391,7 +615,8 @@ Keyword arguments
   - `flipsign=true` computes -∇²(alms) instead
   - `inverse=true` computes ∇⁻²(alms) instead
 
-Default is `add=false`, `flipsign=false`, `inverse=false`. These options can be combined."""
+Default is `add=false`, `flipsign=false`, `inverse=false`. These options can be combined.
+"""
 function ∇²!(
     ∇²alms::LowerTriangularArray,   # Output: (inverse) Laplacian of alms
     alms::LowerTriangularArray,     # Input: spectral coefficients
@@ -409,18 +634,7 @@ function ∇²!(
     kernel = flipsign ? (add ? (o,a) -> (o-a) : (o, a) -> -a) : 
                         (add ? (o,a) -> (o+a) : (o, a) -> a)
     
-    # maximum degree l, order m of spherical harmonics (1-based)
-    lmax, mmax = size(alms, OneBased, as=Matrix)
-
-    for k in eachmatrix(∇²alms, alms)
-        lm = 0
-        @inbounds for m in 1:mmax
-            for l in m:lmax
-                lm += 1
-                ∇²alms[lm, k] = kernel(∇²alms[lm, k], alms[lm, k]*eigenvalues[l])
-            end
-        end
-    end
+    launch!(S.architecture, :lmk, size(∇²alms), ∇²_kernel!, ∇²alms, alms, eigenvalues, kernel, alms.spectrum.l_indices)
 
     # /radius² or *radius² scaling if not unit sphere
     if radius != 1
@@ -430,6 +644,16 @@ function ∇²!(
 
     return ∇²alms
 end
+
+@kernel function ∇²_kernel!(∇²alms, alms, @Const(eigenvalues), kernel_func, @Const(l_indices))
+
+    I = @index(Global, Cartesian) # I[1] == lm, I[2] == k
+                                  # we use cartesian index instead of NTuple here
+                                  # because this works for 2D and 3D matrices
+    l = l_indices[I[1]]
+
+    ∇²alms[I] = kernel_func(∇²alms[I], alms[I]*eigenvalues[l])
+end 
 
 """
 $(TYPEDSIGNATURES)
@@ -499,45 +723,13 @@ function ∇!(
     radius = DEFAULT_RADIUS,        # scale with radius if provided, otherwise unit sphere
 )
     (; grad_y1, grad_y2) = S
+    (; m_indices) = p.spectrum
     @boundscheck ismatching(S, p) || throw(DimensionMismatch(S, p))
 
-    # maximum degree l, order m of spherical harmonics (1-based)
-    lmax, mmax = size(p, OneBased, as=Matrix)
+    @. dpdx = complex(0, m_indices - 1)*p
 
-    for k in eachmatrix(dpdx, dpdy, p)      # also performs size checks
-        lm = 0
-        @inbounds for m in 1:mmax-1         # 1-based l, m, skip last column
-
-            # DIAGONAL (separated to avoid access to l-1, m which is above the diagonal)
-            lm += 1
-
-            dpdx[lm, k] = (m-1)*im*p[lm, k]         # zonal gradient: d/dlon = *i*m
-            dpdy[lm, k] = grad_y2[lm]*p[lm+1, k]    # meridional gradient: p[lm-1]=0 on diagonal
-        
-            # BELOW DIAGONAL (all terms)
-            for l in m+1:lmax-1                     # skip last row
-                lm += 1
-                dpdx[lm, k] = (m-1)*im*p[lm, k]
-                dpdy[lm, k] = grad_y1[lm]*p[lm-1, k] + grad_y2[lm]*p[lm+1, k]
-            end
-
-            # LAST ROW (separated to avoid out-of-bounds access to lmax+1
-            lm += 1
-            dpdx[lm, k] = (m-1)*im*p[lm, k]
-            dpdy[lm, k] = grad_y1[lm]*p[lm-1, k]    # only first term from 2nd last row
-        end
-
-        # LAST COLUMN
-        @inbounds begin
-            lm += 1                                 # second last row
-            dpdx[lm, k] = (mmax-1)*im*p[lm, k]
-            dpdy[lm, k] = grad_y2[lm]*p[lm+1, k]    # only 2nd term
-
-            lm += 1                                 # last row
-            dpdx[lm, k] = (mmax-1)*im*p[lm, k]
-            dpdy[lm, k] = grad_y1[lm]*p[lm-1, k]    # only 1st term
-        end
-    end
+    # first and last element aren't covered by the kernel because they would access p[0], p[end+1]
+    launch!(S.architecture, :lmk, size(dpdy), dpdy_kernel!, dpdy, p, grad_y1, grad_y2)
 
     # 1/radius factor if not unit sphere
     if radius != 1
@@ -547,6 +739,26 @@ function ∇!(
     end
 
     return dpdx, dpdy
+end
+
+@kernel inbounds=true function dpdy_kernel!(dpdy, p, grad_y1, grad_y2)
+    I = @index(Global, Cartesian)
+    lm = I[1]
+    k = ndims(p) == 1 ? CartesianIndex() : I[2]
+    lmmax = size(dpdy, 1)
+
+    gy1 = grad_y1[lm]
+    gy2 = grad_y2[lm]
+
+    # compared to the old CPU only version, some of the gy1 and gy2 are zero 
+    # that's why we don't need to check for l==m (diagonal) or l==p.m (last row)
+    if lm == 1
+        dpdy[lm, k] = gy2*p[lm+1, k]
+    elseif lm == lmmax
+        dpdy[lm, k] = gy1*p[lm-1, k]
+    else
+        dpdy[lm, k] = gy1*p[lm-1, k] + gy2*p[lm+1, k]
+    end
 end
 
 """$(TYPEDSIGNATURES) The zonal and meridional gradient of `p`
