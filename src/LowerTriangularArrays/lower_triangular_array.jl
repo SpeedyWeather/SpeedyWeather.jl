@@ -38,7 +38,7 @@ LowerTriangularMatrix(data::Vector{T}, spectrum::S) where {T, S <: AbstractSpect
     LowerTriangularMatrix{T, typeof(spectrum)}(data, spectrum)
 
 function LowerTriangularArray(data::ArrayType, lmax::Integer, mmax::Integer) where {T, N, ArrayType <: AbstractArray{T,N}}
-    spectrum = Spectrum(lmax, mmax, architecture=default_architecture(ArrayType))
+    spectrum = Spectrum(lmax, mmax, architecture=architecture(ArrayType))
     return LowerTriangularArray{T, N, ArrayType, typeof(spectrum)}(data, spectrum)
 end
 
@@ -163,7 +163,7 @@ for f in (:zeros, :ones, :rand, :randn)
             I::Vararg{Integer, M},
         ) where {T, N, M, ArrayType, S<:AbstractSpectrum}
             ArrayType_ = nonparametric_type(ArrayType)
-            return LowerTriangularArray(ArrayType_($f(T, nonzeros(lmax, mmax), I...)), Spectrum(lmax, mmax, architecture=default_architecture(ArrayType_)))
+            return LowerTriangularArray(ArrayType_($f(T, nonzeros(lmax, mmax), I...)), Spectrum(lmax, mmax, architecture=architecture(ArrayType_)))
         end
 
         function Base.$f(
@@ -182,7 +182,7 @@ for f in (:zeros, :ones, :rand, :randn)
             mmax::Integer, 
             I::Vararg{Integer, M},
         ) where {T, M}
-            return LowerTriangularArray($f(T, nonzeros(lmax, mmax), I...), Spectrum(lmax, mmax, architecture=default_architecture(Array)))
+            return LowerTriangularArray($f(T, nonzeros(lmax, mmax), I...), Spectrum(lmax, mmax, architecture=architecture(Array)))
         end
 
         function Base.$f(
@@ -190,7 +190,7 @@ for f in (:zeros, :ones, :rand, :randn)
             lmax::Integer,
             mmax::Integer, 
         ) where T
-            return LowerTriangularMatrix($f(T, nonzeros(lmax, mmax)), Spectrum(lmax, mmax, architecture=default_architecture(Array)))
+            return LowerTriangularMatrix($f(T, nonzeros(lmax, mmax)), Spectrum(lmax, mmax, architecture=architecture(Array)))
         end
         
         function Base.$f(
@@ -236,7 +236,7 @@ function LowerTriangularArray{T, N, ArrayType, S}(
     ::UndefInitializer,
     I::Vararg{Integer,M},
 ) where {T, N, M, ArrayType<:AbstractArray{T}, S<:AbstractSpectrum}
-    return LowerTriangularArray(ArrayType(undef, nonzeros(I[1], I[2]), I[3:end]...), Spectrum(I[1], I[2], architecture=default_architecture(ArrayType)))
+    return LowerTriangularArray(ArrayType(undef, nonzeros(I[1], I[2]), I[3:end]...), Spectrum(I[1], I[2], architecture=architecture(ArrayType)))
 end
 
 function LowerTriangularArray{T, N, ArrayType, S}(
@@ -775,7 +775,7 @@ function Adapt.adapt_structure(to, L::LowerTriangularArray)
     if ismatching(L.spectrum, typeof(adapted_data))
         return LowerTriangularArray(adapted_data, L.spectrum)
     else 
-        return LowerTriangularArray(adapted_data, Spectrum(L.spectrum, architecture=default_architecture(typeof(adapted_data))))
+        return LowerTriangularArray(adapted_data, Spectrum(L.spectrum, architecture=architecture(typeof(adapted_data))))
     end
 end
 

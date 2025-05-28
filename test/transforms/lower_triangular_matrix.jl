@@ -264,7 +264,7 @@ end
     for f in (ones, zeros, rand, randn)
         s = (5, 5)
         spectrum = Spectrum(s...)
-        spectrum_jlarray = Spectrum(spectrum, architecture=SpeedyWeather.default_architecture(JLArray))
+        spectrum_jlarray = Spectrum(spectrum, architecture=SpeedyWeather.architecture(JLArray))
         
         # for 2D doesn't matter whether you say Matrix or Array, size is determined by s
         L = f(LowerTriangularMatrix, s...)
@@ -622,7 +622,7 @@ end
     NF = Float32
     idims = (5,)
     spectrum = Spectrum(10, 10)
-    spectrum_jlarray = Spectrum(spectrum, architecture=SpeedyWeather.default_architecture(JLArray))
+    spectrum_jlarray = Spectrum(spectrum, architecture=SpeedyWeather.architecture(JLArray))
     
     L_cpu = randn(LowerTriangularArray{NF}, spectrum, idims...)
 
