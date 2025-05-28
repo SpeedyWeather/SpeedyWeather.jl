@@ -88,5 +88,5 @@ module Architectures
     @inline convert_to_device(arch, args)  = args
     @inline convert_to_device(::CPU, args) = args
 
-    KernelAbstractions.synchronize(arch::AbstractArchitecture) = arch.device
+    KernelAbstractions.synchronize(arch::AbstractArchitecture) = KernelAbstractions.synchronize(arch.device)
 end 
