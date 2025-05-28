@@ -15,5 +15,6 @@ ismatching(arch::GPU, array_type::Type{<:JLArrays.JLDeviceArray}) = true
 ismatching(arch::Type{<:GPU}, array_type::Type{<:JLArrays.JLDeviceArray}) = true
 architecture(::Type{<:JLArray}) = GPU(JLArrays.JLBackend())
 array_type(::Type{GPU{JLBackend}}) = JLArray
+array_type(::GPU{JLBackend}) = JLArray
 
 end # module
