@@ -2,7 +2,7 @@ abstract type AbstractSpectralGrid end
 
 # computing
 const DEFAULT_NF = Float32
-const DEFAULT_ARCHITECTURE = CPU
+const DEFAULT_ARCHITECTURE = CPU()
 const DEFAULT_ARRAYTYPE = Array
 
 # numerics
@@ -22,6 +22,7 @@ $(TYPEDFIELDS)
 `nlat_half` and `npoints` should not be chosen but are derived from `trunc`,
 `Grid` and `dealiasing`."""
 struct SpectralGrid{
+    ArchitectureType,      # <: AbstractArchitecture
     SpectrumType,          # <: AbstractSpectrum
 } <: AbstractSpectralGrid
 
@@ -29,7 +30,7 @@ struct SpectralGrid{
     NF::Type{<:AbstractFloat}
 
     "[OPTION] device architecture to run on"
-    architecture::Type{<:AbstractArchitecture} 
+    architecture::ArchitectureType 
 
     "[OPTION] array type to use for all variables"
     ArrayType::Type{<:AbstractArray} 
@@ -127,7 +128,7 @@ end
 # and calculates all derived fields
 function SpectralGrid(;
     NF::Type{<:AbstractFloat} = DEFAULT_NF,
-    architecture::Type{<:AbstractArchitecture} = DEFAULT_ARCHITECTURE,
+    architecture::Union{AbstractArchitecture, Type{<:AbstractArchitecture}} = DEFAULT_ARCHITECTURE,
     ArrayType::Type{<:AbstractArray} = array_type(architecture),
     trunc::Int = DEFAULT_TRUNC,
     Grid::Type{<:AbstractGrid} = DEFAULT_GRID,
@@ -137,6 +138,12 @@ function SpectralGrid(;
     nlayers::Int = DEFAULT_NLAYERS,
     nlayers_soil::Int = DEFAULT_NLAYERS_SOIL
 )
+
+    # Convert architecture to instance if it is a type
+    if architecture isa Type
+        architecture = architecture()
+    end
+
     # Convert numeric parameters to Float64
     dealiasing_f64 = Float64(dealiasing)
     radius_f64 = Float64(radius)
@@ -147,7 +154,7 @@ function SpectralGrid(;
     TensorType = ArrayType{NF, 3}
     
     # Spectral space
-    spectrum = Spectrum(trunc+2, trunc+1, architecture=architecture())
+    spectrum = Spectrum(trunc+2, trunc+1, architecture=architecture)
     
     # Spectral variable types
     SpectralVariable2D = LowerTriangularArray{Complex{NF}, 1, ArrayType{Complex{NF}, 1}, typeof(spectrum)}
@@ -168,7 +175,7 @@ function SpectralGrid(;
     npoints = RingGrids.get_npoints(Grid, nlat_half)
     
     # Create the SpectralGrid with all fields
-    return SpectralGrid{typeof(spectrum)}(
+    return SpectralGrid{typeof(architecture), typeof(spectrum)}(
         NF,
         architecture,
         ArrayType,
