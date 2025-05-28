@@ -101,6 +101,9 @@ export  interpolate,
 # STATISTICS
 export zonal_mean
 
+# UTILITY FUNCTIONS 
+export on_architecture
+
 include("utility_functions.jl")
 
 # GENERAL
