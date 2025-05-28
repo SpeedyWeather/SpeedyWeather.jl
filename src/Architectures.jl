@@ -4,7 +4,7 @@ module Architectures
 
     export AbstractArchitecture
     export CPU, CPUStatic, GPU, CUDAGPU
-    export array_type, on_architecture, architecture, device, convert_to_device
+    export array_type, on_architecture, architecture, device, convert_to_device, default_architecture
 
     """
     AbstractArchitecture
@@ -60,7 +60,14 @@ module Architectures
     architecture(a::SubArray) = architecture(parent(a))
 
     array_type(::CPU) = Array
-    array_type(::Type{CPU}) = Array
+    array_type(::Type{<:CPU}) = Array
+
+    default_architecture(::Type{<:Array}) = CPU()
+    default_architecture(a::AbstractArray) = default_architecture(typeof(a))
+
+    ismatching(arch::Type{<:AbstractArchitecture}, array_T::Type{<:AbstractArray}) = array_T <: array_type(arch)
+    ismatching(arch::AbstractArchitecture, array_T::Type{<:AbstractArray}) = ismatching(typeof(arch), array_T)
+    ismatching(arch::AbstractArchitecture, array::AbstractArray) = ismatching(arch, typeof(array))
 
     # Fallback
     on_architecture(arch, a) = a

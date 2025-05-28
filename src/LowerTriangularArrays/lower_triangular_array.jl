@@ -14,15 +14,19 @@ struct LowerTriangularArray{T, N, ArrayType <: AbstractArray{T,N}, S<:AbstractSp
     LowerTriangularArray{T, N, ArrayType, S}(data::AbstractArray, spectrum::S) where {T, N, ArrayType <: AbstractArray{T,N}, S <: AbstractSpectrum} =
         check_lta_input_array(data, spectrum, N) ? 
         new(data, spectrum)  :
-        error(lta_error_message(data, spectrum, T, N, ArrayType))
+        error(lta_error_message(data, spectrum, T, N, ArrayType, S))
 end
 
 check_lta_input_array(data, spectrum, N) =
-    (ndims(data) == N) & (length(data) == prod(size(data)[2:end]) * nonzeros(spectrum)) 
+    (ndims(data) == N) & (length(data) == prod(size(data)[2:end]) * nonzeros(spectrum)) & ismatching(spectrum, typeof(data))
 
-function lta_error_message(data, spectrum, T, N, ArrayType) 
-    return "$(Base.dims2string(size(data))) $(typeof(data)) cannot be used to create "*
-            "a $(Base.dims2string(matrix_size(data, spectrum))) LowerTriangularArray{$T, $N, $ArrayType}"
+function lta_error_message(data, spectrum, T, N, ArrayType, S) 
+    if ismatching(spectrum, typeof(data))
+        return "Architecture mismatch: Spectrum has architecture $(spectrum.architecture), but array type $(typeof(data)) is used"
+    else 
+        return "$(Base.dims2string(size(data))) $(typeof(data)) cannot be used to create "*
+            "a $(Base.dims2string(matrix_size(data, spectrum))) LowerTriangularArray{$T, $N, $ArrayType, $S}"
+    end
 end 
 
 """2-dimensional `LowerTriangularArray` of type `T` with specturm `S` with its non-zero entries unravelled into a `Vector{T}`"""
@@ -34,7 +38,7 @@ LowerTriangularMatrix(data::Vector{T}, spectrum::S) where {T, S <: AbstractSpect
     LowerTriangularMatrix{T, typeof(spectrum)}(data, spectrum)
 
 function LowerTriangularArray(data::ArrayType, lmax::Integer, mmax::Integer) where {T, N, ArrayType <: AbstractArray{T,N}}
-    spectrum = Spectrum(lmax, mmax)
+    spectrum = Spectrum(lmax, mmax, architecture=default_architecture(ArrayType))
     return LowerTriangularArray{T, N, ArrayType, typeof(spectrum)}(data, spectrum)
 end
 
@@ -159,7 +163,7 @@ for f in (:zeros, :ones, :rand, :randn)
             I::Vararg{Integer, M},
         ) where {T, N, M, ArrayType, S<:AbstractSpectrum}
             ArrayType_ = nonparametric_type(ArrayType)
-            return LowerTriangularArray(ArrayType_($f(T, nonzeros(lmax, mmax), I...)), Spectrum(lmax, mmax))
+            return LowerTriangularArray(ArrayType_($f(T, nonzeros(lmax, mmax), I...)), Spectrum(lmax, mmax, architecture=default_architecture(ArrayType_)))
         end
 
         function Base.$f(
@@ -178,7 +182,7 @@ for f in (:zeros, :ones, :rand, :randn)
             mmax::Integer, 
             I::Vararg{Integer, M},
         ) where {T, M}
-            return LowerTriangularArray($f(T, nonzeros(lmax, mmax), I...), Spectrum(lmax, mmax))
+            return LowerTriangularArray($f(T, nonzeros(lmax, mmax), I...), Spectrum(lmax, mmax, architecture=default_architecture(Array)))
         end
 
         function Base.$f(
@@ -186,7 +190,7 @@ for f in (:zeros, :ones, :rand, :randn)
             lmax::Integer,
             mmax::Integer, 
         ) where T
-            return LowerTriangularMatrix($f(T, nonzeros(lmax, mmax)), Spectrum(lmax, mmax))
+            return LowerTriangularMatrix($f(T, nonzeros(lmax, mmax)), Spectrum(lmax, mmax, architecture=default_architecture(Array)))
         end
         
         function Base.$f(
@@ -232,7 +236,7 @@ function LowerTriangularArray{T, N, ArrayType, S}(
     ::UndefInitializer,
     I::Vararg{Integer,M},
 ) where {T, N, M, ArrayType<:AbstractArray{T}, S<:AbstractSpectrum}
-    return LowerTriangularArray(ArrayType(undef, nonzeros(I[1], I[2]), I[3:end]...), Spectrum(I[1], I[2]))
+    return LowerTriangularArray(ArrayType(undef, nonzeros(I[1], I[2]), I[3:end]...), Spectrum(I[1], I[2], architecture=default_architecture(ArrayType)))
 end
 
 function LowerTriangularArray{T, N, ArrayType, S}(
@@ -766,7 +770,13 @@ function KernelAbstractions.get_backend(
 end 
 
 # To-Do: Actually adapting might need an adapt for the `Spectrum` as well? 
-Adapt.adapt_structure(to, L::LowerTriangularArray) =
-    LowerTriangularArray(Adapt.adapt(to, L.data), L.spectrum)
+function Adapt.adapt_structure(to, L::LowerTriangularArray) 
+    adapted_data = Adapt.adapt(to, L.data)
+    if ismatching(L.spectrum, typeof(adapted_data))
+        return LowerTriangularArray(adapted_data, L.spectrum)
+    else 
+        return LowerTriangularArray(adapted_data, Spectrum(L.spectrum, architecture=default_architecture(typeof(adapted_data))))
+    end
+end
 
 on_architecture(arch::AbstractArchitecture, a::LowerTriangularArray) = Adapt.adapt(array_type(arch), a)

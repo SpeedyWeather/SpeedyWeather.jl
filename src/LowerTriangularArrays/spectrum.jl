@@ -1,6 +1,6 @@
-abstract type AbstractSpectrum end
-struct CPU end
 const DEFAULT_ARCHITECTURE = CPU
+
+abstract type AbstractSpectrum end
 
 """$(TYPEDSIGNATURES) 
 Encodes the spectral trunction, orders and degrees of the spherical harmonics. 
@@ -46,6 +46,13 @@ Spectrum(trunc::Integer; one_degree_more=false, kwargs...) =
     Spectrum(trunc+1+one_degree_more, trunc+1; kwargs...)
 
 Spectrum(; trunc::Integer, kwargs...) = Spectrum(trunc; kwargs...)
+
+"""
+$(TYPEDSIGNATURES)
+Create a `Spectrum` from another `Spectrum` but with a new architecture.
+"""
+Spectrum(spectrum::Spectrum; architecture::AbstractArchitecture=DEFAULT_ARCHITECTURE()) = 
+    Spectrum(spectrum.lmax, spectrum.mmax, architecture, spectrum.orders, spectrum.l_indices, spectrum.m_indices, spectrum.lm_orders)
 
 triangle_number(m::Integer) = m*(m+1)÷2
 nonzeros(l::Integer, m::Integer) = l*m - triangle_number(m-1)
@@ -93,3 +100,6 @@ Base.:(==)(s1::Spectrum, s2::Spectrum) =
 Base.show(io::IO, s::Spectrum) = print(io, "Spectrum(T$(s.mmax-1): (lmax=$(s.lmax), mmax=$(s.mmax)) on $(typeof(s.architecture)))")
 
 eachorder(s::Spectrum) = s.lm_orders
+
+ismatching(s::Spectrum, array_type::Type{<:AbstractArray}) = ismatching(s.architecture, array_type)
+ismatching(s::Spectrum, array::AbstractArray) = ismatching(s.architecture, typeof(array))

@@ -1,5 +1,5 @@
 using KernelAbstractions
-import SpeedyWeather: on_architecture, CPU, CPUStatic, launch!
+import SpeedyWeather: on_architecture, CPU, launch!
 @testset "KernelAbstractions tests" begin 
 
     # To-Do write tests for each type of dims_type in the kernel launching util, 
@@ -10,7 +10,7 @@ import SpeedyWeather: on_architecture, CPU, CPUStatic, launch!
     # Test the kernel with LowerTriangularArrays
     @testset "LowerTriangularArrays kernel test" begin
 
-        @kernel function test_lta_kernel!(A, @Const(B), @Const(C))
+        @kernel function test_lta_kernel!(A, B, C)
             I = @index(Global, Linear)
             A[I] = B[I] * C[I]
         end

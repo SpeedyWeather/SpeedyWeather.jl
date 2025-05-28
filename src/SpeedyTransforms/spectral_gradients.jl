@@ -182,7 +182,7 @@ function _divergence_KA!(
     return div
 end
 
-@kernel function _divergence_kernel!(kernel_func::KernelOP{mode, flipsign, add}, div, @Const(u), @Const(v), @Const(grad_y_vordiv1), @Const(grad_y_vordiv2), @Const(lm2m_indices)) where {mode, flipsign, add}
+@kernel function _divergence_kernel!(kernel_func::KernelOP{mode, flipsign, add}, div, u, v, grad_y_vordiv1, grad_y_vordiv2, lm2m_indices) where {mode, flipsign, add}
 
     I = @index(Global, Cartesian)
     lm = I[1]
@@ -530,7 +530,7 @@ function UV_from_vordiv_KA_split!(
     return U, V
 end
 
-@kernel inbounds=true function _UV_from_vordiv_kernel!(U, V, @Const(vor), @Const(div), @Const(vordiv_to_uv_x), @Const(vordiv_to_uv1), @Const(vordiv_to_uv2))    
+@kernel inbounds=true function _UV_from_vordiv_kernel!(U, V, vor, div, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)    
     I = @index(Global, Cartesian)
     lm = I[1]
     k = ndims(vor) == 1 ? CartesianIndex() : I[2]
@@ -558,7 +558,7 @@ end
     end    
 end 
 
-@kernel inbounds=true function _U_from_vordiv_kernel!(U, @Const(vor), @Const(div), @Const(vordiv_to_uv_x), @Const(vordiv_to_uv1), @Const(vordiv_to_uv2))    
+@kernel inbounds=true function _U_from_vordiv_kernel!(U, vor, div, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)    
     I = @index(Global, Cartesian)
     lm = I[1]
     k = ndims(vor) == 1 ? CartesianIndex() : I[2]
@@ -579,7 +579,7 @@ end
     end    
 end 
 
-@kernel inbounds=true function _V_from_vordiv_kernel!(V, @Const(vor), @Const(div), @Const(vordiv_to_uv_x), @Const(vordiv_to_uv1), @Const(vordiv_to_uv2))    
+@kernel inbounds=true function _V_from_vordiv_kernel!(V, vor, div, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)    
     I = @index(Global, Cartesian)
     lm = I[1]
     k = ndims(vor) == 1 ? CartesianIndex() : I[2]
@@ -741,7 +741,7 @@ function ∇!(
     return dpdx, dpdy
 end
 
-@kernel inbounds=true function dpdy_kernel!(dpdy, @Const(p), @Const(grad_y1), @Const(grad_y2))
+@kernel inbounds=true function dpdy_kernel!(dpdy, p, grad_y1, grad_y2)
     I = @index(Global, Cartesian)
     lm = I[1]
     k = ndims(p) == 1 ? CartesianIndex() : I[2]
