@@ -31,8 +31,8 @@ function get_test_data(; trunc, nlayers, Grid, NF)
                     spectral_grid_cpu.spectrum, 
                     spectral_grid_cpu.nlayers)
     
-    grid_gpu = on_architecture(spectral_grid_gpu.architecture, grid_cpu)
-    spec_gpu = on_architecture(spectral_grid_gpu.architecture, spec_cpu)
+    grid_gpu = on_architecture(S_gpu.architecture, grid_cpu)
+    spec_gpu = on_architecture(S_gpu.architecture, spec_cpu)
     
     return S_cpu, S_gpu, grid_cpu, grid_gpu, spec_cpu, spec_gpu
 end
