@@ -17,7 +17,7 @@ LowerTriangularArrays.nonparametric_type(::Type{<:CuArray}) = CuArray
 array_type(::GPU) = CuArray
 array_type(::Type{<:GPU}) = CuArray
 
-default_architecture(::Type{CuArray}) = GPU()
+default_architecture(::Type{<:CuArray}) = GPU()
 
 CUDAGPU() = GPU(CUDA.CUDABackend(always_inline=true))
 GPU() = CUDAGPU() # default to CUDA
