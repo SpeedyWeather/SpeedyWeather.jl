@@ -12,7 +12,7 @@ SpeedyWeather.globe(geometry::Geometry{NF, Grid}; kwargs...) where {NF, Grid} =
 Create a 3D interactive globe plot of the grid `Grid` at resolution `nlat_half` displaying
 cell centers and faces. Optionally, add coastlines and a background image of the Earth."""
 function SpeedyWeather.globe(
-    Grid::Type{<:AbstractGridArray},
+    Grid::Type{<:AbstractGrid},
     nlat_half::Integer;
     interactive::Bool = true,
     title::String = "$(RingGrids.get_nlat(Grid, nlat_half))-ring $(RingGrids.horizontal_grid_type(Grid))",

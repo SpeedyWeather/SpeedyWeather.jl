@@ -126,7 +126,7 @@ function pressure_gradient_flux!(
     (; uv∇lnp ) = diagn.dynamics
 
     # PRESSURE GRADIENT FLUX
-    @inbounds for k in eachgrid(u_grid, v_grid, uv∇lnp)
+    @inbounds for k in eachlayer(u_grid, v_grid, uv∇lnp)
         for ij in eachgridpoint(u_grid, v_grid, uv∇lnp)
             # the (u, v)⋅∇lnp_s term
             uv∇lnp[ij, k] = u_grid[ij, k]*∇lnp_x[ij] + v_grid[ij, k]*∇lnp_y[ij]
@@ -143,7 +143,7 @@ function temperature_anomaly!(
     (; temp_profile) = implicit     # reference temperature profile
     (; temp_grid, temp_virt_grid ) = diagn.grid
 
-    @inbounds for k in eachgrid(temp_grid, temp_virt_grid)
+    @inbounds for k in eachlayer(temp_grid, temp_virt_grid)
         Tₖ = temp_profile[k]
         for ij in eachgridpoint(temp_grid, temp_virt_grid)
             temp_grid[ij, k]      -= Tₖ  # absolute temperature -> anomaly
@@ -324,7 +324,7 @@ function vordiv_tendencies!(
     # precompute ring indices and boundscheck
     rings = eachring(u_tend_grid, v_tend_grid, u_grid, v_grid, vor_grid, temp_virt_grid)
 
-    @inbounds for k in eachgrid(u_tend_grid, v_tend_grid)
+    @inbounds for k in eachlayer(u_tend_grid, v_tend_grid)
         for (j, ring) in enumerate(rings)
             coslat⁻¹j = coslat⁻¹[j]
             f_j = f[j]
@@ -419,7 +419,7 @@ function temperature_tendency!(
     # implicit_correction! then calculated the implicit terms from Vi-1 minus Vi
     # to move the implicit terms to i-1 which is cheaper then the alternative below
 
-    @inbounds for k in eachgrid(temp_tend_grid, temp_grid, div_grid, Tᵥ, div_sum_above, uv∇lnp_sum_above)
+    @inbounds for k in eachlayer(temp_tend_grid, temp_grid, div_grid, Tᵥ, div_sum_above, uv∇lnp_sum_above)
         Tₖ = temp_profile[k]    # average layer temperature from reference profile
         
         # coefficients from Simmons and Burridge 1981
@@ -480,8 +480,8 @@ end
 
 function horizontal_advection!( 
     A_tend::LowerTriangularArray,       # Ouput: tendency to write into
-    A_tend_grid::AbstractGridArray,     # Input: tendency incl prev terms
-    A_grid::AbstractGridArray,          # Input: grid field to be advected
+    A_tend_grid::AbstractField,         # Input: tendency incl prev terms
+    A_grid::AbstractField,              # Input: grid field to be advected
     diagn::DiagnosticVariables,
     G::Geometry,
     S::SpectralTransform;
@@ -492,7 +492,7 @@ function horizontal_advection!(
     
     kernel = add ? (a,b,c) -> a+b*c : (a,b,c) -> b*c
 
-    for k in eachgrid(A_tend_grid, A_grid, div_grid)
+    for k in eachlayer(A_tend_grid, A_grid, div_grid)
         # +A*div term of the advection operator
         @inbounds for ij in eachgridpoint(A_tend_grid, A_grid, div_grid)
             # add as tend already contains parameterizations + vertical advection
@@ -518,7 +518,7 @@ Computes ∇⋅((u, v)*A) with the option to add/overwrite `A_tend` and to
 """
 function flux_divergence!(
     A_tend::LowerTriangularArray,   # Ouput: tendency to write into
-    A_grid::AbstractGridArray,      # Input: grid field to be advected
+    A_grid::AbstractField,          # Input: grid field to be advected
     diagn::DiagnosticVariables,     # for u_grid, v_grid
     G::Geometry,
     S::SpectralTransform;
@@ -536,7 +536,7 @@ function flux_divergence!(
 
     # precomputed ring indices and check grids_match
     rings = eachring(A_grid, u_grid, v_grid)
-    @inbounds for k in eachgrid(u_grid, v_grid)
+    @inbounds for k in eachlayer(u_grid, v_grid)
         for (j, ring) in enumerate(rings)
             coslat⁻¹j = coslat⁻¹[j]
             for ij in ring
@@ -586,7 +586,7 @@ function vorticity_flux_curldiv!(   diagn::DiagnosticVariables,
 
     # precompute ring indices and check grids match
     rings = eachring(u_tend_grid, v_tend_grid, u, v, vor)
-    @inbounds for k in eachgrid(u)
+    @inbounds for k in eachlayer(u)
         for (j, ring) in enumerate(rings)
             coslat⁻¹j = coslat⁻¹[j]
             f_j = f[j]
@@ -893,7 +893,7 @@ function SpeedyTransforms.transform!(
         # the Tₖ is added for the physics parameterizations again
         # technically Tₖ is from model.implicit (which is held constant throughout) integration
         # but given it's the initial step here using the instantaneous diagn.temp_average is the same
-        @inbounds for k in eachgrid(temp_grid_prev, temp_grid)
+        @inbounds for k in eachlayer(temp_grid_prev, temp_grid)
             Tₖ = diagn.temp_average[k]
             for ij in eachgridpoint(temp_grid_prev, temp_grid)
                 temp_grid_prev[ij, k] = temp_grid[ij, k] - Tₖ

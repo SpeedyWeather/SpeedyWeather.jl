@@ -12,7 +12,8 @@ import Random
         
         @testset for NF in (Float32, Float64)
         
-            A = randn(Grid{NF}, 8)          # a very low resolution grid
+            grid = Grid(8)
+            A = randn(NF, grid)             # a very low resolution grid
             c = randn(NF)
             A .= c                          # constant data globally
 
@@ -189,9 +190,9 @@ end
 end
 
 @testset "3/4D interpolation interfaces" begin
-    A = randn(OctahedralGaussianArray, 16, 2)
-    B = zeros(FullGaussianArray, 16, 2)
-    C = zeros(FullGaussianArray, 16, 2)
+    A = randn(OctahedralGaussianField, 16, 2)
+    B = zeros(FullGaussianField, 16, 2)
+    C = zeros(FullGaussianField, 16, 2)
 
     RingGrids.interpolate!(B, A)
 
@@ -200,9 +201,9 @@ end
 
     @test B == C
 
-    A = randn(OctahedralGaussianArray, 8, 3, 2)
-    B = zeros(FullGaussianArray, 8, 3, 2)
-    C = zeros(FullGaussianArray, 8, 3, 2)
+    A = randn(OctahedralGaussianField, 8, 3, 2)
+    B = zeros(FullGaussianField, 8, 3, 2)
+    C = zeros(FullGaussianField, 8, 3, 2)
 
     RingGrids.interpolate!(B, A)
 

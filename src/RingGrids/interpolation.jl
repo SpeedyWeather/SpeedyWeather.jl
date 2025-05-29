@@ -1,4 +1,4 @@
-"""Contains general precomputed arrays describing the grid of G.
+"""Contains general precomputed arrays describing the grid.
 $(TYPEDFIELDS)"""
 struct GridGeometry{
     Grid,
@@ -6,18 +6,20 @@ struct GridGeometry{
     VectorIntType,
     VectorRangeType,
 }
+    grid::Grid                  # grid, e.g. FullGaussianGrid
+
     nlat_half::Int              # number of latitude rings on one hemisphere (Eq. incl)
     nlat::Int                   # total number of latitude rings
     npoints::Int                # total number of grid points
     londs::VectorType           # longitudes of every grid point 0˚ to 360˚E
     latd::VectorType            # latitude of each ring, incl north pole 90˚N, ..., south pole -90˚N
 
-    rings::VectorRangeType      # for every ring a i:j unit range for ring-based indices
     nlons::VectorIntType        # number of longitudinal points per ring
     lon_offsets::VectorType     # longitude offsets of first grid point per ring
 end
 
-GridGeometry(grid::AbstractGridArray; kwargs...) = GridGeometry(horizontal_grid_type(grid), grid.nlat_half; kwargs...)
+GridGeometry(field::AbstractField; kwargs...) = GridGeometry(field.grid; kwargs...)
+GridGeometry(grid::AbstractGrid; kwargs...) = GridGeometry(grid; kwargs...)
 
 """
 $(TYPEDSIGNATURES)          
@@ -25,18 +27,16 @@ Precomputed arrays describing the geometry of the Grid with resolution nlat_half
 Contains longitudes, latitudes of grid points, their ring index j and their
 unravelled indices ij."""
 function GridGeometry(
-    Grid::Type{<:AbstractGrid},                 # which grid to calculate the geometry for
-    nlat_half::Integer;                         # resolution parameter number of rings
+    grid::AbstractGrid;                         # which grid to calculate the geometry for
     NF::Type{<:AbstractFloat} = Float64,        # number format for the coordinates
     ArrayType::Type{<:AbstractArray} = Array,   # type of the arrays
 )
-
-    nlat = get_nlat(Grid, nlat_half)                # total number of latitude rings
-    npoints = get_npoints(Grid, nlat_half)          # total number of grid points
+    nlat = get_nlat(grid)                       # total number of latitude rings
+    npoints = get_npoints(grid)                 # total number of grid points
 
     # LATITUDES
-    latd = get_latd(Grid, nlat_half)                # latitudes in degrees 90˚N ... -90˚N
-    latd_poles = cat(90, latd, -90, dims=1)         # latd, but poles incl
+    latd = get_latd(grid)                       # latitudes in degrees 90˚N ... -90˚N
+    latd_poles = cat(90, latd, -90, dims=1)     # latd, but poles incl
 
     # Hack: use -90.00...1˚N instead of exactly -90˚N for the <=, > comparison
     # in find_rings! that way the last ring to the south pole can be an open
@@ -45,11 +45,10 @@ function GridGeometry(
     latd_poles[end] = latd_poles[end] - eps(latd_poles[end])
 
     # COORDINATES for every grid point in ring order
-    londs, _ = get_londlatds(Grid, nlat_half)       # in degrees [0˚...360˚E]                         
+    londs, _ = get_londlatds(grid)              # in degrees [0˚...360˚E]                         
 
     # RINGS and LONGITUDE OFFSETS
-    rings = eachring(Grid, nlat_half)               # Vector{UnitRange} descr start/end index on ring
-    nlons = get_nlons(Grid, nlat_half)              # number of longitude points per ring, pole to pole
+    nlons = get_nlons(grid)                     # number of longitude points per ring, pole to pole
     lon_offsets = [londs[ring[1]] for ring in rings]# offset of the first point from 0˚E
 
     # vector type
@@ -58,8 +57,8 @@ function GridGeometry(
     VectorIntType = ArrayType_{Int, 1}
     VectorRangeType = ArrayType_{UnitRange{Int}, 1}
 
-    return GridGeometry{Grid, VectorType, VectorIntType, VectorRangeType}(
-        nlat_half, nlat, npoints, londs, latd_poles, rings, nlons, lon_offsets)
+    return GridGeometry{typeof(grid), VectorType, VectorIntType}(
+        grid, nlat_half, nlat, npoints, londs, latd_poles, nlons, lon_offsets)
 end
 
 function Base.show(io::IO,G::GridGeometry{T}) where T
@@ -137,16 +136,16 @@ NF is the number format used to calculate the interpolation, which can be
 different from the input data and/or the interpolated data on the new grid."""
 abstract type AbstractInterpolator end
 
-struct AnvilInterpolator{NF, Grid, Geometry, Locator} <: AbstractInterpolator
+struct AnvilInterpolator{NF, Geometry, Locator} <: AbstractInterpolator
     geometry::Geometry
     locator::Locator
 end
 
 Base.eltype(::AnvilInterpolator{NF}) where NF = NF
-gridtype(::AnvilInterpolator{NF, Grid}) where {NF, Grid} = Grid
+grid_type(I::AnvilInterpolator) = typeof(I.geometry.grid)
 
 function Base.show(io::IO, L::AbstractInterpolator)
-    NF, Grid = eltype(L), gridtype(L)
+    NF, Grid = eltype(L), grid_type(L)
     println(io,"$(typeof(L))")
     println(io,"├ from: $(L.geometry.nlat)-ring $Grid, $(L.geometry.npoints) grid points")
     print(io,"└ onto: $(L.locator.npoints) points")
@@ -157,51 +156,50 @@ Locator(::Type{<:AnvilInterpolator}) = AnvilLocator
 
 function (::Type{I})(
     ::Type{NF},
-    ::Type{Grid},           # 2D or 3D+
+    ::Type{Grid},           # 2D 
     nlat_half::Integer,     # size of input grid
     npoints::Integer;       # number of points to interpolate onto
     ArrayType::Type{<:AbstractArray} = Array,
-) where {I<:AbstractInterpolator, NF<:AbstractFloat, Grid<:AbstractGridArray}
+) where {I<:AbstractInterpolator, NF<:AbstractFloat, Grid<:AbstractGrid}
 
-    Grid2D = horizontal_grid_type(Grid)
     Loc = Locator(I)                                        # L is the to Interpolator I corresponding locator
-    geometry = GridGeometry(Grid2D, nlat_half; ArrayType)   # general coordinates and indices for grid
+    geometry = GridGeometry(Grid, nlat_half; ArrayType)     # general coordinates and indices for grid
     locator = Loc(NF, npoints; ArrayType)                   # preallocate work arrays for interpolation
 
     # assemble geometry and locator to interpolator
-    return I{NF, Grid2D, typeof(geometry), typeof(locator)}(geometry, locator)
+    return I{NF, Grid, typeof(geometry), typeof(locator)}(geometry, locator)
 end
 
 function (::Type{I})(   ::Type{Grid},
                         nlat_half::Integer,
                         npoints::Integer;
                         kwargs...
-                        ) where {I<:AbstractInterpolator, Grid<:AbstractGridArray}
+                        ) where {I<:AbstractInterpolator, Grid<:AbstractGrid}
     return I(Float64, Grid, nlat_half, npoints; kwargs...)
 end
 
 const DEFAULT_INTERPOLATOR = AnvilInterpolator
 
 function interpolator(  ::Type{NF},
-                        Aout::AbstractGridArray,
-                        A::AbstractGridArray,
+                        Aout::AbstractField,
+                        A::AbstractField,
                         Interpolator::Type{<:AbstractInterpolator}=DEFAULT_INTERPOLATOR
                         ) where {NF<:AbstractFloat}
     
-    londs, latds = get_londlatds(Aout)      # coordinates of new grid
-    I = Interpolator(NF, typeof(A), A.nlat_half, get_npoints2D(Aout))
+    londs, latds = get_londlatds(Aout.grid)     # coordinates of new grid
+    I = Interpolator(NF, typeof(A.grid), get_nlat_half(A), get_npoints2D(Aout))
     update_locator!(I, londs, latds, unsafe=false)
     return I
 end
 
-function interpolator(  Aout::AbstractGridArray,
-                        A::AbstractGridArray,
+function interpolator(  Aout::AbstractField,
+                        A::AbstractField,
                         Interpolator::Type{<:AbstractInterpolator}=DEFAULT_INTERPOLATOR)
     return interpolator(Float64, Aout, A, Interpolator)        # use Float64 as default
 end
     
 ## FUNCTIONS
-function interpolate(lond::Real, latd::Real, A::AbstractGrid)
+function interpolate(lond::Real, latd::Real, A::AbstractField2D)
     Ai = interpolate([lond], [latd], A)
     return Ai[1]
 end
@@ -209,19 +207,19 @@ end
 function interpolate(
     londs::AbstractVector{NF},  # longitudes to interpolate into (0˚...360˚E)
     latds::AbstractVector{NF},  # latitudes to interpolate onto (90˚N...-90˚N)
-    A::AbstractGrid,            # gridded field to interpolate from
+    A::AbstractField2D,         # gridded field to interpolate from
     Interpolator::Type{<:AbstractInterpolator}=DEFAULT_INTERPOLATOR,
 ) where NF                      # number format used for interpolation
     n = length(latds)
     @assert n == length(londs) "New interpolation coordinates londs::Vector, latds::Vector have to be of same length.
                                 $n and $(length(londs)) provided."
     
-    I = Interpolator(NF, typeof(A), A.nlat_half, n)    # generate Interpolator, containing geometry and work arrays
-    update_locator!(I, londs, latds, unsafe=false)     # update location work arrays in I
+    I = Interpolator(NF, typeof(A.grid), get_nlat_half(A), n)    # generate Interpolator, containing geometry and work arrays
+    update_locator!(I, londs, latds, unsafe=false)          # update location work arrays in I
     interpolate(A, I)
 end
 
-function interpolate(   A::AbstractGrid{NF},        # field to interpolate 
+function interpolate(   A::AbstractField2D{NF},     # field to interpolate 
                         I::AbstractInterpolator     # indices in I are assumed to be calculated already!
                         ) where NF                  # use number format from input data also for output
 
@@ -264,67 +262,68 @@ function interpolate!(
     return Aout
 end
 
-# version for 2D grids
+# version for 2D fields
 function interpolate!(
-    Aout::AbstractGrid,     # Out: grid to interpolate onto
-    A::AbstractGrid,        # In: gridded data to interpolate from
+    Aout::AbstractField2D,      # Out: field to interpolate into
+    A::AbstractField2D,         # In: field to interpolate from
     interpolator::AnvilInterpolator,
 )
-    # if grids match just copy data over (eltypes might differ)
-    grids_match(Aout, A) && return copyto!(Aout.data, A.data)
+    # if fields match just copy data over (eltypes might differ)
+    fields_match(Aout, A) && return copyto!(Aout.data, A.data)
     interpolate!(Aout.data, A, interpolator)
 end
 
-# version for 3D grids
+# version for 3D+ fields
 function interpolate!(
-    Aout::AbstractGridArray,    # Out: grid to interpolate onto
-    A::AbstractGridArray,       # In: gridded data to interpolate from
+    Aout::AbstractField,        # Out: grid to interpolate onto
+    A::AbstractField,           # In: gridded data to interpolate from
     interpolator::AnvilInterpolator,
 )
-    # if grids match just copy data over (eltypes might differ)
-    grids_match(Aout, A) && return copyto!(Aout.data, A.data)
+    # if fields match just copy data over (eltypes might differ)
+    fields_match(Aout, A) && return copyto!(Aout.data, A.data)
 
-    for k in eachgrid(Aout, A, vertical_only=true)
+    for k in eachlayer(Aout, A, vertical_only=true)
         interpolate!(view(Aout.data, :, k), view(A.data, :, k), interpolator)
     end
 end
 
 function interpolate!(  ::Type{NF},
-                        Aout::AbstractGridArray,
-                        A::AbstractGridArray,
+                        Aout::AbstractField,
+                        A::AbstractField,
                         Interpolator::Type{<:AbstractInterpolator}=DEFAULT_INTERPOLATOR
                         ) where {NF<:AbstractFloat}
     
-    # if grids match just copy data over (eltypes might differ)
-    grids_match(Aout, A) && return copyto!(Aout.data, A.data)
+    # if fields match just copy data over (eltypes might differ)
+    fields_match(Aout, A) && return copyto!(Aout.data, A.data)
     I = interpolator(NF, Aout, A, Interpolator)     # create interpolator instance from grid A to Aout
     interpolate!(Aout, A, I)                        # perform interpolation
 end
 
-function interpolate!(  Aout::AbstractGridArray,    # Out: grid to interpolate onto
-                        A::AbstractGridArray,       # In: gridded data to interpolate from
+function interpolate!(  Aout::AbstractField,        # Out: grid to interpolate onto
+                        A::AbstractField,           # In: gridded data to interpolate from
                         I::Type{<:AbstractInterpolator}=DEFAULT_INTERPOLATOR)
-    interpolate!(Float64, Aout, A, I)               # use Float64 as default
+    interpolate!(DEFAULT_NF, Aout, A, I)            # use Float64 as default
 end
 
 function interpolate(   ::Type{Grid},
                         nlat_half::Integer,
-                        A::AbstractGridArray,
+                        A::AbstractField,
                         I::Type{<:AbstractInterpolator}=DEFAULT_INTERPOLATOR
-                        ) where {Grid<:AbstractGridArray}
+                        ) where {Grid<:AbstractGrid}
 
-    Aout = Grid(undef, nlat_half, size(A)[2:end]...)
+    grid = Grid(nlat_half)
+    Aout = Field(grid, size(A)[2:end]...)
     interpolate!(Aout, A, I)    # returns a vector
     return Aout                 # returns the grid wrapped around that vector
 end
 
 # if nlat_half not provided use that from input grid
 function interpolate(   ::Type{Grid},
-                        A::AbstractGridArray,
+                        A::AbstractField,
                         I::Type{<:AbstractInterpolator}=DEFAULT_INTERPOLATOR
-                        ) where {Grid<:AbstractGridArray}
+                        ) where {Grid<:AbstractGrid}
 
-    interpolate(Grid, A.nlat_half, A, I)
+    interpolate(Grid, get_nlat_half(A), A, I)
 end
 
 function update_locator!(
@@ -342,8 +341,8 @@ function update_locator!(
     find_grid_indices!(I, λs)               # next points left and right of λ on rings north and south
 end
 
-function update_locator!(I::AbstractInterpolator, A::AbstractGridArray; kwargs...)
-    londs, latds = get_londlatds(A)
+function update_locator!(I::AbstractInterpolator, A::AbstractField; kwargs...)
+    londs, latds = get_londlatds(A.grid)
     update_locator!(I, londs, latds; kwargs...)
 end
 
@@ -370,14 +369,19 @@ function find_rings!(   js::AbstractVector{<:Integer},  # Out: ring indices j
     find_rings_unsafe!(js, Δys, θs, latd)
 end
 
+DimensionMismatchArray(a::AbstractArray, b::AbstractArray) =
+    DimensionMismatch("Arrays have different dimensions: $(size(a)) vs $(size(b))")
+DimensionMismatchArray(a::AbstractArray, bs::AbstractArray...) =
+    DimensionMismatch("Arrays have different dimensions: $(size(a)) vs $(map(size, bs))")
+
 function find_rings_unsafe!(js::AbstractVector{<:Integer},  # Out: vector of ring indices
                             Δys::AbstractVector,            # distance fractions to ring further south
                             θs::AbstractVector,             # latitudes of points to interpolate onto
                             latd::AbstractVector{NF},       # latitudes of rings (90˚ to -90˚, strictly decreasing)
                             ) where {NF<:AbstractFloat}
 
-    @boundscheck length(js) == length(θs) || throw(BoundsError)
-    @boundscheck length(js) == length(Δys) || throw(BoundsError)
+    @boundscheck length(js) == length(θs) || throw(DimensionMismatchArray(js, θs))
+    @boundscheck length(js) == length(Δys) || throw(DimensionMismatchArray(js, Δys))
 
     # find first search for every θ in θs in latd but reuse index j from previous θ
     # as a predictor to start the search. Search walk is therefore either d=1 (southward)
@@ -430,8 +434,8 @@ function find_grid_indices!(I::AnvilInterpolator,       # update indices arrays
         end
 
         # SOUTHERN POINTS c, d
-        if j == nlat            # c, d are at the south pole
-            ij_cs[k] = -1       # use -1 as south pole flag
+        if j == nlat                    # c, d are at the south pole
+            ij_cs[k] = -1               # use -1 as south pole flag
             ij_ds[k] = -1
         else
             # as above but for one ring further down
@@ -448,14 +452,14 @@ function find_lon_indices(  λ::NF,      # longitude to find incides for (0˚...
                             nlon::Int   # number of longitude points on ring
                             ) where {NF<:AbstractFloat}
 
-    Δλ = convert(NF, 360)/nlon       # longitude spacing
-    ix = (λ-λ₀)/Δλ                  # grid index i but with fractional part
-    i = floor(Int, ix)               # 0-based grid index to the left
-    Δ = ix-i                        # distance fraction from i to i+1
+    Δλ = convert(NF, 360)/nlon          # longitude spacing
+    ix = (λ-λ₀)/Δλ                      # grid index i but with fractional part
+    i = floor(Int, ix)                  # 0-based grid index to the left
+    Δ = ix-i                            # distance fraction from i to i+1
 
     # λ ∈ [λa, λb), i.e. a is the next grid point to the left, b to the right
-    i_a = mod(i, nlon) + 1           # convert to 1-based index
-    i_b = mod(i+1, nlon) + 1         # use mod for periodicity
+    i_a = mod(i, nlon) + 1              # convert to 1-based index
+    i_b = mod(i+1, nlon) + 1            # use mod for periodicity
     return i_a, i_b, Δ
 end
 
@@ -527,8 +531,8 @@ Averages all grid points in `input` that are within one grid cell of
 are assumed to be rectangles spanning half way to adjacent longitude
 and latitude points."""
 function grid_cell_average!(
-    output::AbstractGrid,
-    input::AbstractFullGrid)
+    output::AbstractField,
+    input::AbstractFullField)
 
     # for i, j indexing
     input_matrix = reshape(input.data, :, get_nlat(input))
@@ -607,7 +611,8 @@ Averages all grid points in `input` that are within one grid cell of
 are assumed to be rectangles spanning half way to adjacent longitude
 and latitude points."""
 function grid_cell_average(Grid::Type{<:AbstractGrid}, nlat_half::Integer, input::AbstractFullGrid)
-    output = zeros(Grid, nlat_half)
+    grid = Grid(nlat_half)
+    output = Field(grid)
     grid_cell_average!(output, input)
     return output
 end

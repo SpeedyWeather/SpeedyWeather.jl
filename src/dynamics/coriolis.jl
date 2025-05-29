@@ -26,14 +26,7 @@ export coriolis
 $(TYPEDSIGNATURES)
 Return the Coriolis parameter `f` on the grid `Grid` of resolution `nlat_half`
 on a planet of `rotation` [1/s]. Default rotation of Earth."""
-function coriolis(
-    ::Type{Grid},
-    nlat_half::Integer,     # resolution parameter
-    ks::Integer...;         # non-horizontal dimensions
-    rotation = DEFAULT_ROTATION
-) where {Grid<:AbstractGridArray}
-
-    f = zeros(Grid, nlat_half, ks...)       # preallocate
+function coriolis!(f::AbstractField; rotation = DEFAULT_ROTATION)
     lat = get_lat(Grid, nlat_half)          # in radians [-π/2, π/2]
 
     for (j, ring) in enumerate(eachring(f))
@@ -47,11 +40,9 @@ end
 
 """
 $(TYPEDSIGNATURES)
-Return the Coriolis parameter `f` on a grid like `grid`
-on a planet of `rotation` [1/s]. Default rotation of Earth."""
-function coriolis(
-    grid::Grid;
-    kwargs...
-) where {Grid<:AbstractGridArray}
-    return coriolis(Grid, grid.nlat_half, size(grid)[2:end]...; kwargs...)
-end
+Return the Coriolis parameter `f` on the same grid as `field`
+on a planet of kwarg `rotation` [1/s]. Default rotation of Earth."""
+coriolis(field::AbstractField; kwargs...) = coriolis!(similar(field); kwargs...)
+coriolis(grid::AbstractGrid, ks...; kwargs...) = coriolis!(zero(grid, ks...); kwargs...)
+coriolis(::Type{Grid}, nlat_half::Integer, args...; kwargs...) where {Grid<:AbstractGrid} =
+    coriolis(Grid(nlat_half), args...; kwargs...)

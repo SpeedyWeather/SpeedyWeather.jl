@@ -8,7 +8,7 @@ function Base.show(io::IO, A::AbstractDiagnosticVariables)
         val = getfield(A, key)
         T = typeof(val)
 
-        if T <: AbstractGridArray
+        if T <: AbstractField
             NF = first_parameter(T)
             nlat = RingGrids.get_nlat(val)
             Grid = RingGrids.nonparametric_type(T)
@@ -38,8 +38,8 @@ $(TYPEDFIELDS)"""
     SP,                     # <: AbstractSpectrum
     SpectralVariable2D,     # <: LowerTriangularArray
     SpectralVariable3D,     # <: LowerTriangularArray
-    GridVariable2D,         # <: AbstractGridArray
-    GridVariable3D,         # <: AbstractGridArray
+    GridVariable2D,         # <: AbstractField
+    GridVariable3D,         # <: AbstractField
 } <: AbstractDiagnosticVariables
 
     spectrum::SP            # spectral resolution: maximum degree and order of spherical harmonics
@@ -101,8 +101,8 @@ $TYPEDFIELDS."""
 @kwdef struct GridVariables{
     NF,                     # <: AbstractFloat
     ArrayType,              # Array, CuArray, ...
-    GridVariable2D,         # <: AbstractGridArray
-    GridVariable3D,         # <: AbstractGridArray
+    GridVariable2D,         # <: AbstractField
+    GridVariable3D,         # <: AbstractField
 } <: AbstractDiagnosticVariables
 
     nlat_half::Int          # grid resolution: number of latitude rings on one hemisphere (Eq. incl.)
@@ -166,8 +166,8 @@ $(TYPEDFIELDS)"""
     SP,                     # <: AbstractSpectrum
     SpectralVariable2D,     # <: LowerTriangularArray
     SpectralVariable3D,     # <: LowerTriangularArray
-    GridVariable2D,         # <: AbstractGridArray
-    GridVariable3D,         # <: AbstractGridArray
+    GridVariable2D,         # <: AbstractField
+    GridVariable3D,         # <: AbstractField
 } <: AbstractDiagnosticVariables
     
     spectrum::SP            # spectral resolution: maximum degree and order of spherical harmonics
@@ -300,7 +300,7 @@ $(TYPEDFIELDS)"""
 @kwdef struct PhysicsVariables{
     NF,                     # <: AbstractFloat
     ArrayType,              # Array, CuArray, ...
-    GridVariable2D,         # <: AbstractGridArray
+    GridVariable2D,         # <: AbstractField
 } <: AbstractDiagnosticVariables
 
     nlat_half::Int          # resolution of grid
@@ -376,9 +376,9 @@ $(TYPEDFIELDS)"""
 @kwdef struct ParticleVariables{
     NF,                     # <: AbstractFloat
     ArrayType,              # Array, CuArray, ...
-    ParticleVector,         # <: AbstractGridArray
+    ParticleVector,         # <: AbstractField
     VectorNF,               # Vector{NF} or CuVector{NF}
-    Grid,                   # <:AbstractGridArray
+    Grid,                   # <:AbstractGrid
 } <: AbstractDiagnosticVariables
     "Number of particles"
     nparticles::Int
@@ -418,13 +418,13 @@ $(TYPEDFIELDS)"""
 struct DiagnosticVariables{
     NF,                     # <: AbstractFloat
     ArrayType,              # Array, CuArray, ...
-    Grid,                   # <:AbstractGridArray
+    Grid,                   # <:AbstractGrid
     SP,                     # <: AbstractSpectrum
     SpectralVariable2D,     # <: LowerTriangularArray
     SpectralVariable3D,     # <: LowerTriangularArray
-    GridVariable2D,         # <: AbstractGridArray
-    GridVariable3D,         # <: AbstractGridArray
-    ParticleVector,         # <: AbstractGridArray
+    GridVariable2D,         # <: AbstractField
+    GridVariable3D,         # <: AbstractField
+    ParticleVector,         # <: AbstractField
     VectorType,             # <: AbstractVector
     MatrixType,             # <: AbstractMatrix
 } <: AbstractDiagnosticVariables
@@ -531,23 +531,23 @@ end
 function add!(diagn::DiagnosticVariables{
     NF,                     # <: AbstractFloat
     ArrayType,              # Array, CuArray, ...
-    Grid,                   # <:AbstractGridArray
+    Grid,                   # <:AbstractGrid
     SP,                     # <: AbstractSpectrum
     SpectralVariable2D,     # <: LowerTriangularArray
     SpectralVariable3D,     # <: LowerTriangularArray
-    GridVariable2D,         # <: AbstractGridArray
-    GridVariable3D,         # <: AbstractGridArray
+    GridVariable2D,         # <: AbstractField
+    GridVariable3D,         # <: AbstractField
 },
     tracers::Tracer...,
     ) where {
         NF,                     # <: AbstractFloat
         ArrayType,              # Array, CuArray, ...
-        Grid,                   # <:AbstractGridArray
+        Grid,                   # <:AbstractGrid
         SP,                     # <: AbstractSpectrum
         SpectralVariable2D,     # <: LowerTriangularArray
         SpectralVariable3D,     # <: LowerTriangularArray
-        GridVariable2D,         # <: AbstractGridArray
-        GridVariable3D,         # <: AbstractGridArray
+        GridVariable2D,         # <: AbstractField
+        GridVariable3D,         # <: AbstractField
     }
     (; spectrum, nlat_half, nlayers) = diagn
     for tracer in tracers
@@ -618,4 +618,6 @@ end
 Base.fill!(tendencies::Tendencies, x) = Base.fill!(tendencies, x, PrimitiveWet)
 Base.fill!(tendencies::Tendencies, x, model::AbstractModel) = Base.fill!(tendencies, x, typeof(model))
 
+RingGrids.eachlayer(diagn::DiagnosticVariables) = eachlayer(diagn.grid.vor_grid)
 RingGrids.eachgridpoint(diagn::DiagnosticVariables) = eachgridpoint(diagn.grid.vor_grid)
+RingGrids.eachindex(diagn::DiagnosticVariables) = eachindex(diagn.grid.vor_grid)

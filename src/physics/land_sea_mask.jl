@@ -33,32 +33,32 @@ function Base.show(io::IO, L::AbstractLandSeaMask)
 end
 
 function mask!(
-    grid::AbstractGridArray{NF},
-    mask::AbstractGridArray,
+    field::AbstractField,
+    mask::AbstractField,
     land_or_sea::Symbol;
     masked_value = NaN,
-) where NF
+)
 
     val = land_or_sea == :land ? 1 : 0
-    masked_val = convert(NF, masked_value)
+    masked_val = convert(eltype(field), masked_value)
 
-    @boundscheck grids_match(grid, mask, horizontal_only=true) || throw(DimensionMismatch(grid, mask))
-    @boundscheck ndims(mask) == 1 ||throw(DimensionMismatch(grid, mask))
+    @boundscheck fields_match(field, mask, horizontal_only=true) || throw(DimensionMismatch(field, mask))
+    @boundscheck ndims(mask) == 1 || throw(DimensionMismatch(field, mask))
 
-    for k in eachgrid(grid)
+    for k in eachlayer(field)
         for ij in eachgridpoint(mask)
             if mask[ij] == val
-                grid[ij, k] = masked_val
+                field[ij, k] = masked_val
             end
         end
     end
 
-    return grid
+    return field
 end
 
 # also allow for land_sea_mask struct to be passed on, use .mask in that case
-mask!(grid::AbstractGridArray, mask::AbstractLandSeaMask, args...; kwargs...) =
-    mask!(grid, mask.mask, args...; kwargs...)
+mask!(field::AbstractField, mask::AbstractLandSeaMask, args...; kwargs...) =
+    mask!(field, mask.mask, args...; kwargs...)
 
 # make available when using SpeedyWeather
 export EarthLandSeaMask
