@@ -73,22 +73,21 @@ The output grid is optionally determined by keyword arguments `output_Grid` (its
 `nlat_half` (resolution) and `output_NF` (number format). By default, uses the full grid
 equivalent of the grid and resolution used in `SpectralGrid` `S`."""
 function NetCDFOutput(
-    S::SpectralGrid,
+    SG::SpectralGrid,
     Model::Type{<:AbstractModel} = Barotropic;
-    output_Grid::Type{<:AbstractFullGrid} = RingGrids.full_grid_type(S.Grid),
-    nlat_half::Integer = S.nlat_half, 
+    output_grid::AbstractFullGrid = RingGrids.full_grid_type(SG.grid)(SG.grid.nlat_half),
     output_NF::DataType = DEFAULT_OUTPUT_NF,
     output_dt::Period = Second(DEFAULT_OUTPUT_DT),  # only needed for dispatch
     kwargs...)
 
     # INPUT GRID
-    input_Grid = S.Grid
-    input_nlat_half = S.nlat_half
+    input_grid = SG.grid
+    input_nlat_half = input_grid.nlat_half
 
     # OUTPUT GRID
-    nlon = RingGrids.get_nlon(output_Grid, nlat_half)
-    nlat = RingGrids.get_nlat(output_Grid, nlat_half)
-    npoints = nlon*nlat
+    nlon = get_nlon(output_grid)
+    nlat = get_nlat(output_grid)
+    npoints = get_npoints(output_grid)
     (; nlayers, nlayers_soil) = S
 
     # CREATE INTERPOLATOR

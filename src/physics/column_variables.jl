@@ -219,5 +219,5 @@ function reset_column!(column::ColumnVariables{NF}) where NF
 end
 
 # iterator for convenience
-eachlayer(column::ColumnVariables) = eachindex(column)
+RingGrids.eachlayer(column::ColumnVariables) = eachindex(column)
 Base.eachindex(column::ColumnVariables) = Base.OneTo(column.nlayers)

@@ -6,7 +6,7 @@ function Base._reverse!(field::AbstractField, ::Val{:lat})
     nrings = length(rings)
     rings_north = view(rings, 1:nrings ÷ 2)
 
-    @inbounds for k in eachfield(field)
+    @inbounds for k in eachlayer(field)
         for (j_north, ring) in enumerate(rings_north)
             j_south = nrings - j_north + 1
             for (i, ij_north) in enumerate(ring)
@@ -27,7 +27,7 @@ function Base._reverse!(field::AbstractField, ::Val{:lat})
 end
 
 function Base._reverse!(field::AbstractField, ::Val{:lon})
-    for k in eachfield(field)
+    for k in eachlayer(field)
         for ring in eachring(field)
             field_ring = view(field, ring, k)
             reverse!(field_ring)

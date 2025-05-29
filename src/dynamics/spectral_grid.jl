@@ -29,7 +29,7 @@ struct SpectralGrid{
     "[OPTION] number format used throughout the model"
     NF::Type{<:AbstractFloat}
 
-    "[OPTION] device archictecture to run on"
+    "[OPTION] device architecture to run on"
     device::AbstractDevice
 
     "[OPTION] array type to use for all variables"
@@ -212,7 +212,7 @@ function SpeedyTransforms.SpectralTransform(spectral_grid::SpectralGrid;
                                             one_more_degree::Bool=true,
                                             kwargs...)
     (; NF, spectrum, grid, nlayers, ArrayType) = spectral_grid
-    (; lmax, mmax, archictecture) = spectrum
-    spectrum = one_more_degree == false ? Spectrum(lmax-1, mmax; archictecture) : spectrum
+    (; lmax, mmax, architecture) = spectrum
+    spectrum = one_more_degree == false ? Spectrum(lmax-1, mmax; architecture) : spectrum
     return SpectralTransform(spectrum, grid; NF, ArrayType, nlayers, kwargs...)
 end

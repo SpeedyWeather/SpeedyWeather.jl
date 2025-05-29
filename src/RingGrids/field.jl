@@ -107,7 +107,7 @@ e.g. the vertical layer (or a time dimension, etc). To be used like
         for (j, ring) in enumerate(eachring(field))
             for ij in ring
                 field[ij, k]"""
-@inline eachlayer(field::AbstractField) = CartesianIndices(size(field)[2:end])
+eachlayer(field::AbstractField) = CartesianIndices(size(field)[2:end])
 
 # several arguments to check for matching grids
 function eachlayer(field1::AbstractField, fields::AbstractField...; vertical_only=true, kwargs...)

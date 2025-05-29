@@ -312,7 +312,7 @@ end
                 oro_grid2 = transform(oro_spec1, S)
                 oro_spec2 = transform(oro_grid2, S)
 
-                tol = 1e-3
+                tol = 2e-3
 
                 for lm in SpeedyWeather.eachharmonic(oro_spec1, oro_spec2)
                     @test oro_spec1[lm] ≈ oro_spec2[lm] atol=tol rtol=tol

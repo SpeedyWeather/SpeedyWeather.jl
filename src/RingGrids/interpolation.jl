@@ -6,19 +6,20 @@ struct GridGeometry{
     VectorIntType,
     VectorRangeType,
 }
+    grid::Grid                  # grid, e.g. FullGaussianGrid
+
     nlat_half::Int              # number of latitude rings on one hemisphere (Eq. incl)
     nlat::Int                   # total number of latitude rings
     npoints::Int                # total number of grid points
     londs::VectorType           # longitudes of every grid point 0˚ to 360˚E
     latd::VectorType            # latitude of each ring, incl north pole 90˚N, ..., south pole -90˚N
 
-    rings::VectorRangeType      # for every ring a i:j unit range for ring-based indices
     nlons::VectorIntType        # number of longitudinal points per ring
     lon_offsets::VectorType     # longitude offsets of first grid point per ring
 end
 
 GridGeometry(field::AbstractField; kwargs...) = GridGeometry(field.grid; kwargs...)
-GridGeometry(grid::AbstractGrid; kwargs...) = GridGeometry(typeof(grid), grid.nlat_half; kwargs...)
+GridGeometry(grid::AbstractGrid; kwargs...) = GridGeometry(grid; kwargs...)
 
 """
 $(TYPEDSIGNATURES)          
@@ -26,18 +27,16 @@ Precomputed arrays describing the geometry of the Grid with resolution nlat_half
 Contains longitudes, latitudes of grid points, their ring index j and their
 unravelled indices ij."""
 function GridGeometry(
-    Grid::Type{<:AbstractGrid},                 # which grid to calculate the geometry for
-    nlat_half::Integer;                         # resolution parameter number of rings
+    grid::AbstractGrid;                         # which grid to calculate the geometry for
     NF::Type{<:AbstractFloat} = Float64,        # number format for the coordinates
     ArrayType::Type{<:AbstractArray} = Array,   # type of the arrays
 )
-
-    nlat = get_nlat(Grid, nlat_half)                # total number of latitude rings
-    npoints = get_npoints(Grid, nlat_half)          # total number of grid points
+    nlat = get_nlat(grid)                       # total number of latitude rings
+    npoints = get_npoints(grid)                 # total number of grid points
 
     # LATITUDES
-    latd = get_latd(Grid, nlat_half)                # latitudes in degrees 90˚N ... -90˚N
-    latd_poles = cat(90, latd, -90, dims=1)         # latd, but poles incl
+    latd = get_latd(grid)                       # latitudes in degrees 90˚N ... -90˚N
+    latd_poles = cat(90, latd, -90, dims=1)     # latd, but poles incl
 
     # Hack: use -90.00...1˚N instead of exactly -90˚N for the <=, > comparison
     # in find_rings! that way the last ring to the south pole can be an open
@@ -46,11 +45,10 @@ function GridGeometry(
     latd_poles[end] = latd_poles[end] - eps(latd_poles[end])
 
     # COORDINATES for every grid point in ring order
-    londs, _ = get_londlatds(Grid, nlat_half)       # in degrees [0˚...360˚E]                         
+    londs, _ = get_londlatds(grid)              # in degrees [0˚...360˚E]                         
 
     # RINGS and LONGITUDE OFFSETS
-    rings = eachring(Grid, nlat_half)               # Vector{UnitRange} descr start/end index on ring
-    nlons = get_nlons(Grid, nlat_half)              # number of longitude points per ring, pole to pole
+    nlons = get_nlons(grid)                     # number of longitude points per ring, pole to pole
     lon_offsets = [londs[ring[1]] for ring in rings]# offset of the first point from 0˚E
 
     # vector type
@@ -59,8 +57,8 @@ function GridGeometry(
     VectorIntType = ArrayType_{Int, 1}
     VectorRangeType = ArrayType_{UnitRange{Int}, 1}
 
-    return GridGeometry{Grid, VectorType, VectorIntType, VectorRangeType}(
-        nlat_half, nlat, npoints, londs, latd_poles, rings, nlons, lon_offsets)
+    return GridGeometry{typeof(grid), VectorType, VectorIntType}(
+        grid, nlat_half, nlat, npoints, londs, latd_poles, nlons, lon_offsets)
 end
 
 function Base.show(io::IO,G::GridGeometry{T}) where T
@@ -138,13 +136,13 @@ NF is the number format used to calculate the interpolation, which can be
 different from the input data and/or the interpolated data on the new grid."""
 abstract type AbstractInterpolator end
 
-struct AnvilInterpolator{NF, Grid, Geometry, Locator} <: AbstractInterpolator
+struct AnvilInterpolator{NF, Geometry, Locator} <: AbstractInterpolator
     geometry::Geometry
     locator::Locator
 end
 
 Base.eltype(::AnvilInterpolator{NF}) where NF = NF
-grid_type(::AnvilInterpolator{NF, Grid}) where {NF, Grid} = Grid
+grid_type(I::AnvilInterpolator) = typeof(I.geometry.grid)
 
 function Base.show(io::IO, L::AbstractInterpolator)
     NF, Grid = eltype(L), grid_type(L)
@@ -189,7 +187,7 @@ function interpolator(  ::Type{NF},
                         ) where {NF<:AbstractFloat}
     
     londs, latds = get_londlatds(Aout.grid)     # coordinates of new grid
-    I = Interpolator(NF, typeof(A.grid), get_nlat_half(A), get_npoints(Aout))
+    I = Interpolator(NF, typeof(A.grid), get_nlat_half(A), get_npoints2D(Aout))
     update_locator!(I, londs, latds, unsafe=false)
     return I
 end
@@ -216,7 +214,7 @@ function interpolate(
     @assert n == length(londs) "New interpolation coordinates londs::Vector, latds::Vector have to be of same length.
                                 $n and $(length(londs)) provided."
     
-    I = Interpolator(NF, typeof(A), get_nlat_half(A), n)    # generate Interpolator, containing geometry and work arrays
+    I = Interpolator(NF, typeof(A.grid), get_nlat_half(A), n)    # generate Interpolator, containing geometry and work arrays
     update_locator!(I, londs, latds, unsafe=false)          # update location work arrays in I
     interpolate(A, I)
 end
@@ -371,14 +369,19 @@ function find_rings!(   js::AbstractVector{<:Integer},  # Out: ring indices j
     find_rings_unsafe!(js, Δys, θs, latd)
 end
 
+DimensionMismatchArray(a::AbstractArray, b::AbstractArray) =
+    DimensionMismatch("Arrays have different dimensions: $(size(a)) vs $(size(b))")
+DimensionMismatchArray(a::AbstractArray, bs::AbstractArray...) =
+    DimensionMismatch("Arrays have different dimensions: $(size(a)) vs $(map(size, bs))")
+
 function find_rings_unsafe!(js::AbstractVector{<:Integer},  # Out: vector of ring indices
                             Δys::AbstractVector,            # distance fractions to ring further south
                             θs::AbstractVector,             # latitudes of points to interpolate onto
                             latd::AbstractVector{NF},       # latitudes of rings (90˚ to -90˚, strictly decreasing)
                             ) where {NF<:AbstractFloat}
 
-    @boundscheck length(js) == length(θs) || throw(BoundsError)
-    @boundscheck length(js) == length(Δys) || throw(BoundsError)
+    @boundscheck length(js) == length(θs) || throw(DimensionMismatchArray(js, θs))
+    @boundscheck length(js) == length(Δys) || throw(DimensionMismatchArray(js, Δys))
 
     # find first search for every θ in θs in latd but reuse index j from previous θ
     # as a predictor to start the search. Search walk is therefore either d=1 (southward)
