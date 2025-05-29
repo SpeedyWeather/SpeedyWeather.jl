@@ -14,7 +14,7 @@ end
 
 function Base.show(io::IO, S::SpectralTransform{NF, ArrayType}) where {NF, ArrayType}
     (; spectrum, grid, nlayers) = S
-    (; lmax, mmax) = spectrum
+    (; lmax, mmax) = spectrum   # 1-based max degree/order of harmonics
     (; nlat_half) = grid
     Grid = RingGrids.nonparametric_type(grid)
 
@@ -27,7 +27,7 @@ function Base.show(io::IO, S::SpectralTransform{NF, ArrayType}) where {NF, Array
                 Base.summarysize(S.scratch_memory_spec)
             )
 
-    dealias = get_dealiasing(mmax, nlat_half)
+    dealias = get_dealiasing(mmax-1, nlat_half) # -1 for zero-based
     truncations = ["<linear", "linear", "quadratic", "cubic", ">cubic"]
     truncation = truncations[clamp(floor(Int, dealias)+1, 1, 5)]
     dealiasing = @sprintf("%.3g", dealias)
