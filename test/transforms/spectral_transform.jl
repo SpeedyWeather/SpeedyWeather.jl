@@ -91,10 +91,10 @@ end
 @testset "Transform: Individual Legendre polynomials" begin
     @testset for trunc in spectral_resolutions
         @testset for NF in (Float32, Float64)
-            @testset for Grid in (   FullGaussianGrid,
-                            FullClenshawGrid,
-                            OctahedralGaussianGrid,
-                            OctahedralClenshawGrid)
+            @testset for Grid in (  FullGaussianGrid,
+                                    FullClenshawGrid,
+                                    OctahedralGaussianGrid,
+                                    OctahedralClenshawGrid)
 
                 SG = SpectralGrid(; NF, trunc, Grid)
                 S = SpectralTransform(SG)
@@ -139,7 +139,7 @@ end
                         map = transform(alms, S)
                         
                         # add singleton dimension for lower triangular matrix
-                        alms2 = zeros(LowerTriangularArray{Complex{NF}}, SG.spectrum, 1)
+                        alms2 = zeros(Complex{NF}, SG.spectrum, 1)
                         alms2[:, 1] = alms
                         map2 = deepcopy(map)
                         transform!(map2, alms2, S)
@@ -233,10 +233,10 @@ end
     # test Float32 -> Float64
     spectral_grid = SpectralGrid()
     NF = spectral_grid.NF
-    grid = randn(spectral_grid.Grid{NF}, spectral_grid.nlat_half)
+    grid = randn(spectral_grid.NF, spectral_grid.grid)
     
-    L1 = zeros(LowerTriangularMatrix{Complex{Float32}}, spectral_grid.spectrum)
-    L2 = zeros(LowerTriangularMatrix{Complex{Float64}}, spectral_grid.spectrum)
+    L1 = zeros(Complex{Float32}, spectral_grid.spectrum)
+    L2 = zeros(Complex{Float64}, spectral_grid.spectrum)
     
     S = SpectralTransform(spectral_grid)
 
@@ -267,7 +267,7 @@ end
                 lmax = 3
                 for l in 1:lmax
                     for m in 1:l
-                        alms = zeros(LowerTriangularMatrix{Complex{NF}}, SG.spectrum)
+                        alms = zeros(Complex{NF}, SG.spectrum)
                         alms[l, m] = 1
 
                         map = transform(alms, S)

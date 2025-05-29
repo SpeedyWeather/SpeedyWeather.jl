@@ -22,7 +22,7 @@ when using Clenshaw grids provided that nlat >= 2(T + 1), meaning that a grid re
 of at least 128x64 (nlon x nlat) is sufficient for an exact transform with a T=31 spectral
 truncation."""
 function clenshaw_curtis_weights(nlat_half::Integer)
-    nlat = get_nlat(FullClenshawArray, nlat_half)
+    nlat = get_nlat(FullClenshawGrid, nlat_half)
     θs = get_colat(FullClenshawGrid, nlat_half)
     return [4sin(θj)/(nlat+1)*sum([sin(p*θj)/p for p in 1:2:nlat]) for θj in θs]
 end

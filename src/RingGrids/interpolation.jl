@@ -188,7 +188,7 @@ function interpolator(  ::Type{NF},
                         Interpolator::Type{<:AbstractInterpolator}=DEFAULT_INTERPOLATOR
                         ) where {NF<:AbstractFloat}
     
-    londs, latds = get_londlatds(Aout)      # coordinates of new grid
+    londs, latds = get_londlatds(Aout.grid)     # coordinates of new grid
     I = Interpolator(NF, typeof(A.grid), get_nlat_half(A), get_npoints(Aout))
     update_locator!(I, londs, latds, unsafe=false)
     return I
