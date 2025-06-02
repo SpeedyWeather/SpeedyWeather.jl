@@ -23,6 +23,7 @@ end
 
 ## TYPES
 grid_type(::Type{Grid}) where {Grid<:AbstractGrid} = nonparametric_type(Grid) 
+full_grid_type(grid::AbstractGrid) = full_grid_type(typeof(grid))
 
 """$(TYPEDSIGNATURES) For any instance of `AbstractGrid` type its n-dimensional type
 (*Grid{T, N, ...} returns *Array) but without any parameters `{T, N, ArrayType}`"""

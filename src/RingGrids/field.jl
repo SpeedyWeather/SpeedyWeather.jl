@@ -67,7 +67,9 @@ Base.size(f::AbstractField, args...) = size(f.data, args...)
 # sizeof: don't count grid as possibly shared with other fields
 Base.sizeof(field::AbstractField) = sizeof(field.data)  
 
-for f in (:get_nlat, :get_nlat_half, :get_londlatds)
+for f in (  :get_nlat, :get_nlat_half,
+            :get_colat, :get_lat, :get_latd, :get_lon, :get_lond,
+            :get_londlatds, :get_lonlats, :get_loncolats)
     @eval begin
         $f(field::AbstractField) = $f(field.grid)
     end

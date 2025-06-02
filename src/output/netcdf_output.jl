@@ -18,8 +18,8 @@ export NetCDFOutput
 Interpolates non-rectangular grids. Fields are
 $(TYPEDFIELDS)"""
 @kwdef mutable struct NetCDFOutput{
-    Grid2D,
-    Grid3D,
+    Field2D,
+    Field3D,
     Interpolator,
 } <: AbstractOutput
 
@@ -59,10 +59,10 @@ $(TYPEDFIELDS)"""
 
     const interpolator::Interpolator
 
-    # SCRATCH GRIDS TO INTERPOLATE ONTO
-    const grid2D::Grid2D
-    const grid3D::Grid3D
-    const grid3Dland::Grid3D
+    # SCRATCH FIELDS TO INTERPOLATE ONTO
+    const field2D::Field2D
+    const field3D::Field3D
+    const field3Dland::Field3D
 end
 
 """
@@ -82,38 +82,30 @@ function NetCDFOutput(
 
     # INPUT GRID
     input_grid = SG.grid
-    input_nlat_half = input_grid.nlat_half
-
-    # OUTPUT GRID
-    nlon = get_nlon(output_grid)
-    nlat = get_nlat(output_grid)
-    npoints = get_npoints(output_grid)
-    (; nlayers, nlayers_soil) = S
 
     # CREATE INTERPOLATOR
-    interpolator = DEFAULT_INTERPOLATOR(DEFAULT_OUTPUT_NF, input_Grid, input_nlat_half, npoints)
-
-    # CREATE GRIDS TO 
-    output_Grid2D = RingGrids.nonparametric_type(output_Grid){output_NF, 1}
-    output_Grid3D = RingGrids.nonparametric_type(output_Grid){output_NF, 2}
-    grid2D = output_Grid2D(undef, nlat_half)
-    grid3D = output_Grid3D(undef, nlat_half, nlayers)
-    grid3Dland = output_Grid3D(undef, nlat_half, nlayers_soil)
+    interpolator = RingGrids.interpolator(output_grid, input_grid, NF=DEFAULT_OUTPUT_NF)
+    
+    # CREATE FULL FIELDS TO INTERPOLATE ONTO BEFORE WRITING DATA OUT
+    (; nlayers, nlayers_soil) = SG
+    field2D = Field(output_NF, output_grid)
+    field3D = Field(output_NF, output_grid, nlayers)
+    field3Dland = Field(output_NF, output_grid, nlayers_soil)
 
     output = NetCDFOutput(;
         output_dt=Second(output_dt),    # convert to seconds for dispatch
         interpolator,
-        grid2D,
-        grid3D,
-        grid3Dland,
+        field2D,
+        field3D,
+        field3Dland,
         kwargs...)
 
     add_default!(output.variables, Model)
     return output
 end
 
-function Base.show(io::IO, output::NetCDFOutput{Grid}) where Grid
-    println(io, "NetCDFOutput{$Grid}")
+function Base.show(io::IO, output::NetCDFOutput{F}) where F
+    println(io, "NetCDFOutput{$F}")
     println(io, "├ status: $(output.active ? "active" : "inactive/uninitialized")")
     println(io, "├ write restart file: $(output.write_restart) (if active)")
     println(io, "├ interpolator: $(typeof(output.interpolator))")
@@ -207,13 +199,12 @@ end
 Initialize NetCDF `output` by creating a netCDF file and storing the initial conditions
 of `diagn` (and `progn`). To be called just before the first timesteps."""
 function initialize!(   
-    output::NetCDFOutput{Grid2D, Grid3D, Interpolator},
+    output::NetCDFOutput,
     feedback::AbstractFeedback,
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
     model::AbstractModel,
-) where {Grid2D, Grid3D, Interpolator}
-    
+)
     output.active || return nothing     # exit immediately for no output
     
     # GET RUN ID, CREATE FOLDER
@@ -250,16 +241,10 @@ function initialize!(
     output!(output, progn.clock.time)   # write initial time
 
     # DEFINE NETCDF DIMENSIONS SPACE
-    Grid = typeof(output.grid2D)
-    nlat_half = output.grid2D.nlat_half
-    lond = get_lond(Grid, nlat_half)
-    latd = get_latd(Grid, nlat_half)
+    lond = get_lond(output.field2D)
+    latd = get_latd(output.field2D)
     σ = model.geometry.σ_levels_full
     soil_indices = collect(1:model.spectral_grid.nlayers_soil)
-
-    # INTERPOLATION: PRECOMPUTE LOCATION INDICES
-    londs, latds = RingGrids.get_londlatds(Grid, nlat_half)
-    RingGrids.update_locator!(output.interpolator, londs, latds)
         
     defVar(dataset, "lon", lond, ("lon",), attrib=Dict("units"=>"degrees_east", "long_name"=>"longitude"))
     defVar(dataset, "lat", latd, ("lat",), attrib=Dict("units"=>"degrees_north", "long_name"=>"latitude"))
@@ -267,7 +252,7 @@ function initialize!(
     defVar(dataset, "soil_layer", soil_indices, ("soil_layer",), attrib=Dict("units"=>"1", "long_name"=>"soil layer index"))
 
     # VARIABLES, define every output variable in the netCDF file and write initial conditions
-    output_NF = eltype(output.grid2D)
+    output_NF = eltype(output.field2D)
     for (key, var) in output.variables
         define_variable!(dataset, var, output_NF)
         output!(output, var, Simulation(progn, diagn, model))
@@ -346,7 +331,7 @@ function output!(
     ~hastime(variable) && output.output_counter > 1 && return nothing
 
     # interpolate 2D/3D variables
-    var = is3D(variable) ? (is_land(variable) ? output.grid3Dland : output.grid3D) : output.grid2D
+    var = is3D(variable) ? (is_land(variable) ? output.field3Dland : output.field3D) : output.field2D
     raw = path(variable, simulation)
     RingGrids.interpolate!(var, raw, output.interpolator)
 

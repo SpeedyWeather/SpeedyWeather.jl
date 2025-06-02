@@ -120,7 +120,8 @@ function initialize!(land_sea_mask::EarthLandSeaMask, model::PrimitiveEquation)
     ncfile = NCDataset(path)
     
     # high resolution land-sea mask
-    lsm_highres = file_Grid(ncfile["lsm"].var[:, :], input_as=Matrix)
+    # F = RingGrids.field_type(file_Grid)   # TODO this isn't working, hardcode instead
+    lsm_highres = FullClenshawField(ncfile["lsm"].var[:, :], input_as=Matrix)
 
     # average onto grid cells of the model
     RingGrids.grid_cell_average!(land_sea_mask.mask, lsm_highres)

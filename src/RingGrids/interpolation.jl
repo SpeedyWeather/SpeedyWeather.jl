@@ -189,20 +189,25 @@ function interpolator(
     Interpolator::Type{<:AbstractInterpolator}=DEFAULT_INTERPOLATOR,
     kwargs...
 )
+    # note this leaves the interpolator.locator uninitialized
     return Interpolator(grid, npoints; kwargs...)
 end
 
-# generator based on two fields
+# generator based on two grids
 function interpolator(
-    Aout::AbstractField,
-    A::AbstractField;
+    grid_out::AbstractGrid,
+    grid_in::AbstractGrid;
     kwargs...
 )
-    I = interpolator(A.grid, get_npoints2D(Aout); kwargs...)
-    londs, latds = get_londlatds(Aout)     # coordinates of new grid
+    I = interpolator(grid_in, get_npoints(grid_out); kwargs...)
+    londs, latds = get_londlatds(grid_out)
     update_locator!(I, londs, latds, unsafe=false)
     return I
 end
+
+# generator based on two fields
+interpolator(Aout::AbstractField, A::AbstractField; kwargs...) = 
+    interpolator(Aout.grid, A.grid; kwargs...)
     
 ## FUNCTIONS
 # interpolate into one point, wrap them into vector
@@ -238,11 +243,11 @@ function interpolate(
     (; npoints ) = I.locator                    # number of points to interpolate onto
     ArrayType_ = nonparametric_type(ArrayType)
     Aout = ArrayType_{NF, 1}(undef, npoints)    # preallocate: onto θs, λs interpolated values of A
-    interpolate!(Aout, A, I)                    # perform interpolation, store in As
+    _interpolate!(Aout, A.data, I)              # perform interpolation, store in Aout
 end
 
 # the actual interpolation function
-function interpolate!(
+function _interpolate!(
     Aout::AbstractVector,               # Out: interpolated values
     A::AbstractVector,                  # gridded values to interpolate from
     interpolator::AnvilInterpolator,    # geometry info and work arrays       
@@ -253,7 +258,7 @@ function interpolate!(
     
     # 1) Aout's length must match the interpolator
     # 2) input A must match the interpolator's geometry points (do not check grids for view support)
-    @boundscheck length(Aout) == length(ij_as) || throw(DimensionMismatchArray(Aout, j_as))
+    @boundscheck length(Aout) == length(ij_as) || throw(DimensionMismatchArray(Aout, ij_as))
     @boundscheck length(A) == npoints ||
         throw(DimensionMismatch("Interpolator ($npoints points) mismatches input grid ($(length(A)) points)."))
 
@@ -286,7 +291,7 @@ function interpolate!(
 )
     # if fields match just copy data over (eltypes might differ)
     fields_match(Aout, A) && return copyto!(Aout.data, A.data)
-    interpolate!(Aout.data, A, interpolator)    # use .data to trigger dispatch for method above
+    _interpolate!(Aout.data, A.data, interpolator)  # use .data to trigger dispatch for method above
 end
 
 # version for 3D+ fields
@@ -299,7 +304,7 @@ function interpolate!(
     fields_match(Aout, A) && return copyto!(Aout.data, A.data)
 
     for k in eachlayer(Aout, A, vertical_only=true)
-        interpolate!(view(Aout.data, :, k), view(A.data, :, k), interpolator)
+        _interpolate!(view(Aout.data, :, k), view(A.data, :, k), interpolator)
     end
 end
 
@@ -322,13 +327,13 @@ interpolate(Grid::Type{<:AbstractGrid}, nlat_half::Integer, A::AbstractField; kw
 # create field from grid on the fly
 function interpolate(
     grid::AbstractGrid,
-    A::AbstractField;
+    A::AbstractField2D;
     kwargs...
 )
-    I = interpolator(grid, get_npoints2D(A), I)
+    I = interpolator(grid, A.grid; kwargs...)
     Aout = Field(grid, size(A)[2:end]...)
-    interpolate!(Aout, A, I)    # returns a vector
-    return Aout                 # returns the grid wrapped around that vector
+    interpolate!(Aout, A, I)    # returns an array
+    return Aout                 # returns the grid wrapped around that array
 end
 
 function update_locator!(

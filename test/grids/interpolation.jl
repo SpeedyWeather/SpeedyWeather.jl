@@ -138,7 +138,8 @@ end
                     OctaHEALPixGrid)
 
         @testset for nlat_half in [4, 8, 16] 
-            G = RingGrids.GridGeometry(Grid, nlat_half)
+            grid = Grid(nlat_half)
+            G = RingGrids.GridGeometry(grid)
             latd = G.latd
 
             n = length(latd)-1
@@ -177,14 +178,13 @@ end
 
             # interpolate to FullGaussianGrid and back and compare
             nlat_half = 32
-            A_interpolated = RingGrids.interpolate(FullGaussianGrid, nlat_half, A)
+            grid = FullGaussianGrid(nlat_half)
+            A_interpolated = RingGrids.interpolate(grid, A)
             A2 = zero(A)
             RingGrids.interpolate!(A2, A_interpolated)
 
             # just check that it's not completely off
-            for ij in RingGrids.eachgridpoint(A, A2)
-                @test A[ij] ≈ A2[ij] rtol=5e-1 atol=5e-1
-            end
+            @test A ≈ A2 rtol=5e-1 atol=5e-1
         end
     end
 end
