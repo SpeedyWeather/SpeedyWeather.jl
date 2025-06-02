@@ -101,6 +101,10 @@ export  interpolate,
 # STATISTICS
 export zonal_mean
 
+# CONSTANTS
+const DEFAULT_NF = Float64
+const DEFAULT_ARRAYTYPE = Array
+
 include("utility_functions.jl")
 include("architecture.jl")
 

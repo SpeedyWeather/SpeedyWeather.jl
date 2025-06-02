@@ -1,5 +1,3 @@
-const DEFAULT_NF = Float64
-
 struct Field{T, N, ArrayType <: AbstractArray, Grid <: AbstractGrid} <: AbstractField{T, N, ArrayType, Grid}
     data::ArrayType
     grid::Grid
@@ -69,7 +67,7 @@ Base.size(f::AbstractField, args...) = size(f.data, args...)
 # sizeof: don't count grid as possibly shared with other fields
 Base.sizeof(field::AbstractField) = sizeof(field.data)  
 
-for f in (:get_nlat, :get_nlat_half)
+for f in (:get_nlat, :get_nlat_half, :get_londlatds)
     @eval begin
         $f(field::AbstractField) = $f(field.grid)
     end

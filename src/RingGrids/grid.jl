@@ -105,6 +105,7 @@ get_lond(grid::Grid) where {Grid<:AbstractGrid} = get_lond(Grid, grid.nlat_half)
 get_lon(grid::Grid) where {Grid<:AbstractGrid} = get_lon(Grid, grid.nlat_half)
 
 get_nlon_max(grid::Grid) where {Grid<:AbstractGrid} = get_nlon_max(Grid, grid.nlat_half)
+get_nlons(grid::AbstractGrid) = get_nlons(typeof(grid), grid.nlat_half)
 
 get_lat(Grid::Type{<:AbstractGrid}, nlat_half::Integer) = get_latd(Grid, nlat_half) * (π/180)
 get_colat(Grid::Type{<:AbstractGrid}, nlat_half::Integer) = π/2 .- get_lat(Grid, nlat_half)
