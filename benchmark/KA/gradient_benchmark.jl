@@ -9,6 +9,68 @@ using CUDA
 using KernelAbstractions
 using Printf
 
+const DEFAULT_RADIUS = 1
+
+# old version non-KA
+function ∇_old!(
+    dpdx::LowerTriangularArray,     # Output: zonal gradient
+    dpdy::LowerTriangularArray,     # Output: meridional gradient
+    p::LowerTriangularArray,        # Input: spectral coefficients
+    S::SpectralTransform;           # includes precomputed arrays
+    radius = DEFAULT_RADIUS,        # scale with radius if provided, otherwise unit sphere
+)
+    (; grad_y1, grad_y2) = S
+    @boundscheck SpeedyWeather.SpeedyTransforms.ismatching(S, p) || throw(DimensionMismatch(S, p))
+
+    # maximum degree l, order m of spherical harmonics (1-based)
+    lmax, mmax = size(p, OneBased, as=Matrix)
+
+    for k in eachmatrix(dpdx, dpdy, p)      # also performs size checks
+        lm = 0
+        @inbounds for m in 1:mmax-1         # 1-based l, m, skip last column
+
+            # DIAGONAL (separated to avoid access to l-1, m which is above the diagonal)
+            lm += 1
+
+            dpdx[lm, k] = (m-1)*im*p[lm, k]         # zonal gradient: d/dlon = *i*m
+            dpdy[lm, k] = grad_y2[lm]*p[lm+1, k]    # meridional gradient: p[lm-1]=0 on diagonal
+        
+            # BELOW DIAGONAL (all terms)
+            for l in m+1:lmax-1                     # skip last row
+                lm += 1
+                dpdx[lm, k] = (m-1)*im*p[lm, k]
+                dpdy[lm, k] = grad_y1[lm]*p[lm-1, k] + grad_y2[lm]*p[lm+1, k]
+            end
+
+            # LAST ROW (separated to avoid out-of-bounds access to lmax+1
+            lm += 1
+            dpdx[lm, k] = (m-1)*im*p[lm, k]
+            dpdy[lm, k] = grad_y1[lm]*p[lm-1, k]    # only first term from 2nd last row
+        end
+
+        # LAST COLUMN
+        @inbounds begin
+            lm += 1                                 # second last row
+            dpdx[lm, k] = (mmax-1)*im*p[lm, k]
+            dpdy[lm, k] = grad_y2[lm]*p[lm+1, k]    # only 2nd term
+
+            lm += 1                                 # last row
+            dpdx[lm, k] = (mmax-1)*im*p[lm, k]
+            dpdy[lm, k] = grad_y1[lm]*p[lm-1, k]    # only 1st term
+        end
+    end
+
+    # 1/radius factor if not unit sphere
+    if radius != 1
+        R⁻¹ = inv(radius)
+        dpdx .*= R⁻¹
+        dpdy .*= R⁻¹
+    end
+
+    return dpdx, dpdy
+end
+
+
 # Function to create test data for a given size
 function setup_test_data(L, M, N, arch)
     NF = Float32
@@ -24,9 +86,9 @@ function run_benchmark(L, M, N, arch, use_ka=true)
     alms_dx_out, alms_dy_out, alms, S = setup_test_data(L, M, N, arch)
     
     if use_ka
-        return @benchmark SpeedyWeather.SpeedyTransforms.∇_KA!($alms_dx_out, $alms_dy_out, $alms, $S)
+        return @benchmark CUDA.@sync SpeedyWeather.SpeedyTransforms.∇!($alms_dx_out, $alms_dy_out, $alms, $S)
     else
-        return @benchmark SpeedyWeather.SpeedyTransforms.∇!($alms_dx_out, $alms_dy_out, $alms, $S)
+        return @benchmark ∇_old!($alms_dx_out, $alms_dy_out, $alms, $S)
     end
 end
 
@@ -41,6 +103,7 @@ sizes = [
     (257, 256, 8),
     (513, 512, 8),
     (513, 512, 16),
+    (513, 512, 32)
 ]
 
 # Function to run benchmarks with two different architectures

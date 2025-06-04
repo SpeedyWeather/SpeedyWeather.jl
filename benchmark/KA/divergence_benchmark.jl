@@ -41,6 +41,7 @@ sizes = [
     (257, 256, 8),
     (513, 512, 8),
     (513, 512, 16),
+    (513, 512, 32)
 ]
 
 # Function to run benchmarks with two different architectures

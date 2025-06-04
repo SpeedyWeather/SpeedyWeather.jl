@@ -173,6 +173,7 @@ function _divergence_KA!(
     @boundscheck ismatching(S, div) || throw(DimensionMismatch(S, div))
 
     launch!(S.architecture, :lmk, size(div), _divergence_kernel!, kernel, div, u, v, grad_y_vordiv1, grad_y_vordiv2, m_indices)
+    synchronize(S.architecture)
     
     # radius scaling if not unit sphere
     if radius != 1
@@ -490,6 +491,7 @@ function UV_from_vordiv_KA!(
     @boundscheck ismatching(S, U) || throw(DimensionMismatch(S, U))
 
     launch!(S.architecture, :lmk, size(U), _UV_from_vordiv_kernel!, U, V, vor, div, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)
+    synchronize(S.architecture)
     
     # *radius scaling if not unit sphere (*radius² for ∇⁻², then /radius to get from stream function to velocity)
     if radius != 1
@@ -520,6 +522,7 @@ function UV_from_vordiv_KA_split!(
     # Launch separate kernels for U and V
     launch!(S.architecture, :lmk, size(U), _U_from_vordiv_kernel!, U, vor, div, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)
     launch!(S.architecture, :lmk, size(V), _V_from_vordiv_kernel!, V, vor, div, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)
+    synchronize(S.architecture)
     
     # *radius scaling if not unit sphere (*radius² for ∇⁻², then /radius to get from stream function to velocity)
     if radius != 1
@@ -635,6 +638,7 @@ function ∇²!(
                         (add ? (o,a) -> (o+a) : (o, a) -> a)
     
     launch!(S.architecture, :lmk, size(∇²alms), ∇²_kernel!, ∇²alms, alms, eigenvalues, kernel, alms.spectrum.l_indices)
+    synchronize(S.architecture)
 
     # /radius² or *radius² scaling if not unit sphere
     if radius != 1
@@ -726,11 +730,13 @@ function ∇!(
     (; m_indices) = p.spectrum
     @boundscheck ismatching(S, p) || throw(DimensionMismatch(S, p))
 
-    @. dpdx = complex(0, m_indices - 1)*p
+    # TODO: there's currently a scalar indexing error when using p direclty instead of p.data, this should be fixed
+    @. dpdx = complex(0, m_indices - 1)*p.data
 
     # first and last element aren't covered by the kernel because they would access p[0], p[end+1]
-    launch!(S.architecture, :lmk, size(dpdy), dpdy_kernel!, dpdy, p, grad_y1, grad_y2)
-
+    launch!(S.architecture, :lmk, size(dpdy), dpdy_kernel!, dpdy, p.data, grad_y1, grad_y2)
+    synchronize(S.architecture)
+    
     # 1/radius factor if not unit sphere
     if radius != 1
         R⁻¹ = inv(radius)

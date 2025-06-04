@@ -10,7 +10,7 @@ import GenericFFT
 import LinearAlgebra
 import Primes
 import Adapt: adapt
-import KernelAbstractions: @kernel, @index, @Const
+import KernelAbstractions: @kernel, @index, @Const, synchronize
 
 # SPEEDYWEATHER MODULES
 using ..Architectures
