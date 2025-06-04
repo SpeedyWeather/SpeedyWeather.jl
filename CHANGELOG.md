@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Array-agnostic LowerTriangularMatrix [#738](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/738)
 - Major rework of LowerTriangularArrays: Introduce Spectrum type, changes in indexing and constructors [#734](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/734)
 - Reduce CI time [#731](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/731)
 - Remove DocsPreviewCleanup workflow [#730](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/730)
