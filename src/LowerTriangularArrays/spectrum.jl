@@ -28,11 +28,11 @@ function Spectrum(
     mmax::Integer;
     architecture = DEFAULT_ARCHITECTURE(),
   )
-    return Spectrum(lmax, mmax, architecture, 
-    [m:lmax for m in 1:mmax],   # orders 
-    l_indices(lmax, mmax),      # l_indices 
-    m_indices(lmax, mmax),      # m_indices
-    lm_orders(lmax, mmax))      # lm_orders
+    return on_architecture(architecture, Spectrum(lmax, mmax, architecture, 
+    [m:lmax for m in 1:mmax],    # orders 
+    l_indices(lmax, mmax),       # l_indices 
+    m_indices(lmax, mmax),       # m_indices
+    lm_orders(lmax, mmax)))      # lm_orders
 end
 
 """
@@ -52,7 +52,7 @@ $(TYPEDSIGNATURES)
 Create a `Spectrum` from another `Spectrum` but with a new architecture.
 """
 Spectrum(spectrum::Spectrum; architecture::AbstractArchitecture=DEFAULT_ARCHITECTURE()) = 
-    Spectrum(spectrum.lmax, spectrum.mmax, architecture, spectrum.orders, spectrum.l_indices, spectrum.m_indices, spectrum.lm_orders)
+    on_architecture(architecture, Spectrum(spectrum.lmax, spectrum.mmax, architecture, spectrum.orders, spectrum.l_indices, spectrum.m_indices, spectrum.lm_orders))
 
 triangle_number(m::Integer) = m*(m+1)÷2
 nonzeros(l::Integer, m::Integer) = l*m - triangle_number(m-1)
@@ -105,3 +105,5 @@ ismatching(s::Spectrum, array_type::Type{<:AbstractArray}) = ismatching(s.archit
 ismatching(s::Spectrum, array::AbstractArray) = ismatching(s.architecture, typeof(array))
 
 Adapt.@adapt_structure Spectrum
+
+on_architecture(arch::AbstractArchitecture, s::Spectrum) = adapt(array_type(arch), s)
