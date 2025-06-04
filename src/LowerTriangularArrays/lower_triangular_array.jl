@@ -669,7 +669,9 @@ Base.any(L::LowerTriangularArray) = any(L.data)
 
 Base.repeat(L::LowerTriangularArray, counts...) = LowerTriangularArray(repeat(L.data, counts...), L.spectrum)
 
-# Views that return a LowerTriangularArrays again (need to retain all horizontal grid points, hence `:, 1` for example)
+# Views that return a LowerTriangularArray again (need to retain all horizontal grid points, hence `:, 1` for example)
+# view(array, :) unravels like array[:] does hence "::Colon, i, args..." used to enforce one argument after :
+# exception is view(vector, :) which preserves the vector structure, equivalent here is the LowerTriangularMatrix
 # TODO extend Base.view?
 lta_view(L::LowerTriangularArray,  c::Colon, i, args...) = LowerTriangularArray(view(L.data, c, i, args...), L.spectrum)
 lta_view(L::LowerTriangularMatrix, c::Colon) = LowerTriangularArray(view(L.data, c), L.spectrum)
