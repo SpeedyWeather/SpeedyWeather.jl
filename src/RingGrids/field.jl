@@ -221,6 +221,15 @@ for f in (:zeros, :ones, :rand, :randn)
             data = array_type(architecture)($f(T, get_npoints(grid), k...))
             return Field(data, grid)
         end
+
+        function Base.$f(
+            ::Type{F},
+            grid::AbstractGrid,
+            k::Integer...,
+        ) where {F<:AbstractField{T}} where T
+            data = array_type(F)($f(T, get_npoints(grid), k...))
+            return Field(data, grid)
+        end
     end
 end
 

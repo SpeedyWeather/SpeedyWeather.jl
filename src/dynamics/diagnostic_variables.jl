@@ -15,7 +15,7 @@ function Base.show(io::IO, A::AbstractDiagnosticVariables)
             s = Base.dims2string(size(val))*", $nlat-ring $Grid{$NF}"
         elseif T <: LowerTriangularArray
             NF = first_parameter(T)
-            trunc = val.n - 1
+            trunc = LowerTriangularArrays.truncation(val.spectrum)
             s = Base.dims2string(size(val, as=Matrix))*", T$trunc LowerTriangularArray{$NF}"
         else
             s = "$T"
@@ -378,13 +378,10 @@ $(TYPEDFIELDS)"""
     ArrayType,              # Array, CuArray, ...
     ParticleVector,         # <: AbstractField
     VectorNF,               # Vector{NF} or CuVector{NF}
-    Grid,                   # <:AbstractGrid
+    Interpolator,           # <:AbstractInterpolator
 } <: AbstractDiagnosticVariables
     "Number of particles"
     nparticles::Int
-
-    "Number of latitudes on one hemisphere (Eq. incld.), resolution parameter of Grid"
-    nlat_half::Int
 
     "Work array: particle locations"
     locations::ParticleVector = zeros(ParticleVector, nparticles)
@@ -399,16 +396,18 @@ $(TYPEDFIELDS)"""
     σ_tend::VectorNF = VectorNF(zeros(nparticles))
 
     "Interpolator to interpolate velocity fields onto particle positions"
-    interpolator::AnvilInterpolator{NF, Grid} = AnvilInterpolator(NF, Grid, nlat_half, nparticles)
+    interpolator::Interpolator
 end
 
 """$(TYPEDSIGNATURES)
 Generator function."""
 function ParticleVariables(SG::SpectralGrid)
-    (; nlat_half, nparticles, NF, ArrayType, Grid) = SG
+    (; nparticles, NF, ArrayType) = SG
     (; ParticleVector) = SG
     VectorNF = ArrayType{NF, 1}
-    return ParticleVariables{NF, ArrayType, ParticleVector, VectorNF, Grid}(; nlat_half, nparticles)
+    interpolator = RingGrids.AnvilInterpolator(SG.grid, nparticles; NF, ArrayType)
+    return ParticleVariables{NF,ArrayType, ParticleVector, VectorNF, typeof(interpolator)}(;
+            nparticles, interpolator)
 end
 
 export DiagnosticVariables
@@ -510,19 +509,22 @@ end
 
 function Base.show(
     io::IO,
-    diagn::DiagnosticVariables{NF, ArrayType, Grid},
-) where {NF, ArrayType, Grid}
-    println(io, "DiagnosticVariables{$NF, $ArrayType, $Grid}")
+    diagn::DiagnosticVariables{NF, ArrayType},
+) where {NF, ArrayType}
+    println(io, "DiagnosticVariables{$NF, $ArrayType}")
     
-    (; spectrum, nlat_half, nlayers, nparticles) = diagn
-    nlat = RingGrids.get_nlat(Grid, nlat_half)
+    (; spectrum, nlayers, nparticles) = diagn
+    grid = diagn.grid.vor_grid.grid     # TODO use diagn.grid
+    nlat = RingGrids.get_nlat(grid)
+    Grid = RingGrids.nonparametric_type(grid)
     ntracers = length(diagn.grid.tracers_grid)
-    println(io, "├ resolution: T$(truncation(spectrum)), $nlat rings, $nlayers layers, $ntracers tracers, $nparticles particles")
+    println(io, "├ spectrum: T$(truncation(spectrum)), $nlayers layers, $ntracers tracers")
+    println(io, "├ grid: $nlat-ring, $nlayers-layer $Grid")
     println(io, "├ tendencies::Tendencies")
     println(io, "├ grid::GridVariables")
     println(io, "├ dynamics::DynamicsVariables")
     println(io, "├ physics::PhysicsVariables")
-    println(io, "├ particles::ParticleVariables")
+    println(io, "├ particles::ParticleVariables, $nparticles particles")
     println(io, "├ columns::ColumnVariables")
     println(io, "├ temp_average::$(typeof(diagn.temp_average))")
     print(io,   "└ scale: $(diagn.scale[])")

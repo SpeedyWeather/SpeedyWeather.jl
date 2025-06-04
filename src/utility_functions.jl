@@ -71,7 +71,7 @@ nans(dims...) = nans(Float64, dims...)
 $(TYPEDSIGNATURES)
 Prints to `io` all fields of a struct `A` identified by their
 `keys`."""
-function print_fields(io::IO, A, keys;arrays::Bool=false)
+function print_fields(io::IO, A, keys; arrays::Bool=false)
     keys_filtered = arrays ? keys : filter(key -> ~(getfield(A, key) isa AbstractArray), keys)
     n = length(keys_filtered)
     filtered = n < length(keys)
@@ -80,7 +80,7 @@ function print_fields(io::IO, A, keys;arrays::Bool=false)
         key = keys_filtered[i]
         val = getfield(A, key)
         ~last ? println(io, "├ $key::$(typeof(val)) = $val") :
-                print(io,  "└ $key::$(typeof(val)) = $val")
+                print(io,   "└ $key::$(typeof(val)) = $val")
     end
     if filtered                 # add the names of arrays
         s = "└── arrays: "
