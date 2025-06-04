@@ -103,3 +103,5 @@ eachorder(s::Spectrum) = s.lm_orders
 
 ismatching(s::Spectrum, array_type::Type{<:AbstractArray}) = ismatching(s.architecture, array_type)
 ismatching(s::Spectrum, array::AbstractArray) = ismatching(s.architecture, typeof(array))
+
+Adapt.@adapt_structure Spectrum

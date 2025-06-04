@@ -1,5 +1,5 @@
 import SpeedyWeather: on_architecture, GPU, launch!
-import KernelAbstractions: @kernel, synchronize
+import KernelAbstractions: @kernel 
 
 @testset "KernelAbstractions GPU tests" begin 
 
@@ -33,7 +33,7 @@ import KernelAbstractions: @kernel, synchronize
 
         # Run the kernel
         launch!(arch, :lmk, size(A), test_lta_kernel!, A, B, C)
-        synchronize(arch)
+        KernelAbstractions.synchronize(arch)
 
         # Verify results
         @test A ≈ expected

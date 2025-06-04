@@ -22,6 +22,7 @@ GPU() = CUDAGPU() # default to CUDA
 
 architecture(::CuArray) = CUDAGPU()
 architecture(::Type{<:CuArray}) = CUDAGPU()
+architecture(::Type{<:CuDeviceArray}) = CUDAGPU()
 
 on_architecture(::CPU, a::CuArray) = Array(a)
 on_architecture(::GPU, a::CuArray) = a

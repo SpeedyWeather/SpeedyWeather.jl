@@ -769,13 +769,12 @@ function KernelAbstractions.get_backend(
     return KernelAbstractions.get_backend(a.data) 
 end 
 
-# To-Do: Actually adapting might need an adapt for the `Spectrum` as well? 
 function Adapt.adapt_structure(to, L::LowerTriangularArray) 
-    adapted_data = Adapt.adapt(to, L.data)
-    if ismatching(L.spectrum, typeof(adapted_data))
-        return LowerTriangularArray(adapted_data, L.spectrum)
-    else 
-        return LowerTriangularArray(adapted_data, Spectrum(L.spectrum, architecture=architecture(typeof(adapted_data))))
+    adapted_data = adapt(to, L.data)
+    if ismatching(L.spectrum, typeof(adapted_data)) # if matching, adapt the same spectrum 
+        return LowerTriangularArray(adapted_data, adapt(to, L.spectrum))
+    else # if not matching, create new spectrum with other architecture
+        return LowerTriangularArray(adapted_data, adapt(to, Spectrum(L.spectrum, architecture=architecture(typeof(adapted_data)))))
     end
 end
 

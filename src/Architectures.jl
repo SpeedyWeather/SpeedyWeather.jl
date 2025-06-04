@@ -5,7 +5,8 @@ module Architectures
     export AbstractArchitecture
     export CPU, CPUStatic, GPU, CUDAGPU
     export array_type, on_architecture, architecture, device, convert_to_device
-
+    export synchronize 
+    
     """
     AbstractArchitecture
 
