@@ -7,11 +7,11 @@ additional `N`-dimensional or "matrix-style" indexing.
 Supports n-dimensional lower triangular arrays, so that for all trailing dimensions `L[:, :, ..]`
 is a matrix in lower triangular form, e.g. a (5x5x3)-LowerTriangularArray would hold 3 lower
 triangular matrices."""
-struct LowerTriangularArray{T, N, ArrayType <: AbstractArray{T,N}, S<:AbstractSpectrum} <: AbstractArray{T,N}
+struct LowerTriangularArray{T, N, ArrayType <: AbstractArray{T, N}, S<:AbstractSpectrum} <: AbstractArray{T, N}
     data::ArrayType     # non-zero elements unravelled into an in which the lower triangle is flattened
     spectrum::S         # spectrum, that holds all spectral discretization information and the architecture the array is on
 
-    LowerTriangularArray{T, N, ArrayType, S}(data::AbstractArray, spectrum::S) where {T, N, ArrayType <: AbstractArray{T,N}, S <: AbstractSpectrum} =
+    LowerTriangularArray{T, N, ArrayType, S}(data::AbstractArray, spectrum::S) where {T, N, ArrayType <: AbstractArray{T, N}, S <: AbstractSpectrum} =
         check_lta_input_array(data, spectrum, N) ? 
         new(data, spectrum)  :
         error(lta_error_message(data, spectrum, T, N, ArrayType, S))
@@ -29,22 +29,25 @@ function lta_error_message(data, spectrum, T, N, ArrayType, S)
     end
 end 
 
-"""2-dimensional `LowerTriangularArray` of type `T` with specturm `S` with its non-zero entries unravelled into a `Vector{T}`"""
-const LowerTriangularMatrix{T, S} = LowerTriangularArray{T, 1, Vector{T}, S} where S <: AbstractSpectrum
+"""2D `LowerTriangularArray` of type `T`"""
+const LowerTriangularMatrix = LowerTriangularArray{T, 1} where T
 
-LowerTriangularArray(data::ArrayType, spectrum::S) where {T, N, ArrayType <: AbstractArray{T,N}, S <: AbstractSpectrum} = LowerTriangularArray{T, N, ArrayType, S}(data, spectrum)
+# construct LTA from data and spectrum
+LowerTriangularArray( data::ArrayType, spectrum::S) where {T, N, ArrayType <: AbstractArray{T, N}, S <: AbstractSpectrum} =
+    LowerTriangularArray{T, N, ArrayType, S}(data, spectrum)
 
-LowerTriangularMatrix(data::Vector{T}, spectrum::S) where {T, S <: AbstractSpectrum} =
-    LowerTriangularMatrix{T, typeof(spectrum)}(data, spectrum)
+# or construct using LowerTriangularMatrix for 1D arrays
+LowerTriangularMatrix(data::ArrayType, spectrum::S) where {T,    ArrayType <: AbstractArray{T, 1}, S <: AbstractSpectrum} =
+    LowerTriangularArray{T, 1, ArrayType, S}(data, spectrum)
 
-function LowerTriangularArray(data::ArrayType, lmax::Integer, mmax::Integer) where {T, N, ArrayType <: AbstractArray{T,N}}
+function LowerTriangularArray(data::ArrayType, lmax::Integer, mmax::Integer) where {T, N, ArrayType <: AbstractArray{T, N}}
     spectrum = Spectrum(lmax, mmax, architecture=architecture(ArrayType))
     return LowerTriangularArray{T, N, ArrayType, typeof(spectrum)}(data, spectrum)
 end
 
-function LowerTriangularMatrix(data::Vector{T}, lmax::Integer, mmax::Integer) where T 
+function LowerTriangularMatrix(data::ArrayType, lmax::Integer, mmax::Integer) where {T, ArrayType <: AbstractArray{T, 1}}
     spectrum = Spectrum(lmax, mmax) 
-    return LowerTriangularMatrix{T, typeof(spectrum)}(data, spectrum)
+    return LowerTriangularArray{T, 1, ArrayType, typeof(spectrum)}(data, spectrum)
 end 
 
 # SIZE ETC
@@ -253,7 +256,8 @@ function LowerTriangularArray{T, N, ArrayType, SP}(
 ) where {T, N, SP<:AbstractSpectrum, ArrayType<:AbstractArray{T}, S<:Tuple}
     return LowerTriangularArray{T, N, ArrayType, SP}(undef, size...)
 end
-   
+
+# note the following constructors hardcode Vector TODO generalise ?
 function LowerTriangularMatrix{T}(::UndefInitializer, lmax::Integer, mmax::Integer) where T
     return LowerTriangularMatrix(Vector{T}(undef, nonzeros(lmax, mmax)), lmax, mmax)
 end
@@ -653,7 +657,7 @@ function Base.convert(
 end
 
 function Base.convert(::Type{LowerTriangularMatrix{T}}, L::LowerTriangularMatrix) where T
-    return LowerTriangularMatrix{T,typeof(L.spectrum)}(L.data, L.spectrum)
+    return LowerTriangularArray(T.(L.data), L.spectrum)
 end
 
 function Base.similar(L::LowerTriangularArray{T, N, ArrayType, SP}, I::Integer...) where {T, N, ArrayType, SP}
