@@ -24,14 +24,7 @@ function timestep!(
 end
 
 export SeasonalSoilMoisture
-@kwdef struct SeasonalSoilMoisture{NF, Grid} <: AbstractSoilMoisture
-
-    "number of latitudes on one hemisphere, Equator included"
-    nlat_half::Int
-
-    "number of soil layers"
-    nlayers::Int
-
+@kwdef struct SeasonalSoilMoisture{NF, GridVariable4D} <: AbstractSoilMoisture
     # READ CLIMATOLOGY FROM FILE
     "[OPTION] path to the folder containing the soil moisture file, pkg path default"
     path::String = "SpeedyWeather.jl/input_data"
@@ -51,13 +44,14 @@ export SeasonalSoilMoisture
 
     # to be filled from file
     "Monthly soil moisture volume fraction [1], interpolated onto Grid"
-    monthly_soil_moisture::Grid = zeros(Grid, nlat_half, nlayers, 12)
+    monthly_soil_moisture::GridVariable4D
 end
 
 # generator function
 function SeasonalSoilMoisture(SG::SpectralGrid; kwargs...)
-    (; NF, GridVariable4D, nlayers_soil, nlat_half) = SG
-    return SeasonalSoilMoisture{NF, GridVariable4D}(; nlat_half, nlayers=nlayers_soil, kwargs...)
+    (; NF, GridVariable4D, grid, nlayers_soil) = SG
+    monthly_soil_moisture = zeros(GridVariable4D, grid, nlayers_soil, 12)
+    return SeasonalSoilMoisture{NF, GridVariable4D}(; monthly_soil_moisture, kwargs...)
 end
 
 # don't both initializing for the dry model
@@ -231,7 +225,8 @@ function timestep!(
     E = diagn.physics.land.evaporative_flux         # [kg/s/m²], divide by density for [m/s]
     R = diagn.physics.land.river_runoff             # diagnosed [m/s]
 
-    @boundscheck grids_match(soil_moisture, Pconv, Plsc, E, R, horizontal_only=true) || throw(DimensionMismatch(soil_moisture, Pconv))
+    @boundscheck grids_match(soil_moisture, Pconv, Plsc, E, R, horizontal_only=true) ||
+        throw(DimensionMismatch(soil_moisture, Pconv))
     @boundscheck size(soil_moisture, 2) == 2 || throw(DimensionMismatch)
     f₁, f₂ = soil.f₁[], soil.f₂[]
     p = soil.runoff_fraction        # fraction of top layer runoff put into lower layer

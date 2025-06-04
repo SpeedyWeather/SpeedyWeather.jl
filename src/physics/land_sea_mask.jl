@@ -89,8 +89,8 @@ const LandSeaMask = EarthLandSeaMask
 $(TYPEDSIGNATURES)
 Generator function pulling the resolution information from `spectral_grid`."""
 function (L::Type{<:AbstractLandSeaMask})(spectral_grid::SpectralGrid; kwargs...)
-    (; NF, GridVariable2D, nlat_half) = spectral_grid
-    mask = zeros(GridVariable2D, nlat_half)
+    (; NF, GridVariable2D, grid) = spectral_grid
+    mask = zeros(GridVariable2D, grid)
     return L{NF, GridVariable2D}(; mask, kwargs...)
 end
 
@@ -98,7 +98,7 @@ end
 function set!(mask::AbstractLandSeaMask, args...; kwargs...)
     set!(mask.mask, args...; kwargs...)
     lo, hi = extrema(mask.mask)
-    (lo < 0 || hi > 1) && @warn "Land-sea mask was not set to values in [0, 1] but in [$lo, $hi]. Clamping."
+    (lo < 0 || hi > 1) && @warn "Land-sea mask not in [0, 1] but in [$lo, $hi]. Clamping."
     clamp!(mask.mask, 0, 1)
     return nothing
 end
@@ -120,13 +120,12 @@ function initialize!(land_sea_mask::EarthLandSeaMask, model::PrimitiveEquation)
     ncfile = NCDataset(path)
     
     # high resolution land-sea mask
-    # F = RingGrids.field_type(file_Grid)   # TODO this isn't working, hardcode instead
-    lsm_highres = FullClenshawField(ncfile["lsm"].var[:, :], input_as=Matrix)
+    lsm_highres = land_sea_mask.file_Grid(ncfile["lsm"].var[:, :], input_as=Matrix)
 
     # average onto grid cells of the model
     RingGrids.grid_cell_average!(land_sea_mask.mask, lsm_highres)
 
-    # TODO this shoudln't be necessary, but at the moment grid_cell_average! can return values > 1
+    # TODO this shouldn't be necessary, but at the moment grid_cell_average! can return values > 1
     # lo, hi = extrema(land_sea_mask.mask)
     # (lo < 0 || hi > 1) && @warn "Land-sea mask has values in [$lo, $hi], clamping to [0, 1]."
     clamp!(land_sea_mask.mask, 0, 1)
