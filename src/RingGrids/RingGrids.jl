@@ -47,6 +47,7 @@ export  FullGaussianField,
 
 # SIZE
 export  grids_match,
+        fields_match,
         get_nlat,
         get_nlat_half,
         get_npoints,

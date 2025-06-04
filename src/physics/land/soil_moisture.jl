@@ -71,10 +71,12 @@ function initialize!(soil::SeasonalSoilMoisture, model::PrimitiveEquation)
     # read out netCDF data
     nx, ny, nt = ncfile.dim["lon"], ncfile.dim["lat"], ncfile.dim["time"]
     nlat_half = RingGrids.get_nlat_half(soil.file_Grid, nx*ny)
+    grid = soil.file_Grid(nlat_half)
 
     # the soil moisture from file but wrapped into a grid
     NF = eltype(monthly_soil_moisture)
-    soil_moisture_file = zeros(soil.file_Grid{NF}, nlat_half, soil.nlayers, nt)
+    nlayers = size(monthly_soil_moisture, 2)
+    soil_moisture_file = zeros(NF, grid, nlayers, nt)
 
     for l in 1:nt   # read out monthly to swap dimensions to horizontal - vertical - time
         soil_moisture_file[:, 1, l] .= vec(ncfile[soil.varname_layer1].var[:, :, l])
@@ -86,11 +88,11 @@ function initialize!(soil::SeasonalSoilMoisture, model::PrimitiveEquation)
     fill_value1 === fill_value2 || @warn "Fill values are different for the two soil layers, use only from layer 1"
     soil_moisture_file[soil_moisture_file .=== fill_value1] .= soil.missing_value      # === to include NaN
     
-    @boundscheck grids_match(monthly_soil_moisture, soil_moisture_file, vertical_only=true) ||
+    @boundscheck fields_match(monthly_soil_moisture, soil_moisture_file, vertical_only=true) ||
         throw(DimensionMismatch(monthly_soil_moisture, soil_moisture_file))
 
     # create interpolator from grid in file to grid used in model
-    interp = RingGrids.interpolator(Float32, monthly_soil_moisture, soil_moisture_file)
+    interp = RingGrids.interpolator(monthly_soil_moisture, soil_moisture_file, NF=Float32)
     interpolate!(monthly_soil_moisture, soil_moisture_file, interp)
     return nothing
 end

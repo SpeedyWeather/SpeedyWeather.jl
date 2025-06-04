@@ -213,7 +213,7 @@ function _fourier_batched!(                 # SPECTRAL TO GRID
     S::SpectralTransform;                   # precomputed transform
 )
     (; nlat, nlons) = S                     # dimensions
-    (; nlat_half) = S
+    (; nlat_half) = S.grid
     nlayers = size(field, 2)                # number of vertical layers
 
     @boundscheck ismatching(S, field) || throw(DimensionMismatch(S, field))

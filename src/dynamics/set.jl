@@ -110,24 +110,24 @@ end
 function set!(
     var::LowerTriangularArray,
     f::Function,
-    geometry::Geometry{NF, Grid},
+    geometry::Geometry,
     S::Union{SpectralTransform, Nothing}=nothing;
     add::Bool=false,
-) where {NF, Grid}
-    grid = ndims(var) == 1 ? zeros(Grid{NF}, geometry.nlat_half) : zeros(Grid{NF}, geometry.nlat_half, geometry.nlayers)
-    set!(grid, f, geometry, S; add=false)
-    set!(var, grid, geometry, S; add)
+)
+    (; grid, nlayers, NF) = geometry.spectral_grid
+    field = ndims(var) == 1 ? zeros(NF, grid) : zeros(NF, grid, nlayers)
+    set!(field, f, geometry, S; add=false)
+    set!(var, field, geometry, S; add)
 end
 
 # set LTA <- number
 function set!(
-    var::LowerTriangularArray{T},
+    var::LowerTriangularArray,
     s::Number,
-    geometry::Geometry{NF},
+    geometry::Geometry,
     S::Union{SpectralTransform, Nothing}=nothing;
     add::Bool=false,
-) where {T, NF}
-    
+)
     # appropiate normalization, assume standard 2√π normalisation if no transform is given 
     norm_sphere = isnothing(S) ? 2sqrt(π) : S.norm_sphere
 
@@ -141,7 +141,7 @@ function set!(
     set!(var, var_new, geometry, S; add)
 end 
 
-# set Grid <- Grid
+# set Field <- Field
 function set!(
     var::AbstractField,
     field::AbstractField,
@@ -153,7 +153,7 @@ function set!(
         if fields_match(var, field)
             var .+= field
         else 
-            var .+= interpolate(typeof(var), geometry.nlat_half, field)
+            var .+= interpolate(var.grid, field)
         end
     else 
         interpolate!(var, field)
@@ -161,7 +161,7 @@ function set!(
     return var 
 end 
 
-# set Grid <- LTA
+# set Field <- LTA
 function set!(
     var::AbstractField,
     specs::LowerTriangularArray,
@@ -173,7 +173,7 @@ function set!(
     set!(var, field, geometry, S; add)
 end
 
-# set Grid <- Func
+# set Field <- Func
 function set!(
     var::AbstractField,
     f::Function,

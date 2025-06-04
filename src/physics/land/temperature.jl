@@ -45,7 +45,7 @@ function initialize!(land::SeasonalLandTemperature, model::PrimitiveEquation)
     lst = land.file_Grid(ncfile[land.varname].var[:, :, :], input_as=Matrix)
     lst[lst .=== fill_value] .= land.missing_value      # === to include NaN
     
-    @boundscheck grids_match(monthly_temperature, lst, vertical_only=true) ||
+    @boundscheck fields_match(monthly_temperature, lst, vertical_only=true) ||
         throw(DimensionMismatch(monthly_temperature, lst))
 
     # create interpolator from grid in file to grid used in model

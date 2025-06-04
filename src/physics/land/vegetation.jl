@@ -157,8 +157,8 @@ function soil_moisture_availability!(
     D_top = model.land.geometry.layer_thickness[1]
     D_root = model.land.geometry.layer_thickness[2]
 
-    @boundscheck grids_match(high_cover, low_cover, soil_moisture_availability) || throws(BoundsError)
-    @boundscheck grids_match(soil_moisture, soil_moisture_availability, horizontal_only=true) || throws(BoundsError)
+    @boundscheck fields_match(high_cover, low_cover, soil_moisture_availability) || throws(BoundsError)
+    @boundscheck fields_match(soil_moisture, soil_moisture_availability, horizontal_only=true) || throws(BoundsError)
     @boundscheck size(soil_moisture, 2) >= 2    # defined for two layers
 
     # precalculate

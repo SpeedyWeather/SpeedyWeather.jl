@@ -123,11 +123,11 @@ function initialize!(ocean::SeasonalOceanClimatology, model::PrimitiveEquation)
     sst = ocean.file_Grid(ncfile[ocean.varname].var[:, :, :], input_as=Matrix)
     sst[sst .=== fill_value] .= ocean.missing_value      # === to include NaN
 
-    @boundscheck grids_match(monthly_temperature, sst, vertical_only=true) ||
+    @boundscheck fields_match(monthly_temperature, sst, vertical_only=true) ||
         throw(DimensionMismatch(monthly_temperature, sst))
 
     # create interpolator from grid in file to grid used in model
-    interp = RingGrids.interpolator(Float32, monthly_temperature, sst)
+    interp = RingGrids.interpolator(monthly_temperature, sst, NF=Float32)
     interpolate!(monthly_temperature, sst, interp)
     return nothing
 end

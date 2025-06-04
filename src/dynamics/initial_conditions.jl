@@ -446,7 +446,7 @@ function initialize!(   progn::PrognosticVariables{NF},
     (;σ_tropopause) = initial_conditions
     lapse_rate = model.atmosphere.moist_lapse_rate
     (;temp_ref, R_dry) = model.atmosphere
-    (;radius, Grid, nlat_half, nlayers) = model.spectral_grid
+    (;radius, grid, nlayers) = model.spectral_grid
     (;rotation, gravity) = model.planet
     (;σ_levels_full) = model.geometry
 
@@ -465,7 +465,7 @@ function initialize!(   progn::PrognosticVariables{NF},
     end
 
     Tη .= max.(Tη, Tmin)
-    temp_grid = zeros(Grid{NF}, nlat_half, nlayers)     # temperature
+    temp_grid = zeros(NF, grid, nlayers)     # temperature
     aΩ = radius*rotation
 
     for k in eachlayer(temp_grid)
