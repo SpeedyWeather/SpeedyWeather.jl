@@ -853,3 +853,9 @@ end
         end 
     end 
 end 
+
+@testset "LTA view" begin
+    L = randn(LowerTriangularArray{Float32}, 5, 5, 2)
+    @test view(L, :, 1) isa SubArray
+    @test lta_view(L, :, 1) isa LowerTriangularArray
+end
