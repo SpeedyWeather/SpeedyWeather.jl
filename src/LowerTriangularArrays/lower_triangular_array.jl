@@ -28,19 +28,22 @@ end
 """2D `LowerTriangularArray` of type `T`"""
 const LowerTriangularMatrix = LowerTriangularArray{T, 1} where T
 
-LowerTriangularArray(data::ArrayType, spectrum::S) where {T, N, ArrayType <: AbstractArray{T,N}, S <: AbstractSpectrum} = LowerTriangularArray{T, N, ArrayType, S}(data, spectrum)
+# construct LTA from data and spectrum
+LowerTriangularArray( data::ArrayType, spectrum::S) where {T, N, ArrayType <: AbstractArray{T, N}, S <: AbstractSpectrum} =
+    LowerTriangularArray{T, N, ArrayType, S}(data, spectrum)
 
-LowerTriangularMatrix(data::AbstractVector{T}, spectrum::S) where {T, S <: AbstractSpectrum} =
-    LowerTriangularMatrix{T, typeof(spectrum)}(data, spectrum)
+# or construct using LowerTriangularMatrix for 1D arrays
+LowerTriangularMatrix(data::ArrayType, spectrum::S) where {T,    ArrayType <: AbstractArray{T, 1}, S <: AbstractSpectrum} =
+    LowerTriangularArray{T, 1, ArrayType, S}(data, spectrum)
 
-function LowerTriangularArray(data::ArrayType, lmax::Integer, mmax::Integer) where {T, N, ArrayType <: AbstractArray{T,N}}
+function LowerTriangularArray(data::ArrayType, lmax::Integer, mmax::Integer) where {T, N, ArrayType <: AbstractArray{T, N}}
     spectrum = Spectrum(lmax, mmax)
     return LowerTriangularArray{T, N, ArrayType, typeof(spectrum)}(data, spectrum)
 end
 
-function LowerTriangularMatrix(data::AbstractVector{T}, lmax::Integer, mmax::Integer) where T 
+function LowerTriangularMatrix(data::ArrayType, lmax::Integer, mmax::Integer) where {T, ArrayType <: AbstractArray{T, 1}}
     spectrum = Spectrum(lmax, mmax) 
-    return LowerTriangularMatrix{T, typeof(spectrum)}(data, spectrum)
+    return LowerTriangularArray{T, 1, ArrayType, typeof(spectrum)}(data, spectrum)
 end 
 
 # SIZE ETC
@@ -614,7 +617,7 @@ function Base.convert(
 end
 
 function Base.convert(::Type{LowerTriangularMatrix{T}}, L::LowerTriangularMatrix) where T
-    return LowerTriangularMatrix{T,typeof(L.spectrum)}(L.data, L.spectrum)
+    return LowerTriangularArray{T, ndims(L), typeof(L.data), typeof(L.spectrum)}(L.data, L.spectrum)
 end
 
 function Base.similar(L::LowerTriangularArray{T, N, ArrayType, SP}, I::Integer...) where {T, N, ArrayType, SP}
