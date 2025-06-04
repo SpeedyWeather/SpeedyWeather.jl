@@ -23,9 +23,9 @@ function run_benchmark(L, M, N, arch, implementation=:original)
     U, V, vor, div, S = setup_test_data(L, M, N, arch)
     
     if implementation == :original
-        return @benchmark SpeedyWeather.SpeedyTransforms.UV_from_vordiv_KA!($U, $V, $vor, $div, $S)
+        return @benchmark CUDA.@sync SpeedyWeather.SpeedyTransforms.UV_from_vordiv_KA!($U, $V, $vor, $div, $S)
     elseif implementation == :split
-        return @benchmark SpeedyWeather.SpeedyTransforms.UV_from_vordiv_KA_split!($U, $V, $vor, $div, $S)
+        return @benchmark CUDA.@sync SpeedyWeather.SpeedyTransforms.UV_from_vordiv_KA_split!($U, $V, $vor, $div, $S)
     else
         return @benchmark SpeedyWeather.SpeedyTransforms.UV_from_vordiv!($U, $V, $vor, $div, $S)
     end

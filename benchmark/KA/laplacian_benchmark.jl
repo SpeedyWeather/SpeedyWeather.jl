@@ -63,7 +63,7 @@ function run_benchmark(L, M, N, arch, use_ka=true)
     alms_out, alms, S = setup_test_data(L, M, N, arch)
     
     if use_ka
-        return @benchmark SpeedyWeather.SpeedyTransforms.∇²!($alms_out, $alms, $S)
+        return @benchmark CUDA.@sync SpeedyWeather.SpeedyTransforms.∇²!($alms_out, $alms, $S)
     else
         return @benchmark old_∇²!($alms_out, $alms, $S)
     end
