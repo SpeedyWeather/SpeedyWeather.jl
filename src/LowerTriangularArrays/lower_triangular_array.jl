@@ -669,6 +669,9 @@ Base.any(L::LowerTriangularArray) = any(L.data)
 
 Base.repeat(L::LowerTriangularArray, counts...) = LowerTriangularArray(repeat(L.data, counts...), L.spectrum)
 
+# Views that return a LowerTriangularArrays again
+lta_view(L::LowerTriangularArray, args...) = LowerTriangularArray(view(L.data, args...), L.spectrum)
+
 # Broadcast CPU/GPU
 import Base.Broadcast: BroadcastStyle, Broadcasted, DefaultArrayStyle
 import LinearAlgebra: isstructurepreserving, fzeropreserving
