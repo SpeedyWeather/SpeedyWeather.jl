@@ -25,12 +25,12 @@ function lta_error_message(data, spectrum, T, N, ArrayType)
             "a $(Base.dims2string(matrix_size(data, spectrum))) LowerTriangularArray{$T, $N, $ArrayType}"
 end 
 
-"""2-dimensional `LowerTriangularArray` of type `T` with specturm `S` with its non-zero entries unravelled into a `Vector{T}`"""
-const LowerTriangularMatrix{T, S} = LowerTriangularArray{T, 1, Vector{T}, S} where S <: AbstractSpectrum
+"""2D `LowerTriangularArray` of type `T`"""
+const LowerTriangularMatrix = LowerTriangularArray{T, 1} where T
 
 LowerTriangularArray(data::ArrayType, spectrum::S) where {T, N, ArrayType <: AbstractArray{T,N}, S <: AbstractSpectrum} = LowerTriangularArray{T, N, ArrayType, S}(data, spectrum)
 
-LowerTriangularMatrix(data::Vector{T}, spectrum::S) where {T, S <: AbstractSpectrum} =
+LowerTriangularMatrix(data::AbstractVector{T}, spectrum::S) where {T, S <: AbstractSpectrum} =
     LowerTriangularMatrix{T, typeof(spectrum)}(data, spectrum)
 
 function LowerTriangularArray(data::ArrayType, lmax::Integer, mmax::Integer) where {T, N, ArrayType <: AbstractArray{T,N}}
@@ -38,7 +38,7 @@ function LowerTriangularArray(data::ArrayType, lmax::Integer, mmax::Integer) whe
     return LowerTriangularArray{T, N, ArrayType, typeof(spectrum)}(data, spectrum)
 end
 
-function LowerTriangularMatrix(data::Vector{T}, lmax::Integer, mmax::Integer) where T 
+function LowerTriangularMatrix(data::AbstractVector{T}, lmax::Integer, mmax::Integer) where T 
     spectrum = Spectrum(lmax, mmax) 
     return LowerTriangularMatrix{T, typeof(spectrum)}(data, spectrum)
 end 
