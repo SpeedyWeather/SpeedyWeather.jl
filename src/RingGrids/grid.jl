@@ -63,6 +63,35 @@ function (::Type{Grid})(nlat_half::Integer, architecture=DEFAULT_ARCHITECTURE())
     return Grid_(nlat_half, architecture, rings)
 end
 
+# also allow to construct a field with Grid(data)
+function (::Type{Grid})(data::AbstractArray; input_as=Vector, kwargs...) where {Grid<:AbstractGrid}
+    return Grid(data, input_as, kwargs...)      # make input_as a positional argument
+end
+
+function (::Type{Grid})(
+    data::AbstractArray,
+    input_as::Type{Vector};
+    architecture=DEFAULT_ARCHITECTURE(),
+) where {Grid<:AbstractGrid}
+    # create a grid based on the size of data
+    npoints = size(data, 1)
+    nlat_half = get_nlat_half(Grid, npoints)
+    grid = Grid(nlat_half, architecture)
+    return Field(data, grid)
+end
+
+function (::Type{Grid})(
+    data::AbstractArray,
+    input_as::Type{Matrix};
+    architecture=DEFAULT_ARCHITECTURE(),
+) where {Grid<:AbstractGrid}
+    npoints = size(data, 1)*size(data, 2)
+    nlat_half = get_nlat_half(Grid, npoints)
+    grid = Grid(nlat_half, architecture)
+    data_flat = reshape(data, :, size(data)[3:end]...)
+    return Field(data_flat, grid)
+end
+
 ## COORDINATES
 
 """$(TYPEDSIGNATURES) Longitudes (degrees, 0-360˚E), latitudes (degrees, 90˚N to -90˚N) for
