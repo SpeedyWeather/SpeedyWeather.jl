@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- A minimal barotropic model now runs on GPU [#733](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/733)
 - Reworked GPU and utility code structure and added GPU versions of spectral gradients[#727](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/727)
 - LowerTriangularArray-preserving view [#739](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/739)
 - Array-agnostic LowerTriangularMatrix [#738](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/738)

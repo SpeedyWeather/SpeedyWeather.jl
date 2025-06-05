@@ -37,7 +37,8 @@ module Architectures
         GPU(device)
 
     Return a GPU architecture using `device`.
-    `device` defauls to CUDA.CUDABackend(always_inline=true)
+    `device` defauls to CUDA.CUDABackend(always_inline=true). 
+    CUDA has to be loaded for this to work. 
     """
     struct GPU{D} <: AbstractArchitecture
         device :: D
@@ -65,11 +66,6 @@ module Architectures
     architecture(::Type{<:Array}) = CPU()
     architecture(a::SubArray) = architecture(parent(a))
 
-    """
-        architecture(a::AbstractArchitecture)
-
-    Return the architecture of `a`.
-    """
     architecture(a::AbstractArchitecture) = a
 
     """
