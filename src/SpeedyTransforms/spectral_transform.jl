@@ -8,17 +8,18 @@ to perform a spectral transform. Fields are
 $(TYPEDFIELDS)"""
 struct SpectralTransform{
     NF,
-    AR,                         # <: AbstractArchitecture
-    ArrayType,                  # non-parametric array type
+    AR,                                   # <: AbstractArchitecture
+    ArrayType,                            # non-parametric array type
     SpectrumType,                         # <: AbstractSpectrum
-    VectorType,                 # <: ArrayType{NF, 1},
-    ArrayTypeIntMatrix,         # <: ArrayType{Int, 2}
-    VectorComplexType,          # <: ArrayType{Complex{NF}, 1},
-    MatrixComplexType,          # <: ArrayType{Complex{NF}, 2},
-    ArrayComplexType,           # <: ArrayType{Complex{NF}, 3},
-    LowerTriangularMatrixType,  # <: LowerTriangularArray{NF, 1, ArrayType{NF}},
-    ComplexLowerTriangularMatrixType, # <: LowerTriangularArray{Complex{NF}, 1, ArrayType{Complex{NF}}},
-    LowerTriangularArrayType,   # <: LowerTriangularArray{NF, 2, ArrayType{NF}},
+    VectorType,                           # <: ArrayType{NF, 1},
+    ArrayTypeIntMatrix,                   # <: ArrayType{Int, 2}
+    VectorComplexType,                    # <: ArrayType{Complex{NF}, 1},
+    MatrixComplexType,                    # <: ArrayType{Complex{NF}, 2},
+    ArrayComplexType,                     # <: ArrayType{Complex{NF}, 3},
+    LowerTriangularMatrixType,            # <: LowerTriangularArray{NF, 1, ArrayType{NF}},
+    ComplexIntLowerTriangularMatrixType,  # <: LowerTriangularArray{Complex{Int}, 1, ArrayType{Complex{Int}}},
+    ComplexLowerTriangularMatrixType,     # <: LowerTriangularArray{Complex{NF}, 1, ArrayType{Complex{NF}}},
+    LowerTriangularArrayType,             # <: LowerTriangularArray{NF, 2, ArrayType{NF}},
 } <: AbstractSpectralTransform
 
     # Architecture
@@ -46,7 +47,7 @@ struct SpectralTransform{
     lon_offsets::MatrixComplexType  # Offset of first lon per ring from prime meridian
 
     # NORMALIZATION
-    norm_sphere::NF                         # normalization of the l=0, m=0 mode
+    norm_sphere::NF                 # normalization of the l=0, m=0 mode
 
     # FFT plans, one plan for each latitude ring, batched in the vertical
     rfft_plans::Vector{AbstractFFTs.Plan}   # FFT plan for grid to spectral transform
@@ -79,8 +80,9 @@ struct SpectralTransform{
     # GRADIENT MATRICES (on unit sphere, no 1/radius-scaling included)
     grad_y1::LowerTriangularMatrixType  # precomputed meridional gradient factors, term 1
     grad_y2::LowerTriangularMatrixType  # term 2
-
+    
     # GRADIENT MATRICES FOR U, V -> Vorticity, Divergence
+    grad_x_vordiv::ComplexIntLowerTriangularMatrixType # precomputed zonal gradient factors
     grad_y_vordiv1::LowerTriangularMatrixType
     grad_y_vordiv2::LowerTriangularMatrixType
 
@@ -221,6 +223,12 @@ function SpectralTransform(
     end
 
     # meridional gradient used to get from u, v/coslat to vorticity and divergence
+    grad_x_vordiv = zeros(Complex{Int}, spectrum)
+    grad_x_vordiv .= complex.(0, spectrum.m_indices .- 1)
+    for m in 1:mmax                         # last row zero to get vor and div correct
+        grad_x_vordiv[lmax, m] = 0
+    end
+
     grad_y_vordiv1 = zeros(NF, spectrum)   # term 1, mul with harmonic l-1, m
     grad_y_vordiv2 = zeros(NF, spectrum)   # term 2, mul with harmonic l+1, m
  
@@ -269,6 +277,7 @@ function SpectralTransform(
         ArrayType_{Complex{NF}, 2},
         ArrayType_{Complex{NF}, 3},
         LowerTriangularArray{NF, 1, ArrayType_{NF, 1}, typeof(spectrum)},
+        LowerTriangularArray{Complex{Int}, 1, ArrayType_{Complex{Int}, 1}, typeof(spectrum)},   
         LowerTriangularArray{Complex{NF}, 1, ArrayType_{Complex{NF}, 1}, typeof(spectrum)},   
         LowerTriangularArray{NF, 2, ArrayType_{NF, 2}, typeof(spectrum)},
     }(
@@ -284,8 +293,9 @@ function SpectralTransform(
         scratch_memory_grid, scratch_memory_spec,
         scratch_memory_column_north, scratch_memory_column_south,
         jm_index_size, kjm_indices, 
-        solid_angles, grad_y1, grad_y2,
-        grad_y_vordiv1, grad_y_vordiv2, vordiv_to_uv_x,
+        solid_angles, 
+        grad_y1, grad_y2,
+        grad_x_vordiv, grad_y_vordiv1, grad_y_vordiv2, vordiv_to_uv_x,
         vordiv_to_uv1, vordiv_to_uv2,
         eigenvalues, eigenvalues⁻¹
     )
