@@ -181,23 +181,19 @@ function leapfrog!(
     #     A_new[lm] = a_new - w2*a_update         # Williams filter: A_new[lm] becomes 1xfiltered value at t+Δt
     # end
 
-    # TODO CPU hardcoded for now
-    launch!(CPU(), :lmk, size(tendency), leapfrog_kernel!, A_old, A_new, A_lf, tendency, dt_NF, w1, w2)
+    launch!(tendency.spectrum.architecture, :lmk, size(tendency), leapfrog_kernel!, A_old, A_new, A_lf, tendency, dt_NF, w1, w2)
 end
 
-@kernel function leapfrog_kernel!(A_old, A_new, A_lf, tendency, @Const(dt), @Const(w1), @Const(w2))
+@kernel inbounds=true function leapfrog_kernel!(A_old, A_new, A_lf, tendency, @Const(dt), @Const(w1), @Const(w2))
 
     lmk = @index(Global, Linear)    # every harmonic lm, every vertical layer k
 
-    @inbounds begin
-        a_old = A_old[lmk]
-        a_new = a_old + dt*tendency[lmk]
-        a_update = a_old - 2A_lf[lmk] + a_new
-        A_old[lmk] = A_lf[lmk] + w1*a_update
-        A_new[lmk] = a_new - w2*a_update
-    end
+    a_old = A_old[lmk]
+    a_new = a_old + dt*tendency[lmk]
+    a_update = a_old - 2A_lf[lmk] + a_new
+    A_old[lmk] = A_lf[lmk] + w1*a_update
+    A_new[lmk] = a_new - w2*a_update
 end
-
 
 # variables that are leapfrogged in the respective models, e.g. :vor_tend, :div_tend, etc...
 tendency_names(model::AbstractModel) = tuple((Symbol(var, :_tend) for var in prognostic_variables(model))...)
