@@ -29,6 +29,39 @@ function spectral_truncation!(
     return alms
 end
 
+"""Alternative kernel-based implementation of spectral_truncation!"""
+function spectral_truncation_kernel!(
+    alms::LowerTriangularArray,     # spectral field to be truncated
+    ltrunc::Integer,                # truncate to max degree ltrunc (0-based)
+    mtrunc::Integer,                # truncate to max order mtrunc (0-based)
+)   
+    # Convert to 1-based indexing
+    ltrunc += 1     # 0-based to 1-based
+    mtrunc += 1
+    
+    # Launch the kernel
+    launch!(alms.spectrum.architecture, :lmk, size(alms), _spectral_truncation_kernel!, 
+            alms, ltrunc, mtrunc, alms.spectrum.l_indices, alms.spectrum.m_indices)
+    synchronize(alms.spectrum.architecture)
+    
+    return alms
+end
+
+@kernel inbounds=true function _spectral_truncation_kernel!(alms, l_trunc, m_trunc, @Const(l_indices), @Const(m_indices))
+    I = @index(Global, Cartesian)
+    lm = I[1]
+    k = ndims(alms) == 1 ? CartesianIndex() : I[2]
+    
+    # Get the degree l and order m for this coefficient
+    l = l_indices[lm]
+    m = m_indices[lm]
+    
+    # Apply truncation
+    if l > l_trunc || m > m_trunc
+        alms[I] = 0
+    end
+end
+
 """
 $(TYPEDSIGNATURES)
 Sets the upper triangle of `A` to zero."""
