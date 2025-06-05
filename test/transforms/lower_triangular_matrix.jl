@@ -853,3 +853,17 @@ end
         end 
     end 
 end 
+
+@testset "LTA view" begin
+    L = randn(LowerTriangularArray{Float32}, 5, 5, 2)
+    @test view(L, :, 1) isa SubArray
+    @test view(L, 1, :) isa SubArray
+    @test LowerTriangularArrays.lta_view(L, :) isa SubArray                 # unravels both layers
+    @test LowerTriangularArrays.lta_view(L, :, 1) isa LowerTriangularArray
+    @test LowerTriangularArrays.lta_view(L, 1, :) isa SubArray
+
+    L = randn(LowerTriangularArray{Float32}, 5, 5)
+    @test LowerTriangularArrays.lta_view(L, 1:3) isa SubArray
+    @test LowerTriangularArrays.lta_view(L, 1) isa SubArray
+    @test LowerTriangularArrays.lta_view(L, :) isa LowerTriangularArray     # this is LTA representable though!
+end
