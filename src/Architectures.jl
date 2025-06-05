@@ -8,21 +8,21 @@ module Architectures
     export synchronize 
     
     """
-    AbstractArchitecture
+        AbstractArchitecture
 
     Abstract supertype for architectures supported by SpeedyWeather.
     """
     abstract type AbstractArchitecture end
 
     """
-    AbstractCPU <: AbstractArchitecture
+        AbstractCPU <: AbstractArchitecture
 
     Abstract supertype for CPU architectures supported by SpeedyWeather.
     """
     abstract type AbstractCPU <: AbstractArchitecture end
 
     """
-    CPU <: AbstractCPU
+        CPU <: AbstractCPU
 
     Run SpeedyWeather on one CPU node.
     """
@@ -54,12 +54,29 @@ module Architectures
     device(a::CPU) = a.device
     device(a::GPU) = a.device
 
+    """
+        architecture(x)
+
+    Return the default architecture that's associated with the input `x`.
+    """
     architecture() = nothing
     architecture(::Number) = nothing
     architecture(::Array) = CPU()
     architecture(::Type{<:Array}) = CPU()
     architecture(a::SubArray) = architecture(parent(a))
 
+    """
+        architecture(a::AbstractArchitecture)
+
+    Return the architecture of `a`.
+    """
+    architecture(a::AbstractArchitecture) = a
+
+    """
+        array_type(arch::AbstractArchitecture)
+
+    Return the array type that's used with the architecture `arch`.
+    """
     array_type(::CPU) = Array
     array_type(::Type{<:CPU}) = Array
 
