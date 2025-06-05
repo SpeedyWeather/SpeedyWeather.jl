@@ -42,6 +42,7 @@ function Base.DimensionMismatch(data::AbstractArray, grid::AbstractGrid)
 end
 
 Base.DimensionMismatch(f1::AbstractField, f2::AbstractField) = DimensionMismatch("$(summary(f1)) does not match $(summary(f2))")
+Base.DimensionMismatch(f1::AbstractField, f2::AbstractArray) = DimensionMismatch("$(summary(f1)) does not match $(summary(f2))")
 function Base.DimensionMismatch(f1::AbstractField, f2s::AbstractField...)
     length(f2s) == 0 && return DimensionMismatch("$(summary(f1)) does not match any other field")
     s = "$(summary(f1)) does not match either of "

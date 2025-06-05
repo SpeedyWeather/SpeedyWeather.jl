@@ -35,8 +35,8 @@ include("utility_functions.jl")
 
 # LowerTriangularArrays for spherical harmonics
 export  LowerTriangularArrays, 
-        LowerTriangularMatrix,
-        LowerTriangularArray
+        LowerTriangularArray,
+        LowerTriangularMatrix
 
 export  Spectrum
 

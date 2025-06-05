@@ -95,8 +95,9 @@ function initialize!(   progn::PrognosticVariables{NF},
     lmax = progn.trunc + 1
     power = initial_conditions.power + 1    # +1 as power is summed of orders m
 
+    (; spectrum, nlayers)
     A = initial_conditions.amplitude
-    ξ = zeros(LowerTriangularArray{Complex{NF}}, lmax+1, lmax, model.spectral_grid.nlayers)
+    ξ = zeros(LowerTriangularArray{Complex{NF}}, spectrum, nlayers)
 
     lm = 0
     for m in 1:lmax
@@ -140,10 +141,10 @@ function initialize!(   progn::PrognosticVariables{NF},
     RNG = initial_conditions.random_number_generator
     Random.seed!(RNG, seed)
 
-    (; GridVariable2D, nlat_half, radius, trunc, nlayers) = model.spectral_grid
+    (; GridVariable2D, grid, radius, nlayers) = model.spectral_grid
     A = convert(NF, initial_conditions.max_speed) * 2
-    u = 2A*rand(GridVariable2D, nlat_half) .- A
-    v = 2A*rand(GridVariable2D, nlat_half) .- A
+    u = 2A*rand(GridVariable2D, grid) .- A
+    v = 2A*rand(GridVariable2D, grid) .- A
 
     u_spectral = transform(u, model.spectral_transform)
     v_spectral = transform(v, model.spectral_transform)
@@ -213,13 +214,13 @@ function initialize!(   progn::PrognosticVariables,
     λ = perturb_lon*2π/360          # perturbation longitude [radians]
 
     (; rotation, gravity) = model.planet
-    (; Grid, NF, nlat_half) = model.spectral_grid
+    (; grid, NF) = model.spectral_grid
     (; coslat⁻¹, radius) = model.geometry
 
-    u_grid = zeros(Grid{NF}, nlat_half, 1)
-    η_perturb_grid = zeros(Grid{NF}, nlat_half)
-    lat = RingGrids.get_lat(Grid, nlat_half)
-    lons, _ = RingGrids.get_lonlats(Grid, nlat_half)
+    u_grid = zeros(NF, grid, 1)
+    η_perturb_grid = zeros(NF, grid)
+    lat = RingGrids.get_lat(grid)
+    lons, _ = RingGrids.get_lonlats(grid)
 
     for (j, ring) in enumerate(eachring(u_grid))
         θ = lat[j]             # latitude in radians

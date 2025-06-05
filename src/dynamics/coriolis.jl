@@ -27,7 +27,7 @@ $(TYPEDSIGNATURES)
 Return the Coriolis parameter `f` on the grid `Grid` of resolution `nlat_half`
 on a planet of `rotation` [1/s]. Default rotation of Earth."""
 function coriolis!(f::AbstractField; rotation = DEFAULT_ROTATION)
-    lat = get_lat(Grid, nlat_half)          # in radians [-π/2, π/2]
+    lat = get_lat(f)                        # in radians [-π/2, π/2]
 
     for (j, ring) in enumerate(eachring(f))
         fⱼ = 2rotation*sin(lat[j])
