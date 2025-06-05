@@ -250,7 +250,7 @@ function UV_from_vor!(
     (; vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2 ) = S
     @boundscheck ismatching(S, U) || throw(DimensionMismatch(S, U))
     
-    launch!(S.architecture, :lmk, size(U), _UV_from_vor_kernel!, U, V, vor, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)
+    launch!(S.architecture, :lmk, size(U), _UV_from_vor_kernel!, U, V, vor, vor.spectrum.l_indices, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)
     synchronize(S.architecture)
     
     # *radius scaling if not unit sphere (*radius² for ∇⁻² then /radius to get from stream function to velocity)
@@ -262,13 +262,13 @@ function UV_from_vor!(
     return U, V
 end
 
-@kernel inbounds=true function _UV_from_vor_kernel!(U, V, vor, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)    
+@kernel inbounds=true function _UV_from_vor_kernel!(U, V, vor, @Const(l_indices), vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)    
     I = @index(Global, Cartesian)
     lm = I[1]
     k = ndims(vor) == 1 ? CartesianIndex() : I[2]
-    l = U.spectrum.l_indices[lm]
     lmax = U.spectrum.lmax
-    
+    l = l_indices[lm]
+
     # Get the coefficients for the current lm index
     z = vordiv_to_uv_x[lm]
     vordiv_uv1 = vordiv_to_uv1[lm]
@@ -314,7 +314,7 @@ function UV_from_vordiv!(
     (; vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2 ) = S
     @boundscheck ismatching(S, U) || throw(DimensionMismatch(S, U))
 
-    launch!(S.architecture, :lmk, size(U), _UV_from_vordiv_kernel!, U, V, vor, div, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)
+    launch!(S.architecture, :lmk, size(U), _UV_from_vordiv_kernel!, U, V, vor, div, vor.spectrum.l_indices, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)
     synchronize(S.architecture)
     
     # *radius scaling if not unit sphere (*radius² for ∇⁻², then /radius to get from stream function to velocity)
@@ -326,12 +326,12 @@ function UV_from_vordiv!(
     return U, V
 end
 
-@kernel inbounds=true function _UV_from_vordiv_kernel!(U, V, vor, div, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)    
+@kernel inbounds=true function _UV_from_vordiv_kernel!(U, V, vor, div, @Const(l_indices), vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)    
     I = @index(Global, Cartesian)
     lm = I[1]
     k = ndims(vor) == 1 ? CartesianIndex() : I[2]
-    l = U.spectrum.l_indices[lm]
     lmax = U.spectrum.lmax 
+    l = l_indices[lm]
 
     vordiv_uv2 = vordiv_to_uv2[lm]
     vordiv_uv1 = vordiv_to_uv1[lm]
