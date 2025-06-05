@@ -3,22 +3,35 @@ module Architectures
     import KernelAbstractions 
 
     export AbstractArchitecture
-    export CPU, GPU, CUDAGPU
+    export CPU, CPUStatic, GPU, CUDAGPU
     export array_type, on_architecture, architecture, device, convert_to_device
-
+    export synchronize 
+    
     """
-    AbstractArchitecture
+        AbstractArchitecture
 
     Abstract supertype for architectures supported by SpeedyWeather.
     """
     abstract type AbstractArchitecture end
 
     """
-    CPU <: AbstractArchitecture
+        AbstractCPU <: AbstractArchitecture
+
+    Abstract supertype for CPU architectures supported by SpeedyWeather.
+    """
+    abstract type AbstractCPU <: AbstractArchitecture end
+
+    """
+        CPU <: AbstractCPU
 
     Run SpeedyWeather on one CPU node.
     """
-    struct CPU <: AbstractArchitecture end
+    struct CPU{D} <: AbstractCPU
+        device::D
+    end
+
+    CPU() = CPU(KernelAbstractions.CPU())
+    CPUStatic() = CPU(KernelAbstractions.CPU(; static=true))
 
     """
         GPU(device)
@@ -38,19 +51,45 @@ module Architectures
     ##### These methods are extended in SpeedyWeatherCUDAExt
     #####
 
-    device(a::CPU) = KernelAbstractions.CPU()
+    device(a::CPU) = a.device
     device(a::GPU) = a.device
 
+    """
+        architecture(x)
+
+    Return the default architecture that's associated with the input `x`.
+    """
     architecture() = nothing
     architecture(::Number) = nothing
     architecture(::Array) = CPU()
     architecture(::Type{<:Array}) = CPU()
     architecture(a::SubArray) = architecture(parent(a))
 
+    """
+        architecture(a::AbstractArchitecture)
+
+    Return the architecture of `a`.
+    """
+    architecture(a::AbstractArchitecture) = a
+
+    """
+        array_type(arch::AbstractArchitecture)
+
+    Return the array type that's used with the architecture `arch`.
+    """
     array_type(::CPU) = Array
-    array_type(::Type{CPU}) = Array
+    array_type(::Type{<:CPU}) = Array
+
+    ismatching(arch::Type{<:AbstractArchitecture}, array_T::Type{<:AbstractArray}) = array_T <: array_type(arch)
+    ismatching(arch::AbstractArchitecture, array_T::Type{<:AbstractArray}) = ismatching(typeof(arch), array_T)
+    ismatching(arch::AbstractArchitecture, array::AbstractArray) = ismatching(arch, typeof(array))
 
     # Fallback
+    """
+        on_architecture(arch::AbstractArchitecture, a)
+
+    Return `a`, but on the architecture `arch`. 
+    """
     on_architecture(arch, a) = a
 
     # Tupled implementation
@@ -66,5 +105,6 @@ module Architectures
     # Convert arguments to GPU-compatible types
     @inline convert_to_device(arch, args)  = args
     @inline convert_to_device(::CPU, args) = args
-  
+
+    KernelAbstractions.synchronize(arch::AbstractArchitecture) = KernelAbstractions.synchronize(arch.device)
 end 

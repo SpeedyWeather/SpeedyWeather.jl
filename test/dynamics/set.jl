@@ -9,8 +9,6 @@
     model = PrimitiveWetModel(spectral_grid)            # construct model
     simulation = initialize!(model)                     # initialize all model components
  
-    lmax = model.spectral_transform.lmax
-    mmax = model.spectral_transform.mmax
     lf = 2
 
     # test data 

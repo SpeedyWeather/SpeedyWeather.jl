@@ -175,18 +175,18 @@ out to their own packages for now
 - [__RingGrids__](https://speedyweather.github.io/SpeedyWeather.jl/dev/ringgrids/),
 a module that defines several iso-latitude ring-based spherical grids (like the FullGaussianGrid or the HEALPixGrid)
 and interpolations between them
-- [__LowerTriangularMatrices__](https://speedyweather.github.io/SpeedyWeather.jl/dev/lowertriangularmatrices/),
+- [__LowerTriangularArrays__](https://speedyweather.github.io/SpeedyWeather.jl/dev/lowertriangularmatrices/),
 a module that defines `LowerTriangularMatrix` used for the spherical harmonic coefficients
 - [__SpeedyTransforms__](https://speedyweather.github.io/SpeedyWeather.jl/dev/speedytransforms/), a module that defines
-the spherical harmonic transform between spectral space (for which LowerTriangularMatrices is used) and grid-point space
+the spherical harmonic transform between spectral space (for which LowerTriangularArrays is used) and grid-point space
 (as defined by RingGrids).
 
 These modules can also be used independently of SpeedyWeather like so
 ```julia
-julia> using SpeedyWeather: LowerTriangularMatrices, RingGrids, SpeedyTransforms
+julia> using SpeedyWeather: LowerTriangularArrays, RingGrids, SpeedyTransforms
 ```
 check out their documentation: [RingGrids](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/ringgrids/),
-[LowerTriangularMatrices](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/lowertriangularmatrices/),
+[LowerTriangularArrays](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/lowertriangularmatrices/),
 [SpeedyTransforms](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/speedytransforms/).
 
 ## Installation

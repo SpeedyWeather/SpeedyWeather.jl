@@ -3,6 +3,10 @@
 ## Unreleased
 
 - Reworked GPU and utility code structure and added GPU versions of spectral gradients[#727](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/727)
+- LowerTriangularArray-preserving view [#739](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/739)
+- Array-agnostic LowerTriangularMatrix [#738](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/738)
+- Major rework of LowerTriangularArrays: Introduce Spectrum type, changes in indexing and constructors [#734](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/734)
+- Reduce CI time [#731](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/731)
 - Remove DocsPreviewCleanup workflow [#730](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/730)
 - Move UnicodePlots to extension [#728](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/728)
 - Baroclinic wave initial conditions ZonalWind divergence free [#729](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/729)

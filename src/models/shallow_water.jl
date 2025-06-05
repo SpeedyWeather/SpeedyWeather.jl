@@ -31,7 +31,7 @@ $(TYPEDFIELDS)"""
 } <: ShallowWater
     
     spectral_grid::SpectralGrid
-    architecture::AR = spectral_grid.architecture()
+    architecture::AR = spectral_grid.architecture
 
     # DYNAMICS
     geometry::GE = Geometry(spectral_grid)

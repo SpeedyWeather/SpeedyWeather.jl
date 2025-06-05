@@ -11,7 +11,7 @@ export rotate!
 
 # GPU, PARALLEL
 import Base.Threads: Threads, @threads
-import KernelAbstractions: KernelAbstractions, @kernel, @index, @Const
+import KernelAbstractions: KernelAbstractions, @kernel, @index, @Const, synchronize
 import Adapt: Adapt, adapt, adapt_structure
 
 # INPUT OUTPUT
@@ -42,17 +42,19 @@ export on_architecture, architecture
 include("Utils/Utils.jl")
 using .Utils
 
-# LowerTriangularMatrices for spherical harmonics
-export  LowerTriangularMatrices, 
+# LowerTriangularArrays for spherical harmonics
+export  LowerTriangularArrays, 
         LowerTriangularMatrix,
         LowerTriangularArray
 
+export  Spectrum
+
 # indexing styles for LowerTriangularArray/Matrix
 export  OneBased, ZeroBased
-export  eachmatrix, eachharmonic
+export  eachmatrix, eachharmonic, eachorder
         
-include("LowerTriangularMatrices/LowerTriangularMatrices.jl")
-using .LowerTriangularMatrices
+include("LowerTriangularArrays/LowerTriangularArrays.jl")
+using .LowerTriangularArrays
 
 # RingGrids
 export  RingGrids

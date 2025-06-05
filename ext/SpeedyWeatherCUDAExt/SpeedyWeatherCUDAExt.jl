@@ -1,26 +1,28 @@
 module SpeedyWeatherCUDAExt
 
 using SpeedyWeather
-import CUDA: CUDA, CUDAKernels, CuArray, CUFFT
+import CUDA: CUDA, CUDAKernels, CuArray, CuDeviceArray, CUFFT
 import AbstractFFTs
 using SpeedyWeather.DocStringExtensions
-import SpeedyWeather: GPU, CPU, CUDAGPU, array_type, architecture, on_architecture
+import SpeedyWeather: GPU, CPU, CUDAGPU, array_type, architecture, on_architecture, architecture
 
 # DEVICE SETUP FOR CUDA
 # extend functions from main SpeedyWeather 
- 
-# for RingGrids and LowerTriangularMatrices:
+
+# for RingGrids and LowerTriangularArrays:
 # every Array needs this method to strip away the parameters
 RingGrids.nonparametric_type(::Type{<:CuArray}) = CuArray
-LowerTriangularMatrices.nonparametric_type(::Type{<:CuArray}) = CuArray
+LowerTriangularArrays.nonparametric_type(::Type{<:CuArray}) = CuArray
 
 array_type(::GPU) = CuArray
-array_type(::Type{GPU}) = CuArray
+array_type(::Type{<:GPU}) = CuArray
 
 CUDAGPU() = GPU(CUDA.CUDABackend(always_inline=true))
+GPU() = CUDAGPU() # default to CUDA
 
 architecture(::CuArray) = CUDAGPU()
 architecture(::Type{<:CuArray}) = CUDAGPU()
+architecture(::Type{<:CuDeviceArray}) = CUDAGPU()
 
 on_architecture(::CPU, a::CuArray) = Array(a)
 on_architecture(::GPU, a::CuArray) = a
