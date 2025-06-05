@@ -769,7 +769,7 @@ end
 
 function KernelAbstractions.get_backend( 
     a::LowerTriangularArray{T, N, ArrayType, S} 
-) where {T, N, ArrayType <: GPUArrays.AbstractGPUArray, S} 
+) where {T, N, ArrayType, S} 
     return KernelAbstractions.get_backend(a.data) 
 end 
 
