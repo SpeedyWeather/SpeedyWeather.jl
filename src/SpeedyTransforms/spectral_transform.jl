@@ -224,8 +224,10 @@ function SpectralTransform(
 
     # meridional gradient used to get from u, v/coslat to vorticity and divergence
     grad_x_vordiv = zeros(Complex{Int}, spectrum)
-    grad_x_vordiv .= complex.(0, spectrum.m_indices .- 1)
-    for m in 1:mmax                         # last row zero to get vor and div correct
+    for m in 1:mmax
+        for l in m:lmax-1                         
+            grad_x_vordiv[l, m] = complex(0, m-1)
+        end # last row zero to get vor and div correct
         grad_x_vordiv[lmax, m] = 0
     end
 
