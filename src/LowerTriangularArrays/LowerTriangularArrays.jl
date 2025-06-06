@@ -5,8 +5,10 @@ using DocStringExtensions
 
 # GPU
 import Adapt
+import Adapt: adapt
 import GPUArrays
 import KernelAbstractions
+import ..Architectures: AbstractArchitecture, on_architecture, array_type, ismatching, CPU, architecture
 
 # NUMERICS
 import LinearAlgebra: tril!
