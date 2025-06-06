@@ -1,41 +1,54 @@
-# """Abstract supertype for all arrays of ring grids, representing `N`-dimensional
-# data on the sphere in two dimensions (but unravelled into a vector in the first dimension,
-# the actual "ring grid") plus additional `N-1` dimensions for the vertical and/or time etc.
-# Parameter `T` is the `eltype` of the underlying data, held as in the array type `ArrayType`
-# (Julia's `Array` for CPU or others for GPU).
+"""Abstract supertype for all grids in RingGrids.jl, representing a discretization (particularly a tessellation or tiling)
+of the sphere. A "grid" does not contain any data only its resolution is defined by `nlat_half`
+(number of latitude rings on one hemisphere including the equator). A grid does not contain the coordinates of the grid points,
+vertices, latitudes, longtiudes etc but they can be recomputed from the grid object (or its type and resolution) at any time.
 
-# Ring grids have several consecuitive grid points share the same latitude (= a ring),
-# grid points on a given ring are equidistant. Grid points are ordered 0 to 360˚E,
-# starting around the north pole, ring by ring to the south pole. """
-# # abstract type AbstractGridArray{T, N, ArrayType <: AbstractArray{T, N}} <: AbstractArray{T, N} end
+A grid is regarded as 2D but a field (data on a grid) can have N additional dimensions, e.g. for vertical levels or time.
+In that sense, a grid is does not have a number format / eltype. This is a property of a `Field` which can be different for
+every field even when using the same grid. Points on the grid (cell centres) are unravalled into a vector ordered 0 to 360˚E,
+starting at the north pole, then going ring by ring to the south pole. This way both full (those representable as a matrix)
+and reduced grids (not representable as a matrix, with fewer longitude points towards the poles) can be represented.
 
-# """Abstract supertype for all ring grids, representing 2-dimensional data on the
-# sphere unravelled into a Julia `Vector`. Subtype of `AbstractGridArray` with
-# `N=1` and `ArrayType=Vector{T}` of `eltype T`."""
-# # const AbstractGrid{T} = AbstractGridArray{T, 1, Vector{T}}
+A grid has a parameter `Architecture` (the type of the field `architecture`) that can be used to store information
+about the architecture the grid is on, e.g. CPU or GPU.
 
-# """An `AbstractFullGrid` is a horizontal grid with a constant number of longitude
-# points across latitude rings. Different latitudes can be used, Gaussian latitudes,
-# equi-angle latitudes (also called Clenshaw from Clenshaw-Curtis quadrature), or others."""
-# """Subtype of `AbstractGridArray` for all N-dimensional arrays of ring grids that have the
-# same number of longitude points on every ring. As such these (horizontal) grids are representable
-# as a matrix, with denser grid points towards the poles."""
-
-# """Subtype of `AbstractGridArray` for arrays of rings grids that have a reduced number
-# of longitude points towards the poles, i.e. they are not "full", see `AbstractFullGridArray`.
-# Data on these grids cannot be represented as matrix and has to be unravelled into a vector,
-# ordered 0 to 360˚E then north to south, ring by ring. Examples for reduced grids are 
-# the octahedral Gaussian or Clenshaw grids, or the HEALPix grid."""
-
+Furthermore all grids have a `rings` to allow ring-by-ring indexing. Other precomputed indices can be added for specific grids."""
 abstract type AbstractGrid{Architecture} end
+
+"""Abstract supertype for all full grids, representing a horizontal grid with a constant number of longitude
+points across latitude rings. Different latitudes can be used, Gaussian latitudes,
+equi-angle latitudes (also called Clenshaw from Clenshaw-Curtis quadrature), or others."""
 abstract type AbstractFullGrid{Architecture} <: AbstractGrid{Architecture} end
+
+"""Abstract supertype for all reduced grids, representing arrays of ring grids that have a reduced number
+of longitude points towards the poles, i.e. they are not "full", see `AbstractFullGrid`.
+Data on these grids (a `Field`) cannot be represented as matrix and has to be unravelled into a vector,
+ordered 0 to 360˚E then north to south, ring by ring. Examples for reduced grids are
+the octahedral Gaussian or Clenshaw grids, or the HEALPix grid."""
 abstract type AbstractReducedGrid{Architecture} <: AbstractGrid{Architecture} end
 
+"""Abstract supertype for all fields, i.e. data on a grid. A field is an `AbstractArray` with a number format
+`T`, a number of dimensions `N`, an `ArrayType` (e.g. `Vector`, `Matrix`, `Tensor`) and a grid type `Grid`.
+Fields can be full or reduced, 2D, 3D, or 4D, depending on the grid and the number of dimensions.
+Fields are used to store data on the grid, e.g. temperature, pressure, or any other variable.
+Every `Field` has `data` the grid-free array of the data and `grid` which contains information about the grid
+the field is defined on."""
 abstract type AbstractField{T, N, ArrayType, Grid} <: AbstractArray{T, N} end
 
+"""Abstract supertype for all fields on full grids, i.e. grids with a constant number of longitude points across latitude rings."""
 const AbstractFullField = AbstractField{T, N, ArrayType, Grid} where {T, N, ArrayType, Grid<:AbstractFullGrid}
+
+"""Abstract supertype for all fields on reduced grids, i.e. grids with a reduced number of longitude points towards the poles."""
 const AbstractReducedField = AbstractField{T, N, ArrayType, Grid} where {T, N, ArrayType, Grid<:AbstractReducedGrid}
 
+"""Abstract supertype for all 2D fields, i.e. fields with the horizontal dimensions only. Note that this is a `<:AbstractVector`
+as the horizontal dimensions are unravelled into a vector for all grids to be conistent with the reduced grids that cannot be
+represented as a matrix."""
 const AbstractField2D = AbstractField{T, 1} where T
+
+"""Abstract supertype for all 3D fields, i.e. fields with horizontal and one vertical (or time etc) dimension."""
 const AbstractField3D = AbstractField{T, 2} where T
+
+"""Abstract supertype for all 4D fields, i.e. fields with horizontal and (in most cases) a vertical and a time dimensions,
+though these additional dimensions are arbitrary."""
 const AbstractField4D = AbstractField{T, 3} where T
