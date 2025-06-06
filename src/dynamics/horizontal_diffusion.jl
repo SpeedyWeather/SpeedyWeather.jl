@@ -158,6 +158,38 @@ function horizontal_diffusion!(
 end
 
 """$(TYPEDSIGNATURES)
+Kernel-based implementation of horizontal diffusion for a 2D field `var` in spectral space.
+Updates the tendency `tendency` with an implicitly calculated diffusion term.
+The implicit diffusion of the next time step is split into an explicit part `expl` and 
+an implicit part `impl`, such that both can be calculated in a single forward step."""
+function horizontal_diffusion_kernel!(
+    tendency::LowerTriangularArray,     # tendency of a
+    var::LowerTriangularArray,          # spectral horizontal field to diffuse
+    expl::AbstractMatrix,               # explicit spectral damping (lmax x nlayers matrix)
+    impl::AbstractMatrix,               # implicit spectral damping (lmax x nlayers matrix)
+)
+    # Launch the kernel
+    launch!(var.spectrum.architecture, :lmk, size(var), _horizontal_diffusion_kernel!, 
+            tendency, var, expl, impl, var.spectrum.l_indices)
+    synchronize(var.spectrum.architecture)
+    
+    return tendency
+end
+
+@kernel inbounds=true function _horizontal_diffusion_kernel!(
+    tendency, var, @Const(expl), @Const(impl), @Const(l_indices))
+    I = @index(Global, Cartesian)
+    lm = I[1]
+    k = ndims(var) == 1 ? 1 : I[2]
+    
+    # Get the degree l for this coefficient
+    l = l_indices[lm]
+    
+    # Apply horizontal diffusion
+    tendency[I] = (tendency[I] + expl[l, k] * var[I]) * impl[l, k]
+end
+
+"""$(TYPEDSIGNATURES)
 Apply horizontal diffusion to vorticity in the BarotropicModel."""
 function horizontal_diffusion!(
     diagn::DiagnosticVariables,
