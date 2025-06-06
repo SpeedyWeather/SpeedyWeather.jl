@@ -611,6 +611,7 @@ function vorticity_flux_curldiv!(   diagn::DiagnosticVariables,
     return nothing       
 end
 
+# function barrier for GPU
 function vorticity_flux_curldiv!(
     diagn::DiagnosticVariables,
     coriolis::AbstractCoriolis,
@@ -631,7 +632,7 @@ function vorticity_flux_curldiv_kernel!(
                                     diagn::DiagnosticVariables,
                                     coriolis::AbstractCoriolis,
                                     geometry::Geometry,
-                                    S::SpectralTransform{NF, <:GPU};
+                                    S::SpectralTransform;
                                     div::Bool=true,     # also calculate div of vor flux?
                                     add::Bool=false)    # accumulate in vor/div tendencies?
     
