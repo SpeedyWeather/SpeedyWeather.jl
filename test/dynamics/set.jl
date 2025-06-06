@@ -20,10 +20,10 @@
     L3 = rand(spectral_grid.SpectralVariable3D, trunc+6, trunc+5, nlayers)    # bigger 
     L3_trunc = spectral_truncation(L3, size(L, 1, ZeroBased, as=Matrix), size(L, 2, ZeroBased, as=Matrix))
     
-    A = rand(spectral_grid.Grid{NF}, spectral_grid.nlat_half, nlayers)       # same grid 
+    A = rand(NF, spectral_grid.grid, spectral_grid.nlat_half, nlayers)       # same grid 
     A_spec = transform(A, model.spectral_transform)
-    B = rand(OctaHEALPixGrid{NF}, spectral_grid.nlat_half, nlayers)          # different grid 
-    D = rand(spectral_grid.GridVariable3D, spectral_grid.nlat_half, nlayers_soil)   # 3D land data
+    B = rand(NF, OctaHEALPixGrid, spectral_grid.nlat_half, nlayers)             # different grid 
+    D = rand(spectral_grid.GridVariable3D, spectral_grid.grid, nlayers_soil)    # 3D land data
 
     f(lon, lat, sig) = sind(lon)*cosd(lat)*(1 - sig)
 
@@ -73,7 +73,7 @@
 
     # numbers
     set!(simulation, vor=Float32(3.), lf=lf)
-    M3 = zeros(spectral_grid.Grid{NF}, spectral_grid.nlat_half, nlayers) .+ 3  # same grid 
+    M3 = zeros(NF, spectral_grid.grid, nlayers) .+ 3    # same grid 
     M3_spec = transform(M3, model.spectral_transform)
     @test prog_new.vor[lf] ≈ M3_spec
 

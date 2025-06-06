@@ -98,10 +98,10 @@ Every (custom) land-sea mask has to be a subtype of `AbstractLandSeaMask`.
 A custom land-sea mask has to be defined as a new type (`struct` or `mutable struct`)
 
 ```julia
-CustomMask{NF<:AbstractFloat, Grid<:AbstractGrid{NF}} <: AbstractLandSeaMask{NF, Grid}
+CustomMask{NF<:AbstractFloat, GridVariable2D} <: AbstractLandSeaMask{NF, Grid}
 ```
 
-and needs to have at least a field called `mask::Grid` that uses a `Grid` as defined
+and needs to have at least a field called `mask::GridVariable2D` that uses a `GridVariable2D` as defined
 by the spectral grid object, so of correct size and with the number format `NF`.
 All `AbstractLandSeaMask` have a convenient generator function to be used like
 `mask = CustomMask(spectral_grid, option=argument)`, but you may add your own or customize by

@@ -23,7 +23,7 @@ function SpeedyTransforms.transform(                             # SPECTRAL TO G
     kwargs...                                   # pass on unscale_coslat=true/false(default)
 ) where {NF, N}
     ks = size(specs)[2:end]             # the non-horizontal dimensions
-    grids = CUDA.cu(zeros(S.Grid{NF}, S.nlat_half, ks...))
+    grids = CUDA.cu(zeros(NF, S.grid, ks...))
     transform!(grids, specs, S; kwargs...)
     return grids
 end

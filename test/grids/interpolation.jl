@@ -40,7 +40,8 @@ end
         
         @testset for NF in (Float32, Float64)
         
-            A = zeros(Grid{NF}, 32)             # some resolution
+            grid = Grid(32)
+            A = zeros(NF, grid)                 # some resolution
             G = RingGrids.GridGeometry(A)
             lat1 = G.latd[2]                    # latitude of first ring
             
@@ -78,7 +79,8 @@ end
         
         @testset for NF in (Float32, Float64)
         
-            A = zeros(Grid{NF}, 32)          # some resolution
+            grid = Grid(32)
+            A = zeros(NF, grid)             # some resolution
             G = RingGrids.GridGeometry(A)
             lat1 = G.latd[2]                # latitude of first ring
             

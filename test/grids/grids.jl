@@ -79,7 +79,7 @@ end
 
                 field1 = Field(grid)
                 field2 = Field(zeros(npoints), grid)
-                field3 = zeros(Grid{NF}, nlat_half)
+                field3 = zeros(NF, Grid, nlat_half)
 
                 @test size(field1) == size(field2) == size(field3)
                 @test_throws DimensionMismatch Field(zeros(npoints-1), grid)
