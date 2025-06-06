@@ -1,13 +1,17 @@
 """A `FullClenshawGrid` is a discretization of the sphere, a full grid, subtyping `AbstractFullGrid`,
 using equidistant latitudes for each ring (a regular lon-lat grid). These require the
 Clenshaw-Curtis quadrature in the spectral transform, hence the name. One ring is on the equator,
-total number of rings is odd, no rings on the north or south pole. First dimension of the
-underlying `N`-dimensional `data` represents the horizontal dimension, in ring order
-(0 to 360˚E, then north to south), other dimensions are used for the vertical and/or
-time or other dimensions. The resolution parameter of the horizontal grid is `nlat_half`
-(number of latitude rings on one hemisphere, Equator included) and the ring indices are
-precomputed in `rings`. Note that a `Grid` does not contain any data, it only describes
-the discretization of the space, see `Field` for a data on a `Grid`.
+total number of rings is odd, no rings on the north or south pole.
+
+The first dimension of data on this grid (a `Field`) represents the horizontal dimension,
+in ring order (0 to 360˚E, then north to south), other dimensions can be used for the vertical and/or
+time or other dimensions.  Note that a `Grid` does not contain any data, it only describes
+the discretization of the space, see `Field` for a data on a `Grid`.  But a "grid" only defines the
+two horizontal dimensions, two fields, one 2D and one 3D, possibly different ArrayTypes or element types,
+can share the same grid which just defines the discretization and the architecture (CPU/GPU) the grid is on.
+
+The resolution parameter of the horizontal grid is `nlat_half` (number of latitude rings on one hemisphere,
+Equator included) and the ring indices are precomputed in `rings`.
 $(TYPEDFIELDS)"""
 struct FullClenshawGrid{A, V} <: AbstractFullGrid{A}
     nlat_half::Int      # number of latitudes on one hemisphere

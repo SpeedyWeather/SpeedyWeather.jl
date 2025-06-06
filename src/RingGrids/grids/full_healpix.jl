@@ -1,12 +1,16 @@
-"""A `FullHEALPixArray` is an array of full grids, subtyping `AbstractFullGridArray`, that use
+"""A `FullHEALPixGrd` is an array of full grids, subtyping `AbstractFullGridArray`, that use
 HEALPix latitudes for each ring. This type primarily equists to interpolate data from
 the (reduced) HEALPixGrid onto a full grid for output.
 
-First dimension of the underlying `N`-dimensional `data` represents the horizontal dimension,
-in ring order (0 to 360˚E, then north to south), other dimensions are used for the vertical
-and/or time or other dimensions. The resolution parameter of the horizontal grid is
-`nlat_half` (number of latitude rings on one hemisphere, Equator included) and the ring indices
-are precomputed in `rings`. Fields are
+The first dimension of data on this grid (a `Field`) represents the horizontal dimension,
+in ring order (0 to 360˚E, then north to south), other dimensions can be used for the vertical and/or
+time or other dimensions.  Note that a `Grid` does not contain any data, it only describes
+the discretization of the space, see `Field` for a data on a `Grid`.  But a "grid" only defines the
+two horizontal dimensions, two fields, one 2D and one 3D, possibly different ArrayTypes or element types,
+can share the same grid which just defines the discretization and the architecture (CPU/GPU) the grid is on.
+
+The resolution parameter of the horizontal grid is `nlat_half` (number of latitude rings on one hemisphere,
+Equator included) and the ring indices are precomputed in `rings`.
 $(TYPEDFIELDS)"""
 struct FullHEALPixGrid{A, V} <: AbstractFullGrid{A}
     nlat_half::Int      # number of latitudes on one hemisphere
