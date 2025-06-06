@@ -157,12 +157,22 @@ function horizontal_diffusion!(
     end
 end
 
+# temp. function barrier for GPU version 
+function horizontal_diffusion!(
+    tendency::LowerTriangularArray{NF, N, <:CuArray},     # tendency of a
+    var::LowerTriangularArray{NF, N, <:CuArray},          # spectral horizontal field to diffuse
+    expl::AbstractMatrix{NF},               # explicit spectral damping (lmax x nlayers matrix)
+    impl::AbstractMatrix{NF},               # implicit spectral damping (lmax x nlayers matrix)
+) where {NF, N}
+    return _horizontal_diffusion_kernel!(tendency, var, expl, impl)
+end
+
 """$(TYPEDSIGNATURES)
 Kernel-based implementation of horizontal diffusion for a 2D field `var` in spectral space.
 Updates the tendency `tendency` with an implicitly calculated diffusion term.
 The implicit diffusion of the next time step is split into an explicit part `expl` and 
 an implicit part `impl`, such that both can be calculated in a single forward step."""
-function horizontal_diffusion_kernel!(
+function _horizontal_diffusion_kernel!(
     tendency::LowerTriangularArray,     # tendency of a
     var::LowerTriangularArray,          # spectral horizontal field to diffuse
     expl::AbstractMatrix,               # explicit spectral damping (lmax x nlayers matrix)
