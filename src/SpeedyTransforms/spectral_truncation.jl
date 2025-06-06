@@ -8,59 +8,34 @@ function spectral_truncation!(
     ltrunc::Integer,                # truncate to max degree ltrunc (0-based)
     mtrunc::Integer,                # truncate to max order mtrunc (0-based)
 )   
-    lmax, mmax = size(alms, OneBased; as=Matrix)   # 1-based degree l, order m of the legendre polynomials
-
-    ltrunc += 1     # 0-based to 1-based
-    mtrunc += 1
-
-    for k in eachmatrix(alms)
-        lm = 1
-        for m in 1:mmax                 # order m = 0, mmax but 1-based
-            for l in m:lmax             # degree l = 0, lmax but 1-based
-                if  l > ltrunc ||       # and degrees l>ltrunc
-                    m > mtrunc          # and orders m>mtrunc
-
-                    alms[lm, k] = 0     # set that coefficient to zero
-                end
-                lm += 1
-            end
-        end
-    end
-    return alms
-end
-
-"""Alternative kernel-based implementation of spectral_truncation!"""
-function spectral_truncation_kernel!(
-    alms::LowerTriangularArray,     # spectral field to be truncated
-    ltrunc::Integer,                # truncate to max degree ltrunc (0-based)
-    mtrunc::Integer,                # truncate to max order mtrunc (0-based)
-)   
+    (; l_indices, m_indices) = alms.spectrum
+    
     # Convert to 1-based indexing
     ltrunc += 1     # 0-based to 1-based
     mtrunc += 1
     
-    # Launch the kernel
-    launch!(alms.spectrum.architecture, :lmk, size(alms), _spectral_truncation_kernel!, 
-            alms, ltrunc, mtrunc, alms.spectrum.l_indices, alms.spectrum.m_indices)
-    synchronize(alms.spectrum.architecture)
+    alms[(l_indices .> ltrunc) .|| (m_indices .> mtrunc), :] .= 0
     
     return alms
 end
 
-@kernel inbounds=true function _spectral_truncation_kernel!(alms, l_trunc, m_trunc, @Const(l_indices), @Const(m_indices))
-    I = @index(Global, Cartesian)
-    lm = I[1]
-    k = ndims(alms) == 1 ? CartesianIndex() : I[2]
+# version just for matrices with the colon in the indexing
+function spectral_truncation!(
+    alms::LowerTriangularMatrix,     # spectral field to be truncated
+    ltrunc::Integer,                # truncate to max degree ltrunc (0-based)
+    mtrunc::Integer,                # truncate to max order mtrunc (0-based)
+)   
+    (; l_indices, m_indices) = alms.spectrum
     
-    # Get the degree l and order m for this coefficient
-    l = l_indices[lm]
-    m = m_indices[lm]
+    # Convert to 1-based indexing
+    ltrunc += 1     # 0-based to 1-based
+    mtrunc += 1
     
-    # Apply truncation
-    if l > l_trunc || m > m_trunc
-        alms[I] = 0
-    end
+    alms[(l_indices .> ltrunc) .|| (m_indices .> mtrunc)] .= 0
+    
+    return alms
 end
+
 
 """
 $(TYPEDSIGNATURES)
