@@ -56,9 +56,9 @@ function vertical_advection!(
 end
 
 function _vertical_advection!(
-    ξ_tend::AbstractGridArray,  # tendency of quantity ξ
-    σ_tend::AbstractGridArray,  # vertical velocity at k+1/2
-    ξ::AbstractGridArray,       # ξ
+    ξ_tend::AbstractField,      # tendency of quantity ξ
+    σ_tend::AbstractField,      # vertical velocity at k+1/2
+    ξ::AbstractField,           # ξ
     Δσ,                         # layer thickness on σ levels
     adv::VerticalAdvection      # vertical advection scheme of order B
 )

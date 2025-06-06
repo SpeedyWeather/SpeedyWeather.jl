@@ -42,7 +42,7 @@ end
         SpeedyWeather.write_column_tendencies!(diagn, column, model.planet, 1)
 
         # and check that that worked
-        for k in eachgrid(diagn.tendencies.humid_tend_grid)
+        for k in eachlayer(diagn.tendencies.humid_tend_grid)
             @test humid_tend[k] == diagn.tendencies.humid_tend_grid[1, k]
         end
     end

@@ -54,14 +54,14 @@ fd_tests = [true, true]
         # this only holds for exact transforms, like Gaussian grids 
 
         # start with grid (but with a truncated one)
-        function transform_identity!(x_out::AbstractGridArray{T}, x::AbstractGridArray{T}, S::SpectralTransform{T}) where T
+        function transform_identity!(x_out::AbstractField, x::AbstractField, S::SpectralTransform{T}) where T
             x_SH = zeros(LowerTriangularArray{Complex{T}}, S.lmax+1, S.mmax+1, S.nlayers)
             transform!(x_SH, x, S)
             transform!(x_out, x_SH, S)
             return nothing
         end 
 
-        function transform_identity(x::AbstractGridArray{T}, S::SpectralTransform{T}) where T
+        function transform_identity(x::AbstractField, S::SpectralTransform{T}) where T
             x_copy = deepcopy(x)
             transform_identity!(x_copy, x, S) 
             return x_copy

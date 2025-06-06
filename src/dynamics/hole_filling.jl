@@ -13,13 +13,13 @@ initialize!(::ClipNegatives, ::PrimitiveWet) = nothing
 
 # function barrier
 function hole_filling!(
-    q::AbstractGridArray,
+    q::AbstractField,
     H::ClipNegatives,
     model::PrimitiveWet
 )
     hole_filling!(q, H)
 end
 
-function hole_filling!(q::AbstractGridArray,::ClipNegatives)
+function hole_filling!(q::AbstractField,::ClipNegatives)
     @. q = max(q, 0)
 end

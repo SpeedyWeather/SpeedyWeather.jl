@@ -48,7 +48,7 @@ include("fourier.jl")
 include("legendre.jl")
 include("spectral_gradients.jl")
 include("spectral_truncation.jl")
-include("spectrum.jl")
+include("power_spectrum.jl")
 include("show.jl")
 
 end
