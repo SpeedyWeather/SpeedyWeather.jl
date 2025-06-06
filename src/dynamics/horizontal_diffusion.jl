@@ -159,11 +159,11 @@ end
 
 # temp. function barrier for GPU version 
 function horizontal_diffusion!(
-    tendency::LowerTriangularArray{NF, N, <:CuArray},     # tendency of a
-    var::LowerTriangularArray{NF, N, <:CuArray},          # spectral horizontal field to diffuse
-    expl::AbstractMatrix{NF},               # explicit spectral damping (lmax x nlayers matrix)
-    impl::AbstractMatrix{NF},               # implicit spectral damping (lmax x nlayers matrix)
-) where {NF, N}
+    tendency::LowerTriangularArray{NF, N, AT, Spectrum{<:GPU}},     # tendency of a
+    var::LowerTriangularArray,          # spectral horizontal field to diffuse
+    expl::AbstractMatrix,               # explicit spectral damping (lmax x nlayers matrix)
+    impl::AbstractMatrix,               # implicit spectral damping (lmax x nlayers matrix)
+) where {NF, N, AT}
     return _horizontal_diffusion_kernel!(tendency, var, expl, impl)
 end
 
