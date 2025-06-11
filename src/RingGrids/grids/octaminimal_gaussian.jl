@@ -16,10 +16,11 @@ j = nlat. `rings` are the precomputed ring indices, in the example above
 `rings = [1:4, 5:12, 13:24, ...]`. For efficient looping see `eachring` and `eachgrid`.
 Fields are
 $(TYPEDFIELDS)"""
-struct OctaminimalGaussianGrid{A, V} <: AbstractReducedGrid{A}
+struct OctaminimalGaussianGrid{A, V, W} <: AbstractReducedGrid{A}
     nlat_half::Int                  # number of latitudes on one hemisphere
     architecture::A                 # information about device, CPU/GPU
     rings::V                        # precomputed ring indices
+    whichring::W                    # precomputed ring index for each grid point ij
 end
 
 # TYPES

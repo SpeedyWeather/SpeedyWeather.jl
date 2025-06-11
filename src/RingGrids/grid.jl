@@ -59,8 +59,9 @@ matrix_size(grid::Grid) where {Grid<:AbstractGrid} = matrix_size(Grid, get_nlat_
 `architecture` is the device type (CPU/GPU). Precomputes the ring indices `rings`."""
 function (::Type{Grid})(nlat_half::Integer, architecture=DEFAULT_ARCHITECTURE()) where {Grid<:AbstractGrid}
     Grid_ = nonparametric_type(Grid)    # strip away parameters of type, obtain from arguments
-    rings = eachring(Grid, nlat_half)   # precompute indices to access the variable-length rings
-    return Grid_(nlat_half, architecture, rings)
+    rings = eachring(Grid, nlat_half)               # precompute indices to access the variable-length rings
+    whichring = whichring(Grid, nlat_half, rings)   # precompute ring indices for each grid point
+    return Grid_(nlat_half, architecture, rings, whichring)
 end
 
 # also allow to construct a field with Grid(data)
@@ -249,3 +250,17 @@ function whichring(ij::Integer, rings::AbstractVector)
     end
     return j
 end
+
+whichring(ij::Integer, grid::AbstractGrid) = whichring(ij, grid.rings)
+
+"""$(TYPEDSIGNATURES) Vector of ring indices for every grid point in `grid`."""
+function whichring(Grid::Type{<:AbstractGrid}, nlat_half, rings::AbstractVector)
+    w = zeros(Int, get_npoints(Grid, nlat_half))
+    @inbounds for (j, ring) in enumerate(ring)
+        w[ring] .= j
+    end
+    return w
+end
+
+whichring(grid::AbstractGrid) = whichring(typeof(grid), grid.nlat_half, grid.rings)
+whichring(Grid::Type{<:AbstractGrid}, nlat_half::Integer) = whichring(Grid, nlat_half, eachring(Grid, nlat_half))

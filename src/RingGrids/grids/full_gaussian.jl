@@ -14,10 +14,11 @@ can share the same grid which just defines the discretization and the architectu
 The resolution parameter of the horizontal grid is `nlat_half` (number of latitude rings on one hemisphere,
 Equator included) and the ring indices are precomputed in `rings`.
 $(TYPEDFIELDS)"""
-struct FullGaussianGrid{A, V} <: AbstractFullGrid{A}
+struct FullGaussianGrid{A, V, W} <: AbstractFullGrid{A}
     nlat_half::Int              # number of latitudes on one hemisphere
     architecture::A             # information about device, CPU/GPU
     rings::V                    # precomputed ring indices
+    whichring::W                # precomputed ring index for each grid point ij
 end
 
 nonparametric_type(::Type{<:FullGaussianGrid}) = FullGaussianGrid

@@ -19,10 +19,11 @@ HEALPix grids with Nθ = 1, Nφ = 4 but is not explicitly mentioned therein.
 it is `rings = [1:4, 5:12, 13:24, 25:32, 33:36]`. For efficient looping see `eachring` and `eachgrid`.
 Fields are
 $(TYPEDFIELDS)"""
-struct OctaHEALPixGrid{A, V} <: AbstractReducedGrid{A}
+struct OctaHEALPixGrid{A, V, W} <: AbstractReducedGrid{A}
     nlat_half::Int      # number of latitudes on one hemisphere
     architecture::A     # information about device, CPU/GPU
     rings::V            # precomputed ring indices
+    whichring::W        # precomputed ring index for each grid point ij
 end
 
 nonparametric_type(::Type{<:OctaHEALPixGrid}) = OctaHEALPixGrid
