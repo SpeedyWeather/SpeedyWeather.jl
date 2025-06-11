@@ -58,10 +58,10 @@ matrix_size(grid::Grid) where {Grid<:AbstractGrid} = matrix_size(Grid, get_nlat_
 """$(TYPEDSIGNATURES) Create a new `grid` of type `Grid` with resolution parameter `nlat_half`.
 `architecture` is the device type (CPU/GPU). Precomputes the ring indices `rings`."""
 function (::Type{Grid})(nlat_half::Integer, architecture=DEFAULT_ARCHITECTURE()) where {Grid<:AbstractGrid}
-    Grid_ = nonparametric_type(Grid)    # strip away parameters of type, obtain from arguments
-    rings = eachring(Grid, nlat_half)               # precompute indices to access the variable-length rings
-    whichring = whichring(Grid, nlat_half, rings)   # precompute ring indices for each grid point
-    return Grid_(nlat_half, architecture, rings, whichring)
+    Grid_ = nonparametric_type(Grid)        # strip away parameters of type, obtain from arguments
+    rings = eachring(Grid, nlat_half)       # precompute indices to access the variable-length rings
+    w = whichring(Grid, nlat_half, rings)   # precompute ring indices for each grid point
+    return Grid_(nlat_half, architecture, rings, w)
 end
 
 # also allow to construct a field with Grid(data)
