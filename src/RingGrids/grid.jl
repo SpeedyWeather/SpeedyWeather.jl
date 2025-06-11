@@ -256,7 +256,7 @@ whichring(ij::Integer, grid::AbstractGrid) = whichring(ij, grid.rings)
 """$(TYPEDSIGNATURES) Vector of ring indices for every grid point in `grid`."""
 function whichring(Grid::Type{<:AbstractGrid}, nlat_half, rings::AbstractVector)
     w = zeros(Int, get_npoints(Grid, nlat_half))
-    @inbounds for (j, ring) in enumerate(ring)
+    @inbounds for (j, ring) in enumerate(rings)
         w[ring] .= j
     end
     return w
