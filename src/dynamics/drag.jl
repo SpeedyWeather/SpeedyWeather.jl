@@ -117,14 +117,14 @@ export JetDrag
 end
 
 function JetDrag(SG::SpectralGrid; kwargs...)
-    ζ₀ = zeros(Complex{SG.NF}, spectrum)
+    ζ₀ = zeros(Complex{SG.NF}, SG.spectrum)
     return JetDrag{SG.NF, SG.SpectralVariable2D}(; ζ₀, kwargs...)
 end
 
 function initialize!(drag::JetDrag, model::AbstractModel)
     (; spectral_grid, geometry) = model
-    (; grid, NF, nlat_half) = spectral_grid
-    u = zeros(NF, grid, nlat_half)
+    (; grid, NF) = spectral_grid
+    u = zeros(NF, grid)
 
     lat = geometry.latds
 

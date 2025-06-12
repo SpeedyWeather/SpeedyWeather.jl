@@ -294,6 +294,15 @@ function interpolate!(
     _interpolate!(Aout.data, A.data, interpolator)  # use .data to trigger dispatch for method above
 end
 
+# version for 2D field and vector
+function interpolate!(
+    Aout::AbstractVector,      # Out: points to interpolate onto
+    A::AbstractField2D,         # In: field to interpolate from
+    interpolator::AbstractInterpolator,
+)
+    _interpolate!(Aout, A.data, interpolator)  # use .data to trigger dispatch for method above
+end
+
 # version for 3D+ fields
 function interpolate!(
     Aout::AbstractField,        # Out: grid to interpolate onto

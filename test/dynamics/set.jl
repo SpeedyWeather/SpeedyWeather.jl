@@ -15,12 +15,12 @@
     L = rand(spectral_grid.SpectralVariable3D, trunc+2, trunc+1, nlayers)
     L_grid = transform(L, model.spectral_transform)
     
-    L2 = rand(spectral_grid.SpectralVariable3D, trunc-5, trunc-6, nlayers)    # smaller  
+    L2 = rand(spectral_grid.SpectralVariable3D, trunc-5, trunc-6, nlayers)      # smaller  
     L2_trunc = spectral_truncation(L2, size(L, 1, ZeroBased, as=Matrix), size(L, 2, ZeroBased, as=Matrix))
-    L3 = rand(spectral_grid.SpectralVariable3D, trunc+6, trunc+5, nlayers)    # bigger 
+    L3 = rand(spectral_grid.SpectralVariable3D, trunc+6, trunc+5, nlayers)      # bigger 
     L3_trunc = spectral_truncation(L3, size(L, 1, ZeroBased, as=Matrix), size(L, 2, ZeroBased, as=Matrix))
     
-    A = rand(NF, spectral_grid.grid, spectral_grid.nlat_half, nlayers)       # same grid 
+    A = rand(NF, spectral_grid.grid, nlayers)                                   # same grid 
     A_spec = transform(A, model.spectral_transform)
     B = rand(NF, OctaHEALPixGrid, spectral_grid.nlat_half, nlayers)             # different grid 
     D = rand(spectral_grid.GridVariable3D, spectral_grid.grid, nlayers_soil)    # 3D land data

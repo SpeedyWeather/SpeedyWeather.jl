@@ -7,8 +7,8 @@ are bitrounded for compression and the 2nd leapfrog time step is discarded.
 Variables in restart file are unscaled."""
 function write_restart_file!(
     output::AbstractOutput,
-    progn::PrognosticVariables{T},
-) where T
+    progn::PrognosticVariables,
+)
     
     # exit immediately if no output or no restart file desired
     output.active && output.write_restart || return nothing  

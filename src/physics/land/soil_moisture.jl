@@ -227,7 +227,7 @@ function timestep!(
     E = diagn.physics.land.evaporative_flux         # [kg/s/m²], divide by density for [m/s]
     R = diagn.physics.land.river_runoff             # diagnosed [m/s]
 
-    @boundscheck grids_match(soil_moisture, Pconv, Plsc, E, R, horizontal_only=true) ||
+    @boundscheck fields_match(soil_moisture, Pconv, Plsc, E, R, horizontal_only=true) ||
         throw(DimensionMismatch(soil_moisture, Pconv))
     @boundscheck size(soil_moisture, 2) == 2 || throw(DimensionMismatch)
     f₁, f₂ = soil.f₁[], soil.f₂[]

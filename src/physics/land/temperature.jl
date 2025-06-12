@@ -177,8 +177,10 @@ function timestep!(
     Ev = diagn.physics.land.evaporative_flux
     S = diagn.physics.land.sensible_heat_flux
 
-    @boundscheck grids_match(soil_temperature, Rsd, Rsu, Rld, Rlu, Ev, S, horizontal_only=true) || throw(DimensionMismatch(soil_temperature, Rs))
+    @boundscheck fields_match(soil_temperature, Rsd, Rsu, Rld, Rlu, Ev, S, horizontal_only=true) ||
+        throw(DimensionMismatch(soil_temperature, Rs))
     @boundscheck size(soil_moisture, 2) == size(soil_temperature, 2) == 2 || throw(DimensionMismatch)
+    
     λ = thermodynamics.heat_conductivity
     γ = thermodynamics.field_capacity
     Cw = thermodynamics.heat_capacity_water

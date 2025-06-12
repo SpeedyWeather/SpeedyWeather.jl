@@ -23,6 +23,7 @@ const Field4D = Field{T, 3} where T
 # default constructors
 Field(grid::AbstractGrid, k...) = zeros(grid, k...)
 Field(::Type{T}, grid::AbstractGrid, k...) where T = zeros(T, grid, k...)
+(::Type{<:Field{T}})(data::AbstractArray, grid::AbstractGrid) where T = Field(T.(data), grid)
 
 # TYPES
 nonparametric_type(::Type{<:Field}) = Field
@@ -85,6 +86,7 @@ end
 # grid is inherently 2D, for field distinguish between get_npoints (3D+) and get_npoints2D
 get_npoints2D(field::AbstractField) = get_npoints(field.grid)
 get_npoints(field::AbstractField) = get_npoints(field.grid, size(field)[2:end]...)
+matrix_size(field::AbstractField) = matrix_size(field.grid)
 
 # needed for unalias
 @inline Base.dataids(field::AbstractField) = Base.dataids(field.data)
@@ -392,7 +394,7 @@ end
 # TODO extend Base.view?
 field_view(field::AbstractField,  c::Colon, i, args...) = Field(view(field.data, c, i, args...), field.grid)
 field_view(field::AbstractField2D, c::Colon) = Field(view(field.data, c), field.grid)
-field_view(field::AbstractField, args...) = view(L, args...)   # fallback to normal view
+field_view(field::AbstractField, args...) = view(field, args...)   # fallback to normal view
 
 ## BROADCASTING
 # following https://docs.julialang.org/en/v1/manual/interfaces/#man-interfaces-broadcasting

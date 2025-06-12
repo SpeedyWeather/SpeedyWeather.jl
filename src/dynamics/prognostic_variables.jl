@@ -137,6 +137,8 @@ export PrognosticVariables
     clock::Clock = Clock()
 end
 
+get_nsteps(progn::PrognosticVariables{T, A, S, G, nsteps}) where {T, A, S, G, nsteps} = nsteps
+
 """$(TYPEDSIGNATURES)
 Generator function."""
 function PrognosticVariables(SG::SpectralGrid; nsteps=DEFAULT_NSTEPS)
@@ -201,7 +203,7 @@ Copies entries of `progn_old` into `progn_new`."""
 function Base.copy!(progn_new::PrognosticVariables, progn_old::PrognosticVariables)
 
     # Core variables using broadcast
-    @inbounds for i in 1:progn_new.nsteps
+    @inbounds for i in 1:SpeedyWeather.get_nsteps(progn_new)
         progn_new.vor[i] .= progn_old.vor[i]
         progn_new.div[i] .= progn_old.div[i]
         progn_new.temp[i] .= progn_old.temp[i]
