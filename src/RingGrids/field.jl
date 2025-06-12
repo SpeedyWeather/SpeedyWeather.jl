@@ -1,3 +1,9 @@
+"""Field contains data on a grid. There is only one `Field` type which can be used for all grids.
+`data` is the data array, the first dimension is always the horizontal dimension (unravelled into a vector
+for compatibility across full and reduced grids), the other dimensions can be used for the vertical and/or
+time or other dimensions. The `grid` can be shared across multiple fields, e.g. a 2D and a 3D field
+can share the same grid which just defines the discretization and the architecture (CPU/GPU) the grid is on.
+$(TYPEDFIELDS)"""
 struct Field{T, N, ArrayType <: AbstractArray, Grid <: AbstractGrid} <: AbstractField{T, N, ArrayType, Grid}
     data::ArrayType
     grid::Grid
@@ -379,6 +385,14 @@ function fields_match(A::AbstractField, Bs::AbstractField...; kwargs...)
     end
     return match
 end
+
+# Views that return a Field again (need to retain all horizontal grid points, hence `:, 1` for example)
+# view(array, :) unravels like array[:] does, hence "::Colon, i, args..." used to enforce one argument after :
+# exception is view(vector, :) which preserves the vector structure, equivalent here is the Field2D
+# TODO extend Base.view?
+field_view(field::AbstractField,  c::Colon, i, args...) = Field(view(field.data, c, i, args...), field.grid)
+field_view(field::AbstractField2D, c::Colon) = Field(view(field.data, c), field.grid)
+field_view(field::AbstractField, args...) = view(L, args...)   # fallback to normal view
 
 ## BROADCASTING
 # following https://docs.julialang.org/en/v1/manual/interfaces/#man-interfaces-broadcasting

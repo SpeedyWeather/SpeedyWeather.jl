@@ -45,6 +45,8 @@ export  FullGaussianField,
         OctaHEALPixField,
         OctaminimalGaussianField
 
+export  field_view
+
 # SIZE
 export  grids_match,
         fields_match,
