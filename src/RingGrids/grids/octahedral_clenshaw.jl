@@ -1,19 +1,24 @@
-"""An `OctahedralClenshawArray` is an array of octahedral grids, subtyping `AbstractReducedGridArray`,
-that use equidistant latitudes for each ring, the same as for `FullClenshawArray`.
-First dimension of the underlying `N`-dimensional `data` represents the horizontal dimension,
-in ring order (0 to 360˚E, then north to south), other dimensions are used for the vertical and/or
-time or other dimensions. The resolution parameter of the horizontal grid is `nlat_half`
-(number of latitude rings on one hemisphere, Equator included) and the ring indices are
-precomputed in `rings`.
+"""An `OctahedralClenshawGrid` is a discretization of the sphere that uses equidistant latitudes for each latitude ring.
+The spherical harmonic transform on this grid uses the Clenshaw-Curtis quadrature, hence the name.
+As a reduced grid it has a different number of longitude points on every latitude ring. 
+These grids are called octahedral because after starting with 20 points on the first ring around the north pole
+they increase the number of longitude points for each ring by 4, such that they can be conceptually thought of
+as lying on the 4 faces of an octahedron on each hemisphere. Hence, these grids have 20, 24, 28, ... longitude points
+for ring 1, 2, 3, ... There is a ring on the Equator with 16 + 4nlat_half longitude points
+before reducing the number of longitude points per ring by 4 towards the southern-most ring j = nlat.
+The first point on every ring is at longitude 0˚E, i.e. no offset is applied to the longitude values (in contrast to HEALPix grids).
 
-These grids are called octahedral (same as for the `OctahedralGaussianArray` which only uses different
-latitudes) because after starting with 20 points on the first ring around the north pole (default) they
-increase the number of longitude points for each ring by 4, such that they can be conceptually thought
-of as lying on the 4 faces of an octahedron on each hemisphere. Hence, these grids have 20, 24, 28, ...
-longitude points for ring 1, 2, 3, ... Clenshaw grids have a ring on the Equator which has 16 + 4nlat_half
-longitude points before reducing the number of longitude points per ring by 4 towards the southern-most
-ring `j = nlat`. `rings` are the precomputed ring indices, the the example above
-`rings = [1:20, 21:44, 45:72, ...]`. For efficient looping see `eachring` and `eachgrid`.
+The first dimension of data on this grid (a `Field`) represents the horizontal dimension,
+in ring order (0 to 360˚E, then north to south), other dimensions can be used for the vertical and/or
+time or other dimensions.  Note that a `Grid` does not contain any data, it only describes
+the discretization of the space, see `Field` for a data on a `Grid`.  But a "grid" only defines the
+two horizontal dimensions, two fields, one 2D and one 3D, possibly different ArrayTypes or element types,
+can share the same grid which just defines the discretization and the architecture (CPU/GPU) the grid is on.
+
+The resolution parameter of the horizontal grid is `nlat_half` (number of latitude rings on one hemisphere,
+Equator included) `rings` are the precomputed ring indices, the the example above `rings = [1:20, 21:44, 45:72, ...]`. 
+`whichring` is a precomputed vector of ring indices for each grid point ij, i.e. `whichring[ij]` gives the ring index j of grid point ij.
+For efficient looping see `eachring` and `eachgrid`.
 Fields are
 $(TYPEDFIELDS)"""
 struct OctahedralClenshawGrid{A, V, W} <: AbstractReducedGrid{A}

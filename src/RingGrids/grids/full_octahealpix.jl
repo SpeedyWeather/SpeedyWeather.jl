@@ -1,12 +1,6 @@
-"""A `FullOctaHEALPixArray` is an array of full grids, subtyping `AbstractFullGridArray` that use
-OctaHEALPix latitudes for each ring. This type primarily equists to interpolate data from
-the (reduced) OctaHEALPixGrid onto a full grid for output.
-
-First dimension of the underlying `N`-dimensional `data` represents the horizontal dimension,
-in ring order (0 to 360˚E, then north to south), other dimensions are used for the vertical
-and/or time or other dimensions. The resolution parameter of the horizontal grid is
-`nlat_half` (number of latitude rings on one hemisphere, Equator included) and the ring indices
-are precomputed in `rings`. Fields are
+"""A `FullOctaHEALPixGrid` is like a `OctaHEALPixGrid` but with every latitude ring having the same number of longitude
+points (a full grid). It shares the latitudes with the `OctaHEALPixGrid` but uses the longitudes from the `FullGaussianGrid`
+without offset, i.e. the first longitude point on every ring is at 0˚E.
 $(TYPEDFIELDS)"""
 struct FullOctaHEALPixGrid{A, V, W} <: AbstractFullGrid{A}
     nlat_half::Int      # number of latitudes on one hemisphere
