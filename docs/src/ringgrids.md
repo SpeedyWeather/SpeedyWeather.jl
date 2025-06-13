@@ -18,12 +18,12 @@ Full grids
 ```@example ringgrids
 using SpeedyWeather.RingGrids
 using InteractiveUtils # hide
-subtypes(RingGrids.AbstractFullGrids)
+subtypes(RingGrids.AbstractFullGrid)
 ```
 
 and reduced grids
 ```@example ringgrids
-subtypes(RingGrids.AbstractReducedGrids)
+subtypes(RingGrids.AbstractReducedGrid)
 ```
 
 The following explanation of how to use these can be mostly applied to any of them, however,
@@ -100,7 +100,7 @@ Note that in this case all fields share the same `grid`.
 Or the grid can be created on the fly when the grid type is specified, followed by `nlat_half`.
 Every `?Grid` also has a corresponding `?Field` type, e.g.
 
-```@example
+```@example ringgrids
 field = zeros(OctaminimalGaussianGrid, 2)   # nlat_half=2
 field = HEALPixField(undef, 2)              # using undef initializor
 field = HEALPixField{Float16}(undef, 2, 3)  # using Float16 as eltype

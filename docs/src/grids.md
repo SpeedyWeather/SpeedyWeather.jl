@@ -69,7 +69,7 @@ Other implemented reduced grids are
 
 An overview of these grids is visualised here, and a more detailed description follows below.
 
-![Overview of implemented grids in SpeedyWeather.jl](https://raw.githubusercontent.com/SpeedyWeather/SpeedyWeather.jl/main/docs/img/grids_comparison.png)
+![Overview of implemented grids in SpeedyWeather.jl](https://github.com/user-attachments/assets/e996fb71-db1e-436e-bb41-b517e2647dc1)
 
 Visualised are each grid's grid points (white dots) and grid faces (white lines).
 All grids shown have 16 latitude rings on one hemisphere, Equator included.
