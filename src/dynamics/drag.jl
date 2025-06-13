@@ -145,7 +145,7 @@ function drag!(
     lf::Integer,
     model::AbstractModel,
 )
-    vor = progn.vor[lf]
+    vor = get_step(progn.vor, lf)
     (; vor_tend) = diagn.tendencies
     (; ζ₀) = drag
 
