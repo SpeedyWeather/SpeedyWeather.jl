@@ -98,7 +98,7 @@ function SpeedyTransforms._apply_serial_fft!(
     not_equator::Bool = true
 ) where {NF<:AbstractFloat, N}
     rfft_plan = S.rfft_plans_1D[j]     # FFT planned wrt nlon on ring
-    k_grid = eachfield(grids)[k]        # vertical layer index
+    k_grid = eachlayer(grids)[k]        # vertical layer index
 
     if not_equator
         view(f_out, 1:nfreq, k, j) .= rfft_plan * view(grids.data, ilons, k_grid)
@@ -124,7 +124,7 @@ function SpeedyTransforms._apply_serial_fft!(
     not_equator::Bool = true
 ) where {NF<:AbstractFloat, N}
     brfft_plan = S.brfft_plans_1D[j]   # FFT planned wrt nlon on ring
-    k_grid = eachfield(grids)[k]     # vertical layer index
+    k_grid = eachlayer(grids)[k]     # vertical layer index
 
     if not_equator
         view(grids.data, ilons, k_grid) .= brfft_plan * view(g_in, 1:nfreq, k, j)
