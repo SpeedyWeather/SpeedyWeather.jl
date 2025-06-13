@@ -50,6 +50,7 @@ get_nlat(grid::AbstractGrid) = get_nlat(typeof(grid), grid.nlat_half)
 Equivalent to length of the underlying data array."""
 get_npoints(grid::Grid, args...) where {Grid<:AbstractGrid} = get_npoints(Grid, grid.nlat_half, args...)
 get_npoints(G::Type{<:AbstractGrid}, nlat_half::Integer, k::Integer...) = prod(k) * get_npoints(G, nlat_half)
+get_quadrature_weights(grid::AbstractGrid) = get_quadrature_weights(typeof(grid), grid.nlat_half)
 
 """$(TYPEDSIGNATURES) Size of the matrix of the horizontal grid if representable as such (not all grids)."""
 matrix_size(grid::Grid) where {Grid<:AbstractGrid} = matrix_size(Grid, get_nlat_half(grid))

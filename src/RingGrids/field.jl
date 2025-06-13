@@ -175,13 +175,13 @@ Base.Matrix(field::AbstractField2D) = Array(field, as=Matrix)
 for f in (:zeros, :ones, :rand, :randn)
     @eval begin
         # zeros(grid, nlayers...)
-        function Base.$f(grid::AbstractGrid, k...)
+        function Base.$f(grid::AbstractGrid, k::Integer...)
             data = array_type(grid.architecture)($f(DEFAULT_NF, get_npoints(grid), k...))
             return Field(data, grid)
         end
             
         # zeros(NF, grid, nlayers...)
-        function Base.$f(::Type{T}, grid::AbstractGrid, k...) where T
+        function Base.$f(::Type{T}, grid::AbstractGrid, k::Integer...) where T
             data = array_type(grid.architecture)($f(T, get_npoints(grid), k...))
             return Field(data, grid)
         end
@@ -198,8 +198,8 @@ for f in (:zeros, :ones, :rand, :randn)
         function Base.$f(
             ::Type{T},
             Grid::Type{<:AbstractGrid},
-            nlat_half,
-            k...;
+            nlat_half::Integer,
+            k::Integer...;
             architecture=DEFAULT_ARCHITECTURE(),
         ) where T
             grid = Grid(nlat_half, architecture)

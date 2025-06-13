@@ -291,6 +291,7 @@ function interpolate!(
     # if fields match just copy data over (eltypes might differ)
     fields_match(Aout, A) && return copyto!(Aout.data, A.data)
     _interpolate!(Aout.data, A.data, interpolator)  # use .data to trigger dispatch for method above
+    return Aout                             # return the field wrapped around the interpolated data
 end
 
 # version for 2D field and vector
@@ -314,6 +315,7 @@ function interpolate!(
     for k in eachlayer(Aout, A, vertical_only=true)
         _interpolate!(view(Aout.data, :, k), view(A.data, :, k), interpolator)
     end
+    return Aout                             # return the field wrapped around the interpolated data
 end
 
 # interpolate while creating an interpolator on the fly
@@ -325,7 +327,8 @@ function interpolate!(
     # if fields match just copy data over (eltypes might differ)
     fields_match(Aout, A) && return copyto!(Aout.data, A.data)
     I = interpolator(Aout, A; kwargs...)    # create interpolator instance from field A to Aout
-    interpolate!(Aout, A, I)                # perform interpolation
+    interpolate!(Aout, A, I)                # perform interpolation returns 
+    return Aout                             # return the field wrapped around the interpolated data
 end
 
 # create grid on the fly
@@ -335,14 +338,17 @@ interpolate(Grid::Type{<:AbstractGrid}, nlat_half::Integer, A::AbstractField; kw
 # create field from grid on the fly
 function interpolate(
     grid::AbstractGrid,
-    A::AbstractField2D;
+    A::AbstractField;
     kwargs...
 )
     I = interpolator(grid, A.grid; kwargs...)
     Aout = Field(grid, size(A)[2:end]...)
     interpolate!(Aout, A, I)    # returns an array
-    return Aout                 # returns the grid wrapped around that array
+    return Aout                 # returns the field wrapped around that array
 end
+
+# if only the grid type is provided, create a grid with nlat_half from the input field
+interpolate(Grid::Type{<:AbstractGrid}, A::AbstractField; kwargs...) = interpolate(Grid(A.grid.nlat_half), A; kwargs...)
 
 function update_locator!(
     I::AbstractInterpolator,    # GridGeometry and Locator
