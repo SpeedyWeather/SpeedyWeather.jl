@@ -56,7 +56,7 @@ map = transform(alms)
 ```
 By default, the `transforms` transforms onto a [`FullGaussianGrid`](@ref FullGaussianGrid) unravelled here
 into a vector west to east, starting at the prime meridian, then north to south, see [RingGrids](@ref).
-We can visualize `map` quickly with a UnicodePlot via `heatmap` (see [Visualising RingGrid data](@ref)),
+We can visualize `map` quickly with a UnicodePlot via `heatmap` (see [Visualising Fields](@ref)),
 or alternatively in higher quality after `using CairoMakie` or `usin GLMakie`, see
 [Visualisation via Makie](@ref) too
 
@@ -103,7 +103,7 @@ spectral_truncation(alms, 2)
 Yay, we just chopped off ``l > 2`` from `alms` which contained the harmonics up to degree and
 order 5 before.
 If the second argument in `spectral_truncation` is larger than `alms` then it will automatically
-call `spectral_interpolation` and vice versa. Also see [Interpolation on RingGrids](@ref)
+call `spectral_interpolation` and vice versa. Also see [Interpolation between grids](@ref)
 to interpolate directly between grids. If you want to control directly the resolution of the
 grid you want to `transform` onto, use the keyword `dealiasing` (default: 2 for quadratic,
 see [Matching spectral and grid resolution](@ref)).
@@ -232,7 +232,7 @@ so the 96x47 matrix size here corresponds to 23 latitudes north and south of the
 plus the equator (=47).
 
 We now wrap this matrix into a `FullClenshawGrid` (`input_as=Matrix` is required because all
-grids organise their data as vectors, see [Creating data on a RingGrid](@ref))
+grids organise their data as vectors, see [Creating a Field from data](@ref))
 therefore to associate it with the necessary grid information like its coordinates
 ```@example speedytransforms2
 map = FullClenshawGrid(m, input_as=Matrix)
