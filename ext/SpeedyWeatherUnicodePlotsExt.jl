@@ -45,7 +45,7 @@ A UnicodePlots heatmap visualising the data of an `AbstractField`.
 General method that interpolates (from a reduced grid) onto a full grid
 so that it can be visualised as a matrix."""
 function UnicodePlots.heatmap(A::AbstractField2D; title::String="$(get_nlat(A))-ring $(typeof(A))")
-    A_full = interpolate(full_grid_type(A), A.nlat_half, A)
+    A_full = interpolate(full_grid_type(A.grid), A.grid.nlat_half, A)
     UnicodePlots.heatmap(A_full; title)
 end
 
