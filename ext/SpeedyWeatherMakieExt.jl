@@ -5,31 +5,30 @@ using DocStringExtensions
 
 """
 $(TYPEDSIGNATURES)
-Defines Makie's `heatmap` function for a`grid::AbstractGrid` via interpolation
-to `::AbstractFullGrid` (which can be reshaped into a matrix.)"""
+Defines Makie's `heatmap` function for a`field::AbstractField2D` via interpolation
+to `::AbstractFullField2D` (which can be reshaped into a matrix.)"""
 function Makie.heatmap(
-    grid::RingGrids.AbstractGrid;
-    title::String = "$(RingGrids.get_nlat(grid))-ring $(typeof(grid))",
+    field::RingGrids.AbstractField2D;
+    title::String = "$(RingGrids.get_nlat(field))-ring $(typeof(field))",
     kwargs...   # pass on to Makie.heatmap
 )
-    full_grid = RingGrids.interpolate(RingGrids.full_grid_type(grid), grid.nlat_half, grid)
-    heatmap(full_grid; title, kwargs...)
+    full_field = RingGrids.interpolate(RingGrids.full_grid_type(field.grid), field.grid.nlat_half, field)
+    heatmap(full_field; title, kwargs...)
 end
 
 """
 $(TYPEDSIGNATURES)
-Defines Makie's `heatmap` function for a`grid::AbstractGrid` via interpolation
-to `::AbstractFullGrid` (which can be reshaped into a matrix.)"""
+Defines Makie's `heatmap` function for a`field::AbstractFullField2D` which can be reshaped into a matrix."""
 function Makie.heatmap(
-    grid::RingGrids.AbstractFullGrid;
-    title::String = "$(RingGrids.get_nlat(grid))-ring $(typeof(grid))",
+    field::RingGrids.AbstractFullField2D;
+    title::String = "$(RingGrids.get_nlat(field))-ring $(typeof(field))",
     size = (600,300),
     kwargs...
 )
 
-    mat = Matrix(grid)              # reshapes a full grid into a matrix
-    lond = RingGrids.get_lond(grid) # get lon, lat axes in degrees
-    latd = RingGrids.get_latd(grid)
+    mat = Matrix(field)                 # reshapes a full field into a matrix
+    lond = RingGrids.get_lond(field)    # get lon, lat axes in degrees
+    latd = RingGrids.get_latd(field)
 
     fig = Figure(size = size, figure_padding = 10)
     ax = Axis(fig[1, 1],
@@ -40,8 +39,8 @@ function Makie.heatmap(
         yticks = -60:30:60,     # label -60˚N, -30˚N, 0˚N, ... 
         xticklabelsize = 10,
         yticklabelsize = 10,
-        xtickformat = values -> ["$(round(Int,value))˚E" for value in values],
-        ytickformat = values -> ["$(round(Int,value))˚N" for value in values],
+        xtickformat = values -> ["$(round(Int, value))˚E" for value in values],
+        ytickformat = values -> ["$(round(Int, value))˚N" for value in values],
     )
 
     hm = heatmap!(ax, lond, latd, mat; kwargs...)
