@@ -15,7 +15,7 @@ function SpeedyWeather.globe(
     Grid::Type{<:AbstractGrid},
     nlat_half::Integer;
     interactive::Bool = true,
-    title::String = "$(RingGrids.get_nlat(Grid, nlat_half))-ring $(RingGrids.horizontal_grid_type(Grid))",
+    title::String = "$(RingGrids.get_nlat(Grid, nlat_half))-ring $Grid",
     color = :black,
     faces::Bool = true,
     centers::Bool = true,

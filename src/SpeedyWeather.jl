@@ -57,11 +57,13 @@ export  Field, Field2D, Field3D,
         OctahedralGaussianField, OctahedralClenshawField,
         HEALPixField, OctaHEALPixField,
         OctaminimalGaussianField
+
 export  FullClenshawGrid, FullGaussianGrid,
         FullHEALPixGrid, FullOctaHEALPixGrid,
         OctahedralGaussianGrid, OctahedralClenshawGrid,
         HEALPixGrid, OctaHEALPixGrid,
         OctaminimalGaussianGrid
+        
 export  eachring, eachlayer, eachgridpoint
 export  AnvilInterpolator
 export  spherical_distance
