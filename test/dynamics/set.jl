@@ -34,25 +34,25 @@
 
     # LTA
     set!(simulation, vor=L, lf = lf)
-    @test prog_new.vor[lf] == L
+    @test get_step(prog_new.vor, lf) == L
 
     set!(simulation, div=L, lf = lf; add=true)
-    @test prog_new.div[lf] == (prog_old.div[lf] .+ L)
+    @test get_step(prog_new.div, lf) == (get_step(prog_old.div, lf) .+ L)
 
     set!(simulation, temp=L2, lf=lf)
-    @test prog_new.temp[lf] ≈ L2_trunc
+    @test get_step(prog_new.temp, lf) ≈ L2_trunc
 
     set!(simulation, humid=L3, lf=lf)
-    @test prog_new.humid[lf] ≈ L3_trunc
+    @test get_step(prog_new.humid, lf) ≈ L3_trunc
     
     set!(simulation, pres=L[:,1], lf=lf)
-    @test prog_new.pres[lf] == L[:,1]
+    @test get_step(prog_new.pres, lf) == L[:,1]
 
     set!(simulation, vor=A, lf=lf)
-    @test prog_new.vor[lf] == A_spec
+    @test get_step(prog_new.vor, lf) == A_spec
 
     set!(simulation, vor=A, lf=lf, add=true)
-    @test prog_new.vor[lf] == (2 .* A_spec)
+    @test get_step(prog_new.vor, lf) == (2 .* A_spec)
 
     # grids 
     set!(simulation, sea_surface_temperature=A[:,1], lf=lf)
@@ -75,10 +75,10 @@
     set!(simulation, vor=Float32(3.), lf=lf)
     M3 = zeros(NF, spectral_grid.grid, nlayers) .+ 3    # same grid 
     M3_spec = transform(M3, model.spectral_transform)
-    @test prog_new.vor[lf] ≈ M3_spec
+    @test get_step(prog_new.vor, lf) ≈ M3_spec
 
     set!(simulation, vor=Float32(3.), lf=lf, add=true)
-    @test prog_new.vor[lf] ≈ (2 .* M3_spec)
+    @test get_step(prog_new.vor, lf) ≈ (2 .* M3_spec)
 
     set!(simulation, sea_surface_temperature=Float16(3.))
     @test all(prog_new.ocean.sea_surface_temperature .≈ 3.)
@@ -106,7 +106,7 @@
     U = similar(u)
     V = similar(v)
 
-    SpeedyTransforms.UV_from_vordiv!(U, V, prog_new.vor[lf], prog_new.div[lf], model.spectral_transform)
+    SpeedyTransforms.UV_from_vordiv!(U, V, get_step(prog_new.vor, lf), get_step(prog_new.div, lf), model.spectral_transform)
 
     # back to grid and unscale on the fly
     u_grid2 = transform(U, model.spectral_transform, unscale_coslat=true)
@@ -130,7 +130,7 @@
     transform!(A_spec, A, model.spectral_transform)
 
     set!(simulation, vor=f; lf)
-    @test prog_new.vor[lf] ≈ A_spec
+    @test get_step(prog_new.vor, lf) ≈ A_spec
 end
 
 @testset "Set! grids" begin

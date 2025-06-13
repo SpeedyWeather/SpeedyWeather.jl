@@ -68,9 +68,9 @@ export PrognosticVariables
     ArrayType,              # Array, CuArray, ...
     SpectrumType,           # <: AbstractSpectrum
     GridType,               # <: AbstractGrid
-    nsteps,                 # number of timesteps stored simultaneously
     SpectralVariable2D,     # <: LowerTriangularArray
     SpectralVariable3D,     # <: LowerTriangularArray
+    SpectralVariable4D,     # <: LowerTriangularArray
     GridVariable2D,         # <: AbstractField
     GridVariable3D,         # <: AbstractField
     ParticleVector,         # <: AbstractVector{Particle{NF}}
@@ -92,26 +92,24 @@ export PrognosticVariables
     "Number of particles for particle advection"
     nparticles::Int
 
+    "Number of time steps simultaneously stored in prognostic variables, 2 for 2-step leapfrog scheme"
+    nsteps::Int
+
     # LAYERED VARIABLES
     "Vorticity of horizontal wind field [1/s], but scaled by scale (=radius during simulation)"
-    vor::NTuple{nsteps, SpectralVariable3D} =
-        ntuple(i -> zeros(SpectralVariable3D, spectrum, nlayers), nsteps)
+    vor::SpectralVariable4D = zeros(SpectralVariable4D, spectrum, nlayers, nsteps)
 
     "Divergence of horizontal wind field [1/s], but scaled by scale (=radius during simulation)"
-    div::NTuple{nsteps, SpectralVariable3D} =
-        ntuple(i -> zeros(SpectralVariable3D, spectrum, nlayers), nsteps)
+    div::SpectralVariable4D = zeros(SpectralVariable4D, spectrum, nlayers, nsteps)
 
     "Absolute temperature [K]"
-    temp::NTuple{nsteps, SpectralVariable3D} =
-        ntuple(i -> zeros(SpectralVariable3D, spectrum, nlayers), nsteps)
+    temp::SpectralVariable4D = zeros(SpectralVariable4D, spectrum, nlayers, nsteps)
 
     "Specific humidity [kg/kg]"
-    humid::NTuple{nsteps, SpectralVariable3D} =
-        ntuple(i -> zeros(SpectralVariable3D, spectrum, nlayers), nsteps)
+    humid::SpectralVariable4D = zeros(SpectralVariable4D, spectrum, nlayers, nsteps)
 
     "Logarithm of surface pressure [log(Pa)] for PrimitiveEquation, interface displacement [m] for ShallowWaterModel"
-    pres::NTuple{nsteps, SpectralVariable2D} =
-        ntuple(i -> zeros(SpectralVariable2D, spectrum), nsteps)
+    pres::SpectralVariable3D = zeros(SpectralVariable3D, spectrum, nsteps)
 
     "Random pattern following a random process [1]"
     random_pattern::SpectralVariable2D = zeros(SpectralVariable2D, spectrum)
@@ -125,20 +123,32 @@ export PrognosticVariables
         PrognosticVariablesLand{NF, ArrayType, GridType, GridVariable2D, GridVariable3D}(; grid, nlayers=nlayers_soil)
 
     "Tracers, last dimension is for n tracers [?]"
-    tracers::Dict{Symbol, NTuple{nsteps, SpectralVariable3D}} = Dict{Symbol, NTuple{nsteps, SpectralVariable3D}}()
+    tracers::Dict{Symbol, SpectralVariable4D} = Dict{Symbol, SpectralVariable4D}()
 
     "Particles for particle advection"
     particles::ParticleVector = zeros(ParticleVector, nparticles)
 
     "Scaling for vor, div. scale=1 outside simulation, =radius during simulation"
     scale::Base.RefValue{NF} = Ref(one(NF))
-
+s
     "Clock that keeps track of time, number of timesteps to integrate for."
     clock::Clock = Clock()
 end
 
-get_nsteps(progn::PrognosticVariables{T, A, S, G, nsteps}) where {T, A, S, G, nsteps} = nsteps
 Base.eltype(progn::PrognosticVariables{T}) where T = T
+
+function get_steps(specs::LowerTriangularArray{T, 2}) where T
+    nsteps = size(specs, 2)
+    return ntuple(i -> lta_view(specs, :, i), nsteps)
+end
+
+function get_steps(specs::LowerTriangularArray{T, 3}) where T
+    nsteps = size(specs, 3)
+    return ntuple(i -> lta_view(specs, :, :, i), nsteps)
+end
+
+get_step(specs::LowerTriangularArray{T, 2}, i) where T = lta_view(specs, :, i)
+get_step(specs::LowerTriangularArray{T, 3}, i) where T = lta_view(specs, :, :, i)
 
 """$(TYPEDSIGNATURES)
 Generator function."""
@@ -146,11 +156,11 @@ function PrognosticVariables(SG::SpectralGrid; nsteps=DEFAULT_NSTEPS)
 
     (; spectrum, grid, nlayers, nlayers_soil, nparticles) = SG
     (; NF, ArrayType) = SG
-    (; SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, ParticleVector) = SG
+    (; SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, ParticleVector) = SG
 
-    return PrognosticVariables{NF, ArrayType, typeof(spectrum), typeof(grid), nsteps,
-        SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, ParticleVector}(;
-            spectrum, grid, nlayers, nlayers_soil, nparticles,
+    return PrognosticVariables{NF, ArrayType, typeof(spectrum), typeof(grid),
+        SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, ParticleVector}(;
+            spectrum, grid, nlayers, nlayers_soil, nparticles, nsteps,
         )
 end
 
@@ -164,11 +174,11 @@ end
 
 function Base.show(
     io::IO,
-    progn::PrognosticVariables{NF, ArrayType, SpectrumType, GridType, nsteps},
-) where {NF, ArrayType, SpectrumType, GridType, nsteps}
+    progn::PrognosticVariables{NF, ArrayType, SpectrumType, GridType},
+) where {NF, ArrayType, SpectrumType, GridType}
     
     # resolution
-    (; spectrum, grid, nlayers, nlayers_soil, nparticles) = progn
+    (; spectrum, grid, nlayers, nlayers_soil, nparticles, nsteps) = progn
     trunc = truncation(spectrum)
     Grid = RingGrids.nonparametric_type(GridType)
     nlat = RingGrids.get_nlat(grid)
@@ -204,13 +214,11 @@ Copies entries of `progn_old` into `progn_new`."""
 function Base.copy!(progn_new::PrognosticVariables, progn_old::PrognosticVariables)
 
     # Core variables using broadcast
-    @inbounds for i in 1:SpeedyWeather.get_nsteps(progn_new)
-        progn_new.vor[i] .= progn_old.vor[i]
-        progn_new.div[i] .= progn_old.div[i]
-        progn_new.temp[i] .= progn_old.temp[i]
-        progn_new.humid[i] .= progn_old.humid[i]
-        progn_new.pres[i] .= progn_old.pres[i]
-    end
+    progn_new.vor .= progn_old.vor
+    progn_new.div .= progn_old.div
+    progn_new.temp .= progn_old.temp
+    progn_new.humid .= progn_old.humid
+    progn_new.pres .= progn_old.pres
 
     # Ocean variables
     progn_new.ocean.sea_surface_temperature .= progn_old.ocean.sea_surface_temperature
@@ -248,25 +256,25 @@ end
 
 function Base.zero(
     progn::PrognosticVariables{
-        NF, ArrayType, SpectrumType, GridType, nsteps,
-        SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, ParticleVector,
+        NF, ArrayType, SpectrumType, GridType,
+        SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, ParticleVector,
         }) where {
-        NF, ArrayType, SpectrumType, GridType, nsteps,
-        SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, ParticleVector,
+        NF, ArrayType, SpectrumType, GridType,
+        SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, ParticleVector,
         }
 
-    (; spectrum, grid, nlayers, nlayers_soil, nparticles) = progn
+    (; spectrum, grid, nlayers, nlayers_soil, nparticles, nsteps) = progn
     
     # initialize regular progn variables 
     progn_new = PrognosticVariables{NF, ArrayType, SpectrumType, GridType, nsteps,
-        SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, 
+        SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, 
         ParticleVector}(;
-            spectrum, grid, nlayers, nlayers_soil, nparticles,
+            spectrum, grid, nlayers, nlayers_soil, nparticles, nsteps
         )
 
     # add tracers with zero 
     for (key, value) in progn.tracers 
-        progn_new.tracers[key] = ntuple(i -> zeros(SpectralVariable3D, spectrum, nlayers), nsteps)
+        progn_new.tracers[key] = zeros(SpectralVariable4D, spectrum, nlayers, nsteps)
     end 
 
     # use the same scale 
@@ -277,13 +285,13 @@ end
 
 function Base.fill!(progn::PrognosticVariables, value::Number)
 
-    for i in eachindex(progn.vor)   # each leapfrog time step
-        progn.vor[i] .= value
-        progn.div[i] .= value
-        progn.temp[i] .= value
-        progn.humid[i] .= value
-        progn.pres[i] .= value
-    end
+    progn.vor .= value
+    progn.div .= value
+    progn.temp .= value
+    progn.humid .= value
+    progn.pres .= value
+
+    # todo random pattern?
 
     # ocean
     progn.ocean.sea_surface_temperature .= value
@@ -319,20 +327,20 @@ end
 """$(TYPEDSIGNATURES)
 Add `tracers` to the prognostic variables `progn` in `progn.tracers::Dict`."""
 function add!(
-    progn::PrognosticVariables{NF, ArrayType, SpectrumType, GridType, nsteps, SpectralVariable2D, SpectralVariable3D},
+    progn::PrognosticVariables{NF, ArrayType, SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, SpectralVariable4D},
     tracers::Tracer...
 ) where {
         NF,                     # number format
         ArrayType,
         SpectrumType,
         GridType,
-        nsteps,
         SpectralVariable2D,
         SpectralVariable3D,
+        SpectralVariable4D,
     }
-    (; spectrum, nlayers) = progn
+    (; spectrum, nlayers, nsteps) = progn
     for tracer in tracers
-        progn.tracers[tracer.name] = ntuple(i -> zeros(SpectralVariable3D, spectrum, nlayers), nsteps)
+        progn.tracers[tracer.name] = zeros(SpectralVariable4D, spectrum, nlayers, nsteps)
     end
 end
 
