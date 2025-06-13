@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Use views instead of unpacking a tuple for 2-step prognostic variables [#745](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/745)
 - Introduce Field for data on grid [#732](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/732)
 - Makie v0.23 compatibility [#743](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/743)
 - LowerTriangularArray-preserving view [#739](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/739)
