@@ -147,6 +147,7 @@ function get_steps(specs::LowerTriangularArray{T, 3}) where T
     return ntuple(i -> lta_view(specs, :, :, i), nsteps)
 end
 
+export get_step
 get_step(specs::LowerTriangularArray{T, 2}, i) where T = lta_view(specs, :, i)
 get_step(specs::LowerTriangularArray{T, 3}, i) where T = lta_view(specs, :, :, i)
 

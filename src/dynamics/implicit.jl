@@ -71,10 +71,8 @@ function implicit_correction!(  diagn::DiagnosticVariables,
                                 implicit::ImplicitShallowWater)
 
     (; div_tend, pres_tend) = diagn.tendencies # tendency of divergence and pressure/η
-    div_old = progn.div[1]      # divergence at t
-    div_new = progn.div[2]      # divergence at t+dt
-    pres_old = progn.pres[1]    # pressure/η at t
-    pres_new = progn.pres[2]    # pressure/η at t+dt
+    div_old, div_new   = get_steps(progn.div)   # divergence at t, t+dt
+    pres_old, pres_new = get_steps(progn.pres)  # pressure/η at t, t+dt
 
     # unpack with [] as stored in a RefValue for mutation during initialization
     H = implicit.layer_thickness[]      # layer thickness [m], undisturbed, no mountains

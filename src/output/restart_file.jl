@@ -14,27 +14,27 @@ function write_restart_file!(
     output.active && output.write_restart || return nothing  
     
     # move 2nd leapfrog to 1st to compress restart file
-    copyto!(progn.vor[1],   progn.vor[2])
-    copyto!(progn.div[1],   progn.div[2])
-    copyto!(progn.temp[1],  progn.temp[2])
-    copyto!(progn.humid[1], progn.humid[2])
-    copyto!(progn.pres[1],  progn.pres[2])
+    get_step(progn.vor, 1)   .= get_step(progn.vor, 2)
+    get_step(progn.div, 1)   .= get_step(progn.div, 2)
+    get_step(progn.temp, 1)  .= get_step(progn.temp, 2)
+    get_step(progn.humid, 1) .= get_step(progn.humid, 2)
+    get_step(progn.pres, 1)  .= get_step(progn.pres, 2)
 
     # bitround 1st leapfrog step to output precision
     if eltype(progn) <: Base.IEEEFloat  # currently not defined for other formats...
-        round!(progn.vor[1],    7)      # hardcode some defaults for now
-        round!(progn.div[1],    7)
-        round!(progn.temp[1],  12)
-        round!(progn.humid[1], 10)
-        round!(progn.pres[1],  14)
+        round!(get_step(progn.vor, 1),    7)      # hardcode some defaults for now
+        round!(get_step(progn.div, 1),    7)
+        round!(get_step(progn.temp, 1),  12)
+        round!(get_step(progn.humid, 1), 10)
+        round!(get_step(progn.pres, 1),  14)
     end
 
     # remove 2nd leapfrog step by filling with zeros
-    fill!(progn.vor[2],   0)
-    fill!(progn.div[2],   0)
-    fill!(progn.temp[2],  0)
-    fill!(progn.humid[2], 0)
-    fill!(progn.pres[2],  0)
+    fill!(get_step(progn.vor, 2),   0)
+    fill!(get_step(progn.div, 2),   0)
+    fill!(get_step(progn.temp, 2),  0)
+    fill!(get_step(progn.humid, 2), 0)
+    fill!(get_step(progn.pres, 2),  0)
 
     jldopen(joinpath(output.run_path, "restart.jld2"), "w"; compress=true) do f
         f["prognostic_variables"] = progn

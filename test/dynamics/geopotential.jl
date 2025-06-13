@@ -6,8 +6,8 @@
         simulation = initialize!(model)
         progn = simulation.prognostic_variables
         diagn = simulation.diagnostic_variables
-        temp = progn.temp[1]
-        humid = progn.humid[1]
+        temp = get_step(progn.temp, 1)
+        humid = get_step(progn.humid, 1)
 
         # give every layer some constant temperature by setting the l=m=0 mode (index 1) for all k
         temp0 = 280      # in Kelvin
@@ -37,8 +37,8 @@ end
         simulation = initialize!(model)
         progn = simulation.prognostic_variables
         diagn = simulation.diagnostic_variables
-        temp = progn.temp[1]
-        humid = progn.humid[1]
+        temp = get_step(progn.temp, 1)
+        humid = get_step(progn.humid, 1)
 
         # give every layer some constant temperature by setting the l=m=0 mode (index 1) for all k
         temp0 = 280      # in Kelvin
@@ -61,8 +61,8 @@ end
         progn = simulation.prognostic_variables
         diagn = simulation.diagnostic_variables
 
-        temp = progn.temp[1]
-        humid = progn.humid[1]
+        temp = get_step(progn.temp, 1)
+        humid = get_step(progn.humid, 1)
 
         # give every layer some constant temperature by setting the l=m=0 mode (index 1) for all k
         temp0 = 280      # in Kelvin

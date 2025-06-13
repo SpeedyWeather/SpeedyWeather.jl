@@ -253,7 +253,7 @@ function initialize!(   progn::PrognosticVariables,
 
     # get vorticity initial conditions from curl of u, v
     v = zero(u)     # meridional velocity zero for these initial conditions
-    vor = progn.vor[1]
+    vor = get_step(progn.vor, 1)
     curl!(vor, u, v, model.spectral_transform)
 
     # compute the div = -∇⋅(0,(ζ+f)*u) = ∇×((ζ+f)*u, 0) term, v=0
@@ -275,7 +275,7 @@ function initialize!(   progn::PrognosticVariables,
     div .*= inv(gravity)
 
     # invert Laplacian to obtain η
-    pres = progn.pres[1]
+    pres = get_step(progn.pres, 1)  # 1 = first leapfrog timestep
     ∇⁻²!(pres, div, model.spectral_transform)
 
     # add perturbation (reuse u array)
@@ -400,11 +400,11 @@ function initialize!(
     set!(progn, geometry, div = 0)  # technically not needed, but set to zero for completeness
 
     # filter low values below cutoff amplitude c
-    vor = progn.vor[1]  # 1 = first leapfrog timestep
+    vor = get_step(progn.vor, 1)    # 1 = first leapfrog timestep
     low_values = abs.(vor) .< c
     vor[low_values] .= 0
     if model isa ShallowWater
-        pres = progn.pres[1]
+        pres = get_step(progn.pres, 1)
         low_value = abs.(pres) .< c
         pres[low_value] .= 0
     end
@@ -545,7 +545,7 @@ function homogeneous_temperature!(  progn::PrognosticVariables,
 
     # SURFACE TEMPERATURE (store in k = nlayers, but it's actually surface, i.e. k=nlayers+1/2)
     # overwrite with lowermost layer further down
-    temp_surf = progn.temp[1][:,end]     # spectral temperature at k=nlayers+1/2
+    temp_surf = lta_view(progn.temp, :, nlayers, 1)     # spectral temperature at k=nlayers+1/2
 
     temp_surf[1] = norm_sphere*temp_ref                 # set global mean surface temperature
     for lm in eachharmonic(geopot_surf, temp_surf)
@@ -553,13 +553,13 @@ function homogeneous_temperature!(  progn::PrognosticVariables,
     end
 
     # Use lapserate and vertical coordinate σ for profile
-    for k in 1:nlayers                                     # k=nlayers overwrites the surface temperature
+    temp = get_step(progn.temp, 1)                      # 1 = first leapfrog timestep
+    for k in eachmatrix(temp)                           # k=nlayers overwrites the surface temperature
                                                         # with lowermost layer temperature
-        temp = progn.layers[k].timesteps[1].temp
         σₖᴿ = σ_levels_full[k]^(R_dry*Γg⁻¹)             # from hydrostatic equation
 
         for lm in eachharmonic(temp, temp_surf)
-            temp[lm] = temp_surf[lm]*σₖᴿ
+            temp[lm, k] = temp_surf[lm]*σₖᴿ
         end
     end
 end
@@ -632,11 +632,12 @@ function initialize!(
     (; nlayers, σ_levels_full) = model.geometry
 
     # get pressure [Pa] on grid
-    lnpₛ = progn.pres[1]
+    lnpₛ = get_step(progn.pres, 1)  # 1 = first leapfrog timestep
     pres_grid = transform(lnpₛ, model.spectral_transform)
     pres_grid .= exp.(pres_grid)
 
-    temp_grid = transform(progn.temp[1], model.spectral_transform)
+    temp = get_step(progn.temp, 1)  #  1 = first leapfrog timestep
+    temp_grid = transform(temp, model.spectral_transform)
     humid_grid = zero(temp_grid)
 
     for k in eachlayer(temp_grid, humid_grid)

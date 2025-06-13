@@ -88,7 +88,7 @@ function drag!(
     model::AbstractModel,
 )
     (; vor_tend) = diagn.tendencies
-    vor = progn.vor[1]
+    vor = get_step(progn.vor, lf)
 
     # scale by radius (but only once, the second radius is in vor)
     c = drag.c * diagn.scale[]
