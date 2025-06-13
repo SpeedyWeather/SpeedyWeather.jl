@@ -109,7 +109,7 @@ So for example `output_Grid=FullClenshawGrid(48)` would interpolate onto a
 regular 192x95 longitude-latitude grid of 1.875˚ resolution, regardless the grid and resolution used
 for the model integration.
 ```@example netcdf
-my_output_writer = NetCDFOutput(spectral_grid, output_Grid=FullClenshawGrid(48))
+my_output_writer = NetCDFOutput(spectral_grid, output_grid=FullClenshawGrid(48))
 ```
 Note that by default the output is on the corresponding full type of the grid type used in the dynamical core
 so that interpolation only happens at most in the zonal direction as they share the location of the
