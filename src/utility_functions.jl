@@ -96,11 +96,66 @@ function print_fields(io::IO, A, keys;arrays::Bool=false)
     end
 end
 
+"""
+    Century <: Period
+
+Convenience time type representing a 100-year period.
+"""
+struct Century <: Period
+    value::Int
+    Century(value::Int) = new(value)
+end
+
+Dates._units(m::Century) = m.value == 1 ? " century" : " centuries"
+
+# convert Century -> Year
+Base.convert(::Type{Year}, c::Century) = Year(c.value*100)
+
+# promotion rules
+Base.promote_rule(::Type{Century}, ::Type{Year}) = Year
+Base.promote_rule(::Type{Century}, ::Type{Month}) = Month
+Base.promote_rule(::Type{Century}, ::Type{Day}) = Day
+Base.promote_rule(::Type{Century}, ::Type{Hour}) = Hour
+Base.promote_rule(::Type{Century}, ::Type{Second}) = Second
+
+"""
+    Millenium <: Period
+
+Convenience time type representing a 1000-year period.
+"""
+struct Millenium <: Period
+    value::Int
+    Millenium(value::Int) = new(value)
+end
+
+Dates._units(m::Millenium) = m.value == 1 ? " millenium" : " millenia"
+
+# convert Millenium -> Century and Year
+Base.convert(::Type{Century}, m::Millenium) = Century(m.value*10)
+Base.convert(::Type{Year}, m::Millenium) = Year(Century(m))
+
+# promotion rules
+Base.promote_rule(::Type{Millenium}, ::Type{Century}) = Century
+Base.promote_rule(::Type{Millenium}, ::Type{Year}) = Year
+Base.promote_rule(::Type{Millenium}, ::Type{Month}) = Month
+Base.promote_rule(::Type{Millenium}, ::Type{Day}) = Day
+Base.promote_rule(::Type{Millenium}, ::Type{Hour}) = Hour
+Base.promote_rule(::Type{Millenium}, ::Type{Second}) = Second
+
+
+# add coarserperiod dispatches for Century and Millenium
+Dates.coarserperiod(::Type{Year}) = (Century, 100)
+Dates.coarserperiod(::Type{Century}) = (Millenium, 10)
+
 Dates.Second(x::AbstractFloat) = convert(Second, x)
 Dates.Minute(x::AbstractFloat) = Second(60x)
 Dates.Hour(  x::AbstractFloat) = Minute(60x)
 Dates.Day(   x::AbstractFloat) = Hour(24x)
 Dates.Week(  x::AbstractFloat) = Day(7x)
+Dates.Month( x::AbstractFloat) = Day(30x)  # approximate
+Dates.Year(  x::AbstractFloat) = Day(365x) # approximate
+Century(     x::AbstractFloat) = Year(100x)
+Millenium(   x::AbstractFloat) = Century(10x)
 
 # use Dates.second to round to integer seconds
 Dates.second(x::Dates.Nanosecond) = round(Int, x.value*1e-9)
@@ -110,11 +165,39 @@ Dates.second(x::Dates.Millisecond) = round(Int, x.value*1e-3)
 # defined to convert from floats to Dates.Second (which require ints by default) via rounding
 function Base.convert(::Type{Second}, x::AbstractFloat)
     xr = round(Int64, x)
-    x == xr || @info "Rounding and converting $x to $xr for integer seconds."
+    x == xr || @warn "Rounding and converting $x to $xr for integer seconds."
     return Second(xr)
 end
 
 function Base.convert(::Type{Second}, x::Integer)
-    @info "Input '$x' assumed to have units of seconds. Use Minute($x), Hour($x), Day($x) otherwise."
+    @warn "Input '$x' assumed to have units of seconds. Use Minute($x), Hour($x), or Day($x) otherwise."
     return Second(round(Int64, x))
 end
+
+# month conversions
+Base.convert(::Type{Dates.Day}, m::Dates.Month) = Day(Second(m))
+Base.convert(::Type{Dates.Hour}, m::Dates.Month) = Hour(Second(m))
+function Base.convert(::Type{Dates.Second}, m::Dates.Month)
+    @warn "Month is assumed to be approximately equal to 30 days. Use Minute, Hour, or Day otherwise."
+    return Second(m.value * 30 * 24 * 60 * 60) # approximate
+end
+
+# year conversions
+Base.convert(::Type{Dates.Day}, y::Dates.Year) = Day(Second(y))
+Base.convert(::Type{Dates.Hour}, y::Dates.Year) = Hour(Second(y))
+function Base.convert(::Type{Dates.Second}, y::Dates.Year)
+    @warn "Year is assumed to be approximately equal to 365 days. Use Minute, Hour, Day, or Month otherwise."
+    return Second(y.value * 365 * 24 * 60 * 60) # approximate
+end
+
+# additional century conversions
+Base.convert(::Type{Month}, c::Century) = Month(Year(c))
+Base.convert(::Type{Day}, c::Century) = Day(Year(c))
+Base.convert(::Type{Hour}, c::Century) = Hour(Year(c))
+Base.convert(::Type{Second}, c::Century) = Second(Year(c))
+
+# additional month conversions
+Base.convert(::Type{Month}, m::Millenium) = Month(Year(m))
+Base.convert(::Type{Day}, m::Millenium) = Day(Second(Year(m)))
+Base.convert(::Type{Hour}, m::Millenium) = Hour(Year(m))
+Base.convert(::Type{Second}, m::Millenium) = Second(Year(m))
