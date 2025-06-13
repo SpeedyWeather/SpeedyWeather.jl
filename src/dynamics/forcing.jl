@@ -126,7 +126,7 @@ function forcing!(
     Fu = diagn.tendencies.u_tend_grid
     (; amplitude, tapering) = forcing
 
-    @inbounds for k in eachgrid(Fu) 
+    @inbounds for k in eachlayer(Fu) 
         for (j, ring) in enumerate(eachring(Fu))
             F = amplitude[j]
             for ij in ring

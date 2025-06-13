@@ -69,8 +69,8 @@ function initialize!(
     length(particles) == 0 && return nothing
 
     k = particle_advection.layer
-    u_grid = view(diagn.grid.u_grid, :, k)
-    v_grid = view(diagn.grid.v_grid, :, k)
+    u_grid = field_view(diagn.grid.u_grid, :, k)
+    v_grid = field_view(diagn.grid.v_grid, :, k)
     (; interpolator) = diagn.particles
     
     # interpolate initial velocity on initial locations
@@ -157,8 +157,8 @@ function particle_advection!(
 
     # CORRECTOR STEP, use u, v at new location and new time step
     k = particle_advection.layer
-    u_grid = view(diagn.grid.u_grid, :, k)
-    v_grid = view(diagn.grid.v_grid, :, k)
+    u_grid = field_view(diagn.grid.u_grid, :, k)
+    v_grid = field_view(diagn.grid.v_grid, :, k)
     (; interpolator) = diagn.particles
     RingGrids.update_locator!(interpolator, lons, lats)
 
@@ -186,7 +186,7 @@ function particle_advection!(
 end
 
 function advect_2D(
-    particle::Particle{NF,true},    # particle to advect
+    particle::Particle{NF, true},   # particle to advect
     u::NF,                          # zonal velocity [m/s]
     v::NF,                          # meridional velocity [m/s]
     dt::NF,                         # scaled time step [s*˚/m]    

@@ -1,12 +1,5 @@
-"""A `HEALPixArray` is an array of HEALPix grids, subtyping `AbstractReducedGridArray`.
-First dimension of the underlying `N`-dimensional `data` represents the horizontal dimension,
-in ring order (0 to 360˚E, then north to south), other dimensions are used for the vertical and/or
-time or other dimensions. The resolution parameter of the horizontal grid is `nlat_half`
-(number of latitude rings on one hemisphere, Equator included) which has to be even
-(non-fatal error thrown otherwise) which is less strict than the original HEALPix
-formulation (only powers of two for nside = nlat_half/2). Ring indices are precomputed in `rings`.
-
-A HEALPix grid has 12 faces, each `nside`x`nside` grid points, each covering the same area
+"""A `HEALPixGrid` is a equal-area discretization of the sphere. A HEALPix grid has 12 faces,
+each `nside`x`nside` grid points, each covering the same area
 of the sphere. They start with 4 longitude points on the northern-most ring,
 increase by 4 points per ring in the "polar cap" (the top half of the 4 northern-most faces)
 but have a constant number of longitude points in the equatorial belt. The southern hemisphere
@@ -16,36 +9,38 @@ Equator. For more details see Górski et al. 2005, DOI:10.1086/427976.
 `rings` are the precomputed ring indices, for nlat_half = 4 it is
 `rings = [1:4, 5:12, 13:20, 21:28, 29:36, 37:44, 45:48]`. So the first ring has indices
 1:4 in the unravelled first dimension, etc. For efficient looping see `eachring` and `eachgrid`.
-Fields are
+`whichring` is a precomputed vector of ring indices for each grid point ij, i.e. `whichring[ij]`
+gives the ring index j of grid point ij. Fields are
 $(TYPEDFIELDS)"""
-struct HEALPixArray{T, N, ArrayType <: AbstractArray{T, N}} <: AbstractReducedGridArray{T, N, ArrayType}
-    data::ArrayType                 # data array, ring by ring, north to south
+struct HEALPixGrid{A, V, W} <: AbstractReducedGrid{A}
     nlat_half::Int                  # number of latitudes on one hemisphere
-    rings::Vector{UnitRange{Int}}   # TODO make same array type as data?
-
-    HEALPixArray(data::A, nlat_half, rings) where {A <: AbstractArray{T, N}} where {T, N} =
-        check_inputs(data, nlat_half, rings, HEALPixArray) ?
-        new{T, N, A}(data, nlat_half, rings) :
-        error_message(data, nlat_half, rings, HEALPixArray, T, N, A)
+    architecture::A                 # information about device, CPU/GPU
+    rings::V                        # precomputed ring indices
+    whichring::W                    # precomputed ring index for each grid point ij
 end
 
-## TYPES
-const HEALPixGrid{T} = HEALPixArray{T, 1, Vector{T}}
-nonparametric_type(::Type{<:HEALPixArray}) = HEALPixArray
-horizontal_grid_type(::Type{<:HEALPixArray}) = HEALPixGrid
-full_array_type(::Type{<:HEALPixArray}) = FullHEALPixArray
+nonparametric_type(::Type{<:HEALPixGrid}) = HEALPixGrid
+full_grid_type(::Type{<:HEALPixGrid}) = FullHEALPixGrid
 
-"""An `HEALPixArray` but constrained to `N=1` dimensions (horizontal only) and data is a `Vector{T}`."""
-HEALPixGrid
+# FIELD
+const HEALPixField{T, N} = Field{T, N, Architecture, Grid} where {Architecture, Grid<:HEALPixGrid}
+
+# define grid_type (i) without T, N, (ii) with T, (iii) with T, N but not with <:?Field
+# to not have precendence over grid_type(::Type{Field{...})
+grid_type(::Type{HEALPixField}) = HEALPixGrid
+grid_type(::Type{HEALPixField{T}}) where T = HEALPixGrid
+grid_type(::Type{HEALPixField{T, N}}) where {T, N} = HEALPixGrid
+
+Base.show(io::IO, F::Type{<:HEALPixField{T, N}}) where {T, N} = print(io, "HEALPixField{$T, $N}")
 
 ## SIZE
-nlat_odd(::Type{<:HEALPixArray}) = true
-get_npoints2D(::Type{<:HEALPixArray}, nlat_half::Integer) = 3*nlat_half^2
-get_nlat_half(::Type{<:HEALPixArray}, npoints2D::Integer) = round(Int, sqrt(npoints2D/3))
+nlat_odd(::Type{<:HEALPixGrid}) = true
+get_npoints(::Type{<:HEALPixGrid}, nlat_half::Integer) = 3*nlat_half^2
+get_nlat_half(::Type{<:HEALPixGrid}, npoints::Integer) = round(Int, sqrt(npoints/3))
 
 """$(TYPEDSIGNATURES) Number of longitude points for ring `j` on `Grid` of resolution
 `nlat_half`."""
-function get_nlon_per_ring(Grid::Type{<:HEALPixArray}, nlat_half::Integer, j::Integer)
+function get_nlon_per_ring(Grid::Type{<:HEALPixGrid}, nlat_half::Integer, j::Integer)
     nlat = get_nlat(Grid, nlat_half)
     @assert 0 < j <= nlat "Ring $j is outside H$nlat_half grid."
     return min(4j, 2nlat_half, 8nlat_half-4j)
@@ -62,7 +57,7 @@ end
 
 # for future reordering the HEALPix ring order into a matrix consisting of the
 # 12 square faces of a HEALPix grid.
-function matrix_size(::Type{<:HEALPixArray}, nlat_half::Integer)
+function matrix_size(::Type{<:HEALPixGrid}, nlat_half::Integer)
     nside = nside_healpix(nlat_half)
     return (5nside, 5nside)
 end
@@ -71,8 +66,8 @@ end
 
 """$(TYPEDSIGNATURES)
 Latitudes [90˚N to -90˚N] for the `HEALPixGrid` with resolution parameter `nlat_half`."""
-function get_latd(::Type{<:HEALPixArray}, nlat_half::Integer)
-    nlat = get_nlat(HEALPixArray, nlat_half)
+function get_latd(::Type{<:HEALPixGrid}, nlat_half::Integer)
+    nlat = get_nlat(HEALPixGrid, nlat_half)
     nside = nside_healpix(nlat_half)
     latd = zeros(nlat)
     
@@ -87,7 +82,7 @@ end
 """$(TYPEDSIGNATURES)
 Longitudes [0˚E to 360˚E] for the `HEALPixGrid` with resolution parameter `nlat_half`
 on ring `j` (north to south)."""
-function get_lond_per_ring(Grid::Type{<:HEALPixArray}, nlat_half::Integer, j::Integer)
+function get_lond_per_ring(Grid::Type{<:HEALPixGrid}, nlat_half::Integer, j::Integer)
     nside = nside_healpix(nlat_half)
     nlon = get_nlon_per_ring(Grid, nlat_half, j)
 
@@ -99,7 +94,7 @@ function get_lond_per_ring(Grid::Type{<:HEALPixArray}, nlat_half::Integer, j::In
 end
 
 ## INDEXING
-function each_index_in_ring(::Type{<:HEALPixArray},
+function each_index_in_ring(::Type{<:HEALPixGrid},
                             j::Integer,                     # ring index north to south
                             nlat_half::Integer)             # resolution param
     nside = nside_healpix(nlat_half)
@@ -123,15 +118,16 @@ function each_index_in_ring(::Type{<:HEALPixArray},
     return index_1st:index_end                              # range of i's in ring
 end
 
-function each_index_in_ring!(   rings::Vector{<:UnitRange{<:Integer}},
-                                Grid::Type{<:HEALPixArray},
+function each_index_in_ring!(   rings::AbstractVector,
+                                Grid::Type{<:HEALPixGrid},
                                 nlat_half::Integer) # resolution param
 
     nlat = length(rings)
     @boundscheck nlat == get_nlat(Grid, nlat_half) || throw(BoundsError)
     
     # HEALPix not defined for odd nlat_half, the last rings would not be written
-    @boundscheck iseven(nlat_half) || throw(BoundsError)
+    @boundscheck iseven(nlat_half) ||
+        throw(AssertionError("HEALPixGrids only defined for even nlat_half, nlat_half=$nlat_half provided."))
 
     index_end = 0
     nside = nside_healpix(nlat_half)                # side length of a basepixel

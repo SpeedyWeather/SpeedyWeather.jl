@@ -746,7 +746,6 @@ end
                 @. L2 += 5L1
                 @test L2.data == L3.data .+ 5L1.data
 
-
                 L1 = adapt(ArrayType, randn(LowerTriangularArray{NF}, 10, 10, idims...))
                 L2 = adapt(ArrayType, randn(LowerTriangularArray{NF}, 10, 10, idims...))
 
@@ -776,7 +775,7 @@ end
 end 
 
 @testset "Rotate LowerTriangularArray" begin
-    import SpeedyWeather.LowerTriangularArrays: rotate!
+    # import SpeedyWeather.LowerTriangularArrays: rotate!
 
     @testset for NF in (Float16, Float32, Float64)
         @testset for trunc in (5, 10, 15)

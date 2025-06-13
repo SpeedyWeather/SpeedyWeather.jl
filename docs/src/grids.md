@@ -44,7 +44,7 @@ as the first point is not at 0˚E.
     that is used in the Legendre transfrom in the same way as *Gaussian*
     refers to the [Gaussian quadrature](https://en.wikipedia.org/wiki/Gaussian_quadrature).
 
-## Implemented grids
+## Supported grids
 
 All grids in SpeedyWeather.jl are a subtype of `AbstractGrid`, i.e. `<: AbstractGrid`. We further distinguish
 between _full_, and _reduced_ grids. Full grids have the same number of longitude points on every latitude
@@ -69,7 +69,7 @@ Other implemented reduced grids are
 
 An overview of these grids is visualised here, and a more detailed description follows below.
 
-![Overview of implemented grids in SpeedyWeather.jl](https://raw.githubusercontent.com/SpeedyWeather/SpeedyWeather.jl/main/docs/img/grids_comparison.png)
+![Overview of implemented grids in SpeedyWeather.jl](https://github.com/user-attachments/assets/e996fb71-db1e-436e-bb41-b517e2647dc1)
 
 Visualised are each grid's grid points (white dots) and grid faces (white lines).
 All grids shown have 16 latitude rings on one hemisphere, Equator included.
@@ -384,7 +384,8 @@ number of longitude points is constant here)
 ```math
 \phi = \frac{\pi}{2N_{side}}(i - \frac{s}{2}), \quad s = (j - N_{side} + 1) \mod 2
 ```
-The modulo function comes in as there is an alternating longitudinal offset from the prime meridian (see [Implemented grids](@ref)). For the southern hemisphere the grid point locations can be obtained by mirror symmetry.
+The modulo function comes in as there is an alternating longitudinal offset from the prime meridian (see [Supported grids](@ref)).
+For the southern hemisphere the grid point locations can be obtained by mirror symmetry.
 
 ### Grid cell boundaries
 

@@ -196,15 +196,16 @@ Calculate cos of solar zenith angle with a daily cycle
 at time `time`. Seasonal cycle or time correction may be disabled,
 depending on parameters in SolarZenith."""
 function cos_zenith!(
-    cos_zenith::AbstractGrid{NF},
+    cos_zenith::AbstractField,
     S::SolarZenith,
     time::DateTime,
     geometry::AbstractGeometry,
-) where NF
-
+)
+    NF = eltype(cos_zenith)
     (; sinlat, coslat, lons) = geometry
     (; length_of_day, length_of_year) = S
-    @boundscheck geometry.nlat_half == cos_zenith.nlat_half || throw(BoundsError)
+    @boundscheck geometry.spectral_grid.grid == cos_zenith.grid ||
+        throw(DimensionMismatch(geometry.spectral_grid.grid, cos_zenith.grid))
 
     # g: angular fraction of year [0...2π] for Jan-01 to Dec-31
     time_of_year = S.seasonal_cycle ? time : S.initial_time[]
@@ -256,15 +257,16 @@ Calculate cos of solar zenith angle as daily average
 at time `time`. Seasonal cycle or time correction may be disabled,
 depending on parameters in SolarZenithSeason."""
 function cos_zenith!(
-    cos_zenith::AbstractGrid{NF},
+    cos_zenith::AbstractField,
     S::SolarZenithSeason,
     time::DateTime,
     geometry::AbstractGeometry,
-) where NF
-
+)
+    NF = eltype(cos_zenith)
     (; sinlat, coslat, lat) = geometry
     (; length_of_day, length_of_year) = S
-    @boundscheck geometry.nlat_half == cos_zenith.nlat_half || throw(BoundsError)
+    @boundscheck geometry.spectral_grid.grid == cos_zenith.grid ||
+        throw(DimensionMismatch(geometry.spectral_grid.grid, cos_zenith.grid))
 
     # g: angular fraction of year [0...2π] for Jan-01 to Dec-31
     time_of_year = S.seasonal_cycle ? time : S.initial_time[]

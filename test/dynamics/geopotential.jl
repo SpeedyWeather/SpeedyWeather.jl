@@ -6,8 +6,8 @@
         simulation = initialize!(model)
         progn = simulation.prognostic_variables
         diagn = simulation.diagnostic_variables
-        temp = progn.temp[1]
-        humid = progn.humid[1]
+        temp = get_step(progn.temp, 1)
+        humid = get_step(progn.humid, 1)
 
         # give every layer some constant temperature by setting the l=m=0 mode (index 1) for all k
         temp0 = 280      # in Kelvin
@@ -18,14 +18,14 @@
         SpeedyWeather.transform!(diagn, progn, lf, model)
         SpeedyWeather.linear_virtual_temperature!(diagn, progn, lf, model)
         SpeedyWeather.geopotential!(diagn, model.geopotential, model.orography)
-        geopot_grid = Array(transform(diagn.dynamics.geopot, model.spectral_transform))
+        geopot_grid = transform(diagn.dynamics.geopot, model.spectral_transform)
         
         # approximate heights [m] for this setup
         heights = [27000, 18000, 13000, 9000, 6000, 3700, 1800, 700] 
 
-        height_over_ocean = geopot_grid[48, 24, :]/model.planet.gravity    # middle of pacific
+        height_over_ocean = geopot_grid[2304, :]/model.planet.gravity       # somwhere in the tropics
         for k in eachmatrix(temp)
-            @test heights[k] ≈ height_over_ocean[k] rtol=0.5                         # very large error allowed
+            @test heights[k] ≈ height_over_ocean[k] rtol=0.5                # very large error allowed
         end
     end
 end
@@ -37,8 +37,8 @@ end
         simulation = initialize!(model)
         progn = simulation.prognostic_variables
         diagn = simulation.diagnostic_variables
-        temp = progn.temp[1]
-        humid = progn.humid[1]
+        temp = get_step(progn.temp, 1)
+        humid = get_step(progn.humid, 1)
 
         # give every layer some constant temperature by setting the l=m=0 mode (index 1) for all k
         temp0 = 280      # in Kelvin
@@ -61,8 +61,8 @@ end
         progn = simulation.prognostic_variables
         diagn = simulation.diagnostic_variables
 
-        temp = progn.temp[1]
-        humid = progn.humid[1]
+        temp = get_step(progn.temp, 1)
+        humid = get_step(progn.humid, 1)
 
         # give every layer some constant temperature by setting the l=m=0 mode (index 1) for all k
         temp0 = 280      # in Kelvin
