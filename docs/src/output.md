@@ -126,7 +126,8 @@ Overview of the corresponding full grids
 | FullGaussianGrid | FullGaussianGrid |
 | FullClenshawGrid | FullClenshawGrid |
 | OctahadralGaussianGrid | FullGaussianGrid |
-| OctahedralClensawhGrid | FullClenshawGrid |
+| OctaminimalGaussianGrid | FullGaussianGrid |
+| OctahedralClenshawGrid | FullClenshawGrid |
 | HEALPixGrid | FullHEALPixGrid |
 | OctaHEALPixGrid | FullOctaHEALPixGrid |
 
