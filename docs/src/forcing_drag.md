@@ -149,8 +149,8 @@ function SpeedyWeather.initialize!( forcing::StochasticStirring,
     forcing.b[] = exp(-dt/τ)
     
     # precompute the latitudinal mask
-    (; Grid, nlat_half) = model.spectral_grid
-    latd = RingGrids.get_latd(Grid, nlat_half)
+    (; grid) = model.spectral_grid
+    latd = RingGrids.get_latd(grid)
     
     for j in eachindex(forcing.lat_mask)
         # Gaussian centred at forcing.latitude of width forcing.width

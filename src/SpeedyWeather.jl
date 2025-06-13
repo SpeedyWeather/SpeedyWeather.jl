@@ -7,7 +7,7 @@ using DocStringExtensions
 import Primes
 import Random
 import LinearAlgebra: LinearAlgebra, Diagonal
-export rotate!
+export rotate, rotate!
 
 # GPU, PARALLEL
 import Base.Threads: Threads, @threads
@@ -35,8 +35,8 @@ include("utility_functions.jl")
 
 # LowerTriangularArrays for spherical harmonics
 export  LowerTriangularArrays, 
-        LowerTriangularMatrix,
-        LowerTriangularArray
+        LowerTriangularArray,
+        LowerTriangularMatrix
 
 export  Spectrum
 
@@ -49,18 +49,22 @@ using .LowerTriangularArrays
 
 # RingGrids
 export  RingGrids
-export  AbstractGrid, AbstractGridArray,
-        AbstractFullGridarray, AbstractReducedGridArray
-export  FullClenshawGrid, FullClenshawArray,
-        FullGaussianGrid, FullGaussianArray,
-        FullHEALPixGrid, FullHEALPixArray,
-        FullOctaHEALPixGrid, FullOctaHEALPixArray,
-        OctahedralGaussianGrid, OctahedralGaussianArray,
-        OctahedralClenshawGrid, OctahedralClenshawArray,
-        HEALPixGrid, HEALPixArray,
-        OctaHEALPixGrid, OctaHEALPixArray,
-        OctaminimalGaussianGrid, OctaminimalGaussianArray,
-        eachring, eachgrid
+export  AbstractGrid, AbstractFullGrid, AbstractReducedGrid
+export  AbstractField, AbstractField2D, AbstractField3D
+export  Field, Field2D, Field3D,
+        FullClenshawField, FullGaussianField,
+        FullHEALPixField, FullOctaHEALPixField,
+        OctahedralGaussianField, OctahedralClenshawField,
+        HEALPixField, OctaHEALPixField,
+        OctaminimalGaussianField
+
+export  FullClenshawGrid, FullGaussianGrid,
+        FullHEALPixGrid, FullOctaHEALPixGrid,
+        OctahedralGaussianGrid, OctahedralClenshawGrid,
+        HEALPixGrid, OctaHEALPixGrid,
+        OctaminimalGaussianGrid
+        
+export  eachring, eachlayer, eachgridpoint
 export  AnvilInterpolator
 export  spherical_distance
 export  zonal_mean

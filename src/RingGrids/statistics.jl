@@ -1,17 +1,17 @@
 """$(TYPEDSIGNATURES)
 Zonal mean of `grid`, i.e. along its latitude rings."""
-function zonal_mean(grid::AbstractGridArray)
+function zonal_mean(field::AbstractField)
     # extend to any non-horizontal dimensions of grid (e.g. vertical or time)
-    ks = size(grid)[2:end]
+    ks = size(field)[2:end]
 
     # determine type T after division with integer (happening in mean)
-    T = Base.promote_op(/, eltype(grid), Int64)
-    m = zeros(T, RingGrids.get_nlat(grid), ks...)
+    T = Base.promote_op(/, eltype(field), Int64)
+    m = zeros(T, get_nlat(field), ks...)
 
-    rings = RingGrids.eachring(grid)
-    for k in eachgrid(grid)
+    rings = eachring(field.grid)
+    for k in eachlayer(field)
         for (j, ring) in enumerate(rings)
-            m[j, k] = mean(grid[ring, k])
+            m[j, k] = mean(field[ring, k])
         end
     end
 

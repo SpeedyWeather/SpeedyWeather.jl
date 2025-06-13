@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Introduce Field for data on grid [#732](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/732)
 - Makie v0.23 compatibility [#743](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/743)
 - LowerTriangularArray-preserving view [#739](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/739)
 - Array-agnostic LowerTriangularMatrix [#738](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/738)

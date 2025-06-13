@@ -98,12 +98,7 @@ function drag!(
 end
 
 export JetDrag
-@kwdef struct JetDrag{NF, SP, SpectralVariable2D} <: SpeedyWeather.AbstractDrag
-
-    # DIMENSIONS from SpectralGrid
-    "Spectral resolution as max degree of spherical harmonics"
-    spectrum::SP
-
+@kwdef struct JetDrag{NF, SpectralVariable2D} <: SpeedyWeather.AbstractDrag
     "[OPTION] Relaxation time scale τ"
     time_scale::Second = Day(6)
 
@@ -118,17 +113,18 @@ export JetDrag
 
     # TO BE INITIALISED
     "Relaxation back to reference vorticity"
-    ζ₀::SpectralVariable2D = zeros(LowerTriangularMatrix{Complex{NF}}, spectrum)
+    ζ₀::SpectralVariable2D
 end
 
 function JetDrag(SG::SpectralGrid; kwargs...)
-    return JetDrag{SG.NF, typeof(SG.spectrum), SG.SpectralVariable2D}(; SG.spectrum, kwargs...)
+    ζ₀ = zeros(Complex{SG.NF}, SG.spectrum)
+    return JetDrag{SG.NF, SG.SpectralVariable2D}(; ζ₀, kwargs...)
 end
 
 function initialize!(drag::JetDrag, model::AbstractModel)
     (; spectral_grid, geometry) = model
-    (; Grid, NF, nlat_half) = spectral_grid
-    u = zeros(Grid{NF}, nlat_half)
+    (; grid, NF) = spectral_grid
+    u = zeros(NF, grid)
 
     lat = geometry.latds
 
