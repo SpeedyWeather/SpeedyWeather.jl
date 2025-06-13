@@ -20,7 +20,6 @@ struct GridGeometry{
 end
 
 GridGeometry(field::AbstractField; kwargs...) = GridGeometry(field.grid; kwargs...)
-GridGeometry(grid::AbstractGrid; kwargs...) = GridGeometry(grid; kwargs...)
 
 """
 $(TYPEDSIGNATURES)          
