@@ -12,7 +12,8 @@ of longitudinal points towards the poles to be more equal-area than _full_ grids
 
 # Implemented grids
 
-RingGrids defines and exports the following grids.
+RingGrids defines and exports the following grids, see also [Supported grids](@ref) for a
+more mathematical description.
 
 Full grids
 ```@example ringgrids
@@ -269,7 +270,7 @@ Under the hood an interpolation takes three arguments
 
 The output array is just an array into which the interpolated data is written, providing this prevents
 unnecessary allocation of memory in case the destination array of the interpolation already exists.
-Such a destination can be a field but it does not have to be (see [Interpolation on coordiantes](@ref)).
+Such a destination can be a field but it does not have to be (see [Interpolation on coordinates](@ref)).
 The input field contains the data which is subject to interpolation, it must come on a ring grid, however,
 its coordinate information is actually already in the interpolator. The interpolator knows about the
 geometry of the grid of the field and the coordinates it is supposed to interpolate onto.
