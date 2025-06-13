@@ -559,7 +559,8 @@ function add!(diagn::DiagnosticVariables{
         GridVariable2D,         # <: AbstractField
         GridVariable3D,         # <: AbstractField
     }
-    (; spectrum, grid, nlayers) = diagn
+    (; spectrum, nlayers) = diagn
+    grid = diagn.the_grid   # TODO grid is used for 'GridVariables'
     for tracer in tracers
         diagn.tendencies.tracers_tend[tracer.name] = zeros(SpectralVariable3D, spectrum, nlayers)
         diagn.tendencies.tracers_tend_grid[tracer.name] = zeros(GridVariable3D, grid, nlayers)

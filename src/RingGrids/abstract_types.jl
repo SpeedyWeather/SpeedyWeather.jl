@@ -52,3 +52,10 @@ const AbstractField3D = AbstractField{T, 2} where T
 """Abstract supertype for all 4D fields, i.e. fields with horizontal and (in most cases) a vertical and a time dimensions,
 though these additional dimensions are arbitrary."""
 const AbstractField4D = AbstractField{T, 3} where T
+
+const AbstractFullField2D = AbstractFullField{T, 1} where T
+const AbstractFullField3D = AbstractFullField{T, 2} where T
+const AbstractFullField4D = AbstractFullField{T, 3} where T
+const AbstractReducedField2D = AbstractReducedField{T, 1} where T
+const AbstractReducedField3D = AbstractReducedField{T, 2} where T
+const AbstractReducedField4D = AbstractReducedField{T, 3} where T

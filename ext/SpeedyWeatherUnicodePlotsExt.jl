@@ -3,7 +3,7 @@ module SpeedyWeatherUnicodePlotsExt
 using SpeedyWeather, UnicodePlots
 using DocStringExtensions
 
-import SpeedyWeather.RingGrids: AbstractGrid, AbstractFullGrid, interpolate, full_grid_type, get_nlat
+import SpeedyWeather.RingGrids: AbstractField2D, AbstractFullField2D, interpolate, full_grid_type, get_nlat
 
 """$(TYPEDSIGNATURES)
 A UnicodePlots heatmap visualising the elements in a LowerTriangularMatrix.
@@ -41,17 +41,17 @@ function UnicodePlots.heatmap(L::LowerTriangularMatrix{T}; mode::Function=abs) w
 end
 
 """$(TYPEDSIGNATURES)
-A UnicodePlots heatmap visualising the data on an `AbstractGrid`.
+A UnicodePlots heatmap visualising the data of an `AbstractField`.
 General method that interpolates (from a reduced grid) onto a full grid
 so that it can be visualised as a matrix."""
-function UnicodePlots.heatmap(A::AbstractGrid; title::String="$(get_nlat(A))-ring $(typeof(A))")
+function UnicodePlots.heatmap(A::AbstractField2D; title::String="$(get_nlat(A))-ring $(typeof(A))")
     A_full = interpolate(full_grid_type(A), A.nlat_half, A)
     UnicodePlots.heatmap(A_full; title)
 end
 
 """$(TYPEDSIGNATURES)
 A UnicodePlots heatmap visualising the data on an `AbstractFullGrid`."""
-function UnicodePlots.heatmap(A::AbstractFullGrid; title::String="$(get_nlat(A))-ring $(typeof(A))")
+function UnicodePlots.heatmap(A::RingGrids.AbstractFullField2D; title::String="$(get_nlat(A))-ring $(typeof(A))")
 
     A_matrix = Matrix(A)
     nlon, nlat = size(A_matrix)
