@@ -16,7 +16,8 @@ import SpeedyWeather.SpeedyTransforms: _fourier!
 
 # Computes the scale for the adjoint/pullback of all discrete Fourier transforms. 
 function adjoint_scale(S::SpectralTransform)
-    (; nlat_half, nlons, rfft_plans) = S
+    (; nlons, rfft_plans) = S
+    (; nlat_half) = S.grid
     nfreqs = [rfft_plan.osz[1] for rfft_plan in rfft_plans] # TODO: This works with FFTW, but does it with cuFFT as well?
 
     scale = zeros(Int, maximum(nfreqs), 1, nlat_half) # the scratch memory is (Freq x lvl x lat), so we insert 
