@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Add Millenium and Century periods and allow conversion of Month and Year to seconds [#746](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/746)
 - LowerTriangularArray-preserving view [#739](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/739)
 - Array-agnostic LowerTriangularMatrix [#738](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/738)
 - Major rework of LowerTriangularArrays: Introduce Spectrum type, changes in indexing and constructors [#734](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/734)
