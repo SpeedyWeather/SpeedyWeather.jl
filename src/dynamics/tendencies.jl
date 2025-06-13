@@ -754,7 +754,7 @@ function SpeedyTransforms.transform!(
     kwargs...
 )    
     (; vor_grid, u_grid, v_grid ) = diagn.grid
-    vor = get_step(progn.vo, lf)    # relative vorticity at leapfrog step lf
+    vor = get_step(progn.vor, lf)   # relative vorticity at leapfrog step lf
     U = diagn.dynamics.a            # reuse work arrays for velocities in spectral
     V = diagn.dynamics.b            # U = u*coslat, V=v*coslat
     S = model.spectral_transform
