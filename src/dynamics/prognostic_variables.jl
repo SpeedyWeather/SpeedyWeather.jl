@@ -138,6 +138,7 @@ export PrognosticVariables
 end
 
 get_nsteps(progn::PrognosticVariables{T, A, S, G, nsteps}) where {T, A, S, G, nsteps} = nsteps
+Base.eltype(progn::PrognosticVariables{T}) where T = T
 
 """$(TYPEDSIGNATURES)
 Generator function."""

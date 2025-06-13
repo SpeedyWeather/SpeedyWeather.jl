@@ -21,8 +21,8 @@ function write_restart_file!(
     copyto!(progn.pres[1],  progn.pres[2])
 
     # bitround 1st leapfrog step to output precision
-    if T <: Base.IEEEFloat  # currently not defined for other formats...
-        round!(progn.vor[1],    7)  # hardcode some defaults for now
+    if eltype(progn) <: Base.IEEEFloat  # currently not defined for other formats...
+        round!(progn.vor[1],    7)      # hardcode some defaults for now
         round!(progn.div[1],    7)
         round!(progn.temp[1],  12)
         round!(progn.humid[1], 10)
