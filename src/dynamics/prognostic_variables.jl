@@ -130,26 +130,26 @@ export PrognosticVariables
 
     "Scaling for vor, div. scale=1 outside simulation, =radius during simulation"
     scale::Base.RefValue{NF} = Ref(one(NF))
-s
+
     "Clock that keeps track of time, number of timesteps to integrate for."
     clock::Clock = Clock()
 end
 
 Base.eltype(progn::PrognosticVariables{T}) where T = T
 
-function get_steps(specs::LowerTriangularArray{T, 2}) where T
-    nsteps = size(specs, 2)
-    return ntuple(i -> lta_view(specs, :, i), nsteps)
+function get_steps(coeffs::LowerTriangularArray{T, 2}) where T
+    nsteps = size(coeffs, 2)
+    return ntuple(i -> lta_view(coeffs, :, i), nsteps)
 end
 
-function get_steps(specs::LowerTriangularArray{T, 3}) where T
-    nsteps = size(specs, 3)
-    return ntuple(i -> lta_view(specs, :, :, i), nsteps)
+function get_steps(coeffs::LowerTriangularArray{T, 3}) where T
+    nsteps = size(coeffs, 3)
+    return ntuple(i -> lta_view(coeffs, :, :, i), nsteps)
 end
 
 export get_step
-get_step(specs::LowerTriangularArray{T, 2}, i) where T = lta_view(specs, :, i)
-get_step(specs::LowerTriangularArray{T, 3}, i) where T = lta_view(specs, :, :, i)
+get_step(coeffs::LowerTriangularArray{T, 2}, i) where T = lta_view(coeffs, :, i)
+get_step(coeffs::LowerTriangularArray{T, 3}, i) where T = lta_view(coeffs, :, :, i)
 
 """$(TYPEDSIGNATURES)
 Generator function."""
@@ -178,6 +178,8 @@ function Base.show(
     progn::PrognosticVariables{NF, ArrayType, SpectrumType, GridType},
 ) where {NF, ArrayType, SpectrumType, GridType}
     
+    NFspectral = eltype(progn.vor)
+
     # resolution
     (; spectrum, grid, nlayers, nlayers_soil, nparticles, nsteps) = progn
     trunc = truncation(spectrum)
@@ -187,12 +189,12 @@ function Base.show(
     tracer_names = [key for (key, value) in progn.tracers]
 
     println(io, "PrognosticVariables{$NF, $ArrayType}")
-    println(io, "├ vor:   T$trunc, $nlayers-layer, $nsteps-steps LowerTriangularArray{$NF}")
-    println(io, "├ div:   T$trunc, $nlayers-layer, $nsteps-steps LowerTriangularArray{$NF}")
-    println(io, "├ temp:  T$trunc, $nlayers-layer, $nsteps-steps LowerTriangularArray{$NF}")
-    println(io, "├ humid: T$trunc, $nlayers-layer, $nsteps-steps LowerTriangularArray{$NF}")
-    println(io, "├ pres:  T$trunc, 1-layer, $nsteps-steps LowerTriangularArray{$NF}")
-    println(io, "├ random_pattern: T$trunc, 1-layer LowerTriangularArray{$NF}")
+    println(io, "├ vor:   T$trunc, $nlayers-layer, $nsteps-steps LowerTriangularArray{$NFspectral}")
+    println(io, "├ div:   T$trunc, $nlayers-layer, $nsteps-steps LowerTriangularArray{$NFspectral}")
+    println(io, "├ temp:  T$trunc, $nlayers-layer, $nsteps-steps LowerTriangularArray{$NFspectral}")
+    println(io, "├ humid: T$trunc, $nlayers-layer, $nsteps-steps LowerTriangularArray{$NFspectral}")
+    println(io, "├ pres:  T$trunc, 1-layer, $nsteps-steps LowerTriangularArray{$NFspectral}")
+    println(io, "├ random_pattern: T$trunc, 1-layer LowerTriangularArray{$NFspectral}")
     println(io, "├┐ocean: PrognosticVariablesOcean{$NF}")
     println(io, "│├ sea_surface_temperature:  Field{$NF} on $nlat-ring $Grid")
     println(io, "│├ sea_ice_concentration:    Field{$NF} on $nlat-ring $Grid")

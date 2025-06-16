@@ -7,10 +7,8 @@ function scale!(
     var::Symbol,
     scale::Real,
 )
-    variable_nsteps = getfield(progn, var)
-    for step in variable_nsteps
-        step .*= scale
-    end
+    var = getfield(progn, var)
+    var .*= scale
 end
 
 """
@@ -33,6 +31,7 @@ the Earth's radius which is used in the dynamical core."""
 function scale!(progn::PrognosticVariables,
                 diagn::DiagnosticVariables,
                 scale::Real)
+                
     new_scale = scale/progn.scale[]     # undo previous scale and new scale in one go
     scale!(progn, :vor, new_scale)
     scale!(progn, :div, new_scale)
