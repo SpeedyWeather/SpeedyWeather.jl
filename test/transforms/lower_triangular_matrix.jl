@@ -258,7 +258,7 @@ end
 end
 
 # only needed when the extension isn't loaded
-# LowerTriangularArrays.nonparametric_type(::Type{<:JLArray}) = JLArray
+LowerTriangularArrays.nonparametric_type(::Type{<:JLArray}) = JLArray
 
 @testset "Zeros, ones, rand, and randn constructors" begin
     for f in (ones, zeros, rand, randn)

@@ -474,7 +474,7 @@ end
 end
 
 # needed when extension is not loaded (manual testing)
-# RingGrids.nonparametric_type(::Type{<:JLArray}) = JLArray
+RingGrids.nonparametric_type(::Type{<:JLArray}) = JLArray
 
 @testset "AbstractField: GPU (JLArrays)" begin 
     NF = Float32

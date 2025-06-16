@@ -716,6 +716,8 @@ LowerTriangularGPUStyle{N, ArrayType, S}(::Val{M}) where {N, ArrayType, S, M} =
 
 # also needed for other array types
 nonparametric_type(::Type{<:Array}) = Array
+
+# nonparametric_type for a SubArray is the arraytype it is viewing. Needed to construct new arrays from SubArrays!
 nonparametric_type(::Type{<:SubArray{T, N, A}}) where {T, N, A} = nonparametric_type(A)
 
 "`L = find_L(Ls)` returns the first LowerTriangularArray among the arguments. 
