@@ -78,7 +78,7 @@ function UnicodePlots.heatmap(A::AbstractFullGrid; title::String="$(get_nlat(A))
 end
 
 # add a method for Simulation when the extension is loaded to trigger a unicodeplot after run!(simulation)
-SpeedyWeather.unicodeplot(simulation::AbstractSimulation) = 
+SpeedyWeather.unicodeplot(simulation::SpeedyWeather.AbstractSimulation) = 
     UnicodePlots.heatmap(simulation.diagnostic_variables.grid.vor[:, end], title="Surface vorticity [1/s]")
 
 end # module
