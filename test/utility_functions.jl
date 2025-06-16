@@ -74,10 +74,7 @@ end
     @test Day(Year(1)) == Day(365)
     @test Second(Month(1)) == Second(30 * 24 * 60 * 60)
     @test Day(Month(1)) == Day(30)
-    # Test warnings
-    @test_logs (:warn, "Month is assumed to be approximately equal to 30 days. Use Minute, Hour, or Day otherwise.") Second(Month(1))
-    @test_logs (:warn, "Year is assumed to be approximately equal to 365 days. Use Minute, Hour, Day, or Month otherwise.") Second(Year(1))
-    # Century    @test_logs (:warn, "Month is assumed to be approximately equal to 30 days. Use Minute, H    @test_logs (:warn, "Month is assumed to be approximately equal to 30 days. Use Minute, Hour, or Day otherwise.") Second(Month(1))ur, or Day otherwise.") Second(Month(1))
+    # Century
     @test convert(Year, Century(1)) == Year(100)
     @test Century(1) == Year(100)
     @test Second(Century(1)) == Second(100 * 365 * 24 * 60 * 60)
