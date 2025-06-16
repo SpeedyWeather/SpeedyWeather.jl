@@ -44,7 +44,7 @@ as the first point is not at 0˚E.
     that is used in the Legendre transfrom in the same way as *Gaussian*
     refers to the [Gaussian quadrature](https://en.wikipedia.org/wiki/Gaussian_quadrature).
 
-## Supported grids
+## Implemented grids
 
 All grids in SpeedyWeather.jl are a subtype of `AbstractGrid`, i.e. `<: AbstractGrid`. We further distinguish
 between _full_, and _reduced_ grids. Full grids have the same number of longitude points on every latitude
