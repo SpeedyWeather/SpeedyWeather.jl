@@ -194,12 +194,14 @@ function Base.convert(::Type{Dates.Second}, y::Dates.Year)
 end
 
 # additional century conversions
+Base.convert(::Type{Millisecond}, c::Century) = Millisecond(Second(c))
 Base.convert(::Type{Second}, c::Century) = Second(Year(c))
 Base.convert(::Type{Hour}, c::Century) = Hour(Year(c))
 Base.convert(::Type{Day}, c::Century) = Day(Year(c))
 Base.convert(::Type{Month}, c::Century) = Month(Year(c))
 
 # additional month conversions
+Base.convert(::Type{Millisecond}, m::Millenium) = Millisecond(Second(m))
 Base.convert(::Type{Second}, m::Millenium) = Second(Year(m))
 Base.convert(::Type{Hour}, m::Millenium) = Hour(Year(m))
 Base.convert(::Type{Day}, m::Millenium) = Day(Year(m))
