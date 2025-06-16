@@ -10,7 +10,7 @@ section on [Grids](@ref). In brief, they include the regular latitude-longitude 
 the Gaussian latitudes and _reduced_ grids, meaning that they have a decreasing number
 of longitudinal points towards the poles to be more equal-area than _full_ grids.
 
-# Implemented grids
+# Defined grids
 
 RingGrids defines and exports the following grids, see also [Supported grids](@ref) for a
 more mathematical description.

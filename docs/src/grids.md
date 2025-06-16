@@ -384,7 +384,7 @@ number of longitude points is constant here)
 ```math
 \phi = \frac{\pi}{2N_{side}}(i - \frac{s}{2}), \quad s = (j - N_{side} + 1) \mod 2
 ```
-The modulo function comes in as there is an alternating longitudinal offset from the prime meridian (see [Supported grids](@ref)).
+The modulo function comes in as there is an alternating longitudinal offset from the prime meridian (see [Implemented grids](@ref)).
 For the southern hemisphere the grid point locations can be obtained by mirror symmetry.
 
 ### Grid cell boundaries
