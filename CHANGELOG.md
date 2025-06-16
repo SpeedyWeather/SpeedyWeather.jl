@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Add Millenium and Century periods and allow conversion of Month and Year to seconds [#746](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/746)
+- git-auto-commit-action v6 [#747](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/747)
 - Makie v0.23 compatibility [#743](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/743)
 - LowerTriangularArray-preserving view [#739](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/739)
 - Array-agnostic LowerTriangularMatrix [#738](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/738)
