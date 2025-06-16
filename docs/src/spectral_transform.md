@@ -2,7 +2,7 @@
 
 The following sections outline the implementation of the spherical harmonic transform (in short _spectral_ transform)
 between the coefficients of the spherical harmonics (the _spectral_ space) and the grid space which can be any of the
-[Supported grids](@ref) as defined by [RingGrids](@ref). This includes the classical full
+[Implemented grids](@ref) as defined by [RingGrids](@ref). This includes the classical full
 [Gaussian grid](https://confluence.ecmwf.int/display/FCST/Gaussian+grids), a regular longitude-latitude grid called
 the full Clenshaw grid ([FullClenshawGrid](@ref FullClenshawGrid)), ECMWF's octahedral Gaussian grid[^Malardel2016],
 and HEALPix grids[^Gorski2004].
