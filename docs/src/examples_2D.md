@@ -222,7 +222,10 @@ after all!
 How this may change when we add mountains (we had `NoOrography` above!), say Earth's orography, you may ask?
 Let's try it out! We create an `EarthOrography` struct like so
 
-```@example galewsky_setup
+```@example galewsky_setup2
+using SpeedyWeather # hide
+spectral_grid = SpectralGrid(trunc=63, nlayers=1) # hide
+initial_conditions = ZonalJet() # hide                    
 orography = EarthOrography(spectral_grid)
 ```
 
@@ -230,7 +233,7 @@ It will read the orography from file as shown (only at `initialize!(model)`), an
 options too, but let's not change them. Same as before, create a model, initialize into a simulation, run.
 This time directly for 12 days so that we can compare with the last plot
 
-```@example galewsky_setup
+```@example galewsky_setup2
 model = ShallowWaterModel(spectral_grid; orography, initial_conditions)
 simulation = initialize!(model)
 run!(simulation, period=Day(12), output=true)
@@ -239,11 +242,12 @@ run!(simulation, period=Day(12), output=true)
 This time the run got a new run id, which you see in the progress bar, but can again always check
 after the `run!` call (the automatic run id is only determined just before the main time loop starts)
 with `model.output.id`, but otherwise we do as before.
-```@example galewsky_setup
+```@example galewsky_setup2
 id = model.output.id
 ```
 
-```@example galewsky_setup
+```@example galewsky_setup2
+using NCDatasets
 ds = NCDataset("run_$id/output.nc")
 ```
 
@@ -251,7 +255,7 @@ While you could plot the [NetCDF output](@ref) manually as before,
 we'll be plotting directly from the current state of the `simulation` using
 the Makie extension
 
-```@example galewsky_setup
+```@example galewsky_setup2
 using CairoMakie
 vor = simulation.diagnostic_variables.grid.vor_grid[:, 1]   # 1 to index surface
 heatmap(vor, title="Relative vorticity [1/s]")
