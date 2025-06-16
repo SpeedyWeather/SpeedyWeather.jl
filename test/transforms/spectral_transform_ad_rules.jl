@@ -39,16 +39,16 @@ end
                 if !(grid_type <: AbstractReducedGrid) & fd_tests[i_grid]
                     spectral_grid = SpectralGrid(Grid=grid_type, nlayers=1, trunc=5, dealiasing=grid_dealiasing[i_grid])
                     S = SpectralTransform(spectral_grid)
-                    grid = rand(spectral_grid.NF, spectral_grid.grid, spectral_grid.nlayers)
+                    field = rand(spectral_grid.NF, spectral_grid.grid, spectral_grid.nlayers)
                     f_north = S.scratch_memory_north
                     f_south = S.scratch_memory_south
 
                     # forward transform 
-                    test_reverse(SpeedyWeather.SpeedyTransforms._fourier!, Const, (f_north, Duplicated), (f_south, Duplicated), (grid, Duplicated), (S, Const); fdm=FiniteDifferences.central_fdm(5, 1), rtol=1e-2, atol=1e-2)
+                    test_reverse(SpeedyWeather.SpeedyTransforms._fourier!, Const, (f_north, Duplicated), (f_south, Duplicated), (field, Duplicated), (S, Const); fdm=FiniteDifferences.central_fdm(5, 1), rtol=1e-2, atol=1e-2)
 
                     # inverse transform
-                    grid = zero(grid)
-                    test_reverse(SpeedyWeather.SpeedyTransforms._fourier!, Const, (grid, Duplicated), (f_north, Duplicated), (f_south, Duplicated), (S, Const); fdm=FiniteDifferences.central_fdm(5, 1), rtol=1e-2, atol=1e-2)
+                    field = zero(field)
+                    test_reverse(SpeedyWeather.SpeedyTransforms._fourier!, Const, (field, Duplicated), (f_north, Duplicated), (f_south, Duplicated), (S, Const); fdm=FiniteDifferences.central_fdm(5, 1), rtol=1e-2, atol=1e-2)
                 end 
             end
         end
