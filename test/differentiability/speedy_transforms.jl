@@ -11,41 +11,43 @@ fd_tests = [true, true]
         S = SpectralTransform(spectral_grid)
         dS = deepcopy(S)
 
+        (; NF, grid, spectrum, nlayers) = spectral_grid
+
         if fd_tests[i_grid]
             
             # forwards 
-            grid = rand(spectral_grid.Grid{spectral_grid.NF}, spectral_grid.nlat_half, spectral_grid.nlayers)
-            dgrid = zero(grid)
-            specs = zeros(LowerTriangularArray{Complex{spectral_grid.NF}}, spectral_grid.trunc+2, spectral_grid.trunc+1, spectral_grid.nlayers)
+            field = rand(NF, grid, nlayers)
+            dfield = zero(field)
+            specs = zeros(complex(NF), spectrum, nlayers)
             
             # seed
             dspecs = zero(specs)
             fill!(dspecs, 1+1im)
 
-            autodiff(Reverse, transform!, Const, Duplicated(specs, dspecs), Duplicated(grid, dgrid), Duplicated(S, dS))
+            autodiff(Reverse, transform!, Const, Duplicated(specs, dspecs), Duplicated(field, dfield), Duplicated(S, dS))
 
             # new seed
             dspecs2 = zero(specs)
             fill!(dspecs2, 1+1im)
 
             # finite difference comparision, seeded with a one adjoint to get the direct gradient
-            fd_vjp = FiniteDifferences.j′vp(central_fdm(5,1), x -> transform(x, S), dspecs2, grid)
+            fd_vjp = FiniteDifferences.j′vp(central_fdm(5,1), x -> transform(x, S), dspecs2, field)
             @test isapprox(dgrid, fd_vjp[1])
 
             ## now backwards, as the input for spec we use the output of the forward transform
 
             fill!(dspecs,0)
-            grid = zeros(spectral_grid.Grid{spectral_grid.NF}, spectral_grid.nlat_half, spectral_grid.nlayers)
-            dgrid = similar(grid)
+            field = zeros(NF, grid, nlayers)
+            dfield = similar(field)
             fill!(dgrid, 1)
 
-            autodiff(Reverse, transform!, Const, Duplicated(grid, dgrid), Duplicated(specs, dspecs), Duplicated(S, dS))
+            autodiff(Reverse, transform!, Const, Duplicated(field, dfield), Duplicated(specs, dspecs), Duplicated(S, dS))
 
             # new seed 
-            dgrid2 = similar(grid)
-            fill!(dgrid2, 1)
+            dfield2 = similar(field)
+            fill!(dfield2, 1)
 
-            fd_vjp = FiniteDifferences.j′vp(central_fdm(5,1), x -> transform(x, S), dgrid2, specs)
+            fd_vjp = FiniteDifferences.j′vp(central_fdm(5,1), x -> transform(x, S), dfield2, specs)
 
             @test isapprox(dspecs, fd_vjp[1])
         end 
@@ -53,37 +55,37 @@ fd_tests = [true, true]
         # test that d S^{-1}(S(x)) / dx = dx/dx = 1 (starting in both domains) 
         # this only holds for exact transforms, like Gaussian grids 
 
-        # start with grid (but with a truncated one)
-        function transform_identity!(x_out::AbstractField, x::AbstractField, S::SpectralTransform{T}) where T
-            x_SH = zeros(LowerTriangularArray{Complex{T}}, S.lmax+1, S.mmax+1, S.nlayers)
+        # start with field (but with a truncated one)
+        function transform_identity!(x_out::AbstractField, x::AbstractField, S::SpectralTransform{NF}) where NF
+            x_SH = zeros(complex(NF), S.spectrum, S.nlayers)
             transform!(x_SH, x, S)
             transform!(x_out, x_SH, S)
             return nothing
         end 
 
-        function transform_identity(x::AbstractField, S::SpectralTransform{T}) where T
+        function transform_identity(x::AbstractField, S::SpectralTransform)
             x_copy = deepcopy(x)
             transform_identity!(x_copy, x, S) 
             return x_copy
         end
         
-        grid = rand(S.Grid{spectral_grid.NF}, S.nlat_half, S.nlayers)
-        spec = transform(grid, S)
+        field = rand(NF, grid, nlayers)
+        spec = transform(field, S)
 
-        grid = transform(spec, S)
-        grid_out = zero(grid)
+        field = transform(spec, S)
+        field_out = zero(field)
         
-        transform_identity!(grid_out, grid, S)
-        @test isapprox(grid, grid_out)
+        transform_identity!(field_out, field, S)
+        @test isapprox(field, field_out)
 
-        dgrid = similar(grid)
-        fill!(dgrid, 1)
+        dfield = similar(field)
+        fill!(dfield, 1)
 
-        dgrid_out = zero(grid_out)
+        dfield_out = zero(field_out)
 
-        autodiff(Reverse, transform_identity!, Const, Duplicated(grid_out, dgrid_out), Duplicated(grid, dgrid), Duplicated(S, dS))
+        autodiff(Reverse, transform_identity!, Const, Duplicated(field_out, dfield_out), Duplicated(field, dfield), Duplicated(S, dS))
 
-        @test all(isapprox.(dgrid, 1)) 
+        @test all(isapprox.(dfield, 1)) 
         # TODO: previously this test was broken, with a version that directly mutates in-place. 
         # FD yields the same non-one values though. 
         # Not sure why. Do we use such things in our model? 
@@ -98,19 +100,19 @@ fd_tests = [true, true]
         #dgrid2 = similar(grid)
         #fill!(dgrid2, 1)
         #fd_vjp = FiniteDifferences.j′vp(central_fdm(5,1), x -> transform_identity(x, S), dgrid2, grid)
-        #@test isapprox(dgrid, fd_vjp[1], rtol=0.01)
+        #@test isapprox(dfield, fd_vjp[1], rtol=0.01)
 
         # now start with spectral space, exclude for other grid because of https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/626
         if fd_tests[i_grid]
 
-            function transform_identity!(x::LowerTriangularArray{Complex{T}}, S::SpectralTransform{T}) where T
-                x_grid = zeros(S.Grid{T}, S.nlat_half, S.nlayers)
+            function transform_identity!(x::LowerTriangularArray, S::SpectralTransform{NF}) where NF
+                x_grid = zeros(NF, S.grid, S.nlayers)
                 transform!(x_grid, x, S)
                 transform!(x, x_grid, S)
                 return nothing
             end 
 
-            spec = transform(grid, S)
+            spec = transform(field, S)
             spec_copy = deepcopy(spec)
             transform_identity!(spec, S)
             @test isapprox(spec, spec_copy)
