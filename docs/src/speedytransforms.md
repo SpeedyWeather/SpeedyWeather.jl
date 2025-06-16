@@ -57,7 +57,7 @@ map = transform(alms)
 By default, the `transforms` transforms onto a [`FullGaussianGrid`](@ref FullGaussianGrid) unravelled here
 into a vector west to east, starting at the prime meridian, then north to south, see [RingGrids](@ref).
 We can visualize `map` quickly with a UnicodePlot via `heatmap` (see [Visualising Fields](@ref)),
-or alternatively in higher quality after `using CairoMakie` or `usin GLMakie`, see
+or alternatively in higher quality after `using CairoMakie` or `using GLMakie`, see
 [Visualisation via Makie](@ref) too
 
 ```@example speedytransforms

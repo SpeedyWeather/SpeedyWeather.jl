@@ -41,23 +41,24 @@ to a `Matrix` (i.e. they are *rectangular* grids) but not the `OctahedralGaussia
 
 ## Grid versus Field
 
-With "grid" we mean the discretization (or tesselation given that we are tiling a space with polygons)
-of a space, in our case the sphere, only. In that sense a grid does not contain any data it purely
-describes the location of grid cells. Grids in RingGrids are identified by their name, e.g.
+With "grid" we mean the discretization of space. Also called tesselation given that we are tiling
+a space with polygons, we subdivide the sphere into grid cells, with vertices, faces and centres.
+In that sense, a grid does not contain any data it purely describes the location of grid cells.
+Grids in RingGrids are identified by their name, e.g.
 FullGaussianGrid, and a resolution parameter where we use `nlat_half` (the number of latitudes
 on one hemisphere, Equator included) for all grids. This is because some grids have an even number
 some an odd number number of latitudes so not all `nlat` are valid, but all `nlat_half` are.
 While an instance of a grid stores some precomputed arrays to facilitate faster indexing
 it does not store coordinates and similar grid information, these can be recomputed on the fly
 whenever needed given a grid. All grids are considered to be two-dimensional, so they do not
-contain information about the vertical for example. The horizontal grid points are unravelled into
+contain information about the vertical or time, for example. The horizontal grid points are unravelled into
 a vector, starting at 0˚E at the north pole, going first east, then ring by ring to the south pole.
 
 Data on a grid is called a `Field`, many variables, like temperature are a field. Surface temperature
 would be a 2D field (though represented as a vector), temperature on several vertical layers of
 the atmosphere would be 3D (data represented as a matrix, horizontal x vertical), including
 time would make it 4D. Several fields can share the same grid. Given that the grid is always
-two dimensional, a 2D and 3D field can also share the same grid, leaving the 3rd dimension
+two-dimensional, a 2D and 3D field can also share the same grid, leaving the 3rd dimension
 not further specified for flexibility. 
 
 ## Creating a grid

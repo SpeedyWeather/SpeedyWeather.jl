@@ -103,9 +103,9 @@ very neatly hourly output in the NetCDF file!
 ## Output grid
 
 Say we want to run the model at a given horizontal resolution but want to output on another resolution,
-the `NetCDFOutput` takes as argument `output_Grid::AbstractFullGrid`, any instance of a full grid
+the `NetCDFOutput` takes as argument `output_grid::AbstractFullGrid`, any instance of a full grid
 can be provided here.
-So for example `output_Grid=FullClenshawGrid(48)` would interpolate onto a
+So for example `output_grid=FullClenshawGrid(48)` would interpolate onto a
 regular 192x95 longitude-latitude grid of 1.875˚ resolution, regardless the grid and resolution used
 for the model integration.
 ```@example netcdf
@@ -132,7 +132,7 @@ Overview of the corresponding full grids
 | OctaHEALPixGrid | FullOctaHEALPixGrid |
 
 The grids `FullHEALPixGrid`, `FullOctaHEALPixGrid` share the same latitude rings as their reduced grids,
-but have always as many longitude points as they are at most around the equator. These grids are not
+but have always as many longitude points as there are around the equator. These grids are not
 tested in the dynamical core (but you may use them experimentally) and mostly designed for output purposes.
 
 ## Output variables
