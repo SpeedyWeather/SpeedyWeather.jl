@@ -302,7 +302,7 @@ function implicit_correction!(
     # geopotential and linear pressure gradient (divergence equation) are already evaluated at i-1
     # so is the -D̄ term for surface pressure in tendencies!
     (; temp_tend) = diagn.tendencies
-    div_old, div_new = progn.div    # divergence at i-1 (old), i (new, i.e. current)
+    div_old, div_new = get_steps(progn.div)     # divergence at i-1 (old), i (new, i.e. current)
 
     for k in eachmatrix(temp_tend, div_old, div_new)
         for r in eachmatrix(temp_tend, div_old, div_new)
