@@ -143,8 +143,9 @@ end
             S = SpectralTransform(spectral_grid, one_more_degree=true)
             dS = deepcopy(S)
 
-            u_grid = rand(spectral_grid.Grid{spectral_grid.NF}, spectral_grid.nlat_half, spectral_grid.nlayers)
-            v_grid = rand(spectral_grid.Grid{spectral_grid.NF}, spectral_grid.nlat_half, spectral_grid.nlayers)
+            (; NF, grid, spectrum, nlayers) = spectral_grid
+            u_grid = rand(NF, grid, nlayers)
+            v_grid = rand(NF, grid, nlayers)
 
             u = transform(u_grid, S)
             v = transform(v_grid, S)
@@ -197,13 +198,13 @@ end
             # It's because it's the adjoint (')? And this matters here for complex numbers
             # To-Do: double check that
             for i=1:du.n
-                @test all(Array(du[:,1])[i:du.m-1,i] .≈ complex(i-1,-(i-1)))
+                @test all(Array(du[:, 1])[i:du.m-1, i] .≈ complex(i-1, -(i-1)))
             end 
 
             ddiv2 = zero(ddiv)
             fill!(ddiv2, 1 + 1im)
 
-            fd_vjp = FiniteDifferences.j′vp(central_fdm(5,1), x -> divergence(x[1],x[2], S), ddiv2, (u, v))
+            fd_vjp = FiniteDifferences.j′vp(central_fdm(5,1), x -> divergence(x[1], x[2], S), ddiv2, (u, v))
             @test isapprox(du, fd_vjp[1][1])
             @test isapprox(dv, fd_vjp[1][2])
             @test sum(du) != 0 # nonzero gradient
@@ -245,11 +246,11 @@ end
             v = zero(v)
             dv = fill!(dv, 1+1im)
 
-            vor_grid = rand(spectral_grid.Grid{spectral_grid.NF}, spectral_grid.nlat_half, spectral_grid.nlayers)
+            vor_grid = rand(NF, grid, nlayers)
             vor = transform(vor_grid, S)
             dvor = zero(vor)
 
-            div_grid = rand(spectral_grid.Grid{spectral_grid.NF}, spectral_grid.nlat_half, spectral_grid.nlayers)
+            div_grid = rand(NF, grid, nlayers)
             div = transform(vor_grid, S)
             ddiv = zero(vor)
 
@@ -265,9 +266,9 @@ end
             uv_input = zero(uv_input)
             duv_input = fill!(duv_input, 1+im)
 
-            fd_vjp = FiniteDifferences.j′vp(central_fdm(5,1), x-> uvfromvordiv(x[1], x[2], S), duv_input, (vor, div))
-            @test isapprox(dvor, fd_vjp[1][1][:,1]) 
-            @test isapprox(ddiv, fd_vjp[1][2][:,1])
+            fd_vjp = FiniteDifferences.j′vp(central_fdm(5, 1), x-> uvfromvordiv(x[1], x[2], S), duv_input, (vor, div))
+            @test isapprox(dvor, fd_vjp[1][1][:, 1]) 
+            @test isapprox(ddiv, fd_vjp[1][2][:, 1])
             @test sum(dvor) != 0 # nonzero gradient
             @test sum(ddiv) != 0 # nonzero gradient
 
@@ -282,13 +283,13 @@ end
             dres_∇2 = zero(res_∇)
             fill!(dres_∇2, 1+im)
 
-            fd_vjp = FiniteDifferences.j′vp(central_fdm(5,1), x-> ∇²(x, S), dres_∇2, vor)
+            fd_vjp = FiniteDifferences.j′vp(central_fdm(5, 1), x-> ∇²(x, S), dres_∇2, vor)
             @test sum(dvor) != 0 # non-zero 
             @test isapprox(dvor, fd_vjp[1]) # and identical with FD
 
             # test with the eigenvalues saved in S, result should just be seed * eigenvalues
             for i=1:(vor.m-1)
-                @test all(isapprox.(Array(dvor[:,1])[i,1:i], S.eigenvalues[i] * (1+im)))
+                @test all(isapprox.(Array(dvor[:, 1])[i, 1:i], S.eigenvalues[i] * (1+im)))
             end 
 
             # ∇
@@ -309,7 +310,7 @@ end
             dzonal_gradient2 = zero(dzonal_gradient)
             fill!(dzonal_gradient2, 1+im)
 
-            fd_vjp = FiniteDifferences.j′vp(central_fdm(5,1), x-> ∇(x, S), (dmerid_gradient2, dzonal_gradient2), vor)
+            fd_vjp = FiniteDifferences.j′vp(central_fdm(5, 1), x-> ∇(x, S), (dmerid_gradient2, dzonal_gradient2), vor)
             @test sum(dvor) != # nonzero 
             @test isapprox(dvor, fd_vjp[1]) # and identical with FD
         end 
