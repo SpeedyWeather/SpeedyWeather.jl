@@ -103,6 +103,8 @@ Convenience time type representing a 100-year period.
 """
 struct Century <: Period
     value::Int64
+    # override default untyped constructor
+    Century(value::Int64) = new(value)
 end
 
 Dates._units(m::Century) = m.value == 1 ? " century" : " centuries"
@@ -124,6 +126,8 @@ Convenience time type representing a 1000-year period.
 """
 struct Millenium <: Period
     value::Int64
+    # override default untyped constructor
+    Millenium(value::Int64) = new(value)
 end
 
 Dates._units(m::Millenium) = m.value == 1 ? " millenium" : " millenia"
