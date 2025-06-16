@@ -73,8 +73,13 @@ end
     # Pirated conversions for month and year
     @test Second(Year(1)) == Second(365 * 24 * 60 * 60)
     @test Day(Year(1)) == Day(365)
+    @test Hour(Year(1)) == Hour(Second(Year(1)))
+    @test Minute(Year(1)) == Minute(Second(Year(1)))
     @test Second(Month(1)) == Second(30 * 24 * 60 * 60)
+    @test Millisecond(Year(1)) == Millisecond(Second(Year(1)))
     @test Day(Month(1)) == Day(30)
+    @test Minute(Month(1)) == Minute(Second(Month(1)))
+    @test Millisecond(Month(1)) == Millisecond(Second(Month(1)))
     @test_throws MethodError Week(Month(1))
 
     # Century
