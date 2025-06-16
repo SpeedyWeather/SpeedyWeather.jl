@@ -242,7 +242,7 @@ run!(simulation, period=Day(12), output=true)
 This time the run got a new run id, which you see in the progress bar, but can again always check
 after the `run!` call (the automatic run id is only determined just before the main time loop starts)
 with `model.output.id`, but otherwise we do as before.
-```@example galewsky_setup
+```@example galewsky_setup2
 id = model.output.id
 ```
 
