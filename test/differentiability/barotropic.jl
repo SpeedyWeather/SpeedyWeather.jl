@@ -185,7 +185,7 @@
         return diag_copy
     end 
 
-    fd_vjp = FiniteDifferences.j′vp(central_fdm(5,1), x -> transform_diagn(diag_copy, x, lf2, model), ddiag_copy, progn_copy)
+    fd_vjp = FiniteDifferences.j′vp(central_fdm(12,1), x -> transform_diagn(diag_copy, x, lf2, model), ddiag_copy, progn_copy)
     
     @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dprogn)[1],rtol=1e-2,atol=1e-2))
 end
