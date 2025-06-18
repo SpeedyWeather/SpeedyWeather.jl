@@ -15,7 +15,7 @@ function Base.show(io::IO, A::AbstractDiagnosticVariables)
             s = Base.dims2string(size(val))*", $nlat-ring $Grid{$NF}"
         elseif T <: LowerTriangularArray
             NF = first_parameter(T)
-            trunc = val.n - 1
+            trunc = truncation(val.spectrum)
             s = Base.dims2string(size(val, as=Matrix))*", T$trunc LowerTriangularArray{$NF}"
         else
             s = "$T"
