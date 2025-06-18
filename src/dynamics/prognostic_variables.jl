@@ -148,10 +148,18 @@ function get_steps(coeffs::LowerTriangularArray{T, 3}) where T
 end
 
 export get_step
-get_step(coeffs::LowerTriangularArray{T, 2}, i) where T = lta_view(coeffs, :, i)
-get_step(coeffs::LowerTriangularArray{T, 3}, i) where T = lta_view(coeffs, :, :, i)
 
-get_nsteps(progn::PrognosticVariables{T, A, S, G, nsteps}) where {T, A, S, G, nsteps} = nsteps
+"""$(TYPEDSIGNATURES)
+Get the i-th step of a LowerTriangularArray as a view (wrapped into a LowerTriangularArray).
+"step" refers to the last dimension, for prognostic variables used for the leapfrog time step.
+This method is for a 2D spectral variable (horizontal only) with steps in the 3rd dimension."""
+get_step(coeffs::LowerTriangularArray{T, 2}, i) where T = lta_view(coeffs, :, i)
+
+"""$(TYPEDSIGNATURES)
+Get the i-th step of a LowerTriangularArray as a view (wrapped into a LowerTriangularArray).
+"step" refers to the last dimension, for prognostic variables used for the leapfrog time step.
+This method is for a 3D spectral variable (horizontal+vertical) with steps in the 4rd dimension."""
+get_step(coeffs::LowerTriangularArray{T, 3}, i) where T = lta_view(coeffs, :, :, i)
 
 """$(TYPEDSIGNATURES)
 Generator function."""
