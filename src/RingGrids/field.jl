@@ -99,36 +99,64 @@ Base.fill!(field::AbstractField, x) = fill!(field.data, x)
 
 # make [:, k...] not escape the Field
 @inline Base.getindex(field::AbstractField, col::Colon, k...) = Field(field.data[col, k...], field.grid)
-@inline eachring(field::AbstractField) = eachring(field.grid)
 
+# ITERATORS
+
+"""$(TYPEDSIGNATURES)
+Return an iterator over the rings of a field. These are precomputed ranges like [1:20, 21:44, ...] stored
+in `field.grid.rings`. Every element are the unravellend indices `ij` of all 2D grid points that lie on that ring.
+Intended use is like
+
+    for (j, ring) in enumerate(eachring(field))
+        for ij in ring
+            field[ij, k]
+            
+with `j` being the ring index. j=1 around the north pole, j=nlat_half around the Equator or just north of it (for even nlat_half).
+Several fields can be passed on to check for matching grids, e.g. for a 2D and a 3D field.
+If `horizontal_only` is set to `true`, the function will only check the horizontal dimension. """
 function eachring(field1::AbstractField, fields::AbstractField...; horizontal_only=true, kwargs...)
     fields_match(field1, fields...; horizontal_only, kwargs...) || throw(DimensionMismatch(field1, fields...))
     return eachring(field1)
 end
 
-# ITERATORS
+eachring(field::AbstractField) = eachring(field.grid)
 
 """$(TYPEDSIGNATURES)
-CartesianIndices for the 2nd to last dimension of an AbstractField,
-e.g. the vertical layer (or a time dimension, etc). To be used like
+CartesianIndices for the 2nd to last dimension of a field (or fields),
+e.g. the vertical layer (and possibly a time dimension, etc). E.g. for a Nx2x3 field,
+with `N` horizontal grid points k iterates over (1, 1) to (2, 3), meaning both the 2nd 
+and 3rd dimension. To be used like
 
     for k in eachlayer(field)
         for (j, ring) in enumerate(eachring(field))
             for ij in ring
-                field[ij, k]"""
-eachlayer(field::AbstractField) = CartesianIndices(size(field)[2:end])
-
-# several arguments to check for matching grids
+                field[ij, k]
+                
+With `vertical_only=true` (default) only checks whether the non-horizontal dimensions of the fields match.
+E.g. one can loop over two fields of each n layers on different grids."""
 function eachlayer(field1::AbstractField, fields::AbstractField...; vertical_only=true, kwargs...)
     fields_match(field1, fields...; vertical_only, kwargs...) || throw(DimensionMismatch(field1, fields...))
     return eachlayer(field1)
 end
 
-eachgridpoint(field::AbstractField) = eachgridpoint(field.grid)
+eachlayer(field::AbstractField) = CartesianIndices(size(field)[2:end])
+
+"""$(TYPEDSIGNATURES)
+Iterator over all 2D grid points of a field (or fields), i.e. the horizontal dimension only.
+Intended use is like    
+
+    for ij in eachgridpoint(field)
+        field[ij]
+        
+for a 2D field. For a 3D+ field, the iterator will only index and loop over the horizontal grid points.
+If `horizontal_only` is set to `true` (default), the function will only check whether the horizontal dimensions match.
+"""
 function eachgridpoint(field1::AbstractField, fields::AbstractField...; horizontal_only=true, kwargs...)
     fields_match(field1, fields...; horizontal_only, kwargs...) || throw(DimensionMismatch(field1, fields...))
     return eachgridpoint(field1)
 end
+
+eachgridpoint(field::AbstractField) = eachgridpoint(field.grid)
 
 ## CONSTRUCTORS
 
@@ -348,7 +376,6 @@ function (::Type{F})(
     return Field(data, grid)
 end
 
-# TODO is that all that's needed?
 function Base.convert(
     ::Type{F},
     field::AbstractField,

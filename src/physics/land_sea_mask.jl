@@ -1,7 +1,7 @@
 """
 Abstract super type for land-sea masks. Custom land-sea masks have to be defined as
 
-    CustomMask{NF<:AbstractFloat, GridVariable2D} <: AbstractLandSeaMask
+    CustomMask{NF, GridVariable2D} <: AbstractLandSeaMask
 
 and need to have at least a field called `mask::GridVariable2D` that uses a `GridVariable2D` as defined
 by the spectral grid object, so of correct size and with the number format `NF`.

@@ -1,5 +1,7 @@
 """A `FullHEALPixGrid` is like a `HEALPixGrid` but with every latitude ring having the same number of longitude
-points (a full grid). It shares the latitudes with the `HEALPixGrid` but uses the longitudes from the `FullGaussianGrid`
+points (a full grid). This grid is mostly defined for output to minimize the interpolation needed from a
+HEALPixGrid to a full grid. A `FullHEALPixGrid` has none of the equal-area properties of the `HEALPixGrid`.
+It only shares the latitudes with the `HEALPixGrid` but uses the longitudes from the `FullGaussianGrid`
 without offset, i.e. the first longitude point on every ring is at 0˚E.
 $(TYPEDFIELDS)"""
 struct FullHEALPixGrid{A, V, W} <: AbstractFullGrid{A}

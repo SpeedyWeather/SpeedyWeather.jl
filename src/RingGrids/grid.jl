@@ -1,6 +1,3 @@
-architecture_type(grid::AbstractGrid) = typeof(grid.architecture)
-architecture_type(::Type{<:AbstractGrid{Architecture}}) where Architecture = Architecture
-
 isreduced(::Type{<:AbstractGrid}) = true
 isreduced(::Type{<:AbstractFullGrid}) = false
 isreduced(grid) = isreduced(typeof(grid))

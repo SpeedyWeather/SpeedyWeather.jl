@@ -63,7 +63,8 @@ not further specified for flexibility.
 
 ## Creating a grid
 
-All grids are specified by name and the resolution parameter `nlat_half::Integer`, i.e. and instance
+All grids are specified by name and the resolution parameter `nlat_half::Integer` (number of latitude rings
+on one hemisphere, Equator included). An instance
 of a grid is simply created by
 
 ```@example ringgrids
@@ -111,7 +112,7 @@ field = HEALPixField{Float16}(undef, 2, 3)  # using Float16 as eltype
 
 A `field` has `field.data` (some `AbstractArray{T, N}`) and `field.grid` (some `AbstractGrid` as described above).
 The first dimension of `data` describes the horizontal as the grid points on every grid (full and reduced)
-are unravlled west to east then north to south, meaning that it starts at
+are unravelled west to east then north to south, meaning that it starts at
 90˚N and 0˚E then walks eastward for 360˚ before jumping on the next latitude ring further south,
 this way circling around the sphere till reaching the south pole. This may also be called _ring order_.
 
@@ -127,17 +128,22 @@ dimension is not unravelled into a vector, triggering a `reshape` internally, `i
 is the default. A full Gaussian grid has always ``2N`` x ``N`` grid points, but a `FullClenshawGrid`
 has ``2N`` x ``N-1``, if those dimensions don't match, the creation will throw an error.
 
-If you have the data and know which data it comes one you can also create
+If you have the data and know which grid it comes one you can also create
 a `Field` by providing both
 ```@example ringgrids
-data = randn(Float32, 8, 4)
-grid = OctaminimalGaussianGrid(1)
+data = randn(Float32, 8, 4)         # data of some shape
+grid = OctaminimalGaussianGrid(1)   # you need to know the nlat_half (here 1) of that grid!
 field = Field(data, grid)
 ```
-
-You can reshape the data of a full grid (which is representable as a matrix) as follows
+But you can also automatically let `nlat_half` be calculated from the shape of the data.
+Note that you have to provide the name of the field though, `FullGaussianField` here to
+create a `Field` on a `FullGaussianGrid`.
 ```@example ringgrids
-data = randn(Float32, 8, 4)
+field = FullGaussianField(data, input_as=Matrix)
+```
+To return to the original data array you can reshape the data of a full grid (which is representable as a matrix) as follows
+
+```@example ringgrids
 data == Matrix(FullGaussianField(data, input_as=Matrix))
 ```
 which in general is `Array(field, as=Vector)` for no reshaping (equivalent to `field.data`
@@ -160,8 +166,8 @@ field = randn(grid)
 heatmap(field)
 ```
 
-Reduced fields are automatically interpolated to the corresponding full fields so that they can be visualised as
-as matrix.
+Reduced fields are automatically interpolated to the corresponding full fields so that they can be visualised
+as a matrix.
 
 ## Indexing Fields
 
@@ -194,7 +200,7 @@ at that latitude and then loop over all in-ring indices `i` (changing longitudes
 Something similar can be done to scale/unscale with the cosine of latitude for example.
 
 We can always loop over all horizontal grid points with `eachgridpoint` and over every other dimensions
-with `eachlaye`, e.g. for 2D fields you can do
+with `eachlayer`, e.g. for 2D fields you can do
 ```@example ringgrids
 for ij in eachgridpoint(grid)
     field[ij]
@@ -204,9 +210,9 @@ or use `eachindex` instead. For 3D fields `eachindex` loops over all elements, i
 but `eachgridpoint` would only loop over the horizontal. To loop with an index `k` over all
 additional dimensions (vertical, time, ...) do
 ```@example ringgrids
-field = zeros(grid, 2, 3)   # 4D, 2D x 2 x 3
-for k in eachlayer(field)
-    for ij in eachgridpoint(field)
+field = zeros(grid, 2, 3)           # 4D, 2D defined by grid x 2 x 3
+for k in eachlayer(field)           # loop over 2 x 3
+    for ij in eachgridpoint(field)  # loop over 2D grid points
         field[ij, k]
     end
 end

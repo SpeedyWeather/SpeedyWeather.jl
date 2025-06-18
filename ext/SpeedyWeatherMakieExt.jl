@@ -18,7 +18,7 @@ end
 
 """
 $(TYPEDSIGNATURES)
-Defines Makie's `heatmap` function for a`field::AbstractFullField2D` which can be reshaped into a matrix."""
+Defines Makie's `heatmap` function for a `field::AbstractFullField2D` which can be reshaped into a matrix."""
 function Makie.heatmap(
     field::RingGrids.AbstractFullField2D;
     title::String = "$(RingGrids.get_nlat(field))-ring $(typeof(field))",
