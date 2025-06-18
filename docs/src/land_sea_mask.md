@@ -98,25 +98,25 @@ Every (custom) land-sea mask has to be a subtype of `AbstractLandSeaMask`.
 A custom land-sea mask has to be defined as a new type (`struct` or `mutable struct`)
 
 ```julia
-CustomMask{NF<:AbstractFloat, Grid<:AbstractGrid{NF}} <: AbstractLandSeaMask{NF, Grid}
+CustomMask{NF, GridVariable2D} <: AbstractLandSeaMask
 ```
 
-and needs to have at least a field called `mask::Grid` that uses a `Grid` as defined
-by the spectral grid object, so of correct size and with the number format `NF`.
+and needs to have at least a field called `mask::GridVariable2D` that uses a `GridVariable2D`
+as defined by the `SpectralGrid` object, so of correct size and with the number format `NF`.
 All `AbstractLandSeaMask` have a convenient generator function to be used like
 `mask = CustomMask(spectral_grid, option=argument)`, but you may add your own or customize by
-defining `CustomMask(args...)` which should return an instance of type `CustomMask{NF, Grid}`
-with parameters matching the spectral grid. Then the initialize function has to be extended for
-that new mask
+defining `CustomMask(args...)` which should return an uninitialised instance of that new type.
+Uninitialised meaning that for example all elements of the mask are zero.
+Then the initialize function has to be extended for that new mask
 
 ```julia
 initialize!(mask::CustomMask, model::PrimitiveEquation)
 ```
 
 which generally is used to tweak the mask.mask grid as you like, using
-any other options you have included in `CustomMask` as fields or anything else (preferably read-only,
-because this is only to initialize the land-sea mask, nothing else) from `model`. You can
-for example read something from file, set some values manually, or use coordinates from `model.geometry`.
+any other options you have included in `CustomMask` as fields or anything else.
+`model` should be preferably read-only, because this is only to initialize the land-sea mask, nothing else from `model`.
+You can for example read something from file, set some values manually, or use coordinates from `model.geometry`.
 
 ## Time-dependent land-sea mask
 
@@ -128,7 +128,7 @@ in all relevant model components. For example, we can define a callback that
 floods the entire planet at the beginning of the 21st century as
 
 ```@example landseamask
-Base.@kwdef struct MilleniumFlood <: SpeedyWeather.AbstractCallback
+@kwdef struct MilleniumFlood <: SpeedyWeather.AbstractCallback
     schedule::Schedule = Schedule(DateTime(2000,1,1))
 end
 

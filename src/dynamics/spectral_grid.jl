@@ -22,13 +22,14 @@ $(TYPEDFIELDS)
 `nlat_half` and `npoints` should not be chosen but are derived from `trunc`,
 `Grid` and `dealiasing`."""
 struct SpectralGrid{
-    SP,          # <: AbstractSpectrum
+    SP,         # <: AbstractSpectrum
+    Grid,       # <: AbstractGrid
 } <: AbstractSpectralGrid
 
     "[OPTION] number format used throughout the model"
     NF::Type{<:AbstractFloat}
 
-    "[OPTION] device archictecture to run on"
+    "[OPTION] device architecture to run on"
     device::AbstractDevice
 
     "[OPTION] array type to use for all variables"
@@ -59,9 +60,21 @@ struct SpectralGrid{
     "[DERIVED] Type of spectral variable in 4D (horizontal only + e.g. vertical and time, flattened into 3D array)"
     SpectralVariable4D::Type{<:AbstractArray}
     
-    # HORIZONTAL GRID
+    # SIZE OF GRID from trunc, Grid, dealiasing:
+    "[OPTION] how to match spectral with grid resolution: dealiasing factor, 1=linear, 2=quadratic, 3=cubic grid"
+    dealiasing::Float64
+    
+    "[DERIVED] number of latitude rings on one hemisphere (Equator incl)"
+    nlat_half::Int
+
+    "[DERIVED] number of latitude rings on both hemispheres"
+    nlat::Int
+
+    "[DERIVED] total number of grid points in the horizontal"
+    npoints::Int
+
     "[OPTION] horizontal grid used for calculations in grid-point space"
-    Grid::Type{<:AbstractGrid}
+    grid::Grid
 
     "[DERIVED] Type of grid variable in 2D (horizontal only, flattened into 1D vector)"
     GridVariable2D::Type{<:AbstractArray}
@@ -71,9 +84,6 @@ struct SpectralGrid{
     
     "[DERIVED] Type of grid variable in 4D (horizontal + e.g. vertical + time, flattened into 3D array)"
     GridVariable4D::Type{<:AbstractArray}
-
-    "[OPTION] how to match spectral with grid resolution: dealiasing factor, 1=linear, 2=quadratic, 3=cubic grid"
-    dealiasing::Float64
 
     # TODO move to planet?
     "[OPTION] radius of the sphere [m]"
@@ -86,16 +96,6 @@ struct SpectralGrid{
     "[DERIVED] ArrayType of particle vector"
     ParticleVector::Type{<:AbstractArray}
 
-    # SIZE OF GRID from trunc, Grid, dealiasing:
-    "[DERIVED] number of latitude rings on one hemisphere (Equator incl)"
-    nlat_half::Int
-
-    "[DERIVED] number of latitude rings on both hemispheres"
-    nlat::Int
-
-    "[DERIVED] total number of grid points in the horizontal"
-    npoints::Int
-
     # VERTICAL
     "[OPTION] number of vertical layers in the atmosphere"
     nlayers::Int
@@ -105,17 +105,18 @@ struct SpectralGrid{
 end
 
 function Base.show(io::IO, SG::SpectralGrid)
-    (; NF, trunc, Grid, radius, nlat, npoints, nlayers, nlayers_soil) = SG
+    (; NF, trunc, grid, radius, nlat, npoints, nlayers, nlayers_soil) = SG
     (; device, ArrayType) = SG
     (; nparticles) = SG
+    Grid = RingGrids.nonparametric_type(grid)
 
     # resolution information
     average_resolution = sqrt(4π*radius^2/npoints)/1000  # in [km]
     s(x) = x > 1000 ? @sprintf("%i", x) : @sprintf("%.3g", x)
 
-    println(io, "$(typeof(SG)):")
+    println(io, "SpectralGrid{Spectrum{...}, $Grid{...}}")
     println(io, "├ Spectral:   T$trunc LowerTriangularMatrix{Complex{$NF}}, radius = $radius m")
-    println(io, "├ Grid:       $nlat-ring $Grid{$NF}, $npoints grid points")
+    println(io, "├ Grid:       Field{$NF} on $nlat-ring $Grid, $npoints grid points")
     println(io, "├ Resolution: $(s(average_resolution))km (average)")
     nparticles > 0 &&
     println(io, "├ Particles:  $nparticles")
@@ -123,52 +124,58 @@ function Base.show(io::IO, SG::SpectralGrid)
       print(io, "└ Device:     $(typeof(device)) using $ArrayType")
 end
 
+# generate spectrum/grid based on trunc, Grid and dealiasing, use to create a SpectralGrid
+function SpectralGrid(;
+    trunc::Int = DEFAULT_TRUNC,
+    Grid::Type{<:AbstractGrid} = DEFAULT_GRID,
+    dealiasing::Real = 2,
+    kwargs...
+)
+    spectrum = Spectrum(trunc+2, trunc+1)           # defines the Spectral space
+    nlat_half = SpeedyTransforms.get_nlat_half(trunc, dealiasing)
+    grid = Grid(nlat_half)                          # defines the grid space
+    return SpectralGrid(spectrum, grid; kwargs...)
+end
+
 # Constructor that takes all [OPTION] parameters as keyword arguments
 # and calculates all derived fields
-function SpectralGrid(;
+function SpectralGrid(
+    spectrum::AbstractSpectrum,
+    grid::AbstractGrid;
     NF::Type{<:AbstractFloat} = DEFAULT_NF,
     device::AbstractDevice = DEFAULT_DEVICE,
     ArrayType::Type{<:AbstractArray} = default_array_type(device),
-    trunc::Int = DEFAULT_TRUNC,
-    Grid::Type{<:AbstractGrid} = DEFAULT_GRID,
-    dealiasing::Real = 2.0,
     radius::Real = DEFAULT_RADIUS,
     nparticles::Int = 0,
     nlayers::Int = DEFAULT_NLAYERS,
     nlayers_soil::Int = DEFAULT_NLAYERS_SOIL
 )
-    # Convert numeric parameters to Float64
-    dealiasing_f64 = Float64(dealiasing)
-    radius_f64 = Float64(radius)
+    trunc = spectrum.mmax - 1       # 0-based spectral truncation from orders of harmonics
+    (; nlat_half) = grid
+    nlat = RingGrids.get_nlat(grid)
+    npoints = RingGrids.get_npoints(grid)
+    dealiasing = SpeedyTransforms.get_dealiasing(trunc, nlat_half)
     
     # Calculate derived fields
     VectorType = ArrayType{NF, 1}
     MatrixType = ArrayType{NF, 2}
     TensorType = ArrayType{NF, 3}
     
-    # Spectral space
-    spectrum = Spectrum(trunc+2, trunc+1)
-    
     # Spectral variable types
     SpectralVariable2D = LowerTriangularArray{Complex{NF}, 1, ArrayType{Complex{NF}, 1}, typeof(spectrum)}
     SpectralVariable3D = LowerTriangularArray{Complex{NF}, 2, ArrayType{Complex{NF}, 2}, typeof(spectrum)}
     SpectralVariable4D = LowerTriangularArray{Complex{NF}, 3, ArrayType{Complex{NF}, 3}, typeof(spectrum)}
-    
+
     # Grid variable types
-    GridVariable2D = RingGrids.nonparametric_type(Grid){NF, 1, ArrayType{NF, 1}}
-    GridVariable3D = RingGrids.nonparametric_type(Grid){NF, 2, ArrayType{NF, 2}}
-    GridVariable4D = RingGrids.nonparametric_type(Grid){NF, 3, ArrayType{NF, 3}}
+    GridVariable2D = Field{NF, 1, ArrayType{NF, 1}, typeof(grid)}
+    GridVariable3D = Field{NF, 2, ArrayType{NF, 2}, typeof(grid)}
+    GridVariable4D = Field{NF, 3, ArrayType{NF, 3}, typeof(grid)}
     
     # Particle vector type
     ParticleVector = ArrayType{Particle{NF}, 1}
     
-    # Grid size calculations
-    nlat_half = SpeedyTransforms.get_nlat_half(trunc, dealiasing_f64)
-    nlat = RingGrids.get_nlat(Grid, nlat_half)
-    npoints = RingGrids.get_npoints(Grid, nlat_half)
-    
     # Create the SpectralGrid with all fields
-    return SpectralGrid{typeof(spectrum)}(
+    return SpectralGrid{typeof(spectrum), typeof(grid)}(
         NF,
         device,
         ArrayType,
@@ -180,23 +187,23 @@ function SpectralGrid(;
         SpectralVariable2D,
         SpectralVariable3D,
         SpectralVariable4D,
-        Grid,
-        GridVariable2D,
-        GridVariable3D,
-        GridVariable4D,
-        dealiasing_f64,
-        radius_f64,
-        nparticles,
-        ParticleVector,
+        dealiasing,
         nlat_half,
         nlat,
         npoints,
+        grid,
+        GridVariable2D,
+        GridVariable3D,
+        GridVariable4D,
+        radius,
+        nparticles,
+        ParticleVector,
         nlayers,
         nlayers_soil
     )
 end
 
-# also allow spectral grid to be passed on as first an only positional argument to model constructors
+# also allow spectral grid to be passed on as first and only positional argument to model constructors
 (M::Type{<:AbstractModel})(SG::SpectralGrid; kwargs...) = M(spectral_grid=SG; kwargs...)
 
 """$(TYPEDSIGNATURES)
@@ -204,10 +211,8 @@ Generator function for a SpectralTransform struct pulling in parameters from a S
 function SpeedyTransforms.SpectralTransform(spectral_grid::SpectralGrid;
                                             one_more_degree::Bool=true,
                                             kwargs...)
-    (; NF, Grid, spectrum, nlat_half, nlayers, ArrayType) = spectral_grid
-    if one_more_degree == false 
-        return SpectralTransform(NF, Spectrum(spectrum.lmax-1, spectrum.mmax), nlat_half; Grid, ArrayType, nlayers, kwargs...)
-    else 
-        return SpectralTransform(NF, spectrum, nlat_half; Grid, ArrayType, nlayers, kwargs...)
-    end 
+    (; NF, spectrum, grid, nlayers, ArrayType) = spectral_grid
+    (; lmax, mmax, architecture) = spectrum
+    spectrum = one_more_degree == false ? Spectrum(lmax-1, mmax; architecture) : spectrum
+    return SpectralTransform(spectrum, grid; NF, ArrayType, nlayers, kwargs...)
 end

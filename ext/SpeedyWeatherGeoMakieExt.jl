@@ -4,18 +4,18 @@ using SpeedyWeather
 using GeoMakie
 using DocStringExtensions
 
-SpeedyWeather.globe(SG::SpectralGrid; kwargs...) = globe(SG.Grid, SG.nlat_half; kwargs...)
-SpeedyWeather.globe(geometry::Geometry{NF, Grid}; kwargs...) where {NF, Grid} =
-    globe(Grid, geometry.nlat_half; kwargs...)
+SpeedyWeather.globe(SG::SpectralGrid; kwargs...) = globe(SG.grid; kwargs...)
+SpeedyWeather.globe(geometry::Geometry; kwargs...) = globe(geometry.grid; kwargs...)
+SpeedyWeather.globe(grid::AbstractGrid; kwargs...) = globe(typeof(grid), grid.nlat_half; kwargs...)
 
 """($TYPEDSIGNATURES)
 Create a 3D interactive globe plot of the grid `Grid` at resolution `nlat_half` displaying
 cell centers and faces. Optionally, add coastlines and a background image of the Earth."""
 function SpeedyWeather.globe(
-    Grid::Type{<:AbstractGridArray},
+    Grid::Type{<:AbstractGrid},
     nlat_half::Integer;
     interactive::Bool = true,
-    title::String = "$(RingGrids.get_nlat(Grid, nlat_half))-ring $(RingGrids.horizontal_grid_type(Grid))",
+    title::String = "$(RingGrids.get_nlat(Grid, nlat_half))-ring $Grid",
     color = :black,
     faces::Bool = true,
     centers::Bool = true,
@@ -80,9 +80,9 @@ import GeoMakie.Makie.GeometryBasics: Polygon
 Create a 3D interactive globe plot of the data in `grid` displayed as polygons bounded by
 the cell faces. Optionally, add coastlines (default true)."""
 function SpeedyWeather.globe(
-    grid::AbstractGrid;
+    field::AbstractField2D;
     interactive::Bool = true,
-    title::String = "$(RingGrids.get_nlat(typeof(grid), grid.nlat_half))-ring $(RingGrids.horizontal_grid_type(grid))",
+    title::String = "$(RingGrids.get_nlat(field))-ring $(typeof(field))",
     colormap = :viridis,
     coastlines::Bool = true,
 )
@@ -98,9 +98,9 @@ function SpeedyWeather.globe(
             dest = "+proj=ortho +lon_0=30 +lat_0=45")
     end
 
-    faces = RingGrids.get_gridcell_polygons(grid)
+    faces = RingGrids.get_gridcell_polygons(field.grid)
     polygons = [Polygon(faces[:, ij]) for ij in axes(faces, 2)]
-    p = poly!(ax, polygons, color=grid.data; colormap)
+    p = poly!(ax, polygons, color=field.data; colormap)
     interactive && (p.transformation.transform_func[] = transf)
 
     if coastlines

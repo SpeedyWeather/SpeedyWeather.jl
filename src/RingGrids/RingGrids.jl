@@ -2,42 +2,28 @@ module RingGrids
 
 # DOCUMENTATION
 using  DocStringExtensions
+import Printf
 
 # NUMERICS
 import Statistics: Statistics, mean
 import FastGaussQuadrature
 import LinearAlgebra
+export rotate, rotate!
 
-# GPU
 import Adapt
 import GPUArrays
 import KernelAbstractions
 
-# ABSTRACT GRIDS (2D) AND GRIDARRAYS (3D+)
-export  AbstractGridArray,
-        AbstractFullGridArray,
-        AbstractReducedGridArray
-
+# ABSTRACT GRIDS
 export  AbstractGrid,
         AbstractFullGrid,
         AbstractReducedGrid
 
-# CONCRETE GRIDS (2D) AND GRIDARRAYS (3D+)
-export  FullGaussianArray,
-        FullClenshawArray,
-        FullHEALPixArray,
-        FullOctaHEALPixArray
-
+# CONCRETE GRIDS
 export  FullGaussianGrid,
         FullClenshawGrid,
         FullHEALPixGrid,
         FullOctaHEALPixGrid
-
-export  OctahedralGaussianArray,
-        OctahedralClenshawArray,
-        HEALPixArray,
-        OctaHEALPixArray,
-        OctaminimalGaussianArray
 
 export  OctahedralGaussianGrid,
         OctahedralClenshawGrid,
@@ -45,10 +31,28 @@ export  OctahedralGaussianGrid,
         OctaHEALPixGrid,
         OctaminimalGaussianGrid
 
+# FIELDS (Data on grids)
+export  AbstractField, AbstractField2D, AbstractField3D,
+        Field, Field2D, Field3D
+
+export  FullGaussianField,
+        FullClenshawField,
+        FullHEALPixField,
+        FullOctaHEALPixField,
+        OctahedralGaussianField,
+        OctahedralClenshawField,
+        HEALPixField,
+        OctaHEALPixField,
+        OctaminimalGaussianField
+
+export  field_view
+
 # SIZE
 export  grids_match,
+        fields_match,
         get_nlat,
         get_nlat_half,
+        get_npoints,
         get_npoints2D
 
 # COORDINATES
@@ -67,7 +71,7 @@ export  get_quadrature_weights,
         get_solid_angles
 
 # ITERATORS
-export  eachgrid,
+export  eachlayer,
         eachring,
         whichring,
         eachgridpoint,
@@ -100,24 +104,31 @@ export  interpolate,
 # STATISTICS
 export zonal_mean
 
+# CONSTANTS
+const DEFAULT_NF = Float64
+const DEFAULT_ARRAYTYPE = Array
+
 include("utility_functions.jl")
+include("architecture.jl")
 
 # GENERAL
-include("general.jl")
-include("full_grids.jl")
-include("reduced_grids.jl")
+include("abstract_types.jl")
+include("field.jl")
+include("grid.jl")
 include("scaling.jl")
 include("geodesics.jl")
 include("reverse.jl")
 include("rotate.jl")
 
 # FULL GRIDS
+include("grids/full_grids.jl")
 include("grids/full_gaussian.jl")
 include("grids/full_clenshaw.jl")
 include("grids/full_healpix.jl")
 include("grids/full_octahealpix.jl")
 
 # REDUCED GRIDS
+include("grids/reduced_grids.jl")
 include("grids/octahedral_gaussian.jl")
 include("grids/octahedral_clenshaw.jl")
 include("grids/healpix.jl")
@@ -129,8 +140,5 @@ include("quadrature_weights.jl")
 include("interpolation.jl")
 include("vertices.jl")
 include("statistics.jl")
-
-# OUTPUT
-include("show.jl")
 
 end

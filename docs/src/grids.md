@@ -69,7 +69,7 @@ Other implemented reduced grids are
 
 An overview of these grids is visualised here, and a more detailed description follows below.
 
-![Overview of implemented grids in SpeedyWeather.jl](https://raw.githubusercontent.com/SpeedyWeather/SpeedyWeather.jl/main/docs/img/grids_comparison.png)
+![Overview of implemented grids in SpeedyWeather.jl](https://github.com/user-attachments/assets/e996fb71-db1e-436e-bb41-b517e2647dc1)
 
 Visualised are each grid's grid points (white dots) and grid faces (white lines).
 All grids shown have 16 latitude rings on one hemisphere, Equator included.
@@ -384,7 +384,8 @@ number of longitude points is constant here)
 ```math
 \phi = \frac{\pi}{2N_{side}}(i - \frac{s}{2}), \quad s = (j - N_{side} + 1) \mod 2
 ```
-The modulo function comes in as there is an alternating longitudinal offset from the prime meridian (see [Implemented grids](@ref)). For the southern hemisphere the grid point locations can be obtained by mirror symmetry.
+The modulo function comes in as there is an alternating longitudinal offset from the prime meridian (see [Implemented grids](@ref)).
+For the southern hemisphere the grid point locations can be obtained by mirror symmetry.
 
 ### Grid cell boundaries
 
