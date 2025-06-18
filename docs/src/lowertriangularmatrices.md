@@ -220,7 +220,7 @@ L' * L
 
 Summation with `sum` follows the flat, single index logic
 ```@repl 
-L = rand(LowerTriangularMatrix{Float32}, 3, 3, 5)
+L = rand(LowerTriangularArray{Float32}, 3, 3, 5)
 sum(L, dims=2) 
 ```
 sums along the second dimension of the underlying vector, not of the full matrix representation. 
