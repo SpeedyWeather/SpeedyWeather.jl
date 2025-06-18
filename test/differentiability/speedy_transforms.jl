@@ -16,7 +16,7 @@ fd_tests = [true, true]
             # forwards 
             grid = rand(spectral_grid.Grid{spectral_grid.NF}, spectral_grid.nlat_half, spectral_grid.nlayers)
             dgrid = zero(grid)
-            specs = zeros(LowerTriangularArray{Complex{spectral_grid.NF}}, spectral_grid.trunc+2, spectral_grid.trunc+1, spectral_grid.nlayers)
+            specs = zeros(LowerTriangularArray{Complex{spectral_grid.NF}}, S.spectrum, S.nlayers)
             
             # seed
             dspecs = zero(specs)
@@ -55,7 +55,7 @@ fd_tests = [true, true]
 
         # start with grid (but with a truncated one)
         function transform_identity!(x_out::AbstractGridArray{T}, x::AbstractGridArray{T}, S::SpectralTransform{T}) where T
-            x_SH = zeros(LowerTriangularArray{Complex{T}}, S.lmax+1, S.mmax+1, S.nlayers)
+            x_SH = zeros(LowerTriangularArray{Complex{T}}, S.spectrum, S.nlayers)
             transform!(x_SH, x, S)
             transform!(x_out, x_SH, S)
             return nothing
@@ -89,7 +89,7 @@ fd_tests = [true, true]
         # Not sure why. Do we use such things in our model? 
         #
         #function transform_identity!(x::AbstractGridArray{T}, S::SpectralTransform{T}) where T
-        #   x_SH = zeros(LowerTriangularArray{Complex{T}}, S.lmax+1, S.mmax+1, S.nlayers)
+        #   x_SH = zeros(LowerTriangularArray{Complex{T}}, S.spectrum, S.nlayers)
         #   transform!(x_SH, x, S)
         #   transform!(x, x_SH, S)
         #   return nothing
@@ -120,10 +120,10 @@ fd_tests = [true, true]
 
             autodiff(Reverse, transform_identity!, Const, Duplicated(spec, dspec), Duplicated(S, dS))
 
-            @test all(all.([isapprox.(dspec[il,1,:], 1) for il in 1:S.lmax+1])) # m = 0 => Im = 0
+            @test all(all.([isapprox.(dspec[il,1,:], 1) for il in 1:S.spectrum.lmax])) # m = 0 => Im = 0
 
             for i in eachmatrix(dspec)
-                @test all(isapprox.(dspec[:,i][S.lmax+2:end], 1+im)) 
+                @test all(isapprox.(dspec[:,i][S.spectrum.lmax+1:end], 1+im)) 
             end 
         end
     end 
@@ -163,8 +163,8 @@ end
             # TO-DO: why the other sign? but it's the same for Finite Differences
             # It's because it's the adjoint (')? And this matters here for complex numbers (see e.g. FiniteDifferences.jl examples for j'vp)
             # To-Do: double check that
-            for i=1:dv.n
-                @test all(Array(dv[:,1])[i:dv.m-1,i] .≈ complex(0,-(i-1)))
+            for i=1:dv.spectrum.mmax
+                @test all(Array(dv[:,1])[i:dv.spectrum.lmax-1,i] .≈ complex(0,-(i-1)))
             end  
             @test sum(du) != 0 # nonzero gradient
 
@@ -194,8 +194,8 @@ end
             # To-Do: why the minus sign? 
             # It's because it's the adjoint (')? And this matters here for complex numbers
             # To-Do: double check that
-            for i=1:du.n
-                @test all(Array(du[:,1])[i:du.m-1,i] .≈ complex(i-1,-(i-1)))
+            for i=1:du.spectrum.mmax
+                @test all(Array(du[:,1])[i:du.spectrum.lmax-1,i] .≈ complex(i-1,-(i-1)))
             end 
 
             ddiv2 = zero(ddiv)
@@ -285,7 +285,7 @@ end
             @test isapprox(dvor, fd_vjp[1]) # and identical with FD
 
             # test with the eigenvalues saved in S, result should just be seed * eigenvalues
-            for i=1:(vor.m-1)
+            for i=1:(vor.spectrum.mmax)
                 @test all(isapprox.(Array(dvor[:,1])[i,1:i], S.eigenvalues[i] * (1+im)))
             end 
 
