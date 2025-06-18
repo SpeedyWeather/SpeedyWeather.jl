@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Use views instead of unpacking a tuple for 2-step prognostic variables [#745](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/745)
 - Introduce Field for data on grid [#732](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/732)
 - Add Millenium and Century periods and allow conversion of Month and Year to seconds [#746](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/746)
 - Return UnicodePlot after run! if UnicodePlots.jl is loaded [#748](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/748)

@@ -38,14 +38,14 @@ function set!(
     kwargs...
 )
     # ATMOSPHERE
-    isnothing(vor)   || set!(progn.vor[lf],     vor, geometry, spectral_transform; add)
-    isnothing(div)   || set!(progn.div[lf],     div, geometry, spectral_transform; add)
-    isnothing(temp)  || set!(progn.temp[lf],   temp, geometry, spectral_transform; add)
-    isnothing(humid) || set!(progn.humid[lf], humid, geometry, spectral_transform; add)
-    isnothing(pres)  || set!(progn.pres[lf],   pres, geometry, spectral_transform; add)
+    isnothing(vor)   || set!(get_step(progn.vor, lf),     vor, geometry, spectral_transform; add)
+    isnothing(div)   || set!(get_step(progn.div, lf),     div, geometry, spectral_transform; add)
+    isnothing(temp)  || set!(get_step(progn.temp, lf),   temp, geometry, spectral_transform; add)
+    isnothing(humid) || set!(get_step(progn.humid, lf), humid, geometry, spectral_transform; add)
+    isnothing(pres)  || set!(get_step(progn.pres, lf),   pres, geometry, spectral_transform; add)
     
     # or provide u, v instead of vor, div
-    isnothing(u) | isnothing(v) || set_vordiv!(progn.vor[lf], progn.div[lf], u, v, geometry, spectral_transform; add, coslat_scaling_included)
+    isnothing(u) | isnothing(v) || set_vordiv!(get_step(progn.vor, lf), get_step(progn.div, lf), u, v, geometry, spectral_transform; add, coslat_scaling_included)
     
     # OCEAN
     isnothing(sea_surface_temperature)  || set!(progn.ocean.sea_surface_temperature, sea_surface_temperature, geometry, spectral_transform; add)
@@ -59,7 +59,8 @@ function set!(
     # TRACERS
     for varname in keys(kwargs)
         if varname in keys(progn.tracers)
-            set!(progn.tracers[varname][lf], kwargs[varname], geometry, spectral_transform; add)
+            tracer_var = get_step(progn.tracers[varname], lf)
+            set!(tracer_var, kwargs[varname], geometry, spectral_transform; add)
         else
             throw(UndefVarError(varname))
         end

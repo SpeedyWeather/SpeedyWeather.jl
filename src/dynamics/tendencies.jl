@@ -32,8 +32,8 @@ function dynamics_tendencies!(
     # = ∇⋅(v(ζ+f) + Fᵤ, -u(ζ+f) + Fᵥ), tendency for divergence
     vorticity_flux!(diagn, model)
 
-    geopotential!(diagn, progn.pres[lf], planet)    # geopotential Φ = gη in shallow water
-    bernoulli_potential!(diagn, spectral_transform) # = -∇²(E+Φ), tendency for divergence
+    geopotential!(diagn, get_step(progn.pres, lf), planet)  # geopotential Φ = gη in shallow water
+    bernoulli_potential!(diagn, spectral_transform)         # = -∇²(E+Φ), tendency for divergence
     
     # = -∇⋅(uh, vh), tendency for "pressure" η
     volume_flux_divergence!(diagn, orography, atmosphere, geometry, spectral_transform)
@@ -113,7 +113,7 @@ function pressure_gradient_flux!(
     S::SpectralTransform,
 )
     # PRESSURE GRADIENT
-    pres = progn.pres[lf]                   # log of surface pressure at leapfrog step lf
+    pres = get_step(progn.pres, lf)         # log of surface pressure at leapfrog step lf
     ∇lnp_x_spec = diagn.dynamics.a_2D       # reuse 2D work arrays for gradients
     ∇lnp_y_spec = diagn.dynamics.b_2D       # in spectral space
     (; ∇lnp_x, ∇lnp_y) = diagn.dynamics     # but store in grid space
@@ -163,7 +163,7 @@ u, v are averaged in grid-point space, divergence in spectral space.
 function vertical_integration!(
     diagn::DiagnosticVariables,
     progn::PrognosticVariables,
-    lf::Integer,                # leapfrog index for D̄_spec
+    lf::Integer,                    # leapfrog index for D̄_spec
     geometry::Geometry,
 )
     (; σ_levels_thick, nlayers ) = geometry
@@ -171,7 +171,7 @@ function vertical_integration!(
     (; u_grid, v_grid, div_grid) = diagn.grid
     (; u_mean_grid, v_mean_grid, div_mean_grid, div_mean) = diagn.dynamics
     (; div_sum_above, uv∇lnp_sum_above) = diagn.dynamics
-    div = progn.div[lf]
+    div = get_step(progn.div, lf)
 
     @boundscheck nlayers == diagn.nlayers || throw(BoundsError)
 
@@ -699,7 +699,7 @@ function linear_pressure_gradient!(
 )                          
     (; R_dry) = atmosphere                  # dry gas constant 
     (; temp_profile) = implicit             # reference profile at layer k
-    pres = progn.pres[lf]                   # logarithm of surface pressure at leapfrog index lf
+    pres = get_step(progn.pres, lf)         # logarithm of surface pressure at leapfrog index lf
     (; geopot) = diagn.dynamics
 
     # -R_dry*Tₖ*∇²lnpₛ, linear part of the ∇⋅RTᵥ∇lnpₛ pressure gradient term
@@ -754,7 +754,7 @@ function SpeedyTransforms.transform!(
     kwargs...
 )    
     (; vor_grid, u_grid, v_grid ) = diagn.grid
-    vor = progn.vor[lf]             # relative vorticity at leapfrog step lf
+    vor = get_step(progn.vor, lf)   # relative vorticity at leapfrog step lf
     U = diagn.dynamics.a            # reuse work arrays for velocities in spectral
     V = diagn.dynamics.b            # U = u*coslat, V=v*coslat
     S = model.spectral_transform
@@ -771,7 +771,8 @@ function SpeedyTransforms.transform!(
     transform!(v_grid, V, S, unscale_coslat=true)
  
     for (name, tracer) in model.tracers
-        tracer.active && transform!(diagn.grid.tracers_grid[name], progn.tracers[name][lf], S)
+        tracer_var = get_step(progn.tracers[name], lf)  # tracer at leapfrog step lf
+        tracer.active && transform!(diagn.grid.tracers_grid[name], tracer_var, S)
     end
 
     # transform random pattern for random process unless NoRandomProcess
@@ -794,9 +795,9 @@ function SpeedyTransforms.transform!(
     kwargs...
 )
     (; vor_grid, div_grid, pres_grid, u_grid, v_grid ) = diagn.grid
-    vor =  progn.vor[lf]            # relative vorticity at leapfrog step lf
-    div =  progn.div[lf]            # divergence at leapfrog step lf
-    pres = progn.pres[lf]           # interface displacement η at leapfrog step lf
+    vor =  get_step(progn.vor, lf)  # relative vorticity at leapfrog step lf
+    div =  get_step(progn.div, lf)  # divergence at leapfrog step lf
+    pres = get_step(progn.pres, lf) # interface displacement η at leapfrog step lf
 
     U = diagn.dynamics.a            # reuse work arrays for velocities spectral
     V = diagn.dynamics.b            # U = u*coslat, V=v*coslat
@@ -816,7 +817,8 @@ function SpeedyTransforms.transform!(
     transform!(v_grid, V, S, unscale_coslat=true)
 
     for (name, tracer) in model.tracers
-        tracer.active && transform!(diagn.grid.tracers_grid[name], progn.tracers[name][lf], S)
+        tracer_var = get_step(progn.tracers[name], lf)  # tracer at leapfrog step lf
+        tracer.active && transform!(diagn.grid.tracers_grid[name], tracer_var, S)
     end
 
     # transform random pattern for random process unless NoRandomProcess
@@ -841,11 +843,11 @@ function SpeedyTransforms.transform!(
     (; vor_grid, div_grid, pres_grid, u_grid, v_grid, temp_grid, humid_grid, 
     temp_grid_prev, humid_grid_prev, u_grid_prev, v_grid_prev) = diagn.grid
 
-    vor   = progn.vor[lf]           # relative vorticity at leapfrog step lf
-    div   = progn.div[lf]           # divergence at leapfrog step lf
-    temp  = progn.temp[lf]          # temperature at leapfrog step lf
-    humid = progn.humid[lf]         # humidity at leapfrog step lf
-    pres  = progn.pres[lf]          # logarithm of surface pressure at leapfrog step lf
+    vor   = get_step(progn.vor, lf)     # relative vorticity at leapfrog step lf
+    div   = get_step(progn.div, lf)     # divergence at leapfrog step lf
+    temp  = get_step(progn.temp, lf)    # temperature at leapfrog step lf
+    humid = get_step(progn.humid, lf)   # humidity at leapfrog step lf
+    pres  = get_step(progn.pres, lf)    # logarithm of surface pressure at leapfrog step lf
 
     U = diagn.dynamics.a            # reuse work arrays
     V = diagn.dynamics.b            # U = u*coslat, V=v*coslat
@@ -912,7 +914,8 @@ function SpeedyTransforms.transform!(
     end
 
     for (name, tracer) in model.tracers
-        tracer.active && transform!(diagn.grid.tracers_grid[name], progn.tracers[name][lf], S)
+        tracer_var = get_step(progn.tracers[name], lf)  # tracer at leapfrog step lf
+        tracer.active && transform!(diagn.grid.tracers_grid[name], tracer_var, S)
     end
 
     # transform random pattern for random process unless NoRandomProcess

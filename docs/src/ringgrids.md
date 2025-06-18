@@ -12,7 +12,8 @@ of longitudinal points towards the poles to be more equal-area than _full_ grids
 
 # Defined grids
 
-RingGrids defines and exports the following grids.
+RingGrids defines and exports the following grids, see also [Implemented grids](@ref) for a
+more mathematical description.
 
 Full grids
 ```@example ringgrids
