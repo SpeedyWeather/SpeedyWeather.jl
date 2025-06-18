@@ -1,5 +1,7 @@
 """A `FullOctaHEALPixGrid` is like a `OctaHEALPixGrid` but with every latitude ring having the same number of longitude
-points (a full grid). It shares the latitudes with the `OctaHEALPixGrid` but uses the longitudes from the `FullGaussianGrid`
+points (a full grid). This grid is mostly defined for output to minimize the interpolation needed from an
+`OctaHEALPixGrid` to a full grid required for output. A `FullOctaHEALPixGrid` has none of the equal-area properties of the `OctaHEALPixGrid`.
+It only shares the latitudes with the `OctaHEALPixGrid` but uses the longitudes from the `FullGaussianGrid`
 without offset, i.e. the first longitude point on every ring is at 0˚E.
 $(TYPEDFIELDS)"""
 struct FullOctaHEALPixGrid{A, V, W} <: AbstractFullGrid{A}

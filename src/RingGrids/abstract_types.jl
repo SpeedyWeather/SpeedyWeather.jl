@@ -4,7 +4,7 @@ of the sphere. A "grid" does not contain any data only its resolution is defined
 vertices, latitudes, longtiudes etc but they can be recomputed from the grid object (or its type and resolution) at any time.
 
 A grid is regarded as 2D but a field (data on a grid) can have N additional dimensions, e.g. for vertical levels or time.
-In that sense, a grid is does not have a number format / eltype. This is a property of a `Field` which can be different for
+In that sense, a grid does not have a number format / eltype. This is a property of a `Field` which can be different for
 every field even when using the same grid. Points on the grid (cell centres) are unravalled into a vector ordered 0 to 360˚E,
 starting at the north pole, then going ring by ring to the south pole. This way both full (those representable as a matrix)
 and reduced grids (not representable as a matrix, with fewer longitude points towards the poles) can be represented.

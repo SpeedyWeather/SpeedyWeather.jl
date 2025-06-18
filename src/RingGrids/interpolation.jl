@@ -348,7 +348,7 @@ function interpolate(
 end
 
 # if only the grid type is provided, create a grid with nlat_half from the input field
-interpolate(Grid::Type{<:AbstractGrid}, A::AbstractField; kwargs...) = interpolate(Grid(A.grid.nlat_half), A; kwargs...)
+interpolate(Grid::Type{<:AbstractGrid}, A::AbstractField; kwargs...) = interpolate(Grid(A.grid.nlat_half, A.grid.architecture), A; kwargs...)
 
 function update_locator!(
     I::AbstractInterpolator,    # GridGeometry and Locator
