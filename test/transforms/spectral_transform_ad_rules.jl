@@ -40,6 +40,7 @@ end
                     spectral_grid = SpectralGrid(Grid=grid_type, nlayers=1, trunc=5, dealiasing=grid_dealiasing[i_grid])
                     S = SpectralTransform(spectral_grid)
                     field = rand(spectral_grid.NF, spectral_grid.grid, spectral_grid.nlayers)
+
                     f_north = S.scratch_memory_north
                     f_south = S.scratch_memory_south
 

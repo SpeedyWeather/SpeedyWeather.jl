@@ -151,6 +151,8 @@ export get_step
 get_step(coeffs::LowerTriangularArray{T, 2}, i) where T = lta_view(coeffs, :, i)
 get_step(coeffs::LowerTriangularArray{T, 3}, i) where T = lta_view(coeffs, :, :, i)
 
+get_nsteps(progn::PrognosticVariables{T, A, S, G, nsteps}) where {T, A, S, G, nsteps} = nsteps
+
 """$(TYPEDSIGNATURES)
 Generator function."""
 function PrognosticVariables(SG::SpectralGrid; nsteps=DEFAULT_NSTEPS)
@@ -182,6 +184,7 @@ function Base.show(
 
     # resolution
     (; spectrum, grid, nlayers, nlayers_soil, nparticles, nsteps) = progn
+
     trunc = truncation(spectrum)
     Grid = RingGrids.nonparametric_type(GridType)
     nlat = RingGrids.get_nlat(grid)
@@ -294,7 +297,7 @@ function Base.fill!(progn::PrognosticVariables, value::Number)
     progn.humid .= value
     progn.pres .= value
 
-    # todo random pattern?
+    #TODO copy over random pattern?
 
     # ocean
     progn.ocean.sea_surface_temperature .= value
