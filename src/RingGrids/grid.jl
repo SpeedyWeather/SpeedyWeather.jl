@@ -59,7 +59,7 @@ function (::Type{Grid})(nlat_half::Integer, architecture=DEFAULT_ARCHITECTURE())
     Grid_ = nonparametric_type(Grid)        # strip away parameters of type, obtain from arguments
     rings = eachring(Grid, nlat_half)       # precompute indices to access the variable-length rings
     w = whichring(Grid, nlat_half, rings)   # precompute ring indices for each grid point
-    return Grid_(nlat_half, architecture, rings, w)
+    return on_architecture(architecture, Grid_(nlat_half, architecture, rings, w))
 end
 
 # also allow to construct a field with Grid(data)
@@ -272,3 +272,5 @@ whichring(Grid::Type{<:AbstractGrid}, nlat_half::Integer) = whichring(Grid, nlat
 # for architectures / adapt 
 ismatching(grid::AbstractGrid, array_type::Type{<:AbstractArray}) = ismatching(grid.architecture, array_type)
 ismatching(grid::AbstractGrid, array::AbstractArray) = ismatching(grid.architecture, typeof(array))
+
+on_architecture(arch::AbstractArchitecture, grid::AbstractGrid) = adapt(array_type(arch), grid)
