@@ -501,7 +501,13 @@ function KernelAbstractions.get_backend(
     return KernelAbstractions.get_backend(field.data)
 end
 
-function Adapt.adapt_structure(to, field::F) where {F <: AbstractField}
-    # TODO this reuses the same grid but adapt can change the array type which should also change the architecture?
-    return Field(Adapt.adapt(to, field.data), field.grid)
+function Adapt.adapt_structure(to, field::Field{T, N, ArrayType, Grid}) where {T, N, ArrayType, Grid}
+    adapted_data = adapt(to, field.data)
+    if ismatching(field.grid, typeof(adapted_data))
+        return Field(adapted_data, adapt(to, field.grid))
+    else # if not matching, create new grid with other architecture
+        return Field(adapted_data, adapt(to, Grid(field.grid, architecture(typeof(adapted_data)))))
+    end
 end
+
+on_architecture(arch, field::AbstractField) = Adapt.adapt(array_type(arch), field)

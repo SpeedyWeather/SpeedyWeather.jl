@@ -110,7 +110,6 @@ const DEFAULT_NF = Float64
 const DEFAULT_ARRAYTYPE = Array
 
 include("utility_functions.jl")
-include("architecture.jl")
 
 # GENERAL
 include("abstract_types.jl")

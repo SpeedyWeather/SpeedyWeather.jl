@@ -109,6 +109,8 @@ function each_index_in_ring!(   rings::AbstractVector,
     end
 end
 
+Adapt.@adapt_structure OctaHEALPixGrid
+
 # ## CONVERSION
 # Base.Matrix(G::OctaHEALPixGrid{T}; kwargs...) where T = Matrix!(zeros(T, matrix_size(G)...), G; kwargs...)
 

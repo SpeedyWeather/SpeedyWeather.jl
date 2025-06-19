@@ -28,11 +28,6 @@ struct SpectralTransform{
     # Architecture
     architecture::AR
 
-    # GRID
-    Grid::Type{<:AbstractGridArray} # grid type used
-    nlat_half::Int                  # resolution parameter of grid (# of latitudes on one hemisphere, Eq incl)
-    nlayers::Int                    # number of layers in the vertical (for scratch memory size)
-
     # SPECTRAL RESOLUTION
     spectrum::SpectrumType          # spectral trunction 
     nfreq_max::Int                  # Maximum (at Equator) number of Fourier frequencies (real FFT)
@@ -40,8 +35,8 @@ struct SpectralTransform{
     mmax_truncation::Vector{Int}    # Maximum order m to retain per latitude ring
     
     # GRID
-    grid::GridType              # grid used, including nlat_half for resolution, indices for rings, etc.
-    nlayers::Int                # number of layers in the vertical (for scratch memory size)
+    grid::GridType                  # grid used, including nlat_half for resolution, indices for rings, etc.
+    nlayers::Int                    # number of layers in the vertical (for scratch memory size)
 
     # CORRESPONDING GRID SIZE
     nlon_max::Int                   # Maximum number of longitude points (at Equator)
@@ -290,7 +285,7 @@ function SpectralTransform(
         LowerTriangularArray{Complex{NF}, 1, ArrayType_{Complex{NF}, 1}, typeof(spectrum)},   
         LowerTriangularArray{NF, 2, ArrayType_{NF, 2}, typeof(spectrum)},
     }(
-        architecture, Grid, nlat_half, nlayers,
+        architecture,
         spectrum, nfreq_max, 
         LegendreShortcut, mmax_truncation,
         grid, nlayers,

@@ -67,6 +67,11 @@ function (::Type{Grid})(data::AbstractArray; input_as=Vector, kwargs...) where {
     return Grid(data, input_as, kwargs...)      # make input_as a positional argument
 end
 
+# change the architecture of a grid, keep all other fields 
+function (::Type{Grid})(grid::Grid, architecture::AbstractArchitecture) where {Grid<:AbstractGrid}
+    return Grid(grid.nlat_half, architecture, grid.rings, grid.whichring)
+end
+
 function (::Type{Grid})(
     data::AbstractArray,
     input_as::Type{Vector};
@@ -262,3 +267,7 @@ end
 
 whichring(grid::AbstractGrid) = whichring(typeof(grid), grid.nlat_half, grid.rings)
 whichring(Grid::Type{<:AbstractGrid}, nlat_half::Integer) = whichring(Grid, nlat_half, eachring(Grid, nlat_half))
+
+# for architectures / adapt 
+ismatching(grid::AbstractGrid, array_type::Type{<:AbstractArray}) = ismatching(grid.architecture, array_type)
+ismatching(grid::AbstractGrid, array::AbstractArray) = ismatching(grid.architecture, typeof(array))
