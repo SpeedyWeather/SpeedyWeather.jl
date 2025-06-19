@@ -40,7 +40,7 @@ import SpeedyWeather: on_architecture, CPU, launch!
 
     @testset "RingGrids kernel test" begin
 
-        Grid = HEAlPixGrid
+        Grid = HEALPixGrid
         @kernel function test_ringgrids_kernel!(A, B, C)
             I = @index(Global, Linear)
             A[I] = B[I] * C[I]
