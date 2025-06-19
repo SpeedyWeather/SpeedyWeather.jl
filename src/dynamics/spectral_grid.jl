@@ -24,7 +24,7 @@ $(TYPEDFIELDS)
 struct SpectralGrid{
     ArchitectureType,      # <: AbstractArchitecture
     SpectrumType,          # <: AbstractSpectrum
-    Grid,              # <: AbstractGrid
+    GridType,              # <: AbstractGrid
 } <: AbstractSpectralGrid
 
     "[OPTION] number format used throughout the model"
@@ -74,8 +74,11 @@ struct SpectralGrid{
     "[DERIVED] total number of grid points in the horizontal"
     npoints::Int
 
-    "[OPTION] horizontal grid used for calculations in grid-point space"
-    grid::Grid
+    "[DERIVED] instance of horizontal grid used for calculations in grid-point space"
+    grid::GridType
+
+    "[OPTION] type of horizontal grid used for calculations in grid-point space"
+    Grid::Type{<:AbstractGrid}
 
     "[DERIVED] Type of grid variable in 2D (horizontal only, flattened into 1D vector)"
     GridVariable2D::Type{<:AbstractArray}
@@ -125,30 +128,15 @@ function Base.show(io::IO, SG::SpectralGrid)
     println(io, "└ Architecture: $architecture using $ArrayType")
 end
 
-# generate spectrum/grid based on trunc, Grid and dealiasing, use to create a SpectralGrid
-function SpectralGrid(;
-    trunc::Int = DEFAULT_TRUNC,
-    Grid::Type{<:AbstractGrid} = DEFAULT_GRID,
-    dealiasing::Real = 2,
-    kwargs...
-)
-    spectrum = Spectrum(trunc+2, trunc+1)           # defines the Spectral space
-    nlat_half = SpeedyTransforms.get_nlat_half(trunc, dealiasing)
-    grid = Grid(nlat_half)                          # defines the grid space
-    return SpectralGrid(spectrum, grid; kwargs...)
-end
-
 # Constructor that takes all [OPTION] parameters as keyword arguments
 # and calculates all derived fields
-function SpectralGrid(
-    spectrum::AbstractSpectrum,
-    grid::AbstractGrid;
+function SpectralGrid(;
     NF::Type{<:AbstractFloat} = DEFAULT_NF,
     architecture::Union{AbstractArchitecture, Type{<:AbstractArchitecture}} = DEFAULT_ARCHITECTURE,
     ArrayType::Type{<:AbstractArray} = array_type(architecture),
     trunc::Int = DEFAULT_TRUNC,
     Grid::Type{<:AbstractGrid} = DEFAULT_GRID,
-    dealiasing::Real = SpeedyTransforms.get_dealiasing(truncation(spectrum), grid.nlat_half),
+    dealiasing::Real = SpeedyTransforms.get_dealiasing(trunc, grid.nlat_half),
     radius::Real = DEFAULT_RADIUS,
     nparticles::Int = 0,
     nlayers::Int = DEFAULT_NLAYERS,
@@ -164,8 +152,9 @@ function SpectralGrid(
     dealiasing_f64 = Float64(dealiasing)
     radius_f64 = Float64(radius)
 
-    # infer additional grid parameters
-    (; nlat_half) = grid
+    # grid
+    nlat_half = SpeedyTransforms.get_nlat_half(trunc, dealiasing_f64)
+    grid = Grid(nlat_half, architecture=architecture)
     nlat = RingGrids.get_nlat(grid)
     npoints = RingGrids.get_npoints(grid)
     
@@ -208,6 +197,7 @@ function SpectralGrid(
         nlat,
         npoints,
         grid,
+        Grid,
         GridVariable2D,
         GridVariable3D,
         GridVariable4D,

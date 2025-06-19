@@ -120,7 +120,8 @@ function SpectralTransform(
     (; nlat_half) = grid    # number of latitude rings on one hemisphere incl equator
     ArrayType_ = RingGrids.nonparametric_type(ArrayType)    # drop parameters of ArrayType
     (; lmax, mmax) = spectrum                               # 1-based spectral truncation order and degree
-    
+    orders = adapt(Array, spectrum.orders)                  # construct all arrays here on CPU, transfer indices for that
+
     # RESOLUTION PARAMETERS
     nlat = get_nlat(grid)           # 2nlat_half but one less if grid has odd # of lat rings
     nlon_max = get_nlon_max(grid)   # number of longitudes around the equator
@@ -214,7 +215,7 @@ function SpectralTransform(
     grad_y1 = zeros(NF, spectrum)                           # term 1, mul with harmonic l-1, m
     grad_y2 = zeros(NF, spectrum)                           # term 2, mul with harmonic l+1, m
 
-    for (m, degrees) in enumerate(spectrum.orders)          # 1-based degree l, order m
+    for (m, degrees) in enumerate(orders)          # 1-based degree l, order m
         for l in degrees        
             grad_y1[l, m] = -(l-2)*ϵlms[l, m]
             grad_y2[l, m] = (l+1)*ϵlms[l+1, m]
@@ -235,7 +236,7 @@ function SpectralTransform(
     grad_y_vordiv1 = zeros(NF, spectrum)                    # term 1, mul with harmonic l-1, m
     grad_y_vordiv2 = zeros(NF, spectrum)                    # term 2, mul with harmonic l+1, m
  
-    for (m, degrees) in enumerate(spectrum.orders)          # 1-based degree l, order m
+    for (m, degrees) in enumerate(orders)          # 1-based degree l, order m
         for l in degrees           
             grad_y_vordiv1[l, m] = l*ϵlms[l, m]
             grad_y_vordiv2[l, m] = (l-1)*ϵlms[l+1, m]
@@ -253,7 +254,7 @@ function SpectralTransform(
     vordiv_to_uv1 = zeros(NF, spectrum)                     # term 1, to be mul with harmonic l-1, m
     vordiv_to_uv2 = zeros(NF, spectrum)                     # term 2, to be mul with harmonic l+1, m
 
-    for (m, degrees) in enumerate(spectrum.orders)          # 1-based degree l, order m
+    for (m, degrees) in enumerate(orders)          # 1-based degree l, order m
         for l in degrees             
             vordiv_to_uv1[l, m] = ϵlms[l, m]/(l-1)
             vordiv_to_uv2[l, m] = ϵlms[l+1, m]/l
