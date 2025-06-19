@@ -8,12 +8,12 @@
         diagn = simulation.diagnostic_variables
 
         # make sure vorticity and divergence are 0
-        progn.vor[1] .= 0
-        progn.div[1] .= 0
+        progn.vor .= 0
+        progn.div .= 0
         diagn.tendencies.vor_tend .= 0
 
         # start with some vorticity only
-        progn.vor[1] .= randn(Complex{NF}, size(progn.vor[1])...)
+        progn.vor .= randn(Complex{NF}, size(progn.vor)...)
 
         # get corresponding non-divergent u_grid, v_grid
         lf = 1
@@ -35,7 +35,7 @@
         SpeedyWeather.transform!(uω_coslat⁻¹, u_grid, S)
         SpeedyWeather.transform!(vω_coslat⁻¹, v_grid, S)
     
-        div = progn.div[1]
+        div = get_step(progn.div, 1)
         SpeedyWeather.divergence!(div, uω_coslat⁻¹, vω_coslat⁻¹, S)
 
         for div_lm in div
@@ -54,12 +54,12 @@ end
         diagn = simulation.diagnostic_variables
 
         # make sure vorticity and divergence are 0
-        progn.vor[1] .= 0
-        progn.div[1] .= 0
+        progn.vor .= 0
+        progn.div .= 0
         diagn.tendencies.div_tend .= 0
 
         # start with some divergence only
-        progn.div[1] .= randn(Complex{NF}, size(progn.div[1])...)
+        progn.div .= randn(Complex{NF}, size(progn.div)...)
 
         # get corresponding non-divergent u_grid, v_grid
         lf = 1
@@ -72,7 +72,7 @@ end
         @test all(v_grid .!= 0)
 
         # to evaluate ∇×(uv) use curl of vorticity fluxes (=∇×(uv(ζ+f))) with ζ=1, f=0
-        progn.div[1] .= 1
+        progn.div .= 1
         model.coriolis.f .= 0
 
         # calculate uω, vω in spectral space
@@ -171,8 +171,8 @@ end
         simulation = initialize!(model)
         progn = simulation.prognostic_variables
         diagn = simulation.diagnostic_variables
-        vor = progn.vor[1]
-        div = progn.div[1]
+        vor = get_step(progn.vor, 1)
+        div = get_step(progn.div, 1)
 
         # make sure vorticity and divergence are 0
         vor .= 0

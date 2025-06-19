@@ -76,10 +76,10 @@ fields from file, and interpolates them in time regularly
 (default every 3 days) to be stored in the prognostic variables.
 Fields and options are
 $(TYPEDFIELDS)"""
-@kwdef struct SeasonalOceanClimatology{NF, GridVariable3D} <: AbstractOcean
+@kwdef struct SeasonalOceanClimatology{NF, Grid, GridVariable3D} <: AbstractOcean
 
-    "number of latitudes on one hemisphere, Equator included"
-    nlat_half::Int
+    "Grid used for the model"
+    grid::Grid
 
     "[OPTION] Path to the folder containing the sea surface temperatures, pkg path default"
     path::String = "SpeedyWeather.jl/input_data"
@@ -98,13 +98,13 @@ $(TYPEDFIELDS)"""
 
     # to be filled from file
     "Monthly sea surface temperatures [K], interpolated onto Grid"
-    monthly_temperature::GridVariable3D = zeros(GridVariable3D, nlat_half, 12)
+    monthly_temperature::GridVariable3D = zeros(GridVariable3D, grid, 12)
 end
 
 # generator function
 function SeasonalOceanClimatology(SG::SpectralGrid; kwargs...)
-    (; NF, GridVariable3D, nlat_half) = SG
-    return SeasonalOceanClimatology{NF, GridVariable3D}(; nlat_half, kwargs...)
+    (; NF, GridVariable3D, grid) = SG
+    return SeasonalOceanClimatology{NF, typeof(grid), GridVariable3D}(; grid, kwargs...)
 end
 
 function initialize!(ocean::SeasonalOceanClimatology, model::PrimitiveEquation)
@@ -123,11 +123,11 @@ function initialize!(ocean::SeasonalOceanClimatology, model::PrimitiveEquation)
     sst = ocean.file_Grid(ncfile[ocean.varname].var[:, :, :], input_as=Matrix)
     sst[sst .=== fill_value] .= ocean.missing_value      # === to include NaN
 
-    @boundscheck grids_match(monthly_temperature, sst, vertical_only=true) ||
+    @boundscheck fields_match(monthly_temperature, sst, vertical_only=true) ||
         throw(DimensionMismatch(monthly_temperature, sst))
 
     # create interpolator from grid in file to grid used in model
-    interp = RingGrids.interpolator(Float32, monthly_temperature, sst)
+    interp = RingGrids.interpolator(monthly_temperature, sst, NF=Float32)
     interpolate!(monthly_temperature, sst, interp)
     return nothing
 end
@@ -216,8 +216,9 @@ function initialize!(
 )
     # create a seasonal model, initialize it and the variables
     (; path, file, varname, file_Grid, missing_value) = ocean_model
-    (; NF, GridVariable3D, nlat_half) = model.spectral_grid
-    seasonal_model = SeasonalOceanClimatology{NF, GridVariable3D}(; nlat_half, path, file, varname, file_Grid, missing_value)
+    (; NF, GridVariable3D, grid) = model.spectral_grid
+    seasonal_model = SeasonalOceanClimatology{NF, typeof(grid), GridVariable3D}(;
+                                grid, path, file, varname, file_Grid, missing_value)
     initialize!(seasonal_model, model)
     initialize!(ocean, progn, diagn, seasonal_model, model)
     # (seasonal model will be garbage collected hereafter)

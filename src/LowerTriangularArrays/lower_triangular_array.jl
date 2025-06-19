@@ -229,6 +229,8 @@ for f in (:zeros, :ones, :rand, :randn)
             $f(LowerTriangularArray{Float64}, spectrum, I...)
         Base.$f(::Type{LowerTriangularMatrix}, spectrum::AbstractSpectrum) =
             $f(LowerTriangularArray{Float64}, spectrum)
+        Base.$f(spectrum::AbstractSpectrum, I::Vararg{Integer, M}) where M =
+            $f(LowerTriangularArray{Float64}, spectrum, I...)
     end
 end
 
@@ -265,6 +267,8 @@ end
 function LowerTriangularMatrix{T}(::UndefInitializer, spectrum::AbstractSpectrum) where T
     return LowerTriangularMatrix(Vector{T}(undef, nonzeros(spectrum)), spectrum)
 end
+
+Base.eltype(L::LowerTriangularArray) = eltype(L.data)
 
 # INDEXING
 """
@@ -687,6 +691,9 @@ Base.similar(L::LowerTriangularArray{T, N, ArrayType, SP}, ::Type{T}) where {T, 
     LowerTriangularArray{T, N, ArrayType, SP}(similar(L.data, T), L.spectrum)
 Base.similar(L::LowerTriangularArray{T}) where T = similar(L, T)
  
+array_type(::Type{<:LowerTriangularArray{T, N, ArrayType}}) where {T, N, ArrayType} = ArrayType
+array_type(L::LowerTriangularArray) = array_type(typeof(L))
+
 Base.prod(L::LowerTriangularArray{NF}) where NF = zero(NF)
 @inline Base.sum(L::LowerTriangularArray; dims=:, kw...) = sum(L.data; dims, kw...)
 
@@ -748,6 +755,9 @@ LowerTriangularGPUStyle{N, ArrayType, S}(::Val{M}) where {N, ArrayType, S, M} =
 
 # also needed for other array types
 nonparametric_type(::Type{<:Array}) = Array
+
+# nonparametric_type for a SubArray is the arraytype it is viewing. Needed to construct new arrays from SubArrays!
+nonparametric_type(::Type{<:SubArray{T, N, A}}) where {T, N, A} = nonparametric_type(A)
 
 "`L = find_L(Ls)` returns the first LowerTriangularArray among the arguments. 
 Adapted from Julia documentation of Broadcast interface"

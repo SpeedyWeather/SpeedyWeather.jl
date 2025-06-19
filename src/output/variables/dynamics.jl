@@ -6,7 +6,7 @@ optional fields otherwise use variable-independent defaults. Initialize with `Vo
 and non-default fields can always be passed on as keyword arguments,
 e.g. `VorticityOutput(long_name="relative vorticity", compression_level=0)`.
 Custom variable output also requires the `path(::MyOutputVariable, simulation)`
-to be extended to return the AbstractGridArray to be output.
+to be extended to return the AbstractField subject to output.
 Custom element-wise variable transforms, e.g. scale and/or offset to change
 units, or even exp(x)/100 to change from log surface pressure to hPa
 are passed on as `transform::Function = x -> exp(x)/100`."""
@@ -41,7 +41,7 @@ are passed on as `transform::Function = x -> exp(x)/100`."""
 end
 
 """$TYPEDSIGNATURES To be extended for every output variable to define
-the path where in `simulation` to find that output variable `::AbstractGridArray`."""
+the path where in `simulation` to find that output variable `::AbstractField`."""
 path(::VorticityOutput, simulation) = simulation.diagnostic_variables.grid.vor_grid
 
 """Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.

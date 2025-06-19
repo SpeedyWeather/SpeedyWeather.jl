@@ -160,11 +160,10 @@ end
 # called by divergence or curl
 function _div_or_curl(  
     kernel!,
-    u::Grid,
-    v::Grid;
+    u::AbstractField,
+    v::AbstractField;
     kwargs...,
-) where {Grid<:AbstractGridArray}
-
+)
     u_grid = copy(u)
     v_grid = copy(v)
 
@@ -187,8 +186,7 @@ Applies 1/coslat scaling, transforms to spectral space and returns
 the spectral divergence. Acts on the unit sphere, i.e. it omits 1/radius scaling unless
 `radius` keyword argument is provided.
 """
-divergence(u::Grid, v::Grid; kwargs...) where {Grid<:AbstractGridArray} =
-    _div_or_curl(divergence!, u, v; kwargs...)
+divergence(u::AbstractField, v::AbstractField; kwargs...) = _div_or_curl(divergence!, u, v; kwargs...)
 
 """
 $(TYPEDSIGNATURES)
@@ -196,8 +194,7 @@ Curl (∇×) of two vector components `u, v` on a grid.
 Applies 1/coslat scaling, transforms to spectral space and returns
 the spectral curl. Acts on the unit sphere, i.e. it omits 1/radius scaling unless
 `radius` keyword argument is provided."""
-curl(u::Grid, v::Grid; kwargs...) where {Grid<:AbstractGridArray} =
-    _div_or_curl(curl!, u, v; kwargs...)
+curl(u::AbstractField, v::AbstractField; kwargs...) = _div_or_curl(curl!, u, v; kwargs...)
 
 """
 $(TYPEDSIGNATURES)
@@ -642,8 +639,8 @@ end
 Transform to spectral space, takes the gradient and unscales the 1/coslat
 scaling in the gradient. Acts on the unit-sphere, i.e. it omits 1/radius scaling unless
 `radius` keyword argument is provided. Makes use of an existing spectral transform `S`."""
-function ∇(grid::AbstractGridArray, S::SpectralTransform; kwargs...)
-    p = transform(grid, S)
+function ∇(field::AbstractField, S::SpectralTransform; kwargs...)
+    p = transform(field, S)
     dpdx, dpdy = ∇(p, S; kwargs...)
     dpdx_grid = transform(dpdx, S, unscale_coslat=true)
     dpdy_grid = transform(dpdy, S, unscale_coslat=true)
@@ -654,7 +651,7 @@ end
 Transform to spectral space, takes the gradient and unscales the 1/coslat
 scaling in the gradient. Acts on the unit-sphere, i.e. it omits 1/radius scaling unless
 `radius` keyword argument is provided."""
-function ∇(grid::AbstractGridArray; kwargs...)
-    S = SpectralTransform(grid, one_more_degree=true)
-    return ∇(grid, S; kwargs...)
+function ∇(field::AbstractField; kwargs...)
+    S = SpectralTransform(field, one_more_degree=true)
+    return ∇(field, S; kwargs...)
 end

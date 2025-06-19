@@ -14,7 +14,7 @@
             diagn = simulation.diagnostic_variables
 
             (; expl, impl) = model.horizontal_diffusion
-            vor = progn.vor[1]
+            vor = get_step(progn.vor, 1)
             (; vor_tend) = diagn.tendencies
 
             # apply diffusion
@@ -32,7 +32,7 @@
                 end
             end
 
-            vor2 = progn.vor[2]
+            vor2 = get_step(progn.vor, 2)
             SpeedyWeather.leapfrog!(vor, vor2, vor_tend, model.time_stepping.Δt, 1, model.time_stepping)
 
             @test any(vor .!= vor2)    # check that at least some coefficients are different

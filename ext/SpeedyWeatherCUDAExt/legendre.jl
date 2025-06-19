@@ -1,4 +1,4 @@
-# convert i, j indices of a matrix (here 0-based l,m though...) to a single 1-based running index
+# convert l,m indices of a matrix (here 0-based l,m though...) to a single 1-based running index
 import SpeedyWeather.LowerTriangularArrays: lm2i, get_lm_range, get_2lm_range
  
 # (inverse) legendre transform kernel, called from _legendre!
@@ -75,7 +75,7 @@ function SpeedyTransforms._legendre!(
     S::SpectralTransform;               # precomputed transform
     unscale_coslat::Bool = false,       # unscale by cosine of latitude on the fly?
 )
-    (; nlat_half) = S                   # dimensions    
+    (; nlat_half) = S.grid              # dimensions    
     (; lmax, mmax ) = S.spectrum        # 1-based max degree l, order m of spherical harmonics  
     (; legendre_polynomials) = S        # precomputed Legendre polynomials    
     (; jm_index_size, kjm_indices ) = S # kjm loop indices precomputed for threads  
@@ -231,7 +231,7 @@ function SpeedyTransforms._legendre!(                        # GRID TO SPECTRAL
     f_south::CuArray{<:Complex, 3},         # and southern latitudes
     S::SpectralTransform,                   # precomputed transform
 )
-    (; nlat_half) = S                       # dimensions
+    (; nlat_half) = S.grid                  # dimensions
     (; lmax) = S.spectrum                   # 1-based max degree l, order m of spherical harmonics  
     (; legendre_polynomials) = S            # precomputed Legendre polynomials    
     (; kjm_indices, jm_index_size) = S      # Legendre shortcut, shortens loop over m, 0-based  

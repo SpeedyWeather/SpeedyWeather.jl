@@ -97,7 +97,12 @@ end
 Base.:(==)(s1::Spectrum, s2::Spectrum) = 
     s1.lmax == s2.lmax && s1.mmax == s2.mmax
 
-Base.show(io::IO, s::Spectrum) = print(io, "Spectrum(T$(s.mmax-1): (lmax=$(s.lmax), mmax=$(s.mmax)) on $(typeof(s.architecture)))")
+function Base.show(io::IO, S::Spectrum)
+    println(io, "T$(S.mmax-1) Spectrum")
+    println(io, "├ lmax=$(S.lmax) (degrees)")
+    println(io, "├ mmax=$(S.mmax) (orders)")
+    print(io,   "└ architecture: $(typeof(S.architecture))")
+end
 
 eachorder(s::Spectrum) = s.lm_orders
 
