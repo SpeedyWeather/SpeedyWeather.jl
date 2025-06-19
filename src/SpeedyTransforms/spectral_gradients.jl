@@ -333,7 +333,7 @@ function UV_from_vordiv!(
             # ∂Dλ = im*vordiv_to_uv_x[lm]*div[lm]       # divergence contribution to zonal gradient
             # ∂ζλ = im*vordiv_to_uv_x[lm]*vor[lm]       # vorticity contribution to zonal gradient
 
-            z = im*vordiv_to_uv_x[lm]
+            z = vordiv_to_uv_x[lm]
             U[lm, k] = muladd(z, div[lm, k], ∂ζθ)       # = ∂Dλ + ∂ζθ
             V[lm, k] = muladd(z, vor[lm, k], ∂Dθ)       # = ∂ζλ + ∂Dθ
 
@@ -351,15 +351,15 @@ function UV_from_vordiv!(
                 # ∂Dλ = im*vordiv_to_uv_x[lm]*div[lm]   # divergence contribution to zonal gradient
                 # ∂ζλ = im*vordiv_to_uv_x[lm]*vor[lm]   # vorticity contribution to zonal gradient
 
-                z = im*vordiv_to_uv_x[lm]
+                z = vordiv_to_uv_x[lm]
                 U[lm, k] = muladd(z, div[lm, k], ∂ζθ)   # = ∂Dλ + ∂ζθ
                 V[lm, k] = muladd(z, vor[lm, k], ∂Dθ)   # = ∂ζλ + ∂Dθ            
             end
 
             # SECOND LAST ROW (separated to imply that vor, div are zero in last row)
             lm += 1
-            U[lm, k] = im*vordiv_to_uv_x[lm]*div[lm, k] - vordiv_to_uv1[lm]*vor[lm-1, k]
-            V[lm, k] = im*vordiv_to_uv_x[lm]*vor[lm, k] + vordiv_to_uv1[lm]*div[lm-1, k]
+            U[lm, k] = vordiv_to_uv_x[lm]*div[lm, k] - vordiv_to_uv1[lm]*vor[lm-1, k]
+            V[lm, k] = vordiv_to_uv_x[lm]*vor[lm, k] + vordiv_to_uv1[lm]*div[lm-1, k]
 
             # LAST ROW (separated to avoid out-of-bounds access to lmax+1)
             lm += 1
@@ -370,8 +370,8 @@ function UV_from_vordiv!(
         # LAST COLUMN
         @inbounds begin
             lm += 1                                         # second last row
-            U[lm, k] = im*vordiv_to_uv_x[lm]*div[lm, k]     # other terms are zero
-            V[lm, k] = im*vordiv_to_uv_x[lm]*vor[lm, k]     # other terms are zero
+            U[lm, k] = vordiv_to_uv_x[lm]*div[lm, k]     # other terms are zero
+            V[lm, k] = vordiv_to_uv_x[lm]*vor[lm, k]     # other terms are zero
 
             lm += 1                                         # last row
             U[lm, k] = -vordiv_to_uv1[lm]*vor[lm-1, k]      # other terms are zero
