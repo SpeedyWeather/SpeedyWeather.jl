@@ -28,11 +28,23 @@ function Spectrum(
     mmax::Integer;
     architecture = DEFAULT_ARCHITECTURE(),
   )
-    return on_architecture(architecture, Spectrum(lmax, mmax, architecture, 
-    Tuple([m:lmax for m in 1:mmax]),    # orders 
-    l_indices(lmax, mmax),       # l_indices 
-    m_indices(lmax, mmax),       # m_indices
-    lm_orders(lmax, mmax)))      # lm_orders
+
+    orders = Tuple([m:lmax for m in 1:mmax])
+    ls = on_architecture(architecture, l_indices(lmax, mmax))
+    ms = on_architecture(architecture, m_indices(lmax, mmax))
+    lm_orders_tuple = lm_orders(lmax, mmax)
+
+    return Spectrum{typeof(architecture), 
+                    typeof(orders), 
+                    typeof(ls), 
+                    typeof(ms), 
+                    typeof(lm_orders_tuple)}(lmax, 
+                    mmax, 
+                    architecture, 
+                    orders, 
+                    ls, 
+                    ms, 
+                    lm_orders_tuple)
 end
 
 """
@@ -52,7 +64,17 @@ $(TYPEDSIGNATURES)
 Create a `Spectrum` from another `Spectrum` but with a new architecture.
 """
 Spectrum(spectrum::Spectrum; architecture::AbstractArchitecture=DEFAULT_ARCHITECTURE()) = 
-    on_architecture(architecture, Spectrum(spectrum.lmax, spectrum.mmax, architecture, spectrum.orders, spectrum.l_indices, spectrum.m_indices, spectrum.lm_orders))
+    on_architecture(architecture, Spectrum{typeof(architecture), 
+                                            typeof(spectrum.orders), 
+                                            typeof(spectrum.l_indices), 
+                                            typeof(spectrum.m_indices), 
+                                            typeof(spectrum.lm_orders)}(spectrum.lmax, 
+                                            spectrum.mmax, 
+                                            architecture, 
+                                            spectrum.orders, 
+                                            spectrum.l_indices, 
+                                            spectrum.m_indices, 
+                                            spectrum.lm_orders))
 
 triangle_number(m::Integer) = m*(m+1)÷2
 nonzeros(l::Integer, m::Integer) = l*m - triangle_number(m-1)
