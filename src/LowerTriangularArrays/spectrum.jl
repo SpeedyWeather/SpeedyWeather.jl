@@ -7,14 +7,14 @@ Encodes the spectral trunction, orders and degrees of the spherical harmonics.
 Is used by every `LowerTriangularArray` and also defines the architecture on which the 
 data of the `LowerTriangularArray` is stored.
 """
-struct Spectrum{A, O, L, M} <: AbstractSpectrum
+struct Spectrum{A, O, L, M, LMO} <: AbstractSpectrum
     lmax::Int
     mmax::Int
     architecture::A
     orders::O
     l_indices::L    # used by GPU kernels 
     m_indices::M    # used by GPU kernels
-    lm_orders::O    # used by eachorder
+    lm_orders::LMO  # used by eachorder
 end
 
 """
