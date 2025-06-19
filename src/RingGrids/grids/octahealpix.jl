@@ -87,7 +87,7 @@ function each_index_in_ring(::Type{<:OctaHEALPixGrid},     # function for OctaHE
     return index_1st:index_end                              # range of i's in ring
 end
 
-function each_index_in_ring!(   rings::AbstractVector,
+function each_index_in_ring!(   rings,
                                 Grid::Type{<:OctaHEALPixGrid},
                                 nlat_half::Integer) # resolution param
 

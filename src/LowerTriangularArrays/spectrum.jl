@@ -29,7 +29,7 @@ function Spectrum(
     architecture = DEFAULT_ARCHITECTURE(),
   )
     return on_architecture(architecture, Spectrum(lmax, mmax, architecture, 
-    [m:lmax for m in 1:mmax],    # orders 
+    Tuple([m:lmax for m in 1:mmax]),    # orders 
     l_indices(lmax, mmax),       # l_indices 
     m_indices(lmax, mmax),       # m_indices
     lm_orders(lmax, mmax)))      # lm_orders
@@ -91,7 +91,7 @@ function lm_orders(lmax::Integer, mmax::Integer)
         lm_orders[m] = lm+1:lm+(lmax-m+1)
         lm += lmax-m+1
     end
-    return lm_orders
+    return Tuple(lm_orders)
 end
 
 Base.:(==)(s1::Spectrum, s2::Spectrum) = 

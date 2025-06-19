@@ -13,7 +13,7 @@ function SpeedyTransforms.plan_FFTs!(
     brfft_plans_1D::Vector{AbstractFFTs.Plan},
     fake_grid_data::AbstractField{NF, N, <:CuArray{NF}},
     scratch_memory_north::CuArray{Complex{NF}},
-    rings::AbstractArray,
+    rings,
     nlons::Vector{<:Int}
 ) where {NF<:AbstractFloat, N}
     # Determine which FFT package to use (currently either FFTW or GenericFFT)

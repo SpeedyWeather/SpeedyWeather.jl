@@ -304,7 +304,7 @@ end
 
             # precompute indices and boundscheck
             rings = RingGrids.eachring(grid)   
-            rings2 = [RingGrids.each_index_in_ring(grid, j) for j in 1:RingGrids.get_nlat(grid)]
+            rings2 = Tuple([RingGrids.each_index_in_ring(grid, j) for j in 1:RingGrids.get_nlat(grid)])
 
             @test rings == rings2
         end
@@ -505,7 +505,7 @@ end
         # getindex 
         @test field[1, :, :] isa JLArray{NF, 2}
         @test field[:, 1, 1] isa Field{NF, 1, JLArray{NF, 1}}
-        for ring in Vector(eachring(field)) # GPU arrays are not actually intended to be indexed like this, the rings are also JLArrays, that's why the `Vector` is needed here
+        for ring in eachring(field) 
             @test field[ring, :, :] == adapt(JLArray, field_cpu[ring, :, :])
             @test Array(field[ring, :, :]) == field_cpu[ring, :, :]
         end

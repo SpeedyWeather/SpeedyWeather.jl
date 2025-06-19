@@ -183,7 +183,7 @@ over rings of a grid. These indices are also precomputed in every `grid.rings`."
 function eachring(Grid::Type{<:AbstractGrid}, nlat_half::Integer)
     rings = Vector{UnitRange{Int}}(undef, get_nlat(Grid, nlat_half))    # allocate
     each_index_in_ring!(rings, Grid, nlat_half)                         # calculate iteratively
-    return rings
+    return Tuple(rings)                                                 # return as tuple -> more architecture agnostic 
 end
 
 """$(TYPEDSIGNATURES) Same as `eachring(grid)` but performs a bounds check to assess
@@ -246,7 +246,7 @@ end
 
 """$(TYPEDSIGNATURES) Obtain ring index `j` from gridpoint `ij` and `rings`
 describing rind indices as obtained from `eachring(::Grid)`"""
-function whichring(ij::Integer, rings::AbstractVector)
+function whichring(ij::Integer, rings)
     @boundscheck 0 < ij <= rings[end][end] || throw(BoundsError)
     j = 1
     @inbounds while ij > rings[j][end]
@@ -258,7 +258,7 @@ end
 whichring(ij::Integer, grid::AbstractGrid) = whichring(ij, grid.rings)
 
 """$(TYPEDSIGNATURES) Vector of ring indices for every grid point in `grid`."""
-function whichring(Grid::Type{<:AbstractGrid}, nlat_half, rings::AbstractVector)
+function whichring(Grid::Type{<:AbstractGrid}, nlat_half, rings)
     w = zeros(Int, get_npoints(Grid, nlat_half))
     @inbounds for (j, ring) in enumerate(rings)
         w[ring] .= j

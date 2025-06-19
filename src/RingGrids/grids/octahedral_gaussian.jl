@@ -83,7 +83,7 @@ get_quadrature_weights(::Type{<:OctahedralGaussianGrid}, nlat_half::Integer) = g
 """$(TYPEDSIGNATURES) precompute a `Vector{UnitRange{Int}} to index grid points on
 every ring `j` (elements of the vector) of `Grid` at resolution `nlat_half`.
 See `eachring` and `eachgrid` for efficient looping over grid points."""
-function each_index_in_ring!(   rings::AbstractVector,
+function each_index_in_ring!(   rings,
                                 Grid::Type{<:OctahedralGaussianGrid},
                                 nlat_half::Integer) # resolution param
 
