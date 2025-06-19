@@ -274,9 +274,10 @@ function Base.zero(
     progn::PrognosticVariables{
         NF, ArrayType, SpectrumType, GridType,
         SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, ParticleVector,
-        }) where {
+        ClockType}) where {
         NF, ArrayType, SpectrumType, GridType,
         SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, ParticleVector,
+        ClockType
         }
 
     (; spectrum, grid, nlayers, nlayers_soil, nparticles, nsteps) = progn
@@ -284,7 +285,7 @@ function Base.zero(
     # initialize regular progn variables 
     progn_new = PrognosticVariables{NF, ArrayType, SpectrumType, GridType,
         SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, 
-        ParticleVector}(;
+        ParticleVector, ClockType}(;
             spectrum, grid, nlayers, nlayers_soil, nparticles, nsteps
         )
 
