@@ -1,5 +1,3 @@
-using Dates
-
 """
 $(TYPEDSIGNATURES)
 Check whether elements of a vector `v` are strictly increasing."""
@@ -153,15 +151,15 @@ Dates.coarserperiod(::Type{Year}) = (Century, 100)
 Dates.coarserperiod(::Type{Century}) = (Millenium, 10)
 
 # conversion rules for floating point -> time types
-Dates.Second(x::AbstractFloat) = convert(Second, x)
-Dates.Minute(x::AbstractFloat) = Second(60x)
-Dates.Hour(  x::AbstractFloat) = Minute(60x)
-Dates.Day(   x::AbstractFloat) = Hour(24x)
-Dates.Week(  x::AbstractFloat) = Day(7x)
-Dates.Month( x::AbstractFloat) = Day(30x)  # approximate
-Dates.Year(  x::AbstractFloat) = Day(365x) # approximate
-Century(     x::AbstractFloat) = Year(100x)
-Millenium(   x::AbstractFloat) = Century(10x)
+Dates.Second(       x::AbstractFloat) = convert(Second, x)
+Dates.Minute(       x::AbstractFloat) = Second(60x)
+Dates.Hour(         x::AbstractFloat) = Minute(60x)
+Dates.Day(          x::AbstractFloat) = Hour(24x)
+Dates.Week(         x::AbstractFloat) = Day(7x)
+Dates.Month(        x::AbstractFloat) = Day(30x)  # approximate
+Dates.Year(         x::AbstractFloat) = Day(365x) # approximate
+Century(      x::AbstractFloat) = Year(100x)
+Millenium(    x::AbstractFloat) = Century(10x)
 
 # use Dates.second to round to integer seconds
 Dates.second(x::Dates.Nanosecond) = round(Int, x.value*1e-9)
