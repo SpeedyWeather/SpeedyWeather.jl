@@ -47,7 +47,7 @@ import SpeedyWeather: on_architecture, CPU, launch!
         end
 
         # Test parameters
-        nlat_half = 5   # degree
+        nlat_half = 6   # degree
         nlayers = 5
         NF = Float32
 
