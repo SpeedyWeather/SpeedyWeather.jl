@@ -23,6 +23,8 @@ export  SpectralTransform,
         transform!,
         transform
 
+export _legendre_ka!
+
 # ALIASING
 export  get_nlat_half
 
@@ -49,6 +51,7 @@ include("legendre_shortcuts.jl")
 include("spectral_transform.jl")
 include("fourier.jl")
 include("legendre.jl")
+include("legendre_ka.jl")
 include("spectral_gradients.jl")
 include("spectral_truncation.jl")
 include("power_spectrum.jl")
