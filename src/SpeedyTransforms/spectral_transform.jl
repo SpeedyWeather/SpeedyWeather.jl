@@ -145,7 +145,7 @@ function SpectralTransform(
     
     # LONGITUDE OFFSETS OF FIRST GRID POINT PER RING (0 for full and octahedral grids)
     lons, _ = RingGrids.get_lonlats(grid)
-    rings = eachring(grid)                                  # compute ring indices
+    rings = adapt(Array, eachring(grid))                    # compute ring indices (on CPU)
     lon1s = [lons[rings[j].start] for j in 1:nlat_half]     # pick lons at first index for each ring
     lon_offsets = [cispi(m*lon1/π) for m in 0:mmax-1, lon1 in lon1s]
     
