@@ -7,14 +7,14 @@ Encodes the spectral trunction, orders and degrees of the spherical harmonics.
 Is used by every `LowerTriangularArray` and also defines the architecture on which the 
 data of the `LowerTriangularArray` is stored.
 """
-struct Spectrum{A, O, L, M, LMO} <: AbstractSpectrum
+struct Spectrum{A, O, L, M} <: AbstractSpectrum
     lmax::Int
     mmax::Int
     architecture::A
     orders::O
     l_indices::L    # used by GPU kernels 
     m_indices::M    # used by GPU kernels
-    lm_orders::LMO  # used by eachorder
+    lm_orders::O  # used by eachorder
 end
 
 """
@@ -30,15 +30,14 @@ function Spectrum(
   )
 
     orders = Tuple([m:lmax for m in 1:mmax])
-    ls = on_architecture(architecture, l_indices(lmax, mmax))
-    ms = on_architecture(architecture, m_indices(lmax, mmax))
+    ls = adapt(array_type(architecture), l_indices(lmax, mmax))
+    ms = adapt(array_type(architecture), m_indices(lmax, mmax))
     lm_orders_tuple = lm_orders(lmax, mmax)
 
     return Spectrum{typeof(architecture), 
                     typeof(orders), 
                     typeof(ls), 
-                    typeof(ms), 
-                    typeof(lm_orders_tuple)}(lmax, 
+                    typeof(ms)}(lmax, 
                     mmax, 
                     architecture, 
                     orders, 
@@ -64,17 +63,13 @@ $(TYPEDSIGNATURES)
 Create a `Spectrum` from another `Spectrum` but with a new architecture.
 """
 Spectrum(spectrum::Spectrum; architecture::AbstractArchitecture=DEFAULT_ARCHITECTURE()) = 
-    on_architecture(architecture, Spectrum{typeof(architecture), 
-                                            typeof(spectrum.orders), 
-                                            typeof(spectrum.l_indices), 
-                                            typeof(spectrum.m_indices), 
-                                            typeof(spectrum.lm_orders)}(spectrum.lmax, 
-                                            spectrum.mmax, 
-                                            architecture, 
-                                            spectrum.orders, 
-                                            spectrum.l_indices, 
-                                            spectrum.m_indices, 
-                                            spectrum.lm_orders))
+    Spectrum(spectrum.lmax, 
+            spectrum.mmax, 
+            architecture, 
+            spectrum.orders, 
+            adapt(array_type(architecture), spectrum.l_indices), 
+            adapt(array_type(architecture), spectrum.m_indices), 
+            spectrum.lm_orders)
 
 triangle_number(m::Integer) = m*(m+1)÷2
 nonzeros(l::Integer, m::Integer) = l*m - triangle_number(m-1)
@@ -133,4 +128,4 @@ ismatching(s::Spectrum, array::AbstractArray) = ismatching(s.architecture, typeo
 
 Adapt.@adapt_structure Spectrum
 
-on_architecture(arch::AbstractArchitecture, s::Spectrum) = adapt(array_type(arch), s)
+on_architecture(architecture::AbstractArchitecture, s::Spectrum) = Spectrum(s; architecture)

@@ -70,7 +70,7 @@ end
 # change the architecture of a grid, keep all other fields 
 function (::Type{Grid})(grid::Grid, architecture::AbstractArchitecture) where {Grid<:AbstractGrid}
     Grid_ = nonparametric_type(Grid)        # strip away parameters of type, obtain from arguments
-    return Grid_(grid.nlat_half, architecture, grid.rings, grid.whichring)
+    return Grid_(grid.nlat_half, architecture, grid.rings, adapt(array_type(architecture), grid.whichring))
 end
 
 function (::Type{Grid})(
@@ -273,4 +273,7 @@ whichring(Grid::Type{<:AbstractGrid}, nlat_half::Integer) = whichring(Grid, nlat
 ismatching(grid::AbstractGrid, array_type::Type{<:AbstractArray}) = ismatching(grid.architecture, array_type)
 ismatching(grid::AbstractGrid, array::AbstractArray) = ismatching(grid.architecture, typeof(array))
 
-on_architecture(arch::AbstractArchitecture, grid::AbstractGrid) = adapt(array_type(arch), grid)
+function on_architecture(arch::AbstractArchitecture, grid::Grid) where Grid<:AbstractGrid 
+    Grid_ = nonparametric_type(Grid)
+    return Grid_(grid, arch)
+end 
