@@ -294,6 +294,7 @@ end
     end
 end
 
+
 """
 $(TYPEDSIGNATURES)
 Get U, V (=(u, v)*coslat) from vorticity ζ and divergence D in spectral space.
@@ -304,6 +305,100 @@ to get U, V.
 Acts on the unit sphere, i.e. it omits any radius scaling as all inplace gradient operators.
 """
 function UV_from_vordiv!(   
+    U::LowerTriangularArray,
+    V::LowerTriangularArray,
+    vor::LowerTriangularArray,
+    div::LowerTriangularArray,
+    S::SpectralTransform;
+    radius = DEFAULT_RADIUS,
+)
+    (; vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2 ) = S
+    @boundscheck ismatching(S, U) || throw(DimensionMismatch(S, U))
+
+    # maximum degree l, order m of spherical harmonics (1-based)
+    lmax, mmax = size(U, OneBased, as=Matrix)
+
+    for k in eachmatrix(U, V, vor, div)                 # also checks size compatibility
+        lm = 0
+        @inbounds for m in 1:mmax-1                     # 1-based l, m, skip last column
+
+            # DIAGONAL (separated to avoid access to l-1, m which is above the diagonal)
+            lm += 1
+            
+            # div, vor contribution to meridional gradient
+            ∂ζθ =  vordiv_to_uv2[lm]*vor[lm+1, k]       # lm-1 term is zero
+            ∂Dθ = -vordiv_to_uv2[lm]*div[lm+1, k]       # lm-1 term is zero
+            
+            # the following is moved into the muladd        
+            # ∂Dλ = im*vordiv_to_uv_x[lm]*div[lm]       # divergence contribution to zonal gradient
+            # ∂ζλ = im*vordiv_to_uv_x[lm]*vor[lm]       # vorticity contribution to zonal gradient
+
+            z = im*vordiv_to_uv_x[lm]
+            U[lm, k] = muladd(z, div[lm, k], ∂ζθ)       # = ∂Dλ + ∂ζθ
+            V[lm, k] = muladd(z, vor[lm, k], ∂Dθ)       # = ∂ζλ + ∂Dθ
+
+            # BELOW DIAGONAL (all terms)
+            for l in m+1:lmax-2                         # skip last two rows (lmax-1, lmax)
+                lm += 1
+                
+                # div, vor contribution to meridional gradient
+                # ∂ζθ = vordiv_to_uv2[lm]*vor[lm+1] - vordiv_to_uv1[lm]*vor[lm-1]
+                # ∂Dθ = vordiv_to_uv1[lm]*div[lm-1] - vordiv_to_uv2[lm]*div[lm+1]
+                ∂ζθ = muladd(vordiv_to_uv2[lm], vor[lm+1, k], -vordiv_to_uv1[lm]*vor[lm-1, k])
+                ∂Dθ = muladd(vordiv_to_uv1[lm], div[lm-1, k], -vordiv_to_uv2[lm]*div[lm+1, k])
+
+                # The following is moved into the muladd
+                # ∂Dλ = im*vordiv_to_uv_x[lm]*div[lm]   # divergence contribution to zonal gradient
+                # ∂ζλ = im*vordiv_to_uv_x[lm]*vor[lm]   # vorticity contribution to zonal gradient
+
+                z = im*vordiv_to_uv_x[lm]
+                U[lm, k] = muladd(z, div[lm, k], ∂ζθ)   # = ∂Dλ + ∂ζθ
+                V[lm, k] = muladd(z, vor[lm, k], ∂Dθ)   # = ∂ζλ + ∂Dθ            
+            end
+
+            # SECOND LAST ROW (separated to imply that vor, div are zero in last row)
+            lm += 1
+            U[lm, k] = im*vordiv_to_uv_x[lm]*div[lm, k] - vordiv_to_uv1[lm]*vor[lm-1, k]
+            V[lm, k] = im*vordiv_to_uv_x[lm]*vor[lm, k] + vordiv_to_uv1[lm]*div[lm-1, k]
+
+            # LAST ROW (separated to avoid out-of-bounds access to lmax+1)
+            lm += 1
+            U[lm, k] = -vordiv_to_uv1[lm]*vor[lm-1, k]  # only last term from 2nd last row
+            V[lm, k] =  vordiv_to_uv1[lm]*div[lm-1, k]  # only last term from 2nd last row
+        end
+
+        # LAST COLUMN
+        @inbounds begin
+            lm += 1                                         # second last row
+            U[lm, k] = im*vordiv_to_uv_x[lm]*div[lm, k]     # other terms are zero
+            V[lm, k] = im*vordiv_to_uv_x[lm]*vor[lm, k]     # other terms are zero
+
+            lm += 1                                         # last row
+            U[lm, k] = -vordiv_to_uv1[lm]*vor[lm-1, k]      # other terms are zero
+            V[lm, k] =  vordiv_to_uv1[lm]*div[lm-1, k]      # other terms are zero
+        end
+    end
+
+    # *radius scaling if not unit sphere (*radius² for ∇⁻², then /radius to get from stream function to velocity)
+    if radius != 1
+        U .*= radius
+        V .*= radius
+    end
+
+    return U, V
+end
+
+
+"""
+$(TYPEDSIGNATURES)
+Get U, V (=(u, v)*coslat) from vorticity ζ and divergence D in spectral space.
+Two operations are combined into a single linear operation. First, invert the
+spherical Laplace ∇² operator to get stream function from vorticity and
+velocity potential from divergence. Then compute zonal and meridional gradients
+to get U, V.
+Acts on the unit sphere, i.e. it omits any radius scaling as all inplace gradient operators.
+"""
+function UV_from_vordiv_kernel!(   
     U::LowerTriangularArray,
     V::LowerTriangularArray,
     vor::LowerTriangularArray,
