@@ -10,10 +10,10 @@ import FastGaussQuadrature
 import LinearAlgebra
 export rotate, rotate!
 
-import Adapt
+import Adapt: Adapt, adapt, adapt_structure
 import GPUArrays
 import KernelAbstractions
-import ..Architectures: AbstractArchitecture, on_architecture, array_type
+import ..Architectures: AbstractArchitecture, on_architecture, array_type, ismatching, CPU, architecture
 
 # ABSTRACT GRIDS
 export  AbstractGrid,
@@ -108,6 +108,7 @@ export zonal_mean
 # CONSTANTS
 const DEFAULT_NF = Float64
 const DEFAULT_ARRAYTYPE = Array
+const DEFAULT_ARCHITECTURE = CPU
 
 include("utility_functions.jl")
 

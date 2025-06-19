@@ -69,7 +69,8 @@ end
 
 # change the architecture of a grid, keep all other fields 
 function (::Type{Grid})(grid::Grid, architecture::AbstractArchitecture) where {Grid<:AbstractGrid}
-    return Grid(grid.nlat_half, architecture, grid.rings, grid.whichring)
+    Grid_ = nonparametric_type(Grid)        # strip away parameters of type, obtain from arguments
+    return Grid_(grid.nlat_half, architecture, grid.rings, grid.whichring)
 end
 
 function (::Type{Grid})(
