@@ -62,7 +62,7 @@ struct SpectralGrid{
     SpectralVariable4D::Type{<:AbstractArray}
     
     # SIZE OF GRID from trunc, Grid, dealiasing:
-    "[OPTION] how to match spectral with grid resolution: dealiasing factor, 1=linear, 2=quadratic, 3=cubic grid"
+    "[OPTION] how to match spectral with grid resolution: dealiasing factor,0=automatically chosen based on Grid, 1=linear, 2=quadratic, 3=cubic grid"
     dealiasing::Float64
     
     "[DERIVED] number of latitude rings on one hemisphere (Equator incl)"
@@ -136,7 +136,7 @@ function SpectralGrid(;
     ArrayType::Type{<:AbstractArray} = array_type(architecture),
     trunc::Int = DEFAULT_TRUNC,
     Grid::Type{<:AbstractGrid} = DEFAULT_GRID,
-    dealiasing::Real = SpeedyTransforms.get_dealiasing(trunc, grid.nlat_half),
+    dealiasing::Real = 2,
     radius::Real = DEFAULT_RADIUS,
     nparticles::Int = 0,
     nlayers::Int = DEFAULT_NLAYERS,
@@ -148,16 +148,19 @@ function SpectralGrid(;
         architecture = architecture()
     end
 
+    # grid
+    nlat_half = SpeedyTransforms.get_nlat_half(trunc, dealiasing)
+    grid = Grid(nlat_half, architecture)
+    nlat = RingGrids.get_nlat(grid)
+    npoints = RingGrids.get_npoints(grid)
+
+    # default dealiasing or user-defined one? 
+    dealiasing = SpeedyTransforms.get_dealiasing(trunc, grid.nlat_half)
+    
     # Convert numeric parameters to Float64
     dealiasing_f64 = Float64(dealiasing)
     radius_f64 = Float64(radius)
 
-    # grid
-    nlat_half = SpeedyTransforms.get_nlat_half(trunc, dealiasing_f64)
-    grid = Grid(nlat_half, architecture=architecture)
-    nlat = RingGrids.get_nlat(grid)
-    npoints = RingGrids.get_npoints(grid)
-    
     # Calculate derived fields
     VectorType = ArrayType{NF, 1}
     MatrixType = ArrayType{NF, 2}
