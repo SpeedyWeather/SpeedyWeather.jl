@@ -74,6 +74,7 @@ export PrognosticVariables
     GridVariable2D,         # <: AbstractField
     GridVariable3D,         # <: AbstractField
     ParticleVector,         # <: AbstractVector{Particle{NF}}
+    ClockType,              # <: AbstractClock
 } <: AbstractPrognosticVariables
 
     # DIMENSIONS
@@ -132,7 +133,7 @@ export PrognosticVariables
     scale::Base.RefValue{NF} = Ref(one(NF))
 
     "Clock that keeps track of time, number of timesteps to integrate for."
-    clock::Clock = Clock()
+    clock::ClockType = Clock()
 end
 
 Base.eltype(progn::PrognosticVariables{T}) where T = T
@@ -168,10 +169,11 @@ function PrognosticVariables(SG::SpectralGrid; nsteps=DEFAULT_NSTEPS)
     (; spectrum, grid, nlayers, nlayers_soil, nparticles) = SG
     (; NF, ArrayType) = SG
     (; SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, ParticleVector) = SG
-
+    clock = Clock()
+    
     return PrognosticVariables{NF, ArrayType, typeof(spectrum), typeof(grid),
-        SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, ParticleVector}(;
-            spectrum, grid, nlayers, nlayers_soil, nparticles, nsteps,
+        SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, ParticleVector, typeof(clock)}(;
+            spectrum, grid, nlayers, nlayers_soil, nparticles, nsteps, clock,
         )
 end
 
