@@ -148,7 +148,7 @@ function SpectralGrid(
     ArrayType::Type{<:AbstractArray} = array_type(architecture),
     trunc::Int = DEFAULT_TRUNC,
     Grid::Type{<:AbstractGrid} = DEFAULT_GRID,
-    dealiasing::Real = 2.0,
+    dealiasing::Real = SpeedyTransforms.get_dealiasing(truncation(spectrum), grid.nlat_half),
     radius::Real = DEFAULT_RADIUS,
     nparticles::Int = 0,
     nlayers::Int = DEFAULT_NLAYERS,
@@ -163,6 +163,11 @@ function SpectralGrid(
     # Convert numeric parameters to Float64
     dealiasing_f64 = Float64(dealiasing)
     radius_f64 = Float64(radius)
+
+    # infer additional grid parameters
+    (; nlat_half) = grid
+    nlat = RingGrids.get_nlat(grid)
+    npoints = RingGrids.get_npoints(grid)
     
     # Calculate derived fields
     VectorType = ArrayType{NF, 1}
@@ -198,7 +203,7 @@ function SpectralGrid(
         SpectralVariable2D,
         SpectralVariable3D,
         SpectralVariable4D,
-        dealiasing,
+        dealiasing_f64,
         nlat_half,
         nlat,
         npoints,
@@ -206,7 +211,7 @@ function SpectralGrid(
         GridVariable2D,
         GridVariable3D,
         GridVariable4D,
-        radius,
+        radius_f64,
         nparticles,
         ParticleVector,
         nlayers,
