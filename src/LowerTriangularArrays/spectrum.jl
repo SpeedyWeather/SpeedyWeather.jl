@@ -29,10 +29,10 @@ function Spectrum(
     architecture = DEFAULT_ARCHITECTURE(),
   )
 
-    orders = [m:lmax for m in 1:mmax]
+    orders = adapt(array_type(architecture), [m:lmax for m in 1:mmax])
     ls = adapt(array_type(architecture), l_indices(lmax, mmax))
     ms = adapt(array_type(architecture), m_indices(lmax, mmax))
-    lm_orders_tuple = lm_orders(lmax, mmax)
+    lm_orders_tuple = adapt(array_type(architecture), lm_orders(lmax, mmax))
 
     return Spectrum{typeof(architecture), 
                     typeof(orders), 
@@ -63,13 +63,13 @@ $(TYPEDSIGNATURES)
 Create a `Spectrum` from another `Spectrum` but with a new architecture.
 """
 Spectrum(spectrum::Spectrum; architecture::AbstractArchitecture=DEFAULT_ARCHITECTURE()) = 
-    Spectrum{typeof(architecture), typeof(spectrum.orders), typeof(spectrum.l_indices)}(spectrum.lmax, 
+    adapt(array_type(architecture), Spectrum(spectrum.lmax, 
             spectrum.mmax, 
             architecture, 
             spectrum.orders, 
-            adapt(array_type(architecture), spectrum.l_indices), 
-            adapt(array_type(architecture), spectrum.m_indices), 
-            spectrum.lm_orders)
+            spectrum.l_indices, 
+            spectrum.m_indices, 
+            spectrum.lm_orders))
 
 triangle_number(m::Integer) = m*(m+1)÷2
 nonzeros(l::Integer, m::Integer) = l*m - triangle_number(m-1)
