@@ -7,14 +7,14 @@ Encodes the spectral trunction, orders and degrees of the spherical harmonics.
 Is used by every `LowerTriangularArray` and also defines the architecture on which the 
 data of the `LowerTriangularArray` is stored.
 """
-struct Spectrum{A, O, L, M} <: AbstractSpectrum
+struct Spectrum{A, L} <: AbstractSpectrum
     lmax::Int
     mmax::Int
     architecture::A
-    orders::O
+    orders::Vector{UnitRange{Int}}
     l_indices::L    # used by GPU kernels 
-    m_indices::M    # used by GPU kernels
-    lm_orders::O  # used by eachorder
+    m_indices::L    # used by GPU kernels
+    lm_orders::Vector{UnitRange{Int}}  # used by eachorder
 end
 
 """
@@ -29,15 +29,14 @@ function Spectrum(
     architecture = DEFAULT_ARCHITECTURE(),
   )
 
-    orders = ntuple(m -> m:lmax, Val(mmax))  # Compile-time tuple creation
+    orders = [m:lmax for m in 1:mmax]
     ls = adapt(array_type(architecture), l_indices(lmax, mmax))
     ms = adapt(array_type(architecture), m_indices(lmax, mmax))
     lm_orders_tuple = lm_orders(lmax, mmax)
 
     return Spectrum{typeof(architecture), 
-                    typeof(orders), 
-                    typeof(ls), 
-                    typeof(ms)}(lmax, 
+                    typeof(ls)}(
+                    lmax, 
                     mmax, 
                     architecture, 
                     orders, 
@@ -63,7 +62,7 @@ $(TYPEDSIGNATURES)
 Create a `Spectrum` from another `Spectrum` but with a new architecture.
 """
 Spectrum(spectrum::Spectrum; architecture::AbstractArchitecture=DEFAULT_ARCHITECTURE()) = 
-    Spectrum(spectrum.lmax, 
+    Spectrum{typeof(architecture), typeof(spectrum.l_indices)}(spectrum.lmax, 
             spectrum.mmax, 
             architecture, 
             spectrum.orders, 
@@ -108,7 +107,7 @@ function lm_orders(lmax::Integer, mmax::Integer)
         lm_orders[m] = lm+1:lm+(lmax-m+1)
         lm += lmax-m+1
     end
-    return ntuple(m -> lm_orders[m], Val(mmax))
+    return lm_orders
 end
 
 Base.:(==)(s1::Spectrum, s2::Spectrum) = 
