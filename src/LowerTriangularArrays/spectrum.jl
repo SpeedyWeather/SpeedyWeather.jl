@@ -125,6 +125,8 @@ eachorder(s::Spectrum) = s.lm_orders
 ismatching(s::Spectrum, array_type::Type{<:AbstractArray}) = ismatching(s.architecture, array_type)
 ismatching(s::Spectrum, array::AbstractArray) = ismatching(s.architecture, typeof(array))
 
-Adapt.@adapt_structure Spectrum
+function Adapt.adapt_structure(to, s::Spectrum)
+    return Spectrum(s.lmax, s.mmax, s.architecture, s.orders, adapt(to, s.l_indices), adapt(to, s.m_indices), s.lm_orders)
+end
 
 on_architecture(architecture::AbstractArchitecture, s::Spectrum) = Spectrum(s; architecture)
