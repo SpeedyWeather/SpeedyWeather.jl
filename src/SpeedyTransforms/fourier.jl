@@ -291,7 +291,7 @@ function plan_FFTs!(
     brfft_plans_1D::Vector{AbstractFFTs.Plan},
     fake_grid_data::AbstractField{NF, N, <:AbstractArray{NF}},
     scratch_memory_north::AbstractArray{Complex{NF}},
-    rings::AbstractArray,
+    rings,
     nlons::Vector{<:Int}
 ) where {NF<:AbstractFloat, N}
     # Determine which FFT package to use (currently either FFTW or GenericFFT)

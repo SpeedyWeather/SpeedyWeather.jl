@@ -257,13 +257,11 @@ end
     end
 end
 
-# only needed when the extension isn't loaded
-LowerTriangularArrays.nonparametric_type(::Type{<:JLArray}) = JLArray
-
 @testset "Zeros, ones, rand, and randn constructors" begin
     for f in (ones, zeros, rand, randn)
         s = (5, 5)
         spectrum = Spectrum(s...)
+        spectrum_jlarray = Spectrum(spectrum, architecture=SpeedyWeather.architecture(JLArray))
         
         # for 2D doesn't matter whether you say Matrix or Array, size is determined by s
         L = f(LowerTriangularMatrix, s...)
@@ -294,7 +292,7 @@ LowerTriangularArrays.nonparametric_type(::Type{<:JLArray}) = JLArray
         
         L = f(LowerTriangularMatrix{Float16}, s...)
         L2 = f(LowerTriangularArray{Float16, 1, Vector{Float16}, typeof(spectrum)}, s...)
-        JL = f(LowerTriangularArray{Float16, 1, JLArray{Float16, 1}, typeof(spectrum)}, s...)
+        JL = f(LowerTriangularArray{Float16, 1, JLArray{Float16, 1}, typeof(spectrum_jlarray)}, s...)
         @test typeof(L) == typeof(L2)
         @test size(L) == size(L2)
         @test typeof(L) != typeof(JL)
@@ -302,7 +300,7 @@ LowerTriangularArrays.nonparametric_type(::Type{<:JLArray}) = JLArray
 
         L = f(LowerTriangularMatrix{Float16}, spectrum)
         L2 = f(LowerTriangularArray{Float16, 1, Vector{Float16}, typeof(spectrum)}, spectrum)
-        JL = f(LowerTriangularArray{Float16, 1, JLArray{Float16, 1}, typeof(spectrum)}, spectrum)
+        JL = f(LowerTriangularArray{Float16, 1, JLArray{Float16, 1}, typeof(spectrum_jlarray)}, spectrum_jlarray)
         @test typeof(L) == typeof(L2)
         @test size(L) == size(L2)
         @test typeof(L) != typeof(JL)
@@ -314,7 +312,7 @@ LowerTriangularArrays.nonparametric_type(::Type{<:JLArray}) = JLArray
             Random.seed!(123)
             L =  f(LowerTriangularArray{Float16, N-1, Array{Float16, N-1}, typeof(spectrum)}, s...)
             Random.seed!(123)
-            JL = f(LowerTriangularArray{Float16, N-1, JLArray{Float16, N-1}, typeof(spectrum)}, s...)
+            JL = f(LowerTriangularArray{Float16, N-1, JLArray{Float16, N-1}, typeof(spectrum_jlarray)}, s...)
             JL2 = adapt(JLArray, L)
             @test all(JL2 .== JL)   # equality via broadcasting
             @test JL2 == JL         # checks for type and data equality
@@ -331,7 +329,7 @@ LowerTriangularArrays.nonparametric_type(::Type{<:JLArray}) = JLArray
             Random.seed!(123)
             L =  f(LowerTriangularArray{Float16, N+1, Array{Float16, N+1}, typeof(spectrum)}, spectrum, s...)
             Random.seed!(123)
-            JL = f(LowerTriangularArray{Float16, N+1, JLArray{Float16, N+1}, typeof(spectrum)}, spectrum, s...)
+            JL = f(LowerTriangularArray{Float16, N+1, JLArray{Float16, N+1}, typeof(spectrum_jlarray)}, spectrum_jlarray, s...)
             JL2 = adapt(JLArray, L)
             @test all(JL2 .== JL)   # equality via broadcasting
             @test JL2 == JL         # checks for type and data equality
@@ -621,12 +619,13 @@ end
     NF = Float32
     idims = (5,)
     spectrum = Spectrum(10, 10)
+    spectrum_jlarray = Spectrum(spectrum, architecture=SpeedyWeather.architecture(JLArray))
     
     L_cpu = randn(LowerTriangularArray{NF}, spectrum, idims...)
 
     # constructors/adapt
     L = adapt(JLArray, L_cpu)
-    L2 = LowerTriangularArray(adapt(JLArray, L_cpu.data), spectrum)
+    L2 = LowerTriangularArray(adapt(JLArray, L_cpu.data), spectrum_jlarray)
     @test all(L .== L2) 
 
     # getindex 
@@ -657,7 +656,7 @@ end
 
     # rand + convert
     L3 = adapt(JLArray, randn(LowerTriangularArray{NF}, spectrum, idims...))
-    L4 = convert(LowerTriangularArray{Float16,2,JLArray{Float16,2},typeof(spectrum)}, L3)
+    L4 = convert(LowerTriangularArray{Float16,2,JLArray{Float16,2},typeof(spectrum_jlarray)}, L3)
 
     for lm in SpeedyWeather.eachharmonic(L, L3)
         @test all(Float16.(L3[lm, :]) .== L4[lm, :])

@@ -87,7 +87,7 @@ function each_index_in_ring(::Type{<:OctaHEALPixGrid},     # function for OctaHE
     return index_1st:index_end                              # range of i's in ring
 end
 
-function each_index_in_ring!(   rings::AbstractVector,
+function each_index_in_ring!(   rings,
                                 Grid::Type{<:OctaHEALPixGrid},
                                 nlat_half::Integer) # resolution param
 
@@ -108,6 +108,8 @@ function each_index_in_ring!(   rings::AbstractVector,
         rings[j] = index_1st:index_end              # turn into UnitRange
     end
 end
+
+Adapt.@adapt_structure OctaHEALPixGrid
 
 # ## CONVERSION
 # Base.Matrix(G::OctaHEALPixGrid{T}; kwargs...) where T = Matrix!(zeros(T, matrix_size(G)...), G; kwargs...)

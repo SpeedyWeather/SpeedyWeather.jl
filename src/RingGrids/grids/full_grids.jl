@@ -24,7 +24,7 @@ end
 
 # precompute ring indices for full grids
 function each_index_in_ring!(   
-    rings::AbstractVector,
+    rings,
     Grid::Type{<:AbstractFullGrid},
     nlat_half::Integer,
 )

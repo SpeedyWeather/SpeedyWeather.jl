@@ -13,7 +13,7 @@ function prettymemory(b)
 end
 
 function Base.show(io::IO, S::SpectralTransform{NF, ArrayType}) where {NF, ArrayType}
-    (; spectrum, grid, nlayers) = S
+    (; spectrum, grid, nlayers, architecture) = S
     (; lmax, mmax) = spectrum   # 1-based max degree/order of harmonics
     (; nlat_half) = grid
     Grid = RingGrids.nonparametric_type(grid)
@@ -33,9 +33,10 @@ function Base.show(io::IO, S::SpectralTransform{NF, ArrayType}) where {NF, Array
     dealiasing = @sprintf("%.3g", dealias)
 
     println(io, "SpectralTransform{$NF, $ArrayType}:")
-    println(io, "├ Spectral:   T$(mmax-1), $(lmax)x$(mmax) LowerTriangularMatrix{Complex{$NF}}")
-    println(io, "├ Grid:       Field{$NF}, $(RingGrids.get_nlat(grid))-ring $Grid")
-    println(io, "├ Truncation: dealiasing = $dealiasing ($truncation)")
-    println(io, "├ Legendre:   Polynomials $polysize_str, shortcut: $(short_name(S.LegendreShortcut))")
-    print(io,   "└ Memory:     for $nlayers layers ($memorysize_str)")
+    println(io, "├ Spectral:     T$(mmax-1), $(lmax)x$(mmax) LowerTriangularMatrix{Complex{$NF}}")
+    println(io, "├ Grid:         Field{$NF}, $(RingGrids.get_nlat(grid))-ring $Grid")
+    println(io, "├ Truncation:   dealiasing = $dealiasing ($truncation)")
+    println(io, "├ Legendre:     Polynomials $polysize_str, shortcut: $(short_name(S.LegendreShortcut))")
+    println(io, "├ Architecture: $architecture")
+    print(io,   "└ Memory:       for $nlayers layers ($memorysize_str)")
 end

@@ -53,3 +53,5 @@ end
 
 # QUADRATURE
 get_quadrature_weights(::Type{<:FullGaussianGrid}, nlat_half::Integer) = gaussian_weights(nlat_half)
+
+Adapt.@adapt_structure FullGaussianGrid

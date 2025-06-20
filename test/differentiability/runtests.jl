@@ -2,7 +2,7 @@
 # These tests are relatively expensive, and also not strictly necessary to perform at every commit, so they 
 # are only part of the extended test set 
 using SpeedyWeather
-using EnzymeTestUtils, Enzyme, FiniteDifferences, Test
+using EnzymeTestUtils, Enzyme, FiniteDifferences, StatsBase, Test
 import EnzymeTestUtils: test_approx
 import FiniteDifferences: j′vp, grad, central_fdm
 import AbstractFFTs

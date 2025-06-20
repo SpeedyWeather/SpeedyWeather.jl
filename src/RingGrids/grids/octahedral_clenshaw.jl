@@ -87,7 +87,7 @@ get_quadrature_weights(::Type{<:OctahedralClenshawGrid}, nlat_half::Integer) =
     clenshaw_curtis_weights(nlat_half)
 
 ## INDEXING
-function each_index_in_ring!(   rings::Vector{<:UnitRange{<:Integer}},
+function each_index_in_ring!(   rings,
                                 Grid::Type{<:OctahedralClenshawGrid},
                                 nlat_half::Integer) # resolution param
 
@@ -109,6 +109,8 @@ function each_index_in_ring!(   rings::Vector{<:UnitRange{<:Integer}},
         rings[j] = index_1st:index_end              # turn into UnitRange
     end
 end
+
+Adapt.@adapt_structure OctahedralClenshawGrid
 
 ## CONVERSION
 # Base.Matrix(G::OctahedralClenshawGrid{T}; kwargs...) where T =

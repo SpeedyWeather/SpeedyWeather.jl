@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Reworked GPU and utility code structure and added GPU versions of spectral gradients[#727](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/727)
 - Fixed an error in the LowerTriangularArrays documentation [#749](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/749)
 - Use views instead of unpacking a tuple for 2-step prognostic variables [#745](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/745)
 - Introduce Field for data on grid [#732](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/732)
