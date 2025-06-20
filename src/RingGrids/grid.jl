@@ -56,20 +56,20 @@ matrix_size(grid::Grid) where {Grid<:AbstractGrid} = matrix_size(Grid, get_nlat_
 """$(TYPEDSIGNATURES) Create a new `grid` of type `Grid` with resolution parameter `nlat_half`.
 `architecture` is the device type (CPU/GPU). Precomputes the ring indices `rings`."""
 function (::Type{Grid})(nlat_half::Integer, architecture=DEFAULT_ARCHITECTURE()) where {Grid<:AbstractGrid}
-    Grid_ = nonparametric_type(Grid)        # strip away parameters of type, obtain from arguments
-    rings = eachring(Grid, nlat_half)       # precompute indices to access the variable-length rings
-    w = whichring(Grid, nlat_half, rings)   # precompute ring indices for each grid point
+    Grid_ = nonparametric_type(Grid)                # strip away parameters of type, obtain from arguments
+    rings = eachring(Grid, nlat_half)               # precompute indices to access the variable-length rings
+    w = whichring(Grid, nlat_half, rings)           # precompute ring indices for each grid point
     return on_architecture(architecture, Grid_(nlat_half, architecture, rings, w))
 end
 
 # also allow to construct a field with Grid(data)
 function (::Type{Grid})(data::AbstractArray; input_as=Vector, kwargs...) where {Grid<:AbstractGrid}
-    return Grid(data, input_as, kwargs...)      # make input_as a positional argument
+    return Grid(data, input_as, kwargs...)          # make input_as a positional argument
 end
 
 # change the architecture of a grid, keep all other fields 
 function (::Type{Grid})(grid::Grid, architecture::AbstractArchitecture) where {Grid<:AbstractGrid}
-    Grid_ = nonparametric_type(Grid)        # strip away parameters of type, obtain from arguments
+    Grid_ = nonparametric_type(Grid)                # strip away parameters of type, obtain from arguments
     return Grid_(grid.nlat_half, architecture, grid.rings, adapt(array_type(architecture), grid.whichring))
 end
 
@@ -181,9 +181,10 @@ Computes the ring indices `i0:i1` for start and end of every longitudinal point
 on a given ring `j` of `Grid` at resolution `nlat_half`. Used to loop
 over rings of a grid. These indices are also precomputed in every `grid.rings`."""
 function eachring(Grid::Type{<:AbstractGrid}, nlat_half::Integer)
-    rings = Vector{UnitRange{Int}}(undef, get_nlat(Grid, nlat_half))    # allocate
-    each_index_in_ring!(rings, Grid, nlat_half)                         # calculate iteratively
-    return Tuple(rings)                                                 # return as tuple -> more architecture agnostic 
+    nlat = get_nlat(Grid, nlat_half)
+    rings = Vector{UnitRange{Int}}(undef, nlat)    # allocate
+    each_index_in_ring!(rings, Grid, nlat_half)    # calculate iteratively
+    return ntuple(i -> rings[i], Val(nlat))                                                 # return as tuple -> more architecture agnostic 
 end
 
 """$(TYPEDSIGNATURES) Same as `eachring(grid)` but performs a bounds check to assess

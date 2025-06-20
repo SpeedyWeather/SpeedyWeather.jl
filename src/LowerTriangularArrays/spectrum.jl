@@ -29,7 +29,7 @@ function Spectrum(
     architecture = DEFAULT_ARCHITECTURE(),
   )
 
-    orders = Tuple([m:lmax for m in 1:mmax])
+    orders = ntuple(m -> m:lmax, Val(mmax))  # Compile-time tuple creation
     ls = adapt(array_type(architecture), l_indices(lmax, mmax))
     ms = adapt(array_type(architecture), m_indices(lmax, mmax))
     lm_orders_tuple = lm_orders(lmax, mmax)
@@ -108,7 +108,7 @@ function lm_orders(lmax::Integer, mmax::Integer)
         lm_orders[m] = lm+1:lm+(lmax-m+1)
         lm += lmax-m+1
     end
-    return Tuple(lm_orders)
+    return ntuple(m -> lm_orders[m], Val(mmax))
 end
 
 Base.:(==)(s1::Spectrum, s2::Spectrum) = 

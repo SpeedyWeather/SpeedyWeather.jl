@@ -74,7 +74,6 @@ export PrognosticVariables
     GridVariable2D,         # <: AbstractField
     GridVariable3D,         # <: AbstractField
     ParticleVector,         # <: AbstractVector{Particle{NF}}
-    ClockType,              # <: AbstractClock
 } <: AbstractPrognosticVariables
 
     # DIMENSIONS
@@ -133,7 +132,7 @@ export PrognosticVariables
     scale::Base.RefValue{NF} = Ref(one(NF))
 
     "Clock that keeps track of time, number of timesteps to integrate for."
-    clock::ClockType = Clock()
+    clock::Clock = Clock()
 end
 
 Base.eltype(progn::PrognosticVariables{T}) where T = T
@@ -169,11 +168,10 @@ function PrognosticVariables(SG::SpectralGrid{Architecture, SpectrumType, GridTy
     (; spectrum, grid, nlayers, nlayers_soil, nparticles) = SG
     (; NF, ArrayType) = SG
     (; SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, ParticleVector) = SG
-    clock = Clock()
     
     return PrognosticVariables{NF, ArrayType, SpectrumType, GridType,
-        SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, ParticleVector, typeof(clock)}(;
-            spectrum, grid, nlayers, nlayers_soil, nparticles, nsteps, clock,
+        SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, ParticleVector}(;
+            spectrum, grid, nlayers, nlayers_soil, nparticles, nsteps,
         )
 end
 
@@ -274,10 +272,9 @@ function Base.zero(
     progn::PrognosticVariables{
         NF, ArrayType, SpectrumType, GridType,
         SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, ParticleVector,
-        ClockType}) where {
+        }) where {
         NF, ArrayType, SpectrumType, GridType,
         SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, ParticleVector,
-        ClockType
         }
 
     (; spectrum, grid, nlayers, nlayers_soil, nparticles, nsteps) = progn
@@ -285,7 +282,7 @@ function Base.zero(
     # initialize regular progn variables 
     progn_new = PrognosticVariables{NF, ArrayType, SpectrumType, GridType,
         SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, 
-        ParticleVector, ClockType}(;
+        ParticleVector}(;
             spectrum, grid, nlayers, nlayers_soil, nparticles, nsteps
         )
 
