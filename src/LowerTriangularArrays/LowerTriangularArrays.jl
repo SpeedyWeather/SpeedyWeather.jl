@@ -7,7 +7,7 @@ using DocStringExtensions
 import Adapt: Adapt, adapt
 import GPUArrays
 import KernelAbstractions
-import ..Architectures: AbstractArchitecture, on_architecture, array_type, ismatching, CPU, architecture
+import ..Architectures: AbstractArchitecture, on_architecture, array_type, ismatching, CPU, GPU, architecture
 
 # NUMERICS
 import LinearAlgebra: tril!
@@ -15,7 +15,7 @@ import LinearAlgebra: tril!
 export AbstractSpectrum, Spectrum, resolution, truncation
  
 export LowerTriangularMatrix, LowerTriangularArray
-export eachharmonic, eachmatrix, eachorder
+export eachharmonic, eachmatrix, eachorder, orders
 export OneBased, ZeroBased
 export lta_view
 

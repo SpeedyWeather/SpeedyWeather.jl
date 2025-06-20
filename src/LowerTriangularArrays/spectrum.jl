@@ -7,14 +7,14 @@ Encodes the spectral trunction, orders and degrees of the spherical harmonics.
 Is used by every `LowerTriangularArray` and also defines the architecture on which the 
 data of the `LowerTriangularArray` is stored.
 """
-struct Spectrum{A, L} <: AbstractSpectrum
+struct Spectrum{A, O, L} <: AbstractSpectrum
     lmax::Int
     mmax::Int
     architecture::A
-    orders::Vector{UnitRange{Int}}
+    orders::O
     l_indices::L    # used by GPU kernels 
     m_indices::L    # used by GPU kernels
-    lm_orders::Vector{UnitRange{Int}}  # used by eachorder
+    lm_orders::O    # used by eachorder
 end
 
 """
@@ -35,6 +35,7 @@ function Spectrum(
     lm_orders_tuple = lm_orders(lmax, mmax)
 
     return Spectrum{typeof(architecture), 
+                    typeof(orders), 
                     typeof(ls)}(
                     lmax, 
                     mmax, 
@@ -62,7 +63,7 @@ $(TYPEDSIGNATURES)
 Create a `Spectrum` from another `Spectrum` but with a new architecture.
 """
 Spectrum(spectrum::Spectrum; architecture::AbstractArchitecture=DEFAULT_ARCHITECTURE()) = 
-    Spectrum{typeof(architecture), typeof(spectrum.l_indices)}(spectrum.lmax, 
+    Spectrum{typeof(architecture), typeof(spectrum.orders), typeof(spectrum.l_indices)}(spectrum.lmax, 
             spectrum.mmax, 
             architecture, 
             spectrum.orders, 
@@ -75,6 +76,10 @@ nonzeros(l::Integer, m::Integer) = l*m - triangle_number(m-1)
 nonzeros(s::Spectrum) = nonzeros(s.lmax, s.mmax)
 resolution(s::Spectrum) = (s.lmax, s.mmax)
 truncation(s::Spectrum) = s.mmax - 1
+orders(s::Spectrum) = s.orders
+orders(s::Spectrum{<:GPU}) = Vector(s.orders) # on GPU transfer orders back to CPU first 
+
+eachorder(s::Spectrum) = s.lm_orders
 
 function l_indices(lmax::Integer, mmax::Integer)
     l_vector = Vector{Int}(undef, nonzeros(lmax, mmax))
@@ -120,13 +125,9 @@ function Base.show(io::IO, S::Spectrum)
     print(io,   "└ architecture: $(typeof(S.architecture))")
 end
 
-eachorder(s::Spectrum) = s.lm_orders
-
 ismatching(s::Spectrum, array_type::Type{<:AbstractArray}) = ismatching(s.architecture, array_type)
 ismatching(s::Spectrum, array::AbstractArray) = ismatching(s.architecture, typeof(array))
 
-function Adapt.adapt_structure(to, s::Spectrum)
-    return Spectrum(s.lmax, s.mmax, s.architecture, s.orders, adapt(to, s.l_indices), adapt(to, s.m_indices), s.lm_orders)
-end
+Adapt.@adapt_structure Spectrum
 
 on_architecture(architecture::AbstractArchitecture, s::Spectrum) = Spectrum(s; architecture)

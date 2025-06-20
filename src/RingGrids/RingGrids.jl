@@ -13,7 +13,7 @@ export rotate, rotate!
 import Adapt: Adapt, adapt, adapt_structure
 import GPUArrays
 import KernelAbstractions
-import ..Architectures: AbstractArchitecture, on_architecture, array_type, ismatching, CPU, architecture
+import ..Architectures: AbstractArchitecture, on_architecture, array_type, ismatching, CPU, GPU, architecture
 
 # ABSTRACT GRIDS
 export  AbstractGrid,

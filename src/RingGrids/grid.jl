@@ -175,6 +175,7 @@ and then each grid point per ring. To be used like
 
 Accesses precomputed `grid.rings`."""
 @inline eachring(grid::AbstractGrid) = grid.rings
+@inline eachring(grid::AbstractGrid{<:GPU}) = Vector(grid.rings) # on GPU transfer indices back to CPU first 
 
 """$(TYPEDSIGNATURES)
 Computes the ring indices `i0:i1` for start and end of every longitudinal point
@@ -184,7 +185,7 @@ function eachring(Grid::Type{<:AbstractGrid}, nlat_half::Integer)
     nlat = get_nlat(Grid, nlat_half)
     rings = Vector{UnitRange{Int}}(undef, nlat)    # allocate
     each_index_in_ring!(rings, Grid, nlat_half)    # calculate iteratively
-    return ntuple(i -> rings[i], Val(nlat))                                                 # return as tuple -> more architecture agnostic 
+    return rings                                                    
 end
 
 """$(TYPEDSIGNATURES) Same as `eachring(grid)` but performs a bounds check to assess

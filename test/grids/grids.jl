@@ -304,7 +304,7 @@ end
 
             # precompute indices and boundscheck
             rings = RingGrids.eachring(grid)   
-            rings2 = Tuple([RingGrids.each_index_in_ring(grid, j) for j in 1:RingGrids.get_nlat(grid)])
+            rings2 = [RingGrids.each_index_in_ring(grid, j) for j in 1:RingGrids.get_nlat(grid)]
 
             @test rings == rings2
         end

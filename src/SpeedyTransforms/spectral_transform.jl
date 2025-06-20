@@ -214,7 +214,7 @@ function SpectralTransform(
     grad_y1 = zeros(NF, spectrum)                           # term 1, mul with harmonic l-1, m
     grad_y2 = zeros(NF, spectrum)                           # term 2, mul with harmonic l+1, m
 
-    for (m, degrees) in enumerate(spectrum.orders)          # 1-based degree l, order m
+    for (m, degrees) in enumerate(orders(spectrum))          # 1-based degree l, order m
         for l in degrees        
             grad_y1[l, m] = -(l-2)*ϵlms[l, m]
             grad_y2[l, m] = (l+1)*ϵlms[l+1, m]
@@ -235,7 +235,7 @@ function SpectralTransform(
     grad_y_vordiv1 = zeros(NF, spectrum)                    # term 1, mul with harmonic l-1, m
     grad_y_vordiv2 = zeros(NF, spectrum)                    # term 2, mul with harmonic l+1, m
  
-    for (m, degrees) in enumerate(spectrum.orders)          # 1-based degree l, order m
+    for (m, degrees) in enumerate(orders(spectrum))          # 1-based degree l, order m
         for l in degrees           
             grad_y_vordiv1[l, m] = l*ϵlms[l, m]
             grad_y_vordiv2[l, m] = (l-1)*ϵlms[l+1, m]
@@ -253,7 +253,7 @@ function SpectralTransform(
     vordiv_to_uv1 = zeros(NF, spectrum)                     # term 1, to be mul with harmonic l-1, m
     vordiv_to_uv2 = zeros(NF, spectrum)                     # term 2, to be mul with harmonic l+1, m
 
-    for (m, degrees) in enumerate(spectrum.orders)          # 1-based degree l, order m
+    for (m, degrees) in enumerate(orders(spectrum))          # 1-based degree l, order m
         for l in degrees             
             vordiv_to_uv1[l, m] = ϵlms[l, m]/(l-1)
             vordiv_to_uv2[l, m] = ϵlms[l+1, m]/l
@@ -441,7 +441,7 @@ function get_recursion_factors( ::Type{NF},             # number format NF
                                 spectrum::Spectrum,
                                 ) where NF
     ϵlms = zeros(NF, spectrum)
-    for (m, degrees) in enumerate(spectrum.orders)      # loop over 1-based l, m
+    for (m, degrees) in enumerate(orders(spectrum))      # loop over 1-based l, m
         for l in degrees
             ϵlms[l, m] = recursion_factor(l-1, m-1)     # convert to 0-based l, m for function arguments
         end
