@@ -301,7 +301,7 @@ velocity potential from divergence. Then compute zonal and meridional gradients
 to get U, V.
 Acts on the unit sphere, i.e. it omits any radius scaling as all inplace gradient operators.
 """
-function UV_from_vordiv!(   
+function UV_from_vordiv_old!(   
     U::LowerTriangularArray,
     V::LowerTriangularArray,
     vor::LowerTriangularArray,
@@ -395,7 +395,7 @@ velocity potential from divergence. Then compute zonal and meridional gradients
 to get U, V.
 Acts on the unit sphere, i.e. it omits any radius scaling as all inplace gradient operators.
 """
-function UV_from_vordiv_kernel!(   
+function UV_from_vordiv!(   
     U::LowerTriangularArray,
     V::LowerTriangularArray,
     vor::LowerTriangularArray,
@@ -406,7 +406,7 @@ function UV_from_vordiv_kernel!(
     (; vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2 ) = S
     @boundscheck ismatching(S, U) || throw(DimensionMismatch(S, U))
 
-    launch!(S.architecture, :lmk, size(U), _UV_from_vordiv_kernel!, U, V, vor, div, vor.spectrum.l_indices, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)
+    launch!(S.architecture, :lmk, size(U), _UV_from_vordiv_kernel!, U, V, vor, div, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)
     synchronize(S.architecture)
     
     # *radius scaling if not unit sphere (*radius² for ∇⁻², then /radius to get from stream function to velocity)
@@ -418,12 +418,12 @@ function UV_from_vordiv_kernel!(
     return U, V
 end
 
-@kernel inbounds=true function _UV_from_vordiv_kernel!(U, V, vor, div, @Const(l_indices), vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)    
+@kernel inbounds=true function _UV_from_vordiv_kernel!(U, V, vor, div, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)    
     I = @index(Global, Cartesian)
     lm = I[1]
     k = ndims(vor) == 1 ? CartesianIndex() : I[2]
     lmax = U.spectrum.lmax 
-    l = l_indices[lm]
+    l = U.spectrum.l_indices[lm]
 
     vordiv_uv2 = vordiv_to_uv2[lm]
     vordiv_uv1 = vordiv_to_uv1[lm]
@@ -437,8 +437,8 @@ end
         ∂ζθ =  vordiv_uv2*vor[2, k]       # lm-1 term is zero
         ∂Dθ = -vordiv_uv2*div[2, k]       # lm-1 term is zero
 
-        U[I] = muladd(z, div[lm, k], ∂ζθ)   # = ∂Dλ + ∂ζθ
-        V[I] = muladd(z, vor[lm, k], ∂Dθ)   # = ∂ζλ + ∂Dθ             
+        U[I] = z*div[lm, k] + ∂ζθ   # = ∂Dλ + ∂ζθ
+        V[I] = z*vor[lm, k] + ∂Dθ   # = ∂ζλ + ∂Dθ             
     elseif l==(lmax-1) # second last row 
         U[I] = z*div[I] - vordiv_uv1*vor[lm-1, k]
         V[I] = z*vor[I] + vordiv_uv1*div[lm-1, k]
@@ -446,11 +446,11 @@ end
         U[I] = -vordiv_uv1*vor[lm-1, k]
         V[I] =  vordiv_uv1*div[lm-1, k] 
     else    
-        ∂ζθ = muladd(vordiv_uv2, vor[lm+1, k], -vordiv_uv1*vor[lm-1, k])
-        ∂Dθ = muladd(vordiv_uv1, div[lm-1, k], -vordiv_uv2*div[lm+1, k])
+        ∂ζθ = vordiv_uv2*vor[lm+1, k] - vordiv_uv1*vor[lm-1, k]
+        ∂Dθ = vordiv_uv1*div[lm-1, k] - vordiv_uv2*div[lm+1, k]
 
-        U[I] = muladd(z, div[lm, k], ∂ζθ)   # = ∂Dλ + ∂ζθ
-        V[I] = muladd(z, vor[lm, k], ∂Dθ)   # = ∂ζλ + ∂Dθ            
+        U[I] = z*div[lm, k] + ∂ζθ   # = ∂Dλ + ∂ζθ
+        V[I] = z*vor[lm, k] + ∂Dθ   # = ∂ζλ + ∂Dθ            
     end    
 end 
 
