@@ -61,6 +61,13 @@ end
 prognostic_variables(::Type{<:Barotropic}) = (:vor,)
 default_concrete_model(::Type{Barotropic}) = BarotropicModel
 
+parameters(model::Barotropic; kwargs...) = (
+    planet = parameters(model.planet; kwargs...),
+    atmosphere = parameters(model.atmosphere; kwargs...),
+    forcing = parameters(model.forcing; kwargs...),
+    drag = parameters(model.drag; kwargs...),
+)
+
 """
 $(TYPEDSIGNATURES)
 Calls all `initialize!` functions for most fields, representing components, of `model`,

@@ -31,6 +31,12 @@ export QuadraticDrag
 end
 
 QuadraticDrag(SG::SpectralGrid; kwargs...) = QuadraticDrag{SG.NF}(; kwargs...)
+
+parameters(drag::QuadraticDrag{NF}; kwargs...) where {NF} =
+    (
+        c_D = parameters(drag.c_D; desc="Quadratic drag coefficient [1]", kwargs...),
+    )
+
 initialize!(::QuadraticDrag, ::AbstractModel) = nothing
 
 """
@@ -74,6 +80,12 @@ export LinearVorticityDrag
 end
 
 LinearVorticityDrag(SG::SpectralGrid; kwargs...) = LinearVorticityDrag{SG.NF}(; kwargs...)
+
+parameters(drag::LinearVorticityDrag{NF}; kwargs...) where {NF} =
+    (
+        c = parameters(drag.c; desc="Linear vorticity drag coefficient [1/s]", kwargs...),
+    )
+
 initialize!(::LinearVorticityDrag, ::AbstractModel) = nothing
 
 """
@@ -120,6 +132,13 @@ function JetDrag(SG::SpectralGrid; kwargs...)
     ζ₀ = zeros(Complex{SG.NF}, SG.spectrum)
     return JetDrag{SG.NF, SG.SpectralVariable2D}(; ζ₀, kwargs...)
 end
+
+parameters(drag::JetDrag{NF, SP, SpectralVariable2D}; kwargs...) where {NF, SP, SpectralVariable2D} =
+    (
+        u₀ = parameters(drag.u₀; desc="Jet strength [m/s]", kwargs...),
+        latitude = parameters(drag.latitude; desc="Latitude of Gaussian jet [˚N]", kwargs...),
+        width = parameters(drag.width; desc="Width of Gaussian jet [˚]", kwargs...),
+    )
 
 function initialize!(drag::JetDrag, model::AbstractModel)
     (; spectral_grid, geometry) = model
