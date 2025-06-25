@@ -67,6 +67,16 @@ end
 JetStreamForcing(SG::SpectralGrid; kwargs...) = JetStreamForcing{SG.NF}(
     ; nlat=SG.nlat, nlayers=SG.nlayers, kwargs...)
 
+parameters(forcing::JetStreamForcing; kwargs...) =
+    (
+        latitude = parameters(forcing.latitude; desc="jet latitude [˚N]", kwargs...),
+        width = parameters(forcing.width; desc="jet width [˚]", kwargs...),
+        sigma = parameters(forcing.sigma; desc="sigma level [1], vertical location of jet", kwargs...),
+        speed = parameters(forcing.speed; desc="jet speed scale [m/s]", kwargs...),
+        amplitude = parameters(forcing.amplitude; desc="precomputed amplitude vector [m/s²]", kwargs...),
+        tapering = parameters(forcing.tapering; desc="precomputed vertical tapering", kwargs...),
+    )
+
 function initialize!(   forcing::JetStreamForcing,
                         model::AbstractModel)
 
@@ -161,6 +171,14 @@ function StochasticStirring(SG::SpectralGrid; kwargs...)
     return StochasticStirring{SG.NF, SG.VectorType}(; nlat=SG.nlat, kwargs...)
 end
 
+parameters(forcing::StochasticStirring; kwargs...) =
+    (
+        strength = parameters(forcing.strength; desc="Stirring strength A [1/s²]", kwargs...),
+        latitude = parameters(forcing.latitude; desc="Stirring latitude [˚N]", kwargs...),
+        width = parameters(forcing.width; desc="Stirring width [˚]", kwargs...),
+        lat_mask = parameters(forcing.lat_mask; desc="Latitudinal mask [1]", kwargs...),
+    )
+
 function initialize!(
     forcing::StochasticStirring,
     model::AbstractModel)
@@ -226,6 +244,13 @@ $(TYPEDFIELDS)
 end
 
 KolmogorovFlow(SG::SpectralGrid; kwargs...) = KolmogorovFlow{SG.NF}(; kwargs...)
+
+parameters(forcing::KolmogorovFlow; kwargs...) =
+    (
+        strength = parameters(forcing.strength; desc="Strength of forcing [1/s²]", kwargs...),
+        wavenumber = parameters(forcing.wavenumber; desc="Wavenumber of forcing in meridional direction (pole to pole)", kwargs...),
+    )
+
 initialize!(::KolmogorovFlow, ::AbstractModel) = nothing
 
 function forcing!(
