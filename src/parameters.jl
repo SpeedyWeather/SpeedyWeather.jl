@@ -51,8 +51,6 @@ Returns a `NamedTuple` of any additional attributes defined for `param`.
 """
 attributes(param::SpeedyParam) = getfield(param, :attrs)
 
-# parameterize
-
 """
     $SIGNATURES
 
