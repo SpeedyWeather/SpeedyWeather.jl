@@ -61,9 +61,9 @@ the given value in a `Param`-like type. Dispatches can be added for compound dat
 reconstruct the data type with `Param`-like wrappers on all relevant parameters.
 """
 parameters(obj; kwargs...) = parameters(SpeedyParam, obj; kwargs...)
-parameters(::Type{SpeedyParam}, obj; kwargs...) = (;)
-parameters(::Type{SpeedyParam}, param::ModelParameters.AbstractParam; kwargs...) = SpeedyParam(merge(parent(param), kwargs))
-parameters(::Type{SpeedyParam}, x::Union{Number,AbstractArray}; kwargs...) = SpeedyParam(x; kwargs...)
+parameters(::Type{PT}, obj; kwargs...) where {PT<:ModelParameters.AbstractParam} = (;)
+parameters(::Type{PT}, param::ModelParameters.AbstractParam; kwargs...) where {PT<:ModelParameters.AbstractParam} = PT(merge(parent(param), kwargs))
+parameters(::Type{PT}, x::Union{Number,AbstractArray}; kwargs...) where {PT<:ModelParameters.AbstractParam} = PT(x; kwargs...)
 
 """
     $SIGNATURES
