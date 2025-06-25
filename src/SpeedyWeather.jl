@@ -9,6 +9,9 @@ import Random
 import LinearAlgebra: LinearAlgebra, Diagonal
 export rotate, rotate!
 
+# ARRAYS
+import ComponentArrays: ComponentArray
+
 # GPU, PARALLEL
 import Base.Threads: Threads, @threads
 import KernelAbstractions
@@ -25,6 +28,11 @@ import JLD2: jldopen, jldsave, JLDFile
 import CodecZlib
 import BitInformation: round, round!
 import ProgressMeter
+import ModelParameters
+import ConstructionBase: constructorof, getproperties, setproperties
+
+# DOMAINS
+using DomainSets
 
 # to avoid a `using Dates` to pass on DateTime arguments
 export DateTime, Millisecond, Second, Minute, Hour, Day, Week, Month, Year, Century, Millenium
@@ -93,6 +101,11 @@ export power_spectrum
 include("SpeedyTransforms/SpeedyTransforms.jl")
 using .SpeedyTransforms
 import .SpeedyTransforms: prettymemory
+
+# Parameter utilities
+export SpeedyParam, parameters, bounds, description
+
+include("parameters.jl")
 
 # to be defined in GeoMakie extension
 export globe, animate
