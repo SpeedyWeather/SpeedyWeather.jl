@@ -247,7 +247,7 @@ function UV_from_vor!(
     (; vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2 ) = S
     @boundscheck ismatching(S, U) || throw(DimensionMismatch(S, U))
     
-    launch!(S.architecture, :lmk, size(U), _UV_from_vor_kernel!, U, V, vor, vor.spectrum.l_indices, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)
+    launch!(S.architecture, :lmk, size(U), _UV_from_vor_kernel!, U, V, vor, vor.spectrum.l_indices, vor.spectrum.lmax, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)
     synchronize(S.architecture)
     
     # *radius scaling if not unit sphere (*radius² for ∇⁻² then /radius to get from stream function to velocity)
@@ -259,11 +259,10 @@ function UV_from_vor!(
     return U, V
 end
 
-@kernel inbounds=true function _UV_from_vor_kernel!(U, V, vor, @Const(l_indices), vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)    
+@kernel inbounds=true function _UV_from_vor_kernel!(U, V, vor, @Const(l_indices), lmax, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)    
     I = @index(Global, Cartesian)
     lm = I[1]
     k = ndims(vor) == 1 ? CartesianIndex() : I[2]
-    lmax = U.spectrum.lmax
     l = l_indices[lm]
 
     # Get the coefficients for the current lm index
@@ -437,8 +436,8 @@ end
         ∂ζθ =  vordiv_uv2*vor[2, k]       # lm-1 term is zero
         ∂Dθ = -vordiv_uv2*div[2, k]       # lm-1 term is zero
 
-        U[I] = z*div[lm, k] + ∂ζθ   # = ∂Dλ + ∂ζθ
-        V[I] = z*vor[lm, k] + ∂Dθ   # = ∂ζλ + ∂Dθ             
+        U[I] = muladd(z, div[lm, k], ∂ζθ)   # = ∂Dλ + ∂ζθ
+        V[I] = muladd(z, vor[lm, k], ∂Dθ)   # = ∂ζλ + ∂Dθ             
     elseif l==(lmax-1) # second last row 
         U[I] = z*div[I] - vordiv_uv1*vor[lm-1, k]
         V[I] = z*vor[I] + vordiv_uv1*div[lm-1, k]
@@ -446,11 +445,11 @@ end
         U[I] = -vordiv_uv1*vor[lm-1, k]
         V[I] =  vordiv_uv1*div[lm-1, k] 
     else    
-        ∂ζθ = vordiv_uv2*vor[lm+1, k] - vordiv_uv1*vor[lm-1, k]
-        ∂Dθ = vordiv_uv1*div[lm-1, k] - vordiv_uv2*div[lm+1, k]
+        ∂ζθ = muladd(vordiv_uv2, vor[lm+1, k], -vordiv_uv1*vor[lm-1, k])
+        ∂Dθ = muladd(vordiv_uv1, div[lm-1, k], -vordiv_uv2*div[lm+1, k])
 
-        U[I] = z*div[lm, k] + ∂ζθ   # = ∂Dλ + ∂ζθ
-        V[I] = z*vor[lm, k] + ∂Dθ   # = ∂ζλ + ∂Dθ            
+        U[I] = muladd(z, div[lm, k], ∂ζθ)   # = ∂Dλ + ∂ζθ
+        V[I] = muladd(z, vor[lm, k], ∂Dθ)   # = ∂ζλ + ∂Dθ            
     end    
 end 
 
