@@ -1,4 +1,4 @@
-module LowerTriangularMatrices
+module LowerTriangularArrays
 
 # STRUCTURE
 using DocStringExtensions
@@ -11,15 +11,15 @@ import KernelAbstractions
 # NUMERICS
 import LinearAlgebra: tril!
 
-# VISUALISATION
-import UnicodePlots
-
+export AbstractSpectrum, Spectrum, resolution, truncation
+ 
 export LowerTriangularMatrix, LowerTriangularArray
-export eachharmonic, eachmatrix
+export eachharmonic, eachmatrix, eachorder
 export OneBased, ZeroBased
+export lta_view
 
+include("spectrum.jl")
 include("lower_triangular_array.jl")
 include("rotate_reverse.jl")
-include("plot.jl")
 
 end

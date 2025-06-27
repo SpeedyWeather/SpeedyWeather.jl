@@ -165,11 +165,11 @@
     # single variable leapfrog step 
     # 
 
-    A_old = progn.vor[1]
+    A_old = get_step(progn.vor, 1)
     A_old_copy = copy(A_old)
     dA_old = one(A_old)
 
-    A_new = progn.vor[2]
+    A_new = get_step(progn.vor, 2)
     A_new_copy = copy(A_new)
     dA_new = one(A_new)
 

@@ -12,23 +12,23 @@ function LongitudeRotation(degree::Integer)
     throw(ArgumentError("Rotation degree must be multiples of 0, 90, 180, or 270"))
 end
 
-rotate(grid::AbstractGridArray, args...) = rotate!(deepcopy(grid), args...)
-rotate!(grid::AbstractGridArray, degree::Integer) = rotate!(grid, LongitudeRotation(degree))
-rotate!(grid::AbstractGridArray, ::LongitudeRotation{0}) = grid
-rotate!(grid::AbstractGridArray, ::LongitudeRotation{90}) = _rotate!(grid, 1)
-rotate!(grid::AbstractGridArray, ::LongitudeRotation{180}) = _rotate!(grid, 2)
-rotate!(grid::AbstractGridArray, ::LongitudeRotation{270}) = _rotate!(grid, 3)
+rotate( field::AbstractField, args...) = rotate!(deepcopy(field), args...)
+rotate!(field::AbstractField, degree::Integer) = rotate!(field, LongitudeRotation(degree))
+rotate!(field::AbstractField, ::LongitudeRotation{0}) = field
+rotate!(field::AbstractField, ::LongitudeRotation{90}) =  _rotate!(field, 1)
+rotate!(field::AbstractField, ::LongitudeRotation{180}) = _rotate!(field, 2)
+rotate!(field::AbstractField, ::LongitudeRotation{270}) = _rotate!(field, 3)
 
-function _rotate!(grid::AbstractGridArray, quarter::Integer)
+function _rotate!(field::AbstractField, quarter::Integer)
     @assert quarter in (1, 2, 3) "Can only shift by 1, 2, or 3 quarters of a ring"
 
-    for k in eachgrid(grid)
-        for ring in eachring(grid)
-            v = view(grid, ring, k)
+    for k in eachlayer(field)
+        for ring in eachring(field)
+            v = view(field, ring, k)
             shift = quarter*(length(ring) ÷ 4)
             LinearAlgebra.circshift!(v, shift)
         end
     end
 
-    return grid
+    return field
 end

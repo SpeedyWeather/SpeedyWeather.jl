@@ -1,10 +1,10 @@
-# convert i, j indices of a matrix (here 0-based l,m though...) to a single 1-based running index
-import SpeedyWeather.LowerTriangularMatrices: ij2k
+# convert l, m indices of a matrix (here 0-based l,m though...) to a single 1-based running index
+import SpeedyWeather.LowerTriangularArrays: lm2i
 
 # range of the running indices lm in a l-column (degrees of spherical harmonics)
 # given the column index m (order of harmonics) 
-get_lm_range(m, lmax) = ij2k(2*m - 1, m, lmax):ij2k(lmax+m, m, lmax)
-get_2lm_range(m, lmax) = 2*ij2k(2*m - 1, m, lmax)-1:2*ij2k(lmax+m, m, lmax)
+get_lm_range(m, lmax) = lm2i(2*m - 1, m, lmax):lm2i(lmax+m, m, lmax)
+get_2lm_range(m, lmax) = 2*lm2i(2*m - 1, m, lmax)-1:2*lm2i(lmax+m, m, lmax)
  
 # (inverse) legendre transform kernel, called from _legendre!
 function inverse_legendre_kernel!(
@@ -80,13 +80,16 @@ function SpeedyTransforms._legendre!(
     S::SpectralTransform;               # precomputed transform
     unscale_coslat::Bool = false,       # unscale by cosine of latitude on the fly?
 )
-    (; nlat_half) = S                   # dimensions    
-    (; lmax, mmax ) = S                 # 0-based max degree l, order m of spherical harmonics  
+    (; nlat_half) = S.grid              # dimensions    
+    (; lmax, mmax ) = S.spectrum        # 1-based max degree l, order m of spherical harmonics  
     (; legendre_polynomials) = S        # precomputed Legendre polynomials    
     (; jm_index_size, kjm_indices ) = S # kjm loop indices precomputed for threads  
     (; coslat⁻¹, lon_offsets ) = S
     # NOTE: this comes out as a range, not an integer
     nlayers = axes(specs, 2)            # get number of layers of specs for fewer layers than precomputed in S
+
+    lmax = lmax-1                       # 0-based max degree l of spherical harmonics
+    mmax = mmax-1                       # 0-based max order m of spherical harmonics
 
     @boundscheck SpeedyTransforms.ismatching(S, specs) || throw(DimensionMismatch(S, specs))
     @boundscheck size(g_north) == size(g_south) == (S.nfreq_max, S.nlayers, nlat_half) || throw(DimensionMismatch(S, specs))
@@ -233,12 +236,14 @@ function SpeedyTransforms._legendre!(                        # GRID TO SPECTRAL
     f_south::CuArray{<:Complex, 3},         # and southern latitudes
     S::SpectralTransform,                   # precomputed transform
 )
-    (; nlat_half) = S                       # dimensions
-    (; lmax) = S                            # 0-based max degree l, order m of spherical harmonics  
+    (; nlat_half) = S.grid                  # dimensions
+    (; lmax) = S.spectrum                   # 1-based max degree l, order m of spherical harmonics  
     (; legendre_polynomials) = S            # precomputed Legendre polynomials    
     (; kjm_indices, jm_index_size) = S      # Legendre shortcut, shortens loop over m, 0-based  
     (; solid_angles, lon_offsets) = S
     nlayers = axes(specs, 2)                # get number of layers of specs for fewer layers than precomputed in S
+
+    lmax = lmax - 1                         # 0-based max degree l of spherical harmonics
 
     @boundscheck SpeedyTransforms.ismatching(S, specs) || throw(DimensionMismatch(S, specs))
     @boundscheck size(f_north) == size(f_south) == (S.nfreq_max, S.nlayers, nlat_half) || throw(DimensionMismatch(S, specs))

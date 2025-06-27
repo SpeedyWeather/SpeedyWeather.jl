@@ -32,8 +32,8 @@ function dynamics_tendencies!(
     # = ∇⋅(v(ζ+f) + Fᵤ, -u(ζ+f) + Fᵥ), tendency for divergence
     vorticity_flux!(diagn, model)
 
-    geopotential!(diagn, progn.pres[lf], planet)    # geopotential Φ = gη in shallow water
-    bernoulli_potential!(diagn, spectral_transform) # = -∇²(E+Φ), tendency for divergence
+    geopotential!(diagn, get_step(progn.pres, lf), planet)  # geopotential Φ = gη in shallow water
+    bernoulli_potential!(diagn, spectral_transform)         # = -∇²(E+Φ), tendency for divergence
     
     # = -∇⋅(uh, vh), tendency for "pressure" η
     volume_flux_divergence!(diagn, orography, atmosphere, geometry, spectral_transform)
@@ -116,7 +116,7 @@ function pressure_gradient_flux!(
     (; scratch_memory) = diagn.dynamics
 
     # PRESSURE GRADIENT
-    pres = progn.pres[lf]                   # log of surface pressure at leapfrog step lf
+    pres = get_step(progn.pres, lf)         # log of surface pressure at leapfrog step lf
     ∇lnp_x_spec = diagn.dynamics.a_2D       # reuse 2D work arrays for gradients
     ∇lnp_y_spec = diagn.dynamics.b_2D       # in spectral space
     (; ∇lnp_x, ∇lnp_y) = diagn.dynamics     # but store in grid space
@@ -129,7 +129,7 @@ function pressure_gradient_flux!(
     (; uv∇lnp ) = diagn.dynamics
 
     # PRESSURE GRADIENT FLUX
-    @inbounds for k in eachgrid(u_grid, v_grid, uv∇lnp)
+    @inbounds for k in eachlayer(u_grid, v_grid, uv∇lnp)
         for ij in eachgridpoint(u_grid, v_grid, uv∇lnp)
             # the (u, v)⋅∇lnp_s term
             uv∇lnp[ij, k] = u_grid[ij, k]*∇lnp_x[ij] + v_grid[ij, k]*∇lnp_y[ij]
@@ -146,7 +146,7 @@ function temperature_anomaly!(
     (; temp_profile) = implicit     # reference temperature profile
     (; temp_grid, temp_virt_grid ) = diagn.grid
 
-    @inbounds for k in eachgrid(temp_grid, temp_virt_grid)
+    @inbounds for k in eachlayer(temp_grid, temp_virt_grid)
         Tₖ = temp_profile[k]
         for ij in eachgridpoint(temp_grid, temp_virt_grid)
             temp_grid[ij, k]      -= Tₖ  # absolute temperature -> anomaly
@@ -166,7 +166,7 @@ u, v are averaged in grid-point space, divergence in spectral space.
 function vertical_integration!(
     diagn::DiagnosticVariables,
     progn::PrognosticVariables,
-    lf::Integer,                # leapfrog index for D̄_spec
+    lf::Integer,                    # leapfrog index for D̄_spec
     geometry::Geometry,
 )
     (; σ_levels_thick, nlayers ) = geometry
@@ -174,7 +174,7 @@ function vertical_integration!(
     (; u_grid, v_grid, div_grid) = diagn.grid
     (; u_mean_grid, v_mean_grid, div_mean_grid, div_mean) = diagn.dynamics
     (; div_sum_above, uv∇lnp_sum_above) = diagn.dynamics
-    div = progn.div[lf]
+    div = get_step(progn.div, lf)
 
     @boundscheck nlayers == diagn.nlayers || throw(BoundsError)
 
@@ -327,7 +327,7 @@ function vordiv_tendencies!(
     # precompute ring indices and boundscheck
     rings = eachring(u_tend_grid, v_tend_grid, u_grid, v_grid, vor_grid, temp_virt_grid)
 
-    @inbounds for k in eachgrid(u_tend_grid, v_tend_grid)
+    @inbounds for k in eachlayer(u_tend_grid, v_tend_grid)
         for (j, ring) in enumerate(rings)
             coslat⁻¹j = coslat⁻¹[j]
             f_j = f[j]
@@ -423,7 +423,7 @@ function temperature_tendency!(
     # implicit_correction! then calculated the implicit terms from Vi-1 minus Vi
     # to move the implicit terms to i-1 which is cheaper then the alternative below
 
-    @inbounds for k in eachgrid(temp_tend_grid, temp_grid, div_grid, Tᵥ, div_sum_above, uv∇lnp_sum_above)
+    @inbounds for k in eachlayer(temp_tend_grid, temp_grid, div_grid, Tᵥ, div_sum_above, uv∇lnp_sum_above)
         Tₖ = temp_profile[k]    # average layer temperature from reference profile
         
         # coefficients from Simmons and Burridge 1981
@@ -484,8 +484,8 @@ end
 
 function horizontal_advection!( 
     A_tend::LowerTriangularArray,       # Ouput: tendency to write into
-    A_tend_grid::AbstractGridArray,     # Input: tendency incl prev terms
-    A_grid::AbstractGridArray,          # Input: grid field to be advected
+    A_tend_grid::AbstractField,         # Input: tendency incl prev terms
+    A_grid::AbstractField,              # Input: grid field to be advected
     diagn::DiagnosticVariables,
     G::Geometry,
     S::SpectralTransform;
@@ -497,7 +497,7 @@ function horizontal_advection!(
     
     kernel = add ? (a,b,c) -> a+b*c : (a,b,c) -> b*c
 
-    for k in eachgrid(A_tend_grid, A_grid, div_grid)
+    for k in eachlayer(A_tend_grid, A_grid, div_grid)
         # +A*div term of the advection operator
         @inbounds for ij in eachgridpoint(A_tend_grid, A_grid, div_grid)
             # add as tend already contains parameterizations + vertical advection
@@ -523,7 +523,7 @@ Computes ∇⋅((u, v)*A) with the option to add/overwrite `A_tend` and to
 """
 function flux_divergence!(
     A_tend::LowerTriangularArray,   # Ouput: tendency to write into
-    A_grid::AbstractGridArray,      # Input: grid field to be advected
+    A_grid::AbstractField,          # Input: grid field to be advected
     diagn::DiagnosticVariables,     # for u_grid, v_grid
     G::Geometry,
     S::SpectralTransform;
@@ -542,7 +542,7 @@ function flux_divergence!(
 
     # precomputed ring indices and check grids_match
     rings = eachring(A_grid, u_grid, v_grid)
-    @inbounds for k in eachgrid(u_grid, v_grid)
+    @inbounds for k in eachlayer(u_grid, v_grid)
         for (j, ring) in enumerate(rings)
             coslat⁻¹j = coslat⁻¹[j]
             for ij in ring
@@ -593,7 +593,7 @@ function vorticity_flux_curldiv!(   diagn::DiagnosticVariables,
 
     # precompute ring indices and check grids match
     rings = eachring(u_tend_grid, v_tend_grid, u, v, vor)
-    @inbounds for k in eachgrid(u)
+    @inbounds for k in eachlayer(u)
         for (j, ring) in enumerate(rings)
             coslat⁻¹j = coslat⁻¹[j]
             f_j = f[j]
@@ -706,7 +706,7 @@ function linear_pressure_gradient!(
 )                          
     (; R_dry) = atmosphere                  # dry gas constant 
     (; temp_profile) = implicit             # reference profile at layer k
-    pres = progn.pres[lf]                   # logarithm of surface pressure at leapfrog index lf
+    pres = get_step(progn.pres, lf)         # logarithm of surface pressure at leapfrog index lf
     (; geopot) = diagn.dynamics
 
     # -R_dry*Tₖ*∇²lnpₛ, linear part of the ∇⋅RTᵥ∇lnpₛ pressure gradient term
@@ -762,10 +762,11 @@ function SpeedyTransforms.transform!(
 )    
     (; vor_grid, u_grid, v_grid ) = diagn.grid
     (; scratch_memory) = diagn.dynamics  
+
+    vor = get_step(progn.vor, lf)   # relative vorticity at leapfrog step lf
     U = diagn.dynamics.a            # reuse work arrays for velocities in spectral
     V = diagn.dynamics.b            # reuse work arrays for velocities in spectral
                                     # U = u*coslat, V=v*coslat
-    vor = progn.vor[lf]             # relative vorticity at leapfrog step lf
     S = model.spectral_transform
 
     transform!(vor_grid, vor, scratch_memory, S)    # get vorticity on grid from spectral vor
@@ -780,7 +781,8 @@ function SpeedyTransforms.transform!(
     transform!(v_grid, V, scratch_memory, S, unscale_coslat=true)
  
     for (name, tracer) in model.tracers
-        tracer.active && transform!(diagn.grid.tracers_grid[name], progn.tracers[name][lf], scratch_memory, S)
+        tracer_var = get_step(progn.tracers[name], lf)  # tracer at leapfrog step lf
+        tracer.active && transform!(diagn.grid.tracers_grid[name], tracer_var, scratch_memory, S)
     end
 
     # transform random pattern for random process unless NoRandomProcess
@@ -803,9 +805,9 @@ function SpeedyTransforms.transform!(
     kwargs...
 )
     (; vor_grid, div_grid, pres_grid, u_grid, v_grid ) = diagn.grid
-    vor =  progn.vor[lf]            # relative vorticity at leapfrog step lf
-    div =  progn.div[lf]            # divergence at leapfrog step lf
-    pres = progn.pres[lf]           # interface displacement η at leapfrog step lf
+    vor =  get_step(progn.vor, lf)  # relative vorticity at leapfrog step lf
+    div =  get_step(progn.div, lf)  # divergence at leapfrog step lf
+    pres = get_step(progn.pres, lf) # interface displacement η at leapfrog step lf
 
     (; scratch_memory) = diagn.dynamics # reuse work arrays for velocities spectral
                                               # U = u*coslat, V=v*coslat
@@ -828,7 +830,8 @@ function SpeedyTransforms.transform!(
     transform!(v_grid, V, scratch_memory, S, unscale_coslat=true)
 
     for (name, tracer) in model.tracers
-        tracer.active && transform!(diagn.grid.tracers_grid[name], progn.tracers[name][lf], scratch_memory, S)
+        tracer_var = get_step(progn.tracers[name], lf)  # tracer at leapfrog step lf
+        tracer.active && transform!(diagn.grid.tracers_grid[name], tracer_var, scratch_memory, S)
     end
 
     # transform random pattern for random process unless NoRandomProcess
@@ -853,11 +856,11 @@ function SpeedyTransforms.transform!(
     (; vor_grid, div_grid, pres_grid, u_grid, v_grid, temp_grid, humid_grid, 
     temp_grid_prev, humid_grid_prev, u_grid_prev, v_grid_prev) = diagn.grid
 
-    vor   = progn.vor[lf]           # relative vorticity at leapfrog step lf
-    div   = progn.div[lf]           # divergence at leapfrog step lf
-    temp  = progn.temp[lf]          # temperature at leapfrog step lf
-    humid = progn.humid[lf]         # humidity at leapfrog step lf
-    pres  = progn.pres[lf]          # logarithm of surface pressure at leapfrog step lf
+    vor   = get_step(progn.vor, lf)     # relative vorticity at leapfrog step lf
+    div   = get_step(progn.div, lf)     # divergence at leapfrog step lf
+    temp  = get_step(progn.temp, lf)    # temperature at leapfrog step lf
+    humid = get_step(progn.humid, lf)   # humidity at leapfrog step lf
+    pres  = get_step(progn.pres, lf)    # logarithm of surface pressure at leapfrog step lf
 
     (; scratch_memory) = diagn.dynamics
 
@@ -907,7 +910,7 @@ function SpeedyTransforms.transform!(
         # the Tₖ is added for the physics parameterizations again
         # technically Tₖ is from model.implicit (which is held constant throughout) integration
         # but given it's the initial step here using the instantaneous diagn.temp_average is the same
-        @inbounds for k in eachgrid(temp_grid_prev, temp_grid)
+        @inbounds for k in eachlayer(temp_grid_prev, temp_grid)
             Tₖ = diagn.temp_average[k]
             for ij in eachgridpoint(temp_grid_prev, temp_grid)
                 temp_grid_prev[ij, k] = temp_grid[ij, k] - Tₖ
@@ -926,7 +929,8 @@ function SpeedyTransforms.transform!(
     end
 
     for (name, tracer) in model.tracers
-        tracer.active && transform!(diagn.grid.tracers_grid[name], progn.tracers[name][lf], scratch_memory, S)
+        tracer_var = get_step(progn.tracers[name], lf)  # tracer at leapfrog step lf
+        tracer.active && transform!(diagn.grid.tracers_grid[name], tracer_var, scratch_memory, S)
     end
 
     # transform random pattern for random process unless NoRandomProcess

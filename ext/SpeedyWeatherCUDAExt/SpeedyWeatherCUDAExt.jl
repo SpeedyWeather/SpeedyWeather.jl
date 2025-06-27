@@ -5,10 +5,10 @@ import CUDA: CUDA, CUDAKernels, CuArray, CUFFT
 import AbstractFFTs
 using DocStringExtensions
 
-# for RingGrids and LowerTriangularMatrices:
+# for RingGrids and LowerTriangularArrays:
 # every Array needs this method to strip away the parameters
 RingGrids.nonparametric_type(::Type{<:CuArray}) = CuArray
-LowerTriangularMatrices.nonparametric_type(::Type{<:CuArray}) = CuArray
+LowerTriangularArrays.nonparametric_type(::Type{<:CuArray}) = CuArray
 
 SpeedyWeather.default_array_type(::Type{GPU}) = CuArray
 

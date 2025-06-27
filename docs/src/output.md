@@ -103,12 +103,13 @@ very neatly hourly output in the NetCDF file!
 ## Output grid
 
 Say we want to run the model at a given horizontal resolution but want to output on another resolution,
-the `NetCDFOutput` takes as argument `output_Grid<:AbstractFullGrid` and `nlat_half::Int`.
-So for example `output_Grid=FullClenshawGrid` and `nlat_half=48` will always interpolate onto a
+the `NetCDFOutput` takes as argument `output_grid::AbstractFullGrid`, any instance of a full grid
+can be provided here.
+So for example `output_grid=FullClenshawGrid(48)` would interpolate onto a
 regular 192x95 longitude-latitude grid of 1.875˚ resolution, regardless the grid and resolution used
 for the model integration.
 ```@example netcdf
-my_output_writer = NetCDFOutput(spectral_grid, output_Grid=FullClenshawGrid, nlat_half=48)
+my_output_writer = NetCDFOutput(spectral_grid, output_grid=FullClenshawGrid(48))
 ```
 Note that by default the output is on the corresponding full type of the grid type used in the dynamical core
 so that interpolation only happens at most in the zonal direction as they share the location of the
@@ -125,12 +126,13 @@ Overview of the corresponding full grids
 | FullGaussianGrid | FullGaussianGrid |
 | FullClenshawGrid | FullClenshawGrid |
 | OctahadralGaussianGrid | FullGaussianGrid |
-| OctahedralClensawhGrid | FullClenshawGrid |
+| OctaminimalGaussianGrid | FullGaussianGrid |
+| OctahedralClenshawGrid | FullClenshawGrid |
 | HEALPixGrid | FullHEALPixGrid |
 | OctaHEALPixGrid | FullOctaHEALPixGrid |
 
 The grids `FullHEALPixGrid`, `FullOctaHEALPixGrid` share the same latitude rings as their reduced grids,
-but have always as many longitude points as they are at most around the equator. These grids are not
+but have always as many longitude points as there are around the equator. These grids are not
 tested in the dynamical core (but you may use them experimentally) and mostly designed for output purposes.
 
 ## Output variables
