@@ -32,7 +32,7 @@ end
     spectral_grid = SpectralGrid(trunc=31, nlayers=1)   # define resolution
     model = BarotropicModel(spectral_grid)
     model_ps = ComponentVector(parameters(model))
-    new_model = SpeedyWeather.reconstruct(model, 2*model_ps)
+    new_model = reconstruct(model, 2*model_ps)
     new_model_ps = ComponentVector(parameters(new_model))
     @test all(new_model_ps .== 2*model_ps)
 end
