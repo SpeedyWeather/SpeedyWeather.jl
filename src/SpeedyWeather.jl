@@ -85,8 +85,9 @@ using .SpeedyTransforms
 import .SpeedyTransforms: prettymemory
 
 # to be defined in GeoMakie extension
-export globe
+export globe, animate_simulation
 function globe end
+function animate_simulation end
 
 # Utility for GPU / KernelAbstractions
 include("gpu.jl")                               
