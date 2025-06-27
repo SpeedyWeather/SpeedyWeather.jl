@@ -34,17 +34,16 @@ Generator function for a `ScratchMemory` that holds the scratch memory for Speed
 function ScratchMemory(
     ::Type{NF},                     
     ArrayType::Type{<:AbstractArray}, 
-    nlat_half::Integer, 
-    Grid::Type{<:AbstractGridArray},
+    grid::AbstractGrid,
     nlayers::Integer) where NF
 
-    Grid = RingGrids.nonparametric_type(Grid)   # always use nonparametric concrete type
+    grid_type = RingGrids.nonparametric_type(grid)   # always use nonparametric concrete type
 
     # RESOLUTION PARAMETERS
-    nlon_max = get_nlon_max(Grid, nlat_half)    # number of longitudes around the equator
+    nlon_max = get_nlon_max(grid_type, grid.nlat_half)    # number of longitudes around the equator
                                             # number of longitudes per latitude ring (one hemisphere only)
     nfreq_max = nlon_max÷2 + 1                      # maximum number of fourier frequencies (real FFTs)
 
-    return ScratchMemory(NF, ArrayType, nfreq_max, nlayers, nlat_half)
+    return ScratchMemory(NF, ArrayType, nfreq_max, nlayers, grid.nlat_half)
 end 
 

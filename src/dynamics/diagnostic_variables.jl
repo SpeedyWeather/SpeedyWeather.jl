@@ -236,7 +236,7 @@ $(TYPEDFIELDS)"""
     div_mean_grid::GridVariable2D = zeros(GridVariable2D, grid)
 
     "Scratch memory for the transforms"
-    scratch_memory::ScratchMemoryType = SpeedyTransforms.ScratchMemory(NF, ArrayType, nlat_half, GridVariable2D, nlayers)
+    scratch_memory::ScratchMemoryType = SpeedyTransforms.ScratchMemory(NF, ArrayType, grid, nlayers)
 end
 
 """$(TYPEDSIGNATURES)
@@ -257,7 +257,8 @@ function DynamicsVariables(SG::SpectralGrid;
 
         return DynamicsVariables{NF, ArrayType, SpectralVariable2D, SpectralVariable3D,
         GridVariable2D, GridVariable3D, typeof(scratch_memory)}(;
-            spectrum, grid, nlayers, scratch_memory,
+            spectrum, grid, nlayers, scratch_memory
+        )
     end 
 end
 

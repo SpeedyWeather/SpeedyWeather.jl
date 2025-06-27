@@ -147,7 +147,7 @@ function SpectralTransform(
     end
     
     # SCRATCH MEMORY FOR FOURIER NOT YET LEGENDRE TRANSFORMED AND VICE VERSA
-    scratch_memory = ScratchMemory(NF, ArrayType_, nfreq_max, nlayers, nlat_half)
+    scratch_memory = ScratchMemory(NF, ArrayType_, grid, nlayers)
 
     # SCRATCH MEMORY TO 1-STRIDE DATA FOR FFTs
     scratch_memory_grid  = ArrayType_(zeros(NF, nlon_max*nlayers))
@@ -431,11 +431,11 @@ function transform!(                    # SPECTRAL TO GRID
     coeffs::LowerTriangularArray,       # spectral coefficients input
     S::SpectralTransform;               # precomputed transform
     unscale_coslat::Bool = false,       # unscale with cos(lat) on the fly?
-) = transform!(grids, specs, S.scratch_memory, S; unscale_coslat)
+) = transform!(field, coeffs, S.scratch_memory, S; unscale_coslat)
 
 function transform!(                                # SPECTRAL TO GRID
-    grids::AbstractField,                           # gridded output
-    specs::LowerTriangularArray,                    # spectral coefficients input
+    field::AbstractField,                           # gridded output
+    coeffs::LowerTriangularArray,                    # spectral coefficients input
     scratch_memory::ScratchMemory,      # explicit scratch memory to use
     S::SpectralTransform;                           # precomputed transform
     unscale_coslat::Bool = false,                   # unscale with cos(lat) on the fly?
@@ -465,14 +465,14 @@ number format-flexible but `field` and the spectral transform `S` have to have t
 Uses the precalculated arrays, FFT plans and other constants in the SpectralTransform struct `S`.
 The spectral transform is grid-flexible as long as `field.grid` and `S.grid` match."""
 transform!(                             # GRID TO SPECTRAL
-    specs::LowerTriangularArray,        # output: spectral coefficients
-    grids::AbstractField,               # input: gridded values
+    coeffs::LowerTriangularArray,        # output: spectral coefficients
+    field::AbstractField,               # input: gridded values
     S::SpectralTransform,               # precomputed spectral transform
-) = transform!(specs, grids, S.scratch_memory, S)
+) = transform!(coeffs, field, S.scratch_memory, S)
     
 function transform!(                               # GRID TO SPECTRAL
-    specs::LowerTriangularArray,                   # output: spectral coefficients
-    grids::AbstractField,                          # input: gridded values
+    coeffs::LowerTriangularArray,                   # output: spectral coefficients
+    field::AbstractField,                          # input: gridded values
     scratch_memory::ScratchMemory,                 # explicit scratch memory to use
     S::SpectralTransform,                          # precomputed spectral transform
 )
