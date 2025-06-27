@@ -45,7 +45,7 @@ end
 Earth(SG::SpectralGrid; kwargs...) = Earth{SG.NF}(; kwargs...)
 Earth(::Type{NF}; kwargs...) where NF = Earth{NF}(; kwargs...)
 
-parameters(earth::Earth{NF}; kwargs...) where {NF} =
+parameters(earth::Earth; kwargs...) =
     (
         rotation = parameters(earth.rotation; desc="angular frequency of Earth's rotation [rad/s]", kwargs...),
         gravity = parameters(earth.gravity; bounds=HalfLine(), desc="gravitational acceleration [m/s^2]", kwargs...),
