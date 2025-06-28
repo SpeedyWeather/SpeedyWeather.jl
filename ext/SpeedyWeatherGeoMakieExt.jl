@@ -132,12 +132,14 @@ CairoMakie or GtkMakie to be loaded at the time of calling this function.
 - `nc_file::String`: Path to the NetCDF file containing SpeedyWeather simulation data
 - `variable::String = "temp"`: Variable to animate (e.g., "temp", "pres", "vor", "u", "v", "humid")
 - `level::Int = 1`: Vertical level to plot (for 3D variables)
+- `transient_timesteps::Int = 0`: Number of timesteps to skip at the beginning of the animation
 - `output_file::String = "animation.mp4"`: Path to save the animation
 - `colormap = :viridis`: Colormap to use for the animation
 - `framerate::Int = 15`: Frame rate of the animation
 - `title::String = ""`: Title for the animation (if empty, will use variable name)
 - `colorrange = nothing`: Range for the colorbar (nothing for automatic)
 - `projection = "+proj=robin"`: Map projection to use (e.g., "+proj=robin", "+proj=ortho")
+- `figure_size = (800, 600)`: Size of the figure
 
 # Example
 ```julia
@@ -157,12 +159,14 @@ function SpeedyWeather.animate_simulation(
     nc_file::String;
     variable::String = "temp",
     level::Int = 1,
+    transient_timesteps::Int = 0,
     output_file::String = "animation.mp4",
     colormap = :viridis,
     framerate::Int = 15,
     title::String = "",
     colorrange = nothing,
-    projection = "+proj=robin"
+    projection = "+proj=robin",
+    figure_size = (800, 600)
 )
   
     # Open the NetCDF file
@@ -189,7 +193,7 @@ function SpeedyWeather.animate_simulation(
     is_3d = "layer" in dimnames(ds[variable])
     
     # Create the figure
-    fig = Figure(size = (800, 600))
+    fig = Figure(size = figure_size)
     
     # Create the axis
     ax = GeoAxis(
@@ -202,10 +206,10 @@ function SpeedyWeather.animate_simulation(
     # Create a placeholder for the plot
     if is_3d
         # For 3D variables, extract the specified level
-        data_init = ds[variable][:, :, level, 1]
+        data_init = ds[variable][:, :, level, transient_timesteps + 1]
     else
         # For 2D variables
-        data_init = ds[variable][:, :, 1]
+        data_init = ds[variable][:, :, transient_timesteps + 1]
     end
     
     # Determine color range if not specified
@@ -242,7 +246,7 @@ function SpeedyWeather.animate_simulation(
     time_label = Label(fig[2, 1:2], "Time: $(time[1]) $(time_units)")
     
     # Create the animation
-    record(fig, output_file, 1:length(time); framerate=framerate) do frame
+    record(fig, output_file, (transient_timesteps + 1):length(time); framerate=framerate) do frame
         # Update the data
         if is_3d
             new_data = ds[variable][:, :, level, frame]
