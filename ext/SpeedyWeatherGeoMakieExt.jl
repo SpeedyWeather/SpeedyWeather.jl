@@ -267,5 +267,35 @@ function SpeedyWeather.animate_simulation(
     return output_file
 end
 
+"""
+$(TYPEDSIGNATURES)
+Create an animation from a SpeedyWeather Simulation object. 
+Needs the output of a simulation with NetCDF output enabled and a backend like 
+CairoMakie or GtkMakie to be loaded at the time of calling this function.
+Takes the same keyword arguments as [`animate_simulation`](@ref).
+"""
+function SpeedyWeather.animate_simulation(
+    simulation::Simulation;
+    kwargs...
+)
+    # Extract the NetCDF file path from the simulation object
+    if simulation.model.output.active
+        nc_file = joinpath(simulation.model.output.run_path, simulation.model.output.filename)
+    else
+        error("NetCDF output is not active. Make sure the simulation has been run with NetCDF output enabled.")
+    end
+    
+    # Check if the NetCDF file exists
+    if !isfile(nc_file)
+        error("NetCDF file $(nc_file) not found. Make sure the simulation has been run with NetCDF output enabled.")
+    end
+    
+    # Call animate_simulation with the extracted file path
+    return animate_simulation(
+        nc_file;
+        kwargs...
+    )
+end
+
 end # module
 
