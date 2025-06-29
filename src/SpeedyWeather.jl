@@ -10,7 +10,7 @@ import LinearAlgebra: LinearAlgebra, Diagonal
 export rotate, rotate!
 
 # ARRAYS
-import ComponentArrays: ComponentArray
+import ComponentArrays: ComponentArray, labels, label2index, getaxes
 
 # GPU, PARALLEL
 import Base.Threads: Threads, @threads
@@ -32,7 +32,8 @@ import ModelParameters
 import ConstructionBase: constructorof, getproperties, setproperties
 
 # DOMAINS
-using DomainSets
+import DomainSets: Domain, RealLine, HalfLine, UnitInterval
+using DomainSets.IntervalSets
 
 # to avoid a `using Dates` to pass on DateTime arguments
 export DateTime, Millisecond, Second, Minute, Hour, Day, Week, Month, Year, Century, Millenium
@@ -103,7 +104,7 @@ using .SpeedyTransforms
 import .SpeedyTransforms: prettymemory
 
 # Parameter utilities
-export SpeedyParam, parameters, bounds, description
+export SpeedyParam, SpeedyParams, parameters, bounds, description
 
 include("parameters.jl")
 

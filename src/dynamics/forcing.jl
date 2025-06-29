@@ -69,12 +69,12 @@ JetStreamForcing(SG::SpectralGrid; kwargs...) = JetStreamForcing{SG.NF}(
 
 parameters(forcing::JetStreamForcing; kwargs...) =
     (
-        latitude = parameters(forcing.latitude; desc="jet latitude [˚N]", kwargs...),
-        width = parameters(forcing.width; desc="jet width [˚]", kwargs...),
-        sigma = parameters(forcing.sigma; desc="sigma level [1], vertical location of jet", kwargs...),
-        speed = parameters(forcing.speed; desc="jet speed scale [m/s]", kwargs...),
-        amplitude = parameters(forcing.amplitude; desc="precomputed amplitude vector [m/s²]", kwargs...),
-        tapering = parameters(forcing.tapering; desc="precomputed vertical tapering", kwargs...),
+        latitude = parameterof(forcing, :latitude; desc="jet latitude [˚N]", kwargs...),
+        width = parameterof(forcing, :width; desc="jet width [˚]", kwargs...),
+        sigma = parameterof(forcing, :sigma; desc="sigma level [1], vertical location of jet", kwargs...),
+        speed = parameterof(forcing, :speed; desc="jet speed scale [m/s]", kwargs...),
+        amplitude = parameterof(forcing, :amplitude; desc="precomputed amplitude vector [m/s²]", kwargs...),
+        tapering = parameterof(forcing, :tapering; desc="precomputed vertical tapering", kwargs...),
     )
 
 function initialize!(   forcing::JetStreamForcing,
@@ -173,10 +173,10 @@ end
 
 parameters(forcing::StochasticStirring; kwargs...) =
     (
-        strength = parameters(forcing.strength; desc="Stirring strength A [1/s²]", kwargs...),
-        latitude = parameters(forcing.latitude; desc="Stirring latitude [˚N]", kwargs...),
-        width = parameters(forcing.width; desc="Stirring width [˚]", kwargs...),
-        lat_mask = parameters(forcing.lat_mask; desc="Latitudinal mask [1]", kwargs...),
+        strength = parameterof(forcing, :strength; desc="Stirring strength A [1/s²]", kwargs...),
+        latitude = parameterof(forcing, :latitude; desc="Stirring latitude [˚N]", kwargs...),
+        width = parameterof(forcing, :width; desc="Stirring width [˚]", kwargs...),
+        lat_mask = parameterof(forcing, :lat_mask; desc="Latitudinal mask [1]", kwargs...),
     )
 
 function initialize!(
@@ -247,8 +247,8 @@ KolmogorovFlow(SG::SpectralGrid; kwargs...) = KolmogorovFlow{SG.NF}(; kwargs...)
 
 parameters(forcing::KolmogorovFlow; kwargs...) =
     (
-        strength = parameters(forcing.strength; desc="Strength of forcing [1/s²]", kwargs...),
-        wavenumber = parameters(forcing.wavenumber; desc="Wavenumber of forcing in meridional direction (pole to pole)", kwargs...),
+        strength = parameterof(forcing, :strength; desc="Strength of forcing [1/s²]", kwargs...),
+        wavenumber = parameterof(forcing, :wavenumber; desc="Wavenumber of forcing in meridional direction (pole to pole)", kwargs...),
     )
 
 initialize!(::KolmogorovFlow, ::AbstractModel) = nothing
