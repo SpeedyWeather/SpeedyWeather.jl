@@ -34,7 +34,7 @@ QuadraticDrag(SG::SpectralGrid; kwargs...) = QuadraticDrag{SG.NF}(; kwargs...)
 
 parameters(drag::QuadraticDrag; kwargs...) =
     (
-        c_D = parameters(drag.c_D; desc="Quadratic drag coefficient [1]", kwargs...),
+        c_D = parameterof(drag, :c_D; desc="Quadratic drag coefficient [1]", kwargs...),
     )
 
 initialize!(::QuadraticDrag, ::AbstractModel) = nothing
@@ -83,7 +83,7 @@ LinearVorticityDrag(SG::SpectralGrid; kwargs...) = LinearVorticityDrag{SG.NF}(; 
 
 parameters(drag::LinearVorticityDrag; kwargs...) =
     (
-        c = parameters(drag.c; desc="Linear vorticity drag coefficient [1/s]", kwargs...),
+        c = parameterof(drag, :c; desc="Linear vorticity drag coefficient [1/s]", kwargs...),
     )
 
 initialize!(::LinearVorticityDrag, ::AbstractModel) = nothing
@@ -135,9 +135,9 @@ end
 
 parameters(drag::JetDrag; kwargs...) =
     (
-        u₀ = parameters(drag.u₀; desc="Jet strength [m/s]", kwargs...),
-        latitude = parameters(drag.latitude; desc="Latitude of Gaussian jet [˚N]", kwargs...),
-        width = parameters(drag.width; desc="Width of Gaussian jet [˚]", kwargs...),
+        u₀ = parameterof(drag, :u₀; desc="Jet strength [m/s]", kwargs...),
+        latitude = parameterof(drag, :latitude; desc="Latitude of Gaussian jet [˚N]", kwargs...),
+        width = parameterof(drag, :width; desc="Width of Gaussian jet [˚]", kwargs...),
     )
 
 function initialize!(drag::JetDrag, model::AbstractModel)
