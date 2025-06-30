@@ -129,7 +129,7 @@ Create an animation from a SpeedyWeather simulation NetCDF output file. Needs a 
 CairoMakie or GtkMakie to be loaded at the time of calling this function.
 
 # Arguments
-- `nc_file::String`: Path to the NetCDF file containing SpeedyWeather simulation data
+- `nc_file::NCDataset`: NetCDF dataset containing SpeedyWeather simulation data
 - `variable::String = "temp"`: Variable to animate (e.g., "temp", "pres", "vor", "u", "v", "humid")
 - `level::Int = 1`: Vertical level to plot (for 3D variables)
 - `transient_timesteps::Int = 0`: Number of timesteps to skip at the beginning of the animation
@@ -140,23 +140,24 @@ CairoMakie or GtkMakie to be loaded at the time of calling this function.
 - `colorrange = nothing`: Range for the colorbar (nothing for automatic)
 - `projection = "+proj=robin"`: Map projection to use (e.g., "+proj=robin", "+proj=ortho")
 - `figure_size = (800, 600)`: Size of the figure
+- `geoaxis_kwargs = (:xgridvisible => false, :ygridvisible => false)`: Keyword arguments to pass to the GeoAxis
 
 # Example
 ```julia
 using SpeedyWeather, GeoMakie, CairoMakie
 
 # Animate temperature at level 1
-animate_simulation("output.nc", variable="temp", level=1)
+animate("output.nc", variable="temp", level=1)
 
 # Animate surface pressure with a specific colormap
-animate_simulation("output.nc", variable="pres", colormap=:thermal)
+animate(nc_file, variable="pres", colormap=:thermal)
 
 # Create an animation with Orthographic projection
-animate_simulation("output.nc", variable="temp", projection="+proj=ortho +lon_0=0 +lat_0=30")
+animate(nc_file, variable="temp", projection="+proj=ortho +lon_0=0 +lat_0=30")
 ```
 """
-function SpeedyWeather.animate_simulation(
-    nc_file::String;
+function SpeedyWeather.animate(
+    ds::NCDataset;
     variable::String = "temp",
     level::Int = 1,
     transient_timesteps::Int = 0,
@@ -166,12 +167,11 @@ function SpeedyWeather.animate_simulation(
     title::String = "",
     colorrange = nothing,
     projection = "+proj=robin",
-    figure_size = (800, 600)
+    figure_size = (800, 600),
+    coastlines::Bool = true,
+    geoaxis_kwargs = (:xgridvisible => false, :ygridvisible => false, :titlesize => 20)
 )
   
-    # Open the NetCDF file
-    ds = NCDataset(nc_file)
-    
     # Get dimensions
     lon = ds["lon"][:]
     lat = ds["lat"][:]
@@ -199,29 +199,27 @@ function SpeedyWeather.animate_simulation(
     ax = GeoAxis(
             fig[1, 1],
             title = title,
-            titlesize = 20,
-            dest = projection
+            dest = projection;
+            geoaxis_kwargs...
         )
     
-    # Create a placeholder for the plot
+    tsteps = Observable(transient_timesteps + 1)
+
+    # Create data based on tsteps
     if is_3d
         # For 3D variables, extract the specified level
-        data_init = ds[variable][:, :, level, transient_timesteps + 1]
+        data = @lift ds[variable][:, :, level, $tsteps]
     else
         # For 2D variables
-        data_init = ds[variable][:, :, transient_timesteps + 1]
+        data = @lift ds[variable][:, :, $tsteps]
     end
     
     # Determine color range if not specified
     if isnothing(colorrange)
         # Sample data to determine a good color range
         sample_indices = min(10, length(time))
-        
-        if is_3d
-            sample_data = ds[variable][:, :, level, 1:sample_indices]
-        else
-            sample_data = ds[variable][:, :, 1:sample_indices]
-        end
+
+        sample_data = is_3d ? ds[variable][:, :, level, 1:sample_indices] : ds[variable][:, :, 1:sample_indices]
         
         # Calculate min and max across samples
         sample_data = filter(!isnan, sample_data)
@@ -237,33 +235,46 @@ function SpeedyWeather.animate_simulation(
     end
     
     # Create the surface plot
-    hm = surface!(ax, lon, lat, data_init; colormap=colormap, colorrange=colorrange)
+    hm = surface!(ax, lon, lat, data; colormap=colormap, colorrange=colorrange)
     
     # Add colorbar
     cb = Colorbar(fig[1, 2], hm, label = var_units)
     
     # Add time label
     time_label = Label(fig[2, 1:2], "Time: $(time[1]) $(time_units)")
+
+    # Add coastlines 
+    if coastlines
+        lines!(GeoMakie.coastlines(); color=:white)
+    end
     
     # Create the animation
     record(fig, output_file, (transient_timesteps + 1):length(time); framerate=framerate) do frame
-        # Update the data
-        if is_3d
-            new_data = ds[variable][:, :, level, frame]
-        else
-            new_data = ds[variable][:, :, frame]
-        end
-        
-        # Update the surface plot
-        hm[3] = new_data
-        
+        # Update the Observable
+        tsteps[] = frame
+
         # Update the time label
         time_label.text = "Time: $(time[frame]) $(time_units)"
     end
     
-    # Close the dataset
-    close(ds)
-    
+    return output_file
+end
+
+"""
+$(TYPEDSIGNATURES)
+Create an animation from a NetCDF file. Needs a backend like 
+CairoMakie or GtkMakie to be loaded at the time of calling this function.
+Takes the same keyword arguments as [`SpeedyWeather.animate`](@ref).
+"""
+function SpeedyWeather.animate(
+    file_path::String;
+    kwargs...
+)
+
+    file = NCDataset(file_path)
+    output_file = animate(file; kwargs...)
+    close(file)
+
     return output_file
 end
 
@@ -272,9 +283,9 @@ $(TYPEDSIGNATURES)
 Create an animation from a SpeedyWeather Simulation object. 
 Needs the output of a simulation with NetCDF output enabled and a backend like 
 CairoMakie or GtkMakie to be loaded at the time of calling this function.
-Takes the same keyword arguments as [`animate_simulation`](@ref).
+Takes the same keyword arguments as [`SpeedyWeather.animate`](@ref).
 """
-function SpeedyWeather.animate_simulation(
+function SpeedyWeather.animate(
     simulation::Simulation;
     kwargs...
 )
@@ -290,8 +301,8 @@ function SpeedyWeather.animate_simulation(
         error("NetCDF file $(nc_file) not found. Make sure the simulation has been run with NetCDF output enabled.")
     end
     
-    # Call animate_simulation with the extracted file path
-    return animate_simulation(
+    # Call animate with the extracted file path
+    return animate(
         nc_file;
         kwargs...
     )
