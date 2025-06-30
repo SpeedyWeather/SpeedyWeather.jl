@@ -335,7 +335,7 @@ end
 
 # pragmetic longitude conversion from 0-360 to -180-180
 function longitude_shift_180(lon::AbstractVector)
-    if maximum(lon) > 180
+    if maximum(lon) > 185 # sometimes due to rounding we might get a value slightly above 180
         return lon .- 180
     else
         return lon
