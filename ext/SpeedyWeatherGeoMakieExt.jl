@@ -140,6 +140,8 @@ CairoMakie or GtkMakie to be loaded at the time of calling this function.
 - `colorrange = nothing`: Range for the colorbar (nothing for automatic)
 - `projection = "+proj=robin"`: Map projection to use (e.g., "+proj=robin", "+proj=ortho")
 - `figure_size = (800, 600)`: Size of the figure
+- `coastlines::Bool = true`: Whether to show coastlines
+- `time_label::Bool = true`: Whether to show the time label
 - `geoaxis_kwargs = (:xgridvisible => false, :ygridvisible => false)`: Keyword arguments to pass to the GeoAxis
 
 # Example
@@ -169,6 +171,7 @@ function SpeedyWeather.animate(
     projection = "+proj=robin",
     figure_size = (800, 600),
     coastlines::Bool = true,
+    time_label::Bool = true,
     geoaxis_kwargs = (:xgridvisible => false, :ygridvisible => false, :titlesize => 20)
 )
   
@@ -234,14 +237,16 @@ function SpeedyWeather.animate(
         end
     end
     
-    # Create the surface plot
+    # Create the plot
     hm = surface!(ax, lon, lat, data; colormap=colormap, colorrange=colorrange)
     
     # Add colorbar
     cb = Colorbar(fig[1, 2], hm, label = var_units)
     
     # Add time label
-    time_label = Label(fig[2, 1:2], "Time: $(time[1]) $(time_units)")
+    if time_label
+        time_label = Label(fig[2, 1:2], "Time: $(time[1]) $(time_units)")
+    end
 
     # Add coastlines 
     if coastlines
@@ -254,7 +259,9 @@ function SpeedyWeather.animate(
         tsteps[] = frame
 
         # Update the time label
-        time_label.text = "Time: $(time[frame]) $(time_units)"
+        if time_label
+            time_label.text = "Time: $(time[frame]) $(time_units)"
+        end
     end
     
     return output_file
