@@ -126,7 +126,7 @@ end
 """
 $(TYPEDSIGNATURES)
 Create an animation from a SpeedyWeather simulation NetCDF output file. Using 
-`GeoMakie.surface!` or `GeoMakie.heatmap!` for plotting. Needs a backend like 
+`GeoMakie.surface!` or `GeoMakie.heatmap!` or `GeoMakie.meshimage!` for plotting. Needs a backend like 
 CairoMakie or GtkMakie to be loaded at the time of calling this function.
 
 # Arguments
@@ -135,7 +135,7 @@ CairoMakie or GtkMakie to be loaded at the time of calling this function.
 - `level::Int = 1`: Vertical level to plot (for 3D variables)
 - `transient_timesteps::Int = 0`: Number of timesteps to skip at the beginning of the animation
 - `output_file::String = "animation.mp4"`: Path to save the animation
-- `plot_func = :surface`: Function to use for plotting (:surface or :heatmap)
+- `plot_func = :surface`: Function to use for plotting (:surface, :heatmap, :meshimage)
 - `colormap = :viridis`: Colormap to use for the animation
 - `framerate::Int = 15`: Frame rate of the animation
 - `title::String = ""`: Title for the animation (if empty, will use variable name)
@@ -184,7 +184,7 @@ function SpeedyWeather.animate(
     plot_kwargs = ()
 )   
 
-    @assert plot_func in (:surface, :heatmap) "plot_func must be :surface or :heatmap"
+    @assert plot_func in (:surface, :heatmap, :meshimage) "plot_func must be :surface, :heatmap or :meshimage"
 
     # Get dimensions
     lon = longitude_shift_180(ds["lon"][:]) # longitudes -180 to 180
@@ -253,6 +253,8 @@ function SpeedyWeather.animate(
         hm = surface!(ax, lon, lat, data; colormap=colormap, colorrange=colorrange, plot_kwargs...)
     elseif plot_func == :heatmap
         hm = heatmap!(ax, lon, lat, data; colormap=colormap, colorrange=colorrange, plot_kwargs...)
+    elseif plot_func == :meshimage
+        hm = meshimage!(ax, lon, lat, data; colormap=colormap, colorrange=colorrange, plot_kwargs...)
     end
     
     # Add colorbar
