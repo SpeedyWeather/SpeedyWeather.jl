@@ -262,7 +262,8 @@ function SpeedyWeather.animate(
     
     # Add time label
     if time_label
-        t_label = Label(fig[2, 1:2], "Time: $(time[1]) $(time_units)")
+        x_position = show_colorbar ? (1:2) : 1
+        t_label = Label(fig[2, x_position], "Time: $(time[1]) $(time_units)")
     end
 
     # Add coastlines 
