@@ -248,17 +248,19 @@ function DynamicsVariables(SG::SpectralGrid;
     (; GridVariable2D, GridVariable3D) = SG
 
     if isnothing(spectral_transform)
-        return DynamicsVariables{NF, ArrayType, SpectralVariable2D, SpectralVariable3D,
+        return DynamicsVariables{NF, ArrayType, typeof(spectrum), typeof(grid),
+            SpectralVariable2D, SpectralVariable3D,
             GridVariable2D, GridVariable3D, SpeedyTransforms.ScratchMemory{NF, ArrayType{Complex{NF}, 3}}}(;
                 spectrum, grid, nlayers,
             )
     else 
         scratch_memory = spectral_transform.scratch_memory 
 
-        return DynamicsVariables{NF, ArrayType, SpectralVariable2D, SpectralVariable3D,
-        GridVariable2D, GridVariable3D, typeof(scratch_memory)}(;
-            spectrum, grid, nlayers, scratch_memory
-        )
+        return DynamicsVariables{NF, ArrayType, typeof(spectrum), typeof(grid),
+            SpectralVariable2D, SpectralVariable3D,
+            GridVariable2D, GridVariable3D, typeof(scratch_memory)}(;
+                spectrum, grid, nlayers, scratch_memory
+            )
     end 
 end
 
