@@ -235,6 +235,9 @@ $(TYPEDFIELDS)"""
     "Vertical average of divergence [1/s], grid"
     div_mean_grid::GridVariable2D = zeros(GridVariable2D, grid)
 
+    "Vertical average of divergence [1/s], spectral"
+    div_mean::SpectralVariable2D = zeros(SpectralVariable2D, spectrum)
+
     "Scratch memory for the transforms"
     scratch_memory::ScratchMemoryType = SpeedyTransforms.ScratchMemory(NF, ArrayType, grid, nlayers)
 end
