@@ -273,8 +273,8 @@ end
                     result_cpu = S_cpu.scratch_memory.north;
                     @test result_cpu ≈ result_gpu rtol=sqrt(eps(Float32))   # GPU error tolerance always Float32
 
-                    result_gpu = adapt(Array, S_gpu.scratch_memory_south);
-                    result_cpu = S_cpu.scratch_memory_south;
+                    result_gpu = adapt(Array, S_gpu.scratch_memory.south);
+                    result_cpu = S_cpu.scratch_memory.south;
                     @test result_cpu ≈ result_gpu rtol=sqrt(eps(Float32))
                 end
             end
