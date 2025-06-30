@@ -135,7 +135,7 @@ CairoMakie or GtkMakie to be loaded at the time of calling this function.
 - `level::Int = 1`: Vertical level to plot (for 3D variables)
 - `transient_timesteps::Int = 0`: Number of timesteps to skip at the beginning of the animation
 - `output_file::String = "animation.mp4"`: Path to save the animation
-- `plot_func = :surface`: Function to use for plotting (:surface, :heatmap, :meshimage)
+- `plot_func = :meshimage`: Function to use for plotting (:surface, :heatmap, :meshimage)
 - `colormap = :viridis`: Colormap to use for the animation
 - `framerate::Int = 15`: Frame rate of the animation
 - `title::String = ""`: Title for the animation (if empty, will use variable name)
