@@ -169,7 +169,7 @@ function SpeedyWeather.animate(
     level::Int = 1,
     transient_timesteps::Int = 0,
     output_file::String = "animation.mp4",
-    plot_func = :surface,
+    plot_func = :meshimage,
     colormap = :viridis,
     framerate::Int = 15,
     title::String = "",
@@ -254,7 +254,7 @@ function SpeedyWeather.animate(
     elseif plot_func == :heatmap
         hm = heatmap!(ax, lon, lat, data; colormap=colormap, colorrange=colorrange, plot_kwargs...)
     elseif plot_func == :meshimage
-        hm = meshimage!(ax, lon, lat, data; colormap=colormap, colorrange=colorrange, plot_kwargs...)
+        hm = meshimage!(ax, lon[1]..lon[end], lat[1]..lat[end], data; colormap=colormap, colorrange=colorrange, plot_kwargs...)
     end
     
     # Add colorbar
