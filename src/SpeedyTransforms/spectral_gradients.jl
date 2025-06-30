@@ -300,7 +300,7 @@ velocity potential from divergence. Then compute zonal and meridional gradients
 to get U, V.
 Acts on the unit sphere, i.e. it omits any radius scaling as all inplace gradient operators.
 """
-function UV_from_vordiv_old!(   
+function UV_from_vordiv!(   
     U::LowerTriangularArray,
     V::LowerTriangularArray,
     vor::LowerTriangularArray,
@@ -384,17 +384,8 @@ function UV_from_vordiv_old!(
     return U, V
 end
 
-
-"""
-$(TYPEDSIGNATURES)
-Get U, V (=(u, v)*coslat) from vorticity ζ and divergence D in spectral space.
-Two operations are combined into a single linear operation. First, invert the
-spherical Laplace ∇² operator to get stream function from vorticity and
-velocity potential from divergence. Then compute zonal and meridional gradients
-to get U, V.
-Acts on the unit sphere, i.e. it omits any radius scaling as all inplace gradient operators.
-"""
-function UV_from_vordiv!(   
+# New kernel-based implementation, currently unused because of problems with Enzyme
+function UV_from_vordiv_kernel!(   
     U::LowerTriangularArray,
     V::LowerTriangularArray,
     vor::LowerTriangularArray,
@@ -405,7 +396,7 @@ function UV_from_vordiv!(
     (; vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2 ) = S
     @boundscheck ismatching(S, U) || throw(DimensionMismatch(S, U))
 
-    launch!(S.architecture, :lmk, size(U), _UV_from_vordiv_kernel!, U, V, vor, div, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)
+    launch!(S.architecture, :lmk, size(U), _UV_from_vordiv_kernel!, U, V, vor, div, vor.spectrum.l_indices, vor.spectrum.lmax, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)
     synchronize(S.architecture)
     
     # *radius scaling if not unit sphere (*radius² for ∇⁻², then /radius to get from stream function to velocity)
@@ -417,41 +408,43 @@ function UV_from_vordiv!(
     return U, V
 end
 
-@kernel inbounds=true function _UV_from_vordiv_kernel!(U, V, vor, div, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)    
+@kernel inbounds=true function _UV_from_vordiv_kernel!(U, V, vor, div, @Const(l_indices), lmax, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)    
     I = @index(Global, Cartesian)
     lm = I[1]
     k = ndims(vor) == 1 ? CartesianIndex() : I[2]
-    lmax = U.spectrum.lmax 
-    l = U.spectrum.l_indices[lm]
-
-    vordiv_uv2 = vordiv_to_uv2[lm]
-    vordiv_uv1 = vordiv_to_uv1[lm]
+    l = l_indices[lm]
+    
+    # Get the coefficients for the current lm index
     z = vordiv_to_uv_x[lm]
+    vordiv_uv1 = vordiv_to_uv1[lm]
+    vordiv_uv2 = vordiv_to_uv2[lm]
+    
+    # Handle different cases based on position in the triangular matrix
+    if lm == 1  # First element (diagonal)
+        # Meridional gradient contributions
+        ∂ζθ =  vordiv_uv2 * vor[lm+1, k]       # lm-1 term is zero
+        ∂Dθ = -vordiv_uv2 * div[lm+1, k]       # lm-1 term is zero
+        
+        # Zonal gradient contributions
+        U[I] = muladd(z, div[I], ∂ζθ)          # = ∂Dλ + ∂ζθ
+        V[I] = muladd(z, vor[I], ∂Dθ)          # = ∂ζλ + ∂Dθ
+    elseif l == (lmax-1)  # Second last row
+        U[I] = muladd(z, div[I], -vordiv_uv1 * vor[lm-1, k])
+        V[I] = muladd(z, vor[I], vordiv_uv1 * div[lm-1, k])
+    elseif l == lmax  # Last row
+        U[I] = -vordiv_uv1 * vor[lm-1, k]      # only last term from 2nd last row
+        V[I] =  vordiv_uv1 * div[lm-1, k]      # only last term from 2nd last row
+    else  # General case (below diagonal)
+        # Meridional gradient contributions
+        ∂ζθ = muladd(vordiv_uv2, vor[lm+1, k], -vordiv_uv1 * vor[lm-1, k])
+        ∂Dθ = muladd(vordiv_uv1, div[lm-1, k], -vordiv_uv2 * div[lm+1, k])
+        
+        # Zonal gradient contributions
+        U[I] = muladd(z, div[I], ∂ζθ)          # = ∂Dλ + ∂ζθ
+        V[I] = muladd(z, vor[I], ∂Dθ)          # = ∂ζλ + ∂Dθ
+    end
+end
 
-    # vordiv_to_uv2 is zero in the last row, so we don't need special treatment there
-    # we do treat the two last rows seperatly: if we would assume that vor and div are always zero in the last row (like they should)
-    # we could avoid that, but this can easily lead to some errors when starting with random vorticities in tests and scripts
-    # this kernel isn't performance critical, so better safe than sorry
-    if lm==1 
-        ∂ζθ =  vordiv_uv2*vor[2, k]       # lm-1 term is zero
-        ∂Dθ = -vordiv_uv2*div[2, k]       # lm-1 term is zero
-
-        U[I] = muladd(z, div[lm, k], ∂ζθ)   # = ∂Dλ + ∂ζθ
-        V[I] = muladd(z, vor[lm, k], ∂Dθ)   # = ∂ζλ + ∂Dθ             
-    elseif l==(lmax-1) # second last row 
-        U[I] = z*div[I] - vordiv_uv1*vor[lm-1, k]
-        V[I] = z*vor[I] + vordiv_uv1*div[lm-1, k]
-    elseif l==lmax # last row
-        U[I] = -vordiv_uv1*vor[lm-1, k]
-        V[I] =  vordiv_uv1*div[lm-1, k] 
-    else    
-        ∂ζθ = muladd(vordiv_uv2, vor[lm+1, k], -vordiv_uv1*vor[lm-1, k])
-        ∂Dθ = muladd(vordiv_uv1, div[lm-1, k], -vordiv_uv2*div[lm+1, k])
-
-        U[I] = muladd(z, div[lm, k], ∂ζθ)   # = ∂Dλ + ∂ζθ
-        V[I] = muladd(z, vor[lm, k], ∂Dθ)   # = ∂ζλ + ∂Dθ            
-    end    
-end 
 
 """
 $(TYPEDSIGNATURES)
