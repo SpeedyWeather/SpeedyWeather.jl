@@ -246,8 +246,7 @@ The saved NetCDF files can be visualized with a wide range of tools, both in Jul
 using SpeedyWeather, GeoMakie, CairoMakie
 spectral_grid = SpectralGrid()
 model = PrimitiveWetModel(spectral_grid)
-simulation = Simulation(model)
-initialize!(simulation)
+simulation = initialize!(model)
 run!(simulation, period=Day(3), output=false) # some spin-up
 run!(simulation, period=Day(2), output=true)
 
