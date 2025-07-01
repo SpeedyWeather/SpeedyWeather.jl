@@ -21,12 +21,8 @@ check_lta_input_array(data, spectrum, N) =
     (ndims(data) == N) & (length(data) == prod(size(data)[2:end]) * nonzeros(spectrum)) # & ismatching(spectrum, typeof(data)) TODO: reactivate this? problem for constructors
 
 function lta_error_message(data, spectrum, T, N, ArrayType, S) 
-    if ismatching(spectrum, typeof(data))
-        return "Architecture mismatch: Spectrum has architecture $(spectrum.architecture), but array type $(typeof(data)) is used"
-    else 
-        return "$(Base.dims2string(size(data))) $(typeof(data)) cannot be used to create "*
+    return "$(Base.dims2string(size(data))) $(typeof(data)) cannot be used to create "*
             "a $(Base.dims2string(matrix_size(data, spectrum))) LowerTriangularArray{$T, $N, $ArrayType, $S}"
-    end
 end 
 
 """2D `LowerTriangularArray` of type `T`"""
