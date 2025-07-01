@@ -261,5 +261,5 @@ model.output
 With all options shown below 
 
 ```@example netcdf 
-@docs JLD2Output
+@doc JLD2Output
 ```
