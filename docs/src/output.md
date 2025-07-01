@@ -238,6 +238,15 @@ The actual options are declared as `[OPTION]` in the following
 @doc NetCDFOutput
 ```
 
+## Visualizing output
+
+The saved NetCDF files can be visualized with a wide range of tools, both in Julia, but also in other languages. In order to get a quick view into a NetCDF file, you can use command line tools like `ncview`. For actual visualizations in Julia, it's easy to use [NCDatasets.jl](https://github.com/JuliaGeo/NCDatasets.jl) for accessing the data and [GeoMakie.jl](https://github.com/JuliaGeo/GeoMakie.jl) for plotting it. For a standard animation we already provide the `animate` function within SpeedyWeather.jl's GeoMakie extension that makes it easy to animate a variable from a NetCDF output file or a `Simulation` object, as seen below:
+
+```@example netcdf
+using GeoMakie
+@doc SpeedyWeather.animate
+```
+
 # JLD2 Output 
 
 As an alternative to the NetCDF output, it is also possible to directly output the `PrognosticVariables` and `DiagnosticVariables` to a JLD2 file. This might be interesting if you are really interested in the model internals, or also for some machine learning tasks. However, this option doesn't feature any possibilites to regrid or select variables, and it comes with the usual limitations of serialized JLD2 data: SpeedyWeather.jl always has to be in the scope when loading the data and the saved files might only load properly with exactly the same version of SpeedyWeather.jl and Julia as used when saving the data. Its usage is similar to the NetCDF output above:
@@ -252,5 +261,5 @@ model.output
 With all options shown below 
 
 ```@example netcdf 
-@doc JLD2Output
+@docs JLD2Output
 ```
