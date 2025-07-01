@@ -20,8 +20,6 @@ struct SpectralTransform{
     MatrixComplexType,                    # <: ArrayType{Complex{NF}, 2},
     ArrayComplexType,                     # <: ArrayType{Complex{NF}, 3},
     LowerTriangularMatrixType,            # <: LowerTriangularArray{NF, 1, ArrayType{NF}},
-    ComplexIntLowerTriangularMatrixType,  # <: LowerTriangularArray{Complex{Int}, 1, ArrayType{Complex{Int}}},
-    ComplexLowerTriangularMatrixType,     # <: LowerTriangularArray{Complex{NF}, 1, ArrayType{Complex{NF}}},
     LowerTriangularArrayType,             # <: LowerTriangularArray{NF, 2, ArrayType{NF}},
 } <: AbstractSpectralTransform
 
@@ -84,12 +82,12 @@ struct SpectralTransform{
     grad_y2::LowerTriangularMatrixType  # term 2
     
     # GRADIENT MATRICES FOR U, V -> Vorticity, Divergence
-    grad_x_vordiv::ComplexIntLowerTriangularMatrixType # precomputed zonal gradient factors
+    grad_x_vordiv::LowerTriangularMatrixType # precomputed zonal gradient factors
     grad_y_vordiv1::LowerTriangularMatrixType
     grad_y_vordiv2::LowerTriangularMatrixType
 
     # GRADIENT MATRICES FOR Vorticity, Divergence -> U, V
-    vordiv_to_uv_x::ComplexLowerTriangularMatrixType
+    vordiv_to_uv_x::LowerTriangularMatrixType
     vordiv_to_uv1::LowerTriangularMatrixType
     vordiv_to_uv2::LowerTriangularMatrixType
 
@@ -224,10 +222,10 @@ function SpectralTransform(
     end
 
     # meridional gradient used to get from u, v/coslat to vorticity and divergence
-    grad_x_vordiv = zeros(Complex{Int}, spectrum)
+    grad_x_vordiv = zeros(Int, spectrum)
     for m in 1:mmax
         for l in m:lmax-1                         
-            grad_x_vordiv[l, m] = complex(0, m-1)
+            grad_x_vordiv[l, m] = m-1
         end # last row zero to get vor and div correct
         grad_x_vordiv[lmax, m] = 0
     end
@@ -246,7 +244,7 @@ function SpectralTransform(
     end
 
     # zonal integration (sort of) to get from vorticity and divergence to u, v*coslat
-    vordiv_to_uv_x = LowerTriangularMatrix([-m/(l*(l+1))*im for l in 0:(lmax-1), m in 0:(mmax-1)], spectrum)
+    vordiv_to_uv_x = LowerTriangularMatrix([-m/(l*(l+1)) for l in 0:(lmax-1), m in 0:(mmax-1)], spectrum)
     vordiv_to_uv_x[1, 1] = 0
 
     # meridional integration (sort of) to get from vorticity and divergence to u, v*coslat
@@ -280,9 +278,7 @@ function SpectralTransform(
         ArrayType_{Complex{NF}, 1},
         ArrayType_{Complex{NF}, 2},
         ArrayType_{Complex{NF}, 3},
-        LowerTriangularArray{NF, 1, ArrayType_{NF, 1}, typeof(spectrum)},
-        LowerTriangularArray{Complex{Int}, 1, ArrayType_{Complex{Int}, 1}, typeof(spectrum)},   
-        LowerTriangularArray{Complex{NF}, 1, ArrayType_{Complex{NF}, 1}, typeof(spectrum)},   
+        LowerTriangularArray{NF, 1, ArrayType_{NF, 1}, typeof(spectrum)}, 
         LowerTriangularArray{NF, 2, ArrayType_{NF, 2}, typeof(spectrum)},
     }(
         architecture,
