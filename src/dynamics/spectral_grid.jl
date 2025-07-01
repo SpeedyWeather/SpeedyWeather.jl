@@ -62,7 +62,7 @@ struct SpectralGrid{
     SpectralVariable4D::Type{<:AbstractArray}
     
     # SIZE OF GRID from trunc, Grid, dealiasing:
-    "[OPTION] how to match spectral with grid resolution: dealiasing factor,0=automatically chosen based on Grid, 1=linear, 2=quadratic, 3=cubic grid"
+    "[OPTION] how to match spectral with grid resolution: dealiasing factor, 1=linear, 2=quadratic, 3=cubic grid"
     dealiasing::Float64
     
     "[DERIVED] number of latitude rings on one hemisphere (Equator incl)"
