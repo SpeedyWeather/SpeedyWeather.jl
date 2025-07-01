@@ -242,8 +242,23 @@ The actual options are declared as `[OPTION]` in the following
 
 The saved NetCDF files can be visualized with a wide range of tools, both in Julia, but also in other languages. In order to get a quick view into a NetCDF file, you can use command line tools like `ncview`. For actual visualizations in Julia, it's easy to use [NCDatasets.jl](https://github.com/JuliaGeo/NCDatasets.jl) for accessing the data and [GeoMakie.jl](https://github.com/JuliaGeo/GeoMakie.jl) for plotting it. For a standard animation we already provide the `animate` function within SpeedyWeather.jl's GeoMakie extension that makes it easy to animate a variable from a NetCDF output file or a `Simulation` object, as seen below:
 
-```@example netcdf
-using GeoMakie
+```@example netcdf 
+using SpeedyWeather, GeoMakie, CairoMakie
+spectral_grid = SpectralGrid()
+model = PrimitiveWetModel(spectral_grid)
+simulation = Simulation(model)
+initialize!(simulation)
+run!(simulation, period=Day(3), output=false) # some spin-up
+run!(simulation, period=Day(2), output=true)
+
+animate(simulation, output_file="test_vor_animation.mp4", variable="vor", level=1) # animate vorticity at the first vertical level
+```
+
+![test_vor_animation](test_vor_animation.mp4)
+
+For more options for `animate`, see below: 
+
+```@example netcdf 
 @doc SpeedyWeather.animate
 ```
 
