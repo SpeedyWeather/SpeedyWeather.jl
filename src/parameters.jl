@@ -1,5 +1,3 @@
-const AbstractParam = ModelParameters.AbstractParam
-
 """
     SpeedyParam{NF<:AbstractFloat} <: AbstractParam
 
@@ -11,7 +9,7 @@ Base.@kwdef struct SpeedyParam{NF<:AbstractFloat} <: AbstractParam{NF}
     value::NF = NaN
     
     "numerical domain on which the parameter is defined"
-    bounds::Domain = RealLine()
+    bounds::Domain = ℝ
 
     "human-readable description of the parameter"
     desc::String = ""
@@ -22,7 +20,7 @@ Base.@kwdef struct SpeedyParam{NF<:AbstractFloat} <: AbstractParam{NF}
     # default constructor
     SpeedyParam(value::NF, bounds::Domain, desc::String, attrs::NamedTuple) where {NF<:AbstractFloat} = new{NF}(value, bounds, desc, attrs)
     # convenience constructor
-    SpeedyParam(value::NF; bounds=RealLine(), desc="", attrs...) where {NF<:AbstractFloat} = new{NF}(value, bounds, desc, NamedTuple(attrs))
+    SpeedyParam(value::NF; bounds=ℝ, desc="", attrs...) where {NF<:AbstractFloat} = new{NF}(value, bounds, desc, NamedTuple(attrs))
     # mandatory constructor from ModelParameters that allows for automated reconstruction
     SpeedyParam(nt::NamedTuple) = new{typeof(nt.val)}(nt.val, nt.bounds, nt.desc, _attrs(nt))
 end
@@ -70,12 +68,12 @@ Convenience method that creates a model parameter from its property with the giv
 A parameter attribute `copmonenttype` is automatically added with value `T`.
 """
 parameterof(obj::T, name::Symbol; kwargs...) where {T} = parameterof(SpeedyParam, obj, name; kwargs...)
-parameterof(::Type{PT}, obj::T, name::Symbol; kwargs...) where {PT,T} = parameters(PT, getproperty(obj, name); componenttype=T, kwargs...)
+parameterof(::Type{PT}, obj::T, name::Symbol; kwargs...) where {PT,T} = name => parameters(PT, getproperty(obj, name); componenttype=T, kwargs...)
 
 """
     SpeedyParams{NT<:NamedTuple} <: ModelParameters.AbstractModel
 
-Lightweight wrapper around a parameter `NamedTuple` following the ModelParameters `AbstractModel` interface.
+Lightweight wrapper around a `NamedTuple` of parameters following the ModelParameters `AbstractModel` interface.
 This provides a table-like interface for interacting with model parameters.
 """
 struct SpeedyParams{NT<:NamedTuple} <: ModelParameters.AbstractModel
@@ -91,6 +89,7 @@ struct SpeedyParams{NT<:NamedTuple} <: ModelParameters.AbstractModel
         end
         return new{typeof(parent)}(parent)
     end
+    SpeedyParams(; params...) = SpeedyParams((; params...))
 end
 
 # Base overridese for SpeedyParams
@@ -125,6 +124,9 @@ Base.getindex(ps::SpeedyParams, nm::Symbol) = getindex(ps, :, nm)
     end
 end
 
+## non-mutating setindex!
+## consider using a method instead of setindex! to avoid confusion?
+Base.setindex!(ps::SpeedyParams, x, nm::Symbol) = setindex!(ps, x, :, nm)
 @inline function Base.setindex!(ps::SpeedyParams, x, ::Colon, nm::Symbol)
     # include fieldname only (no component)
     if nm == :idx
@@ -142,7 +144,7 @@ end
 end
 
 Base.keys(params::SpeedyParams) = (:idx, :fieldname, keys(first(params))...)
-Base.vec(params::SpeedyParams) = ComponentArray(getfield(params, :parent))
+Base.vec(params::SpeedyParams) = ComponentArray(parent(params))
 
 # Override internal ModelParameters method _columntypes to condense type names in table schema (just to look nicer)
 # TODO: propose this change upstream in ModelParameters.jl
@@ -170,6 +172,82 @@ function reconstruct(obj, values::NamedTuple{keys}) where {keys}
     # construct a named tuple with the reconstructed values and apply with setproperties
     patch = NamedTuple{keys}(patchvals)
     return setproperties(obj, patch)
+end
+
+"""
+    $SIGNATURES
+
+Convenience macro for creating "parameterized" `struct`s. Fields can be marked as parameters with `@param`, e.g:
+
+```julia
+@parameterized Base.@kwdef struct Foo{T}
+    @param x::T = 1.0
+    y::T = NaN
+end
+```
+where here `x` will be treated as a parameter field and `y` will not. Parameters will be then automatically
+generated in a corresponding `parameters(::Foo)` method definition. Additional parameter attributes can be
+supplied as keywords after the parameter, e.g. `@param p::T = 0.5 bounds=UnitInterval()` or
+`@param p::T = 0.5 (bounds=UnitInterval(), constant=false)`.
+"""
+macro parameterized(expr)
+    # process struct definition
+    ## first declare local variables for capturing metadata
+    paraminfo = []
+    lastdoc = nothing
+    typename = nothing
+    ## prewalk (top-down) over expression tree; note that there is some danger of infinite
+    ## recursion with prewalk since it will descend into the returned expression. However,
+    ## this is not a problem here since we only deconstruct/reduce the @param expressions.
+    new_expr = MacroTools.prewalk(expr) do ex
+        # case 1: struct definition (top level)
+        if isa(ex, Expr) && ex.head == :struct
+            # type signature is in second argument;
+            # use namify to extract type name (discard type parameters)
+            typename = namify(ex.args[2])
+            ex
+        # case 2: parameterized field definition
+        elseif @capture(ex, @param fieldname_::FT_ = defval_; attrs__) || @capture(ex, @param fieldname_::FT_; attrs__)
+            # use last seen docstring as description, if present
+            desc = isnothing(lastdoc) ? "" : lastdoc
+            attrs = if isempty(attrs)
+                (;)
+            elseif length(attrs) == 1
+                # handle both singleton attr=value syntax as well as named tuple syntax (attr1=value1, attr2=value2, ...)
+                attrs[1].head == :tuple ? eval(attrs[1]) : eval(:(($(attrs...),)))
+            else
+                error("invalid syntax for parameter attributes: $(QuoteNode(attrs))")
+            end
+            # then reset to nothing to prevent duplication
+            lastdoc = nothing
+            push!(paraminfo, (name=fieldname, type=FT, desc=desc, attrs...))
+            :($fieldname::$FT = $defval)
+        # case 3: non-parameterized field definition
+        elseif @capture(ex, fieldname_::FT_ = defval_) || @capture(ex, fieldname_::FT_)
+            # reset lastdoc variable to prevent confusing docstrings between parameteter and non-parameter fields
+            lastdoc = nothing
+            ex
+        # case 4: field documentation
+        elseif @capture(ex, docs_String)
+            # store in lastdoc field
+            lastdoc = docs
+            ex
+        # catch-all case for all other nodes in the epxression tree
+        else
+            ex
+        end
+    end
+    # emit parametersof calls for each parsed parameter
+    param_constructors = map(paraminfo) do info
+        :($(QuoteNode(info.name)) => parameterof(obj, $(QuoteNode(info.name)); desc=$(info.desc), info.attrs..., kwargs...))
+    end
+    # construct final expression block
+    block = Expr(:block)
+    ## 1. struct definition
+    push!(block.args, esc(new_expr))
+    ## 2. parameters method dispatch
+    push!(block.args, esc(:(parameters(obj::$(typename); kwargs...) = (; $(param_constructors...)))))
+    return block
 end
 
 # Internal helper functions
