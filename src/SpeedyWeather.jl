@@ -28,12 +28,16 @@ import JLD2: jldopen, jldsave, JLDFile
 import CodecZlib
 import BitInformation: round, round!
 import ProgressMeter
-import ModelParameters
+import ModelParameters: ModelParameters, AbstractParam
 import ConstructionBase: constructorof, getproperties, setproperties
 
 # DOMAINS
-import DomainSets: Domain, RealLine, HalfLine, UnitInterval
+import DomainSets: Domain, RealLine, NonnegativeRealLine, PositiveRealLine, NegativeRealLine, UnitInterval
 using DomainSets.IntervalSets
+
+const StrictlyPositive = PositiveRealLine()
+const Nonnegative = NonnegativeRealLine()
+const Negative = NegativeRealLine()
 
 # to avoid a `using Dates` to pass on DateTime arguments
 export DateTime, Millisecond, Second, Minute, Hour, Day, Week, Month, Year, Century, Millenium
