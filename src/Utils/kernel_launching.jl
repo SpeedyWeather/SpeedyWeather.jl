@@ -25,7 +25,7 @@ function work_layout(dims_type::Symbol, worksize::NTuple{N, Int}) where N
         # compare how jack has done that in 
         # number of (M, k) items?
         workgroup = heuristic_workgroup(worksize...)
-    elseif dims_type == :ijk # kernel over RingGrid i, j, k
+    elseif dims_type == :ijk # kernel over RingGrids 'ij' indices and layers 
         workgroup = heuristic_workgroup(worksize...)
     elseif dims_type == :lmk_inner_points    # kernel over sph number 'lm' and layers, but leaving out the lm=1 element
         # number of (M, k) items?

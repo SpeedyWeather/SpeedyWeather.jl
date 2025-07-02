@@ -16,9 +16,9 @@ Example
 
 with cell center c (the grid point), e, s, w, n the vertices and o the surrounding grid points.
 Returns 2xnpoints arrays for east, south, west, north each containing the longitude and latitude of the vertices."""
-function get_vertices(Grid::Type{<:AbstractGridArray}, nlat_half::Integer)
+function get_vertices(Grid::Type{<:AbstractGrid}, nlat_half::Integer)
 
-    npoints = get_npoints2D(Grid, nlat_half)
+    npoints = get_npoints(Grid, nlat_half)
     londs, latds = get_londlatds(Grid, nlat_half)
 
     # use the locator to find the neighbouring grid points
@@ -83,9 +83,9 @@ end
 Vertices for full grids, other definition than for reduced grids to prevent
 a diamond shape of the cells. Use default rectangular instead.
 Effectively rotating the vertices clockwise by 45˚, making east south-east etc."""
-function get_vertices(Grid::Type{<:AbstractFullGridArray}, nlat_half::Integer)
+function get_vertices(Grid::Type{<:AbstractFullGrid}, nlat_half::Integer)
 
-    npoints = get_npoints2D(Grid, nlat_half)
+    npoints = get_npoints(Grid, nlat_half)
     nlat = get_nlat(Grid, nlat_half)
     nlon = get_nlon(Grid, nlat_half)
     latd = get_latd(Grid, nlat_half)
@@ -128,11 +128,11 @@ are the vertices (E, S, W, N) of every grid points ij in 1:N, row 5 is duplicate
 to close the grid cell. Use keyword arguemnt `add_nan=true` (default `false`) to add a 6th row
 with (NaN, NaN) to separate grid cells when drawing them as a continuous line with `vec(polygons)`."""
 function get_gridcell_polygons(
-    Grid::Type{<:AbstractGridArray},
+    Grid::Type{<:AbstractGrid},
     nlat_half::Integer;
     add_nan::Bool = false,
 )
-    npoints = get_npoints2D(Grid, nlat_half)
+    npoints = get_npoints(Grid, nlat_half)
 
     # vertex east, south, west, north (i.e. clockwise for every grid point)
     E, S, W, N = get_vertices(Grid, nlat_half)
@@ -164,5 +164,5 @@ function get_gridcell_polygons(
     return polygons
 end
 
-get_gridcell_polygons(grid::AbstractGridArray; kwargs...) =
+get_gridcell_polygons(grid::AbstractGrid; kwargs...) =
     get_gridcell_polygons(typeof(grid), grid.nlat_half; kwargs...)

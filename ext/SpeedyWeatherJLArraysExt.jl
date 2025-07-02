@@ -1,7 +1,7 @@
 module SpeedyWeatherJLArraysExt
 
 using SpeedyWeather, JLArrays
-import SpeedyWeather.Architectures: ismatching, GPU, architecture, array_type
+import SpeedyWeather.Architectures: ismatching, GPU, architecture, array_type, compatible_array_types
 
 # for RingGrids and LowerTriangularArrays:
 # every Array needs this method to strip away the parameters
@@ -16,5 +16,6 @@ ismatching(arch::Type{<:GPU}, array_type::Type{<:JLArrays.JLDeviceArray}) = true
 architecture(::Type{<:JLArray}) = GPU(JLArrays.JLBackend())
 array_type(::Type{GPU{JLBackend}}) = JLArray
 array_type(::GPU{JLBackend}) = JLArray
+compatible_array_types(::GPU) = (JLArray, JLArrays.JLDeviceArray)
 
 end # module

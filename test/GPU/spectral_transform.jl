@@ -24,17 +24,16 @@ function get_test_data(; trunc, nlayers, Grid, NF)
     S_cpu = SpectralTransform(spectral_grid_cpu)
     S_gpu = SpectralTransform(spectral_grid_gpu)
 
-    grid_cpu = rand(spectral_grid_cpu.Grid{spectral_grid_cpu.NF}, 
-                    spectral_grid_cpu.nlat_half, 
-                    spectral_grid_cpu.nlayers)
-    spec_cpu = rand(LowerTriangularArray{Complex{spectral_grid_cpu.NF}}, 
-                    spectral_grid_cpu.spectrum, 
-                    spectral_grid_cpu.nlayers)
+    field_cpu  = rand(NF, spectral_grid_cpu.grid,
+                        spectral_grid_cpu.nlayers)
+    coeffs_cpu = rand(LowerTriangularArray{Complex{NF}}, 
+                        spectral_grid_cpu.spectrum, 
+                        spectral_grid_cpu.nlayers)
     
-    grid_gpu = on_architecture(S_gpu.architecture, grid_cpu)
-    spec_gpu = on_architecture(S_gpu.architecture, spec_cpu)
+    grid_gpu = on_architecture(S_gpu.architecture, field_cpu)
+    spec_gpu = on_architecture(S_gpu.architecture, coeffs_cpu)
     
-    return S_cpu, S_gpu, grid_cpu, grid_gpu, spec_cpu, spec_gpu
+    return S_cpu, S_gpu, field_cpu, grid_gpu, coeffs_cpu, spec_gpu
 end
 
 

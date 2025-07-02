@@ -94,8 +94,8 @@ function _divergence!(
   
     @boundscheck ismatching(S, div) || throw(DimensionMismatch(S, div))
 
-    launch!(S.architecture, :lmk, size(div), _divergence_kernel!, kernel, div, u, v, grad_x_vordiv, grad_y_vordiv1, grad_y_vordiv2)
-    synchronize(S.architecture)
+    launch!(architecture(div), :lmk, size(div), _divergence_kernel!, kernel, div, u, v, grad_x_vordiv, grad_y_vordiv1, grad_y_vordiv2)
+    synchronize(architecture(div))
     
     # radius scaling if not unit sphere
     if radius != 1
@@ -117,7 +117,7 @@ end
     elseif lm == lmmax    
         div[I] = 0
     else
-        ∂u∂λ  = grad_x_vordiv[lm]*u[I]
+        ∂u∂λ  = im*grad_x_vordiv[lm]*u[I]
         ∂v∂θ1 = grad_y_vordiv1[lm] * v[lm-1, k] 
         ∂v∂θ2 = grad_y_vordiv2[lm] * v[lm+1, k]  
         div[I] = kernel_func(div[I], ∂u∂λ, ∂v∂θ1, ∂v∂θ2)
@@ -160,11 +160,10 @@ end
 # called by divergence or curl
 function _div_or_curl(  
     kernel!,
-    u::Grid,
-    v::Grid;
+    u::AbstractField,
+    v::AbstractField;
     kwargs...,
-) where {Grid<:AbstractGridArray}
-
+)
     u_grid = copy(u)
     v_grid = copy(v)
 
@@ -187,8 +186,7 @@ Applies 1/coslat scaling, transforms to spectral space and returns
 the spectral divergence. Acts on the unit sphere, i.e. it omits 1/radius scaling unless
 `radius` keyword argument is provided.
 """
-divergence(u::Grid, v::Grid; kwargs...) where {Grid<:AbstractGridArray} =
-    _div_or_curl(divergence!, u, v; kwargs...)
+divergence(u::AbstractField, v::AbstractField; kwargs...) = _div_or_curl(divergence!, u, v; kwargs...)
 
 """
 $(TYPEDSIGNATURES)
@@ -196,8 +194,7 @@ Curl (∇×) of two vector components `u, v` on a grid.
 Applies 1/coslat scaling, transforms to spectral space and returns
 the spectral curl. Acts on the unit sphere, i.e. it omits 1/radius scaling unless
 `radius` keyword argument is provided."""
-curl(u::Grid, v::Grid; kwargs...) where {Grid<:AbstractGridArray} =
-    _div_or_curl(curl!, u, v; kwargs...)
+curl(u::AbstractField, v::AbstractField; kwargs...) = _div_or_curl(curl!, u, v; kwargs...)
 
 """
 $(TYPEDSIGNATURES)
@@ -250,8 +247,8 @@ function UV_from_vor!(
     (; vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2 ) = S
     @boundscheck ismatching(S, U) || throw(DimensionMismatch(S, U))
     
-    launch!(S.architecture, :lmk, size(U), _UV_from_vor_kernel!, U, V, vor, vor.spectrum.l_indices, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)
-    synchronize(S.architecture)
+    launch!(architecture(U), :lmk, size(U), _UV_from_vor_kernel!, U, V, vor, vor.spectrum.l_indices, vor.spectrum.lmax, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)
+    synchronize(architecture(U))
     
     # *radius scaling if not unit sphere (*radius² for ∇⁻² then /radius to get from stream function to velocity)
     if radius != 1
@@ -262,15 +259,14 @@ function UV_from_vor!(
     return U, V
 end
 
-@kernel inbounds=true function _UV_from_vor_kernel!(U, V, vor, @Const(l_indices), vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)    
+@kernel inbounds=true function _UV_from_vor_kernel!(U, V, vor, @Const(l_indices), lmax, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)    
     I = @index(Global, Cartesian)
     lm = I[1]
     k = ndims(vor) == 1 ? CartesianIndex() : I[2]
-    lmax = U.spectrum.lmax
     l = l_indices[lm]
 
     # Get the coefficients for the current lm index
-    z = vordiv_to_uv_x[lm]
+    z = im*vordiv_to_uv_x[lm]
     vordiv_uv1 = vordiv_to_uv1[lm]
     vordiv_uv2 = vordiv_to_uv2[lm]
     
@@ -294,6 +290,7 @@ end
     end
 end
 
+
 """
 $(TYPEDSIGNATURES)
 Get U, V (=(u, v)*coslat) from vorticity ζ and divergence D in spectral space.
@@ -314,8 +311,93 @@ function UV_from_vordiv!(
     (; vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2 ) = S
     @boundscheck ismatching(S, U) || throw(DimensionMismatch(S, U))
 
-    launch!(S.architecture, :lmk, size(U), _UV_from_vordiv_kernel!, U, V, vor, div, vor.spectrum.l_indices, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)
-    synchronize(S.architecture)
+    # maximum degree l, order m of spherical harmonics (1-based)
+    lmax, mmax = size(U, OneBased, as=Matrix)
+
+    for k in eachmatrix(U, V, vor, div)                 # also checks size compatibility
+        lm = 0
+        @inbounds for m in 1:mmax-1                     # 1-based l, m, skip last column
+
+            # DIAGONAL (separated to avoid access to l-1, m which is above the diagonal)
+            lm += 1
+            
+            # div, vor contribution to meridional gradient
+            ∂ζθ =  vordiv_to_uv2[lm]*vor[lm+1, k]       # lm-1 term is zero
+            ∂Dθ = -vordiv_to_uv2[lm]*div[lm+1, k]       # lm-1 term is zero
+            
+            # the following is moved into the muladd        
+            # ∂Dλ = im*vordiv_to_uv_x[lm]*div[lm]       # divergence contribution to zonal gradient
+            # ∂ζλ = im*vordiv_to_uv_x[lm]*vor[lm]       # vorticity contribution to zonal gradient
+
+            z = im*vordiv_to_uv_x[lm]
+            U[lm, k] = muladd(z, div[lm, k], ∂ζθ)       # = ∂Dλ + ∂ζθ
+            V[lm, k] = muladd(z, vor[lm, k], ∂Dθ)       # = ∂ζλ + ∂Dθ
+
+            # BELOW DIAGONAL (all terms)
+            for l in m+1:lmax-2                         # skip last two rows (lmax-1, lmax)
+                lm += 1
+                
+                # div, vor contribution to meridional gradient
+                # ∂ζθ = vordiv_to_uv2[lm]*vor[lm+1] - vordiv_to_uv1[lm]*vor[lm-1]
+                # ∂Dθ = vordiv_to_uv1[lm]*div[lm-1] - vordiv_to_uv2[lm]*div[lm+1]
+                ∂ζθ = muladd(vordiv_to_uv2[lm], vor[lm+1, k], -vordiv_to_uv1[lm]*vor[lm-1, k])
+                ∂Dθ = muladd(vordiv_to_uv1[lm], div[lm-1, k], -vordiv_to_uv2[lm]*div[lm+1, k])
+
+                # The following is moved into the muladd
+                # ∂Dλ = im*vordiv_to_uv_x[lm]*div[lm]   # divergence contribution to zonal gradient
+                # ∂ζλ = im*vordiv_to_uv_x[lm]*vor[lm]   # vorticity contribution to zonal gradient
+
+                z = im*vordiv_to_uv_x[lm]
+                U[lm, k] = muladd(z, div[lm, k], ∂ζθ)   # = ∂Dλ + ∂ζθ
+                V[lm, k] = muladd(z, vor[lm, k], ∂Dθ)   # = ∂ζλ + ∂Dθ            
+            end
+
+            # SECOND LAST ROW (separated to imply that vor, div are zero in last row)
+            lm += 1
+            U[lm, k] = im*vordiv_to_uv_x[lm]*div[lm, k] - vordiv_to_uv1[lm]*vor[lm-1, k]
+            V[lm, k] = im*vordiv_to_uv_x[lm]*vor[lm, k] + vordiv_to_uv1[lm]*div[lm-1, k]
+
+            # LAST ROW (separated to avoid out-of-bounds access to lmax+1)
+            lm += 1
+            U[lm, k] = -vordiv_to_uv1[lm]*vor[lm-1, k]  # only last term from 2nd last row
+            V[lm, k] =  vordiv_to_uv1[lm]*div[lm-1, k]  # only last term from 2nd last row
+        end
+
+        # LAST COLUMN
+        @inbounds begin
+            lm += 1                                         # second last row
+            U[lm, k] = im*vordiv_to_uv_x[lm]*div[lm, k]     # other terms are zero
+            V[lm, k] = im*vordiv_to_uv_x[lm]*vor[lm, k]     # other terms are zero
+
+            lm += 1                                         # last row
+            U[lm, k] = -vordiv_to_uv1[lm]*vor[lm-1, k]      # other terms are zero
+            V[lm, k] =  vordiv_to_uv1[lm]*div[lm-1, k]      # other terms are zero
+        end
+    end
+
+    # *radius scaling if not unit sphere (*radius² for ∇⁻², then /radius to get from stream function to velocity)
+    if radius != 1
+        U .*= radius
+        V .*= radius
+    end
+
+    return U, V
+end
+
+# New kernel-based implementation, currently unused because of problems with Enzyme
+function UV_from_vordiv_kernel!(   
+    U::LowerTriangularArray,
+    V::LowerTriangularArray,
+    vor::LowerTriangularArray,
+    div::LowerTriangularArray,
+    S::SpectralTransform;
+    radius = DEFAULT_RADIUS,
+)
+    (; vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2 ) = S
+    @boundscheck ismatching(S, U) || throw(DimensionMismatch(S, U))
+
+    launch!(architecture(U), :lmk, size(U), _UV_from_vordiv_kernel!, U, V, vor, div, vor.spectrum.l_indices, vor.spectrum.lmax, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)
+    synchronize(architecture(U))
     
     # *radius scaling if not unit sphere (*radius² for ∇⁻², then /radius to get from stream function to velocity)
     if radius != 1
@@ -326,41 +408,43 @@ function UV_from_vordiv!(
     return U, V
 end
 
-@kernel inbounds=true function _UV_from_vordiv_kernel!(U, V, vor, div, @Const(l_indices), vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)    
+@kernel inbounds=true function _UV_from_vordiv_kernel!(U, V, vor, div, @Const(l_indices), lmax, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)    
     I = @index(Global, Cartesian)
     lm = I[1]
     k = ndims(vor) == 1 ? CartesianIndex() : I[2]
-    lmax = U.spectrum.lmax 
     l = l_indices[lm]
-
-    vordiv_uv2 = vordiv_to_uv2[lm]
-    vordiv_uv1 = vordiv_to_uv1[lm]
+    
+    # Get the coefficients for the current lm index
     z = vordiv_to_uv_x[lm]
+    vordiv_uv1 = vordiv_to_uv1[lm]
+    vordiv_uv2 = vordiv_to_uv2[lm]
+    
+    # Handle different cases based on position in the triangular matrix
+    if lm == 1  # First element (diagonal)
+        # Meridional gradient contributions
+        ∂ζθ =  vordiv_uv2 * vor[lm+1, k]       # lm-1 term is zero
+        ∂Dθ = -vordiv_uv2 * div[lm+1, k]       # lm-1 term is zero
+        
+        # Zonal gradient contributions
+        U[I] = muladd(z, div[I], ∂ζθ)          # = ∂Dλ + ∂ζθ
+        V[I] = muladd(z, vor[I], ∂Dθ)          # = ∂ζλ + ∂Dθ
+    elseif l == (lmax-1)  # Second last row
+        U[I] = muladd(z, div[I], -vordiv_uv1 * vor[lm-1, k])
+        V[I] = muladd(z, vor[I], vordiv_uv1 * div[lm-1, k])
+    elseif l == lmax  # Last row
+        U[I] = -vordiv_uv1 * vor[lm-1, k]      # only last term from 2nd last row
+        V[I] =  vordiv_uv1 * div[lm-1, k]      # only last term from 2nd last row
+    else  # General case (below diagonal)
+        # Meridional gradient contributions
+        ∂ζθ = muladd(vordiv_uv2, vor[lm+1, k], -vordiv_uv1 * vor[lm-1, k])
+        ∂Dθ = muladd(vordiv_uv1, div[lm-1, k], -vordiv_uv2 * div[lm+1, k])
+        
+        # Zonal gradient contributions
+        U[I] = muladd(z, div[I], ∂ζθ)          # = ∂Dλ + ∂ζθ
+        V[I] = muladd(z, vor[I], ∂Dθ)          # = ∂ζλ + ∂Dθ
+    end
+end
 
-    # vordiv_to_uv2 is zero in the last row, so we don't need special treatment there
-    # we do treat the two last rows seperatly: if we would assume that vor and div are always zero in the last row (like they should)
-    # we could avoid that, but this can easily lead to some errors when starting with random vorticities in tests and scripts
-    # this kernel isn't performance critical, so better safe than sorry
-    if lm==1 
-        ∂ζθ =  vordiv_uv2*vor[2, k]       # lm-1 term is zero
-        ∂Dθ = -vordiv_uv2*div[2, k]       # lm-1 term is zero
-
-        U[I] = muladd(z, div[lm, k], ∂ζθ)   # = ∂Dλ + ∂ζθ
-        V[I] = muladd(z, vor[lm, k], ∂Dθ)   # = ∂ζλ + ∂Dθ             
-    elseif l==(lmax-1) # second last row 
-        U[I] = z*div[I] - vordiv_uv1*vor[lm-1, k]
-        V[I] = z*vor[I] + vordiv_uv1*div[lm-1, k]
-    elseif l==lmax # last row
-        U[I] = -vordiv_uv1*vor[lm-1, k]
-        V[I] =  vordiv_uv1*div[lm-1, k] 
-    else    
-        ∂ζθ = muladd(vordiv_uv2, vor[lm+1, k], -vordiv_uv1*vor[lm-1, k])
-        ∂Dθ = muladd(vordiv_uv1, div[lm-1, k], -vordiv_uv2*div[lm+1, k])
-
-        U[I] = muladd(z, div[lm, k], ∂ζθ)   # = ∂Dλ + ∂ζθ
-        V[I] = muladd(z, vor[lm, k], ∂Dθ)   # = ∂ζλ + ∂Dθ            
-    end    
-end 
 
 """
 $(TYPEDSIGNATURES)
@@ -396,8 +480,8 @@ function ∇²!(
     kernel = flipsign ? (add ? (o,a) -> (o-a) : (o, a) -> -a) : 
                         (add ? (o,a) -> (o+a) : (o, a) -> a)
     
-    launch!(S.architecture, :lmk, size(∇²alms), ∇²_kernel!, ∇²alms, alms, eigenvalues, kernel, alms.spectrum.l_indices)
-    synchronize(S.architecture)
+    launch!(architecture(∇²alms), :lmk, size(∇²alms), ∇²_kernel!, ∇²alms, alms, eigenvalues, kernel, alms.spectrum.l_indices)
+    synchronize(architecture(∇²alms))
 
     # /radius² or *radius² scaling if not unit sphere
     if radius != 1
@@ -492,8 +576,8 @@ function ∇!(
     # TODO: there's currently a scalar indexing error when using p direclty instead of p.data, this should be fixed
     @. dpdx = complex(0, m_indices - 1)*p.data
 
-    launch!(S.architecture, :lmk, size(dpdy), dpdy_kernel!, dpdy, p.data, grad_y1, grad_y2)
-    synchronize(S.architecture)
+    launch!(architecture(dpdy), :lmk, size(dpdy), dpdy_kernel!, dpdy, p.data, grad_y1, grad_y2)
+    synchronize(architecture(dpdy))
     
     # 1/radius factor if not unit sphere
     if radius != 1
@@ -547,8 +631,8 @@ end
 Transform to spectral space, takes the gradient and unscales the 1/coslat
 scaling in the gradient. Acts on the unit-sphere, i.e. it omits 1/radius scaling unless
 `radius` keyword argument is provided. Makes use of an existing spectral transform `S`."""
-function ∇(grid::AbstractGridArray, S::SpectralTransform; kwargs...)
-    p = transform(grid, S)
+function ∇(field::AbstractField, S::SpectralTransform; kwargs...)
+    p = transform(field, S)
     dpdx, dpdy = ∇(p, S; kwargs...)
     dpdx_grid = transform(dpdx, S, unscale_coslat=true)
     dpdy_grid = transform(dpdy, S, unscale_coslat=true)
@@ -559,7 +643,7 @@ end
 Transform to spectral space, takes the gradient and unscales the 1/coslat
 scaling in the gradient. Acts on the unit-sphere, i.e. it omits 1/radius scaling unless
 `radius` keyword argument is provided."""
-function ∇(grid::AbstractGridArray; kwargs...)
-    S = SpectralTransform(grid, one_more_degree=true)
-    return ∇(grid, S; kwargs...)
+function ∇(field::AbstractField; kwargs...)
+    S = SpectralTransform(field, one_more_degree=true)
+    return ∇(field, S; kwargs...)
 end

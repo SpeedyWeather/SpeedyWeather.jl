@@ -257,9 +257,6 @@ end
     end
 end
 
-# only needed when the extension isn't loaded
-# LowerTriangularArrays.nonparametric_type(::Type{<:JLArray}) = JLArray
-
 @testset "Zeros, ones, rand, and randn constructors" begin
     for f in (ones, zeros, rand, randn)
         s = (5, 5)
@@ -748,7 +745,6 @@ end
                 @. L2 += 5L1
                 @test L2.data == L3.data .+ 5L1.data
 
-
                 L1 = adapt(ArrayType, randn(LowerTriangularArray{NF}, 10, 10, idims...))
                 L2 = adapt(ArrayType, randn(LowerTriangularArray{NF}, 10, 10, idims...))
 
@@ -778,7 +774,7 @@ end
 end 
 
 @testset "Rotate LowerTriangularArray" begin
-    import SpeedyWeather.LowerTriangularArrays: rotate!
+    # import SpeedyWeather.LowerTriangularArrays: rotate!
 
     @testset for NF in (Float16, Float32, Float64)
         @testset for trunc in (5, 10, 15)

@@ -37,4 +37,36 @@ import SpeedyWeather: on_architecture, CPU, launch!
         # Verify results
         @test A ≈ expected
     end
+
+    @testset "RingGrids kernel test" begin
+
+        Grid = HEALPixGrid
+        @kernel function test_ringgrids_kernel!(A, B, C)
+            I = @index(Global, Linear)
+            A[I] = B[I] * C[I]
+        end
+
+        # Test parameters
+        nlat_half = 6   # degree
+        nlayers = 5
+        NF = Float32
+
+        arch = SpeedyWeather.CPU()
+
+        # Create test arrays
+        B = on_architecture(arch, rand(Grid{NF}, nlat_half, nlayers))
+        C = on_architecture(arch, rand(Grid{NF}, nlat_half, nlayers))
+        A = similar(B)
+
+        expected = B .* C
+
+        # Run the kernel
+        launch!(arch, :ijk, size(A), test_ringgrids_kernel!, A, B, C)
+        synchronize(arch)
+
+        # Verify results
+        @test A ≈ expected
+
+    end     
+
 end 

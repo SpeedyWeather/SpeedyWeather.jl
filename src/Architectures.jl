@@ -4,7 +4,8 @@ module Architectures
 
     export AbstractArchitecture
     export CPU, CPUStatic, GPU, CUDAGPU
-    export array_type, on_architecture, architecture, device, convert_to_device
+    export array_type, on_architecture, architecture, device
+    export convert_to_device, ismatching, compatible_array_types
     export synchronize 
     
     """
@@ -76,7 +77,17 @@ module Architectures
     array_type(::CPU) = Array
     array_type(::Type{<:CPU}) = Array
 
-    ismatching(arch::Type{<:AbstractArchitecture}, array_T::Type{<:AbstractArray}) = array_T <: array_type(arch)
+    """
+        compatible_array_types(arch::AbstractArchitecture)
+
+    Return the array types that are compatible with the architecture `arch`.
+    This includes the regular `array_type(arch)` as well as any other array types
+    that are compatible with the architecture, e.g. device arrays on GPU.
+    """
+    compatible_array_types(arch::Type{<:AbstractArchitecture}) = (array_type(arch),) # fallback to array_type
+    compatible_array_types(arch::AbstractArchitecture) = (array_type(arch),) # fallback to array_type
+
+    ismatching(arch::Type{<:AbstractArchitecture}, array_T::Type{<:AbstractArray}) = any(arch_array -> array_T <: arch_array, compatible_array_types(arch))
     ismatching(arch::AbstractArchitecture, array_T::Type{<:AbstractArray}) = ismatching(typeof(arch), array_T)
     ismatching(arch::AbstractArchitecture, array::AbstractArray) = ismatching(arch, typeof(array))
 

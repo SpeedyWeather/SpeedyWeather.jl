@@ -42,7 +42,7 @@ function _legendre!(
     S::SpectralTransform;                   # precomputed transform
     unscale_coslat::Bool = false,           # unscale by cosine of latitude on the fly?
 )
-    (; nlat_half) = S                       # dimensions    
+    (; nlat_half) = S.grid                  # dimensions    
     (; lmax, mmax ) = S.spectrum            # 1-based max degree l, order m of spherical harmonics  
     (; legendre_polynomials) = S            # precomputed Legendre polynomials    
     (; mmax_truncation) = S                 # Legendre shortcut, shortens loop over m, 1-based  
@@ -127,7 +127,8 @@ function _legendre!(                        # GRID TO SPECTRAL
     f_south::AbstractArray{<:Complex, 3},   # and southern latitudes
     S::SpectralTransform,                   # precomputed transform
 )
-    (; nlat, nlat_half) = S                 # dimensions
+    (; nlat) = S                            # dimensions
+    (; nlat_half) = S.grid
     (; lmax, mmax) = S.spectrum             # 1-based max degree l, order m of spherical harmonics  
     (; legendre_polynomials) = S            # precomputed Legendre polynomials    
     (; mmax_truncation) = S                 # Legendre shortcut, shortens loop over m, 1-based  

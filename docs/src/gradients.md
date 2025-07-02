@@ -178,7 +178,7 @@ that we also used in `spectral_grid`. The Coriolis parameter for a grid like `vo
 is obtained, and we do the following for ``f\zeta/g``.
 
 ```@example gradient
-vor_grid = transform(vor, Grid=spectral_grid.Grid)
+vor_grid = transform(vor, S)
 f = coriolis(vor_grid)      # create Coriolis parameter f on same grid with default rotation
 g = model.planet.gravity
 fζ_g = @. vor_grid * f / g  # in-place and element-wise
@@ -187,11 +187,11 @@ nothing # hide
 Now we need to apply the inverse Laplace operator to ``f\zeta/g`` which we do as follows
 
 ```@example gradient
-fζ_g_spectral = transform(fζ_g, one_more_degree=true)
+fζ_g_spectral = transform(fζ_g, S)
 
 R = spectral_grid.radius
 η = SpeedyTransforms.∇⁻²(fζ_g_spectral) * R^2
-η_grid = transform(η, Grid=spectral_grid.Grid)
+η_grid = transform(η, S)
 nothing # hide
 ```
 Note the manual scaling with the radius ``R^2`` here. We now compare the results

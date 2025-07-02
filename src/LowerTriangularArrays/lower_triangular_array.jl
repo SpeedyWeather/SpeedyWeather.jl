@@ -21,12 +21,8 @@ check_lta_input_array(data, spectrum, N) =
     (ndims(data) == N) & (length(data) == prod(size(data)[2:end]) * nonzeros(spectrum)) # & ismatching(spectrum, typeof(data)) TODO: reactivate this? problem for constructors
 
 function lta_error_message(data, spectrum, T, N, ArrayType, S) 
-    if ismatching(spectrum, typeof(data))
-        return "Architecture mismatch: Spectrum has architecture $(spectrum.architecture), but array type $(typeof(data)) is used"
-    else 
-        return "$(Base.dims2string(size(data))) $(typeof(data)) cannot be used to create "*
+    return "$(Base.dims2string(size(data))) $(typeof(data)) cannot be used to create "*
             "a $(Base.dims2string(matrix_size(data, spectrum))) LowerTriangularArray{$T, $N, $ArrayType, $S}"
-    end
 end 
 
 """2D `LowerTriangularArray` of type `T`"""
@@ -229,6 +225,8 @@ for f in (:zeros, :ones, :rand, :randn)
             $f(LowerTriangularArray{Float64}, spectrum, I...)
         Base.$f(::Type{LowerTriangularMatrix}, spectrum::AbstractSpectrum) =
             $f(LowerTriangularArray{Float64}, spectrum)
+        Base.$f(spectrum::AbstractSpectrum, I::Vararg{Integer, M}) where M =
+            $f(LowerTriangularArray{Float64}, spectrum, I...)
     end
 end
 
@@ -265,6 +263,8 @@ end
 function LowerTriangularMatrix{T}(::UndefInitializer, spectrum::AbstractSpectrum) where T
     return LowerTriangularMatrix(Vector{T}(undef, nonzeros(spectrum)), spectrum)
 end
+
+Base.eltype(L::LowerTriangularArray) = eltype(L.data)
 
 # INDEXING
 """
@@ -687,6 +687,9 @@ Base.similar(L::LowerTriangularArray{T, N, ArrayType, SP}, ::Type{T}) where {T, 
     LowerTriangularArray{T, N, ArrayType, SP}(similar(L.data, T), L.spectrum)
 Base.similar(L::LowerTriangularArray{T}) where T = similar(L, T)
  
+array_type(::Type{<:LowerTriangularArray{T, N, ArrayType}}) where {T, N, ArrayType} = ArrayType
+array_type(L::LowerTriangularArray) = array_type(typeof(L))
+
 Base.prod(L::LowerTriangularArray{NF}) where NF = zero(NF)
 @inline Base.sum(L::LowerTriangularArray; dims=:, kw...) = sum(L.data; dims, kw...)
 
@@ -749,6 +752,9 @@ LowerTriangularGPUStyle{N, ArrayType, S}(::Val{M}) where {N, ArrayType, S, M} =
 # also needed for other array types
 nonparametric_type(::Type{<:Array}) = Array
 
+# nonparametric_type for a SubArray is the arraytype it is viewing. Needed to construct new arrays from SubArrays!
+nonparametric_type(::Type{<:SubArray{T, N, A}}) where {T, N, A} = nonparametric_type(A)
+
 "`L = find_L(Ls)` returns the first LowerTriangularArray among the arguments. 
 Adapted from Julia documentation of Broadcast interface"
 find_L(bc::Base.Broadcast.Broadcasted) = find_L(bc.args)
@@ -786,8 +792,10 @@ function Adapt.adapt_structure(to, L::LowerTriangularArray)
     if ismatching(L.spectrum, typeof(adapted_data)) # if matching, adapt the same spectrum 
         return LowerTriangularArray(adapted_data, adapt(to, L.spectrum))
     else # if not matching, create new spectrum with other architecture
+        @warn "Adapting LowerTriangularArray to new architecture with $(typeof(adapted_data))"
         return LowerTriangularArray(adapted_data, adapt(to, Spectrum(L.spectrum, architecture=architecture(typeof(adapted_data)))))
     end
 end
 
+Architectures.architecture(L::LowerTriangularArray) = architecture(L.spectrum)
 on_architecture(arch::AbstractArchitecture, a::LowerTriangularArray) = Adapt.adapt(array_type(arch), a)

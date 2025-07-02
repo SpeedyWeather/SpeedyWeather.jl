@@ -4,7 +4,7 @@ using SpeedyWeather
 import CUDA: CUDA, CUDAKernels, CuArray, CuDeviceArray, CUFFT
 import AbstractFFTs
 using SpeedyWeather.DocStringExtensions
-import SpeedyWeather: GPU, CPU, CUDAGPU, array_type, architecture, on_architecture, architecture
+import SpeedyWeather: GPU, CPU, CUDAGPU, array_type, architecture, on_architecture, architecture, compatible_array_types
 
 # DEVICE SETUP FOR CUDA
 # extend functions from main SpeedyWeather 
@@ -16,6 +16,9 @@ LowerTriangularArrays.nonparametric_type(::Type{<:CuArray}) = CuArray
 
 array_type(::GPU) = CuArray
 array_type(::Type{<:GPU}) = CuArray
+
+compatible_array_types(::GPU) = (CuArray, CuDeviceArray)
+compatible_array_types(::Type{<:GPU}) = (CuArray, CuDeviceArray)
 
 CUDAGPU() = GPU(CUDA.CUDABackend(always_inline=true))
 GPU() = CUDAGPU() # default to CUDA

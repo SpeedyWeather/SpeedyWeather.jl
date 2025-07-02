@@ -10,10 +10,22 @@ section on [Grids](@ref). In brief, they include the regular latitude-longitude 
 the Gaussian latitudes and _reduced_ grids, meaning that they have a decreasing number
 of longitudinal points towards the poles to be more equal-area than _full_ grids.
 
-RingGrids defines and exports the following grids:
+# Defined grids
 
-- full grids: `FullClenshawGrid`, `FullGaussianGrid`, `FullHEALPix`, and `FullOctaHEALPix`
-- reduced grids: `OctahedralGaussianGrid`, `OctahedralClenshawGrid`, `OctaHEALPixGrid` and `HEALPixGrid`
+RingGrids defines and exports the following grids, see also [Implemented grids](@ref) for a
+more mathematical description.
+
+Full grids
+```@example ringgrids
+using SpeedyWeather.RingGrids
+using InteractiveUtils # hide
+subtypes(RingGrids.AbstractFullGrid)
+```
+
+and reduced grids
+```@example ringgrids
+subtypes(RingGrids.AbstractReducedGrid)
+```
 
 The following explanation of how to use these can be mostly applied to any of them, however,
 there are certain functions that are not defined, e.g. the full grids can be trivially converted
@@ -28,203 +40,304 @@ to a `Matrix` (i.e. they are *rectangular* grids) but not the `OctahedralGaussia
     because its a requirement for the [Spherical Harmonic Transform](@ref) to be efficient.
     See [Grids](@ref).
 
-## Creating data on a RingGrid
+## Grid versus Field
 
-Every `grid` in RingGrids has a `grid.data` field, which is a vector containing the data on the grid.
-The grid points are unravelled west to east then north to south, meaning that it starts at
+With "grid" we mean the discretization of space. Also called tesselation given that we are tiling
+a space with polygons, we subdivide the sphere into grid cells, with vertices, faces and centres.
+In that sense, a grid does not contain any data it purely describes the location of grid cells.
+Grids in RingGrids are identified by their name, e.g.
+FullGaussianGrid, and a resolution parameter where we use `nlat_half` (the number of latitudes
+on one hemisphere, Equator included) for all grids. This is because some grids have an even number
+some an odd number number of latitudes so not all `nlat` are valid, but all `nlat_half` are.
+While an instance of a grid stores some precomputed arrays to facilitate faster indexing
+it does not store coordinates and similar grid information, these can be recomputed on the fly
+whenever needed given a grid. All grids are considered to be two-dimensional, so they do not
+contain information about the vertical or time, for example. The horizontal grid points are unravelled into
+a vector, starting at 0˚E at the north pole, going first east, then ring by ring to the south pole.
+
+Data on a grid is called a `Field`, many variables, like temperature are a field. Surface temperature
+would be a 2D field (though represented as a vector), temperature on several vertical layers of
+the atmosphere would be 3D (data represented as a matrix, horizontal x vertical), including
+time would make it 4D. Several fields can share the same grid. Given that the grid is always
+two-dimensional, a 2D and 3D field can also share the same grid, leaving the 3rd dimension
+not further specified for flexibility. 
+
+## Creating a grid
+
+All grids are specified by name and the resolution parameter `nlat_half::Integer` (number of latitude rings
+on one hemisphere, Equator included). An instance
+of a grid is simply created by
+
+```@example ringgrids
+grid = FullGaussianGrid(24)
+```
+
+As a second argument `architecture` can be provided which helps to share information on the
+computing architecture (CPU/GPU) but this will not be further explained here. 
+
+## Accessing coordinates
+
+With a `grid` you can get the coordinates through `get_lat`, `get_latd`, `get_colat`, `get_lond`
+but note that the latter is only defined for full grids as the reduced grids do not share the same
+longitudes across rings. To obtain the longitudes and latitudes for all grid points use
+`get_londlatds`, `get_lonlats`, `get_loncolats`, e.g.
+
+```@example ringgrids
+grid = OctaminimalGaussianGrid(2)   # a tiny grid with 4 latitudes only
+get_latd(grid)
+```
+
+## Creating a Field
+
+Creating `Field`, that means data on a grid can be done in many ways, for example using
+`zeros`, `ones, `rand`, or `randn`
+
+```@example ringgrids
+grid = HEALPixGrid(2)               # smallest HEALPix
+field = zeros(grid)                 # 2D field
+field = rand(grid, 10)              # 3D field with 10 vertical layers or time steps
+field = randn(Float32, grid, 2, 2)  # 4D using Float32 as element type
+```
+
+Note that in this case all fields share the same `grid`.
+Or the grid can be created on the fly when the grid type is specified, followed by `nlat_half`.
+Every `?Grid` also has a corresponding `?Field` type, e.g.
+
+```@example ringgrids
+field = zeros(OctaminimalGaussianGrid, 2)   # nlat_half=2
+field = HEALPixField(undef, 2)              # using undef initializor
+field = HEALPixField{Float16}(undef, 2, 3)  # using Float16 as eltype
+```
+
+## Creating a Field from data
+
+A `field` has `field.data` (some `AbstractArray{T, N}`) and `field.grid` (some `AbstractGrid` as described above).
+The first dimension of `data` describes the horizontal as the grid points on every grid (full and reduced)
+are unravelled west to east then north to south, meaning that it starts at
 90˚N and 0˚E then walks eastward for 360˚ before jumping on the next latitude ring further south,
 this way circling around the sphere till reaching the south pole. This may also be called _ring order_.
 
 Data in a `Matrix` which follows this ring order can be put on a `FullGaussianGrid` like so
 ```@example ringgrids
-using SpeedyWeather.RingGrids
-map = randn(Float32, 8, 4)
+data = randn(Float32, 8, 4)
+field = FullGaussianGrid(data, input_as=Matrix)
+field = FullGaussianField(data, input_as=Matrix)    # equivalent
 ```
+Both return a field (there is no data in the grid itself) and create an instance of
+`FullGaussianGrid` on the fly. The `input_as=Matrix` is required to denote that the horizontal
+dimension is not unravelled into a vector, triggering a `reshape` internally, `input_as=Vector`
+is the default. A full Gaussian grid has always ``2N`` x ``N`` grid points, but a `FullClenshawGrid`
+has ``2N`` x ``N-1``, if those dimensions don't match, the creation will throw an error.
+
+If you have the data and know which grid it comes one you can also create
+a `Field` by providing both
+```@example ringgrids
+data = randn(Float32, 8, 4)         # data of some shape
+grid = OctaminimalGaussianGrid(1)   # you need to know the nlat_half (here 1) of that grid!
+field = Field(data, grid)
+```
+But you can also automatically let `nlat_half` be calculated from the shape of the data.
+Note that you have to provide the name of the field though, `FullGaussianField` here to
+create a `Field` on a `FullGaussianGrid`.
+```@example ringgrids
+field = FullGaussianField(data, input_as=Matrix)
+```
+To return to the original data array you can reshape the data of a full grid (which is representable as a matrix) as follows
 
 ```@example ringgrids
-grid = FullGaussianGrid(map, input_as=Matrix)
+data == Matrix(FullGaussianField(data, input_as=Matrix))
 ```
-Note that `input_as=Matrix` is necessary as, RingGrids have a flattened horizontal dimension into a vector.
-To distinguish the 2nd horizontal dimension from a possible vertical dimension the keyword argument here
-is required.
+which in general is `Array(field, as=Vector)` for no reshaping (equivalent to `field.data`
+including possible conversion to `Array`) and `Array(field, as=Matrix)` with reshaping
+(full grids only).
 
-A full Gaussian grid has always ``2N`` x ``N`` grid points, but a `FullClenshawGrid` has ``2N`` x ``N-1``,
-if those dimensions don't match, the creation will throw an error. To reobtain the data from a grid,
-you can access its `data` field which returns a normal `Vector`
-```@example ringgrids
-grid.data
-```
-Which can be reshaped to reobtain `map` from above. Alternatively you can `Matrix(grid)` to do this in one step
-```@example ringgrids
-map == Matrix(FullGaussianGrid(map))
-```
-You can also use `zeros`, `ones`, `rand`, `randn` to create a grid, whereby `nlat_half`, i.e. the number of latitude
-rings on one hemisphere, Equator included, is used as a resolution parameter and here as a second argument.
-```@example ringgrids
-nlat_half = 4
-grid = randn(OctahedralGaussianGrid{Float16}, nlat_half)
-```
-and any element type `T` can be used for `OctahedralGaussianGrid{T}` and similar for other grid types.
+## Visualising Fields
 
-## Visualising RingGrid data
-
-As only the full grids can be reshaped into a matrix, the underlying data structure of any `AbstractGrid`
+As only the full fields can be reshaped into a matrix, the underlying data structure of any `AbstractField`
 is a vector for consistency. As shown in the examples above, one can therefore inspect the data as if it was a vector.
-But as that data has, through its `<:AbstractGrid` type, all the geometric information available to plot
+But a field has through `field.grid` all the geometric information available to plot
 it on a map, SpeedyWeather also implements extensions for [Makie's](https://github.com/MakieOrg/Makie.jl)
 and [UnicodePlots's](https://github.com/JuliaPlots/UnicodePlots.jl)' `heatmap`, also see
 [Visualisation via Makie](@ref) and [Visualisation via UnicodePlots](@ref).
 
 ```@example ringgrids
 using CairoMakie    # triggers loading of Makie extension, or do using UnicodePlots instead!
-nlat_half = 24
-grid = randn(OctahedralGaussianGrid, nlat_half)
-heatmap(grid)
+grid = OctahedralGaussianGrid(24)
+field = randn(grid)
+heatmap(field)
 ```
 
-Reduced grids are interpolated to the corresponding full grids so that they can be visualised as
-as matrix.
+Reduced fields are automatically interpolated to the corresponding full fields so that they can be visualised
+as a matrix.
 
-## Indexing RingGrids
+## Indexing Fields
 
-All RingGrids have a single index `ij` which follows the ring order. While this is obviously not super
-exciting here are some examples how to make better use of the information that the data sits on a grid.
-
-We obtain the latitudes of the rings of a grid by calling `get_latd` (`get_lond` is only defined for full
-grids, or use `get_londlatds` for latitudes, longitudes per grid point not per ring)
-```@example ringgrids
-grid = randn(OctahedralClenshawGrid, 5)
-latd = get_latd(grid)
-```
+All fields have a single index `ij` which follows the ring order. While this is obviously not super
+exciting here are some examples how to make better use of the information that the data sits on a
+two-dimensional grid covering the sphere. We obtain the latitudes of the rings of a grid by calling
+`get_latd` (`get_lond` is only defined for full
+grids, or use `get_londlatds` for latitudes, longitudes per grid point not per ring).
 Now we could calculate Coriolis and add it on the grid as follows
+
 ```@example ringgrids
+grid = OctahedralClenshawGrid(5)    # define a grid
+field = randn(grid)                 # random data on that grid
+latd = get_latd(grid)               # get a vector of latitudes [˚N] per ring, north to south
+
 rotation = 7.29e-5                  # angular frequency of Earth's rotation [rad/s]
 coriolis = 2rotation*sind.(latd)    # vector of coriolis parameters per latitude ring
 
-rings = eachring(grid)
-for (j, ring) in enumerate(rings)
+for (j, ring) in enumerate(eachring(field))     # loop over every ring j
     f = coriolis[j]
-    for ij in ring
-        grid[ij] += f
+    for ij in ring                              # loop over every longitude point on that ring
+        field[ij] += f
     end
 end
 ```
-`eachring` creates a vector of `UnitRange` indices, such that we can loop over the ring index `j`
-(`j=1` being closest to the North pole) pull the coriolis parameter at that latitude and then
-loop over all in-ring indices `i` (changing longitudes) to do something on the grid.
+
+`eachring(field)` accesses `field.grid.rings` a precomputed vector of `UnitRange` indices, such that
+we can loop over the ring index `j` (`j=1` being closest to the North pole) pull the coriolis parameter
+at that latitude and then loop over all in-ring indices `i` (changing longitudes) to do something on the grid.
 Something similar can be done to scale/unscale with the cosine of latitude for example.
-We can always loop over all grid-points like so
+
+We can always loop over all horizontal grid points with `eachgridpoint` and over every other dimensions
+with `eachlayer`, e.g. for 2D fields you can do
 ```@example ringgrids
 for ij in eachgridpoint(grid)
-    grid[ij]
+    field[ij]
 end
 ```
-or use `eachindex` instead.
+or use `eachindex` instead. For 3D fields `eachindex` loops over all elements, including the 3rd dimension
+but `eachgridpoint` would only loop over the horizontal. To loop with an index `k` over all
+additional dimensions (vertical, time, ...) do
+```@example ringgrids
+field = zeros(grid, 2, 3)           # 4D, 2D defined by grid x 2 x 3
+for k in eachlayer(field)           # loop over 2 x 3
+    for ij in eachgridpoint(field)  # loop over 2D grid points
+        field[ij, k]
+    end
+end
+```
 
-## Interpolation on RingGrids
+## Interpolation between grids
 
 In most cases we will want to use RingGrids so that our data directly comes with the geometric information
 of where the grid-point is one the sphere. We have seen how to use `get_latd`, `get_lond`, ... for that
-above. This information generally can also be used to interpolate our data from grid to another or to
-request an interpolated value on some coordinates. Using our data on `grid` which is an `OctahedralGaussianGrid`
-from above we can use the `interpolate` function to get it onto a `FullGaussianGrid` (or any other grid for
-purpose)
+above. This information generally can also be used to interpolate our data from one grid to another or to
+request an interpolated value on some coordinates. Using a `OctahedralGaussianField`
+(data on an `OctahedralGaussianGrid`) from above we can use the `interpolate` function to get it onto a
+`FullGaussianGrid` (or any other grid for purpose)
 ```@example ringgrids
-grid = randn(OctahedralGaussianGrid{Float32}, 4)
-```
-```@example ringgrids
-interpolate(FullGaussianGrid, grid)
+grid = OctahedralGaussianGrid(4)
+field = randn(Float32, grid)
+interpolate(FullGaussianGrid, field)
+nothing # hide
 ```
 By default this will linearly interpolate (it's an [Anvil interpolator](@ref), see below) onto a grid with the same
-`nlat_half`, but we can also coarse-grain or fine-grain by specifying `nlat_half` directly as 2nd argument
+`nlat_half`, but we can also coarse-grain or fine-grain by specifying any other `grid` as an instance not a type
+(or provide `nlat_half` as the second argument), e.g.
 ```@example ringgrids
-interpolate(FullGaussianGrid, 6, grid)
+output_grid = HEALPixGrid(6)
+interpolate(output_grid, field)
+interpolate(HEALPixGrid, 6, field)  # equivalent
+nothing # hide
 ```
-So we got from an `8-ring OctahedralGaussianGrid{Float16}` to a `12-ring FullGaussianGrid{Float64}`, so it did
-a conversion from `Float16` to `Float64` on the fly too, because the default precision is `Float64` unless
-specified. `interpolate(FullGaussianGrid{Float16}, 6, grid)` would have interpolated onto a grid with element type
-`Float16`.
+To change the number format during interpolation you can preallocate the output field
+```@example ringgrids
+output_field = Field(Float16, output_grid)
+interpolate!(output_field, field)
+nothing # hide
+```
+Which will convert from `Float64` to `Float16` on the fly too. Note that we use `interpolate!` here not
+`interpolate` without `!` as the former writes into `output_field` and therefore changes it in place.
 
-One can also interpolate onto a given coordinate ˚N, ˚E like so
+## Interpolation on coordinates
+
+One can also interpolate a 2D field onto a given coordinate ˚N, ˚E like so
 ```@example ringgrids
-interpolate(30.0, 10.0, grid)
+interpolate(30.0, 10.0, field)
 ```
-we interpolated the data from `grid` onto 30˚N, 10˚E. To do this simultaneously for many coordinates they can
+we interpolated the data from `field` onto 30˚N, 10˚E. To do this simultaneously for many coordinates they can
 be packed into a vector too
 ```@example ringgrids
-interpolate([30.0, 40.0, 50.0], [10.0, 10.0, 10.0], grid)
+interpolate([30.0, 40.0, 50.0], [10.0, 10.0, 10.0], field)
 ```
-which returns the data on `grid` at 30˚N, 40˚N, 50˚N, and 10˚E respectively. Note how the interpolation here
-retains the element type of `grid`.
+which returns the data on `field` at 30˚N, 40˚N, 50˚N, and 10˚E respectively. Note how the interpolation here
+retains the element type of `field`.
 
 ## Performance for RingGrid interpolation
 
-Every time an interpolation like `interpolate(30.0, 10.0, grid)` is called, several things happen, which
+Every time an interpolation like `interpolate(30.0, 10.0, field)` is called, several things happen, which
 are important to understand to know how to get the fastest interpolation out of this module in a given situation.
 Under the hood an interpolation takes three arguments
 
-- output vector
-- input grid
+- output array
+- input field
 - interpolator
 
-The output vector is just an array into which the interpolated data is written, providing this prevents
+The output array is just an array into which the interpolated data is written, providing this prevents
 unnecessary allocation of memory in case the destination array of the interpolation already exists.
-The input grid contains the data which is subject to interpolation, it must come on a ring grid, however,
+Such a destination can be a field but it does not have to be (see [Interpolation on coordinates](@ref)).
+The input field contains the data which is subject to interpolation, it must come on a ring grid, however,
 its coordinate information is actually already in the interpolator. The interpolator knows about the
-geometry of the grid the data is coming on and the coordinates it is supposed to interpolate onto.
-It has therefore precalculated the indices that are needed to access the right data on the input grid
+geometry of the grid of the field and the coordinates it is supposed to interpolate onto.
+It has therefore precalculated the indices that are needed to access the right data on the input field
 and the weights it needs to apply in the actual interpolation operation. The only thing it does not
-know is the actual data values of that grid. So in the case you want to interpolate from grid A
-to grid B many times, you can just reuse the same interpolator. If you want to change the coordinates
-of the output grid but its total number of points remain constants then you can update the locator
+know is the actual data values of that field. So in the case you want to interpolate from field A
+to field B many times, you can just reuse the same interpolator. If you want to change the coordinates
+of the output but its total number of points remain constant then you can update the locator
 inside the interpolator and only else you will need to create a new interpolator. Let's look at this
-in practice. Say we have two grids an want to interpolate between them
+in practice. Say we have two grids and want to interpolate between them
 ```@example ringgrids
-grid_in = rand(HEALPixGrid, 4)
-grid_out = zeros(FullClenshawGrid, 6)
+grid_in = HEALPixGrid(4)
+grid_out = FullClenshawGrid(6)
 interp = RingGrids.interpolator(grid_out, grid_in)
 ```
 Now we have created an interpolator `interp` which knows about the geometry where to interpolate
 *from* and the coordinates there to interpolate *to*. It is also initialized, meaning it has
 precomputed the indices to of `grid_in` that are supposed to be used. It just does not know about
-the data of `grid_in` (and neither of `grid_out` which will be overwritten anyway). We can now do
+the data (it has only seen grids, no fields). We can now do
 ```@example ringgrids
-interpolate!(grid_out, grid_in, interp)
-grid_out
+field_in = rand(grid_in)
+field_out = zeros(grid_out)
+interpolate!(field_out, field_in, interp)
+nothing # hide
 ```
-which is identical to `interpolate(grid_out, grid_in)` but you can reuse `interp` for other data.
+which is identical to `interpolate(field_out, field_in)` but you can reuse `interp` for other data.
 The interpolation can also handle various element types (the interpolator `interp` does not have
 to be updated for this either)
 ```@example ringgrids
-grid_out = zeros(FullClenshawGrid{Float16}, 6);
-interpolate!(grid_out, grid_in, interp)
-grid_out
+field_out = zeros(Float16, grid_out)
+interpolate!(field_out, field_in, interp)
+nothing # hide
 ```
-and we have converted data from a `HEALPixGrid{Float64}` (`Float64` is always default if not specified)
-to a `FullClenshawGrid{Float16}` including the type conversion Float64-Float16 on the fly.
+and we have converted data from a `HEALPixField{Float64}` (`Float64` is always default if not specified)
+to a `FullClenshawField{Float16}` including the type conversion Float64-Float16 on the fly.
 Technically there are three data types and their combinations possible: The input data will come
 with a type, the output array has an element type and the interpolator has precomputed weights
 with a given type. Say we want to go from Float16 data on an `OctahedralGaussianGrid` to Float16
 on a `FullClenshawGrid` but using Float32 precision for the interpolation itself, we would do
 this by
 ```@example ringgrids
-grid_in = randn(OctahedralGaussianGrid{Float16}, 24)
-grid_out = zeros(FullClenshawGrid{Float16}, 24)
-interp = RingGrids.interpolator(Float32, grid_out, grid_in)
-interpolate!(grid_out, grid_in, interp)
-grid_out
+field_in = randn(OctahedralGaussianField{Float16}, 24)
+field_out = zeros(FullClenshawField{Float16}, 24)
+interp = RingGrids.interpolator(field_out, field_in, NF=Float32)
+interpolate!(field_out, field_in, interp)
+nothing # hide
 ```
+
 As a last example we want to illustrate a situation where we would always want to interpolate onto
 10 coordinates, but their locations may change. In order to avoid recreating an interpolator object
 we would do (`AnvilInterpolator` is described in [Anvil interpolator](@ref))
 ```@example ringgrids
 npoints = 10    # number of coordinates to interpolate onto
-interp = AnvilInterpolator(Float32, HEALPixGrid, 24, npoints)
+grid = HEALPixGrid(24)
+interp = AnvilInterpolator(grid, npoints, NF=Float32)
 ```
-with the first argument being the number format used during interpolation, then the input grid type,
-its resolution in terms of `nlat_half` and then the number of points to interpolate onto. However,
-`interp` is not yet initialized as it does not know about the destination coordinates yet. Let's define
-them, but note that we already decided there's only 10 of them above.
+with the first argument being the input grid and then the number of points to interpolate onto.
+The number format used for the interpolator is provided as `NF`.
+However, `interp` is not yet initialized as it does not know about the destination coordinates yet.
+Let's define them, but note that we already decided there's only 10 of them above.
 ```@example ringgrids
 londs = collect(-10.0:2.0:8.0)
 latds = collect(0.0:5.0:45.0)
@@ -237,16 +350,16 @@ RingGrids.update_locator!(interp, londs, latds)
 With data matching the input from above, a `nlat_half=24` HEALPixGrid, and allocate 10-element output vector
 ```@example ringgrids
 output_vec = zeros(10)
-grid_input = rand(HEALPixGrid, 24)
+field_in = rand(grid)
 nothing # hide
 ```
 we can use the interpolator as follows
 ```@example ringgrids
-interpolate!(output_vec, grid_input, interp)
+interpolate!(output_vec, field_in, interp)
 ```
 which is the approximately the same as doing it directly without creating an interpolator first and updating its locator
 ```@example ringgrids
-interpolate(latds, londs, grid_input)
+interpolate(londs, latds, field_in)
 ```
 but allows for a reuse of the interpolator. Note that the two output arrays are not exactly identical because we manually
 set our interpolator `interp` to use `Float32` for the interpolation whereas the default is `Float64`.
