@@ -50,27 +50,6 @@ Returns a `NamedTuple` of any additional attributes defined for `param`.
 attributes(param::SpeedyParam) = getfield(param, :attrs)
 
 """
-    $SIGNATURES
-
-Returns a "parameterized" copy of the given data structure. For numeric types, this simply wraps
-the given value in a `Param`-like type. Dispatches can be added for compound data types that
-reconstruct the data type with `Param`-like wrappers on all relevant parameters.
-"""
-parameters(obj; kwargs...) = parameters(SpeedyParam, obj; kwargs...)
-parameters(::Type{PT}, obj; kwargs...) where {PT<:AbstractParam} = (;)
-parameters(::Type{PT}, param::AbstractParam; kwargs...) where {PT<:AbstractParam} = PT(merge(parent(param), kwargs))
-parameters(::Type{PT}, x::Union{Number,AbstractArray}; kwargs...) where {PT<:AbstractParam} = PT(x; kwargs...)
-
-"""
-    $SIGNATURES
-
-Convenience method that creates a model parameter from its property with the given `name` and optional extra attributes in `kwargs`.
-A parameter attribute `copmonenttype` is automatically added with value `T`.
-"""
-parameterof(obj::T, name::Symbol; kwargs...) where {T} = parameterof(SpeedyParam, obj, name; kwargs...)
-parameterof(::Type{PT}, obj::T, name::Symbol; kwargs...) where {PT,T} = parameters(PT, getproperty(obj, name); componenttype=T, kwargs...)
-
-"""
     SpeedyParams{NT<:NamedTuple} <: ModelParameters.AbstractModel
 
 Lightweight wrapper around a `NamedTuple` of parameters following the ModelParameters `AbstractModel` interface.
@@ -149,6 +128,28 @@ Base.vec(params::SpeedyParams) = ComponentArray(parent(params))
 # Override internal ModelParameters method _columntypes to condense type names in table schema (just to look nicer)
 # TODO: propose this change upstream in ModelParameters.jl
 ModelParameters._columntypes(ps::SpeedyParams) = map(k -> promote_type(map(typeof, getindex(ps, k))...), keys(ps)) 
+
+# parameters method interface
+"""
+    $SIGNATURES
+
+Returns a "parameterized" copy of the given data structure. For numeric types, this simply wraps
+the given value in a `Param`-like type. Dispatches can be added for compound data types that
+reconstruct the data type with `Param`-like wrappers on all relevant parameters.
+"""
+parameters(obj; kwargs...) = parameters(SpeedyParam, obj; kwargs...)
+parameters(::Type{PT}, obj; kwargs...) where {PT<:AbstractParam} = (;)
+parameters(::Type{PT}, param::AbstractParam; kwargs...) where {PT<:AbstractParam} = PT(merge(parent(param), kwargs))
+parameters(::Type{PT}, x::Union{Number,AbstractArray}; kwargs...) where {PT<:AbstractParam} = PT(x; kwargs...)
+
+"""
+    $SIGNATURES
+
+Convenience method that creates a model parameter from its property with the given `name` and optional extra attributes in `kwargs`.
+A parameter attribute `copmonenttype` is automatically added with value `T`.
+"""
+parameterof(obj::T, name::Symbol; kwargs...) where {T} = parameterof(SpeedyParam, obj, name; kwargs...)
+parameterof(::Type{PT}, obj::T, name::Symbol; kwargs...) where {PT,T} = parameters(PT, getproperty(obj, name); componenttype=T, kwargs...)
 
 # reconstruct
 
@@ -246,7 +247,7 @@ macro parameterized(expr)
     ## 1. struct definition
     push!(block.args, esc(new_expr))
     ## 2. parameters method dispatch
-    push!(block.args, esc(:(parameters(obj::$(typename); kwargs...) = (; $(param_constructors...)))))
+    push!(block.args, esc(:(parameters(obj::$(typename); kwargs...) = SpeedyParams((; $(param_constructors...))))))
     return block
 end
 
