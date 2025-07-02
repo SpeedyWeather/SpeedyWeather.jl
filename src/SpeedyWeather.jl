@@ -35,6 +35,10 @@ import ConstructionBase: constructorof, getproperties, setproperties
 import DomainSets: Domain, RealLine, NonnegativeRealLine, PositiveRealLine, NegativeRealLine, UnitInterval
 using DomainSets.IntervalSets
 
+# UTILITIES
+import MacroTools
+
+const Unbounded = RealLine()
 const StrictlyPositive = PositiveRealLine()
 const Nonnegative = NonnegativeRealLine()
 const Negative = NegativeRealLine()

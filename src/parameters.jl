@@ -9,7 +9,7 @@ Base.@kwdef struct SpeedyParam{NF<:AbstractFloat} <: AbstractParam{NF}
     value::NF = NaN
     
     "numerical domain on which the parameter is defined"
-    bounds::Domain = ℝ
+    bounds::Domain = RealLine()
 
     "human-readable description of the parameter"
     desc::String = ""
@@ -20,7 +20,7 @@ Base.@kwdef struct SpeedyParam{NF<:AbstractFloat} <: AbstractParam{NF}
     # default constructor
     SpeedyParam(value::NF, bounds::Domain, desc::String, attrs::NamedTuple) where {NF<:AbstractFloat} = new{NF}(value, bounds, desc, attrs)
     # convenience constructor
-    SpeedyParam(value::NF; bounds=ℝ, desc="", attrs...) where {NF<:AbstractFloat} = new{NF}(value, bounds, desc, NamedTuple(attrs))
+    SpeedyParam(value::NF; bounds=RealLine(), desc="", attrs...) where {NF<:AbstractFloat} = new{NF}(value, bounds, desc, NamedTuple(attrs))
     # mandatory constructor from ModelParameters that allows for automated reconstruction
     SpeedyParam(nt::NamedTuple) = new{typeof(nt.val)}(nt.val, nt.bounds, nt.desc, _attrs(nt))
 end
@@ -68,7 +68,7 @@ Convenience method that creates a model parameter from its property with the giv
 A parameter attribute `copmonenttype` is automatically added with value `T`.
 """
 parameterof(obj::T, name::Symbol; kwargs...) where {T} = parameterof(SpeedyParam, obj, name; kwargs...)
-parameterof(::Type{PT}, obj::T, name::Symbol; kwargs...) where {PT,T} = name => parameters(PT, getproperty(obj, name); componenttype=T, kwargs...)
+parameterof(::Type{PT}, obj::T, name::Symbol; kwargs...) where {PT,T} = parameters(PT, getproperty(obj, name); componenttype=T, kwargs...)
 
 """
     SpeedyParams{NT<:NamedTuple} <: ModelParameters.AbstractModel
@@ -204,10 +204,10 @@ macro parameterized(expr)
         if isa(ex, Expr) && ex.head == :struct
             # type signature is in second argument;
             # use namify to extract type name (discard type parameters)
-            typename = namify(ex.args[2])
+            typename = MacroTools.namify(ex.args[2])
             ex
         # case 2: parameterized field definition
-        elseif @capture(ex, @param fieldname_::FT_ = defval_; attrs__) || @capture(ex, @param fieldname_::FT_; attrs__)
+        elseif MacroTools.@capture(ex, @param fieldname_::FT_ = defval_ attrs__) || MacroTools.@capture(ex, @param fieldname_::FT_ attrs__)
             # use last seen docstring as description, if present
             desc = isnothing(lastdoc) ? "" : lastdoc
             attrs = if isempty(attrs)
@@ -220,15 +220,15 @@ macro parameterized(expr)
             end
             # then reset to nothing to prevent duplication
             lastdoc = nothing
-            push!(paraminfo, (name=fieldname, type=FT, desc=desc, attrs...))
+            push!(paraminfo, (name=fieldname, type=FT, desc=desc, attrs=attrs))
             :($fieldname::$FT = $defval)
         # case 3: non-parameterized field definition
-        elseif @capture(ex, fieldname_::FT_ = defval_) || @capture(ex, fieldname_::FT_)
+        elseif MacroTools.@capture(ex, fieldname_::FT_ = defval_) || MacroTools.@capture(ex, fieldname_::FT_)
             # reset lastdoc variable to prevent confusing docstrings between parameteter and non-parameter fields
             lastdoc = nothing
             ex
         # case 4: field documentation
-        elseif @capture(ex, docs_String)
+        elseif MacroTools.@capture(ex, docs_String)
             # store in lastdoc field
             lastdoc = docs
             ex
@@ -239,7 +239,7 @@ macro parameterized(expr)
     end
     # emit parametersof calls for each parsed parameter
     param_constructors = map(paraminfo) do info
-        :($(QuoteNode(info.name)) => parameterof(obj, $(QuoteNode(info.name)); desc=$(info.desc), info.attrs..., kwargs...))
+        :($(QuoteNode(info.name)) => parameterof(obj, $(QuoteNode(info.name)); desc=$(info.desc), $(info.attrs)..., kwargs...))
     end
     # construct final expression block
     block = Expr(:block)
