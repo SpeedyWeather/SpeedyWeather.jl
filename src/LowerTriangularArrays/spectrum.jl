@@ -125,8 +125,8 @@ function Base.show(io::IO, S::Spectrum)
     print(io,   "└ architecture: $(typeof(S.architecture))")
 end
 
-ismatching(s::Spectrum, array_type::Type{<:AbstractArray}) = ismatching(s.architecture, array_type)
-ismatching(s::Spectrum, array::AbstractArray) = ismatching(s.architecture, typeof(array))
+Architectures.ismatching(s::Spectrum, array_type::Type{<:AbstractArray}) = ismatching(s.architecture, array_type)
+Architectures.ismatching(s::Spectrum, array::AbstractArray) = ismatching(s.architecture, typeof(array))
 
 Adapt.@adapt_structure Spectrum
 

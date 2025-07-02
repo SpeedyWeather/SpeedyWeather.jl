@@ -388,7 +388,7 @@ SpectralTransform(coeffs::LowerTriangularArray, field::AbstractField; kwargs...)
 Spectral transform `S` and lower triangular matrix `L` match if the
 spectral dimensions `(lmax, mmax)` match and the number of vertical layers is
 equal or larger in the transform (constraints due to allocated scratch memory size)."""
-function ismatching(S::SpectralTransform, L::LowerTriangularArray)
+function Architectures.ismatching(S::SpectralTransform, L::LowerTriangularArray)
     resolution_math = resolution(S.spectrum) == size(L, OneBased, as=Matrix)[1:2]
     vertical_match = length(axes(L, 2)) <= S.nlayers
     return resolution_math && vertical_match
@@ -398,15 +398,15 @@ end
 Spectral transform `S` and `grid` match if the resolution `nlat_half` and the
 type of the grid match and the number of vertical layers is equal or larger in
 the transform (constraints due to allocated scratch memory size)."""
-function ismatching(S::SpectralTransform, field::AbstractField)
+function Architectures.ismatching(S::SpectralTransform, field::AbstractField)
     grid_match = S.grid == field.grid   # grid type and resolution match
     vertical_match = size(field, 2) <= S.nlayers
     return grid_match && vertical_match
 end
 
 # make `ismatching` commutative
-ismatching(L::LowerTriangularArray, S::SpectralTransform) = ismatching(S, L)
-ismatching(F::AbstractField,        S::SpectralTransform) = ismatching(S, F)
+Architectures.ismatching(L::LowerTriangularArray, S::SpectralTransform) = ismatching(S, L)
+Architectures.ismatching(F::AbstractField,        S::SpectralTransform) = ismatching(S, F)
 
 function Base.DimensionMismatch(S::SpectralTransform, L::LowerTriangularArray)
     s = "SpectralTransform for $(S.spectrum.lmax)x$(S.spectrum.mmax)x$(S.nlayers) LowerTriangularArrays "*

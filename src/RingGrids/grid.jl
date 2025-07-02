@@ -272,8 +272,8 @@ whichring(grid::AbstractGrid) = whichring(typeof(grid), grid.nlat_half, grid.rin
 whichring(Grid::Type{<:AbstractGrid}, nlat_half::Integer) = whichring(Grid, nlat_half, eachring(Grid, nlat_half))
 
 # for architectures / adapt 
-ismatching(grid::AbstractGrid, array_type::Type{<:AbstractArray}) = ismatching(grid.architecture, array_type)
-ismatching(grid::AbstractGrid, array::AbstractArray) = ismatching(grid.architecture, typeof(array))
+Architectures.ismatching(grid::AbstractGrid, array_type::Type{<:AbstractArray}) = ismatching(grid.architecture, array_type)
+Architectures.ismatching(grid::AbstractGrid, array::AbstractArray) = ismatching(grid.architecture, typeof(array))
 
 function on_architecture(arch::AbstractArchitecture, grid::Grid) where Grid<:AbstractGrid 
     Grid_ = nonparametric_type(Grid)
