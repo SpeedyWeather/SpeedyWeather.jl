@@ -1,5 +1,5 @@
 import SpeedyWeather: on_architecture, GPU, launch!
-import KernelAbstractions: @kernel 
+import KernelAbstractions: KernelAbstractions, @kernel 
 
 @testset "KernelAbstractions GPU tests" begin 
 
