@@ -94,8 +94,8 @@ function _divergence!(
   
     @boundscheck ismatching(S, div) || throw(DimensionMismatch(S, div))
 
-    launch!(S.architecture, :lmk, size(div), _divergence_kernel!, kernel, div, u, v, grad_x_vordiv, grad_y_vordiv1, grad_y_vordiv2)
-    synchronize(S.architecture)
+    launch!(architecture(div), :lmk, size(div), _divergence_kernel!, kernel, div, u, v, grad_x_vordiv, grad_y_vordiv1, grad_y_vordiv2)
+    synchronize(architecture(div))
     
     # radius scaling if not unit sphere
     if radius != 1
@@ -247,8 +247,8 @@ function UV_from_vor!(
     (; vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2 ) = S
     @boundscheck ismatching(S, U) || throw(DimensionMismatch(S, U))
     
-    launch!(S.architecture, :lmk, size(U), _UV_from_vor_kernel!, U, V, vor, vor.spectrum.l_indices, vor.spectrum.lmax, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)
-    synchronize(S.architecture)
+    launch!(architecture(U), :lmk, size(U), _UV_from_vor_kernel!, U, V, vor, vor.spectrum.l_indices, vor.spectrum.lmax, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)
+    synchronize(architecture(U))
     
     # *radius scaling if not unit sphere (*radius² for ∇⁻² then /radius to get from stream function to velocity)
     if radius != 1
@@ -396,8 +396,8 @@ function UV_from_vordiv_kernel!(
     (; vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2 ) = S
     @boundscheck ismatching(S, U) || throw(DimensionMismatch(S, U))
 
-    launch!(S.architecture, :lmk, size(U), _UV_from_vordiv_kernel!, U, V, vor, div, vor.spectrum.l_indices, vor.spectrum.lmax, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)
-    synchronize(S.architecture)
+    launch!(architecture(U), :lmk, size(U), _UV_from_vordiv_kernel!, U, V, vor, div, vor.spectrum.l_indices, vor.spectrum.lmax, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)
+    synchronize(architecture(U))
     
     # *radius scaling if not unit sphere (*radius² for ∇⁻², then /radius to get from stream function to velocity)
     if radius != 1
@@ -480,8 +480,8 @@ function ∇²!(
     kernel = flipsign ? (add ? (o,a) -> (o-a) : (o, a) -> -a) : 
                         (add ? (o,a) -> (o+a) : (o, a) -> a)
     
-    launch!(S.architecture, :lmk, size(∇²alms), ∇²_kernel!, ∇²alms, alms, eigenvalues, kernel, alms.spectrum.l_indices)
-    synchronize(S.architecture)
+    launch!(architecture(∇²alms), :lmk, size(∇²alms), ∇²_kernel!, ∇²alms, alms, eigenvalues, kernel, alms.spectrum.l_indices)
+    synchronize(architecture(∇²alms))
 
     # /radius² or *radius² scaling if not unit sphere
     if radius != 1
@@ -576,8 +576,8 @@ function ∇!(
     # TODO: there's currently a scalar indexing error when using p direclty instead of p.data, this should be fixed
     @. dpdx = complex(0, m_indices - 1)*p.data
 
-    launch!(S.architecture, :lmk, size(dpdy), dpdy_kernel!, dpdy, p.data, grad_y1, grad_y2)
-    synchronize(S.architecture)
+    launch!(architecture(dpdy), :lmk, size(dpdy), dpdy_kernel!, dpdy, p.data, grad_y1, grad_y2)
+    synchronize(architecture(dpdy))
     
     # 1/radius factor if not unit sphere
     if radius != 1

@@ -130,4 +130,5 @@ Architectures.ismatching(s::Spectrum, array::AbstractArray) = ismatching(s.archi
 
 Adapt.@adapt_structure Spectrum
 
+Architectures.architecture(s::Spectrum) = s.architecture
 on_architecture(architecture::AbstractArchitecture, s::Spectrum) = Spectrum(s; architecture)

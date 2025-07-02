@@ -797,4 +797,5 @@ function Adapt.adapt_structure(to, L::LowerTriangularArray)
     end
 end
 
+Architectures.architecture(L::LowerTriangularArray) = architecture(L.spectrum)
 on_architecture(arch::AbstractArchitecture, a::LowerTriangularArray) = Adapt.adapt(array_type(arch), a)
