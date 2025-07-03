@@ -33,7 +33,7 @@ nonparametric_type(::Type{<:OctahedralClenshawGrid}) = OctahedralClenshawGrid
 full_grid_type(::Type{<:OctahedralClenshawGrid}) = FullClenshawGrid
 
 # FIELD
-const OctahedralClenshawField{T, N} = Field{T, N, Architecture, Grid} where {Architecture, Grid<:OctahedralClenshawGrid}
+const OctahedralClenshawField{T, N} = Field{T, N, ArrayType, Grid} where {ArrayType, Grid<:OctahedralClenshawGrid}
 
 # define grid_type (i) without T, N, (ii) with T, (iii) with T, N but not with <:?Field
 # to not have precendence over grid_type(::Type{Field{...})
@@ -41,8 +41,11 @@ grid_type(::Type{OctahedralClenshawField}) = OctahedralClenshawGrid
 grid_type(::Type{OctahedralClenshawField{T}}) where T = OctahedralClenshawGrid
 grid_type(::Type{OctahedralClenshawField{T, N}}) where {T, N} = OctahedralClenshawGrid
 
-Base.show(io::IO, F::Type{<:OctahedralClenshawField{T, N}}) where {T, N} =
+function Base.showarg(io::IO, F::Field{T, N, ArrayType, Grid}, toplevel) where {T, N, ArrayType, Grid<:OctahedralClenshawGrid{A}} where A <: AbstractArchitecture
     print(io, "OctahedralClenshawField{$T, $N}")
+    toplevel && print(io, " on ", nonparametric_type(ArrayType))
+    toplevel && print(io, " on ", A)
+end
 
 # SIZE
 nlat_odd(::Type{<:OctahedralClenshawGrid}) = true
