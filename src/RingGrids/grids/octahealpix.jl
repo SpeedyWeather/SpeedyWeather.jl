@@ -25,7 +25,7 @@ nonparametric_type(::Type{<:OctaHEALPixGrid}) = OctaHEALPixGrid
 full_grid_type(::Type{<:OctaHEALPixGrid}) = FullOctaHEALPixGrid
 
 # FIELD
-const OctaHEALPixField{T, N} = Field{T, N, Architecture, Grid} where {Architecture, Grid<:OctaHEALPixGrid}
+const OctaHEALPixField{T, N} = Field{T, N, ArrayType, Grid} where {ArrayType, Grid<:OctaHEALPixGrid}
 
 # define grid_type (i) without T, N, (ii) with T, (iii) with T, N but not with <:?Field
 # to not have precendence over grid_type(::Type{Field{...})
@@ -33,7 +33,11 @@ grid_type(::Type{OctaHEALPixField}) = OctaHEALPixGrid
 grid_type(::Type{OctaHEALPixField{T}}) where T = OctaHEALPixGrid
 grid_type(::Type{OctaHEALPixField{T, N}}) where {T, N} = OctaHEALPixGrid
 
-Base.show(io::IO, F::Type{<:OctaHEALPixField{T, N}}) where {T, N} = print(io, "OctaHEALPixField{$T, $N}")
+function Base.showarg(io::IO, F::Field{T, N, ArrayType, Grid}, toplevel) where {T, N, ArrayType, Grid<:OctaHEALPixGrid{A}} where A <: AbstractArchitecture
+    print(io, "OctaHEALPixField{$T, $N}")
+    toplevel && print(io, " on ", nonparametric_type(ArrayType))
+    toplevel && print(io, " on ", A)
+end
 
 ## SIZE
 nlat_odd(::Type{<:OctaHEALPixGrid}) = true
@@ -87,7 +91,7 @@ function each_index_in_ring(::Type{<:OctaHEALPixGrid},     # function for OctaHE
     return index_1st:index_end                              # range of i's in ring
 end
 
-function each_index_in_ring!(   rings::AbstractVector,
+function each_index_in_ring!(   rings,
                                 Grid::Type{<:OctaHEALPixGrid},
                                 nlat_half::Integer) # resolution param
 
@@ -108,6 +112,8 @@ function each_index_in_ring!(   rings::AbstractVector,
         rings[j] = index_1st:index_end              # turn into UnitRange
     end
 end
+
+Adapt.@adapt_structure OctaHEALPixGrid
 
 # ## CONVERSION
 # Base.Matrix(G::OctaHEALPixGrid{T}; kwargs...) where T = Matrix!(zeros(T, matrix_size(G)...), G; kwargs...)

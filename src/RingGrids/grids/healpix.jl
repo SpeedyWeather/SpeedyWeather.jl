@@ -23,7 +23,7 @@ nonparametric_type(::Type{<:HEALPixGrid}) = HEALPixGrid
 full_grid_type(::Type{<:HEALPixGrid}) = FullHEALPixGrid
 
 # FIELD
-const HEALPixField{T, N} = Field{T, N, Architecture, Grid} where {Architecture, Grid<:HEALPixGrid}
+const HEALPixField{T, N} = Field{T, N, ArrayType, Grid} where {ArrayType, Grid<:HEALPixGrid}
 
 # define grid_type (i) without T, N, (ii) with T, (iii) with T, N but not with <:?Field
 # to not have precendence over grid_type(::Type{Field{...})
@@ -31,7 +31,11 @@ grid_type(::Type{HEALPixField}) = HEALPixGrid
 grid_type(::Type{HEALPixField{T}}) where T = HEALPixGrid
 grid_type(::Type{HEALPixField{T, N}}) where {T, N} = HEALPixGrid
 
-Base.show(io::IO, F::Type{<:HEALPixField{T, N}}) where {T, N} = print(io, "HEALPixField{$T, $N}")
+function Base.showarg(io::IO, F::Field{T, N, ArrayType, Grid}, toplevel) where {T, N, ArrayType, Grid<:HEALPixGrid{A}} where A <: AbstractArchitecture
+    print(io, "HEALPixField{$T, $N}")
+    toplevel && print(io, " on ", nonparametric_type(ArrayType))
+    toplevel && print(io, " on ", A)
+end
 
 ## SIZE
 nlat_odd(::Type{<:HEALPixGrid}) = true
@@ -156,3 +160,5 @@ function each_index_in_ring!(   rings::AbstractVector,
         rings[j] = index_1st:index_end              # turn into UnitRange
     end
 end
+
+Adapt.@adapt_structure HEALPixGrid

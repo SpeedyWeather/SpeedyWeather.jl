@@ -473,9 +473,6 @@ end
     end
 end
 
-# needed when extension is not loaded (manual testing)
-RingGrids.nonparametric_type(::Type{<:JLArray}) = JLArray
-
 @testset "AbstractField: GPU (JLArrays)" begin 
     NF = Float32
     @testset for F in ( 
@@ -508,11 +505,9 @@ RingGrids.nonparametric_type(::Type{<:JLArray}) = JLArray
         # getindex 
         @test field[1, :, :] isa JLArray{NF, 2}
         @test field[:, 1, 1] isa Field{NF, 1, JLArray{NF, 1}}
-        for k in eachlayer(field)
-            for (j, ring) in enumerate(eachring(field))
-                @test field[ring, k] == adapt(JLArray, field_cpu[ring, k])
-                @test Array(field[ring, k]) == field_cpu[ring, k]
-            end
+        for ring in eachring(field) 
+            @test field[ring, :, :] == adapt(JLArray, field_cpu[ring, :, :])
+            @test Array(field[ring, :, :]) == field_cpu[ring, :, :]
         end
 
         # setindex! 

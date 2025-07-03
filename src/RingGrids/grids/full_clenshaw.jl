@@ -24,7 +24,7 @@ end
 nonparametric_type(::Type{<:FullClenshawGrid}) = FullClenshawGrid
 
 # FIELD
-const FullClenshawField{T, N} = Field{T, N, Architecture, Grid} where {Architecture, Grid<:FullClenshawGrid}
+const FullClenshawField{T, N} = Field{T, N, ArrayType, Grid} where {ArrayType, Grid<:FullClenshawGrid}
 
 # define grid_type (i) without T, N, (ii) with T, (iii) with T, N but not with <:?Field
 # to not have precendence over grid_type(::Type{Field{...})
@@ -32,7 +32,11 @@ grid_type(::Type{FullClenshawField}) = FullClenshawGrid
 grid_type(::Type{FullClenshawField{T}}) where T = FullClenshawGrid
 grid_type(::Type{FullClenshawField{T, N}}) where {T, N} = FullClenshawGrid
 
-Base.show(io::IO, F::Type{<:FullClenshawField{T, N}}) where {T, N} = print(io, "FullClenshawField{$T, $N}")
+function Base.showarg(io::IO, F::Field{T, N, ArrayType, Grid}, toplevel) where {T, N, ArrayType, Grid<:FullClenshawGrid{A}} where A <: AbstractArchitecture
+    print(io, "FullClenshawField{$T, $N}")
+    toplevel && print(io, " on ", nonparametric_type(ArrayType))
+    toplevel && print(io, " on ", A)
+end
 
 # SIZE
 nlat_odd(::Type{<:FullClenshawGrid}) = true
@@ -46,3 +50,5 @@ get_lond(::Type{<:FullClenshawGrid}, nlat_half::Integer) = get_lond(FullGaussian
 
 # QUADRATURE
 get_quadrature_weights(::Type{<:FullClenshawGrid}, nlat_half::Integer) = clenshaw_curtis_weights(nlat_half)
+
+Adapt.@adapt_structure FullClenshawGrid

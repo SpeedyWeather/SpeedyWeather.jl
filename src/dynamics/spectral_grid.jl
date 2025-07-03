@@ -2,7 +2,7 @@ abstract type AbstractSpectralGrid end
 
 # computing
 const DEFAULT_NF = Float32
-const DEFAULT_DEVICE = CPU()
+const DEFAULT_ARCHITECTURE = CPU()
 const DEFAULT_ARRAYTYPE = Array
 
 # numerics
@@ -22,18 +22,19 @@ $(TYPEDFIELDS)
 `nlat_half` and `npoints` should not be chosen but are derived from `trunc`,
 `Grid` and `dealiasing`."""
 struct SpectralGrid{
-    SP,         # <: AbstractSpectrum
-    Grid,       # <: AbstractGrid
+    ArchitectureType,      # <: AbstractArchitecture
+    SpectrumType,          # <: AbstractSpectrum
+    GridType,              # <: AbstractGrid
 } <: AbstractSpectralGrid
 
     "[OPTION] number format used throughout the model"
     NF::Type{<:AbstractFloat}
 
     "[OPTION] device architecture to run on"
-    device::AbstractDevice
+    architecture::ArchitectureType 
 
     "[OPTION] array type to use for all variables"
-    ArrayType::Type{<:AbstractArray}
+    ArrayType::Type{<:AbstractArray} 
 
     "[DERIVED] Type of vector"
     VectorType::Type{<:AbstractVector}
@@ -49,7 +50,7 @@ struct SpectralGrid{
     trunc::Int
 
     "[DERIVED] spectral space"
-    spectrum::SP
+    spectrum::SpectrumType
 
     "[DERIVED] Type of spectral variable in 2D (horizontal only, flattened into 1D vector)"
     SpectralVariable2D::Type{<:AbstractArray}
@@ -73,8 +74,11 @@ struct SpectralGrid{
     "[DERIVED] total number of grid points in the horizontal"
     npoints::Int
 
-    "[OPTION] horizontal grid used for calculations in grid-point space"
-    grid::Grid
+    "[DERIVED] instance of horizontal grid used for calculations in grid-point space"
+    grid::GridType
+
+    "[OPTION] type of horizontal grid used for calculations in grid-point space"
+    Grid::Type{<:AbstractGrid}
 
     "[DERIVED] Type of grid variable in 2D (horizontal only, flattened into 1D vector)"
     GridVariable2D::Type{<:AbstractArray}
@@ -106,7 +110,7 @@ end
 
 function Base.show(io::IO, SG::SpectralGrid)
     (; NF, trunc, grid, radius, nlat, npoints, nlayers, nlayers_soil) = SG
-    (; device, ArrayType) = SG
+    (; architecture, ArrayType) = SG
     (; nparticles) = SG
     Grid = RingGrids.nonparametric_type(grid)
 
@@ -119,47 +123,51 @@ function Base.show(io::IO, SG::SpectralGrid)
     println(io, "├ Grid:       Field{$NF} on $nlat-ring $Grid, $npoints grid points")
     println(io, "├ Resolution: $(s(average_resolution))km (average)")
     nparticles > 0 &&
-    println(io, "├ Particles:  $nparticles")
-    println(io, "├ Vertical:   $nlayers-layer atmosphere, $nlayers_soil-layer land")
-      print(io, "└ Device:     $(typeof(device)) using $ArrayType")
-end
-
-# generate spectrum/grid based on trunc, Grid and dealiasing, use to create a SpectralGrid
-function SpectralGrid(;
-    trunc::Int = DEFAULT_TRUNC,
-    Grid::Type{<:AbstractGrid} = DEFAULT_GRID,
-    dealiasing::Real = 2,
-    kwargs...
-)
-    spectrum = Spectrum(trunc+2, trunc+1)           # defines the Spectral space
-    nlat_half = SpeedyTransforms.get_nlat_half(trunc, dealiasing)
-    grid = Grid(nlat_half)                          # defines the grid space
-    return SpectralGrid(spectrum, grid; kwargs...)
+    println(io, "├ Particles:    $nparticles")
+    println(io, "├ Vertical:     $nlayers-layer atmosphere, $nlayers_soil-layer land")
+    println(io, "└ Architecture: $architecture using $ArrayType")
 end
 
 # Constructor that takes all [OPTION] parameters as keyword arguments
 # and calculates all derived fields
-function SpectralGrid(
-    spectrum::AbstractSpectrum,
-    grid::AbstractGrid;
+function SpectralGrid(;
     NF::Type{<:AbstractFloat} = DEFAULT_NF,
-    device::AbstractDevice = DEFAULT_DEVICE,
-    ArrayType::Type{<:AbstractArray} = default_array_type(device),
+    architecture::Union{AbstractArchitecture, Type{<:AbstractArchitecture}} = DEFAULT_ARCHITECTURE,
+    ArrayType::Type{<:AbstractArray} = array_type(architecture),
+    trunc::Int = DEFAULT_TRUNC,
+    Grid::Type{<:AbstractGrid} = DEFAULT_GRID,
+    dealiasing::Real = 2,
     radius::Real = DEFAULT_RADIUS,
     nparticles::Int = 0,
     nlayers::Int = DEFAULT_NLAYERS,
     nlayers_soil::Int = DEFAULT_NLAYERS_SOIL
 )
-    trunc = spectrum.mmax - 1       # 0-based spectral truncation from orders of harmonics
-    (; nlat_half) = grid
+
+    # Convert architecture to instance if it is a type
+    if architecture isa Type
+        architecture = architecture()
+    end
+
+    # grid
+    nlat_half = SpeedyTransforms.get_nlat_half(trunc, dealiasing)
+    grid = Grid(nlat_half, architecture)
     nlat = RingGrids.get_nlat(grid)
     npoints = RingGrids.get_npoints(grid)
-    dealiasing = SpeedyTransforms.get_dealiasing(trunc, nlat_half)
+
+    # default dealiasing or user-defined one? 
+    dealiasing = SpeedyTransforms.get_dealiasing(trunc, grid.nlat_half)
     
+    # Convert numeric parameters to Float64
+    dealiasing_f64 = Float64(dealiasing)
+    radius_f64 = Float64(radius)
+
     # Calculate derived fields
     VectorType = ArrayType{NF, 1}
     MatrixType = ArrayType{NF, 2}
     TensorType = ArrayType{NF, 3}
+    
+    # Spectral space
+    spectrum = Spectrum(trunc+2, trunc+1, architecture=architecture)
     
     # Spectral variable types
     SpectralVariable2D = LowerTriangularArray{Complex{NF}, 1, ArrayType{Complex{NF}, 1}, typeof(spectrum)}
@@ -175,9 +183,9 @@ function SpectralGrid(
     ParticleVector = ArrayType{Particle{NF}, 1}
     
     # Create the SpectralGrid with all fields
-    return SpectralGrid{typeof(spectrum), typeof(grid)}(
+    return SpectralGrid{typeof(architecture), typeof(spectrum), typeof(grid)}(
         NF,
-        device,
+        architecture,
         ArrayType,
         VectorType,
         MatrixType,
@@ -187,15 +195,16 @@ function SpectralGrid(
         SpectralVariable2D,
         SpectralVariable3D,
         SpectralVariable4D,
-        dealiasing,
+        dealiasing_f64,
         nlat_half,
         nlat,
         npoints,
         grid,
+        Grid,
         GridVariable2D,
         GridVariable3D,
         GridVariable4D,
-        radius,
+        radius_f64,
         nparticles,
         ParticleVector,
         nlayers,

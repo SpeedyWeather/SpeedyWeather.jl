@@ -1,11 +1,7 @@
-# convert l, m indices of a matrix (here 0-based l,m though...) to a single 1-based running index
-import SpeedyWeather.LowerTriangularArrays: lm2i
+# convert l,m indices of a matrix (here 0-based l,m though...) to a single 1-based running index
+import SpeedyWeather.LowerTriangularArrays: lm2i, get_lm_range, get_2lm_range
+import SpeedyWeather.Architectures: ismatching
 
-# range of the running indices lm in a l-column (degrees of spherical harmonics)
-# given the column index m (order of harmonics) 
-get_lm_range(m, lmax) = lm2i(2*m - 1, m, lmax):lm2i(lmax+m, m, lmax)
-get_2lm_range(m, lmax) = 2*lm2i(2*m - 1, m, lmax)-1:2*lm2i(lmax+m, m, lmax)
- 
 # (inverse) legendre transform kernel, called from _legendre!
 function inverse_legendre_kernel!(
     g_north,                        # Scratch storage for legendre coefficients
@@ -91,7 +87,7 @@ function SpeedyTransforms._legendre!(
     lmax = lmax-1                       # 0-based max degree l of spherical harmonics
     mmax = mmax-1                       # 0-based max order m of spherical harmonics
 
-    @boundscheck SpeedyTransforms.ismatching(S, specs) || throw(DimensionMismatch(S, specs))
+    @boundscheck ismatching(S, specs) || throw(DimensionMismatch(S, specs))
     @boundscheck size(g_north) == size(g_south) == (S.nfreq_max, S.nlayers, nlat_half) || throw(DimensionMismatch(S, specs))
     # reduced_kjm = kjm_indices[1:(nlayers.stop * jm_index_size), :]  # get the reduced kjm indices
 
@@ -245,7 +241,7 @@ function SpeedyTransforms._legendre!(                        # GRID TO SPECTRAL
 
     lmax = lmax - 1                         # 0-based max degree l of spherical harmonics
 
-    @boundscheck SpeedyTransforms.ismatching(S, specs) || throw(DimensionMismatch(S, specs))
+    @boundscheck ismatching(S, specs) || throw(DimensionMismatch(S, specs))
     @boundscheck size(f_north) == size(f_south) == (S.nfreq_max, S.nlayers, nlat_half) || throw(DimensionMismatch(S, specs))
 
     fill!(specs, 0)                         # reset as we accumulate into specs
