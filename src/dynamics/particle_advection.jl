@@ -46,7 +46,7 @@ Initialize particle locations uniformly in latitude, longitude and in the
 vertical σ coordinates. This uses a cosin-distribution in latitude for
 an equal-area uniformity."""
 function initialize!(
-    particles::Vector{P},
+    particles::AbstractVector{P},
     model::AbstractModel,
 ) where {P <: Particle}
     for i in eachindex(particles)
@@ -94,11 +94,12 @@ end
 
 # function barrier
 function particle_advection!(progn, diagn, adv::ParticleAdvection2D)
-    particle_advection!(progn.particles, diagn, progn.clock, adv)
+    particle_advection!(progn.particles, progn.particles_activity, diagn, progn.clock, adv)
 end
 
 function particle_advection!(
-    particles::Vector{Particle{NF}},
+    particles::AbstractVector{Particle{NF}},
+    particles_activity::AbstractVector{Bool},
     diagn::AbstractVariables,
     clock::Clock,
     particle_advection::ParticleAdvection2D,
@@ -121,10 +122,7 @@ function particle_advection!(
     clock.timestep_counter % n == (n-1) || return nothing   
 
     # also escape if no particle is active
-    any_active::Bool = false 
-    for particle in particles
-        any_active |= active(particle)
-    end
+    any_active::Bool = any(particles_activity)
     any_active || return nothing
 
     # HEUN: PREDICTOR STEP, use u, v at previous time step and location
@@ -142,6 +140,7 @@ function particle_advection!(
     lats = diagn.particles.v
 
     for i in eachindex(particles, u_old, v_old)
+        particles_activity[i] || continue
         # sum up Heun's first term in 1/2*Δt*(uv_old + uv_new) on the fly
         # use only Δt/2
         particles[i] = advect_2D(particles[i], u_old[i], v_old[i], Δt_half)
@@ -169,6 +168,8 @@ function particle_advection!(
     interpolate!(v_new, v_grid, interpolator)
 
     for i in eachindex(particles, u_new, v_new)
+        particles_activity[i] || continue
+
         # sum up Heun's 2nd term in 1/2*Δt*(uv_old + uv_new) on the fly
         particles[i] = advect_2D(particles[i], u_new[i], v_new[i], Δt_half)
 
@@ -186,7 +187,7 @@ function particle_advection!(
 end
 
 function advect_2D(
-    particle::Particle{NF, true},   # particle to advect
+    particle::Particle{NF},   # particle to advect
     u::NF,                          # zonal velocity [m/s]
     v::NF,                          # meridional velocity [m/s]
     dt::NF,                         # scaled time step [s*˚/m]    
@@ -197,5 +198,3 @@ function advect_2D(
     dlon = u * dt/coslat                        # increment in longitude [˚E]
     return mod(move(particle, dlon, dlat))      # move, mod back to [0, 360˚E], [-90, 90˚N]
 end
-
-@inline advect_2D(p::Particle{NF, false}, args...) where NF = p

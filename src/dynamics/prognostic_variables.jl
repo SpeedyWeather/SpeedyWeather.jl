@@ -74,6 +74,7 @@ export PrognosticVariables
     GridVariable2D,         # <: AbstractField
     GridVariable3D,         # <: AbstractField
     ParticleVector,         # <: AbstractVector{Particle{NF}}
+    BoolVector,             # <: AbstractVector{Bool}   
 } <: AbstractPrognosticVariables
 
     # DIMENSIONS
@@ -128,6 +129,9 @@ export PrognosticVariables
     "Particles for particle advection"
     particles::ParticleVector = zeros(ParticleVector, nparticles)
 
+    "Particles activity"
+    particles_activity::BoolVector = fill(true, nparticles)
+
     "Scaling for vor, div. scale=1 outside simulation, =radius during simulation"
     scale::Base.RefValue{NF} = Ref(one(NF))
 
@@ -167,10 +171,10 @@ function PrognosticVariables(SG::SpectralGrid{Architecture, SpectrumType, GridTy
 
     (; spectrum, grid, nlayers, nlayers_soil, nparticles) = SG
     (; NF, ArrayType) = SG
-    (; SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, ParticleVector) = SG
+    (; SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, ParticleVector, BoolVector) = SG
     
     return PrognosticVariables{NF, ArrayType, SpectrumType, GridType,
-        SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, ParticleVector}(;
+        SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, ParticleVector, BoolVector}(;
             spectrum, grid, nlayers, nlayers_soil, nparticles, nsteps,
         )
 end
