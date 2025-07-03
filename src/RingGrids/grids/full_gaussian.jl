@@ -24,7 +24,7 @@ end
 nonparametric_type(::Type{<:FullGaussianGrid}) = FullGaussianGrid
 
 # FIELD
-const FullGaussianField{T, N} = Field{T, N, Architecture, Grid} where {Architecture, Grid<:FullGaussianGrid}
+const FullGaussianField{T, N} = Field{T, N, ArrayType, Grid} where {ArrayType, Grid<:FullGaussianGrid}
 
 # define grid_type (i) without T, N, (ii) with T, (iii) with T, N but not with <:FullGaussianField
 # to not have precendence over grid_type(::Type{Field{...})
@@ -32,7 +32,11 @@ grid_type(::Type{FullGaussianField}) = FullGaussianGrid
 grid_type(::Type{FullGaussianField{T}}) where T = FullGaussianGrid
 grid_type(::Type{FullGaussianField{T, N}}) where {T, N} = FullGaussianGrid
 
-Base.show(io::IO, F::Type{<:FullGaussianField{T, N}}) where {T, N} = print(io, "FullGaussianField{$T, $N}")
+function Base.showarg(io::IO, F::Field{T, N, ArrayType, Grid}, toplevel) where {T, N, ArrayType, Grid<:FullGaussianGrid{A}} where A <: AbstractArchitecture
+    print(io, "FullGaussianField{$T, $N}")
+    toplevel && print(io, " on ", nonparametric_type(ArrayType))
+    toplevel && print(io, " on ", A)
+end
 
 # SIZE
 nlat_odd(::Type{<:FullGaussianGrid}) = false        # Gaussian latitudes always even
@@ -53,3 +57,5 @@ end
 
 # QUADRATURE
 get_quadrature_weights(::Type{<:FullGaussianGrid}, nlat_half::Integer) = gaussian_weights(nlat_half)
+
+Adapt.@adapt_structure FullGaussianGrid

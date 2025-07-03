@@ -1,19 +1,19 @@
-abstract type AbstractSpectrum end
-struct CPU end
 const DEFAULT_ARCHITECTURE = CPU
+
+abstract type AbstractSpectrum end
 
 """$(TYPEDSIGNATURES) 
 Encodes the spectral trunction, orders and degrees of the spherical harmonics. 
 Is used by every `LowerTriangularArray` and also defines the architecture on which the 
 data of the `LowerTriangularArray` is stored.
 """
-struct Spectrum{A, O, L, M} <: AbstractSpectrum
+struct Spectrum{A, O, L} <: AbstractSpectrum
     lmax::Int
     mmax::Int
     architecture::A
     orders::O
     l_indices::L    # used by GPU kernels 
-    m_indices::M    # used by GPU kernels
+    m_indices::L    # used by GPU kernels
     lm_orders::O    # used by eachorder
 end
 
@@ -28,11 +28,22 @@ function Spectrum(
     mmax::Integer;
     architecture = DEFAULT_ARCHITECTURE(),
   )
-    return Spectrum(lmax, mmax, architecture, 
-    [m:lmax for m in 1:mmax],   # orders 
-    l_indices(lmax, mmax),      # l_indices 
-    m_indices(lmax, mmax),      # m_indices
-    lm_orders(lmax, mmax))      # lm_orders
+
+    orders = adapt(array_type(architecture), [m:lmax for m in 1:mmax])
+    ls = adapt(array_type(architecture), l_indices(lmax, mmax))
+    ms = adapt(array_type(architecture), m_indices(lmax, mmax))
+    lm_orders_tuple = adapt(array_type(architecture), lm_orders(lmax, mmax))
+
+    return Spectrum{typeof(architecture), 
+                    typeof(orders), 
+                    typeof(ls)}(
+                    lmax, 
+                    mmax, 
+                    architecture, 
+                    orders, 
+                    ls, 
+                    ms, 
+                    lm_orders_tuple)
 end
 
 """
@@ -47,11 +58,28 @@ Spectrum(trunc::Integer; one_degree_more=false, kwargs...) =
 
 Spectrum(; trunc::Integer, kwargs...) = Spectrum(trunc; kwargs...)
 
+"""
+$(TYPEDSIGNATURES)
+Create a `Spectrum` from another `Spectrum` but with a new architecture.
+"""
+Spectrum(spectrum::Spectrum; architecture::AbstractArchitecture=DEFAULT_ARCHITECTURE()) = 
+    adapt(array_type(architecture), Spectrum(spectrum.lmax, 
+            spectrum.mmax, 
+            architecture, 
+            spectrum.orders, 
+            spectrum.l_indices, 
+            spectrum.m_indices, 
+            spectrum.lm_orders))
+
 triangle_number(m::Integer) = m*(m+1)÷2
 nonzeros(l::Integer, m::Integer) = l*m - triangle_number(m-1)
 nonzeros(s::Spectrum) = nonzeros(s.lmax, s.mmax)
 resolution(s::Spectrum) = (s.lmax, s.mmax)
 truncation(s::Spectrum) = s.mmax - 1
+orders(s::Spectrum) = s.orders
+orders(s::Spectrum{<:GPU}) = Vector(s.orders) # on GPU transfer orders back to CPU first 
+
+eachorder(s::Spectrum) = s.lm_orders
 
 function l_indices(lmax::Integer, mmax::Integer)
     l_vector = Vector{Int}(undef, nonzeros(lmax, mmax))
@@ -97,4 +125,10 @@ function Base.show(io::IO, S::Spectrum)
     print(io,   "└ architecture: $(typeof(S.architecture))")
 end
 
-eachorder(s::Spectrum) = s.lm_orders
+Architectures.ismatching(s::Spectrum, array_type::Type{<:AbstractArray}) = ismatching(s.architecture, array_type)
+Architectures.ismatching(s::Spectrum, array::AbstractArray) = ismatching(s.architecture, typeof(array))
+
+Adapt.@adapt_structure Spectrum
+
+Architectures.architecture(s::Spectrum) = s.architecture
+on_architecture(architecture::AbstractArchitecture, s::Spectrum) = Spectrum(s; architecture)

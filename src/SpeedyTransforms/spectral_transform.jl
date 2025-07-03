@@ -10,16 +10,21 @@ to perform a spectral transform. Fields are
 $(TYPEDFIELDS)"""
 struct SpectralTransform{
     NF,
-    ArrayType,                  # non-parametric array type
-    SpectrumType,               # <: AbstractSpectrum
-    GridType,                   # <: AbstractGrid
-    VectorType,                 # <: ArrayType{NF, 1},
-    VectorComplexType,          # <: ArrayType{Complex{NF}, 1},
-    MatrixComplexType,          # <: ArrayType{Complex{NF}, 2},
-    ArrayComplexType,           # <: ArrayType{Complex{NF}, 3},
-    LowerTriangularMatrixType,  # <: LowerTriangularArray{NF, 1, ArrayType{NF}, SpectrumType},
-    LowerTriangularArrayType,   # <: LowerTriangularArray{NF, 2, ArrayType{NF}, SpectrumType},
+    AR,                                   # <: AbstractArchitecture
+    ArrayType,                            # non-parametric array type
+    SpectrumType,                         # <: AbstractSpectrum
+    GridType,                             # <: AbstractGrid
+    VectorType,                           # <: ArrayType{NF, 1},
+    ArrayTypeIntMatrix,                   # <: ArrayType{Int, 2}
+    VectorComplexType,                    # <: ArrayType{Complex{NF}, 1},
+    MatrixComplexType,                    # <: ArrayType{Complex{NF}, 2},
+    ArrayComplexType,                     # <: ArrayType{Complex{NF}, 3},
+    LowerTriangularMatrixType,            # <: LowerTriangularArray{NF, 1, ArrayType{NF}},
+    LowerTriangularArrayType,             # <: LowerTriangularArray{NF, 2, ArrayType{NF}},
 } <: AbstractSpectralTransform
+
+    # Architecture
+    architecture::AR
 
     # SPECTRAL RESOLUTION
     spectrum::SpectrumType          # spectral trunction 
@@ -28,8 +33,8 @@ struct SpectralTransform{
     mmax_truncation::Vector{Int}    # Maximum order m to retain per latitude ring
     
     # GRID
-    grid::GridType              # grid used, including nlat_half for resolution, indices for rings, etc.
-    nlayers::Int                # number of layers in the vertical (for scratch memory size)
+    grid::GridType                  # grid used, including nlat_half for resolution, indices for rings, etc.
+    nlayers::Int                    # number of layers in the vertical (for scratch memory size)
 
     # CORRESPONDING GRID SIZE
     nlon_max::Int                   # Maximum number of longitude points (at Equator)
@@ -42,7 +47,7 @@ struct SpectralTransform{
     lon_offsets::MatrixComplexType  # Offset of first lon per ring from prime meridian
 
     # NORMALIZATION
-    norm_sphere::NF                         # normalization of the l=0, m=0 mode
+    norm_sphere::NF                 # normalization of the l=0, m=0 mode
 
     # FFT plans, one plan for each latitude ring, batched in the vertical
     rfft_plans::Vector{AbstractFFTs.Plan}   # FFT plan for grid to spectral transform
@@ -63,8 +68,8 @@ struct SpectralTransform{
     scratch_memory_column_north::VectorComplexType  # scratch memory for vertically batched Legendre transform
     scratch_memory_column_south::VectorComplexType  # scratch memory for vertically batched Legendre transform
 
-    jm_index_size::Int                              # number of indices per layer in kjm_indices
-    kjm_indices::ArrayType                          # precomputed kjm loop indices map
+    jm_index_size::Int                             # number of indices per layer in kjm_indices
+    kjm_indices::ArrayTypeIntMatrix                # precomputed kjm loop indices map for legendre transform
 
     # SOLID ANGLES ΔΩ FOR QUADRATURE
     # (integration for the Legendre polynomials, extra normalisation of π/nlat included)
@@ -74,8 +79,9 @@ struct SpectralTransform{
     # GRADIENT MATRICES (on unit sphere, no 1/radius-scaling included)
     grad_y1::LowerTriangularMatrixType  # precomputed meridional gradient factors, term 1
     grad_y2::LowerTriangularMatrixType  # term 2
-
+    
     # GRADIENT MATRICES FOR U, V -> Vorticity, Divergence
+    grad_x_vordiv::LowerTriangularMatrixType # precomputed zonal gradient factors
     grad_y_vordiv1::LowerTriangularMatrixType
     grad_y_vordiv2::LowerTriangularMatrixType
 
@@ -106,11 +112,12 @@ function SpectralTransform(
     ArrayType::Type{<:AbstractArray} = DEFAULT_ARRAYTYPE,   # Array type used for spectral coefficients (can be parametric)
     nlayers::Integer = DEFAULT_NLAYERS,             # number of layers in the vertical (for scratch memory size)
     LegendreShortcut::Type{<:AbstractLegendreShortcut} = LegendreShortcutLinear,   # shorten Legendre loop over order m
+    architecture::AbstractArchitecture = architecture(ArrayType), # architecture that kernels are launched 
 )
     (; nlat_half) = grid    # number of latitude rings on one hemisphere incl equator
     ArrayType_ = RingGrids.nonparametric_type(ArrayType)    # drop parameters of ArrayType
     (; lmax, mmax) = spectrum                               # 1-based spectral truncation order and degree
-    
+
     # RESOLUTION PARAMETERS
     nlat = get_nlat(grid)           # 2nlat_half but one less if grid has odd # of lat rings
     nlon_max = get_nlon_max(grid)   # number of longitudes around the equator
@@ -134,7 +141,7 @@ function SpectralTransform(
     
     # LONGITUDE OFFSETS OF FIRST GRID POINT PER RING (0 for full and octahedral grids)
     lons, _ = RingGrids.get_lonlats(grid)
-    rings = eachring(grid)                                  # compute ring indices
+    rings = adapt(Array, eachring(grid))                    # compute ring indices (on CPU)
     lon1s = [lons[rings[j].start] for j in 1:nlat_half]     # pick lons at first index for each ring
     lon_offsets = [cispi(m*lon1/π) for m in 0:mmax-1, lon1 in lon1s]
     
@@ -186,7 +193,7 @@ function SpectralTransform(
             end
         end
     end
-
+  
     # SOLID ANGLES WITH QUADRATURE WEIGHTS (Gaussian, Clenshaw-Curtis, or Riemann depending on grid)
     # solid angles are ΔΩ = sinθ Δθ Δϕ for every grid point with
     # sin(θ)dθ are the quadrature weights approximate the integration over latitudes
@@ -202,37 +209,52 @@ function SpectralTransform(
     grad_y1 = zeros(NF, spectrum)                           # term 1, mul with harmonic l-1, m
     grad_y2 = zeros(NF, spectrum)                           # term 2, mul with harmonic l+1, m
 
-    for (m, degrees) in enumerate(spectrum.orders)          # 1-based degree l, order m
+    for (m, degrees) in enumerate(orders(spectrum))          # 1-based degree l, order m
         for l in degrees        
             grad_y1[l, m] = -(l-2)*ϵlms[l, m]
             grad_y2[l, m] = (l+1)*ϵlms[l+1, m]
         end
+        # explicitly set the last row to zero, so that kernels yield correct gradient in last row 
+        grad_y2[lmax, m] = 0
     end
 
     # meridional gradient used to get from u, v/coslat to vorticity and divergence
+    grad_x_vordiv = zeros(Int, spectrum)
+    for m in 1:mmax
+        for l in m:lmax-1                         
+            grad_x_vordiv[l, m] = m-1
+        end # last row zero to get vor and div correct
+        grad_x_vordiv[lmax, m] = 0
+    end
+
     grad_y_vordiv1 = zeros(NF, spectrum)                    # term 1, mul with harmonic l-1, m
     grad_y_vordiv2 = zeros(NF, spectrum)                    # term 2, mul with harmonic l+1, m
-
-    for (m, degrees) in enumerate(spectrum.orders)          # 1-based degree l, order m
-        for l in degrees       
+ 
+    for (m, degrees) in enumerate(orders(spectrum))          # 1-based degree l, order m
+        for l in degrees           
             grad_y_vordiv1[l, m] = l*ϵlms[l, m]
             grad_y_vordiv2[l, m] = (l-1)*ϵlms[l+1, m]
         end
+        # explicitly set the last row to zero, so that kernels yield correct gradient in last row 
+        grad_y_vordiv1[lmax, m] = 0
+        grad_y_vordiv2[lmax, m] = 0
     end
 
     # zonal integration (sort of) to get from vorticity and divergence to u, v*coslat
-    vordiv_to_uv_x = LowerTriangularMatrix([-m/(l*(l+1)) for l in 0:(lmax-1), m in 0:(mmax-1)])
+    vordiv_to_uv_x = LowerTriangularMatrix([-m/(l*(l+1)) for l in 0:(lmax-1), m in 0:(mmax-1)], spectrum)
     vordiv_to_uv_x[1, 1] = 0
 
     # meridional integration (sort of) to get from vorticity and divergence to u, v*coslat
     vordiv_to_uv1 = zeros(NF, spectrum)                     # term 1, to be mul with harmonic l-1, m
     vordiv_to_uv2 = zeros(NF, spectrum)                     # term 2, to be mul with harmonic l+1, m
 
-    for (m, degrees) in enumerate(spectrum.orders)          # 1-based degree l, order m
+    for (m, degrees) in enumerate(orders(spectrum))          # 1-based degree l, order m
         for l in degrees             
             vordiv_to_uv1[l, m] = ϵlms[l, m]/(l-1)
             vordiv_to_uv2[l, m] = ϵlms[l+1, m]/l
         end
+        # explicitly set the last row of vordiv_to_uv2 to zero, so that kernels yield correct gradient in last row 
+        vordiv_to_uv2[lmax, m] = 0
     end
 
     vordiv_to_uv1[1, 1] = 0                 # remove NaN from 0/0
@@ -244,16 +266,19 @@ function SpectralTransform(
 
     return SpectralTransform{
         NF,
+        typeof(architecture),
         ArrayType_,
         typeof(spectrum),
         typeof(grid),
         ArrayType_{NF, 1},
+        ArrayType_{Int, 2},
         ArrayType_{Complex{NF}, 1},
         ArrayType_{Complex{NF}, 2},
         ArrayType_{Complex{NF}, 3},
-        LowerTriangularArray{NF, 1, ArrayType_{NF, 1}, typeof(spectrum)},
+        LowerTriangularArray{NF, 1, ArrayType_{NF, 1}, typeof(spectrum)}, 
         LowerTriangularArray{NF, 2, ArrayType_{NF, 2}, typeof(spectrum)},
     }(
+        architecture,
         spectrum, nfreq_max, 
         LegendreShortcut, mmax_truncation,
         grid, nlayers,
@@ -265,9 +290,10 @@ function SpectralTransform(
         scratch_memory, 
         scratch_memory_grid, scratch_memory_spec,
         scratch_memory_column_north, scratch_memory_column_south,
-        jm_index_size, kjm_indices,
-        solid_angles, grad_y1, grad_y2,
-        grad_y_vordiv1, grad_y_vordiv2, vordiv_to_uv_x,
+        jm_index_size, kjm_indices, 
+        solid_angles, 
+        grad_y1, grad_y2,
+        grad_x_vordiv, grad_y_vordiv1, grad_y_vordiv2, vordiv_to_uv_x,
         vordiv_to_uv1, vordiv_to_uv2,
         eigenvalues, eigenvalues⁻¹
     )
@@ -359,7 +385,7 @@ SpectralTransform(coeffs::LowerTriangularArray, field::AbstractField; kwargs...)
 Spectral transform `S` and lower triangular matrix `L` match if the
 spectral dimensions `(lmax, mmax)` match and the number of vertical layers is
 equal or larger in the transform (constraints due to allocated scratch memory size)."""
-function ismatching(S::SpectralTransform, L::LowerTriangularArray)
+function Architectures.ismatching(S::SpectralTransform, L::LowerTriangularArray)
     resolution_math = resolution(S.spectrum) == size(L, OneBased, as=Matrix)[1:2]
     vertical_match = length(axes(L, 2)) <= S.nlayers
     return resolution_math && vertical_match
@@ -369,15 +395,15 @@ end
 Spectral transform `S` and `grid` match if the resolution `nlat_half` and the
 type of the grid match and the number of vertical layers is equal or larger in
 the transform (constraints due to allocated scratch memory size)."""
-function ismatching(S::SpectralTransform, field::AbstractField)
+function Architectures.ismatching(S::SpectralTransform, field::AbstractField)
     grid_match = S.grid == field.grid   # grid type and resolution match
     vertical_match = size(field, 2) <= S.nlayers
     return grid_match && vertical_match
 end
 
 # make `ismatching` commutative
-ismatching(L::LowerTriangularArray, S::SpectralTransform) = ismatching(S, L)
-ismatching(F::AbstractField,        S::SpectralTransform) = ismatching(S, F)
+Architectures.ismatching(L::LowerTriangularArray, S::SpectralTransform) = ismatching(S, L)
+Architectures.ismatching(F::AbstractField,        S::SpectralTransform) = ismatching(S, F)
 
 function Base.DimensionMismatch(S::SpectralTransform, L::LowerTriangularArray)
     s = "SpectralTransform for $(S.spectrum.lmax)x$(S.spectrum.mmax)x$(S.nlayers) LowerTriangularArrays "*
@@ -408,7 +434,7 @@ function get_recursion_factors( ::Type{NF},             # number format NF
                                 spectrum::Spectrum,
                                 ) where NF
     ϵlms = zeros(NF, spectrum)
-    for (m, degrees) in enumerate(spectrum.orders)      # loop over 1-based l, m
+    for (m, degrees) in enumerate(orders(spectrum))      # loop over 1-based l, m
         for l in degrees
             ϵlms[l, m] = recursion_factor(l-1, m-1)     # convert to 0-based l, m for function arguments
         end

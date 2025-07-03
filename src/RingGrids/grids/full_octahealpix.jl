@@ -14,7 +14,7 @@ end
 nonparametric_type(::Type{<:FullOctaHEALPixGrid}) = FullOctaHEALPixGrid
 
 # FIELD
-const FullOctaHEALPixField{T, N} = Field{T, N, Architecture, Grid} where {Architecture, Grid<:FullOctaHEALPixGrid}
+const FullOctaHEALPixField{T, N} = Field{T, N, ArrayType, Grid} where {ArrayType, Grid<:FullOctaHEALPixGrid}
 
 # define grid_type (i) without T, N, (ii) with T, (iii) with T, N but not with <:?Field
 # to not have precendence over grid_type(::Type{Field{...})
@@ -22,8 +22,11 @@ grid_type(::Type{FullOctaHEALPixField}) = FullOctaHEALPixGrid
 grid_type(::Type{FullOctaHEALPixField{T}}) where T = FullOctaHEALPixGrid
 grid_type(::Type{FullOctaHEALPixField{T, N}}) where {T, N} = FullOctaHEALPixGrid
 
-Base.show(io::IO, F::Type{<:FullOctaHEALPixField{T, N}}) where {T, N} =
+function Base.showarg(io::IO, F::Field{T, N, ArrayType, Grid}, toplevel) where {T, N, ArrayType, Grid<:FullOctaHEALPixGrid{A}} where A <: AbstractArchitecture
     print(io, "FullOctaHEALPixField{$T, $N}")
+    toplevel && print(io, " on ", nonparametric_type(ArrayType))
+    toplevel && print(io, " on ", A)
+end
 
 # SIZE
 nlat_odd(::Type{<:FullOctaHEALPixGrid}) = true
@@ -38,3 +41,5 @@ get_lond(::Type{<:FullOctaHEALPixGrid}, nlat_half::Integer) = get_lond(FullGauss
 # QUADRATURE (use weights from reduced grids though!)
 get_quadrature_weights(::Type{<:FullOctaHEALPixGrid}, nlat_half::Integer) =
     equal_area_weights(OctaHEALPixGrid, nlat_half)
+
+Adapt.@adapt_structure FullOctaHEALPixGrid

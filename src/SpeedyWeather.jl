@@ -12,6 +12,7 @@ export rotate, rotate!
 # GPU, PARALLEL
 import Base.Threads: Threads, @threads
 import KernelAbstractions
+import KernelAbstractions: synchronize
 import Adapt: Adapt, adapt, adapt_structure
 
 # INPUT OUTPUT
@@ -31,7 +32,16 @@ export DateTime, Millisecond, Second, Minute, Hour, Day, Week, Month, Year, Cent
 # export functions that have many cross-component methods
 export initialize!, finalize!
 
-include("utility_functions.jl")
+# import device architectures
+include("Architectures.jl")
+using .Architectures
+
+# export device functions 
+export on_architecture, architecture
+
+# import utilities
+include("Utils/Utils.jl")
+using .Utils
 
 # LowerTriangularArrays for spherical harmonics
 export  LowerTriangularArrays, 
@@ -85,11 +95,9 @@ using .SpeedyTransforms
 import .SpeedyTransforms: prettymemory
 
 # to be defined in GeoMakie extension
-export globe
+export globe, animate
 function globe end
-
-# Utility for GPU / KernelAbstractions
-include("gpu.jl")                               
+function animate end
 
 # abstract types
 include("models/abstract_models.jl")

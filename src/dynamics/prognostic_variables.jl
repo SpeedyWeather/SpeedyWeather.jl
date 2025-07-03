@@ -163,13 +163,13 @@ get_step(coeffs::LowerTriangularArray{T, 3}, i) where T = lta_view(coeffs, :, :,
 
 """$(TYPEDSIGNATURES)
 Generator function."""
-function PrognosticVariables(SG::SpectralGrid; nsteps=DEFAULT_NSTEPS)
+function PrognosticVariables(SG::SpectralGrid{Architecture, SpectrumType, GridType}; nsteps=DEFAULT_NSTEPS) where {Architecture, SpectrumType, GridType}
 
     (; spectrum, grid, nlayers, nlayers_soil, nparticles) = SG
     (; NF, ArrayType) = SG
     (; SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, ParticleVector) = SG
-
-    return PrognosticVariables{NF, ArrayType, typeof(spectrum), typeof(grid),
+    
+    return PrognosticVariables{NF, ArrayType, SpectrumType, GridType,
         SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, ParticleVector}(;
             spectrum, grid, nlayers, nlayers_soil, nparticles, nsteps,
         )

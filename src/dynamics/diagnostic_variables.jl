@@ -35,16 +35,16 @@ $(TYPEDFIELDS)"""
 @kwdef struct Tendencies{
     NF,                     # <: AbstractFloat
     ArrayType,              # Array, CuArray, ...
-    SP,                     # <: AbstractSpectrum
-    Grid,                   # <: AbstractGrid
+    SpectrumType,           # <: AbstractSpectrum
+    GridType,               # <: AbstractGrid
     SpectralVariable2D,     # <: LowerTriangularArray
     SpectralVariable3D,     # <: LowerTriangularArray
     GridVariable2D,         # <: AbstractField
     GridVariable3D,         # <: AbstractField
 } <: AbstractDiagnosticVariables
 
-    spectrum::SP            # spectral resolution: maximum degree and order of spherical harmonics
-    grid::Grid              # grid resolution: number of latitude rings on one hemisphere (Eq. incl.)
+    spectrum::SpectrumType            # spectral resolution: maximum degree and order of spherical harmonics
+    grid::GridType              # grid resolution: number of latitude rings on one hemisphere (Eq. incl.)
     nlayers::Int            # number of vertical layers
 
     # SPECTRAL TENDENCIES
@@ -102,12 +102,12 @@ $TYPEDFIELDS."""
 @kwdef struct GridVariables{
     NF,                     # <: AbstractFloat
     ArrayType,              # Array, CuArray, ...
-    Grid,                   # <:AbstractGrid
+    GridType,               # <:AbstractGrid
     GridVariable2D,         # <: AbstractField
     GridVariable3D,         # <: AbstractField
 } <: AbstractDiagnosticVariables
 
-    grid::Grid              # grid resolution: number of latitude rings on one hemisphere (Eq. incl.)
+    grid::GridType              # grid resolution: number of latitude rings on one hemisphere (Eq. incl.)
     nlayers::Int            # number of vertical layers
 
     "Relative vorticity of the horizontal wind [1/s]"
@@ -165,8 +165,8 @@ $(TYPEDFIELDS)"""
 @kwdef struct DynamicsVariables{
     NF,                     # <: AbstractFloat
     ArrayType,              # Array, CuArray, ...
-    SP,                     # <: AbstractSpectrum
-    Grid,                   # <:AbstractGrid
+    SpectrumType,           # <: AbstractSpectrum
+    GridType,               # <:AbstractGrid
     SpectralVariable2D,     # <: LowerTriangularArray
     SpectralVariable3D,     # <: LowerTriangularArray
     GridVariable2D,         # <: AbstractField
@@ -174,8 +174,8 @@ $(TYPEDFIELDS)"""
     ScratchMemoryType,      # <: ScratchMemory{NF, ArrayType{Complex{NF},3}}
 } <: AbstractDiagnosticVariables
     
-    spectrum::SP            # spectral resolution: maximum degree and order of spherical harmonics
-    grid::Grid              # grid resolution: number of latitude rings on one hemisphere (Eq. incl.)
+    spectrum::SpectrumType            # spectral resolution: maximum degree and order of spherical harmonics
+    grid::GridType              # grid resolution: number of latitude rings on one hemisphere (Eq. incl.)
     nlayers::Int            # number of vertical layers
 
     "Multi-purpose a, 3D work array to be reused in various places"
@@ -272,11 +272,11 @@ export DynamicsVariablesOcean
 @kwdef struct DynamicsVariablesOcean{
     NF,
     ArrayType,
-    Grid,
+    GridType,
     GridVariable2D,
 } <: AbstractDiagnosticVariables
 
-    grid::Grid
+    grid::GridType
     sensible_heat_flux::GridVariable2D = zeros(GridVariable2D, grid)
     evaporative_flux::GridVariable2D = zeros(GridVariable2D, grid)
     surface_shortwave_up::GridVariable2D = zeros(GridVariable2D, grid)
@@ -291,11 +291,11 @@ export DynamicsVariablesLand
 @kwdef struct DynamicsVariablesLand{
     NF,
     ArrayType,
-    Grid,
+    GridType,
     GridVariable2D,
 } <: AbstractDiagnosticVariables
 
-    grid::Grid
+    grid::GridType
     sensible_heat_flux::GridVariable2D = zeros(GridVariable2D, grid)
     evaporative_flux::GridVariable2D = zeros(GridVariable2D, grid)
     surface_shortwave_up::GridVariable2D = zeros(GridVariable2D, grid)
@@ -321,14 +321,14 @@ $(TYPEDFIELDS)"""
 @kwdef struct PhysicsVariables{
     NF,                     # <: AbstractFloat
     ArrayType,              # Array, CuArray, ...
-    Grid,                   # <:AbstractGrid
+    GridType,               # <:AbstractGrid
     GridVariable2D,         # <: AbstractField
 } <: AbstractDiagnosticVariables
 
-    grid::Grid          # resolution of grid
+    grid::GridType          # resolution of grid
 
-    ocean::DynamicsVariablesOcean{NF, ArrayType, Grid, GridVariable2D}
-    land::DynamicsVariablesLand{NF, ArrayType, Grid, GridVariable2D}
+    ocean::DynamicsVariablesOcean{NF, ArrayType, GridType, GridVariable2D}
+    land::DynamicsVariablesLand{NF, ArrayType, GridType, GridVariable2D}
 
     # PRECIPITATION
     "Accumulated large-scale precipitation [m]"
@@ -439,8 +439,8 @@ $(TYPEDFIELDS)"""
 struct DiagnosticVariables{
     NF,                     # <: AbstractFloat
     ArrayType,              # Array, CuArray, ...
-    SP,                     # <: AbstractSpectrum
-    Grid,                   # <:AbstractGrid
+    SpectrumType,           # <: AbstractSpectrum
+    GridType,               # <:AbstractGrid
     SpectralVariable2D,     # <: LowerTriangularArray
     SpectralVariable3D,     # <: LowerTriangularArray
     GridVariable2D,         # <: AbstractField
@@ -454,10 +454,10 @@ struct DiagnosticVariables{
 
     # DIMENSIONS
     "Spectral resolution: Max degree of spherical harmonics"
-    spectrum::SP
+    spectrum::SpectrumType
 
     "Grid resolution: Number of latitude rings on one hemisphere (Equator incl.)"
-    the_grid::Grid          # TODO cannot be named `grid` because of `GridVariables` ...
+    grid_used::GridType          # TODO cannot be named `grid` because of `GridVariables` ...
 
     "Number of vertical layers"
     nlayers::Int
@@ -466,16 +466,16 @@ struct DiagnosticVariables{
     nparticles::Int
 
     "Tendencies (spectral and grid) of the prognostic variables"
-    tendencies::Tendencies{NF, ArrayType, SP, Grid, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D}
+    tendencies::Tendencies{NF, ArrayType, SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D}
     
     "Gridded prognostic variables"
-    grid::GridVariables{NF, ArrayType, Grid, GridVariable2D, GridVariable3D}
+    grid::GridVariables{NF, ArrayType, GridType, GridVariable2D, GridVariable3D}
     
     "Intermediate variables for the dynamical core"
-    dynamics::DynamicsVariables{NF, ArrayType, SP, Grid, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, ScratchMemoryType}
+    dynamics::DynamicsVariables{NF, ArrayType, SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, ScratchMemoryType}
     
     "Global fields returned from physics parameterizations"
-    physics::PhysicsVariables{NF, ArrayType, Grid, GridVariable2D}
+    physics::PhysicsVariables{NF, ArrayType, GridType, GridVariable2D}
     
     "Intermediate variables for the particle advection"
     particles::ParticleVariables{NF, ArrayType, ParticleVector, VectorType, Interpolator}
@@ -539,7 +539,7 @@ function Base.show(
     println(io, "DiagnosticVariables{$NF, $ArrayType}")
     
     (; spectrum, nlayers, nparticles) = diagn
-    grid = diagn.the_grid   # TODO grid is used by 'GridVariables'
+    grid = diagn.grid_used   # TODO grid is used by 'GridVariables'
     nlat = RingGrids.get_nlat(grid)
     Grid = RingGrids.nonparametric_type(grid)
 
@@ -559,8 +559,8 @@ end
 function add!(diagn::DiagnosticVariables{
     NF,                     # <: AbstractFloat
     ArrayType,              # Array, CuArray, ...
-    SP,                     # <: AbstractSpectrum
-    Grid,                   # <:AbstractGrid
+    SpectrumType,           # <: AbstractSpectrum
+    GridType,               # <:AbstractGrid
     SpectralVariable2D,     # <: LowerTriangularArray
     SpectralVariable3D,     # <: LowerTriangularArray
     GridVariable2D,         # <: AbstractField
@@ -570,15 +570,15 @@ function add!(diagn::DiagnosticVariables{
     ) where {
         NF,                     # <: AbstractFloat
         ArrayType,              # Array, CuArray, ...
-        SP,                     # <: AbstractSpectrum
-        Grid,                   # <:AbstractGrid
+        SpectrumType,           # <: AbstractSpectrum
+        GridType,               # <:AbstractGrid
         SpectralVariable2D,     # <: LowerTriangularArray
         SpectralVariable3D,     # <: LowerTriangularArray
         GridVariable2D,         # <: AbstractField
         GridVariable3D,         # <: AbstractField
     }
     (; spectrum, nlayers) = diagn
-    grid = diagn.the_grid   # TODO grid is used for 'GridVariables'
+    grid = diagn.grid_used   # TODO grid is used for 'GridVariables'
     for tracer in tracers
         diagn.tendencies.tracers_tend[tracer.name] = zeros(SpectralVariable3D, spectrum, nlayers)
         diagn.tendencies.tracers_tend_grid[tracer.name] = zeros(GridVariable3D, grid, nlayers)
