@@ -32,7 +32,7 @@ nonparametric_type(::Type{<:OctahedralGaussianGrid}) = OctahedralGaussianGrid
 full_grid_type(::Type{<:OctahedralGaussianGrid}) = FullGaussianGrid
 
 # FIELD
-const OctahedralGaussianField{T, N} = Field{T, N, Architecture, Grid} where {Architecture, Grid<:OctahedralGaussianGrid}
+const OctahedralGaussianField{T, N} = Field{T, N, ArrayType, Grid} where {ArrayType, Grid<:OctahedralGaussianGrid}
 
 # define grid_type (i) without T, N, (ii) with T, (iii) with T, N but not with <:?Field
 # to not have precendence over grid_type(::Type{Field{...})
@@ -40,8 +40,11 @@ grid_type(::Type{OctahedralGaussianField}) = OctahedralGaussianGrid
 grid_type(::Type{OctahedralGaussianField{T}}) where T = OctahedralGaussianGrid
 grid_type(::Type{OctahedralGaussianField{T, N}}) where {T, N} = OctahedralGaussianGrid
 
-Base.show(io::IO, F::Type{<:OctahedralGaussianField{T, N}}) where {T, N} =
+function Base.showarg(io::IO, F::Field{T, N, ArrayType, Grid}, toplevel) where {T, N, ArrayType, Grid<:OctahedralGaussianGrid{A}} where A <: AbstractArchitecture
     print(io, "OctahedralGaussianField{$T, $N}")
+    toplevel && print(io, " on ", nonparametric_type(ArrayType))
+    toplevel && print(io, " on ", A)
+end 
 
 # SIZE
 nlat_odd(::Type{<:OctahedralGaussianGrid}) = false
