@@ -85,22 +85,12 @@ end
 
 @testset "Particle conversion" begin
     for NF in (Float16, Float32, Float64)
-        v = zeros(Particle{NF},5)       # active/inactive not specified
+        v = zeros(Particle{NF},5)      
         v[1] = Particle(lon=1, lat=2)
         v[2] = Particle{Float64}(lon=1, lat=2)
 
         for particle in v
             @test particle isa Particle{NF}
-        end
-    end
-
-    for NF in (Float16, Float32, Float64)
-        v = zeros(Particle{NF, true}, 5)                # all particles active
-        v[1] = Particle(lon=1, lat=2)
-        v[2] = Particle{Float64}(lon=1, lat=2)
-
-        for particle in v
-            @test particle isa Particle{NF, true}
         end
     end
 end
@@ -133,5 +123,9 @@ end
 
         p = Particle{NF}(lon=0,lat=-89)
         @test mod(move(p,-1,-4)) ≈ Particle{NF}(lon=179,lat=-87) atol=atol rtol=rtol
+
+        # move inactive particle: should not move
+        p = deactivate(Particle{NF}(lon=2,lat=2))
+        @test move(p,1,2) == p
     end
 end
