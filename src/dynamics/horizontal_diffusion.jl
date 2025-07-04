@@ -159,12 +159,12 @@ end
 
 # temp. function barrier for GPU version 
 function horizontal_diffusion!(
-    tendency::LowerTriangularArray{NF, N, AT, Spectrum{<:GPU}},     # tendency of a
-    var::LowerTriangularArray,          # spectral horizontal field to diffuse
+    tendency::LowerTriangularArray{NF, N, AT, <:Spectrum{<:GPU}},     # tendency of a
+    var::LowerTriangularArray{NF, N, AT, <:Spectrum{<:GPU}},          # spectral horizontal field to diffuse
     expl::AbstractMatrix,               # explicit spectral damping (lmax x nlayers matrix)
     impl::AbstractMatrix,               # implicit spectral damping (lmax x nlayers matrix)
-) where {NF, N, AT}
-    return _horizontal_diffusion_kernel!(tendency, var, expl, impl)
+) where {NF, N, AT <: AbstractArray}
+    return _horizontal_diffusion_KA!(tendency, var, expl, impl)
 end
 
 """$(TYPEDSIGNATURES)
@@ -172,28 +172,29 @@ Kernel-based implementation of horizontal diffusion for a 2D field `var` in spec
 Updates the tendency `tendency` with an implicitly calculated diffusion term.
 The implicit diffusion of the next time step is split into an explicit part `expl` and 
 an implicit part `impl`, such that both can be calculated in a single forward step."""
-function _horizontal_diffusion_kernel!(
+function _horizontal_diffusion_KA!(
     tendency::LowerTriangularArray,     # tendency of a
     var::LowerTriangularArray,          # spectral horizontal field to diffuse
     expl::AbstractMatrix,               # explicit spectral damping (lmax x nlayers matrix)
     impl::AbstractMatrix,               # implicit spectral damping (lmax x nlayers matrix)
 )
     # Launch the kernel
-    launch!(var.spectrum.architecture, :lmk, size(var), _horizontal_diffusion_kernel!, 
-            tendency, var, expl, impl, var.spectrum.l_indices)
-    synchronize(var.spectrum.architecture)
+    launch!(architecture(var), :lmk, size(var), _horizontal_diffusion_kernel!, 
+            tendency, var, expl, impl)
+    synchronize(architecture(var))
     
     return tendency
 end
 
 @kernel inbounds=true function _horizontal_diffusion_kernel!(
-    tendency, var, @Const(expl), @Const(impl), @Const(l_indices))
+    tendency, var, @Const(expl), @Const(impl))
+
     I = @index(Global, Cartesian)
     lm = I[1]
     k = ndims(var) == 1 ? 1 : I[2]
     
     # Get the degree l for this coefficient
-    l = l_indices[lm]
+    l = var.spectrum.l_indices[lm]
     
     # Apply horizontal diffusion
     tendency[I] = (tendency[I] + expl[l, k] * var[I]) * impl[l, k]

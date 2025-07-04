@@ -181,7 +181,8 @@ function leapfrog!(
     #     A_new[lm] = a_new - w2*a_update         # Williams filter: A_new[lm] becomes 1xfiltered value at t+Δt
     # end
 
-    launch!(tendency.spectrum.architecture, :lmk, size(tendency), leapfrog_kernel!, A_old, A_new, A_lf, tendency, dt_NF, w1, w2)
+    launch!(architecture(tendency), :lmk, size(tendency), leapfrog_kernel!, A_old, A_new, A_lf, tendency, dt_NF, w1, w2)
+    synchronize(architecture(tendency))
 end
 
 @kernel inbounds=true function leapfrog_kernel!(A_old, A_new, A_lf, tendency, @Const(dt), @Const(w1), @Const(w2))

@@ -618,18 +618,6 @@ function vorticity_flux_curldiv!(   diagn::DiagnosticVariables,
     return nothing       
 end
 
-# function barrier for GPU
-function vorticity_flux_curldiv!(
-    diagn::DiagnosticVariables,
-    coriolis::AbstractCoriolis,
-    geometry::Geometry,
-    S::SpectralTransform{NF, <:GPU};
-    div::Bool=true,     # also calculate div of vor flux?
-    add::Bool=false) where {NF}   # accumulate in vor/div tendencies?
-    
-    return vorticity_flux_curldiv_kernel!(diagn, coriolis, geometry, S; div, add)
-end
-
 """$(TYPEDSIGNATURES)
 Kernel-based implementation of vorticity flux calculation for the curl-divergence form.
 Computes the tendencies of vorticity and divergence from the absolute vorticity flux.
