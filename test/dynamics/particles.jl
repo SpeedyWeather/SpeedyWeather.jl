@@ -3,7 +3,7 @@
     @test Particle(0, 0, 0) == zero(Particle) == zero(Particle{Float32})
     @test Particle(0.0, 0.0) == Particle(0f0, 0f0, 0.0)
     @test zero(Particle{Float32}) == Particle{Float32}(true, 0, 0, 0)
-    @test zero(Particle{Float32}) != Particle{Float32}(false,0, 0)
+    @test zero(Particle{Float32}) != Particle{Float32}(false,0, 0, 0)
     @test deactivate(zero(Particle)) != zero(Particle)
     @test activate(zero(Particle)) == zero(Particle)
 

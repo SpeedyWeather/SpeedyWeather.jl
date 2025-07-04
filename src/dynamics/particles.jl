@@ -87,7 +87,7 @@ function Base.show(io::IO,p::Particle{NF}) where {NF}
     lat = @sprintf("%6.2f",p.lat)
     lon = @sprintf("%6.2f",p.lon)
     σ = @sprintf("%.2f",p.σ)
-    print(io,"Particle{$NF}($(lon)˚E, $(lat)˚N, σ = $σ, $(p.active ? "active" : "inactive")")
+    print(io,"Particle{$NF}($(lon)˚E, $(lat)˚N, σ = $σ, $(p.active) ? active : inactive)")
 end
 
 export move
