@@ -24,17 +24,17 @@ end
 
 # keyword constructors
 Particle{NF}(;lon, lat, σ=0) where NF = Particle{NF}(true, lon, lat, σ)
-Particle(;lon, lat, σ=0) = Particle(true, lon, lat, σ)
+Particle(;lon, lat, σ=0) = Particle(lon, lat, σ)
 
 # parametric constructors
 Particle{NF}(lon, lat) where NF = Particle{NF}(true, lon, lat, 0)
 Particle{NF}(lon, lat, σ) where NF = Particle{NF}(true, lon, lat, σ)
 
 # promotion of arguments if NF not provided
-Particle(lon, lat) = Particle(true, lon, lat, 0)
+Particle(lon, lat) = Particle(lon, lat, 0)
 Particle(lon, lat, σ) = Particle{promote_type(typeof.((lon, lat, σ))...)}(true, lon, lat, σ)
-Particle(lon::Integer, lat::Integer) = Particle(true, lon,lat,0)
-Particle(lon::Integer, lat::Integer, σ::Integer) = Particle{DEFAULT_NF}(true,lon, lat, σ)
+Particle(lon::Integer, lat::Integer) = Particle(lon,lat,0)
+Particle(lon::Integer, lat::Integer, σ::Integer) = Particle{DEFAULT_NF}(true, lon, lat, σ)
 
 # zero generators
 Base.zero(::Type{Particle}) = Particle{DEFAULT_NF}(true,0,0,0)
