@@ -95,7 +95,7 @@ export move
 """$(TYPEDSIGNATURES)
 Move a particle with increments (dlon, dlat, dσ) in those respective coordinates."""
 @inline function move(p::Particle{NF}, dlon, dlat, dσ) where NF
-    if p.active
+    if active(p)
         (;lon, lat, σ) = p
         Particle{NF}(p.active, lon+dlon, lat+dlat, σ+dσ)
     end 
@@ -104,7 +104,7 @@ end
 """$(TYPEDSIGNATURES)
 Move a particle with increments (dlon, dlat) in 2D. No movement in vertical σ."""
 @inline function move(p::Particle{NF}, dlon, dlat) where NF
-    if p.active
+    if active(p)
         (;lon, lat, σ) = p
         Particle{NF}(p.active, lon+dlon, lat+dlat, σ)
     end

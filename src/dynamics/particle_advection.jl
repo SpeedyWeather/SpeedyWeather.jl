@@ -121,8 +121,7 @@ function particle_advection!(
     clock.timestep_counter % n == (n-1) || return nothing   
 
     # also escape if no particle is active
-    any_active::Bool = any(active.(particles))
-    any_active || return nothing
+    any(active.(particles)) || return nothing
 
     # HEUN: PREDICTOR STEP, use u, v at previous time step and location
     Δt = particle_advection.Δt[]        # time step [s*˚/m]
