@@ -1,7 +1,7 @@
 @testset "Create and compare particles" begin
-    @test Particle(0, 0) == Particle(0, 0, 0) == Particle(true, 0, 0, 0)
-    @test Particle(true, 0, 0, 0) == zero(Particle) == zero(Particle{Float32})
-    @test Particle(0.0, 0.0) == Particle(0f0, 0f0, 0.0) == Particle(true, 0, 0, 0)
+    @test Particle(0, 0) == Particle(0, 0, 0)
+    @test Particle(0, 0, 0) == zero(Particle) == zero(Particle{Float32})
+    @test Particle(0.0, 0.0) == Particle(0f0, 0f0, 0.0)
     @test zero(Particle{Float32}) == Particle{Float32}(true, 0, 0, 0)
     @test zero(Particle{Float32}) != Particle{Float32}(false,0, 0)
     @test deactivate(zero(Particle)) != zero(Particle)
