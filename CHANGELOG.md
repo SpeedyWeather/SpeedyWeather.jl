@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+ - Add parameter handling system and implement for Barotropic model [#754](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/754)
+
 ## v0.16
 
 - Move full differentiability tests to separate CI workflow [#759](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/759)
