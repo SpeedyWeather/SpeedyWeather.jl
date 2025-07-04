@@ -14,6 +14,7 @@ end
 
 # GENERAL
 include("utility_functions.jl")
+include("parameters.jl")
 
 # GRIDS
 include("grids/grids.jl")
