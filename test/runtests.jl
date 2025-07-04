@@ -2,9 +2,14 @@ using SpeedyWeather
 using Test
 
 FLAG_EXTENDED_TESTS = "extended_tests" in ARGS ? true : false
+FLAG_ENZYME_TESTS = "enzyme" in ARGS ? true : false
 
 if FLAG_EXTENDED_TESTS 
     @info "Running extended test suite"
+end 
+
+if FLAG_ENZYME_TESTS 
+    @info "Running Enzyme CI tests"
 end 
 
 # GENERAL
