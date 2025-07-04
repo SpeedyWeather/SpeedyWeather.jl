@@ -43,5 +43,6 @@ on_architecture(::GPU, a::StepRangeLen) = a
 
 include("fourier.jl")
 include("legendre.jl")
+include("function_barriers.jl")
 
 end # module
