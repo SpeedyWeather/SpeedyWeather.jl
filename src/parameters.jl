@@ -57,17 +57,7 @@ This provides a table-like interface for interacting with model parameters.
 """
 struct SpeedyParams{NT<:NamedTuple} <: ModelParameters.AbstractModel
     parent::NT
-    # This constructor is adapted from ModelParameters.jl
-    function SpeedyParams(parent::NamedTuple)
-        if ModelParameters.hasparam(parent)
-            # add component type and filename attributes to parameters
-            expandedpars = ModelParameters._expandkeys(ModelParameters.params(parent))
-            parent = ModelParameters.Flatten.reconstruct(parent, expandedpars, ModelParameters.SELECT, ModelParameters.IGNORE)
-        else
-            @warn "Model has no parameter fields"
-        end
-        return new{typeof(parent)}(parent)
-    end
+    SpeedyParams(parent::NamedTuple) = new{typeof(parent)}(parent)
     SpeedyParams(; params...) = SpeedyParams((; params...))
 end
 
@@ -79,6 +69,16 @@ Simple recursive dispatch algorithm for unpacking nested named tuples of `Speedy
 unpack_params(x) = x
 unpack_params(nt::NamedTuple) = map(unpack_params, nt)
 unpack_params(params::SpeedyParams) = unpack_params(parent(params))
+
+"""
+    $SIGNATURES
+
+Unpacks and strips all `AbstractParam` types from the given `params` object, replacing them with their numeric `val`.
+This is a type-stable alternative to the (currently unstable) `stripparams` in `ModelParameters`.
+"""
+stripparams(param::AbstractParam) = value(param)
+stripparams(params::NamedTuple) = map(stripparams, params)
+stripparams(params::SpeedyParams) = stripparams(unpack_params(params))
 
 # Base overridese for SpeedyParams
 
@@ -160,8 +160,8 @@ parameters(::Type{PT}, x::Union{Number,AbstractArray}; kwargs...) where {PT<:Abs
 Convenience method that creates a model parameter from its property with the given `name` and optional extra attributes in `kwargs`.
 A parameter attribute `copmonenttype` is automatically added with value `T`.
 """
-parameterof(obj::T, name::Symbol; kwargs...) where {T} = parameterof(SpeedyParam, obj, name; kwargs...)
-parameterof(::Type{PT}, obj::T, name::Symbol; kwargs...) where {PT,T} = parameters(PT, getproperty(obj, name); componenttype=T, kwargs...)
+parameterof(obj::T, ::Val{propname}; kwargs...) where {T,propname} = parameterof(SpeedyParam, obj, Val{propname}(); kwargs...)
+parameterof(::Type{PT}, obj::T, ::Val{propname}; kwargs...) where {PT,T,propname} = parameters(PT, getproperty(obj, propname); componenttype=T, kwargs...)
 
 # reconstruct
 
@@ -175,6 +175,7 @@ reconstruct(obj::T, value::T) where {T} = value
 reconstruct(obj::AbstractParam, value::T) where {T} = ModelParameters.update(obj, Tuple(value))
 reconstruct(obj::NamedTuple{keys,V}, values::NamedTuple{keys,V}) where {keys,V<:Tuple} = values
 reconstruct(obj, values::ComponentArray) = reconstruct(obj, NamedTuple(values))
+reconstruct(obj, values::SpeedyParams) = reconstruct(obj, stripparams(values))
 function reconstruct(obj, values::NamedTuple{keys}) where {keys}
     # extract properties from obj as named tuple
     nt = getproperties(obj)
@@ -296,7 +297,7 @@ macro parameterized(expr)
     typesig = typedef2sig(typedef)
     # emit parameterof calls for each parsed parameter
     param_constructors = map(params) do info
-        :($(QuoteNode(info.name)) => SpeedyWeather.parameterof(obj, $(QuoteNode(info.name)); desc=$(info.desc), $(info.attrs)..., kwargs...))
+        :($(QuoteNode(info.name)) => SpeedyWeather.parameterof(obj, Val{$(QuoteNode(info.name))}(); desc=$(info.desc), $(info.attrs)..., kwargs...))
     end
     # construct final expression block
     block = Expr(:block)
