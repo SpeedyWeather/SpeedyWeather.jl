@@ -44,4 +44,3 @@ end
 
 Earth(SG::SpectralGrid; kwargs...) = Earth{SG.NF}(; kwargs...)
 Earth(::Type{NF}; kwargs...) where NF = Earth{NF}(; kwargs...)
-
