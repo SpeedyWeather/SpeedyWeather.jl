@@ -61,7 +61,7 @@ end
 prognostic_variables(::Type{<:Barotropic}) = (:vor,)
 default_concrete_model(::Type{Barotropic}) = BarotropicModel
 
-parameters(model::Barotropic; kwargs...) = (
+parameters(model::Barotropic; kwargs...) = SpeedyParams(
     planet = parameters(model.planet; component=:planet, kwargs...),
     atmosphere = parameters(model.atmosphere; component=:atmosphere, kwargs...),
     forcing = parameters(model.forcing; component=:forcing, kwargs...),

@@ -25,17 +25,12 @@ end
 
 # Quadratic drag
 export QuadraticDrag
-@kwdef mutable struct QuadraticDrag{NF} <: AbstractDrag
+@parameterized @kwdef mutable struct QuadraticDrag{NF} <: AbstractDrag
     "[OPTION] drag coefficient [1]"
-    c_D::NF = 1e-12         # TODO is this a good default?
+    @param c_D::NF = 1e-12         # TODO is this a good default?
 end
 
 QuadraticDrag(SG::SpectralGrid; kwargs...) = QuadraticDrag{SG.NF}(; kwargs...)
-
-parameters(drag::QuadraticDrag; kwargs...) =
-    (
-        c_D = parameterof(drag, :c_D; desc="Quadratic drag coefficient [1]", kwargs...),
-    )
 
 initialize!(::QuadraticDrag, ::AbstractModel) = nothing
 
@@ -74,17 +69,12 @@ function drag!(
 end
 
 export LinearVorticityDrag
-@kwdef mutable struct LinearVorticityDrag{NF} <: AbstractDrag
+@parameterized @kwdef mutable struct LinearVorticityDrag{NF} <: AbstractDrag
     "[OPTION] drag coefficient [1/s]"
-    c::NF = 1e-7
+    @param c::NF = 1e-7
 end
 
 LinearVorticityDrag(SG::SpectralGrid; kwargs...) = LinearVorticityDrag{SG.NF}(; kwargs...)
-
-parameters(drag::LinearVorticityDrag; kwargs...) =
-    (
-        c = parameterof(drag, :c; desc="Linear vorticity drag coefficient [1/s]", kwargs...),
-    )
 
 initialize!(::LinearVorticityDrag, ::AbstractModel) = nothing
 
@@ -110,18 +100,18 @@ function drag!(
 end
 
 export JetDrag
-@kwdef struct JetDrag{NF, SpectralVariable2D} <: SpeedyWeather.AbstractDrag
+@parameterized @kwdef struct JetDrag{NF, SpectralVariable2D} <: SpeedyWeather.AbstractDrag
     "[OPTION] Relaxation time scale τ"
     time_scale::Second = Day(6)
 
     "[OPTION] Jet strength [m/s]"
-    u₀::NF = 20
+    @param u₀::NF = 20
 
     "[OPTION] latitude of Gaussian jet [˚N]"
-    latitude::NF = 30
+    @param latitude::NF = 30 (bounds=-90..90,)
 
     "[OPTION] Width of Gaussian jet [˚]"
-    width::NF = 6
+    @param width::NF = 6 (bounds=Positive,)
 
     # TO BE INITIALISED
     "Relaxation back to reference vorticity"
@@ -132,13 +122,6 @@ function JetDrag(SG::SpectralGrid; kwargs...)
     ζ₀ = zeros(Complex{SG.NF}, SG.spectrum)
     return JetDrag{SG.NF, SG.SpectralVariable2D}(; ζ₀, kwargs...)
 end
-
-parameters(drag::JetDrag; kwargs...) =
-    (
-        u₀ = parameterof(drag, :u₀; desc="Jet strength [m/s]", kwargs...),
-        latitude = parameterof(drag, :latitude; desc="Latitude of Gaussian jet [˚N]", kwargs...),
-        width = parameterof(drag, :width; desc="Width of Gaussian jet [˚]", kwargs...),
-    )
 
 function initialize!(drag::JetDrag, model::AbstractModel)
     (; spectral_grid, geometry) = model

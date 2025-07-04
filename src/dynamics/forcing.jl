@@ -35,7 +35,7 @@ Galewsky, 2004, but mirrored for both hemispheres.
 
 $(TYPEDFIELDS)
 """
-@kwdef mutable struct JetStreamForcing{NF} <: AbstractForcing
+@parameterized @kwdef mutable struct JetStreamForcing{NF} <: AbstractForcing
     "Number of latitude rings"
     nlat::Int = 0
 
@@ -43,16 +43,16 @@ $(TYPEDFIELDS)
     nlayers::Int = 0
 
     "jet latitude [˚N]"
-    latitude::NF = 45
+    @param latitude::NF = 45 (bounds=-90..90,)
     
     "jet width [˚], default ≈ 19.29˚"
-    width::NF = (1/4-1/7)*180
+    @param width::NF = (1/4-1/7)*180 (bounds=Positive,)
 
     "sigma level [1], vertical location of jet"
-    sigma::NF = 0.2
+    @param sigma::NF = 0.2 (bounds=Nonnegative,)
 
     "jet speed scale [m/s]"
-    speed::NF = 85
+    @param speed::NF = 85
 
     "time scale [days]"
     time_scale::Second = Day(30)
@@ -66,16 +66,6 @@ end
 
 JetStreamForcing(SG::SpectralGrid; kwargs...) = JetStreamForcing{SG.NF}(
     ; nlat=SG.nlat, nlayers=SG.nlayers, kwargs...)
-
-parameters(forcing::JetStreamForcing; kwargs...) =
-    (
-        latitude = parameterof(forcing, :latitude; desc="jet latitude [˚N]", kwargs...),
-        width = parameterof(forcing, :width; desc="jet width [˚]", kwargs...),
-        sigma = parameterof(forcing, :sigma; desc="sigma level [1], vertical location of jet", kwargs...),
-        speed = parameterof(forcing, :speed; desc="jet speed scale [m/s]", kwargs...),
-        amplitude = parameterof(forcing, :amplitude; desc="precomputed amplitude vector [m/s²]", kwargs...),
-        tapering = parameterof(forcing, :tapering; desc="precomputed vertical tapering", kwargs...),
-    )
 
 function initialize!(   forcing::JetStreamForcing,
                         model::AbstractModel)
@@ -148,19 +138,19 @@ function forcing!(
 end
 
 export StochasticStirring
-@kwdef struct StochasticStirring{NF, VectorType} <: AbstractForcing
+@parameterized @kwdef struct StochasticStirring{NF, VectorType} <: AbstractForcing
         
     "Number of latitude rings, used for latitudinal mask"
     nlat::Int
 
     "[OPTION] Stirring strength A [1/s²]"
-    strength::NF = 1e-9
+    @param strength::NF = 1e-9
 
     "[OPTION] Stirring latitude [˚N]"
-    latitude::NF = 45
+    @param latitude::NF = 45 (bounds=-90..90,)
 
     "[OPTION] Stirring width [˚]"
-    width::NF = 24
+    @param width::NF = 24 (bounds=Positive,)
     
     # TO BE INITIALISED        
     "Latitudinal mask, confined to mid-latitude storm track by default [1]"
@@ -170,14 +160,6 @@ end
 function StochasticStirring(SG::SpectralGrid; kwargs...)
     return StochasticStirring{SG.NF, SG.VectorType}(; nlat=SG.nlat, kwargs...)
 end
-
-parameters(forcing::StochasticStirring; kwargs...) =
-    (
-        strength = parameterof(forcing, :strength; desc="Stirring strength A [1/s²]", kwargs...),
-        latitude = parameterof(forcing, :latitude; desc="Stirring latitude [˚N]", kwargs...),
-        width = parameterof(forcing, :width; desc="Stirring width [˚]", kwargs...),
-        lat_mask = parameterof(forcing, :lat_mask; desc="Latitudinal mask [1]", kwargs...),
-    )
 
 function initialize!(
     forcing::StochasticStirring,
@@ -235,21 +217,15 @@ export KolmogorovFlow
 """Kolmogorov flow forcing. Fields are
 $(TYPEDFIELDS)
 """
-@kwdef mutable struct KolmogorovFlow{NF} <: AbstractForcing
+@parameterized @kwdef mutable struct KolmogorovFlow{NF} <: AbstractForcing
     "[OPTION] Strength of forcing [1/s²]"
-    strength::NF = 3e-12
+    @param strength::NF = 3e-12
 
     "[OPTION] Wavenumber of forcing in meridional direction (pole to pole)"
-    wavenumber::NF = 8
+    @param wavenumber::NF = 8 (bounds=Positive,)
 end
 
 KolmogorovFlow(SG::SpectralGrid; kwargs...) = KolmogorovFlow{SG.NF}(; kwargs...)
-
-parameters(forcing::KolmogorovFlow; kwargs...) =
-    (
-        strength = parameterof(forcing, :strength; desc="Strength of forcing [1/s²]", kwargs...),
-        wavenumber = parameterof(forcing, :wavenumber; desc="Wavenumber of forcing in meridional direction (pole to pole)", kwargs...),
-    )
 
 initialize!(::KolmogorovFlow, ::AbstractModel) = nothing
 

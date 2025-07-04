@@ -9,7 +9,7 @@ Base.@kwdef struct SpeedyParam{NF<:AbstractFloat} <: AbstractParam{NF}
     value::NF = NaN
     
     "numerical domain on which the parameter is defined"
-    bounds::Domain = RealLine()
+    bounds::Domain = Unbounded
 
     "human-readable description of the parameter"
     desc::String = ""
@@ -20,7 +20,7 @@ Base.@kwdef struct SpeedyParam{NF<:AbstractFloat} <: AbstractParam{NF}
     # default constructor
     SpeedyParam(value::NF, bounds::Domain, desc::String, attrs::NamedTuple) where {NF<:AbstractFloat} = new{NF}(value, bounds, desc, attrs)
     # convenience constructor
-    SpeedyParam(value::NF; bounds=RealLine(), desc="", attrs...) where {NF<:AbstractFloat} = new{NF}(value, bounds, desc, NamedTuple(attrs))
+    SpeedyParam(value::NF; bounds=Unbounded, desc="", attrs...) where {NF<:AbstractFloat} = new{NF}(value, bounds, desc, NamedTuple(attrs))
     # mandatory constructor from ModelParameters that allows for automated reconstruction
     SpeedyParam(nt::NamedTuple) = new{typeof(nt.val)}(nt.val, nt.bounds, nt.desc, _attrs(nt))
 end
@@ -71,17 +71,25 @@ struct SpeedyParams{NT<:NamedTuple} <: ModelParameters.AbstractModel
     SpeedyParams(; params...) = SpeedyParams((; params...))
 end
 
+"""
+    $SIGNATURES
+
+Simple recursive dispatch algorithm for unpacking nested named tuples of `SpeedyParams`
+"""
+unpack_params(x) = x
+unpack_params(nt::NamedTuple) = map(unpack_params, nt)
+unpack_params(params::SpeedyParams) = unpack_params(parent(params))
+
 # Base overridese for SpeedyParams
 
 ## parameter subsets
 Base.getindex(ps::SpeedyParams, param_label::String) = getindex(ps, [param_label])
 @inline function Base.getindex(ps::SpeedyParams, param_labels::Vector{String})
-    # extract labels from ComponentVector and 
+    # extract labels from ComponentVector 
     ls = labels(vec(ps))
-    idx = map(i -> findfirst(==(i), ls), param_labels)
+    idx = reduce(vcat, map(query -> findall(key -> startswith(key, query), ls), param_labels))
     # check if any names were not found
-    unmatched_idx = findfirst(isnothing, idx)
-    @assert isnothing(unmatched_idx) "$(param_labels[unmatched_idx]) is not a valid parameter index"
+    length(idx) > 0 || @warn "no parameters matched to labels: $(param_labels)"
     # get flattened parameter tuple
     params = ModelParameters.params(ps)
     # get tuple of selected parameters
@@ -123,7 +131,11 @@ Base.setindex!(ps::SpeedyParams, x, nm::Symbol) = setindex!(ps, x, :, nm)
 end
 
 Base.keys(params::SpeedyParams) = (:idx, :fieldname, keys(first(params))...)
-Base.vec(params::SpeedyParams) = ComponentArray(parent(params))
+
+function Base.vec(params::SpeedyParams)
+    # recursively unpack params and build component vector
+    return ComponentArray(unpack_params(params))
+end
 
 # Override internal ModelParameters method _columntypes to condense type names in table schema (just to look nicer)
 # TODO: propose this change upstream in ModelParameters.jl
@@ -187,27 +199,60 @@ Convenience macro for creating "parameterized" `struct`s. Fields can be marked a
 end
 ```
 where here `x` will be treated as a parameter field and `y` will not. Parameters will be then automatically
-generated in a corresponding `parameters(::Foo)` method definition. Additional parameter attributes can be
-supplied as keywords after the parameter, e.g. `@param p::T = 0.5 bounds=UnitInterval()` or
-`@param p::T = 0.5 (bounds=UnitInterval(), constant=false)`.
+generated in a corresponding `parameters(::Foo)` method definition with descriptions set to the corresponding
+struct field docstring, if present. Additional parameter attributes can be supplied as keywords after the parameter,
+e.g. `@param p::T = 0.5 bounds=UnitInterval()` or `@param p::T = 0.5 (bounds=UnitInterval(), constant=false)`.
+
+## Known limitations
+
+This macro will fail to behave correctly in the following known corner cases:
+
+    1. **Untyped struct fields without default values**. The macro will not work if the struct has untyped
+    fields without default values specified using the `@kwdef` syntax. This is because untyped fields are
+    not distinguishable in the expression tree from symbols in other expressions (such as typed field definitions).
+    This problem can be avoided by always specifying types on struct fields (which should always be done anyway!).
+
+    2. **`@kwdef` struct with a single parameter field and no default value**. `@parameterized` has a buggy
+    interaction with `@kwdef` in this corner case:
+    ```julia
+    @parameterized @kwdef struct Foo{T}
+        @param x::T
+    end
+    ```
+    where the auto-generated constructors erroneously duplicate `T` as a function and type parameter. This is, however,
+    a fairly meaningless corner-case since there is no purpose in marking this struct as `@kwdef` if no default assignments
+    are made!
+
+If you encounter any other weird interactions or behaviors, please raise an issue.
 """
 macro parameterized(expr)
+    function typedef2sig(typedef)
+        if MacroTools.@capture(typedef, T_ <: super__)
+            T
+        else
+            typedef
+        end
+    end
     # process struct definition
     ## first declare local variables for capturing metadata
-    paraminfo = []
+    params = []
     lastdoc = nothing
-    typename = nothing
+    typedef = nothing
+    has_kwdef = false
+    # defval = nothing
     ## prewalk (top-down) over expression tree; note that there is some danger of infinite
     ## recursion with prewalk since it will descend into the returned expression. However,
     ## this is not a problem here since we only deconstruct/reduce the @param expressions.
     new_expr = MacroTools.prewalk(expr) do ex
-        # case 1: struct definition (top level)
-        if isa(ex, Expr) && ex.head == :struct
-            # type signature is in second argument;
-            # use namify to extract type name (discard type parameters)
-            typename = MacroTools.namify(ex.args[2])
+        if MacroTools.@capture(ex, @kwdef structdef__) || MacroTools.@capture(ex, Base.@kwdef structdef__)
+            has_kwdef = true
             ex
-        # case 2: parameterized field definition
+        # struct definition (top level)
+        elseif isa(ex, Expr) && ex.head == :struct
+            # extract type definition from second argument
+            typedef = ex.args[2]
+            ex
+        # case 1: parameterized field definition
         elseif MacroTools.@capture(ex, @param fieldname_::FT_ = defval_ attrs__) || MacroTools.@capture(ex, @param fieldname_::FT_ attrs__)
             # use last seen docstring as description, if present
             desc = isnothing(lastdoc) ? "" : lastdoc
@@ -219,16 +264,24 @@ macro parameterized(expr)
             else
                 error("invalid syntax for parameter attributes: $(QuoteNode(attrs))")
             end
-            # then reset to nothing to prevent duplication
+            paraminfo = (name=fieldname, type=FT, desc=desc, attrs=attrs)
+            push!(params, paraminfo)
+            # reset lastdoc to nothing to prevent duplication
             lastdoc = nothing
-            push!(paraminfo, (name=fieldname, type=FT, desc=desc, attrs=attrs))
-            :($fieldname::$FT = $defval)
-        # case 3: non-parameterized field definition
-        elseif MacroTools.@capture(ex, fieldname_::FT_ = defval_) || MacroTools.@capture(ex, fieldname_::FT_)
+            isnothing(defval) ? :($fieldname::$FT) : :($fieldname::$FT = $defval)
+        # case 1a: untyped parameter
+        elseif MacroTools.@capture(ex, @param fieldname_ = defval_ attrs__) || MacroTools.@capture(ex, @param fieldname_ attrs__)
+            lastdoc = nothing
+            @warn "ignoring untyped parameter $fieldname"
+            isnothing(defval) ? :($fieldname) : :($fieldname = $defval)
+        # case 2: non-parameter field
+        elseif MacroTools.@capture(ex, fieldname_::FT_ = defval_) ||
+            MacroTools.@capture(ex, fieldname_::FT_) ||
+            MacroTools.@capture(ex, fieldname_ = defval_)
             # reset lastdoc variable to prevent confusing docstrings between parameteter and non-parameter fields
             lastdoc = nothing
             ex
-        # case 4: field documentation
+        # case 3: field documentation
         elseif MacroTools.@capture(ex, docs_String)
             # store in lastdoc field
             lastdoc = docs
@@ -238,16 +291,29 @@ macro parameterized(expr)
             ex
         end
     end
-    # emit parametersof calls for each parsed parameter
-    param_constructors = map(paraminfo) do info
-        :($(QuoteNode(info.name)) => parameterof(obj, $(QuoteNode(info.name)); desc=$(info.desc), $(info.attrs)..., kwargs...))
+    # extract type info
+    typename = MacroTools.namify(typedef)
+    typesig = typedef2sig(typedef)
+    # emit parameterof calls for each parsed parameter
+    param_constructors = map(params) do info
+        :($(QuoteNode(info.name)) => SpeedyWeather.parameterof(obj, $(QuoteNode(info.name)); desc=$(info.desc), $(info.attrs)..., kwargs...))
     end
     # construct final expression block
     block = Expr(:block)
     ## 1. struct definition
     push!(block.args, esc(new_expr))
     ## 2. parameters method dispatch
-    push!(block.args, esc(:(parameters(obj::$(typename); kwargs...) = SpeedyParams((; $(param_constructors...))))))
+    push!(block.args, esc(:(SpeedyWeather.parameters(obj::$(typename); kwargs...) = SpeedyWeather.SpeedyParams((; $(param_constructors...))))))
+    ## 3. override ConstructionBase.setproperties if @kwdef is used; we do this so that internal logic in the keyword defaults gets preserved
+    if has_kwdef && typesig.head == :curly
+        # handle type arguments; first extract argument names (discarding upper type bounds)
+        typeargs = map(typedef2sig, typesig.args[2:end])
+        # then build method signature
+        push!(block.args, esc(:(setproperties(obj::$(typename){$(typeargs...)}, patch::NamedTuple) where {$(typesig.args[2:end]...)} = $(typename){$(typeargs...)}(; patch...))))
+    elseif has_kwdef
+        # otherwise we can just use the typename
+        push!(block.args, esc(:(setproperties(obj::$(typename), patch::NamedTuple) = $(typename)(; patch...))))
+    end
     return block
 end
 
@@ -264,12 +330,13 @@ _attrs(nt::NamedTuple) = nt[filter(k -> k ∉ (:val,:bounds,:desc), keys(nt))]
 Recursively filters out all values from a (possibly nested) named tuple `nt` for which `selector`
 returns true.
 """
+_selectrecursive(selector, ps::SpeedyParams) = _selectrecursive(selector, parent(ps))
 _selectrecursive(selector, x) = selector(x) ? x : nothing
 function _selectrecursive(selector, nt::NamedTuple)
     # recursively apply selector
     new_nt = map(x -> _selectrecursive(selector, x), nt)
     # filter out all nothing values
     selected_keys = filter(k -> !isnothing(new_nt[k]), keys(new_nt))
-    # construct filtered named tuple
-    return NamedTuple{selected_keys}(map(k -> new_nt[k], selected_keys))
+    # construct named tuple from filtered keys or return nothing if no keys were selected
+    return length(selected_keys) > 0 ? NamedTuple{selected_keys}(map(k -> new_nt[k], selected_keys)) : nothing
 end
