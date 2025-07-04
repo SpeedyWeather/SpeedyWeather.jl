@@ -122,10 +122,12 @@ function SpeedyTransforms._legendre!(
         blocks
     )
     
+    #TODO: suboptimal adjustment to GPU made to avoid scalar indexing here. 
+    #TODO: either integrate it into the kernel or write a new kernel for it
     if unscale_coslat
         @inbounds for j in 1:nlat_half          # symmetry: loop over northern latitudes only
-            g_north[:, nlayers, j] .*= coslat⁻¹[j]        # scale in place
-            g_south[:, nlayers, j] .*= coslat⁻¹[j]
+            g_north[:, nlayers, j] .*= coslat⁻¹[j:j]        # scale in place
+            g_south[:, nlayers, j] .*= coslat⁻¹[j:j]
         end
     end
 end

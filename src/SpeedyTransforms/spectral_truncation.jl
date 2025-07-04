@@ -8,26 +8,38 @@ function spectral_truncation!(
     ltrunc::Integer,                # truncate to max degree ltrunc (0-based)
     mtrunc::Integer,                # truncate to max order mtrunc (0-based)
 )   
-    lmax, mmax = size(alms, OneBased; as=Matrix)   # 1-based degree l, order m of the legendre polynomials
-
+    (; l_indices, m_indices) = alms.spectrum
+    
+    # Convert to 1-based indexing
     ltrunc += 1     # 0-based to 1-based
     mtrunc += 1
-
-    for k in eachmatrix(alms)
-        lm = 1
-        for m in 1:mmax                 # order m = 0, mmax but 1-based
-            for l in m:lmax             # degree l = 0, lmax but 1-based
-                if  l > ltrunc ||       # and degrees l>ltrunc
-                    m > mtrunc          # and orders m>mtrunc
-
-                    alms[lm, k] = 0     # set that coefficient to zero
-                end
-                lm += 1
-            end
-        end
-    end
+    
+    # TODO: there's currently a bug that prevents this from working on GPU without the .data
+    # that's mostly related to the custom broadcasting
+    alms.data[(l_indices .> ltrunc) .|| (m_indices .> mtrunc), :] .= 0
+    
     return alms
 end
+
+# version just for matrices with the colon in the indexing
+function spectral_truncation!(
+    alms::LowerTriangularMatrix,     # spectral field to be truncated
+    ltrunc::Integer,                # truncate to max degree ltrunc (0-based)
+    mtrunc::Integer,                # truncate to max order mtrunc (0-based)
+)   
+    (; l_indices, m_indices) = alms.spectrum
+    
+    # Convert to 1-based indexing
+    ltrunc += 1     # 0-based to 1-based
+    mtrunc += 1
+    
+    # TODO: there's currently a bug that prevents this from working on GPU without the .data
+    # that's mostly related to the custom broadcasting
+    alms.data[(l_indices .> ltrunc) .|| (m_indices .> mtrunc)] .= 0
+    
+    return alms
+end
+
 
 """
 $(TYPEDSIGNATURES)

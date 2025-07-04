@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- A minimal barotropic model now runs on GPU [#733](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/733)
+- 
 ## v0.16
 
 - Move full differentiability tests to separate CI workflow [#759](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/759)
