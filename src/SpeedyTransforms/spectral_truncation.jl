@@ -14,7 +14,9 @@ function spectral_truncation!(
     ltrunc += 1     # 0-based to 1-based
     mtrunc += 1
     
-    alms[(l_indices .> ltrunc) .|| (m_indices .> mtrunc), :] .= 0
+    # TODO: there's currently a bug that prevents this from working on GPU without the .data
+    # that's mostly related to the custom broadcasting
+    alms.data[(l_indices .> ltrunc) .|| (m_indices .> mtrunc), :] .= 0
     
     return alms
 end
@@ -31,7 +33,9 @@ function spectral_truncation!(
     ltrunc += 1     # 0-based to 1-based
     mtrunc += 1
     
-    alms[(l_indices .> ltrunc) .|| (m_indices .> mtrunc)] .= 0
+    # TODO: there's currently a bug that prevents this from working on GPU without the .data
+    # that's mostly related to the custom broadcasting
+    alms.data[(l_indices .> ltrunc) .|| (m_indices .> mtrunc)] .= 0
     
     return alms
 end
