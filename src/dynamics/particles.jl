@@ -95,18 +95,22 @@ export move
 """$(TYPEDSIGNATURES)
 Move a particle with increments (dlon, dlat, dσ) in those respective coordinates."""
 @inline function move(p::Particle{NF}, dlon, dlat, dσ) where NF
-    if active(p)
+    if isactive(p)
         (;lon, lat, σ) = p
-        Particle{NF}(p.active, lon+dlon, lat+dlat, σ+dσ)
-    end 
+        return Particle{NF}(p.active, lon+dlon, lat+dlat, σ+dσ)
+    else 
+        return p
+    end
 end
 
 """$(TYPEDSIGNATURES)
 Move a particle with increments (dlon, dlat) in 2D. No movement in vertical σ."""
 @inline function move(p::Particle{NF}, dlon, dlat) where NF
-    if active(p)
+    if isactive(p)
         (;lon, lat, σ) = p
-        Particle{NF}(p.active, lon+dlon, lat+dlat, σ)
+        return Particle{NF}(p.active, lon+dlon, lat+dlat, σ)
+    else 
+        return p
     end
 end
 
@@ -134,7 +138,7 @@ function ismod(p::Particle)
     return valid
 end
 
-export activate, deactivate, active
+export activate, deactivate, isactive
 
 """$(TYPEDSIGNATURES)
 Activate particle. Active particles can move."""
@@ -146,4 +150,4 @@ deactivate(p::Particle{NF}) where NF = Particle{NF}(false, p.lon, p.lat, p.σ)
 
 """$(TYPEDSIGNATURES)
 Check whether particle is active."""
-active(p::Particle{NF}) where NF = p.active
+isactive(p::Particle{NF}) where NF = p.active

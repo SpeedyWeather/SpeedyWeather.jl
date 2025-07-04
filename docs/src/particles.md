@@ -151,7 +151,7 @@ and so
 ```@example particle
 activate(p)
 ```
-or check its activity by [`active(::Particle)`](@ref) returning `true` or `false`.
+or check its activity by [`isactive(::Particle)`](@ref) returning `true` or `false`.
 The zero-element of the [`Particle`](@ref) type is
 ```@example particle
 zero(Particle)

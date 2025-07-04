@@ -138,7 +138,7 @@ function particle_advection!(
     lats = diagn.particles.v
 
     for i in eachindex(particles, u_old, v_old)
-        active(particles[i]) || continue
+        isactive(particles[i]) || continue
         # sum up Heun's first term in 1/2*Δt*(uv_old + uv_new) on the fly
         # use only Δt/2
         particles[i] = advect_2D(particles[i], u_old[i], v_old[i], Δt_half)
@@ -166,7 +166,7 @@ function particle_advection!(
     interpolate!(v_new, v_grid, interpolator)
 
     for i in eachindex(particles, u_new, v_new)
-        active(particles[i]) || continue
+        isactive(particles[i]) || continue
 
         # sum up Heun's 2nd term in 1/2*Δt*(uv_old + uv_new) on the fly
         particles[i] = advect_2D(particles[i], u_new[i], v_new[i], Δt_half)
