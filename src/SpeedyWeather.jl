@@ -3,14 +3,13 @@ module SpeedyWeather
 # STRUCTURE
 using DocStringExtensions
 
+import ConstructionBase: constructorof, getproperties, setproperties
+
 # NUMERICS
 import Primes
 import Random
 import LinearAlgebra: LinearAlgebra, Diagonal
 export rotate, rotate!
-
-# ARRAYS
-import ComponentArrays: ComponentArray, ComponentVector, labels, label2index, getaxes
 
 # GPU, PARALLEL
 import Base.Threads: Threads, @threads
@@ -28,20 +27,9 @@ import JLD2: jldopen, jldsave, JLDFile
 import CodecZlib
 import BitInformation: round, round!
 import ProgressMeter
-import ModelParameters: ModelParameters, AbstractParam
-import ConstructionBase: constructorof, getproperties, setproperties
 
-# DOMAINS
-import DomainSets: Domain, RealLine, NonnegativeRealLine, PositiveRealLine, NegativeRealLine, UnitInterval
+# INTERVALS
 using DomainSets.IntervalSets
-
-# UTILITIES
-import MacroTools
-
-const Unbounded = RealLine()
-const Positive = PositiveRealLine()
-const Nonnegative = NonnegativeRealLine()
-const Negative = NegativeRealLine()
 
 # to avoid a `using Dates` to pass on DateTime arguments
 export DateTime, Millisecond, Second, Minute, Hour, Day, Week, Month, Year, Century, Millenium
@@ -59,6 +47,11 @@ export on_architecture, architecture
 # import utilities
 include("Utils/Utils.jl")
 using .Utils
+
+import .Utils: parameters
+
+# export user-facing parameter handling types and methods
+export  SpeedyParam, SpeedyParams, parameters, stripparams
 
 # LowerTriangularArrays for spherical harmonics
 export  LowerTriangularArrays, 
@@ -110,11 +103,6 @@ export power_spectrum
 include("SpeedyTransforms/SpeedyTransforms.jl")
 using .SpeedyTransforms
 import .SpeedyTransforms: prettymemory
-
-# Parameter utilities
-export SpeedyParam, SpeedyParams, parameters, bounds, description
-
-include("parameters.jl")
 
 # to be defined in GeoMakie extension
 export globe, animate
