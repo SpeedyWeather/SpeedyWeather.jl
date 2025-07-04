@@ -39,7 +39,7 @@ using DomainSets.IntervalSets
 import MacroTools
 
 const Unbounded = RealLine()
-const StrictlyPositive = PositiveRealLine()
+const Positive = PositiveRealLine()
 const Nonnegative = NonnegativeRealLine()
 const Negative = NegativeRealLine()
 
