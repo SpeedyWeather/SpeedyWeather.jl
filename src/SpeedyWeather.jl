@@ -10,7 +10,7 @@ import LinearAlgebra: LinearAlgebra, Diagonal
 export rotate, rotate!
 
 # ARRAYS
-import ComponentArrays: ComponentArray, labels, label2index, getaxes
+import ComponentArrays: ComponentArray, ComponentVector, labels, label2index, getaxes
 
 # GPU, PARALLEL
 import Base.Threads: Threads, @threads
