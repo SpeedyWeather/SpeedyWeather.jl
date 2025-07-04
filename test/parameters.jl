@@ -1,7 +1,8 @@
 using ComponentArrays: ComponentVector
 using DomainSets: Domain, RealLine, UnitInterval
-using ModelParameters
-using SpeedyWeather: value, bounds, description, attributes, parameters, reconstruct
+using SpeedyWeather: value, bounds, description, attributes, parameters, reconstruct, stripparams
+
+import ModelParameters: ModelParameters, Model, Param, params, update
 
 @testset "SpeedyParam" begin
     # Test basic construction and getter functions
