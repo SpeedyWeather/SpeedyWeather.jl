@@ -1,4 +1,4 @@
-# SpeedyWeather.jl <img src="https://github.com/user-attachments/assets/977f5f46-ccd3-49d8-950a-8b619df863c3" width="100" />
+# SpeedyWeather.jl <img src="https://github.com/user-attachments/assets/7259f148-a920-4f79-adb2-6659e0cf917b" width="100" />
 
 
 [![CI](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI.yml) 
@@ -17,6 +17,8 @@ With minimal code redundancies it supports
 - Particle advection in 2D for all equations
 - Tracer advection in 2D/3D that can be added, deleted, (de)activated anytime
 - Physics parameterizations for convection, precipitation, boundary layer, etc.
+- Various more or less realistic planets and what-if scenarios by easily modifying initial and boundary conditions
+- A slab ocean and a 2-layer land bucket model
 
 **Numerics and computing**
 - Different spatial grids (full and octahedral grids, Gaussian and Clenshaw-Curtis, HEALPix, OctaHEALPix)
@@ -47,24 +49,27 @@ We decided to use Julia because it combines the best of Fortran and Python: With
 we can interactively run SpeedyWeather but also extend it, inspect its components, evaluate
 individual terms of the equations, and analyse and visualise output on the fly.
 
-We do not aim to make SpeedyWeather an atmospheric model similar to the production-ready models used
-in weather forecasting, at least not at the cost of our current level of interactivity and ease of
-use or extensibility. If someone wants to implement a cloud parameterization that is very complicated
-and expensive to run then they are more than encouraged to do so, but it will probably live in
-its own repository and we are happy to provide a general interface to do so. But SpeedyWeather's
-defaults should be balanced: Physically accurate yet general; as independently as possible from other
-components and parameter choices; not too complicated to implement and understand; and computationally cheap.
+We do not necessarily aim to make SpeedyWeather an atmospheric model for the purpose of production-ready
+weather forecasting, at least not at the cost of our current level of interactivity and ease of
+use or extensibility. If someone wants to implement a parameterization that is very complicated
+and expensive to run then they are more than encouraged to do so. We are happy to provide a general interface
+to do so and support you to move this to its own repository, leveraging modularity. This may note become
+the default to not oppose the "easy and fast by default"-philosophy but that does not mean we don't
+appreciate your efforts or reject your contributions. In fact, we would love to show case more how
+easy to complex, laptop to HPC can work seamlessly within the same model.
+But SpeedyWeather's defaults should be balanced: Physically accurate yet general; as independently as possible
+from other components and parameter choices; not too complicated to implement and understand; and computationally cheap.
 Finding a good balance is difficult but we try our best. 
 
 This means in practice, that while SpeedyWeather is currently developed, many more physical processes
 and other features will be implemented. On our TODO is
 
-- A (somewhat) realistic radiation scheme with a daily cycle, depending on clouds and humidity
-- Longwave radiation that depends on (global) CO2 concentrations to represent climate change
-- Slab ocean and a (seasonal cycle) sea ice interacting with radiation
-- Exoplanet support
+- A more realistic radiation scheme depending on clouds and humidity
+- Longwave radiation that depends on (globally averaged) greenhouse gas concentrations to represent climate change
+- Sea ice, snow affecting surface fluxes including albedo
+- Exoplanet support with more flexibility on the atmospheric composition
 - 3D particle advection
-- single GPU support to accelerate medium to high resolution simulations
+- single GPU and CPU multi-threading support via KernelAbstractions
 - differentiability with Enzyme
 
 ## Contributing
@@ -166,6 +171,8 @@ The physical parametrizations were then added by Franco Molteni, Fred Kucharski,
 afterwards while the model was still written in Fortran77.
 Around 2018-19, SPEEDY was then translated to Fortran90 by Sam Hatfield in [speedy.f90](https://github.com/samhatfield/speedy.f90).
 SpeedyWeather.jl is then adopted from [first translations to Julia](https://github.com/samhatfield/speedy.jl) by Sam Hatfield.
+All these past creators and contributors are strongly acknowledged. Thank you for letting us use your efforts to create
+intermediate-complexity climate models as a conceptual launchpad for SpeedyWeather!
 
 ## Submodules
 
@@ -216,6 +223,9 @@ at a small accuracy sacrifice of the then inexact spectral transforms.
 
 On older CPUs, like the Intel CPU MacBooks, the 1800 SYPD drop to about 500-600 SYPD,
 which is still 2x faster than Fortran SPEEDY which is reported to reach 240 SYPD.
+With GPU support being a work in progress we do not expect a performance increase for 
+the lower resolutions but aim to provide the ability to also run the model very efficiently
+at high resolution!
 
 For an overview of typical simulation speeds a user can expect under different model setups see
 [Benchmarks](https://github.com/SpeedyWeather/SpeedyWeather.jl/blob/main/benchmark).

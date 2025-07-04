@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.16
+
 - Move full differentiability tests to separate CI workflow [#759](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/759)
 - Type stability for particle advection [#757](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/757)
 - Scratch memory for SpeedyTransforms now part of DiagnosticVariables [#680](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/680/)
