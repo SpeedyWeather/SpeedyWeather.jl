@@ -30,7 +30,9 @@ end
     @test isa(ps, SpeedyParams) && SpeedyParams <: ModelParameters.AbstractModel
     @test values(stripparams(ps)) == pvals
     @test ps[:val] == pvals
-    @test all(map(p -> p.category == "planet", ps))
+    # this fails with an indexing error... looks like a bug in ModelParameters.jl;
+    # @test all(map(p -> p.category == "planet", ps))
+    @test all(map(p -> p.category == "planet", params(ps)))
     # test for nested model type
     spectral_grid = SpectralGrid(trunc=31, nlayers=1)   # define resolution
     model = BarotropicModel(spectral_grid)
