@@ -67,6 +67,11 @@ module Architectures
     architecture(::Type{<:Array}) = CPU()
     architecture(a::SubArray) = architecture(parent(a))
 
+    """
+        architecture(a::AbstractArchitecture)
+
+    Return the architecture of `a`.
+    """
     architecture(a::AbstractArchitecture) = a
 
     """
@@ -78,8 +83,8 @@ module Architectures
     array_type(::Type{<:CPU}) = Array
 
     """
-    array_type(::AbstractArchitecture, NF::Type, N::Int)
-
+        array_type(::AbstractArchitecture, NF::Type, N::Int)
+  
     Return the concrete array type that's used with the architecture 
     for a number type `NF` and dimension `N`.
     """

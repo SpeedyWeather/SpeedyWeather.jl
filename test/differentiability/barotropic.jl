@@ -18,6 +18,9 @@
     diagn_copy = deepcopy(diagn)
     progn_copy = deepcopy(progn)
 
+    diagn_copy_2 = deepcopy(diagn) # 2nd copy for Const activity test 
+    progn_copy_2 = deepcopy(progn)
+
     d_progn = zero(progn)
     d_diag = make_zero(diagn)
 
@@ -30,7 +33,7 @@
     # for the full timestep, we need a bit higher precision 
     fd_vjp = FiniteDifferences.j′vp(central_fdm(15,1), x -> timestep_oop(x, deepcopy(diagn_copy), dt, deepcopy(model)), deepcopy(dprogn_2), deepcopy(progn_copy))
 
-    # test that we can differentiate wrt an IC 
+    # test that we can differentiate wrt to everything  
     autodiff(Reverse, timestep_oop!, Const, Duplicated(progn_new, dprogn_new), Duplicated(progn, d_progn), Duplicated(diagn, d_diag), Const(dt), Duplicated(model, make_zero(model)))
 
     # nonzero gradient
@@ -39,7 +42,22 @@
     @test isapprox(to_vec(fd_vjp[1])[1], to_vec(d_progn)[1], rtol=0.05) # we have to go really quite low with the tolerances here
     @test mean(abs.(to_vec(fd_vjp[1])[1] - to_vec(d_progn)[1])) < 0.002 # so we check a few extra statistics
     @test maximum(to_vec(fd_vjp[1].vor)[1] - to_vec(d_progn.vor)[1]) < 0.05
+    
+    # test that we can differentiante with Const(Model) only wrt to the state
+    d_progn = zero(progn)
+    d_diag = make_zero(diagn)
 
+    progn_new = zero(progn)
+    dprogn_new = one(progn) # seed 
+
+    autodiff(set_runtime_activity(Reverse), timestep_oop!, Const, Duplicated(progn_new, dprogn_new), Duplicated(progn_copy_2, d_progn), Duplicated(diagn_copy_2, d_diag), Const(dt), Const(model))
+
+    # use the same FD comparision 
+
+    @test isapprox(to_vec(fd_vjp[1])[1], to_vec(d_progn)[1], rtol=0.05) # we have to go really quite low with the tolerances here
+    @test mean(abs.(to_vec(fd_vjp[1])[1] - to_vec(d_progn)[1])) < 0.002 # so we check a few extra statistics
+    @test maximum(to_vec(fd_vjp[1].vor)[1] - to_vec(d_progn.vor)[1]) < 0.05
+    
     #
     # We go individually through all components of the time stepping and check 
     # correctness
@@ -59,7 +77,7 @@
     progn_copy = deepcopy(progn)
     dprogn = make_zero(progn)
 
-    autodiff(Reverse, SpeedyWeather.dynamics_tendencies!, Const, Duplicated(diagn, ddiag), Duplicated(progn, dprogn), Const(lf2), Duplicated(model, make_zero(model)))
+    autodiff(Reverse, SpeedyWeather.dynamics_tendencies!, Const, Duplicated(diagn, ddiag), Duplicated(progn, dprogn), Const(lf2), Const(model))
 
     function dynamics_tendencies(diagn, progn, lf, model)
         diagn_new = deepcopy(diagn)
@@ -83,7 +101,7 @@
     progn_copy = deepcopy(progn)
     dprogn = make_zero(progn)
 
-    autodiff(Reverse, SpeedyWeather.horizontal_diffusion!, Const, Duplicated(diagn, ddiag), Duplicated(progn, dprogn), Const(model.horizontal_diffusion), Duplicated(model, make_zero(model)), Const(lf1))
+    autodiff(Reverse, SpeedyWeather.horizontal_diffusion!, Const, Duplicated(diagn, ddiag), Duplicated(progn, dprogn), Const(model.horizontal_diffusion), Const(model), Const(lf1))
 
     # FD comparision not necessary, we have the exact values 
     #function horizontal_diffusion(diagn, progn, diffusion, model, lf)
@@ -124,7 +142,6 @@
     tend = diagn.tendencies
     tend_copy = deepcopy(tend)
     dtend = make_zero(tend)
-    dmodel = make_zero(model)
 
     autodiff(Reverse, SpeedyWeather.leapfrog!, Const, Duplicated(progn, dprogn), Duplicated(tend, dtend), Const(dt), Const(lf1), Const(model))
 
@@ -177,6 +194,7 @@
     progn_copy = deepcopy(progn)
     dprogn = make_zero(progn)
 
+    autodiff(Reverse, SpeedyWeather.transform!, Const, Duplicated(diagn, ddiag), Duplicated(progn, dprogn), Const(lf2), Const(model))
     autodiff(Reverse, SpeedyWeather.transform!, Const, Duplicated(diagn, ddiag), Duplicated(progn, dprogn), Const(lf2), Duplicated(model, make_zero(model)))
 
     function transform_diagn(diag, progn, lf2, model)
@@ -189,5 +207,3 @@
     
     @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dprogn)[1],rtol=1e-2,atol=1e-2))
 end
-
-

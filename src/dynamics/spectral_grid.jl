@@ -169,6 +169,9 @@ function SpectralGrid(;
     # Spectral space
     spectrum = Spectrum(trunc+2, trunc+1, architecture=architecture)
     
+    # Spectral space
+    spectrum = Spectrum(trunc+2, trunc+1, architecture=architecture)
+    
     # Spectral variable types
     SpectralVariable2D = LowerTriangularArray{Complex{NF}, 1, array_type(architecture, Complex{NF}, 1), typeof(spectrum)}
     SpectralVariable3D = LowerTriangularArray{Complex{NF}, 2, array_type(architecture, Complex{NF}, 2), typeof(spectrum)}

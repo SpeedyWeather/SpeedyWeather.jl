@@ -3,6 +3,8 @@
 ## Unreleased
 
 - A minimal barotropic model now runs on GPU [#733](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/733)
+- Type stability for particle advection [#757](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/757)
+- Scratch memory for SpeedyTransforms now part of DiagnosticVariables [#680](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/680/)
 - Reworked GPU and utility code structure and added GPU versions of spectral gradients[#727](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/727)
 - Added `animate` to animate a NetCDF output file with GeoMakie [#755](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/755)
 - Makie v0.24 compatibility [#750](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/750)
