@@ -141,7 +141,7 @@ and latitude are wrapped into the reference range [0, 360˚E] and [-90˚N, 90˚N
 
 By default `Float32` is used, but providing coordinates in `Float64` will promote the
 type accordingly. Also by default, particles are _active_
-which is indicated by the 2nd parametric type of `Particle`, a boolean. Active particles
+which is indicated by the field `active` of `Particle`, a boolean. Active particles
 are moved following the equation above, but inactive particles are not. You can
 [`activate`](@ref) or [`deactivate`](@ref) a particle like so
 ```@example particle
@@ -161,7 +161,6 @@ and you can also create a random particle which uses a
 in latitude for an equal area-weighted uniform distribution over the sphere
 ```@example particle
 rand(Particle{Float32})         # specify number format
-rand(Particle{Float32, true})   # and active/inactive
 rand(Particle)                  # or not (defaults used instead)
 ```
 
@@ -173,24 +172,15 @@ zeros(Particle{Float32}, 3)
 rand(Particle{Float64}, 5)
 ```
 which is how particles are represented inside a SpeedyWeather [`Simulation`](@ref).
-Note that we have not specified whether the particles inside these vectors are
-active (e.g. `Particle{Float32, true}`) or inactive (e.g. `Particle{Float64, false}`)
-because that would generally force all particles in these vectors to be either
-active or inactive as specified such that
-```@example particle
-v = zeros(Particle{Float32, false}, 3)
-v[1] = Particle(lon = 134.0, lat = 23)      # conversion to inactive Particle{Float32, false}
-v
-```
-would not just convert from `Float64` to `Float32` but also
-from an active to an inactive particle. In SpeedyWeather all particles can be
-activated or deactivated at any time.
+Note that the default initial state of particles is active. In SpeedyWeather all 
+particles can be activated or deactivated at any time using the [`activate`](@ref)
+and [`deactivate`](@ref) functions.
 
 First, you create a [`SpectralGrid`](@ref) with the `nparticles` keyword
 ```@example particle
 spectral_grid = SpectralGrid(nparticles = 3)
 ```
-Then the particles live as `Vector{Particle}` inside the prognostic variables
+Then the particles live as `AbstractVector{Particle}` inside the prognostic variables
 ```@example particle
 model = BarotropicModel(spectral_grid)
 simulation = initialize!(model)
