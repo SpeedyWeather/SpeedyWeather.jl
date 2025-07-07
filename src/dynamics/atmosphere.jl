@@ -14,22 +14,22 @@ $(TYPEDFIELDS)"""
     @param mol_mass_vapour::NF = 18.0153 (bounds=Positive,)
 
     "specific heat at constant pressure cₚ [J/K/kg]"
-    @param heat_capacity::NF = 1004
+    @param heat_capacity::NF = 1004 (bounds=Nonnegative,)
 
     "universal gas constant [J/K/mol]"
-    @param R_gas::NF = 8.3145
+    R_gas::NF = 8.3145
 
     "specific gas constant for dry air [J/kg/K]"
-    @param R_dry::NF = 1000*R_gas/mol_mass_dry_air
+    @param R_dry::NF = 1000*R_gas/mol_mass_dry_air (bounds=Positive,)
 
     "specific gas constant for water vapour [J/kg/K]"
-    @param R_vapour::NF = 1000*R_gas/mol_mass_vapour
+    @param R_vapour::NF = 1000*R_gas/mol_mass_vapour (bounds=Positive,)
 
     "Ratio of gas constants: dry air / water vapour, often called ε [1]"
-    @param mol_ratio::NF = R_dry/R_vapour
+    @param mol_ratio::NF = R_dry/R_vapour (bounds=Positive,)
 
     "Virtual temperature Tᵥ calculation, Tᵥ = T(1 + μ*q), humidity q, absolute tempereature T"
-    @param μ_virt_temp::NF = (1-mol_ratio)/mol_ratio
+    @param μ_virt_temp::NF = (1-mol_ratio)/mol_ratio (bounds=Positive,)
 
     "= R_dry/cₚ, gas const for air over heat capacity"
     @param κ::NF = R_dry/heat_capacity
@@ -44,10 +44,10 @@ $(TYPEDFIELDS)"""
     @param latent_heat_sublimation::NF = 2801e3 (bounds=Nonnegative,)
 
     "stefan-Boltzmann constant [W/m²/K⁴]"
-    @param stefan_boltzmann::NF = 5.67e-8
+    stefan_boltzmann::NF = 5.67e-8
 
     "surface reference pressure [Pa]"
-    @param pres_ref::NF = 1e5
+    @param pres_ref::NF = 1e5 (bounds=Positive,)
 
     "surface reference temperature [K]"
     @param temp_ref::NF = 288 (bounds=Nonnegative,)

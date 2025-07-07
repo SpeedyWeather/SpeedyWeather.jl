@@ -27,7 +27,7 @@ end
 export QuadraticDrag
 @parameterized @kwdef mutable struct QuadraticDrag{NF} <: AbstractDrag
     "[OPTION] drag coefficient [1]"
-    @param c_D::NF = 1e-12         # TODO is this a good default?
+    @param c_D::NF = 1e-12 (bounds=Nonnegative,)    # TODO is this a good default?
 end
 
 QuadraticDrag(SG::SpectralGrid; kwargs...) = QuadraticDrag{SG.NF}(; kwargs...)
@@ -71,7 +71,7 @@ end
 export LinearVorticityDrag
 @parameterized @kwdef mutable struct LinearVorticityDrag{NF} <: AbstractDrag
     "[OPTION] drag coefficient [1/s]"
-    @param c::NF = 1e-7
+    @param c::NF = 1e-7 (bounds=Nonnegative,)
 end
 
 LinearVorticityDrag(SG::SpectralGrid; kwargs...) = LinearVorticityDrag{SG.NF}(; kwargs...)
