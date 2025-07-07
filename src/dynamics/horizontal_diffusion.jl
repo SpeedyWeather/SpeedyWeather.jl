@@ -146,44 +146,10 @@ function horizontal_diffusion!(
     @boundscheck lmax <= size(expl, 1) == size(impl, 1) || throw(BoundsError)
     @boundscheck nlayers <= size(expl, 2) == size(impl, 2) || throw(BoundsError)
 
-    @inbounds for k in eachmatrix(tendency, var)
-        lm = 0                      # running index
-        for m in 1:mmax             # loops over all columns/order m
-            for l in m:lmax
-                lm += 1             # single index lm corresponding to harmonic l, m
-                tendency[lm, k] = (tendency[lm, k] + expl[l, k]*var[lm, k]) * impl[l, k]
-            end
-        end
-    end
-end
-
-# temp. function barrier for GPU version 
-function horizontal_diffusion!(
-    tendency::LowerTriangularArray{NF, N, AT, <:Spectrum{<:GPU}},     # tendency of a
-    var::LowerTriangularArray{NF, N, AT, <:Spectrum{<:GPU}},          # spectral horizontal field to diffuse
-    expl::AbstractMatrix,               # explicit spectral damping (lmax x nlayers matrix)
-    impl::AbstractMatrix,               # implicit spectral damping (lmax x nlayers matrix)
-) where {NF, N, AT <: AbstractArray}
-    return _horizontal_diffusion_KA!(tendency, var, expl, impl)
-end
-
-"""$(TYPEDSIGNATURES)
-Kernel-based implementation of horizontal diffusion for a 2D field `var` in spectral space.
-Updates the tendency `tendency` with an implicitly calculated diffusion term.
-The implicit diffusion of the next time step is split into an explicit part `expl` and 
-an implicit part `impl`, such that both can be calculated in a single forward step."""
-function _horizontal_diffusion_KA!(
-    tendency::LowerTriangularArray,     # tendency of a
-    var::LowerTriangularArray,          # spectral horizontal field to diffuse
-    expl::AbstractMatrix,               # explicit spectral damping (lmax x nlayers matrix)
-    impl::AbstractMatrix,               # implicit spectral damping (lmax x nlayers matrix)
-)
-    # Launch the kernel
-    launch!(architecture(var), :lmk, size(var), _horizontal_diffusion_kernel!, 
+    launch!(architecture(tendency), :lmk, size(tendency), _horizontal_diffusion_kernel!, 
             tendency, var, expl, impl)
-    synchronize(architecture(var))
-    
-    return tendency
+    synchronize(architecture(tendency))
+
 end
 
 @kernel inbounds=true function _horizontal_diffusion_kernel!(
