@@ -121,15 +121,21 @@ function SpeedyTransforms._legendre!(
         threads, 
         blocks
     )
-    
-    #TODO: suboptimal adjustment to GPU made to avoid scalar indexing here. 
-    #TODO: either integrate it into the kernel or write a new kernel for it
-    if unscale_coslat
-        @inbounds for j in 1:nlat_half          # symmetry: loop over northern latitudes only
-            g_north[:, nlayers, j] .*= coslat⁻¹[j:j]        # scale in place
-            g_south[:, nlayers, j] .*= coslat⁻¹[j:j]
-        end
-    end
+    CUDA.synchronize()
+
+    launch!(architecture(g_north), :array_3d, size(g_north), unscale_costlat_kernel!, 
+            g_north, g_south, coslat⁻¹)
+    synchronize(architecture(g_north))
+end
+
+@kernel inbounds=true function unscale_costlat_kernel!(
+    g_north,
+    g_south,
+    @Const(coslat⁻¹),
+)
+    i, k, j = @index(Global, NTuple)
+    g_north[i, k, j] *= coslat⁻¹[j]
+    g_south[i, k, j] *= coslat⁻¹[j]
 end
 
 
