@@ -30,10 +30,10 @@ function setup_simulation(trunc::Int; nlayers::Int=1, arch=SpeedyWeather.CPU())
     )
     
     # Create a simulation with the model
-    simulation = CUDA.@allowscalar initialize!(model)
+    simulation = initialize!(model)
     
     # spin up 
-    run!(simulation, period=Day(10))
+    run!(simulation, period=Day(3))
     
     return simulation
 end
@@ -44,7 +44,7 @@ end
 Run a benchmark for the given simulation.
 Returns the median time in milliseconds.
 """
-function run_benchmark(simulation; ntrials=5, nsteps=400)
+function run_benchmark(simulation; ntrials=1, nsteps=1500)
     
     sypd = zeros(Float64, ntrials)
     for i in 1:ntrials
@@ -63,16 +63,20 @@ end
 Benchmark CPU vs GPU performance for the given truncations.
 Returns a tuple of (cpu_times, gpu_times) in milliseconds.
 """
-function benchmark_cpu_vs_gpu(truncations::Vector{Int}; nlayers::Int=1, ntrials::Int=10, nsteps::Int=100)
+function benchmark_cpu_vs_gpu(truncations::Vector{Int}; nlayers::Int=1, ntrials::Int=1, nsteps::Union{Int, Vector{Int}}=1000)
     cpu_times = Float64[]
     gpu_times = Float64[]
     
+    if typeof(nsteps) <: Int
+        nsteps = fill(nsteps, length(truncations))
+    end
+    
     println("Benchmarking CPU vs GPU performance for different truncations")
     println("===========================================================")
-    println("Truncation | CPU Time (ms) | GPU Time (ms) | Speedup")
+    println("Truncation | CPU Time (SYPD) | GPU Time (SYPD) | Speedup")
     println("----------|--------------|--------------|--------")
     
-    for trunc in truncations
+    for (i, trunc) in enumerate(truncations)
         # Skip GPU benchmarks if CUDA is not available
         if !CUDA.functional()
             println("CUDA is not available, skipping GPU benchmarks")
@@ -81,16 +85,16 @@ function benchmark_cpu_vs_gpu(truncations::Vector{Int}; nlayers::Int=1, ntrials:
         
         # CPU benchmark
         cpu_sim = setup_simulation(trunc, nlayers=nlayers, arch=SpeedyWeather.CPU())
-        cpu_time = run_benchmark(cpu_sim; ntrials=ntrials, nsteps=nsteps)
+        cpu_time = run_benchmark(cpu_sim; ntrials=ntrials, nsteps=nsteps[i])
         push!(cpu_times, cpu_time)
         
         # GPU benchmark 
         gpu_sim = setup_simulation(trunc, nlayers=nlayers, arch=SpeedyWeather.GPU())
-        gpu_time = run_benchmark(gpu_sim; ntrials=ntrials, nsteps=nsteps)
+        gpu_time = run_benchmark(gpu_sim; ntrials=ntrials, nsteps=nsteps[i])
         push!(gpu_times, gpu_time)
         
         # Calculate speedup
-        speedup = cpu_time / gpu_time
+        speedup = gpu_time / cpu_time
         
         # Print results
         @printf("%10d | %12.2f | %12.2f | %6.2fx\n", trunc, cpu_time, gpu_time, speedup)
@@ -111,7 +115,7 @@ function plot_results(truncations, cpu_times, gpu_times; filename="cpu_vs_gpu_be
         [cpu_times gpu_times], 
         label=["CPU" "GPU"],
         xlabel="Truncation",
-        ylabel="Time (ms)",
+        ylabel="Time (SYPD)",
         title="CPU vs GPU Performance",
         marker=:circle,
         markersize=4,
@@ -131,7 +135,7 @@ function plot_results(truncations, cpu_times, gpu_times; filename="cpu_vs_gpu_be
         speedups, 
         label="GPU Speedup",
         xlabel="Truncation",
-        ylabel="Speedup (CPU time / GPU time)",
+        ylabel="Speedup (GPU/CPU SYPD)",
         title="GPU Speedup Factor",
         marker=:circle,
         markersize=4,
@@ -159,10 +163,10 @@ end
 # Main benchmark function
 function main()
     # Define truncations to test
-    truncations = [31, 63, 127, 255, 511]
-    
+    truncations = [31, 63, 127, 255, 511, 1023]
+    nsteps = [1500, 1000, 500, 250, 100, 50]
     # Single layer benchmarks
-    cpu_times, gpu_times = benchmark_cpu_vs_gpu(truncations)
+    cpu_times, gpu_times = benchmark_cpu_vs_gpu(truncations; nsteps=nsteps)
     
     # Plot results
     plot_results(truncations, cpu_times, gpu_times)
