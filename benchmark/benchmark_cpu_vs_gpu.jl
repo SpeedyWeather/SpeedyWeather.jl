@@ -44,20 +44,17 @@ end
 Run a benchmark for the given simulation.
 Returns the median time in milliseconds.
 """
-function run_benchmark(simulation)
-    # Run a short simulation to compile everything
-    simulation.stop_time = 600  # 10 minutes in seconds
-    run!(simulation)
+function run_benchmark(simulation, ntrials=10, nsteps=100)
     
-    # Reset the simulation
-    simulation.clock.time = 0.0
-    simulation.stop_time = 3600  # 1 hour in seconds
-    
-    # Benchmark the simulation
-    b = @benchmark run!($simulation, steps=50)
-    
-    # Return the median time in milliseconds
-    return median(b.times) / 1_000_000
+    sypd = zeros(Float64, ntrials)
+    for i in 1:ntrials
+        run!(simulation, steps=nsteps)
+        time_elapsed = simulation.feedback.progress_meter.tlast - simulation.feedback.progress_meter.tinit
+        sypd[i] = simulation.time_stepping.Δt_sec*nsteps / (time_elapsed * 365.25)
+    end 
+
+    # Return the median time of SYPD
+    return median(sypd)
 end
 
 """
@@ -66,7 +63,7 @@ end
 Benchmark CPU vs GPU performance for the given truncations.
 Returns a tuple of (cpu_times, gpu_times) in milliseconds.
 """
-function benchmark_cpu_vs_gpu(truncations::Vector{Int}; nlayers::Int=1)
+function benchmark_cpu_vs_gpu(truncations::Vector{Int}; nlayers::Int=1, ntrials::Int=10, nsteps::Int=100)
     cpu_times = Float64[]
     gpu_times = Float64[]
     
@@ -84,12 +81,12 @@ function benchmark_cpu_vs_gpu(truncations::Vector{Int}; nlayers::Int=1)
         
         # CPU benchmark
         cpu_sim = setup_simulation(trunc, nlayers=nlayers, arch=SpeedyWeather.CPU())
-        cpu_time = run_benchmark(cpu_sim)
+        cpu_time = run_benchmark(cpu_sim, ntrials=ntrials, nsteps=nsteps)
         push!(cpu_times, cpu_time)
         
-        # GPU benchmark
+        # GPU benchmark 
         gpu_sim = setup_simulation(trunc, nlayers=nlayers, arch=SpeedyWeather.GPU())
-        gpu_time = run_benchmark(gpu_sim)
+        gpu_time = run_benchmark(gpu_sim, ntrials=ntrials, nsteps=nsteps)
         push!(gpu_times, gpu_time)
         
         # Calculate speedup
