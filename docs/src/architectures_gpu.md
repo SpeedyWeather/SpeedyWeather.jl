@@ -7,7 +7,8 @@ Some of SpeedyWeather.jl already supposts GPU acceleration, e.g. the barotropic 
 
 ```julia
 using SpeedyWeather, CUDA 
-spectral_grid = SpectralGrid(trunc=41, nlayers=1, architecture=SpeedyWeather.GPU())           
+architecture = SpeedyWeather.GPU()
+spectral_grid = SpectralGrid(trunc=41, nlayers=1, architecture=architecture)           
 
 CUDA.@allowscalar model = BarotropicModel(spectral_grid=spectral_grid)
 CUDA.@allowscalar simulation = initialize!(model)
@@ -18,7 +19,7 @@ Note that we need to use `CUDA.@allowscalar` here during initialization. Current
 
 ## Architectures Utilities 
 
-In order to easily transfer our data structures between CPU (e.g. for plotting and output) and GPU, we have the following utilities:
+In order to easily transfer our data structures between CPU (e.g. for plotting and output) and GPU, we have the following utilities that make can make use of the `architecture` object defined above:
 
 ```@docs
 SpeedyWeather.on_architecture
