@@ -123,20 +123,9 @@ function SpeedyTransforms._legendre!(
     )
     CUDA.synchronize()
 
-    launch!(architecture(g_north), :array_3d, size(g_north), unscale_costlat_kernel!, 
-            g_north, g_south, coslat⁻¹)
-    synchronize(architecture(g_north))
+    SpeedyWeather.SpeedyTransforms.unscale_coslat!(g_north, g_south, coslat⁻¹)
 end
 
-@kernel inbounds=true function unscale_costlat_kernel!(
-    g_north,
-    g_south,
-    @Const(coslat⁻¹),
-)
-    i, k, j = @index(Global, NTuple)
-    g_north[i, k, j] *= coslat⁻¹[j]
-    g_south[i, k, j] *= coslat⁻¹[j]
-end
 
 
 # (forward) Legendre kernel, called from _legendre!
