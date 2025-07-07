@@ -44,7 +44,7 @@ end
 Run a benchmark for the given simulation.
 Returns the median time in milliseconds.
 """
-function run_benchmark(simulation, ntrials=10, nsteps=100)
+function run_benchmark(simulation; ntrials=10, nsteps=100)
     
     sypd = zeros(Float64, ntrials)
     for i in 1:ntrials
@@ -81,12 +81,12 @@ function benchmark_cpu_vs_gpu(truncations::Vector{Int}; nlayers::Int=1, ntrials:
         
         # CPU benchmark
         cpu_sim = setup_simulation(trunc, nlayers=nlayers, arch=SpeedyWeather.CPU())
-        cpu_time = run_benchmark(cpu_sim, ntrials=ntrials, nsteps=nsteps)
+        cpu_time = run_benchmark(cpu_sim; ntrials=ntrials, nsteps=nsteps)
         push!(cpu_times, cpu_time)
         
         # GPU benchmark 
         gpu_sim = setup_simulation(trunc, nlayers=nlayers, arch=SpeedyWeather.GPU())
-        gpu_time = run_benchmark(gpu_sim, ntrials=ntrials, nsteps=nsteps)
+        gpu_time = run_benchmark(gpu_sim; ntrials=ntrials, nsteps=nsteps)
         push!(gpu_times, gpu_time)
         
         # Calculate speedup
