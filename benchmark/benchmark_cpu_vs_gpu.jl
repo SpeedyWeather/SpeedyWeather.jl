@@ -49,8 +49,8 @@ function run_benchmark(simulation; ntrials=10, nsteps=100)
     sypd = zeros(Float64, ntrials)
     for i in 1:ntrials
         run!(simulation, steps=nsteps)
-        time_elapsed = simulation.feedback.progress_meter.tlast - simulation.feedback.progress_meter.tinit
-        sypd[i] = simulation.time_stepping.Δt_sec*nsteps / (time_elapsed * 365.25)
+        time_elapsed = simulation.model.feedback.progress_meter.tlast - simulation.model.feedback.progress_meter.tinit
+        sypd[i] = simulation.model.time_stepping.Δt_sec*nsteps / (time_elapsed * 365.25)
     end 
 
     # Return the median time of SYPD
