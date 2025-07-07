@@ -95,7 +95,7 @@ function plot_results(truncations, cpu_times, gpu_times; filename="cpu_vs_gpu_be
     )
     
     # Calculate speedup
-    speedups = cpu_times ./ gpu_times
+    speedups = gpu_times ./ cpu_times
     
     # Create a speedup plot
     p2 = plot(
