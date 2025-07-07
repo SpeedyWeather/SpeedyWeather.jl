@@ -123,9 +123,10 @@ function SpeedyTransforms._legendre!(
     )
     CUDA.synchronize()
 
-    SpeedyWeather.SpeedyTransforms.unscale_coslat!(g_north, g_south, coslat⁻¹)
+    if unscale_coslat
+        SpeedyWeather.SpeedyTransforms.unscale_coslat!(g_north, g_south, coslat⁻¹)
+    end
 end
-
 
 
 # (forward) Legendre kernel, called from _legendre!
