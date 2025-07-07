@@ -30,7 +30,7 @@ function setup_simulation(trunc::Int; nlayers::Int=1, arch=SpeedyWeather.CPU())
     )
     
     # Create a simulation with the model
-    simulation = initialize!(model)
+    simulation = CUDA.@allowscalar initialize!(model)
     
     # spin up 
     run!(simulation, period=Day(10))
@@ -44,7 +44,7 @@ end
 Run a benchmark for the given simulation.
 Returns the median time in milliseconds.
 """
-function run_benchmark(simulation; ntrials=10, nsteps=100)
+function run_benchmark(simulation; ntrials=5, nsteps=400)
     
     sypd = zeros(Float64, ntrials)
     for i in 1:ntrials
