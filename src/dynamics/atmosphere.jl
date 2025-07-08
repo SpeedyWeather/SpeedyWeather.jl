@@ -20,7 +20,7 @@ $(TYPEDFIELDS)"""
     R_gas::NF = 8.3145
 
     "specific gas constant for dry air [J/kg/K]"
-    @param R_dry::NF = 1000*R_gas/mol_mass_dry_air (bounds=Positive,)
+    R_dry::NF = 1000*R_gas/mol_mass_dry_air
 
     "specific gas constant for water vapour [J/kg/K]"
     @param R_vapour::NF = 1000*R_gas/mol_mass_vapour (bounds=Positive,)
