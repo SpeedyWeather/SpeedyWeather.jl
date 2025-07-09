@@ -58,12 +58,7 @@ function soil_moisture_availability!(
 end
 
 export VegetationClimatology
-@kwdef struct VegetationClimatology{NF, Grid} <: AbstractVegetation
-
-    "number of latitudes on one hemisphere, Equator included"
-    nlat_half::Int
-
-    # OPTIONS
+@kwdef struct VegetationClimatology{NF, GridVariable2D} <: AbstractVegetation
     "[OPTION] Combine high and low vegetation factor, a in high + a*low [1]"
     low_veg_factor::NF = 0.8
 
@@ -85,16 +80,18 @@ export VegetationClimatology
 
     # to be filled from file
     "High vegetation cover [1], interpolated onto Grid"
-    high_cover::Grid = zeros(Grid, nlat_half)
+    high_cover::GridVariable2D
 
     "Low vegetation cover [1], interpolated onto Grid"
-    low_cover::Grid = zeros(Grid, nlat_half)
+    low_cover::GridVariable2D
 end
 
 # generator function
 function VegetationClimatology(SG::SpectralGrid; kwargs...)
-    (; NF, GridVariable2D, nlat_half) = SG
-    return VegetationClimatology{NF, GridVariable2D}(; nlat_half, kwargs...)
+    (; NF, GridVariable2D, grid) = SG
+    high_cover = zeros(GridVariable2D, grid)
+    low_cover  = zeros(GridVariable2D, grid)
+    return VegetationClimatology{NF, GridVariable2D}(; high_cover, low_cover, kwargs...)
 end
 
 function initialize!(vegetation::VegetationClimatology, model::PrimitiveEquation)
@@ -114,7 +111,7 @@ function initialize!(vegetation::VegetationClimatology, model::PrimitiveEquation
     # interpolate onto grid
     high_vegetation_cover = vegetation.high_cover
     low_vegetation_cover = vegetation.low_cover
-    interpolator = RingGrids.interpolator(Float32, high_vegetation_cover, vegh)
+    interpolator = RingGrids.interpolator(high_vegetation_cover, vegh, NF=Float32)
     interpolate!(high_vegetation_cover, vegh, interpolator)
     interpolate!(low_vegetation_cover, vegl, interpolator)
 end
@@ -162,8 +159,8 @@ function soil_moisture_availability!(
     D_top = model.land.geometry.layer_thickness[1]
     D_root = model.land.geometry.layer_thickness[2]
 
-    @boundscheck grids_match(high_cover, low_cover, soil_moisture_availability) || throws(BoundsError)
-    @boundscheck grids_match(soil_moisture, soil_moisture_availability, horizontal_only=true) || throws(BoundsError)
+    @boundscheck fields_match(high_cover, low_cover, soil_moisture_availability) || throws(BoundsError)
+    @boundscheck fields_match(soil_moisture, soil_moisture_availability, horizontal_only=true) || throws(BoundsError)
     @boundscheck size(soil_moisture, 2) >= 2    # defined for two layers
 
     # precalculate

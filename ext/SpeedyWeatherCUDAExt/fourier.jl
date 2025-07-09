@@ -11,9 +11,9 @@ function SpeedyTransforms.plan_FFTs!(
     brfft_plans::Vector{AbstractFFTs.Plan},
     rfft_plans_1D::Vector{AbstractFFTs.Plan},
     brfft_plans_1D::Vector{AbstractFFTs.Plan},
-    fake_grid_data::AbstractGridArray{NF, N, <:CuArray{NF}},
+    fake_grid_data::AbstractField{NF, N, <:CuArray{NF}},
     scratch_memory_north::CuArray{Complex{NF}},
-    rings::AbstractArray,
+    rings,
     nlons::Vector{<:Int}
 ) where {NF<:AbstractFloat, N}
     # Determine which FFT package to use (currently either FFTW or GenericFFT)
@@ -42,7 +42,7 @@ Uses indexing as we seemingly can't use views with the FFT planning with CUFFT.
 """
 function SpeedyTransforms._apply_batched_fft!(
     f_out::CuArray{<:Complex, 3},
-    grids::AbstractGridArray{NF, N, <:CuArray},
+    grids::AbstractField{NF, N, <:CuArray},
     S::SpectralTransform, 
     j::Int,
     nfreq::Int,
@@ -65,7 +65,7 @@ GPU/CUDA equivalent of the `apply_batched_fft!` function in the CPU version.
 Uses indexing as we seemingly can't use views with the FFT planning with CUFFT.
 """
 function SpeedyTransforms._apply_batched_fft!(
-    grids::AbstractGridArray{NF, N, <:CuArray},
+    grids::AbstractField{NF, N, <:CuArray},
     g_in::CuArray{<:Complex, 3},
     S::SpectralTransform,
     j::Int,
@@ -89,7 +89,7 @@ This uses views but still allocates, i.e. `mul!` still cannot be used.
 """
 function SpeedyTransforms._apply_serial_fft!(
     f_out::CuArray{<:Complex, 3},
-    grids::AbstractGridArray{NF, N, <:CuArray},
+    grids::AbstractField{NF, N, <:CuArray},
     S::SpectralTransform, 
     j::Int,
     k::Int,
@@ -98,7 +98,7 @@ function SpeedyTransforms._apply_serial_fft!(
     not_equator::Bool = true
 ) where {NF<:AbstractFloat, N}
     rfft_plan = S.rfft_plans_1D[j]     # FFT planned wrt nlon on ring
-    k_grid = eachgrid(grids)[k]        # vertical layer index
+    k_grid = eachlayer(grids)[k]        # vertical layer index
 
     if not_equator
         view(f_out, 1:nfreq, k, j) .= rfft_plan * view(grids.data, ilons, k_grid)
@@ -114,7 +114,7 @@ This uses views but still allocates, i.e. `mul!` still cannot be used with views
 of CuArrays. 
 """
 function SpeedyTransforms._apply_serial_fft!(
-    grids::AbstractGridArray{NF, N, <:CuArray},
+    grids::AbstractField{NF, N, <:CuArray},
     g_in::CuArray{<:Complex, 3},
     S::SpectralTransform,
     j::Int,
@@ -124,7 +124,7 @@ function SpeedyTransforms._apply_serial_fft!(
     not_equator::Bool = true
 ) where {NF<:AbstractFloat, N}
     brfft_plan = S.brfft_plans_1D[j]   # FFT planned wrt nlon on ring
-    k_grid = eachgrid(grids)[k]     # vertical layer index
+    k_grid = eachlayer(grids)[k]     # vertical layer index
 
     if not_equator
         view(grids.data, ilons, k_grid) .= brfft_plan * view(g_in, 1:nfreq, k, j)

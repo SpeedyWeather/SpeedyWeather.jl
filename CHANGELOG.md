@@ -3,8 +3,32 @@
 ## Unreleased
 
 - Isfinite checks in land and ocean to differentiate land and ocean parameters correctly [#692](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/692)
+
+## v0.16
+
+- Move full differentiability tests to separate CI workflow [#759](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/759)
+- Type stability for particle advection [#757](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/757)
+- Scratch memory for SpeedyTransforms now part of DiagnosticVariables [#680](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/680/)
+- Reworked GPU and utility code structure and added GPU versions of spectral gradients[#727](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/727)
+- Added `animate` to animate a NetCDF output file with GeoMakie [#755](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/755)
+- Makie v0.24 compatibility [#750](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/750)
+- Fixed an error in the LowerTriangularArrays documentation [#749](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/749)
+- Use views instead of unpacking a tuple for 2-step prognostic variables [#745](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/745)
+- Introduce Field for data on grid [#732](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/732)
+- Add Millenium and Century periods and allow conversion of Month and Year to seconds [#746](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/746)
+- Return UnicodePlot after run! if UnicodePlots.jl is loaded [#748](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/748)
+- git-auto-commit-action v6 [#747](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/747)
+- Makie v0.23 compatibility [#743](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/743)
+- LowerTriangularArray-preserving view [#739](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/739)
+- Array-agnostic LowerTriangularMatrix [#738](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/738)
+- Major rework of LowerTriangularArrays: Introduce Spectrum type, changes in indexing and constructors [#734](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/734)
+- Reduce CI time [#731](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/731)
+- Remove DocsPreviewCleanup workflow [#730](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/730)
+- Move UnicodePlots to extension [#728](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/728)
+- Baroclinic wave initial conditions ZonalWind divergence free [#729](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/729)
+- reverse and reverse! for LowerTriangularArray, in longitude or latitude [#720](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/720)
 - Speed up CI for land models [#719](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/719)
-- Move documentation to SpeedyWeatherDocumentation repository [#713](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/713), [#722](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/722) and [#723](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/723)
+- Move documentation to SpeedyWeatherDocumentation repository [#713](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/713), [#722](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/722), [#723](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/723), and [#725](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/725)
 - Ensure docs don't deploy with `.jld2` or `.nc` files [#724](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/724)
 
 ## v0.15

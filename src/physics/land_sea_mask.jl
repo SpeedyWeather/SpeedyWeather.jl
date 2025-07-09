@@ -1,9 +1,9 @@
 """
 Abstract super type for land-sea masks. Custom land-sea masks have to be defined as
 
-    CustomMask{NF<:AbstractFloat, Grid<:AbstractGrid{NF}} <: AbstractLandSeaMask
+    CustomMask{NF, GridVariable2D} <: AbstractLandSeaMask
 
-and need to have at least a field called `mask::Grid` that uses a `Grid` as defined
+and need to have at least a field called `mask::GridVariable2D` that uses a `GridVariable2D` as defined
 by the spectral grid object, so of correct size and with the number format `NF`.
 All `AbstractLandSeaMask` have a convenient generator function to be used like
 `mask = CustomMask(spectral_grid, option=argument)`, but you may add your own or customize by
@@ -33,32 +33,32 @@ function Base.show(io::IO, L::AbstractLandSeaMask)
 end
 
 function mask!(
-    grid::AbstractGridArray{NF},
-    mask::AbstractGridArray,
+    field::AbstractField,
+    mask::AbstractField,
     land_or_sea::Symbol;
     masked_value = NaN,
-) where NF
+)
 
     val = land_or_sea == :land ? 1 : 0
-    masked_val = convert(NF, masked_value)
+    masked_val = convert(eltype(field), masked_value)
 
-    @boundscheck grids_match(grid, mask, horizontal_only=true) || throw(DimensionMismatch(grid, mask))
-    @boundscheck ndims(mask) == 1 ||throw(DimensionMismatch(grid, mask))
+    @boundscheck fields_match(field, mask, horizontal_only=true) || throw(DimensionMismatch(field, mask))
+    @boundscheck ndims(mask) == 1 || throw(DimensionMismatch(field, mask))
 
-    for k in eachgrid(grid)
+    for k in eachlayer(field)
         for ij in eachgridpoint(mask)
             if mask[ij] == val
-                grid[ij, k] = masked_val
+                field[ij, k] = masked_val
             end
         end
     end
 
-    return grid
+    return field
 end
 
 # also allow for land_sea_mask struct to be passed on, use .mask in that case
-mask!(grid::AbstractGridArray, mask::AbstractLandSeaMask, args...; kwargs...) =
-    mask!(grid, mask.mask, args...; kwargs...)
+mask!(field::AbstractField, mask::AbstractLandSeaMask, args...; kwargs...) =
+    mask!(field, mask.mask, args...; kwargs...)
 
 # make available when using SpeedyWeather
 export EarthLandSeaMask
@@ -89,8 +89,8 @@ const LandSeaMask = EarthLandSeaMask
 $(TYPEDSIGNATURES)
 Generator function pulling the resolution information from `spectral_grid`."""
 function (L::Type{<:AbstractLandSeaMask})(spectral_grid::SpectralGrid; kwargs...)
-    (; NF, GridVariable2D, nlat_half) = spectral_grid
-    mask = zeros(GridVariable2D, nlat_half)
+    (; NF, GridVariable2D, grid) = spectral_grid
+    mask = zeros(GridVariable2D, grid)
     return L{NF, GridVariable2D}(; mask, kwargs...)
 end
 
@@ -98,7 +98,7 @@ end
 function set!(mask::AbstractLandSeaMask, args...; kwargs...)
     set!(mask.mask, args...; kwargs...)
     lo, hi = extrema(mask.mask)
-    (lo < 0 || hi > 1) && @warn "Land-sea mask was not set to values in [0, 1] but in [$lo, $hi]. Clamping."
+    (lo < 0 || hi > 1) && @warn "Land-sea mask not in [0, 1] but in [$lo, $hi]. Clamping."
     clamp!(mask.mask, 0, 1)
     return nothing
 end
@@ -120,12 +120,12 @@ function initialize!(land_sea_mask::EarthLandSeaMask, model::PrimitiveEquation)
     ncfile = NCDataset(path)
     
     # high resolution land-sea mask
-    lsm_highres = file_Grid(ncfile["lsm"].var[:, :], input_as=Matrix)
+    lsm_highres = land_sea_mask.file_Grid(ncfile["lsm"].var[:, :], input_as=Matrix)
 
     # average onto grid cells of the model
     RingGrids.grid_cell_average!(land_sea_mask.mask, lsm_highres)
 
-    # TODO this shoudln't be necessary, but at the moment grid_cell_average! can return values > 1
+    # TODO this shouldn't be necessary, but at the moment grid_cell_average! can return values > 1
     # lo, hi = extrema(land_sea_mask.mask)
     # (lo < 0 || hi > 1) && @warn "Land-sea mask has values in [$lo, $hi], clamping to [0, 1]."
     clamp!(land_sea_mask.mask, 0, 1)

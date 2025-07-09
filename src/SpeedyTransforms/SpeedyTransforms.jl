@@ -10,9 +10,12 @@ import GenericFFT
 import LinearAlgebra
 import Primes
 import Adapt: adapt
+import KernelAbstractions: @kernel, @index, @Const, synchronize
 
 # SPEEDYWEATHER MODULES
-using ..LowerTriangularMatrices
+using ..Architectures
+using ..Utils
+using ..LowerTriangularArrays
 using ..RingGrids
 
 # TRANSFORM
@@ -42,14 +45,14 @@ export  spectral_truncation,
 export  power_spectrum
 
 include("aliasing.jl")
-include("legendrepolarray.jl")
 include("legendre_shortcuts.jl")
+include("scratch_memory.jl")
 include("spectral_transform.jl")
 include("fourier.jl")
 include("legendre.jl")
 include("spectral_gradients.jl")
 include("spectral_truncation.jl")
-include("spectrum.jl")
+include("power_spectrum.jl")
 include("show.jl")
 
 end

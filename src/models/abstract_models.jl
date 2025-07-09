@@ -47,6 +47,8 @@ function Base.show(io::IO, M::AbstractModel)
         val = getfield(M, key)
         s = i == n ? "└" : "├"  # choose ending └ for last property
         p = i == n ? print : println
-        p(io, "$s $key: $(typeof(val))")
+        a = "$s $key: $(typeof(val))"
+        a = textwidth(a) > 100 ? string(a[1:97], "...") : a  # truncate long strings
+        p(io, a)
     end
 end

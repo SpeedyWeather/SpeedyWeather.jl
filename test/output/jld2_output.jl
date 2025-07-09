@@ -20,24 +20,20 @@ using JLD2
     
     @test length(f["output_vector"]) == simulation.prognostic_variables.clock.n_timesteps + 1 # + 1 for the IC
 
-    for i in eachindex(progn_ic.vor)
-        @test f["output_vector"][1][1].vor[i] == progn_ic.vor[i]
-        @test f["output_vector"][1][1].div[i] == progn_ic.div[i]
-        @test f["output_vector"][1][1].humid[i] == progn_ic.humid[i]
-        @test f["output_vector"][1][1].pres[i] == progn_ic.pres[i]
-        @test f["output_vector"][1][1].temp[i] == progn_ic.temp[i]
-    end 
+    @test f["output_vector"][1][1].vor == progn_ic.vor
+    @test f["output_vector"][1][1].div == progn_ic.div
+    @test f["output_vector"][1][1].humid == progn_ic.humid
+    @test f["output_vector"][1][1].pres == progn_ic.pres
+    @test f["output_vector"][1][1].temp == progn_ic.temp
 
     # the last output in the simuluation is unscaled, shifted and compressed by `write_restart_file!` 
     # for comparision we need to do that as well
     final_output = f["output_vector"][end][1] 
     SpeedyWeather.unscale!(final_output)
     
-    for i in eachindex(progn_ic.vor)
-        @test final_output.vor[i] == simulation.prognostic_variables.vor[i]
-        @test final_output.div[i] == simulation.prognostic_variables.div[i]
-        @test final_output.humid[i] == simulation.prognostic_variables.humid[i]
-        @test final_output.pres[i] == simulation.prognostic_variables.pres[i]
-        @test final_output.temp[i] == simulation.prognostic_variables.temp[i]
-    end
+    @test final_output.vor == simulation.prognostic_variables.vor
+    @test final_output.div == simulation.prognostic_variables.div
+    @test final_output.humid == simulation.prognostic_variables.humid
+    @test final_output.pres == simulation.prognostic_variables.pres
+    @test final_output.temp == simulation.prognostic_variables.temp
 end 

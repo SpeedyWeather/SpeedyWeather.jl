@@ -67,7 +67,7 @@ function linear_virtual_temperature!(
     model::PrimitiveDry,
 )
     (; temp_virt) = diagn.dynamics
-    temp = progn.temp[lf]
+    temp = get_step(progn.temp, lf)
     copyto!(temp_virt, temp)
 end
 
@@ -92,8 +92,8 @@ function linear_virtual_temperature!(
     (; temp_virt) = diagn.dynamics
     μ = model.atmosphere.μ_virt_temp
     (; temp_average) = diagn
-    temp = progn.temp[lf]
-    humid = progn.humid[lf]
+    temp  = get_step(progn.temp, lf)
+    humid = get_step(progn.humid, lf)
 
     # TODO check that doing a non-linear virtual temperature in grid-point space
     # but a linear virtual temperature in spectral space to avoid another transform

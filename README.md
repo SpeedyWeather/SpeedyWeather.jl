@@ -1,10 +1,10 @@
-# SpeedyWeather.jl <img src="https://github.com/user-attachments/assets/977f5f46-ccd3-49d8-950a-8b619df863c3" width="100" />
+# SpeedyWeather.jl <img src="https://github.com/user-attachments/assets/7259f148-a920-4f79-adb2-6659e0cf917b" width="100" />
 
 
 [![CI](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI.yml) 
 [![status](https://joss.theoj.org/papers/515c81a4d6a69e31cc71ded65ac9c36a/status.svg)](https://joss.theoj.org/papers/515c81a4d6a69e31cc71ded65ac9c36a)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.6510139.svg)](https://doi.org/10.5281/zenodo.6510139)  
-[![docs](https://img.shields.io/badge/documentation-latest_release-blue.svg)](https://speedyweather.github.io/SpeedyWeather.jl/stable/)
+[![docs](https://img.shields.io/badge/documentation-latest_release-blue.svg)](https://speedyweather.github.io/SpeedyWeatherDocumentation/stable/)
 [![docs](https://img.shields.io/badge/documentation-main-blue.svg)](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/)
 
 SpeedyWeather.jl is a global atmospheric model with simple physics developed as a research playground
@@ -17,6 +17,8 @@ With minimal code redundancies it supports
 - Particle advection in 2D for all equations
 - Tracer advection in 2D/3D that can be added, deleted, (de)activated anytime
 - Physics parameterizations for convection, precipitation, boundary layer, etc.
+- Various more or less realistic planets and what-if scenarios by easily modifying initial and boundary conditions
+- A slab ocean and a 2-layer land bucket model
 
 **Numerics and computing**
 - Different spatial grids (full and octahedral grids, Gaussian and Clenshaw-Curtis, HEALPix, OctaHEALPix)
@@ -34,7 +36,7 @@ With minimal code redundancies it supports
 and Julia will compile to these choices just-in-time.
 
 For an overview of the functionality and explanation see the
-[documentation](https://speedyweather.github.io/SpeedyWeather.jl/dev).
+[documentation](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev).
 You are always encouraged to [raise an issue](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues)
 (even it is not actually an issue but an idea, a suggestion or really anything)
 describing what you'd like to use SpeedyWeather for. We're keen to help!
@@ -47,24 +49,27 @@ We decided to use Julia because it combines the best of Fortran and Python: With
 we can interactively run SpeedyWeather but also extend it, inspect its components, evaluate
 individual terms of the equations, and analyse and visualise output on the fly.
 
-We do not aim to make SpeedyWeather an atmospheric model similar to the production-ready models used
-in weather forecasting, at least not at the cost of our current level of interactivity and ease of
-use or extensibility. If someone wants to implement a cloud parameterization that is very complicated
-and expensive to run then they are more than encouraged to do so, but it will probably live in
-its own repository and we are happy to provide a general interface to do so. But SpeedyWeather's
-defaults should be balanced: Physically accurate yet general; as independently as possible from other
-components and parameter choices; not too complicated to implement and understand; and computationally cheap.
+We do not necessarily aim to make SpeedyWeather an atmospheric model for the purpose of production-ready
+weather forecasting, at least not at the cost of our current level of interactivity and ease of
+use or extensibility. If someone wants to implement a parameterization that is very complicated
+and expensive to run then they are more than encouraged to do so. We are happy to provide a general interface
+to do so and support you to move this to its own repository, leveraging modularity. This may note become
+the default to not oppose the "easy and fast by default"-philosophy but that does not mean we don't
+appreciate your efforts or reject your contributions. In fact, we would love to show case more how
+easy to complex, laptop to HPC can work seamlessly within the same model.
+But SpeedyWeather's defaults should be balanced: Physically accurate yet general; as independently as possible
+from other components and parameter choices; not too complicated to implement and understand; and computationally cheap.
 Finding a good balance is difficult but we try our best. 
 
 This means in practice, that while SpeedyWeather is currently developed, many more physical processes
 and other features will be implemented. On our TODO is
 
-- A (somewhat) realistic radiation scheme with a daily cycle, depending on clouds and humidity
-- Longwave radiation that depends on (global) CO2 concentrations to represent climate change
-- Slab ocean and a (seasonal cycle) sea ice interacting with radiation
-- Exoplanet support
+- A more realistic radiation scheme depending on clouds and humidity
+- Longwave radiation that depends on (globally averaged) greenhouse gas concentrations to represent climate change
+- Sea ice, snow affecting surface fluxes including albedo
+- Exoplanet support with more flexibility on the atmospheric composition
 - 3D particle advection
-- single GPU support to accelerate medium to high resolution simulations
+- single GPU and CPU multi-threading support via KernelAbstractions
 - differentiability with Enzyme
 
 ## Contributing
@@ -78,7 +83,7 @@ about dos and don'ts. Just express your interest to contribute and we'll be happ
 ## Example use
 
 For a more comprehensive tutorial with several examples, see
-[Examples](https://speedyweather.github.io/SpeedyWeather.jl/dev/examples_2D/) in the documentation.
+[Examples](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/examples_2D/) in the documentation.
 The basic interface to SpeedyWeather.jl consist of 4 steps: define the grid,
 construct the model, initialize, run
 
@@ -88,21 +93,19 @@ model = PrimitiveWetModel(spectral_grid)            # construct model
 simulation = initialize!(model)                     # initialize all model components
 run!(simulation, period=Day(10), output=true)       # aaaand action!
 ```
-and you will see
+showing
+```
+Weather is speedy: run 0001 100%|█████████| Time: 0:00:02 (1000.22 years/day)
+```
 
-<img src="https://github.com/SpeedyWeather/SpeedyWeather.jl/assets/25530332/a04fbb10-1cc1-4f77-93f2-7bdf047f277d" width="450"><br>
-
-Hurray🥳 In a few seconds seconds we just simulated 10 days of the Earth's atmosphere at a speed of 440 years per day.
+Hurray🥳 In a few seconds seconds we just simulated 10 days of the Earth's atmosphere at a speed of 1000 years per day.
 This simulation used a T31 spectral resolution on an
-[octahedral Gaussian grid](https://speedyweather.github.io/SpeedyWeather.jl/dev/grids/#Implemented-grids)
-(~400km resolution) solving the primitive equations on 8 vertical levels.
-The [UnicodePlot](https://github.com/JuliaPlots/UnicodePlots.jl) will give
-you a snapshot of surface vorticity at the last time step. The plotted resolution is not representative,
-but allows a quick check of what has been simulated.
-The [NetCDF output](https://speedyweather.github.io/SpeedyWeather.jl/dev/output/) is independent of the unicode plot.
+[octahedral Gaussian grid](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/grids/#Implemented-grids)
+(~400km resolution) solving the primitive equations on 8 vertical levels,
+storing [NetCDF output](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/output/).
 
-More examples in the [How to run SpeedyWeather](https://speedyweather.github.io/SpeedyWeather.jl/dev/how_to_run_speedy/)
-section of the [documentation](https://speedyweather.github.io/SpeedyWeather.jl/dev).
+More examples in the [How to run SpeedyWeather](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/how_to_run_speedy/)
+section of the [documentation](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev).
 
 ## Gallery
 
@@ -114,7 +117,7 @@ and some simplified radiation (the daily cycle is visible)
 https://github.com/SpeedyWeather/SpeedyWeather.jl/assets/25530332/614f04cf-5080-4c89-9fd6-35efd54103a7
 
 Relative vorticity in the shallow water model, simulated at T1023 spectral resolution (about 10km) on an
-[octahedral Clenshaw-Curtis grid](https://speedyweather.github.io/SpeedyWeather.jl/dev/grids/#Implemented-grids)
+[octahedral Clenshaw-Curtis grid](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/grids/#Implemented-grids)
 with more than 4 million grid points
 
 https://user-images.githubusercontent.com/25530332/190443050-d5b8d093-86c0-46c9-b515-8420059ac8dc.mp4
@@ -126,7 +129,7 @@ https://github.com/SpeedyWeather/SpeedyWeather.jl/assets/25530332/95897b82-9b81-
 
 SpeedyWeather.jl can also solve the 2D barotropic vorticity equations on the sphere.
 Here, we use Float32 (single precision) at a resolution of T340 (40km) on
-an [octahedral Gaussian grid](https://speedyweather.github.io/SpeedyWeather.jl/dev/grids/#Implemented-grids).
+an [octahedral Gaussian grid](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/grids/#Implemented-grids).
 Forcing is a stochastic stirring on northern hemisphere mid-latitudes following Barnes and Hartmann, 2011.
 Map projection is orthographic centred on the north pole.
 
@@ -147,8 +150,8 @@ https://github.com/SpeedyWeather/SpeedyWeather.jl/assets/25530332/a6192374-24d9-
 
 Difficult to plot spherical data? SpeedyWeather also includes extensions for Makie and GeoMakie
 making it supereasy to create plots and interactively investigate a variables from a simulation.
-Two examples (screen recording those makes it a bit laggy, it's pretty smooth otherwise): Humidity plotted
-on a 50km HEALPix grid 
+Two examples (screen recording those makes it a bit laggy, it's pretty smooth otherwise):
+Humidity plotted on a 50km HEALPix grid 
 
 https://github.com/user-attachments/assets/b02b31eb-e139-4193-89d1-7e277a2af5cc
 
@@ -168,6 +171,8 @@ The physical parametrizations were then added by Franco Molteni, Fred Kucharski,
 afterwards while the model was still written in Fortran77.
 Around 2018-19, SPEEDY was then translated to Fortran90 by Sam Hatfield in [speedy.f90](https://github.com/samhatfield/speedy.f90).
 SpeedyWeather.jl is then adopted from [first translations to Julia](https://github.com/samhatfield/speedy.jl) by Sam Hatfield.
+All these past creators and contributors are strongly acknowledged. Thank you for letting us use your efforts to create
+intermediate-complexity climate models as a conceptual launchpad for SpeedyWeather!
 
 ## Submodules
 
@@ -177,19 +182,19 @@ out to their own packages for now
 - [__RingGrids__](https://speedyweather.github.io/SpeedyWeather.jl/dev/ringgrids/),
 a module that defines several iso-latitude ring-based spherical grids (like the FullGaussianGrid or the HEALPixGrid)
 and interpolations between them
-- [__LowerTriangularMatrices__](https://speedyweather.github.io/SpeedyWeather.jl/dev/lowertriangularmatrices/),
+- [__LowerTriangularArrays__](https://speedyweather.github.io/SpeedyWeather.jl/dev/lowertriangularmatrices/),
 a module that defines `LowerTriangularMatrix` used for the spherical harmonic coefficients
 - [__SpeedyTransforms__](https://speedyweather.github.io/SpeedyWeather.jl/dev/speedytransforms/), a module that defines
-the spherical harmonic transform between spectral space (for which LowerTriangularMatrices is used) and grid-point space
+the spherical harmonic transform between spectral space (for which LowerTriangularArrays is used) and grid-point space
 (as defined by RingGrids).
 
 These modules can also be used independently of SpeedyWeather like so
 ```julia
-julia> using SpeedyWeather: LowerTriangularMatrices, RingGrids, SpeedyTransforms
+julia> using SpeedyWeather: LowerTriangularArrays, RingGrids, SpeedyTransforms
 ```
-check out their documentation: [RingGrids](https://speedyweather.github.io/SpeedyWeather.jl/dev/ringgrids/),
-[LowerTriangularMatrices](https://speedyweather.github.io/SpeedyWeather.jl/dev/lowertriangularmatrices/),
-[SpeedyTransforms](https://speedyweather.github.io/SpeedyWeather.jl/dev/speedytransforms/).
+check out their documentation: [RingGrids](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/ringgrids/),
+[LowerTriangularArrays](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/lowertriangularmatrices/),
+[SpeedyTransforms](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/speedytransforms/).
 
 ## Installation
 
@@ -199,7 +204,7 @@ SpeedyWeather.jl is registered in Julia's registry, so open the package manager 
 ```
 which will install the [latest release]([url](https://github.com/SpeedyWeather/SpeedyWeather.jl/releases))
 and all dependencies automatically. For more information see the
-[Installation](https://speedyweather.github.io/SpeedyWeather.jl/dev/installation/) in the documentation.
+[Installation](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/installation/) in the documentation.
 Please use the current minor version of Julia,
 compatibilities with older versions are not guaranteed.
 
@@ -218,6 +223,9 @@ at a small accuracy sacrifice of the then inexact spectral transforms.
 
 On older CPUs, like the Intel CPU MacBooks, the 1800 SYPD drop to about 500-600 SYPD,
 which is still 2x faster than Fortran SPEEDY which is reported to reach 240 SYPD.
+With GPU support being a work in progress we do not expect a performance increase for 
+the lower resolutions but aim to provide the ability to also run the model very efficiently
+at high resolution!
 
 For an overview of typical simulation speeds a user can expect under different model setups see
 [Benchmarks](https://github.com/SpeedyWeather/SpeedyWeather.jl/blob/main/benchmark).

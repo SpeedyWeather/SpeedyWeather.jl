@@ -126,7 +126,7 @@ function forcing!(
     Fu = diagn.tendencies.u_tend_grid
     (; amplitude, tapering) = forcing
 
-    @inbounds for k in eachgrid(Fu) 
+    @inbounds for k in eachlayer(Fu) 
         for (j, ring) in enumerate(eachring(Fu))
             F = amplitude[j]
             for ij in ring
@@ -199,7 +199,7 @@ function forcing!(
     
     # back to spectral space
     S_masked = diagn.dynamics.a_2D
-    transform!(S_masked, S_grid, spectral_transform)
+    transform!(S_masked, S_grid, diagn.dynamics.scratch_memory, spectral_transform)
 
     # scale by radius^2 as is the vorticity equation, and scale to forcing strength
     S_masked .*= (diagn.scale[]^2 * forcing.strength)

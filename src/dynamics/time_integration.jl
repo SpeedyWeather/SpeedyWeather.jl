@@ -193,7 +193,8 @@ function leapfrog!(
     model::AbstractModel,
 )
     for (varname, tendname) in zip(prognostic_variables(model), tendency_names(model))
-        var_old, var_new = getfield(progn, varname)
+        var = getfield(progn, varname)
+        var_old, var_new = get_steps(var)
         var_tend = getfield(tend, tendname)
         spectral_truncation!(var_tend)
         leapfrog!(var_old, var_new, var_tend, dt, lf, model.time_stepping)
@@ -202,7 +203,7 @@ function leapfrog!(
     # and time stepping for tracers if active
     for (name, tracer) in model.tracers
         if tracer.active
-            var_old, var_new = progn.tracers[name]
+            var_old, var_new = get_steps(progn.tracers[name])
             var_tend = tend.tracers_tend[name]
             spectral_truncation!(var_tend)
             leapfrog!(var_old, var_new, var_tend, dt, lf, model.time_stepping)
@@ -285,6 +286,8 @@ function timestep!(
     # PARTICLE ADVECTION (always skip 1st step of first_timesteps!)
     not_first_timestep = lf2 == 2
     not_first_timestep && particle_advection!(progn, diagn, model.particle_advection)
+
+    return nothing 
 end
 
 """
@@ -315,6 +318,8 @@ function timestep!(
     # PARTICLE ADVECTION (always skip 1st step of first_timesteps!)
     not_first_timestep = lf2 == 2
     not_first_timestep && particle_advection!(progn, diagn, model.particle_advection)
+
+    return nothing
 end
 
 """
@@ -359,6 +364,8 @@ function timestep!(
     # PARTICLE ADVECTION (always skip 1st step of first_timesteps!)
     not_first_timestep = lf2 == 2
     not_first_timestep && particle_advection!(progn, diagn, model.particle_advection)
+
+    return nothing 
 end
 
 """$(TYPEDSIGNATURES)

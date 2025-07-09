@@ -73,7 +73,7 @@ One may filter out low values of spectral vorticity with some cut-off amplitude
 c = 1e-10       # cut-off amplitude
 
 # 1 = first leapfrog timestep of spectral vorticity
-vor = simulation.prognostic_variables.vor[1]
+vor = get_step(simulation.prognostic_variables.vor, 1)      # get the first leapfrog step
 low_values = abs.(vor) .< c
 vor[low_values] .= 0
 nothing # hide
@@ -86,8 +86,8 @@ in grid coordinates. So to show vorticity again in grid space we transform
 back
 
 ```@example haurwitz
-# [1] for first leapfrog time step, [:, 1] for all values on first layer
-vor = simulation.prognostic_variables.vor[1][:, 1]
+# [:, 1, 1] for all values on first layer and first leapfrog step
+vor = simulation.prognostic_variables.vor[:, 1, 1]
 vor_grid = transform(vor)
 
 using CairoMakie

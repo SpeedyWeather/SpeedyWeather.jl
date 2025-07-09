@@ -88,7 +88,7 @@ function drag!(
     model::AbstractModel,
 )
     (; vor_tend) = diagn.tendencies
-    vor = progn.vor[1]
+    vor = get_step(progn.vor, lf)
 
     # scale by radius (but only once, the second radius is in vor)
     c = drag.c * diagn.scale[]
@@ -99,11 +99,6 @@ end
 
 export JetDrag
 @kwdef struct JetDrag{NF, SpectralVariable2D} <: SpeedyWeather.AbstractDrag
-
-    # DIMENSIONS from SpectralGrid
-    "Spectral resolution as max degree of spherical harmonics"
-    trunc::Int
-
     "[OPTION] Relaxation time scale τ"
     time_scale::Second = Day(6)
 
@@ -118,17 +113,18 @@ export JetDrag
 
     # TO BE INITIALISED
     "Relaxation back to reference vorticity"
-    ζ₀::SpectralVariable2D = zeros(LowerTriangularMatrix{Complex{NF}}, trunc+2, trunc+1)
+    ζ₀::SpectralVariable2D
 end
 
 function JetDrag(SG::SpectralGrid; kwargs...)
-    return JetDrag{SG.NF, SG.SpectralVariable2D}(; SG.trunc, kwargs...)
+    ζ₀ = zeros(Complex{SG.NF}, SG.spectrum)
+    return JetDrag{SG.NF, SG.SpectralVariable2D}(; ζ₀, kwargs...)
 end
 
 function initialize!(drag::JetDrag, model::AbstractModel)
     (; spectral_grid, geometry) = model
-    (; Grid, NF, nlat_half) = spectral_grid
-    u = zeros(Grid{NF}, nlat_half)
+    (; grid, NF) = spectral_grid
+    u = zeros(NF, grid)
 
     lat = geometry.latds
 
@@ -149,7 +145,7 @@ function drag!(
     lf::Integer,
     model::AbstractModel,
 )
-    vor = progn.vor[lf]
+    vor = get_step(progn.vor, lf)
     (; vor_tend) = diagn.tendencies
     (; ζ₀) = drag
 
