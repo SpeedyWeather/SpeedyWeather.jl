@@ -19,6 +19,7 @@ if !FLAG_EXTENDED_TESTS && !FLAG_ENZYME_TESTS
 
     # GENERAL
     include("utility_functions.jl")
+    include("parameters.jl")
 
     # GRIDS
     include("grids/grids.jl")

@@ -25,12 +25,13 @@ end
 
 # Quadratic drag
 export QuadraticDrag
-@kwdef mutable struct QuadraticDrag{NF} <: AbstractDrag
+@parameterized @kwdef mutable struct QuadraticDrag{NF} <: AbstractDrag
     "[OPTION] drag coefficient [1]"
-    c_D::NF = 1e-12         # TODO is this a good default?
+    @param c_D::NF = 1e-12 (bounds=Nonnegative,)    # TODO is this a good default?
 end
 
 QuadraticDrag(SG::SpectralGrid; kwargs...) = QuadraticDrag{SG.NF}(; kwargs...)
+
 initialize!(::QuadraticDrag, ::AbstractModel) = nothing
 
 """
@@ -68,12 +69,13 @@ function drag!(
 end
 
 export LinearVorticityDrag
-@kwdef mutable struct LinearVorticityDrag{NF} <: AbstractDrag
+@parameterized @kwdef mutable struct LinearVorticityDrag{NF} <: AbstractDrag
     "[OPTION] drag coefficient [1/s]"
-    c::NF = 1e-7
+    @param c::NF = 1e-7 (bounds=Nonnegative,)
 end
 
 LinearVorticityDrag(SG::SpectralGrid; kwargs...) = LinearVorticityDrag{SG.NF}(; kwargs...)
+
 initialize!(::LinearVorticityDrag, ::AbstractModel) = nothing
 
 """
@@ -98,18 +100,18 @@ function drag!(
 end
 
 export JetDrag
-@kwdef struct JetDrag{NF, SpectralVariable2D} <: SpeedyWeather.AbstractDrag
+@parameterized @kwdef struct JetDrag{NF, SpectralVariable2D} <: SpeedyWeather.AbstractDrag
     "[OPTION] Relaxation time scale τ"
     time_scale::Second = Day(6)
 
     "[OPTION] Jet strength [m/s]"
-    u₀::NF = 20
+    @param u₀::NF = 20
 
     "[OPTION] latitude of Gaussian jet [˚N]"
-    latitude::NF = 30
+    @param latitude::NF = 30 (bounds=-90..90,)
 
     "[OPTION] Width of Gaussian jet [˚]"
-    width::NF = 6
+    @param width::NF = 6 (bounds=Positive,)
 
     # TO BE INITIALISED
     "Relaxation back to reference vorticity"
