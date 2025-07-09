@@ -218,7 +218,7 @@ end
             v = zero(v)
             dv = fill!(dv, 1+1im)
 
-            vor_grid = rand(spectral_grid.grid, spectral_grid.nlayers)
+            vor_grid = rand(NF, spectral_grid.grid, spectral_grid.nlayers)
             vor = transform(vor_grid, S)
             dvor = zero(vor)
 
@@ -246,11 +246,11 @@ end
             v = zero(v)
             dv = fill!(dv, 1+1im)
 
-            vor_grid = rand(spectral_grid.grid, spectral_grid.nlayers)
+            vor_grid = rand(NF, grid, spectral_grid.nlayers)
             vor = transform(vor_grid, S)
             dvor = zero(vor)
 
-            div_grid = rand(spectral_grid.grid, spectral_grid.nlayers)
+            div_grid = rand(NF, grid, spectral_grid.nlayers)
             div = transform(div_grid, S)
             ddiv = zero(vor)
 
