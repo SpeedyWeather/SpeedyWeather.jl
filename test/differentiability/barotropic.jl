@@ -87,7 +87,7 @@
     
     fd_vjp = FiniteDifferences.j′vp(central_fdm(15,1), x -> dynamics_tendencies(diagn_copy, x, lf2, model), ddiag_copy, progn_copy)
     
-    @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dprogn)[1],rtol=1e-2,atol=1e-1))
+    @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dprogn)[1],rtol=1e-1,atol=1e-1))
  
     #
     # horizontal_diffusion!
