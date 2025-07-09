@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fix Enzyme CI to run as expected [#762](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/762)
+
 ## v0.16
 
 - Move full differentiability tests to separate CI workflow [#759](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/759)
