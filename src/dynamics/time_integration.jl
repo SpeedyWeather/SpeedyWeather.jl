@@ -229,7 +229,7 @@ function first_timesteps!(
     
     (; implicit) = model
     (; Δt, Δt_millisec) = model.time_stepping
-    Δt_millisec_half = Dates.Millisecond(Δt_millisec.value÷2)   # this might be 1ms off
+    Δt_millisec_half = Millisecond(Δt_millisec.value÷2)     # this might be 1ms off
 
     # FIRST TIME STEP (EULER FORWARD with dt=Δt/2)
     lf1 = 1                             # without Robert+Williams filter
