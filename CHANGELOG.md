@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Isfinite checks in land and ocean to differentiate land and ocean parameters correctly [#692](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/692)
+
 ## v0.16
 
 - Move full differentiability tests to separate CI workflow [#759](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/759)
