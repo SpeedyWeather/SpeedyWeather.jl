@@ -218,7 +218,7 @@ end
             v = zero(v)
             dv = fill!(dv, 1+1im)
 
-            vor_grid = rand(spectral_grid.Grid{spectral_grid.NF}, spectral_grid.nlat_half, spectral_grid.nlayers)
+            vor_grid = rand(spectral_grid.grid, spectral_grid.nlayers)
             vor = transform(vor_grid, S)
             dvor = zero(vor)
 
@@ -246,12 +246,12 @@ end
             v = zero(v)
             dv = fill!(dv, 1+1im)
 
-            vor_grid = rand(NF, grid, nlayers)
+            vor_grid = rand(spectral_grid.grid, spectral_grid.nlayers)
             vor = transform(vor_grid, S)
             dvor = zero(vor)
 
-            div_grid = rand(NF, grid, nlayers)
-            div = transform(vor_grid, S)
+            div_grid = rand(spectral_grid.grid, spectral_grid.nlayers)
+            div = transform(div_grid, S)
             ddiv = zero(vor)
 
             autodiff(Reverse, SpeedyWeather.SpeedyTransforms.UV_from_vordiv!, Const, Duplicated(u, du), Duplicated(v, dv), Duplicated(vor, dvor), Duplicated(div, ddiv), Duplicated(S, dS))
