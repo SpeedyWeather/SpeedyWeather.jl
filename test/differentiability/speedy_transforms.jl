@@ -32,14 +32,14 @@ fd_tests = [true, true]
 
             # finite difference comparision, seeded with a one adjoint to get the direct gradient
             fd_vjp = FiniteDifferences.j′vp(central_fdm(5,1), x -> transform(x, S), dspecs2, field)
-            @test isapprox(dgrid, fd_vjp[1])
+            @test isapprox(dfield, fd_vjp[1])
 
             ## now backwards, as the input for spec we use the output of the forward transform
 
             fill!(dspecs,0)
             field = zeros(NF, grid, nlayers)
             dfield = similar(field)
-            fill!(dgrid, 1)
+            fill!(dfield, 1)
 
             autodiff(Reverse, transform!, Const, Duplicated(field, dfield), Duplicated(specs, dspecs), Duplicated(S, dS))
 
