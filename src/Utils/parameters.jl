@@ -80,7 +80,7 @@ stripparams(param::AbstractParam) = value(param)
 stripparams(params::NamedTuple) = map(stripparams, params)
 stripparams(params::SpeedyParams) = stripparams(unpack_params(params))
 
-# Base overridese for SpeedyParams
+# Base overrides for SpeedyParams
 
 ## parameter subsets
 Base.getindex(ps::SpeedyParams, param_label::String) = getindex(ps, [param_label])
@@ -145,12 +145,13 @@ ModelParameters._columntypes(ps::SpeedyParams) = map(k -> promote_type(map(typeo
 """
     $SIGNATURES
 
-Returns a "parameterized" copy of the given data structure. For numeric types, this simply wraps
-the given value in a `Param`-like type. Dispatches can be added for compound data types that
-reconstruct the data type with `Param`-like wrappers on all relevant parameters.
+Extract parameters from the given `obj` as (possibly nested) named-tuple of `SpeedyParam`s or some other
+`AbstractParam` type. If `obj`
 """
-parameters(obj; kwargs...) = parameters(SpeedyParam, obj; kwargs...)
-parameters(::Type{PT}, obj; kwargs...) where {PT<:AbstractParam} = (;)
+parameters(obj; kwargs...) = (;)
+parameters(param::PT; kwargs...) where {PT<:AbstractParam} = parameters(PT, param; kwargs...)
+parameters(param::Union{Number,AbstractArray}; kwargs...) = parameters(SpeedyParam, param; kwargs...)
+parameters(::Type{PT}, obj; kwargs...) where {PT<:AbstractParam} = parameters(obj; kwargs...)
 parameters(::Type{PT}, param::AbstractParam; kwargs...) where {PT<:AbstractParam} = PT(merge(parent(param), kwargs))
 parameters(::Type{PT}, x::Union{Number,AbstractArray}; kwargs...) where {PT<:AbstractParam} = PT(x; kwargs...)
 
@@ -161,7 +162,7 @@ Convenience method that creates a model parameter from its property with the giv
 A parameter attribute `copmonenttype` is automatically added with value `T`.
 """
 parameterof(obj::T, ::Val{propname}; kwargs...) where {T,propname} = parameterof(SpeedyParam, obj, Val{propname}(); kwargs...)
-parameterof(::Type{PT}, obj::T, ::Val{propname}; kwargs...) where {PT,T,propname} = parameters(PT, getproperty(obj, propname); componenttype=T, kwargs...)
+parameterof(::Type{PT}, obj::T, ::Val{propname}; kwargs...) where {PT<:AbstractParam,T,propname} = parameters(PT, getproperty(obj, propname); merge((; kwargs...), (componentttype=T,),)...)
 
 # reconstruct
 
@@ -269,12 +270,12 @@ macro parameterized(expr)
             push!(params, paraminfo)
             # reset lastdoc to nothing to prevent duplication
             lastdoc = nothing
-            isnothing(defval) ? :($fieldname::$FT) : :($fieldname::$FT = $defval)
+            isnothing(defval) ? :($fieldname::$FT;) : :($fieldname::$FT = $defval;)
         # case 1a: untyped parameter
         elseif MacroTools.@capture(ex, @param fieldname_ = defval_ attrs__) || MacroTools.@capture(ex, @param fieldname_ attrs__)
             lastdoc = nothing
             @warn "ignoring untyped parameter $fieldname"
-            isnothing(defval) ? :($fieldname) : :($fieldname = $defval)
+            isnothing(defval) ? :($fieldname;) : :($fieldname = $defval;)
         # case 2: non-parameter field
         elseif MacroTools.@capture(ex, fieldname_::FT_ = defval_) ||
             MacroTools.@capture(ex, fieldname_::FT_) ||

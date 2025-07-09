@@ -11,7 +11,7 @@ import AbstractFFTs
 include("test_utils.jl")
 include("timestep_utils.jl")
 
-# TESTS 
+# TESTS
 include("speedy_transforms.jl")
 include("barotropic.jl")
 #include("primitivewet.jl")
