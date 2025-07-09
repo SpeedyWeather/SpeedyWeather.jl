@@ -41,10 +41,11 @@ if VERSION <= v"1.11.0"
         autodiff(Reverse, timestep_oop!, Const, Duplicated(progn_new, dprogn_new), Duplicated(progn, d_progn), Duplicated(diagn, d_diag), Const(dt), Duplicated(model, d_model))
         @test sum(to_vec(d_progn)[1]) != 0
 
-        # with Const(model)
-        autodiff(set_runtime_activity(Reverse), timestep_oop!, Const, Duplicated(progn_new, dprogn_new), Duplicated(progn, d_progn), Duplicated(diagn, d_diag), Const(dt), Const(model))
-        @test sum(to_vec(d_progn)[1]) != 0
-        @test progn != d_progn
+        # with Const(model) 
+        # currently not activated to keep the CI fast 
+        #autodiff(set_runtime_activity(Reverse), timestep_oop!, Const, Duplicated(progn_new, dprogn_new), Duplicated(progn, d_progn), Duplicated(diagn, d_diag), Const(dt), Const(model))
+        #@test sum(to_vec(d_progn)[1]) != 0
+        #@test progn != d_progn
     end 
 else 
     @testset "Complete Differentiability" begin

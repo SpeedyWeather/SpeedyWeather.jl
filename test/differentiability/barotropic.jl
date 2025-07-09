@@ -85,7 +85,7 @@
         return diagn_new
     end 
     
-    fd_vjp = FiniteDifferences.j′vp(central_fdm(9,1), x -> dynamics_tendencies(diagn_copy, x, lf2, deepcopy(model)), ddiag_copy, progn_copy)
+    fd_vjp = FiniteDifferences.j′vp(central_fdm(15,1), x -> dynamics_tendencies(diagn_copy, x, lf2, model), ddiag_copy, progn_copy)
     
     @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dprogn)[1],rtol=1e-2,atol=1e-1))
  
@@ -161,11 +161,11 @@
     # single variable leapfrog step 
     # 
 
-    A_old = get_step(progn.vor, 1)
+    A_old = progn.vor[:,:,1]
     A_old_copy = deepcopy(A_old)
     dA_old = one(A_old)
 
-    A_new = get_step(progn.vor, 2)
+    A_new = progn.vor[:,:,2]
     A_new_copy = deepcopy(A_new)
     dA_new = one(A_new)
 
