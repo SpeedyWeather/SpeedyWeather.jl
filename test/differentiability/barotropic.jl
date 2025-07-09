@@ -117,9 +117,9 @@
     # should be row-wise `model.horizontal_diffusion.impl .* model.horizontal_diffusion.expl`
     # for all variables that are diffused 
     diff_coefficient = model.horizontal_diffusion.impl .* model.horizontal_diffusion.expl
-    l_indices = [(1:l) for l=1:progn.vor[1].spectrum.mmax]
+    l_indices = [(1:l) for l=1:spectral_grid.spectrum.mmax]
     for (i,il) in enumerate(l_indices)
-        @test all(real.(Matrix(dprogn.vor[lf1][:,1])[i, il]) .≈ diff_coefficient[i])
+        @test all(real.(Matrix(dprogn.vor[:,1,lf1])[i, il]) .≈ diff_coefficient[i])
     end 
 
     # ∂(tend_old)
