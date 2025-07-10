@@ -1,0 +1,8 @@
+@testset "GPU PrimitiveDryModel" begin
+    spectral_grid = SpectralGrid(trunc=32, nlayers=8, architecture=SpeedyWeather.GPU())
+    model = CUDA.@allowscalar PrimitiveDryModel(spectral_grid=spectral_grid)
+    simulation = CUDA.@allowscalar initialize!(model)
+    run!(simulation, steps=4)
+
+    @test simulation.model.feedback.nars_detected == false
+end

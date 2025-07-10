@@ -12,4 +12,5 @@ include("kernels_GPU.jl")
 
 # test if the models run on GPU 
 include("barotropic.jl")
+include("primitive_dry.jl")
 
