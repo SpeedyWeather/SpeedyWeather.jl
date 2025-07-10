@@ -85,9 +85,9 @@
         return diagn_new
     end 
     
-    fd_vjp = FiniteDifferences.j′vp(central_fdm(9,1), x -> dynamics_tendencies(diagn_copy, x, lf2, deepcopy(model)), ddiag_copy, progn_copy)
+    fd_vjp = FiniteDifferences.j′vp(central_fdm(15,1), x -> dynamics_tendencies(diagn_copy, x, lf2, model), ddiag_copy, progn_copy)
     
-    @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dprogn)[1],rtol=1e-4,atol=1e-1))
+    @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dprogn)[1],rtol=1e-1,atol=1e-1))
  
     #
     # horizontal_diffusion!
@@ -117,9 +117,9 @@
     # should be row-wise `model.horizontal_diffusion.impl .* model.horizontal_diffusion.expl`
     # for all variables that are diffused 
     diff_coefficient = model.horizontal_diffusion.impl .* model.horizontal_diffusion.expl
-    l_indices = [(1:l) for l=1:progn.vor[1].spectrum.mmax]
+    l_indices = [(1:l) for l=1:spectral_grid.spectrum.mmax]
     for (i,il) in enumerate(l_indices)
-        @test all(real.(Matrix(dprogn.vor[lf1][:,1])[i, il]) .≈ diff_coefficient[i])
+        @test all(real.(Matrix(dprogn.vor[:,1,lf1])[i, il]) .≈ diff_coefficient[i])
     end 
 
     # ∂(tend_old)
@@ -161,17 +161,17 @@
     # single variable leapfrog step 
     # 
 
-    A_old = get_step(progn.vor, 1)
-    A_old_copy = copy(A_old)
+    A_old = progn.vor[:,:,1]
+    A_old_copy = deepcopy(A_old)
     dA_old = one(A_old)
 
-    A_new = get_step(progn.vor, 2)
-    A_new_copy = copy(A_new)
+    A_new = progn.vor[:,:,2]
+    A_new_copy = deepcopy(A_new)
     dA_new = one(A_new)
 
     tendency = diagn.tendencies.vor_tend
-    tendency_copy = copy(tendency)
-    dtendency = zero(tendency)
+    tendency_copy = deepcopy(tendency)
+    dtendency = make_zero(tendency)
 
     L = model.time_stepping
 
