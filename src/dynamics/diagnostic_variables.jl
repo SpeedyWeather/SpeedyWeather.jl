@@ -44,8 +44,8 @@ $(TYPEDFIELDS)"""
 } <: AbstractDiagnosticVariables
 
     spectrum::SpectrumType            # spectral resolution: maximum degree and order of spherical harmonics
-    grid::GridType              # grid resolution: number of latitude rings on one hemisphere (Eq. incl.)
-    nlayers::Int            # number of vertical layers
+    grid::GridType                    # grid resolution: number of latitude rings on one hemisphere (Eq. incl.)
+    nlayers::Int                      # number of vertical layers
 
     # SPECTRAL TENDENCIES
     "Vorticity of horizontal wind field [1/s]"
@@ -107,7 +107,7 @@ $TYPEDFIELDS."""
     GridVariable3D,         # <: AbstractField
 } <: AbstractDiagnosticVariables
 
-    grid::GridType              # grid resolution: number of latitude rings on one hemisphere (Eq. incl.)
+    grid::GridType          # grid resolution: number of latitude rings on one hemisphere (Eq. incl.)
     nlayers::Int            # number of vertical layers
 
     "Relative vorticity of the horizontal wind [1/s]"
@@ -424,9 +424,9 @@ end
 """$(TYPEDSIGNATURES)
 Generator function."""
 function ParticleVariables(SG::SpectralGrid)
-    (; nparticles, NF, ArrayType) = SG
+    (; architecture, nparticles, NF, ArrayType) = SG
     (; ParticleVector) = SG
-    VectorNF = ArrayType{NF, 1}
+    VectorNF = array_type(architecture, NF, 1)
     interpolator = RingGrids.AnvilInterpolator(SG.grid, nparticles; NF, ArrayType)
     return ParticleVariables{NF,ArrayType, ParticleVector, VectorNF, typeof(interpolator)}(;
             nparticles, interpolator)
@@ -513,10 +513,13 @@ function DiagnosticVariables(
     nbands_shortwave::Integer = 0,
     nbands_longwave::Integer = 0,
 )
-    (; spectrum, nparticles, NF, nlayers) = SG
+    (; spectrum, grid, nparticles, NF, nlayers) = SG
+    (; SpectralVariable2D, SpectralVariable3D) = SG
+    (; GridVariable2D, GridVariable3D) = SG
+    (; ArrayType, VectorType, MatrixType, ParticleVector) = SG
 
     tendencies = Tendencies(SG)
-    grid = GridVariables(SG)
+    grid_variables = GridVariables(SG)
     dynamics = DynamicsVariables(SG; spectral_transform)
     physics = PhysicsVariables(SG)
     particles = ParticleVariables(SG)
@@ -525,9 +528,13 @@ function DiagnosticVariables(
 
     scale = Ref(one(NF))
 
-    return DiagnosticVariables(
-        spectrum, SG.grid, nlayers, nparticles,
-        tendencies, grid, dynamics, physics, particles,
+    return DiagnosticVariables{
+        NF, ArrayType, typeof(spectrum), typeof(grid), SpectralVariable2D, SpectralVariable3D,
+        GridVariable2D, GridVariable3D, ParticleVector, VectorType, MatrixType,
+        typeof(dynamics.scratch_memory), typeof(particles.interpolator)
+    }(
+        spectrum, grid, nlayers, nparticles,
+        tendencies, grid_variables, dynamics, physics, particles,
         column, temp_average, scale,
     )
 end
