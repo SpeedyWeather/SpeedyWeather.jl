@@ -185,11 +185,12 @@ Unscale by cosine of latitude on the fly.
 function unscale_coslat!(
     g_north::AbstractArray{<:Complex, 3}, 
     g_south::AbstractArray{<:Complex, 3}, 
-    coslat⁻¹::AbstractArray{<:Real, 1},
-)
-    launch!(architecture(g_north), :array_3d, size(g_north), unscale_coslat_kernel!, 
+    coslat⁻¹::AbstractArray{<:Real, 1};
+    architecture::AbstractArchitecture = DEFAULT_ARCHITECTURE)
+
+    launch!(architecture, :array_3d, size(g_north), unscale_coslat_kernel!, 
             g_north, g_south, coslat⁻¹)
-    synchronize(architecture(g_north))
+    synchronize(architecture)
 end 
 
 @kernel inbounds=true function unscale_coslat_kernel!(
