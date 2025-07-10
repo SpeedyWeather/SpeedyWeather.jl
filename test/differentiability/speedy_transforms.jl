@@ -32,14 +32,14 @@ fd_tests = [true, true]
 
             # finite difference comparision, seeded with a one adjoint to get the direct gradient
             fd_vjp = FiniteDifferences.j′vp(central_fdm(5,1), x -> transform(x, S), dspecs2, field)
-            @test isapprox(dgrid, fd_vjp[1])
+            @test isapprox(dfield, fd_vjp[1])
 
             ## now backwards, as the input for spec we use the output of the forward transform
 
             fill!(dspecs,0)
             field = zeros(NF, grid, nlayers)
             dfield = similar(field)
-            fill!(dgrid, 1)
+            fill!(dfield, 1)
 
             autodiff(Reverse, transform!, Const, Duplicated(field, dfield), Duplicated(specs, dspecs), Duplicated(S, dS))
 
@@ -218,7 +218,7 @@ end
             v = zero(v)
             dv = fill!(dv, 1+1im)
 
-            vor_grid = rand(spectral_grid.Grid{spectral_grid.NF}, spectral_grid.nlat_half, spectral_grid.nlayers)
+            vor_grid = rand(NF, spectral_grid.grid, spectral_grid.nlayers)
             vor = transform(vor_grid, S)
             dvor = zero(vor)
 
@@ -246,12 +246,12 @@ end
             v = zero(v)
             dv = fill!(dv, 1+1im)
 
-            vor_grid = rand(NF, grid, nlayers)
+            vor_grid = rand(NF, grid, spectral_grid.nlayers)
             vor = transform(vor_grid, S)
             dvor = zero(vor)
 
-            div_grid = rand(NF, grid, nlayers)
-            div = transform(vor_grid, S)
+            div_grid = rand(NF, grid, spectral_grid.nlayers)
+            div = transform(div_grid, S)
             ddiv = zero(vor)
 
             autodiff(Reverse, SpeedyWeather.SpeedyTransforms.UV_from_vordiv!, Const, Duplicated(u, du), Duplicated(v, dv), Duplicated(vor, dvor), Duplicated(div, ddiv), Duplicated(S, dS))
