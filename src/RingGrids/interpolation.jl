@@ -164,9 +164,8 @@ function AnvilInterpolator(
     npoints::Integer;       # number of points to interpolate onto
     NF::Type{<:AbstractFloat} = DEFAULT_NF,
 )
-    (; architecture) = grid
-    geometry = GridGeometry(grid; architecture)        # general coordinates and indices for grid
-    locator = AnvilLocator(NF, npoints; architecture)  # preallocate work arrays for interpolation
+    geometry = GridGeometry(grid)        # general coordinates and indices for grid
+    locator = AnvilLocator(NF, npoints)  # preallocate work arrays for interpolation
 
     # assemble geometry and locator to interpolator
     return AnvilInterpolator(geometry, locator; NF)
