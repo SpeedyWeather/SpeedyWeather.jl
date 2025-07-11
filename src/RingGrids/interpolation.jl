@@ -371,23 +371,24 @@ end
 
 # version for 3D+ fields
 function interpolate!(
-    Aout::AbstractField,        # Out: grid to interpolate onto
-    A::AbstractField,           # In: gridded data to interpolate from
+    Aout::AbstractField,                      # Out: grid to interpolate onto
+    A::AbstractField{NF,N,AT,Grid},           # In: gridded data to interpolate from
     interpolator::AbstractInterpolator,
-)
+) where {NF,N,AT,Grid<:AbstractGrid{<:CPU}}
     # if fields match just copy data over (eltypes might differ)
     fields_match(Aout, A) && return copyto!(Aout.data, A.data)
-
-    _interpolate!(Aout.data, A, interpolator, architecture=A.grid.architecture)
+    for k in eachlayer(Aout, A, vertical_only=true)
+        _interpolate!(view(Aout.data, :, k), view(A.data, :, k), interpolator)
+    end
     return Aout                             # return the field wrapped around the interpolated data
 end
 
 # version for 3D+ fields GPU 
 function interpolate!(
     Aout::AbstractField,
-    A::AbstractField,
+    A::AbstractField{NF,N,AT,Grid},
     interpolator::AbstractInterpolator,
-)
+) where {NF,N,AT,Grid<:AbstractGrid{<:GPU}}
     _interpolate!(Aout.data, A.data, interpolator, architecture=A.grid.architecture)
 end
 
@@ -447,7 +448,7 @@ function find_rings!(   js::AbstractVector{<:Integer},  # Out: ring indices j
                         Δys::AbstractVector,            # Out: distance fractions to ring further south
                         θs::AbstractVector,             # latitudes to interpolate onto
                         latd::AbstractVector;           # latitudes of the rings on the original grid
-                        unsafe::Bool=false;             # skip safety checks when true
+                        unsafe::Bool=false,             # skip safety checks when true
                         architecture::AbstractArchitecture=architecture(js))     
     
     if ~unsafe
@@ -774,9 +775,8 @@ are assumed to be rectangles spanning half way to adjacent longitude
 and latitude points."""
 function grid_cell_average!(
     output::AbstractField,
-    input::AbstractFullField;
-    architecture::CPU=architecture(input))
-
+    input::AbstractFullField{NF,N,AT,Grid}) where {NF<:AbstractFloat, N, AT, Grid<:AbstractGrid{<:CPU}}
+        
     # for i, j indexing
     input_matrix = reshape(input.data, :, get_nlat(input))
 
@@ -928,8 +928,9 @@ end
 # GPU version of grid_cell_average!
 function grid_cell_average!(
     output::AbstractField,
-    input::AbstractFullField;
-    architecture::GPU=architecture(output.data))
+    input::AbstractFullField{NF,N,AT,Grid}) where {NF<:AbstractFloat, N, AT, Grid<:AbstractGrid{<:GPU}}
+    
+    architecture = input.grid.architecture
     
     # Reset output to zeros
     fill!(output.data, 0)

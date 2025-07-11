@@ -195,11 +195,11 @@ end
                     )
 
             n = 4      # resolution parameter nlat_half
-            G1 = rand(G, n)
-            @test eltype(G1) == Float64
+            G1 = rand(G, n) 
+            @test eltype(G1) == Float32 # that's the default
             
             G1 = randn(G, n)
-            @test eltype(G1) == Float64
+            @test eltype(G1) == Float32 # that's the default
             
             G1 = rand(NF, G, n)
             @test eltype(G1) == NF
