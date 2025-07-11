@@ -17,6 +17,9 @@ struct GridGeometry{
 
     nlons::VectorIntType        # number of longitudinal points per ring
     lon_offsets::VectorType     # longitude offsets of first grid point per ring
+
+    # rings, CPU copy of grid.rings
+    rings::Vector{UnitRange{Int}} 
 end
 
 GridGeometry(field::AbstractField; kwargs...) = GridGeometry(field.grid; kwargs...)
@@ -29,9 +32,8 @@ unravelled indices ij."""
 function GridGeometry(
     grid::AbstractGrid;                                     # which grid to calculate the geometry for
     NF::Type{<:AbstractFloat} = DEFAULT_NF,                 # number format for the coordinates
-    ArrayType::Type{<:AbstractArray} = DEFAULT_ARRAYTYPE,   # type of the arrays
 )
-    (; nlat_half) = grid
+    (; architecture, nlat_half) = grid
     nlat = get_nlat(grid)                       # total number of latitude rings
     npoints = get_npoints(grid)                 # total number of grid points
 
@@ -53,12 +55,12 @@ function GridGeometry(
     lon_offsets = [londs[ring[1]] for ring in grid.rings]   # offset of the first point from 0˚E
 
     # vector type
-    ArrayType_ = nonparametric_type(ArrayType)
-    VectorType = ArrayType_{NF, 1}
-    VectorIntType = ArrayType_{Int, 1}
+    VectorType = array_type(architecture, NF, 1)
+    VectorIntType = array_type(architecture, Int, 1)
 
     return GridGeometry{typeof(grid), VectorType, VectorIntType}(
-        grid, nlat_half, nlat, npoints, londs, latd_poles, nlons, lon_offsets)
+        grid, nlat_half, nlat, npoints, londs, latd_poles, nlons, lon_offsets, Vector(grid.rings))
+    )
 end
 
 Base.show(io::IO,G::GridGeometry) = print(io,"GridGeometry for $(G.grid)")
@@ -99,19 +101,18 @@ update the grid indices used for interpolation and their weights. The number for
 NF is the format used for the calculations within the interpolation, the input data
 and/or output data formats may differ."""
 function (::Type{L})(
-    NF::Type{<:AbstractFloat},                              # number format
-    npoints::Integer;                                       # points to interpolate onto
-    ArrayType::Type{<:AbstractArray} = DEFAULT_ARRAYTYPE    # type of the arrays
+    NF::Type{<:AbstractFloat},                                 # number format
+    npoints::Integer; 
+    architecture::AbstractArchitecture = DEFAULT_ARCHITECTURE, # architecture to use
 ) where {L<:AbstractLocator}
 
-    ArrayType_ = nonparametric_type(ArrayType)
-    VectorType = ArrayType_{NF, 1}
-    VectorIntType = ArrayType_{Int, 1}
+    VectorType = array_type(architecture, NF, 1)
+    VectorIntType = array_type(architecture, Int, 1)
 
     return L{NF, VectorType, VectorIntType}(npoints=npoints)
 end
 
-# use Float64 as default for weights
+# use Float32 as default for weights
 (::Type{L})(npoints::Integer; kwargs...) where {L<:AbstractLocator} = L(DEFAULT_NF, npoints; kwargs...)
 
 function Base.show(io::IO,L::AnvilLocator)
@@ -163,10 +164,10 @@ function AnvilInterpolator(
     grid::AbstractGrid,
     npoints::Integer;       # number of points to interpolate onto
     NF::Type{<:AbstractFloat} = DEFAULT_NF,
-    ArrayType::Type{<:AbstractArray} = DEFAULT_ARRAYTYPE,
 )
-    geometry = GridGeometry(grid; ArrayType)        # general coordinates and indices for grid
-    locator = AnvilLocator(NF, npoints; ArrayType)  # preallocate work arrays for interpolation
+    (; architecture) = grid
+    geometry = GridGeometry(grid; architecture)        # general coordinates and indices for grid
+    locator = AnvilLocator(NF, npoints; architecture)  # preallocate work arrays for interpolation
 
     # assemble geometry and locator to interpolator
     return AnvilInterpolator(geometry, locator; NF)
@@ -235,25 +236,23 @@ end
 function interpolate(
     A::AbstractField2D{NF},     # field to interpolate 
     I::AbstractInterpolator;    # indices in I are assumed to be calculated already!
-    ArrayType::Type{<:AbstractArray} = array_type(A),   # type of the output array
     kwargs...
-) where NF                      # use number format from input data also for output
-
-    (; npoints ) = I.locator                    # number of points to interpolate onto
-    ArrayType_ = nonparametric_type(ArrayType)
-    Aout = ArrayType_{NF, 1}(undef, npoints)    # preallocate: onto θs, λs interpolated values of A
-    _interpolate!(Aout, A.data, I)              # perform interpolation, store in Aout
+) where NF
+    (; npoints ) = I.locator                                         # number of points to interpolate onto
+    Aout = array_type(A.grid.architecture, NF, 1)(undef, npoints)    # preallocate: onto θs, λs interpolated values of A
+    _interpolate!(Aout, A.data, I, architecture=A.grid.architecture) # perform interpolation, store in Aout
 end
 
 # the actual interpolation function
 function _interpolate!(
     Aout::AbstractVector,               # Out: interpolated values
     A::AbstractVector,                  # gridded values to interpolate from
-    interpolator::AnvilInterpolator,    # geometry info and work arrays       
+    interpolator::AnvilInterpolator;    # geometry info and work arrays       
+    architecture::CPU=architecture(Aout)
 )
     (; ij_as, ij_bs, ij_cs, ij_ds, Δabs, Δcds, Δys) = interpolator.locator
     (; npoints) = interpolator.geometry
-    (; rings) = interpolator.geometry.grid
+    (; rings) = interpolator.geometry
     
     # 1) Aout's length must match the interpolator
     # 2) input A must match the interpolator's geometry points (do not check grids for view support)
@@ -282,6 +281,74 @@ function _interpolate!(
     return Aout
 end
 
+# the actual interpolation function
+function _interpolate!(
+    Aout,               # Out: interpolated values
+    A,                  # gridded values to interpolate from
+    interpolator::AnvilInterpolator;    # geometry info and work arrays 
+    architecture::GPU=architecture(Aout)      
+)
+    (; ij_as, ij_bs, ij_cs, ij_ds, Δabs, Δcds, Δys) = interpolator.locator
+    (; npoints) = interpolator.geometry
+    (; rings) = interpolator.geometry.grid
+    
+    # 1) Aout's length must match the interpolator
+    # 2) input A must match the interpolator's geometry points (do not check grids for view support)
+    @boundscheck length(Aout) == length(ij_as) || throw(DimensionMismatchArray(Aout, ij_as))
+    @boundscheck length(A) == npoints ||
+        throw(DimensionMismatch("Interpolator ($npoints points) mismatches input grid ($(length(A)) points)."))
+
+    A_northpole, A_southpole = average_on_poles(A, rings)
+
+    #TODO ij_cs, ij_ds shouldn't be 0...
+    @boundscheck extrema_in(ij_as,  0, npoints) || throw(BoundsError)
+    @boundscheck extrema_in(ij_bs,  0, npoints) || throw(BoundsError)
+    @boundscheck extrema_in(ij_cs, -1, npoints) || throw(BoundsError)
+    @boundscheck extrema_in(ij_ds, -1, npoints) || throw(BoundsError)
+
+    launch!(architecture(A),
+    :linear,
+    (npoints,),
+    _kernel!,
+        Aout,
+        A,
+        ij_as,
+        ij_bs,
+        ij_cs,
+        ij_ds,
+        Δabs,
+        Δcds,
+        Δys,
+        A_northpole,
+        A_southpole,
+    )
+    synchronize(architecture(A))
+
+    return Aout
+end
+
+@kernel inbounds=true function _interpolate_kernel!(
+    Aout,               # Out: interpolated values
+    @Const(A),          # gridded values to interpolate from
+    @Const(ij_as),      # indices of A to interpolate from
+    @Const(ij_bs),      # indices of A to interpolate from
+    @Const(ij_cs),      # indices of A to interpolate from
+    @Const(ij_ds),      # indices of A to interpolate from
+    @Const(Δabs),       # weights of A to interpolate from
+    @Const(Δcds),       # weights of A to interpolate from
+    @Const(Δys),        # weights of A to interpolate from
+    @Const(A_northpole),
+    @Const(A_southpole),
+)
+    
+    k = @index(Global, Linear)
+
+    a, b = ij_as[k] ==  0 ? (A_northpole, A_northpole) : (A[ij_as[k]], A[ij_bs[k]])
+    c, d = ij_cs[k] == -1 ? (A_southpole, A_southpole) : (A[ij_cs[k]], A[ij_ds[k]])
+    
+    Aout[k] = anvil_average(a, b, c, d, Δabs[k], Δcds[k], Δys[k])
+end
+
 # version for 2D fields
 function interpolate!(
     Aout::AbstractField2D,      # Out: field to interpolate into
@@ -290,7 +357,7 @@ function interpolate!(
 )
     # if fields match just copy data over (eltypes might differ)
     fields_match(Aout, A) && return copyto!(Aout.data, A.data)
-    _interpolate!(Aout.data, A.data, interpolator)  # use .data to trigger dispatch for method above
+    _interpolate!(Aout.data, A.data, interpolator, architecture=A.grid.architecture)  # use .data to trigger dispatch for method above
     return Aout                             # return the field wrapped around the interpolated data
 end
 
@@ -300,7 +367,7 @@ function interpolate!(
     A::AbstractField2D,         # In: field to interpolate from
     interpolator::AbstractInterpolator,
 )
-    _interpolate!(Aout, A.data, interpolator)  # use .data to trigger dispatch for method above
+    _interpolate!(Aout, A.data, interpolator, architecture=A.grid.architecture)  # use .data to trigger dispatch for method above
 end
 
 # version for 3D+ fields
@@ -312,10 +379,17 @@ function interpolate!(
     # if fields match just copy data over (eltypes might differ)
     fields_match(Aout, A) && return copyto!(Aout.data, A.data)
 
-    for k in eachlayer(Aout, A, vertical_only=true)
-        _interpolate!(view(Aout.data, :, k), view(A.data, :, k), interpolator)
-    end
+    _interpolate!(Aout.data, A, interpolator, architecture=A.grid.architecture)
     return Aout                             # return the field wrapped around the interpolated data
+end
+
+# version for 3D+ fields GPU 
+function interpolate!(
+    Aout::AbstractField,
+    A::AbstractField,
+    interpolator::AbstractInterpolator,
+)
+    _interpolate!(Aout.data, A.data, interpolator, architecture=A.grid.architecture)
 end
 
 # interpolate while creating an interpolator on the fly
@@ -359,7 +433,7 @@ function update_locator!(
     # find latitude ring indices corresponding to interpolation points
     (; latd ) = I.geometry                  # latitudes of rings including north and south pole
     (; js, Δys ) = I.locator                # to be updated: ring indices js, and meridional weights Δys
-    find_rings!(js, Δys, θs, latd; unsafe)  # next ring at or north of θ
+    find_rings!(js, Δys, θs, latd; unsafe, architecture=I.geometry.grid.architecture)  # next ring at or north of θ
 
     # find grid incides ij for top, bottom and left, right grid points around (θ, λ)
     find_grid_indices!(I, λs)               # next points left and right of λ on rings north and south
@@ -374,23 +448,28 @@ function find_rings!(   js::AbstractVector{<:Integer},  # Out: ring indices j
                         Δys::AbstractVector,            # Out: distance fractions to ring further south
                         θs::AbstractVector,             # latitudes to interpolate onto
                         latd::AbstractVector;           # latitudes of the rings on the original grid
-                        unsafe::Bool=false)             # skip safety checks when true
+                        unsafe::Bool=false;             # skip safety checks when true
+                        architecture::AbstractArchitecture=architecture(js))     
     
     if ~unsafe
         θmin, θmax = extrema(θs)
         @assert θmin >= -90 "Latitudes θs are expected to be within [-90˚, 90˚]; θ=$(θmin)˚ given."
         @assert θmax <= 90 "Latitudes θs are expected to be within [-90˚, 90˚]; θ=$(θmax)˚ given."
         
-        @assert isdecreasing(latd) "Latitudes latd are expected to be strictly decreasing."
-        @assert latd[1] == 90 "Latitudes latd are expected to contain 90˚N, the north pole."
+        #TODO: currently we only check the latitudes of the grid we interpolate onto 
+        #TODO: as we only allow instances of Field to be the original grid, the latitudes below 
+        #TODO: should be okay anyway. Checking it on GPU is a bit more annoying...
+
+        #@assert isdecreasing(latd) "Latitudes latd are expected to be strictly decreasing."
+        #@assert latd[1] == 90 "Latitudes latd are expected to contain 90˚N, the north pole."
 
         # Hack: for intervals between rings to be one-sided open [j, j+1) the last element in
         # latd has to be prevfloat(-90) for the <=, > comparisons
-        ϵ = eps(latd[end])  
-        @assert latd[end] == -90-ϵ "Latitudes latd are expected to contain -90˚, the south pole."
+        #ϵ = eps(latd[end])  
+        #@assert latd[end] == -90-ϵ "Latitudes latd are expected to contain -90˚, the south pole."
     end
 
-    find_rings_unsafe!(js, Δys, θs, latd)
+    find_rings_unsafe!(js, Δys, θs, latd; architecture)
 end
 
 DimensionMismatchArray(a::AbstractArray, b::AbstractArray) =
@@ -398,11 +477,12 @@ DimensionMismatchArray(a::AbstractArray, b::AbstractArray) =
 DimensionMismatchArray(a::AbstractArray, bs::AbstractArray...) =
     DimensionMismatch("Arrays have different dimensions: $(size(a)) vs $(map(size, bs))")
 
+# CPU version of find_rings_unsafe!
 function find_rings_unsafe!(js::AbstractVector{<:Integer},  # Out: vector of ring indices
                             Δys::AbstractVector,            # distance fractions to ring further south
                             θs::AbstractVector,             # latitudes of points to interpolate onto
-                            latd::AbstractVector{NF},       # latitudes of rings (90˚ to -90˚, strictly decreasing)
-                            ) where {NF<:AbstractFloat}
+                            latd::AbstractVector{NF};       # latitudes of rings (90˚ to -90˚, strictly decreasing)
+                            architecture::CPU=architecture(js)) where {NF<:AbstractFloat}
 
     @boundscheck length(js) == length(θs) || throw(DimensionMismatchArray(js, θs))
     @boundscheck length(js) == length(Δys) || throw(DimensionMismatchArray(js, Δys))
@@ -424,6 +504,68 @@ function find_rings_unsafe!(js::AbstractVector{<:Integer},  # Out: vector of rin
     end
 end
 
+# GPU kernel for finding ring indices
+@kernel inbounds=true function find_rings_kernel!(
+    js,                # Out: ring indices j
+    Δys,               # Out: distance fractions to ring further south
+    @Const(θs),        # latitudes to interpolate onto
+    @Const(latd)       # latitudes of the rings on the original grid
+)
+    k = @index(Global, Linear)
+    
+    # Binary search to find the ring index for this latitude
+    θ = θs[k]
+    
+    # Initialize search bounds
+    j_low = 1
+    j_high = length(latd) - 1
+    
+    # Binary search for the ring that contains this latitude
+    j = 1  # Default starting point
+    
+    # Binary search is more efficient on GPU than linear search
+    while j_low <= j_high
+        j_mid = (j_low + j_high) ÷ 2
+        
+        if θ <= latd[j_mid] && (j_mid == length(latd) - 1 || θ > latd[j_mid + 1])
+            # Found the correct ring
+            j = j_mid
+            break
+        elseif θ > latd[j_mid]
+            j_high = j_mid - 1
+        else
+            j_low = j_mid + 1
+        end
+    end
+    
+    # Store results
+    js[k] = j - 1  # Convert to 1-based indexed rings
+    Δys[k] = (latd[j] - θ) / (latd[j] - latd[j+1])
+end
+
+# GPU version of find_rings_unsafe! using KernelAbstractions
+function find_rings_unsafe!(js::AbstractArray{<:Integer},  # Out: vector of ring indices
+                           Δys::AbstractArray,            # distance fractions to ring further south
+                           θs::AbstractArray,             # latitudes of points to interpolate onto
+                           latd::AbstractArray{NF};       # latitudes of rings (90˚ to -90˚, strictly decreasing)
+                           architecture::GPU=architecture(js)) where {NF<:AbstractFloat}
+    
+    @boundscheck length(js) == length(θs) || throw(DimensionMismatchArray(js, θs))
+    @boundscheck length(js) == length(Δys) || throw(DimensionMismatchArray(js, Δys))
+        
+    launch!(
+        architecture,
+        :linear,
+        size(js),
+        find_rings_kernel!,
+        js,
+        Δys,
+        θs,
+        latd
+    )
+    synchronize(architecture)
+end
+
 # for testing only
 function find_rings(θs::AbstractVector, latd::AbstractVector{NF}) where NF
     js = Vector{Int}(undef, length(θs))
@@ -432,6 +574,7 @@ function find_rings(θs::AbstractVector, latd::AbstractVector{NF}) where NF
     return js, Δys
 end
 
+# CPU version of find_grid_indices!
 function find_grid_indices!(I::AnvilInterpolator,       # update indices arrays
                             λs::AbstractVector)         # based on new longitudes λ
 
@@ -472,7 +615,82 @@ function find_grid_indices!(I::AnvilInterpolator,       # update indices arrays
     end
 end
 
-function find_lon_indices(  λ::NF,      # longitude to find incides for (0˚...360˚E)
+# GPU kernel for finding grid indices
+@kernel inbounds=true function find_grid_indices_kernel!(
+    @Const(js),            # ring indices j
+    ij_as, ij_bs,          # northern point indices
+    ij_cs, ij_ds,          # southern point indices
+    Δabs, Δcds,            # distance fractions
+    @Const(λs),            # longitudes to interpolate onto
+    @Const(lon_offsets),   # longitude offsets for each ring
+    @Const(nlons),         # number of longitude points per ring
+    @Const(nlat),          # number of latitude rings
+    @Const(rings)          # ring indices
+)
+    k = @index(Global, Linear)
+    
+    j = js[k]
+    λ = λs[k]
+    
+    # NORTHERN POINTS a, b
+    if j == 0               # a, b are at the north pole
+        ij_as[k] = 0        # use 0 as north pole flag
+        ij_bs[k] = 0
+    else
+        # get in-ring index i for a, the next grid point to the left
+        # and b the next grid point to the right, such that
+        # λ ∈ [a, b); while in most cases i_a + 1 = i_b, across 0˚E this is not the case
+        i_a, i_b, Δ = find_lon_indices(λ, lon_offsets[j], nlons[j])
+        ij_as[k] = rings[j][i_a]    # index ij for a
+        ij_bs[k] = rings[j][i_b]    # index ij for b
+        Δabs[k] = Δ                 # distance fraction of λ between a, b
+    end
+
+    # SOUTHERN POINTS c, d
+    if j == nlat                    # c, d are at the south pole
+        ij_cs[k] = -1               # use -1 as south pole flag
+        ij_ds[k] = -1
+    else
+        # as above but for one ring further down
+        i_c, i_d, Δ = find_lon_indices(λ, lon_offsets[j+1], nlons[j+1])
+        ij_cs[k] = rings[j+1][i_c]  # index ij for c
+        ij_ds[k] = rings[j+1][i_d]  # index ij for d
+        Δcds[k] = Δ                 # distance fraction of λ between c, d
+    end
+end
+
+# GPU version of find_grid_indices! using KernelAbstractions
+function find_grid_indices!(I::AnvilInterpolator,       # update indices arrays
+                           λs::AbstractArray,           # based on new longitudes λ
+                           architecture::GPU=architecture(λs))
+                           
+    (; js, ij_as, ij_bs, ij_cs, ij_ds ) = I.locator
+    (; Δabs, Δcds ) = I.locator
+    (; nlons, lon_offsets, nlat ) = I.geometry
+    (; rings ) = I.geometry.grid
+    
+    # Convert λs to the same type as lon_offsets if needed
+    λs_converted = convert.(eltype(lon_offsets), λs)
+    
+    launch!(
+        architecture,
+        :linear,
+        size(js),
+        find_grid_indices_kernel!,
+        js,
+        ij_as, ij_bs,
+        ij_cs, ij_ds,
+        Δabs, Δcds,
+        λs_converted,
+        lon_offsets,
+        nlons,
+        nlat,
+        rings
+    )
+    synchronize(architecture)
+end
+
+@inline function find_lon_indices(λ::NF,     # longitude to find incides for (0˚...360˚E)
                             λ₀::NF,     # offset of the first longitude point on ring
                             nlon::Int   # number of longitude points on ring
                             ) where {NF<:AbstractFloat}
@@ -493,17 +711,17 @@ $(TYPEDSIGNATURES)
 Computes the average at the North and South pole from a given grid `A` and it's precomputed
 ring indices `rings`. The North pole average is an equally weighted average of all grid points
 on the northern-most ring. Similar for the South pole."""
-function average_on_poles(A::AbstractVector{NF}, rings) where {NF<:AbstractFloat}   
+@inline function average_on_poles(A::AbstractVector{NF}, rings) where {NF<:AbstractFloat}   
     A_northpole = mean(view(A, rings[1]))     # average of all grid points around the north pole
     A_southpole = mean(view(A, rings[end]))   # same for south pole
-    return convert(NF, A_northpole), convert(NF, A_southpole)
+    return A_northpole, A_southpole
 end
-
+    
 """
 $(TYPEDSIGNATURES)
 Method for `A::Abstract{T<:Integer}` which rounds the averaged values
 to return the same number format `NF`."""
-function average_on_poles(A::AbstractVector{NF}, rings) where {NF<:Integer}
+@inline function average_on_poles(A::AbstractVector{NF}, rings) where {NF<:Integer}
     A_northpole = mean(view(A, rings[1]))    # average of all grid points around the north pole
     A_southpole = mean(view(A, rings[end]))  # same for south pole
     return round(NF, A_northpole), round(NF, A_southpole)
@@ -531,7 +749,7 @@ longitude/x-coordinate. See schematic:
               0...............1 # fraction of distance Δcd between c, d
 ```
 ^ fraction of distance Δy between a-b and c-d."""
-function anvil_average(
+@inline function anvil_average(
     a,      # top left value
     b,      # top right value
     c,      # bottom left value
@@ -557,7 +775,8 @@ are assumed to be rectangles spanning half way to adjacent longitude
 and latitude points."""
 function grid_cell_average!(
     output::AbstractField,
-    input::AbstractFullField)
+    input::AbstractFullField;
+    architecture::CPU=architecture(input))
 
     # for i, j indexing
     input_matrix = reshape(input.data, :, get_nlat(input))
@@ -625,6 +844,142 @@ function grid_cell_average!(
             output[ij] /= sum_of_weights
         end
     end
+    
+    return output
+end
+
+# GPU kernel for grid cell averaging
+@kernel inbounds=true function grid_cell_average_kernel!(
+    output_data,                # Output field data
+    @Const(input_data),         # Input field data
+    @Const(input_nlat),         # Number of latitudes in input
+    @Const(colat_in),           # Colatitudes of input grid
+    @Const(coslat),             # Cosine of latitudes (weights)
+    @Const(lon_in),             # Longitudes of input grid
+    @Const(nlon_in),            # Number of longitudes in input
+    @Const(colat_out),          # Colatitudes of output grid (with padding)
+    @Const(lons_out),           # Longitudes of output grid
+    @Const(whichring),          # Precomputed ring indices for each grid point
+    @Const(ring_spacings)       # Precomputed longitude spacings (Δϕ) for each ring
+)
+    # Get the output grid point index
+    ij = @index(Global, Linear)
+    
+    # Get the ring index from precomputed whichring
+    j = whichring[ij]
+    
+    # Get precomputed longitude spacing for this ring
+    Δϕ = ring_spacings[j]
+    
+    # Calculate latitude boundaries
+    θ0 = (colat_out[j] + colat_out[j+1]) / 2    # northern edge
+    θ1 = (colat_out[j+1] + colat_out[j+2]) / 2  # southern edge
+
+    # Matrix indices for input grid that lie in output grid cell
+    j0 = findfirst(θ -> θ >= θ0, colat_in)  # northern edge
+    j1 = findlast(θ -> θ < θ1, colat_in)    # southern edge
+    
+    # Calculate longitude boundaries
+    ϕ0 = mod(lons_out[ij] - Δϕ/2, 2π)  # western edge
+    ϕ1 = ϕ0 + Δϕ                       # eastern edge
+    
+    # Matrix indices for input grid that lie in output grid cell
+    a = findlast(ϕ -> ϕ < ϕ0, lon_in)      # western edge
+    b = findfirst(ϕ -> ϕ >= ϕ1, lon_in)    # eastern edge
+    
+    # Map around prime meridian if coordinates outside of range
+    a = isnothing(a) ? nlon_in : a
+    b = isnothing(b) ? 1 : b
+    
+    # Process the grid cell averaging
+    sum_of_weights = 0.0
+    weighted_sum = 0.0
+    
+    # Handle the case where we need to wrap around the prime meridian
+    if b < a
+        # First part: 1 to b
+        for j′ in j0:j1
+            for i in 1:b
+                w = coslat[j′]
+                sum_of_weights += w
+                weighted_sum += w * input_data[(j′-1)*nlon_in + i]
+            end
+            
+            # Second part: a to nlon_in
+            for i in a:nlon_in
+                w = coslat[j′]
+                sum_of_weights += w
+                weighted_sum += w * input_data[(j′-1)*nlon_in + i]
+            end
+        end
+    else
+        # Simple case: a to b
+        for j′ in j0:j1
+            for i in a:b
+                w = coslat[j′]
+                sum_of_weights += w
+                weighted_sum += w * input_data[(j′-1)*nlon_in + i]
+            end
+        end
+    end
+    
+    output_data[ij] = weighted_sum / sum_of_weights
+end
+
+# GPU version of grid_cell_average!
+function grid_cell_average!(
+    output::AbstractField,
+    input::AbstractFullField;
+    architecture::GPU=architecture(output.data))
+    
+    # Reset output to zeros
+    fill!(output.data, 0)
+    
+    # Prepare input data in the right format for the kernel
+    input_matrix = reshape(input.data, :, get_nlat(input))
+    input_nlat = get_nlat(input)
+    
+    # Input grid coordinates
+    colat_in = get_colat(input)
+    coslat = sin.(colat_in)    # cos(lat) = sin(colat)
+    lon_in = get_lon(input)
+    nlon_in = length(lon_in)
+    
+    # Output grid coordinates with padding
+    colat_out = vcat(-π, get_colat(output), 2π)
+    lons_out, _ = get_lonlats(output)
+    
+    # Get precomputed ring information from the grid
+    whichring = output.grid.whichring
+    
+    # Precompute longitude spacings for each ring
+    rings = eachring(output)
+    ring_sizes = [length(ring) for ring in rings]
+    
+    # Create array on the appropriate architecture with inferred element type
+    T = eltype(output.data)
+    ring_spacings = similar(output.data, length(rings))
+    map!(i -> T(2π) / ring_sizes[i], ring_spacings, 1:length(rings))
+    
+    # Launch the kernel
+    launch!(
+        architecture,
+        :linear,
+        size(output.data),
+        grid_cell_average_kernel!,
+        output.data,
+        input.data,
+        input_nlat,
+        colat_in,
+        coslat,
+        lon_in,
+        nlon_in,
+        colat_out,
+        lons_out,
+        whichring,
+        ring_spacings
+    )
+    synchronize(architecture)
     
     return output
 end

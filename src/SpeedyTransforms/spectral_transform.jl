@@ -1,6 +1,6 @@
 const DEFAULT_NLAYERS = 1
 const DEFAULT_GRID = FullGaussianGrid
-const DEFAULT_NF = Float64
+const DEFAULT_NF = Float32
 const DEFAULT_ARRAYTYPE = Array
 
 abstract type AbstractSpectralTransform end

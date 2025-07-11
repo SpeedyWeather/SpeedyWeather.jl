@@ -107,7 +107,7 @@ export  interpolate,
 export zonal_mean
 
 # CONSTANTS
-const DEFAULT_NF = Float64
+const DEFAULT_NF = Float32
 const DEFAULT_ARRAYTYPE = Array
 const DEFAULT_ARCHITECTURE = CPU
 

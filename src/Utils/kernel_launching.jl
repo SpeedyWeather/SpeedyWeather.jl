@@ -40,6 +40,8 @@ function work_layout(dims_type::Symbol, worksize::NTuple{N, Int}) where N
         return heuristic_workgroup(worksize[2], worksize[3:end]...), (worksize[2], worksize[3:end]...)
     elseif dims_type == :array_3d # kernel over a regular 3D array
         return heuristic_workgroup(worksize...), worksize
+    elseif dims_type == :linear # kernel over eachindex / linear
+        return heuristic_workgroup(prod(worksize)), (prod(worksize),)
     else 
         error("Not yet implemented")
     end 
