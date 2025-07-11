@@ -1,7 +1,7 @@
 @testset "GPU interpolation" begin
     arch = SpeedyWeather.GPU()
-    grid_in = HEALPixGrid(40, architecture=arch)
-    grid_out = FullClenshawGrid(30, architecture=arch)
+    grid_in = HEALPixGrid(40, arch)
+    grid_out = FullClenshawGrid(30, arch)
     interp = RingGrids.interpolator(grid_out, grid_in)
     
     field_in = on_architecture(arch, rand(grid_in))
