@@ -225,7 +225,7 @@ end
 
             n = 4      # resolution parameter nlat_half
             field1 = F(undef, n)
-            @test eltype(field1) == Float64
+            @test eltype(field1) == Float32     # that's the default NF
             
             field2 = F{NF}(undef, n)
             @test eltype(field2) == NF
