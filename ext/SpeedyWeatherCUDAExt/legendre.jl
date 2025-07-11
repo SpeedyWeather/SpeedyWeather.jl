@@ -121,12 +121,10 @@ function SpeedyTransforms._legendre!(
         threads, 
         blocks
     )
-    
+    CUDA.synchronize()
+
     if unscale_coslat
-        @inbounds for j in 1:nlat_half          # symmetry: loop over northern latitudes only
-            g_north[:, nlayers, j] .*= coslat⁻¹[j]        # scale in place
-            g_south[:, nlayers, j] .*= coslat⁻¹[j]
-        end
+        SpeedyWeather.SpeedyTransforms.unscale_coslat!(g_north, g_south, coslat⁻¹)
     end
 end
 

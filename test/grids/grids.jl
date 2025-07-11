@@ -195,11 +195,11 @@ end
                     )
 
             n = 4      # resolution parameter nlat_half
-            G1 = rand(G, n)
-            @test eltype(G1) == Float64
+            G1 = rand(G, n) 
+            @test eltype(G1) == Float32 # that's the default
             
             G1 = randn(G, n)
-            @test eltype(G1) == Float64
+            @test eltype(G1) == Float32 # that's the default
             
             G1 = rand(NF, G, n)
             @test eltype(G1) == NF
@@ -225,7 +225,7 @@ end
 
             n = 4      # resolution parameter nlat_half
             field1 = F(undef, n)
-            @test eltype(field1) == Float64
+            @test eltype(field1) == Float32     # that's the default NF
             
             field2 = F{NF}(undef, n)
             @test eltype(field2) == NF
