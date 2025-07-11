@@ -52,7 +52,7 @@ function GridGeometry(
 
     # RINGS and LONGITUDE OFFSETS
     nlons = get_nlons(grid)                                 # number of longitude per ring, pole to pole
-    lon_offsets = [londs[ring[1]] for ring in grid.rings]   # offset of the first point from 0˚E
+    lon_offsets = [londs[ring[1]] for ring in eachring(grid)]   # offset of the first point from 0˚E
 
     # vector type
     VectorType = array_type(architecture, NF, 1)
