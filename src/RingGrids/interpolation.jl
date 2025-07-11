@@ -102,7 +102,7 @@ and/or output data formats may differ."""
 function (::Type{L})(
     NF::Type{<:AbstractFloat},                                 # number format
     npoints::Integer; 
-    architecture::AbstractArchitecture = DEFAULT_ARCHITECTURE, # architecture to use
+    architecture::AbstractArchitecture = DEFAULT_ARCHITECTURE(), # architecture to use
 ) where {L<:AbstractLocator}
 
     VectorType = array_type(architecture, NF, 1)
@@ -165,7 +165,7 @@ function AnvilInterpolator(
     NF::Type{<:AbstractFloat} = DEFAULT_NF,
 )
     geometry = GridGeometry(grid)        # general coordinates and indices for grid
-    locator = AnvilLocator(NF, npoints)  # preallocate work arrays for interpolation
+    locator = AnvilLocator(NF, npoints; architecture = grid.architecture)  # preallocate work arrays for interpolation
 
     # assemble geometry and locator to interpolator
     return AnvilInterpolator(geometry, locator; NF)
