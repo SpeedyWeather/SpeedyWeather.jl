@@ -60,7 +60,6 @@ function GridGeometry(
 
     return GridGeometry{typeof(grid), VectorType, VectorIntType}(
         grid, nlat_half, nlat, npoints, londs, latd_poles, nlons, lon_offsets, Vector(grid.rings))
-    )
 end
 
 Base.show(io::IO,G::GridGeometry) = print(io,"GridGeometry for $(G.grid)")
