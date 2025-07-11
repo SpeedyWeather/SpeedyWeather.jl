@@ -12,7 +12,7 @@ export rotate, rotate!
 
 import Adapt: Adapt, adapt, adapt_structure
 import GPUArrays
-import KernelAbstractions
+import KernelAbstractions: KernelAbstractions, @kernel, @index, @Const, synchronize
 import ..Architectures: Architectures, AbstractArchitecture, on_architecture, array_type, 
     ismatching, CPU, GPU, architecture
 
