@@ -512,4 +512,4 @@ function Adapt.adapt_structure(to, field::Field{T, N, ArrayType, Grid}) where {T
 end
 
 Architectures.architecture(field::AbstractField) = architecture(field.grid)
-on_architecture(arch, field::AbstractField) = Adapt.adapt(array_type(arch), field)
+Architectures.on_architecture(arch, field::AbstractField) = Adapt.adapt(array_type(arch), field)

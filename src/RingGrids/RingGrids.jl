@@ -15,7 +15,8 @@ import GPUArrays
 import KernelAbstractions: KernelAbstractions, @kernel, @index, @Const, synchronize
 
 # SPEEDYWEATHER SUBMODULES
-using ..Architectures
+import ..Architectures: Architectures, AbstractArchitecture, CPU, GPU, 
+        on_architecture, architecture, array_type, ismatching
 using ..Utils
 
 # ABSTRACT GRIDS
