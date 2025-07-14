@@ -468,7 +468,7 @@ function find_rings!(   js::AbstractVector{<:Integer},  # Out: ring indices j
         #@assert latd[end] == -90-ϵ "Latitudes latd are expected to contain -90˚, the south pole."
     end
 
-    find_rings_unsafe!(js, Δys, θs, latd; architecture)
+    find_rings_unsafe!(js, Δys, θs, latd, architecture)
 end
 
 DimensionMismatchArray(a::AbstractArray, b::AbstractArray) =
@@ -480,8 +480,8 @@ DimensionMismatchArray(a::AbstractArray, bs::AbstractArray...) =
 function find_rings_unsafe!(js::AbstractVector{<:Integer},  # Out: vector of ring indices
                             Δys::AbstractVector,            # distance fractions to ring further south
                             θs::AbstractVector,             # latitudes of points to interpolate onto
-                            latd::AbstractVector{NF};       # latitudes of rings (90˚ to -90˚, strictly decreasing)
-                            architecture::CPU=architecture(js)) where {NF<:AbstractFloat}
+                            latd::AbstractVector{NF},       # latitudes of rings (90˚ to -90˚, strictly decreasing)
+                            architecture::CPU) where {NF<:AbstractFloat}
 
     @boundscheck length(js) == length(θs) || throw(DimensionMismatchArray(js, θs))
     @boundscheck length(js) == length(Δys) || throw(DimensionMismatchArray(js, Δys))
@@ -546,8 +546,8 @@ end
 function find_rings_unsafe!(js::AbstractArray{<:Integer},  # Out: vector of ring indices
                            Δys::AbstractArray,            # distance fractions to ring further south
                            θs::AbstractArray,             # latitudes of points to interpolate onto
-                           latd::AbstractArray{NF};       # latitudes of rings (90˚ to -90˚, strictly decreasing)
-                           architecture::GPU=architecture(js)) where {NF<:AbstractFloat}
+                           latd::AbstractArray{NF},       # latitudes of rings (90˚ to -90˚, strictly decreasing)
+                           architecture::GPU) where {NF<:AbstractFloat}
     
     @boundscheck length(js) == length(θs) || throw(DimensionMismatchArray(js, θs))
     @boundscheck length(js) == length(Δys) || throw(DimensionMismatchArray(js, Δys))
