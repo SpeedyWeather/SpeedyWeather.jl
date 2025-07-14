@@ -177,16 +177,15 @@ reconstruct(obj::AbstractParam, value::T) where {T} = ModelParameters.update(obj
 reconstruct(obj::NamedTuple{keys,V}, values::NamedTuple{keys,V}) where {keys,V<:Tuple} = values
 reconstruct(obj, values::ComponentArray) = reconstruct(obj, NamedTuple(values))
 reconstruct(obj, values::SpeedyParams) = reconstruct(obj, stripparams(values))
-function reconstruct(obj, values::NamedTuple{keys}) where {keys}
-    # extract properties from obj as named tuple
-    nt = getproperties(obj)
-    # recursively call reconstruct for all keys specified in values
-    patchvals = map(keys) do key
-        reconstruct(nt[key], values[key])
+@generated function reconstruct(obj, values::NamedTuple{keys}) where {keys}
+    recursive_calls = map(k -> :(reconstruct(obj.$k, values.$k)), keys)
+    quote
+        # recursively call reconstruct for all keys specified in values
+        patchvals = tuple($(recursive_calls...))
+        # construct a named tuple with the reconstructed values and apply with setproperties
+        patch = NamedTuple{keys}(patchvals)
+        return setproperties(obj, patch)
     end
-    # construct a named tuple with the reconstructed values and apply with setproperties
-    patch = NamedTuple{keys}(patchvals)
-    return setproperties(obj, patch)
 end
 
 """

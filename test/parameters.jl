@@ -38,7 +38,7 @@ end
     spectral_grid = SpectralGrid(trunc=31, nlayers=1)   # define resolution
     model = BarotropicModel(spectral_grid)
     model_ps = parameters(model)
-    new_model = reconstruct(model, 2*vec(model_ps))
+    new_model = @inferred reconstruct(model, 2*vec(model_ps))
     new_model_ps = parameters(new_model)
     @test all(vec(new_model_ps) .== 2*vec(model_ps))
     # test parameter subsets
@@ -52,7 +52,7 @@ end
     @test haskey(vec(planet_hc_ps), :planet) && haskey(vec(planet_hc_ps), :atmosphere)
     # test reconstruction from subset
     new_model_ps2 = 2*vec(planet_hc_ps)
-    new_model2 = reconstruct(model, new_model_ps2)
+    new_model2 = @inferred reconstruct(model, new_model_ps2)
     @test vec(parameters(new_model2.planet)) == new_model_ps2.planet
     @test vec(parameters(new_model2.atmosphere)).heat_capacity == new_model_ps2.atmosphere.heat_capacity
     ## check if functional constraints are preserved
