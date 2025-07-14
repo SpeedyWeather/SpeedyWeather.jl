@@ -65,6 +65,18 @@ function Base.array_summary(io::IO, field::AbstractField, inds::Tuple{Vararg{Bas
     Base.showarg(io, field, true)
 end
 
+function Base.show(io::IO, ::MIME"text/plain", field::AbstractField)
+    Base.array_summary(io, field, axes(field))
+
+    if get(io, :limit, false)::Bool && displaysize(io)[1]-4 <= 0
+        return print(io, " …")
+    else
+        println(io)
+    end
+    
+    Base.print_array(io, field.data)
+end
+
 # TYPE: reduced (fewer points around poles) or full (constant number of longitudes)
 isreduced(::Type{<:AbstractField}) = true
 isreduced(::Type{<:AbstractFullField}) = false

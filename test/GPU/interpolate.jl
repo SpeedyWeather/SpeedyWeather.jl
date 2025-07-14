@@ -6,7 +6,7 @@
     
     field_in = on_architecture(arch, rand(grid_in))
     field_out = on_architecture(arch, zeros(grid_out))
-    interpolate!(field_out, field_in, interp)
+    RingGrids.interpolate!(field_out, field_in, interp)
     
     cpu_arch = SpeedyWeather.CPU()
     field_in_cpu = on_architecture(cpu_arch, field_in)

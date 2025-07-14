@@ -199,6 +199,9 @@ function interpolator(
 )
     I = interpolator(grid_in, get_npoints(grid_out); kwargs...)
     londs, latds = get_londlatds(grid_out)
+    londs = on_architecture(architecture(grid_in), londs)
+    latds = on_architecture(architecture(grid_in), latds)
+
     update_locator!(I, londs, latds, unsafe=false)
     return I
 end
@@ -237,8 +240,8 @@ function interpolate(
     kwargs...
 ) where NF
     (; npoints ) = I.locator                                         # number of points to interpolate onto
-    Aout = array_type(A.grid.architecture, NF, 1)(undef, npoints)    # preallocate: onto θs, λs interpolated values of A
-    _interpolate!(Aout, A.data, I, architecture=A.grid.architecture) # perform interpolation, store in Aout
+    Aout = array_type(architecture(A), NF, 1)(undef, npoints)    # preallocate: onto θs, λs interpolated values of A
+    _interpolate!(Aout, A.data, I, architecture=architecture(A)) # perform interpolation, store in Aout
 end
 
 # the actual interpolation function
@@ -284,7 +287,7 @@ function _interpolate!(
     Aout,               # Out: interpolated values
     A,                  # gridded values to interpolate from
     interpolator::AnvilInterpolator;    # geometry info and work arrays 
-    architecture::GPU=architecture(Aout)      
+    architecture::GPU=architecture(A)      
 )
     (; ij_as, ij_bs, ij_cs, ij_ds, Δabs, Δcds, Δys) = interpolator.locator
     (; npoints) = interpolator.geometry
@@ -355,7 +358,7 @@ function interpolate!(
 )
     # if fields match just copy data over (eltypes might differ)
     fields_match(Aout, A) && return copyto!(Aout.data, A.data)
-    _interpolate!(Aout.data, A.data, interpolator, architecture=A.grid.architecture)  # use .data to trigger dispatch for method above
+    _interpolate!(Aout.data, A.data, interpolator, architecture=architecture(A))  # use .data to trigger dispatch for method above
     return Aout                             # return the field wrapped around the interpolated data
 end
 
@@ -365,7 +368,8 @@ function interpolate!(
     A::AbstractField2D,         # In: field to interpolate from
     interpolator::AbstractInterpolator,
 )
-    _interpolate!(Aout, A.data, interpolator, architecture=A.grid.architecture)  # use .data to trigger dispatch for method above
+    @assert ismatching(architecture(Aout), architecture(A)) "Interpolation is only supported between fields on the same architecture."
+    _interpolate!(Aout, A.data, interpolator, architecture=architecture(A))  # use .data to trigger dispatch for method above
 end
 
 # version for 3D+ fields
@@ -388,7 +392,8 @@ function interpolate!(
     A::AbstractField{NF,N,AT,Grid},
     interpolator::AbstractInterpolator,
 ) where {NF,N,AT,Grid<:AbstractGrid{<:GPU}}
-    _interpolate!(Aout.data, A.data, interpolator, architecture=A.grid.architecture)
+    @assert ismatching(architecture(Aout), architecture(A)) "Interpolation is only supported between fields on the same architecture."
+    _interpolate!(Aout.data, A.data, interpolator, architecture=architecture(A))
 end
 
 # interpolate while creating an interpolator on the fly
@@ -421,7 +426,7 @@ function interpolate(
 end
 
 # if only the grid type is provided, create a grid with nlat_half and architecture from the input field
-interpolate(Grid::Type{<:AbstractGrid}, A::AbstractField; kwargs...) = interpolate(Grid(A.grid.nlat_half, A.grid.architecture), A; kwargs...)
+interpolate(Grid::Type{<:AbstractGrid}, A::AbstractField; kwargs...) = interpolate(Grid(A.grid.nlat_half, architecture(A)), A; kwargs...)
 
 function update_locator!(
     I::AbstractInterpolator,    # GridGeometry and Locator
@@ -435,11 +440,14 @@ function update_locator!(
     find_rings!(js, Δys, θs, latd; unsafe, architecture=I.geometry.grid.architecture)  # next ring at or north of θ
 
     # find grid incides ij for top, bottom and left, right grid points around (θ, λ)
-    find_grid_indices!(I, λs)               # next points left and right of λ on rings north and south
+    find_grid_indices!(I, λs, I.geometry.grid.architecture)               # next points left and right of λ on rings north and south
 end
 
 function update_locator!(I::AbstractInterpolator, A::AbstractField; kwargs...)
     londs, latds = get_londlatds(A.grid)
+    londs = on_architecture(architecture(A), londs)
+    latds = on_architecture(architecture(A), latds)
+
     update_locator!(I, londs, latds; kwargs...)
 end
 
@@ -575,7 +583,8 @@ end
 
 # CPU version of find_grid_indices!
 function find_grid_indices!(I::AnvilInterpolator,       # update indices arrays
-                            λs::AbstractVector)         # based on new longitudes λ
+                            λs::AbstractVector, 
+                            architecture::CPU)         # based on new longitudes λ
 
     (; js, ij_as, ij_bs, ij_cs, ij_ds ) = I.locator
     (; Δabs, Δcds ) = I.locator
@@ -661,7 +670,7 @@ end
 # GPU version of find_grid_indices! using KernelAbstractions
 function find_grid_indices!(I::AnvilInterpolator,       # update indices arrays
                            λs::AbstractArray,           # based on new longitudes λ
-                           architecture::GPU=architecture(λs))
+                           architecture::GPU)
                            
     (; js, ij_as, ij_bs, ij_cs, ij_ds ) = I.locator
     (; Δabs, Δcds ) = I.locator
@@ -929,7 +938,7 @@ function grid_cell_average!(
     output::AbstractField,
     input::AbstractFullField{NF,N,AT,Grid}) where {NF<:AbstractFloat, N, AT, Grid<:AbstractGrid{<:GPU}}
     
-    architecture = input.grid.architecture
+    architecture = architecture(input)
     
     # Reset output to zeros
     fill!(output.data, 0)
