@@ -35,8 +35,8 @@ field_type(grid::AbstractGrid) = field_type(typeof(grid))
 field_type(::Type{G}) where {G<:AbstractGrid} = Field{T, N, A, G} where {T, N, A}
 full_grid_type(field::AbstractField) = full_grid_type(typeof(field.grid))
 full_grid_type(::Type{F}) where {F<:AbstractField} = full_grid_type(grid_type(F))
-array_type(::Type{Field{T, N, A, G}}) where {T, N, A, G} = A
-array_type(field::AbstractField) = array_type(typeof(field))
+Architectures.array_type(::Type{Field{T, N, A, G}}) where {T, N, A, G} = A
+Architectures.array_type(field::AbstractField) = array_type(typeof(field))
 
 # test number of horizontal grid points matches
 data_matches_grid(data::AbstractArray, grid::AbstractGrid) = size(data, 1) == get_npoints(grid)
