@@ -29,6 +29,10 @@ function ADSimulation(sim::AbstractSimulation)
     )
 end
 
+prognosticseed(adsim::ADSimulation) = deepcopy(adsim.progvars), one(adsim.progvars)
+
+diagnosticseed(adsim::ADSimulation) = deepcopy(adsim.diagvars), one(adsim.diagvars)
+
 function Base.one(diag::DiagnosticVariables{NF}) where NF
     vec, re = to_vec(diag)
     vec .= NF(1)
