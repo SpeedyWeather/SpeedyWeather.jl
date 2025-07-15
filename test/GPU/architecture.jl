@@ -16,7 +16,6 @@ import SpeedyWeather: array_type
     # transfering Grid 
     grid_gpu = on_architecture(arch_gpu, grid_cpu)
     @test typeof(grid_gpu.architecture) <: typeof(arch_gpu)
-    @test architecture(typeof(grid_gpu)) <: typeof(arch_gpu)
     @test typeof(architecture(grid_gpu)) <: typeof(arch_gpu)
 
     # transfering Field

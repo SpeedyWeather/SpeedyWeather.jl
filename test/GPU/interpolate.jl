@@ -9,8 +9,13 @@
     RingGrids.interpolate!(field_out, field_in, interp)
     
     cpu_arch = SpeedyWeather.CPU()
+    grid_in_cpu = on_architecture(cpu_arch, grid_in)
+    grid_out_cpu = on_architecture(cpu_arch, grid_out)
     field_in_cpu = on_architecture(cpu_arch, field_in)
     field_out_cpu = on_architecture(cpu_arch, field_out)
-    field_out_cpu = interpolate(field_out_cpu, field_in_cpu)
+    interp_cpu = RingGrids.interpolator(grid_out_cpu, grid_in_cpu)
+    RingGrids.interpolate!(field_out_cpu, field_in_cpu, interp_cpu)
     @test on_architecture(cpu_arch, field_out) ≈ field_out_cpu
 end
+
+

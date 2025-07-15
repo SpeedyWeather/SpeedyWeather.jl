@@ -11,7 +11,7 @@ struct GridGeometry{
 
     nlat_half::Int              # number of latitude rings on one hemisphere (Eq. incl)
     nlat::Int                   # total number of latitude rings
-    npoints::Int                # total number of grid points
+    npoints::Int          # total number of grid points
     londs::VectorType           # longitudes of every grid point 0˚ to 360˚E
     latd::VectorType            # latitude of each ring, incl north pole 90˚N, ..., south pole -90˚N
 
@@ -78,19 +78,19 @@ between two latitude rings."""
     VectorIntType,
 } <: AbstractLocator
 
-    npoints::Int            # number of points to interpolate onto (length of following vectors)
+    npoints_output::Int            # number of points to interpolate onto (length of following vectors)
 
     # to the coordinates respective indices
-    js::VectorIntType       = zeros(Int, npoints)   # ring indices j such that [j, j+1) contains the point
-    ij_as::VectorIntType    = zeros(Int, npoints)   # pixel index ij for top left point a on ring j
-    ij_bs::VectorIntType    = zeros(Int, npoints)   # pixel index ij for top right point b on ring j
-    ij_cs::VectorIntType    = zeros(Int, npoints)   # pixel index ij for bottom left point c on ring j+1
-    ij_ds::VectorIntType    = zeros(Int, npoints)   # pixel index ij for bottom right point d on ring j+1
+    js::VectorIntType       = zeros(Int, npoints_output)   # ring indices j such that [j, j+1) contains the point
+    ij_as::VectorIntType    = zeros(Int, npoints_output)   # pixel index ij for top left point a on ring j
+    ij_bs::VectorIntType    = zeros(Int, npoints_output)   # pixel index ij for top right point b on ring j
+    ij_cs::VectorIntType    = zeros(Int, npoints_output)   # pixel index ij for bottom left point c on ring j+1
+    ij_ds::VectorIntType    = zeros(Int, npoints_output)   # pixel index ij for bottom right point d on ring j+1
 
     # distances to adjacent grid points (i.e. the averaging weights)
-    Δys::VectorType         = zeros(NF, npoints)    # distance fractions between rings
-    Δabs::VectorType        = zeros(NF, npoints)    # distance fractions between a, b
-    Δcds::VectorType        = zeros(NF, npoints)    # distance fractions between c, d
+    Δys::VectorType         = zeros(NF, npoints_output)    # distance fractions between rings
+    Δabs::VectorType        = zeros(NF, npoints_output)    # distance fractions between a, b
+    Δcds::VectorType        = zeros(NF, npoints_output)    # distance fractions between c, d
 end
 
 """
@@ -108,7 +108,7 @@ function (::Type{L})(
     VectorType = array_type(architecture, NF, 1)
     VectorIntType = array_type(architecture, Int, 1)
 
-    return L{NF, VectorType, VectorIntType}(npoints=npoints)
+    return L{NF, VectorType, VectorIntType}(;npoints_output=npoints)
 end
 
 # use Float32 as default for weights
@@ -116,7 +116,7 @@ end
 
 function Base.show(io::IO,L::AnvilLocator)
     println(io,"$(typeof(L))")
-    print(io,"└ npoints::Int = $(L.npoints)")
+    print(io,"└ npoints_output::Int = $(L.npoints_output)")
 end
 
 
@@ -144,7 +144,7 @@ grid_type(I::AnvilInterpolator) = typeof(I.geometry.grid)
 
 function Base.show(io::IO, L::AnvilInterpolator{NF}) where NF
     println(io,"AnvilInterpolator{$NF} for $(L.geometry.grid)")
-    print(io,"└ onto: $(L.locator.npoints) points")
+    print(io,"└ onto: $(L.locator.npoints_output) points")
 end
 
 # define to a <:AbstractInterpolator the corresponding Locator
@@ -199,8 +199,8 @@ function interpolator(
 )
     I = interpolator(grid_in, get_npoints(grid_out); kwargs...)
     londs, latds = get_londlatds(grid_out)
-    londs = on_architecture(architecture(grid_in), londs)
-    latds = on_architecture(architecture(grid_in), latds)
+    londs = on_architecture(architecture(grid_out), londs)
+    latds = on_architecture(architecture(grid_out), latds)
 
     update_locator!(I, londs, latds, unsafe=false)
     return I
@@ -246,52 +246,13 @@ end
 
 # the actual interpolation function
 function _interpolate!(
-    Aout::AbstractVector,               # Out: interpolated values
-    A::AbstractVector,                  # gridded values to interpolate from
-    interpolator::AnvilInterpolator;    # geometry info and work arrays       
-    architecture::CPU=architecture(Aout)
-)
-    (; ij_as, ij_bs, ij_cs, ij_ds, Δabs, Δcds, Δys) = interpolator.locator
-    (; npoints) = interpolator.geometry
-    (; rings) = interpolator.geometry
-    
-    # 1) Aout's length must match the interpolator
-    # 2) input A must match the interpolator's geometry points (do not check grids for view support)
-    @boundscheck length(Aout) == length(ij_as) || throw(DimensionMismatchArray(Aout, ij_as))
-    @boundscheck length(A) == npoints ||
-        throw(DimensionMismatch("Interpolator ($npoints points) mismatches input grid ($(length(A)) points)."))
-
-    A_northpole, A_southpole = average_on_poles(A, rings)
-
-    #TODO ij_cs, ij_ds shouldn't be 0...
-    @boundscheck extrema_in(ij_as,  0, npoints) || throw(BoundsError)
-    @boundscheck extrema_in(ij_bs,  0, npoints) || throw(BoundsError)
-    @boundscheck extrema_in(ij_cs, -1, npoints) || throw(BoundsError)
-    @boundscheck extrema_in(ij_ds, -1, npoints) || throw(BoundsError)
-
-    @inbounds for (k, (ij_a, ij_b, ij_c, ij_d, Δab, Δcd, Δy)) in enumerate(zip(ij_as, ij_bs, ij_cs, ij_ds, Δabs, Δcds, Δys))
-
-        # index ij=0, -1 indicates north, south pole
-        a, b = ij_a ==  0 ? (A_northpole, A_northpole) : (A[ij_a], A[ij_b])
-        c, d = ij_c == -1 ? (A_southpole, A_southpole) : (A[ij_c], A[ij_d])
-
-        # weighted anvil-shaped average of a, b, c, d points around i point to interpolate on
-        Aout[k] = anvil_average(a, b, c, d, Δab, Δcd, Δy)
-    end
-
-    return Aout
-end
-
-# the actual interpolation function
-function _interpolate!(
     Aout,               # Out: interpolated values
     A,                  # gridded values to interpolate from
-    interpolator::AnvilInterpolator;    # geometry info and work arrays 
-    architecture::GPU=architecture(A)      
+    interpolator::AnvilInterpolator,    # geometry info and work arrays 
+    architecture::AbstractArchitecture      
 )
-    (; ij_as, ij_bs, ij_cs, ij_ds, Δabs, Δcds, Δys) = interpolator.locator
-    (; npoints) = interpolator.geometry
-    (; rings) = interpolator.geometry.grid
+    (; npoints_output, ij_as, ij_bs, ij_cs, ij_ds, Δabs, Δcds, Δys) = interpolator.locator
+    (; npoints, rings) = interpolator.geometry
     
     # 1) Aout's length must match the interpolator
     # 2) input A must match the interpolator's geometry points (do not check grids for view support)
@@ -307,10 +268,10 @@ function _interpolate!(
     @boundscheck extrema_in(ij_cs, -1, npoints) || throw(BoundsError)
     @boundscheck extrema_in(ij_ds, -1, npoints) || throw(BoundsError)
 
-    launch!(architecture(A),
+    launch!(architecture,
     :linear,
-    (npoints,),
-    _kernel!,
+    (npoints_output,),
+    _interpolate_kernel!,
         Aout,
         A,
         ij_as,
@@ -323,14 +284,14 @@ function _interpolate!(
         A_northpole,
         A_southpole,
     )
-    synchronize(architecture(A))
+    synchronize(architecture)
 
     return Aout
 end
 
 @kernel inbounds=true function _interpolate_kernel!(
     Aout,               # Out: interpolated values
-    @Const(A),          # gridded values to interpolate from
+    A,                  # gridded values to interpolate from
     @Const(ij_as),      # indices of A to interpolate from
     @Const(ij_bs),      # indices of A to interpolate from
     @Const(ij_cs),      # indices of A to interpolate from
@@ -350,50 +311,15 @@ end
     Aout[k] = anvil_average(a, b, c, d, Δabs[k], Δcds[k], Δys[k])
 end
 
-# version for 2D fields
-function interpolate!(
-    Aout::AbstractField2D,      # Out: field to interpolate into
-    A::AbstractField2D,         # In: field to interpolate from
-    interpolator::AbstractInterpolator,
-)
-    # if fields match just copy data over (eltypes might differ)
-    fields_match(Aout, A) && return copyto!(Aout.data, A.data)
-    _interpolate!(Aout.data, A.data, interpolator, architecture=architecture(A))  # use .data to trigger dispatch for method above
-    return Aout                             # return the field wrapped around the interpolated data
-end
-
-# version for 2D field and vector
-function interpolate!(
-    Aout::AbstractVector,      # Out: points to interpolate onto
-    A::AbstractField2D,         # In: field to interpolate from
-    interpolator::AbstractInterpolator,
-)
-    @assert ismatching(architecture(Aout), architecture(A)) "Interpolation is only supported between fields on the same architecture."
-    _interpolate!(Aout, A.data, interpolator, architecture=architecture(A))  # use .data to trigger dispatch for method above
-end
-
-# version for 3D+ fields
-function interpolate!(
-    Aout::AbstractField,                      # Out: grid to interpolate onto
-    A::AbstractField{NF,N,AT,Grid},           # In: gridded data to interpolate from
-    interpolator::AbstractInterpolator,
-) where {NF,N,AT,Grid<:AbstractGrid{<:CPU}}
-    # if fields match just copy data over (eltypes might differ)
-    fields_match(Aout, A) && return copyto!(Aout.data, A.data)
-    for k in eachlayer(Aout, A, vertical_only=true)
-        _interpolate!(view(Aout.data, :, k), view(A.data, :, k), interpolator)
-    end
-    return Aout                             # return the field wrapped around the interpolated data
-end
-
 # version for 3D+ fields GPU 
 function interpolate!(
     Aout::AbstractField,
-    A::AbstractField{NF,N,AT,Grid},
+    A::AbstractField,
     interpolator::AbstractInterpolator,
-) where {NF,N,AT,Grid<:AbstractGrid{<:GPU}}
+) 
+    fields_match(Aout, A) && return copyto!(Aout.data, A.data)
     @assert ismatching(architecture(Aout), architecture(A)) "Interpolation is only supported between fields on the same architecture."
-    _interpolate!(Aout.data, A.data, interpolator, architecture=architecture(A))
+    _interpolate!(Aout.data, A.data, interpolator, architecture(A))
 end
 
 # interpolate while creating an interpolator on the fly
@@ -719,9 +645,10 @@ $(TYPEDSIGNATURES)
 Computes the average at the North and South pole from a given grid `A` and it's precomputed
 ring indices `rings`. The North pole average is an equally weighted average of all grid points
 on the northern-most ring. Similar for the South pole."""
-@inline function average_on_poles(A::AbstractVector{NF}, rings) where {NF<:AbstractFloat}   
-    A_northpole = mean(view(A, rings[1]))     # average of all grid points around the north pole
-    A_southpole = mean(view(A, rings[end]))   # same for south pole
+@inline function average_on_poles(A::AbstractVector{NF}, rings) where {NF<:AbstractFloat} 
+    # TODO: doing the computation below with views causes scalarindexing on GPUs
+    A_northpole = mean(A[rings[1]])     # average of all grid points around the north pole
+    A_southpole = mean(A[rings[end]])   # same for south pole
     return A_northpole, A_southpole
 end
     
@@ -730,8 +657,9 @@ $(TYPEDSIGNATURES)
 Method for `A::Abstract{T<:Integer}` which rounds the averaged values
 to return the same number format `NF`."""
 @inline function average_on_poles(A::AbstractVector{NF}, rings) where {NF<:Integer}
-    A_northpole = mean(view(A, rings[1]))    # average of all grid points around the north pole
-    A_southpole = mean(view(A, rings[end]))  # same for south pole
+    # TODO: doing the computation below with views causes scalarindexing on GPUs
+    A_northpole = mean(A[rings[1]])    # average of all grid points around the north pole
+    A_southpole = mean(A[rings[end]])  # same for south pole
     return round(NF, A_northpole), round(NF, A_southpole)
 end
 
