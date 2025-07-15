@@ -3,207 +3,249 @@
     # T15 still yields somewhat sensible dynamics, that's why it's chosen here
     spectral_grid = SpectralGrid(trunc=9, nlayers=1)          # define resolution
     model = BarotropicModel(; spectral_grid)   # construct model
-    simulation = initialize!(model)  
-    initialize!(simulation)
-    run!(simulation, period=Day(5)) # spin-up to get nonzero values for all fields
-    initialize!(simulation; period=Day(1))
-    
-    (; prognostic_variables, diagnostic_variables, model) = simulation
-    (; Δt, Δt_millisec) = model.time_stepping
-    dt = 2Δt
+    simulation = initialize_with_spinup!(model)
 
-    progn = prognostic_variables
-    diagn = diagnostic_variables
-
-    diagn_copy = deepcopy(diagn)
-    progn_copy = deepcopy(progn)
-
-    diagn_copy_2 = deepcopy(diagn) # 2nd copy for Const activity test 
-    progn_copy_2 = deepcopy(progn)
-
-    d_progn = zero(progn)
-    d_diag = make_zero(diagn)
-
-    progn_new = zero(progn)
-    dprogn_new = one(progn) # seed 
-
-    # Timestepping: FD comparison 
-    dprogn_2 = one(progn) # seed 
-
-    # for the full timestep, we need a bit higher precision 
-    fd_vjp = FiniteDifferences.j′vp(central_fdm(15,1), x -> timestep_oop(x, deepcopy(diagn_copy), dt, deepcopy(model)), deepcopy(dprogn_2), deepcopy(progn_copy))
-
-    # test that we can differentiate wrt to everything  
-    autodiff(Reverse, timestep_oop!, Const, Duplicated(progn_new, dprogn_new), Duplicated(progn, d_progn), Duplicated(diagn, d_diag), Const(dt), Duplicated(model, make_zero(model)))
-
-    # nonzero gradient
-    @test sum(to_vec(d_progn)[1]) != 0
-
-    @test isapprox(to_vec(fd_vjp[1])[1], to_vec(d_progn)[1], rtol=0.05) # we have to go really quite low with the tolerances here
-    @test mean(abs.(to_vec(fd_vjp[1])[1] - to_vec(d_progn)[1])) < 0.002 # so we check a few extra statistics
-    @test maximum(to_vec(fd_vjp[1].vor)[1] - to_vec(d_progn.vor)[1]) < 0.05
-    
-    # test that we can differentiante with Const(Model) only wrt to the state
-    d_progn = zero(progn)
-    d_diag = make_zero(diagn)
-
-    progn_new = zero(progn)
-    dprogn_new = one(progn) # seed 
-
-    autodiff(set_runtime_activity(Reverse), timestep_oop!, Const, Duplicated(progn_new, dprogn_new), Duplicated(progn_copy_2, d_progn), Duplicated(diagn_copy_2, d_diag), Const(dt), Const(model))
-
-    # use the same FD comparision 
-
-    @test isapprox(to_vec(fd_vjp[1])[1], to_vec(d_progn)[1], rtol=0.05) # we have to go really quite low with the tolerances here
-    @test mean(abs.(to_vec(fd_vjp[1])[1] - to_vec(d_progn)[1])) < 0.002 # so we check a few extra statistics
-    @test maximum(to_vec(fd_vjp[1].vor)[1] - to_vec(d_progn.vor)[1]) < 0.05
-    
     #
     # We go individually through all components of the time stepping and check 
     # correctness
     #
 
-    fill!(diagn.tendencies, 0, Barotropic)
+    @testset "VJP: dynamics_tendencies!" begin
 
-    #
-    # dynamics_tendencies!
-    #
+        fill!(diagn.tendencies, 0, Barotropic)
 
-    lf2 = 2 
+        #
+        # dynamics_tendencies!
+        #
 
-    diagn_copy = deepcopy(diagn)
-    ddiag = one(diagn_copy)
-    ddiag_copy = deepcopy(ddiag)
-    progn_copy = deepcopy(progn)
-    dprogn = make_zero(progn)
+        lf2 = 2 
 
-    autodiff(Reverse, SpeedyWeather.dynamics_tendencies!, Const, Duplicated(diagn, ddiag), Duplicated(progn, dprogn), Const(lf2), Const(model))
+        diagn_copy = deepcopy(diagn)
+        ddiag = one(diagn_copy)
+        ddiag_copy = deepcopy(ddiag)
+        progn_copy = deepcopy(progn)
+        dprogn = make_zero(progn)
 
-    function dynamics_tendencies(diagn, progn, lf, model)
-        diagn_new = deepcopy(diagn)
-        SpeedyWeather.dynamics_tendencies!(diagn_new, deepcopy(progn), lf, deepcopy(model))
-        return diagn_new
-    end 
-    
-    fd_vjp = FiniteDifferences.j′vp(central_fdm(15,1), x -> dynamics_tendencies(diagn_copy, x, lf2, model), ddiag_copy, progn_copy)
-    
-    @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dprogn)[1],rtol=1e-1,atol=1e-1))
+        autodiff(Reverse, SpeedyWeather.dynamics_tendencies!, Const, Duplicated(diagn, ddiag), Duplicated(progn, dprogn), Const(lf2), Const(model))
+
+        function dynamics_tendencies(diagn, progn, lf, model)
+            diagn_new = deepcopy(diagn)
+            SpeedyWeather.dynamics_tendencies!(diagn_new, deepcopy(progn), lf, deepcopy(model))
+            return diagn_new
+        end 
+        
+        fd_vjp = FiniteDifferences.j′vp(central_fdm(15,1), x -> dynamics_tendencies(diagn_copy, x, lf2, model), ddiag_copy, progn_copy)
+        
+        @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dprogn)[1],rtol=1e-1,atol=1e-1))
  
+    end
+
     #
     # horizontal_diffusion!
     #
 
-    lf1 = 1
-    diagn_copy = deepcopy(diagn)
-    ddiag = one(diagn_copy)
-    ddiag_copy = deepcopy(ddiag)
+    @testset "VJP: horizontal_diffusion!" begin
 
-    progn_copy = deepcopy(progn)
-    dprogn = make_zero(progn)
+        lf1 = 1
+        diagn_copy = deepcopy(diagn)
+        ddiag = one(diagn_copy)
+        ddiag_copy = deepcopy(ddiag)
 
-    autodiff(Reverse, SpeedyWeather.horizontal_diffusion!, Const, Duplicated(diagn, ddiag), Duplicated(progn, dprogn), Const(model.horizontal_diffusion), Const(model), Const(lf1))
+        progn_copy = deepcopy(progn)
+        dprogn = make_zero(progn)
 
-    # FD comparision not necessary, we have the exact values 
-    #function horizontal_diffusion(diagn, progn, diffusion, model, lf)
-    #    diagn_new = deepcopy(diagn)
-    #    SpeedyWeather.horizontal_diffusion!(diagn_new, progn, diffusion, model, lf)
-    #    return diagn_new
-    #end 
+        autodiff(Reverse, SpeedyWeather.horizontal_diffusion!, Const, Duplicated(diagn, ddiag), Duplicated(progn, dprogn), Const(model.horizontal_diffusion), Const(model), Const(lf1))
 
-    #fd_vjp = FiniteDifferences.j′vp(central_fdm(5,1), x -> horizontal_diffusion(diagn_copy, x, model.horizontal_diffusion, model, lf1), ddiag_copy, progn_copy)
-    #@test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dprogn)[1],rtol=1e-4,atol=1e-2))
+        # FD comparision not necessary, we have the exact values 
+        #function horizontal_diffusion(diagn, progn, diffusion, model, lf)
+        #    diagn_new = deepcopy(diagn)
+        #    SpeedyWeather.horizontal_diffusion!(diagn_new, progn, diffusion, model, lf)
+        #    return diagn_new
+        #end 
 
-    # ∂(progn)
-    # should be row-wise `model.horizontal_diffusion.impl .* model.horizontal_diffusion.expl`
-    # for all variables that are diffused 
-    diff_coefficient = model.horizontal_diffusion.impl .* model.horizontal_diffusion.expl
-    l_indices = [(1:l) for l=1:spectral_grid.spectrum.mmax]
-    for (i,il) in enumerate(l_indices)
-        @test all(real.(Matrix(dprogn.vor[:,1,lf1])[i, il]) .≈ diff_coefficient[i])
-    end 
+        #fd_vjp = FiniteDifferences.j′vp(central_fdm(5,1), x -> horizontal_diffusion(diagn_copy, x, model.horizontal_diffusion, model, lf1), ddiag_copy, progn_copy)
+        #@test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dprogn)[1],rtol=1e-4,atol=1e-2))
 
-    # ∂(tend_old)
-    # should be row-wise `model.horizontal_diffusion.impl` 
-    for (i,il) in enumerate(l_indices)
-        @test all(real.(Matrix(ddiag.tendencies.vor_tend[:,1])[i, il]) .≈ model.horizontal_diffusion.impl[i])
-    end 
+        # ∂(progn)
+        # should be row-wise `model.horizontal_diffusion.impl .* model.horizontal_diffusion.expl`
+        # for all variables that are diffused 
+        diff_coefficient = model.horizontal_diffusion.impl .* model.horizontal_diffusion.expl
+        l_indices = [(1:l) for l=1:spectral_grid.spectrum.mmax]
+        for (i,il) in enumerate(l_indices)
+            @test all(real.(Matrix(dprogn.vor[:,1,lf1])[i, il]) .≈ diff_coefficient[i])
+        end 
+
+        # ∂(tend_old)
+        # should be row-wise `model.horizontal_diffusion.impl` 
+        for (i,il) in enumerate(l_indices)
+            @test all(real.(Matrix(ddiag.tendencies.vor_tend[:,1])[i, il]) .≈ model.horizontal_diffusion.impl[i])
+        end
+    end
 
     #
     # Test the leapfrog 
     # 
 
-    lf1 = 2 
-    lf2 = 2 
+    @testset "VJP: leapfrog!" begin
 
-    progn_copy = deepcopy(progn)
-    dprogn = one(progn_copy)
-    dprogn_copy = one(progn_copy)
+        lf1 = 2 
+        lf2 = 2 
 
-    tend = diagn.tendencies
-    tend_copy = deepcopy(tend)
-    dtend = make_zero(tend)
+        progn_copy = deepcopy(progn)
+        dprogn = one(progn_copy)
+        dprogn_copy = one(progn_copy)
 
-    autodiff(Reverse, SpeedyWeather.leapfrog!, Const, Duplicated(progn, dprogn), Duplicated(tend, dtend), Const(dt), Const(lf1), Const(model))
+        tend = diagn.tendencies
+        tend_copy = deepcopy(tend)
+        dtend = make_zero(tend)
 
-    function leapfrog_step(progn_new::PrognosticVariables, progn::PrognosticVariables, tend, dt, lf, model)
-        copy!(progn_new, progn)
-        SpeedyWeather.leapfrog!(progn_new, tend, dt, lf, model)
-        return progn_new
-    end 
+        autodiff(Reverse, SpeedyWeather.leapfrog!, Const, Duplicated(progn, dprogn), Duplicated(tend, dtend), Const(dt), Const(lf1), Const(model))
 
-    prog_new = zero(progn_copy)
+        function leapfrog_step(progn_new::PrognosticVariables, progn::PrognosticVariables, tend, dt, lf, model)
+            copy!(progn_new, progn)
+            SpeedyWeather.leapfrog!(progn_new, tend, dt, lf, model)
+            return progn_new
+        end 
 
-    fd_vjp = FiniteDifferences.j′vp(central_fdm(5,1), x -> leapfrog_step(prog_new, progn_copy, x, dt, lf1, model), dprogn_copy, tend_copy)
+        prog_new = zero(progn_copy)
 
-    @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dtend)[1],rtol=1e-3,atol=1e-3))
+        fd_vjp = FiniteDifferences.j′vp(central_fdm(5,1), x -> leapfrog_step(prog_new, progn_copy, x, dt, lf1, model), dprogn_copy, tend_copy)
 
-    # 
-    # single variable leapfrog step 
-    # 
+        @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dtend)[1],rtol=1e-3,atol=1e-3))
 
-    A_old = progn.vor[:,:,1]
-    A_old_copy = deepcopy(A_old)
-    dA_old = one(A_old)
+        # 
+        # single variable leapfrog step 
+        # 
 
-    A_new = progn.vor[:,:,2]
-    A_new_copy = deepcopy(A_new)
-    dA_new = one(A_new)
+        A_old = progn.vor[:,:,1]
+        A_old_copy = deepcopy(A_old)
+        dA_old = one(A_old)
 
-    tendency = diagn.tendencies.vor_tend
-    tendency_copy = deepcopy(tendency)
-    dtendency = make_zero(tendency)
+        A_new = progn.vor[:,:,2]
+        A_new_copy = deepcopy(A_new)
+        dA_new = one(A_new)
 
-    L = model.time_stepping
+        tendency = diagn.tendencies.vor_tend
+        tendency_copy = deepcopy(tendency)
+        dtendency = make_zero(tendency)
 
-    autodiff(Reverse, SpeedyWeather.leapfrog!, Const, Duplicated(A_old, dA_old), Duplicated(A_new, dA_new), Duplicated(tendency, dtendency), Const(dt), Const(lf1), Const(L))
+        L = model.time_stepping
 
-    w1 = L.robert_filter*L.williams_filter/2   
-    w2 = L.robert_filter*(1-L.williams_filter)/2   
-    @test all(dtendency .≈ dt*(1+w1-w2))
-    # ∂(tend) needs to be: dt* ( 1 + w1 - w2) (for every coefficient)
+        autodiff(Reverse, SpeedyWeather.leapfrog!, Const, Duplicated(A_old, dA_old), Duplicated(A_new, dA_new), Duplicated(tendency, dtendency), Const(dt), Const(lf1), Const(L))
 
-    #
-    # transform!(diagn, progn, lf2, model)
-    #
+        w1 = L.robert_filter*L.williams_filter/2   
+        w2 = L.robert_filter*(1-L.williams_filter)/2   
+        @test all(dtendency .≈ dt*(1+w1-w2))
+        # ∂(tend) needs to be: dt* ( 1 + w1 - w2) (for every coefficient)
+    end
 
-    diag_copy = deepcopy(diagn)
-    
-    ddiag = one(diagn)
-    ddiag_copy = deepcopy(ddiag)
+    @testset "VJP: timestep!" begin
+        
+        (; Δt, Δt_millisec) = simulation.model.time_stepping
+        dt = 2Δt
+        fdsim = ADSimulation(simulation)
+        # for the full timestep, we need a bit higher precision 
+        fd_vjp = FiniteDifferences.j′vp(
+            central_fdm(15,1),
+            x -> timestep_oop(x, deepcopy(fdsim.diagvars), dt, deepcopy(fdsim.model)),
+            one(fdsim.progvars),
+            deepcopy(fdsim.progvars)
+        )
 
-    progn_copy = deepcopy(progn)
-    dprogn = make_zero(progn)
+        adsim = ADSimulation(simulation)
+        progn_new, dprogn_new = deepcopy(adsim.progvars), one(adsim.dprogvars)
+        # test that we can differentiate wrt to everything  
+        autodiff(
+            Reverse,
+            timestep_oop!,
+            Const,
+            Duplicated(progn_new, dprogn_new),
+            Duplicated(adsim.progvars, adsim.dprogvars),
+            Duplicated(adsim.diagvars, adsim.ddiagvars),
+            Const(dt),
+            Duplicated(model, make_zero(model))
+        )
 
-    autodiff(Reverse, SpeedyWeather.transform!, Const, Duplicated(diagn, ddiag), Duplicated(progn, dprogn), Const(lf2), Const(model))
-    autodiff(Reverse, SpeedyWeather.transform!, Const, Duplicated(diagn, ddiag), Duplicated(progn, dprogn), Const(lf2), Duplicated(model, make_zero(model)))
+        # nonzero gradient
+        @test sum(to_vec(d_progn)[1]) != 0
 
-    function transform_diagn(diag, progn, lf2, model)
-        diag_copy = deepcopy(diag)
-        transform!(diag_copy, progn, lf2, model)
-        return diag_copy
-    end 
+        @test isapprox(to_vec(fd_vjp[1])[1], to_vec(d_progn)[1], rtol=0.05) # we have to go really quite low with the tolerances here
+        @test mean(abs.(to_vec(fd_vjp[1])[1] - to_vec(d_progn)[1])) < 0.002 # so we check a few extra statistics
+        @test maximum(to_vec(fd_vjp[1].vor)[1] - to_vec(d_progn.vor)[1]) < 0.05
+        
+        # test that we can differentiante with Const(Model) only wrt to the state
+        d_progn = zero(progn)
+        d_diag = make_zero(diagn)
 
-    fd_vjp = FiniteDifferences.j′vp(central_fdm(12,1), x -> transform_diagn(diag_copy, x, lf2, model), ddiag_copy, progn_copy)
-    
-    @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dprogn)[1],rtol=1e-2,atol=1e-2))
+        progn_new = zero(progn)
+        dprogn_new = one(progn) # seed 
+
+        autodiff(set_runtime_activity(Reverse), timestep_oop!, Const, Duplicated(progn_new, dprogn_new), Duplicated(progn_copy_2, d_progn), Duplicated(diagn_copy_2, d_diag), Const(dt), Const(model))
+
+        # use the same FD comparision 
+
+        @test isapprox(to_vec(fd_vjp[1])[1], to_vec(d_progn)[1], rtol=0.05) # we have to go really quite low with the tolerances here
+        @test mean(abs.(to_vec(fd_vjp[1])[1] - to_vec(d_progn)[1])) < 0.002 # so we check a few extra statistics
+        @test maximum(to_vec(fd_vjp[1].vor)[1] - to_vec(d_progn.vor)[1]) < 0.05
+    end
+
+    # finite differences on transform! has issues with numerical accuracy
+    # @testset "VJP: transform!" begin
+
+    #     diag_copy = deepcopy(diagn)
+        
+    #     ddiag = one(diagn)
+    #     ddiag_copy = deepcopy(ddiag)
+
+    #     progn_copy = deepcopy(progn)
+    #     dprogn = make_zero(progn)
+
+    #     autodiff(Reverse, SpeedyWeather.transform!, Const, Duplicated(diagn, ddiag), Duplicated(progn, dprogn), Const(lf2), Const(model))
+    #     autodiff(Reverse, SpeedyWeather.transform!, Const, Duplicated(diagn, ddiag), Duplicated(progn, dprogn), Const(lf2), Duplicated(model, make_zero(model)))
+
+    #     function transform_diagn(diag, progn, lf2, model)
+    #         diag_copy = deepcopy(diag)
+    #         transform!(diag_copy, progn, lf2, model)
+    #         return diag_copy
+    #     end 
+
+    #     fd_vjp = FiniteDifferences.j′vp(central_fdm(12,1), x -> transform_diagn(diag_copy, x, lf2, model), ddiag_copy, progn_copy)
+        
+    #     @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dprogn)[1],rtol=1e-2,atol=1e-2))
+    # end
+end
+
+@testset "Differentiability: Barotropic model parameters" begin
+    # T15 still yields somewhat sensible dynamics, that's why it's chosen here
+    spectral_grid = SpectralGrid(trunc=9, nlayers=1)          # define resolution
+    model = BarotropicModel(; spectral_grid)   # construct model
+    simulation = initialize_with_spinup!(model)
+    (; Δt, Δt_sec) = simulation.model.time_stepping
+    dt = Δt
+    ps = parameters(model)
+    pvec = vec(ps)
+    adsim = ADSimulation(simulation)
+    # timestep_oop!(deepcopy(adsim.progvars), adsim.progvars, adsim.diagvars, dt, adsim.model, pvec)
+    dp = zero(pvec)
+    progn_new, dprogn_new = deepcopy(adsim.progvars), one(adsim.dprogvars)
+    @time autodiff(
+        Reverse,
+        timestep_oop!,
+        Const,
+        Duplicated(progn_new, dprogn_new),
+        Duplicated(adsim.progvars, adsim.dprogvars),
+        Duplicated(adsim.diagvars, adsim.ddiagvars),
+        Const(dt),
+        Duplicated(adsim.model, make_zero(adsim.model)),
+        Duplicated(pvec, dp),
+    )
+
+    fdsim = ADSimulation(simulation)
+    fd_vjp = @time FiniteDifferences.j′vp(
+        central_fdm(10,1),
+        x -> timestep_oop(deepcopy(fdsim.progvars), deepcopy(fdsim.diagvars), dt, deepcopy(fdsim.model), x),
+        one(fdsim.progvars),
+        copy(pvec),
+    )
+    @test all(isapprox.(dp, fd_vjp[1], atol=1e-5, rtol=1e-3))
 end
