@@ -318,7 +318,7 @@ function interpolate!(
     interpolator::AbstractInterpolator,
 ) 
     fields_match(Aout, A) && return copyto!(Aout.data, A.data)
-    @assert ismatching(architecture(Aout), architecture(A)) "Interpolation is only supported between fields on the same architecture."
+    @assert ismatching(architecture(A), A_out) "Interpolation is only supported between fields on the same architecture."
     _interpolate!(Aout.data, A.data, interpolator, architecture(A))
 end
 
@@ -711,7 +711,7 @@ are assumed to be rectangles spanning half way to adjacent longitude
 and latitude points."""
 function grid_cell_average!(
     output::AbstractField,
-    input::AbstractFullField{NF,N,AT,Grid}) where {NF<:AbstractFloat, N, AT, Grid<:AbstractGrid{<:CPU}}
+    input::AbstractFullField)
         
     # for i, j indexing
     input_matrix = reshape(input.data, :, get_nlat(input))
@@ -783,142 +783,6 @@ function grid_cell_average!(
     return output
 end
 
-# GPU kernel for grid cell averaging
-@kernel inbounds=true function grid_cell_average_kernel!(
-    output_data,                # Output field data
-    @Const(input_data),         # Input field data
-    @Const(input_nlat),         # Number of latitudes in input
-    @Const(colat_in),           # Colatitudes of input grid
-    @Const(coslat),             # Cosine of latitudes (weights)
-    @Const(lon_in),             # Longitudes of input grid
-    @Const(nlon_in),            # Number of longitudes in input
-    @Const(colat_out),          # Colatitudes of output grid (with padding)
-    @Const(lons_out),           # Longitudes of output grid
-    @Const(whichring),          # Precomputed ring indices for each grid point
-    @Const(ring_spacings)       # Precomputed longitude spacings (Δϕ) for each ring
-)
-    # Get the output grid point index
-    ij = @index(Global, Linear)
-    
-    # Get the ring index from precomputed whichring
-    j = whichring[ij]
-    
-    # Get precomputed longitude spacing for this ring
-    Δϕ = ring_spacings[j]
-    
-    # Calculate latitude boundaries
-    θ0 = (colat_out[j] + colat_out[j+1]) / 2    # northern edge
-    θ1 = (colat_out[j+1] + colat_out[j+2]) / 2  # southern edge
-
-    # Matrix indices for input grid that lie in output grid cell
-    j0 = findfirst(θ -> θ >= θ0, colat_in)  # northern edge
-    j1 = findlast(θ -> θ < θ1, colat_in)    # southern edge
-    
-    # Calculate longitude boundaries
-    ϕ0 = mod(lons_out[ij] - Δϕ/2, 2π)  # western edge
-    ϕ1 = ϕ0 + Δϕ                       # eastern edge
-    
-    # Matrix indices for input grid that lie in output grid cell
-    a = findlast(ϕ -> ϕ < ϕ0, lon_in)      # western edge
-    b = findfirst(ϕ -> ϕ >= ϕ1, lon_in)    # eastern edge
-    
-    # Map around prime meridian if coordinates outside of range
-    a = isnothing(a) ? nlon_in : a
-    b = isnothing(b) ? 1 : b
-    
-    # Process the grid cell averaging
-    sum_of_weights = 0.0
-    weighted_sum = 0.0
-    
-    # Handle the case where we need to wrap around the prime meridian
-    if b < a
-        # First part: 1 to b
-        for j′ in j0:j1
-            for i in 1:b
-                w = coslat[j′]
-                sum_of_weights += w
-                weighted_sum += w * input_data[(j′-1)*nlon_in + i]
-            end
-            
-            # Second part: a to nlon_in
-            for i in a:nlon_in
-                w = coslat[j′]
-                sum_of_weights += w
-                weighted_sum += w * input_data[(j′-1)*nlon_in + i]
-            end
-        end
-    else
-        # Simple case: a to b
-        for j′ in j0:j1
-            for i in a:b
-                w = coslat[j′]
-                sum_of_weights += w
-                weighted_sum += w * input_data[(j′-1)*nlon_in + i]
-            end
-        end
-    end
-    
-    output_data[ij] = weighted_sum / sum_of_weights
-end
-
-# GPU version of grid_cell_average!
-function grid_cell_average!(
-    output::AbstractField,
-    input::AbstractFullField{NF,N,AT,Grid}) where {NF<:AbstractFloat, N, AT, Grid<:AbstractGrid{<:GPU}}
-    
-    architecture = architecture(input)
-    
-    # Reset output to zeros
-    fill!(output.data, 0)
-    
-    # Prepare input data in the right format for the kernel
-    input_matrix = reshape(input.data, :, get_nlat(input))
-    input_nlat = get_nlat(input)
-    
-    # Input grid coordinates
-    colat_in = get_colat(input)
-    coslat = sin.(colat_in)    # cos(lat) = sin(colat)
-    lon_in = get_lon(input)
-    nlon_in = length(lon_in)
-    
-    # Output grid coordinates with padding
-    colat_out = vcat(-π, get_colat(output), 2π)
-    lons_out, _ = get_lonlats(output)
-    
-    # Get precomputed ring information from the grid
-    whichring = output.grid.whichring
-    
-    # Precompute longitude spacings for each ring
-    rings = eachring(output)
-    ring_sizes = [length(ring) for ring in rings]
-    
-    # Create array on the appropriate architecture with inferred element type
-    T = eltype(output.data)
-    ring_spacings = similar(output.data, length(rings))
-    map!(i -> T(2π) / ring_sizes[i], ring_spacings, 1:length(rings))
-    
-    # Launch the kernel
-    launch!(
-        architecture,
-        :linear,
-        size(output.data),
-        grid_cell_average_kernel!,
-        output.data,
-        input.data,
-        input_nlat,
-        colat_in,
-        coslat,
-        lon_in,
-        nlon_in,
-        colat_out,
-        lons_out,
-        whichring,
-        ring_spacings
-    )
-    synchronize(architecture)
-    
-    return output
-end
 
 """
 $TYPEDSIGNATURES

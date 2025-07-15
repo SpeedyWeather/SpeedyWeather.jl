@@ -1,7 +1,7 @@
 @testset "GPU interpolation" begin
     arch = SpeedyWeather.GPU()
-    grid_in = HEALPixGrid(40, arch)
-    grid_out = FullClenshawGrid(30, arch)
+    grid_in = FullClenshawGrid(50, arch)
+    grid_out = HEALPixGrid(26, arch)
     interp = RingGrids.interpolator(grid_out, grid_in)
     
     field_in = on_architecture(arch, rand(grid_in))
@@ -16,6 +16,19 @@
     interp_cpu = RingGrids.interpolator(grid_out_cpu, grid_in_cpu)
     RingGrids.interpolate!(field_out_cpu, field_in_cpu, interp_cpu)
     @test on_architecture(cpu_arch, field_out) ≈ field_out_cpu
+
+    
+    field_in_cpu = rand(grid_in_cpu)
+    field_out_cpu = zeros(grid_out_cpu)
+    field_in_gpu = on_architecture(arch, field_in_cpu)
+    field_out_gpu = on_architecture(arch, field_out_cpu)
+    RingGrids.grid_cell_average_KA!(field_out_gpu, field_in_gpu)
+    RingGrids.grid_cell_average!(field_out_cpu, field_in_cpu)
+
+    @test on_architecture(cpu_arch, field_out_gpu) ≈ field_out_cpu
+
+
+
 end
 
 
