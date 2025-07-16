@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fix show of field views by defining nonparametric_type for SubArray [#776](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/776)
 - Add parameter handling system and implement for Barotropic model [#754](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/754)
 - Fix Enzyme CI to run as expected [#762](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/762)
 
