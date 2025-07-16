@@ -169,8 +169,8 @@ parameterof(::Type{PT}, obj::T, ::Val{propname}; kwargs...) where {PT<:AbstractP
 """
     $SIGNATURES
 
-Reconstructs the given data structure with the given `values`. If `values` is a `NamedTuple`, the structure
-must match that of `obj`. This function is used to reconstruct model types from `SpeedyParams`.
+Reconstructs the given (possibly nested) data structure with the given `values`. If `values` is a `NamedTuple`,
+the nested structure must match that of `obj`. This function is used to reconstruct model types from `SpeedyParams`.
 """
 reconstruct(obj::T, value::T) where {T} = value
 reconstruct(obj::AbstractParam, value::T) where {T} = ModelParameters.update(obj, Tuple(value))
