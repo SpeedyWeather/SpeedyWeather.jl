@@ -123,7 +123,7 @@ function initialize!(land_sea_mask::EarthLandSeaMask, model::PrimitiveEquation)
     lsm_highres = land_sea_mask.file_Grid(ncfile["lsm"].var[:, :], input_as=Matrix)
 
     # average onto grid cells of the model 
-    if architecture(model.spectral_grid.architecture) <: CPU
+    if typeof(architecture(model.spectral_grid.architecture)) <: CPU
         RingGrids.grid_cell_average!(land_sea_mask.mask, lsm_highres)
     else
         temp_mask = on_architecture(CPU(), land_sea_mask.mask)
