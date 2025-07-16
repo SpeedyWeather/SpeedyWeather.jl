@@ -18,17 +18,20 @@
     @test on_architecture(cpu_arch, field_out) ≈ field_out_cpu
 
     
-    field_in_cpu = rand(grid_in_cpu)
-    field_out_cpu = zeros(grid_out_cpu)
-    field_in_gpu = on_architecture(arch, field_in_cpu)
+    field_out_cpu = rand(grid_out_cpu)
     field_out_gpu = on_architecture(arch, field_out_cpu)
-    RingGrids.grid_cell_average_KA!(field_out_gpu, field_in_gpu)
-    RingGrids.grid_cell_average!(field_out_cpu, field_in_cpu)
+   
+    SpeedyWeather.RingGrids.update_locator!(interp_cpu, field_out_cpu)
+    SpeedyWeather.RingGrids.update_locator!(interp, field_out_gpu)
 
-    @test on_architecture(cpu_arch, field_out_gpu) ≈ field_out_cpu
-
-
-
+    @test interp_cpu.locator.js == interp.locator.js
+    @test interp_cpu.locator.ij_as == interp.locator.ij_as
+    @test interp_cpu.locator.ij_bs == interp.locator.ij_bs
+    @test interp_cpu.locator.ij_cs == interp.locator.ij_cs
+    @test interp_cpu.locator.ij_ds == interp.locator.ij_ds
+    @test interp_cpu.locator.Δys == interp.locator.Δys
+    @test interp_cpu.locator.Δabs == interp.locator.Δabs
+    @test interp_cpu.locator.Δcds == interp.locator.Δcds
 end
 
 

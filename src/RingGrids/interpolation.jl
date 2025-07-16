@@ -374,7 +374,7 @@ function update_locator!(I::AbstractInterpolator, A::AbstractField; kwargs...)
     londs = on_architecture(architecture(A), londs)
     latds = on_architecture(architecture(A), latds)
 
-    update_locator!(I, londs, latds; kwargs...)
+    update_locator_KA!(I, londs, latds; kwargs...)
 end
 
 function find_rings!(   js::AbstractVector{<:Integer},  # Out: ring indices j
@@ -409,33 +409,6 @@ DimensionMismatchArray(a::AbstractArray, b::AbstractArray) =
     DimensionMismatch("Arrays have different dimensions: $(size(a)) vs $(size(b))")
 DimensionMismatchArray(a::AbstractArray, bs::AbstractArray...) =
     DimensionMismatch("Arrays have different dimensions: $(size(a)) vs $(map(size, bs))")
-
-# CPU version of find_rings_unsafe!
-function find_rings_unsafe!(js::AbstractVector{<:Integer},  # Out: vector of ring indices
-                            Δys::AbstractVector,            # distance fractions to ring further south
-                            θs::AbstractVector,             # latitudes of points to interpolate onto
-                            latd::AbstractVector{NF},       # latitudes of rings (90˚ to -90˚, strictly decreasing)
-                            architecture::CPU) where {NF<:AbstractFloat}
-
-    @boundscheck length(js) == length(θs) || throw(DimensionMismatchArray(js, θs))
-    @boundscheck length(js) == length(Δys) || throw(DimensionMismatchArray(js, Δys))
-
-    # find first search for every θ in θs in latd but reuse index j from previous θ
-    # as a predictor to start the search. Search walk is therefore either d=1 (southward)
-    # or d=-1 (northward)
-    
-    j = 1                                       # starting ring, 0-based as latd contains poles
-    @inbounds for (iθ, θf) in enumerate(θs)     # one latitude θ after another
-        θ = convert(NF, θf)                     # convert to latd's format
-        d, c = θ <= latd[j] ? (1, <=) : (-1, >) # search direction d, d=1:south, d=-1:north, comparison c
-        while c(θ, latd[j])                     # check whether ring j has been crossed in search direction
-            j += d                              # walk in direction d
-        end           
-        j -= max(0, d)                          # so that [j, j+1) contains the point
-        js[iθ] = j-1                            # convert back to 1-based indexed rings
-        Δys[iθ] = (latd[j]-θ) / (latd[j]-latd[j+1])
-    end
-end
 
 # GPU kernel for finding ring indices
 @kernel inbounds=true function find_rings_kernel!(
@@ -476,12 +449,11 @@ end
     Δys[k] = (latd[j] - θ) / (latd[j] - latd[j+1])
 end
 
-# GPU version of find_rings_unsafe! using KernelAbstractions
 function find_rings_unsafe!(js::AbstractArray{<:Integer},  # Out: vector of ring indices
                            Δys::AbstractArray,            # distance fractions to ring further south
                            θs::AbstractArray,             # latitudes of points to interpolate onto
                            latd::AbstractArray{NF},       # latitudes of rings (90˚ to -90˚, strictly decreasing)
-                           architecture::GPU) where {NF<:AbstractFloat}
+                           architecture::AbstractArchitecture) where {NF<:AbstractFloat}
     
     @boundscheck length(js) == length(θs) || throw(DimensionMismatchArray(js, θs))
     @boundscheck length(js) == length(Δys) || throw(DimensionMismatchArray(js, Δys))
@@ -507,49 +479,6 @@ function find_rings(θs::AbstractVector, latd::AbstractVector{NF}) where NF
     return js, Δys
 end
 
-# CPU version of find_grid_indices!
-function find_grid_indices!(I::AnvilInterpolator,       # update indices arrays
-                            λs::AbstractVector, 
-                            architecture::CPU)         # based on new longitudes λ
-
-    (; js, ij_as, ij_bs, ij_cs, ij_ds ) = I.locator
-    (; Δabs, Δcds ) = I.locator
-    (; nlons, lon_offsets, nlat ) = I.geometry
-    (; rings ) = I.geometry.grid
-
-    @inbounds for (k, (λf, j)) in enumerate(zip(λs, js))
-
-        λ = convert(eltype(lon_offsets), λf)
-
-        # NORTHERN POINTS a, b
-        if j == 0               # a, b are at the north pole
-            ij_as[k] = 0        # use 0 as north pole flag
-            ij_bs[k] = 0
-        else
-            # get in-ring index i for a, the next grid point to the left
-            # and b the next grid point to the right, such that
-            # λ ∈ [a, b); while in most cases i_a + 1 = i_b, across 0˚E this is not the case
-            i_a, i_b, Δ = find_lon_indices(λ, lon_offsets[j], nlons[j])
-            ij_as[k] = rings[j][i_a]    # index ij for a
-            ij_bs[k] = rings[j][i_b]    # index ij for b
-            Δabs[k] = Δ                 # distance fraction of λ between a, b
-        end
-
-        # SOUTHERN POINTS c, d
-        if j == nlat                    # c, d are at the south pole
-            ij_cs[k] = -1               # use -1 as south pole flag
-            ij_ds[k] = -1
-        else
-            # as above but for one ring further down
-            i_c, i_d, Δ = find_lon_indices(λ, lon_offsets[j+1], nlons[j+1])
-            ij_cs[k] = rings[j+1][i_c]  # index ij for c
-            ij_ds[k] = rings[j+1][i_d]  # index ij for d
-            Δcds[k] = Δ                 # distance fraction of λ between c, d
-        end
-    end
-end
-
-# GPU kernel for finding grid indices
 @kernel inbounds=true function find_grid_indices_kernel!(
     @Const(js),            # ring indices j
     ij_as, ij_bs,          # northern point indices
@@ -593,10 +522,9 @@ end
     end
 end
 
-# GPU version of find_grid_indices! using KernelAbstractions
 function find_grid_indices!(I::AnvilInterpolator,       # update indices arrays
                            λs::AbstractArray,           # based on new longitudes λ
-                           architecture::GPU)
+                           architecture::AbstractArchitecture=architecture(λs))
                            
     (; js, ij_as, ij_bs, ij_cs, ij_ds ) = I.locator
     (; Δabs, Δcds ) = I.locator
