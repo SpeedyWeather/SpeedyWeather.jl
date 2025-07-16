@@ -318,7 +318,7 @@ function interpolate!(
     interpolator::AbstractInterpolator,
 ) 
     fields_match(Aout, A) && return copyto!(Aout.data, A.data)
-    @assert ismatching(architecture(A), Aout) "Interpolation is only supported between fields on the same architecture."
+    @assert ismatching(architecture(A), Aout) "Interpolation is only supported between fields on the same architecture, got $(architecture(A)) and )"
     _interpolate!(Aout.data, A.data, interpolator, architecture(A))
 end
 
@@ -374,7 +374,7 @@ function update_locator!(I::AbstractInterpolator, A::AbstractField; kwargs...)
     londs = on_architecture(architecture(A), londs)
     latds = on_architecture(architecture(A), latds)
 
-    update_locator_KA!(I, londs, latds; kwargs...)
+    update_locator!(I, londs, latds; kwargs...)
 end
 
 function find_rings!(   js::AbstractVector{<:Integer},  # Out: ring indices j
