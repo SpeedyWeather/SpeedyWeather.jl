@@ -689,6 +689,7 @@ Base.similar(L::LowerTriangularArray{T}) where T = similar(L, T)
  
 Architectures.array_type(::Type{<:LowerTriangularArray{T, N, ArrayType}}) where {T, N, ArrayType} = ArrayType
 Architectures.array_type(L::LowerTriangularArray) = array_type(typeof(L))
+Architectures.ismatching(arch::AbstractArchitecture, L::LowerTriangularArray) = ismatching(arch, L.data)
 
 Base.prod(L::LowerTriangularArray{NF}) where NF = zero(NF)
 @inline Base.sum(L::LowerTriangularArray; dims=:, kw...) = sum(L.data; dims, kw...)
