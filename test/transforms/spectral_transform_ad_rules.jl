@@ -52,6 +52,30 @@ end
                 end 
             end
         end
+
+        @testset "EnzymeTestUtils forward rules" begin 
+            for (i_grid, grid_type) in enumerate(grid_types)
+                
+                # these tests don't pass for reduced grids 
+                # this is likely due to FiniteDifferences and not our EnzymeRules 
+                # see comments in https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/589
+                if !(grid_type <: AbstractReducedGrid) & fd_tests[i_grid]
+                    spectral_grid = SpectralGrid(Grid=grid_type, nlayers=1, trunc=5, dealiasing=grid_dealiasing[i_grid])
+                    S = SpectralTransform(spectral_grid)
+                    field = rand(spectral_grid.NF, spectral_grid.grid, spectral_grid.nlayers)
+                    f_north = S.scratch_memory.north
+                    f_south = S.scratch_memory.south
+
+                    # forward transform 
+                    # TODO: currently duplicated activity is needed here in forward, but not in reverse, why?
+                    test_forward(SpeedyWeather.SpeedyTransforms._fourier!, Const, (f_north, Duplicated), (f_south, Duplicated), (field, Duplicated), (S, Duplicated); fdm=FiniteDifferences.central_fdm(5, 1), rtol=1e-2, atol=1e-2)
+
+                    # inverse transform
+                    field = zero(field)
+                    test_forward(SpeedyWeather.SpeedyTransforms._fourier!, Const, (field, Duplicated), (f_north, Duplicated), (f_south, Duplicated), (S, Duplicated); fdm=FiniteDifferences.central_fdm(5, 1), rtol=1e-2, atol=1e-2)
+                end 
+            end
+        end 
     end 
     @testset "Complete Transform ChainRules" begin 
         # WIP

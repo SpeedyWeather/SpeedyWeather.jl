@@ -40,6 +40,7 @@ function rfft_adjoint_scale(n_freq::Int, n_real::Int)
     end 
 end 
 
+### REVERSE RULES 
 ### Custom rule for _fourier!(f_north, f_north, grid, S)
 function augmented_primal(config::EnzymeRules.RevConfigWidth{1}, func::Const{typeof(_fourier!)}, ::Type{<:Const}, 
     f_north::Duplicated, f_south::Duplicated, grids::Duplicated{<:AbstractField}, S::Union{Const, MixedDuplicated}) 
@@ -114,6 +115,26 @@ function reverse(config::EnzymeRules.RevConfigWidth{1}, func::Const{typeof(_four
     # the function has no return values, so we also return nothing here
     return (nothing, nothing, nothing, nothing)
 end
+
+### FORWARD RULES 
+function forward(config::EnzymeRules.FwdConfig, func::Const{typeof(_fourier!)}, ::Type{<:Const}, 
+    grids::Duplicated{<:AbstractField}, f_north::Duplicated, f_south::Duplicated, S::Union{Const, MixedDuplicated})
+
+    func.val(grids.val, f_north.val, f_south.val, S.val) # 
+    func.val(grids.dval, f_north.dval, f_south.dval, S.val)
+
+    return nothing # because the function actually returns nothing
+end 
+
+function forward(config::EnzymeRules.FwdConfig, func::Const{typeof(_fourier!)}, ::Type{<:Const}, 
+    f_north::Duplicated, f_south::Duplicated, grid::Duplicated{<:AbstractField}, S::Union{Const, MixedDuplicated})
+
+    func.val(f_north.val, f_south.val, grid.val, S.val) # 
+    func.val(f_north.dval, f_south.dval, grid.dval, S.val)
+
+    return nothing # because the function actually returns nothing
+end 
+
 
 ###
 # implement make_zero where the default one fails
