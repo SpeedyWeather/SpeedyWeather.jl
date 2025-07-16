@@ -75,13 +75,13 @@ equivalent of the grid and resolution used in `SpectralGrid` `S`."""
 function NetCDFOutput(
     SG::SpectralGrid,
     Model::Type{<:AbstractModel} = Barotropic;
-    output_grid::AbstractFullGrid = RingGrids.full_grid_type(SG.grid)(SG.grid.nlat_half),
+    output_grid::AbstractFullGrid = on_architecture(CPU(), RingGrids.full_grid_type(SG.grid)(SG.grid.nlat_half)),
     output_NF::DataType = DEFAULT_OUTPUT_NF,
     output_dt::Period = Second(DEFAULT_OUTPUT_DT),  # only needed for dispatch
     kwargs...)
 
-    # INPUT GRID
-    input_grid = SG.grid
+    # INPUT GRID (but on CPU)
+    input_grid = on_architecture(CPU(), SG.grid)
 
     # CREATE INTERPOLATOR
     interpolator = RingGrids.interpolator(output_grid, input_grid, NF=DEFAULT_OUTPUT_NF)
@@ -332,7 +332,7 @@ function output!(
 
     # interpolate 2D/3D variables
     var = is3D(variable) ? (is_land(variable) ? output.field3Dland : output.field3D) : output.field2D
-    raw = path(variable, simulation)
+    raw = on_architecture(CPU(), path(variable, simulation))
     RingGrids.interpolate!(var, raw, output.interpolator)
 
     # unscale if variable.unscale == true and exists

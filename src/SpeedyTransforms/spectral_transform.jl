@@ -529,7 +529,7 @@ function transform(             # GRID TO SPECTRAL
     S::SpectralTransform,       # precomputed spectral transform
 )
     ks = size(field)[2:end]     # the non-horizontal dimensions
-    coeffs = zeros(Complex{eltype(S)}, S.spectrum, ks...)
+    coeffs = on_architecture(architecture(field), zeros(Complex{eltype(S)}, S.spectrum, ks...))
     transform!(coeffs, field, S)
     return coeffs
 end
@@ -543,7 +543,7 @@ function transform(                 # SPECTRAL TO GRID
     kwargs...                       # pass on unscale_coslat=true/false(default)
 )
     ks = size(coeffs)[2:end]        # the non-horizontal dimensions
-    field = zeros(eltype(S), S.grid, ks...)
+    field = on_architecture(architecture(coeffs), zeros(eltype(S), S.grid, ks...))
     transform!(field, coeffs, S; kwargs...)
     return field
 end
