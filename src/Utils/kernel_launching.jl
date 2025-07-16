@@ -9,6 +9,12 @@ function heuristic_workgroup(Wxy, Wz)
     return (min(Wxy,cld(256,minWy)),minWy)
 end 
 
+function heuristic_workgroup(Wx, Wy, Wz)
+    minWz = min(Wz, 8)
+    minWy = min(Wy, 8)
+    return (min(Wx,cld(cld(256,minWy),minWz)),minWy,minWz)
+end
+
 # TO-DO: in the future we might want to distinguish between LTA/RingGrids/different grids in some way
 """
 ($(TYPEDSIGNATURES))
@@ -32,11 +38,10 @@ function work_layout(dims_type::Symbol, worksize::NTuple{N, Int}) where N
         return heuristic_workgroup(worksize[1]-2, worksize[2:end]...), (worksize[1]-2, worksize[2:end]...)
     elseif dims_type == :diagonal # kernel just over the diagonal of a (m+1)x m or m x m LTA
         return heuristic_workgroup(worksize[2], worksize[3:end]...), (worksize[2], worksize[3:end]...)
-    elseif dims_type == :lastrow # kernel just over the last row of a (m+1)x m or m x m LTA
-        return heuristic_workgroup(worksize[2], worksize[3:end]...), (worksize[2], worksize[3:end]...)
-    elseif dims_type == :lmk_main # kernel over everything in a LTA that's not the last row or diagonal
-        N_elements = worksize[2]*(worksize[2]+1)÷2 - worksize[2] 
-        return heuristic_workgroup(N_elements, worksize[3:end]...), (N_elements, worksize[3:end]...)
+    elseif dims_type == :array_3d # kernel over a regular 3D array
+        return heuristic_workgroup(worksize...), worksize
+    elseif dims_type == :linear # kernel over eachindex / linear
+        return heuristic_workgroup(prod(worksize)), (prod(worksize),)
     else 
         error("Not yet implemented")
     end 
