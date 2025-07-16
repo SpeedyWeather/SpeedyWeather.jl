@@ -32,8 +32,9 @@ function dynamics_tendencies!(
     # = ∇⋅(v(ζ+f) + Fᵤ, -u(ζ+f) + Fᵥ), tendency for divergence
     vorticity_flux!(diagn, model)
 
-    geopotential!(diagn, get_step(progn.pres, lf), planet)  # geopotential Φ = gη in shallow water
-    bernoulli_potential!(diagn, spectral_transform)         # = -∇²(E+Φ), tendency for divergence
+    pres_lf = get_step(progn.pres, lf)              # interface displacement η at leapfrog step lf
+    geopotential!(diagn, pres_lf, planet)           # geopotential Φ = gη in shallow water
+    bernoulli_potential!(diagn, spectral_transform) # = -∇²(E+Φ), tendency for divergence
     
     # = -∇⋅(uh, vh), tendency for "pressure" η
     volume_flux_divergence!(diagn, orography, atmosphere, geometry, spectral_transform)
@@ -827,7 +828,7 @@ function SpeedyTransforms.transform!(
 
     # transform from U, V in spectral to u, v on grid (U, V = u, v*coslat)
     transform!(u_grid, U, scratch_memory, S, unscale_coslat=true)
-    transform!(v_grid, V, scratch_memory, S, unscale_coslat=true)
+    transform!(v_grid, V, scratch_memory, S, unscale_coslat=false)
 
     for (name, tracer) in model.tracers
         tracer_var = get_step(progn.tracers[name], lf)  # tracer at leapfrog step lf

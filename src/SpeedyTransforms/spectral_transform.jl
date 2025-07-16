@@ -1,6 +1,6 @@
 const DEFAULT_NLAYERS = 1
 const DEFAULT_GRID = FullGaussianGrid
-const DEFAULT_NF = Float64
+const DEFAULT_NF = Float32
 const DEFAULT_ARRAYTYPE = Array
 
 abstract type AbstractSpectralTransform end
@@ -201,68 +201,18 @@ function SpectralTransform(
     # Δϕ = 2π/nlon is the azimuth every grid point covers
     solid_angles = get_solid_angles(grid)
 
-    # RECURSION FACTORS
-    ϵlms = get_recursion_factors(Spectrum(lmax+1, mmax))    # one more degree needed!
-
     # GRADIENTS (on unit sphere, hence 1/radius-scaling is omitted)
-    # meridional gradient for scalars (coslat scaling included)
-    grad_y1 = zeros(NF, spectrum)                           # term 1, mul with harmonic l-1, m
-    grad_y2 = zeros(NF, spectrum)                           # term 2, mul with harmonic l+1, m
+    grad_y1, grad_y2, grad_y_vordiv1, grad_y_vordiv2 = meridional_gradient_factors(spectrum)
+    grad_x_vordiv = zonal_gradient_factors(spectrum)
 
-    for (m, degrees) in enumerate(orders(spectrum))          # 1-based degree l, order m
-        for l in degrees        
-            grad_y1[l, m] = -(l-2)*ϵlms[l, m]
-            grad_y2[l, m] = (l+1)*ϵlms[l+1, m]
-        end
-        # explicitly set the last row to zero, so that kernels yield correct gradient in last row 
-        grad_y2[lmax, m] = 0
-    end
-
-    # meridional gradient used to get from u, v/coslat to vorticity and divergence
-    grad_x_vordiv = zeros(Int, spectrum)
-    for m in 1:mmax
-        for l in m:lmax-1                         
-            grad_x_vordiv[l, m] = m-1
-        end # last row zero to get vor and div correct
-        grad_x_vordiv[lmax, m] = 0
-    end
-
-    grad_y_vordiv1 = zeros(NF, spectrum)                    # term 1, mul with harmonic l-1, m
-    grad_y_vordiv2 = zeros(NF, spectrum)                    # term 2, mul with harmonic l+1, m
- 
-    for (m, degrees) in enumerate(orders(spectrum))          # 1-based degree l, order m
-        for l in degrees           
-            grad_y_vordiv1[l, m] = l*ϵlms[l, m]
-            grad_y_vordiv2[l, m] = (l-1)*ϵlms[l+1, m]
-        end
-        # explicitly set the last row to zero, so that kernels yield correct gradient in last row 
-        grad_y_vordiv1[lmax, m] = 0
-        grad_y_vordiv2[lmax, m] = 0
-    end
-
-    # zonal integration (sort of) to get from vorticity and divergence to u, v*coslat
-    vordiv_to_uv_x = LowerTriangularMatrix([-m/(l*(l+1)) for l in 0:(lmax-1), m in 0:(mmax-1)], spectrum)
-    vordiv_to_uv_x[1, 1] = 0
-
-    # meridional integration (sort of) to get from vorticity and divergence to u, v*coslat
-    vordiv_to_uv1 = zeros(NF, spectrum)                     # term 1, to be mul with harmonic l-1, m
-    vordiv_to_uv2 = zeros(NF, spectrum)                     # term 2, to be mul with harmonic l+1, m
-
-    for (m, degrees) in enumerate(orders(spectrum))          # 1-based degree l, order m
-        for l in degrees             
-            vordiv_to_uv1[l, m] = ϵlms[l, m]/(l-1)
-            vordiv_to_uv2[l, m] = ϵlms[l+1, m]/l
-        end
-        # explicitly set the last row of vordiv_to_uv2 to zero, so that kernels yield correct gradient in last row 
-        vordiv_to_uv2[lmax, m] = 0
-    end
-
-    vordiv_to_uv1[1, 1] = 0                 # remove NaN from 0/0
+    # VORTICITY, DIVERGENCE TO U, V includes some precomputed "integration" factors
+    vordiv_to_uv1, vordiv_to_uv2 = meridional_integration_factors(spectrum)
+    vordiv_to_uv_x = zonal_integration_factors(spectrum)
 
     # EIGENVALUES (on unit sphere, hence 1/radius²-scaling is omitted)
-    eigenvalues = [-l*(l+1) for l in 0:mmax]
+    eigenvalues = get_eigenvalues(NF, spectrum)     # = -l*(l+1), degree l of spherical harmonic
     eigenvalues⁻¹ = inv.(eigenvalues)
-    eigenvalues⁻¹[1] = 0                    # set the integration constant to 0
+    eigenvalues⁻¹[1] = 0                            # set the integration constant to 0
 
     return SpectralTransform{
         NF,
@@ -420,30 +370,6 @@ function Base.DimensionMismatch(S::SpectralTransform, F::AbstractField)
         "$(Base.dims2string(size(F))) field on $Grid2 do not match."
     return DimensionMismatch(s)
 end
-
-"""
-$(TYPEDSIGNATURES)
-Recursion factors `ϵ` as a function of degree `l` and order `m` (0-based) of the spherical harmonics.
-ϵ(l, m) = sqrt((l^2-m^2)/(4*l^2-1))."""
-recursion_factor(l::Int, m::Int) = sqrt((l^2-m^2)/(4*l^2-1))
-
-"""
-$(TYPEDSIGNATURES)     
-Returns a matrix of recursion factors `ϵ` up to degree `lmax` and order `mmax` (1-based) of the `spectrum` in number format `NF`."""
-function get_recursion_factors( ::Type{NF},             # number format NF
-                                spectrum::Spectrum,
-                                ) where NF
-    ϵlms = zeros(NF, spectrum)
-    for (m, degrees) in enumerate(orders(spectrum))      # loop over 1-based l, m
-        for l in degrees
-            ϵlms[l, m] = recursion_factor(l-1, m-1)     # convert to 0-based l, m for function arguments
-        end
-    end
-    return ϵlms
-end
-
-# if number format not provided use Float64
-get_recursion_factors(spectrum::Spectrum) = get_recursion_factors(Float64, spectrum)
 
 """$(TYPEDSIGNATURES)
 Spectral transform (spectral to grid space) from n-dimensional array `coeffs` of spherical harmonic
