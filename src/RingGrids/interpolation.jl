@@ -318,7 +318,7 @@ function interpolate!(
     interpolator::AbstractInterpolator,
 ) 
     fields_match(Aout, A) && return copyto!(Aout.data, A.data)
-    @assert ismatching(architecture(A), A_out) "Interpolation is only supported between fields on the same architecture."
+    @assert ismatching(architecture(A), Aout) "Interpolation is only supported between fields on the same architecture."
     _interpolate!(Aout.data, A.data, interpolator, architecture(A))
 end
 
