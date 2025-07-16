@@ -24,14 +24,14 @@
     SpeedyWeather.RingGrids.update_locator!(interp_cpu, field_out_cpu)
     SpeedyWeather.RingGrids.update_locator!(interp, field_out_gpu)
 
-    @test interp_cpu.locator.js == interp.locator.js
-    @test interp_cpu.locator.ij_as == interp.locator.ij_as
-    @test interp_cpu.locator.ij_bs == interp.locator.ij_bs
-    @test interp_cpu.locator.ij_cs == interp.locator.ij_cs
-    @test interp_cpu.locator.ij_ds == interp.locator.ij_ds
-    @test interp_cpu.locator.Δys == interp.locator.Δys
-    @test interp_cpu.locator.Δabs == interp.locator.Δabs
-    @test interp_cpu.locator.Δcds == interp.locator.Δcds
+    @test interp_cpu.locator.js == on_architecture(cpu_arch, interp.locator.js)
+    @test interp_cpu.locator.ij_as == on_architecture(cpu_arch, interp.locator.ij_as)
+    @test interp_cpu.locator.ij_bs == on_architecture(cpu_arch, interp.locator.ij_bs)
+    @test interp_cpu.locator.ij_cs == on_architecture(cpu_arch, interp.locator.ij_cs)
+    @test interp_cpu.locator.ij_ds == on_architecture(cpu_arch, interp.locator.ij_ds)
+    @test interp_cpu.locator.Δys == on_architecture(cpu_arch, interp.locator.Δys)
+    @test interp_cpu.locator.Δabs == on_architecture(cpu_arch, interp.locator.Δabs)
+    @test interp_cpu.locator.Δcds == on_architecture(cpu_arch, interp.locator.Δcds)
 end
 
 
