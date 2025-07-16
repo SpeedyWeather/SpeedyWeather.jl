@@ -3,6 +3,7 @@
 ## Unreleased
 
 - A minimal barotropic model now runs on GPU [#733](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/733)
+- Add parameter handling system and implement for Barotropic model [#754](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/754)
 - Fix Enzyme CI to run as expected [#762](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/762)
 
 ## v0.16
