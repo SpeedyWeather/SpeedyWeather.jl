@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Forward rules for SpectralTransform [#767](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/767)
 - Fix Enzyme CI to run as expected [#762](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/762)
 
 ## v0.16
