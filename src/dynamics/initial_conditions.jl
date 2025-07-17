@@ -64,12 +64,12 @@ export RandomVorticity
 
 """Start with random vorticity as initial conditions
 $(TYPEDFIELDS)"""
-@kwdef mutable struct RandomVorticity <: AbstractInitialConditions
+@parameterized @kwdef mutable struct RandomVorticity{NF} <: AbstractInitialConditions
     "[OPTION] Power of the spectral distribution k^power"
-    power::Float64 = -3
+    @param power::NF = -3 (bounds=Negative,)
 
     "[OPTION] the (approximate) amplitude in [1/s], used as standard deviation of spherical harmonic coefficients"
-    amplitude::Float64 = 1e-4
+    @param amplitude::NF = 1e-4
 
     "[OPTION] Maximum wavenumber"
     max_wavenumber::Int = 20
@@ -116,9 +116,9 @@ export RandomVelocity
 
 """Start with random velocity as initial conditions
 $(TYPEDFIELDS)"""
-@kwdef mutable struct RandomVelocity <: AbstractInitialConditions
+@parameterized @kwdef mutable struct RandomVelocity{NF} <: AbstractInitialConditions
     "[OPTION] maximum speed [ms⁻¹]"
-    max_speed::Float64 = 60
+    @param max_speed::NF = 60 (bounds=Positive,)
 
     "[OPTION] Maximum wavenumber after truncation"
     truncation::Int = 15
@@ -167,30 +167,30 @@ export ZonalJet
 """A struct that contains all parameters for the Galewsky et al, 2004 zonal jet
 intitial conditions for the ShallowWaterModel. Default values as in Galewsky.
 $(TYPEDFIELDS)"""
-@kwdef mutable struct ZonalJet <: AbstractInitialConditions
+@parameterized @kwdef mutable struct ZonalJet{NF} <: AbstractInitialConditions
     "jet latitude [˚N]"
-    latitude::Float64 = 45
+    latitude::NF = 45.0
 
     "jet width [˚], default ≈ 19.29˚"
-    width::Float64 = (1/4-1/7)*180
+    @param width::NF = (1/4-1/7)*180.0 (bounds=Positive,)
 
     "jet maximum velocity [m/s]"
-    umax::Float64 = 80
+    @param umax::NF = 80.0 (bounds=Positive,)
 
     "perturbation latitude [˚N], position in jet by default"
-    perturb_lat::Float64 = latitude
+    perturb_lat::NF = latitude
 
     "perturbation longitude [˚E]"
-    perturb_lon::Float64 = 270
+    perturb_lon::NF = 270.0
 
     "perturbation zonal extent [˚], default ≈ 19.1˚"
-    perturb_xwidth::Float64 = 1/3*360/2π
+    @param perturb_xwidth::NF = 1/3*360/2π (bounds=Positive,)
 
     "perturbation meridinoal extent [˚], default ≈ 3.8˚"
-    perturb_ywidth::Float64 = 1/15*360/2π
+    @param perturb_ywidth::NF = 1/15*360/2π (bounds=Positive,)
 
     "perturbation amplitude [m]"
-    perturb_height::Float64 = 120
+    @param perturb_height::NF = 120.0 (bounds=Positive,)
 end
 
 """
@@ -292,25 +292,25 @@ $(TYPEDSIGNATURES)
 Create a struct that contains all parameters for the Jablonowski and Williamson, 2006
 intitial conditions for the primitive equation model. Default values as in Jablonowski.
 $(TYPEDFIELDS)"""
-@kwdef struct ZonalWind <: AbstractInitialConditions
+@parameterized @kwdef struct ZonalWind{NF} <: AbstractInitialConditions
     "conversion from σ to Jablonowski's ηᵥ-coordinates"
-    η₀::Float64 = 0.252
+    η₀::NF = 0.252
 
     "[OPTION] max amplitude of zonal wind [m/s]"
-    u₀::Float64 = 35
+    @param u₀::NF = 35 (bounds=Positive,)
 
     # PERTURBATION
     "[OPTION] perturbation centred at [˚N]"
-    perturb_lat::Float64 = 40
+    perturb_lat::NF = 40
 
     "[OPTION] perturbation centred at [˚E]"
-    perturb_lon::Float64 = 20
+    perturb_lon::NF = 20
 
     "[OPTION] perturbation strength [m/s]"
-    perturb_uₚ::Float64 = 1
+    @param perturb_uₚ::NF = 1 (bounds=Positive,)
 
     "[OPTION] radius of Gaussian perturbation in units of Earth's radius [1]"
-    perturb_radius::Float64 = 1/10
+    @param perturb_radius::NF = 1/10 (bounds=Positive,)
 end
 
 """
@@ -419,21 +419,21 @@ $(TYPEDSIGNATURES)
 Create a struct that contains all parameters for the Jablonowski and Williamson, 2006
 intitial conditions for the primitive equation model. Default values as in Jablonowski.
 $(TYPEDFIELDS)"""
-@kwdef struct JablonowskiTemperature <: AbstractInitialConditions
+@parameterized @kwdef struct JablonowskiTemperature{NF} <: AbstractInitialConditions
     "conversion from σ to Jablonowski's ηᵥ-coordinates"
-    η₀::Float64 = 0.252
+    η₀::NF = 0.252
 
     "Sigma coordinates of the tropopause [1]"
-    σ_tropopause::Float64 = 0.2
+    @param σ_tropopause::NF = 0.2 (bounds=UnitInterval,)
 
     "max amplitude of zonal wind [m/s]"
-    u₀::Float64 = 35
+    @param u₀::NF = 35 (bounds=Positive,)
 
     "temperature difference used for stratospheric lapse rate [K], Jablonowski uses ΔT = 4.8e5 [K]"
-    ΔT::Float64 = 0
+    @param ΔT::NF = 0
 
     "minimum temperature [K] of profile"
-    Tmin::Float64 = 200
+    @param Tmin::NF = 200 (bounds=Positive,)
 end
 
 """
@@ -658,11 +658,11 @@ export RandomWaves
 """Parameters for random initial conditions for the interface displacement η
 in the shallow water equations.
 $(TYPEDFIELDS)"""
-@kwdef struct RandomWaves <: AbstractInitialConditions
+@parameterized @kwdef struct RandomWaves{NF} <: AbstractInitialConditions
     # random interface displacement field
-    A::Float64 = 2000       # amplitude [m]
-    lmin::Int64 = 10        # minimum wavenumber
-    lmax::Int64 = 30        # maximum wavenumber
+    @param A::NF = 2000 (bounds=Positive,)  # amplitude [m]
+    lmin::Int64 = 10                        # minimum wavenumber
+    lmax::Int64 = 30                        # maximum wavenumber
 end
 
 RandomWaves(S::SpectralGrid; kwargs...) = RandomWaves(;kwargs...)

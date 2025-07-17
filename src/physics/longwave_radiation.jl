@@ -26,15 +26,15 @@ relaxation term with `time_scale_stratosphere` towards `temp_stratosphere` is ap
 
 Fields are
 $(TYPEDFIELDS)"""
-@kwdef struct UniformCooling{NF} <: AbstractLongwave
+@parameterized @kwdef struct UniformCooling{NF} <: AbstractLongwave
     "[OPTION] time scale of cooling, default = -1.5K/day = -1K/16hrs"
     time_scale::Second = Hour(16)
 
     "[OPTION] temperature [K] below which stratospheric relaxation is applied"
-    temp_min::NF = 207.5
+    @param temp_min::NF = 207.5 (bounds=Positive,)
 
     "[OPTION] target temperature [K] of stratospheric relaxation"
-    temp_stratosphere::NF = 200
+    @param temp_stratosphere::NF = 200 (bounds=Positive,)
 
     "[OPTION] time scale of stratospheric relaxation"
     time_scale_stratosphere::Second = Day(5)
@@ -84,12 +84,12 @@ layer towards the tropopause temperature `T_t` with time scale `τ = 24h`
 (Seeley and Wordsworth, 2023 use 6h, which is unstable a low resolutions here).
 Fields are
 $(TYPEDFIELDS)"""
-@kwdef struct JeevanjeeRadiation{NF} <: AbstractLongwave
+@parameterized @kwdef struct JeevanjeeRadiation{NF} <: AbstractLongwave
     "Radiative forcing constant (W/m²/K²)"
-    α::NF = 0.025
+    @param α::NF = 0.025
 
     "Tropopause temperature [K]"
-    temp_tropopause::NF = 200
+    @param temp_tropopause::NF = 200 (bounds=Positive,)
 
     "Tropopause relaxation time scale to temp_tropopause"
     time_scale::Second = Hour(24)

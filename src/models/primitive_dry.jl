@@ -10,7 +10,7 @@ with `spectral_grid::SpectralGrid` used to initalize all non-default components
 passed on as keyword arguments, e.g. `planet=Earth(spectral_grid)`. Fields, representing
 model components, are
 $(TYPEDFIELDS)"""
-@kwdef mutable struct PrimitiveDryModel{
+@parameterized @kwdef mutable struct PrimitiveDryModel{
     AR,     # <:AbstractArchitecture,
     GE,     # <:AbstractGeometry,
     PL,     # <:AbstractPlanet,
@@ -55,41 +55,41 @@ $(TYPEDFIELDS)"""
     # DYNAMICS
     dynamics::Bool = true
     geometry::GE = Geometry(spectral_grid)
-    planet::PL = Earth(spectral_grid)
-    atmosphere::AT = EarthAtmosphere(spectral_grid)
-    coriolis::CO = Coriolis(spectral_grid)
-    geopotential::GO = Geopotential(spectral_grid)
-    adiabatic_conversion::AC = AdiabaticConversion(spectral_grid)
-    particle_advection::PA = NoParticleAdvection()
-    initial_conditions::IC = InitialConditions(PrimitiveDry)
-    forcing::FR = NoForcing()
-    drag::DR = NoDrag()
+    @component planet::PL = Earth(spectral_grid)
+    @component atmosphere::AT = EarthAtmosphere(spectral_grid)
+    @component coriolis::CO = Coriolis(spectral_grid)
+    @component geopotential::GO = Geopotential(spectral_grid)
+    @component adiabatic_conversion::AC = AdiabaticConversion(spectral_grid)
+    @component particle_advection::PA = NoParticleAdvection()
+    @component initial_conditions::IC = InitialConditions(PrimitiveDry)
+    @component forcing::FR = NoForcing()
+    @component drag::DR = NoDrag()
   
     # VARIABLES
-    random_process::RP = NoRandomProcess()
+    @component random_process::RP = NoRandomProcess()
     tracers::TRACER_DICT = TRACER_DICT()
 
     # BOUNDARY CONDITIONS
-    orography::OR = EarthOrography(spectral_grid)
-    land_sea_mask::LS = EarthLandSeaMask(spectral_grid)
-    ocean::OC = SeasonalOceanClimatology(spectral_grid)
-    land::LA = DryLandModel(spectral_grid)
-    solar_zenith::ZE = WhichZenith(spectral_grid, planet)
-    albedo::AL = DefaultAlbedo(spectral_grid)
+    @component orography::OR = EarthOrography(spectral_grid)
+    @component land_sea_mask::LS = EarthLandSeaMask(spectral_grid)
+    @component ocean::OC = SeasonalOceanClimatology(spectral_grid)
+    @component land::LA = DryLandModel(spectral_grid)
+    @component solar_zenith::ZE = WhichZenith(spectral_grid, planet)
+    @component albedo::AL = DefaultAlbedo(spectral_grid)
     
     # PHYSICS/PARAMETERIZATIONS
     physics::Bool = true
-    boundary_layer_drag::BL = BulkRichardsonDrag(spectral_grid)
-    temperature_relaxation::TR = NoTemperatureRelaxation(spectral_grid)
-    vertical_diffusion::VD = BulkRichardsonDiffusion(spectral_grid)
-    surface_thermodynamics::SUT = SurfaceThermodynamicsConstant(spectral_grid)
-    surface_wind::SUW = SurfaceWind(spectral_grid)
-    surface_heat_flux::SH = SurfaceHeatFlux(spectral_grid)
-    convection::CV = DryBettsMiller(spectral_grid)
-    optical_depth::OD = ZeroOpticalDepth(spectral_grid)
-    shortwave_radiation::SW = TransparentShortwave(spectral_grid)
-    longwave_radiation::LW = JeevanjeeRadiation(spectral_grid)
-    stochastic_physics::SP = NoStochasticPhysics()
+    @component boundary_layer_drag::BL = BulkRichardsonDrag(spectral_grid)
+    @component temperature_relaxation::TR = NoTemperatureRelaxation(spectral_grid)
+    @component vertical_diffusion::VD = BulkRichardsonDiffusion(spectral_grid)
+    @component surface_thermodynamics::SUT = SurfaceThermodynamicsConstant(spectral_grid)
+    @component surface_wind::SUW = SurfaceWind(spectral_grid)
+    @component surface_heat_flux::SH = SurfaceHeatFlux(spectral_grid)
+    @component convection::CV = DryBettsMiller(spectral_grid)
+    @component optical_depth::OD = ZeroOpticalDepth(spectral_grid)
+    @component shortwave_radiation::SW = TransparentShortwave(spectral_grid)
+    @component longwave_radiation::LW = JeevanjeeRadiation(spectral_grid)
+    @component stochastic_physics::SP = NoStochasticPhysics()
     
     # NUMERICS
     time_stepping::TS = Leapfrog(spectral_grid)

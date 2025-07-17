@@ -5,21 +5,21 @@ initialize!(::NoSurfaceWind, ::PrimitiveEquation) = nothing
 surface_wind_stress!(::ColumnVariables, ::NoSurfaceWind, ::PrimitiveEquation) = nothing
 
 export SurfaceWind
-Base.@kwdef struct SurfaceWind{NF<:AbstractFloat} <: AbstractSurfaceWind
+@parameterized Base.@kwdef struct SurfaceWind{NF<:AbstractFloat} <: AbstractSurfaceWind
     "Ratio of near-surface wind to lowest-level wind [1]"
-    f_wind::NF = 0.95
+    @param f_wind::NF = 0.95 (bounds=UnitInterval,)
 
     "Wind speed of sub-grid scale gusts [m/s]"
-    V_gust::NF = 5
+    @param V_gust::NF = 5 (bounds=Nonnegative,)
 
     "Use (possibly) flow-dependent column.boundary_layer_drag coefficient"
     use_boundary_layer_drag::Bool = true
 
     "Otherwise, drag coefficient over land (orography = 0) [1]"
-    drag_land::NF = 2.4e-3
+    @param drag_land::NF = 2.4e-3
     
     "Otherwise, Drag coefficient over sea [1]"
-    drag_sea::NF = 1.8e-3
+    @param drag_sea::NF = 1.8e-3
 end
 
 SurfaceWind(SG::SpectralGrid; kwargs...) = SurfaceWind{SG.NF}(; kwargs...)

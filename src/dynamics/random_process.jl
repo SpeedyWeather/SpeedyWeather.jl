@@ -49,7 +49,7 @@ independently. Transformed after every time step to grid space with a
 `clamp` applied to limit extrema. For reproducability `seed` can be
 provided and an independent `random_number_generator` is used
 that is reseeded on every `initialize!`. Fields are: $(TYPEDFIELDS)"""
-@kwdef struct SpectralAR1Process{NF, VectorType} <: AbstractRandomProcess
+@parameterized @kwdef struct SpectralAR1Process{NF, VectorType} <: AbstractRandomProcess
     trunc::Int
 
     "[OPTION] Time scale of the AR1 process"
@@ -59,7 +59,10 @@ that is reseeded on every `initialize!`. Fields are: $(TYPEDFIELDS)"""
     wavenumber::Int = 12
 
     "[OPTION] Standard deviation of the AR1 process"
-    standard_deviation::NF = 1/3
+    @param standard_deviation::NF = 1/3 (bounds=Positive,)
+
+    "[OPTION] Damping factor of the autoregressive coefficient"
+    @param damping_factor::NF = one(NF) (bounds=Positive,)
 
     "[OPTION] Range to clamp values into after every transform into grid space"
     clamp::NTuple{2, NF} = (-1, 1)
@@ -71,7 +74,7 @@ that is reseeded on every `initialize!`. Fields are: $(TYPEDFIELDS)"""
     random_number_generator::Random.Xoshiro = Random.Xoshiro(seed)
 
     "Precomputed auto-regressive factor [1], function of time scale and model time step"
-    autoregressive_factor::Base.RefValue{NF} = Ref(zero(NF))
+    autoregressive_factor::NF = zero(NF)
 
     "Precomputed noise factors [1] for every total wavenumber l"
     noise_factors::VectorType = zeros(NF, trunc+2)
@@ -86,11 +89,11 @@ function initialize!(
 )
     # auto-regressive factor in the AR1 process
     dt = model.time_stepping.Δt_sec         # in seconds
-    process.autoregressive_factor[] = exp(-dt/Second(process.time_scale).value)
+    process.autoregressive_factor = exp(-process.damping_factor*dt/Second(process.time_scale).value)
 
     # noise factors per total wavenumber in the AR1 process
     k = process.wavenumber
-    a = process.autoregressive_factor[]
+    a = process.autoregressive_factor
     σ = process.standard_deviation
 
     # ECMWF Tech Memorandum 598, Appendix 8, eq. 18
