@@ -1,9 +1,9 @@
 abstract type AbstractAlbedo <: AbstractModelComponent end
 
 export Albedo
-@kwdef struct Albedo{Ocean, Land} <: AbstractAlbedo
-    ocean::Ocean
-    land::Land
+@parameterized @kwdef struct Albedo{Ocean, Land} <: AbstractAlbedo
+    @param ocean::Ocean
+    @param land::Land
 end
 
 function Base.show(io::IO, A::Albedo)
@@ -68,8 +68,8 @@ end
 
 ## GLOBAL CONSTANT ALBEDO
 export GlobalConstantAlbedo
-@kwdef mutable struct GlobalConstantAlbedo{NF} <: AbstractAlbedo
-    albedo::NF = 0.3
+@parameterized @kwdef mutable struct GlobalConstantAlbedo{NF} <: AbstractAlbedo
+    @param albedo::NF = 0.3 (bounds=UnitInterval,)
 end
 
 GlobalConstantAlbedo(SG::SpectralGrid; kwargs...) = GlobalConstantAlbedo{SG.NF}(; kwargs...)

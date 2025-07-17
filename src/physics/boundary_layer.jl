@@ -17,14 +17,14 @@ export LinearDrag
 
 """Linear boundary layer drag following Held and Suarez, 1996 BAMS
 $(TYPEDFIELDS)"""
-@kwdef struct LinearDrag{NF<:AbstractFloat} <: AbstractBoundaryLayer
+@parameterized @kwdef struct LinearDrag{NF<:AbstractFloat} <: AbstractBoundaryLayer
     
     # DIMENSIONS
     nlayers::Int
     
     # PARAMETERS
-    σb::NF = 0.7                    # sigma coordinate below which linear drag is applied
-    time_scale::Second = Hour(24)   # time scale for linear drag coefficient at σ=1 (=1/kf in HS96)
+    @param σb::NF = 0.7 (bounds=UnitInterval,)  # sigma coordinate below which linear drag is applied
+    time_scale::Second = Hour(24)               # time scale for linear drag coefficient at σ=1 (=1/kf in HS96)
 
     # PRECOMPUTED CONSTANTS
     drag_coefs::Vector{NF} = zeros(NF, nlayers)
@@ -77,8 +77,8 @@ function boundary_layer_drag!(  column::ColumnVariables,
 end
 
 export ConstantDrag
-Base.@kwdef struct ConstantDrag{NF} <: AbstractBoundaryLayer
-    drag::NF = 1e-3
+@parameterized Base.@kwdef struct ConstantDrag{NF} <: AbstractBoundaryLayer
+    @param drag::NF = 1e-3
 end
 
 ConstantDrag(SG::SpectralGrid; kwargs...) = ConstantDrag{SG.NF}(; kwargs...)
@@ -94,12 +94,12 @@ export BulkRichardsonDrag
 """Boundary layer drag coefficient from the bulk Richardson number,
 following Frierson, 2006, Journal of the Atmospheric Sciences.
 $(TYPEDFIELDS)"""
-@kwdef struct BulkRichardsonDrag{NF} <: AbstractBoundaryLayer
+@parameterized @kwdef struct BulkRichardsonDrag{NF} <: AbstractBoundaryLayer
     "von Kármán constant [1]"
-    κ::NF = 0.4
+    @param κ::NF = 0.4 (bounds=Positive,)
 
     "roughness length [m]"
-    z₀::NF = 3.21e-5
+    @param z₀::NF = 3.21e-5 (bounds=Positive,)
 
     "Critical Richardson number for stable mixing cutoff [1]"
     Ri_c::NF = 10

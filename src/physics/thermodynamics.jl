@@ -9,7 +9,7 @@ Parameters for computing saturation vapour pressure of water using the Clausis-C
 
 where T is in Kelvin, Lᵥ the the latent heat of condensation and Rᵥ the gas constant of water vapour
 $(TYPEDFIELDS)"""
-Base.@kwdef struct ClausiusClapeyron{NF<:AbstractFloat} <: AbstractClausiusClapeyron
+@parameterized Base.@kwdef struct ClausiusClapeyron{NF<:AbstractFloat} <: AbstractClausiusClapeyron
     "Saturation water vapour pressure at 0°C [Pa]"
     e₀::NF = 610.78
 
@@ -23,10 +23,10 @@ Base.@kwdef struct ClausiusClapeyron{NF<:AbstractFloat} <: AbstractClausiusClape
     cₚ::NF = 1004.64
 
     "Gas constant of water vapour [J/kg/K]"
-    R_vapour::NF = 461.5
+    @param R_vapour::NF = 461.5 (bounds=Positive,)
 
     "Gas constant of dry air [J/kg/K]"
-    R_dry::NF = 287.04
+    @param R_dry::NF = 287.04 (bounds=Positive,)
 
     "Latent heat of condensation divided by gas constant of water vapour [K]"    
     Lᵥ_Rᵥ::NF = Lᵥ/R_vapour
@@ -190,7 +190,7 @@ Parameters for computing saturation vapour pressure of water using the Tetens' e
 where T is in Kelvin and i = 1, 2 for saturation above and below freezing,
 respectively. From Tetens (1930), and Murray (1967) for below freezing.
 $(TYPEDFIELDS)"""
-Base.@kwdef struct TetensEquation{NF<:AbstractFloat} <: AbstractClausiusClapeyron
+@parameterized Base.@kwdef struct TetensEquation{NF<:AbstractFloat} <: AbstractClausiusClapeyron
     "Saturation water vapour pressure at 0°C [Pa]"
     e₀::NF = 610.78
 
@@ -198,16 +198,16 @@ Base.@kwdef struct TetensEquation{NF<:AbstractFloat} <: AbstractClausiusClapeyro
     T₀::NF = 273.15
 
     "Tetens denominator (water) [˚C]"
-    T₁::NF = 237.3
+    @param T₁::NF = 237.3 (bounds=Positive,)
 
     "Tetens denominator following Murray (1967, below freezing) [˚C]"
-    T₂::NF = 265.5
+    @param T₂::NF = 265.5 (bounds=Positive,)
 
     "Tetens numerator scaling [1], above freezing"
-    C₁::NF = 17.27
+    @param C₁::NF = 17.27 (bounds=Positive,)
 
     "Tetens numerator scaling [1], below freezing"
-    C₂::NF = 21.875
+    @param C₂::NF = 21.875 (bounds=Positive,)
 end
 
 """

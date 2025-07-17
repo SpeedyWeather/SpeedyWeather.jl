@@ -15,19 +15,19 @@ function optical_depth!(column::ColumnVariables, od::ZeroOpticalDepth, model::Ab
 end
 
 export FriersonOpticalDepth
-@kwdef mutable struct FriersonOpticalDepth{NF} <: AbstractOpticalDepth
+@parameterized @kwdef mutable struct FriersonOpticalDepth{NF} <: AbstractOpticalDepth
     
     "[OPTION] Spectral band to use"
     band::Int = 1
 
     "[OPTION] Optical depth at the equator"
-    τ₀_equator::NF = 6
+    @param τ₀_equator::NF = 6 (bounds=Positive,)
 
     "[OPTION] Optical depth at the poles"
-    τ₀_pole::NF = 1.5
+    @param τ₀_pole::NF = 1.5 (bounds=Positive,)
 
     "[OPTION] Fraction to mix linear and quadratic profile"
-    fₗ::NF = 0.1
+    @param fₗ::NF = 0.1 (bounds=UnitInterval,)
 end
 
 FriersonOpticalDepth(SG::SpectralGrid; kwargs...) = FriersonOpticalDepth{SG.NF}(; kwargs...)

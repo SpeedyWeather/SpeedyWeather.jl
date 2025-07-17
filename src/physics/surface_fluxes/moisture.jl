@@ -1,7 +1,7 @@
 export SurfaceEvaporation
-@kwdef struct SurfaceEvaporation{Ocean, Land} <: AbstractSurfaceEvaporation
-    ocean::Ocean = SurfaceOceanEvaporation()
-    land::Land = SurfaceLandEvaporation()
+@parameterized @kwdef struct SurfaceEvaporation{Ocean, Land} <: AbstractSurfaceEvaporation
+    @param ocean::Ocean = SurfaceOceanEvaporation()
+    @param land::Land = SurfaceLandEvaporation()
 end
 
 function SurfaceEvaporation(
@@ -37,12 +37,12 @@ surface_evaporation!(::ColumnVariables, ::NoSurfaceEvaporation, ::PrimitiveWet) 
 ## ----
 
 export SurfaceOceanEvaporation
-@kwdef struct SurfaceOceanEvaporation{NF<:AbstractFloat} <: AbstractSurfaceEvaporation
+@parameterized @kwdef struct SurfaceOceanEvaporation{NF<:AbstractFloat} <: AbstractSurfaceEvaporation
     "Use column.boundary_layer_drag coefficient"
     use_boundary_layer_drag::Bool = true
 
     "Or drag coefficient for evaporation over ocean"
-    moisture_exchange::NF = 0.9e-3
+    @param moisture_exchange::NF = 0.9e-3
 end
 
 SurfaceOceanEvaporation(SG::SpectralGrid; kwargs...) = SurfaceOceanEvaporation{SG.NF}(; kwargs...)
@@ -84,12 +84,12 @@ end
 ## ----
 
 export SurfaceLandEvaporation
-@kwdef struct SurfaceLandEvaporation{NF<:AbstractFloat} <: AbstractSurfaceEvaporation
+@parameterized @kwdef struct SurfaceLandEvaporation{NF<:AbstractFloat} <: AbstractSurfaceEvaporation
     "Use column.boundary_layer_drag coefficient"
     use_boundary_layer_drag::Bool = true
 
     "Otherwise, use the following drag coefficient for evaporation over land"
-    moisture_exchange::NF = 1.2e-3
+    @param moisture_exchange::NF = 1.2e-3
 end
 
 SurfaceLandEvaporation(SG::SpectralGrid; kwargs...) = SurfaceLandEvaporation{SG.NF}(; kwargs...)

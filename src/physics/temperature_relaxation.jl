@@ -16,7 +16,7 @@ export HeldSuarez
 """
 Temperature relaxation from Held and Suarez, 1996 BAMS
 $(TYPEDFIELDS)"""
-Base.@kwdef struct HeldSuarez{NF<:AbstractFloat} <: AbstractTemperatureRelaxation
+@parameterized Base.@kwdef struct HeldSuarez{NF<:AbstractFloat} <: AbstractTemperatureRelaxation
     # DIMENSIONS
     "number of latitude rings"
     nlat::Int
@@ -26,7 +26,7 @@ Base.@kwdef struct HeldSuarez{NF<:AbstractFloat} <: AbstractTemperatureRelaxatio
     
     # OPTIONS
     "sigma coordinate below which faster surface relaxation is applied"
-    σb::NF = 0.7
+    @param σb::NF = 0.7 (bounds=UnitInterval,)
 
     "time scale for slow global relaxation"
     relax_time_slow::Second = Day(40)
@@ -35,16 +35,16 @@ Base.@kwdef struct HeldSuarez{NF<:AbstractFloat} <: AbstractTemperatureRelaxatio
     relax_time_fast::Second = Day(4)
 
     "minimum equilibrium temperature [K]"
-    Tmin::NF = 200    
+    @param Tmin::NF = 200 (bounds=Positive,)
 
     "maximum equilibrium temperature [K]"
-    Tmax::NF = 315    
+    @param Tmax::NF = 315 (bounds=Positive,) # TODO: should really enforce Tmax > Tmin?
 
     "meridional temperature gradient [K]"
-    ΔTy::NF = 60
+    @param ΔTy::NF = 60
     
     "vertical temperature gradient [K]"
-    Δθz::NF = 10
+    @param Δθz::NF = 10
 
     # precomputed constants, allocate here, fill in initialize!
     κ::Base.RefValue{NF} = Ref(zero(NF))
@@ -132,7 +132,7 @@ export JablonowskiRelaxation
 """$(TYPEDSIGNATURES)
 HeldSuarez-like temperature relaxation, but towards the Jablonowski temperature
 profile with increasing temperatures in the stratosphere."""
-Base.@kwdef mutable struct JablonowskiRelaxation{NF<:AbstractFloat} <: AbstractTemperatureRelaxation
+@parameterized Base.@kwdef mutable struct JablonowskiRelaxation{NF<:AbstractFloat} <: AbstractTemperatureRelaxation
     
     # DIMENSIONS
     nlat::Int
@@ -140,22 +140,22 @@ Base.@kwdef mutable struct JablonowskiRelaxation{NF<:AbstractFloat} <: AbstractT
 
     # OPTIONS
     "sigma coordinate below which relax_time_fast is applied [1]"
-    σb::NF = 0.7
+    @param σb::NF = 0.7 (bounds=UnitInterval,)
 
     "sigma coordinate for tropopause temperature inversion"
-    σ_tropopause::NF = 0.2
+    @param σ_tropopause::NF = 0.2 (bounds=UnitInterval,)
 
     "conversion from σ to Jablonowski's ηᵥ-coordinates"
     η₀::NF = 0.252
 
     "max amplitude of zonal wind [m/s]"
-    u₀::NF = 35
+    @param u₀::NF = 35 (bounds=Positive,)
 
     "temperature difference used for stratospheric lapse rate [K]"
-    ΔT::NF = 4.8e5
+    @param ΔT::NF = 4.8e5
 
     "Dry-adiabatic lapse rate [K/m]"
-    lapse_rate::NF = 5/1000
+    @param lapse_rate::NF = 5/1000
 
     "time scale for slow global relaxation"
     relax_time_slow::Second = Day(40)
