@@ -234,6 +234,16 @@ macro parameterized(expr)
             typedef
         end
     end
+    function parse_attributes(attrs)
+        if isempty(attrs)
+                (;)
+        elseif length(attrs) == 1
+            # handle both singleton attr=value syntax as well as named tuple syntax (attr1=value1, attr2=value2, ...)
+            attrs[1].head == :tuple ? eval(attrs[1]) : eval(:(($(attrs...),)))
+        else
+            error("invalid syntax for parameter attributes: $(QuoteNode(attrs))")
+        end
+    end
     # process struct definition
     ## first declare local variables for capturing metadata
     params = []
@@ -257,14 +267,7 @@ macro parameterized(expr)
         elseif MacroTools.@capture(ex, @param fieldname_::FT_ = defval_ attrs__) || MacroTools.@capture(ex, @param fieldname_::FT_ attrs__)
             # use last seen docstring as description, if present
             desc = isnothing(lastdoc) ? "" : lastdoc
-            attrs = if isempty(attrs)
-                (;)
-            elseif length(attrs) == 1
-                # handle both singleton attr=value syntax as well as named tuple syntax (attr1=value1, attr2=value2, ...)
-                attrs[1].head == :tuple ? eval(attrs[1]) : eval(:(($(attrs...),)))
-            else
-                error("invalid syntax for parameter attributes: $(QuoteNode(attrs))")
-            end
+            attrs = parse_attributes(attrs)
             paraminfo = (name=fieldname, type=FT, desc=desc, attrs=attrs)
             push!(params, paraminfo)
             # reset lastdoc to nothing to prevent duplication
@@ -282,7 +285,16 @@ macro parameterized(expr)
             # reset lastdoc variable to prevent confusing docstrings between parameteter and non-parameter fields
             lastdoc = nothing
             ex
-        # case 3: field documentation
+        # case 3: subcomponent
+        elseif MacroTools.@capture(ex, @component fieldname_::FT_ = defval_ attrs__) || MacroTools.@capture(ex, @component fieldname_::FT_ attrs__)
+            attrs = parse_attributes(attrs)
+            # add component name to attributes
+            paraminfo = (name=fieldname, type=FT, desc="", attrs=(component=fieldname, attrs...))
+            push!(params, paraminfo)
+            # reset lastdoc
+            lastdoc = nothing
+            isnothing(defval) ? :($fieldname::$FT;) : :($fieldname::$FT = $defval;)
+        # case 4: field documentation
         elseif MacroTools.@capture(ex, docs_String)
             # store in lastdoc field
             lastdoc = docs

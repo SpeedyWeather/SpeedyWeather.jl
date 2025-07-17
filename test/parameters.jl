@@ -111,13 +111,23 @@ end
     @test vec(ps) == ComponentVector(x=1.0,y=2.0,z=3.0)
     @test ps[:desc] == ("parameter 1","parameter 2","")
 
-    # test parameters for nested type
+    # test @parameterized for nested type
     SpeedyWeather.@parameterized @kwdef struct MyModel{T}
-        @param component::T = TestType4() (group=:group1,)
+        @param inner::T = TestType4() (group=:group1,)
     end
     ps = parameters(MyModel())
     @test length(ps) == 3
-    @test haskey(parent(ps), :component)
-    @test vec(ps) == ComponentVector(component=(x=1.0,y=2.0,z=3.0))
+    @test haskey(parent(ps), :inner)
+    @test vec(ps) == ComponentVector(inner=(x=1.0,y=2.0,z=3.0))
     @test all(map(==(:group1), ps[:group]))
+
+    # test using @component instead of @param for nested type
+    SpeedyWeather.@parameterized @kwdef struct MyModel2{T}
+        @component inner::T = TestType4()
+    end
+    ps = parameters(MyModel2())
+    @test length(ps) == 3
+    @test haskey(parent(ps), :inner)
+    @test vec(ps) == ComponentVector(inner=(x=1.0,y=2.0,z=3.0))
+    @test all(map(==(:inner)), ps[:component])
 end
