@@ -32,6 +32,9 @@ $(TYPEDFIELDS)"""
     "[OPTION] run identification number/string"
     id::String = "0001"
     run_path::String = ""                   # will be determined in initalize!
+
+    "[OPTION] Overwrite an existing run folder?"
+    overwrite::Bool = false
     
     "[OPTION] name of the output netcdf file"
     filename::String = "output.nc"
@@ -109,7 +112,7 @@ function Base.show(io::IO, output::NetCDFOutput{F}) where F
     println(io, "├ status: $(output.active ? "active" : "inactive/uninitialized")")
     println(io, "├ write restart file: $(output.write_restart) (if active)")
     println(io, "├ interpolator: $(typeof(output.interpolator))")
-    println(io, "├ path: $(joinpath(output.run_path, output.filename))")
+    println(io, "├ path: $(joinpath(output.run_path, output.filename)) (overwrite=$(output.overwrite))")
     println(io, "├ frequency: $(output.output_dt)")
     print(io,   "└┐ variables:")
     nvars = length(output.variables)
@@ -209,8 +212,8 @@ function initialize!(
     
     # GET RUN ID, CREATE FOLDER
     # get new id only if not already specified
-    output.id = get_run_id(output.path, output.id)
-    output.run_path = create_output_folder(output.path, output.id) 
+    output.id = get_run_id(output.path, output.id, output.overwrite)
+    output.run_path = create_output_folder(output.path, output.id, output.overwrite) 
     
     feedback.id = output.id             # synchronize with feedback struct
     feedback.run_path = output.run_path
@@ -424,59 +427,67 @@ output!(output::NetCDFOutput, variable::NoOutputVariable, args...) = nothing
 
 include("variables/output_variables.jl")
 
-"""
-$(TYPEDSIGNATURES)
+"""$(TYPEDSIGNATURES)
 Checks existing `run_????` folders in `path` to determine a 4-digit `id` number
 by counting up. E.g. if folder run_0001 exists it will return the string "0002".
-Does not create a folder for the returned run id.
-"""
-function get_run_id(path::String, id::String)
+Does not create a folder for the returned run id."""
+function get_run_id(
+    path::String,
+    id::String,
+    overwrite::Bool = false,
+)
+    # if overwrite is true, just return the id (no changes to id needed)
+    overwrite && return id
+
     # if run_???? folder doesn't exist yet don't change the id
-    run_id = string("run_", run_id_to_string(id))
+    run_id = string("run_", id)
     !(run_id in readdir(path)) && return id
 
-    # otherwise pull list of existing run_???? folders via readdir
-    pattern = r"run_\d\d\d\d"               # run_???? in regex
-    runlist = filter(x->startswith(x, pattern), readdir(path))
-    runlist = filter(x->endswith(  x, pattern), runlist)
-    existing_runs = [parse(Int, id[5:end]) for id in runlist]
+    # if run_* folder does exist update run_id
+    # first check if id is a valid integer
+    run_id = try parse(Int, id)
 
-    # get the run id from existing folders
-    if length(existing_runs) == 0           # if no runfolder exists yet
-        run_id = 1                          # start with run_0001
-    else
-        run_id = maximum(existing_runs)+1   # next run gets id +1
+        # then pull list of existing run_* folders via readdir
+        pattern = r"run_\d\d\d\d"               # run_???? in regex
+        runlist = filter(x->startswith(x, pattern), readdir(path))
+        runlist = filter(x->endswith(  x, pattern), runlist)
+        existing_runs = [parse(Int, id[5:end]) for id in runlist]
+        new_id = maximum(existing_runs)+1   # next run gets id +1
+        @sprintf("%04d", new_id)
+
+    catch ArgumentError     # if id is not a valid integer
+        
+        new_id = 2          # append e.g. _0002 to run_id to no overwrite existing folder!
+        while string(run_id, @sprintf("_%04d", new_id)) in readdir(path)
+            new_id += 1
+        end
+        string(run_id, @sprintf("_%04d", new_id))
     end
     
-    return @sprintf("%04d", run_id)
+    return run_id
 end
 
-"""
-$(TYPEDSIGNATURES)
+"""$(TYPEDSIGNATURES)
 Creates a new folder `run_*` with the identification `id`. Also returns the full path
-`run_path` of that folder.
-"""
-function create_output_folder(path::String, id::Union{String, Int})
-    run_id = string("run_", run_id_to_string(id))
+`run_path` of that folder."""
+function create_output_folder(path::String, id::String, overwrite::Bool = false)
+    run_id = string("run_", id)
     run_path = joinpath(path, run_id)
-    @assert !(run_id in readdir(path)) "Run folder $run_path already exists."
-    mkdir(run_path)             # actually create the folder
+
+    # actually create the folder
+    # unless overwrite is true and the folder exists
+    # otherwise throws an error if the folder already exists
+    (overwrite && isdir(run_path)) || mkdir(run_path)
     return run_path
 end
 
-run_id_to_string(run_id::Integer) = @sprintf("%04d", run_id)
-run_id_to_string(run_id::String) = run_id
-
-"""
-$(TYPEDSIGNATURES)
-Returns the full path of the output file after it was created.
-"""
+"""$(TYPEDSIGNATURES)
+Returns the full path of the output file after it was created."""
 get_full_output_file_path(output::AbstractOutput) = joinpath(output.run_path, output.filename)
 
-"""
-$(TYPEDSIGNATURES)
-Loads a `var_name` trajectory of the model `M` that has been saved in a netCDF file during the time stepping.
-"""
+"""$(TYPEDSIGNATURES)
+Loads a `var_name` trajectory of the model `M` that has been saved in
+a netCDF file during the time stepping."""
 function load_trajectory(var_name::Union{Symbol, String}, model::AbstractModel) 
     @assert model.output.active "Output is turned off"
     return Array(NCDataset(get_full_output_file_path(model.output))[string(var_name)])
