@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Overwrite output folder option [#782](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/782)
+- Update compat entries [#777](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/777)
 - Fix show of field views by defining nonparametric_type for SubArray [#776](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/776)
 - Add parameter handling system and implement for Barotropic model [#754](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/754)
 - Fix Enzyme CI to run as expected [#762](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/762)
