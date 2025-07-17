@@ -202,7 +202,7 @@ end
 where here `x` will be treated as a parameter field and `y` will not. Parameters will be then automatically
 generated in a corresponding `parameters(::Foo)` method definition with descriptions set to the corresponding
 struct field docstring, if present. Additional parameter attributes can be supplied as keywords after the parameter,
-e.g. `@param p::T = 0.5 bounds=UnitInterval()` or `@param p::T = 0.5 (bounds=UnitInterval(), constant=false)`.
+e.g. `@param p::T = 0.5 bounds=UnitInterval` or `@param p::T = 0.5 (bounds=UnitInterval, constant=false)`.
 
 ## Known limitations
 
