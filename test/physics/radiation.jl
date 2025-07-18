@@ -14,7 +14,7 @@
             model.feedback.verbose = false
             simulation = initialize!(model)
             run!(simulation, period=Day(3))
-            @test model.feedback.nars_detected == false
+            @test model.feedback.nans_detected == false
         end
     end     
 end

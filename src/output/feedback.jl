@@ -7,17 +7,17 @@ Feedback struct that contains options and object for command-line feedback
 like the progress meter.
 $(TYPEDFIELDS)"""
 @kwdef mutable struct Feedback <: AbstractFeedback
-    "print feedback to REPL?, default is isinteractive(), true in interactive REPL mode"
+    "[OPTION] print feedback to REPL?, default is isinteractive(), true in interactive REPL mode"
     verbose::Bool = isinteractive()
 
-    "check for NaRs in the prognostic variables"
+    "[OPTION] check for NaNs in the prognostic variables"
     debug::Bool = true
     
     "write a progress.txt file? State synced with NetCDFOutput.output"
     output::Bool = false
 
     "identification of run, taken from ::OutputWriter"
-    id::String = ""
+    run_folder::String = ""
 
     "path to run folder, taken from ::OutputWriter"
     run_path::String = ""
@@ -30,8 +30,8 @@ $(TYPEDFIELDS)"""
     "txt is a Nothing in case of no output"
     progress_txt::IOStream = IOStream("")
 
-    "did Infs/NaNs occur in the simulation?"
-    nars_detected::Bool = false
+    "did NaNs occur in the simulation?"
+    nans_detected::Bool = false
 end
 
 function Base.show(io::IO, F::AbstractFeedback)
@@ -51,22 +51,22 @@ $(TYPEDSIGNATURES)
 Initializes the a `Feedback` struct."""
 function initialize!(feedback::Feedback, clock::Clock, model::AbstractModel)
 
-    # set to false to recheck for NaRs
-    feedback.nars_detected = false
+    # set to false to recheck for NaNs
+    feedback.nans_detected = false
 
     # hack: redefine element in global constant dt_in_sec
     # used to pass on the time step to ProgressMeter.speedstring
     DT_IN_SEC[] = model.time_stepping.Δt_sec
 
     if feedback.output   # with netcdf output write progress.txt
-        (; run_path, id) = feedback
+        (; run_path, run_folder) = feedback
         SG = model.spectral_grid
         L = model.time_stepping
         days = Second(clock.period).value/(3600*24)
         
         # create progress.txt file in run_????/
         progress_txt = open(joinpath(run_path, "progress.txt"), "w")
-        s = "Starting SpeedyWeather.jl run $id on "*
+        s = "Starting SpeedyWeather.jl $run_folder on "*
                 Dates.format(Dates.now(), Dates.RFC1123Format)
         write(progress_txt, s*"\n")
         write(progress_txt, "Integrating:\n")
@@ -104,7 +104,7 @@ function progress!(feedback::Feedback)
             s = speedstring(time_elapsed/counter, DT_IN_SEC[])
             write(feedback.progress_txt, ", $s")
 
-            feedback.nars_detected && write(feedback.progress_txt, ", NaRs detected.")
+            feedback.nans_detected && write(feedback.progress_txt, ", NaN/Inf detected.")
             flush(feedback.progress_txt)
         end
     end
@@ -113,7 +113,7 @@ end
 function progress!( feedback::Feedback,
                     progn::PrognosticVariables)
     progress!(feedback)
-    feedback.debug && nar_detection!(feedback, progn)
+    feedback.debug && nan_detection!(feedback, progn)
 end
 
 """
@@ -132,17 +132,17 @@ end
 
 """
 $(TYPEDSIGNATURES)
-Detect NaR (Not-a-Real) in the prognostic variables."""
-function nar_detection!(feedback::Feedback, progn::PrognosticVariables)
+Detect NaN (Not-a-Number, or Inf) in the prognostic variables."""
+function nan_detection!(feedback::Feedback, progn::PrognosticVariables)
 
-    feedback.nars_detected && return nothing    # escape immediately if nans already detected
+    feedback.nans_detected && return nothing    # escape immediately if nans already detected
     i = feedback.progress_meter.counter         # time step
-    vor0 = progn.vor[2][1, end]                 # only check 0-0 mode of surface vorticity
+    vor0 = progn.vor[1, end, 2]                 # only check 0-0 mode of surface vorticity at leapfrog lf=2
 
-    # just check first harmonic, spectral transform propagates NaRs globally anyway
-    nars_detected_here = ~isfinite(vor0)
-    nars_detected_here && @warn "NaN or Inf detected at time step $i"
-    feedback.nars_detected = nars_detected_here
+    # just check first harmonic, spectral transform propagates NaNs globally anyway
+    nans_detected_here = ~isfinite(vor0)
+    nans_detected_here && @warn "NaN or Inf detected at time step $i"
+    feedback.nans_detected = nans_detected_here
 end
 
 """
