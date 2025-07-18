@@ -498,12 +498,24 @@ Restart from a previous SpeedyWeather.jl simulation via the restart file restart
 Applies interpolation in the horizontal but not in the vertical. restart.jld2 is
 identified by
 $(TYPEDFIELDS)"""
-@kwdef struct StartFromFile <: AbstractInitialConditions
+@kwdef mutable struct StartFromFile <: AbstractInitialConditions
     "path for restart file"
     path::String = pwd()
 
-    "`run_id` of restart file in `run_????/restart.jld2`"
-    id::Union{String, Int} = 1
+    "run prefix, e.g. 'run' in 'run_0001/restart.jld2'"
+    run_prefix::String = "run"
+    
+    "identification of run folder, e.g. 'set1' in 'run_set1_0001/restart.jld2'"
+    id::String = ""
+
+    "run number, e.g. 1 in 'run_set1_0001/restart.jld2'"
+    run_number::Int = 1
+
+    "run digits, e.g. 4 in 'run_set1_0001/restart.jld2' for run_number=1"
+    run_digits::Int = 4
+
+    "directly specify the run folder, e.q. 'run_0001'"
+    run_folder::String = ""
 end
 
 """
@@ -514,13 +526,20 @@ function initialize!(   progn_new::PrognosticVariables,
                         initial_conditions::StartFromFile,
                         model::AbstractModel)
 
-    (; path, id ) = initial_conditions
+    (; path, run_prefix, id, run_number, run_digits) = initial_conditions
 
-    restart_file = jldopen(joinpath(path, string("run_", run_id_to_string(id)), "restart.jld2"))
+    if length(initial_conditions.run_folder) == 0
+        # run_folder not specified, determine from run_prefix, id, run_number
+        fmt = Printf.Format("%0$(run_digits)d")
+        run_folder = run_folder_name(run_prefix, id, run_number; fmt)
+    else    # use as specified
+        run_folder = initial_conditions.run_folder
+    end
+    restart_file = jldopen(joinpath(path, run_folder, "restart.jld2"))
     progn_old = restart_file["prognostic_variables"]
     version = restart_file["version"]
     if version != pkgversion(SpeedyWeather)
-        @info "Restart file created with SpeedyWeather $version loaded"*
+        @info "Restart file created with SpeedyWeather $version loaded "*
                 "but currently used is $(pkgversion(SpeedyWeather))"
     end
     return copy!(progn_new, progn_old)

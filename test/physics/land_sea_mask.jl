@@ -6,6 +6,6 @@
         simulation = initialize!(model)
         model.feedback.verbose = false
         run!(simulation, period=Day(5))
-        @test simulation.model.feedback.nars_detected == false
+        @test simulation.model.feedback.nans_detected == false
     end
 end

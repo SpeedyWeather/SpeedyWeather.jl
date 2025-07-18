@@ -52,12 +52,15 @@ function initialize!(
     # if model.output doesn't output create a folder anyway to store the particles.nc file
     if model.output.active == false
         (;output, feedback) = model
-        output.id = get_run_id(output.path, output.id)
-        output.run_path = create_output_folder(output.path, output.id) 
         
-        feedback.id = output.id         # synchronize with feedback struct
+        # GET RUN ID, CREATE FOLDER
+        # get new id only if not already specified
+        determine_run_folder!(output)
+        create_run_folder!(output)
+
+        feedback.run_folder = output.run_folder     # synchronize with feedback struct
         feedback.run_path = output.run_path
-        feedback.progress_meter.desc = "Weather is speedy: run $(output.id) "
+        feedback.progress_meter.desc = "Weather is speedy: $(output.run_folder) "
     end
 
     # CREATE NETCDF FILE, vector of NcVars for output
@@ -96,7 +99,7 @@ function initialize!(
         deflatelevel=callback.compression_level, shuffle=callback.shuffle)
 
     # pull particle locations into output work arrays
-    for (p,particle) in enumerate(progn.particles)
+    for (p, particle) in enumerate(progn.particles)
         callback.lon[p] = particle.lon
         callback.lat[p] = particle.lat
         callback.σ[p]   = particle.σ
@@ -126,7 +129,7 @@ function callback!(
     i = callback.schedule.counter+1     # +1 for initial conditions (not scheduled)
 
     # pull particle locations into output work arrays
-    for (p,particle) in enumerate(progn.particles)
+    for (p, particle) in enumerate(progn.particles)
         callback.lon[p] = particle.lon
         callback.lat[p] = particle.lat
         callback.σ[p]   = particle.σ
