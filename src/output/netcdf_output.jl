@@ -25,13 +25,27 @@ $(TYPEDFIELDS)"""
 
     # FILE OPTIONS
     active::Bool = false
-    
-    "[OPTION] path to output folder, run_???? will be created within"
+
+    "[OPTION] path to output parent folder, run folders will be created within"
     path::String = pwd()
     
-    "[OPTION] run identification number/string"
-    id::String = "0001"
-    run_path::String = ""                   # will be determined in initalize!
+    "[OPTION] Prefix for run folder where data is stored, e.g. 'run_'"
+    run_prefix::String = "run"
+
+    "[OPTION] run identification, added between run_prefix and run_number"
+    id::String = ""
+
+    "[OPTION] run identification number"
+    run_number::Int = 1
+
+    "[OPTION] run numbers digits"
+    run_digits::Int = 4
+
+    "[DERIVED] folder name where data is stored, determined at initialize!"
+    run_folder::String = ""
+
+    "[DERIVED] full path to folder where data is stored, determined at initialize!"
+    run_path::String = ""
 
     "[OPTION] Overwrite an existing run folder?"
     overwrite::Bool = false
@@ -41,9 +55,12 @@ $(TYPEDFIELDS)"""
     
     "[OPTION] also write restart file if output==true?"
     write_restart::Bool = true
+
+    "[DERIVED] package version, used for restart files"
     pkg_version::VersionNumber = isnothing(pkgversion(SpeedyWeather)) ? v"0.0.0" : pkgversion(SpeedyWeather)
 
     # WHAT/WHEN OPTIONS
+    "[DERIVD] start date of the simulation, used for time dimension in netcdf file"
     startdate::DateTime = DateTime(2000, 1, 1)
 
     "[OPTION] output frequency, time step"
@@ -208,16 +225,16 @@ function initialize!(
     diagn::DiagnosticVariables,
     model::AbstractModel,
 )
-    output.active || return nothing     # exit immediately for no output
+    output.active || return nothing             # exit immediately for no output
     
     # GET RUN ID, CREATE FOLDER
     # get new id only if not already specified
-    output.id = get_run_id(output.path, output.id, output.overwrite)
-    output.run_path = create_output_folder(output.path, output.id, output.overwrite) 
-    
-    feedback.id = output.id             # synchronize with feedback struct
+    determine_run_folder!(output)
+    create_run_folder!(output)
+
+    feedback.run_folder = output.run_folder     # synchronize with feedback struct
     feedback.run_path = output.run_path
-    feedback.progress_meter.desc = "Weather is speedy: run $(output.id) "
+    feedback.progress_meter.desc = "Weather is speedy: $(output.run_folder) "
     feedback.output = true              # if output=true set feedback.output=true too!
 
     # OUTPUT FREQUENCY
@@ -428,57 +445,46 @@ output!(output::NetCDFOutput, variable::NoOutputVariable, args...) = nothing
 include("variables/output_variables.jl")
 
 """$(TYPEDSIGNATURES)
-Checks existing `run_????` folders in `path` to determine a 4-digit `id` number
-by counting up. E.g. if folder run_0001 exists it will return the string "0002".
+Checks existing folders in `path` and determine `run_number`by counting up.
+E.g. if folder run_0001 exists then run_number is 2.
 Does not create a folder for the returned run id."""
-function get_run_id(
-    path::String,
-    id::String,
-    overwrite::Bool = false,
-)
-    # if overwrite is true, just return the id (no changes to id needed)
-    overwrite && return id
+function determine_run_folder!(output::NetCDFOutput)
+    (; run_prefix, id, run_digits) = output
+    fmt = Printf.Format("%0$(run_digits)d")
 
-    # if run_???? folder doesn't exist yet don't change the id
-    run_id = string("run_", id)
-    !(run_id in readdir(path)) && return id
-
-    # if run_* folder does exist update run_id
-    # first check if id is a valid integer
-    run_id = try parse(Int, id)
-
-        # then pull list of existing run_* folders via readdir
-        pattern = r"run_\d\d\d\d"               # run_???? in regex
-        runlist = filter(x->startswith(x, pattern), readdir(path))
-        runlist = filter(x->endswith(  x, pattern), runlist)
-        existing_runs = [parse(Int, id[5:end]) for id in runlist]
-        new_id = maximum(existing_runs)+1   # next run gets id +1
-        @sprintf("%04d", new_id)
-
-    catch ArgumentError     # if id is not a valid integer
-        
-        new_id = 2          # append e.g. _0002 to run_id to no overwrite existing folder!
-        while string(run_id, @sprintf("_%04d", new_id)) in readdir(path)
-            new_id += 1
+    if !output.overwrite    # if not overwrite determine the next run number
+        # try current run folder name, reset run number to 1
+        output.run_number = 1
+        run_folder = run_folder_name(run_prefix, id, output.run_number; fmt)
+        while run_folder in readdir(output.path)    # if run folder already exists, increase run_number
+            output.run_number += 1
+            run_folder = run_folder_name(run_prefix, id, output.run_number; fmt)
         end
-        string(run_id, @sprintf("_%04d", new_id))
-    end
-    
-    return run_id
+    end # else use the run_number exactly as specified in output.run_number
+
+    output.run_folder = run_folder_name(run_prefix, id, output.run_number; fmt)
 end
 
 """$(TYPEDSIGNATURES)
-Creates a new folder `run_*` with the identification `id`. Also returns the full path
+Creates a new folder `prefix_id_number` with the identification `id`. Also returns the full path
 `run_path` of that folder."""
-function create_output_folder(path::String, id::String, overwrite::Bool = false)
-    run_id = string("run_", id)
-    run_path = joinpath(path, run_id)
+function create_run_folder!(output::NetCDFOutput)
+    run_path = joinpath(output.path, output.run_folder)
 
     # actually create the folder
     # unless overwrite is true and the folder exists
     # otherwise throws an error if the folder already exists
-    (overwrite && isdir(run_path)) || mkdir(run_path)
-    return run_path
+    (output.overwrite && isdir(run_path)) || mkdir(run_path)
+    output.run_path = run_path
+end
+
+"""$(TYPEDSIGNATURES)
+Concatenate the run folder name from `prefix`, `id` and `number` to
+e.g. "run_0001" or "run_shallow_convection_0001"."""
+function run_folder_name(prefix::String, id::String, number::Int; fmt = Printf.Format("%04d"))
+    number_fmt = Printf.format(fmt, number)
+    length(id) == 0 && return join((prefix, number_fmt), "_")   # otherwise "run__0001" with double underscore
+    return join((prefix, id, number_fmt), "_")
 end
 
 """$(TYPEDSIGNATURES)
