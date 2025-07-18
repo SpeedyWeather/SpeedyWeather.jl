@@ -35,7 +35,7 @@ $(TYPEDFIELDS)"""
     "[OPTION] run identification, added between run_prefix and run_number"
     id::String = ""
 
-    "[OPTION] run identification number"
+    "[OPTION] run identification number, automatically determined if overwrite=false"
     run_number::Int = 1
 
     "[OPTION] run numbers digits"

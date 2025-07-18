@@ -115,11 +115,11 @@ but this time also store [NetCDF output](@ref).
 ```@example galewsky_setup
 run!(simulation, period=Day(6), output=true)
 ```
-The progress bar tells us that the simulation run got the identification "0001"
+The progress bar tells us that the simulation run got the identification "run_0001"
 (which just counts up, so yours might be higher), meaning that
 data is stored in the folder `run_0001`. In general we can check this also via
 ```@example galewsky_setup
-id = model.output.id
+model.output.run_folder
 ```
 
 ### Visualisation (manually)
@@ -239,16 +239,16 @@ simulation = initialize!(model)
 run!(simulation, period=Day(12), output=true)
 ```
 
-This time the run got a new run id, which you see in the progress bar, but can again always check
-after the `run!` call (the automatic run id is only determined just before the main time loop starts)
-with `model.output.id`, but otherwise we do as before.
+This time the run got a new `run_number`, which you see in the progress bar, but can again always check
+after the `run!` call (the automatic `run_number` is only determined just before the main time loop starts)
+with `model.output.run_folder`, but otherwise we do as before.
 ```@example galewsky_setup2
-id = model.output.id
+run_folder = model.output.run_folder
 ```
 
 ```@example galewsky_setup2
 using NCDatasets
-ds = NCDataset("run_$id/output.nc")
+ds = NCDataset("$run_folder/output.nc")
 ```
 
 While you could plot the [NetCDF output](@ref) manually as before, 

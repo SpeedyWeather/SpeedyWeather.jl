@@ -83,8 +83,8 @@ The time axis of the NetCDF output will now look like
 ```@example netcdf
 using NCDatasets
 run!(simulation, period=Day(1), output=true)
-id = model.output.id
-ds = NCDataset("run_$id/output.nc")
+run_folder = model.output.run_folder
+ds = NCDataset("$run_folder/output.nc")
 ds["time"][:]
 ```
 which is a bit ugly, that's why `adjust_with_output=true` is the default. In that case we would have
@@ -94,8 +94,8 @@ output = NetCDFOutput(spectral_grid, ShallowWater, output_dt=Hour(1))
 model = ShallowWaterModel(spectral_grid; time_stepping, output)
 simulation = initialize!(model)
 run!(simulation, period=Day(1), output=true)
-id = model.output.id
-ds = NCDataset("run_$id/output.nc")
+run_folder = model.output.run_folder
+ds = NCDataset("$run_folder/output.nc")
 ds["time"][:]
 ```
 very neatly hourly output in the NetCDF file!
