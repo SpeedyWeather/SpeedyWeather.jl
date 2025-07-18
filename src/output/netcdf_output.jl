@@ -315,7 +315,7 @@ Writes the variables from `progn` or `diagn` of time step `i` at time `time` int
 Simply escapes for no netcdf output or if output shouldn't be written on this time step.
 Interpolates onto output grid and resolution as specified in `output`, converts to output
 number format, truncates the mantissa for higher compression and applies lossless compression."""
-function output!(output::NetCDFOutput, simulation::AbstractSimulation)
+function output!(output::AbstractOutput, simulation::AbstractSimulation)
     output.timestep_counter += 1                                        # increase counter
     (; active, output_every_n_steps, timestep_counter ) = output
     active || return nothing                                            # escape immediately for no netcdf output
@@ -399,7 +399,7 @@ end
 Loop over every variable in `output.variables` to call the respective `output!` method
 to write into the `output.netcdf_file`."""
 function output!(
-    output::NetCDFOutput,
+    output::AbstractOutput,
     output_variables::OUTPUT_VARIABLES_DICT,
     simulation::AbstractSimulation,
 )
@@ -417,7 +417,7 @@ function Base.show(io::IO, outputvariable::AbstractOutputVariable)
 end
 
 function finalize!(
-    output::NetCDFOutput,
+    output::AbstractOutput,
     simulation::AbstractSimulation,
 )
     if output.active    # only finalize if active otherwise output.netcdf_file is nothing
@@ -430,7 +430,7 @@ end
 
 # default finalize method for output variables
 function finalize!(
-    output::NetCDFOutput,
+    output::AbstractOutput,
     var::AbstractOutputVariable,
     args...
 )
@@ -440,7 +440,7 @@ end
 
 """Dummy output variable that doesn't do anything."""
 struct NoOutputVariable <: AbstractOutputVariable end
-output!(output::NetCDFOutput, variable::NoOutputVariable, args...) = nothing
+output!(output::AbstractOutput, variable::NoOutputVariable, args...) = nothing
 
 include("variables/output_variables.jl")
 
@@ -448,7 +448,7 @@ include("variables/output_variables.jl")
 Checks existing folders in `path` and determine `run_number`by counting up.
 E.g. if folder run_0001 exists then run_number is 2.
 Does not create a folder for the returned run id."""
-function determine_run_folder!(output::NetCDFOutput)
+function determine_run_folder!(output::AbstractOutput)
     (; run_prefix, id, run_digits) = output
     fmt = Printf.Format("%0$(run_digits)d")
 
@@ -468,7 +468,7 @@ end
 """$(TYPEDSIGNATURES)
 Creates a new folder `prefix_id_number` with the identification `id`. Also returns the full path
 `run_path` of that folder."""
-function create_run_folder!(output::NetCDFOutput)
+function create_run_folder!(output::AbstractOutput)
     run_path = joinpath(output.path, output.run_folder)
 
     # actually create the folder
