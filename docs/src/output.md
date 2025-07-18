@@ -228,8 +228,8 @@ output = NetCDFOutput(spectral_grid, id="forrest_run", run_number=1234, run_digi
 
 # let us test the last one
 model = BarotropicModel(spectral_grid; output)
-simulation = initialize!(simulation)
-run!(simulation, period=Day(1), output=true)
+simulation = initialize!(model)
+run!(simulation, steps=1, output=true)
 
 # what is the run folder?
 output.run_folder
