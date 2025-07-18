@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Restart from file for ocean and land [#784](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/784)
 - Update compat entries [#777](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/777)
 - Fix show of field views by defining nonparametric_type for SubArray [#776](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/776)
 - Add parameter handling system and implement for Barotropic model [#754](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/754)
