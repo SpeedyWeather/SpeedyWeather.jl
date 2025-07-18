@@ -121,14 +121,18 @@ data is stored in the folder `run_0001`. In general we can check this also via
 ```@example galewsky_setup
 model.output.run_folder
 ```
+more on this in [Output path, identification and number](@ref).
 
 ### Visualisation (manually)
 
-So let's plot that data. `$id` in the following just means
-that the string is interpolated to `run_0001` if this is the first unnamed run in your folder.
+So let's plot that data. `joinpath(...)` in the following just joins folder and filename together,
+by default this would be "run_0001/output.nc" but the run number increases when you ran other simulations
+before
 ```@example galewsky_setup
 using NCDatasets
-ds = NCDataset("run_$id/output.nc")
+run_folder = model.output.run_folder
+filename = model.output.filename
+ds = NCDataset(joinpath(run_folder, filename))
 ds["vor"]
 ```
 Vorticity `vor` is stored as a lon x lat x vert x time array, we may want to look at the first time step,
