@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Add mailmap to merge multiple developers for repo statistics [#785](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/785)
 - Restart from file for ocean and land [#784](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/784)
 - Overwrite output folder option [#782](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/782)
 - Update compat entries [#777](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/777)
