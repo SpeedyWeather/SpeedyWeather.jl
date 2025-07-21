@@ -160,13 +160,13 @@ export LandBucketMoisture
     "[OPTION] Apply land-sea mask to NaN ocean-only points?"
     mask::Bool = false
 
-    "[DERIVED] Field capacity [1]"
+    "[DERIVED] Field capacity per meter soil, set at initialize from land.thermodynamics [1/m]"
     field_capacity::Base.RefValue{NF} = Ref(zero(NF))
 
-    "[DERIVED] Field capacity per meter soil [m], top layer, f = γz, set by land.temperature"
+    "[DERIVED] Field capacity [1], top layer, f = γz, set at initialize from by land.thermodynamics and .geometry"
     f₁::Base.RefValue{NF} = Ref(zero(NF))
 
-    "[DERIVED] Field capacity per meter soil [m], lower layer, f = γz, set by land.temperature"
+    "[DERIVED] Field capacity [1], lower layer, f = γz, set at initialize from by land.thermodynamics and .geometry"
     f₂::Base.RefValue{NF} = Ref(zero(NF))
 end
 
@@ -180,9 +180,9 @@ function initialize!(soil::LandBucketMoisture, model::PrimitiveEquation)
     γ = model.land.thermodynamics.field_capacity
     z₁ = model.land.geometry.layer_thickness[1]
     z₂ = model.land.geometry.layer_thickness[2]
-    soil.field_capacity[] = γ
-    soil.f₁[] = γ*z₁
-    soil.f₂[] = γ*z₂
+    soil.field_capacity[] = γ   # per meter soil [1/m]
+    soil.f₁[] = γ*z₁            # field capacity of first layer [1]
+    soil.f₂[] = γ*z₂            # field capacity of second layer [1]
 
     return nothing
 end
@@ -234,7 +234,8 @@ function timestep!(
     @boundscheck fields_match(soil_moisture, Pconv, Plsc, E, R, horizontal_only=true) ||
         throw(DimensionMismatch(soil_moisture, Pconv))
     @boundscheck size(soil_moisture, 2) == 2 || throw(DimensionMismatch)
-    W_cap, f₁, f₂ = soil.field_capacity[], soil.f₁[], soil.f₂[]
+    W_cap = soil.field_capacity[]   # also called γ in MITgcm documentation, W_cap in Fortran SPEEDY Eq. 51
+    f₁, f₂ = soil.f₁[], soil.f₂[]
     p = soil.runoff_fraction        # fraction of top layer runoff put into lower layer
     τ⁻¹ = inv(convert(eltype(soil_moisture), Second(soil.time_scale).value))
     f₁_f₂ = f₁/f₂
@@ -256,7 +257,7 @@ function timestep!(
 
             # river runoff
             W₁ = soil_moisture[ij, 1]
-            δW₁ = W₁ - min(W₁, W_cap)           # excess moisture in top layer
+            δW₁ = W₁ - min(W₁, W_cap)           # excess moisture in top layer, cap at field capacity
             soil_moisture[ij, 1] -= δW₁         # remove excess from top layer
             soil_moisture[ij, 2] += p*δW₁*f₁_f₂ # add fraction to lower layer
             R[ij] += Δt*(1-p)*δW₁*f₁            # accumulate river runoff [m] of top layer
