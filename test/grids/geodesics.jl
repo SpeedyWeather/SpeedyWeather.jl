@@ -86,3 +86,18 @@ end
         @test typeof(spherical_distance(p1, p2)) == Float64
     end
 end
+
+@testset "Haversine: Rounding errors" begin
+    
+    # some coordinates in Float64
+    λ₀ = -56.2842
+    φ₀ = 76.07610000000003
+
+    # others in Float32, they are alsmost antipoles
+    λ = 123.75f0
+    φ = -76.070244f0
+
+    # this used to error from sqrt of negative number
+    # just test for almost antipodal points (and therefore no error)
+    @test spherical_distance((λ, φ), (λ₀, φ₀), radius=360/2π) > 179
+end
