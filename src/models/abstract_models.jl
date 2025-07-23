@@ -39,6 +39,8 @@ model_type(::Type{<:PrimitiveDry}) = PrimitiveDryModel
 model_type(::Type{<:PrimitiveWet}) = PrimitiveWetModel
 model_type(model::AbstractModel) = model_type(typeof(model))
 
+initialize!(model::AbstractModel, ps::Union{ComponentVector,SpeedyParams}; kwargs...) = initialize!(reconstruct(model, ps); kwargs...)
+
 function Base.show(io::IO, M::AbstractModel)
     println(io, "$(model_type(M)) <: $(model_class(M))")
     properties = propertynames(M)

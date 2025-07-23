@@ -213,7 +213,7 @@ function SpectralGrid(;
 end
 
 # also allow spectral grid to be passed on as first and only positional argument to model constructors
-(M::Type{<:AbstractModel})(SG::SpectralGrid; kwargs...) = M(spectral_grid=SG; kwargs...)
+(M::Type{<:AbstractModel})(SG::SpectralGrid; kwargs...) = M(; spectral_grid=SG, kwargs...)
 
 """$(TYPEDSIGNATURES)
 Generator function for a SpectralTransform struct pulling in parameters from a SpectralGrid struct."""

@@ -25,22 +25,42 @@ $(TYPEDFIELDS)"""
 
     # FILE OPTIONS
     active::Bool = false
-    
-    "[OPTION] path to output folder, run_???? will be created within"
+
+    "[OPTION] path to output parent folder, run folders will be created within"
     path::String = pwd()
     
-    "[OPTION] run identification number/string"
-    id::String = "0001"
-    run_path::String = ""                   # will be determined in initalize!
+    "[OPTION] Prefix for run folder where data is stored, e.g. 'run_'"
+    run_prefix::String = "run"
+
+    "[OPTION] run identification, added between run_prefix and run_number"
+    id::String = ""
+
+    "[OPTION] run identification number, automatically determined if overwrite=false"
+    run_number::Int = 1
+
+    "[OPTION] run numbers digits"
+    run_digits::Int = 4
+
+    "[DERIVED] folder name where data is stored, determined at initialize!"
+    run_folder::String = ""
+
+    "[DERIVED] full path to folder where data is stored, determined at initialize!"
+    run_path::String = ""
+
+    "[OPTION] Overwrite an existing run folder?"
+    overwrite::Bool = false
     
     "[OPTION] name of the output netcdf file"
     filename::String = "output.nc"
     
     "[OPTION] also write restart file if output==true?"
     write_restart::Bool = true
+
+    "[DERIVED] package version, used for restart files"
     pkg_version::VersionNumber = isnothing(pkgversion(SpeedyWeather)) ? v"0.0.0" : pkgversion(SpeedyWeather)
 
     # WHAT/WHEN OPTIONS
+    "[DERIVD] start date of the simulation, used for time dimension in netcdf file"
     startdate::DateTime = DateTime(2000, 1, 1)
 
     "[OPTION] output frequency, time step"
@@ -109,7 +129,7 @@ function Base.show(io::IO, output::NetCDFOutput{F}) where F
     println(io, "├ status: $(output.active ? "active" : "inactive/uninitialized")")
     println(io, "├ write restart file: $(output.write_restart) (if active)")
     println(io, "├ interpolator: $(typeof(output.interpolator))")
-    println(io, "├ path: $(joinpath(output.run_path, output.filename))")
+    println(io, "├ path: $(joinpath(output.run_path, output.filename)) (overwrite=$(output.overwrite))")
     println(io, "├ frequency: $(output.output_dt)")
     print(io,   "└┐ variables:")
     nvars = length(output.variables)
@@ -205,16 +225,16 @@ function initialize!(
     diagn::DiagnosticVariables,
     model::AbstractModel,
 )
-    output.active || return nothing     # exit immediately for no output
+    output.active || return nothing             # exit immediately for no output
     
     # GET RUN ID, CREATE FOLDER
     # get new id only if not already specified
-    output.id = get_run_id(output.path, output.id)
-    output.run_path = create_output_folder(output.path, output.id) 
-    
-    feedback.id = output.id             # synchronize with feedback struct
+    determine_run_folder!(output)
+    create_run_folder!(output)
+
+    feedback.run_folder = output.run_folder     # synchronize with feedback struct
     feedback.run_path = output.run_path
-    feedback.progress_meter.desc = "Weather is speedy: run $(output.id) "
+    feedback.progress_meter.desc = "Weather is speedy: $(output.run_folder) "
     feedback.output = true              # if output=true set feedback.output=true too!
 
     # OUTPUT FREQUENCY
@@ -295,7 +315,7 @@ Writes the variables from `progn` or `diagn` of time step `i` at time `time` int
 Simply escapes for no netcdf output or if output shouldn't be written on this time step.
 Interpolates onto output grid and resolution as specified in `output`, converts to output
 number format, truncates the mantissa for higher compression and applies lossless compression."""
-function output!(output::NetCDFOutput, simulation::AbstractSimulation)
+function output!(output::AbstractOutput, simulation::AbstractSimulation)
     output.timestep_counter += 1                                        # increase counter
     (; active, output_every_n_steps, timestep_counter ) = output
     active || return nothing                                            # escape immediately for no netcdf output
@@ -379,7 +399,7 @@ end
 Loop over every variable in `output.variables` to call the respective `output!` method
 to write into the `output.netcdf_file`."""
 function output!(
-    output::NetCDFOutput,
+    output::AbstractOutput,
     output_variables::OUTPUT_VARIABLES_DICT,
     simulation::AbstractSimulation,
 )
@@ -397,7 +417,7 @@ function Base.show(io::IO, outputvariable::AbstractOutputVariable)
 end
 
 function finalize!(
-    output::NetCDFOutput,
+    output::AbstractOutput,
     simulation::AbstractSimulation,
 )
     if output.active    # only finalize if active otherwise output.netcdf_file is nothing
@@ -410,7 +430,7 @@ end
 
 # default finalize method for output variables
 function finalize!(
-    output::NetCDFOutput,
+    output::AbstractOutput,
     var::AbstractOutputVariable,
     args...
 )
@@ -420,63 +440,60 @@ end
 
 """Dummy output variable that doesn't do anything."""
 struct NoOutputVariable <: AbstractOutputVariable end
-output!(output::NetCDFOutput, variable::NoOutputVariable, args...) = nothing
+output!(output::AbstractOutput, variable::NoOutputVariable, args...) = nothing
 
 include("variables/output_variables.jl")
 
-"""
-$(TYPEDSIGNATURES)
-Checks existing `run_????` folders in `path` to determine a 4-digit `id` number
-by counting up. E.g. if folder run_0001 exists it will return the string "0002".
-Does not create a folder for the returned run id.
-"""
-function get_run_id(path::String, id::String)
-    # if run_???? folder doesn't exist yet don't change the id
-    run_id = string("run_", run_id_to_string(id))
-    !(run_id in readdir(path)) && return id
+"""$(TYPEDSIGNATURES)
+Checks existing folders in `path` and determine `run_number`by counting up.
+E.g. if folder run_0001 exists then run_number is 2.
+Does not create a folder for the returned run id."""
+function determine_run_folder!(output::AbstractOutput)
+    (; run_prefix, id, run_digits) = output
+    fmt = Printf.Format("%0$(run_digits)d")
 
-    # otherwise pull list of existing run_???? folders via readdir
-    pattern = r"run_\d\d\d\d"               # run_???? in regex
-    runlist = filter(x->startswith(x, pattern), readdir(path))
-    runlist = filter(x->endswith(  x, pattern), runlist)
-    existing_runs = [parse(Int, id[5:end]) for id in runlist]
+    if !output.overwrite    # if not overwrite determine the next run number
+        # try current run folder name, reset run number to 1
+        output.run_number = 1
+        run_folder = run_folder_name(run_prefix, id, output.run_number; fmt)
+        while run_folder in readdir(output.path)    # if run folder already exists, increase run_number
+            output.run_number += 1
+            run_folder = run_folder_name(run_prefix, id, output.run_number; fmt)
+        end
+    end # else use the run_number exactly as specified in output.run_number
 
-    # get the run id from existing folders
-    if length(existing_runs) == 0           # if no runfolder exists yet
-        run_id = 1                          # start with run_0001
-    else
-        run_id = maximum(existing_runs)+1   # next run gets id +1
-    end
-    
-    return @sprintf("%04d", run_id)
+    output.run_folder = run_folder_name(run_prefix, id, output.run_number; fmt)
 end
 
-"""
-$(TYPEDSIGNATURES)
-Creates a new folder `run_*` with the identification `id`. Also returns the full path
-`run_path` of that folder.
-"""
-function create_output_folder(path::String, id::Union{String, Int})
-    run_id = string("run_", run_id_to_string(id))
-    run_path = joinpath(path, run_id)
-    @assert !(run_id in readdir(path)) "Run folder $run_path already exists."
-    mkdir(run_path)             # actually create the folder
-    return run_path
+"""$(TYPEDSIGNATURES)
+Creates a new folder `prefix_id_number` with the identification `id`. Also returns the full path
+`run_path` of that folder."""
+function create_run_folder!(output::AbstractOutput)
+    run_path = joinpath(output.path, output.run_folder)
+
+    # actually create the folder
+    # unless overwrite is true and the folder exists
+    # otherwise throws an error if the folder already exists
+    (output.overwrite && isdir(run_path)) || mkdir(run_path)
+    output.run_path = run_path
 end
 
-run_id_to_string(run_id::Integer) = @sprintf("%04d", run_id)
-run_id_to_string(run_id::String) = run_id
+"""$(TYPEDSIGNATURES)
+Concatenate the run folder name from `prefix`, `id` and `number` to
+e.g. "run_0001" or "run_shallow_convection_0001"."""
+function run_folder_name(prefix::String, id::String, number::Int; fmt = Printf.Format("%04d"))
+    number_fmt = Printf.format(fmt, number)
+    length(id) == 0 && return join((prefix, number_fmt), "_")   # otherwise "run__0001" with double underscore
+    return join((prefix, id, number_fmt), "_")
+end
 
-"""
-$(TYPEDSIGNATURES)
-Returns the full path of the output file after it was created.
-"""
+"""$(TYPEDSIGNATURES)
+Returns the full path of the output file after it was created."""
 get_full_output_file_path(output::AbstractOutput) = joinpath(output.run_path, output.filename)
 
-"""
-$(TYPEDSIGNATURES)
-Loads a `var_name` trajectory of the model `M` that has been saved in a netCDF file during the time stepping.
-"""
+"""$(TYPEDSIGNATURES)
+Loads a `var_name` trajectory of the model `M` that has been saved in
+a netCDF file during the time stepping."""
 function load_trajectory(var_name::Union{Symbol, String}, model::AbstractModel) 
     @assert model.output.active "Output is turned off"
     return Array(NCDataset(get_full_output_file_path(model.output))[string(var_name)])

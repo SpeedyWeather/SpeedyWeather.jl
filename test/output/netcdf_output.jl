@@ -10,7 +10,7 @@ using NCDatasets, Dates
         model = BarotropicModel(spectral_grid; output)
         simulation = initialize!(model)
         run!(simulation, output=true; period)
-        @test simulation.model.feedback.nars_detected == false
+        @test simulation.model.feedback.nans_detected == false
 
         # read netcdf file and check that all variables exist
         ds = NCDataset(joinpath(model.output.run_path, model.output.filename))
@@ -36,7 +36,7 @@ end
         model = ShallowWaterModel(spectral_grid; output)
         simulation = initialize!(model)
         run!(simulation, output=true; period)
-        @test simulation.model.feedback.nars_detected == false
+        @test simulation.model.feedback.nans_detected == false
 
         # read netcdf file and check that all variables exist
         ds = NCDataset(joinpath(model.output.run_path, model.output.filename))
@@ -84,7 +84,7 @@ end
         model = PrimitiveDryModel(spectral_grid; output)
         simulation = initialize!(model)
         run!(simulation, output=true; period)
-        @test simulation.model.feedback.nars_detected == false
+        @test simulation.model.feedback.nans_detected == false
 
         # read netcdf file and check that all variables exist
         ds = NCDataset(joinpath(model.output.run_path, model.output.filename))
@@ -109,7 +109,7 @@ end
         model = PrimitiveWetModel(spectral_grid; output)
         simulation = initialize!(model)
         run!(simulation, output=true; period)
-        @test simulation.model.feedback.nars_detected == false
+        @test simulation.model.feedback.nans_detected == false
 
         # read netcdf file and check that all variables exist
         ds = NCDataset(joinpath(model.output.run_path, model.output.filename))
@@ -127,7 +127,7 @@ end
     model = PrimitiveWetModel(spectral_grid; output)
     simulation = initialize!(model)
     run!(simulation, output=true; period)
-    @test simulation.model.feedback.nars_detected == false
+    @test simulation.model.feedback.nans_detected == false
     ds = NCDataset(joinpath(model.output.run_path, model.output.filename))
     @test ~haskey(ds, "temp")
     @test ~haskey(ds, "humid")

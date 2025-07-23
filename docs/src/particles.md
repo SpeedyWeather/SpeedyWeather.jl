@@ -256,19 +256,19 @@ which will give it a random key too in case you need to remove it again (more on
 [Callbacks](@ref)). If you now run the simulation the particle tracker is called on
 `particle_tracker.every_n_timesteps` and it continuously writes into `particle_tracker.netcdf_file`
 which is placed in the run folder similar to other [NetCDF output](@ref). For example,
-the run id can be obtained after the simulation by `model.output.id`.
+the run folder can be obtained after the simulation by `model.output.run_folder`.
 
 ```@example particle_tracker
 simulation = initialize!(model)
 run!(simulation, period=Day(10))
-model.output.id
+model.output.run_folder
 ```
 so that you can read the netCDF file with
 
 ```@example particle_tracker
 using NCDatasets
-run_id = "run_$(model.output.id)"                    # create a run_???? string with output id
-path = joinpath(run_id, particle_tracker.file_name)  # by default "run_????/particles.nc"
+run_folder = model.output.run_folder                    # normally the run_???? string with run number
+path = joinpath(run_folder, particle_tracker.file_name) # by default "run_????/particles.nc"
 ds = NCDataset(path)
 ds["lon"]
 ds["lat"]
