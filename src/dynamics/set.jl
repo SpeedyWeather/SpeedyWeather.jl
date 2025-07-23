@@ -220,6 +220,8 @@ function set!(
 )
     # otherwise recompute longitude, latitude vectors
     londs, latds = RingGrids.get_londlatds(var)
+    londs = on_architecture(architecture(var), londs)
+    latds = on_architecture(architecture(var), latds)
     _set!(var, f, londs, latds; kwargs...)
 end
 
