@@ -17,8 +17,8 @@ import Random
             c = randn(NF)
             A .= c                          # constant data globally
 
-            λs = 360*rand(npoints)          # some longitudes in [0˚, 360˚E]
-            θs = 180*rand(npoints) .- 90    # some latitudes in [-90˚, 90˚N]
+            λs = 360*rand(NF, npoints)          # some longitudes in [0˚, 360˚E]
+            θs = 180*rand(NF, npoints) .- 90    # some latitudes in [-90˚, 90˚N]
             As = RingGrids.interpolate(λs, θs, A)
 
             for a in As
@@ -55,8 +55,8 @@ end
             # don't interpolate above first or below last ring
             # northpole value isn't 90 as it's just the average of the
             # first ring, same for south pole
-            λs = 360*rand(npoints)              # some longitudes in [0˚, 360˚E]
-            θs = 2lat1*rand(npoints) .- lat1    # some latitudes in [-90˚, 90˚N]
+            λs = 360*rand(NF, npoints)              # some longitudes in [0˚, 360˚E]
+            θs = 2lat1*rand(NF, npoints) .- lat1    # some latitudes in [-90˚, 90˚N]
             
             As = RingGrids.interpolate(λs, θs, A; NF)
 
@@ -97,10 +97,10 @@ end
             # don't interpolate above first or below last ring
             # northpole value isn't 90 as it's just the average of the
             # first ring, same for south pole
-            λs = 240*rand(npoints) .+ 60        # some longitudes in [60˚, 300˚E]
-            θs = 2lat1*rand(npoints) .- lat1    # some latitudes in (-90˚, 90˚N)
+            λs = 240*rand(NF, npoints) .+ 60        # some longitudes in [60˚, 300˚E]
+            θs = 2lat1*rand(NF, npoints) .- lat1    # some latitudes in (-90˚, 90˚N)
             
-            As = RingGrids.interpolate(λs, θs, A)
+            As = RingGrids.interpolate(λs, θs, A; NF)
 
             for (a, λ) in zip(As, λs)
                 @test a ≈ λ
@@ -119,10 +119,10 @@ end
             # don't interpolate above first or below last ring
             # northpole value isn't 90 as it's just the average of the
             # first ring, same for south pole
-            λs = 240*rand(npoints) .- 120       # some longitudes in [-120˚, 120˚E]
-            θs = 2lat1*rand(npoints) .- lat1    # some latitudes in (-90˚, 90˚N)
+            λs = 240*rand(NF, npoints) .- 120       # some longitudes in [-120˚, 120˚E]
+            θs = 2lat1*rand(NF, npoints) .- lat1    # some latitudes in (-90˚, 90˚N)
             
-            As = RingGrids.interpolate(λs, θs, A)
+            As = RingGrids.interpolate(λs, θs, A; NF)
 
             for (a, λ) in zip(As, λs)
                 @test a ≈ λ

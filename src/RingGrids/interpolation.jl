@@ -22,7 +22,7 @@ struct GridGeometry{
     rings::Vector{UnitRange{Int}} 
 end
 
-GridGeometry(field::AbstractField; kwargs...) = GridGeometry(field.grid; kwargs...)
+GridGeometry(field::AbstractField; kwargs...) = GridGeometry(field.grid; NF=eltype(field), kwargs...)
 
 """
 $(TYPEDSIGNATURES)          
@@ -164,7 +164,7 @@ function AnvilInterpolator(
     npoints::Integer;       # number of points to interpolate onto
     NF::Type{<:AbstractFloat} = DEFAULT_NF,
 )
-    geometry = GridGeometry(grid)        # general coordinates and indices for grid
+    geometry = GridGeometry(grid; NF)        # general coordinates and indices for grid
     locator = AnvilLocator(NF, npoints; architecture = grid.architecture)  # preallocate work arrays for interpolation
 
     # assemble geometry and locator to interpolator
