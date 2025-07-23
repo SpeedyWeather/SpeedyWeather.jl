@@ -15,49 +15,48 @@ using KernelAbstractions
 )
     tid = @index(Global)
 
-    if tid <= size(kjm_indices, 1)
-        # Unpack indices from precomputed kjm_indices using single thread index
-        k = kjm_indices[tid, 1]
-        j = kjm_indices[tid, 2]
-        m = kjm_indices[tid, 3]
+    # Unpack indices from precomputed kjm_indices using single thread index
+    k = kjm_indices[tid, 1]
+    j = kjm_indices[tid, 2]
+    m = kjm_indices[tid, 3]
 
-        # are m, lmax 0-based here or 1-based? 
-        lm_range = get_lm_range(m, lmax)    # assumes 1-based
+    # are m, lmax 0-based here or 1-based? 
+    lm_range = get_lm_range(m, lmax)    # assumes 1-based
 
-        # view on lower triangular column, but batched in vertical
-        spec_view = view(specs_data, lm_range, :)
-        legendre_view = view(legendre_polynomials_data, lm_range, j)
+    # view on lower triangular column, but batched in vertical
+    spec_view = view(specs_data, lm_range, :)
+    legendre_view = view(legendre_polynomials_data, lm_range, j)
         
-        # dot product but split into even and odd harmonics on the fly as this 
-        # is how the previous implementation was enacted
-        lmax_range = length(lm_range)           # number of degrees at order m, lmax-m
-        isoddlmax = isodd(lmax_range)
-        lmax_even = lmax_range - isoddlmax     # if odd do last odd element after the loop
+    # dot product but split into even and odd harmonics on the fly as this 
+    # is how the previous implementation was enacted
+    lmax_range = length(lm_range)           # number of degrees at order m, lmax-m
+    isoddlmax = isodd(lmax_range)
+    lmax_even = lmax_range - isoddlmax     # if odd do last odd element after the loop
 
-        # "even" and "odd" coined with 0-based indexing, i.e. the even l=0 mode is 1st element
-        even_k = zero(eltype(g_south))    # dot product with elements 1, 3, 5, ...
-        odd_k  = zero(eltype(g_north))    # dot prodcut with elements 2, 4, 6, ...
+    # "even" and "odd" coined with 0-based indexing, i.e. the even l=0 mode is 1st element
+    even_k = zero(eltype(g_south))    # dot product with elements 1, 3, 5, ...
+    odd_k  = zero(eltype(g_north))    # dot prodcut with elements 2, 4, 6, ...
 
-        # Switched to while loop as more performant from inside a Kernel     
-        l = 1
-        while l < lmax_even     # dot product in pairs for contiguous memory access
-            even_k += spec_view[l, k] * legendre_view[l]
-            odd_k += spec_view[l+1, k] * legendre_view[l+1]
-            l += 2
-        end
+    # Switched to while loop as more performant from inside a Kernel     
+    l = 1
+    while l < lmax_even     # dot product in pairs for contiguous memory access
+        even_k += spec_view[l, k] * legendre_view[l]
+        odd_k += spec_view[l+1, k] * legendre_view[l+1]
+        l += 2
+    end
 
-        # now do the last row if lmax is odd
-        even_k += spec_view[end, k] * (isoddlmax * legendre_view[end])
-        north = even_k + odd_k
-        south = even_k - odd_k
+    # now do the last row if lmax is odd
+    even_k += spec_view[end, k] * (isoddlmax * legendre_view[end])
+    north = even_k + odd_k
+    south = even_k - odd_k
 
-        # CORRECT FOR LONGITUDE OFFSETTS (if grid points don't start at 0°E)
-        o = lon_offsets[m, j]           # rotation through multiplication with complex unit vector
+    # CORRECT FOR LONGITUDE OFFSETTS (if grid points don't start at 0°E)
+    o = lon_offsets[m, j]           # rotation through multiplication with complex unit vector
 
-        g_north[m, k, j] += o * north
-        g_south[m, k, j] += o * south
-    end 
-end
+    g_north[m, k, j] += o * north
+    g_south[m, k, j] += o * south
+end 
+
 
 """$(TYPEDSIGNATURES)
 Inverse Legendre transform, adapted for CUDA and batched across j (lattitude), 
@@ -71,9 +70,9 @@ function _legendre_ka!(
     unscale_coslat::Bool = false,       # unscale by cosine of latitude on the fly?
 )
     (; nlat_half) = S                   # dimensions    
-    (; lmax ) = S                 # 0-based max degree l, order m of spherical harmonics  
+    (; lmax ) = S                       # 0-based max degree l, order m of spherical harmonics  
     (; legendre_polynomials) = S        # precomputed Legendre polynomials    
-    (; kjm_indices ) = S # kjm loop indices precomputed for threads  
+    (; kjm_indices ) = S                # kjm loop indices precomputed for threads  
     (; coslat⁻¹, lon_offsets ) = S
     # NOTE: this comes out as a range, not an integer
     nlayers = axes(specs, 2)            # get number of layers of specs for fewer layers than precomputed in S
@@ -87,8 +86,8 @@ function _legendre_ka!(
     # Launch the kernel with the specified configuration
     launch!(
         S.architecture,
-        :lmk,
-        size(kjm_indices),
+        :linear,
+        (size(kjm_indices,1),),
         inverse_legendre_kernel!,
         g_north,
         g_south,
@@ -98,9 +97,12 @@ function _legendre_ka!(
         lon_offsets,
         kjm_indices;
     )
+
+    synchronize(S.architecture)
     
+    # unscale by cosine of latitude on the fly if requested
     if unscale_coslat
-        @inbounds for j in 1:nlat_half          # symmetry: loop over northern latitudes only
+        @inbounds for j in 1:nlat_half                    # symmetry: loop over northern latitudes only
             g_north[:, nlayers, j] .*= coslat⁻¹[j]        # scale in place
             g_south[:, nlayers, j] .*= coslat⁻¹[j]
         end
@@ -120,53 +122,51 @@ end
 )
     tid = @index(Global)
 
-    if tid <= size(kjm_indices, 1)
-        # Unpack indices from precomputed kjm_indices using single thread index
-        k = kjm_indices[tid, 1]
-        j = kjm_indices[tid, 2]
-        m = kjm_indices[tid, 3]
+    # Unpack indices from precomputed kjm_indices using single thread index
+    k = kjm_indices[tid, 1]
+    j = kjm_indices[tid, 2]
+    m = kjm_indices[tid, 3]
 
-        lm_range = get_lm_range(m, lmax) 
-        lm2_range = get_2lm_range(m, lmax)
+    lm_range = get_lm_range(m, lmax) 
+    lm2_range = get_2lm_range(m, lmax)
 
-        ΔΩ = solid_angles[j]                # Solid angle for a grid point
-        o = lon_offsets[m, j]               # Longitude offset rotation
-        ΔΩ_rotated = ΔΩ * conj(o)           # Rotation back to prime meridian
+    ΔΩ = solid_angles[j]                # Solid angle for a grid point
+    o = lon_offsets[m, j]               # Longitude offset rotation
+    ΔΩ_rotated = ΔΩ * conj(o)           # Rotation back to prime meridian
         
-        even_k = zero(eltype(f_north))
-        odd_k = zero(eltype(f_north))
-        even_spec = zero(eltype(f_north))
-        odd_spec = zero(eltype(f_north))
+    even_k = zero(eltype(f_north))
+    odd_k = zero(eltype(f_north))
+    even_spec = zero(eltype(f_north))
+    odd_spec = zero(eltype(f_north))
 
-        fn = f_north[m, k, j]
-        fs = f_south[m, k, j]
-        even_k = ΔΩ_rotated * (fn + fs)
-        odd_k  = ΔΩ_rotated * (fn - fs)
+    fn = f_north[m, k, j]
+    fs = f_south[m, k, j]
+    even_k = ΔΩ_rotated * (fn + fs)
+    odd_k  = ΔΩ_rotated * (fn - fs)
 
-        legendre_view = view(legendre_polynomials_data, lm_range, j)
+    legendre_view = view(legendre_polynomials_data, lm_range, j)
 
-        lmax_range = length(lm_range)
-        isoddlmax = isodd(lmax_range)
-        lmax_even = lmax_range - isoddlmax
+    lmax_range = length(lm_range)
+    isoddlmax = isodd(lmax_range)
+    lmax_even = lmax_range - isoddlmax
 
-        l = 1
-        while l < lmax_even
-            even_spec = legendre_view[l] * even_k
-            odd_spec = legendre_view[l+1] * odd_k
+    l = 1
+    while l < lmax_even
+        even_spec = legendre_view[l] * even_k
+        odd_spec = legendre_view[l+1] * odd_k
 
-            Atomix.@atomic specs_data[lm2_range[2l - 1], k] += even_spec.re
-            Atomix.@atomic specs_data[lm2_range[2l    ], k] += even_spec.im
-            Atomix.@atomic specs_data[lm2_range[2l + 1], k] += odd_spec.re
-            Atomix.@atomic specs_data[lm2_range[2l + 2], k] += odd_spec.im
+        Atomix.@atomic specs_data[lm2_range[2l - 1], k] += even_spec.re
+        Atomix.@atomic specs_data[lm2_range[2l    ], k] += even_spec.im
+        Atomix.@atomic specs_data[lm2_range[2l + 1], k] += odd_spec.re
+        Atomix.@atomic specs_data[lm2_range[2l + 2], k] += odd_spec.im
 
-            l += 2
-        end
+        l += 2
+    end
 
-        if isoddlmax == 1
-            even_spec = legendre_view[end] * even_k
-            Atomix.@atomic specs_data[lm2_range[end - 1], k] += even_spec.re
-            Atomix.@atomic specs_data[lm2_range[end    ], k] += even_spec.im
-        end
+    if isoddlmax == 1
+        even_spec = legendre_view[end] * even_k
+        Atomix.@atomic specs_data[lm2_range[end - 1], k] += even_spec.re
+        Atomix.@atomic specs_data[lm2_range[end    ], k] += even_spec.im
     end
 end
 
@@ -187,8 +187,8 @@ function _legendre_ka!(                        # GRID TO SPECTRAL
 
     launch!(
         S.architecture,
-        :lmk,
-        size(kjm_indices),
+        :linear,
+        (size(kjm_indices,1),),
         forward_legendre_kernel!,
         specs_reinterpret,
         legendre_polynomials.data, 
@@ -201,4 +201,5 @@ function _legendre_ka!(                        # GRID TO SPECTRAL
     )
 
     # NOTE: synchronize here?
+    synchronize(S.architecture)
 end
