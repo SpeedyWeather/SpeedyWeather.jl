@@ -103,12 +103,13 @@ very neatly hourly output in the NetCDF file!
 ## Output grid
 
 Say we want to run the model at a given horizontal resolution but want to output on another resolution,
-the `NetCDFOutput` takes as argument `output_Grid<:AbstractFullGrid` and `nlat_half::Int`.
-So for example `output_Grid=FullClenshawGrid` and `nlat_half=48` will always interpolate onto a
+the `NetCDFOutput` takes as argument `output_grid::AbstractFullGrid`, any instance of a full grid
+can be provided here.
+So for example `output_grid=FullClenshawGrid(48)` would interpolate onto a
 regular 192x95 longitude-latitude grid of 1.875˚ resolution, regardless the grid and resolution used
 for the model integration.
 ```@example netcdf
-my_output_writer = NetCDFOutput(spectral_grid, output_Grid=FullClenshawGrid, nlat_half=48)
+my_output_writer = NetCDFOutput(spectral_grid, output_grid=FullClenshawGrid(48))
 ```
 Note that by default the output is on the corresponding full type of the grid type used in the dynamical core
 so that interpolation only happens at most in the zonal direction as they share the location of the
@@ -125,12 +126,13 @@ Overview of the corresponding full grids
 | FullGaussianGrid | FullGaussianGrid |
 | FullClenshawGrid | FullClenshawGrid |
 | OctahadralGaussianGrid | FullGaussianGrid |
-| OctahedralClensawhGrid | FullClenshawGrid |
+| OctaminimalGaussianGrid | FullGaussianGrid |
+| OctahedralClenshawGrid | FullClenshawGrid |
 | HEALPixGrid | FullHEALPixGrid |
 | OctaHEALPixGrid | FullOctaHEALPixGrid |
 
 The grids `FullHEALPixGrid`, `FullOctaHEALPixGrid` share the same latitude rings as their reduced grids,
-but have always as many longitude points as they are at most around the equator. These grids are not
+but have always as many longitude points as there are around the equator. These grids are not
 tested in the dynamical core (but you may use them experimentally) and mostly designed for output purposes.
 
 ## Output variables
@@ -234,6 +236,29 @@ The actual options are declared as `[OPTION]` in the following
 
 ```@example netcdf
 @doc NetCDFOutput
+```
+
+## Visualizing output
+
+The saved NetCDF files can be visualized with a wide range of tools, both in Julia, but also in other languages. In order to get a quick view into a NetCDF file, you can use command line tools like `ncview`. For actual visualizations in Julia, it's easy to use [NCDatasets.jl](https://github.com/JuliaGeo/NCDatasets.jl) for accessing the data and [GeoMakie.jl](https://github.com/JuliaGeo/GeoMakie.jl) for plotting it. For a standard animation we already provide the `animate` function within SpeedyWeather.jl's GeoMakie extension that makes it easy to animate a variable from a NetCDF output file or a `Simulation` object, as seen below:
+
+```@example netcdf 
+using SpeedyWeather, GeoMakie, CairoMakie
+spectral_grid = SpectralGrid()
+model = PrimitiveWetModel(spectral_grid)
+simulation = initialize!(model)
+run!(simulation, period=Day(3), output=false) # some spin-up
+run!(simulation, period=Day(2), output=true)
+
+animate(simulation, output_file="test_vor_animation.mp4", variable="vor", level=1) # animate vorticity at the first vertical level
+```
+
+![test_vor_animation](test_vor_animation.mp4)
+
+For more options for `animate`, see below: 
+
+```@example netcdf 
+@doc SpeedyWeather.animate
 ```
 
 # JLD2 Output 

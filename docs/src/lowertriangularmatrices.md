@@ -1,6 +1,6 @@
-# [LowerTriangularMatrices](@id lowertriangularmatrices)
+# [LowerTriangularArrays](@id lowertriangularmatrices)
 
-LowerTriangularMatrices is a submodule that has been developed for SpeedyWeather.jl which is
+LowerTriangularArrays is a submodule that has been developed for SpeedyWeather.jl which is
 technically independent (SpeedyWeather.jl however imports it and so does SpeedyTransforms)
 and can also be used without running simulations. It is just not put into its own respective repository.
 
@@ -22,8 +22,8 @@ So, for example a ``(10\times 10\times 10)`` `LowerTriangularArray` holds 10 `Lo
 ## Creation of `LowerTriangularArray` 
 
 A `LowerTriangularMatrix` and `LowerTriangularArray` can be created using `zeros`, `ones`, `rand`, or `randn`
-```@repl LowerTriangularMatrices
-using SpeedyWeather.LowerTriangularMatrices
+```@repl LowerTriangularArrays
+using SpeedyWeather.LowerTriangularArrays
 
 L = rand(LowerTriangularMatrix{Float32}, 5, 5)
 L2 = rand(LowerTriangularArray{Float32}, 5, 5, 5)
@@ -38,7 +38,7 @@ matrix with 15 elements forming a 5x5 matrix, but the zeros are not shown.
 
 Alternatively, it can be created through conversion from `Array`, which drops the upper triangle
 entries and sets them to zero (which are not stored however)
-```@repl LowerTriangularMatrices
+```@repl LowerTriangularArrays
 M = rand(Float16, 3, 3)
 L = LowerTriangularMatrix(M)
 
@@ -50,7 +50,7 @@ L2 = LowerTriangularArray(M2)
 
 There are three different ways to describe the size of a `LowerTriangularArray`. For example with `L`
 
-```@repl LowerTriangularMatrices
+```@repl LowerTriangularArrays
 L = rand(LowerTriangularMatrix, 5, 5)
 ```
 
@@ -58,7 +58,7 @@ we have (additional dimensions follow naturally thereafter)
 
 ### 1-based vector indexing (default)
 
-```@repl LowerTriangularMatrices
+```@repl LowerTriangularArrays
 size(L)    # equivalently size(L, OneBased, as=Vector)
 ```
 
@@ -66,7 +66,7 @@ The lower triangle is unravelled hence the number of elements in the lower trian
 
 ### 1-based matrix indexing
 
-```@repl LowerTriangularMatrices
+```@repl LowerTriangularArrays
 size(L, as=Matrix)    # equivalently size(L, OneBased, as=Matrix)
 ```
 
@@ -79,7 +79,7 @@ Because `LowerTriangularArray`s are used to represent the coefficients of spheri
 are commonly indexed based on zero (i.e. starting with the zero mode representing the mean),
 we also add `ZeroBased` to get the corresponding size.
 
-```@repl LowerTriangularMatrices
+```@repl LowerTriangularArrays
 size(L, ZeroBased, as=Matrix)
 ```
 which is convenient if you want to know the maximum degree and order of the spherical harmonics in `L`.
@@ -95,18 +95,18 @@ We illustrate the two types of indexing `LowerTriangularArray` supports.
 
 The matrix index works as expected
 
-```@repl LowerTriangularMatrices
+```@repl LowerTriangularArrays
 L
 
 L[2, 2]
 ```
 But the single index skips the zero entries in the upper triangle, i.e. a `2, 2` index points to the
 same element as the index `6`
-```@repl LowerTriangularMatrices
+```@repl LowerTriangularArrays
 L[6]
 ```
 which, important, is different from single indices of an `AbstractMatrix`
-```@repl LowerTriangularMatrices
+```@repl LowerTriangularArrays
 Matrix(L)[6]
 ```
 which would point to the first element in the upper triangle (hence zero).
@@ -116,7 +116,7 @@ to the index of the underlying data vector. The matrix index is somewhat slower
 as it first has to be converted to the corresponding single index. 
 
 Consequently, many loops in SpeedyWeather.jl are build with the following structure
-```@repl LowerTriangularMatrices
+```@repl LowerTriangularArrays
 n, m = size(L, as=Matrix)
 
 ij = 0
@@ -136,7 +136,7 @@ loop body or to perform any calculation (`i+j` here).
 
 The `setindex!` functionality of matrixes will throw a `BoundsError` when trying to write
 into the upper triangle of a `LowerTriangularArray`, for example
-```@repl LowerTriangularMatrices
+```@repl LowerTriangularArrays
 L[2, 1] = 0    # valid index
 
 L[1, 2] = 0    # invalid index in the upper triangle
@@ -144,14 +144,14 @@ L[1, 2] = 0    # invalid index in the upper triangle
 
 But reading from it will just return a zero
 
-```@repl LowerTriangularMatrices
+```@repl LowerTriangularArrays
 L[2, 3]     # in the upper triangle
 ```
 
 Higher dimensional `LowerTriangularArray` can be indexed with multidimensional array indices 
 like most other arrays types. Both the vector index and the matrix index for the lower 
 triangle work as shown here
-```@repl LowerTriangularMatrices
+```@repl LowerTriangularArrays
 L = rand(LowerTriangularArray{Float32}, 3, 3, 5)
 
 L[2, 1] # second lower triangle element of the first lower triangle matrix 
@@ -163,7 +163,7 @@ The `setindex!` functionality follows accordingly.
 ### Iterators
 
 An iterator over all entries in the array can be created with `eachindex`
-```@repl LowerTriangularMatrices
+```@repl LowerTriangularArrays
 L = rand(LowerTriangularArray, 5, 5, 5)
 for ij in eachindex(L)
     # do something
@@ -174,19 +174,19 @@ eachindex(L)
 
 In order to only loop over the harmonics (essentially the horizontal, ignoring other dimensions)
 use `eachharmonic`
-```@repl LowerTriangularMatrices
+```@repl LowerTriangularArrays
 eachharmonic(L)
 ```
 
 If you only want to loop over the other dimensions use `eachmatrix`
 
-```@repl LowerTriangularMatrices
+```@repl LowerTriangularArrays
 eachmatrix(L)
 ```
 
 together they can be used as
 
-```@repl LowerTriangularMatrices
+```@repl LowerTriangularArrays
 for k in eachmatrix(L)
     for lm in eachharmonic(L)
         L[lm, k]
@@ -200,11 +200,11 @@ lower triangular matrix).
 
 ## Linear algebra with `LowerTriangularArray`
 
-The [LowerTriangularMatrices](@ref lowertriangularmatrices) module's main purpose is not linear algebra,
+The [LowerTriangularArrays](@ref lowertriangularmatrices) module's main purpose is not linear algebra,
 and typical matrix operations will not work with `LowerTriangularMatrix` because it's treated as a vector
 not as a matrix, meaning that the following will not work as expected
 
-```@repl LowerTriangularMatrices
+```@repl LowerTriangularArrays
 L = rand(LowerTriangularMatrix{Float32}, 3, 3)
 L * L
 inv(L)
@@ -214,13 +214,13 @@ And many other operations that require `L` to be a `AbstractMatrix` which it isn
 vector operations like a scalar product between two "LowerTriangularMatrix" vectors does work
 
 
-```@repl LowerTriangularMatrices
+```@repl LowerTriangularArrays
 L' * L
 ```
 
 Summation with `sum` follows the flat, single index logic
 ```@repl 
-L = rand(LowerTriangularMatrix{Float32}, 3, 3, 5)
+L = rand(LowerTriangularArray{Float32}, 3, 3, 5)
 sum(L, dims=2) 
 ```
 sums along the second dimension of the underlying vector, not of the full matrix representation. 
@@ -233,13 +233,13 @@ when transformed to grid space. We implement `rotate!` (and `rotate` for an allo
 for `LowerTriangularArray` to rotate these coefficients in complex number space to represent
 a longitude rotation of the represented grid space field. For example start with
 
-```@repl LowerTriangularMatrices
+```@repl LowerTriangularArrays
 M = rand(LowerTriangularMatrix{ComplexF32}, 3, 3)
 ```
 
 Now `rotate!(::LowerTriangularArray, degree)`
 
-```@repl LowerTriangularMatrices
+```@repl LowerTriangularArrays
 rotate!(M, 45)
 ```
 
@@ -254,7 +254,7 @@ but isn't here as created by the `rand`) and for the other modes this amounts to
 With ``\phi`` the rotation angle in degrees (positive eastward) and ``m`` the zonal wavenumber (order of the
 spherical harmonic, the zero-based column index). Rotating again by 315˚ yields the original array
 
-```@repl LowerTriangularMatrices
+```@repl LowerTriangularArrays
 rotate!(M, 315)
 ```
 
@@ -270,13 +270,13 @@ odd harmonics, which are the ones that are not symmetric around the equator. Sph
 reversed in longitude by taking the complex conjugate of every element as this flips the sign of the
 imaginary parts, which effectively mirrors the rotation of that harmonic around 0˚E.
 
-```@repl LowerTriangularMatrices
+```@repl LowerTriangularArrays
 reverse(M, dims=:lat)
 ```
 
 and in longitude
 
-```@repl LowerTriangularMatrices
+```@repl LowerTriangularArrays
 reverse(M, dims=:lon)
 ```
 
@@ -286,7 +286,7 @@ In contrast to linear algebra, many element-wise operations work as expected tha
 so operations that can be written in `.` notation whether implicit `+`, `2*`, ... or explicitly
 written `.+`, `.^`, ... or via the `@.` macro
 
-```@repl LowerTriangularMatrices
+```@repl LowerTriangularArrays
 L + L
 2L
 
@@ -295,7 +295,7 @@ L + L
 
 ## GPU 
 
-`LowerTriangularArray{T, N, ArrayType}` wraps around an array of type `ArrayType`.
+`LowerTriangularArray{T, N, ArrayType, S}` wraps around an array of type `ArrayType`.
 If this array is a GPU array (e.g. `CuArray`), all operations are performed on GPU as well (work in progress).
 The implementation was written so that scalar indexing is avoided in almost all cases,
 so that GPU operation should be performant.
@@ -307,8 +307,31 @@ L = rand(LowerTriangularArray{Float32}, 5, 5, 5)
 L_gpu = adapt(CuArray, L)
 ```
 
+## The `Spectrum` type
+
+Internally, a `LowerTriangularArray` is represented by an array that holds all non-zero elements of the matrices and a `Spectrum` type that holds all spectral discretization information and the architecture the array is on. The `Spectrum` can also be used to create new `LowerTriangularArray`s with the same spectral discretization:
+
+```@repl LowerTriangularArrays
+spectrum = Spectrum(5, 5) # initailize 
+```
+
+```@repl LowerTriangularArrays
+L = rand(Float32, spectrum)
+```
+
+```@repl LowerTriangularArrays
+L = rand(ComplexF32, spectrum, 5)
+```
+
+In the SpeedyWeather.jl model, the `Spectrum` is stored just once in the `SpectralGrid` type, and all `LowerTriangularArray`s are created with the same `Spectrum`. Therefore, once you've initialized the `SpectralGrid`, you can create `LowerTriangularArray`s with the same spectral discretization as follows: 
+
+```@repl LowerTriangularArrays
+SG = SpectralGrid(trunc=31)
+L = rand(Float32, SG.spectrum)
+```
+
 ## Function and type index
 
 ```@autodocs
-Modules = [SpeedyWeather.LowerTriangularMatrices]
+Modules = [SpeedyWeather.LowerTriangularArrays]
 ```

@@ -1,5 +1,5 @@
 using KernelAbstractions
-import SpeedyWeather: on_architecture, CPU, CPUStatic, launch!
+import SpeedyWeather: on_architecture, CPU, launch!
 @testset "KernelAbstractions tests" begin 
 
     # To-Do write tests for each type of dims_type in the kernel launching util, 
@@ -10,7 +10,7 @@ import SpeedyWeather: on_architecture, CPU, CPUStatic, launch!
     # Test the kernel with LowerTriangularArrays
     @testset "LowerTriangularArrays kernel test" begin
 
-        @kernel function test_lta_kernel!(A, @Const(B), @Const(C))
+        @kernel function test_lta_kernel!(A, B, C)
             I = @index(Global, Linear)
             A[I] = B[I] * C[I]
         end
@@ -37,4 +37,36 @@ import SpeedyWeather: on_architecture, CPU, CPUStatic, launch!
         # Verify results
         @test A ≈ expected
     end
+
+    @testset "RingGrids kernel test" begin
+
+        Grid = HEALPixGrid
+        @kernel function test_ringgrids_kernel!(A, B, C)
+            I = @index(Global, Linear)
+            A[I] = B[I] * C[I]
+        end
+
+        # Test parameters
+        nlat_half = 6   # degree
+        nlayers = 5
+        NF = Float32
+
+        arch = SpeedyWeather.CPU()
+
+        # Create test arrays
+        B = on_architecture(arch, rand(Grid{NF}, nlat_half, nlayers))
+        C = on_architecture(arch, rand(Grid{NF}, nlat_half, nlayers))
+        A = similar(B)
+
+        expected = B .* C
+
+        # Run the kernel
+        launch!(arch, :ijk, size(A), test_ringgrids_kernel!, A, B, C)
+        synchronize(arch)
+
+        # Verify results
+        @test A ≈ expected
+
+    end     
+
 end 

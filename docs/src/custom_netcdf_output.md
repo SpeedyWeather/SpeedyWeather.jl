@@ -59,7 +59,7 @@ the global scope.
 ## Define the output variable's path
 
 To output a variable one also has to define its path where
-to find the `AbstractGridArray`. For our example we already
+to find the `AbstractField`. For our example we already
 said above that this is `simulation.diagnostic_variables.dynamics.σ_tend`.
 For this we need to extend the `path` function. Using multiple
 dispatch we need to constrain the first argument's type to

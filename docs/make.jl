@@ -53,7 +53,7 @@ makedocs(
                 "Grids"=>"grids.md",
             ],
             "RingGrids"=>"ringgrids.md",
-            "LowerTriangularMatrices"=>"lowertriangularmatrices.md",
+            "LowerTriangularArrays"=>"lowertriangularmatrices.md",
             "SpeedyTransforms" => [
                 "Spectral transforms" => "speedytransforms.md",
                 "Gradient operators" => "gradients.md",

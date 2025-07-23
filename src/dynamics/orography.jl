@@ -151,9 +151,9 @@ end
 
 # constructor
 function EarthOrography(spectral_grid::SpectralGrid; kwargs...)
-    (; NF, GridVariable2D, SpectralVariable2D, nlat_half, trunc) = spectral_grid
+    (; NF, GridVariable2D, SpectralVariable2D, nlat_half, spectrum) = spectral_grid
     orography   = zeros(GridVariable2D, nlat_half)
-    geopot_surf = zeros(SpectralVariable2D, trunc+2, trunc+1)
+    geopot_surf = zeros(SpectralVariable2D, spectrum)
     return EarthOrography{NF, GridVariable2D, SpectralVariable2D}(;
         orography, geopot_surf, kwargs...)
 end
@@ -186,7 +186,8 @@ function initialize!(   orog::EarthOrography,
 
     # height [m], wrap matrix into a grid
     # TODO also read lat, lon from file and flip array in case it's not as expected
-    orography_highres = orog.file_Grid(ncfile["orog"].var[:, :], input_as=Matrix)
+    # F = RingGrids.field_type(orog.file_Grid)  # TODO this isn't working, hardcode instead
+    orography_highres = FullGaussianField(ncfile["orog"].var[:, :], input_as=Matrix)
 
     # Interpolate/coarsen to desired resolution
     interpolate!(orography, orography_highres)
