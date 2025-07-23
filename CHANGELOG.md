@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Enzyme Forward rules for SpectralTransform [#767](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/767)
 - Fix Haversine rounding errors with type promotion [#787](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/787)
 - Add mailmap to merge multiple developers for repo statistics [#785](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/785)
 - Restart from file for ocean and land [#784](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/784)
