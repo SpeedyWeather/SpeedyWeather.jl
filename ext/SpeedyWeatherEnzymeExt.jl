@@ -4,7 +4,7 @@ using SpeedyWeather
 using Enzyme
 using Enzyme.EnzymeCore
 using SpeedyWeather.ProgressMeter
-import .EnzymeRules: reverse, augmented_primal
+import .EnzymeRules: reverse, augmented_primal, forward
 using .EnzymeRules
 
 # import all functions for which we define rules
@@ -117,7 +117,7 @@ function reverse(config::EnzymeRules.RevConfigWidth{1}, func::Const{typeof(_four
 end
 
 ### FORWARD RULES 
-function forward(config::EnzymeRules.FwdConfig, func::Const{typeof(_fourier!)}, ::Type{<:Const}, 
+function forward(config, func::Const{typeof(_fourier!)}, ::Type{<:Union{Const,DuplicatedNoNeed,Duplicated}}, 
     grids::Duplicated{<:AbstractField}, f_north::Duplicated, f_south::Duplicated, S::Union{Const, MixedDuplicated})
 
     func.val(grids.val, f_north.val, f_south.val, S.val) # 
@@ -126,7 +126,7 @@ function forward(config::EnzymeRules.FwdConfig, func::Const{typeof(_fourier!)}, 
     return nothing # because the function actually returns nothing
 end 
 
-function forward(config::EnzymeRules.FwdConfig, func::Const{typeof(_fourier!)}, ::Type{<:Const}, 
+function forward(config, func::Const{typeof(_fourier!)}, ::Type{<:Const}, 
     f_north::Duplicated, f_south::Duplicated, grid::Duplicated{<:AbstractField}, S::Union{Const, MixedDuplicated})
 
     func.val(f_north.val, f_south.val, grid.val, S.val) # 
