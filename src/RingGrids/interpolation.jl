@@ -260,9 +260,6 @@ function _interpolate!(
     @boundscheck length(A) == npoints ||
         throw(DimensionMismatch("Interpolator ($npoints points) mismatches input grid ($(length(A)) points)."))
 
-    @boundscheck size(Aout, 1) == npoints_output ||
-        throw(DimensionMismatch("Locator ($npoints_output points) mismatches output grid ($(size(Aout, 1)) points)."))
-    
     A_northpole, A_southpole = average_on_poles(A, rings)
 
     #TODO ij_cs, ij_ds shouldn't be 0...
@@ -273,7 +270,7 @@ function _interpolate!(
 
     launch!(architecture,
     :linear,
-    size(Aout),
+    (npoints_output,),
     _interpolate_kernel!,
         Aout,
         A,
@@ -314,14 +311,40 @@ end
     Aout[k] = anvil_average(a, b, c, d, Δabs[k], Δcds[k], Δys[k])
 end
 
+# version for 2D field and vector
+function interpolate!(
+    Aout::AbstractVector,      # Out: points to interpolate onto
+    A::AbstractField2D,         # In: field to interpolate from
+    interpolator::AbstractInterpolator,
+)
+    _interpolate!(Aout, A.data, interpolator, architecture(A))  # use .data to trigger dispatch for method above
+end
+
+# version for 2D field and vector
 function interpolate!(
     Aout::AbstractField,
-    A::AbstractField,
+    A::AbstractField2D,
     interpolator::AbstractInterpolator,
 ) 
     fields_match(Aout, A) && return copyto!(Aout.data, A.data)
     @assert ismatching(architecture(A), Aout) "Interpolation is only supported between fields on the same architecture, got $(architecture(A)) and )"
     _interpolate!(Aout.data, A.data, interpolator, architecture(A))
+end
+
+# version for 3D+ fields
+function interpolate!(
+    Aout::AbstractField,        # Out: grid to interpolate onto
+    A::AbstractField,           # In: gridded data to interpolate from
+    interpolator::AbstractInterpolator,
+)
+    # if fields match just copy data over (eltypes might differ)
+    fields_match(Aout, A) && return copyto!(Aout.data, A.data)
+    @assert ismatching(architecture(A), Aout) "Interpolation is only supported between fields on the same architecture, got $(architecture(A)) and )"
+
+    for k in eachlayer(Aout, A, vertical_only=true)
+        _interpolate!(view(Aout.data, :, k), view(A.data, :, k), interpolator, architecture(A))
+    end
+    return Aout                             # return the field wrapped around the interpolated data
 end
 
 # interpolate while creating an interpolator on the fly
