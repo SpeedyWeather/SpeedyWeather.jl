@@ -29,6 +29,10 @@ nonparametric_type(grid::AbstractGrid) = nonparametric_type(typeof(grid))
 # also needed for other array types, defined in extensions
 nonparametric_type(::Type{<:Array}) = Array
 
+# nonparametric_type for a SubArray is the arraytype it is viewing. Needed to construct new arrays from SubArrays!
+nonparametric_type(::Type{<:SubArray{T, N, A}}) where {T, N, A} = nonparametric_type(A)
+nonparametric_type(::Type{<:SubArray}) = SubArray   # if ArrayType A is not specified, return SubArray
+
 """$(TYPEDSIGNATURES) Resolution paraemeters `nlat_half` of a `grid`.
 Number of latitude rings on one hemisphere, Equator included."""
 get_nlat_half(grid::AbstractGrid) = grid.nlat_half
