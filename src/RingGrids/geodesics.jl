@@ -24,8 +24,8 @@ function Haversine(             # functor for Haversine struct
     lonlat2::Tuple;             # point 2
     radius = DEFAULT_RADIUS,    # radius of the sphere [m]
 )
-    lon1, lat1 = lonlat1
-    lon2, lat2 = lonlat2    
+    # promote lon and lat to common precision to avoid rounding errors in Haversine formula
+    lon1, lat1, lon2, lat2 = promote(lonlat1..., lonlat2...)    
 
     φ1 = deg2rad(lat1)
     φ2 = deg2rad(lat2)

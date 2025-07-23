@@ -562,3 +562,16 @@ end
         end
     end
 end
+
+@testset "nonparametric types" begin
+    for M in (RingGrids, LowerTriangularArrays)
+        @test M.nonparametric_type(Array) == Array
+        @test M.nonparametric_type(Array{Float32}) == Array
+        @test M.nonparametric_type(Array{Float32, 1}) == Array
+        @test M.nonparametric_type(SubArray) == SubArray
+        @test M.nonparametric_type(SubArray{Float32}) == SubArray
+        @test M.nonparametric_type(SubArray{Float32, 1}) == SubArray
+        @test M.nonparametric_type(SubArray{Float32, 1, Array}) == Array
+        @test M.nonparametric_type(SubArray{Float32, 1, Array{Float32, 1}}) == Array
+    end
+end
