@@ -55,8 +55,8 @@ function _legendre!(
     @boundscheck ismatching(S, specs) || throw(DimensionMismatch(S, specs))
     @boundscheck size(g_north) == size(g_south) == (S.nfreq_max, S.nlayers, nlat_half) || throw(DimensionMismatch(S, specs))
 
-    north = S.scratch_memory_column.north   # use scratch memory for vertically-batched dot product
-    south = S.scratch_memory_column.south
+    north = S.scratch_memory.column_north   # use scratch memory for vertically-batched dot product
+    south = S.scratch_memory.column_south
 
     @inbounds for j in 1:nlat_half          # symmetry: loop over northern latitudes only
         g_north[:, nlayers, j] .= 0       # reset scratch memory
@@ -141,8 +141,8 @@ function _legendre!(                        # GRID TO SPECTRAL
     @boundscheck ismatching(S, specs) || throw(DimensionMismatch(S, specs))
     @boundscheck size(f_north) == size(f_south) == (S.nfreq_max, S.nlayers, nlat_half) || throw(DimensionMismatch(S, specs))
 
-    even = S.scratch_memory_column.north    # use scratch memory for outer product
-    odd = S.scratch_memory_column.south
+    even = S.scratch_memory.column_north    # use scratch memory for outer product
+    odd = S.scratch_memory.column_south
 
     fill!(specs, 0)                         # reset as we accumulate into specs
 

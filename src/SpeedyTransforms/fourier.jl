@@ -90,7 +90,7 @@ function _apply_serial_fft!(
     k_grid = eachlayer(field)[k]    # Precomputed ring index (as a Cartesian index)
 
     field_jk = view(field.data, ilons, k_grid)  # data on northern ring, vertical layer k
-    out = view(S.scratch_memory_spec, 1:nfreq)  # view on scratch memory to store transformed data
+    out = view(S.scratch_memory.spec, 1:nfreq)  # view on scratch memory to store transformed data
     if not_equator 
         LinearAlgebra.mul!(out, rfft_plan, field_jk)    # perform FFT
     else
