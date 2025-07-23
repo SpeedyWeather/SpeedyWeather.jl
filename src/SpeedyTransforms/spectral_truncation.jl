@@ -152,29 +152,43 @@ function spectral_smoothing(A::LowerTriangularArray, c::Real; power::Real=1)
     return A_smooth
 end
 
-"""$(TYPEDSIGNATURES)
+"""
+$(TYPEDSIGNATURES)
 Smooth the spectral field `A` following A *= (1-(1-c)*∇²ⁿ) with power n of a normalised Laplacian
 so that the highest degree lmax is dampened by multiplication with c. Anti-diffusion for c>1."""
-function spectral_smoothing!(   L::LowerTriangularArray,
-                                c::Real;
-                                power::Real=1,          # power of Laplacian used for smoothing
-                                truncation::Int=-1)     # smoothing wrt wavenumber (0 = largest)
-                        
+function spectral_smoothing!(
+    L::LowerTriangularArray,
+    c::Real;
+    power::Real=1,          # power of Laplacian used for smoothing
+    truncation::Int=-1      # smoothing wrt wavenumber (0 = largest)
+)
     lmax, mmax = size(L; as=Matrix)
-        
+    
     # normalize by largest eigenvalue by default, or wrt to given truncation
     eigenvalue_norm = truncation == -1 ? -mmax*(mmax+1) : -truncation*(truncation+1)
+    
+    # Launch kernel
+    launch!(architecture(L), :lmk, size(L), spectral_smoothing_kernel!, 
+            L, c, power, eigenvalue_norm, L.spectrum.l_indices)
+    synchronize(architecture(L))
+end
 
-    for k in eachmatrix(L)
-        lm = 1
-        for m in 1:mmax
-            for l in m:lmax
-                eigenvalue_normalised = -l*(l-1)/eigenvalue_norm
-                # for eigenvalue_norm < largest eigenvalue the factor becomes negative
-                # set to zero in that case
-                L[lm, k] *= max(1 - (1-c)*eigenvalue_normalised^power, 0)
-                lm += 1
-            end
-        end
-    end
+@kernel function spectral_smoothing_kernel!(
+    L::LowerTriangularArray,
+    @Const(c),
+    @Const(power),
+    @Const(eigenvalue_norm),
+    @Const(l_indices)
+)
+    I = @index(Global, Cartesian)  # I[1] == lm, I[2] == k
+    
+    # Get the degree l for this coefficient
+    l = l_indices[I[1]]
+    
+    # Calculate eigenvalue_normalised
+    eigenvalue_normalised = -l*(l-1)/eigenvalue_norm
+    
+    # Apply smoothing: for eigenvalue_norm < largest eigenvalue the factor becomes negative
+    # set to zero in that case
+    L[I] *= max(1 - (1-c)*eigenvalue_normalised^power, 0)
 end
