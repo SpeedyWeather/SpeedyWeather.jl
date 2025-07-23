@@ -67,7 +67,6 @@ end
                     f_south = S.scratch_memory.south
 
                     # forward transform 
-                    # TODO: currently duplicated activity is needed here in forward, but not in reverse, why?
                     test_forward(SpeedyWeather.SpeedyTransforms._fourier!, Const, (f_north, Duplicated), (f_south, Duplicated), (field, Duplicated), (S, Const); fdm=FiniteDifferences.central_fdm(5, 1), rtol=1e-2, atol=1e-2)
 
                     # inverse transform
