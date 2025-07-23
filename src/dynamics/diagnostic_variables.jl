@@ -427,7 +427,7 @@ function ParticleVariables(SG::SpectralGrid)
     (; architecture, nparticles, NF, ArrayType) = SG
     (; ParticleVector) = SG
     VectorNF = array_type(architecture, NF, 1)
-    interpolator = RingGrids.AnvilInterpolator(SG.grid, nparticles; NF, ArrayType)
+    interpolator = RingGrids.AnvilInterpolator(SG.grid, nparticles; NF)
     return ParticleVariables{NF,ArrayType, ParticleVector, VectorNF, typeof(interpolator)}(;
             nparticles, interpolator)
 end

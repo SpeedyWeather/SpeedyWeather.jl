@@ -67,6 +67,34 @@ import SpeedyWeather: on_architecture, CPU, launch!
         # Verify results
         @test A ≈ expected
 
-    end     
+    end 
+    
+    @testset "Linear kernel test" begin
+
+        @kernel function test_linear_kernel!(A, B, C)
+            I = @index(Global, Linear)
+            A[I] = B[I] * C[I]
+        end
+
+        # Test parameters
+        npoints = 20
+        NF = Float32
+
+        arch = SpeedyWeather.CPU()
+
+        # Create test arrays
+        B = on_architecture(arch, rand(NF, npoints))
+        C = on_architecture(arch, rand(NF, npoints))
+        A = similar(B)
+
+        expected = B .* C
+
+        # Run the kernel
+        launch!(arch, :linear, (npoints,), test_linear_kernel!, A, B, C)
+        synchronize(arch)
+
+        # Verify results
+        @test A ≈ expected
+    end
 
 end 

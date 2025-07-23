@@ -122,8 +122,14 @@ function initialize!(land_sea_mask::EarthLandSeaMask, model::PrimitiveEquation)
     # high resolution land-sea mask
     lsm_highres = land_sea_mask.file_Grid(ncfile["lsm"].var[:, :], input_as=Matrix)
 
-    # average onto grid cells of the model
-    RingGrids.grid_cell_average!(land_sea_mask.mask, lsm_highres)
+    # average onto grid cells of the model 
+    if typeof(architecture(model.spectral_grid.architecture)) <: CPU
+        RingGrids.grid_cell_average!(land_sea_mask.mask, lsm_highres)
+    else
+        temp_mask = on_architecture(CPU(), land_sea_mask.mask)
+        RingGrids.grid_cell_average!(temp_mask, lsm_highres)
+        land_sea_mask.mask .= on_architecture(model.spectral_grid.architecture, temp_mask)
+    end
 
     # TODO this shouldn't be necessary, but at the moment grid_cell_average! can return values > 1
     # lo, hi = extrema(land_sea_mask.mask)
