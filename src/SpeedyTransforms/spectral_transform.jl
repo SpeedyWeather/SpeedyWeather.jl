@@ -62,11 +62,7 @@ struct SpectralTransform{
     
     # SCRATCH MEMORY FOR FOURIER NOT YET LEGENDRE TRANSFORMED AND VICE VERSA
     # state is undetermined, only read after writing to it
-    scratch_memory::ScratchMemory{NF, ArrayComplexType} 
-    scratch_memory_grid::VectorType                 # scratch memory with 1-stride for FFT output
-    scratch_memory_spec::VectorComplexType
-    scratch_memory_column_north::VectorComplexType  # scratch memory for vertically batched Legendre transform
-    scratch_memory_column_south::VectorComplexType  # scratch memory for vertically batched Legendre transform
+    scratch_memory::ScratchMemory{NF, ArrayComplexType, VectorType, VectorComplexType} 
 
     jm_index_size::Int                             # number of indices per layer in kjm_indices
     kjm_indices::ArrayTypeIntMatrix                # precomputed kjm loop indices map for legendre transform
@@ -154,15 +150,7 @@ function SpectralTransform(
     end
     
     # SCRATCH MEMORY FOR FOURIER NOT YET LEGENDRE TRANSFORMED AND VICE VERSA
-    scratch_memory = ScratchMemory(NF, ArrayType_, grid, nlayers)
-
-    # SCRATCH MEMORY TO 1-STRIDE DATA FOR FFTs
-    scratch_memory_grid  = ArrayType_(zeros(NF, nlon_max*nlayers))
-    scratch_memory_spec  = ArrayType_(zeros(Complex{NF}, nfreq_max*nlayers))
-
-    # SCRATCH MEMORY COLUMNS FOR VERTICALLY BATCHED LEGENDRE TRANSFORM
-    scratch_memory_column_north = ArrayType_(zeros(Complex{NF}, nlayers))
-    scratch_memory_column_south = ArrayType_(zeros(Complex{NF}, nlayers))
+    scratch_memory = ScratchMemory(NF, architecture, grid, nlayers)
 
     rfft_plans = Vector{AbstractFFTs.Plan}(undef, nlat_half)
     brfft_plans = Vector{AbstractFFTs.Plan}(undef, nlat_half)
@@ -270,13 +258,13 @@ function SpectralTransform(
         ArrayType_,
         typeof(spectrum),
         typeof(grid),
-        ArrayType_{NF, 1},
-        ArrayType_{Int, 2},
-        ArrayType_{Complex{NF}, 1},
-        ArrayType_{Complex{NF}, 2},
-        ArrayType_{Complex{NF}, 3},
-        LowerTriangularArray{NF, 1, ArrayType_{NF, 1}, typeof(spectrum)}, 
-        LowerTriangularArray{NF, 2, ArrayType_{NF, 2}, typeof(spectrum)},
+        array_type(architecture, NF, 1),
+        array_type(architecture, Int, 2),
+        array_type(architecture, Complex{NF}, 1),
+        array_type(architecture, Complex{NF}, 2),
+        array_type(architecture, Complex{NF}, 3),
+        LowerTriangularArray{NF, 1, array_type(architecture, NF, 1), typeof(spectrum)}, 
+        LowerTriangularArray{NF, 2, array_type(architecture, NF, 2), typeof(spectrum)},
     }(
         architecture,
         spectrum, nfreq_max, 
@@ -288,8 +276,6 @@ function SpectralTransform(
         rfft_plans, brfft_plans, rfft_plans_1D, brfft_plans_1D,
         legendre_polynomials,
         scratch_memory, 
-        scratch_memory_grid, scratch_memory_spec,
-        scratch_memory_column_north, scratch_memory_column_south,
         jm_index_size, kjm_indices, 
         solid_angles, 
         grad_y1, grad_y2,

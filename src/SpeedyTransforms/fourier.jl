@@ -35,7 +35,7 @@ function _apply_batched_fft!(
     # Construct views of the data to perform the FFT on
     # views and copies necessary for stride-1 outputs required by FFTW
     ring_layers = view(field.data, ilons, :)
-    out = reshape(view(S.scratch_memory_spec, 1:nfreq*nlayers), (nfreq, nlayers))
+    out = reshape(view(S.scratch_memory.spec, 1:nfreq*nlayers), (nfreq, nlayers))
 
     # Perform the FFT
     if not_equator # skip FFT, redundant when north already did that latitude
@@ -63,7 +63,7 @@ function _apply_batched_fft!(
 
     # Construct views of the data to perform the FFT on
     # views and copies necessary for stride-1 outputs required by FFTW
-    out = reshape(view(S.scratch_memory_grid, 1:nlon*nlayers), (nlon, nlayers))
+    out = reshape(view(S.scratch_memory.grid, 1:nlon*nlayers), (nlon, nlayers))
 
     # PERFORM FFT, inverse complex to real, hence brfft
     # FFTW is in-place writing into `out` via `mul`
