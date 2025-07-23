@@ -60,11 +60,11 @@
 
     set!(simulation, sea_ice_concentration=B[:,1], lf=lf, add=true)
     C = similar(A[:,1])
-    SpeedyWeather.RingGrids.interpolate!(C, B[:,1])
-    @test prog_new.ocean.sea_ice_concentration ≈ (prog_old.ocean.sea_ice_concentration .+ C)
+    RingGrids.interpolate!(C, B[:,1]; NF)
+    @test all(isapprox(prog_new.ocean.sea_ice_concentration, prog_old.ocean.sea_ice_concentration .+ C, atol=1e-6))
 
     Di = deepcopy(prog_new.land.soil_temperature)
-    RingGrids.interpolate!(Di, D)
+    RingGrids.interpolate!(Di, D; NF)
     set!(simulation, soil_temperature=D, lf=lf)
     @test prog_new.land.soil_temperature == Di
 

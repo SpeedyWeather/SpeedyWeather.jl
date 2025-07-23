@@ -154,10 +154,10 @@ function set!(
         if fields_match(var, field)
             var .+= field
         else 
-            var .+= interpolate(var.grid, field)
+            var .+= interpolate(var.grid, field; NF=eltype(var))
         end
     else 
-        interpolate!(var, field)
+        interpolate!(var, field; NF=eltype(var))
     end 
     return var 
 end 
@@ -183,13 +183,20 @@ function set!(
     add::Bool=false,
 )
     (; londs, latds, σ_levels_full) = geometry
-    kernel = add ? (a,b) -> a+b : (a,b) -> b
-    for k in eachlayer(var)
-        for ij in eachgridpoint(var)
-            var[ij, k] = kernel(var[ij, k], f(londs[ij], latds[ij], σ_levels_full[k]))
-        end
-    end
+    kernel_func = add ? (a,b) -> a+b : (a,b) -> b
+
+    launch!(architecture(var), :ijk, size(var), set_field_3d_kernel!, var, londs, latds, σ_levels_full, f, kernel_func)
+    synchronize(architecture(var))
+
     return var
+end
+
+@kernel inbounds=true function set_field_3d_kernel!(var, @Const(londs), @Const(latds), @Const(σ_levels_full), @Const(f), @Const(kernel_func))
+    # Get indices
+    ij, k = @index(Global, NTuple)
+    
+    # compute 
+    var[ij, k] = kernel_func(var[ij, k], f(londs[ij], latds[ij], σ_levels_full[k]))
 end
 
 # if geometry available
@@ -213,6 +220,8 @@ function set!(
 )
     # otherwise recompute longitude, latitude vectors
     londs, latds = RingGrids.get_londlatds(var)
+    londs = on_architecture(architecture(var), londs)
+    latds = on_architecture(architecture(var), latds)
     _set!(var, f, londs, latds; kwargs...)
 end
 
@@ -224,10 +233,8 @@ function _set!(
     latds::AbstractVector;
     add::Bool=false,
 )   
-    kernel = add ? (a,b) -> a+b : (a,b) -> b
-    for ij in eachgridpoint(var)
-        var[ij] = kernel(var[ij], f(londs[ij], latds[ij]))
-    end
+    kernel_func = add ? (a,b) -> a+b : (a,b) -> b
+    var .= kernel_func.(var, f.(londs, latds))
     return var
 end
 
