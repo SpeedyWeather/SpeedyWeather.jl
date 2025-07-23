@@ -4,5 +4,5 @@
     simulation = CUDA.@allowscalar initialize!(model)
     run!(simulation, steps=4)
 
-    @test simulation.model.feedback.nars_detected == false
+    @test simulation.model.feedback.nans_detected == false
 end
