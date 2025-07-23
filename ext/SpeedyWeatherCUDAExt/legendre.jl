@@ -124,7 +124,7 @@ function SpeedyTransforms._legendre!(
     CUDA.synchronize()
 
     if unscale_coslat
-        SpeedyWeather.SpeedyTransforms.unscale_coslat!(g_north, g_south, coslat⁻¹)
+        SpeedyWeather.SpeedyTransforms.unscale_coslat!(g_north, g_south, coslat⁻¹, architecture=S.architecture)
     end
 end
 
