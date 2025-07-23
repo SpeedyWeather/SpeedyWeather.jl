@@ -239,15 +239,15 @@ function interpolate(
     I::AbstractInterpolator;    # indices in I are assumed to be calculated already!
     kwargs...
 ) where NF
-    (; npoints ) = I.locator                                         # number of points to interpolate onto
-    Aout = array_type(architecture(A), NF, 1)(undef, npoints)    # preallocate: onto θs, λs interpolated values of A
-    _interpolate!(Aout, A.data, I, architecture=architecture(A)) # perform interpolation, store in Aout
+    (; npoints_output) = I.locator                                         # number of points to interpolate onto
+    Aout = array_type(architecture(A), NF, 1)(undef, npoints_output)    # preallocate: onto θs, λs interpolated values of A
+    _interpolate!(Aout, A.data, I, architecture(A)) # perform interpolation, store in Aout
 end
 
 # the actual interpolation function
 function _interpolate!(
-    Aout,               # Out: interpolated values
-    A,                  # gridded values to interpolate from
+    Aout,                               # Out: interpolated values
+    A,                                  # gridded values to interpolate from
     interpolator::AnvilInterpolator,    # geometry info and work arrays 
     architecture::AbstractArchitecture      
 )
@@ -256,10 +256,13 @@ function _interpolate!(
     
     # 1) Aout's length must match the interpolator
     # 2) input A must match the interpolator's geometry points (do not check grids for view support)
-    @boundscheck length(Aout) == length(ij_as) || throw(DimensionMismatchArray(Aout, ij_as))
+    @boundscheck size(Aout, 1) == length(ij_as) || throw(DimensionMismatchArray(Aout, ij_as))
     @boundscheck length(A) == npoints ||
         throw(DimensionMismatch("Interpolator ($npoints points) mismatches input grid ($(length(A)) points)."))
 
+    @boundscheck size(Aout, 1) == npoints_output ||
+        throw(DimensionMismatch("Locator ($npoints_output points) mismatches output grid ($(size(Aout, 1)) points)."))
+    
     A_northpole, A_southpole = average_on_poles(A, rings)
 
     #TODO ij_cs, ij_ds shouldn't be 0...
@@ -270,7 +273,7 @@ function _interpolate!(
 
     launch!(architecture,
     :linear,
-    (npoints_output,),
+    size(Aout),
     _interpolate_kernel!,
         Aout,
         A,
@@ -311,7 +314,6 @@ end
     Aout[k] = anvil_average(a, b, c, d, Δabs[k], Δcds[k], Δys[k])
 end
 
-# version for 3D+ fields GPU 
 function interpolate!(
     Aout::AbstractField,
     A::AbstractField,
