@@ -1,7 +1,7 @@
 export SurfaceHeatFlux
-@kwdef struct SurfaceHeatFlux{Ocean, Land} <: AbstractSurfaceHeatFlux
-    ocean::Ocean = SurfaceOceanHeatFlux()
-    land::Land = SurfaceLandHeatFlux()
+@parameterized @kwdef struct SurfaceHeatFlux{Ocean, Land} <: AbstractSurfaceHeatFlux
+    @param ocean::Ocean = SurfaceOceanHeatFlux()
+    @param land::Land = SurfaceLandHeatFlux()
 end
 
 function SurfaceHeatFlux(
@@ -37,12 +37,12 @@ surface_heat_flux!(::ColumnVariables, ::NoSurfaceHeatFlux, ::PrimitiveEquation) 
 ## ----
 
 export SurfaceOceanHeatFlux
-@kwdef struct SurfaceOceanHeatFlux{NF} <: AbstractSurfaceHeatFlux
+@parameterized @kwdef struct SurfaceOceanHeatFlux{NF} <: AbstractSurfaceHeatFlux
     "Use (possibly) flow-dependent column.boundary_layer_drag coefficient"
     use_boundary_layer_drag::Bool = true
 
     "Otherwise, use the following drag coefficient for heat fluxes over ocean"
-    heat_exchange::NF = 0.9e-3
+    @param heat_exchange::NF = 0.9e-3
 end
 
 SurfaceOceanHeatFlux(SG::SpectralGrid; kwargs...) = SurfaceOceanHeatFlux{SG.NF}(; kwargs...)
@@ -80,12 +80,12 @@ end
 ## ----
 
 export SurfaceLandHeatFlux
-@kwdef struct SurfaceLandHeatFlux{NF} <: AbstractSurfaceHeatFlux
+@parameterized @kwdef struct SurfaceLandHeatFlux{NF} <: AbstractSurfaceHeatFlux
     "Use (possibly) flow-dependent column.boundary_layer_drag coefficient"
     use_boundary_layer_drag::Bool = true
 
     "Otherwise, use the following drag coefficient for heat fluxes over land"
-    heat_exchange::NF = 1.2e-3    # for neutral stability
+    @param heat_exchange::NF = 1.2e-3    # for neutral stability
 end
 
 SurfaceLandHeatFlux(SG::SpectralGrid; kwargs...) = SurfaceLandHeatFlux{SG.NF}(; kwargs...)
