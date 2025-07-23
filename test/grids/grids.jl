@@ -1,6 +1,7 @@
 using JLArrays
 using Adapt
 
+RINGGRIDS_DEFAULT_NF = SpeedyWeather.RingGrids.DEFAULT_NF
 @testset "Grid types" begin
     for G in (  
         FullClenshawGrid,
@@ -194,7 +195,6 @@ end
                     FullOctaHEALPixGrid
                     )
 
-            RINGGRIDS_DEFAULT_NF = SpeedyWeather.RingGrids.DEFAULT_NF
             n = 4      # resolution parameter nlat_half
             G1 = rand(G, n) 
             @test eltype(G1) == RINGGRIDS_DEFAULT_NF # that's the default
@@ -226,7 +226,7 @@ end
 
             n = 4      # resolution parameter nlat_half
             field1 = F(undef, n)
-            @test eltype(field1) == Float64     # that's the default NF
+            @test eltype(field1) == RINGGRIDS_DEFAULT_NF     # that's the default NF
             
             field2 = F{NF}(undef, n)
             @test eltype(field2) == NF

@@ -58,7 +58,7 @@ end
             λs = 360*rand(npoints)              # some longitudes in [0˚, 360˚E]
             θs = 2lat1*rand(npoints) .- lat1    # some latitudes in [-90˚, 90˚N]
             
-            As = RingGrids.interpolate(λs, θs, A)
+            As = RingGrids.interpolate(λs, θs, A; NF)
 
             for (a, θ) in zip(As, θs)
                 @test a ≈ θ
