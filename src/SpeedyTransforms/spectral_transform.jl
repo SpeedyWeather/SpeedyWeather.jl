@@ -93,7 +93,7 @@ end
 
 # eltype of a transform is the number format used within
 Base.eltype(S::SpectralTransform{NF}) where NF = NF
-array_type(S::SpectralTransform{NF, A}) where {NF, A} = A
+Architectures.array_type(S::SpectralTransform{NF, A}) where {NF, A} = A
 
 """
 $(TYPEDSIGNATURES)

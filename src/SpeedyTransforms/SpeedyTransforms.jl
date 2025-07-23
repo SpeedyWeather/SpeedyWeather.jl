@@ -13,7 +13,9 @@ import Adapt: adapt
 import KernelAbstractions: @kernel, @index, @Const, synchronize
 
 # SPEEDYWEATHER MODULES
-using ..Architectures
+using ..Architectures: Architectures, AbstractArchitecture, CPU, GPU, 
+on_architecture, architecture, array_type, ismatching
+
 using ..Utils
 using ..LowerTriangularArrays
 using ..RingGrids
