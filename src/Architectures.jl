@@ -38,7 +38,8 @@ module Architectures
         GPU(device)
 
     Return a GPU architecture using `device`.
-    `device` defauls to CUDA.CUDABackend(always_inline=true)
+    `device` defauls to CUDA.CUDABackend(always_inline=true). 
+    CUDA has to be loaded for this to work. 
     """
     struct GPU{D} <: AbstractArchitecture
         device :: D
@@ -80,6 +81,14 @@ module Architectures
     """
     array_type(::CPU) = Array
     array_type(::Type{<:CPU}) = Array
+
+    """
+        array_type(::AbstractArchitecture, NF::Type, N::Int)
+  
+    Return the concrete array type that's used with the architecture 
+    for a number type `NF` and dimension `N`.
+    """
+    array_type(::CPU, NF::Type, N::Int) = Array{NF, N}
 
     """
         compatible_array_types(arch::AbstractArchitecture)

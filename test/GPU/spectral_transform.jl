@@ -284,7 +284,6 @@ end
 
                     # Convert GPU to CPU for comparison, result is stored in the 
                     # scratch memory
-
                     result_gpu = on_architecture(cpu_arch, S_gpu.scratch_memory.north);
                     result_cpu = S_cpu.scratch_memory.north;
                     @test result_cpu ≈ result_gpu rtol=sqrt(eps(Float32))   # GPU error tolerance always Float32
