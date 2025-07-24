@@ -59,16 +59,16 @@ end
 
 
 """$(TYPEDSIGNATURES)
-Inverse Legendre transform, adapted for CUDA and batched across j (lattitude), 
+Inverse Legendre transform, adapted for KernelAbstractions (GPU usage) and batched across j (lattitude), 
 k (vertical layers) and m (spherical harmonic order). Not to be used directly, 
 but called from transform! with CuArrays."""
-function _legendre_ka!(
-    g_north::AbstractArray{<:Complex, 3},     # Legendre-transformed output, northern latitudes
-    g_south::AbstractArray{<:Complex, 3},     # and southern latitudes
-    specs::LowerTriangularArray,        # input: spherical harmonic coefficients
-    S::SpectralTransform;               # precomputed transform
-    unscale_coslat::Bool = false,       # unscale by cosine of latitude on the fly?
-)
+function _legendre!(
+    g_north::AbstractArray{<:Complex, 3},       # Legendre-transformed output, northern latitudes
+    g_south::AbstractArray{<:Complex, 3},       # and southern latitudes
+    specs::LowerTriangularArray,                # input: spherical harmonic coefficients
+    S::SpectralTransform{NF,<:GPU};             # precomputed transform
+    unscale_coslat::Bool = false,               # unscale by cosine of latitude on the fly?
+) where NF
     (; nlat_half) = S.grid              # dimensions    
     (; lmax ) = S.spectrum              # 1-based max degree l, order m of spherical harmonics  
     (; legendre_polynomials) = S        # precomputed Legendre polynomials    
@@ -169,12 +169,12 @@ end
     end
 end
 
-function _legendre_ka!(                        # GRID TO SPECTRAL
+function _legendre!(                        # GRID TO SPECTRAL
     specs::LowerTriangularArray,            # Fourier and Legendre-transformed output
     f_north::AbstractArray{<:Complex, 3},   # Fourier-transformed input, northern latitudes
     f_south::AbstractArray{<:Complex, 3},   # and southern latitudes
-    S::SpectralTransform,                   # precomputed transform
-)
+    S::SpectralTransform{NF,<:GPU},        # precomputed transform
+) where NF
     (; lmax) = S.spectrum                   # 1-based max degree l, order m of spherical harmonics  
     (; legendre_polynomials) = S            # precomputed Legendre polynomials    
     (; kjm_indices) = S                     # Legendre shortcut, shortens loop over m, 0-based  
