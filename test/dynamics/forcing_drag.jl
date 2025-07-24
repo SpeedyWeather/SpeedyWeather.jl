@@ -14,7 +14,7 @@
         simulation = initialize!(model)
 
         run!(simulation, period=Day(15), output=true)
-        @test simulation.model.feedback.nars_detected == false
+        @test simulation.model.feedback.nans_detected == false
     end
 end
 
@@ -34,6 +34,6 @@ end
         simulation = initialize!(model)
 
         run!(simulation, period=Day(15), output=true)
-        @test simulation.model.feedback.nars_detected == false
+        @test simulation.model.feedback.nans_detected == false
     end
 end

@@ -35,7 +35,7 @@ Galewsky, 2004, but mirrored for both hemispheres.
 
 $(TYPEDFIELDS)
 """
-@kwdef mutable struct JetStreamForcing{NF} <: AbstractForcing
+@parameterized @kwdef mutable struct JetStreamForcing{NF} <: AbstractForcing
     "Number of latitude rings"
     nlat::Int = 0
 
@@ -43,16 +43,16 @@ $(TYPEDFIELDS)
     nlayers::Int = 0
 
     "jet latitude [˚N]"
-    latitude::NF = 45
+    @param latitude::NF = 45 (bounds=-90..90,)
     
     "jet width [˚], default ≈ 19.29˚"
-    width::NF = (1/4-1/7)*180
+    @param width::NF = (1/4-1/7)*180 (bounds=Positive,)
 
     "sigma level [1], vertical location of jet"
-    sigma::NF = 0.2
+    @param sigma::NF = 0.2 (bounds=Nonnegative,)
 
     "jet speed scale [m/s]"
-    speed::NF = 85
+    @param speed::NF = 85
 
     "time scale [days]"
     time_scale::Second = Day(30)
@@ -138,19 +138,19 @@ function forcing!(
 end
 
 export StochasticStirring
-@kwdef struct StochasticStirring{NF, VectorType} <: AbstractForcing
+@parameterized @kwdef struct StochasticStirring{NF, VectorType} <: AbstractForcing
         
     "Number of latitude rings, used for latitudinal mask"
     nlat::Int
 
     "[OPTION] Stirring strength A [1/s²]"
-    strength::NF = 1e-9
+    @param strength::NF = 1e-9
 
     "[OPTION] Stirring latitude [˚N]"
-    latitude::NF = 45
+    @param latitude::NF = 45 (bounds=-90..90,)
 
     "[OPTION] Stirring width [˚]"
-    width::NF = 24
+    @param width::NF = 24 (bounds=Positive,)
     
     # TO BE INITIALISED        
     "Latitudinal mask, confined to mid-latitude storm track by default [1]"
@@ -199,7 +199,7 @@ function forcing!(
     
     # back to spectral space
     S_masked = diagn.dynamics.a_2D
-    transform!(S_masked, S_grid, spectral_transform)
+    transform!(S_masked, S_grid, diagn.dynamics.scratch_memory, spectral_transform)
 
     # scale by radius^2 as is the vorticity equation, and scale to forcing strength
     S_masked .*= (diagn.scale[]^2 * forcing.strength)
@@ -217,15 +217,16 @@ export KolmogorovFlow
 """Kolmogorov flow forcing. Fields are
 $(TYPEDFIELDS)
 """
-@kwdef mutable struct KolmogorovFlow{NF} <: AbstractForcing
+@parameterized @kwdef mutable struct KolmogorovFlow{NF} <: AbstractForcing
     "[OPTION] Strength of forcing [1/s²]"
-    strength::NF = 3e-12
+    @param strength::NF = 3e-12
 
     "[OPTION] Wavenumber of forcing in meridional direction (pole to pole)"
-    wavenumber::NF = 8
+    @param wavenumber::NF = 8 (bounds=Positive,)
 end
 
 KolmogorovFlow(SG::SpectralGrid; kwargs...) = KolmogorovFlow{SG.NF}(; kwargs...)
+
 initialize!(::KolmogorovFlow, ::AbstractModel) = nothing
 
 function forcing!(

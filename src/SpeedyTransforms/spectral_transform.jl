@@ -1,6 +1,6 @@
 const DEFAULT_NLAYERS = 1
 const DEFAULT_GRID = FullGaussianGrid
-const DEFAULT_NF = Float64
+const DEFAULT_NF = Float32
 const DEFAULT_ARRAYTYPE = Array
 
 abstract type AbstractSpectralTransform end
@@ -62,8 +62,7 @@ struct SpectralTransform{
     
     # SCRATCH MEMORY FOR FOURIER NOT YET LEGENDRE TRANSFORMED AND VICE VERSA
     # state is undetermined, only read after writing to it
-    scratch_memory_north::ArrayComplexType
-    scratch_memory_south::ArrayComplexType
+    scratch_memory::ScratchMemory{NF, ArrayComplexType} 
     scratch_memory_grid::VectorType                 # scratch memory with 1-stride for FFT output
     scratch_memory_spec::VectorComplexType
     scratch_memory_column_north::VectorComplexType  # scratch memory for vertically batched Legendre transform
@@ -155,9 +154,7 @@ function SpectralTransform(
     end
     
     # SCRATCH MEMORY FOR FOURIER NOT YET LEGENDRE TRANSFORMED AND VICE VERSA
-    # convert all to the arraytype (e.g. moves array to GPU)
-    scratch_memory_north = ArrayType_(zeros(Complex{NF}, nfreq_max, nlayers, nlat_half))
-    scratch_memory_south = ArrayType_(zeros(Complex{NF}, nfreq_max, nlayers, nlat_half))
+    scratch_memory = ScratchMemory(NF, ArrayType_, grid, nlayers)
 
     # SCRATCH MEMORY TO 1-STRIDE DATA FOR FFTs
     scratch_memory_grid  = ArrayType_(zeros(NF, nlon_max*nlayers))
@@ -177,7 +174,7 @@ function SpectralTransform(
     # PLAN THE FFTs
     plan_FFTs!(
         rfft_plans, brfft_plans, rfft_plans_1D, brfft_plans_1D,
-        fake_grid_data, scratch_memory_north, rings, nlons
+        fake_grid_data, scratch_memory.north, rings, nlons
     )
     
     # PRECOMPUTE KJM INDICES FOR LEGENDRE TRANSFORM (0-based)
@@ -290,7 +287,7 @@ function SpectralTransform(
         norm_sphere,
         rfft_plans, brfft_plans, rfft_plans_1D, brfft_plans_1D,
         legendre_polynomials,
-        scratch_memory_north, scratch_memory_south,
+        scratch_memory, 
         scratch_memory_grid, scratch_memory_spec,
         scratch_memory_column_north, scratch_memory_column_south,
         jm_index_size, kjm_indices, 
@@ -455,19 +452,27 @@ and a Legendre Transform in the meridional direction exploiting symmetries. The 
 number format-flexible but `field` and the spectral transform `S` have to have the same number format.
 Uses the precalculated arrays, FFT plans and other constants in the SpectralTransform struct `S`.
 The spectral transform is grid-flexible as long as `field.grid` and `S.grid` match."""
-function transform!(                    # SPECTRAL TO GRID
+transform!(                    # SPECTRAL TO GRID
     field::AbstractField,               # gridded output
     coeffs::LowerTriangularArray,       # spectral coefficients input
     S::SpectralTransform;               # precomputed transform
     unscale_coslat::Bool = false,       # unscale with cos(lat) on the fly?
+) = transform!(field, coeffs, S.scratch_memory, S; unscale_coslat)
+
+function transform!(                                # SPECTRAL TO GRID
+    field::AbstractField,                           # gridded output
+    coeffs::LowerTriangularArray,                    # spectral coefficients input
+    scratch_memory::ScratchMemory,      # explicit scratch memory to use
+    S::SpectralTransform;                           # precomputed transform
+    unscale_coslat::Bool = false,                   # unscale with cos(lat) on the fly?
 )
     # catch incorrect sizes early
     @boundscheck ismatching(S, field) || throw(DimensionMismatch(S, field))
     @boundscheck ismatching(S, coeffs) || throw(DimensionMismatch(S, coeffs))
 
     # use scratch memory for Legendre but not yet Fourier-transformed data
-    g_north = S.scratch_memory_north    # phase factors for northern latitudes
-    g_south = S.scratch_memory_south    # phase factors for southern latitudes
+    g_north = scratch_memory.north    # phase factors for northern latitudes
+    g_south = scratch_memory.south    # phase factors for southern latitudes
 
     # INVERSE LEGENDRE TRANSFORM in meridional direction
     _legendre!(g_north, g_south, coeffs, S; unscale_coslat)
@@ -485,18 +490,25 @@ and a Legendre Transform in the meridional direction exploiting symmetries. The 
 number format-flexible but `field` and the spectral transform `S` have to have the same number format.
 Uses the precalculated arrays, FFT plans and other constants in the SpectralTransform struct `S`.
 The spectral transform is grid-flexible as long as `field.grid` and `S.grid` match."""
-function transform!(                # GRID TO SPECTRAL
-    coeffs::LowerTriangularArray,   # output: spectral coefficients
-    field::AbstractField,           # input: gridded values
-    S::SpectralTransform,           # precomputed spectral transform
+transform!(                             # GRID TO SPECTRAL
+    coeffs::LowerTriangularArray,        # output: spectral coefficients
+    field::AbstractField,               # input: gridded values
+    S::SpectralTransform,               # precomputed spectral transform
+) = transform!(coeffs, field, S.scratch_memory, S)
+    
+function transform!(                               # GRID TO SPECTRAL
+    coeffs::LowerTriangularArray,                   # output: spectral coefficients
+    field::AbstractField,                          # input: gridded values
+    scratch_memory::ScratchMemory,                 # explicit scratch memory to use
+    S::SpectralTransform,                          # precomputed spectral transform
 )
     # catch incorrect sizes early
     @boundscheck ismatching(S, field) || throw(DimensionMismatch(S, field))
     @boundscheck ismatching(S, coeffs) || throw(DimensionMismatch(S, coeffs))
 
     # use scratch memory for Fourier but not yet Legendre-transformed data
-    f_north = S.scratch_memory_north    # phase factors for northern latitudes
-    f_south = S.scratch_memory_south    # phase factors for southern latitudes
+    f_north = scratch_memory.north    # phase factors for northern latitudes
+    f_south = scratch_memory.south    # phase factors for southern latitudes
 
     # FOURIER TRANSFORM in zonal direction
     _fourier!(f_north, f_south, field, S)    
@@ -517,7 +529,7 @@ function transform(             # GRID TO SPECTRAL
     S::SpectralTransform,       # precomputed spectral transform
 )
     ks = size(field)[2:end]     # the non-horizontal dimensions
-    coeffs = zeros(Complex{eltype(S)}, S.spectrum, ks...)
+    coeffs = on_architecture(architecture(field), zeros(Complex{eltype(S)}, S.spectrum, ks...))
     transform!(coeffs, field, S)
     return coeffs
 end
@@ -531,7 +543,7 @@ function transform(                 # SPECTRAL TO GRID
     kwargs...                       # pass on unscale_coslat=true/false(default)
 )
     ks = size(coeffs)[2:end]        # the non-horizontal dimensions
-    field = zeros(eltype(S), S.grid, ks...)
+    field = on_architecture(architecture(coeffs), zeros(eltype(S), S.grid, ks...))
     transform!(field, coeffs, S; kwargs...)
     return field
 end

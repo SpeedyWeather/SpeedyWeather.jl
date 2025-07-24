@@ -162,25 +162,28 @@ function SpectralGrid(;
     radius_f64 = Float64(radius)
 
     # Calculate derived fields
-    VectorType = ArrayType{NF, 1}
-    MatrixType = ArrayType{NF, 2}
-    TensorType = ArrayType{NF, 3}
+    VectorType = array_type(architecture, NF, 1)
+    MatrixType = array_type(architecture, NF, 2)
+    TensorType = array_type(architecture, NF, 3)
+    
+    # Spectral space
+    spectrum = Spectrum(trunc+2, trunc+1, architecture=architecture)
     
     # Spectral space
     spectrum = Spectrum(trunc+2, trunc+1, architecture=architecture)
     
     # Spectral variable types
-    SpectralVariable2D = LowerTriangularArray{Complex{NF}, 1, ArrayType{Complex{NF}, 1}, typeof(spectrum)}
-    SpectralVariable3D = LowerTriangularArray{Complex{NF}, 2, ArrayType{Complex{NF}, 2}, typeof(spectrum)}
-    SpectralVariable4D = LowerTriangularArray{Complex{NF}, 3, ArrayType{Complex{NF}, 3}, typeof(spectrum)}
+    SpectralVariable2D = LowerTriangularArray{Complex{NF}, 1, array_type(architecture, Complex{NF}, 1), typeof(spectrum)}
+    SpectralVariable3D = LowerTriangularArray{Complex{NF}, 2, array_type(architecture, Complex{NF}, 2), typeof(spectrum)}
+    SpectralVariable4D = LowerTriangularArray{Complex{NF}, 3, array_type(architecture, Complex{NF}, 3), typeof(spectrum)}
 
     # Grid variable types
-    GridVariable2D = Field{NF, 1, ArrayType{NF, 1}, typeof(grid)}
-    GridVariable3D = Field{NF, 2, ArrayType{NF, 2}, typeof(grid)}
-    GridVariable4D = Field{NF, 3, ArrayType{NF, 3}, typeof(grid)}
+    GridVariable2D = Field{NF, 1, array_type(architecture, NF, 1), typeof(grid)}
+    GridVariable3D = Field{NF, 2, array_type(architecture, NF, 2), typeof(grid)}
+    GridVariable4D = Field{NF, 3, array_type(architecture, NF, 3), typeof(grid)}
     
     # Particle vector type
-    ParticleVector = ArrayType{Particle{NF}, 1}
+    ParticleVector = array_type(architecture, Particle{NF}, 1)
     
     # Create the SpectralGrid with all fields
     return SpectralGrid{typeof(architecture), typeof(spectrum), typeof(grid)}(
@@ -213,7 +216,7 @@ function SpectralGrid(;
 end
 
 # also allow spectral grid to be passed on as first and only positional argument to model constructors
-(M::Type{<:AbstractModel})(SG::SpectralGrid; kwargs...) = M(spectral_grid=SG; kwargs...)
+(M::Type{<:AbstractModel})(SG::SpectralGrid; kwargs...) = M(; spectral_grid=SG, kwargs...)
 
 """$(TYPEDSIGNATURES)
 Generator function for a SpectralTransform struct pulling in parameters from a SpectralGrid struct."""

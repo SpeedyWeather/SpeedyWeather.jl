@@ -687,8 +687,9 @@ Base.similar(L::LowerTriangularArray{T, N, ArrayType, SP}, ::Type{T}) where {T, 
     LowerTriangularArray{T, N, ArrayType, SP}(similar(L.data, T), L.spectrum)
 Base.similar(L::LowerTriangularArray{T}) where T = similar(L, T)
  
-array_type(::Type{<:LowerTriangularArray{T, N, ArrayType}}) where {T, N, ArrayType} = ArrayType
-array_type(L::LowerTriangularArray) = array_type(typeof(L))
+Architectures.array_type(::Type{<:LowerTriangularArray{T, N, ArrayType}}) where {T, N, ArrayType} = ArrayType
+Architectures.array_type(L::LowerTriangularArray) = array_type(typeof(L))
+Architectures.ismatching(arch::AbstractArchitecture, L::LowerTriangularArray) = ismatching(arch, L.data)
 
 Base.prod(L::LowerTriangularArray{NF}) where NF = zero(NF)
 @inline Base.sum(L::LowerTriangularArray; dims=:, kw...) = sum(L.data; dims, kw...)
@@ -754,6 +755,7 @@ nonparametric_type(::Type{<:Array}) = Array
 
 # nonparametric_type for a SubArray is the arraytype it is viewing. Needed to construct new arrays from SubArrays!
 nonparametric_type(::Type{<:SubArray{T, N, A}}) where {T, N, A} = nonparametric_type(A)
+nonparametric_type(::Type{<:SubArray}) = SubArray   # if ArrayType A is not specified, return SubArray
 
 "`L = find_L(Ls)` returns the first LowerTriangularArray among the arguments. 
 Adapted from Julia documentation of Broadcast interface"

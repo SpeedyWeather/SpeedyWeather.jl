@@ -134,15 +134,15 @@ end
                     
                     # CPU forward transform
                     SpeedyTransforms._fourier_batched!(
-                        S_cpu.scratch_memory_north, 
-                        S_cpu.scratch_memory_south, 
+                        S_cpu.scratch_memory.north, 
+                        S_cpu.scratch_memory.south, 
                         grid_cpu, 
                         S_cpu
                     )
                     # GPU forward transform
                     SpeedyTransforms._fourier_batched!(
-                        S_gpu.scratch_memory_north, 
-                        S_gpu.scratch_memory_south, 
+                        S_gpu.scratch_memory.north, 
+                        S_gpu.scratch_memory.south, 
                         grid_gpu, 
                         S_gpu
                     )
@@ -178,8 +178,8 @@ end
                     # Use scratch memory to store mid-transform data, using the 
                     # CPU legendre transform to generate the intermediate data
                     # NOTE: assumption of working Legendre transform
-                    g_north_cpu = S_cpu.scratch_memory_north    
-                    g_south_cpu = S_cpu.scratch_memory_south   
+                    g_north_cpu = S_cpu.scratch_memory.north    
+                    g_south_cpu = S_cpu.scratch_memory.south   
                     SpeedyTransforms._legendre!(g_north_cpu, g_south_cpu, spec_cpu, S_cpu)
                     # Copy to GPU
                     g_north_gpu = cu(g_north_cpu)
@@ -224,15 +224,15 @@ end
                     
                     # CPU forward transform
                     SpeedyTransforms._fourier_serial!(
-                        S_cpu.scratch_memory_north, 
-                        S_cpu.scratch_memory_south, 
+                        S_cpu.scratch_memory.north, 
+                        S_cpu.scratch_memory.south, 
                         grid_cpu, 
                         S_cpu
                     )
                     # GPU forward transform
                     SpeedyTransforms._fourier_serial!(
-                        S_gpu.scratch_memory_north, 
-                        S_gpu.scratch_memory_south, 
+                        S_gpu.scratch_memory.north, 
+                        S_gpu.scratch_memory.south, 
                         grid_gpu, 
                         S_gpu
                     )
@@ -302,25 +302,25 @@ end
                     
                     # CPU inverse transform
                     SpeedyTransforms._legendre!(
-                        S_cpu.scratch_memory_north, 
-                        S_cpu.scratch_memory_south, 
+                        S_cpu.scratch_memory.north, 
+                        S_cpu.scratch_memory.south, 
                         spec_cpu, S_cpu
                     )
                     # GPU inverse transform
                     SpeedyTransforms._legendre!(
-                        S_gpu.scratch_memory_north, 
-                        S_gpu.scratch_memory_south, 
+                        S_gpu.scratch_memory.north, 
+                        S_gpu.scratch_memory.south, 
                         spec_gpu, S_gpu
                     )
 
                     # Convert GPU to CPU for comparison, result is stored in the 
                     # scratch memory
-                    result_gpu = on_architecture(cpu_arch, S_gpu.scratch_memory_north);
-                    result_cpu = S_cpu.scratch_memory_north;
+                    result_gpu = on_architecture(cpu_arch, S_gpu.scratch_memory.north);
+                    result_cpu = S_cpu.scratch_memory.north;
                     @test result_cpu ≈ result_gpu rtol=sqrt(eps(Float32))   # GPU error tolerance always Float32
 
-                    result_gpu = on_architecture(cpu_arch, S_gpu.scratch_memory_south);
-                    result_cpu = S_cpu.scratch_memory_south;
+                    result_gpu = on_architecture(cpu_arch, S_gpu.scratch_memory.south);
+                    result_cpu = S_cpu.scratch_memory.south;
                     @test result_cpu ≈ result_gpu rtol=sqrt(eps(Float32))
                 end
             end
@@ -343,8 +343,8 @@ end
 
                     # Use scratch memory to store mid-transform data, using the 
                     # CPU fourier transform to generate the intermediate data
-                    f_north_cpu = S_cpu.scratch_memory_north    
-                    f_south_cpu = S_cpu.scratch_memory_south   
+                    f_north_cpu = S_cpu.scratch_memory.north    
+                    f_south_cpu = S_cpu.scratch_memory.south   
                     SpeedyTransforms._fourier!(f_north_cpu, f_south_cpu, grid_cpu, S_cpu)
                     # Copy to GPU
                     f_north_gpu = cu(f_north_cpu)

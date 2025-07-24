@@ -3,6 +3,8 @@ module SpeedyWeather
 # STRUCTURE
 using DocStringExtensions
 
+import ConstructionBase: constructorof, getproperties, setproperties
+
 # NUMERICS
 import Primes
 import Random
@@ -11,8 +13,7 @@ export rotate, rotate!
 
 # GPU, PARALLEL
 import Base.Threads: Threads, @threads
-import KernelAbstractions
-import KernelAbstractions: synchronize
+import KernelAbstractions: KernelAbstractions, @kernel, @index, @Const, synchronize
 import Adapt: Adapt, adapt, adapt_structure
 
 # INPUT OUTPUT
@@ -25,6 +26,9 @@ import JLD2: jldopen, jldsave, JLDFile
 import CodecZlib
 import BitInformation: round, round!
 import ProgressMeter
+
+# INTERVALS
+using DomainSets.IntervalSets
 
 # to avoid a `using Dates` to pass on DateTime arguments
 export DateTime, Millisecond, Second, Minute, Hour, Day, Week, Month, Year, Century, Millenium
@@ -42,6 +46,11 @@ export on_architecture, architecture
 # import utilities
 include("Utils/Utils.jl")
 using .Utils
+
+import .Utils: parameters
+
+# export user-facing parameter handling types and methods
+export  SpeedyParam, SpeedyParams, parameters, stripparams
 
 # LowerTriangularArrays for spherical harmonics
 export  LowerTriangularArrays, 

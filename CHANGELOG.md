@@ -3,6 +3,22 @@
 ## Unreleased
 
 - Adjusted legendre transform kernels to work with KernelAbstractions [#736](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/736)
+- Interpolation now works on GPU [#764](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/764)
+- A minimal barotropic model now runs on GPU [#733](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/733)
+- Fix Haversine rounding errors with type promotion [#787](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/787)
+- Add mailmap to merge multiple developers for repo statistics [#785](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/785)
+- Restart from file for ocean and land [#784](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/784)
+- Overwrite output folder option [#782](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/782)
+- Update compat entries [#777](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/777)
+- Fix show of field views by defining nonparametric_type for SubArray [#776](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/776)
+- Add parameter handling system and implement for Barotropic model [#754](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/754)
+- Fix Enzyme CI to run as expected [#762](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/762)
+
+## v0.16
+
+- Move full differentiability tests to separate CI workflow [#759](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/759)
+- Type stability for particle advection [#757](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/757)
+- Scratch memory for SpeedyTransforms now part of DiagnosticVariables [#680](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/680/)
 - Reworked GPU and utility code structure and added GPU versions of spectral gradients[#727](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/727)
 - Added `animate` to animate a NetCDF output file with GeoMakie [#755](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/755)
 - Makie v0.24 compatibility [#750](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/750)
