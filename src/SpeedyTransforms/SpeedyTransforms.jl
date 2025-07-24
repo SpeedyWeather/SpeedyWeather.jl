@@ -23,8 +23,6 @@ export  SpectralTransform,
         transform!,
         transform
 
-export _legendre_ka!
-
 # ALIASING
 export  get_nlat_half
 
