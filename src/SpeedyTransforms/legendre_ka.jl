@@ -182,6 +182,9 @@ function _legendre!(                        # GRID TO SPECTRAL
     (; solid_angles, lon_offsets) = S
 
     nlayers = size(specs, 2)                # get number of layers of specs for fewer layers than precomputed in S
+
+    @boundscheck SpeedyTransforms.ismatching(S, specs) || throw(DimensionMismatch(S, specs))
+    @boundscheck size(f_north) == size(f_south) == (S.nfreq_max, S.nlayers, S.grid.nlat_half) || throw(DimensionMismatch(S, specs))
     @boundscheck nlayers <= S.nlayers || throw(DimensionMismatch(S, specs))
 
     fill!(specs, 0)                         # reset as we accumulate into specs
