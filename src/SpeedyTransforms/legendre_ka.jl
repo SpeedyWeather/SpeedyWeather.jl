@@ -13,7 +13,7 @@ using KernelAbstractions
     lon_offsets,                    # Longitude 
     kjm_indices                     # precomputed indices for thread    
 )
-    tid = @index(Global)
+    tid = @index(Global, Linear)
 
     # Unpack indices from precomputed kjm_indices using single thread index
     k = kjm_indices[tid, 1]
@@ -120,7 +120,7 @@ end
     solid_angles,               # Solid angles for each latitude
     kjm_indices                 # precomputed indices for thread
 )
-    tid = @index(Global)
+    tid = @index(Global, Linear)
 
     # Unpack indices from precomputed kjm_indices using single thread index
     k = kjm_indices[tid, 1]
