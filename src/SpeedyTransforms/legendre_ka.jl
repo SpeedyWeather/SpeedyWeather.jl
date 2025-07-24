@@ -1,4 +1,4 @@
-import SpeedyWeather.LowerTriangularMatrices: ij2k, get_lm_range, get_2lm_range
+import SpeedyWeather.LowerTriangularArrays: ij2k, get_lm_range, get_2lm_range
 import Atomix 
 
 using KernelAbstractions
