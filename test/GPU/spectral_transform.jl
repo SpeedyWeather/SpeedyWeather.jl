@@ -87,6 +87,7 @@ end
     end
 end
 
+# test that the transforms also work when they are called with a different number of layers than they were initialized with
 @testset "Test transforms with fewer layers" begin
     # Generate test data
     S_cpu, S_gpu, grid_cpu, grid_gpu, spec_cpu, spec_gpu = get_test_data(
