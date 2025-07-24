@@ -103,11 +103,11 @@ end
     grid_gpu_test = on_architecture(gpu_arch, grid_cpu_test)
     spec_gpu_test = on_architecture(gpu_arch, spec_cpu_test)
 
-    transform!(spec_gpu_test, grid_gpu_test, S_gpu)
-    transform!(grid_gpu_test, spec_gpu_test, S_gpu)
-
     transform!(spec_cpu_test, grid_cpu_test, S_cpu)
     transform!(grid_cpu_test, spec_cpu_test, S_cpu)
+
+    transform!(spec_gpu_test, grid_gpu_test, S_gpu)
+    transform!(grid_gpu_test, spec_gpu_test, S_gpu)
 
     @test grid_cpu_test ≈ on_architecture(cpu_arch, grid_gpu_test) rtol=sqrt(eps(Float32))
     @test spec_cpu_test ≈ on_architecture(cpu_arch, spec_gpu_test) rtol=sqrt(eps(Float32))
