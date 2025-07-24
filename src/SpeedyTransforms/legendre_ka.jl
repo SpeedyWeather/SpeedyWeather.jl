@@ -4,7 +4,7 @@ import Atomix
 using KernelAbstractions
 
 # (inverse) legendre transform kernel, called from _legendre!
-@kernel function inverse_legendre_kernel!(
+@kernel inbounds=true function inverse_legendre_kernel!(
     g_north,                        # Scratch storage for legendre coefficients
     g_south,                        # before fft
     specs_data,                     # Data passed from spectral grid
@@ -69,20 +69,22 @@ function _legendre_ka!(
     S::SpectralTransform;               # precomputed transform
     unscale_coslat::Bool = false,       # unscale by cosine of latitude on the fly?
 )
-    (; nlat_half) = S.grid                   # dimensions    
-    (; lmax ) = S.spectrum                       # 0-based max degree l, order m of spherical harmonics  
+    (; nlat_half) = S.grid              # dimensions    
+    (; lmax ) = S.spectrum              # 1-based max degree l, order m of spherical harmonics  
     (; legendre_polynomials) = S        # precomputed Legendre polynomials    
     (; kjm_indices ) = S                # kjm loop indices precomputed for threads  
     (; coslat⁻¹, lon_offsets ) = S
     # NOTE: this comes out as a range, not an integer
     nlayers = axes(specs, 2)            # get number of layers of specs for fewer layers than precomputed in S
 
+    lmax = lmax-1                       # 0-based max degree l of spherical harmonics
+
     @boundscheck SpeedyTransforms.ismatching(S, specs) || throw(DimensionMismatch(S, specs))
     @boundscheck size(g_north) == size(g_south) == (S.nfreq_max, S.nlayers, nlat_half) || throw(DimensionMismatch(S, specs))
 
     g_north .= 0
     g_south .= 0
-
+   
     # Launch the kernel with the specified configuration
     launch!(
         S.architecture,
@@ -107,7 +109,7 @@ function _legendre_ka!(
 end
 
 
-@kernel function forward_legendre_kernel!(
+@kernel inbounds=true function forward_legendre_kernel!(
     specs_data,                 # output, accumulated spherical harmonic coefficients
     legendre_polynomials_data,  # input, Legendre polynomials
     f_north,                    # input, Fourier-transformed northern latitudes
@@ -173,12 +175,13 @@ function _legendre_ka!(                        # GRID TO SPECTRAL
     f_south::AbstractArray{<:Complex, 3},   # and southern latitudes
     S::SpectralTransform,                   # precomputed transform
 )
-    (; lmax) = S.spectrum                   # 0-based max degree l, order m of spherical harmonics  
+    (; lmax) = S.spectrum                   # 1-based max degree l, order m of spherical harmonics  
     (; legendre_polynomials) = S            # precomputed Legendre polynomials    
     (; kjm_indices) = S                     # Legendre shortcut, shortens loop over m, 0-based  
     (; solid_angles, lon_offsets) = S
 
     fill!(specs, 0)                         # reset as we accumulate into specs
+    lmax = lmax-1                           # 0-based max degree l of spherical harmonics
 
     specs_reinterpret = reinterpret(real(eltype(specs.data)), specs.data)
 
