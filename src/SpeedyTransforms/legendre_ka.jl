@@ -69,8 +69,8 @@ function _legendre_ka!(
     S::SpectralTransform;               # precomputed transform
     unscale_coslat::Bool = false,       # unscale by cosine of latitude on the fly?
 )
-    (; nlat_half) = S                   # dimensions    
-    (; lmax ) = S                       # 0-based max degree l, order m of spherical harmonics  
+    (; nlat_half) = S.grid                   # dimensions    
+    (; lmax ) = S.spectrum                       # 0-based max degree l, order m of spherical harmonics  
     (; legendre_polynomials) = S        # precomputed Legendre polynomials    
     (; kjm_indices ) = S                # kjm loop indices precomputed for threads  
     (; coslat⁻¹, lon_offsets ) = S
@@ -173,7 +173,7 @@ function _legendre_ka!(                        # GRID TO SPECTRAL
     f_south::AbstractArray{<:Complex, 3},   # and southern latitudes
     S::SpectralTransform,                   # precomputed transform
 )
-    (; lmax) = S                            # 0-based max degree l, order m of spherical harmonics  
+    (; lmax) = S.spectrum                   # 0-based max degree l, order m of spherical harmonics  
     (; legendre_polynomials) = S            # precomputed Legendre polynomials    
     (; kjm_indices) = S                     # Legendre shortcut, shortens loop over m, 0-based  
     (; solid_angles, lon_offsets) = S
