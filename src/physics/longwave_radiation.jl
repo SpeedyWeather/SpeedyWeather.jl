@@ -123,12 +123,12 @@ function longwave_radiation!(
     # extension to Jeevanjee: Include temperature flux between surface and lowermost air temperature
     # but zero flux if land/sea not available
     Fₖ_ocean = isfinite(skin_temperature_sea) ?
-        (T[end] - skin_temperature_sea) * α * (Tₜ - skin_temperature_sea) : 
+        (T[end] - skin_temperature_sea) * 3.1 * α * (Tₜ - skin_temperature_sea) : 
         zero(skin_temperature_sea)
     column.surface_longwave_up_ocean = Fₖ_ocean
 
     Fₖ_land = isfinite(skin_temperature_land) ?
-        (T[end] - skin_temperature_land) * α * (Tₜ - skin_temperature_land) : 
+        (T[end] - skin_temperature_land) * 4.4 * α * (Tₜ - skin_temperature_land) : 
         zero(skin_temperature_land)
     column.surface_longwave_up_land = Fₖ_land
 
