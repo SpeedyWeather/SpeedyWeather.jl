@@ -90,7 +90,7 @@ function _legendre!(
     launch!(
         S.architecture,
         :linear,
-        (size(specs,1)*nlayers,),
+        (S.jm_index_size*nlayers,),
         inverse_legendre_kernel!,
         g_north,
         g_south,
@@ -192,7 +192,7 @@ function _legendre!(                        # GRID TO SPECTRAL
     launch!(
         S.architecture,
         :linear,
-        (size(specs,1)*nlayers,),
+        (S.jm_index_size*nlayers,),
         forward_legendre_kernel!,
         specs_reinterpret,
         legendre_polynomials.data, 
