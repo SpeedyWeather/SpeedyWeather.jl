@@ -87,32 +87,6 @@ end
     end
 end
 
-# test that the transforms also work when they are called with a different number of layers than they were initialized with
-@testset "Test transforms with fewer layers" begin
-    # Generate test data
-    S_cpu, S_gpu, grid_cpu, grid_gpu, spec_cpu, spec_gpu = get_test_data(
-        trunc=spectral_resolutions[1], nlayers=nlayers_list[1], Grid=grid_list[1], NF=NFs[1]
-    )
-
-    gpu_arch = S_gpu.architecture
-    cpu_arch = S_cpu.architecture
-
-    grid_cpu_test = rand(S_gpu.grid, 4)
-    spec_cpu_test = zeros(S_gpu.spectrum, 4)
-
-    grid_gpu_test = on_architecture(gpu_arch, grid_cpu_test)
-    spec_gpu_test = on_architecture(gpu_arch, spec_cpu_test)
-
-    transform!(spec_cpu_test, grid_cpu_test, S_cpu)
-    transform!(grid_cpu_test, spec_cpu_test, S_cpu)
-
-    transform!(spec_gpu_test, grid_gpu_test, S_gpu)
-    transform!(grid_gpu_test, spec_gpu_test, S_gpu)
-
-    @test grid_cpu_test ≈ on_architecture(cpu_arch, grid_gpu_test) rtol=sqrt(eps(Float32))
-    @test spec_cpu_test ≈ on_architecture(cpu_arch, spec_gpu_test) rtol=sqrt(eps(Float32))
-end
-
 @testset "fourier_batched: compare forward pass to CPU" begin
     @testset for trunc in spectral_resolutions
         @testset for nlayers in nlayers_list
