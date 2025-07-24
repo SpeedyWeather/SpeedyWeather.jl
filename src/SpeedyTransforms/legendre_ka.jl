@@ -66,7 +66,7 @@ function _legendre!(
     g_north::AbstractArray{<:Complex, 3},       # Legendre-transformed output, northern latitudes
     g_south::AbstractArray{<:Complex, 3},       # and southern latitudes
     specs::LowerTriangularArray,                # input: spherical harmonic coefficients
-    S::SpectralTransform{NF,<:GPU};             # precomputed transform
+    S::SpectralTransform{NF,<:Architectures.GPU};             # precomputed transform
     unscale_coslat::Bool = false,               # unscale by cosine of latitude on the fly?
 ) where NF
     (; nlat_half) = S.grid              # dimensions    
@@ -75,12 +75,13 @@ function _legendre!(
     (; kjm_indices ) = S                # kjm loop indices precomputed for threads  
     (; coslat⁻¹, lon_offsets ) = S
     # NOTE: this comes out as a range, not an integer
-    nlayers = axes(specs, 2)            # get number of layers of specs for fewer layers than precomputed in S
+    nlayers = size(specs, 2)            # get number of layers of specs for fewer layers than precomputed in S
 
     lmax = lmax-1                       # 0-based max degree l of spherical harmonics
 
     @boundscheck SpeedyTransforms.ismatching(S, specs) || throw(DimensionMismatch(S, specs))
     @boundscheck size(g_north) == size(g_south) == (S.nfreq_max, S.nlayers, nlat_half) || throw(DimensionMismatch(S, specs))
+    @boundscheck nlayers <= S.nlayers || throw(DimensionMismatch(S, specs))
 
     g_north .= 0
     g_south .= 0
@@ -89,7 +90,7 @@ function _legendre!(
     launch!(
         S.architecture,
         :linear,
-        (size(kjm_indices,1),),
+        (size(specs,1)*nlayers,),
         inverse_legendre_kernel!,
         g_north,
         g_south,
@@ -173,12 +174,15 @@ function _legendre!(                        # GRID TO SPECTRAL
     specs::LowerTriangularArray,            # Fourier and Legendre-transformed output
     f_north::AbstractArray{<:Complex, 3},   # Fourier-transformed input, northern latitudes
     f_south::AbstractArray{<:Complex, 3},   # and southern latitudes
-    S::SpectralTransform{NF,<:GPU},        # precomputed transform
+    S::SpectralTransform{NF,<:Architectures.GPU},        # precomputed transform
 ) where NF
     (; lmax) = S.spectrum                   # 1-based max degree l, order m of spherical harmonics  
     (; legendre_polynomials) = S            # precomputed Legendre polynomials    
     (; kjm_indices) = S                     # Legendre shortcut, shortens loop over m, 0-based  
     (; solid_angles, lon_offsets) = S
+
+    nlayers = size(specs, 2)                # get number of layers of specs for fewer layers than precomputed in S
+    @boundscheck nlayers <= S.nlayers || throw(DimensionMismatch(S, specs))
 
     fill!(specs, 0)                         # reset as we accumulate into specs
     lmax = lmax-1                           # 0-based max degree l of spherical harmonics
@@ -188,7 +192,7 @@ function _legendre!(                        # GRID TO SPECTRAL
     launch!(
         S.architecture,
         :linear,
-        (size(kjm_indices,1),),
+        (size(specs,1)*nlayers,),
         forward_legendre_kernel!,
         specs_reinterpret,
         legendre_polynomials.data, 
