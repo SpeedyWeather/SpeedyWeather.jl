@@ -81,13 +81,6 @@ end
                     transform!(spec_gpu_test, grid_gpu_test, S_gpu)
                     spec_test = on_architecture(cpu_arch, spec_gpu_test)
                     @test spec_cpu ≈ spec_test rtol=sqrt(eps(Float32))
-
-                    # test round trip with fewer layers 
-                    grid_gpu_test = on_architecture(gpu_arch, rand(S_gpu.grid, 4))
-                    spec_gpu_test = on_architecture(gpu_arch, zero(S_gpu.spectrum, 4))
-                    grid_gpu_test_copy = deepcopy(grid_gpu_test)
-                    
-                    @test on_architecture(cpu_arch, grid_gpu_test) ≈ grid_gpu_test_copy rtol=sqrt(eps(Float32))
                 end
             end
         end
@@ -104,7 +97,7 @@ end
     cpu_arch = S_cpu.architecture
 
     grid_cpu_test = rand(S_gpu.grid, 4)
-    spec_cpu_test = zero(S_gpu.spectrum, 4)
+    spec_cpu_test = zeros(S_gpu.spectrum, 4)
 
     grid_gpu_test = on_architecture(gpu_arch, grid_cpu_test)
     spec_gpu_test = on_architecture(gpu_arch, spec_cpu_test)
