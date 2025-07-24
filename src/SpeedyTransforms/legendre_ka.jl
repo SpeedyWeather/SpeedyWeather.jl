@@ -102,10 +102,7 @@ function _legendre_ka!(
     
     # unscale by cosine of latitude on the fly if requested
     if unscale_coslat
-        @inbounds for j in 1:nlat_half                    # symmetry: loop over northern latitudes only
-            g_north[:, nlayers, j] .*= coslat⁻¹[j]        # scale in place
-            g_south[:, nlayers, j] .*= coslat⁻¹[j]
-        end
+        unscale_coslat!(g_north, g_south, coslat⁻¹, architecture=S.architecture)
     end
 end
 
