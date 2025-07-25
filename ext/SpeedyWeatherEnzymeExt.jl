@@ -8,7 +8,7 @@ import .EnzymeRules: reverse, augmented_primal
 using .EnzymeRules
 
 # import all functions for which we define rules
-import SpeedyWeather.SpeedyTransforms: _fourier!
+import SpeedyWeather.SpeedyTransforms: _fourier!, ColumnScratchMemory
 
 # Rules for SpeedyTransforms
 
