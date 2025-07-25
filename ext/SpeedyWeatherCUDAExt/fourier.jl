@@ -1,3 +1,4 @@
+import SpeedyWeather.SpeedyTransforms: ColumnScratchMemory
 
 # Override FFT package deciding function
 SpeedyTransforms.which_FFT_package(::Type{<:CuArray{<:AbstractFloat}}) = CUFFT 

@@ -77,7 +77,7 @@ function reverse(config::EnzymeRules.RevConfigWidth{1}, func::Const{typeof(_four
     make_zero!(scratch_memory.dval)
 
     # the function has no return values, so we also return nothing here
-    return (nothing, nothing, nothing, nothing)
+    return (nothing, nothing, nothing, nothing, nothing)
 end
 
 ### Custom rule for _fourier!(grid, f_north, f_south, S)
@@ -114,7 +114,7 @@ function reverse(config::EnzymeRules.RevConfigWidth{1}, func::Const{typeof(_four
     make_zero!(scratch_memory.dval)
 
     # the function has no return values, so we also return nothing here
-    return (nothing, nothing, nothing, nothing)
+    return (nothing, nothing, nothing, nothing, nothing)
 end
 
 ###
