@@ -169,8 +169,10 @@ function soil_moisture_availability!(
         # Fortran SPEEDY source/land_model.f90 line 111 origin unclear
         veg = max(0, high_cover[ij] + low_veg_factor*low_cover[ij])
 
-        # Fortran SPEEDY documentation eq. 51
-        soil_moisture_availability[ij] = r*(D_top*soil_moisture[ij, 1] +
-            veg*D_root*max(soil_moisture[ij, 2] - W_wilt, 0))
+        # Fortran SPEEDY documentation eq. 51 #This is incompatible with the units in Speedy, which are: vol frac to Field Capacity
+        #soil_moisture_availability[ij] = r*(D_top*soil_moisture[ij, 1] +
+        #    veg*D_root*max(soil_moisture[ij, 2] - W_wilt, 0))
+        soil_moisture_availability[ij] = r*(D_top*soil_moisture[ij, 1] * W_cap +
+            veg*D_root*max((soil_moisture[ij, 2] * W_cap) - W_wilt, 0))
     end
 end
