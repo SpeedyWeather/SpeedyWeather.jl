@@ -128,7 +128,7 @@ function longwave_radiation!(
     column.surface_longwave_up_ocean = Fₖ_ocean
 
     Fₖ_land = isfinite(skin_temperature_land) ?
-        (T[end] - skin_temperature_land) * 4.4 * α * (Tₜ - skin_temperature_land) : 
+        (T[end] - skin_temperature_land) * 4.6 * α * (Tₜ - skin_temperature_land) : 
         zero(skin_temperature_land)
     column.surface_longwave_up_land = Fₖ_land
 
