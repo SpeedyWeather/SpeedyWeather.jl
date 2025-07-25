@@ -42,6 +42,5 @@ on_architecture(::GPU, a::StepRangeLen) = a
 @inline SpeedyWeather.convert_to_device(::GPU, args::Tuple) = map(CUDA.cudaconvert, args)
 
 include("fourier.jl")
-include("legendre.jl")
 
 end # module
