@@ -1,7 +1,21 @@
+# THE SCRATCH MEMORY INTRODUCED HERE IS TO AVOID TEMPORARAY STORAGE IN THE SPECTRAL TRANSFORM
+# THIS IS SO THAT THE SPECTRAL TRANSFORM CAN BE USED WITH CONST ACTIVITY IN ENZYME
+
+# We do this seperate struct here for purely technical reasons to avoid that we have memory 
+# alias each other in the call to `_legendre!` and `_fourier!`.  The alternative would be to 
+# pass only scratch memory (and not g_north/f_north/etc..), but this caused some trouble with 
+# setting up the AD rules (probably solvable though)
+struct ColumnScratchMemory{NF, VectorType, VectorComplexType, ArrayComplexType}
+    grid::VectorType                # scratch memory with 1-stride for FFT output
+    spec::VectorComplexType         # scratch memory with 1-stride for FFT output
+    column_north::VectorComplexType        # scratch memory for vertically batched Legendre transform
+    column_south::VectorComplexType        # scratch memory for vertically batched Legendre transform
+end
+
 """
 ScratchMemory holds scratch memory for the `SpectralTransform` that's used both by the Fourier and Legendre transform. Fields are
 $(TYPEDFIELDS)"""
-mutable struct ScratchMemory{ # mutable struct so that referencing the scratch memory in
+struct ScratchMemory{ # mutable struct so that referencing the scratch memory in
     NF,                       # SpectralTransform creates a reference and not a copy
     ArrayComplexType,         # <: ArrayType{Complex{NF}, 3},
     VectorType,               # <: ArrayType{NF, 1},
@@ -12,10 +26,7 @@ mutable struct ScratchMemory{ # mutable struct so that referencing the scratch m
     north::ArrayComplexType
     south::ArrayComplexType
 
-    grid::VectorType                # scratch memory with 1-stride for FFT output
-    spec::VectorComplexType
-    column_north::VectorComplexType # scratch memory for vertically batched Legendre transform
-    column_south::VectorComplexType # scratch memory for vertically batched Legendre transform
+    column::ColumnScratchMemory{NF, VectorType, VectorComplexType, ArrayComplexType}
 end 
 
 function ScratchMemory(
@@ -43,8 +54,11 @@ function ScratchMemory(
         array_type(architecture, NF, 1),
         array_type(architecture, Complex{NF}, 1),
     }(scratch_memory_north, scratch_memory_south, 
+    ColumnScratchMemory{NF, array_type(architecture, NF, 1),
+     array_type(architecture, Complex{NF}, 1), 
+     array_type(architecture, Complex{NF}, 3)}(
     scratch_memory_grid, scratch_memory_spec, 
-    scratch_memory_column_north, scratch_memory_column_south)
+    scratch_memory_column_north, scratch_memory_column_south))
 end 
 
 """$(TYPEDSIGNATURES)

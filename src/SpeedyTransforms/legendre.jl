@@ -39,6 +39,7 @@ function _legendre!(
     g_north::AbstractArray{<:Complex, 3},   # Legendre-transformed output, northern latitudes
     g_south::AbstractArray{<:Complex, 3},   # and southern latitudes
     specs::LowerTriangularArray,            # input: spherical harmonic coefficients
+    scratch_memory::ColumnScratchMemory,    # scratch memory for vertically batched Legendre transform
     S::SpectralTransform;                   # precomputed transform
     unscale_coslat::Bool = false,           # unscale by cosine of latitude on the fly?
 )
@@ -55,8 +56,8 @@ function _legendre!(
     @boundscheck ismatching(S, specs) || throw(DimensionMismatch(S, specs))
     @boundscheck size(g_north) == size(g_south) == (S.nfreq_max, S.nlayers, nlat_half) || throw(DimensionMismatch(S, specs))
 
-    north = S.scratch_memory.column_north   # use scratch memory for vertically-batched dot product
-    south = S.scratch_memory.column_south
+    north = scratch_memory.column_north     # use scratch memory for vertically-batched dot product
+    south = scratch_memory.column_south
 
     @inbounds for j in 1:nlat_half          # symmetry: loop over northern latitudes only
         g_north[:, nlayers, j] .= 0       # reset scratch memory
@@ -125,6 +126,7 @@ function _legendre!(                        # GRID TO SPECTRAL
     specs::LowerTriangularArray,            # Fourier and Legendre-transformed output
     f_north::AbstractArray{<:Complex, 3},   # Fourier-transformed input, northern latitudes
     f_south::AbstractArray{<:Complex, 3},   # and southern latitudes
+    scratch_memory::ColumnScratchMemory,    # scratch memory for vertically batched Legendre transform
     S::SpectralTransform,                   # precomputed transform
 )
     (; nlat) = S                            # dimensions
@@ -141,8 +143,8 @@ function _legendre!(                        # GRID TO SPECTRAL
     @boundscheck ismatching(S, specs) || throw(DimensionMismatch(S, specs))
     @boundscheck size(f_north) == size(f_south) == (S.nfreq_max, S.nlayers, nlat_half) || throw(DimensionMismatch(S, specs))
 
-    even = S.scratch_memory.column_north    # use scratch memory for outer product
-    odd = S.scratch_memory.column_south
+    even = scratch_memory.column_north      # use scratch memory for outer product
+    odd = scratch_memory.column_south
 
     fill!(specs, 0)                         # reset as we accumulate into specs
 

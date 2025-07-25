@@ -43,6 +43,7 @@ Uses indexing as we seemingly can't use views with the FFT planning with CUFFT.
 function SpeedyTransforms._apply_batched_fft!(
     f_out::CuArray{<:Complex, 3},
     grids::AbstractField{NF, N, <:CuArray},
+    scratch_memory::ColumnScratchMemory,    # not used here, but in CPU version
     S::SpectralTransform, 
     j::Int,
     nfreq::Int,
@@ -67,6 +68,7 @@ Uses indexing as we seemingly can't use views with the FFT planning with CUFFT.
 function SpeedyTransforms._apply_batched_fft!(
     grids::AbstractField{NF, N, <:CuArray},
     g_in::CuArray{<:Complex, 3},
+    scratch_memory::ColumnScratchMemory,    # not used here, but in CPU version
     S::SpectralTransform,
     j::Int,
     nlon::Int,
@@ -90,6 +92,7 @@ This uses views but still allocates, i.e. `mul!` still cannot be used.
 function SpeedyTransforms._apply_serial_fft!(
     f_out::CuArray{<:Complex, 3},
     grids::AbstractField{NF, N, <:CuArray},
+    scratch_memory::ColumnScratchMemory,    # not used here, but in CPU version
     S::SpectralTransform, 
     j::Int,
     k::Int,
@@ -116,6 +119,7 @@ of CuArrays.
 function SpeedyTransforms._apply_serial_fft!(
     grids::AbstractField{NF, N, <:CuArray},
     g_in::CuArray{<:Complex, 3},
+    scratch_memory::ColumnScratchMemory,    # not used here, but in CPU version
     S::SpectralTransform,
     j::Int,
     k::Int,
