@@ -19,4 +19,3 @@ include("interpolate.jl")
 # FULL MODELS
 include("barotropic.jl")
 #include("primitive_dry.jl")
-

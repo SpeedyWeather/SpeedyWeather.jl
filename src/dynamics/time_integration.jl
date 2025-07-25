@@ -173,14 +173,6 @@ function leapfrog!(
     w1 = lf == 1 ? zero(NF) : robert_filter*williams_filter/2       # = ν*α/2 in Williams (2009, Eq. 8)
     w2 = lf == 1 ? zero(NF) : robert_filter*(1-williams_filter)/2   # = ν(1-α)/2 in Williams (2009, Eq. 9)
 
-    # @inbounds for lm in eachindex(A_old, A_new, tendency)
-    #     a_old = A_old[lm]                       # double filtered value from previous time step (t-Δt)
-    #     a_new = a_old + dt_NF*tendency[lm]      # Leapfrog/Euler step depending on dt=Δt, 2Δt (unfiltered at t+Δt)
-    #     a_update = a_old - 2A_lf[lm] + a_new    # Eq. 8&9 in Williams (2009), calculate only once
-    #     A_old[lm] = A_lf[lm] + w1*a_update      # Robert's filter: A_old[lm] becomes 2xfiltered value at t
-    #     A_new[lm] = a_new - w2*a_update         # Williams filter: A_new[lm] becomes 1xfiltered value at t+Δt
-    # end
-
     launch!(architecture(tendency), :lmk, size(tendency), leapfrog_kernel!, A_old, A_new, A_lf, tendency, dt_NF, w1, w2)
     synchronize(architecture(tendency))
 end

@@ -11,7 +11,7 @@ struct GridGeometry{
 
     nlat_half::Int              # number of latitude rings on one hemisphere (Eq. incl)
     nlat::Int                   # total number of latitude rings
-    npoints::Int          # total number of grid points
+    npoints::Int                # total number of grid points
     londs::VectorType           # longitudes of every grid point 0˚ to 360˚E
     latd::VectorType            # latitude of each ring, incl north pole 90˚N, ..., south pole -90˚N
 
@@ -239,7 +239,7 @@ function interpolate(
     I::AbstractInterpolator;    # indices in I are assumed to be calculated already!
     kwargs...
 ) where NF
-    (; npoints_output) = I.locator                                         # number of points to interpolate onto
+    (; npoints_output) = I.locator                                      # number of points to interpolate onto
     Aout = array_type(architecture(A), NF, 1)(undef, npoints_output)    # preallocate: onto θs, λs interpolated values of A
     _interpolate!(Aout, A.data, I, architecture(A)) # perform interpolation, store in Aout
 end
@@ -311,16 +311,7 @@ end
     Aout[k] = anvil_average(a, b, c, d, Δabs[k], Δcds[k], Δys[k])
 end
 
-# version for 2D field and vector
-function interpolate!(
-    Aout::AbstractVector,      # Out: points to interpolate onto
-    A::AbstractField2D,         # In: field to interpolate from
-    interpolator::AbstractInterpolator,
-)
-    _interpolate!(Aout, A.data, interpolator, architecture(A))  # use .data to trigger dispatch for method above
-end
-
-# version for 2D field and vector
+# version for 2D fields
 function interpolate!(
     Aout::AbstractField,
     A::AbstractField2D,
@@ -329,6 +320,15 @@ function interpolate!(
     fields_match(Aout, A) && return copyto!(Aout.data, A.data)
     @assert ismatching(architecture(A), Aout) "Interpolation is only supported between fields on the same architecture, got $(architecture(A)) and )"
     _interpolate!(Aout.data, A.data, interpolator, architecture(A))
+end
+
+# version for 2D field and vector
+function interpolate!(
+    Aout::AbstractVector,      # Out: points to interpolate onto
+    A::AbstractField2D,         # In: field to interpolate from
+    interpolator::AbstractInterpolator,
+)
+    _interpolate!(Aout, A.data, interpolator, architecture(A))  # use .data to trigger dispatch for method above
 end
 
 # version for 3D+ fields
