@@ -269,7 +269,7 @@ function _interpolate!(
     @boundscheck extrema_in(ij_ds, -1, npoints) || throw(BoundsError)
 
     launch!(architecture,
-    :linear,
+    LinearWorkOrder,
     (npoints_output,),
     _interpolate_kernel!,
         Aout,
@@ -486,7 +486,7 @@ function find_rings_unsafe!(js::AbstractArray{<:Integer},  # Out: vector of ring
         
     launch!(
         architecture,
-        :linear,
+        LinearWorkOrder,
         size(js),
         find_rings_kernel!,
         js,
@@ -562,7 +562,7 @@ function find_grid_indices!(I::AnvilInterpolator,       # update indices arrays
     
     launch!(
         architecture,
-        :linear,
+        LinearWorkOrder,
         size(js),
         find_grid_indices_kernel!,
         js,

@@ -32,7 +32,7 @@ import KernelAbstractions: KernelAbstractions, @kernel
         expected = B .* C
 
         # Run the kernel
-        launch!(arch, :lmk, size(A), test_lta_kernel!, A, B, C)
+        launch!(arch, SpectralWorkOrder, size(A), test_lta_kernel!, A, B, C)
         KernelAbstractions.synchronize(arch)
 
         # Verify results
