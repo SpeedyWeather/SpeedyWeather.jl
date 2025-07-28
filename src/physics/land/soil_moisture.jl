@@ -154,8 +154,8 @@ export LandBucketMoisture
     "[OPTION] Fraction of top layer runoff that is put into layer below [1]"
     runoff_fraction::NF = 0.5
 
-    "[OPTION] Initial soil moisture, volume fraction [1]"#CPL much easier to discharge than to charge. Faster spin-up.
-    initial_moisture::NF = 1
+    "[OPTION] Initial soil moisture, volume fraction [1]"
+    initial_moisture::NF = 0
     
     "[OPTION] Apply land-sea mask to NaN ocean-only points?"
     mask::Bool = false

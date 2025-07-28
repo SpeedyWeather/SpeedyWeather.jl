@@ -88,10 +88,10 @@ $(TYPEDFIELDS)"""
     "[OPTION] Radiative forcing constant (W/m²/K²)"
     α::NF = 0.025
 
-    "[OPTION] Radiative forcing constant (W/m²/K²), surface flux over ocean, default: "
+    "[OPTION] Radiative forcing constant (W/m²/K²), surface flux over ocean, default: 3.1α"
     α_ocean::NF = 3.1α
 
-    "[OPTION] Radiative forcing constant (W/m²/K²), surface flux over land"
+    "[OPTION] Radiative forcing constant (W/m²/K²), surface flux over land, default: 4.6α"
     α_land::NF = 4.6α
 
     "Tropopause temperature [K]"
