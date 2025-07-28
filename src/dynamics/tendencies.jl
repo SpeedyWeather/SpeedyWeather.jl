@@ -575,7 +575,8 @@ with
 with `Fᵤ, Fᵥ` from `u_tend_grid`/`v_tend_grid` that are assumed to be alread
 set in `forcing!`. Set `div=false` for the BarotropicModel which doesn't
 require the divergence tendency."""
-function vorticity_flux_curldiv!(   diagn::DiagnosticVariables,
+function vorticity_flux_curldiv!(   
+                                    diagn::DiagnosticVariables,
                                     coriolis::AbstractCoriolis,
                                     geometry::Geometry,
                                     S::SpectralTransform;
@@ -586,36 +587,47 @@ function vorticity_flux_curldiv!(   diagn::DiagnosticVariables,
     (; coslat⁻¹) = geometry
 
     (; u_tend_grid, v_tend_grid) = diagn.tendencies     # already contains forcing
-    (; scratch_memory) = diagn.dynamics
     u = diagn.grid.u_grid                               # velocity
     v = diagn.grid.v_grid                               # velocity
     vor = diagn.grid.vor_grid                           # relative vorticity
+    (; whichring) = u.grid                              # precomputed ring indices
+    # Launch the kernel for vorticity flux calculation
+    arch = S.architecture
 
-    # precompute ring indices and check grids match
-    rings = eachring(u_tend_grid, v_tend_grid, u, v, vor)
-    @inbounds for k in eachlayer(u)
-        for (j, ring) in enumerate(rings)
-            coslat⁻¹j = coslat⁻¹[j]
-            f_j = f[j]
-            for ij in ring
-                ω = vor[ij, k] + f_j                   # absolute vorticity
-                u_tend_grid[ij, k] = (u_tend_grid[ij, k] + v[ij, k]*ω)*coslat⁻¹j
-                v_tend_grid[ij, k] = (v_tend_grid[ij, k] - u[ij, k]*ω)*coslat⁻¹j
-            end
-        end
-    end
-
+    launch!(arch, :ijk, size(u), _vorticity_flux_kernel!,
+            u_tend_grid, v_tend_grid, u, v, vor, f, coslat⁻¹, whichring)
+    synchronize(arch)
+    
     # divergence and curl of that u, v_tend vector for vor, div tendencies
     (; vor_tend, div_tend ) = diagn.tendencies
     u_tend = diagn.dynamics.a
     v_tend = diagn.dynamics.b
 
-    transform!(u_tend, u_tend_grid, scratch_memory, S)
-    transform!(v_tend, v_tend_grid, scratch_memory, S)
+    transform!(u_tend, u_tend_grid, S)
+    transform!(v_tend, v_tend_grid, S)
 
     curl!(vor_tend, u_tend, v_tend, S; add)                 # ∂ζ/∂t = ∇×(u_tend, v_tend)
     div && divergence!(div_tend, u_tend, v_tend, S; add)    # ∂D/∂t = ∇⋅(u_tend, v_tend)
     return nothing       
+end
+
+@kernel inbounds=true function _vorticity_flux_kernel!(
+    u_tend_grid, v_tend_grid, u, v, vor, @Const(f), @Const(coslat⁻¹), @Const(whichring)
+)
+    # Get indices
+    ij, k = @index(Global, NTuple)
+    j = whichring[ij]
+    
+    # Get the coriolis parameter and cosine latitude factor for this latitude
+    f_j = f[j]
+    coslat⁻¹j = coslat⁻¹[j]
+    
+    # Calculate absolute vorticity
+    ω = vor[ij, k] + f_j
+    
+    # Update tendencies
+    u_tend_grid[ij, k] = (u_tend_grid[ij, k] + v[ij, k] * ω) * coslat⁻¹j
+    v_tend_grid[ij, k] = (v_tend_grid[ij, k] - u[ij, k] * ω) * coslat⁻¹j
 end
 
 """

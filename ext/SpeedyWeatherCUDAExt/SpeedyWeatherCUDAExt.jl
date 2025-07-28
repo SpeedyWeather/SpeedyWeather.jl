@@ -16,6 +16,7 @@ LowerTriangularArrays.nonparametric_type(::Type{<:CuArray}) = CuArray
 
 array_type(::GPU) = CuArray
 array_type(::Type{<:GPU}) = CuArray
+array_type(::GPU, NF::Type, N::Int) = CuArray{NF, N, CUDA.DeviceMemory}
 
 compatible_array_types(::GPU) = (CuArray, CuDeviceArray)
 compatible_array_types(::Type{<:GPU}) = (CuArray, CuDeviceArray)
@@ -40,7 +41,6 @@ on_architecture(::GPU, a::StepRangeLen) = a
 @inline SpeedyWeather.convert_to_device(::GPU, args) = CUDA.cudaconvert(args)
 @inline SpeedyWeather.convert_to_device(::GPU, args::Tuple) = map(CUDA.cudaconvert, args)
 
-include("spectral_transform.jl")
 include("fourier.jl")
 include("legendre.jl")
 

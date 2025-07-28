@@ -177,3 +177,29 @@ function _legendre!(                        # GRID TO SPECTRAL
         end
     end
 end
+
+"""
+$(TYPEDSIGNATURES)
+Unscale by cosine of latitude on the fly.
+"""
+function unscale_coslat!(
+    g_north::AbstractArray{<:Complex, 3}, 
+    g_south::AbstractArray{<:Complex, 3}, 
+    coslat⁻¹::AbstractArray{<:Real, 1};
+    architecture::AbstractArchitecture = DEFAULT_ARCHITECTURE)
+
+    launch!(architecture, :array_3d, size(g_north), unscale_coslat_kernel!, 
+            g_north, g_south, coslat⁻¹)
+    synchronize(architecture)
+end 
+
+@kernel inbounds=true function unscale_coslat_kernel!(
+    g_north,
+    g_south,
+    @Const(coslat⁻¹),
+)
+    i, k, j = @index(Global, NTuple)
+    g_north[i, k, j] *= coslat⁻¹[j]
+    g_south[i, k, j] *= coslat⁻¹[j]
+end
+    
