@@ -97,7 +97,7 @@ end
 
 # eltype of a transform is the number format used within
 Base.eltype(S::SpectralTransform{NF}) where NF = NF
-array_type(S::SpectralTransform{NF, A}) where {NF, A} = A
+Architectures.array_type(S::SpectralTransform{NF, AR, AT}) where {NF, AR, AT} = AT
 
 """
 $(TYPEDSIGNATURES)
@@ -365,7 +365,7 @@ function SpectralTransform(
     # infer types for SpectralTransform
     NF = promote_type(real(eltype(field)), real(eltype(coeffs)))
     ArrayType = nonparametric_type(array_type(field))
-    ArrayType2 = nonparametric_type(LowerTriangularArrays.array_type(coeffs))
+    ArrayType2 = nonparametric_type(array_type(coeffs))
     @assert ArrayType == ArrayType2 "ArrayTypes of field ($_ArrayType1) and coeffs ($_ArrayType2) do not match."
 
     # get resolution
