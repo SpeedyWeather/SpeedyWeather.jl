@@ -21,7 +21,7 @@ struct FullGaussianGrid{A, V, W} <: AbstractFullGrid{A}
     whichring::W                # precomputed ring index for each grid point ij
 end
 
-nonparametric_type(::Type{<:FullGaussianGrid}) = FullGaussianGrid
+Architectures.nonparametric_type(::Type{<:FullGaussianGrid}) = FullGaussianGrid
 
 # FIELD
 const FullGaussianField{T, N} = Field{T, N, ArrayType, Grid} where {ArrayType, Grid<:FullGaussianGrid}

@@ -454,7 +454,8 @@ DimensionMismatchArray(a::AbstractArray, bs::AbstractArray...) =
     # Binary search for the ring that contains this latitude
     j = 1  # Default starting point
     
-    # Binary search is more efficient on GPU than linear search
+    # Binary search is more efficient than linear search as latd are sorted 
+    # and scales with log(N_lat) instead of N_lat 
     while j_low <= j_high
         j_mid = (j_low + j_high) ÷ 2
         

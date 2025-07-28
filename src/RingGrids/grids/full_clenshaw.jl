@@ -21,7 +21,7 @@ struct FullClenshawGrid{A, V, W} <: AbstractFullGrid{A}
 end
 
 # TYPES
-nonparametric_type(::Type{<:FullClenshawGrid}) = FullClenshawGrid
+Architectures.nonparametric_type(::Type{<:FullClenshawGrid}) = FullClenshawGrid
 
 # FIELD
 const FullClenshawField{T, N} = Field{T, N, ArrayType, Grid} where {ArrayType, Grid<:FullClenshawGrid}
