@@ -85,8 +85,14 @@ layer towards the tropopause temperature `T_t` with time scale `τ = 24h`
 Fields are
 $(TYPEDFIELDS)"""
 @kwdef struct JeevanjeeRadiation{NF} <: AbstractLongwave
-    "Radiative forcing constant (W/m²/K²)"
+    "[OPTION] Radiative forcing constant (W/m²/K²)"
     α::NF = 0.025
+
+    "[OPTION] Radiative forcing constant (W/m²/K²), surface flux over ocean, default: "
+    α_ocean::NF = 3.1α
+
+    "[OPTION] Radiative forcing constant (W/m²/K²), surface flux over land"
+    α_land::NF = 4.6α
 
     "Tropopause temperature [K]"
     temp_tropopause::NF = 200
@@ -115,7 +121,7 @@ function longwave_radiation!(
     (; nlayers, temp_tend) = column
     T = column.temp                 # to match Seeley, 2023 notation
     F = column.flux_temp_upward
-    (; α, time_scale) = scheme
+    (; α, α_ocean, α_land, time_scale) = scheme
     Tₜ = scheme.temp_tropopause
     
     (; skin_temperature_sea, skin_temperature_land, land_fraction) = column
@@ -123,12 +129,12 @@ function longwave_radiation!(
     # extension to Jeevanjee: Include temperature flux between surface and lowermost air temperature
     # but zero flux if land/sea not available
     Fₖ_ocean = isfinite(skin_temperature_sea) ?
-        (T[end] - skin_temperature_sea) * 3.1 * α * (Tₜ - skin_temperature_sea) : 
+        (T[end] - skin_temperature_sea) * α_ocean * (Tₜ - skin_temperature_sea) : 
         zero(skin_temperature_sea)
     column.surface_longwave_up_ocean = Fₖ_ocean
 
     Fₖ_land = isfinite(skin_temperature_land) ?
-        (T[end] - skin_temperature_land) * 4.6 * α * (Tₜ - skin_temperature_land) : 
+        (T[end] - skin_temperature_land) * α_land * (Tₜ - skin_temperature_land) : 
         zero(skin_temperature_land)
     column.surface_longwave_up_land = Fₖ_land
 
