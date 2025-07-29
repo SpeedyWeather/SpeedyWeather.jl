@@ -185,7 +185,7 @@ function set!(
     (; londs, latds, σ_levels_full) = geometry
     kernel_func = add ? (a,b) -> a+b : (a,b) -> b
 
-    launch!(architecture(var), :ijk, size(var), set_field_3d_kernel!, var, londs, latds, σ_levels_full, f, kernel_func)
+    launch!(architecture(var), RingGridWorkOrder, size(var), set_field_3d_kernel!, var, londs, latds, σ_levels_full, f, kernel_func)
     synchronize(architecture(var))
 
     return var

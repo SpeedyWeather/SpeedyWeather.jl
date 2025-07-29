@@ -70,7 +70,7 @@ function ScratchMemory(
     grid::AbstractGrid,
     nlayers::Integer) where NF
 
-    grid_type = RingGrids.nonparametric_type(grid)   # always use nonparametric concrete type
+    grid_type = nonparametric_type(grid)   # always use nonparametric concrete type
 
     # RESOLUTION PARAMETERS
     nlon_max = get_nlon_max(grid_type, grid.nlat_half)    # number of longitudes around the equator

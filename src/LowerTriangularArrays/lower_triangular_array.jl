@@ -750,13 +750,6 @@ LowerTriangularStyle{N, ArrayType, S}(::Val{M}) where {N, ArrayType, S, M} =
 LowerTriangularGPUStyle{N, ArrayType, S}(::Val{M}) where {N, ArrayType, S, M} =
     LowerTriangularGPUStyle{N, ArrayType, S}()
 
-# also needed for other array types
-nonparametric_type(::Type{<:Array}) = Array
-
-# nonparametric_type for a SubArray is the arraytype it is viewing. Needed to construct new arrays from SubArrays!
-nonparametric_type(::Type{<:SubArray{T, N, A}}) where {T, N, A} = nonparametric_type(A)
-nonparametric_type(::Type{<:SubArray}) = SubArray   # if ArrayType A is not specified, return SubArray
-
 "`L = find_L(Ls)` returns the first LowerTriangularArray among the arguments. 
 Adapted from Julia documentation of Broadcast interface"
 find_L(bc::Base.Broadcast.Broadcasted) = find_L(bc.args)

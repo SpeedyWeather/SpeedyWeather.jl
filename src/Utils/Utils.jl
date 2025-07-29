@@ -37,6 +37,8 @@ using DocStringExtensions
     include("utility_functions.jl")
 
     export configure_kernel, launch!
+    export AbstractWorkOrder, SpectralWorkOrder, RingGridWorkOrder, SpectralInnerWorkOrder
+    export DiagonalWorkOrder, Array3DWorkOrder, LinearWorkOrder
 
     include("kernel_launching.jl")
 

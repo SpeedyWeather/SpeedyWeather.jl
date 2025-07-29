@@ -190,7 +190,7 @@ function unscale_coslat!(
     coslat⁻¹::AbstractArray{<:Real, 1};
     architecture::AbstractArchitecture = DEFAULT_ARCHITECTURE)
 
-    launch!(architecture, :array_3d, size(g_north), unscale_coslat_kernel!, 
+    launch!(architecture, Array3DWorkOrder, size(g_north), unscale_coslat_kernel!, 
             g_north, g_south, coslat⁻¹)
     synchronize(architecture)
 end 

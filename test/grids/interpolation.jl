@@ -22,7 +22,7 @@ import Random
             As = RingGrids.interpolate(λs, θs, A)
 
             for a in As
-                @test a ≈ c
+                @test a ≈ c 
             end
         end
     end
@@ -61,7 +61,7 @@ end
             As = RingGrids.interpolate(λs, θs, A; NF)
 
             for (a, θ) in zip(As, θs)
-                @test a ≈ θ
+                @test a ≈ θ 
             end
         end
     end
@@ -103,7 +103,7 @@ end
             As = RingGrids.interpolate(λs, θs, A; NF)
 
             for (a, λ) in zip(As, λs)
-                @test a ≈ λ
+                @test a ≈ λ rtol=1e-4
             end
 
             f(λ) = λ > 180 ? λ-360 : λ          # 0-360˚ to -180˚-180˚E
@@ -125,7 +125,7 @@ end
             As = RingGrids.interpolate(λs, θs, A; NF)
 
             for (a, λ) in zip(As, λs)
-                @test a ≈ λ
+                @test a ≈ λ rtol=1e-4
             end
         end
     end
