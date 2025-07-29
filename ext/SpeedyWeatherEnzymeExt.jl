@@ -74,6 +74,7 @@ function reverse(config::EnzymeRules.RevConfigWidth{1}, func::Const{typeof(_four
     # no derivative wrt the f_north and f_south that were input because they are overwritten
     make_zero!(f_north.dval) 
     make_zero!(f_south.dval)
+    make_zero!(scratch_memory.dval.spec)
 
     # the function has no return values, so we also return nothing here
     return (nothing, nothing, nothing, nothing, nothing)
@@ -110,6 +111,7 @@ function reverse(config::EnzymeRules.RevConfigWidth{1}, func::Const{typeof(_four
 
     # no derivative wrt the grids that were input because they are overwritten
     make_zero!(grids.dval) 
+    make_zero!(scratch_memory.dval.grid)
 
     # the function has no return values, so we also return nothing here
     return (nothing, nothing, nothing, nothing, nothing)

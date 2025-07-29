@@ -110,9 +110,9 @@ function SpectralTransform(
     LegendreShortcut::Type{<:AbstractLegendreShortcut} = LegendreShortcutLinear,   # shorten Legendre loop over order m
     architecture::AbstractArchitecture = architecture(ArrayType), # architecture that kernels are launched 
 )
-    (; nlat_half) = grid    # number of latitude rings on one hemisphere incl equator
-    ArrayType_ = nonparametric_type(ArrayType)    # drop parameters of ArrayType
-    (; lmax, mmax) = spectrum                               # 1-based spectral truncation order and degree
+    (; nlat_half) = grid                            # number of latitude rings on one hemisphere incl equator
+    ArrayType_ = nonparametric_type(ArrayType)      # drop parameters of ArrayType
+    (; lmax, mmax) = spectrum                       # 1-based spectral truncation order and degree
 
     # RESOLUTION PARAMETERS
     nlat = get_nlat(grid)           # 2nlat_half but one less if grid has odd # of lat rings

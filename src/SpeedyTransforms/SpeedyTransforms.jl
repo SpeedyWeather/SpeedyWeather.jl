@@ -14,7 +14,7 @@ import KernelAbstractions: @kernel, @index, @Const, synchronize
 
 # SPEEDYWEATHER MODULES
 using ..Architectures: Architectures, AbstractArchitecture, CPU, GPU, 
-on_architecture, architecture, array_type, ismatching
+on_architecture, architecture, array_type, ismatching, nonparametric_type
 
 using ..Utils
 using ..LowerTriangularArrays
