@@ -594,7 +594,7 @@ function vorticity_flux_curldiv!(
     # Launch the kernel for vorticity flux calculation
     arch = S.architecture
 
-    launch!(arch, :ijk, size(u), _vorticity_flux_kernel!,
+    launch!(arch, RingGridWorkOrder, size(u), _vorticity_flux_kernel!,
             u_tend_grid, v_tend_grid, u, v, vor, f, coslat⁻¹, whichring)
     synchronize(arch)
     

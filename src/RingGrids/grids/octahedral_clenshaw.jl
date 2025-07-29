@@ -29,7 +29,7 @@ struct OctahedralClenshawGrid{A, V, W} <: AbstractReducedGrid{A}
 end
 
 # TYPES
-nonparametric_type(::Type{<:OctahedralClenshawGrid}) = OctahedralClenshawGrid
+Architectures.nonparametric_type(::Type{<:OctahedralClenshawGrid}) = OctahedralClenshawGrid
 full_grid_type(::Type{<:OctahedralClenshawGrid}) = FullClenshawGrid
 
 # FIELD

@@ -16,7 +16,7 @@ function Base.show(io::IO, S::SpectralTransform{NF, ArrayType}) where {NF, Array
     (; spectrum, grid, nlayers, architecture) = S
     (; lmax, mmax) = spectrum   # 1-based max degree/order of harmonics
     (; nlat_half) = grid
-    Grid = RingGrids.nonparametric_type(grid)
+    Grid = nonparametric_type(grid)
 
     # add information about size of Legendre polynomials and scratch memory
     polysize_str = prettymemory(Base.summarysize(S.legendre_polynomials))

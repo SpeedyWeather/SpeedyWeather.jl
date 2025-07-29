@@ -97,7 +97,7 @@ end
 
 # eltype of a transform is the number format used within
 Base.eltype(S::SpectralTransform{NF}) where NF = NF
-array_type(S::SpectralTransform{NF, A}) where {NF, A} = A
+Architectures.array_type(S::SpectralTransform{NF, AR, AT}) where {NF, AR, AT} = AT
 
 """
 $(TYPEDSIGNATURES)
@@ -115,7 +115,7 @@ function SpectralTransform(
     architecture::AbstractArchitecture = architecture(ArrayType), # architecture that kernels are launched 
 )
     (; nlat_half) = grid    # number of latitude rings on one hemisphere incl equator
-    ArrayType_ = RingGrids.nonparametric_type(ArrayType)    # drop parameters of ArrayType
+    ArrayType_ = nonparametric_type(ArrayType)    # drop parameters of ArrayType
     (; lmax, mmax) = spectrum                               # 1-based spectral truncation order and degree
 
     # RESOLUTION PARAMETERS
@@ -364,8 +364,8 @@ function SpectralTransform(
 ) 
     # infer types for SpectralTransform
     NF = promote_type(real(eltype(field)), real(eltype(coeffs)))
-    ArrayType = RingGrids.nonparametric_type(RingGrids.array_type(field))
-    ArrayType2 = LowerTriangularArrays.nonparametric_type(LowerTriangularArrays.array_type(coeffs))
+    ArrayType = nonparametric_type(array_type(field))
+    ArrayType2 = nonparametric_type(array_type(coeffs))
     @assert ArrayType == ArrayType2 "ArrayTypes of field ($_ArrayType1) and coeffs ($_ArrayType2) do not match."
 
     # get resolution
@@ -414,8 +414,8 @@ end
 
 function Base.DimensionMismatch(S::SpectralTransform, F::AbstractField)
     sz = (RingGrids.get_npoints(S.grid), S.nlayers)
-    Grid = RingGrids.nonparametric_type(S.grid)
-    Grid2 = RingGrids.nonparametric_type(F.grid)
+    Grid = nonparametric_type(S.grid)
+    Grid2 = nonparametric_type(F.grid)
     s = "SpectralTransform for $(Base.dims2string(sz)) $Grid with "*
         "$(Base.dims2string(size(F))) field on $Grid2 do not match."
     return DimensionMismatch(s)

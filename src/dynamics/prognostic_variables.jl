@@ -194,7 +194,7 @@ function Base.show(
     (; spectrum, grid, nlayers, nlayers_soil, nparticles, nsteps) = progn
 
     trunc = truncation(spectrum)
-    Grid = RingGrids.nonparametric_type(GridType)
+    Grid = nonparametric_type(GridType)
     nlat = RingGrids.get_nlat(grid)
     
     tracer_names = [key for (key, value) in progn.tracers]
