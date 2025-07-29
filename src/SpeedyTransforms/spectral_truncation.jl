@@ -87,7 +87,7 @@ function spectral_truncation(
     (ltrunc > lmax || mtrunc > mmax) && return spectral_interpolation(NF, alms, ltrunc, mtrunc)
 
     # preallocate new (smaller) array
-    ArrayType_ = LowerTriangularArrays.nonparametric_type(ArrayType)
+    ArrayType_ = nonparametric_type(ArrayType)
     alms_trunc = zeros(LowerTriangularArray{NF, N, ArrayType_{NF, N}, S}, Spectrum(ltrunc+1, mtrunc+1), k...)  
 
     # copy data over, copyto! copies the largest matching subset of harmonics
@@ -117,7 +117,7 @@ function spectral_interpolation(
     (ltrunc <= lmax && mtrunc <= mmax) && return spectral_truncation(NF, alms, ltrunc, mtrunc)
 
     # preallocate new (larger) array
-    ArrayType_ = LowerTriangularArrays.nonparametric_type(ArrayType)
+    ArrayType_ = nonparametric_type(ArrayType)
     alms_interp = zeros(LowerTriangularArray{NF, N, ArrayType_{NF, N}, S}, Spectrum(ltrunc+1, mtrunc+1), k...)  
 
     # copy data over, copyto! copies the largest matching subset of harmonics

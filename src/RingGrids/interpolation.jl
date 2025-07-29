@@ -11,7 +11,7 @@ struct GridGeometry{
 
     nlat_half::Int              # number of latitude rings on one hemisphere (Eq. incl)
     nlat::Int                   # total number of latitude rings
-    npoints::Int          # total number of grid points
+    npoints::Int                # total number of grid points
     londs::VectorType           # longitudes of every grid point 0˚ to 360˚E
     latd::VectorType            # latitude of each ring, incl north pole 90˚N, ..., south pole -90˚N
 
@@ -239,7 +239,7 @@ function interpolate(
     I::AbstractInterpolator;    # indices in I are assumed to be calculated already!
     kwargs...
 ) where NF
-    (; npoints_output) = I.locator                                         # number of points to interpolate onto
+    (; npoints_output) = I.locator                                      # number of points to interpolate onto
     Aout = array_type(architecture(A), NF, 1)(undef, npoints_output)    # preallocate: onto θs, λs interpolated values of A
     _interpolate!(Aout, A.data, I, architecture(A)) # perform interpolation, store in Aout
 end
@@ -269,7 +269,7 @@ function _interpolate!(
     @boundscheck extrema_in(ij_ds, -1, npoints) || throw(BoundsError)
 
     launch!(architecture,
-    :linear,
+    LinearWorkOrder,
     (npoints_output,),
     _interpolate_kernel!,
         Aout,
@@ -311,16 +311,7 @@ end
     Aout[k] = anvil_average(a, b, c, d, Δabs[k], Δcds[k], Δys[k])
 end
 
-# version for 2D field and vector
-function interpolate!(
-    Aout::AbstractVector,      # Out: points to interpolate onto
-    A::AbstractField2D,         # In: field to interpolate from
-    interpolator::AbstractInterpolator,
-)
-    _interpolate!(Aout, A.data, interpolator, architecture(A))  # use .data to trigger dispatch for method above
-end
-
-# version for 2D field and vector
+# version for 2D fields
 function interpolate!(
     Aout::AbstractField,
     A::AbstractField2D,
@@ -329,6 +320,15 @@ function interpolate!(
     fields_match(Aout, A) && return copyto!(Aout.data, A.data)
     @assert ismatching(architecture(A), Aout) "Interpolation is only supported between fields on the same architecture, got $(architecture(A)) and )"
     _interpolate!(Aout.data, A.data, interpolator, architecture(A))
+end
+
+# version for 2D field and vector
+function interpolate!(
+    Aout::AbstractVector,      # Out: points to interpolate onto
+    A::AbstractField2D,         # In: field to interpolate from
+    interpolator::AbstractInterpolator,
+)
+    _interpolate!(Aout, A.data, interpolator, architecture(A))  # use .data to trigger dispatch for method above
 end
 
 # version for 3D+ fields
@@ -418,7 +418,7 @@ function find_rings!(   js::AbstractVector{<:Integer},  # Out: ring indices j
         #TODO: as we only allow instances of Field to be the original grid, the latitudes below 
         #TODO: should be okay anyway. Checking it on GPU is a bit more annoying...
 
-        #@assert isdecreasing(latd) "Latitudes latd are expected to be strictly decreasing."
+        @assert isdecreasing(latd) "Latitudes latd are expected to be strictly decreasing."
         #@assert latd[1] == 90 "Latitudes latd are expected to contain 90˚N, the north pole."
 
         # Hack: for intervals between rings to be one-sided open [j, j+1) the last element in
@@ -454,7 +454,8 @@ DimensionMismatchArray(a::AbstractArray, bs::AbstractArray...) =
     # Binary search for the ring that contains this latitude
     j = 1  # Default starting point
     
-    # Binary search is more efficient on GPU than linear search
+    # Binary search is more efficient than linear search as latd are sorted 
+    # and scales with log(N_lat) instead of N_lat 
     while j_low <= j_high
         j_mid = (j_low + j_high) ÷ 2
         
@@ -485,7 +486,7 @@ function find_rings_unsafe!(js::AbstractArray{<:Integer},  # Out: vector of ring
         
     launch!(
         architecture,
-        :linear,
+        LinearWorkOrder,
         size(js),
         find_rings_kernel!,
         js,
@@ -561,7 +562,7 @@ function find_grid_indices!(I::AnvilInterpolator,       # update indices arrays
     
     launch!(
         architecture,
-        :linear,
+        LinearWorkOrder,
         size(js),
         find_grid_indices_kernel!,
         js,
@@ -599,7 +600,7 @@ Computes the average at the North and South pole from a given grid `A` and it's 
 ring indices `rings`. The North pole average is an equally weighted average of all grid points
 on the northern-most ring. Similar for the South pole."""
 @inline function average_on_poles(A::AbstractVector{NF}, rings) where {NF<:AbstractFloat} 
-    # TODO: doing the computation below with views causes scalarindexing on GPUs
+    # TODO: doing the computation below causes allocations, doing it with views causes scalarindexing on GPU
     A_northpole = mean(A[rings[1]])     # average of all grid points around the north pole
     A_southpole = mean(A[rings[end]])   # same for south pole
     return A_northpole, A_southpole
@@ -610,7 +611,7 @@ $(TYPEDSIGNATURES)
 Method for `A::Abstract{T<:Integer}` which rounds the averaged values
 to return the same number format `NF`."""
 @inline function average_on_poles(A::AbstractVector{NF}, rings) where {NF<:Integer}
-    # TODO: doing the computation below with views causes scalarindexing on GPUs
+    # TODO: doing the computation below causes allocations, doing it with views causes scalarindexing on GPU
     A_northpole = mean(A[rings[1]])    # average of all grid points around the north pole
     A_southpole = mean(A[rings[end]])  # same for south pole
     return round(NF, A_northpole), round(NF, A_southpole)

@@ -26,7 +26,7 @@ Field(::Type{T}, grid::AbstractGrid, k...) where T = zeros(T, grid, k...)
 (::Type{<:Field{T}})(data::AbstractArray, grid::AbstractGrid) where T = Field(T.(data), grid)
 
 # TYPES
-nonparametric_type(::Type{<:Field}) = Field
+Architectures.nonparametric_type(::Type{<:Field}) = Field
 grid_type(field::AbstractField) = grid_type(typeof(field))
 grid_type(::Type{Field{T, N, A, G}}) where {T, N, A, G} = G
 field_type(field::AbstractField) = typeof(field)

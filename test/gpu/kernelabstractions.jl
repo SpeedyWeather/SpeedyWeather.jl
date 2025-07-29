@@ -1,5 +1,5 @@
 using KernelAbstractions
-import SpeedyWeather: on_architecture, CPU, launch!
+import SpeedyWeather: on_architecture, CPU, launch!, SpectralWorkOrder, RingGridWorkOrder, LinearWorkOrder
 @testset "KernelAbstractions tests" begin 
 
     # To-Do write tests for each type of dims_type in the kernel launching util, 
@@ -31,7 +31,7 @@ import SpeedyWeather: on_architecture, CPU, launch!
         expected = B .* C
 
         # Run the kernel
-        launch!(arch, :lmk, size(A), test_lta_kernel!, A, B, C)
+        launch!(arch, SpectralWorkOrder, size(A), test_lta_kernel!, A, B, C)
         synchronize(arch)
 
         # Verify results
@@ -61,7 +61,7 @@ import SpeedyWeather: on_architecture, CPU, launch!
         expected = B .* C
 
         # Run the kernel
-        launch!(arch, :ijk, size(A), test_ringgrids_kernel!, A, B, C)
+        launch!(arch, RingGridWorkOrder, size(A), test_ringgrids_kernel!, A, B, C)
         synchronize(arch)
 
         # Verify results
@@ -90,7 +90,7 @@ import SpeedyWeather: on_architecture, CPU, launch!
         expected = B .* C
 
         # Run the kernel
-        launch!(arch, :linear, (npoints,), test_linear_kernel!, A, B, C)
+        launch!(arch, LinearWorkOrder, (npoints,), test_linear_kernel!, A, B, C)
         synchronize(arch)
 
         # Verify results

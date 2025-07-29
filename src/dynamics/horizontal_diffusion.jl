@@ -146,7 +146,7 @@ function horizontal_diffusion!(
     @boundscheck lmax <= size(expl, 1) == size(impl, 1) || throw(BoundsError)
     @boundscheck nlayers <= size(expl, 2) == size(impl, 2) || throw(BoundsError)
 
-    launch!(architecture(tendency), :lmk, size(tendency), _horizontal_diffusion_kernel!, 
+    launch!(architecture(tendency), SpectralWorkOrder, size(tendency), _horizontal_diffusion_kernel!, 
             tendency, var, expl, impl)
     synchronize(architecture(tendency))
 

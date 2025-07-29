@@ -11,7 +11,7 @@ struct FullHEALPixGrid{A, V, W} <: AbstractFullGrid{A}
     whichring::W        # precomputed ring index for each grid point ij
 end
 
-nonparametric_type(::Type{<:FullHEALPixGrid}) = FullHEALPixGrid
+Architectures.nonparametric_type(::Type{<:FullHEALPixGrid}) = FullHEALPixGrid
 
 # FIELD
 const FullHEALPixField{T, N} = Field{T, N, ArrayType, Grid} where {ArrayType, Grid<:FullHEALPixGrid}
