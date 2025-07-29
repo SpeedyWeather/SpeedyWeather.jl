@@ -1,3 +1,5 @@
+# KernelAbstractions implementation of Legendre transform used only on GPU 
+
 import SpeedyWeather.LowerTriangularArrays: lm2i, get_lm_range, get_2lm_range
 import Atomix 
 
@@ -89,7 +91,7 @@ function _legendre!(
     # Launch the kernel with the specified configuration
     launch!(
         S.architecture,
-        :linear,
+        LinearWorkOrder,
         (S.jm_index_size*nlayers,),
         inverse_legendre_kernel!,
         g_north,
@@ -194,7 +196,7 @@ function _legendre!(                        # GRID TO SPECTRAL
 
     launch!(
         S.architecture,
-        :linear,
+        LinearWorkOrder,
         (S.jm_index_size*nlayers,),
         forward_legendre_kernel!,
         specs_reinterpret,
