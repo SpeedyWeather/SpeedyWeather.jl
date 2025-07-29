@@ -123,6 +123,9 @@ function initialize!(ocean::SeasonalOceanClimatology, model::PrimitiveEquation)
     sst = ocean.file_Grid(ncfile[ocean.varname].var[:, :, :], input_as=Matrix)
     sst[sst .=== fill_value] .= ocean.missing_value      # === to include NaN
 
+    # transfer to architecture of model if needed 
+    sst = on_architecture(model.architecture, sst)
+
     @boundscheck fields_match(monthly_temperature, sst, vertical_only=true) ||
         throw(DimensionMismatch(monthly_temperature, sst))
 

@@ -44,6 +44,7 @@ function initialize!(land::SeasonalLandTemperature, model::PrimitiveEquation)
     fill_value = ncfile[land.varname].attrib["_FillValue"]
     lst = land.file_Grid(ncfile[land.varname].var[:, :, :], input_as=Matrix)
     lst[lst .=== fill_value] .= land.missing_value      # === to include NaN
+    lst = on_architecture(model.architecture, lst)
     
     @boundscheck fields_match(monthly_temperature, lst, vertical_only=true) ||
         throw(DimensionMismatch(monthly_temperature, lst))

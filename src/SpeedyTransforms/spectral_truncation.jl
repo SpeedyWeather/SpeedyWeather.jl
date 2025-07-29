@@ -168,7 +168,7 @@ function spectral_smoothing!(
     eigenvalue_norm = truncation == -1 ? -mmax*(mmax+1) : -truncation*(truncation+1)
     
     # Launch kernel
-    launch!(architecture(L), :lmk, size(L), spectral_smoothing_kernel!, 
+    launch!(architecture(L), SpectralWorkOrder, size(L), spectral_smoothing_kernel!, 
             L, c, power, eigenvalue_norm, L.spectrum.l_indices)
     synchronize(architecture(L))
 end
