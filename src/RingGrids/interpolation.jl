@@ -600,7 +600,7 @@ Computes the average at the North and South pole from a given grid `A` and it's 
 ring indices `rings`. The North pole average is an equally weighted average of all grid points
 on the northern-most ring. Similar for the South pole."""
 @inline function average_on_poles(A::AbstractVector{NF}, rings) where {NF<:AbstractFloat} 
-    # TODO: doing the computation below with views causes scalarindexing on GPUs
+    # TODO: doing the computation below causes allocations, doing it with views causes scalarindexing on GPU
     A_northpole = mean(A[rings[1]])     # average of all grid points around the north pole
     A_southpole = mean(A[rings[end]])   # same for south pole
     return A_northpole, A_southpole
@@ -611,7 +611,7 @@ $(TYPEDSIGNATURES)
 Method for `A::Abstract{T<:Integer}` which rounds the averaged values
 to return the same number format `NF`."""
 @inline function average_on_poles(A::AbstractVector{NF}, rings) where {NF<:Integer}
-    # TODO: doing the computation below with views causes scalarindexing on GPUs
+    # TODO: doing the computation below causes allocations, doing it with views causes scalarindexing on GPU
     A_northpole = mean(A[rings[1]])    # average of all grid points around the north pole
     A_southpole = mean(A[rings[end]])  # same for south pole
     return round(NF, A_northpole), round(NF, A_southpole)
