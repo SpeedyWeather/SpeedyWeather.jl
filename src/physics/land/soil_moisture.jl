@@ -160,13 +160,10 @@ export LandBucketMoisture
     "[OPTION] Apply land-sea mask to NaN ocean-only points?"
     mask::Bool = false
 
-    "[DERIVED] Field capacity per meter soil, set at initialize from land.thermodynamics [1/m]"
-    field_capacity::Base.RefValue{NF} = Ref(zero(NF))
-
-    "[DERIVED] Field capacity [1], top layer, f = γz, set at initialize from by land.thermodynamics and .geometry"
+    "[DERIVED] Water at field capacity [m], top layer, f = γz, set at initialize from by land.thermodynamics and .geometry"
     f₁::Base.RefValue{NF} = Ref(zero(NF))
 
-    "[DERIVED] Field capacity [1], lower layer, f = γz, set at initialize from by land.thermodynamics and .geometry"
+    "[DERIVED] Water at field capacity [m], lower layer, f = γz, set at initialize from by land.thermodynamics and .geometry"
     f₂::Base.RefValue{NF} = Ref(zero(NF))
 end
 
@@ -174,15 +171,14 @@ LandBucketMoisture(SG::SpectralGrid; kwargs...) = LandBucketMoisture{SG.NF}(; kw
 function initialize!(soil::LandBucketMoisture, model::PrimitiveEquation)
     (; nlayers_soil) = model.spectral_grid
     @assert nlayers_soil == 2 "LandBucketMoisture only works with 2 soil layers "*
-        "but spectral_grid.nlayers_soil = $nlayers_soil given. Ignoring additional layers."
-
+    "but spectral_grid.nlayers_soil = $nlayers_soil given. Ignoring additional layers."
+    
     # set the field capacity given layer thickness and 
     γ = model.land.thermodynamics.field_capacity
     z₁ = model.land.geometry.layer_thickness[1]
     z₂ = model.land.geometry.layer_thickness[2]
-    soil.field_capacity[] = γ   # per meter soil [1/m]
-    soil.f₁[] = γ*z₁            # field capacity of first layer [1]
-    soil.f₂[] = γ*z₂            # field capacity of second layer [1]
+    soil.f₁[] = γ*z₁    # amount of water at field capacity in first layer [m]
+    soil.f₂[] = γ*z₂    # amount of water at field capacity in second layer [m]
 
     return nothing
 end
@@ -234,7 +230,6 @@ function timestep!(
     @boundscheck fields_match(soil_moisture, Pconv, Plsc, E, R, horizontal_only=true) ||
         throw(DimensionMismatch(soil_moisture, Pconv))
     @boundscheck size(soil_moisture, 2) == 2 || throw(DimensionMismatch)
-    W_cap = soil.field_capacity[]   # also called γ in MITgcm documentation, W_cap in Fortran SPEEDY Eq. 51
     f₁, f₂ = soil.f₁[], soil.f₂[]
     p = soil.runoff_fraction        # fraction of top layer runoff put into lower layer
     τ⁻¹ = inv(convert(eltype(soil_moisture), Second(soil.time_scale).value))
@@ -256,14 +251,14 @@ function timestep!(
             soil_moisture[ij, 2] += Δt*f₁_f₂*D
 
             # river runoff
-            W₁ = soil_moisture[ij, 1]
-            δW₁ = W₁ - min(W₁, W_cap)           # excess moisture in top layer, cap at field capacity
+            W₁ = soil_moisture[ij, 1]           # wrt to field capacity so maximum is 1
+            δW₁ = W₁ - min(W₁, 1)               # excess moisture in top layer, cap at field capacity
             soil_moisture[ij, 1] -= δW₁         # remove excess from top layer
             soil_moisture[ij, 2] += p*δW₁*f₁_f₂ # add fraction to lower layer
             R[ij] += Δt*(1-p)*δW₁*f₁            # accumulate river runoff [m] of top layer
 
             # remove excess water from lower layer (this disappears)
-            soil_moisture[ij, 2] = min(soil_moisture[ij, 2], W_cap)
+            soil_moisture[ij, 2] = min(soil_moisture[ij, 2], 1)
         end
     end
 end
