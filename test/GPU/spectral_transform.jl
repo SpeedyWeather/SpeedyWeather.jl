@@ -128,6 +128,7 @@ end
                         S_cpu.scratch_memory.north, 
                         S_cpu.scratch_memory.south, 
                         grid_cpu, 
+                        S_cpu.scratch_memory.column,
                         S_cpu
                     )
                     # GPU forward transform
@@ -135,6 +136,7 @@ end
                         S_gpu.scratch_memory.north, 
                         S_gpu.scratch_memory.south, 
                         grid_gpu, 
+                        S_gpu.scratch_memory.column,
                         S_gpu
                     )
 
@@ -178,11 +180,11 @@ end
 
                     # CPU inverse transform
                     SpeedyTransforms._fourier_batched!(
-                        grid_cpu, g_north_cpu, g_south_cpu, S_cpu
+                        grid_cpu, g_north_cpu, g_south_cpu, S_cpu.scratch_memory.column, S_cpu
                     )
                     # GPU inverse transform
                     SpeedyTransforms._fourier_batched!(
-                        grid_gpu, g_north_gpu, g_south_gpu, S_gpu
+                        grid_gpu, g_north_gpu, g_south_gpu, S_gpu.scratch_memory.column, S_gpu
                     )
 
                     # Copy back to CPU again for comparison
@@ -218,6 +220,7 @@ end
                         S_cpu.scratch_memory.north, 
                         S_cpu.scratch_memory.south, 
                         grid_cpu, 
+                        S_cpu.scratch_memory.column,
                         S_cpu
                     )
                     # GPU forward transform
@@ -225,6 +228,7 @@ end
                         S_gpu.scratch_memory.north, 
                         S_gpu.scratch_memory.south, 
                         grid_gpu, 
+                        S_gpu.scratch_memory.column,
                         S_gpu
                     )
 
@@ -295,13 +299,13 @@ end
                     SpeedyTransforms._legendre!(
                         S_cpu.scratch_memory.north, 
                         S_cpu.scratch_memory.south, 
-                        spec_cpu, S_cpu
+                        spec_cpu, S_cpu.scratch_memory.column, S_cpu
                     )
                     # GPU inverse transform
                     SpeedyTransforms._legendre!(
                         S_gpu.scratch_memory.north, 
                         S_gpu.scratch_memory.south, 
-                        spec_gpu, S_gpu
+                        spec_gpu, S_gpu.scratch_memory.column, S_gpu
                     )
 
                     # Convert GPU to CPU for comparison, result is stored in the 
@@ -345,7 +349,8 @@ end
                     SpeedyTransforms._legendre!(
                         spec_cpu,    
                         f_north_cpu, 
-                        f_south_cpu, 
+                        f_south_cpu,
+                        S_cpu.scratch_memory.column,
                         S_cpu
                     )
                     # GPU inverse transform
@@ -353,6 +358,7 @@ end
                         spec_gpu,
                         f_north_gpu, 
                         f_south_gpu, 
+                        S_gpu.scratch_memory.column,
                         S_gpu
                     )
 
