@@ -28,7 +28,7 @@ struct OctahedralGaussianGrid{A, V, W} <: AbstractReducedGrid{A}
 end
 
 # TYPES
-nonparametric_type(::Type{<:OctahedralGaussianGrid}) = OctahedralGaussianGrid
+Architectures.nonparametric_type(::Type{<:OctahedralGaussianGrid}) = OctahedralGaussianGrid
 full_grid_type(::Type{<:OctahedralGaussianGrid}) = FullGaussianGrid
 
 # FIELD

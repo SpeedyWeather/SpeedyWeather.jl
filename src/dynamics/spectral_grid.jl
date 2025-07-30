@@ -112,7 +112,7 @@ function Base.show(io::IO, SG::SpectralGrid)
     (; NF, trunc, grid, radius, nlat, npoints, nlayers, nlayers_soil) = SG
     (; architecture, ArrayType) = SG
     (; nparticles) = SG
-    Grid = RingGrids.nonparametric_type(grid)
+    Grid = nonparametric_type(grid)
 
     # resolution information
     average_resolution = sqrt(4π*radius^2/npoints)/1000  # in [km]

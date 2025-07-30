@@ -12,9 +12,12 @@ export rotate, rotate!
 
 import Adapt: Adapt, adapt, adapt_structure
 import GPUArrays
-import KernelAbstractions
-import ..Architectures: Architectures, AbstractArchitecture, on_architecture, array_type, 
-    ismatching, CPU, GPU, architecture
+import KernelAbstractions: KernelAbstractions, @kernel, @index, @Const, synchronize
+
+# SPEEDYWEATHER SUBMODULES
+import ..Architectures: Architectures, AbstractArchitecture, CPU, GPU, 
+        on_architecture, architecture, array_type, ismatching, nonparametric_type
+using ..Utils
 
 # ABSTRACT GRIDS
 export  AbstractGrid,
@@ -107,7 +110,7 @@ export  interpolate,
 export zonal_mean
 
 # CONSTANTS
-const DEFAULT_NF = Float64
+const DEFAULT_NF = Float32
 const DEFAULT_ARRAYTYPE = Array
 const DEFAULT_ARCHITECTURE = CPU
 
