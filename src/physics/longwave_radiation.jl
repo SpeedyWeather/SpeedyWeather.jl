@@ -88,12 +88,6 @@ $(TYPEDFIELDS)"""
     "[OPTION] Radiative forcing constant (W/m²/K²)"
     α::NF = 0.025
 
-    "[OPTION] Radiative forcing constant (W/m²/K²), surface flux over ocean, default: 3.1α"
-    α_ocean::NF = 3.1α
-
-    "[OPTION] Radiative forcing constant (W/m²/K²), surface flux over land, default: 4.6α"
-    α_land::NF = 4.6α
-
     "Tropopause temperature [K]"
     temp_tropopause::NF = 200
 
@@ -122,13 +116,14 @@ function longwave_radiation!(
     (; nlayers, temp_tend) = column
     T = column.temp                 # to match Seeley, 2023 notation
     F = column.flux_temp_upward
-    (; α, α_ocean, α_land, time_scale) = scheme
+    (; α, time_scale) = scheme
     σ = atmosphere.stefan_boltzmann
     Tₜ = scheme.temp_tropopause
     
     (; skin_temperature_sea, skin_temperature_land, land_fraction) = column
 
-    # extension to Jeevanjee: Include temperature flux between surface and lowermost air temperature
+    # extension to Jeevanjee: Include temperature flux (Stefan-Boltzmann)
+    # between surface and lowermost air temperature
     # but zero flux if land/sea not available
     Fₖ_ocean = isfinite(skin_temperature_sea) ?
         σ*skin_temperature_sea^4 : 
