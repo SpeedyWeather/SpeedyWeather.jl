@@ -110,11 +110,12 @@ function longwave_radiation!(
     scheme::JeevanjeeRadiation,
     model::PrimitiveEquation,
 )
-    longwave_radiation!(column, scheme)
+    longwave_radiation!(column, model.atmosphere, scheme)
 end
 
 function longwave_radiation!(
     column::ColumnVariables{NF},
+    atmosphere::AbstractAtmosphere,
     scheme::JeevanjeeRadiation,
 ) where NF
 
@@ -122,6 +123,7 @@ function longwave_radiation!(
     T = column.temp                 # to match Seeley, 2023 notation
     F = column.flux_temp_upward
     (; α, α_ocean, α_land, time_scale) = scheme
+    σ = atmosphere.stefan_boltzmann
     Tₜ = scheme.temp_tropopause
     
     (; skin_temperature_sea, skin_temperature_land, land_fraction) = column
@@ -129,12 +131,12 @@ function longwave_radiation!(
     # extension to Jeevanjee: Include temperature flux between surface and lowermost air temperature
     # but zero flux if land/sea not available
     Fₖ_ocean = isfinite(skin_temperature_sea) ?
-        (T[end] - skin_temperature_sea) * α_ocean * (Tₜ - skin_temperature_sea) : 
+        σ*skin_temperature_sea^4 : 
         zero(skin_temperature_sea)
     column.surface_longwave_up_ocean = Fₖ_ocean
 
     Fₖ_land = isfinite(skin_temperature_land) ?
-        (T[end] - skin_temperature_land) * α_land * (Tₜ - skin_temperature_land) : 
+        σ*skin_temperature_land^4 : 
         zero(skin_temperature_land)
     column.surface_longwave_up_land = Fₖ_land
 
