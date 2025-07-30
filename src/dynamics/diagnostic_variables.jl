@@ -11,7 +11,7 @@ function Base.show(io::IO, A::AbstractDiagnosticVariables)
         if T <: AbstractField
             NF = first_parameter(T)
             nlat = RingGrids.get_nlat(val)
-            Grid = RingGrids.nonparametric_type(T)
+            Grid = nonparametric_type(T)
             s = Base.dims2string(size(val))*", $nlat-ring $Grid{$NF}"
         elseif T <: LowerTriangularArray
             NF = first_parameter(T)
@@ -427,7 +427,7 @@ function ParticleVariables(SG::SpectralGrid)
     (; architecture, nparticles, NF, ArrayType) = SG
     (; ParticleVector) = SG
     VectorNF = array_type(architecture, NF, 1)
-    interpolator = RingGrids.AnvilInterpolator(SG.grid, nparticles; NF, ArrayType)
+    interpolator = RingGrids.AnvilInterpolator(SG.grid, nparticles; NF)
     return ParticleVariables{NF,ArrayType, ParticleVector, VectorNF, typeof(interpolator)}(;
             nparticles, interpolator)
 end
@@ -548,7 +548,7 @@ function Base.show(
     (; spectrum, nlayers, nparticles) = diagn
     grid = diagn.grid_used   # TODO grid is used by 'GridVariables'
     nlat = RingGrids.get_nlat(grid)
-    Grid = RingGrids.nonparametric_type(grid)
+    Grid = nonparametric_type(grid)
 
     ntracers = length(diagn.grid.tracers_grid)
     println(io, "├ spectrum: T$(truncation(spectrum)), $nlayers layers, $ntracers tracers")

@@ -5,7 +5,7 @@ module Architectures
     export AbstractArchitecture
     export CPU, CPUStatic, GPU, CUDAGPU
     export array_type, on_architecture, architecture, device
-    export convert_to_device, ismatching, compatible_array_types
+    export convert_to_device, ismatching, compatible_array_types, nonparametric_type
     export synchronize 
     
     """
@@ -99,10 +99,22 @@ module Architectures
     """
     compatible_array_types(arch::Type{<:AbstractArchitecture}) = (array_type(arch),) # fallback to array_type
     compatible_array_types(arch::AbstractArchitecture) = (array_type(arch),) # fallback to array_type
-
+    
     ismatching(arch::Type{<:AbstractArchitecture}, array_T::Type{<:AbstractArray}) = any(arch_array -> array_T <: arch_array, compatible_array_types(arch))
     ismatching(arch::AbstractArchitecture, array_T::Type{<:AbstractArray}) = ismatching(typeof(arch), array_T)
     ismatching(arch::AbstractArchitecture, array::AbstractArray) = ismatching(arch, typeof(array))
+
+
+    """
+        nonparametric_type(array_T::Type{<:AbstractArray})
+
+    Strip away all the parameters of `array_T` and return the nonparametric type.
+    """
+    nonparametric_type(::Type{<:Array}) = Array
+    
+    # nonparametric_type for a SubArray is the arraytype it is viewing. Needed to construct new arrays from SubArrays!
+    nonparametric_type(::Type{<:SubArray{T, N, A}}) where {T, N, A} = nonparametric_type(A)
+    nonparametric_type(::Type{<:SubArray}) = SubArray   # if ArrayType A is not specified, return SubArray
 
     # Fallback
     """

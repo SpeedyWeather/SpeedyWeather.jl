@@ -26,7 +26,7 @@ Field(::Type{T}, grid::AbstractGrid, k...) where T = zeros(T, grid, k...)
 (::Type{<:Field{T}})(data::AbstractArray, grid::AbstractGrid) where T = Field(T.(data), grid)
 
 # TYPES
-nonparametric_type(::Type{<:Field}) = Field
+Architectures.nonparametric_type(::Type{<:Field}) = Field
 grid_type(field::AbstractField) = grid_type(typeof(field))
 grid_type(::Type{Field{T, N, A, G}}) where {T, N, A, G} = G
 field_type(field::AbstractField) = typeof(field)
@@ -35,8 +35,9 @@ field_type(grid::AbstractGrid) = field_type(typeof(grid))
 field_type(::Type{G}) where {G<:AbstractGrid} = Field{T, N, A, G} where {T, N, A}
 full_grid_type(field::AbstractField) = full_grid_type(typeof(field.grid))
 full_grid_type(::Type{F}) where {F<:AbstractField} = full_grid_type(grid_type(F))
-array_type(::Type{Field{T, N, A, G}}) where {T, N, A, G} = A
-array_type(field::AbstractField) = array_type(typeof(field))
+Architectures.array_type(::Type{Field{T, N, A, G}}) where {T, N, A, G} = A
+Architectures.array_type(field::AbstractField) = array_type(typeof(field))
+Architectures.ismatching(arch::AbstractArchitecture, field::AbstractField) = ismatching(arch, field.data)
 
 # test number of horizontal grid points matches
 data_matches_grid(data::AbstractArray, grid::AbstractGrid) = size(data, 1) == get_npoints(grid)
@@ -63,6 +64,18 @@ end
 function Base.array_summary(io::IO, field::AbstractField, inds::Tuple{Vararg{Base.OneTo}})
     print(io, Base.dims2string(length.(inds)), ", $(get_nlat(field))-ring ")
     Base.showarg(io, field, true)
+end
+
+function Base.show(io::IO, ::MIME"text/plain", field::AbstractField)
+    Base.array_summary(io, field, axes(field))
+
+    if get(io, :limit, false)::Bool && displaysize(io)[1]-4 <= 0
+        return print(io, " …")
+    else
+        println(io)
+    end
+    
+    Base.print_array(io, field.data)
 end
 
 # TYPE: reduced (fewer points around poles) or full (constant number of longitudes)
@@ -512,4 +525,4 @@ function Adapt.adapt_structure(to, field::Field{T, N, ArrayType, Grid}) where {T
 end
 
 Architectures.architecture(field::AbstractField) = architecture(field.grid)
-on_architecture(arch, field::AbstractField) = Adapt.adapt(array_type(arch), field)
+Architectures.on_architecture(arch, field::AbstractField) = Adapt.adapt(array_type(arch), field)

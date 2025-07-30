@@ -55,16 +55,6 @@ function get_londlatds(Grid::Type{<:AbstractFullGrid}, nlat_half::Integer)
     nlat = get_nlat(Grid, nlat_half)        # number of latitudes
 
     npoints = get_npoints(Grid, nlat_half)  # total number of grid points
-    londs = zeros(npoints)
-    latds = zeros(npoints)                  # preallocate
 
-    for j in 1:nlat                         # populate preallocated colats, lons
-        for i in 1:nlon
-            ij = i + (j-1)*nlon             # continuous index ij
-            londs[ij] = lond[i]
-            latds[ij] = latd[j]
-        end
-    end
-
-    return londs, latds
+    return reshape(ones(nlat)' .* lond, :), reshape(latd' .* ones(nlon), :)
 end
