@@ -19,7 +19,7 @@ struct HEALPixGrid{A, V, W} <: AbstractReducedGrid{A}
     whichring::W                    # precomputed ring index for each grid point ij
 end
 
-nonparametric_type(::Type{<:HEALPixGrid}) = HEALPixGrid
+Architectures.nonparametric_type(::Type{<:HEALPixGrid}) = HEALPixGrid
 full_grid_type(::Type{<:HEALPixGrid}) = FullHEALPixGrid
 
 # FIELD
