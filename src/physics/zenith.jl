@@ -5,8 +5,8 @@ abstract type AbstractZenith end
 """Coefficients to calculate the solar declination angle δ [radians] based on a simple
 sine function, with Earth's axial tilt as amplitude, equinox as phase shift.
 $(TYPEDFIELDS)"""
-Base.@kwdef struct SinSolarDeclination{NF} <: AbstractSolarDeclination
-    axial_tilt::NF = 23.44
+@parameterized Base.@kwdef struct SinSolarDeclination{NF} <: AbstractSolarDeclination
+    @param axial_tilt::NF = 23.44 (bounds=-90..90,)
     equinox::DateTime = DateTime(2000, 3, 20)
     length_of_year::Second = Day(365.25)
     length_of_day::Second = Hour(24)
@@ -140,7 +140,7 @@ export SolarZenith
 
 """Solar zenith angle varying with daily and seasonal cycle.
 $(TYPEDFIELDS)"""
-Base.@kwdef struct SolarZenith{NF<:AbstractFloat} <: AbstractZenith
+@parameterized Base.@kwdef struct SolarZenith{NF<:AbstractFloat} <: AbstractZenith
     # OPTIONS
     length_of_day::Second = Hour(24)
     length_of_year::Second = Day(365.25)
@@ -148,8 +148,8 @@ Base.@kwdef struct SolarZenith{NF<:AbstractFloat} <: AbstractZenith
     seasonal_cycle::Bool = true
 
     # COEFFICIENTS
-    solar_declination::SinSolarDeclination{NF} = SinSolarDeclination{NF}()
-    time_correction::SolarTimeCorrection{NF} = SolarTimeCorrection{NF}()
+    @param solar_declination::SinSolarDeclination{NF} = SinSolarDeclination{NF}()
+    @param time_correction::SolarTimeCorrection{NF} = SolarTimeCorrection{NF}()
 
     initial_time::Base.RefValue{DateTime} = Ref(DEFAULT_DATE)
 end
@@ -239,14 +239,14 @@ export SolarZenithSeason
 
 """Solar zenith angle varying with seasonal cycle only.
 $(TYPEDFIELDS)"""
-Base.@kwdef struct SolarZenithSeason{NF<:AbstractFloat} <: AbstractZenith
+@parameterized Base.@kwdef struct SolarZenithSeason{NF<:AbstractFloat} <: AbstractZenith
     # OPTIONS
     length_of_day::Second = Hour(24)
     length_of_year::Second = Day(365.25)
     seasonal_cycle::Bool = true
 
     # COEFFICIENTS
-    solar_declination::SinSolarDeclination{NF} = SinSolarDeclination{NF}()
+    @param solar_declination::SinSolarDeclination{NF} = SinSolarDeclination{NF}()
 
     initial_time::Base.RefValue{DateTime} = Ref(DEFAULT_DATE)
 end

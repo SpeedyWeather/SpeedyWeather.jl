@@ -16,20 +16,20 @@ initialize!(::NoVerticalDiffusion,::PrimitiveEquation) = nothing
 vertical_diffusion!(::ColumnVariables, ::NoVerticalDiffusion, ::PrimitiveEquation) = nothing
 
 export BulkRichardsonDiffusion
-@kwdef struct BulkRichardsonDiffusion{NF, VectorType} <: AbstractVerticalDiffusion
+@parameterized @kwdef struct BulkRichardsonDiffusion{NF, VectorType} <: AbstractVerticalDiffusion
     nlayers::Int
 
     "[OPTION] von Kármán constant [1]"
-    κ::NF = 0.4
+    @param κ::NF = 0.4 (bounds=Positive,)
 
     "[OPTION] roughness length [m]"
-    z₀::NF = 3.21e-5
+    @param z₀::NF = 3.21e-5 (bounds=Positive,)
 
     "[OPTION] Critical Richardson number for stable mixing cutoff [1]"
     Ri_c::NF = 10
 
     "[OPTION] Fraction of surface boundary layer"
-    fb::NF = 0.1
+    @param fb::NF = 0.1 (bounds=UnitInterval,)
 
     "[OPTION] diffuse static energy?"
     diffuse_static_energy::Bool = true

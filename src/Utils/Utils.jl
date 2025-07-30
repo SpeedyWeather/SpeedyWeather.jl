@@ -15,7 +15,7 @@ using DocStringExtensions
     import ConstructionBase: constructorof, getproperties, setproperties
 
     # DOMAINS
-    import DomainSets: Domain, RealLine, NonnegativeRealLine, PositiveRealLine, NegativeRealLine, UnitInterval
+    import DomainSets: DomainSets, Domain, RealLine, NonnegativeRealLine, PositiveRealLine, NegativeRealLine
 
     using DomainSets.IntervalSets
 
@@ -33,6 +33,7 @@ using DocStringExtensions
     const Positive = PositiveRealLine()
     const Nonnegative = NonnegativeRealLine()
     const Negative = NegativeRealLine()
+    const UnitInterval = DomainSets.UnitInterval()
 
     include("utility_functions.jl")
 

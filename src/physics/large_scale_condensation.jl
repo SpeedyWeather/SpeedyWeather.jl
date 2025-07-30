@@ -10,12 +10,12 @@ export ImplicitCondensation
 """
 Large scale condensation as with implicit precipitation.
 $(TYPEDFIELDS)"""
-@kwdef struct ImplicitCondensation{NF<:AbstractFloat} <: AbstractCondensation
+@parameterized @kwdef struct ImplicitCondensation{NF<:AbstractFloat} <: AbstractCondensation
     "Relative humidity threshold [1 = 100%] to trigger condensation"
-    relative_humidity_threshold::NF = 1
+    @param relative_humidity_threshold::NF = 1 (bounds=UnitInterval,)
 
     "Time scale in multiples of time step Δt, the larger the less immediate"
-    time_scale::NF = 3
+    @param time_scale::NF = 3 (bounds=Positive,)
 end
 
 ImplicitCondensation(SG::SpectralGrid; kwargs...) = ImplicitCondensation{SG.NF}(; kwargs...)
