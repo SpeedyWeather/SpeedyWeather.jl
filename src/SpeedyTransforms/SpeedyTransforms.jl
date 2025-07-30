@@ -13,10 +13,14 @@ import Adapt: adapt
 import KernelAbstractions: @kernel, @index, @Const, synchronize
 
 # SPEEDYWEATHER MODULES
-using ..Architectures
-using ..Utils
-using ..LowerTriangularArrays
-using ..RingGrids
+include("../Utils/Utils.jl")
+using .Utils
+include("../Architectures.jl")
+using .Architectures
+include("../LowerTriangularArrays/LowerTriangularArrays.jl")
+using .LowerTriangularArrays
+include("../RingGrids/RingGrids.jl")
+using .RingGrids
 
 # TRANSFORM
 export  SpectralTransform,
