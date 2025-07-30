@@ -339,7 +339,7 @@ function interpolate!(
 )
     # if fields match just copy data over (eltypes might differ)
     fields_match(Aout, A) && return copyto!(Aout.data, A.data)
-    @assert ismatching(architecture(A), Aout) "Interpolation is only supported between fields on the same architecture, got $(architecture(A)) and )"
+    @assert ismatching(architecture(A), Aout) "Interpolation is only supported between fields on the same architecture, got $(architecture(A)) and $(architecture(Aout))"
 
     for k in eachlayer(Aout, A, vertical_only=true)
         _interpolate!(view(Aout.data, :, k), view(A.data, :, k), interpolator, architecture(A))
