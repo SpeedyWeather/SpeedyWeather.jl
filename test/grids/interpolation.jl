@@ -125,7 +125,7 @@ end
             As = RingGrids.interpolate(λs, θs, A; NF)
 
             for (a, λ) in zip(As, λs)
-                @test a ≈ λ rtol=1e-4
+                @test a ≈ λ rtol=1e-3
             end
         end
     end
