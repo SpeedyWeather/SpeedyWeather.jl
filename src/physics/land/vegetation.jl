@@ -42,13 +42,17 @@ function soil_moisture_availability!(
     (; soil_moisture) = progn.land
     (; soil_moisture_availability) = diagn.physics.land
     
-    # SPEEDY documentation eq. 51 with vegetation = 0
-    (; W_cap, W_wilt) = model.land.thermodynamics
+    # Fortran SPEEDY documentation eq. 51 with vegetation = 0
+    W_cap = model.land.thermodynamics.field_capacity
+    W_wilt = model.land.thermodynamics.wilting_point
     D_top = model.land.geometry.layer_thickness[1]
     D_root = model.land.geometry.layer_thickness[2]
+
+    # precalculate denominator
     r = 1/(D_top*W_cap + D_root*(W_cap - W_wilt))
 
     @inbounds for ij in eachindex(soil_moisture_availability)
+        # Fortran SPEEDY documentation eq. 51 but veg=0
         soil_moisture_availability[ij] = r*D_top*soil_moisture[ij, 1]
     end
 
@@ -162,7 +166,7 @@ function soil_moisture_availability!(
     @boundscheck fields_match(soil_moisture, soil_moisture_availability, horizontal_only=true) || throws(BoundsError)
     @boundscheck size(soil_moisture, 2) >= 2    # defined for two layers
 
-    # precalculate
+    # precalculate denominator
     r = 1/(D_top*W_cap + D_root*(W_cap - W_wilt))
 
     for ij in eachgridpoint(soil_moisture_availability, high_cover, low_cover)
