@@ -8,9 +8,6 @@ export LandThermodynamics
     "[OPTION] Field capacity (W_cap or γ) [volume fraction]"
     field_capacity::NF = 0.3
 
-    "[OPTION] Field capacity (W_cap or γ) [volume fraction]"
-    field_capacity::NF = 0.3
-
     "[OPTION] Heat capacity Cw of water [J/(m³ K)]"
     heat_capacity_water::NF = 4.2e6
 
