@@ -155,7 +155,7 @@ export LandBucketMoisture
     runoff_fraction::NF = 0.5
 
     "[OPTION] Initial soil moisture, volume fraction [1]"
-    initial_moisture::NF = 0
+    initial_moisture::NF = 1
     
     "[OPTION] Apply land-sea mask to NaN ocean-only points?"
     mask::Bool = false
