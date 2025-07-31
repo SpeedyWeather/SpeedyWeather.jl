@@ -153,7 +153,8 @@ function soil_moisture_availability!(
     (; soil_moisture_availability) = diagn.physics.land
     (; soil_moisture) = progn.land
     (; high_cover, low_cover, low_veg_factor) = vegetation
-    (; W_cap, W_wilt) = model.land.thermodynamics
+    W_cap = model.land.thermodynamics.field_capacity
+    W_wilt = model.land.thermodynamics.wilting_point
     D_top = model.land.geometry.layer_thickness[1]
     D_root = model.land.geometry.layer_thickness[2]
 
@@ -169,7 +170,11 @@ function soil_moisture_availability!(
         # Fortran SPEEDY source/land_model.f90 line 111 origin unclear
         veg = max(0, high_cover[ij] + low_veg_factor*low_cover[ij])
 
-        # Fortran SPEEDY documentation eq. 51
+        # Fortran SPEEDY documentation eq. 51, original formulation
+        # soil_moisture_availability[ij] = r*(D_top*soil_moisture[ij, 1] +
+        #     veg*D_root*max(soil_moisture[ij, 2] - W_wilt, 0))
+        # Soil moisture is defined as volume fraction wrt to field capacity
+        # so multiply by W_cap here (not done in Fortran SPEEDY)
         soil_moisture_availability[ij] = r*(D_top*soil_moisture[ij, 1]*W_cap +
             veg*D_root*max(soil_moisture[ij, 2]*W_cap - W_wilt, 0))
     end
