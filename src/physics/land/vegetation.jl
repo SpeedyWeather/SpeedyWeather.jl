@@ -70,8 +70,10 @@ export VegetationClimatology
     "[OPTION] filename of soil moisture"
     file::String = "vegetation.nc"
 
-    "[OPTION] variable name in netcdf file"
+    "[OPTION] variable name in netcdf file for high vegetation"
     varname_vegh::String = "vegh"
+
+    "[OPTION] variable name in netcdf file for low vegetation"
     varname_vegl::String = "vegl"
 
     "[OPTION] Grid the soil moisture file comes on"

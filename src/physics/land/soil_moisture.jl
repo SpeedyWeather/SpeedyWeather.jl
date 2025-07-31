@@ -32,8 +32,10 @@ export SeasonalSoilMoisture
     "[OPTION] filename of soil moisture"
     file::String = "soil_moisture.nc"
 
-    "[OPTION] variable name in netcdf file"
+    "[OPTION] variable name in netcdf file for layer 1"
     varname_layer1::String = "swl1"
+
+    "[OPTION] variable name in netcdf file for layer 2"
     varname_layer2::String = "swl2"
 
     "[OPTION] Grid the soil moisture file comes on"

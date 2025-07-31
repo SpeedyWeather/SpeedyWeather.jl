@@ -94,10 +94,10 @@ $(TYPEDFIELDS)"""
     "[OPTION] Effective emissivity for surface flux over land [1]"
     emissivity_land::NF = 0.65
 
-    "Tropopause temperature [K]"
+    "[OPTION] Tropopause temperature [K]"
     temp_tropopause::NF = 200
 
-    "Tropopause relaxation time scale to temp_tropopause"
+    "[OPTION] Tropopause relaxation time scale to temp_tropopause"
     time_scale::Second = Hour(24)
 end
 
