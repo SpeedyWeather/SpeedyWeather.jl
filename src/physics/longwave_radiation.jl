@@ -118,6 +118,8 @@ function longwave_radiation!(
     F = column.flux_temp_upward
     (; α, time_scale) = scheme
     σ = atmosphere.stefan_boltzmann
+    ϵ_ocn = 0.6
+	ϵ_lnd = 0.65
     Tₜ = scheme.temp_tropopause
     
     (; skin_temperature_sea, skin_temperature_land, land_fraction) = column
@@ -126,12 +128,12 @@ function longwave_radiation!(
     # between surface and lowermost air temperature
     # but zero flux if land/sea not available
     Fₖ_ocean = isfinite(skin_temperature_sea) ?
-        σ*skin_temperature_sea^4 : 
+        ϵ_ocn*σ*skin_temperature_sea^4 : 
         zero(skin_temperature_sea)
     column.surface_longwave_up_ocean = Fₖ_ocean
 
     Fₖ_land = isfinite(skin_temperature_land) ?
-        σ*skin_temperature_land^4 : 
+        ϵ_lnd*σ*skin_temperature_land^4 : 
         zero(skin_temperature_land)
     column.surface_longwave_up_land = Fₖ_land
 
