@@ -41,25 +41,25 @@ $(TYPEDFIELDS)"""
 end
 
 UniformCooling(SG::SpectralGrid; kwargs...) = UniformCooling{SG.NF}(; kwargs...)
-initialize!(scheme::UniformCooling, model::PrimitiveEquation) = nothing
+initialize!(radiation::UniformCooling, model::PrimitiveEquation) = nothing
 
 function longwave_radiation!(
     column::ColumnVariables,
-    scheme::UniformCooling,
+    radiation::UniformCooling,
     model::PrimitiveEquation,
 )
-    longwave_radiation!(column, scheme)
+    longwave_radiation!(column, radiation)
 end
 
 function longwave_radiation!(
     column::ColumnVariables{NF},
-    scheme::UniformCooling,
+    radiation::UniformCooling,
 ) where NF
     (; temp, temp_tend) = column
-    (; temp_min, temp_stratosphere) = scheme
+    (; temp_min, temp_stratosphere) = radiation
     
-    cooling = -inv(convert(NF, scheme.time_scale.value))
-    τ⁻¹ = inv(scheme.time_scale_stratosphere.value)
+    cooling = -inv(convert(NF, radiation.time_scale.value))
+    τ⁻¹ = inv(radiation.time_scale_stratosphere.value)
 
     @inbounds for k in eachlayer(column)
         # Pauluis and Garner, 2006, eq (1) and (2)
@@ -102,31 +102,31 @@ $(TYPEDFIELDS)"""
 end
 
 JeevanjeeRadiation(SG::SpectralGrid; kwargs...) = JeevanjeeRadiation{SG.NF}(; kwargs...)
-initialize!(scheme::JeevanjeeRadiation, model::PrimitiveEquation) = nothing
+initialize!(radiation::JeevanjeeRadiation, model::PrimitiveEquation) = nothing
 
 # function barrier
 function longwave_radiation!(
     column::ColumnVariables,
-    scheme::JeevanjeeRadiation,
+    radiation::JeevanjeeRadiation,
     model::PrimitiveEquation,
 )
-    longwave_radiation!(column, model.atmosphere, scheme)
+    longwave_radiation!(column, radiation, model.atmosphere)
 end
 
 function longwave_radiation!(
     column::ColumnVariables{NF},
+    radiation::JeevanjeeRadiation,
     atmosphere::AbstractAtmosphere,
-    scheme::JeevanjeeRadiation,
 ) where NF
 
     (; nlayers, temp_tend) = column
     T = column.temp                 # to match Seeley, 2023 notation
     F = column.flux_temp_upward
-    (; α, time_scale) = scheme
-    ϵ_ocn = scheme.emissivity_ocean
-    ϵ_lnd = scheme.emissivity_land
+    (; α, time_scale) = radiation
+    ϵ_ocean = radiation.emissivity_ocean
+    ϵ_land = radiation.emissivity_land
     σ = atmosphere.stefan_boltzmann
-    Tₜ = scheme.temp_tropopause
+    Tₜ = radiation.temp_tropopause
     
     (; skin_temperature_sea, skin_temperature_land, land_fraction) = column
 
@@ -134,12 +134,12 @@ function longwave_radiation!(
     # between surface and lowermost air temperature
     # but zero flux if land/sea not available
     Fₖ_ocean = isfinite(skin_temperature_sea) ?
-        ϵ_ocn*σ*skin_temperature_sea^4 : 
+        ϵ_ocean*σ*skin_temperature_sea^4 : 
         zero(skin_temperature_sea)
     column.surface_longwave_up_ocean = Fₖ_ocean
 
     Fₖ_land = isfinite(skin_temperature_land) ?
-        ϵ_lnd*σ*skin_temperature_land^4 : 
+        ϵ_land*σ*skin_temperature_land^4 : 
         zero(skin_temperature_land)
     column.surface_longwave_up_land = Fₖ_land
 
@@ -170,11 +170,11 @@ export NBandRadiation
 end
 
 NBandRadiation(SG::SpectralGrid; kwargs...) = NBandRadiation(; kwargs...)
-initialize!(scheme::NBandRadiation, model::PrimitiveEquation) = nothing
+initialize!(radiation::NBandRadiation, model::PrimitiveEquation) = nothing
 
 function longwave_radiation!(
     column::ColumnVariables,
-    scheme::NBandRadiation,
+    radiation::NBandRadiation,
     model::PrimitiveEquation,
 )
 
