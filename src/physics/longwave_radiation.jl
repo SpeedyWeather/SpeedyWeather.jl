@@ -87,7 +87,7 @@ $(TYPEDFIELDS)"""
 @kwdef struct JeevanjeeRadiation{NF} <: AbstractLongwave
     "[OPTION] Radiative forcing constant (W/m²/K²)"
     α::NF = 0.025
-    #INTRODUCING SOME EFFECTIVE EMISSIVITIES AS TUNING PARAMETERS
+#INTRODUCING SOME EFFECTIVE EMISSIVITIES AS TUNING PARAMETERS
     "Effective emissivities of different surfaces []"
     emissivity_ocean::NF = 0.6    # for surface longwave calculation over the ocean
     emissivity_land::NF = 0.65   # for surface longwave calculation over the land
