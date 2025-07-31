@@ -38,8 +38,8 @@ function soil_moisture_availability!(
     vegetation::NoVegetation,
     model::PrimitiveWet,
 )
-    # set soil moisture availability to a constant value everywhere
-    (; soil_moisture) = progn.land
+    # view on the top layer of soil moisture
+    soil_moisture_top = field_view(progn.land.soil_moisture, :, 1)
     (; soil_moisture_availability) = diagn.physics.land
     
     # Fortran SPEEDY documentation eq. 51 with vegetation = 0
@@ -48,14 +48,8 @@ function soil_moisture_availability!(
     D_top = model.land.geometry.layer_thickness[1]
     D_root = model.land.geometry.layer_thickness[2]
 
-    # precalculate denominator
-    r = 1/(D_top*W_cap + D_root*(W_cap - W_wilt))
-
-    @inbounds for ij in eachindex(soil_moisture_availability)
-        # Fortran SPEEDY documentation eq. 51 but veg=0
-        soil_moisture_availability[ij] = r*D_top*soil_moisture[ij, 1]
-    end
-
+    soil_moisture_availability .= D_top*soil_moisture_top*W_cap/
+                                    (D_top*W_cap + D_root*(W_cap - W_wilt))
     return nothing
 end
 
