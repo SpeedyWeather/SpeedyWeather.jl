@@ -175,7 +175,7 @@ function soil_moisture_availability!(
         #     veg*D_root*max(soil_moisture[ij, 2] - W_wilt, 0))
         # Soil moisture is defined as volume fraction wrt to field capacity
         # so multiply by W_cap here (not done in Fortran SPEEDY)
-        soil_moisture_availability[ij] = r*(D_top*soil_moisture[ij, 1] * W_cap +
-            veg*D_root*max((soil_moisture[ij, 2] * W_cap) - W_wilt, 0))
+        soil_moisture_availability[ij] = r*(D_top*soil_moisture[ij, 1]*W_cap +
+            veg*D_root*max(soil_moisture[ij, 2]*W_cap - W_wilt, 0))
     end
 end
