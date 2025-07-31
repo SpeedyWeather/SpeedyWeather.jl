@@ -89,8 +89,8 @@ $(TYPEDFIELDS)"""
     α::NF = 0.025
     #INTRODUCING SOME EFFECTIVE EMISSIVITIES AS TUNING PARAMETERS
     "Effective emissivities of different surfaces []"
-    ϵ_ocn::NF = 0.6    # for surface longwave calculation over the ocean
-    ϵ_lnd::NF = 0.65   # for surface longwave calculation over the land
+    emissivity_ocean::NF = 0.6    # for surface longwave calculation over the ocean
+    emissivity_land::NF = 0.65   # for surface longwave calculation over the land
 
     "Tropopause temperature [K]"
     temp_tropopause::NF = 200
@@ -121,6 +121,8 @@ function longwave_radiation!(
     T = column.temp                 # to match Seeley, 2023 notation
     F = column.flux_temp_upward
     (; α, time_scale) = scheme
+    ϵ_ocn = scheme.emissivity_ocean
+    ϵ_lnd = scheme.emissivity_land
     σ = atmosphere.stefan_boltzmann
     Tₜ = scheme.temp_tropopause
     
