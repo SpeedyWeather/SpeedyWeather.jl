@@ -118,8 +118,9 @@ function longwave_radiation!(
     F = column.flux_temp_upward
     (; α, time_scale) = scheme
     σ = atmosphere.stefan_boltzmann
-    ϵ_ocn = 0.6
-	ϵ_lnd = 0.65
+#INTRODUCING SOME EFFECTIVE EMISSIVITIES AS TUNING PARAMETERS
+    ϵ_ocn::NF = 0.6    # for surface longwave calculation over the ocean
+    ϵ_lnd::NF = 0.65   # for surface longwave calculation over the land
     Tₜ = scheme.temp_tropopause
     
     (; skin_temperature_sea, skin_temperature_land, land_fraction) = column
