@@ -87,6 +87,10 @@ $(TYPEDFIELDS)"""
 @kwdef struct JeevanjeeRadiation{NF} <: AbstractLongwave
     "[OPTION] Radiative forcing constant (W/m²/K²)"
     α::NF = 0.025
+    #INTRODUCING SOME EFFECTIVE EMISSIVITIES AS TUNING PARAMETERS
+    "Effective emissivities of different surfaces []"
+    ϵ_ocn::NF = 0.6    # for surface longwave calculation over the ocean
+    ϵ_lnd::NF = 0.65   # for surface longwave calculation over the land
 
     "Tropopause temperature [K]"
     temp_tropopause::NF = 200
@@ -118,9 +122,6 @@ function longwave_radiation!(
     F = column.flux_temp_upward
     (; α, time_scale) = scheme
     σ = atmosphere.stefan_boltzmann
-#INTRODUCING SOME EFFECTIVE EMISSIVITIES AS TUNING PARAMETERS
-    ϵ_ocn::NF = 0.6    # for surface longwave calculation over the ocean
-    ϵ_lnd::NF = 0.65   # for surface longwave calculation over the land
     Tₜ = scheme.temp_tropopause
     
     (; skin_temperature_sea, skin_temperature_land, land_fraction) = column
