@@ -5,8 +5,8 @@ export LandThermodynamics
     "[OPTION] Heat conductivity λ of the soil [W/(m K)]" 
     heat_conductivity::NF = 0.42
 
-    "[OPTION] Field capacity γ per meter soil [1]"
-    field_capacity::NF = 0.24
+    "[OPTION] Field capacity (W_cap or γ) [volume fraction]"
+    field_capacity::NF = 0.3
 
     "[OPTION] Field capacity (W_cap or γ) [volume fraction]"
     field_capacity::NF = 0.3
