@@ -3,62 +3,87 @@ module SpeedyWeather
 # STRUCTURE
 using DocStringExtensions
 
+import ConstructionBase: constructorof, getproperties, setproperties
+
 # NUMERICS
 import Primes
 import Random
 import LinearAlgebra: LinearAlgebra, Diagonal
+export rotate, rotate!
 
 # GPU, PARALLEL
 import Base.Threads: Threads, @threads
-import KernelAbstractions
+import KernelAbstractions: KernelAbstractions, @kernel, @index, @Const, synchronize
 import Adapt: Adapt, adapt, adapt_structure
 
 # INPUT OUTPUT
 import TOML
-import Dates: Dates, DateTime, Period, Millisecond, Second, Minute, Hour, Day, Week
+import Dates: Dates, DateTime, Period, Millisecond, Second, Minute, Hour, Day, Week, Month, Year
 import Printf: Printf, @sprintf
 import Random: randstring
 import NCDatasets: NCDatasets, NCDataset, defDim, defVar
 import JLD2: jldopen, jldsave, JLDFile 
 import CodecZlib
 import BitInformation: round, round!
-import UnicodePlots
 import ProgressMeter
 
+# INTERVALS
+using DomainSets.IntervalSets
+
 # to avoid a `using Dates` to pass on DateTime arguments
-export DateTime, Millisecond, Second, Minute, Hour, Day, Week
+export DateTime, Millisecond, Second, Minute, Hour, Day, Week, Month, Year, Century, Millenium
 
 # export functions that have many cross-component methods
 export initialize!, finalize!
 
-include("utility_functions.jl")
+# import device architectures
+include("Architectures.jl")
+using .Architectures
 
-# LowerTriangularMatrices for spherical harmonics
-export  LowerTriangularMatrices, 
-        LowerTriangularMatrix,
-        LowerTriangularArray
+# export device functions 
+export on_architecture, architecture
+
+# import utilities
+include("Utils/Utils.jl")
+using .Utils
+
+import .Utils: parameters
+
+# export user-facing parameter handling types and methods
+export  SpeedyParam, SpeedyParams, parameters, stripparams
+
+# LowerTriangularArrays for spherical harmonics
+export  LowerTriangularArrays, 
+        LowerTriangularArray,
+        LowerTriangularMatrix
+
+export  Spectrum
 
 # indexing styles for LowerTriangularArray/Matrix
 export  OneBased, ZeroBased
-export  eachmatrix, eachharmonic
+export  eachmatrix, eachharmonic, eachorder
         
-include("LowerTriangularMatrices/LowerTriangularMatrices.jl")
-using .LowerTriangularMatrices
+include("LowerTriangularArrays/LowerTriangularArrays.jl")
+using .LowerTriangularArrays
 
 # RingGrids
 export  RingGrids
-export  AbstractGrid, AbstractGridArray,
-        AbstractFullGridarray, AbstractReducedGridArray
-export  FullClenshawGrid, FullClenshawArray,
-        FullGaussianGrid, FullGaussianArray,
-        FullHEALPixGrid, FullHEALPixArray,
-        FullOctaHEALPixGrid, FullOctaHEALPixArray,
-        OctahedralGaussianGrid, OctahedralGaussianArray,
-        OctahedralClenshawGrid, OctahedralClenshawArray,
-        HEALPixGrid, HEALPixArray,
-        OctaHEALPixGrid, OctaHEALPixArray,
-        OctaminimalGaussianGrid, OctaminimalGaussianArray,
-        eachring, eachgrid, plot
+export  AbstractGrid, AbstractFullGrid, AbstractReducedGrid
+export  AbstractField, AbstractField2D, AbstractField3D
+export  Field, Field2D, Field3D,
+        FullClenshawField, FullGaussianField,
+        FullHEALPixField, FullOctaHEALPixField,
+        OctahedralGaussianField, OctahedralClenshawField,
+        HEALPixField, OctaHEALPixField,
+        OctaminimalGaussianField
+
+export  FullClenshawGrid, FullGaussianGrid,
+        FullHEALPixGrid, FullOctaHEALPixGrid,
+        OctahedralGaussianGrid, OctahedralClenshawGrid,
+        HEALPixGrid, OctaHEALPixGrid,
+        OctaminimalGaussianGrid
+        
+export  eachring, eachlayer, eachgridpoint
 export  AnvilInterpolator
 export  spherical_distance
 export  zonal_mean
@@ -79,11 +104,9 @@ using .SpeedyTransforms
 import .SpeedyTransforms: prettymemory
 
 # to be defined in GeoMakie extension
-export globe
+export globe, animate
 function globe end
-
-# Utility for GPU / KernelAbstractions
-include("gpu.jl")                               
+function animate end
 
 # abstract types
 include("models/abstract_models.jl")
@@ -155,7 +178,6 @@ include("output/schedule.jl")
 include("output/feedback.jl")
 include("output/netcdf_output.jl")
 include("output/restart_file.jl")
-include("output/plot.jl")
 include("output/callbacks.jl")
 include("output/particle_tracker.jl")
 include("output/jld2_output.jl")

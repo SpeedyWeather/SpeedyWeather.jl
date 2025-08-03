@@ -6,7 +6,7 @@ optional fields otherwise use variable-independent defaults. Initialize with `Vo
 and non-default fields can always be passed on as keyword arguments,
 e.g. `VorticityOutput(long_name="relative vorticity", compression_level=0)`.
 Custom variable output also requires the `path(::MyOutputVariable, simulation)`
-to be extended to return the AbstractGridArray to be output.
+to be extended to return the AbstractField subject to output.
 Custom element-wise variable transforms, e.g. scale and/or offset to change
 units, or even exp(x)/100 to change from log surface pressure to hPa
 are passed on as `transform::Function = x -> exp(x)/100`."""
@@ -41,11 +41,11 @@ are passed on as `transform::Function = x -> exp(x)/100`."""
 end
 
 """$TYPEDSIGNATURES To be extended for every output variable to define
-the path where in `simulation` to find that output variable `::AbstractGridArray`."""
+the path where in `simulation` to find that output variable `::AbstractField`."""
 path(::VorticityOutput, simulation) = simulation.diagnostic_variables.grid.vor_grid
 
-"""Defines netCDF output for a specific variables, see `VorticityOutput` for details.
-Fields are $(TYPEDFIELDS)"""
+"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+Fields are: $(TYPEDFIELDS)"""
 @kwdef mutable struct ZonalVelocityOutput <: AbstractOutputVariable
     name::String = "u"
     unit::String = "m/s"
@@ -59,8 +59,8 @@ end
 
 path(::ZonalVelocityOutput, simulation) = simulation.diagnostic_variables.grid.u_grid
 
-"""Defines netCDF output for a specific variables, see `VorticityOutput` for details.
-Fields are $(TYPEDFIELDS)"""
+"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+Fields are: $(TYPEDFIELDS)"""
 @kwdef mutable struct MeridionalVelocityOutput <: AbstractOutputVariable
     name::String = "v"
     unit::String = "m/s"
@@ -74,8 +74,8 @@ end
 
 path(::MeridionalVelocityOutput, simulation) = simulation.diagnostic_variables.grid.v_grid
 
-"""Defines netCDF output for a specific variables, see `VorticityOutput` for details.
-Fields are $(TYPEDFIELDS)"""
+"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+Fields are: $(TYPEDFIELDS)"""
 @kwdef mutable struct DivergenceOutput <: AbstractOutputVariable
     name::String = "div"
     unit::String = "s^-1"
@@ -90,8 +90,8 @@ end
 
 path(::DivergenceOutput, simulation) = simulation.diagnostic_variables.grid.div_grid
 
-"""Defines netCDF output for a specific variables, see `VorticityOutput` for details.
-Fields are $(TYPEDFIELDS)"""
+"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+Fields are: $(TYPEDFIELDS)"""
 @kwdef mutable struct InterfaceDisplacementOutput <: AbstractOutputVariable
     name::String = "eta"
     unit::String = "m"
@@ -105,8 +105,8 @@ end
 
 path(::InterfaceDisplacementOutput, simulation) = simulation.diagnostic_variables.grid.pres_grid
 
-"""Defines netCDF output for a specific variables, see `VorticityOutput` for details.
-Fields are $(TYPEDFIELDS)"""
+"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+Fields are: $(TYPEDFIELDS)"""
 @kwdef mutable struct SurfacePressureOutput{F} <: AbstractOutputVariable
     name::String = "pres"
     unit::String = "hPa"
@@ -121,8 +121,8 @@ end
 
 path(::SurfacePressureOutput, simulation) = simulation.diagnostic_variables.grid.pres_grid
 
-"""Defines netCDF output for a specific variables, see `VorticityOutput` for details.
-Fields are $(TYPEDFIELDS)"""
+"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+Fields are: $(TYPEDFIELDS)"""
 @kwdef mutable struct TemperatureOutput{F} <: AbstractOutputVariable
     name::String = "temp"
     unit::String = "degC"
@@ -137,8 +137,8 @@ end
 
 path(::TemperatureOutput, simulation) = simulation.diagnostic_variables.grid.temp_grid
 
-"""Defines netCDF output for a specific variables, see `VorticityOutput` for details.
-Fields are $(TYPEDFIELDS)"""
+"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+Fields are: $(TYPEDFIELDS)"""
 @kwdef mutable struct HumidityOutput <: AbstractOutputVariable
     name::String = "humid"
     unit::String = "kg/kg"

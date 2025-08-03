@@ -83,8 +83,8 @@ The time axis of the NetCDF output will now look like
 ```@example netcdf
 using NCDatasets
 run!(simulation, period=Day(1), output=true)
-id = model.output.id
-ds = NCDataset("run_$id/output.nc")
+run_folder = model.output.run_folder
+ds = NCDataset("$run_folder/output.nc")
 ds["time"][:]
 ```
 which is a bit ugly, that's why `adjust_with_output=true` is the default. In that case we would have
@@ -94,8 +94,8 @@ output = NetCDFOutput(spectral_grid, ShallowWater, output_dt=Hour(1))
 model = ShallowWaterModel(spectral_grid; time_stepping, output)
 simulation = initialize!(model)
 run!(simulation, period=Day(1), output=true)
-id = model.output.id
-ds = NCDataset("run_$id/output.nc")
+run_folder = model.output.run_folder
+ds = NCDataset("$run_folder/output.nc")
 ds["time"][:]
 ```
 very neatly hourly output in the NetCDF file!
@@ -103,12 +103,13 @@ very neatly hourly output in the NetCDF file!
 ## Output grid
 
 Say we want to run the model at a given horizontal resolution but want to output on another resolution,
-the `NetCDFOutput` takes as argument `output_Grid<:AbstractFullGrid` and `nlat_half::Int`.
-So for example `output_Grid=FullClenshawGrid` and `nlat_half=48` will always interpolate onto a
+the `NetCDFOutput` takes as argument `output_grid::AbstractFullGrid`, any instance of a full grid
+can be provided here.
+So for example `output_grid=FullClenshawGrid(48)` would interpolate onto a
 regular 192x95 longitude-latitude grid of 1.875˚ resolution, regardless the grid and resolution used
 for the model integration.
 ```@example netcdf
-my_output_writer = NetCDFOutput(spectral_grid, output_Grid=FullClenshawGrid, nlat_half=48)
+my_output_writer = NetCDFOutput(spectral_grid, output_grid=FullClenshawGrid(48))
 ```
 Note that by default the output is on the corresponding full type of the grid type used in the dynamical core
 so that interpolation only happens at most in the zonal direction as they share the location of the
@@ -125,12 +126,13 @@ Overview of the corresponding full grids
 | FullGaussianGrid | FullGaussianGrid |
 | FullClenshawGrid | FullClenshawGrid |
 | OctahadralGaussianGrid | FullGaussianGrid |
-| OctahedralClensawhGrid | FullClenshawGrid |
+| OctaminimalGaussianGrid | FullGaussianGrid |
+| OctahedralClenshawGrid | FullClenshawGrid |
 | HEALPixGrid | FullHEALPixGrid |
 | OctaHEALPixGrid | FullOctaHEALPixGrid |
 
 The grids `FullHEALPixGrid`, `FullOctaHEALPixGrid` share the same latitude rings as their reduced grids,
-but have always as many longitude points as they are at most around the equator. These grids are not
+but have always as many longitude points as there are around the equator. These grids are not
 tested in the dynamical core (but you may use them experimentally) and mostly designed for output purposes.
 
 ## Output variables
@@ -198,32 +200,44 @@ each of them has to be splatted by appending `...`, e.g.
 add!(model, SpeedyWeather.SurfaceFluxesOutput()...)
 ```
 
-## Output path and identification
+## Output path, identification and number
 
-That's easy by passing on `path="/my/favourite/path/"` and the folder `run_*` with `*` the identification
-of the run (that's the `id` keyword, which can be manually set but is also automatically determined as a
-number counting up depending on which folders already exist) will be created within.
-```julia
-julia> path = pwd()
-"/Users/milan"
-julia> my_output_writer = NetCDFOutput(spectral_grid, path=path)
+SpeedyWeather uses `path`, `run_folder` and `filename` to determine where to write the output to.
+`path` is the parent folder where all simulations will be stored, by default this is the current
+folder through `pwd()`. `run_folder` consists of three parts `run_prefix`, `id` and `run_number`
+to form "prefix_id_number" (joined by `_`) so for example `run_test_0001`. The prefix is by default `run`
+and used to determine folders that contain simulation data for example by using a `run_*` pattern.
+The id (default "") is an optional identification one can use to further distinguish runs, e.g.
+`id = "experiment1"`. Given prefix and id the logic is then to count up a number such that one
+can run several simulations under the same id without overwriting previously stored output.
+By default `run_number` is formatted as 4-digit integer as in `run_test_0001`.
+If you set `output.overwrite = true` (default `false`) then `output.run_prefix`, `output.id`,
+`output.run_number` are used as is, potentially overwriting an already existing folder.
+Otherwise (`overwrite=false`) we (re)set the run number to 1, check whether the run folder
+already exists and count the run number up until no folder of that same name already exists.
+
+```@example netcdf
+# default naming run_0001, run_0002, ...
+output = NetCDFOutput(spectral_grid)
+
+# provide an id, would yield run_test_0001, run_test_0002, ...
+output = NetCDFOutput(spectral_grid, id="test")
+
+# write into run_forrest_run_01234 potentially ovewriting it
+output = NetCDFOutput(spectral_grid, id="forrest_run", run_number=1234, run_digits=5, overwrite=true)
+
+# let us test the last one
+model = BarotropicModel(spectral_grid; output)
+simulation = initialize!(model)
+run!(simulation, steps=1, output=true)
+
+# what is the run folder?
+output.run_folder
 ```
-This folder must already exist. If you want to give your run a name/identification you can pass on `id`
-```julia
-julia> my_output_writer = NetCDFOutput(spectral_grid, id="diffusion_test");
-```
-which will be used instead of a 4 digit number like 0001, 0002 which is automatically determined if
-`id` is not provided. You will see the id of the run in the progress bar
-```julia
-Weather is speedy: run diffusion_test 100%|███████████████████████| Time: 0:00:12 (19.20 years/day)
-```
-and the run folder, here `run_diffusion_test`, is also named accordingly
-```julia
-shell> ls
-...
-run_diffusion_test
-...
-```
+
+Note that for the last example with `overwrite=false` (the default) the `run_number` would be
+automatically determined by the lowest non-existing folder as outlined above, so
+`run_forest_run_00001` (5 digits though) if you have not run this before.
 
 ## Further options
 
@@ -234,6 +248,29 @@ The actual options are declared as `[OPTION]` in the following
 
 ```@example netcdf
 @doc NetCDFOutput
+```
+
+## Visualizing output
+
+The saved NetCDF files can be visualized with a wide range of tools, both in Julia, but also in other languages. In order to get a quick view into a NetCDF file, you can use command line tools like `ncview`. For actual visualizations in Julia, it's easy to use [NCDatasets.jl](https://github.com/JuliaGeo/NCDatasets.jl) for accessing the data and [GeoMakie.jl](https://github.com/JuliaGeo/GeoMakie.jl) for plotting it. For a standard animation we already provide the `animate` function within SpeedyWeather.jl's GeoMakie extension that makes it easy to animate a variable from a NetCDF output file or a `Simulation` object, as seen below:
+
+```@example netcdf 
+using SpeedyWeather, GeoMakie, CairoMakie
+spectral_grid = SpectralGrid()
+model = PrimitiveWetModel(spectral_grid)
+simulation = initialize!(model)
+run!(simulation, period=Day(3), output=false) # some spin-up
+run!(simulation, period=Day(2), output=true)
+
+animate(simulation, output_file="test_vor_animation.mp4", variable="vor", level=1) # animate vorticity at the first vertical level
+```
+
+![test_vor_animation](test_vor_animation.mp4)
+
+For more options for `animate`, see below: 
+
+```@example netcdf 
+@doc SpeedyWeather.animate
 ```
 
 # JLD2 Output 

@@ -39,6 +39,8 @@ model_type(::Type{<:PrimitiveDry}) = PrimitiveDryModel
 model_type(::Type{<:PrimitiveWet}) = PrimitiveWetModel
 model_type(model::AbstractModel) = model_type(typeof(model))
 
+initialize!(model::AbstractModel, ps::Union{ComponentVector,SpeedyParams}; kwargs...) = initialize!(reconstruct(model, ps); kwargs...)
+
 function Base.show(io::IO, M::AbstractModel)
     println(io, "$(model_type(M)) <: $(model_class(M))")
     properties = propertynames(M)
@@ -47,6 +49,8 @@ function Base.show(io::IO, M::AbstractModel)
         val = getfield(M, key)
         s = i == n ? "└" : "├"  # choose ending └ for last property
         p = i == n ? print : println
-        p(io, "$s $key: $(typeof(val))")
+        a = "$s $key: $(typeof(val))"
+        a = textwidth(a) > 100 ? string(a[1:97], "...") : a  # truncate long strings
+        p(io, a)
     end
 end

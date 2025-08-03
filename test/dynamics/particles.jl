@@ -1,9 +1,9 @@
 @testset "Create and compare particles" begin
     @test Particle(0, 0) == Particle(0, 0, 0)
-    @test Particle(0, 0, 0) == zero(Particle) == zero(Particle{Float32}) == zero(Particle{Float32, true})
-    @test Particle(0.0, 0.0) == Particle(0f0, 0f0, 0.0) == Particle(0, Float16(0))
-    @test zero(Particle{Float32}) == Particle{Float32,true}(0, 0)
-    @test zero(Particle{Float32}) != Particle{Float32,false}(0, 0)
+    @test Particle(0, 0, 0) == zero(Particle) == zero(Particle{Float32})
+    @test Particle(0.0, 0.0) == Particle(0f0, 0f0, 0.0)
+    @test zero(Particle{Float32}) == Particle{Float32}(true, 0, 0, 0)
+    @test zero(Particle{Float32}) != Particle{Float32}(false,0, 0, 0)
     @test deactivate(zero(Particle)) != zero(Particle)
     @test activate(zero(Particle)) == zero(Particle)
 
@@ -14,9 +14,9 @@
     @test Particle{Float16}(lon=1,lat=2) == Particle{Float32}(lat=2,lon=1.0)
     @test Particle{Float16}(lon=1,lat=2,σ=0) == Particle{Float32}(lat=2,lon=1.0)
     @test Particle{Float16}(lon=1,lat=2,σ=3.0) == Particle{Float32}(1,2,3)
-    @test active(Particle(1,2,3))
-    @test ~active(deactivate(Particle(1,2,3)))
-    @test ~active(Particle{Float64,false}(1,2,3))
+    @test isactive(Particle(1,2,3))
+    @test ~isactive(deactivate(Particle(1,2,3)))
+    @test ~isactive(Particle{Float64}(false,1,2,3))
     @test Particle(lon=0,lat=90) == Particle(lon=10,lat=90)
     @test Particle(lon=0,lat=-90) == Particle(lon=10,lat=-90)
     @test Particle(lon=0,lat=-90) != Particle(lon=10,lat=90)
@@ -42,7 +42,7 @@ end
         end
     end
 
-    for NF in (Float32,Float64)
+    for NF in (Float32, Float64)
         for n in 1:1000
             # move particles 1-4x around the globe
             for k in 1:4
@@ -61,17 +61,20 @@ end
                 @test isapprox(p, mod(Particle(lon = p.lon - k*360, lat = p.lat - k*360, σ=p.σ)); atol, rtol)
             end
         end
+
+        # this test kept failing in CI
+        p = Particle{NF}(360.0,  0, 0)
+        @test mod(p) ≈ p
+        @test p ≈ mod(p)
     end
 end
 
 @testset "Random particles" begin
     @test rand(Particle) isa Particle
     @test rand(Particle{Float16}) isa Particle
-    @test rand(Particle{Float64,false}) isa Particle
 
     @test rand(Particle,5) isa Vector{Particle}
     @test rand(Particle{Float32},5) isa Vector{Particle{Float32}}
-    @test rand(Particle{Float32,false},5) isa Vector{Particle{Float32,false}}
 
     for NF in (Float16, Float32, Float64)
         for i in 1:1000
@@ -82,24 +85,12 @@ end
 
 @testset "Particle conversion" begin
     for NF in (Float16, Float32, Float64)
-        v = zeros(Particle{NF},5)       # active/inactive not specified
+        v = zeros(Particle{NF},5)      
         v[1] = Particle(lon=1, lat=2)
         v[2] = Particle{Float64}(lon=1, lat=2)
-        v[3] = Particle{Float64, false}(lon=1, lat=2)
 
         for particle in v
             @test particle isa Particle{NF}
-        end
-    end
-
-    for NF in (Float16, Float32, Float64)
-        v = zeros(Particle{NF, true}, 5)                # all particles active
-        v[1] = Particle(lon=1, lat=2)
-        v[2] = Particle{Float64}(lon=1, lat=2)
-        v[3] = Particle{Float64, false}(lon=1, lat=2)   # will convert to active
-
-        for particle in v
-            @test particle isa Particle{NF, true}
         end
     end
 end
@@ -132,5 +123,9 @@ end
 
         p = Particle{NF}(lon=0,lat=-89)
         @test mod(move(p,-1,-4)) ≈ Particle{NF}(lon=179,lat=-87) atol=atol rtol=rtol
+
+        # move inactive particle: should not move
+        p = deactivate(Particle{NF}(lon=2,lat=2))
+        @test move(p,1,2) == p
     end
 end

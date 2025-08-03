@@ -14,7 +14,7 @@
             diagn = simulation.diagnostic_variables
 
             (; expl, impl) = model.horizontal_diffusion
-            vor = progn.vor[1]
+            vor = get_step(progn.vor, 1)
             (; vor_tend) = diagn.tendencies
 
             # apply diffusion
@@ -22,17 +22,17 @@
 
             # diffusion tendency has opposite sign (real/imag respectively)
             # than prognostic variable to act as a dissipation 
-            (; lmax, mmax) = model.spectral_transform
+            (; spectrum) = model.spectral_transform
             for k in eachmatrix(vor, vor_tend)
-                for m in 1:mmax+1
-                    for l in max(2, m):lmax
+                for m in 1:spectrum.mmax
+                    for l in max(2, m):(spectrum.lmax-1)
                         @test -sign(real(vor[l, m, k])) == sign(real(vor_tend[l, m, k]))
                         @test -sign(imag(vor[l, m, k])) == sign(imag(vor_tend[l, m, k]))
                     end
                 end
             end
 
-            vor2 = progn.vor[2]
+            vor2 = get_step(progn.vor, 2)
             SpeedyWeather.leapfrog!(vor, vor2, vor_tend, model.time_stepping.Δt, 1, model.time_stepping)
 
             @test any(vor .!= vor2)    # check that at least some coefficients are different

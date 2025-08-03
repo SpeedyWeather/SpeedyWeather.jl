@@ -13,7 +13,7 @@ function SpeedyTransforms.transform!(
 )
     grid = diagn.grid.random_pattern
     spec = progn.random_pattern
-    transform!(grid, spec, spectral_transform)
+    transform!(grid, spec, diagn.dynamics.scratch_memory, spectral_transform)
 
     if :clamp in fieldnames(typeof(random_process))
         clamp!(grid, random_process.clamp...)
@@ -48,10 +48,10 @@ evolving `wavenumbers` with respectice `time_scales` and `standard_deviations`
 independently. Transformed after every time step to grid space with a
 `clamp` applied to limit extrema. For reproducability `seed` can be
 provided and an independent `random_number_generator` is used
-that is reseeded on every `initialize!`. Fields are $(TYPEDFIELDS)"""
+that is reseeded on every `initialize!`. Fields are: $(TYPEDFIELDS)"""
 @kwdef struct SpectralAR1Process{NF, VectorType} <: AbstractRandomProcess
     trunc::Int
-    
+
     "[OPTION] Time scale of the AR1 process"
     time_scale::Second = Hour(6)
 

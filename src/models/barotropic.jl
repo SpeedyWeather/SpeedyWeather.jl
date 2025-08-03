@@ -11,7 +11,7 @@ passed on as keyword arguments, e.g. `planet=Earth(spectral_grid)`. Fields, repr
 model components, are
 $(TYPEDFIELDS)"""
 @kwdef mutable struct BarotropicModel{
-    DS,     # <:DeviceSetup,
+    AR,     # <:AbstractArchitecture,
     GE,     # <:AbstractGeometry,
     PL,     # <:AbstractPlanet,
     AT,     # <:AbstractAtmosphere,
@@ -30,20 +30,20 @@ $(TYPEDFIELDS)"""
 } <: Barotropic
     
     spectral_grid::SpectralGrid
-    device_setup::DS = DeviceSetup(spectral_grid.device)
+    architecture::AR = spectral_grid.architecture
     
     # DYNAMICS
     geometry::GE = Geometry(spectral_grid)
     planet::PL = Earth(spectral_grid)
     atmosphere::AT = EarthAtmosphere(spectral_grid)
     coriolis::CO = Coriolis(spectral_grid)
-    forcing::FR = NoForcing()
-    drag::DR = NoDrag()
+    forcing::FR = KolmogorovFlow(spectral_grid)
+    drag::DR = LinearVorticityDrag(spectral_grid)
     particle_advection::PA = NoParticleAdvection()
     initial_conditions::IC = InitialConditions(Barotropic)
     
     # VARIABLES
-    random_process::RP = NoRandomProcess()
+    random_process::RP = NoRandomProcess(spectral_grid)
     tracers::TRACER_DICT = TRACER_DICT()
 
     # NUMERICS
@@ -60,6 +60,13 @@ end
 
 prognostic_variables(::Type{<:Barotropic}) = (:vor,)
 default_concrete_model(::Type{Barotropic}) = BarotropicModel
+
+parameters(model::Barotropic; kwargs...) = SpeedyParams(
+    planet = parameters(model.planet; component=:planet, kwargs...),
+    atmosphere = parameters(model.atmosphere; component=:atmosphere, kwargs...),
+    forcing = parameters(model.forcing; component=:forcing, kwargs...),
+    drag = parameters(model.drag; component=:drag, kwargs...),
+)
 
 """
 $(TYPEDSIGNATURES)

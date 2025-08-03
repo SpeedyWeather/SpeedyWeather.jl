@@ -16,9 +16,9 @@ Example
 
 with cell center c (the grid point), e, s, w, n the vertices and o the surrounding grid points.
 Returns 2xnpoints arrays for east, south, west, north each containing the longitude and latitude of the vertices."""
-function get_vertices(Grid::Type{<:AbstractGridArray}, nlat_half::Integer)
+function get_vertices(Grid::Type{<:AbstractGrid}, nlat_half::Integer)
 
-    npoints = get_npoints2D(Grid, nlat_half)
+    npoints = get_npoints(Grid, nlat_half)
     londs, latds = get_londlatds(Grid, nlat_half)
 
     # use the locator to find the neighbouring grid points
@@ -81,10 +81,11 @@ end
 
 """$(TYPEDSIGNATURES)
 Vertices for full grids, other definition than for reduced grids to prevent
-a diamond shape of the cells. Use default rectangular instead."""
-function get_vertices(Grid::Type{<:AbstractFullGridArray}, nlat_half::Integer)
+a diamond shape of the cells. Use default rectangular instead.
+Effectively rotating the vertices clockwise by 45˚, making east south-east etc."""
+function get_vertices(Grid::Type{<:AbstractFullGrid}, nlat_half::Integer)
 
-    npoints = get_npoints2D(Grid, nlat_half)
+    npoints = get_npoints(Grid, nlat_half)
     nlat = get_nlat(Grid, nlat_half)
     nlon = get_nlon(Grid, nlat_half)
     latd = get_latd(Grid, nlat_half)
@@ -119,4 +120,49 @@ function get_vertices(Grid::Type{<:AbstractFullGridArray}, nlat_half::Integer)
 
     # retain clockwise order
     return seast, swest, nwest, neast
-end    
+end
+
+"""$(TYPEDSIGNATURES)
+Return a 5xN matrix `polygons` (or grid cells) of `NTuple{2, Float64}` where the first 4 rows
+are the vertices (E, S, W, N) of every grid points ij in 1:N, row 5 is duplicated north vertex
+to close the grid cell. Use keyword arguemnt `add_nan=true` (default `false`) to add a 6th row
+with (NaN, NaN) to separate grid cells when drawing them as a continuous line with `vec(polygons)`."""
+function get_gridcell_polygons(
+    Grid::Type{<:AbstractGrid},
+    nlat_half::Integer;
+    add_nan::Bool = false,
+)
+    npoints = get_npoints(Grid, nlat_half)
+
+    # vertex east, south, west, north (i.e. clockwise for every grid point)
+    E, S, W, N = get_vertices(Grid, nlat_half)
+
+    @boundscheck size(N) == size(W) == size(S) == size(E) || throw(BoundsError("Vertices must have the same size"))
+    @boundscheck size(N) == (2, npoints) || throw(BoundsError("Number of vertices and npoints do not agree"))
+
+    # number of vertices = 4, 5 to close the polygon, 6 to add a nan
+    # to prevent grid lines to be drawn between cells
+    nvertices = add_nan ? 6 : 5
+
+    # allocate polygons as tuple so that no data copy has to be made in Makie
+    polygons = Matrix{NTuple{2, Float64}}(undef, nvertices, npoints)
+
+    @inbounds for ij in 1:npoints
+        polygons[1, ij] = (E[1, ij], E[2, ij])  # clockwise
+        polygons[2, ij] = (S[1, ij], S[2, ij])
+        polygons[3, ij] = (W[1, ij], W[2, ij])
+        polygons[4, ij] = (N[1, ij], N[2, ij])
+        polygons[5, ij] = (E[1, ij], E[2, ij])  # back to east to close the polygon        
+    end
+
+    if add_nan  # add a NaN to separate grid cells
+        for ij in 1:npoints
+            polygons[6, ij] = (NaN, NaN)
+        end
+    end
+
+    return polygons
+end
+
+get_gridcell_polygons(grid::AbstractGrid; kwargs...) =
+    get_gridcell_polygons(typeof(grid), grid.nlat_half; kwargs...)

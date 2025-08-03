@@ -12,15 +12,34 @@ $(TYPEDFIELDS)"""
     "[OPTION] path to output folder, run_???? will be created within"
     path::String = pwd()
     
-    "[OPTION] run identification number/string"
-    id::String = "0001"
-    run_path::String = ""                   # will be determined in initalize!
+    "[OPTION] Prefix for run folder where data is stored, e.g. 'run_'"
+    run_prefix::String = "run"
+
+    "[OPTION] run identification, added between run_prefix and run_number"
+    id::String = ""
+
+    "[OPTION] run identification number, automatically determined if overwrite=false"
+    run_number::Int = 1
+
+    "[OPTION] run numbers digits"
+    run_digits::Int = 4
+
+    "[DERIVED] folder name where data is stored, determined at initialize!"
+    run_folder::String = ""
+
+    "[DERIVED] full path to folder where data is stored, determined at initialize!"
+    run_path::String = ""
+
+    "[OPTION] Overwrite an existing run folder?"
+    overwrite::Bool = false
     
     "[OPTION] name of the output jld2 file"
     filename::String = "output.jld2"
     
     "[OPTION] also write restart file if output==true?"
     write_restart::Bool = true
+
+    "[OPTION] package version, used restart file"
     pkg_version::VersionNumber = isnothing(pkgversion(SpeedyWeather)) ? v"0.0.0" : pkgversion(SpeedyWeather)
 
     "[OPTION] output frequency, time step"
@@ -66,12 +85,12 @@ function initialize!(
     
     # GET RUN ID, CREATE FOLDER
     # get new id only if not already specified
-    output.id = get_run_id(output.path, output.id)
-    output.run_path = create_output_folder(output.path, output.id) 
-    
-    feedback.id = output.id             # synchronize with feedback struct
+    determine_run_folder!(output)
+    create_run_folder!(output)
+
+    feedback.run_folder = output.run_folder     # synchronize with feedback struct
     feedback.run_path = output.run_path
-    feedback.progress_meter.desc = "Weather is speedy: run $(output.id) "
+    feedback.progress_meter.desc = "Weather is speedy: $(output.run_folder) "
     feedback.output = true              # if output=true set feedback.output=true too!
 
     # OUTPUT FREQUENCY

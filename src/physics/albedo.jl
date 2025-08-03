@@ -78,24 +78,21 @@ initialize!(albedo::GlobalConstantAlbedo, ::PrimitiveEquation) = nothing
 ## MANUAL ALBEDO
 export ManualAlbedo
 
-"""Manual albedo field, to be used with set! and is copied into the diagnostic variables on every time step.
+"""Manual albedo field, to be used with `set!` and is copied into the diagnostic variables on every time step.
 Defined so that parameterizations can change the albedo at every time step (e.g. snow cover) without
 losing the information of the original surface albedo. Fields are
 $(TYPEDFIELDS)"""
-struct ManualAlbedo{NF, Grid} <: AbstractAlbedo
-    albedo::Grid
+struct ManualAlbedo{NF, GridVariable2D} <: AbstractAlbedo
+    albedo::GridVariable2D
 end
 
-ManualAlbedo(SG::SpectralGrid) = ManualAlbedo{SG.NF, SG.GridVariable2D}(zeros(SG.GridVariable2D, SG.nlat_half))
+ManualAlbedo(SG::SpectralGrid) = ManualAlbedo{SG.NF, SG.GridVariable2D}(zeros(SG.GridVariable2D, SG.grid))
 initialize!(albedo::ManualAlbedo, model::PrimitiveEquation) = nothing
 
 ## ALEBDO CLIMATOLOGY
 
 export AlbedoClimatology
-@kwdef struct AlbedoClimatology{NF, Grid} <: AbstractAlbedo
-    "number of latitudes on one hemisphere, Equator included"
-    nlat_half::Int
-
+@kwdef struct AlbedoClimatology{NF, GridVariable2D} <: AbstractAlbedo
     "[OPTION] path to the folder containing the albedo file, pkg path default"
     path::String = "SpeedyWeather.jl/input_data"
 
@@ -109,19 +106,20 @@ export AlbedoClimatology
     file_Grid::Type{<:AbstractGrid} = FullGaussianGrid
 
     "Albedo climatology"
-    albedo::Grid = zeros(Grid, nlat_half)
+    albedo::GridVariable2D
 end
 
 function AlbedoClimatology(SG::SpectralGrid; kwargs...)
-    (; NF, Grid, nlat_half) = SG
-    AlbedoClimatology{NF,Grid{NF}}(;nlat_half, kwargs...)
+    (; NF, GridVariable2D, grid) = SG
+    albedo = zeros(GridVariable2D, grid)
+    AlbedoClimatology{NF, GridVariable2D}(; albedo, kwargs...)
 end
 
 # set albedo with grid, scalar, function; just define path `albedo.albedo` to grid here
 set!(albedo::AbstractAlbedo, args...; kwargs...) = set!(albedo.albedo, args...; kwargs...)
 
 function initialize!(albedo::AlbedoClimatology, model::PrimitiveEquation)
-    
+
     # LOAD NETCDF FILE
     if albedo.path == "SpeedyWeather.jl/input_data"
         path = joinpath(@__DIR__, "../../input_data", albedo.file)

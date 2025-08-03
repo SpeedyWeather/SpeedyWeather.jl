@@ -3,7 +3,7 @@ export Geometry
 
 """
 $(TYPEDSIGNATURES)
-Construct Geometry struct containing parameters and arrays describing an iso-latitude grid <:AbstractGrid
+Construct Geometry struct containing parameters and arrays describing an iso-latitude grid `<:AbstractGrid`
 and the vertical levels. Pass on `SpectralGrid` to calculate the following fields
 $(TYPEDFIELDS)
 """
@@ -18,14 +18,14 @@ $(TYPEDFIELDS)
     spectral_grid::SpectralGrid
 
     "resolution parameter nlat_half of Grid, # of latitudes on one hemisphere (incl Equator)"
-    nlat_half::Int = spectral_grid.nlat_half      
+    nlat_half::Int = spectral_grid.nlat_half
 
     "maximum number of longitudes (at/around Equator)"
     nlon_max::Int = get_nlon_max(Grid, nlat_half)
 
     "number of latitude rings"
     nlat::Int = spectral_grid.nlat
-    
+
     "number of vertical levels"
     nlayers::Int = spectral_grid.nlayers
 
@@ -33,40 +33,40 @@ $(TYPEDFIELDS)
     npoints::Int = spectral_grid.npoints
 
     "Planet's radius [m]"
-    radius::NF = spectral_grid.radius    
+    radius::NF = spectral_grid.radius
 
 
     # ARRAYS OF LANGITUDES/LONGITUDES
     "array of longitudes in degrees (0...360˚), empty for non-full grids"
     lond::VectorFloat64Type = get_lond(Grid, nlat_half)
-    
+
     "array of latitudes in degrees (90˚...-90˚)"
     latd::VectorFloat64Type = get_latd(Grid, nlat_half)
-    
+
     "array of latitudes in radians (π...-π)"
     lat::VectorType = get_lat(Grid, nlat_half)
-    
+
     "array of colatitudes in radians (0...π)"
     colat::VectorType = get_colat(Grid, nlat_half)
 
     "longitude (0˚...360˚) for each grid point in ring order"
     londs::VectorType = get_londlatds(Grid, nlat_half)[1]
-    
+
     "latitude (-90˚...˚90) for each grid point in ring order"
     latds::VectorType = get_londlatds(Grid, nlat_half)[2]
 
     "longitude (0...2π) for each grid point in ring order"
     lons::VectorType = RingGrids.get_lonlats(Grid, nlat_half)[1]
-    
+
     "latitude (-π/2...π/2) for each grid point in ring order"
     lats::VectorType = RingGrids.get_lonlats(Grid, nlat_half)[2]
 
     "sin of latitudes"
     sinlat::VectorType = sind.(latd)
-    
+
     "cos of latitudes"
     coslat::VectorType = cosd.(latd)
-    
+
     "= 1/cos(lat)"
     coslat⁻¹::VectorType = 1 ./ coslat
 
@@ -74,7 +74,7 @@ $(TYPEDFIELDS)
     coslat²::VectorType = coslat.^2
 
     "# = 1/cos²(lat)"
-    coslat⁻²::VectorType = 1 ./ coslat²            
+    coslat⁻²::VectorType = 1 ./ coslat²
 
     # VERTICAL SIGMA COORDINATE σ = p/p0 (fraction of surface pressure)
     "σ at half levels, σ_k+1/2"
@@ -97,17 +97,17 @@ end
 $(TYPEDSIGNATURES)
 Generator function for `Geometry` struct based on `spectral_grid`."""
 function Geometry(SG::SpectralGrid; vertical_coordinates=SigmaCoordinates(SG.nlayers))
-    
+
     (; nlayers) = SG
     error_message = "nlayers=$(SG.nlayers) does not match length nlayers="*
         "$(vertical_coordinates.nlayers) in spectral_grid.vertical_coordinates."
     @assert nlayers == vertical_coordinates.nlayers error_message
 
-    (; NF, Grid, VectorType) = SG
+    (; NF, grid, VectorType) = SG
     VectorTypeFloat64 = SG.ArrayType{Float64, 1}
 
     (; σ_half) = vertical_coordinates
-    return Geometry{NF, Grid, VectorType, VectorTypeFloat64}(; spectral_grid=SG, σ_levels_half=σ_half)
+    return Geometry{NF, typeof(grid), VectorType, VectorTypeFloat64}(; spectral_grid=SG, σ_levels_half=σ_half)
 end
 
 function Base.show(io::IO, G::Geometry)
@@ -133,7 +133,7 @@ function σ_interpolation_weights(
     # was log(0.99) in Fortran SPEEDY code but doesn't make sense to me
     weights[end] =  (log(σ_levels_half[nlayers+1]) - log(σ_levels_full[nlayers])) /
                         (log(σ_levels_full[nlayers]) - log(σ_levels_full[nlayers-1]))
-    
+
     return weights
 end
 

@@ -24,14 +24,7 @@ function timestep!(
 end
 
 export SeasonalSoilMoisture
-@kwdef struct SeasonalSoilMoisture{NF, Grid} <: AbstractSoilMoisture
-
-    "number of latitudes on one hemisphere, Equator included"
-    nlat_half::Int
-
-    "number of soil layers"
-    nlayers::Int
-
+@kwdef struct SeasonalSoilMoisture{NF, GridVariable4D} <: AbstractSoilMoisture
     # READ CLIMATOLOGY FROM FILE
     "[OPTION] path to the folder containing the soil moisture file, pkg path default"
     path::String = "SpeedyWeather.jl/input_data"
@@ -39,8 +32,10 @@ export SeasonalSoilMoisture
     "[OPTION] filename of soil moisture"
     file::String = "soil_moisture.nc"
 
-    "[OPTION] variable name in netcdf file"
+    "[OPTION] variable name in netcdf file for layer 1"
     varname_layer1::String = "swl1"
+
+    "[OPTION] variable name in netcdf file for layer 2"
     varname_layer2::String = "swl2"
 
     "[OPTION] Grid the soil moisture file comes on"
@@ -51,13 +46,14 @@ export SeasonalSoilMoisture
 
     # to be filled from file
     "Monthly soil moisture volume fraction [1], interpolated onto Grid"
-    monthly_soil_moisture::Grid = zeros(Grid, nlat_half, nlayers, 12)
+    monthly_soil_moisture::GridVariable4D
 end
 
 # generator function
 function SeasonalSoilMoisture(SG::SpectralGrid; kwargs...)
-    (; NF, GridVariable4D, nlayers_soil, nlat_half) = SG
-    return SeasonalSoilMoisture{NF, GridVariable4D}(; nlat_half, nlayers=nlayers_soil, kwargs...)
+    (; NF, GridVariable4D, grid, nlayers_soil) = SG
+    monthly_soil_moisture = zeros(GridVariable4D, grid, nlayers_soil, 12)
+    return SeasonalSoilMoisture{NF, GridVariable4D}(; monthly_soil_moisture, kwargs...)
 end
 
 # don't both initializing for the dry model
@@ -77,10 +73,12 @@ function initialize!(soil::SeasonalSoilMoisture, model::PrimitiveEquation)
     # read out netCDF data
     nx, ny, nt = ncfile.dim["lon"], ncfile.dim["lat"], ncfile.dim["time"]
     nlat_half = RingGrids.get_nlat_half(soil.file_Grid, nx*ny)
+    grid = soil.file_Grid(nlat_half)
 
     # the soil moisture from file but wrapped into a grid
     NF = eltype(monthly_soil_moisture)
-    soil_moisture_file = zeros(soil.file_Grid{NF}, nlat_half, soil.nlayers, nt)
+    nlayers = size(monthly_soil_moisture, 2)
+    soil_moisture_file = zeros(NF, grid, nlayers, nt)
 
     for l in 1:nt   # read out monthly to swap dimensions to horizontal - vertical - time
         soil_moisture_file[:, 1, l] .= vec(ncfile[soil.varname_layer1].var[:, :, l])
@@ -92,11 +90,11 @@ function initialize!(soil::SeasonalSoilMoisture, model::PrimitiveEquation)
     fill_value1 === fill_value2 || @warn "Fill values are different for the two soil layers, use only from layer 1"
     soil_moisture_file[soil_moisture_file .=== fill_value1] .= soil.missing_value      # === to include NaN
     
-    @boundscheck grids_match(monthly_soil_moisture, soil_moisture_file, vertical_only=true) ||
+    @boundscheck fields_match(monthly_soil_moisture, soil_moisture_file, vertical_only=true) ||
         throw(DimensionMismatch(monthly_soil_moisture, soil_moisture_file))
 
     # create interpolator from grid in file to grid used in model
-    interp = RingGrids.interpolator(Float32, monthly_soil_moisture, soil_moisture_file)
+    interp = RingGrids.interpolator(monthly_soil_moisture, soil_moisture_file, NF=Float32)
     interpolate!(monthly_soil_moisture, soil_moisture_file, interp)
     return nothing
 end
@@ -139,7 +137,7 @@ function timestep!(
     (; monthly_soil_moisture) = soil
     (; soil_moisture) = progn.land
 
-    for k in eachgrid(soil_moisture)
+    for k in eachlayer(soil_moisture)
         for ij in eachgridpoint(soil_moisture)
             soil_moisture[ij, k] = (1-weight) * monthly_soil_moisture[ij, k, this_month] +
                                     weight  * monthly_soil_moisture[ij, k, next_month]
@@ -152,22 +150,22 @@ end
 export LandBucketMoisture
 
 @kwdef struct LandBucketMoisture{NF} <: AbstractSoilMoisture
-    "Time scale of vertical diffusion [s]"
+    "[OPTION] Time scale of vertical diffusion [s]"
     time_scale::Second = Day(2)
 
-    "Fraction of top layer runoff that is put into layer below [1]"
+    "[OPTION] Fraction of top layer runoff that is put into layer below [1]"
     runoff_fraction::NF = 0.5
 
-    "[OPTION] Initial soil moisture, volume fraction [1]"
-    initial_moisture::NF = 0
+    "[OPTION] Initial soil moisture, volume fraction [1], start saturated for faster spinup"
+    initial_moisture::NF = 1
     
     "[OPTION] Apply land-sea mask to NaN ocean-only points?"
     mask::Bool = false
 
-    "Field capacity per meter soil [m], top layer, f = γz, set by land.temperature"
+    "[DERIVED] Water at field capacity [m], top layer, f = γz, set at initialize from by land.thermodynamics and .geometry"
     f₁::Base.RefValue{NF} = Ref(zero(NF))
 
-    "Field capacity per meter soil [m], lower layer, f = γz, set by land.temperature"
+    "[DERIVED] Water at field capacity [m], lower layer, f = γz, set at initialize from by land.thermodynamics and .geometry"
     f₂::Base.RefValue{NF} = Ref(zero(NF))
 end
 
@@ -175,14 +173,14 @@ LandBucketMoisture(SG::SpectralGrid; kwargs...) = LandBucketMoisture{SG.NF}(; kw
 function initialize!(soil::LandBucketMoisture, model::PrimitiveEquation)
     (; nlayers_soil) = model.spectral_grid
     @assert nlayers_soil == 2 "LandBucketMoisture only works with 2 soil layers "*
-        "but spectral_grid.nlayers_soil = $nlayers_soil given. Ignoring additional layers."
-
+    "but spectral_grid.nlayers_soil = $nlayers_soil given. Ignoring additional layers."
+    
     # set the field capacity given layer thickness and 
     γ = model.land.thermodynamics.field_capacity
     z₁ = model.land.geometry.layer_thickness[1]
     z₂ = model.land.geometry.layer_thickness[2]
-    soil.f₁[] = γ*z₁
-    soil.f₂[] = γ*z₂
+    soil.f₁[] = γ*z₁    # amount of water at field capacity in first layer [m]
+    soil.f₂[] = γ*z₂    # amount of water at field capacity in second layer [m]
 
     return nothing
 end
@@ -231,7 +229,8 @@ function timestep!(
     E = diagn.physics.land.evaporative_flux         # [kg/s/m²], divide by density for [m/s]
     R = diagn.physics.land.river_runoff             # diagnosed [m/s]
 
-    @boundscheck grids_match(soil_moisture, Pconv, Plsc, E, R, horizontal_only=true) || throw(DimensionMismatch(soil_moisture, Pconv))
+    @boundscheck fields_match(soil_moisture, Pconv, Plsc, E, R, horizontal_only=true) ||
+        throw(DimensionMismatch(soil_moisture, Pconv))
     @boundscheck size(soil_moisture, 2) == 2 || throw(DimensionMismatch)
     f₁, f₂ = soil.f₁[], soil.f₂[]
     p = soil.runoff_fraction        # fraction of top layer runoff put into lower layer
@@ -254,8 +253,8 @@ function timestep!(
             soil_moisture[ij, 2] += Δt*f₁_f₂*D
 
             # river runoff
-            W₁ = soil_moisture[ij, 1]
-            δW₁ = W₁ - min(W₁, 1)               # excess moisture in top layer
+            W₁ = soil_moisture[ij, 1]           # wrt to field capacity so maximum is 1
+            δW₁ = W₁ - min(W₁, 1)               # excess moisture in top layer, cap at field capacity
             soil_moisture[ij, 1] -= δW₁         # remove excess from top layer
             soil_moisture[ij, 2] += p*δW₁*f₁_f₂ # add fraction to lower layer
             R[ij] += Δt*(1-p)*δW₁*f₁            # accumulate river runoff [m] of top layer

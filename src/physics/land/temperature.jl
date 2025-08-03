@@ -1,11 +1,7 @@
 abstract type AbstractLandTemperature <: AbstractParameterization end
 
 export SeasonalLandTemperature
-@kwdef struct SeasonalLandTemperature{NF, Grid} <: AbstractLandTemperature
-
-    "number of latitudes on one hemisphere, Equator included"
-    nlat_half::Int
-
+@kwdef struct SeasonalLandTemperature{NF, GridVariable3D} <: AbstractLandTemperature
     "[OPTION] path to the folder containing the land temperature file, pkg path default"
     path::String = "SpeedyWeather.jl/input_data"
 
@@ -23,13 +19,14 @@ export SeasonalLandTemperature
 
     # to be filled from file
     "Monthly land surface temperatures [K], interpolated onto Grid"
-    monthly_temperature::Grid = zeros(Grid, nlat_half, 12)
+    monthly_temperature::GridVariable3D
 end
 
 # generator function
 function SeasonalLandTemperature(SG::SpectralGrid; kwargs...)
-    (; NF, GridVariable3D, nlat_half) = SG
-    return SeasonalLandTemperature{NF, GridVariable3D}(; nlat_half, kwargs...)
+    (; NF, GridVariable3D, grid) = SG
+    monthly_temperature = zeros(GridVariable3D, grid, 12)  # 12 months
+    return SeasonalLandTemperature{NF, GridVariable3D}(; monthly_temperature, kwargs...)
 end
 
 function initialize!(land::SeasonalLandTemperature, model::PrimitiveEquation)
@@ -48,11 +45,11 @@ function initialize!(land::SeasonalLandTemperature, model::PrimitiveEquation)
     lst = land.file_Grid(ncfile[land.varname].var[:, :, :], input_as=Matrix)
     lst[lst .=== fill_value] .= land.missing_value      # === to include NaN
     
-    @boundscheck grids_match(monthly_temperature, lst, vertical_only=true) ||
+    @boundscheck fields_match(monthly_temperature, lst, vertical_only=true) ||
         throw(DimensionMismatch(monthly_temperature, lst))
 
     # create interpolator from grid in file to grid used in model
-    interp = RingGrids.interpolator(Float32, monthly_temperature, lst)
+    interp = RingGrids.interpolator(monthly_temperature, lst, NF=Float32)
     interpolate!(monthly_temperature, lst, interp)
     return nothing
 end
@@ -92,7 +89,7 @@ function timestep!(
     end
 
     # set other layers to the same temperature?
-    # for k in eachgrid(soil_temperature)
+    # for k in eachlayer(soil_temperature)
     #     if k != k0
     #         soil_temperature[:, k] .= soil_temperature[:, k0]
     #     end
@@ -180,8 +177,10 @@ function timestep!(
     Ev = diagn.physics.land.evaporative_flux
     S = diagn.physics.land.sensible_heat_flux
 
-    @boundscheck grids_match(soil_temperature, Rsd, Rsu, Rld, Rlu, Ev, S, horizontal_only=true) || throw(DimensionMismatch(soil_temperature, Rs))
+    @boundscheck fields_match(soil_temperature, Rsd, Rsu, Rld, Rlu, Ev, S, horizontal_only=true) ||
+        throw(DimensionMismatch(soil_temperature, Rs))
     @boundscheck size(soil_moisture, 2) == size(soil_temperature, 2) == 2 || throw(DimensionMismatch)
+    
     λ = thermodynamics.heat_conductivity
     γ = thermodynamics.field_capacity
     Cw = thermodynamics.heat_capacity_water

@@ -7,21 +7,21 @@ import FiniteDifferences: to_vec
 # FiniteDifferences needs to be able to convert data structures to Vectors and back 
 # This doesn't work out of the box with our data types, so we'll define those 
 # conversions here.
-function FiniteDifferences.to_vec(x::Grid) where Grid <: AbstractGridArray
+function FiniteDifferences.to_vec(x::AbstractField)
     x_vec, from_vec = FiniteDifferences.to_vec(Array(x))
 
-    function GridArray_from_vec(x_vec)
-        return Grid(reshape(from_vec(x_vec), size(x)), x.nlat_half)
+    function field_from_vec(x_vec)
+        return Field(reshape(from_vec(x_vec), size(x)), x.grid)
     end 
 
-    return x_vec, GridArray_from_vec
+    return x_vec, field_from_vec
 end 
 
 function FiniteDifferences.to_vec(x::LTA) where LTA <: LowerTriangularArray
     x_vec, from_vec = FiniteDifferences.to_vec(x.data)
 
     function LowerTriangularArray_from_vec(x_vec)
-        return LowerTriangularArray(reshape(from_vec(x_vec), size(x)), x.m, x.n)
+        return LowerTriangularArray(reshape(from_vec(x_vec), size(x)), x.spectrum)
     end 
 
     return x_vec, LowerTriangularArray_from_vec

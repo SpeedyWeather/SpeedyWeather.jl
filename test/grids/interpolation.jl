@@ -12,16 +12,17 @@ import Random
         
         @testset for NF in (Float32, Float64)
         
-            A = randn(Grid{NF}, 8)          # a very low resolution grid
+            grid = Grid(8)
+            A = randn(NF, grid)             # a very low resolution grid
             c = randn(NF)
             A .= c                          # constant data globally
 
-            λs = 360*rand(npoints)          # some longitudes in [0˚, 360˚E]
-            θs = 180*rand(npoints) .- 90    # some latitudes in [-90˚, 90˚N]
+            λs = 360*rand(NF, npoints)          # some longitudes in [0˚, 360˚E]
+            θs = 180*rand(NF, npoints) .- 90    # some latitudes in [-90˚, 90˚N]
             As = RingGrids.interpolate(λs, θs, A)
 
             for a in As
-                @test a ≈ c
+                @test a ≈ c 
             end
         end
     end
@@ -39,7 +40,8 @@ end
         
         @testset for NF in (Float32, Float64)
         
-            A = zeros(Grid{NF}, 32)             # some resolution
+            grid = Grid(32)
+            A = zeros(NF, grid)                 # some resolution
             G = RingGrids.GridGeometry(A)
             lat1 = G.latd[2]                    # latitude of first ring
             
@@ -53,13 +55,13 @@ end
             # don't interpolate above first or below last ring
             # northpole value isn't 90 as it's just the average of the
             # first ring, same for south pole
-            λs = 360*rand(npoints)              # some longitudes in [0˚, 360˚E]
-            θs = 2lat1*rand(npoints) .- lat1    # some latitudes in [-90˚, 90˚N]
+            λs = 360*rand(NF, npoints)              # some longitudes in [0˚, 360˚E]
+            θs = 2lat1*rand(NF, npoints) .- lat1    # some latitudes in [-90˚, 90˚N]
             
-            As = RingGrids.interpolate(λs, θs, A)
+            As = RingGrids.interpolate(λs, θs, A; NF)
 
             for (a, θ) in zip(As, θs)
-                @test a ≈ θ
+                @test a ≈ θ 
             end
         end
     end
@@ -77,7 +79,8 @@ end
         
         @testset for NF in (Float32, Float64)
         
-            A = zeros(Grid{NF}, 32)          # some resolution
+            grid = Grid(32)
+            A = zeros(NF, grid)             # some resolution
             G = RingGrids.GridGeometry(A)
             lat1 = G.latd[2]                # latitude of first ring
             
@@ -94,13 +97,13 @@ end
             # don't interpolate above first or below last ring
             # northpole value isn't 90 as it's just the average of the
             # first ring, same for south pole
-            λs = 240*rand(npoints) .+ 60        # some longitudes in [60˚, 300˚E]
-            θs = 2lat1*rand(npoints) .- lat1    # some latitudes in (-90˚, 90˚N)
+            λs = 240*rand(NF, npoints) .+ 60        # some longitudes in [60˚, 300˚E]
+            θs = 2lat1*rand(NF, npoints) .- lat1    # some latitudes in (-90˚, 90˚N)
             
-            As = RingGrids.interpolate(λs, θs, A)
+            As = RingGrids.interpolate(λs, θs, A; NF)
 
             for (a, λ) in zip(As, λs)
-                @test a ≈ λ
+                @test a ≈ λ rtol=1e-3
             end
 
             f(λ) = λ > 180 ? λ-360 : λ          # 0-360˚ to -180˚-180˚E
@@ -116,13 +119,13 @@ end
             # don't interpolate above first or below last ring
             # northpole value isn't 90 as it's just the average of the
             # first ring, same for south pole
-            λs = 240*rand(npoints) .- 120       # some longitudes in [-120˚, 120˚E]
-            θs = 2lat1*rand(npoints) .- lat1    # some latitudes in (-90˚, 90˚N)
+            λs = 240*rand(NF, npoints) .- 120       # some longitudes in [-120˚, 120˚E]
+            θs = 2lat1*rand(NF, npoints) .- lat1    # some latitudes in (-90˚, 90˚N)
             
-            As = RingGrids.interpolate(λs, θs, A)
+            As = RingGrids.interpolate(λs, θs, A; NF)
 
             for (a, λ) in zip(As, λs)
-                @test a ≈ λ
+                @test a ≈ λ rtol=1e-3
             end
         end
     end
@@ -137,7 +140,8 @@ end
                     OctaHEALPixGrid)
 
         @testset for nlat_half in [4, 8, 16] 
-            G = RingGrids.GridGeometry(Grid, nlat_half)
+            grid = Grid(nlat_half)
+            G = RingGrids.GridGeometry(grid)
             latd = G.latd
 
             n = length(latd)-1
@@ -176,22 +180,21 @@ end
 
             # interpolate to FullGaussianGrid and back and compare
             nlat_half = 32
-            A_interpolated = RingGrids.interpolate(FullGaussianGrid, nlat_half, A)
+            grid = FullGaussianGrid(nlat_half)
+            A_interpolated = RingGrids.interpolate(grid, A)
             A2 = zero(A)
             RingGrids.interpolate!(A2, A_interpolated)
 
             # just check that it's not completely off
-            for ij in RingGrids.eachgridpoint(A, A2)
-                @test A[ij] ≈ A2[ij] rtol=5e-1 atol=5e-1
-            end
+            @test A ≈ A2 rtol=5e-1 atol=5e-1
         end
     end
 end
 
 @testset "3/4D interpolation interfaces" begin
-    A = randn(OctahedralGaussianArray, 16, 2)
-    B = zeros(FullGaussianArray, 16, 2)
-    C = zeros(FullGaussianArray, 16, 2)
+    A = randn(OctahedralGaussianField, 16, 2)
+    B = zeros(FullGaussianField, 16, 2)
+    C = zeros(FullGaussianField, 16, 2)
 
     RingGrids.interpolate!(B, A)
 
@@ -200,9 +203,9 @@ end
 
     @test B == C
 
-    A = randn(OctahedralGaussianArray, 8, 3, 2)
-    B = zeros(FullGaussianArray, 8, 3, 2)
-    C = zeros(FullGaussianArray, 8, 3, 2)
+    A = randn(OctahedralGaussianField, 8, 3, 2)
+    B = zeros(FullGaussianField, 8, 3, 2)
+    C = zeros(FullGaussianField, 8, 3, 2)
 
     RingGrids.interpolate!(B, A)
 

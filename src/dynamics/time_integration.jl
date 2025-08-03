@@ -173,13 +173,19 @@ function leapfrog!(
     w1 = lf == 1 ? zero(NF) : robert_filter*williams_filter/2       # = ν*α/2 in Williams (2009, Eq. 8)
     w2 = lf == 1 ? zero(NF) : robert_filter*(1-williams_filter)/2   # = ν(1-α)/2 in Williams (2009, Eq. 9)
 
-    @inbounds for lm in eachindex(A_old, A_new, tendency)
-        a_old = A_old[lm]                       # double filtered value from previous time step (t-Δt)
-        a_new = a_old + dt_NF*tendency[lm]      # Leapfrog/Euler step depending on dt=Δt, 2Δt (unfiltered at t+Δt)
-        a_update = a_old - 2A_lf[lm] + a_new    # Eq. 8&9 in Williams (2009), calculate only once
-        A_old[lm] = A_lf[lm] + w1*a_update      # Robert's filter: A_old[lm] becomes 2xfiltered value at t
-        A_new[lm] = a_new - w2*a_update         # Williams filter: A_new[lm] becomes 1xfiltered value at t+Δt
-    end
+    launch!(architecture(tendency), SpectralWorkOrder, size(tendency), leapfrog_kernel!, A_old, A_new, A_lf, tendency, dt_NF, w1, w2)
+    synchronize(architecture(tendency))
+end
+
+@kernel inbounds=true function leapfrog_kernel!(A_old, A_new, A_lf, tendency, @Const(dt), @Const(w1), @Const(w2))
+
+    lmk = @index(Global, Linear)    # every harmonic lm, every vertical layer k
+
+    a_old = A_old[lmk]
+    a_new = a_old + dt*tendency[lmk]
+    a_update = a_old - 2A_lf[lmk] + a_new
+    A_old[lmk] = A_lf[lmk] + w1*a_update
+    A_new[lmk] = a_new - w2*a_update
 end
 
 # variables that are leapfrogged in the respective models, e.g. :vor_tend, :div_tend, etc...
@@ -193,7 +199,8 @@ function leapfrog!(
     model::AbstractModel,
 )
     for (varname, tendname) in zip(prognostic_variables(model), tendency_names(model))
-        var_old, var_new = getfield(progn, varname)
+        var = getfield(progn, varname)
+        var_old, var_new = get_steps(var)
         var_tend = getfield(tend, tendname)
         spectral_truncation!(var_tend)
         leapfrog!(var_old, var_new, var_tend, dt, lf, model.time_stepping)
@@ -202,7 +209,7 @@ function leapfrog!(
     # and time stepping for tracers if active
     for (name, tracer) in model.tracers
         if tracer.active
-            var_old, var_new = progn.tracers[name]
+            var_old, var_new = get_steps(progn.tracers[name])
             var_tend = tend.tracers_tend[name]
             spectral_truncation!(var_tend)
             leapfrog!(var_old, var_new, var_tend, dt, lf, model.time_stepping)
@@ -271,8 +278,8 @@ function timestep!(
     lf1::Integer = 2,               # leapfrog index 1 (dis/enables Robert+Williams filter)
     lf2::Integer = 2,               # leapfrog index 2 (time step used for tendencies)
 )
-    model.feedback.nars_detected && return nothing  # exit immediately if NaNs/Infs already present
-    
+    model.feedback.nans_detected && return nothing  # exit immediately if NaNs/Infs already present
+
     # set the tendencies back to zero for accumulation
     fill!(diagn.tendencies, 0, Barotropic)
 
@@ -285,6 +292,8 @@ function timestep!(
     # PARTICLE ADVECTION (always skip 1st step of first_timesteps!)
     not_first_timestep = lf2 == 2
     not_first_timestep && particle_advection!(progn, diagn, model.particle_advection)
+
+    return nothing 
 end
 
 """
@@ -298,7 +307,7 @@ function timestep!(
     lf1::Integer = 2,               # leapfrog index 1 (dis/enables Robert+Williams filter)
     lf2::Integer = 2,               # leapfrog index 2 (time step used for tendencies)
 )
-    model.feedback.nars_detected && return nothing  # exit immediately if NaRs already present
+    model.feedback.nans_detected && return nothing  # exit immediately if NaRs already present
 
     # set the tendencies back to zero for accumulation
     fill!(diagn.tendencies, 0, ShallowWater)
@@ -315,6 +324,8 @@ function timestep!(
     # PARTICLE ADVECTION (always skip 1st step of first_timesteps!)
     not_first_timestep = lf2 == 2
     not_first_timestep && particle_advection!(progn, diagn, model.particle_advection)
+
+    return nothing
 end
 
 """
@@ -329,7 +340,7 @@ function timestep!(
     lf2::Integer = 2,               # leapfrog index 2 (time step used for tendencies)
 )
 
-    model.feedback.nars_detected && return nothing  # exit immediately if NaRs already present
+    model.feedback.nans_detected && return nothing  # exit immediately if NaRs already present
     (; time) = progn.clock                           # current time
 
     # set the tendencies back to zero for accumulation
@@ -359,6 +370,8 @@ function timestep!(
     # PARTICLE ADVECTION (always skip 1st step of first_timesteps!)
     not_first_timestep = lf2 == 2
     not_first_timestep && particle_advection!(progn, diagn, model.particle_advection)
+
+    return nothing 
 end
 
 """$(TYPEDSIGNATURES)

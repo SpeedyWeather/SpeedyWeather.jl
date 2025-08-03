@@ -1,42 +1,45 @@
-"""A `FullOctaHEALPixArray` is an array of full grids, subtyping `AbstractFullGridArray` that use
-OctaHEALPix latitudes for each ring. This type primarily equists to interpolate data from
-the (reduced) OctaHEALPixGrid onto a full grid for output.
-
-First dimension of the underlying `N`-dimensional `data` represents the horizontal dimension,
-in ring order (0 to 360˚E, then north to south), other dimensions are used for the vertical
-and/or time or other dimensions. The resolution parameter of the horizontal grid is
-`nlat_half` (number of latitude rings on one hemisphere, Equator included) and the ring indices
-are precomputed in `rings`. Fields are
+"""A `FullOctaHEALPixGrid` is like a `OctaHEALPixGrid` but with every latitude ring having the same number of longitude
+points (a full grid). This grid is mostly defined for output to minimize the interpolation needed from an
+`OctaHEALPixGrid` to a full grid required for output. A `FullOctaHEALPixGrid` has none of the equal-area properties of the `OctaHEALPixGrid`.
+It only shares the latitudes with the `OctaHEALPixGrid` but uses the longitudes from the `FullGaussianGrid`
+without offset, i.e. the first longitude point on every ring is at 0˚E.
 $(TYPEDFIELDS)"""
-struct FullOctaHEALPixArray{T, N, ArrayType <: AbstractArray{T, N}} <: AbstractFullGridArray{T, N, ArrayType}
-    data::ArrayType                 # data array, ring by ring, north to south
-    nlat_half::Int                  # number of latitudes on one hemisphere
-    rings::Vector{UnitRange{Int}}   # TODO make same array type as data?
-
-    FullOctaHEALPixArray(data::A, nlat_half, rings) where {A <: AbstractArray{T, N}} where {T, N} =
-        check_inputs(data, nlat_half, rings, FullOctaHEALPixArray) ?
-        new{T, N, A}(data, nlat_half, rings) :
-        error_message(data, nlat_half, rings, FullOctaHEALPixArray, T, N, A)
+struct FullOctaHEALPixGrid{A, V, W} <: AbstractFullGrid{A}
+    nlat_half::Int      # number of latitudes on one hemisphere
+    architecture::A     # information about device, CPU/GPU
+    rings::V            # precomputed ring indices
+    whichring::W        # precomputed ring index for each grid point ij
 end
 
-# TYPES
-const FullOctaHEALPixGrid{T} = FullOctaHEALPixArray{T, 1, Vector{T}}
-nonparametric_type(::Type{<:FullOctaHEALPixArray}) = FullOctaHEALPixArray
-horizontal_grid_type(::Type{<:FullOctaHEALPixArray}) = FullOctaHEALPixGrid
+Architectures.nonparametric_type(::Type{<:FullOctaHEALPixGrid}) = FullOctaHEALPixGrid
 
-"""A `FullOctaHEALPixArray` but constrained to `N=1` dimensions (horizontal only) and data is a `Vector{T}`."""
-FullOctaHEALPixGrid
+# FIELD
+const FullOctaHEALPixField{T, N} = Field{T, N, ArrayType, Grid} where {ArrayType, Grid<:FullOctaHEALPixGrid}
+
+# define grid_type (i) without T, N, (ii) with T, (iii) with T, N but not with <:?Field
+# to not have precendence over grid_type(::Type{Field{...})
+grid_type(::Type{FullOctaHEALPixField}) = FullOctaHEALPixGrid
+grid_type(::Type{FullOctaHEALPixField{T}}) where T = FullOctaHEALPixGrid
+grid_type(::Type{FullOctaHEALPixField{T, N}}) where {T, N} = FullOctaHEALPixGrid
+
+function Base.showarg(io::IO, F::Field{T, N, ArrayType, Grid}, toplevel) where {T, N, ArrayType, Grid<:FullOctaHEALPixGrid{A}} where A <: AbstractArchitecture
+    print(io, "FullOctaHEALPixField{$T, $N}")
+    toplevel && print(io, " on ", nonparametric_type(ArrayType))
+    toplevel && print(io, " on ", A)
+end
 
 # SIZE
-nlat_odd(::Type{<:FullOctaHEALPixArray}) = true
-get_npoints2D(::Type{<:FullOctaHEALPixArray}, nlat_half::Integer) = 4nlat_half * (2nlat_half-1)
-get_nlat_half(::Type{<:FullOctaHEALPixArray}, npoints2D::Integer) = round(Int, 1/4 + sqrt(1/16 + npoints2D/8))
-get_nlon(::Type{<:FullOctaHEALPixArray}, nlat_half::Integer) = 4nlat_half
+nlat_odd(::Type{<:FullOctaHEALPixGrid}) = true
+get_npoints(::Type{<:FullOctaHEALPixGrid}, nlat_half::Integer) = 4nlat_half * (2nlat_half-1)
+get_nlat_half(::Type{<:FullOctaHEALPixGrid}, npoints::Integer) = round(Int, 1/4 + sqrt(1/16 + npoints/8))
+get_nlon(::Type{<:FullOctaHEALPixGrid}, nlat_half::Integer) = 4nlat_half
 
 ## COORDINATES
-get_latd(::Type{<:FullOctaHEALPixArray}, nlat_half::Integer) = get_latd(OctaHEALPixGrid, nlat_half)
-get_lond(::Type{<:FullOctaHEALPixArray}, nlat_half::Integer) = get_lond(FullGaussianArray, nlat_half)
+get_latd(::Type{<:FullOctaHEALPixGrid}, nlat_half::Integer) = get_latd(OctaHEALPixGrid, nlat_half)
+get_lond(::Type{<:FullOctaHEALPixGrid}, nlat_half::Integer) = get_lond(FullGaussianGrid, nlat_half)
 
 # QUADRATURE (use weights from reduced grids though!)
-get_quadrature_weights(::Type{<:FullOctaHEALPixArray}, nlat_half::Integer) =
-    equal_area_weights(OctaHEALPixArray, nlat_half)
+get_quadrature_weights(::Type{<:FullOctaHEALPixGrid}, nlat_half::Integer) =
+    equal_area_weights(OctaHEALPixGrid, nlat_half)
+
+Adapt.@adapt_structure FullOctaHEALPixGrid

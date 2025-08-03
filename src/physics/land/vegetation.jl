@@ -38,30 +38,23 @@ function soil_moisture_availability!(
     vegetation::NoVegetation,
     model::PrimitiveWet,
 )
-    # set soil moisture availability to a constant value everywhere
-    (; soil_moisture) = progn.land
+    # view on the top layer of soil moisture
+    soil_moisture_top = field_view(progn.land.soil_moisture, :, 1)
     (; soil_moisture_availability) = diagn.physics.land
     
-    # SPEEDY documentation eq. 51 with vegetation = 0
-    (; W_cap, W_wilt) = model.land.thermodynamics
+    # Fortran SPEEDY documentation eq. 51 with vegetation = 0
+    W_cap = model.land.thermodynamics.field_capacity
+    W_wilt = model.land.thermodynamics.wilting_point
     D_top = model.land.geometry.layer_thickness[1]
     D_root = model.land.geometry.layer_thickness[2]
-    r = 1/(D_top*W_cap + D_root*(W_cap - W_wilt))
 
-    @inbounds for ij in eachindex(soil_moisture_availability)
-        soil_moisture_availability[ij] = r*D_top*soil_moisture[ij, 1]
-    end
-
+    soil_moisture_availability .= D_top*soil_moisture_top*W_cap/
+                                    (D_top*W_cap + D_root*(W_cap - W_wilt))
     return nothing
 end
 
 export VegetationClimatology
-@kwdef struct VegetationClimatology{NF, Grid} <: AbstractVegetation
-
-    "number of latitudes on one hemisphere, Equator included"
-    nlat_half::Int
-
-    # OPTIONS
+@kwdef struct VegetationClimatology{NF, GridVariable2D} <: AbstractVegetation
     "[OPTION] Combine high and low vegetation factor, a in high + a*low [1]"
     low_veg_factor::NF = 0.8
 
@@ -71,8 +64,10 @@ export VegetationClimatology
     "[OPTION] filename of soil moisture"
     file::String = "vegetation.nc"
 
-    "[OPTION] variable name in netcdf file"
+    "[OPTION] variable name in netcdf file for high vegetation"
     varname_vegh::String = "vegh"
+
+    "[OPTION] variable name in netcdf file for low vegetation"
     varname_vegl::String = "vegl"
 
     "[OPTION] Grid the soil moisture file comes on"
@@ -83,16 +78,18 @@ export VegetationClimatology
 
     # to be filled from file
     "High vegetation cover [1], interpolated onto Grid"
-    high_cover::Grid = zeros(Grid, nlat_half)
+    high_cover::GridVariable2D
 
     "Low vegetation cover [1], interpolated onto Grid"
-    low_cover::Grid = zeros(Grid, nlat_half)
+    low_cover::GridVariable2D
 end
 
 # generator function
 function VegetationClimatology(SG::SpectralGrid; kwargs...)
-    (; NF, GridVariable2D, nlat_half) = SG
-    return VegetationClimatology{NF, GridVariable2D}(; nlat_half, kwargs...)
+    (; NF, GridVariable2D, grid) = SG
+    high_cover = zeros(GridVariable2D, grid)
+    low_cover  = zeros(GridVariable2D, grid)
+    return VegetationClimatology{NF, GridVariable2D}(; high_cover, low_cover, kwargs...)
 end
 
 function initialize!(vegetation::VegetationClimatology, model::PrimitiveEquation)
@@ -112,7 +109,7 @@ function initialize!(vegetation::VegetationClimatology, model::PrimitiveEquation
     # interpolate onto grid
     high_vegetation_cover = vegetation.high_cover
     low_vegetation_cover = vegetation.low_cover
-    interpolator = RingGrids.interpolator(Float32, high_vegetation_cover, vegh)
+    interpolator = RingGrids.interpolator(high_vegetation_cover, vegh, NF=Float32)
     interpolate!(high_vegetation_cover, vegh, interpolator)
     interpolate!(low_vegetation_cover, vegl, interpolator)
 end
@@ -156,15 +153,16 @@ function soil_moisture_availability!(
     (; soil_moisture_availability) = diagn.physics.land
     (; soil_moisture) = progn.land
     (; high_cover, low_cover, low_veg_factor) = vegetation
-    (; W_cap, W_wilt) = model.land.thermodynamics
+    W_cap = model.land.thermodynamics.field_capacity
+    W_wilt = model.land.thermodynamics.wilting_point
     D_top = model.land.geometry.layer_thickness[1]
     D_root = model.land.geometry.layer_thickness[2]
 
-    @boundscheck grids_match(high_cover, low_cover, soil_moisture_availability) || throws(BoundsError)
-    @boundscheck grids_match(soil_moisture, soil_moisture_availability, horizontal_only=true) || throws(BoundsError)
+    @boundscheck fields_match(high_cover, low_cover, soil_moisture_availability) || throws(BoundsError)
+    @boundscheck fields_match(soil_moisture, soil_moisture_availability, horizontal_only=true) || throws(BoundsError)
     @boundscheck size(soil_moisture, 2) >= 2    # defined for two layers
 
-    # precalculate
+    # precalculate denominator
     r = 1/(D_top*W_cap + D_root*(W_cap - W_wilt))
 
     for ij in eachgridpoint(soil_moisture_availability, high_cover, low_cover)
@@ -172,8 +170,12 @@ function soil_moisture_availability!(
         # Fortran SPEEDY source/land_model.f90 line 111 origin unclear
         veg = max(0, high_cover[ij] + low_veg_factor*low_cover[ij])
 
-        # Fortran SPEEDY documentation eq. 51
-        soil_moisture_availability[ij] = r*(D_top*soil_moisture[ij, 1] +
-            veg*D_root*max(soil_moisture[ij, 2] - W_wilt, 0))
+        # Fortran SPEEDY documentation eq. 51, original formulation
+        # soil_moisture_availability[ij] = r*(D_top*soil_moisture[ij, 1] +
+        #     veg*D_root*max(soil_moisture[ij, 2] - W_wilt, 0))
+        # Soil moisture is defined as volume fraction wrt to field capacity
+        # so multiply by W_cap here (not done in Fortran SPEEDY)
+        soil_moisture_availability[ij] = r*(D_top*soil_moisture[ij, 1]*W_cap +
+            veg*D_root*max(soil_moisture[ij, 2]*W_cap - W_wilt, 0))
     end
 end

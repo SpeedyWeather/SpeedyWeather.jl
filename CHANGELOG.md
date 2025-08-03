@@ -3,6 +3,59 @@
 ## Unreleased
 
 - NBandRadiation via FriersonOpticalDepth and transmittance [#693](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/693)
+- Jeevanjee surface fluxes and soil moisture field capacity  [#794](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/794) [#788](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/788)
+- Add Atomix v1 compat to Project.toml [#799]((https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/799)
+- Adjusted legendre transform kernels to work with KernelAbstractions [#736](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/736)[#737](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/737)
+- Interpolation now works on GPU [#764](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/764)
+- A minimal barotropic model now runs on GPU [#733](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/733)
+- Fix Haversine rounding errors with type promotion [#787](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/787)
+- Add mailmap to merge multiple developers for repo statistics [#785](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/785)
+- Restart from file for ocean and land [#784](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/784)
+- Overwrite output folder option [#782](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/782)
+- Update compat entries [#777](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/777)
+- Fix show of field views by defining nonparametric_type for SubArray [#776](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/776)
+- Add parameter handling system and implement for Barotropic model [#754](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/754)
+- Fix Enzyme CI to run as expected [#762](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/762)
+
+## v0.16
+
+- Move full differentiability tests to separate CI workflow [#759](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/759)
+- Type stability for particle advection [#757](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/757)
+- Scratch memory for SpeedyTransforms now part of DiagnosticVariables [#680](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/680/)
+- Reworked GPU and utility code structure and added GPU versions of spectral gradients[#727](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/727)
+- Added `animate` to animate a NetCDF output file with GeoMakie [#755](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/755)
+- Makie v0.24 compatibility [#750](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/750)
+- Fixed an error in the LowerTriangularArrays documentation [#749](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/749)
+- Use views instead of unpacking a tuple for 2-step prognostic variables [#745](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/745)
+- Introduce Field for data on grid [#732](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/732)
+- Add Millenium and Century periods and allow conversion of Month and Year to seconds [#746](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/746)
+- Return UnicodePlot after run! if UnicodePlots.jl is loaded [#748](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/748)
+- git-auto-commit-action v6 [#747](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/747)
+- Makie v0.23 compatibility [#743](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/743)
+- LowerTriangularArray-preserving view [#739](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/739)
+- Array-agnostic LowerTriangularMatrix [#738](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/738)
+- Major rework of LowerTriangularArrays: Introduce Spectrum type, changes in indexing and constructors [#734](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/734)
+- Reduce CI time [#731](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/731)
+- Remove DocsPreviewCleanup workflow [#730](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/730)
+- Move UnicodePlots to extension [#728](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/728)
+- Baroclinic wave initial conditions ZonalWind divergence free [#729](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/729)
+- reverse and reverse! for LowerTriangularArray, in longitude or latitude [#720](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/720)
+- Speed up CI for land models [#719](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/719)
+- Move documentation to SpeedyWeatherDocumentation repository [#713](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/713), [#722](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/722), [#723](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/723), and [#725](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/725)
+- Ensure docs don't deploy with `.jld2` or `.nc` files [#724](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/724)
+
+## v0.15
+
+- RingGrid and LowerTriangularArray longitude rotation [#710](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/710)
+- ImplicitShallowWater without precomputed arrays [#717](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/717)
+- CUDA-ised spectral transform [#602](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/602)
+- Fix isapprox for particles with longitude modulo [#714](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/714)
+- Fix docstring rendering [#712](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/712)
+- Make KolmogorovFlow forcing default for BarotropicModel [#687](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/687)
+- Updated documentation to include four illustrative figures in the large-scale precipitation and convection sections [#702](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/702)
+- Added documentation to output surface variables [#708](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/708)
+- `get_gridcell_polygons` in RingGrids [#706](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/706)
+- Revised extended CI tests for differentiability can be launched on comment in PRs [#695](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/695), [#696](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/696), [#697](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/697), [#698](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/698)
 - Reverse for AbstractGridArrays [#691](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/691)
 - LandGeometry, LandThermodynamics as component of LandModel, DryLandModel [#677](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/677)
 - Diagnostic albedo separate for ocean/land [#677](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/677)
@@ -85,6 +138,7 @@
 - Move CUDA dependency into extension [#586](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/586)
 - Stop supporting Julia v1.9 [#585](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/585)
 - `feedback.verbose` (de/activate the progressbar) is now set to `isinteractive()` to disable automatically for documentation [#582](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/582)
+- CUDA CI added for the GPU version [#645](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/645)
 
 ## v0.11.0
 

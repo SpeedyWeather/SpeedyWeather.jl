@@ -111,7 +111,7 @@ Let us start by generating some data
 ```@example gradient
 spectral_grid = SpectralGrid(trunc=31, nlayers=1)
 forcing = SpeedyWeather.JetStreamForcing(spectral_grid)
-drag = QuadraticDrag(spectral_grid)
+drag = LinearVorticityDrag(spectral_grid)
 model = ShallowWaterModel(spectral_grid; forcing, drag)
 simulation = initialize!(model);
 run!(simulation, period=Day(30))
@@ -167,7 +167,7 @@ additional degree, but in the returned lower triangular matrix this row is set t
 You may also generally assume that a `SpectralTransform` struct precomputed for
 some truncation, say ``l_{max} = m_{max} = T`` could also be used for smaller
 lower triangular matrices. While this is mathematically true, this does not work
-here in practice because [`LowerTriangularMatrices`](@ref lowertriangularmatrices)
+here in practice because [`LowerTriangularArrays`](@ref lowertriangularmatrices)
 are implemented as a vector. So always use a `SpectralTransform` struct that
 fits matches your resolution exactly (otherwise an error will be thrown).
 
@@ -178,7 +178,7 @@ that we also used in `spectral_grid`. The Coriolis parameter for a grid like `vo
 is obtained, and we do the following for ``f\zeta/g``.
 
 ```@example gradient
-vor_grid = transform(vor, Grid=spectral_grid.Grid)
+vor_grid = transform(vor, S)
 f = coriolis(vor_grid)      # create Coriolis parameter f on same grid with default rotation
 g = model.planet.gravity
 fζ_g = @. vor_grid * f / g  # in-place and element-wise
@@ -187,11 +187,11 @@ nothing # hide
 Now we need to apply the inverse Laplace operator to ``f\zeta/g`` which we do as follows
 
 ```@example gradient
-fζ_g_spectral = transform(fζ_g, one_more_degree=true)
+fζ_g_spectral = transform(fζ_g, S)
 
 R = spectral_grid.radius
 η = SpeedyTransforms.∇⁻²(fζ_g_spectral) * R^2
-η_grid = transform(η, Grid=spectral_grid.Grid)
+η_grid = transform(η, S)
 nothing # hide
 ```
 Note the manual scaling with the radius ``R^2`` here. We now compare the results

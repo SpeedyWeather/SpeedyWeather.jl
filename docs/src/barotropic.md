@@ -266,7 +266,7 @@ u_i = v_i + \frac{\nu}{2}(v_{i+1} - 2v_i + u_{i-1})
 by adding a discrete Laplacian with coefficient ``\tfrac{\nu}{2}`` to it, evaluated
 from the available filtered and unfiltered time steps centred around ``i``:
 ``v_{i-1}`` is not available anymore because it was overwritten by the filtering
-at the previous iteration, ``u_i, u_{i+1}`` are not filtered yet when applying
+at the previous iteration, ``v_i, v_{i+1}`` are not filtered yet when applying
 the Laplacian. The filter parameter ``\nu`` is typically chosen between 0.01-0.2,
 with stronger filtering for higher values.
 

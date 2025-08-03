@@ -10,7 +10,7 @@ using NCDatasets, Dates
         model = BarotropicModel(spectral_grid; output)
         simulation = initialize!(model)
         run!(simulation, output=true; period)
-        @test simulation.model.feedback.nars_detected == false
+        @test simulation.model.feedback.nans_detected == false
 
         # read netcdf file and check that all variables exist
         ds = NCDataset(joinpath(model.output.run_path, model.output.filename))
@@ -19,7 +19,7 @@ using NCDatasets, Dates
 
             # test dimensions
             nx, ny, nz, nt = size(ds[key])
-            @test (nx, ny) == RingGrids.matrix_size(output.grid2D)
+            @test (nx, ny) == RingGrids.matrix_size(output.field2D)
             @test nz == spectral_grid.nlayers
             @test nt == Int(period / output.output_dt) + 1
         end
@@ -36,7 +36,7 @@ end
         model = ShallowWaterModel(spectral_grid; output)
         simulation = initialize!(model)
         run!(simulation, output=true; period)
-        @test simulation.model.feedback.nars_detected == false
+        @test simulation.model.feedback.nans_detected == false
 
         # read netcdf file and check that all variables exist
         ds = NCDataset(joinpath(model.output.run_path, model.output.filename))
@@ -62,7 +62,7 @@ end
         @test haskey(ds, orog_output.name)
         
         nx, ny = size(ds[orog_output.name])
-        @test (nx, ny) == RingGrids.matrix_size(output.grid2D)
+        @test (nx, ny) == RingGrids.matrix_size(output.field2D)
 
         # delete divergence output
         delete!(output, div_output.name)
@@ -79,11 +79,12 @@ end
     # test also output at various resolutions
     for nlat_half in (24, 32, 48, 64)
         spectral_grid = SpectralGrid(nlayers=8)
-        output = NetCDFOutput(spectral_grid, ShallowWater, path=tmp_output_path; nlat_half)
+        output_grid = RingGrids.full_grid_type(typeof(spectral_grid.grid))(nlat_half)
+        output = NetCDFOutput(spectral_grid, ShallowWater, path=tmp_output_path; output_grid)
         model = PrimitiveDryModel(spectral_grid; output)
         simulation = initialize!(model)
         run!(simulation, output=true; period)
-        @test simulation.model.feedback.nars_detected == false
+        @test simulation.model.feedback.nans_detected == false
 
         # read netcdf file and check that all variables exist
         ds = NCDataset(joinpath(model.output.run_path, model.output.filename))
@@ -108,7 +109,7 @@ end
         model = PrimitiveWetModel(spectral_grid; output)
         simulation = initialize!(model)
         run!(simulation, output=true; period)
-        @test simulation.model.feedback.nars_detected == false
+        @test simulation.model.feedback.nans_detected == false
 
         # read netcdf file and check that all variables exist
         ds = NCDataset(joinpath(model.output.run_path, model.output.filename))
@@ -126,7 +127,7 @@ end
     model = PrimitiveWetModel(spectral_grid; output)
     simulation = initialize!(model)
     run!(simulation, output=true; period)
-    @test simulation.model.feedback.nars_detected == false
+    @test simulation.model.feedback.nans_detected == false
     ds = NCDataset(joinpath(model.output.run_path, model.output.filename))
     @test ~haskey(ds, "temp")
     @test ~haskey(ds, "humid")

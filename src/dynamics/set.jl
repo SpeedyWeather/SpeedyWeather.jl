@@ -12,7 +12,7 @@ scaling is already included in the arrays or not (default: `false`)
 The input may be:
 * A function or callable object `f(lond, latd, σ) -> value` (multilevel variables) 
 * A function or callable object `f(lond, latd) -> value` (surface level variables)
-* An instance of `AbstractGridArray` 
+* An instance of `AbstractField` 
 * An instance of `LowerTriangularArray` 
 * A scalar `<: Number` (interpreted as a constant field in grid space)
 """
@@ -38,14 +38,14 @@ function set!(
     kwargs...
 )
     # ATMOSPHERE
-    isnothing(vor)   || set!(progn.vor[lf],     vor, geometry, spectral_transform; add)
-    isnothing(div)   || set!(progn.div[lf],     div, geometry, spectral_transform; add)
-    isnothing(temp)  || set!(progn.temp[lf],   temp, geometry, spectral_transform; add)
-    isnothing(humid) || set!(progn.humid[lf], humid, geometry, spectral_transform; add)
-    isnothing(pres)  || set!(progn.pres[lf],   pres, geometry, spectral_transform; add)
+    isnothing(vor)   || set!(get_step(progn.vor, lf),     vor, geometry, spectral_transform; add)
+    isnothing(div)   || set!(get_step(progn.div, lf),     div, geometry, spectral_transform; add)
+    isnothing(temp)  || set!(get_step(progn.temp, lf),   temp, geometry, spectral_transform; add)
+    isnothing(humid) || set!(get_step(progn.humid, lf), humid, geometry, spectral_transform; add)
+    isnothing(pres)  || set!(get_step(progn.pres, lf),   pres, geometry, spectral_transform; add)
     
     # or provide u, v instead of vor, div
-    isnothing(u) | isnothing(v) || set_vordiv!(progn.vor[lf], progn.div[lf], u, v, geometry, spectral_transform; add, coslat_scaling_included)
+    isnothing(u) | isnothing(v) || set_vordiv!(get_step(progn.vor, lf), get_step(progn.div, lf), u, v, geometry, spectral_transform; add, coslat_scaling_included)
     
     # OCEAN
     isnothing(sea_surface_temperature)  || set!(progn.ocean.sea_surface_temperature, sea_surface_temperature, geometry, spectral_transform; add)
@@ -59,7 +59,8 @@ function set!(
     # TRACERS
     for varname in keys(kwargs)
         if varname in keys(progn.tracers)
-            set!(progn.tracers[varname][lf], kwargs[varname], geometry, spectral_transform; add)
+            tracer_var = get_step(progn.tracers[varname], lf)
+            set!(tracer_var, kwargs[varname], geometry, spectral_transform; add)
         else
             throw(UndefVarError(varname))
         end
@@ -91,17 +92,17 @@ end
 # set LTA <- Grid 
 function set!(
     var::LowerTriangularArray,
-    grids::AbstractGridArray,
+    field::AbstractField,
     geometry::Union{Geometry, Nothing}=nothing,
     S::Union{Nothing, SpectralTransform}=nothing;
     add::Bool=false,
 )
     if isnothing(S)
-        specs = transform(grids)
+        specs = transform(field)
     else
         # convert to number format in S, needed for FFTW
-        grids = convert.(eltype(S), grids)
-        specs = transform(grids, S)
+        field = convert.(eltype(S), field)
+        specs = transform(field, S)
     end
     set!(var, specs; add)
 end
@@ -110,24 +111,24 @@ end
 function set!(
     var::LowerTriangularArray,
     f::Function,
-    geometry::Geometry{NF, Grid},
+    geometry::Geometry,
     S::Union{SpectralTransform, Nothing}=nothing;
     add::Bool=false,
-) where {NF, Grid}
-    grid = ndims(var) == 1 ? zeros(Grid{NF}, geometry.nlat_half) : zeros(Grid{NF}, geometry.nlat_half, geometry.nlayers)
-    set!(grid, f, geometry, S; add=false)
-    set!(var, grid, geometry, S; add)
+)
+    (; grid, nlayers, NF) = geometry.spectral_grid
+    field = ndims(var) == 1 ? zeros(NF, grid) : zeros(NF, grid, nlayers)
+    set!(field, f, geometry, S; add=false)
+    set!(var, field, geometry, S; add)
 end
 
 # set LTA <- number
 function set!(
-    var::LowerTriangularArray{T},
+    var::LowerTriangularArray,
     s::Number,
-    geometry::Geometry{NF},
+    geometry::Geometry,
     S::Union{SpectralTransform, Nothing}=nothing;
     add::Bool=false,
-) where {T, NF}
-    
+)
     # appropiate normalization, assume standard 2√π normalisation if no transform is given 
     norm_sphere = isnothing(S) ? 2sqrt(π) : S.norm_sphere
 
@@ -141,63 +142,70 @@ function set!(
     set!(var, var_new, geometry, S; add)
 end 
 
-# set Grid <- Grid
+# set Field <- Field
 function set!(
-    var::AbstractGridArray,
-    grids::AbstractGridArray,
+    var::AbstractField,
+    field::AbstractField,
     geometry::Geometry,
     S::Union{Nothing, SpectralTransform}=nothing;
     add::Bool=false,
 )
     if add 
-        if grids_match(var, grids)
-            var .+= grids
+        if fields_match(var, field)
+            var .+= field
         else 
-            var .+= interpolate(typeof(var), geometry.nlat_half, grids)
+            var .+= interpolate(var.grid, field; NF=eltype(var))
         end
     else 
-        interpolate!(var, grids)
+        interpolate!(var, field; NF=eltype(var))
     end 
     return var 
 end 
 
-# set Grid <- LTA
+# set Field <- LTA
 function set!(
-    var::AbstractGridArray,
+    var::AbstractField,
     specs::LowerTriangularArray,
     geometry::Geometry,
     S::Union{Nothing, SpectralTransform}=nothing;
     add::Bool=false,
 )
-    grids = isnothing(S) ? transform(specs) : transform(specs, S)
-    set!(var, grids, geometry, S; add)
+    field = isnothing(S) ? transform(specs) : transform(specs, S)
+    set!(var, field, geometry, S; add)
 end
 
-# set Grid <- Func
+# set Field <- Func
 function set!(
-    var::AbstractGridArray,
+    var::AbstractField,
     f::Function,
     geometry::Geometry,
     S::Union{Nothing, SpectralTransform}=nothing;
     add::Bool=false,
 )
     (; londs, latds, σ_levels_full) = geometry
-    kernel = add ? (a,b) -> a+b : (a,b) -> b
-    for k in eachgrid(var)
-        for ij in eachgridpoint(var)
-            var[ij, k] = kernel(var[ij, k], f(londs[ij], latds[ij], σ_levels_full[k]))
-        end
-    end
+    kernel_func = add ? (a,b) -> a+b : (a,b) -> b
+
+    launch!(architecture(var), RingGridWorkOrder, size(var), set_field_3d_kernel!, var, londs, latds, σ_levels_full, f, kernel_func)
+    synchronize(architecture(var))
+
     return var
+end
+
+@kernel inbounds=true function set_field_3d_kernel!(var, @Const(londs), @Const(latds), @Const(σ_levels_full), @Const(f), @Const(kernel_func))
+    # Get indices
+    ij, k = @index(Global, NTuple)
+    
+    # compute 
+    var[ij, k] = kernel_func(var[ij, k], f(londs[ij], latds[ij], σ_levels_full[k]))
 end
 
 # if geometry available
 function set!(
-    var::AbstractGridArray{T, 1},
+    var::AbstractField2D,
     f::Function,
     geometry::Geometry,             
     S::Union{Nothing, SpectralTransform}=nothing;
-    kwargs...) where T
+    kwargs...)
 
     (; londs, latds) = geometry     # use coordinates from geometry
     _set!(var, f, londs, latds; kwargs...)
@@ -205,43 +213,42 @@ end
 
 # otherwise recompute longitude, latitude vectors
 function set!(
-    var::AbstractGridArray{T, 1},
+    var::AbstractField2D,
     f::Function,
     S::Union{Nothing, SpectralTransform}=nothing;
-    kwargs...) where T
-
+    kwargs...
+)
     # otherwise recompute longitude, latitude vectors
     londs, latds = RingGrids.get_londlatds(var)
+    londs = on_architecture(architecture(var), londs)
+    latds = on_architecture(architecture(var), latds)
     _set!(var, f, londs, latds; kwargs...)
 end
 
 # set Grid (surface/single level) <- Func
 function _set!(
-    var::AbstractGridArray{T, 1},
+    var::AbstractField2D,
     f::Function,
     londs::AbstractVector,
     latds::AbstractVector;
     add::Bool=false,
-) where T
-    
-    kernel = add ? (a,b) -> a+b : (a,b) -> b
-    for ij in eachgridpoint(var)
-        var[ij] = kernel(var[ij], f(londs[ij], latds[ij]))
-    end
+)   
+    kernel_func = add ? (a,b) -> a+b : (a,b) -> b
+    var .= kernel_func.(var, f.(londs, latds))
     return var
 end
 
 # set Grid <- Number 
 function set!(
-    var::AbstractGridArray{T}, 
+    var::AbstractField, 
     s::Number, 
     geometry::Union{Geometry, Nothing}=nothing, 
     S::Union{Nothing, SpectralTransform}=nothing;
     add::Bool=false,
-) where T
+)
     kernel = add ? (a,b) -> a+b : (a,b) -> b
-    sT = T(s)
-    var .= kernel.(var, sT)
+    s = convert(eltype(var), s)
+    var .= kernel.(var, s)
 end 
 
 # set vor_div <- func 
@@ -267,8 +274,8 @@ end
 function set_vordiv!(
     vor::LowerTriangularArray,
     div::LowerTriangularArray,
-    u::AbstractGridArray,
-    v::AbstractGridArray,
+    u::AbstractField,
+    v::AbstractField,
     geometry::Geometry,
     S::SpectralTransform = SpectralTransform(geometry.spectral_grid);
     add::Bool=false,

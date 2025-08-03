@@ -18,29 +18,49 @@ export NetCDFOutput
 Interpolates non-rectangular grids. Fields are
 $(TYPEDFIELDS)"""
 @kwdef mutable struct NetCDFOutput{
-    Grid2D,
-    Grid3D,
+    Field2D,
+    Field3D,
     Interpolator,
 } <: AbstractOutput
 
     # FILE OPTIONS
     active::Bool = false
-    
-    "[OPTION] path to output folder, run_???? will be created within"
+
+    "[OPTION] path to output parent folder, run folders will be created within"
     path::String = pwd()
     
-    "[OPTION] run identification number/string"
-    id::String = "0001"
-    run_path::String = ""                   # will be determined in initalize!
+    "[OPTION] Prefix for run folder where data is stored, e.g. 'run_'"
+    run_prefix::String = "run"
+
+    "[OPTION] run identification, added between run_prefix and run_number"
+    id::String = ""
+
+    "[OPTION] run identification number, automatically determined if overwrite=false"
+    run_number::Int = 1
+
+    "[OPTION] run numbers digits"
+    run_digits::Int = 4
+
+    "[DERIVED] folder name where data is stored, determined at initialize!"
+    run_folder::String = ""
+
+    "[DERIVED] full path to folder where data is stored, determined at initialize!"
+    run_path::String = ""
+
+    "[OPTION] Overwrite an existing run folder?"
+    overwrite::Bool = false
     
     "[OPTION] name of the output netcdf file"
     filename::String = "output.nc"
     
     "[OPTION] also write restart file if output==true?"
     write_restart::Bool = true
+
+    "[DERIVED] package version, used for restart files"
     pkg_version::VersionNumber = isnothing(pkgversion(SpeedyWeather)) ? v"0.0.0" : pkgversion(SpeedyWeather)
 
     # WHAT/WHEN OPTIONS
+    "[DERIVD] start date of the simulation, used for time dimension in netcdf file"
     startdate::DateTime = DateTime(2000, 1, 1)
 
     "[OPTION] output frequency, time step"
@@ -59,10 +79,10 @@ $(TYPEDFIELDS)"""
 
     const interpolator::Interpolator
 
-    # SCRATCH GRIDS TO INTERPOLATE ONTO
-    const grid2D::Grid2D
-    const grid3D::Grid3D
-    const grid3Dland::Grid3D
+    # SCRATCH FIELDS TO INTERPOLATE ONTO
+    const field2D::Field2D
+    const field3D::Field3D
+    const field3Dland::Field3D
 end
 
 """
@@ -73,52 +93,43 @@ The output grid is optionally determined by keyword arguments `output_Grid` (its
 `nlat_half` (resolution) and `output_NF` (number format). By default, uses the full grid
 equivalent of the grid and resolution used in `SpectralGrid` `S`."""
 function NetCDFOutput(
-    S::SpectralGrid,
+    SG::SpectralGrid,
     Model::Type{<:AbstractModel} = Barotropic;
-    output_Grid::Type{<:AbstractFullGrid} = RingGrids.full_grid_type(S.Grid),
-    nlat_half::Integer = S.nlat_half, 
+    output_grid::AbstractFullGrid = on_architecture(CPU(), RingGrids.full_grid_type(SG.grid)(SG.grid.nlat_half)),
     output_NF::DataType = DEFAULT_OUTPUT_NF,
     output_dt::Period = Second(DEFAULT_OUTPUT_DT),  # only needed for dispatch
     kwargs...)
 
-    # INPUT GRID
-    input_Grid = S.Grid
-    input_nlat_half = S.nlat_half
-
-    # OUTPUT GRID
-    nlon = RingGrids.get_nlon(output_Grid, nlat_half)
-    nlat = RingGrids.get_nlat(output_Grid, nlat_half)
-    npoints = nlon*nlat
-    (; nlayers, nlayers_soil) = S
+    # INPUT GRID (but on CPU)
+    input_grid = on_architecture(CPU(), SG.grid)
 
     # CREATE INTERPOLATOR
-    interpolator = DEFAULT_INTERPOLATOR(DEFAULT_OUTPUT_NF, input_Grid, input_nlat_half, npoints)
-
-    # CREATE GRIDS TO 
-    output_Grid2D = RingGrids.nonparametric_type(output_Grid){output_NF, 1}
-    output_Grid3D = RingGrids.nonparametric_type(output_Grid){output_NF, 2}
-    grid2D = output_Grid2D(undef, nlat_half)
-    grid3D = output_Grid3D(undef, nlat_half, nlayers)
-    grid3Dland = output_Grid3D(undef, nlat_half, nlayers_soil)
+    interpolator = RingGrids.interpolator(output_grid, input_grid, NF=DEFAULT_OUTPUT_NF)
+    
+    # CREATE FULL FIELDS TO INTERPOLATE ONTO BEFORE WRITING DATA OUT
+    (; nlayers, nlayers_soil) = SG
+    field2D = Field(output_NF, output_grid)
+    field3D = Field(output_NF, output_grid, nlayers)
+    field3Dland = Field(output_NF, output_grid, nlayers_soil)
 
     output = NetCDFOutput(;
         output_dt=Second(output_dt),    # convert to seconds for dispatch
         interpolator,
-        grid2D,
-        grid3D,
-        grid3Dland,
+        field2D,
+        field3D,
+        field3Dland,
         kwargs...)
 
     add_default!(output.variables, Model)
     return output
 end
 
-function Base.show(io::IO, output::NetCDFOutput{Grid}) where Grid
-    println(io, "NetCDFOutput{$Grid}")
+function Base.show(io::IO, output::NetCDFOutput{F}) where F
+    println(io, "NetCDFOutput{$F}")
     println(io, "├ status: $(output.active ? "active" : "inactive/uninitialized")")
     println(io, "├ write restart file: $(output.write_restart) (if active)")
     println(io, "├ interpolator: $(typeof(output.interpolator))")
-    println(io, "├ path: $(joinpath(output.run_path, output.filename))")
+    println(io, "├ path: $(joinpath(output.run_path, output.filename)) (overwrite=$(output.overwrite))")
     println(io, "├ frequency: $(output.output_dt)")
     print(io,   "└┐ variables:")
     nvars = length(output.variables)
@@ -208,23 +219,22 @@ end
 Initialize NetCDF `output` by creating a netCDF file and storing the initial conditions
 of `diagn` (and `progn`). To be called just before the first timesteps."""
 function initialize!(   
-    output::NetCDFOutput{Grid2D, Grid3D, Interpolator},
+    output::NetCDFOutput,
     feedback::AbstractFeedback,
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
     model::AbstractModel,
-) where {Grid2D, Grid3D, Interpolator}
-    
-    output.active || return nothing     # exit immediately for no output
+)
+    output.active || return nothing             # exit immediately for no output
     
     # GET RUN ID, CREATE FOLDER
     # get new id only if not already specified
-    output.id = get_run_id(output.path, output.id)
-    output.run_path = create_output_folder(output.path, output.id) 
-    
-    feedback.id = output.id             # synchronize with feedback struct
+    determine_run_folder!(output)
+    create_run_folder!(output)
+
+    feedback.run_folder = output.run_folder     # synchronize with feedback struct
     feedback.run_path = output.run_path
-    feedback.progress_meter.desc = "Weather is speedy: run $(output.id) "
+    feedback.progress_meter.desc = "Weather is speedy: $(output.run_folder) "
     feedback.output = true              # if output=true set feedback.output=true too!
 
     # OUTPUT FREQUENCY
@@ -251,16 +261,10 @@ function initialize!(
     output!(output, progn.clock.time)   # write initial time
 
     # DEFINE NETCDF DIMENSIONS SPACE
-    Grid = typeof(output.grid2D)
-    nlat_half = output.grid2D.nlat_half
-    lond = get_lond(Grid, nlat_half)
-    latd = get_latd(Grid, nlat_half)
+    lond = get_lond(output.field2D)
+    latd = get_latd(output.field2D)
     σ = model.geometry.σ_levels_full
     soil_indices = collect(1:model.spectral_grid.nlayers_soil)
-
-    # INTERPOLATION: PRECOMPUTE LOCATION INDICES
-    londs, latds = RingGrids.get_londlatds(Grid, nlat_half)
-    RingGrids.update_locator!(output.interpolator, londs, latds)
         
     defVar(dataset, "lon", lond, ("lon",), attrib=Dict("units"=>"degrees_east", "long_name"=>"longitude"))
     defVar(dataset, "lat", latd, ("lat",), attrib=Dict("units"=>"degrees_north", "long_name"=>"latitude"))
@@ -268,7 +272,7 @@ function initialize!(
     defVar(dataset, "soil_layer", soil_indices, ("soil_layer",), attrib=Dict("units"=>"1", "long_name"=>"soil layer index"))
 
     # VARIABLES, define every output variable in the netCDF file and write initial conditions
-    output_NF = eltype(output.grid2D)
+    output_NF = eltype(output.field2D)
     for (key, var) in output.variables
         define_variable!(dataset, var, output_NF)
         output!(output, var, Simulation(progn, diagn, model))
@@ -311,7 +315,7 @@ Writes the variables from `progn` or `diagn` of time step `i` at time `time` int
 Simply escapes for no netcdf output or if output shouldn't be written on this time step.
 Interpolates onto output grid and resolution as specified in `output`, converts to output
 number format, truncates the mantissa for higher compression and applies lossless compression."""
-function output!(output::NetCDFOutput, simulation::AbstractSimulation)
+function output!(output::AbstractOutput, simulation::AbstractSimulation)
     output.timestep_counter += 1                                        # increase counter
     (; active, output_every_n_steps, timestep_counter ) = output
     active || return nothing                                            # escape immediately for no netcdf output
@@ -347,8 +351,8 @@ function output!(
     ~hastime(variable) && output.output_counter > 1 && return nothing
 
     # interpolate 2D/3D variables
-    var = is3D(variable) ? (is_land(variable) ? output.grid3Dland : output.grid3D) : output.grid2D
-    raw = path(variable, simulation)
+    var = is3D(variable) ? (is_land(variable) ? output.field3Dland : output.field3D) : output.field2D
+    raw = on_architecture(CPU(), path(variable, simulation))
     RingGrids.interpolate!(var, raw, output.interpolator)
 
     # unscale if variable.unscale == true and exists
@@ -395,7 +399,7 @@ end
 Loop over every variable in `output.variables` to call the respective `output!` method
 to write into the `output.netcdf_file`."""
 function output!(
-    output::NetCDFOutput,
+    output::AbstractOutput,
     output_variables::OUTPUT_VARIABLES_DICT,
     simulation::AbstractSimulation,
 )
@@ -413,7 +417,7 @@ function Base.show(io::IO, outputvariable::AbstractOutputVariable)
 end
 
 function finalize!(
-    output::NetCDFOutput,
+    output::AbstractOutput,
     simulation::AbstractSimulation,
 )
     if output.active    # only finalize if active otherwise output.netcdf_file is nothing
@@ -426,7 +430,7 @@ end
 
 # default finalize method for output variables
 function finalize!(
-    output::NetCDFOutput,
+    output::AbstractOutput,
     var::AbstractOutputVariable,
     args...
 )
@@ -436,63 +440,60 @@ end
 
 """Dummy output variable that doesn't do anything."""
 struct NoOutputVariable <: AbstractOutputVariable end
-output!(output::NetCDFOutput, variable::NoOutputVariable, args...) = nothing
+output!(output::AbstractOutput, variable::NoOutputVariable, args...) = nothing
 
 include("variables/output_variables.jl")
 
-"""
-$(TYPEDSIGNATURES)
-Checks existing `run_????` folders in `path` to determine a 4-digit `id` number
-by counting up. E.g. if folder run_0001 exists it will return the string "0002".
-Does not create a folder for the returned run id.
-"""
-function get_run_id(path::String, id::String)
-    # if run_???? folder doesn't exist yet don't change the id
-    run_id = string("run_", run_id_to_string(id))
-    !(run_id in readdir(path)) && return id
+"""$(TYPEDSIGNATURES)
+Checks existing folders in `path` and determine `run_number`by counting up.
+E.g. if folder run_0001 exists then run_number is 2.
+Does not create a folder for the returned run id."""
+function determine_run_folder!(output::AbstractOutput)
+    (; run_prefix, id, run_digits) = output
+    fmt = Printf.Format("%0$(run_digits)d")
 
-    # otherwise pull list of existing run_???? folders via readdir
-    pattern = r"run_\d\d\d\d"               # run_???? in regex
-    runlist = filter(x->startswith(x, pattern), readdir(path))
-    runlist = filter(x->endswith(  x, pattern), runlist)
-    existing_runs = [parse(Int, id[5:end]) for id in runlist]
+    if !output.overwrite    # if not overwrite determine the next run number
+        # try current run folder name, reset run number to 1
+        output.run_number = 1
+        run_folder = run_folder_name(run_prefix, id, output.run_number; fmt)
+        while run_folder in readdir(output.path)    # if run folder already exists, increase run_number
+            output.run_number += 1
+            run_folder = run_folder_name(run_prefix, id, output.run_number; fmt)
+        end
+    end # else use the run_number exactly as specified in output.run_number
 
-    # get the run id from existing folders
-    if length(existing_runs) == 0           # if no runfolder exists yet
-        run_id = 1                          # start with run_0001
-    else
-        run_id = maximum(existing_runs)+1   # next run gets id +1
-    end
-    
-    return @sprintf("%04d", run_id)
+    output.run_folder = run_folder_name(run_prefix, id, output.run_number; fmt)
 end
 
-"""
-$(TYPEDSIGNATURES)
-Creates a new folder `run_*` with the identification `id`. Also returns the full path
-`run_path` of that folder.
-"""
-function create_output_folder(path::String, id::Union{String, Int})
-    run_id = string("run_", run_id_to_string(id))
-    run_path = joinpath(path, run_id)
-    @assert !(run_id in readdir(path)) "Run folder $run_path already exists."
-    mkdir(run_path)             # actually create the folder
-    return run_path
+"""$(TYPEDSIGNATURES)
+Creates a new folder `prefix_id_number` with the identification `id`. Also returns the full path
+`run_path` of that folder."""
+function create_run_folder!(output::AbstractOutput)
+    run_path = joinpath(output.path, output.run_folder)
+
+    # actually create the folder
+    # unless overwrite is true and the folder exists
+    # otherwise throws an error if the folder already exists
+    (output.overwrite && isdir(run_path)) || mkdir(run_path)
+    output.run_path = run_path
 end
 
-run_id_to_string(run_id::Integer) = @sprintf("%04d", run_id)
-run_id_to_string(run_id::String) = run_id
+"""$(TYPEDSIGNATURES)
+Concatenate the run folder name from `prefix`, `id` and `number` to
+e.g. "run_0001" or "run_shallow_convection_0001"."""
+function run_folder_name(prefix::String, id::String, number::Int; fmt = Printf.Format("%04d"))
+    number_fmt = Printf.format(fmt, number)
+    length(id) == 0 && return join((prefix, number_fmt), "_")   # otherwise "run__0001" with double underscore
+    return join((prefix, id, number_fmt), "_")
+end
 
-"""
-$(TYPEDSIGNATURES)
-Returns the full path of the output file after it was created.
-"""
+"""$(TYPEDSIGNATURES)
+Returns the full path of the output file after it was created."""
 get_full_output_file_path(output::AbstractOutput) = joinpath(output.run_path, output.filename)
 
-"""
-$(TYPEDSIGNATURES)
-Loads a `var_name` trajectory of the model `M` that has been saved in a netCDF file during the time stepping.
-"""
+"""$(TYPEDSIGNATURES)
+Loads a `var_name` trajectory of the model `M` that has been saved in
+a netCDF file during the time stepping."""
 function load_trajectory(var_name::Union{Symbol, String}, model::AbstractModel) 
     @assert model.output.active "Output is turned off"
     return Array(NCDataset(get_full_output_file_path(model.output))[string(var_name)])
