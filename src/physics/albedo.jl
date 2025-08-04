@@ -21,7 +21,7 @@ end
 export DefaultAlbedo
 function DefaultAlbedo(SG::SpectralGrid;
     ocean = GlobalConstantAlbedo(SG, albedo=0.06),
-    land = GlobalConstantAlbedo(SG, albedo=0.4))
+    land = GlobalConstantAlbedo(SG, albedo=0.3))
     return Albedo(ocean, land)
 end
 

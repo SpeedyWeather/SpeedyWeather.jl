@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- NBandRadiation via FriersonOpticalDepth and transmittance [#693](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/693)
 - Jeevanjee surface fluxes and soil moisture field capacity  [#794](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/794) [#788](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/788)
 - Add Atomix v1 compat to Project.toml [#799]((https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/799)
 - Adjusted legendre transform kernels to work with KernelAbstractions [#736](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/736)[#737](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/737)
