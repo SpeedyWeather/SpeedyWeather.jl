@@ -1,9 +1,6 @@
 # KernelAbstractions implementation of Legendre transform used only on GPU 
 
 import SpeedyWeather.LowerTriangularArrays: lm2i, get_lm_range, get_2lm_range
-import Atomix 
-
-using KernelAbstractions
 
 # (inverse) legendre transform kernel, called from _legendre!
 @kernel inbounds=true function inverse_legendre_kernel!(

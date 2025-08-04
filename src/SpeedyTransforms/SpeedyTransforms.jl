@@ -11,6 +11,7 @@ import LinearAlgebra
 import Primes
 import Adapt: adapt
 import KernelAbstractions: @kernel, @index, @Const, synchronize
+import Atomix
 
 # SPEEDYWEATHER MODULES
 using ..Architectures
