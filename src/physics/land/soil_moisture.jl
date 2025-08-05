@@ -89,6 +89,7 @@ function initialize!(soil::SeasonalSoilMoisture, model::PrimitiveEquation)
     fill_value2 = NF(ncfile[soil.varname_layer2].attrib["_FillValue"])
     fill_value1 === fill_value2 || @warn "Fill values are different for the two soil layers, use only from layer 1"
     soil_moisture_file[soil_moisture_file .=== fill_value1] .= soil.missing_value      # === to include NaN
+    soil_moisture_file = on_architecture(model.architecture, soil_moisture_file)
     
     @boundscheck fields_match(monthly_soil_moisture, soil_moisture_file, vertical_only=true) ||
         throw(DimensionMismatch(monthly_soil_moisture, soil_moisture_file))

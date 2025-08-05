@@ -151,9 +151,9 @@ end
 
 # constructor
 function EarthOrography(spectral_grid::SpectralGrid; kwargs...)
-    (; NF, GridVariable2D, SpectralVariable2D, nlat_half, spectrum) = spectral_grid
-    orography   = zeros(GridVariable2D, nlat_half)
-    geopot_surf = zeros(SpectralVariable2D, spectrum)
+    (; architecture, NF, GridVariable2D, SpectralVariable2D, grid, spectrum) = spectral_grid
+    orography   = on_architecture(architecture, zeros(GridVariable2D, grid))
+    geopot_surf = on_architecture(architecture, zeros(SpectralVariable2D, spectrum))
     return EarthOrography{NF, GridVariable2D, SpectralVariable2D}(;
         orography, geopot_surf, kwargs...)
 end

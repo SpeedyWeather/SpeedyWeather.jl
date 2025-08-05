@@ -105,7 +105,9 @@ function initialize!(vegetation::VegetationClimatology, model::PrimitiveEquation
     # high and low vegetation cover
     vegh = vegetation.file_Grid(ncfile[vegetation.varname_vegh].var[:, :], input_as=Matrix)
     vegl = vegetation.file_Grid(ncfile[vegetation.varname_vegl].var[:, :], input_as=Matrix)
-
+    vegh = on_architecture(model.architecture, vegh)
+    vegl = on_architecture(model.architecture, vegl)
+    
     # interpolate onto grid
     high_vegetation_cover = vegetation.high_cover
     low_vegetation_cover = vegetation.low_cover
