@@ -1,7 +1,7 @@
 abstract type AbstractLandTemperature <: AbstractParameterization end
 
 export SeasonalLandTemperature
-@kwdef struct SeasonalLandTemperature{NF, GridVariable3D} <: AbstractLandTemperature
+@kwdef mutable struct SeasonalLandTemperature{NF, GridVariable3D} <: AbstractLandTemperature
     "[OPTION] path to the folder containing the land temperature file, pkg path default"
     path::String = "SpeedyWeather.jl/input_data"
 
@@ -101,7 +101,7 @@ end
 
 ## CONSTANT LAND CLIMATOLOGY
 export ConstantLandTemperature
-@kwdef struct ConstantLandTemperature{NF} <: AbstractLandTemperature
+@kwdef mutable struct ConstantLandTemperature{NF} <: AbstractLandTemperature
     "[OPTION] Globally constant temperature"
     temperature::NF = 285
 
@@ -130,7 +130,7 @@ export LandBucketTemperature
 
 """MITgcm's two-layer soil model (https://mitgcm.readthedocs.io/en/latest/phys_pkgs/land.html). Fields assert
 $(TYPEDFIELDS)"""
-@kwdef struct LandBucketTemperature{NF} <: AbstractLandTemperature
+@kwdef mutable struct LandBucketTemperature{NF} <: AbstractLandTemperature
     "[OPTION] Initial soil temperature [K]"
     initial_temperature::NF = 285
 

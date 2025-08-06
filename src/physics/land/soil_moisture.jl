@@ -24,7 +24,7 @@ function timestep!(
 end
 
 export SeasonalSoilMoisture
-@kwdef struct SeasonalSoilMoisture{NF, GridVariable4D} <: AbstractSoilMoisture
+@kwdef mutable struct SeasonalSoilMoisture{NF, GridVariable4D} <: AbstractSoilMoisture
     # READ CLIMATOLOGY FROM FILE
     "[OPTION] path to the folder containing the soil moisture file, pkg path default"
     path::String = "SpeedyWeather.jl/input_data"
@@ -150,7 +150,7 @@ end
 
 export LandBucketMoisture
 
-@kwdef struct LandBucketMoisture{NF} <: AbstractSoilMoisture
+@kwdef mutable struct LandBucketMoisture{NF} <: AbstractSoilMoisture
     "[OPTION] Time scale of vertical diffusion [s]"
     time_scale::Second = Day(2)
 
@@ -164,10 +164,10 @@ export LandBucketMoisture
     mask::Bool = false
 
     "[DERIVED] Water at field capacity [m], top layer, f = γz, set at initialize from by land.thermodynamics and .geometry"
-    f₁::Base.RefValue{NF} = Ref(zero(NF))
+    f₁::NF = zero(NF)
 
     "[DERIVED] Water at field capacity [m], lower layer, f = γz, set at initialize from by land.thermodynamics and .geometry"
-    f₂::Base.RefValue{NF} = Ref(zero(NF))
+    f₂::NF = zero(NF)
 end
 
 LandBucketMoisture(SG::SpectralGrid; kwargs...) = LandBucketMoisture{SG.NF}(; kwargs...)
@@ -180,8 +180,8 @@ function initialize!(soil::LandBucketMoisture, model::PrimitiveEquation)
     γ = model.land.thermodynamics.field_capacity
     z₁ = model.land.geometry.layer_thickness[1]
     z₂ = model.land.geometry.layer_thickness[2]
-    soil.f₁[] = γ*z₁    # amount of water at field capacity in first layer [m]
-    soil.f₂[] = γ*z₂    # amount of water at field capacity in second layer [m]
+    soil.f₁ = γ*z₁    # amount of water at field capacity in first layer [m]
+    soil.f₂ = γ*z₂    # amount of water at field capacity in second layer [m]
 
     return nothing
 end
@@ -233,7 +233,7 @@ function timestep!(
     @boundscheck fields_match(soil_moisture, Pconv, Plsc, E, R, horizontal_only=true) ||
         throw(DimensionMismatch(soil_moisture, Pconv))
     @boundscheck size(soil_moisture, 2) == 2 || throw(DimensionMismatch)
-    f₁, f₂ = soil.f₁[], soil.f₂[]
+    f₁, f₂ = soil.f₁, soil.f₂
     p = soil.runoff_fraction        # fraction of top layer runoff put into lower layer
     τ⁻¹ = inv(convert(eltype(soil_moisture), Second(soil.time_scale).value))
     f₁_f₂ = f₁/f₂
