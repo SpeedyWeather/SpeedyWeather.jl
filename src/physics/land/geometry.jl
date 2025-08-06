@@ -16,7 +16,7 @@ function LandGeometry(SG::SpectralGrid; kwargs...)
 
     # for two layers use the default soil layer thickness of MITgcm's 2-layer model
     if nlayers == 2
-        layer_thickness = NF[0.1, 4]
+        layer_thickness = NF[0.5, 4]
     else
         layer_thickness = ones(NF, nlayers)
     end

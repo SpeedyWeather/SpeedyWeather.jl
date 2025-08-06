@@ -3,7 +3,10 @@
 ## Unreleased
 
 - Expand scratch memory handling in spectral transforms [#791](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/791)
-- Adjusted legendre transform kernels to work with KernelAbstractions [#736](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/736)
+- More work towards PrimitiveDryModel on GPU [#792](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/792)
+- Jeevanjee surface fluxes and soil moisture field capacity  [#794](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/794) [#788](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/788)
+- Add Atomix v1 compat to Project.toml [#799]((https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/799)
+- Adjusted legendre transform kernels to work with KernelAbstractions [#736](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/736)[#737](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/737)
 - Interpolation now works on GPU [#764](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/764)
 - A minimal barotropic model now runs on GPU [#733](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/733)
 - Fix Haversine rounding errors with type promotion [#787](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/787)

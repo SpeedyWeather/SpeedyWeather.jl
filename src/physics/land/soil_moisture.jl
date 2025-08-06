@@ -32,8 +32,10 @@ export SeasonalSoilMoisture
     "[OPTION] filename of soil moisture"
     file::String = "soil_moisture.nc"
 
-    "[OPTION] variable name in netcdf file"
+    "[OPTION] variable name in netcdf file for layer 1"
     varname_layer1::String = "swl1"
+
+    "[OPTION] variable name in netcdf file for layer 2"
     varname_layer2::String = "swl2"
 
     "[OPTION] Grid the soil moisture file comes on"
@@ -87,6 +89,7 @@ function initialize!(soil::SeasonalSoilMoisture, model::PrimitiveEquation)
     fill_value2 = NF(ncfile[soil.varname_layer2].attrib["_FillValue"])
     fill_value1 === fill_value2 || @warn "Fill values are different for the two soil layers, use only from layer 1"
     soil_moisture_file[soil_moisture_file .=== fill_value1] .= soil.missing_value      # === to include NaN
+    soil_moisture_file = on_architecture(model.architecture, soil_moisture_file)
     
     @boundscheck fields_match(monthly_soil_moisture, soil_moisture_file, vertical_only=true) ||
         throw(DimensionMismatch(monthly_soil_moisture, soil_moisture_file))
@@ -154,16 +157,16 @@ export LandBucketMoisture
     "[OPTION] Fraction of top layer runoff that is put into layer below [1]"
     runoff_fraction::NF = 0.5
 
-    "[OPTION] Initial soil moisture, volume fraction [1]"
-    initial_moisture::NF = 0
+    "[OPTION] Initial soil moisture, volume fraction [1], start saturated for faster spinup"
+    initial_moisture::NF = 1
     
     "[OPTION] Apply land-sea mask to NaN ocean-only points?"
     mask::Bool = false
 
-    "Field capacity per meter soil [m], top layer, f = γz, set by land.temperature"
+    "[DERIVED] Water at field capacity [m], top layer, f = γz, set at initialize from by land.thermodynamics and .geometry"
     f₁::Base.RefValue{NF} = Ref(zero(NF))
 
-    "Field capacity per meter soil [m], lower layer, f = γz, set by land.temperature"
+    "[DERIVED] Water at field capacity [m], lower layer, f = γz, set at initialize from by land.thermodynamics and .geometry"
     f₂::Base.RefValue{NF} = Ref(zero(NF))
 end
 
@@ -171,14 +174,14 @@ LandBucketMoisture(SG::SpectralGrid; kwargs...) = LandBucketMoisture{SG.NF}(; kw
 function initialize!(soil::LandBucketMoisture, model::PrimitiveEquation)
     (; nlayers_soil) = model.spectral_grid
     @assert nlayers_soil == 2 "LandBucketMoisture only works with 2 soil layers "*
-        "but spectral_grid.nlayers_soil = $nlayers_soil given. Ignoring additional layers."
-
+    "but spectral_grid.nlayers_soil = $nlayers_soil given. Ignoring additional layers."
+    
     # set the field capacity given layer thickness and 
     γ = model.land.thermodynamics.field_capacity
     z₁ = model.land.geometry.layer_thickness[1]
     z₂ = model.land.geometry.layer_thickness[2]
-    soil.f₁[] = γ*z₁
-    soil.f₂[] = γ*z₂
+    soil.f₁[] = γ*z₁    # amount of water at field capacity in first layer [m]
+    soil.f₂[] = γ*z₂    # amount of water at field capacity in second layer [m]
 
     return nothing
 end
@@ -251,8 +254,8 @@ function timestep!(
             soil_moisture[ij, 2] += Δt*f₁_f₂*D
 
             # river runoff
-            W₁ = soil_moisture[ij, 1]
-            δW₁ = W₁ - min(W₁, 1)               # excess moisture in top layer
+            W₁ = soil_moisture[ij, 1]           # wrt to field capacity so maximum is 1
+            δW₁ = W₁ - min(W₁, 1)               # excess moisture in top layer, cap at field capacity
             soil_moisture[ij, 1] -= δW₁         # remove excess from top layer
             soil_moisture[ij, 2] += p*δW₁*f₁_f₂ # add fraction to lower layer
             R[ij] += Δt*(1-p)*δW₁*f₁            # accumulate river runoff [m] of top layer
