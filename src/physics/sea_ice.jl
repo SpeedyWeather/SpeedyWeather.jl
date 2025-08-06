@@ -5,14 +5,6 @@ struct NoSeaIce <: AbstractSeaIce end
 NoSeaIce(::SpectralGrid) = NoSeaIce()
 initialize!(::NoSeaIce, ::AbstractModel) = nothing
 
-# function barrier for all oceans
-function initialize!(   ocean::PrognosticVariablesOcean,
-                        progn::PrognosticVariables,
-                        diagn::DiagnosticVariables,
-                        model::PrimitiveEquation)
-    initialize!(ocean, progn, diagn, model.ocean, model)
-end
-
 # set all concentration to zero
 function initialize!(
     ocean::PrognosticVariablesOcean,
@@ -40,13 +32,14 @@ function sea_ice_timestep!( progn::PrognosticVariables,
 end
 
 export ThermodynamicSeaIce
-@kwdef mutable struct ThermodynamicSeaIce{NF} <: AbstractModelComponent
+@kwdef mutable struct ThermodynamicSeaIce{NF} <: AbstractSeaIce
     capacity::NF = 1e-4
-    temp_freeze::NF = -1.8
+    temp_freeze::NF = 273.15-1.8
     growth::NF = 3e-1
 end
 
 ThermodynamicSeaIce(SG::SpectralGrid; kwargs...) = ThermodynamicSeaIce{SG.NF}(;kwargs...)
+initialize!(::ThermodynamicSeaIce, ::AbstractModel) = nothing
 
 # don't affect concentration (may be set with set!)
 function initialize!(

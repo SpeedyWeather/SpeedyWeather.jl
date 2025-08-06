@@ -302,7 +302,7 @@ export SlabOcean
     mixed_layer_depth::NF = 10
 
     "[OPTION] Sea ice insulation to reduce air-sea fluxes [0-1], 0->1 for no->full insulation"
-    sea_ice_insulation::F = (x) -> x
+    sea_ice_insulation::F
 
     "[OPTION] Density of water [kg/m³]"
     density::NF = 1000
@@ -315,7 +315,8 @@ export SlabOcean
 end
 
 # generator function
-SlabOcean(SG::SpectralGrid; kwargs...) = SlabOcean{SG.NF}(; kwargs...)
+SlabOcean(SG::SpectralGrid; sea_ice_insulation = (x) -> x, kwargs...) =
+    SlabOcean{SG.NF, typeof(sea_ice_insulation)}(; sea_ice_insulation, kwargs...)
 
 # nothing to initialize for SlabOcean
 initialize!(ocean_model::SlabOcean, model::PrimitiveEquation) = nothing

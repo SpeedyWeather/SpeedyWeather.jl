@@ -30,3 +30,8 @@ end
 
 path(::SeaIceConcentrationOutput, simulation) =
     simulation.prognostic_variables.ocean.sea_ice_concentration
+
+OceanOutput() = (
+    SeaSurfaceTemperatureOutput(),
+    SeaIceConcentrationOutput(),
+)
