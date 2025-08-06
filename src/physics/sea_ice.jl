@@ -33,9 +33,14 @@ end
 
 export ThermodynamicSeaIce
 @kwdef mutable struct ThermodynamicSeaIce{NF} <: AbstractSeaIce
-    capacity::NF = 1e-4
+    "[OPTION] Freezing temperature of sea water [K]"
     temp_freeze::NF = 273.15-1.8
-    growth::NF = 3e-1
+
+    "[OPTION] Melting rate of sea ice [m²/m²/s/K]"
+    melt_rate::NF = 5e-6
+
+    "[OPTION] Freezing rate of sea ice [m²/m²/s/K]"
+    freeze_rate::NF = 5e-6
 end
 
 ThermodynamicSeaIce(SG::SpectralGrid; kwargs...) = ThermodynamicSeaIce{SG.NF}(;kwargs...)
@@ -64,20 +69,21 @@ function sea_ice_timestep!( progn::PrognosticVariables,
     Δt = model.time_stepping.Δt_sec
     (; mask) = model.land_sea_mask
 
-    γ = sea_ice_model.capacity
-    g = sea_ice_model.growth
+    f = sea_ice_model.freeze_rate
+    m = sea_ice_model.melt_rate
     temp_freeze = sea_ice_model.temp_freeze
 
     # Euler forward step
     @inbounds for ij in eachgridpoint(sst, ice, mask)
         if mask[ij] < 1     # at least partially ocean
 
-            F = -γ*(sst[ij] - temp_freeze)          # ice-sst flux as a relaxation term
-            F += -min(sst[ij] - temp_freeze, 0)/Δt  # move flux below freezing to ice growth
+            # ice-sst flux as a relaxation term wrt to freezing, with different melt/freeze rates
+            dT = sst[ij] - temp_freeze              # uncorrected difference to freezing temperature
+            F = -m*max(dT, 0) - f*min(dT, 0)        # melt if above freezing, freeze if below
             sst[ij] = max(sst[ij], temp_freeze)     # cap sst at freezing
 
-            # update concentration, cap between [0, 1]
-            ice[ij] += Δt*F*g
+            # update sea ice concentration, cap between [0, 1]
+            ice[ij] += Δt*F
             ice[ij] = max(min(ice[ij], 1), 0)
         end
     end
