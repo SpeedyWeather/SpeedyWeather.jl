@@ -33,7 +33,7 @@ include("rivers.jl")
 
 # LandModel defined through its components
 export LandModel
-@kwdef struct LandModel{G, TD, T, SM, V, R} <: AbstractWetLand
+@kwdef mutable struct LandModel{G, TD, T, SM, V, R} <: AbstractWetLand
     spectral_grid::SpectralGrid
     geometry::G = LandGeometry(spectral_grid)
     thermodynamics::TD = LandThermodynamics(spectral_grid)
