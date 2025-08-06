@@ -57,6 +57,7 @@ function initialize!(   ocean::PrognosticVariablesOcean,
                         diagn::DiagnosticVariables,
                         model::PrimitiveEquation)
     initialize!(ocean, progn, diagn, model.ocean, model)
+    initialize!(ocean, progn, diagn, model.sea_ice, model)
 end
 
 # function barrier for all oceans
@@ -287,7 +288,7 @@ end
 
 export SlabOcean
 
-@kwdef struct SlabOcean{NF} <: AbstractOcean
+@kwdef mutable struct SlabOcean{NF, F} <: AbstractOcean
     "[OPTION] Initial temperature on the equator [K]"
     temp_equator::NF = 302
 
@@ -299,6 +300,9 @@ export SlabOcean
 
     "[OPTION] Average mixed-layer depth [m]"
     mixed_layer_depth::NF = 10
+
+    "[OPTION] Sea ice insulation to reduce air-sea fluxes [0-1], 0->1 for no->full insulation"
+    sea_ice_insulation::F = (x) -> x
 
     "[OPTION] Density of water [kg/m³]"
     density::NF = 1000
@@ -339,6 +343,8 @@ function ocean_timestep!(
     model::PrimitiveEquation,
 )
     sst = progn.ocean.sea_surface_temperature
+    ice = progn.ocean.sea_ice_concentration
+
     Lᵥ = model.atmosphere.latent_heat_condensation
     C₀ = ocean_model.heat_capacity_mixed_layer
     Δt = model.time_stepping.Δt_sec
@@ -353,9 +359,10 @@ function ocean_timestep!(
     S = diagn.physics.ocean.sensible_heat_flux
 
     # Euler forward step
-    @inbounds for ij in eachgridpoint(sst, mask, Rsd, Rsu, Rld, Rlu, Ev, S)
+    @inbounds for ij in eachgridpoint(sst, ice, mask, Rsd, Rsu, Rld, Rlu, Ev, S)
         if mask[ij] < 1     # at least partially ocean
-            sst[ij] += (Δt/C₀)*(Rsd[ij] - Rsu[ij] - Rlu[ij] + Rld[ij] - Lᵥ*Ev[ij] - S[ij])
+            r = 1 - ocean_model.sea_ice_insulation(ice[ij])     # formulate as reduction
+            sst[ij] += (Δt/C₀)*r*(Rsd[ij] - Rsu[ij] - Rlu[ij] + Rld[ij] - Lᵥ*Ev[ij] - S[ij])
         end
     end
 
