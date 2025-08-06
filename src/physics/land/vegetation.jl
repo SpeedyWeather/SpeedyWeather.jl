@@ -54,7 +54,7 @@ function soil_moisture_availability!(
 end
 
 export VegetationClimatology
-@kwdef struct VegetationClimatology{NF, GridVariable2D} <: AbstractVegetation
+@kwdef mutable struct VegetationClimatology{NF, GridVariable2D} <: AbstractVegetation
     "[OPTION] Combine high and low vegetation factor, a in high + a*low [1]"
     low_veg_factor::NF = 0.8
 

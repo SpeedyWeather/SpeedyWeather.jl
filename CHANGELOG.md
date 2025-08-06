@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Thermodynamic sea ice model [#811](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/811)
+- Make all land model components mutable [#810](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/810)
 - More work towards PrimitiveDryModel on GPU [#792](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/792)
 - Jeevanjee surface fluxes and soil moisture field capacity  [#794](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/794) [#788](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/788)
 - Add Atomix v1 compat to Project.toml [#799]((https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/799)
