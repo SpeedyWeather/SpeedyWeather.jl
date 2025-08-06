@@ -3,24 +3,25 @@ module SpeedyWeatherMakieExt
 using SpeedyWeather, Makie
 using DocStringExtensions
 
+function default_title(field::RingGrids.AbstractField)
+    Grid = RingGrids.nonparametric_type(field.grid)
+    NF = eltype(field)
+    return "$(RingGrids.get_nlat(field))-ring Field{$NF} on $Grid"
+end
+
 """
 $(TYPEDSIGNATURES)
 Defines Makie's `heatmap` function for a`field::AbstractField2D` via interpolation
 to `::AbstractFullField2D` (which can be reshaped into a matrix.)"""
 function Makie.heatmap(
     field::RingGrids.AbstractField2D;
-    title::String = "$(RingGrids.get_nlat(field))-ring $(typeof(field))",
+    title::String = default_title(field),
     kwargs...   # pass on to Makie.heatmap
 )
     full_field = RingGrids.interpolate(RingGrids.full_grid_type(field.grid), field.grid.nlat_half, field)
     heatmap(full_field; title, kwargs...)
 end
 
-function default_title(field::RingGrids.AbstractField)
-    Grid = RingGrids.nonparametric_type(field.grid)
-    NF = eltype(field)
-    return "$(RingGrids.get_nlat(field))-ring Field{$NF} on $Grid"
-end
 
 """
 $(TYPEDSIGNATURES)
