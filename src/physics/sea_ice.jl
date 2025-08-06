@@ -37,10 +37,10 @@ export ThermodynamicSeaIce
     temp_freeze::NF = 273.15-1.8
 
     "[OPTION] Melting rate of sea ice [m²/m²/s/K]"
-    melt_rate::NF = 5e-6
+    melt_rate::NF = 5e-5
 
     "[OPTION] Freezing rate of sea ice [m²/m²/s/K]"
-    freeze_rate::NF = 5e-6
+    freeze_rate::NF = 5e-5
 end
 
 ThermodynamicSeaIce(SG::SpectralGrid; kwargs...) = ThermodynamicSeaIce{SG.NF}(;kwargs...)
@@ -68,8 +68,8 @@ function sea_ice_timestep!( progn::PrognosticVariables,
     Δt = model.time_stepping.Δt_sec
     (; mask) = model.land_sea_mask
 
-    f = sea_ice_model.freeze_rate
     m = sea_ice_model.melt_rate
+    f = sea_ice_model.freeze_rate
     temp_freeze = sea_ice_model.temp_freeze
 
     # Euler forward step

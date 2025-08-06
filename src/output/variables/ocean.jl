@@ -19,7 +19,7 @@ path(::SeaSurfaceTemperatureOutput, simulation) =
 Fields are: $(TYPEDFIELDS)"""
 @kwdef mutable struct SeaIceConcentrationOutput <: AbstractOutputVariable
     name::String = "sic"
-    unit::String = "1"
+    unit::String = "m²/m²"
     long_name::String = "sea ice concentration"
     dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
     missing_value::Float64 = NaN
