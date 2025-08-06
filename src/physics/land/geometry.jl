@@ -1,7 +1,7 @@
 abstract type AbstractLandGeometry <: AbstractModelComponent end
 
 export LandGeometry
-struct LandGeometry{NF, VectorType} <: AbstractLandGeometry
+mutable struct LandGeometry{NF, VectorType} <: AbstractLandGeometry
     "[OPTION] number of soil layers"
     nlayers::Int
 
