@@ -9,6 +9,17 @@ SpeedyWeather.globe(SG::SpectralGrid; kwargs...) = globe(SG.grid; kwargs...)
 SpeedyWeather.globe(geometry::Geometry; kwargs...) = globe(geometry.grid; kwargs...)
 SpeedyWeather.globe(grid::AbstractGrid; kwargs...) = globe(typeof(grid), grid.nlat_half; kwargs...)
 
+function default_title(Grid::Type{<:RingGrids.AbstractGrid}, nlat_half::Integer)
+    Grid_ = RingGrids.nonparametric_type(Grid)
+    return "$(RingGrids.get_nlat(Grid, nlat_half))-ring $Grid"
+end
+
+function default_title(field::RingGrids.AbstractField)
+    Grid = RingGrids.nonparametric_type(field.grid)
+    NF = eltype(field)
+    return "$(RingGrids.get_nlat(field))-ring Field{$NF} on $Grid"
+end
+
 """($TYPEDSIGNATURES)
 Create a 3D interactive globe plot of the grid `Grid` at resolution `nlat_half` displaying
 cell centers and faces. Optionally, add coastlines and a background image of the Earth."""
@@ -16,7 +27,7 @@ function SpeedyWeather.globe(
     Grid::Type{<:AbstractGrid},
     nlat_half::Integer;
     interactive::Bool = true,
-    title::String = "$(RingGrids.get_nlat(Grid, nlat_half))-ring $Grid",
+    title::String = default_title(Grid, nlat_half),
     color = :black,
     faces::Bool = true,
     centers::Bool = true,
@@ -83,7 +94,7 @@ the cell faces. Optionally, add coastlines (default true)."""
 function SpeedyWeather.globe(
     field::AbstractField2D;
     interactive::Bool = true,
-    title::String = "$(RingGrids.get_nlat(field))-ring $(typeof(field))",
+    title::String = default_title(field),
     colormap = :viridis,
     coastlines::Bool = true,
 )
