@@ -16,12 +16,18 @@ function Makie.heatmap(
     heatmap(full_field; title, kwargs...)
 end
 
+function default_title(field::RingGrids.AbstractField)
+    Grid = RingGrids.nonparametric_type(field.grid)
+    NF = eltype(field)
+    return "$(RingGrids.get_nlat(field))-ring Field{$NF} on $Grid"
+end
+
 """
 $(TYPEDSIGNATURES)
 Defines Makie's `heatmap` function for a `field::AbstractFullField2D` which can be reshaped into a matrix."""
 function Makie.heatmap(
     field::RingGrids.AbstractFullField2D;
-    title::String = "$(RingGrids.get_nlat(field))-ring $(typeof(field))",
+    title::String = default_title(field),
     size = (600,300),
     kwargs...
 )
