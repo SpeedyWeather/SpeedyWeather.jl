@@ -57,7 +57,6 @@ function initialize!(
     return nothing
 end
 
-# NoSeaIce does not do anything 
 function sea_ice_timestep!( progn::PrognosticVariables,
                             diagn::DiagnosticVariables,
                             sea_ice_model::ThermodynamicSeaIce,

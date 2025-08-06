@@ -25,7 +25,7 @@ Fields are: $(TYPEDFIELDS)"""
     missing_value::Float64 = NaN
     compression_level::Int = 3
     shuffle::Bool = true
-    keepbits::Int = 5
+    keepbits::Int = 10
 end
 
 path(::SeaIceConcentrationOutput, simulation) =
