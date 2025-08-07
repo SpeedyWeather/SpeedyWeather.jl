@@ -293,13 +293,13 @@ export SlabOcean
     temp_equator::NF = 302
 
     "[OPTION] Initial temperature at the poles [K]"
-    temp_poles::NF = 273
+    temp_poles::NF = 273.15-1.8     # freezing point of sea water
 
     "[OPTION] Specific heat capacity of water [J/kg/K]"
     specific_heat_capacity::NF = 4184
 
     "[OPTION] Average mixed-layer depth [m]"
-    mixed_layer_depth::NF = 10
+    mixed_layer_depth::NF = 50
 
     "[OPTION] Sea ice insulation to reduce air-sea fluxes [0-1], 0->1 for no->full insulation"
     sea_ice_insulation::F
