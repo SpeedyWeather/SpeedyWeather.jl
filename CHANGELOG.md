@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Keyword arguments corrected for ImplicitPrimitiveEquation [#812](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/812)
 - Fix admonition and typo on GPU-and-Architectures docs [#807](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/807)
 - Make all land model components mutable [#810](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/810)
 - More work towards PrimitiveDryModel on GPU [#792](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/792)
