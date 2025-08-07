@@ -72,20 +72,22 @@ function sea_ice_timestep!( progn::PrognosticVariables,
     f = sea_ice_model.freeze_rate
     temp_freeze = sea_ice_model.temp_freeze
 
-    # Euler forward step
-    @inbounds for ij in eachgridpoint(sst, ice, mask)
-        if mask[ij] < 1     # at least partially ocean
+    launch!(architecture(ice), LinearWorkOrder, size(ice), sea_ice_kernel!, ice, sst, mask, temp_freeze, m, f, Δt)
+    synchronize(architecture(ice))
+end
 
-            # ice-sst flux as a relaxation term wrt to freezing, with different melt/freeze rates
-            dT = sst[ij] - temp_freeze              # uncorrected difference to freezing temperature
-            F = -m*max(dT, 0) - f*min(dT, 0)        # melt if above freezing, freeze if below
-            sst[ij] = max(sst[ij], temp_freeze)     # cap sst at freezing
+@kernel inbounds=true function sea_ice_kernel!(ice, sst, mask, @Const(temp_freeze), @Const(m), @Const(f), @Const(Δt))
+    ij = @index(Global, Linear)    # every grid point ij
 
-            # update sea ice concentration, cap between [0, 1]
-            ice[ij] += Δt*F
-            ice[ij] = max(min(ice[ij], 1), 0)
-        end
+    if mask[ij] < 1     # at least partially ocean
+
+        # ice-sst flux as a relaxation term wrt to freezing, with different melt/freeze rates
+        dT = sst[ij] - temp_freeze              # uncorrected difference to freezing temperature
+        F = -m*max(dT, 0) - f*min(dT, 0)        # melt if above freezing, freeze if below
+        sst[ij] = max(sst[ij], temp_freeze)     # cap sst at freezing
+
+        # Euler forward step to update sea ice concentration, cap between [0, 1]
+        ice[ij] += Δt*F
+        ice[ij] = max(min(ice[ij], 1), 0)
     end
-
-    return nothing
 end
