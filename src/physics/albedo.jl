@@ -137,7 +137,7 @@ export OceanSeaIceAlbedo
 
 @kwdef struct OceanSeaIceAlbedo{NF} <: AbstractAlbedo
     albedo_ocean::NF = 0.06
-    albedo_ice::NF = 0.7
+    albedo_ice::NF = 0.6
 end
 
 OceanSeaIceAlbedo(SG::SpectralGrid; kwargs...) = OceanSeaIceAlbedo{SG.NF}(;kwargs...)
