@@ -57,6 +57,7 @@ function initialize!(   ocean::PrognosticVariablesOcean,
                         diagn::DiagnosticVariables,
                         model::PrimitiveEquation)
     initialize!(ocean, progn, diagn, model.ocean, model)
+    initialize!(ocean, progn, diagn, model.sea_ice, model)
 end
 
 # function barrier for all oceans
@@ -287,18 +288,21 @@ end
 
 export SlabOcean
 
-@kwdef struct SlabOcean{NF} <: AbstractOcean
+@kwdef mutable struct SlabOcean{NF, F} <: AbstractOcean
     "[OPTION] Initial temperature on the equator [K]"
     temp_equator::NF = 302
 
     "[OPTION] Initial temperature at the poles [K]"
-    temp_poles::NF = 273
+    temp_poles::NF = 273.15-1.8     # freezing point of sea water
 
     "[OPTION] Specific heat capacity of water [J/kg/K]"
     specific_heat_capacity::NF = 4184
 
     "[OPTION] Average mixed-layer depth [m]"
-    mixed_layer_depth::NF = 10
+    mixed_layer_depth::NF = 50
+
+    "[OPTION] Sea ice insulation to reduce air-sea fluxes [0-1], 0->1 for no->full insulation"
+    sea_ice_insulation::F
 
     "[OPTION] Density of water [kg/m³]"
     density::NF = 1000
@@ -311,7 +315,13 @@ export SlabOcean
 end
 
 # generator function
-SlabOcean(SG::SpectralGrid; kwargs...) = SlabOcean{SG.NF}(; kwargs...)
+function SlabOcean(
+    SG::SpectralGrid;
+    sea_ice_insulation = (x) -> x,  # default is linear reduction of air-sea fluxes with sea ice concentration
+    kwargs...,
+)
+    return SlabOcean{SG.NF, typeof(sea_ice_insulation)}(; sea_ice_insulation, kwargs...)
+end
 
 # nothing to initialize for SlabOcean
 initialize!(ocean_model::SlabOcean, model::PrimitiveEquation) = nothing
@@ -339,9 +349,14 @@ function ocean_timestep!(
     model::PrimitiveEquation,
 )
     sst = progn.ocean.sea_surface_temperature
+    ice = progn.ocean.sea_ice_concentration
+    insulation = ocean_model.sea_ice_insulation
+
     Lᵥ = model.atmosphere.latent_heat_condensation
     C₀ = ocean_model.heat_capacity_mixed_layer
     Δt = model.time_stepping.Δt_sec
+    Δt_C₀ = Δt / C₀
+
     (; mask) = model.land_sea_mask
 
     # Frierson et al. 2006, eq (1)
@@ -352,12 +367,15 @@ function ocean_timestep!(
     Ev = diagn.physics.ocean.evaporative_flux
     S = diagn.physics.ocean.sensible_heat_flux
 
-    # Euler forward step
-    @inbounds for ij in eachgridpoint(sst, mask, Rsd, Rsu, Rld, Rlu, Ev, S)
-        if mask[ij] < 1     # at least partially ocean
-            sst[ij] += (Δt/C₀)*(Rsd[ij] - Rsu[ij] - Rlu[ij] + Rld[ij] - Lᵥ*Ev[ij] - S[ij])
-        end
-    end
+    launch!(architecture(sst), LinearWorkOrder, size(sst), slab_ocean_kernel!, sst, ice, mask, Rsd, Rsu, Rld, Rlu, Ev, S, insulation, Δt_C₀, Lᵥ)
+    synchronize(architecture(sst))
+end
 
-    return nothing
+@kernel inbounds=true function slab_ocean_kernel!(sst, ice, mask, Rsd, Rsu, Rld, Rlu, Ev, S, @Const(insulation), @Const(Δt_C₀), @Const(Lᵥ))
+    ij = @index(Global, Linear)         # every grid point ij
+
+    if mask[ij] < 1                     # at least partially ocean
+        r = 1 - insulation(ice[ij])     # formulate as reduction of the net flux
+        sst[ij] += Δt_C₀*r*(Rsd[ij] - Rsu[ij] - Rlu[ij] + Rld[ij] - Lᵥ*Ev[ij] - S[ij])
+    end
 end
