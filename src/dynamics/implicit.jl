@@ -171,7 +171,7 @@ end
 
 """$(TYPEDSIGNATURES)
 Generator using the resolution from SpectralGrid."""
-function ImplicitPrimitiveEquation(spectral_grid::SpectralGrid, kwargs...)
+function ImplicitPrimitiveEquation(spectral_grid::SpectralGrid; kwargs...)
     (; NF, VectorType, MatrixType, TensorType, trunc, nlayers) = spectral_grid
     return ImplicitPrimitiveEquation{NF, VectorType, MatrixType, TensorType}(;
         trunc, nlayers, kwargs...)
