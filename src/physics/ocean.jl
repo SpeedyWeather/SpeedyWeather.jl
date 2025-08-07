@@ -345,10 +345,13 @@ function ocean_timestep!(
 )
     sst = progn.ocean.sea_surface_temperature
     ice = progn.ocean.sea_ice_concentration
+    insulation = ocean_model.sea_ice_insulation
 
     Lᵥ = model.atmosphere.latent_heat_condensation
     C₀ = ocean_model.heat_capacity_mixed_layer
     Δt = model.time_stepping.Δt_sec
+    Δt_C₀ = Δt / C₀
+
     (; mask) = model.land_sea_mask
 
     # Frierson et al. 2006, eq (1)
@@ -359,13 +362,15 @@ function ocean_timestep!(
     Ev = diagn.physics.ocean.evaporative_flux
     S = diagn.physics.ocean.sensible_heat_flux
 
-    # Euler forward step
-    @inbounds for ij in eachgridpoint(sst, ice, mask, Rsd, Rsu, Rld, Rlu, Ev, S)
-        if mask[ij] < 1     # at least partially ocean
-            r = 1 - ocean_model.sea_ice_insulation(ice[ij])     # formulate as reduction
-            sst[ij] += (Δt/C₀)*r*(Rsd[ij] - Rsu[ij] - Rlu[ij] + Rld[ij] - Lᵥ*Ev[ij] - S[ij])
-        end
-    end
+    launch!(architecture(sst), LinearWorkOrder, size(sst), slab_ocean_kernel!, sst, ice, mask, Rsd, Rsu, Rld, Rlu, Ev, S, insulation, Δt_C₀, Lᵥ)
+    synchronize(architecture(sst))
+end
 
-    return nothing
+@kernel inbounds=true function slab_ocean_kernel!(sst, ice, mask, Rsd, Rsu, Rld, Rlu, Ev, S, @Const(insulation), @Const(Δt_C₀), @Const(Lᵥ))
+    ij = @index(Global, Linear)         # every grid point ij
+
+    if mask[ij] < 1                     # at least partially ocean
+        r = 1 - insulation(ice[ij])     # formulate as reduction of the net flux
+        sst[ij] += Δt_C₀*r*(Rsd[ij] - Rsu[ij] - Rlu[ij] + Rld[ij] - Lᵥ*Ev[ij] - S[ij])
+    end
 end
