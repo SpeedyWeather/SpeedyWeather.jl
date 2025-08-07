@@ -10,7 +10,7 @@ struct Field{T, N, ArrayType <: AbstractArray, Grid <: AbstractGrid} <: Abstract
 
     # Inner constructor to check for matching grid and data
     function Field(data, grid)
-        data_matches_grid(data, grid) || throw(DimensionMismatch(data, grid))
+        data_matches_grid(data, grid; horizontal_dim=1) || throw(DimensionMismatch(data, grid))
         return new{eltype(data), ndims(data), typeof(data), typeof(grid)}(data, grid)
     end
 end
@@ -40,7 +40,7 @@ Architectures.array_type(field::AbstractField) = array_type(typeof(field))
 Architectures.ismatching(arch::AbstractArchitecture, field::AbstractField) = ismatching(arch, field.data)
 
 # test number of horizontal grid points matches
-data_matches_grid(data::AbstractArray, grid::AbstractGrid) = size(data, 1) == get_npoints(grid)
+data_matches_grid(data::AbstractArray, grid::AbstractGrid; horizontal_dim::Integer=1) = size(data, horizontal_dim) == get_npoints(grid)
 
 function Base.DimensionMismatch(data::AbstractArray, grid::AbstractGrid)
     Grid_ = nonparametric_type(grid)
@@ -284,13 +284,13 @@ for f in (:zeros, :ones, :rand, :randn)
 end
 
 # zero element of a Field with new data but same grid
-Base.zero(field::AbstractField) = Field(zero(field.data), field.grid)
+Base.zero(field::F) where {F<:AbstractField} = F(zero(field.data), field.grid)
 
 # similar data but share grid
-Base.similar(field::AbstractField) = Field(similar(field.data), field.grid)
+Base.similar(field::F) where {F<:AbstractField} = F(similar(field.data), field.grid)
 
 # data with new type T but share grid
-Base.similar(field::AbstractField, ::Type{T}) where {T} = Field(similar(field.data, T), field.grid)
+Base.similar(field::F, ::Type{T}) where {F<:AbstractField, T} = F(similar(field.data, T), field.grid)
 
 # data with same type T but new size (=new grid)
 function Base.similar(
