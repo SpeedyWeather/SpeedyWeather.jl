@@ -315,8 +315,13 @@ export SlabOcean
 end
 
 # generator function
-SlabOcean(SG::SpectralGrid; sea_ice_insulation = (x) -> x, kwargs...) =
-    SlabOcean{SG.NF, typeof(sea_ice_insulation)}(; sea_ice_insulation, kwargs...)
+function SlabOcean(
+    SG::SpectralGrid;
+    sea_ice_insulation = (x) -> x,  # default is linear reduction of air-sea fluxes with sea ice concentration
+    kwargs...,
+)
+    return SlabOcean{SG.NF, typeof(sea_ice_insulation)}(; sea_ice_insulation, kwargs...)
+end
 
 # nothing to initialize for SlabOcean
 initialize!(ocean_model::SlabOcean, model::PrimitiveEquation) = nothing
