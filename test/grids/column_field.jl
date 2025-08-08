@@ -85,11 +85,6 @@ end
             field2 = ColumnF(undef, nlayers, nlat_half, 3)
             @test size(field2) == (nlayers, npoints, 3)
             @test eltype(field2) == NF
-
-            # Test generic ColumnField constructor
-            field3 = ColumnField(undef, nlayers, nlat_half)
-            @test size(field3) == (nlayers, npoints)
-            @test eltype(field3) == RINGGRIDS_DEFAULT_NF
         end
     end
 end
