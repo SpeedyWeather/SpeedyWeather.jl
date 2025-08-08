@@ -113,7 +113,7 @@ function (::Type{F})(
     nlayers::Integer,
     nlat_half::Integer,
     k::Integer...,
-) where {F<:AbstractField{T, N, ArrayType, Grid}} where {T, N, ArrayType, Grid<:AbstractGrid{Architecture}} where Architecture
+) where {F<:ColumnField{T, N, ArrayType, Grid}} where {T, N, ArrayType, Grid<:AbstractGrid{Architecture}} where Architecture
     # this (inevitably) creates a new grid and architecture instance
     grid = nonparametric_type(Grid)(nlat_half, Architecture())
     # TODO this should allocate on the device
