@@ -50,6 +50,13 @@ export  FullGaussianField,
         OctaHEALPixField,
         OctaminimalGaussianField
 
+export  ColumnField,
+        FullColumnField,
+        ReducedColumnField,
+        ColumnField2D,
+        ColumnField3D,
+        ColumnField4D
+
 export  field_view
 
 # SIZE

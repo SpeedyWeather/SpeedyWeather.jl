@@ -1,3 +1,6 @@
+import LinearAlgebra.transpose
+import LinearAlgebra.transpose!
+
 """
 ColumnField is a version of `Field` with data stored in a column-major format. 
 It is used e.g. to represent data on a vertical column of a grid in column-based
@@ -39,12 +42,12 @@ grid_type(::Type{ColumnField{T, N, A, G}}) where {T, N, A, G} = G
 Architectures.array_type(::Type{ColumnField{T, N, A, G}}) where {T, N, A, G} = A
 
 # CONVERSION from Field 
-transpose(field::Field) = transpose_safe(field)
-transpose!(field::Field) = transpose_unsafe!(field, similar(transpose(field.data)))
+LinearAlgebra.transpose(field::Field) = transpose_safe(field)
+LinearAlgebra.transpose!(field::Field) = transpose_unsafe!(field, similar(transpose(field.data)))
 
 # and back to Field 
-transpose(field::ColumnField) = transpose_safe(field)
-transpose!(field::ColumnField) = transpose_unsafe!(field, similar(transpose(field.data)))
+LinearAlgebra.transpose(field::ColumnField) = transpose_safe(field)
+LinearAlgebra.transpose!(field::ColumnField) = transpose_unsafe!(field, similar(transpose(field.data)))
 
 # safe version which allocates a new field
 function transpose_safe(field::Field)
