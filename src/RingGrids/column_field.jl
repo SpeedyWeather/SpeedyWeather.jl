@@ -56,7 +56,7 @@ function transpose_safe(field::Field)
 end
 
 # tranpose is defined here as swapping first two dimensions 
-functison _size_of_transpose(data::AbstractArray)
+function _size_of_transpose(data::AbstractArray)
     IJ, K, L... = size(data)
     return (K, IJ, L...)
 end
