@@ -55,7 +55,8 @@ export  ColumnField,
         ReducedColumnField,
         ColumnField2D,
         ColumnField3D,
-        ColumnField4D
+        ColumnField4D,
+        transpose!
 
 export  field_view
 

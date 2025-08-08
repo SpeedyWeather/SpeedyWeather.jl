@@ -122,8 +122,10 @@ end
             field[1, 1] = original_val  # restore
 
             # Test linear indexing
+            num = 1
             for i in eachindex(field)
-                field[i] = NF(i)
+                field[i] = NF(num)
+                num += 1
             end
             @test field[1] == NF(1)
             @test field[end] == NF(length(field))
@@ -245,26 +247,6 @@ end
     end
 end
 
-@testset "ColumnField Array conversion" begin
-    for Grid in (FullGaussianGrid, FullClenshawGrid)  # Only test full grids
-        nlat_half = 4
-        nlayers = 6
-        grid = Grid(nlat_half)
-        npoints = RingGrids.get_npoints(grid)
-        nlat = RingGrids.get_nlat(grid)
-
-        field = ColumnField(rand(Float64, nlayers, npoints), grid)
-
-        # Test Array conversion for full grids
-        if field isa FullColumnField
-            matrix = Array(field, Matrix)
-            @test matrix isa Matrix
-            @test size(matrix, 1) == nlat
-            @test size(matrix, 2) == nlayers
-        end
-    end
-end
-
 @testset "ColumnField arithmetic with Field" begin
     for NF in (Float32, Float64)
         for Grid in (FullGaussianGrid, OctahedralGaussianGrid)
@@ -279,12 +261,12 @@ end
 
             # Test add! operations
             field_copy = Field(copy(field.data), grid)
-            add!(field_copy, column_field)
+            SpeedyWeather.RingGrids.add!(field_copy, column_field)
             @test field_copy isa Field
             @test size(field_copy) == size(field)
 
             column_field_copy = ColumnField(copy(column_field.data), grid)
-            add!(column_field_copy, field)
+            SpeedyWeather.RingGrids.add!(column_field_copy, field)
             @test column_field_copy isa ColumnField
             @test size(column_field_copy) == size(column_field)
         end
@@ -344,10 +326,10 @@ end
     # Test grid_type extraction
     grid = FullGaussianGrid(4)
     field = ColumnField(rand(5, RingGrids.get_npoints(grid)), grid)
-    @test RingGrids.grid_type(typeof(field)) == typeof(grid)
+    @test SpeedyWeather.RingGrids.grid_type(typeof(field)) == typeof(grid)
 
     # Test array_type extraction
-    @test Architectures.array_type(typeof(field)) == Array{Float64, 2}
+    @test SpeedyWeather.Architectures.array_type(typeof(field)) == Array{Float64, 2}
 end
 
 @testset "ColumnField error handling" begin
@@ -361,5 +343,5 @@ end
     # Test bounds errors in transpose operations
     field = ColumnField(rand(5, npoints), grid)
     wrong_scratch = rand(3, 4)  # Wrong size scratch array
-    @test_throws BoundsError RingGrids.transpose_unsafe!(field, wrong_scratch)
+    @test_throws BoundsError SpeedyWeather.RingGrids.transpose_unsafe!(field, wrong_scratch)
 end

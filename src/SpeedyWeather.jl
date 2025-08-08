@@ -78,7 +78,7 @@ export  Field, Field2D, Field3D,
         OctaminimalGaussianField
 
 export  ColumnField, ColumnField2D, ColumnField3D, ColumnField4D,
-        FullColumnField, ReducedColumnField
+        FullColumnField, ReducedColumnField, transpose!
 
 export  FullClenshawGrid, FullGaussianGrid,
         FullHEALPixGrid, FullOctaHEALPixGrid,
