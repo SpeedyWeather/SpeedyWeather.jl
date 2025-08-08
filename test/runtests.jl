@@ -23,6 +23,7 @@ if !FLAG_EXTENDED_TESTS && !FLAG_ENZYME_TESTS
 
     # GRIDS
     include("grids/grids.jl")
+    include("grids/column_field.jl")
     include("grids/geodesics.jl")
     include("grids/interpolation.jl")
     include("grids/reverse.jl")

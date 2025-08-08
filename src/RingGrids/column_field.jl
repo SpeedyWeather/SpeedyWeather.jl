@@ -1,3 +1,16 @@
+"""
+ColumnField is a version of `Field` with data stored in a column-major format. 
+It is used e.g. to represent data on a vertical column of a grid in column-based
+parametrizations. 
+$(TYPEDFIELDS)
+
+A ColumnField can be easily created from a `Field` by transposing it:
+
+```julia
+field = Field(grid, k...)
+column_field = transpose(field)
+```
+"""
 struct ColumnField{T, N, ArrayType <: AbstractArray, Grid <: AbstractGrid} <: AbstractField{T, N, ArrayType, Grid}
     data::ArrayType
     grid::Grid
@@ -25,7 +38,7 @@ Architectures.nonparametric_type(::Type{<:ColumnField}) = ColumnField
 grid_type(::Type{ColumnField{T, N, A, G}}) where {T, N, A, G} = G
 Architectures.array_type(::Type{ColumnField{T, N, A, G}}) where {T, N, A, G} = A
 
-# conversion from Field 
+# CONVERSION from Field 
 transpose(field::Field) = transpose_safe(field)
 transpose!(field::Field) = transpose_unsafe!(field, similar(transpose(field.data)))
 
@@ -63,6 +76,148 @@ function transpose_unsafe!(field::ColumnField, scratch::AbstractArray)
     return Field(field.data, field.grid)    # view on the same data of field
 end
 
-# full grids can be reshaped into a matrix, reduced grids cannot
+# full fields can be reshaped into a matrix, reduced grids cannot
 Base.Array(field::FullColumnField, as::Type{Matrix}) = Array(reshape(field.data, get_nlat(field), :, size(field)[2:end]...))
+
+# SIMILAR AND UNDEF CONSTRUCTORS
+# data with same type T but new size (=new grid)
+function Base.similar(
+    field::ColumnField,
+    nlayers::Integer,
+    nlat_half::Integer,
+    k::Integer...
+)
+    # use same architecture though
+    new_grid = typeof(field.grid)(nlat_half, field.grid.architecture)
+    similar_data = similar(field.data, nlayers, get_npoints(new_grid), k...)
+    return ColumnField(similar_data, new_grid)
+end
+
+# data with new type T and new size
+function Base.similar(
+    field::ColumnField,
+    ::Type{Tnew},
+    nlayers::Integer,
+    nlat_half::Integer,
+    k::Integer...
+) where Tnew
+    # use same architecture though
+    new_grid = typeof(field.grid)(nlat_half, field.grid.architecture)
+    similar_data = similar(field.data, Tnew, nlayers, get_npoints(new_grid), k...)
+    return ColumnField(similar_data, new_grid)
+end
+
+# general version with ArrayType{T, N}(undef, ...) generator
+function (::Type{F})(
+    ::UndefInitializer,
+    nlayers::Integer,
+    nlat_half::Integer,
+    k::Integer...,
+) where {F<:AbstractField{T, N, ArrayType, Grid}} where {T, N, ArrayType, Grid<:AbstractGrid{Architecture}} where Architecture
+    # this (inevitably) creates a new grid and architecture instance
+    grid = nonparametric_type(Grid)(nlat_half, Architecture())
+    # TODO this should allocate on the device
+    data = nonparametric_type(ArrayType){T}(undef, nlayers, get_npoints(grid), k...)
+    return ColumnField(data, grid)
+end
+
+# in case Architecture is not provided use DEFAULT_ARCHITECTURE
+function (::Type{F})(
+    ::UndefInitializer,
+    nlayers::Integer,
+    nlat_half::Integer,
+    k::Integer...,
+) where {F<:ColumnField{T, N, ArrayType, Grid}} where {T, N, ArrayType, Grid<:AbstractGrid}
+    grid = nonparametric_type(Grid)(nlat_half, DEFAULT_ARCHITECTURE())
+    data = nonparametric_type(ArrayType){T}(undef, nlayers, get_npoints(grid), k...)
+    return ColumnField(data, grid)
+end
+
+# in case only grid is provided (e.g. FullGaussianField) use Float64, Array, DEFAULT_ARCHITECTURE
+function (::Type{F})(
+    ::UndefInitializer,
+    nlayers::Integer,
+    nlat_half::Integer,
+    k::Integer...,
+) where {F<:ColumnField}
+    Grid = grid_type(F)
+    grid = nonparametric_type(Grid)(nlat_half, DEFAULT_ARCHITECTURE())
+    data = Array{DEFAULT_NF}(undef, nlayers, get_npoints(grid), k...)
+    return ColumnField(data, grid)
+end
+
+# in case only number format is provided use Array and DEFAULT_ARCHITECTURE
+function (::Type{F})(
+    ::UndefInitializer,
+    nlayers::Integer,
+    nlat_half::Integer,
+    k::Integer...,
+) where {F<:ColumnField{T}} where T
+    Grid = grid_type(F)
+    grid = nonparametric_type(Grid)(nlat_half, DEFAULT_ARCHITECTURE())
+    data = Array{T}(undef, nlayers, get_npoints(grid), k...)
+    return ColumnField(data, grid)
+end
+
+#  same as above but with N (ignored though as obtained from integer arguments)
+function (::Type{F})(
+    ::UndefInitializer,
+    nlayers::Integer,
+    nlat_half::Integer,
+    k::Integer...,
+) where {F<:ColumnField{T, N}} where {T, N}
+    Grid = grid_type(F)
+    grid = nonparametric_type(Grid)(nlat_half, DEFAULT_ARCHITECTURE())
+    data = Array{T}(undef, nlayers, get_npoints(grid), k...)
+    return ColumnField(data, grid)
+end
+
+# in case ArrayType is provided use that!
+function (::Type{F})(
+    ::UndefInitializer,
+    nlayers::Integer,
+    nlat_half::Integer,
+    k::Integer...,
+) where {F<:ColumnField{T, N, ArrayType}} where {T, N, ArrayType}
+    Grid = grid_type(F)
+    grid = nonparametric_type(Grid)(nlat_half, DEFAULT_ARCHITECTURE())
+    data = nonparametric_type(ArrayType){T}(undef, nlayers, get_npoints(grid), k...)
+    return ColumnField(data, grid)
+end
+
+## Some ARITHMETICS with regular Fields 
+add!(field::Field, column_field::ColumnField) = field .+= transpose(column_field)
+add!(column_field::ColumnField, field::Field) = column_field .+= transpose(field)
+
+## BROADCASTING (main functionality defined in field.jl)
+
+# define broadcast style for ColumnField from its parameters
+Base.BroadcastStyle(::Type{F}) where {F<:ColumnField{T, N, ArrayType, Grid}} where {T, N, ArrayType, Grid} =
+    FieldStyle{N, nonparametric_type(Grid), true}()
+
+# allocation for broadcasting via similar, reusing grid from the first field of the broadcast arguments
+# e.g. field1 + field2 creates a new field that share the grid of field1
+# 2 .+ field1 creates a new field that share the grid of field1
+function Base.similar(bc::Broadcasted{FieldStyle{N, Grid, true}}, ::Type{T}) where {N, Grid, T}
+    field = find_field(bc)
+    ArrayType_ = nonparametric_type(typeof(field.data))
+    new_data = ArrayType_{T}(undef, size(bc))
+    old_grid = field.grid
+    return ColumnField(new_data, old_grid)
+end
+
+# same as for FieldStyle but for constrain to ArrayType<:GPUArrays
+function Base.BroadcastStyle(
+    ::Type{F}
+) where {F<:ColumnField{T, N, ArrayType, Grid}} where {T, N, ArrayType <: GPUArrays.AbstractGPUArray, Grid}
+    return FieldGPUStyle{N, Grid, true}()
+end
+
+function Base.similar(bc::Broadcasted{FieldGPUStyle{N, Grid, true}}, ::Type{T}) where {N, Grid, T}
+    field = find_field(bc)
+    ArrayType_ = nonparametric_type(typeof(field.data))
+    new_data = ArrayType_{T}(undef, size(bc))
+    old_grid = field.grid
+    return ColumnField(new_data, old_grid)
+end
 
