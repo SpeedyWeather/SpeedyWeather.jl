@@ -350,6 +350,7 @@ function timestep!(
         # calculate all parameterizations
         parameterization_tendencies!(diagn, progn, time, model)
         ocean_timestep!(progn, diagn, model)    # sea surface temperature and maybe in the future sea ice
+        sea_ice_timestep!(progn, diagn, model)  # sea ice
         land_timestep!(progn, diagn, model)     # soil moisture and temperature, vegetation, maybe rivers
     end
 

@@ -3,6 +3,7 @@
 ## Unreleased
 
 - New ColumnField type introduced for fields optimized for column-based computations [#815](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/815)
+- Thermodynamic sea ice model [#811](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/811)
 - Keyword arguments corrected for ImplicitPrimitiveEquation [#812](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/812)
 - Fix admonition and typo on GPU-and-Architectures docs [#807](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/807)
 - Make all land model components mutable [#810](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/810)
