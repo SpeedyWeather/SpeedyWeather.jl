@@ -43,11 +43,11 @@ Architectures.array_type(::Type{ColumnField{T, N, A, G}}) where {T, N, A, G} = A
 
 # CONVERSION from Field 
 LinearAlgebra.transpose(field::Field) = transpose_safe(field)
-LinearAlgebra.transpose!(field::Field) = transpose_unsafe!(field, similar(permutedims(field.data, (2, 1, 3:ndims(field)...))))
+LinearAlgebra.transpose!(field::Field) = transpose_unsafe!(field, similar(field.data))
 
 # and back to Field 
 LinearAlgebra.transpose(field::ColumnField) = transpose_safe(field)
-LinearAlgebra.transpose!(field::ColumnField) = transpose_unsafe!(field, similar(permutedims(field.data, (2, 1, 3:ndims(field)...))))
+LinearAlgebra.transpose!(field::ColumnField) = transpose_unsafe!(field, similar(field.data))
 
 # safe version which allocates a new field
 function transpose_safe(field::Field)
@@ -55,13 +55,23 @@ function transpose_safe(field::Field)
     return ColumnField(data_transposed, field.grid)
 end
 
+# tranpose is defined here as swapping first two dimensions 
+functison _size_of_transpose(data::AbstractArray)
+    IJ, K, L... = size(data)
+    return (K, IJ, L...)
+end
+
+# for vectors (i.e. Field2D) return original size
+_size_of_transpose(data::AbstractVector) = size(data)
+
 # unsafe version that leaves the origional data corrupted (=transposed even though `field` doesn't indicate this)
 # but returns a ColumnField view onto the same memory
 function transpose_unsafe!(field::Field, scratch::AbstractArray)
-    @boundscheck size(transpose(scratch)) == size(field.data) || throw(BoundsError(scratch, field.data))
-    permutedims!(scratch, field.data, (2, 1, 3:ndims(field)...))    # transpose into scratch memory
-    vec(field.data) .= vec(scratch)               # copy back (scratch memory is free again after this)
-    return ColumnField(reshape(field.data, size(scratch, 1), size(scratch, 2), size(scratch)[3:end]...), field.grid)    # view on the same data of field
+    @boundscheck length(scratch)) == length(field.data) || throw(BoundsError(scratch, field.data))
+    scratch_reshaped = reshape(scratch, _size_of_transpose(field.data))     # so scratch input can be of size(field) or its tranpose
+    permutedims!(scratch_reshaped, field.data, (2, 1, 3:ndims(field)...))   # transpose into scratch memory
+    vec(field.data) .= vec(scratch_reshaped)                                # copy back (scratch memory is free again after this)
+    return ColumnField(field.data, field.grid)                              # view on the same data of field
 end
 
 # safe version which allocates a new field
@@ -73,10 +83,11 @@ end
 # unsafe version that leaves the origional data corrupted (=transposed even though `field` doesn't indicate this)
 # but returns a ColumnField view onto the same memory
 function transpose_unsafe!(field::ColumnField, scratch::AbstractArray)
-    @boundscheck size(transpose(scratch)) == size(field.data) || throw(BoundsError(scratch, field.data))
-    permutedims!(scratch, field.data, (2, 1, 3:ndims(field)...))    # transpose into scratch memory
-    vec(field.data) .= vec(scratch)               # copy back (scratch memory is free again after this)
-    return Field(reshape(field.data, size(scratch, 1), size(scratch, 2), size(scratch)[3:end]...), field.grid)    # view on the same data of field
+    @boundscheck length(scratch) == length(field.data) || throw(BoundsError(scratch, field.data))
+    scratch_reshaped = reshape(scratch, _size_transpose(field.data))        # so scratch input can be of size(field) or its tranpose
+    permutedims!(scratch_reshaped, field.data, (2, 1, 3:ndims(field)...))   # transpose into scratch memory
+    vec(field.data) .= vec(scratch_reshaped)                                # copy back (scratch memory is free again after this)
+    return Field(field.data, field.grid)                                    # view on the same data of field
 end
 
 # SIMILAR AND UNDEF CONSTRUCTORS
