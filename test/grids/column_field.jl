@@ -6,8 +6,6 @@ RINGGRIDS_DEFAULT_NF = SpeedyWeather.RingGrids.DEFAULT_NF
 @testset "ColumnField types" begin
     # Test type hierarchy and properties
     @test ColumnField <: AbstractField
-    @test FullColumnField <: ColumnField
-    @test ReducedColumnField <: ColumnField
     
     # Test type aliases
     @test ColumnField2D == ColumnField{T, 1} where T
