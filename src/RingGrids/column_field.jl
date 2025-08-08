@@ -65,29 +65,22 @@ end
 _size_of_transpose(data::AbstractVector) = size(data)
 
 # unsafe version that leaves the origional data corrupted (=transposed even though `field` doesn't indicate this)
-# but returns a ColumnField view onto the same memory
-function transpose_unsafe!(field::Field, scratch::AbstractArray)
-    @boundscheck length(scratch)) == length(field.data) || throw(BoundsError(scratch, field.data))
-    scratch_reshaped = reshape(scratch, _size_of_transpose(field.data))     # so scratch input can be of size(field) or its tranpose
-    permutedims!(scratch_reshaped, field.data, (2, 1, 3:ndims(field)...))   # transpose into scratch memory
-    vec(field.data) .= vec(scratch_reshaped)                                # copy back (scratch memory is free again after this)
-    return ColumnField(field.data, field.grid)                              # view on the same data of field
+# but returns a ColumnField/Field view onto the same memory
+transpose_unsafe!(field::Field,       scratch::AbstractArray) = ColumnField(_data_transpose!(field.data, scratch), field.grid)
+transpose_unsafe!(field::ColumnField, scratch::AbstractArray) =       Field(_data_transpose!(field.data, scratch), field.grid)
+
+function _data_transpose!(data::AbstractArray, scratch::AbstractArray)
+    @boundscheck length(scratch) == length(data) || throw(BoundsError(scratch, data))
+    scratch_reshaped = reshape(scratch, _size_of_transpose(data))           # so scratch input can be of size(field) or its tranpose
+    permutedims!(scratch_reshaped, data, (2, 1, 3:ndims(data)...))          # transpose into scratch memory
+    vec(data) .= vec(scratch_reshaped)                                      # copy back (scratch memory is free again after this)
+    return data
 end
 
 # safe version which allocates a new field
 function transpose_safe(field::ColumnField)
     data_transposed = collect(permutedims(field.data, (2, 1, 3:ndims(field)...)))
     return Field(data_transposed, field.grid)
-end
-
-# unsafe version that leaves the origional data corrupted (=transposed even though `field` doesn't indicate this)
-# but returns a ColumnField view onto the same memory
-function transpose_unsafe!(field::ColumnField, scratch::AbstractArray)
-    @boundscheck length(scratch) == length(field.data) || throw(BoundsError(scratch, field.data))
-    scratch_reshaped = reshape(scratch, _size_transpose(field.data))        # so scratch input can be of size(field) or its tranpose
-    permutedims!(scratch_reshaped, field.data, (2, 1, 3:ndims(field)...))   # transpose into scratch memory
-    vec(field.data) .= vec(scratch_reshaped)                                # copy back (scratch memory is free again after this)
-    return Field(field.data, field.grid)                                    # view on the same data of field
 end
 
 # SIMILAR AND UNDEF CONSTRUCTORS
