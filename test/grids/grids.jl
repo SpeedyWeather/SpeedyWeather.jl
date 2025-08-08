@@ -531,7 +531,7 @@ end
         @test field[:, 1, 2].data ≈ v.data
 
         # fill 
-        fill!(field, 2)
+        fill!(field, 2.0)
         @test all(field .== 2)
     end
 end

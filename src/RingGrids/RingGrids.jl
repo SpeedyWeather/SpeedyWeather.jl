@@ -50,6 +50,14 @@ export  FullGaussianField,
         OctaHEALPixField,
         OctaminimalGaussianField
 
+export  ColumnField,
+        FullColumnField,
+        ReducedColumnField,
+        ColumnField2D,
+        ColumnField3D,
+        ColumnField4D,
+        transpose!
+
 export  field_view
 
 # SIZE
@@ -119,6 +127,7 @@ include("utility_functions.jl")
 # GENERAL
 include("abstract_types.jl")
 include("field.jl")
+include("column_field.jl")
 include("grid.jl")
 include("scaling.jl")
 include("geodesics.jl")

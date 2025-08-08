@@ -207,12 +207,12 @@ function interpolator(
 end
 
 # generator based on two fields
-interpolator(Aout::AbstractField, A::AbstractField; kwargs...) = 
+interpolator(Aout::Field, A::Field; kwargs...) = 
     interpolator(Aout.grid, A.grid; kwargs...)
     
 ## FUNCTIONS
 # interpolate into one point, wrap them into vector
-function interpolate(lond::Real, latd::Real, A::AbstractField2D; kwargs...)
+function interpolate(lond::Real, latd::Real, A::Field2D; kwargs...)
     Ai = interpolate([lond], [latd], A; kwargs...)
     return Ai[1]
 end
@@ -221,7 +221,7 @@ end
 function interpolate(
     londs::AbstractVector{NF},  # longitudes to interpolate into (0˚...360˚E)
     latds::AbstractVector{NF},  # latitudes to interpolate onto (90˚N...-90˚N)
-    A::AbstractField2D;         # gridded field to interpolate from
+    A::Field2D;         # gridded field to interpolate from
     kwargs...
 ) where NF                      # number format used for interpolation
     npoints = length(latds)
@@ -235,7 +235,7 @@ end
 
 # interpolate using an existing interpolator (needs to be initialized with update_locator!)
 function interpolate(
-    A::AbstractField2D{NF},     # field to interpolate 
+    A::Field2D{NF},     # field to interpolate 
     I::AbstractInterpolator;    # indices in I are assumed to be calculated already!
     kwargs...
 ) where NF
@@ -313,8 +313,8 @@ end
 
 # version for 2D fields
 function interpolate!(
-    Aout::AbstractField,
-    A::AbstractField2D,
+    Aout::Field,
+    A::Field2D,
     interpolator::AbstractInterpolator,
 ) 
     fields_match(Aout, A) && return copyto!(Aout.data, A.data)
@@ -325,7 +325,7 @@ end
 # version for 2D field and vector
 function interpolate!(
     Aout::AbstractVector,      # Out: points to interpolate onto
-    A::AbstractField2D,         # In: field to interpolate from
+    A::Field2D,         # In: field to interpolate from
     interpolator::AbstractInterpolator,
 )
     _interpolate!(Aout, A.data, interpolator, architecture(A))  # use .data to trigger dispatch for method above
@@ -333,8 +333,8 @@ end
 
 # version for 3D+ fields
 function interpolate!(
-    Aout::AbstractField,        # Out: grid to interpolate onto
-    A::AbstractField,           # In: gridded data to interpolate from
+    Aout::Field,        # Out: grid to interpolate onto
+    A::Field,           # In: gridded data to interpolate from
     interpolator::AbstractInterpolator,
 )
     # if fields match just copy data over (eltypes might differ)
@@ -349,8 +349,8 @@ end
 
 # interpolate while creating an interpolator on the fly
 function interpolate!(
-    Aout::AbstractField,
-    A::AbstractField;
+    Aout::Field,
+    A::Field;
     kwargs...
 )
     # if fields match just copy data over (eltypes might differ)
@@ -361,13 +361,13 @@ function interpolate!(
 end
 
 # create grid on the fly
-interpolate(Grid::Type{<:AbstractGrid}, nlat_half::Integer, A::AbstractField; kwargs...) =
+interpolate(Grid::Type{<:AbstractGrid}, nlat_half::Integer, A::Field; kwargs...) =
     interpolate(Grid(nlat_half), A; kwargs...)
 
 # create field from grid on the fly
 function interpolate(
     grid::AbstractGrid,
-    A::AbstractField;
+    A::Field;
     kwargs...
 )
     I = interpolator(grid, A.grid; kwargs...)
@@ -377,7 +377,7 @@ function interpolate(
 end
 
 # if only the grid type is provided, create a grid with nlat_half and architecture from the input field
-interpolate(Grid::Type{<:AbstractGrid}, A::AbstractField; kwargs...) = interpolate(Grid(A.grid.nlat_half, architecture(A)), A; kwargs...)
+interpolate(Grid::Type{<:AbstractGrid}, A::Field; kwargs...) = interpolate(Grid(A.grid.nlat_half, architecture(A)), A; kwargs...)
 
 function update_locator!(
     I::AbstractInterpolator,    # GridGeometry and Locator
@@ -394,7 +394,7 @@ function update_locator!(
     find_grid_indices!(I, λs, I.geometry.grid.architecture)               # next points left and right of λ on rings north and south
 end
 
-function update_locator!(I::AbstractInterpolator, A::AbstractField; kwargs...)
+function update_locator!(I::AbstractInterpolator, A::Field; kwargs...)
     londs, latds = get_londlatds(A.grid)
     londs = on_architecture(architecture(A), londs)
     latds = on_architecture(architecture(A), latds)
@@ -664,7 +664,7 @@ Averages all grid points in `input` that are within one grid cell of
 are assumed to be rectangles spanning half way to adjacent longitude
 and latitude points."""
 function grid_cell_average!(
-    output::AbstractField,
+    output::Field,
     input::AbstractFullField)
         
     # for i, j indexing

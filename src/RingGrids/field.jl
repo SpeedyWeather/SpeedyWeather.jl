@@ -10,7 +10,7 @@ struct Field{T, N, ArrayType <: AbstractArray, Grid <: AbstractGrid} <: Abstract
 
     # Inner constructor to check for matching grid and data
     function Field(data, grid)
-        data_matches_grid(data, grid) || throw(DimensionMismatch(data, grid))
+        data_matches_grid(data, grid; horizontal_dim=1) || throw(DimensionMismatch(data, grid))
         return new{eltype(data), ndims(data), typeof(data), typeof(grid)}(data, grid)
     end
 end
@@ -40,7 +40,7 @@ Architectures.array_type(field::AbstractField) = array_type(typeof(field))
 Architectures.ismatching(arch::AbstractArchitecture, field::AbstractField) = ismatching(arch, field.data)
 
 # test number of horizontal grid points matches
-data_matches_grid(data::AbstractArray, grid::AbstractGrid) = size(data, 1) == get_npoints(grid)
+data_matches_grid(data::AbstractArray, grid::AbstractGrid; horizontal_dim::Integer=1) = size(data, horizontal_dim) == get_npoints(grid)
 
 function Base.DimensionMismatch(data::AbstractArray, grid::AbstractGrid)
     Grid_ = nonparametric_type(grid)
@@ -284,13 +284,13 @@ for f in (:zeros, :ones, :rand, :randn)
 end
 
 # zero element of a Field with new data but same grid
-Base.zero(field::AbstractField) = Field(zero(field.data), field.grid)
+Base.zero(field::F) where {F<:AbstractField} = F(zero(field.data), field.grid)
 
 # similar data but share grid
-Base.similar(field::AbstractField) = Field(similar(field.data), field.grid)
+Base.similar(field::F) where {F<:AbstractField} = F(similar(field.data), field.grid)
 
 # data with new type T but share grid
-Base.similar(field::AbstractField, ::Type{T}) where {T} = Field(similar(field.data, T), field.grid)
+Base.similar(field::F, ::Type{T}) where {F<:AbstractField, T} = F(similar(field.data, T), field.grid)
 
 # data with same type T but new size (=new grid)
 function Base.similar(
@@ -445,11 +445,11 @@ import Base.Broadcast: BroadcastStyle, Broadcasted, DefaultArrayStyle
 # important to not have parameter T (eltype/number format) here to broadcast
 # automatically across the same field type but with different T
 # e.g. FullGaussianField{Float32} and FullGaussianField{Float64}
-struct FieldStyle{N, Grid} <: Broadcast.AbstractArrayStyle{N} end
+struct FieldStyle{N, Grid, Column} <: Broadcast.AbstractArrayStyle{N} end
 
 # define broadcast style for Field from its parameters
-Base.BroadcastStyle(::Type{F}) where {F<:AbstractField{T, N, ArrayType, Grid}} where {T, N, ArrayType, Grid} =
-    FieldStyle{N, nonparametric_type(Grid)}()
+Base.BroadcastStyle(::Type{F}) where {F<:Field{T, N, ArrayType, Grid}} where {T, N, ArrayType, Grid} =
+    FieldStyle{N, nonparametric_type(Grid), false}()
 
 # find a field within Broadcasted to reuse its grid
 find_field(bc::Base.Broadcast.Broadcasted) = find_field(bc.args) 
@@ -462,7 +462,7 @@ find_field(::Any, rest) = find_field(rest)
 # allocation for broadcasting via similar, reusing grid from the first field of the broadcast arguments
 # e.g. field1 + field2 creates a new field that share the grid of field1
 # 2 .+ field1 creates a new field that share the grid of field1
-function Base.similar(bc::Broadcasted{FieldStyle{N, Grid}}, ::Type{T}) where {N, Grid, T}
+function Base.similar(bc::Broadcasted{FieldStyle{N, Grid, false}}, ::Type{T}) where {N, Grid, T}
     field = find_field(bc)
     ArrayType_ = nonparametric_type(typeof(field.data))
     new_data = ArrayType_{T}(undef, size(bc))
@@ -472,25 +472,25 @@ end
 
 # ::Val{0} for broadcasting with 0-dimensional, ::Val{1} for broadcasting with vectors, etc
 # when there's a dimension mismatch always choose the larger dimension
-FieldStyle{N, Grid}(::Val{N}) where {N, Grid} = FieldStyle{N, Grid}()
-FieldStyle{1, Grid}(::Val{2}) where {Grid} = FieldStyle{2, Grid}()
-FieldStyle{1, Grid}(::Val{0}) where {Grid} = FieldStyle{1, Grid}()
-FieldStyle{2, Grid}(::Val{3}) where {Grid} = FieldStyle{3, Grid}()
-FieldStyle{2, Grid}(::Val{1}) where {Grid} = FieldStyle{2, Grid}()
-FieldStyle{3, Grid}(::Val{4}) where {Grid} = FieldStyle{4, Grid}()
-FieldStyle{3, Grid}(::Val{2}) where {Grid} = FieldStyle{3, Grid}()
+FieldStyle{N, Grid, Column}(::Val{N}) where {N, Grid, Column} = FieldStyle{N, Grid, Column}()
+FieldStyle{1, Grid, Column}(::Val{2}) where {Grid, Column} = FieldStyle{2, Grid, Column}()
+FieldStyle{1, Grid, Column}(::Val{0}) where {Grid, Column} = FieldStyle{1, Grid, Column}()
+FieldStyle{2, Grid, Column}(::Val{3}) where {Grid, Column} = FieldStyle{3, Grid, Column}()
+FieldStyle{2, Grid, Column}(::Val{1}) where {Grid, Column} = FieldStyle{2, Grid, Column}()
+FieldStyle{3, Grid, Column}(::Val{4}) where {Grid, Column} = FieldStyle{4, Grid, Column}()
+FieldStyle{3, Grid, Column}(::Val{2}) where {Grid, Column} = FieldStyle{2, Grid, Column}()
 
 ## GPU (same but <: GPUArrays.AbstractGPUArrayStyle)
-struct FieldGPUStyle{N, Grid} <: GPUArrays.AbstractGPUArrayStyle{N} end
+struct FieldGPUStyle{N, Grid, Column} <: GPUArrays.AbstractGPUArrayStyle{N} end
 
 # same as for FieldStyle but for constrain to ArrayType<:GPUArrays
 function Base.BroadcastStyle(
     ::Type{F}
-) where {F<:AbstractField{T, N, ArrayType, Grid}} where {T, N, ArrayType <: GPUArrays.AbstractGPUArray, Grid}
-    return FieldGPUStyle{N, Grid}()
+) where {F<:Field{T, N, ArrayType, Grid}} where {T, N, ArrayType <: GPUArrays.AbstractGPUArray, Grid}
+    return FieldGPUStyle{N, Grid, false}()
 end
 
-function Base.similar(bc::Broadcasted{FieldGPUStyle{N, Grid}}, ::Type{T}) where {N, Grid, T}
+function Base.similar(bc::Broadcasted{FieldGPUStyle{N, Grid, false}}, ::Type{T}) where {N, Grid, T}
     field = find_field(bc)
     ArrayType_ = nonparametric_type(typeof(field.data))
     new_data = ArrayType_{T}(undef, size(bc))
@@ -500,13 +500,13 @@ end
 
 # ::Val{0} for broadcasting with 0-dimensional, ::Val{1} for broadcasting with vectors, etc
 # when there's a dimension mismatch always choose the larger dimension
-FieldGPUStyle{N, Grid}(::Val{N}) where {N, Grid} = FieldGPUStyle{N, Grid}()
-FieldGPUStyle{1, Grid}(::Val{2}) where {Grid}    = FieldGPUStyle{2, Grid}()
-FieldGPUStyle{1, Grid}(::Val{0}) where {Grid}    = FieldGPUStyle{1, Grid}()
-FieldGPUStyle{2, Grid}(::Val{3}) where {Grid}    = FieldGPUStyle{3, Grid}()
-FieldGPUStyle{2, Grid}(::Val{1}) where {Grid}    = FieldGPUStyle{2, Grid}()
-FieldGPUStyle{3, Grid}(::Val{4}) where {Grid}    = FieldGPUStyle{4, Grid}()
-FieldGPUStyle{3, Grid}(::Val{2}) where {Grid}    = FieldGPUStyle{3, Grid}()
+FieldGPUStyle{N, Grid, Column}(::Val{N}) where {N, Grid, Column} = FieldGPUStyle{N, Grid, Column}()
+FieldGPUStyle{1, Grid, Column}(::Val{2}) where {Grid, Column}    = FieldGPUStyle{2, Grid, Column}()
+FieldGPUStyle{1, Grid, Column}(::Val{0}) where {Grid, Column}    = FieldGPUStyle{1, Grid, Column}()
+FieldGPUStyle{2, Grid, Column}(::Val{3}) where {Grid, Column}    = FieldGPUStyle{3, Grid, Column}()
+FieldGPUStyle{2, Grid, Column}(::Val{1}) where {Grid, Column}    = FieldGPUStyle{2, Grid, Column}()
+FieldGPUStyle{3, Grid, Column}(::Val{4}) where {Grid, Column}    = FieldGPUStyle{4, Grid, Column}()
+FieldGPUStyle{3, Grid, Column}(::Val{2}) where {Grid, Column}    = FieldGPUStyle{2, Grid, Column}()
 
 function KernelAbstractions.get_backend(
     field::F
