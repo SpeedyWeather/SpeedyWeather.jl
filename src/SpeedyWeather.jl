@@ -102,7 +102,7 @@ export curl, divergence, curl!, divergence!
 export ∇, ∇², ∇⁻², ∇!, ∇²!, ∇⁻²!
 export power_spectrum
 
-include("SpeedyTransforms/SpeedyTransforms.jl")
+include("SpeedyTransforms/src/SpeedyTransforms.jl")
 using .SpeedyTransforms
 import .SpeedyTransforms: prettymemory
 

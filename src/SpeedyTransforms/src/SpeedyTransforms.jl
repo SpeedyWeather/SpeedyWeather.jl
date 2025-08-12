@@ -16,8 +16,12 @@ import Atomix
 # SPEEDYWEATHER MODULES
 using ..Architectures
 using ..Utils
-using ..LowerTriangularArrays
-using ..RingGrids
+
+include("../../RingGrids/src/RingGrids.jl")
+using .RingGrids
+
+include("../../LowerTriangularArrays/LowerTriangularArrays.jl")
+using .LowerTriangularArrays
 
 # TRANSFORM
 export  SpectralTransform,
