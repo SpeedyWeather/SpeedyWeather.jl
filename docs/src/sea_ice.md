@@ -113,7 +113,14 @@ no insulation (i.e. no impact) in the case of no ice.
 
 And output is added like
 
-```julia
+```@example sea_ice
 add!(model, SpeedyWeather.SeaIceConcentrationOutput())
+```
+
+or as part of `SpeedyWeather.OceanOutput()` which however needs splatting `...`
+to unpack the tuple
+
+```@example sea_ice
+add!(model, SpeedyWeather.OceanOutput()...)
 ```
 

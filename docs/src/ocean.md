@@ -30,7 +30,7 @@ exist to load another `file` from `path` etc. For a full list of
 options type `?SeasonalOceanClimatology`. 
 To be passed on to the model constructor like
 
-```@example
+```@example ocean
 model = PrimitiveWetModel(spectral_grid, ocean=ocean)
 nothing # hide
 ```
