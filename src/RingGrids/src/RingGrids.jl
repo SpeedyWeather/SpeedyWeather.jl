@@ -15,9 +15,16 @@ import GPUArrays
 import KernelAbstractions: KernelAbstractions, @kernel, @index, @Const, synchronize
 
 # SPEEDYWEATHER SUBMODULES
-import ..Architectures: Architectures, AbstractArchitecture, CPU, GPU, 
+# import ..Architectures: Architectures, AbstractArchitecture, CPU, GPU, 
+#         on_architecture, architecture, array_type, ismatching, nonparametric_type
+# using ..Utils
+
+include("../../Architectures.jl")
+import .Architectures: Architectures, AbstractArchitecture, CPU, GPU, 
         on_architecture, architecture, array_type, ismatching, nonparametric_type
-using ..Utils
+
+include("../../Utils/Utils.jl")
+using .Utils
 
 # ABSTRACT GRIDS
 export  AbstractGrid,

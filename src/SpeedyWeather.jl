@@ -91,7 +91,7 @@ export  AnvilInterpolator
 export  spherical_distance
 export  zonal_mean
 
-include("RingGrids/RingGrids.jl")
+include("RingGrids/src/RingGrids.jl")
 using .RingGrids
 
 # SpeedyTransforms

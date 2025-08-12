@@ -1,6 +1,6 @@
 name = "SpeedyWeather"
 uuid = "9e226e20-d153-4fed-8a5b-493def4f21a9"
-authors = ["Milan Klöwer and SpeedyWeather contributors"]
+authors = ["SpeedyWeather contributors"]
 version = "0.16.0"
 
 [deps]
