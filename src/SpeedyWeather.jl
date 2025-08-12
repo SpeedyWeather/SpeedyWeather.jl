@@ -77,6 +77,9 @@ export  Field, Field2D, Field3D,
         HEALPixField, OctaHEALPixField,
         OctaminimalGaussianField
 
+export  ColumnField, ColumnField2D, ColumnField3D, ColumnField4D,
+        FullColumnField, ReducedColumnField, transpose!
+
 export  FullClenshawGrid, FullGaussianGrid,
         FullHEALPixGrid, FullOctaHEALPixGrid,
         OctahedralGaussianGrid, OctahedralClenshawGrid,
@@ -88,7 +91,7 @@ export  AnvilInterpolator
 export  spherical_distance
 export  zonal_mean
 
-include("RingGrids/RingGrids.jl")
+include("RingGrids/src/RingGrids.jl")
 using .RingGrids
 
 # SpeedyTransforms
@@ -99,7 +102,7 @@ export curl, divergence, curl!, divergence!
 export ∇, ∇², ∇⁻², ∇!, ∇²!, ∇⁻²!
 export power_spectrum
 
-include("SpeedyTransforms/SpeedyTransforms.jl")
+include("SpeedyTransforms/src/SpeedyTransforms.jl")
 using .SpeedyTransforms
 import .SpeedyTransforms: prettymemory
 

@@ -389,6 +389,17 @@ Note that a, c and b, d do not necessarily share the same longitude/x-coordinate
 This interpolation is chosen as by definition of the ring grids, a and b share the same latitude, so do c and d,
 but the longitudes can be different for all four, a, b, c, d.
 
+## ColumnField 
+
+Additionally to `Field` there is also a `ColumnField` type. `ColumnField` store the data in a column-major format, which is more efficient for column-based computations. As such, when indexing `ColumnField` the first dimension is the vertical dimension, while the second dimension is the horizontal dimension. Otherwise it behaves just like `Field`. To create a `ColumnField` from a `Field` one can use the `transpose` function, which will transpose the data in place and return a `ColumnField`:
+
+```@example ringgrids
+grid = OctahedralClenshawGrid(5)    # define a grid
+field = randn(grid, 5)  
+column_field = transpose(field)
+field == transpose(column_field)    # transposing again returns the original Field
+```
+
 ## Function index
 
 ```@autodocs

@@ -2,50 +2,50 @@ module Utils
 
 using DocStringExtensions
 
-    import Dates: Dates, DateTime, Period, Millisecond, Second, Minute, Hour, Day, Week, Month, Year
+import Dates: Dates, DateTime, Period, Millisecond, Second, Minute, Hour, Day, Week, Month, Year
 
-    # ARRAYS
-    import ComponentArrays: ComponentArray, ComponentVector, labels, label2index, getaxes
+# ARRAYS
+import ComponentArrays: ComponentArray, ComponentVector, labels, label2index, getaxes
 
-    # UTILITIES
-    import MacroTools
+# UTILITIES
+import MacroTools
 
-    import ModelParameters: ModelParameters, AbstractParam
-    
-    import ConstructionBase: constructorof, getproperties, setproperties
+import ModelParameters: ModelParameters, AbstractParam
 
-    # DOMAINS
-    import DomainSets: Domain, RealLine, NonnegativeRealLine, PositiveRealLine, NegativeRealLine, UnitInterval
+import ConstructionBase: constructorof, getproperties, setproperties
 
-    using DomainSets.IntervalSets
+# DOMAINS
+import DomainSets: Domain, RealLine, NonnegativeRealLine, PositiveRealLine, NegativeRealLine, UnitInterval
 
-    export Unbounded, Positive, Nonnegative, Negative
+using DomainSets.IntervalSets
 
-    export ComponentVector
+export Unbounded, Positive, Nonnegative, Negative
 
-    export isincreasing, isdecreasing, clip_negatives!, underflow!
-    export flipsign!, nans, print_fields
+export ComponentVector
 
-    export DateTime, Millisecond, Second, Minute, Hour, Day, Week, Month, Year, Century, Millenium
+export isincreasing, isdecreasing, clip_negatives!, underflow!
+export flipsign!, nans, print_fields
 
-    # Domain aliases
-    const Unbounded = RealLine()
-    const Positive = PositiveRealLine()
-    const Nonnegative = NonnegativeRealLine()
-    const Negative = NegativeRealLine()
+export DateTime, Millisecond, Second, Minute, Hour, Day, Week, Month, Year, Century, Millenium
 
-    include("utility_functions.jl")
+# Domain aliases
+const Unbounded = RealLine()
+const Positive = PositiveRealLine()
+const Nonnegative = NonnegativeRealLine()
+const Negative = NegativeRealLine()
 
-    export configure_kernel, launch!
-    export AbstractWorkOrder, SpectralWorkOrder, RingGridWorkOrder, SpectralInnerWorkOrder
-    export DiagonalWorkOrder, Array3DWorkOrder, LinearWorkOrder
+include("utility_functions.jl")
 
-    include("kernel_launching.jl")
+export configure_kernel, launch!
+export AbstractWorkOrder, SpectralWorkOrder, RingGridWorkOrder, SpectralInnerWorkOrder
+export DiagonalWorkOrder, Array3DWorkOrder, LinearWorkOrder
 
-    # Parameter utilities
-    export SpeedyParam, SpeedyParams
-    export @parameterized, parameters, parameterof, reconstruct, stripparams, attributes, bounds, description, value
+include("kernel_launching.jl")
 
-    include("parameters.jl")
+# Parameter utilities
+export SpeedyParam, SpeedyParams
+export @parameterized, parameters, parameterof, reconstruct, stripparams, attributes, bounds, description, value
+
+include("parameters.jl")
 
 end 
