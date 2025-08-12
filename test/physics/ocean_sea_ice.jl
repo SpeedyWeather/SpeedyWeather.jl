@@ -10,11 +10,11 @@
         for sea_ice in (ThermodynamicSeaIce(spectral_grid, temp_freeze=0),
                         NoSeaIce(spectral_grid))
 
-            albedo = Albedo(ocean=OceanSeaIceAlbedo(spectral_grid, land=AlbedoClimatology(spectral_grid)))
+            albedo = Albedo(ocean=OceanSeaIceAlbedo(spectral_grid), land=AlbedoClimatology(spectral_grid))
 
             model = PrimitiveDryModel(spectral_grid; ocean, sea_ice, albedo)
             model.feedback.verbose = false
-            simulation = initialize!(model, time=DateTime(2000,5,1))
+            simulation = initialize!(model, time=DateTime(2000, 5, 1))
             run!(simulation, period=Day(3))
 
             @test simulation.model.feedback.nans_detected == false

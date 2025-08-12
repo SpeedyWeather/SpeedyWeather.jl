@@ -56,7 +56,7 @@ r &= 1 - c_{i-1} \\
 SST_i^* &= SST_{i-1} + \Delta t~r~F \\
 \end{aligned}
 ```
-This happens inside the [Slab ocean model](@ref).
+This happens inside the [Slab ocean](@ref) model.
 
 Now determine a tendency in sea ice concentration ``\Delta c`` from the melting and freezing, both proportional to the
 difference of the sea surface temperature to freezing temperature with freeze rate ``f`` in ``[\text{m}^2/\text{m}^2/K]``
