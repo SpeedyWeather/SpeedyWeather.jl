@@ -2,14 +2,20 @@
     
     spectral_grid = SpectralGrid(trunc=31, nlayers=5)
 
-    for ocean in (  SeasonalOceanClimatology(spectral_grid), 
-                    ConstantOceanClimatology(spectral_grid),
-                    AquaPlanet(spectral_grid),
-                    SlabOcean(spectral_grid, sea_ice_insulation = (x) -> x))
+    # just test that these parameters can be set
+    SlabOcean(spectral_grid, sea_ice_insulation = (x) -> x)
+    ThermodynamicSeaIce(spectral_grid, temp_freeze=-1.8)
 
-        for sea_ice in (ThermodynamicSeaIce(spectral_grid, temp_freeze=0),
-                        NoSeaIce(spectral_grid))
+    @testset for OceanModel in ( SeasonalOceanClimatology, 
+                            ConstantOceanClimatology,
+                            AquaPlanet,
+                            SlabOcean)
 
+        @testset for SeaIceModel in (ThermodynamicSeaIce,
+                                 NoSeaIce)
+
+            ocean = OceanModel(spectral_grid)
+            sea_ice = SeaIceModel(spectral_grid)
             albedo = Albedo(ocean=OceanSeaIceAlbedo(spectral_grid), land=AlbedoClimatology(spectral_grid))
 
             model = PrimitiveDryModel(spectral_grid; ocean, sea_ice, albedo)
