@@ -3,16 +3,53 @@
 The following describes the currently implemented ocean models,
 some prescribed sea surface temperature (not dependent on the state
 of other variables) others are active (dependent on the atmospheric
-state). All force the atmosphere as the sea surface temperatures are
-used to calculate surface heat fluxes. All models can be used
-with PrimitiveDry and PrimitiveWet models, for the former only
-surface heat fluxes are applied, but not humidity fluxes.
+state). All but SlabOcean force the atmosphere, as the sea surface temperatures are
+used to calculate surface heat fluxes. SlabOcean interacts with both Atmosphere and SeaIce. All models can be used
+with PrimitiveDry and PrimitiveWet models; for the former, only
+surface heat fluxes are applied, albeit not the humidity fluxes.
 
 ```@example ocean
 using InteractiveUtils # hide
 using SpeedyWeather
 subtypes(SpeedyWeather.AbstractOcean)
 ```
+
+## Aqua planet
+
+The `AquaPlanet` in SpeedyWeather is a prescribed sea surface temperature
+that only depends on latitude, applying a cosine squared between the
+Equator and the poles
+
+```@example ocean
+ocean = AquaPlanet(spectral_grid)
+```
+
+pole and equator temperatures can be modified and `mask` can mask the
+sea surface temperatures according to `model.land_sea_mask`. Otherwise
+sea surface temperatures are defined everywhere but the land-sea mask
+will determine their proportional contribution to surface fluxes.
+
+## Constant ocean climatology
+
+`ConstantOceanClimatology` is like `SeasonalOceanClimatology` but constant in time.
+At `initalize!(model)` the seasonal ocean climatology is read from file and interpolated
+to the current time, but the sea surface temperature field is not further updated
+thereafter. To be used like
+
+```@example ocean
+ocean = ConstantOceanClimatology(spectral_grid)
+```
+
+```@example ocean
+model = PrimitiveWetModel(spectral_grid, ocean=ocean)
+simulation = initialize!(model, time=DateTime(2000, 6, 1))
+nothing # hide
+```
+
+which will use the sea surface temperature climatology from 1 June but
+not change it thereafter. Note that because nothing happens in the ocean time step
+you can use `set!(simulation, sea_surface_temperature=...)` to modify the 
+sea surface temperatures further at any point.
 
 ## Seasonal ocean climatology
 
@@ -42,46 +79,9 @@ The time of the year is determined by the clock in `prognostic_variables.clock`
 such that `initialize!(model, time=DateTime(2000, 1, 1))` would interpolate
 the seasonal climatology onto the first of January.
 
-## Constant ocean climatology
-
-`ConstantOceanClimatology` is like `SeasonalOceanClimatology` but constant in time.
-At `initalize!(model)` the seasonal ocean climatology is read and interpolated
-to the current time, but the sea surface temperature field is not further updated
-thereafter. To be used like
-
-```@example ocean
-ocean = ConstantOceanClimatology(spectral_grid)
-```
-
-```@example ocean
-model = PrimitiveWetModel(spectral_grid, ocean=ocean)
-simulation = initialize!(model, time=DateTime(2000, 6, 1))
-nothing # hide
-```
-
-which will use the sea surface temperature climatology from 1 June but
-not change it thereafter. Note that because nothing happens in the ocean time step
-you can use `set!(simulation, sea_surface_temperature=...)` to modify the 
-sea surface temperatures further at any point.
-
-## Aqua planet
-
-The `AquaPlanet` in SpeedyWeather is a prescribed sea surface temperature
-that only depends on latitude, applying a cosine squared between the
-Equator and the poles
-
-```@example ocean
-ocean = AquaPlanet(spectral_grid)
-```
-
-pole and equator temperatures can be modified and `mask` can mask the
-sea surface temperatures according to `model.land_sea_mask`. Otherwise
-sea surface temperatures are defined everywhere but the land-sea mask
-will determine their proportional contribution to surface fluxes.
-
 ## Slab ocean
 
-The most complex ocean model implemented is a slab ocean model,
+The most complex ocean model implemented is a slab ocean model:
 it can heat up and cool down given atmospheric fluxes and in turn
 warm up or cool down the atmosphere from below and provide
 sources or sink of humidity. The slab ocean model has
