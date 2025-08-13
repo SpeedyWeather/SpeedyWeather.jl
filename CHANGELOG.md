@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Make dynamic Land/Ocean/SeaIce models the default [#816](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/816)
+- Thermodynamic sea ice model testing and docs [#814](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/814)
 - Thermodynamic sea ice model [#811](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/811)
 - Keyword arguments corrected for ImplicitPrimitiveEquation [#812](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/812)
 - Fix admonition and typo on GPU-and-Architectures docs [#807](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/807)
