@@ -1,7 +1,6 @@
-# Ocean and sea ice models
+# Sea ice models
 
-The following describes the currently implemented sea ice models,
-which are
+The following describes the currently implemented sea ice models, which are
 
 ```@example sea_ice
 using InteractiveUtils # hide

@@ -21,6 +21,7 @@ that only depends on latitude, applying a cosine squared between the
 Equator and the poles
 
 ```@example ocean
+spectral_grid = SpectralGrid(trunc=31)
 ocean = AquaPlanet(spectral_grid)
 ```
 
@@ -34,11 +35,13 @@ will determine their proportional contribution to surface fluxes.
 `ConstantOceanClimatology` is like `SeasonalOceanClimatology` but constant in time.
 At `initalize!(model)` the seasonal ocean climatology is read from file and interpolated
 to the current time, but the sea surface temperature field is not further updated
-thereafter. To be used like
+thereafter. To be created like
 
 ```@example ocean
 ocean = ConstantOceanClimatology(spectral_grid)
 ```
+
+and passed to the model constructor as follows
 
 ```@example ocean
 model = PrimitiveWetModel(spectral_grid, ocean=ocean)
@@ -46,17 +49,19 @@ simulation = initialize!(model, time=DateTime(2000, 6, 1))
 nothing # hide
 ```
 
-which will use the sea surface temperature climatology from 1 June but
+Or, equivalently, `; ocean` as Julia can match keyword arguments by name,
+where `;` just means that every argument that follows is a keyword argument.
+
+This will use the sea surface temperature climatology from 1 June but
 not change it thereafter. Note that because nothing happens in the ocean time step
 you can use `set!(simulation, sea_surface_temperature=...)` to modify the 
-sea surface temperatures further at any point.
+sea surface temperatures further at any point after `initialize!`.
 
 ## Seasonal ocean climatology
 
 Created like
 
 ```@example ocean
-spectral_grid = SpectralGrid(trunc=31)
 ocean = SeasonalOceanClimatology(spectral_grid)
 ```
 
@@ -68,12 +73,9 @@ options type `?SeasonalOceanClimatology`.
 To be passed on to the model constructor like
 
 ```@example ocean
-model = PrimitiveWetModel(spectral_grid, ocean=ocean)
+model = PrimitiveWetModel(spectral_grid; ocean)
 nothing # hide
 ```
-
-Or, equivalently, `; ocean` as Julia can match keyword arguments by name,
-where `;` just means that every argument that follows is a keyword argument.
 
 The time of the year is determined by the clock in `prognostic_variables.clock`
 such that `initialize!(model, time=DateTime(2000, 1, 1))` would interpolate
