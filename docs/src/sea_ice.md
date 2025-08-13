@@ -13,7 +13,7 @@ subtypes(SpeedyWeather.AbstractSeaIce)
 
 `NoSeaIce` as the name says, initializes `prognostic_variables.sea_ice_concentration` 
 to zero. But you may use `set!(simulation, sea_ice_concentration=...)` to set the
-sea ice concentration manually. `NoSeaIce` does not to anything on every time step
+sea ice concentration manually. `NoSeaIce` does not do anything on every time step
 so your manual modifications will prevail after `initialize!`.
 
 To be used like
@@ -38,7 +38,7 @@ effect, this will be discussed in `ThermodynamicSeaIce` below.
 ## Thermodynamic sea ice model
 
 Thermodynamic sea ice models do not account for advection through wind and currents or rheological processes
-but are only concern with local freezing, ice growth and melt and the thermodynamic processes involved.
+but are only concerned with local freezing, ice growth and melt and the thermodynamic processes involved.
 The `ThermodynamicSeaIce` model defined here uses only sea ice concentration ``c`` in units of
 ``[\text{m}^2/\text{m}^2]`` as a prognostic variable.
 
