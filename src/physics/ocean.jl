@@ -73,8 +73,8 @@ export SeasonalOceanClimatology
 
 """
 Seasonal ocean climatology that reads monthly sea surface temperature
-fields from file, and interpolates them in time regularly
-(default every 3 days) to be stored in the prognostic variables.
+fields from file, and interpolates them in time on every time step
+and writes them to the prognostic variables.
 Fields and options are
 $(TYPEDFIELDS)"""
 @kwdef struct SeasonalOceanClimatology{NF, Grid, GridVariable3D} <: AbstractOcean
@@ -254,6 +254,9 @@ $(TYPEDFIELDS)"""
 
     "[OPTION] Temperature at the poles [K]"
     temp_poles::NF = 273
+
+    "[OPTION] Mask the sea surface temperature according to model.land_sea_mask?"
+    mask::Bool = true
 end
 
 # generator function
@@ -274,7 +277,7 @@ function initialize!(
     Te, Tp = ocean_model.temp_equator, ocean_model.temp_poles
     sst(λ, φ) = (Te - Tp)*cosd(φ)^2 + Tp
     set!(sea_surface_temperature, sst, model.geometry)
-    mask!(sea_surface_temperature, model.land_sea_mask, :land)
+    ocean_model.mask && mask!(sea_surface_temperature, model.land_sea_mask, :land)
 end
 
 function ocean_timestep!(

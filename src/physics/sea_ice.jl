@@ -79,11 +79,11 @@ end
 @kernel inbounds=true function sea_ice_kernel!(ice, sst, mask, @Const(temp_freeze), @Const(m), @Const(f_Δt), @Const(Δt))
     ij = @index(Global, Linear)    # every grid point ij
 
-    if mask[ij] < 1     # at least partially ocean
+    if mask[ij] < 1 && isfinite(sst[ij])        # at least partially ocean, SST not NaN (=masked)
 
         # ice-sst flux as a relaxation term wrt to freezing, with different melt/freeze rates
         dT = sst[ij] - temp_freeze              # uncorrected difference to freezing temperature
-        F = -m*max(dT, 0) - f_Δt*min(dT, 0)        # melt if above freezing, freeze if below
+        F = -m*max(dT, 0) - f_Δt*min(dT, 0)     # melt if above freezing, freeze if below
         sst[ij] = max(sst[ij], temp_freeze)     # cap sst at freezing
 
         # Euler forward step to update sea ice concentration, cap between [0, 1]
