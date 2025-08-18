@@ -154,11 +154,11 @@ export LandBucketMoisture
     "[OPTION] Time scale of vertical diffusion [s]"
     time_scale::Second = Day(2)
 
-    "[OPTION] Fraction of top layer runoff that is put into layer below [1]"
-    runoff_fraction::NF = 0.5
+    "[OPTION] Infiltration fraction, that is, fraction of top layer runoff that is put into layer below [1]"
+    infiltration_fraction::NF = 0.25
 
     "[OPTION] Initial soil moisture, volume fraction [1], start saturated for faster spinup"
-    initial_moisture::NF = 1
+    initial_moisture::NF = 0.5
     
     "[OPTION] Apply land-sea mask to NaN ocean-only points?"
     mask::Bool = false
@@ -234,7 +234,7 @@ function timestep!(
         throw(DimensionMismatch(soil_moisture, Pconv))
     @boundscheck size(soil_moisture, 2) == 2 || throw(DimensionMismatch)
     f₁, f₂ = soil.f₁, soil.f₂
-    p = soil.runoff_fraction        # fraction of top layer runoff put into lower layer
+    p = soil.infiltration_fraction        # Infiltration fraction: fraction of top layer runoff put into lower layer
     τ⁻¹ = inv(convert(eltype(soil_moisture), Second(soil.time_scale).value))
     f₁_f₂ = f₁/f₂
     Δt_f₁ = Δt/f₁
