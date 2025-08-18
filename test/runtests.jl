@@ -16,6 +16,7 @@ end
 
 if !FLAG_EXTENDED_TESTS && !FLAG_ENZYME_TESTS 
     @info "Running general test suite"
+    include("transforms/spectral_transform_ad_rules.jl") 
 
     # GENERAL
     include("utility_functions.jl")
@@ -36,7 +37,6 @@ if !FLAG_EXTENDED_TESTS && !FLAG_ENZYME_TESTS
     include("transforms/spectral_transform.jl")
     include("transforms/spectral_gradients.jl")
     include("transforms/spectrum.jl")
-    include("transforms/spectral_transform_ad_rules.jl") 
     include("transforms/resolutions.jl")
 
     # DYNAMICS

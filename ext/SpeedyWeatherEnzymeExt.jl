@@ -42,7 +42,7 @@ end
 
 ### Custom rule for _fourier!(f_north, f_north, grid, S)
 function augmented_primal(config::EnzymeRules.RevConfigWidth{1}, func::Const{typeof(_fourier!)}, ::Type{<:Const}, 
-    f_north::Duplicated, f_south::Duplicated, grids::Duplicated{<:AbstractField}, S::Union{Const, MixedDuplicated}) 
+    f_north::Annotation{<:AbstractArray}, f_south::Annotation{<:AbstractArray}, grids::Duplicated{<:AbstractField}, S::Union{Const, MixedDuplicated}) 
 
     func.val(f_north.val, f_south.val, grids.val, S.val) # forward pass
 
@@ -79,9 +79,27 @@ function reverse(config::EnzymeRules.RevConfigWidth{1}, func::Const{typeof(_four
     return (nothing, nothing, nothing, nothing)
 end
 
+function reverse(config::EnzymeRules.RevConfigWidth{1}, func::Const{typeof(_fourier!)}, ::Type{<:Const}, tape,
+    f_north::Const{<:AbstractArray}, f_south::Const{<:AbstractArray}, grids::Duplicated{<:AbstractField}, S::Union{Const, MixedDuplicated})
+
+    # adjoint/jvp of FFT has a different scaling, compute it, apply it later to f_north, f_south
+    scale = adjoint_scale(S.val)
+    
+    # retrieve grids value, either from original grids or from tape if grids may have been overwritten.
+    gridsval = overwritten(config)[4] ? tape : grids.val
+
+    # compute the adjoint
+    dgridval = zero(gridsval)
+    _fourier!(dgridval, f_north.val ./ scale, f_south.val ./ scale, S.val) # inverse FFT (w/o normalization)
+    grids.dval .+= dgridval 
+
+    # the function has no return values, so we also return nothing here
+    return (nothing, nothing, nothing, nothing)
+end
+
 ### Custom rule for _fourier!(grid, f_north, f_south, S)
 function augmented_primal(config::EnzymeRules.RevConfigWidth{1}, func::Const{typeof(_fourier!)}, ::Type{<:Const}, 
-    grids::Duplicated{<:AbstractField}, f_north::Duplicated, f_south::Duplicated, S::Union{Const, MixedDuplicated}) 
+    grids::Duplicated{<:AbstractField}, f_north::Annotation{<:AbstractArray}, f_south::Annotation{<:AbstractArray}, S::Union{Const, MixedDuplicated}) 
 
     func.val(grids.val, f_north.val, f_south.val, S.val) # forward pass
 
