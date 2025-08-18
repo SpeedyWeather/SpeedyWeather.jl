@@ -2,6 +2,7 @@ using JLArrays
 using Adapt
 
 RINGGRIDS_DEFAULT_NF = SpeedyWeather.RingGrids.DEFAULT_NF
+RINGGRIDS_DEFAULT_NF = Float32
 
 @testset "ColumnField types" begin
     # Test type hierarchy and properties
@@ -261,12 +262,12 @@ end
 
             # Test add! operations
             field_copy = Field(copy(field.data), grid)
-            SpeedyWeather.RingGrids.add!(field_copy, column_field)
+            RingGrids.add!(field_copy, column_field)
             @test field_copy isa Field
             @test size(field_copy) == size(field)
 
             column_field_copy = ColumnField(copy(column_field.data), grid)
-            SpeedyWeather.RingGrids.add!(column_field_copy, field)
+            RingGrids.add!(column_field_copy, field)
             @test column_field_copy isa ColumnField
             @test size(column_field_copy) == size(column_field)
         end
@@ -319,17 +320,17 @@ end
 
 @testset "ColumnField type utilities" begin
     # Test nonparametric_type
-    @test SpeedyWeather.nonparametric_type(ColumnField) == ColumnField
-    @test SpeedyWeather.nonparametric_type(ColumnField{Float32}) == ColumnField
-    @test SpeedyWeather.nonparametric_type(ColumnField{Float32, 2}) == ColumnField
+    @test RingGrids.Architectures.nonparametric_type(ColumnField) == ColumnField
+    @test RingGrids.Architectures.nonparametric_type(ColumnField{Float32}) == ColumnField
+    @test RingGrids.Architectures.nonparametric_type(ColumnField{Float32, 2}) == ColumnField
 
     # Test grid_type extraction
     grid = FullGaussianGrid(4)
     field = ColumnField(rand(5, RingGrids.get_npoints(grid)), grid)
-    @test SpeedyWeather.RingGrids.grid_type(typeof(field)) == typeof(grid)
+    @test RingGrids.grid_type(typeof(field)) == typeof(grid)
 
     # Test array_type extraction
-    @test SpeedyWeather.Architectures.array_type(typeof(field)) == Array{Float64, 2}
+    @test RingGrids.Architectures.array_type(typeof(field)) == Array{Float64, 2}
 end
 
 @testset "ColumnField error handling" begin
@@ -343,5 +344,5 @@ end
     # Test bounds errors in transpose operations
     field = ColumnField(rand(5, npoints), grid)
     wrong_scratch = rand(3, 4)  # Wrong size scratch array
-    @test_throws BoundsError SpeedyWeather.RingGrids.transpose_unsafe!(field, wrong_scratch)
+    @test_throws BoundsError RingGrids.transpose_unsafe!(field, wrong_scratch)
 end
