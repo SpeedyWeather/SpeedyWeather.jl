@@ -3,8 +3,6 @@ module SpeedyWeather
 # STRUCTURE
 using DocStringExtensions
 
-import ConstructionBase: constructorof, getproperties, setproperties
-
 # NUMERICS
 import Primes
 import Random
@@ -15,6 +13,10 @@ export rotate, rotate!
 import Base.Threads: Threads, @threads
 import KernelAbstractions: KernelAbstractions, @kernel, @index, @Const, synchronize
 import Adapt: Adapt, adapt, adapt_structure
+
+include("../Architectures/src/Architectures.jl")    # import device architectures
+using  .Architectures
+export on_architecture, architecture                # export device functions 
 
 # INPUT OUTPUT
 import TOML
@@ -27,31 +29,25 @@ import CodecZlib
 import BitInformation: round, round!
 import ProgressMeter
 
-# INTERVALS
+# UTILITIES
 using DomainSets.IntervalSets
 
 # to avoid a `using Dates` to pass on DateTime arguments
-export DateTime, Millisecond, Second, Minute, Hour, Day, Week, Month, Year, Century, Millenium
+export DateTime, Millisecond, Second, Minute, Hour, Day, Week, Month, Year
 
 # export functions that have many cross-component methods
 export initialize!, finalize!
 
-# import device architectures
-include("Architectures.jl")
-using .Architectures
-
-# export device functions 
-export on_architecture, architecture
-
 # import utilities
-include("Utils/Utils.jl")
-using .Utils
-
+include("../Utils/src/Utils.jl")
+using  .Utils
 import .Utils: parameters
+export  Century, Millenium
 
 # export user-facing parameter handling types and methods
 export  SpeedyParam, SpeedyParams, parameters, stripparams
 
+# DATA STRUCTURES
 # LowerTriangularArrays for spherical harmonics
 export  LowerTriangularArrays, 
         LowerTriangularArray,
@@ -63,8 +59,8 @@ export  Spectrum
 export  OneBased, ZeroBased
 export  eachmatrix, eachharmonic, eachorder
         
-include("LowerTriangularArrays/LowerTriangularArrays.jl")
-using .LowerTriangularArrays
+include("../LowerTriangularArrays/src/LowerTriangularArrays.jl")
+using  .LowerTriangularArrays
 
 # RingGrids
 export  RingGrids
@@ -91,8 +87,8 @@ export  AnvilInterpolator
 export  spherical_distance
 export  zonal_mean
 
-include("RingGrids/src/RingGrids.jl")
-using .RingGrids
+include("../RingGrids/src/RingGrids.jl")
+using  .RingGrids
 
 # SpeedyTransforms
 export SpeedyTransforms, SpectralTransform
@@ -102,8 +98,8 @@ export curl, divergence, curl!, divergence!
 export ∇, ∇², ∇⁻², ∇!, ∇²!, ∇⁻²!
 export power_spectrum
 
-include("SpeedyTransforms/src/SpeedyTransforms.jl")
-using .SpeedyTransforms
+include("../SpeedyTransforms/src/SpeedyTransforms.jl")
+using  .SpeedyTransforms
 import .SpeedyTransforms: prettymemory
 
 # to be defined in GeoMakie extension

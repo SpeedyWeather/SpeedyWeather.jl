@@ -7,6 +7,10 @@ import Dates: Dates, DateTime, Period, Millisecond, Second, Minute, Hour, Day, W
 # ARRAYS
 import ComponentArrays: ComponentArray, ComponentVector, labels, label2index, getaxes
 
+# ARCHITECTURE
+include("../../Architectures/src/Architectures.jl")
+using .Architectures
+
 # UTILITIES
 import MacroTools
 

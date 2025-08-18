@@ -64,7 +64,7 @@ end
     end
 end
 
-@testset "time convsersions" begin
+@testset "time conversions" begin
     # Priated conversions from integer/float types
     @test convert(Second, 1) == Second(1)
     @test convert(Second, 1.4) == Second(1)
