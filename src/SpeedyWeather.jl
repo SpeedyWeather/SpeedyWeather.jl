@@ -16,6 +16,8 @@ import Adapt: Adapt, adapt, adapt_structure
 
 include("../Architectures/src/Architectures.jl")    # import device architectures
 using  .Architectures
+import .Architectures: AbstractArchitecture, CPU, GPU, 
+        on_architecture, architecture, array_type, ismatching, nonparametric_type
 export on_architecture, architecture                # export device functions 
 
 # INPUT OUTPUT

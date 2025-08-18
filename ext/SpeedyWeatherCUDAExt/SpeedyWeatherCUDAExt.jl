@@ -4,7 +4,7 @@ using SpeedyWeather
 import CUDA: CUDA, CUDAKernels, CuArray, CuDeviceArray, CUFFT
 import AbstractFFTs
 using SpeedyWeather.DocStringExtensions
-import SpeedyWeather: GPU, CPU, CUDAGPU, array_type, architecture, on_architecture, architecture, compatible_array_types, nonparametric_type
+import SpeedyWeather.Architectures: GPU, CPU, CUDAGPU, array_type, architecture, on_architecture, architecture, compatible_array_types, nonparametric_type
 
 # DEVICE SETUP FOR CUDA
 # extend functions from main SpeedyWeather 
