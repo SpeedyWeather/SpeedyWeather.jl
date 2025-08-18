@@ -33,7 +33,7 @@ import ProgressMeter
 using DomainSets.IntervalSets
 
 # to avoid a `using Dates` to pass on DateTime arguments
-export DateTime, Millisecond, Second, Minute, Hour, Day, Week, Month, Year
+export DateTime, Millisecond, Second, Minute, Hour, Day, Week, Month, Year, Century, Millenium
 
 # export functions that have many cross-component methods
 export initialize!, finalize!
@@ -42,7 +42,6 @@ export initialize!, finalize!
 include("../Utils/src/Utils.jl")
 using  .Utils
 import .Utils: parameters
-export  Century, Millenium
 
 # export user-facing parameter handling types and methods
 export  SpeedyParam, SpeedyParams, parameters, stripparams
