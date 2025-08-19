@@ -115,5 +115,6 @@ function large_scale_condensation!(
     column.precip_rate_large_scale = column.precip_large_scale / Δt_sec
     if temp[:] < freezing_threshold
         column.snow_rate_large_scale = column.precip_rate_large_scale
+        column.precip_rate_large_scale = 0.
     return nothing
 end
