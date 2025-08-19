@@ -13,6 +13,7 @@ $(TYPEDFIELDS)"""
 @kwdef struct ImplicitCondensation{NF<:AbstractFloat} <: AbstractCondensation
     "Relative humidity threshold [1 = 100%] to trigger condensation"
     relative_humidity_threshold::NF = 1
+    freezing_threshold::NF = 263.0
 
     "Time scale in multiples of time step Δt, the larger the less immediate"
     time_scale::NF = 3
@@ -112,5 +113,7 @@ function large_scale_condensation!(
 
     # convert to rain rate [m/s]
     column.precip_rate_large_scale = column.precip_large_scale / Δt_sec
+    if temp[:] < freezing_threshold
+        column.snow_rate_large_scale = column.precip_rate_large_scale
     return nothing
 end
