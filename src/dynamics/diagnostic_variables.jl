@@ -343,6 +343,19 @@ $(TYPEDFIELDS)"""
     "Rate of large-scale precipitation [m/s], instantaneous"
     precip_rate_convection::GridVariable2D = zeros(GridVariable2D, grid)
 
+     # FROZEN PRECIPITATION (SNOW)
+    "Accumulated large-scale snow [m]"
+    snow_large_scale::GridVariable2D = zeros(GridVariable2D, grid)
+
+    "Accumulated large-scale precipitation [m]"
+    snow_convection::GridVariable2D = zeros(GridVariable2D, grid)
+
+    "Rate of large-scale precipitation [m/s], instantaneous"
+    snow_rate_large_scale::GridVariable2D = zeros(GridVariable2D, grid)
+
+    "Rate of large-scale precipitation [m/s], instantaneous"
+    snow_rate_convection::GridVariable2D = zeros(GridVariable2D, grid)
+
     "Cloud top [m]"
     cloud_top::GridVariable2D = zeros(GridVariable2D, grid)            
     
