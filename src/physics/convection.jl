@@ -54,6 +54,7 @@ $(TYPEDFIELDS)"""
 
     "[OPTION] Relative humidity for reference profile"
     relative_humidity::NF = 0.7
+    freezing_threshold::NF = 263.0
 
     "[OPTION] Surface perturbation of temp, humid to calculate the moist pseudo adiabat"
     surface_temp_humid::SP  # don't specify default here but in generator below
@@ -204,6 +205,9 @@ function convection!(
     pₛΔt_gρ = (pₛ * Δt_sec / gravity / water_density) * deep_convection # enfore no precip for shallow conv 
     column.precip_convection *= pₛΔt_gρ                                 # convert to [m] of rain during Δt
     column.precip_rate_convection = column.precip_convection / Δt_sec   # rate: convert to [m/s] of rain
+    if temp[:] < freezing_threshold
+        column.snow_rate_convection = column.precip_rate_convection
+        column.precip_rate_convection = 0.
     column.cloud_top = min(column.cloud_top, level_zero_buoyancy)       # clouds reach to top of convection
     return nothing
 end
