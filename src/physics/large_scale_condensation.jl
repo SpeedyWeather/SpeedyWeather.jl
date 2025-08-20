@@ -113,8 +113,9 @@ function large_scale_condensation!(
 
     # convert to rain rate [m/s]
     column.precip_rate_large_scale = column.precip_large_scale / Δt_sec
-    if temp[:] < freezing_threshold
-        column.snow_rate_large_scale = column.precip_rate_large_scale
-        column.precip_rate_large_scale = 0.
+    # decide whether to declare precip (rain water) as snow
+    snow, precip = temp[k] < freezing_threshold ? (precip, zero(precip)) : (zero(precip), precip)
+    column.precip_large_scale += precip
+    column.snow_large_scale   += snow
     return nothing
 end
