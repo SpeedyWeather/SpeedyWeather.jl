@@ -10,12 +10,17 @@ export ImplicitCondensation
 """
 Large scale condensation as with implicit precipitation.
 $(TYPEDFIELDS)"""
-@kwdef struct ImplicitCondensation{NF<:AbstractFloat} <: AbstractCondensation
-    "Relative humidity threshold [1 = 100%] to trigger condensation"
+@kwdef mutable struct ImplicitCondensation{NF<:AbstractFloat} <: AbstractCondensation
+    "[OPTION] Relative humidity threshold [1 = 100%] to trigger condensation"
     relative_humidity_threshold::NF = 1
-    freezing_threshold::NF = 263.0
 
-    "Time scale in multiples of time step Δt, the larger the less immediate"
+    "[OPTION] Convert precipitation below freezing to snow?"
+    snow::Bool = true
+
+    "[OPTION] Freezing temperature for snow fall [K]"
+    freezing_threshold::NF = 263
+
+    "[OPTION] Time scale in multiples of time step Δt, the larger the less immediate"
     time_scale::NF = 3
 end
 
@@ -60,7 +65,7 @@ and temperature from latent heat release and integrates the
 large-scale precipitation vertically for output."""
 function large_scale_condensation!(
     column::ColumnVariables,
-    scheme::ImplicitCondensation,
+    condensation::ImplicitCondensation,
     clausius_clapeyron::AbstractClausiusClapeyron,
     geometry::Geometry,
     planet::AbstractPlanet,
@@ -80,7 +85,8 @@ function large_scale_condensation!(
 
     (; Lᵥ, cₚ, Lᵥ_Rᵥ) = clausius_clapeyron
     Lᵥ_cₚ = Lᵥ/cₚ                           # latent heat of vaporization over heat capacity
-    (; time_scale, relative_humidity_threshold) = scheme
+    (; time_scale, relative_humidity_threshold) = condensation
+    use_snow = condensation.snow
 
     @inbounds for k in eachindex(column)
         if humid[k] > sat_humid[k]*relative_humidity_threshold
@@ -103,7 +109,13 @@ function large_scale_condensation!(
             # 2. Precipitation due to large-scale condensation [kg/m²/s] /ρ for [m/s]
             # += for vertical integral
             precip = Δσ[k] * pₛΔt_gρ * -δq          # precipitation [m] on layer k, Formula 4
+            snow = zero(precip)                     # start with zero snow but potentially swap below
+
+            # decide whether to turn precip into snow
+            precip, snow = use_snow && temp[k] < freezing_threshold ? (snow, precip) : (precip, snow)
+
             column.precip_large_scale += precip     # integrate vertically, Formula 25, unit [m]
+            column.snow_large_scale   += snow
 
             # only accumulate into humid_tend now to allow humid_tend != 0 before this scheme is called
             humid_tend[k] += δq
@@ -111,11 +123,9 @@ function large_scale_condensation!(
         end
     end
 
-    # convert to rain rate [m/s]
+    # convert to rain/snow fall rate [m/s]
     column.precip_rate_large_scale = column.precip_large_scale / Δt_sec
-    # decide whether to declare precip (rain water) as snow
-    snow, precip = temp[k] < freezing_threshold ? (precip, zero(precip)) : (zero(precip), precip)
-    column.precip_large_scale += precip
-    column.snow_large_scale   += snow
+    column.snow_rate_large_scale = column.snow_large_scale / Δt_sec
+
     return nothing
 end

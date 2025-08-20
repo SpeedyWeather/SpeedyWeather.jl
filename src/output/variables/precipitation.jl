@@ -35,6 +35,9 @@ Fields are: $(TYPEDFIELDS)"""
     transform::F = (x) -> 1000x     # [m] to [mm]
 end
 
+"""$TYPEDSIGNATURES
+Post-process the netCDF `output` file to convert accumulated precipitation/snow to
+rates."""
 function output!(
     output::NetCDFOutput,
     variable::AbstractRateOutputVariable,
@@ -145,7 +148,7 @@ end
 path(::LargeScalePrecipitationOutput, simulation) =
     simulation.diagnostic_variables.physics.snow_large_scale
 
-# at finalize step postprocess the convective precipitation to get the rate
+# at finalize step postprocess the convective snow precipitation to get the rate
 finalize!(output::NetCDFOutput, variable::LargeScaleSnowOutput, args...) = output!(output, variable.rate, variable)
 
 """Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.

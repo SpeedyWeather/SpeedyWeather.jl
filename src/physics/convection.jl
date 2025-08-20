@@ -45,16 +45,18 @@ export SimplifiedBettsMiller
 https://doi.org/10.1175/JAS3935.1. This implements the qref-formulation
 in their paper. Fields and options are
 $(TYPEDFIELDS)"""
-@kwdef struct SimplifiedBettsMiller{NF, SP} <: AbstractConvection
-    "number of vertical layers"
-    nlayers::Int
-
+@kwdef mutable struct SimplifiedBettsMiller{NF, SP} <: AbstractConvection
     "[OPTION] Relaxation time for profile adjustment"
     time_scale::Second = Hour(4)
 
-    "[OPTION] Relative humidity for reference profile"
+    "[OPTION] Relative humidity for reference profile [1]"
     relative_humidity::NF = 0.7
-    freezing_threshold::NF = 263.0
+
+    "[OPTION] Convert rain fall to snow below freezing?"
+    snow::Bool = true
+
+    "[OPTION] Freezing temperature below which to convert rain into snow [K]"
+    freezing_threshold::NF = 263
 
     "[OPTION] Surface perturbation of temp, humid to calculate the moist pseudo adiabat"
     surface_temp_humid::SP  # don't specify default here but in generator below
@@ -66,8 +68,7 @@ function SimplifiedBettsMiller(
     surface_temp_humid = NoSurfacePerturbation(),
     kwargs...)
     # type inference happens here as @kwdef only defines no/all types specified
-    return SimplifiedBettsMiller{SG.NF, typeof(surface_temp_humid)}(
-        nlayers=SG.nlayers; surface_temp_humid, kwargs...)
+    return SimplifiedBettsMiller{SG.NF, typeof(surface_temp_humid)}(; surface_temp_humid, kwargs...)
 end
 
 # nothing to initialize but maybe the surface temp/humid functor?
@@ -115,6 +116,7 @@ function convection!(
     (; geopot, nlayers, temp, temp_virt, humid, temp_tend, humid_tend) = column
     pₛ = column.pres[end]
     (; Lᵥ, cₚ) = clausius_clapeyron
+    let_it_snow = SBM.snow             # flag to switch on/off rain -> snow conversion
     
     # use work arrays for temp_ref_profile, humid_ref_profile
     temp_ref_profile = column.a     # temperature [K] reference profile to adjust to
@@ -196,7 +198,14 @@ function convection!(
         humid_tend[k] -= δq
 
         # convective precipiation, integrate dq\dt [(kg/kg)/s] vertically
-        column.precip_convection += δq * Δσ[k]
+        precip = δq * Δσ[k]
+        snow = zero(precip)     # start with zero snow but potentially swap below
+
+        # decide whether to turn precip into snow
+        precip, snow = let_it_snow && temp[k] < freezing_threshold ? (snow, precip) : (precip, snow)
+
+        column.precip_convection += precip     # integrate vertically, Formula 25, unit [m]
+        column.snow_convection   += snow
     end
 
     (; gravity) = planet
@@ -205,10 +214,11 @@ function convection!(
     pₛΔt_gρ = (pₛ * Δt_sec / gravity / water_density) * deep_convection # enfore no precip for shallow conv 
     column.precip_convection *= pₛΔt_gρ                                 # convert to [m] of rain during Δt
     column.precip_rate_convection = column.precip_convection / Δt_sec   # rate: convert to [m/s] of rain
-    # decide whether to declare precip (rain water) as snow
-    snow, precip = temp[k] < freezing_threshold ? (column.precip_convection, zero(column.precip_convection)) : (zero(column.precip_convection), column.precip_convection)
-    column.precip_convection += precip
-    column.snow_convection += snow
+
+    # same for snow
+    column.snow_convection *= pₛΔt_gρ                                   # convert to [m] of rain during Δt
+    column.snow_rate_convection = column.snow_convection / Δt_sec       # rate: convert to [m/s] of rain
+
     column.cloud_top = min(column.cloud_top, level_zero_buoyancy)       # clouds reach to top of convection
     return nothing
 end
@@ -302,9 +312,6 @@ https://doi.org/10.1175/JAS3935.1 but with humidity set to zero.
 Fields and options are
 $(TYPEDFIELDS)"""
 @kwdef struct DryBettsMiller{NF, SP} <: AbstractConvection
-    "number of vertical layers/levels"
-    nlayers::Int
-
     "[OPTION] Relaxation time for profile adjustment"
     time_scale::Second = Hour(4)
 
@@ -318,7 +325,7 @@ function DryBettsMiller(
     surface_temp = NoSurfacePerturbation(),
     kwargs...)
     # infer type here as @kwdef only defines constructors for no/all types specified
-    return DryBettsMiller{SG.NF, typeof(surface_temp)}(nlayers=SG.nlayers; surface_temp, kwargs...)
+    return DryBettsMiller{SG.NF, typeof(surface_temp)}(; surface_temp, kwargs...)
 end
 
 # nothing to initialize but maybe the surface temp functor?
