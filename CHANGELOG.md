@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Diagnose snow fall from condensation and convection [#817](https://github.dev/SpeedyWeather/SpeedyWeather.jl/pull/817)
 - Make dynamic Land/Ocean/SeaIce models the default [#816](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/816)
 - Thermodynamic sea ice model testing and docs [#814](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/814)
 - Thermodynamic sea ice model [#811](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/811)
