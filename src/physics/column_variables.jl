@@ -212,12 +212,18 @@ function reset_column!(column::ColumnVariables{NF}) where NF
     column.flux_temp_upward .= 0
     column.flux_temp_downward .= 0
 
-    # Convection and precipitation
+    # Convection and large-scale precipitation
     column.cloud_top = column.nlayers+1
     column.precip_convection = 0            # set back to zero to accumulate in the vertical
     column.precip_large_scale = 0
     column.precip_rate_convection = 0       # instantaneously overwritten, but convection may escape early
     column.precip_rate_large_scale = 0
+    
+    # same for snow
+    column.snow_convection = 0              # set back to zero to accumulate in the vertical
+    column.snow_large_scale = 0
+    column.snow_rate_convection = 0         # instantaneously overwritten, but convection may escape early
+    column.snow_rate_large_scale = 0
 
     # radiation
     column.outgoing_longwave_radiation = 0
