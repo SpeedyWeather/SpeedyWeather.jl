@@ -26,6 +26,7 @@ $(TYPEDFIELDS)"""
     OR,     # <:AbstractOrography,
     LS,     # <:AbstractLandSeaMask,
     OC,     # <:AbstractOcean,
+    SI,     # <:AbstractSeaIce,
     LA,     # <:AbstractLand,
     ZE,     # <:AbstractZenith,
     AL,     # <:AbstractAlbedo,
@@ -72,7 +73,8 @@ $(TYPEDFIELDS)"""
     # BOUNDARY CONDITIONS
     orography::OR = EarthOrography(spectral_grid)
     land_sea_mask::LS = EarthLandSeaMask(spectral_grid)
-    ocean::OC = SeasonalOceanClimatology(spectral_grid)
+    ocean::OC = SlabOcean(spectral_grid)
+    sea_ice::SI = ThermodynamicSeaIce(spectral_grid)
     land::LA = DryLandModel(spectral_grid)
     solar_zenith::ZE = WhichZenith(spectral_grid, planet)
     albedo::AL = DefaultAlbedo(spectral_grid)
@@ -131,6 +133,7 @@ function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
     initialize!(model.orography, model)
     initialize!(model.land_sea_mask, model)
     initialize!(model.ocean, model)
+    initialize!(model.sea_ice, model)
     initialize!(model.land, model)
     initialize!(model.solar_zenith, time, model)
     initialize!(model.albedo, model)
@@ -156,7 +159,7 @@ function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
     initialize!(model.particle_advection, model)
     initialize!(prognostic_variables.particles, model)
     
-    # initialize ocean and land
+    # initialize ocean (includes sea ice) and land
     initialize!(prognostic_variables.ocean, prognostic_variables, diagnostic_variables, model)
     initialize!(prognostic_variables.land,  prognostic_variables, diagnostic_variables, model)
 

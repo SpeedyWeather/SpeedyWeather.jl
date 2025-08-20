@@ -20,8 +20,8 @@ end
 
 export DefaultAlbedo
 function DefaultAlbedo(SG::SpectralGrid;
-    ocean = GlobalConstantAlbedo(SG, albedo=0.06),
-    land = GlobalConstantAlbedo(SG, albedo=0.4))
+    ocean = OceanSeaIceAlbedo(SG),
+    land = AlbedoClimatology(SG))
     return Albedo(ocean, land)
 end
 
@@ -130,4 +130,28 @@ function initialize!(albedo::AlbedoClimatology, model::PrimitiveEquation)
 
     a = albedo.file_Grid(ncfile[albedo.varname].var[:, :], input_as=Matrix)
     interpolate!(albedo.albedo, a)
+end
+
+## OceanSeaIceAlbedo
+export OceanSeaIceAlbedo
+
+@kwdef struct OceanSeaIceAlbedo{NF} <: AbstractAlbedo
+    albedo_ocean::NF = 0.06
+    albedo_ice::NF = 0.6
+end
+
+OceanSeaIceAlbedo(SG::SpectralGrid; kwargs...) = OceanSeaIceAlbedo{SG.NF}(;kwargs...)
+initialize!(albedo::OceanSeaIceAlbedo, model::PrimitiveEquation) = nothing
+
+function albedo!(
+    diagn::AbstractDiagnosticVariables,
+    progn::PrognosticVariables,
+    albedo::OceanSeaIceAlbedo,
+    model::PrimitiveEquation,
+)
+    (; sea_ice_concentration ) = progn.ocean
+    (; albedo_ocean, albedo_ice) = albedo
+
+    # set ocean albedo linearly between ocean and ice depending on sea ice concentration
+    diagn.albedo .= albedo_ocean .+ sea_ice_concentration .* (albedo_ice .- albedo_ocean)
 end

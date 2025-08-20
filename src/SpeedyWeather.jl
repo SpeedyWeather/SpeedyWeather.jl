@@ -171,6 +171,7 @@ include("physics/stochastic_physics.jl")
 
 # OCEAN AND LAND
 include("physics/ocean.jl")
+include("physics/sea_ice.jl")
 include("physics/land/land.jl")
 
 # OUTPUT
