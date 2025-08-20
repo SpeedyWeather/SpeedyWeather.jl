@@ -19,11 +19,11 @@ path(::ConvectivePrecipitationOutput, simulation) =
 # at finalize step postprocess the convective precipitation to get the rate
 finalize!(output::NetCDFOutput, variable::ConvectivePrecipitationOutput, args...) = output!(output, variable.rate, variable)
 
-abstract type AbstractRainRateOutputVariable <: AbstractOutputVariable end
+abstract type AbstractRateOutputVariable <: AbstractOutputVariable end
 
 """Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct ConvectivePrecipitationRateOutput{F} <: AbstractRainRateOutputVariable
+@kwdef mutable struct ConvectivePrecipitationRateOutput{F} <: AbstractRateOutputVariable
     name::String = "precip_conv_rate"
     unit::String = "mm/hr"
     long_name::String = "convective precipitation rate"
@@ -37,7 +37,7 @@ end
 
 function output!(
     output::NetCDFOutput,
-    variable::AbstractRainRateOutputVariable,
+    variable::AbstractRateOutputVariable,
     acc_variable::AbstractOutputVariable,
 )
     # use .var to prevent Union{Missing, Float32} that NCDatasets uses
@@ -80,7 +80,7 @@ finalize!(output::NetCDFOutput, variable::LargeScalePrecipitationOutput, args...
 
 """Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct LargeScalePrecipitationRateOutput{F} <: AbstractRainRateOutputVariable
+@kwdef mutable struct LargeScalePrecipitationRateOutput{F} <: AbstractRateOutputVariable
     name::String = "precip_cond_rate"
     unit::String = "mm/hr"
     long_name::String = "large-scale precipitation rate"
@@ -115,11 +115,9 @@ path(::ConvectiveSnowOutput, simulation) =
 # at finalize step postprocess the convective snow to get the rate
 finalize!(output::NetCDFOutput, variable::ConvectiveSnowOutput, args...) = output!(output, variable.rate, variable)
 
-abstract type AbstractSnowRateOutputVariable <: AbstractOutputVariable end
-
 """Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct ConvectiveSnowRateOutput{F} <: AbstractRainRateOutputVariable
+@kwdef mutable struct ConvectiveSnowRateOutput{F} <: AbstractRateOutputVariable
     name::String = "snow_conv_rate"
     unit::String = "mm/hr"
     long_name::String = "convective snow rate"
@@ -129,28 +127,6 @@ Fields are: $(TYPEDFIELDS)"""
     shuffle::Bool = true
     keepbits::Int = 7
     transform::F = (x) -> 1000x     # [m] to [mm]
-end
-
-function output!(
-    output::NetCDFOutput,
-    variable::AbstractSnowRateOutputVariable,
-    acc_variable::AbstractOutputVariable,
-)
-    # use .var to prevent Union{Missing, Float32} that NCDatasets uses
-    accumulated = output.netcdf_file[acc_variable.name].var[:, :, :]
-
-    # rate is defined as average snow since last output step, so first step is 0
-    # convert from accumulated [m] to [mm/hr] rain rate over output time step (e.g. 6hours)
-    s = Hour(1)/output.output_dt
-    nx, ny = size(accumulated)
-    rate = cat(zeros(eltype(accumulated), nx, ny), diff(accumulated, dims=3), dims=3)
-    rate .*= s
-
-    # DEFINE NEW NETCDF VARIABLE AND WRITE
-    define_variable!(output.netcdf_file, variable, eltype(rate))
-
-    output.netcdf_file[variable.name][:, :, :] = rate
-    return nothing
 end
 
 """Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
@@ -176,7 +152,7 @@ finalize!(output::NetCDFOutput, variable::LargeScaleSnowOutput, args...) = outpu
 
 """Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct LargeScaleSnowRateOutput{F} <: AbstractRainRateOutputVariable
+@kwdef mutable struct LargeScaleSnowRateOutput{F} <: AbstractRateOutputVariable
     name::String = "snow_cond_rate"
     unit::String = "mm/hr"
     long_name::String = "large-scale snow rate"
@@ -187,9 +163,6 @@ Fields are: $(TYPEDFIELDS)"""
     keepbits::Int = 7
     transform::F = (x) -> 1000x     # [m] to [mm]
 end
-
---------------
-
 
 """Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
