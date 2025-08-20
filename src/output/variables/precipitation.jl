@@ -145,7 +145,7 @@ Fields are: $(TYPEDFIELDS)"""
     rate::R = LargeScaleSnowRateOutput()   # include here to be called at finalize!
 end
 
-path(::LargeScalePrecipitationOutput, simulation) =
+path(::LargeScaleSnowOutput, simulation) =
     simulation.diagnostic_variables.physics.snow_large_scale
 
 # at finalize step postprocess the convective snow precipitation to get the rate
