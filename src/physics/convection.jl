@@ -206,9 +206,9 @@ function convection!(
     column.precip_convection *= pₛΔt_gρ                                 # convert to [m] of rain during Δt
     column.precip_rate_convection = column.precip_convection / Δt_sec   # rate: convert to [m/s] of rain
     # decide whether to declare precip (rain water) as snow
-    snow, precip = temp[k] < freezing_threshold ? (precip, zero(precip)) : (zero(precip), precip)
-    column.precip_rate_convection += precip
-    column.snow_rate_convection += snow
+    snow, precip = temp[k] < freezing_threshold ? (column.precip_convection, zero(column.precip_convection)) : (zero(column.precip_convection), column.precip_convection)
+    column.precip_convection += precip
+    column.snow_convection += snow
     column.cloud_top = min(column.cloud_top, level_zero_buoyancy)       # clouds reach to top of convection
     return nothing
 end
