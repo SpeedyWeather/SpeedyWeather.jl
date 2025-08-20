@@ -34,8 +34,8 @@ grid_type(::Type{FullGaussianField{T, N}}) where {T, N} = FullGaussianGrid
 
 function Base.showarg(io::IO, F::Field{T, N, ArrayType, Grid}, toplevel) where {T, N, ArrayType, Grid<:FullGaussianGrid{A}} where A <: AbstractArchitecture
     print(io, "FullGaussianField{$T, $N}")
-    toplevel && print(io, " on ", nonparametric_type(ArrayType))
-    toplevel && print(io, " on ", A)
+    toplevel && print(io, " as ", nonparametric_type(ArrayType))
+    toplevel && print(io, " on ", F.grid.architecture)
 end
 
 # SIZE

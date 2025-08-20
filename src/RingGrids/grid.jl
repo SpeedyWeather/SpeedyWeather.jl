@@ -15,7 +15,7 @@ function Base.show(io::IO, grid::AbstractGrid)
 
     println(io, "$nlat-ring $Grid_")
     println(io, "├ nlat_half=$nlat_half ($npoints points, ~$average_resolution, $full_or_reduced)")
-    print(io,   "└ architecture: $(typeof(grid.architecture))")
+    print(io,   "└ architecture: $(grid.architecture)")
 end
 
 ## TYPES
