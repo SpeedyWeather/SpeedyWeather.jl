@@ -85,8 +85,8 @@ function large_scale_condensation!(
 
     (; Lᵥ, cₚ, Lᵥ_Rᵥ) = clausius_clapeyron
     Lᵥ_cₚ = Lᵥ/cₚ                           # latent heat of vaporization over heat capacity
-    (; time_scale, relative_humidity_threshold) = condensation
-    use_snow = condensation.snow
+    (; time_scale, relative_humidity_threshold, freezing_threshold) = condensation
+    let_it_snow = condensation.snow
 
     @inbounds for k in eachindex(column)
         if humid[k] > sat_humid[k]*relative_humidity_threshold
@@ -112,7 +112,7 @@ function large_scale_condensation!(
             snow = zero(precip)                     # start with zero snow but potentially swap below
 
             # decide whether to turn precip into snow
-            precip, snow = use_snow && temp[k] < freezing_threshold ? (snow, precip) : (precip, snow)
+            precip, snow = let_it_snow && temp[k] < freezing_threshold ? (snow, precip) : (precip, snow)
 
             column.precip_large_scale += precip     # integrate vertically, Formula 25, unit [m]
             column.snow_large_scale   += snow

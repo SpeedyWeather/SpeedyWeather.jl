@@ -116,8 +116,9 @@ function convection!(
     (; geopot, nlayers, temp, temp_virt, humid, temp_tend, humid_tend) = column
     pₛ = column.pres[end]
     (; Lᵥ, cₚ) = clausius_clapeyron
-    let_it_snow = SBM.snow             # flag to switch on/off rain -> snow conversion
-    
+    let_it_snow = SBM.snow              # flag to switch on/off rain -> snow conversion
+    (; freezing_threshold) = SBM        # threshold temperature below which it snows
+
     # use work arrays for temp_ref_profile, humid_ref_profile
     temp_ref_profile = column.a     # temperature [K] reference profile to adjust to
     humid_ref_profile = column.b    # specific humidity [kg/kg] profile to adjust to
