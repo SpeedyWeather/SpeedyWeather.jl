@@ -92,8 +92,6 @@ Fields are: $(TYPEDFIELDS)"""
     transform::F = (x) -> 1000x     # [m] to [mm]
 end
 
---------------
-
 """Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
 @kwdef mutable struct ConvectiveSnowOutput{F, R} <: AbstractOutputVariable
