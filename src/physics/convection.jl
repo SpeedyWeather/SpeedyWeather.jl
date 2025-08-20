@@ -199,8 +199,8 @@ function convection!(
         humid_tend[k] -= δq
 
         # convective precipiation, integrate dq\dt [(kg/kg)/s] vertically
-        precip = δq * Δσ[k]
-        snow = zero(precip)     # start with zero snow but potentially swap below
+        precip = max(δq * Δσ[k], zero(δq))      # only integrate excess humidity for precip (no reevaporation)
+        snow = zero(precip)                     # start with zero snow but potentially swap below
 
         # decide whether to turn precip into snow
         precip, snow = let_it_snow && temp[k] < freezing_threshold ? (snow, precip) : (precip, snow)
