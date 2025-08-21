@@ -106,7 +106,7 @@ $(TYPEDFIELDS)"""
     implicit::IM = ImplicitPrimitiveEquation(spectral_grid)
     horizontal_diffusion::HD = HyperDiffusion(spectral_grid)
     vertical_advection::VA = CenteredVerticalAdvection(spectral_grid)
-    hole_filling::HF = ClipNegatives(spectral_grid)
+    hole_filling::HO = ClipNegatives(spectral_grid)
     
     # OUTPUT
     output::OU = NetCDFOutput(spectral_grid, PrimitiveWet)

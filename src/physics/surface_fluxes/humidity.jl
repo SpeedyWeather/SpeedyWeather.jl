@@ -73,7 +73,7 @@ function surface_humidity_flux!(
     # but remove the max( ,0) to allow for surface condensation
     flux_sea = isfinite(skin_temperature_sea) ? ρ*drag_sea*V₀*(sat_humid_sea  - surface_humid) :
                                                     zero(skin_temperature_sea)
-    column.humidity_flux_ocean = flux_sea       # store without weighting by land fraction for coupling
+    column.surface_humidity_flux_ocean = flux_sea       # store without weighting by land fraction for coupling
 
     flux_sea *= (1 - land_fraction)             # weight by ocean fraction of land-sea mask
     column.flux_humid_upward[end] += flux_sea   # accumulate with += into end=lowermost layer total flux
@@ -145,11 +145,11 @@ function surface_humidity_flux!(
 
     # read in a prescribed flux
     flux = progn.ocean.humidity_flux[column.ij]
-    column.humidity_flux_ocean = flux       # store ocean-only flux separately too
+    column.surface_humidity_flux_ocean = flux   # store ocean-only flux separately too
 
-    flux *= (1-land_fraction)               # weight by ocean fraction of land-sea mask
-    column.flux_humid_upward[end] += flux   # end=lowermost layer, accumulate with (+=) to total flux
-    column.humidity_flux = flux             # ocean sets the flux (=), land accumulates (+=)
+    flux *= (1-land_fraction)                   # weight by ocean fraction of land-sea mask
+    column.flux_humid_upward[end] += flux       # end=lowermost layer, accumulate with (+=) to total flux
+    column.humidity_flux = flux                 # ocean sets the flux (=), land accumulates (+=)
 end
 
 ## ----
