@@ -77,7 +77,7 @@ function surface_humidity_flux!(
 
     flux_sea *= (1 - land_fraction)             # weight by ocean fraction of land-sea mask
     column.flux_humid_upward[end] += flux_sea   # accumulate with += into end=lowermost layer total flux
-    column.humidity_flux = flux_sea             # output/diagnose: ocean sets flux (=), land accumulates (+=)
+    column.surface_humidity_flux = flux_sea     # output/diagnose: ocean sets flux (=), land accumulates (+=)
     return nothing
 end
 
@@ -121,10 +121,10 @@ function surface_humidity_flux!(
     # but remove the max( ,0) to allow for surface condensation
     flux_land = isfinite(skin_temperature_land) && isfinite(α) ?
                 ρ*drag_land*V₀*(α*sat_humid_land  - surface_humid) : zero(NF)
-    column.humidity_flux_land = flux_land           # store flux separately for land
+    column.surface_humidity_flux_land = flux_land   # store flux separately for land
     flux_land *= land_fraction                      # weight by land fraction of land-sea mask
     column.flux_humid_upward[end] += flux_land      # end=lowermost layer, accumulate with (+=) to total flux
-    column.humidity_flux += flux_land               # ocean sets the flux (=), land accumulates (+=)
+    column.surface_humidity_flux += flux_land       # ocean sets the flux (=), land accumulates (+=)
     return nothing
 end
 
@@ -149,7 +149,7 @@ function surface_humidity_flux!(
 
     flux *= (1-land_fraction)                   # weight by ocean fraction of land-sea mask
     column.flux_humid_upward[end] += flux       # end=lowermost layer, accumulate with (+=) to total flux
-    column.humidity_flux = flux                 # ocean sets the flux (=), land accumulates (+=)
+    column.surface_humidity_flux = flux         # ocean sets the flux (=), land accumulates (+=)
 end
 
 ## ----
@@ -169,9 +169,9 @@ function surface_humidity_flux!(
 
     # read in a prescribed flux
     flux = progn.land.humidity_flux[column.ij]
-    column.humidity_flux_land = flux        # store land-only flux separately
+    column.surface_humidity_flux_land = flux    # store land-only flux separately
 
     flux *= land_fraction
-    column.flux_humid_upward[end] += flux   # end=lowermost layer
-    column.humidity_flux += flux            # ocean sets the flux (=), land accumulates (+=)
+    column.flux_humid_upward[end] += flux       # end=lowermost layer
+    column.surface_humidity_flux += flux        # ocean sets the flux (=), land accumulates (+=)
 end
