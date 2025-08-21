@@ -25,8 +25,8 @@ export PrognosticVariablesOcean
     "Prescribed ocean sensible heat flux [W/m²]"
     sensible_heat_flux::GridVariable2D = zeros(GridVariable2D, grid)
 
-    "Prescribed ocean evaporative flux [kg/s/m²]"
-    evaporative_flux::GridVariable2D = zeros(GridVariable2D, grid)
+    "Prescribed ocean humidity flux [kg/s/m²]"
+    surface_humidity_flux::GridVariable2D = zeros(GridVariable2D, grid)
 end
 
 export PrognosticVariablesLand
@@ -55,11 +55,11 @@ export PrognosticVariablesLand
     "Snow depth [m]"
     snow_depth::GridVariable2D = zeros(GridVariable2D, grid)
 
-    "Prescribed land sensible heat flux [W/m²], zero if not used"
+    "Prescribed land sensible heat flux [W/m²], positive up, zero if not used"
     sensible_heat_flux::GridVariable2D = zeros(GridVariable2D, grid)
 
-    "Prescribed land evaporative flux [kg/s/m²], zero if not used"
-    evaporative_flux::GridVariable2D = zeros(GridVariable2D, grid)
+    "Prescribed land humidity flux [kg/s/m²], positive up, zero if not used"
+    surface_humidity_flux::GridVariable2D = zeros(GridVariable2D, grid)
 end
 
 export PrognosticVariables
@@ -210,13 +210,13 @@ function Base.show(
     println(io, "│├ sea_surface_temperature:  Field{$NF} on $nlat-ring $Grid")
     println(io, "│├ sea_ice_concentration:    Field{$NF} on $nlat-ring $Grid")
     println(io, "│├ sensible_heat_flux:       Field{$NF} on $nlat-ring $Grid")
-    println(io, "│└ evaporative_flux:         Field{$NF} on $nlat-ring $Grid")
+    println(io, "│└ surface_humidity_flux:    Field{$NF} on $nlat-ring $Grid")
     println(io, "├┐land:  PrognosticVariablesLand{$NF}")
     println(io, "│├ soil_temperature:         Field{$NF} on $nlayers_soil-layer, $nlat-ring $Grid")
     println(io, "│├ soil_moisture:            Field{$NF} on $nlayers_soil-layer, $nlat-ring $Grid")
     println(io, "│├ snow_depth:               Field{$NF} on $nlat-ring $Grid")
     println(io, "│├ sensible_heat_flux:       Field{$NF} on $nlat-ring $Grid")
-    println(io, "│└ evaporative_flux:         Field{$NF} on $nlat-ring $Grid")
+    println(io, "│└ surface_humidity_flux:    Field{$NF} on $nlat-ring $Grid")
     println(io, "├ tracers: $(length(tracer_names)), $tracer_names")
     println(io, "├ particles: $nparticles-element $(typeof(progn.particles))")
     println(io, "├ scale: $(progn.scale[])")
@@ -238,14 +238,14 @@ function Base.copy!(progn_new::PrognosticVariables, progn_old::PrognosticVariabl
     progn_new.ocean.sea_surface_temperature .= progn_old.ocean.sea_surface_temperature
     progn_new.ocean.sea_ice_concentration .= progn_old.ocean.sea_ice_concentration
     progn_new.ocean.sensible_heat_flux .= progn_old.ocean.sensible_heat_flux
-    progn_new.ocean.evaporative_flux .= progn_old.ocean.evaporative_flux
+    progn_new.ocean.surface_humidity_flux .= progn_old.ocean.surface_humidity_flux
 
     # Land variables
     progn_new.land.soil_temperature .= progn_old.land.soil_temperature
     progn_new.land.snow_depth .= progn_old.land.snow_depth
     progn_new.land.soil_moisture .= progn_old.land.soil_moisture
     progn_new.land.sensible_heat_flux .= progn_old.land.sensible_heat_flux
-    progn_new.land.evaporative_flux .= progn_old.land.evaporative_flux
+    progn_new.land.surface_humidity_flux .= progn_old.land.surface_humidity_flux
 
     # Tracers - using broadcast assignment
     for (key, value) in progn_old.tracers
@@ -311,14 +311,14 @@ function Base.fill!(progn::PrognosticVariables, value::Number)
     progn.ocean.sea_surface_temperature .= value
     progn.ocean.sea_ice_concentration .= value
     progn.ocean.sensible_heat_flux .= value
-    progn.ocean.evaporative_flux .= value
+    progn.ocean.surface_humidity_flux .= value
 
     # land
     progn.land.soil_temperature .= value
     progn.land.snow_depth .= value
     progn.land.soil_moisture .= value
     progn.land.sensible_heat_flux .= value
-    progn.land.evaporative_flux .= value
+    progn.land.surface_humidity_flux .= value
 
     # fill tracers
     for (key, value) in progn.tracers 

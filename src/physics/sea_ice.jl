@@ -63,8 +63,8 @@ function sea_ice_timestep!( progn::PrognosticVariables,
                             model::PrimitiveEquation)
     
     sst = progn.ocean.sea_surface_temperature
-    ice = progn.ocean.sea_ice_concentration
-
+    ℵ = progn.ocean.sea_ice_concentration   # sea ice concentration [0, 1] as \aleph yay!
+    
     Δt = model.time_stepping.Δt_sec
     (; mask) = model.land_sea_mask
 
@@ -72,11 +72,11 @@ function sea_ice_timestep!( progn::PrognosticVariables,
     f_Δt = sea_ice_model.freeze_rate / Δt   # include 1/Δt here as SST below freezing is proportional to Δt
     temp_freeze = sea_ice_model.temp_freeze
 
-    launch!(architecture(ice), LinearWorkOrder, size(ice), sea_ice_kernel!, ice, sst, mask, temp_freeze, m, f_Δt, Δt)
-    synchronize(architecture(ice))
+    launch!(architecture(ℵ), LinearWorkOrder, size(ℵ), sea_ice_kernel!, ℵ, sst, mask, temp_freeze, m, f_Δt, Δt)
+    synchronize(architecture(ℵ))
 end
 
-@kernel inbounds=true function sea_ice_kernel!(ice, sst, mask, @Const(temp_freeze), @Const(m), @Const(f_Δt), @Const(Δt))
+@kernel inbounds=true function sea_ice_kernel!(ℵ, sst, mask, @Const(temp_freeze), @Const(m), @Const(f_Δt), @Const(Δt))
     ij = @index(Global, Linear)    # every grid point ij
 
     if mask[ij] < 1 && isfinite(sst[ij])        # at least partially ocean, SST not NaN (=masked)
@@ -87,7 +87,7 @@ end
         sst[ij] = max(sst[ij], temp_freeze)     # cap sst at freezing
 
         # Euler forward step to update sea ice concentration, cap between [0, 1]
-        ice[ij] += Δt*F
-        ice[ij] = max(min(ice[ij], 1), 0)
+        ℵ[ij] += Δt*F
+        ℵ[ij] = max(min(ℵ[ij], 1), 0)
     end
 end

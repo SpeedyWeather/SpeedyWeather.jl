@@ -367,7 +367,7 @@ function ocean_timestep!(
     Rsu = diagn.physics.ocean.surface_shortwave_up      # reflected from albedo
     Rld = diagn.physics.surface_longwave_down
     Rlu = diagn.physics.ocean.surface_longwave_up
-    Ev = diagn.physics.ocean.evaporative_flux
+    Ev = diagn.physics.ocean.surface_humidity_flux
     S = diagn.physics.ocean.sensible_heat_flux
 
     launch!(architecture(sst), LinearWorkOrder, size(sst), slab_ocean_kernel!, sst, ice, mask, Rsd, Rsu, Rld, Rlu, Ev, S, insulation, Δt_C₀, Lᵥ)
