@@ -276,11 +276,22 @@ export DynamicsVariablesOcean
     GridVariable2D,
 } <: AbstractDiagnosticVariables
 
+    "Grid used for fields"
     grid::GridType
+
+    "Surface sensible heat flux [W/m²], positive up"
     sensible_heat_flux::GridVariable2D = zeros(GridVariable2D, grid)
-    evaporative_flux::GridVariable2D = zeros(GridVariable2D, grid)
+
+    "Surface humidity flux [kg/s/m²], positive up"
+    surface_humidity_flux::GridVariable2D = zeros(GridVariable2D, grid)
+
+    "Surface shortwave radiative flux up [W/m²]"
     surface_shortwave_up::GridVariable2D = zeros(GridVariable2D, grid)
+
+    "Surface longwave radiative flux up [W/m²]"
     surface_longwave_up::GridVariable2D = zeros(GridVariable2D, grid)
+
+    "Albedo over ocean (but defined everywhere) [1]"
     albedo::GridVariable2D = zeros(GridVariable2D, grid)
 end
 
@@ -295,14 +306,25 @@ export DynamicsVariablesLand
     GridVariable2D,
 } <: AbstractDiagnosticVariables
 
+    "Grid used for fields"
     grid::GridType
+
+    "Surface sensible heat flux [W/m²], positive up"
     sensible_heat_flux::GridVariable2D = zeros(GridVariable2D, grid)
-    evaporative_flux::GridVariable2D = zeros(GridVariable2D, grid)
+    
+    "Surface humidity flux [W/m²], positive up"
+    surface_humidity_flux::GridVariable2D = zeros(GridVariable2D, grid)
+    
+    "Surface shortwave radiative flux up [W/m²]"
     surface_shortwave_up::GridVariable2D = zeros(GridVariable2D, grid)
+
+    "Surface longwave radiative flux up [W/m²]"
     surface_longwave_up::GridVariable2D = zeros(GridVariable2D, grid)
+
+    "Albedo over land (but defined everywhere) [1]"
     albedo::GridVariable2D = zeros(GridVariable2D, grid)
 
-    "Availability of soil moisture to evaporation [1]"
+    "Availability of soil moisture to evaporation (or condensation) [1]"
     soil_moisture_availability::GridVariable2D = zeros(GridVariable2D, grid)
 
     "River runoff [m/s], diagnostic overflow from soil moisture"
@@ -350,8 +372,11 @@ $(TYPEDFIELDS)"""
     "Sensible heat flux [W/m²], positive up"
     sensible_heat_flux::GridVariable2D = zeros(GridVariable2D, grid)
     
-    "Evaporative flux [kg/s/m^2], positive up"
-    evaporative_flux::GridVariable2D = zeros(GridVariable2D, grid)
+    "Surface humidity flux [kg/s/m^2], positive up"
+    surface_humidity_flux::GridVariable2D = zeros(GridVariable2D, grid)
+
+    "Surface latent heat flux [W/m²], positive up"
+    surface_latent_heat_flux::GridVariable2D = zeros(GridVariable2D, grid)
 
     # RADIATION
     "Surface radiation: shortwave up [W/m²]"

@@ -37,7 +37,7 @@ $(TYPEDFIELDS)"""
     SUT,    # <:AbstractSurfaceThermodynamics,
     SUW,    # <:AbstractSurfaceWind,
     SH,     # <:AbstractSurfaceHeatFlux,
-    EV,     # <:AbstractSurfaceEvaporation,
+    HF,     # <:AbstractSurfaceHumidityFlux,
     LSC,    # <:AbstractCondensation,
     CV,     # <:AbstractConvection,
     OD,     # <:AbstractOpticalDepth,
@@ -49,7 +49,7 @@ $(TYPEDFIELDS)"""
     IM,     # <:AbstractImplicit,
     HD,     # <:AbstractHorizontalDiffusion,
     VA,     # <:AbstractVerticalAdvection,
-    HF,     # <:AbstractHoleFilling,
+    HO,     # <:AbstractHoleFilling,
     OU,     # <:AbstractOutput,
     FB,     # <:AbstractFeedback,
 } <: PrimitiveWet
@@ -92,7 +92,7 @@ $(TYPEDFIELDS)"""
     surface_thermodynamics::SUT = SurfaceThermodynamicsConstant(spectral_grid)
     surface_wind::SUW = SurfaceWind(spectral_grid)
     surface_heat_flux::SH = SurfaceHeatFlux(spectral_grid)
-    surface_evaporation::EV = SurfaceEvaporation(spectral_grid)
+    surface_humidity_flux::HF = SurfaceHumidityFlux(spectral_grid)
     large_scale_condensation::LSC = ImplicitCondensation(spectral_grid)
     convection::CV = SimplifiedBettsMiller(spectral_grid)
     optical_depth::OD = ZeroOpticalDepth(spectral_grid)
@@ -158,7 +158,7 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
     initialize!(model.surface_thermodynamics, model)
     initialize!(model.surface_wind, model)
     initialize!(model.surface_heat_flux, model)
-    initialize!(model.surface_evaporation, model)
+    initialize!(model.surface_humidity_flux, model)
     initialize!(model.stochastic_physics, model)
 
     # allocate prognostic and diagnostic variables

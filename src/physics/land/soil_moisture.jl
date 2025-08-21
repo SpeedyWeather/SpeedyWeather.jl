@@ -227,7 +227,7 @@ function timestep!(
 
     Pconv = diagn.physics.precip_rate_convection    # precipitation in [m/s]
     Plsc = diagn.physics.precip_rate_large_scale
-    E = diagn.physics.land.evaporative_flux         # [kg/s/m²], divide by density for [m/s]
+    E = diagn.physics.land.surface_humidity_flux    # [kg/s/m²], divide by density for [m/s]
     R = diagn.physics.land.river_runoff             # diagnosed [m/s]
 
     @boundscheck fields_match(soil_moisture, Pconv, Plsc, E, R, horizontal_only=true) ||
@@ -241,7 +241,7 @@ function timestep!(
 
     @inbounds for ij in eachgridpoint(soil_moisture)
         if mask[ij] > 0                         # at least partially land
-            # precipitation (convection + large-scale) minus evaporation
+            # precipitation (convection + large-scale) minus evaporation (or condensation)
             # river runoff only diagnostic, i.e. R=0 here but drain excess water below
             # convert to [m/s] by dividing by density
             F = Pconv[ij] + Plsc[ij] - E[ij]/ρ    # - R[ij]

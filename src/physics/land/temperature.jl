@@ -173,9 +173,9 @@ function timestep!(
     # use separate land fluxes (not ocean)
     Rsd = diagn.physics.surface_shortwave_down          # before albedo reflection
     Rsu = diagn.physics.land.surface_shortwave_up       # only albedo reflection
-    Rld = diagn.physics.surface_longwave_down
+    Rld = diagn.physics.surface_longwave_down           # all in [W/m²]
     Rlu = diagn.physics.land.surface_longwave_up
-    Ev = diagn.physics.land.evaporative_flux
+    Ev = diagn.physics.land.surface_humidity_flux       # except this in [kg/s/m²]
     S = diagn.physics.land.sensible_heat_flux
 
     @boundscheck fields_match(soil_temperature, Rsd, Rsu, Rld, Rlu, Ev, S, horizontal_only=true) ||
