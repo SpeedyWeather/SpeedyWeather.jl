@@ -111,6 +111,16 @@ function get_column(    S::AbstractSimulation,
     return column
 end
 
+# function barrier
+function write_column_tendencies!(
+    diagn::DiagnosticVariables,
+    column::ColumnVariables,
+    model::PrimitiveEquation,
+    ij::Integer,                                # grid point index
+)
+    write_column_tendencies!(diagn, column, model.planet, model.atmosphere, ij)
+end
+
 """
 $(TYPEDSIGNATURES)
 Write the parametrization tendencies from `C::ColumnVariables` into the horizontal fields
