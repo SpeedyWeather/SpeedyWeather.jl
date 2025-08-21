@@ -150,6 +150,11 @@ function write_column_tendencies!(
     diagn.physics.precip_rate_large_scale[ij] = column.precip_rate_large_scale
     diagn.physics.precip_rate_convection[ij] = column.precip_rate_convection
 
+    # total precipitation rate [kg/m²/s]
+    ρ = atmosphere.water_density
+    diagn.physics.total_precipitation_rate[ij] =
+        (column.precip_rate_large_scale + column.precip_rate_convection) * ρ
+
     # Cloud top in height [m] from geopotential height divided by gravity, 0 for no clouds
     diagn.physics.cloud_top[ij] = column.cloud_top == nlayers+1 ? 0 : column.geopot[column.cloud_top]
     diagn.physics.cloud_top[ij] /= planet.gravity

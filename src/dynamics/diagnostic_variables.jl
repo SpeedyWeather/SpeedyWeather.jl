@@ -365,6 +365,9 @@ $(TYPEDFIELDS)"""
     "Rate of large-scale precipitation [m/s], instantaneous"
     precip_rate_convection::GridVariable2D = zeros(GridVariable2D, grid)
 
+    "Rate of total precipitation (rain+snow) [kg/m²/s]"
+    total_precipitation_rate::GridVariable2D = zeros(GridVariable2D, grid)
+
     "Cloud top [m]"
     cloud_top::GridVariable2D = zeros(GridVariable2D, grid)            
     
