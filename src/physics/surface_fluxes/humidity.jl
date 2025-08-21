@@ -144,7 +144,7 @@ function surface_humidity_flux!(
     land_fraction = column.land_fraction
 
     # read in a prescribed flux
-    flux = progn.ocean.humidity_flux[column.ij]
+    flux = progn.ocean.surface_humidity_flux[column.ij]
     column.surface_humidity_flux_ocean = flux   # store ocean-only flux separately too
 
     flux *= (1-land_fraction)                   # weight by ocean fraction of land-sea mask
@@ -168,7 +168,7 @@ function surface_humidity_flux!(
     land_fraction = column.land_fraction
 
     # read in a prescribed flux
-    flux = progn.land.humidity_flux[column.ij]
+    flux = progn.land.surface_humidity_flux[column.ij]
     column.surface_humidity_flux_land = flux    # store land-only flux separately
 
     flux *= land_fraction
