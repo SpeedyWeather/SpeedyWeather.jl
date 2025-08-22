@@ -70,10 +70,8 @@ tree(simulation.diagnostic_variables)
 
 The `BarotropicModel` is the simplest model we have, which will not have many of
 the model components that are needed to define the primitive equations for example.
-Note that forcing or drag aren't further branched which is because the default
-`BarotropicModel` has `NoForcing` and `NoDrag` which don't have any fields. 
 If you create a model with non-default conponents they will show up here. 
-`tree` dynamicallt inspects the current contents of a (mutable) struct and
+`tree` dynamically inspects the current contents of a (mutable) struct and
 that tree may look different depending on what model you have constructed!
 
 ```@example structure

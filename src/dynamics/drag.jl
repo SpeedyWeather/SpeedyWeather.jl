@@ -11,17 +11,7 @@ function drag!(
 end
 
 ## NO DRAG
-export NoDrag
-struct NoDrag <: AbstractDrag end
-NoDrag(SG::SpectralGrid) = NoDrag()
-initialize!(::NoDrag, ::AbstractModel) = nothing
-
-function drag!(     diagn::DiagnosticVariables,
-                    progn::PrognosticVariables,
-                    drag::NoDrag,
-                    args...)
-    return nothing
-end
+drag!(diagn, progn, drag::Nothing, args...) = nothing
 
 # Quadratic drag
 export QuadraticDrag
@@ -31,8 +21,6 @@ export QuadraticDrag
 end
 
 QuadraticDrag(SG::SpectralGrid; kwargs...) = QuadraticDrag{SG.NF}(; kwargs...)
-
-initialize!(::QuadraticDrag, ::AbstractModel) = nothing
 
 """
 $(TYPEDSIGNATURES)
@@ -75,8 +63,6 @@ export LinearVorticityDrag
 end
 
 LinearVorticityDrag(SG::SpectralGrid; kwargs...) = LinearVorticityDrag{SG.NF}(; kwargs...)
-
-initialize!(::LinearVorticityDrag, ::AbstractModel) = nothing
 
 """
 $(TYPEDSIGNATURES)

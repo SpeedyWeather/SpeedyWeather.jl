@@ -14,8 +14,8 @@ See also [Examples 3D](@ref) for examples with the primitive equation models.
     spectral_grid = SpectralGrid(trunc=63, nlayers=1)
     still_earth = Earth(spectral_grid, rotation=0)
     initial_conditions = RandomVelocity()
-    forcing = NoForcing()
-    drag = NoDrag()
+    forcing = nothing
+    drag = nothing
     model = BarotropicModel(spectral_grid; initial_conditions, planet=still_earth, forcing, drag)
     simulation = initialize!(model)
     run!(simulation, period=Day(20))
@@ -48,8 +48,8 @@ wavenumbers are truncated.
 For free-decaying turbulence we switch off any forcing or drag with
 
 ```@example barotropic_setup
-forcing = NoForcing()
-drag = NoDrag()
+forcing = nothing
+drag = nothing
 ```
 
 Now we want to construct a `BarotropicModel` with these simply by passing
@@ -218,7 +218,7 @@ literally made up of unicode characters so the most you can expect is somthing l
 
 However, here in the documentation they are usually vertically spaced as the line
 spacing is by default higher than in the REPL.
-A similar issue arises in Jupyter Notebooks by default. Well, they are unicode
+A similar issue arises in Jupyter notebooks by default. Well, they are unicode
 after all!
 
 ### Adding mountains

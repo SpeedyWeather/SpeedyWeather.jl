@@ -25,14 +25,13 @@ the following functions
         # ocean.sea_surface_temperature .= 300      # 300K everywhere
     end
 
-    function ocean_timestep!(
+    function timestep!(
         progn::PrognosticVariables,
         diagn::DiagnosticVariables,
         ocean_model::CustomOceanModel,
         model::PrimitiveEquation,
     )
-        # your code here to change the progn.ocean.sea_surface_temperature and/or
-        # progn.ocean.sea_ice_concentration on any timestep
+        # your code here to change the progn.ocean.sea_surface_temperature
     end
 
 Temperatures in ocean.sea_surface_temperature have units of Kelvin,
@@ -43,7 +42,7 @@ be (fractionally) ignored in the calculation of surface fluxes (potentially lead
 to a zero flux depending on land surface temperatures). For an ocean grid-cell that is NaN
 but not masked by the land-sea mask, its value is always ignored.
 """
-abstract type AbstractOcean end
+abstract type AbstractOcean <: AbstractModelComponent end
 
 function Base.show(io::IO, O::AbstractOcean)
     println(io, "$(typeof(O)) <: AbstractOcean")
@@ -64,7 +63,7 @@ end
 function ocean_timestep!(   progn::PrognosticVariables,
                             diagn::DiagnosticVariables,
                             model::PrimitiveEquation)
-    ocean_timestep!(progn, diagn, model.ocean, model)
+    timestep!(progn, diagn, model.ocean, model)
 end
 
 
@@ -143,10 +142,10 @@ function initialize!(
     ocean_model::SeasonalOceanClimatology,
     model::PrimitiveEquation,
 )
-    ocean_timestep!(progn, diagn, ocean_model, model)
+    timestep!(progn, diagn, ocean_model, model)
 end
 
-function ocean_timestep!(
+function timestep!(
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
     ocean::SeasonalOceanClimatology,
@@ -228,7 +227,7 @@ function initialize!(
     # (seasonal model will be garbage collected hereafter)
 end
 
-function ocean_timestep!(
+function timestep!(
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
     ocean_model::ConstantOceanClimatology,
@@ -280,7 +279,7 @@ function initialize!(
     ocean_model.mask && mask!(sea_surface_temperature, model.land_sea_mask, :land)
 end
 
-function ocean_timestep!(
+function timestep!(
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
     ocean_model::AquaPlanet,
@@ -345,7 +344,7 @@ function initialize!(
     ocean_model.mask && mask!(sea_surface_temperature, model.land_sea_mask, :land)
 end
 
-function ocean_timestep!(
+function timestep!(
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
     ocean_model::SlabOcean,

@@ -1,4 +1,7 @@
-# Support for 1D, To-DO: do we need higher dim workgroups like Oceananigans? Not in one horizontal level (because LTA/Rings), but maybe when we include vertical?
+import ..device
+
+# Support for 1D, To-DO: do we need higher dim workgroups like Oceananigans?
+# Not in one horizontal level (because LTA/Rings), but maybe when we include vertical?
 heuristic_workgroup(Wx) = min(Wx, 256)
 
 # horizontal + vertical, 3D 

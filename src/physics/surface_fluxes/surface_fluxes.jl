@@ -3,6 +3,10 @@ abstract type AbstractSurfaceWind <: AbstractParameterization end
 abstract type AbstractSurfaceHeatFlux <: AbstractParameterization end
 abstract type AbstractSurfaceHumidityFlux <: AbstractParameterization end
 
+# skip immediately for sensi_heat_flux or 
+surface_heat_flux!(c::ColumnVariables, f::Nothing, ::PrognosticVariables, ::PrimitiveEquation) = nothing
+surface_humidity_flux!(c::ColumnVariables, f::Nothing, ::PrognosticVariables, ::PrimitiveEquation) = nothing
+
 # skip the prognostic variables if not defined (needed to read in prescribed fluxes)
 surface_heat_flux!(c::ColumnVariables, f::AbstractSurfaceHeatFlux,
     p::PrognosticVariables, m::PrimitiveEquation) = surface_heat_flux!(c, f, m)

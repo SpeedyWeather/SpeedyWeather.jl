@@ -61,13 +61,13 @@ $(TYPEDFIELDS)"""
     coriolis::CO = Coriolis(spectral_grid)
     geopotential::GO = Geopotential(spectral_grid)
     adiabatic_conversion::AC = AdiabaticConversion(spectral_grid)
-    particle_advection::PA = NoParticleAdvection()
+    particle_advection::PA = nothing
     initial_conditions::IC = InitialConditions(PrimitiveDry)
-    forcing::FR = NoForcing()
-    drag::DR = NoDrag()
-  
+    forcing::FR = nothing
+    drag::DR = nothing
+
     # VARIABLES
-    random_process::RP = NoRandomProcess()
+    random_process::RP = nothing
     tracers::TRACER_DICT = TRACER_DICT()
 
     # BOUNDARY CONDITIONS
@@ -82,7 +82,7 @@ $(TYPEDFIELDS)"""
     # PHYSICS/PARAMETERIZATIONS
     physics::Bool = true
     boundary_layer_drag::BL = BulkRichardsonDrag(spectral_grid)
-    temperature_relaxation::TR = NoTemperatureRelaxation(spectral_grid)
+    temperature_relaxation::TR = nothing
     vertical_diffusion::VD = BulkRichardsonDiffusion(spectral_grid)
     surface_thermodynamics::SUT = SurfaceThermodynamicsConstant(spectral_grid)
     surface_wind::SUW = SurfaceWind(spectral_grid)
@@ -91,7 +91,7 @@ $(TYPEDFIELDS)"""
     optical_depth::OD = ZeroOpticalDepth(spectral_grid)
     shortwave_radiation::SW = TransparentShortwave(spectral_grid)
     longwave_radiation::LW = JeevanjeeRadiation(spectral_grid)
-    stochastic_physics::SP = NoStochasticPhysics()
+    stochastic_physics::SP = nothing
     
     # NUMERICS
     time_stepping::TS = Leapfrog(spectral_grid)
@@ -150,18 +150,17 @@ function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
     initialize!(model.surface_wind, model)
     initialize!(model.surface_heat_flux, model)
     initialize!(model.stochastic_physics, model)
+    initialize!(model.particle_advection, model)
 
     # allocate prognostic and diagnostic variables
     prognostic_variables = PrognosticVariables(spectral_grid, model)
     diagnostic_variables = DiagnosticVariables(spectral_grid, model)
     
-    # particle advection
-    initialize!(model.particle_advection, model)
-    initialize!(prognostic_variables.particles, model)
-    
-    # initialize ocean (includes sea ice) and land
-    initialize!(prognostic_variables.ocean, prognostic_variables, diagnostic_variables, model)
-    initialize!(prognostic_variables.land,  prognostic_variables, diagnostic_variables, model)
+    # initialize non-atmosphere prognostic variables
+    (; particles, ocean, land) = prognostic_variables
+    initialize!(particles, prognostic_variables, diagnostic_variables, model)
+    initialize!(ocean,     prognostic_variables, diagnostic_variables, model)
+    initialize!(land,      prognostic_variables, diagnostic_variables, model)
 
     # set the initial conditions (may overwrite variables set in intialize! ocean/land)
     initialize!(prognostic_variables, model.initial_conditions, model)

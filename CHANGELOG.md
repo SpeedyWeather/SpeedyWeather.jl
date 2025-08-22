@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Introduce `nothing` as valid model component [#822](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/822)
 - Towards standalone packages [#815](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/815)
 - New ColumnField type as the transpose of Field [#815](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/815)
 - Update CITATION.cff for Zenodo archives [#821](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/821)

@@ -20,26 +20,20 @@ function SpeedyTransforms.transform!(
     end
 end
 
-export NoRandomProcess
-"""Dummy type for no random process."""
-struct NoRandomProcess <: AbstractRandomProcess end
-NoRandomProcess(::SpectralGrid) = NoRandomProcess()
-
 """$(TYPEDSIGNATURES)
-`NoRandomProcess` does not need to transform any random pattern from
+`random_process=nothing` does not need to transform any random pattern from
 spectral to grid space."""
 function SpeedyTransforms.transform!(
     diagn::DiagnosticVariables,
     progn::PrognosticVariables,
     lf::Integer,
-    random_process::NoRandomProcess,
+    random_process::Nothing,
     spectral_transform::SpectralTransform,
 )
     return nothing
 end
 
-initialize!(process::NoRandomProcess, model::AbstractModel) = nothing
-random_process!(progn::PrognosticVariables, process::NoRandomProcess) = nothing
+random_process!(progn::PrognosticVariables, process::Nothing) = nothing
 
 export SpectralAR1Process
 
