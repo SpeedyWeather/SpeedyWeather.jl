@@ -14,17 +14,15 @@ import KernelAbstractions: @kernel, @index, @Const, synchronize
 import Atomix
 
 # SPEEDYWEATHER MODULES
-include("../../Architectures/src/Architectures.jl")
-using .Architectures
+using Architectures
 
 include("../../Utils/src/Utils.jl")
 using .Utils
 
-include("../../RingGrids/src/RingGrids.jl")
-using .RingGrids
+using RingGrids
 
-include("../../LowerTriangularArrays/src/LowerTriangularArrays.jl")
-using .LowerTriangularArrays
+using LowerTriangularArrays
+import LowerTriangularArrays: lm2i, get_lm_range, get_2lm_range
 
 # TRANSFORM
 export  SpectralTransform,

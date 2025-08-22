@@ -3,7 +3,7 @@ module SpeedyWeatherCUDAExt
 using SpeedyWeather
 import CUDA: CUDA, CUDAKernels, CuArray, CuDeviceArray, CUFFT
 import AbstractFFTs
-using SpeedyWeather.DocStringExtensions
+using DocStringExtensions
 import SpeedyWeather.Architectures: Architectures, GPU, CPU, CUDAGPU, array_type, architecture, on_architecture, architecture, compatible_array_types, nonparametric_type
 
 # DEVICE SETUP FOR CUDA

@@ -14,9 +14,8 @@ import Base.Threads: Threads, @threads
 import KernelAbstractions: KernelAbstractions, @kernel, @index, @Const, synchronize
 import Adapt: Adapt, adapt, adapt_structure
 
-include("../Architectures/src/Architectures.jl")    # import device architectures
-using  .Architectures
-import .Architectures: AbstractArchitecture, CPU, GPU, 
+using  Architectures
+import Architectures: AbstractArchitecture, CPU, GPU, 
         on_architecture, architecture, array_type, ismatching, nonparametric_type
 export on_architecture, architecture                # export device functions 
 
@@ -42,14 +41,19 @@ export initialize!, finalize!
 
 # import utilities
 include("../Utils/src/Utils.jl")
-using  .Utils
-import .Utils: parameters
+using .Utils
+
+include("SpeedyParameters/SpeedyParameters.jl")
+using .SpeedyParameters
+import .SpeedyParameters: parameters
 
 # export user-facing parameter handling types and methods
 export  SpeedyParam, SpeedyParams, parameters, stripparams
 
 # DATA STRUCTURES
 # LowerTriangularArrays for spherical harmonics
+using  LowerTriangularArrays
+
 export  LowerTriangularArrays, 
         LowerTriangularArray,
         LowerTriangularMatrix
@@ -60,10 +64,10 @@ export  Spectrum
 export  OneBased, ZeroBased
 export  eachmatrix, eachharmonic, eachorder
         
-include("../LowerTriangularArrays/src/LowerTriangularArrays.jl")
-using  .LowerTriangularArrays
 
 # RingGrids
+using  RingGrids
+
 export  RingGrids
 export  AbstractGrid, AbstractFullGrid, AbstractReducedGrid
 export  AbstractField, AbstractField2D, AbstractField3D
@@ -88,10 +92,9 @@ export  AnvilInterpolator
 export  spherical_distance
 export  zonal_mean
 
-include("../RingGrids/src/RingGrids.jl")
-using  .RingGrids
-
 # SpeedyTransforms
+using SpeedyTransforms
+
 export SpeedyTransforms, SpectralTransform
 export transform, transform!
 export spectral_truncation, spectral_truncation!
@@ -99,9 +102,7 @@ export curl, divergence, curl!, divergence!
 export ∇, ∇², ∇⁻², ∇!, ∇²!, ∇⁻²!
 export power_spectrum
 
-include("../SpeedyTransforms/src/SpeedyTransforms.jl")
-using  .SpeedyTransforms
-import .SpeedyTransforms: prettymemory
+import SpeedyTransforms: prettymemory
 
 # to be defined in GeoMakie extension
 export globe, animate

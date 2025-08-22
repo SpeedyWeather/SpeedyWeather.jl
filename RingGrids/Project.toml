@@ -5,6 +5,7 @@ version = "0.1.0"
 
 [deps]
 Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
+Architectures = "c5c4acf7-95e6-4f60-ae13-83e51f04c294"
 DocStringExtensions = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
 FastGaussQuadrature = "442a2c76-b920-505d-bb47-c5924d526838"
 GPUArrays = "0c68f7d7-f131-5f86-a1c3-88cf8149b2d7"
@@ -19,6 +20,9 @@ DocStringExtensions = "0.9.5"
 FastGaussQuadrature = "1.0.2"
 GPUArrays = "11.2.3"
 KernelAbstractions = "0.9.38"
-LinearAlgebra = "1.11.0"
-Printf = "1.11.0"
-Statistics = "1.11.1"
+
+[sources.Architectures]
+path = "../Architectures"
+
+[sources.Utils]
+path = "../Utils"

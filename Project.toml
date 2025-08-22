@@ -6,6 +6,7 @@ version = "0.16.0"
 [deps]
 AbstractFFTs = "621f4979-c628-5d54-868e-fcf4e3e8185c"
 Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
+Architectures = "c5c4acf7-95e6-4f60-ae13-83e51f04c294"
 AssociatedLegendrePolynomials = "2119f1ac-fb78-50f5-8cc0-dda848ebdb19"
 Atomix = "a9b6321e-bd34-4604-b9c9-b65b8de01458"
 BitInformation = "de688a37-743e-4ac2-a6f0-bd62414d1aa7"
@@ -22,6 +23,7 @@ GenericFFT = "a8297547-1b15-4a5a-a998-a2ac5f1cef28"
 JLD2 = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
 KernelAbstractions = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+LowerTriangularArrays = "ed20b33f-a660-45d0-a353-9c8c20bb5814"
 MacroTools = "1914dd2f-81c6-5fcd-8719-6d5c9610ff09"
 ModelParameters = "4744a3fa-6c31-4707-899e-a3298e4618ad"
 NCDatasets = "85f8d34a-cbdd-5861-8df4-14fed0d494ab"
@@ -29,6 +31,8 @@ Primes = "27ebfcd6-29c5-5fa9-bf4b-fb8fc14df3ae"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+RingGrids = "d1845624-ad4f-453b-8ff4-a8db365bf3a7"
+SpeedyTransforms = "ed023a3f-7a3c-42dd-bab6-68c21c8c3105"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 TOML = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
 
@@ -86,3 +90,15 @@ Statistics = "1.10"
 TOML = "1"
 UnicodePlots = "3.3"
 julia = "1.10"
+
+[sources.Architectures]
+path = "../Architectures"
+
+[sources.LowerTriangularArrays]
+path = "../LowerTriangularArrays"
+
+[sources.RingGrids]
+path = "../RingGrids"
+
+[sources.SpeedyTransforms]
+path = "../SpeedyTransforms"

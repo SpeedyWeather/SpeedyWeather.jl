@@ -7,10 +7,8 @@ using DocStringExtensions
 import Adapt: Adapt, adapt
 import GPUArrays
 import KernelAbstractions
-
-include("../../Architectures/src/Architectures.jl")
-import .Architectures
-import .Architectures: AbstractArchitecture, on_architecture, 
+ 
+import Architectures: Architectures, AbstractArchitecture, on_architecture, 
     array_type, ismatching, CPU, GPU, architecture, nonparametric_type
 
 # NUMERICS
