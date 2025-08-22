@@ -83,7 +83,7 @@ function large_scale_condensation!(
     Δσ = geometry.σ_levels_thick
     pₛΔt_gρ = (pₛ * Δt_sec)/(planet.gravity * atmosphere.water_density)
 
-    (; Lᵥ, cₚ, Lᵥ_Rᵥ) = clausius_clapeyron
+    (; Lᵥ, Lᵢ, cₚ, Lᵥ_Rᵥ) = clausius_clapeyron
     Lᵥ_cₚ = Lᵥ/cₚ                           # latent heat of vaporization over heat capacity
     (; time_scale, relative_humidity_threshold, freezing_threshold) = condensation
     let_it_snow = condensation.snow
@@ -113,6 +113,19 @@ function large_scale_condensation!(
 
             # decide whether to turn precip into snow
             precip, snow = let_it_snow && temp[k] < freezing_threshold ? (snow, precip) : (precip, snow)
+            
+            # --- NEW: latent heat and temperature changes due to freezing ---
+            if snow > 0
+                # equivalent humidity change associated with snow (reverse of precip scaling)
+                δq_freeze = -snow / (Δσ[k] * pₛΔt_gρ)
+
+                # temperature tendency from freezing
+                δT_freeze = -(Lᵢ / cₚ) * δq_freeze
+                temp_tend[k] += δT_freeze
+            end
+            # Need to implement the sublimation part if we think it is significant.
+
+            # --- TODO: implement a test for temperature and melt snow at the next level down if warmer than freezing
 
             column.precip_large_scale += precip     # integrate vertically, Formula 25, unit [m]
             column.snow_large_scale   += snow
