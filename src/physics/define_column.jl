@@ -74,13 +74,13 @@ $(TYPEDFIELDS)"""
     soil_moisture_availability::NF = 0
 
     # surface fluxes
-    evaporative_flux::NF = 0            # land-sea mask fraction-weighted flux 
-    evaporative_flux_ocean::NF = 0      # flux from ocean only
-    evaporative_flux_land::NF = 0       # and from land
+    surface_humidity_flux::NF = 0           # land-sea mask fraction-weighted flux 
+    surface_humidity_flux_ocean::NF = 0     # flux from ocean only
+    surface_humidity_flux_land::NF = 0      # and from land
 
-    sensible_heat_flux::NF = 0          # land-sea mask fraction-weighted flux 
-    sensible_heat_flux_ocean::NF = 0    # flux from ocean only
-    sensible_heat_flux_land::NF = 0     # and from land
+    sensible_heat_flux::NF = 0              # land-sea mask fraction-weighted flux 
+    sensible_heat_flux_ocean::NF = 0        # flux from ocean only
+    sensible_heat_flux_land::NF = 0         # and from land
 
     # THERMODYNAMICS
     surface_air_density::NF = 0

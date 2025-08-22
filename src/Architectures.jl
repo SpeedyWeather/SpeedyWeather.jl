@@ -31,6 +31,8 @@ module Architectures
         device::D
     end
 
+    Base.show(io::IO, a::CPU) = print(io, "CPU")
+
     CPU() = CPU(KernelAbstractions.CPU())
     CPUStatic() = CPU(KernelAbstractions.CPU(; static=true))
 
@@ -44,6 +46,8 @@ module Architectures
     struct GPU{D} <: AbstractArchitecture
         device :: D
     end
+
+    Base.show(io::IO, a::GPU) = print(io, "GPU($(device(a)))")
 
     # defined here so that it can be extended in SpeedyWeatherCUDAExt
     function CUDAGPU end

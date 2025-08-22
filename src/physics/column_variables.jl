@@ -111,6 +111,16 @@ function get_column(    S::AbstractSimulation,
     return column
 end
 
+# function barrier
+function write_column_tendencies!(
+    diagn::DiagnosticVariables,
+    column::ColumnVariables,
+    model::PrimitiveEquation,
+    ij::Integer,                                # grid point index
+)
+    write_column_tendencies!(diagn, column, model.planet, model.atmosphere, ij)
+end
+
 """
 $(TYPEDSIGNATURES)
 Write the parametrization tendencies from `C::ColumnVariables` into the horizontal fields
@@ -119,6 +129,7 @@ function write_column_tendencies!(
     diagn::DiagnosticVariables,
     column::ColumnVariables,
     planet::AbstractPlanet,
+    atmosphere::AbstractAtmosphere,
     ij::Integer,                                # grid point index
 )
     (; nlayers) = column
@@ -147,6 +158,12 @@ function write_column_tendencies!(
     diagn.physics.snow_rate_large_scale[ij] = column.snow_rate_large_scale
     diagn.physics.snow_rate_convection[ij] = column.snow_rate_convection
     
+    # total precipitation rate (rain+snow) [kg/m²/s]
+    ρ = atmosphere.water_density
+    diagn.physics.total_precipitation_rate[ij] =
+        (column.precip_rate_large_scale + column.precip_rate_convection +
+         column.snow_rate_large_scale + column.snow_rate_convection) * ρ
+
     # Cloud top in height [m] from geopotential height divided by gravity, 0 for no clouds
     diagn.physics.cloud_top[ij] = column.cloud_top == nlayers+1 ? 0 : column.geopot[column.cloud_top]
     diagn.physics.cloud_top[ij] /= planet.gravity
@@ -154,10 +171,12 @@ function write_column_tendencies!(
     # just use layer index 1 (top) to nlayers (surface) for analysis, but 0 for no clouds
     # diagn.physics.cloud_top[ij] = column.cloud_top == nlayers+1 ? 0 : column.cloud_top
 
-    # surface evaporative [kg/s/m²], positive up
-    diagn.physics.evaporative_flux[ij] = column.evaporative_flux
-    diagn.physics.ocean.evaporative_flux[ij] = column.evaporative_flux_ocean
-    diagn.physics.land.evaporative_flux[ij] = column.evaporative_flux_land
+    # surface humidity flux [kg/s/m²], positive up
+    Lᵥ = atmosphere.latent_heat_condensation
+    diagn.physics.surface_humidity_flux[ij] = column.surface_humidity_flux
+    diagn.physics.surface_latent_heat_flux[ij] = column.surface_humidity_flux * Lᵥ      # in [W/m²]
+    diagn.physics.ocean.surface_humidity_flux[ij] = column.surface_humidity_flux_ocean
+    diagn.physics.land.surface_humidity_flux[ij] = column.surface_humidity_flux_land
 
     # surface sensible heat flux [W/m²], positive up
     diagn.physics.sensible_heat_flux[ij] = column.sensible_heat_flux
