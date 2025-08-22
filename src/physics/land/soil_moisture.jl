@@ -1,23 +1,5 @@
 abstract type AbstractSoilMoisture <: AbstractParameterization end
 
-function initialize!(
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
-    soil::Nothing,
-    model::PrimitiveEquation,
-)
-    return nothing
-end
-
-function timestep!(
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
-    soil::Nothing,
-    model::PrimitiveEquation,
-)
-    return nothing
-end
-
 export SeasonalSoilMoisture
 @kwdef mutable struct SeasonalSoilMoisture{NF, GridVariable4D} <: AbstractSoilMoisture
     # READ CLIMATOLOGY FROM FILE
