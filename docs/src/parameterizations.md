@@ -155,7 +155,7 @@ in the [Surface fluxes](@ref).
 ## Custom temperature relaxation
 
 By default, there is no temperature relaxation in the primitive equation
-models (i.e. `temperature_relaxation = NoTemperatureRelaxation()`).
+models (i.e. `temperature_relaxation = nothing`).
 This parameterization exists for the [Held-Suarez forcing](@ref).
 
 - subtype `CustomTemperatureRelaxation <: AbstractTemperatureRelaxation`
@@ -247,7 +247,7 @@ are called one after another
 - expected to accumulate (`+=`) into `column.flux_humid_upward`
 
 You can customize individual components and leave the other ones as default
-or by setting them to `NoSurfaceWind`, `NoSurfaceHeatFlux`, `NoSurfaceHumidityFlux`,
+or by setting them to `nothing`
 but note that without the surface wind the heat and humidity fluxes
 are also effectively disabled as they scale with the `column.surface_wind_speed`
 set by default with the `surface_wind_stress!` in (2.) above.

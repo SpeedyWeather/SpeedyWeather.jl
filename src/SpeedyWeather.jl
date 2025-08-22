@@ -111,7 +111,6 @@ function animate end
 # abstract types
 include("models/abstract_models.jl")
 include("dynamics/abstract_types.jl")
-include("physics/abstract_types.jl")
 
 # GEOMETRY CONSTANTS ETC
 include("dynamics/vertical_coordinates.jl")

@@ -62,14 +62,14 @@ model = PrimitiveDryModel(
     boundary_layer_drag = LinearDrag(spectral_grid),
 
     # switch off other physics
-    convection = NoConvection(),
-    shortwave_radiation = NoShortwave(),
-    longwave_radiation = NoLongwave(),
-    vertical_diffusion = NoVerticalDiffusion(),
+    convection = nothing,
+    shortwave_radiation = nothing,
+    longwave_radiation = nothing,
+    vertical_diffusion = nothing,
 
     # switch off surface fluxes (makes ocean/land/land-sea mask redundant)
-    surface_wind = NoSurfaceWind(),
-    surface_heat_flux = NoSurfaceHeatFlux(),
+    surface_wind = nothing,
+    surface_heat_flux = nothing,
 
     # use Earth's orography
     orography = EarthOrography(spectral_grid)
@@ -85,12 +85,12 @@ and a linear drag term that is applied near the planetary boundary but switches 
 all other physics in the primitive equation model without humidity.
 Switching off the surface wind would also automatically turn off the surface evaporation
 (not relevant in the primitive _dry_ model) and sensible heat flux as that one is proportional
-to the surface wind (which is zero with `NoSurfaceWind`).
-But to also avoid the calculation being run at all we use `NoSurfaceHeatFlux()`
-for the model constructor.
-Many of the `NoSomething` model components do not require the
-spectral grid to be passed on, but as a convention we allow every model component
-to have it for construction even if not required.
+to the surface wind (which is zero with `nothing`).
+But to also avoid the calculation being run at all we use `nothing` for model components
+passed to the model constructor.
+Some model components use a `NoSomething` but most can just be set to `nothing`.
+`NoSomething`s do not require the spectral grid to be passed on, but as a convention
+we allow every model component to have it for construction even if not required.
 
 Visualising surface temperature with
 
@@ -183,12 +183,11 @@ nothing # hide
 ```
 
 But we also want to compare this to a setup where convection is completely
-disabled, i.e. `convection = NoConvection()` (many of the `No` model components
-don't require the `spectral_grid` to be passed on, but some do!)
+disabled, i.e. `convection = nothing`
 
 ```@example aquaplanet
 # Execute the code from Aquaplanet above first!
-convection = NoConvection(spectral_grid)
+convection = nothing
 
 # reuse other model components from before
 model = PrimitiveWetModel(spectral_grid; ocean, land_sea_mask, orography, convection)

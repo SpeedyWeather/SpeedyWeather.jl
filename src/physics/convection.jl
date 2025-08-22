@@ -1,8 +1,5 @@
 abstract type AbstractSurfacePerturbation <: AbstractParameterization end
 
-# subtypes don't require an initialize! method defined by default
-initialize!(::AbstractSurfacePerturbation, ::PrimitiveEquation) = nothing
-
 export NoSurfacePerturbation
 
 """Returns the surface temperature and humidity without
@@ -31,13 +28,8 @@ end
 
 abstract type AbstractConvection <: AbstractParameterization end
 
-export NoConvection
-
-"""Dummy type to disable convection."""
-struct NoConvection <: AbstractConvection end
-NoConvection(::SpectralGrid) = NoConvection()
-initialize!(::NoConvection, ::PrimitiveEquation) = nothing
-convection!(::ColumnVariables, ::NoConvection, ::PrimitiveEquation) = nothing
+# no convection
+convection!(::ColumnVariables, ::Nothing, ::PrimitiveEquation) = nothing
 
 export SimplifiedBettsMiller
 

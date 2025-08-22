@@ -6,12 +6,8 @@ function boundary_layer_drag!(  column::ColumnVariables,
     boundary_layer_drag!(column, model.boundary_layer_drag, model)
 end
 
-# dummy boundary layer
-export NoBoundaryLayerDrag
-struct NoBoundaryLayerDrag <: AbstractBoundaryLayer end
-NoBoundaryLayerDrag(::SpectralGrid) = NoBoundaryLayerDrag()
-initialize!(::NoBoundaryLayerDrag, ::PrimitiveEquation) = nothing
-boundary_layer_drag!(::ColumnVariables, ::NoBoundaryLayerDrag, ::PrimitiveEquation) = nothing
+# no boundary layer drag
+boundary_layer_drag!(::ColumnVariables, ::Nothing, ::PrimitiveEquation) = nothing
 
 export LinearDrag
 

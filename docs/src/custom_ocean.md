@@ -45,18 +45,16 @@ function initialize!(
     # you can use other fields from model, e.g. model.geometry
 end
 
-function initialize!(   
+function initialize!(
     ocean::PrognosticVariablesOcean,
-    time::DateTime,
+    progn::PrognosticVariables,
+    diagn::DiagnosticVariables,
     ocean_model::CustomOceanModel,
-    model::PrimitiveEquation)
-    
+    model::PrimitiveEquation,
+)
     # your code here to initialize the prognostic variables for the ocean
     # namely, ocean.sea_surface_temperature, ocean.sea_ice_concentration, e.g.
     # ocean.sea_surface_temperature .= 300      # 300K everywhere
-
-    # ocean also has its own time, set initial time
-    ocean.time = time
 end
 ```
 
@@ -68,17 +66,15 @@ variables in the second `initialize!`. They are internally therefore also
 called in that order. Note that the function signatures should not be changed
 except to define a new method for `CustomOceanModel` or whichever name you chose.
 
-Then you have to extend the `ocean_timestep!` function which has a signature like
+Then you have to extend the `timestep!` function which has a signature like
 ```julia
-function ocean_timestep!(
-    ocean::PrognosticVariablesOcean,
-    time::DateTime,
+function timestep!(
+    progn::PrognosticVariables,
+    diagn::DiagnosticVariables,
     ocean_model::CustomOceanModel,
+    model::PrimitiveEquation,
 )
-    # your code here to change the ocean.sea_surface_temperature and/or
-    # ocean.sea_ice_concentration on any timestep
-    # you should also synchronize the clocks when executed like
-    # ocean.time = time
+    # your code here to change the progn.ocean.sea_surface_temperature
 end
 ```
 which is called on every time step before the land and before the parameterization

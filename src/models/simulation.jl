@@ -83,7 +83,7 @@ function initialize!(
     # propagate spectral state to grid variables for initial condition output
     lf = 1                                  # use first leapfrog index
     transform!(diagn, progn, lf, model, initialize=true)
-    initialize!(progn.particles, progn, diagn, model.particle_advection)
+    initialize!(diagn, progn.particles, progn, model)
     initialize!(model.output, model.feedback, progn, diagn, model)
     initialize!(model.callbacks, progn, diagn, model)
 end

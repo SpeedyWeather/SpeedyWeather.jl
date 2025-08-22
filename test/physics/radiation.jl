@@ -2,7 +2,7 @@
 
     spectral_grid = SpectralGrid(trunc=31, nlayers=5)
 
-    for Radiation in (NoLongwave,
+    for Radiation in (  Nothing,
                         UniformCooling,
                         JeevanjeeRadiation)
 

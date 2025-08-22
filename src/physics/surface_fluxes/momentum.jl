@@ -1,8 +1,5 @@
-export NoSurfaceWind
-struct NoSurfaceWind <: AbstractSurfaceWind end
-NoSurfaceWind(::SpectralGrid) = NoSurfaceWind()
-initialize!(::NoSurfaceWind, ::PrimitiveEquation) = nothing
-surface_wind_stress!(::ColumnVariables, ::NoSurfaceWind, ::PrimitiveEquation) = nothing
+# no surface wind stress
+surface_wind_stress!(::ColumnVariables, ::Nothing, ::PrimitiveEquation) = nothing
 
 export SurfaceWind
 Base.@kwdef struct SurfaceWind{NF<:AbstractFloat} <: AbstractSurfaceWind

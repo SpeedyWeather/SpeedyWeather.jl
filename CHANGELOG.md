@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Introduce `nothing` as valid model component [#822](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/822)
 - Update CITATION.cff for Zenodo archives [#821](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/821)
 - Land kernels with KernelAbstractions [#820](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/820)
 - Rename evaporation to surface humidity fluxes [#818](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/818)
