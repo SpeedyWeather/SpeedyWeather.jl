@@ -65,13 +65,13 @@ $(TYPEDFIELDS)"""
     coriolis::CO = Coriolis(spectral_grid)
     geopotential::GO = Geopotential(spectral_grid)
     adiabatic_conversion::AC = AdiabaticConversion(spectral_grid)
-    particle_advection::PA = NoParticleAdvection()
+    particle_advection::PA = nothing
     initial_conditions::IC = InitialConditions(PrimitiveWet)
-    forcing::FR = NoForcing()
-    drag::DR = NoDrag()  
-  
+    forcing::FR = nothing
+    drag::DR = nothing
+
     # VARIABLES
-    random_process::RP = NoRandomProcess()
+    random_process::RP = nothing
     tracers::TRACER_DICT = TRACER_DICT()
     
     # BOUNDARY CONDITIONS
@@ -87,7 +87,7 @@ $(TYPEDFIELDS)"""
     physics::Bool = true
     clausius_clapeyron::CC = ClausiusClapeyron(spectral_grid, atmosphere)
     boundary_layer_drag::BL = BulkRichardsonDrag(spectral_grid)
-    temperature_relaxation::TR = NoTemperatureRelaxation(spectral_grid)
+    temperature_relaxation::TR = nothing
     vertical_diffusion::VD = BulkRichardsonDiffusion(spectral_grid)
     surface_thermodynamics::SUT = SurfaceThermodynamicsConstant(spectral_grid)
     surface_wind::SUW = SurfaceWind(spectral_grid)
@@ -98,8 +98,8 @@ $(TYPEDFIELDS)"""
     optical_depth::OD = ZeroOpticalDepth(spectral_grid)
     shortwave_radiation::SW = TransparentShortwave(spectral_grid)
     longwave_radiation::LW = JeevanjeeRadiation(spectral_grid)
-    stochastic_physics::SP = NoStochasticPhysics()
-    
+    stochastic_physics::SP = nothing
+
     # NUMERICS
     time_stepping::TS = Leapfrog(spectral_grid)
     spectral_transform::ST = SpectralTransform(spectral_grid)

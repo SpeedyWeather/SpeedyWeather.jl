@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Introduce `nothing` as valid model component [#822](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/822)
 - Rename evaporation to surface humidity fluxes [#818](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/818)
 - Show architecture as "CPU"/"GPU" [#809](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/809)
 - Make dynamic Land/Ocean/SeaIce models the default [#816](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/816)
