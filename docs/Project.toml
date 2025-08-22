@@ -7,6 +7,7 @@ LowerTriangularArrays = "ed20b33f-a660-45d0-a353-9c8c20bb5814"
 NCDatasets = "85f8d34a-cbdd-5861-8df4-14fed0d494ab"
 RingGrids = "d1845624-ad4f-453b-8ff4-a8db365bf3a7"
 SpeedyTransforms = "ed023a3f-7a3c-42dd-bab6-68c21c8c3105"
+SpeedyWeather = "9e226e20-d153-4fed-8a5b-493def4f21a9"
 UnicodePlots = "b8865327-cd53-5732-bb35-84acbb429228"
 
 [compat]
@@ -17,13 +18,16 @@ NCDatasets = "0.12, 0.13, 0.14"
 UnicodePlots = "3"
 
 [sources.Architectures]
-path = "Architectures"
+path = "../Architectures"
 
 [sources.LowerTriangularArrays]
-path = "LowerTriangularArrays"
+path = "../LowerTriangularArrays"
 
 [sources.RingGrids]
-path = "RingGrids"
+path = "../RingGrids"
 
 [sources.SpeedyTransforms]
-path = "SpeedyTransforms"
+path = "../SpeedyTransforms"
+
+[sources.SpeedyWeather]
+path = ".."
