@@ -1,7 +1,8 @@
 abstract type AbstractImplicit <: AbstractModelComponent end
 
-# BAROTROPIC MODEL (no implicit needed)
-implicit_correction!(diagn, progn, ::Nothing) = nothing
+# model.implicit=nothing (for BarotropicModel)
+initialize!(::Nothing, dt::Real, ::DiagnosticVariables, ::AbstractModel) = nothing
+implicit_correction!(::DiagnosticVariables, ::PrognosticVariables, ::Nothing) = nothing
 
 # SHALLOW WATER MODEL
 export ImplicitShallowWater
