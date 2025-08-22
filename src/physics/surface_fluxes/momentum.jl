@@ -40,7 +40,7 @@ function surface_wind_stress!(  column::ColumnVariables{NF},
     # SPEEDY documentation eq. 50
     column.surface_wind_speed = sqrt(surface_u^2 + surface_v^2 + V_gust^2)
 
-    # drag coefficient either from SurfaceEvaporation or from a central drag coefficient
+    # drag coefficient either from SurfaceWind or from a central drag coefficient
     drag_sea, drag_land = surface_wind.use_boundary_layer_drag ?
                                 (column.boundary_layer_drag, column.boundary_layer_drag) : 
                                 (drag_sea, drag_land)

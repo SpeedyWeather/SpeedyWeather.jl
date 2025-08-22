@@ -4,6 +4,10 @@
 
 - Towards standalone packages [#815](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/815)
 - New ColumnField type as the transpose of Field [#815](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/815)
+- Update CITATION.cff for Zenodo archives [#821](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/821)
+- Land kernels with KernelAbstractions [#820](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/820)
+- Rename evaporation to surface humidity fluxes [#818](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/818)
+- Show architecture as "CPU"/"GPU" [#809](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/809)
 - Make dynamic Land/Ocean/SeaIce models the default [#816](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/816)
 - Thermodynamic sea ice model testing and docs [#814](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/814)
 - Thermodynamic sea ice model [#811](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/811)

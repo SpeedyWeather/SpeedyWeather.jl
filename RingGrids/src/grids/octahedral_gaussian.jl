@@ -42,8 +42,8 @@ grid_type(::Type{OctahedralGaussianField{T, N}}) where {T, N} = OctahedralGaussi
 
 function Base.showarg(io::IO, F::Field{T, N, ArrayType, Grid}, toplevel) where {T, N, ArrayType, Grid<:OctahedralGaussianGrid{A}} where A <: AbstractArchitecture
     print(io, "OctahedralGaussianField{$T, $N}")
-    toplevel && print(io, " on ", nonparametric_type(ArrayType))
-    toplevel && print(io, " on ", A)
+    toplevel && print(io, " as ", nonparametric_type(ArrayType))
+    toplevel && print(io, " on ", F.grid.architecture)
 end 
 
 # SIZE

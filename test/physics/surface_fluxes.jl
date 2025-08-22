@@ -28,28 +28,28 @@
     end
 end
 
-@testset "Prescribed surface evaporative fluxes" begin
+@testset "Prescribed surface humidity fluxes" begin
     tmp_output_path = mktempdir(pwd(), prefix = "tmp_testruns_")  # Cleaned up when the process exits
 
     # prescribe ocean
     spectral_grid = SpectralGrid(trunc=31)
     output = NetCDFOutput(spectral_grid, path=tmp_output_path)
-    evaporative_flux_ocean = PrescribedOceanEvaporation(spectral_grid)
-    evaporative_flux_land = SurfaceLandEvaporation(spectral_grid)
-    surface_evaporation = SurfaceEvaporation(ocean=evaporative_flux_ocean, land=evaporative_flux_land)
-    model = PrimitiveWetModel(spectral_grid; surface_evaporation, output)
+    humidity_flux_ocean = PrescribedOceanHumidityFlux(spectral_grid)
+    humidity_flux_land = SurfaceLandHumidityFlux(spectral_grid)
+    surface_humidity_flux = SurfaceHumidityFlux(ocean=humidity_flux_ocean, land=humidity_flux_land)
+    model = PrimitiveWetModel(spectral_grid; surface_humidity_flux, output)
     
     simulation = initialize!(model)
-    set!(simulation.prognostic_variables.ocean.evaporative_flux, (λ, ϕ) -> ϕ > 0 ? 5e-5 : 0, model.geometry)
+    set!(simulation.prognostic_variables.ocean.surface_humidity_flux, (λ, ϕ) -> ϕ > 0 ? 5e-5 : 0, model.geometry)
     run!(simulation, period=Day(1))
 
     # prescribe land
-    evaporative_flux_ocean = SurfaceOceanEvaporation(spectral_grid)
-    evaporative_flux_land = PrescribedLandEvaporation(spectral_grid)
-    surface_evaporation = SurfaceEvaporation(ocean=evaporative_flux_ocean, land=evaporative_flux_land)
-    model = PrimitiveWetModel(spectral_grid; surface_evaporation, output)
+    humidity_flux_ocean = SurfaceOceanHumidityFlux(spectral_grid)
+    humidity_flux_land = PrescribedLandHumidityFlux(spectral_grid)
+    surface_humidity_flux = SurfaceHumidityFlux(ocean=humidity_flux_ocean, land=humidity_flux_land)
+    model = PrimitiveWetModel(spectral_grid; surface_humidity_flux, output)
 
     simulation = initialize!(model);
-    set!(simulation.prognostic_variables.land.evaporative_flux, (λ, ϕ) -> ϕ > 0 ? 5e-5 : 0, model.geometry)
+    set!(simulation.prognostic_variables.land.surface_humidity_flux, (λ, ϕ) -> ϕ > 0 ? 5e-5 : 0, model.geometry)
     run!(simulation, period=Day(1))
 end

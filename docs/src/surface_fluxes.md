@@ -1,14 +1,15 @@
 # Surface fluxes
 
 The surfaces fluxes in SpeedyWeather represent the exchange of momentum, heat,
-and moisture between ocean and land as surface into the lowermost atmospheric
-layer. Surface fluxes of momentum represent a drag that the boundary layer
-wind experiences due to friction over more or less rough ground on land
-or over sea. Surface fluxes of heat represent a sensible heat flux from 
-a warmer or colder ocean or land into or out of the surface layer of the
-atmosphere. Surface fluxes of moisture represent evaporation of sea water
-into undersaturated surface air masses or, similarly, evaporation from
-land with a given soil moisture and vegetation's evapotranspiration.
+and humidity/moisture between ocean and land as surface into or out of
+the lowermost atmospheric layer. Surface fluxes of momentum represent
+a drag that the boundary layer wind experiences due to friction over more
+or less rough ground on land or over sea. Surface fluxes of heat represent
+a sensible heat flux from  a warmer or colder ocean or land into or out of
+the surface layer of the atmosphere. Surface fluxes of humidity represent
+evaporation of sea water or condensation of humidity onto the ocean surface.
+Similarly, humidity fluxes over land with a given soil moisture
+and vegetation's evapotranspiration.
 
 ## Surface flux implementations
 
@@ -32,12 +33,11 @@ with more explanation below. The surface heat fluxes currently implemented are
 subtypes(SpeedyWeather.AbstractSurfaceHeatFlux)
 ```
 
-and the surface moisture fluxes, i.e. evaporation (this does not include [Convection](@ref) or
-[Large-scale condensation](@ref) which currently immediately removes humidity instead of
-fluxing it out at the bottom) implemented are
+and the surface humidity fluxes (this does not include [Convection](@ref) or
+[Large-scale condensation](@ref) those are precipitation) implemented are
 
 ```@example surface_fluxes
-subtypes(SpeedyWeather.AbstractSurfaceEvaporation)
+subtypes(SpeedyWeather.AbstractSurfaceHumidityFlux)
 ```
 
 The calculation of thermodynamic quantities at the surface (air density, temperature, humidity)
@@ -207,25 +207,28 @@ land surface layer or the mixed layer in the ocean. We then compute
 F_T^\uparrow = \rho_s C V_0 c_p (T_{skin} - T_s)
 ```
 
-## Surface evaporation
+in ``W/m^2``, positive up.
 
-The surface moisture flux, i.e. evaporation of soil moisture over land and evaporation of
-sea water over the ocean is proportional to the difference of the surface specific humidity
-``q_s`` and the saturation specific humidity given ``T_{skin}`` and surface pressure ``p_s``.
-This assumes that a very thin layer of air just above the ocean is saturated but over land
-this assumption is less well justified as it should be a function of the soil moisture
-and how much of that is available to evaporate given vegetation. We again make the
-simplification that ``q_s = q_N``, i.e. specific humidity of the surface is the
+## Surface humidity fluxes
+
+The surface humidity flux, i.e. evaporation/condensation of soil moisture over land and
+evaporation of sea water over the ocean or condensation of humidity on the ocean surface
+is proportional to the difference of the surface specific humidity ``q_s`` and the saturation
+specific humidity given ``T_{skin}`` and surface pressure ``p_s``.
+This assumes that a very thin layer of air just above the ocean is saturated but over land this
+assumption is less well justified as it should be a function of the soil moisture and how much
+of that is available to evaporate given vegetation, hence we include a soil moisture availability.
+We again make the simplification that ``q_s = q_N``, i.e. specific humidity of the surface is the
 same as in the lowermost atmospheric layer above. 
 
-The surface evaporative flux is then (always positive)
+The surface humidity flux in ``kg/s/m^2``, positive up, is then
 
 ```math
-F_q^\uparrow = \rho_s C V_0 \max(0, \alpha_{sw} q^* - q_s)
+F_q^\uparrow = \rho_s C V_0 (\alpha_{sw} q^* - q_s)
 ```
 
 with ``q^*`` the saturation specific humidity calculated from the skin temperature ``T_{skin}``
-and surface pressure ``p_s``. The available of soil water over land is represented by
+and surface pressure ``p_s``. The availability of soil water over land is represented by
 (over the ocean ``\alpha_{sw} = 1``)
 
 ```math
@@ -238,8 +241,9 @@ following the Fortran SPEEDY documentation[^SPEEDY] which follows Viterbo and Be
 soil layer ``W_{top}`` and the root layer below ``W_{root}`` using the vegetation
 fraction ``f_{veg} = veg_{high} + 0.8 veg_{low}`` composed of a (dimensionless)
 high and low vegetation cover per grid cell ``veg_{high}, veg_{low}``.
-The constants are depth of top soil layer ``D_{top} = 7~cm``, depth of root layer
-``D_{root} = 21~cm``, soil wetness at field capacity (volume fraction)
+The constants are depth of top soil layer ``D_{top} = 20~cm``, depth of root layer
+``D_{root} = 2~m`` (defaults subject to change, check `model.land.geometry`),
+soil wetness at field capacity (volume fraction)
 ``W_{cap} = 0.3``, and soil wetness at wilting point (volume fraction) ``W_{wil} = 0.17``.
 
 ## Land-sea mask
@@ -253,7 +257,7 @@ SpeedyWeather uses a _fractional_ land-sea mask, i.e. for every grid-point
 The land-sea mask determines solely how to weight the surface fluxes
 coming from land or from the ocean. For the sensible heat fluxes this uses
 land and sea surface temperatures and weights the respective fluxes
-proportional to the fractional mask. Similar for evaporation.
+proportional to the fractional mask. Similar for humidity fluxes.
 You can therefore define an ocean on top of a mountain, or a land without
 heat fluxes when the land-surface temperature is not defined, i.e. `NaN`.
 Let ``F_L, F_S`` be the fluxes coming from land and sea, respectively.
