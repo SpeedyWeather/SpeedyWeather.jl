@@ -11,11 +11,7 @@ function shortwave_radiation!(column::ColumnVariables, model::PrimitiveEquation)
 end
 
 ## NO SHORTWAVE RADIATION
-export NoShortwave
-struct NoShortwave <: AbstractShortwave end
-NoShortwave(SG::SpectralGrid) = NoShortwave()
-initialize!(::NoShortwave, ::PrimitiveEquation) = nothing
-shortwave_radiation!(::ColumnVariables, ::NoShortwave, ::PrimitiveEquation) = nothing
+shortwave_radiation!(::ColumnVariables, ::Nothing, ::PrimitiveEquation) = nothing
 
 ## SHORTWAVE RADIATION FOR A FULLY TRANSPARENT ATMOSPHERE
 export TransparentShortwave

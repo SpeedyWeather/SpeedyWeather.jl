@@ -21,7 +21,7 @@ end
     spectral_grid = SpectralGrid(trunc=31, nlayers=8)
 
     for Temperature in (SeasonalLandTemperature, ConstantLandTemperature, LandBucketTemperature)
-        for SoilMoisture in (NoSoilMoisture, SeasonalSoilMoisture, LandBucketMoisture)
+        for SoilMoisture in (Nothing, SeasonalSoilMoisture, LandBucketMoisture)
             for Vegetation in (NoVegetation, VegetationClimatology)
                 for Model in (PrimitiveDryModel, PrimitiveWetModel)
 

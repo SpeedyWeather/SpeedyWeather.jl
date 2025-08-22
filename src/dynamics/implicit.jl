@@ -1,11 +1,7 @@
 abstract type AbstractImplicit <: AbstractModelComponent end
 
 # BAROTROPIC MODEL (no implicit needed)
-export NoImplicit
-struct NoImplicit <: AbstractImplicit end
-NoImplicit(SG::SpectralGrid) = NoImplicit()
-initialize!(::NoImplicit, args...) = nothing
-implicit_correction!(::DiagnosticVariables, ::PrognosticVariables, ::NoImplicit) = nothing
+implicit_correction!(diagn, progn, ::Nothing) = nothing
 
 # SHALLOW WATER MODEL
 export ImplicitShallowWater

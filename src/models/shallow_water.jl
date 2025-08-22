@@ -39,13 +39,13 @@ $(TYPEDFIELDS)"""
     atmosphere::AT = EarthAtmosphere(spectral_grid)
     coriolis::CO = Coriolis(spectral_grid)
     orography::OR = EarthOrography(spectral_grid)
-    forcing::FR = NoForcing()
-    drag::DR = NoDrag()
-    particle_advection::PA = NoParticleAdvection()
+    forcing::FR = nothing
+    drag::DR = nothing
+    particle_advection::PA = nothing
     initial_conditions::IC = InitialConditions(ShallowWater)
     
     # VARIABLES
-    random_process::RP = NoRandomProcess()
+    random_process::RP = nothing
     tracers::TRACER_DICT = TRACER_DICT()
 
     # NUMERICS

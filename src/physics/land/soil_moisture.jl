@@ -1,14 +1,9 @@
 abstract type AbstractSoilMoisture <: AbstractParameterization end
 
-export NoSoilMoisture
-struct NoSoilMoisture <: AbstractSoilMoisture end
-NoSoilMoisture(SG::SpectralGrid) = NoSoilMoisture()
-initialize!(soil::NoSoilMoisture, model::PrimitiveEquation) = nothing
-
 function initialize!(
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
-    soil::NoSoilMoisture,
+    soil::Nothing,
     model::PrimitiveEquation,
 )
     return nothing
@@ -17,7 +12,7 @@ end
 function timestep!(
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
-    soil::NoSoilMoisture,
+    soil::Nothing,
     model::PrimitiveEquation,
 )
     return nothing

@@ -228,3 +228,7 @@ function SpeedyTransforms.SpectralTransform(spectral_grid::SpectralGrid;
     spectrum = one_more_degree == false ? Spectrum(lmax-1, mmax; architecture) : spectrum
     return SpectralTransform(spectrum, grid; NF, ArrayType, nlayers, kwargs...)
 end
+
+# because model components can be `nothing`, their constructor being `Nothing()`
+# we also allow `::SpectralGrid` as the first argument
+Base.Nothing(::SpectralGrid) = Nothing()

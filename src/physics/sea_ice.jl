@@ -1,19 +1,14 @@
 abstract type AbstractSeaIce <: AbstractModelComponent end
 
-export NoSeaIce
-struct NoSeaIce <: AbstractSeaIce end
-NoSeaIce(::SpectralGrid) = NoSeaIce()
-initialize!(::NoSeaIce, ::AbstractModel) = nothing
-
 # set all concentration to zero
 function initialize!(
     ocean::PrognosticVariablesOcean,
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
-    sea_ice_model::NoSeaIce,
+    sea_ice_model::Nothing,
     model::PrimitiveEquation,
 )
-    ocean.sea_ice_concentration .= 0
+    return nothing
 end
 
 # function barrier for all oceans
@@ -23,10 +18,10 @@ function sea_ice_timestep!( progn::PrognosticVariables,
     sea_ice_timestep!(progn, diagn, model.sea_ice, model)
 end
 
-# NoSeaIce does not do anything 
+# Nothing for sea ice does not do anything 
 function sea_ice_timestep!( progn::PrognosticVariables,
                             diagn::DiagnosticVariables,
-                            sea_ice_model::NoSeaIce,
+                            sea_ice_model::Nothing,
                             model::PrimitiveEquation)
     return nothing
 end

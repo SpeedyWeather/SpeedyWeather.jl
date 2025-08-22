@@ -5,11 +5,8 @@ function temperature_relaxation!(column::ColumnVariables, model::PrimitiveEquati
     temperature_relaxation!(column, model.temperature_relaxation, model)
 end
 
-export NoTemperatureRelaxation
-struct NoTemperatureRelaxation <: AbstractTemperatureRelaxation end
-NoTemperatureRelaxation(::SpectralGrid) = NoTemperatureRelaxation()
-initialize!(::NoTemperatureRelaxation, ::PrimitiveEquation) = nothing
-temperature_relaxation!(::ColumnVariables, ::NoTemperatureRelaxation, ::PrimitiveEquation) = nothing
+# no temperature relaxation
+temperature_relaxation!(::ColumnVariables, ::Nothing, ::PrimitiveEquation) = nothing
 
 export HeldSuarez
 

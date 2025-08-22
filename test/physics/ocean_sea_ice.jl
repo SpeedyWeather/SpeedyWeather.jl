@@ -12,7 +12,7 @@
                             SlabOcean)
 
         @testset for SeaIceModel in (ThermodynamicSeaIce,
-                                 NoSeaIce)
+                                        Nothing)
 
             ocean = OceanModel(spectral_grid)
             sea_ice = SeaIceModel(spectral_grid)
@@ -28,7 +28,7 @@
             @test all(0 .<= simulation.prognostic_variables.ocean.sea_ice_concentration .<= 1)
             @test all(0 .<= simulation.diagnostic_variables.physics.ocean.albedo .<= 1)
 
-            if sea_ice isa NoSeaIce
+            if sea_ice isa Nothing
                 @test all(simulation.prognostic_variables.ocean.sea_ice_concentration .== 0)
             end
         end

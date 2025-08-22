@@ -10,6 +10,14 @@ abstract type PrimitiveWet <: PrimitiveEquation end
 
 abstract type AbstractModelComponent end
 
+# any model component set to nothing needs no initialization or finalize!
+initialize!(::Nothing, ::AbstractModel) = nothing
+finalize!(::Nothing, ::AbstractModel) = nothing
+
+# fallback for model components: nothing to initialize
+initialize!(::AbstractModelComponent, ::AbstractModel) = nothing
+finalize!(::AbstractModelComponent, ::AbstractModel) = nothing
+
 # print all fields with type <: Number
 function Base.show(io::IO, P::AbstractModelComponent)
     println(io, "$(typeof(P)) <: $(supertype(typeof(P)))")

@@ -40,7 +40,7 @@ export LandModel
     temperature::T = LandBucketTemperature(spectral_grid)
     soil_moisture::SM = LandBucketMoisture(spectral_grid)
     vegetation::V = VegetationClimatology(spectral_grid)
-    rivers::R = NoRivers(spectral_grid)
+    rivers::R = nothing
 end
 
 # also allow spectral grid to be passed on as first an only positional argument to model constructors

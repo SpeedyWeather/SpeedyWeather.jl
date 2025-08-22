@@ -1,15 +1,11 @@
 abstract type AbstractParticleAdvection <: AbstractModelComponent end
 
-# dummy no particle advection type
-export NoParticleAdvection
-struct NoParticleAdvection <: AbstractParticleAdvection end
-NoParticleAdvection(::SpectralGrid) = NoParticleAdvection()
-initialize!(::NoParticleAdvection, ::AbstractModel) = nothing
-initialize!(particles, progn, diagn, ::NoParticleAdvection) = nothing
-particle_advection!(progn, diagn, ::NoParticleAdvection) = nothing
+# no particle advection
+initialize!(particles, progn, diagn, ::Nothing) = nothing
+particle_advection!(progn, diagn, ::Nothing) = nothing
 
 export ParticleAdvection2D
-Base.@kwdef struct ParticleAdvection2D{NF} <: AbstractParticleAdvection
+@kwdef struct ParticleAdvection2D{NF} <: AbstractParticleAdvection
     "[OPTION] Execute particle advection every n timesteps"
     every_n_timesteps::Int = 6
 

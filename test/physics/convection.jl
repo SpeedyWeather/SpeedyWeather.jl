@@ -2,7 +2,7 @@
     
     spectral_grid = SpectralGrid(trunc=31, nlayers=8)
 
-    for Convection in ( NoConvection,
+    for Convection in ( Nothing,
                         SimplifiedBettsMiller,
                         DryBettsMiller,
                         ConvectiveHeating)

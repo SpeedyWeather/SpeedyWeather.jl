@@ -7,13 +7,7 @@ function vertical_diffusion!(   column::ColumnVariables,
 end
 
 ## NO VERTICAL DIFFUSION
-export NoVerticalDiffusion
-struct NoVerticalDiffusion <: AbstractVerticalDiffusion end
-NoVerticalDiffusion(SG::SpectralGrid) = NoVerticalDiffusion()
-
-# define dummy functions
-initialize!(::NoVerticalDiffusion,::PrimitiveEquation) = nothing
-vertical_diffusion!(::ColumnVariables, ::NoVerticalDiffusion, ::PrimitiveEquation) = nothing
+vertical_diffusion!(::ColumnVariables, ::Nothing, ::PrimitiveEquation) = nothing
 
 export BulkRichardsonDiffusion
 @kwdef struct BulkRichardsonDiffusion{NF, VectorType} <: AbstractVerticalDiffusion

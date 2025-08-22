@@ -10,28 +10,23 @@ subtypes(SpeedyWeather.AbstractSeaIce)
 
 ## No sea ice
 
-`NoSeaIce` as the name says, initializes `prognostic_variables.sea_ice_concentration` 
-to zero. But you may use `set!(simulation, sea_ice_concentration=...)` to set the
-sea ice concentration manually. `NoSeaIce` does not do anything on every time step
+You can set `sea_ice = nothing` which will not touch the initial
+`prognostic_variables.sea_ice_concentration` (which when allocated is zero),
+nor advance it. But you may use `set!(simulation, sea_ice_concentration=...)` to set the
+sea ice concentration manually. No sea ice does not do anything on every time step
 so your manual modifications will prevail after `initialize!`.
 
 To be used like
 
 ```@example sea_ice
 spectral_grid = SpectralGrid(trunc=31)
-sea_ice = NoSeaIce(spectral_grid)
-```
-
-which is then passed on to the model constructor like
-
-```@example sea_ice
-model = PrimitiveWetModel(spectral_grid; sea_ice)
+model = PrimitiveWetModel(spectral_grid; sea_ice=nothing)
 model.sea_ice
 ```
 
 Note that in SpeedyWeather the sea ice model and its albedo are defined
 independently, means you can have a sea ice model without affecting the albedo
-and `NoSeaIce` but set the sea ice concentration manually and use its albedo
+and `sea_ice=nothing` but set the sea ice concentration manually and use its albedo
 effect, this will be discussed in `ThermodynamicSeaIce` below.
 
 ## Thermodynamic sea ice model
