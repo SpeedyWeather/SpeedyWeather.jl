@@ -32,8 +32,6 @@ jobs:
           Pkg.develop([PackageSpec(; path) for path in ("Architectures", "LowerTriangularArrays", "RingGrids", "SpeedyTransforms")])
           Pkg.instantiate()
         if: ${{ matrix.version == '1.10' }}
-        env:
-          JULIA_PKG_SERVER_REGISTRY_PREFERENCE: eager
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
         env:
