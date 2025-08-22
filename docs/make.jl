@@ -1,5 +1,5 @@
 using Documenter
-using SpeedyWeather
+using Architectures, LowerTriangularArrays, RingGrids, SpeedyTransforms, SpeedyWeather
 
 makedocs(
     format = Documenter.HTML(prettyurls=get(ENV, "CI", nothing)=="true",
