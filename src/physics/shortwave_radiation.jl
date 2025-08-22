@@ -1,7 +1,7 @@
 abstract type AbstractShortwave <: AbstractRadiation end
 
-function get_nbands(R::AbstractRadiation)
-    hasfield(typeof(R), :nbands) && return R.nbands
+function get_nbands(radiation::Union{AbstractRadiation, Nothing})
+    hasfield(typeof(radiation), :nbands) && return radiation.nbands
     return 0
 end
 
