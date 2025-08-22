@@ -16,10 +16,10 @@ import Atomix
 # SPEEDYWEATHER MODULES
 using Architectures
 
-include("../../Utils/src/Utils.jl")
-using .Utils
-
 using RingGrids
+
+# import utilities (chain load them from RingGrids to avoid double loading)
+using RingGrids.Utils
 
 using LowerTriangularArrays
 import LowerTriangularArrays: lm2i, get_lm_range, get_2lm_range

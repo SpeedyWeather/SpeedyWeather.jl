@@ -39,9 +39,8 @@ export DateTime, Millisecond, Second, Minute, Hour, Day, Week, Month, Year, Cent
 # export functions that have many cross-component methods
 export initialize!, finalize!
 
-# import utilities
-include("../Utils/src/Utils.jl")
-using .Utils
+# import utilities (chain load them from RingGrids to avoid double loading)
+using RingGrids.Utils 
 
 include("SpeedyParameters/SpeedyParameters.jl")
 using .SpeedyParameters
