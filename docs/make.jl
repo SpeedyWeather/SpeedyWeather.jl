@@ -9,7 +9,7 @@ makedocs(
                              size_threshold = 600_000),      # in bytes
     sitename = "SpeedyWeather.jl",
     authors = "M Klöwer and SpeedyWeather contributors",
-    modules = [SpeedyWeather],
+    modules = [SpeedyWeather, Architectures, LowerTriangularArrays, RingGrids, SpeedyTransforms],
     pages = ["Home"=>"index.md",
             "Installation"=>"installation.md",
             "Running SpeedyWeather" => [
