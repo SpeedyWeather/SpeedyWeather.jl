@@ -23,6 +23,3 @@ KernelAbstractions = "0.9.38"
 
 [sources.Architectures]
 path = "../Architectures"
-
-[sources.Utils]
-path = "../Utils"
