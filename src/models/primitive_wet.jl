@@ -160,18 +160,17 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
     initialize!(model.surface_heat_flux, model)
     initialize!(model.surface_humidity_flux, model)
     initialize!(model.stochastic_physics, model)
+    initialize!(model.particle_advection, model)
 
     # allocate prognostic and diagnostic variables
     prognostic_variables = PrognosticVariables(spectral_grid, model)
     diagnostic_variables = DiagnosticVariables(spectral_grid, model)
-    
-    # particle advection
-    initialize!(model.particle_advection, model)
-    initialize!(prognostic_variables.particles, model)
-    
-    # initialize ocean (includes sea ice) and land
-    initialize!(prognostic_variables.ocean, prognostic_variables, diagnostic_variables, model)
-    initialize!(prognostic_variables.land,  prognostic_variables, diagnostic_variables, model)
+
+    # initialize non-atmosphere prognostic variables
+    (; particles, ocean, land) = prognostic_variables
+    initialize!(particles, prognostic_variables, diagnostic_variables, model)
+    initialize!(ocean,     prognostic_variables, diagnostic_variables, model)
+    initialize!(land,      prognostic_variables, diagnostic_variables, model)
 
     # set the initial conditions (may overwrite variables set in intialize! ocean/land)
     initialize!(prognostic_variables, model.initial_conditions, model)

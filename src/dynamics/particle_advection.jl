@@ -1,8 +1,26 @@
 abstract type AbstractParticleAdvection <: AbstractModelComponent end
 
+# function barrier for all particle advections, dispatch by model.particle_advection
+# 1. initial conditions for particles
+initialize!(particles::AbstractVector{P}, progn, diagn, model) where {P<:Particle}=
+    initialize!(particles, progn, diagn, model.particle_advection, model)
+
+# 2. initialize the particle advection work arrays
+function initialize!(
+    diagn::DiagnosticVariables,
+    particles::AbstractVector{P},   # for dispatch to distinguish from other initialize! functions
+    progn::PrognosticVariables,
+    model::AbstractModel,
+) where {P <: Particle}
+    # dispatch by model.particle_advection
+    initialize!(diagn, particles, progn, model.particle_advection, model)
+end
+
+# 3. the repeated call to actually advect particles
+particle_advection!(progn, diagn, model) = particle_advection!(progn, diagn, model.particle_advection, model)
+
 # no particle advection
-initialize!(particles, progn, diagn, ::Nothing) = nothing
-particle_advection!(progn, diagn, ::Nothing) = nothing
+particle_advection!(progn, diagn, ::Nothing, ::AbstractModel) = nothing
 
 export ParticleAdvection2D
 @kwdef struct ParticleAdvection2D{NF} <: AbstractParticleAdvection
@@ -43,6 +61,9 @@ vertical σ coordinates. This uses a cosin-distribution in latitude for
 an equal-area uniformity."""
 function initialize!(
     particles::AbstractVector{P},
+    progn::PrognosticVariables,     # used for dispatch as all sub components
+    diagn::DiagnosticVariables,     # have this function signature
+    particle_advection::ParticleAdvection2D,
     model::AbstractModel,
 ) where {P <: Particle}
     for i in eachindex(particles)
@@ -55,11 +76,12 @@ end
 Initialize particle advection time integration: Store u,v interpolated initial conditions
 in `diagn.particles.u` and `.v`  to be used when particle advection actually executed for first time."""
 function initialize!(
-    particles::Vector{Particle{NF}},
-    progn::PrognosticVariables,
     diagn::DiagnosticVariables,
+    particles::AbstractVector{P},
+    progn::PrognosticVariables,
     particle_advection::ParticleAdvection2D,
-) where NF
+    model::AbstractModel,
+) where {P<:Particle}
 
     # escape immediately for no particles
     length(particles) == 0 && return nothing
@@ -88,17 +110,17 @@ function initialize!(
     interpolate!(v0, v_grid, interpolator)
 end
 
-# function barrier
-function particle_advection!(progn, diagn, adv::ParticleAdvection2D)
+# function barrier, unpack what's needed
+function particle_advection!(progn, diagn, adv::ParticleAdvection2D, model::AbstractModel)
     particle_advection!(progn.particles, diagn, progn.clock, adv)
 end
 
 function particle_advection!(
-    particles::AbstractVector{Particle{NF}},
+    particles::AbstractVector{P},
     diagn::AbstractVariables,
     clock::Clock,
     particle_advection::ParticleAdvection2D,
-) where NF
+) where {P<:Particle}
 
     # escape immediately for no particles
     length(particles) == 0 && return nothing
@@ -181,7 +203,7 @@ function particle_advection!(
 end
 
 function advect_2D(
-    particle::Particle{NF},   # particle to advect
+    particle::Particle{NF},         # particle to advect
     u::NF,                          # zonal velocity [m/s]
     v::NF,                          # meridional velocity [m/s]
     dt::NF,                         # scaled time step [s*˚/m]    

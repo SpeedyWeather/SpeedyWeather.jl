@@ -86,17 +86,20 @@ function initialize!(model::Barotropic; time::DateTime = DEFAULT_DATE)
     initialize!(model.drag, model)
     initialize!(model.horizontal_diffusion, model)
     initialize!(model.random_process, model)
-
-    # initial conditions
-    prognostic_variables = PrognosticVariables(spectral_grid, model)
-    initialize!(prognostic_variables, model.initial_conditions, model)
-    prognostic_variables.clock.time = time       # set the current time
-    prognostic_variables.clock.start = time      # and store the start time
-
-    # particle advection
     initialize!(model.particle_advection, model)
-    initialize!(prognostic_variables.particles, model)
 
+    # allocate prognostic and diagnostic variables
+    prognostic_variables = PrognosticVariables(spectral_grid, model)
     diagnostic_variables = DiagnosticVariables(spectral_grid, model)
+    
+    # initialize particles (or other non-atmosphere prognostic variables)
+    initialize!(prognostic_variables.particles, prognostic_variables, diagnostic_variables, model)
+    
+    # set the initial conditions 
+    initialize!(prognostic_variables, model.initial_conditions, model)
+    (; clock) = prognostic_variables
+    clock.time = time       # set the current time
+    clock.start = time      # and store the start time
+
     return Simulation(prognostic_variables, diagnostic_variables, model)
 end
