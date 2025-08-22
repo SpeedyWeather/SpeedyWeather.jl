@@ -19,6 +19,12 @@ Base.@kwdef struct ClausiusClapeyron{NF<:AbstractFloat} <: AbstractClausiusClape
     "Latent heat of condensation/vaporization of water [J/kg]"
     Lᵥ::NF = 2.5e6
 
+    "Latent heat of freezing/fusion of ice [J/kg]"
+    Lᵢ::NF = 3.3e5
+
+    "Latent heat of freezing/sublimation of ice [J/kg]"
+    Lₛ::NF = 2.8e6
+
     "Specific heat at constant pressure [J/K/kg]"
     cₚ::NF = 1004.64
 
