@@ -138,6 +138,7 @@ function large_scale_condensation!(
                 snow_flux    -= δq_melt
                 precip       += δq_melt
                 temp_tend[k] -= δT_melt
+            end
             
             column.precip_large_scale += precip     # integrate vertically, Formula 25, unit [m]
             column.snow_large_scale   += snow
