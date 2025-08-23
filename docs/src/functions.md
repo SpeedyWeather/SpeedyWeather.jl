@@ -1,5 +1,5 @@
 # Function and type index
 
 ```@autodocs
-Modules = [SpeedyWeather]
+Modules = [SpeedyWeather, Architectures, RingGrids.Utils, SpeedyWeather.SpeedyParameters]
 ```
