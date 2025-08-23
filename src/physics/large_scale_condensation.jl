@@ -20,6 +20,9 @@ $(TYPEDFIELDS)"""
     "[OPTION] Freezing temperature for snow fall [K]"
     freezing_threshold::NF = 263
 
+    "[OPTION] Melting temperature for snow fall [K]"
+    melting_threshold::NF = 278
+
     "[OPTION] Time scale in multiples of time step Δt, the larger the less immediate"
     time_scale::NF = 3
 end
@@ -99,7 +102,7 @@ function large_scale_condensation!(
             δq /= ((1 + Lᵥ_cₚ*dqsat_dT) * time_scale*Δt_sec) 
 
             # latent heat release for enthalpy conservation
-            δT = -Lᵥ_cₚ * δq
+            #δT = -Lᵥ_cₚ * δq
 
             # If there is large-scale condensation at a level higher (i.e. smaller k) than
             # the cloud-top previously diagnosed due to convection, then increase the cloud-top
@@ -113,20 +116,22 @@ function large_scale_condensation!(
 
             # decide whether to turn precip into snow
             precip, snow = let_it_snow && temp[k] < freezing_threshold ? (snow, precip) : (precip, snow)
-            
-            # --- NEW: latent heat and temperature changes due to freezing ---
-            if snow > 0
-                # equivalent humidity change associated with snow (reverse of precip scaling)
-                δq_freeze = -snow / (Δσ[k] * pₛΔt_gρ)
+            # latent heat release for enthalpy conservation
+            L = snow > 0 ? (Lᵥ + Lᵢ) : Lᵥ
+            δT = -L / cₚ * δq
 
-                # temperature tendency from freezing
-                δT_freeze = -(Lᵢ / cₚ) * δq_freeze
-                temp_tend[k] += δT_freeze
+            is_warm_below = any(temp[j] > melting_threshold for j in k+1:length(temp))
+            if is_warm_below && snow > 0
+                # convert snow to rain
+                precip += snow
+                snow = 0.0
+
+                # add latent heat from melting
+                δq_melt = -precip / (Δσ[k] * pₛΔt_gρ)   # equivalent to humidity change
+                δT_melt = -(Lᵢ / cₚ) * δq_melt
+                δT += δT_melt
             end
-            # Need to implement the sublimation part if we think it is significant.
-
-            # --- TODO: implement a test for temperature and melt snow at the next level down if warmer than freezing
-
+            
             column.precip_large_scale += precip     # integrate vertically, Formula 25, unit [m]
             column.snow_large_scale   += snow
 
