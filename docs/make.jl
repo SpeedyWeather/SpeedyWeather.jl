@@ -10,6 +10,7 @@ makedocs(
     sitename = "SpeedyWeather.jl",
     authors = "M Klöwer and SpeedyWeather contributors",
     modules = [SpeedyWeather, Architectures, LowerTriangularArrays, RingGrids, SpeedyTransforms],
+    checkdocs = :exports,
     pages = ["Home"=>"index.md",
             "Installation"=>"installation.md",
             "Running SpeedyWeather" => [
