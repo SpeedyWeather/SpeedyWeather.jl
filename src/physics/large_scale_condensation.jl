@@ -90,6 +90,7 @@ function large_scale_condensation!(
     Lᵥ_cₚ = Lᵥ/cₚ                           # latent heat of vaporization over heat capacity
     (; time_scale, relative_humidity_threshold, freezing_threshold) = condensation
     let_it_snow = condensation.snow
+    snow_flux = 0.0   # start an empty snow flux at top of atmosphere
 
     @inbounds for k in eachindex(column)
         if humid[k] > sat_humid[k]*relative_humidity_threshold
@@ -116,28 +117,26 @@ function large_scale_condensation!(
 
             # decide whether to turn precip into snow
             precip, snow = let_it_snow && temp[k] < freezing_threshold ? (snow, precip) : (precip, snow)
+            snow_flux += snow
             # latent heat release for enthalpy conservation
             L = snow > 0 ? (Lᵥ + Lᵢ) : Lᵥ
             δT = -L / cₚ * δq
 
-            is_warm_below = any(temp[j] > melting_threshold for j in k+1:length(temp))
-            if is_warm_below && snow > 0
-                # convert snow to rain
-                precip += snow
-                snow = 0.0
-
-                # add latent heat from melting
-                δq_melt = -precip / (Δσ[k] * pₛΔt_gρ)   # equivalent to humidity change
-                δT_melt = -(Lᵢ / cₚ) * δq_melt
-                δT += δT_melt
-            end
-            
-            column.precip_large_scale += precip     # integrate vertically, Formula 25, unit [m]
-            column.snow_large_scale   += snow
-
             # only accumulate into humid_tend now to allow humid_tend != 0 before this scheme is called
             humid_tend[k] += δq
             temp_tend[k] += δT
+
+            # now test whether any snow has come into this layer as snow_flux and whether the current layer can melt it
+            δT_melt = temp[k] - melting_threshold
+            if snow_flux > 0 && δT_melt > 0 
+                melting_enthalpy = cₚ * δT_melt 
+                δq = melting_enthalpy / Lᵢ
+                snow   -= δq
+                precip += δq
+                temp_tend[k] -= δT_melt
+            
+            column.precip_large_scale += precip     # integrate vertically, Formula 25, unit [m]
+            column.snow_large_scale   += snow
         end
     end
 
