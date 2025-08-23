@@ -2,7 +2,7 @@ abstract type AbstractCondensation <: AbstractParameterization end
 
 export NoCondensation
 struct NoCondensation <: AbstractCondensation end
-NoCondesantion(::SpectralGrid) = NoCondensation()
+NoCondensation(::SpectralGrid) = NoCondensation()
 initialize!(::NoCondensation, ::PrimitiveEquation) = nothing
 large_scale_condensation!(::ColumnVariables, ::NoCondensation, ::PrimitiveEquation) = nothing
 
@@ -88,7 +88,7 @@ function large_scale_condensation!(
 
     (; Lᵥ, Lᵢ, cₚ, Lᵥ_Rᵥ) = clausius_clapeyron
     Lᵥ_cₚ = Lᵥ/cₚ                           # latent heat of vaporization over heat capacity
-    (; time_scale, relative_humidity_threshold, freezing_threshold) = condensation
+    (; time_scale, relative_humidity_threshold, freezing_threshold, melting_threshold) = condensation
     let_it_snow = condensation.snow
     snow_flux = 0.0   # start an empty snow flux at top of atmosphere
 
@@ -129,16 +129,15 @@ function large_scale_condensation!(
             # now test whether any snow has come into this layer as snow_flux and whether the current layer can melt it
             δT_melt = temp[k] - melting_threshold
             if snow_flux > 0 && δT_melt > 0 
-                E_avail = cₚ * δT_melt   # J / kg (of air)
-                # maximum snow depth that can be melted with that energy
-                melt_depth = (E_avail / Lᵢ) * (Δσ[k] * pₛΔt_gρ)
-                # actual melt limited by available snow
-                melt_amount = min(snow_flux, melt_depth)
-                δq_melt = melt_amount / (Δσ[k] * pₛΔt_gρ)
-                snow_flux    -= δq_melt
-                precip       += δq_melt
-                temp_tend[k] -= δT_melt
-            end
+			    E_avail = cₚ * δT_melt   # J / kg (of air)
+			    melt_depth = (E_avail / Lᵢ) * (Δσ[k] * pₛΔt_gρ)   # [m]
+			    melt_amount = min(snow_flux, melt_depth)          # [m]
+			    δq_melt = melt_amount / (Δσ[k] * pₛΔt_gρ)         # [kg/kg]
+			    snow_flux    -= melt_amount                       # consistent units
+			    precip       += melt_amount
+			    δT_melt_actual = -(Lᵢ/cₚ) * δq_melt
+			    temp_tend[k] += δT_melt_actual
+			end
             
             column.precip_large_scale += precip     # integrate vertically, Formula 25, unit [m]
             column.snow_large_scale   += snow
