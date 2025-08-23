@@ -142,7 +142,7 @@ Base.promote_rule(::Type{Millenium}, ::Type{Hour}) = Hour
 Base.promote_rule(::Type{Millenium}, ::Type{Second}) = Second
 
 # add coarserperiod dispatches for Century and Millenium
-# Dates.coarserperiod(::Type{Year}) = (Century, 100)
+Dates.coarserperiod(::Type{Year}) = (Century, 100)
 Dates.coarserperiod(::Type{Century}) = (Millenium, 10)
 
 # conversion rules for floating point -> time types
