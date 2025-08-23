@@ -103,7 +103,6 @@ function _legendre!(
         unscale_coslat!(g_north, g_south, coslat⁻¹, architecture=S.architecture)
     end
 
-    synchronize(S.architecture)
 end
 
 
@@ -204,5 +203,4 @@ function _legendre!(                        # GRID TO SPECTRAL
         kjm_indices;
     )
 
-    synchronize(S.architecture)
 end

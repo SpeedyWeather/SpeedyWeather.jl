@@ -95,7 +95,6 @@ function _divergence!(
     @boundscheck ismatching(S, div) || throw(DimensionMismatch(S, div))
 
     launch!(architecture(div), SpectralWorkOrder, size(div), _divergence_kernel!, kernel, div, u, v, grad_x_vordiv, grad_y_vordiv1, grad_y_vordiv2)
-    synchronize(architecture(div))
     
     # radius scaling if not unit sphere
     if radius != 1
@@ -248,7 +247,6 @@ function UV_from_vor!(
     @boundscheck ismatching(S, U) || throw(DimensionMismatch(S, U))
     
     launch!(architecture(U), SpectralWorkOrder, size(U), _UV_from_vor_kernel!, U, V, vor, vor.spectrum.l_indices, vor.spectrum.lmax, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)
-    synchronize(architecture(U))
     
     # *radius scaling if not unit sphere (*radius² for ∇⁻² then /radius to get from stream function to velocity)
     if radius != 1
@@ -397,7 +395,6 @@ function UV_from_vordiv_kernel!(
     @boundscheck ismatching(S, U) || throw(DimensionMismatch(S, U))
 
     launch!(architecture(U), SpectralWorkOrder, size(U), _UV_from_vordiv_kernel!, U, V, vor, div, vor.spectrum.l_indices, vor.spectrum.lmax, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)
-    synchronize(architecture(U))
     
     # *radius scaling if not unit sphere (*radius² for ∇⁻², then /radius to get from stream function to velocity)
     if radius != 1
@@ -481,7 +478,6 @@ function ∇²!(
                         (add ? (o,a) -> (o+a) : (o, a) -> a)
     
     launch!(architecture(∇²alms), SpectralWorkOrder, size(∇²alms), ∇²_kernel!, ∇²alms, alms, eigenvalues, kernel, alms.spectrum.l_indices)
-    synchronize(architecture(∇²alms))
 
     # /radius² or *radius² scaling if not unit sphere
     if radius != 1
@@ -577,7 +573,6 @@ function ∇!(
     @. dpdx = complex(0, m_indices - 1)*p.data
 
     launch!(architecture(dpdy), SpectralWorkOrder, size(dpdy), dpdy_kernel!, dpdy, p.data, grad_y1, grad_y2)
-    synchronize(architecture(dpdy))
     
     # 1/radius factor if not unit sphere
     if radius != 1

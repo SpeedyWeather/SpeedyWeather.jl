@@ -514,15 +514,17 @@ function KernelAbstractions.get_backend(
     return KernelAbstractions.get_backend(field.data)
 end
 
-function Adapt.adapt_structure(to, field::Field{T, N, ArrayType, Grid}) where {T, N, ArrayType, Grid}
-    adapted_data = adapt(to, field.data)
+Adapt.adapt_structure(to, field::AbstractField) = Adapt.adapt(to, field.data)
+  
+Architectures.architecture(field::AbstractField) = architecture(field.grid)
+
+function Architectures.on_architecture(arch, field::AbstractField) 
+    adapted_data = on_architecture(arch, field.data)
     if ismatching(field.grid, typeof(adapted_data))
-        return Field(adapted_data, adapt(to, field.grid))
+        return Field(adapted_data, on_architecture(arch, field.grid))
     else # if not matching, create new grid with other architecture
         #@warn "Adapting field to new architecture with $(typeof(adapted_data))"
-        return Field(adapted_data, adapt(to, Grid(field.grid, architecture(typeof(adapted_data)))))
+        return Field(adapted_data, Grid(field.grid, architecture(typeof(adapted_data))))
     end
-end
-
-Architectures.architecture(field::AbstractField) = architecture(field.grid)
-Architectures.on_architecture(arch, field::AbstractField) = Adapt.adapt(array_type(arch), field)
+end 
+    

@@ -370,7 +370,8 @@ function timestep!(
     S = diagn.physics.ocean.sensible_heat_flux
 
     launch!(architecture(sst), LinearWorkOrder, size(sst), slab_ocean_kernel!, sst, ice, mask, Rsd, Rsu, Rld, Rlu, Ev, S, insulation, Δt_C₀, Lᵥ)
-    synchronize(architecture(sst))
+
+    return nothing
 end
 
 @kernel inbounds=true function slab_ocean_kernel!(sst, ice, mask, Rsd, Rsu, Rld, Rlu, Ev, S, @Const(insulation), @Const(Δt_C₀), @Const(Lᵥ))
