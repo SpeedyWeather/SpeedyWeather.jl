@@ -518,7 +518,7 @@ Adapt.adapt_structure(to, field::AbstractField) = Adapt.adapt(to, field.data)
   
 Architectures.architecture(field::AbstractField) = architecture(field.grid)
 
-function Architectures.on_architecture(arch, field::AbstractField) 
+function Architectures.on_architecture(arch, field::Field{T, N, ArrayType, Grid}) where {T, N, ArrayType, Grid} 
     adapted_data = on_architecture(arch, field.data)
     if ismatching(field.grid, typeof(adapted_data))
         return Field(adapted_data, on_architecture(arch, field.grid))
