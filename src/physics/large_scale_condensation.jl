@@ -140,7 +140,7 @@ function large_scale_condensation!(
 			end
             
             column.precip_large_scale += precip     # integrate vertically, Formula 25, unit [m]
-            column.snow_large_scale   += snow
+            column.snow_large_scale   += snow_flux
         end
     end
 
