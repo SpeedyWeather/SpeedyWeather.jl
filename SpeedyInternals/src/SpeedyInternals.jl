@@ -1,9 +1,7 @@
-"""
-    SpeedyInternals
+#= SpeedyInternals
 
 Common (internal) functions for SpeedyWeather.jl and related packages 
-like RingGrids.jl, LowerTriangularArrays.jl and SpeedyTransforms.jl
-"""
+like RingGrids.jl, LowerTriangularArrays.jl and SpeedyTransforms.jl =#
 module SpeedyInternals
 
     # ARCHITECTURES (Device handling)
