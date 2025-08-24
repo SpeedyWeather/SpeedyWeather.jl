@@ -1,7 +1,7 @@
 module SpeedyWeatherJLArraysExt
 
 using SpeedyWeather, JLArrays
-import SpeedyWeather.Architectures: Architectures, ismatching, GPU, architecture, array_type, compatible_array_types, nonparametric_type
+import SpeedyWeather.SpeedyInternals.Architectures: Architectures, ismatching, GPU, architecture, array_type, compatible_array_types, nonparametric_type
 
 # make JLArrays compatible with standard GPU Architecture
 Architectures.ismatching(arch::GPU, array_type::Type{<:JLArray}) = true

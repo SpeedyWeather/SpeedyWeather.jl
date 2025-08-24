@@ -1,10 +1,7 @@
 module Utils
 
 using DocStringExtensions
-
-# ARCHITECTURE
-using Architectures
-import Architectures: device
+using ..Architectures
 
 # miscellaneous utility functions
 export isincreasing, isdecreasing, clip_negatives!, underflow!

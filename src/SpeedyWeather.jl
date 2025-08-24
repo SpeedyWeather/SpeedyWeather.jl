@@ -14,8 +14,9 @@ import Base.Threads: Threads, @threads
 import KernelAbstractions: KernelAbstractions, @kernel, @index, @Const, synchronize
 import Adapt: Adapt, adapt, adapt_structure
 
-using  Architectures
-import Architectures: AbstractArchitecture, CPU, GPU, 
+using SpeedyInternals
+using  SpeedyInternals.Architectures
+import SpeedyInternals.Architectures: AbstractArchitecture, CPU, GPU, 
         on_architecture, architecture, array_type, ismatching, nonparametric_type
 export on_architecture, architecture                # export device functions 
 
@@ -39,8 +40,8 @@ export DateTime, Millisecond, Second, Minute, Hour, Day, Week, Month, Year, Cent
 # export functions that have many cross-component methods
 export initialize!, finalize!
 
-# import utilities (chain load them from RingGrids to avoid double loading)
-using RingGrids.Utils 
+# import utilities
+using SpeedyInternals.Utils 
 
 include("SpeedyParameters/SpeedyParameters.jl")
 using .SpeedyParameters
