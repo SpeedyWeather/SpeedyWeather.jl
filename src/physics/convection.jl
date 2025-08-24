@@ -58,6 +58,9 @@ $(TYPEDFIELDS)"""
     "[OPTION] Freezing temperature below which to convert rain into snow [K]"
     freezing_threshold::NF = 263
 
+    "[OPTION] Melting temperature for snow fall [K]"
+    melting_threshold::NF = 278
+
     "[OPTION] Surface perturbation of temp, humid to calculate the moist pseudo adiabat"
     surface_temp_humid::SP  # don't specify default here but in generator below
 end
@@ -115,9 +118,9 @@ function convection!(
     Δσ = geometry.σ_levels_thick
     (; geopot, nlayers, temp, temp_virt, humid, temp_tend, humid_tend) = column
     pₛ = column.pres[end]
-    (; Lᵥ, cₚ) = clausius_clapeyron
+    (; Lᵥ, Lᵢ, cₚ) = clausius_clapeyron
     let_it_snow = SBM.snow              # flag to switch on/off rain -> snow conversion
-    (; freezing_threshold) = SBM        # threshold temperature below which it snows
+    (; freezing_threshold, melting_threshold) = SBM        # threshold temperature below which it snows
 
     # use work arrays for temp_ref_profile, humid_ref_profile
     temp_ref_profile = column.a     # temperature [K] reference profile to adjust to
@@ -140,6 +143,7 @@ function convection!(
     local PT::NF = 0        # precipitation due to cooling
     local ΔT::NF = 0        # vertically uniform temperature profile adjustment
     local Qref::NF = 0      # = ∫_pₛ^p_LZB -humid_ref_profile dp
+    local snow_flux::NF = 0.0   # start an empty snow flux at top of atmosphere
 
     # skip constants compared to Frierson 2007, i.e. no /τ, /gravity, *cₚ/Lᵥ
     for k in level_zero_buoyancy:nlayers
@@ -204,10 +208,32 @@ function convection!(
 
         # decide whether to turn precip into snow
         precip, snow = let_it_snow && temp[k] < freezing_threshold ? (snow, precip) : (precip, snow)
+        snow_flux += snow # assign snow to the snow_flux local variable
+        # latent heat release for enthalpy conservation
+        L = snow > 0 ? (Lᵥ + Lᵢ) : Lᵥ
+        δT = -L / cₚ * δq
 
+        # I am not sure whether or not these belong here. They are needed in condensation, perhaps not here?
+        humid_tend[k] += δq
+        temp_tend[k] += δT
+        
+        # now test whether any snow has come into this layer as snow_flux and whether the current layer can melt it
+        δT_melt = temp[k] - melting_threshold
+        if snow_flux > 0 && δT_melt > 0 
+			E_avail = cₚ * δT_melt                            # J / kg (of air)
+			melt_depth = (E_avail / Lᵢ) * (Δσ[k] * pₛΔt_gρ)   # [m]
+			melt_amount = min(snow_flux, melt_depth)          # [m]
+			δq_melt = melt_amount / (Δσ[k] * pₛΔt_gρ)         # [kg/kg]
+			snow_flux    -= melt_amount                       # consistent units
+			precip       += melt_amount
+			δT_melt_actual = -(Lᵢ/cₚ) * δq_melt
+			temp_tend[k] += δT_melt_actual
+		end
+        
         column.precip_convection += precip     # integrate vertically, Formula 25, unit [m]
-        column.snow_convection   += snow
+        #column.snow_convection   += snow       # No longer do this here
     end
+    column.snow_convection   = snow_flux       # do it here, as snow_flux holds the vertical integral [m]
 
     (; gravity) = planet
     (; water_density) = atmosphere
