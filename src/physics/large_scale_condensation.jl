@@ -129,7 +129,7 @@ function large_scale_condensation!(
             # now test whether any snow has come into this layer as snow_flux and whether the current layer can melt it
             δT_melt = temp[k] - melting_threshold
             if snow_flux > 0 && δT_melt > 0 
-			    E_avail = cₚ * δT_melt   # J / kg (of air)
+			    E_avail = cₚ * δT_melt                            # J / kg (of air)
 			    melt_depth = (E_avail / Lᵢ) * (Δσ[k] * pₛΔt_gρ)   # [m]
 			    melt_amount = min(snow_flux, melt_depth)          # [m]
 			    δq_melt = melt_amount / (Δσ[k] * pₛΔt_gρ)         # [kg/kg]
@@ -140,9 +140,10 @@ function large_scale_condensation!(
 			end
             
             column.precip_large_scale += precip     # integrate vertically, Formula 25, unit [m]
-            column.snow_large_scale   += snow_flux
+            #column.snow_large_scale   += snow # No longer do this here
         end
     end
+	column.snow_large_scale   = snow_flux # do it here, as snow_flux holds the vertical integral [m]
 
     # convert to rain/snow fall rate [m/s]
     column.precip_rate_large_scale = column.precip_large_scale / Δt_sec
