@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Compatibility for JLD2 v0.6 [#825](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/825)
 - Introduce `nothing` as valid model component [#822](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/822)
 - Update CITATION.cff for Zenodo archives [#821](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/821)
 - Land kernels with KernelAbstractions [#820](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/820)
