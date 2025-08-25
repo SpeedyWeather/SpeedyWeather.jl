@@ -182,8 +182,7 @@ intermediate-complexity climate models as a conceptual launchpad for SpeedyWeath
 
 ## Submodules
 
-SpeedyWeather.jl defines several submodules that are technically stand-alone (with dependencies) but aren't separated
-out to their own packages for now
+SpeedyWeather.jl defines several submodules that are part of this repository, but also avaiable to be used and instaled as stand-alone packages: 
 
 - [__RingGrids__](https://speedyweather.github.io/SpeedyWeather.jl/dev/ringgrids/),
 a module that defines several iso-latitude ring-based spherical grids (like the FullGaussianGrid or the HEALPixGrid)
@@ -194,9 +193,10 @@ a module that defines `LowerTriangularMatrix` used for the spherical harmonic co
 the spherical harmonic transform between spectral space (for which LowerTriangularArrays is used) and grid-point space
 (as defined by RingGrids).
 
-These modules can also be used independently of SpeedyWeather like so
+These modules can also be used independently of SpeedyWeather. They are registered, so just install and use them as every other package, e.g:
 ```julia
-julia> using SpeedyWeather: LowerTriangularArrays, RingGrids, SpeedyTransforms
+(@v1.11) pkg> add RingGrids
+julia> using RingGrids
 ```
 check out their documentation: [RingGrids](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/ringgrids/),
 [LowerTriangularArrays](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/lowertriangularmatrices/),

@@ -1,8 +1,6 @@
 # RingGrids
 
-RingGrids is a submodule that has been developed for SpeedyWeather.jl which is technically
-independent (SpeedyWeather.jl however imports it and so does SpeedyTransforms) and can also
-be used without running simulations. It is just not put into its own respective repository.
+RingGrids is a package that has been developed for SpeedyWeather.jl and is used by it but can also be used standalone.
 
 RingGrids defines several iso-latitude grids, which are mathematically described in the
 section on [Grids](@ref). In brief, they include the regular latitude-longitude grids
