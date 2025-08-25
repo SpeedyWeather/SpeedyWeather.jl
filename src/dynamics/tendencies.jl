@@ -596,7 +596,6 @@ function vorticity_flux_curldiv!(
 
     launch!(arch, RingGridWorkOrder, size(u), _vorticity_flux_kernel!,
             u_tend_grid, v_tend_grid, u, v, vor, f, coslat⁻¹, whichring)
-    synchronize(arch)
     
     # divergence and curl of that u, v_tend vector for vor, div tendencies
     (; vor_tend, div_tend ) = diagn.tendencies

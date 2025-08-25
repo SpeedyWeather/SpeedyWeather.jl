@@ -190,7 +190,6 @@ function unscale_coslat!(
 
     launch!(architecture, Array3DWorkOrder, size(g_north), unscale_coslat_kernel!, 
             g_north, g_south, coslat⁻¹)
-    synchronize(architecture)
 end 
 
 @kernel inbounds=true function unscale_coslat_kernel!(

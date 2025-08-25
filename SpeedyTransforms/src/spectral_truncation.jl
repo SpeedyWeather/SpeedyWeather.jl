@@ -170,7 +170,6 @@ function spectral_smoothing!(
     # Launch kernel
     launch!(architecture(L), SpectralWorkOrder, size(L), spectral_smoothing_kernel!, 
             L, c, power, eigenvalue_norm, L.spectrum.l_indices)
-    synchronize(architecture(L))
 end
 
 @kernel function spectral_smoothing_kernel!(

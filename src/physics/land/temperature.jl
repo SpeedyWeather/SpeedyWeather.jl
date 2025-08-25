@@ -194,7 +194,8 @@ function timestep!(
     launch!(architecture(soil_temperature), LinearWorkOrder, (size(soil_temperature, 1),),
         land_bucket_temperature_kernel!, soil_temperature, mask, soil_moisture, Rsd, Rsu, Rlu, Rld, Ev, S,
         Lᵥ, γ, Cw, Cs, z₁, z₂, Δ, Δt)
-    synchronize(architecture(soil_temperature))
+
+    return nothing
 end
 
 @kernel inbounds=true function land_bucket_temperature_kernel!(

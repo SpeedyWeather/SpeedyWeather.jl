@@ -148,7 +148,6 @@ function horizontal_diffusion!(
 
     launch!(architecture(tendency), SpectralWorkOrder, size(tendency), _horizontal_diffusion_kernel!, 
             tendency, var, expl, impl)
-    synchronize(architecture(tendency))
 
 end
 

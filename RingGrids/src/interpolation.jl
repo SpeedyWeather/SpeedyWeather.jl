@@ -284,7 +284,6 @@ function _interpolate!(
         A_northpole,
         A_southpole,
     )
-    synchronize(architecture)
 
     return Aout
 end
@@ -494,7 +493,6 @@ function find_rings_unsafe!(js::AbstractArray{<:Integer},  # Out: vector of ring
         θs,
         latd
     )
-    synchronize(architecture)
 end
 
 # for testing only
@@ -575,7 +573,6 @@ function find_grid_indices!(I::AnvilInterpolator,       # update indices arrays
         nlat,
         rings
     )
-    synchronize(architecture)
 end
 
 @inline function find_lon_indices(λ::NF,     # longitude to find incides for (0˚...360˚E)
