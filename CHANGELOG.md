@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Expand scratch memory handling in spectral transforms [#791](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/791)
 - GitHub actions checkout v5 [#826](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/826)
 - Compatibility for JLD2 v0.6 [#825](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/825)
 - Introduce `nothing` as valid model component [#822](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/822)
