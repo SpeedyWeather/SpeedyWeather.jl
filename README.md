@@ -182,7 +182,7 @@ intermediate-complexity climate models as a conceptual launchpad for SpeedyWeath
 
 ## Submodules
 
-SpeedyWeather.jl defines several modules that are part of this repository, but also avaiable to be used and installed as stand-alone packages: 
+SpeedyWeather.jl defines several modules that are part of this repository, but also available to be used and installed as stand-alone packages: 
 
 - [__RingGrids__](https://speedyweather.github.io/SpeedyWeather.jl/dev/ringgrids/),
 a module that defines several iso-latitude ring-based spherical grids (like the FullGaussianGrid or the HEALPixGrid)
