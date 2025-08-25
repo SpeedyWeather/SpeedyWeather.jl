@@ -1,4 +1,4 @@
-import ..device
+import ..Architectures: device
 
 # Support for 1D, To-DO: do we need higher dim workgroups like Oceananigans?
 # Not in one horizontal level (because LTA/Rings), but maybe when we include vertical?
