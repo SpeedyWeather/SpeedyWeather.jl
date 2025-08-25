@@ -188,6 +188,11 @@ function convection!(
         end
     end
 
+	(; gravity) = planet
+	(; water_density) = atmosphere
+	(; Δt_sec) = time_stepping
+	pₛΔt_gρ = (pₛ * Δt_sec / gravity / water_density) # enfore no precip for shallow conv
+	
     # GET TENDENCIES FROM ADJUSTED PROFILES
     for k in level_zero_buoyancy:nlayers
         temp_tend[k] -= (temp[k] - temp_ref_profile[k]) / SBM.time_scale.value
@@ -208,11 +213,6 @@ function convection!(
         # I am not sure whether or not these belong here. They are needed in condensation, perhaps not here?
         humid_tend[k] += δq
         temp_tend[k] += δT
-
-		(; gravity) = planet
-    	(; water_density) = atmosphere
-    	(; Δt_sec) = time_stepping
-    	pₛΔt_gρ = (pₛ * Δt_sec / gravity / water_density) * deep_convection # enfore no precip for shallow conv
 		
         # now test whether any snow has come into this layer as snow_flux and whether the current layer can melt it
         δT_melt = temp[k] - melting_threshold
@@ -230,13 +230,14 @@ function convection!(
         column.precip_convection += precip     # integrate vertically, Formula 25, unit [m]
         #column.snow_convection   += snow       # No longer do this here
     end
-    column.snow_convection   = snow_flux       # do it here, as snow_flux holds the vertical integral [m]
  
-    column.precip_convection *= pₛΔt_gρ                                 # convert to [m] of rain during Δt
+    pₛΔt_gρ = (pₛ * Δt_sec / gravity / water_density) * deep_convection # enfore no precip for shallow conv
+	column.precip_convection *= pₛΔt_gρ                                 # convert to [m] of rain during Δt
     column.precip_rate_convection = column.precip_convection / Δt_sec   # rate: convert to [m/s] of rain
 
     # same for snow
-    column.snow_convection *= pₛΔt_gρ                                   # convert to [m] of rain during Δt
+    #column.snow_convection *= pₛΔt_gρ                                   # convert to [m] of rain during Δt
+	column.snow_convection   = snow_flux       # do it here, as snow_flux holds the vertical integral [m]
     column.snow_rate_convection = column.snow_convection / Δt_sec       # rate: convert to [m/s] of rain
 
     column.cloud_top = min(column.cloud_top, level_zero_buoyancy)       # clouds reach to top of convection
