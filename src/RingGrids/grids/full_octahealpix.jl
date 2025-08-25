@@ -24,8 +24,8 @@ grid_type(::Type{FullOctaHEALPixField{T, N}}) where {T, N} = FullOctaHEALPixGrid
 
 function Base.showarg(io::IO, F::Field{T, N, ArrayType, Grid}, toplevel) where {T, N, ArrayType, Grid<:FullOctaHEALPixGrid{A}} where A <: AbstractArchitecture
     print(io, "FullOctaHEALPixField{$T, $N}")
-    toplevel && print(io, " on ", nonparametric_type(ArrayType))
-    toplevel && print(io, " on ", A)
+    toplevel && print(io, " as ", nonparametric_type(ArrayType))
+    toplevel && print(io, " on ", F.grid.architecture)
 end
 
 # SIZE

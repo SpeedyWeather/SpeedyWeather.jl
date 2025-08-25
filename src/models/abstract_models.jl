@@ -9,6 +9,21 @@ abstract type PrimitiveDry <: PrimitiveEquation end
 abstract type PrimitiveWet <: PrimitiveEquation end
 
 abstract type AbstractModelComponent end
+abstract type AbstractParameterization <: AbstractModelComponent end
+
+# any model component set to nothing needs no initialization or finalize!
+initialize!(::Nothing, ::AbstractModel) = nothing
+
+# allow for components that initialize variables to be nothing
+initialize!(p, d, ::Nothing, ::AbstractModel) = nothing
+# or sub parts of the prognostic variables; this makes land=nothing, ocean=nothing possible
+initialize!(psub, p, d, ::Nothing, ::AbstractModel) = nothing
+timestep!(p, d, ::Nothing, ::AbstractModel) = nothing
+finalize!(::Nothing, ::AbstractModel) = nothing
+
+# fallback for model components: nothing to initialize
+initialize!(::AbstractModelComponent, ::AbstractModel) = nothing
+finalize!(::AbstractModelComponent, ::AbstractModel) = nothing
 
 # print all fields with type <: Number
 function Base.show(io::IO, P::AbstractModelComponent)

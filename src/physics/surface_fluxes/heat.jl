@@ -28,11 +28,8 @@ end
 
 ## ----
 
-export NoSurfaceHeatFlux
-struct NoSurfaceHeatFlux <: AbstractSurfaceHeatFlux end
-NoSurfaceHeatFlux(::SpectralGrid) = NoSurfaceHeatFlux()
-initialize!(::NoSurfaceHeatFlux, ::PrimitiveEquation) = nothing
-surface_heat_flux!(::ColumnVariables, ::NoSurfaceHeatFlux, ::PrimitiveEquation) = nothing
+# no surface heat flux
+surface_heat_flux!(::ColumnVariables, ::Nothing, ::PrimitiveEquation) = nothing
 
 ## ----
 

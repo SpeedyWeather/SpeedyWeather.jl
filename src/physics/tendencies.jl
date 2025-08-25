@@ -32,7 +32,7 @@ function parameterization_tendencies!(
         perturb_parameterization_tendencies!(column, model)     # possibly perturb tendencies from parameterizations
 
         # write tendencies from parametrizations back into horizontal fields
-        write_column_tendencies!(diagn, column, model.planet, ij)
+        write_column_tendencies!(diagn, column, model, ij)
     end
 end
 

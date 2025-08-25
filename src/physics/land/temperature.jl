@@ -1,7 +1,7 @@
 abstract type AbstractLandTemperature <: AbstractParameterization end
 
 export SeasonalLandTemperature
-@kwdef struct SeasonalLandTemperature{NF, GridVariable3D} <: AbstractLandTemperature
+@kwdef mutable struct SeasonalLandTemperature{NF, GridVariable3D} <: AbstractLandTemperature
     "[OPTION] path to the folder containing the land temperature file, pkg path default"
     path::String = "SpeedyWeather.jl/input_data"
 
@@ -101,7 +101,7 @@ end
 
 ## CONSTANT LAND CLIMATOLOGY
 export ConstantLandTemperature
-@kwdef struct ConstantLandTemperature{NF} <: AbstractLandTemperature
+@kwdef mutable struct ConstantLandTemperature{NF} <: AbstractLandTemperature
     "[OPTION] Globally constant temperature"
     temperature::NF = 285
 
@@ -130,7 +130,7 @@ export LandBucketTemperature
 
 """MITgcm's two-layer soil model (https://mitgcm.readthedocs.io/en/latest/phys_pkgs/land.html). Fields assert
 $(TYPEDFIELDS)"""
-@kwdef struct LandBucketTemperature{NF} <: AbstractLandTemperature
+@kwdef mutable struct LandBucketTemperature{NF} <: AbstractLandTemperature
     "[OPTION] Initial soil temperature [K]"
     initial_temperature::NF = 285
 
@@ -173,9 +173,9 @@ function timestep!(
     # use separate land fluxes (not ocean)
     Rsd = diagn.physics.surface_shortwave_down          # before albedo reflection
     Rsu = diagn.physics.land.surface_shortwave_up       # only albedo reflection
-    Rld = diagn.physics.surface_longwave_down
+    Rld = diagn.physics.surface_longwave_down           # all in [W/m²]
     Rlu = diagn.physics.land.surface_longwave_up
-    Ev = diagn.physics.land.evaporative_flux
+    Ev = diagn.physics.land.surface_humidity_flux       # except this in [kg/s/m²]
     S = diagn.physics.land.sensible_heat_flux
 
     @boundscheck fields_match(soil_temperature, Rsd, Rsu, Rld, Rlu, Ev, S, horizontal_only=true) ||
@@ -191,21 +191,31 @@ function timestep!(
 
     Δ =  2λ/(z₁ + z₂)   # thermal diffusion operator [W/(m² K)]
 
-    @inbounds for ij in eachgridpoint(soil_moisture, soil_temperature)
-        if mask[ij] > 0                         # at least partially land
-            # total surface downward heat flux
-            F = Rsd[ij] - Rsu[ij] - Rlu[ij] + Rld[ij] - Lᵥ*Ev[ij] - S[ij]
+    launch!(architecture(soil_temperature), LinearWorkOrder, (size(soil_temperature, 1),),
+        land_bucket_temperature_kernel!, soil_temperature, mask, soil_moisture, Rsd, Rsu, Rlu, Rld, Ev, S,
+        Lᵥ, γ, Cw, Cs, z₁, z₂, Δ, Δt)
+    synchronize(architecture(soil_temperature))
+end
 
-            # heat capacity of the (wet) soil layers 1 and 2 [J/(m³ K)]
-            C₁ = Cw * soil_moisture[ij, 1] * γ + Cs
-            C₂ = Cw * soil_moisture[ij, 2] * γ + Cs
+@kernel inbounds=true function land_bucket_temperature_kernel!(
+    soil_temperature, mask, soil_moisture, Rsd, Rsu, Rlu, Rld, Ev, S,
+    @Const(Lᵥ), @Const(γ), @Const(Cw), @Const(Cs), @Const(z₁), @Const(z₂), @Const(Δ), @Const(Δt),
+)
+    ij = @index(Global, Linear)
 
-            # vertical diffusion term between layers
-            D = Δ*(soil_temperature[ij, 1] - soil_temperature[ij, 2])
+    if mask[ij] > 0                         # at least partially land
+        # total surface downward heat flux
+        F = Rsd[ij] - Rsu[ij] - Rlu[ij] + Rld[ij] - Lᵥ*Ev[ij] - S[ij]
 
-            # Equation in 8.5.2.2 of the MITgcm users guide (Land package)
-            soil_temperature[ij, 1] += Δt/(z₁*C₁)*(F - D)
-            soil_temperature[ij, 2] += Δt/(z₂*C₂)*D
-        end
+        # heat capacity of the (wet) soil layers 1 and 2 [J/(m³ K)]
+        C₁ = Cw * soil_moisture[ij, 1] * γ + Cs
+        C₂ = Cw * soil_moisture[ij, 2] * γ + Cs
+
+        # vertical diffusion term between layers
+        D = Δ*(soil_temperature[ij, 1] - soil_temperature[ij, 2])
+
+        # Equation in 8.5.2.2 of the MITgcm users guide (Land package)
+        soil_temperature[ij, 1] += Δt/(z₁*C₁)*(F - D)
+        soil_temperature[ij, 2] += Δt/(z₂*C₂)*D
     end
 end

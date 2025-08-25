@@ -111,7 +111,6 @@ function animate end
 # abstract types
 include("models/abstract_models.jl")
 include("dynamics/abstract_types.jl")
-include("physics/abstract_types.jl")
 
 # GEOMETRY CONSTANTS ETC
 include("dynamics/vertical_coordinates.jl")
@@ -161,7 +160,7 @@ include("physics/large_scale_condensation.jl")
 include("physics/surface_fluxes/surface_fluxes.jl")
 include("physics/surface_fluxes/momentum.jl")
 include("physics/surface_fluxes/heat.jl")
-include("physics/surface_fluxes/moisture.jl")
+include("physics/surface_fluxes/humidity.jl")
 include("physics/convection.jl")
 include("physics/zenith.jl")
 include("physics/optical_depth.jl")
@@ -171,6 +170,7 @@ include("physics/stochastic_physics.jl")
 
 # OCEAN AND LAND
 include("physics/ocean.jl")
+include("physics/sea_ice.jl")
 include("physics/land/land.jl")
 
 # OUTPUT

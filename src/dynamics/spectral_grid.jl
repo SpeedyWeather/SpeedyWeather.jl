@@ -119,13 +119,13 @@ function Base.show(io::IO, SG::SpectralGrid)
     s(x) = x > 1000 ? @sprintf("%i", x) : @sprintf("%.3g", x)
 
     println(io, "SpectralGrid{Spectrum{...}, $Grid{...}}")
-    println(io, "├ Spectral:   T$trunc LowerTriangularMatrix{Complex{$NF}}, radius = $radius m")
-    println(io, "├ Grid:       Field{$NF} on $nlat-ring $Grid, $npoints grid points")
-    println(io, "├ Resolution: $(s(average_resolution))km (average)")
+    println(io, "├ Spectral:     T$trunc LowerTriangularMatrix{Complex{$NF}}, radius = $radius m")
+    println(io, "├ Grid:         Field{$NF} on $nlat-ring $Grid, $npoints grid points")
+    println(io, "├ Resolution:   $(s(average_resolution))km (average)")
     nparticles > 0 &&
     println(io, "├ Particles:    $nparticles")
     println(io, "├ Vertical:     $nlayers-layer atmosphere, $nlayers_soil-layer land")
-    println(io, "└ Architecture: $architecture using $ArrayType")
+    print(io,   "└ Architecture: $architecture using $ArrayType")
 end
 
 # Constructor that takes all [OPTION] parameters as keyword arguments
@@ -228,3 +228,7 @@ function SpeedyTransforms.SpectralTransform(spectral_grid::SpectralGrid;
     spectrum = one_more_degree == false ? Spectrum(lmax-1, mmax; architecture) : spectrum
     return SpectralTransform(spectrum, grid; NF, ArrayType, nlayers, kwargs...)
 end
+
+# because model components can be `nothing`, their constructor being `Nothing()`
+# we also allow `::SpectralGrid` as the first argument
+Base.Nothing(::SpectralGrid) = Nothing()

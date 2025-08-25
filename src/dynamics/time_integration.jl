@@ -291,7 +291,7 @@ function timestep!(
 
     # PARTICLE ADVECTION (always skip 1st step of first_timesteps!)
     not_first_timestep = lf2 == 2
-    not_first_timestep && particle_advection!(progn, diagn, model.particle_advection)
+    not_first_timestep && particle_advection!(progn, diagn, model)
 
     return nothing 
 end
@@ -323,7 +323,7 @@ function timestep!(
     
     # PARTICLE ADVECTION (always skip 1st step of first_timesteps!)
     not_first_timestep = lf2 == 2
-    not_first_timestep && particle_advection!(progn, diagn, model.particle_advection)
+    not_first_timestep && particle_advection!(progn, diagn, model)
 
     return nothing
 end
@@ -350,6 +350,7 @@ function timestep!(
         # calculate all parameterizations
         parameterization_tendencies!(diagn, progn, time, model)
         ocean_timestep!(progn, diagn, model)    # sea surface temperature and maybe in the future sea ice
+        sea_ice_timestep!(progn, diagn, model)  # sea ice
         land_timestep!(progn, diagn, model)     # soil moisture and temperature, vegetation, maybe rivers
     end
 
@@ -369,7 +370,7 @@ function timestep!(
 
     # PARTICLE ADVECTION (always skip 1st step of first_timesteps!)
     not_first_timestep = lf2 == 2
-    not_first_timestep && particle_advection!(progn, diagn, model.particle_advection)
+    not_first_timestep && particle_advection!(progn, diagn, model)
 
     return nothing 
 end
