@@ -1,34 +1,10 @@
 abstract type AbstractSeaIce <: AbstractModelComponent end
 
-export NoSeaIce
-struct NoSeaIce <: AbstractSeaIce end
-NoSeaIce(::SpectralGrid) = NoSeaIce()
-initialize!(::NoSeaIce, ::AbstractModel) = nothing
-
-# set all concentration to zero
-function initialize!(
-    ocean::PrognosticVariablesOcean,
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
-    sea_ice_model::NoSeaIce,
-    model::PrimitiveEquation,
-)
-    ocean.sea_ice_concentration .= 0
-end
-
 # function barrier for all oceans
 function sea_ice_timestep!( progn::PrognosticVariables,
                             diagn::DiagnosticVariables,
                             model::PrimitiveEquation)
-    sea_ice_timestep!(progn, diagn, model.sea_ice, model)
-end
-
-# NoSeaIce does not do anything 
-function sea_ice_timestep!( progn::PrognosticVariables,
-                            diagn::DiagnosticVariables,
-                            sea_ice_model::NoSeaIce,
-                            model::PrimitiveEquation)
-    return nothing
+    timestep!(progn, diagn, model.sea_ice, model)
 end
 
 export ThermodynamicSeaIce
@@ -57,10 +33,10 @@ function initialize!(
     return nothing
 end
 
-function sea_ice_timestep!( progn::PrognosticVariables,
-                            diagn::DiagnosticVariables,
-                            sea_ice_model::ThermodynamicSeaIce,
-                            model::PrimitiveEquation)
+function timestep!( progn::PrognosticVariables,
+                    diagn::DiagnosticVariables,
+                    sea_ice_model::ThermodynamicSeaIce,
+                    model::PrimitiveEquation)
     
     sst = progn.ocean.sea_surface_temperature
     ℵ = progn.ocean.sea_ice_concentration   # sea ice concentration [0, 1] as \aleph yay!

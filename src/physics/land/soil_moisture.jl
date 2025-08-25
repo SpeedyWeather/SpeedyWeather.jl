@@ -1,28 +1,5 @@
 abstract type AbstractSoilMoisture <: AbstractParameterization end
 
-export NoSoilMoisture
-struct NoSoilMoisture <: AbstractSoilMoisture end
-NoSoilMoisture(SG::SpectralGrid) = NoSoilMoisture()
-initialize!(soil::NoSoilMoisture, model::PrimitiveEquation) = nothing
-
-function initialize!(
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
-    soil::NoSoilMoisture,
-    model::PrimitiveEquation,
-)
-    return nothing
-end
-
-function timestep!(
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
-    soil::NoSoilMoisture,
-    model::PrimitiveEquation,
-)
-    return nothing
-end
-
 export SeasonalSoilMoisture
 @kwdef mutable struct SeasonalSoilMoisture{NF, GridVariable4D} <: AbstractSoilMoisture
     # READ CLIMATOLOGY FROM FILE

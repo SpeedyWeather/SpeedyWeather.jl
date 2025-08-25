@@ -797,7 +797,7 @@ function SpeedyTransforms.transform!(
         tracer.active && transform!(diagn.grid.tracers_grid[name], tracer_var, scratch_memory, S)
     end
 
-    # transform random pattern for random process unless NoRandomProcess
+    # transform random pattern for random process unless random_process=nothing
     transform!(diagn, progn, lf, model.random_process, S)
 
     return nothing
@@ -846,7 +846,7 @@ function SpeedyTransforms.transform!(
         tracer.active && transform!(diagn.grid.tracers_grid[name], tracer_var, scratch_memory, S)
     end
 
-    # transform random pattern for random process unless NoRandomProcess
+    # transform random pattern for random process unless random_process=nothing
     transform!(diagn, progn, lf, model.random_process, S)
 
     return nothing
@@ -945,7 +945,7 @@ function SpeedyTransforms.transform!(
         tracer.active && transform!(diagn.grid.tracers_grid[name], tracer_var, scratch_memory, S)
     end
 
-    # transform random pattern for random process unless NoRandomProcess
+    # transform random pattern for random process unless random_process=nothing
     transform!(diagn, progn, lf, model.random_process, S)
 
     return nothing

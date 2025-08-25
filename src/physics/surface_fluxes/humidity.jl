@@ -28,11 +28,8 @@ end
 
 ## ----
 
-export NoSurfaceHumidityFlux
-struct NoSurfaceHumidityFlux <: AbstractSurfaceHumidityFlux end
-NoSurfaceHumidityFlux(::SpectralGrid) = NoSurfaceHumidityFlux()
-initialize!(::NoSurfaceHumidityFlux, ::PrimitiveWet) = nothing
-surface_humidity_flux!(::ColumnVariables, ::NoSurfaceHumidityFlux, ::PrimitiveWet) = nothing
+# no surface humidity flux
+surface_humidity_flux!(::ColumnVariables, ::Nothing, ::PrimitiveWet) = nothing
 
 ## ----
 

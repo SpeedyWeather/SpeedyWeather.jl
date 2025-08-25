@@ -1,10 +1,7 @@
 abstract type AbstractCondensation <: AbstractParameterization end
 
-export NoCondensation
-struct NoCondensation <: AbstractCondensation end
-NoCondensation(::SpectralGrid) = NoCondensation()
-initialize!(::NoCondensation, ::PrimitiveEquation) = nothing
-large_scale_condensation!(::ColumnVariables, ::NoCondensation, ::PrimitiveEquation) = nothing
+# no condensation
+large_scale_condensation!(::ColumnVariables, ::Nothing, ::PrimitiveEquation) = nothing
 
 export ImplicitCondensation
 """
@@ -45,7 +42,7 @@ function large_scale_condensation!(
     column::ColumnVariables,
     model::PrimitiveWet,
 )
-    #TODO not needed for NoCondensation
+    #TODO not needed for no condensation
     saturation_humidity!(column, model.clausius_clapeyron)
     large_scale_condensation!(column, model.large_scale_condensation, model)
 end

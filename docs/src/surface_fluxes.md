@@ -23,7 +23,7 @@ subtypes(SpeedyWeather.AbstractSurfaceWind)
 
 !!! note "Interdependence of surface flux computations"
     `SurfaceWind` computes the surface fluxes of momentum but also the computation
-    of the surface wind (which by default includes wind gusts) meaning that `NoSurfaceWind`
+    of the surface wind (which by default includes wind gusts) meaning that `surface_wind_speed=nothing`
     will also effectively disable other surface fluxes unless custom surface fluxes
     have been implemented that do not rely on `column.surface_wind_speed`.
 
