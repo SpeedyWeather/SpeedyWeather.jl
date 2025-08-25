@@ -208,7 +208,12 @@ function convection!(
         # I am not sure whether or not these belong here. They are needed in condensation, perhaps not here?
         humid_tend[k] += δq
         temp_tend[k] += δT
-        
+
+		(; gravity) = planet
+    	(; water_density) = atmosphere
+    	(; Δt_sec) = time_stepping
+    	pₛΔt_gρ = (pₛ * Δt_sec / gravity / water_density) * deep_convection # enfore no precip for shallow conv
+		
         # now test whether any snow has come into this layer as snow_flux and whether the current layer can melt it
         δT_melt = temp[k] - melting_threshold
         if snow_flux > 0 && δT_melt > 0 
@@ -226,11 +231,7 @@ function convection!(
         #column.snow_convection   += snow       # No longer do this here
     end
     column.snow_convection   = snow_flux       # do it here, as snow_flux holds the vertical integral [m]
-
-    (; gravity) = planet
-    (; water_density) = atmosphere
-    (; Δt_sec) = time_stepping
-    pₛΔt_gρ = (pₛ * Δt_sec / gravity / water_density) * deep_convection # enfore no precip for shallow conv 
+ 
     column.precip_convection *= pₛΔt_gρ                                 # convert to [m] of rain during Δt
     column.precip_rate_convection = column.precip_convection / Δt_sec   # rate: convert to [m/s] of rain
 
