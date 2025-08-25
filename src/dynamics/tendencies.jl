@@ -591,6 +591,8 @@ function vorticity_flux_curldiv!(
     v = diagn.grid.v_grid                               # velocity
     vor = diagn.grid.vor_grid                           # relative vorticity
     (; whichring) = u.grid                              # precomputed ring indices
+    scratch_memory = diagn.dynamics.scratch_memory      # scratch memory for transforms
+
     # Launch the kernel for vorticity flux calculation
     arch = S.architecture
 
@@ -603,8 +605,8 @@ function vorticity_flux_curldiv!(
     u_tend = diagn.dynamics.a
     v_tend = diagn.dynamics.b
 
-    transform!(u_tend, u_tend_grid, S)
-    transform!(v_tend, v_tend_grid, S)
+    transform!(u_tend, u_tend_grid, scratch_memory, S)
+    transform!(v_tend, v_tend_grid, scratch_memory, S)
 
     curl!(vor_tend, u_tend, v_tend, S; add)                 # ∂ζ/∂t = ∇×(u_tend, v_tend)
     div && divergence!(div_tend, u_tend, v_tend, S; add)    # ∂D/∂t = ∇⋅(u_tend, v_tend)
