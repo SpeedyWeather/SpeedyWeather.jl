@@ -130,7 +130,7 @@ function large_scale_condensation!(
             # effective latent heat L as weighted average from condensation/evaporation and melting (fusion)
             w1, w2 = abs(δq_cond_evap), abs(δq_melt)
             w12 = w1 + w2
-            L = w12 > 0 ? (Lᵥ * w1 + Lᵢ * w2) / (w1 + w2) : Lᵥ
+            L = w12 > 0 ? (Lᵥ*w1 + Lᵢ*w2) / w12 : Lᵥ
 
             # Solve for melting of snow, condensation, reevaporation (and possibly sublimation) implicitly in time
             # implicit correction, Frierson et al. 2006 eq. (21)
@@ -155,12 +155,12 @@ function large_scale_condensation!(
             snow_flux_down += snow              # accumulate into downward fluxes [m] (used in layer below)
 
             # latent heat release when freezing for enthalpy conservation
-            δT = -(snow > 0) * Lᵢ_cₚ * δq_rain  # snow for negative δq (condensation then freezing)
+            δT -= (snow > 0) * Lᵢ_cₚ * δq_rain  # snow for negative δq (condensation then freezing)
 
             # only accumulate into humid_tend now to allow humid_tend != 0 before this scheme is called
             humid_tend[k] += δq
             temp_tend[k] += δT
-        end   
+        end
     end
 
     # precipitation from rain/snow whatever is fluxed out 
