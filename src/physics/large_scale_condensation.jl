@@ -163,6 +163,10 @@ function large_scale_condensation!(
         end
     end
 
+    # avoid negative precipitation from rounding errors 
+    rain_flux_down = max(rain_flux_down, 0)
+    snow_flux_down = max(snow_flux_down, 0)
+
     # precipitation from rain/snow whatever is fluxed out 
     column.precip_large_scale = rain_flux_down      # vertical integral [m]
 	column.snow_large_scale   = snow_flux_down      # vertical integral [m]
