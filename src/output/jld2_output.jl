@@ -145,7 +145,7 @@ function finalize!(
     output::JLD2Output,
     simulation::AbstractSimulation,
 )   
-    if output.merge_output
+    if output.merge_output && output.output_counter > 0
         merge_output(output)
     else  
         close(output)
@@ -161,7 +161,7 @@ is a concern.
 """
 function merge_output(output::JLD2Output)
     (; output_counter, jld2_file, run_path, filename) = output
-
+        
     output_vector = Vector{typeof(jld2_file["1"])}(undef, output_counter)
 
     for i in 1:output_counter
