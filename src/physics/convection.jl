@@ -110,7 +110,14 @@ function convection!(
     Δσ = geometry.σ_levels_thick
     (; geopot, nlayers, temp, temp_virt, humid, temp_tend, humid_tend) = column
     pₛ = column.pres[end]
-    (; Lᵥ, Lᵢ, cₚ) = clausius_clapeyron
+
+    # thermodynamics
+    Lᵥ = clausius_clapeyron.latent_heat_condensation    # latent heat of vaporization
+    Lᵢ = clausius_clapeyron.latent_heat_fusion          # latent heat of fusion
+    cₚ = clausius_clapeyron.heat_capacity               # heat capacity
+    # Rᵥ = clausius_clapeyron.R_vapour                    # gas constant for water vapour
+
+    # (; Lᵥ, Lᵢ, cₚ) = clausius_clapeyron
     let_it_snow = SBM.snow              # flag to switch on/off rain -> snow conversion
     (; freezing_threshold, melting_threshold) = SBM        # threshold temperature below which it snows
 
@@ -201,31 +208,31 @@ function convection!(
 
         # convective precipiation, integrate dq\dt [(kg/kg)/s] vertically
         precip = max(δq * Δσ[k], zero(δq))      # only integrate excess humidity for precip (no reevaporation)
-        snow = zero(precip)                     # start with zero snow but potentially swap below
+        # snow = zero(precip)                     # start with zero snow but potentially swap below
 
-        # decide whether to turn precip into snow
-        precip, snow = let_it_snow && temp[k] < freezing_threshold ? (snow, precip) : (precip, snow)
-        snow_flux += snow # assign snow to the snow_flux local variable
-        # latent heat release for enthalpy conservation
-        L = snow > 0 ? (Lᵥ + Lᵢ) : Lᵥ
-        δT = -L / cₚ * δq
+        # # decide whether to turn precip into snow
+        # precip, snow = let_it_snow && temp[k] < freezing_threshold ? (snow, precip) : (precip, snow)
+        # snow_flux += snow # assign snow to the snow_flux local variable
+        # # latent heat release for enthalpy conservation
+        # L = snow > 0 ? (Lᵥ + Lᵢ) : Lᵥ
+        # δT = -L / cₚ * δq
 
-        # I am not sure whether or not these belong here. They are needed in condensation, perhaps not here?
-        humid_tend[k] += δq
-        temp_tend[k] += δT
+        # # I am not sure whether or not these belong here. They are needed in condensation, perhaps not here?
+        # humid_tend[k] += δq
+        # temp_tend[k] += δT
 		
-        # now test whether any snow has come into this layer as snow_flux and whether the current layer can melt it
-        δT_melt = temp[k] - melting_threshold
-        if snow_flux > 0 && δT_melt > 0 
-			E_avail = cₚ * δT_melt                            # J / kg (of air)
-			melt_depth = (E_avail / Lᵢ) * (Δσ[k] * pₛΔt_gρ)   # [m]
-			melt_amount = min(snow_flux, melt_depth)          # [m]
-			δq_melt = melt_amount / (Δσ[k] * pₛΔt_gρ)         # [kg/kg]
-			snow_flux    -= melt_amount                       # consistent units
-			precip       += melt_amount
-			δT_melt_actual = -(Lᵢ/cₚ) * δq_melt
-			temp_tend[k] += δT_melt_actual
-		end
+        # # now test whether any snow has come into this layer as snow_flux and whether the current layer can melt it
+        # δT_melt = temp[k] - melting_threshold
+        # if snow_flux > 0 && δT_melt > 0 
+		# 	E_avail = cₚ * δT_melt                            # J / kg (of air)
+		# 	melt_depth = (E_avail / Lᵢ) * (Δσ[k] * pₛΔt_gρ)   # [m]
+		# 	melt_amount = min(snow_flux, melt_depth)          # [m]
+		# 	δq_melt = melt_amount / (Δσ[k] * pₛΔt_gρ)         # [kg/kg]
+		# 	snow_flux    -= melt_amount                       # consistent units
+		# 	precip       += melt_amount
+		# 	δT_melt_actual = -(Lᵢ/cₚ) * δq_melt
+		# 	temp_tend[k] += δT_melt_actual
+		# end
         
         column.precip_convection += precip     # integrate vertically, Formula 25, unit [m]
         #column.snow_convection   += snow       # No longer do this here
@@ -235,10 +242,10 @@ function convection!(
 	column.precip_convection *= pₛΔt_gρ                                 # convert to [m] of rain during Δt
     column.precip_rate_convection = column.precip_convection / Δt_sec   # rate: convert to [m/s] of rain
 
-    # same for snow
-    #column.snow_convection *= pₛΔt_gρ                                   # convert to [m] of rain during Δt
-	column.snow_convection   = snow_flux       # do it here, as snow_flux holds the vertical integral [m]
-    column.snow_rate_convection = column.snow_convection / Δt_sec       # rate: convert to [m/s] of rain
+    # # same for snow
+    # #column.snow_convection *= pₛΔt_gρ                                   # convert to [m] of rain during Δt
+	# column.snow_convection   = snow_flux       # do it here, as snow_flux holds the vertical integral [m]
+    # column.snow_rate_convection = column.snow_convection / Δt_sec       # rate: convert to [m/s] of rain
 
     column.cloud_top = min(column.cloud_top, level_zero_buoyancy)       # clouds reach to top of convection
     return nothing
@@ -261,7 +268,13 @@ function pseudo_adiabat!(
     clausius_clapeyron::AbstractClausiusClapeyron,
 ) where NF
 
-    (; Lᵥ, R_dry, R_vapour, cₚ) = clausius_clapeyron
+    # thermodynamics
+    (; R_dry, R_vapour) = clausius_clapeyron
+    Lᵥ = clausius_clapeyron.latent_heat_condensation    # latent heat of vaporization
+    # Lᵢ = clausius_clapeyron.latent_heat_fusion          # latent heat of fusion
+    cₚ = clausius_clapeyron.heat_capacity               # heat capacity
+    # Rᵥ = clausius_clapeyron.R_vapour                    # gas constant for water vapour
+
     R_cₚ = R_dry/cₚ
     ε = clausius_clapeyron.mol_ratio
     μ = (1-ε)/ε                             # for virtual temperature

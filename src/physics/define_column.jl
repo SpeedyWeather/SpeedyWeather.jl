@@ -136,6 +136,8 @@ $(TYPEDFIELDS)"""
     const d::VectorType = zeros(NF, nlayers)
 end
 
+Base.eltype(::ColumnVariables{NF}) where NF = NF
+
 # generator based on spectral grid
 ColumnVariables(SG::SpectralGrid; kwargs...) = ColumnVariables{SG.NF, SG.VectorType, SG.MatrixType}(; nlayers=SG.nlayers, kwargs...)
 

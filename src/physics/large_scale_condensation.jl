@@ -124,11 +124,13 @@ function large_scale_condensation!(
             rain_evaporated = min(r, 1) * rain_flux_down        # [m], min(r, 1) to not evaporate more than available
             rain_flux_down -= rain_evaporated                   # remove reevaporated rain
             δq_evap = rain_evaporated / Δp_gρ                   # convert to humidity tendency over timestep [kg/kg]
-            δq = min(0, δq_cond) + δq_evap                      # sum with condensation and melting
+            δq_cond_evap = min(0, δq_cond) + δq_evap            # sum with condensation and evaporation
+            δq = δq_cond_evap + δq_melt
 
             # effective latent heat L as weighted average from condensation/evaporation and melting (fusion)
-            L = (Lᵥ * abs(δq) + Lᵢ * δq_melt) / (abs(δq) + δq_melt)
-            δq += δq_melt                                       # only add now to allow distinction in line above
+            w1, w2 = abs(δq_cond_evap), abs(δq_melt)
+            w12 = w1 + w2
+            L = w12 > 0 ? (Lᵥ * w1 + Lᵢ * w2) / (w1 + w2) : Lᵥ
 
             # Solve for melting of snow, condensation, reevaporation (and possibly sublimation) implicitly in time
             # implicit correction, Frierson et al. 2006 eq. (21)
@@ -143,8 +145,8 @@ function large_scale_condensation!(
             column.cloud_top = min(column.cloud_top, k)
 
             # 2. Precipitation (rain) due to large-scale condensation [kg/m²/s] /ρ for [m/s]
-            δq = min(0, δq)                     # precipitation only for negative humidity tendency
-            rain = ΔpΔt_gρ * -δq                # precipitation rain [m] on this layer k, Formula 4
+            δq_rain = min(0, δq)                # precipitation only for negative humidity tendency
+            rain = ΔpΔt_gρ * -δq_rain           # precipitation rain [m] on this layer k, Formula 4
             snow = zero(rain)                   # start with zero snow but potentially swap below
 
             # decide whether to turn precip into snow (all rain freezes to snow)
@@ -153,7 +155,7 @@ function large_scale_condensation!(
             snow_flux_down += snow              # accumulate into downward fluxes [m] (used in layer below)
 
             # latent heat release when freezing for enthalpy conservation
-            δT = -(snow > 0) * Lᵢ_cₚ * δq        # snow for negative δq (condensation then freezing)
+            δT = -(snow > 0) * Lᵢ_cₚ * δq_rain  # snow for negative δq (condensation then freezing)
 
             # only accumulate into humid_tend now to allow humid_tend != 0 before this scheme is called
             humid_tend[k] += δq
