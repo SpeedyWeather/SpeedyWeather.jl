@@ -123,11 +123,14 @@ end
 Base.close(output::JLD2Output) = close(output.jld2_file)
 
 function output!(output::JLD2Output, simulation::AbstractSimulation)
-    output.output_counter += 1      # output counter increases when writing time
-    i = output.output_counter
+    output.timestep_counter += 1
 
-    (; active, jld2_file, output_diagnostic, output_prognostic) = output 
-    active || return nothing    # escape immediately for no jld2 output
+    (; active, jld2_file, output_diagnostic, output_prognostic, output_every_n_steps, timestep_counter) = output 
+    active || return nothing                                        # escape immediately for no jld2 output
+    timestep_counter % output_every_n_steps == 0 || return nothing  # escape if output not written on this step
+    
+    output.output_counter += 1                                      # output counter increases when writing time
+    i = output.output_counter
 
     if output_diagnostic & output_prognostic
         jld2_file["$i"] = (simulation.prognostic_variables, simulation.diagnostic_variables)
