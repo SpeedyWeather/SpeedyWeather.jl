@@ -185,7 +185,7 @@ path(::CloudTopOutput, simulation) =
 PrecipitationOutput() = (
     ConvectivePrecipitationOutput(),
     LargeScalePrecipitationOutput(),
-    ConvectiveSnowOutput(),
+    # ConvectiveSnowOutput(),
     LargeScaleSnowOutput(),
     CloudTopOutput(),
 )
