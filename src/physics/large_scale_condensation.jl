@@ -91,6 +91,7 @@ function large_scale_condensation!(
     Lᵢ = clausius_clapeyron.latent_heat_fusion          # latent heat of fusion
     cₚ = clausius_clapeyron.heat_capacity               # heat capacity
     Rᵥ = clausius_clapeyron.R_vapour                    # gas constant for water vapour
+    Lᵥ_cₚ = Lᵥ / cₚ
     Lᵢ_cₚ = Lᵢ / cₚ
 
     (; time_scale, relative_humidity_threshold, freezing_threshold, melting_threshold) = condensation
@@ -118,26 +119,21 @@ function large_scale_condensation!(
             snow_flux_down -= melt_amount                   # move melted snow to rain
             rain_flux_down += melt_amount                   # this can evaporate now too
             δq_melt = melt_amount / Δp_gρ                   # convert back to humidity increase over timestep [kg/kg]
+            δT_melt = -Lᵢ_cₚ * δq_melt                      # just to calculate the latent heat required
 
             # 2. Reevaporation and condensation
             r = condensation.reevaporation * max(δq_cond, 0)    # reevaporation efficiency [1], scale linearly with dryness
             rain_evaporated = min(r, 1) * rain_flux_down        # [m], min(r, 1) to not evaporate more than available
             rain_flux_down -= rain_evaporated                   # remove reevaporated rain
             δq_evap = rain_evaporated / Δp_gρ                   # convert to humidity tendency over timestep [kg/kg]
-            δq_cond_evap = min(0, δq_cond) + δq_evap            # sum with condensation and evaporation
-            δq = δq_cond_evap + δq_melt
-
-            # effective latent heat L as weighted average from condensation/evaporation and melting (fusion)
-            w1, w2 = abs(δq_cond_evap), abs(δq_melt)
-            w12 = w1 + w2
-            L = w12 > 0 ? (Lᵥ*w1 + Lᵢ*w2) / w12 : Lᵥ
+            δq = min(0, δq_cond) + δq_evap                      # sum with condensation and evaporation
 
             # Solve for melting of snow, condensation, reevaporation (and possibly sublimation) implicitly in time
             # implicit correction, Frierson et al. 2006 eq. (21)
             # derivative of qsat wrt to temp, 1/cₚ included for fewer divisions
-            dqsat_dT = sat_humid[k] * relative_humidity_threshold * L/(cₚ*Rᵥ*temp[k]^2)
-            δq /= ((1 + L*dqsat_dT) * time_scale*Δt_sec)
-            δT = -L/cₚ * δq                     # latent heat release for enthalpy conservation
+            dqsat_dT = sat_humid[k] * relative_humidity_threshold * Lᵥ_cₚ/(Rᵥ*(temp[k]+δT_melt)^2)
+            δq /= ((1 + Lᵥ*dqsat_dT) * time_scale*Δt_sec)
+            δT -= Lᵥ_cₚ * δq                    # latent heat release for enthalpy conservation
 
             # If there is large-scale condensation at a level higher (i.e. smaller k) than
             # the cloud-top previously diagnosed due to convection, then increase the cloud-top

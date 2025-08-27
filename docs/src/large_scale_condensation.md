@@ -121,6 +121,94 @@ as follows
 ``r`` is a linear scale and therefore can be taken out of the gradient
 ``\frac{\partial q^\star}{\partial T}`` in the denominator.
 
+## Reevaporation
+
+Reevaporation is a process that requires to compute the downward rain water flux ``F_r``
+iteratively from the top layer to the bottom layer, we therefore start with ``F_r = 0``
+at the top of the atmosphere. We will use it in units of meters, that is the rainfall
+amount during one time step as it would be added to the accumulated precipitation.
+But you also may use ``kg/m^2/s`` the mass flux of rain water per second.
+Which would need to be divided by the water density ``\rho` to convert into a rain
+rate in ``m/s``, multiply with the time step ``\Delta t`` and you get meters again.
+
+When rainfall is created in one layer but falls through a drier (and often warmer) layer below
+then the rain water can reevaporate effectively causing a humidity flux into lower layers
+which however, at least partially, does not reach the ground. We parameterize this effect
+proportional to the difference of humidity ``q`` to saturation ``q^*``.
+
+```math
+F_{e, k} = \min(c\max(q^* - q, 0), 1) F_{r, k}
+F_{r, k+1} = F_{r, k} - F_{e, k}
+```
+
+So ``F_e`` is the evaporated rain in layer ``k`` as a fraction of ``F_r`` the rain water
+flux into layer ``k`` from above. ``c`` is a proportionality constant that effectively
+parameterizes the effectiveness of reevaporation. For ``c=0`` reevaporation is disabled,
+for ``c = 1/q^*`` (though ``c`` is a global constant) and ``q=0`` evaporation would be immediate,
+i.e. when the humidity in the layer is zero but ``c`` is chosen to be on the order of 
+one over the saturation humidity then all rain water would evaporate. We add a ``\min(..., 1)``
+to avoid evaporating more rain water than is available. We then convert ``F_e`` into
+a humidity tendency by division with ``\Delta p/(\Delta t g \rho)``, layer pressure thickness
+``\Delta p``, gravity ``g``, but this depends on the units you use for the rain water flux.
+Since reevaporation takes the same latent heat (though opposite sign) as condensation,
+this tendency has to be substracted from the large-scale condensation tendency but the
+implicit time stepping can be used as before if reevaporation is calculated before the
+latent heat release.
+
+The reevaportation in `ImplicitCondensation` is controlled by `reevaporation`,
+the proportionality constant ``c \leq 0`` here. 
+
+```@example lsc
+using SpeedyWeather
+spectral_grid = SpectralGrid()
+large_scale_condensation = ImplicitCondensation(spectral_grid, reevaporation=0)
+```
+
+would disable reevaporation ``reevaporation = 30`` instead would be roughly equivalent
+to immediate evaporation at 30˚C and zero ambient humidity near surface.
+
+## Snow fall
+
+We parameterize snow fall if large-scale condensation occurs below a freezing temperature ``T_f``,
+we currently use ``T_f = -10˚C`` but this may change in future versions, check `model.large_scale_condensation`
+for that. Freezing of rain water to snow occurs immediately, so we move the rain water flux
+to the snow flux ``F_s = F_r`` and set the ``F_r = 0`` afterwards, if temperature in that layer
+is below freezing ``T < T_f``. The latent heat release from freezing is then
+
+```math
+\delta T_f = -\frac{L_i}{c_p} \delta q_f
+```
+
+with latent heat of fusion ``L_i``. As ``L_i`` is an order of magnitude smaller than the latent heat
+of vaporization we add this temperature tendency explicitly in time. The minus sign is to denote
+that a negative humidity tendency due to freezing condensation (=snow) should release latent heat
+and therefore warm the air.
+
+Like rain water can reevaporate in the layer so can snow melt in the layer below and turn into rain again.
+Precipitation often occurs in layers high up in the atmosphere where water may be subject to freezing
+but if the atmopshere below is warm then there is enough energy available to melt the snow before it
+reaches the ground. We want to parameterize this effect (otherwise it can easily snow in the tropics).
+
+The available energy ``E_m`` for melting snow is proportional to the temperature of the air above
+a melt threshold ``T_m``
+
+```math
+E_m = c\_p max(T - T_m, 0)
+```
+
+We can convert this to a melt "depth", i.e. the amount of snow that this energy is able to melt
+in one time step. Note that with "depth" we in units of rain water height (or depth)
+in meters what we also use for the snow and rain water fluxes ``F_r, F_s``. So this is not
+the actual "depth" of snow as it would have on the ground but if melted to water.
+
+```math
+F_m = min(F_s, \frac{E_m}{L_i}\frac{\Delta t \Delta p}{g\rho})
+```
+
+We cap this to ``F_s`` so that one cannot melt more snow than there is. This snow melt flux
+is then subtracted from ``F_s`` but added to ``F_r`` to move snow water to rain water.
+The according latent heat from melting (TO BE CONTINUED)
+
 ## Large-scale precipitation
 
 The tendencies ``\delta q`` in units of  kg/kg/s are vertically
