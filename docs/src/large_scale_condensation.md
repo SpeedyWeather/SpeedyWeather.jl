@@ -1,15 +1,15 @@
 # Large-scale condensation
 
 Large-scale condensation in an atmospheric general circulation represents the
-micro-physical that kicks in when an air parcel reaches saturation.
+micro-physics that kicks in when an air parcel reaches saturation.
 Subsequently, the water vapour inside it condenses, forms droplets around
 condensation nuclei, which grow, become heavy and eventually fall out
 as precipitation. This process is never actually representable at the resolution
 of global (or even regional) atmospheric models as typical cloud droplets
 have a size of micrometers. Atmospheric models therefore rely on large-scale
 quantities such as specific humidity, pressure and temperature within a
-given grid cell, even though there might be considerably variability of
-these quantities within a grid cell if the resolution was higher.
+given grid cell, even though there might be considerable variability of
+these quantities within a grid cell if the resolution was higher. PLV-COMMENT I DO NOT UNDERSTAND THIS ABOUT RESOLUTION. At the limit of resolving updrafts, the environment would be decently represented. At low resolution, variability is poorly represented. This is where stochastic physics can help.
 
 ## Condensation implementations
 
