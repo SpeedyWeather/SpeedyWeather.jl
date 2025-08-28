@@ -5,7 +5,7 @@ large_scale_condensation!(::ColumnVariables, ::Nothing, ::PrimitiveEquation) = n
 
 export ImplicitCondensation
 """
-Large scale condensation as with implicit precipitation.
+Large-scale condensation with implicit time stepping.
 $(TYPEDFIELDS)"""
 @kwdef mutable struct ImplicitCondensation{NF<:AbstractFloat} <: AbstractCondensation
     "[OPTION] Relative humidity threshold [1 = 100%] to trigger condensation"
@@ -14,7 +14,7 @@ $(TYPEDFIELDS)"""
     "[OPTION] Reevaporation efficiency [1/(kg/kg)], 0 for no reevaporation"
     reevaporation::NF = 30
 
-    "[OPTION] Convert precipitation below freezing to snow?"
+    "[OPTION] Convert rain below freezing to snow?"
     snow::Bool = true
 
     "[OPTION] Freezing temperature for snow fall [K]"
@@ -171,11 +171,11 @@ function large_scale_condensation!(
     snow_flux_down = max(snow_flux_down, 0)
 
     # precipitation from rain/snow [m] during time step whatever is fluxed out 
-    column.precip_large_scale = Δt_sec*rain_flux_down
-	column.snow_large_scale   = Δt_sec*snow_flux_down
+    column.rain_large_scale = Δt_sec*rain_flux_down
+	column.snow_large_scale = Δt_sec*snow_flux_down
 
-    # convert to rain/snow fall rate [m/s]
-    column.precip_rate_large_scale = rain_flux_down
+    # and the rain/snow fall rate [m/s]
+    column.rain_rate_large_scale = rain_flux_down
     column.snow_rate_large_scale = snow_flux_down
 
     return nothing

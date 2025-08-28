@@ -213,7 +213,7 @@ using SpeedyWeather
 
 # components
 spectral_grid = SpectralGrid(trunc=31, nlayers=8)
-large_scale_condensation = ImplicitCondensation(spectral_grid)
+large_scale_condensation = ImplicitCondensation(spectral_grid, snow=false)
 convection = SimplifiedBettsMiller(spectral_grid)
 
 # create model, initialize, run
@@ -229,20 +229,23 @@ for convection (see [Simplified Betts-Miller](@ref BettsMiller)). These schemes
 have some additional parameters, we leave them as default for now, but you could
 do `ImplicitCondensation(spectral_grid, relative_humidity_threshold = 0.8)` to
 let it rain at 80% instead of 100% relative humidity. We now want to analyse
-the precipitation that comes from these parameterizations
+the precipitation that comes from these parameterizations.
+
+Note that the following only considers liquid precipitation for simplicity.
+We set `snow=false` in `ImplicitCondensation` and therefore deal with rain only.
 
 ```@example precipitation
 using CairoMakie
 
-(; precip_large_scale, precip_convection) = simulation.diagnostic_variables.physics
+(; rain_large_scale, rain_convection) = simulation.diagnostic_variables.physics
 m2mm = 1000     # convert from [m] to [mm]
-heatmap(m2mm*precip_large_scale, title="Large-scale precipiation [mm]: Accumulated over 10 days", colormap=:dense)
+heatmap(m2mm*rain_large_scale, title="Large-scale precipiation (rain) [mm]: Accumulated over 10 days", colormap=:dense)
 save("large-scale_precipitation_acc.png", ans) # hide
 nothing # hide
 ```
 ![Large-scale precipitation](large-scale_precipitation_acc.png)
 
-Precipitation (both large-scale and convective) are written into the
+Precipitation (rain, both large-scale and convective) are written into the
 `simulation.diagnostic_variables.physics` which, however, accumulate all precipitation
 during simulation. In the NetCDF output, precipitation rate (in mm/hr) is calculated
 from accumulated precipitation as a post-processing step.
@@ -251,15 +254,15 @@ to get the precipitation only in that period.
 
 ```@example precipitation
 # reset accumulators and simulate 6 hours
-simulation.diagnostic_variables.physics.precip_large_scale .= 0
-simulation.diagnostic_variables.physics.precip_convection .= 0
+simulation.diagnostic_variables.physics.rain_large_scale .= 0
+simulation.diagnostic_variables.physics.rain_convection .= 0
 run!(simulation, period=Hour(6))
 
-# visualise, precip_* arrays are flat copies, no need to read them out again!
+# visualise, rain_* arrays are flat copies, no need to read them out again!
 m2mm_hr = (1000*Hour(1)/Hour(6))    # convert from [m] to [mm/hr]
-heatmap(m2mm_hr*precip_large_scale, title="Large-scale precipiation [mm/hr]", colormap=:dense)
+heatmap(m2mm_hr_rain_large_scale, title="Large-scale precipiation (rain) [mm/hr]", colormap=:dense)
 save("large-scale_precipitation.png", ans) # hide
-heatmap(m2mm_hr*precip_convection, title="Convective precipiation [mm/hr]", colormap=:dense)
+heatmap(m2mm_hr*rain_convection, title="Convective precipiation (rain) [mm/hr]", colormap=:dense)
 save("convective_precipitation.png", ans) # hide
 nothing # hide
 ```

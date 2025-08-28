@@ -91,11 +91,11 @@ $(TYPEDFIELDS)"""
 
     # CONVECTION AND PRECIPITATION
     cloud_top::Int = nlayers+1              # layer index k of top-most layer with clouds
-    precip_convection::NF = 0               # precipitation due to convection [m]
-    precip_large_scale::NF = 0              # precipitation due to large-scale condensation [m]
-    precip_rate_convection::NF = 0          # precipitation rate due to convection [m/s]
-    precip_rate_large_scale::NF = 0         # precipitation rate due to large-scale condensation [m/s]
-    
+    rain_convection::NF = 0                 # rain due to convection [m]
+    rain_large_scale::NF = 0                # rain due to large-scale condensation [m]
+    rain_rate_convection::NF = 0            # rain rate due to convection [m/s]
+    rain_rate_large_scale::NF = 0           # rain rate due to large-scale condensation [m/s]
+
     # same for snow
     snow_convection::NF = 0                 # snow due to convection [m]
     snow_large_scale::NF = 0                # snow due to large-scale condensation [m]

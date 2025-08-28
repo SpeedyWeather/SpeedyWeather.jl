@@ -182,22 +182,21 @@ function convection!(
 	(; gravity) = planet
 	(; water_density) = atmosphere
 	(; Δt_sec) = time_stepping
-	pₛΔt_gρ = (pₛ * Δt_sec / gravity / water_density) # enfore no precip for shallow conv
-	
+
     # GET TENDENCIES FROM ADJUSTED PROFILES
     for k in level_zero_buoyancy:nlayers
         temp_tend[k] -= (temp[k] - temp_ref_profile[k]) / SBM.time_scale.value
         δq = (humid[k] - humid_ref_profile[k]) / SBM.time_scale.value
         humid_tend[k] -= δq
 
-        # convective precipiation, integrate dq\dt [(kg/kg)/s] vertically
-        precip = max(δq * Δσ[k], zero(δq))      # only integrate excess humidity for precip (no reevaporation)
-        column.precip_convection += precip     # integrate vertically, Formula 25, unit [m]
+        # convective precipitation (rain), integrate dq\dt [(kg/kg)/s] vertically
+        rain = max(δq * Δσ[k], zero(δq))        # only integrate excess humidity for precip (no reevaporation)
+        column.rain_convection += rain          # integrate vertically, Formula 25, unit [m]
     end
  
     pₛΔt_gρ = (pₛ * Δt_sec / gravity / water_density) * deep_convection # enfore no precip for shallow conv
-	column.precip_convection *= pₛΔt_gρ                                 # convert to [m] of rain during Δt
-    column.precip_rate_convection = column.precip_convection / Δt_sec   # rate: convert to [m/s] of rain
+	column.rain_convection *= pₛΔt_gρ                                   # convert to [m] of rain during Δt
+    column.rain_rate_convection = column.rain_convection / Δt_sec       # rate: convert to [m/s] of rain
 
     column.cloud_top = min(column.cloud_top, level_zero_buoyancy)       # clouds reach to top of convection
     return nothing

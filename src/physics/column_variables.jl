@@ -143,25 +143,17 @@ function write_column_tendencies!(
     end
 
     # accumulate precipitation [m]
-    diagn.physics.precip_large_scale[ij] += column.precip_large_scale
-    diagn.physics.precip_convection[ij] += column.precip_convection
-
-    # precipitation rate [m/s], instantaneous (i.e. overwrite, do not accumulate)
-    diagn.physics.precip_rate_large_scale[ij] = column.precip_rate_large_scale
-    diagn.physics.precip_rate_convection[ij] = column.precip_rate_convection
+    diagn.physics.rain_large_scale[ij] += column.rain_large_scale
+    diagn.physics.rain_convection[ij] += column.rain_convection
 
     # accumulate snow [m]
     diagn.physics.snow_large_scale[ij] += column.snow_large_scale
     diagn.physics.snow_convection[ij] += column.snow_convection
-
-    # precipitation rate [m/s], instantaneous (i.e. overwrite, do not accumulate)
-    diagn.physics.snow_rate_large_scale[ij] = column.snow_rate_large_scale
-    diagn.physics.snow_rate_convection[ij] = column.snow_rate_convection
     
     # total precipitation rate (rain+snow) [kg/m²/s]
     ρ = atmosphere.water_density
     diagn.physics.total_precipitation_rate[ij] =
-        (column.precip_rate_large_scale + column.precip_rate_convection +
+        (column.rain_rate_large_scale + column.rain_rate_convection +
          column.snow_rate_large_scale + column.snow_rate_convection) * ρ
 
     # Cloud top in height [m] from geopotential height divided by gravity, 0 for no clouds
@@ -233,10 +225,10 @@ function reset_column!(column::ColumnVariables{NF}) where NF
 
     # Convection and large-scale precipitation
     column.cloud_top = column.nlayers+1
-    column.precip_convection = 0            # set back to zero to accumulate in the vertical
-    column.precip_large_scale = 0
-    column.precip_rate_convection = 0       # instantaneously overwritten, but convection may escape early
-    column.precip_rate_large_scale = 0
+    column.rain_convection = 0              # set back to zero to accumulate in the vertical
+    column.rain_large_scale = 0
+    column.rain_rate_convection = 0         # instantaneously overwritten, but convection may escape early
+    column.rain_rate_large_scale = 0
     
     # same for snow
     column.snow_convection = 0              # set back to zero to accumulate in the vertical

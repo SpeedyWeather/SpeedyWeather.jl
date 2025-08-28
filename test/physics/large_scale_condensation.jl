@@ -9,23 +9,19 @@
                 simulation = initialize!(model)
                 run!(simulation, period=Day(5))
                 
-                precip = simulation.diagnostic_variables.physics.precip_large_scale
+                rain_fall = simulation.diagnostic_variables.physics.rain_large_scale
                 snow_fall = simulation.diagnostic_variables.physics.snow_large_scale
 
-                for ij in eachindex(precip)
-                    @test precip[ij] >= 0   # precipitation should always be non-negative
-                end
+                @test all(rain_fall .>= 0)      # precipitation should always be non-negative
             
                 if snow
-                    for ij in eachindex(snow_fall)
-                        @test snow_fall[ij] >= 0     # snow should always be non-negative
-                    end
 
-                    @test any(snow_fall .> 0)        # should have some snow
-                    @test any(snow_fall .== 0)       # should have some areas without snow
+                    @test all(snow_fall .>= 0)  # snow should always be non-negative
+                    @test any(snow_fall .> 0)   # should have some snow
+                    @test any(snow_fall .== 0)  # should have some areas without snow
 
                 else
-                    @test all(snow_fall .== 0)       # no snow should be produced
+                    @test all(snow_fall .== 0)  # no snow should be produced
                 end
             end
         end
