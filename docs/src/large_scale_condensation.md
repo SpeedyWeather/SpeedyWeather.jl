@@ -125,11 +125,11 @@ as follows
 
 Reevaporation is a process that requires to compute the downward rain water flux ``F_r``
 iteratively from the top layer to the bottom layer, we therefore start with ``F_r = 0``
-at the top of the atmosphere. We will use it in units of meters, that is the rainfall
-amount during one time step as it would be added to the accumulated precipitation.
+at the top of the atmosphere. We will use it in units of ``m/s``, that is the rainfall rate.
 But you also may use ``kg/m^2/s`` the mass flux of rain water per second.
-Which would need to be divided by the water density ``\rho` to convert into a rain
-rate in ``m/s``, multiply with the time step ``\Delta t`` and you get meters again.
+Which would need to be divided by the water density ``\rho`` to convert into a rain
+rate in ``m/s``, or then multiply with the time step ``\Delta t`` and to get
+a rainfall amount in meters.
 
 When rainfall is created in one layer but falls through a drier (and often warmer) layer below
 then the rain water can reevaporate effectively causing a humidity flux into lower layers
@@ -158,8 +158,7 @@ latent heat release.
 The reevaportation in `ImplicitCondensation` is controlled by `reevaporation`,
 the proportionality constant ``c \leq 0`` here. 
 
-```@example lsc
-using SpeedyWeather
+```@example condensation
 spectral_grid = SpectralGrid()
 large_scale_condensation = ImplicitCondensation(spectral_grid, reevaporation=0)
 ```
@@ -189,17 +188,17 @@ Precipitation often occurs in layers high up in the atmosphere where water may b
 but if the atmopshere below is warm then there is enough energy available to melt the snow before it
 reaches the ground. We want to parameterize this effect (otherwise it can easily snow in the tropics).
 
-The available energy ``E_m`` for melting snow is proportional to the temperature of the air above
-a melt threshold ``T_m``
+The available energy ``E_m`` in ``J/kg`` (of air) for melting snow is proportional to the temperature
+of the air above a melt threshold ``T_m``
 
 ```math
 E_m = c\_p max(T - T_m, 0)
 ```
 
-We can convert this to a melt "depth", i.e. the amount of snow that this energy is able to melt
-in one time step. Note that with "depth" we in units of rain water height (or depth)
-in meters what we also use for the snow and rain water fluxes ``F_r, F_s``. So this is not
-the actual "depth" of snow as it would have on the ground but if melted to water.
+We can convert this to a maximum melt rate, i.e. the amount of snow that this energy is able to melt
+in one time step. Note that for rate we use units of rain water height (or depth)
+in meters per second what we also use for the snow and rain water fluxes ``F_r, F_s``. So this is not
+the actual snow height as it would have on the ground but if melted to water.
 
 ```math
 F_m = min(F_s, \frac{E_m}{L_i}\frac{\Delta t \Delta p}{g\rho})
@@ -207,7 +206,17 @@ F_m = min(F_s, \frac{E_m}{L_i}\frac{\Delta t \Delta p}{g\rho})
 
 We cap this to ``F_s`` so that one cannot melt more snow than there is. This snow melt flux
 is then subtracted from ``F_s`` but added to ``F_r`` to move snow water to rain water.
-The according latent heat from melting (TO BE CONTINUED)
+The according latent heat required for melting is 
+
+```math
+\delta q_m = F_m \frac{\Delta t g \rho}{\Delta p}
+\delta T_m = - \frac{L_i}{c_p}\delta q_m
+```
+
+But note that we do not add ``\delta q_m`` to the humidity tendency as this is a
+phase transition from snow to rain water and so does not increase water vapour ``q``.
+We solely use this to calculate the rain water concentration in ``[kg/kg]`` from melting,
+and translate it to latent heat.
 
 ## Large-scale precipitation
 
