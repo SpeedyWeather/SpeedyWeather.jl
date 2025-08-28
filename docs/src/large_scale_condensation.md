@@ -160,7 +160,7 @@ implicit time stepping can be used as before if reevaporation is calculated befo
 latent heat release.
 
 The reevaportation in `ImplicitCondensation` is controlled by `reevaporation` (dimensionless),
-the proportionality constant ``c \leq 0`` here. 
+the proportionality constant ``c \geq 0`` here. 
 
 ```@example condensation
 spectral_grid = SpectralGrid()
