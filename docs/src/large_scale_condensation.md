@@ -121,7 +121,7 @@ as follows
 ``r`` is a linear scale and therefore can be taken out of the gradient
 ``\frac{\partial q^\star}{\partial T}`` in the denominator.
 
-## Reevaporation
+## Re-evaporation
 
 Reevaporation is a process that requires to compute the downward rain water flux ``F_r``
 iteratively from the top layer to the bottom layer, we therefore start with ``F_r = 0``
@@ -132,8 +132,7 @@ rate in ``m/s``, or then multiply with the time step ``\Delta t`` and to get
 a rainfall amount in meters.
 
 When rainfall is created in one layer but falls through a drier (and often warmer) layer below
-then the rain water can reevaporate effectively causing a humidity flux into lower layers
-which however, at least partially, does not reach the ground. We parameterize this effect
+then the rain water can re-evaporate, effectively causing a humidity flux into lower layers, and reducing the amount of rain that reaches the ground. We parameterize this effect
 proportional to the difference of humidity ``q`` to saturation ``q^*``.
 
 ```math
