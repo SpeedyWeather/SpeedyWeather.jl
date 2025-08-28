@@ -142,20 +142,21 @@ F_{r, k+1} = F_{r, k} - F_{e, k}
 ```
 
 So ``F_e`` is the evaporated rain in layer ``k`` as a fraction of ``F_r`` the rain water
-flux into layer ``k`` from above. ``c`` is a proportionality constant that effectively
-parameterizes the effectiveness of reevaporation. For ``c=0`` reevaporation is disabled,
-for ``c = 1/q^*`` (though ``c`` is a global constant) and ``q=0`` evaporation would be immediate,
-i.e. when the humidity in the layer is zero but ``c`` is chosen to be on the order of 
-one over the saturation humidity then all rain water would evaporate. We add a ``\min(..., 1)``
-to avoid evaporating more rain water than is available. We then convert ``F_e`` into
-a humidity tendency by division with ``\Delta p/(\Delta t g \rho)``, layer pressure thickness
-``\Delta p``, gravity ``g``, but this depends on the units you use for the rain water flux.
+flux into layer ``k`` from above (``k`` increases top to bottom). ``c`` is a proportionality
+constant that effectively parameterizes the effectiveness of reevaporation.
+For ``c=0`` reevaporation is disabled, for ``c = 1/q^*`` (though ``c`` is a global constant)
+and ``q=0`` evaporation would be immediate, i.e. when the humidity in the layer is zero
+but ``c`` is chosen to be on the order of  one over the saturation humidity then all
+rain water would evaporate. We add a ``\min(..., 1)`` to avoid evaporating more rain water
+than is available. We then convert ``F_e`` into a humidity tendency by division with
+``\Delta p/(\Delta t g \rho)``, layer pressure thickness ``\Delta p``, gravity ``g``,
+but this depends on the units you use for the rain water flux.
 Since reevaporation takes the same latent heat (though opposite sign) as condensation,
 this tendency has to be substracted from the large-scale condensation tendency but the
 implicit time stepping can be used as before if reevaporation is calculated before the
 latent heat release.
 
-The reevaportation in `ImplicitCondensation` is controlled by `reevaporation`,
+The reevaportation in `ImplicitCondensation` is controlled by `reevaporation` (dimensionless),
 the proportionality constant ``c \leq 0`` here. 
 
 ```@example condensation
@@ -163,7 +164,7 @@ spectral_grid = SpectralGrid()
 large_scale_condensation = ImplicitCondensation(spectral_grid, reevaporation=0)
 ```
 
-would disable reevaporation ``reevaporation = 30`` instead would be roughly equivalent
+would disable reevaporation `reevaporation = 30` instead would be roughly equivalent
 to immediate evaporation at 30˚C and zero ambient humidity near surface.
 
 ## Snow fall
@@ -181,7 +182,9 @@ is below freezing ``T < T_f``. The latent heat release from freezing is then
 with latent heat of fusion ``L_i``. As ``L_i`` is an order of magnitude smaller than the latent heat
 of vaporization we add this temperature tendency explicitly in time. The minus sign is to denote
 that a negative humidity tendency due to freezing condensation (=snow) should release latent heat
-and therefore warm the air.
+and therefore warm the air. ``\delta q_f`` is ``\min(0, \delta q)`` if the freezing condition is
+met (negative because condensation is a negative humidity tendency and to exclude a tendency
+that is dominated by reevaporation), ``\delta q_f = 0`` otherwise.
 
 Like rain water can reevaporate in the layer so can snow melt in the layer below and turn into rain again.
 Precipitation often occurs in layers high up in the atmosphere where water may be subject to freezing
@@ -201,7 +204,7 @@ in meters per second what we also use for the snow and rain water fluxes ``F_r, 
 the actual snow height as it would have on the ground but if melted to water.
 
 ```math
-F_m = min(F_s, \frac{E_m}{L_i}\frac{\Delta t \Delta p}{g\rho})
+F_m = min(F_s, \frac{E_m}{L_i}\frac{\Delta p}{\Delta t g\rho})
 ```
 
 We cap this to ``F_s`` so that one cannot melt more snow than there is. This snow melt flux
@@ -218,10 +221,24 @@ phase transition from snow to rain water and so does not increase water vapour `
 We solely use this to calculate the rain water concentration in ``[kg/kg]`` from melting,
 and translate it to latent heat.
 
+We calculate the melting of a downward snow flux before [Reevaporation](@ref).
+This is such that melting snow becomes rain water and is subject to reevaporation
+within one layer. This is effectively equivalent to allowing sublimation of snow
+to water vapour.
+
+Snow can be enabled/disabled with the `snow` keyword argument, and
+``T_f`` and ``T_m`` (both in Kelvin) can be passed on too, e.g.
+
+```@example condensation
+spectral_grid = SpectralGrid()
+large_scale_condensation = ImplicitCondensation(spectral_grid, snow=true, freezing_threshold=263)
+```
+
 ## Large-scale precipitation
 
-The tendencies ``\delta q`` in units of  kg/kg/s are vertically
-integrated (top to bottom, the direction of pressure ``p``) to diagnose the large-scale precipitation ``P`` in units of meters
+The tendencies ``\delta q`` in units of kg/kg/s are vertically
+integrated (top to bottom, the direction of pressure ``p``) to diagnose the
+large-scale precipitation ``P`` in units of meters
 
 ```math
 P = - \int_{top}^{bottom} \frac{\Delta t}{g \rho} \delta q dp 
@@ -234,9 +251,16 @@ is always negative due to the ``q > q^\star`` condition for saturation,
 hence ``P`` is positive only.
 It is then accumulated over several time steps, e.g. over the course of an
 hour to yield a typical rain rate of mm/h.
-The water density is taken as reference density of ``1000~kg/m^3``
+The water density is taken as reference density of ``1000~kg/m^3``.
 
-A schematic of the large scale precipitation parameterization is illustrated below:
+While the above equation to diagnose large-scale precipitation holds, this
+would include the total precipitation from both rain water and snow water
+(make sure _not_ to add ``\delta q_m`` the snow to rain melt rate).
+Given that we already compute the rain water and snow water fluxes ``F_r, F_s``
+throughout the column we can also use ``F_{r, N+1}, F_{s, N+1}`` the fluxes
+out of the last layer ``N`` and have ``P = \Delta t (F_{r, N+1} + F_{s, N+1})``.
+
+A schematic of the large-scale precipitation parameterization is illustrated below:
 
 ![image](https://github.com/user-attachments/assets/4422c0df-7a5d-40ba-9434-da6292bce489)
 
