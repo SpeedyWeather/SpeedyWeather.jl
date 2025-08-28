@@ -93,47 +93,54 @@ function large_scale_condensation!(
     Rᵥ = clausius_clapeyron.R_vapour                    # gas constant for water vapour
     Lᵥ_cₚ = Lᵥ / cₚ
     Lᵢ_cₚ = Lᵢ / cₚ
+    cₚ_Lᵢ = cₚ / Lᵢ
 
     (; time_scale, relative_humidity_threshold, freezing_threshold, melting_threshold) = condensation
     let_it_snow = condensation.snow                     # flag to switch snow on/off
     rain_flux_down = zero(eltype(column))               # start with zero rain/snow flux at top of atmosphere
-    snow_flux_down = zero(eltype(column))               # both have units of [m] (precipitation)
+    snow_flux_down = zero(eltype(column))               # both have units of [m/s] (precipitation)
 
     @inbounds for k in eachindex(column)
 
         # Condensation from humidity in this layer (for a negative humidity tendency)
+        # relative to threshold that can be <100%, e.g. 95%
         δq_cond = sat_humid[k] * relative_humidity_threshold - humid[k]
         
         # skip if no condensation has occurred yet in this layer or above
         if δq_cond < 0 || snow_flux_down > 0 || rain_flux_down > 0
 
-            # 0. convert between humidity tendency [kg/kg/s] and precipitation amount [m]
+            # 0. convert between humidity tendency [kg/kg/s] and precipitation amount [m] or rate [m/s]
             Δp_gρ = Δσ[k] * pₛ_gρ                           # pressure thickness of layer Δp times 1/g/ρ [m]
-            ΔpΔt_gρ = Δp_gρ*Δt_sec                          # pressure thickness of layer Δp times Δt/g/ρ [ms]
+            Δp_Δtgρ = Δp_gρ/Δt_sec                          # pressure thickness of layer Δp times 1/Δt/g/ρ [m/s]
+            Δtgρ_Δp = inv(Δp_Δtgρ)                          # [s/m]
 
             # 1. Melting of snow from layer above
             δT_melt = max(temp[k] - melting_threshold, 0)   # only if temperature above melting threshold
-            E_avail = cₚ * δT_melt                          # available Energy [J / kg (of air)] for melting
-            melt_depth = (E_avail / Lᵢ) * ΔpΔt_gρ           # "depth" of snow (in rainwater amount) [m] that can be melted
-            melt_amount = min(snow_flux_down, melt_depth)   # cap to snow flux amount [m], don't melt more than available
-            snow_flux_down -= melt_amount                   # move melted snow to rain
-            rain_flux_down += melt_amount                   # this can evaporate now too
-            δq_melt = melt_amount / Δp_gρ                   # convert back to humidity increase over timestep [kg/kg]
-            δT_melt = -Lᵢ_cₚ * δq_melt                      # just to calculate the latent heat required
+            E_avail = cₚ_Lᵢ * δT_melt                       # available energy [1] in multiples of latent heat [J/kg of air] for melting
+            melt_rate_max = E_avail * Δp_Δtgρ               # max rate of snow melt [m/s]
+            melt_rate = min(snow_flux_down, melt_rate_max)  # cap to snow flux [m/s], don't melt more than available
+            snow_flux_down -= melt_rate                     # move melted snow to rain
+            rain_flux_down += melt_rate                     # this can evaporate now too
+            δq_melt = melt_rate * Δtgρ_Δp                   # convert back to humidity increase over timestep [kg/kg]
+            δT = -Lᵢ_cₚ * δq_melt                           # just to calculate the latent heat required (explicit in time)
+                                                            # don't use δq_melt as humidity tendency as it's only snow->rain
 
             # 2. Reevaporation and condensation
-            r = condensation.reevaporation * max(δq_cond, 0)    # reevaporation efficiency [1], scale linearly with dryness
-            rain_evaporated = min(r, 1) * rain_flux_down        # [m], min(r, 1) to not evaporate more than available
-            rain_flux_down -= rain_evaporated                   # remove reevaporated rain
-            δq_evap = rain_evaporated / Δp_gρ                   # convert to humidity tendency over timestep [kg/kg]
-            δq = min(0, δq_cond) + δq_evap                      # sum with condensation and evaporation
+            dq = sat_humid[k] - humid[k]                    # reevaporation relative to 100% humidity
+            r = condensation.reevaporation * max(dq, 0)     # reevaporation efficiency [1], scale linearly with dryness
+            rain_evaporated = min(r, 1) * rain_flux_down    # [m/s], min(r, 1) to not evaporate more than available
+            rain_flux_down -= rain_evaporated               # remove reevaporated rain
+            δq_evap = rain_evaporated * Δtgρ_Δp             # convert to humidity tendency over timestep [kg/kg]
+            δq = min(0, δq_cond) + δq_evap                  # [kg/kg] sum with condensation (negative) and evaporation (positive)
+                                                            # division by timestep for tendency below
 
             # Solve for melting of snow, condensation, reevaporation (and possibly sublimation) implicitly in time
             # implicit correction, Frierson et al. 2006 eq. (21)
-            # derivative of qsat wrt to temp, 1/cₚ included for fewer divisions
-            dqsat_dT = sat_humid[k] * relative_humidity_threshold * Lᵥ_cₚ/(Rᵥ*(temp[k]+δT_melt)^2)
-            δq /= ((1 + Lᵥ*dqsat_dT) * time_scale*Δt_sec)
-            δT -= Lᵥ_cₚ * δq                    # latent heat release for enthalpy conservation
+            # derivative of qsat wrt to temp
+            T = temp[k] + Δt_sec*δT             # use temperature minus latent heat for melting in gradient
+            dqsat_dT = sat_humid[k] * relative_humidity_threshold * Lᵥ_cₚ/(Rᵥ*T^2)
+            δq /= ((1 + Lᵥ_cₚ*dqsat_dT) * time_scale*Δt_sec)
+            δT = -Lᵥ_cₚ * δq                    # latent heat release for enthalpy conservation
 
             # If there is large-scale condensation at a level higher (i.e. smaller k) than
             # the cloud-top previously diagnosed due to convection, then increase the cloud-top
@@ -142,20 +149,20 @@ function large_scale_condensation!(
 
             # 2. Precipitation (rain) due to large-scale condensation [kg/m²/s] /ρ for [m/s]
             δq_rain = min(0, δq)                # precipitation only for negative humidity tendency
-            rain = ΔpΔt_gρ * -δq_rain           # precipitation rain [m] on this layer k, Formula 4
+            rain = Δp_gρ * -δq_rain             # precipitation rain [m/s] on this layer k, Formula 4
             snow = zero(rain)                   # start with zero snow but potentially swap below
 
             # decide whether to turn precip into snow (all rain freezes to snow)
             rain, snow = let_it_snow && temp[k] < freezing_threshold ? (snow, rain) : (rain, snow)
-            rain_flux_down += rain              # accumulate into downward fluxes [m] (used in layer below)
-            snow_flux_down += snow              # accumulate into downward fluxes [m] (used in layer below)
+            rain_flux_down += rain              # accumulate into downward fluxes [m/s] (used in layer below)
+            snow_flux_down += snow              # accumulate into downward fluxes [m/s] (used in layer below)
 
             # latent heat release when freezing for enthalpy conservation
             δT -= (snow > 0) * Lᵢ_cₚ * δq_rain  # snow for negative δq (condensation then freezing)
 
             # only accumulate into humid_tend now to allow humid_tend != 0 before this scheme is called
-            humid_tend[k] += δq
-            temp_tend[k] += δT
+            humid_tend[k] += δq                 # [kg/kg/s]
+            temp_tend[k] += δT                  # [K/s]
         end
     end
 
@@ -163,13 +170,13 @@ function large_scale_condensation!(
     rain_flux_down = max(rain_flux_down, 0)
     snow_flux_down = max(snow_flux_down, 0)
 
-    # precipitation from rain/snow whatever is fluxed out 
-    column.precip_large_scale = rain_flux_down      # vertical integral [m]
-	column.snow_large_scale   = snow_flux_down      # vertical integral [m]
+    # precipitation from rain/snow [m] during time step whatever is fluxed out 
+    column.precip_large_scale = Δt_sec*rain_flux_down
+	column.snow_large_scale   = Δt_sec*snow_flux_down
 
     # convert to rain/snow fall rate [m/s]
-    column.precip_rate_large_scale = rain_flux_down / Δt_sec
-    column.snow_rate_large_scale = snow_flux_down / Δt_sec
+    column.precip_rate_large_scale = rain_flux_down
+    column.snow_rate_large_scale = snow_flux_down
 
     return nothing
 end

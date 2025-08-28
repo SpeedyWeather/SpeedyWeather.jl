@@ -25,7 +25,7 @@ $(TYPEDFIELDS)"""
     "Latent heat of freezing/sublimation of ice [J/kg]"
     latent_heat_sublimation::NF = 2.8e6
 
-    "Specific heat at constant pressure [J/K/kg]"
+    "Specific heat of air at constant pressure [J/K/kg]"
     heat_capacity::NF = 1004.64
 
     "Gas constant of water vapour [J/kg/K]"
