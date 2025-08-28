@@ -1,15 +1,17 @@
 # Large-scale condensation
 
 Large-scale condensation in an atmospheric general circulation represents the
-micro-physical that kicks in when an air parcel reaches saturation.
+micro-physics that kick in when an air parcel reaches saturation.
 Subsequently, the water vapour inside it condenses, forms droplets around
 condensation nuclei, which grow, become heavy and eventually fall out
 as precipitation. This process is never actually representable at the resolution
 of global (or even regional) atmospheric models as typical cloud droplets
 have a size of micrometers. Atmospheric models therefore rely on large-scale
 quantities such as specific humidity, pressure and temperature within a
-given grid cell, even though there might be considerably variability of
-these quantities within a grid cell if the resolution was higher.
+given grid cell, even though there might be considerable variability of
+these quantities within the area covered by that grid cell.
+Higher resolution would use more grid cells within the same area,
+resolving more variability that averaged out at lower resolution.
 
 ## Condensation implementations
 
@@ -137,8 +139,10 @@ which however, at least partially, does not reach the ground. We parameterize th
 proportional to the difference of humidity ``q`` to saturation ``q^*``.
 
 ```math
-F_{e, k} = \min(c\max(q^* - q, 0), 1) F_{r, k}
-F_{r, k+1} = F_{r, k} - F_{e, k}
+\begin{aligned}
+F_{e, k}   &= \min(c\max(q^* - q, 0), 1) F_{r, k} \\
+F_{r, k+1} &= F_{r, k} - F_{e, k}
+\end{aligned}
 ```
 
 So ``F_e`` is the evaporated rain in layer ``k`` as a fraction of ``F_r`` the rain water
@@ -195,7 +199,7 @@ The available energy ``E_m`` in ``J/kg`` (of air) for melting snow is proportion
 of the air above a melt threshold ``T_m``
 
 ```math
-E_m = c\_p max(T - T_m, 0)
+E_m = c_p \max(T - T_m, 0)
 ```
 
 We can convert this to a maximum melt rate, i.e. the amount of snow that this energy is able to melt
@@ -204,7 +208,7 @@ in meters per second what we also use for the snow and rain water fluxes ``F_r, 
 the actual snow height as it would have on the ground but if melted to water.
 
 ```math
-F_m = min(F_s, \frac{E_m}{L_i}\frac{\Delta p}{\Delta t g\rho})
+F_m = \min(F_s, \frac{E_m}{L_i}\frac{\Delta p}{\Delta t g\rho})
 ```
 
 We cap this to ``F_s`` so that one cannot melt more snow than there is. This snow melt flux
@@ -212,8 +216,10 @@ is then subtracted from ``F_s`` but added to ``F_r`` to move snow water to rain 
 The according latent heat required for melting is 
 
 ```math
-\delta q_m = F_m \frac{\Delta t g \rho}{\Delta p}
-\delta T_m = - \frac{L_i}{c_p}\delta q_m
+\begin{aligned}
+\delta q_m &= F_m \frac{\Delta t g \rho}{\Delta p} \\
+\delta T_m &= - \frac{L_i}{c_p}\delta q_m
+\end{aligned}
 ```
 
 But note that we do not add ``\delta q_m`` to the humidity tendency as this is a
