@@ -206,8 +206,8 @@ function timestep!(
     E = diagn.physics.land.surface_humidity_flux    # [kg/s/m²], divide by density for [m/s]
     R = diagn.physics.land.river_runoff             # diagnosed [m/s]
 
-    @boundscheck fields_match(soil_moisture, Pconv, Plsc, E, R, horizontal_only=true) ||
-        throw(DimensionMismatch(soil_moisture, Pconv))
+    @boundscheck fields_match(soil_moisture, P, E, R, horizontal_only=true) ||
+        throw(DimensionMismatch(soil_moisture, P))
     @boundscheck size(soil_moisture, 2) == 2 || throw(DimensionMismatch)
     f₁, f₂ = soil.f₁, soil.f₂
     p = soil.infiltration_fraction        # Infiltration fraction: fraction of top layer runoff put into lower layer

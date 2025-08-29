@@ -19,10 +19,10 @@ With minimal code redundancies it supports
 - Physics parameterizations for convection, precipitation, boundary layer, etc.
 - Various more or less realistic planets and what-if scenarios by easily modifying initial and boundary conditions
 - A slab ocean and thermodynamic sea ice model
-- A 2-layer land bucket model with soil temperature and moisture and vegetation
+- A 2-layer land bucket model with soil temperature, moisture and vegetation
 
 **Numerics and computing**
-- Different spatial grids (full and octahedral grids, Gaussian and Clenshaw-Curtis, HEALPix, OctaHEALPix)
+- Different spatial grids (full and octahedral, Gaussian and Clenshaw-Curtis, HEALPix, OctaHEALPix)
 - Different resolutions (T31 to T1023 and higher, i.e. 400km to 10km using linear, quadratic or cubic truncation)
 - Different arithmetics: Float32 (default), Float64, and (experimental) BFloat16, stochastic rounding
 - a very fast and flexible spherical harmonics transform library SpeedyTransforms
