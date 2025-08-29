@@ -202,13 +202,12 @@ function timestep!(
     ρ = model.atmosphere.water_density
     (; mask) = model.land_sea_mask
 
-    Pconv = diagn.physics.precip_rate_convection    # precipitation in [m/s]
-    Plsc = diagn.physics.precip_rate_large_scale
+    P = diagn.physics.total_precipitation_rate      # precipitation (rain+snow) in [m/s]
     E = diagn.physics.land.surface_humidity_flux    # [kg/s/m²], divide by density for [m/s]
     R = diagn.physics.land.river_runoff             # diagnosed [m/s]
 
-    @boundscheck fields_match(soil_moisture, Pconv, Plsc, E, R, horizontal_only=true) ||
-        throw(DimensionMismatch(soil_moisture, Pconv))
+    @boundscheck fields_match(soil_moisture, P, E, R, horizontal_only=true) ||
+        throw(DimensionMismatch(soil_moisture, P))
     @boundscheck size(soil_moisture, 2) == 2 || throw(DimensionMismatch)
     f₁, f₂ = soil.f₁, soil.f₂
     p = soil.infiltration_fraction        # Infiltration fraction: fraction of top layer runoff put into lower layer
@@ -217,21 +216,21 @@ function timestep!(
     Δt_f₁ = Δt/f₁
 
     launch!(architecture(soil_moisture), LinearWorkOrder, (size(soil_moisture, 1),),
-        land_bucket_soil_moisture_kernel!, soil_moisture, mask, Pconv, Plsc, E, R, ρ, Δt, f₁, Δt_f₁, f₁_f₂, p, τ⁻¹)
+        land_bucket_soil_moisture_kernel!, soil_moisture, mask, P, E, R, ρ, Δt, f₁, Δt_f₁, f₁_f₂, p, τ⁻¹)
     synchronize(architecture(soil_moisture))
 end
 
 @kernel inbounds=true function land_bucket_soil_moisture_kernel!(
-    soil_moisture, mask, Pconv, Plsc, E, R,
+    soil_moisture, mask, P, E, R,
     @Const(ρ), @Const(Δt), @Const(f₁), @Const(Δt_f₁), @Const(f₁_f₂), @Const(p), @Const(τ⁻¹),
 )
     ij = @index(Global, Linear)             # every grid point ij
 
     if mask[ij] > 0                         # at least partially land
-        # precipitation (convection + large-scale) minus evaporation (or condensation)
+        # precipitation (rain+snow, convection + large-scale) minus evaporation (or condensation)
         # river runoff only diagnostic, i.e. R=0 here but drain excess water below
         # convert to [m/s] by dividing by density
-        F = Pconv[ij] + Plsc[ij] - E[ij]/ρ  # - R[ij]
+        F = (P[ij] - E[ij])/ρ               # - R[ij]
   
         # vertical diffusion term between layers
         D = τ⁻¹*(soil_moisture[ij, 1] - soil_moisture[ij, 2])

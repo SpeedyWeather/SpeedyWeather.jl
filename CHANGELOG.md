@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Diagnose snow fall from large-scale condensation [#817](https://github.dev/SpeedyWeather/SpeedyWeather.jl/pull/817)
 - Fix output_dt for JLD2Output [#829](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/829)
 - Fix some missign scratch memory usage in the transforms [#828](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/828)
 - GitHub actions checkout v5 [#826](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/826)

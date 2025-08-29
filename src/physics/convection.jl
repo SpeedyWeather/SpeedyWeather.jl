@@ -37,14 +37,11 @@ export SimplifiedBettsMiller
 https://doi.org/10.1175/JAS3935.1. This implements the qref-formulation
 in their paper. Fields and options are
 $(TYPEDFIELDS)"""
-@kwdef struct SimplifiedBettsMiller{NF, SP} <: AbstractConvection
-    "number of vertical layers"
-    nlayers::Int
-
+@kwdef mutable struct SimplifiedBettsMiller{NF, SP} <: AbstractConvection
     "[OPTION] Relaxation time for profile adjustment"
     time_scale::Second = Hour(4)
 
-    "[OPTION] Relative humidity for reference profile"
+    "[OPTION] Relative humidity for reference profile [1]"
     relative_humidity::NF = 0.7
 
     "[OPTION] Surface perturbation of temp, humid to calculate the moist pseudo adiabat"
@@ -57,8 +54,7 @@ function SimplifiedBettsMiller(
     surface_temp_humid = NoSurfacePerturbation(),
     kwargs...)
     # type inference happens here as @kwdef only defines no/all types specified
-    return SimplifiedBettsMiller{SG.NF, typeof(surface_temp_humid)}(
-        nlayers=SG.nlayers; surface_temp_humid, kwargs...)
+    return SimplifiedBettsMiller{SG.NF, typeof(surface_temp_humid)}(; surface_temp_humid, kwargs...)
 end
 
 # nothing to initialize but maybe the surface temp/humid functor?
@@ -105,8 +101,11 @@ function convection!(
     Δσ = geometry.σ_levels_thick
     (; geopot, nlayers, temp, temp_virt, humid, temp_tend, humid_tend) = column
     pₛ = column.pres[end]
-    (; Lᵥ, cₚ) = clausius_clapeyron
-    
+
+    # thermodynamics
+    Lᵥ = clausius_clapeyron.latent_heat_condensation    # latent heat of vaporization
+    cₚ = clausius_clapeyron.heat_capacity               # heat capacity
+
     # use work arrays for temp_ref_profile, humid_ref_profile
     temp_ref_profile = column.a     # temperature [K] reference profile to adjust to
     humid_ref_profile = column.b    # specific humidity [kg/kg] profile to adjust to
@@ -180,22 +179,25 @@ function convection!(
         end
     end
 
+	(; gravity) = planet
+	(; water_density) = atmosphere
+	(; Δt_sec) = time_stepping
+
     # GET TENDENCIES FROM ADJUSTED PROFILES
     for k in level_zero_buoyancy:nlayers
         temp_tend[k] -= (temp[k] - temp_ref_profile[k]) / SBM.time_scale.value
         δq = (humid[k] - humid_ref_profile[k]) / SBM.time_scale.value
         humid_tend[k] -= δq
 
-        # convective precipiation, integrate dq\dt [(kg/kg)/s] vertically
-        column.precip_convection += δq * Δσ[k]
+        # convective precipitation (rain), integrate dq\dt [(kg/kg)/s] vertically
+        rain = max(δq * Δσ[k], zero(δq))        # only integrate excess humidity for precip (no reevaporation)
+        column.rain_convection += rain          # integrate vertically, Formula 25, unit [m]
     end
+ 
+    pₛΔt_gρ = (pₛ * Δt_sec / gravity / water_density) * deep_convection # enfore no precip for shallow conv
+	column.rain_convection *= pₛΔt_gρ                                   # convert to [m] of rain during Δt
+    column.rain_rate_convection = column.rain_convection / Δt_sec       # rate: convert to [m/s] of rain
 
-    (; gravity) = planet
-    (; water_density) = atmosphere
-    (; Δt_sec) = time_stepping
-    pₛΔt_gρ = (pₛ * Δt_sec / gravity / water_density) * deep_convection # enfore no precip for shallow conv 
-    column.precip_convection *= pₛΔt_gρ                                 # convert to [m] of rain during Δt
-    column.precip_rate_convection = column.precip_convection / Δt_sec   # rate: convert to [m/s] of rain
     column.cloud_top = min(column.cloud_top, level_zero_buoyancy)       # clouds reach to top of convection
     return nothing
 end
@@ -217,7 +219,11 @@ function pseudo_adiabat!(
     clausius_clapeyron::AbstractClausiusClapeyron,
 ) where NF
 
-    (; Lᵥ, R_dry, R_vapour, cₚ) = clausius_clapeyron
+    # thermodynamics
+    (; R_dry, R_vapour) = clausius_clapeyron
+    Lᵥ = clausius_clapeyron.latent_heat_condensation    # latent heat of vaporization
+    cₚ = clausius_clapeyron.heat_capacity               # heat capacity
+
     R_cₚ = R_dry/cₚ
     ε = clausius_clapeyron.mol_ratio
     μ = (1-ε)/ε                             # for virtual temperature
@@ -289,9 +295,6 @@ https://doi.org/10.1175/JAS3935.1 but with humidity set to zero.
 Fields and options are
 $(TYPEDFIELDS)"""
 @kwdef struct DryBettsMiller{NF, SP} <: AbstractConvection
-    "number of vertical layers/levels"
-    nlayers::Int
-
     "[OPTION] Relaxation time for profile adjustment"
     time_scale::Second = Hour(4)
 
@@ -305,7 +308,7 @@ function DryBettsMiller(
     surface_temp = NoSurfacePerturbation(),
     kwargs...)
     # infer type here as @kwdef only defines constructors for no/all types specified
-    return DryBettsMiller{SG.NF, typeof(surface_temp)}(nlayers=SG.nlayers; surface_temp, kwargs...)
+    return DryBettsMiller{SG.NF, typeof(surface_temp)}(; surface_temp, kwargs...)
 end
 
 # nothing to initialize but maybe the surface temp functor?
