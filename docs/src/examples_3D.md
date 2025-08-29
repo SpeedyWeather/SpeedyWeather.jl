@@ -260,7 +260,7 @@ run!(simulation, period=Hour(6))
 
 # visualise, rain_* arrays are flat copies, no need to read them out again!
 m2mm_hr = (1000*Hour(1)/Hour(6))    # convert from [m] to [mm/hr]
-heatmap(m2mm_hr_rain_large_scale, title="Large-scale precipiation (rain) [mm/hr]", colormap=:dense)
+heatmap(m2mm_hr*rain_large_scale, title="Large-scale precipiation (rain) [mm/hr]", colormap=:dense)
 save("large-scale_precipitation.png", ans) # hide
 heatmap(m2mm_hr*rain_convection, title="Convective precipiation (rain) [mm/hr]", colormap=:dense)
 save("convective_precipitation.png", ans) # hide
