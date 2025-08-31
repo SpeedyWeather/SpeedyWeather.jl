@@ -1,15 +1,17 @@
 # Large-scale condensation
 
 Large-scale condensation in an atmospheric general circulation represents the
-micro-physical that kicks in when an air parcel reaches saturation.
+micro-physics that kick in when an air parcel reaches saturation.
 Subsequently, the water vapour inside it condenses, forms droplets around
 condensation nuclei, which grow, become heavy and eventually fall out
 as precipitation. This process is never actually representable at the resolution
 of global (or even regional) atmospheric models as typical cloud droplets
 have a size of micrometers. Atmospheric models therefore rely on large-scale
 quantities such as specific humidity, pressure and temperature within a
-given grid cell, even though there might be considerably variability of
-these quantities within a grid cell if the resolution was higher.
+given grid cell, even though there might be considerable variability of
+these quantities within the area covered by that grid cell.
+Higher resolution would use more grid cells within the same area,
+resolving more variability that averaged out at lower resolution.
 
 ## Condensation implementations
 
@@ -121,10 +123,127 @@ as follows
 ``r`` is a linear scale and therefore can be taken out of the gradient
 ``\frac{\partial q^\star}{\partial T}`` in the denominator.
 
+## Re-evaporation
+
+Reevaporation is a process that requires to compute the downward rain water flux ``F_r``
+iteratively from the top layer to the bottom layer, we therefore start with ``F_r = 0``
+at the top of the atmosphere. We will use it in units of ``m/s``, that is the rainfall rate.
+But you also may use ``kg/m^2/s`` the mass flux of rain water per second.
+Which would need to be divided by the water density ``\rho`` to convert into a rain
+rate in ``m/s``, or then multiply with the time step ``\Delta t`` and to get
+a rainfall amount in meters.
+
+When rainfall is created in one layer but falls through a drier (and often warmer) layer below
+then the rain water can re-evaporate, effectively causing a humidity flux into lower layers, and reducing the amount of rain that reaches the ground. We parameterize this effect
+proportional to the difference of humidity ``q`` to saturation ``q^*``.
+
+```math
+\begin{aligned}
+F_{e, k}   &= \min(c\max(q^* - q, 0), 1) F_{r, k} \\
+F_{r, k+1} &= F_{r, k} - F_{e, k}
+\end{aligned}
+```
+
+So ``F_e`` is the evaporated rain in layer ``k`` as a fraction of ``F_r`` the rain water
+flux into layer ``k`` from above (``k`` increases top to bottom). ``c`` is a proportionality
+constant that effectively parameterizes the effectiveness of reevaporation.
+For ``c=0`` reevaporation is disabled, for ``c = 1/q^*`` (though ``c`` is a global constant)
+and ``q=0`` evaporation would be immediate, i.e. when the humidity in the layer is zero
+but ``c`` is chosen to be on the order of  one over the saturation humidity then all
+rain water would evaporate. We add a ``\min(..., 1)`` to avoid evaporating more rain water
+than is available. We then convert ``F_e`` into a humidity tendency by division with
+``\Delta p/(\Delta t g \rho)``, layer pressure thickness ``\Delta p``, gravity ``g``,
+but this depends on the units you use for the rain water flux.
+Since reevaporation takes the same latent heat (though opposite sign) as condensation,
+this tendency has to be substracted from the large-scale condensation tendency but the
+implicit time stepping can be used as before if reevaporation is calculated before the
+latent heat release.
+
+The reevaportation in `ImplicitCondensation` is controlled by `reevaporation` (dimensionless),
+the proportionality constant ``c \geq 0`` here. 
+
+```@example condensation
+spectral_grid = SpectralGrid()
+large_scale_condensation = ImplicitCondensation(spectral_grid, reevaporation=0)
+```
+
+would disable reevaporation `reevaporation = 30` instead would be roughly equivalent
+to immediate evaporation at 30˚C and zero ambient humidity near surface.
+
+## Snow fall
+
+We parameterize snow fall if large-scale condensation occurs below a freezing temperature ``T_f``,
+we currently use ``T_f = -10˚C`` but this may change in future versions, check `model.large_scale_condensation`
+for that. Freezing of rain water to snow occurs immediately, so we move the rain water flux
+to the snow flux ``F_s = F_r`` and set the ``F_r = 0`` afterwards, if temperature in that layer
+is below freezing ``T < T_f``. The latent heat release from freezing is then
+
+```math
+\delta T_f = -\frac{L_i}{c_p} \delta q_f
+```
+
+with latent heat of fusion ``L_i``. As ``L_i`` is an order of magnitude smaller than the latent heat
+of vaporization we add this temperature tendency explicitly in time. The minus sign is to denote
+that a negative humidity tendency due to freezing condensation (=snow) should release latent heat
+and therefore warm the air. ``\delta q_f`` is ``\min(0, \delta q)`` if the freezing condition is
+met (negative because condensation is a negative humidity tendency and to exclude a tendency
+that is dominated by reevaporation), ``\delta q_f = 0`` otherwise.
+
+Like rain water can reevaporate in the layer so can snow melt in the layer below and turn into rain again.
+Precipitation often occurs in layers high up in the atmosphere where water may be subject to freezing
+but if the atmopshere below is warm then there is enough energy available to melt the snow before it
+reaches the ground. We want to parameterize this effect (otherwise it can easily snow in the tropics).
+
+The available energy ``E_m`` in ``J/kg`` (of air) for melting snow is proportional to the temperature
+of the air above a melt threshold ``T_m``
+
+```math
+E_m = c_p \max(T - T_m, 0)
+```
+
+We can convert this to a maximum melt rate, i.e. the amount of snow that this energy is able to melt
+in one time step. Note that for rate we use units of rain water height (or depth)
+in meters per second what we also use for the snow and rain water fluxes ``F_r, F_s``. So this is not
+the actual snow height as it would have on the ground but if melted to water.
+
+```math
+F_m = \min(F_s, \frac{E_m}{L_i}\frac{\Delta p}{\Delta t g\rho})
+```
+
+We cap this to ``F_s`` so that one cannot melt more snow than there is. This snow melt flux
+is then subtracted from ``F_s`` but added to ``F_r`` to move snow water to rain water.
+The according latent heat required for melting is 
+
+```math
+\begin{aligned}
+\delta q_m &= F_m \frac{\Delta t g \rho}{\Delta p} \\
+\delta T_m &= - \frac{L_i}{c_p}\delta q_m
+\end{aligned}
+```
+
+But note that we do not add ``\delta q_m`` to the humidity tendency as this is a
+phase transition from snow to rain water and so does not increase water vapour ``q``.
+We solely use this to calculate the rain water concentration in ``[kg/kg]`` from melting,
+and translate it to latent heat.
+
+We calculate the melting of a downward snow flux before [Re-evaporation](@ref).
+This is such that melting snow becomes rain water and is subject to reevaporation
+within one layer. This is effectively equivalent to allowing sublimation of snow
+to water vapour.
+
+Snow can be enabled/disabled with the `snow` keyword argument, and
+``T_f`` and ``T_m`` (both in Kelvin) can be passed on too, e.g.
+
+```@example condensation
+spectral_grid = SpectralGrid()
+large_scale_condensation = ImplicitCondensation(spectral_grid, snow=true, freezing_threshold=263)
+```
+
 ## Large-scale precipitation
 
-The tendencies ``\delta q`` in units of  kg/kg/s are vertically
-integrated (top to bottom, the direction of pressure ``p``) to diagnose the large-scale precipitation ``P`` in units of meters
+The tendencies ``\delta q`` in units of kg/kg/s are vertically
+integrated (top to bottom, the direction of pressure ``p``) to diagnose the
+large-scale precipitation ``P`` in units of meters
 
 ```math
 P = - \int_{top}^{bottom} \frac{\Delta t}{g \rho} \delta q dp 
@@ -137,9 +256,16 @@ is always negative due to the ``q > q^\star`` condition for saturation,
 hence ``P`` is positive only.
 It is then accumulated over several time steps, e.g. over the course of an
 hour to yield a typical rain rate of mm/h.
-The water density is taken as reference density of ``1000~kg/m^3``
+The water density is taken as reference density of ``1000~kg/m^3``.
 
-A schematic of the large scale precipitation parameterization is illustrated below:
+While the above equation to diagnose large-scale precipitation holds, this
+would include the total precipitation from both rain water and snow water
+(make sure _not_ to add ``\delta q_m`` the snow to rain melt rate).
+Given that we already compute the rain water and snow water fluxes ``F_r, F_s``
+throughout the column we can also use ``F_{r, N+1}, F_{s, N+1}`` the fluxes
+out of the last layer ``N`` and have ``P = \Delta t (F_{r, N+1} + F_{s, N+1})``.
+
+A schematic of the large-scale precipitation parameterization is illustrated below:
 
 ![image](https://github.com/user-attachments/assets/4422c0df-7a5d-40ba-9434-da6292bce489)
 

@@ -33,14 +33,14 @@ include("rivers.jl")
 
 # LandModel defined through its components
 export LandModel
-@kwdef struct LandModel{G, TD, T, SM, V, R} <: AbstractWetLand
+@kwdef mutable struct LandModel{G, TD, T, SM, V, R} <: AbstractWetLand
     spectral_grid::SpectralGrid
     geometry::G = LandGeometry(spectral_grid)
     thermodynamics::TD = LandThermodynamics(spectral_grid)
     temperature::T = LandBucketTemperature(spectral_grid)
     soil_moisture::SM = LandBucketMoisture(spectral_grid)
     vegetation::V = VegetationClimatology(spectral_grid)
-    rivers::R = NoRivers(spectral_grid)
+    rivers::R = nothing
 end
 
 # also allow spectral grid to be passed on as first an only positional argument to model constructors
@@ -71,10 +71,11 @@ function initialize!(land::DryLandModel, model::PrimitiveEquation)
     initialize!(model.land.temperature, model)
 end
 
+# unpack land model and call general timestep! function
 land_timestep!(progn::PrognosticVariables, diagn::DiagnosticVariables, model::PrimitiveEquation) =
-    land_timestep!(progn, diagn, model.land, model)
+    timestep!(progn, diagn, model.land, model)
 
-function land_timestep!(
+function timestep!(
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
     land::AbstractLand,
@@ -95,12 +96,23 @@ function initialize!(
     diagn::DiagnosticVariables,
     model::PrimitiveEquation,
 )
-    initialize!(progn, diagn, model.land.temperature, model)
+    # unpack model.land to dispatch over it and so that model.land = nothing is valid
+    initialize!(land, progn, diagn, model.land, model)
+end
+
+function initialize!(
+    land::PrognosticVariablesLand,  # for dispatch
+    progn::PrognosticVariables,
+    diagn::DiagnosticVariables,
+    land_model::AbstractLand,
+    model::PrimitiveEquation,
+)
+    initialize!(progn, diagn, land_model.temperature, model)
 
     # only initialize soil moisture, vegetation, rivers if atmosphere and land are wet
-    if model isa PrimitiveWet && model.land isa AbstractWetLand
-        initialize!(progn, diagn, model.land.soil_moisture, model)      
-        initialize!(progn, diagn, model.land.vegetation, model)     
-        initialize!(progn, diagn, model.land.rivers, model)
+    if model isa PrimitiveWet && land_model isa AbstractWetLand
+        initialize!(progn, diagn, land_model.soil_moisture, model)      
+        initialize!(progn, diagn, land_model.vegetation, model)     
+        initialize!(progn, diagn, land_model.rivers, model)
     end
 end

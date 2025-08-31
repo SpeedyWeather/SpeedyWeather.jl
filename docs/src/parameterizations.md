@@ -133,7 +133,7 @@ and [PrimitiveWetModel](@ref)
 - `model.surface_thermodynamics`
 - `model.surface_wind`
 - `model.surface_heat_flux`
-- `model.surface_evaporation` (`PrimitiveWetModel` only)
+- `model.surface_humidity_flux` (`PrimitiveWetModel` only)
 
 Note that the parameterizations are executed in the order of the list
 above. That way, for example, radiation can depend on calculations in
@@ -155,7 +155,7 @@ in the [Surface fluxes](@ref).
 ## Custom temperature relaxation
 
 By default, there is no temperature relaxation in the primitive equation
-models (i.e. `temperature_relaxation = NoTemperatureRelaxation()`).
+models (i.e. `temperature_relaxation = nothing`).
 This parameterization exists for the [Held-Suarez forcing](@ref).
 
 - subtype `CustomTemperatureRelaxation <: AbstractTemperatureRelaxation`
@@ -240,14 +240,14 @@ are called one after another
 - define `surface_heat_flux!(::ColumnVariables, ::CustomSurfaceHeatFlux, ::PrimitiveEquation)`
 - expected to accumulate (`+=`) into `column.flux_temp_upward`
 
-4. Surface evaporation
-- subtype `CustomSurfaceEvaporation <: AbstractSurfaceEvaporation`
-- define `initialize!(::CustomSurfaceEvaporation, ::PrimitiveEquation)`
-- define `surface_evaporation!(::ColumnVariables, ::CustomSurfaceEvaporation, ::PrimitiveEquation)`
+4. Surface humidity flux
+- subtype `CustomSurfaceHumidityFlux <: AbstractSurfaceHumidityFlux`
+- define `initialize!(::CustomSurfaceHumidityFlux, ::PrimitiveEquation)`
+- define `surface_humidity_flux!(::ColumnVariables, ::CustomSurfaceHumidityFlux, ::PrimitiveEquation)`
 - expected to accumulate (`+=`) into `column.flux_humid_upward`
 
 You can customize individual components and leave the other ones as default
-or by setting them to `NoSurfaceWind`, `NoSurfaceHeatFlux`, `NoSurfaceEvaporation`,
-but note that without the surface wind the heat and evaporative fluxes
+or by setting them to `nothing`
+but note that without the surface wind the heat and humidity fluxes
 are also effectively disabled as they scale with the `column.surface_wind_speed`
 set by default with the `surface_wind_stress!` in (2.) above.

@@ -14,8 +14,8 @@
         @test column.cloud_top === column.nlayers+1
 
         # Large-scale condensation
-        @test column.precip_large_scale === zero(NF)
-        @test column.precip_convection === zero(NF)
+        @test column.rain_large_scale === zero(NF)
+        @test column.rain_convection === zero(NF)
     end
 end
 
@@ -39,7 +39,7 @@ end
         column.humid_tend .= humid_tend
 
         # copy into diagn
-        SpeedyWeather.write_column_tendencies!(diagn, column, model.planet, 1)
+        SpeedyWeather.write_column_tendencies!(diagn, column, model, 1)
 
         # and check that that worked
         for k in eachlayer(diagn.tendencies.humid_tend_grid)

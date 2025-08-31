@@ -17,5 +17,5 @@ AllOutputVariables() = (
     RandomPatternOutput(),
     SurfaceFluxesOutput()...,
     LandOutput()...,
-    SeaSurfaceTemperatureOutput(),
+    OceanOutput()...,
 )

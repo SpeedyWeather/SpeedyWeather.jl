@@ -77,6 +77,9 @@ $(TYPEDFIELDS)"""
     "Grid the land-sea mask file comes on"
     file_Grid::Type{<:AbstractGrid} = FullClenshawGrid
 
+    "[OPTION] Quantization to fraction?"
+    quantization::Float64 = 0.01
+
     # FIELDS (to be initialized in initialize!)
     "Land-sea mask [1] on grid-point space. Land=1, sea=0, land-area fraction in between."
     mask::GridVariable2D
@@ -129,6 +132,11 @@ function initialize!(land_sea_mask::EarthLandSeaMask, model::PrimitiveEquation)
         temp_mask = on_architecture(CPU(), land_sea_mask.mask)
         RingGrids.grid_cell_average!(temp_mask, lsm_highres)
         land_sea_mask.mask .= on_architecture(model.spectral_grid.architecture, temp_mask)
+    end
+
+    if land_sea_mask.quantization > 0
+        q = land_sea_mask.quantization
+        land_sea_mask.mask .= round.(land_sea_mask.mask ./ q) .* q
     end
 
     # TODO this shouldn't be necessary, but at the moment grid_cell_average! can return values > 1

@@ -99,13 +99,13 @@ function _legendre!(
         lon_offsets,
         kjm_indices;
     )
-
-    synchronize(S.architecture)
     
     # unscale by cosine of latitude on the fly if requested
     if unscale_coslat
         unscale_coslat!(g_north, g_south, coslat⁻¹, architecture=S.architecture)
     end
+
+    synchronize(S.architecture)
 end
 
 
@@ -206,6 +206,5 @@ function _legendre!(                        # GRID TO SPECTRAL
         kjm_indices;
     )
 
-    # NOTE: synchronize here?
     synchronize(S.architecture)
 end

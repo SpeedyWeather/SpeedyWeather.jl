@@ -1,11 +1,8 @@
 abstract type AbstractRadiation <: AbstractParameterization end
 abstract type AbstractLongwave <: AbstractRadiation end
 
-export NoLongwave
-struct NoLongwave <: AbstractLongwave end
-NoLongwave(SG::SpectralGrid) = NoLongwave()
-initialize!(::NoLongwave, ::PrimitiveEquation) = nothing
-longwave_radiation!(::ColumnVariables, ::NoLongwave, ::PrimitiveEquation) = nothing
+# no longwave radiation
+longwave_radiation!(::ColumnVariables, ::Nothing, ::PrimitiveEquation) = nothing
 
 # function barrier for all AbstractLongwave
 function longwave_radiation!(column::ColumnVariables, model::PrimitiveEquation)
@@ -62,7 +59,7 @@ function longwave_radiation!(
     τ⁻¹ = inv(radiation.time_scale_stratosphere.value)
 
     @inbounds for k in eachlayer(column)
-        # Pauluis and Garner, 2006, eq (1) and (2)
+        # Paulius and Garner, 2006, eq (1) and (2)
         temp_tend[k] += temp[k] > temp_min ? cooling : (temp_stratosphere - temp[k])*τ⁻¹
     end
 end
