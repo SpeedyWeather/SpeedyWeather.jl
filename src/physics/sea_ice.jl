@@ -49,7 +49,8 @@ function timestep!( progn::PrognosticVariables,
     temp_freeze = sea_ice_model.temp_freeze
 
     launch!(architecture(ℵ), LinearWorkOrder, size(ℵ), sea_ice_kernel!, ℵ, sst, mask, temp_freeze, m, f_Δt, Δt)
-    synchronize(architecture(ℵ))
+
+    return nothing
 end
 
 @kernel inbounds=true function sea_ice_kernel!(ℵ, sst, mask, @Const(temp_freeze), @Const(m), @Const(f_Δt), @Const(Δt))

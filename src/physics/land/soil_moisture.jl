@@ -218,7 +218,8 @@ function timestep!(
 
     launch!(architecture(soil_moisture), LinearWorkOrder, (size(soil_moisture, 1),),
         land_bucket_soil_moisture_kernel!, soil_moisture, mask, Pconv, Plsc, E, R, ρ, Δt, f₁, Δt_f₁, f₁_f₂, p, τ⁻¹)
-    synchronize(architecture(soil_moisture))
+
+    return nothing
 end
 
 @kernel inbounds=true function land_bucket_soil_moisture_kernel!(
