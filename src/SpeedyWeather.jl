@@ -167,6 +167,7 @@ include("physics/zenith.jl")
 include("physics/radiation/optical_depth.jl")
 include("physics/radiation/longwave_radiation.jl")
 include("physics/radiation/shortwave_radiation.jl")
+include("physics/radiation/radiative_transfer.jl")
 include("physics/stochastic_physics.jl")
 
 # OCEAN AND LAND
