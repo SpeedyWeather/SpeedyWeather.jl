@@ -138,7 +138,7 @@ export LandBucketMoisture
     initial_moisture::NF = 0.5
     
     "[OPTION] Apply land-sea mask to NaN ocean-only points?"
-    mask::Bool = false
+    mask::Bool = true
 
     "[DERIVED] Water at field capacity [m], top layer, f = γz, set at initialize from by land.thermodynamics and .geometry"
     f₁::NF = zero(NF)
@@ -179,7 +179,7 @@ function initialize!(
     model::PrimitiveEquation,
 )
     set!(progn.land.soil_moisture, soil.initial_moisture)
-    soil.mask && mask!(progn.land.soil_moisture, model.land_sea_mask, :ocean)
+    soil.mask && mask!(progn.land.soil_moisture, model.land_sea_mask, :ocean, masked_value=1)
 end
 
 function timestep!(
