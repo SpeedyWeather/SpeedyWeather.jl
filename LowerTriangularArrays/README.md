@@ -36,3 +36,11 @@ to the index of the underlying data vector. The matrix index is somewhat slower
 as it first has to be converted to the corresponding single index. 
 
 For more details on the usage of `LowerTriangularArray` see the [documentation](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/lowertriangularmatrices/).
+
+## Related Modules
+
+LowerTriangularArrays.jl is designed to be used in conjuction with the other modules of the SpeedyWeather.jl ecosystem: 
+ 
+- **RingGrids** - Spherical grid definitions and operations
+- **SpeedyTransforms** - Spherical harmonic transforms
+- **SpeedyWeather** - The full atmospheric modeling library
