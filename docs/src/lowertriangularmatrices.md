@@ -21,7 +21,7 @@ So, for example a ``(10\times 10\times 10)`` `LowerTriangularArray` holds 10 `Lo
 
 A `LowerTriangularMatrix` and `LowerTriangularArray` can be created using `zeros`, `ones`, `rand`, or `randn`
 ```@repl LowerTriangularArrays
-using SpeedyWeather.LowerTriangularArrays
+using LowerTriangularArrays
 
 L = rand(LowerTriangularMatrix{Float32}, 5, 5)
 L2 = rand(LowerTriangularArray{Float32}, 5, 5, 5)

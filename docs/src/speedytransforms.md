@@ -31,9 +31,9 @@ Lets start with a simple transform. We could be `using SpeedyWeather` but to be 
 these are the modules required to load
 
 ```@example speedytransforms
-using SpeedyWeather.RingGrids
-using SpeedyWeather.LowerTriangularArrays
-using SpeedyWeather.SpeedyTransforms
+using RingGrids
+using LowerTriangularArrays
+using SpeedyTransforms
 ```
 
 As an example, we want to transform the ``l=m=1`` spherical harmonic from spectral space in `alms`
@@ -214,9 +214,9 @@ docstrings at `?SpectralTransform`.
 How to take some data and compute a power spectrum with SpeedyTransforms you may ask.
 Say you have some global data in a matrix `m` that looks, for example, like
 ```@example speedytransforms2
-using SpeedyWeather.RingGrids # hide
-using SpeedyWeather.LowerTriangularArrays # hide
-using SpeedyWeather.SpeedyTransforms # hide
+using RingGrids # hide
+using LowerTriangularArrays # hide
+using SpeedyTransforms # hide
 alms = randn(LowerTriangularMatrix{Complex{Float32}}, 32, 32) # hide
 spectral_truncation!(alms, 10) # hide
 map = transform(alms, Grid=FullClenshawGrid) # hide

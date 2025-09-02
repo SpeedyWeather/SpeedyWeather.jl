@@ -15,7 +15,7 @@ more mathematical description.
 
 Full grids
 ```@example ringgrids
-using SpeedyWeather.RingGrids
+using RingGrids
 using InteractiveUtils # hide
 subtypes(RingGrids.AbstractFullGrid)
 ```
