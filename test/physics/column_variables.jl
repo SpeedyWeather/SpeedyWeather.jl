@@ -14,8 +14,8 @@
         @test column.cloud_top === column.nlayers+1
 
         # Large-scale condensation
-        @test column.precip_large_scale === zero(NF)
-        @test column.precip_convection === zero(NF)
+        @test column.rain_large_scale === zero(NF)
+        @test column.rain_convection === zero(NF)
     end
 end
 
