@@ -83,18 +83,12 @@ function timestep!(
     NF = eltype(soil_temperature)
     weight = convert(NF, Dates.days(time-Dates.firstdayofmonth(time))/Dates.daysinmonth(time))
 
-    k0 = 1   # first layer only
-    for ij in eachgridpoint(soil_temperature)
-        soil_temperature[ij, k0] = (1-weight) * monthly_temperature[ij, this_month] +
-                                                weight  * monthly_temperature[ij, next_month]
+    for k in eachlayer(soil_temperature)
+        for ij in eachgridpoint(soil_temperature)
+            soil_temperature[ij, k] = (1-weight) * monthly_temperature[ij, this_month] +
+                                    weight  * monthly_temperature[ij, next_month]
+        end
     end
-
-    # set other layers to the same temperature?
-    # for k in eachlayer(soil_temperature)
-    #     if k != k0
-    #         soil_temperature[:, k] .= soil_temperature[:, k0]
-    #     end
-    # end
 
     return nothing
 end
@@ -131,11 +125,11 @@ export LandBucketTemperature
 """MITgcm's two-layer soil model (https://mitgcm.readthedocs.io/en/latest/phys_pkgs/land.html). Fields assert
 $(TYPEDFIELDS)"""
 @kwdef mutable struct LandBucketTemperature{NF} <: AbstractLandTemperature
-    "[OPTION] Initial soil temperature [K]"
-    initial_temperature::NF = 285
-
-    "[OPTION] Apply land-sea mask to NaN ocean-only points?"
-    mask::Bool = false
+    "[OPTION] Apply land-sea mask to set ocean-only points?"
+    mask::Bool = true
+    
+    "[OPTION] Initial soil temperature over ocean [K]"
+    ocean_temperature::NF = 285
 end
 
 # generator function
@@ -153,8 +147,15 @@ function initialize!(
     land::LandBucketTemperature,
     model::PrimitiveEquation,
 )
-    set!(progn.land.soil_temperature, land.initial_temperature)
-    land.mask && mask!(progn.land.soil_temperature, model.land_sea_mask, :ocean)
+    # create a seasonal model, initialize it and the variables
+    seasonal_model = SeasonalLandTemperature(model.spectral_grid)
+    initialize!(seasonal_model, model)
+    initialize!(progn, diagn, seasonal_model, model)
+    # (seasonal model will be garbage collected hereafter)
+
+    # set ocean "land" temperature points (100% ocean only)
+    masked_value = land.ocean_temperature
+    land.mask && mask!(progn.land.soil_moisture, model.land_sea_mask, :ocean; masked_value)
 end
 
 function timestep!(

@@ -134,7 +134,7 @@ export LandBucketMoisture
     "[OPTION] Infiltration fraction, that is, fraction of top layer runoff that is put into layer below [1]"
     infiltration_fraction::NF = 0.25
 
-    "[OPTION] Apply land-sea mask to NaN ocean-only points?"
+    "[OPTION] Apply land-sea mask to set ocean-only points?"
     mask::Bool = true
 
     "[OPTION] Initial soil moisture over ocean, volume fraction [1]"
@@ -215,7 +215,7 @@ function timestep!(
 
     @boundscheck fields_match(soil_moisture, P, E, R, horizontal_only=true) ||
         throw(DimensionMismatch(soil_moisture, P))
-    @boundscheck size(soil_moisture, 2) == 2 || throw(DimensionMismatch)
+    @boundscheck size(soil_moisture, 2) >= 2 || throw(DimensionMismatch)
     f₁, f₂ = soil.f₁, soil.f₂
     p = soil.infiltration_fraction        # Infiltration fraction: fraction of top layer runoff put into lower layer
     τ⁻¹ = inv(convert(eltype(soil_moisture), Second(soil.time_scale).value))
