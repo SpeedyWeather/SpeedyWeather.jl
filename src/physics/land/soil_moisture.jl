@@ -83,7 +83,7 @@ function initialize!(
     soil::SeasonalSoilMoisture,
     model::PrimitiveEquation,
 )
-    # initialize land temperature by "running" the step at the current time
+    # initialize soil_moisture by "running" the step at the current time
     timestep!(progn, diagn, soil, model)
 end
 
@@ -134,11 +134,11 @@ export LandBucketMoisture
     "[OPTION] Infiltration fraction, that is, fraction of top layer runoff that is put into layer below [1]"
     infiltration_fraction::NF = 0.25
 
-    "[OPTION] Initial soil moisture, volume fraction [1], start saturated for faster spinup"
-    initial_moisture::NF = 0.5
-    
     "[OPTION] Apply land-sea mask to NaN ocean-only points?"
     mask::Bool = true
+
+    "[OPTION] Initial soil moisture over ocean, volume fraction [1]"
+    ocean_moisture::NF = 0
 
     "[DERIVED] Water at field capacity [m], top layer, f = γz, set at initialize from by land.thermodynamics and .geometry"
     f₁::NF = zero(NF)
@@ -178,8 +178,15 @@ function initialize!(
     soil::LandBucketMoisture,
     model::PrimitiveEquation,
 )
-    set!(progn.land.soil_moisture, soil.initial_moisture)
-    soil.mask && mask!(progn.land.soil_moisture, model.land_sea_mask, :ocean, masked_value=1)
+    # create a seasonal model, initialize it and the variables
+    seasonal_model = SeasonalSoilMoisture(model.spectral_grid)
+    initialize!(seasonal_model, model)
+    initialize!(progn, diagn, seasonal_model, model)
+    # (seasonal model will be garbage collected hereafter)
+
+    # set ocean "soil" moisture points (100% ocean only)
+    masked_value = soil.ocean_moisture
+    soil.mask && mask!(progn.land.soil_moisture, model.land_sea_mask, :ocean; masked_value)
 end
 
 function timestep!(
