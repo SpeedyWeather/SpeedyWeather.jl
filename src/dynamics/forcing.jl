@@ -66,9 +66,8 @@ function JetStreamForcing(SG::SpectralGrid; kwargs...)
     amplitude = on_architecture(SG.architecture, zeros(SG.NF, SG.nlat))
     tapering = on_architecture(SG.architecture, zeros(SG.NF, SG.nlayers))
     
-    return JetStreamForcing{SG.NF, SG.VectorType}(  
-        nlat=SG.nlat, nlayers=SG.nlayers,
-        amplitude=amplitude, tapering=tapering; kwargs...)
+    (; nlat, nlayers) = SG
+    return JetStreamForcing{SG.NF, SG.VectorType}(; nlat, nlayers, amplitude, tapering, kwargs...)
 end
 
 function initialize!(   forcing::JetStreamForcing,
