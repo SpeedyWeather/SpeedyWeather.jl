@@ -10,20 +10,8 @@ function forcing!(
     forcing!(diagn, progn, model.forcing, lf, model)
 end
 
-## NO FORCING = dummy forcing
-export NoForcing
-struct NoForcing <: AbstractForcing end
-NoForcing(SG::SpectralGrid) = NoForcing()
-initialize!(::NoForcing, ::AbstractModel) = nothing
-
-function forcing!(  
-    diagn::DiagnosticVariables,
-    progn::PrognosticVariables,
-    forcing::NoForcing,
-    args...,
-)
-    return nothing
-end
+## NO FORCING
+forcing!(diagn, progn, forcing::Nothing, args...) = nothing
 
 # JET STREAM FORCING
 export JetStreamForcing

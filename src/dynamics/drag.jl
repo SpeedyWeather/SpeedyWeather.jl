@@ -22,8 +22,6 @@ end
 
 QuadraticDrag(SG::SpectralGrid; kwargs...) = QuadraticDrag{SG.NF}(; kwargs...)
 
-initialize!(::QuadraticDrag, ::AbstractModel) = nothing
-
 """
 $(TYPEDSIGNATURES)
 Quadratic drag for the momentum equations.
@@ -88,7 +86,7 @@ function drag!(
 end
 
 @kernel inbounds=true function quadratic_drag_kernel!(
-    Fu, Fv, u, v, c, k 
+    Fu, Fv, u, v, @Const(c), @Const(k) 
 )
     ij = @index(Global, Linear)
     
@@ -107,8 +105,6 @@ export LinearVorticityDrag
 end
 
 LinearVorticityDrag(SG::SpectralGrid; kwargs...) = LinearVorticityDrag{SG.NF}(; kwargs...)
-
-initialize!(::LinearVorticityDrag, ::AbstractModel) = nothing
 
 """
 $(TYPEDSIGNATURES)
@@ -155,7 +151,7 @@ function drag!(
 end
 
 @kernel inbounds=true function linear_vorticity_drag_kernel!(
-    vor_tend, vor, c
+    vor_tend, vor, @Const(c)
 )
     I = @index(Global, Cartesian)
     vor_tend[I] -= c * vor[I]
@@ -250,7 +246,7 @@ function drag!(
 end
 
 @kernel inbounds=true function jet_drag_kernel!(
-    vor_tend, vor, ζ₀, r, k  
+    vor_tend, vor, ζ₀, @Const(r), @Const(k),  
 )
     lm = @index(Global, Linear)
     vor_tend[lm, k] -= r * (vor[lm, k] - ζ₀[lm])
