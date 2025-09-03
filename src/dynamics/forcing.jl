@@ -23,7 +23,7 @@ Galewsky, 2004, but mirrored for both hemispheres.
 
 $(TYPEDFIELDS)
 """
-@parameterized @kwdef mutable struct JetStreamForcing{NF} <: AbstractForcing
+@parameterized @kwdef mutable struct JetStreamForcing{NF, VectorType} <: AbstractForcing
     "Number of latitude rings"
     nlat::Int = 0
 
@@ -45,15 +45,30 @@ $(TYPEDFIELDS)
     "time scale [days]"
     time_scale::Second = Day(30)
 
+    """
     "precomputed amplitude vector [m/s²]"
     amplitude::Vector{NF} = zeros(NF, nlat)
 
     "precomputed vertical tapering"
     tapering::Vector{NF} = zeros(NF, nlayers)
+    """
+
+    "precomputed amplitude vector [m/s²]"
+    amplitude::VectorType
+    
+    "precomputed vertical tapering"
+    tapering::VectorType
+
 end
 
-JetStreamForcing(SG::SpectralGrid; kwargs...) = JetStreamForcing{SG.NF}(
-    ; nlat=SG.nlat, nlayers=SG.nlayers, kwargs...)
+function JetStreamForcing(SG::SpectralGrid; kwargs...)
+    # Create arrays on the target architecture
+    amplitude = on_architecture(SG.architecture, zeros(SG.NF, SG.nlat))
+    tapering = on_architecture(SG.architecture, zeros(SG.NF, SG.nlayers))
+    
+    (; nlat, nlayers) = SG
+    return JetStreamForcing{SG.NF, SG.VectorType}(; nlat, nlayers, amplitude, tapering, kwargs...)
+end
 
 function initialize!(   forcing::JetStreamForcing,
                         model::AbstractModel)
@@ -107,6 +122,8 @@ end
 Set for every latitude ring the tendency to the precomputed forcing
 in the momentum equations following the JetStreamForcing.
 The forcing is precomputed in `initialize!(::JetStreamForcing, ::AbstractModel)`."""
+
+"""
 function forcing!(
     diagn::DiagnosticVariables,
     forcing::JetStreamForcing)
@@ -124,6 +141,34 @@ function forcing!(
         end
     end
 end
+"""
+
+function forcing!(
+    diagn::DiagnosticVariables, 
+    forcing::JetStreamForcing)
+
+    Fu = diagn.tendencies.u_tend_grid
+
+    (; amplitude, tapering) = forcing          
+    (; whichring) = Fu.grid                    
+
+    arch = architecture(Fu)
+    launch!(arch, RingGridWorkOrder, size(Fu), jetstream_forcing_kernel!,
+            Fu, amplitude, tapering, whichring)
+    synchronize(arch)
+end
+
+@kernel inbounds=true function jetstream_forcing_kernel!(
+    Fu,
+    amplitude,
+    tapering,
+    whichring
+)
+    ij, k = @index(Global, NTuple)
+    j = whichring[ij]
+    Fu[ij] += tapering[k] * amplitude[j]
+end
+
 
 export StochasticStirring
 @parameterized @kwdef struct StochasticStirring{NF, VectorType} <: AbstractForcing
@@ -154,7 +199,7 @@ function initialize!(
     model::AbstractModel)
     
     model.random_process isa Nothing &&
-        @warn "StochasticStirring needs a random process. model.random_process is nothing."
+        @warn "StochasticStirring needs a random process. model.random_process is a NoRandomProcess."
 
     # precompute the latitudinal mask
     (; latd) = model.geometry
@@ -174,6 +219,7 @@ function forcing!(
     forcing!(diagn, forcing, model.spectral_transform)
 end
 
+"""
 function forcing!(
     diagn::DiagnosticVariables,
     forcing::StochasticStirring,
@@ -199,6 +245,46 @@ function forcing!(
         vor_tend[:, k] .+= S_masked
     end
 end
+"""
+
+function forcing!(
+    diagn::DiagnosticVariables,
+    forcing::StochasticStirring,
+    spectral_transform::SpectralTransform
+)
+    # get random values from random process
+    S_grid = diagn.grid.random_pattern
+    
+    # mask everything but mid-latitudes
+    RingGrids._scale_lat!(S_grid, forcing.lat_mask)
+    
+    # back to spectral space
+    S_masked = diagn.dynamics.a_2D
+    transform!(S_masked, S_grid, diagn.dynamics.scratch_memory, spectral_transform)
+    
+    # scale by radius^2 as is the vorticity equation, and scale to forcing strength
+    S_masked .*= (diagn.scale[]^2 * forcing.strength)
+    
+    # force every layer
+    (; vor_tend) = diagn.tendencies
+    arch = architecture(vor_tend)
+    launch!(arch, SpectralWorkOrder, size(vor_tend), stochastic_stirring_kernel!,
+            vor_tend, S_masked)
+    synchronize(arch)
+end
+
+# GPU kernel for adding 2D spectral field to each layer of 3D field
+@kernel inbounds=true function stochastic_stirring_kernel!(
+    vor_tend, 
+    S_masked
+)
+    I = @index(Global, Cartesian)
+    lm = I[1]  # spectral coefficient index
+    k = I[2]   # layer index
+    
+    vor_tend[lm, k] += S_masked[lm]
+end
+
 
 export KolmogorovFlow
 
@@ -214,6 +300,8 @@ $(TYPEDFIELDS)
 end
 
 KolmogorovFlow(SG::SpectralGrid; kwargs...) = KolmogorovFlow{SG.NF}(; kwargs...)
+
+initialize!(::KolmogorovFlow, ::AbstractModel) = nothing
 
 function forcing!(
     diagn::DiagnosticVariables,
