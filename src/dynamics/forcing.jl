@@ -156,7 +156,10 @@ function forcing!(
 end
 """
 
-function forcing!(diagn::DiagnosticVariables, forcing::JetStreamForcing)
+function forcing!(
+    diagn::DiagnosticVariables, 
+    forcing::JetStreamForcing)
+
     Fu = diagn.tendencies.u_tend_grid
 
     (; amplitude, tapering) = forcing          
@@ -241,7 +244,7 @@ function forcing!(
     # mask everything but mid-latitudes
     RingGrids._scale_lat!(S_grid, forcing.lat_mask)
     
-    # back to spectral spaceRingGrids._scale_lat!
+    # back to spectral space
     S_masked = diagn.dynamics.a_2D
     transform!(S_masked, S_grid, diagn.dynamics.scratch_memory, spectral_transform)
 
@@ -276,7 +279,7 @@ function forcing!(
     S_masked .*= (diagn.scale[]^2 * forcing.strength)
     
     # force every layer
-    vor_tend = diagn.tendencies.vor_tend
+    (; vor_tend) = diagn.tendencies
     arch = architecture(vor_tend)
     launch!(arch, SpectralWorkOrder, size(vor_tend), stochastic_stirring_kernel!,
             vor_tend, S_masked)

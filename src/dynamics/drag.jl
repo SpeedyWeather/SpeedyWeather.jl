@@ -80,6 +80,7 @@ function drag!(
 )
     u = diagn.grid.u_grid
     v = diagn.grid.v_grid
+
     Fu = diagn.tendencies.u_tend_grid
     Fv = diagn.tendencies.v_tend_grid
 
@@ -89,8 +90,8 @@ function drag!(
 
     k = diagn.nlayers   # only apply to surface layer
     
-    # GPU kernel launch - linear over grid points at surface layer
-    arch = architecture(u)  # Use RingGrid architecture (avoids LowerTriangularArray issues)
+    # GPU kernel launch
+    arch = architecture(u) 
     launch!(arch, LinearWorkOrder, (length(u.data),), quadratic_drag_kernel!,
             Fu, Fv, u, v, c, k)
     synchronize(arch)
@@ -99,12 +100,12 @@ end
 @kernel inbounds=true function quadratic_drag_kernel!(
     Fu, Fv, u, v, c, k 
 )
-    ij = @index(Global, Linear)  # Grid point index only
+    ij = @index(Global, Linear)
     
     # Calculate speed at surface layer k
     speed = sqrt(u[ij, k]^2 + v[ij, k]^2)
     
-    # Apply quadratic drag
+    # Apply quadratic drag, -= as the tendencies already contain forcing
     Fu[ij, k] -= c * speed * u[ij, k]
     Fv[ij, k] -= c * speed * v[ij, k]
 end
@@ -242,17 +243,17 @@ function drag!(
     model::AbstractModel,
 )
     vor = get_step(progn.vor, lf)
-    vor_tend = diagn.tendencies.vor_tend
-    ζ₀ = drag.ζ₀
+    (; vor_tend) = diagn.tendencies
+    (; ζ₀) = drag
 
     # scale by radius as is vorticity
-    radius = model.spectral_grid.radius
+    (; radius) = model.spectral_grid
     r = radius/drag.time_scale.value
 
     k = diagn.nlayers   # drag only on surface layer
     
     # GPU kernel launch 
-    arch = architecture(diagn.grid.u_grid)  # Avoid LowerTriangularArray architecture issues
+    arch = architecture(diagn.grid.u_grid)
     launch!(arch, LinearWorkOrder, (size(vor_tend, 1),), jet_drag_kernel!,
             vor_tend, vor, ζ₀, r, k)
     synchronize(arch)
@@ -261,8 +262,6 @@ end
 @kernel inbounds=true function jet_drag_kernel!(
     vor_tend, vor, ζ₀, r, k  
 )
-    lm = @index(Global, Linear)  # Spectral coefficient index only
-    
-    # Apply relaxation drag to surface layer only
+    lm = @index(Global, Linear)
     vor_tend[lm, k] -= r * (vor[lm, k] - ζ₀[lm])
 end
