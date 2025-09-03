@@ -28,6 +28,7 @@ include("geometry.jl")
 include("thermodynamics.jl")
 include("temperature.jl")
 include("soil_moisture.jl")
+include("snow.jl")
 include("vegetation.jl")
 include("rivers.jl")
 
