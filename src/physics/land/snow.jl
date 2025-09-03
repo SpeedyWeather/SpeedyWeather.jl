@@ -1,7 +1,7 @@
 abstract type AbstractSnow <: AbstractParameterization end
 
 export SnowModel    # maybe change for a more concise name later
-@kwdef mutable struct SnowModel{NF} <: AbstractSoilMoisture
+@kwdef mutable struct SnowModel{NF} <: AbstractSnow
     parameter1::NF = 0
     parameter2::NF = 0
 end
