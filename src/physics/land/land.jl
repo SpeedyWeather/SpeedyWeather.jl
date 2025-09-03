@@ -33,12 +33,13 @@ include("rivers.jl")
 
 # LandModel defined through its components
 export LandModel
-@kwdef mutable struct LandModel{G, TD, T, SM, V, R} <: AbstractWetLand
+@kwdef mutable struct LandModel{G, TD, T, SM, SN, V, R} <: AbstractWetLand
     spectral_grid::SpectralGrid
     geometry::G = LandGeometry(spectral_grid)
     thermodynamics::TD = LandThermodynamics(spectral_grid)
     temperature::T = LandBucketTemperature(spectral_grid)
     soil_moisture::SM = LandBucketMoisture(spectral_grid)
+    snow::SN = SnowModel(spectral_grid)
     vegetation::V = VegetationClimatology(spectral_grid)
     rivers::R = nothing
 end
@@ -53,6 +54,7 @@ function initialize!(   land::LandModel,
     initialize!(model.land.thermodynamics, model)
     initialize!(model.land.temperature, model)
     initialize!(model.land.soil_moisture, model)
+    initialize!(model.land.snow, model)
     initialize!(model.land.vegetation, model)
     initialize!(model.land.rivers, model)
 end
@@ -84,6 +86,7 @@ function timestep!(
     if model isa PrimitiveWet && land isa AbstractWetLand
         # TODO think about the order of these
         timestep!(progn, diagn, land.soil_moisture, model)
+        timestep!(progn, diagn, land.snow, model)
         timestep!(progn, diagn, land.rivers, model)
         timestep!(progn, diagn, land.vegetation, model)
     end
@@ -111,7 +114,8 @@ function initialize!(
 
     # only initialize soil moisture, vegetation, rivers if atmosphere and land are wet
     if model isa PrimitiveWet && land_model isa AbstractWetLand
-        initialize!(progn, diagn, land_model.soil_moisture, model)      
+        initialize!(progn, diagn, land_model.soil_moisture, model)   
+        initialize!(progn, diagn, land_model.snow, model)
         initialize!(progn, diagn, land_model.vegetation, model)     
         initialize!(progn, diagn, land_model.rivers, model)
     end
