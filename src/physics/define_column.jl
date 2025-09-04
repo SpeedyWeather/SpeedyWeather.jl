@@ -35,6 +35,7 @@ $(TYPEDFIELDS)"""
     # (log) pressure per layer, surface is prognostic, last element here, but precompute other layers too
     const ln_pres::VectorType = zeros(NF, nlayers+1)    # logarithm of pressure [log(Pa)]
     const pres::VectorType = zeros(NF, nlayers+1)       # pressure [Pa]
+    const layer_depth::VectorType = zeros(NF, nlayers)  # normalised layer depth in terms of pressure [1]
 
     # TENDENCIES to accumulate the parametrizations into
     const u_tend::VectorType = zeros(NF, nlayers)       # zonal velocity [m/s²]
@@ -125,9 +126,10 @@ $(TYPEDFIELDS)"""
     outgoing_longwave_radiation::NF = 0     # OLR [W/m^2]
     outgoing_shortwave_radiation::NF = 0    # same for shortwave reflection [W/m^2]
 
-    # optical depth of the atmosphere, on half levels, for shortwave and longwave radiation
-    const optical_depth_shortwave::MatrixType = zeros(NF, nlayers, nbands_shortwave)
-    const optical_depth_longwave::MatrixType = zeros(NF, nlayers, nbands_longwave)
+    # transmittance of the atmosphere, on half levels, for shortwave and longwave radiation
+    # transmittance = exp(-optical_depth)
+    const transmittance_shortwave::MatrixType = zeros(NF, nlayers, nbands_shortwave)
+    const transmittance_longwave::MatrixType = zeros(NF, nlayers, nbands_longwave)
 
     # WORK ARRAYS
     const a::VectorType = zeros(NF, nlayers)
@@ -143,3 +145,4 @@ ColumnVariables(SG::SpectralGrid; kwargs...) = ColumnVariables{SG.NF, SG.VectorT
 
 # generator assuming Julia Arrays
 ColumnVariables{NF}(; kwargs...) where NF = ColumnVariables{NF, Vector{NF}, Matrix{NF}}(; kwargs...)
+Base.eltype(::ColumnVariables{NF}) where NF = NF
