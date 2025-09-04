@@ -1,0 +1,24 @@
+name = "LowerTriangularArrays"
+uuid = "ed20b33f-a660-45d0-a353-9c8c20bb5814"
+authors = ["LowerTriangularArrays contributors"]
+version = "0.1.0"
+
+[deps]
+Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
+DocStringExtensions = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
+GPUArrays = "0c68f7d7-f131-5f86-a1c3-88cf8149b2d7"
+KernelAbstractions = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+SpeedyInternals = "34489162-d270-4603-8b96-37b04f830d73"
+
+[compat]
+Adapt = "4.3.0"
+DocStringExtensions = "0.9.5"
+GPUArrays = "11.2.3"
+KernelAbstractions = "0.9.38"
+LinearAlgebra = "1.10"
+SpeedyInternals = "0.1"
+julia = "1.10"
+
+[sources.SpeedyInternals]
+path = "../SpeedyInternals"

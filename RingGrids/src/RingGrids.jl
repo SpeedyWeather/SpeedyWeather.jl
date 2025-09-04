@@ -15,9 +15,11 @@ import GPUArrays
 import KernelAbstractions: KernelAbstractions, @kernel, @index, @Const, synchronize
 
 # SPEEDYWEATHER SUBMODULES
-import ..Architectures: Architectures, AbstractArchitecture, CPU, GPU, 
+import SpeedyInternals.Architectures: Architectures, AbstractArchitecture, CPU, GPU, 
         on_architecture, architecture, array_type, ismatching, nonparametric_type
-using ..Utils
+
+using SpeedyInternals.Architectures
+using SpeedyInternals.Utils 
 
 # ABSTRACT GRIDS
 export  AbstractGrid,
@@ -49,6 +51,14 @@ export  FullGaussianField,
         HEALPixField,
         OctaHEALPixField,
         OctaminimalGaussianField
+
+export  ColumnField,
+        FullColumnField,
+        ReducedColumnField,
+        ColumnField2D,
+        ColumnField3D,
+        ColumnField4D,
+        transpose!
 
 export  field_view
 
@@ -119,6 +129,7 @@ include("utility_functions.jl")
 # GENERAL
 include("abstract_types.jl")
 include("field.jl")
+include("column_field.jl")
 include("grid.jl")
 include("scaling.jl")
 include("geodesics.jl")
