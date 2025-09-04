@@ -330,18 +330,18 @@ function initialize!(
     ocean::PrognosticVariablesOcean,
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
-    ocean::SlabOcean,
+    ocean_model::SlabOcean,
     model::PrimitiveEquation,
 )
     # create a seasonal model, initialize it and the variables
     seasonal_model = SeasonalOceanClimatology(model.spectral_grid)
     initialize!(seasonal_model, model)
-    initialize!(progn, diagn, seasonal_model, model)
+    initialize!(ocean, progn, diagn, seasonal_model, model)
     # (seasonal model will be garbage collected hereafter)
 
     # set land "sst" points (100% land only)
-    masked_value = ocean.land_temperature
-    ocean.mask && mask!(progn.ocean.sea_surface_temperature, model.land_sea_mask, :land; masked_value)
+    masked_value = ocean_model.land_temperature
+    ocean_model.mask && mask!(progn.ocean.sea_surface_temperature, model.land_sea_mask, :land; masked_value)
 end
 
 function timestep!(
