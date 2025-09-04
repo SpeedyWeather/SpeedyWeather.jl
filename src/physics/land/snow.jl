@@ -57,6 +57,7 @@ function timestep!(
     ## First, lose snow by sublimation and lose liquid precip by runoff over snow
 	infiltration_flux[ij] = (P[ij] - E[ij] - S[ij])/ρ   # Need to remove snowfall from total precipitation, to use just liquid part
 	if Sₐ[ij] > snow_threshold
+		Δt_snow = 0 							   # Re-start the time counter since the last significant snowfall.
 		Rₛ[ij] = infiltration_flux[ij]             # put all precipitation into runoff (no infiltration)
 		infiltration_flux[ij] = 0.                 # Assume no infiltration if snow on surface        - R[ij]
 		sat_humid_land[ij] = saturation_humidity(soil_temperature[ij,1], surface_pressure[ij], model.clausius_clapeyron)
@@ -98,7 +99,7 @@ function timestep!(
 	σₛ[ij] = min(1.0, Sₐ[ij] / snow_depth_scale)   # e.g. snow_depth_scale ≈ 0.1 m
 	## Now compute the change in albedo
 	τˢ = 10.0 * day   # tunable parameter
-	albedo_snow[ij] = snow_albedo_old + (snow_albedo_fresh - snow_albedo_old) * exp(-Δt / τˢ) # time needs to be expresssed in days. 
+	albedo_snow[ij] = snow_albedo_old + (snow_albedo_fresh - snow_albedo_old) * exp(-Δt_snow / τˢ) # time needs to be expresssed in days. 
 	albedo_land[ij] = (1-σₛ[ij]) * albedo_land + σₛ[ij] * albedo_snow[ij]
 
 	F[ij] = infiltration_flux[ij] + melt_flux[ij]  # Need to pass this back to bucket model
@@ -106,6 +107,7 @@ function timestep!(
 
     launch!(architecture(snow_depth), LinearWorkOrder, size(snow_depth),
         land_snow_kernel!, snow_depth, mask, p1)
+	Δt_snow += Δt  #Increment the time counter since the time of last significant snowfall
 end
 
 @kernel inbounds=true function land_snow_kernel!(
