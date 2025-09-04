@@ -1,8 +1,6 @@
 # SpeedyTransforms
 
-SpeedyTransforms is a submodule that has been developed for SpeedyWeather.jl which is technically
-independent (SpeedyWeather.jl however imports it) and can also be used without running simulations.
-It is just not put into its own respective repository for now.
+SpeedyTransforms is a package that has been developed for SpeedyWeather.jl and is used by it but can also be used standalone.
 
 The SpeedyTransforms are based on [RingGrids](@ref) and
 [LowerTriangularArrays](@ref lowertriangularmatrices) to hold
@@ -33,9 +31,9 @@ Lets start with a simple transform. We could be `using SpeedyWeather` but to be 
 these are the modules required to load
 
 ```@example speedytransforms
-using SpeedyWeather.RingGrids
-using SpeedyWeather.LowerTriangularArrays
-using SpeedyWeather.SpeedyTransforms
+using RingGrids
+using LowerTriangularArrays
+using SpeedyTransforms
 ```
 
 As an example, we want to transform the ``l=m=1`` spherical harmonic from spectral space in `alms`
@@ -216,9 +214,9 @@ docstrings at `?SpectralTransform`.
 How to take some data and compute a power spectrum with SpeedyTransforms you may ask.
 Say you have some global data in a matrix `m` that looks, for example, like
 ```@example speedytransforms2
-using SpeedyWeather.RingGrids # hide
-using SpeedyWeather.LowerTriangularArrays # hide
-using SpeedyWeather.SpeedyTransforms # hide
+using RingGrids # hide
+using LowerTriangularArrays # hide
+using SpeedyTransforms # hide
 alms = randn(LowerTriangularMatrix{Complex{Float32}}, 32, 32) # hide
 spectral_truncation!(alms, 10) # hide
 map = transform(alms, Grid=FullClenshawGrid) # hide
