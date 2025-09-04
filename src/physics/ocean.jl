@@ -341,7 +341,11 @@ function initialize!(
 
     # set land "sst" points (100% land only)
     masked_value = ocean_model.land_temperature
-    ocean_model.mask && mask!(progn.ocean.sea_surface_temperature, model.land_sea_mask, :land; masked_value)
+    if ocean_model.mask
+        sst = progn.ocean.sea_surface_temperature
+        progn.ocean.sea_surface_temperature[isnan.(sst)] .= masked_value
+        mask!(progn.ocean.sea_surface_temperature, model.land_sea_mask, :land; masked_value)
+    end
 end
 
 function timestep!(

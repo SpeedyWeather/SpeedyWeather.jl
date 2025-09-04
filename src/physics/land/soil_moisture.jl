@@ -186,7 +186,11 @@ function initialize!(
 
     # set ocean "soil" moisture points (100% ocean only)
     masked_value = soil.ocean_moisture
-    soil.mask && mask!(progn.land.soil_moisture, model.land_sea_mask, :ocean; masked_value)
+    if soil.mask
+        sm = progn.land.soil_moisture
+        progn.land.soil_moisture[isnan.(sm)] .= masked_value
+        mask!(progn.land.soil_moisture, model.land_sea_mask, :ocean; masked_value)
+    end
 end
 
 function timestep!(
