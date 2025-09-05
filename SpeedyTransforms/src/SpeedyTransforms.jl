@@ -14,8 +14,8 @@ import KernelAbstractions: @kernel, @index, @Const, synchronize
 import Atomix
 
 # SPEEDYWEATHER MODULES
-using SpeedyInternals.Architectures
-using SpeedyInternals.Utils
+using SpeedyWeatherInternals.Architectures
+using SpeedyWeatherInternals.Utils
 
 using RingGrids
 

@@ -1,5 +1,5 @@
 using Documenter
-using SpeedyInternals, LowerTriangularArrays, RingGrids, SpeedyTransforms, SpeedyWeather
+using SpeedyWeatherInternals, LowerTriangularArrays, RingGrids, SpeedyTransforms, SpeedyWeather
 
 makedocs(
     format = Documenter.HTML(prettyurls=get(ENV, "CI", nothing)=="true",
@@ -9,7 +9,7 @@ makedocs(
                              size_threshold = 600_000),      # in bytes
     sitename = "SpeedyWeather.jl",
     authors = "M Klöwer and SpeedyWeather contributors",
-    modules = [SpeedyWeather, SpeedyInternals, LowerTriangularArrays, RingGrids, SpeedyTransforms],
+    modules = [SpeedyWeather, SpeedyWeatherInternals, LowerTriangularArrays, RingGrids, SpeedyTransforms],
     checkdocs = :exports,
     pages = ["Home"=>"index.md",
             "Installation"=>"installation.md",
