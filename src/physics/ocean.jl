@@ -291,12 +291,6 @@ end
 export SlabOcean
 
 @kwdef mutable struct SlabOcean{NF, F} <: AbstractOcean
-    "[OPTION] Initial temperature on the equator [K]"
-    temp_equator::NF = 302
-
-    "[OPTION] Initial temperature at the poles [K]"
-    temp_poles::NF = 273.15-1.8     # freezing point of sea water
-
     "[OPTION] Specific heat capacity of water [J/kg/K]"
     specific_heat_capacity::NF = 4184
 
@@ -310,7 +304,10 @@ export SlabOcean
     density::NF = 1000
 
     "[OPTION] Mask initial sea surface temperature with land-sea mask?"
-    mask::Bool = false
+    mask::Bool = true
+
+    "[OPTION] SST over land [K]"
+    land_temperature::NF = 283
 
     "[DERIVED] Effective mixed-layer heat capacity [J/K/m²]"
     heat_capacity_mixed_layer::NF = specific_heat_capacity*mixed_layer_depth*density
@@ -336,12 +333,19 @@ function initialize!(
     ocean_model::SlabOcean,
     model::PrimitiveEquation,
 )
-    # initialize like AquaPlanet
-    (; sea_surface_temperature) = ocean
-    Te, Tp = ocean_model.temp_equator, ocean_model.temp_poles
-    sst(λ, φ) = (Te - Tp)*cosd(φ)^2 + Tp
-    set!(sea_surface_temperature, sst, model.geometry)
-    ocean_model.mask && mask!(sea_surface_temperature, model.land_sea_mask, :land)
+    # create a seasonal model, initialize it and the variables
+    seasonal_model = SeasonalOceanClimatology(model.spectral_grid)
+    initialize!(seasonal_model, model)
+    initialize!(ocean, progn, diagn, seasonal_model, model)
+    # (seasonal model will be garbage collected hereafter)
+
+    # set land "sst" points (100% land only)
+    masked_value = ocean_model.land_temperature
+    if ocean_model.mask
+        sst = progn.ocean.sea_surface_temperature
+        progn.ocean.sea_surface_temperature[isnan.(sst)] .= masked_value
+        mask!(progn.ocean.sea_surface_temperature, model.land_sea_mask, :land; masked_value)
+    end
 end
 
 function timestep!(
@@ -377,6 +381,7 @@ end
     ij = @index(Global, Linear)         # every grid point ij
 
     if mask[ij] < 1                     # at least partially ocean
+        # TODO this reduces the flux on the SST side only not on the atmosphere side
         r = 1 - insulation(ice[ij])     # formulate as reduction of the net flux
         sst[ij] += Δt_C₀*r*(Rsd[ij] - Rsu[ij] - Rlu[ij] + Rld[ij] - Lᵥ*Ev[ij] - S[ij])
     end
