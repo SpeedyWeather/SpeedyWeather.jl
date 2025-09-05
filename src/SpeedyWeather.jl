@@ -14,9 +14,9 @@ import Base.Threads: Threads, @threads
 import KernelAbstractions: KernelAbstractions, @kernel, @index, @Const, synchronize
 import Adapt: Adapt, adapt, adapt_structure
 
-using SpeedyInternals
-using  SpeedyInternals.Architectures
-import SpeedyInternals.Architectures: AbstractArchitecture, CPU, GPU, 
+using SpeedyWeatherInternals
+using  SpeedyWeatherInternals.Architectures
+import SpeedyWeatherInternals.Architectures: AbstractArchitecture, CPU, GPU, 
         on_architecture, architecture, array_type, ismatching, nonparametric_type
 export on_architecture, architecture                # export device functions 
 
@@ -41,7 +41,7 @@ export DateTime, Millisecond, Second, Minute, Hour, Day, Week, Month, Year, Cent
 export initialize!, finalize!
 
 # import utilities
-using SpeedyInternals.Utils 
+using SpeedyWeatherInternals.Utils 
 
 include("SpeedyParameters/SpeedyParameters.jl")
 using .SpeedyParameters
