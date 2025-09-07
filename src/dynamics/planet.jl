@@ -1,5 +1,6 @@
 abstract type AbstractPlanet <: AbstractModelComponent end
 
+const DEFAULT_RADIUS = 6.371e6
 const DEFAULT_ROTATION = 7.29e-5    # default angular frequency of Earth's rotation [1/s]
 const DEFAULT_GRAVITY = 9.81        # default gravitational acceleration on Earth [m/s²]
 
@@ -13,6 +14,9 @@ in `SpectralGrid`. Keyword arguments are
 $(TYPEDFIELDS)
 """
 @parameterized @kwdef mutable struct Earth{NF<:AbstractFloat} <: AbstractPlanet
+
+    "Earth's radius [m]"
+    @param radius::NF = DEFAULT_RADIUS
 
     "angular frequency of Earth's rotation [rad/s]"
     @param rotation::NF = DEFAULT_ROTATION

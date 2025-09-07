@@ -32,10 +32,6 @@ $(TYPEDFIELDS)
     "total number of horizontal grid points"
     npoints::Int = spectral_grid.npoints
 
-    "Planet's radius [m]"
-    radius::NF = spectral_grid.radius
-
-
     # ARRAYS OF LANGITUDES/LONGITUDES
     "array of longitudes in degrees (0...360˚), empty for non-full grids"
     lond::VectorFloat64Type = get_lond(Grid, nlat_half)

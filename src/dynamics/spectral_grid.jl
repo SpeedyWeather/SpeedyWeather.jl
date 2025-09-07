@@ -7,7 +7,6 @@ const DEFAULT_ARRAYTYPE = Array
 
 # numerics
 const DEFAULT_GRID = OctahedralGaussianGrid
-const DEFAULT_RADIUS = 6.371e6
 const DEFAULT_TRUNC = 31
 const DEFAULT_NLAYERS = 8
 const DEFAULT_NLAYERS_SOIL = 2
@@ -85,13 +84,9 @@ struct SpectralGrid{
     
     "[DERIVED] Type of grid variable in 3D (horizontal + e.g. vertical, flattened into 2D matrix)"
     GridVariable3D::Type{<:AbstractArray}
-    
+
     "[DERIVED] Type of grid variable in 4D (horizontal + e.g. vertical + time, flattened into 3D array)"
     GridVariable4D::Type{<:AbstractArray}
-
-    # TODO move to planet?
-    "[OPTION] radius of the sphere [m]"
-    radius::Float64
 
     # PARTICLES
     "[OPTION] number of particles for particle advection [1]"
@@ -109,19 +104,20 @@ struct SpectralGrid{
 end
 
 function Base.show(io::IO, SG::SpectralGrid)
-    (; NF, trunc, grid, radius, nlat, npoints, nlayers, nlayers_soil) = SG
+    (; NF, trunc, grid, nlat, npoints, nlayers, nlayers_soil) = SG
     (; architecture, ArrayType) = SG
     (; nparticles) = SG
     Grid = nonparametric_type(grid)
 
     # resolution information
+    radius = DEFAULT_RADIUS
     average_resolution = sqrt(4π*radius^2/npoints)/1000  # in [km]
     s(x) = x > 1000 ? @sprintf("%i", x) : @sprintf("%.3g", x)
 
     println(io, "SpectralGrid{Spectrum{...}, $Grid{...}}")
-    println(io, "├ Spectral:     T$trunc LowerTriangularMatrix{Complex{$NF}}, radius = $radius m")
+    println(io, "├ Spectral:     T$trunc LowerTriangularMatrix{Complex{$NF}}")
     println(io, "├ Grid:         Field{$NF} on $nlat-ring $Grid, $npoints grid points")
-    println(io, "├ Resolution:   $(s(average_resolution))km (average)")
+    println(io, "├ Resolution:   $(s(average_resolution))km (average at $(radius/1000) km radius)")
     nparticles > 0 &&
     println(io, "├ Particles:    $nparticles")
     println(io, "├ Vertical:     $nlayers-layer atmosphere, $nlayers_soil-layer land")
@@ -137,7 +133,6 @@ function SpectralGrid(;
     trunc::Int = DEFAULT_TRUNC,
     Grid::Type{<:AbstractGrid} = DEFAULT_GRID,
     dealiasing::Real = 2,
-    radius::Real = DEFAULT_RADIUS,
     nparticles::Int = 0,
     nlayers::Int = DEFAULT_NLAYERS,
     nlayers_soil::Int = DEFAULT_NLAYERS_SOIL
@@ -159,7 +154,6 @@ function SpectralGrid(;
     
     # Convert numeric parameters to Float64
     dealiasing_f64 = Float64(dealiasing)
-    radius_f64 = Float64(radius)
 
     # Calculate derived fields
     VectorType = array_type(architecture, NF, 1)
@@ -207,7 +201,6 @@ function SpectralGrid(;
         GridVariable2D,
         GridVariable3D,
         GridVariable4D,
-        radius_f64,
         nparticles,
         ParticleVector,
         nlayers,
