@@ -126,6 +126,7 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
     (; spectral_grid) = model
 
     # NUMERICS (implicit is initialized later)
+    initialize!(model.geometry, model)
     initialize!(model.time_stepping, model)
     initialize!(model.horizontal_diffusion, model)
 
