@@ -27,7 +27,7 @@ end
     # test for non-nested type
     earth = Earth(Float32)
     ps = parameters(earth, category="planet")
-    pvals = (earth.rotation, earth.gravity, earth.axial_tilt, earth.solar_constant)
+    pvals = (earth.radius, earth.rotation, earth.gravity, earth.axial_tilt, earth.solar_constant)
     @test isa(ps, SpeedyParams) && SpeedyParams <: ModelParameters.AbstractModel
     @test values(stripparams(ps)) == pvals
     @test ps[:val] == pvals
