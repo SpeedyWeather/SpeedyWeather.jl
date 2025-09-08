@@ -46,10 +46,10 @@ Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
 UnicodePlots = "b8865327-cd53-5732-bb35-84acbb429228"
 
 [sources]
-SpeedyWeatherInternals = {path = "SpeedyWeatherInternals"}
-LowerTriangularArrays = {path = "LowerTriangularArrays"}
-RingGrids = {path = "RingGrids"}
-SpeedyTransforms = {path = "SpeedyTransforms"}
+SpeedyWeatherInternals = {path = "./SpeedyWeatherInternals"}
+LowerTriangularArrays = {path = "./LowerTriangularArrays"}
+RingGrids = {path = "./RingGrids"}
+SpeedyTransforms = {path = "./SpeedyTransforms"}
 
 [extensions]
 SpeedyWeatherCUDAExt = "CUDA"
@@ -84,6 +84,7 @@ JLArrays = "0.1, 0.2"
 JLD2 = "0.4, 0.5, 0.6"
 KernelAbstractions = "0.9"
 LinearAlgebra = "1.10"
+LowerTriangularArrays = "0.1"
 MacroTools = "0.5"
 Makie = "0.20, 0.21, 0.22, 0.23, 0.24"
 ModelParameters = "0.4"
@@ -92,6 +93,9 @@ Primes = "0.5"
 Printf = "1.10"
 ProgressMeter = "1.7"
 Random = "1.10"
+RingGrids = "0.1"
+SpeedyTransforms = "0.1"
+SpeedyWeatherInternals = "0.1"
 Statistics = "1.10"
 TOML = "1"
 UnicodePlots = "3.3"
