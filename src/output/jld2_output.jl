@@ -109,7 +109,7 @@ function initialize!(
     output.jld2_file = jld2_file
 
     # write iniital condition 
-    output!(output, Simulation(progn, diagn, model))
+    output_jld2!(output, Simulation(progn, diagn, model))
 
     # also export parameters into run????/parameters.txt
     parameters_txt = open(joinpath(output.run_path, "parameters.txt"), "w")
@@ -123,11 +123,20 @@ end
 Base.close(output::JLD2Output) = close(output.jld2_file)
 
 function output!(output::JLD2Output, simulation::AbstractSimulation)
-    output.output_counter += 1      # output counter increases when writing time
-    i = output.output_counter
+    output.timestep_counter += 1
 
-    (; active, jld2_file, output_diagnostic, output_prognostic) = output 
-    active || return nothing    # escape immediately for no jld2 output
+    (; active, jld2_file, output_every_n_steps, timestep_counter) = output 
+    active || return nothing                                        # escape immediately for no jld2 output
+    timestep_counter % output_every_n_steps == 0 || return nothing  # escape if output not written on this step
+    
+    output_jld2!(output, simulation)
+end 
+
+function output_jld2!(output::JLD2Output, simulation::AbstractSimulation)
+    (; jld2_file, output_diagnostic, output_prognostic) = output
+    
+    output.output_counter += 1                                      # output counter increases when writing time
+    i = output.output_counter
 
     if output_diagnostic & output_prognostic
         jld2_file["$i"] = (simulation.prognostic_variables, simulation.diagnostic_variables)
@@ -142,7 +151,7 @@ function finalize!(
     output::JLD2Output,
     simulation::AbstractSimulation,
 )   
-    if output.merge_output
+    if output.merge_output && output.output_counter > 0
         merge_output(output)
     else  
         close(output)
@@ -158,7 +167,7 @@ is a concern.
 """
 function merge_output(output::JLD2Output)
     (; output_counter, jld2_file, run_path, filename) = output
-
+        
     output_vector = Vector{typeof(jld2_file["1"])}(undef, output_counter)
 
     for i in 1:output_counter

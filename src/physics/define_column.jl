@@ -91,10 +91,16 @@ $(TYPEDFIELDS)"""
 
     # CONVECTION AND PRECIPITATION
     cloud_top::Int = nlayers+1              # layer index k of top-most layer with clouds
-    precip_convection::NF = 0               # Precipitation due to convection [m]
-    precip_large_scale::NF = 0              # precipitation due to large-scale condensation [m]
-    precip_rate_convection::NF = 0          # Precipitation rate due to convection [m/s]
-    precip_rate_large_scale::NF = 0         # precipitation rate due to large-scale condensation [m/s]
+    rain_convection::NF = 0                 # rain due to convection [m]
+    rain_large_scale::NF = 0                # rain due to large-scale condensation [m]
+    rain_rate_convection::NF = 0            # rain rate due to convection [m/s]
+    rain_rate_large_scale::NF = 0           # rain rate due to large-scale condensation [m/s]
+
+    # same for snow
+    snow_convection::NF = 0                 # snow due to convection [m]
+    snow_large_scale::NF = 0                # snow due to large-scale condensation [m]
+    snow_rate_convection::NF = 0            # snow rate due to convection [m/s]
+    snow_rate_large_scale::NF = 0           # snow rate due to large-scale condensation [m/s]
 
     # RADIATION
     cos_zenith::NF = 0                      # cosine of solar zenith angle [1]
@@ -129,6 +135,8 @@ $(TYPEDFIELDS)"""
     const c::VectorType = zeros(NF, nlayers)
     const d::VectorType = zeros(NF, nlayers)
 end
+
+Base.eltype(::ColumnVariables{NF}) where NF = NF
 
 # generator based on spectral grid
 ColumnVariables(SG::SpectralGrid; kwargs...) = ColumnVariables{SG.NF, SG.VectorType, SG.MatrixType}(; nlayers=SG.nlayers, kwargs...)

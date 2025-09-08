@@ -12,8 +12,8 @@ end
 Coriolis(SG::SpectralGrid; kwargs...) = Coriolis{SG.NF, SG.VectorType}(nlat=SG.nlat; kwargs...)
 
 function initialize!(coriolis::Coriolis, model::AbstractModel)
-    (; rotation) = model.planet
-    (; sinlat, radius) = model.geometry
+    (; radius, rotation) = model.planet
+    (; sinlat) = model.geometry
 
     # =2Ωsin(lat) but scaled with radius as are the equations
     coriolis.f .= 2rotation * sinlat * radius

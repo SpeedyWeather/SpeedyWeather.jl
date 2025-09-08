@@ -355,23 +355,23 @@ $(TYPEDFIELDS)"""
     land::DynamicsVariablesLand{NF, ArrayType, GridType, GridVariable2D}
 
     # PRECIPITATION
-    "Accumulated large-scale precipitation [m]"
-    precip_large_scale::GridVariable2D = zeros(GridVariable2D, grid)
+    "Accumulated large-scale rain [m]"
+    rain_large_scale::GridVariable2D = zeros(GridVariable2D, grid)
 
-    "Accumulated large-scale precipitation [m]"
-    precip_convection::GridVariable2D = zeros(GridVariable2D, grid)
+    "Accumulated convective rain [m]"
+    rain_convection::GridVariable2D = zeros(GridVariable2D, grid)
 
-    "Rate of large-scale precipitation [m/s], instantaneous"
-    precip_rate_large_scale::GridVariable2D = zeros(GridVariable2D, grid)
-
-    "Rate of large-scale precipitation [m/s], instantaneous"
-    precip_rate_convection::GridVariable2D = zeros(GridVariable2D, grid)
-
+    "Accumulated large-scale snow [m]"
+    snow_large_scale::GridVariable2D = zeros(GridVariable2D, grid)
+    
+    "Accumulated convective snow [m]"
+    snow_convection::GridVariable2D = zeros(GridVariable2D, grid)
+    
     "Rate of total precipitation (rain+snow) [kg/m²/s]"
     total_precipitation_rate::GridVariable2D = zeros(GridVariable2D, grid)
 
     "Cloud top [m]"
-    cloud_top::GridVariable2D = zeros(GridVariable2D, grid)            
+    cloud_top::GridVariable2D = zeros(GridVariable2D, grid)      
     
     # SURFACE FLUXES
     "Sensible heat flux [W/m²], positive up"

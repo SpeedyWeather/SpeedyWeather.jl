@@ -32,9 +32,8 @@ $(TYPEDFIELDS)
     "total number of horizontal grid points"
     npoints::Int = spectral_grid.npoints
 
-    "Planet's radius [m]"
-    radius::NF = spectral_grid.radius
-
+    "Planet's radius [m], set from model.planet during initialize!"
+    radius::Base.RefValue{NF} = Ref{NF}(DEFAULT_RADIUS)
 
     # ARRAYS OF LANGITUDES/LONGITUDES
     "array of longitudes in degrees (0...360˚), empty for non-full grids"
@@ -112,6 +111,12 @@ end
 
 function Base.show(io::IO, G::Geometry)
     print(io, "Geometry for $(G.spectral_grid)")
+end
+
+# take over radius from model.planet
+function initialize!(geometry::Geometry, model::AbstractModel)
+    geometry.radius[] = model.planet.radius
+    return geometry
 end
 
 """

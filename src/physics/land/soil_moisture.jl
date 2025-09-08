@@ -83,7 +83,7 @@ function initialize!(
     soil::SeasonalSoilMoisture,
     model::PrimitiveEquation,
 )
-    # initialize land temperature by "running" the step at the current time
+    # initialize soil_moisture by "running" the step at the current time
     timestep!(progn, diagn, soil, model)
 end
 
@@ -134,11 +134,11 @@ export LandBucketMoisture
     "[OPTION] Infiltration fraction, that is, fraction of top layer runoff that is put into layer below [1]"
     infiltration_fraction::NF = 0.25
 
-    "[OPTION] Initial soil moisture, volume fraction [1], start saturated for faster spinup"
-    initial_moisture::NF = 0.5
-    
-    "[OPTION] Apply land-sea mask to NaN ocean-only points?"
-    mask::Bool = false
+    "[OPTION] Apply land-sea mask to set ocean-only points?"
+    mask::Bool = true
+
+    "[OPTION] Initial soil moisture over ocean, volume fraction [1]"
+    ocean_moisture::NF = 0
 
     "[DERIVED] Water at field capacity [m], top layer, f = γz, set at initialize from by land.thermodynamics and .geometry"
     f₁::NF = zero(NF)
@@ -178,8 +178,19 @@ function initialize!(
     soil::LandBucketMoisture,
     model::PrimitiveEquation,
 )
-    set!(progn.land.soil_moisture, soil.initial_moisture)
-    soil.mask && mask!(progn.land.soil_moisture, model.land_sea_mask, :ocean)
+    # create a seasonal model, initialize it and the variables
+    seasonal_model = SeasonalSoilMoisture(model.spectral_grid)
+    initialize!(seasonal_model, model)
+    initialize!(progn, diagn, seasonal_model, model)
+    # (seasonal model will be garbage collected hereafter)
+
+    # set ocean "soil" moisture points (100% ocean only)
+    masked_value = soil.ocean_moisture
+    if soil.mask
+        sm = progn.land.soil_moisture
+        progn.land.soil_moisture[isnan.(sm)] .= masked_value
+        mask!(progn.land.soil_moisture, model.land_sea_mask, :ocean; masked_value)
+    end
 end
 
 function timestep!(
@@ -202,14 +213,13 @@ function timestep!(
     ρ = model.atmosphere.water_density
     (; mask) = model.land_sea_mask
 
-    Pconv = diagn.physics.precip_rate_convection    # precipitation in [m/s]
-    Plsc = diagn.physics.precip_rate_large_scale
+    P = diagn.physics.total_precipitation_rate      # precipitation (rain+snow) in [m/s]
     E = diagn.physics.land.surface_humidity_flux    # [kg/s/m²], divide by density for [m/s]
     R = diagn.physics.land.river_runoff             # diagnosed [m/s]
 
-    @boundscheck fields_match(soil_moisture, Pconv, Plsc, E, R, horizontal_only=true) ||
-        throw(DimensionMismatch(soil_moisture, Pconv))
-    @boundscheck size(soil_moisture, 2) == 2 || throw(DimensionMismatch)
+    @boundscheck fields_match(soil_moisture, P, E, R, horizontal_only=true) ||
+        throw(DimensionMismatch(soil_moisture, P))
+    @boundscheck size(soil_moisture, 2) >= 2 || throw(DimensionMismatch)
     f₁, f₂ = soil.f₁, soil.f₂
     p = soil.infiltration_fraction        # Infiltration fraction: fraction of top layer runoff put into lower layer
     τ⁻¹ = inv(convert(eltype(soil_moisture), Second(soil.time_scale).value))
@@ -217,21 +227,21 @@ function timestep!(
     Δt_f₁ = Δt/f₁
 
     launch!(architecture(soil_moisture), LinearWorkOrder, (size(soil_moisture, 1),),
-        land_bucket_soil_moisture_kernel!, soil_moisture, mask, Pconv, Plsc, E, R, ρ, Δt, f₁, Δt_f₁, f₁_f₂, p, τ⁻¹)
+        land_bucket_soil_moisture_kernel!, soil_moisture, mask, P, E, R, ρ, Δt, f₁, Δt_f₁, f₁_f₂, p, τ⁻¹)
     synchronize(architecture(soil_moisture))
 end
 
 @kernel inbounds=true function land_bucket_soil_moisture_kernel!(
-    soil_moisture, mask, Pconv, Plsc, E, R,
+    soil_moisture, mask, P, E, R,
     @Const(ρ), @Const(Δt), @Const(f₁), @Const(Δt_f₁), @Const(f₁_f₂), @Const(p), @Const(τ⁻¹),
 )
     ij = @index(Global, Linear)             # every grid point ij
 
     if mask[ij] > 0                         # at least partially land
-        # precipitation (convection + large-scale) minus evaporation (or condensation)
+        # precipitation (rain+snow, convection + large-scale) minus evaporation (or condensation)
         # river runoff only diagnostic, i.e. R=0 here but drain excess water below
         # convert to [m/s] by dividing by density
-        F = Pconv[ij] + Plsc[ij] - E[ij]/ρ  # - R[ij]
+        F = (P[ij] - E[ij])/ρ               # - R[ij]
   
         # vertical diffusion term between layers
         D = τ⁻¹*(soil_moisture[ij, 1] - soil_moisture[ij, 2])

@@ -1,7 +1,5 @@
 # KernelAbstractions implementation of Legendre transform used only on GPU 
 
-import SpeedyWeather.LowerTriangularArrays: lm2i, get_lm_range, get_2lm_range
-
 # (inverse) legendre transform kernel, called from _legendre!
 @kernel inbounds=true function inverse_legendre_kernel!(
     g_north,                        # Scratch storage for legendre coefficients

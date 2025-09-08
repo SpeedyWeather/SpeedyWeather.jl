@@ -261,7 +261,7 @@ macro parameterized(expr)
                 (;)
             elseif length(attrs) == 1
                 # handle both singleton attr=value syntax as well as named tuple syntax (attr1=value1, attr2=value2, ...)
-                attrs[1].head == :tuple ? eval(attrs[1]) : eval(:(($(attrs...),)))
+                attrs[1].head == :tuple ? Core.eval(@__MODULE__, attrs[1]) : Core.eval(@__MODULE__, :($(attrs...),))
             else
                 error("invalid syntax for parameter attributes: $(QuoteNode(attrs))")
             end

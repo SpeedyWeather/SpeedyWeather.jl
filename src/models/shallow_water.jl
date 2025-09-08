@@ -75,6 +75,7 @@ function initialize!(model::ShallowWater; time::DateTime = DEFAULT_DATE)
                                 SpectralGrid with nlayers=$(spectral_grid.nlayers) provided."
 
     # initialize components
+    initialize!(model.geometry, model)
     initialize!(model.time_stepping, model)
     initialize!(model.coriolis, model)
     initialize!(model.orography, model)

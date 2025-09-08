@@ -262,7 +262,7 @@ using SpeedyWeather
 function total_angular_momentum(u, η, model)
     H = model.atmosphere.layer_thickness
     Hb = model.orography.orography
-    R = model.spectral_grid.radius
+    R = model.planet.radius
     Ω = model.planet.rotation
 
     r = R * cos.(model.geometry.lats)       # momentum arm for every grid point
@@ -403,7 +403,7 @@ function global_diagnostics(u, v, ζ, η, model)
     NF = model.spectral_grid.NF     # number format used
     H = model.atmosphere.layer_thickness
     Hb = model.orography.orography
-    R = model.spectral_grid.radius
+    R = model.planet.radius
     Ω = model.planet.rotation
     g = model.planet.gravity
 

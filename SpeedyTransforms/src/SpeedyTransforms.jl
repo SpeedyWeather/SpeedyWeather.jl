@@ -14,12 +14,14 @@ import KernelAbstractions: @kernel, @index, @Const, synchronize
 import Atomix
 
 # SPEEDYWEATHER MODULES
-using ..Architectures: Architectures, AbstractArchitecture, CPU, GPU, 
-on_architecture, architecture, array_type, ismatching, nonparametric_type
 
-using ..Utils
-using ..LowerTriangularArrays
-using ..RingGrids
+using SpeedyWeatherInternals.Architectures
+using SpeedyWeatherInternals.Utils
+
+using RingGrids
+
+using LowerTriangularArrays
+import LowerTriangularArrays: lm2i, get_lm_range, get_2lm_range
 
 # TRANSFORM
 export  SpectralTransform,
