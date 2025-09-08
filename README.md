@@ -1,4 +1,4 @@
-# SpeedyWeather.jl <img src="https://github.com/user-attachments/assets/7259f148-a920-4f79-adb2-6659e0cf917b" width="100" />
+# SpeedyWeather.jl <img src="docs/src/assets/logo.png" width="100" />
 
 
 [![CI](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI.yml) 
