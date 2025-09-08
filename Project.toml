@@ -46,10 +46,10 @@ Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
 UnicodePlots = "b8865327-cd53-5732-bb35-84acbb429228"
 
 [sources]
-SpeedyWeatherInternals = {path = "./SpeedyWeatherInternals"}
-LowerTriangularArrays = {path = "./LowerTriangularArrays"}
-RingGrids = {path = "./RingGrids"}
-SpeedyTransforms = {path = "./SpeedyTransforms"}
+SpeedyWeatherInternals = {path = "SpeedyWeatherInternals"}
+LowerTriangularArrays = {path = "LowerTriangularArrays"}
+RingGrids = {path = "RingGrids"}
+SpeedyTransforms = {path = "SpeedyTransforms"}
 
 [extensions]
 SpeedyWeatherCUDAExt = "CUDA"
