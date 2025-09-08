@@ -141,7 +141,8 @@ function initialize!(   progn::PrognosticVariables{NF},
     RNG = initial_conditions.random_number_generator
     Random.seed!(RNG, seed)
 
-    (; GridVariable2D, grid, radius, nlayers) = model.spectral_grid
+    (; GridVariable2D, grid, nlayers) = model.spectral_grid
+    (; radius) = model.planet
     A = convert(NF, initial_conditions.max_speed) * 2
     u = 2A*rand(GridVariable2D, grid) .- A
     v = 2A*rand(GridVariable2D, grid) .- A
@@ -213,9 +214,9 @@ function initialize!(   progn::PrognosticVariables,
     β = perturb_ywidth*2π/360       # meridional extent of interface perturbation [radians]
     λ = perturb_lon*2π/360          # perturbation longitude [radians]
 
-    (; rotation, gravity) = model.planet
+    (; radius, rotation, gravity) = model.planet
     (; grid, NF) = model.spectral_grid
-    (; coslat⁻¹, radius) = model.geometry
+    (; coslat⁻¹) = model.geometry
 
     u_grid = zeros(NF, grid, 1)
     η_perturb_grid = zeros(NF, grid)
@@ -324,7 +325,7 @@ function initialize!(   progn::PrognosticVariables{NF},
     (; perturb_uₚ, perturb_radius) = initial_conditions
     λc = initial_conditions.perturb_lon
     sinφc, cosφc = sind(initial_conditions.perturb_lat), cosd(initial_conditions.perturb_lat)
-    (; radius) = model.spectral_grid
+    (; radius) = model.planet
     R = radius*perturb_radius           # spatial extent of perturbation
 
     function vor(λ, φ, η)               # longitude, latitude (degree), sigma coordinate
@@ -381,7 +382,7 @@ function initialize!(
     (; m, ω, K, c) = initial_conditions
     (; geometry) = model
     Ω = model.planet.rotation
-    R = model.spectral_grid.radius
+    R = model.planet.radius
     g = model.planet.gravity
 
     # Rossby-Haurwitz wave defined through vorticity ζ as a function of
@@ -443,13 +444,13 @@ function initialize!(   progn::PrognosticVariables{NF},
                         initial_conditions::JablonowskiTemperature,
                         model::PrimitiveEquation) where NF
 
-    (;u₀, η₀, ΔT, Tmin) = initial_conditions
-    (;σ_tropopause) = initial_conditions
+    (; u₀, η₀, ΔT, Tmin) = initial_conditions
+    (; σ_tropopause) = initial_conditions
     lapse_rate = model.atmosphere.moist_lapse_rate
-    (;temp_ref, R_dry) = model.atmosphere
-    (;radius, grid, nlayers) = model.spectral_grid
-    (;rotation, gravity) = model.planet
-    (;σ_levels_full) = model.geometry
+    (; temp_ref, R_dry) = model.atmosphere
+    (; grid, nlayers) = model.spectral_grid
+    (; radius, rotation, gravity) = model.planet
+    (; σ_levels_full) = model.geometry
 
     φ, λ = model.geometry.latds, model.geometry.londs
     S = model.spectral_transform

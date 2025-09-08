@@ -49,7 +49,6 @@ alms2 = transform(map)
 
 For more information, e.g. how to pre-plan the transforms and how to use the gradient implementations, see the [documentation](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/speedytransforms/) for more information on its usage.
 
-
 ## Related Modules
 
 SpeedyTransforms.jl is designed to be used in conjuction with the other modules of the SpeedyWeather.jl ecosystem: 

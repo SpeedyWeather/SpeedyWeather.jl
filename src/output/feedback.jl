@@ -121,6 +121,9 @@ $(TYPEDSIGNATURES)
 Finalises the progress meter and the progress txt file."""
 function finalize!(F::Feedback)
     ProgressMeter.finish!(F.progress_meter)
+
+    # reset progress meter description to not have previous run id printed
+    F.progress_meter.desc = "Weather is speedy: "
     
     if F.output     # write final progress to txt file
         time_elapsed = F.progress_meter.tlast - F.progress_meter.tinit
@@ -130,8 +133,7 @@ function finalize!(F::Feedback)
     end
 end
 
-"""
-$(TYPEDSIGNATURES)
+"""$(TYPEDSIGNATURES)
 Detect NaN (Not-a-Number, or Inf) in the prognostic variables."""
 function nan_detection!(feedback::Feedback, progn::PrognosticVariables)
 

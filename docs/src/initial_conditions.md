@@ -145,9 +145,9 @@ C(θ) &= \frac{1}{4}K^2 \cos(θ)^{2m}\left((m+1)\cos(θ)^2 - (m + 2)\right).
 ```
 
 Where ``R`` is the radius of the planet on which we consider the
-Rossby-Haurwitz wave, this value can be found in `model.spectral_grid.radius`
+Rossby-Haurwitz wave, this value can be found in `model.planet.radius`
 and ``Ω`` and ``g`` are the rotation and the gravity constant of the planet,
-which can be found in `model.planet.rotation` and `model.planet.gravity`.
+which are in `model.planet.rotation` and `model.planet.gravity`.
 
 The interface displacement ``\eta`` in SpeedyWeather's `ShallowWaterModel`
 is stored in the variable `pres` in analogy to the actual pressure in
