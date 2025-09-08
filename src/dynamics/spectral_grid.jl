@@ -113,15 +113,18 @@ function Base.show(io::IO, SG::SpectralGrid)
     radius = DEFAULT_RADIUS
     average_resolution = sqrt(4π*radius^2/npoints)/1000  # in [km]
     s(x) = x > 1000 ? @sprintf("%i", x) : @sprintf("%.3g", x)
+    radius_str = @sprintf("%.0f", radius/1000)
+    average_degrees = 360/sqrt(npoints*π)
 
     println(io, "SpectralGrid{Spectrum{...}, $Grid{...}}")
-    println(io, "├ Spectral:     T$trunc LowerTriangularMatrix{Complex{$NF}}")
-    println(io, "├ Grid:         Field{$NF} on $nlat-ring $Grid, $npoints grid points")
-    println(io, "├ Resolution:   $(s(average_resolution))km (average at $(radius/1000) km radius)")
+    println(io, "├ Number format: $NF")
+    println(io, "├ Spectral:      T$trunc LowerTriangularMatrix")
+    println(io, "├ Grid:          $nlat-ring $Grid, $npoints grid points")
+    println(io, "├ Resolution:    $(s(average_degrees))°, $(s(average_resolution))km (at $(radius_str)km radius)")
     nparticles > 0 &&
-    println(io, "├ Particles:    $nparticles")
-    println(io, "├ Vertical:     $nlayers-layer atmosphere, $nlayers_soil-layer land")
-    print(io,   "└ Architecture: $architecture using $ArrayType")
+    println(io, "├ Particles:     $nparticles")
+    println(io, "├ Vertical:      $nlayers-layer atmosphere, $nlayers_soil-layer land")
+    print(io,   "└ Architecture:  $architecture using $ArrayType")
 end
 
 # Constructor that takes all [OPTION] parameters as keyword arguments
