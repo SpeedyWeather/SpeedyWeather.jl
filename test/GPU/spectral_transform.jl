@@ -341,7 +341,7 @@ end
                     # CPU fourier transform to generate the intermediate data
                     f_north_cpu = S_cpu.scratch_memory.north    
                     f_south_cpu = S_cpu.scratch_memory.south   
-                    SpeedyTransforms._fourier!(f_north_cpu, f_south_cpu, grid_cpu, S_cpu)
+                    SpeedyTransforms._fourier!(f_north_cpu, f_south_cpu, grid_cpu, S_cpu.scratch_memory.column, S_cpu)
                     # Copy to GPU
                     f_north_gpu = cu(f_north_cpu)
                     f_south_gpu = cu(f_south_cpu)
