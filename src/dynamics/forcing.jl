@@ -59,7 +59,7 @@ function initialize!(   forcing::JetStreamForcing,
                         model::AbstractModel)
 
     (; latitude, width, speed, time_scale, amplitude) = forcing
-    (; radius) = model.spectral_grid
+    (; radius) = model.planet
     
     # Some constants similar to Galewsky 2004
     θ₀ = (latitude-width)/360*2π        # southern boundary of jet [radians]

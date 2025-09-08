@@ -307,6 +307,7 @@ function set_vordiv!(
 ) 
     u_ = coslat_scaling_included ? u : transform(RingGrids.scale_coslat⁻¹(transform(u, S)), S)
     v_ = coslat_scaling_included ? v : transform(RingGrids.scale_coslat⁻¹(transform(u, S)), S)
+    radius = geometry.radius[]
 
     if size(vor) != size(u_) != size(v_)
         u_new = zero(vor)
@@ -315,11 +316,11 @@ function set_vordiv!(
         v_new = zero(vor)
         copyto!(v_new, v_)
 
-        curl!(vor, u_new, v_new, S; add, radius=geometry.radius)
-        divergence!(div, u_new, v_new, S; add, radius=geometry.radius)
+        curl!(vor, u_new, v_new, S; add, radius)
+        divergence!(div, u_new, v_new, S; add, radius)
     else 
-        curl!(vor, u_, v_, S; add, radius=geometry.radius)
-        divergence!(div, u_, v_, S; add, radius=geometry.radius)
+        curl!(vor, u_, v_, S; add, radius)
+        divergence!(div, u_, v_, S; add, radius)
     end
 end 
 

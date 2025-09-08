@@ -1,6 +1,6 @@
 name = "SpeedyTransforms"
 uuid = "ed023a3f-7a3c-42dd-bab6-68c21c8c3105"
-authors = ["SpeedyTransform contributors"]
+authors = ["SpeedyTransforms contributors"]
 version = "0.1.0"
 
 [deps]
