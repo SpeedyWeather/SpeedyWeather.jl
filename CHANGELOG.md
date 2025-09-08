@@ -9,7 +9,7 @@
 - GitHub actions checkout v5 [#826](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/826)
 - Compatibility for JLD2 v0.6 [#825](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/825)
 - Introduce `nothing` as valid model component [#822](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/822)
-- Towards standalone packages [#815](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/815) [#835](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/835) [#836](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/836)
+- Towards standalone packages [#815](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/815) [#835](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/835) [#836](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/836) [#841](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/841)
 - New ColumnField type as the transpose of Field [#815](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/815)
 - Update CITATION.cff for Zenodo archives [#821](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/821)
 - Land kernels with KernelAbstractions [#820](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/820)
