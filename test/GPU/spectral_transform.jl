@@ -172,8 +172,9 @@ end
                     # CPU legendre transform to generate the intermediate data
                     # NOTE: assumption of working Legendre transform
                     g_north_cpu = S_cpu.scratch_memory.north    
-                    g_south_cpu = S_cpu.scratch_memory.south   
-                    SpeedyTransforms._legendre!(g_north_cpu, g_south_cpu, spec_cpu, S_cpu)
+                    g_south_cpu = S_cpu.scratch_memory.south  
+                    scratch = S_cpu.scratch_memory.column 
+                    SpeedyTransforms._legendre!(g_north_cpu, g_south_cpu, spec_cpu, scratch, S_cpu)
                     # Copy to GPU
                     g_north_gpu = cu(g_north_cpu)
                     g_south_gpu = cu(g_south_cpu);
