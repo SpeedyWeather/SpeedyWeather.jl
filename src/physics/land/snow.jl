@@ -38,6 +38,7 @@ function timestep!(
     drag_snow::NF = 3.0e-5 # [m]
     soil_density::NF = 1.3e4 #[kg/m2]
     snow_depth_scale::NF = 0.1 #[m]                       #Tunable parameter
+	τˢ::NF = 864000   # tunable parameter, currently set to 10 days [s]
     # Some atmospheric variables needed to compute snow sublimation
     P = diagn.physics.total_precipitation_rate      # precipitation (rain+snow) in [m/s]
 	S = diagn.physics.large_scale_snow_rate +  diagn.physics.convective_snow_rate    # Snowfall rate in [m/s]
@@ -98,7 +99,6 @@ function timestep!(
 	#σₛ = Sₐ / (10. * drag_snow + Sₐ) #JULES, from Betts et al.
 	σₛ[ij] = min(1.0, Sₐ[ij] / snow_depth_scale)   # e.g. snow_depth_scale ≈ 0.1 m
 	## Now compute the change in albedo
-	τˢ = 10.0 * day   # tunable parameter
 	albedo_snow[ij] = snow_albedo_old + (snow_albedo_fresh - snow_albedo_old) * exp(-Δt_snow / τˢ) # time needs to be expresssed in days. 
 	albedo_land[ij] = (1-σₛ[ij]) * albedo_land + σₛ[ij] * albedo_snow[ij]
 
