@@ -2,8 +2,10 @@ abstract type AbstractSnow <: AbstractParameterization end
 
 export SnowModel    # maybe change for a more concise name later
 @kwdef mutable struct SnowModel{NF} <: AbstractSnow
-    parameter1::NF = 0
-    parameter2::NF = 0
+    drag_snow::NF = 3.0e-5        # [m]
+    soil_density::NF = 1.3e4      # [kg/m2]
+    snow_depth_scale::NF = 0.1    # [m]                       #Tunable parameter
+	τˢ::NF = 864000               # [s] tunable parameter, currently set to 10 days 
 end
 
 # generator function
@@ -25,25 +27,26 @@ end
 function timestep!(
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
+	column::ColumnVariables,
     snow::SnowModel,
     model::PrimitiveEquation,
 )
-    (; snow_depth) = progn.land
+    Δt = model.time_stepping.Δt_sec
+	(; snow_depth) = progn.land
     (; mask) = model.land_sea_mask
-    #p1 = snow.parameter1  # ??? PLV I do not know what to make of this
     # Some thermodynamics needed by snow
-	cᵢ = thermodynamics.heat_capacity_snow
-	cₛ = thermodynamics.heat_capacity_soil
-	Lᵢ = clausius_clapeyron.latent_heat_fusion            # latent heat of fusion
-    drag_snow::NF = 3.0e-5 # [m]
-    soil_density::NF = 1.3e4 #[kg/m2]
-    snow_depth_scale::NF = 0.1 #[m]                       #Tunable parameter
-	τˢ::NF = 864000   # tunable parameter, currently set to 10 days [s]
+	drag_snow=snow.drag_snow
+	soil_density=snow.soil_density
+	snow_depth_scale=snow.snow_depth_scale
+	τˢ=snow.τˢ
+	cᵢ = model.land.thermodynamics.heat_capacity_snow
+	cₛ = model.land.thermodynamics.heat_capacity_dry_soil
+	Lᵢ = model.clausius_clapeyron.latent_heat_fusion                  # latent heat of fusion
     # Some atmospheric variables needed to compute snow sublimation
-    P = diagn.physics.total_precipitation_rate      # precipitation (rain+snow) in [m/s]
-	S = diagn.physics.large_scale_snow_rate +  diagn.physics.convective_snow_rate    # Snowfall rate in [m/s]
-    E = diagn.physics.land.surface_humidity_flux    # [kg/s/m²], divide by density for [m/s]
-    R = diagn.physics.land.river_runoff             # diagnosed [m/s]
+    P = diagn.physics.total_precipitation_rate                        # precipitation (rain+snow) in [m/s]
+	S = column.snow_rate_large_scale +  column.snow_rate_convection   # Snowfall rate in [m/s]
+    E = diagn.physics.land.surface_humidity_flux                      # [kg/s/m²], divide by density for [m/s]
+    R = diagn.physics.land.river_runoff                               # diagnosed [m/s]
     ρ = column.surface_air_density
     V₀ = column.surface_wind_speed
 	Sₐ = progn.land.snow_depth                             # snow accumulation at the surface (m of water)
@@ -52,7 +55,6 @@ function timestep!(
 	(; land_fraction, albedo_land) = column
 	snow_albedo_old=model.land.thermodynamics.snow_albedo_old
 	snow_albedo_fresh=model.land.thermodynamics.snow_albedo_fresh
-    Δt = model.time_stepping.Δt_sec
 
     # PLV's code here updating snow_depth, e.g.
     ## First, lose snow by sublimation and lose liquid precip by runoff over snow
@@ -100,10 +102,10 @@ function timestep!(
 	σₛ[ij] = min(1.0, Sₐ[ij] / snow_depth_scale)   # e.g. snow_depth_scale ≈ 0.1 m
 	## Now compute the change in albedo
 	albedo_snow[ij] = snow_albedo_old + (snow_albedo_fresh - snow_albedo_old) * exp(-Δt_snow / τˢ) # time needs to be expresssed in days. 
-	albedo_land[ij] = (1-σₛ[ij]) * albedo_land + σₛ[ij] * albedo_snow[ij]
+	column.albedo_land[ij] = (1-σₛ[ij]) * albedo_land + σₛ[ij] * albedo_snow[ij]
 
-	F[ij] = infiltration_flux[ij] + melt_flux[ij]  # Need to pass this back to bucket model
-    R[ij] = + Rₛ[ij]   #??? PLV this needs to be returned to the bucket model, it may be enough to do it here
+	F[ij] = infiltration_flux[ij] + melt_flux[ij]    # Need to pass this back to bucket model
+    diagn.physics.land.river_runoff[ij] = + Rₛ[ij]   #??? PLV this needs to be returned to the bucket model, it may be enough to do it here
 
     launch!(architecture(snow_depth), LinearWorkOrder, size(snow_depth),
         land_snow_kernel!, snow_depth, mask, p1)

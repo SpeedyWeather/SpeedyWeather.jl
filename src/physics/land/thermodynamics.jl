@@ -3,7 +3,7 @@ abstract type AbstractLandThermodynamics <: AbstractModelComponent end
 export LandThermodynamics
 @kwdef mutable struct LandThermodynamics{NF} <: AbstractLandThermodynamics
     "[OPTION] Heat conductivity λ_{soil} of the soil [W/(m K)]" 
-    heat_conductivity::NF = 0.42
+    heat_conductivity_dry_soil::NF = 0.42
 
     "[OPTION] Heat conductivity λ_{snow} of snow [W/(m K)]" 
     heat_conductivity_snow::NF = 0.08

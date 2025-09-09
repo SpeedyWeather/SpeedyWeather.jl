@@ -187,7 +187,7 @@ function timestep!(
         throw(DimensionMismatch(soil_temperature, Rs))
     @boundscheck size(soil_moisture, 2) == size(soil_temperature, 2) == 2 || throw(DimensionMismatch)
     
-    λ = thermodynamics.heat_conductivity
+    λ = thermodynamics.heat_conductivity_dry_soil
     γ = thermodynamics.field_capacity
     Cw = thermodynamics.heat_capacity_water
     Cs = thermodynamics.heat_capacity_dry_soil
