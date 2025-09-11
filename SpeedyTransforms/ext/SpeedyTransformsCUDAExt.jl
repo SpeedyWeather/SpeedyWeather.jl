@@ -1,7 +1,7 @@
 module SpeedyTransformsCUDAExt
     
     using SpeedyTransforms
-    import CUDA: CUDA, CUFFT
+    import CUDA: CUDA, CUFFT, CuArray
     import AbstractFFTs
     using DocStringExtensions
 
@@ -136,5 +136,5 @@ module SpeedyTransformsCUDAExt
             view(grids.data, ilons, k_grid) .= brfft_plan * view(g_in, 1:nfreq, k, j)
         end
     end
-    
+
 end 
