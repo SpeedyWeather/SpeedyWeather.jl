@@ -1,9 +1,12 @@
 module SpeedyTransformsCUDAExt
     
-    using SpeedyTransforms
     import CUDA: CUDA, CUFFT, CuArray
     import AbstractFFTs
     using DocStringExtensions
+
+    using SpeedyTransforms
+    using SpeedyTransforms.RingGrids
+    using SpeedyTransforms.LowerTriangularArrays
 
     # Override FFT package deciding function
     SpeedyTransforms.which_FFT_package(::Type{<:CuArray{<:AbstractFloat}}) = CUFFT 
