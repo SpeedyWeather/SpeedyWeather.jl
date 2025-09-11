@@ -6,6 +6,7 @@ module SpeedyTransformsEnzymeExt
     using .EnzymeRules
 
     # import all functions for which we define rules
+    using SpeedyTransforms
     import SpeedyTransforms: _fourier!
 
     # Rules for SpeedyTransforms

@@ -1,6 +1,7 @@
 module LowerTriangularArraysFiniteDifferencesExt 
 
     import FiniteDifferences: FiniteDifferences, to_vec 
+    using LowerTriangularArrays
 
     function FiniteDifferences.to_vec(x::LTA) where LTA <: LowerTriangularArray
         x_vec, from_vec = FiniteDifferences.to_vec(x.data)

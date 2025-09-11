@@ -1,6 +1,7 @@
 module RingGridsFiniteDifferencesExt 
 
     import FiniteDifferences: FiniteDifferences, to_vec 
+    using RingGrids
 
     function FiniteDifferences.to_vec(x::AbstractField)
         x_vec, from_vec = FiniteDifferences.to_vec(Array(x))
@@ -11,5 +12,5 @@ module RingGridsFiniteDifferencesExt
     
         return x_vec, field_from_vec
     end 
-    
+
 end 
