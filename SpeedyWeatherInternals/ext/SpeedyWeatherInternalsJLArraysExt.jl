@@ -14,5 +14,5 @@ module SpeedyWeatherInternalsJLArraysExt
     Architectures.array_type(::GPU{JLBackend}, NF::Type, N::Int) = JLArray{NF, N}
     Architectures.compatible_array_types(::GPU) = (JLArray, JLArrays.JLDeviceArray)
     Architectures.nonparametric_type(::Type{<:JLArray}) = JLArray
-    
+
 end
