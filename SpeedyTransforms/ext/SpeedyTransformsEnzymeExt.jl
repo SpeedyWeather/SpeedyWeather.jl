@@ -7,6 +7,9 @@ module SpeedyTransformsEnzymeExt
 
     # import all functions for which we define rules
     using SpeedyTransforms
+    using SpeedyTransforms.RingGrids
+    using SpeedyTransforms.LowerTriangularArrays
+    
     import SpeedyTransforms: _fourier!
 
     # Rules for SpeedyTransforms
