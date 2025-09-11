@@ -11,6 +11,8 @@ KernelAbstractions = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
 julia = "1.10"
 KernelAbstractions = "0.9"
 DocStringExtensions = "0.9"
+JLArrays = "0.1, 0.2"
+CUDA = "4, 5"
 
 [extensions]
 SpeedyWeatherInternalsJLArraysExt = "JLArrays"
