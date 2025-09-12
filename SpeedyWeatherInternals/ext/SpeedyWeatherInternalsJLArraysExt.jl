@@ -8,7 +8,10 @@ module SpeedyWeatherInternalsJLArraysExt
     Architectures.ismatching(arch::Type{<:GPU}, array_type::Type{<:JLArray}) = true
     Architectures.ismatching(arch::GPU, array_type::Type{<:JLArrays.JLDeviceArray}) = true
     Architectures.ismatching(arch::Type{<:GPU}, array_type::Type{<:JLArrays.JLDeviceArray}) = true
+
+    Architectures.architecture(::JLArray) = GPU(JLArrays.JLBackend())
     Architectures.architecture(::Type{<:JLArray}) = GPU(JLArrays.JLBackend())
+    Architectures.architecture(::Type{<:JLArrays.JLDeviceArray}) = GPU(JLArrays.JLBackend())
 
     Architectures.on_architecture(::CPU, a::JLArray) = Array(a)
     Architectures.on_architecture(::GPU{JLBackend}, a::JLArray) = a
