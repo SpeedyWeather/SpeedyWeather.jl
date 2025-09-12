@@ -28,7 +28,7 @@ function adjoint_scale(S::SpectralTransform)
     end 
 
     # TODO: transfer array to GPU in case we are on GPU?
-    return scale
+    return on_architecture(S.architecture, scale)
 end 
 
 # Computes the scale for the adjoint/pullback of a real discrete fourier transform.
