@@ -36,6 +36,4 @@ module SpeedyWeatherInternalsMetalExt
 
     @inline Architectures.convert_to_device(::GPU, args) = Metal.mtlconvert(args)
     @inline Architectures.convert_to_device(::GPU, args::Tuple) = map(Metal.mtlconvert, args)
-
-    @info "SpeedyWeatherInternalsMetalExt loaded"
 end

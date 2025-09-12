@@ -14,11 +14,11 @@ import Base.Threads: Threads, @threads
 import KernelAbstractions: KernelAbstractions, @kernel, @index, @Const, synchronize
 import Adapt: Adapt, adapt, adapt_structure
 
-using SpeedyWeatherInternals
+using  SpeedyWeatherInternals
 using  SpeedyWeatherInternals.Architectures
 import SpeedyWeatherInternals.Architectures: AbstractArchitecture, CPU, GPU, 
-        on_architecture, architecture, array_type, ismatching, nonparametric_type
-export on_architecture, architecture                # export device functions 
+       on_architecture, architecture, array_type, ismatching, nonparametric_type
+export CPU, GPU, on_architecture, architecture                # export device functions 
 
 # INPUT OUTPUT
 import TOML
@@ -32,7 +32,7 @@ import BitInformation: round, round!
 import ProgressMeter
 
 # UTILITIES
-using DomainSets.IntervalSets
+using  DomainSets.IntervalSets
 
 # to avoid a `using Dates` to pass on DateTime arguments
 export DateTime, Millisecond, Second, Minute, Hour, Day, Week, Month, Year, Century, Millenium
