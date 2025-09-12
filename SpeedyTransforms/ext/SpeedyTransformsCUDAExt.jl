@@ -43,4 +43,48 @@ module SpeedyTransformsCUDAExt
 
         return rfft_plans, brfft_plans, rfft_plans_1D, brfft_plans_1D
     end
+
+    """$(TYPEDSIGNATURES)
+    (Forward) FFT, applied in zonal direction of `field` provided. 
+    """
+    function _apply_batched_fft!(
+        f_out::CuArray{<:Complex, 3},
+        field::AbstractField,
+        S::SpectralTransform, 
+        j::Int,
+        nfreq::Int,
+        ilons::UnitRange{Int};
+        not_equator::Bool = true
+    )
+        rfft_plan = S.rfft_plans[j]     # FFT planned wrt nlon on ring
+        nlayers = size(field, 2)        # number of vertical layers
+
+        if not_equator
+            view(f_out, 1:nfreq, 1:nlayers, j) .= rfft_plan * field.data[ilons, :]
+        else
+            fill!(f_out[1:nfreq, 1:nlayers, j], 0)
+        end
+    end
+
+    """$(TYPEDSIGNATURES)
+    (Inverse) FFT, applied in zonal direction of `field` provided.
+    """
+    function _apply_batched_fft!(
+        field::AbstractField,
+        g_in::CuArray{<:Complex, 3},
+        S::SpectralTransform,
+        j::Int,
+        nlon::Int,
+        ilons::UnitRange{Int};
+        not_equator::Bool = true
+    )
+        brfft_plan = S.brfft_plans[j]   # FFT planned wrt nlon on ring
+        nlayers = size(field, 2)        # number of vertical layers
+        nfreq = nlon÷2 + 1              # linear max Fourier frequency wrt to nlon
+
+        if not_equator
+            view(field.data, ilons, :) .= brfft_plan * g_in[1:nfreq, 1:nlayers, j]
+        end
+    end 
+
 end 
