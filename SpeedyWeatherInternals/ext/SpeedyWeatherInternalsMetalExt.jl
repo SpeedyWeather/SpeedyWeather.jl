@@ -1,9 +1,10 @@
 module SpeedyWeatherInternalsMetalExt
 
-    import  Metal: Metal, MtlArray
+    import  Metal: Metal, MtlArray, MtlDeviceArray
     import  SpeedyWeatherInternals.Architectures: Architectures, 
             GPU, CPU, MetalGPU, array_type, architecture, on_architecture, architecture,
             compatible_array_types, nonparametric_type
+
 
     # DEVICE SETUP FOR METAL
     # extend functions from Architectures
@@ -36,4 +37,5 @@ module SpeedyWeatherInternalsMetalExt
     @inline Architectures.convert_to_device(::GPU, args) = Metal.mtlconvert(args)
     @inline Architectures.convert_to_device(::GPU, args::Tuple) = map(Metal.mtlconvert, args)
 
+    @info "SpeedyWeatherInternalsMetalExt loaded"
 end
