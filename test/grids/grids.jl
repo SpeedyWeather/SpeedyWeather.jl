@@ -1,5 +1,4 @@
 using JLArrays
-using Adapt
 
 RINGGRIDS_DEFAULT_NF = SpeedyWeather.RingGrids.DEFAULT_NF
 @testset "Grid types" begin
@@ -491,10 +490,10 @@ end
         ndims = length(s)
 
         field_cpu = randn(F{NF}, s...)
-
+        jl_arch = architecture(JLArray)
         # constructors/adapt
-        field = adapt(JLArray, field_cpu)
-        field2 = Field(adapt(JLArray, field_cpu.data), field.grid)
+        field = on_architecture(jl_arch, field_cpu)
+        field2 = Field(on_architecture(jl_arch, field_cpu.data), field.grid)
         @test field == field2
 
         # broadcasting doesn't escape
@@ -507,7 +506,7 @@ end
         @test field[1, :, :] isa JLArray{NF, 2}
         @test field[:, 1, 1] isa Field{NF, 1, JLArray{NF, 1}}
         for ring in eachring(field) 
-            @test field[ring, :, :] == adapt(JLArray, field_cpu[ring, :, :])
+            @test field[ring, :, :] == on_architecture(jl_arch, field_cpu[ring, :, :])
             @test Array(field[ring, :, :]) == field_cpu[ring, :, :]
         end
 
@@ -526,7 +525,7 @@ end
         @test Array(field[:, 1, 1].data) ≈ v
 
         # with other field {JLArray}
-        v = adapt(JLArray, rand(F, s[1]))
+        v = on_architecture(jl_arch, rand(F, s[1]))
         field[:, 1, 2] = v
         @test field[:, 1, 2].data ≈ v.data
 

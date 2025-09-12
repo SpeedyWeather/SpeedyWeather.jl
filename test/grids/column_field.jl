@@ -1,5 +1,4 @@
 using JLArrays
-using Adapt
 
 RINGGRIDS_DEFAULT_NF = SpeedyWeather.RingGrids.DEFAULT_NF
 RINGGRIDS_DEFAULT_NF = Float32
@@ -288,9 +287,10 @@ end
 
         # Create CPU ColumnField
         column_field_cpu = ColumnField(rand(NF, nlayers, npoints), grid)
+        jl_arch = architecture(JLArray)
 
         # Test adapt to GPU
-        column_field_gpu = adapt(JLArray, column_field_cpu)
+        column_field_gpu = on_architecture(jl_arch, column_field_cpu)
         @test column_field_gpu isa ColumnField{NF, 2, JLArray{NF, 2}}
         @test size(column_field_gpu) == size(column_field_cpu)
 
