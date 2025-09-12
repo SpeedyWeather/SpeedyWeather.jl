@@ -5,8 +5,8 @@ module SpeedyTransformsCUDAExt
     using DocStringExtensions
 
     using SpeedyTransforms
-    using SpeedyTransforms.LowerTriangularArrays
     using SpeedyTransforms.RingGrids 
+    using SpeedyTransforms.LowerTriangularArrays
     
     # Override FFT package deciding function
     SpeedyTransforms.which_FFT_package(::Type{<:CuArray{<:AbstractFloat}}) = CUFFT 
