@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.17
+
 - More documentation on GPU and on_architecture [#845](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/845)
 - The documentation has a logo now as well [#842](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/842)
 - Move radius to model.planet [#838](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/838)
