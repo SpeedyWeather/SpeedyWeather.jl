@@ -68,6 +68,7 @@ function reverse(config::EnzymeRules.RevConfigWidth{1}, func::Const{typeof(_four
 
     # compute the adjoint
     dgridval = zero(gridsval)
+
     _fourier!(dgridval, f_north.dval ./ scale, f_south.dval ./ scale, scratch_memory.dval, S.val) # inverse FFT (w/o normalization)
     grids.dval .+= dgridval 
 
