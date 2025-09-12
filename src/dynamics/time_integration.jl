@@ -18,7 +18,7 @@ $(TYPEDFIELDS)
     "Time step in minutes for T31, scale linearly to `trunc`"
     Δt_at_T31::Second = Minute(40)
 
-    "Radius of sphere [m], used for scaling"
+    "Radius of sphere [m], used for scaling, set in intialize! to planet.radius"
     radius::NF = DEFAULT_RADIUS
 
     "Adjust Δt_at_T31 with the output_dt to reach output_dt exactly in integer time steps"
@@ -94,8 +94,8 @@ $(TYPEDSIGNATURES)
 Generator function for a Leapfrog struct using `spectral_grid`
 for the resolution information."""
 function Leapfrog(spectral_grid::SpectralGrid; kwargs...)
-    (; NF, trunc, radius) = spectral_grid
-    return Leapfrog{NF}(; trunc, radius, kwargs...)
+    (; NF, trunc) = spectral_grid
+    return Leapfrog{NF}(; trunc, kwargs...)
 end
 
 """
@@ -106,13 +106,12 @@ be a divisor such that an integer number of time steps matches exactly with the 
 time step."""
 function initialize!(L::Leapfrog, model::AbstractModel)
     (; output_dt) = model.output
+    (; radius) = model.planet
 
-    if L.adjust_with_output
-        # take actual output dt from model.output and recalculate timestep
-        L.Δt_millisec = get_Δt_millisec(L.Δt_at_T31, L.trunc, L.radius, L.adjust_with_output, output_dt)
-        L.Δt_sec = L.Δt_millisec.value/1000
-        L.Δt = L.Δt_sec/L.radius
-    end
+    # take radius from planet and recalculate time step and possibly adjust with output dt
+    L.Δt_millisec = get_Δt_millisec(L.Δt_at_T31, L.trunc, radius, L.adjust_with_output, output_dt)
+    L.Δt_sec = L.Δt_millisec.value/1000
+    L.Δt = L.Δt_sec/radius
 
     # check how time steps from time integration and output align
     n = round(Int, Millisecond(output_dt).value/L.Δt_millisec.value)
@@ -173,13 +172,19 @@ function leapfrog!(
     w1 = lf == 1 ? zero(NF) : robert_filter*williams_filter/2       # = ν*α/2 in Williams (2009, Eq. 8)
     w2 = lf == 1 ? zero(NF) : robert_filter*(1-williams_filter)/2   # = ν(1-α)/2 in Williams (2009, Eq. 9)
 
-    @inbounds for lm in eachindex(A_old, A_new, tendency)
-        a_old = A_old[lm]                       # double filtered value from previous time step (t-Δt)
-        a_new = a_old + dt_NF*tendency[lm]      # Leapfrog/Euler step depending on dt=Δt, 2Δt (unfiltered at t+Δt)
-        a_update = a_old - 2A_lf[lm] + a_new    # Eq. 8&9 in Williams (2009), calculate only once
-        A_old[lm] = A_lf[lm] + w1*a_update      # Robert's filter: A_old[lm] becomes 2xfiltered value at t
-        A_new[lm] = a_new - w2*a_update         # Williams filter: A_new[lm] becomes 1xfiltered value at t+Δt
-    end
+    launch!(architecture(tendency), SpectralWorkOrder, size(tendency), leapfrog_kernel!, A_old, A_new, A_lf, tendency, dt_NF, w1, w2)
+    synchronize(architecture(tendency))
+end
+
+@kernel inbounds=true function leapfrog_kernel!(A_old, A_new, A_lf, tendency, @Const(dt), @Const(w1), @Const(w2))
+
+    lmk = @index(Global, Linear)    # every harmonic lm, every vertical layer k
+
+    a_old = A_old[lmk]
+    a_new = a_old + dt*tendency[lmk]
+    a_update = a_old - 2A_lf[lmk] + a_new
+    A_old[lmk] = A_lf[lmk] + w1*a_update
+    A_new[lmk] = a_new - w2*a_update
 end
 
 # variables that are leapfrogged in the respective models, e.g. :vor_tend, :div_tend, etc...
@@ -285,7 +290,7 @@ function timestep!(
 
     # PARTICLE ADVECTION (always skip 1st step of first_timesteps!)
     not_first_timestep = lf2 == 2
-    not_first_timestep && particle_advection!(progn, diagn, model.particle_advection)
+    not_first_timestep && particle_advection!(progn, diagn, model)
 
     return nothing 
 end
@@ -317,7 +322,7 @@ function timestep!(
     
     # PARTICLE ADVECTION (always skip 1st step of first_timesteps!)
     not_first_timestep = lf2 == 2
-    not_first_timestep && particle_advection!(progn, diagn, model.particle_advection)
+    not_first_timestep && particle_advection!(progn, diagn, model)
 
     return nothing
 end
@@ -344,6 +349,7 @@ function timestep!(
         # calculate all parameterizations
         parameterization_tendencies!(diagn, progn, time, model)
         ocean_timestep!(progn, diagn, model)    # sea surface temperature and maybe in the future sea ice
+        sea_ice_timestep!(progn, diagn, model)  # sea ice
         land_timestep!(progn, diagn, model)     # soil moisture and temperature, vegetation, maybe rivers
     end
 
@@ -363,7 +369,7 @@ function timestep!(
 
     # PARTICLE ADVECTION (always skip 1st step of first_timesteps!)
     not_first_timestep = lf2 == 2
-    not_first_timestep && particle_advection!(progn, diagn, model.particle_advection)
+    not_first_timestep && particle_advection!(progn, diagn, model)
 
     return nothing 
 end

@@ -11,7 +11,7 @@ function Base.show(io::IO, A::AbstractDiagnosticVariables)
         if T <: AbstractField
             NF = first_parameter(T)
             nlat = RingGrids.get_nlat(val)
-            Grid = RingGrids.nonparametric_type(T)
+            Grid = nonparametric_type(T)
             s = Base.dims2string(size(val))*", $nlat-ring $Grid{$NF}"
         elseif T <: LowerTriangularArray
             NF = first_parameter(T)
@@ -44,8 +44,8 @@ $(TYPEDFIELDS)"""
 } <: AbstractDiagnosticVariables
 
     spectrum::SpectrumType            # spectral resolution: maximum degree and order of spherical harmonics
-    grid::GridType              # grid resolution: number of latitude rings on one hemisphere (Eq. incl.)
-    nlayers::Int            # number of vertical layers
+    grid::GridType                    # grid resolution: number of latitude rings on one hemisphere (Eq. incl.)
+    nlayers::Int                      # number of vertical layers
 
     # SPECTRAL TENDENCIES
     "Vorticity of horizontal wind field [1/s]"
@@ -107,7 +107,7 @@ $TYPEDFIELDS."""
     GridVariable3D,         # <: AbstractField
 } <: AbstractDiagnosticVariables
 
-    grid::GridType              # grid resolution: number of latitude rings on one hemisphere (Eq. incl.)
+    grid::GridType          # grid resolution: number of latitude rings on one hemisphere (Eq. incl.)
     nlayers::Int            # number of vertical layers
 
     "Relative vorticity of the horizontal wind [1/s]"
@@ -276,11 +276,22 @@ export DynamicsVariablesOcean
     GridVariable2D,
 } <: AbstractDiagnosticVariables
 
+    "Grid used for fields"
     grid::GridType
+
+    "Surface sensible heat flux [W/m²], positive up"
     sensible_heat_flux::GridVariable2D = zeros(GridVariable2D, grid)
-    evaporative_flux::GridVariable2D = zeros(GridVariable2D, grid)
+
+    "Surface humidity flux [kg/s/m²], positive up"
+    surface_humidity_flux::GridVariable2D = zeros(GridVariable2D, grid)
+
+    "Surface shortwave radiative flux up [W/m²]"
     surface_shortwave_up::GridVariable2D = zeros(GridVariable2D, grid)
+
+    "Surface longwave radiative flux up [W/m²]"
     surface_longwave_up::GridVariable2D = zeros(GridVariable2D, grid)
+
+    "Albedo over ocean (but defined everywhere) [1]"
     albedo::GridVariable2D = zeros(GridVariable2D, grid)
 end
 
@@ -295,14 +306,25 @@ export DynamicsVariablesLand
     GridVariable2D,
 } <: AbstractDiagnosticVariables
 
+    "Grid used for fields"
     grid::GridType
+
+    "Surface sensible heat flux [W/m²], positive up"
     sensible_heat_flux::GridVariable2D = zeros(GridVariable2D, grid)
-    evaporative_flux::GridVariable2D = zeros(GridVariable2D, grid)
+    
+    "Surface humidity flux [W/m²], positive up"
+    surface_humidity_flux::GridVariable2D = zeros(GridVariable2D, grid)
+    
+    "Surface shortwave radiative flux up [W/m²]"
     surface_shortwave_up::GridVariable2D = zeros(GridVariable2D, grid)
+
+    "Surface longwave radiative flux up [W/m²]"
     surface_longwave_up::GridVariable2D = zeros(GridVariable2D, grid)
+
+    "Albedo over land (but defined everywhere) [1]"
     albedo::GridVariable2D = zeros(GridVariable2D, grid)
 
-    "Availability of soil moisture to evaporation [1]"
+    "Availability of soil moisture to evaporation (or condensation) [1]"
     soil_moisture_availability::GridVariable2D = zeros(GridVariable2D, grid)
 
     "River runoff [m/s], diagnostic overflow from soil moisture"
@@ -331,27 +353,33 @@ $(TYPEDFIELDS)"""
     land::DynamicsVariablesLand{NF, ArrayType, GridType, GridVariable2D}
 
     # PRECIPITATION
-    "Accumulated large-scale precipitation [m]"
-    precip_large_scale::GridVariable2D = zeros(GridVariable2D, grid)
+    "Accumulated large-scale rain [m]"
+    rain_large_scale::GridVariable2D = zeros(GridVariable2D, grid)
 
-    "Accumulated large-scale precipitation [m]"
-    precip_convection::GridVariable2D = zeros(GridVariable2D, grid)
+    "Accumulated convective rain [m]"
+    rain_convection::GridVariable2D = zeros(GridVariable2D, grid)
 
-    "Rate of large-scale precipitation [m/s], instantaneous"
-    precip_rate_large_scale::GridVariable2D = zeros(GridVariable2D, grid)
-
-    "Rate of large-scale precipitation [m/s], instantaneous"
-    precip_rate_convection::GridVariable2D = zeros(GridVariable2D, grid)
+    "Accumulated large-scale snow [m]"
+    snow_large_scale::GridVariable2D = zeros(GridVariable2D, grid)
+    
+    "Accumulated convective snow [m]"
+    snow_convection::GridVariable2D = zeros(GridVariable2D, grid)
+    
+    "Rate of total precipitation (rain+snow) [kg/m²/s]"
+    total_precipitation_rate::GridVariable2D = zeros(GridVariable2D, grid)
 
     "Cloud top [m]"
-    cloud_top::GridVariable2D = zeros(GridVariable2D, grid)            
+    cloud_top::GridVariable2D = zeros(GridVariable2D, grid)      
     
     # SURFACE FLUXES
     "Sensible heat flux [W/m²], positive up"
     sensible_heat_flux::GridVariable2D = zeros(GridVariable2D, grid)
     
-    "Evaporative flux [kg/s/m^2], positive up"
-    evaporative_flux::GridVariable2D = zeros(GridVariable2D, grid)
+    "Surface humidity flux [kg/s/m^2], positive up"
+    surface_humidity_flux::GridVariable2D = zeros(GridVariable2D, grid)
+
+    "Surface latent heat flux [W/m²], positive up"
+    surface_latent_heat_flux::GridVariable2D = zeros(GridVariable2D, grid)
 
     # RADIATION
     "Surface radiation: shortwave up [W/m²]"
@@ -424,10 +452,10 @@ end
 """$(TYPEDSIGNATURES)
 Generator function."""
 function ParticleVariables(SG::SpectralGrid)
-    (; nparticles, NF, ArrayType) = SG
+    (; architecture, nparticles, NF, ArrayType) = SG
     (; ParticleVector) = SG
-    VectorNF = ArrayType{NF, 1}
-    interpolator = RingGrids.AnvilInterpolator(SG.grid, nparticles; NF, ArrayType)
+    VectorNF = array_type(architecture, NF, 1)
+    interpolator = RingGrids.AnvilInterpolator(SG.grid, nparticles; NF)
     return ParticleVariables{NF,ArrayType, ParticleVector, VectorNF, typeof(interpolator)}(;
             nparticles, interpolator)
 end
@@ -513,10 +541,13 @@ function DiagnosticVariables(
     nbands_shortwave::Integer = 0,
     nbands_longwave::Integer = 0,
 )
-    (; spectrum, nparticles, NF, nlayers) = SG
+    (; spectrum, grid, nparticles, NF, nlayers) = SG
+    (; SpectralVariable2D, SpectralVariable3D) = SG
+    (; GridVariable2D, GridVariable3D) = SG
+    (; ArrayType, VectorType, MatrixType, ParticleVector) = SG
 
     tendencies = Tendencies(SG)
-    grid = GridVariables(SG)
+    grid_variables = GridVariables(SG)
     dynamics = DynamicsVariables(SG; spectral_transform)
     physics = PhysicsVariables(SG)
     particles = ParticleVariables(SG)
@@ -525,9 +556,13 @@ function DiagnosticVariables(
 
     scale = Ref(one(NF))
 
-    return DiagnosticVariables(
-        spectrum, SG.grid, nlayers, nparticles,
-        tendencies, grid, dynamics, physics, particles,
+    return DiagnosticVariables{
+        NF, ArrayType, typeof(spectrum), typeof(grid), SpectralVariable2D, SpectralVariable3D,
+        GridVariable2D, GridVariable3D, ParticleVector, VectorType, MatrixType,
+        typeof(dynamics.scratch_memory), typeof(particles.interpolator)
+    }(
+        spectrum, grid, nlayers, nparticles,
+        tendencies, grid_variables, dynamics, physics, particles,
         column, temp_average, scale,
     )
 end
@@ -541,7 +576,7 @@ function Base.show(
     (; spectrum, nlayers, nparticles) = diagn
     grid = diagn.grid_used   # TODO grid is used by 'GridVariables'
     nlat = RingGrids.get_nlat(grid)
-    Grid = RingGrids.nonparametric_type(grid)
+    Grid = nonparametric_type(grid)
 
     ntracers = length(diagn.grid.tracers_grid)
     println(io, "├ spectrum: T$(truncation(spectrum)), $nlayers layers, $ntracers tracers")

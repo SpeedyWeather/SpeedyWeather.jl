@@ -1,5 +1,5 @@
 using Documenter
-using SpeedyWeather
+using SpeedyWeatherInternals, LowerTriangularArrays, RingGrids, SpeedyTransforms, SpeedyWeather
 
 makedocs(
     format = Documenter.HTML(prettyurls=get(ENV, "CI", nothing)=="true",
@@ -9,7 +9,8 @@ makedocs(
                              size_threshold = 600_000),      # in bytes
     sitename = "SpeedyWeather.jl",
     authors = "M Klöwer and SpeedyWeather contributors",
-    modules = [SpeedyWeather],
+    modules = [SpeedyWeather, SpeedyWeatherInternals, LowerTriangularArrays, RingGrids, SpeedyTransforms],
+    checkdocs = :exports,
     pages = ["Home"=>"index.md",
             "Installation"=>"installation.md",
             "Running SpeedyWeather" => [
@@ -20,11 +21,14 @@ makedocs(
                 "Tracer advection"=>"tracers.md",
                 "Particle advection"=>"particles.md",
                 "Stochastic physics" => "stochastic_physics.md",
-                "Land surface model" => "land.md",
+                "Ocean models" => "ocean.md",
+                "Sea ice models" => "sea_ice.md",
+                "Land surface models" => "land.md",
                 "Analysis"=>"analysis.md",
                 "Tree structure"=>"structure.md",
                 "Differentiability and Adjoint Model"=>"differentiability.md",
                 "NetCDF output"=>"output.md",
+                "GPU & Architectures" => "architectures_gpu.md",
             ],
             "Extending SpeedyWeather" => [
                 "Extensions"=>"extensions.md",
@@ -32,7 +36,7 @@ makedocs(
                 "Parameterizations"=>"parameterizations.md",
                 "Orography"=>"orography.md",
                 "Land-Sea Mask"=>"land_sea_mask.md",
-                "Ocean"=>"ocean.md",
+                "Ocean"=>"custom_ocean.md",
                 "NetCDF output variables"=>"custom_netcdf_output.md",
                 "Callbacks"=>"callbacks.md",
             ],

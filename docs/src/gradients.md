@@ -123,7 +123,7 @@ so calculated anyway...).
 ```@example gradient
 u = simulation.diagnostic_variables.grid.u_grid[:, 1]   # [:, 1] for 1st layer
 v = simulation.diagnostic_variables.grid.v_grid[:, 1]
-vor = curl(u, v, radius = spectral_grid.radius)
+vor = curl(u, v, radius = model.planet.radius)
 nothing # hide
 ```
 Here, `u, v` are the grid-point velocity fields, and the function `curl` takes in either
@@ -138,7 +138,7 @@ S = SpectralTransform(u, one_more_degree=true)
 us = transform(u, S)
 vs = transform(v, S)
 
-vor = curl(us, vs, radius = spectral_grid.radius)
+vor = curl(us, vs, radius = model.planet.radius)
 ```
 (Copies of) the velocity fields are unscaled by the cosine of latitude (see above),
 then transformed into spectral space, and the `curl` has the keyword argument `radius`
@@ -189,7 +189,7 @@ Now we need to apply the inverse Laplace operator to ``f\zeta/g`` which we do as
 ```@example gradient
 fζ_g_spectral = transform(fζ_g, S)
 
-R = spectral_grid.radius
+R = model.planet.radius
 η = SpeedyTransforms.∇⁻²(fζ_g_spectral) * R^2
 η_grid = transform(η, S)
 nothing # hide

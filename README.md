@@ -1,4 +1,4 @@
-# SpeedyWeather.jl <img src="https://github.com/user-attachments/assets/7259f148-a920-4f79-adb2-6659e0cf917b" width="100" />
+# SpeedyWeather.jl <img src="docs/src/assets/logo.png" width="100" />
 
 
 [![CI](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI.yml) 
@@ -18,10 +18,11 @@ With minimal code redundancies it supports
 - Tracer advection in 2D/3D that can be added, deleted, (de)activated anytime
 - Physics parameterizations for convection, precipitation, boundary layer, etc.
 - Various more or less realistic planets and what-if scenarios by easily modifying initial and boundary conditions
-- A slab ocean and a 2-layer land bucket model
+- A slab ocean and thermodynamic sea ice model
+- A 2-layer land bucket model with soil temperature, moisture and vegetation
 
 **Numerics and computing**
-- Different spatial grids (full and octahedral grids, Gaussian and Clenshaw-Curtis, HEALPix, OctaHEALPix)
+- Different spatial grids (full and octahedral, Gaussian and Clenshaw-Curtis, HEALPix, OctaHEALPix)
 - Different resolutions (T31 to T1023 and higher, i.e. 400km to 10km using linear, quadratic or cubic truncation)
 - Different arithmetics: Float32 (default), Float64, and (experimental) BFloat16, stochastic rounding
 - a very fast and flexible spherical harmonics transform library SpeedyTransforms
@@ -66,9 +67,12 @@ and other features will be implemented. On our TODO is
 
 - A more realistic radiation scheme depending on clouds and humidity
 - Longwave radiation that depends on (globally averaged) greenhouse gas concentrations to represent climate change
-- Sea ice, snow affecting surface fluxes including albedo
+- Snow affecting surface fluxes including albedo
 - Exoplanet support with more flexibility on the atmospheric composition
 - 3D particle advection
+
+Currently in development are
+
 - single GPU and CPU multi-threading support via KernelAbstractions
 - differentiability with Enzyme
 
@@ -162,9 +166,11 @@ https://github.com/user-attachments/assets/6dfa212a-c5dc-4c54-b274-7755d5baf15c
 ## History
 
 SpeedyWeather.jl started off as a reinvention of the atmospheric general circulation model
-[SPEEDY](http://users.ictp.it/~kucharsk/speedy-net.html) in Julia. While conceptually a similar model,
-it is entirely restructured, features have been added, changed and removed, such that only some of the numerical
-schemes share similarities. Fortran SPEEDY's dynamical core has an obscure history:
+[SPEEDY](http://users.ictp.it/~kucharsk/speedy-net.html) in Julia.
+SpeedyWeather has a different philosophy except for the simplicty of some parameterizations
+and many features have been added or changed so that only some of the numerical
+schemes share similarities, but so do many global spectral models.
+Fortran SPEEDY's dynamical core has an obscure history:
 Large parts were written by Isaac Held at GFDL in/before the 90ies with an unknown amount of
 contributions/modifications from Steve Jewson (Oxford) in the 90ies.
 The physical parametrizations were then added by Franco Molteni, Fred Kucharski, and Martin P. King
@@ -176,8 +182,7 @@ intermediate-complexity climate models as a conceptual launchpad for SpeedyWeath
 
 ## Submodules
 
-SpeedyWeather.jl defines several submodules that are technically stand-alone (with dependencies) but aren't separated
-out to their own packages for now
+SpeedyWeather.jl defines several modules that are part of this repository, but also available to be used and installed as stand-alone packages: 
 
 - [__RingGrids__](https://speedyweather.github.io/SpeedyWeather.jl/dev/ringgrids/),
 a module that defines several iso-latitude ring-based spherical grids (like the FullGaussianGrid or the HEALPixGrid)
@@ -188,9 +193,10 @@ a module that defines `LowerTriangularMatrix` used for the spherical harmonic co
 the spherical harmonic transform between spectral space (for which LowerTriangularArrays is used) and grid-point space
 (as defined by RingGrids).
 
-These modules can also be used independently of SpeedyWeather like so
+These modules can also be used independently of SpeedyWeather. They are registered, so just install and use them as every other package, e.g:
 ```julia
-julia> using SpeedyWeather: LowerTriangularArrays, RingGrids, SpeedyTransforms
+(@v1.11) pkg> add RingGrids
+julia> using RingGrids
 ```
 check out their documentation: [RingGrids](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/ringgrids/),
 [LowerTriangularArrays](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/lowertriangularmatrices/),

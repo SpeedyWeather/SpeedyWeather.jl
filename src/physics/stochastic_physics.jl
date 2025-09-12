@@ -9,13 +9,9 @@ function perturb_parameterization_tendencies!(column::AbstractColumnVariables, m
     perturb_parameterization_tendencies!(column, model.stochastic_physics, model)
 end
 
-
-export NoStochasticPhysics
-struct NoStochasticPhysics <: AbstractStochasticPhysics end
-NoStochasticPhysics(::SpectralGrid) = NoStochasticPhysics()
-initialize!(::NoStochasticPhysics, ::PrimitiveEquation) = nothing
-perturb_parameterization_inputs!(::ColumnVariables, ::NoStochasticPhysics, ::PrimitiveEquation) = nothing
-perturb_parameterization_tendencies!(::ColumnVariables, ::NoStochasticPhysics, ::PrimitiveEquation) = nothing
+# no perturbations
+perturb_parameterization_inputs!(::ColumnVariables, ::Nothing, ::PrimitiveEquation) = nothing
+perturb_parameterization_tendencies!(::ColumnVariables, ::Nothing, ::PrimitiveEquation) = nothing
 
 export StochasticallyPerturbedParameterizationTendencies
 @kwdef struct StochasticallyPerturbedParameterizationTendencies{NF, VectorType} <: AbstractStochasticPhysics

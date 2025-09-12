@@ -21,7 +21,7 @@ jobs:
         uses: xt0rted/pull-request-comment-branch@v3
         id: comment-branch
       - name: Checkout PR branch 
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ steps.comment-branch.outputs.head_ref }}
       - uses: julia-actions/setup-julia@v2

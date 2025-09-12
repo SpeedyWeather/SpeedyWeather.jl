@@ -2,13 +2,13 @@
 
 SpeedyWeather.jl is written with differentiability in mind. This means that our model is differentiable by automatic differentiation (AD). If you are interested in machine learning (ML), this means that you can integrate our model directly into your ML models without the need to first train your neural networks offline. For atmospheric modellers this means that you get an adjoint model for free which is always generated automatically, so that we don't need to maintain it separately. This allows you to calibrate SpeedyWeather.jl in a fully automatic and data-driven way.
 
-!!! Work in progress
+!!! warn Work in progress
     The differentiability of SpeedyWeather.jl is still work in progress and some parts of this documentation might be not be always updated to the latest state. We will extend this documentation over time. Don't hesitate to contact us via GitHub issues or mail when you have questions or want to colloborate.
 
 For the differentiability of our model we rely on [Enzyme.jl](https://github.com/EnzymeAD/Enzyme.jl). If you've used Enzyme before, just go ahead and try to differentiate the model! It should work. We have checked the correctness of the gradients extensively against a finite differences differentiation with [FiniteDifferences.jl](https://github.com/JuliaDiff/FiniteDifferences.jl/). In the following we present a simple example how we can take the gradient of a single timestep of the primitive equation model with respect to one of the model parameter. 
 
-!!! Enzyme with Julia 1.11
-    Currently there are still some issues with Enzyme in Julia 1.11, we recommend to use Julia 1.10 for the following example.
+!!! warn Enzyme with Julia 1.11
+    Currently there are still some issues with Enzyme in Julia 1.11, we recommend to use Julia 1.10 for the following
 
 ## Differentiating through a single timestep
 

@@ -3,8 +3,6 @@ module SpeedyWeather
 # STRUCTURE
 using DocStringExtensions
 
-import ConstructionBase: constructorof, getproperties, setproperties
-
 # NUMERICS
 import Primes
 import Random
@@ -13,9 +11,14 @@ export rotate, rotate!
 
 # GPU, PARALLEL
 import Base.Threads: Threads, @threads
-import KernelAbstractions
-import KernelAbstractions: synchronize
+import KernelAbstractions: KernelAbstractions, @kernel, @index, @Const, synchronize
 import Adapt: Adapt, adapt, adapt_structure
+
+using SpeedyWeatherInternals
+using  SpeedyWeatherInternals.Architectures
+import SpeedyWeatherInternals.Architectures: AbstractArchitecture, CPU, GPU, 
+        on_architecture, architecture, array_type, ismatching, nonparametric_type
+export on_architecture, architecture                # export device functions 
 
 # INPUT OUTPUT
 import TOML
@@ -28,7 +31,7 @@ import CodecZlib
 import BitInformation: round, round!
 import ProgressMeter
 
-# INTERVALS
+# UTILITIES
 using DomainSets.IntervalSets
 
 # to avoid a `using Dates` to pass on DateTime arguments
@@ -37,23 +40,20 @@ export DateTime, Millisecond, Second, Minute, Hour, Day, Week, Month, Year, Cent
 # export functions that have many cross-component methods
 export initialize!, finalize!
 
-# import device architectures
-include("Architectures.jl")
-using .Architectures
-
-# export device functions 
-export on_architecture, architecture
-
 # import utilities
-include("Utils/Utils.jl")
-using .Utils
+using SpeedyWeatherInternals.Utils 
 
-import .Utils: parameters
+include("SpeedyParameters/SpeedyParameters.jl")
+using .SpeedyParameters
+import .SpeedyParameters: parameters
 
 # export user-facing parameter handling types and methods
 export  SpeedyParam, SpeedyParams, parameters, stripparams
 
+# DATA STRUCTURES
 # LowerTriangularArrays for spherical harmonics
+using  LowerTriangularArrays
+
 export  LowerTriangularArrays, 
         LowerTriangularArray,
         LowerTriangularMatrix
@@ -64,10 +64,10 @@ export  Spectrum
 export  OneBased, ZeroBased
 export  eachmatrix, eachharmonic, eachorder
         
-include("LowerTriangularArrays/LowerTriangularArrays.jl")
-using .LowerTriangularArrays
 
 # RingGrids
+using  RingGrids
+
 export  RingGrids
 export  AbstractGrid, AbstractFullGrid, AbstractReducedGrid
 export  AbstractField, AbstractField2D, AbstractField3D
@@ -77,6 +77,9 @@ export  Field, Field2D, Field3D,
         OctahedralGaussianField, OctahedralClenshawField,
         HEALPixField, OctaHEALPixField,
         OctaminimalGaussianField
+
+export  ColumnField, ColumnField2D, ColumnField3D, ColumnField4D,
+        FullColumnField, ReducedColumnField, transpose!
 
 export  FullClenshawGrid, FullGaussianGrid,
         FullHEALPixGrid, FullOctaHEALPixGrid,
@@ -89,10 +92,9 @@ export  AnvilInterpolator
 export  spherical_distance
 export  zonal_mean
 
-include("RingGrids/RingGrids.jl")
-using .RingGrids
-
 # SpeedyTransforms
+using SpeedyTransforms
+
 export SpeedyTransforms, SpectralTransform
 export transform, transform!
 export spectral_truncation, spectral_truncation!
@@ -100,9 +102,7 @@ export curl, divergence, curl!, divergence!
 export ∇, ∇², ∇⁻², ∇!, ∇²!, ∇⁻²!
 export power_spectrum
 
-include("SpeedyTransforms/SpeedyTransforms.jl")
-using .SpeedyTransforms
-import .SpeedyTransforms: prettymemory
+import SpeedyTransforms: prettymemory
 
 # to be defined in GeoMakie extension
 export globe, animate
@@ -112,7 +112,6 @@ function animate end
 # abstract types
 include("models/abstract_models.jl")
 include("dynamics/abstract_types.jl")
-include("physics/abstract_types.jl")
 
 # GEOMETRY CONSTANTS ETC
 include("dynamics/vertical_coordinates.jl")
@@ -162,7 +161,7 @@ include("physics/large_scale_condensation.jl")
 include("physics/surface_fluxes/surface_fluxes.jl")
 include("physics/surface_fluxes/momentum.jl")
 include("physics/surface_fluxes/heat.jl")
-include("physics/surface_fluxes/moisture.jl")
+include("physics/surface_fluxes/humidity.jl")
 include("physics/convection.jl")
 include("physics/zenith.jl")
 include("physics/optical_depth.jl")
@@ -172,6 +171,7 @@ include("physics/stochastic_physics.jl")
 
 # OCEAN AND LAND
 include("physics/ocean.jl")
+include("physics/sea_ice.jl")
 include("physics/land/land.jl")
 
 # OUTPUT

@@ -87,6 +87,28 @@ end
     end
 end
 
+@testset "Whole transform: works in 2D" begin
+    S_cpu, S_gpu, field_cpu, field_gpu, spec_cpu, spec_gpu = get_test_data(
+                        trunc=spectral_resolutions[1], nlayers=nlayers_list[1], Grid=grid_list[1], NF=NFs[1]
+                    )
+
+    cpu_arch = S_cpu.architecture
+                    
+    field_2d_cpu = field_cpu[:,1]
+    spec_2d_cpu = spec_cpu[:,1]
+
+    spec_2d_cpu_res = transform(field_2d_cpu, S_cpu)
+    field_2d_cpu_res = transform(spec_2d_cpu, S_cpu)
+
+    field_2d_gpu = field_gpu[:,1]
+    spec_2d_gpu = spec_gpu[:,1]
+
+    spec_2d_gpu_res = transform(field_2d_gpu, S_gpu)
+    field_2d_gpu_res = transform(spec_2d_gpu, S_gpu)
+
+    @test field_2d_cpu_res ≈ on_architecture(cpu_arch, field_2d_gpu_res)
+    @test spec_2d_cpu_res ≈ on_architecture(cpu_arch, spec_2d_gpu_res)
+end
 
 @testset "fourier_batched: compare forward pass to CPU" begin
     @testset for trunc in spectral_resolutions
@@ -284,7 +306,6 @@ end
 
                     # Convert GPU to CPU for comparison, result is stored in the 
                     # scratch memory
-
                     result_gpu = on_architecture(cpu_arch, S_gpu.scratch_memory.north);
                     result_cpu = S_cpu.scratch_memory.north;
                     @test result_cpu ≈ result_gpu rtol=sqrt(eps(Float32))   # GPU error tolerance always Float32

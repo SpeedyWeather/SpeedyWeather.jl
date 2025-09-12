@@ -139,7 +139,7 @@ function SpeedyWeather.initialize!( forcing::StochasticStirring,
                                     model::AbstractModel)
     
     # precompute forcing strength, scale with radius^2 as is the vorticity equation
-    (; radius) = model.spectral_grid
+    (; radius) = model.planet
     A = radius^2 * forcing.strength
     
     # precompute noise and auto-regressive factor, packed in RefValue for mutability

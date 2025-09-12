@@ -187,10 +187,12 @@ definces both accumulated large-scale and convective precipitation as well as th
 cloud top height. Groups are
 
 ```julia
-SpeedyWeather.BoundaryOutput()
 SpeedyWeather.PrecipitationOutput()
+SpeedyWeather.BoundaryOutput()
 SpeedyWeather.RadiationOutput()
-SpeedyWeather.SurfacesFluxesOutput()
+SpeedyWeather.SurfaceFluxesOutput()
+SpeedyWeather.LandOutput()
+SpeedyWeather.OceanOutput()
 SpeedyWeather.AllOutputVariabesl()
 ```
 

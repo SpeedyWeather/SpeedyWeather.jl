@@ -10,20 +10,8 @@ function forcing!(
     forcing!(diagn, progn, model.forcing, lf, model)
 end
 
-## NO FORCING = dummy forcing
-export NoForcing
-struct NoForcing <: AbstractForcing end
-NoForcing(SG::SpectralGrid) = NoForcing()
-initialize!(::NoForcing, ::AbstractModel) = nothing
-
-function forcing!(  
-    diagn::DiagnosticVariables,
-    progn::PrognosticVariables,
-    forcing::NoForcing,
-    args...,
-)
-    return nothing
-end
+## NO FORCING
+forcing!(diagn, progn, forcing::Nothing, args...) = nothing
 
 # JET STREAM FORCING
 export JetStreamForcing
@@ -71,7 +59,7 @@ function initialize!(   forcing::JetStreamForcing,
                         model::AbstractModel)
 
     (; latitude, width, speed, time_scale, amplitude) = forcing
-    (; radius) = model.spectral_grid
+    (; radius) = model.planet
     
     # Some constants similar to Galewsky 2004
     θ₀ = (latitude-width)/360*2π        # southern boundary of jet [radians]
@@ -165,8 +153,8 @@ function initialize!(
     forcing::StochasticStirring,
     model::AbstractModel)
     
-    model.random_process isa NoRandomProcess &&
-        @warn "StochasticStirring needs a random process. model.random_process is a NoRandomProcess."
+    model.random_process isa Nothing &&
+        @warn "StochasticStirring needs a random process. model.random_process is nothing."
 
     # precompute the latitudinal mask
     (; latd) = model.geometry
@@ -226,8 +214,6 @@ $(TYPEDFIELDS)
 end
 
 KolmogorovFlow(SG::SpectralGrid; kwargs...) = KolmogorovFlow{SG.NF}(; kwargs...)
-
-initialize!(::KolmogorovFlow, ::AbstractModel) = nothing
 
 function forcing!(
     diagn::DiagnosticVariables,

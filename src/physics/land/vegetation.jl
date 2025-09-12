@@ -38,25 +38,23 @@ function soil_moisture_availability!(
     vegetation::NoVegetation,
     model::PrimitiveWet,
 )
-    # set soil moisture availability to a constant value everywhere
-    (; soil_moisture) = progn.land
+    # view on the top layer of soil moisture
+    soil_moisture_top = field_view(progn.land.soil_moisture, :, 1)
     (; soil_moisture_availability) = diagn.physics.land
     
-    # SPEEDY documentation eq. 51 with vegetation = 0
-    (; W_cap, W_wilt) = model.land.thermodynamics
+    # Fortran SPEEDY documentation eq. 51 with vegetation = 0
+    W_cap = model.land.thermodynamics.field_capacity
+    W_wilt = model.land.thermodynamics.wilting_point
     D_top = model.land.geometry.layer_thickness[1]
     D_root = model.land.geometry.layer_thickness[2]
-    r = 1/(D_top*W_cap + D_root*(W_cap - W_wilt))
 
-    @inbounds for ij in eachindex(soil_moisture_availability)
-        soil_moisture_availability[ij] = r*D_top*soil_moisture[ij, 1]
-    end
-
+    soil_moisture_availability .= D_top*soil_moisture_top*W_cap/
+                                    (D_top*W_cap + D_root*(W_cap - W_wilt))
     return nothing
 end
 
 export VegetationClimatology
-@kwdef struct VegetationClimatology{NF, GridVariable2D} <: AbstractVegetation
+@kwdef mutable struct VegetationClimatology{NF, GridVariable2D} <: AbstractVegetation
     "[OPTION] Combine high and low vegetation factor, a in high + a*low [1]"
     low_veg_factor::NF = 0.8
 
@@ -66,8 +64,10 @@ export VegetationClimatology
     "[OPTION] filename of soil moisture"
     file::String = "vegetation.nc"
 
-    "[OPTION] variable name in netcdf file"
+    "[OPTION] variable name in netcdf file for high vegetation"
     varname_vegh::String = "vegh"
+
+    "[OPTION] variable name in netcdf file for low vegetation"
     varname_vegl::String = "vegl"
 
     "[OPTION] Grid the soil moisture file comes on"
@@ -105,7 +105,9 @@ function initialize!(vegetation::VegetationClimatology, model::PrimitiveEquation
     # high and low vegetation cover
     vegh = vegetation.file_Grid(ncfile[vegetation.varname_vegh].var[:, :], input_as=Matrix)
     vegl = vegetation.file_Grid(ncfile[vegetation.varname_vegl].var[:, :], input_as=Matrix)
-
+    vegh = on_architecture(model.architecture, vegh)
+    vegl = on_architecture(model.architecture, vegl)
+    
     # interpolate onto grid
     high_vegetation_cover = vegetation.high_cover
     low_vegetation_cover = vegetation.low_cover
@@ -153,7 +155,8 @@ function soil_moisture_availability!(
     (; soil_moisture_availability) = diagn.physics.land
     (; soil_moisture) = progn.land
     (; high_cover, low_cover, low_veg_factor) = vegetation
-    (; W_cap, W_wilt) = model.land.thermodynamics
+    W_cap = model.land.thermodynamics.field_capacity
+    W_wilt = model.land.thermodynamics.wilting_point
     D_top = model.land.geometry.layer_thickness[1]
     D_root = model.land.geometry.layer_thickness[2]
 
@@ -161,16 +164,31 @@ function soil_moisture_availability!(
     @boundscheck fields_match(soil_moisture, soil_moisture_availability, horizontal_only=true) || throws(BoundsError)
     @boundscheck size(soil_moisture, 2) >= 2    # defined for two layers
 
-    # precalculate
+    # precalculate denominator
     r = 1/(D_top*W_cap + D_root*(W_cap - W_wilt))
 
-    for ij in eachgridpoint(soil_moisture_availability, high_cover, low_cover)
-        
-        # Fortran SPEEDY source/land_model.f90 line 111 origin unclear
-        veg = max(0, high_cover[ij] + low_veg_factor*low_cover[ij])
+    launch!(architecture(soil_moisture_availability), LinearWorkOrder,
+        (size(soil_moisture_availability, 1),), soil_moisture_availability_kernel!,
+        soil_moisture_availability, soil_moisture, high_cover, low_cover,
+        low_veg_factor, r, W_cap, W_wilt, D_top, D_root,
+    )
+    synchronize(architecture(soil_moisture_availability))
+end
 
-        # Fortran SPEEDY documentation eq. 51
-        soil_moisture_availability[ij] = r*(D_top*soil_moisture[ij, 1] +
-            veg*D_root*max(soil_moisture[ij, 2] - W_wilt, 0))
-    end
+@kernel inbounds=true function soil_moisture_availability_kernel!(
+    soil_moisture_availability, soil_moisture, high_cover, low_cover,
+    @Const(low_veg_factor), @Const(r), @Const(W_cap), @Const(W_wilt), @Const(D_top), @Const(D_root)
+)
+    ij = @index(Global, Linear)    # every grid point ij
+
+    # Fortran SPEEDY source/land_model.f90 line 111 origin unclear
+    veg = max(0, high_cover[ij] + low_veg_factor*low_cover[ij])
+
+    # Fortran SPEEDY documentation eq. 51, original formulation
+    # soil_moisture_availability[ij] = r*(D_top*soil_moisture[ij, 1] +
+    #     veg*D_root*max(soil_moisture[ij, 2] - W_wilt, 0))
+    # Soil moisture is defined as volume fraction wrt to field capacity
+    # so multiply by W_cap here (not done in Fortran SPEEDY)
+    soil_moisture_availability[ij] = r*(D_top*soil_moisture[ij, 1]*W_cap +
+        veg*D_root*max(soil_moisture[ij, 2]*W_cap - W_wilt, 0))
 end

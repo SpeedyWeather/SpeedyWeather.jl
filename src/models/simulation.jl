@@ -77,13 +77,13 @@ function initialize!(
     simulation.model.output.active = output                     # enable/disable output
 
     # SCALING: we use vorticity*radius, divergence*radius in the dynamical core
-    scale!(progn, diagn, model.spectral_grid.radius)
+    scale!(progn, diagn, model.planet.radius)
 
     # OUTPUT INITIALISATION AND STORING INITIAL CONDITIONS + FEEDBACK
     # propagate spectral state to grid variables for initial condition output
     lf = 1                                  # use first leapfrog index
     transform!(diagn, progn, lf, model, initialize=true)
-    initialize!(progn.particles, progn, diagn, model.particle_advection)
+    initialize!(diagn, progn.particles, progn, model)
     initialize!(model.output, model.feedback, progn, diagn, model)
     initialize!(model.callbacks, progn, diagn, model)
 end
