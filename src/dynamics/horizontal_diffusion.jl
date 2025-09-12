@@ -147,19 +147,19 @@ function horizontal_diffusion!(
     @boundscheck nlayers <= size(expl, 2) == size(impl, 2) || throw(BoundsError)
 
     launch!(architecture(tendency), SpectralWorkOrder, size(tendency), _horizontal_diffusion_kernel!, 
-            tendency, var, expl, impl)
+            tendency, var, expl, impl, var.spectrum.l_indices)
 
 end
 
 @kernel inbounds=true function _horizontal_diffusion_kernel!(
-    tendency, var, @Const(expl), @Const(impl))
+    tendency, var, @Const(expl), @Const(impl), @Const(l_indices))
 
     I = @index(Global, Cartesian)
     lm = I[1]
     k = ndims(var) == 1 ? 1 : I[2]
     
     # Get the degree l for this coefficient
-    l = var.spectrum.l_indices[lm]
+    l = l_indices[lm]
     
     # Apply horizontal diffusion
     tendency[I] = (tendency[I] + expl[l, k] * var[I]) * impl[l, k]
