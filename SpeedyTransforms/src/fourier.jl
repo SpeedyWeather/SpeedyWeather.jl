@@ -19,85 +19,85 @@ function _fourier!(field::AbstractField, f_north, f_south, S::SpectralTransform)
 end
 
 """$(TYPEDSIGNATURES)
-(Forward) FFT, applied in zonal direction of `grids` provided. This is the 
+(Forward) FFT, applied in zonal direction of `field` provided. This is the 
 GPU/CUDA equivalent of the `apply_batched_fft!` function in the CPU version. 
 Uses indexing as we seemingly can't use views with the FFT planning with CUFFT.
 """
 function _apply_batched_fft!(
     f_out::AbstractArray{<:Complex, 3},
-    grids::AbstractField{NF, N, <:AbstractArray},
+    field::AbstractField,
     S::SpectralTransform, 
     j::Int,
     nfreq::Int,
     ilons::UnitRange{Int};
     not_equator::Bool = true
-) where {NF<:AbstractFloat, N}
+)
     rfft_plan = S.rfft_plans[j]     # FFT planned wrt nlon on ring
-    nlayers = size(grids, 2)        # number of vertical layers
+    nlayers = size(field, 2)        # number of vertical layers
 
     if not_equator
-        view(f_out, 1:nfreq, 1:nlayers, j) .= rfft_plan * view(grids.data, ilons, :)
+        view(f_out, 1:nfreq, 1:nlayers, j) .= rfft_plan * view(field.data, ilons, :)
     else
         fill!(f_out[1:nfreq, 1:nlayers, j], 0)
     end
 end
 
 """$(TYPEDSIGNATURES)
-(Inverse) FFT, applied in zonal direction of `grids` provided. This is the
+(Inverse) FFT, applied in zonal direction of `field` provided. This is the
 GPU/CUDA equivalent of the `apply_batched_fft!` function in the CPU version.
 Uses indexing as we seemingly can't use views with the FFT planning with CUFFT.
 """
 function _apply_batched_fft!(
-    grids::AbstractField{NF, N, <:AbstractArray},
+    field::AbstractField,
     g_in::AbstractArray{<:Complex, 3},
     S::SpectralTransform,
     j::Int,
     nlon::Int,
     ilons::UnitRange{Int};
     not_equator::Bool = true
-) where {NF<:AbstractFloat, N}
+)
     brfft_plan = S.brfft_plans[j]   # FFT planned wrt nlon on ring
-    nlayers = size(grids, 2)        # number of vertical layers
+    nlayers = size(field, 2)        # number of vertical layers
     nfreq = nlon÷2 + 1              # linear max Fourier frequency wrt to nlon
 
     if not_equator
-        view(grids.data, ilons, :) .= brfft_plan * view(g_in, 1:nfreq, 1:nlayers, j)
+        view(field.data, ilons, :) .= brfft_plan * view(g_in, 1:nfreq, 1:nlayers, j)
     end
 end
 
 """$(TYPEDSIGNATURES)
-(Forward) FFT, applied in vertical direction of `grids` provided. This is the
+(Forward) FFT, applied in vertical direction of `field` provided. This is the
 GPU/CUDA equivalent of the `apply_serial_fft!` function in the CPU version.
 This uses views but still allocates, i.e. `mul!` still cannot be used. 
 """
 function _apply_serial_fft!(
     f_out::AbstractArray{<:Complex, 3},
-    grids::AbstractField{NF, N, <:AbstractArray},
+    field::AbstractField,
     S::SpectralTransform, 
     j::Int,
     k::Int,
     nfreq::Int,
     ilons::UnitRange{Int};
     not_equator::Bool = true
-) where {NF<:AbstractFloat, N}
+)
     rfft_plan = S.rfft_plans_1D[j]     # FFT planned wrt nlon on ring
-    k_grid = eachlayer(grids)[k]        # vertical layer index
+    k_grid = eachlayer(field)[k]        # vertical layer index
 
     if not_equator
-        view(f_out, 1:nfreq, k, j) .= rfft_plan * view(grids.data, ilons, k_grid)
+        view(f_out, 1:nfreq, k, j) .= rfft_plan * view(field.data, ilons, k_grid)
     else
         fill!(f_out[1:nfreq, k, j], 0)
     end
 end
 
 """$(TYPEDSIGNATURES)
-(Inverse) FFT, applied in vertical direction of `grids` provided. This is the
+(Inverse) FFT, applied in vertical direction of `field` provided. This is the
 GPU/CUDA equivalent of the `apply_serial_fft!` function in the CPU version.
 This uses views but still allocates, i.e. `mul!` still cannot be used with views 
 of CuArrays. 
 """
 function _apply_serial_fft!(
-    grids::AbstractField{NF, N, <:AbstractArray},
+    field::AbstractField,
     g_in::AbstractArray{<:Complex, 3},
     S::SpectralTransform,
     j::Int,
@@ -105,17 +105,17 @@ function _apply_serial_fft!(
     nfreq::Int,
     ilons::UnitRange{Int};
     not_equator::Bool = true
-) where {NF<:AbstractFloat, N}
+)
     brfft_plan = S.brfft_plans_1D[j]   # FFT planned wrt nlon on ring
-    k_grid = eachlayer(grids)[k]     # vertical layer index
+    k_grid = eachlayer(field)[k]     # vertical layer index
 
     if not_equator
-        view(grids.data, ilons, k_grid) .= brfft_plan * view(g_in, 1:nfreq, k, j)
+        view(field.data, ilons, k_grid) .= brfft_plan * view(g_in, 1:nfreq, k, j)
     end
 end
 
 """$(TYPEDSIGNATURES)
-(Forward) Fast Fourier transform (grid to spectral) in zonal direction of `grids`,
+(Forward) Fast Fourier transform (grid to spectral) in zonal direction of `field`,
 stored in scratch memories `f_north`, `f_south` to be passed on to the Legendre transform.
 Batched version that requires the number of vertical layers to be the same as precomputed in `S`.
 Not to be called directly, use `transform!` instead."""
