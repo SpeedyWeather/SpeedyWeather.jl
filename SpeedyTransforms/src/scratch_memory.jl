@@ -11,8 +11,8 @@ end
 """
 ScratchMemory holds scratch memory for the `SpectralTransform` that's used both by the Fourier and Legendre transform. Fields are
 $(TYPEDFIELDS)"""
-struct ScratchMemory{ # mutable struct so that referencing the scratch memory in
-    NF,                       # SpectralTransform creates a reference and not a copy
+struct ScratchMemory{ 
+    NF,                       
     ArrayComplexType,         # <: ArrayType{Complex{NF}, 3},
     VectorType,               # <: ArrayType{NF, 1},
     VectorComplexType,        # <: ArrayType{Complex{NF}, 1},
