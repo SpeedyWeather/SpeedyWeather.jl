@@ -10,14 +10,17 @@ KernelAbstractions = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
 [weakdeps]
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 JLArrays = "27aeb0d3-9eb9-45fb-866b-73c2ecf80fcb"
+Metal = "dde4c033-4e86-420c-a63e-0dd931031962"
 
 [extensions]
 SpeedyWeatherInternalsCUDAExt = "CUDA"
 SpeedyWeatherInternalsJLArraysExt = "JLArrays"
+SpeedyWeatherInternalsMetalExt = "Metal"
 
 [compat]
 CUDA = "4, 5"
 DocStringExtensions = "0.9"
 JLArrays = "0.1, 0.2"
 KernelAbstractions = "0.9"
+Metal = "1.8.0"
 julia = "1.10"
