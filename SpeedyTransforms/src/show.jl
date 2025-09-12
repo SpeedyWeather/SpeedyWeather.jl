@@ -23,10 +23,8 @@ function Base.show(io::IO, S::SpectralTransform{NF, ArrayType}) where {NF, Array
     memorysize_str = prettymemory(
                 Base.summarysize(S.scratch_memory.north) +      # add all scratch_memories
                 Base.summarysize(S.scratch_memory.south) + 
-                Base.summarysize(S.scratch_memory.column.grid) + 
-                Base.summarysize(S.scratch_memory.column.spec) +
-                Base.summarysize(S.scratch_memory.column.column_north) + 
-                Base.summarysize(S.scratch_memory.column.column_south)
+                Base.summarysize(S.scratch_memory.column.north) + 
+                Base.summarysize(S.scratch_memory.column.south)
             )
 
     dealias = get_dealiasing(mmax-1, nlat_half) # -1 for zero-based

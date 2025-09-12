@@ -464,7 +464,7 @@ function transform!(                                # SPECTRAL TO GRID
     _legendre!(g_north, g_south, coeffs, scratch_memory.column, S; unscale_coslat)
 
     # INVERSE FOURIER TRANSFORM in zonal direction
-    _fourier!(field, g_north, g_south, scratch_memory.column, S)
+    _fourier!(field, g_north, g_south, S)
 
     return field
 end
@@ -497,7 +497,7 @@ function transform!(                               # GRID TO SPECTRAL
     f_south = scratch_memory.south    # phase factors for southern latitudes
 
     # FOURIER TRANSFORM in zonal direction
-    _fourier!(f_north, f_south, field, scratch_memory.column, S)    
+    _fourier!(f_north, f_south, field, S)    
     
     # LEGENDRE TRANSFORM in meridional direction
     _legendre!(coeffs, f_north, f_south, scratch_memory.column, S)

@@ -1,130 +1,118 @@
 # function barrier for batched or serial transforms as FFTW plans cannot be reused for fewer vertical layers
-function _fourier!(f_north, f_south, field::AbstractField, scratch_memory::ColumnScratchMemory, S::SpectralTransform)
+function _fourier!(f_north, f_south, field::AbstractField, S::SpectralTransform)
     _fourier! = if size(field, 2) == S.nlayers > 1
         _fourier_batched!
     else
         _fourier_serial!
     end
-    return _fourier!(f_north, f_south, field, scratch_memory, S)
+    return _fourier!(f_north, f_south, field, S)
 end
 
 # function barrier for batched or serial transforms as FFTW plans cannot be reused for fewer vertical layers
-function _fourier!(field::AbstractField, f_north, f_south, scratch_memory::ColumnScratchMemory, S::SpectralTransform)
+function _fourier!(field::AbstractField, f_north, f_south, S::SpectralTransform)
     _fourier! = if size(field, 2) == S.nlayers > 1
         _fourier_batched!
     else
         _fourier_serial!
     end
-    return _fourier!(field, f_north, f_south, scratch_memory, S)
+    return _fourier!(field, f_north, f_south, S)
 end
 
-# Forward FFT Application Function for batched FFT
+"""$(TYPEDSIGNATURES)
+(Forward) FFT, applied in zonal direction of `grids` provided. This is the 
+GPU/CUDA equivalent of the `apply_batched_fft!` function in the CPU version. 
+Uses indexing as we seemingly can't use views with the FFT planning with CUFFT.
+"""
 function _apply_batched_fft!(
     f_out::AbstractArray{<:Complex, 3},
-    field::AbstractField,
-    scratch_memory::ColumnScratchMemory,
+    grids::AbstractField{NF, N, <:AbstractArray},
     S::SpectralTransform, 
     j::Int,
     nfreq::Int,
     ilons::UnitRange{Int};
     not_equator::Bool = true
-)
-    (; rfft_plans) = S              # pre-planned transforms
-    rfft_plan = rfft_plans[j]       # FFT planned wrt nlon on ring
-    nlayers = size(field, 2)        # number of vertical layers
+) where {NF<:AbstractFloat, N}
+    rfft_plan = S.rfft_plans[j]     # FFT planned wrt nlon on ring
+    nlayers = size(grids, 2)        # number of vertical layers
 
-    # Construct views of the data to perform the FFT on
-    # views and copies necessary for stride-1 outputs required by FFTW
-    ring_layers = view(field.data, ilons, :)
-    out = reshape(view(scratch_memory.spec, 1:nfreq*nlayers), (nfreq, nlayers))
-
-    # Perform the FFT
-    if not_equator # skip FFT, redundant when north already did that latitude
-        LinearAlgebra.mul!(out, rfft_plan, ring_layers)
+    if not_equator
+        view(f_out, 1:nfreq, 1:nlayers, j) .= rfft_plan * view(grids.data, ilons, :)
     else
-        fill!(out, 0)
+        fill!(f_out[1:nfreq, 1:nlayers, j], 0)
     end
-    f_out[1:nfreq, 1:nlayers, j] .= out     # copy into correct stride
-end    
+end
 
-# Inverse FFT Application Function for batched FFT
+"""$(TYPEDSIGNATURES)
+(Inverse) FFT, applied in zonal direction of `grids` provided. This is the
+GPU/CUDA equivalent of the `apply_batched_fft!` function in the CPU version.
+Uses indexing as we seemingly can't use views with the FFT planning with CUFFT.
+"""
 function _apply_batched_fft!(
-    field::AbstractField,
+    grids::AbstractField{NF, N, <:AbstractArray},
     g_in::AbstractArray{<:Complex, 3},
-    scratch_memory::ColumnScratchMemory,
     S::SpectralTransform,
     j::Int,
     nlon::Int,
     ilons::UnitRange{Int};
     not_equator::Bool = true
-)
-    (; brfft_plans) = S             # pre-planned transforms
-    brfft_plan = brfft_plans[j]     # FFT planned wrt nlon on ring
-    nlayers = size(field, 2)        # number of vertical layers
-    nfreq = nlon÷2 + 1              
+) where {NF<:AbstractFloat, N}
+    brfft_plan = S.brfft_plans[j]   # FFT planned wrt nlon on ring
+    nlayers = size(grids, 2)        # number of vertical layers
+    nfreq = nlon÷2 + 1              # linear max Fourier frequency wrt to nlon
 
-    # Construct views of the data to perform the FFT on
-    # views and copies necessary for stride-1 outputs required by FFTW
-    out = reshape(view(scratch_memory.grid, 1:nlon*nlayers), (nlon, nlayers))
-
-    # PERFORM FFT, inverse complex to real, hence brfft
-    # FFTW is in-place writing into `out` via `mul`
-    # FFTW requires stride-1 output, hence view on scratch memory
-    if not_equator  # skip FFT, redundant when north already did that latitude
-        LinearAlgebra.mul!(out, brfft_plan, view(g_in, 1:nfreq, 1:nlayers, j))
-        field[ilons, :] = out
+    if not_equator
+        view(grids.data, ilons, :) .= brfft_plan * view(g_in, 1:nfreq, 1:nlayers, j)
     end
 end
 
-# Forward FFT Application Function for serial FFT
+"""$(TYPEDSIGNATURES)
+(Forward) FFT, applied in vertical direction of `grids` provided. This is the
+GPU/CUDA equivalent of the `apply_serial_fft!` function in the CPU version.
+This uses views but still allocates, i.e. `mul!` still cannot be used. 
+"""
 function _apply_serial_fft!(
     f_out::AbstractArray{<:Complex, 3},
-    field::AbstractField,
-    scratch_memory::ColumnScratchMemory,
+    grids::AbstractField{NF, N, <:AbstractArray},
     S::SpectralTransform, 
     j::Int,
     k::Int,
     nfreq::Int,
     ilons::UnitRange{Int};
     not_equator::Bool = true
-)
-    (; rfft_plans_1D) = S           # pre-planned transforms
-    rfft_plan = rfft_plans_1D[j]    # FFT planned wrt nlon on ring
-    k_grid = eachlayer(field)[k]    # Precomputed ring index (as a Cartesian index)
+) where {NF<:AbstractFloat, N}
+    rfft_plan = S.rfft_plans_1D[j]     # FFT planned wrt nlon on ring
+    k_grid = eachlayer(grids)[k]        # vertical layer index
 
-    field_jk = view(field.data, ilons, k_grid)  # data on northern ring, vertical layer k
-    out = view(scratch_memory.spec, 1:nfreq)  # view on scratch memory to store transformed data
-    if not_equator 
-        LinearAlgebra.mul!(out, rfft_plan, field_jk)    # perform FFT
+    if not_equator
+        view(f_out, 1:nfreq, k, j) .= rfft_plan * view(grids.data, ilons, k_grid)
     else
-        fill!(out, 0)
+        fill!(f_out[1:nfreq, k, j], 0)
     end
-    f_out[1:nfreq, k, j] = out
 end
 
-# Inverse FFT Application Function for serial FFT
+"""$(TYPEDSIGNATURES)
+(Inverse) FFT, applied in vertical direction of `grids` provided. This is the
+GPU/CUDA equivalent of the `apply_serial_fft!` function in the CPU version.
+This uses views but still allocates, i.e. `mul!` still cannot be used with views 
+of CuArrays. 
+"""
 function _apply_serial_fft!(
-    field::AbstractField,
+    grids::AbstractField{NF, N, <:AbstractArray},
     g_in::AbstractArray{<:Complex, 3},
-    scratch_memory::ColumnScratchMemory,
     S::SpectralTransform,
     j::Int,
     k::Int,
     nfreq::Int,
     ilons::UnitRange{Int};
     not_equator::Bool = true
-)
-    (; brfft_plans_1D) = S              # pre-planned transforms
-    brfft_plan = brfft_plans_1D[j]      # FFT planned wrt nlon on ring
-    k_grid = eachlayer(field)[k]        # Precomputed ring index (as a Cartesian index)
+) where {NF<:AbstractFloat, N}
+    brfft_plan = S.brfft_plans_1D[j]   # FFT planned wrt nlon on ring
+    k_grid = eachlayer(grids)[k]     # vertical layer index
 
-    g = view(g_in, 1:nfreq, k, j)           # data on northern ring, vertical layer k
-    out = view(field.data, ilons, k_grid)   # view on scratch memory to store transformed data
     if not_equator
-        LinearAlgebra.mul!(out, brfft_plan, g)  # perform FFT
+        view(grids.data, ilons, k_grid) .= brfft_plan * view(g_in, 1:nfreq, k, j)
     end
 end
-
 
 """$(TYPEDSIGNATURES)
 (Forward) Fast Fourier transform (grid to spectral) in zonal direction of `grids`,
@@ -135,7 +123,6 @@ function _fourier_batched!(                 # GRID TO SPECTRAL
     f_north::AbstractArray{<:Complex, 3},   # Fourier-transformed output
     f_south::AbstractArray{<:Complex, 3},   # and for southern latitudes
     field::AbstractField,                   # gridded input
-    scratch_memory::ColumnScratchMemory,
     S::SpectralTransform;                   # precomputed transform
 )
     (; nlat, nlons) = S                     # dimensions
@@ -157,11 +144,11 @@ function _fourier_batched!(                 # GRID TO SPECTRAL
 
         ilons = rings[j_north]              # in-ring indices northern ring
         # FOURIER TRANSFORM in zonal direction, northern latitude
-        _apply_batched_fft!(f_north, field, scratch_memory, S, j, nfreq, ilons)
+        _apply_batched_fft!(f_north, field, S, j, nfreq, ilons)
 
         # and southern latitude if not on Equator
         ilons = rings[j_south]              # in-ring indices southern ring
-        _apply_batched_fft!(f_south, field, scratch_memory, S, j, nfreq, ilons; not_equator=not_equator)
+        _apply_batched_fft!(f_south, field, S, j, nfreq, ilons; not_equator=not_equator)
        
     end
 end
@@ -176,7 +163,6 @@ function _fourier_serial!(                  # GRID TO SPECTRAL
     f_north::AbstractArray{<:Complex, 3},   # Fourier-transformed output
     f_south::AbstractArray{<:Complex, 3},   # and for southern latitudes
     field::AbstractField,                   # gridded input
-    scratch_memory::ColumnScratchMemory,
     S::SpectralTransform;                   # precomputed transform
 )
     (; nlat, nlons) = S                     # dimensions
@@ -200,11 +186,11 @@ function _fourier_serial!(                  # GRID TO SPECTRAL
             ilons = rings[j_north]              # in-ring indices northern ring
             
             # Apply FFT in the northern latitudes
-            _apply_serial_fft!(f_north, field, scratch_memory, S, j, k, nfreq, ilons)
+            _apply_serial_fft!(f_north, field, S, j, k, nfreq, ilons)
             
             # southern latitude, don't call redundant 2nd fft if ring is on equator 
             ilons = rings[j_south]                      # in-ring indices southern ring
-            _apply_serial_fft!(f_south, field, scratch_memory, S, j, k, nfreq, ilons; not_equator=not_equator)
+            _apply_serial_fft!(f_south, field, S, j, k, nfreq, ilons; not_equator=not_equator)
         end
     end
 end
@@ -216,7 +202,6 @@ function _fourier_batched!(                 # SPECTRAL TO GRID
     field::AbstractField,                   # gridded output
     g_north::AbstractArray{<:Complex, 3},   # Legendre-transformed input
     g_south::AbstractArray{<:Complex, 3},   # and for southern latitudes
-    scratch_memory::ColumnScratchMemory,
     S::SpectralTransform;                   # precomputed transform
 )
     (; nlat, nlons) = S                     # dimensions
@@ -237,11 +222,11 @@ function _fourier_batched!(                 # SPECTRAL TO GRID
         ilons = rings[j_north]              # in-ring indices northern ring
 
         # northern latitude
-        _apply_batched_fft!(field, g_north, scratch_memory, S, j, nlon, ilons)
+        _apply_batched_fft!(field, g_north, S, j, nlon, ilons)
 
         # southern latitude, don't call redundant 2nd FFT if ring is on equator 
         ilons = rings[j_south]              # in-ring indices southern ring
-        _apply_batched_fft!(field, g_south, scratch_memory, S, j, nlon, ilons; not_equator=not_equator)
+        _apply_batched_fft!(field, g_south, S, j, nlon, ilons; not_equator=not_equator)
 
     end
 end
@@ -254,7 +239,6 @@ function _fourier_serial!(                  # SPECTRAL TO GRID
     field::AbstractField,                   # gridded output
     g_north::AbstractArray{<:Complex, 3},   # Legendre-transformed input
     g_south::AbstractArray{<:Complex, 3},   # and for southern latitudes
-    scratch_memory::ColumnScratchMemory,    # scratch memory
     S::SpectralTransform;                   # precomputed transform
 )
     (; nlat, nlons) = S                     # dimensions   
@@ -276,11 +260,11 @@ function _fourier_serial!(                  # SPECTRAL TO GRID
 
             # Apply FFT in the northern latitudes
             ilons = rings[j_north]              # in-ring indices northern ring
-            _apply_serial_fft!(field, g_north, scratch_memory, S, j, k, nfreq, ilons)
+            _apply_serial_fft!(field, g_north, S, j, k, nfreq, ilons)
 
             # southern latitude, don't call redundant 2nd fft if ring is on equator
             ilons = rings[j_south]              # in-ring indices southern ring
-            _apply_serial_fft!(field, g_south, scratch_memory, S, j, k, nfreq, ilons; not_equator=not_equator)
+            _apply_serial_fft!(field, g_south, S, j, k, nfreq, ilons; not_equator=not_equator)
         end
     end
 end
