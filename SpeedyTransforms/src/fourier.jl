@@ -19,9 +19,7 @@ function _fourier!(field::AbstractField, f_north, f_south, S::SpectralTransform)
 end
 
 """$(TYPEDSIGNATURES)
-(Forward) FFT, applied in zonal direction of `field` provided. This is the 
-GPU/CUDA equivalent of the `apply_batched_fft!` function in the CPU version. 
-Uses indexing as we seemingly can't use views with the FFT planning with CUFFT.
+(Forward) FFT, applied in zonal direction of `field` provided. 
 """
 function _apply_batched_fft!(
     f_out::AbstractArray{<:Complex, 3},
@@ -43,9 +41,7 @@ function _apply_batched_fft!(
 end
 
 """$(TYPEDSIGNATURES)
-(Inverse) FFT, applied in zonal direction of `field` provided. This is the
-GPU/CUDA equivalent of the `apply_batched_fft!` function in the CPU version.
-Uses indexing as we seemingly can't use views with the FFT planning with CUFFT.
+(Inverse) FFT, applied in zonal direction of `field` provided.
 """
 function _apply_batched_fft!(
     field::AbstractField,
@@ -66,9 +62,7 @@ function _apply_batched_fft!(
 end
 
 """$(TYPEDSIGNATURES)
-(Forward) FFT, applied in vertical direction of `field` provided. This is the
-GPU/CUDA equivalent of the `apply_serial_fft!` function in the CPU version.
-This uses views but still allocates, i.e. `mul!` still cannot be used. 
+(Forward) FFT, applied in vertical direction of `field` provided. 
 """
 function _apply_serial_fft!(
     f_out::AbstractArray{<:Complex, 3},
@@ -91,10 +85,7 @@ function _apply_serial_fft!(
 end
 
 """$(TYPEDSIGNATURES)
-(Inverse) FFT, applied in vertical direction of `field` provided. This is the
-GPU/CUDA equivalent of the `apply_serial_fft!` function in the CPU version.
-This uses views but still allocates, i.e. `mul!` still cannot be used with views 
-of CuArrays. 
+(Inverse) FFT, applied in vertical direction of `field` provided.
 """
 function _apply_serial_fft!(
     field::AbstractField,
@@ -152,7 +143,6 @@ function _fourier_batched!(                 # GRID TO SPECTRAL
        
     end
 end
-
 
 """$(TYPEDSIGNATURES)
 (Forward) Fast Fourier transform (grid to spectral) in zonal direction of `grids`,
