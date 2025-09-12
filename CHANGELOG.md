@@ -2,7 +2,13 @@
 
 ## Unreleased
 
-- Expand scratch memory handling in spectral transforms [#791](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/791)
+- Expand scratch memory handling in spectral transforms for better differentiability with Enzyme [#791](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/791)
+- Split extensions across subpackages [#846](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/846)
+
+## v0.17
+
+- More documentation on GPU and on_architecture [#845](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/845)
+- The documentation has a logo now as well [#842](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/842)
 - Move radius to model.planet [#838](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/838)
 - Soil moisture initial conditions [#830](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/830)
 - Diagnose snow fall from large-scale condensation [#817](https://github.dev/SpeedyWeather/SpeedyWeather.jl/pull/817)

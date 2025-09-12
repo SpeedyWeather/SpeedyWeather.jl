@@ -10,7 +10,7 @@ using SpeedyWeather, CUDA
 architecture = SpeedyWeather.GPU()
 spectral_grid = SpectralGrid(trunc=41, nlayers=1, architecture=architecture)           
 
-CUDA.@allowscalar model = BarotropicModel(spectral_grid=spectral_grid)
+model = BarotropicModel(spectral_grid=spectral_grid)
 CUDA.@allowscalar simulation = initialize!(model)
 run!(simulation, period=Day(10))
 ```
@@ -19,12 +19,28 @@ Note that we need to use `CUDA.@allowscalar` here during initialization. Current
 
 ## Architectures Utilities 
 
-In order to easily transfer our data structures between CPU (e.g. for plotting and output) and GPU, we have the following utilities that make can make use of the `architecture` object defined above:
+In order to easily transfer our structures between CPU (e.g. for plotting and output) and GPU, we have the following utilities that make can make use of the `architecture` object defined above and the `on_architecture` function, e.g. as follows: 
 
-```@docs
-SpeedyWeather.on_architecture
-SpeedyWeather.array_type
+```julia
+using SpeedyWeather, CUDA 
+nlat_half = 6
+arch_cpu = SpeedyWeather.CPU()
+arch_gpu = SpeedyWeather.GPU()
+
+grid_cpu = HEALPixGrid(nlat_half, arch_cpu)
+grid_gpu = on_architecture(arch_gpu, grid_cpu)
+
+field_cpu = rand(grid_cpu)
+field_gpu = on_architecture(arch_gpu, field_cpu)
+
+spectrum_cpu = Spectrum(trunc=41, architecture=arch_cpu)
+spectrum_gpu = on_architecture(arch_gpu, spectrum_cpu)
+
+spec_cpu = rand(spectrum_cpu)
+spec_gpu = on_architecture(arch_gpu, spec_cpu)
 ```
+
+Be aware that directly calling e.g. `CuArray` or `adapt` on the data structres is not recommended, as it can lead to unexpected behavior, e.g. mismatching internal architecture representations when launching kernels and other operations. Please use the `on_architecture` function instead for all transfer between devices. 
 
 ## Benchmarks 
 

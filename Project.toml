@@ -1,7 +1,7 @@
 name = "SpeedyWeather"
 uuid = "9e226e20-d153-4fed-8a5b-493def4f21a9"
 authors = ["SpeedyWeather contributors"]
-version = "0.16.0"
+version = "0.17.0"
 
 [deps]
 AbstractFFTs = "621f4979-c628-5d54-868e-fcf4e3e8185c"
@@ -37,11 +37,9 @@ Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 TOML = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
 
 [weakdeps]
-CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
 FiniteDifferences = "26cc04aa-876d-5657-8c51-4c34ba976000"
 GeoMakie = "db073c08-6b98-4ee5-b6a4-5efafb3259c6"
-JLArrays = "27aeb0d3-9eb9-45fb-866b-73c2ecf80fcb"
 Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
 UnicodePlots = "b8865327-cd53-5732-bb35-84acbb429228"
 
@@ -52,11 +50,9 @@ RingGrids = {path = "RingGrids"}
 SpeedyTransforms = {path = "SpeedyTransforms"}
 
 [extensions]
-SpeedyWeatherCUDAExt = "CUDA"
 SpeedyWeatherEnzymeExt = "Enzyme"
 SpeedyWeatherFiniteDifferencesExt = "FiniteDifferences"
 SpeedyWeatherGeoMakieExt = "GeoMakie"
-SpeedyWeatherJLArraysExt = "JLArrays"
 SpeedyWeatherMakieExt = "Makie"
 SpeedyWeatherUnicodePlotsExt = "UnicodePlots"
 
@@ -66,7 +62,6 @@ Adapt = "3, 4"
 AssociatedLegendrePolynomials = "1"
 Atomix = "1"
 BitInformation = "0.6"
-CUDA = "4, 5"
 CodecZlib = "0.7"
 ComponentArrays = "0.15"
 ConstructionBase = "1"
@@ -80,7 +75,6 @@ FiniteDifferences = "0.12"
 GPUArrays = "11"
 GenericFFT = "0.1"
 GeoMakie = "0.7.6"
-JLArrays = "0.1, 0.2"
 JLD2 = "0.4, 0.5, 0.6"
 KernelAbstractions = "0.9"
 LinearAlgebra = "1.10"
