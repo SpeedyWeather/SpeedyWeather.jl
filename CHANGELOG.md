@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Split extensions across subpackages [#846](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/846)
+
 ## v0.17
 
 - More documentation on GPU and on_architecture [#845](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/845)
