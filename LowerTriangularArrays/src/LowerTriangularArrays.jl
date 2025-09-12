@@ -8,7 +8,7 @@ import Adapt: Adapt, adapt
 import GPUArrays
 import KernelAbstractions
  
-import Architectures: Architectures, AbstractArchitecture, on_architecture, 
+import SpeedyWeatherInternals.Architectures: Architectures, AbstractArchitecture, on_architecture, 
     array_type, ismatching, CPU, GPU, architecture, nonparametric_type
 
 # NUMERICS

@@ -84,8 +84,7 @@ function initialize!(   orog::ZonalRidge,
                         S::SpectralTransform,
                         G::Geometry)
     
-    (; gravity, rotation) = P
-    (; radius) = G
+    (; radius, gravity, rotation) = P
     φ = G.latds                         # latitude for each grid point [˚N]
 
     (; orography, geopot_surf, η₀, u₀) = orog

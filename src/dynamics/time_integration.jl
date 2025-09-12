@@ -18,7 +18,7 @@ $(TYPEDFIELDS)
     "Time step in minutes for T31, scale linearly to `trunc`"
     Δt_at_T31::Second = Minute(40)
 
-    "Radius of sphere [m], used for scaling"
+    "Radius of sphere [m], used for scaling, set in intialize! to planet.radius"
     radius::NF = DEFAULT_RADIUS
 
     "Adjust Δt_at_T31 with the output_dt to reach output_dt exactly in integer time steps"
@@ -94,8 +94,8 @@ $(TYPEDSIGNATURES)
 Generator function for a Leapfrog struct using `spectral_grid`
 for the resolution information."""
 function Leapfrog(spectral_grid::SpectralGrid; kwargs...)
-    (; NF, trunc, radius) = spectral_grid
-    return Leapfrog{NF}(; trunc, radius, kwargs...)
+    (; NF, trunc) = spectral_grid
+    return Leapfrog{NF}(; trunc, kwargs...)
 end
 
 """
@@ -106,13 +106,12 @@ be a divisor such that an integer number of time steps matches exactly with the 
 time step."""
 function initialize!(L::Leapfrog, model::AbstractModel)
     (; output_dt) = model.output
+    (; radius) = model.planet
 
-    if L.adjust_with_output
-        # take actual output dt from model.output and recalculate timestep
-        L.Δt_millisec = get_Δt_millisec(L.Δt_at_T31, L.trunc, L.radius, L.adjust_with_output, output_dt)
-        L.Δt_sec = L.Δt_millisec.value/1000
-        L.Δt = L.Δt_sec/L.radius
-    end
+    # take radius from planet and recalculate time step and possibly adjust with output dt
+    L.Δt_millisec = get_Δt_millisec(L.Δt_at_T31, L.trunc, radius, L.adjust_with_output, output_dt)
+    L.Δt_sec = L.Δt_millisec.value/1000
+    L.Δt = L.Δt_sec/radius
 
     # check how time steps from time integration and output align
     n = round(Int, Millisecond(output_dt).value/L.Δt_millisec.value)

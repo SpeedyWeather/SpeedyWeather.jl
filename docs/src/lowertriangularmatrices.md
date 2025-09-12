@@ -1,8 +1,6 @@
 # [LowerTriangularArrays](@id lowertriangularmatrices)
 
-LowerTriangularArrays is a submodule that has been developed for SpeedyWeather.jl which is
-technically independent (SpeedyWeather.jl however imports it and so does SpeedyTransforms)
-and can also be used without running simulations. It is just not put into its own respective repository.
+LowerTriangularArrays is a package that has been developed for SpeedyWeather.jl but can also be used standalone.
 
 This module defines `LowerTriangularArray`, a lower triangular matrix format, which in contrast to
 [`LinearAlgebra.LowerTriangular`](https://docs.julialang.org/en/v1/stdlib/LinearAlgebra/#LinearAlgebra.LowerTriangular)
@@ -23,7 +21,7 @@ So, for example a ``(10\times 10\times 10)`` `LowerTriangularArray` holds 10 `Lo
 
 A `LowerTriangularMatrix` and `LowerTriangularArray` can be created using `zeros`, `ones`, `rand`, or `randn`
 ```@repl LowerTriangularArrays
-using SpeedyWeather.LowerTriangularArrays
+using LowerTriangularArrays
 
 L = rand(LowerTriangularMatrix{Float32}, 5, 5)
 L2 = rand(LowerTriangularArray{Float32}, 5, 5, 5)

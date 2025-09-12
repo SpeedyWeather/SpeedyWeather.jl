@@ -59,7 +59,7 @@ function longwave_radiation!(
     τ⁻¹ = inv(radiation.time_scale_stratosphere.value)
 
     @inbounds for k in eachlayer(column)
-        # Pauluis and Garner, 2006, eq (1) and (2)
+        # Paulius and Garner, 2006, eq (1) and (2)
         temp_tend[k] += temp[k] > temp_min ? cooling : (temp_stratosphere - temp[k])*τ⁻¹
     end
 end

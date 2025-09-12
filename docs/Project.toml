@@ -6,9 +6,17 @@ GeoMakie = "db073c08-6b98-4ee5-b6a4-5efafb3259c6"
 LowerTriangularArrays = "ed20b33f-a660-45d0-a353-9c8c20bb5814"
 NCDatasets = "85f8d34a-cbdd-5861-8df4-14fed0d494ab"
 RingGrids = "d1845624-ad4f-453b-8ff4-a8db365bf3a7"
+SpeedyWeatherInternals = "34489162-d270-4603-8b96-37b04f830d73"
 SpeedyTransforms = "ed023a3f-7a3c-42dd-bab6-68c21c8c3105"
 SpeedyWeather = "9e226e20-d153-4fed-8a5b-493def4f21a9"
 UnicodePlots = "b8865327-cd53-5732-bb35-84acbb429228"
+
+[sources]
+SpeedyWeatherInternals = {path = "../SpeedyWeatherInternals"}
+LowerTriangularArrays = {path = "../LowerTriangularArrays"}
+RingGrids = {path = "../RingGrids"}
+SpeedyTransforms = {path = "../SpeedyTransforms"}
+SpeedyWeather = {path = ".."}
 
 [compat]
 CairoMakie = "0.12"

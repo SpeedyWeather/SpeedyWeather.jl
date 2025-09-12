@@ -6,7 +6,7 @@ Pkg.activate(".")
 using Test
 using InteractiveUtils  # For @code_warntype
 using SpeedyWeather
-using SpeedyWeather.Architectures
+using SpeedyWeather.SpeedyWeatherInternals.Architectures
 using SpeedyWeather.SpeedyTransforms
 using SpeedyWeather.RingGrids
 using SpeedyWeather.LowerTriangularArrays

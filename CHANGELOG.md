@@ -2,8 +2,22 @@
 
 ## Unreleased
 
+- Reduce GPU overhead and revise on_architecture and adapt [#824](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/824)
+- Split extensions across subpackages [#846](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/846)
+
+## v0.17
+
+- More documentation on GPU and on_architecture [#845](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/845)
+- The documentation has a logo now as well [#842](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/842)
+- Move radius to model.planet [#838](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/838)
+- Soil moisture initial conditions [#830](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/830)
+- Diagnose snow fall from large-scale condensation [#817](https://github.dev/SpeedyWeather/SpeedyWeather.jl/pull/817)
+- Fix output_dt for JLD2Output [#829](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/829)
+- Fix some missign scratch memory usage in the transforms [#828](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/828)
+- GitHub actions checkout v5 [#826](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/826)
+- Compatibility for JLD2 v0.6 [#825](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/825)
 - Introduce `nothing` as valid model component [#822](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/822)
-- Towards standalone packages [#815](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/815)
+- Towards standalone packages [#815](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/815) [#835](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/835) [#836](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/836) [#841](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/841)
 - New ColumnField type as the transpose of Field [#815](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/815)
 - Update CITATION.cff for Zenodo archives [#821](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/821)
 - Land kernels with KernelAbstractions [#820](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/820)

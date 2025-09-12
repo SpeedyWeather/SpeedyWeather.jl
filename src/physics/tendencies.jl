@@ -76,7 +76,7 @@ function fluxes_to_tendencies!(
 
     Δσ = geometry.σ_levels_thick
     pₛ = column.pres[end]               # surface pressure
-    (; radius) = geometry               # used for scaling
+    (; radius) = planet                 # used for scaling
 
     # for g/Δp and g/(Δp*c_p), see Fortran SPEEDY documentation eq. (3, 5)
     g_pₛ = planet.gravity/pₛ

@@ -1,16 +1,11 @@
 name = "SpeedyTransforms"
 uuid = "ed023a3f-7a3c-42dd-bab6-68c21c8c3105"
-authors = ["SpeedyTransform contributors"]
+authors = ["SpeedyTransforms contributors"]
 version = "0.1.0"
 
 [deps]
 AbstractFFTs = "621f4979-c628-5d54-868e-fcf4e3e8185c"
 Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
-Architectures = "c5c4acf7-95e6-4f60-ae13-83e51f04c294"
-AssociatedLegendrePolynomials = "2119f1ac-fb78-50f5-8cc0-dda848ebdb19"
-Atomix = "a9b6321e-bd34-4604-b9c9-b65b8de01458"
-DocStringExtensions = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
-FFTW = "7a1cc6ca-52ef-59f5-83cd-3a7055c09341"
 FastGaussQuadrature = "442a2c76-b920-505d-bb47-c5924d526838"
 GPUArrays = "0c68f7d7-f131-5f86-a1c3-88cf8149b2d7"
 GenericFFT = "a8297547-1b15-4a5a-a998-a2ac5f1cef28"
@@ -20,24 +15,40 @@ LowerTriangularArrays = "ed20b33f-a660-45d0-a353-9c8c20bb5814"
 Primes = "27ebfcd6-29c5-5fa9-bf4b-fb8fc14df3ae"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 RingGrids = "d1845624-ad4f-453b-8ff4-a8db365bf3a7"
+SpeedyWeatherInternals = "34489162-d270-4603-8b96-37b04f830d73"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
+
+[sources]
+SpeedyWeatherInternals = {path = "../SpeedyWeatherInternals"}
+LowerTriangularArrays = {path = "../LowerTriangularArrays"}
+RingGrids = {path = "../RingGrids"}
 
 [compat]
 AbstractFFTs = "1.5.0"
 Adapt = "4.3.0"
 AssociatedLegendrePolynomials = "1.0.1"
 Atomix = "1.1.2"
+CUDA = "4, 5"
 DocStringExtensions = "0.9.5"
+Enzyme = "0.13"
+FastGaussQuadrature = "1.0.2"
 FFTW = "1.9.0"
+GPUArrays = "11.2.3"
 GenericFFT = "0.1.6"
 KernelAbstractions = "0.9.38"
+LinearAlgebra = "1.10"
+LowerTriangularArrays = "0.1"
 Primes = "0.5.7"
+Printf = "1.10"
+RingGrids = "0.1"
+Statistics = "1.10"
+SpeedyWeatherInternals = "0.1"
+julia = "1.10"
 
-[sources.Architectures]
-path = "../Architectures"
+[extensions]
+SpeedyTransformsCUDAExt = "CUDA"
+SpeedyTransformsEnzymeExt = "Enzyme"
 
-[sources.LowerTriangularArrays]
-path = "../LowerTriangularArrays"
-
-[sources.RingGrids]
-path = "../RingGrids"
+[weakdeps]
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
