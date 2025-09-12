@@ -169,7 +169,7 @@ function SpectralTransform(
     rfft_plans_1D = Vector{AbstractFFTs.Plan}(undef, nlat_half)
     brfft_plans_1D = Vector{AbstractFFTs.Plan}(undef, nlat_half)
 
-    fake_grid_data = adapt(ArrayType_, zeros(NF, grid, nlayers))
+    fake_grid_data = on_architecture(architecture, zeros(NF, grid, nlayers))
 
     # PLAN THE FFTs
     plan_FFTs!(
