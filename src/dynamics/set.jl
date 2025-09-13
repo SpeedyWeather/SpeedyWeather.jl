@@ -186,7 +186,6 @@ function set!(
     kernel_func = add ? (a,b) -> a+b : (a,b) -> b
 
     launch!(architecture(var), RingGridWorkOrder, size(var), set_field_3d_kernel!, var, londs, latds, σ_levels_full, f, kernel_func)
-    synchronize(architecture(var))
 
     return var
 end

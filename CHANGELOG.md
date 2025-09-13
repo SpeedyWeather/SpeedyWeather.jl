@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Reduce GPU overhead and revise on_architecture and adapt [#824](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/824)
 - Split extensions across subpackages [#846](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/846)
 
 ## v0.17
