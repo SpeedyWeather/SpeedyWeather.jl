@@ -116,7 +116,7 @@ function _apply_serial_fft!(
     k_grid = eachlayer(field)[k]     # vertical layer index
 
     if not_equator
-        _apply_fft_plan!(field.data, ilons, k_grid, brfft_plan, g_in, nfreq, k_grid, j)
+        _apply_fft_plan!(field.data, ilons, k_grid, brfft_plan, g_in, nfreq, k, j)
     end
 end
 
