@@ -47,7 +47,7 @@ module SpeedyTransformsCUDAExt
     """$(TYPEDSIGNATURES)
     (Forward) FFT, applied in zonal direction of `field` provided. 
     """
-    function _apply_batched_fft!(
+    function SpeedyTransforms._apply_batched_fft!(
         f_out::CuArray{<:Complex, 3},
         field::AbstractField,
         S::SpectralTransform, 
@@ -69,7 +69,7 @@ module SpeedyTransformsCUDAExt
     """$(TYPEDSIGNATURES)
     (Inverse) FFT, applied in zonal direction of `field` provided.
     """
-    function _apply_batched_fft!(
+    function SpeedyTransforms._apply_batched_fft!(
         field::AbstractField,
         g_in::CuArray{<:Complex, 3},
         S::SpectralTransform,
