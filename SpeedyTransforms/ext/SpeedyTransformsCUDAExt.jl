@@ -51,5 +51,6 @@ module SpeedyTransformsCUDAExt
     """
     SpeedyTransforms._apply_fft_plan!(f_out_slice, plan, field::Field{NF, N, <:CuArray{NF}}, ilons) where {NF, N} = LinearAlgebra.mul!(f_out_slice, plan, field.data[ilons, :])
     SpeedyTransforms._apply_fft_plan!(f_out_slice, plan, field::Field{NF, N, <:CuArray{NF}}, ilons, k_grid) where {NF, N} = LinearAlgebra.mul!(f_out_slice, plan, field.data[ilons, k_grid])
+    SpeedyTransforms._apply_fft_plan!(f_out_slice, plan, g_in::CuArray, ilons, k_grid) = LinearAlgebra.mul!(f_out_slice, plan, g_in[ilons, k_grid])
     SpeedyTransforms._apply_fft_plan!(f_out_slice, plan, g_in::CuArray, nfreq, nlayers, j) = LinearAlgebra.mul!(f_out_slice, plan, g_in[1:nfreq, 1:nlayers, j])
 end 

@@ -24,6 +24,7 @@ this function is dispatched on the array type and indexing.
 """
 _apply_fft_plan!(f_out_slice, plan, field::Field{NF, N, <:Array}, ilons) where {NF, N} = LinearAlgebra.mul!(f_out_slice, plan, view(field.data, ilons, :))
 _apply_fft_plan!(f_out_slice, plan, field::Field{NF, N, <:Array}, ilons, k_grid) where {NF, N} = LinearAlgebra.mul!(f_out_slice, plan, view(field.data, ilons, k_grid))
+_apply_fft_plan!(f_out_slice, plan, g_in::Array, ilons, k_grid) = LinearAlgebra.mul!(f_out_slice, plan, view(g_in, ilons, k_grid))
 _apply_fft_plan!(f_out_slice, plan, g_in::Array, nfreq, nlayers, j) = LinearAlgebra.mul!(f_out_slice, plan, view(g_in, 1:nfreq, 1:nlayers, j))
 
 """$(TYPEDSIGNATURES)
