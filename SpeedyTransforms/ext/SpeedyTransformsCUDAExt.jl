@@ -60,7 +60,7 @@ module SpeedyTransformsCUDAExt
         nlayers = size(field, 2)        # number of vertical layers
 
         if not_equator
-            view(f_out, 1:nfreq, 1:nlayers, j) .= rfft_plan * field.data[ilons, :]
+            LinearAlgebra.mul!(f_out[1:nfreq, 1:nlayers, j], rfft_plan, field.data[ilons, :])
         else
             fill!(f_out[1:nfreq, 1:nlayers, j], 0)
         end
@@ -83,8 +83,7 @@ module SpeedyTransformsCUDAExt
         nfreq = nlon÷2 + 1              # linear max Fourier frequency wrt to nlon
 
         if not_equator
-            view(field.data, ilons, :) .= brfft_plan * g_in[1:nfreq, 1:nlayers, j]
+            LinearAlgebra.mul!(view(field.data, ilons, :), brfft_plan, g_in[1:nfreq, 1:nlayers, j])
         end
     end 
-
 end 
