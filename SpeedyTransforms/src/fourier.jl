@@ -42,7 +42,7 @@ function _apply_batched_fft!(
     nlayers = size(field, 2)        # number of vertical layers
 
     if not_equator
-        apply_fft_plan!(view(f_out, 1:nfreq, 1:nlayers, j), rfft_plan, field, ilons)
+        _apply_fft_plan!(view(f_out, 1:nfreq, 1:nlayers, j), rfft_plan, field, ilons)
     else
         fill!(f_out[1:nfreq, 1:nlayers, j], 0)
     end
@@ -65,7 +65,7 @@ function _apply_batched_fft!(
     nfreq = nlon÷2 + 1              # linear max Fourier frequency wrt to nlon
 
     if not_equator
-        apply_fft_plan!(view(field.data, ilons, :), brfft_plan, g_in, nfreq, nlayers, j)
+        _apply_fft_plan!(view(field.data, ilons, :), brfft_plan, g_in, nfreq, nlayers, j)
     end
 end
 
@@ -86,7 +86,7 @@ function _apply_serial_fft!(
     k_grid = eachlayer(field)[k]        # vertical layer index
 
     if not_equator
-        apply_fft_plan!(view(f_out, 1:nfreq, k, j), rfft_plan, field, ilons, k_grid)
+        _apply_fft_plan!(view(f_out, 1:nfreq, k, j), rfft_plan, field, ilons, k_grid)
     else
         fill!(f_out[1:nfreq, k, j], 0)
     end
@@ -109,7 +109,7 @@ function _apply_serial_fft!(
     k_grid = eachlayer(field)[k]     # vertical layer index
 
     if not_equator
-        apply_fft_plan!(view(field.data, ilons, k_grid), brfft_plan, g_in, ilons, k_grid)
+        _apply_fft_plan!(view(field.data, ilons, k_grid), brfft_plan, g_in, ilons, k_grid)
     end
 end
 
