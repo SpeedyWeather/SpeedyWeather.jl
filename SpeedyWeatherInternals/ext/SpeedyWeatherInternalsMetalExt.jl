@@ -6,14 +6,16 @@ module SpeedyWeatherInternalsMetalExt
             compatible_array_types, nonparametric_type
 
 
+    const MtlGPU = GPU{MetalBackend}
+
     # DEVICE SETUP FOR METAL
     # extend functions from Architectures
-    Architectures.array_type(::GPU) = MtlArray
-    Architectures.array_type(::Type{<:GPU}) = MtlArray
+    Architectures.array_type(::MtlGPU) = MtlArray
+    Architectures.array_type(::Type{<:MtlGPU}) = MtlArray
     Architectures.array_type(::GPU, NF::Type, N::Int) = MtlArray{NF, N, Metal.PrivateStorage}
 
-    Architectures.compatible_array_types(::GPU) = (MtlArray, MtlDeviceArray)
-    Architectures.compatible_array_types(::Type{<:GPU}) = (MtlArray, MtlDeviceArray)
+    Architectures.compatible_array_types(::MtlGPU) = (MtlArray, MtlDeviceArray)
+    Architectures.compatible_array_types(::Type{<:MtlGPU}) = (MtlArray, MtlDeviceArray)
 
     Architectures.nonparametric_type(::Type{<:MtlArray}) = MtlArray
 
@@ -25,15 +27,15 @@ module SpeedyWeatherInternalsMetalExt
     Architectures.architecture(::Type{<:MtlDeviceArray}) = MetalGPU()
 
     Architectures.on_architecture(::CPU, a::MtlArray) = Array(a)
-    Architectures.on_architecture(::GPU, a::MtlArray) = a
+    Architectures.on_architecture(::MtlGPU, a::MtlArray) = a
     Architectures.on_architecture(::CPU, a::SubArray{<:Any, <:Any, <:MtlArray}) = Array(a)
 
-    Architectures.on_architecture(::GPU, a::Array) = MtlArray(a)
-    Architectures.on_architecture(::GPU, a::BitArray) = MtlArray(a)
-    Architectures.on_architecture(::GPU, a::SubArray{<:Any, <:Any, <:MtlArray}) = a
-    Architectures.on_architecture(::GPU, a::SubArray{<:Any, <:Any, <:Array}) = MtlArray(a)
-    Architectures.on_architecture(::GPU, a::StepRangeLen) = a
+    Architectures.on_architecture(::MtlGPU, a::Array) = MtlArray(a)
+    Architectures.on_architecture(::MtlGPU, a::BitArray) = MtlArray(a)
+    Architectures.on_architecture(::MtlGPU, a::SubArray{<:Any, <:Any, <:MtlArray}) = a
+    Architectures.on_architecture(::MtlGPU, a::SubArray{<:Any, <:Any, <:Array}) = MtlArray(a)
+    Architectures.on_architecture(::MtlGPU, a::StepRangeLen) = a
 
-    @inline Architectures.convert_to_device(::GPU, args) = Metal.mtlconvert(args)
-    @inline Architectures.convert_to_device(::GPU, args::Tuple) = map(Metal.mtlconvert, args)
+    @inline Architectures.convert_to_device(::MtlGPU, args) = Metal.mtlconvert(args)
+    @inline Architectures.convert_to_device(::MtlGPU, args::Tuple) = map(Metal.mtlconvert, args)
 end

@@ -11,7 +11,6 @@ $(TYPEDFIELDS)
     NF,
     Grid,
     VectorType,
-    VectorFloat64Type,
 } <: AbstractGeometry
 
     "SpectralGrid that defines spectral and grid resolution"
@@ -37,10 +36,10 @@ $(TYPEDFIELDS)
 
     # ARRAYS OF LANGITUDES/LONGITUDES
     "array of longitudes in degrees (0...360˚), empty for non-full grids"
-    lond::VectorFloat64Type = get_lond(Grid, nlat_half)
+    lond::VectorType = get_lond(Grid, nlat_half)
 
     "array of latitudes in degrees (90˚...-90˚)"
-    latd::VectorFloat64Type = get_latd(Grid, nlat_half)
+    latd::VectorType = get_latd(Grid, nlat_half)
 
     "array of latitudes in radians (π...-π)"
     lat::VectorType = get_lat(Grid, nlat_half)
@@ -103,10 +102,8 @@ function Geometry(SG::SpectralGrid; vertical_coordinates=SigmaCoordinates(SG.nla
     @assert nlayers == vertical_coordinates.nlayers error_message
 
     (; NF, grid, VectorType) = SG
-    VectorTypeFloat64 = SG.ArrayType{Float64, 1}
-
     (; σ_half) = vertical_coordinates
-    return Geometry{NF, typeof(grid), VectorType, VectorTypeFloat64}(; spectral_grid=SG, σ_levels_half=σ_half)
+    return Geometry{NF, typeof(grid), VectorType}(; spectral_grid=SG, σ_levels_half=σ_half)
 end
 
 function Base.show(io::IO, G::Geometry)
