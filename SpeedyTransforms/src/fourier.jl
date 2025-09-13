@@ -21,9 +21,17 @@ end
 """$(TYPEDSIGNATURES)
 Apply FFT plan to field. Due to different limitations of FFTW and CUDA FFT plans,
 this function is dispatched on the array type and indexing.
+
+With FFTW currently strided inputs are possible, there's low-level support for 
+strided outputs, but it's not really implementend to be used at a high-level, so we 
+use broadcasting instead of mul!
 """
-_apply_fft_plan!(f_out_slice, plan, field::Field{NF, N, <:Array}, ilons, k_grid=Colon()) where {NF, N} = LinearAlgebra.mul!(f_out_slice, plan, view(field.data, ilons, k_grid))
-_apply_fft_plan!(f_out_slice, plan, g_in::Array, nfreq, layers, j) = LinearAlgebra.mul!(f_out_slice, plan, view(g_in, 1:nfreq, layers, j))
+function _apply_fft_plan!(f_out, nfreq, layers, j, plan, field::Field{NF, N, <:Array}, ilons, k_grid=Colon()) where {NF, N} 
+    view(f_out, 1:nfreq, layers, j) .= plan * view(field.data, ilons, k_grid)
+end
+function _apply_fft_plan!(field_out, ilons, k, plan, g_in::Array, nfreq, layers, j) 
+    view(field_out, ilons, k) .= plan * view(g_in, 1:nfreq, layers, j)
+end
 
 """$(TYPEDSIGNATURES)
 (Forward) FFT, applied in zonal direction of `field` provided. 
@@ -41,7 +49,7 @@ function _apply_batched_fft!(
     nlayers = size(field, 2)        # number of vertical layers
 
     if not_equator
-        _apply_fft_plan!(view(f_out, 1:nfreq, 1:nlayers, j), rfft_plan, field, ilons)
+        _apply_fft_plan!(f_out, nfreq, 1:nlayers, j, rfft_plan, field, ilons)
     else
         fill!(f_out[1:nfreq, 1:nlayers, j], 0)
     end
@@ -64,7 +72,7 @@ function _apply_batched_fft!(
     nfreq = nlon÷2 + 1              # linear max Fourier frequency wrt to nlon
 
     if not_equator
-        _apply_fft_plan!(view(field.data, ilons, :), brfft_plan, g_in, nfreq, 1:nlayers, j)
+        _apply_fft_plan!(field.data, ilons, Colon(), brfft_plan, g_in, nfreq, 1:nlayers, j)
     end
 end
 
@@ -85,7 +93,7 @@ function _apply_serial_fft!(
     k_grid = eachlayer(field)[k]        # vertical layer index
 
     if not_equator
-        _apply_fft_plan!(view(f_out, 1:nfreq, k, j), rfft_plan, field, ilons, k_grid)
+        _apply_fft_plan!(f_out, nfreq, k, j, rfft_plan, field, ilons, k_grid)
     else
         fill!(f_out[1:nfreq, k, j], 0)
     end
@@ -108,7 +116,7 @@ function _apply_serial_fft!(
     k_grid = eachlayer(field)[k]     # vertical layer index
 
     if not_equator
-        _apply_fft_plan!(view(field.data, ilons, k_grid), brfft_plan, g_in, nfreq, k_grid, j)
+        _apply_fft_plan!(field.data, ilons, k_grid, brfft_plan, g_in, nfreq, k_grid, j)
     end
 end
 
