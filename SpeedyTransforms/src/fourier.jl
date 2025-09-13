@@ -24,8 +24,7 @@ this function is dispatched on the array type and indexing.
 """
 _apply_fft_plan!(f_out_slice, plan, field::Field{NF, N, <:Array}, ilons) where {NF, N} = LinearAlgebra.mul!(f_out_slice, plan, view(field.data, ilons, :))
 _apply_fft_plan!(f_out_slice, plan, field::Field{NF, N, <:Array}, ilons, k_grid) where {NF, N} = LinearAlgebra.mul!(f_out_slice, plan, view(field.data, ilons, k_grid))
-_apply_fft_plan!(f_out_slice, plan, g_in::Array, ilons, k_grid) = LinearAlgebra.mul!(f_out_slice, plan, view(g_in, ilons, k_grid))
-_apply_fft_plan!(f_out_slice, plan, g_in::Array, nfreq, nlayers, j) = LinearAlgebra.mul!(f_out_slice, plan, view(g_in, 1:nfreq, 1:nlayers, j))
+_apply_fft_plan!(f_out_slice, plan, g_in::Array, nfreq, layers, j) = LinearAlgebra.mul!(f_out_slice, plan, view(g_in, 1:nfreq, layers, j))
 
 """$(TYPEDSIGNATURES)
 (Forward) FFT, applied in zonal direction of `field` provided. 
@@ -66,7 +65,7 @@ function _apply_batched_fft!(
     nfreq = nlon÷2 + 1              # linear max Fourier frequency wrt to nlon
 
     if not_equator
-        _apply_fft_plan!(view(field.data, ilons, :), brfft_plan, g_in, nfreq, nlayers, j)
+        _apply_fft_plan!(view(field.data, ilons, :), brfft_plan, g_in, nfreq, 1:nlayers, j)
     end
 end
 
@@ -110,7 +109,7 @@ function _apply_serial_fft!(
     k_grid = eachlayer(field)[k]     # vertical layer index
 
     if not_equator
-        _apply_fft_plan!(view(field.data, ilons, k_grid), brfft_plan, g_in, ilons, k_grid)
+        _apply_fft_plan!(view(field.data, ilons, k_grid), brfft_plan, g_in, nfreq, k_grid, j)
     end
 end
 
