@@ -197,14 +197,14 @@ for f in (:zeros, :ones, :rand, :randn)
             spectrum::AbstractSpectrum,
             I::Vararg{Integer, M},
         ) where {T, M}
-            return LowerTriangularArray($f(T, nonzeros(spectrum), I...), spectrum)
+            return LowerTriangularArray(array_type(spectrum.architecture)($f(T, nonzeros(spectrum), I...)), spectrum)
         end
 
         function Base.$f(
             ::Type{LowerTriangularMatrix{T}},
             spectrum::AbstractSpectrum,
         ) where T
-            return LowerTriangularMatrix($f(T, nonzeros(spectrum)), spectrum)
+            return LowerTriangularMatrix(array_type(spectrum.architecture)($f(T, nonzeros(spectrum))), spectrum)
         end
 
         function Base.$f(
@@ -212,7 +212,7 @@ for f in (:zeros, :ones, :rand, :randn)
             spectrum::AbstractSpectrum,
             I::Vararg{Integer, M},
         ) where {T <: Number, M}
-            return LowerTriangularArray($f(T, nonzeros(spectrum), I...), spectrum)
+            return LowerTriangularArray(array_type(spectrum.architecture)($f(T, nonzeros(spectrum), I...)), spectrum)
         end
 
         # use Float64 as default if type T is not provided
