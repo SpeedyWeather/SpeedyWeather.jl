@@ -50,7 +50,6 @@ module SpeedyTransformsCUDAExt
     this function is dispatched on the array type and indexing. CUFFT doesn't allow plans to be applied to views,
     so we have to use indexing instead.
     """
-    SpeedyTransforms._apply_fft_plan!(f_out_slice, plan, field::Field{NF, N, <:CuArray{NF}}, ilons) where {NF, N} = LinearAlgebra.mul!(f_out_slice, plan, field.data[ilons, :])
-    SpeedyTransforms._apply_fft_plan!(f_out_slice, plan, field::Field{NF, N, <:CuArray{NF}}, ilons, k_grid) where {NF, N} = LinearAlgebra.mul!(f_out_slice, plan, field.data[ilons, k_grid])
+    SpeedyTransforms._apply_fft_plan!(f_out_slice, plan, field::Field{NF, N, <:CuArray{NF}}, ilons, k_grid=Colon()) where {NF, N} = LinearAlgebra.mul!(f_out_slice, plan, field.data[ilons, k_grid])
     SpeedyTransforms._apply_fft_plan!(f_out_slice, plan, g_in::CuArray, nfreq::Int, layers, j::Int) = LinearAlgebra.mul!(f_out_slice, plan, g_in[1:nfreq, layers, j])
 end 
