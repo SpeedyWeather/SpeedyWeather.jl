@@ -205,11 +205,13 @@ function SpectralTransform(
     ϵlms = get_recursion_factors(Spectrum(lmax+1, mmax))    # one more degree needed!
 
     # GRADIENTS (on unit sphere, hence 1/radius-scaling is omitted)
-    # meridional gradient for scalars (coslat scaling included)
-    grad_y1 = zeros(NF, spectrum)                           # term 1, mul with harmonic l-1, m
-    grad_y2 = zeros(NF, spectrum)                           # term 2, mul with harmonic l+1, m
+    # meridional gradient for scalars (coslat scaling included
+    # precomputations always on CPU, then transfered to the actual architecture used
+    spectrum_cpu = Spectrum(lmax, mmax)
+    grad_y1 = zeros(NF, spectrum_cpu)                           # term 1, mul with harmonic l-1, m
+    grad_y2 = zeros(NF, spectrum_cpu)                           # term 2, mul with harmonic l+1, m
 
-    for (m, degrees) in enumerate(orders(spectrum))          # 1-based degree l, order m
+    for (m, degrees) in enumerate(orders(spectrum_cpu))          # 1-based degree l, order m
         for l in degrees        
             grad_y1[l, m] = -(l-2)*ϵlms[l, m]
             grad_y2[l, m] = (l+1)*ϵlms[l+1, m]
@@ -217,20 +219,23 @@ function SpectralTransform(
         # explicitly set the last row to zero, so that kernels yield correct gradient in last row 
         grad_y2[lmax, m] = 0
     end
+    grad_y1 = on_architecture(architecture, grad_y1)
+    grad_y2 = on_architecture(architecture, grad_y2)
 
     # meridional gradient used to get from u, v/coslat to vorticity and divergence
-    grad_x_vordiv = zeros(Int, spectrum)
+    grad_x_vordiv = zeros(Int, spectrum_cpu)
     for m in 1:mmax
         for l in m:lmax-1                         
             grad_x_vordiv[l, m] = m-1
         end # last row zero to get vor and div correct
         grad_x_vordiv[lmax, m] = 0
     end
+    grad_x_vordiv = on_architecture(architecture, grad_x_vordiv)
 
-    grad_y_vordiv1 = zeros(NF, spectrum)                    # term 1, mul with harmonic l-1, m
-    grad_y_vordiv2 = zeros(NF, spectrum)                    # term 2, mul with harmonic l+1, m
+    grad_y_vordiv1 = zeros(NF, spectrum_cpu)                    # term 1, mul with harmonic l-1, m
+    grad_y_vordiv2 = zeros(NF, spectrum_cpu)                    # term 2, mul with harmonic l+1, m
  
-    for (m, degrees) in enumerate(orders(spectrum))          # 1-based degree l, order m
+    for (m, degrees) in enumerate(orders(spectrum_cpu))          # 1-based degree l, order m
         for l in degrees           
             grad_y_vordiv1[l, m] = l*ϵlms[l, m]
             grad_y_vordiv2[l, m] = (l-1)*ϵlms[l+1, m]
@@ -239,14 +244,17 @@ function SpectralTransform(
         grad_y_vordiv1[lmax, m] = 0
         grad_y_vordiv2[lmax, m] = 0
     end
+    grad_y_vordiv1 = on_architecture(architecture, grad_y_vordiv1)
+    grad_y_vordiv2 = on_architecture(architecture, grad_y_vordiv2)
 
     # zonal integration (sort of) to get from vorticity and divergence to u, v*coslat
-    vordiv_to_uv_x = LowerTriangularMatrix([-m/(l*(l+1)) for l in 0:(lmax-1), m in 0:(mmax-1)], spectrum)
+    vordiv_to_uv_x = LowerTriangularMatrix([-m/(l*(l+1)) for l in 0:(lmax-1), m in 0:(mmax-1)], spectrum_cpu)
     vordiv_to_uv_x[1, 1] = 0
+    vordiv_to_uv_x = on_architecture(architecture, vordiv_to_uv_x)
 
     # meridional integration (sort of) to get from vorticity and divergence to u, v*coslat
-    vordiv_to_uv1 = zeros(NF, spectrum)                     # term 1, to be mul with harmonic l-1, m
-    vordiv_to_uv2 = zeros(NF, spectrum)                     # term 2, to be mul with harmonic l+1, m
+    vordiv_to_uv1 = zeros(NF, spectrum_cpu)                     # term 1, to be mul with harmonic l-1, m
+    vordiv_to_uv2 = zeros(NF, spectrum_cpu)                     # term 2, to be mul with harmonic l+1, m
 
     for (m, degrees) in enumerate(orders(spectrum))          # 1-based degree l, order m
         for l in degrees             
@@ -258,6 +266,8 @@ function SpectralTransform(
     end
 
     vordiv_to_uv1[1, 1] = 0                 # remove NaN from 0/0
+    vordiv_to_uv1 = on_architecture(architecture, vordiv_to_uv1)
+    vordiv_to_uv2 = on_architecture(architecture, vordiv_to_uv2)
 
     # EIGENVALUES (on unit sphere, hence 1/radius²-scaling is omitted)
     eigenvalues = [-l*(l+1) for l in 0:mmax]
