@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Expand scratch memory handling in spectral transforms for better differentiability with Enzyme [#791](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/791)
 - Split extensions across subpackages [#846](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/846)
 
 ## v0.17

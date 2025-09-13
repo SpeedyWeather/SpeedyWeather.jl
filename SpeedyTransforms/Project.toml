@@ -31,7 +31,7 @@ RingGrids = {path = "../RingGrids"}
 AbstractFFTs = "1.5.0"
 Adapt = "4.3.0"
 AssociatedLegendrePolynomials = "1.0.1"
-Atomix = "1.1.2"
+Atomix = "1"
 CUDA = "4, 5"
 DocStringExtensions = "0.9.5"
 Enzyme = "0.13"
