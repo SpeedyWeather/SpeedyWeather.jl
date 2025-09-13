@@ -6,7 +6,7 @@ module SpeedyWeatherInternalsMetalExt
             compatible_array_types, nonparametric_type
 
 
-    const MtlGPU = GPU{MetalBackend}
+    const MtlGPU = GPU{Metal.MetalBackend}
 
     # DEVICE SETUP FOR METAL
     # extend functions from Architectures
