@@ -132,7 +132,7 @@ export StochasticStirring
     nlat::Int
 
     "[OPTION] Stirring strength A [1/s²]"
-    @param strength::NF = 1e-9
+    @param strength::NF = 2e-11
 
     "[OPTION] Stirring latitude [˚N]"
     @param latitude::NF = 45 (bounds=-90..90,)
