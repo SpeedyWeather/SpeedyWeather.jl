@@ -355,6 +355,8 @@ instead to accumulate the tendency. Otherwise you would undo the forcing term!
 Note that this conflict would be avoided if the forcing writes into
 `vor_tend` but the drag writes into `u_tend_grid`.
 
+## Allowed forcings
+
 In general, these are the fields you can write into for new terms
 
 - `vor_tend` in spectral space
@@ -365,4 +367,6 @@ In general, these are the fields you can write into for new terms
 - `v_tend_grid` in grid space
 
 These space restrictions exist because of the way how SpeedyWeather transforms
-between spaces to obtain tendencies.
+between spaces to obtain tendencies. Note that if you write into the
+pressure tendency for the primitie equation model these need to correspond
+to ``\partial_t \ln p_s`` so not in units of Pa/s but including the logarithm.
