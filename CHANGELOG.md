@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Mean sea-level pressure output [#853](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/853)
+- Mean sea-level pressure and dynamics output [#853](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/853) [#854](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/854)
 - Split extensions across subpackages [#846](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/846)
 
 ## v0.17
