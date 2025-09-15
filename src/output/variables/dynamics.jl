@@ -203,3 +203,16 @@ Fields are: $(TYPEDFIELDS)"""
 end
 
 path(::HumidityOutput, simulation) = simulation.diagnostic_variables.grid.humid_grid
+
+# collect all in one for convenience
+DynamicsOutput() = (
+    VorticityOutput(),
+    ZonalVelocityOutput(),
+    MeridionalVelocityOutput(),
+    DivergenceOutput(),
+    InterfaceDisplacementOutput(),
+    SurfacePressureOutput(),
+    MeanSeaLevelPressureOutput(),
+    TemperatureOutput(),
+    HumidityOutput(),
+)
