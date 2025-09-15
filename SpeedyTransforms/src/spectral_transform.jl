@@ -434,7 +434,7 @@ function get_recursion_factors( ::Type{NF},             # number format NF
                                 spectrum::Spectrum,
                                 ) where NF
     ϵlms = zeros(NF, spectrum)
-    for (m, degrees) in enumerate(orders(spectrum))      # loop over 1-based l, m
+    for (m, degrees) in enumerate(orders(spectrum))     # loop over 1-based l, m
         for l in degrees
             ϵlms[l, m] = recursion_factor(l-1, m-1)     # convert to 0-based l, m for function arguments
         end
@@ -461,8 +461,8 @@ transform!(                    # SPECTRAL TO GRID
 
 function transform!(                                # SPECTRAL TO GRID
     field::AbstractField,                           # gridded output
-    coeffs::LowerTriangularArray,                    # spectral coefficients input
-    scratch_memory::ScratchMemory,      # explicit scratch memory to use
+    coeffs::LowerTriangularArray,                   # spectral coefficients input
+    scratch_memory::ScratchMemory,                  # explicit scratch memory to use
     S::SpectralTransform;                           # precomputed transform
     unscale_coslat::Bool = false,                   # unscale with cos(lat) on the fly?
 )
@@ -497,7 +497,7 @@ transform!(                             # GRID TO SPECTRAL
 ) = transform!(coeffs, field, S.scratch_memory, S)
     
 function transform!(                               # GRID TO SPECTRAL
-    coeffs::LowerTriangularArray,                   # output: spectral coefficients
+    coeffs::LowerTriangularArray,                  # output: spectral coefficients
     field::AbstractField,                          # input: gridded values
     scratch_memory::ScratchMemory,                 # explicit scratch memory to use
     S::SpectralTransform,                          # precomputed spectral transform
