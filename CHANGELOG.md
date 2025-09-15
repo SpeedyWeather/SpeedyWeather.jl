@@ -2,9 +2,10 @@
 
 ## Unreleased
 
+- Mean sea-level pressure output [#853](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/853)
 - Split extensions across subpackages [#846](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/846)
 
-## v0.17
+## v0.17
 
 - More documentation on GPU and on_architecture [#845](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/845)
 - The documentation has a logo now as well [#842](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/842)
