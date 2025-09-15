@@ -234,7 +234,7 @@ function surface_pressure_tendency!(
     (; ∇lnp_x, ∇lnp_y, u_mean_grid, v_mean_grid, div_mean, scratch_memory) = diagn.dynamics
     
     # in grid-point space the the (ū, v̄)⋅∇lnpₛ term (swap sign in spectral)
-    @. pres_tend_grid = u_mean_grid*∇lnp_x + v_mean_grid*∇lnp_y
+    @. pres_tend_grid += u_mean_grid*∇lnp_x + v_mean_grid*∇lnp_y
     transform!(pres_tend, pres_tend_grid, scratch_memory, S)
     
     # for semi-implicit div_mean is calc at time step i-1 in vertical_integration!
@@ -256,8 +256,12 @@ function vertical_velocity!(
     (; div_mean_grid) = diagn.dynamics          # vertical avrgd div to be added to ūv̄∇lnp
     (; σ_tend) = diagn.dynamics                 # vertical mass flux M = pₛσ̇ at k+1/2
     (; div_grid) = diagn.grid
-    ūv̄∇lnp = diagn.tendencies.pres_tend_grid    # calc'd in surface_pressure_tendency! (excl -D̄)
-
+    
+    # to calculate u_mean_grid*∇lnp_x + v_mean_grid*∇lnp_y again
+    (; ∇lnp_x, ∇lnp_y, u_mean_grid, v_mean_grid) = diagn.dynamics
+    ūv̄∇lnp = diagn.dynamics.a_2D_grid           # use scratch memory
+    @. ūv̄∇lnp = u_mean_grid*∇lnp_x + v_mean_grid*∇lnp_y
+    
     grids_match(σ_tend, div_sum_above, div_grid, uv∇lnp_sum_above, uv∇lnp) ||
         throw(DimensionMismatch(σ_tend, div_sum_above, div_grid, uv∇lnp_sum_above, uv∇lnp))
 
