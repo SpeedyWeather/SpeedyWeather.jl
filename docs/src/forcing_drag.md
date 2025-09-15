@@ -359,9 +359,10 @@ In general, these are the fields you can write into for new terms
 
 - `vor_tend` in spectral space
 - `div_tend` in spectral space (shallow water only)
-- `pres_tend` in spectral space (shallow water only)
-- `u_tend_grid` in grid-point space
-- `v_tend_grid` in grid-point space
+- `pres_tend` in spectral space
+- `pres_tend_grid` in grid space
+- `u_tend_grid` in grid space
+- `v_tend_grid` in grid space
 
 These space restrictions exist because of the way how SpeedyWeather transforms
 between spaces to obtain tendencies.
