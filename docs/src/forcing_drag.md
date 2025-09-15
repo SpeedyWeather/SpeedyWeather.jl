@@ -367,8 +367,8 @@ In general, these are the fields you can write into for new terms
 - `pres_tend_grid` in grid space
 
 One currently cannot force vorticity or divergence in grid space
-but you would need to force u,v instead. In contrast, vorticity
-and divergence can be forced in spectral space but not in grid space.
+but you would need to force u,v instead. In contrast, u and v cannot
+be forced in spectral space only in grid space.
 These restrictions exist because of the way how SpeedyWeather transforms
 between spaces to obtain tendencies. Pressure (or interface displacement
 in the shallow water) can be forced both in spectral or grid space.
