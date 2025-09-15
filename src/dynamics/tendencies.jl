@@ -338,8 +338,8 @@ function vordiv_tendencies!(
             coslat⁻¹j = coslat⁻¹[j]
             f_j = f[j]
             for ij in ring
-                ω = vor_grid[ij, k] + f_j               # absolute vorticity
-                RTᵥ = R_dry*temp_virt_grid[ij, k]       # dry gas constant * virtual temperature anomaly(!)
+                ω = vor_grid[ij, k] + f_j                   # absolute vorticity
+                RTᵥ = R_dry*temp_virt_grid[ij, k]           # dry gas constant * virtual temperature anomaly(!)
                 u_tend_grid[ij, k] = (u_tend_grid[ij, k] + v_grid[ij, k]*ω - RTᵥ*∇lnp_x[ij])*coslat⁻¹j
                 v_tend_grid[ij, k] = (v_tend_grid[ij, k] - u_grid[ij, k]*ω - RTᵥ*∇lnp_y[ij])*coslat⁻¹j
             end
@@ -354,8 +354,8 @@ function vordiv_tendencies!(
     transform!(u_tend, u_tend_grid, scratch_memory, S)
     transform!(v_tend, v_tend_grid, scratch_memory, S)
 
-    curl!(vor_tend, u_tend, v_tend, S)         # ∂ζ/∂t = ∇×(u_tend, v_tend)
-    divergence!(div_tend, u_tend, v_tend, S)   # ∂D/∂t = ∇⋅(u_tend, v_tend)
+    curl!(vor_tend, u_tend, v_tend, S, add=true)            # ∂ζ/∂t += ∇×(u_tend, v_tend)
+    divergence!(div_tend, u_tend, v_tend, S, add=true)      # ∂D/∂t += ∇⋅(u_tend, v_tend)
     return nothing
 end
 
