@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Allow to force surface pressure tendency [#855](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/855)
 - Call callbacks before output not after [#852](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/852)
 - Split extensions across subpackages [#846](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/846)
 
