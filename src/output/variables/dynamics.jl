@@ -123,6 +123,58 @@ path(::SurfacePressureOutput, simulation) = simulation.diagnostic_variables.grid
 
 """Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
+@kwdef mutable struct MeanSeaLevelPressureOutput <: AbstractOutputVariable
+    name::String = "mslp"
+    unit::String = "hPa"
+    long_name::String = "mean sea-level pressure"
+    dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
+    missing_value::Float64 = NaN
+    compression_level::Int = 3
+    shuffle::Bool = true
+    keepbits::Int = 12
+end
+
+path(::MeanSeaLevelPressureOutput, simulation) = simulation.diagnostic_variables.grid.pres_grid
+
+function output!(
+    output::NetCDFOutput,
+    variable::MeanSeaLevelPressureOutput,
+    simulation::AbstractSimulation,
+)
+    # escape immediately after first call if variable doesn't have a time dimension
+    ~hastime(variable) && output.output_counter > 1 && return nothing
+
+    lnpₛ = path(variable, simulation)
+    h = simulation.model.orography.orography
+    (; R_dry) = simulation.model.atmosphere
+    g = simulation.model.planet.gravity
+
+    # virtual temperature in 3D view on surface-most 2D layer
+    temp_virt_grid = simulation.diagnostic_variables.grid.temp_virt_grid
+    nlayers = size(temp_virt_grid, 2)
+    Tᵥ = field_view(simulation.diagnostic_variables.grid.temp_virt_grid, :, nlayers)
+
+    # calculate mean sea-level pressure on model grid
+    mslp = simulation.diagnostic_variables.dynamics.a_2D_grid
+    @. mslp = exp(g*h/R_dry/Tᵥ + lnpₛ) / 100  # Pa to hPa
+
+    # interpolate 2D/3D variables
+    mslp_output = output.field2D
+    mslp_grid = on_architecture(CPU(), mslp)
+    RingGrids.interpolate!(mslp_output, mslp_grid, output.interpolator)
+
+    if hasproperty(variable, :keepbits)     # round mantissabits for compression
+        round!(mslp_output, variable.keepbits)
+    end
+
+    i = output.output_counter               # output time step i to write
+    indices = get_indices(i, variable)      # returns (:, :, i) for example, depending on dims
+    output.netcdf_file[variable.name][indices...] = mslp_output     # actually write to file
+    return nothing
+end
+
+"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+Fields are: $(TYPEDFIELDS)"""
 @kwdef mutable struct TemperatureOutput{F} <: AbstractOutputVariable
     name::String = "temp"
     unit::String = "degC"
