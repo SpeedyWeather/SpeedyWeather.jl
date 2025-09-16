@@ -343,8 +343,8 @@ for (Tr,Tc) in ((:Float32,:(Complex{Float32})),(:Float64,:(Complex{Float64})))
         end
 
         function plan_brfft(X::StridedArray{$Tc,N}, d::Integer, region;
-            flags::Integer=ESTIMATE,
-            timelimit::Real=NO_TIMELIMIT,
+            flags::Integer=FFTW.ESTIMATE,
+            timelimit::Real=FFTW.NO_TIMELIMIT,
             num_threads::Union{Nothing, Integer} = nothing,
             ostride=Tuple(1 for i in 1:N)) where N
 
