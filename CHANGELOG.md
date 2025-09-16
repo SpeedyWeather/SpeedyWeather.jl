@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Expand scratch memory handling in spectral transforms for better differentiability with Enzyme and revise FFT plans [#791](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/791)
 - Fix LowerTriangularArrays zeros, rand, etc to return correct array type based on Spectrum architecture [#850](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/850)
 - Call callbacks before output not after [#852](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/852)
 - Split extensions across subpackages [#846](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/846)
