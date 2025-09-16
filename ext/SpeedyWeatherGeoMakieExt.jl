@@ -283,6 +283,9 @@ function SpeedyWeather.animate(
     if coastlines
         lines!(GeoMakie.coastlines(); color=:white)
     end
+
+    # remove grid and grid labels
+    hidedecorations!(ax)
     
     # Create the animation
     record(fig, output_file, (transient_timesteps + 1):length(time); framerate=framerate) do frame

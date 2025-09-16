@@ -1,6 +1,6 @@
 # define all variables for output
-include("dynamics.jl")
-include("precipitation.jl")   # collected as PrecipitationOutput()
+include("dynamics.jl")        # collected as DynamicsOutput()
+include("precipitation.jl")   # PrecipitationOutput()
 include("boundaries.jl")      # BoundaryOutput()
 include("radiation.jl")       # RadiationOutput()
 include("stochastic.jl")      # RandomPatternOutput()
@@ -11,6 +11,7 @@ include("tracers.jl")         # TracerOutput()
 
 # collect all together for conveneince
 AllOutputVariables() = (
+    DynamicsOutput()...,
     PrecipitationOutput()...,
     BoundaryOutput()...,
     RadiationOutput()...,
