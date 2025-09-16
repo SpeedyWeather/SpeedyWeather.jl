@@ -362,11 +362,11 @@ for (Tr,Tc) in ((:Float32,:(Complex{Float32})),(:Float64,:(Complex{Float64})))
         # multidimensional out-of-place c2r transforms, so
         # we have to handle 1d and >1d cases separately with a copy.  Ugh.
         if length(region) <= 1
-            FFTW.rFFTWPlan{$Tc,$BACKWARD,false,N}(X, Y, region,
-                                        flags | PRESERVE_INPUT,
+            FFTW.rFFTWPlan{$Tc,$FFTW.BACKWARD,false,N}(X, Y, region,
+                                        flags | FFTW.PRESERVE_INPUT,
                                         timelimit)
         else
-            FFTW.rFFTWPlan{$Tc,$BACKWARD,false,N}(copy(X), Y, region, flags,
+            FFTW.rFFTWPlan{$Tc,$FFTW.BACKWARD,false,N}(copy(X), Y, region, flags,
                                         timelimit)
         end
     end
