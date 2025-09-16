@@ -214,7 +214,7 @@ function timestep!(
     (; mask) = model.land_sea_mask
 
     P = diagn.physics.rain_rate                     # precipitation (rain only) in [m/s]
-    S = diagn.physics.land.snow_melt_rate           # TODO [m/s]?
+    S = diagn.physics.land.snow_melt_rate           # [m/s]
     E = diagn.physics.land.surface_humidity_flux    # [kg/s/m²], divide by density for [m/s]
     R = diagn.physics.land.river_runoff             # diagnosed [m/s]
 
@@ -242,7 +242,7 @@ end
         # precipitation (rain+snow, convection + large-scale) minus evaporation (or condensation)
         # river runoff only diagnostic, i.e. R=0 here but drain excess water below
         # convert to [m/s] by dividing by density
-        F = (P[ij] - E[ij] + S[ij])/ρ               # - R[ij]
+        F = (P[ij] + S[ij] - E[ij])/ρ         # - R[ij]
 
         # vertical diffusion term between layers
         D = τ⁻¹*(soil_moisture[ij, 1] - soil_moisture[ij, 2])

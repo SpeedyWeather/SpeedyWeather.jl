@@ -20,6 +20,9 @@ export LandThermodynamics
     "[OPTION] Heat capacity Cs of dry soil [J/(m³ K)]"
     heat_capacity_dry_soil::NF = 1.13e6
 
+    "[OPTION] Soil density [kg/m³]"
+    soil_density::NF = 1700
+
     "[OPTION] Soil wetness at wilting point [volume fraction]"
     wilting_point::NF = 0.17
 end

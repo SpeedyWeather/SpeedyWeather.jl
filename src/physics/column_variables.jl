@@ -150,7 +150,7 @@ function write_column_tendencies!(
     diagn.physics.snow_large_scale[ij] += column.snow_large_scale
     diagn.physics.snow_convection[ij] += column.snow_convection
     
-    # rain and snow rate [m/s]
+    # rain and snow rate [kg/m²/s]
     ρ = atmosphere.water_density
     diagn.physics.rain_rate[ij] = (column.rain_rate_large_scale + column.rain_rate_convection) * ρ
     diagn.physics.snow_rate[ij] = (column.snow_rate_large_scale + column.snow_rate_convection) * ρ
