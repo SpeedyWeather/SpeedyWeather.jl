@@ -22,21 +22,6 @@ export LandThermodynamics
 
     "[OPTION] Soil wetness at wilting point [volume fraction]"
     wilting_point::NF = 0.17
-	
-    "[OPTION] Freezing temperature for snow on top soil layer [K]"
-    snow_temp_freeze::NF = 273.15
-
-    "[OPTION] Melting temperature for snow on top soil layer [K]"
-    snow_temp_melt::NF = 273.15+2.5
-	
-    "[OPTION] Amount of cumulative snowfall required to trigger land snow scheme [m/m²]"
-    snowfall_threshold::NF = 0.01
-	
-    "[OPTION] Fresh Snow albedo []"
-    snow_albedo_fresh::NF = 0.8
-
-    "[OPTION] Old Snow albedo []"
-    snow_albedo_old::NF = 0.4
 end
 
 LandThermodynamics(SG::SpectralGrid; kwargs...) = LandThermodynamics{SG.NF}(; kwargs...)

@@ -213,7 +213,8 @@ function timestep!(
     ρ = model.atmosphere.water_density
     (; mask) = model.land_sea_mask
 
-    P = diagn.physics.total_precipitation_rate      # precipitation (rain+snow) in [m/s]
+    P = diagn.physics.rain_rate                     # precipitation (rain only) in [m/s]
+    S = diagn.physics.land.snow_melt_rate           # TODO [m/s]?
     E = diagn.physics.land.surface_humidity_flux    # [kg/s/m²], divide by density for [m/s]
     R = diagn.physics.land.river_runoff             # diagnosed [m/s]
 
@@ -227,12 +228,12 @@ function timestep!(
     Δt_f₁ = Δt/f₁
 
     launch!(architecture(soil_moisture), LinearWorkOrder, (size(soil_moisture, 1),),
-        land_bucket_soil_moisture_kernel!, soil_moisture, mask, P, E, R, ρ, Δt, f₁, Δt_f₁, f₁_f₂, p, τ⁻¹)
+        land_bucket_soil_moisture_kernel!, soil_moisture, mask, P, S, E, R, ρ, Δt, f₁, Δt_f₁, f₁_f₂, p, τ⁻¹)
     synchronize(architecture(soil_moisture))
 end
 
 @kernel inbounds=true function land_bucket_soil_moisture_kernel!(
-    soil_moisture, mask, P, E, R,
+    soil_moisture, mask, P, S, E, R,
     @Const(ρ), @Const(Δt), @Const(f₁), @Const(Δt_f₁), @Const(f₁_f₂), @Const(p), @Const(τ⁻¹),
 )
     ij = @index(Global, Linear)             # every grid point ij
@@ -241,8 +242,8 @@ end
         # precipitation (rain+snow, convection + large-scale) minus evaporation (or condensation)
         # river runoff only diagnostic, i.e. R=0 here but drain excess water below
         # convert to [m/s] by dividing by density
-        F = (P[ij] - E[ij])/ρ               # - R[ij]
-  
+        F = (P[ij] - E[ij] + S[ij])/ρ               # - R[ij]
+
         # vertical diffusion term between layers
         D = τ⁻¹*(soil_moisture[ij, 1] - soil_moisture[ij, 2])
 

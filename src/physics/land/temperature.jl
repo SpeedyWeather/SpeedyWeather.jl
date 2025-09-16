@@ -170,7 +170,11 @@ function timestep!(
 )
     (; soil_temperature, soil_moisture) = progn.land
     Lᵥ = model.atmosphere.latent_heat_condensation
+    Lᵢ = model.atmosphere.latent_heat_sublimation
+    ρ = model.atmosphere.water_density
     Δt = model.time_stepping.Δt_sec
+    Lᵢ_ρ_Δt = Lᵢ * ρ * Δt
+    
     (; mask) = model.land_sea_mask
     (; thermodynamics, geometry) = model.land
 
@@ -182,8 +186,9 @@ function timestep!(
     Rlu = diagn.physics.land.surface_longwave_up
     Ev = diagn.physics.land.surface_humidity_flux       # except this in [kg/s/m²]
     S = diagn.physics.land.sensible_heat_flux
+    M = diagn.physics.land.snow_melt_rate
 
-    @boundscheck fields_match(soil_temperature, Rsd, Rsu, Rld, Rlu, Ev, S, horizontal_only=true) ||
+    @boundscheck fields_match(soil_temperature, Rsd, Rsu, Rld, Rlu, Ev, S, M, horizontal_only=true) ||
         throw(DimensionMismatch(soil_temperature, Rs))
     @boundscheck size(soil_moisture, 2) == size(soil_temperature, 2) == 2 || throw(DimensionMismatch)
     
@@ -197,20 +202,28 @@ function timestep!(
     Δ =  2λ/(z₁ + z₂)   # thermal diffusion operator [W/(m² K)]
 
     launch!(architecture(soil_temperature), LinearWorkOrder, (size(soil_temperature, 1),),
-        land_bucket_temperature_kernel!, soil_temperature, mask, soil_moisture, Rsd, Rsu, Rlu, Rld, Ev, S,
-        Lᵥ, γ, Cw, Cs, z₁, z₂, Δ, Δt)
+        land_bucket_temperature_kernel!, soil_temperature, mask, soil_moisture, Rsd, Rsu, Rlu, Rld, Ev, S, M,
+        Lᵥ, Lᵢ_ρ_Δt, γ, Cw, Cs, z₁, z₂, Δ, Δt)
     synchronize(architecture(soil_temperature))
 end
 
 @kernel inbounds=true function land_bucket_temperature_kernel!(
-    soil_temperature, mask, soil_moisture, Rsd, Rsu, Rlu, Rld, Ev, S,
-    @Const(Lᵥ), @Const(γ), @Const(Cw), @Const(Cs), @Const(z₁), @Const(z₂), @Const(Δ), @Const(Δt),
+    soil_temperature, mask, soil_moisture, Rsd, Rsu, Rlu, Rld, Ev, S, M,
+    @Const(Lᵥ), @Const(Lᵢ_ρ_Δt), @Const(γ), @Const(Cw), @Const(Cs),
+    @Const(z₁), @Const(z₂), @Const(Δ), @Const(Δt),
 )
     ij = @index(Global, Linear)
 
     if mask[ij] > 0                         # at least partially land
-        # total surface downward heat flux
-        F = Rsd[ij] - Rsu[ij] - Rlu[ij] + Rld[ij] - Lᵥ*Ev[ij] - S[ij]
+        
+        # Cooling from snow melt rate
+        Q_melt = Lᵢ_ρ_Δt * M[ij]
+
+        # # soil heat capacity [J/m²/K]
+        # C_soil = ρ_soil * cₛ * z₁
+
+        # total surface downward heat flux [W/m^2]
+        F = Rsd[ij] - Rsu[ij] - Rlu[ij] + Rld[ij] - Lᵥ*Ev[ij] - S[ij] - Q_melt
 
         # heat capacity of the (wet) soil layers 1 and 2 [J/(m³ K)]
         C₁ = Cw * soil_moisture[ij, 1] * γ + Cs

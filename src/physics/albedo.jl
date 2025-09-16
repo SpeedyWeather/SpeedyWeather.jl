@@ -168,6 +168,9 @@ export LandSnowAlbedo
 
     "Albedo of snow [1]"
     albedo_snow::NF = 0.8
+
+    "Conversion from snow depth to snow cover [m]"
+    snow_depth_scale::NF = 0.1
 end
 
 LandSnowAlbedo(SG::SpectralGrid; kwargs...) = LandSnowAlbedo{SG.NF}(;kwargs...)
@@ -180,10 +183,17 @@ function albedo!(
     model::PrimitiveEquation,
 )
     (; snow_depth) = progn.land
-    (; albedo_land, albedo_vegetation, albedo_snow) = albedo
+    (; albedo_land, albedo_vegetation, albedo_snow, snow_depth_scale) = albedo
 
     snow_cover = diagn.dynamics.a_grid_2D       # scratch memory
     snow_cover .= max.(snow_depth, 1)
+
+	# ## Now compute the snow area cover fraction based on snow depth
+	# #σₛ = Sₐ / (10. * drag_snow + Sₐ) #JULES, from Betts et al.
+	# σₛ[ij] = min(1.0, Sₐ[ij] / snow_depth_scale)   # e.g. snow_depth_scale ≈ 0.1 m
+	# ## Now compute the change in albedo
+	# albedo_snow[ij] = snow_albedo_old + (snow_albedo_fresh - snow_albedo_old) * exp(-Δt_snow / τˢ) # time needs to be expresssed in days. 
+	# column.albedo_land[ij] = (1-σₛ[ij]) * albedo_land + σₛ[ij] * albedo_snow[ij]
 
     # set land albedo linearly between bare land and snow depending on snow cover [0, 1]
     diagn.albedo .= albedo_land .+ snow_cover .* (albedo_snow .- albedo_land)

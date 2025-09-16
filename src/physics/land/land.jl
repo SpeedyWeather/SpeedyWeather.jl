@@ -86,8 +86,8 @@ function timestep!(
 )
     if model isa PrimitiveWet && land isa AbstractWetLand
         # TODO think about the order of these
-        timestep!(progn, diagn, land.soil_moisture, model)
         timestep!(progn, diagn, land.snow, model)
+        timestep!(progn, diagn, land.soil_moisture, model)
         timestep!(progn, diagn, land.rivers, model)
         timestep!(progn, diagn, land.vegetation, model)
     end

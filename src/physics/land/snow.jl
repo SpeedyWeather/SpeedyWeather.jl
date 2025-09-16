@@ -2,10 +2,7 @@ abstract type AbstractSnow <: AbstractParameterization end
 
 export SnowModel    # maybe change for a more concise name later
 @kwdef mutable struct SnowModel{NF} <: AbstractSnow
-    drag_snow::NF = 3.0e-5        # [m]
-    soil_density::NF = 1.3e4      # [kg/m2]
-    snow_depth_scale::NF = 0.1    # [m]                       #Tunable parameter
-	τˢ::NF = 864000               # [s] tunable parameter, currently set to 10 days 
+	melting_threshold::NF = 275
 end
 
 # generator function
@@ -27,89 +24,31 @@ end
 function timestep!(
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
-	column::ColumnVariables,
     snow::SnowModel,
     model::PrimitiveEquation,
 )
+
     Δt = model.time_stepping.Δt_sec
-	(; snow_depth) = progn.land
-    (; mask) = model.land_sea_mask
+	(; snow_depth) = progn.land								# in equivalent iquid water height [m]
+	(; soil_temperature, soil_moisture) = progn.land
+    
+	(; mask) = model.land_sea_mask
+
     # Some thermodynamics needed by snow
-	drag_snow=snow.drag_snow
+
 	soil_density=snow.soil_density
-	snow_depth_scale=snow.snow_depth_scale
-	τˢ=snow.τˢ
+
 	cᵢ = model.land.thermodynamics.heat_capacity_snow
 	cₛ = model.land.thermodynamics.heat_capacity_dry_soil
 	Lᵢ = model.clausius_clapeyron.latent_heat_fusion                  # latent heat of fusion
-    # Some atmospheric variables needed to compute snow sublimation
-    P = diagn.physics.total_precipitation_rate                        # precipitation (rain+snow) in [m/s]
-	S = column.snow_rate_large_scale +  column.snow_rate_convection   # Snowfall rate in [m/s]
-    E = diagn.physics.land.surface_humidity_flux                      # [kg/s/m²], divide by density for [m/s]
-    R = diagn.physics.land.river_runoff                               # diagnosed [m/s]
-    ρ = column.surface_air_density
-    V₀ = column.surface_wind_speed
-	Sₐ = progn.land.snow_depth                             # snow accumulation at the surface (m of water)
-	(; surface_pressure) = column
-    (; soil_temperature, soil_moisture) = progn.land
-	(; land_fraction, albedo_land) = column
-	snow_albedo_old=model.land.thermodynamics.snow_albedo_old
-	snow_albedo_fresh=model.land.thermodynamics.snow_albedo_fresh
 
-    # PLV's code here updating snow_depth, e.g.
-    ## First, lose snow by sublimation and lose liquid precip by runoff over snow
-	infiltration_flux[ij] = (P[ij] - E[ij] - S[ij])/ρ   # Need to remove snowfall from total precipitation, to use just liquid part
-	if Sₐ[ij] > snow_threshold
-		Δt_snow = 0 							   # Re-start the time counter since the last significant snowfall.
-		Rₛ[ij] = infiltration_flux[ij]             # put all precipitation into runoff (no infiltration)
-		infiltration_flux[ij] = 0.                 # Assume no infiltration if snow on surface        - R[ij]
-		sat_humid_land[ij] = saturation_humidity(soil_temperature[ij,1], surface_pressure[ij], model.clausius_clapeyron)
-		sublimation_flux_snow[ij] = isfinite(soil_temperature[ij,1]) && isfinite(Sₐ[ij]) ?
-	                ρ[ij]*drag_snow*V₀[ij]*(sat_humid_land[ij]  - surface_humid)[ij] : zero(NF)
-	else
-		F[ij] = infiltration_flux[ij]                       # - R[ij]
-	end
-	## now check for melting of snow
-	δT_melt[ij] = max(soil_temperature[ij,1] - melting_threshold, 0)   # only if temperature above melting threshold
-	if δT_melt[ij] > 0
-	    # energy available from soil warming above melting threshold [J/m²/s]
-	    E_avail[ij] = cₛ * δT_melt[ij] * ρ_soil * z₁ / Δt  
+	# 
+	S = diagn.physics.snow_rate   								# Snowfall rate in [m/s]
 
-	    # max melt rate allowed by available energy [m/s]
-	    melt_rate_max[ij] = E_avail[ij] / (ρ_w * Lᵢ)  
 
-	    # actual melt rate, limited by snow available
-	    melt_rate[ij] = min(Sₐ[ij] / Δt, melt_rate_max)  # [m/s]
-
-	    # snow water equivalent melted this timestep [m]
-	    melt_depth[ij] = melt_rate[ij] * Δt
-
-	    # convert to infiltration flux
-	    melt_flux[ij] = melt_depth[ij]                   # [m], can add to infiltration
-
-	    # energy used for melting [J/m²]
-	    Q_melt[ij] = ρ_w * Lᵢ * melt_depth[ij]
-
-	    # soil heat capacity [J/m²/K]
-	    C_soil = ρ_soil * cₛ * z₁
-
-	    # temperature tendency
-	    δT[ij] = -Q_melt[ij] / C_soil
-	    soil_temperature[ij,1] += δT[ij]
-	end
-	## Now compute the snow area cover fraction based on snow depth
-	#σₛ = Sₐ / (10. * drag_snow + Sₐ) #JULES, from Betts et al.
-	σₛ[ij] = min(1.0, Sₐ[ij] / snow_depth_scale)   # e.g. snow_depth_scale ≈ 0.1 m
-	## Now compute the change in albedo
-	albedo_snow[ij] = snow_albedo_old + (snow_albedo_fresh - snow_albedo_old) * exp(-Δt_snow / τˢ) # time needs to be expresssed in days. 
-	column.albedo_land[ij] = (1-σₛ[ij]) * albedo_land + σₛ[ij] * albedo_snow[ij]
-
-	F[ij] = infiltration_flux[ij] + melt_flux[ij]    # Need to pass this back to bucket model
-    diagn.physics.land.river_runoff[ij] = + Rₛ[ij]   #??? PLV this needs to be returned to the bucket model, it may be enough to do it here
 
     launch!(architecture(snow_depth), LinearWorkOrder, size(snow_depth),
         land_snow_kernel!, snow_depth, mask, p1)
-	Δt_snow += Δt  #Increment the time counter since the time of last significant snowfall
 end
 
 @kernel inbounds=true function land_snow_kernel!(
@@ -118,6 +57,20 @@ end
     ij = @index(Global, Linear)             # every grid point ij
 
     if mask[ij] > 0                         # at least partially land
-        snow_depth[ij] = 0                  # dummy operation, replace with real logic
+
+		# check for melting of snow if temperature above melting threshold
+		δT_melt = max(soil_temperature[ij, 1] - melting_threshold, 0)
+	
+		# energy available from soil warming above melting threshold [J/m²/s]
+		E_avail = cₛ * δT_melt * ρ_soil * z₁ / Δt  
+
+		# max melt rate allowed by available energy [m/s]
+		melt_rate = E_avail / (ρ_w * Lᵢ)  
+
+		# add the melt tendency to falling snow
+		dsnow = melt_rate + S[ij]
+
+		# Euler forward time step but cap at 0 depth to not melt more snow than available
+		snow_depth[ij] = max(snow_depth[ij] + Δt * dsnow, 0)
     end
 end
