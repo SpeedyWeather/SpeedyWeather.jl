@@ -179,7 +179,7 @@ function drag!(
 end
 
 @kernel inbounds=true function jet_drag_kernel!(
-    vor_tend, vor, ζ₀, r, k  
+    vor_tend, vor, ζ₀, @Const(r), @Const(k)  
 )
     lm = @index(Global, Linear)
     vor_tend[lm, k] -= r * (vor[lm, k] - ζ₀[lm])
