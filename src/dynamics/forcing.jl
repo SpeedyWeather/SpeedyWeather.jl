@@ -136,26 +136,6 @@ Set for every latitude ring the tendency to the precomputed forcing
 in the momentum equations following the JetStreamForcing.
 The forcing is precomputed in `initialize!(::JetStreamForcing, ::AbstractModel)`."""
 
-"""
-function forcing!(
-    diagn::DiagnosticVariables,
-    forcing::JetStreamForcing)
-
-    Fu = diagn.tendencies.u_tend_grid
-    (; amplitude, tapering) = forcing
-
-    @inbounds for k in eachlayer(Fu) 
-        for (j, ring) in enumerate(eachring(Fu))
-            F = amplitude[j]
-            for ij in ring
-                # += to accumulate, not overwrite previous parameterizations/terms
-                Fu[ij] += tapering[k]*F
-            end
-        end
-    end
-end
-"""
-
 function forcing!(
     diagn::DiagnosticVariables, 
     forcing::JetStreamForcing)
@@ -232,33 +212,6 @@ function forcing!(
     forcing!(diagn, forcing, model.spectral_transform)
 end
 
-"""
-function forcing!(
-    diagn::DiagnosticVariables,
-    forcing::StochasticStirring,
-    spectral_transform::SpectralTransform,
-)
-    # get random values from random process
-    S_grid = diagn.grid.random_pattern
-
-    # mask everything but mid-latitudes
-    RingGrids._scale_lat!(S_grid, forcing.lat_mask)
-    
-    # back to spectral space
-    S_masked = diagn.dynamics.a_2D
-    transform!(S_masked, S_grid, diagn.dynamics.scratch_memory, spectral_transform)
-
-    # scale by radius^2 as is the vorticity equation, and scale to forcing strength
-    S_masked .*= (diagn.scale[]^2 * forcing.strength)
-
-    # force every layer
-    (; vor_tend) = diagn.tendencies
-
-    @inbounds for k in eachmatrix(vor_tend)
-        vor_tend[:, k] .+= S_masked
-    end
-end
-"""
 
 function forcing!(
     diagn::DiagnosticVariables,
