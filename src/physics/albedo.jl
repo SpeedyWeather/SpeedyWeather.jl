@@ -155,3 +155,36 @@ function albedo!(
     # set ocean albedo linearly between ocean and ice depending on sea ice concentration
     diagn.albedo .= albedo_ocean .+ sea_ice_concentration .* (albedo_ice .- albedo_ocean)
 end
+
+## LandSnowAlbedo
+export LandSnowAlbedo
+
+@kwdef struct LandSnowAlbedo{NF} <: AbstractAlbedo
+    "Albedo of bare land (excluding vegetation) [1]"
+    albedo_land::NF = 0.3
+
+    "Albedo of vegetation [1]"
+    albedo_vegetation::NF = 0.15
+
+    "Albedo of snow [1]"
+    albedo_snow::NF = 0.8
+end
+
+LandSnowAlbedo(SG::SpectralGrid; kwargs...) = LandSnowAlbedo{SG.NF}(;kwargs...)
+initialize!(albedo::LandSnowAlbedo, model::PrimitiveEquation) = nothing
+
+function albedo!(
+    diagn::AbstractDiagnosticVariables,
+    progn::PrognosticVariables,
+    albedo::SnowLandAlbedo,
+    model::PrimitiveEquation,
+)
+    (; snow_depth) = progn.land
+    (; albedo_land, albedo_vegetation, albedo_snow) = albedo
+
+    snow_cover = diagn.dynamics.a_grid_2D       # scratch memory
+    snow_cover .= max.(snow_depth, 1)
+
+    # set land albedo linearly between bare land and snow depending on snow cover [0, 1]
+    diagn.albedo .= albedo_land .+ snow_cover .* (albedo_snow .- albedo_land)
+end
