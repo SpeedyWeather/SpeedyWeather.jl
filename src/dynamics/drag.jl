@@ -167,29 +167,6 @@ function initialize!(drag::JetDrag, model::AbstractModel)
     return nothing
 end
 
-"""
-function drag!(
-    diagn::DiagnosticVariables,
-    progn::PrognosticVariables,
-    drag::JetDrag,
-    lf::Integer,
-    model::AbstractModel,
-)
-    vor = get_step(progn.vor, lf)
-    (; vor_tend) = diagn.tendencies
-    (; ζ₀) = drag
-
-    # scale by radius as is vorticity
-    s = diagn.scale[]
-    r = s/drag.time_scale.value
-
-    k = diagn.nlayers   # drag only on surface layer
-    for lm in eachharmonic(vor_tend)
-        vor_tend[lm, k] -= r*(vor[lm, k] - ζ₀[lm])
-    end
-end
-"""
-
 function drag!(
     diagn::DiagnosticVariables,
     progn::PrognosticVariables,
