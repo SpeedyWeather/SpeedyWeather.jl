@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Mean sea-level pressure and dynamics output [#853](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/853) [#854](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/854)
+- Fix LowerTriangularArrays zeros, rand, etc to return correct array type based on Spectrum architecture [#850](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/850)
 - Call callbacks before output not after [#852](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/852)
 - Split extensions across subpackages [#846](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/846)
 
