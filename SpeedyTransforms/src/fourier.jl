@@ -24,15 +24,15 @@ this function is dispatched on the array type and indexing.
 
 With FFTW currently strided inputs are possible, there's low-level support for 
 strided outputs, but it's not really implementend to be used at a high-level, so we 
-have our own custom plans below.
+have use the allocating application of the plan for now. 
 """
 function _apply_fft_plan!(f_out, nfreq, layers, j, plan, field::Field{NF, N, <:Array}, ilons, k_grid=Colon()) where {NF, N} 
-    #view(f_out, 1:nfreq, layers, j) .= plan * view(field.data, ilons, k_grid)
-    LinearAlgebra.mul!(view(f_out, 1:nfreq, layers, j), plan, view(field.data, ilons, k_grid))
+    view(f_out, 1:nfreq, layers, j) .= plan * view(field.data, ilons, k_grid)
+    #LinearAlgebra.mul!(view(f_out, 1:nfreq, layers, j), plan, view(field.data, ilons, k_grid))
 end
 function _apply_fft_plan!(field_out, ilons, k, plan, g_in::Array, nfreq, layers, j) 
-    #view(field_out, ilons, k) .= plan * view(g_in, 1:nfreq, layers, j)
-    LinearAlgebra.mul!(view(field_out, ilons, k), plan, view(g_in, 1:nfreq, layers, j))
+    view(field_out, ilons, k) .= plan * view(g_in, 1:nfreq, layers, j)
+    #LinearAlgebra.mul!(view(field_out, ilons, k), plan, view(g_in, 1:nfreq, layers, j))
 end
 
 """$(TYPEDSIGNATURES)
@@ -276,8 +276,7 @@ function _fourier_serial!(                  # SPECTRAL TO GRID
     end
 end
 
-# NOTE: due to missing output strides in FFTW.jl, we currently use a modified version of the FFTW.jl plans declared here in SpeedyTransforms
-which_FFT_package(::Type{<:AbstractArray{NF}}) where NF<:AbstractFloat = NF <: Union{Float32, Float64} ? SpeedyTransforms : GenericFFT
+which_FFT_package(::Type{<:AbstractArray{NF}}) where NF<:AbstractFloat = NF <: Union{Float32, Float64} ? FFTW : GenericFFT
 
 """$(TYPEDSIGNATURES)
 Util function to generate FFT plans based on the array type of the fake Grid 
@@ -304,70 +303,11 @@ function plan_FFTs!(
         real_vector_input = view(fake_grid_data.data, rings[j], 1)
         complex_vector_input = view(scratch_memory_north, 1:nlon÷2 + 1, 1, j)
 
-        if FFT_package == SpeedyTransforms
-            rfft_plans[j] = FFT_package.plan_rfft(real_matrix_input, 1, ostride=(1, size(scratch_memory_north, 1)))
-            brfft_plans[j] = FFT_package.plan_brfft(complex_matrix_input, nlon, 1, ostride=(1, size(scratch_memory_north, 1)))
-            rfft_plans_1D[j] = FFT_package.plan_rfft(real_vector_input, 1, ostride=(1,))
-            brfft_plans_1D[j] = FFT_package.plan_brfft(complex_vector_input, nlon, 1, ostride=(1,))
-        else 
-            rfft_plans[j] = FFT_package.plan_rfft(real_matrix_input, 1)
-            brfft_plans[j] = FFT_package.plan_brfft(complex_matrix_input, nlon, 1)
-            rfft_plans_1D[j] = FFT_package.plan_rfft(real_vector_input, 1)
-            brfft_plans_1D[j] = FFT_package.plan_brfft(complex_vector_input, nlon, 1)
-        end 
+        rfft_plans[j] = FFT_package.plan_rfft(real_matrix_input, 1)
+        brfft_plans[j] = FFT_package.plan_brfft(complex_matrix_input, nlon, 1)
+        rfft_plans_1D[j] = FFT_package.plan_rfft(real_vector_input, 1)
+        brfft_plans_1D[j] = FFT_package.plan_brfft(complex_vector_input, nlon, 1) 
     end
 
     return rfft_plans, brfft_plans, rfft_plans_1D, brfft_plans_1D
 end
-
-# these are FFTW plans with output strides, modified from the original implementation in FFTW.jl
-# see: https://github.com/JuliaMath/FFTW.jl/issues/324
-# hopefully they'll just be part of the library soon. 
-for (Tr,Tc) in ((:Float32,:(Complex{Float32})),(:Float64,:(Complex{Float64})))
-    # Note: use $FORWARD and $BACKWARD below because of issue #9775
-    @eval begin
-        function plan_rfft(X::StridedArray{$Tr,N}, region;
-                           flags::Integer=FFTW.ESTIMATE,
-                           timelimit::Real=FFTW.NO_TIMELIMIT,
-                           num_threads::Union{Nothing, Integer} = nothing,
-                           ostride=Tuple(1 for i in 1:N)) where N
-            if num_threads !== nothing
-                plan = FFTW.set_num_threads(num_threads) do
-                    plan_rfft(X, region; flags = flags, timelimit = timelimit)
-                end
-                return plan
-            end
-            osize = FFTW.rfft_output_size(X, region)
-            Y = flags&FFTW.ESTIMATE != 0 ? FFTW.FakeArray{$Tc, N}(osize, ostride) : Array{$Tc}(undef, osize)
-            FFTW.rFFTWPlan{$Tr,$FFTW.FORWARD,false,N}(X, Y, region, flags, timelimit)
-        end
-
-        function plan_brfft(X::StridedArray{$Tc,N}, d::Integer, region;
-            flags::Integer=FFTW.ESTIMATE,
-            timelimit::Real=FFTW.NO_TIMELIMIT,
-            num_threads::Union{Nothing, Integer} = nothing,
-            ostride=Tuple(1 for i in 1:N)) where N
-
-            if num_threads !== nothing
-                plan = FFTW.set_num_threads(num_threads) do
-                    plan_brfft(X, d, region; flags = flags, timelimit = timelimit)
-                end
-                return plan
-            end
-            osize = FFTW.brfft_output_size(X, d, region)
-            Y = flags&FFTW.ESTIMATE != 0 ? FFTW.FakeArray{$Tr,N}(osize, ostride) : Array{$Tr}(undef, osize)
-
-            # FFTW currently doesn't support PRESERVE_INPUT for
-            # multidimensional out-of-place c2r transforms, so
-            # we have to handle 1d and >1d cases separately with a copy.  Ugh.
-            if length(region) <= 1
-                FFTW.rFFTWPlan{$Tc,$FFTW.BACKWARD,false,N}(X, Y, region,
-                                            flags | FFTW.PRESERVE_INPUT,
-                                            timelimit)
-            else
-                FFTW.rFFTWPlan{$Tc,$FFTW.BACKWARD,false,N}(copy(X), Y, region, flags,
-                                            timelimit)
-            end
-        end
-    end 
-end 
