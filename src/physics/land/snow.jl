@@ -3,6 +3,7 @@ abstract type AbstractSnow <: AbstractParameterization end
 export SnowModel    # maybe change for a more concise name later
 @kwdef mutable struct SnowModel{NF} <: AbstractSnow
 	melting_threshold::NF = 275
+	leakage_time_scale::Second = Year(1)
 end
 
 # generator function
@@ -40,22 +41,24 @@ function timestep!(
 	cₛ = model.land.thermodynamics.heat_capacity_dry_soil
 	z₁ = model.land.geometry.layer_thickness[1]
 	(; melting_threshold) = snow
+	r⁻¹ = 1 / Second(snow.leakage_time_scale).value
 
-	# Snowfall rate in [m/s]
+	# Snowfall rate in [kg/m²/s]
 	snow_fall_rate = diagn.physics.snow_rate
 	snow_melt_rate = diagn.physics.land.snow_melt_rate
 
     launch!(architecture(snow_depth), LinearWorkOrder, size(snow_depth), land_snow_kernel!,
 		snow_depth, soil_temperature, snow_melt_rate, snow_fall_rate, mask,
 		melting_threshold, cₛ, ρ_soil, z₁, Δt,
-		ρ_water, Lᵢ
+		ρ_water, Lᵢ, r⁻¹
 		)
+	synchronize(architecture(snow_depth))
 end
 
 @kernel inbounds=true function land_snow_kernel!(
     snow_depth, soil_temperature, snow_melt_rate, snow_fall_rate, mask,
 	@Const(melting_threshold), @Const(cₛ), @Const(ρ_soil), @Const(z₁), @Const(Δt),
-	@Const(ρ_water), @Const(Lᵢ)
+	@Const(ρ_water), @Const(Lᵢ), @Const(r⁻¹),
 )
     ij = @index(Global, Linear)             # every grid point ij
 
@@ -68,11 +71,14 @@ end
 		E_avail = cₛ * δT_melt * ρ_soil * z₁ / Δt  
 
 		# max melt rate allowed by available energy [m/s]
-		melt_rate = E_avail / (ρ_water * Lᵢ)
-		snow_melt_rate[ij] = melt_rate		# store to pass to soil moisture
+		melt_rate_max = E_avail / (ρ_water * Lᵢ) + r⁻¹*snow_depth[ij]   # plus leakage term
 
-		# add the melt tendency to falling snow
-		dsnow = melt_rate + snow_fall_rate[ij]
+	    # actual melt rate [m/s], limited by snow available
+	    melt_rate = min(snow_depth[ij] / Δt, melt_rate_max)
+		snow_melt_rate[ij] = melt_rate*ρ_water		# store to pass to soil moisture [kg/m²/s]
+
+		# change snow depth by falling snow minus melting [m/s]
+		dsnow = snow_fall_rate[ij]/ρ_water - melt_rate 
 
 		# Euler forward time step but cap at 0 depth to not melt more snow than available
 		snow_depth[ij] = max(snow_depth[ij] + Δt * dsnow, 0)

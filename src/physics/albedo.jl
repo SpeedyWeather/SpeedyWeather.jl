@@ -189,7 +189,7 @@ function albedo!(
     (; albedo_land, albedo_vegetation, albedo_snow, snow_depth_scale) = albedo
 
     snow_cover = diagn_all.dynamics.a_2D_grid       # scratch memory
-    snow_cover .= max.(snow_depth, 1)
+    snow_cover .= min.(snow_depth, 1)
 
 	# ## Now compute the snow area cover fraction based on snow depth
 	# #σₛ = Sₐ / (10. * drag_snow + Sₐ) #JULES, from Betts et al.
@@ -199,5 +199,5 @@ function albedo!(
 	# column.albedo_land[ij] = (1-σₛ[ij]) * albedo_land + σₛ[ij] * albedo_snow[ij]
 
     # set land albedo linearly between bare land and snow depending on snow cover [0, 1]
-    diagn.albedo .= albedo_land .+ snow_cover .* (albedo_snow .- albedo_land)
+    diagn.albedo .= albedo_land .+ snow_cover .* (albedo_snow - albedo_land)
 end

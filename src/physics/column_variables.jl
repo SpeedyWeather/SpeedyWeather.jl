@@ -165,7 +165,7 @@ function write_column_tendencies!(
     # just use layer index 1 (top) to nlayers (surface) for analysis, but 0 for no clouds
     # diagn.physics.cloud_top[ij] = column.cloud_top == nlayers+1 ? 0 : column.cloud_top
 
-    # surface humidity flux [kg/s/m²], positive up
+    # surface humidity flux [kg/m²/s], positive up
     Lᵥ = atmosphere.latent_heat_condensation
     diagn.physics.surface_humidity_flux[ij] = column.surface_humidity_flux
     diagn.physics.surface_latent_heat_flux[ij] = column.surface_humidity_flux * Lᵥ      # in [W/m²]
