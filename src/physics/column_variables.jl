@@ -150,11 +150,13 @@ function write_column_tendencies!(
     diagn.physics.snow_large_scale[ij] += column.snow_large_scale
     diagn.physics.snow_convection[ij] += column.snow_convection
     
-    # total precipitation rate (rain+snow) [kg/m²/s]
+    # rain and snow rate [m/s]
     ρ = atmosphere.water_density
-    diagn.physics.total_precipitation_rate[ij] =
-        (column.rain_rate_large_scale + column.rain_rate_convection +
-         column.snow_rate_large_scale + column.snow_rate_convection) * ρ
+    diagn.physics.rain_rate[ij] = (column.rain_rate_large_scale + column.rain_rate_convection) * ρ
+    diagn.physics.snow_rate[ij] = (column.snow_rate_large_scale + column.snow_rate_convection) * ρ
+    
+    # total precipitation rate (rain+snow) [kg/m²/s]
+    diagn.physics.total_precipitation_rate[ij] = diagn.physics.rain_rate[ij] + diagn.physics.snow_rate[ij]
 
     # Cloud top in height [m] from geopotential height divided by gravity, 0 for no clouds
     diagn.physics.cloud_top[ij] = column.cloud_top == nlayers+1 ? 0 : column.geopot[column.cloud_top]
