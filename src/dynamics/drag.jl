@@ -11,17 +11,7 @@ function drag!(
 end
 
 ## NO DRAG
-export NoDrag
-struct NoDrag <: AbstractDrag end
-NoDrag(SG::SpectralGrid) = NoDrag()
-initialize!(::NoDrag, ::AbstractModel) = nothing
-
-function drag!(     diagn::DiagnosticVariables,
-                    progn::PrognosticVariables,
-                    drag::NoDrag,
-                    args...)
-    return nothing
-end
+drag!(diagn, progn, drag::Nothing, args...) = nothing
 
 # Quadratic drag
 export QuadraticDrag
