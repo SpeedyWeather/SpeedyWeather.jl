@@ -24,7 +24,7 @@ this function is dispatched on the array type and indexing.
 
 With FFTW currently strided inputs are possible, there's low-level support for 
 strided outputs, but it's not really implementend to be used at a high-level, so we 
-use broadcasting instead of mul!
+have our own custom plans below.
 """
 function _apply_fft_plan!(f_out, nfreq, layers, j, plan, field::Field{NF, N, <:Array}, ilons, k_grid=Colon()) where {NF, N} 
     #view(f_out, 1:nfreq, layers, j) .= plan * view(field.data, ilons, k_grid)
@@ -355,7 +355,7 @@ for (Tr,Tc) in ((:Float32,:(Complex{Float32})),(:Float64,:(Complex{Float64})))
                 return plan
             end
             osize = FFTW.brfft_output_size(X, d, region)
-            Y = flags&ESTIMATE != 0 ? FFTW.FakeArray{$Tr,N}(osize, ostride) : Array{$Tr}(undef, osize)
+            Y = flags&FFTW.ESTIMATE != 0 ? FFTW.FakeArray{$Tr,N}(osize, ostride) : Array{$Tr}(undef, osize)
 
             # FFTW currently doesn't support PRESERVE_INPUT for
             # multidimensional out-of-place c2r transforms, so
