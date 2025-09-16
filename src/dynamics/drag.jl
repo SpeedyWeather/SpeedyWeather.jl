@@ -57,11 +57,10 @@ function drag!(
     arch = architecture(u) 
     launch!(arch, LinearWorkOrder, (length(u.data),), quadratic_drag_kernel!,
             Fu, Fv, u, v, c, k)
-    synchronize(arch)
 end
 
 @kernel inbounds=true function quadratic_drag_kernel!(
-    Fu, Fv, u, v, c, k 
+    Fu, Fv, u, v, @Const(c), @Const(k) 
 )
     ij = @index(Global, Linear)
     
@@ -106,11 +105,10 @@ function drag!(
     arch = architecture(vor_tend)
     launch!(arch, SpectralWorkOrder, size(vor_tend), linear_vorticity_drag_kernel!,
             vor_tend, vor, c)
-    synchronize(arch)
 end
 
 @kernel inbounds=true function linear_vorticity_drag_kernel!(
-    vor_tend, vor, c
+    vor_tend, vor, @Const(c)
 )
     I = @index(Global, Cartesian)
     vor_tend[I] -= c * vor[I]
@@ -169,8 +167,8 @@ function drag!(
     (; ζ₀) = drag
 
     # scale by radius as is vorticity
-    (; radius) = model.spectral_grid
-    r = radius/drag.time_scale.value
+    s = diagn.scale[]
+    r = s/drag.time_scale.value
 
     k = diagn.nlayers   # drag only on surface layer
     
@@ -178,7 +176,6 @@ function drag!(
     arch = architecture(diagn.grid.u_grid)
     launch!(arch, LinearWorkOrder, (size(vor_tend, 1),), jet_drag_kernel!,
             vor_tend, vor, ζ₀, r, k)
-    synchronize(arch)
 end
 
 @kernel inbounds=true function jet_drag_kernel!(

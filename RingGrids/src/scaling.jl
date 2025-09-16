@@ -25,12 +25,11 @@ function _scale_lat!(field::AbstractField, v::AbstractVector)
     # Ensure worksize is always 2D by adding layer dimension dim=1
     worksize = ndims(field) == 1 ? (size(field, 1), 1) : size(field)
     launch!(arch, RingGridWorkOrder, worksize, scale_lat_kernel!, field, v)
-    synchronize(arch)
     return field
 end
 
 @kernel inbounds=true function scale_lat_kernel!(field, v)
     ij, k = @index(Global, NTuple)
     j = field.grid.whichring[ij]
-    field[ij, k] *= convert(eltype(field), v[j])
+    field[ij, k] *= v[j]
 end

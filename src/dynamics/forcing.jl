@@ -136,7 +136,6 @@ function forcing!(
     arch = architecture(Fu)
     launch!(arch, RingGridWorkOrder, size(Fu), jetstream_forcing_kernel!,
             Fu, amplitude, tapering, whichring)
-    synchronize(arch)
 end
 
 @kernel inbounds=true function jetstream_forcing_kernel!(
@@ -180,7 +179,7 @@ function initialize!(
     model::AbstractModel)
     
     model.random_process isa Nothing &&
-        @warn "StochasticStirring needs a random process. model.random_process is a NoRandomProcess."
+        @warn "StochasticStirring needs a random process. model.random_process is nothing."
 
     # precompute the latitudinal mask
     (; latd) = model.geometry
@@ -224,7 +223,6 @@ function forcing!(
     arch = architecture(vor_tend)
     launch!(arch, SpectralWorkOrder, size(vor_tend), stochastic_stirring_kernel!,
             vor_tend, S_masked)
-    synchronize(arch)
 end
 
 # GPU kernel for adding 2D spectral field to each layer of 3D field
