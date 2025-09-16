@@ -339,7 +339,7 @@ for (Tr,Tc) in ((:Float32,:(Complex{Float32})),(:Float64,:(Complex{Float64})))
             end
             osize = FFTW.rfft_output_size(X, region)
             Y = flags&FFTW.ESTIMATE != 0 ? FFTW.FakeArray{$Tc, N}(osize, ostride) : Array{$Tc}(undef, osize)
-            FFTW.rFFTWPlan{$Tr,$FFTW.FORWARD,false,N}(X, Y, region, flags, timelimit)
+            FFTW.rFFTWPlan{$Tr,FFTW.FORWARD,false,N}(X, Y, region, flags, timelimit)
         end
     end 
 
@@ -362,11 +362,11 @@ for (Tr,Tc) in ((:Float32,:(Complex{Float32})),(:Float64,:(Complex{Float64})))
         # multidimensional out-of-place c2r transforms, so
         # we have to handle 1d and >1d cases separately with a copy.  Ugh.
         if length(region) <= 1
-            FFTW.rFFTWPlan{$Tc,$FFTW.BACKWARD,false,N}(X, Y, region,
+            FFTW.rFFTWPlan{$Tc,FFTW.BACKWARD,false,N}(X, Y, region,
                                         flags | FFTW.PRESERVE_INPUT,
                                         timelimit)
         else
-            FFTW.rFFTWPlan{$Tc,$FFTW.BACKWARD,false,N}(copy(X), Y, region, flags,
+            FFTW.rFFTWPlan{$Tc,FFTW.BACKWARD,false,N}(copy(X), Y, region, flags,
                                         timelimit)
         end
     end
