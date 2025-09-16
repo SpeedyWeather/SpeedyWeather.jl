@@ -179,7 +179,7 @@ initialize!(albedo::LandSnowAlbedo, model::PrimitiveEquation) = nothing
 function albedo!(
     diagn::AbstractDiagnosticVariables,
     progn::PrognosticVariables,
-    albedo::SnowLandAlbedo,
+    albedo::LandSnowAlbedo,
     model::PrimitiveEquation,
 )
     (; snow_depth) = progn.land
