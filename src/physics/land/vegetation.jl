@@ -172,7 +172,8 @@ function soil_moisture_availability!(
         soil_moisture_availability, soil_moisture, high_cover, low_cover,
         low_veg_factor, r, W_cap, W_wilt, D_top, D_root,
     )
-    synchronize(architecture(soil_moisture_availability))
+    
+    return nothing 
 end
 
 @kernel inbounds=true function soil_moisture_availability_kernel!(
