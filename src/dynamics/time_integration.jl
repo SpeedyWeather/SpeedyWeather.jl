@@ -258,8 +258,8 @@ function first_timesteps!(
     timestep!(clock, Δt_millisec) 
     
     # do output and callbacks after the first proper (from i=0 to i=1) time step
-    output!(model.output, Simulation(progn, diagn, model))
     callback!(model.callbacks, progn, diagn, model)
+    output!(model.output, Simulation(progn, diagn, model))
 
     # from now on precomputed implicit terms with 2Δt
     initialize!(implicit, 2Δt, diagn, model) 
@@ -390,10 +390,10 @@ function timestep!(simulation::AbstractSimulation)
     else                                                # 3rd and further timesteps after Δt as normal
         timestep!(progn, diagn, 2Δt, model)             # calculate tendencies and leapfrog forward
         timestep!(clock, Δt_millisec)                   # time of lf=2 and diagn after timestep!
-
+        
         progress!(feedback, progn)                      # updates the progress meter bar
-        output!(output, simulation)                     # do output?
         callback!(model.callbacks, progn, diagn, model) # any callbacks?
+        output!(output, simulation)                     # do output?
     end
 end
 
