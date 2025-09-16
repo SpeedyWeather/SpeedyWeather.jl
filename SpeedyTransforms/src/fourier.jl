@@ -339,35 +339,35 @@ for (Tr,Tc) in ((:Float32,:(Complex{Float32})),(:Float64,:(Complex{Float64})))
             end
             osize = FFTW.rfft_output_size(X, region)
             Y = flags&FFTW.ESTIMATE != 0 ? FFTW.FakeArray{$Tc, N}(osize, ostride) : Array{$Tc}(undef, osize)
-            FFTW.rFFTWPlan{$Tr,FFTW.FORWARD,false,N}(X, Y, region, flags, timelimit)
+            FFTW.rFFTWPlan{$Tr,$FFTW.FORWARD,false,N}(X, Y, region, flags, timelimit)
+        end
+
+        function plan_brfft(X::StridedArray{$Tc,N}, d::Integer, region;
+            flags::Integer=ESTIMATE,
+            timelimit::Real=NO_TIMELIMIT,
+            num_threads::Union{Nothing, Integer} = nothing,
+            ostride=Tuple(1 for i in 1:N)) where N
+
+            if num_threads !== nothing
+                plan = FFTW.set_num_threads(num_threads) do
+                    plan_brfft(X, d, region; flags = flags, timelimit = timelimit)
+                end
+                return plan
+            end
+            osize = FFTW.brfft_output_size(X, d, region)
+            Y = flags&ESTIMATE != 0 ? FFTW.FakeArray{$Tr,N}(osize, ostride) : Array{$Tr}(undef, osize)
+
+            # FFTW currently doesn't support PRESERVE_INPUT for
+            # multidimensional out-of-place c2r transforms, so
+            # we have to handle 1d and >1d cases separately with a copy.  Ugh.
+            if length(region) <= 1
+                FFTW.rFFTWPlan{$Tc,$FFTW.BACKWARD,false,N}(X, Y, region,
+                                            flags | FFTW.PRESERVE_INPUT,
+                                            timelimit)
+            else
+                FFTW.rFFTWPlan{$Tc,$FFTW.BACKWARD,false,N}(copy(X), Y, region, flags,
+                                            timelimit)
+            end
         end
     end 
-
-    function plan_brfft(X::StridedArray{$Tc,N}, d::Integer, region;
-        flags::Integer=ESTIMATE,
-        timelimit::Real=NO_TIMELIMIT,
-        num_threads::Union{Nothing, Integer} = nothing,
-        ostride=Tuple(1 for i in 1:N)) where N
-
-        if num_threads !== nothing
-            plan = FFTW.set_num_threads(num_threads) do
-                plan_brfft(X, d, region; flags = flags, timelimit = timelimit)
-            end
-            return plan
-        end
-        osize = FFTW.brfft_output_size(X, d, region)
-        Y = flags&ESTIMATE != 0 ? FFTW.FakeArray{$Tr,N}(osize, ostride) : Array{$Tr}(undef, osize)
-
-        # FFTW currently doesn't support PRESERVE_INPUT for
-        # multidimensional out-of-place c2r transforms, so
-        # we have to handle 1d and >1d cases separately with a copy.  Ugh.
-        if length(region) <= 1
-            FFTW.rFFTWPlan{$Tc,FFTW.BACKWARD,false,N}(X, Y, region,
-                                        flags | FFTW.PRESERVE_INPUT,
-                                        timelimit)
-        else
-            FFTW.rFFTWPlan{$Tc,FFTW.BACKWARD,false,N}(copy(X), Y, region, flags,
-                                        timelimit)
-        end
-    end
 end 
