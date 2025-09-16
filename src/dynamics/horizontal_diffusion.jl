@@ -32,7 +32,7 @@ $(TYPEDFIELDS)"""
     "[OPTION] diffusion time scale"
     time_scale::Second = Hour(4)
 
-    "[OPTION] diffusion time scale for temperature and humidity"
+    "[OPTION] diffusion time scale for divergence"
     time_scale_div::Second = Hour(1)
 
     "[OPTION] stronger diffusion with resolution? 0: constant with trunc, 1: (inverse) linear with trunc, etc"
