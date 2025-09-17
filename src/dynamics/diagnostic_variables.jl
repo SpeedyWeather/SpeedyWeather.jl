@@ -404,7 +404,10 @@ $(TYPEDFIELDS)"""
     albedo::GridVariable2D = zeros(GridVariable2D, grid)
 
     "Cosine of solar zenith angle [1]"
-    cos_zenith::GridVariable2D = zeros(GridVariable2D, grid)           
+    cos_zenith::GridVariable2D = zeros(GridVariable2D, grid)
+    
+    "Boundary layer drag coefficient [1] from BulkRichardsonDrag scheme"
+    boundary_layer_drag::GridVariable2D = zeros(GridVariable2D, grid)
 end
 
 """$(TYPEDSIGNATURES)

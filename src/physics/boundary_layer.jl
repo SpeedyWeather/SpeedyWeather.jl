@@ -100,6 +100,9 @@ $(TYPEDFIELDS)"""
     "Critical Richardson number for stable mixing cutoff [1]"
     Ri_c::NF = 10
 
+    "Drag minimum to avoid zero surface fluxes in stable conditions [1]"
+    drag_min::NF = 1e-4
+
     "Maximum drag coefficient, κ²/log(zₐ/z₀) for zₐ from reference temperature"
     drag_max::Base.RefValue{NF} = Ref(zero(NF))
 end
@@ -127,13 +130,16 @@ function boundary_layer_drag!(  column::ColumnVariables,
     boundary_layer_drag!(column, scheme, model.atmosphere)
 end
 
+"""$(TYPEDSIGNATURES)
+Calculate a boundary_layer_drag from the bulk richardson number
+following Frierson, 2006."""
 function boundary_layer_drag!(
     column::ColumnVariables,
     scheme::BulkRichardsonDrag,
     atmopshere::AbstractAtmosphere,
 )
     
-    (; Ri_c) = scheme
+    (; drag_min, Ri_c) = scheme
     drag_max = scheme.drag_max[]
 
     # bulk Richardson number at lowermost layer N from Frierson, 2006, eq. (15)
@@ -148,7 +154,9 @@ function boundary_layer_drag!(
     # which doesn't change much with instantaneous temperature variations but with
     # vertical resolution, hence κ^2/log(Z/z₀)^2 is precalculated in initialize!
     Ri_N = clamp(Ri_N, 0, Ri_c)
-    column.boundary_layer_drag = drag_max*(1-Ri_N/Ri_c)^2
+
+    # extension over Frierson, 2006: minimum drag to avoid zero surface fluxes
+    column.boundary_layer_drag = max(drag_min, drag_max*(1-Ri_N/Ri_c)^2)
 end
 
 """
