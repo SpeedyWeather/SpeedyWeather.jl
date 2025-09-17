@@ -79,8 +79,61 @@ function output!(
     return nothing
 end
 
+"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+Fields are: $(TYPEDFIELDS)"""
+@kwdef mutable struct SurfaceTemperatureOutput <: AbstractOutputVariable
+    name::String = "tsurf"
+    unit::String = "degC"
+    long_name::String = "Surface Temperature"
+    dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
+    missing_value::Float64 = NaN
+    compression_level::Int = 3
+    shuffle::Bool = true
+    keepbits::Int = 12
+end
+
+function output!(
+    output::NetCDFOutput,
+    variable::SurfaceTemperatureOutput,
+    simulation::AbstractSimulation,
+)
+    # escape immediately after first call if variable doesn't have a time dimension
+    ~hastime(variable) && output.output_counter > 1 && return nothing
+
+    # Placeholder
+    Ts = simulation.diagnostic_variables.dynamics.a_2D_grid
+    #u_or_v10 = simulation.diagnostic_variables.dynamics.b_2D_grid
+    
+    # Retrieve T_bottom
+    T_grid = simulation.diagnostic_variables.grid.temp_grid
+    nlayers = size(T_grid, 2)
+    T_bottom = field_view(T_grid, :, nlayers)
+
+    # Other parameters
+    κ = simulation.model.atmosphere.κ
+    σ_bottom = simulation.model.geometry.σ_levels_full[end]
+
+    # Compute Ts
+    @. Ts = T_bottom * σ_bottom ^ (-κ) - 273.15 # Convert to °C
+
+    # interpolate 2D/3D variables
+    Ts_output = output.field2D
+    Ts_grid = on_architecture(CPU(), Ts)
+    RingGrids.interpolate!(Ts_output, Ts_grid, output.interpolator)
+
+    if hasproperty(variable, :keepbits)     # round mantissabits for compression
+        round!(Ts_output, variable.keepbits)
+    end
+
+    i = output.output_counter               # output time step i to write
+    indices = get_indices(i, variable)      # returns (:, :, i) for example, depending on dims
+    output.netcdf_file[variable.name][indices...] = Ts_output     # actually write to file
+    return nothing
+end
+
 # collect all in one for convenience
 BoundaryLayerOutput() = (
     ZonalVelocity10mOutput(),
     MeridionalVelocity10mOutput(),
+    SurfaceTemperatureOutput(),
 )
