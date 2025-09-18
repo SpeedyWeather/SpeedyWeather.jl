@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Higher default BulkRichardsonDrag via surface gusts + bug fixes [#857](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/857)
 - Metal extension [#849](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/849)
 - Fix LowerTriangularArrays zeros, rand, etc to return correct array type based on Spectrum architecture [#850](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/850)
 - Call callbacks before output not after [#852](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/852)
