@@ -130,6 +130,7 @@ end
         SpeedyWeather.MeridionalVelocity10mOutput(), 
         SpeedyWeather.SurfaceTemperatureOutput(),
         SpeedyWeather.MeanSeaLevelPressureOutput(),
+        SpeedyWeather.SurfacePressureOutput(),
     )
     simulation = initialize!(model)
     run!(simulation, output=true; period)
