@@ -95,13 +95,16 @@ $(TYPEDFIELDS)"""
     κ::NF = 0.4
 
     "roughness length [m]"
-    z₀::NF = 3.21e-5
+    z₀::NF = 0.01
 
     "Critical Richardson number for stable mixing cutoff [1]"
-    Ri_c::NF = 10
+    Ri_c::NF = 10   # higher than typical to get a higher drag in general
 
     "Drag minimum to avoid zero surface fluxes in stable conditions [1]"
     drag_min::NF = 1e-4
+
+    "Gust speed to be added to wind speed for drag calculation [m/s]"
+    gust_speed::NF = 5
 
     "Maximum drag coefficient, κ²/log(zₐ/z₀) for zₐ from reference temperature"
     drag_max::Base.RefValue{NF} = Ref(zero(NF))
@@ -135,16 +138,16 @@ Calculate a boundary_layer_drag from the bulk richardson number
 following Frierson, 2006."""
 function boundary_layer_drag!(
     column::ColumnVariables,
-    scheme::BulkRichardsonDrag,
-    atmopshere::AbstractAtmosphere,
+    drag::BulkRichardsonDrag,
+    atmosphere::AbstractAtmosphere,
 )
     
-    (; drag_min, Ri_c) = scheme
-    drag_max = scheme.drag_max[]
+    (; drag_min, Ri_c) = drag
+    drag_max = drag.drag_max[]
 
     # bulk Richardson number at lowermost layer N from Frierson, 2006, eq. (15)
     # they call it Ri_a = Ri_N here
-    Ri_N = bulk_richardson_surface(column, atmopshere)
+    Ri_N = bulk_richardson_surface(column, drag, atmosphere)
 
     # clamp to get the cases, eq (12-14)
     # if Ri_N > Ri_c then C = 0
@@ -165,16 +168,19 @@ Calculate the bulk richardson number following Frierson, 2007.
 For vertical stability in the boundary layer."""
 function bulk_richardson_surface(
     column::ColumnVariables,
+    drag::BulkRichardsonDrag,
     atmosphere::AbstractAtmosphere,
 )
     cₚ = atmosphere.heat_capacity
-    (; u, v, geopot, temp_virt) = column
+    (; u, v, geopot, temp_virt, surface_geopotential) = column
+    (; gust_speed) = drag
     surface = column.nlayers    # surface index = nlayers
 
-    V² = u[surface]^2 + v[surface]^2
+    V² = u[surface]^2 + v[surface]^2 + gust_speed^2
+    gz = geopot[surface] - surface_geopotential
     Θ₀ = cₚ*temp_virt[surface]
-    Θ₁ = Θ₀ + geopot[surface]
-    bulk_richardson = geopot[surface]*(Θ₁ - Θ₀) / (Θ₀*V²)
+    Θ₁ = Θ₀ + gz
+    bulk_richardson = gz*(Θ₁ - Θ₀) / (Θ₀*V²)
     return bulk_richardson
 end
 
