@@ -98,7 +98,7 @@ $(TYPEDFIELDS)"""
     z₀::NF = 0.01
 
     "Critical Richardson number for stable mixing cutoff [1]"
-    Ri_c::NF = 10   # higher than typical to get a higher drag in general
+    Ri_c::NF = 5   # higher than typical to get a higher drag in general
 
     "Drag minimum to avoid zero surface fluxes in stable conditions [1]"
     drag_min::NF = 1e-4
