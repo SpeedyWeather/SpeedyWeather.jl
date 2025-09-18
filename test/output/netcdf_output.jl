@@ -1,4 +1,4 @@
-using NCDatasets, Dates
+using NCDatasets, Dates, Statistics
 
 @testset "Output for BarotropicModel" begin
     tmp_output_path = mktempdir(pwd(), prefix = "tmp_testruns_")  # Cleaned up when the process exits
@@ -125,6 +125,12 @@ end
     # test outputting other model defaults
     output = NetCDFOutput(spectral_grid, Barotropic, path=tmp_output_path)
     model = PrimitiveWetModel(spectral_grid; output)
+    # Add surface variables output for testing them
+    add!(model, SpeedyWeather.ZonalVelocity10mOutput(), 
+        SpeedyWeather.MeridionalVelocity10mOutput(), 
+        SpeedyWeather.SurfaceTemperatureOutput(),
+        SpeedyWeather.MeanSeaLevelPressureOutput(),
+    )
     simulation = initialize!(model)
     run!(simulation, output=true; period)
     @test simulation.model.feedback.nans_detected == false
@@ -132,6 +138,18 @@ end
     @test ~haskey(ds, "temp")
     @test ~haskey(ds, "humid")
     @test ~haskey(ds, "pres")
+    # Test surface variables
+    ## MSLP
+    p_scale = median(ds["pres"].var[:,:,end]) # Surface pressure order of magnitude
+    mslp = ds["mslp"].var[:, :, end]
+    @test all(0.8 .< mslp/p_scale .< 1.2)
+    ## u10, v10: 10m value cannot exceed bottom value
+    @test max(abs.(ds["u10"].var[:,:,end])...) < max(abs.(ds["u"].var[:,:,end, end])...)
+    @test max(abs.(ds["v10"].var[:,:,end])...) < max(abs.(ds["u"].var[:,:,end, end])...)
+    ## Ts
+    T_scale = median(ds["temp"].var[:,:,end,end] .+ 273.15)
+    Tsurf = ds["tsurf"].var[:,:,end] .+ 273.15
+    @test all(0.6 .< (Tsurf ./ T_scale) .< 1.3)
 end
 
 @testset "Restart from output file" begin
