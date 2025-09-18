@@ -3,7 +3,8 @@ module Architectures
     import KernelAbstractions 
 
     export AbstractArchitecture
-    export CPU, CPUStatic, GPU, CUDAGPU
+    export CPU, CPUStatic, GPU
+    export CUDAGPU, MetalGPU
     export array_type, on_architecture, architecture, device
     export convert_to_device, ismatching, compatible_array_types, nonparametric_type
     export synchronize 
@@ -49,9 +50,10 @@ module Architectures
 
     Base.show(io::IO, a::GPU) = print(io, "GPU($(device(a)))")
 
-    # defined here so that it can be extended in SpeedyWeatherCUDAExt
-    function CUDAGPU end
+    # defined here so that it can be extended
     function GPU end 
+    function CUDAGPU end
+    function MetalGPU end
 
     #####
     ##### These methods are extended in SpeedyWeatherCUDAExt

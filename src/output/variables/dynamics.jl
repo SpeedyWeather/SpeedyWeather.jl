@@ -135,8 +135,6 @@ Fields are: $(TYPEDFIELDS)"""
     transform::F = (x) -> exp(x)/100     # log(Pa) to hPa
 end
 
-path(::MeanSeaLevelPressureOutput, simulation) = simulation.diagnostic_variables.grid.pres_grid
-
 function output!(
     output::NetCDFOutput,
     variable::MeanSeaLevelPressureOutput,
@@ -145,7 +143,7 @@ function output!(
     # escape immediately after first call if variable doesn't have a time dimension
     ~hastime(variable) && output.output_counter > 1 && return nothing
 
-    lnpₛ = path(variable, simulation)
+    lnpₛ = simulation.diagnostic_variables.grid.pres_grid
     h = simulation.model.orography.orography
     (; R_dry) = simulation.model.atmosphere
     g = simulation.model.planet.gravity

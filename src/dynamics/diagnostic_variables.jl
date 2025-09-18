@@ -116,7 +116,7 @@ $TYPEDFIELDS."""
     div_grid        ::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
     "Absolute temperature [K]"
     temp_grid       ::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
-    "Virtual tempereature [K]"
+    "Virtual temperature [K]"
     temp_virt_grid  ::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
     "Specific_humidity [kg/kg]"
     humid_grid      ::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
