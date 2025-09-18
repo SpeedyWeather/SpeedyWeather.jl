@@ -100,18 +100,9 @@ function drag!(
 
     # scale by radius (but only once, the second radius is in vor)
     c = drag.c * diagn.scale[]
-    
-    # GPU kernel launch
-    arch = architecture(vor_tend)
-    launch!(arch, SpectralWorkOrder, size(vor_tend), linear_vorticity_drag_kernel!,
-            vor_tend, vor, c)
-end
+    vor_tend .-= c*vor
 
-@kernel inbounds=true function linear_vorticity_drag_kernel!(
-    vor_tend, vor, @Const(c)
-)
-    I = @index(Global, Cartesian)
-    vor_tend[I] -= c * vor[I]
+    return nothing
 end
 
 export JetDrag
