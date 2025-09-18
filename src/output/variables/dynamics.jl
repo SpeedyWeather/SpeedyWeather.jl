@@ -123,7 +123,7 @@ path(::SurfacePressureOutput, simulation) = simulation.diagnostic_variables.grid
 
 """Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct MeanSeaLevelPressureOutput <: AbstractOutputVariable
+@kwdef mutable struct MeanSeaLevelPressureOutput{F} <: AbstractOutputVariable
     name::String = "mslp"
     unit::String = "hPa"
     long_name::String = "mean sea-level pressure"
@@ -132,6 +132,7 @@ Fields are: $(TYPEDFIELDS)"""
     compression_level::Int = 3
     shuffle::Bool = true
     keepbits::Int = 12
+    transform::F = (x) -> exp(x)/100     # log(Pa) to hPa
 end
 
 path(::MeanSeaLevelPressureOutput, simulation) = simulation.diagnostic_variables.grid.pres_grid
@@ -156,7 +157,8 @@ function output!(
 
     # calculate mean sea-level pressure on model grid
     mslp = simulation.diagnostic_variables.dynamics.a_2D_grid
-    @. mslp = exp(g*h/R_dry/Tᵥ + lnpₛ) / 100  # Pa to hPa
+    (; transform) = variable                    # to change units from log(Pa) to hPa
+    @. mslp = transform(g*h/R_dry/Tᵥ + lnpₛ)    # Pa to hPa
 
     # interpolate 2D/3D variables
     mslp_output = output.field2D
