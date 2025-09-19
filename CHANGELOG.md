@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.17.1
 
 - Metal extension [#849](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/849)
 - Fix LowerTriangularArrays zeros, rand, etc to return correct array type based on Spectrum architecture [#850](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/850)
