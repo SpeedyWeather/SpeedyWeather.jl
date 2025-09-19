@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.17.1
 
 - Bump SpeedyWeatherInternals to v0.1.1 [##860](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/860)
 - Metal extension [#849](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/849)
