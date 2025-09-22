@@ -1,4 +1,4 @@
-using NCDatasets, Dates, Statistics
+using NCDatasets, Dates
 
 @testset "Output for BarotropicModel" begin
     tmp_output_path = mktempdir(pwd(), prefix = "tmp_testruns_")  # Cleaned up when the process exits
@@ -123,7 +123,7 @@ end
     end
 
     # test outputting other model defaults
-    output = NetCDFOutput(spectral_grid, Barotropic, path=tmp_output_path)
+    output = NetCDFOutput(spectral_grid, PrimitiveWet, path=tmp_output_path)
     model = PrimitiveWetModel(spectral_grid; output)
 
     # Add surface variables output for testing them
@@ -148,7 +148,7 @@ end
     @test haskey(ds, "mslp")    # but this variable
 
     # Test reasonable scale for mean
-    (; pres_ref) = model.atmosphere)    # unpack reference pressure
+    (; pres_ref) = model.atmosphere     # unpack reference pressure
     pres_ref = pres_ref / 100           # Pa -> hPa  
     mslp = ds["mslp"].var[:, :, end]    # variable at last time step `.var` to read the raw data ignoring any mask
     
