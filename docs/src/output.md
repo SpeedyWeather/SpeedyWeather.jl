@@ -261,15 +261,21 @@ using SpeedyWeather, GeoMakie, CairoMakie
 spectral_grid = SpectralGrid()
 model = PrimitiveWetModel(spectral_grid)
 simulation = initialize!(model)
+
+# Add mean sea-level pressure for visualisation
+add!(model, SpeedyWeather.MeanSeaLevelPressureOutput())
+
 run!(simulation, period=Day(3), output=false) # some spin-up
-run!(simulation, period=Day(2), output=true)
+run!(simulation, period=Day(5), output=true)
 
-animate(simulation, output_file="test_vor_animation.mp4", variable="vor", level=1) # animate vorticity at the first vertical level
+# animate mean sea-level pressure
+animate(simulation, output_file="test_mslp_animation.mp4", variable="mslp") 
 ```
+![test_mslp_animation](test_mslp_animation.mp4)
 
-![test_vor_animation](test_vor_animation.mp4)
 
-For more options for `animate`, see below: 
+For 3D variables you can provide e.g. `level=1` as keyword argumen to `animate`
+to specify the vertical level to visualise. For more options for `animate`, see below: 
 
 ```@example netcdf 
 @doc SpeedyWeather.animate
