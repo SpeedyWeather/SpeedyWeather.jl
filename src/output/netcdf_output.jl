@@ -201,7 +201,7 @@ function add_default!(
     Model::Type{<:PrimitiveDry},
 )
     add_default!(variables, Barotropic)
-    add!(variables, SurfacePressureOutput(), TemperatureOutput())
+    add!(variables, MeanSeaLevelPressureOutput(), TemperatureOutput())
 end
 
 """$(TYPEDSIGNATURES)
