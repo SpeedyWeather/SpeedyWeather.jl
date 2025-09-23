@@ -2,6 +2,7 @@
 
 # Unreleased
 
+- Reduce GPU overhead and revise on_architecture and adapt [#824](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/824)
 - Implement GPU kernels for forcing and drag [#834](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/834)
 - Mean sea-level pressure and dynamics output [#853](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/853) [#854](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/854)
 
