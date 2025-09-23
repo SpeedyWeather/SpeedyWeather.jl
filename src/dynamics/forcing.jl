@@ -123,7 +123,6 @@ end
 Set for every latitude ring the tendency to the precomputed forcing
 in the momentum equations following the JetStreamForcing.
 The forcing is precomputed in `initialize!(::JetStreamForcing, ::AbstractModel)`."""
-
 function forcing!(
     diagn::DiagnosticVariables, 
     forcing::JetStreamForcing)

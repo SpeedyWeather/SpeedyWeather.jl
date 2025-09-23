@@ -33,7 +33,6 @@ Quadratic drag for the momentum equations.
 with `c_D` the non-dimensional drag coefficient as defined in `drag::QuadraticDrag`.
 `c_D` and layer thickness `H` are precomputed in `initialize!(::QuadraticDrag, ::AbstractModel)`
 and scaled by the radius as are the momentum equations."""
-
 function drag!(
     diagn::DiagnosticVariables,
     progn::PrognosticVariables,
@@ -86,8 +85,6 @@ initialize!(::LinearVorticityDrag, ::AbstractModel) = nothing
 $(TYPEDSIGNATURES)
 Linear drag for the vorticity equations of the form F = -cξ
 with c drag coefficient [1/s]."""
-
-
 function drag!(
     diagn::DiagnosticVariables,
     progn::PrognosticVariables,
