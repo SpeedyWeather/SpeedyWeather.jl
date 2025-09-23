@@ -123,15 +123,26 @@ end
     end
 
     # test outputting other model defaults
-    output = NetCDFOutput(spectral_grid, Barotropic, path=tmp_output_path)
+    output = NetCDFOutput(spectral_grid, PrimitiveWet, path=tmp_output_path)
     model = PrimitiveWetModel(spectral_grid; output)
     simulation = initialize!(model)
     run!(simulation, output=true; period)
     @test simulation.model.feedback.nans_detected == false
     ds = NCDataset(joinpath(model.output.run_path, model.output.filename))
-    @test ~haskey(ds, "temp")
-    @test ~haskey(ds, "humid")
-    @test ~haskey(ds, "pres")
+    
+    # test    
+    @test haskey(ds, "temp")
+    @test haskey(ds, "humid")
+    @test ~haskey(ds, "pres")   # with MSLP as default this should not be contained in the nc file
+    @test haskey(ds, "mslp")    # but this variable
+
+    # Test reasonable scale for mean
+    (; pres_ref) = model.atmosphere     # unpack reference pressure
+    pres_ref = pres_ref / 100           # Pa -> hPa  
+    mslp = ds["mslp"].var[:, :, end]    # variable at last time step `.var` to read the raw data ignoring any mask
+    
+    # should be within ~800 to ~1200hPa
+    @test all(0.8 .< mslp/pres_ref .< 1.2)
 end
 
 @testset "Restart from output file" begin
