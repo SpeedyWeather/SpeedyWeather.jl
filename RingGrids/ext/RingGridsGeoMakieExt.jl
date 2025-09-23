@@ -83,7 +83,7 @@ function RingGrids.globe(
     return fig
 end
 
-import GeoMakie.Makie.GeometryBasics: Polygon
+import GeoMakie.Makie.GeometryBasics: Polygon, Point
 
 """($TYPEDSIGNATURES)
 Create a 3D interactive globe plot of the data in `grid` displayed as polygons bounded by
@@ -108,7 +108,7 @@ function RingGrids.globe(
     end
 
     faces = RingGrids.get_gridcell_polygons(field.grid)
-    polygons = [Polygon(faces[:, ij]) for ij in axes(faces, 2)]
+    polygons = [Polygon(Point.(faces[:, ij])) for ij in axes(faces, 2)]
     p = poly!(ax, polygons, color=field.data; colormap)
     interactive && (p.transformation.transform_func[] = transf)
 
