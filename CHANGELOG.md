@@ -2,6 +2,7 @@
 
 # Unreleased
 
+- Implement GPU kernels for forcing and drag [#834](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/834)
 - Mean sea-level pressure and dynamics output [#853](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/853) [#854](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/854)
 
 ## v0.17.1
