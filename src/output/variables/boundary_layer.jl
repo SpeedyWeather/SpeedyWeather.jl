@@ -54,13 +54,15 @@ function output!(
     z_bottom = simulation.diagnostic_variables.dynamics.a_2D_grid
     u_or_v10 = simulation.diagnostic_variables.dynamics.b_2D_grid
     
-    # Compute z_bottom
-    z_surf = max.(simulation.model.orography.orography, 0) #m, set negative values to zero
+    # Compute z_bottom as z_surf + T_bottom * Δp_geopot / g, start with z_surf
+    z_bottom .= max.(simulation.model.orography.orography, 0)   # [m] set negative values to zero
     T_bottom = field_view(simulation.diagnostic_variables.grid.temp_grid, :, nlayers)
     Δp_geopot = simulation.model.geopotential.Δp_geopot_full[end]
-    @. z_bottom = z_surf + T_bottom * Δp_geopot / simulation.model.planet.gravity
+    
+    # accumulate the second term in
+    @. z_bottom += T_bottom * Δp_geopot / simulation.model.planet.gravity
 
-    # Compute u10
+    # Compute u10, TODO should this be the same z₀ as in vertical diffusion or surface fluxes?
     z₀ = simulation.model.vertical_diffusion.z₀
     @. u_or_v10 = u_or_v_bottom .* log(10/z₀) ./ log.(z_bottom/z₀)
 
@@ -81,7 +83,7 @@ end
 
 """Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct SurfaceTemperatureOutput <: AbstractOutputVariable
+@kwdef mutable struct SurfaceTemperatureOutput{F} <: AbstractOutputVariable
     name::String = "tsurf"
     unit::String = "degC"
     long_name::String = "Surface Temperature"
@@ -90,7 +92,11 @@ Fields are: $(TYPEDFIELDS)"""
     compression_level::Int = 3
     shuffle::Bool = true
     keepbits::Int = 12
+    transform::F = (x) -> x - 273.15     # [K] to [˚C]
 end
+
+# not the actual surface temperature but the core variable to read in
+path(::SurfaceTemperatureOutput, simulation) = simulation.diagnostic_variables.grid.temp_grid
 
 function output!(
     output::NetCDFOutput,
@@ -100,12 +106,11 @@ function output!(
     # escape immediately after first call if variable doesn't have a time dimension
     ~hastime(variable) && output.output_counter > 1 && return nothing
 
-    # Placeholder
+    # resuse scratch array to avoid allocations
     Ts = simulation.diagnostic_variables.dynamics.a_2D_grid
-    #u_or_v10 = simulation.diagnostic_variables.dynamics.b_2D_grid
-    
+
     # Retrieve T_bottom
-    T_grid = simulation.diagnostic_variables.grid.temp_grid
+    T_grid = path(variable, simulation)
     nlayers = size(T_grid, 2)
     T_bottom = field_view(T_grid, :, nlayers)
 
@@ -114,7 +119,8 @@ function output!(
     σ_bottom = simulation.model.geometry.σ_levels_full[end]
 
     # Compute Ts
-    @. Ts = T_bottom * σ_bottom ^ (-κ) - 273.15 # Convert to °C
+    (; transform) = variable
+    @. Ts = transform(T_bottom * σ_bottom ^ (-κ))   # Convert to °C
 
     # interpolate 2D/3D variables
     Ts_output = output.field2D
