@@ -135,6 +135,7 @@ Fields are: $(TYPEDFIELDS)"""
     transform::F = (x) -> exp(x)/100     # log(Pa) to hPa
 end
 
+# points to surface not mean sea level pressure but core variable to read in
 path(::MeanSeaLevelPressureOutput, simulation) = simulation.diagnostic_variables.grid.pres_grid
 
 function output!(
@@ -144,6 +145,7 @@ function output!(
 )
     # escape immediately after first call if variable doesn't have a time dimension
     ~hastime(variable) && output.output_counter > 1 && return nothing
+
 
     lnpₛ = path(variable, simulation)
     h = simulation.model.orography.orography

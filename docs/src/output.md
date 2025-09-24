@@ -180,6 +180,40 @@ delete!(output, :div)
 If you change the `name` of an output variable, i.e. `SpeedyWeather.DivergenceOutput(name="divergence")`
 the key would change accordingly to `:divergence`.
 
+### Surface variables
+
+Mean sea-Level pressure (`mslp`), surface temperature (`tsurf`) and 10m winds (`u10`, `v10`) are computed
+specifically for the output. If these output variables are not requested then they will not be computed.
+
+**Mean sea-level pressure** is computed as 
+
+```math
+p_{surf} \times \exp\left(\frac{g h}{R_d T_v}\right)
+```
+
+with gravity ``g``, orographic height ``h``, dry gas constant ``R_d`` and ``T_v`` virtual temperature
+at the surface.
+
+**Surface temperature** is computed assuming an adiabatic descent from the lowermost model
+level
+
+```math
+T_{surf} = T_{bottom} (\frac{p_{bottom}}{p_{surf}})^\kappa
+```
+
+where ``\kappa = R_d / C_p``, and ``\frac{p_{bottom}}{p_{surf}}`` is equal to
+``\sigma`` at the bottom level.
+
+**10 winds** are computed assuming a logarithmic profile down to a height ``h_0 = 10~\text{m}``
+
+```math
+u_{10} = u_{bottom} \frac{\log(h_0/z_0)}{\log(z_{bottom}/z_0)}
+```
+
+(same for ``v``), with ``z_0`` the surface roughness length.
+All length/height units are in meters but technically they just have to be consistent.
+
+
 ## Grouped variables
 
 For convenience we have defined several output groups, for example `SpeedyWeather.PrecipitationOutput()`

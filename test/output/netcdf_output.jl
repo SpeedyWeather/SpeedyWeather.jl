@@ -125,8 +125,19 @@ end
     # test outputting other model defaults
     output = NetCDFOutput(spectral_grid, PrimitiveWet, path=tmp_output_path)
     model = PrimitiveWetModel(spectral_grid; output)
+
+    # Add surface variables output for testing them
+    add!(model,
+        SpeedyWeather.ZonalVelocity10mOutput(), 
+        SpeedyWeather.MeridionalVelocity10mOutput(), 
+        SpeedyWeather.SurfaceTemperatureOutput(),
+#         SpeedyWeather.MeanSeaLevelPressureOutput(),   # this should be default now
+#         SpeedyWeather.SurfacePressureOutput(),        # don't output surface pressure too
+    )
+
     simulation = initialize!(model)
     run!(simulation, output=true; period)
+    
     @test simulation.model.feedback.nans_detected == false
     ds = NCDataset(joinpath(model.output.run_path, model.output.filename))
     
@@ -142,7 +153,22 @@ end
     mslp = ds["mslp"].var[:, :, end]    # variable at last time step `.var` to read the raw data ignoring any mask
     
     # should be within ~800 to ~1200hPa
-    @test all(0.8 .< mslp/pres_ref .< 1.2)
+    @test all(0.8 .< mslp./pres_ref .< 1.2)
+
+    ## test u10, v10 existence
+    @test haskey(ds, "u")
+    @test haskey(ds, "u10")
+    @test haskey(ds, "v")
+    @test haskey(ds, "v10")
+
+    # and 10m values cannot exceed lowermost layer of u,v value
+    @test maximum(abs.(ds["u10"].var[:, :, end])) < maximum(abs.(ds["u"].var[:, :, end, end]))
+    @test maximum(abs.(ds["v10"].var[:, :, end])) < maximum(abs.(ds["u"].var[:, :, end, end]))
+
+    ## surface temperature should be within 60-130% of 
+    (; temp_ref) = model.atmosphere                 # in K
+    Tsurf = ds["tsurf"].var[:, :, end] .+ 273.15    # last timestep from ˚C to K
+    @test all(0.6 .< (Tsurf ./ temp_ref) .< 1.3)
 end
 
 @testset "Restart from output file" begin
