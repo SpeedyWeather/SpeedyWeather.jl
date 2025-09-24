@@ -105,8 +105,7 @@ export power_spectrum
 import SpeedyTransforms: prettymemory
 
 # to be defined in GeoMakie extension
-export globe, animate
-function globe end
+export animate, globe
 function animate end
 
 # abstract types

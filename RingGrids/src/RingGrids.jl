@@ -124,6 +124,10 @@ const DEFAULT_NF = Float32
 const DEFAULT_ARRAYTYPE = Array
 const DEFAULT_ARCHITECTURE = CPU
 
+# to be defined in GeoMakie extension
+export globe
+function globe end
+
 include("utility_functions.jl")
 
 # GENERAL
