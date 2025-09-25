@@ -7,7 +7,7 @@ Base.@kwdef struct SurfaceWind{NF<:AbstractFloat} <: AbstractSurfaceWind
     f_wind::NF = 0.95
 
     "Wind speed of sub-grid scale gusts [m/s]"
-    V_gust::NF = 5
+    gust_speed::NF = 5
 
     "Use (possibly) flow-dependent column.boundary_layer_drag coefficient"
     use_boundary_layer_drag::Bool = true
@@ -27,7 +27,7 @@ function surface_wind_stress!(  column::ColumnVariables{NF},
                                 model::PrimitiveEquation) where NF
 
     (; land_fraction) = column
-    (; f_wind, V_gust, drag_land, drag_sea) = surface_wind
+    (; f_wind, gust_speed, drag_land, drag_sea) = surface_wind
 
     # SPEEDY documentation eq. 49, but use previous time step for numerical stability
     column.surface_u = f_wind*column.u[end] 
@@ -35,7 +35,7 @@ function surface_wind_stress!(  column::ColumnVariables{NF},
     (; surface_u, surface_v) = column
 
     # SPEEDY documentation eq. 50
-    column.surface_wind_speed = sqrt(surface_u^2 + surface_v^2 + V_gust^2)
+    column.surface_wind_speed = sqrt(surface_u^2 + surface_v^2 + gust_speed^2)
 
     # drag coefficient either from SurfaceWind or from a central drag coefficient
     drag_sea, drag_land = surface_wind.use_boundary_layer_drag ?

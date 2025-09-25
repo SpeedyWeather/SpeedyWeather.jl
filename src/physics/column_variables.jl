@@ -198,6 +198,9 @@ function write_column_tendencies!(
     (; land_fraction) = column
     diagn.physics.albedo[ij] = (1 - land_fraction)*column.albedo_ocean + land_fraction*column.albedo_land
 
+    # store boundary layer drag coefficient from bulk richardson number scheme
+    diagn.physics.boundary_layer_drag[ij] = column.boundary_layer_drag
+
     return nothing
 end
 

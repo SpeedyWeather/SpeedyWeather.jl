@@ -2,6 +2,7 @@
 
 # Unreleased
 
+- Higher default BulkRichardsonDrag via surface gusts + bug fixes [#857](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/857)
 - 10m winds and surface temperature output [#858](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/858)
 - Move Makie extensions to RingGrids and fix `globe` bug [#866](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/866)
 - Implement GPU kernels for forcing and drag [#834](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/834)
