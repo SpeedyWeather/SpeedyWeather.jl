@@ -236,6 +236,43 @@ maximum and add a fraction ``p = 0.5`` of that excess water to the layer below
 ``W_2 = W_2 + p \delta W_1 \tfrac{f_1}{f_2}`` the other half of that excess
 water is put into the river runoff.
 
+### LandSnowModel
+Snow is accumulated at the surface based on the column integrated snow (large scale and convective) and on the surface temperature, which must exceed a threshold ``T_{freeze}``. The surface snow depth budget depends on two processes: snow_melt and snow_sublimation.
+
+If the soil top layer temperature ``T_1 > T_{freeze}``, then a melting potential term ``δT_{melt}`` is computed, and from it the available energy ``E_{avail}`` [J/m²/s]:
+
+```math
+E_{avail} = cₛ * δT_{melt} * ρ_{soil} * z₁ / Δt 
+```
+This available energy is then used to compute the top soil cooling that results from the latent heat conversion: 
+
+```math
+\begin{aligned}
+melt_{rate_{max}} = E_{avail} / (ρ_w * Lᵢ) \\
+melt_{depth} = melt_{rate} * Δt \\
+Q_{melt} = ρ_w * Lᵢ * melt_{depth}
+δT = -Q_{melt} / C_{soil}
+\end{aligned}
+```
+where ...
+
+Snow depth is finally available from the updated budget, and a snow cover, σₛ, is computed from it:
+
+```math
+σₛ = min(1.0, Sₐ / snow_{depth_{scale}}) 
+```
+
+The land surface albedo is then updated based on the relative area cover of soil, vegetation and snow:
+```math
+albedo_{land} = (1-σₛ) * albedo_{land} + σₛ * albedo_{snow}
+```
+
+where albedo_snow starts with a high value (snow_albedo_fresh) and decays to a minimum value ((snow_albedo_old)) over a prescribed time scale:
+```math
+albedo_{snow} = snow_{albedo_{old}} + (snow_{albedo_{fresh}} - snow_{albedo_{old}}) * exp(-Δt_{snow} / τˢ)
+```
+where ``τˢ`` is a decay time sale, and ``Δt_{snow}`` is the time since the last significant snowfall, expresssed in days.
+
 ## Albedo
 
 Albedo is the surface reflectivity to downward solar shortwave radiation.
