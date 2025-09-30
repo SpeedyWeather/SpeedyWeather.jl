@@ -1,5 +1,6 @@
 abstract type AbstractPlanet <: AbstractModelComponent end
 
+const DEFAULT_RADIUS = 6.371e6
 const DEFAULT_ROTATION = 7.29e-5    # default angular frequency of Earth's rotation [1/s]
 const DEFAULT_GRAVITY = 9.81        # default gravitational acceleration on Earth [m/s²]
 
@@ -12,19 +13,22 @@ characteristics. Note that `radius` is not part of it as this should be chosen
 in `SpectralGrid`. Keyword arguments are
 $(TYPEDFIELDS)
 """
-@kwdef mutable struct Earth{NF<:AbstractFloat} <: AbstractPlanet
+@parameterized @kwdef mutable struct Earth{NF<:AbstractFloat} <: AbstractPlanet
+
+    "Earth's radius [m]"
+    @param radius::NF = DEFAULT_RADIUS
 
     "angular frequency of Earth's rotation [rad/s]"
-    rotation::NF = DEFAULT_ROTATION
+    @param rotation::NF = DEFAULT_ROTATION
     
     "gravitational acceleration [m/s^2]"
-    gravity::NF = DEFAULT_GRAVITY              
+    @param gravity::NF = DEFAULT_GRAVITY (bounds=Nonnegative,)
     
     "switch on/off daily cycle"
     daily_cycle::Bool = true
     
     "Seconds in a daily rotation"
-    length_of_day::Second = Hour(24)             
+    length_of_day::Second = Hour(24)
 
     "switch on/off seasonal cycle"
     seasonal_cycle::Bool = true
@@ -36,10 +40,10 @@ $(TYPEDFIELDS)
     equinox::DateTime = DateTime(2000, 3, 20) 
 
     "angle [˚] rotation axis tilt wrt to orbit"
-    axial_tilt::NF = 23.4
+    @param axial_tilt::NF = 23.4 (bounds=-90..90,)
 
     "Total solar irradiance at the distance of 1 AU [W/m²]"
-    solar_constant::NF = 1365
+    @param solar_constant::NF = 1365 (bounds=Nonnegative,)
 end
 
 Earth(SG::SpectralGrid; kwargs...) = Earth{SG.NF}(; kwargs...)

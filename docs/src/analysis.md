@@ -77,19 +77,20 @@ Now we check ``\eta_{0,0}`` the ``l = m = 0`` coefficent of the inital condition
 of that simulation with
 
 ```@example analysis
-simulation.prognostic_variables.pres[1][1]
+simulation.prognostic_variables.pres[1, 1]
 ```
 
-`[1][1]` pulls the first Leapfrog time step and of that the first element of the underlying
-[LowerTriangularMatrix](@ref lowertriangularmatrices) which is the coefficient of the ``l = m = 0``
-harmonic. Its imaginary part is always zero (which is true for any zonal harmonic ``m=0`` as its
+`[1, 1]` the first element of the underlying
+[LowerTriangularMatrix](@ref lowertriangularmatrices) at the first Leapfrog time step
+which is the coefficient of the ``l = m = 0`` harmonic. Its imaginary part is always zero
+(which is true for any zonal harmonic ``m=0`` as its
 imaginary part would just unnecessarily rotate something zonally constant in zonal direction),
 so you can `real` it. Also for spherical harmonic transforms there is a norm of the sphere
 by which you have to divide to get your mean value in the original units
 
 ```@example analysis
 a = model.spectral_transform.norm_sphere    # = 2√π = 3.5449078
-η_mean = real(simulation.prognostic_variables.pres[1][1]) / a
+η_mean = real(simulation.prognostic_variables.pres[1, 1]) / a
 ```
 
 So the initial conditions in this simulation are such that the global mean interface displacement
@@ -104,7 +105,7 @@ Let's check what happens after the simulation ran for some days
 run!(simulation, period=Day(10))
 
 # now we check η_mean again
-η_mean_later = real(simulation.prognostic_variables.pres[1][1]) / a
+η_mean_later = real(simulation.prognostic_variables.pres[1, 1]) / a
 ```
 
 which is _exactly_ the same. So mass is conserved, woohoo. 
@@ -261,7 +262,7 @@ using SpeedyWeather
 function total_angular_momentum(u, η, model)
     H = model.atmosphere.layer_thickness
     Hb = model.orography.orography
-    R = model.spectral_grid.radius
+    R = model.planet.radius
     Ω = model.planet.rotation
 
     r = R * cos.(model.geometry.lats)       # momentum arm for every grid point
@@ -402,7 +403,7 @@ function global_diagnostics(u, v, ζ, η, model)
     NF = model.spectral_grid.NF     # number format used
     H = model.atmosphere.layer_thickness
     Hb = model.orography.orography
-    R = model.spectral_grid.radius
+    R = model.planet.radius
     Ω = model.planet.rotation
     g = model.planet.gravity
 

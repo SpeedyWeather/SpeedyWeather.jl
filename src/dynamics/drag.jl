@@ -11,26 +11,17 @@ function drag!(
 end
 
 ## NO DRAG
-export NoDrag
-struct NoDrag <: AbstractDrag end
-NoDrag(SG::SpectralGrid) = NoDrag()
-initialize!(::NoDrag, ::AbstractModel) = nothing
-
-function drag!(     diagn::DiagnosticVariables,
-                    progn::PrognosticVariables,
-                    drag::NoDrag,
-                    args...)
-    return nothing
-end
+drag!(diagn, progn, drag::Nothing, args...) = nothing
 
 # Quadratic drag
 export QuadraticDrag
-@kwdef mutable struct QuadraticDrag{NF} <: AbstractDrag
+@parameterized @kwdef mutable struct QuadraticDrag{NF} <: AbstractDrag
     "[OPTION] drag coefficient [1]"
-    c_D::NF = 1e-12         # TODO is this a good default?
+    @param c_D::NF = 1e-12 (bounds=Nonnegative,)    # TODO is this a good default?
 end
 
 QuadraticDrag(SG::SpectralGrid; kwargs...) = QuadraticDrag{SG.NF}(; kwargs...)
+
 initialize!(::QuadraticDrag, ::AbstractModel) = nothing
 
 """
@@ -60,20 +51,34 @@ function drag!(
     c *= diagn.scale[]^2
 
     k = diagn.nlayers   # only apply to surface layer
-    @inbounds for ij in eachgridpoint(u, v, Fu, Fv)
-        speed = sqrt(u[ij, k]^2 + v[ij, k]^2)
-        Fu[ij, k] -= c*speed*u[ij, k]     # -= as the tendencies already contain forcing
-        Fv[ij, k] -= c*speed*v[ij, k]
-    end
+    
+    # GPU kernel launch
+    arch = architecture(u) 
+    launch!(arch, LinearWorkOrder, (length(u.data),), quadratic_drag_kernel!,
+            Fu, Fv, u, v, c, k)
+end
+
+@kernel inbounds=true function quadratic_drag_kernel!(
+    Fu, Fv, u, v, @Const(c), @Const(k) 
+)
+    ij = @index(Global, Linear)
+    
+    # Calculate speed at surface layer k
+    speed = sqrt(u[ij, k]^2 + v[ij, k]^2)
+    
+    # Apply quadratic drag, -= as the tendencies already contain forcing
+    Fu[ij, k] -= c * speed * u[ij, k]
+    Fv[ij, k] -= c * speed * v[ij, k]
 end
 
 export LinearVorticityDrag
-@kwdef mutable struct LinearVorticityDrag{NF} <: AbstractDrag
+@parameterized @kwdef mutable struct LinearVorticityDrag{NF} <: AbstractDrag
     "[OPTION] drag coefficient [1/s]"
-    c::NF = 1e-7
+    @param c::NF = 1e-7 (bounds=Nonnegative,)
 end
 
 LinearVorticityDrag(SG::SpectralGrid; kwargs...) = LinearVorticityDrag{SG.NF}(; kwargs...)
+
 initialize!(::LinearVorticityDrag, ::AbstractModel) = nothing
 
 """
@@ -88,7 +93,7 @@ function drag!(
     model::AbstractModel,
 )
     (; vor_tend) = diagn.tendencies
-    vor = progn.vor[1]
+    vor = get_step(progn.vor, lf)
 
     # scale by radius (but only once, the second radius is in vor)
     c = drag.c * diagn.scale[]
@@ -98,37 +103,33 @@ function drag!(
 end
 
 export JetDrag
-@kwdef struct JetDrag{NF, SpectralVariable2D} <: SpeedyWeather.AbstractDrag
-
-    # DIMENSIONS from SpectralGrid
-    "Spectral resolution as max degree of spherical harmonics"
-    trunc::Int
-
+@parameterized @kwdef struct JetDrag{NF, SpectralVariable2D} <: SpeedyWeather.AbstractDrag
     "[OPTION] Relaxation time scale τ"
     time_scale::Second = Day(6)
 
     "[OPTION] Jet strength [m/s]"
-    u₀::NF = 20
+    @param u₀::NF = 20
 
     "[OPTION] latitude of Gaussian jet [˚N]"
-    latitude::NF = 30
+    @param latitude::NF = 30 (bounds=-90..90,)
 
     "[OPTION] Width of Gaussian jet [˚]"
-    width::NF = 6
+    @param width::NF = 6 (bounds=Positive,)
 
     # TO BE INITIALISED
     "Relaxation back to reference vorticity"
-    ζ₀::SpectralVariable2D = zeros(LowerTriangularMatrix{Complex{NF}}, trunc+2, trunc+1)
+    ζ₀::SpectralVariable2D
 end
 
 function JetDrag(SG::SpectralGrid; kwargs...)
-    return JetDrag{SG.NF, SG.SpectralVariable2D}(; SG.trunc, kwargs...)
+    ζ₀ = zeros(Complex{SG.NF}, SG.spectrum)
+    return JetDrag{SG.NF, SG.SpectralVariable2D}(; ζ₀, kwargs...)
 end
 
 function initialize!(drag::JetDrag, model::AbstractModel)
     (; spectral_grid, geometry) = model
-    (; Grid, NF, nlat_half) = spectral_grid
-    u = zeros(Grid{NF}, nlat_half)
+    (; grid, NF) = spectral_grid
+    u = zeros(NF, grid)
 
     lat = geometry.latds
 
@@ -149,16 +150,25 @@ function drag!(
     lf::Integer,
     model::AbstractModel,
 )
-    vor = progn.vor[lf]
+    vor = get_step(progn.vor, lf)
     (; vor_tend) = diagn.tendencies
     (; ζ₀) = drag
 
     # scale by radius as is vorticity
-    (; radius) = model.spectral_grid
-    r = radius/drag.time_scale.value
+    s = diagn.scale[]
+    r = s/drag.time_scale.value
 
     k = diagn.nlayers   # drag only on surface layer
-    for lm in eachharmonic(vor_tend)
-        vor_tend[lm, k] -= r*(vor[lm, k] - ζ₀[lm])
-    end
+    
+    # GPU kernel launch 
+    arch = architecture(diagn.grid.u_grid)
+    launch!(arch, LinearWorkOrder, (size(vor_tend, 1),), jet_drag_kernel!,
+            vor_tend, vor, ζ₀, r, k)
+end
+
+@kernel inbounds=true function jet_drag_kernel!(
+    vor_tend, vor, ζ₀, @Const(r), @Const(k)  
+)
+    lm = @index(Global, Linear)
+    vor_tend[lm, k] -= r * (vor[lm, k] - ζ₀[lm])
 end

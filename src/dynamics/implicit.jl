@@ -1,11 +1,8 @@
 abstract type AbstractImplicit <: AbstractModelComponent end
 
-# BAROTROPIC MODEL (no implicit needed)
-export NoImplicit
-struct NoImplicit <: AbstractImplicit end
-NoImplicit(SG::SpectralGrid) = NoImplicit()
-initialize!(::NoImplicit, args...) = nothing
-implicit_correction!(::DiagnosticVariables, ::PrognosticVariables, ::NoImplicit) = nothing
+# model.implicit=nothing (for BarotropicModel)
+initialize!(::Nothing, dt::Real, ::DiagnosticVariables, ::AbstractModel) = nothing
+implicit_correction!(::DiagnosticVariables, ::PrognosticVariables, ::Nothing) = nothing
 
 # SHALLOW WATER MODEL
 export ImplicitShallowWater
@@ -71,10 +68,8 @@ function implicit_correction!(  diagn::DiagnosticVariables,
                                 implicit::ImplicitShallowWater)
 
     (; div_tend, pres_tend) = diagn.tendencies # tendency of divergence and pressure/η
-    div_old = progn.div[1]      # divergence at t
-    div_new = progn.div[2]      # divergence at t+dt
-    pres_old = progn.pres[1]    # pressure/η at t
-    pres_new = progn.pres[2]    # pressure/η at t+dt
+    div_old, div_new   = get_steps(progn.div)   # divergence at t, t+dt
+    pres_old, pres_new = get_steps(progn.pres)  # pressure/η at t, t+dt
 
     # unpack with [] as stored in a RefValue for mutation during initialization
     H = implicit.layer_thickness[]      # layer thickness [m], undisturbed, no mountains
@@ -173,7 +168,7 @@ end
 
 """$(TYPEDSIGNATURES)
 Generator using the resolution from SpectralGrid."""
-function ImplicitPrimitiveEquation(spectral_grid::SpectralGrid, kwargs...)
+function ImplicitPrimitiveEquation(spectral_grid::SpectralGrid; kwargs...)
     (; NF, VectorType, MatrixType, TensorType, trunc, nlayers) = spectral_grid
     return ImplicitPrimitiveEquation{NF, VectorType, MatrixType, TensorType}(;
         trunc, nlayers, kwargs...)
@@ -304,7 +299,7 @@ function implicit_correction!(
     # geopotential and linear pressure gradient (divergence equation) are already evaluated at i-1
     # so is the -D̄ term for surface pressure in tendencies!
     (; temp_tend) = diagn.tendencies
-    div_old, div_new = progn.div    # divergence at i-1 (old), i (new, i.e. current)
+    div_old, div_new = get_steps(progn.div)     # divergence at i-1 (old), i (new, i.e. current)
 
     for k in eachmatrix(temp_tend, div_old, div_new)
         for r in eachmatrix(temp_tend, div_old, div_new)
@@ -344,7 +339,7 @@ function implicit_correction!(
                 # in the δD = S⁻¹G calculation below
                 div_tend[lm, k] = 0
             end
-            lm += 1         # skip last row, LowerTriangularMatrices are of size lmax+2 x mmax+1
+            lm += 1         # skip last row, LowerTriangularArrays are of size lmax+2 x mmax+1
         end
     end
 

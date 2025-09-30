@@ -4,6 +4,6 @@
         model = PrimitiveWetModel(spectral_grid)
         simulation = initialize!(model)
         run!(simulation, period=Day(0))
-        @test simulation.model.feedback.nars_detected == false
+        @test simulation.model.feedback.nans_detected == false
     end
 end

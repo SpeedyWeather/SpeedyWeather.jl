@@ -42,11 +42,11 @@ function run!(
     initialize!(simulation; period, steps, output)      # scaling, initialize output, store initial conditions
     time_stepping!(simulation)                          # run it, yeah!
     finalize!(simulation)                               # unscale, finalize output, write restart file, finalize callbacks             
-
-    # return a UnicodePlot of surface vorticity
-    surface_vorticity = simulation.diagnostic_variables.grid.vor_grid[:, end]
-    return plot(surface_vorticity, title="Surface relative vorticity [1/s]")
+    return unicodeplot(simulation)
 end
+
+# fallback to be extended when plotting library extension are loaded
+unicodeplot(x) = x
 
 """$(TYPEDSIGNATURES)
 Initializes a `simulation`. Scales the variables, initializes
@@ -77,13 +77,13 @@ function initialize!(
     simulation.model.output.active = output                     # enable/disable output
 
     # SCALING: we use vorticity*radius, divergence*radius in the dynamical core
-    scale!(progn, diagn, model.spectral_grid.radius)
+    scale!(progn, diagn, model.planet.radius)
 
     # OUTPUT INITIALISATION AND STORING INITIAL CONDITIONS + FEEDBACK
     # propagate spectral state to grid variables for initial condition output
     lf = 1                                  # use first leapfrog index
     transform!(diagn, progn, lf, model, initialize=true)
-    initialize!(progn.particles, progn, diagn, model.particle_advection)
+    initialize!(diagn, progn.particles, progn, model)
     initialize!(model.output, model.feedback, progn, diagn, model)
     initialize!(model.callbacks, progn, diagn, model)
 end

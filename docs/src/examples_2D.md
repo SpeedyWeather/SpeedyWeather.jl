@@ -14,8 +14,8 @@ See also [Examples 3D](@ref) for examples with the primitive equation models.
     spectral_grid = SpectralGrid(trunc=63, nlayers=1)
     still_earth = Earth(spectral_grid, rotation=0)
     initial_conditions = RandomVelocity()
-    forcing = NoForcing()
-    drag = NoDrag()
+    forcing = nothing
+    drag = nothing
     model = BarotropicModel(spectral_grid; initial_conditions, planet=still_earth, forcing, drag)
     simulation = initialize!(model)
     run!(simulation, period=Day(20))
@@ -48,8 +48,8 @@ wavenumbers are truncated.
 For free-decaying turbulence we switch off any forcing or drag with
 
 ```@example barotropic_setup
-forcing = NoForcing()
-drag = NoDrag()
+forcing = nothing
+drag = nothing
 ```
 
 Now we want to construct a `BarotropicModel` with these simply by passing
@@ -60,16 +60,14 @@ model = BarotropicModel(spectral_grid; initial_conditions, planet=still_earth, f
 nothing # hide
 ```
 The `model` contains all the parameters, but isn't initialized yet, which we can do
-with and then run it. The `run!` command will always return a unicode plot
-(via [UnicodePlots.jl](https://github.com/JuliaPlots/UnicodePlots.jl))
-of the surface relative vorticity. This is just to get a quick idea of what was simulated.
-The resolution of the plot is not necessarily representative.
+with and then run it.
+
 ```@example barotropic_setup
 simulation = initialize!(model)
 run!(simulation, period=Day(20))
 ```
 
-Woohoo! Something is moving! You could pick up where this simulation stopped by simply
+Woohoo! You could pick up where this simulation stopped by simply
 doing `run!(simulation, period=Day(50))` again. We didn't store any output, which
 you can do by `run!(simulation, output=true)`, which will switch on NetCDF output
 with default settings. More options on output in [NetCDF output](@ref).
@@ -117,17 +115,24 @@ but this time also store [NetCDF output](@ref).
 ```@example galewsky_setup
 run!(simulation, period=Day(6), output=true)
 ```
-The progress bar tells us that the simulation run got the identification "0001"
+The progress bar tells us that the simulation run got the identification "run_0001"
 (which just counts up, so yours might be higher), meaning that
-data is stored in the folder `/run_0001`. In general we can check this also via
+data is stored in the folder `run_0001`. In general we can check this also via
 ```@example galewsky_setup
-id = model.output.id
+model.output.run_folder
 ```
-So let's plot that data properly (and not just using UnicodePlots.jl). `$id` in the following just means
-that the string is interpolated to `run_0001` if this is the first unnamed run in your folder.
+more on this in [Output path, identification and number](@ref).
+
+### Visualisation (manually)
+
+So let's plot that data. `joinpath(...)` in the following just joins folder and filename together,
+by default this would be "run_0001/output.nc" but the run number increases when you ran other simulations
+before
 ```@example galewsky_setup
 using NCDatasets
-ds = NCDataset("run_$id/output.nc")
+run_folder = model.output.run_folder
+filename = model.output.filename
+ds = NCDataset(joinpath(run_folder, filename))
 ds["vor"]
 ```
 Vorticity `vor` is stored as a lon x lat x vert x time array, we may want to look at the first time step,
@@ -145,7 +150,6 @@ nothing # hide
 ```
 ![Galewsky jet](galewsky0.png)
 
-You see that in comparison the unicode plot heavily coarse-grains the simulation, well it's unicode after all!
 Here, we have unpacked the netCDF file using [NCDatasets.jl](https://github.com/Alexander-Barth/NCDatasets.jl)
 and then plotted via `heatmap(lon, lat, vor)`. While you can do that to give you more control
 on the plotting, SpeedyWeather.jl also defines an extension for Makie.jl, see [Extensions](@ref).
@@ -164,12 +168,14 @@ heatmap(vor_grid, title="Relative vorticity [1/s]")
 save("galewsky1.png", ans) # hide
 nothing # hide
 ```
-![Galewsky jet pyplot1](galewsky1.png)
+![Galewsky jet plot1](galewsky1.png)
 
 Note that here you need to know which grid the data comes on (an error is thrown if `FullGaussianGrid(vor)`
 is not size compatible). By default the output will be on the FullGaussianGrid, but if you
 play around with other grids, you'd need to change this here,
 see [NetCDF output](@ref) and [Output grid](@ref).
+
+### Visualisation via Makie
 
 We did want to showcase the usage of [NetCDF output](@ref) here, but from now on
 we will use `heatmap` to plot data on our grids directly, without storing output first.
@@ -187,10 +193,43 @@ nothing # hide
 ![Galewsky jet](galewsky2.png)
 
 The jet broke up into many small eddies, but the turbulence is still confined to the northern hemisphere, cool!
+
+### Visualisation via UnicodePlots
+
+Similar to the Makie extension that is loaded automatically with `using CairoMakie`
+(or another backend like `using GLMakie`) we have defined an extension for
+[UnicodePlots.jl](https://github.com/JuliaPlots/UnicodePlots.jl)
+
+```@example galewsky_setup
+using UnicodePlots
+UnicodePlots.heatmap(vor)       # UnicodePlots. only needed as CairoMakie was loaded first!
+```
+
+Note that if you first load Makie and then UnicodePlots then calling `heatmap`
+without further specifying the scope like `UnicodePlots.heatmap` will continue
+to use the `heatmap` from Makie. Add `UnicodePlots.` or `CairoMakie.` if
+needed.
+
+UnicodePlots look good in the Julia REPL, especially with the more colours
+a terminal like [iTerm](https://iterm2.com/) provides. But these plots are
+literally made up of unicode characters so the most you can expect is somthing like
+
+<img src="https://github.com/SpeedyWeather/SpeedyWeather.jl/assets/25530332/a04fbb10-1cc1-4f77-93f2-7bdf047f277d" width="450"><br>
+
+However, here in the documentation they are usually vertically spaced as the line
+spacing is by default higher than in the REPL.
+A similar issue arises in Jupyter notebooks by default. Well, they are unicode
+after all!
+
+### Adding mountains
+
 How this may change when we add mountains (we had `NoOrography` above!), say Earth's orography, you may ask?
 Let's try it out! We create an `EarthOrography` struct like so
 
-```@example galewsky_setup
+```@example galewsky_setup2
+using SpeedyWeather # hide
+spectral_grid = SpectralGrid(trunc=63, nlayers=1) # hide
+initial_conditions = ZonalJet() # hide                    
 orography = EarthOrography(spectral_grid)
 ```
 
@@ -198,27 +237,30 @@ It will read the orography from file as shown (only at `initialize!(model)`), an
 options too, but let's not change them. Same as before, create a model, initialize into a simulation, run.
 This time directly for 12 days so that we can compare with the last plot
 
-```@example galewsky_setup
+```@example galewsky_setup2
 model = ShallowWaterModel(spectral_grid; orography, initial_conditions)
 simulation = initialize!(model)
 run!(simulation, period=Day(12), output=true)
 ```
 
-This time the run got a new run id, which you see in the progress bar, but can again always check
-after the `run!` call (the automatic run id is only determined just before the main time loop starts)
-with `model.output.id`, but otherwise we do as before.
-```@example galewsky_setup
-id = model.output.id
+This time the run got a new `run_number`, which you see in the progress bar, but can again always check
+after the `run!` call (the automatic `run_number` is only determined just before the main time loop starts)
+with `model.output.run_folder`, but otherwise we do as before.
+```@example galewsky_setup2
+run_folder = model.output.run_folder
 ```
 
-```@example galewsky_setup
-ds = NCDataset("run_$id/output.nc")
+```@example galewsky_setup2
+using NCDatasets
+ds = NCDataset("$run_folder/output.nc")
 ```
 
-You could plot the [NetCDF output](@ref) now as before, but we'll be plotting directly
-from the current state of the `simulation`
+While you could plot the [NetCDF output](@ref) manually as before, 
+we'll be plotting directly from the current state of the `simulation` using
+the Makie extension
 
-```@example galewsky_setup
+```@example galewsky_setup2
+using CairoMakie
 vor = simulation.diagnostic_variables.grid.vor_grid[:, 1]   # 1 to index surface
 heatmap(vor, title="Relative vorticity [1/s]")
 save("galewsky3.png", ans) # hide
@@ -261,7 +303,7 @@ heatmap(u, title="Zonal wind [m/s]")
 save("polar_jets.png", ans) # hide
 nothing # hide
 ```
-![Polar jets pyplot](polar_jets.png)
+![Polar jets plot](polar_jets.png)
 
 
 ## Gravity waves on the sphere
@@ -323,7 +365,7 @@ heatmap(h, title="Dynamic layer thickness h", colormap=:oslo)
 save("gravity_waves.png", ans) # hide
 nothing # hide
 ```
-![Gravity waves pyplot](gravity_waves.png)
+![Gravity waves plot](gravity_waves.png)
 
 Mountains like the Himalayas or the Andes are quite obvious because the atmospheric layer
 is much thinner there. The pressure gradient is relative to ``z=0`` so in a fluid

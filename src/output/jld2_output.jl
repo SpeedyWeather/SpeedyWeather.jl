@@ -12,15 +12,34 @@ $(TYPEDFIELDS)"""
     "[OPTION] path to output folder, run_???? will be created within"
     path::String = pwd()
     
-    "[OPTION] run identification number/string"
-    id::String = "0001"
-    run_path::String = ""                   # will be determined in initalize!
+    "[OPTION] Prefix for run folder where data is stored, e.g. 'run_'"
+    run_prefix::String = "run"
+
+    "[OPTION] run identification, added between run_prefix and run_number"
+    id::String = ""
+
+    "[OPTION] run identification number, automatically determined if overwrite=false"
+    run_number::Int = 1
+
+    "[OPTION] run numbers digits"
+    run_digits::Int = 4
+
+    "[DERIVED] folder name where data is stored, determined at initialize!"
+    run_folder::String = ""
+
+    "[DERIVED] full path to folder where data is stored, determined at initialize!"
+    run_path::String = ""
+
+    "[OPTION] Overwrite an existing run folder?"
+    overwrite::Bool = false
     
     "[OPTION] name of the output jld2 file"
     filename::String = "output.jld2"
     
     "[OPTION] also write restart file if output==true?"
     write_restart::Bool = true
+
+    "[OPTION] package version, used restart file"
     pkg_version::VersionNumber = isnothing(pkgversion(SpeedyWeather)) ? v"0.0.0" : pkgversion(SpeedyWeather)
 
     "[OPTION] output frequency, time step"
@@ -66,12 +85,12 @@ function initialize!(
     
     # GET RUN ID, CREATE FOLDER
     # get new id only if not already specified
-    output.id = get_run_id(output.path, output.id)
-    output.run_path = create_output_folder(output.path, output.id) 
-    
-    feedback.id = output.id             # synchronize with feedback struct
+    determine_run_folder!(output)
+    create_run_folder!(output)
+
+    feedback.run_folder = output.run_folder     # synchronize with feedback struct
     feedback.run_path = output.run_path
-    feedback.progress_meter.desc = "Weather is speedy: run $(output.id) "
+    feedback.progress_meter.desc = "Weather is speedy: $(output.run_folder) "
     feedback.output = true              # if output=true set feedback.output=true too!
 
     # OUTPUT FREQUENCY
@@ -90,7 +109,7 @@ function initialize!(
     output.jld2_file = jld2_file
 
     # write iniital condition 
-    output!(output, Simulation(progn, diagn, model))
+    output_jld2!(output, Simulation(progn, diagn, model))
 
     # also export parameters into run????/parameters.txt
     parameters_txt = open(joinpath(output.run_path, "parameters.txt"), "w")
@@ -104,11 +123,20 @@ end
 Base.close(output::JLD2Output) = close(output.jld2_file)
 
 function output!(output::JLD2Output, simulation::AbstractSimulation)
-    output.output_counter += 1      # output counter increases when writing time
-    i = output.output_counter
+    output.timestep_counter += 1
 
-    (; active, jld2_file, output_diagnostic, output_prognostic) = output 
-    active || return nothing    # escape immediately for no jld2 output
+    (; active, jld2_file, output_every_n_steps, timestep_counter) = output 
+    active || return nothing                                        # escape immediately for no jld2 output
+    timestep_counter % output_every_n_steps == 0 || return nothing  # escape if output not written on this step
+    
+    output_jld2!(output, simulation)
+end 
+
+function output_jld2!(output::JLD2Output, simulation::AbstractSimulation)
+    (; jld2_file, output_diagnostic, output_prognostic) = output
+    
+    output.output_counter += 1                                      # output counter increases when writing time
+    i = output.output_counter
 
     if output_diagnostic & output_prognostic
         jld2_file["$i"] = (simulation.prognostic_variables, simulation.diagnostic_variables)
@@ -123,7 +151,7 @@ function finalize!(
     output::JLD2Output,
     simulation::AbstractSimulation,
 )   
-    if output.merge_output
+    if output.merge_output && output.output_counter > 0
         merge_output(output)
     else  
         close(output)
@@ -139,7 +167,7 @@ is a concern.
 """
 function merge_output(output::JLD2Output)
     (; output_counter, jld2_file, run_path, filename) = output
-
+        
     output_vector = Vector{typeof(jld2_file["1"])}(undef, output_counter)
 
     for i in 1:output_counter

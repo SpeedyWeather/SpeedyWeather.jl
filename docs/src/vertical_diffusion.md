@@ -19,7 +19,7 @@ using SpeedyWeather
 subtypes(SpeedyWeather.AbstractVerticalDiffusion)
 ```
 
-`NoVerticalDiffusion` disabled all vertical diffusion,
+You can always set `vertical_diffusion=nothing` which will disable all vertical diffusion.
 `BulkRichardsonDiffusion` is explained in the following.
 
 ## Laplacian in sigma coordinates

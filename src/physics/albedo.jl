@@ -20,8 +20,8 @@ end
 
 export DefaultAlbedo
 function DefaultAlbedo(SG::SpectralGrid;
-    ocean = GlobalConstantAlbedo(SG, albedo=0.06),
-    land = GlobalConstantAlbedo(SG, albedo=0.4))
+    ocean = OceanSeaIceAlbedo(SG),
+    land = AlbedoClimatology(SG))
     return Albedo(ocean, land)
 end
 
@@ -82,20 +82,17 @@ export ManualAlbedo
 Defined so that parameterizations can change the albedo at every time step (e.g. snow cover) without
 losing the information of the original surface albedo. Fields are
 $(TYPEDFIELDS)"""
-struct ManualAlbedo{NF, Grid} <: AbstractAlbedo
-    albedo::Grid
+struct ManualAlbedo{NF, GridVariable2D} <: AbstractAlbedo
+    albedo::GridVariable2D
 end
 
-ManualAlbedo(SG::SpectralGrid) = ManualAlbedo{SG.NF, SG.GridVariable2D}(zeros(SG.GridVariable2D, SG.nlat_half))
+ManualAlbedo(SG::SpectralGrid) = ManualAlbedo{SG.NF, SG.GridVariable2D}(zeros(SG.GridVariable2D, SG.grid))
 initialize!(albedo::ManualAlbedo, model::PrimitiveEquation) = nothing
 
 ## ALEBDO CLIMATOLOGY
 
 export AlbedoClimatology
-@kwdef struct AlbedoClimatology{NF, Grid} <: AbstractAlbedo
-    "number of latitudes on one hemisphere, Equator included"
-    nlat_half::Int
-
+@kwdef struct AlbedoClimatology{NF, GridVariable2D} <: AbstractAlbedo
     "[OPTION] path to the folder containing the albedo file, pkg path default"
     path::String = "SpeedyWeather.jl/input_data"
 
@@ -109,12 +106,13 @@ export AlbedoClimatology
     file_Grid::Type{<:AbstractGrid} = FullGaussianGrid
 
     "Albedo climatology"
-    albedo::Grid = zeros(Grid, nlat_half)
+    albedo::GridVariable2D
 end
 
 function AlbedoClimatology(SG::SpectralGrid; kwargs...)
-    (; NF, Grid, nlat_half) = SG
-    AlbedoClimatology{NF,Grid{NF}}(;nlat_half, kwargs...)
+    (; NF, GridVariable2D, grid) = SG
+    albedo = zeros(GridVariable2D, grid)
+    AlbedoClimatology{NF, GridVariable2D}(; albedo, kwargs...)
 end
 
 # set albedo with grid, scalar, function; just define path `albedo.albedo` to grid here
@@ -132,4 +130,28 @@ function initialize!(albedo::AlbedoClimatology, model::PrimitiveEquation)
 
     a = albedo.file_Grid(ncfile[albedo.varname].var[:, :], input_as=Matrix)
     interpolate!(albedo.albedo, a)
+end
+
+## OceanSeaIceAlbedo
+export OceanSeaIceAlbedo
+
+@kwdef struct OceanSeaIceAlbedo{NF} <: AbstractAlbedo
+    albedo_ocean::NF = 0.06
+    albedo_ice::NF = 0.6
+end
+
+OceanSeaIceAlbedo(SG::SpectralGrid; kwargs...) = OceanSeaIceAlbedo{SG.NF}(;kwargs...)
+initialize!(albedo::OceanSeaIceAlbedo, model::PrimitiveEquation) = nothing
+
+function albedo!(
+    diagn::AbstractDiagnosticVariables,
+    progn::PrognosticVariables,
+    albedo::OceanSeaIceAlbedo,
+    model::PrimitiveEquation,
+)
+    (; sea_ice_concentration ) = progn.ocean
+    (; albedo_ocean, albedo_ice) = albedo
+
+    # set ocean albedo linearly between ocean and ice depending on sea ice concentration
+    diagn.albedo .= albedo_ocean .+ sea_ice_concentration .* (albedo_ice .- albedo_ocean)
 end

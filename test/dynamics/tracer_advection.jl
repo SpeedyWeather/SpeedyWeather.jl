@@ -49,7 +49,7 @@ end
     run!(simulation, period=Day(0))
 
     # initial conditions
-    abc0_spec = simulation.prognostic_variables.tracers[:abc][1]
+    abc0_spec = get_step(simulation.prognostic_variables.tracers[:abc], 1)
     abc0 = deepcopy(simulation.diagnostic_variables.grid.tracers_grid[:abc])
     
     # set some grid in the same way and check that the tracer abc is correctly set

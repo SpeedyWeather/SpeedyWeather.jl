@@ -13,33 +13,27 @@ function SpeedyTransforms.transform!(
 )
     grid = diagn.grid.random_pattern
     spec = progn.random_pattern
-    transform!(grid, spec, spectral_transform)
+    transform!(grid, spec, diagn.dynamics.scratch_memory, spectral_transform)
 
     if :clamp in fieldnames(typeof(random_process))
         clamp!(grid, random_process.clamp...)
     end
 end
 
-export NoRandomProcess
-"""Dummy type for no random process."""
-struct NoRandomProcess <: AbstractRandomProcess end
-NoRandomProcess(::SpectralGrid) = NoRandomProcess()
-
 """$(TYPEDSIGNATURES)
-`NoRandomProcess` does not need to transform any random pattern from
+`random_process=nothing` does not need to transform any random pattern from
 spectral to grid space."""
 function SpeedyTransforms.transform!(
     diagn::DiagnosticVariables,
     progn::PrognosticVariables,
     lf::Integer,
-    random_process::NoRandomProcess,
+    random_process::Nothing,
     spectral_transform::SpectralTransform,
 )
     return nothing
 end
 
-initialize!(process::NoRandomProcess, model::AbstractModel) = nothing
-random_process!(progn::PrognosticVariables, process::NoRandomProcess) = nothing
+random_process!(progn::PrognosticVariables, process::Nothing) = nothing
 
 export SpectralAR1Process
 

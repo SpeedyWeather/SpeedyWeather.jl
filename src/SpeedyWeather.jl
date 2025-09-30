@@ -7,66 +7,94 @@ using DocStringExtensions
 import Primes
 import Random
 import LinearAlgebra: LinearAlgebra, Diagonal
+export rotate, rotate!
 
 # GPU, PARALLEL
 import Base.Threads: Threads, @threads
-import KernelAbstractions
+import KernelAbstractions: KernelAbstractions, @kernel, @index, @Const, synchronize
 import Adapt: Adapt, adapt, adapt_structure
+
+using  SpeedyWeatherInternals
+using  SpeedyWeatherInternals.Architectures
+import SpeedyWeatherInternals.Architectures: AbstractArchitecture, CPU, GPU, 
+       on_architecture, architecture, array_type, ismatching, nonparametric_type
+export CPU, GPU, on_architecture, architecture                # export device functions 
 
 # INPUT OUTPUT
 import TOML
-import Dates: Dates, DateTime, Period, Millisecond, Second, Minute, Hour, Day, Week
+import Dates: Dates, DateTime, Period, Millisecond, Second, Minute, Hour, Day, Week, Month, Year
 import Printf: Printf, @sprintf
 import Random: randstring
 import NCDatasets: NCDatasets, NCDataset, defDim, defVar
 import JLD2: jldopen, jldsave, JLDFile 
 import CodecZlib
 import BitInformation: round, round!
-import UnicodePlots
 import ProgressMeter
 
+# UTILITIES
+using  DomainSets.IntervalSets
+
 # to avoid a `using Dates` to pass on DateTime arguments
-export DateTime, Millisecond, Second, Minute, Hour, Day, Week
+export DateTime, Millisecond, Second, Minute, Hour, Day, Week, Month, Year, Century, Millenium
 
 # export functions that have many cross-component methods
 export initialize!, finalize!
 
-include("utility_functions.jl")
+# import utilities
+using SpeedyWeatherInternals.Utils 
 
-# LowerTriangularMatrices for spherical harmonics
-export  LowerTriangularMatrices, 
-        LowerTriangularMatrix,
-        LowerTriangularArray
+include("SpeedyParameters/SpeedyParameters.jl")
+using .SpeedyParameters
+import .SpeedyParameters: parameters
+
+# export user-facing parameter handling types and methods
+export  SpeedyParam, SpeedyParams, parameters, stripparams
+
+# DATA STRUCTURES
+# LowerTriangularArrays for spherical harmonics
+using  LowerTriangularArrays
+
+export  LowerTriangularArrays, 
+        LowerTriangularArray,
+        LowerTriangularMatrix
+
+export  Spectrum
 
 # indexing styles for LowerTriangularArray/Matrix
 export  OneBased, ZeroBased
-export  eachmatrix, eachharmonic
+export  eachmatrix, eachharmonic, eachorder
         
-include("LowerTriangularMatrices/LowerTriangularMatrices.jl")
-using .LowerTriangularMatrices
 
 # RingGrids
+using  RingGrids
+
 export  RingGrids
-export  AbstractGrid, AbstractGridArray,
-        AbstractFullGridarray, AbstractReducedGridArray
-export  FullClenshawGrid, FullClenshawArray,
-        FullGaussianGrid, FullGaussianArray,
-        FullHEALPixGrid, FullHEALPixArray,
-        FullOctaHEALPixGrid, FullOctaHEALPixArray,
-        OctahedralGaussianGrid, OctahedralGaussianArray,
-        OctahedralClenshawGrid, OctahedralClenshawArray,
-        HEALPixGrid, HEALPixArray,
-        OctaHEALPixGrid, OctaHEALPixArray,
-        OctaminimalGaussianGrid, OctaminimalGaussianArray,
-        eachring, eachgrid, plot
+export  AbstractGrid, AbstractFullGrid, AbstractReducedGrid
+export  AbstractField, AbstractField2D, AbstractField3D
+export  Field, Field2D, Field3D,
+        FullClenshawField, FullGaussianField,
+        FullHEALPixField, FullOctaHEALPixField,
+        OctahedralGaussianField, OctahedralClenshawField,
+        HEALPixField, OctaHEALPixField,
+        OctaminimalGaussianField
+
+export  ColumnField, ColumnField2D, ColumnField3D, ColumnField4D,
+        FullColumnField, ReducedColumnField, transpose!
+
+export  FullClenshawGrid, FullGaussianGrid,
+        FullHEALPixGrid, FullOctaHEALPixGrid,
+        OctahedralGaussianGrid, OctahedralClenshawGrid,
+        HEALPixGrid, OctaHEALPixGrid,
+        OctaminimalGaussianGrid
+        
+export  eachring, eachlayer, eachgridpoint
 export  AnvilInterpolator
 export  spherical_distance
 export  zonal_mean
 
-include("RingGrids/RingGrids.jl")
-using .RingGrids
-
 # SpeedyTransforms
+using SpeedyTransforms
+
 export SpeedyTransforms, SpectralTransform
 export transform, transform!
 export spectral_truncation, spectral_truncation!
@@ -74,21 +102,15 @@ export curl, divergence, curl!, divergence!
 export ∇, ∇², ∇⁻², ∇!, ∇²!, ∇⁻²!
 export power_spectrum
 
-include("SpeedyTransforms/SpeedyTransforms.jl")
-using .SpeedyTransforms
-import .SpeedyTransforms: prettymemory
+import SpeedyTransforms: prettymemory
 
 # to be defined in GeoMakie extension
-export globe
-function globe end
-
-# Utility for GPU / KernelAbstractions
-include("gpu.jl")                               
+export animate, globe
+function animate end
 
 # abstract types
 include("models/abstract_models.jl")
 include("dynamics/abstract_types.jl")
-include("physics/abstract_types.jl")
 
 # GEOMETRY CONSTANTS ETC
 include("dynamics/vertical_coordinates.jl")
@@ -138,7 +160,7 @@ include("physics/large_scale_condensation.jl")
 include("physics/surface_fluxes/surface_fluxes.jl")
 include("physics/surface_fluxes/momentum.jl")
 include("physics/surface_fluxes/heat.jl")
-include("physics/surface_fluxes/moisture.jl")
+include("physics/surface_fluxes/humidity.jl")
 include("physics/convection.jl")
 include("physics/zenith.jl")
 include("physics/optical_depth.jl")
@@ -148,6 +170,7 @@ include("physics/stochastic_physics.jl")
 
 # OCEAN AND LAND
 include("physics/ocean.jl")
+include("physics/sea_ice.jl")
 include("physics/land/land.jl")
 
 # OUTPUT
@@ -155,7 +178,6 @@ include("output/schedule.jl")
 include("output/feedback.jl")
 include("output/netcdf_output.jl")
 include("output/restart_file.jl")
-include("output/plot.jl")
 include("output/callbacks.jl")
 include("output/particle_tracker.jl")
 include("output/jld2_output.jl")

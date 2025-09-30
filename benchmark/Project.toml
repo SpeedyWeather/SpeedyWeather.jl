@@ -1,3 +1,8 @@
 [deps]
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
+Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
+Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 SpeedyWeather = "9e226e20-d153-4fed-8a5b-493def4f21a9"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"

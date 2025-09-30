@@ -11,7 +11,6 @@ $(TYPEDFIELDS)
     NF,
     Grid,
     VectorType,
-    VectorFloat64Type,
 } <: AbstractGeometry
 
     "SpectralGrid that defines spectral and grid resolution"
@@ -32,16 +31,15 @@ $(TYPEDFIELDS)
     "total number of horizontal grid points"
     npoints::Int = spectral_grid.npoints
 
-    "Planet's radius [m]"
-    radius::NF = spectral_grid.radius
-
+    "Planet's radius [m], set from model.planet during initialize!"
+    radius::Base.RefValue{NF} = Ref{NF}(DEFAULT_RADIUS)
 
     # ARRAYS OF LANGITUDES/LONGITUDES
     "array of longitudes in degrees (0...360˚), empty for non-full grids"
-    lond::VectorFloat64Type = get_lond(Grid, nlat_half)
+    lond::VectorType = get_lond(Grid, nlat_half)
 
     "array of latitudes in degrees (90˚...-90˚)"
-    latd::VectorFloat64Type = get_latd(Grid, nlat_half)
+    latd::VectorType = get_latd(Grid, nlat_half)
 
     "array of latitudes in radians (π...-π)"
     lat::VectorType = get_lat(Grid, nlat_half)
@@ -103,15 +101,19 @@ function Geometry(SG::SpectralGrid; vertical_coordinates=SigmaCoordinates(SG.nla
         "$(vertical_coordinates.nlayers) in spectral_grid.vertical_coordinates."
     @assert nlayers == vertical_coordinates.nlayers error_message
 
-    (; NF, Grid, VectorType) = SG
-    VectorTypeFloat64 = SG.ArrayType{Float64, 1}
-
+    (; NF, grid, VectorType) = SG
     (; σ_half) = vertical_coordinates
-    return Geometry{NF, Grid, VectorType, VectorTypeFloat64}(; spectral_grid=SG, σ_levels_half=σ_half)
+    return Geometry{NF, typeof(grid), VectorType}(; spectral_grid=SG, σ_levels_half=σ_half)
 end
 
 function Base.show(io::IO, G::Geometry)
     print(io, "Geometry for $(G.spectral_grid)")
+end
+
+# take over radius from model.planet
+function initialize!(geometry::Geometry, model::AbstractModel)
+    geometry.radius[] = model.planet.radius
+    return geometry
 end
 
 """

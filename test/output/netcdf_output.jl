@@ -10,7 +10,7 @@ using NCDatasets, Dates
         model = BarotropicModel(spectral_grid; output)
         simulation = initialize!(model)
         run!(simulation, output=true; period)
-        @test simulation.model.feedback.nars_detected == false
+        @test simulation.model.feedback.nans_detected == false
 
         # read netcdf file and check that all variables exist
         ds = NCDataset(joinpath(model.output.run_path, model.output.filename))
@@ -19,7 +19,7 @@ using NCDatasets, Dates
 
             # test dimensions
             nx, ny, nz, nt = size(ds[key])
-            @test (nx, ny) == RingGrids.matrix_size(output.grid2D)
+            @test (nx, ny) == RingGrids.matrix_size(output.field2D)
             @test nz == spectral_grid.nlayers
             @test nt == Int(period / output.output_dt) + 1
         end
@@ -36,7 +36,7 @@ end
         model = ShallowWaterModel(spectral_grid; output)
         simulation = initialize!(model)
         run!(simulation, output=true; period)
-        @test simulation.model.feedback.nars_detected == false
+        @test simulation.model.feedback.nans_detected == false
 
         # read netcdf file and check that all variables exist
         ds = NCDataset(joinpath(model.output.run_path, model.output.filename))
@@ -62,7 +62,7 @@ end
         @test haskey(ds, orog_output.name)
         
         nx, ny = size(ds[orog_output.name])
-        @test (nx, ny) == RingGrids.matrix_size(output.grid2D)
+        @test (nx, ny) == RingGrids.matrix_size(output.field2D)
 
         # delete divergence output
         delete!(output, div_output.name)
@@ -79,11 +79,12 @@ end
     # test also output at various resolutions
     for nlat_half in (24, 32, 48, 64)
         spectral_grid = SpectralGrid(nlayers=8)
-        output = NetCDFOutput(spectral_grid, ShallowWater, path=tmp_output_path; nlat_half)
+        output_grid = RingGrids.full_grid_type(typeof(spectral_grid.grid))(nlat_half)
+        output = NetCDFOutput(spectral_grid, ShallowWater, path=tmp_output_path; output_grid)
         model = PrimitiveDryModel(spectral_grid; output)
         simulation = initialize!(model)
         run!(simulation, output=true; period)
-        @test simulation.model.feedback.nars_detected == false
+        @test simulation.model.feedback.nans_detected == false
 
         # read netcdf file and check that all variables exist
         ds = NCDataset(joinpath(model.output.run_path, model.output.filename))
@@ -108,7 +109,7 @@ end
         model = PrimitiveWetModel(spectral_grid; output)
         simulation = initialize!(model)
         run!(simulation, output=true; period)
-        @test simulation.model.feedback.nars_detected == false
+        @test simulation.model.feedback.nans_detected == false
 
         # read netcdf file and check that all variables exist
         ds = NCDataset(joinpath(model.output.run_path, model.output.filename))
@@ -122,15 +123,52 @@ end
     end
 
     # test outputting other model defaults
-    output = NetCDFOutput(spectral_grid, Barotropic, path=tmp_output_path)
+    output = NetCDFOutput(spectral_grid, PrimitiveWet, path=tmp_output_path)
     model = PrimitiveWetModel(spectral_grid; output)
+
+    # Add surface variables output for testing them
+    add!(model,
+        SpeedyWeather.ZonalVelocity10mOutput(), 
+        SpeedyWeather.MeridionalVelocity10mOutput(), 
+        SpeedyWeather.SurfaceTemperatureOutput(),
+#         SpeedyWeather.MeanSeaLevelPressureOutput(),   # this should be default now
+#         SpeedyWeather.SurfacePressureOutput(),        # don't output surface pressure too
+    )
+
     simulation = initialize!(model)
     run!(simulation, output=true; period)
-    @test simulation.model.feedback.nars_detected == false
+    
+    @test simulation.model.feedback.nans_detected == false
     ds = NCDataset(joinpath(model.output.run_path, model.output.filename))
-    @test ~haskey(ds, "temp")
-    @test ~haskey(ds, "humid")
-    @test ~haskey(ds, "pres")
+    
+    # test    
+    @test haskey(ds, "temp")
+    @test haskey(ds, "humid")
+    @test ~haskey(ds, "pres")   # with MSLP as default this should not be contained in the nc file
+    @test haskey(ds, "mslp")    # but this variable
+
+    # Test reasonable scale for mean
+    (; pres_ref) = model.atmosphere     # unpack reference pressure
+    pres_ref = pres_ref / 100           # Pa -> hPa  
+    mslp = ds["mslp"].var[:, :, end]    # variable at last time step `.var` to read the raw data ignoring any mask
+    
+    # should be within ~800 to ~1200hPa
+    @test all(0.8 .< mslp./pres_ref .< 1.2)
+
+    ## test u10, v10 existence
+    @test haskey(ds, "u")
+    @test haskey(ds, "u10")
+    @test haskey(ds, "v")
+    @test haskey(ds, "v10")
+
+    # and 10m values cannot exceed lowermost layer of u,v value
+    @test maximum(abs.(ds["u10"].var[:, :, end])) < maximum(abs.(ds["u"].var[:, :, end, end]))
+    @test maximum(abs.(ds["v10"].var[:, :, end])) < maximum(abs.(ds["u"].var[:, :, end, end]))
+
+    ## surface temperature should be within 60-130% of 
+    (; temp_ref) = model.atmosphere                 # in K
+    Tsurf = ds["tsurf"].var[:, :, end] .+ 273.15    # last timestep from ˚C to K
+    @test all(0.6 .< (Tsurf ./ temp_ref) .< 1.3)
 end
 
 @testset "Restart from output file" begin

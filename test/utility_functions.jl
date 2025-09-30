@@ -1,4 +1,4 @@
-using Dates: CompoundPeriod, Day, Hour, Minute, Second, Millisecond
+using Dates: CompoundPeriod, Day, Hour, Minute, Second, Millisecond, coarserperiod
 
 @testset "Increasing/decresing vectors" begin
     @test SpeedyWeather.isincreasing(collect(1:10))

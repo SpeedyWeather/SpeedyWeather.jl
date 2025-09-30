@@ -49,6 +49,21 @@ end
 path(::SoilMoistureAvailabilityOutput, simulation) =
     simulation.diagnostic_variables.physics.land.soil_moisture_availability
 
+"""Defines netCDF output for a specific variable, see [`VorticityOutput`](@ref) for details.
+Fields are: $(TYPEDFIELDS)"""
+@kwdef mutable struct RiverRunoffOutput <: AbstractOutputVariable
+    name::String = "roff"
+    unit::String = "m"
+    long_name::String = "river runoff"
+    dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
+    missing_value::Float64 = NaN
+    compression_level::Int = 3
+    shuffle::Bool = true
+    keepbits::Int = 15
+end
+
+path(::RiverRunoffOutput, simulation) =
+    simulation.diagnostic_variables.physics.land.river_runoff
 
 """Defines netCDF output for a specific variable, see [`VorticityOutput`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
@@ -66,10 +81,10 @@ end
 path(::LandSeaMaskOutput, simulation) =
     simulation.model.land_sea_mask.mask
 
-
 LandOutput() = (
     SoilTemperatureOutput(),
     SoilMoistureOutput(),
     SoilMoistureAvailabilityOutput(),
+    RiverRunoffOutput(),
     LandSeaMaskOutput(),
 )

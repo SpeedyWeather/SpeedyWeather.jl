@@ -19,12 +19,10 @@ default_function_names() = ["forward_legendre", "inverse_legendre", "forward_fou
 
 
 function generate_random_inputs(spectral_grid::SpectralGrid)
-    (; nlat_half, nlayers) = spectral_grid
-    (; NF, Grid, trunc) = spectral_grid
-    (; ArrayType) = spectral_grid
+    (; spectrum, grid, nlayers, NF, ArrayType) = spectral_grid
 
-    grids = adapt(ArrayType, rand(Grid{NF}, nlat_half, nlayers))
-    specs = adapt(ArrayType, rand(LowerTriangularArray{Complex{NF}}, trunc+2, trunc+1, nlayers))
+    grids = adapt(ArrayType, rand(NF, grid, nlayers))
+    specs = adapt(ArrayType, rand(Complex{NF}, spectrum, nlayers))
 
     return specs, grids
 end

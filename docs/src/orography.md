@@ -98,7 +98,7 @@ the orography itself need to come on one of the full grids
 SpeedyWeather defines, i.e. `FullGaussianGrid` or `FullClenshawGrid`
 (a regular lat-lon grid, see [FullClenshawGrid](@ref FullClenshawGrid)),
 which you can specify. Best to inspect the correct orientation with
-`plot(mars_orography.orography)` (or `heatmap` after `using CairoMakie`;
+`heatmap(mars_orography.orography)` (after `using CairoMakie`;
 the scope `mars_orography.` is whatever name you chose here).
 You can use smoothing as above.
 

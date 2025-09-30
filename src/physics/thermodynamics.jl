@@ -9,18 +9,24 @@ Parameters for computing saturation vapour pressure of water using the Clausis-C
 
 where T is in Kelvin, Lᵥ the the latent heat of condensation and Rᵥ the gas constant of water vapour
 $(TYPEDFIELDS)"""
-Base.@kwdef struct ClausiusClapeyron{NF<:AbstractFloat} <: AbstractClausiusClapeyron
+@kwdef struct ClausiusClapeyron{NF<:AbstractFloat} <: AbstractClausiusClapeyron
     "Saturation water vapour pressure at 0°C [Pa]"
     e₀::NF = 610.78
 
     "0°C in Kelvin"
-    T₀::NF = 273.16
+    T₀::NF = 273.15
 
     "Latent heat of condensation/vaporization of water [J/kg]"
-    Lᵥ::NF = 2.5e6
+    latent_heat_condensation::NF = 2.5e6
 
-    "Specific heat at constant pressure [J/K/kg]"
-    cₚ::NF = 1004.64
+    "Latent heat of freezing/fusion of ice [J/kg]"
+    latent_heat_fusion::NF = 3.3e5
+
+    "Latent heat of freezing/sublimation of ice [J/kg]"
+    latent_heat_sublimation::NF = 2.8e6
+
+    "Specific heat of air at constant pressure [J/K/kg]"
+    heat_capacity::NF = 1004.64
 
     "Gas constant of water vapour [J/kg/K]"
     R_vapour::NF = 461.5
@@ -28,20 +34,20 @@ Base.@kwdef struct ClausiusClapeyron{NF<:AbstractFloat} <: AbstractClausiusClape
     "Gas constant of dry air [J/kg/K]"
     R_dry::NF = 287.04
 
-    "Latent heat of condensation divided by gas constant of water vapour [K]"    
-    Lᵥ_Rᵥ::NF = Lᵥ/R_vapour
+    "[DERIVED] Latent heat of condensation divided by gas constant of water vapour [K]"    
+    Lᵥ_Rᵥ::NF = latent_heat_condensation/R_vapour
 
-    "Inverse of T₀, one over 0°C in Kelvin"
+    "[DERIVED] Inverse of T₀, one over 0°C in Kelvin"
     T₀⁻¹::NF = inv(T₀)
 
-    "Ratio of molecular masses [1] of water vapour over dry air (=R_dry/R_vapour)."
+    "[DERIVED] Ratio of molecular masses [1] of water vapour over dry air (=R_dry/R_vapour)."
     mol_ratio::NF = R_dry/R_vapour
 end
 
 # generator function
 function ClausiusClapeyron(SG::SpectralGrid, atm::AbstractAtmosphere; kwargs...)
     (; R_dry, R_vapour, latent_heat_condensation, heat_capacity) = atm
-    return ClausiusClapeyron{SG.NF}(; Lᵥ=latent_heat_condensation, R_dry, R_vapour, cₚ=heat_capacity, kwargs...)
+    return ClausiusClapeyron{SG.NF}(; latent_heat_condensation, R_dry, R_vapour, heat_capacity, kwargs...)
 end
 
 """
@@ -190,7 +196,7 @@ Parameters for computing saturation vapour pressure of water using the Tetens' e
 where T is in Kelvin and i = 1, 2 for saturation above and below freezing,
 respectively. From Tetens (1930), and Murray (1967) for below freezing.
 $(TYPEDFIELDS)"""
-Base.@kwdef struct TetensEquation{NF<:AbstractFloat} <: AbstractClausiusClapeyron
+@kwdef struct TetensEquation{NF<:AbstractFloat} <: AbstractClausiusClapeyron
     "Saturation water vapour pressure at 0°C [Pa]"
     e₀::NF = 610.78
 

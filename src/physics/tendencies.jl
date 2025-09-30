@@ -32,7 +32,7 @@ function parameterization_tendencies!(
         perturb_parameterization_tendencies!(column, model)     # possibly perturb tendencies from parameterizations
 
         # write tendencies from parametrizations back into horizontal fields
-        write_column_tendencies!(diagn, column, model.planet, ij)
+        write_column_tendencies!(diagn, column, model, ij)
     end
 end
 
@@ -76,7 +76,7 @@ function fluxes_to_tendencies!(
 
     Δσ = geometry.σ_levels_thick
     pₛ = column.pres[end]               # surface pressure
-    (; radius) = geometry               # used for scaling
+    (; radius) = planet                 # used for scaling
 
     # for g/Δp and g/(Δp*c_p), see Fortran SPEEDY documentation eq. (3, 5)
     g_pₛ = planet.gravity/pₛ

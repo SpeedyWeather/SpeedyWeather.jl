@@ -39,7 +39,7 @@
     ddiagn_copy = deepcopy(ddiagn)
     diagn_copy = deepcopy(diagn)
 
-    autodiff(Reverse, SpeedyWeather.parameterization_tendencies!, Const, Duplicated(diagn, ddiagn), Duplicated(progn, dprogn), Const(progn.clock.time), Duplicated(model, make_zero(model)))
+    autodiff(Reverse, SpeedyWeather.parameterization_tendencies!, Const, Duplicated(diagn, ddiagn), Duplicated(progn, dprogn), Const(progn.clock.time), Const(model))
 
     function parameterization_tendencies(diagn, progn, time, model)
         diagn_new = deepcopy(diagn)
@@ -62,7 +62,7 @@
     dprogn_copy = deepcopy(dprogn)
     diagn_copy = deepcopy(diagn)
 
-    autodiff(Reverse, SpeedyWeather.ocean_timestep!, Const, Duplicated(progn, dprogn), Duplicated(diagn, ddiagn), Duplicated(model, make_zero(model)))
+    autodiff(Reverse, SpeedyWeather.ocean_timestep!, Const, Duplicated(progn, dprogn), Duplicated(diagn, ddiagn), Const(model))
 
     function ocean_timestep(progn, diagn, model)
         progn_new = deepcopy(progn)
@@ -85,7 +85,7 @@
     dprogn_copy = deepcopy(dprogn)
     diagn_copy = deepcopy(diagn)
 
-    autodiff(Reverse, SpeedyWeather.land_timestep!, Const, Duplicated(progn, dprogn), Duplicated(diagn, ddiagn), Duplicated(model, make_zero(model)))
+    autodiff(Reverse, SpeedyWeather.land_timestep!, Const, Duplicated(progn, dprogn), Duplicated(diagn, ddiagn), Const(model))
 
     function land_timestep(progn, diagn, model)
         progn_new = deepcopy(progn)
@@ -112,7 +112,7 @@
     progn_copy = deepcopy(progn)
     dprogn = make_zero(progn)
    
-    autodiff(Reverse, SpeedyWeather.dynamics_tendencies!, Const, Duplicated(diagn, ddiag), Duplicated(progn, dprogn), Const(lf2), Duplicated(model, make_zero(model)))
+    autodiff(Reverse, SpeedyWeather.dynamics_tendencies!, Const, Duplicated(diagn, ddiag), Duplicated(progn, dprogn), Const(lf2), Const(model))
 
     function dynamics_tendencies(diagn, progn, lf, model)
         diagn_new = deepcopy(diagn)
@@ -135,7 +135,7 @@
     progn_copy = deepcopy(progn)
     dprogn = one(progn)
 
-    autodiff(Reverse, SpeedyWeather.implicit_correction!, Const, Duplicated(diagn, ddiag), Duplicated(model.implicit, make_zero(model.implicit)), Duplicated(progn, dprogn))
+    autodiff(Reverse, SpeedyWeather.implicit_correction!, Const, Duplicated(diagn, ddiag), Const(model.implicit), Duplicated(progn, dprogn))
 
     function implicit_correction(diagn, implicit, progn)
         diagn_new = deepcopy(diagn)
@@ -160,6 +160,7 @@
     dprogn = make_zero(progn)
 
     autodiff(Reverse, SpeedyWeather.transform!, Const, Duplicated(diagn, ddiag), Duplicated(progn, dprogn), Const(lf2), Duplicated(model, make_zero(model)))
+    #autodiff(Reverse, SpeedyWeather.transform!, Const, Duplicated(diagn, ddiag), Duplicated(progn, dprogn), Const(lf2), Const(model))
 
     function transform_diagn(diag, progn, lf2, model)
         diag_copy = deepcopy(diag)

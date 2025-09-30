@@ -204,11 +204,12 @@ conditions can be set with the `initial_conditions` model component
 which are then set during `initialize!(::AbstractModel)`, but you can also
 change them now, before the model runs 
 ```@example howto
-simulation.prognostic_variables.vor[1][1, 1] = 0
+# harmonic x layer x leapfrog steps
+simulation.prognostic_variables.vor[1, 1, 1] = 0
 ```
-So with this we have set the zero mode of vorticity of the first (and only)
-layer in the shallow water to zero. Because the leapfrogging is a 2-step
-time stepping scheme we set here the first. As it is often tricky
+So with this we have set the zero mode (first index) of vorticity of the first (and only)
+layer (second index) in the shallow water model to zero. Because the leapfrogging is a 2-step
+time stepping scheme we set here the first (third index). As it is often tricky
 to set the initial conditions in spectral space, it is generally advised
 to do so through the `initial_conditions` model component.
 
@@ -219,10 +220,8 @@ is to run the simulation.
 ```@example howto
 run!(simulation)
 ```
-By default this runs for 10 days without output and returns a
-[unicode plot](https://github.com/JuliaPlots/UnicodePlots.jl)
-of surface relative vorticity (see [Shallow water with mountains](@ref) for more
-on this). Now `period` and `output` are the only options to change, so with
+By default this runs for 10 days without output and returns the updated `simulation`.
+Now `period` and `output` are the only options to change, so with
 ```@example howto
 model.output.id = "test" # hide
 run!(simulation, period=Day(5), output=true)

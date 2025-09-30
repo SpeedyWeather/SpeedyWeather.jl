@@ -1,5 +1,3 @@
-import SpeedyWeather.RingGrids: rotate!, rotate
-
 @testset "Rotate grids" begin
     @testset for Grid in (
         FullGaussianGrid,

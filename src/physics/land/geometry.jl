@@ -1,7 +1,7 @@
 abstract type AbstractLandGeometry <: AbstractModelComponent end
 
 export LandGeometry
-struct LandGeometry{NF, VectorType} <: AbstractLandGeometry
+mutable struct LandGeometry{NF, VectorType} <: AbstractLandGeometry
     "[OPTION] number of soil layers"
     nlayers::Int
 
@@ -16,7 +16,7 @@ function LandGeometry(SG::SpectralGrid; kwargs...)
 
     # for two layers use the default soil layer thickness of MITgcm's 2-layer model
     if nlayers == 2
-        layer_thickness = NF[0.1, 4]
+        layer_thickness = NF[0.2, 2]
     else
         layer_thickness = ones(NF, nlayers)
     end

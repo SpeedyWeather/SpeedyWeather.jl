@@ -1,7 +1,7 @@
 abstract type AbstractShortwave <: AbstractRadiation end
 
-function get_nbands(R::AbstractRadiation)
-    hasfield(typeof(R), :nbands) && return R.nbands
+function get_nbands(radiation::Union{AbstractRadiation, Nothing})
+    hasfield(typeof(radiation), :nbands) && return radiation.nbands
     return 0
 end
 
@@ -11,11 +11,7 @@ function shortwave_radiation!(column::ColumnVariables, model::PrimitiveEquation)
 end
 
 ## NO SHORTWAVE RADIATION
-export NoShortwave
-struct NoShortwave <: AbstractShortwave end
-NoShortwave(SG::SpectralGrid) = NoShortwave()
-initialize!(::NoShortwave, ::PrimitiveEquation) = nothing
-shortwave_radiation!(::ColumnVariables, ::NoShortwave, ::PrimitiveEquation) = nothing
+shortwave_radiation!(::ColumnVariables, ::Nothing, ::PrimitiveEquation) = nothing
 
 ## SHORTWAVE RADIATION FOR A FULLY TRANSPARENT ATMOSPHERE
 export TransparentShortwave
