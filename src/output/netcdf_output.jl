@@ -218,7 +218,7 @@ function add_default!(
     add!(variables, HumidityOutput())
 end
 
-function set!(output::NetCDFOutput; active, reset_path=true)
+function set!(output::AbstractOutput; active, reset_path=true)
     output.active = active
     if reset_path
         output.run_folder = ""

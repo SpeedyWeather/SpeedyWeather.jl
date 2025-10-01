@@ -212,7 +212,7 @@ function initialize!(progress_txt::ProgressTxt, progn, diagn, model)
     progress_txt.write_only_with_output && (model.output.active || return nothing)
 
     (; filename) = progress_txt
-    path = progress_txt.path == "" ? model.output.run_path : parameters_txt.path
+    path = progress_txt.path == "" ? model.output.run_path : progress_txt.path
     mkpath(path)
 
     (; run_folder, run_path) = model.output

@@ -543,7 +543,7 @@ function initialize!(   progn_new::PrognosticVariables,
     progn_old = restart_file["prognostic_variables"]
     version = restart_file["version"]
     if version != pkgversion(SpeedyWeather)
-        @info "Restart file created with SpeedyWeather $version loaded "*
+        @warn "Restart file created with SpeedyWeather $version loaded "*
                 "but currently used is $(pkgversion(SpeedyWeather))"
     end
     return copy!(progn_new, progn_old)

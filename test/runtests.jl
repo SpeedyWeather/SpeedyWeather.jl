@@ -78,4 +78,5 @@ if !FLAG_EXTENDED_TESTS && !FLAG_ENZYME_TESTS
     include("output/schedule.jl")
     include("output/netcdf_output.jl")
     include("output/jld2_output.jl")
+    include("output/feedback.jl")
 end 
