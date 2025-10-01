@@ -73,8 +73,8 @@ function initialize!(
         initialize!(clock, time_stepping, period)
     end
 
-    # OUTPUT
-    simulation.model.output.active = output                     # enable/disable output
+    # OUTPUT, enable/disable output
+    set!(simulation.model.output, active=output, reset_path=true)
 
     # SCALING: we use vorticity*radius, divergence*radius in the dynamical core
     scale!(progn, diagn, model.planet.radius)
@@ -98,6 +98,5 @@ function finalize!(simulation::AbstractSimulation)
     unscale!(progn)                                 # undo radius-scaling for vor, div from the dynamical core
     unscale!(diagn)                                 # undo radius-scaling for vor, div from the dynamical core
     finalize!(model.output, simulation)             # possibly post-process output, then close netCDF file
-    write_restart_file!(model.output, progn)         # as JLD2 
     finalize!(model.callbacks, progn, diagn, model) # any callbacks to finalize?
 end

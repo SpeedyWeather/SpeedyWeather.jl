@@ -215,6 +215,14 @@ function add_default!(
     add!(variables, HumidityOutput())
 end
 
+function set!(output::NetCDFOutput; active, reset_path=true)
+    output.active = active
+    if reset_path
+        output.run_path = ""
+    end
+    return nothing
+end
+
 """$(TYPEDSIGNATURES)
 Initialize NetCDF `output` by creating a netCDF file and storing the initial conditions
 of `diagn` (and `progn`). To be called just before the first timesteps."""
@@ -225,6 +233,7 @@ function initialize!(
     diagn::DiagnosticVariables,
     model::AbstractModel,
 )
+    feedback.output = output.active             # sync with feedback struct
     output.active || return nothing             # exit immediately for no output
     
     # GET RUN ID, CREATE FOLDER
@@ -235,7 +244,6 @@ function initialize!(
     feedback.run_folder = output.run_folder     # synchronize with feedback struct
     feedback.run_path = output.run_path
     feedback.progress_meter.desc = "Weather is speedy: $(output.run_folder) "
-    feedback.output = true              # if output=true set feedback.output=true too!
 
     # OUTPUT FREQUENCY
     output.output_every_n_steps = max(1, round(Int,
@@ -285,6 +293,11 @@ function initialize!(
         println(parameters_txt, getfield(model, property,), "\n")
     end
     close(parameters_txt)
+
+    # add RestartFile callback
+    if output.write_restart
+        add!(model.callbacks, :restart_file => RestartFile())
+    end
 end
 
 Base.close(output::NetCDFOutput) = NCDatasets.close(output.netcdf_file)

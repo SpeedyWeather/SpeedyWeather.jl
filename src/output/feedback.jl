@@ -188,7 +188,7 @@ end
 # hack: define global constant whose element will be changed in initialize_feedback
 # used to pass on the time step to ProgressMeter.speedstring via calling this
 # constant from the ProgressMeter module
-const DT_IN_SEC = Ref(1800.0)
+const DT_IN_SEC = Ref(1.0)
 
 # "extend" the speedstring function from ProgressMeter by defining it for ::AbstractFloat
 # not just ::Any to effectively overwrite it

@@ -80,7 +80,7 @@ function initialize!(
     diagn::DiagnosticVariables,
     model::AbstractModel,
 )
-    
+    feedback.output = output.active     # sync with feedback struct
     output.active || return nothing     # exit immediately for no output
     
     # GET RUN ID, CREATE FOLDER
@@ -91,7 +91,6 @@ function initialize!(
     feedback.run_folder = output.run_folder     # synchronize with feedback struct
     feedback.run_path = output.run_path
     feedback.progress_meter.desc = "Weather is speedy: $(output.run_folder) "
-    feedback.output = true              # if output=true set feedback.output=true too!
 
     # OUTPUT FREQUENCY
     output.output_every_n_steps = max(1, round(Int,
@@ -108,7 +107,7 @@ function initialize!(
     jld2_file = jldopen(joinpath(run_path, filename), "w") 
     output.jld2_file = jld2_file
 
-    # write iniital condition 
+    # write initial condition 
     output_jld2!(output, Simulation(progn, diagn, model))
 
     # also export parameters into run????/parameters.txt
@@ -118,6 +117,11 @@ function initialize!(
         println(parameters_txt, getfield(model, property,), "\n")
     end
     close(parameters_txt)
+
+    # add RestartFile callback
+    if output.write_restart
+        add!(model.callbacks, :restart_file => RestartFile())
+    end
 end
 
 Base.close(output::JLD2Output) = close(output.jld2_file)
