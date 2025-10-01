@@ -2,7 +2,7 @@ export RestartFile
 
 """RestartFile callback. Writes a restart file as .jld2.
 Options are $(TYPEDFIELDS)"""
-@kwdef struct RestartFile <: AbstractCallback
+@kwdef mutable struct RestartFile <: AbstractCallback
     "[OPTION] File name for restart file, should end with .jld2"
     filename::String = "restart.jld2"
 
@@ -35,16 +35,19 @@ function finalize!(
     model::AbstractModel,
 )
     # escape in case of no output
-    restart.write_only_with_output && model.output.active || return nothing
+    restart.write_only_with_output && (model.output.active || return nothing)
 
     (; compress, filename) = restart
 
     # use output run path if not specified
     path = restart.path == "" ? model.output.run_path : restart.path
+    mkpath(path)
 
     jldopen(joinpath(path, filename), "w"; compress) do f
         f["prognostic_variables"] = progn
         f["version"] = restart.pkg_version
         f["description"] = "Restart file created by SpeedyWeather.jl"
     end
+
+    model.output.active || @info "Restart file written to $(joinpath(path, filename)) although output=false"
 end

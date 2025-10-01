@@ -162,10 +162,11 @@ Initialize ParametersTxt by writing the model parameters (via defined show of mo
 function initialize!(parameters_txt::ParametersTxt, progn, diagn, model)
 
     # escape in case of no output
-    parameters_txt.write_only_with_output && model.output.active || return nothing
+    parameters_txt.write_only_with_output && (model.output.active || return nothing)
 
     (; filename) = parameters_txt
     path = parameters_txt.path == "" ? model.output.run_path : parameters_txt.path
+    mkpath(path)
 
     # also export parameters into run????/parameters.txt
     file = open(joinpath(path, filename), "w")
@@ -174,6 +175,9 @@ function initialize!(parameters_txt::ParametersTxt, progn, diagn, model)
         println(file, getfield(model, property,), "\n")
     end
     close(file)
+
+    model.output.active || @info "Parameter summary written to $(joinpath(path, filename)) although output=false"
+    return nothing
 end
 
 callback!(::ParametersTxt, args...) = nothing
@@ -195,7 +199,7 @@ Options are $(TYPEDFIELDS)"""
     write_only_with_output::Bool = true
 
     "[OPTION] Every n% of time steps write to progress.txt, default is 5%"
-    every_n_percent::Int = 2
+    every_n_percent::Int = 5
 
     "[DERIVED] IOStream for progress.txt file"
     file::IOStream = IOStream("")
@@ -205,10 +209,11 @@ end
 Initializes the ProgressTxt callback by creating a progress.txt file and writing some initial information to it."""
 function initialize!(progress_txt::ProgressTxt, progn, diagn, model)
     # escape in case of no output
-    progress_txt.write_only_with_output && model.output.active || return nothing
+    progress_txt.write_only_with_output && (model.output.active || return nothing)
 
     (; filename) = progress_txt
     path = progress_txt.path == "" ? model.output.run_path : parameters_txt.path
+    mkpath(path)
 
     (; run_folder, run_path) = model.output
     SG = model.spectral_grid
@@ -223,8 +228,11 @@ function initialize!(progress_txt::ProgressTxt, progn, diagn, model)
     write(file, "Integrating:\n")
     write(file, "$SG\n")
     write(file, "Time: $days days at Δt = $(L.Δt_sec)s\n")
-    write(file, "\nAll data will be stored in $run_path\n")
+    model.output.active && write(file, "\nAll data will be stored in $run_path\n")
+    model.output.active || write(file, "\nNo output will be written (output=false)\n")
     progress_txt.file = file
+
+    model.output.active || @info "Progress is being written to $(joinpath(path, filename)) although output=false"
     return nothing
 end
 
@@ -232,7 +240,7 @@ end
 Writes the time stepping progress to the progress.txt file every `every_n_percent` % of time steps."""
 function callback!(progress_txt::ProgressTxt, progn, diagn, model)
     # escape in case of no output
-    progress_txt.write_only_with_output && model.output.active || return nothing
+    progress_txt.write_only_with_output && (model.output.active || return nothing)
 
     (; progress_meter, nans_detected) = model.feedback
     (; counter, n) = progress_meter
@@ -260,7 +268,7 @@ end
 Finalizes the ProgressTxt callback by writing the total time taken to the progress.txt file and closing it."""
 function finalize!(progress_txt::ProgressTxt, progn, diagn, model)
     # escape in case of no output
-    progress_txt.write_only_with_output && model.output.active || return nothing
+    progress_txt.write_only_with_output && (model.output.active || return nothing)
 
     (; file) = progress_txt
     (; progress_meter) = model.feedback
