@@ -517,6 +517,9 @@ $(TYPEDFIELDS)"""
 
     "directly specify the run folder, e.q. 'run_0001'"
     run_folder::String = ""
+
+    "File name of restart file, default 'restart.jld2'"
+    filename::String = "restart.jld2"
 end
 
 """
@@ -527,7 +530,7 @@ function initialize!(   progn_new::PrognosticVariables,
                         initial_conditions::StartFromFile,
                         model::AbstractModel)
 
-    (; path, run_prefix, id, run_number, run_digits) = initial_conditions
+    (; path, run_prefix, id, run_number, run_digits, filename) = initial_conditions
 
     if length(initial_conditions.run_folder) == 0
         # run_folder not specified, determine from run_prefix, id, run_number
@@ -536,7 +539,7 @@ function initialize!(   progn_new::PrognosticVariables,
     else    # use as specified
         run_folder = initial_conditions.run_folder
     end
-    restart_file = jldopen(joinpath(path, run_folder, "restart.jld2"))
+    restart_file = jldopen(joinpath(path, run_folder, filename))
     progn_old = restart_file["prognostic_variables"]
     version = restart_file["version"]
     if version != pkgversion(SpeedyWeather)
