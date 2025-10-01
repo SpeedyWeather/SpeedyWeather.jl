@@ -144,8 +144,14 @@ function initialize!(   progn::PrognosticVariables{NF},
     (; GridVariable2D, grid, nlayers) = model.spectral_grid
     (; radius) = model.planet
     A = convert(NF, initial_conditions.max_speed) * 2
-    u = 2A*rand(GridVariable2D, grid) .- A
-    v = 2A*rand(GridVariable2D, grid) .- A
+
+    # sample vector to use RNG (not implemented for RingGrids)
+    npoints = RingGrids.get_npoints(grid)
+    u_data = rand(RNG, NF, npoints)
+    v_data = rand(RNG, NF, npoints)
+
+    u = 2A*Field(u_data, grid) .- A  
+    v = 2A*Field(v_data, grid) .- A
 
     u_spectral = transform(u, model.spectral_transform)
     v_spectral = transform(v, model.spectral_transform)

@@ -81,7 +81,7 @@ function initialize!(
 
     # OUTPUT INITIALISATION AND STORING INITIAL CONDITIONS + FEEDBACK
     # propagate spectral state to grid variables for initial condition output
-    lf = 1                                  # use first leapfrog index
+    lf = model.time_stepping.start_with_euler ? 1 : 2       # use 2nd leapfrog index when restarting
     transform!(diagn, progn, lf, model, initialize=true)
     initialize!(diagn, progn.particles, progn, model)
     initialize!(model.output, model.feedback, progn, diagn, model)

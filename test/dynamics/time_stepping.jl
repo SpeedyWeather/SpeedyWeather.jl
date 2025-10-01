@@ -127,3 +127,41 @@ end
         @test time_stepping.Δt_sec == 20*60
     end
 end
+
+@testset "Bit reproducibility" begin
+    spectral_grid = SpectralGrid(nlayers=1)
+    leapfrog = Leapfrog(spectral_grid; start_with_euler=true)
+    planet = Earth(spectral_grid, radius=2^22)  # use radius that is power of 2 to avoid rounding errors in scaling
+
+    ic = RandomVelocity(seed=1234)
+    model = BarotropicModel(spectral_grid, time_stepping=leapfrog, initial_conditions=ic)
+
+    simulation = initialize!(model)
+    run!(simulation, steps=10)
+
+    # indexing to trigger deep copy
+    vor_restarted = deepcopy(simulation.prognostic_variables.vor)
+    time_restarted = simulation.prognostic_variables.clock.time
+
+    simulation = initialize!(model)
+    run!(simulation, steps=10)
+
+    # just doing twice the same simulation
+    @test vor_restarted == simulation.prognostic_variables.vor
+    @test time_restarted == simulation.prognostic_variables.clock.time
+
+    # check bit reproducibility of scaling
+    SpeedyWeather.scale!(simulation.prognostic_variables, simulation.diagnostic_variables, planet.radius)
+    @test vor_restarted != simulation.prognostic_variables.vor
+    SpeedyWeather.unscale!(simulation.prognostic_variables)
+    @test vor_restarted == simulation.prognostic_variables.vor
+
+    # with restart half way
+    simulation = initialize!(model)
+    run!(simulation, steps=5)
+    @test model.time_stepping.start_with_euler == false
+    run!(simulation, steps=5)
+
+    @test_broken vor_restarted == simulation.prognostic_variables.vor
+    @test time_restarted == simulation.prognostic_variables.clock.time
+end
