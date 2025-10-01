@@ -8,7 +8,7 @@ $(TYPEDFIELDS)
 @kwdef mutable struct Leapfrog{NF<:AbstractFloat} <: AbstractTimeStepper
 
     # DIMENSIONS
-    "spectral resolution (max degree of spherical harmonics)"
+    "Spectral resolution (max degree of spherical harmonics)"
     trunc::Int                      
 
     "Number of timesteps stored simultaneously in prognostic variables"
@@ -35,13 +35,13 @@ $(TYPEDFIELDS)
     williams_filter::NF = 0.53
 
     # DERIVED FROM OPTIONS    
-    "time step Δt [ms] at specified resolution"
+    "Time step Δt [ms] at specified resolution"
     Δt_millisec::Millisecond = get_Δt_millisec(Second(Δt_at_T31), trunc, radius, adjust_with_output)
 
-    "time step Δt [s] at specified resolution"
+    "Time step Δt [s] at specified resolution"
     Δt_sec::NF = Δt_millisec.value/1000
 
-    "time step Δt [s/m] at specified resolution, scaled by 1/radius"
+    "Time step Δt [s/m] at specified resolution, scaled by 1/radius"
     Δt::NF = Δt_sec/radius  
 end
 
@@ -122,6 +122,12 @@ function initialize!(L::Leapfrog, model::AbstractModel)
     if nΔt != output_dt
         @warn "$n steps of Δt = $(L.Δt_millisec.value)ms yield output every $(nΔt.value)ms (=$(nΔt.value/1000)s), but output_dt = $(output_dt.value)s"
     end
+
+    # reset to start with Euler step because
+    # simulation = initialize! also reallocates the prognostic variables
+    # by default without setting the 2nd step
+    L.start_with_euler = true
+    return nothing
 end
 
 """$(TYPEDSIGNATURES)
@@ -225,7 +231,7 @@ end
 
 function first_timesteps!(simulation::AbstractSimulation)
     progn, diagn, model = unpack(simulation)
-    (; time_stepping) = model.simulation
+    (; time_stepping) = model
     (; Δt) = time_stepping
 
     # decide whether to start with 1x Euler then 1x Leapfrog at Δt
@@ -236,11 +242,13 @@ function first_timesteps!(simulation::AbstractSimulation)
     else    # or continue with leaprog steps at 2Δt (e.g. restart)
             # but make sure that implicit solver is initialized in that situation
         initialize!(model.implicit, 2Δt, diagn, model)
-        later_timestep!(progn, diagn, model)
+        set_initialized!(model.implicit)            # mark implicit as initialized
+        later_timestep!(simulation)
     end
 
     # only now initialise feedback for benchmark accuracy
-    initialize!(feedback, clock, model)
+    (; clock) = progn
+    initialize!(model.feedback, clock, model)
     return nothing
 end
 
@@ -286,7 +294,8 @@ function first_timesteps!(
     output!(model.output, Simulation(progn, diagn, model))
 
     # from now on precomputed implicit terms with 2Δt
-    initialize!(implicit, 2Δt, diagn, model) 
+    initialize!(implicit, 2Δt, diagn, model)
+    set_initialized!(implicit)      # mark implicit as initialized
 
     return nothing
 end
@@ -337,7 +346,7 @@ function timestep!(
 
     # GET TENDENCIES, CORRECT THEM FOR SEMI-IMPLICIT INTEGRATION
     dynamics_tendencies!(diagn, progn, lf2, model)
-    implicit_correction!(diagn, progn, model.implicit)
+    implicit_correction!(diagn, progn, model.implicit, model)
     
     # APPLY DIFFUSION, STEP FORWARD IN TIME, AND TRANSFORM NEW TIME STEP TO GRID
     horizontal_diffusion!(diagn, progn, model.horizontal_diffusion, model)
@@ -380,8 +389,8 @@ function timestep!(
     if model.dynamics                                           # switch on/off all dynamics
         forcing!(diagn, progn, lf2, model)
         drag!(diagn, progn, lf2, model)
-        dynamics_tendencies!(diagn, progn, lf2, model)          # dynamical core
-        implicit_correction!(diagn, model.implicit, progn)      # semi-implicit time stepping corrections
+        dynamics_tendencies!(diagn, progn, lf2, model)              # dynamical core
+        implicit_correction!(diagn, progn, model.implicit, model)   # semi-implicit time stepping corrections
     else    # just transform physics tendencies to spectral space
         physics_tendencies_only!(diagn, model)
     end
@@ -402,8 +411,7 @@ end
 Perform one single time step of `simulation` including
 possibly output and callbacks."""
 function timestep!(simulation::AbstractSimulation)
-    progn, diagn, model = unpack(simulation)            # unpack the simulation
-    (; clock) = progn
+    (; clock) = simulation.prognostic_variables
 
     if clock.timestep_counter == 0
         first_timesteps!(simulation)
@@ -417,6 +425,7 @@ function later_timestep!(simulation::AbstractSimulation)
     progn, diagn, model = unpack(simulation)
     (; feedback, output) = model
     (; Δt, Δt_millisec) = model.time_stepping
+    (; clock) = progn
 
     timestep!(progn, diagn, 2Δt, model)             # calculate tendencies and leapfrog forward
     timestep!(clock, Δt_millisec)                   # time of lf=2 and diagn after timestep!

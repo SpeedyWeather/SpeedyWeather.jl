@@ -2,7 +2,7 @@ abstract type AbstractImplicit <: AbstractModelComponent end
 
 # model.implicit=nothing (for BarotropicModel)
 initialize!(::Nothing, dt::Real, ::DiagnosticVariables, ::AbstractModel) = nothing
-implicit_correction!(::DiagnosticVariables, ::PrognosticVariables, ::Nothing) = nothing
+implicit_correction!(::DiagnosticVariables, ::PrognosticVariables, ::Nothing, ::AbstractModel) = nothing
 
 # SHALLOW WATER MODEL
 export ImplicitShallowWater
@@ -20,18 +20,12 @@ between i-1 and i+1 is controlled by the parameter `α` in the range [0, 1]
 
 Fields are
 $(TYPEDFIELDS)"""
-@kwdef struct ImplicitShallowWater{NF} <: AbstractImplicit
+@kwdef mutable struct ImplicitShallowWater{NF} <: AbstractImplicit
     "[OPTION] coefficient for semi-implicit computations to filter gravity waves, 0.5 <= α <= 1"
     α::NF = 1
-
-    "Gravity [m/s²], taken from model.planet at initialize!"
-    gravity::Base.RefValue{NF} = Ref(zero(NF))
-    
-    "Layer thickness [m], taken from model.atmosphere at initialize!"
-    layer_thickness::Base.RefValue{NF} = Ref(zero(NF))
     
     "Time step [s], = αdt = 2αΔt (for leapfrog)"
-    time_step::Base.RefValue{NF} = Ref(zero(NF))
+    time_step::NF = 0
 end
 
 """
@@ -39,43 +33,36 @@ $(TYPEDSIGNATURES)
 Generator using the resolution from `spectral_grid`."""
 ImplicitShallowWater(SG::SpectralGrid; kwargs...) = ImplicitShallowWater{SG.NF}(; kwargs...)
 
-# function barrier to unpack the constants struct for shallow water
-function initialize!(I::ImplicitShallowWater, dt::Real, ::DiagnosticVariables, model::ShallowWater)
-    initialize!(I, dt, model.planet, model.atmosphere)
-end
-
 """
 $(TYPEDSIGNATURES)
 Update the implicit terms in `implicit` for the shallow water model as they depend on the time step `dt`."""
-function initialize!(
-    implicit::ImplicitShallowWater,
-    dt::Real,                   # time step used [s]
-    planet::AbstractPlanet,
-    atmosphere::AbstractAtmosphere,
-)
-    implicit.gravity[] = planet.gravity                     # gravitational acceleration [m/s²]
-    implicit.layer_thickness[] = atmosphere.layer_thickness # shallow water layer thickness [m], undisturbed, no mountains
-    implicit.time_step[] = implicit.α*dt                    # new implicit timestep ξ = α*dt = 2αΔt (for leapfrog) from input dt
+function initialize!(implicit::ImplicitShallowWater, dt::Real, args...)
+    implicit.time_step = implicit.α*dt  # new implicit timestep ξ = α*dt = 2αΔt (for leapfrog) from input dt
 end
+
+# implicit shallow water has no precomputed arrays, so implicit.initialized is not defined
+set_initialized!(implicit::ImplicitShallowWater) = nothing
 
 """
 $(TYPEDSIGNATURES)
 Apply correction to the tendencies in `diagn` to prevent the gravity waves from amplifying.
 The correction is implicitly evaluated using the parameter `implicit.α` to switch between
 forward, centered implicit or backward evaluation of the gravity wave terms."""
-function implicit_correction!(  diagn::DiagnosticVariables,
-                                progn::PrognosticVariables,
-                                implicit::ImplicitShallowWater)
+function implicit_correction!(
+    diagn::DiagnosticVariables,
+    progn::PrognosticVariables,
+    implicit::ImplicitShallowWater,
+    model::ShallowWater)
 
-    (; div_tend, pres_tend) = diagn.tendencies # tendency of divergence and pressure/η
+    (; div_tend, pres_tend) = diagn.tendencies  # tendency of divergence and pressure/η
     div_old, div_new   = get_steps(progn.div)   # divergence at t, t+dt
     pres_old, pres_new = get_steps(progn.pres)  # pressure/η at t, t+dt
 
     # unpack with [] as stored in a RefValue for mutation during initialization
-    H = implicit.layer_thickness[]      # layer thickness [m], undisturbed, no mountains
-    g = implicit.gravity[]              # gravitational acceleration [m/s²]
-    ξ = implicit.time_step[]            # new implicit timestep ξ = α*dt = 2αΔt (for leapfrog)
-    
+    H = model.atmosphere.layer_thickness        # layer thickness [m], undisturbed, no mountains
+    g = model.planet.gravity                    # gravitational acceleration [m/s²]
+    ξ = implicit.time_step                      # new implicit timestep ξ = α*dt = 2αΔt (for leapfrog)
+
     lmax, mmax = size(div_tend, OneBased, as=Matrix)
 
     @inbounds for k in eachmatrix(div_tend)
@@ -107,7 +94,7 @@ export ImplicitPrimitiveEquation
 Struct that holds various precomputed arrays for the semi-implicit correction to
 prevent gravity waves from amplifying in the primitive equation model.
 $(TYPEDFIELDS)"""
-@kwdef struct ImplicitPrimitiveEquation{
+@kwdef mutable struct ImplicitPrimitiveEquation{
     NF,             # number format
     VectorType,
     MatrixType,
@@ -115,15 +102,21 @@ $(TYPEDFIELDS)"""
 } <: AbstractImplicit
 
     # DIMENSIONS
-    "spectral resolution"
+    "Spectral resolution"
     trunc::Int
 
-    "number of vertical layers"
+    "Number of vertical layers"
     nlayers::Int
 
     # PARAMETERS
-    "time-step coefficient: 0=explicit, 0.5=centred implicit, 1=backward implicit"
+    "Time-step coefficient: 0=explicit, 0.5=centred implicit, 1=backward implicit"
     α::NF = 1
+
+    "Reinitialize at restart when initialized=true"
+    reinitialize::Bool = true
+
+    "Flag automatically set to true when initialize! has been called"
+    initialized::Bool = false
 
     # PRECOMPUTED ARRAYS, to be initiliazed with initialize!
     "vertical temperature profile, obtained from diagn on first time step"
@@ -196,6 +189,9 @@ function initialize!(
     atmosphere::AbstractAtmosphere,
     adiabatic_conversion::AbstractAdiabaticConversion,
 ) where NF
+
+    # option to skip reinitialization at restart
+    (implicit.initialized && !implicit.reinitialize) && return nothing
 
     (; trunc, nlayers, α, temp_profile, S, S⁻¹, L, R, U, W, L0, L1, L2, L3, L4) = implicit
     (; σ_levels_full, σ_levels_thick) = geometry
@@ -281,12 +277,15 @@ function initialize!(
     end
 end
 
+set_initialized!(implicit::ImplicitPrimitiveEquation) = (implicit.initialized = true)
+
 """$(TYPEDSIGNATURES)
 Apply the implicit corrections to dampen gravity waves in the primitive equation models."""
 function implicit_correction!(
     diagn::DiagnosticVariables,
-    implicit::ImplicitPrimitiveEquation,
     progn::PrognosticVariables,
+    implicit::ImplicitPrimitiveEquation,
+    model::PrimitiveEquation,
 )
     # escape immediately if explicit
     implicit.α == 0 && return nothing
