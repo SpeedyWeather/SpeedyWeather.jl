@@ -36,11 +36,14 @@ $(TYPEDFIELDS)"""
     "[OPTION] name of the output jld2 file"
     filename::String = "output.jld2"
     
-    "[OPTION] also write restart file if output==true?"
+    "[OPTION] also write restart file if output=true?"
     write_restart::Bool = true
 
-    "[OPTION] package version, used restart file"
-    pkg_version::VersionNumber = isnothing(pkgversion(SpeedyWeather)) ? v"0.0.0" : pkgversion(SpeedyWeather)
+    "[OPTION] also write parameters txt file if output=true?"
+    write_parameters_txt::Bool = true
+
+    "[OPTION] also write progress txt file if output=true?"
+    write_progress_txt::Bool = true
 
     "[OPTION] output frequency, time step"
     output_dt::Second = Second(DEFAULT_OUTPUT_DT)
@@ -80,17 +83,12 @@ function initialize!(
     diagn::DiagnosticVariables,
     model::AbstractModel,
 )
-    feedback.output = output.active     # sync with feedback struct
     output.active || return nothing     # exit immediately for no output
     
     # GET RUN ID, CREATE FOLDER
     # get new id only if not already specified
     determine_run_folder!(output)
     create_run_folder!(output)
-
-    feedback.run_folder = output.run_folder     # synchronize with feedback struct
-    feedback.run_path = output.run_path
-    feedback.progress_meter.desc = "Weather is speedy: $(output.run_folder) "
 
     # OUTPUT FREQUENCY
     output.output_every_n_steps = max(1, round(Int,
@@ -110,18 +108,15 @@ function initialize!(
     # write initial condition 
     output_jld2!(output, Simulation(progn, diagn, model))
 
-    # also export parameters into run????/parameters.txt
-    parameters_txt = open(joinpath(output.run_path, "parameters.txt"), "w")
-    for property in propertynames(model)
-        println(parameters_txt, "model.$property")
-        println(parameters_txt, getfield(model, property,), "\n")
-    end
-    close(parameters_txt)
+    # CALLBACKS
+    # add ParametersTxt callback
+    output.write_parameters_txt && add!(model.callbacks, :parameters_txt => ParametersTxt())
+
+    # add ProgressTxt callback
+    output.write_progress_txt && add!(model.callbacks, :progress_txt => ProgressTxt())
 
     # add RestartFile callback
-    if output.write_restart
-        add!(model.callbacks, :restart_file => RestartFile())
-    end
+    output.write_restart && add!(model.callbacks, :restart_file => RestartFile())
 end
 
 Base.close(output::JLD2Output) = close(output.jld2_file)

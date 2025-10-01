@@ -2,6 +2,8 @@
 
 # Unreleased
 
+- Reimplement RestartFile, ProgressTxt, ParamatersTxt as callback [#726](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/726/)
+- Implicit has reinitialize option [#726](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/726/)
 - Leapfrog restart default [#726](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/726/)
 - Update CITATION.cff for Zenodo [#869](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/869)
 - 10m winds and surface temperature output [#858](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/858)

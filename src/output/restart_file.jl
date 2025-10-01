@@ -3,14 +3,20 @@ export RestartFile
 """RestartFile callback. Writes a restart file as .jld2.
 Options are $(TYPEDFIELDS)"""
 @kwdef struct RestartFile <: AbstractCallback
-    "File name for restart file, should end with .jld2"
+    "[OPTION] File name for restart file, should end with .jld2"
     filename::String = "restart.jld2"
 
-    "Path for restart file, uses model.output.run_path if not specified"
+    "[OPTION] Path for restart file, uses model.output.run_path if not specified"
     path::String = ""
 
-    "Apply lossless compression in JLD2?"
+    "[OPTION] Apply lossless compression in JLD2?"
     compress::Bool = true
+
+    "[OPTION] Only write with model.output.active = true?"
+    write_only_with_output::Bool = true
+
+    "[DERIVED] package version to track possible incompatibilities"
+    pkg_version::VersionNumber = isnothing(pkgversion(SpeedyWeather)) ? v"0.0.0" : pkgversion(SpeedyWeather)
 end
 
 initialize!(::RestartFile, args...) = nothing
@@ -28,6 +34,9 @@ function finalize!(
     diagn::DiagnosticVariables,
     model::AbstractModel,
 )
+    # escape in case of no output
+    restart.write_only_with_output && model.output.active || return nothing
+
     (; compress, filename) = restart
 
     # use output run path if not specified
@@ -35,7 +44,7 @@ function finalize!(
 
     jldopen(joinpath(path, filename), "w"; compress) do f
         f["prognostic_variables"] = progn
-        f["version"] = model.output.pkg_version
+        f["version"] = restart.pkg_version
         f["description"] = "Restart file created by SpeedyWeather.jl"
     end
 end

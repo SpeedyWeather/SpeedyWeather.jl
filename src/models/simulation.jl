@@ -46,7 +46,7 @@ function run!(
 end
 
 # fallback to be extended when plotting library extension are loaded
-unicodeplot(x) = x
+unicodeplot(x) = nothing
 
 """$(TYPEDSIGNATURES)
 Initializes a `simulation`. Scales the variables, initializes
