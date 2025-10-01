@@ -42,6 +42,7 @@ end
 
 # implicit shallow water has no precomputed arrays, so implicit.initialized is not defined
 set_initialized!(implicit::ImplicitShallowWater) = nothing
+set_initialized!(implicit::Nothing) = nothing
 
 """
 $(TYPEDSIGNATURES)
