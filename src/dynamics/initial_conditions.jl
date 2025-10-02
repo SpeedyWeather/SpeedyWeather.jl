@@ -148,7 +148,7 @@ function initialize!(   progn::PrognosticVariables{NF},
     # sample vector to use RNG (not implemented for RingGrids)
     npoints = RingGrids.get_npoints(grid)
     u_data = on_architecture(grid.architecture, rand(RNG, NF, npoints))
-    v_data = on_architecture(CPU(), rand(RNG, NF, npoints))
+    v_data = on_architecture(grid.architecture, rand(RNG, NF, npoints))
 
     u = 2A*Field(u_data, grid) .- A  
     v = 2A*Field(v_data, grid) .- A
