@@ -331,3 +331,69 @@ With all options shown below
 ```@example netcdf 
 @doc JLD2Output
 ```
+
+# Parameter summary
+
+With `output=true` as an argument in the `run!(simulation)` call the `NetCDFOutput` by default also
+writes a parameter summary into `parameters.txt` in the same folder. This is implemented as
+a [Callback](@ref) (`<: SpeedyWeather.AbstractCallback`) and can be added independent of
+`NetCDFOutput` too. After `output=true` this callback is found here as `ParametersTxt`
+
+```@example netcdf
+simulation.model.callbacks
+```
+
+but it's activity is by default tied to activity of the `NetCDFOutput` with
+you can control with `write_only_with_output`.
+Creating such a callback independently
+
+```@example netcdf
+parameters_txt = ParametersTxt(write_only_with_output=false)
+```
+
+we can add it with a random or manual key as
+
+```@example netcdf
+add!(model, parameters_txt)             # random key
+add!(model, :my_key => parameters_txt)  # manual key
+```
+
+But note that callbacks are overwritten with identical keys, otherwise treated independently.
+Meaning now we have the preexisting `:parameters_txt` callback and then the two we just added,
+writing their `parameters.txt` files one after another, overwriting that same file two times.
+
+# Progress txt
+
+Similarly to `ParametersTxt`, a callback `ProgressTxt` is by default added with `output=true`.
+They can be created independently too
+
+```@example netcdf
+progress_txt = ProgressTxt(write_only_with_output=false, path="myfolder", filename="letsgo.txt")
+```
+
+and added like
+
+```@example netcdf
+add!(model, :progress_txt => progress_txt)
+```
+
+# Restart file
+
+`NetCDFOutput` also by default writes a restart file, containing the `simulation.prognostic_variables`
+that can be read back in with teh `StartFromFile` initial conditions. Implemented as a callback
+`RestartFile` can also be created independently of `NetCDFOutput`, e.g.
+
+```@example netcdf
+restart_file = RestartFile(write_only_with_output=false, path="folder1", filename="restart.jld2")
+```
+
+and added like
+
+```@example netcdf
+add!(model, :restart_file => restart_file)
+```
+
+By default `path=""` will use the folder determined by `NetCDFOutput` but otherwise you can
+also provide your own.
+
+
