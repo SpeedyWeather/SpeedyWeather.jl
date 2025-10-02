@@ -147,8 +147,8 @@ function initialize!(   progn::PrognosticVariables{NF},
 
     # sample vector to use RNG (not implemented for RingGrids)
     npoints = RingGrids.get_npoints(grid)
-    u_data = rand(RNG, NF, npoints)
-    v_data = rand(RNG, NF, npoints)
+    u_data = on_architecture(grid.architecture, rand(RNG, NF, npoints))
+    v_data = on_architecture(grid.architecture, rand(RNG, NF, npoints))
 
     u = 2A*Field(u_data, grid) .- A  
     v = 2A*Field(v_data, grid) .- A
@@ -160,7 +160,10 @@ function initialize!(   progn::PrognosticVariables{NF},
     spectral_truncation!(v_spectral, initial_conditions.truncation)
 
     ξ = curl(u_spectral, v_spectral, model.spectral_transform; radius)
-    ξ[1] = 0        # remove mean
+    
+    ξ[1:1] .= 0        # remove mean in a ugly hacky way that doesn't use scalar indexing for GPU compat
+    # TODO: do this better, we could also just use the @allowscalar macro in cases like this, 
+    # but currenlty CUDA isn't a dependency of SpeedyWeather, so we can't use it here 
 
     # repeat over vertical layers
     ξks = repeat(ξ, 1, nlayers)
