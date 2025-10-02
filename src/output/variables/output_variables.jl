@@ -8,6 +8,7 @@ include("surface_fluxes.jl")  # SurfaceFluxesOutput()
 include("land.jl")            # LandOutput()
 include("ocean.jl")           # SeaSurfaceTemperatureOutput()
 include("tracers.jl")         # TracerOutput()
+include("boundary_layer.jl")  # BoundaryLayerOutput()
 
 # collect all together for conveneince
 AllOutputVariables() = (
@@ -19,4 +20,5 @@ AllOutputVariables() = (
     SurfaceFluxesOutput()...,
     LandOutput()...,
     OceanOutput()...,
+    BoundaryLayerOutput()...,
 )

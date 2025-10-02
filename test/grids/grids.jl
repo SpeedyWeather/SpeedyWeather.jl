@@ -2,6 +2,7 @@ using JLArrays
 
 RINGGRIDS_DEFAULT_NF = SpeedyWeather.RingGrids.DEFAULT_NF
 @testset "Grid types" begin
+    # TODO: These grid/field types should be pulled out into constants rather than copy-pasted
     for G in (  
         FullClenshawGrid,
         FullGaussianGrid,

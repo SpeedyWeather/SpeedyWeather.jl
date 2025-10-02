@@ -3,6 +3,9 @@
 # Unreleased
 
 - Reduce GPU overhead and revise on_architecture and adapt [#824](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/824)
+- Update CITATION.cff for Zenodo [#869](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/869)
+- 10m winds and surface temperature output [#858](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/858)
+- Move Makie extensions to RingGrids and fix `globe` bug [#866](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/866)
 - Implement GPU kernels for forcing and drag [#834](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/834)
 - Mean sea-level pressure and dynamics output [#853](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/853) [#854](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/854)
 
