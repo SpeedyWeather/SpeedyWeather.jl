@@ -16,6 +16,7 @@ of SpeedyWeather.jl and Julia as used when saving the data.
 Its usage is similar to the NetCDF output above:
 
 ```@example output2
+using SpeedyWeather
 spectral_grid = SpectralGrid()
 output = JLD2Output(output_dt=Hour(1))
 model = ShallowWaterModel(spectral_grid, output=output)
