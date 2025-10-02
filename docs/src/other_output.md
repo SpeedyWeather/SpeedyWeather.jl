@@ -17,7 +17,7 @@ Its usage is similar to the NetCDF output above:
 
 ```@example output2
 using SpeedyWeather
-spectral_grid = SpectralGrid()
+spectral_grid = SpectralGrid(trunc=31, nlayers=1)
 output = JLD2Output(output_dt=Hour(1))
 model = ShallowWaterModel(spectral_grid, output=output)
 model.output
