@@ -329,6 +329,9 @@ export DynamicsVariablesLand
 
     "River runoff [m/s], diagnostic overflow from soil moisture"
     river_runoff::GridVariable2D = zeros(GridVariable2D, grid)
+
+    "Snow melt rate []"
+    snow_melt_rate::GridVariable2D = zeros(GridVariable2D, grid)
 end
 
 DynamicsVariablesLand(SG::SpectralGrid) =
@@ -365,6 +368,12 @@ $(TYPEDFIELDS)"""
     "Accumulated convective snow [m]"
     snow_convection::GridVariable2D = zeros(GridVariable2D, grid)
     
+    "Rate of liquid precipitation [kg/m²/s]"
+    rain_rate::GridVariable2D = zeros(GridVariable2D, grid)
+
+    "Rate of frozen precipitation [kg/m²/s]"
+    snow_rate::GridVariable2D = zeros(GridVariable2D, grid)
+
     "Rate of total precipitation (rain+snow) [kg/m²/s]"
     total_precipitation_rate::GridVariable2D = zeros(GridVariable2D, grid)
 

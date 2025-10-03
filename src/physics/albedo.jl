@@ -41,8 +41,8 @@ function albedo!(
     albedo::Albedo,
     model::PrimitiveEquation,
 )
-    albedo!(diagn.physics.ocean, progn, albedo.ocean, model)
-    albedo!(diagn.physics.land, progn, albedo.land, model)
+    albedo!(diagn.physics.ocean, diagn, progn, albedo.ocean, model)
+    albedo!(diagn.physics.land, diagn, progn, albedo.land, model)
 end
 
 # single albedo: call separately for ocean and land with the same albedo
@@ -52,13 +52,14 @@ function albedo!(
     albedo::AbstractAlbedo,
     model::PrimitiveEquation,
 )
-    albedo!(diagn.physics.ocean, progn, albedo, model)
-    albedo!(diagn.physics.land, progn, albedo, model)
+    albedo!(diagn.physics.ocean, diagn, progn, albedo, model)
+    albedo!(diagn.physics.land, diagn, progn, albedo, model)
 end
 
 # single albedo, copy over the constant albedo
 function albedo!(
     diagn::AbstractDiagnosticVariables,     # ocean or land!
+    diagn_all::DiagnosticVariables,         # all diagnostics
     progn::PrognosticVariables,
     albedo::AbstractAlbedo,
     model::PrimitiveEquation,
@@ -144,7 +145,8 @@ OceanSeaIceAlbedo(SG::SpectralGrid; kwargs...) = OceanSeaIceAlbedo{SG.NF}(;kwarg
 initialize!(albedo::OceanSeaIceAlbedo, model::PrimitiveEquation) = nothing
 
 function albedo!(
-    diagn::AbstractDiagnosticVariables,
+    diagn::AbstractDiagnosticVariables,     # ocean only
+    diagn_all::DiagnosticVariables,         # all diagnostics
     progn::PrognosticVariables,
     albedo::OceanSeaIceAlbedo,
     model::PrimitiveEquation,
@@ -154,4 +156,48 @@ function albedo!(
 
     # set ocean albedo linearly between ocean and ice depending on sea ice concentration
     diagn.albedo .= albedo_ocean .+ sea_ice_concentration .* (albedo_ice .- albedo_ocean)
+end
+
+## LandSnowAlbedo
+export LandSnowAlbedo
+
+@kwdef struct LandSnowAlbedo{NF} <: AbstractAlbedo
+    "Albedo of bare land (excluding vegetation) [1]"
+    albedo_land::NF = 0.3
+
+    "Albedo of vegetation [1]"
+    albedo_vegetation::NF = 0.15
+
+    "Albedo of snow [1]"
+    albedo_snow::NF = 0.8
+
+    "Conversion from snow depth to snow cover [m]"
+    snow_depth_scale::NF = 0.1
+end
+
+LandSnowAlbedo(SG::SpectralGrid; kwargs...) = LandSnowAlbedo{SG.NF}(;kwargs...)
+initialize!(albedo::LandSnowAlbedo, model::PrimitiveEquation) = nothing
+
+function albedo!(
+    diagn::AbstractDiagnosticVariables,     # land only
+    diagn_all::DiagnosticVariables,         # all diagnostics
+    progn::PrognosticVariables,
+    albedo::LandSnowAlbedo,
+    model::PrimitiveEquation,
+)
+    (; snow_depth) = progn.land
+    (; albedo_land, albedo_vegetation, albedo_snow, snow_depth_scale) = albedo
+
+    snow_cover = diagn_all.dynamics.a_2D_grid       # scratch memory
+    snow_cover .= min.(snow_depth, 1)
+
+	# ## Now compute the snow area cover fraction based on snow depth
+	# #σₛ = Sₐ / (10. * drag_snow + Sₐ) #JULES, from Betts et al.
+	# σₛ[ij] = min(1.0, Sₐ[ij] / snow_depth_scale)   # e.g. snow_depth_scale ≈ 0.1 m
+	# ## Now compute the change in albedo
+	# albedo_snow[ij] = snow_albedo_old + (snow_albedo_fresh - snow_albedo_old) * exp(-Δt_snow / τˢ) # time needs to be expresssed in days. 
+	# column.albedo_land[ij] = (1-σₛ[ij]) * albedo_land + σₛ[ij] * albedo_snow[ij]
+
+    # set land albedo linearly between bare land and snow depending on snow cover [0, 1]
+    diagn.albedo .= albedo_land .+ snow_cover .* (albedo_snow - albedo_land)
 end
