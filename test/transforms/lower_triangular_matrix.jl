@@ -1,4 +1,4 @@
-using JLArrays, Adapt
+using JLArrays
 import Random
 
 @testset "LowerTriangularMatrix" begin
@@ -262,7 +262,8 @@ end
         s = (5, 5)
         spectrum = Spectrum(s...)
         spectrum_jlarray = Spectrum(spectrum, architecture=SpeedyWeather.architecture(JLArray))
-        
+        jl_arch = spectrum_jlarray.architecture
+
         # for 2D doesn't matter whether you say Matrix or Array, size is determined by s
         L = f(LowerTriangularMatrix, s...)
         L2 = f(LowerTriangularArray, s...)
@@ -285,8 +286,8 @@ end
         @test typeof(L) == typeof(L2) == typeof(L3)
         @test size(L) == size(L2) == size(L3)
         
-        JL = adapt(JLArray, L)
-        JL2 = adapt(JLArray, L2)
+        JL = on_architecture(jl_arch, L)
+        JL2 = on_architecture(jl_arch, L2)
         @test typeof(JL) == typeof(JL2) == typeof(zero(JL))
         @test size(JL) == size(JL2) == size(zero(JL))
         
@@ -313,7 +314,7 @@ end
             L =  f(LowerTriangularArray{Float16, N-1, Array{Float16, N-1}, typeof(spectrum)}, s...)
             Random.seed!(123)
             JL = f(LowerTriangularArray{Float16, N-1, JLArray{Float16, N-1}, typeof(spectrum_jlarray)}, s...)
-            JL2 = adapt(JLArray, L)
+            JL2 = on_architecture(jl_arch, L)
             @test all(JL2 .== JL)   # equality via broadcasting
             @test JL2 == JL         # checks for type and data equality
 
@@ -330,7 +331,7 @@ end
             L =  f(LowerTriangularArray{Float16, N+1, Array{Float16, N+1}, typeof(spectrum)}, spectrum, s...)
             Random.seed!(123)
             JL = f(LowerTriangularArray{Float16, N+1, JLArray{Float16, N+1}, typeof(spectrum_jlarray)}, spectrum_jlarray, s...)
-            JL2 = adapt(JLArray, L)
+            JL2 = on_architecture(jl_arch, L)
             @test all(JL2 .== JL)   # equality via broadcasting
             @test JL2 == JL         # checks for type and data equality
 
@@ -620,12 +621,13 @@ end
     idims = (5,)
     spectrum = Spectrum(10, 10)
     spectrum_jlarray = Spectrum(spectrum, architecture=SpeedyWeather.architecture(JLArray))
-    
+    jl_arch = spectrum_jlarray.architecture
+
     L_cpu = randn(LowerTriangularArray{NF}, spectrum, idims...)
 
     # constructors/adapt
-    L = adapt(JLArray, L_cpu)
-    L2 = LowerTriangularArray(adapt(JLArray, L_cpu.data), spectrum_jlarray)
+    L = on_architecture(jl_arch, L_cpu)
+    L2 = LowerTriangularArray(on_architecture(jl_arch, L_cpu.data), spectrum_jlarray)
     @test all(L .== L2) 
 
     # getindex 
@@ -655,7 +657,7 @@ end
     @test all(L2[1,:] .== rand_array)
 
     # rand + convert
-    L3 = adapt(JLArray, randn(LowerTriangularArray{NF}, spectrum, idims...))
+    L3 = on_architecture(jl_arch, randn(LowerTriangularArray{NF}, spectrum, idims...))
     L4 = convert(LowerTriangularArray{Float16,2,JLArray{Float16,2},typeof(spectrum_jlarray)}, L3)
 
     for lm in SpeedyWeather.eachharmonic(L, L3)
@@ -677,7 +679,7 @@ end
 
     # copyto! same size 
     L1 = randn(LowerTriangularArray{NF}, 10, 10, idims...)
-    L1 = adapt(JLArray, L1)
+    L1 = on_architecture(jl_arch, L1)
     L2 = similar(L1)
     copyto!(L2, L1)
 
@@ -719,47 +721,49 @@ end
     @testset for idims = ((), (2,), (2, 2))
         @testset for NF in (Float32, Float64)
             @testset for ArrayType in (Array, JLArray)
-                L1 = adapt(ArrayType, randn(LowerTriangularArray{NF}, 10, 10, idims...))
+
+                arch = architecture(ArrayType)
+                L1 = on_architecture(arch, randn(LowerTriangularArray{NF}, 10, 10, idims...))
                 L2 = deepcopy(L1) 
 
                 L2 .*= 5
                 @test 5L1 == L2
 
-                L1 = adapt(ArrayType, randn(LowerTriangularArray{NF}, 10, 10, idims...))
+                L1 = on_architecture(arch, randn(LowerTriangularArray{NF}, 10, 10, idims...))
                 L2 = deepcopy(L1) 
 
                 L2 ./= 5
                 @test (L1.data ./ 5) == L2.data
 
-                L1 = adapt(ArrayType, randn(LowerTriangularArray{NF}, 10, 10, idims...))
+                L1 = on_architecture(arch, randn(LowerTriangularArray{NF}, 10, 10, idims...))
                 L2 = deepcopy(L1)
 
                 L2 .^= 2
                 @test L1.data.^2 == L2.data
 
                 # tests mirroring usage in dynamical core
-                L1 = adapt(ArrayType, randn(LowerTriangularArray{NF}, 10, 10, idims...))
-                L2 = adapt(ArrayType, randn(LowerTriangularArray{NF}, 10, 10, idims...))
+                L1 = on_architecture(arch, randn(LowerTriangularArray{NF}, 10, 10, idims...))
+                L2 = on_architecture(arch, randn(LowerTriangularArray{NF}, 10, 10, idims...))
                 L3 = deepcopy(L2)
 
                 @. L2 += 5L1
                 @test L2.data == L3.data .+ 5L1.data
 
-                L1 = adapt(ArrayType, randn(LowerTriangularArray{NF}, 10, 10, idims...))
-                L2 = adapt(ArrayType, randn(LowerTriangularArray{NF}, 10, 10, idims...))
+                L1 = on_architecture(arch, randn(LowerTriangularArray{NF}, 10, 10, idims...))
+                L2 = on_architecture(arch, randn(LowerTriangularArray{NF}, 10, 10, idims...))
 
                 @. L3 = -L1 - L2
                 @test L3.data == -L1.data - L2.data
 
-                L1 = adapt(ArrayType, randn(LowerTriangularArray{NF}, 10, 10, idims...))
-                L2 = adapt(ArrayType, randn(LowerTriangularArray{NF}, 10, 10, idims...))
+                L1 = on_architecture(arch, randn(LowerTriangularArray{NF}, 10, 10, idims...))
+                L2 = on_architecture(arch, randn(LowerTriangularArray{NF}, 10, 10, idims...))
                 L3 = deepcopy(L2)
 
                 L2 .+= L1 
                 L3.data .+= L1.data
                 @test L2.data == L3.data
 
-                L1 = adapt(ArrayType, randn(LowerTriangularArray{NF}, 10, 10, idims...))
+                L1 = on_architecture(arch, randn(LowerTriangularArray{NF}, 10, 10, idims...))
                 L2 = similar(L1)
 
                 L2 .= 5L1
