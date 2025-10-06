@@ -108,11 +108,11 @@ time_stepping = Leapfrog(spectral_grid, start_with_euler=true)
 ```
 
 and with `?Leapfrog` you see a summary of the fields, only manually change those marked `[OPTION]`.
+We will discuss some options in the following.
+
 ```@example leapfrog
 @doc Leapfrog
 ```
-
-we will discuss some options in the following.
 
 ## Change the time step
 
@@ -125,15 +125,15 @@ time_stepping.Δt_at_T31
 
 is used at T31 (`trunc=31`) spectral resolution (see [Available horizontal resolutions](@ref))
 which is then (almost) linearly scaled to higher (or lower) resolution. Creating a simulation
-at twice the resolution (T63) will approximatel half the time step (20min if T31 runs at 40min).
+at twice the resolution (T63) will approximately half the time step (20min if T31 runs at 40min).
 This is such that in most cases the user does need to know what time step is stable. But if
 you want a shorter time step the easiest is to choose `Δt_at_T31` (write `\Delta` then hit tab,
 works in the Julia REPL and other interfaces) relative to its default. If you half that time step
-you'll half the time step for all resolutions. The other "timesteps" in `time_stepping` are
+you'll half the time step for all resolutions. The other "time steps" in `time_stepping` are
 explained in the docstring (`?Leapfrog`). Note that internally SpeedyWeather uses a time step
-scaled by the radius, so `time_stepping.Δt` will be in units of meter times second. 
+scaled by the radius, so `time_stepping.Δt` will be in units of second divided by meter.
 
-You can also choose the timestep manually with
+You can also choose the time step manually with
 
 ```@example leapfrog
 set!(time_stepping, Δt=Minute(10))
@@ -172,6 +172,7 @@ e.g. for the `PrimitiveDryModel`
 
 ```@example leapfrog
 model = PrimitiveDryModel(spectral_grid; time_stepping)
+nothing # hide
 ```
 
 where `;` matches the `time_stepping` keyword argument by name. If you name `leapfrog = Leapfrog(spectral_grid)` then you

@@ -7,34 +7,34 @@ $(TYPEDFIELDS)"""
     "[DERIVED] Spectral resolution (max degree of spherical harmonics)"
     trunc::Int                      
 
-    "[CONST] Number of timesteps stored simultaneously in prognostic variables"
+    "[CONST] Number of time steps stored simultaneously in prognostic variables"
     nsteps::Int = 2
 
     "[OPTION] Time step in minutes for T31, scale linearly to `trunc`"
     Δt_at_T31::Second = Minute(40)
 
-    "[OPTION] Adjust Δt_at_T31 with the output_dt to reach output_dt exactly in integer time steps"
+    "[OPTION] Adjust `Δt_at_T31` with the `output_dt` to reach `output_dt` exactly in integer time steps"
     adjust_with_output::Bool = true
 
     "[OPTION] Start integration with (1) Euler step with dt/2, (2) Leapfrog step with dt"
     start_with_euler::Bool = true
 
-    "[OPTION] Sets first_step_euler=false after first step to continue with leapfrog after 1st run! call"
+    "[OPTION] Sets `first_step_euler=false` after first step to continue with leapfrog after 1st `run!` call"
     continue_with_leapfrog::Bool = true
 
-    "[DERIVED] Use Euler on first time step? (controlled by start_with_euler and continue_with_leapfrog)"
+    "[DERIVED] Use Euler on first time step? (controlled by `start_with_euler` and `continue_with_leapfrog`)"
     first_step_euler::Bool = start_with_euler
 
-    "[OPTION] Robert (1966) time filter coefficeint to suppress comput. mode"
+    "[OPTION] Robert (1966) time filter coefficient to suppress the computational mode"
     robert_filter::NF = 0.1
 
     "[OPTION] Williams time filter (Amezcua 2011) coefficient for 3rd order acc"
     williams_filter::NF = 0.53
 
-    "[DERIVED] Radius of sphere [m], used for scaling, set in intialize! to planet.radius"
+    "[DERIVED] Radius of sphere [m], used for scaling, set in `initialize!` to `planet.radius`"
     radius::NF = DEFAULT_RADIUS
-    
-    "[DERIVED] Time step Δt [ms] at specified resolution"
+
+    "[DERIVED] Time step Δt in milliseconds at specified resolution"
     Δt_millisec::Millisecond = get_Δt_millisec(Second(Δt_at_T31), trunc, radius, adjust_with_output)
 
     "[DERIVED] Time step Δt [s] at specified resolution"
@@ -98,7 +98,7 @@ function Leapfrog(spectral_grid::SpectralGrid; kwargs...)
 end
 
 """$(TYPEDSIGNATURES)
-Initialize leapfrogging `L` by recalculating the timestep given the output time step
+Initialize leapfrogging `L` by recalculating the time step given the output time step
 `output_dt` from `model.output`. Recalculating will slightly adjust the time step to
 be a divisor such that an integer number of time steps matches exactly with the output
 time step."""
@@ -228,7 +228,7 @@ end
 
 """$(TYPEDSIGNATURES)
 First 1 or 2 time steps of `simulation`. If `model.time_stepping.start_with_euler` is true,
-then start with 1x Euler step with dt/2, followed by 1x Leapfrog step with dt.
+then start with one Euler step with dt/2, followed by one Leapfrog step with dt.
 If false, continue with leapfrog steps at 2Δt (e.g. restart)."""
 function first_timesteps!(simulation::AbstractSimulation)
     progn, diagn, model = unpack(simulation)
