@@ -81,7 +81,13 @@ function initialize!(
 
     # OUTPUT INITIALISATION AND STORING INITIAL CONDITIONS + FEEDBACK
     # propagate spectral state to grid variables for initial condition output
-    lf = model.time_stepping.start_with_euler ? 1 : 2       # use 2nd leapfrog index when restarting
+    lf = model.time_stepping.first_step_euler ? 1 : 2       # use 2nd leapfrog index when restarting
+    
+    # raise a warning if starting with leapfrog but there's zero vorticity
+    vor = get_step(progn.vor, lf)
+    lf == 2 && all(vor .== 0) || @warn "Vorticity is zero on 2nd leapfrog index though you use it to calculate tendencies"
+        "You may wanted to continue with a leapfrog step without data for it in the 2nd step".
+
     transform!(diagn, progn, lf, model, initialize=true)
     initialize!(diagn, progn.particles, progn, model)
     initialize!(model.output, model.feedback, progn, diagn, model)

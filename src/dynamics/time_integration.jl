@@ -4,42 +4,43 @@ export Leapfrog
 """Leapfrog time stepping defined by the following fields
 $(TYPEDFIELDS)"""
 @kwdef mutable struct Leapfrog{NF<:AbstractFloat} <: AbstractTimeStepper
-
-    # DIMENSIONS
-    "Spectral resolution (max degree of spherical harmonics)"
+    "[DERIVED] Spectral resolution (max degree of spherical harmonics)"
     trunc::Int                      
 
-    "Number of timesteps stored simultaneously in prognostic variables"
+    "[CONST] Number of timesteps stored simultaneously in prognostic variables"
     nsteps::Int = 2
 
-    # OPTIONS
-    "Time step in minutes for T31, scale linearly to `trunc`"
+    "[OPTION] Time step in minutes for T31, scale linearly to `trunc`"
     Δt_at_T31::Second = Minute(40)
 
-    "Radius of sphere [m], used for scaling, set in intialize! to planet.radius"
-    radius::NF = DEFAULT_RADIUS
-
-    "Adjust Δt_at_T31 with the output_dt to reach output_dt exactly in integer time steps"
+    "[OPTION] Adjust Δt_at_T31 with the output_dt to reach output_dt exactly in integer time steps"
     adjust_with_output::Bool = true
 
-    "Start integration with (1) Euler step with dt/2, (2) Leapfrog step with dt"
+    "[OPTION] Start integration with (1) Euler step with dt/2, (2) Leapfrog step with dt"
     start_with_euler::Bool = true
 
-    # NUMERICS
-    "Robert (1966) time filter coefficeint to suppress comput. mode"
+    "[OPTION] Sets first_step_euler=false after first step to continue with leapfrog after 1st run! call"
+    continue_with_leapfrog::Bool = true
+
+    "[DERIVED] Use Euler on first time step? (controlled by start_with_euler and continue_with_leapfrog)"
+    first_step_euler::Bool = start_with_euler
+
+    "[OPTION] Robert (1966) time filter coefficeint to suppress comput. mode"
     robert_filter::NF = 0.1
 
-    "Williams time filter (Amezcua 2011) coefficient for 3rd order acc"
+    "[OPTION] Williams time filter (Amezcua 2011) coefficient for 3rd order acc"
     williams_filter::NF = 0.53
 
-    # DERIVED FROM OPTIONS    
-    "Time step Δt [ms] at specified resolution"
+    "[DERIVED] Radius of sphere [m], used for scaling, set in intialize! to planet.radius"
+    radius::NF = DEFAULT_RADIUS
+    
+    "[DERIVED] Time step Δt [ms] at specified resolution"
     Δt_millisec::Millisecond = get_Δt_millisec(Second(Δt_at_T31), trunc, radius, adjust_with_output)
 
-    "Time step Δt [s] at specified resolution"
+    "[DERIVED] Time step Δt [s] at specified resolution"
     Δt_sec::NF = Δt_millisec.value/1000
 
-    "Time step Δt [s/m] at specified resolution, scaled by 1/radius"
+    "[DERIVED] Time step Δt [s/m] at specified resolution, scaled by 1/radius"
     Δt::NF = Δt_sec/radius  
 end
 
@@ -116,6 +117,10 @@ function initialize!(L::Leapfrog, model::AbstractModel)
     if nΔt != output_dt
         @warn "$n steps of Δt = $(L.Δt_millisec.value)ms yield output every $(nΔt.value)ms (=$(nΔt.value/1000)s), but output_dt = $(output_dt.value)s"
     end
+    if L.start_with_euler
+        L.first_step_euler = true
+    end
+
     return nothing
 end
 
@@ -231,9 +236,9 @@ function first_timesteps!(simulation::AbstractSimulation)
     (; Δt) = time_stepping
 
     # decide whether to start with 1x Euler then 1x Leapfrog at Δt
-    if time_stepping.start_with_euler
+    if time_stepping.first_step_euler
         first_timesteps!(progn, diagn, model)
-        time_stepping.start_with_euler = false      # disable for subsequent restarts
+        time_stepping.first_step_euler = !time_stepping.continue_with_leapfrog   # after first run! continue with leapfrog
         
     else    # or continue with leaprog steps at 2Δt (e.g. restart)
             # but make sure that implicit solver is initialized in that situation
