@@ -137,16 +137,18 @@ end
     model = BarotropicModel(spectral_grid, time_stepping=leapfrog, initial_conditions=ic)
 
     simulation = initialize!(model)
+    @test leapfrog.first_step_euler == true
     run!(simulation, steps=10)
+    @test leapfrog.first_step_euler == false
 
-    # indexing to trigger deep copy
     vor_restarted = deepcopy(simulation.prognostic_variables.vor)
     time_restarted = simulation.prognostic_variables.clock.time
 
+    # do a new simulation from same model
     simulation = initialize!(model)
+    @test leapfrog.first_step_euler == true
     run!(simulation, steps=10)
-
-    # just doing twice the same simulation
+    @test leapfrog.first_step_euler == false
     @test vor_restarted == simulation.prognostic_variables.vor
     @test time_restarted == simulation.prognostic_variables.clock.time
 
@@ -158,10 +160,13 @@ end
 
     # with restart half way
     simulation = initialize!(model)
+    @test model.time_stepping.first_step_euler == true
     run!(simulation, steps=5)
-    @test model.time_stepping.start_with_euler == false
+    @test model.time_stepping.first_step_euler == false
     run!(simulation, steps=5)
 
-    @test_broken vor_restarted == simulation.prognostic_variables.vor
+    # this test is flagged as "broken" as bit reproducibility is close but not perfect
+    # not sure exactly why, needs further investigation if deemed important
+    @test vor_restarted == simulation.prognostic_variables.vor
     @test time_restarted == simulation.prognostic_variables.clock.time
 end
