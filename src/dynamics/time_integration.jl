@@ -1,10 +1,8 @@
 const DEFAULT_NSTEPS = 2
 export Leapfrog
 
-"""
-Leapfrog time stepping defined by the following fields
-$(TYPEDFIELDS)
-"""
+"""Leapfrog time stepping defined by the following fields
+$(TYPEDFIELDS)"""
 @kwdef mutable struct Leapfrog{NF<:AbstractFloat} <: AbstractTimeStepper
 
     # DIMENSIONS
@@ -45,13 +43,11 @@ $(TYPEDFIELDS)
     Δt::NF = Δt_sec/radius  
 end
 
-"""
-$(TYPEDSIGNATURES)
+"""$(TYPEDSIGNATURES)
 Computes the time step in [ms]. `Δt_at_T31` is always scaled with the resolution `trunc` 
 of the model. In case `adjust_Δt_with_output` is true, the `Δt_at_T31` is additionally 
 adjusted to the closest divisor of `output_dt` so that the output time axis is keeping
-`output_dt` exactly.
-"""
+`output_dt` exactly."""
 function get_Δt_millisec(
     Δt_at_T31::Dates.TimePeriod,
     trunc,
@@ -92,8 +88,7 @@ function get_Δt_millisec(
     return Δt_millisec
 end 
 
-"""
-$(TYPEDSIGNATURES)
+"""$(TYPEDSIGNATURES)
 Generator function for a Leapfrog struct using `spectral_grid`
 for the resolution information."""
 function Leapfrog(spectral_grid::SpectralGrid; kwargs...)
@@ -101,8 +96,7 @@ function Leapfrog(spectral_grid::SpectralGrid; kwargs...)
     return Leapfrog{NF}(; trunc, kwargs...)
 end
 
-"""
-$(TYPEDSIGNATURES)
+"""$(TYPEDSIGNATURES)
 Initialize leapfrogging `L` by recalculating the timestep given the output time step
 `output_dt` from `model.output`. Recalculating will slightly adjust the time step to
 be a divisor such that an integer number of time steps matches exactly with the output
@@ -122,11 +116,6 @@ function initialize!(L::Leapfrog, model::AbstractModel)
     if nΔt != output_dt
         @warn "$n steps of Δt = $(L.Δt_millisec.value)ms yield output every $(nΔt.value)ms (=$(nΔt.value/1000)s), but output_dt = $(output_dt.value)s"
     end
-
-    # reset to start with Euler step because
-    # simulation = initialize! also reallocates the prognostic variables
-    # by default without setting the 2nd step
-    L.start_with_euler = true
     return nothing
 end
 
@@ -153,8 +142,7 @@ end
 # also allow for keyword arguments
 set!(L::AbstractTimeStepper; Δt::Period) = set!(L, Δt)
 
-"""
-$(TYPEDSIGNATURES)
+"""$(TYPEDSIGNATURES)
 Performs one leapfrog time step with (`lf=2`) or without (`lf=1`) Robert+Williams filter
 (see Williams (2009), Montly Weather Review, Eq. 7-9)."""
 function leapfrog!(
@@ -199,6 +187,9 @@ end
 # variables that are leapfrogged in the respective models, e.g. :vor_tend, :div_tend, etc...
 tendency_names(model::AbstractModel) = tuple((Symbol(var, :_tend) for var in prognostic_variables(model))...)
 
+"""$(TYPEDSIGNATURES)
+Leapfrog time stepping for all prognostic variables in `progn` using their tendencies in `tend`.
+Depending on `model` decides which variables to time step."""
 function leapfrog!(
     progn::PrognosticVariables,
     tend::Tendencies,
@@ -229,6 +220,10 @@ function leapfrog!(
     return nothing
 end
 
+"""$(TYPEDSIGNATURES)
+First 1 or 2 time steps of `simulation`. If `model.time_stepping.start_with_euler` is true,
+then start with 1x Euler step with dt/2, followed by 1x Leapfrog step with dt.
+If false, continue with leapfrog steps at 2Δt (e.g. restart)."""
 function first_timesteps!(simulation::AbstractSimulation)
     progn, diagn, model = unpack(simulation)
     (; time_stepping) = model
@@ -420,7 +415,8 @@ function timestep!(simulation::AbstractSimulation)
     end
 end
 
-# 3rd and further timesteps after Δt as normal
+"""$(TYPEDSIGNATURES)
+Perform one single "normal" time step of `simulation`, after `first_timesteps!`."""
 function later_timestep!(simulation::AbstractSimulation)
     progn, diagn, model = unpack(simulation)
     (; feedback, output) = model
