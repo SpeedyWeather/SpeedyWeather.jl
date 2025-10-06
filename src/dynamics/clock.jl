@@ -7,7 +7,7 @@ export Clock
 Clock struct keeps track of the model time, how many days to integrate for
 and how many time steps this takes.
 $(TYPEDFIELDS)"""
-Base.@kwdef mutable struct Clock <: AbstractClock
+@kwdef mutable struct Clock <: AbstractClock
     "current model time"
     time::DateTime = DEFAULT_DATE
 

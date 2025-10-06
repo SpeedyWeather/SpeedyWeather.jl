@@ -8,14 +8,16 @@ of particles from particle advection. To be added like
 
 Output done via netCDF. Fields and options are
 $(TYPEDFIELDS)"""
-Base.@kwdef mutable struct ParticleTracker{NF} <: AbstractCallback
+@kwdef mutable struct ParticleTracker{NF} <: AbstractCallback
     "[OPTION] when to schedule particle tracking"
     schedule::Schedule = Schedule(every=Hour(3))
 
     "[OPTION] File name for netCDF file"
-    file_name::String = "particles.nc"
+    filename::String = "particles.nc"
     
-    # COMPRESSION OPTIONS
+    "[OPTION] Path for netCDF file, uses model.output.run_path if not specified"
+    path::String = ""
+
     "[OPTION] lossless compression level; 1=low but fast, 9=high but slow"
     compression_level::Int = 1
 
@@ -41,34 +43,22 @@ ParticleTracker(SG::SpectralGrid; kwargs...) =
     ParticleTracker{SG.NF}(;nparticles = SG.nparticles, kwargs...)
 
 function initialize!(
-    callback::ParticleTracker{NF},
+    particle_tracker::ParticleTracker{NF},
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
     model::AbstractModel,
 ) where NF
 
-    initialize!(callback.schedule, progn.clock)
-
-    # if model.output doesn't output create a folder anyway to store the particles.nc file
-    if model.output.active == false
-        (;output, feedback) = model
-        
-        # GET RUN ID, CREATE FOLDER
-        # get new id only if not already specified
-        determine_run_folder!(output)
-        create_run_folder!(output)
-
-        feedback.run_folder = output.run_folder     # synchronize with feedback struct
-        feedback.run_path = output.run_path
-        feedback.progress_meter.desc = "Weather is speedy: $(output.run_folder) "
-    end
+    initialize!(particle_tracker.schedule, progn.clock)
 
     # CREATE NETCDF FILE, vector of NcVars for output
-    (; run_path) = model.output
-    (; file_name) = callback
-    # model.output.output || @info "ParticleTracker stores data in $(joinpath(pwd(),file_name))"
-    dataset = NCDataset(joinpath(run_path, file_name), "c")
-    callback.netcdf_file = dataset
+    (; filename) = particle_tracker
+    path = particle_tracker.path == "" ? model.output.run_path : particle_tracker.path
+    mkpath(path)
+    model.output.active || @info "ParticleTracker writes to $(joinpath(path, filename)) as output=false"
+
+    dataset = NCDataset(joinpath(path, filename), "c")
+    particle_tracker.netcdf_file = dataset
         
     # DEFINE NETCDF DIMENSIONS TIME
     (; time) = progn.clock
@@ -80,7 +70,7 @@ function initialize!(
 
     # PARTICLE DIMENSION
     nparticles = length(progn.particles)
-    callback.nparticles = nparticles
+    particle_tracker.nparticles = nparticles
     defDim(dataset, "particle", nparticles)
     defVar(dataset, "particle", Int64, ("particle",),
         attrib=Dict("units"=>"1", "long_name"=>"particle identification number"))
@@ -88,67 +78,67 @@ function initialize!(
     # coordinates of particles (the variables inside netCDF)
     defVar(dataset, "lon", NF, ("particle", "time"), attrib = 
         Dict("long_name"=>"longitude", "units"=>"degrees_north"),
-        deflatelevel=callback.compression_level, shuffle=callback.shuffle)
+        deflatelevel=particle_tracker.compression_level, shuffle=particle_tracker.shuffle)
 
     defVar(dataset, "lat", NF, ("particle", "time"), attrib = 
         Dict("long_name"=>"latitude", "units"=>"degrees_east"),
-        deflatelevel=callback.compression_level, shuffle=callback.shuffle)
+        deflatelevel=particle_tracker.compression_level, shuffle=particle_tracker.shuffle)
 
     defVar(dataset, "sigma", NF, ("particle", "time"), attrib = 
         Dict("long_name"=>"vertical sigma coordinate", "units"=>"1"),
-        deflatelevel=callback.compression_level, shuffle=callback.shuffle)
+        deflatelevel=particle_tracker.compression_level, shuffle=particle_tracker.shuffle)
 
     # pull particle locations into output work arrays
     for (p, particle) in enumerate(progn.particles)
-        callback.lon[p] = particle.lon
-        callback.lat[p] = particle.lat
-        callback.σ[p]   = particle.σ
+        particle_tracker.lon[p] = particle.lon
+        particle_tracker.lat[p] = particle.lat
+        particle_tracker.σ[p]   = particle.σ
     end
     
     # rounding
-    (; keepbits) = callback
-    round!(callback.lon, keepbits)
-    round!(callback.lat, keepbits)
-    round!(callback.σ,   keepbits)
+    (; keepbits) = particle_tracker
+    round!(particle_tracker.lon, keepbits)
+    round!(particle_tracker.lat, keepbits)
+    round!(particle_tracker.σ,   keepbits)
         
     # set initial conditions
-    callback.netcdf_file["time"][1]     = 0.0
-    callback.netcdf_file["lon"][:, 1]   = callback.lon
-    callback.netcdf_file["lat"][:, 1]   = callback.lat
-    callback.netcdf_file["sigma"][:, 1] = callback.σ
-    NCDatasets.sync(callback.netcdf_file)
+    particle_tracker.netcdf_file["time"][1]     = 0.0
+    particle_tracker.netcdf_file["lon"][:, 1]   = particle_tracker.lon
+    particle_tracker.netcdf_file["lat"][:, 1]   = particle_tracker.lat
+    particle_tracker.netcdf_file["sigma"][:, 1] = particle_tracker.σ
+    NCDatasets.sync(particle_tracker.netcdf_file)
 end
 
 function callback!(
-    callback::ParticleTracker,
+    particle_tracker::ParticleTracker,
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
     model::AbstractModel,
 )
-    isscheduled(callback.schedule, progn.clock) || return nothing   # else escape immediately
-    i = callback.schedule.counter+1     # +1 for initial conditions (not scheduled)
+    isscheduled(particle_tracker.schedule, progn.clock) || return nothing   # else escape immediately
+    i = particle_tracker.schedule.counter+1     # +1 for initial conditions (not scheduled)
 
     # pull particle locations into output work arrays
     for (p, particle) in enumerate(progn.particles)
-        callback.lon[p] = particle.lon
-        callback.lat[p] = particle.lat
-        callback.σ[p]   = particle.σ
+        particle_tracker.lon[p] = particle.lon
+        particle_tracker.lat[p] = particle.lat
+        particle_tracker.σ[p]   = particle.σ
     end
     
     # rounding
-    (; keepbits) = callback
-    round!(callback.lon, keepbits)
-    round!(callback.lat, keepbits)
-    round!(callback.σ,   keepbits)
+    (; keepbits) = particle_tracker
+    round!(particle_tracker.lon, keepbits)
+    round!(particle_tracker.lat, keepbits)
+    round!(particle_tracker.σ,   keepbits)
         
     # write current particle locations to file
     (;time, start) = progn.clock
     time_passed_hrs = Millisecond(time - start).value/3600_000     # [ms] -> [hrs]
-    callback.netcdf_file["time"][i]     = time_passed_hrs
-    callback.netcdf_file["lon"][:, i]   = callback.lon
-    callback.netcdf_file["lat"][:, i]   = callback.lat
-    callback.netcdf_file["sigma"][:, i] = callback.σ
-    NCDatasets.sync(callback.netcdf_file)
+    particle_tracker.netcdf_file["time"][i]     = time_passed_hrs
+    particle_tracker.netcdf_file["lon"][:, i]   = particle_tracker.lon
+    particle_tracker.netcdf_file["lat"][:, i]   = particle_tracker.lat
+    particle_tracker.netcdf_file["sigma"][:, i] = particle_tracker.σ
+    NCDatasets.sync(particle_tracker.netcdf_file)
 end
 
-finalize!(callback::ParticleTracker,args...) = NCDatasets.close(callback.netcdf_file)
+finalize!(particle_tracker::ParticleTracker,args...) = NCDatasets.close(particle_tracker.netcdf_file)

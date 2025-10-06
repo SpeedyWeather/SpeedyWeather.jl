@@ -1,7 +1,7 @@
 using JLD2 
 
 @testset "JLD2 Output" begin
-    tmp_output_path = mktempdir(pwd(), prefix = "tmp_testruns_")  # Cleaned up when the process exits
+    tmp_output_path = mktempdir(pwd(), prefix = "tmp_jld2tests_")  # Cleaned up when the process exits
 
     spectral_grid = SpectralGrid()   
     
