@@ -1,4 +1,22 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
 cff-version: 1.2.0
+title: SpeedyWeather.jl
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - family-names: SpeedyWeather contributors
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.6510139
+repository-code: 'https://github.com/SpeedyWeather/SpeedyWeather.jl'
+url: 'https://speedyweather.github.io'
+abstract: Playing atmospheric modelling like it's LEGO.
+license: MIT
+
 preferred-citation:
   type: article
   authors:
@@ -41,4 +59,3 @@ preferred-citation:
   issue: 98
   start: 6323
   year: 2024
-  license: MIT
