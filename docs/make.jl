@@ -18,6 +18,7 @@ makedocs(
                 "Examples 2D"=>"examples_2D.md",
                 "Examples 3D"=>"examples_3D.md",
                 "Initial conditions" => "initial_conditions.md",
+                "Time integration" => "time_integration.md",
                 "Tracer advection"=>"tracers.md",
                 "Particle advection"=>"particles.md",
                 "Stochastic physics" => "stochastic_physics.md",
