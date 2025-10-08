@@ -15,10 +15,12 @@ time step in mind (valid for all models)
 
 1. set tendencies to zero
 2. compute parameterizations, forcing, or drag terms. Accumulate tendencies.
-3. compute dynamics, accumulate tendencies.
-4. time stepping
-5. output
-6. callbacks
+3. advance ocean, sea ice, land models (tendencies plus time stepping)
+4. compute dynamics, accumulate tendencies for atmosphere
+5. time stepping of atmosphere
+6. output
+7. callbacks
+8. go back to 1.
 
 This means that, at the current callsite, a callback can read the tendencies but writing
 into it would be overwritten by the zeroing of the tendencies in 1. anyway. At the moment,
