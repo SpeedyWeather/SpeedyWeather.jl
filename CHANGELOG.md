@@ -2,6 +2,7 @@
 
 # Unreleased
 
+- Pluto notebook example in README [#872](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/872/)
 - Reimplement RestartFile, ProgressTxt, ParamatersTxt as callback [#726](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/726/)
 - Implicit has reinitialize option [#726](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/726/)
 - Leapfrog restart default [#726](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/726/)
