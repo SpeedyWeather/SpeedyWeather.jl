@@ -111,6 +111,16 @@ storing [NetCDF output](https://speedyweather.github.io/SpeedyWeatherDocumentati
 More examples in the [How to run SpeedyWeather](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/how_to_run_speedy/)
 section of the [documentation](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev).
 
+## Interactive use
+
+You can use SpeedyWeather from the [Julia REPL](https://docs.julialang.org/en/v1/stdlib/REPL/), running a script
+like `julia speedyweather.jl`, or interactively through [Jupyter](https://jupyter.org/try) (install a Julia kernel
+with [IJulia](https://github.com/JuliaLang/IJulia.jl)) or [Pluto notebooks](https://plutojl.org/).
+Here an example for a Pluto notebook
+
+![speedyweather_pluto](https://github.com/user-attachments/assets/4cf84571-9d07-40fc-ad4e-821dc9fad39d)
+
+
 ## Gallery
 
 Specific humidity in the primitive equation model simulated at T340 spectral resolution (about 40km)
@@ -154,14 +164,13 @@ https://github.com/SpeedyWeather/SpeedyWeather.jl/assets/25530332/a6192374-24d9-
 
 Difficult to plot spherical data? SpeedyWeather also includes extensions for Makie and GeoMakie
 making it supereasy to create plots and interactively investigate a variables from a simulation.
-Two examples (screen recording those makes it a bit laggy, it's pretty smooth otherwise):
-Humidity plotted on a 50km HEALPix grid 
+Two examples, a variable from a simulation
 
-https://github.com/user-attachments/assets/b02b31eb-e139-4193-89d1-7e277a2af5cc
+https://github.com/user-attachments/assets/543cddf8-bcd9-41a7-83e3-184dba994069
 
-or the visualising cell centres and faces of the OctaminimalGaussianGrid 
+or visualising cell centres and faces of the HEALPixGrid via our `globe` function
 
-https://github.com/user-attachments/assets/6dfa212a-c5dc-4c54-b274-7755d5baf15c
+https://github.com/user-attachments/assets/fa0636e3-30d7-4fbe-af29-dba047e8bded
 
 ## History
 
@@ -217,8 +226,8 @@ compatibilities with older versions are not guaranteed.
 ## Benchmarks
 
 The primitive equations at 400km resolution with 8 vertical layers can be simulated by
-SpeedyWeather.jl at 1800 simulated years per day (SYPD) on a single core of newer CPUs with arm architecture
-(M-series MacBooks for example). At that speed, simulating one year takes about 50 seconds
+SpeedyWeather.jl at 2300 simulated years per day (SYPD) on a single core of newer CPUs with arm architecture
+(M4 MacBooks in this case). At that speed, simulating one year takes about 40 seconds
 without output. The complex fused-multiply adds of the spectral transform compile efficiently to
 the large vector extensions of the newer arm chips in single precision.
 Another considerable speed-up comes from the reduced grids minimizing the number of columns for
@@ -227,7 +236,7 @@ take up 40-60% of the total simulation time, depending on the grid. Particularly
 `OctaminimalGaussianGrid`, `OctaHEALPixGrid` and the `HEALPixGrid` are increasingly faster,
 at a small accuracy sacrifice of the then inexact spectral transforms. 
 
-On older CPUs, like the Intel CPU MacBooks, the 1800 SYPD drop to about 500-600 SYPD,
+On older CPUs, like the Intel CPU MacBooks, the speed drops to about 500-600 SYPD,
 which is still 2x faster than Fortran SPEEDY which is reported to reach 240 SYPD.
 With GPU support being a work in progress we do not expect a performance increase for 
 the lower resolutions but aim to provide the ability to also run the model very efficiently
