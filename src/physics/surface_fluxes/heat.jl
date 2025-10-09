@@ -35,10 +35,10 @@ surface_heat_flux!(::ColumnVariables, ::Nothing, ::PrimitiveEquation) = nothing
 
 export SurfaceOceanHeatFlux
 @kwdef struct SurfaceOceanHeatFlux{NF} <: AbstractSurfaceHeatFlux
-    "Use (possibly) flow-dependent column.boundary_layer_drag coefficient"
+    "[OPTION] Use (possibly) flow-dependent column.boundary_layer_drag coefficient"
     use_boundary_layer_drag::Bool = true
 
-    "Otherwise, use the following drag coefficient for heat fluxes over ocean"
+    "[OPTION] Otherwise, use the following drag coefficient for heat fluxes over ocean"
     heat_exchange::NF = 0.9e-3
 end
 
@@ -78,10 +78,10 @@ end
 
 export SurfaceLandHeatFlux
 @kwdef struct SurfaceLandHeatFlux{NF} <: AbstractSurfaceHeatFlux
-    "Use (possibly) flow-dependent column.boundary_layer_drag coefficient"
+    "[OPTION] Use (possibly) flow-dependent column.boundary_layer_drag coefficient"
     use_boundary_layer_drag::Bool = true
 
-    "Otherwise, use the following drag coefficient for heat fluxes over land"
+    "[OPTION] Otherwise, use the following drag coefficient for heat fluxes over land"
     heat_exchange::NF = 1.2e-3    # for neutral stability
 end
 

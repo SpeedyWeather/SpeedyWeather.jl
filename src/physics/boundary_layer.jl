@@ -73,7 +73,7 @@ function boundary_layer_drag!(  column::ColumnVariables,
 end
 
 export ConstantDrag
-Base.@kwdef struct ConstantDrag{NF} <: AbstractBoundaryLayer
+@kwdef struct ConstantDrag{NF} <: AbstractBoundaryLayer
     drag::NF = 1e-3
 end
 
@@ -91,26 +91,26 @@ export BulkRichardsonDrag
 following Frierson, 2006, Journal of the Atmospheric Sciences.
 $(TYPEDFIELDS)"""
 @kwdef struct BulkRichardsonDrag{NF} <: AbstractBoundaryLayer
-    "von Kármán constant [1]"
+    "[OPTION] von Kármán constant [1]"
     κ::NF = 0.4
 
-    "roughness length [m]"
+    "[OPTION] roughness length [m]"
     z₀::NF = 0.01
 
-    "Critical Richardson number for stable mixing cutoff [1]"
-    Ri_c::NF = 5   # higher than typical to get a higher drag in general
+    "[OPTION] Critical Richardson number for stable mixing cutoff [1]"
+    Ri_c::NF = 3
 
-    "Drag minimum to avoid zero surface fluxes in stable conditions [1]"
-    drag_min::NF = 1e-4
+    "[OPTION] Drag minimum to avoid zero surface fluxes in stable conditions [1]"
+    drag_min::NF = 1e-5
 
-    "Gust speed to be added to wind speed for drag calculation [m/s]"
+    "[OPTION] Gust speed to be added to wind speed for drag calculation [m/s]"
     gust_speed::NF = 5
 
-    "Maximum drag coefficient, κ²/log(zₐ/z₀) for zₐ from reference temperature"
+    "[DERIVED] Maximum drag coefficient, κ²/log(zₐ/z₀) for zₐ from reference temperature"
     drag_max::Base.RefValue{NF} = Ref(zero(NF))
 end
 
-BulkRichardsonDrag(SG::SpectralGrid, kwargs...) = BulkRichardsonDrag{SG.NF}(; kwargs...)
+BulkRichardsonDrag(SG::SpectralGrid; kwargs...) = BulkRichardsonDrag{SG.NF}(; kwargs...)
 
 function initialize!(scheme::BulkRichardsonDrag, model::PrimitiveEquation)
 
