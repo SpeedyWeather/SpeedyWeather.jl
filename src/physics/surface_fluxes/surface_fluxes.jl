@@ -33,31 +33,38 @@ end
 
 ## SURFACE THERMODYNAMICS
 export SurfaceThermodynamicsConstant
-struct SurfaceThermodynamicsConstant <: AbstractSurfaceThermodynamics end
-SurfaceThermodynamicsConstant(SG::SpectralGrid) = SurfaceThermodynamicsConstant()
-initialize!(::SurfaceThermodynamicsConstant,::PrimitiveEquation) = nothing
+@kwdef mutable struct SurfaceThermodynamicsConstant{NF} <: AbstractSurfaceThermodynamics
+    σ_power_minus_κ::NF = 0
+end
 
-function surface_thermodynamics!(   column::ColumnVariables,
-                                    ::SurfaceThermodynamicsConstant,
-                                    model::PrimitiveWet)
-
-    # surface value is same as lowest model level, use previous time step
-    # for numerical stability
-    column.surface_temp = column.temp[end]      # todo use constant POTENTIAL temperature
-    column.surface_humid = column.humid[end]    # humidity at surface is the same as 
-
-    # surface air density via virtual temperature
-    (; R_dry) = model.atmosphere
-    Tᵥ = column.temp_virt[column.nlayers]
-    column.surface_air_density = column.pres[end]/(R_dry*Tᵥ)
+SurfaceThermodynamicsConstant(SG::SpectralGrid; kwargs...) = SurfaceThermodynamicsConstant{SG.NF}(; kwargs...)
+function initialize!(S::SurfaceThermodynamicsConstant, model::PrimitiveEquation)
+    (; κ) = model.atmosphere
+    σ = model.geometry.σ_levels_full[end]
+    S.σ_power_minus_κ = σ^-κ
 end
 
 function surface_thermodynamics!(   column::ColumnVariables,
-                                    ::SurfaceThermodynamicsConstant,
+                                    S::SurfaceThermodynamicsConstant,
+                                    model::PrimitiveWet)
+    (; R_dry) = model.atmosphere
+    σ⁻ᵏ = S.σ_power_minus_κ
+
+    # constant potential temperature
+    column.surface_temp = column.temp[end]*σ⁻ᵏ
+    column.surface_humid = column.humid[end]    # humidity at surface is the same as in lowermost layer
+
+    (; R_dry) = model.atmosphere
+    column.surface_air_density = column.pres[end]/(R_dry*column.surface_temp)
+end
+
+function surface_thermodynamics!(   column::ColumnVariables,
+                                    S::SurfaceThermodynamicsConstant,
                                     model::PrimitiveDry)
     (; R_dry) = model.atmosphere
-    # surface value is same as lowest model level, but use previous
-    # time step for numerical stability
-    column.surface_temp = column.temp[end]   # todo use constant POTENTIAL temperature
+    σ⁻ᵏ = S.σ_power_minus_κ
+
+    # constant potential temperature
+    column.surface_temp = column.temp[end]*σ⁻ᵏ
     column.surface_air_density = column.pres[end]/(R_dry*column.surface_temp)
 end

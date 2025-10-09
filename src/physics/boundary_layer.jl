@@ -73,7 +73,7 @@ function boundary_layer_drag!(  column::ColumnVariables,
 end
 
 export ConstantDrag
-Base.@kwdef struct ConstantDrag{NF} <: AbstractBoundaryLayer
+@kwdef struct ConstantDrag{NF} <: AbstractBoundaryLayer
     drag::NF = 1e-3
 end
 
@@ -91,20 +91,26 @@ export BulkRichardsonDrag
 following Frierson, 2006, Journal of the Atmospheric Sciences.
 $(TYPEDFIELDS)"""
 @kwdef struct BulkRichardsonDrag{NF} <: AbstractBoundaryLayer
-    "von Kármán constant [1]"
+    "[OPTION] von Kármán constant [1]"
     κ::NF = 0.4
 
-    "roughness length [m]"
-    z₀::NF = 3.21e-5
+    "[OPTION] roughness length [m]"
+    z₀::NF = 0.01
 
-    "Critical Richardson number for stable mixing cutoff [1]"
-    Ri_c::NF = 10
+    "[OPTION] Critical Richardson number for stable mixing cutoff [1]"
+    Ri_c::NF = 3
 
-    "Maximum drag coefficient, κ²/log(zₐ/z₀) for zₐ from reference temperature"
+    "[OPTION] Drag minimum to avoid zero surface fluxes in stable conditions [1]"
+    drag_min::NF = 1e-5
+
+    "[OPTION] Gust speed to be added to wind speed for drag calculation [m/s]"
+    gust_speed::NF = 5
+
+    "[DERIVED] Maximum drag coefficient, κ²/log(zₐ/z₀) for zₐ from reference temperature"
     drag_max::Base.RefValue{NF} = Ref(zero(NF))
 end
 
-BulkRichardsonDrag(SG::SpectralGrid, kwargs...) = BulkRichardsonDrag{SG.NF}(; kwargs...)
+BulkRichardsonDrag(SG::SpectralGrid; kwargs...) = BulkRichardsonDrag{SG.NF}(; kwargs...)
 
 function initialize!(scheme::BulkRichardsonDrag, model::PrimitiveEquation)
 
@@ -127,18 +133,21 @@ function boundary_layer_drag!(  column::ColumnVariables,
     boundary_layer_drag!(column, scheme, model.atmosphere)
 end
 
+"""$(TYPEDSIGNATURES)
+Calculate a boundary_layer_drag from the bulk richardson number
+following Frierson, 2006."""
 function boundary_layer_drag!(
     column::ColumnVariables,
-    scheme::BulkRichardsonDrag,
-    atmopshere::AbstractAtmosphere,
+    drag::BulkRichardsonDrag,
+    atmosphere::AbstractAtmosphere,
 )
     
-    (; Ri_c) = scheme
-    drag_max = scheme.drag_max[]
+    (; drag_min, Ri_c) = drag
+    drag_max = drag.drag_max[]
 
     # bulk Richardson number at lowermost layer N from Frierson, 2006, eq. (15)
     # they call it Ri_a = Ri_N here
-    Ri_N = bulk_richardson_surface(column, atmopshere)
+    Ri_N = bulk_richardson_surface(column, drag, atmosphere)
 
     # clamp to get the cases, eq (12-14)
     # if Ri_N > Ri_c then C = 0
@@ -148,7 +157,9 @@ function boundary_layer_drag!(
     # which doesn't change much with instantaneous temperature variations but with
     # vertical resolution, hence κ^2/log(Z/z₀)^2 is precalculated in initialize!
     Ri_N = clamp(Ri_N, 0, Ri_c)
-    column.boundary_layer_drag = drag_max*(1-Ri_N/Ri_c)^2
+
+    # extension over Frierson, 2006: minimum drag to avoid zero surface fluxes
+    column.boundary_layer_drag = max(drag_min, drag_max*(1-Ri_N/Ri_c)^2)
 end
 
 """
@@ -157,16 +168,19 @@ Calculate the bulk richardson number following Frierson, 2007.
 For vertical stability in the boundary layer."""
 function bulk_richardson_surface(
     column::ColumnVariables,
+    drag::BulkRichardsonDrag,
     atmosphere::AbstractAtmosphere,
 )
     cₚ = atmosphere.heat_capacity
-    (; u, v, geopot, temp_virt) = column
+    (; u, v, geopot, temp_virt, surface_geopotential) = column
+    (; gust_speed) = drag
     surface = column.nlayers    # surface index = nlayers
 
-    V² = u[surface]^2 + v[surface]^2
+    V² = u[surface]^2 + v[surface]^2 + gust_speed^2
+    gz = geopot[surface] - surface_geopotential
     Θ₀ = cₚ*temp_virt[surface]
-    Θ₁ = Θ₀ + geopot[surface]
-    bulk_richardson = geopot[surface]*(Θ₁ - Θ₀) / (Θ₀*V²)
+    Θ₁ = Θ₀ + gz
+    bulk_richardson = gz*(Θ₁ - Θ₀) / (Θ₀*V²)
     return bulk_richardson
 end
 
