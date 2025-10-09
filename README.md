@@ -116,9 +116,12 @@ section of the [documentation](https://speedyweather.github.io/SpeedyWeatherDocu
 You can use SpeedyWeather from the [Julia REPL](https://docs.julialang.org/en/v1/stdlib/REPL/), running a script
 like `julia speedyweather.jl`, or interactively through [Jupyter](https://jupyter.org/try) (install a Julia kernel
 with [IJulia](https://github.com/JuliaLang/IJulia.jl)) or [Pluto notebooks](https://plutojl.org/).
-Here an example for a Pluto notebook
+Here an example for a Pluto notebook, changing interactively resolution and switching off
+convection and surface humidity fluxes, automatically updating a plot of near-surface
+humidity
 
-![speedyweather_pluto](https://github.com/user-attachments/assets/4cf84571-9d07-40fc-ad4e-821dc9fad39d)
+![speedyweather_pluto](https://github.com/user-attachments/assets/5d485015-8c28-4c44-9c2b-c3acdf335788)
+
 
 
 ## Gallery
