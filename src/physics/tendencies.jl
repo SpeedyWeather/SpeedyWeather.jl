@@ -1,5 +1,4 @@
-"""
-$(TYPEDSIGNATURES)
+"""$(TYPEDSIGNATURES)
 Compute tendencies for u, v, temp, humid from physical parametrizations.
 Extract for each vertical atmospheric column the prognostic variables
 (stored in `diagn` as they are grid-point transformed), loop over all
@@ -9,54 +8,37 @@ then write the tendencies back into a horizontal field of tendencies.
 function parameterization_tendencies!(
     diagn::DiagnosticVariables,
     progn::PrognosticVariables,
-    time::DateTime,
     model::PrimitiveEquation,
 )
-    # TODO call them elsewhere? these are non-column parameterizations (could be reformulated as column though)
+    # parameterizations with their own kernel
+    (; time) = progn.clock
     cos_zenith!(diagn, time, model)
-    albedo!(diagn, progn, model)
 
-    rings = eachring(diagn.grid.vor_grid)       # indices on every latitude ring
-    for ij in eachgridpoint(diagn)              # loop over all horizontal grid points
-
-        (; column) = diagn
-        jring = whichring(ij, rings)            # ring index gridpoint ij is on
-
-        # extract current column for contiguous memory access
-        reset_column!(column)                   # set accumulators back to zero for next grid point
-        get_column!(column, diagn, progn, ij, jring, model)  
-
-        # calculate parameterizations
-        perturb_parameterization_inputs!(column, model)         # possibly perturb inputs to parameterizations?
-        parameterization_tendencies!(column, progn, model)      # execute all parameterizations
-        perturb_parameterization_tendencies!(column, model)     # possibly perturb tendencies from parameterizations
-
-        # write tendencies from parametrizations back into horizontal fields
-        write_column_tendencies!(diagn, column, model, ij)
-    end
+    # all other parameterizations are fused into a single kernel over horizontal grid point index ij
+    (; architecture, npoints) = model.spectral_grid
+    launch!(architecture, LinearWorkOrder, (npoints,), parameterization_tendencies_kernel!, diagn, progn, model)
+    return nothing
 end
 
-"""$(TYPEDSIGNATURES)
-Calls for `column` one physics parameterization after another
-and convert fluxes to tendencies."""
-function parameterization_tendencies!(
-    column::ColumnVariables,
-    progn::PrognosticVariables,
-    model::PrimitiveEquation,
-)
-    get_thermodynamics!(column, model)
-    temperature_relaxation!(column, model)
-    boundary_layer_drag!(column, model)
-    vertical_diffusion!(column, model)
-    convection!(column, model)
-    large_scale_condensation!(column, model)
-    optical_depth!(column, model)
-    shortwave_radiation!(column, model)
-    longwave_radiation!(column, model)
-    surface_fluxes!(column, progn, model)   # pass on prognostic variables for prescribed fluxes
+@kernel function parameterization_tendencies_kernel!(diagn, progn, model)
+    
+    ij = @index(Global, Linear)     # every horizontal grid point ij
 
-    # sum fluxes on half levels up and down for every layer
-    fluxes_to_tendencies!(column, model.geometry, model.planet, model.atmosphere)
+    perturb_inputs!(            ij, diagn, progn, model)
+
+    albedo!(                    ij, diagn, progn, model)
+    thermodynamics!(            ij, diagn, progn, model)
+    temperature_relaxation!(    ij, diagn, progn, model)
+    boundary_layer_drag!(       ij, diagn, progn, model)
+    vertical_diffusion!(        ij, diagn, progn, model)
+    convection!(                ij, diagn, progn, model)
+    large_scale_condensation!(  ij, diagn, progn, model)
+    optical_depth!(             ij, diagn, progn, model)
+    shortwave_radiation!(       ij, diagn, progn, model)
+    longwave_radiation!(        ij, diagn, progn, model)
+    surface_fluxes!(            ij, diagn, progn, model)
+
+    perturb_tendencies!(        ij, diagn, progn, model)
 end
 
 """

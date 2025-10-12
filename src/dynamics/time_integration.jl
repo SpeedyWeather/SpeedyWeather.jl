@@ -372,22 +372,20 @@ function timestep!(
     lf1::Integer = 2,               # leapfrog index 1 (dis/enables Robert+Williams filter)
     lf2::Integer = 2,               # leapfrog index 2 (time step used for tendencies)
 )
-
     model.feedback.nans_detected && return nothing  # exit immediately if NaRs already present
-    (; time) = progn.clock                           # current time
 
     # set the tendencies back to zero for accumulation
     fill!(diagn.tendencies, 0, typeof(model))
 
-    if model.physics                                # switch on/off all physics parameterizations
+    if model.physics                            # switch on/off all physics parameterizations
         # calculate all parameterizations
-        parameterization_tendencies!(diagn, progn, time, model)
+        parameterization_tendencies!(diagn, progn, model)
         ocean_timestep!(progn, diagn, model)    # sea surface temperature and maybe in the future sea ice
         sea_ice_timestep!(progn, diagn, model)  # sea ice
         land_timestep!(progn, diagn, model)     # soil moisture and temperature, vegetation, maybe rivers
     end
 
-    if model.dynamics                                           # switch on/off all dynamics
+    if model.dynamics                                               # switch on/off all dynamics
         forcing!(diagn, progn, lf2, model)
         drag!(diagn, progn, lf2, model)
         dynamics_tendencies!(diagn, progn, lf2, model)              # dynamical core

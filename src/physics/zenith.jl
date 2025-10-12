@@ -140,7 +140,7 @@ export SolarZenith
 
 """Solar zenith angle varying with daily and seasonal cycle.
 $(TYPEDFIELDS)"""
-Base.@kwdef struct SolarZenith{NF<:AbstractFloat} <: AbstractZenith
+@kwdef struct SolarZenith{NF<:AbstractFloat} <: AbstractZenith
     # OPTIONS
     length_of_day::Second = Hour(24)
     length_of_year::Second = Day(365.25)
