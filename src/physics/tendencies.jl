@@ -26,6 +26,9 @@ end
     for parameterization in parameterizations
         parameterization!(ij, diagn, progn, parameterization, model_parameters)
     end
+
+    # tendencies have to be scaled by the radius
+    scaling!(ij, diagn, model_parameters.planet.radius)
 end
 
 """

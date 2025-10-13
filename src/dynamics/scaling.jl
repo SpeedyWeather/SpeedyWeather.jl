@@ -41,6 +41,15 @@ function scale!(progn::PrognosticVariables,
     # overwritten by the transform of the prognostic variables anyway
 end
 
+function scale!(ij::Integer,
+                diagn::Tendencies,
+                scale::Real)
+    diagn.u_tend_grid[ij] *= scale
+    diagn.v_tend_grid[ij] *= scale
+    diagn.temp_tend_grid[ij] *= scale
+    diagn.humid_tend_grid[ij] *= scale
+end
+
 """
 $(TYPEDSIGNATURES)
 Undo the radius-scaling of vorticity and divergence from scale!(progn, scale::Real)."""
