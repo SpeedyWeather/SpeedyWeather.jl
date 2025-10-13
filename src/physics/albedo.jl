@@ -34,26 +34,14 @@ end
 albedo!(ij, diagn::DiagnosticVariables, progn::PrognosticVariables, model::PrimitiveEquation) =
     albedo!(ij, diagn, progn, model.albedo, model)
 
-# composite albedos: call separately for ocean and land with .ocean and .land
-function albedo!(
-    ij::Integer,
-    diagn::DiagnosticVariables,
-    progn::PrognosticVariables,
-    albedo::OceanLandAlbedo,
-    model::PrimitiveEquation,
-)
+# composite OceanLandAlbedo: call separately for ocean and land with .ocean and .land
+function albedo!(ij, diagn::DiagnosticVariables, progn, albedo::OceanLandAlbedo, model)
     albedo!(ij, diagn.physics.ocean, progn, albedo.ocean, model)
     albedo!(ij, diagn.physics.land, progn, albedo.land, model)
 end
 
 # single albedo: call separately for ocean and land with the same albedo
-function albedo!(
-    ij::Integer,
-    diagn::DiagnosticVariables,
-    progn::PrognosticVariables,
-    albedo::AbstractAlbedo,
-    model::PrimitiveEquation,
-)
+function albedo!(ij, diagn::DiagnosticVariables, progn, albedo::AbstractAlbedo, model)
     albedo!(ij, diagn.physics.ocean, progn, albedo, model)
     albedo!(ij, diagn.physics.land, progn, albedo, model)
 end

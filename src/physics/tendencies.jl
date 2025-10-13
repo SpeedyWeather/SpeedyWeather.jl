@@ -1,10 +1,5 @@
 """$(TYPEDSIGNATURES)
-Compute tendencies for u, v, temp, humid from physical parametrizations.
-Extract for each vertical atmospheric column the prognostic variables
-(stored in `diagn` as they are grid-point transformed), loop over all
-grid-points, compute all parametrizations on a single-column basis,
-then write the tendencies back into a horizontal field of tendencies.
-"""
+Compute tendencies for u, v, temp, humid from physical parametrizations."""
 function parameterization_tendencies!(
     diagn::DiagnosticVariables,
     progn::PrognosticVariables,
@@ -14,31 +9,23 @@ function parameterization_tendencies!(
     (; time) = progn.clock
     cos_zenith!(diagn, time, model)
 
+    model_parameters = get_model_parameters(model)      # subsection of GPU-compatible model components
+    parameterizations = get_parameterizations(model)    # subsection of model: parameterizations only
+
     # all other parameterizations are fused into a single kernel over horizontal grid point index ij
     (; architecture, npoints) = model.spectral_grid
-    launch!(architecture, LinearWorkOrder, (npoints,), parameterization_tendencies_kernel!, diagn, progn, model)
+    launch!(architecture, LinearWorkOrder, (npoints,), parameterization_tendencies_kernel!,
+        diagn, progn, parameterizations, model_parameters)
     return nothing
 end
 
-@kernel function parameterization_tendencies_kernel!(diagn, progn, model)
+@kernel function parameterization_tendencies_kernel!(diagn, progn, parameterizations, model_parameters)
     
     ij = @index(Global, Linear)     # every horizontal grid point ij
 
-    perturb_inputs!(            ij, diagn, progn, model)
-
-    albedo!(                    ij, diagn, progn, model)
-    thermodynamics!(            ij, diagn, progn, model)
-    temperature_relaxation!(    ij, diagn, progn, model)
-    boundary_layer_drag!(       ij, diagn, progn, model)
-    vertical_diffusion!(        ij, diagn, progn, model)
-    convection!(                ij, diagn, progn, model)
-    large_scale_condensation!(  ij, diagn, progn, model)
-    optical_depth!(             ij, diagn, progn, model)
-    shortwave_radiation!(       ij, diagn, progn, model)
-    longwave_radiation!(        ij, diagn, progn, model)
-    surface_fluxes!(            ij, diagn, progn, model)
-
-    perturb_tendencies!(        ij, diagn, progn, model)
+    for parameterization in parameterizations
+        parameterization!(ij, diagn, progn, parameterization, model_parameters)
+    end
 end
 
 """

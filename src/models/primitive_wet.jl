@@ -182,3 +182,44 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
     # pack prognostic, diagnostic variables and model into a simulation
     return Simulation(prognostic_variables, diagnostic_variables, model)
 end
+
+"""$(TYPEDSIGNATURES)
+Extract the model components with parameters needed for the parameterizations
+as NamedTuple. These are the GPU-compatible components of the model."""
+function get_model_parameters(model::PrimitiveWet)
+    return (orography = model.orography.orography,
+            atmosphere = model.atmosphere,
+            planet = model.planet,
+            geometry = model.geometry,
+            land_sea_mask = model.land_sea_mask,
+            clausius_clapeyron = model.clausius_clapeyron,
+    )
+end
+
+"""$(TYPEDSIGNATURES)
+Extract the parameterizations from the model as NamedTuple.
+These are the GPU-compatible components of the model."""
+function get_parameterizations(model::PrimitiveWet)
+    return (# diffusion
+            vertical_diffusion = model.vertical_diffusion,
+            
+            # hydrological cycle
+            convection = model.convection,
+            large_scale_condensation = model.large_scale_condensation,
+            
+            # radiation
+            albedo = model.albedo,
+            optical_depth = model.optical_depth,
+            shortwave_radiation = model.shortwave_radiation,
+            longwave_radiation = model.longwave_radiation,
+            
+            # surface fluxes
+            boundary_layer_drag = model.boundary_layer_drag,
+            surface_momentum_flux = model.surface_momentum_flux,
+            surface_heat_flux = model.surface_heat_flux,
+            surface_humidity_flux = model.surface_humidity_flux,
+            
+            # stochastic physics
+            stochastic_physics = model.stochastic_physics,
+    )
+end
