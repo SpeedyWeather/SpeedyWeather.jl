@@ -141,7 +141,7 @@ $TYPEDFIELDS."""
     u_grid_prev     ::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
     "Meridional velocity [m/s] at previous time step"
     v_grid_prev     ::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
-    "Logarithm of surface pressure [Pa] at previous time step"
+    "Surface pressure [Pa] at previous time step (not logarithm!)"
     pres_grid_prev  ::GridVariable2D = zeros(GridVariable2D, grid)
     "Tracers [?] at previous time step"
     tracers_grid_prev::Dict{Symbol, GridVariable3D} = Dict{Symbol, GridVariable3D}()
@@ -268,8 +268,8 @@ function DynamicsVariables(SG::SpectralGrid;
 end
 
 
-export DynamicsVariablesOcean
-@kwdef struct DynamicsVariablesOcean{
+export DiagnosticVariablesOcean
+@kwdef struct DiagnosticVariablesOcean{
     NF,
     ArrayType,
     GridType,
@@ -295,11 +295,11 @@ export DynamicsVariablesOcean
     albedo::GridVariable2D = zeros(GridVariable2D, grid)
 end
 
-DynamicsVariablesOcean(SG::SpectralGrid) =
-    DynamicsVariablesOcean{SG.NF, SG.ArrayType, typeof(SG.grid), SG.GridVariable2D}(; SG.grid)
+DiagnosticVariablesOcean(SG::SpectralGrid) =
+    DiagnosticVariablesOcean{SG.NF, SG.ArrayType, typeof(SG.grid), SG.GridVariable2D}(; SG.grid)
 
-export DynamicsVariablesLand
-@kwdef struct DynamicsVariablesLand{
+export DiagnosticVariablesLand
+@kwdef struct DiagnosticVariablesLand{
     NF,
     ArrayType,
     GridType,
@@ -331,8 +331,8 @@ export DynamicsVariablesLand
     river_runoff::GridVariable2D = zeros(GridVariable2D, grid)
 end
 
-DynamicsVariablesLand(SG::SpectralGrid) =
-    DynamicsVariablesLand{SG.NF, SG.ArrayType, typeof(SG.grid), SG.GridVariable2D}(; SG.grid)
+DiagnosticVariablesLand(SG::SpectralGrid) =
+    DiagnosticVariablesLand{SG.NF, SG.ArrayType, typeof(SG.grid), SG.GridVariable2D}(; SG.grid)
 
 
 export PhysicsVariables
@@ -349,8 +349,8 @@ $(TYPEDFIELDS)"""
 
     grid::GridType          # resolution of grid
 
-    ocean::DynamicsVariablesOcean{NF, ArrayType, GridType, GridVariable2D}
-    land::DynamicsVariablesLand{NF, ArrayType, GridType, GridVariable2D}
+    ocean::DiagnosticVariablesOcean{NF, ArrayType, GridType, GridVariable2D}
+    land::DiagnosticVariablesLand{NF, ArrayType, GridType, GridVariable2D}
 
     # PRECIPITATION
     "Accumulated large-scale rain [m]"
@@ -413,8 +413,8 @@ function PhysicsVariables(SG::SpectralGrid)
     (; grid, NF, ArrayType) = SG
     (; GridVariable2D) = SG
 
-    ocean = DynamicsVariablesOcean(SG)
-    land = DynamicsVariablesLand(SG)
+    ocean = DiagnosticVariablesOcean(SG)
+    land = DiagnosticVariablesLand(SG)
 
     return PhysicsVariables{NF, ArrayType, typeof(grid), GridVariable2D}(; grid, ocean, land)
 end

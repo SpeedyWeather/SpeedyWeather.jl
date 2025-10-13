@@ -78,7 +78,6 @@ function albedo!(ij, diagn_albedo::AbstractField2D, albedo::AbstractField2D)
 end
 
 ## ALBEDO CLIMATOLOGY
-
 export AlbedoClimatology
 @kwdef struct AlbedoClimatology{NF, GridVariable2D} <: AbstractAlbedo
     "[OPTION] path to the folder containing the albedo file, pkg path default"

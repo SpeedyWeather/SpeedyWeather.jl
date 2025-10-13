@@ -1,18 +1,5 @@
 abstract type AbstractStochasticPhysics <: AbstractParameterization end
 
-# fucntion barriers
-function perturb_inputs!(ij, diagn, progn, model)
-    perturb_inputs!(ij, diagn, progn, model.stochastic_physics, model)
-end
-
-function perturb_tendencies!(ij, diagn, progn, model)
-    perturb_tendencies!(ij, diagn, progn, model.stochastic_physics, model)
-end
-
-# no perturbations
-perturb_inputs!(ij, diagn, progn, ::Nothing, model) = nothing
-perturb_tendencies!(ij, diagn, progn, ::Nothing, model) = nothing
-
 export StochasticallyPerturbedParameterizationTendencies
 
 """Defines the stochastically perturbed parameterization tendencies (SPPT)
@@ -39,16 +26,17 @@ function initialize!(sppt::StochasticallyPerturbedParameterizationTendencies, mo
     return nothing
 end
 
-# only perturb tendencies (=outputs) not inputs
-perturb_inputs!(ij, diagn, progn, sppt::StochasticallyPerturbedParameterizationTendencies, model) = nothing
+# function barrier
+parameterization!(ij, diagn, progn, sppt::StochasticallyPerturbedParameterizationTendencies, model) =
+    sppt!(ij, diagn, sppt)
 
-function perturb_tendencies!(ij, diagn, progn, sppt::StochasticallyPerturbedParameterizationTendencies, model)
+function sppt!(ij, diagn, sppt)
     
     r = diagn.grid.random_pattern[ij]
     (; taper) = sppt
     (; u_tend_grid, v_tend_grid, temp_tend_grid, humid_tend_grid) = diagn.tendencies
 
-    for k in eachlayer(u_tend_grid, v_tend_grid, temp_tend_grid, humid_tend_grid)
+    @inbounds for k in eachlayer(u_tend_grid, v_tend_grid, temp_tend_grid, humid_tend_grid)
         R = 1 + r*taper[k]
         u_tend_grid[ij, k] *= R
         v_tend_grid[ij, k] *= R

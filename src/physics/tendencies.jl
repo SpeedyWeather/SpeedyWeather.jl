@@ -23,12 +23,13 @@ end
     
     ij = @index(Global, Linear)     # every horizontal grid point ij
 
+    # loop over all parameterizations in order
     for parameterization in parameterizations
         parameterization!(ij, diagn, progn, parameterization, model_parameters)
     end
 
-    # tendencies have to be scaled by the radius
-    scaling!(ij, diagn, model_parameters.planet.radius)
+    # tendencies have to be scaled by the radius for the dynamical core
+    scale!(ij, diagn, model_parameters.planet.radius)
 end
 
 """
@@ -83,3 +84,11 @@ function fluxes_to_tendencies!(
 
     return nothing
 end
+
+# function barrier
+flux_to_tendency(k, flux, pₛ, model) =
+    flux_to_tendency(k, flux, pₛ, model.planet.gravity, model.geometry.σ_levels_thick)
+
+"""$(TYPEDSIGNATURES)
+Flux `flux` into layer `k` converted to tendency [?/s]"""
+flux_to_tendency(k, flux, pₛ, g, Δσ) = g/(pₛ*Δσ[k]) * flux

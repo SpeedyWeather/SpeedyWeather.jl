@@ -1,13 +1,10 @@
 abstract type AbstractCondensation <: AbstractParameterization end
 
-# no condensation
-large_scale_condensation!(::ColumnVariables, ::Nothing, ::PrimitiveEquation) = nothing
-
 export ImplicitCondensation
 """
 Large-scale condensation with implicit time stepping.
 $(TYPEDFIELDS)"""
-@kwdef mutable struct ImplicitCondensation{NF<:AbstractFloat} <: AbstractCondensation
+@kwdef mutable struct ImplicitCondensation{NF} <: AbstractCondensation
     "[OPTION] Relative humidity threshold [1 = 100%] to trigger condensation"
     relative_humidity_threshold::NF = 0.95
 
@@ -28,36 +25,12 @@ $(TYPEDFIELDS)"""
 end
 
 ImplicitCondensation(SG::SpectralGrid; kwargs...) = ImplicitCondensation{SG.NF}(; kwargs...)
+initialize!(::ImplicitCondensation, ::PrimitiveEquation) = nothing
 
-# nothing to initialize with this scheme
-initialize!(scheme::ImplicitCondensation, model::PrimitiveEquation) = nothing
-
-# do nothing fall back for primitive dry 
-function large_scale_condensation!( 
-    column::ColumnVariables,
-    model::PrimitiveEquation,
-)
-    return nothing
-end
-
-# function barrier for all AbstractCondensation
-function large_scale_condensation!( 
-    column::ColumnVariables,
-    model::PrimitiveWet,
-)
-    # dispatch by large scale condensation type
-    large_scale_condensation!(column, model.large_scale_condensation, model)
-end
-
-# function barrier for ImplicitCondensation to unpack model
-function large_scale_condensation!( 
-    column::ColumnVariables,
-    condensation::ImplicitCondensation,
-    model::PrimitiveWet,
-)
-    saturation_humidity!(column, model.clausius_clapeyron)
-    large_scale_condensation!(column, condensation,
-        model.clausius_clapeyron, model.geometry, model.planet, model.atmosphere, model.time_stepping)
+# function barrier
+function parameterization!(ij, diagn, progn, lsc::ImplicitCondensation, model)
+    (; clausius_clapeyron, geometry, planet, atmosphere, time_stepping) = model
+    large_scale_condensation!(ij, diagn, lsc, clausius_clapeyron, geometry, planet, atmosphere, time_stepping)
 end
 
 """
@@ -67,7 +40,8 @@ relative humidity. Calculates the tendencies for specific humidity
 and temperature from latent heat release and integrates the
 large-scale precipitation vertically for output."""
 function large_scale_condensation!(
-    column::ColumnVariables,
+    ij,
+    diagn::DiagnosticVariables,
     condensation::ImplicitCondensation,
     clausius_clapeyron::AbstractClausiusClapeyron,
     geometry::Geometry,
@@ -75,13 +49,14 @@ function large_scale_condensation!(
     atmosphere::AbstractAtmosphere,
     time_stepping::AbstractTimeStepper,
 )
-
-    (; pres, temp, humid) = column          # prognostic vars (from previous time step for numerical stability)
-    (; temp_tend, humid_tend) = column      # tendencies to write into
-    (; sat_humid) = column                  # intermediate variable, calculated in thermodynamics!
+    # use previous time step for more stable Euler forward step of the parameterizations
+    temp = diagn.grid.temp_grid_prev
+    humid = diagn.grid.humid_grid_prev
+    temp_tend = diagn.tendencies.temp_tend_grid
+    humid_tend = diagn.tendencies.humid_tend_grid
 
     # precompute scaling constants to minimize divisions (used to convert between humidity [kg/kg] and precipitation [m])
-    pₛ = pres[end]                          # surface pressure
+    pₛ = diagn.grid.pres_grid_prev[ij]      # surface pressure [Pa]
     (; Δt_sec) = time_stepping
     Δσ = geometry.σ_levels_thick            # layer thickness in sigma coordinates
     pₛ_gρ = pₛ/(planet.gravity * atmosphere.water_density)
@@ -97,14 +72,15 @@ function large_scale_condensation!(
 
     (; time_scale, relative_humidity_threshold, freezing_threshold, melting_threshold) = condensation
     let_it_snow = condensation.snow                     # flag to switch snow on/off
-    rain_flux_down = zero(eltype(column))               # start with zero rain/snow flux at top of atmosphere
-    snow_flux_down = zero(eltype(column))               # both have units of [m/s] (precipitation)
+    rain_flux_down = zero(eltype(temp))                 # start with zero rain/snow flux at top of atmosphere
+    snow_flux_down = zero(eltype(temp))                 # both have units of [m/s] (precipitation)
 
-    @inbounds for k in eachindex(column)
+    @inbounds for k in eachlayer(temp, humid)
 
         # Condensation from humidity in this layer (for a negative humidity tendency)
         # relative to threshold that can be <100%, e.g. 95%
-        δq_cond = sat_humid[k] * relative_humidity_threshold - humid[k]
+        sat_humid_k = saturation_humidity(temp[ij, k], σ[k]*pres[ij], clausius_clapeyron)
+        δq_cond = sat_humid_k * relative_humidity_threshold - humid[ij, k]
         
         # skip if no condensation has occurred yet in this layer or above
         if δq_cond < 0 || snow_flux_down > 0 || rain_flux_down > 0
@@ -115,7 +91,7 @@ function large_scale_condensation!(
             Δtgρ_Δp = inv(Δp_Δtgρ)                          # [s/m]
 
             # 1. Melting of snow from layer above
-            δT_melt = max(temp[k] - melting_threshold, 0)   # only if temperature above melting threshold
+            δT_melt = max(temp[ij, k] - melting_threshold, 0)   # only if temperature above melting threshold
             E_avail = cₚ_Lᵢ * δT_melt                       # available energy [1] in multiples of latent heat [J/kg of air] for melting
             melt_rate_max = E_avail * Δp_Δtgρ               # max rate of snow melt [m/s]
             melt_rate = min(snow_flux_down, melt_rate_max)  # cap to snow flux [m/s], don't melt more than available
@@ -126,7 +102,7 @@ function large_scale_condensation!(
                                                             # don't use δq_melt as humidity tendency as it's only snow->rain
 
             # 2. Reevaporation and condensation
-            dq = sat_humid[k] - humid[k]                    # reevaporation relative to 100% humidity
+            dq = sat_humid_k - humid[ij, k]                 # reevaporation relative to 100% humidity
             r = condensation.reevaporation * max(dq, 0)     # reevaporation efficiency [1], scale linearly with dryness
             rain_evaporated = min(r, 1) * rain_flux_down    # [m/s], min(r, 1) to not evaporate more than available
             rain_flux_down -= rain_evaporated               # remove reevaporated rain
@@ -137,15 +113,15 @@ function large_scale_condensation!(
             # Solve for melting of snow, condensation, reevaporation (and possibly sublimation) implicitly in time
             # implicit correction, Frierson et al. 2006 eq. (21)
             # derivative of qsat wrt to temp
-            T = temp[k] + Δt_sec*δT             # use temperature minus latent heat for melting in gradient
-            dqsat_dT = sat_humid[k] * relative_humidity_threshold * Lᵥ_cₚ/(Rᵥ*T^2)
+            T = temp[ij, k] + Δt_sec*δT                     # use temperature minus latent heat for melting in gradient
+            dqsat_dT = sat_humid_k * relative_humidity_threshold * Lᵥ_cₚ/(Rᵥ*T^2)
             δq /= ((1 + Lᵥ_cₚ*dqsat_dT) * time_scale*Δt_sec)
-            δT = -Lᵥ_cₚ * δq                    # latent heat release for enthalpy conservation
+            δT = -Lᵥ_cₚ * δq                                # latent heat release for enthalpy conservation
 
             # If there is large-scale condensation at a level higher (i.e. smaller k) than
             # the cloud-top previously diagnosed due to convection, then increase the cloud-top
             # Fortran SPEEDY documentation Page 7 (last sentence)
-            column.cloud_top = min(column.cloud_top, k)
+            # diagn.physics.cloud_top = min(column.cloud_top, k)
 
             # 2. Precipitation (rain) due to large-scale condensation [kg/m²/s] /ρ for [m/s]
             δq_rain = min(0, δq)                # precipitation only for negative humidity tendency
@@ -153,7 +129,7 @@ function large_scale_condensation!(
             snow = zero(rain)                   # start with zero snow but potentially swap below
 
             # decide whether to turn precip into snow (all rain freezes to snow)
-            rain, snow = let_it_snow && temp[k] < freezing_threshold ? (snow, rain) : (rain, snow)
+            rain, snow = let_it_snow && temp[ij, k] < freezing_threshold ? (snow, rain) : (rain, snow)
             rain_flux_down += rain              # accumulate into downward fluxes [m/s] (used in layer below)
             snow_flux_down += snow              # accumulate into downward fluxes [m/s] (used in layer below)
 
@@ -161,8 +137,8 @@ function large_scale_condensation!(
             δT -= (snow > 0) * Lᵢ_cₚ * δq_rain  # snow for negative δq (condensation then freezing)
 
             # only accumulate into humid_tend now to allow humid_tend != 0 before this scheme is called
-            humid_tend[k] += δq                 # [kg/kg/s]
-            temp_tend[k] += δT                  # [K/s]
+            humid_tend[ij, k] += δq             # [kg/kg/s]
+            temp_tend[ij, k] += δT              # [K/s]
         end
     end
 
@@ -171,12 +147,12 @@ function large_scale_condensation!(
     snow_flux_down = max(snow_flux_down, 0)
 
     # precipitation from rain/snow [m] during time step whatever is fluxed out 
-    column.rain_large_scale = Δt_sec*rain_flux_down
-	column.snow_large_scale = Δt_sec*snow_flux_down
+    diagn.physics.rain_large_scale[ij] += Δt_sec*rain_flux_down
+	diagn.physics.snow_large_scale[ij] += Δt_sec*snow_flux_down
 
     # and the rain/snow fall rate [m/s]
-    column.rain_rate_large_scale = rain_flux_down
-    column.snow_rate_large_scale = snow_flux_down
+    # diagn.physics.rain_rate_large_scale[ij] = rain_flux_down
+    # diagn.physics.snow_rate_large_scale[ij] = snow_flux_down
 
     return nothing
 end

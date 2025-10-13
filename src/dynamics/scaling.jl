@@ -41,17 +41,18 @@ function scale!(progn::PrognosticVariables,
     # overwritten by the transform of the prognostic variables anyway
 end
 
-function scale!(ij::Integer,
-                diagn::Tendencies,
-                scale::Real)
-    diagn.u_tend_grid[ij] *= scale
-    diagn.v_tend_grid[ij] *= scale
-    diagn.temp_tend_grid[ij] *= scale
-    diagn.humid_tend_grid[ij] *= scale
+"""$(TYPEDSIGNATURES)
+Scale the tendencies inside `diagn` with scalar `scale`.
+Intended use to scale the tendencies of the parameterizations
+by the radius for the dynamical core."""
+function scale!(ij, diagn::Tendencies, scale::Real)
+    diagn.u_tend_grid[ij, :]        .*= scale
+    diagn.v_tend_grid[ij, :]        .*= scale
+    diagn.temp_tend_grid[ij, :]     .*= scale
+    diagn.humid_tend_grid[ij, :]    .*= scale
 end
 
-"""
-$(TYPEDSIGNATURES)
+"""$(TYPEDSIGNATURES)
 Undo the radius-scaling of vorticity and divergence from scale!(progn, scale::Real)."""
 function unscale!(progn::PrognosticVariables)
     inv_scale = inv(progn.scale[])
@@ -60,8 +61,7 @@ function unscale!(progn::PrognosticVariables)
     progn.scale[] = 1                   # set scale back to 1=unscaled
 end
 
-"""
-$(TYPEDSIGNATURES)
+"""$(TYPEDSIGNATURES)
 Undo the radius-scaling of vorticity and divergence from scale!(diagn, scale::Real)."""
 function unscale!(diagn::DiagnosticVariables)
     inv_scale = inv(diagn.scale[])
