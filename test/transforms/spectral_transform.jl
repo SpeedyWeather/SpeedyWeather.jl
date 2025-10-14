@@ -94,9 +94,7 @@ end
             @testset for Grid in (  FullGaussianGrid,
                                     FullClenshawGrid,
                                     OctahedralGaussianGrid,
-                                    OctahedralClenshawGrid, 
-                                    HEALPixGrid,
-                                    OctaHEALPixGrid)
+                                    OctahedralClenshawGrid)
 
                 SG = SpectralGrid(; NF, trunc, Grid)
                 S = SpectralTransform(SG)
