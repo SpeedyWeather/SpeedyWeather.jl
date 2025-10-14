@@ -144,7 +144,7 @@ function _fourier_batched!(                 # GRID TO SPECTRAL
 end
 
 """$(TYPEDSIGNATURES)
-(Forward) Fast Fourier transform (grid to spectral) in zonal direction of `grids`,
+(Forward) Fast Fourier transform (grid to spectral) in zonal direction of `field`,
 stored in scratch memories `f_north`, `f_south` to be passed on to the Legendre transform.
 Serial version that does not require the number of vertical layers to be the same as precomputed in `S`.
 Not to be called directly, use `transform!` instead."""
@@ -222,7 +222,7 @@ end
 
 """$(TYPEDSIGNATURES)
 (Inverse) Fast Fourier transform (spectral to grid) of Legendre-transformed inputs `g_north` and `g_south`
-to be stored in `grids`. Serial version that does not require the number of vertical layers to be the same
+to be stored in `field`. Serial version that does not require the number of vertical layers to be the same
 as precomputed in `S`. Not to be called directly, use `transform!` instead."""
 function _fourier_serial!(                  # SPECTRAL TO GRID
     field::AbstractField,                   # gridded output

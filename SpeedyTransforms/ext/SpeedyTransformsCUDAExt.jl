@@ -21,7 +21,7 @@ module SpeedyTransformsCUDAExt
         brfft_plans::Vector{AbstractFFTs.Plan},
         rfft_plans_1D::Vector{AbstractFFTs.Plan},
         brfft_plans_1D::Vector{AbstractFFTs.Plan},
-        fake_grid_data::AbstractField{NF, N, <:CuArray{NF}},
+        fake_field_data::AbstractField{NF, N, <:CuArray{NF}},
         scratch_memory_north::CuArray{Complex{NF}},
         rings,
         nlons::Vector{<:Int}
@@ -31,9 +31,9 @@ module SpeedyTransformsCUDAExt
 
         # For each ring generate an FFT plan (for all layers and for a single layer)
         for (j, nlon) in enumerate(nlons)
-            real_matrix_input = fake_grid_data.data[rings[j], :]
+            real_matrix_input = fake_field_data.data[rings[j], :]
             complex_matrix_input = scratch_memory_north[1:nlon÷2 + 1, :, j]
-            real_vector_input = fake_grid_data.data[rings[j], 1]
+            real_vector_input = fake_field_data.data[rings[j], 1]
             complex_vector_input = scratch_memory_north[1:nlon÷2 + 1, 1, j]
 
             rfft_plans[j] = FFT_package.plan_rfft(real_matrix_input, 1)
@@ -60,7 +60,7 @@ module SpeedyTransformsCUDAExt
         not_equator::Bool = true
     ) where {NF<:AbstractFloat, N}
         rfft_plan = S.rfft_plans[j]     # FFT planned wrt nlon on ring
-        nlayers = size(grids, 2)        # number of vertical layers
+        nlayers = size(fields, 2)        # number of vertical layers
 
         if not_equator
             view(f_out, 1:nfreq, 1:nlayers, j) .= rfft_plan * fields.data[ilons, :]
