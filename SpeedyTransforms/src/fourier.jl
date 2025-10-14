@@ -18,6 +18,92 @@ function _fourier!(field::AbstractField, f_north, f_south, S::SpectralTransform)
     return _fourier!(field, f_north, f_south, S)
 end
 
+# Forward FFT Application Function for batched FFT
+function _apply_batched_fft!(
+    f_out::AbstractArray{<:Complex, 3},
+    field::AbstractField,
+    S::SpectralTransform, 
+    j::Int,
+    nfreq::Int,
+    ilons::UnitRange{Int};
+    not_equator::Bool = true
+)
+    (; rfft_plans) = S              # pre-planned transforms
+    rfft_plan = rfft_plans[j]       # FFT planned wrt nlon on ring
+    nlayers = size(field, 2)        # number of vertical layers
+
+    # Perform the FFT
+    if not_equator # skip FFT, redundant when north already did that latitude
+        # this version currently allocates a small array, FFTW supports strided outputs, but FFTW.jl doesn't 
+        view(f_out, 1:nfreq, 1:nlayers, j) .= rfft_plan * view(field.data, ilons, :)
+    else
+        fill!(view(f_out, 1:nfreq, 1:nlayers, j), 0)
+    end
+end    
+
+# Inverse FFT Application Function for batched FFT
+function _apply_batched_fft!(
+    field::AbstractField,
+    g_in::AbstractArray{<:Complex, 3},
+    S::SpectralTransform,
+    j::Int,
+    nlon::Int,
+    ilons::UnitRange{Int};
+    not_equator::Bool = true
+)
+    (; brfft_plans) = S             # pre-planned transforms
+    brfft_plan = brfft_plans[j]     # FFT planned wrt nlon on ring
+    nlayers = size(field, 2)        # number of vertical layers
+    nfreq = nlon÷2 + 1              
+
+    if not_equator  # skip FFT, redundant when north already did that latitude
+        # this version currently allocates a small array, FFTW supports strided outputs, but FFTW.jl doesn't 
+        view(field.data, ilons, :) .= brfft_plan * view(g_in, 1:nfreq, 1:nlayers, j)
+    end
+end
+
+# Forward FFT Application Function for serial FFT
+function _apply_serial_fft!(
+    f_out::AbstractArray{<:Complex, 3},
+    field::AbstractField,
+    S::SpectralTransform, 
+    j::Int,
+    k::Int,
+    nfreq::Int,
+    ilons::UnitRange{Int};
+    not_equator::Bool = true
+)
+    (; rfft_plans_1D) = S           # pre-planned transforms
+    rfft_plan = rfft_plans_1D[j]    # FFT planned wrt nlon on ring
+    k_grid = eachlayer(field)[k]    # Precomputed ring index (as a Cartesian index)
+
+    if not_equator 
+        view(f_out, 1:nfreq, k, j) .= rfft_plan *  view(field.data, ilons, k_grid)
+    else
+        fill!(view(f_out, 1:nfreq, k, j), 0)
+    end
+end
+
+# Inverse FFT Application Function for serial FFT
+function _apply_serial_fft!(
+    field::AbstractField,
+    g_in::AbstractArray{<:Complex, 3},
+    S::SpectralTransform,
+    j::Int,
+    k::Int,
+    nfreq::Int,
+    ilons::UnitRange{Int};
+    not_equator::Bool = true
+)
+    (; brfft_plans_1D) = S              # pre-planned transforms
+    brfft_plan = brfft_plans_1D[j]      # FFT planned wrt nlon on ring
+    k_grid = eachlayer(field)[k]        # Precomputed ring index (as a Cartesian index)
+
+    if not_equator
+        view(field.data, ilons, k_grid) .= brfft_plan * view(g_in, 1:nfreq, k, j)
+    end
+end
+
 """$(TYPEDSIGNATURES)
 Apply FFT plan to field. Due to different limitations of FFTW and CUDA FFT plans,
 this function is dispatched on the array type and indexing.

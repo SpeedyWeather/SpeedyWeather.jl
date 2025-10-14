@@ -46,15 +46,98 @@ module SpeedyTransformsCUDAExt
     end
 
     """$(TYPEDSIGNATURES)
-    Apply FFT plan to field. Due to different limitations of FFTW and CUDA FFT plans,
-    this function is dispatched on the array type and indexing. CUFFT doesn't allow plans to be applied to views,
-    so we have to use indexing instead.
+    (Forward) FFT, applied in zonal direction of `fields` provided. This is the 
+    GPU/CUDA equivalent of the `apply_batched_fft!` function in the CPU version. 
+    Uses indexing as we seemingly can't use views with the FFT planning with CUFFT.
     """
-    function SpeedyTransforms._apply_fft_plan!(f_out, nfreq, layers, j, plan, field::Field{NF, N, <:CuArray{NF}}, ilons, k_grid=Colon()) where {NF, N}
-        view(f_out, 1:nfreq, layers, j) .= plan * field.data[ilons, k_grid]
+    function SpeedyTransforms._apply_batched_fft!(
+        f_out::CuArray{<:Complex, 3},
+        fields::AbstractField{NF, N, <:CuArray},
+        S::SpectralTransform, 
+        j::Int,
+        nfreq::Int,
+        ilons::UnitRange{Int};
+        not_equator::Bool = true
+    ) where {NF<:AbstractFloat, N}
+        rfft_plan = S.rfft_plans[j]     # FFT planned wrt nlon on ring
+        nlayers = size(grids, 2)        # number of vertical layers
+
+        if not_equator
+            view(f_out, 1:nfreq, 1:nlayers, j) .= rfft_plan * fields.data[ilons, :]
+        else
+            fill!(f_out[1:nfreq, 1:nlayers, j], 0)
+        end
     end
 
-    function SpeedyTransforms._apply_fft_plan!(field_out, ilons, k, plan, g_in::CuArray, nfreq::Int, layers, j::Int) 
-        view(field_out, ilons, k) .= plan * g_in[1:nfreq, layers, j]
+    """$(TYPEDSIGNATURES)
+    (Inverse) FFT, applied in zonal direction of `fields` provided. This is the
+    GPU/CUDA equivalent of the `apply_batched_fft!` function in the CPU version.
+    Uses indexing as we seemingly can't use views with the FFT planning with CUFFT.
+    """
+    function SpeedyTransforms._apply_batched_fft!(
+        fields::AbstractField{NF, N, <:CuArray},
+        g_in::CuArray{<:Complex, 3},
+        S::SpectralTransform,
+        j::Int,
+        nlon::Int,
+        ilons::UnitRange{Int};
+        not_equator::Bool = true
+    ) where {NF<:AbstractFloat, N}
+        brfft_plan = S.brfft_plans[j]   # FFT planned wrt nlon on ring
+        nlayers = size(fields, 2)        # number of vertical layers
+        nfreq = nlon÷2 + 1              # linear max Fourier frequency wrt to nlon
+
+        if not_equator
+            view(fields.data, ilons, :) .= brfft_plan * g_in[1:nfreq, 1:nlayers, j]
+        end
+    end
+
+    """$(TYPEDSIGNATURES)
+    (Forward) FFT, applied in vertical direction of `fields` provided. This is the
+    GPU/CUDA equivalent of the `apply_serial_fft!` function in the CPU version.
+    This uses views but still allocates, i.e. `mul!` still cannot be used. 
+    """
+    function SpeedyTransforms._apply_serial_fft!(
+        f_out::CuArray{<:Complex, 3},
+        fields::AbstractField{NF, N, <:CuArray},
+        S::SpectralTransform, 
+        j::Int,
+        k::Int,
+        nfreq::Int,
+        ilons::UnitRange{Int};
+        not_equator::Bool = true
+    ) where {NF<:AbstractFloat, N}
+        rfft_plan = S.rfft_plans_1D[j]     # FFT planned wrt nlon on ring
+        k_grid = eachlayer(fields)[k]      # vertical layer index
+
+        if not_equator
+            view(f_out, 1:nfreq, k, j) .= rfft_plan * view(fields.data, ilons, k_grid)
+        else
+            fill!(f_out[1:nfreq, k, j], 0)
+        end
+    end
+
+    """$(TYPEDSIGNATURES)
+    (Inverse) FFT, applied in vertical direction of `fields` provided. This is the
+    GPU/CUDA equivalent of the `apply_serial_fft!` function in the CPU version.
+    This uses views but still allocates, i.e. `mul!` still cannot be used with views 
+    of CuArrays. 
+    """
+    function SpeedyTransforms._apply_serial_fft!(
+        fields::AbstractField{NF, N, <:CuArray},
+        g_in::CuArray{<:Complex, 3},
+        S::SpectralTransform,
+        j::Int,
+        k::Int,
+        nfreq::Int,
+        ilons::UnitRange{Int};
+        not_equator::Bool = true
+    ) where {NF<:AbstractFloat, N}
+        brfft_plan = S.brfft_plans_1D[j]   # FFT planned wrt nlon on ring
+        k_grid = eachlayer(fields)[k]     # vertical layer index
+
+        if not_equator
+            view(fields.data, ilons, k_grid) .= brfft_plan * view(g_in, 1:nfreq, k, j)
+        end
     end
 end 
