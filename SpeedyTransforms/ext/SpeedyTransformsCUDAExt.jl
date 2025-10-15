@@ -6,7 +6,7 @@ module SpeedyTransformsCUDAExt
     using DocStringExtensions
 
     using SpeedyTransforms
-    using SpeedyTransforms.RingGrids 
+    using SpeedyTransforms.RingGrids
     using SpeedyTransforms.LowerTriangularArrays
     
     # Override FFT package deciding function
@@ -91,4 +91,5 @@ module SpeedyTransformsCUDAExt
             view(fields.data, ilons, :) .= brfft_plan * g_in[1:nfreq, 1:nlayers, j]
         end
     end
+    
 end 
