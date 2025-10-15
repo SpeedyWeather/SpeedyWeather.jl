@@ -46,13 +46,13 @@ module SpeedyTransformsCUDAExt
     end
 
     """$(TYPEDSIGNATURES)
-    (Forward) FFT, applied in zonal direction of `fields` provided. This is the 
+    (Forward) FFT, applied in zonal direction of `field` provided. This is the 
     GPU/CUDA equivalent of the `apply_batched_fft!` function in the CPU version. 
     Uses indexing as we seemingly can't use views with the FFT planning with CUFFT.
     """
     function SpeedyTransforms._apply_batched_fft!(
         f_out::CuArray{<:Complex, 3},
-        fields::AbstractField{NF, N, <:CuArray},
+        field::AbstractField{NF, N, <:CuArray},
         S::SpectralTransform, 
         j::Int,
         nfreq::Int,
@@ -60,22 +60,22 @@ module SpeedyTransformsCUDAExt
         not_equator::Bool = true
     ) where {NF<:AbstractFloat, N}
         rfft_plan = S.rfft_plans[j]     # FFT planned wrt nlon on ring
-        nlayers = size(fields, 2)        # number of vertical layers
+        nlayers = size(field, 2)        # number of vertical layers
 
         if not_equator
-            view(f_out, 1:nfreq, 1:nlayers, j) .= rfft_plan * fields.data[ilons, :]
+            view(f_out, 1:nfreq, 1:nlayers, j) .= rfft_plan * field.data[ilons, :]
         else
             fill!(f_out[1:nfreq, 1:nlayers, j], 0)
         end
     end
 
     """$(TYPEDSIGNATURES)
-    (Inverse) FFT, applied in zonal direction of `fields` provided. This is the
+    (Inverse) FFT, applied in zonal direction of `field` provided. This is the
     GPU/CUDA equivalent of the `apply_batched_fft!` function in the CPU version.
     Uses indexing as we seemingly can't use views with the FFT planning with CUFFT.
     """
     function SpeedyTransforms._apply_batched_fft!(
-        fields::AbstractField{NF, N, <:CuArray},
+        field::AbstractField{NF, N, <:CuArray},
         g_in::CuArray{<:Complex, 3},
         S::SpectralTransform,
         j::Int,
@@ -84,11 +84,11 @@ module SpeedyTransformsCUDAExt
         not_equator::Bool = true
     ) where {NF<:AbstractFloat, N}
         brfft_plan = S.brfft_plans[j]   # FFT planned wrt nlon on ring
-        nlayers = size(fields, 2)        # number of vertical layers
+        nlayers = size(field, 2)        # number of vertical layers
         nfreq = nlon÷2 + 1              # linear max Fourier frequency wrt to nlon
 
         if not_equator
-            view(fields.data, ilons, :) .= brfft_plan * g_in[1:nfreq, 1:nlayers, j]
+            view(field.data, ilons, :) .= brfft_plan * g_in[1:nfreq, 1:nlayers, j]
         end
     end
     
