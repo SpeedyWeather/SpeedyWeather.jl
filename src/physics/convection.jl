@@ -5,7 +5,7 @@ export SimplifiedBettsMiller
 """The simplified Betts-Miller convection scheme from Frierson, 2007,
 https://doi.org/10.1175/JAS3935.1. This implements the qref-formulation
 in their paper. Fields and options are $(TYPEDFIELDS)"""
-@kwdef mutable struct SimplifiedBettsMiller{NF, SP} <: AbstractConvection
+@kwdef struct SimplifiedBettsMiller{NF} <: AbstractConvection
     "[OPTION] Relaxation time for profile adjustment"
     time_scale::Second = Hour(4)
 
@@ -14,7 +14,7 @@ in their paper. Fields and options are $(TYPEDFIELDS)"""
 end
 
 # generator function 
-SimplifiedBettsMillerSG(SG::SpectralGrid; kwargs...) = SimplifiedBettsMiller{SG.NF}(; kwargs...)
+SimplifiedBettsMiller(SG::SpectralGrid; kwargs...) = SimplifiedBettsMiller{SG.NF}(; kwargs...)
 initialize!(::SimplifiedBettsMiller, ::PrimitiveEquation) = nothing
 
 # function barrier
@@ -31,6 +31,7 @@ for thermodynamic consistency (e.g. in dry convection the humidity profile is no
 and relaxes current vertical profiles to the adjusted references."""
 function convection!(ij, diagn, SBM::SimplifiedBettsMiller, model)
 
+    (; geometry, clausius_clapeyron, planet, atmosphere, time_stepping) = model
     NF = eltype(diagn.grid.temp_grid)
     σ = geometry.σ_levels_full
     σ_half = geometry.σ_levels_half
@@ -39,20 +40,22 @@ function convection!(ij, diagn, SBM::SimplifiedBettsMiller, model)
     
     # use previous time step for more stable calculations
     temp = diagn.grid.temp_grid_prev
-    temp_virt = diagn.grid.temp_virt_grid_prev
+    temp_virt = diagn.grid.temp_virt_grid
     humid = diagn.grid.humid_grid_prev
-    geopot = diagn.grid.geopot_grid
+    geopot = diagn.dynamics.geopot
     temp_tend = diagn.tendencies.temp_tend_grid
     humid_tend = diagn.tendencies.humid_tend_grid
     pₛ = diagn.grid.pres_grid_prev[ij]
 
     # thermodynamics
-    Lᵥ = model.clausius_clapeyron.latent_heat_condensation  # latent heat of vaporization
-    cₚ = model.clausius_clapeyron.heat_capacity             # heat capacity
+    Lᵥ = clausius_clapeyron.latent_heat_condensation  # latent heat of vaporization
+    cₚ = clausius_clapeyron.heat_capacity             # heat capacity
 
     # use scratch arrays for temp_ref_profile, humid_ref_profile
     temp_ref_profile =  diagn.dynamics.a_grid               # temperature [K] reference profile to adjust to
     humid_ref_profile = diagn.dynamics.b_grid               # specific humidity [kg/kg] profile to adjust to
+    geopot = diagn.dynamics.uv∇lnp                          # geopotential [m²/s²] on full levels
+    geopotential!(ij, geopot, temp_virt, model.geopotential, model.orography, planet.gravity)
 
     # CONVECTIVE CRITERIA AND FIRST GUESS RELAXATION
     # Create pseudo column for surface_temp_humid function (this needs to be updated later)

@@ -1,8 +1,12 @@
 abstract type AbstractGeopotential <: AbstractModelComponent end
 
 export Geopotential
-@kwdef struct Geopotential{NF, VectorType} <: AbstractGeopotential
 
+"""Geopotential calculation component for primitive equation models. Precomputes
+integration constants for vertical hydrostatic integration from temperature to
+geopotential on both full and half pressure levels using the hypsometric equation.
+Fields are $(TYPEDFIELDS)"""
+@kwdef struct Geopotential{NF, VectorType} <: AbstractGeopotential
     "Number of vertical layers"
     nlayers::Int
 
@@ -32,16 +36,13 @@ function initialize!(
     (; σ_levels_full, σ_levels_half) = model.geometry
 
     # 1. integration onto half levels
-    for k in 1:nlayers-1               # k is full level index, 1=top, nlayers=bottom
-        # used for: Φ_{k+1/2} = Φ_{k+1} + R*T_{k+1}*(ln(p_{k+1}) - ln(p_{k+1/2}))
-        Δp_geopot_half[k+1] = R_dry*log(σ_levels_full[k+1]/σ_levels_half[k+1])
-    end
+    # used for: Φ_{k+1/2} = Φ_{k+1} + R*T_{k+1}*(ln(p_{k+1}) - ln(p_{k+1/2}))
+    @. Δp_geopot_half[2:nlayers] = R_dry * log(σ_levels_full[2:nlayers] / σ_levels_half[2:nlayers])
 
     # 2. integration onto full levels (same formula but k -> k-1/2)
-    for k in 1:nlayers
-        # used for: Φ_k = Φ_{k+1/2} + R*T_k*(ln(p_{k+1/2}) - ln(p_k))
-        Δp_geopot_full[k] = R_dry*log(σ_levels_half[k+1]/σ_levels_full[k])
-    end
+    # used for: Φ_k = Φ_{k+1/2} + R*T_k*(ln(p_{k+1/2}) - ln(p_k))
+    @. Δp_geopot_full = R_dry * log(σ_levels_half[2:nlayers+1] / σ_levels_full)
+    return nothing
 end
 
 """
@@ -83,29 +84,31 @@ $(TYPEDSIGNATURES)
 Calculate the geopotential based on `temp` in a single column.
 This exclues the surface geopotential that would need to be added to the returned vector.
 Function not used in the dynamical core but for post-processing and analysis."""
-function geopotential!( 
-    geopot::AbstractVector,
-    temp::AbstractVector,
-    G::Geopotential,
-    geopot_surf::Real = 0
+function geopotential!(
+    ij,                         # horizontal grid point index
+    geopot::AbstractField3D,    # geopotential to be filled
+    temp::AbstractField3D,      # temperature field (virtual temperature for PrimitiveWet)
+    G::Geopotential,            # precomputed integration constants
+    orography::AbstractField2D, # orography field
+    gravity,                    # gravity [m/s^2]
 )
-
-    nlayers = length(geopot)
-    (; Δp_geopot_half, Δp_geopot_full) = G  # = R*Δlnp either on half or full levels
-
-    @boundscheck length(temp) >= nlayers || throw(BoundsError)
-    @boundscheck length(Δp_geopot_full) >= nlayers || throw(BoundsError)
-    @boundscheck length(Δp_geopot_half) >= nlayers || throw(BoundsError)
+    (; nlayers, Δp_geopot_half, Δp_geopot_full) = G  # = R*Δlnp either on half or full levels
 
     # bottom layer
-    geopot[nlayers] = geopot_surf + temp[nlayers]*Δp_geopot_full[end]
+    geopot[ij, end] = gravity*orography[ij] + temp[nlayers]*Δp_geopot_full[end]
 
     # OTHER FULL LAYERS, integrate two half-layers from bottom to top
     @inbounds for k in nlayers-1:-1:1
-        geopot[k] = geopot[k+1] + temp[k+1]*Δp_geopot_half[k+1] + temp[k]*Δp_geopot_full[k]
+        geopot[ij, k] = geopot[ij, k+1] + temp[ij, k+1]*Δp_geopot_half[k+1] + temp[ij, k]*Δp_geopot_full[k]
     end
 end
 
+"""
+$(TYPEDSIGNATURES)
+Non-mutating version that creates a new geopotential vector from temperature.
+Calculates the geopotential based on `temp` in a single column, excluding
+the surface geopotential. Returns a new vector containing the computed
+geopotential values. Convenience function for analysis and post-processing."""
 function geopotential(  temp::Vector,
                         G::Geopotential) 
     geopot = zero(temp)

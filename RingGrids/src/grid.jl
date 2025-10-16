@@ -245,7 +245,7 @@ end
 
 """$(TYPEDSIGNATURES) Obtain ring index `j` from gridpoint `ij` and `rings`
 describing rind indices as obtained from `eachring(::Grid)`"""
-function whichring(ij::Integer, rings)
+function whichring(ij, rings::AbstractVector)
     @boundscheck 0 < ij <= rings[end][end] || throw(BoundsError)
     j = 1
     @inbounds while ij > rings[j][end]

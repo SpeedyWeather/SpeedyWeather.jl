@@ -211,7 +211,7 @@ $(TYPEDFIELDS)"""
     "Sum of div_weighted from top to k"
     div_sum_above::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
     
-    "Virtual temperature [K], spectral for geopotential"
+    "Virtual temperature [K], spectral, used for geopotential"
     temp_virt::SpectralVariable3D = zeros(SpectralVariable3D, spectrum, nlayers)
 
     "Geopotential [m²/s²] on full layers"

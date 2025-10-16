@@ -205,7 +205,7 @@ function get_parameterizations(model::PrimitiveWet)
             # vertical_diffusion = model.vertical_diffusion,
             
             # hydrological cycle
-            # convection = model.convection,
+            convection = model.convection,
             large_scale_condensation = model.large_scale_condensation,
             
             # radiation
