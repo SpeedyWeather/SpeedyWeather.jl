@@ -62,11 +62,7 @@ struct SpectralTransform{
     
     # SCRATCH MEMORY FOR FOURIER NOT YET LEGENDRE TRANSFORMED AND VICE VERSA
     # state is undetermined, only read after writing to it
-    scratch_memory::ScratchMemory{NF, ArrayComplexType} 
-    scratch_memory_grid::VectorType                 # scratch memory with 1-stride for FFT output
-    scratch_memory_spec::VectorComplexType
-    scratch_memory_column_north::VectorComplexType  # scratch memory for vertically batched Legendre transform
-    scratch_memory_column_south::VectorComplexType  # scratch memory for vertically batched Legendre transform
+    scratch_memory::ScratchMemory{NF, ArrayComplexType, VectorType, VectorComplexType} 
 
     jm_index_size::Int                             # number of indices per layer in kjm_indices
     kjm_indices::ArrayTypeIntMatrix                # precomputed kjm loop indices map for legendre transform
@@ -114,9 +110,9 @@ function SpectralTransform(
     LegendreShortcut::Type{<:AbstractLegendreShortcut} = LegendreShortcutLinear,   # shorten Legendre loop over order m
     architecture::AbstractArchitecture = architecture(ArrayType), # architecture that kernels are launched 
 )
-    (; nlat_half) = grid    # number of latitude rings on one hemisphere incl equator
-    ArrayType_ = nonparametric_type(ArrayType)    # drop parameters of ArrayType
-    (; lmax, mmax) = spectrum                               # 1-based spectral truncation order and degree
+    (; nlat_half) = grid                            # number of latitude rings on one hemisphere incl equator
+    ArrayType_ = nonparametric_type(ArrayType)      # drop parameters of ArrayType
+    (; lmax, mmax) = spectrum                       # 1-based spectral truncation order and degree
 
     # RESOLUTION PARAMETERS
     nlat = get_nlat(grid)           # 2nlat_half but one less if grid has odd # of lat rings
@@ -154,22 +150,14 @@ function SpectralTransform(
     end
     
     # SCRATCH MEMORY FOR FOURIER NOT YET LEGENDRE TRANSFORMED AND VICE VERSA
-    scratch_memory = ScratchMemory(NF, ArrayType_, grid, nlayers)
-
-    # SCRATCH MEMORY TO 1-STRIDE DATA FOR FFTs
-    scratch_memory_grid  = ArrayType_(zeros(NF, nlon_max*nlayers))
-    scratch_memory_spec  = ArrayType_(zeros(Complex{NF}, nfreq_max*nlayers))
-
-    # SCRATCH MEMORY COLUMNS FOR VERTICALLY BATCHED LEGENDRE TRANSFORM
-    scratch_memory_column_north = ArrayType_(zeros(Complex{NF}, nlayers))
-    scratch_memory_column_south = ArrayType_(zeros(Complex{NF}, nlayers))
+    scratch_memory = ScratchMemory(NF, architecture, grid, nlayers)
 
     rfft_plans = Vector{AbstractFFTs.Plan}(undef, nlat_half)
     brfft_plans = Vector{AbstractFFTs.Plan}(undef, nlat_half)
     rfft_plans_1D = Vector{AbstractFFTs.Plan}(undef, nlat_half)
     brfft_plans_1D = Vector{AbstractFFTs.Plan}(undef, nlat_half)
 
-    fake_grid_data = adapt(ArrayType_, zeros(NF, grid, nlayers))
+    fake_grid_data = on_architecture(architecture, zeros(NF, grid, nlayers))
 
     # PLAN THE FFTs
     plan_FFTs!(
@@ -205,11 +193,13 @@ function SpectralTransform(
     ϵlms = get_recursion_factors(Spectrum(lmax+1, mmax))    # one more degree needed!
 
     # GRADIENTS (on unit sphere, hence 1/radius-scaling is omitted)
-    # meridional gradient for scalars (coslat scaling included)
-    grad_y1 = zeros(NF, spectrum)                           # term 1, mul with harmonic l-1, m
-    grad_y2 = zeros(NF, spectrum)                           # term 2, mul with harmonic l+1, m
+    # meridional gradient for scalars (coslat scaling included
+    # precomputations always on CPU, then transfered to the actual architecture used
+    spectrum_cpu = Spectrum(lmax, mmax)
+    grad_y1 = zeros(NF, spectrum_cpu)                           # term 1, mul with harmonic l-1, m
+    grad_y2 = zeros(NF, spectrum_cpu)                           # term 2, mul with harmonic l+1, m
 
-    for (m, degrees) in enumerate(orders(spectrum))          # 1-based degree l, order m
+    for (m, degrees) in enumerate(orders(spectrum_cpu))          # 1-based degree l, order m
         for l in degrees        
             grad_y1[l, m] = -(l-2)*ϵlms[l, m]
             grad_y2[l, m] = (l+1)*ϵlms[l+1, m]
@@ -217,20 +207,23 @@ function SpectralTransform(
         # explicitly set the last row to zero, so that kernels yield correct gradient in last row 
         grad_y2[lmax, m] = 0
     end
+    grad_y1 = on_architecture(architecture, grad_y1)
+    grad_y2 = on_architecture(architecture, grad_y2)
 
     # meridional gradient used to get from u, v/coslat to vorticity and divergence
-    grad_x_vordiv = zeros(Int, spectrum)
+    grad_x_vordiv = zeros(Int, spectrum_cpu)
     for m in 1:mmax
         for l in m:lmax-1                         
             grad_x_vordiv[l, m] = m-1
         end # last row zero to get vor and div correct
         grad_x_vordiv[lmax, m] = 0
     end
+    grad_x_vordiv = on_architecture(architecture, grad_x_vordiv)
 
-    grad_y_vordiv1 = zeros(NF, spectrum)                    # term 1, mul with harmonic l-1, m
-    grad_y_vordiv2 = zeros(NF, spectrum)                    # term 2, mul with harmonic l+1, m
+    grad_y_vordiv1 = zeros(NF, spectrum_cpu)                    # term 1, mul with harmonic l-1, m
+    grad_y_vordiv2 = zeros(NF, spectrum_cpu)                    # term 2, mul with harmonic l+1, m
  
-    for (m, degrees) in enumerate(orders(spectrum))          # 1-based degree l, order m
+    for (m, degrees) in enumerate(orders(spectrum_cpu))          # 1-based degree l, order m
         for l in degrees           
             grad_y_vordiv1[l, m] = l*ϵlms[l, m]
             grad_y_vordiv2[l, m] = (l-1)*ϵlms[l+1, m]
@@ -239,14 +232,17 @@ function SpectralTransform(
         grad_y_vordiv1[lmax, m] = 0
         grad_y_vordiv2[lmax, m] = 0
     end
+    grad_y_vordiv1 = on_architecture(architecture, grad_y_vordiv1)
+    grad_y_vordiv2 = on_architecture(architecture, grad_y_vordiv2)
 
     # zonal integration (sort of) to get from vorticity and divergence to u, v*coslat
-    vordiv_to_uv_x = LowerTriangularMatrix([-m/(l*(l+1)) for l in 0:(lmax-1), m in 0:(mmax-1)], spectrum)
+    vordiv_to_uv_x = LowerTriangularMatrix([-m/(l*(l+1)) for l in 0:(lmax-1), m in 0:(mmax-1)], spectrum_cpu)
     vordiv_to_uv_x[1, 1] = 0
+    vordiv_to_uv_x = on_architecture(architecture, vordiv_to_uv_x)
 
     # meridional integration (sort of) to get from vorticity and divergence to u, v*coslat
-    vordiv_to_uv1 = zeros(NF, spectrum)                     # term 1, to be mul with harmonic l-1, m
-    vordiv_to_uv2 = zeros(NF, spectrum)                     # term 2, to be mul with harmonic l+1, m
+    vordiv_to_uv1 = zeros(NF, spectrum_cpu)                     # term 1, to be mul with harmonic l-1, m
+    vordiv_to_uv2 = zeros(NF, spectrum_cpu)                     # term 2, to be mul with harmonic l+1, m
 
     for (m, degrees) in enumerate(orders(spectrum))          # 1-based degree l, order m
         for l in degrees             
@@ -258,6 +254,8 @@ function SpectralTransform(
     end
 
     vordiv_to_uv1[1, 1] = 0                 # remove NaN from 0/0
+    vordiv_to_uv1 = on_architecture(architecture, vordiv_to_uv1)
+    vordiv_to_uv2 = on_architecture(architecture, vordiv_to_uv2)
 
     # EIGENVALUES (on unit sphere, hence 1/radius²-scaling is omitted)
     eigenvalues = [-l*(l+1) for l in 0:mmax]
@@ -270,13 +268,13 @@ function SpectralTransform(
         ArrayType_,
         typeof(spectrum),
         typeof(grid),
-        ArrayType_{NF, 1},
-        ArrayType_{Int, 2},
-        ArrayType_{Complex{NF}, 1},
-        ArrayType_{Complex{NF}, 2},
-        ArrayType_{Complex{NF}, 3},
-        LowerTriangularArray{NF, 1, ArrayType_{NF, 1}, typeof(spectrum)}, 
-        LowerTriangularArray{NF, 2, ArrayType_{NF, 2}, typeof(spectrum)},
+        array_type(architecture, NF, 1),
+        array_type(architecture, Int, 2),
+        array_type(architecture, Complex{NF}, 1),
+        array_type(architecture, Complex{NF}, 2),
+        array_type(architecture, Complex{NF}, 3),
+        LowerTriangularArray{NF, 1, array_type(architecture, NF, 1), typeof(spectrum)}, 
+        LowerTriangularArray{NF, 2, array_type(architecture, NF, 2), typeof(spectrum)},
     }(
         architecture,
         spectrum, nfreq_max, 
@@ -288,8 +286,6 @@ function SpectralTransform(
         rfft_plans, brfft_plans, rfft_plans_1D, brfft_plans_1D,
         legendre_polynomials,
         scratch_memory, 
-        scratch_memory_grid, scratch_memory_spec,
-        scratch_memory_column_north, scratch_memory_column_south,
         jm_index_size, kjm_indices, 
         solid_angles, 
         grad_y1, grad_y2,
@@ -434,7 +430,7 @@ function get_recursion_factors( ::Type{NF},             # number format NF
                                 spectrum::Spectrum,
                                 ) where NF
     ϵlms = zeros(NF, spectrum)
-    for (m, degrees) in enumerate(orders(spectrum))      # loop over 1-based l, m
+    for (m, degrees) in enumerate(orders(spectrum))     # loop over 1-based l, m
         for l in degrees
             ϵlms[l, m] = recursion_factor(l-1, m-1)     # convert to 0-based l, m for function arguments
         end
@@ -461,8 +457,8 @@ transform!(                    # SPECTRAL TO GRID
 
 function transform!(                                # SPECTRAL TO GRID
     field::AbstractField,                           # gridded output
-    coeffs::LowerTriangularArray,                    # spectral coefficients input
-    scratch_memory::ScratchMemory,      # explicit scratch memory to use
+    coeffs::LowerTriangularArray,                   # spectral coefficients input
+    scratch_memory::ScratchMemory,                  # explicit scratch memory to use
     S::SpectralTransform;                           # precomputed transform
     unscale_coslat::Bool = false,                   # unscale with cos(lat) on the fly?
 )
@@ -475,7 +471,7 @@ function transform!(                                # SPECTRAL TO GRID
     g_south = scratch_memory.south    # phase factors for southern latitudes
 
     # INVERSE LEGENDRE TRANSFORM in meridional direction
-    _legendre!(g_north, g_south, coeffs, S; unscale_coslat)
+    _legendre!(g_north, g_south, coeffs, scratch_memory.column, S; unscale_coslat)
 
     # INVERSE FOURIER TRANSFORM in zonal direction
     _fourier!(field, g_north, g_south, S)
@@ -497,7 +493,7 @@ transform!(                             # GRID TO SPECTRAL
 ) = transform!(coeffs, field, S.scratch_memory, S)
     
 function transform!(                               # GRID TO SPECTRAL
-    coeffs::LowerTriangularArray,                   # output: spectral coefficients
+    coeffs::LowerTriangularArray,                  # output: spectral coefficients
     field::AbstractField,                          # input: gridded values
     scratch_memory::ScratchMemory,                 # explicit scratch memory to use
     S::SpectralTransform,                          # precomputed spectral transform
@@ -514,7 +510,7 @@ function transform!(                               # GRID TO SPECTRAL
     _fourier!(f_north, f_south, field, S)    
     
     # LEGENDRE TRANSFORM in meridional direction
-    _legendre!(coeffs, f_north, f_south, S)
+    _legendre!(coeffs, f_north, f_south, scratch_memory.column, S)
 
     return coeffs
 end

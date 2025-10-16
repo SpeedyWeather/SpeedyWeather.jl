@@ -1,11 +1,30 @@
 # Changelog
 
-## Unreleased
+# Unreleased
 
 - Enzyme Forward rules for SpectralTransform [#767](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/767)
+- Expand scratch memory handling in spectral transforms for better differentiability with Enzyme and revise FFT plans [#791](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/791)
+- Increase version of RingGrids, LowerTriangularArrays and SpeedyTransforms to v0.1.1 [#875](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/875)
+- Pluto notebook example in README [#872](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/872/)
+- Reimplement RestartFile, ProgressTxt, ParamatersTxt as callback [#726](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/726/)
+- Implicit has reinitialize option [#726](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/726/)
+- Leapfrog restart default [#726](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/726/)
+- Reduce GPU overhead and revise on_architecture and adapt [#824](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/824)
+- Update CITATION.cff for Zenodo [#869](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/869)
+- 10m winds and surface temperature output [#858](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/858)
+- Move Makie extensions to RingGrids and fix `globe` bug [#866](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/866)
+- Implement GPU kernels for forcing and drag [#834](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/834)
+- Mean sea-level pressure and dynamics output [#853](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/853) [#854](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/854)
+
+## v0.17.1
+
+- Bump SpeedyWeatherInternals to v0.1.1 [##860](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/860)
+- Metal extension [#849](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/849)
+- Fix LowerTriangularArrays zeros, rand, etc to return correct array type based on Spectrum architecture [#850](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/850)
+- Call callbacks before output not after [#852](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/852)
 - Split extensions across subpackages [#846](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/846)
 
-## v0.17
+## v0.17
 
 - More documentation on GPU and on_architecture [#845](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/845)
 - The documentation has a logo now as well [#842](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/842)

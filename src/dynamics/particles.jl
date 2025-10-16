@@ -133,7 +133,7 @@ Check that a particle is in longitude [0,360˚E), latitude [-90˚,90˚N], and σ
 function ismod(p::Particle)
     valid::Bool = true
     valid &= -90 <= p.lat <= 90     # poles included
-    valid &= 0 <= p.lon < 360       # 360˚E excluded (=0˚)
+    valid &= 0 <= p.lon <= 360      # 360˚E included (=0˚), float mod can return 360
     valid &= 0 <= p.σ <= 1          # top and ground included
     return valid
 end

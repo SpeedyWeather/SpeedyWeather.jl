@@ -1,6 +1,7 @@
-module SpeedyWeatherMakieExt
+module RingGridsMakieExt
 
-using SpeedyWeather, Makie
+using RingGrids
+using Makie
 using DocStringExtensions
 
 function default_title(field::RingGrids.AbstractField)
