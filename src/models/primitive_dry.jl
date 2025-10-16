@@ -33,8 +33,8 @@ $(TYPEDFIELDS)"""
     BL,     # <:AbstractBoundaryLayer,
     TR,     # <:AbstractTemperatureRelaxation,
     VD,     # <:AbstractVerticalDiffusion,
-    SUT,    # <:AbstractSurfaceThermodynamics,
-    SUW,    # <:AbstractSurfaceWind,
+    SC,    # <:AbstractSurfaceCondition,
+    SM,    # <:AbstractSurfaceMomentumFlux,
     SH,     # <:AbstractSurfaceHeatFlux,
     CV,     # <:AbstractConvection,
     OD,     # <:AbstractOpticalDepth,
@@ -84,8 +84,8 @@ $(TYPEDFIELDS)"""
     boundary_layer_drag::BL = BulkRichardsonDrag(spectral_grid)
     temperature_relaxation::TR = nothing
     vertical_diffusion::VD = BulkRichardsonDiffusion(spectral_grid)
-    surface_thermodynamics::SUT = SurfaceThermodynamicsConstant(spectral_grid)
-    surface_wind::SUW = SurfaceWind(spectral_grid)
+    surface_condition::SC = SurfaceCondition(spectral_grid)
+    surface_momentum_flux::SM = SurfaceMomentumFlux(spectral_grid)
     surface_heat_flux::SH = SurfaceHeatFlux(spectral_grid)
     convection::CV = DryBettsMiller(spectral_grid)
     optical_depth::OD = ZeroOpticalDepth(spectral_grid)
@@ -147,8 +147,8 @@ function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
     initialize!(model.optical_depth, model)
     initialize!(model.shortwave_radiation, model)
     initialize!(model.longwave_radiation, model)
-    initialize!(model.surface_thermodynamics, model)
-    initialize!(model.surface_wind, model)
+    initialize!(model.surface_condition, model)
+    initialize!(model.surface_momentum_flux, model)
     initialize!(model.surface_heat_flux, model)
     initialize!(model.stochastic_physics, model)
     initialize!(model.particle_advection, model)

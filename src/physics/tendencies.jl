@@ -9,8 +9,8 @@ function parameterization_tendencies!(
     (; time) = progn.clock
     cos_zenith!(diagn, time, model)
 
-    model_parameters = get_model_parameters(model)      # subsection of GPU-compatible model components
-    parameterizations = get_parameterizations(model)    # subsection of model: parameterizations only
+    model_parameters = get_model_parameters(model)      # subset of GPU-compatible model components
+    parameterizations = get_parameterizations(model)    # subset of model: parameterizations only
 
     # all other parameterizations are fused into a single kernel over horizontal grid point index ij
     (; architecture, npoints) = model.spectral_grid
@@ -32,10 +32,10 @@ end
     scale!(ij, diagn, model_parameters.planet.radius)
 end
 
-# function barrier
-flux_to_tendency(k, flux, pₛ, model) =
-    flux_to_tendency(k, flux, pₛ, model.planet.gravity, model.geometry.σ_levels_thick)
+surface_flux_to_tendency(flux::Real, pₛ::Real, model) =
+    flux_to_tendency(flux, pₛ, model.planet.gravity, model.geometry.σ_levels_thick[end])
 
 """$(TYPEDSIGNATURES)
-Flux `flux` into layer `k` converted to tendency [?/s]"""
-flux_to_tendency(k, flux, pₛ, g, Δσ) = g/(pₛ*Δσ[k]) * flux
+Flux `flux` into layer `k` of thickness `Δσ`  converted to tendency [?/s].
+Using surface pressure `pₛ` [Pa] and gravity `g` [m/s^2]."""
+flux_to_tendency(flux::Real, pₛ::Real, g::Real, Δσ_k::Real) = g/(pₛ*Δσ_k) * flux
