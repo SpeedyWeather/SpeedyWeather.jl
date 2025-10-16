@@ -254,7 +254,9 @@ function whichring(ij::Integer, rings)
     return j
 end
 
-whichring(ij::Integer, grid::AbstractGrid) = whichring(ij, grid.rings)
+# access precomputed whichring
+whichring(ij, field::AbstractField) = whichring(ij, field.grid)
+whichring(ij, grid::AbstractGrid) = grid.whichring[ij]
 
 """$(TYPEDSIGNATURES) Vector of ring indices for every grid point in `grid`."""
 function whichring(Grid::Type{<:AbstractGrid}, nlat_half, rings)
@@ -265,7 +267,7 @@ function whichring(Grid::Type{<:AbstractGrid}, nlat_half, rings)
     return w
 end
 
-whichring(grid::AbstractGrid) = whichring(typeof(grid), grid.nlat_half, grid.rings)
+whichring(grid::AbstractGrid) = grid.whichring
 whichring(Grid::Type{<:AbstractGrid}, nlat_half::Integer) = whichring(Grid, nlat_half, eachring(Grid, nlat_half))
 
 # for architectures / adapt 
