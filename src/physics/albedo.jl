@@ -30,20 +30,16 @@ function initialize!(albedo::OceanLandAlbedo, model::PrimitiveEquation)
     initialize!(albedo.land, model)
 end
 
-# dispatch over model.albedo
-albedo!(ij, diagn::DiagnosticVariables, progn::PrognosticVariables, model::PrimitiveEquation) =
-    albedo!(ij, diagn, progn, model.albedo, model)
-
 # composite OceanLandAlbedo: call separately for ocean and land with .ocean and .land
-function albedo!(ij, diagn::DiagnosticVariables, progn, albedo::OceanLandAlbedo, model)
-    albedo!(ij, diagn.physics.ocean, progn, albedo.ocean, model)
-    albedo!(ij, diagn.physics.land, progn, albedo.land, model)
+function parameterization!(ij, diagn::DiagnosticVariables, progn, albedo::OceanLandAlbedo, model)
+    parameterization!(ij, diagn.physics.ocean, progn, albedo.ocean, model)
+    parameterization!(ij, diagn.physics.land, progn, albedo.land, model)
 end
 
 # single albedo: call separately for ocean and land with the same albedo
-function albedo!(ij, diagn::DiagnosticVariables, progn, albedo::AbstractAlbedo, model)
-    albedo!(ij, diagn.physics.ocean, progn, albedo, model)
-    albedo!(ij, diagn.physics.land, progn, albedo, model)
+function parameterization!(ij, diagn::DiagnosticVariables, progn, albedo::AbstractAlbedo, model)
+    parameterization!(ij, diagn.physics.ocean, progn, albedo, model)
+    parameterization!(ij, diagn.physics.land, progn, albedo, model)
 end
 
 ## GLOBAL CONSTANT ALBEDO
@@ -54,7 +50,7 @@ end
 
 GlobalConstantAlbedo(SG::SpectralGrid; kwargs...) = GlobalConstantAlbedo{SG.NF}(; kwargs...)
 initialize!(albedo::GlobalConstantAlbedo, ::PrimitiveEquation) = nothing
-albedo!(ij, diagn, progn, albedo::GlobalConstantAlbedo, model) = albedo!(ij, diagn.albedo, albedo.albedo)
+parameterization!(ij, diagn, progn, albedo::GlobalConstantAlbedo, model) = albedo!(ij, diagn.albedo, albedo.albedo)
 function albedo!(ij, diagn_albedo::AbstractField2D, albedo::Real)
     diagn_albedo[ij] = albedo
 end
@@ -72,7 +68,7 @@ end
 
 ManualAlbedo(SG::SpectralGrid) = ManualAlbedo{SG.NF, SG.GridVariable2D}(zeros(SG.GridVariable2D, SG.grid))
 initialize!(albedo::ManualAlbedo, model::PrimitiveEquation) = nothing
-albedo!(ij, diagn, progn, albedo::ManualAlbedo, model) = albedo!(ij, diagn.albedo, albedo.albedo)
+parameterization!(ij, diagn, progn, albedo::ManualAlbedo, model) = albedo!(ij, diagn.albedo, albedo.albedo)
 function albedo!(ij, diagn_albedo::AbstractField2D, albedo::AbstractField2D)
     diagn_albedo[ij] = albedo[ij]
 end
@@ -119,6 +115,8 @@ function initialize!(albedo::AlbedoClimatology, model::PrimitiveEquation)
     interpolate!(albedo.albedo, a)
 end
 
+parameterization!(ij, diagn, progn, albedo::AlbedoClimatology, model) = albedo!(ij, diagn.albedo, albedo.albedo)
+
 ## OceanSeaIceAlbedo
 export OceanSeaIceAlbedo
 
@@ -129,7 +127,7 @@ end
 
 OceanSeaIceAlbedo(SG::SpectralGrid; kwargs...) = OceanSeaIceAlbedo{SG.NF}(;kwargs...)
 initialize!(::OceanSeaIceAlbedo, ::PrimitiveEquation) = nothing
-albedo!(ij, diagn, progn, albedo::OceanSeaIceAlbedo, model) = albedo!(ij, diagn.albedo, progn.ocean, albedo)
+parameterization!(ij, diagn, progn, albedo::OceanSeaIceAlbedo, model) = albedo!(ij, diagn.albedo, progn.ocean, albedo)
 
 function albedo!(ij, diagn_albedo::AbstractField2D, ocean, albedo::OceanSeaIceAlbedo)
     (; sea_ice_concentration ) = ocean

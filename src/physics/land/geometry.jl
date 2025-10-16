@@ -26,8 +26,8 @@ end
 
 initialize!(::LandGeometry, model::PrimitiveEquation) = nothing
 
-function Base.show(io::IO, geom::LandGeometry{T, V}) where {T, V}
+function Base.show(io::IO, geom::LandGeometry{T}) where {T}
     (; nlayers) = geom
-    println(io, "$nlayers-layer LandGeometry{$T, $V}")
+    println(io, "$nlayers-layer LandGeometry{$T}")
     print(io, "└ layer_thickness: $(geom.layer_thickness)")
 end

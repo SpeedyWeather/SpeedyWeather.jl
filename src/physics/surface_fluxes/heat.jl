@@ -48,7 +48,7 @@ initialize!(::SurfaceOceanHeatFlux, ::PrimitiveEquation) = nothing
 
 function surface_heat_flux!(ij, diagn, progn, heat_flux::SurfaceOceanHeatFlux, model)
 
-    (; cₚ) = model.atmosphere
+    cₚ = model.atmosphere.heat_capacity
     ρ = diagn.physics.surface_air_density[ij]
     V₀ = diagn.physics.surface_wind_speed[ij]
 
@@ -100,7 +100,7 @@ initialize!(::SurfaceLandHeatFlux, ::PrimitiveEquation) = nothing
 
 function surface_heat_flux!(ij, diagn, progn, heat_flux::SurfaceLandHeatFlux, model)
     
-    (; cₚ) = model.atmosphere
+    cₚ = model.atmosphere.heat_capacity
     pₛ = diagn.grid.pres_grid_prev[ij]                  # surface pressure [Pa]
     ρ = diagn.physics.surface_air_density[ij]
     V₀ = diagn.physics.surface_wind_speed[ij]

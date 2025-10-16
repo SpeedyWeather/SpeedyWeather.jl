@@ -29,9 +29,12 @@ end
     end
 
     # tendencies have to be scaled by the radius for the dynamical core
-    scale!(ij, diagn, model_parameters.planet.radius)
+    scale!(ij, diagn.tendencies, model_parameters.planet.radius)
 end
 
+"""$(TYPEDSIGNATURES)
+Flux `flux` into surface layer with surface pressure `pₛ` [Pa] and gravity `g` [m/s^2]
+converted to tendency [?/s]."""
 surface_flux_to_tendency(flux::Real, pₛ::Real, model) =
     flux_to_tendency(flux, pₛ, model.planet.gravity, model.geometry.σ_levels_thick[end])
 

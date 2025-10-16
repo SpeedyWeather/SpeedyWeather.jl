@@ -92,7 +92,7 @@ function surface_humidity_flux!(ij, diagn, progn, humidity_flux::SurfaceLandHumi
 
     # TODO use a skin temperature?
     T = progn.land.soil_temperature[ij, 1]  # uppermost land layer with index 1
-    α = diagn.physics.soil_moisture_availability[ij]
+    α = diagn.physics.land.soil_moisture_availability[ij]
 
     # SATURATION HUMIDITY OVER LAND
     pₛ = diagn.grid.pres_grid_prev[ij]          # surface pressure [Pa]
@@ -112,11 +112,11 @@ function surface_humidity_flux!(ij, diagn, progn, humidity_flux::SurfaceLandHumi
     flux_land = isfinite(T) && isfinite(α) ? ρ*drag_land*V₀*(α*sat_humid_land  - surface_humid) : zero(T)
     
     # store without weighting by land fraction for coupling
-    diagn.physics.land.surface_humidity_flux = flux_land         
+    diagn.physics.land.surface_humidity_flux[ij] = flux_land         
     flux_land *= land_fraction             # weight by land fraction of land-sea mask
 
     # output/diagnose: ocean sets flux (=), land accumulates (+=)
-    diagn.physics.surface_humidity_flux += flux_land
+    diagn.physics.surface_humidity_flux[ij] += flux_land
     
     # accumulate with += into end=lowermost layer total flux
     diagn.tendencies.humid_tend_grid[ij, end] += surface_flux_to_tendency(flux_land, pₛ, model)

@@ -201,6 +201,7 @@ function get_parameterizations(model::PrimitiveDry)
             
             # surface fluxes
             boundary_layer_drag = model.boundary_layer_drag,
+            surface_condition = model.surface_condition,
             surface_momentum_flux = model.surface_momentum_flux,
             surface_heat_flux = model.surface_heat_flux,
             

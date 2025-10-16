@@ -50,15 +50,16 @@ function large_scale_condensation!(
     time_stepping::AbstractTimeStepper,
 )
     # use previous time step for more stable Euler forward step of the parameterizations
-    temp = diagn.grid.temp_grid_prev
+    temp = diagn.grid.temp_grid_prev        # temperature [K] TODO add temperature profile!!!
     humid = diagn.grid.humid_grid_prev
     temp_tend = diagn.tendencies.temp_tend_grid
     humid_tend = diagn.tendencies.humid_tend_grid
 
     # precompute scaling constants to minimize divisions (used to convert between humidity [kg/kg] and precipitation [m])
-    pₛ = diagn.grid.pres_grid_prev[ij]      # surface pressure [Pa]
+    pₛ = diagn.grid.pres_grid_prev[ij]                  # surface pressure [Pa]
     (; Δt_sec) = time_stepping
-    Δσ = geometry.σ_levels_thick            # layer thickness in sigma coordinates
+    σ = geometry.σ_levels_full                          # vertical sigma coordinate [1]
+    Δσ = geometry.σ_levels_thick                        # layer thickness in sigma coordinates
     pₛ_gρ = pₛ/(planet.gravity * atmosphere.water_density)
 
     # thermodynamics
@@ -79,7 +80,7 @@ function large_scale_condensation!(
 
         # Condensation from humidity in this layer (for a negative humidity tendency)
         # relative to threshold that can be <100%, e.g. 95%
-        sat_humid_k = saturation_humidity(temp[ij, k], σ[k]*pres[ij], clausius_clapeyron)
+        sat_humid_k = saturation_humidity(temp[ij, k], σ[k]*pₛ, clausius_clapeyron)
         δq_cond = sat_humid_k * relative_humidity_threshold - humid[ij, k]
         
         # skip if no condensation has occurred yet in this layer or above

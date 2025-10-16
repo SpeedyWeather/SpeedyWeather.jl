@@ -372,6 +372,18 @@ $(TYPEDFIELDS)"""
     cloud_top::GridVariable2D = zeros(GridVariable2D, grid)      
     
     # SURFACE FLUXES
+    "Surface wind speed [m/s]"
+    surface_wind_speed::GridVariable2D = zeros(GridVariable2D, grid)
+
+    "Surface air density [kg/m³]"
+    surface_air_density::GridVariable2D = zeros(GridVariable2D, grid)
+
+    "Boundary layer drag coefficient [1]"
+    boundary_layer_drag::GridVariable2D = zeros(GridVariable2D, grid)
+
+    "Surface air temperature [K]"
+    surface_air_temperature::GridVariable2D = zeros(GridVariable2D, grid)
+
     "Sensible heat flux [W/m²], positive up"
     sensible_heat_flux::GridVariable2D = zeros(GridVariable2D, grid)
     

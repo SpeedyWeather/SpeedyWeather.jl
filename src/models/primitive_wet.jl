@@ -34,11 +34,11 @@ $(TYPEDFIELDS)"""
     BL,     # <:AbstractBoundaryLayer,
     TR,     # <:AbstractTemperatureRelaxation,
     VD,     # <:AbstractVerticalDiffusion,
-    SUT,    # <:AbstractSurfaceThermodynamics,
-    SUW,    # <:AbstractSurfaceWind,
+    SC,     # <:AbstractSurfaceCondition,
+    SM,     # <:AbstractSurfaceMomentumFlux,
     SH,     # <:AbstractSurfaceHeatFlux,
     HF,     # <:AbstractSurfaceHumidityFlux,
-    LSC,    # <:AbstractCondensation,
+    LC,     # <:AbstractCondensation,
     CV,     # <:AbstractConvection,
     OD,     # <:AbstractOpticalDepth,
     SW,     # <:AbstractShortwave,
@@ -93,7 +93,7 @@ $(TYPEDFIELDS)"""
     surface_momentum_flux::SM = SurfaceMomentumFlux(spectral_grid)
     surface_heat_flux::SH = SurfaceHeatFlux(spectral_grid)
     surface_humidity_flux::HF = SurfaceHumidityFlux(spectral_grid)
-    large_scale_condensation::LSC = ImplicitCondensation(spectral_grid)
+    large_scale_condensation::LC = ImplicitCondensation(spectral_grid)
     convection::CV = SimplifiedBettsMiller(spectral_grid)
     optical_depth::OD = ZeroOpticalDepth(spectral_grid)
     shortwave_radiation::SW = TransparentShortwave(spectral_grid)
@@ -187,7 +187,8 @@ end
 Extract the model components with parameters needed for the parameterizations
 as NamedTuple. These are the GPU-compatible components of the model."""
 function get_model_parameters(model::PrimitiveWet)
-    return (orography = model.orography.orography,              # use only orography field as strings aren't GPU-compatible
+    return (time_stepping = model.time_stepping,
+            orography = model.orography.orography,              # use only orography field as strings aren't GPU-compatible
             atmosphere = model.atmosphere,
             planet = model.planet,
             geometry = model.geometry,
@@ -201,20 +202,21 @@ Extract the parameterizations from the model as NamedTuple.
 These are the GPU-compatible components of the model."""
 function get_parameterizations(model::PrimitiveWet)
     return (# diffusion
-            vertical_diffusion = model.vertical_diffusion,
+            # vertical_diffusion = model.vertical_diffusion,
             
             # hydrological cycle
-            convection = model.convection,
+            # convection = model.convection,
             large_scale_condensation = model.large_scale_condensation,
             
             # radiation
             albedo = model.albedo,
-            optical_depth = model.optical_depth,
-            shortwave_radiation = model.shortwave_radiation,
-            longwave_radiation = model.longwave_radiation,
+            # optical_depth = model.optical_depth,
+            # shortwave_radiation = model.shortwave_radiation,
+            # longwave_radiation = model.longwave_radiation,
             
             # surface fluxes
-            boundary_layer_drag = model.boundary_layer_drag,
+            # boundary_layer_drag = model.boundary_layer_drag,
+            surface_condition = model.surface_condition,
             surface_momentum_flux = model.surface_momentum_flux,
             surface_heat_flux = model.surface_heat_flux,
             surface_humidity_flux = model.surface_humidity_flux,
