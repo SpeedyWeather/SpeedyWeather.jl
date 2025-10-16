@@ -52,3 +52,5 @@ function surface_condition!(ij, diagn, surface_condition::SurfaceCondition, mode
     diagn.physics.surface_air_temperature[ij] = T   # store for surface temp/humidity fluxes
     return nothing
 end
+
+Adapt.@adapt_structure SurfaceCondition

@@ -30,6 +30,8 @@ function parameterization!(ij, diagn, progn, humidity_flux::SurfaceHumidityFlux,
     surface_humidity_flux!(ij, diagn, progn, humidity_flux.land,  model)
 end
 
+Adapt.@adapt_structure SurfaceHumidityFlux
+
 export SurfaceOceanHumidityFlux
 @kwdef struct SurfaceOceanHumidityFlux{NF<:AbstractFloat} <: AbstractSurfaceHumidityFlux
     "[OPTION] Use drag coefficient from calculated following model.boundary_layer_drag"
@@ -75,6 +77,8 @@ function surface_humidity_flux!(ij, diagn, progn, humidity_flux::SurfaceOceanHum
     diagn.tendencies.humid_tend_grid[ij, end] += surface_flux_to_tendency(flux_ocean, pₛ, model)
     return nothing
 end
+
+Adapt.@adapt_structure SurfaceOceanHumidityFlux
 
 export SurfaceLandHumidityFlux
 @kwdef struct SurfaceLandHumidityFlux{NF<:AbstractFloat} <: AbstractSurfaceHumidityFlux
@@ -123,6 +127,8 @@ function surface_humidity_flux!(ij, diagn, progn, humidity_flux::SurfaceLandHumi
     return nothing
 end
 
+Adapt.@adapt_structure SurfaceLandHumidityFlux
+
 ## ----
 
 export PrescribedOceanHumidityFlux
@@ -149,6 +155,8 @@ function surface_humidity_flux!(ij, diagn, progn, ::PrescribedOceanHumidityFlux,
     return nothing
 end
 
+Adapt.@adapt_structure PrescribedOceanHumidityFlux
+
 ## ----
 
 export PrescribedLandHumidityFlux
@@ -174,3 +182,5 @@ function surface_humidity_flux!(ij, diagn, progn, ::PrescribedLandHumidityFlux, 
     diagn.tendencies.humid_tend_grid[ij, end] += surface_flux_to_tendency(flux_land, pₛ, model)
     return nothing
 end
+
+Adapt.@adapt_structure PrescribedLandHumidityFlux

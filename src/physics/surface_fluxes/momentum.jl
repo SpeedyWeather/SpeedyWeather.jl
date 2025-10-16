@@ -54,3 +54,5 @@ function surface_wind_stress!(ij, diagn, momentum_flux::SurfaceMomentumFlux, mod
 
     return nothing
 end
+
+Adapt.@adapt_structure SurfaceMomentumFlux
