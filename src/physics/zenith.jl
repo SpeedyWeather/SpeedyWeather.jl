@@ -231,7 +231,7 @@ end
 # Kernel for solar zenith calculation with daily cycle
 @kernel inbounds=true function solar_zenith_kernel!(cos_zenith, @Const(solar_hour_angle_0E), @Const(sinδ), @Const(cosδ), @Const(sinlat), @Const(coslat), @Const(lons))
     ij = @index(Global, Linear)
-    j = cos_zenith.grid.whichring[ij]
+    j = whichring(ij, cos_zenith)
     
     sinδsinϕ = sinδ * sinlat[j]
     cosδcosϕ = cosδ * coslat[j]
@@ -289,16 +289,16 @@ end
 # Kernel for seasonal solar zenith calculation (daily average)
 @kernel inbounds=true function solar_zenith_season_kernel!(cos_zenith, @Const(δ), @Const(sinδ), @Const(cosδ), @Const(sinlat), @Const(coslat), @Const(lat))
     ij = @index(Global, Linear)
-    j = cos_zenith.grid.whichring[ij]
+    j = whichring(ij, cos_zenith)
     
-    NF = eltype(cos_zenith)
+    NF = eltype(cos_zenith)         # force type stability
     local h₀::NF                    # hour angle sunrise to sunset
     local cos_zenith_j::NF          # at latitude j
 
     ϕ = lat[j]
     h₀ = abs(δ) + abs(ϕ) < π/2 ?    # polar day/night?
          acos(-tan(ϕ) * tan(δ)) :   # if not: calculate length of day
-         ϕ*δ > 0 ? π : zero(NF)     # polar day if signs are equal, otherwise polar night
+         ϕ*δ > 0 ? π : 0            # polar day if signs are equal, otherwise polar night
     
     sinϕ, cosϕ = sinlat[j], coslat[j]
     cos_zenith_j = h₀*sinδ*sinϕ + cosδ*cosϕ*sin(h₀)

@@ -30,6 +30,6 @@ end
 
 @kernel inbounds=true function scale_lat_kernel!(field, v)
     ij, k = @index(Global, NTuple)
-    j = field.grid.whichring[ij]
+    j = whichring(ij, field)   # get ring index for grid point ij
     field[ij, k] *= v[j]
 end
