@@ -81,21 +81,21 @@ end
 
 """
 $(TYPEDSIGNATURES)
-Calculate the geopotential based on `temp` in a single column.
-This exclues the surface geopotential that would need to be added to the returned vector.
-Function not used in the dynamical core but for post-processing and analysis."""
+Calculate the geopotential based on `temp` in the column `ij`.
+Used for parameterizations that need the geopotential in a single column,
+convection and vertical diffusion."""
 function geopotential!(
     ij,                         # horizontal grid point index
-    geopot::AbstractField3D,    # geopotential to be filled
-    temp::AbstractField3D,      # temperature field (virtual temperature for PrimitiveWet)
+    geopot,                     # ::AbstractField3D, geopotential to be filled
+    temp,                       # ::AbstractField3D, temperature field (virtual temperature for PrimitiveWet)
+    orography,                  # ::AbstractField2D, orography field
+    gravity,                    # ::Real, gravity [m/s^2]
     G::Geopotential,            # precomputed integration constants
-    orography::AbstractField2D, # orography field
-    gravity,                    # gravity [m/s^2]
 )
     (; nlayers, Δp_geopot_half, Δp_geopot_full) = G  # = R*Δlnp either on half or full levels
 
     # bottom layer
-    geopot[ij, end] = gravity*orography[ij] + temp[nlayers]*Δp_geopot_full[end]
+    geopot[ij, end] = gravity*orography[ij] + temp[ij, nlayers]*Δp_geopot_full[end]
 
     # OTHER FULL LAYERS, integrate two half-layers from bottom to top
     @inbounds for k in nlayers-1:-1:1

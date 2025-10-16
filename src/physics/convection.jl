@@ -55,7 +55,9 @@ function convection!(ij, diagn, SBM::SimplifiedBettsMiller, model)
     temp_ref_profile =  diagn.dynamics.a_grid               # temperature [K] reference profile to adjust to
     humid_ref_profile = diagn.dynamics.b_grid               # specific humidity [kg/kg] profile to adjust to
     geopot = diagn.dynamics.uv∇lnp                          # geopotential [m²/s²] on full levels
-    geopotential!(ij, geopot, temp_virt, model.geopotential, model.orography, planet.gravity)
+
+    # TODO move this to its own parameterization?
+    geopotential!(ij, geopot, temp_virt, model.orography, planet.gravity, model.geopotential)
 
     # CONVECTIVE CRITERIA AND FIRST GUESS RELAXATION
     # Create pseudo column for surface_temp_humid function (this needs to be updated later)
