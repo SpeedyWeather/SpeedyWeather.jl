@@ -3,6 +3,7 @@
 # Unreleased
 
 - Parameterizations with KernelAbstractions [#873](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/873)
+- Increase version of RingGrids, LowerTriangularArrays and SpeedyTransforms to v0.1.1 [#875](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/875)
 - Pluto notebook example in README [#872](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/872/)
 - Reimplement RestartFile, ProgressTxt, ParamatersTxt as callback [#726](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/726/)
 - Implicit has reinitialize option [#726](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/726/)
