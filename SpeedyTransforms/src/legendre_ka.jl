@@ -63,6 +63,7 @@ function _legendre!(
     g_north::AbstractArray{<:Complex, 3},       # Legendre-transformed output, northern latitudes
     g_south::AbstractArray{<:Complex, 3},       # and southern latitudes
     specs::LowerTriangularArray,                # input: spherical harmonic coefficients
+    scratch_memory::ColumnScratchMemory,        # scratch memory (unused here, but used in CPU _legendre!)
     S::SpectralTransform{NF,<:Architectures.GPU};             # precomputed transform
     unscale_coslat::Bool = false,               # unscale by cosine of latitude on the fly?
 ) where NF
@@ -170,6 +171,7 @@ function _legendre!(                        # GRID TO SPECTRAL
     specs::LowerTriangularArray,            # Fourier and Legendre-transformed output
     f_north::AbstractArray{<:Complex, 3},   # Fourier-transformed input, northern latitudes
     f_south::AbstractArray{<:Complex, 3},   # and southern latitudes
+    scratch_memory::ColumnScratchMemory,    # scratch memory (not used here, but for CPU _legendre!)
     S::SpectralTransform{NF,<:Architectures.GPU},        # precomputed transform
 ) where NF
     (; lmax) = S.spectrum                   # 1-based max degree l, order m of spherical harmonics  

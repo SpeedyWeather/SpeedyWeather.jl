@@ -3,6 +3,8 @@
 # Unreleased
 
 - Higher default BulkRichardsonDrag via surface gusts + bug fixes [#857](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/857)
+- Expand scratch memory handling in spectral transforms for better differentiability with Enzyme and revise FFT plans [#791](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/791)
+- Increase version of RingGrids, LowerTriangularArrays and SpeedyTransforms to v0.1.1 [#875](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/875)
 - Pluto notebook example in README [#872](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/872/)
 - Reimplement RestartFile, ProgressTxt, ParamatersTxt as callback [#726](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/726/)
 - Implicit has reinitialize option [#726](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/726/)

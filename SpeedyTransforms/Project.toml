@@ -1,7 +1,7 @@
 name = "SpeedyTransforms"
 uuid = "ed023a3f-7a3c-42dd-bab6-68c21c8c3105"
 authors = ["SpeedyTransforms contributors"]
-version = "0.1.0"
+version = "0.1.1"
 
 [deps]
 AbstractFFTs = "621f4979-c628-5d54-868e-fcf4e3e8185c"
@@ -31,7 +31,7 @@ RingGrids = {path = "../RingGrids"}
 AbstractFFTs = "1.5.0"
 Adapt = "4.3.0"
 AssociatedLegendrePolynomials = "1.0.1"
-Atomix = "1.1.2"
+Atomix = "1"
 CUDA = "4, 5"
 DocStringExtensions = "0.9.5"
 Enzyme = "0.13"
