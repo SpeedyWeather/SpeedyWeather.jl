@@ -71,15 +71,15 @@ version = "1.1.1"
 
 [[deps.ArrayInterface]]
 deps = ["Adapt", "LinearAlgebra"]
-git-tree-sha1 = "dbd8c3bbbdbb5c2778f85f4422c39960eac65a42"
+git-tree-sha1 = "d2cd034553ee6ca084edaaf8ed6c9d50fd01555d"
 uuid = "4fba245c-0d91-5ea0-9b3e-6abc04ee57a9"
-version = "7.20.0"
+version = "7.21.0"
 
     [deps.ArrayInterface.extensions]
     ArrayInterfaceBandedMatricesExt = "BandedMatrices"
     ArrayInterfaceBlockBandedMatricesExt = "BlockBandedMatrices"
     ArrayInterfaceCUDAExt = "CUDA"
-    ArrayInterfaceCUDSSExt = "CUDSS"
+    ArrayInterfaceCUDSSExt = ["CUDSS", "CUDA"]
     ArrayInterfaceChainRulesCoreExt = "ChainRulesCore"
     ArrayInterfaceChainRulesExt = "ChainRules"
     ArrayInterfaceGPUArraysCoreExt = "GPUArraysCore"
@@ -718,9 +718,15 @@ uuid = "56ddb016-857b-54e1-b83d-db4d58db5568"
 
 [[deps.LowerTriangularArrays]]
 deps = ["Adapt", "DocStringExtensions", "GPUArrays", "KernelAbstractions", "LinearAlgebra", "SpeedyWeatherInternals"]
-git-tree-sha1 = "39f68559d6648dfe829ff8de9058ec66665a3d25"
+path = "../../../LowerTriangularArrays"
 uuid = "ed20b33f-a660-45d0-a353-9c8c20bb5814"
 version = "0.1.0"
+
+    [deps.LowerTriangularArrays.extensions]
+    LowerTriangularArraysFiniteDifferencesExt = "FiniteDifferences"
+
+    [deps.LowerTriangularArrays.weakdeps]
+    FiniteDifferences = "26cc04aa-876d-5657-8c51-4c34ba976000"
 
 [[deps.Lz4_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
@@ -942,9 +948,19 @@ version = "1.3.1"
 
 [[deps.RingGrids]]
 deps = ["Adapt", "DocStringExtensions", "FastGaussQuadrature", "GPUArrays", "KernelAbstractions", "LinearAlgebra", "Printf", "SpeedyWeatherInternals", "Statistics"]
-git-tree-sha1 = "8ffd4efafea8df661ccadcbebccc7b4b8ef95161"
+path = "../../../RingGrids"
 uuid = "d1845624-ad4f-453b-8ff4-a8db365bf3a7"
 version = "0.1.0"
+
+    [deps.RingGrids.extensions]
+    RingGridsFiniteDifferencesExt = "FiniteDifferences"
+    RingGridsGeoMakieExt = "GeoMakie"
+    RingGridsMakieExt = "Makie"
+
+    [deps.RingGrids.weakdeps]
+    FiniteDifferences = "26cc04aa-876d-5657-8c51-4c34ba976000"
+    GeoMakie = "db073c08-6b98-4ee5-b6a4-5efafb3259c6"
+    Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
 
 [[deps.Rmath]]
 deps = ["Random", "Rmath_jll"]
@@ -1014,9 +1030,17 @@ weakdeps = ["ChainRulesCore"]
 
 [[deps.SpeedyTransforms]]
 deps = ["AbstractFFTs", "Adapt", "AssociatedLegendrePolynomials", "Atomix", "DocStringExtensions", "FFTW", "FastGaussQuadrature", "GPUArrays", "GenericFFT", "KernelAbstractions", "LinearAlgebra", "LowerTriangularArrays", "Primes", "Printf", "RingGrids", "SpeedyWeatherInternals", "Statistics"]
-git-tree-sha1 = "28341fb60de93ade4d9d8d36604ef90dca38e365"
+path = "../../../SpeedyTransforms"
 uuid = "ed023a3f-7a3c-42dd-bab6-68c21c8c3105"
 version = "0.1.0"
+
+    [deps.SpeedyTransforms.extensions]
+    SpeedyTransformsCUDAExt = "CUDA"
+    SpeedyTransformsEnzymeExt = "Enzyme"
+
+    [deps.SpeedyTransforms.weakdeps]
+    CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+    Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
 
 [[deps.SpeedyWeather]]
 deps = ["AbstractFFTs", "Adapt", "AssociatedLegendrePolynomials", "Atomix", "BitInformation", "CodecZlib", "ComponentArrays", "ConstructionBase", "Dates", "DocStringExtensions", "DomainSets", "FFTW", "FastGaussQuadrature", "GPUArrays", "GenericFFT", "JLD2", "KernelAbstractions", "LinearAlgebra", "LowerTriangularArrays", "MacroTools", "ModelParameters", "NCDatasets", "Primes", "Printf", "ProgressMeter", "Random", "RingGrids", "SpeedyTransforms", "SpeedyWeatherInternals", "Statistics", "TOML"]
@@ -1038,7 +1062,7 @@ version = "0.17.1"
 
 [[deps.SpeedyWeatherInternals]]
 deps = ["DocStringExtensions", "KernelAbstractions"]
-git-tree-sha1 = "b453d3b89fd1336eadcd3f9572a1975d2403017c"
+path = "../../../SpeedyWeatherInternals"
 uuid = "34489162-d270-4603-8b96-37b04f830d73"
 version = "0.1.1"
 
@@ -1240,10 +1264,10 @@ uuid = "8e850ede-7688-5339-a07c-302acd2aaf8d"
 version = "1.52.0+1"
 
 [[deps.oneTBB_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "d5a767a3bb77135a99e433afe0eb14cd7f6914c3"
+deps = ["Artifacts", "JLLWrappers", "LazyArtifacts", "Libdl"]
+git-tree-sha1 = "1350188a69a6e46f799d3945beef36435ed7262f"
 uuid = "1317d2d5-d96f-522e-a858-c73665f53c3e"
-version = "2022.0.0+0"
+version = "2022.0.0+1"
 
 [[deps.p7zip_jll]]
 deps = ["Artifacts", "Libdl"]
