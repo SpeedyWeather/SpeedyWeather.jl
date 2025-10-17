@@ -1,6 +1,8 @@
 # Changelog
 
-# Unreleased
+## Unreleased
+
+## v0.17.2
 
 - Parameterizations with KernelAbstractions [#873](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/873)
 - Expand scratch memory handling in spectral transforms for better differentiability with Enzyme and revise FFT plans [#791](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/791)

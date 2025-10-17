@@ -189,6 +189,7 @@ as NamedTuple. These are the GPU-compatible components of the model."""
 function get_model_parameters(model::PrimitiveWet)
     return (time_stepping = model.time_stepping,
             orography = model.orography.orography,              # use only orography field as strings aren't GPU-compatible
+            geopotential = model.geopotential,
             atmosphere = model.atmosphere,
             planet = model.planet,
             geometry = model.geometry,
@@ -205,7 +206,7 @@ function get_parameterizations(model::PrimitiveWet)
             # vertical_diffusion = model.vertical_diffusion,
             
             # hydrological cycle
-            # convection = model.convection,
+            convection = model.convection,
             large_scale_condensation = model.large_scale_condensation,
             
             # radiation

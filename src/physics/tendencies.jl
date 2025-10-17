@@ -19,7 +19,7 @@ function parameterization_tendencies!(
     return nothing
 end
 
-@kernel function parameterization_tendencies_kernel!(diagn, progn, parameterizations, model_parameters)
+@kernel function parameterization_tendencies_kernel!(diagn, progn, @Const(parameterizations), @Const(model_parameters))
     
     ij = @index(Global, Linear)     # every horizontal grid point ij
 
