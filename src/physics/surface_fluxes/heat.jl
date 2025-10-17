@@ -29,6 +29,8 @@ function parameterization!(ij, diagn, progn, heat_flux::SurfaceHeatFlux, model)
     surface_heat_flux!(ij, diagn, progn, heat_flux.land,  model)
 end
 
+Adapt.@adapt_structure SurfaceHeatFlux
+
 export SurfaceOceanHeatFlux
 
 """Surface sensible heat flux parameterization over ocean. Calculates the 
@@ -79,6 +81,8 @@ function surface_heat_flux!(ij, diagn, progn, heat_flux::SurfaceOceanHeatFlux, m
     diagn.tendencies.temp_tend_grid[ij, end] += surface_flux_to_tendency(flux_ocean, pₛ, model)
     return nothing
 end
+
+Adapt.@adapt_structure SurfaceOceanHeatFlux
 
 export SurfaceLandHeatFlux
 
@@ -131,6 +135,8 @@ function surface_heat_flux!(ij, diagn, progn, heat_flux::SurfaceLandHeatFlux, mo
     return nothing
 end
 
+Adapt.@adapt_structure SurfaceLandHeatFlux
+
 ## ----
 
 export PrescribedOceanHeatFlux
@@ -163,6 +169,8 @@ function surface_heat_flux!(ij, diagn, progn, ::PrescribedOceanHeatFlux, model)
     return nothing
 end
 
+Adapt.@adapt_structure PrescribedOceanHeatFlux
+
 ## ----
 
 export PrescribedLandHeatFlux
@@ -193,4 +201,6 @@ function surface_heat_flux!(ij, diagn, progn, ::PrescribedLandHeatFlux, model)
     # accumulate with += into end=lowermost layer total flux
     diagn.tendencies.temp_tend_grid[ij, end] += surface_flux_to_tendency(flux_land, pₛ, model)
     return nothing
-end
+end 
+
+Adapt.@adapt_structure PrescribedLandHeatFlux

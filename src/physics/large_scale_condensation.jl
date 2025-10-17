@@ -27,6 +27,8 @@ end
 ImplicitCondensation(SG::SpectralGrid; kwargs...) = ImplicitCondensation{SG.NF}(; kwargs...)
 initialize!(::ImplicitCondensation, ::PrimitiveEquation) = nothing
 
+Adapt.@adapt_structure ImplicitCondensation
+
 # function barrier
 function parameterization!(ij, diagn, progn, lsc::ImplicitCondensation, model)
     (; clausius_clapeyron, geometry, planet, atmosphere, time_stepping) = model

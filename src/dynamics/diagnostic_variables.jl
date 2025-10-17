@@ -95,6 +95,8 @@ function Tendencies(SG::SpectralGrid)
     )
 end
 
+Adapt.@adapt_structure Tendencies
+
 export GridVariables
 
 """Transformed prognostic variables (and u, v, temp_virt) into grid-point space.
@@ -157,6 +159,8 @@ function GridVariables(SG::SpectralGrid)
             grid, nlayers,
         )
 end
+
+Adapt.@adapt_structure GridVariables
 
 export DynamicsVariables
 
@@ -269,6 +273,7 @@ function DynamicsVariables(SG::SpectralGrid;
     end 
 end
 
+Adapt.@adapt_structure DynamicsVariables
 
 export DiagnosticVariablesOcean
 @kwdef struct DiagnosticVariablesOcean{
@@ -299,6 +304,8 @@ end
 
 DiagnosticVariablesOcean(SG::SpectralGrid) =
     DiagnosticVariablesOcean{SG.NF, SG.ArrayType, typeof(SG.grid), SG.GridVariable2D}(; SG.grid)
+
+Adapt.@adapt_structure DiagnosticVariablesOcean
 
 export DiagnosticVariablesLand
 @kwdef struct DiagnosticVariablesLand{
@@ -336,6 +343,7 @@ end
 DiagnosticVariablesLand(SG::SpectralGrid) =
     DiagnosticVariablesLand{SG.NF, SG.ArrayType, typeof(SG.grid), SG.GridVariable2D}(; SG.grid)
 
+Adapt.@adapt_structure DiagnosticVariablesLand
 
 export PhysicsVariables
 
@@ -433,6 +441,8 @@ function PhysicsVariables(SG::SpectralGrid)
     return PhysicsVariables{NF, ArrayType, typeof(grid), GridVariable2D}(; grid, ocean, land)
 end
 
+Adapt.@adapt_structure PhysicsVariables
+
 export ParticleVariables
 
 """Diagnostic variables for the particle advection
@@ -473,6 +483,8 @@ function ParticleVariables(SG::SpectralGrid)
     return ParticleVariables{NF,ArrayType, ParticleVector, VectorNF, typeof(interpolator)}(;
             nparticles, interpolator)
 end
+
+Adapt.@adapt_structure ParticleVariables
 
 export DiagnosticVariables
 
@@ -580,6 +592,8 @@ function DiagnosticVariables(
         column, temp_average, scale,
     )
 end
+
+Adapt.@adapt_structure DiagnosticVariables
 
 function Base.show(
     io::IO,

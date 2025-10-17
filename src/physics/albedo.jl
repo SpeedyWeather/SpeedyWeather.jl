@@ -55,6 +55,8 @@ function albedo!(ij, diagn_albedo::AbstractField2D, albedo::Real)
     diagn_albedo[ij] = albedo
 end
 
+Adapt.@adapt_structure GlobalConstantAlbedo
+
 ## MANUAL ALBEDO
 export ManualAlbedo
 
@@ -72,6 +74,8 @@ parameterization!(ij, diagn, progn, albedo::ManualAlbedo, model) = albedo!(ij, d
 function albedo!(ij, diagn_albedo::AbstractField2D, albedo::AbstractField2D)
     diagn_albedo[ij] = albedo[ij]
 end
+
+Adapt.@adapt_structure ManualAlbedo
 
 ## ALBEDO CLIMATOLOGY
 export AlbedoClimatology
@@ -111,11 +115,14 @@ function initialize!(albedo::AlbedoClimatology, model::PrimitiveEquation)
     end
     ncfile = NCDataset(path)
 
-    a = albedo.file_Grid(ncfile[albedo.varname].var[:, :], input_as=Matrix)
+    a = on_architecture(model.architecture, albedo.file_Grid(ncfile[albedo.varname].var[:, :], input_as=Matrix))
     interpolate!(albedo.albedo, a)
 end
 
 parameterization!(ij, diagn, progn, albedo::AlbedoClimatology, model) = albedo!(ij, diagn.albedo, albedo.albedo)
+
+# For GPU usage just discard the extra information and treat it as a `ManualAlbedo`
+Adapt.adapt_structure(to, albedo::AlbedoClimatology) = adapt(to, ManualAlbedo(albedo.albedo))
 
 ## OceanSeaIceAlbedo
 export OceanSeaIceAlbedo
@@ -136,3 +143,5 @@ function albedo!(ij, diagn_albedo::AbstractField2D, ocean, albedo::OceanSeaIceAl
     # set ocean albedo linearly between ocean and ice depending on sea ice concentration
     diagn_albedo[ij] = albedo_ocean + sea_ice_concentration[ij] * (albedo_ice - albedo_ocean)
 end
+
+Adapt.@adapt_structure OceanSeaIceAlbedo
