@@ -29,6 +29,8 @@ export PrognosticVariablesOcean
     surface_humidity_flux::GridVariable2D = zeros(GridVariable2D, grid)
 end
 
+Adapt.@adapt_structure PrognosticVariablesOcean
+
 export PrognosticVariablesLand
 @kwdef struct PrognosticVariablesLand{
     NF,                     # <: AbstractFloat
@@ -61,6 +63,8 @@ export PrognosticVariablesLand
     "Prescribed land humidity flux [kg/s/m²], positive up, zero if not used"
     surface_humidity_flux::GridVariable2D = zeros(GridVariable2D, grid)
 end
+
+Adapt.@adapt_structure PrognosticVariablesLand
 
 export PrognosticVariables
 @kwdef struct PrognosticVariables{
@@ -134,6 +138,8 @@ export PrognosticVariables
     "Clock that keeps track of time, number of timesteps to integrate for."
     clock::Clock = Clock()
 end
+
+Adapt.@adapt_structure PrognosticVariables
 
 Base.eltype(progn::PrognosticVariables{T}) where T = T
 
