@@ -115,7 +115,7 @@ end
 (::Type{L})(npoints::Integer; kwargs...) where {L<:AbstractLocator} = L(DEFAULT_NF, npoints; kwargs...)
 
 function Base.show(io::IO,L::AnvilLocator)
-    println(io,"$(typeof(L))")
+    println(io,"$(typeof(L))")  
     print(io,"└ npoints_output::Int = $(L.npoints_output)")
 end
 
@@ -317,7 +317,7 @@ function interpolate!(
     interpolator::AbstractInterpolator,
 ) 
     fields_match(Aout, A) && return copyto!(Aout.data, A.data)
-    @assert ismatching(architecture(A), Aout) "Interpolation is only supported between fields on the same architecture, got $(architecture(A)) and )"
+    @assert ismatching(architecture(A), Aout) "Interpolation is only supported between fields on the same architecture, got $(architecture(A)) and $(architecture(Aout))"
     _interpolate!(Aout.data, A.data, interpolator, architecture(A))
 end
 
