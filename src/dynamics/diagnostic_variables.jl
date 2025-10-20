@@ -540,7 +540,7 @@ function DiagnosticVariables(SG::SpectralGrid, model::PrimitiveEquation)
 end
 
 Base.eltype(::DiagnosticVariables{SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, GridVariable2D}) where {SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, GridVariable2D <: AbstractField{NF}} where NF = NF 
-Architectures.array_type(::DiagnosticVariables{SpectrumType, GridType, SpectralVariable2D}) where {SpectrumType, GridType, SpectralVariable2D <: AbstractField{NF, N, ArrayType}} where {NF, N, ArrayType <: AbstractArray} = nonparametric_type(ArrayType)
+Architectures.array_type(::DiagnosticVariables{SpectrumType, GridType, SpectralVariable2D}) where {SpectrumType, GridType, SpectralVariable2D <: LowerTriangularArray{NF, N, ArrayType}} where {NF, N, ArrayType <: AbstractArray} = nonparametric_type(ArrayType)
 
 """$(TYPEDSIGNATURES)
 Generator function. If a `transform` is handed over, the same scratch memory is used."""
