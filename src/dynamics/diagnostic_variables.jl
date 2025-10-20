@@ -489,6 +489,8 @@ struct DiagnosticVariables{
     VectorType,             # <: AbstractVector
     ScratchMemoryType,      # <: ArrayType{Complex{NF}, 3}
     Interpolator,           # <:AbstractInterpolator
+    SpectralDict,           # <: Dict{Symbol, SpectralVariable3D}
+    GridDict,               # <: Dict{Symbol, GridVariable3D}
     RefValueNF,             # <: Base.RefValue{NF}
 } <: AbstractDiagnosticVariables
 
@@ -506,10 +508,10 @@ struct DiagnosticVariables{
     nparticles::Int
 
     "Tendencies (spectral and grid) of the prognostic variables"
-    tendencies::Tendencies{SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, Dict{Symbol, SpectralVariable3D}, Dict{Symbol, GridVariable3D}}
+    tendencies::Tendencies{SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, SpectralDict, GridDict}
     
     "Gridded prognostic variables"
-    grid::GridVariables{GridType, GridVariable2D, GridVariable3D, Dict{Symbol, GridVariable3D}}
+    grid::GridVariables{GridType, GridVariable2D, GridVariable3D, GridDict}
     
     "Intermediate variables for the dynamical core"
     dynamics::DynamicsVariables{SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, ScratchMemoryType}
@@ -532,8 +534,8 @@ struct DiagnosticVariables{
         grid::GridType,
         nlayers::Int,
         nparticles::Int,
-        tendencies::Tendencies{SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, Dict{Symbol, SpectralVariable3D}, Dict{Symbol, GridVariable3D}},
-        grid_variables::GridVariables{GridType, GridVariable2D, GridVariable3D, Dict{Symbol, GridVariable3D}},
+        tendencies::Tendencies{SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, SpectralDict, GridDict},
+        grid_variables::GridVariables{GridType, GridVariable2D, GridVariable3D, GridDict},
         dynamics::DynamicsVariables{SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, ScratchMemoryType},
         physics::PhysicsVariables{GridType, GridVariable2D},
         particles::ParticleVariables{ParticleVector, VectorType, Interpolator},
@@ -550,12 +552,15 @@ struct DiagnosticVariables{
         VectorType,             # <: AbstractVector
         ScratchMemoryType,      # <: ArrayType{Complex{NF}, 3}
         Interpolator,           # <: AbstractInterpolator
+        SpectralDict,           # <: Dict{Symbol, SpectralVariable3D}
+        GridDict,               # <: Dict{Symbol, GridVariable3D}
         RefValueNF,             # <: Base.RefValue{NF}
     }
         return new{
             typeof(spectrum), typeof(grid), SpectralVariable2D, SpectralVariable3D,
             GridVariable2D, GridVariable3D, ParticleVector, VectorType,
-            typeof(dynamics.scratch_memory), typeof(particles.interpolator), typeof(scale)
+            typeof(dynamics.scratch_memory), typeof(particles.interpolator), 
+            SpectralDict, GridDict, typeof(scale)
         }(
             spectrum, grid, nlayers, nparticles,
             tendencies, grid_variables, dynamics, physics, particles,
@@ -563,8 +568,16 @@ struct DiagnosticVariables{
         )
     end
 
-    # full constructors with parameters
-    function DiagnosticVariables{SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, ParticleVector, VectorType, ScratchMemoryType, Interpolator, RefValueNF}(spectrum, grid, nlayers, nparticles, tendencies, grid_variables, dynamics, physics, particles, temp_average, scale) where {
+    # full constructor with parameters
+    function DiagnosticVariables{
+        SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D,
+        GridVariable2D, GridVariable3D, ParticleVector, VectorType,
+        ScratchMemoryType, Interpolator, SpectralDict, GridDict, RefValueNF,
+    }(
+        spectrum, grid, nlayers, nparticles,
+        tendencies, grid_variables, dynamics, physics, particles,
+        temp_average, scale,
+    ) where {
         SpectrumType,           # <: AbstractSpectrum
         GridType,               # <: AbstractGrid
         SpectralVariable2D,     # <: LowerTriangularArray
@@ -575,9 +588,19 @@ struct DiagnosticVariables{
         VectorType,             # <: AbstractVector
         ScratchMemoryType,      # <: ArrayType{Complex{NF}, 3}
         Interpolator,           # <: AbstractInterpolator
+        SpectralDict,           # <: Dict{Symbol, SpectralVariable3D}
+        GridDict,               # <: Dict{Symbol, GridVariable3D}
         RefValueNF,             # <: Base.RefValue{NF}
     }
-        return DiagnosticVariables(spectrum, grid, nlayers, nparticles, tendencies, grid_variables, dynamics, physics, particles, temp_average, scale)
+        return new{
+            SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D,
+            GridVariable2D, GridVariable3D, ParticleVector, VectorType,
+            ScratchMemoryType, Interpolator, SpectralDict, GridDict, RefValueNF,
+        }(
+            spectrum, grid, nlayers, nparticles,
+            tendencies, grid_variables, dynamics, physics, particles,
+            temp_average, scale,
+        )
     end
 end
 
@@ -624,7 +647,9 @@ function DiagnosticVariables(
     return DiagnosticVariables{
         typeof(spectrum), typeof(grid), SpectralVariable2D, SpectralVariable3D,
         GridVariable2D, GridVariable3D, ParticleVector, VectorType,
-        typeof(dynamics.scratch_memory), typeof(particles.interpolator), typeof(scale)
+        typeof(dynamics.scratch_memory), typeof(particles.interpolator), 
+        typeof(tendencies.tracers_tend), typeof(grid_variables.tracers_grid),
+        typeof(scale),
     }(
         spectrum, grid, nlayers, nparticles,
         tendencies, grid_variables, dynamics, physics, particles,
