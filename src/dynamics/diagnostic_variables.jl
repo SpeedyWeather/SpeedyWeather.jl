@@ -483,7 +483,6 @@ struct DiagnosticVariables{
     GridVariable3D,         # <: AbstractField
     ParticleVector,         # <: AbstractField
     VectorType,             # <: AbstractVector
-    MatrixType,             # <: AbstractMatrix
     ScratchMemoryType,      # <: ArrayType{Complex{NF}, 3}
     Interpolator,           # <:AbstractInterpolator
     RefValueNF,             # <: Base.RefValue{NF}
@@ -553,7 +552,7 @@ function DiagnosticVariables(
     (; spectrum, grid, nparticles, NF, nlayers) = SG
     (; SpectralVariable2D, SpectralVariable3D) = SG
     (; GridVariable2D, GridVariable3D) = SG
-    (; VectorType, MatrixType, ParticleVector) = SG
+    (; VectorType, ParticleVector) = SG
 
     tendencies = Tendencies(SG)
     grid_variables = GridVariables(SG)
@@ -566,7 +565,7 @@ function DiagnosticVariables(
 
     return DiagnosticVariables{
         typeof(spectrum), typeof(grid), SpectralVariable2D, SpectralVariable3D,
-        GridVariable2D, GridVariable3D, ParticleVector, VectorType, MatrixType,
+        GridVariable2D, GridVariable3D, ParticleVector, VectorType,
         typeof(dynamics.scratch_memory), typeof(particles.interpolator), typeof(scale)
     }(
         spectrum, grid, nlayers, nparticles,
