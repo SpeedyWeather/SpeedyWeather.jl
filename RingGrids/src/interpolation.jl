@@ -138,6 +138,8 @@ struct AnvilInterpolator{NF, Geometry, Locator} <: AbstractInterpolator
     locator::Locator
 end
 
+Adapt.@adapt_structure AnvilInterpolator
+
 const DEFAULT_INTERPOLATOR = AnvilInterpolator
 Base.eltype(::AnvilInterpolator{NF}) where NF = NF
 grid_type(I::AnvilInterpolator) = typeof(I.geometry.grid)

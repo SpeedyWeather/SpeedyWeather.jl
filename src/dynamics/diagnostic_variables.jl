@@ -93,7 +93,53 @@ function Tendencies(SG::SpectralGrid)
     )
 end
 
-Adapt.@adapt_structure Tendencies
+function Adapt.adapt_structure(to, tendencies::Tendencies)
+    # empty dictionaries don't get adapted per default...
+    if isempty(tendencies.tracers_tend)
+        vor_tend_adapted = adapt_structure(to, tendencies.vor_tend)
+        u_tend_grid_adapted = adapt_structure(to, tendencies.u_tend_grid)
+
+        return Tendencies(
+            adapt_structure(to, tendencies.spectrum),
+            adapt_structure(to, tendencies.grid),
+            tendencies.nlayers,
+            vor_tend_adapted,
+            adapt_structure(to, tendencies.div_tend),
+            adapt_structure(to, tendencies.temp_tend),
+            adapt_structure(to, tendencies.humid_tend),
+            adapt_structure(to, tendencies.u_tend),
+            adapt_structure(to, tendencies.v_tend),
+            adapt_structure(to, tendencies.pres_tend),
+            Dict{Symbol, typeof(vor_tend_adapted)}(),
+            u_tend_grid_adapted,
+            adapt_structure(to, tendencies.v_tend_grid),
+            adapt_structure(to, tendencies.temp_tend_grid),
+            adapt_structure(to, tendencies.humid_tend_grid),
+            adapt_structure(to, tendencies.pres_tend_grid),
+            Dict{Symbol, typeof(u_tend_grid_adapted)}(),
+        )
+    else
+        return Tendencies(
+            adapt_structure(to, tendencies.spectrum),
+            adapt_structure(to, tendencies.grid),
+            tendencies.nlayers,
+            adapt_structure(to, tendencies.vor_tend),
+            adapt_structure(to, tendencies.div_tend),
+            adapt_structure(to, tendencies.temp_tend),
+            adapt_structure(to, tendencies.humid_tend),
+            adapt_structure(to, tendencies.u_tend),
+            adapt_structure(to, tendencies.v_tend),
+            adapt_structure(to, tendencies.pres_tend),
+            adapt_structure(to, tendencies.tracers_tend),
+            adapt_structure(to, tendencies.u_tend_grid),
+            adapt_structure(to, tendencies.v_tend_grid),
+            adapt_structure(to, tendencies.temp_tend_grid),
+            adapt_structure(to, tendencies.humid_tend_grid),
+            adapt_structure(to, tendencies.pres_tend_grid),
+            adapt_structure(to, tendencies.tracers_tend_grid),
+        )
+    end
+end
 
 export GridVariables
 
@@ -156,7 +202,53 @@ function GridVariables(SG::SpectralGrid)
         )
 end
 
-Adapt.@adapt_structure GridVariables
+function Adapt.adapt_structure(to, grid_variables::GridVariables)
+    # empty dictionaries don't get adapted per default...
+    if isempty(grid_variables.tracers_grid)
+        vor_grid_adapted = adapt_structure(to, grid_variables.vor_grid) 
+
+        return GridVariables(
+            adapt_structure(to, grid_variables.grid), 
+            grid_variables.nlayers,
+            vor_grid_adapted,
+            adapt_structure(to, grid_variables.div_grid), 
+            adapt_structure(to, grid_variables.temp_grid), 
+            adapt_structure(to, grid_variables.temp_virt_grid), 
+            adapt_structure(to, grid_variables.humid_grid), 
+            adapt_structure(to, grid_variables.u_grid), 
+            adapt_structure(to, grid_variables.v_grid), 
+            adapt_structure(to, grid_variables.pres_grid), 
+            adapt_structure(to, grid_variables.random_pattern), 
+            Dict{Symbol, typeof(vor_grid_adapted)}(),
+            adapt_structure(to, grid_variables.temp_grid_prev), 
+            adapt_structure(to, grid_variables.humid_grid_prev), 
+            adapt_structure(to, grid_variables.u_grid_prev), 
+            adapt_structure(to, grid_variables.v_grid_prev), 
+            adapt_structure(to, grid_variables.pres_grid_prev), 
+            Dict{Symbol, typeof(vor_grid_adapted)}(),
+        )   
+    else 
+        return GridVariables(
+            adapt_structure(to, grid_variables.grid), 
+            grid_variables.nlayers,
+            adapt_structure(to, grid_variables.vor_grid), 
+            adapt_structure(to, grid_variables.div_grid), 
+            adapt_structure(to, grid_variables.temp_grid), 
+            adapt_structure(to, grid_variables.temp_virt_grid), 
+            adapt_structure(to, grid_variables.humid_grid), 
+            adapt_structure(to, grid_variables.u_grid), 
+            adapt_structure(to, grid_variables.v_grid), 
+            adapt_structure(to, grid_variables.pres_grid), 
+            adapt_structure(to, grid_variables.random_pattern), 
+            adapt_structure(to, grid_variables.tracers_grid), 
+            adapt_structure(to, grid_variables.temp_grid_prev), 
+            adapt_structure(to, grid_variables.humid_grid_prev), 
+            adapt_structure(to, grid_variables.u_grid_prev), 
+            adapt_structure(to, grid_variables.pres_grid_prev), 
+            adapt_structure(to, grid_variables.tracers_grid_prev),
+        )
+    end
+end
 
 export DynamicsVariables
 
@@ -521,6 +613,77 @@ struct DiagnosticVariables{
 
     "Scale applied to vorticity and divergence"
     scale::RefValueNF
+
+    # full constructor that infers correct type parameters, mainly for adapt_structure / GPU etc.
+    function DiagnosticVariables(
+        spectrum::SpectrumType,
+        grid::GridType,
+        nlayers::Int,
+        nparticles::Int,
+        tendencies::Tendencies{SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D},
+        grid_variables::GridVariables{GridType, GridVariable2D, GridVariable3D},
+        dynamics::DynamicsVariables{SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, ScratchMemoryType},
+        physics::PhysicsVariables{GridType, GridVariable2D},
+        particles::ParticleVariables{ParticleVector, VectorType, Interpolator},
+        temp_average::VectorType,
+        scale::RefValueNF,
+    ) where {
+        SpectrumType,           # <: AbstractSpectrum
+        GridType,               # <: AbstractGrid
+        SpectralVariable2D,     # <: LowerTriangularArray
+        SpectralVariable3D,     # <: LowerTriangularArray
+        GridVariable2D,         # <: AbstractField
+        GridVariable3D,         # <: AbstractField
+        ParticleVector,         # <: AbstractField
+        VectorType,             # <: AbstractVector
+        ScratchMemoryType,      # <: ArrayType{Complex{NF}, 3}
+        Interpolator,           # <: AbstractInterpolator
+        RefValueNF,             # <: Base.RefValue{NF}
+    }
+        return new{
+            typeof(spectrum), typeof(grid), SpectralVariable2D, SpectralVariable3D,
+            GridVariable2D, GridVariable3D, ParticleVector, VectorType,
+            typeof(dynamics.scratch_memory), typeof(particles.interpolator), 
+            typeof(scale)
+        }(
+            spectrum, grid, nlayers, nparticles,
+            tendencies, grid_variables, dynamics, physics, particles,
+            temp_average, scale,
+        )
+    end
+
+    # full constructor with parameters
+    function DiagnosticVariables{
+        SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D,
+        GridVariable2D, GridVariable3D, ParticleVector, VectorType,
+        ScratchMemoryType, Interpolator, RefValueNF
+    }(
+        spectrum, grid, nlayers, nparticles,
+        tendencies, grid_variables, dynamics, physics, particles,
+        temp_average, scale,
+    ) where {
+        SpectrumType,           # <: AbstractSpectrum
+        GridType,               # <: AbstractGrid
+        SpectralVariable2D,     # <: LowerTriangularArray
+        SpectralVariable3D,     # <: LowerTriangularArray
+        GridVariable2D,         # <: AbstractField
+        GridVariable3D,         # <: AbstractField
+        ParticleVector,         # <: AbstractField
+        VectorType,             # <: AbstractVector
+        ScratchMemoryType,      # <: ArrayType{Complex{NF}, 3}
+        Interpolator,           # <: AbstractInterpolator
+        RefValueNF,             # <: Base.RefValue{NF}
+    }
+        return new{
+            SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D,
+            GridVariable2D, GridVariable3D, ParticleVector, VectorType,
+            ScratchMemoryType, Interpolator, RefValueNF,
+        }(
+            spectrum, grid, nlayers, nparticles,
+            tendencies, grid_variables, dynamics, physics, particles,
+            temp_average, scale,
+        )
+    end
 end
 
 function DiagnosticVariables(SG::SpectralGrid, model::Union{Barotropic, ShallowWater})
