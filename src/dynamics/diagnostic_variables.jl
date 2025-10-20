@@ -487,7 +487,6 @@ struct DiagnosticVariables{
     GridVariable3D,         # <: AbstractField
     ParticleVector,         # <: AbstractField
     VectorType,             # <: AbstractVector
-    MatrixType,             # <: AbstractMatrix
     ScratchMemoryType,      # <: ArrayType{Complex{NF}, 3}
     Interpolator,           # <:AbstractInterpolator
     RefValueNF,             # <: Base.RefValue{NF}
@@ -526,6 +525,60 @@ struct DiagnosticVariables{
 
     "Scale applied to vorticity and divergence"
     scale::RefValueNF
+
+    # full constructor that infers correct type parameters, mainly for adapt_structure / GPU etc.
+    function DiagnosticVariables(
+        spectrum::SpectrumType,
+        grid::GridType,
+        nlayers::Int,
+        nparticles::Int,
+        tendencies::Tendencies{SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, Dict{Symbol, SpectralVariable3D}, Dict{Symbol, GridVariable3D}},
+        grid_variables::GridVariables{GridType, GridVariable2D, GridVariable3D, Dict{Symbol, GridVariable3D}},
+        dynamics::DynamicsVariables{SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, ScratchMemoryType},
+        physics::PhysicsVariables{GridType, GridVariable2D},
+        particles::ParticleVariables{ParticleVector, VectorType, Interpolator},
+        temp_average::VectorType,
+        scale::RefValueNF,
+    ) where {
+        SpectrumType,           # <: AbstractSpectrum
+        GridType,               # <: AbstractGrid
+        SpectralVariable2D,     # <: LowerTriangularArray
+        SpectralVariable3D,     # <: LowerTriangularArray
+        GridVariable2D,         # <: AbstractField
+        GridVariable3D,         # <: AbstractField
+        ParticleVector,         # <: AbstractField
+        VectorType,             # <: AbstractVector
+        ScratchMemoryType,      # <: ArrayType{Complex{NF}, 3}
+        Interpolator,           # <: AbstractInterpolator
+        RefValueNF,             # <: Base.RefValue{NF}
+    }
+        return new{
+            typeof(spectrum), typeof(grid), SpectralVariable2D, SpectralVariable3D,
+            GridVariable2D, GridVariable3D, ParticleVector, VectorType,
+            typeof(dynamics.scratch_memory), typeof(particles.interpolator), typeof(scale)
+        }(
+            spectrum, grid, nlayers, nparticles,
+            tendencies, grid_variables, dynamics, physics, particles,
+            temp_average, scale,
+        )
+    end
+
+    # full constructors with parameters
+    function DiagnosticVariables{SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, ParticleVector, VectorType, ScratchMemoryType, Interpolator, RefValueNF}(spectrum, grid, nlayers, nparticles, tendencies, grid_variables, dynamics, physics, particles, temp_average, scale) where {
+        SpectrumType,           # <: AbstractSpectrum
+        GridType,               # <: AbstractGrid
+        SpectralVariable2D,     # <: LowerTriangularArray
+        SpectralVariable3D,     # <: LowerTriangularArray
+        GridVariable2D,         # <: AbstractField
+        GridVariable3D,         # <: AbstractField
+        ParticleVector,         # <: AbstractField
+        VectorType,             # <: AbstractVector
+        ScratchMemoryType,      # <: ArrayType{Complex{NF}, 3}
+        Interpolator,           # <: AbstractInterpolator
+        RefValueNF,             # <: Base.RefValue{NF}
+    }
+        return DiagnosticVariables(spectrum, grid, nlayers, nparticles, tendencies, grid_variables, dynamics, physics, particles, temp_average, scale)
+    end
 end
 
 function DiagnosticVariables(SG::SpectralGrid, model::Union{Barotropic, ShallowWater})
@@ -557,7 +610,7 @@ function DiagnosticVariables(
     (; spectrum, grid, nparticles, NF, nlayers) = SG
     (; SpectralVariable2D, SpectralVariable3D) = SG
     (; GridVariable2D, GridVariable3D) = SG
-    (; VectorType, MatrixType, ParticleVector) = SG
+    (; VectorType, ParticleVector) = SG
 
     tendencies = Tendencies(SG)
     grid_variables = GridVariables(SG)
@@ -570,32 +623,7 @@ function DiagnosticVariables(
 
     return DiagnosticVariables{
         typeof(spectrum), typeof(grid), SpectralVariable2D, SpectralVariable3D,
-        GridVariable2D, GridVariable3D, ParticleVector, VectorType, MatrixType,
-        typeof(dynamics.scratch_memory), typeof(particles.interpolator), typeof(scale)
-    }(
-        spectrum, grid, nlayers, nparticles,
-        tendencies, grid_variables, dynamics, physics, particles,
-        temp_average, scale,
-    )
-end
-
-# full constructor that infers correct type parameters, mainly for adapt_structure / GPU etc.
-function DiagnosticVariables(
-    spectrum::SpectrumType,
-    grid::GridType,
-    nlayers::Int,
-    nparticles::Int,
-    tendencies::Tendencies{SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, Dict{Symbol, SpectralVariable3D}, Dict{Symbol, GridVariable3D}},
-    grid_variables::GridVariables{GridType, GridVariable2D, GridVariable3D, Dict{Symbol, GridVariable3D}},
-    dynamics::DynamicsVariables{SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, ScratchMemoryType},
-    physics::PhysicsVariables{GridType, GridVariable2D},
-    particles::ParticleVariables{ParticleVector, VectorType, Interpolator},
-    temp_average::VectorType,
-    scale::RefValueNF,
-)
-    return DiagnosticVariables{
-        typeof(spectrum), typeof(grid), SpectralVariable2D, SpectralVariable3D,
-        GridVariable2D, GridVariable3D, ParticleVector, VectorType, MatrixType,
+        GridVariable2D, GridVariable3D, ParticleVector, VectorType,
         typeof(dynamics.scratch_memory), typeof(particles.interpolator), typeof(scale)
     }(
         spectrum, grid, nlayers, nparticles,
