@@ -39,6 +39,8 @@ $(TYPEDFIELDS)"""
     SpectralVariable3D,     # <: LowerTriangularArray
     GridVariable2D,         # <: AbstractField
     GridVariable3D,         # <: AbstractField
+    SpectralDict,           # <: Dict{Symbol, SpectralVariable3D} # TODO: explictily a parameter, to make it easier to use adapt when the dict is empty 
+    GridDict,               # <: Dict{Symbol, GridVariable3D}
 } <: AbstractDiagnosticVariables
 
     spectrum::SpectrumType            # spectral resolution: maximum degree and order of spherical harmonics
@@ -61,7 +63,7 @@ $(TYPEDFIELDS)"""
     "Logarithm of surface pressure [Pa]"
     pres_tend ::SpectralVariable2D = zeros(SpectralVariable2D, spectrum)
     "Tracers [?]"
-    tracers_tend::Dict{Symbol, SpectralVariable3D} = Dict{Symbol, SpectralVariable3D}()
+    tracers_tend::SpectralDict = Dict{Symbol, SpectralVariable3D}()
 
     "Zonal velocity [m/s], grid"
     u_tend_grid     ::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
@@ -74,7 +76,7 @@ $(TYPEDFIELDS)"""
     "Logarith of surface pressure [Pa], grid"
     pres_tend_grid  ::GridVariable2D = zeros(GridVariable2D, grid)
     "Tracers [?], grid"
-    tracers_tend_grid::Dict{Symbol, GridVariable3D} = Dict{Symbol, GridVariable3D}()
+    tracers_tend_grid::GridDict = Dict{Symbol, GridVariable3D}()
 end
 
 """$(TYPEDSIGNATURES)
@@ -88,6 +90,7 @@ function Tendencies(SG::SpectralGrid)
         typeof(spectrum), typeof(grid),
         SpectralVariable2D, SpectralVariable3D,
         GridVariable2D, GridVariable3D,
+        Dict{Symbol, SpectralVariable3D}, Dict{Symbol, GridVariable3D},
     }(;
         spectrum, grid, nlayers
     )
@@ -103,6 +106,7 @@ $TYPEDFIELDS."""
     GridType,               # <:AbstractGrid
     GridVariable2D,         # <: AbstractField
     GridVariable3D,         # <: AbstractField
+    GridDict,               # <: Dict{Symbol, GridVariable3D}
 } <: AbstractDiagnosticVariables
 
     grid::GridType          # grid resolution: number of latitude rings on one hemisphere (Eq. incl.)
@@ -125,7 +129,7 @@ $TYPEDFIELDS."""
     "Logarithm of surface pressure [Pa]"
     pres_grid       ::GridVariable2D = zeros(GridVariable2D, grid)
     "Tracers [?]"
-    tracers_grid    ::Dict{Symbol, GridVariable3D} = Dict{Symbol, GridVariable3D}()
+    tracers_grid    ::GridDict = Dict{Symbol, GridVariable3D}()
 
     "Random pattern controlled by random process [1]"
     random_pattern  ::GridVariable2D = zeros(GridVariable2D, grid)
@@ -142,7 +146,7 @@ $TYPEDFIELDS."""
     "Surface pressure [Pa] at previous time step (not logarithm!)"
     pres_grid_prev  ::GridVariable2D = zeros(GridVariable2D, grid)
     "Tracers [?] at previous time step"
-    tracers_grid_prev::Dict{Symbol, GridVariable3D} = Dict{Symbol, GridVariable3D}()
+    tracers_grid_prev::GridDict = Dict{Symbol, GridVariable3D}()
 end
 
 """$(TYPEDSIGNATURES)
@@ -151,7 +155,7 @@ function GridVariables(SG::SpectralGrid)
     (; grid, nlayers) = SG
     (; GridVariable2D, GridVariable3D) = SG
 
-    return GridVariables{typeof(grid), GridVariable2D, GridVariable3D}(;
+    return GridVariables{typeof(grid), GridVariable2D, GridVariable3D, Dict{Symbol, GridVariable3D}}(;
             grid, nlayers,
         )
 end
@@ -503,10 +507,10 @@ struct DiagnosticVariables{
     nparticles::Int
 
     "Tendencies (spectral and grid) of the prognostic variables"
-    tendencies::Tendencies{SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D}
+    tendencies::Tendencies{SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, Dict{Symbol, SpectralVariable3D}, Dict{Symbol, GridVariable3D}}
     
     "Gridded prognostic variables"
-    grid::GridVariables{GridType, GridVariable2D, GridVariable3D}
+    grid::GridVariables{GridType, GridVariable2D, GridVariable3D, Dict{Symbol, GridVariable3D}}
     
     "Intermediate variables for the dynamical core"
     dynamics::DynamicsVariables{SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, ScratchMemoryType}

@@ -72,8 +72,9 @@ export PrognosticVariables
     SpectralVariable4D,     # <: LowerTriangularArray
     GridVariable2D,         # <: AbstractField
     GridVariable3D,         # <: AbstractField
+    SpectralDict,           # <: Dict{Symbol, SpectralVariable4D}
     ParticleVector,         # <: AbstractVector{Particle{NF}}
-    RefValueNF,               # <: Base.RefValue{NF}
+    RefValueNF,             # <: Base.RefValue{NF}
 } <: AbstractPrognosticVariables
 
     # DIMENSIONS
@@ -123,7 +124,7 @@ export PrognosticVariables
         PrognosticVariablesLand{GridType, GridVariable2D, GridVariable3D}(; grid, nlayers=nlayers_soil)
 
     "Tracers, last dimension is for n tracers [?]"
-    tracers::Dict{Symbol, SpectralVariable4D} = Dict{Symbol, SpectralVariable4D}()
+    tracers::SpectralDict = Dict{Symbol, SpectralVariable4D}()
 
     "Particles for particle advection"
     particles::ParticleVector = zeros(ParticleVector, nparticles)
@@ -172,7 +173,9 @@ function PrognosticVariables(SG::SpectralGrid{Architecture, SpectrumType, GridTy
     (; SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, ParticleVector) = SG
     
     return PrognosticVariables{SpectrumType, GridType,
-        SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, ParticleVector, Base.RefValue{NF}}(;
+        SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, 
+        GridVariable2D, GridVariable3D, Dict{Symbol, SpectralVariable4D}, 
+        ParticleVector, Base.RefValue{NF}}(;
             spectrum, grid, nlayers, nlayers_soil, nparticles, nsteps,
         )
 end
@@ -274,10 +277,10 @@ end
 function Base.zero(
     progn::PrognosticVariables{
         SpectrumType, GridType,
-        SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, ParticleVector,
+        SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, SpectralDict, ParticleVector,
         }) where {
         SpectrumType, GridType,
-        SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, ParticleVector,
+        SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, SpectralDict, ParticleVector,
         }
 
     (; spectrum, grid, nlayers, nlayers_soil, nparticles, nsteps) = progn
@@ -285,7 +288,7 @@ function Base.zero(
     # initialize regular progn variables 
     progn_new = PrognosticVariables{SpectrumType, GridType,
         SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, 
-        ParticleVector, typeof(progn.scale)}(;
+        SpectralDict, ParticleVector, typeof(progn.scale)}(;
             spectrum, grid, nlayers, nlayers_soil, nparticles, nsteps
         )
 
