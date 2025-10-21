@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+## v0.17.3
+- Move SpeedyParameters to SpeedyWeatherInternals
+
 ## v0.17.2
 
 - SpectralGrid can now be initialized from a grid instance as well [#882](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/882)
