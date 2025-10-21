@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Remove JOSS paper draft workflow [#874](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/874)
+
 ## v0.17.2
 
 - Expand scratch memory handling in spectral transforms for better differentiability with Enzyme and revise FFT plans [#791](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/791)
