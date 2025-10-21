@@ -32,7 +32,7 @@ struct SpectralGrid{
     "[OPTION] device architecture to run on"
     architecture::ArchitectureType 
 
-    "[DERIVED] array type to use for all variables, customize by define a new architecture"
+    "[OPTION] array type to use for all variables"
     ArrayType::Type{<:AbstractArray} 
 
     "[DERIVED] Type of vector"
