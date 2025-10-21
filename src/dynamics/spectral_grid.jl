@@ -174,8 +174,8 @@ function SpectralGrid(grid::AbstractGrid,
 )
     architecture = grid.architecture
     
-    trunc = get_truncation(grid, dealiasing)
-    nlat_half = get_nlat_half(grid)
+    trunc = SpeedyTransforms.get_truncation(grid, dealiasing)
+    nlat_half = SpeedyTransforms.get_nlat_half(grid)
     nlat = RingGrids.get_nlat(grid)
     npoints = RingGrids.get_npoints(grid)
 
