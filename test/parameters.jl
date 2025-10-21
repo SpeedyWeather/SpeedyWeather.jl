@@ -1,6 +1,6 @@
 using ComponentArrays: ComponentVector
 using DomainSets: Domain, RealLine, UnitInterval
-using SpeedyWeather: value, bounds, description, attributes, parameters, reconstruct, stripparams
+using SpeedyWeatherInternals.SpeedyParameters: value, bounds, description, attributes, parameters, reconstruct, stripparams
 
 import ModelParameters: ModelParameters, Model, Param, params, update
 

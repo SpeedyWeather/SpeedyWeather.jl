@@ -202,7 +202,7 @@ end
 where here `x` will be treated as a parameter field and `y` will not. Parameters will be then automatically
 generated in a corresponding `parameters(::Foo)` method definition with descriptions set to the corresponding
 struct field docstring, if present. Additional parameter attributes can be supplied as keywords after the parameter,
-e.g. `@param p::T = 0.5 bounds=UnitInterval()` or `@param p::T = 0.5 (bounds=UnitInterval(), constant=false)`.
+e.g. `@param p::T = 0.5 bounds=UnitInterval` or `@param p::T = 0.5 (bounds=UnitInterval, constant=false)`.
 
 ## Known limitations
 
@@ -234,6 +234,16 @@ macro parameterized(expr)
             typedef
         end
     end
+    function parse_attributes(attrs)
+        if isempty(attrs)
+                (;)
+        elseif length(attrs) == 1
+            # handle both singleton attr=value syntax as well as named tuple syntax (attr1=value1, attr2=value2, ...)
+            attrs[1].head == :tuple ? :($(attrs[1])) : :(($(attrs...),))
+        else
+            error("invalid syntax for parameter attributes: $(QuoteNode(attrs))")
+        end
+    end
     # process struct definition
     ## first declare local variables for capturing metadata
     params = []
@@ -257,14 +267,7 @@ macro parameterized(expr)
         elseif MacroTools.@capture(ex, @param fieldname_::FT_ = defval_ attrs__) || MacroTools.@capture(ex, @param fieldname_::FT_ attrs__)
             # use last seen docstring as description, if present
             desc = isnothing(lastdoc) ? "" : lastdoc
-            attrs = if isempty(attrs)
-                (;)
-            elseif length(attrs) == 1
-                # handle both singleton attr=value syntax as well as named tuple syntax (attr1=value1, attr2=value2, ...)
-                attrs[1].head == :tuple ? Core.eval(@__MODULE__, attrs[1]) : Core.eval(@__MODULE__, :($(attrs...),))
-            else
-                error("invalid syntax for parameter attributes: $(QuoteNode(attrs))")
-            end
+            attrs = parse_attributes(attrs)
             paraminfo = (name=fieldname, type=FT, desc=desc, attrs=attrs)
             push!(params, paraminfo)
             # reset lastdoc to nothing to prevent duplication
@@ -282,7 +285,16 @@ macro parameterized(expr)
             # reset lastdoc variable to prevent confusing docstrings between parameteter and non-parameter fields
             lastdoc = nothing
             ex
-        # case 3: field documentation
+        # case 3: subcomponent
+        elseif MacroTools.@capture(ex, @component fieldname_::FT_ = defval_ attrs__) || MacroTools.@capture(ex, @component fieldname_::FT_ attrs__)
+            attrs = parse_attributes(attrs)
+            # add component name to attributes
+            paraminfo = (name=fieldname, type=FT, desc="", attrs=(component=fieldname, attrs...))
+            push!(params, paraminfo)
+            # reset lastdoc
+            lastdoc = nothing
+            isnothing(defval) ? :($fieldname::$FT;) : :($fieldname::$FT = $defval;)
+        # case 4: field documentation
         elseif MacroTools.@capture(ex, docs_String)
             # store in lastdoc field
             lastdoc = docs
@@ -297,14 +309,14 @@ macro parameterized(expr)
     typesig = typedef2sig(typedef)
     # emit parameterof calls for each parsed parameter
     param_constructors = map(params) do info
-        :($(QuoteNode(info.name)) => SpeedyWeather.parameterof(obj, Val{$(QuoteNode(info.name))}(); desc=$(info.desc), $(info.attrs)..., kwargs...))
+        :($(QuoteNode(info.name)) => SpeedyParameters.parameterof(obj, Val{$(QuoteNode(info.name))}(); desc=$(info.desc), $(info.attrs)..., kwargs...))
     end
     # construct final expression block
     block = Expr(:block)
     ## 1. struct definition
     push!(block.args, esc(new_expr))
     ## 2. parameters method dispatch
-    push!(block.args, esc(:(SpeedyWeather.parameters(obj::$(typename); kwargs...) = SpeedyWeather.SpeedyParams((; $(param_constructors...))))))
+    push!(block.args, esc(:(SpeedyParameters.parameters(obj::$(typename); kwargs...) = SpeedyParameters.SpeedyParams((; $(param_constructors...))))))
     ## 3. override ConstructionBase.setproperties if @kwdef is used; we do this so that internal logic in the keyword defaults gets preserved
     if has_kwdef && typesig.head == :curly
         # handle type arguments; first extract argument names (discarding upper type bounds)
