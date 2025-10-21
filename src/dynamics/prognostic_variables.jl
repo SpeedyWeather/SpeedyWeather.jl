@@ -72,6 +72,7 @@ export PrognosticVariables
     SpectralVariable4D,     # <: LowerTriangularArray
     GridVariable2D,         # <: AbstractField
     GridVariable3D,         # <: AbstractField
+    TracerTuple,            # <: NamedTuple{Tuple{Symbol}, Tuple{SpectralVariable4D}}
     ParticleVector,         # <: AbstractVector{Particle{NF}}
     RefValueNF,               # <: Base.RefValue{NF}
 } <: AbstractPrognosticVariables
@@ -123,7 +124,7 @@ export PrognosticVariables
         PrognosticVariablesLand{GridType, GridVariable2D, GridVariable3D}(; grid, nlayers=nlayers_soil)
 
     "Tracers, last dimension is for n tracers [?]"
-    tracers::Dict{Symbol, SpectralVariable4D} = Dict{Symbol, SpectralVariable4D}()
+    tracers::TracerTuple = NamedTuple()
 
     "Particles for particle advection"
     particles::ParticleVector = zeros(ParticleVector, nparticles)
@@ -166,24 +167,23 @@ get_step(coeffs::LowerTriangularArray{T, 3}, i) where T = lta_view(coeffs, :, :,
 
 """$(TYPEDSIGNATURES)
 Generator function."""
-function PrognosticVariables(SG::SpectralGrid{Architecture, SpectrumType, GridType}; nsteps=DEFAULT_NSTEPS) where {Architecture, SpectrumType, GridType}
+function PrognosticVariables(SG::SpectralGrid{Architecture, SpectrumType, GridType}; tracers::TRACER_DICT=TRACER_DICT(), nsteps=DEFAULT_NSTEPS) where {Architecture, SpectrumType, GridType}
 
     (; NF, spectrum, grid, nlayers, nlayers_soil, nparticles) = SG
     (; SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, ParticleVector) = SG
     
+    tracer_tuple = (; [key => zeros(SpectralVariable4D, spectrum, nlayers, nsteps) for key in keys(tracers)]...)
+
     return PrognosticVariables{SpectrumType, GridType,
-        SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, ParticleVector, Base.RefValue{NF}}(;
-            spectrum, grid, nlayers, nlayers_soil, nparticles, nsteps,
+        SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, typeof(tracer_tuple), ParticleVector, Base.RefValue{NF}}(;
+            spectrum, grid, nlayers, nlayers_soil, nparticles, nsteps, tracer_tuple
         )
 end
 
 """$(TYPEDSIGNATURES)
 Generator function."""
-function PrognosticVariables(SG::SpectralGrid, model::AbstractModel)
-    progn = PrognosticVariables(SG, nsteps = model.time_stepping.nsteps)
-    add!(progn, model.tracers)
-    return progn
-end
+PrognosticVariables(SG::SpectralGrid, model::AbstractModel) = PrognosticVariables(SG, tracers = model.tracers, nsteps = model.time_stepping.nsteps)
+
 function Base.show(
     io::IO,
     progn::PrognosticVariables{SpectrumType, GridType},
@@ -200,7 +200,7 @@ function Base.show(
     Grid = nonparametric_type(GridType)
     nlat = RingGrids.get_nlat(grid)
     
-    tracer_names = [key for (key, value) in progn.tracers]
+    tracer_names = keys(progn.tracers)
 
     println(io, "PrognosticVariables{$NF, $ArrayType}")
     println(io, "├ vor:   T$trunc, $nlayers-layer, $nsteps-steps LowerTriangularArray{$NFspectral}")
@@ -342,27 +342,42 @@ function Base.one(progn::PrognosticVariables)
 end 
 
 """$(TYPEDSIGNATURES)
-Add `tracers` to the prognostic variables `progn` in `progn.tracers::Dict`."""
-function add!(
-    progn::PrognosticVariables{SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, SpectralVariable4D},
+Add `tracers` to the prognostic variables `progn` in `progn.tracers::NamedTuple`, reconstructs the `PrognosticVariables`."""
+function add(
+    progn::PrognosticVariables{SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, TracerTuple, ParticleVector, NF},
     tracers::Tracer...
-) where {
-        SpectrumType,
-        GridType,
-        SpectralVariable2D,
-        SpectralVariable3D,
-        SpectralVariable4D,
-    }
-    (; spectrum, nlayers, nsteps) = progn
-    for tracer in tracers
-        progn.tracers[tracer.name] = zeros(SpectralVariable4D, spectrum, nlayers, nsteps)
-    end
+    ) where {SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, TracerTuple, ParticleVector, NF}
+
+    (; spectrum, grid, nlayers, nlayers_soil, nparticles, nsteps) = progn
+    
+    new_tracers = union(keys(progn.tracers), keys(tracers))
+
+    progn_new = PrognosticVariables{SpectrumType, GridType, 
+        SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, 
+        GridVariable2D, GridVariable3D, typeof(new_tracers), ParticleVector, NF}(;
+            spectrum, grid, nlayers, nlayers_soil, nparticles, nsteps, new_tracers
+        )
+
+    copy!(progn_new, progn)
+    return progn_new 
 end
 
 """$(TYPEDSIGNATURES)
-Delete `tracers` in the prognostic variables `progn` in `progn.tracers::Dict`."""
-function Base.delete!(progn::PrognosticVariables, tracers::Tracer...)
-    for tracer in tracers
-        delete!(progn.tracers, tracer.name)
-    end
+Delete `tracers` in the prognostic variables `progn` in `progn.tracers::NamedTuple`, reconstructs the `PrognosticVariables`."""
+function delete(progn::PrognosticVariables{SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, TracerTuple, ParticleVector, NF}, 
+    tracers::Tracer...
+    ) where {SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, TracerTuple, ParticleVector, NF}
+
+    (; spectrum, grid, nlayers, nlayers_soil, nparticles, nsteps) = progn
+    
+    new_tracers = setdiff(keys(progn.tracers), keys(tracers))
+    
+    progn_new = PrognosticVariables{SpectrumType, GridType, 
+        SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, 
+        GridVariable2D, GridVariable3D, typeof(new_tracers), ParticleVector, NF}(;
+            spectrum, grid, nlayers, nlayers_soil, nparticles, nsteps, new_tracers
+        )
+
+    copy!(progn_new, progn)
+    return progn_new
 end
