@@ -1,6 +1,6 @@
 using ComponentArrays: ComponentVector
 using DomainSets: Domain, RealLine, UnitInterval
-using SpeedyWeatherInternals.SpeedyParameters: value, bounds, description, attributes, parameters, reconstruct, stripparams
+using SpeedyWeather.SpeedyWeatherInternals.SpeedyParameters
 
 import ModelParameters: ModelParameters, Model, Param, params, update
 
@@ -62,7 +62,7 @@ end
 
 @testset "@parameterized" begin
     # test single parameter, no kwdef
-    SpeedyWeather.@parameterized struct TestType1{T}
+    SpeedyParameters.@parameterized struct TestType1{T}
         "non parameter"
         x::T
         "parameter"
@@ -74,7 +74,7 @@ end
     @test ps[:desc] == ("parameter",)
 
     # test two parameters, no kwdef
-    SpeedyWeather.@parameterized struct TestType2{TX,TY,TZ}
+    SpeedyParameters.@parameterized struct TestType2{TX,TY,TZ}
         "parameter"
         @param x::TX
         "non-parameter"
@@ -87,7 +87,7 @@ end
     @test ps[:desc] == ("parameter","")
 
     # test one parameter, with kwdef
-    SpeedyWeather.@parameterized @kwdef struct TestType3{T}
+    SpeedyParameters.@parameterized @kwdef struct TestType3{T}
         "parameter"
         @param x::T = 1.0
         "non-parameter"
@@ -99,7 +99,7 @@ end
     @test ps[:desc] == ("parameter",)
 
     # test multiple parameters, with kwdef
-    SpeedyWeather.@parameterized @kwdef struct TestType4{T1,T2}
+    SpeedyParameters.@parameterized @kwdef struct TestType4{T1,T2}
         "parameter 1"
         @param x::T1 = 1.0
         "parameter 2"
@@ -113,7 +113,7 @@ end
     @test ps[:desc] == ("parameter 1","parameter 2","")
 
     # test parameters for nested type
-    SpeedyWeather.@parameterized @kwdef struct MyModel{T}
+    SpeedyParameters.@parameterized @kwdef struct MyModel{T}
         @param component::T = TestType4() (group=:group1,)
     end
     ps = parameters(MyModel())
