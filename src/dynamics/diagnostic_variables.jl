@@ -93,53 +93,7 @@ function Tendencies(SG::SpectralGrid)
     )
 end
 
-function Adapt.adapt_structure(to, tendencies::Tendencies)
-    # empty dictionaries don't get adapted per default...
-    if isempty(tendencies.tracers_tend)
-        vor_tend_adapted = adapt_structure(to, tendencies.vor_tend)
-        u_tend_grid_adapted = adapt_structure(to, tendencies.u_tend_grid)
-
-        return Tendencies(
-            adapt_structure(to, tendencies.spectrum),
-            adapt_structure(to, tendencies.grid),
-            tendencies.nlayers,
-            vor_tend_adapted,
-            adapt_structure(to, tendencies.div_tend),
-            adapt_structure(to, tendencies.temp_tend),
-            adapt_structure(to, tendencies.humid_tend),
-            adapt_structure(to, tendencies.u_tend),
-            adapt_structure(to, tendencies.v_tend),
-            adapt_structure(to, tendencies.pres_tend),
-            Dict{Symbol, typeof(vor_tend_adapted)}(),
-            u_tend_grid_adapted,
-            adapt_structure(to, tendencies.v_tend_grid),
-            adapt_structure(to, tendencies.temp_tend_grid),
-            adapt_structure(to, tendencies.humid_tend_grid),
-            adapt_structure(to, tendencies.pres_tend_grid),
-            Dict{Symbol, typeof(u_tend_grid_adapted)}(),
-        )
-    else
-        return Tendencies(
-            adapt_structure(to, tendencies.spectrum),
-            adapt_structure(to, tendencies.grid),
-            tendencies.nlayers,
-            adapt_structure(to, tendencies.vor_tend),
-            adapt_structure(to, tendencies.div_tend),
-            adapt_structure(to, tendencies.temp_tend),
-            adapt_structure(to, tendencies.humid_tend),
-            adapt_structure(to, tendencies.u_tend),
-            adapt_structure(to, tendencies.v_tend),
-            adapt_structure(to, tendencies.pres_tend),
-            adapt_structure(to, tendencies.tracers_tend),
-            adapt_structure(to, tendencies.u_tend_grid),
-            adapt_structure(to, tendencies.v_tend_grid),
-            adapt_structure(to, tendencies.temp_tend_grid),
-            adapt_structure(to, tendencies.humid_tend_grid),
-            adapt_structure(to, tendencies.pres_tend_grid),
-            adapt_structure(to, tendencies.tracers_tend_grid),
-        )
-    end
-end
+Adapt.@adapt_structure Tendencies
 
 export GridVariables
 
@@ -202,53 +156,7 @@ function GridVariables(SG::SpectralGrid)
         )
 end
 
-function Adapt.adapt_structure(to, grid_variables::GridVariables)
-    # empty dictionaries don't get adapted per default...
-    if isempty(grid_variables.tracers_grid)
-        vor_grid_adapted = adapt_structure(to, grid_variables.vor_grid) 
-
-        return GridVariables(
-            adapt_structure(to, grid_variables.grid), 
-            grid_variables.nlayers,
-            vor_grid_adapted,
-            adapt_structure(to, grid_variables.div_grid), 
-            adapt_structure(to, grid_variables.temp_grid), 
-            adapt_structure(to, grid_variables.temp_virt_grid), 
-            adapt_structure(to, grid_variables.humid_grid), 
-            adapt_structure(to, grid_variables.u_grid), 
-            adapt_structure(to, grid_variables.v_grid), 
-            adapt_structure(to, grid_variables.pres_grid), 
-            Dict{Symbol, typeof(vor_grid_adapted)}(),
-            adapt_structure(to, grid_variables.random_pattern), 
-            adapt_structure(to, grid_variables.temp_grid_prev), 
-            adapt_structure(to, grid_variables.humid_grid_prev), 
-            adapt_structure(to, grid_variables.u_grid_prev), 
-            adapt_structure(to, grid_variables.v_grid_prev), 
-            adapt_structure(to, grid_variables.pres_grid_prev), 
-            Dict{Symbol, typeof(vor_grid_adapted)}(),
-        )   
-    else 
-        return GridVariables(
-            adapt_structure(to, grid_variables.grid), 
-            grid_variables.nlayers,
-            adapt_structure(to, grid_variables.vor_grid), 
-            adapt_structure(to, grid_variables.div_grid), 
-            adapt_structure(to, grid_variables.temp_grid), 
-            adapt_structure(to, grid_variables.temp_virt_grid), 
-            adapt_structure(to, grid_variables.humid_grid), 
-            adapt_structure(to, grid_variables.u_grid), 
-            adapt_structure(to, grid_variables.v_grid), 
-            adapt_structure(to, grid_variables.pres_grid), 
-            adapt_structure(to, grid_variables.tracers_grid), 
-            adapt_structure(to, grid_variables.random_pattern), 
-            adapt_structure(to, grid_variables.temp_grid_prev), 
-            adapt_structure(to, grid_variables.humid_grid_prev), 
-            adapt_structure(to, grid_variables.u_grid_prev), 
-            adapt_structure(to, grid_variables.pres_grid_prev), 
-            adapt_structure(to, grid_variables.tracers_grid_prev),
-        )
-    end
-end
+Adapt.@adapt_structure GridVariables
 
 export DynamicsVariables
 

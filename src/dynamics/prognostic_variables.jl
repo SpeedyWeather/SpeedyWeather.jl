@@ -135,54 +135,7 @@ export PrognosticVariables
     clock::Clock = Clock()
 end
 
-function Adapt.adapt_structure(to, progn::PrognosticVariables)
-    # empty dictionary don't get adapted per default...
-    if isempty(progn.tracers)
-        vor_adapted = adapt_structure(to, progn.vor)
-
-        return PrognosticVariables(
-            adapt_structure(to, progn.spectrum),
-            adapt_structure(to, progn.grid),
-            progn.nlayers,
-            progn.nlayers_soil,
-            progn.nparticles,
-            progn.nsteps,
-            vor_adapted,
-            adapt_structure(to, progn.div),
-            adapt_structure(to, progn.temp),
-            adapt_structure(to, progn.humid),
-            adapt_structure(to, progn.pres),
-            adapt_structure(to, progn.random_pattern),
-            adapt_structure(to, progn.ocean),
-            adapt_structure(to, progn.land),
-            Dict{Symbol, typeof(vor_adapted)}(),
-            adapt_structure(to, progn.particles),
-            adapt_structure(to, progn.scale),
-            adapt_structure(to, progn.clock),
-        )
-    else
-        return PrognosticVariables(
-            adapt_structure(to, progn.spectrum),
-            adapt_structure(to, progn.grid),
-            progn.nlayers,
-            progn.nlayers_soil,
-            progn.nparticles,
-            progn.nsteps,
-            adapt_structure(to, progn.vor),
-            adapt_structure(to, progn.div),
-            adapt_structure(to, progn.temp),
-            adapt_structure(to, progn.humid),
-            adapt_structure(to, progn.pres),
-            adapt_structure(to, progn.random_pattern),
-            adapt_structure(to, progn.ocean),
-            adapt_structure(to, progn.land),
-            adapt_structure(to, progn.tracers),
-            adapt_structure(to, progn.particles),
-            adapt_structure(to, progn.scale),
-            adapt_structure(to, progn.clock),
-        )
-    end
-end
+Adapt.@adapt_structure PrognosticVariables
 
 Base.eltype(::PrognosticVariables{SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D}) where {SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D <: AbstractField{NF}} where NF = NF 
 Architectures.array_type(::PrognosticVariables{SpectrumType, GridType, SpectralVariable2D}) where {SpectrumType, GridType, SpectralVariable2D <: LowerTriangularArray{NF, N, ArrayType}} where {NF, N, ArrayType <: AbstractArray} = nonparametric_type(ArrayType)
