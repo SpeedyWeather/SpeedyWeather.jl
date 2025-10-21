@@ -165,7 +165,7 @@ end
 $(TYPEDSIGNATURES)
 Initialize a SpectralGrid from a given grid.
 """
-function SpectralGrid(grid::AbstractGrid,
+function SpectralGrid(grid::AbstractGrid;
     NF::Type{<:AbstractFloat} = DEFAULT_NF,
     dealiasing::Real = 2,
     nparticles::Int = 0,
