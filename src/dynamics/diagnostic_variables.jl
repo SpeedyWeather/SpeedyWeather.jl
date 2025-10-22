@@ -695,42 +695,6 @@ function Base.show(
     print(io,   "└ scale: $(diagn.scale[])")
 end
 
-function add!(diagn::DiagnosticVariables{
-    SpectrumType,           # <: AbstractSpectrum
-    GridType,               # <:AbstractGrid
-    SpectralVariable2D,     # <: LowerTriangularArray
-    SpectralVariable3D,     # <: LowerTriangularArray
-    GridVariable2D,         # <: AbstractField
-    GridVariable3D,         # <: AbstractField
-},
-    tracers::Tracer...,
-    ) where {
-        SpectrumType,           # <: AbstractSpectrum
-        GridType,               # <:AbstractGrid
-        SpectralVariable2D,     # <: LowerTriangularArray
-        SpectralVariable3D,     # <: LowerTriangularArray
-        GridVariable2D,         # <: AbstractField
-        GridVariable3D,         # <: AbstractField
-    }
-    (; spectrum, nlayers) = diagn
-    grid = diagn.grid_used   # TODO grid is used for 'GridVariables'
-    for tracer in tracers
-        diagn.tendencies.tracers_tend[tracer.name] = zeros(SpectralVariable3D, spectrum, nlayers)
-        diagn.tendencies.tracers_tend_grid[tracer.name] = zeros(GridVariable3D, grid, nlayers)
-        diagn.grid.tracers_grid[tracer.name] = zeros(GridVariable3D, grid, nlayers)
-        diagn.grid.tracers_grid_prev[tracer.name] = zeros(GridVariable3D, grid, nlayers)
-    end
-end
-
-function Base.delete!(diagn::DiagnosticVariables, tracers::Tracer...)
-    for tracer in tracers
-        delete!(diagn.tendencies.tracers_tend, tracer.name)
-        delete!(diagn.tendencies.tracers_tend_grid, tracer.name)
-        delete!(diagn.grid.tracers_grid, tracer.name)
-        delete!(diagn.grid.tracers_grid_prev, tracer.name)
-    end
-end
-
 """$(TYPEDSIGNATURES)
 Set the tendencies for the barotropic model to `x`."""
 function Base.fill!(tendencies::Tendencies, x, ::Type{<:Barotropic})
