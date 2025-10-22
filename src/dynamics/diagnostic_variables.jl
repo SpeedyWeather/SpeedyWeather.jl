@@ -183,7 +183,7 @@ $(TYPEDFIELDS)"""
     SpectralVariable3D,     # <: LowerTriangularArray
     GridVariable2D,         # <: AbstractField
     GridVariable3D,         # <: AbstractField
-    ScratchMemoryType,      # <: ScratchMemory{NF, ArrayType{Complex{NF},3}}
+    ScratchMemoryType,      # <: ScratchMemory{ArrayType{Complex{NF},3}}
 } <: AbstractDiagnosticVariables
     
     spectrum::SpectrumType            # spectral resolution: maximum degree and order of spherical harmonics
@@ -266,7 +266,7 @@ function DynamicsVariables(SG::SpectralGrid;
         return DynamicsVariables{typeof(spectrum), typeof(grid),
             SpectralVariable2D, SpectralVariable3D,
             GridVariable2D, GridVariable3D, 
-            SpeedyTransforms.ScratchMemory{NF, array_type(architecture, Complex{NF}, 3), 
+            SpeedyTransforms.ScratchMemory{array_type(architecture, Complex{NF}, 3), 
             array_type(architecture, NF, 1), array_type(architecture, Complex{NF}, 1)}}(;
                 spectrum, grid, nlayers,
             )
