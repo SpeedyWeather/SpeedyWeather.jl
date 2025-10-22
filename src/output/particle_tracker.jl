@@ -10,7 +10,7 @@ Output done via netCDF. Fields and options are
 $(TYPEDFIELDS)"""
 @kwdef mutable struct ParticleTracker{NF} <: AbstractCallback
     "[OPTION] when to schedule particle tracking"
-    schedule::Schedule = Schedule(every=Hour(3))
+    schedule::Schedule = Schedule(every=Hour(4))
 
     "[OPTION] File name for netCDF file"
     filename::String = "particles.nc"
