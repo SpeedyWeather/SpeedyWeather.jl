@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## v0.17.3
+
+- Move SpeedyParameters to SpeedyWeatherInternals [#880](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/880)
+- Remove JOSS paper draft workflow [#874](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/874)
+- Change particle tracking to every 4 hours [#881](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/881)
+- SpectralGrid can now be initialized from a grid instance as well [#882](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/882)
+
 ## v0.17.2
 
 - Parameterizations with KernelAbstractions [#873](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/873) [#878](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/878)
