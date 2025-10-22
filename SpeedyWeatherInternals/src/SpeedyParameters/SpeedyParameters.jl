@@ -4,7 +4,7 @@ module SpeedyParameters
     using DocStringExtensions
 
     # ARRAYS
-    import ComponentArrays: ComponentArray, ComponentVector, labels, label2index, getaxes
+    import ComponentArrays: ComponentArray, ComponentVector, Axis, labels, label2index, getaxes
 
     # UTILITIES
     import MacroTools
