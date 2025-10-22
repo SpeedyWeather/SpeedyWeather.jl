@@ -276,18 +276,18 @@ end
 function Base.zero(
     progn::PrognosticVariables{
         SpectrumType, GridType,
-        SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, ParticleVector,
+        SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, TracerTuple, ParticleVector, RefValueNF, ClockType,
         }) where {
         SpectrumType, GridType,
-        SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, ParticleVector,
+        SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, TracerTuple, ParticleVector, RefValueNF, ClockType,
         }
 
     (; spectrum, grid, nlayers, nlayers_soil, nparticles, nsteps) = progn
     
     # initialize regular progn variables 
     progn_new = PrognosticVariables{SpectrumType, GridType,
-        SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, 
-        ParticleVector, typeof(progn.scale)}(;
+        SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, TracerTuple,
+        ParticleVector, RefValueNF, ClockType}(;
             spectrum, grid, nlayers, nlayers_soil, nparticles, nsteps
         )
 
