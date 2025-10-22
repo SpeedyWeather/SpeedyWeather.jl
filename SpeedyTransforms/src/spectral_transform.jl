@@ -62,7 +62,7 @@ struct SpectralTransform{
     
     # SCRATCH MEMORY FOR FOURIER NOT YET LEGENDRE TRANSFORMED AND VICE VERSA
     # state is undetermined, only read after writing to it
-    scratch_memory::ScratchMemory{NF, ArrayComplexType, VectorType, VectorComplexType} 
+    scratch_memory::ScratchMemory{ArrayComplexType, VectorType, VectorComplexType} 
 
     jm_index_size::Int                             # number of indices per layer in kjm_indices
     kjm_indices::ArrayTypeIntMatrix                # precomputed kjm loop indices map for legendre transform
