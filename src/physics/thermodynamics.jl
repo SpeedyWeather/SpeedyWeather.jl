@@ -44,6 +44,8 @@ $(TYPEDFIELDS)"""
     mol_ratio::NF = R_dry/R_vapour
 end
 
+Adapt.@adapt_structure ClausiusClapeyron
+
 # generator function
 function ClausiusClapeyron(SG::SpectralGrid, atm::AbstractAtmosphere; kwargs...)
     (; R_dry, R_vapour, latent_heat_condensation, heat_capacity) = atm

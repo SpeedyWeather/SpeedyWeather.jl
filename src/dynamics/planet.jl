@@ -46,5 +46,7 @@ $(TYPEDFIELDS)
     @param solar_constant::NF = 1365 (bounds=Nonnegative,)
 end
 
+Adapt.@adapt_structure Earth
+
 Earth(SG::SpectralGrid; kwargs...) = Earth{SG.NF}(; kwargs...)
 Earth(::Type{NF}; kwargs...) where NF = Earth{NF}(; kwargs...)

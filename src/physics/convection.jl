@@ -13,6 +13,8 @@ in their paper. Fields and options are $(TYPEDFIELDS)"""
     relative_humidity::NF = 0.7
 end
 
+Adapt.@adapt_structure SimplifiedBettsMiller
+
 # generator function 
 SimplifiedBettsMiller(SG::SpectralGrid; kwargs...) = SimplifiedBettsMiller{SG.NF}(; kwargs...)
 initialize!(::SimplifiedBettsMiller, ::PrimitiveEquation) = nothing
@@ -257,6 +259,10 @@ $(TYPEDFIELDS)"""
     time_scale::Second = Hour(4)
 end
 
+function Adapt.adapt_structure(to, DBM::DryBettsMiller{NF}) where NF
+    return DryBettsMiller{NF}(adapt_structure(to, DBM.time_scale))
+end
+
 # generator function
 DryBettsMiller(SG::SpectralGrid; kwargs...) = DryBettsMiller{SG.NF}(; kwargs...)
 initialize!(::DryBettsMiller, ::PrimitiveEquation) = nothing
@@ -395,6 +401,8 @@ $(TYPEDFIELDS)"""
     "[DERIVED] Latitudinal mask"
     lat_mask::VectorType
 end
+
+Adapt.@adapt_structure ConvectiveHeating
 
 # generator
 ConvectiveHeating(SG::SpectralGrid; kwargs...) = ConvectiveHeating{SG.NF, SG.VectorType}(lat_mask=zeros(SG.nlat); kwargs...)

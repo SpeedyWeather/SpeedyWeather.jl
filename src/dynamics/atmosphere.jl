@@ -62,6 +62,8 @@ $(TYPEDFIELDS)"""
     @param layer_thickness::NF = 8500 (bounds=Positive,)
 end
 
+Adapt.@adapt_structure EarthAtmosphere
+
 EarthAtmosphere(SG::SpectralGrid; kwargs...) = EarthAtmosphere{SG.NF}(; kwargs...)
 EarthAtmosphere(::Type{NF}; kwargs...) where NF = EarthAtmosphere{NF}(; kwargs...)
 Base.eltype(::EarthAtmosphere{NF}) where NF = NF
