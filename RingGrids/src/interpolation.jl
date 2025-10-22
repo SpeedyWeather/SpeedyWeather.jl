@@ -79,7 +79,6 @@ abstract type AbstractLocator end
 and their weights. This Locator is a 4-point average in an anvil-shaped grid-point arrangement
 between two latitude rings."""
 @kwdef struct AnvilLocator{
-    NF,
     VectorType,
     VectorIntType,
 } <: AbstractLocator
@@ -94,9 +93,9 @@ between two latitude rings."""
     ij_ds::VectorIntType    = zeros(Int, npoints_output)   # pixel index ij for bottom right point d on ring j+1
 
     # distances to adjacent grid points (i.e. the averaging weights)
-    Δys::VectorType         = zeros(NF, npoints_output)    # distance fractions between rings
-    Δabs::VectorType        = zeros(NF, npoints_output)    # distance fractions between a, b
-    Δcds::VectorType        = zeros(NF, npoints_output)    # distance fractions between c, d
+    Δys::VectorType         = zero(VectorType(undef, npoints_output))    # distance fractions between rings
+    Δabs::VectorType        = zero(VectorType(undef, npoints_output))    # distance fractions between a, b
+    Δcds::VectorType        = zero(VectorType(undef, npoints_output))    # distance fractions between c, d
 end
 
 Adapt.@adapt_structure AnvilLocator
@@ -116,7 +115,7 @@ function (::Type{L})(
     VectorType = array_type(architecture, NF, 1)
     VectorIntType = array_type(architecture, Int, 1)
 
-    return L{NF, VectorType, VectorIntType}(;npoints_output=npoints)
+    return L{VectorType, VectorIntType}(;npoints_output=npoints)
 end
 
 # use Float32 as default for weights
@@ -141,12 +140,23 @@ NF is the number format used to calculate the interpolation, which can be
 different from the input data and/or the interpolated data on the new grid."""
 abstract type AbstractInterpolator end
 
+"""
+$(TYPEDSIGNATURES)
+Interpolator type for `anvil_anverage`[@ref]. 
+
+NF is the number format used to calculate the interpolation, which can be
+different from the input data and/or the interpolated data on the new grid.
+"""
 struct AnvilInterpolator{NF, Geometry, Locator} <: AbstractInterpolator
     geometry::Geometry
     locator::Locator
 end
 
-Adapt.@adapt_structure AnvilInterpolator
+function Adapt.adapt_structure(to, I::AnvilInterpolator{NF}) where {NF}
+    geometry = adapt_structure(to, I.geometry)
+    locator = adapt_structure(to, I.locator)
+    return AnvilInterpolator{eltype(NF), typeof(geometry), typeof(locator)}(geometry, locator)
+end
 
 const DEFAULT_INTERPOLATOR = AnvilInterpolator
 Base.eltype(::AnvilInterpolator{NF}) where NF = NF
