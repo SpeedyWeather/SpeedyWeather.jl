@@ -15,7 +15,6 @@ ScratchMemory holds scratch memory for the `SpectralTransform` that's used both 
 $(TYPEDFIELDS)"""
 struct ScratchMemory{ 
     ArrayComplexType,         # <: ArrayType{Complex{NF}, 3},
-    VectorType,               # <: ArrayType{NF, 1},
     VectorComplexType,        # <: ArrayType{Complex{NF}, 1},
 }
     # SCRATCH MEMORY FOR FOURIER NOT YET LEGENDRE TRANSFORMED AND VICE VERSA
@@ -46,7 +45,6 @@ function ScratchMemory(
 
     return ScratchMemory{
         array_type(architecture, Complex{NF}, 3), 
-        array_type(architecture, NF, 1),
         array_type(architecture, Complex{NF}, 1),
     }(scratch_memory_north, scratch_memory_south, 
     ColumnScratchMemory{array_type(architecture, Complex{NF}, 1)}(

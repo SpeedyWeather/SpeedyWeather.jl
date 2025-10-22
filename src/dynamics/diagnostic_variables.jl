@@ -267,7 +267,7 @@ function DynamicsVariables(SG::SpectralGrid;
             SpectralVariable2D, SpectralVariable3D,
             GridVariable2D, GridVariable3D, 
             SpeedyTransforms.ScratchMemory{array_type(architecture, Complex{NF}, 3), 
-            array_type(architecture, NF, 1), array_type(architecture, Complex{NF}, 1)}}(;
+            array_type(architecture, Complex{NF}, 1)}}(;
                 spectrum, grid, nlayers,
             )
     else 
