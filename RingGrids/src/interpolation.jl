@@ -6,6 +6,7 @@ struct GridGeometry{
     Grid,
     VectorType,
     VectorIntType,
+    RangeTupleType,
 } <: AbstractGridGeometry
     grid::Grid                  # grid, e.g. FullGaussianGrid
 
@@ -18,11 +19,13 @@ struct GridGeometry{
     nlons::VectorIntType        # number of longitudinal points per ring
     lon_offsets::VectorType     # longitude offsets of first grid point per ring
 
-    # rings, CPU copy of grid.rings
-    rings::Vector{UnitRange{Int}} 
+    # rings, but as a tuple (for GPU compat reasons)
+    rings_tuple::RangeTupleType
 end
 
 GridGeometry(field::AbstractField; kwargs...) = GridGeometry(field.grid; NF=eltype(field), kwargs...)
+
+Adapt.@adapt_structure GridGeometry
 
 """
 $(TYPEDSIGNATURES)          
@@ -58,8 +61,11 @@ function GridGeometry(
     VectorType = array_type(architecture, NF, 1)
     VectorIntType = array_type(architecture, Int, 1)
 
-    return GridGeometry{typeof(grid), VectorType, VectorIntType}(
-        grid, nlat_half, nlat, npoints, londs, latd_poles, nlons, lon_offsets, Vector(grid.rings))
+    # rings as tuple (for GPU compat reasons)
+    rings_tuple = Tuple(grid.rings)
+
+    return GridGeometry{typeof(grid), VectorType, VectorIntType, typeof(rings_tuple)}(
+        grid, nlat_half, nlat, npoints, londs, latd_poles, nlons, lon_offsets, rings_tuple)
 end
 
 Base.show(io::IO,G::GridGeometry) = print(io,"GridGeometry for $(G.grid)")
@@ -92,6 +98,8 @@ between two latitude rings."""
     Δabs::VectorType        = zeros(NF, npoints_output)    # distance fractions between a, b
     Δcds::VectorType        = zeros(NF, npoints_output)    # distance fractions between c, d
 end
+
+Adapt.@adapt_structure AnvilLocator
 
 """
 $(TYPEDSIGNATURES)
@@ -254,7 +262,7 @@ function _interpolate!(
     architecture::AbstractArchitecture      
 )
     (; npoints_output, ij_as, ij_bs, ij_cs, ij_ds, Δabs, Δcds, Δys) = interpolator.locator
-    (; npoints, rings) = interpolator.geometry
+    (; npoints, rings_tuple) = interpolator.geometry
     
     # 1) Aout's length must match the interpolator
     # 2) input A must match the interpolator's geometry points (do not check grids for view support)
@@ -262,7 +270,7 @@ function _interpolate!(
     @boundscheck length(A) == npoints ||
         throw(DimensionMismatch("Interpolator ($npoints points) mismatches input grid ($(length(A)) points)."))
 
-    A_northpole, A_southpole = average_on_poles(A, rings)
+    A_northpole, A_southpole = average_on_poles(A, rings_tuple)
 
     #TODO ij_cs, ij_ds shouldn't be 0...
     @boundscheck extrema_in(ij_as,  0, npoints) || throw(BoundsError)
