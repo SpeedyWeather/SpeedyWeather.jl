@@ -176,7 +176,7 @@ function PrognosticVariables(SG::SpectralGrid{Architecture, SpectrumType, GridTy
 
     return PrognosticVariables{SpectrumType, GridType,
         SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, typeof(tracer_tuple), ParticleVector, Base.RefValue{NF}}(;
-            spectrum, grid, nlayers, nlayers_soil, nparticles, nsteps, tracer_tuple
+            spectrum, grid, nlayers, nlayers_soil, nparticles, nsteps, tracers = tracer_tuple
         )
 end
 

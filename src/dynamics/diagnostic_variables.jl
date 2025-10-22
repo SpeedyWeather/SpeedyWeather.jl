@@ -160,13 +160,13 @@ function GridVariables(SG::SpectralGrid; tracers::TRACER_DICT=TRACER_DICT())
     (; grid, nlayers) = SG
     (; GridVariable2D, GridVariable3D) = SG
 
-    tracer_grid_tuple = (; [key => zeros(GridVariable3D, grid, nlayers) for key in keys(tracers)]...)
+    tracers_grid = (; [key => zeros(GridVariable3D, grid, nlayers) for key in keys(tracers)]...)
 
-    tracer_grid_prev_tuple = (; [key => zeros(GridVariable3D, grid, nlayers) for key in keys(tracers)]...)
+    tracers_grid_prev = (; [key => zeros(GridVariable3D, grid, nlayers) for key in keys(tracers)]...)
 
-    return GridVariables{typeof(grid), GridVariable2D, GridVariable3D, typeof(tracer_grid_tuple)}(;
+    return GridVariables{typeof(grid), GridVariable2D, GridVariable3D, typeof(tracers_grid)}(;
             grid, nlayers,
-            tracer_grid_tuple, tracer_grid_prev_tuple
+            tracers_grid, tracers_grid_prev
         )
 end
 
@@ -558,6 +558,8 @@ struct DiagnosticVariables{
         SpectralVariable3D,     # <: LowerTriangularArray
         GridVariable2D,         # <: AbstractField
         GridVariable3D,         # <: AbstractField
+        SpectralTracerTuple,    # <: NamedTuple{Symbol, SpectralVariable3D}
+        GridTracerTuple,        # <: NamedTuple{Symbol, GridVariable3D}
         ParticleVector,         # <: AbstractField
         VectorType,             # <: AbstractVector
         ScratchMemoryType,      # <: ArrayType{Complex{NF}, 3}
