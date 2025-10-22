@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Remove JOSS paper draft workflow [#874](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/874)
 - Change particle tracking to every 4 hours [#881](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/881)
 - SpectralGrid can now be initialized from a grid instance as well [#882](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/882)
 
