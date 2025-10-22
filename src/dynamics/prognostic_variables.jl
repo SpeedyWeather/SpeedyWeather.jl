@@ -74,7 +74,8 @@ export PrognosticVariables
     GridVariable3D,         # <: AbstractField
     TracerTuple,            # <: NamedTuple{Tuple{Symbol}, Tuple{SpectralVariable4D}}
     ParticleVector,         # <: AbstractVector{Particle{NF}}
-    RefValueNF,               # <: Base.RefValue{NF}
+    RefValueNF,             # <: Base.RefValue{NF}
+    ClockType,              # <: Union{Clock, Nothing}
 } <: AbstractPrognosticVariables
 
     # DIMENSIONS
@@ -133,7 +134,7 @@ export PrognosticVariables
     scale::RefValueNF = Ref(one(eltype(land)))
 
     "Clock that keeps track of time, number of timesteps to integrate for."
-    clock::Clock = Clock()
+    clock::ClockType = Clock()
 end
 
 Adapt.@adapt_structure PrognosticVariables
@@ -173,10 +174,11 @@ function PrognosticVariables(SG::SpectralGrid{Architecture, SpectrumType, GridTy
     (; SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, ParticleVector) = SG
     
     tracer_tuple = (; [key => zeros(SpectralVariable4D, spectrum, nlayers, nsteps) for key in keys(tracers)]...)
+    clock = Clock()
 
     return PrognosticVariables{SpectrumType, GridType,
-        SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, typeof(tracer_tuple), ParticleVector, Base.RefValue{NF}}(;
-            spectrum, grid, nlayers, nlayers_soil, nparticles, nsteps, tracers = tracer_tuple
+        SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, typeof(tracer_tuple), ParticleVector, Base.RefValue{NF}, typeof(clock)}(;
+            spectrum, grid, nlayers, nlayers_soil, nparticles, nsteps, tracers = tracer_tuple, clock
         )
 end
 
