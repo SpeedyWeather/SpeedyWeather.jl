@@ -142,8 +142,8 @@ function convection!(ij, diagn, SBM::SimplifiedBettsMiller, model)
 
     # GET TENDENCIES FROM ADJUSTED PROFILES
     for k in level_zero_buoyancy:nlayers
-        temp_tend[ij, k] -= (temp[ij, k] - temp_ref_profile[k]) / SBM.time_scale.value
-        δq = (humid[ij, k] - humid_ref_profile[k]) / SBM.time_scale.value
+        temp_tend[ij, k] -= (temp[ij, k] - temp_ref_profile[ij,k]) / SBM.time_scale.value
+        δq = (humid[ij, k] - humid_ref_profile[ij,k]) / SBM.time_scale.value
         humid_tend[ij, k] -= δq
 
         # convective precipitation (rain), integrate dq\dt [(kg/kg)/s] vertically
@@ -191,8 +191,10 @@ function pseudo_adiabat!(
     ε = clausius_clapeyron.mol_ratio
     μ = (1-ε)/ε                             # for virtual temperature
 
-    nlayers = length(σ)                     # number of vertical levels
-    temp_ref_profile[ij, :] .= NaN          # reset profile from any previous calculation, TODO necessary?
+    nlayers = length(σ)                         # number of vertical levels
+    for i in 1:nlayers
+        temp_ref_profile[ij, i] = NF(NaN)           # reset profile from any previous calculation, TODO necessary?
+    end
     temp_ref_profile[ij, nlayers] = temp_parcel     # start profile at surface with parcel temperature
 
     local saturated::Bool = false           # did the parcel reach saturation yet?
@@ -240,7 +242,7 @@ function pseudo_adiabat!(
     end
     
     # if parcel isn't buoyant anymore set last temperature (with negative buoyancy) back to NaN
-    temp_ref_profile[ij, k] = !buoyant ? NaN : temp_ref_profile[ij, k]
+    temp_ref_profile[ij, k] = !buoyant ? NF(NaN) : temp_ref_profile[ij, k]
     
     # level of zero buoyancy is reached when the loop stops, but in case it's at the top it's still buoyant
     level_zero_buoyancy = k + (1-buoyant)
@@ -352,7 +354,10 @@ function dry_adiabat!(
         length(σ) == length(temp_environment) || throw(BoundsError)
 
     nlayers = length(temp_ref_profile)      # number of vertical levels
-    temp_ref_profile[ij, :] .= NaN          # reset profile from any previous calculation
+
+    for i in 1:nlayers
+        temp_ref_profile[ij, i] = NF(NaN)          # reset profile from any previous calculation
+    end
     temp_ref_profile[ij, nlayers] = temp_parcel    # start profile at surface with parcel temperature
 
     local buoyant::Bool = true              # is the parcel still buoyant?
@@ -370,7 +375,7 @@ function dry_adiabat!(
     end
     
     # if parcel isn't buoyant anymore set last temperature (with negative buoyancy) back to NaN
-    temp_ref_profile[ij, k] = !buoyant ? NaN : temp_ref_profile[ij, k]    
+    temp_ref_profile[ij, k] = !buoyant ? NF(NaN) : temp_ref_profile[ij, k]    
     
     # level of zero buoyancy is reached when the loop stops, but in case it's at the top it's still buoyant
     level_zero_buoyancy = k + (1-buoyant)
@@ -420,7 +425,7 @@ end
 # function barrier
 parameterization!(ij, diagn, progn, convection_scheme::ConvectiveHeating, model) = convection!(ij, diagn, convection_scheme, model)
 
-function convection!(
+@inline function convection!(
     ij,
     diagn::DiagnosticVariables,
     scheme::ConvectiveHeating,
