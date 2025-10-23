@@ -261,18 +261,19 @@ function interpolate(
 ) where NF
     (; npoints_output) = I.locator                                      # number of points to interpolate onto
     Aout = array_type(architecture(A), NF, 1)(undef, npoints_output)    # preallocate: onto θs, λs interpolated values of A
-    _interpolate!(Aout, A.data, I, architecture(A)) # perform interpolation, store in Aout
+    _interpolate!(Aout, A.data, I.locator, I.geometry, architecture(A)) # perform interpolation, store in Aout
 end
 
 # the actual interpolation function
 function _interpolate!(
     Aout,                               # Out: interpolated values
     A,                                  # gridded values to interpolate from
-    interpolator::AnvilInterpolator,    # geometry info and work arrays 
+    locator::AnvilLocator, 
+    geometry::GridGeometry,
     architecture::AbstractArchitecture      
 )
-    (; npoints_output, ij_as, ij_bs, ij_cs, ij_ds, Δabs, Δcds, Δys) = interpolator.locator
-    (; npoints, rings_tuple) = interpolator.geometry
+    (; npoints_output, ij_as, ij_bs, ij_cs, ij_ds, Δabs, Δcds, Δys) = locator
+    (; npoints, rings) = geometry
     
     # 1) Aout's length must match the interpolator
     # 2) input A must match the interpolator's geometry points (do not check grids for view support)
@@ -280,7 +281,7 @@ function _interpolate!(
     @boundscheck length(A) == npoints ||
         throw(DimensionMismatch("Interpolator ($npoints points) mismatches input grid ($(length(A)) points)."))
 
-    A_northpole, A_southpole = average_on_poles(A, rings_tuple)
+    A_northpole, A_southpole = average_on_poles(A, rings)
 
     #TODO ij_cs, ij_ds shouldn't be 0...
     @boundscheck extrema_in(ij_as,  0, npoints) || throw(BoundsError)
@@ -331,37 +332,58 @@ end
 end
 
 # version for 2D fields
-function interpolate!(
+interpolate!(
     Aout::Field,
     A::Field2D,
     interpolator::AbstractInterpolator,
+) = interpolate!(Aout, A, interpolater.locator, interpolator.geometry)
+
+function interpolate!(
+    Aout::Field,
+    A::Field2D,
+    locator::AbstractLocator,
+    geometry::AbstractGridGeometry,
 ) 
     fields_match(Aout, A) && return copyto!(Aout.data, A.data)
-    @assert ismatching(architecture(A), Aout) "Interpolation is only supported between fields on the same architecture, got $(architecture(A)) and $(architecture(Aout))"
-    _interpolate!(Aout.data, A.data, interpolator, architecture(A))
+    @assert ismatching(architecture(A), Aout) "Interpolation is only supported between fields on the same architecture, got $(architecture(A)) and )"
+    _interpolate!(Aout.data, A.data, locator, geometry, architecture(A))
 end
 
 # version for 2D field and vector
-function interpolate!(
-    Aout::AbstractVector,      # Out: points to interpolate onto
-    A::Field2D,         # In: field to interpolate from
+interpolate!(
+    Aout::AbstractVector,       # Out: points to interpolate onto
+    A::Field2D,                 # In: field to interpolate from
     interpolator::AbstractInterpolator,
+) = interpolate!(Aout, A, interpolator.locator, interpolator.geometry)
+
+function interpolate!(
+    Aout::AbstractVector,       # Out: points to interpolate onto
+    A::Field2D,                 # In: field to interpolate from
+    locator::AbstractLocator,
+    geometry::AbstractGridGeometry,
 )
-    _interpolate!(Aout, A.data, interpolator, architecture(A))  # use .data to trigger dispatch for method above
+    _interpolate!(Aout, A.data, locator, geometry, architecture(A))  # use .data to trigger dispatch for method above
 end
 
 # version for 3D+ fields
-function interpolate!(
+interpolate!(
     Aout::Field,        # Out: grid to interpolate onto
     A::Field,           # In: gridded data to interpolate from
     interpolator::AbstractInterpolator,
+) = interpolate!(Aout, A, interpolator.locator, interpolator.geometry)
+
+function interpolate!(
+    Aout::Field,        # Out: grid to interpolate onto
+    A::Field,           # In: gridded data to interpolate from
+    locator::AbstractLocator,
+    geometry::AbstractGridGeometry,
 )
     # if fields match just copy data over (eltypes might differ)
     fields_match(Aout, A) && return copyto!(Aout.data, A.data)
     @assert ismatching(architecture(A), Aout) "Interpolation is only supported between fields on the same architecture, got $(architecture(A)) and $(architecture(Aout))"
 
     for k in eachlayer(Aout, A, vertical_only=true)
-        _interpolate!(view(Aout.data, :, k), view(A.data, :, k), interpolator, architecture(A))
+        _interpolate!(view(Aout.data, :, k), view(A.data, :, k), locator, geometry, architecture(A))
     end
     return Aout                             # return the field wrapped around the interpolated data
 end
@@ -398,27 +420,39 @@ end
 # if only the grid type is provided, create a grid with nlat_half and architecture from the input field
 interpolate(Grid::Type{<:AbstractGrid}, A::Field; kwargs...) = interpolate(Grid(A.grid.nlat_half, architecture(A)), A; kwargs...)
 
-function update_locator!(
+update_locator!(
     I::AbstractInterpolator,    # GridGeometry and Locator
+    λs::AbstractVector,         # longitudes to interpolate onto
+    θs::AbstractVector;         # latitudes to interpolate onto
+    unsafe::Bool=false,         # true to disable safety checks
+) = update_locator!(I.locator, I.geometry, λs, θs; unsafe)
+
+function update_locator!(
+    locator::AbstractLocator,    
+    geometry::AbstractGridGeometry,
     λs::AbstractVector,         # longitudes to interpolate onto
     θs::AbstractVector;         # latitudes to interpolate onto
     unsafe::Bool=false,         # true to disable safety checks
 )
     # find latitude ring indices corresponding to interpolation points
-    (; latd ) = I.geometry                  # latitudes of rings including north and south pole
-    (; js, Δys ) = I.locator                # to be updated: ring indices js, and meridional weights Δys
+    (; latd ) = geometry                  # latitudes of rings including north and south pole
+    (; js, Δys ) = locator                # to be updated: ring indices js, and meridional weights Δys
     find_rings!(js, Δys, θs, latd; unsafe, architecture=I.geometry.grid.architecture)  # next ring at or north of θ
 
     # find grid incides ij for top, bottom and left, right grid points around (θ, λ)
     find_grid_indices!(I, λs, I.geometry.grid.architecture)               # next points left and right of λ on rings north and south
 end
 
-function update_locator!(I::AbstractInterpolator, A::Field; kwargs...)
+update_locator!(I::AbstractInterpolator, A::Field; kwargs...) = update_locator(I.locator, I.geometry, A::Field; kwargs...)
+ 
+function update_locator!(locator::AbstractLocator,
+                         geometry::AbstractGridGeometry, 
+                         A::Field; kwargs...)
     londs, latds = get_londlatds(A.grid)
     londs = on_architecture(architecture(A), londs)
     latds = on_architecture(architecture(A), latds)
 
-    update_locator!(I, londs, latds; kwargs...)
+    update_locator!(locator, geometry, londs, latds; kwargs...)
 end
 
 function find_rings!(   js::AbstractVector{<:Integer},  # Out: ring indices j
