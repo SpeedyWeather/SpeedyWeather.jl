@@ -25,6 +25,9 @@ finalize!(::Nothing, ::AbstractModel) = nothing
 initialize!(::AbstractModelComponent, ::AbstractModel) = nothing
 finalize!(::AbstractModelComponent, ::AbstractModel) = nothing
 
+# allows paramterizations to be nothing and skipped on a timestep
+parameterization!(ij, diagn, progn, ::Nothing, args...) = nothing
+
 # print all fields with type <: Number
 function Base.show(io::IO, P::AbstractModelComponent)
     println(io, "$(typeof(P)) <: $(supertype(typeof(P)))")

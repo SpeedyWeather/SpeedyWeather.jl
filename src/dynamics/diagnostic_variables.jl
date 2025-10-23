@@ -141,7 +141,7 @@ $TYPEDFIELDS."""
     u_grid_prev     ::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
     "Meridional velocity [m/s] at previous time step"
     v_grid_prev     ::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
-    "Logarithm of surface pressure [Pa] at previous time step"
+    "Surface pressure [Pa] at previous time step (not logarithm!)"
     pres_grid_prev  ::GridVariable2D = zeros(GridVariable2D, grid)
     "Tracers [?] at previous time step"
     tracers_grid_prev::Dict{Symbol, GridVariable3D} = Dict{Symbol, GridVariable3D}()
@@ -211,7 +211,7 @@ $(TYPEDFIELDS)"""
     "Sum of div_weighted from top to k"
     div_sum_above::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
     
-    "Virtual temperature [K], spectral for geopotential"
+    "Virtual temperature [K], spectral, used for geopotential"
     temp_virt::SpectralVariable3D = zeros(SpectralVariable3D, spectrum, nlayers)
 
     "Geopotential [m²/s²] on full layers"
@@ -270,8 +270,8 @@ function DynamicsVariables(SG::SpectralGrid;
 end
 
 
-export DynamicsVariablesOcean
-@kwdef struct DynamicsVariablesOcean{
+export DiagnosticVariablesOcean
+@kwdef struct DiagnosticVariablesOcean{
     NF,
     ArrayType,
     GridType,
@@ -297,11 +297,11 @@ export DynamicsVariablesOcean
     albedo::GridVariable2D = zeros(GridVariable2D, grid)
 end
 
-DynamicsVariablesOcean(SG::SpectralGrid) =
-    DynamicsVariablesOcean{SG.NF, SG.ArrayType, typeof(SG.grid), SG.GridVariable2D}(; SG.grid)
+DiagnosticVariablesOcean(SG::SpectralGrid) =
+    DiagnosticVariablesOcean{SG.NF, SG.ArrayType, typeof(SG.grid), SG.GridVariable2D}(; SG.grid)
 
-export DynamicsVariablesLand
-@kwdef struct DynamicsVariablesLand{
+export DiagnosticVariablesLand
+@kwdef struct DiagnosticVariablesLand{
     NF,
     ArrayType,
     GridType,
@@ -333,8 +333,8 @@ export DynamicsVariablesLand
     river_runoff::GridVariable2D = zeros(GridVariable2D, grid)
 end
 
-DynamicsVariablesLand(SG::SpectralGrid) =
-    DynamicsVariablesLand{SG.NF, SG.ArrayType, typeof(SG.grid), SG.GridVariable2D}(; SG.grid)
+DiagnosticVariablesLand(SG::SpectralGrid) =
+    DiagnosticVariablesLand{SG.NF, SG.ArrayType, typeof(SG.grid), SG.GridVariable2D}(; SG.grid)
 
 
 export PhysicsVariables
@@ -351,8 +351,8 @@ $(TYPEDFIELDS)"""
 
     grid::GridType          # resolution of grid
 
-    ocean::DynamicsVariablesOcean{NF, ArrayType, GridType, GridVariable2D}
-    land::DynamicsVariablesLand{NF, ArrayType, GridType, GridVariable2D}
+    ocean::DiagnosticVariablesOcean{NF, ArrayType, GridType, GridVariable2D}
+    land::DiagnosticVariablesLand{NF, ArrayType, GridType, GridVariable2D}
 
     # PRECIPITATION
     "Accumulated large-scale rain [m]"
@@ -374,6 +374,18 @@ $(TYPEDFIELDS)"""
     cloud_top::GridVariable2D = zeros(GridVariable2D, grid)      
     
     # SURFACE FLUXES
+    "Surface wind speed [m/s]"
+    surface_wind_speed::GridVariable2D = zeros(GridVariable2D, grid)
+
+    "Surface air density [kg/m³]"
+    surface_air_density::GridVariable2D = zeros(GridVariable2D, grid)
+
+    "Boundary layer drag coefficient [1]"
+    boundary_layer_drag::GridVariable2D = zeros(GridVariable2D, grid)
+
+    "Surface air temperature [K]"
+    surface_air_temperature::GridVariable2D = zeros(GridVariable2D, grid)
+
     "Sensible heat flux [W/m²], positive up"
     sensible_heat_flux::GridVariable2D = zeros(GridVariable2D, grid)
     
@@ -415,8 +427,8 @@ function PhysicsVariables(SG::SpectralGrid)
     (; grid, NF, ArrayType) = SG
     (; GridVariable2D) = SG
 
-    ocean = DynamicsVariablesOcean(SG)
-    land = DynamicsVariablesLand(SG)
+    ocean = DiagnosticVariablesOcean(SG)
+    land = DiagnosticVariablesLand(SG)
 
     return PhysicsVariables{NF, ArrayType, typeof(grid), GridVariable2D}(; grid, ocean, land)
 end
