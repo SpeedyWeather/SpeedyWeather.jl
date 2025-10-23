@@ -156,7 +156,9 @@ function convection!(ij, diagn, SBM::SimplifiedBettsMiller, model)
     
     # Store precipitation in diagnostic arrays
     diagn.physics.rain_convection[ij] += rain_convection
-    diagn.physics.rain_rate_convection[ij] = rain_convection / Δt_sec    # rate: convert to [m/s] of rain
+
+    # TODO: double check, because preivously this was rain_rate_convection, which didn't exist
+    diagn.physics.total_precipitation_rate[ij] = rain_convection / Δt_sec    # rate: convert to [m/s] of rain
 
     # Update cloud top
     diagn.physics.cloud_top[ij] = min(diagn.physics.cloud_top[ij], level_zero_buoyancy)       # clouds reach to top of convection

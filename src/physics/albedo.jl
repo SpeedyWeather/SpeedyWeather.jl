@@ -53,7 +53,7 @@ end
 GlobalConstantAlbedo(SG::SpectralGrid; kwargs...) = GlobalConstantAlbedo{SG.NF}(; kwargs...)
 initialize!(albedo::GlobalConstantAlbedo, ::PrimitiveEquation) = nothing
 parameterization!(ij, diagn, progn, albedo::GlobalConstantAlbedo, model) = albedo!(ij, diagn.albedo, albedo.albedo)
-function albedo!(ij, diagn_albedo::AbstractField2D, albedo::Real)
+@inline function albedo!(ij, diagn_albedo::AbstractArray, albedo::Real)
     diagn_albedo[ij] = albedo
 end
 
@@ -73,7 +73,7 @@ end
 ManualAlbedo(SG::SpectralGrid) = ManualAlbedo{SG.GridVariable2D}(zeros(SG.GridVariable2D, SG.grid))
 initialize!(albedo::ManualAlbedo, model::PrimitiveEquation) = nothing
 parameterization!(ij, diagn, progn, albedo::ManualAlbedo, model) = albedo!(ij, diagn.albedo, albedo.albedo)
-function albedo!(ij, diagn_albedo::AbstractField2D, albedo::AbstractField2D)
+@inline function albedo!(ij, diagn_albedo::AbstractArray, albedo::AbstractArray)
     diagn_albedo[ij] = albedo[ij]
 end
 
@@ -138,7 +138,7 @@ OceanSeaIceAlbedo(SG::SpectralGrid; kwargs...) = OceanSeaIceAlbedo{SG.NF}(;kwarg
 initialize!(::OceanSeaIceAlbedo, ::PrimitiveEquation) = nothing
 parameterization!(ij, diagn, progn, albedo::OceanSeaIceAlbedo, model) = albedo!(ij, diagn.albedo, progn.ocean, albedo)
 
-function albedo!(ij, diagn_albedo::AbstractField2D, ocean, albedo::OceanSeaIceAlbedo)
+@inline function albedo!(ij, diagn_albedo::AbstractArray, ocean, albedo::OceanSeaIceAlbedo)
     (; sea_ice_concentration ) = ocean
     (; albedo_ocean, albedo_ice) = albedo
 

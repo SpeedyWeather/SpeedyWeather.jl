@@ -49,7 +49,7 @@ function large_scale_condensation!(
     geometry::Geometry,
     planet::AbstractPlanet,
     atmosphere::AbstractAtmosphere,
-    time_stepping::AbstractTimeStepper,
+    time_stepping,
 )
     # use previous time step for more stable Euler forward step of the parameterizations
     temp = diagn.grid.temp_grid_prev        # temperature [K] TODO add temperature profile!!!
