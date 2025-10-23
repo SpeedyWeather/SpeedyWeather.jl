@@ -273,7 +273,7 @@ function _interpolate!(
     architecture::AbstractArchitecture      
 )
     (; npoints_output, ij_as, ij_bs, ij_cs, ij_ds, Δabs, Δcds, Δys) = locator
-    (; npoints, rings) = geometry
+    (; npoints, rings_tuple) = geometry
     
     # 1) Aout's length must match the interpolator
     # 2) input A must match the interpolator's geometry points (do not check grids for view support)
@@ -281,7 +281,7 @@ function _interpolate!(
     @boundscheck length(A) == npoints ||
         throw(DimensionMismatch("Interpolator ($npoints points) mismatches input grid ($(length(A)) points)."))
 
-    A_northpole, A_southpole = average_on_poles(A, rings)
+    A_northpole, A_southpole = average_on_poles(A, rings_tuple)
 
     #TODO ij_cs, ij_ds shouldn't be 0...
     @boundscheck extrema_in(ij_as,  0, npoints) || throw(BoundsError)
@@ -336,7 +336,7 @@ interpolate!(
     Aout::Field,
     A::Field2D,
     interpolator::AbstractInterpolator,
-) = interpolate!(Aout, A, interpolater.locator, interpolator.geometry)
+) = interpolate!(Aout, A, interpolator.locator, interpolator.geometry)
 
 function interpolate!(
     Aout::Field,
@@ -437,10 +437,10 @@ function update_locator!(
     # find latitude ring indices corresponding to interpolation points
     (; latd ) = geometry                  # latitudes of rings including north and south pole
     (; js, Δys ) = locator                # to be updated: ring indices js, and meridional weights Δys
-    find_rings!(js, Δys, θs, latd; unsafe, architecture=I.geometry.grid.architecture)  # next ring at or north of θ
+    find_rings!(js, Δys, θs, latd; unsafe, architecture=geometry.grid.architecture)  # next ring at or north of θ
 
     # find grid incides ij for top, bottom and left, right grid points around (θ, λ)
-    find_grid_indices!(I, λs, I.geometry.grid.architecture)               # next points left and right of λ on rings north and south
+    find_grid_indices!(locator, geometry, λs, geometry.grid.architecture)               # next points left and right of λ on rings north and south
 end
 
 update_locator!(I::AbstractInterpolator, A::Field; kwargs...) = update_locator(I.locator, I.geometry, A::Field; kwargs...)
@@ -600,14 +600,19 @@ end
     end
 end
 
-function find_grid_indices!(I::AnvilInterpolator,       # update indices arrays
+find_grid_indices!(I::AnvilInterpolator,        # update indices arrays
+                   λs::AbstractArray,           # based on new longitudes λ
+                   architecture::AbstractArchitecture=architecture(λs)) = find_grid_indices!(I.locator, I.geometry, λs, architecture)
+
+function find_grid_indices!(locator::AbstractLocator,   # update indices arrays
+                           geometry::AbstractGridGeometry,
                            λs::AbstractArray,           # based on new longitudes λ
                            architecture::AbstractArchitecture=architecture(λs))
                            
-    (; js, ij_as, ij_bs, ij_cs, ij_ds ) = I.locator
-    (; Δabs, Δcds ) = I.locator
-    (; nlons, lon_offsets, nlat ) = I.geometry
-    (; rings ) = I.geometry.grid
+    (; js, ij_as, ij_bs, ij_cs, ij_ds ) = locator
+    (; Δabs, Δcds ) = locator
+    (; nlons, lon_offsets, nlat ) = geometry
+    (; rings ) = geometry.grid
     
     # Convert λs to the same type as lon_offsets if needed
     λs_converted = convert.(eltype(lon_offsets), λs)

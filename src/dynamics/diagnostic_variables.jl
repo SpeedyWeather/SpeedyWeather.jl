@@ -449,8 +449,6 @@ export ParticleVariables
 """Diagnostic variables for the particle advection
 $(TYPEDFIELDS)"""
 @kwdef struct ParticleVariables{
-    NF,                     # <: AbstractFloat
-    ArrayType,              # Array, CuArray, ...
     ParticleVector,         # <: AbstractField
     VectorNF,               # Vector{NF} or CuVector{NF}
     LocatorType,           # <:AbstractLocator
@@ -481,7 +479,7 @@ function ParticleVariables(SG::SpectralGrid)
     (; ParticleVector) = SG
     VectorNF = array_type(architecture, NF, 1)
     locator = RingGrids.AnvilLocator(NF, nparticles; architecture)
-    return ParticleVariables{NF,ArrayType, ParticleVector, VectorNF, typeof(locator)}(;
+    return ParticleVariables{ParticleVector, VectorNF, typeof(locator)}(;
             nparticles, locator)
 end
 
