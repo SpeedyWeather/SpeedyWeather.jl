@@ -18,6 +18,8 @@ function Base.show(io::IO, A::OceanLandAlbedo)
     end
 end
 
+Adapt.@adapt_structure OceanLandAlbedo
+
 export DefaultAlbedo
 function DefaultAlbedo(SG::SpectralGrid;
     ocean = OceanSeaIceAlbedo(SG),
@@ -44,7 +46,7 @@ end
 
 ## GLOBAL CONSTANT ALBEDO
 export GlobalConstantAlbedo
-@kwdef mutable struct GlobalConstantAlbedo{NF} <: AbstractAlbedo
+@kwdef struct GlobalConstantAlbedo{NF} <: AbstractAlbedo
     albedo::NF = 0.3
 end
 

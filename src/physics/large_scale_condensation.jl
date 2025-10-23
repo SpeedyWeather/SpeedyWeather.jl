@@ -4,7 +4,7 @@ export ImplicitCondensation
 """
 Large-scale condensation with implicit time stepping.
 $(TYPEDFIELDS)"""
-@kwdef mutable struct ImplicitCondensation{NF} <: AbstractCondensation
+@kwdef struct ImplicitCondensation{NF} <: AbstractCondensation
     "[OPTION] Relative humidity threshold [1 = 100%] to trigger condensation"
     relative_humidity_threshold::NF = 0.95
 
