@@ -66,11 +66,11 @@ export ManualAlbedo
 Defined so that parameterizations can change the albedo at every time step (e.g. snow cover) without
 losing the information of the original surface albedo. Fields are
 $(TYPEDFIELDS)"""
-struct ManualAlbedo{NF, GridVariable2D} <: AbstractAlbedo
+struct ManualAlbedo{GridVariable2D} <: AbstractAlbedo
     albedo::GridVariable2D
 end
 
-ManualAlbedo(SG::SpectralGrid) = ManualAlbedo{SG.NF, SG.GridVariable2D}(zeros(SG.GridVariable2D, SG.grid))
+ManualAlbedo(SG::SpectralGrid) = ManualAlbedo{SG.GridVariable2D}(zeros(SG.GridVariable2D, SG.grid))
 initialize!(albedo::ManualAlbedo, model::PrimitiveEquation) = nothing
 parameterization!(ij, diagn, progn, albedo::ManualAlbedo, model) = albedo!(ij, diagn.albedo, albedo.albedo)
 function albedo!(ij, diagn_albedo::AbstractField2D, albedo::AbstractField2D)
@@ -81,7 +81,7 @@ Adapt.@adapt_structure ManualAlbedo
 
 ## ALBEDO CLIMATOLOGY
 export AlbedoClimatology
-@kwdef struct AlbedoClimatology{NF, GridVariable2D} <: AbstractAlbedo
+@kwdef struct AlbedoClimatology{GridVariable2D} <: AbstractAlbedo
     "[OPTION] path to the folder containing the albedo file, pkg path default"
     path::String = "SpeedyWeather.jl/input_data"
 
@@ -99,9 +99,9 @@ export AlbedoClimatology
 end
 
 function AlbedoClimatology(SG::SpectralGrid; kwargs...)
-    (; NF, GridVariable2D, grid) = SG
+    (; GridVariable2D, grid) = SG
     albedo = zeros(GridVariable2D, grid)
-    AlbedoClimatology{NF, GridVariable2D}(; albedo, kwargs...)
+    AlbedoClimatology{GridVariable2D}(; albedo, kwargs...)
 end
 
 # set albedo with grid, scalar, function; just define path `albedo.albedo` to grid here
