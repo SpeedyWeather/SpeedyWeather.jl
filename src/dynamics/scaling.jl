@@ -45,11 +45,13 @@ end
 Scale the tendencies inside `diagn` with scalar `scale`.
 Intended use to scale the tendencies of the parameterizations
 by the radius for the dynamical core."""
-function scale!(ij, diagn::Tendencies, scale::Real)
-    diagn.u_tend_grid[ij, :]        .*= scale
-    diagn.v_tend_grid[ij, :]        .*= scale
-    diagn.temp_tend_grid[ij, :]     .*= scale
-    diagn.humid_tend_grid[ij, :]    .*= scale
+@inline function scale!(ij, diagn::Tendencies, scale::Real)
+    @inbounds for k in eachlayer(diagn.u_tend_grid)
+        diagn.u_tend_grid[ij, k] *= scale
+        diagn.v_tend_grid[ij, k] *= scale
+        diagn.temp_tend_grid[ij, k] *= scale
+        diagn.humid_tend_grid[ij, k] *= scale
+    end
 end
 
 """$(TYPEDSIGNATURES)
