@@ -13,7 +13,7 @@ characteristics. Note that `radius` is not part of it as this should be chosen
 in `SpectralGrid`. Keyword arguments are
 $(TYPEDFIELDS)
 """
-@parameterized @kwdef mutable struct Earth{NF<:AbstractFloat} <: AbstractPlanet
+@parameterized @kwdef struct Earth{NF<:AbstractFloat} <: AbstractPlanet
 
     "Earth's radius [m]"
     @param radius::NF = DEFAULT_RADIUS

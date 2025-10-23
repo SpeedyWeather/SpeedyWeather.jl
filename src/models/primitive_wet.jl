@@ -187,8 +187,7 @@ end
 Extract the model components with parameters needed for the parameterizations
 as NamedTuple. These are the GPU-compatible components of the model."""
 function get_model_parameters(model::PrimitiveWet)
-    return (time_stepping = model.time_stepping,
-            orography = model.orography.orography,              # use only orography field as strings aren't GPU-compatible
+    return (orography = model.orography.orography,              # use only orography field as strings aren't GPU-compatible
             geopotential = model.geopotential,
             atmosphere = model.atmosphere,
             planet = model.planet,
