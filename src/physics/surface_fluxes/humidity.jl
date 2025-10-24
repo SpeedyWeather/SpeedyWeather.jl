@@ -46,6 +46,7 @@ initialize!(::SurfaceOceanHumidityFlux, ::PrimitiveWet) = nothing
 
 function surface_humidity_flux!(ij, diagn, progn, humidity_flux::SurfaceOceanHumidityFlux, model)
 
+    nlayers = model.geometry.nlayers
     # TODO use a skin temperature?
     T = progn.ocean.sea_surface_temperature[ij]
 
@@ -56,7 +57,7 @@ function surface_humidity_flux!(ij, diagn, progn, humidity_flux::SurfaceOceanHum
     ρ = diagn.physics.surface_air_density[ij]
     V₀ = diagn.physics.surface_wind_speed[ij]
     land_fraction = model.land_sea_mask[ij]
-    surface_humid = diagn.grid.humid_grid[ij, end]
+    surface_humid = diagn.grid.humid_grid[ij, nlayers]
 
     # drag coefficient either from SurfaceHumidityFlux or from a central drag coefficient
     d = diagn.physics.boundary_layer_drag[ij]
@@ -74,7 +75,7 @@ function surface_humidity_flux!(ij, diagn, progn, humidity_flux::SurfaceOceanHum
     diagn.physics.surface_humidity_flux[ij] = flux_ocean
     
     # accumulate with += into end=lowermost layer total flux
-    diagn.tendencies.humid_tend_grid[ij, end] += surface_flux_to_tendency(flux_ocean, pₛ, model)
+    diagn.tendencies.humid_tend_grid[ij, nlayers] += surface_flux_to_tendency(flux_ocean, pₛ, model)
     return nothing
 end
 
@@ -105,7 +106,8 @@ function surface_humidity_flux!(ij, diagn, progn, humidity_flux::SurfaceLandHumi
     ρ = diagn.physics.surface_air_density[ij]
     V₀ = diagn.physics.surface_wind_speed[ij]
     land_fraction = model.land_sea_mask[ij]
-    surface_humid = diagn.grid.humid_grid[ij, end]
+    nlayers = model.geometry.nlayers
+    surface_humid = diagn.grid.humid_grid[ij, nlayers]
 
     # drag coefficient either from SurfaceLandHumidityFlux or from a central drag coefficient
     d = diagn.physics.boundary_layer_drag[ij]
@@ -151,7 +153,8 @@ function surface_humidity_flux!(ij, diagn, progn, ::PrescribedOceanHumidityFlux,
     diagn.physics.surface_humidity_flux[ij] = flux_ocean
     
     # accumulate with += into end=lowermost layer total flux
-    diagn.tendencies.humid_tend_grid[ij, end] += surface_flux_to_tendency(flux_ocean, pₛ, model)
+    nlayers = model.geometry.nlayers
+    diagn.tendencies.humid_tend_grid[ij, nlayers] += surface_flux_to_tendency(flux_ocean, pₛ, model)
     return nothing
 end
 
@@ -179,7 +182,8 @@ function surface_humidity_flux!(ij, diagn, progn, ::PrescribedLandHumidityFlux, 
     diagn.physics.surface_humidity_flux[ij] += flux_land
     
     # accumulate with += into end=lowermost layer total flux
-    diagn.tendencies.humid_tend_grid[ij, end] += surface_flux_to_tendency(flux_land, pₛ, model)
+    nlayers = model.geometry.nlayers
+    diagn.tendencies.humid_tend_grid[ij, nlayers] += surface_flux_to_tendency(flux_land, pₛ, model)
     return nothing
 end
 

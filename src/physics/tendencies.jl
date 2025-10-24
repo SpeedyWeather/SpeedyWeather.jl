@@ -23,22 +23,26 @@ end
     
     ij = @index(Global, Linear)     # every horizontal grid point ij
 
-    # loop over all parameterizations in order
-    for parameterization in parameterizations
-        parameterization!(ij, diagn, progn, parameterization, model_parameters)
-    end
+    # manually unroll loop over all parameterizations (NamedTuple iteration not GPU-compatible)
+    _call_parameterizations!(ij, diagn, progn, parameterizations, model_parameters)
 
     # tendencies have to be scaled by the radius for the dynamical core
     scale!(ij, diagn.tendencies, model_parameters.planet.radius)
 end
 
+# Use @generated to unroll NamedTuple iteration at compile time for GPU compatibility
+@generated function _call_parameterizations!(ij, diagn, progn, parameterizations::NamedTuple{names}, model_parameters) where {names}
+    calls = [:(parameterization!(ij, diagn, progn, parameterizations.$name, model_parameters)) for name in names]
+    return Expr(:block, calls...)
+end
+
 """$(TYPEDSIGNATURES)
 Flux `flux` into surface layer with surface pressure `pₛ` [Pa] and gravity `g` [m/s^2]
 converted to tendency [?/s]."""
-surface_flux_to_tendency(flux::Real, pₛ::Real, model) =
+@inline surface_flux_to_tendency(flux::Real, pₛ::Real, model) =
     flux_to_tendency(flux, pₛ, model.planet.gravity, model.geometry.σ_levels_thick[end])
 
 """$(TYPEDSIGNATURES)
 Flux `flux` into layer `k` of thickness `Δσ`  converted to tendency [?/s].
 Using surface pressure `pₛ` [Pa] and gravity `g` [m/s^2]."""
-flux_to_tendency(flux::Real, pₛ::Real, g::Real, Δσ_k::Real) = g/(pₛ*Δσ_k) * flux
+@inline flux_to_tendency(flux::Real, pₛ::Real, g::Real, Δσ_k::Real) = g/(pₛ*Δσ_k) * flux

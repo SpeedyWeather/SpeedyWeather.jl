@@ -54,33 +54,36 @@ end
 
 """
 $(TYPEDSIGNATURES)
-Functor: Saturation water vapour pressure as a function of temperature using the
+Saturation water vapour pressure as a function of temperature using the
 Clausius-Clapeyron equation,
 
     e(T) = e₀ * exp( -Lᵥ/Rᵥ * (1/T - 1/T₀)),
 
 where T is in Kelvin, Lᵥ the the latent heat of vaporization and Rᵥ the gas constant
 of water vapour, T₀ is 0˚C in Kelvin."""
-function (CC::ClausiusClapeyron{NF})(temp_kelvin::NF) where NF
+@inline function saturation_vapor_pressure(CC::ClausiusClapeyron{NF}, temp_kelvin::NF) where NF
     (; e₀, T₀⁻¹, Lᵥ_Rᵥ) = CC
     return e₀ * exp(Lᵥ_Rᵥ*(T₀⁻¹ - inv(temp_kelvin)))
 end
 
 # convert to number format of struct
-function (CC::ClausiusClapeyron{NF})(temp_kelvin) where NF
-    CC(convert(NF, temp_kelvin))
+@inline function saturation_vapor_pressure(CC::ClausiusClapeyron{NF}, temp_kelvin) where NF
+    saturation_vapor_pressure(CC, convert(NF, temp_kelvin))
 end
+
+# Keep functor for backwards compatibility
+@inline (CC::ClausiusClapeyron)(temp_kelvin) = saturation_vapor_pressure(CC, temp_kelvin)
 
 """
 $(TYPEDSIGNATURES)
 Gradient of Clausius-Clapeyron wrt to temperature, evaluated at `temp_kelvin`."""
-function grad(CC::ClausiusClapeyron{NF}, temp_kelvin::NF) where NF
-    e = CC(temp_kelvin)
+@inline function grad(CC::ClausiusClapeyron{NF}, temp_kelvin::NF) where NF
+    e = saturation_vapor_pressure(CC, temp_kelvin)
     return e*CC.Lᵥ_Rᵥ/temp_kelvin^2
 end
 
 # convert to input argument to number format from struct
-grad(CC::ClausiusClapeyron{NF}, temp_kelvin) where NF = grad(CC, convert(NF, temp_kelvin))
+@inline grad(CC::ClausiusClapeyron{NF}, temp_kelvin) where NF = grad(CC, convert(NF, temp_kelvin))
 
 """
 $(TYPEDSIGNATURES)
@@ -89,7 +92,7 @@ Saturation humidity from saturation vapour pressure and pressure via
     qsat = mol_ratio*sat_vap_pres/pres
 
 with both pressures in same units and qsat in kg/kg."""
-function saturation_humidity(
+@inline function saturation_humidity(
     sat_vap_pres::NF,                   # saturation vapour pressure [Pa]
     pres::NF;                           # pressure [Pa]
     mol_ratio::NF = NF(287.04/461.5)    # ratio of mol masses dry air - water vapour
@@ -104,21 +107,21 @@ end
 $(TYPEDSIGNATURES)
 Saturation humidity [kg/kg] from temperature [K], pressure [Pa] via
 
-    sat_vap_pres = clausius_clapeyron(temperature)
+    sat_vap_pres = saturation_vapor_pressure(clausius_clapeyron, temperature)
     saturation humidity = mol_ratio * sat_vap_pres / pressure"""
-function saturation_humidity(
+@inline function saturation_humidity(
     temp_kelvin::NF,
     pres::NF,
     clausius_clapeyron::AbstractClausiusClapeyron,
 ) where NF
-    sat_vap_pres = clausius_clapeyron(temp_kelvin)
+    sat_vap_pres = saturation_vapor_pressure(clausius_clapeyron, temp_kelvin)
     return saturation_humidity(sat_vap_pres, pres; mol_ratio=clausius_clapeyron.mol_ratio)
 end
 
 """
 $(TYPEDSIGNATURES)
 Gradient of Clausius-Clapeyron wrt to temperature, evaluated at `temp_kelvin`."""
-function grad_saturation_humidity(CC::ClausiusClapeyron{NF}, temp_kelvin::NF, pres::NF) where NF
+@inline function grad_saturation_humidity(CC::ClausiusClapeyron{NF}, temp_kelvin::NF, pres::NF) where NF
     qsat = saturation_humidity(temp_kelvin, pres, CC)
     return qsat*CC.Lᵥ_Rᵥ/temp_kelvin^2
 end
@@ -220,26 +223,29 @@ end
 
 """
 $(TYPEDSIGNATURES)
-Functor: Saturation water vapour pressure as a function of temperature using the
+Saturation water vapour pressure as a function of temperature using the
 Tetens equation,
 
     eᵢ(T) = e₀ * exp(Cᵢ * (T - T₀) / (T - Tᵢ)),
 
 where T is in Kelvin and i = 1, 2 for saturation above and below freezing,
 respectively."""
-function (TetensCoefficients::TetensEquation{NF})(temp_kelvin::NF) where NF
+@inline function saturation_vapor_pressure(TetensCoefficients::TetensEquation{NF}, temp_kelvin::NF) where NF
     (; e₀, T₀, C₁, C₂, T₁, T₂) = TetensCoefficients
     C, T = temp_kelvin > T₀ ? (C₁, T₁) : (C₂, T₂)      # change coefficients above/below freezing
     temp_celsius = temp_kelvin - T₀
     return e₀ * exp(C * temp_celsius / (temp_celsius + T))
 end
 
+# Keep functor for backwards compatibility
+@inline (TE::TetensEquation)(temp_kelvin) = saturation_vapor_pressure(TE, temp_kelvin)
+
 """
 $(TYPEDSIGNATURES)
 Gradient of the Tetens equation wrt to temperature, evaluated at `temp_kelvin`."""
-function grad(TetensCoefficients::TetensEquation{NF}, temp_kelvin::NF) where NF
+@inline function grad(TetensCoefficients::TetensEquation{NF}, temp_kelvin::NF) where NF
     (; T₀, C₁, C₂, T₁, T₂) = TetensCoefficients
-    e = TetensCoefficients(temp_kelvin)             # saturation vapour pressure
+    e = saturation_vapor_pressure(TetensCoefficients, temp_kelvin)  # saturation vapour pressure
     C, T = temp_kelvin > T₀ ? (C₁, T₁) : (C₂, T₂)   # change coefficients above/below freezing
     return e*C*T/(temp_kelvin - T₀ - T)^2           # chain rule: times derivative of inner function
 end
