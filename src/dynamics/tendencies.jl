@@ -129,12 +129,19 @@ function pressure_gradient_flux!(
     (; uv∇lnp ) = diagn.dynamics
 
     # PRESSURE GRADIENT FLUX
-    @inbounds for k in eachlayer(u_grid, v_grid, uv∇lnp)
-        for ij in eachgridpoint(u_grid, v_grid, uv∇lnp)
-            # the (u, v)⋅∇lnp_s term
-            uv∇lnp[ij, k] = u_grid[ij, k]*∇lnp_x[ij] + v_grid[ij, k]*∇lnp_y[ij]
-        end
-    end
+    # Launch the kernel for pressure gradient flux calculation
+    launch!(architecture(uv∇lnp), RingGridWorkOrder, size(uv∇lnp), _pressure_gradient_flux_kernel!,
+            uv∇lnp, u_grid, v_grid, ∇lnp_x, ∇lnp_y)
+end
+
+@kernel inbounds=true function _pressure_gradient_flux_kernel!(
+    uv∇lnp, u_grid, v_grid, @Const(∇lnp_x), @Const(∇lnp_y)
+)
+    # Get indices
+    ij, k = @index(Global, NTuple)
+    
+    # Calculate the (u, v)⋅∇lnp_s term
+    uv∇lnp[ij, k] = u_grid[ij, k] * ∇lnp_x[ij] + v_grid[ij, k] * ∇lnp_y[ij]
 end
 
 """$(TYPEDSIGNATURES)
@@ -146,13 +153,23 @@ function temperature_anomaly!(
     (; temp_profile) = implicit     # reference temperature profile
     (; temp_grid, temp_virt_grid ) = diagn.grid
 
-    @inbounds for k in eachlayer(temp_grid, temp_virt_grid)
-        Tₖ = temp_profile[k]
-        for ij in eachgridpoint(temp_grid, temp_virt_grid)
-            temp_grid[ij, k]      -= Tₖ  # absolute temperature -> anomaly
-            temp_virt_grid[ij, k] -= Tₖ  # virtual temperature -> anomaly
-        end
-    end
+    # Launch the kernel for temperature anomaly calculation
+    launch!(architecture(temp_grid), RingGridWorkOrder, size(temp_grid), _temperature_anomaly_kernel!,
+            temp_grid, temp_virt_grid, temp_profile)
+end
+
+@kernel inbounds=true function _temperature_anomaly_kernel!(
+    temp_grid, temp_virt_grid, @Const(temp_profile)
+)
+    # Get indices
+    ij, k = @index(Global, NTuple)
+    
+    # Get reference temperature for this layer
+    Tₖ = temp_profile[k]
+    
+    # Convert to anomalies
+    temp_grid[ij, k]      -= Tₖ  # absolute temperature -> anomaly
+    temp_virt_grid[ij, k] -= Tₖ  # virtual temperature -> anomaly
 end
 
 """$(TYPEDSIGNATURES)
@@ -192,24 +209,46 @@ function vertical_integration!(
         # before this k's u, v, D are added to ū, v̄, D̄ store in the
         # sum_above fields for a 1:k-1 integration
         # which is =0 for k=1 as ū, v̄, D̄ accumulators are 0-initialised
-        for ij in eachgridpoint(u_mean_grid, v_mean_grid, div_mean_grid)
-            # for the Σ_r=1^k-1 Δσᵣ(Dᵣ +  u̲⋅∇lnpₛ) vertical integration
-            # Simmons and Burridge, 1981 eq 3.12 split into div and u̲⋅∇lnpₛ
-            div_sum_above[ij, k] = div_mean_grid[ij]
-            uv∇lnp_sum_above[ij, k] = u_mean_grid[ij]*∇lnp_x[ij] + v_mean_grid[ij]*∇lnp_y[ij]
-
-            u_mean_grid[ij] += u_grid[ij, k]*Δσₖ  # now add the k-th element to the sum
-            v_mean_grid[ij] += v_grid[ij, k]*Δσₖ
-            div_mean_grid[ij] += div_grid[ij, k]*Δσₖ
-        end
+        # GRID-POINT SPACE kernel
+        launch!(architecture(u_mean_grid), RingGridWorkOrder, size(u_mean_grid), 
+                _vertical_integration_grid_kernel!,
+                u_mean_grid, v_mean_grid, div_mean_grid, div_sum_above, uv∇lnp_sum_above,
+                u_grid, v_grid, div_grid, ∇lnp_x, ∇lnp_y, Δσₖ, k)
         
-        # SPECTRAL SPACE: divergence
-        for lm in eachharmonic(div, div_mean)
-            div_mean[lm] += div[lm, k]*Δσₖ
-        end
+        # SPECTRAL SPACE kernel  
+        launch!(architecture(div_mean), SpectralWorkOrder, size(div_mean), 
+                _vertical_integration_spectral_kernel!,
+                div_mean, div, Δσₖ, k)
     end
 end
-        
+
+@kernel inbounds=true function _vertical_integration_grid_kernel!(
+    u_mean_grid, v_mean_grid, div_mean_grid, div_sum_above, uv∇lnp_sum_above,
+    u_grid, v_grid, div_grid, @Const(∇lnp_x), @Const(∇lnp_y), @Const(Δσₖ), @Const(k)
+)
+    # Get index
+    ij = @index(Global, Linear)
+    
+    # Store the sum before adding k-th element (for 1:k-1 integration)
+    # Simmons and Burridge, 1981 eq 3.12 split into div and u̲⋅∇lnpₛ
+    div_sum_above[ij, k] = div_mean_grid[ij]
+    uv∇lnp_sum_above[ij, k] = u_mean_grid[ij] * ∇lnp_x[ij] + v_mean_grid[ij] * ∇lnp_y[ij]
+    
+    # Add k-th element to the vertical sum
+    u_mean_grid[ij] += u_grid[ij, k] * Δσₖ
+    v_mean_grid[ij] += v_grid[ij, k] * Δσₖ
+    div_mean_grid[ij] += div_grid[ij, k] * Δσₖ
+end
+
+@kernel inbounds=true function _vertical_integration_spectral_kernel!(
+    div_mean, div, @Const(Δσₖ), @Const(k)
+)
+    # Get index
+    lm = @index(Global, Linear)
+    
+    # Add k-th element to the vertical sum
+    div_mean[lm] += div[lm, k] * Δσₖ
+end
 """
     surface_pressure_tendency!( Prog::PrognosticVariables,
                                 Diag::DiagnosticVariables,
@@ -256,27 +295,38 @@ function vertical_velocity!(
     (; div_mean_grid) = diagn.dynamics          # vertical avrgd div to be added to ūv̄∇lnp
     (; σ_tend) = diagn.dynamics                 # vertical mass flux M = pₛσ̇ at k+1/2
     (; div_grid) = diagn.grid
-    ūv̄∇lnp = diagn.tendencies.pres_tend_grid    # calc'd in surface_pressure_tendency! (excl -D̄)
+    uvm∇lnp = diagn.tendencies.pres_tend_grid    # calc'd in surface_pressure_tendency! (excl -D̄)
 
     grids_match(σ_tend, div_sum_above, div_grid, uv∇lnp_sum_above, uv∇lnp) ||
         throw(DimensionMismatch(σ_tend, div_sum_above, div_grid, uv∇lnp_sum_above, uv∇lnp))
 
-    @inbounds for k in 1:nlayers-1
-        Δσₖ = σ_levels_thick[k]
-        σₖ_half = σ_levels_half[k+1]
-
-        for ij in eachgridpoint(σ_tend)
-            # Hoskins and Simmons, 1975 just before eq. (6)
-            σ_tend[ij, k] = σₖ_half*(div_mean_grid[ij] + ūv̄∇lnp[ij]) -
-                (div_sum_above[ij, k] + Δσₖ*div_grid[ij, k]) -
-                (uv∇lnp_sum_above[ij, k] + Δσₖ*uv∇lnp[ij, k])
-        end
-    end
+    # Launch kernel for vertical velocity calculation for all layers
+    launch!(architecture(σ_tend), RingGridWorkOrder, (size(σ_tend, 1), nlayers-1), 
+            _vertical_velocity_kernel!,
+            σ_tend, div_mean_grid, uvm∇lnp, div_sum_above, div_grid, 
+            uv∇lnp_sum_above, uv∇lnp, σ_levels_thick, σ_levels_half)
 
     # mass flux σ̇ is zero at k=1/2 (not explicitly stored) and k=nlayers+1/2 (stored in layer k)
     # set to zero for bottom layer then
     σ_tend[:, nlayers] .= 0
     return nothing
+end
+
+@kernel inbounds=true function _vertical_velocity_kernel!(
+    σ_tend, div_mean_grid, uvm∇lnp, div_sum_above, div_grid,
+    uv∇lnp_sum_above, uv∇lnp, @Const(σ_levels_thick), @Const(σ_levels_half)
+)
+    # Get index for both horizontal and vertical dimensions
+    ij, k = @index(Global, NTuple)
+    
+    # Extract layer-specific values from arrays
+    Δσₖ = σ_levels_thick[k]
+    σₖ_half = σ_levels_half[k+1]
+    
+    # Hoskins and Simmons, 1975 just before eq. (6)
+    σ_tend[ij, k] = σₖ_half * (div_mean_grid[ij] + uvm∇lnp[ij]) -
+        (div_sum_above[ij, k] + Δσₖ * div_grid[ij, k]) -
+        (uv∇lnp_sum_above[ij, k] + Δσₖ * uv∇lnp[ij, k])
 end
 
 """
@@ -324,21 +374,13 @@ function vordiv_tendencies!(
     (; u_grid, v_grid, vor_grid, temp_virt_grid) = diagn.grid   # velocities, vorticity
     (; ∇lnp_x, ∇lnp_y, scratch_memory) = diagn.dynamics         # zonal/meridional gradient of logarithm of surface pressure
 
-    # precompute ring indices and boundscheck
-    rings = eachring(u_tend_grid, v_tend_grid, u_grid, v_grid, vor_grid, temp_virt_grid)
+    # precomputed ring indices
+    (; whichring) = u_tend_grid.grid
 
-    @inbounds for k in eachlayer(u_tend_grid, v_tend_grid)
-        for (j, ring) in enumerate(rings)
-            coslat⁻¹j = coslat⁻¹[j]
-            f_j = f[j]
-            for ij in ring
-                ω = vor_grid[ij, k] + f_j               # absolute vorticity
-                RTᵥ = R_dry*temp_virt_grid[ij, k]       # dry gas constant * virtual temperature anomaly(!)
-                u_tend_grid[ij, k] = (u_tend_grid[ij, k] + v_grid[ij, k]*ω - RTᵥ*∇lnp_x[ij])*coslat⁻¹j
-                v_tend_grid[ij, k] = (v_tend_grid[ij, k] - u_grid[ij, k]*ω - RTᵥ*∇lnp_y[ij])*coslat⁻¹j
-            end
-        end
-    end
+    # Launch the kernel for vorticity/divergence tendency calculation
+    launch!(architecture(u_tend_grid), RingGridWorkOrder, size(u_tend_grid), _vordiv_tendencies_kernel!,
+            u_tend_grid, v_tend_grid, u_grid, v_grid, vor_grid, temp_virt_grid,
+            ∇lnp_x, ∇lnp_y, f, coslat⁻¹, whichring, R_dry)
 
     # divergence and curl of that u, v_tend vector for vor, div tendencies
     (; vor_tend, div_tend ) = diagn.tendencies
@@ -351,6 +393,25 @@ function vordiv_tendencies!(
     curl!(vor_tend, u_tend, v_tend, S)         # ∂ζ/∂t = ∇×(u_tend, v_tend)
     divergence!(div_tend, u_tend, v_tend, S)   # ∂D/∂t = ∇⋅(u_tend, v_tend)
     return nothing
+end
+
+@kernel inbounds=true function _vordiv_tendencies_kernel!(
+    u_tend_grid, v_tend_grid, u_grid, v_grid, vor_grid, temp_virt_grid,
+    ∇lnp_x, ∇lnp_y, @Const(f), @Const(coslat⁻¹), @Const(whichring), @Const(R_dry)
+)
+    # Get indices
+    ij, k = @index(Global, NTuple)
+    j = whichring[ij]
+    
+    # Get latitude-specific values
+    coslat⁻¹j = coslat⁻¹[j]
+    f_j = f[j]
+    
+    # Calculate tendencies
+    ω = vor_grid[ij, k] + f_j               # absolute vorticity
+    RTᵥ = R_dry * temp_virt_grid[ij, k]     # dry gas constant * virtual temperature anomaly(!)
+    u_tend_grid[ij, k] = (u_tend_grid[ij, k] + v_grid[ij, k] * ω - RTᵥ * ∇lnp_x[ij]) * coslat⁻¹j
+    v_tend_grid[ij, k] = (v_tend_grid[ij, k] - u_grid[ij, k] * ω - RTᵥ * ∇lnp_y[ij]) * coslat⁻¹j
 end
 
 """$(TYPEDSIGNATURES)
@@ -423,24 +484,11 @@ function temperature_tendency!(
     # implicit_correction! then calculated the implicit terms from Vi-1 minus Vi
     # to move the implicit terms to i-1 which is cheaper then the alternative below
 
-    @inbounds for k in eachlayer(temp_tend_grid, temp_grid, div_grid, Tᵥ, div_sum_above, uv∇lnp_sum_above)
-        Tₖ = temp_profile[k]    # average layer temperature from reference profile
-        
-        # coefficients from Simmons and Burridge 1981
-        σ_lnp_A = adiabatic_conversion.σ_lnp_A[k]   # eq. 3.12, -1/Δσₖ*ln(σ_k+1/2/σ_k-1/2)
-        σ_lnp_B = adiabatic_conversion.σ_lnp_B[k]   # eq. 3.12 -αₖ
-        
-        # Adiabatic conversion term following Simmons and Burridge 1981 but for σ coordinates 
-        # += as tend already contains parameterizations + vertical advection
-        for ij in eachgridpoint(temp_tend_grid, temp_grid, div_grid, Tᵥ)
-            temp_tend_grid[ij, k] +=
-                temp_grid[ij, k] * div_grid[ij, k] +            # +T'D term of hori advection
-                κ * (Tᵥ[ij, k] + Tₖ)*(                          # +κTᵥ*Dlnp/Dt, adiabatic term
-                σ_lnp_A * (div_sum_above[ij, k] + uv∇lnp_sum_above[ij, k]) +    # eq. 3.12 1st term
-                σ_lnp_B * (div_grid[ij, k] + uv∇lnp[ij, k]) +                   # eq. 3.12 2nd term
-                uv∇lnp[ij, k])                                                  # eq. 3.13
-        end
-    end
+    # Launch the kernel for temperature tendency calculation
+    (; σ_lnp_A, σ_lnp_B) = adiabatic_conversion
+    launch!(architecture(temp_tend_grid), RingGridWorkOrder, size(temp_tend_grid), _temperature_tendency_kernel!,
+            temp_tend_grid, temp_grid, div_grid, Tᵥ, div_sum_above, uv∇lnp_sum_above,
+            uv∇lnp, temp_profile, σ_lnp_A, σ_lnp_B, κ)
 
     transform!(temp_tend, temp_tend_grid, scratch_memory, S)
 
@@ -448,6 +496,28 @@ function temperature_tendency!(
     flux_divergence!(temp_tend, temp_grid, diagn, G, S, add=true, flipsign=true)
     
     return nothing
+end
+
+@kernel inbounds=true function _temperature_tendency_kernel!(
+    temp_tend_grid, temp_grid, div_grid, Tᵥ, div_sum_above, uv∇lnp_sum_above,
+    uv∇lnp, @Const(temp_profile), @Const(σ_lnp_A), @Const(σ_lnp_B), @Const(κ)
+)
+    # Get indices
+    ij, k = @index(Global, NTuple)
+    
+    # Get layer-specific values
+    Tₖ = temp_profile[k]        # average layer temperature from reference profile
+    σ_lnp_A_k = σ_lnp_A[k]      # eq. 3.12, -1/Δσₖ*ln(σ_k+1/2/σ_k-1/2)
+    σ_lnp_B_k = σ_lnp_B[k]      # eq. 3.12 -αₖ
+    
+    # Adiabatic conversion term following Simmons and Burridge 1981 but for σ coordinates 
+    # += as tend already contains parameterizations + vertical advection
+    temp_tend_grid[ij, k] +=
+        temp_grid[ij, k] * div_grid[ij, k] +            # +T'D term of hori advection
+        κ * (Tᵥ[ij, k] + Tₖ) * (                        # +κTᵥ*Dlnp/Dt, adiabatic term
+        σ_lnp_A_k * (div_sum_above[ij, k] + uv∇lnp_sum_above[ij, k]) +    # eq. 3.12 1st term
+        σ_lnp_B_k * (div_grid[ij, k] + uv∇lnp[ij, k]) +                   # eq. 3.12 2nd term
+        uv∇lnp[ij, k])                                                    # eq. 3.13
 end
 
 function humidity_tendency!(diagn::DiagnosticVariables,
@@ -497,18 +567,26 @@ function horizontal_advection!(
     
     kernel = add ? (a,b,c) -> a+b*c : (a,b,c) -> b*c
 
-    for k in eachlayer(A_tend_grid, A_grid, div_grid)
-        # +A*div term of the advection operator
-        @inbounds for ij in eachgridpoint(A_tend_grid, A_grid, div_grid)
-            # add as tend already contains parameterizations + vertical advection
-            A_tend_grid[ij, k] = kernel(A_tend_grid[ij, k], A_grid[ij, k], div_grid[ij, k])
-        end
-    end
+    # Launch kernel for horizontal advection
+    launch!(architecture(A_tend_grid), RingGridWorkOrder, size(A_tend_grid), 
+            _horizontal_advection_kernel!,
+            A_tend_grid, A_grid, div_grid, kernel)
 
     transform!(A_tend, A_tend_grid, scratch_memory, S)  # for +A*div in spectral space
     
     # now add the -∇⋅((u, v)*A) term
     flux_divergence!(A_tend, A_grid, diagn, G, S, add=true, flipsign=true)
+end
+
+@kernel inbounds=true function _horizontal_advection_kernel!(
+    A_tend_grid, @Const(A_grid), @Const(div_grid), @Const(kernel)
+)
+    # Get index for both horizontal and vertical dimensions
+    ij, k = @index(Global, NTuple)
+    
+    # +A*div term of the advection operator
+    # add as tend already contains parameterizations + vertical advection
+    A_tend_grid[ij, k] = kernel(A_tend_grid[ij, k], A_grid[ij, k], div_grid[ij, k])
 end
 
 """
@@ -540,24 +618,34 @@ function flux_divergence!(
     uA_grid = diagn.dynamics.a_grid # = u*A on grid
     vA_grid = diagn.dynamics.b_grid # = v*A on grid
 
-    # precomputed ring indices and check grids_match
-    rings = eachring(A_grid, u_grid, v_grid)
-    @inbounds for k in eachlayer(u_grid, v_grid)
-        for (j, ring) in enumerate(rings)
-            coslat⁻¹j = coslat⁻¹[j]
-            for ij in ring
-                Acoslat⁻¹j = A_grid[ij, k]*coslat⁻¹j
-                uA_grid[ij, k] = u_grid[ij, k]*Acoslat⁻¹j
-                vA_grid[ij, k] = v_grid[ij, k]*Acoslat⁻¹j
-            end
-        end
-    end
+    # precomputed ring indices
+    (; whichring) = A_grid.grid
+    
+    # Launch the kernel for flux calculation
+    launch!(architecture(A_grid), RingGridWorkOrder, size(A_grid), _flux_divergence_kernel!,
+            uA_grid, vA_grid, A_grid, u_grid, v_grid, coslat⁻¹, whichring)
 
     transform!(uA, uA_grid, scratch_memory, S)
     transform!(vA, vA_grid, scratch_memory, S)
 
     divergence!(A_tend, uA, vA, S; add, flipsign)
     return nothing
+end
+
+@kernel inbounds=true function _flux_divergence_kernel!(
+    uA_grid, vA_grid, A_grid, u_grid, v_grid, @Const(coslat⁻¹), @Const(whichring)
+)
+    # Get indices
+    ij, k = @index(Global, NTuple)
+    j = whichring[ij]
+    
+    # Get the cosine latitude factor for this latitude
+    coslat⁻¹j = coslat⁻¹[j]
+    
+    # Calculate flux components
+    Acoslat⁻¹j = A_grid[ij, k] * coslat⁻¹j
+    uA_grid[ij, k] = u_grid[ij, k] * Acoslat⁻¹j
+    vA_grid[ij, k] = v_grid[ij, k] * Acoslat⁻¹j
 end
 
 """
@@ -594,9 +682,7 @@ function vorticity_flux_curldiv!(
     scratch_memory = diagn.dynamics.scratch_memory      # scratch memory for transforms
 
     # Launch the kernel for vorticity flux calculation
-    arch = S.architecture
-
-    launch!(arch, RingGridWorkOrder, size(u), _vorticity_flux_kernel!,
+    launch!(architecture(u), RingGridWorkOrder, size(u), _vorticity_flux_kernel!,
             u_tend_grid, v_tend_grid, u, v, vor, f, coslat⁻¹, whichring)
     
     # divergence and curl of that u, v_tend vector for vor, div tendencies
