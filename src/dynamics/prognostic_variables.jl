@@ -6,8 +6,6 @@ end
 
 export PrognosticVariablesOcean
 @kwdef struct PrognosticVariablesOcean{
-    NF,                     # <: AbstractFloat
-    ArrayType,              # Array, CuArray, ...
     GridType,               # <: AbstractGrid
     GridVariable2D,         # <: AbstractField
 } <: AbstractPrognosticVariables
@@ -29,10 +27,10 @@ export PrognosticVariablesOcean
     surface_humidity_flux::GridVariable2D = zeros(GridVariable2D, grid)
 end
 
+Adapt.@adapt_structure PrognosticVariablesOcean
+
 export PrognosticVariablesLand
 @kwdef struct PrognosticVariablesLand{
-    NF,                     # <: AbstractFloat
-    ArrayType,              # Array, CuArray, ...
     GridType,               # <: AbstractGrid
     GridVariable2D,         # <: AbstractField
     GridVariable3D,         # <: AbstractField
@@ -62,10 +60,11 @@ export PrognosticVariablesLand
     surface_humidity_flux::GridVariable2D = zeros(GridVariable2D, grid)
 end
 
+Adapt.@adapt_structure PrognosticVariablesLand
+Base.eltype(::PrognosticVariablesLand{GridType, GridVariable}) where {GridType, GridVariable <: AbstractField{NF}} where {NF} = NF
+
 export PrognosticVariables
 @kwdef struct PrognosticVariables{
-    NF,                     # <: AbstractFloat
-    ArrayType,              # Array, CuArray, ...
     SpectrumType,           # <: AbstractSpectrum
     GridType,               # <: AbstractGrid
     SpectralVariable2D,     # <: LowerTriangularArray
@@ -73,7 +72,10 @@ export PrognosticVariables
     SpectralVariable4D,     # <: LowerTriangularArray
     GridVariable2D,         # <: AbstractField
     GridVariable3D,         # <: AbstractField
+    TracerTuple,            # <: NamedTuple{Tuple{Symbol}, Tuple{SpectralVariable4D}}
     ParticleVector,         # <: AbstractVector{Particle{NF}}
+    RefValueNF,             # <: Base.RefValue{NF}
+    ClockType,              # <: Union{Clock, Nothing}
 } <: AbstractPrognosticVariables
 
     # DIMENSIONS
@@ -115,27 +117,30 @@ export PrognosticVariables
     random_pattern::SpectralVariable2D = zeros(SpectralVariable2D, spectrum)
 
     "Ocean variables, sea surface temperature and sea ice concentration"
-    ocean::PrognosticVariablesOcean{NF, ArrayType, GridType, GridVariable2D} =
-        PrognosticVariablesOcean{NF, ArrayType, GridType, GridVariable2D}(; grid)
+    ocean::PrognosticVariablesOcean{GridType, GridVariable2D} =
+        PrognosticVariablesOcean{GridType, GridVariable2D}(; grid)
     
     "Land variables, soil temperature, snow, and soil moisture"
-    land::PrognosticVariablesLand{NF, ArrayType, GridType, GridVariable2D, GridVariable3D} =
-        PrognosticVariablesLand{NF, ArrayType, GridType, GridVariable2D, GridVariable3D}(; grid, nlayers=nlayers_soil)
+    land::PrognosticVariablesLand{GridType, GridVariable2D, GridVariable3D} =
+        PrognosticVariablesLand{GridType, GridVariable2D, GridVariable3D}(; grid, nlayers=nlayers_soil)
 
     "Tracers, last dimension is for n tracers [?]"
-    tracers::Dict{Symbol, SpectralVariable4D} = Dict{Symbol, SpectralVariable4D}()
+    tracers::TracerTuple = NamedTuple()
 
     "Particles for particle advection"
     particles::ParticleVector = zeros(ParticleVector, nparticles)
 
     "Scaling for vor, div. scale=1 outside simulation, =radius during simulation"
-    scale::Base.RefValue{NF} = Ref(one(NF))
+    scale::RefValueNF = Ref(one(eltype(land)))
 
     "Clock that keeps track of time, number of timesteps to integrate for."
-    clock::Clock = Clock()
+    clock::ClockType = Clock()
 end
 
-Base.eltype(progn::PrognosticVariables{T}) where T = T
+Adapt.@adapt_structure PrognosticVariables
+
+Base.eltype(::PrognosticVariables{SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D}) where {SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D <: AbstractField{NF}} where NF = NF 
+Architectures.array_type(::PrognosticVariables{SpectrumType, GridType, SpectralVariable2D}) where {SpectrumType, GridType, SpectralVariable2D <: LowerTriangularArray{NF, N, ArrayType}} where {NF, N, ArrayType <: AbstractArray} = nonparametric_type(ArrayType)
 
 function get_steps(coeffs::LowerTriangularArray{T, 2}) where T
     nsteps = size(coeffs, 2)
@@ -163,32 +168,32 @@ get_step(coeffs::LowerTriangularArray{T, 3}, i) where T = lta_view(coeffs, :, :,
 
 """$(TYPEDSIGNATURES)
 Generator function."""
-function PrognosticVariables(SG::SpectralGrid{Architecture, SpectrumType, GridType}; nsteps=DEFAULT_NSTEPS) where {Architecture, SpectrumType, GridType}
+function PrognosticVariables(SG::SpectralGrid{Architecture, SpectrumType, GridType}; tracers::TRACER_DICT=TRACER_DICT(), nsteps=DEFAULT_NSTEPS) where {Architecture, SpectrumType, GridType}
 
-    (; spectrum, grid, nlayers, nlayers_soil, nparticles) = SG
-    (; NF, ArrayType) = SG
+    (; NF, spectrum, grid, nlayers, nlayers_soil, nparticles) = SG
     (; SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, ParticleVector) = SG
     
-    return PrognosticVariables{NF, ArrayType, SpectrumType, GridType,
-        SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, ParticleVector}(;
-            spectrum, grid, nlayers, nlayers_soil, nparticles, nsteps,
+    tracer_tuple = (; [key => zeros(SpectralVariable4D, spectrum, nlayers, nsteps) for key in keys(tracers)]...)
+    clock = Clock()
+
+    return PrognosticVariables{SpectrumType, GridType,
+        SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, typeof(tracer_tuple), ParticleVector, Base.RefValue{NF}, typeof(clock)}(;
+            spectrum, grid, nlayers, nlayers_soil, nparticles, nsteps, tracers = tracer_tuple, clock
         )
 end
 
 """$(TYPEDSIGNATURES)
 Generator function."""
-function PrognosticVariables(SG::SpectralGrid, model::AbstractModel)
-    progn = PrognosticVariables(SG, nsteps = model.time_stepping.nsteps)
-    add!(progn, model.tracers)
-    return progn
-end
+PrognosticVariables(SG::SpectralGrid, model::AbstractModel) = PrognosticVariables(SG, tracers = model.tracers, nsteps = model.time_stepping.nsteps)
 
 function Base.show(
     io::IO,
-    progn::PrognosticVariables{NF, ArrayType, SpectrumType, GridType},
-) where {NF, ArrayType, SpectrumType, GridType}
+    progn::PrognosticVariables{SpectrumType, GridType},
+) where {SpectrumType, GridType}
     
+    NF = eltype(progn)
     NFspectral = eltype(progn.vor)
+    ArrayType = array_type(progn)
 
     # resolution
     (; spectrum, grid, nlayers, nlayers_soil, nparticles, nsteps) = progn
@@ -197,7 +202,7 @@ function Base.show(
     Grid = nonparametric_type(GridType)
     nlat = RingGrids.get_nlat(grid)
     
-    tracer_names = [key for (key, value) in progn.tracers]
+    tracer_names = keys(progn.tracers)
 
     println(io, "PrognosticVariables{$NF, $ArrayType}")
     println(io, "├ vor:   T$trunc, $nlayers-layer, $nsteps-steps LowerTriangularArray{$NFspectral}")
@@ -270,19 +275,19 @@ end
 
 function Base.zero(
     progn::PrognosticVariables{
-        NF, ArrayType, SpectrumType, GridType,
-        SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, ParticleVector,
+        SpectrumType, GridType,
+        SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, TracerTuple, ParticleVector, RefValueNF, ClockType,
         }) where {
-        NF, ArrayType, SpectrumType, GridType,
-        SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, ParticleVector,
+        SpectrumType, GridType,
+        SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, TracerTuple, ParticleVector, RefValueNF, ClockType,
         }
 
     (; spectrum, grid, nlayers, nlayers_soil, nparticles, nsteps) = progn
     
     # initialize regular progn variables 
-    progn_new = PrognosticVariables{NF, ArrayType, SpectrumType, GridType,
-        SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, 
-        ParticleVector}(;
+    progn_new = PrognosticVariables{SpectrumType, GridType,
+        SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, TracerTuple,
+        ParticleVector, RefValueNF, ClockType}(;
             spectrum, grid, nlayers, nlayers_soil, nparticles, nsteps
         )
 
@@ -337,31 +342,3 @@ function Base.one(progn::PrognosticVariables)
     fill!(zero_progn, 1)
     return zero_progn
 end 
-
-"""$(TYPEDSIGNATURES)
-Add `tracers` to the prognostic variables `progn` in `progn.tracers::Dict`."""
-function add!(
-    progn::PrognosticVariables{NF, ArrayType, SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, SpectralVariable4D},
-    tracers::Tracer...
-) where {
-        NF,                     # number format
-        ArrayType,
-        SpectrumType,
-        GridType,
-        SpectralVariable2D,
-        SpectralVariable3D,
-        SpectralVariable4D,
-    }
-    (; spectrum, nlayers, nsteps) = progn
-    for tracer in tracers
-        progn.tracers[tracer.name] = zeros(SpectralVariable4D, spectrum, nlayers, nsteps)
-    end
-end
-
-"""$(TYPEDSIGNATURES)
-Delete `tracers` in the prognostic variables `progn` in `progn.tracers::Dict`."""
-function Base.delete!(progn::PrognosticVariables, tracers::Tracer...)
-    for tracer in tracers
-        delete!(progn.tracers, tracer.name)
-    end
-end

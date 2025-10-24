@@ -147,6 +147,10 @@ end
 # also allow for keyword arguments
 set!(L::AbstractTimeStepper; Δt::Period) = set!(L, Δt)
 
+function Adapt.adapt_structure(to, L::Leapfrog)
+    return (; Δt=L.Δt, Δt_sec=L.Δt_sec, Δt_millisec=L.Δt_millisec)
+end
+    
 """$(TYPEDSIGNATURES)
 Performs one leapfrog time step with (`lf=2`) or without (`lf=1`) Robert+Williams filter
 (see Williams (2009), Montly Weather Review, Eq. 7-9)."""
