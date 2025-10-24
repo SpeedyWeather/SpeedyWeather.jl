@@ -43,12 +43,13 @@ export initialize!, finalize!
 # import utilities
 using SpeedyWeatherInternals.Utils 
 
-include("SpeedyParameters/SpeedyParameters.jl")
-using .SpeedyParameters
-import .SpeedyParameters: parameters
+# parameter handling
+using SpeedyWeatherInternals.SpeedyParameters
+
+import SpeedyWeatherInternals.SpeedyParameters: parameters
 
 # export user-facing parameter handling types and methods
-export  SpeedyParam, SpeedyParams, parameters, stripparams
+export SpeedyParam, SpeedyParams, parameters, stripparams
 
 # DATA STRUCTURES
 # LowerTriangularArrays for spherical harmonics
