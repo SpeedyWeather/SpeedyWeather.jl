@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Ring, nested and matrix order for OctaHEALPixGrid [#887](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/887)
+
 ## v0.17.3
 
 - Add missing compat entires for SpeedyWeatherInternals [#883](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/883)
