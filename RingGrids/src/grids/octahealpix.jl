@@ -122,7 +122,6 @@ struct RingOrder <: AbstractHEALPixOrder end
 struct NestedOrder <: AbstractHEALPixOrder end
 struct MatrixOrder <: AbstractHEALPixOrder end
 
-reorder(::Type{T}, ij, grid::OctaHEALPixGrid) where {T<:AbstractHEALPixOrder} = reorder(T(), ij, grid)
 reorder(::RingOrder,   ij, grid::OctaHEALPixGrid) = nest2ring(ij, grid)
 reorder(::NestedOrder, ij, grid::OctaHEALPixGrid) = ring2nest(ij, grid)
 reorder(::MatrixOrder, ij, grid::OctaHEALPixGrid) = ring2xy(ij, grid)
@@ -133,8 +132,11 @@ function reorder!(
     out::OctaHEALPixField,
     order,
     field::OctaHEALPixField,
-) 
-    for k in eachlayer(field)
+)
+    @boundscheck out.grid == field.grid || throw(BoundsError("Reordering requires identical grids, got $(out.grid) and $(field.grid)."))
+    @assert ispow2(get_nlat_half(field.grid)) "Reordering only supported for nlat_half power of 2, got $(get_nlat_half(field.grid))."
+
+    @inbounds for k in eachlayer(field)
         for ij in eachgridpoint(field)
             out_indices = reorder(order, ij, field.grid)
             out[out_indices, k] = field[ij, k]
@@ -143,9 +145,14 @@ function reorder!(
     return out
 end
 
-ring_order(  field::OctaHEALPixField) = reorder(RingOrder,   field)
-nested_order(field::OctaHEALPixField) = reorder(NestedOrder, field)
-matrix_order(field::OctaHEALPixField) = reorder(MatrixOrder, field)
+ring_order(  field::OctaHEALPixField) = reorder(RingOrder(),   field)
+nested_order(field::OctaHEALPixField) = reorder(NestedOrder(), field)
+matrix_order(field::OctaHEALPixField) = reorder(MatrixOrder(), field)
+
+ring_order!(  out, field::OctaHEALPixField) = reorder!(out, RingOrder(),   field)
+nested_order!(out, field::OctaHEALPixField) = reorder!(out, NestedOrder(), field)
+matrix_order!(out, field::OctaHEALPixField) = reorder!(out, MatrixOrder(), field)
+
 Matrix(field::OctaHEALPixField) = reshape(field.data, matrix_size(field)...)
 
 # quadrant of ij in ring order, TODO needed?
@@ -201,9 +208,10 @@ Convert matrix indices row, column (r, c) and quadrant q to nested index ij. All
 r=1, c=1, is at the north pole, r increases south-eastwards, c increases south-westwards.
 Quadrants are numbered 1 to 4 starting at the prime meridian and increasing eastwards."""
 function rcq2nest(r, c, q, nside::Integer)
-    @assert ispow2(nside)                   # nside must be power of 2
-    br = interleave_with_zeros(r-1)         # bit representation of row (0-based) occupies odd bits
-    bc = interleave_with_zeros(c-1) << 1    # bit representation of column (0-based) occupies even bits
+    # @assert ispow2(nside)                   # nside must be power of 2
+    # TODO UInt32 restricts nside to 2^16, ~150m resolution, remove for higher resolution but slower
+    br = interleave_with_zeros(UInt32(r-1))         # bit representation of row (0-based) occupies odd bits
+    bc = interleave_with_zeros(UInt32(c-1)) << 1    # bit representation of column (0-based) occupies even bits
     bq = (q-1) << 2trailing_zeros(nside)    # the 2 quadrant bits occupy highest bits
     b = bq | bc | br                        # combine bits
     return b + 1                            # convert to 1-based nested index
@@ -217,11 +225,13 @@ Convert nested index ij to matrix indices row, column (r, c) and quadrant q. All
 r=1, c=1, is at the north pole, r increases south-eastwards, c increases south-westwards.
 Quadrants are numbered 1 to 4 starting at the prime meridian and increasing eastwards."""
 function nest2rcq(ij, nside)
-    @assert ispow2(nside)           # nside must be power of 2
+    # @assert ispow2(nside)           # nside must be power of 2
     ij -= 1                         # convert to 0-based ij
     shift = 2trailing_zeros(nside)  # number of bits occupied for row and column
     q = ij >> shift                 # 0-based quadrant is encoded in first 2 bits
     bcr = ij - (q << shift)         # bits for column, row, quadrant bits removed
+    bcr %= UInt32                   # TODO this restricts to nside = 2^16, ~150m
+                                    # remove for higher resolution but also much slower
     r = deinterleave(bcr) + 1       # 1-based row index by deinterleaving the odd bits
     c = deinterleave(bcr >> 1) + 1  # 1-based column index by deinterleaving the even bits
     q += 1                          # 1-based quadrant
