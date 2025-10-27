@@ -443,7 +443,7 @@ function update_locator!(
     find_grid_indices!(locator, geometry, λs, geometry.grid.architecture)               # next points left and right of λ on rings north and south
 end
 
-update_locator!(I::AbstractInterpolator, A::Field; kwargs...) = update_locator(I.locator, I.geometry, A::Field; kwargs...)
+update_locator!(I::AbstractInterpolator, A::Field; kwargs...) = update_locator!(I.locator, I.geometry, A::Field; kwargs...)
  
 function update_locator!(locator::AbstractLocator,
                          geometry::AbstractGridGeometry, 
