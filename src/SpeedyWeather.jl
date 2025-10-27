@@ -111,7 +111,7 @@ function animate end
 
 # abstract types
 include("models/abstract_models.jl")
-include("dynamics/abstract_types.jl")
+include("variables/abstract_types.jl")
 
 # GEOMETRY CONSTANTS ETC
 include("dynamics/vertical_coordinates.jl")
@@ -125,13 +125,14 @@ include("dynamics/orography.jl")
 include("physics/land_sea_mask.jl")
 
 # VARIABLES
+include("variables/variables.jl")
 include("dynamics/tracers.jl")
 include("dynamics/particles.jl")
 include("dynamics/clock.jl")
-include("dynamics/prognostic_variables.jl")
-include("dynamics/set.jl")
+include("variables/prognostic_variables.jl")
+include("variables/set.jl")
 include("physics/define_column.jl")
-include("dynamics/diagnostic_variables.jl")
+include("variables/diagnostic_variables.jl")
 
 # MODEL COMPONENTS
 include("dynamics/time_integration.jl")

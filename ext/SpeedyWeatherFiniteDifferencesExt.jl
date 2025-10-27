@@ -29,7 +29,7 @@ end
 # A version of the generic fallback from FiniteDifferences that excludes some of the fields 
 # that we don't want to be varied for our big data structures 
 # also replaces NaNs that are expected in land and ocean variables
-function FiniteDifferences.to_vec(x::T) where {T <: Union{PrognosticVariables, PrognosticVariablesOcean, PrognosticVariablesLand, DiagnosticVariables, Tendencies, GridVariables, DynamicsVariables, PhysicsVariables, ParticleVariables}}
+function FiniteDifferences.to_vec(x::T) where {T <: Union{PrognosticVariables, DiagnosticVariables, Tendencies, GridVariables, DynamicsVariables, ParticleVariables}}
 
     excluded_fields_pre, included_fields, excluded_fields_post = determine_included_fields(T)
 

@@ -61,3 +61,7 @@ function surface_wind_stress!(ij, diagn, momentum_flux::SurfaceMomentumFlux, mod
 end
 
 Adapt.@adapt_structure SurfaceMomentumFlux
+
+function variables(::AbstractSurfaceMomentumFlux)
+    return (DiagnosticVariable(name=:boundary_layer_drag, dims=Grid2D()),)  # No additional diagnostic variables, tendencies are directly applied to u and v
+end

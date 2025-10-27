@@ -283,167 +283,6 @@ end
 
 Adapt.@adapt_structure DynamicsVariables
 
-export DiagnosticVariablesOcean
-@kwdef struct DiagnosticVariablesOcean{
-    GridType,
-    GridVariable2D,
-} <: AbstractDiagnosticVariables
-
-    "Grid used for fields"
-    grid::GridType
-
-    "Surface sensible heat flux [W/m²], positive up"
-    sensible_heat_flux::GridVariable2D = zeros(GridVariable2D, grid)
-
-    "Surface humidity flux [kg/s/m²], positive up"
-    surface_humidity_flux::GridVariable2D = zeros(GridVariable2D, grid)
-
-    "Surface shortwave radiative flux up [W/m²]"
-    surface_shortwave_up::GridVariable2D = zeros(GridVariable2D, grid)
-
-    "Surface longwave radiative flux up [W/m²]"
-    surface_longwave_up::GridVariable2D = zeros(GridVariable2D, grid)
-
-    "Albedo over ocean (but defined everywhere) [1]"
-    albedo::GridVariable2D = zeros(GridVariable2D, grid)
-end
-
-DiagnosticVariablesOcean(SG::SpectralGrid) =
-    DiagnosticVariablesOcean{typeof(SG.grid), SG.GridVariable2D}(; SG.grid)
-
-Adapt.@adapt_structure DiagnosticVariablesOcean
-
-export DiagnosticVariablesLand
-@kwdef struct DiagnosticVariablesLand{
-    GridType,
-    GridVariable2D,
-} <: AbstractDiagnosticVariables
-
-    "Grid used for fields"
-    grid::GridType
-
-    "Surface sensible heat flux [W/m²], positive up"
-    sensible_heat_flux::GridVariable2D = zeros(GridVariable2D, grid)
-    
-    "Surface humidity flux [W/m²], positive up"
-    surface_humidity_flux::GridVariable2D = zeros(GridVariable2D, grid)
-    
-    "Surface shortwave radiative flux up [W/m²]"
-    surface_shortwave_up::GridVariable2D = zeros(GridVariable2D, grid)
-
-    "Surface longwave radiative flux up [W/m²]"
-    surface_longwave_up::GridVariable2D = zeros(GridVariable2D, grid)
-
-    "Albedo over land (but defined everywhere) [1]"
-    albedo::GridVariable2D = zeros(GridVariable2D, grid)
-
-    "Availability of soil moisture to evaporation (or condensation) [1]"
-    soil_moisture_availability::GridVariable2D = zeros(GridVariable2D, grid)
-
-    "River runoff [m/s], diagnostic overflow from soil moisture"
-    river_runoff::GridVariable2D = zeros(GridVariable2D, grid)
-end
-
-DiagnosticVariablesLand(SG::SpectralGrid) =
-    DiagnosticVariablesLand{typeof(SG.grid), SG.GridVariable2D}(; SG.grid)
-
-Adapt.@adapt_structure DiagnosticVariablesLand
-
-export PhysicsVariables
-
-"""
-Diagnostic variables of the physical parameterizations.
-$(TYPEDFIELDS)"""
-@kwdef struct PhysicsVariables{
-    GridType,               # <:AbstractGrid
-    GridVariable2D,         # <: AbstractField
-} <: AbstractDiagnosticVariables
-
-    grid::GridType          # resolution of grid
-
-    ocean::DiagnosticVariablesOcean{GridType, GridVariable2D}
-    land::DiagnosticVariablesLand{GridType, GridVariable2D}
-
-    # PRECIPITATION
-    "Accumulated large-scale rain [m]"
-    rain_large_scale::GridVariable2D = zeros(GridVariable2D, grid)
-
-    "Accumulated convective rain [m]"
-    rain_convection::GridVariable2D = zeros(GridVariable2D, grid)
-
-    "Accumulated large-scale snow [m]"
-    snow_large_scale::GridVariable2D = zeros(GridVariable2D, grid)
-    
-    "Accumulated convective snow [m]"
-    snow_convection::GridVariable2D = zeros(GridVariable2D, grid)
-    
-    "Rate of total precipitation (rain+snow) [kg/m²/s]"
-    total_precipitation_rate::GridVariable2D = zeros(GridVariable2D, grid)
-
-    "Cloud top [m]"
-    cloud_top::GridVariable2D = zeros(GridVariable2D, grid)      
-    
-    # SURFACE FLUXES
-    "Surface wind speed [m/s]"
-    surface_wind_speed::GridVariable2D = zeros(GridVariable2D, grid)
-
-    "Surface air density [kg/m³]"
-    surface_air_density::GridVariable2D = zeros(GridVariable2D, grid)
-
-    "Boundary layer drag coefficient [1]"
-    boundary_layer_drag::GridVariable2D = zeros(GridVariable2D, grid)
-
-    "Surface air temperature [K]"
-    surface_air_temperature::GridVariable2D = zeros(GridVariable2D, grid)
-
-    "Sensible heat flux [W/m²], positive up"
-    sensible_heat_flux::GridVariable2D = zeros(GridVariable2D, grid)
-    
-    "Surface humidity flux [kg/s/m^2], positive up"
-    surface_humidity_flux::GridVariable2D = zeros(GridVariable2D, grid)
-
-    "Surface latent heat flux [W/m²], positive up"
-    surface_latent_heat_flux::GridVariable2D = zeros(GridVariable2D, grid)
-
-    # RADIATION
-    "Surface radiation: shortwave up [W/m²]"
-    surface_shortwave_up::GridVariable2D = zeros(GridVariable2D, grid)
-    
-    "Surface radiation: shortwave down [W/m²]"
-    surface_shortwave_down::GridVariable2D = zeros(GridVariable2D, grid)
-    
-    "Surface radiation: longwave up [W/m²]"
-    surface_longwave_up::GridVariable2D = zeros(GridVariable2D, grid)
-    
-    "Surface radiation: longwave down [W/m²]"
-    surface_longwave_down::GridVariable2D = zeros(GridVariable2D, grid)
-
-    "Outgoing shortwave radiation [W/m^2]"
-    outgoing_shortwave_radiation::GridVariable2D = zeros(GridVariable2D, grid)
-
-    "Outgoing longwave radiation [W/m^2]"
-    outgoing_longwave_radiation::GridVariable2D = zeros(GridVariable2D, grid)
-
-    "Albedo [1]"
-    albedo::GridVariable2D = zeros(GridVariable2D, grid)
-
-    "Cosine of solar zenith angle [1]"
-    cos_zenith::GridVariable2D = zeros(GridVariable2D, grid)           
-end
-
-"""$(TYPEDSIGNATURES)
-Generator function."""
-function PhysicsVariables(SG::SpectralGrid)
-    (; grid, GridVariable2D) = SG
-
-    ocean = DiagnosticVariablesOcean(SG)
-    land = DiagnosticVariablesLand(SG)
-
-    return PhysicsVariables{typeof(grid), GridVariable2D}(; grid, ocean, land)
-end
-
-Adapt.@adapt_structure PhysicsVariables
-
 export ParticleVariables
 
 """Diagnostic variables for the particle advection
@@ -500,6 +339,7 @@ struct DiagnosticVariables{
     GridTracerTuple,        # <: NamedTuple{Symbol, GridVariable3D}
     ParticleVector,         # <: AbstractField
     VectorType,             # <: AbstractVector
+    PhysicsTuple,           # <: NamedTyple{Symbol, ...} 
     ScratchMemoryType,      # <: ArrayType{Complex{NF}, 3}
     LocatorType,            # <: AbstractLocator
     RefValueNF,             # <: Base.RefValue{NF}
@@ -527,8 +367,9 @@ struct DiagnosticVariables{
     "Intermediate variables for the dynamical core"
     dynamics::DynamicsVariables{SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, ScratchMemoryType}
     
-    "Global fields returned from physics parameterizations"
-    physics::PhysicsVariables{GridType, GridVariable2D}
+    # TODO: different parameteric type here? 
+    "Global fields returned from physics parameterizations, including land and ocean"
+    physics::PhysicsTuple
     
     "Intermediate variables for the particle advection"
     particles::ParticleVariables{ParticleVector, VectorType, LocatorType}
@@ -548,7 +389,7 @@ struct DiagnosticVariables{
         tendencies::Tendencies{SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, SpectralTracerTuple, GridTracerTuple},
         grid_variables::GridVariables{GridType, GridVariable2D, GridVariable3D, GridTracerTuple},
         dynamics::DynamicsVariables{SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, ScratchMemoryType},
-        physics::PhysicsVariables{GridType, GridVariable2D},
+        physics::PhysicsTuple,
         particles::ParticleVariables{ParticleVector, VectorType, LocatorType},
         temp_average::VectorType,
         scale::RefValueNF,
@@ -563,6 +404,7 @@ struct DiagnosticVariables{
         GridTracerTuple,        # <: NamedTuple{Symbol, GridVariable3D}
         ParticleVector,         # <: AbstractField
         VectorType,             # <: AbstractVector
+        PhysicsTuple,
         ScratchMemoryType,      # <: ArrayType{Complex{NF}, 3}
         LocatorType,            # <: AbstractLocator
         RefValueNF,             # <: Base.RefValue{NF}
@@ -570,7 +412,7 @@ struct DiagnosticVariables{
         return new{
             typeof(spectrum), typeof(grid), SpectralVariable2D, SpectralVariable3D,
             GridVariable2D, GridVariable3D, SpectralTracerTuple, GridTracerTuple,
-            ParticleVector, VectorType,
+            ParticleVector, VectorType, typeof(physics),
             typeof(dynamics.scratch_memory), typeof(particles.locator), 
             typeof(scale)
         }(
@@ -584,7 +426,7 @@ struct DiagnosticVariables{
     function DiagnosticVariables{
         SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D,
         GridVariable2D, GridVariable3D, SpectralTracerTuple, GridTracerTuple,
-        ParticleVector, VectorType,
+        ParticleVector, VectorType, PhysicsTuple,
         ScratchMemoryType, LocatorType, RefValueNF
     }(
         spectrum, grid, nlayers, nparticles,
@@ -601,6 +443,7 @@ struct DiagnosticVariables{
         GridTracerTuple,        # <: NamedTuple{Symbol, GridVariable3D}
         ParticleVector,         # <: AbstractField
         VectorType,             # <: AbstractVector
+        PhysicsTuple,
         ScratchMemoryType,      # <: ArrayType{Complex{NF}, 3}
         LocatorType,            # <: AbstractLocator
         RefValueNF,             # <: Base.RefValue{NF}
@@ -608,7 +451,7 @@ struct DiagnosticVariables{
         return new{
             SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D,
             GridVariable2D, GridVariable3D, SpectralTracerTuple, GridTracerTuple,
-            ParticleVector, VectorType,
+            ParticleVector, VectorType, typeof(physics),
             ScratchMemoryType, LocatorType, RefValueNF,
         }(
             spectrum, grid, nlayers, nparticles,
@@ -618,30 +461,25 @@ struct DiagnosticVariables{
     end
 end
 
-DiagnosticVariables(SG::SpectralGrid, model::Union{Barotropic, ShallowWater}) = DiagnosticVariables(SG; spectral_transform=model.spectral_transform, tracers=model.tracers)
-
-# decide on spectral resolution `nbands` of radiation schemes
-function DiagnosticVariables(SG::SpectralGrid, model::PrimitiveEquation)
-    nbands_shortwave = get_nbands(model.shortwave_radiation)
-    nbands_longwave = get_nbands(model.longwave_radiation)
-    diagn =  DiagnosticVariables(SG; spectral_transform=model.spectral_transform, nbands_shortwave, nbands_longwave, tracers=model.tracers)
-    return diagn
-end
-
 Base.eltype(::DiagnosticVariables{SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, GridVariable2D}) where {SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, GridVariable2D <: AbstractField{NF}} where NF = NF 
 Architectures.array_type(::DiagnosticVariables{SpectrumType, GridType, SpectralVariable2D}) where {SpectrumType, GridType, SpectralVariable2D <: LowerTriangularArray{NF, N, ArrayType}} where {NF, N, ArrayType <: AbstractArray} = nonparametric_type(ArrayType)
 Architectures.array_type(::DiagnosticVariables{SpectrumType, GridType, SpectralVariable2D}) where {SpectrumType, GridType, SpectralVariable2D <: AbstractArray} = SpectralVariable2D
 
 """$(TYPEDSIGNATURES)
-Generator function. If a `transform` is handed over, the same scratch memory is used."""
-function DiagnosticVariables(
-    SG::SpectralGrid;
-    spectral_transform::Union{Nothing, SpectralTransform} = nothing,
-    nbands_shortwave::Integer = 0,
-    nbands_longwave::Integer = 0,
-    tracers::TRACER_DICT = TRACER_DICT(),
-)
-    (; spectrum, grid, nparticles, NF, nlayers) = SG
+Generator function."""
+function DiagnosticVariables(model::AbstractModel)
+
+    SG = model.spectral_grid
+    (; spectral_transform, tracers) = model
+
+    if typeof(model) <: PrimitiveEquation
+        nbands_shortwave = get_nbands(model.shortwave_radiation)
+        nbands_longwave = get_nbands(model.longwave_radiation)
+    else 
+        nbands_shortwave = nbands_longwave = 0
+    end
+
+    (; spectrum, grid, nparticles, NF, nlayers, nlayers_soil) = SG
     (; SpectralVariable2D, SpectralVariable3D) = SG
     (; GridVariable2D, GridVariable3D) = SG
     (; VectorType, ParticleVector) = SG
@@ -649,9 +487,18 @@ function DiagnosticVariables(
     tendencies = Tendencies(SG; tracers)
     grid_variables = GridVariables(SG; tracers)
     dynamics = DynamicsVariables(SG; spectral_transform)
-    physics = PhysicsVariables(SG)
     particles = ParticleVariables(SG)
     temp_average = SG.VectorType(undef, nlayers)
+
+    # allocate parameterization variables 
+    variable_names = get_diagnostic_variables(model)
+
+    # TODO: currently this is just a drop-in replacement, later we should have nlayers_soil from the land model and not from the SpectralGrid
+    land = initialize_variables(SG, nlayers_soil, variable_names.land...)
+    atmosphere = initialize_variables(SG, nlayers, variable_names.atmosphere...)
+    ocean = initialize_variables(SG, 1, variable_names.ocean...)
+
+    physics = merge(atmosphere, (ocean=ocean, land=land))
 
     scale = Ref(one(NF))
 
@@ -661,7 +508,7 @@ function DiagnosticVariables(
     return DiagnosticVariables{
         typeof(spectrum), typeof(grid), SpectralVariable2D, SpectralVariable3D,
         GridVariable2D, GridVariable3D, SpectralTracerTuple, GridTracerTuple,
-        ParticleVector, VectorType,
+        ParticleVector, VectorType, typeof(physics),
         typeof(dynamics.scratch_memory), typeof(particles.locator), typeof(scale)
     }(
         spectrum, grid, nlayers, nparticles,

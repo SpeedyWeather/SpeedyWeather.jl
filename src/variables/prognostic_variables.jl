@@ -4,65 +4,6 @@ function Base.show(io::IO, A::AbstractVariables)
     print_fields(io, A, keys)
 end
 
-export PrognosticVariablesOcean
-@kwdef struct PrognosticVariablesOcean{
-    GridType,               # <: AbstractGrid
-    GridVariable2D,         # <: AbstractField
-} <: AbstractPrognosticVariables
-    # DIMENSION
-    "Grid used for ocean variables"
-    grid::GridType
-
-    # OCEAN VARIABLES
-    "Sea surface temperature [K]"
-    sea_surface_temperature::GridVariable2D = zeros(GridVariable2D, grid)
-
-    "Sea ice concentration [1]"
-    sea_ice_concentration::GridVariable2D = zeros(GridVariable2D, grid)
-
-    "Prescribed ocean sensible heat flux [W/m²]"
-    sensible_heat_flux::GridVariable2D = zeros(GridVariable2D, grid)
-
-    "Prescribed ocean humidity flux [kg/s/m²]"
-    surface_humidity_flux::GridVariable2D = zeros(GridVariable2D, grid)
-end
-
-Adapt.@adapt_structure PrognosticVariablesOcean
-
-export PrognosticVariablesLand
-@kwdef struct PrognosticVariablesLand{
-    GridType,               # <: AbstractGrid
-    GridVariable2D,         # <: AbstractField
-    GridVariable3D,         # <: AbstractField
-} <: AbstractPrognosticVariables
-
-    # DIMENSION
-    "Grid used for land variables"
-    grid::GridType
-
-    "Number of soil layers for temperature and humidity"
-    nlayers::Int
-
-    # LAND VARIABLES
-    "Soil temperature [K]"
-    soil_temperature::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
-
-    "Soil moisture, volume fraction [1]"
-    soil_moisture::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
-    
-    "Snow depth [m]"
-    snow_depth::GridVariable2D = zeros(GridVariable2D, grid)
-
-    "Prescribed land sensible heat flux [W/m²], positive up, zero if not used"
-    sensible_heat_flux::GridVariable2D = zeros(GridVariable2D, grid)
-
-    "Prescribed land humidity flux [kg/s/m²], positive up, zero if not used"
-    surface_humidity_flux::GridVariable2D = zeros(GridVariable2D, grid)
-end
-
-Adapt.@adapt_structure PrognosticVariablesLand
-Base.eltype(::PrognosticVariablesLand{GridType, GridVariable}) where {GridType, GridVariable <: AbstractField{NF}} where {NF} = NF
-
 export PrognosticVariables
 @kwdef struct PrognosticVariables{
     SpectrumType,           # <: AbstractSpectrum
@@ -72,6 +13,9 @@ export PrognosticVariables
     SpectralVariable4D,     # <: LowerTriangularArray
     GridVariable2D,         # <: AbstractField
     GridVariable3D,         # <: AbstractField
+    OceanTuple,             # <: NamedTuple{Tuple{Symbol}, Tuple{PrognosticVariablesOcean}} #TODO: should the parameters change?
+    LandTuple,              # <: NamedTuple{Tuple{Symbol}, Tuple{PrognosticVariablesLand}}
+    PhysicsTuple,           # <: NamedTuple{Tuple{Symbol}, Tuple{PrognosticVariablesPhysics}}
     TracerTuple,            # <: NamedTuple{Tuple{Symbol}, Tuple{SpectralVariable4D}}
     ParticleVector,         # <: AbstractVector{Particle{NF}}
     RefValueNF,             # <: Base.RefValue{NF}
@@ -117,13 +61,14 @@ export PrognosticVariables
     random_pattern::SpectralVariable2D = zeros(SpectralVariable2D, spectrum)
 
     "Ocean variables, sea surface temperature and sea ice concentration"
-    ocean::PrognosticVariablesOcean{GridType, GridVariable2D} =
-        PrognosticVariablesOcean{GridType, GridVariable2D}(; grid)
+    ocean::OceanTuple = NamedTuple()
     
     "Land variables, soil temperature, snow, and soil moisture"
-    land::PrognosticVariablesLand{GridType, GridVariable2D, GridVariable3D} =
-        PrognosticVariablesLand{GridType, GridVariable2D, GridVariable3D}(; grid, nlayers=nlayers_soil)
+    land::LandTuple = NamedTuple()
 
+    "Physics variables from the parametrizations"
+    physics::PhysicsTuple = NamedTuple()
+    
     "Tracers, last dimension is for n tracers [?]"
     tracers::TracerTuple = NamedTuple()
 
@@ -131,7 +76,7 @@ export PrognosticVariables
     particles::ParticleVector = zeros(ParticleVector, nparticles)
 
     "Scaling for vor, div. scale=1 outside simulation, =radius during simulation"
-    scale::RefValueNF = Ref(one(eltype(land)))
+    scale::RefValueNF = Ref(one(typeof(real(vor[1]))))
 
     "Clock that keeps track of time, number of timesteps to integrate for."
     clock::ClockType = Clock()
@@ -168,23 +113,31 @@ get_step(coeffs::LowerTriangularArray{T, 3}, i) where T = lta_view(coeffs, :, :,
 
 """$(TYPEDSIGNATURES)
 Generator function."""
-function PrognosticVariables(SG::SpectralGrid{Architecture, SpectrumType, GridType}; tracers::TRACER_DICT=TRACER_DICT(), nsteps=DEFAULT_NSTEPS) where {Architecture, SpectrumType, GridType}
+function PrognosticVariables(model::AbstractModel)
+
+    SG = model.spectral_grid 
+    tracers = model.tracers
+    nsteps = model.time_stepping.nsteps
 
     (; NF, spectrum, grid, nlayers, nlayers_soil, nparticles) = SG
     (; SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, ParticleVector) = SG
     
+    # allocate parameterization variables 
+    variable_names = get_prognostic_variables(model)
+
+    # TODO: currently this is just a drop-in replacement, later we should have nlayers_soil from the land model and not from the SpectralGrid
+    land = initialize_variables(SG, nlayers_soil, variable_names.land...)
+    physics = initialize_variables(SG, nlayers, variable_names.atmosphere...)
+    ocean = initialize_variables(SG, 1, variable_names.ocean...)
+
     tracer_tuple = (; [key => zeros(SpectralVariable4D, spectrum, nlayers, nsteps) for key in keys(tracers)]...)
     clock = Clock()
 
-    return PrognosticVariables{SpectrumType, GridType,
-        SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, typeof(tracer_tuple), ParticleVector, Base.RefValue{NF}, typeof(clock)}(;
-            spectrum, grid, nlayers, nlayers_soil, nparticles, nsteps, tracers = tracer_tuple, clock
+    return PrognosticVariables{typeof(spectrum), typeof(grid),
+        SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, typeof(ocean), typeof(land), typeof(physics), typeof(tracer_tuple), ParticleVector, Base.RefValue{NF}, typeof(clock)}(;
+            spectrum, grid, nlayers, nlayers_soil, nparticles, nsteps, ocean, land, physics, tracers = tracer_tuple, clock
         )
 end
-
-"""$(TYPEDSIGNATURES)
-Generator function."""
-PrognosticVariables(SG::SpectralGrid, model::AbstractModel) = PrognosticVariables(SG, tracers = model.tracers, nsteps = model.time_stepping.nsteps)
 
 function Base.show(
     io::IO,
@@ -211,12 +164,12 @@ function Base.show(
     println(io, "├ humid: T$trunc, $nlayers-layer, $nsteps-steps LowerTriangularArray{$NFspectral}")
     println(io, "├ pres:  T$trunc, 1-layer, $nsteps-steps LowerTriangularArray{$NFspectral}")
     println(io, "├ random_pattern: T$trunc, 1-layer LowerTriangularArray{$NFspectral}")
-    println(io, "├┐ocean: PrognosticVariablesOcean{$NF}")
+    println(io, "├┐ocean:")
     println(io, "│├ sea_surface_temperature:  Field{$NF} on $nlat-ring $Grid")
     println(io, "│├ sea_ice_concentration:    Field{$NF} on $nlat-ring $Grid")
     println(io, "│├ sensible_heat_flux:       Field{$NF} on $nlat-ring $Grid")
     println(io, "│└ surface_humidity_flux:    Field{$NF} on $nlat-ring $Grid")
-    println(io, "├┐land:  PrognosticVariablesLand{$NF}")
+    println(io, "├┐land:")
     println(io, "│├ soil_temperature:         Field{$NF} on $nlayers_soil-layer, $nlat-ring $Grid")
     println(io, "│├ soil_moisture:            Field{$NF} on $nlayers_soil-layer, $nlat-ring $Grid")
     println(io, "│├ snow_depth:               Field{$NF} on $nlat-ring $Grid")

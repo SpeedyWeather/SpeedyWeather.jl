@@ -154,14 +154,14 @@ function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
     initialize!(model.particle_advection, model)
 
     # allocate prognostic and diagnostic variables
-    prognostic_variables = PrognosticVariables(spectral_grid, model)
-    diagnostic_variables = DiagnosticVariables(spectral_grid, model)
+    prognostic_variables = PrognosticVariables(model)
+    diagnostic_variables = DiagnosticVariables(model)
     
     # initialize non-atmosphere prognostic variables
     (; particles, ocean, land) = prognostic_variables
-    initialize!(particles, prognostic_variables, diagnostic_variables, model)
-    initialize!(ocean,     prognostic_variables, diagnostic_variables, model)
-    initialize!(land,      prognostic_variables, diagnostic_variables, model)
+    initialize!(particles, prognostic_variables, diagnostic_variables, model.particle_advection, model)
+    initialize!(ocean,     prognostic_variables, diagnostic_variables, model.ocean, model)
+    initialize!(land,      prognostic_variables, diagnostic_variables, model.land, model)
 
     # set the initial conditions (may overwrite variables set in intialize! ocean/land)
     initialize!(prognostic_variables, model.initial_conditions, model)
@@ -208,4 +208,18 @@ function get_parameterizations(model::PrimitiveDry)
             # stochastic physics
             stochastic_physics = model.stochastic_physics,
     )
+end
+
+# TODO: better name? other system? for abstractmodel?
+"""$(TYPEDSIGNATURES)
+Extract the extra parameterizations from the model that are not part of the 
+column-based parameterizations, but define variables such as land and ocean."""
+get_extra_parameterizations(model::PrimitiveDry) = (solar_zenith = model.solar_zenith,
+                                                    land = model.land, 
+                                                    ocean = model.ocean)
+
+"""$(TYPEDSIGNATURES)
+Extract the parameterizations from the model including land and ocean, to infer variables."""
+function get_all_parameterizations(model::PrimitiveDry)
+    return merge(get_parameterizations(model), get_extra_parameterizations(model))
 end

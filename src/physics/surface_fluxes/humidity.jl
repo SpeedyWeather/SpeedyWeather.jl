@@ -188,3 +188,13 @@ function surface_humidity_flux!(ij, diagn, progn, ::PrescribedLandHumidityFlux, 
 end
 
 Adapt.@adapt_structure PrescribedLandHumidityFlux
+
+function variables(::AbstractSurfaceHumidityFlux)
+    return (
+        DiagnosticVariable(name=:surface_humidity_flux, dims=Grid2D(), desc="Total surface humidity flux", units="kg/m²/s"),
+        DiagnosticVariable(name=:surface_humidity_flux, dims=Grid2D(), desc="Ocean surface humidity flux", units="kg/m²/s", namespace=:ocean),
+        DiagnosticVariable(name=:surface_humidity_flux, dims=Grid2D(), desc="Land surface humidity flux", units="kg/m²/s", namespace=:land),
+        PrognosticVariable(name=:surface_humidity_flux, dims=Grid2D(), desc="Prescribed Ocean surface humidity flux", units="kg/m²/s", namespace=:ocean),
+        PrognosticVariable(name=:surface_humidity_flux, dims=Grid2D(), desc="Prescribed Land surface humidity flux", units="kg/m²/s", namespace=:land),
+    )
+end

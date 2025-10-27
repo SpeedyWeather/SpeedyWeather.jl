@@ -208,3 +208,13 @@ function surface_heat_flux!(ij, diagn, progn, ::PrescribedLandHeatFlux, model)
 end 
 
 Adapt.@adapt_structure PrescribedLandHeatFlux
+
+function variables(::AbstractSurfaceHeatFlux)
+    return (
+        DiagnosticVariable(name=:sensible_heat_flux, dims=Grid2D(), desc="Total surface sensible heat flux", units="W/m²"),
+        DiagnosticVariable(name=:sensible_heat_flux, dims=Grid2D(), desc="Ocean sensible heat flux", units="W/m²", namespace=:ocean),
+        DiagnosticVariable(name=:sensible_heat_flux, dims=Grid2D(), desc="Land sensible heat flux", units="W/m²", namespace=:land),
+        PrognosticVariable(name=:sensible_heat_flux, dims=Grid2D(), desc="Prescribed Ocean sensible heat flux", units="W/m²", namespace=:ocean),
+        PrognosticVariable(name=:sensible_heat_flux, dims=Grid2D(), desc="Prescribed Land sensible heat flux", units="W/m²", namespace=:land),
+    )
+end

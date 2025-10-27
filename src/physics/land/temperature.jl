@@ -93,6 +93,12 @@ function timestep!(
     return nothing
 end
 
+function variables(::SeasonalLandTemperature)
+    return (
+        PrognosticVariable(name=:soil_temperature, dims=Grid3D(), namespace=:land),
+    )
+end
+
 ## CONSTANT LAND CLIMATOLOGY
 export ConstantLandTemperature
 @kwdef mutable struct ConstantLandTemperature{NF} <: AbstractLandTemperature
@@ -119,6 +125,12 @@ end
 
 # temperature is constant so do nothing during land timestep
 timestep!(progn::PrognosticVariables, diagn::DiagnosticVariables, land::ConstantLandTemperature, args...) = nothing
+
+function variables(::ConstantLandTemperature)
+    return (
+        PrognosticVariable(name=:soil_temperature, dims=Grid3D(), namespace=:land),
+    )
+end
 
 export LandBucketTemperature
 
@@ -224,4 +236,19 @@ end
         soil_temperature[ij, 1] += Δt/(z₁*C₁)*(F - D)
         soil_temperature[ij, 2] += Δt/(z₂*C₂)*D
     end
+end
+
+function variables(::LandBucketTemperature)
+    return (
+        # Prognostic variables
+        PrognosticVariable(name=:soil_temperature, dims=Grid3D(), namespace=:land),
+        PrognosticVariable(name=:soil_moisture, dims=Grid3D(), namespace=:land),
+        # Diagnostic variables read from diagn.physics
+        DiagnosticVariable(name=:surface_shortwave_down, dims=Grid2D(), desc="Surface shortwave radiation down", units="W/m²"),
+        DiagnosticVariable(name=:surface_shortwave_up, dims=Grid2D(), desc="Surface shortwave radiation up", units="W/m²", namespace=:land),
+        DiagnosticVariable(name=:surface_longwave_down, dims=Grid2D(), desc="Surface longwave radiation down", units="W/m²"),
+        DiagnosticVariable(name=:surface_longwave_up, dims=Grid2D(), desc="Surface longwave radiation up", units="W/m²", namespace=:land),
+        DiagnosticVariable(name=:surface_humidity_flux, dims=Grid2D(), desc="Surface humidity flux", units="kg/s/m²", namespace=:land),
+        DiagnosticVariable(name=:sensible_heat_flux, dims=Grid2D(), desc="Sensible heat flux", units="W/m²", namespace=:land),
+    )
 end

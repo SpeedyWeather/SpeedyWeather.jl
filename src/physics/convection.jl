@@ -459,3 +459,11 @@ parameterization!(ij, diagn, progn, convection_scheme::ConvectiveHeating, model)
     end
     return nothing
 end
+
+function variables(::AbstractConvection)
+    return (
+        DiagnosticVariable(name=:rain_convection, dims=Grid2D(), desc="Convective precipitation", units="m"),
+        DiagnosticVariable(name=:cloud_top, dims=Grid2D(), desc="Cloud top level", units="1"),
+        DiagnosticVariable(name=:total_precipitation_rate, dims=Grid2D(), desc="Total precipitation rate", units="m/s"),
+    )
+end

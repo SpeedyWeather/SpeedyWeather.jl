@@ -38,6 +38,14 @@ function parameterization!(ij, diagn::DiagnosticVariables, progn, albedo::OceanL
     parameterization!(ij, diagn.physics.land, progn, albedo.land, model)
 end
 
+function variables(::OceanLandAlbedo)
+    return (
+        DiagnosticVariable(name=:albedo, dims=Grid2D(), desc="Albedo", units="1"),
+        DiagnosticVariable(name=:albedo, dims=Grid2D(), desc="Albedo over the ocean", units="1", namespace=:ocean),
+        DiagnosticVariable(name=:albedo, dims=Grid2D(), desc="Albedo over the land", units="1", namespace=:land),
+    )
+end
+
 # single albedo: call separately for ocean and land with the same albedo
 function parameterization!(ij, diagn::DiagnosticVariables, progn, albedo::AbstractAlbedo, model)
     parameterization!(ij, diagn.physics.ocean, progn, albedo, model)
@@ -147,3 +155,9 @@ parameterization!(ij, diagn, progn, albedo::OceanSeaIceAlbedo, model) = albedo!(
 end
 
 Adapt.@adapt_structure OceanSeaIceAlbedo
+
+function variables(::AbstractAlbedo)
+    return (
+        DiagnosticVariable(name=:albedo, dims=Grid2D(), desc="Albedo", units="1"),
+    )
+end

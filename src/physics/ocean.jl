@@ -14,7 +14,7 @@ the following functions
     end
 
     function initialize!(
-        ocean::PrognosticVariablesOcean,
+        ocean,
         progn::PrognosticVariables,
         diagn::DiagnosticVariables,
         ocean_model::CustomOceanModel,
@@ -54,8 +54,9 @@ end
 function initialize!(   ocean::PrognosticVariablesOcean,
                         progn::PrognosticVariables,
                         diagn::DiagnosticVariables,
-                        model::PrimitiveEquation)
-    initialize!(ocean, progn, diagn, model.ocean, model)
+                        ocean_model::AbstractOcean,
+                        model::PrimitiveEquation) where PrognosticVariablesOcean
+    initialize!(ocean, progn, diagn, ocean_model, model)
     initialize!(ocean, progn, diagn, model.sea_ice, model)
 end
 
@@ -141,7 +142,7 @@ function initialize!(
     diagn::DiagnosticVariables,
     ocean_model::SeasonalOceanClimatology,
     model::PrimitiveEquation,
-)
+) where PrognosticVariablesOcean
     timestep!(progn, diagn, ocean_model, model)
 end
 
@@ -168,6 +169,8 @@ function timestep!(
                                           weight  * monthly_temperature[ij, next_month]
     end
 end
+
+variables(::SeasonalOceanClimatology) = (PrognosticVariable(name=:sea_surface_temperature, dims=Grid2D(), namespace=:ocean),)
 
 ## CONSTANT OCEAN CLIMATOLOGY
 export ConstantOceanClimatology
@@ -216,7 +219,7 @@ function initialize!(
     diagn::DiagnosticVariables,
     ocean_model::ConstantOceanClimatology,
     model::PrimitiveEquation,
-)
+) where PrognosticVariablesOcean
     # create a seasonal model, initialize it and the variables
     (; path, file, varname, file_Grid, missing_value) = ocean_model
     (; NF, GridVariable3D, grid) = model.spectral_grid
@@ -235,6 +238,10 @@ function timestep!(
 )
     return nothing
 end
+
+#TODO: it's not actually prognostic, but used as such so far? 
+variables(::ConstantOceanClimatology) = (PrognosticVariable(name=:sea_surface_temperature, dims=Grid2D(), namespace=:ocean),)
+
 
 ## CONSTANT OCEAN CLIMATOLOGY
 export AquaPlanet
@@ -271,7 +278,7 @@ function initialize!(
     diagn::DiagnosticVariables,
     ocean_model::AquaPlanet,
     model::PrimitiveEquation,
-)
+) where PrognosticVariablesOcean
     (; sea_surface_temperature) = ocean
     Te, Tp = ocean_model.temp_equator, ocean_model.temp_poles
     sst(λ, φ) = (Te - Tp)*cosd(φ)^2 + Tp
@@ -287,6 +294,9 @@ function timestep!(
 )
     return nothing
 end
+
+#TODO: it's not actually prognostic, but used as such so far? 
+variables(::AquaPlanet) = (PrognosticVariable(name=:sea_surface_temperature, dims=Grid2D(), namespace=:ocean),)
 
 export SlabOcean
 
@@ -332,7 +342,7 @@ function initialize!(
     diagn::DiagnosticVariables,
     ocean_model::SlabOcean,
     model::PrimitiveEquation,
-)
+) where PrognosticVariablesOcean
     # create a seasonal model, initialize it and the variables
     seasonal_model = SeasonalOceanClimatology(model.spectral_grid)
     initialize!(seasonal_model, model)
@@ -386,4 +396,17 @@ end
         r = 1 - insulation(ice[ij])     # formulate as reduction of the net flux
         sst[ij] += Δt_C₀*r*(Rsd[ij] - Rsu[ij] - Rlu[ij] + Rld[ij] - Lᵥ*Ev[ij] - S[ij])
     end
+end
+
+# TODO: Add descriptions and units
+function variables(::SlabOcean)
+    return (DiagnosticVariable(name=:surface_shortwave_down, dims=Grid2D()),
+    DiagnosticVariable(name=:surface_shortwave_up, dims=Grid2D(), namespace=:ocean),
+    DiagnosticVariable(name=:surface_longwave_down, dims=Grid2D()),
+    DiagnosticVariable(name=:surface_longwave_up, dims=Grid2D(), namespace=:ocean),
+    DiagnosticVariable(name=:surface_humidity_flux, dims=Grid2D(), namespace=:ocean),
+    DiagnosticVariable(name=:surface_sensible_heat_flux, dims=Grid2D(), namespace=:ocean),
+    PrognosticVariable(name=:sea_ice_concentration, dims=Grid2D(), namespace=:ocean),
+    PrognosticVariable(name=:sea_surface_temperature, dims=Grid2D(), namespace=:ocean),
+    ) 
 end

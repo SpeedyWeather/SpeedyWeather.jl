@@ -72,3 +72,10 @@ function Base.show(io::IO, M::AbstractModel)
         p(io, a)
     end
 end
+
+# TODO: rework or generalize this? Currenlty also only works for Primitve Models
+function variables(model::AbstractModel)
+    # Collect all variables from all parameterizations and flatten into a single tuple
+    all_vars = Tuple(vcat([collect(SpeedyWeather.variables(component)) for component in SpeedyWeather.get_all_parameterizations(model)]...))
+    return all_vars
+end
