@@ -73,9 +73,16 @@ function Base.show(io::IO, M::AbstractModel)
     end
 end
 
-# TODO: rework or generalize this? Currenlty also only works for Primitve Models
+# TODO: rework or generalize this? 
 function variables(model::AbstractModel)
     # Collect all variables from all parameterizations and flatten into a single tuple
     all_vars = Tuple(vcat([collect(SpeedyWeather.variables(component)) for component in SpeedyWeather.get_all_parameterizations(model)]...))
     return all_vars
+end
+
+#TODO: better name? 
+"""$(TYPEDSIGNATURES)
+Extract the parameterizations from the model including land and ocean, to infer variables."""
+function get_all_parameterizations(model::AbstractModel)
+    return merge(get_parameterizations(model), get_extra_parameterizations(model))
 end
