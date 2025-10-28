@@ -54,6 +54,9 @@ end
 
 matrix_size(::Type{<:OctaHEALPixGrid}, nlat_half::Integer) = (2nlat_half, 2nlat_half)
 
+# convert to a 2D matrix view, should be applied to matrix-ordered field
+Matrix(field::OctaHEALPixField) = reshape(field.data, matrix_size(field)...)
+
 ## COORDINATES
 function get_latd(::Type{<:OctaHEALPixGrid}, nlat_half::Integer)
     nlat = get_nlat(OctaHEALPixGrid, nlat_half)

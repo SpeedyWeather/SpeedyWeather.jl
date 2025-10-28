@@ -38,7 +38,3 @@ matrix_order(field::AbstractField) = reorder(MatrixOrder(), field)
 ring_order!(  out, field::AbstractField) = reorder!(out, RingOrder(),   field)
 nested_order!(out, field::AbstractField) = reorder!(out, NestedOrder(), field)
 matrix_order!(out, field::AbstractField) = reorder!(out, MatrixOrder(), field)
-
-# convert to a 2D matrix view, should be applied to matrix-ordered field
-Matrix(field::OctaHEALPixField) = reshape(field.data, matrix_size(field)...)
-
