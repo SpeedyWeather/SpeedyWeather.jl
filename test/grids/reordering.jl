@@ -1,6 +1,6 @@
 @testset "Reordering identity" begin
 
-    @testset for nlat_half in (4, 8, 16)
+    @testset for nlat_half in (4, 8, 16, 32, 64)
         grid = OctaHEALPixGrid(nlat_half)
         N = RingGrids.get_npoints(grid)
 
@@ -13,6 +13,10 @@
         field3 = RingGrids.nested_order(RingGrids.ring_order(field))
         @test field == field2
         @test field == field3
+
+        field4 = RingGrids.matrix_order(field)
+        M = Matrix(field4)
+        @test size(M) == (2nlat_half, 2nlat_half)
     end
 end
 
@@ -21,13 +25,13 @@ end
         m = min(typemax(T) >> (sizeof(T)*4), 2^18 - 1)  # limit to 18 bits for performance
         for i in 0:m
             ui = T(i)
-            @test deinterleave(interleave_with_zeros(ui)) == ui
+            @test RingGrids.deinterleave(RingGrids.interleave_with_zeros(ui)) == ui
         end
 
         # random bitpatterns too
         for _ in 1:1024
             ui = T(rand(0:m))
-            @test deinterleave(interleave_with_zeros(ui)) == ui
+            @test RingGrids.deinterleave(RingGrids.interleave_with_zeros(ui)) == ui
         end
     end
 end

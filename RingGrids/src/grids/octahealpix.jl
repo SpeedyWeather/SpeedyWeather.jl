@@ -115,46 +115,6 @@ end
 
 Adapt.@adapt_structure OctaHEALPixGrid
 
-# REORDERING: Ring to Nested or Matrix and vice versa
-
-abstract type AbstractHEALPixOrder end
-struct RingOrder <: AbstractHEALPixOrder end
-struct NestedOrder <: AbstractHEALPixOrder end
-struct MatrixOrder <: AbstractHEALPixOrder end
-
-reorder(::RingOrder,   ij, grid::OctaHEALPixGrid) = nest2ring(ij, grid)
-reorder(::NestedOrder, ij, grid::OctaHEALPixGrid) = ring2nest(ij, grid)
-reorder(::MatrixOrder, ij, grid::OctaHEALPixGrid) = ring2xy(ij, grid)
-
-reorder(order, field::OctaHEALPixField) = reorder!(similar(field), order, field)
-
-function reorder!(
-    out::OctaHEALPixField,
-    order,
-    field::OctaHEALPixField,
-)
-    @boundscheck out.grid == field.grid || throw(BoundsError("Reordering requires identical grids, got $(out.grid) and $(field.grid)."))
-    @assert ispow2(get_nlat_half(field.grid)) "Reordering only supported for nlat_half power of 2, got $(get_nlat_half(field.grid))."
-
-    @inbounds for k in eachlayer(field)
-        for ij in eachgridpoint(field)
-            out_indices = reorder(order, ij, field.grid)
-            out[out_indices, k] = field[ij, k]
-        end    
-    end
-    return out
-end
-
-ring_order(  field::OctaHEALPixField) = reorder(RingOrder(),   field)
-nested_order(field::OctaHEALPixField) = reorder(NestedOrder(), field)
-matrix_order(field::OctaHEALPixField) = reorder(MatrixOrder(), field)
-
-ring_order!(  out, field::OctaHEALPixField) = reorder!(out, RingOrder(),   field)
-nested_order!(out, field::OctaHEALPixField) = reorder!(out, NestedOrder(), field)
-matrix_order!(out, field::OctaHEALPixField) = reorder!(out, MatrixOrder(), field)
-
-Matrix(field::OctaHEALPixField) = reshape(field.data, matrix_size(field)...)
-
 # quadrant of ij in ring order, TODO needed?
 function quadrant_ring(ij::Integer, grid::OctaHEALPixGrid)
     j = RingGrids.whichring(grid)[ij]  # ring index j of ij
@@ -250,7 +210,7 @@ becomes
 The highest half of the bits are zeros will be discarded."""
 function interleave_with_zeros(ui::Integer)
     r = zero(ui)
-    nbits = 8*sizeof(ui)
+    nbits = 4*sizeof(ui)
     for s in 0:nbits-1  # TODO is there a more efficient way?
         r |= (ui & (one(ui) << s)) << s
     end
@@ -267,7 +227,7 @@ becomes
     00000000 00000000 00000000 00000111."""
 function deinterleave(ui::Integer)
     r = zero(ui)
-    nbits = 8*sizeof(ui)
+    nbits = 4*sizeof(ui)
     for s in 0:nbits-1  # TODO is there a more efficient way?
         r |= (ui & (one(ui) << 2s)) >> s
     end
@@ -304,4 +264,4 @@ Convert ring index ij to matrix index xy of grid. All 1-based.
 xy is a running index in a 2D matrix of size (2*nlat_half, 2*nlat_half),
 with a polar-centric view on the north pole in the middle of that matrix,
 the South Pole divided into 4 in the corners. Like a stereographic projection."""
-ring2xy(grid::OctaHEALPixGrid, ij::Integer; kwargs...) = rcq2xy(ring2rcq(ij, grid)..., grid; kwargs...)
+ring2xy(ij::Integer, grid::OctaHEALPixGrid; kwargs...) = rcq2xy(ring2rcq(ij, grid)..., grid; kwargs...)
