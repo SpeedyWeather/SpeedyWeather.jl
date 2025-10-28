@@ -87,3 +87,123 @@ function shortwave_radiation!(
         column.outgoing_shortwave_radiation += U
     end
 end
+
+
+############### SPEEDY B.4 — One-Band Shortwave with Diagnostic Clouds ###############
+
+export SpeedyOneBandShortwave
+
+struct SpeedyOneBandShortwave <: AbstractShortwave
+    # thresholds / weights
+    rh_cl::Float64        # RH_cl
+    rh_clp::Float64       # RH'_cl
+    q_cl::Float64         # Q_cl
+    wp_cl::Float64        # w_pcl
+    pmax_cl::Float64      # p_maxcl (mm/day)
+    # optics
+    alb_cl::Float64       # A_cl (cloud albedo, visible)
+    abs_dry::Float64      # dry-air absorptivity (visible)
+    abs_wv_vis::Float64   # H2O absorptivity (visible, per unit q)
+end
+
+# Defaults aligned with SPEEDY-style magnitudes (units must match column fields)
+SpeedyOneBandShortwave() = SpeedyOneBandShortwave(
+    0.30, 1.00, 0.20,   # rh_cl, rh_clp, q_cl
+    0.20, 10.0,         # wp_cl, pmax_cl (mm/day cap)
+    0.43,               # alb_cl
+    0.033, 0.022        # abs_dry, abs_wv_vis
+)
+
+get_nbands(::SpeedyOneBandShortwave) = 1
+
+initialize!(::SpeedyOneBandShortwave, ::PrimitiveEquation) = nothing
+
+# Drop-in replacement: uses only fields that actually exist on `ColumnVariables`
+# (humid, sat_humid, pres, cos_zenith, albedo_*, rain_rate_*, cloud_top, optical_depth_shortwave, flux_*).
+
+function shortwave_radiation!(
+    column::ColumnVariables,
+    scheme::SpeedyOneBandShortwave,
+    model::PrimitiveEquation,
+)
+    # ---- pull only fields that exist on ColumnVariables ----
+    (; nlayers, cos_zenith, land_fraction,
+       humid, sat_humid, albedo_ocean, albedo_land,
+       optical_depth_shortwave, flux_temp_downward, flux_temp_upward,
+       cloud_top, rain_rate_convection, rain_rate_large_scale) = column
+
+    # ---- aliases / guards ----
+    μ   = max(cos_zenith, 1f-3)                         # avoid divide-by-zero
+    qv  = humid
+    qsat = sat_humid
+    T   = eltype(qv)
+
+    # pick band 1 if optical_depth_shortwave is 2D (layers × bands)
+    τk = ndims(optical_depth_shortwave) == 1 ?
+         @view(optical_depth_shortwave[1:nlayers]) :
+         @view(optical_depth_shortwave[1:nlayers, 1])
+
+    # ---- derived diagnostics (no hidden fields) ----
+    RH = @. clamp(qv / max(qsat, eps(T)), 0, 1)
+
+    k_cl = (1 <= cloud_top <= nlayers) ? cloud_top : max(nlayers - 1, 1)
+
+    RH_cl  = scheme.rh_cl
+    RH_clp = scheme.rh_clp
+    r      = clamp((RH[min(k_cl, nlayers)] - RH_cl) / max(RH_clp - RH_cl, T(1e-6)), zero(T), one(T))
+
+    P_mmday = T(86.4) * (rain_rate_convection + rain_rate_large_scale)
+    P_mmday = min(scheme.pmax_cl, P_mmday)
+    CLC     = min(one(T), scheme.wp_cl * sqrt(P_mmday) + r^2)
+
+    # ---- transmissivity per layer: τ_layer = exp(- τk / μ) ----
+    τ = similar(qv)
+    @inbounds @simd for k in 1:nlayers
+        τ[k] = exp(-τk[k] / μ)
+    end
+
+    # ---- 1) Downward beam ----
+    S0 = model.planet.solar_constant
+    D  = T(S0) * μ
+    @inbounds flux_temp_downward[1] += D
+
+    D_incident_ct = zero(T)
+    @inbounds for k in 1:(k_cl - 1)
+        D *= τ[k]
+        flux_temp_downward[k + 1] += D
+    end
+    D_incident_ct = D
+    D *= (one(T) - scheme.alb_cl * CLC)
+    @inbounds for k in k_cl:nlayers
+        D *= τ[k]
+        flux_temp_downward[k + 1] += D
+    end
+
+    # ---- 2) Surface reflection ----
+    column.surface_shortwave_down = D
+    up_ocean = albedo_ocean * D
+    up_land  = albedo_land  * D
+    column.surface_shortwave_up_ocean = up_ocean
+    column.surface_shortwave_up_land  = up_land
+    albedo_sfc = (one(T) - land_fraction) * albedo_ocean + land_fraction * albedo_land
+    column.surface_shortwave_up = (one(T) - land_fraction) * up_ocean + land_fraction * up_land
+
+    U = albedo_sfc * D
+    @inbounds flux_temp_upward[nlayers + 1] += U
+
+    # ---- 3) Upward beam (+ extra cloud-top reflection) ----
+    @inbounds for k in nlayers:-1:1
+        U *= τ[k]
+        flux_temp_upward[k] += U
+        if k == k_cl
+            dU = scheme.alb_cl * CLC * D_incident_ct
+            U  += dU
+            flux_temp_upward[k] += dU
+        end
+    end
+
+    # ---- 4) TOA outgoing SW ----
+    column.outgoing_shortwave_radiation += U
+
+    return nothing
+end
