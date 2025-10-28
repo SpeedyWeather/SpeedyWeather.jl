@@ -20,14 +20,14 @@ function reorder!(
     arch = architecture(field)
     # Ensure worksize is always 2D by adding layer dimension dim=1
     worksize = ndims(field) == 1 ? (size(field, 1), 1) : size(field)
-    launch!(arch, RingGridWorkOrder, worksize, reorder_kernel!, out, order, field)
+    launch!(arch, RingGridWorkOrder, worksize, reorder_kernel!, out, field, order, field.grid)
     return out
 end
 
-@kernel inbounds=true function reorder_kernel!(out, @Const(order), @Const(field))
+@kernel inbounds=true function reorder_kernel!(out, field, @Const(order), @Const(grid))
     ij, k = @index(Global, NTuple)
     # TODO the recomputes the reordering for every layer k, maybe distribute only over ij?
-    out_indices = reorder(order, ij, field.grid)    
+    out_indices = reorder(order, ij, grid)    
     out[out_indices, k] = field[ij, k]
 end
 
@@ -39,5 +39,6 @@ ring_order!(  out, field::AbstractField) = reorder!(out, RingOrder(),   field)
 nested_order!(out, field::AbstractField) = reorder!(out, NestedOrder(), field)
 matrix_order!(out, field::AbstractField) = reorder!(out, MatrixOrder(), field)
 
-Matrix(field::AbstractField) = reshape(field.data, matrix_size(field)...)
+# convert to a 2D matrix view, should be applied to matrix-ordered field
+Matrix(field::OctaHEALPixField) = reshape(field.data, matrix_size(field)...)
 
