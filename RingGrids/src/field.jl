@@ -99,7 +99,7 @@ end
 # grid is inherently 2D, for field distinguish between get_npoints (3D+) and get_npoints2D
 get_npoints2D(field::AbstractField) = get_npoints(field.grid)
 get_npoints(field::AbstractField) = get_npoints(field.grid, size(field)[2:end]...)
-matrix_size(field::AbstractField) = matrix_size(field.grid)
+matrix_size(field::AbstractField) = (matrix_size(field.grid)..., size(field)[2:end]...)
 
 # needed for unalias
 @inline Base.dataids(field::AbstractField) = Base.dataids(field.data)

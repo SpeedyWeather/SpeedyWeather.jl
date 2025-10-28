@@ -139,6 +139,7 @@ include("scaling.jl")
 include("geodesics.jl")
 include("reverse.jl")
 include("rotate.jl")
+include("reordering.jl")
 
 # FULL GRIDS
 include("grids/full_grids.jl")
