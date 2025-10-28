@@ -137,7 +137,7 @@ See [configure_kernel](@ref) for more information.
 @inline launch!(args...; kwargs...) = _launch!(args...; kwargs...)
 
 # Inner interface for type-based dispatch (preferred)
-@inline function _launch!(arch, work_order::Type{<:AbstractWorkOrder}, worksize::NTuple{N, Int}, kernel!, kernel_args...)
+@inline function _launch!(arch, work_order::Type{<:AbstractWorkOrder}, worksize::Tuple, kernel!, kernel_args...)
 
     loop!, worksize = configure_kernel(arch, work_order, worksize, kernel!)
     
