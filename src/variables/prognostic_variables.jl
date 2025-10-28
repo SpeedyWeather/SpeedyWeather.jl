@@ -11,8 +11,6 @@ export PrognosticVariables
     SpectralVariable2D,     # <: LowerTriangularArray
     SpectralVariable3D,     # <: LowerTriangularArray
     SpectralVariable4D,     # <: LowerTriangularArray
-    GridVariable2D,         # <: AbstractField
-    GridVariable3D,         # <: AbstractField
     OceanTuple,             # <: NamedTuple{Tuple{Symbol}, Tuple{PrognosticVariablesOcean}} #TODO: should the parameters change?
     LandTuple,              # <: NamedTuple{Tuple{Symbol}, Tuple{PrognosticVariablesLand}}
     PhysicsTuple,           # <: NamedTuple{Tuple{Symbol}, Tuple{PrognosticVariablesPhysics}}
@@ -84,7 +82,7 @@ end
 
 Adapt.@adapt_structure PrognosticVariables
 
-Base.eltype(::PrognosticVariables{SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D}) where {SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D <: AbstractField{NF}} where NF = NF 
+Base.eltype(progn::PrognosticVariables) = eltype(real(progn.vor[1]))
 Architectures.array_type(::PrognosticVariables{SpectrumType, GridType, SpectralVariable2D}) where {SpectrumType, GridType, SpectralVariable2D <: LowerTriangularArray{NF, N, ArrayType}} where {NF, N, ArrayType <: AbstractArray} = nonparametric_type(ArrayType)
 
 function get_steps(coeffs::LowerTriangularArray{T, 2}) where T
@@ -120,7 +118,7 @@ function PrognosticVariables(model::AbstractModel)
     nsteps = model.time_stepping.nsteps
 
     (; NF, spectrum, grid, nlayers, nlayers_soil, nparticles) = SG
-    (; SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, ParticleVector) = SG
+    (; SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, ParticleVector) = SG
     
     # allocate parameterization variables 
     variable_names = get_prognostic_variables(model)
@@ -134,7 +132,7 @@ function PrognosticVariables(model::AbstractModel)
     clock = Clock()
 
     return PrognosticVariables{typeof(spectrum), typeof(grid),
-        SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, typeof(ocean), typeof(land), typeof(physics), typeof(tracer_tuple), ParticleVector, Base.RefValue{NF}, typeof(clock)}(;
+        SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, typeof(ocean), typeof(land), typeof(physics), typeof(tracer_tuple), ParticleVector, Base.RefValue{NF}, typeof(clock)}(;
             spectrum, grid, nlayers, nlayers_soil, nparticles, nsteps, ocean, land, physics, tracers = tracer_tuple, clock
         )
 end
