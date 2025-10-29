@@ -1,3 +1,5 @@
+export Grid2D, Grid3D, Spectral2D, Spectral3D, PrognosticVariable, DiagnosticVariable
+
 """
     $TYPEDEF
 
@@ -184,9 +186,6 @@ end
 
 get_prognostic_variables(model::AbstractModel) = get_prognostic_variables(variables(model)...)
 get_diagnostic_variables(model::AbstractModel) = get_diagnostic_variables(variables(model)...)
-
-# variables of nothing are nothing
-variables(::Nothing) = ()
 
 # TODO: not quite sure yet about the nlayers or where it'll go
 # initialize a NamedTuple from variables 

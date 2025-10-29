@@ -9,7 +9,6 @@ abstract type PrimitiveDry <: PrimitiveEquation end
 abstract type PrimitiveWet <: PrimitiveEquation end
 
 abstract type AbstractModelComponent end
-abstract type AbstractParameterization <: AbstractModelComponent end
 
 # any model component set to nothing needs no initialization or finalize!
 initialize!(::Nothing, ::AbstractModel) = nothing
@@ -71,18 +70,4 @@ function Base.show(io::IO, M::AbstractModel)
         a = textwidth(a) > 100 ? string(a[1:97], "...") : a  # truncate long strings
         p(io, a)
     end
-end
-
-# TODO: rework or generalize this? 
-function variables(model::AbstractModel)
-    # Collect all variables from all parameterizations and flatten into a single tuple
-    all_vars = Tuple(vcat([collect(SpeedyWeather.variables(component)) for component in SpeedyWeather.get_all_parameterizations(model)]...))
-    return all_vars
-end
-
-#TODO: better name? 
-"""$(TYPEDSIGNATURES)
-Extract the parameterizations from the model including land and ocean, to infer variables."""
-function get_all_parameterizations(model::AbstractModel)
-    return merge(get_parameterizations(model), get_extra_parameterizations(model))
 end
