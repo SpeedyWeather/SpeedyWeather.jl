@@ -1,22 +1,22 @@
-@testset "Optical depth" begin
+@testset "Transmittance" begin
     spectral_grid = SpectralGrid(trunc=31, nlayers=8)
 
-    for OD in (ZeroOpticalDepth, FriersonOpticalDepth)
-        optical_depth = OD(spectral_grid)
+    for TR in (TransparentTransmittance, FriersonTransmittance)
+        transmittance = TR(spectral_grid)
         longwave_radiation = NBandRadiation(spectral_grid)
-        
-        model = PrimitiveWetModel(spectral_grid; optical_depth, longwave_radiation)
+
+        model = PrimitiveWetModel(spectral_grid; transmittance, longwave_radiation)
         simulation = initialize!(model)
         run!(simulation, period=Day(1))
     
         band = longwave_radiation.nbands
-        dτ = simulation.diagnostic_variables.column.optical_depth_longwave[:, band]
+        t = simulation.diagnostic_variables.column.transmittance_longwave[:, band]
 
         (; nlayers) = spectral_grid
 
         for k in 2:nlayers
-            # optical depth cannot be negative
-            @test dτ[k] >= 0
+            # transmittance cannot be negative
+            @test 1 >= t[k] >= 0
         end
     end
 end

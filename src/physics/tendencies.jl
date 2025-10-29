@@ -50,7 +50,7 @@ function parameterization_tendencies!(
     vertical_diffusion!(column, model)
     convection!(column, model)
     large_scale_condensation!(column, model)
-    optical_depth!(column, model)
+    transmittance!(column, model)
     shortwave_radiation!(column, model)
     longwave_radiation!(column, model)
     surface_fluxes!(column, progn, model)   # pass on prognostic variables for prescribed fluxes
