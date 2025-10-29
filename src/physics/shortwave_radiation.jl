@@ -91,39 +91,36 @@ end
 
 ############### SPEEDY B.4 — One-Band Shortwave with Diagnostic Clouds ###############
 
-export SpeedyOneBandShortwave
+export OneBandShortwave
 
-struct SpeedyOneBandShortwave <: AbstractShortwave
+struct OneBandShortwave <: AbstractShortwave
     # thresholds / weights
-    rh_cl::Float64        # RH_cl
-    rh_clp::Float64       # RH'_cl
-    q_cl::Float64         # Q_cl
-    wp_cl::Float64        # w_pcl
-    pmax_cl::Float64      # p_maxcl (mm/day)
+    rh_cl::Float64        # RH_cl,  thresholds for RH and cloud water content (Eqs. 26–27).
+    rh_clp::Float64       # RH'_cl,     ---------------------''-----------------------
+    q_cl::Float64         # Q_cl,       ---------------------''-----------------------
+    wp_cl::Float64        # w_pcl   weighting of precipitation term (Eq. 28).
+    pmax_cl::Float64      # p_maxcl (mm/day) 
     # optics
-    alb_cl::Float64       # A_cl (cloud albedo, visible)
-    abs_dry::Float64      # dry-air absorptivity (visible)
-    abs_wv_vis::Float64   # H2O absorptivity (visible, per unit q)
+    alb_cl::Float64       # A_cl (cloud albedo, visible) (Eq. 33).
+    abs_dry::Float64      # dry-air absorptivity (visible) (Eq. 32)
+    abs_wv_vis::Float64   # H2O absorptivity (visible, per unit q) (Eq. 32)
 end
 
 # Defaults aligned with SPEEDY-style magnitudes (units must match column fields)
-SpeedyOneBandShortwave() = SpeedyOneBandShortwave(
+OneBandShortwave() = OneBandShortwave(
     0.30, 1.00, 0.20,   # rh_cl, rh_clp, q_cl
     0.20, 10.0,         # wp_cl, pmax_cl (mm/day cap)
     0.43,               # alb_cl
     0.033, 0.022        # abs_dry, abs_wv_vis
 )
 
-get_nbands(::SpeedyOneBandShortwave) = 1
+get_nbands(::OneBandShortwave) = 1
+initialize!(::OneBandShortwave, ::PrimitiveEquation) = nothing
 
-initialize!(::SpeedyOneBandShortwave, ::PrimitiveEquation) = nothing
-
-# Drop-in replacement: uses only fields that actually exist on `ColumnVariables`
-# (humid, sat_humid, pres, cos_zenith, albedo_*, rain_rate_*, cloud_top, optical_depth_shortwave, flux_*).
 
 function shortwave_radiation!(
     column::ColumnVariables,
-    scheme::SpeedyOneBandShortwave,
+    scheme::OneBandShortwave,
     model::PrimitiveEquation,
 )
     # ---- pull only fields that exist on ColumnVariables ----
@@ -143,12 +140,12 @@ function shortwave_radiation!(
          @view(optical_depth_shortwave[1:nlayers]) :
          @view(optical_depth_shortwave[1:nlayers, 1])
 
-    # ---- derived diagnostics (no hidden fields) ----
-    RH = @. clamp(qv / max(qsat, eps(T)), 0, 1)
+    # ---- derived diagnostics ----
+    RH = @. clamp(qv / max(qsat, eps(T)), 0, 1) # clamp relative humidity between 0 and 1
 
-    k_cl = (1 <= cloud_top <= nlayers) ? cloud_top : max(nlayers - 1, 1)
+    k_cl = (1 <= cloud_top <= nlayers) ? cloud_top : max(nlayers - 1, 1) # cloud top layer index
 
-    RH_cl  = scheme.rh_cl
+    RH_cl  = scheme.rh_cl 
     RH_clp = scheme.rh_clp
     r      = clamp((RH[min(k_cl, nlayers)] - RH_cl) / max(RH_clp - RH_cl, T(1e-6)), zero(T), one(T))
 
