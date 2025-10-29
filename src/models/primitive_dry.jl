@@ -37,7 +37,7 @@ $(TYPEDFIELDS)"""
     SUW,    # <:AbstractSurfaceWind,
     SH,     # <:AbstractSurfaceHeatFlux,
     CV,     # <:AbstractConvection,
-    TR,     # <:AbstractTransmittance,
+    TA,     # <:AbstractTransmittance,
     SW,     # <:AbstractShortwave,
     LW,     # <:AbstractLongwave,
     SP,     # <:AbstractStochasticPhysics,
@@ -88,7 +88,7 @@ $(TYPEDFIELDS)"""
     surface_wind::SUW = SurfaceWind(spectral_grid)
     surface_heat_flux::SH = SurfaceHeatFlux(spectral_grid)
     convection::CV = DryBettsMiller(spectral_grid)
-    transmittance::TR = TransparentTransmittance(spectral_grid)
+    transmittance::TA = TransparentTransmittance(spectral_grid)
     shortwave_radiation::SW = TransparentShortwave(spectral_grid)
     longwave_radiation::LW = JeevanjeeRadiation(spectral_grid)
     stochastic_physics::SP = nothing

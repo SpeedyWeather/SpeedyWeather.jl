@@ -1,7 +1,7 @@
 @testset "Transmittance" begin
     spectral_grid = SpectralGrid(trunc=31, nlayers=8)
 
-    for TR in (TransparentTransmittance, FriersonTransmittance)
+    @testset for TR in (TransparentTransmittance, FriersonTransmittance)
         transmittance = TR(spectral_grid)
         longwave_radiation = NBandRadiation(spectral_grid)
 
@@ -15,7 +15,8 @@
         (; nlayers) = spectral_grid
 
         for k in 2:nlayers
-            # transmittance cannot be negative
+            # transmittance has to be between 0 and 1
+            # because optical depth non-negative
             @test 1 >= t[k] >= 0
         end
     end

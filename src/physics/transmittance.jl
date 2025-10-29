@@ -1,21 +1,21 @@
 abstract type AbstractTransmittance <: AbstractParameterization end
 
-# function barrier to dispatch to type of model.optical_depth
+# function barrier to dispatch to type of model.transmittance
 function transmittance!(column::ColumnVariables, model::AbstractModel)
-    transmittance!(column, model.optical_depth, model)
+    transmittance!(column, model.transmittance, model)
 end
 
-export TransparentTrasmittance
-struct TransparentTrasmittance{NF} <: AbstractTransmittance end
-TransparentTrasmittance(SG::SpectralGrid) = TransparentTrasmittance{SG.NF}()
-initialize!(od::TransparentTrasmittance, ::AbstractModel) = nothing
-function transmittance!(column::ColumnVariables, ::TransparentTrasmittance, ::AbstractModel)
+export TransparentTransmittance
+struct TransparentTransmittance{NF} <: AbstractTransmittance end
+TransparentTransmittance(SG::SpectralGrid) = TransparentTransmittance{SG.NF}()
+initialize!(od::TransparentTransmittance, ::AbstractModel) = nothing
+function transmittance!(column::ColumnVariables, ::TransparentTransmittance, ::AbstractModel)
     column.transmittance_longwave .= 1
     column.transmittance_shortwave .= 1
 end
 
-export FriersonTransmittace
-@kwdef mutable struct FriersonTransmittace{NF} <: AbstractTransmittace
+export FriersonTransmittance
+@kwdef mutable struct FriersonTransmittance{NF} <: AbstractTransmittance
     "[OPTION] Spectral band to use"
     band::Int = 1
 
@@ -29,12 +29,12 @@ export FriersonTransmittace
     fₗ::NF = 0.1
 end
 
-FriersonTransmittace(SG::SpectralGrid; kwargs...) = FriersonTransmittace{SG.NF}(; kwargs...)
-initialize!(od::FriersonTransmittace, model::AbstractModel) = nothing
+FriersonTransmittance(SG::SpectralGrid; kwargs...) = FriersonTransmittance{SG.NF}(; kwargs...)
+initialize!(od::FriersonTransmittance, model::AbstractModel) = nothing
 
 function transmittance!(
     column::ColumnVariables{NF},
-    od::FriersonTransmittace,
+    od::FriersonTransmittance,
     model::AbstractModel,
 ) where NF
 

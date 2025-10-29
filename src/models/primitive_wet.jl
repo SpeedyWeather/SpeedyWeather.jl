@@ -40,7 +40,7 @@ $(TYPEDFIELDS)"""
     HF,     # <:AbstractSurfaceHumidityFlux,
     LSC,    # <:AbstractCondensation,
     CV,     # <:AbstractConvection,
-    TR,     # <:AbstractTransmittance,
+    TA,     # <:AbstractTransmittance,
     SW,     # <:AbstractShortwave,
     LW,     # <:AbstractLongwave,
     SP,     # <:AbstractStochasticPhysics,
@@ -95,7 +95,7 @@ $(TYPEDFIELDS)"""
     surface_humidity_flux::HF = SurfaceHumidityFlux(spectral_grid)
     large_scale_condensation::LSC = ImplicitCondensation(spectral_grid)
     convection::CV = SimplifiedBettsMiller(spectral_grid)
-    transmittance::TR = ZeroTransmittance(spectral_grid)
+    transmittance::TA = TransparentTransmittance(spectral_grid)
     shortwave_radiation::SW = TransparentShortwave(spectral_grid)
     longwave_radiation::LW = JeevanjeeRadiation(spectral_grid)
     stochastic_physics::SP = nothing

@@ -174,8 +174,8 @@ function shortwave_radiation!(
     for k in 1:nlayers
         q = humid[k]
         qsat = sat_humid[k]
-        qmin = qsat*radiation.specific_humidity_threshold_min
-        qmax = qsat*radiation.specific_humidity_threshold_max
+        qmin = qsat*radiation.relative_humidity_threshold_min
+        qmax = qsat*radiation.relative_humidity_threshold_max
         cloud_cover[k] = min(1, P + min(1, (q - qmin)/(qmax-qmin))^2)
     end
 
@@ -190,14 +190,17 @@ function shortwave_radiation!(
         D *= t[k]
         flux_temp_downward[k+1] += D
     end
-    
-    # Cloudy portion from cloud top downward
-    R = cloud_albedo * cloud_cover[cloud_top]       # reflectivity
-    U_reflected = D * R                             # upward flux from cloud-top reflection
-    D *= (1 - R)                                    # reduce downward flux due to cloud albedo
-    for k in cloud_top:nlayers
-        D *= τ[k]
-        flux_temp_downward[k+1] += D
+
+    U_reflected = zero(D)                           # initialize reflected upward flux from cloud top
+    if cloud_top < nlayers+1                        # otherwise no clouds
+        # Cloudy portion from cloud top downward
+        R = cloud_albedo * cloud_cover[cloud_top]   # reflectivity
+        U_reflected = D * R                         # upward flux from cloud-top reflection
+        D *= (1 - R)                                # reduce downward flux due to cloud albedo
+        for k in cloud_top:nlayers
+            D *= t[k]
+            flux_temp_downward[k+1] += D
+        end 
     end
 
     # Surface reflection
@@ -215,7 +218,7 @@ function shortwave_radiation!(
     # Upward beam
     flux_temp_upward[nlayers+1] += U
     for k in nlayers:-1:1
-        U *= τ[k]
+        U *= t[k]
         U += k == cloud_top ? U_reflected : zero(U)
         flux_temp_upward[k] += U
     end
