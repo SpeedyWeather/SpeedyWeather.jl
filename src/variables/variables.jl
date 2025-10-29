@@ -28,6 +28,11 @@ Indicator type for spectral 3D variables (l, m, k).
 """
 struct Spectral3D <: AbstractVariableDims end
 
+# intialize variables
+zero(::AbstractVariable{Grid2D}, SG::SpectralGrid) = zeros(SG.GridVariable2D, SG.grid)
+zero(::AbstractVariable{Grid3D}, SG::SpectralGrid) = zeros(SG.GridVariable3D, SG.grid, SG.nlayers)
+zero(::AbstractVariable{Spectral2D}, SG::SpectralGrid) = zeros(SG.SpectralVariable2D, SG.spectrum)
+zero(::AbstractVariable{Spectral3D}, SG::SpectralGrid) = zeros(SG.SpectralVariable3D, SG.spectrum, SG.nlayers)
 
 """
     $TYPEDEF
@@ -190,12 +195,5 @@ get_diagnostic_variables(model::AbstractModel) = get_diagnostic_variables(variab
 # TODO: not quite sure yet about the nlayers or where it'll go
 # initialize a NamedTuple from variables 
 function initialize_variables(SG::SpectralGrid, nlayers::Integer, variables...) 
-    (; grid, spectrum, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D) = SG
-
-    zero_init(var::AbstractVariable{Grid2D}) = zeros(GridVariable2D, grid)
-    zero_init(var::AbstractVariable{Grid3D}) = zeros(GridVariable3D, grid, nlayers)
-    zero_init(var::AbstractVariable{Spectral2D}) = zeros(SpectralVariable2D, spectrum)
-    zero_init(var::AbstractVariable{Spectral3D}) = zeros(SpectralVariable3D, spectrum, nlayers)
-    
-    return NamedTuple{Tuple(map(v -> v.name, variables))}(Tuple(map(var -> zero_init(var), variables)))
+    return NamedTuple{Tuple(map(v -> v.name, variables))}(Tuple(map(var -> zero(var, SG, nlayers), variables)))
 end 
