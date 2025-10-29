@@ -95,7 +95,7 @@ export OneBandShortwave
 
 struct OneBandShortwave <: AbstractShortwave
     # thresholds / weights
-    rh_cl::Float64        # RH_cl,  thresholds for RH and cloud water content (Eqs. 26–27).
+    rh_cl::Float64        # RH_cl,  thresholds for RH and cloud water content (Eqs. 2627).
     rh_clp::Float64       # RH'_cl,     ---------------------''-----------------------
     q_cl::Float64         # Q_cl,       ---------------------''-----------------------
     wp_cl::Float64        # w_pcl   weighting of precipitation term (Eq. 28).
@@ -106,24 +106,24 @@ end
 
 """
     OneBandShortwave(; 
-        rh_cl=0.30,          # RH threshold for cloud cover = 0 (–)
-        rh_clp=1.00,         # RH threshold for cloud cover = 1 (–)
+        rh_cl=0.30,          # RH threshold for cloud cover = 0 (-)
+        rh_clp=1.00,         # RH threshold for cloud cover = 1 (-)
         q_cl=0.20,           # Absolute humidity threshold for cloud cover (g kg⁻¹)
-        wp_cl=0.20,          # Weight for √precip term (–) at 1 mm day⁻¹
+        wp_cl=0.20,          # Weight for √precip term (-) at 1 mm day⁻¹
         pmax_cl=10.0,        # Cap on precip contributing to cloud cover (mm day⁻¹)
-        alb_cl=0.43,         # Cloud albedo for visible band at CLC=1 (–)
+        alb_cl=0.43,         # Cloud albedo for visible band at CLC=1 (-)
     )
 
-Defaults mirror SPEEDY’s shortwave constants. 
+Defaults mirror SPEEDYs shortwave constants. 
 Notes:
 - `abs_wv_vis` expects q in g kg⁻¹. If your model uses kg kg⁻¹, internally scale by 1000 (or rescale the coefficient).
-- `abs_dry` is calibrated per layer mass of Δp = 10⁵ Pa (SPEEDY convention). Match your Beer–Lambert exponent accordingly.
-- If you don’t implement Eq. 34 stratocumulus, you can ignore `alb_cls`, `cls_*`, `clf`, `gses*`.
+- `abs_dry` is calibrated per layer mass of Δp = 10⁵ Pa (SPEEDY convention). Match your Beer-Lambert exponent accordingly.
+- If you dont implement Eq. 34 stratocumulus, you can ignore `alb_cls`, `cls_*`, `clf`, `gses*`.
 """
 OneBandShortwave() = OneBandShortwave(
-    0.30, 1.00, 0.20,   # rh_cl (–), rh_clp (–), q_cl (g kg⁻¹)
-    0.20, 10.0,         # wp_cl (–), pmax_cl (mm day⁻¹)
-    0.43                # alb_cl (–)
+    0.30, 1.00, 0.20,   # rh_cl (-), rh_clp (-), q_cl (g kg⁻¹)
+    0.20, 10.0,         # wp_cl (-), pmax_cl (mm day⁻¹)
+    0.43                # alb_cl (-)
 )
 
 get_nbands(::OneBandShortwave) = 1
