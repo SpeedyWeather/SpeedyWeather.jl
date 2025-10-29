@@ -146,7 +146,11 @@ function shortwave_radiation!(
     qv  = humid
     qsat = sat_humid
     T   = eltype(qv)
-    τk = @view optical_depth_shortwave[1:nlayers, 1]
+    
+    τk = ndims(optical_depth_shortwave) == 1 ?
+         @view(optical_depth_shortwave[1:nlayers]) :
+         @view(optical_depth_shortwave[1:nlayers, 1])
+
 
     # ---- derived diagnostics ----
     RH = @. clamp(qv / max(qsat, eps(T)), 0, 1) # clamp relative humidity between 0 and 1
