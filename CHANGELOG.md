@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- OneBandShortwave radiation implemented with diagnostic clouds [#888](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/888)
+
 ## v0.17.3
 
 - Add missing compat entires for SpeedyWeatherInternals [#883](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/883)
