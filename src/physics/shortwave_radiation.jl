@@ -140,6 +140,9 @@ $(TYPEDFIELDS)"""
 
     "[OPTION] Cloud albedo for visible band at CLC=1 [1]"
     cloud_albedo::NF = 0.43
+
+    "[OPTION] Use cloud top reflection?"
+    cloud_top_reflection::Bool = true
 end
 
 # generator function
@@ -159,9 +162,12 @@ function shortwave_radiation!(
     # ---- pull only fields that exist on ColumnVariables ----
     (; nlayers, cos_zenith, land_fraction,
        humid, sat_humid, albedo_ocean, albedo_land,
-       transmittance_shortwave, flux_temp_downward, flux_temp_upward,
-       cloud_top) = column
+       transmittance_shortwave, flux_temp_downward, flux_temp_upward) = column
 
+    # without cloud top reflection set locally cloud top below surface to disable
+    # cloud reflection completely
+    cloud_top = radiation.cloud_top_reflection ? column.cloud_top : nlayers+1
+    
     wpcl = radiation.precipitation_weight
     pmcl = radiation.precipitation_max
 
@@ -191,6 +197,7 @@ function shortwave_radiation!(
         flux_temp_downward[k+1] += D
     end
 
+    # Cloud reflection
     U_reflected = zero(D)                           # initialize reflected upward flux from cloud top
     if cloud_top < nlayers+1                        # otherwise no clouds
         # Cloudy portion from cloud top downward
