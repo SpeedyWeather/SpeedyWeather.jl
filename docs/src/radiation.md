@@ -171,6 +171,7 @@ run!(simulation, period=Week(1))
 
 # get surface shortwave radiation down
 ssrd = simulation.diagnostic_variables.physics.surface_shortwave_down
+heatmap(ssrd,title="Outgoing shortwave radiation [W/m^2]")
 save("ssrd.png", ans) # hide
 nothing # hide
 ```
