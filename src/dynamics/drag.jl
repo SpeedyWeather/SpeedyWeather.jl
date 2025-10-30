@@ -64,7 +64,7 @@ function drag!(
     Fv = diagn.tendencies.v_tend_grid
 
     # total drag coefficient with radius scaling
-    c = diagn.scale[]^2
+    c = diagn.scale[]
 
     @. Fu -= c*drag.drag_coefs' .* u
     @. Fv -= c*drag.drag_coefs' .* v

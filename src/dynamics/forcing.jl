@@ -148,7 +148,6 @@ end
     Fu[ij] += tapering[k] * amplitude[j]
 end
 
-
 export StochasticStirring
 @parameterized @kwdef struct StochasticStirring{NF, VectorType} <: AbstractForcing
         
@@ -295,6 +294,9 @@ $(TYPEDFIELDS)"""
     "[OPTION] vertical temperature gradient [K]"
     Δθz::NF = 10
 
+    "[OPTION] log of sigma level per layer"
+    logσ::VectorType
+
     "[DERIVED] (inverse) relaxation time scale per layer and latitude"
     temp_relax_freq::MatrixType
 
@@ -312,11 +314,12 @@ function HeldSuarez(SG::SpectralGrid; kwargs...)
     (; NF, VectorType, MatrixType, nlat, nlayers) = SG
 
     # allocate
-    temp_relax_freq = zeros(MatrixType, nlayers, nlat)
-    temp_equil_a = zeros(VectorType, nlat)
-    temp_equil_b = zeros(VectorType, nlat)
+    logσ = zeros(nlayers)
+    temp_relax_freq = zeros(nlayers, nlat)
+    temp_equil_a = zeros(nlat)
+    temp_equil_b = zeros(nlat)
 
-    return HeldSuarez{NF, VectorType, MatrixType}(; temp_relax_freq, temp_equil_a, temp_equil_b, kwargs...)
+    return HeldSuarez{NF, VectorType, MatrixType}(; logσ, temp_relax_freq, temp_equil_a, temp_equil_b, kwargs...)
 end
 
 """$(TYPEDSIGNATURES)
@@ -325,15 +328,18 @@ equilibrium temperature Teq."""
 function initialize!(   forcing::HeldSuarez,
                         model::PrimitiveEquation)
 
-    (; σ_levels_full, coslat, sinlat) = model.geometry
+    (; coslat, sinlat) = model.geometry
+    σ = model.geometry.σ_levels_full
     (; σb, ΔTy, Δθz, relax_time_slow, relax_time_fast, Tmax) = forcing
-    (; temp_relax_freq, temp_equil_a, temp_equil_b) = forcing
+    (; logσ, temp_relax_freq, temp_equil_a, temp_equil_b) = forcing
                            
     (; pres_ref) = model.atmosphere
 
     # slow relaxation everywhere, fast in the tropics
     kₐ = 1/relax_time_slow.value
     kₛ = 1/relax_time_fast.value
+
+    logσ .= log.(σ)               # precompute log(σ) for equilibrium temperature calculation
 
     # Held and Suarez equation 4
     temp_relax_freq .=  kₐ .+ (kₛ - kₐ)*max.(0, (σ .- σb) ./ (1-σb)) .* (coslat').^4
@@ -357,15 +363,15 @@ function forcing!(
     pres_grid = diagn.grid.pres_grid
     temp_tend_grid = diagn.tendencies.temp_tend_grid
 
-    (; Tmin, temp_relax_freq, temp_equil_a, temp_equil_b) = forcing
+    (; Tmin, logσ, temp_relax_freq, temp_equil_a, temp_equil_b) = forcing
     (; κ) = model.atmosphere
     σ = model.geometry.σ_levels_full
 
     (; whichring) = temp_grid.grid
     launch!(architecture(temp_tend_grid), RingGridWorkOrder, size(temp_tend_grid), held_suarez_kernel!,
             temp_tend_grid, temp_grid, pres_grid,
-            @Const(temp_relax_freq), @Const(temp_equil_a), @Const(temp_equil_b),
-            @Const(Tmin), @Const(κ), @Const(σ), @Const(whichring))
+            temp_relax_freq, temp_equil_a, temp_equil_b, logσ,
+            Tmin, κ, σ, whichring)
 end
 
 @kernel inbounds=true function held_suarez_kernel!(
@@ -375,6 +381,7 @@ end
     @Const(temp_relax_freq),
     @Const(temp_equil_a),
     @Const(temp_equil_b),
+    @Const(logσ),
     @Const(Tmin),
     @Const(κ),
     @Const(σ),
@@ -385,6 +392,6 @@ end
     kₜ = temp_relax_freq[k, j]           # (inverse) relaxation time scale
 
     # Held and Suarez 1996, equation 3 with precomputed a, b during initialization
-    Teq = max(Tmin, (temp_equil_a[j] + temp_equil_b[j]*pres_grid[ij])*σ[k]^κ)
+    Teq = max(Tmin, (temp_equil_a[j] + temp_equil_b[j]*logσ[k])*σ[k]^κ)
     temp_tend_grid[ij, k] -= kₜ*(temp_grid[ij, k] - Teq)  # Held and Suarez 1996, equation 2
 end
