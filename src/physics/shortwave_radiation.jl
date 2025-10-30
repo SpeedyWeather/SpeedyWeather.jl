@@ -259,7 +259,9 @@ function shortwave_radiation!(
 
     # --- Surface stratocumulus reflection ---
     # At the surface, apply stratocumulus reflection using CLS and stratocumulus_cloud_albedo
-    D_surface = D * (1 - stratocumulus_cloud_albedo * CLS)
+    # Compute the reflected (upward) flux from stratocumulus at the surface
+    U_stratocumulus = D * stratocumulus_cloud_albedo * CLS
+    D_surface = D - U_stratocumulus
     column.surface_shortwave_down = D_surface
     up_ocean = albedo_ocean * D_surface
     up_land  = albedo_land  * D_surface
@@ -268,11 +270,13 @@ function shortwave_radiation!(
 
     # Computes grid-cell-average surface albedo and reflected shortwave flux
     albedo = (1 - land_fraction) * albedo_ocean + land_fraction * albedo_land
-    U = albedo * D_surface # TODO add reflect flux? + D_surface * stratocumulus_cloud_albedo * CLS
-    column.surface_shortwave_up = U
+    
+    U = albedo * D_surface 
+    column.surface_shortwave_up = U 
 
     # Upward beam
-    flux_temp_upward[nlayers+1] += U
+    flux_temp_upward[nlayers+1] += U + U_stratocumulus
+
     for k in nlayers:-1:1
         U *= t[k]
         U += k == cloud_top ? U_reflected : zero(U)
