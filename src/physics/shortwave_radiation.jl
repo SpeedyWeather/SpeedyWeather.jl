@@ -145,22 +145,22 @@ $(TYPEDFIELDS)"""
     cloud_top_reflection::Bool = true
 
     "[OPTION] Ozone absorption in upper stratosphere (W/m^2)"
-    ozone_absorp_upper::NF = 0.0
+    ozone_absorp_upper::NF = 0
     
     "[OPTION] Ozone absorption in lower stratosphere (W/m^2)"
-    ozone_absorp_lower::NF = 0.0
+    ozone_absorp_lower::NF = 0
 
     "[OPTION] Stratocumulus cloud albedo (surface reflection/absorption) [1]"
     stratocumulus_cloud_albedo::NF = 0.5
 
     "[OPTION] Static stability lower threshold for stratocumulus (GSEN, called GSES0 in the paper) [J/kg]"
-    stratocumulus_stability_min::NF = 0.0
+    stratocumulus_stability_min::NF = 0
 
     "[OPTION] Static stability upper threshold for stratocumulus (GSEN, called GSES1 in the paper) [J/kg]"
-    stratocumulus_stability_max::NF = 200.0
+    stratocumulus_stability_max::NF = 200
 
     "[OPTION] Maximum stratocumulus cloud cover (called CLSMAX in the paper) [1]"
-    stratocumulus_cover_max::NF = 1.0
+    stratocumulus_cover_max::NF = 1
 
     "[OPTION] Enable stratocumulus cloud parameterization?"
     use_stratocumulus::Bool = true
@@ -207,7 +207,7 @@ function shortwave_radiation!(
     end
 
     # --- Stratocumulus parameterization (CLS) ---
-    CLS = 0.0
+    CLS = zero(P)
     if radiation.use_stratocumulus
         # Compute static stability (GSEN) as difference in dry static energy between lowest and next-lowest layer
         # GSEN = S_N - S_{N-1}
@@ -232,7 +232,7 @@ function shortwave_radiation!(
 
     # Downward beam
     (; cloud_albedo, ozone_absorp_upper, ozone_absorp_lower, stratocumulus_cloud_albedo) = radiation
-    t = view(transmittance_shortwave,:, 1)          # only one band
+    t = view(transmittance_shortwave, :, 1)          # only one band
 
     # Apply ozone absorption at TOA as subtracted fluxes 
     D_TOA = model.planet.solar_constant * cos_zenith
@@ -268,7 +268,7 @@ function shortwave_radiation!(
 
     # Computes grid-cell-average surface albedo and reflected shortwave flux
     albedo = (1 - land_fraction) * albedo_ocean + land_fraction * albedo_land
-    U = albedo * D_surface
+    U = albedo * D_surface # TODO add reflect flux? + D_surface * stratocumulus_cloud_albedo * CLS
     column.surface_shortwave_up = U
 
     # Upward beam

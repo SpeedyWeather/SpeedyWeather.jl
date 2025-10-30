@@ -68,7 +68,7 @@ using SpeedyWeather
 subtypes(SpeedyWeather.AbstractShortwave)
 ```
 
-### OneBandShortwave: Single-band shortwave radiation with diagnostic clouds
+## OneBandShortwave: Single-band shortwave radiation with diagnostic clouds
 
 *Note: Stratocumulus cloud parameterization and ozone-radiation interactions are currently not implemented in the `OneBandShortwave` scheme.*
 
@@ -156,15 +156,35 @@ with cloud reflection added at the cloud-top layer. The upward part is only mode
 - Top-of-atmosphere insolation set by the solar constant and zenith angle
 - Designed for use in idealized and moist atmospheric simulations
 
-#### Usage
+### Usage
 
-To use the new scheme, construct your model with:
+To use the new scheme, construct your model with the following and run as usual.
+The altered shortwave fluxes can be visualised as shown.
 
-```julia
+```@example radiation
+using SpeedyWeather
+spectral_grid = SpectralGrid(trunc=31, nlayers=8)
 model = PrimitiveWetModel(spectral_grid; shortwave_radiation=OneBandShortwave(spectral_grid))
-```
+simulation = initialize!(model)
+run!(simulation, period=Week(1))
 
-and run as usual. The scheme will output surface and top-of-atmosphere shortwave fluxes, as well as cloud-modified radiative tendencies.
+# get surface shortwave radiation down
+ssrd = simulation.diagnostic_variables.physics.surface_shortwave_down
+heatmap(ssrd, title="Surface shortwave radiation down [W/m^2]")
+save("ssrd.png", ans) # hide
+nothing # hide
+```
+![Surface shortwave radiation down](ssrd.png)
+
+
+```@example radiation
+osr = simulation.diagnostic_variables.physics.outgoing_shortwave_radiation
+heatmap(osr, title="Outgoing shortwave radiation [W/m^2]")
+save("osr.png", ans) # hide
+nothing # hide
+```
+![Outgoing shortwave radiation](osr.png)
+
 
 ## References
 
