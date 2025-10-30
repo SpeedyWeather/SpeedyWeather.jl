@@ -69,25 +69,17 @@ function initialize!(   forcing::JetStreamForcing,
     A₀ *= radius                        # scale by radius as are the momentum equations
 
     (; nlat, colat) = model.geometry
-
-    for j in 1:nlat
-        # latitude in radians, abs for north/south symmetry
-        θ = abs(π/2 - colat[j])
-        if θ₀ < θ < θ₁
-            # Similar to u as in Galewsky, 2004 but with north/south symmetry
-            amplitude[j] = A₀*exp(1/(θ-θ₀)/(θ-θ₁))  
-        else
-            amplitude[j] = 0
-        end
-    end
+    # latitude in radians, abs for north/south symmetry
+    θ = @. abs(π/2 - colat)
+    
+    # Similar to u as in Galewsky, 2004 but with north/south symmetry
+    @. amplitude = A₀*exp(1/(θ-θ₀)/(θ-θ₁))
+    amplitude[.~(θ₀ .< θ .< θ₁)] .= 0   # apply latitude mask
 
     # vertical tapering
-    (; nlayers, sigma, tapering) = forcing
-    (; σ_levels_full) = model.geometry
-
-    for k in 1:nlayers
-        tapering[k] = 1 - abs(sigma - σ_levels_full[k])
-    end
+    (; sigma, tapering) = forcing
+    σ = model.geometry.σ_levels_full
+    tapering .= 1 .- abs.(sigma .- σ)
 
     return nothing
 end
@@ -162,10 +154,10 @@ function initialize!(
 
     # precompute the latitudinal mask
     (; latd) = model.geometry
-    for j in eachindex(forcing.lat_mask)
-        # Gaussian centred at forcing.latitude of width forcing.width
-        forcing.lat_mask[j] = exp(-(forcing.latitude-latd[j])^2/forcing.width^2*2)
-    end
+
+    # Gaussian centred at forcing.latitude of width forcing.width
+    @. forcing.lat_mask = exp(-(forcing.latitude-latd)^2/forcing.width^2*2)
+    return nothing
 end
 
 function forcing!(
@@ -224,7 +216,7 @@ $(TYPEDFIELDS)
 """
 @parameterized @kwdef mutable struct KolmogorovFlow{NF} <: AbstractForcing
     "[OPTION] Strength of forcing [1/s²]"
-    @param strength::NF = 3e-12
+    @param strength::NF = 1.5e-5
 
     "[OPTION] Wavenumber of forcing in meridional direction (pole to pole)"
     @param wavenumber::NF = 8 (bounds=Positive,)
@@ -241,8 +233,8 @@ function forcing!(
     lf::Integer,
     model::AbstractModel,
 )
-    # scale by radius^2 as is the vorticity equation
-    s = forcing.strength * diagn.scale[]^2
+    # scale by radius as is the vorticity equation
+    s = forcing.strength * diagn.scale[]
     k = forcing.wavenumber
 
     Fu = diagn.tendencies.u_tend_grid
