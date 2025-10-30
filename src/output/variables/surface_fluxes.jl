@@ -46,8 +46,25 @@ end
 path(::SurfaceLatentHeatFluxOutput, simulation) =
     simulation.diagnostic_variables.physics.surface_latent_heat_flux
 
+"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+Fields are: $(TYPEDFIELDS)"""
+@kwdef mutable struct BoundaryLayerDragOutput <: AbstractOutputVariable
+    name::String = "bld"
+    unit::String = "1"
+    long_name::String = "Boundary layer drag coefficient from BulkRichardsonDrag scheme"
+    dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
+    missing_value::Float64 = NaN
+    compression_level::Int = 3
+    shuffle::Bool = true
+    keepbits::Int = 7
+end
+
+path(::BoundaryLayerDragOutput, simulation) =
+    simulation.diagnostic_variables.physics.boundary_layer_drag
+
 SurfaceFluxesOutput() = (
     SurfaceSensibleHeatFluxOutput(),
     # SurfaceHumidityFluxOutput(),      # don't output by default as it is proportional to latent heat flux
     SurfaceLatentHeatFluxOutput(),
+    BoundaryLayerDragOutput(),
 )
