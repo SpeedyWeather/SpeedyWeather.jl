@@ -4,7 +4,7 @@ export ImplicitCondensation
 """
 Large-scale condensation with implicit time stepping.
 $(TYPEDFIELDS)"""
-@kwdef mutable struct ImplicitCondensation{NF} <: AbstractCondensation
+@kwdef struct ImplicitCondensation{NF} <: AbstractCondensation
     "[OPTION] Relative humidity threshold [1 = 100%] to trigger condensation"
     relative_humidity_threshold::NF = 0.95
 
@@ -27,6 +27,8 @@ end
 ImplicitCondensation(SG::SpectralGrid; kwargs...) = ImplicitCondensation{SG.NF}(; kwargs...)
 initialize!(::ImplicitCondensation, ::PrimitiveEquation) = nothing
 
+Adapt.@adapt_structure ImplicitCondensation
+
 # function barrier
 function parameterization!(ij, diagn, progn, lsc::ImplicitCondensation, model)
     (; clausius_clapeyron, geometry, planet, atmosphere, time_stepping) = model
@@ -47,7 +49,7 @@ function large_scale_condensation!(
     geometry::Geometry,
     planet::AbstractPlanet,
     atmosphere::AbstractAtmosphere,
-    time_stepping::AbstractTimeStepper,
+    time_stepping,
 )
     # use previous time step for more stable Euler forward step of the parameterizations
     temp = diagn.grid.temp_grid_prev        # temperature [K] TODO add temperature profile!!!
@@ -156,4 +158,11 @@ function large_scale_condensation!(
     # diagn.physics.snow_rate_large_scale[ij] = snow_flux_down
 
     return nothing
+end
+
+function variables(::AbstractCondensation)
+    return (
+        DiagnosticVariable(name=:rain_large_scale, dims=Grid2D(), desc="Large-scale precipitation (rain)", units="m"),
+        DiagnosticVariable(name=:snow_large_scale, dims=Grid2D(), desc="Large-scale precipitation (snow)", units="m"),
+    )
 end

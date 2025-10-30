@@ -53,6 +53,13 @@ function soil_moisture_availability!(
     return nothing
 end
 
+function variables(::NoVegetation)
+    return (
+        PrognosticVariable(name=:soil_moisture, dims=Grid3D(), namespace=:land),
+        DiagnosticVariable(name=:soil_moisture_availability, dims=Grid2D(), desc="Soil moisture availability for evaporation", units="1", namespace=:land),
+    )
+end
+
 export VegetationClimatology
 @kwdef mutable struct VegetationClimatology{NF, GridVariable2D} <: AbstractVegetation
     "[OPTION] Combine high and low vegetation factor, a in high + a*low [1]"
@@ -192,4 +199,11 @@ end
     # so multiply by W_cap here (not done in Fortran SPEEDY)
     soil_moisture_availability[ij] = r*(D_top*soil_moisture[ij, 1]*W_cap +
         veg*D_root*max(soil_moisture[ij, 2]*W_cap - W_wilt, 0))
+end
+
+function variables(::VegetationClimatology)
+    return (
+        DiagnosticVariable(name=:soil_moisture_availability, dims=Grid2D(), desc="Soil moisture availability for evaporation", units="1", namespace=:land),
+        PrognosticVariable(name=:soil_moisture, dims=Grid2D(), namespace=:land),
+    )
 end

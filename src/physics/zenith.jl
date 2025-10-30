@@ -225,13 +225,13 @@ function cos_zenith!(
 
     # Launch kernel for solar zenith calculation
     launch!(architecture(cos_zenith), LinearWorkOrder, size(cos_zenith), solar_zenith_kernel!, 
-            cos_zenith, solar_hour_angle_0E, sinδ, cosδ, sinlat, coslat, lons)
+            cos_zenith, solar_hour_angle_0E, sinδ, cosδ, sinlat, coslat, lons, cos_zenith.grid.whichring)
 end
 
 # Kernel for solar zenith calculation with daily cycle
-@kernel inbounds=true function solar_zenith_kernel!(cos_zenith, @Const(solar_hour_angle_0E), @Const(sinδ), @Const(cosδ), @Const(sinlat), @Const(coslat), @Const(lons))
+@kernel inbounds=true function solar_zenith_kernel!(cos_zenith, @Const(solar_hour_angle_0E), @Const(sinδ), @Const(cosδ), @Const(sinlat), @Const(coslat), @Const(lons), @Const(whichring))
     ij = @index(Global, Linear)
-    j = whichring(ij, cos_zenith)
+    j = whichring[ij]
     
     sinδsinϕ = sinδ * sinlat[j]
     cosδcosϕ = cosδ * coslat[j]
@@ -283,13 +283,13 @@ function cos_zenith!(
 
     # Launch kernel for seasonal solar zenith calculation
     launch!(architecture(cos_zenith), LinearWorkOrder, size(cos_zenith), solar_zenith_season_kernel!,
-            cos_zenith, δ, sinδ, cosδ, sinlat, coslat, lat)
+            cos_zenith, δ, sinδ, cosδ, sinlat, coslat, lat, cos_zenith.grid.whichring)
 end
 
 # Kernel for seasonal solar zenith calculation (daily average)
-@kernel inbounds=true function solar_zenith_season_kernel!(cos_zenith, @Const(δ), @Const(sinδ), @Const(cosδ), @Const(sinlat), @Const(coslat), @Const(lat))
+@kernel inbounds=true function solar_zenith_season_kernel!(cos_zenith, @Const(δ), @Const(sinδ), @Const(cosδ), @Const(sinlat), @Const(coslat), @Const(lat), @Const(whichring))
     ij = @index(Global, Linear)
-    j = whichring(ij, cos_zenith)
+    j = whichring[ij]
     
     NF = eltype(cos_zenith)         # force type stability
     local h₀::NF                    # hour angle sunrise to sunset
@@ -306,3 +306,5 @@ end
     
     cos_zenith[ij] = cos_zenith_j
 end
+
+variables(::AbstractZenith) = (DiagnosticVariable(name=:cos_zenith, dims=Grid2D(), desc="Cosine of solar zenith angle", units="1"),)

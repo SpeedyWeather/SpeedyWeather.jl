@@ -208,3 +208,5 @@ function initialize!(   orog::EarthOrography,
     spectral_truncation!(geopot_surf)       # set the lmax+1 harmonics to zero
     return nothing    
 end
+
+Adapt.adapt_structure(to, orog::AbstractOrography) = (orography=orog.orography, )

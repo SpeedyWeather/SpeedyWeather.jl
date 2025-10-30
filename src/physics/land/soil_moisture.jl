@@ -125,6 +125,12 @@ function timestep!(
     return nothing
 end
 
+function variables(::SeasonalSoilMoisture)
+    return (
+        PrognosticVariable(name=:soil_moisture, dims=Grid3D(), namespace=:land),
+    )
+end
+
 export LandBucketMoisture
 
 @kwdef mutable struct LandBucketMoisture{NF} <: AbstractSoilMoisture
@@ -260,4 +266,16 @@ end
         # remove excess water from lower layer (this disappears)
         soil_moisture[ij, 2] = min(soil_moisture[ij, 2], 1)
     end
+end
+
+function variables(::LandBucketMoisture)
+    return (
+        # Prognostic variables
+        PrognosticVariable(name=:soil_moisture, dims=Grid3D(), namespace=:land),
+        # Diagnostic variables written to diagn.physics
+        DiagnosticVariable(name=:river_runoff, dims=Grid2D(), desc="River runoff from soil moisture", units="m/s", namespace=:land),
+        # Diagnostic variables read from diagn.physics
+        DiagnosticVariable(name=:total_precipitation_rate, dims=Grid2D(), desc="Total precipitation rate", units="m/s"),
+        DiagnosticVariable(name=:surface_humidity_flux, dims=Grid2D(), desc="Surface humidity flux", units="kg/s/m²", namespace=:land),
+    )
 end

@@ -13,6 +13,8 @@ in their paper. Fields and options are $(TYPEDFIELDS)"""
     relative_humidity::NF = 0.7
 end
 
+Adapt.@adapt_structure SimplifiedBettsMiller
+
 # generator function 
 SimplifiedBettsMiller(SG::SpectralGrid; kwargs...) = SimplifiedBettsMiller{SG.NF}(; kwargs...)
 initialize!(::SimplifiedBettsMiller, ::PrimitiveEquation) = nothing
@@ -57,7 +59,7 @@ function convection!(ij, diagn, SBM::SimplifiedBettsMiller, model)
     geopot = diagn.dynamics.uv∇lnp                          # geopotential [m²/s²] on full levels
 
     # TODO move this to its own parameterization?
-    geopotential!(ij, geopot, temp_virt, model.orography, planet.gravity, model.geopotential)
+    geopotential!(ij, geopot, temp_virt, model.orography.orography, planet.gravity, model.geopotential)
 
     # CONVECTIVE CRITERIA AND FIRST GUESS RELAXATION
     # Create pseudo column for surface_temp_humid function (this needs to be updated later)
@@ -140,8 +142,8 @@ function convection!(ij, diagn, SBM::SimplifiedBettsMiller, model)
 
     # GET TENDENCIES FROM ADJUSTED PROFILES
     for k in level_zero_buoyancy:nlayers
-        temp_tend[ij, k] -= (temp[ij, k] - temp_ref_profile[k]) / SBM.time_scale.value
-        δq = (humid[ij, k] - humid_ref_profile[k]) / SBM.time_scale.value
+        temp_tend[ij, k] -= (temp[ij, k] - temp_ref_profile[ij,k]) / SBM.time_scale.value
+        δq = (humid[ij, k] - humid_ref_profile[ij,k]) / SBM.time_scale.value
         humid_tend[ij, k] -= δq
 
         # convective precipitation (rain), integrate dq\dt [(kg/kg)/s] vertically
@@ -154,7 +156,9 @@ function convection!(ij, diagn, SBM::SimplifiedBettsMiller, model)
     
     # Store precipitation in diagnostic arrays
     diagn.physics.rain_convection[ij] += rain_convection
-    diagn.physics.rain_rate_convection[ij] = rain_convection / Δt_sec    # rate: convert to [m/s] of rain
+
+    # TODO: double check, because preivously this was rain_rate_convection, which didn't exist
+    diagn.physics.total_precipitation_rate[ij] = rain_convection / Δt_sec    # rate: convert to [m/s] of rain
 
     # Update cloud top
     diagn.physics.cloud_top[ij] = min(diagn.physics.cloud_top[ij], level_zero_buoyancy)       # clouds reach to top of convection
@@ -189,8 +193,10 @@ function pseudo_adiabat!(
     ε = clausius_clapeyron.mol_ratio
     μ = (1-ε)/ε                             # for virtual temperature
 
-    nlayers = length(σ)                     # number of vertical levels
-    temp_ref_profile[ij, :] .= NaN          # reset profile from any previous calculation, TODO necessary?
+    nlayers = length(σ)                         # number of vertical levels
+    for i in 1:nlayers
+        temp_ref_profile[ij, i] = NF(NaN)           # reset profile from any previous calculation, TODO necessary?
+    end
     temp_ref_profile[ij, nlayers] = temp_parcel     # start profile at surface with parcel temperature
 
     local saturated::Bool = false           # did the parcel reach saturation yet?
@@ -238,7 +244,7 @@ function pseudo_adiabat!(
     end
     
     # if parcel isn't buoyant anymore set last temperature (with negative buoyancy) back to NaN
-    temp_ref_profile[ij, k] = !buoyant ? NaN : temp_ref_profile[ij, k]
+    temp_ref_profile[ij, k] = !buoyant ? NF(NaN) : temp_ref_profile[ij, k]
     
     # level of zero buoyancy is reached when the loop stops, but in case it's at the top it's still buoyant
     level_zero_buoyancy = k + (1-buoyant)
@@ -255,6 +261,10 @@ $(TYPEDFIELDS)"""
 @kwdef struct DryBettsMiller{NF} <: AbstractConvection
     "[OPTION] Relaxation time for profile adjustment"
     time_scale::Second = Hour(4)
+end
+
+function Adapt.adapt_structure(to, DBM::DryBettsMiller{NF}) where NF
+    return DryBettsMiller{NF}(adapt_structure(to, DBM.time_scale))
 end
 
 # generator function
@@ -346,7 +356,10 @@ function dry_adiabat!(
         length(σ) == length(temp_environment) || throw(BoundsError)
 
     nlayers = length(temp_ref_profile)      # number of vertical levels
-    temp_ref_profile[ij, :] .= NaN          # reset profile from any previous calculation
+
+    for i in 1:nlayers
+        temp_ref_profile[ij, i] = NF(NaN)          # reset profile from any previous calculation
+    end
     temp_ref_profile[ij, nlayers] = temp_parcel    # start profile at surface with parcel temperature
 
     local buoyant::Bool = true              # is the parcel still buoyant?
@@ -364,7 +377,7 @@ function dry_adiabat!(
     end
     
     # if parcel isn't buoyant anymore set last temperature (with negative buoyancy) back to NaN
-    temp_ref_profile[ij, k] = !buoyant ? NaN : temp_ref_profile[ij, k]    
+    temp_ref_profile[ij, k] = !buoyant ? NF(NaN) : temp_ref_profile[ij, k]    
     
     # level of zero buoyancy is reached when the loop stops, but in case it's at the top it's still buoyant
     level_zero_buoyancy = k + (1-buoyant)
@@ -396,6 +409,8 @@ $(TYPEDFIELDS)"""
     lat_mask::VectorType
 end
 
+Adapt.@adapt_structure ConvectiveHeating
+
 # generator
 ConvectiveHeating(SG::SpectralGrid; kwargs...) = ConvectiveHeating{SG.NF, SG.VectorType}(lat_mask=zeros(SG.nlat); kwargs...)
 
@@ -412,7 +427,7 @@ end
 # function barrier
 parameterization!(ij, diagn, progn, convection_scheme::ConvectiveHeating, model) = convection!(ij, diagn, convection_scheme, model)
 
-function convection!(
+@inline function convection!(
     ij,
     diagn::DiagnosticVariables,
     scheme::ConvectiveHeating,
@@ -443,4 +458,12 @@ function convection!(
         temp_tend[ij, k] += Qmax*exp(-((p-p₀)/σₚ)^2 / 2)*cos²θ_term
     end
     return nothing
+end
+
+function variables(::AbstractConvection)
+    return (
+        DiagnosticVariable(name=:rain_convection, dims=Grid2D(), desc="Convective precipitation", units="m"),
+        DiagnosticVariable(name=:cloud_top, dims=Grid2D(), desc="Cloud top level", units="1"),
+        DiagnosticVariable(name=:total_precipitation_rate, dims=Grid2D(), desc="Total precipitation rate", units="m/s"),
+    )
 end

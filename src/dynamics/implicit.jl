@@ -184,13 +184,13 @@ Initialize the implicit terms for the PrimitiveEquation models."""
 function initialize!(
     implicit::ImplicitPrimitiveEquation,
     dt::Real,                                           # the scaled time step radius*dt
-    diagn::DiagnosticVariables{NF},
+    diagn::DiagnosticVariables,
     geometry::AbstractGeometry,
     geopotential::AbstractGeopotential,
     atmosphere::AbstractAtmosphere,
     adiabatic_conversion::AbstractAdiabaticConversion,
-) where NF
-
+) 
+    NF = eltype(diagn)
     # option to skip reinitialization at restart
     (implicit.initialized && !implicit.reinitialize) && return nothing
 
