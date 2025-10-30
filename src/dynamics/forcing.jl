@@ -229,3 +229,122 @@ function forcing!(
     Fu = diagn.tendencies.u_tend_grid
     set!(Fu, (λ, θ, σ) -> s*sind(k*θ), model.geometry)
 end
+
+export HeldSuarez
+
+"""Temperature relaxation from Held and Suarez, 1996 BAMS
+$(TYPEDFIELDS)"""
+@kwdef struct HeldSuarez{NF, VectorType, MatrixType} <: AbstractForcing
+    "[OPTION] sigma coordinate below which faster surface relaxation is applied"
+    σb::NF = 0.7
+
+    "[OPTION] time scale for slow global relaxation"
+    relax_time_slow::Second = Day(40)
+
+    "[OPTION] time scale for faster tropical surface relaxation"
+    relax_time_fast::Second = Day(4)
+
+    "[OPTION] minimum equilibrium temperature [K]"
+    Tmin::NF = 200    
+
+    "[OPTION] maximum equilibrium temperature [K]"
+    Tmax::NF = 315    
+
+    "[OPTION] meridional temperature gradient [K]"
+    ΔTy::NF = 60
+    
+    "[OPTION] vertical temperature gradient [K]"
+    Δθz::NF = 10
+
+    "[DERIVED] (inverse) relaxation time scale per layer and latitude"
+    temp_relax_freq::MatrixType
+
+    "[DERIVED] Term a to calculate equilibrium temperature function of latitude"
+    temp_equil_a::VectorType
+
+    "[DERIVED] Term b to calculate equilibrium temperature function of latitude"
+    temp_equil_b::VectorType
+end
+
+"""
+$(TYPEDSIGNATURES)
+create a HeldSuarez temperature relaxation with arrays allocated given `spectral_grid`"""
+function HeldSuarez(SG::SpectralGrid; kwargs...)
+    (; NF, VectorType, MatrixType, nlat, nlayers) = SG
+
+    # allocate
+    temp_relax_freq = zeros(MatrixType, nlayers, nlat)
+    temp_equil_a = zeros(VectorType, nlat)
+    temp_equil_b = zeros(VectorType, nlat)
+
+    return HeldSuarez{NF, VectorType, MatrixType}(; temp_relax_freq, temp_equil_a, temp_equil_b, kwargs...)
+end
+
+"""$(TYPEDSIGNATURES)
+initialize the HeldSuarez temperature relaxation by precomputing terms for the
+equilibrium temperature Teq."""
+function initialize!(   forcing::HeldSuarez,
+                        model::PrimitiveEquation)
+
+    (; σ_levels_full, coslat, sinlat) = model.geometry
+    (; σb, ΔTy, Δθz, relax_time_slow, relax_time_fast, Tmax) = forcing
+    (; temp_relax_freq, temp_equil_a, temp_equil_b) = forcing
+                           
+    (; pres_ref) = model.atmosphere
+
+    # slow relaxation everywhere, fast in the tropics
+    kₐ = 1/relax_time_slow.value
+    kₛ = 1/relax_time_fast.value
+
+    # Held and Suarez equation 4
+    temp_relax_freq .=  kₐ .+ (kₛ - kₐ)*max.(0, (σ .- σb) ./ (1-σb)) .* (coslat').^4
+
+    # Held and Suarez equation 3, split into max(Tmin, (a - b*ln(p))*(p/p₀)^κ)
+    # precompute a, b to simplify online calculation
+    @. temp_equil_a = Tmax - ΔTy*sinlat^2 + Δθz*log(pres_ref)*coslat^2
+    @. temp_equil_b = -Δθz*coslat^2
+end
+
+"""$(TYPEDSIGNATURES)
+Apply temperature relaxation following Held and Suarez 1996, BAMS."""
+function forcing!(
+    diagn::DiagnosticVariables,
+    progn::PrognosticVariables,
+    forcing::HeldSuarez,
+    lf::Integer,
+    model::AbstractModel,
+)
+    temp_grid = diagn.grid.temp_grid
+    pres_grid = diagn.grid.pres_grid
+    temp_tend_grid = diagn.tendencies.temp_tend_grid
+
+    (; Tmin, temp_relax_freq, temp_equil_a, temp_equil_b) = forcing
+    (; κ) = model.atmosphere
+    σ = model.geometry.σ_levels_full
+
+    launch!(architecture(temp_tend_grid), RingGridWorkOrder, size(temp_tend_grid), held_suarez_kernel!,
+            temp_tend_grid, temp_grid, pres_grid,
+            @Const(temp_relax_freq), @Const(temp_equil_a), @Const(temp_equil_b),
+            @Const(Tmin), @Const(κ), @Const(σ), @Const(temp_grid.grid.whichring))
+end
+
+@kernel inbounds=true function held_suarez_kernel!(
+    temp_tend_grid,
+    temp_grid,
+    pres_grid,
+    @Const(temp_relax_freq),
+    @Const(temp_equil_a),
+    @Const(temp_equil_b),
+    @Const(Tmin),
+    @Const(κ),
+    @Const(σ),
+    @Const(whichring),
+)
+    ij, k = @index(Global, Linear)
+    j = whichring[ij]                   # latitude ring index
+    kₜ = temp_relax_freq[k, j]           # (inverse) relaxation time scale
+
+    # Held and Suarez 1996, equation 3 with precomputed a, b during initialization
+    Teq = max(Tmin, (temp_equil_a[j] + temp_equil_b[j]*pres_grid[ij])*σ[k]^κ)
+    temp_tend_grid[ij, k] -= kₜ*(temp_grid[ij, k] - Teq)  # Held and Suarez 1996, equation 2
+end

@@ -365,6 +365,8 @@ In general, these are the fields you can write into for new terms
 - `div_tend` in spectral space
 - `pres_tend` in spectral space
 - `pres_tend_grid` in grid space
+- `temp_tend_grid` in grid space
+- `humid_tend_gri` in grid space
 
 One currently cannot force vorticity or divergence in grid space
 but you would need to force u,v instead. In contrast, u and v cannot

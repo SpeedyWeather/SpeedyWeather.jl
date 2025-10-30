@@ -45,7 +45,6 @@ function parameterization_tendencies!(
     model::PrimitiveEquation,
 )
     get_thermodynamics!(column, model)
-    temperature_relaxation!(column, model)
     boundary_layer_drag!(column, model)
     vertical_diffusion!(column, model)
     convection!(column, model)
