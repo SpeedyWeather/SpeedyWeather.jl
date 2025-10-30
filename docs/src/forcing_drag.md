@@ -355,13 +355,26 @@ instead to accumulate the tendency. Otherwise you would undo the forcing term!
 Note that this conflict would be avoided if the forcing writes into
 `vor_tend` but the drag writes into `u_tend_grid`.
 
+## Allowed forcings
+
 In general, these are the fields you can write into for new terms
 
+- `u_tend_grid` in grid space
+- `v_tend_grid` in grid space
 - `vor_tend` in spectral space
-- `div_tend` in spectral space (shallow water only)
-- `pres_tend` in spectral space (shallow water only)
-- `u_tend_grid` in grid-point space
-- `v_tend_grid` in grid-point space
+- `div_tend` in spectral space
+- `pres_tend` in spectral space
+- `pres_tend_grid` in grid space
+- `temp_tend_grid` in grid space
+- `humid_tend_gri` in grid space
 
-These space restrictions exist because of the way how SpeedyWeather transforms
-between spaces to obtain tendencies.
+One currently cannot force vorticity or divergence in grid space
+but you would need to force u,v instead. In contrast, u and v cannot
+be forced in spectral space only in grid space.
+These restrictions exist because of the way how SpeedyWeather transforms
+between spaces to obtain tendencies. Pressure (or interface displacement
+in the shallow water) can be forced both in spectral or grid space.
+Note that if you write into the pressure tendency for the primitie equation model
+these need to correspond to ``\partial_t \ln p_s`` so not in units of Pa/s but
+including the logarithm! In the shallow water model, this should have
+the normal units of m/s instead.
