@@ -69,7 +69,7 @@ if !FLAG_EXTENDED_TESTS && !FLAG_ENZYME_TESTS
     include("physics/land.jl")
     include("physics/transmittance.jl")
     include("physics/longwave_radiation.jl")
-    # include("physics/shortwave_radiation.jl")
+    include("physics/shortwave_radiation.jl")
     include("physics/surface_fluxes.jl")
     include("physics/random_process.jl")
     include("physics/stochastic_physics.jl")
