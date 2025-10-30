@@ -117,7 +117,7 @@ $(TYPEDFIELDS)"""
     feedback::FB = Feedback()
 
     # COMPONENTS
-    # Tuples with symbols of all parameterizations and parameter functions
+    # Tuples with symbols or instances of all parameterizations and parameter functions
     # Used to initiliaze variables and for the column-based parameterizations
     model_parameters::TS1 = (:time_stepping, :orography, :geopotential, :atmosphere, 
                                                        :planet, :geometry, :land_sea_mask, :clausius_clapeyron)

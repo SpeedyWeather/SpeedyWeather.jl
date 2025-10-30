@@ -79,16 +79,18 @@ end
 Extract the model components with parameters needed for the parameterizations
 as NamedTuple. These are the GPU-compatible components of the model."""
 function get_model_parameters(model::PrimitiveEquation)
-    values = map(field -> getproperty(model, field), model.model_parameters)
-    return NamedTuple{model.model_parameters}(values)
+    names = map(field -> _get_param_name(model, field), model.model_parameters)
+    values = map(field -> _get_param(model, field), model.model_parameters)
+    return NamedTuple{names}(values)
 end
 
 """$(TYPEDSIGNATURES)
 Extract the parameterizations from the model as NamedTuple.
 These are the GPU-compatible components of the model."""
 function get_parameterizations(model::PrimitiveEquation)
-    values = map(field -> getproperty(model, field), model.parameterizations)
-    return NamedTuple{model.parameterizations}(values)
+    names = map(field -> _get_param_name(model, field), model.parameterizations)
+    values = map(field -> _get_param(model, field), model.parameterizations)
+    return NamedTuple{names}(values)
 end
 
 # TODO: better name? 
@@ -96,8 +98,9 @@ end
 Extract the extra parameterizations from the model that are not part of the 
 column-based parameterizations, but define variables such as land and ocean."""
 function get_extra_parameterizations(model::PrimitiveEquation)
-    values = map(field -> getproperty(model, field), model.extra_parameterizations)
-    return NamedTuple{model.extra_parameterizations}(values)
+    names = map(field -> _get_param_name(model, field), model.extra_parameterizations)
+    values = map(field -> _get_param(model, field), model.extra_parameterizations)
+    return NamedTuple{names}(values)
 end
 
 get_parameterizations(model::Barotropic) = NamedTuple()
@@ -111,3 +114,12 @@ Extract the parameterizations from the model including land and ocean, to infer 
 function get_all_parameterizations(model::PrimitiveEquation)
     return merge(get_parameterizations(model), get_extra_parameterizations(model))
 end
+
+# helper function to extract parameterizations from model tuples
+_get_param(model, field::Symbol) = getfield(model, field)
+_get_param(model, obj::Pair{Symbol}) = obj.second
+_get_param(model, obj) = error("Unknown parameterization type: $(typeof(obj)), needs to be <:Symbol or <:Pair{Symbol, obj}")
+
+_get_param_name(model, field::Symbol) = field
+_get_param_name(model, obj::Pair{Symbol}) = obj.first
+_get_param_name(model, obj) = error("Unknown parameterization type: $(typeof(obj)), needs to be <:Symbol or <:Pair{Symbol, obj}")

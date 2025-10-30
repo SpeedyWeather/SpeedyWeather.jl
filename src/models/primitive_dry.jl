@@ -108,7 +108,7 @@ $(TYPEDFIELDS)"""
     callbacks::Dict{Symbol, AbstractCallback} = Dict{Symbol, AbstractCallback}()
     feedback::FB = Feedback()
     
-    # Tuples with symbols of all parameterizations and parameter functions
+    # Tuples with symbols or instances of all parameterizations and parameter functions
     # Used to initiliaze variables and for the column-based parameterizations
     model_parameters::TS1 = (:orography, :atmosphere, :planet, :geometry, :land_sea_mask)
     parameterizations::TS2 = (:vertical_diffusion, :convection, :albedo, :optical_depth,
