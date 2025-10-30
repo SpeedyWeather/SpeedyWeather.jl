@@ -143,6 +143,12 @@ $(TYPEDFIELDS)"""
 
     "[OPTION] Use cloud top reflection?"
     cloud_top_reflection::Bool = true
+
+    "[OPTION] Ozone absorption factor at TOA (0 = full absorption, 1 = no absorption)"
+    ozone_absorption_factor::NF = 1.0
+
+    "[OPTION] Stratocumulus enhancement factor for low cloud reflection/absorption (1 = no enhancement)"
+    stratocumulus_enhancement::NF = 1.0
 end
 
 # generator function
@@ -186,9 +192,10 @@ function shortwave_radiation!(
     end
 
     # Downward beam
-    (; cloud_albedo) = radiation
+    (; cloud_albedo, ozone_absorption_factor, stratocumulus_enhancement) = radiation
     t = view(transmittance_shortwave,:, 1)          # only one band
-    D = model.planet.solar_constant * cos_zenith    # top of atmosphere downward radiation
+    # Apply ozone absorption at TOA (multiplicative factor < 1)
+    D = model.planet.solar_constant * cos_zenith * ozone_absorption_factor
     flux_temp_downward[1] += D
 
     # Clear sky portion until cloud top
@@ -201,7 +208,11 @@ function shortwave_radiation!(
     U_reflected = zero(D)                           # initialize reflected upward flux from cloud top
     if cloud_top < nlayers+1                        # otherwise no clouds
         # Cloudy portion from cloud top downward
-        R = cloud_albedo * cloud_cover[cloud_top]   # reflectivity
+        # Stratocumulus enhancement: apply only to lowest layer if desired
+        R = cloud_albedo * cloud_cover[cloud_top]
+        if cloud_top == nlayers  # cloud top at surface (low cloud)
+            R *= stratocumulus_enhancement
+        end
         U_reflected = D * R                         # upward flux from cloud-top reflection
         D *= (1 - R)                                # reduce downward flux due to cloud albedo
         for k in cloud_top:nlayers
