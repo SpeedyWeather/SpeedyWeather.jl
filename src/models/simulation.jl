@@ -5,12 +5,12 @@ $(TYPEDSIGNATURES)
 Simulation is a container struct to be used with `run!(::Simulation)`.
 It contains
 $(TYPEDFIELDS)"""
-struct Simulation{Model<:AbstractModel} <: AbstractSimulation{Model}
+struct Simulation{Model<:AbstractModel, Progn, Diagn} <: AbstractSimulation{Model}
     "define the current state of the model"
-    prognostic_variables::PrognosticVariables
+    prognostic_variables::Progn
 
     "contain the tendencies and auxiliary arrays to compute them"
-    diagnostic_variables::DiagnosticVariables
+    diagnostic_variables::Diagn
 
     "all parameters, constant at runtime"
     model::Model
@@ -46,7 +46,7 @@ function run!(
 end
 
 # fallback to be extended when plotting library extension are loaded
-unicodeplot(x) = x
+unicodeplot(x) = nothing
 
 """$(TYPEDSIGNATURES)
 Initializes a `simulation`. Scales the variables, initializes
@@ -73,15 +73,21 @@ function initialize!(
         initialize!(clock, time_stepping, period)
     end
 
-    # OUTPUT
-    simulation.model.output.active = output                     # enable/disable output
+    # OUTPUT, enable/disable output
+    set!(simulation.model.output, active=output, reset_path=true)
 
     # SCALING: we use vorticity*radius, divergence*radius in the dynamical core
     scale!(progn, diagn, model.planet.radius)
 
     # OUTPUT INITIALISATION AND STORING INITIAL CONDITIONS + FEEDBACK
     # propagate spectral state to grid variables for initial condition output
-    lf = 1                                  # use first leapfrog index
+    lf = model.time_stepping.first_step_euler ? 1 : 2       # use 2nd leapfrog index when restarting
+    
+    # raise a warning if starting with leapfrog but there's zero vorticity
+    vor = get_step(progn.vor, lf)
+    lf == 2 && all(vor .== 0) && @warn "Vorticity is zero on 2nd leapfrog index though you use it to calculate tendencies."*
+        " You may wanted to continue with a leapfrog step without data for it in the 2nd step."
+
     transform!(diagn, progn, lf, model, initialize=true)
     initialize!(diagn, progn.particles, progn, model)
     initialize!(model.output, model.feedback, progn, diagn, model)
@@ -98,6 +104,5 @@ function finalize!(simulation::AbstractSimulation)
     unscale!(progn)                                 # undo radius-scaling for vor, div from the dynamical core
     unscale!(diagn)                                 # undo radius-scaling for vor, div from the dynamical core
     finalize!(model.output, simulation)             # possibly post-process output, then close netCDF file
-    write_restart_file!(model.output, progn)         # as JLD2 
     finalize!(model.callbacks, progn, diagn, model) # any callbacks to finalize?
 end

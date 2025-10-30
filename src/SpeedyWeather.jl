@@ -14,11 +14,11 @@ import Base.Threads: Threads, @threads
 import KernelAbstractions: KernelAbstractions, @kernel, @index, @Const, synchronize
 import Adapt: Adapt, adapt, adapt_structure
 
-using SpeedyWeatherInternals
+using  SpeedyWeatherInternals
 using  SpeedyWeatherInternals.Architectures
 import SpeedyWeatherInternals.Architectures: AbstractArchitecture, CPU, GPU, 
-        on_architecture, architecture, array_type, ismatching, nonparametric_type
-export on_architecture, architecture                # export device functions 
+       on_architecture, architecture, array_type, ismatching, nonparametric_type
+export CPU, GPU, on_architecture, architecture                # export device functions 
 
 # INPUT OUTPUT
 import TOML
@@ -32,7 +32,7 @@ import BitInformation: round, round!
 import ProgressMeter
 
 # UTILITIES
-using DomainSets.IntervalSets
+using  DomainSets.IntervalSets
 
 # to avoid a `using Dates` to pass on DateTime arguments
 export DateTime, Millisecond, Second, Minute, Hour, Day, Week, Month, Year, Century, Millenium
@@ -43,12 +43,13 @@ export initialize!, finalize!
 # import utilities
 using SpeedyWeatherInternals.Utils 
 
-include("SpeedyParameters/SpeedyParameters.jl")
-using .SpeedyParameters
-import .SpeedyParameters: parameters
+# parameter handling
+using SpeedyWeatherInternals.SpeedyParameters
+
+import SpeedyWeatherInternals.SpeedyParameters: parameters
 
 # export user-facing parameter handling types and methods
-export  SpeedyParam, SpeedyParams, parameters, stripparams
+export SpeedyParam, SpeedyParams, parameters, stripparams
 
 # DATA STRUCTURES
 # LowerTriangularArrays for spherical harmonics
@@ -105,8 +106,7 @@ export power_spectrum
 import SpeedyTransforms: prettymemory
 
 # to be defined in GeoMakie extension
-export globe, animate
-function globe end
+export animate, globe
 function animate end
 
 # abstract types
@@ -176,10 +176,10 @@ include("physics/land/land.jl")
 
 # OUTPUT
 include("output/schedule.jl")
+include("output/callbacks.jl")
 include("output/feedback.jl")
 include("output/netcdf_output.jl")
 include("output/restart_file.jl")
-include("output/callbacks.jl")
 include("output/particle_tracker.jl")
 include("output/jld2_output.jl")
 

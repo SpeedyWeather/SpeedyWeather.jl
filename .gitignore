@@ -33,6 +33,7 @@ Manifest.toml
 
 # no model output folders
 run_*/
+tmp_*/
 
 # no video outputs
 *.mp4

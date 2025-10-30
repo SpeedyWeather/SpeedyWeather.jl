@@ -123,18 +123,55 @@ end
     end
 
     # test outputting other model defaults
-    output = NetCDFOutput(spectral_grid, Barotropic, path=tmp_output_path)
+    output = NetCDFOutput(spectral_grid, PrimitiveWet, path=tmp_output_path)
     model = PrimitiveWetModel(spectral_grid; output)
+
+    # Add surface variables output for testing them
+    add!(model,
+        SpeedyWeather.ZonalVelocity10mOutput(), 
+        SpeedyWeather.MeridionalVelocity10mOutput(), 
+        SpeedyWeather.SurfaceTemperatureOutput(),
+#         SpeedyWeather.MeanSeaLevelPressureOutput(),   # this should be default now
+#         SpeedyWeather.SurfacePressureOutput(),        # don't output surface pressure too
+    )
+
     simulation = initialize!(model)
     run!(simulation, output=true; period)
+    
     @test simulation.model.feedback.nans_detected == false
     ds = NCDataset(joinpath(model.output.run_path, model.output.filename))
-    @test ~haskey(ds, "temp")
-    @test ~haskey(ds, "humid")
-    @test ~haskey(ds, "pres")
+    
+    # test    
+    @test haskey(ds, "temp")
+    @test haskey(ds, "humid")
+    @test ~haskey(ds, "pres")   # with MSLP as default this should not be contained in the nc file
+    @test haskey(ds, "mslp")    # but this variable
+
+    # Test reasonable scale for mean
+    (; pres_ref) = model.atmosphere     # unpack reference pressure
+    pres_ref = pres_ref / 100           # Pa -> hPa  
+    mslp = ds["mslp"].var[:, :, end]    # variable at last time step `.var` to read the raw data ignoring any mask
+    
+    # should be within ~800 to ~1200hPa
+    @test all(0.8 .< mslp./pres_ref .< 1.2)
+
+    ## test u10, v10 existence
+    @test haskey(ds, "u")
+    @test haskey(ds, "u10")
+    @test haskey(ds, "v")
+    @test haskey(ds, "v10")
+
+    # and 10m values cannot exceed lowermost layer of u,v value
+    @test maximum(abs.(ds["u10"].var[:, :, end])) < maximum(abs.(ds["u"].var[:, :, end, end]))
+    @test maximum(abs.(ds["v10"].var[:, :, end])) < maximum(abs.(ds["u"].var[:, :, end, end]))
+
+    ## surface temperature should be within 60-130% of 
+    (; temp_ref) = model.atmosphere                 # in K
+    Tsurf = ds["tsurf"].var[:, :, end] .+ 273.15    # last timestep from ˚C to K
+    @test all(0.6 .< (Tsurf ./ temp_ref) .< 1.3)
 end
 
-@testset "Restart from output file" begin
+@testset "Restart from restart file" begin
     tmp_output_path = mktempdir(pwd(), prefix = "tmp_testruns_")  # Cleaned up when the process exits
 
     spectral_grid = SpectralGrid()
@@ -151,8 +188,31 @@ end
     progn_new = simulation_new.prognostic_variables
 
     for varname in (:vor, :div, :temp, :pres)
-        var_old = getfield(progn_old, varname)[1]
-        var_new = getfield(progn_new, varname)[1]
+        var_old = getfield(progn_old, varname)
+        var_new = getfield(progn_new, varname)
+        @test all(var_old .== var_new)
+    end
+end 
+
+@testset "Restart from restart file without output" begin
+    tmp_output_path = mktempdir(pwd(), prefix = "tmp_restart_")  # Cleaned up when the process exits
+
+    spectral_grid = SpectralGrid()
+    model = PrimitiveDryModel(spectral_grid)
+    simulation = initialize!(model)
+    add!(model, :restart_file => RestartFile(path=tmp_output_path, write_only_with_output=false, filename="myrestart.jld2"))
+    run!(simulation, period=Day(1))
+
+    initial_conditions = StartFromFile(run_folder=tmp_output_path, filename="myrestart.jld2")
+    model_new = PrimitiveDryModel(spectral_grid; initial_conditions)
+    simulation_new = initialize!(model_new)
+
+    progn_old = simulation.prognostic_variables
+    progn_new = simulation_new.prognostic_variables
+
+    for varname in (:vor, :div, :temp, :pres)
+        var_old = getfield(progn_old, varname)
+        var_new = getfield(progn_new, varname)
         @test all(var_old .== var_new)
     end
 end 
@@ -207,3 +267,4 @@ end
     @test t == manual_time_axis(model.output.startdate, model.time_stepping.Δt_millisec, progn.clock.n_timesteps)
     @test t == SpeedyWeather.load_trajectory("time", model)
 end
+
