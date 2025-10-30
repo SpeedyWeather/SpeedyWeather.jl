@@ -1,6 +1,19 @@
 # Changelog
 
-# Unreleased
+## Unreleased
+
+- Zenith constructors [#889](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/889)
+- More general forcing of pressure, vorticity and divergence [#855](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/855)
+
+## v0.17.3
+
+- Add missing compat entires for SpeedyWeatherInternals [#883](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/883)
+- Move SpeedyParameters to SpeedyWeatherInternals [#880](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/880)
+- Remove JOSS paper draft workflow [#874](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/874)
+- Change particle tracking to every 4 hours [#881](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/881)
+- SpectralGrid can now be initialized from a grid instance as well [#882](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/882)
+
+## v0.17.2
 
 - Higher default BulkRichardsonDrag via surface gusts + bug fixes [#857](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/857)
 - Expand scratch memory handling in spectral transforms for better differentiability with Enzyme and revise FFT plans [#791](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/791)
