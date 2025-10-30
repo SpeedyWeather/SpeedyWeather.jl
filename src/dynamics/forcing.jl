@@ -24,39 +24,25 @@ Galewsky, 2004, but mirrored for both hemispheres.
 $(TYPEDFIELDS)
 """
 @parameterized @kwdef mutable struct JetStreamForcing{NF, VectorType} <: AbstractForcing
-    "Number of latitude rings"
-    nlat::Int = 0
-
-    "Number of vertical layers"
-    nlayers::Int = 0
-
-    "jet latitude [˚N]"
+    "[OPTION] jet latitude [˚N]"
     @param latitude::NF = 45 (bounds=-90..90,)
     
-    "jet width [˚], default ≈ 19.29˚"
+    "[OPTION] jet width [˚], default ≈ 19.29˚"
     @param width::NF = (1/4-1/7)*180 (bounds=Positive,)
 
-    "sigma level [1], vertical location of jet"
+    "[OPTION] sigma level [1], vertical location of jet"
     @param sigma::NF = 0.2 (bounds=Nonnegative,)
 
-    "jet speed scale [m/s]"
+    "[OPTION] jet speed scale [m/s]"
     @param speed::NF = 85
 
-    "time scale [days]"
+    "[OPTION] time scale [days]"
     time_scale::Second = Day(30)
 
-    """
-    "precomputed amplitude vector [m/s²]"
-    amplitude::Vector{NF} = zeros(NF, nlat)
-
-    "precomputed vertical tapering"
-    tapering::Vector{NF} = zeros(NF, nlayers)
-    """
-
-    "precomputed amplitude vector [m/s²]"
+    "[DERIVED] precomputed amplitude vector [m/s²]"
     amplitude::VectorType
     
-    "precomputed vertical tapering"
+    "[DERIVED] precomputed vertical tapering"
     tapering::VectorType
 
 end
@@ -66,9 +52,7 @@ function JetStreamForcing(SG::SpectralGrid; kwargs...)
     amplitude = on_architecture(SG.architecture, zeros(SG.NF, SG.nlat))
     tapering = on_architecture(SG.architecture, zeros(SG.NF, SG.nlayers))
     
-    return JetStreamForcing{SG.NF, SG.VectorType}(  
-        nlat=SG.nlat, nlayers=SG.nlayers,
-        amplitude=amplitude, tapering=tapering; kwargs...)
+    return JetStreamForcing{SG.NF, SG.VectorType}(; amplitude, tapering, kwargs...)
 end
 
 function initialize!(   forcing::JetStreamForcing,
@@ -150,9 +134,6 @@ end
 
 export StochasticStirring
 @parameterized @kwdef struct StochasticStirring{NF, VectorType} <: AbstractForcing
-        
-    "Number of latitude rings, used for latitudinal mask"
-    nlat::Int
 
     "[OPTION] Stirring strength A [1/s²]"
     @param strength::NF = 2e-11
@@ -162,14 +143,14 @@ export StochasticStirring
 
     "[OPTION] Stirring width [˚]"
     @param width::NF = 24 (bounds=Positive,)
-    
-    # TO BE INITIALISED        
-    "Latitudinal mask, confined to mid-latitude storm track by default [1]"
-    lat_mask::VectorType = zeros(NF, nlat)
+
+    "[DERIVED] Latitudinal mask, confined to mid-latitude storm track by default [1]"
+    lat_mask::VectorType
 end
 
 function StochasticStirring(SG::SpectralGrid; kwargs...)
-    return StochasticStirring{SG.NF, SG.VectorType}(; nlat=SG.nlat, kwargs...)
+    lat_mask = on_architecture(SG.architecture, zeros(SG.NF, SG.nlat))
+    return StochasticStirring{SG.NF, SG.VectorType}(; lat_mask, kwargs...)
 end
 
 function initialize!(
@@ -294,7 +275,7 @@ $(TYPEDFIELDS)"""
     "[OPTION] vertical temperature gradient [K]"
     Δθz::NF = 10
 
-    "[OPTION] log of sigma level per layer"
+    "[DERIVED] log of sigma level per layer"
     logσ::VectorType
 
     "[DERIVED] (inverse) relaxation time scale per layer and latitude"
@@ -314,10 +295,10 @@ function HeldSuarez(SG::SpectralGrid; kwargs...)
     (; NF, VectorType, MatrixType, nlat, nlayers) = SG
 
     # allocate
-    logσ = zeros(nlayers)
-    temp_relax_freq = zeros(nlayers, nlat)
-    temp_equil_a = zeros(nlat)
-    temp_equil_b = zeros(nlat)
+    logσ = on_architecture(SG.architecture, zeros(SG.NF, nlayers))
+    temp_relax_freq = on_architecture(SG.architecture, zeros(SG.NF, nlayers, nlat))
+    temp_equil_a = on_architecture(SG.architecture, zeros(SG.NF, nlat))
+    temp_equil_b = on_architecture(SG.architecture, zeros(SG.NF, nlat))
 
     return HeldSuarez{NF, VectorType, MatrixType}(; logσ, temp_relax_freq, temp_equil_a, temp_equil_b, kwargs...)
 end
