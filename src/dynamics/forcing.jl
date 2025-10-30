@@ -270,7 +270,7 @@ $(TYPEDFIELDS)"""
     "[DERIVED] log of sigma level per layer"
     logσ::VectorType
 
-    "[DERIVED] (inverse) relaxation time scale per layer and latitude"
+    "[DERIVED] relaxation time scale per layer and latitude (inverse, 1/s)"
     temp_relax_freq::MatrixType
 
     "[DERIVED] Term a to calculate equilibrium temperature function of latitude"
