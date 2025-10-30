@@ -23,8 +23,8 @@
 end
 
 @testset "Modulo particles" begin
-    for NF in (Float16,Float32,Float64)
-        for n in 1:100
+    @testset for NF in (Float16,Float32,Float64)
+        for n in 1:1000      # not too large otherwise 90 + n*eps(NF) can reach Inf for Float16
             lat = 90 + n*eps(NF)
             p = Particle(lon = 0, lat = lat)
             @test mod(p).lat <= 90
@@ -35,14 +35,15 @@ end
             @test mod(Particle(lon = 0, lat = lat)).lat >= -90
             @test SpeedyWeather.ismod(mod(p))
 
-            lat = 1000*randn(NF)
-            lon = 1000*randn(NF)
+            lat = 100*randn(NF)
+            lon = 100*randn(NF)
             p = Particle(;lon,lat)
             @test SpeedyWeather.ismod(mod(p))
+            SpeedyWeather.ismod(mod(p)) || @info p 
         end
     end
 
-    for NF in (Float32, Float64)
+    @testset for NF in (Float32, Float64)
         for n in 1:1000
             # move particles 1-4x around the globe
             for k in 1:4

@@ -19,6 +19,7 @@ if !FLAG_EXTENDED_TESTS && !FLAG_ENZYME_TESTS
 
     # GENERAL
     include("utility_functions.jl")
+    include("spectral_grid.jl")
     include("parameters.jl")
 
     # GRIDS
@@ -78,4 +79,5 @@ if !FLAG_EXTENDED_TESTS && !FLAG_ENZYME_TESTS
     include("output/schedule.jl")
     include("output/netcdf_output.jl")
     include("output/jld2_output.jl")
+    include("output/feedback.jl")
 end 

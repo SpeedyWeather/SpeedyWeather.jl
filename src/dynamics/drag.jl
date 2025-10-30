@@ -81,6 +81,8 @@ end
 
 QuadraticDrag(SG::SpectralGrid; kwargs...) = QuadraticDrag{SG.NF}(; kwargs...)
 
+initialize!(::QuadraticDrag, ::AbstractModel) = nothing
+
 """
 $(TYPEDSIGNATURES)
 Quadratic drag for the momentum equations.
@@ -108,9 +110,31 @@ function drag!(
     c = drag.c_D / model.atmosphere.layer_thickness
     c *= diagn.scale[]^2
 
+<<<<<<< HEAD
     @. Fu -= c*sqrt(us^2 + vs^2)*us
     @. Fv -= c*sqrt(us^2 + vs^2)*vs
     return nothing
+=======
+    k = diagn.nlayers   # only apply to surface layer
+    
+    # GPU kernel launch
+    arch = architecture(u) 
+    launch!(arch, LinearWorkOrder, (length(u.data),), quadratic_drag_kernel!,
+            Fu, Fv, u, v, c, k)
+end
+
+@kernel inbounds=true function quadratic_drag_kernel!(
+    Fu, Fv, u, v, @Const(c), @Const(k) 
+)
+    ij = @index(Global, Linear)
+    
+    # Calculate speed at surface layer k
+    speed = sqrt(u[ij, k]^2 + v[ij, k]^2)
+    
+    # Apply quadratic drag, -= as the tendencies already contain forcing
+    Fu[ij, k] -= c * speed * u[ij, k]
+    Fv[ij, k] -= c * speed * v[ij, k]
+>>>>>>> f0a433305ff7b287e22f95e9f5720c44f9ab16c8
 end
 
 export LinearVorticityDrag
@@ -120,6 +144,8 @@ export LinearVorticityDrag
 end
 
 LinearVorticityDrag(SG::SpectralGrid; kwargs...) = LinearVorticityDrag{SG.NF}(; kwargs...)
+
+initialize!(::LinearVorticityDrag, ::AbstractModel) = nothing
 
 """
 $(TYPEDSIGNATURES)
@@ -199,7 +225,16 @@ function drag!(
     r = s/drag.time_scale.value
 
     k = diagn.nlayers   # drag only on surface layer
-    for lm in eachharmonic(vor_tend)
-        vor_tend[lm, k] -= r*(vor[lm, k] - ζ₀[lm])
-    end
+    
+    # GPU kernel launch 
+    arch = architecture(diagn.grid.u_grid)
+    launch!(arch, LinearWorkOrder, (size(vor_tend, 1),), jet_drag_kernel!,
+            vor_tend, vor, ζ₀, r, k)
+end
+
+@kernel inbounds=true function jet_drag_kernel!(
+    vor_tend, vor, ζ₀, @Const(r), @Const(k)  
+)
+    lm = @index(Global, Linear)
+    vor_tend[lm, k] -= r * (vor[lm, k] - ζ₀[lm])
 end

@@ -170,8 +170,9 @@ end
                     # CPU legendre transform to generate the intermediate data
                     # NOTE: assumption of working Legendre transform
                     g_north_cpu = S_cpu.scratch_memory.north    
-                    g_south_cpu = S_cpu.scratch_memory.south   
-                    SpeedyTransforms._legendre!(g_north_cpu, g_south_cpu, spec_cpu, S_cpu)
+                    g_south_cpu = S_cpu.scratch_memory.south  
+                    scratch = S_cpu.scratch_memory.column 
+                    SpeedyTransforms._legendre!(g_north_cpu, g_south_cpu, spec_cpu, scratch, S_cpu)
                     # Copy to GPU
                     g_north_gpu = cu(g_north_cpu)
                     g_south_gpu = cu(g_south_cpu);
@@ -295,13 +296,13 @@ end
                     SpeedyTransforms._legendre!(
                         S_cpu.scratch_memory.north, 
                         S_cpu.scratch_memory.south, 
-                        spec_cpu, S_cpu
+                        spec_cpu, S_cpu.scratch_memory.column, S_cpu
                     )
                     # GPU inverse transform
                     SpeedyTransforms._legendre!(
                         S_gpu.scratch_memory.north, 
                         S_gpu.scratch_memory.south, 
-                        spec_gpu, S_gpu
+                        spec_gpu, S_gpu.scratch_memory.column, S_gpu
                     )
 
                     # Convert GPU to CPU for comparison, result is stored in the 
@@ -345,7 +346,8 @@ end
                     SpeedyTransforms._legendre!(
                         spec_cpu,    
                         f_north_cpu, 
-                        f_south_cpu, 
+                        f_south_cpu,
+                        S_cpu.scratch_memory.column,
                         S_cpu
                     )
                     # GPU inverse transform
@@ -353,6 +355,7 @@ end
                         spec_gpu,
                         f_north_gpu, 
                         f_south_gpu, 
+                        S_gpu.scratch_memory.column,
                         S_gpu
                     )
 

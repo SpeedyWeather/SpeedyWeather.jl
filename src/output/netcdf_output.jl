@@ -52,12 +52,15 @@ $(TYPEDFIELDS)"""
     
     "[OPTION] name of the output netcdf file"
     filename::String = "output.nc"
-    
-    "[OPTION] also write restart file if output==true?"
+
+    "[OPTION] also write restart file if output=true?"
     write_restart::Bool = true
 
-    "[DERIVED] package version, used for restart files"
-    pkg_version::VersionNumber = isnothing(pkgversion(SpeedyWeather)) ? v"0.0.0" : pkgversion(SpeedyWeather)
+    "[OPTION] also write parameters txt file if output=true?"
+    write_parameters_txt::Bool = true
+
+    "[OPTION] also write progress txt file if output=true?"
+    write_progress_txt::Bool = true
 
     # WHAT/WHEN OPTIONS
     "[DERIVD] start date of the simulation, used for time dimension in netcdf file"
@@ -201,7 +204,7 @@ function add_default!(
     Model::Type{<:PrimitiveDry},
 )
     add_default!(variables, Barotropic)
-    add!(variables, SurfacePressureOutput(), TemperatureOutput())
+    add!(variables, MeanSeaLevelPressureOutput(), TemperatureOutput())
 end
 
 """$(TYPEDSIGNATURES)
@@ -213,6 +216,15 @@ function add_default!(
 )
     add_default!(variables, PrimitiveDry)
     add!(variables, HumidityOutput())
+end
+
+function set!(output::AbstractOutput; active, reset_path=true)
+    output.active = active
+    if reset_path
+        output.run_folder = ""
+        output.run_path = ""
+    end
+    return nothing
 end
 
 """$(TYPEDSIGNATURES)
@@ -231,11 +243,6 @@ function initialize!(
     # get new id only if not already specified
     determine_run_folder!(output)
     create_run_folder!(output)
-
-    feedback.run_folder = output.run_folder     # synchronize with feedback struct
-    feedback.run_path = output.run_path
-    feedback.progress_meter.desc = "Weather is speedy: $(output.run_folder) "
-    feedback.output = true              # if output=true set feedback.output=true too!
 
     # OUTPUT FREQUENCY
     output.output_every_n_steps = max(1, round(Int,
@@ -278,13 +285,16 @@ function initialize!(
         output!(output, var, Simulation(progn, diagn, model))
     end
 
-    # also export parameters into run????/parameters.txt
-    parameters_txt = open(joinpath(output.run_path, "parameters.txt"), "w")
-    for property in propertynames(model)
-        println(parameters_txt, "model.$property")
-        println(parameters_txt, getfield(model, property,), "\n")
-    end
-    close(parameters_txt)
+    # CALLBACKS
+    # add ParametersTxt callback
+    output.write_parameters_txt && add!(model.callbacks, :parameters_txt => ParametersTxt())
+
+    # add ProgressTxt callback
+    output.write_progress_txt && add!(model.callbacks, :progress_txt => ProgressTxt())
+
+    # add RestartFile callback
+    output.write_restart && add!(model.callbacks, :restart_file => RestartFile())
+    return nothing
 end
 
 Base.close(output::NetCDFOutput) = NCDatasets.close(output.netcdf_file)

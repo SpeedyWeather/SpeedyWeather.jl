@@ -268,7 +268,7 @@ so that you can read the netCDF file with
 ```@example particle_tracker
 using NCDatasets
 run_folder = model.output.run_folder                    # normally the run_???? string with run number
-path = joinpath(run_folder, particle_tracker.file_name) # by default "run_????/particles.nc"
+path = joinpath(run_folder, particle_tracker.filename)  # by default "run_????/particles.nc"
 ds = NCDataset(path)
 ds["lon"]
 ds["lat"]
