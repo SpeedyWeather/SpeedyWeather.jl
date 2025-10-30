@@ -361,10 +361,11 @@ function forcing!(
     (; κ) = model.atmosphere
     σ = model.geometry.σ_levels_full
 
+    (; whichring) = temp_grid.grid
     launch!(architecture(temp_tend_grid), RingGridWorkOrder, size(temp_tend_grid), held_suarez_kernel!,
             temp_tend_grid, temp_grid, pres_grid,
             @Const(temp_relax_freq), @Const(temp_equil_a), @Const(temp_equil_b),
-            @Const(Tmin), @Const(κ), @Const(σ), @Const(temp_grid.grid.whichring))
+            @Const(Tmin), @Const(κ), @Const(σ), @Const(whichring))
 end
 
 @kernel inbounds=true function held_suarez_kernel!(
@@ -379,7 +380,7 @@ end
     @Const(σ),
     @Const(whichring),
 )
-    ij, k = @index(Global, Linear)
+    ij, k = @index(Global, NTuple)
     j = whichring[ij]                   # latitude ring index
     kₜ = temp_relax_freq[k, j]           # (inverse) relaxation time scale
 
