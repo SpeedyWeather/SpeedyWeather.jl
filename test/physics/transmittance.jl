@@ -14,7 +14,7 @@
 
         (; nlayers) = spectral_grid
 
-        for k in 2:nlayers
+        for k in 1:nlayers
             # transmittance has to be between 0 and 1
             # because optical depth non-negative
             @test 1 >= t[k] >= 0
