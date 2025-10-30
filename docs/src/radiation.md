@@ -163,6 +163,7 @@ The altered shortwave fluxes can be visualised as shown.
 
 ```@example radiation
 using SpeedyWeather
+using CairoMakie
 spectral_grid = SpectralGrid(trunc=31, nlayers=8)
 model = PrimitiveWetModel(spectral_grid; shortwave_radiation=OneBandShortwave(spectral_grid))
 simulation = initialize!(model)
@@ -170,21 +171,20 @@ run!(simulation, period=Week(1))
 
 # get surface shortwave radiation down
 ssrd = simulation.diagnostic_variables.physics.surface_shortwave_down
-heatmap(ssrd, title="Surface shortwave radiation down [W/m^2]")
 save("ssrd.png", ans) # hide
 nothing # hide
 ```
-![Surface shortwave radiation down](ssrd.png)
 
+![Surface shortwave radiation down](ssrd.png)
 
 ```@example radiation
 osr = simulation.diagnostic_variables.physics.outgoing_shortwave_radiation
-heatmap(osr, title="Outgoing shortwave radiation [W/m^2]")
+heatmap(osr,title="Outgoing shortwave radiation [W/m^2]")
 save("osr.png", ans) # hide
 nothing # hide
 ```
-![Outgoing shortwave radiation](osr.png)
 
+![Outgoing shortwave radiation](osr.png)
 
 ## References
 
