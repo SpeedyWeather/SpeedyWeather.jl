@@ -66,7 +66,7 @@ function drag!(
     # total drag coefficient with radius scaling
     c = diagn.scale[]^2
 
-    @. Fu -= c*drag.drag_coefs' * u
+    @. Fu -= c*drag.drag_coefs' .* u
     @. Fv -= c*drag.drag_coefs' .* v
 
     return nothing
@@ -100,8 +100,8 @@ function drag!(
     model::AbstractModel,
 )
     k = diagn.nlayers   # only apply to surface layer
-    us = field_view(diagn.grid.u_grid, :, k)
-    vs = field_view(diagn.grid.v_grid, :, k)
+    u = field_view(diagn.grid.u_grid, :, k)
+    v = field_view(diagn.grid.v_grid, :, k)
 
     Fu = field_view(diagn.tendencies.u_tend_grid, :, k)
     Fv = field_view(diagn.tendencies.v_tend_grid, :, k)
@@ -110,31 +110,21 @@ function drag!(
     c = drag.c_D / model.atmosphere.layer_thickness
     c *= diagn.scale[]^2
 
-<<<<<<< HEAD
-    @. Fu -= c*sqrt(us^2 + vs^2)*us
-    @. Fv -= c*sqrt(us^2 + vs^2)*vs
-    return nothing
-=======
-    k = diagn.nlayers   # only apply to surface layer
-    
-    # GPU kernel launch
-    arch = architecture(u) 
-    launch!(arch, LinearWorkOrder, (length(u.data),), quadratic_drag_kernel!,
-            Fu, Fv, u, v, c, k)
+    launch!(architecture(Fu), LinearWorkOrder, size(Fu), quadratic_drag_kernel!,
+            Fu, Fv, u, v, c)
 end
 
 @kernel inbounds=true function quadratic_drag_kernel!(
-    Fu, Fv, u, v, @Const(c), @Const(k) 
+    Fu, Fv, u, v, @Const(c)
 )
     ij = @index(Global, Linear)
     
     # Calculate speed at surface layer k
-    speed = sqrt(u[ij, k]^2 + v[ij, k]^2)
+    speed = sqrt(u[ij]^2 + v[ij]^2)
     
     # Apply quadratic drag, -= as the tendencies already contain forcing
-    Fu[ij, k] -= c * speed * u[ij, k]
-    Fv[ij, k] -= c * speed * v[ij, k]
->>>>>>> f0a433305ff7b287e22f95e9f5720c44f9ab16c8
+    Fu[ij] -= c * speed * u[ij]
+    Fv[ij] -= c * speed * v[ij]
 end
 
 export LinearVorticityDrag
