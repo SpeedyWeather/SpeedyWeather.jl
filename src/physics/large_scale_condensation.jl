@@ -159,3 +159,10 @@ function large_scale_condensation!(
 
     return nothing
 end
+
+function variables(::AbstractCondensation)
+    return (
+        DiagnosticVariable(name=:rain_large_scale, dims=Grid2D(), desc="Large-scale precipitation (rain)", units="m"),
+        DiagnosticVariable(name=:snow_large_scale, dims=Grid2D(), desc="Large-scale precipitation (snow)", units="m"),
+    )
+end

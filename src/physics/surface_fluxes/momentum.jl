@@ -33,7 +33,7 @@ function surface_wind_stress!(ij, diagn, momentum_flux::SurfaceMomentumFlux, mod
 
     (; drag_land, drag_ocean) = momentum_flux
     # TODO: is this the right land_fraction used here?
-    land_fraction = model.land_sea_mask[ij]
+    land_fraction = model.land_sea_mask.mask[ij]
     nlayers = model.geometry.nlayers 
 
     f = momentum_flux.wind_slowdown
@@ -61,3 +61,7 @@ function surface_wind_stress!(ij, diagn, momentum_flux::SurfaceMomentumFlux, mod
 end
 
 Adapt.@adapt_structure SurfaceMomentumFlux
+
+function variables(::AbstractSurfaceMomentumFlux)
+    return (DiagnosticVariable(name=:boundary_layer_drag, dims=Grid2D()),)  # No additional diagnostic variables, tendencies are directly applied to u and v
+end

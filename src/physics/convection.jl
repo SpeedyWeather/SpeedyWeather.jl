@@ -59,7 +59,7 @@ function convection!(ij, diagn, SBM::SimplifiedBettsMiller, model)
     geopot = diagn.dynamics.uv∇lnp                          # geopotential [m²/s²] on full levels
 
     # TODO move this to its own parameterization?
-    geopotential!(ij, geopot, temp_virt, model.orography, planet.gravity, model.geopotential)
+    geopotential!(ij, geopot, temp_virt, model.orography.orography, planet.gravity, model.geopotential)
 
     # CONVECTIVE CRITERIA AND FIRST GUESS RELAXATION
     # Create pseudo column for surface_temp_humid function (this needs to be updated later)
@@ -458,4 +458,12 @@ parameterization!(ij, diagn, progn, convection_scheme::ConvectiveHeating, model)
         temp_tend[ij, k] += Qmax*exp(-((p-p₀)/σₚ)^2 / 2)*cos²θ_term
     end
     return nothing
+end
+
+function variables(::AbstractConvection)
+    return (
+        DiagnosticVariable(name=:rain_convection, dims=Grid2D(), desc="Convective precipitation", units="m"),
+        DiagnosticVariable(name=:cloud_top, dims=Grid2D(), desc="Cloud top level", units="1"),
+        DiagnosticVariable(name=:total_precipitation_rate, dims=Grid2D(), desc="Total precipitation rate", units="m/s"),
+    )
 end

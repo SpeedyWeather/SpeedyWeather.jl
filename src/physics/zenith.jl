@@ -306,3 +306,5 @@ end
     
     cos_zenith[ij] = cos_zenith_j
 end
+
+variables(::AbstractZenith) = (DiagnosticVariable(name=:cos_zenith, dims=Grid2D(), desc="Cosine of solar zenith angle", units="1"),)

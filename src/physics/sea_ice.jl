@@ -29,7 +29,7 @@ function initialize!(
     diagn::DiagnosticVariables,
     sea_ice_model::ThermodynamicSeaIce,
     model::PrimitiveEquation,
-)
+) where PrognosticVariablesOcean
     return nothing
 end
 

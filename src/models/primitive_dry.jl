@@ -48,6 +48,9 @@ $(TYPEDFIELDS)"""
     VA,     # <:AbstractVerticalAdvection,
     OU,     # <:AbstractOutput,
     FB,     # <:AbstractFeedback,
+    TS1,    # <:Tuple{Symbol}
+    TS2,    # <:Tuple{Symbol}
+    TS3,    # <:Tuple{Symbol}
 } <: PrimitiveDry
 
     spectral_grid::SpectralGrid
@@ -104,6 +107,15 @@ $(TYPEDFIELDS)"""
     output::OU = NetCDFOutput(spectral_grid, PrimitiveDry)
     callbacks::Dict{Symbol, AbstractCallback} = Dict{Symbol, AbstractCallback}()
     feedback::FB = Feedback()
+    
+    # Tuples with symbols or instances of all parameterizations and parameter functions
+    # Used to initiliaze variables and for the column-based parameterizations
+    model_parameters::TS1 = (:orography, :atmosphere, :planet, :geometry, :land_sea_mask)
+    parameterizations::TS2 = (:vertical_diffusion, :convection, :albedo, :optical_depth,
+                                                        :shortwave_radiation, :longwave_radiation, :boundary_layer_drag,
+                                                        :surface_condition, :surface_momentum_flux, :surface_heat_flux,
+                                                        :stochastic_physics)
+    extra_parameterizations::TS3 = (:solar_zenith, :land, :ocean)
 end
 
 prognostic_variables(::Type{<:PrimitiveDry}) = (:vor, :div, :temp, :pres)
@@ -154,14 +166,14 @@ function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
     initialize!(model.particle_advection, model)
 
     # allocate prognostic and diagnostic variables
-    prognostic_variables = PrognosticVariables(spectral_grid, model)
-    diagnostic_variables = DiagnosticVariables(spectral_grid, model)
+    prognostic_variables = PrognosticVariables(model)
+    diagnostic_variables = DiagnosticVariables(model)
     
     # initialize non-atmosphere prognostic variables
     (; particles, ocean, land) = prognostic_variables
-    initialize!(particles, prognostic_variables, diagnostic_variables, model)
-    initialize!(ocean,     prognostic_variables, diagnostic_variables, model)
-    initialize!(land,      prognostic_variables, diagnostic_variables, model)
+    initialize!(particles, prognostic_variables, diagnostic_variables, model.particle_advection, model)
+    initialize!(ocean,     prognostic_variables, diagnostic_variables, model.ocean, model)
+    initialize!(land,      prognostic_variables, diagnostic_variables, model.land, model)
 
     # set the initial conditions (may overwrite variables set in intialize! ocean/land)
     initialize!(prognostic_variables, model.initial_conditions, model)
@@ -171,41 +183,4 @@ function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
 
     # pack prognostic, diagnostic variables and model into a simulation
     return Simulation(prognostic_variables, diagnostic_variables, model)
-end
-
-"""$(TYPEDSIGNATURES)
-Extract the model components with parameters needed for the parameterizations
-as NamedTuple. These are the GPU-compatible components of the model."""
-function get_model_parameters(model::PrimitiveDry)
-    return (orography = model.orography.orography,
-            atmosphere = model.atmosphere,
-            planet = model.planet,
-            geometry = model.geometry,
-            land_sea_mask = model.land_sea_mask,
-    )
-end
-
-"""$(TYPEDSIGNATURES)
-Extract the parameterizations from the model as NamedTuple.
-These are the GPU-compatible components of the model."""
-function get_parameterizations(model::PrimitiveDry)
-    return (# diffusion
-            vertical_diffusion = model.vertical_diffusion,
-            convection = model.convection,
-            
-            # radiation
-            albedo = model.albedo,
-            optical_depth = model.optical_depth,
-            shortwave_radiation = model.shortwave_radiation,
-            longwave_radiation = model.longwave_radiation,
-            
-            # surface fluxes
-            boundary_layer_drag = model.boundary_layer_drag,
-            surface_condition = model.surface_condition,
-            surface_momentum_flux = model.surface_momentum_flux,
-            surface_heat_flux = model.surface_heat_flux,
-            
-            # stochastic physics
-            stochastic_physics = model.stochastic_physics,
-    )
 end

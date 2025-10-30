@@ -46,3 +46,7 @@ function sppt!(ij, diagn, sppt)
 end
 
 Adapt.@adapt_structure StochasticallyPerturbedParameterizationTendencies
+
+function variables(::AbstractStochasticPhysics)
+    return ()  # No additional diagnostic variables, modifies existing tendencies
+end

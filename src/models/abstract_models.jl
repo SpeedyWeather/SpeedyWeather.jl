@@ -9,7 +9,6 @@ abstract type PrimitiveDry <: PrimitiveEquation end
 abstract type PrimitiveWet <: PrimitiveEquation end
 
 abstract type AbstractModelComponent end
-abstract type AbstractParameterization <: AbstractModelComponent end
 
 # any model component set to nothing needs no initialization or finalize!
 initialize!(::Nothing, ::AbstractModel) = nothing
@@ -72,3 +71,55 @@ function Base.show(io::IO, M::AbstractModel)
         p(io, a)
     end
 end
+
+# Functions to get parameters and parameterization to 
+# a) initialize variables 
+# b) assemble compnents necessary for column parameterizations
+"""$(TYPEDSIGNATURES)
+Extract the model components with parameters needed for the parameterizations
+as NamedTuple. These are the GPU-compatible components of the model."""
+function get_model_parameters(model::PrimitiveEquation)
+    names = map(field -> _get_param_name(model, field), model.model_parameters)
+    values = map(field -> _get_param(model, field), model.model_parameters)
+    return NamedTuple{names}(values)
+end
+
+"""$(TYPEDSIGNATURES)
+Extract the parameterizations from the model as NamedTuple.
+These are the GPU-compatible components of the model."""
+function get_parameterizations(model::PrimitiveEquation)
+    names = map(field -> _get_param_name(model, field), model.parameterizations)
+    values = map(field -> _get_param(model, field), model.parameterizations)
+    return NamedTuple{names}(values)
+end
+
+# TODO: better name? 
+"""$(TYPEDSIGNATURES)
+Extract the extra parameterizations from the model that are not part of the 
+column-based parameterizations, but define variables such as land and ocean."""
+function get_extra_parameterizations(model::PrimitiveEquation)
+    names = map(field -> _get_param_name(model, field), model.extra_parameterizations)
+    values = map(field -> _get_param(model, field), model.extra_parameterizations)
+    return NamedTuple{names}(values)
+end
+
+get_parameterizations(model::Barotropic) = NamedTuple()
+get_extra_parameterizations(model::Barotropic) = NamedTuple()
+
+get_parameterizations(model::ShallowWater) = NamedTuple()
+get_extra_parameterizations(model::ShallowWater) = NamedTuple()
+
+"""$(TYPEDSIGNATURES)
+Extract the parameterizations from the model including land and ocean, to infer variables."""
+function get_all_parameterizations(model::PrimitiveEquation)
+    return merge(get_parameterizations(model), get_extra_parameterizations(model))
+end
+
+# helper function to extract parameterizations from model tuples
+_get_param(model, field::Symbol) = getfield(model, field)
+_get_param(model, obj::Pair{Symbol}) = obj.second
+_get_param(model, obj) = error("Unknown parameterization type: $(typeof(obj)), needs to be <:Symbol or <:Pair{Symbol, obj}")
+
+_get_param_name(model, field::Symbol) = field
+_get_param_name(model, obj::Pair{Symbol}) = obj.first
+_get_param_name(model, obj) = error("Unknown parameterization type: $(typeof(obj)), needs to be <:Symbol or <:Pair{Symbol, obj}")

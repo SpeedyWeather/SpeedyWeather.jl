@@ -56,7 +56,7 @@ function surface_humidity_flux!(ij, diagn, progn, humidity_flux::SurfaceOceanHum
 
     ρ = diagn.physics.surface_air_density[ij]
     V₀ = diagn.physics.surface_wind_speed[ij]
-    land_fraction = model.land_sea_mask[ij]
+    land_fraction = model.land_sea_mask.mask[ij]
     surface_humid = diagn.grid.humid_grid[ij, nlayers]
 
     # drag coefficient either from SurfaceHumidityFlux or from a central drag coefficient
@@ -105,7 +105,7 @@ function surface_humidity_flux!(ij, diagn, progn, humidity_flux::SurfaceLandHumi
 
     ρ = diagn.physics.surface_air_density[ij]
     V₀ = diagn.physics.surface_wind_speed[ij]
-    land_fraction = model.land_sea_mask[ij]
+    land_fraction = model.land_sea_mask.mask[ij]
     nlayers = model.geometry.nlayers
     surface_humid = diagn.grid.humid_grid[ij, nlayers]
 
@@ -139,7 +139,7 @@ PrescribedOceanHumidityFlux(::SpectralGrid) = PrescribedOceanHumidityFlux()
 initialize!(::PrescribedOceanHumidityFlux, ::PrimitiveWet) = nothing
 
 function surface_humidity_flux!(ij, diagn, progn, ::PrescribedOceanHumidityFlux, model)
-    land_fraction = model.land_sea_mask[ij]
+    land_fraction = model.land_sea_mask.mask[ij]
     pₛ = diagn.grid.pres_grid_prev[ij]          # surface pressure [Pa]
 
     # read in a prescribed flux
@@ -168,7 +168,7 @@ PrescribedLandHumidityFlux(::SpectralGrid) = PrescribedLandHumidityFlux()
 initialize!(::PrescribedLandHumidityFlux, ::PrimitiveWet) = nothing
 
 function surface_humidity_flux!(ij, diagn, progn, ::PrescribedLandHumidityFlux, model)
-    land_fraction = model.land_sea_mask[ij]
+    land_fraction = model.land_sea_mask.mask[ij]
     pₛ = diagn.grid.pres_grid_prev[ij]          # surface pressure [Pa]
 
     # read in a prescribed flux
@@ -188,3 +188,13 @@ function surface_humidity_flux!(ij, diagn, progn, ::PrescribedLandHumidityFlux, 
 end
 
 Adapt.@adapt_structure PrescribedLandHumidityFlux
+
+function variables(::AbstractSurfaceHumidityFlux)
+    return (
+        DiagnosticVariable(name=:surface_humidity_flux, dims=Grid2D(), desc="Total surface humidity flux", units="kg/m²/s"),
+        DiagnosticVariable(name=:surface_humidity_flux, dims=Grid2D(), desc="Ocean surface humidity flux", units="kg/m²/s", namespace=:ocean),
+        DiagnosticVariable(name=:surface_humidity_flux, dims=Grid2D(), desc="Land surface humidity flux", units="kg/m²/s", namespace=:land),
+        PrognosticVariable(name=:surface_humidity_flux, dims=Grid2D(), desc="Prescribed Ocean surface humidity flux", units="kg/m²/s", namespace=:ocean),
+        PrognosticVariable(name=:surface_humidity_flux, dims=Grid2D(), desc="Prescribed Land surface humidity flux", units="kg/m²/s", namespace=:land),
+    )
+end
