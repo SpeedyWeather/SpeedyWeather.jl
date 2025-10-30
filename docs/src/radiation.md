@@ -13,12 +13,13 @@ subtypes(SpeedyWeather.AbstractLongwave)
 ## Uniform cooling
 
 Following Paulius and Garner[^PG06], the uniform cooling of the atmosphere
-is defined as 
+is defined as
 
 ```math
 \frac{\partial T}{\partial t} = \begin{cases} - \tau^{-1}\quad&\text{for}\quad T > T_{min} \\
                                             \frac{T_{strat} - T}{\tau_{strat}} \quad &\text{else.} \end{cases}
 ```
+
 with ``\tau = 16~h`` resulting in a cooling of -1.5K/day for most of the atmosphere,
 except below temperatures of ``T_{min} = 207.5~K`` in the stratosphere where a
 relaxation towards ``T_{strat} = 200~K`` with a time scale of ``\tau_{strat} = 5~days``
@@ -58,7 +59,6 @@ flux from below at interface ``k+1/2`` (``k`` increases downwards, see
 ``\Delta p = p_{k+1/2} - p_{k-1/2}`` is the pressure thickness of layer ``k``,
 gravity ``g`` and heat capacity ``c_p``.
 
-
 ## Shortwave radiation
 
 Currently implemented schemes:
@@ -67,7 +67,6 @@ Currently implemented schemes:
 using SpeedyWeather
 subtypes(SpeedyWeather.AbstractShortwave)
 ```
-
 
 ### OneBandShortwave: Single-band shortwave radiation with diagnostic clouds
 
@@ -102,7 +101,6 @@ with
 $$
 F_{ST} = \max\left(0, \min\left(1, \frac{\mathrm{GSE}_N - \mathrm{GSES}_0}{\mathrm{GSES}_1 - \mathrm{GSES}_0}\right)\right)
 $$
-
 
 Over land, the stratocumulus cover $\mathrm{CLS}$ is further modified to be proportional to the surface relative humidity:
 
