@@ -17,22 +17,6 @@ many of the details, but want to highlight which abstract supertype
 new parameterizations have to subtype respectively and which functions
 and signatures they have to extend.
 
-In general, every parameterization "class" (e.g. convection) is just a
-*conceptual* class for clarity. You can define a custom convection
-parameterization that acts as a longwave radiation and vice versa.
-This also means that if you want to implement a parameterization
-that does not fit into any of the "classes" described here you
-can still implement it under any name and any class. From a software
-engineering perspective they are all the same except that they
-are executed in the order as defined in [`get_parametrizations](@ref).
-That's also why below we write for every parameterization
-"expected to write into `some.array_name`" as this would correspond
-conceptually to this class, but no hard requirement exists that a
-parameterization actually does that.
-
-We start by highlighting some general do's and don'ts for
-parameterization before listing specifics for individual parameterizations.
-
 !!! info "Parameterizations for PrimitiveEquation models only"
     The parameterizations described here can only be used for the primitive
     equation models `PrimitiveDryModel` and `PrimitiveWetModel` as the
@@ -44,7 +28,7 @@ parameterization before listing specifics for individual parameterizations.
 
 When defining a new paramerization it is required to subtype `AbstractParameterization` 
 and implement the [`variables`](@ref), [`initialize!`](@ref), and [`parameterization!`](@ref) 
-that define its behaviour. We'll first introduce the general idea, before 
+that define its behaviour. We'll first introduce the general idea here, before 
 giving a concrete example.
 
 When defining a new parameterization with (mutable) fields
@@ -99,7 +83,7 @@ diagn.tendendies.temp_tend[k] += something_you_calculated
 not `diagn.tendendies.temp_tend[k] = something_you_calculated` which would overwrite
 any previous tendency. 
 
-## Define generator function
+## Define the generator function
 
 After defining a (custom) parameterization it is recommended to also define
 a generator function that takes in the `SpectralGrid` object
@@ -161,8 +145,7 @@ and [PrimitiveWetModel](@ref)
 Note that the parameterizations are executed in the order of the list
 above. That way, for example, radiation can depend on calculations in
 large-scale condensation but not vice versa (only at the next time step). 
-In principle, it is possible to change this order by overwriting the default
-[`get_parameterizations`](@ref) function of the model. 
+In principle, it is possible to change this order by providing a new `parametrizations` tuple of symbols as a keyword argument to the model constructor. 
 
 ### Customizing existing parameterizations
 
@@ -180,41 +163,84 @@ These include among others: `AbstractBoundaryLayers`, `AbstractLargeScaleCondens
 
 ### Registering a new parameterization
 
-If you want to implement a new parameterization that doesn't replace an existing one, you can register it by overwriting the `get_parameterizations(model)` function for the model your using. 
-The default implementation is 
+If you want to implement a new parameterization that doesn't replace an existing one, you can register it by providing a custom `parametrizations` tuple of symbols as a keyword argument to the model constructor. 
 
-```julia 
-function SpeedyWeather.get_parameterizations(model::PrimitiveWetModel)
-    return (# diffusion
-            vertical_diffusion = model.vertical_diffusion,
-            
-            # hydrological cycle
-            convection = model.convection,
-            large_scale_condensation = model.large_scale_condensation,
-            
-            # radiation
-            albedo = model.albedo,
-            optical_depth = model.optical_depth,
-            shortwave_radiation = model.shortwave_radiation,
-            longwave_radiation = model.longwave_radiation,
-            
-            # surface fluxes
-            boundary_layer_drag = model.boundary_layer_drag,
-            surface_condition = model.surface_condition,
-            surface_momentum_flux = model.surface_momentum_flux,
-            surface_heat_flux = model.surface_heat_flux,
-            surface_humidity_flux = model.surface_humidity_flux,
-            
-            # stochastic physics
-            stochastic_physics = model.stochastic_physics,
-    )
-end
+The default parameterizations of the `PrimitiveWetModel` currently are:
+
+```@example parameterization
+model = PrimitiveWetModel(spectral_grid)
+model.parameterizations
 ```
 
-You can add your own parameterizations to this function. The order of the parametrizations in this tuple is important as it defines the order in which they are called. 
+You can change the order in which the parametrizations are executed by reordering the tuple or you can add your own, additional parametrization to the model by adding a `Pair` `:name_of_parametrization => MyParam(spectral_grid)` to the tuple. Below we will demonstrate this in an example. 
 
 ## Example: Albedo 
 
 Let's implement a very simple albedo parameterization as an example how to define a new parameterization. All this parametrization does is to set the albedo to a constant value over land and to linearly interpolate between the albedo of the ocean and the seaice depending on the current sea ice concentration. This albedo is written into the diagnostic variable `diagn.physics.albedo` and used later by subsequent parameterizations. 
 
-Let's get started, 
+Let's get started. First we define our albedo parameterization with all the functions we need to implement for our parameterization interface: 
+
+```@example custom-parameterization
+using SpeedyWeather, Adapt, CairoMakie
+
+ @kwdef struct SimpleAlbedo{NF<:Number} <: SpeedyWeather.AbstractParameterization
+    land_albedo::NF=0.35
+    seaice_albedo::NF=0.6
+    ocean_albedo::NF=0.06
+end 
+
+Adapt.@adapt_structure SimpleAlbedo # this is needed to make it GPU compatible
+
+SimpleAlbedo(SG::SpectralGrid; kwargs...) = SimpleAlbedo(; kwargs...)
+
+SpeedyWeather.initialize!(::SimpleAlbedo, model::PrimitiveEquation) = nothing 
+
+SpeedyWeather.variables(::SimpleAlbedo) = (
+    DiagnosticVariable(name=:albedo, dims=Grid2D(), desc="Albedo", units="1"),
+)
+
+function SpeedyWeather.parameterization!(ij, diagn::DiagnosticVariables, progn::PrognosticVariables, albedo::SimpleAlbedo, model_parameters) 
+        
+    (; land_sea_mask) = model_parameters
+    (; sea_ice_concentration) = progn.ocean
+    (; land_albedo, seaice_albedo, ocean_albedo) = albedo
+        
+    if land_sea_mask.mask[ij] > 0.95 # if mostly land 
+        diagn.physics.albedo[ij] = land_albedo
+    else # if ocean
+        diagn.physics.albedo[ij] = ocean_albedo + sea_ice_concentration[ij] * (seaice_albedo - ocean_albedo)
+    end
+end 
+```
+
+Now, we can use our new parameterization in a model. We'll first demonstrate how to simply replace the existing albedo: 
+
+```@example custom-parameterization
+spectral_grid = SpectralGrid(trunc=31, nlayers=8)
+albedo = SimpleAlbedo()
+model = PrimitiveWetModel(spectral_grid; albedo=albedo)
+simulation = initialize!(model) 
+run!(simulation, period=Day(5)) # spin up the model a little
+progn, diagn, model = SpeedyWeather.unpack(simulation)
+
+heatmap(diagn.physics.albedo)
+```
+
+As you can see, it worked! The albedo is set to a constant value over land and to linearly interpolate between the albedo of the ocean and the seaice depending on the current sea ice concentration. 
+
+Now, let's demonstrate how to add our new parameterization to the model by adding it to the `parametrizations` tuple. This way you can add parametrizations to the model that don't have to fit one of our pre-defined ones.
+
+```@example custom-parameterization
+model = PrimitiveWetModel(spectral_grid; parameterizations=(:convection,                             :large_scale_condensation, :simple_albedo => SimpleAlbedo(), :surface_condition, :surface_momentum_flux, 
+:surface_heat_flux, :surface_humidity_flux, :stochastic_physics))
+
+simulation = initialize!(model) 
+run!(simulation, period=Day(5)) # spin up the model a little
+progn, diagn, model = SpeedyWeather.unpack(simulation)
+
+heatmap(diagn.physics.albedo)
+```
+
+Again, it worked! 
+
+In order to write more complex parameterization that access other variabels and parameters of our models, it's best to familiarize yourself with our data structures that we explain in [Tree structure](@ref), and therein [PrimitiveDryModel](@ref) and [PrimitiveWetModel](@ref)
