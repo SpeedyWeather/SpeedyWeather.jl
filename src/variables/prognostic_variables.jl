@@ -82,7 +82,7 @@ end
 
 Adapt.@adapt_structure PrognosticVariables
 
-Base.eltype(progn::PrognosticVariables) = eltype(real(progn.vor[1]))
+Base.eltype(::PrognosticVariables{SpectrumType, GridType, SpectralVariable2D}) where {SpectrumType, GridType, SpectralVariable2D <: LowerTriangularArray{Complex{NF}}} where NF = NF
 Architectures.array_type(::PrognosticVariables{SpectrumType, GridType, SpectralVariable2D}) where {SpectrumType, GridType, SpectralVariable2D <: LowerTriangularArray{NF, N, ArrayType}} where {NF, N, ArrayType <: AbstractArray} = nonparametric_type(ArrayType)
 
 function get_steps(coeffs::LowerTriangularArray{T, 2}) where T
