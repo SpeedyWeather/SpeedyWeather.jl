@@ -29,10 +29,10 @@ Indicator type for spectral 3D variables (l, m, k).
 struct Spectral3D <: AbstractVariableDims end
 
 # intialize variables
-zero(::AbstractVariable{Grid2D}, SG::SpectralGrid) = zeros(SG.GridVariable2D, SG.grid)
-zero(::AbstractVariable{Grid3D}, SG::SpectralGrid) = zeros(SG.GridVariable3D, SG.grid, SG.nlayers)
-zero(::AbstractVariable{Spectral2D}, SG::SpectralGrid) = zeros(SG.SpectralVariable2D, SG.spectrum)
-zero(::AbstractVariable{Spectral3D}, SG::SpectralGrid) = zeros(SG.SpectralVariable3D, SG.spectrum, SG.nlayers)
+Base.zero(::AbstractVariable{Grid2D}, SG::SpectralGrid, nlayers::Int) = zeros(SG.GridVariable2D, SG.grid)
+Base.zero(::AbstractVariable{Grid3D}, SG::SpectralGrid, nlayers::Int) = zeros(SG.GridVariable3D, SG.grid, nlayers)
+Base.zero(::AbstractVariable{Spectral2D}, SG::SpectralGrid, nlayers::Int) = zeros(SG.SpectralVariable2D, SG.spectrum)
+Base.zero(::AbstractVariable{Spectral3D}, SG::SpectralGrid, nlayers::Int) = zeros(SG.SpectralVariable3D, SG.spectrum, nlayers)
 
 """
     $TYPEDEF

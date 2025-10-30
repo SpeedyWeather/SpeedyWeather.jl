@@ -71,3 +71,43 @@ function Base.show(io::IO, M::AbstractModel)
         p(io, a)
     end
 end
+
+# Functions to get parameters and parameterization to 
+# a) initialize variables 
+# b) assemble compnents necessary for column parameterizations
+"""$(TYPEDSIGNATURES)
+Extract the model components with parameters needed for the parameterizations
+as NamedTuple. These are the GPU-compatible components of the model."""
+function get_model_parameters(model::PrimitiveEquation)
+    values = map(field -> getproperty(model, field), model.model_parameters)
+    return NamedTuple{model.model_parameters}(values)
+end
+
+"""$(TYPEDSIGNATURES)
+Extract the parameterizations from the model as NamedTuple.
+These are the GPU-compatible components of the model."""
+function get_parameterizations(model::PrimitiveEquation)
+    values = map(field -> getproperty(model, field), model.parameterizations)
+    return NamedTuple{model.parameterizations}(values)
+end
+
+# TODO: better name? 
+"""$(TYPEDSIGNATURES)
+Extract the extra parameterizations from the model that are not part of the 
+column-based parameterizations, but define variables such as land and ocean."""
+function get_extra_parameterizations(model::PrimitiveEquation)
+    values = map(field -> getproperty(model, field), model.extra_parameterizations)
+    return NamedTuple{model.extra_parameterizations}(values)
+end
+
+get_parameterizations(model::Barotropic) = NamedTuple()
+get_extra_parameterizations(model::Barotropic) = NamedTuple()
+
+get_parameterizations(model::ShallowWater) = NamedTuple()
+get_extra_parameterizations(model::ShallowWater) = NamedTuple()
+
+"""$(TYPEDSIGNATURES)
+Extract the parameterizations from the model including land and ocean, to infer variables."""
+function get_all_parameterizations(model::PrimitiveEquation)
+    return merge(get_parameterizations(model), get_extra_parameterizations(model))
+end

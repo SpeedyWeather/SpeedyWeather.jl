@@ -100,6 +100,3 @@ function initialize!(model::ShallowWater; time::DateTime = DEFAULT_DATE)
 
     return Simulation(prognostic_variables, diagnostic_variables, model)
 end
-
-get_parameterizations(model::ShallowWater) = NamedTuple()
-get_extra_parameterizations(model::ShallowWater) = NamedTuple()

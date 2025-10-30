@@ -33,7 +33,7 @@ function surface_wind_stress!(ij, diagn, momentum_flux::SurfaceMomentumFlux, mod
 
     (; drag_land, drag_ocean) = momentum_flux
     # TODO: is this the right land_fraction used here?
-    land_fraction = model.land_sea_mask[ij]
+    land_fraction = model.land_sea_mask.mask[ij]
     nlayers = model.geometry.nlayers 
 
     f = momentum_flux.wind_slowdown

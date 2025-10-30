@@ -104,6 +104,3 @@ function initialize!(model::Barotropic; time::DateTime = DEFAULT_DATE)
 
     return Simulation(prognostic_variables, diagnostic_variables, model)
 end
-
-get_parameterizations(model::Barotropic) = NamedTuple()
-get_extra_parameterizations(model::Barotropic) = NamedTuple()

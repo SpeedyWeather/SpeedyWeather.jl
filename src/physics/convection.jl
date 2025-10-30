@@ -59,7 +59,7 @@ function convection!(ij, diagn, SBM::SimplifiedBettsMiller, model)
     geopot = diagn.dynamics.uv∇lnp                          # geopotential [m²/s²] on full levels
 
     # TODO move this to its own parameterization?
-    geopotential!(ij, geopot, temp_virt, model.orography, planet.gravity, model.geopotential)
+    geopotential!(ij, geopot, temp_virt, model.orography.orography, planet.gravity, model.geopotential)
 
     # CONVECTIVE CRITERIA AND FIRST GUESS RELAXATION
     # Create pseudo column for surface_temp_humid function (this needs to be updated later)

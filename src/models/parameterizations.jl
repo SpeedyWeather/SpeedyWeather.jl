@@ -3,8 +3,8 @@
 
 Abstract type for all column-based parmaetrizations. Custom parametrizations are expected to 
 subtype this and implement the [`variables`](@ref), [`initialize!`](@ref), and [`parameterization!`](@ref) for it. In
-order to use the parameterization in a model, overwrite the `get_parameterizations(model)` for 
-the model.  
+order to use the parameterization in a model, add it to the `parameterizations` of the model 
+at definition.
 """
 abstract type AbstractParameterization <: AbstractModelComponent end
 
@@ -14,14 +14,14 @@ abstract type AbstractParameterization <: AbstractModelComponent end
 Function that defines the actual parameterization of an `AbstractParameterization`. 
 
 Takes in the index of the column `ij`, the `DiagnosticVariables` and `PrognosticVariables`, the 
-parameterization itself and a tuple with all relevant model parameters (the return of `get_model_parameters`). 
+parameterization itself and a tuple with all relevant model parameters (all fields in `model.parameters`). 
 The latter includes - among others - land sea mask, orography and physical constants. 
 
 This function is used within a KernelAbstractions kernel and is therefore expected to work on GPU as well. 
 Don't use any dynamic dispatches, try to avoid allocations and branches in your code and only use scalar 
 indexing of arrays. 
 """
-parameterization!(ij, diagn::DiagnosticVariables, progn::PrognosticVariables, parameterization::AbstractParameterization, model_parameters) = nothing
+parameterization!(ij, diagn, progn, parameterization::AbstractParameterization, model_parameters) = nothing
 
 """
     $(TYPEDSIGNATURES)

@@ -58,7 +58,7 @@ function surface_heat_flux!(ij, diagn, progn, heat_flux::SurfaceOceanHeatFlux, m
     # TODO actually implement skin temperature?
     T_skin_ocean = progn.ocean.sea_surface_temperature[ij]
     T = diagn.physics.surface_air_temperature[ij]
-    land_fraction = model.land_sea_mask[ij]
+    land_fraction = model.land_sea_mask.mask[ij]
     pₛ = diagn.grid.pres_grid_prev[ij]
 
     # drag coefficient
@@ -113,7 +113,7 @@ function surface_heat_flux!(ij, diagn, progn, heat_flux::SurfaceLandHeatFlux, mo
     # TODO actually implement skin temperature?
     T_skin_land = progn.land.soil_temperature[ij, 1]    # uppermost land layer with index 1
     T = diagn.physics.surface_air_temperature[ij]
-    land_fraction = model.land_sea_mask[ij]
+    land_fraction = model.land_sea_mask.mask[ij]
 
     # drag coefficient
     d = diagn.physics.boundary_layer_drag[ij]
@@ -152,7 +152,7 @@ PrescribedOceanHeatFlux(::SpectralGrid) = PrescribedOceanHeatFlux()
 initialize!(::PrescribedOceanHeatFlux, ::PrimitiveEquation) = nothing
 
 function surface_heat_flux!(ij, diagn, progn, ::PrescribedOceanHeatFlux, model)
-    land_fraction = model.land_sea_mask[ij]
+    land_fraction = model.land_sea_mask.mask[ij]
     pₛ = diagn.grid.pres_grid_prev[ij]          # surface pressure [Pa]
 
     # read in a prescribed flux
@@ -187,7 +187,7 @@ PrescribedLandHeatFlux(::SpectralGrid) = PrescribedLandHeatFlux()
 initialize!(::PrescribedLandHeatFlux, ::PrimitiveEquation) = nothing
 
 function surface_heat_flux!(ij, diagn, progn, ::PrescribedLandHeatFlux, model)
-    land_fraction = model.land_sea_mask[ij]
+    land_fraction = model.land_sea_mask.mask[ij]
     pₛ = diagn.grid.pres_grid_prev[ij]          # surface pressure [Pa]
 
     # read in a prescribed flux
