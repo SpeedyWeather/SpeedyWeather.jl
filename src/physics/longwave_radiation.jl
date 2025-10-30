@@ -187,7 +187,7 @@ function longwave_radiation!(
     end
 
     @inbounds for band in 1:nbands                  # loop over spectral bands
-        dτ = view(column.transmittance_longwave, :, band)   # differential optical depth per layer in that band
+        dτ = view(column.transmittance_longwave, :, band)   # transmittance per layer in that band
 
         # UPWARD flux U
         U = σ*column.surface_temp^4                 # boundary condition at surface U(τ=τ(z=0)) = σTₛ⁴

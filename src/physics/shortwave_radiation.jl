@@ -144,11 +144,26 @@ $(TYPEDFIELDS)"""
     "[OPTION] Use cloud top reflection?"
     cloud_top_reflection::Bool = true
 
-    "[OPTION] Ozone absorption factor at TOA (0 = full absorption, 1 = no absorption)"
-    ozone_absorption_factor::NF = 1.0
+    "[OPTION] Ozone absorption in upper stratosphere (W/m^2)"
+    ozone_absorp_upper::NF = 0.0
+    
+    "[OPTION] Ozone absorption in lower stratosphere (W/m^2)"
+    ozone_absorp_lower::NF = 0.0
 
-    "[OPTION] Stratocumulus enhancement factor for low cloud reflection/absorption (1 = no enhancement)"
-    stratocumulus_enhancement::NF = 1.0
+    "[OPTION] Stratocumulus cloud albedo (surface reflection/absorption) [1]"
+    stratocumulus_cloud_albedo::NF = 0.5
+
+    "[OPTION] Static stability lower threshold for stratocumulus (GSEN, called GSES0 in the paper) [J/kg]"
+    stratocumulus_stability_min::NF = 0.0
+
+    "[OPTION] Static stability upper threshold for stratocumulus (GSEN, called GSES1 in the paper) [J/kg]"
+    stratocumulus_stability_max::NF = 200.0
+
+    "[OPTION] Maximum stratocumulus cloud cover (called CLSMAX in the paper) [1]"
+    stratocumulus_cover_max::NF = 1.0
+
+    "[OPTION] Enable stratocumulus cloud parameterization?"
+    use_stratocumulus::Bool = true
 end
 
 # generator function
@@ -168,7 +183,7 @@ function shortwave_radiation!(
     # ---- pull only fields that exist on ColumnVariables ----
     (; nlayers, cos_zenith, land_fraction,
        humid, sat_humid, albedo_ocean, albedo_land,
-       transmittance_shortwave, flux_temp_downward, flux_temp_upward) = column
+       transmittance_shortwave, flux_temp_downward, flux_temp_upward, dry_static_energy) = column
 
     # without cloud top reflection set locally cloud top below surface to disable
     # cloud reflection completely
@@ -191,11 +206,37 @@ function shortwave_radiation!(
         cloud_cover[k] = min(1, P + min(1, (q - qmin)/(qmax-qmin))^2)
     end
 
+    # --- Stratocumulus parameterization (CLS) ---
+    CLS = 0.0
+    if radiation.use_stratocumulus
+        # Compute static stability (GSEN) as difference in dry static energy between lowest and next-lowest layer
+        # GSEN = S_N - S_{N-1}
+        GSEN = dry_static_energy[nlayers] - dry_static_energy[nlayers-1]
+
+        # Use tunable parameters from struct
+        stability_min = radiation.stratocumulus_stability_min
+        stability_max = radiation.stratocumulus_stability_max
+        cover_max = radiation.stratocumulus_cover_max
+
+        # F_ST: stability factor (bounded between 0 and 1)
+        F_ST = max(0, min(1, (GSEN - stability_min) / (stability_max - stability_min)))
+
+        # Stratocumulus cloud cover (CLS) over ocean
+        CLS_ocean = F_ST * max(cover_max - cloud_cover[nlayers], 0)
+        # Over land, further modulate by surface RH (lowest layer relative humidity)
+        RH_N = humid[nlayers] / sat_humid[nlayers]
+        CLS_land = CLS_ocean * RH_N
+        # Land-sea mask weighted stratocumulus cover
+        CLS = (1 - land_fraction) * CLS_ocean + land_fraction * CLS_land
+    end
+
     # Downward beam
-    (; cloud_albedo, ozone_absorption_factor, stratocumulus_enhancement) = radiation
+    (; cloud_albedo, ozone_absorp_upper, ozone_absorp_lower, stratocumulus_cloud_albedo) = radiation
     t = view(transmittance_shortwave,:, 1)          # only one band
-    # Apply ozone absorption at TOA (multiplicative factor < 1)
-    D = model.planet.solar_constant * cos_zenith * ozone_absorption_factor
+
+    # Apply ozone absorption at TOA as subtracted fluxes 
+    D_TOA = model.planet.solar_constant * cos_zenith
+    D = D_TOA - ozone_absorp_upper - ozone_absorp_lower
     flux_temp_downward[1] += D
 
     # Clear sky portion until cloud top
@@ -204,33 +245,30 @@ function shortwave_radiation!(
         flux_temp_downward[k+1] += D
     end
 
-    # Cloud reflection
-    U_reflected = zero(D)                           # initialize reflected upward flux from cloud top
-    if cloud_top < nlayers+1                        # otherwise no clouds
-        # Cloudy portion from cloud top downward
-        # Stratocumulus enhancement: apply only to lowest layer if desired
+    # Cloud reflection (cloud top)
+    U_reflected = zero(D)
+    if cloud_top < nlayers+1
         R = cloud_albedo * cloud_cover[cloud_top]
-        if cloud_top == nlayers  # cloud top at surface (low cloud)
-            R *= stratocumulus_enhancement
-        end
-        U_reflected = D * R                         # upward flux from cloud-top reflection
-        D *= (1 - R)                                # reduce downward flux due to cloud albedo
+        U_reflected = D * R
+        D *= (1 - R)
         for k in cloud_top:nlayers
             D *= t[k]
             flux_temp_downward[k+1] += D
-        end 
+        end
     end
 
-    # Surface reflection
-    column.surface_shortwave_down = D
-    up_ocean = albedo_ocean * D
-    up_land  = albedo_land  * D
+    # --- Surface stratocumulus reflection ---
+    # At the surface, apply stratocumulus reflection using CLS and stratocumulus_cloud_albedo
+    D_surface = D * (1 - stratocumulus_cloud_albedo * CLS)
+    column.surface_shortwave_down = D_surface
+    up_ocean = albedo_ocean * D_surface
+    up_land  = albedo_land  * D_surface
     column.surface_shortwave_up_ocean = up_ocean
     column.surface_shortwave_up_land  = up_land
 
     # Computes grid-cell-average surface albedo and reflected shortwave flux
     albedo = (1 - land_fraction) * albedo_ocean + land_fraction * albedo_land
-    U = albedo * D
+    U = albedo * D_surface
     column.surface_shortwave_up = U
 
     # Upward beam
