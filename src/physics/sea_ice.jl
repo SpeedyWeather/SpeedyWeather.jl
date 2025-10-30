@@ -29,7 +29,7 @@ function initialize!(
     diagn::DiagnosticVariables,
     sea_ice_model::ThermodynamicSeaIce,
     model::PrimitiveEquation,
-)
+) where PrognosticVariablesOcean
     return nothing
 end
 
@@ -49,7 +49,6 @@ function timestep!( progn::PrognosticVariables,
     temp_freeze = sea_ice_model.temp_freeze
 
     launch!(architecture(ℵ), LinearWorkOrder, size(ℵ), sea_ice_kernel!, ℵ, sst, mask, temp_freeze, m, f_Δt, Δt)
-
     return nothing
 end
 

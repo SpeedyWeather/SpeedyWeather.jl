@@ -270,3 +270,6 @@ end
 # because model components can be `nothing`, their constructor being `Nothing()`
 # we also allow `::SpectralGrid` as the first argument
 Base.Nothing(::SpectralGrid) = Nothing()
+
+# we do not actually want to adapt SpectralGrid
+Adapt.adapt_structure(to, sg::SpectralGrid) = nothing 

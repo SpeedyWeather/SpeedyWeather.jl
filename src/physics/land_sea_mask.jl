@@ -178,3 +178,5 @@ function initialize!(land_sea_mask::RockyPlanetMask, model::PrimitiveEquation)
     land_sea_mask.mask .= 1    # set all to land
     return nothing
 end
+
+Adapt.adapt_structure(to, land_sea_mask::AbstractLandSeaMask) = (mask=land_sea_mask.mask, )

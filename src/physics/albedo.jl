@@ -1,13 +1,13 @@
 abstract type AbstractAlbedo <: AbstractModelComponent end
 
-export Albedo
-@kwdef struct Albedo{Ocean, Land} <: AbstractAlbedo
+export OceanLandAlbedo
+@kwdef struct OceanLandAlbedo{Ocean, Land} <: AbstractAlbedo
     ocean::Ocean
     land::Land
 end
 
-function Base.show(io::IO, A::Albedo)
-    println(io, "Albedo <: SpeedyWeather.AbstractAlbedo")
+function Base.show(io::IO, A::OceanLandAlbedo)
+    println(io, "OceanLandAlbedo <: SpeedyWeather.AbstractAlbedo")
     properties = propertynames(A)
     n = length(properties)
     for (i, key) in enumerate(properties)
@@ -18,62 +18,54 @@ function Base.show(io::IO, A::Albedo)
     end
 end
 
+Adapt.@adapt_structure OceanLandAlbedo
+
 export DefaultAlbedo
 function DefaultAlbedo(SG::SpectralGrid;
     ocean = OceanSeaIceAlbedo(SG),
     land = AlbedoClimatology(SG))
-    return Albedo(ocean, land)
+    return OceanLandAlbedo(ocean, land)
 end
 
-function initialize!(albedo::Albedo, model::PrimitiveEquation)
+function initialize!(albedo::OceanLandAlbedo, model::PrimitiveEquation)
     initialize!(albedo.ocean, model)
     initialize!(albedo.land, model)
 end
 
-# dispatch over model.albedo
-albedo!(diagn::DiagnosticVariables, progn::PrognosticVariables, model::PrimitiveEquation) =
-    albedo!(diagn, progn, model.albedo, model)
+# composite OceanLandAlbedo: call separately for ocean and land with .ocean and .land
+function parameterization!(ij, diagn::DiagnosticVariables, progn, albedo::OceanLandAlbedo, model)
+    parameterization!(ij, diagn.physics.ocean, progn, albedo.ocean, model)
+    parameterization!(ij, diagn.physics.land, progn, albedo.land, model)
+end
 
-# composite albedos: call separately for ocean and land with .ocean and .land
-function albedo!(
-    diagn::DiagnosticVariables,
-    progn::PrognosticVariables,
-    albedo::Albedo,
-    model::PrimitiveEquation,
-)
-    albedo!(diagn.physics.ocean, progn, albedo.ocean, model)
-    albedo!(diagn.physics.land, progn, albedo.land, model)
+function variables(::OceanLandAlbedo)
+    return (
+        DiagnosticVariable(name=:albedo, dims=Grid2D(), desc="Albedo", units="1"),
+        DiagnosticVariable(name=:albedo, dims=Grid2D(), desc="Albedo over the ocean", units="1", namespace=:ocean),
+        DiagnosticVariable(name=:albedo, dims=Grid2D(), desc="Albedo over the land", units="1", namespace=:land),
+    )
 end
 
 # single albedo: call separately for ocean and land with the same albedo
-function albedo!(
-    diagn::DiagnosticVariables,
-    progn::PrognosticVariables,
-    albedo::AbstractAlbedo,
-    model::PrimitiveEquation,
-)
-    albedo!(diagn.physics.ocean, progn, albedo, model)
-    albedo!(diagn.physics.land, progn, albedo, model)
-end
-
-# single albedo, copy over the constant albedo
-function albedo!(
-    diagn::AbstractDiagnosticVariables,     # ocean or land!
-    progn::PrognosticVariables,
-    albedo::AbstractAlbedo,
-    model::PrimitiveEquation,
-)
-    diagn.albedo .= albedo.albedo           # copy over the constant albedo
+function parameterization!(ij, diagn::DiagnosticVariables, progn, albedo::AbstractAlbedo, model)
+    parameterization!(ij, diagn.physics.ocean, progn, albedo, model)
+    parameterization!(ij, diagn.physics.land, progn, albedo, model)
 end
 
 ## GLOBAL CONSTANT ALBEDO
 export GlobalConstantAlbedo
-@kwdef mutable struct GlobalConstantAlbedo{NF} <: AbstractAlbedo
+@kwdef struct GlobalConstantAlbedo{NF} <: AbstractAlbedo
     albedo::NF = 0.3
 end
 
 GlobalConstantAlbedo(SG::SpectralGrid; kwargs...) = GlobalConstantAlbedo{SG.NF}(; kwargs...)
 initialize!(albedo::GlobalConstantAlbedo, ::PrimitiveEquation) = nothing
+parameterization!(ij, diagn, progn, albedo::GlobalConstantAlbedo, model) = albedo!(ij, diagn.albedo, albedo.albedo)
+@inline function albedo!(ij, diagn_albedo::AbstractArray, albedo::Real)
+    diagn_albedo[ij] = albedo
+end
+
+Adapt.@adapt_structure GlobalConstantAlbedo
 
 ## MANUAL ALBEDO
 export ManualAlbedo
@@ -82,17 +74,22 @@ export ManualAlbedo
 Defined so that parameterizations can change the albedo at every time step (e.g. snow cover) without
 losing the information of the original surface albedo. Fields are
 $(TYPEDFIELDS)"""
-struct ManualAlbedo{NF, GridVariable2D} <: AbstractAlbedo
+struct ManualAlbedo{GridVariable2D} <: AbstractAlbedo
     albedo::GridVariable2D
 end
 
-ManualAlbedo(SG::SpectralGrid) = ManualAlbedo{SG.NF, SG.GridVariable2D}(zeros(SG.GridVariable2D, SG.grid))
+ManualAlbedo(SG::SpectralGrid) = ManualAlbedo{SG.GridVariable2D}(zeros(SG.GridVariable2D, SG.grid))
 initialize!(albedo::ManualAlbedo, model::PrimitiveEquation) = nothing
+parameterization!(ij, diagn, progn, albedo::ManualAlbedo, model) = albedo!(ij, diagn.albedo, albedo.albedo)
+@inline function albedo!(ij, diagn_albedo::AbstractArray, albedo::AbstractArray)
+    diagn_albedo[ij] = albedo[ij]
+end
 
-## ALEBDO CLIMATOLOGY
+Adapt.@adapt_structure ManualAlbedo
 
+## ALBEDO CLIMATOLOGY
 export AlbedoClimatology
-@kwdef struct AlbedoClimatology{NF, GridVariable2D} <: AbstractAlbedo
+@kwdef struct AlbedoClimatology{GridVariable2D} <: AbstractAlbedo
     "[OPTION] path to the folder containing the albedo file, pkg path default"
     path::String = "SpeedyWeather.jl/input_data"
 
@@ -110,9 +107,9 @@ export AlbedoClimatology
 end
 
 function AlbedoClimatology(SG::SpectralGrid; kwargs...)
-    (; NF, GridVariable2D, grid) = SG
+    (; GridVariable2D, grid) = SG
     albedo = zeros(GridVariable2D, grid)
-    AlbedoClimatology{NF, GridVariable2D}(; albedo, kwargs...)
+    AlbedoClimatology{GridVariable2D}(; albedo, kwargs...)
 end
 
 # set albedo with grid, scalar, function; just define path `albedo.albedo` to grid here
@@ -128,9 +125,14 @@ function initialize!(albedo::AlbedoClimatology, model::PrimitiveEquation)
     end
     ncfile = NCDataset(path)
 
-    a = albedo.file_Grid(ncfile[albedo.varname].var[:, :], input_as=Matrix)
+    a = on_architecture(model.architecture, albedo.file_Grid(ncfile[albedo.varname].var[:, :], input_as=Matrix))
     interpolate!(albedo.albedo, a)
 end
+
+parameterization!(ij, diagn, progn, albedo::AlbedoClimatology, model) = albedo!(ij, diagn.albedo, albedo.albedo)
+
+# For GPU usage just discard the extra information and treat it as a `ManualAlbedo`
+Adapt.adapt_structure(to, albedo::AlbedoClimatology) = adapt(to, ManualAlbedo(albedo.albedo))
 
 ## OceanSeaIceAlbedo
 export OceanSeaIceAlbedo
@@ -141,17 +143,21 @@ export OceanSeaIceAlbedo
 end
 
 OceanSeaIceAlbedo(SG::SpectralGrid; kwargs...) = OceanSeaIceAlbedo{SG.NF}(;kwargs...)
-initialize!(albedo::OceanSeaIceAlbedo, model::PrimitiveEquation) = nothing
+initialize!(::OceanSeaIceAlbedo, ::PrimitiveEquation) = nothing
+parameterization!(ij, diagn, progn, albedo::OceanSeaIceAlbedo, model) = albedo!(ij, diagn.albedo, progn.ocean, albedo)
 
-function albedo!(
-    diagn::AbstractDiagnosticVariables,
-    progn::PrognosticVariables,
-    albedo::OceanSeaIceAlbedo,
-    model::PrimitiveEquation,
-)
-    (; sea_ice_concentration ) = progn.ocean
+@inline function albedo!(ij, diagn_albedo::AbstractArray, ocean, albedo::OceanSeaIceAlbedo)
+    (; sea_ice_concentration ) = ocean
     (; albedo_ocean, albedo_ice) = albedo
 
     # set ocean albedo linearly between ocean and ice depending on sea ice concentration
-    diagn.albedo .= albedo_ocean .+ sea_ice_concentration .* (albedo_ice .- albedo_ocean)
+    diagn_albedo[ij] = albedo_ocean + sea_ice_concentration[ij] * (albedo_ice - albedo_ocean)
+end
+
+Adapt.@adapt_structure OceanSeaIceAlbedo
+
+function variables(::AbstractAlbedo)
+    return (
+        DiagnosticVariable(name=:albedo, dims=Grid2D(), desc="Albedo", units="1"),
+    )
 end

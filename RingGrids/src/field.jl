@@ -147,12 +147,16 @@ and 3rd dimension. To be used like
                 
 With `vertical_only=true` (default) only checks whether the non-horizontal dimensions of the fields match.
 E.g. one can loop over two fields of each n layers on different grids."""
-function eachlayer(field1::AbstractField, fields::AbstractField...; vertical_only=true, kwargs...)
+@inline function eachlayer(field1::AbstractField, fields::AbstractField...; vertical_only=true, kwargs...)
     fields_match(field1, fields...; vertical_only, kwargs...) || throw(DimensionMismatch(field1, fields...))
     return eachlayer(field1)
 end
 
-eachlayer(field::AbstractField) = CartesianIndices(size(field)[2:end])
+@inline eachlayer(field::AbstractField) = CartesianIndices(size(field)[2:end])
+
+#TODO: This is a bit of a stop-gap solution here while we work on the GPU column parametrization. This might be removed again
+@inline eachlayer(array_field::AbstractArray{T,2}) where T = 1:size(array_field, 2)
+@inline eachlayer(array_field::AbstractArray{T,2}, array_fields::AbstractArray{T,2}...) where T = 1:size(array_field, 2)
 
 """$(TYPEDSIGNATURES)
 Iterator over all 2D grid points of a field (or fields), i.e. the horizontal dimension only.

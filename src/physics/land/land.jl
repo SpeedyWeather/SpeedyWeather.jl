@@ -57,6 +57,12 @@ function initialize!(   land::LandModel,
     initialize!(model.land.rivers, model)
 end
 
+variables(land::LandModel) = (variables(land.temperature)...,
+                               variables(land.soil_moisture)...,
+                               variables(land.vegetation)...,
+                               variables(land.rivers)...,
+                               )
+
 export DryLandModel
 @kwdef struct DryLandModel{G, TD, T} <: AbstractDryLand
     spectral_grid::SpectralGrid
@@ -71,6 +77,8 @@ function initialize!(land::DryLandModel, model::PrimitiveEquation)
     initialize!(model.land.temperature, model)
 end
 
+variables(land::DryLandModel) = (variables(land.temperature)...,
+                               )
 # unpack land model and call general timestep! function
 land_timestep!(progn::PrognosticVariables, diagn::DiagnosticVariables, model::PrimitiveEquation) =
     timestep!(progn, diagn, model.land, model)
@@ -94,19 +102,9 @@ function initialize!(
     land::PrognosticVariablesLand,  # for dispatch
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
-    model::PrimitiveEquation,
-)
-    # unpack model.land to dispatch over it and so that model.land = nothing is valid
-    initialize!(land, progn, diagn, model.land, model)
-end
-
-function initialize!(
-    land::PrognosticVariablesLand,  # for dispatch
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
     land_model::AbstractLand,
     model::PrimitiveEquation,
-)
+) where PrognosticVariablesLand
     initialize!(progn, diagn, land_model.temperature, model)
 
     # only initialize soil moisture, vegetation, rivers if atmosphere and land are wet

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Diagnostic and prognostic variables partially revised to NamedTuples and variables system introduced to allow to add to them modularly [#885](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/885)
+- Parameterizations with KernelAbstractions [#873](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/873) [#878](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/878)
+
 ## v0.17.3
 
 - Add missing compat entires for SpeedyWeatherInternals [#883](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/883)

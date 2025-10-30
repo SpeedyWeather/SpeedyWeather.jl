@@ -27,6 +27,10 @@ $(TYPEDFIELDS)"""
     Δt::Millisecond = Millisecond(0)
 end
 
+# we don't want to adapt the clock, it has to stay mutable, 
+# we just explicitly transfer nothing to the kernels 
+Adapt.adapt_structure(to, ::Clock) = nothing
+    
 function timestep!(clock::Clock, Δt; increase_counter::Bool=true)
     clock.time += Δt
     # the first timestep is a half-step and doesn't count

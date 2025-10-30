@@ -83,9 +83,11 @@ end
 
 """$(TYPEDSIGNATURES)
 Start with random vorticity as initial conditions"""
-function initialize!(   progn::PrognosticVariables{NF},
+function initialize!(   progn::PrognosticVariables,
                         initial_conditions::RandomVorticity,
-                        model::Barotropic) where NF
+                        model::Barotropic)
+
+    NF = eltype(progn)
 
     # reseed the random number generator, for seed=0 randomly seed from Julia's global RNG
     seed = initial_conditions.seed == 0 ? rand(UInt) : initial_conditions.seed
@@ -132,9 +134,11 @@ end
 
 """$(TYPEDSIGNATURES)
 Start with random vorticity as initial conditions"""
-function initialize!(   progn::PrognosticVariables{NF},
+function initialize!(   progn::PrognosticVariables,
                         initial_conditions::RandomVelocity,
-                        model::Barotropic) where NF
+                        model::Barotropic)
+
+    NF = eltype(progn)
 
     # reseed the random number generator, for seed=0 randomly seed from Julia's global RNG
     seed = initial_conditions.seed == 0 ? rand(UInt) : initial_conditions.seed
@@ -326,10 +330,11 @@ end
 """
 $(TYPEDSIGNATURES)
 Initial conditions from Jablonowski and Williamson, 2006, QJR Meteorol. Soc"""
-function initialize!(   progn::PrognosticVariables{NF},
+function initialize!(   progn::PrognosticVariables,
                         initial_conditions::ZonalWind,
-                        model::PrimitiveEquation) where NF
+                        model::PrimitiveEquation)
 
+    NF = eltype(progn)  
     (; u₀, η₀) = initial_conditions
     (; perturb_uₚ, perturb_radius) = initial_conditions
     λc = initial_conditions.perturb_lon
@@ -449,10 +454,11 @@ end
 """
 $(TYPEDSIGNATURES)
 Initial conditions from Jablonowski and Williamson, 2006, QJR Meteorol. Soc"""
-function initialize!(   progn::PrognosticVariables{NF},
+function initialize!(   progn::PrognosticVariables,
                         initial_conditions::JablonowskiTemperature,
-                        model::PrimitiveEquation) where NF
+                        model::PrimitiveEquation)
 
+    NF = eltype(progn)
     (; u₀, η₀, ΔT, Tmin) = initial_conditions
     (; σ_tropopause) = initial_conditions
     lapse_rate = model.atmosphere.moist_lapse_rate
@@ -704,10 +710,10 @@ $(TYPEDSIGNATURES)
 Random initial conditions for the interface displacement η
 in the shallow water equations. The flow (u, v) is zero initially.
 This kicks off gravity waves that will interact with orography."""
-function initialize!(   progn::PrognosticVariables{NF},
+function initialize!(   progn::PrognosticVariables,
                         initial_conditions::RandomWaves,
-                        model::ShallowWater) where NF
-
+                        model::ShallowWater)
+    NF = eltype(progn)
     (; A, lmin, lmax) = initial_conditions
     (; spectrum) = progn
 

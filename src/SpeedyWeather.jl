@@ -111,7 +111,8 @@ function animate end
 
 # abstract types
 include("models/abstract_models.jl")
-include("dynamics/abstract_types.jl")
+include("variables/abstract_types.jl")
+include("models/parameterizations.jl")
 
 # GEOMETRY CONSTANTS ETC
 include("dynamics/vertical_coordinates.jl")
@@ -125,13 +126,14 @@ include("dynamics/orography.jl")
 include("physics/land_sea_mask.jl")
 
 # VARIABLES
+include("variables/variables.jl")
 include("dynamics/tracers.jl")
 include("dynamics/particles.jl")
 include("dynamics/clock.jl")
-include("dynamics/prognostic_variables.jl")
-include("dynamics/set.jl")
+include("variables/prognostic_variables.jl")
+include("variables/set.jl")
 include("physics/define_column.jl")
-include("dynamics/diagnostic_variables.jl")
+include("variables/diagnostic_variables.jl")
 
 # MODEL COMPONENTS
 include("dynamics/time_integration.jl")
@@ -154,11 +156,11 @@ include("physics/albedo.jl")
 include("physics/tendencies.jl")
 include("physics/column_variables.jl")
 include("physics/thermodynamics.jl")
-include("physics/boundary_layer.jl")
 include("physics/temperature_relaxation.jl")
 include("physics/vertical_diffusion.jl")
 include("physics/large_scale_condensation.jl")
-include("physics/surface_fluxes/surface_fluxes.jl")
+include("physics/surface_fluxes/boundary_layer.jl")
+include("physics/surface_fluxes/surface_condition.jl")
 include("physics/surface_fluxes/momentum.jl")
 include("physics/surface_fluxes/heat.jl")
 include("physics/surface_fluxes/humidity.jl")

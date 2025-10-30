@@ -34,11 +34,11 @@ $(TYPEDFIELDS)"""
     BL,     # <:AbstractBoundaryLayer,
     TR,     # <:AbstractTemperatureRelaxation,
     VD,     # <:AbstractVerticalDiffusion,
-    SUT,    # <:AbstractSurfaceThermodynamics,
-    SUW,    # <:AbstractSurfaceWind,
+    SC,     # <:AbstractSurfaceCondition,
+    SM,     # <:AbstractSurfaceMomentumFlux,
     SH,     # <:AbstractSurfaceHeatFlux,
     HF,     # <:AbstractSurfaceHumidityFlux,
-    LSC,    # <:AbstractCondensation,
+    LC,     # <:AbstractCondensation,
     CV,     # <:AbstractConvection,
     OD,     # <:AbstractOpticalDepth,
     SW,     # <:AbstractShortwave,
@@ -52,6 +52,9 @@ $(TYPEDFIELDS)"""
     HO,     # <:AbstractHoleFilling,
     OU,     # <:AbstractOutput,
     FB,     # <:AbstractFeedback,
+    TS1,    # <:Tuple{Symbol}
+    TS2,    # <:Tuple{Symbol}
+    TS3,    # <:Tuple{Symbol}
 } <: PrimitiveWet
 
     spectral_grid::SpectralGrid
@@ -89,11 +92,11 @@ $(TYPEDFIELDS)"""
     boundary_layer_drag::BL = BulkRichardsonDrag(spectral_grid)
     temperature_relaxation::TR = nothing
     vertical_diffusion::VD = BulkRichardsonDiffusion(spectral_grid)
-    surface_thermodynamics::SUT = SurfaceThermodynamicsConstant(spectral_grid)
-    surface_wind::SUW = SurfaceWind(spectral_grid)
+    surface_condition::SC = SurfaceCondition(spectral_grid)
+    surface_momentum_flux::SM = SurfaceMomentumFlux(spectral_grid)
     surface_heat_flux::SH = SurfaceHeatFlux(spectral_grid)
     surface_humidity_flux::HF = SurfaceHumidityFlux(spectral_grid)
-    large_scale_condensation::LSC = ImplicitCondensation(spectral_grid)
+    large_scale_condensation::LC = ImplicitCondensation(spectral_grid)
     convection::CV = SimplifiedBettsMiller(spectral_grid)
     optical_depth::OD = ZeroOpticalDepth(spectral_grid)
     shortwave_radiation::SW = TransparentShortwave(spectral_grid)
@@ -112,6 +115,17 @@ $(TYPEDFIELDS)"""
     output::OU = NetCDFOutput(spectral_grid, PrimitiveWet)
     callbacks::Dict{Symbol, AbstractCallback} = Dict{Symbol, AbstractCallback}()
     feedback::FB = Feedback()
+
+    # COMPONENTS
+    # Tuples with symbols or instances of all parameterizations and parameter functions
+    # Used to initiliaze variables and for the column-based parameterizations
+    model_parameters::TS1 = (:time_stepping, :orography, :geopotential, :atmosphere, 
+                                                       :planet, :geometry, :land_sea_mask, :clausius_clapeyron)
+    parameterizations::TS2 = (:convection, :large_scale_condensation, :albedo, 
+                                                        :surface_condition, :surface_momentum_flux, 
+                                                        :surface_heat_flux, :surface_humidity_flux, 
+                                                        :stochastic_physics)
+    extra_parameterizations::TS3 = (:solar_zenith, :land, :ocean)
 end
 
 prognostic_variables(::Type{<:PrimitiveWet}) = (:vor, :div, :temp, :humid, :pres)
@@ -156,22 +170,22 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
     initialize!(model.optical_depth, model)
     initialize!(model.shortwave_radiation, model)
     initialize!(model.longwave_radiation, model)
-    initialize!(model.surface_thermodynamics, model)
-    initialize!(model.surface_wind, model)
+    initialize!(model.surface_condition, model)
+    initialize!(model.surface_momentum_flux, model)
     initialize!(model.surface_heat_flux, model)
     initialize!(model.surface_humidity_flux, model)
     initialize!(model.stochastic_physics, model)
     initialize!(model.particle_advection, model)
 
     # allocate prognostic and diagnostic variables
-    prognostic_variables = PrognosticVariables(spectral_grid, model)
-    diagnostic_variables = DiagnosticVariables(spectral_grid, model)
+    prognostic_variables = PrognosticVariables(model)
+    diagnostic_variables = DiagnosticVariables(model)
 
     # initialize non-atmosphere prognostic variables
     (; particles, ocean, land) = prognostic_variables
-    initialize!(particles, prognostic_variables, diagnostic_variables, model)
-    initialize!(ocean,     prognostic_variables, diagnostic_variables, model)
-    initialize!(land,      prognostic_variables, diagnostic_variables, model)
+    initialize!(particles, prognostic_variables, diagnostic_variables, model.particle_advection, model)
+    initialize!(ocean,     prognostic_variables, diagnostic_variables, model.ocean, model)
+    initialize!(land,      prognostic_variables, diagnostic_variables, model.land, model)
 
     # set the initial conditions (may overwrite variables set in intialize! ocean/land)
     initialize!(prognostic_variables, model.initial_conditions, model)

@@ -87,8 +87,8 @@ function initialize!(model::ShallowWater; time::DateTime = DEFAULT_DATE)
     initialize!(model.particle_advection, model)
 
     # allocate variables
-    prognostic_variables = PrognosticVariables(spectral_grid, model)
-    diagnostic_variables = DiagnosticVariables(spectral_grid, model)
+    prognostic_variables = PrognosticVariables(model)
+    diagnostic_variables = DiagnosticVariables(model)
 
     # initialize non-atmosphere prognostic variables
     initialize!(prognostic_variables.particles, prognostic_variables, diagnostic_variables, model)
