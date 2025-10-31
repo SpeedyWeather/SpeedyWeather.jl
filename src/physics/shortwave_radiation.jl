@@ -154,16 +154,42 @@ $(TYPEDFIELDS)"""
     stratocumulus_cloud_albedo::NF = 0.5
 
     "[OPTION] Static stability lower threshold for stratocumulus (GSEN, called GSES0 in the paper) [J/kg]"
-    stratocumulus_stability_min::NF = 0
+    stratocumulus_stability_min::NF = 0.25
 
     "[OPTION] Static stability upper threshold for stratocumulus (GSEN, called GSES1 in the paper) [J/kg]"
-    stratocumulus_stability_max::NF = 200
+    stratocumulus_stability_max::NF = 0.40
 
     "[OPTION] Maximum stratocumulus cloud cover (called CLSMAX in the paper) [1]"
-    stratocumulus_cover_max::NF = 1
+    stratocumulus_cover_max::NF = 0.60
 
     "[OPTION] Enable stratocumulus cloud parameterization?"
     use_stratocumulus::Bool = true
+
+    "[OPTION] Absorptivity of dry air (effective OneBand) [1]"
+    # (0.95 * 0.033) + (0.05 * 0.0) = 0.03135
+    absorptivity_dry_air::NF = 0.03135
+
+    "[OPTION] Absorptivity of aerosols (effective OneBand) [1]"
+    # (0.95 * 0.033) + (0.05 * 0.0) = 0.03135
+    absorptivity_aerosol::NF = 0.03135
+
+    "[OPTION] Absorptivity of water vapor (effective OneBand) [1]"
+    # (0.95 * 22.0) + (0.05 * 15000.0) = 770.9
+    # Scaled by 1000 for kg/kg units
+    absorptivity_water_vapor::NF = 770.9
+
+    "[OPTION] Base cloud absorptivity (effective OneBand) [1]"
+    # (0.95 * 15.0) + (0.05 * 0.0) = 14.25
+    # Scaled by 1000 for kg/kg units
+    absorptivity_cloud_base::NF = 14.25
+
+    "[OPTION] Maximum cloud absorptivity (effective OneBand) [1]"
+    # (0.95 * 0.15) + (0.05 * 0.0) = 0.1425
+    # This parameter (abscl2) is unitless, so it stays the same
+    absorptivity_cloud_limit::NF = 0.1425
+
+    "[OPTION] Use SPEEDY-style shortwave transmittance scheme?"
+    use_speedy_transmittance::Bool = true
 end
 
 # generator function
@@ -185,73 +211,146 @@ function shortwave_radiation!(
        humid, sat_humid, albedo_ocean, albedo_land,
        transmittance_shortwave, flux_temp_downward, flux_temp_upward, dry_static_energy) = column
 
-    # without cloud top reflection set locally cloud top below surface to disable
-    # cloud reflection completely
-    cloud_top = radiation.cloud_top_reflection ? column.cloud_top : nlayers+1
-    
+     
+    # Weight and max precip for cloud cover calculation
     wpcl = radiation.precipitation_weight
     pmcl = radiation.precipitation_max
-
     # Contribution to cloud cover from precipitation, convert m/s to mm/day
-    P = wpcl*min(pmcl, (86400 * (column.rain_rate_large_scale + column.rain_rate_convection) / 1000))   
+    P = wpcl*sqrt(min(pmcl, (86400 * (column.rain_rate_large_scale + column.rain_rate_convection) / 1000)))
 
-    # use scratch array for cloud cover fraction
-    cloud_cover = column.a
+    # Get Precipitation Top (kprtop) from the condensation scheme
+    # This was previously calculated by other schemes and stored in column.cloud_top
+    kprtop = column.cloud_top
 
-    for k in 1:nlayers
+    # Diagnose RH_term and Humidity Cloud Top (kcltop)
+    rh_min = radiation.relative_humidity_threshold_min
+    rh_max = radiation.relative_humidity_threshold_max
+    q_min_kg_kg = radiation.specific_humidity_threshold_min
+
+    humidity_term_max = zero(P)
+    kcltop = nlayers + 1 # Default to no cloud (below surface)
+
+    # Loop from top layer (k=1) to the layer ABOVE the surface (nlayers-1)
+    for k in 1:(nlayers-1)
         q = humid[k]
         qsat = sat_humid[k]
-        qmin = qsat*radiation.relative_humidity_threshold_min
-        qmax = qsat*radiation.relative_humidity_threshold_max
-        cloud_cover[k] = min(1, P + min(1, (q - qmin)/(qmax-qmin))^2)
+
+        # Check if specific humidity is above the absolute threshold
+        if q > q_min_kg_kg
+            # Calculate this layer's RH contribution
+            rh = q / qsat
+            rh_norm = max(0, (rh - rh_min) / (rh_max - rh_min))
+            humidity_term_k = min(1, rh_norm)^2
+
+            # If this is the new maximum, update the max term and set humidity top
+            if humidity_term_k > humidity_term_max
+                humidity_term_max = humidity_term_k
+                kcltop = k  # This layer is now the humidity cloud top
+            end
+        end
     end
+    
+    # Calculate the Single Column Cloud Cover (CLC)
+    # This uses the humidity term from the kcltop layer
+    cloud_cover = min(1, P + humidity_term_max)
+
+    # The final cloud top is the minimum (highest in alt) of the two
+    cloud_top = min(kcltop, kprtop)
+
+    # Update the column's cloud_top with this final, correct value
+    column.cloud_top = cloud_top
+
+    # Local variable for reflection (can be disabled)
+    reflection_cloud_top = radiation.cloud_top_reflection ? cloud_top : nlayers + 1
 
     # --- Stratocumulus parameterization (CLS) ---
     CLS = zero(P)
     if radiation.use_stratocumulus
-        # Compute static stability (GSEN) as difference in dry static energy between lowest and next-lowest layer
-        # GSEN = S_N - S_{N-1}
+        # Compute static stability (GSEN)
         GSEN = dry_static_energy[nlayers] - dry_static_energy[nlayers-1]
 
         # Use tunable parameters from struct
         stability_min = radiation.stratocumulus_stability_min
         stability_max = radiation.stratocumulus_stability_max
         cover_max = radiation.stratocumulus_cover_max
+        clfact = 1.2  # Added missing factor from SPEEDY
 
-        # F_ST: stability factor (bounded between 0 and 1)
+        # F_ST: stability factor
         F_ST = max(0, min(1, (GSEN - stability_min) / (stability_max - stability_min)))
 
         # Stratocumulus cloud cover (CLS) over ocean
-        CLS_ocean = F_ST * max(cover_max - cloud_cover[nlayers], 0)
-        # Over land, further modulate by surface RH (lowest layer relative humidity)
+        # Uses the single column CLC
+        CLS_ocean = F_ST * max(cover_max - clfact * cloud_cover, 0)
+        
+        # Over land, further modulate by surface RH
         RH_N = humid[nlayers] / sat_humid[nlayers]
         CLS_land = CLS_ocean * RH_N
+        
         # Land-sea mask weighted stratocumulus cover
         CLS = (1 - land_fraction) * CLS_ocean + land_fraction * CLS_land
     end
 
+    # ---  Transmittance Calculation ---
+    t = view(transmittance_shortwave, :, 1)
+    if radiation.use_speedy_transmittance
+        
+        (; absorptivity_dry_air, absorptivity_aerosol, absorptivity_water_vapor,
+        absorptivity_cloud_base, absorptivity_cloud_limit) = radiation
+
+        sigma_levels   = model.geometry.σ_levels_half
+        surface_pressure = column.pres[end] 
+        reference_surface_pressure = model.atmosphere.pres_ref # Corrected path
+
+        # Cloud absorption term based on cloud base humidity (SPEEDY logic)
+        q_base = humid[nlayers-1] # Assumes nlayers-1 is the cloud base layer
+        cloud_absorptivity_term = min(absorptivity_cloud_base * q_base,
+                                    absorptivity_cloud_limit)
+
+        for k in 1:nlayers
+            aerosol_factor = sigma_levels[k]^0.5
+            layer_absorptivity = absorptivity_dry_air +
+                                absorptivity_aerosol * aerosol_factor^2 +
+                                absorptivity_water_vapor * humid[k]
+
+            # Add cloud absorption below the FINAL cloud top
+            if k >= cloud_top
+                # Use the single CLC value and the pre-calculated term
+                layer_absorptivity += cloud_absorptivity_term * cloud_cover
+            end
+
+            # compute differential optical depth
+            delta_sigma = sigma_levels[k+1] - sigma_levels[k]
+            optical_depth = layer_absorptivity * delta_sigma * surface_pressure / reference_surface_pressure
+        
+
+            # transmittance through layer k
+            t[k] = exp(-optical_depth)
+        end
+    end
+
     # Downward beam
     (; cloud_albedo, ozone_absorp_upper, ozone_absorp_lower, stratocumulus_cloud_albedo) = radiation
-    t = view(transmittance_shortwave, :, 1)          # only one band
-
+   
     # Apply ozone absorption at TOA as subtracted fluxes 
     D_TOA = model.planet.solar_constant * cos_zenith
     D = D_TOA - ozone_absorp_upper - ozone_absorp_lower
     flux_temp_downward[1] += D
 
     # Clear sky portion until cloud top
-    for k in 1:(cloud_top - 1)
+    for k in 1:(reflection_cloud_top - 1)
         D *= t[k]
         flux_temp_downward[k+1] += D
     end
 
     # Cloud reflection (cloud top)
     U_reflected = zero(D)
-    if cloud_top < nlayers+1
-        R = cloud_albedo * cloud_cover[cloud_top]
+    if reflection_cloud_top < nlayers+1
+
+        # Use single CLC value for reflection
+        R = cloud_albedo * cloud_cover
         U_reflected = D * R
         D *= (1 - R)
-        for k in cloud_top:nlayers
+        for k in reflection_cloud_top:nlayers
             D *= t[k]
             flux_temp_downward[k+1] += D
         end
@@ -263,6 +362,7 @@ function shortwave_radiation!(
     U_stratocumulus = D * stratocumulus_cloud_albedo * CLS
     D_surface = D - U_stratocumulus
     column.surface_shortwave_down = D_surface
+
     up_ocean = albedo_ocean * D_surface
     up_land  = albedo_land  * D_surface
     column.surface_shortwave_up_ocean = up_ocean
@@ -270,16 +370,18 @@ function shortwave_radiation!(
 
     # Computes grid-cell-average surface albedo and reflected shortwave flux
     albedo = (1 - land_fraction) * albedo_ocean + land_fraction * albedo_land
-    
-    U = albedo * D_surface 
-    column.surface_shortwave_up = U 
+    U_surface_albedo = albedo * D_surface
+    column.surface_shortwave_up = U_surface_albedo
 
+    U = U_surface_albedo + U_stratocumulus
+    
     # Upward beam
-    flux_temp_upward[nlayers+1] += U + U_stratocumulus
+    flux_temp_upward[nlayers+1] += U
 
     for k in nlayers:-1:1
         U *= t[k]
-        U += k == cloud_top ? U_reflected : zero(U)
+        # Add reflected flux at the correct layer
+        U += k == reflection_cloud_top ? U_reflected : zero(U) # <--- THIS IS CORRECT
         flux_temp_upward[k] += U
     end
 
