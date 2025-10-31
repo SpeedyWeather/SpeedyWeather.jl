@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Reset geopotential accumulator in implicit correction [#890](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/890)
 - Zenith constructors [#889](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/889)
 - More general forcing of pressure, vorticity and divergence [#855](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/855)
 
