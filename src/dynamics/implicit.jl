@@ -317,6 +317,7 @@ function implicit_correction!(
     (; pres_tend, div_tend) = diagn.tendencies
     G = diagn.dynamics.a        # reuse work arrays, used for combined tendency G
     geopot = diagn.dynamics.b   # used for geopotential
+    geopot .= 0                 # reset geopotential accumulator
 
     for k in 1:nlayers
         for r in k:nlayers      # skip 1:k-1 as integration is surface to k
