@@ -32,7 +32,6 @@ $(TYPEDFIELDS)"""
     AL,     # <:AbstractAlbedo,
     CC,     # <:AbstractClausiusClapeyron,
     BL,     # <:AbstractBoundaryLayer,
-    TR,     # <:AbstractTemperatureRelaxation,
     VD,     # <:AbstractVerticalDiffusion,
     SUT,    # <:AbstractSurfaceThermodynamics,
     SUW,    # <:AbstractSurfaceWind,
@@ -87,7 +86,6 @@ $(TYPEDFIELDS)"""
     physics::Bool = true
     clausius_clapeyron::CC = ClausiusClapeyron(spectral_grid, atmosphere)
     boundary_layer_drag::BL = BulkRichardsonDrag(spectral_grid)
-    temperature_relaxation::TR = nothing
     vertical_diffusion::VD = BulkRichardsonDiffusion(spectral_grid)
     surface_thermodynamics::SUT = SurfaceThermodynamicsConstant(spectral_grid)
     surface_wind::SUW = SurfaceWind(spectral_grid)
@@ -149,7 +147,6 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
 
     # parameterizations
     initialize!(model.boundary_layer_drag, model)
-    initialize!(model.temperature_relaxation, model)
     initialize!(model.vertical_diffusion, model)
     initialize!(model.large_scale_condensation, model)
     initialize!(model.convection, model)

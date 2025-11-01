@@ -3,6 +3,9 @@
 ## Unreleased
 
 - OneBandShortwave radiation implemented with diagnostic clouds [#888](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/888)
+- Zenith constructors [#889](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/889)
+- More general forcing of pressure, vorticity and divergence [#855](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/855)
+
 
 ## v0.17.3
 

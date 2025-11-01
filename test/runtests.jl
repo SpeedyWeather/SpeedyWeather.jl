@@ -58,6 +58,7 @@ if !FLAG_EXTENDED_TESTS && !FLAG_ENZYME_TESTS
     include("dynamics/geopotential.jl")
 
     # PHYSICS
+    include("physics/zenith.jl")
     include("physics/column_variables.jl")
     include("physics/land_sea_mask.jl")
     include("physics/ocean_sea_ice.jl")
