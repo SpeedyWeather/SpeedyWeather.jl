@@ -179,7 +179,7 @@ $(TYPEDFIELDS)"""
 
     "[OPTION] Base cloud absorptivity [per kg/kg per 10^5 Pa]"
     # Weighted visible band: 0.95*0.015 = 0.014 per g/kg → 1.4e-5 per kg/kg (SPEEDY abscl1)
-    absorptivity_cloud_base::NF = 0.000015
+    absorptivity_cloud_base::NF = 0.000014
 
     "[OPTION] Maximum cloud absorptivity [per 10^5 Pa]"
     # Weighted one-band scaling: 0.95*0.15 = 0.1425 → rounded to 0.14 (SPEEDY abscl2)
