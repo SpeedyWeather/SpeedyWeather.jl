@@ -227,6 +227,7 @@ function shortwave_radiation!(
     kcltop = nlayers + 1 # Default to no cloud (below surface)
 
     # Loop from top layer (k=1) to the layer ABOVE the surface (nlayers-1)
+    # to find the maximum humidity term and corresponding cloud top 
     for k in 1:(nlayers-1)
         humidity_k = humid[k]
         qsat = sat_humid[k]
@@ -259,8 +260,8 @@ function shortwave_radiation!(
     # Local variable for reflection (can be disabled)
     reflection_cloud_top = radiation.cloud_top_reflection ? cloud_top : nlayers + 1
 
-    # --- Stratocumulus parameterization (CLS) ---
-    CLS = zero(P)
+    # --- Stratocumulus parameterization (stratocumulus_cloudcover) ---
+    stratocumulus_cloudcover = zero(P)
     if radiation.use_stratocumulus
         # Compute static stability (GSEN)
         GSEN = dry_static_energy[nlayers] - dry_static_energy[nlayers-1]
@@ -274,16 +275,16 @@ function shortwave_radiation!(
         # F_ST: stability factor
         F_ST = max(0, min(1, (GSEN - stability_min) / (stability_max - stability_min)))
 
-        # Stratocumulus cloud cover (CLS) over ocean
+        # Stratocumulus cloud cover (stratocumulus_cloudcover) over ocean
         # Uses the single column CLC
-        CLS_ocean = F_ST * max(cover_max - clfact * cloud_cover, 0)
+        stratocumulus_cloudcover_ocean = F_ST * max(cover_max - clfact * cloud_cover, 0)
         
         # Over land, further modulate by surface RH
         RH_N = humid[nlayers] / sat_humid[nlayers]
-        CLS_land = CLS_ocean * RH_N
+        stratocumulus_cloudcover_land = stratocumulus_cloudcover_ocean * RH_N
         
         # Land-sea mask weighted stratocumulus cover
-        CLS = (1 - land_fraction) * CLS_ocean + land_fraction * CLS_land
+        stratocumulus_cloudcover = (1 - land_fraction) * stratocumulus_cloudcover_ocean + land_fraction * stratocumulus_cloudcover_land
     end
 
     # ---  Transmittance Calculation ---
@@ -313,6 +314,7 @@ function shortwave_radiation!(
             aerosol_factor = sigma_mid^2
             
             # Layer absorptivity (all humidity-based parameters are per kg/kg per 10^5 Pa)
+            # Aerosol loading increases toward surface (proportional to σ²).
             layer_absorptivity = (absorptivity_dry_air +
                                 absorptivity_aerosol * aerosol_factor +
                                 absorptivity_water_vapor * q)
@@ -349,12 +351,15 @@ function shortwave_radiation!(
 
     # Cloud reflection (cloud top)
     U_reflected = zero(D)
-    if reflection_cloud_top < nlayers+1
 
+    # At cloud top: reflect R fraction upward, transmit (1-R) downward
+    if reflection_cloud_top < nlayers+1
         # Use single CLC value for reflection
         R = cloud_albedo * cloud_cover
         U_reflected = D * R
         D *= (1 - R)
+
+        # Continue propagating downward below cloud top.
         for k in reflection_cloud_top:nlayers
             D *= t[k]
             flux_temp_downward[k+1] += D
@@ -362,12 +367,13 @@ function shortwave_radiation!(
     end
 
     # --- Surface stratocumulus reflection ---
-    # At the surface, apply stratocumulus reflection using CLS and stratocumulus_cloud_albedo
+    # At the surface, apply stratocumulus reflection using stratocumulus_cloudcover and stratocumulus_cloud_albedo
     # Compute the reflected (upward) flux from stratocumulus at the surface
-    U_stratocumulus = D * stratocumulus_cloud_albedo * CLS
+    U_stratocumulus = D * stratocumulus_cloud_albedo * stratocumulus_cloudcover
     D_surface = D - U_stratocumulus
     column.surface_shortwave_down = D_surface
 
+    # Separate ocean and land albedo reflections.
     up_ocean = albedo_ocean * D_surface
     up_land  = albedo_land  * D_surface
     column.surface_shortwave_up_ocean = up_ocean
@@ -378,11 +384,13 @@ function shortwave_radiation!(
     U_surface_albedo = albedo * D_surface
     column.surface_shortwave_up = U_surface_albedo
 
+    # Total upward flux = surface reflection + stratocumulus reflection.
     U = U_surface_albedo + U_stratocumulus
     
     # Upward beam
     flux_temp_upward[nlayers+1] += U
-
+    
+    # Propagate upward, applying transmittance. At cloud top, add the reflected flux.
     for k in nlayers:-1:1
         U *= t[k]
         # Add reflected flux at the correct layer
