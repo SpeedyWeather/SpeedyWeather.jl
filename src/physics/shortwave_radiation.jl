@@ -302,7 +302,7 @@ function shortwave_radiation!(
         zenit_factor = 1.0 + 1.0 * (1.0 - cos_zenith)^2
 
         # Cloud absorption term based on cloud base humidity (SPEEDY logic)
-        q_base = humid[nlayers-1]
+        q_base = nlayers > 1 ? humid[nlayers-1] : humid[nlayers]
         cloud_absorptivity_term = min(absorptivity_cloud_base * q_base,
                                     absorptivity_cloud_limit)
 
