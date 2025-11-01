@@ -166,28 +166,23 @@ $(TYPEDFIELDS)"""
     use_stratocumulus::Bool = true
 
     "[OPTION] Absorptivity of dry air [per 10^5 Pa]"
-    # (0.95 * 0.033) + (0.05 * 0.0) = 0.03135
+    # Weighted visible + near-IR: 0.95*0.033 + 0.05*0.0 = 0.03135 (SPEEDY absdry, fband weights)
     absorptivity_dry_air::NF = 0.03135
 
     "[OPTION] Absorptivity of aerosols [per 10^5 Pa]"
-    # (0.95 * 0.033) + (0.05 * 0.0) = 0.03135
+    # Weighted visible + near-IR: 0.95*0.033 + 0.05*0.0 = 0.03135 (SPEEDY absaer, fband weights)
     absorptivity_aerosol::NF = 0.03135
 
-    "[OPTION] Absorptivity of water vapor [per g/kg per 10^5 Pa]"
-    # This is a tricky one. The visible band absorbs ~0.022, but the near-IR
-    # band absorbs strongly (15.0). However, since near-IR is only 5% and is
-    # mostly absorbed in the downward pass, its effective contribution to 
-    # transmittance is much less than 0.05 * 15.0 = 0.75
-    # A reasonable approximation: 0.95*0.022 + 0.05*15.0*0.2 ≈ 0.021 + 0.15 = 0.171
-    absorptivity_water_vapor::NF = 0.17
+    "[OPTION] Absorptivity of water vapor [per kg/kg per 10^5 Pa]"
+    # Weighted visible + near-IR: 0.95*0.022 + 0.05*15.0*0.2 = 0.171 per g/kg → 1.7e-4 per kg/kg (SPEEDY abswv1, abswv2)
+    absorptivity_water_vapor::NF = 0.00017
 
-    "[OPTION] Base cloud absorptivity [per g/kg per 10^5 Pa]"
-    # Visible band only: 0.95 * 0.015 ≈ 0.014, but keep SPEEDY's original value
-    absorptivity_cloud_base::NF = 0.015
+    "[OPTION] Base cloud absorptivity [per kg/kg per 10^5 Pa]"
+    # Weighted visible band: 0.95*0.015 = 0.014 per g/kg → 1.4e-5 per kg/kg (SPEEDY abscl1)
+    absorptivity_cloud_base::NF = 0.000015
 
     "[OPTION] Maximum cloud absorptivity [per 10^5 Pa]"
-    # (0.95 * 0.15) + (0.05 * 0.0) = 0.1425
-    # This parameter (abscl2) is unitless, so it stays the same
+    # Weighted one-band scaling: 0.95*0.15 = 0.1425 → rounded to 0.14 (SPEEDY abscl2)
     absorptivity_cloud_limit::NF = 0.14
 
     "[OPTION] Use SPEEDY-style shortwave transmittance scheme?"
@@ -217,8 +212,8 @@ function shortwave_radiation!(
     # Weight and max precip for cloud cover calculation
     wpcl = radiation.precipitation_weight
     pmcl = radiation.precipitation_max
-    # Contribution to cloud cover from precipitation, convert m/s to mm/day
-    P = wpcl*sqrt(min(pmcl, (86400 * (column.rain_rate_large_scale + column.rain_rate_convection) / 1000)))
+    # Contribution to cloud cover from precipitation, convert m/s to mm/day (Speedy multiplies by 86.4 because its rates are already in kg m⁻² s⁻¹ (= mm s⁻¹))
+    P = wpcl*sqrt(min(pmcl, (86400 * (column.rain_rate_large_scale + column.rain_rate_convection) * 1000)))
 
     # Get Precipitation Top (kprtop) from the condensation scheme
     # This was previously calculated by other schemes and stored in column.cloud_top
@@ -306,22 +301,21 @@ function shortwave_radiation!(
         zenit_factor = 1.0 + 1.0 * (1.0 - cos_zenith)^2
 
         # Cloud absorption term based on cloud base humidity (SPEEDY logic)
-        q_base_gkg = humid[nlayers-1]
-        cloud_absorptivity_term = min(absorptivity_cloud_base * q_base_gkg,
+        q_base = humid[nlayers-1]
+        cloud_absorptivity_term = min(absorptivity_cloud_base * q_base,
                                     absorptivity_cloud_limit)
 
         for k in 1:nlayers
-            # Convert humidity from kg/kg to g/kg for SPEEDY parameters
-            q_gkg = humid[k] 
-            
+            q = humid[k]
+
             # Aerosol factor: use mid-level sigma, squared
             sigma_mid = 0.5 * (sigma_levels[k] + sigma_levels[k+1])
             aerosol_factor = sigma_mid^2
             
-            # Layer absorptivity (all parameters are per g/kg per 10^5 Pa)
+            # Layer absorptivity (all humidity-based parameters are per kg/kg per 10^5 Pa)
             layer_absorptivity = (absorptivity_dry_air +
                                 absorptivity_aerosol * aerosol_factor +
-                                absorptivity_water_vapor * q_gkg)
+                                absorptivity_water_vapor * q)
 
             # Add cloud absorption below the FINAL cloud top
             if k >= cloud_top
