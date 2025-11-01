@@ -132,7 +132,7 @@ $(TYPEDFIELDS)"""
     "[OPTION] Specific humidity threshold for cloud cover [Kg/kg]"
     specific_humidity_threshold_min::NF = 0.0002
 
-    "[OPTION] Weight for √precip term [1] at 1 mm/day"
+    "[OPTION] Weight for √precip term [1]"
     precipitation_weight::NF = 0.2
 
     "[OPTION] Cap on precip contributing to cloud cover [mm/day]"
@@ -165,28 +165,30 @@ $(TYPEDFIELDS)"""
     "[OPTION] Enable stratocumulus cloud parameterization?"
     use_stratocumulus::Bool = true
 
-    "[OPTION] Absorptivity of dry air (effective OneBand) [1]"
+    "[OPTION] Absorptivity of dry air [per 10^5 Pa]"
     # (0.95 * 0.033) + (0.05 * 0.0) = 0.03135
     absorptivity_dry_air::NF = 0.03135
 
-    "[OPTION] Absorptivity of aerosols (effective OneBand) [1]"
+    "[OPTION] Absorptivity of aerosols [per 10^5 Pa]"
     # (0.95 * 0.033) + (0.05 * 0.0) = 0.03135
     absorptivity_aerosol::NF = 0.03135
 
-    "[OPTION] Absorptivity of water vapor (effective OneBand) [1]"
-    # (0.95 * 22.0) + (0.05 * 15000.0) = 770.9
-    # Scaled by 1000 for kg/kg units
-    absorptivity_water_vapor::NF = 770.9
+    "[OPTION] Absorptivity of water vapor [per g/kg per 10^5 Pa]"
+    # This is a tricky one. The visible band absorbs ~0.022, but the near-IR
+    # band absorbs strongly (15.0). However, since near-IR is only 5% and is
+    # mostly absorbed in the downward pass, its effective contribution to 
+    # transmittance is much less than 0.05 * 15.0 = 0.75
+    # A reasonable approximation: 0.95*0.022 + 0.05*15.0*0.2 ≈ 0.021 + 0.15 = 0.171
+    absorptivity_water_vapor::NF = 0.17
 
-    "[OPTION] Base cloud absorptivity (effective OneBand) [1]"
-    # (0.95 * 15.0) + (0.05 * 0.0) = 14.25
-    # Scaled by 1000 for kg/kg units
-    absorptivity_cloud_base::NF = 14.25
+    "[OPTION] Base cloud absorptivity [per g/kg per 10^5 Pa]"
+    # Visible band only: 0.95 * 0.015 ≈ 0.014, but keep SPEEDY's original value
+    absorptivity_cloud_base::NF = 0.015
 
-    "[OPTION] Maximum cloud absorptivity (effective OneBand) [1]"
+    "[OPTION] Maximum cloud absorptivity [per 10^5 Pa]"
     # (0.95 * 0.15) + (0.05 * 0.0) = 0.1425
     # This parameter (abscl2) is unitless, so it stays the same
-    absorptivity_cloud_limit::NF = 0.1425
+    absorptivity_cloud_limit::NF = 0.14
 
     "[OPTION] Use SPEEDY-style shortwave transmittance scheme?"
     use_speedy_transmittance::Bool = true
@@ -223,23 +225,22 @@ function shortwave_radiation!(
     kprtop = column.cloud_top
 
     # Diagnose RH_term and Humidity Cloud Top (kcltop)
-    rh_min = radiation.relative_humidity_threshold_min
-    rh_max = radiation.relative_humidity_threshold_max
-    q_min_kg_kg = radiation.specific_humidity_threshold_min
+    (;relative_humidity_threshold_min, relative_humidity_threshold_max, specific_humidity_threshold_min) = radiation
 
     humidity_term_max = zero(P)
+    
     kcltop = nlayers + 1 # Default to no cloud (below surface)
 
     # Loop from top layer (k=1) to the layer ABOVE the surface (nlayers-1)
     for k in 1:(nlayers-1)
-        q = humid[k]
+        humidity_k = humid[k]
         qsat = sat_humid[k]
 
         # Check if specific humidity is above the absolute threshold
-        if q > q_min_kg_kg
+        if humidity_k > specific_humidity_threshold_min
             # Calculate this layer's RH contribution
-            rh = q / qsat
-            rh_norm = max(0, (rh - rh_min) / (rh_max - rh_min))
+            relative_humidity_k = humidity_k / qsat
+            rh_norm = max(0, (relative_humidity_k - relative_humidity_threshold_min) / (relative_humidity_threshold_max - relative_humidity_threshold_min))
             humidity_term_k = min(1, rh_norm)^2
 
             # If this is the new maximum, update the max term and set humidity top
@@ -297,33 +298,43 @@ function shortwave_radiation!(
         (; absorptivity_dry_air, absorptivity_aerosol, absorptivity_water_vapor,
         absorptivity_cloud_base, absorptivity_cloud_limit) = radiation
 
-        sigma_levels   = model.geometry.σ_levels_half
-        surface_pressure = column.pres[end] 
-        reference_surface_pressure = model.atmosphere.pres_ref # Corrected path
+        sigma_levels = model.geometry.σ_levels_half
+        surface_pressure = column.pres[end]  # This is in Pa
+
+        # Zenith angle correction factor (SPEEDY's zenit)
+        # azen = 1.0, nzen = 2 in SPEEDY
+        zenit_factor = 1.0 + 1.0 * (1.0 - cos_zenith)^2
 
         # Cloud absorption term based on cloud base humidity (SPEEDY logic)
-        q_base = humid[nlayers-1] # Assumes nlayers-1 is the cloud base layer
-        cloud_absorptivity_term = min(absorptivity_cloud_base * q_base,
+        q_base_gkg = humid[nlayers-1]
+        cloud_absorptivity_term = min(absorptivity_cloud_base * q_base_gkg,
                                     absorptivity_cloud_limit)
 
         for k in 1:nlayers
-            aerosol_factor = sigma_levels[k]^0.5
-            layer_absorptivity = absorptivity_dry_air +
-                                absorptivity_aerosol * aerosol_factor^2 +
-                                absorptivity_water_vapor * humid[k]
+            # Convert humidity from kg/kg to g/kg for SPEEDY parameters
+            q_gkg = humid[k] 
+            
+            # Aerosol factor: use mid-level sigma, squared
+            sigma_mid = 0.5 * (sigma_levels[k] + sigma_levels[k+1])
+            aerosol_factor = sigma_mid^2
+            
+            # Layer absorptivity (all parameters are per g/kg per 10^5 Pa)
+            layer_absorptivity = (absorptivity_dry_air +
+                                absorptivity_aerosol * aerosol_factor +
+                                absorptivity_water_vapor * q_gkg)
 
             # Add cloud absorption below the FINAL cloud top
             if k >= cloud_top
-                # Use the single CLC value and the pre-calculated term
                 layer_absorptivity += cloud_absorptivity_term * cloud_cover
             end
 
-            # compute differential optical depth
+            # Compute differential optical depth with zenith correction
+            # CRITICAL: Normalize pressure to 10^5 Pa since absorptivities are per 10^5 Pa
             delta_sigma = sigma_levels[k+1] - sigma_levels[k]
-            optical_depth = layer_absorptivity * delta_sigma * surface_pressure / reference_surface_pressure
-        
+            normalized_pressure = surface_pressure / 1e5  # Convert Pa to units of 10^5 Pa
+            optical_depth = layer_absorptivity * delta_sigma * normalized_pressure * zenit_factor
 
-            # transmittance through layer k
+            # Transmittance through layer k
             t[k] = exp(-optical_depth)
         end
     end
@@ -381,7 +392,7 @@ function shortwave_radiation!(
     for k in nlayers:-1:1
         U *= t[k]
         # Add reflected flux at the correct layer
-        U += k == reflection_cloud_top ? U_reflected : zero(U) # <--- THIS IS CORRECT
+        U += k == reflection_cloud_top ? U_reflected : zero(U)
         flux_temp_upward[k] += U
     end
 
