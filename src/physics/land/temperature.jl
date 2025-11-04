@@ -83,7 +83,7 @@ function timestep!(
     NF = eltype(soil_temperature)
     weight = convert(NF, Dates.days(time-Dates.firstdayofmonth(time))/Dates.daysinmonth(time))
 
-    launch!(architecture(soil_temperature), LinearWorkOrder, size(soil_temperature),
+    launch!(architecture(soil_temperature), RingGridWorkOrder, size(soil_temperature),
             seasonal_land_temperature_kernel!,
             soil_temperature, monthly_temperature, weight, this_month, next_month)
 
@@ -93,10 +93,10 @@ end
 @kernel inbounds=true function seasonal_land_temperature_kernel!(
     soil_temperature, monthly_temperature, weight, this_month, next_month
 )
-    ij = @index(Global, Linear)
+    I = @index(Global, NTuple)
     
-    soil_temperature[ij] = (1 - weight) * monthly_temperature[ij, this_month] + 
-                            weight * monthly_temperature[ij, next_month]
+    soil_temperature[I] = (1 - weight) * monthly_temperature[I[1], this_month] + 
+                            weight * monthly_temperature[I[1], next_month]
 end
 
 ## CONSTANT LAND CLIMATOLOGY

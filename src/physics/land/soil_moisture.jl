@@ -115,7 +115,7 @@ function timestep!(
     (; monthly_soil_moisture) = soil
     (; soil_moisture) = progn.land
 
-    launch!(architecture(soil_moisture), LinearWorkOrder, size(soil_moisture),
+    launch!(architecture(soil_moisture), RingGridWorkOrder, size(soil_moisture),
             seasonal_soil_moisture_kernel!,
             soil_moisture, monthly_soil_moisture, weight, this_month, next_month)
 
@@ -125,10 +125,10 @@ end
 @kernel inbounds=true function seasonal_soil_moisture_kernel!(
     soil_moisture, monthly_soil_moisture, weight, this_month, next_month
 )
-    ij = @index(Global, Linear)
+    I = @index(Global, NTuple)
     
-    soil_moisture[ij] = (1 - weight) * monthly_soil_moisture[ij, this_month] + 
-                         weight * monthly_soil_moisture[ij, next_month]
+    soil_moisture[I] = (1 - weight) * monthly_soil_moisture[I[1], this_month] + 
+                         weight * monthly_soil_moisture[I[1], next_month]
 end
 
 export LandBucketMoisture
