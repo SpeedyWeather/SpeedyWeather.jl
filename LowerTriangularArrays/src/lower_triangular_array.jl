@@ -703,6 +703,31 @@ function Base.fill!(L::LowerTriangularArray, x)
     return L
 end
 
+"""
+$(TYPEDSIGNATURES)
+Zeros the largest degree (last row, l = lmax) of a LowerTriangularArray `L`.
+This sets all elements where l = lmax to zero
+"""
+function zero_last_degree!(L::LowerTriangularArray)
+    (; lmax, l_indices) = L.spectrum
+    arch = architecture(L)
+    
+    launch!(arch, LinearWorkOrder, size(L.data), 
+            zero_last_degree_kernel!, 
+            L.data, l_indices, lmax)
+    
+    return L
+end
+
+@kernel inbounds=true function zero_last_degree_kernel!(data, @Const(l_indices), @Const(lmax))
+    lm = @index(Global, Linear)
+    
+    l = l_indices[lm]
+    if l == lmax
+        data[lm] = 0
+    end
+end
+
 Base.:(==)(L1::LowerTriangularArray, L2::LowerTriangularArray) = 
     L1.spectrum == L2.spectrum && L1.data == L2.data
 Base.isapprox(L1::LowerTriangularArray, L2::LowerTriangularArray; kwargs...) =

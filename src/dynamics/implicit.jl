@@ -390,7 +390,12 @@ function implicit_correction!(
     launch!(arch, SpectralWorkOrder, (lm_size,),
             implicit_correct_pres_kernel!,
             pres_tend, div_tend, W, l_indices, ξ, nlayers, trunc)
-    return geopot
+
+    zero_last_degree!(div_tend)
+    zero_last_degree!(pres_tend)
+    zero_last_degree!(temp_tend)
+
+    return 
 end
 
 # Alternative single-kernel version (parallelize only over lm, not k)
@@ -425,6 +430,10 @@ function implicit_correction_lm_only!(
             implicit_primitive_single_kernel!,
             temp_tend, pres_tend, div_tend, G, geopot,
             div_old, div_new, S⁻¹, R, U, L, W, l_indices, ξ, nlayers)
+
+    zero_last_degree!(div_tend)
+    zero_last_degree!(pres_tend)
+    zero_last_degree!(temp_tend)
 
     return geopot
 end
@@ -686,6 +695,10 @@ function implicit_correction_cpu!(
             pres_tend[lm] += ξ*W[k]*div_tend[lm, k]
         end
     end
+
+    zero_last_degree!(div_tend)
+    zero_last_degree!(pres_tend)
+    zero_last_degree!(temp_tend)
 
     return nothing
 end
