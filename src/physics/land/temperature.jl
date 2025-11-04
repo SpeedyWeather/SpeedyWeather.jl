@@ -95,8 +95,8 @@ end
 )
     ij, k  = @index(Global, NTuple)
     
-    soil_temperature[ij, k] = (1 - weight) * monthly_temperature[ij, this_month] + 
-                            weight * monthly_temperature[ij, next_month]
+    soil_temperature[ij, k] = (1 - weight) * monthly_temperature[ij, k, this_month] + 
+                            weight * monthly_temperature[ij, k, next_month]
 end
 
 ## CONSTANT LAND CLIMATOLOGY

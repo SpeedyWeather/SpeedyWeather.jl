@@ -127,8 +127,8 @@ end
 )
     ij, k = @index(Global, NTuple)
     
-    soil_moisture[ij, k] = (1 - weight) * monthly_soil_moisture[ij, this_month] + 
-                         weight * monthly_soil_moisture[ij, next_month]
+    soil_moisture[ij, k] = (1 - weight) * monthly_soil_moisture[ij, k, this_month] + 
+                         weight * monthly_soil_moisture[ij, k, next_month]
 end
 
 export LandBucketMoisture
