@@ -125,10 +125,10 @@ end
 @kernel inbounds=true function seasonal_soil_moisture_kernel!(
     soil_moisture, monthly_soil_moisture, weight, this_month, next_month
 )
-    I = @index(Global, NTuple)
+    ij, k = @index(Global, NTuple)
     
-    soil_moisture[I] = (1 - weight) * monthly_soil_moisture[I[1], this_month] + 
-                         weight * monthly_soil_moisture[I[1], next_month]
+    soil_moisture[ij, k] = (1 - weight) * monthly_soil_moisture[ij, this_month] + 
+                         weight * monthly_soil_moisture[ij, next_month]
 end
 
 export LandBucketMoisture

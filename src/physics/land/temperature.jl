@@ -93,10 +93,10 @@ end
 @kernel inbounds=true function seasonal_land_temperature_kernel!(
     soil_temperature, monthly_temperature, weight, this_month, next_month
 )
-    I = @index(Global, NTuple)
+    ij, k  = @index(Global, NTuple)
     
-    soil_temperature[I] = (1 - weight) * monthly_temperature[I[1], this_month] + 
-                            weight * monthly_temperature[I[1], next_month]
+    soil_temperature[ij, k] = (1 - weight) * monthly_temperature[ij, this_month] + 
+                            weight * monthly_temperature[ij, next_month]
 end
 
 ## CONSTANT LAND CLIMATOLOGY
