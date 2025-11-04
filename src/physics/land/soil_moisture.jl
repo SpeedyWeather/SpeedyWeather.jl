@@ -115,14 +115,20 @@ function timestep!(
     (; monthly_soil_moisture) = soil
     (; soil_moisture) = progn.land
 
-    for k in eachlayer(soil_moisture)
-        for ij in eachgridpoint(soil_moisture)
-            soil_moisture[ij, k] = (1-weight) * monthly_soil_moisture[ij, k, this_month] +
-                                    weight  * monthly_soil_moisture[ij, k, next_month]
-        end
-    end
+    launch!(architecture(soil_moisture), LinearWorkOrder, size(soil_moisture),
+            seasonal_soil_moisture_kernel!,
+            soil_moisture, monthly_soil_moisture, weight, this_month, next_month)
 
     return nothing
+end
+
+@kernel inbounds=true function seasonal_soil_moisture_kernel!(
+    soil_moisture, monthly_soil_moisture, weight, this_month, next_month
+)
+    ij = @index(Global, Linear)
+    
+    soil_moisture[ij] = (1 - weight) * monthly_soil_moisture[ij, this_month] + 
+                         weight * monthly_soil_moisture[ij, next_month]
 end
 
 export LandBucketMoisture

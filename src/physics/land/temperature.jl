@@ -83,14 +83,20 @@ function timestep!(
     NF = eltype(soil_temperature)
     weight = convert(NF, Dates.days(time-Dates.firstdayofmonth(time))/Dates.daysinmonth(time))
 
-    for k in eachlayer(soil_temperature)
-        for ij in eachgridpoint(soil_temperature)
-            soil_temperature[ij, k] = (1-weight) * monthly_temperature[ij, this_month] +
-                                    weight  * monthly_temperature[ij, next_month]
-        end
-    end
+    launch!(architecture(soil_temperature), LinearWorkOrder, size(soil_temperature),
+            seasonal_land_temperature_kernel!,
+            soil_temperature, monthly_temperature, weight, this_month, next_month)
 
     return nothing
+end
+
+@kernel inbounds=true function seasonal_land_temperature_kernel!(
+    soil_temperature, monthly_temperature, weight, this_month, next_month
+)
+    ij = @index(Global, Linear)
+    
+    soil_temperature[ij] = (1 - weight) * monthly_temperature[ij, this_month] + 
+                            weight * monthly_temperature[ij, next_month]
 end
 
 ## CONSTANT LAND CLIMATOLOGY
