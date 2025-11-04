@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Implicit correction kernelized and GPU-ready [#891](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/891)
+
 ## v0.17.3
 
 - Add missing compat entires for SpeedyWeatherInternals [#883](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/883)
