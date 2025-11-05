@@ -275,6 +275,7 @@ Architectures.ismatching(grid::AbstractGrid, array_type::Type{<:AbstractArray}) 
 Architectures.ismatching(grid::AbstractGrid, array::AbstractArray) = ismatching(grid.architecture, typeof(array))
 
 Architectures.architecture(grid::AbstractGrid) = grid.architecture
+Architectures.on_architecture(grid::AbstractGrid, x) = on_architecture(architecture(grid), x)
 
 function Architectures.on_architecture(arch::AbstractArchitecture, grid::Grid) where Grid<:AbstractGrid 
     Grid_ = nonparametric_type(Grid)

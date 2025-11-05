@@ -7,9 +7,6 @@ integration constants for vertical hydrostatic integration from temperature to
 geopotential on both full and half pressure levels using the hypsometric equation.
 Fields are $(TYPEDFIELDS)"""
 @kwdef struct Geopotential{VectorType} <: AbstractGeopotential
-    "Number of vertical layers"
-    nlayers::Int
-
     "Used to compute the geopotential on half layers"
     Δp_geopot_half::VectorType = zero(VectorType(undef, nlayers))
 
@@ -19,7 +16,11 @@ end
 
 Adapt.@adapt_structure Geopotential
 
-Geopotential(SG::SpectralGrid) = Geopotential{SG.VectorType}(; nlayers=SG.nlayers)
+# generator
+Geopotential(SG::SpectralGrid) = Geopotential(
+    zeros(SG.VectorType, SG.nlayers),
+    zeros(SG.VectorType, SG.nlayers)
+)
 
 """
 $(TYPEDSIGNATURES)

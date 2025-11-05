@@ -1,15 +1,15 @@
 abstract type AbstractCoriolis <: AbstractModelComponent end
 
 export Coriolis
-@kwdef struct Coriolis{NF, VectorType} <: AbstractCoriolis
-    "number of latitude rings"
-    nlat::Int
-
-    "coriolis frequency [s^-1], scaled by radius as is vorticity = 2Ω*sin(lat)*radius"
-    f::VectorType = zeros(NF, nlat)
+@kwdef struct Coriolis{VectorType} <: AbstractCoriolis
+    "[DERIVED] Coriolis frequency [s^-1], scaled by radius as is vorticity = 2Ω*sin(lat)*radius"
+    f::VectorType
 end
 
-Coriolis(SG::SpectralGrid; kwargs...) = Coriolis{SG.NF, SG.VectorType}(nlat=SG.nlat; kwargs...)
+Adapt.@adapt_structure Coriolis
+
+# generator
+Coriolis(SG::SpectralGrid) = Coriolis(zeros(SG.VectorType, SG.nlayers))
 
 function initialize!(coriolis::Coriolis, model::AbstractModel)
     (; radius, rotation) = model.planet
@@ -26,16 +26,18 @@ export coriolis
 $(TYPEDSIGNATURES)
 Return the Coriolis parameter `f` on the grid `Grid` of resolution `nlat_half`
 on a planet of `rotation` [1/s]. Default rotation of Earth."""
-function coriolis!(f::AbstractField; rotation = DEFAULT_ROTATION)
-    lat = get_lat(f)                        # in radians [-π/2, π/2]
+function coriolis!(f::AbstractField; rotation = DEFAULT_ROTATION)                  
+    lat = on_architecture(f, get_lat(f))     # in radians [-π/2, π/2]
 
-    for (j, ring) in enumerate(eachring(f))
-        fⱼ = 2rotation*sin(lat[j])
-        for ij in ring
-            f[ij, :] .= fⱼ                  # setindex across all ks dimensions
-        end
-    end
-    return f
+    arch = architecture(f)
+    (; whichring) = field.grid
+    launch!(arch, RingGridWorkOrder, size(f), coriolis_kernel!, f, lat, rotation, whichring)
+end
+
+@kernel inbounds=true function coriolis_kernel!(f, lat, rotation, whichring)
+    ij, k = @index(Global, NTuple)
+    j = whichring[ij]
+    f[ij, k] .= 2rotation*sin(lat[j])
 end
 
 """

@@ -45,20 +45,11 @@ $(TYPEDFIELDS)
     "time scale [days]"
     time_scale::Second = Day(30)
 
-    """
-    "precomputed amplitude vector [m/s²]"
-    amplitude::Vector{NF} = zeros(NF, nlat)
-
-    "precomputed vertical tapering"
-    tapering::Vector{NF} = zeros(NF, nlayers)
-    """
-
     "precomputed amplitude vector [m/s²]"
     amplitude::VectorType
     
     "precomputed vertical tapering"
     tapering::VectorType
-
 end
 
 function JetStreamForcing(SG::SpectralGrid; kwargs...)
