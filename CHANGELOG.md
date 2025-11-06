@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- The number of soil layers is now solely defined by the land model and not in the `SpectralGrid` anymore [#898](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/898)   
 - Diagnostic and prognostic variables partially revised to NamedTuples and variables system introduced to allow to add to them modularly [#885](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/885)
 - Parameterizations with KernelAbstractions [#873](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/873) [#878](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/878)
 
