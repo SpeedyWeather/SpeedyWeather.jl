@@ -15,10 +15,10 @@ UpwindVerticalAdvection(spectral_grid; order = 5)   =   UpwindVerticalAdvection{
 WENOVerticalAdvection(spectral_grid)                =     WENOVerticalAdvection{spectral_grid.NF}()
 
 @inline retrieve_previous_time_step(variables, var) = getproperty(variables, Symbol(var, :_grid_prev))
-@inline  retrieve_current_time_step(variables, var) = getproperty(variables, Symbol(var, :_grid))
+@inline retrieve_current_time_step(variables, var) = getproperty(variables, Symbol(var, :_grid))
 
 @inline retrieve_time_step(::DiffusiveVerticalAdvection,  variables, var) = retrieve_previous_time_step(variables, var)
-@inline retrieve_time_step(::DispersiveVerticalAdvection, variables, var) =  retrieve_current_time_step(variables, var)
+@inline retrieve_time_step(::DispersiveVerticalAdvection, variables, var) = retrieve_current_time_step(variables, var)
 
 @inline function retrieve_stencil(k, nlayers, ::VerticalAdvection{NF, B}) where {NF, B}
     # creates allocation-free tuples for k-B:k+B but clamped into (1, nlayers)
@@ -55,7 +55,37 @@ function vertical_advection!(
     end
 end
 
-function _vertical_advection!(
+function vertical_advection_cpu!(
+    diagn::DiagnosticVariables,
+    model::PrimitiveEquation,
+)
+    Δσ = model.geometry.σ_levels_thick
+    advection_scheme = model.vertical_advection
+    (; σ_tend) = diagn.dynamics
+    
+    for var in (:u, :v, :temp)
+        ξ_tend = getproperty(diagn.tendencies, Symbol(var, :_tend_grid))
+        ξ      = retrieve_time_step(advection_scheme, diagn.grid, var)
+        _vertical_advection_cpu!(ξ_tend, σ_tend, ξ, Δσ, advection_scheme)
+    end
+
+    if model isa PrimitiveWet   # advect humidity only with primitive wet core
+        ξ_tend = getproperty(diagn.tendencies, :humid_tend_grid)
+        ξ      = retrieve_time_step(advection_scheme, diagn.grid, :humid)
+        _vertical_advection_cpu!(ξ_tend, σ_tend, ξ, Δσ, advection_scheme)
+    end
+
+    for tracer in values(model.tracers)
+        if tracer.active
+            ξ_tend = diagn.tendencies.tracers_tend_grid[tracer.name]
+            ξ      = retrieve_time_step(advection_scheme, diagn.grid, :tracers)[tracer.name]
+            _vertical_advection_cpu!(ξ_tend, σ_tend, ξ, Δσ, advection_scheme)
+        end
+    end
+end
+
+# CPU version (original implementation)
+function _vertical_advection_cpu!(
     ξ_tend::AbstractField,      # tendency of quantity ξ
     σ_tend::AbstractField,      # vertical velocity at k+1/2
     ξ::AbstractField,           # ξ
@@ -86,6 +116,47 @@ function _vertical_advection!(
             ξ_tend[ij, k] -=  Δσₖ⁻¹ * (σ̇⁺ * ξᶠ⁺ - σ̇⁻ * ξᶠ⁻ - ξ[ij, k] * (σ̇⁺ - σ̇⁻))
         end
     end
+end
+
+# GPU kernel version
+function _vertical_advection!(
+    ξ_tend::AbstractField,      # tendency of quantity ξ
+    σ_tend::AbstractField,      # vertical velocity at k+1/2
+    ξ::AbstractField,           # ξ
+    Δσ,                         # layer thickness on σ levels
+    adv::VerticalAdvection      # vertical advection scheme of order B
+)
+    grids_match(ξ_tend, σ_tend, ξ) || throw(DimensionMismatch(ξ_tend, σ_tend, ξ))
+
+    nlayers = size(ξ, 2)
+    arch = architecture(ξ_tend)
+
+    launch!(arch, RingGridWorkOrder, size(ξ_tend), 
+            vertical_advection_kernel!,
+            ξ_tend, σ_tend, ξ, Δσ, nlayers, adv)
+end
+
+@kernel inbounds=true function vertical_advection_kernel!(
+    ξ_tend, σ_tend, ξ, @Const(Δσ), @Const(nlayers), adv
+)
+    ij, k = @index(Global, NTuple)
+    
+    Δσₖ⁻¹ = inv(Δσ[k])
+    
+    # for k=1 "above" term (at k-1/2) is 0, for k==nlayers "below" term (at k+1/2) is zero
+    k⁻ = max(1, k-1)
+    k⁺ = k
+    
+    k_stencil = retrieve_stencil(k, nlayers, adv)
+    
+    σ̇⁻ = σ_tend[ij, k⁻]
+    σ̇⁺ = σ_tend[ij, k⁺]
+    
+    ξᶠ⁺ = reconstructed_at_face(ξ, ij, k_stencil[2:end],   σ̇⁺, adv)
+    ξᶠ⁻ = reconstructed_at_face(ξ, ij, k_stencil[1:end-1], σ̇⁻, adv)
+    
+    # -= as the tendencies already contain the parameterizations
+    ξ_tend[ij, k] -= Δσₖ⁻¹ * (σ̇⁺ * ξᶠ⁺ - σ̇⁻ * ξᶠ⁻ - ξ[ij, k] * (σ̇⁺ - σ̇⁻))
 end
 
 # 1st order upwind
