@@ -19,7 +19,7 @@ Note that we need to use `CUDA.@allowscalar` here during initialization. Current
 
 ## Architectures Utilities 
 
-In order to easily transfer our structures between CPU (e.g. for plotting and output) and GPU, we have the following utilities that make can make use of the `architecture` object defined above and the `on_architecture` function, e.g. as follows: 
+In order to easily transfer our structures between CPU (e.g. for plotting and output) and GPU, we have the following utilities that can make use of the `architecture` object defined above and the `on_architecture` function, e.g. as follows: 
 
 ```julia
 using SpeedyWeather, CUDA 
