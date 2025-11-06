@@ -27,9 +27,10 @@ export SeasonalSoilMoisture
 end
 
 # generator function
-function SeasonalSoilMoisture(SG::SpectralGrid; kwargs...)
-    (; NF, GridVariable4D, grid, nlayers_soil) = SG
-    monthly_soil_moisture = zeros(GridVariable4D, grid, nlayers_soil, 12)
+function SeasonalSoilMoisture(SG::SpectralGrid, geometry::LandGeometry; kwargs...)
+    (; NF, GridVariable4D, grid) = SG
+    (; nlayers) = geometry
+    monthly_soil_moisture = zeros(GridVariable4D, grid, nlayers, 12)
     return SeasonalSoilMoisture{NF, GridVariable4D}(; monthly_soil_moisture, kwargs...)
 end
 
@@ -153,11 +154,11 @@ export LandBucketMoisture
     f₂::NF = zero(NF)
 end
 
-LandBucketMoisture(SG::SpectralGrid; kwargs...) = LandBucketMoisture{SG.NF}(; kwargs...)
+LandBucketMoisture(SG::SpectralGrid, geometry::LandGeometry; kwargs...) = LandBucketMoisture{SG.NF}(; kwargs...)
 function initialize!(soil::LandBucketMoisture, model::PrimitiveEquation)
-    (; nlayers_soil) = model.spectral_grid
-    @assert nlayers_soil == 2 "LandBucketMoisture only works with 2 soil layers "*
-    "but spectral_grid.nlayers_soil = $nlayers_soil given. Ignoring additional layers."
+    (; nlayers) = model.land
+    @assert nlayers == 2 "LandBucketMoisture only works with 2 soil layers "*
+    "but model.land.nlayers = $nlayers given. Ignoring additional layers."
     
     # set the field capacity given layer thickness and 
     γ = model.land.thermodynamics.field_capacity

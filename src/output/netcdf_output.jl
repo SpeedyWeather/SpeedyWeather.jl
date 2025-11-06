@@ -111,6 +111,7 @@ function NetCDFOutput(
     
     # CREATE FULL FIELDS TO INTERPOLATE ONTO BEFORE WRITING DATA OUT
     (; nlayers, nlayers_soil) = SG
+    # TODO: infer nlayers_soil from somewhere
     field2D = Field(output_NF, output_grid)
     field3D = Field(output_NF, output_grid, nlayers)
     field3Dland = Field(output_NF, output_grid, nlayers_soil)

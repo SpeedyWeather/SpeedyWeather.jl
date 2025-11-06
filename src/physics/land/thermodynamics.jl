@@ -18,5 +18,5 @@ export LandThermodynamics
     wilting_point::NF = 0.17
 end
 
-LandThermodynamics(SG::SpectralGrid; kwargs...) = LandThermodynamics{SG.NF}(; kwargs...)
+LandThermodynamics(SG::SpectralGrid, geometry::LandGeometry; kwargs...) = LandThermodynamics{SG.NF}(; kwargs...)
 initialize!(land::LandThermodynamics, model::PrimitiveEquation) = nothing

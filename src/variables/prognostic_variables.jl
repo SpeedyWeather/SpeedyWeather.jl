@@ -117,9 +117,10 @@ function PrognosticVariables(model::AbstractModel)
     tracers = model.tracers
     nsteps = model.time_stepping.nsteps
 
-    (; NF, spectrum, grid, nlayers, nlayers_soil, nparticles) = SG
+    (; NF, spectrum, grid, nlayers, nparticles) = SG
     (; SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, ParticleVector) = SG
-    
+    nlayers_soil = model.land.nlayers 
+
     # allocate parameterization variables 
     variable_names = get_prognostic_variables(model)
 

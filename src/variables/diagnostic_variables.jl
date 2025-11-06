@@ -479,10 +479,11 @@ function DiagnosticVariables(model::AbstractModel)
         nbands_shortwave = nbands_longwave = 0
     end
 
-    (; spectrum, grid, nparticles, NF, nlayers, nlayers_soil) = SG
+    (; spectrum, grid, nparticles, NF, nlayers) = SG
     (; SpectralVariable2D, SpectralVariable3D) = SG
     (; GridVariable2D, GridVariable3D) = SG
     (; VectorType, ParticleVector) = SG
+    nlayers_soil = model.land.nlayers 
 
     tendencies = Tendencies(SG; tracers)
     grid_variables = GridVariables(SG; tracers)

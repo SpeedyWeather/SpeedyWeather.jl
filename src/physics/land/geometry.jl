@@ -10,9 +10,8 @@ mutable struct LandGeometry{NF} <: AbstractLandGeometry
 end
 
 # default constructor
-function LandGeometry(SG::SpectralGrid; kwargs...)
+function LandGeometry(SG::SpectralGrid, nlayers::Int; kwargs...)
     (; NF) = SG
-    nlayers = SG.nlayers_soil
 
     # for two layers use the default soil layer thickness of MITgcm's 2-layer model
     if nlayers == 2
