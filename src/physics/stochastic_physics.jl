@@ -21,6 +21,12 @@ function StochasticallyPerturbedParameterizationTendencies(SG::SpectralGrid;
     return StochasticallyPerturbedParameterizationTendencies(tapering, taper)
 end
 
+Adapt.@adapt_structure StochasticallyPerturbedParameterizationTendencies
+
+# No additional variables required, return empty tuple
+variables(::AbstractStochasticPhysics) = ()
+
+# precompute the taper
 function initialize!(sppt::StochasticallyPerturbedParameterizationTendencies, model::PrimitiveEquation)
     sppt.taper .= sppt.tapering.(model.geometry.σ_levels_full)
     return nothing
@@ -30,6 +36,9 @@ end
 parameterization!(ij, diagn, progn, sppt::StochasticallyPerturbedParameterizationTendencies, model) =
     sppt!(ij, diagn, sppt)
 
+"$(TYPEDFIELDS)
+Apply stochastically perturbed parameterization tendencies to u, v, temperature and humidity
+in column ij."
 function sppt!(ij, diagn, sppt)
     
     r = diagn.grid.random_pattern[ij]
@@ -37,16 +46,10 @@ function sppt!(ij, diagn, sppt)
     (; u_tend_grid, v_tend_grid, temp_tend_grid, humid_tend_grid) = diagn.tendencies
 
     @inbounds for k in eachlayer(u_tend_grid, v_tend_grid, temp_tend_grid, humid_tend_grid)
-        R = 1 + r*taper[k]
-        u_tend_grid[ij, k] *= R
+        R = 1 + r*taper[k]          # r in [-1, 1], R in [0, 2] (don't change sign of tendency)
+        u_tend_grid[ij, k] *= R     # perturb all prognostic variables in the same way
         v_tend_grid[ij, k] *= R
         temp_tend_grid[ij, k] *= R
         humid_tend_grid[ij, k] *= R
     end
-end
-
-Adapt.@adapt_structure StochasticallyPerturbedParameterizationTendencies
-
-function variables(::AbstractStochasticPhysics)
-    return ()  # No additional diagnostic variables, modifies existing tendencies
 end

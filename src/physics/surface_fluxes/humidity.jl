@@ -10,6 +10,8 @@ $(TYPEDFIELDS)"""
     land::Land = SurfaceLandHumidityFlux()
 end
 
+Adapt.@adapt_structure SurfaceHumidityFlux
+
 # generator function and defaults
 function SurfaceHumidityFlux(
     SG::SpectralGrid; 
@@ -30,8 +32,6 @@ function parameterization!(ij, diagn, progn, humidity_flux::SurfaceHumidityFlux,
     surface_humidity_flux!(ij, diagn, progn, humidity_flux.land,  model)
 end
 
-Adapt.@adapt_structure SurfaceHumidityFlux
-
 export SurfaceOceanHumidityFlux
 @kwdef struct SurfaceOceanHumidityFlux{NF<:AbstractFloat} <: AbstractSurfaceHumidityFlux
     "[OPTION] Use drag coefficient from calculated following model.boundary_layer_drag"
@@ -40,6 +40,8 @@ export SurfaceOceanHumidityFlux
     "[OPTION] Or fixed drag coefficient for humidity flux over ocean"
     drag::NF = 0.9e-3
 end
+
+Adapt.@adapt_structure SurfaceOceanHumidityFlux
 
 SurfaceOceanHumidityFlux(SG::SpectralGrid; kwargs...) = SurfaceOceanHumidityFlux{SG.NF}(; kwargs...)
 initialize!(::SurfaceOceanHumidityFlux, ::PrimitiveWet) = nothing
@@ -78,8 +80,6 @@ function surface_humidity_flux!(ij, diagn, progn, humidity_flux::SurfaceOceanHum
     diagn.tendencies.humid_tend_grid[ij, nlayers] += surface_flux_to_tendency(flux_ocean, pₛ, model)
     return nothing
 end
-
-Adapt.@adapt_structure SurfaceOceanHumidityFlux
 
 export SurfaceLandHumidityFlux
 @kwdef struct SurfaceLandHumidityFlux{NF<:AbstractFloat} <: AbstractSurfaceHumidityFlux

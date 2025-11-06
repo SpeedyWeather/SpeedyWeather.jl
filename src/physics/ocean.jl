@@ -50,6 +50,11 @@ function Base.show(io::IO, O::AbstractOcean)
     print_fields(io, O, keys)
 end
 
+# variable that AbstractOcean requires
+variables(::AbstractOcean) =
+    (PrognosticVariable(name=:sea_surface_temperature, dims=Grid2D(),
+        namespace=:ocean, units="K", desc="Sea surface temperature"),)
+
 # function barrier for all oceans
 function initialize!(   ocean::PrognosticVariablesOcean,
                         progn::PrognosticVariables,
@@ -170,8 +175,6 @@ function timestep!(
     end
 end
 
-variables(::SeasonalOceanClimatology) = (PrognosticVariable(name=:sea_surface_temperature, dims=Grid2D(), namespace=:ocean),)
-
 ## CONSTANT OCEAN CLIMATOLOGY
 export ConstantOceanClimatology
 
@@ -204,10 +207,8 @@ $(TYPEDFIELDS)"""
     missing_value::Float64 = NaN
 end
 
-# generator function, just pass on kwargs
-function ConstantOceanClimatology(SG::SpectralGrid; kwargs...)
-    ConstantOceanClimatology(; kwargs...)
-end
+# generator
+ConstantOceanClimatology(SG::SpectralGrid; kwargs...) = ConstantOceanClimatology(; kwargs...)
 
 # nothing to initialize for model.ocean
 initialize!(::ConstantOceanClimatology, ::PrimitiveEquation) = nothing
@@ -238,10 +239,6 @@ function timestep!(
 )
     return nothing
 end
-
-#TODO: it's not actually prognostic, but used as such so far? 
-variables(::ConstantOceanClimatology) = (PrognosticVariable(name=:sea_surface_temperature, dims=Grid2D(), namespace=:ocean),)
-
 
 ## CONSTANT OCEAN CLIMATOLOGY
 export AquaPlanet
@@ -295,8 +292,6 @@ function timestep!(
     return nothing
 end
 
-#TODO: it's not actually prognostic, but used as such so far? 
-variables(::AquaPlanet) = (PrognosticVariable(name=:sea_surface_temperature, dims=Grid2D(), namespace=:ocean),)
 
 export SlabOcean
 
@@ -330,6 +325,21 @@ function SlabOcean(
     kwargs...,
 )
     return SlabOcean{SG.NF, typeof(sea_ice_insulation)}(; sea_ice_insulation, kwargs...)
+end
+
+function variables(::SlabOcean)
+    return (
+    PrognosticVariable(name=:sea_surface_temperature, dims=Grid2D(), namespace=:ocean, desc="Sea surface temperature", units="K"),
+    PrognosticVariable(name=:sea_ice_concentration,   dims=Grid2D(), namespace=:ocean, desc="Sea ice concentration", units="1"),
+    
+    DiagnosticVariable(name=:surface_shortwave_down, dims=Grid2D(), desc="Surface shortwave radiation down", units="W/m^2"),
+    DiagnosticVariable(name=:surface_shortwave_up,   dims=Grid2D(), desc="Surface shortwave radiation up over ocean", units="W/m^2", namespace=:ocean),
+    DiagnosticVariable(name=:surface_longwave_down,  dims=Grid2D(), desc="Surface longwave radiation down", units="W/m^2"),
+    DiagnosticVariable(name=:surface_longwave_up,    dims=Grid2D(), desc="Surface longwave radiation up over ocean", units="W/m^2", namespace=:ocean),
+
+    DiagnosticVariable(name=:surface_humidity_flux,      dims=Grid2D(), desc="Surface humidity flux", units="kg/s/m^2", namespace=:ocean),
+    DiagnosticVariable(name=:surface_sensible_heat_flux, dims=Grid2D(), desc="Surface sensible heat flux", units="kg/s/m^2", namespace=:ocean),
+    ) 
 end
 
 # nothing to initialize for SlabOcean
@@ -383,12 +393,17 @@ function timestep!(
     Ev = diagn.physics.ocean.surface_humidity_flux
     S = diagn.physics.ocean.sensible_heat_flux
 
-    launch!(architecture(sst), LinearWorkOrder, size(sst), slab_ocean_kernel!, sst, ice, mask, Rsd, Rsu, Rld, Rlu, Ev, S, insulation, Δt_C₀, Lᵥ)
+    launch!(architecture(sst), LinearWorkOrder, size(sst), slab_ocean_kernel!,
+        sst, ice, mask, Rsd, Rsu, Rld, Rlu, Ev, S,
+        insulation, Δt_C₀, Lᵥ)
 
     return nothing
 end
 
-@kernel inbounds=true function slab_ocean_kernel!(sst, ice, mask, Rsd, Rsu, Rld, Rlu, Ev, S, @Const(insulation), @Const(Δt_C₀), @Const(Lᵥ))
+@kernel inbounds=true function slab_ocean_kernel!(
+    sst, ice, mask, Rsd, Rsu, Rld, Rlu, Ev, S,
+    @Const(insulation), @Const(Δt_C₀), @Const(Lᵥ),
+)
     ij = @index(Global, Linear)         # every grid point ij
 
     if mask[ij] < 1                     # at least partially ocean
@@ -396,17 +411,4 @@ end
         r = 1 - insulation(ice[ij])     # formulate as reduction of the net flux
         sst[ij] += Δt_C₀*r*(Rsd[ij] - Rsu[ij] - Rlu[ij] + Rld[ij] - Lᵥ*Ev[ij] - S[ij])
     end
-end
-
-# TODO: Add descriptions and units
-function variables(::SlabOcean)
-    return (DiagnosticVariable(name=:surface_shortwave_down, dims=Grid2D()),
-    DiagnosticVariable(name=:surface_shortwave_up, dims=Grid2D(), namespace=:ocean),
-    DiagnosticVariable(name=:surface_longwave_down, dims=Grid2D()),
-    DiagnosticVariable(name=:surface_longwave_up, dims=Grid2D(), namespace=:ocean),
-    DiagnosticVariable(name=:surface_humidity_flux, dims=Grid2D(), namespace=:ocean),
-    DiagnosticVariable(name=:surface_sensible_heat_flux, dims=Grid2D(), namespace=:ocean),
-    PrognosticVariable(name=:sea_ice_concentration, dims=Grid2D(), namespace=:ocean),
-    PrognosticVariable(name=:sea_surface_temperature, dims=Grid2D(), namespace=:ocean),
-    ) 
 end

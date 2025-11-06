@@ -5,85 +5,55 @@ function get_nbands(radiation::Union{AbstractRadiation, Nothing})
     return 0
 end
 
-# function barrier for all AbstractShortwave
-function shortwave_radiation!(column::ColumnVariables, model::PrimitiveEquation)
-    shortwave_radiation!(column, model.shortwave_radiation, model)
-end
-
-## NO SHORTWAVE RADIATION
-shortwave_radiation!(::ColumnVariables, ::Nothing, ::PrimitiveEquation) = nothing
-
 ## SHORTWAVE RADIATION FOR A FULLY TRANSPARENT ATMOSPHERE
 export TransparentShortwave
 struct TransparentShortwave <: AbstractShortwave end
 TransparentShortwave(SG::SpectralGrid) = TransparentShortwave()
+
+function variables(::TransparentShortwave)
+    return (
+        DiagnosticVariable(name=:surface_shortwave_down, dims=Grid2D(), desc="Surface shortwave radiation down", units="W/m^2"),
+        DiagnosticVariable(name=:surface_shortwave_down, dims=Grid2D(), desc="Surface shortwave radiation down over ocean", units="W/m^2", namespace=:ocean),
+        DiagnosticVariable(name=:surface_shortwave_down, dims=Grid2D(), desc="Surface shortwave radiation down over land", units="W/m^2", namespace=:land),
+        DiagnosticVariable(name=:surface_shortwave_up,   dims=Grid2D(), desc="Surface shortwave radiation up",   units="W/m^2"),
+        DiagnosticVariable(name=:outgoing_shortwave,     dims=Grid2D(), desc="TOA Shortwave radiation up",       units="W/m^2"),
+        DiagnosticVariable(name=:cos_zenith,             dims=Grid2D(), desc="Cos zenith angle",                 units="1"),
+        DiagnosticVariable(name=:albedo, dims=Grid2D(), desc="Albedo over ocean", units="1", namespace=:ocean),
+        DiagnosticVariable(name=:albedo, dims=Grid2D(), desc="Albedo over land", units="1", namespace=:land),
+    )
+end
+
 initialize!(::TransparentShortwave, ::PrimitiveEquation) = nothing
 
-function shortwave_radiation!(
-    column::ColumnVariables,
-    scheme::TransparentShortwave,
-    model::PrimitiveEquation,
-)
-    shortwave_radiation!(column, scheme, model.planet)
-end
+# function barrier
+parameterization!(ij, diagn, progn, shortwave::TransparentShortwave, model) =
+    shortwave_radiation!(ij, diagn, shortwave, model)
 
-function shortwave_radiation!(
-    column::ColumnVariables,
-    scheme::TransparentShortwave,
-    planet::AbstractPlanet,
-)
-    (; cos_zenith, land_fraction, albedo_ocean, albedo_land) = column
-    (; solar_constant) = planet
+function shortwave_radiation!(ij, diagn, shortwave, model)
 
-    R = solar_constant * cos_zenith         # top of atmosphere downward radiation
-    column.surface_shortwave_down = R       # transparent atmosphere so same at surface (before albedo)
+    (; surface_shortwave_down, surface_shortwave_up) = diagn.physics
+    (; outgoing_shortwave) = diagn.physics
+    ssrd_ocean = diagn.physics.ocean.surface_shortwave_down
+    ssrd_land = diagn.physics.land.surface_shortwave_down
+
+    cos_zenith = diagn.physics.cos_zenith[ij]
+    land_fraction = model.land_sea_mask[ij]
+    albedo_ocean = diagn.physics.ocean.albedo[ij]
+    albedo_land = diagn.physics.land.albedo[ij]
+    S₀ = model.planet.solar_constant
+
+    D = S₀ * cos_zenith             # top of atmosphere downward radiation
+    surface_shortwave_down[ij] = D  # transparent atmosphere so same at surface (before albedo)
 
     # shortwave up is after albedo reflection, separated by ocean/land
-    column.surface_shortwave_up_ocean = albedo_ocean * R
-    column.surface_shortwave_up_land = albedo_land * R
+    ssrd_ocean[ij] = albedo_ocean * D
+    ssrd_land[ij]  = albedo_land * D
 
-    # land-sea mask-weighted, transparent shortwave so surface = outgoing
-    column.surface_shortwave_up = (1 - land_fraction)*column.surface_shortwave_up_ocean +
-                                            land_fraction*column.surface_shortwave_up_land
-    column.outgoing_shortwave_radiation = column.surface_shortwave_up
+    # land-sea mask-weighted
+    albedo = (1 - land_fraction)*albedo_ocean + land_fraction*albedo_land
+    surface_shortwave_up[ij] = albedo * D
 
+    # transparent also for reflected shortwave radiation travelling up
+    outgoing_shortwave[ij] = surface_shortwave_up[ij]
     return nothing
-end
-
-# NBandRadiation is defined in longwave_radiation.jl
-function shortwave_radiation!(
-    column::ColumnVariables,
-    scheme::NBandRadiation,
-    model::PrimitiveEquation,
-)
-
-    (; nlayers, cos_zenith, albedo) = column
-    nbands = column.nbands_shortwave                # number of spectral bands
-    (; solar_constant) = model.planet
-
-    @inbounds for band in 1:nbands                  # loop over spectral bands
-        dτ = view(column.optical_depth_shortwave, :, band)   # differential optical depth per layer of that band
-
-        # DOWNWARD flux D
-        D = solar_constant * cos_zenith             # top boundary condition of longwave flux
-        column.flux_temp_downward[1] += D           # accumulate the top downward flux
-
-        for k in 1:nlayers
-            D -= dτ[k]*D                            # flux through layer k with optical depth dτ, radiative transfer
-            column.flux_temp_downward[k+1] += D
-        end
-
-        # UPWARD flux U
-        U = D*albedo                                # boundary condition at surface, reflection from albedo
-        column.flux_temp_upward[nlayers+1] += U     # accumulate fluxes
-
-        for k in nlayers:-1:1                       # integrate from surface up
-            # Radiative transfer, e.g. Frierson et al. 2006, equation 6
-            U -= dτ[k]*U                            # negative because we integrate from surface up in -τ direction
-            column.flux_temp_upward[k] += U         # accumulate that flux
-        end
-
-        # store outgoing shortwave radiation (OSR) for diagnostics, accumulate over bands (reset when column is reset)
-        column.outgoing_shortwave_radiation += U
-    end
 end
