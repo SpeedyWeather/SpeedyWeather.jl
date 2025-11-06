@@ -86,17 +86,11 @@ for trunc in truncations
         spectral_grid_gpu = SpectralGrid(; NF, trunc, nlayers, architecture=GPU())
         vertical_advection_gpu = CenteredVerticalAdvection(spectral_grid_gpu, order=order)
         model_gpu = PrimitiveWetModel(spectral_grid_gpu; vertical_advection=vertical_advection_gpu)
-        sim_gpu = initialize!(model_gpu)
+        sim_gpu = CUDA.@allowscalar initialize!(model_gpu)
         
         # Warm up GPU
-        run!(sim_gpu, steps=5)
+        #run!(sim_gpu, steps=5)
         diagn_gpu = sim_gpu.diagnostic_variables
-        
-        # Additional warmup for GPU kernels
-        for _ in 1:10
-            SpeedyWeather.vertical_advection!(diagn_gpu, model_gpu)
-        end
-        SpeedyWeather.Architectures.synchronize(model_gpu.spectral_grid.architecture)
         
         println("Benchmarking kernel version on GPU (vertical_advection!)...")
         
