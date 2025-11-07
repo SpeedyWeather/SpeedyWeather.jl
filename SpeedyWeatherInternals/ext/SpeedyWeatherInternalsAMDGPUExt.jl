@@ -1,7 +1,7 @@
 module SpeedyWeatherInternalsAMDGPUExt
 
     import AMDGPU: ROCArray, ROCDeviceArray, ROCBackend, rocconvert, Runtime
-    import SpeedyWeatherInternals.Architectures: Architectures, GPU, CPU, ROCGPU, array_type, architecture, on_architecture, architecture, compatible_array_types, nonparametric_type
+    import SpeedyWeatherInternals.Architectures: Architectures, GPU, CPU, ROCGPU, array_type, architecture, on_architecture, compatible_array_types, nonparametric_type
 
     # DEVICE SETUP FOR AMDGPU
     # extend functions from Architectures
