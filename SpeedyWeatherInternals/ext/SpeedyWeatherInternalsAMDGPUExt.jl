@@ -1,9 +1,9 @@
-module SpeedyWeatherInternalsROCmExt
+module SpeedyWeatherInternalsAMDGPUExt
 
     import AMDGPU: ROCArray, ROCDeviceArray, ROCBackend, rocconvert
     import SpeedyWeatherInternals.Architectures: Architectures, GPU, CPU, AMDGPU, array_type, architecture, on_architecture, architecture, compatible_array_types, nonparametric_type
 
-    # DEVICE SETUP FOR ROCm (AMD's software stack)
+    # DEVICE SETUP FOR AMDGPU
     # extend functions from Architectures
     Architectures.array_type(::GPU) = ROCArray
     Architectures.array_type(::Type{<:GPU}) = ROCArray

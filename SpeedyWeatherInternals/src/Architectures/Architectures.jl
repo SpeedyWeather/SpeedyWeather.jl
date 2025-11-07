@@ -4,7 +4,7 @@ module Architectures
 
     export AbstractArchitecture
     export CPU, CPUStatic, GPU
-    export CUDAGPU, MetalGPU
+    export CUDAGPU, MetalGPU, AMDGPU
     export array_type, on_architecture, architecture, device
     export convert_to_device, ismatching, compatible_array_types, nonparametric_type
     export synchronize 
