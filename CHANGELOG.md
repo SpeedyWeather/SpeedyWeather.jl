@@ -3,6 +3,7 @@
 ## Unreleased
 
 - CI tests on Julia 1.12 as well [#896](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/896)
+- Remove double imports of `architecture` in SpeedyWeatherInternals/ext/ [#899](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/899)
 - Documentation typos [#894](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/894)
 - Seasonal ocean and land climatology models GPU-ready [#892](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/892)
 - Zenith constructors [#889](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/889)
