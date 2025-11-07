@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Remove double imports of `architecture` in SpeedyWeatherInternals/ext/ [#899](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/899)
 - Zenith constructors [#889](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/889)
 - More general forcing of pressure, vorticity and divergence [#855](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/855)
 
