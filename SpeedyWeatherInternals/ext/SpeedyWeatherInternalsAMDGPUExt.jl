@@ -1,26 +1,25 @@
 module SpeedyWeatherInternalsAMDGPUExt
 
-    import AMDGPU: ROCArray, ROCDeviceArray, ROCBackend, rocconvert
-    import SpeedyWeatherInternals.Architectures: Architectures, GPU, CPU, AMDGPU, array_type, architecture, on_architecture, architecture, compatible_array_types, nonparametric_type
+    import AMDGPU: ROCArray, ROCDeviceArray, ROCBackend, rocconvert, Runtime
+    import SpeedyWeatherInternals.Architectures: Architectures, GPU, CPU, ROCGPU, array_type, architecture, on_architecture, architecture, compatible_array_types, nonparametric_type
 
     # DEVICE SETUP FOR AMDGPU
     # extend functions from Architectures
     Architectures.array_type(::GPU) = ROCArray
     Architectures.array_type(::Type{<:GPU}) = ROCArray
-    # Architectures.array_type(::GPU, NF::Type, N::Int) = CuArray{NF, N, CUDA.DeviceMemory}
-    Architectures.array_type(::GPU, NF::Type, N::Int) = ROCArray{NF, N} # check whether GPU memory needs to be specified differently
+    Architectures.array_type(::GPU, NF::Type, N::Int) = ROCArray{NF, N, Runtime.Mem.HIPBuffer}
 
     Architectures.compatible_array_types(::GPU) = (ROCArray, ROCDeviceArray)
     Architectures.compatible_array_types(::Type{<:GPU}) = (ROCArray, ROCDeviceArray)
 
     Architectures.nonparametric_type(::Type{<:ROCArray}) = ROCArray
 
-    Architectures.AMDGPU() = GPU(ROCBackend())
-    Architectures.GPU() = AMDGPU()
+    Architectures.ROCGPU() = GPU(ROCBackend())
+    Architectures.GPU() = ROCGPU()
 
-    Architectures.architecture(::ROCArray) = AMDGPU()
-    Architectures.architecture(::Type{<:ROCArray}) = AMDGPU()
-    Architectures.architecture(::Type{<:ROCDeviceArray}) = AMDGPU()
+    Architectures.architecture(::ROCArray) = ROCGPU()
+    Architectures.architecture(::Type{<:ROCArray}) = ROCGPU()
+    Architectures.architecture(::Type{<:ROCDeviceArray}) = ROCGPU()
 
     Architectures.on_architecture(::CPU, a::ROCArray) = Array(a)
     Architectures.on_architecture(::GPU, a::ROCArray) = a

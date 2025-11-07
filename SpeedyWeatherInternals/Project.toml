@@ -1,7 +1,7 @@
 name = "SpeedyWeatherInternals"
 uuid = "34489162-d270-4603-8b96-37b04f830d73"
-authors = ["SpeedyWeather contributors"]
 version = "0.1.2"
+authors = ["SpeedyWeather contributors"]
 
 [deps]
 ComponentArrays = "b0b7db55-cfe3-40fc-9ded-d10e2dbeff66"
@@ -16,17 +16,19 @@ ModelParameters = "4744a3fa-6c31-4707-899e-a3298e4618ad"
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 JLArrays = "27aeb0d3-9eb9-45fb-866b-73c2ecf80fcb"
 Metal = "dde4c033-4e86-420c-a63e-0dd931031962"
+AMDGPU = "21141c5a-9bdb-4563-92ae-f87d6854732e"
 
 [extensions]
+SpeedyWeatherInternalsAMDGPUExt = "AMDGPU"
 SpeedyWeatherInternalsCUDAExt = "CUDA"
 SpeedyWeatherInternalsJLArraysExt = "JLArrays"
 SpeedyWeatherInternalsMetalExt = "Metal"
-SpeedyWeatherInternalsAMDGPUExt = "AMDGPU"
 
 [compat]
+AMDGPU = "2.1.2"
+CUDA = "4, 5"
 ComponentArrays = "0.15"
 ConstructionBase = "1"
-CUDA = "4, 5"
 DocStringExtensions = "0.9"
 DomainSets = "0.7"
 JLArrays = "0.1, 0.2"
