@@ -60,6 +60,6 @@ end
         end
     else 
         # Enzyme currently isn't compatible with Julia 1.12
-        @test_broken true
+        @test_broken false
     end 
 end 
