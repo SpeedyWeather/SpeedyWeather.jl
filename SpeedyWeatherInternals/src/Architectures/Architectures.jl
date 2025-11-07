@@ -54,6 +54,7 @@ module Architectures
     function GPU end 
     function CUDAGPU end
     function MetalGPU end
+    function AMDGPU end
 
     #####
     ##### These methods are extended in SpeedyWeatherCUDAExt
