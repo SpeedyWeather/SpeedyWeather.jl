@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- CI tests on Julia 1.12 as well [#896](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/896)
 - Seasonal ocean and land climatology models GPU-ready [#892](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/892)
 - Zenith constructors [#889](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/889)
 - More general forcing of pressure, vorticity and divergence [#855](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/855)

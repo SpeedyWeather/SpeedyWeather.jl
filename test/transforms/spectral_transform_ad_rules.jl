@@ -29,31 +29,37 @@ function EnzymeTestUtils.test_approx(x::AbstractFFTs.Plan, y::AbstractFFTs.Plan,
 end 
 
 @testset "SpeedyTransforms: AD Rules" begin
-    @testset "_fourier! Enzyme rules" begin      
-        @testset "EnzymeTestUtils reverse rule test" begin
-            for (i_grid, grid_type) in enumerate(grid_types)
-                
-                # these tests don't pass for reduced grids 
-                # this is likely due to FiniteDifferences and not our EnzymeRules 
-                # see comments in https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/589
-                if !(grid_type <: AbstractReducedGrid) & fd_tests[i_grid]
-                    spectral_grid = SpectralGrid(Grid=grid_type, nlayers=1, trunc=5, dealiasing=grid_dealiasing[i_grid])
-                    S = SpectralTransform(spectral_grid)
-                    field = rand(spectral_grid.NF, spectral_grid.grid, spectral_grid.nlayers)
-                    f_north = S.scratch_memory.north
-                    f_south = S.scratch_memory.south
 
-                    # forward transform 
-                    test_reverse(SpeedyWeather.SpeedyTransforms._fourier!, Const, (f_north, Duplicated), (f_south, Duplicated), (field, Duplicated), (S, Const); fdm=FiniteDifferences.central_fdm(5, 1), rtol=1e-2, atol=1e-2)
+    if VERSION < v"1.12"
+        @testset "_fourier! Enzyme rules" begin      
+            @testset "EnzymeTestUtils reverse rule test" begin
+                for (i_grid, grid_type) in enumerate(grid_types)
+                    
+                    # these tests don't pass for reduced grids 
+                    # this is likely due to FiniteDifferences and not our EnzymeRules 
+                    # see comments in https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/589
+                    if !(grid_type <: AbstractReducedGrid) & fd_tests[i_grid]
+                        spectral_grid = SpectralGrid(Grid=grid_type, nlayers=1, trunc=5, dealiasing=grid_dealiasing[i_grid])
+                        S = SpectralTransform(spectral_grid)
+                        field = rand(spectral_grid.NF, spectral_grid.grid, spectral_grid.nlayers)
+                        f_north = S.scratch_memory.north
+                        f_south = S.scratch_memory.south
 
-                    # inverse transform
-                    field = zero(field)
-                    test_reverse(SpeedyWeather.SpeedyTransforms._fourier!, Const, (field, Duplicated), (f_north, Duplicated), (f_south, Duplicated), (S, Const); fdm=FiniteDifferences.central_fdm(5, 1), rtol=1e-2, atol=1e-2)
-                end 
+                        # forward transform 
+                        test_reverse(SpeedyWeather.SpeedyTransforms._fourier!, Const, (f_north, Duplicated), (f_south, Duplicated), (field, Duplicated), (S, Const); fdm=FiniteDifferences.central_fdm(5, 1), rtol=1e-2, atol=1e-2)
+
+                        # inverse transform
+                        field = zero(field)
+                        test_reverse(SpeedyWeather.SpeedyTransforms._fourier!, Const, (field, Duplicated), (f_north, Duplicated), (f_south, Duplicated), (S, Const); fdm=FiniteDifferences.central_fdm(5, 1), rtol=1e-2, atol=1e-2)
+                    end 
+                end
             end
+        end 
+        @testset "Complete Transform ChainRules" begin 
+            # WIP
         end
+    else 
+        # Enzyme currently isn't compatible with Julia 1.12
+        @test_broken true
     end 
-    @testset "Complete Transform ChainRules" begin 
-        # WIP
-    end
 end 
