@@ -157,7 +157,7 @@ nothing # hide
 ## Aquaplanet without (deep) convection
 
 Now we want to compare the previous simulation to a simulation without
-deep convection, called `DryBettsMiller`, because it is the
+deep convection, called `BettsMillerDryConvection`, because it is the
 [Betts-Miller convection](@ref BettsMiller) but with humidity set to zero
 in which case the convection is always non-precipitating _shallow_
 (because the missing latent heat release from condensation makes it shallower)
@@ -168,7 +168,7 @@ and `orography` (because `spectral_grid` hasn't changed this is possible).
 
 ```@example aquaplanet
 # Execute the code from Aquaplanet above first!
-convection = DryBettsMiller(spectral_grid, time_scale=Hour(4))
+convection = BettsMillerDryConvection(spectral_grid, time_scale=Hour(4))
 
 # reuse other model components from before
 model = PrimitiveWetModel(spectral_grid; ocean, land_sea_mask, orography, convection)
@@ -214,7 +214,7 @@ using SpeedyWeather
 # components
 spectral_grid = SpectralGrid(trunc=31, nlayers=8)
 large_scale_condensation = ImplicitCondensation(spectral_grid, snow=false)
-convection = SimplifiedBettsMiller(spectral_grid)
+convection = BettsMillerConvection(spectral_grid)
 
 # create model, initialize, run
 model = PrimitiveWetModel(spectral_grid; large_scale_condensation, convection)
@@ -224,7 +224,7 @@ nothing # hide
 ```
 
 We run the default `PrimitiveWetModel` with `ImplicitCondensation` as large-scale condensation
-(see [Implicit large-scale condensation](@ref)) and the `SimplifiedBettsMiller`
+(see [Implicit large-scale condensation](@ref)) and the `BettsMillerConvection`
 for convection (see [Simplified Betts-Miller](@ref BettsMiller)). These schemes
 have some additional parameters, we leave them as default for now, but you could
 do `ImplicitCondensation(spectral_grid, relative_humidity_threshold = 0.8)` to

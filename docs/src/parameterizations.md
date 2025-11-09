@@ -93,7 +93,7 @@ defined. Creating the default convection parameterization for example would be
 ```@example parameterization
 using SpeedyWeather
 spectral_grid = SpectralGrid(trunc=31, nlayers=8)
-convection = SimplifiedBettsMiller(spectral_grid, time_scale=Hour(4))
+convection = BettsMillerConvection(spectral_grid, time_scale=Hour(4))
 ```
 Further keyword arguments can be added or omitted all together (using the default
 setup), only the `spectral_grid` is required. 
@@ -120,7 +120,7 @@ nothing # hide
 otherwise we would need to write
 
 ```@example parameterization
-my_convection = SimplifiedBettsMiller(spectral_grid)
+my_convection = BettsMillerConvection(spectral_grid)
 model = PrimitiveWetModel(spectral_grid, convection=my_convection)
 nothing # hide
 ```

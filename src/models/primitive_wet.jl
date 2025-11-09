@@ -97,7 +97,7 @@ $(TYPEDFIELDS)"""
     surface_heat_flux::SH = SurfaceHeatFlux(spectral_grid)
     surface_humidity_flux::HF = SurfaceHumidityFlux(spectral_grid)
     large_scale_condensation::LC = ImplicitCondensation(spectral_grid)
-    convection::CV = SimplifiedBettsMiller(spectral_grid)
+    convection::CV = BettsMillerConvection(spectral_grid)
     optical_depth::OD = ZeroOpticalDepth(spectral_grid)
     shortwave_radiation::SW = TransparentShortwave(spectral_grid)
     longwave_radiation::LW = JeevanjeeRadiation(spectral_grid)

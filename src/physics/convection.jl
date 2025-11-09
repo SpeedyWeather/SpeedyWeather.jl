@@ -1,11 +1,11 @@
 abstract type AbstractConvection <: AbstractParameterization end
 
-export SimplifiedBettsMiller
+export BettsMillerConvection
 
 """The simplified Betts-Miller convection scheme from Frierson, 2007,
 https://doi.org/10.1175/JAS3935.1. This implements the qref-formulation
 in their paper. Fields and options are $(TYPEDFIELDS)"""
-@kwdef struct SimplifiedBettsMiller{NF} <: AbstractConvection
+@kwdef struct BettsMillerConvection{NF} <: AbstractConvection
     "[OPTION] Relaxation time for profile adjustment"
     time_scale::Second = Hour(4)
 
@@ -13,14 +13,14 @@ in their paper. Fields and options are $(TYPEDFIELDS)"""
     relative_humidity::NF = 0.7
 end
 
-Adapt.@adapt_structure SimplifiedBettsMiller
+Adapt.@adapt_structure BettsMillerConvection
 
 # generator function 
-SimplifiedBettsMiller(SG::SpectralGrid; kwargs...) = SimplifiedBettsMiller{SG.NF}(; kwargs...)
-initialize!(::SimplifiedBettsMiller, ::PrimitiveEquation) = nothing
+BettsMillerConvection(SG::SpectralGrid; kwargs...) = BettsMillerConvection{SG.NF}(; kwargs...)
+initialize!(::BettsMillerConvection, ::PrimitiveEquation) = nothing
 
 # function barrier
-function parameterization!(ij, diagn, progn, convection_scheme::SimplifiedBettsMiller, model)
+function parameterization!(ij, diagn, progn, convection_scheme::BettsMillerConvection, model)
     convection!(ij, diagn, convection_scheme, model)
 end
 
@@ -31,7 +31,7 @@ simplified Betts-Miller convection. Starts with a first-guess relaxation to dete
 the convective criteria (none, dry/shallow or deep), then adjusts reference profiles
 for thermodynamic consistency (e.g. in dry convection the humidity profile is non-precipitating),
 and relaxes current vertical profiles to the adjusted references."""
-function convection!(ij, diagn, SBM::SimplifiedBettsMiller, model)
+function convection!(ij, diagn, SBM::BettsMillerConvection, model)
 
     (; geometry, clausius_clapeyron, planet, atmosphere, time_stepping) = model
     NF = eltype(diagn.grid.temp_grid)
@@ -251,28 +251,28 @@ function pseudo_adiabat!(
     return level_zero_buoyancy
 end
 
-export DryBettsMiller
+export BettsMillerDryConvection
 
 """
 The simplified Betts-Miller convection scheme from Frierson, 2007,
 https://doi.org/10.1175/JAS3935.1 but with humidity set to zero.
 Fields and options are
 $(TYPEDFIELDS)"""
-@kwdef struct DryBettsMiller{NF} <: AbstractConvection
+@kwdef struct BettsMillerDryConvection{NF} <: AbstractConvection
     "[OPTION] Relaxation time for profile adjustment"
     time_scale::Second = Hour(4)
 end
 
-function Adapt.adapt_structure(to, DBM::DryBettsMiller{NF}) where NF
-    return DryBettsMiller{NF}(adapt_structure(to, DBM.time_scale))
+function Adapt.adapt_structure(to, DBM::BettsMillerDryConvection{NF}) where NF
+    return BettsMillerDryConvection{NF}(adapt_structure(to, DBM.time_scale))
 end
 
 # generator function
-DryBettsMiller(SG::SpectralGrid; kwargs...) = DryBettsMiller{SG.NF}(; kwargs...)
-initialize!(::DryBettsMiller, ::PrimitiveEquation) = nothing
+BettsMillerDryConvection(SG::SpectralGrid; kwargs...) = BettsMillerDryConvection{SG.NF}(; kwargs...)
+initialize!(::BettsMillerDryConvection, ::PrimitiveEquation) = nothing
 
 # function barrier
-function parameterization!(ij, diagn, progn, convection_scheme::DryBettsMiller, model)
+function parameterization!(ij, diagn, progn, convection_scheme::BettsMillerDryConvection, model)
     convection!(ij, diagn, convection_scheme, model)
 end
 
@@ -284,7 +284,7 @@ Starts with a first-guess relaxation to determine the convective criterion,
 then adjusts the reference profiles
 for thermodynamic consistency (e.g. in dry convection the humidity profile is non-precipitating),
 and relaxes current vertical profiles to the adjusted references."""
-function convection!(ij, diagn, DBM::DryBettsMiller, model)
+function convection!(ij, diagn, DBM::BettsMillerDryConvection, model)
 
     (; geometry, atmosphere) = model
     NF = eltype(diagn.grid.temp_grid)

@@ -90,7 +90,7 @@ $(TYPEDFIELDS)"""
     surface_condition::SC = SurfaceCondition(spectral_grid)
     surface_momentum_flux::SM = SurfaceMomentumFlux(spectral_grid)
     surface_heat_flux::SH = SurfaceHeatFlux(spectral_grid)
-    convection::CV = DryBettsMiller(spectral_grid)
+    convection::CV = BettsMillerDryConvection(spectral_grid)
     optical_depth::OD = ZeroOpticalDepth(spectral_grid)
     shortwave_radiation::SW = TransparentShortwave(spectral_grid)
     longwave_radiation::LW = JeevanjeeRadiation(spectral_grid)

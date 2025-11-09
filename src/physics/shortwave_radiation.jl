@@ -27,9 +27,9 @@ initialize!(::TransparentShortwave, ::PrimitiveEquation) = nothing
 
 # function barrier
 parameterization!(ij, diagn, progn, shortwave::TransparentShortwave, model) =
-    shortwave_radiation!(ij, diagn, shortwave, model)
+    shortwave_radiation!(ij, diagn, shortwave, model.planet, model.land_sea_mask)
 
-function shortwave_radiation!(ij, diagn, shortwave, model)
+function shortwave_radiation!(ij, diagn, shortwave::TransparentShortwave, planet, land_sea_mask)
 
     (; surface_shortwave_down, surface_shortwave_up) = diagn.physics
     (; outgoing_shortwave) = diagn.physics
@@ -37,10 +37,10 @@ function shortwave_radiation!(ij, diagn, shortwave, model)
     ssrd_land = diagn.physics.land.surface_shortwave_down
 
     cos_zenith = diagn.physics.cos_zenith[ij]
-    land_fraction = model.land_sea_mask[ij]
+    land_fraction = land_sea_mask[ij]
     albedo_ocean = diagn.physics.ocean.albedo[ij]
     albedo_land = diagn.physics.land.albedo[ij]
-    S₀ = model.planet.solar_constant
+    S₀ = planet.solar_constant
 
     D = S₀ * cos_zenith             # top of atmosphere downward radiation
     surface_shortwave_down[ij] = D  # transparent atmosphere so same at surface (before albedo)
