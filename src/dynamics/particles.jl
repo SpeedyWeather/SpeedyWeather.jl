@@ -151,3 +151,10 @@ deactivate(p::Particle{NF}) where NF = Particle{NF}(false, p.lon, p.lat, p.σ)
 """$(TYPEDSIGNATURES)
 Check whether particle is active."""
 isactive(p::Particle{NF}) where NF = p.active
+
+function set(p::P; lon=nothing, lat=nothing, σ=nothing) where {P<:Particle}
+    plon = isnothing(lon) ? p.lon : lon
+    plat = isnothing(lat) ? p.lat : lat
+    pσ = isnothing(σ) ? p.σ : σ
+    return P(p.active, plon, plat, pσ)
+end
