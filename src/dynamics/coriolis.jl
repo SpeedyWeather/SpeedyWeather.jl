@@ -46,16 +46,16 @@ end
     @Const(whichring),
     rotation
 )
-    ij, k = @index(Global, NTuple)
+    I = @index(Global, Cartesian)
     
     # Get latitude ring index for this grid point
-    j = whichring[ij]
+    j = whichring[I[1]]
     
     # Compute Coriolis parameter
     fⱼ = 2rotation * sin(lat[j])
     
     # Set value for this grid point and layer
-    f[ij, k] = fⱼ
+    f[I] = fⱼ
 end
 
 """
