@@ -195,7 +195,7 @@ function initialize!(   progn::PrognosticVariables{NF},
 
     ξ = curl(u_spectral, v_spectral, model.spectral_transform; radius)
     
-    fill!(ξ[1:1], 0)  # remove mean in a ugly hacky way that doesn't use scalar indexing for GPU compat
+    @allowscalar ξ[1] = 0  # remove mean
 
     # repeat over vertical layers
     ξks = repeat(ξ, 1, nlayers)
@@ -659,7 +659,7 @@ function homogeneous_temperature!(  progn::PrognosticVariables,
     # overwrite with lowermost layer further down
     temp_surf = lta_view(progn.temp, :, nlayers, 1)     # spectral temperature at k=nlayers+1/2
 
-    fill!(temp_surf[1:1], norm_sphere*temp_ref)  # set global mean surface temperature
+    @allowscalar temp_surf[1] = norm_sphere*temp_ref  # set global mean surface temperature
     temp_surf .-= Γg⁻¹.*geopot_surf # lower temperature for higher mountains
 
     # Use lapserate and vertical coordinate σ for profile
