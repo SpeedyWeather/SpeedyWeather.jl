@@ -94,11 +94,13 @@ function initialize!(
     # interpolate initial velocity on initial locations
     lats = diagn.particles.u    # reuse u,v arrays as only used for u, v
     lons = diagn.particles.v    # after update_locator!
+    σ = model.geometry.σ_levels_full[k]
     
     for i in eachindex(particles)
         # modulo all particles here
         # i.e. one can start with a particle at -120˚E which moduloed to 240˚E here
-        particles[i] = mod(particles[i])
+        # also given this is 2D advection on a given layer set that vertical coordinate σ here
+        particles[i] = mod(set(particles[i]; σ=σ))
         lons[i] = particles[i].lon
         lats[i] = particles[i].lat
     end
@@ -137,9 +139,6 @@ function particle_advection!(
     # escape immediately if advection not on this timestep
     n = particle_advection.every_n_timesteps
     clock.timestep_counter % n == (n-1) || return nothing   
-
-    # also escape if no particle is active
-    any(isactive.(particles)) || return nothing
 
     # HEUN: PREDICTOR STEP, use u, v at previous time step and location
     Δt = particle_advection.Δt[]        # time step [s*˚/m]
