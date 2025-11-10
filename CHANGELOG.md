@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- The barotropic model can now also be initiliazed on GPU [#903](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/903)
 - Remove double imports of `architecture` in SpeedyWeatherInternals/ext/ [#899](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/899)
 - Documentation typos [#894](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/894)
 - Seasonal ocean and land climatology models GPU-ready [#892](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/892)
