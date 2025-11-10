@@ -231,34 +231,42 @@ function shortwave_radiation!(
     # Diagnose RH_term and Humidity Cloud Top (kcltop)
     (;relative_humidity_threshold_min, relative_humidity_threshold_max, specific_humidity_threshold_min) = radiation
 
-    humidity_term_max = zero(P)
+    humidity_term_kcltop = zero(P)
     
     kcltop = nlayers + 1 # Default to no cloud (below surface)
 
-    # Loop from top layer (k=1) to the layer ABOVE the surface (nlayers-1)
-    # to find the maximum humidity term and corresponding cloud top 
+    # Following SPEEDY documentation B.4: cloud_top starts at nlayers+1 (no cloud),
+    # then is moved up to the highest layer k where condensation occurs.
+    # Loop from top layer (k=1) to find the TOPMOST layer where RH ≥ 95% (condensation threshold).
+    # This matches ImplicitCondensation which also triggers at 95% RH.
     for k in 1:(nlayers-1)
         humidity_k = humid[k]
         qsat = sat_humid[k]
 
         # Check if specific humidity is above the absolute threshold
         if humidity_k > specific_humidity_threshold_min
-            # Calculate this layer's RH contribution
+            # Calculate this layer's RH
             relative_humidity_k = humidity_k / qsat
-            rh_norm = max(0, (relative_humidity_k - relative_humidity_threshold_min) / (relative_humidity_threshold_max - relative_humidity_threshold_min))
-            humidity_term_k = min(1, rh_norm)^2
+            
+            # Check if RH exceeds the condensation threshold (95%, matching ImplicitCondensation)
+            if relative_humidity_k >= relative_humidity_threshold_min
+                # Cloud cover increases smoothly from RH=95% to RH=100%
+                rh_norm = max(0, (relative_humidity_k - relative_humidity_threshold_min) / (relative_humidity_threshold_max - relative_humidity_threshold_min))
+                humidity_term_k = min(1, rh_norm)^2
 
-            # If this is the new maximum, update the max term and set humidity top
-            if humidity_term_k > humidity_term_max
-                humidity_term_max = humidity_term_k
-                kcltop = k  # This layer is now the humidity cloud top
+                # SPEEDY algorithm: set kcltop to the TOPMOST (smallest k) layer with condensation
+                # Once we find a layer with condensation, we've found the cloud top, so break
+                if kcltop == nlayers + 1  # Only update if we haven't found cloud top yet
+                    kcltop = k
+                    humidity_term_kcltop = humidity_term_k
+                end
             end
         end
     end
     
     # Calculate the Single Column Cloud Cover (CLC)
-    # This uses the humidity term from the kcltop layer
-    cloud_cover = min(1, P + humidity_term_max)
+    # This uses the humidity term from the cloud top layer (SPEEDY B.4)
+    cloud_cover = min(1, P + humidity_term_kcltop)
 
     # The final cloud top is the minimum (highest in alt) of the two
     cloud_top = min(kcltop, kprtop)
