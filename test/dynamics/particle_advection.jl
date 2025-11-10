@@ -1,5 +1,5 @@
 @testset "Particle advection" begin
-    for Model in (  BarotropicModel,
+    @testset for Model in (  BarotropicModel,
                     ShallowWaterModel,
                     PrimitiveDryModel,
                     PrimitiveWetModel)
@@ -11,7 +11,7 @@
         end
 
         spectral_grid = SpectralGrid(trunc=31, nlayers=nlayers, nparticles=100)
-        particle_advection = ParticleAdvection2D(spectral_grid)
+        particle_advection = ParticleAdvection2D(spectral_grid, layer=1)
 
         model = Model(spectral_grid; particle_advection)
 
@@ -23,6 +23,7 @@
 
         for particle in simulation.prognostic_variables.particles
             @test SpeedyWeather.ismod(particle)
+            @test particle.σ == model.geometry.σ_levels_full[1]
         end
     end
 end
