@@ -568,7 +568,7 @@ function initialize!(   progn::PrognosticVariables{NF},
     end
 
     Tη .= max.(Tη, Tmin)
-    Tη = on_architecture(architecture(model), Tη)
+    Tη = on_architecture(model.architecture, Tη)
     
     temp_grid = zeros(NF, grid, nlayers)     # temperature
     aΩ = radius*rotation
