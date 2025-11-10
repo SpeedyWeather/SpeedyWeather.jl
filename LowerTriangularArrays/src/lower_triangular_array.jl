@@ -100,9 +100,9 @@ Base.sizeof(L::LowerTriangularArray) = sizeof(L.data)
 
 function Base.show(io::IO, ::MIME"text/plain", L::LowerTriangularMatrix)
     Base.array_summary(io, L, axes(L))
-    
+    L_print = architecture(L) <: Architectures.CPU ? L : on_architecture(CPU(), L)
     # the following is copied over from base/arrayshow.jl
-    X = Matrix(L)
+    X = Matrix(L_print)
     # 2) compute new IOContext
     if !haskey(io, :compact) && length(axes(X, 2)) > 1
         io = IOContext(io, :compact => true)

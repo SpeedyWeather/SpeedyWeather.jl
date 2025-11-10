@@ -86,6 +86,7 @@ function initialize!(
     ∇²ⁿ_implicit = on_architecture(CPU(), diffusion.impl)
     ∇²ⁿ_div = on_architecture(CPU(), diffusion.expl_div)
     ∇²ⁿ_div_implicit = on_architecture(CPU(), diffusion.impl_div)
+    σ_levels_full = on_architecture(CPU(), G.σ_levels_full)
     (; power, power_stratosphere, tapering_σ) = diffusion
     (; Δt, radius) = L
 
@@ -107,7 +108,7 @@ function initialize!(
     for k in 1:nlayers
         # VERTICAL TAPERING for the stratosphere
         # go from 1 to 0 between σ=0 and tapering_σ
-        σ = G.σ_levels_full[k]
+        σ = σ_levels_full[k]
         tapering = max(0, (tapering_σ-σ)/tapering_σ)         # ∈ [0, 1]
         p = power + tapering*(power_stratosphere - power)
 
