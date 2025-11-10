@@ -202,11 +202,11 @@ When `false`, this term is omitted, allowing more radiation to penetrate through
 ```@example radiation
 using SpeedyWeather, CairoMakie
 
-SG = SpectralGrid()
+spectral_grid = SpectralGrid(trunc=31, nlayers=8)
 
 # Run with cloud_top_reflection ON
-sw_on = OneBandShortwave(SG; cloud_top_reflection=true)
-model_on = PrimitiveWetModel(SG; shortwave_radiation=sw_on)
+sw_on = OneBandShortwave(spectral_grid; cloud_top_reflection=true)
+model_on = PrimitiveWetModel(spectral_grid; shortwave_radiation=sw_on)
 sim_on = initialize!(model_on)
 run!(sim_on, period=Day(5))
 osr_on = sim_on.diagnostic_variables.physics.outgoing_shortwave_radiation
@@ -219,8 +219,8 @@ nothing # hide
 
 ```@example radiation
 # Run with cloud_top_reflection OFF
-sw_off = OneBandShortwave(SG; cloud_top_reflection=false)
-model_off = PrimitiveWetModel(SG; shortwave_radiation=sw_off)
+sw_off = OneBandShortwave(spectral_grid; cloud_top_reflection=false)
+model_off = PrimitiveWetModel(spectral_grid; shortwave_radiation=sw_off)
 sim_off = initialize!(model_off)
 run!(sim_off, period=Day(5))
 osr_off = sim_off.diagnostic_variables.physics.outgoing_shortwave_radiation
@@ -238,11 +238,11 @@ Enables the diagnostic stratocumulus cloud parameterization over oceans. When `f
 ```@example radiation
 using SpeedyWeather, CairoMakie
 
-SG = SpectralGrid()
+spectral_grid = SpectralGrid()
 
 # Run with use_stratocumulus ON
-sw_on = OneBandShortwave(SG; use_stratocumulus=true)
-model_on = PrimitiveWetModel(SG; shortwave_radiation=sw_on)
+sw_on = OneBandShortwave(spectral_grid; use_stratocumulus=true)
+model_on = PrimitiveWetModel(spectral_grid; shortwave_radiation=sw_on)
 sim_on = initialize!(model_on)
 run!(sim_on, period=Day(5))
 ssrd_on = sim_on.diagnostic_variables.physics.surface_shortwave_down
@@ -255,8 +255,8 @@ nothing # hide
 
 ```@example radiation
 # Run with use_stratocumulus OFF
-sw_off = OneBandShortwave(SG; use_stratocumulus=false)
-model_off = PrimitiveWetModel(SG; shortwave_radiation=sw_off)
+sw_off = OneBandShortwave(spectral_grid; use_stratocumulus=false)
+model_off = PrimitiveWetModel(spectral_grid; shortwave_radiation=sw_off)
 sim_off = initialize!(model_off)
 run!(sim_off, period=Day(5))
 ssrd_off = sim_off.diagnostic_variables.physics.surface_shortwave_down
@@ -274,11 +274,11 @@ Controls the transmittance calculation scheme. When `true`, uses the SPEEDY-styl
 ```@example radiation
 using SpeedyWeather, CairoMakie
 
-SG = SpectralGrid()
+spectral_grid = SpectralGrid()
 
 # Run with use_speedy_transmittance ON
-sw_on = OneBandShortwave(SG; use_speedy_transmittance=true)
-model_on = PrimitiveWetModel(SG; shortwave_radiation=sw_on)
+sw_on = OneBandShortwave(spectral_grid; use_speedy_transmittance=true)
+model_on = PrimitiveWetModel(spectral_grid; shortwave_radiation=sw_on)
 sim_on = initialize!(model_on)
 run!(sim_on, period=Day(5))
 ssrd_on = sim_on.diagnostic_variables.physics.surface_shortwave_down
@@ -291,8 +291,8 @@ nothing # hide
 
 ```@example radiation
 # Run with use_speedy_transmittance OFF
-sw_off = OneBandShortwave(SG; use_speedy_transmittance=false)
-model_off = PrimitiveWetModel(SG; shortwave_radiation=sw_off)
+sw_off = OneBandShortwave(spectral_grid; use_speedy_transmittance=false)
+model_off = PrimitiveWetModel(spectral_grid; shortwave_radiation=sw_off)
 sim_off = initialize!(model_off)
 run!(sim_off, period=Day(5))
 ssrd_off = sim_off.diagnostic_variables.physics.surface_shortwave_down
