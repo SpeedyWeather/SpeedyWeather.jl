@@ -80,13 +80,17 @@ function initialize!(
     G::AbstractGeometry,
     L::AbstractTimeStepper,
 )
+    architecture = architecture(diffusion.expl)
     (; trunc, nlayers, resolution_scaling) = diffusion
-    ∇²ⁿ = diffusion.expl
-    ∇²ⁿ_implicit = diffusion.impl
-    ∇²ⁿ_div = diffusion.expl_div
-    ∇²ⁿ_div_implicit = diffusion.impl_div
+    ∇²ⁿ = on_architecture(CPU(), diffusion.expl)
+    ∇²ⁿ_implicit = on_architecture(CPU(), diffusion.impl)
+    ∇²ⁿ_div = on_architecture(CPU(), diffusion.expl_div)
+    ∇²ⁿ_div_implicit = on_architecture(CPU(), diffusion.impl_div)
     (; power, power_stratosphere, tapering_σ) = diffusion
     (; Δt, radius) = L
+
+    # arrays are relatively small (Nlayers x trunc) -> precompute explicitly on CPU
+     
 
     # Reduce diffusion time scale (=increase diffusion, always in seconds) with resolution
     # times 1/radius because time step Δt is scaled with 1/radius
@@ -126,6 +130,11 @@ function initialize!(
         ∇²ⁿ_div[trunc+2, k] = 0
         ∇²ⁿ_div_implicit[trunc+2, k] = 0
     end
+
+    diffusion.expl = on_architecture(architecture, ∇²ⁿ)
+    diffusion.impl = on_architecture(architecture, ∇²ⁿ_implicit)
+    diffusion.expl_div = on_architecture(architecture, ∇²ⁿ_div)
+    diffusion.impl_div = on_architecture(architecture, ∇²ⁿ_div_implicit)
 end
 
 """$(TYPEDSIGNATURES)
