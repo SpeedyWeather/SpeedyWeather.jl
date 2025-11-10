@@ -1,7 +1,7 @@
 module SpeedyWeatherInternalsCUDAExt
 
     import CUDA: CUDA, CuArray, CuDeviceArray
-    import SpeedyWeatherInternals.Architectures: Architectures, GPU, CPU, CUDAGPU, array_type, architecture, on_architecture, architecture, compatible_array_types, nonparametric_type
+    import SpeedyWeatherInternals.Architectures: Architectures, GPU, CPU, CUDAGPU, array_type, architecture, on_architecture, compatible_array_types, nonparametric_type
 
     # DEVICE SETUP FOR CUDA
     # extend functions from Architectures
