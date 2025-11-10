@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Vertical advection kernelized and GPU-ready [#895](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/895)
 - Remove double imports of `architecture` in SpeedyWeatherInternals/ext/ [#899](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/899)
 - Documentation typos [#894](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/894)
 - Seasonal ocean and land climatology models GPU-ready [#892](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/892)
