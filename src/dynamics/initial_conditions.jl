@@ -82,39 +82,7 @@ $(TYPEDFIELDS)"""
 end
 
 """$(TYPEDSIGNATURES)
-Start with random vorticity as initial conditions"""
-function initialize!(   progn::PrognosticVariables{NF},
-                        initial_conditions::RandomVorticity,
-                        model::Barotropic) where NF
-
-    # reseed the random number generator, for seed=0 randomly seed from Julia's global RNG
-    seed = initial_conditions.seed == 0 ? rand(UInt) : initial_conditions.seed
-    RNG = initial_conditions.random_number_generator
-    Random.seed!(RNG, seed)
-
-    lmax = progn.trunc + 1
-    power = initial_conditions.power + 1    # +1 as power is summed of orders m
-
-    (; spectrum, nlayers)
-    A = initial_conditions.amplitude
-    ξ = zeros(LowerTriangularArray{Complex{NF}}, spectrum, nlayers)
-
-    lm = 0
-    for m in 1:lmax
-        for l in m:lmax
-            lm += 1
-            ξ[lm, :] .= A*l^power*(2rand(RNG, Complex{NF}) - (1 + 1im))
-        end
-    end
-
-    spectral_truncation!(ξ, initial_conditions.max_wavenumber)
-    ξ[1:lmax, :] .= 0       # remove zonal modes and mean
-    set!(progn, model; vor=ξ, lf=1)
-end
-
-"""$(TYPEDSIGNATURES)
-Kernel version of initialize! for RandomVorticity initial conditions.
-Uses GPU-compatible operations for parallel execution."""
+Kernel version of initialize! for RandomVorticity initial conditions."""
 function initialize!(
     progn::PrognosticVariables{NF},
     initial_conditions::RandomVorticity,
