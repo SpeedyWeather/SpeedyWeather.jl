@@ -490,7 +490,7 @@ end
 
 @kernel function ∇²_kernel!(∇²alms, alms, @Const(eigenvalues), kernel_func, @Const(l_indices))
 
-    I = @index(Global, NTuple) # I[1] == lm, I[2] == k
+    I = @index(Global, Cartesian) # I[1] == lm, I[2] == k
                                   # we use cartesian index instead of NTuple here
                                   # because this works for 2D and 3D matrices
     l = l_indices[I[1]]
