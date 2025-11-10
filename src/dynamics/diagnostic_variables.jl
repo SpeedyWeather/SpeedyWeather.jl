@@ -247,13 +247,12 @@ Generator function. If a `spectral_transform` is handed over, the same scratch m
 function DynamicsVariables(SG::SpectralGrid; 
                            spectral_transform::Union{Nothing,SpectralTransform}=nothing) 
     
-    (; spectrum, grid, nlayers, NF, ArrayType) = SG
+    (; architecture, spectrum, grid, nlayers, NF, ArrayType) = SG
     (; SpectralVariable2D, SpectralVariable3D) = SG
     (; GridVariable2D, GridVariable3D) = SG
 
-
     if isnothing(spectral_transform)    # then create ScratchMemory now
-        scratch_memory = SpeedyTransforms.ScratchMemory(NF, ArrayType, grid, nlayers)
+        scratch_memory = SpeedyTransforms.ScratchMemory(NF, architecture, grid, nlayers)
     else                                # otherwise reuse existing ScratchMemory
         scratch_memory = spectral_transform.scratch_memory
     end
