@@ -162,7 +162,7 @@ end
     @Const(l_indices),
     lmax
 )
-    I = @index(Global, Cartesian)
+    I = @index(Global, NTuple)
     lm = I[1]  # spectral coefficient index
     k = I[2]   # layer index
     
@@ -709,7 +709,7 @@ end
     R_dry,
     Γg⁻¹
 )
-    I = @index(Global, Cartesian)
+    I = @index(Global, NTuple)
     lm = I[1]  # spectral coefficient index
     k = I[2]   # layer index
     

@@ -179,7 +179,7 @@ end
     @Const(eigenvalue_norm),
     @Const(l_indices)
 )
-    I = @index(Global, Cartesian)  # I[1] == lm, I[2] == k
+    I = @index(Global, NTuple)  # I[1] == lm, I[2] == k
     
     # Get the degree l for this coefficient
     l = l_indices[I[1]]

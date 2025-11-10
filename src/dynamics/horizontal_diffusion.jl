@@ -164,7 +164,7 @@ end
 @kernel inbounds=true function _horizontal_diffusion_kernel!(
     tendency, var, @Const(expl), @Const(impl), @Const(l_indices))
 
-    I = @index(Global, Cartesian)
+    I = @index(Global, NTuple)
     lm = I[1]
     k = ndims(var) == 1 ? 1 : I[2]
     

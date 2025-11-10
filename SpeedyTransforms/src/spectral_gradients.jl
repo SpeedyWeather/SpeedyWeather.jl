@@ -106,7 +106,7 @@ end
 
 @kernel inbounds=true function _divergence_kernel!(kernel_func::KernelOP{mode, flipsign, add}, div, u, v, grad_x_vordiv, grad_y_vordiv1, grad_y_vordiv2) where {mode, flipsign, add}
 
-    I = @index(Global, Cartesian)
+    I = @index(Global, NTuple)
     lm = I[1]
     lmmax = size(div, 1)
     k = ndims(div) == 1 ? CartesianIndex() : I[2]
@@ -258,7 +258,7 @@ function UV_from_vor!(
 end
 
 @kernel inbounds=true function _UV_from_vor_kernel!(U, V, vor, @Const(l_indices), lmax, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)    
-    I = @index(Global, Cartesian)
+    I = @index(Global, NTuple)
     lm = I[1]
     k = ndims(vor) == 1 ? CartesianIndex() : I[2]
     l = l_indices[lm]
@@ -406,7 +406,7 @@ function UV_from_vordiv_kernel!(
 end
 
 @kernel inbounds=true function _UV_from_vordiv_kernel!(U, V, vor, div, @Const(l_indices), lmax, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)    
-    I = @index(Global, Cartesian)
+    I = @index(Global, NTuple)
     lm = I[1]
     k = ndims(vor) == 1 ? CartesianIndex() : I[2]
     l = l_indices[lm]
@@ -490,7 +490,7 @@ end
 
 @kernel function ∇²_kernel!(∇²alms, alms, @Const(eigenvalues), kernel_func, @Const(l_indices))
 
-    I = @index(Global, Cartesian) # I[1] == lm, I[2] == k
+    I = @index(Global, NTuple) # I[1] == lm, I[2] == k
                                   # we use cartesian index instead of NTuple here
                                   # because this works for 2D and 3D matrices
     l = l_indices[I[1]]
@@ -585,7 +585,7 @@ function ∇!(
 end
 
 @kernel inbounds=true function dpdy_kernel!(dpdy, p, grad_y1, grad_y2)
-    I = @index(Global, Cartesian)
+    I = @index(Global, NTuple)
     lm = I[1]
     k = ndims(p) == 1 ? CartesianIndex() : I[2]
     lmmax = size(dpdy, 1)
