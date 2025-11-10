@@ -80,7 +80,7 @@ function initialize!(
     G::AbstractGeometry,
     L::AbstractTimeStepper,
 )
-    architecture = architecture(diffusion.expl)
+    arch = architecture(diffusion.expl)
     (; trunc, nlayers, resolution_scaling) = diffusion
     ∇²ⁿ = on_architecture(CPU(), diffusion.expl)
     ∇²ⁿ_implicit = on_architecture(CPU(), diffusion.impl)
@@ -131,10 +131,10 @@ function initialize!(
         ∇²ⁿ_div_implicit[trunc+2, k] = 0
     end
 
-    diffusion.expl = on_architecture(architecture, ∇²ⁿ)
-    diffusion.impl = on_architecture(architecture, ∇²ⁿ_implicit)
-    diffusion.expl_div = on_architecture(architecture, ∇²ⁿ_div)
-    diffusion.impl_div = on_architecture(architecture, ∇²ⁿ_div_implicit)
+    diffusion.expl = on_architecture(arch, ∇²ⁿ)
+    diffusion.impl = on_architecture(arch, ∇²ⁿ_implicit)
+    diffusion.expl_div = on_architecture(arch, ∇²ⁿ_div)
+    diffusion.impl_div = on_architecture(arch, ∇²ⁿ_div_implicit)
 end
 
 """$(TYPEDSIGNATURES)
