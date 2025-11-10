@@ -112,6 +112,72 @@ function initialize!(   progn::PrognosticVariables{NF},
     set!(progn, model; vor=ξ, lf=1)
 end
 
+"""$(TYPEDSIGNATURES)
+Kernel version of initialize! for RandomVorticity initial conditions.
+Uses GPU-compatible operations for parallel execution."""
+function initialize!(
+    progn::PrognosticVariables{NF},
+    initial_conditions::RandomVorticity,
+    model::Barotropic
+) where NF
+
+    # reseed the random number generator, for seed=0 randomly seed from Julia's global RNG
+    seed = initial_conditions.seed == 0 ? rand(UInt) : initial_conditions.seed
+    RNG = initial_conditions.random_number_generator
+    Random.seed!(RNG, seed)
+
+    lmax = progn.trunc + 1
+    power = initial_conditions.power + 1    # +1 as power is summed of orders m
+
+    (; spectrum, nlayers) = progn
+    A = convert(NF, initial_conditions.amplitude)
+    
+    # Pre-generate random values on CPU, then transfer to device
+    nlm = length(spectrum)
+    random_values_cpu = 2 .* rand(RNG, Complex{NF}, nlm, nlayers) .- (1 + 1im)
+    
+    # Transfer to device architecture
+    ξ = zeros(LowerTriangularArray{Complex{NF}}, spectrum, nlayers)
+    random_values = on_architecture(architecture(ξ), random_values_cpu)
+    
+    # Get l indices for each harmonic
+    l_indices = spectrum.l_indices
+    
+    # Launch kernel to fill vorticity field
+    launch!(architecture(ξ), SpectralWorkOrder, size(ξ), 
+            random_vorticity_kernel!, ξ, random_values, A, power, l_indices, lmax)
+    
+    # Apply spectral truncation
+    spectral_truncation!(ξ, initial_conditions.max_wavenumber)
+    
+    # Set the prognostic variable
+    set!(progn, model; vor=ξ, lf=1)
+end
+
+@kernel inbounds=true function random_vorticity_kernel!(
+    ξ,
+    @Const(random_values),
+    A,
+    power,
+    @Const(l_indices),
+    lmax
+)
+    I = @index(Global, Cartesian)
+    lm = I[1]  # spectral coefficient index
+    k = I[2]   # layer index
+    
+    # Get the degree l for this harmonic
+    l = l_indices[lm]
+    
+    # Skip zonal modes (m=0, which are the first lmax harmonics)
+    if lm > lmax
+        ξ[I] = A * l^power * random_values[I]
+    else
+        ξ[I] = 0
+    end
+end
+
+
 export RandomVelocity
 
 """Start with random velocity as initial conditions
@@ -161,9 +227,7 @@ function initialize!(   progn::PrognosticVariables{NF},
 
     ξ = curl(u_spectral, v_spectral, model.spectral_transform; radius)
     
-    ξ[1:1] .= 0        # remove mean in a ugly hacky way that doesn't use scalar indexing for GPU compat
-    # TODO: do this better, we could also just use the @allowscalar macro in cases like this, 
-    # but currenlty CUDA isn't a dependency of SpeedyWeather, so we can't use it here 
+    fill!(ξ[1:1], 0)  # remove mean in a ugly hacky way that doesn't use scalar indexing for GPU compat
 
     # repeat over vertical layers
     ξks = repeat(ξ, 1, nlayers)
@@ -231,29 +295,17 @@ function initialize!(   progn::PrognosticVariables,
     η_perturb_grid = zeros(NF, grid)
     lat = RingGrids.get_lat(grid)
     lons, _ = RingGrids.get_lonlats(grid)
-
-    for (j, ring) in enumerate(eachring(u_grid))
-        θ = lat[j]             # latitude in radians
-
-        # velocity per latitude
-        if θ₀ < θ < θ₁
-            u_θ = umax/eₙ*exp(1/(θ-θ₀)/(θ-θ₁))  # u as in Galewsky, 2004
-        else
-            u_θ = 0
-        end
-
-        # lon-constant part of perturbation
-        ηθ = perturb_height*cos(θ)*exp(-((θ₂-θ)/β)^2)
-
-        # store in all longitudes
-        for ij in ring
-            u_grid[ij] = u_θ/radius*coslat⁻¹[j]   # include scaling for curl!
-
-            # calculate perturbation (possibly shifted in lon compared to Galewsky 2004)
-            ϕ = lons[ij] - λ
-            η_perturb_grid[ij] = exp(-(ϕ/α)^2)*ηθ
-        end
-    end
+    
+    # Transfer parameters to device
+    lat_device = on_architecture(architecture(u_grid), lat)
+    lons_device = on_architecture(architecture(u_grid), lons)
+    whichring = u_grid.grid.whichring
+    
+    # Launch kernel
+    launch!(architecture(u_grid), RingGridWorkOrder, size(u_grid),
+            zonal_jet_kernel!, u_grid, η_perturb_grid, lat_device, lons_device, 
+            coslat⁻¹, whichring, θ₀, θ₁, umax, eₙ, θ₂, α, β, λ, 
+            radius, perturb_height)
 
     # the following obtain initial conditions for η from u, v=0 via
     # 0 = -∇⋅((ζ+f)*(-v, u)) - ∇²((u^2 + v^2)/2), i.e.
@@ -293,6 +345,46 @@ function initialize!(   progn::PrognosticVariables,
     pres .+= η_perturb
     spectral_truncation!(pres)
     return nothing
+end
+
+@kernel inbounds=true function zonal_jet_kernel!(
+    u_grid,
+    η_perturb_grid,
+    @Const(lat),
+    @Const(lons),
+    @Const(coslat⁻¹),
+    @Const(whichring),
+    θ₀,
+    θ₁,
+    umax,
+    eₙ,
+    θ₂,
+    α,
+    β,
+    λ,
+    radius,
+    perturb_height
+)
+    ij = @index(Global, Linear)
+    
+    # Get latitude ring index for this grid point
+    j = whichring[ij]
+    θ = lat[j]  # latitude in radians
+    
+    # Compute velocity per latitude
+    if θ₀ < θ < θ₁
+        u_θ = umax/eₙ*exp(1/(θ-θ₀)/(θ-θ₁))  # u as in Galewsky, 2004
+    else
+        u_θ = 0
+    end
+    
+    # Store velocity with scaling for curl!
+    u_grid[ij] = u_θ/radius*coslat⁻¹[j]
+    
+    # Compute perturbation
+    ηθ = perturb_height*cos(θ)*exp(-((θ₂-θ)/β)^2)
+    ϕ = lons[ij] - λ
+    η_perturb_grid[ij] = exp(-(ϕ/α)^2)*ηθ
 end
 
 export ZonalWind
@@ -465,7 +557,7 @@ function initialize!(   progn::PrognosticVariables{NF},
     S = model.spectral_transform
 
     # vertical profile
-    Tη = zero(σ_levels_full)
+    Tη = on_architecture(CPU(), zero(σ_levels_full))
     for k in 1:nlayers
         σ = σ_levels_full[k]
         Tη[k] = temp_ref*σ^(R_dry*lapse_rate/gravity)   # Jablonowski and Williamson eq. 4
@@ -476,29 +568,49 @@ function initialize!(   progn::PrognosticVariables{NF},
     end
 
     Tη .= max.(Tη, Tmin)
+    Tη = on_architecture(architecture(model), Tη)
+    
     temp_grid = zeros(NF, grid, nlayers)     # temperature
     aΩ = radius*rotation
-
-    for k in eachlayer(temp_grid)
-        η = σ_levels_full[k]    # Jablonowski and Williamson use η for σ coordinates
-        ηᵥ = (η - η₀)*π/2       # auxiliary variable for vertical coordinate
-
-        # amplitudes with height
-        A1 = 3/4*η*π*u₀/R_dry*sin(ηᵥ)*sqrt(cos(ηᵥ))
-        A2 = 2u₀*cos(ηᵥ)^(3/2)
-
-        for (ij, φij) in enumerate(φ)
-            sinφ = sind(φij)
-            cosφ = cosd(φij)
-
-             # Jablonowski and Williamson, eq. (6)
-            temp_grid[ij, k] = Tη[k] + A1*((-2sinφ^6*(cosφ^2 + 1/3) + 10/63)*A2 + (8/5*cosφ^3*(sinφ^2 + 2/3) - π/4)*aΩ)
-        end
-    end
+    
+    # Launch kernel
+    launch!(architecture(temp_grid), RingGridWorkOrder, size(temp_grid),
+            jablonowski_temperature_kernel!, temp_grid, Tη, φ, σ_levels_full,
+            η₀, u₀, R_dry, aΩ)
 
     set!(progn, model; temp=temp_grid, lf=1)
 
     return nothing
+end
+
+@kernel inbounds=true function jablonowski_temperature_kernel!(
+    temp_grid,
+    @Const(Tη),
+    @Const(φ),
+    @Const(σ_levels_full),
+    η₀,
+    u₀,
+    R_dry,
+    aΩ
+)
+    ij, k = @index(Global, NTuple)
+    
+    # Jablonowski and Williamson use η for σ coordinates
+    η = σ_levels_full[k]
+    ηᵥ = (η - η₀) * π / 2  # auxiliary variable for vertical coordinate
+    
+    # Amplitudes with height
+    A1 = 3/4 * η * π * u₀ / R_dry * sin(ηᵥ) * sqrt(cos(ηᵥ))
+    A2 = 2u₀ * cos(ηᵥ)^(3/2)
+    
+    # Get latitude
+    φij = φ[ij]
+    sinφ = sind(φij)
+    cosφ = cosd(φij)
+    
+    # Jablonowski and Williamson, eq. (6)
+    temp_grid[ij, k] = Tη[k] + A1 * ((-2sinφ^6 * (cosφ^2 + 1/3) + 10/63) * A2 + 
+                                      (8/5 * cosφ^3 * (sinφ^2 + 2/3) - π/4) * aΩ)
 end
 
 export StartFromFile
@@ -579,21 +691,33 @@ function homogeneous_temperature!(  progn::PrognosticVariables,
     # overwrite with lowermost layer further down
     temp_surf = lta_view(progn.temp, :, nlayers, 1)     # spectral temperature at k=nlayers+1/2
 
-    temp_surf[1] = norm_sphere*temp_ref                 # set global mean surface temperature
-    for lm in eachharmonic(geopot_surf, temp_surf)
-        temp_surf[lm] -= Γg⁻¹*geopot_surf[lm]           # lower temperature for higher mountains
-    end
+    fill!(temp_surf[1:1], norm_sphere*temp_ref)  # set global mean surface temperature
+    temp_surf .-= Γg⁻¹.*geopot_surf # lower temperature for higher mountains
 
     # Use lapserate and vertical coordinate σ for profile
     temp = get_step(progn.temp, 1)                      # 1 = first leapfrog timestep
-    for k in eachmatrix(temp)                           # k=nlayers overwrites the surface temperature
-                                                        # with lowermost layer temperature
-        σₖᴿ = σ_levels_full[k]^(R_dry*Γg⁻¹)             # from hydrostatic equation
+    
+    # Launch kernel to compute temperature profile
+    launch!(architecture(temp), SpectralWorkOrder, size(temp),
+            homogeneous_temperature_kernel!, temp, temp_surf, σ_levels_full, R_dry, Γg⁻¹)
+end
 
-        for lm in eachharmonic(temp, temp_surf)
-            temp[lm, k] = temp_surf[lm]*σₖᴿ
-        end
-    end
+@kernel inbounds=true function homogeneous_temperature_kernel!(
+    temp,
+    temp_surf,
+    @Const(σ_levels_full),
+    R_dry,
+    Γg⁻¹
+)
+    I = @index(Global, Cartesian)
+    lm = I[1]  # spectral coefficient index
+    k = I[2]   # layer index
+    
+    # Compute σ scaling from hydrostatic equation
+    σₖᴿ = σ_levels_full[k]^(R_dry*Γg⁻¹)
+    
+    # Apply vertical profile
+    temp[I] = temp_surf[lm] * σₖᴿ
 end
 
 export PressureOnOrography
@@ -626,9 +750,7 @@ function initialize!(   progn::PrognosticVariables,
     RΓg⁻¹ = R_dry*lapse_rate/gravity         # for convenience
     ΓT⁻¹ = lapse_rate/temp_ref
 
-    for ij in eachgridpoint(lnp_grid, orography)
-        lnp_grid[ij] = lnp₀ + log(1 - ΓT⁻¹*orography[ij])/RΓg⁻¹
-    end
+    lnp_grid = @. lnp₀ + log(1 - ΓT⁻¹ * orography)/RΓg⁻¹
 
     set!(progn, model; pres=lnp_grid, lf=1)
 
@@ -671,18 +793,43 @@ function initialize!(
     temp = get_step(progn.temp, 1)  #  1 = first leapfrog timestep
     temp_grid = transform(temp, model.spectral_transform)
     humid_grid = zero(temp_grid)
-
-    for k in eachlayer(temp_grid, humid_grid)
-        for ij in eachgridpoint(humid_grid)
-            pₖ = σ_levels_full[k] * pres_grid[ij]
-            q_sat = saturation_humidity(temp_grid[ij, k], pₖ, model.clausius_clapeyron)
-            humid_grid[ij, k] = relhumid_ref*q_sat
-        end
-    end
+    
+    # Extract Clausius-Clapeyron parameters for kernel
+    (; e₀, T₀⁻¹, Lᵥ_Rᵥ, mol_ratio) = model.clausius_clapeyron
+    
+    # Launch kernel
+    launch!(architecture(humid_grid), RingGridWorkOrder, size(humid_grid),
+            constant_relative_humidity_kernel!, humid_grid, temp_grid, pres_grid,
+            σ_levels_full, relhumid_ref, e₀, T₀⁻¹, Lᵥ_Rᵥ, mol_ratio)
 
     set!(progn, model; humid=humid_grid, lf=1)
 
     return nothing
+end
+
+@kernel inbounds=true function constant_relative_humidity_kernel!(
+    humid_grid,
+    temp_grid,
+    pres_grid,
+    @Const(σ_levels_full),
+    relhumid_ref,
+    e₀,
+    T₀⁻¹,
+    Lᵥ_Rᵥ,
+    mol_ratio
+)
+    ij, k = @index(Global, NTuple)
+    
+    # Compute pressure at this level
+    pₖ = σ_levels_full[k] * pres_grid[ij]
+    
+    # Compute saturation humidity using Clausius-Clapeyron
+    temp = temp_grid[ij, k]
+    sat_vap_pres = e₀ * exp(Lᵥ_Rᵥ * (T₀⁻¹ - inv(temp)))
+    q_sat = mol_ratio * sat_vap_pres / pₖ
+    
+    # Set humidity as fraction of saturation
+    humid_grid[ij, k] = relhumid_ref * q_sat
 end
 
 export RandomWaves
