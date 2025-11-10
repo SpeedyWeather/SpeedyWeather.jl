@@ -28,14 +28,34 @@ Return the Coriolis parameter `f` on the grid `Grid` of resolution `nlat_half`
 on a planet of `rotation` [1/s]. Default rotation of Earth."""
 function coriolis!(f::AbstractField; rotation = DEFAULT_ROTATION)
     lat = get_lat(f)                        # in radians [-π/2, π/2]
-
-    for (j, ring) in enumerate(eachring(f))
-        fⱼ = 2rotation*sin(lat[j])
-        for ij in ring
-            f[ij, :] .= fⱼ                  # setindex across all ks dimensions
-        end
-    end
+    
+    # Transfer lat to device
+    lat_device = on_architecture(architecture(f), lat)
+    whichring = f.grid.whichring
+    
+    # Launch kernel
+    launch!(architecture(f), RingGridWorkOrder, size(f),
+            coriolis_kernel!, f, lat_device, whichring, rotation)
+    
     return f
+end
+
+@kernel inbounds=true function coriolis_kernel!(
+    f,
+    @Const(lat),
+    @Const(whichring),
+    rotation
+)
+    ij, k = @index(Global, NTuple)
+    
+    # Get latitude ring index for this grid point
+    j = whichring[ij]
+    
+    # Compute Coriolis parameter
+    fⱼ = 2rotation * sin(lat[j])
+    
+    # Set value for this grid point and layer
+    f[ij, k] = fⱼ
 end
 
 """
