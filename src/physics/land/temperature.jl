@@ -29,6 +29,12 @@ function SeasonalLandTemperature(SG::SpectralGrid; kwargs...)
     return SeasonalLandTemperature{NF, GridVariable3D}(; monthly_temperature, kwargs...)
 end
 
+function variables(::SeasonalLandTemperature)
+    return (
+        PrognosticVariable(name=:soil_temperature, dims=Grid3D(), namespace=:land),
+    )
+end
+
 function initialize!(land::SeasonalLandTemperature, model::PrimitiveEquation)
     (; monthly_temperature) = land
 
@@ -83,20 +89,20 @@ function timestep!(
     NF = eltype(soil_temperature)
     weight = convert(NF, Dates.days(time-Dates.firstdayofmonth(time))/Dates.daysinmonth(time))
 
-    for k in eachlayer(soil_temperature)
-        for ij in eachgridpoint(soil_temperature)
-            soil_temperature[ij, k] = (1-weight) * monthly_temperature[ij, this_month] +
-                                    weight  * monthly_temperature[ij, next_month]
-        end
-    end
+    launch!(architecture(soil_temperature), RingGridWorkOrder, size(soil_temperature),
+            seasonal_land_temperature_kernel!,
+            soil_temperature, monthly_temperature, weight, this_month, next_month)
 
     return nothing
 end
 
-function variables(::SeasonalLandTemperature)
-    return (
-        PrognosticVariable(name=:soil_temperature, dims=Grid3D(), namespace=:land),
-    )
+@kernel inbounds=true function seasonal_land_temperature_kernel!(
+    soil_temperature, monthly_temperature, weight, this_month, next_month
+)
+    ij, k  = @index(Global, NTuple)
+    
+    soil_temperature[ij, k] = (1 - weight) * monthly_temperature[ij, this_month] + 
+                            weight * monthly_temperature[ij, next_month]
 end
 
 ## CONSTANT LAND CLIMATOLOGY

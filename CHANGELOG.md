@@ -4,6 +4,11 @@
 
 - Diagnostic and prognostic variables partially revised to NamedTuples and variables system introduced to allow to add to them modularly [#885](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/885)
 - Parameterizations with KernelAbstractions [#873](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/873) [#878](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/878)
+- Remove double imports of `architecture` in SpeedyWeatherInternals/ext/ [#899](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/899)
+- Documentation typos [#894](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/894)
+- Seasonal ocean and land climatology models GPU-ready [#892](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/892)
+- Zenith constructors [#889](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/889)
+- More general forcing of pressure, vorticity and divergence [#855](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/855)
 
 ## v0.17.3
 

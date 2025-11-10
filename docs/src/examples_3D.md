@@ -58,18 +58,11 @@ model = PrimitiveDryModel(
     spectral_grid,
 
     # Held-Suarez forcing and drag
-    temperature_relaxation = HeldSuarez(spectral_grid),
-    boundary_layer_drag = LinearDrag(spectral_grid),
+    forcing = HeldSuarez(spectral_grid),
+    drag = LinearDrag(spectral_grid),
 
     # switch off other physics
-    convection = nothing,
-    shortwave_radiation = nothing,
-    longwave_radiation = nothing,
-    vertical_diffusion = nothing,
-
-    # switch off surface fluxes (makes ocean/land/land-sea mask redundant)
-    surface_wind = nothing,
-    surface_heat_flux = nothing,
+    physics = false,
 
     # use Earth's orography
     orography = EarthOrography(spectral_grid)

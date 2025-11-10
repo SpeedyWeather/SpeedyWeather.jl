@@ -9,71 +9,8 @@ end
 # no boundary layer drag
 boundary_layer_drag!(::ColumnVariables, ::Nothing, ::PrimitiveEquation) = nothing
 
-export LinearDrag
-
-"""Linear boundary layer drag following Held and Suarez, 1996 BAMS
-$(TYPEDFIELDS)"""
-@kwdef struct LinearDrag{NF<:AbstractFloat} <: AbstractBoundaryLayer
-    
-    # DIMENSIONS
-    nlayers::Int
-    
-    # PARAMETERS
-    σb::NF = 0.7                    # sigma coordinate below which linear drag is applied
-    time_scale::Second = Hour(24)   # time scale for linear drag coefficient at σ=1 (=1/kf in HS96)
-
-    # PRECOMPUTED CONSTANTS
-    drag_coefs::Vector{NF} = zeros(NF, nlayers)
-end
-
-"""
-$(TYPEDSIGNATURES)
-Generator function using `nlayers` from `SG::SpectralGrid`"""
-LinearDrag(SG::SpectralGrid; kwargs...) = LinearDrag{SG.NF}(nlayers=SG.nlayers; kwargs...)
-
-"""
-$(TYPEDSIGNATURES)
-Precomputes the drag coefficients for this `BoundaryLayerDrag` scheme."""
-function initialize!(   scheme::LinearDrag,
-                        model::PrimitiveEquation)
-
-    (; σ_levels_full) = model.geometry
-    (; σb, time_scale, drag_coefs) = scheme
-
-    kf = 1/time_scale.value
-
-    for (k, σ) in enumerate(σ_levels_full)
-        drag_coefs[k] = -kf*max(0, (σ-σb)/(1-σb))    # drag only below σb, lin increasing to kf at σ=1
-    end
-end 
-
-# function barrier
-function boundary_layer_drag!(  column::ColumnVariables,
-                                scheme::LinearDrag,
-                                model::PrimitiveEquation)
-    boundary_layer_drag!(column, scheme)
-end
-
-"""
-$(TYPEDSIGNATURES)
-Compute tendency for boundary layer drag of a `column` and add to its tendencies fields"""
-function boundary_layer_drag!(  column::ColumnVariables,
-                                scheme::LinearDrag)
-
-    (; u, v, u_tend, v_tend) = column
-    (; drag_coefs) = scheme
-
-    @inbounds for k in eachlayer(column)
-        kᵥ = drag_coefs[k]
-        if kᵥ > 0
-            u_tend[k] += kᵥ*u[k]    # Held and Suarez 1996, equation 1
-            v_tend[k] += kᵥ*v[k]
-        end
-    end
-end
-
 export ConstantDrag
-Base.@kwdef struct ConstantDrag{NF} <: AbstractBoundaryLayer
+@kwdef struct ConstantDrag{NF} <: AbstractBoundaryLayer
     drag::NF = 1e-3
 end
 

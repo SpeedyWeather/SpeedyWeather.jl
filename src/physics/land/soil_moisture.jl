@@ -33,7 +33,13 @@ function SeasonalSoilMoisture(SG::SpectralGrid; kwargs...)
     return SeasonalSoilMoisture{NF, GridVariable4D}(; monthly_soil_moisture, kwargs...)
 end
 
-# don't both initializing for the dry model
+function variables(::SeasonalSoilMoisture)
+    return (
+        PrognosticVariable(name=:soil_moisture, dims=Grid3D(), namespace=:land),
+    )
+end
+
+# don't bother initializing for the dry model
 initialize!(soil::SeasonalSoilMoisture, model::PrimitiveDry) = nothing
 
 function initialize!(soil::SeasonalSoilMoisture, model::PrimitiveEquation)
@@ -115,20 +121,20 @@ function timestep!(
     (; monthly_soil_moisture) = soil
     (; soil_moisture) = progn.land
 
-    for k in eachlayer(soil_moisture)
-        for ij in eachgridpoint(soil_moisture)
-            soil_moisture[ij, k] = (1-weight) * monthly_soil_moisture[ij, k, this_month] +
-                                    weight  * monthly_soil_moisture[ij, k, next_month]
-        end
-    end
+    launch!(architecture(soil_moisture), RingGridWorkOrder, size(soil_moisture),
+            seasonal_soil_moisture_kernel!,
+            soil_moisture, monthly_soil_moisture, weight, this_month, next_month)
 
     return nothing
 end
 
-function variables(::SeasonalSoilMoisture)
-    return (
-        PrognosticVariable(name=:soil_moisture, dims=Grid3D(), namespace=:land),
-    )
+@kernel inbounds=true function seasonal_soil_moisture_kernel!(
+    soil_moisture, monthly_soil_moisture, weight, this_month, next_month
+)
+    ij, k = @index(Global, NTuple)
+    
+    soil_moisture[ij, k] = (1 - weight) * monthly_soil_moisture[ij, k, this_month] + 
+                         weight * monthly_soil_moisture[ij, k, next_month]
 end
 
 export LandBucketMoisture
