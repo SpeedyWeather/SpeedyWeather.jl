@@ -187,6 +187,122 @@ nothing # hide
 
 ![Outgoing shortwave radiation](osr.png)
 
+### Parameterization flags
+
+The `OneBandShortwave` scheme includes several boolean flags that control which physical processes are included.
+
+#### `cloud_top_reflection` (default: `true`)
+
+Enables cloud reflection at the cloud top layer. When `true`, a fraction of incoming radiation is reflected back to space at the cloud-top layer, consistent with the radiative transfer equation:
+
+$$F_{k+h}^{\downarrow, SR} = F_{k-h}^{\downarrow, SR} (1 - A_{cl} \, \mathrm{CLC}) \, \tau_{k}^{SR}$$
+
+When `false`, this term is omitted, allowing more radiation to penetrate through clouds and reach the surface.
+
+```@example radiation
+using SpeedyWeather, CairoMakie
+
+SG = SpectralGrid()
+
+# Run with cloud_top_reflection ON
+sw_on = OneBandShortwave(SG; cloud_top_reflection=true)
+model_on = PrimitiveWetModel(SG; shortwave_radiation=sw_on)
+sim_on = initialize!(model_on)
+run!(sim_on, period=Day(5))
+osr_on = sim_on.diagnostic_variables.physics.outgoing_shortwave_radiation
+heatmap(osr_on, title="cloud_top_reflection = true [W/m²]")
+save("oneband_cloud_top_reflection_on.png", ans) # hide
+nothing # hide
+```
+
+![cloud_top_reflection = true](oneband_cloud_top_reflection_on.png)
+
+```@example radiation
+# Run with cloud_top_reflection OFF
+sw_off = OneBandShortwave(SG; cloud_top_reflection=false)
+model_off = PrimitiveWetModel(SG; shortwave_radiation=sw_off)
+sim_off = initialize!(model_off)
+run!(sim_off, period=Day(5))
+osr_off = sim_off.diagnostic_variables.physics.outgoing_shortwave_radiation
+heatmap(osr_off, title="cloud_top_reflection = false [W/m²]")
+save("oneband_cloud_top_reflection_off.png", ans) # hide
+nothing # hide
+```
+
+![cloud_top_reflection = false](oneband_cloud_top_reflection_off.png)
+
+#### `use_stratocumulus` (default: `true`)
+
+Enables the diagnostic stratocumulus cloud parameterization over oceans. When `false`, only large-scale condensation and convective clouds are included.
+
+```@example radiation
+using SpeedyWeather, CairoMakie
+
+SG = SpectralGrid()
+
+# Run with use_stratocumulus ON
+sw_on = OneBandShortwave(SG; use_stratocumulus=true)
+model_on = PrimitiveWetModel(SG; shortwave_radiation=sw_on)
+sim_on = initialize!(model_on)
+run!(sim_on, period=Day(5))
+ssrd_on = sim_on.diagnostic_variables.physics.surface_shortwave_down
+heatmap(ssrd_on, title="use_stratocumulus = true [W/m²]")
+save("oneband_stratocumulus_on.png", ans) # hide
+nothing # hide
+```
+
+![use_stratocumulus = true](oneband_stratocumulus_on.png)
+
+```@example radiation
+# Run with use_stratocumulus OFF
+sw_off = OneBandShortwave(SG; use_stratocumulus=false)
+model_off = PrimitiveWetModel(SG; shortwave_radiation=sw_off)
+sim_off = initialize!(model_off)
+run!(sim_off, period=Day(5))
+ssrd_off = sim_off.diagnostic_variables.physics.surface_shortwave_down
+heatmap(ssrd_off, title="use_stratocumulus = false [W/m²]")
+save("oneband_stratocumulus_off.png", ans) # hide
+nothing # hide
+```
+
+![use_stratocumulus = false](oneband_stratocumulus_off.png)
+
+#### `use_speedy_transmittance` (default: `true`)
+
+Controls the transmittance calculation scheme. When `true`, uses the SPEEDY-style transmittance with zenith angle correction and explicit absorption by aerosols, water vapor, and clouds. When `false`, uses a simpler transmittance calculation.
+
+```@example radiation
+using SpeedyWeather, CairoMakie
+
+SG = SpectralGrid()
+
+# Run with use_speedy_transmittance ON
+sw_on = OneBandShortwave(SG; use_speedy_transmittance=true)
+model_on = PrimitiveWetModel(SG; shortwave_radiation=sw_on)
+sim_on = initialize!(model_on)
+run!(sim_on, period=Day(5))
+ssrd_on = sim_on.diagnostic_variables.physics.surface_shortwave_down
+heatmap(ssrd_on, title="use_speedy_transmittance = true [W/m²]")
+save("oneband_speedy_transmittance_on.png", ans) # hide
+nothing # hide
+```
+
+![use_speedy_transmittance = true](oneband_speedy_transmittance_on.png)
+
+```@example radiation
+# Run with use_speedy_transmittance OFF
+sw_off = OneBandShortwave(SG; use_speedy_transmittance=false)
+model_off = PrimitiveWetModel(SG; shortwave_radiation=sw_off)
+sim_off = initialize!(model_off)
+run!(sim_off, period=Day(5))
+ssrd_off = sim_off.diagnostic_variables.physics.surface_shortwave_down
+heatmap(ssrd_off, title="use_speedy_transmittance = false [W/m²]")
+save("oneband_speedy_transmittance_off.png", ans) # hide
+nothing # hide
+```
+
+![use_speedy_transmittance = false](oneband_speedy_transmittance_off.png)
+
 ## References
 
 [^PG06]: Paulius and Garner, 2006. JAS. DOI:[10.1175/JAS3705.1](https://doi.org/10.1175/JAS3705.1)

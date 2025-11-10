@@ -165,6 +165,15 @@ $(TYPEDFIELDS)"""
     "[OPTION] Enable stratocumulus cloud parameterization?"
     use_stratocumulus::Bool = true
 
+    "[OPTION] Stratocumulus cloud factor (SPEEDY clfact) [1]"
+    stratocumulus_clfact::NF = 1.2
+
+    "[OPTION] Zenith correction amplitude (SPEEDY azen) [1]"
+    zenith_amplitude::NF = 1
+
+    "[OPTION] Zenith correction exponent (SPEEDY nzen)"
+    zenith_exponent::NF = 2
+
     "[OPTION] Absorptivity of dry air [per 10^5 Pa]"
     # Weighted visible + near-IR: 0.95*0.033 + 0.05*0.0 = 0.03135 (SPEEDY absdry, fband weights)
     absorptivity_dry_air::NF = 0.03135
@@ -213,7 +222,7 @@ function shortwave_radiation!(
     wpcl = radiation.precipitation_weight
     pmcl = radiation.precipitation_max
     # Contribution to cloud cover from precipitation, convert m/s to mm/day (Speedy multiplies by 86.4 because its rates are already in kg m⁻² s⁻¹ (= mm s⁻¹))
-    P = wpcl*sqrt(min(pmcl, (86400 * (column.rain_rate_large_scale + column.rain_rate_convection) * 1000)))
+    P = wpcl*sqrt(min(pmcl, (86400 * (column.rain_rate_large_scale + column.rain_rate_convection) / 1000)))
 
     # Get Precipitation Top (kprtop) from the condensation scheme
     # This was previously calculated by other schemes and stored in column.cloud_top
@@ -270,7 +279,7 @@ function shortwave_radiation!(
         stability_min = radiation.stratocumulus_stability_min
         stability_max = radiation.stratocumulus_stability_max
         cover_max = radiation.stratocumulus_cover_max
-        clfact = 1.2  # Added missing factor from SPEEDY
+        clfact = radiation.stratocumulus_clfact
 
         # F_ST: stability factor
         F_ST = max(0, min(1, (GSEN - stability_min) / (stability_max - stability_min)))
@@ -297,9 +306,12 @@ function shortwave_radiation!(
         sigma_levels = model.geometry.σ_levels_half
         surface_pressure = column.pres[end]  # This is in Pa
 
-        # Zenith angle correction factor (SPEEDY's zenit)
-        # azen = 1.0, nzen = 2 in SPEEDY
-        zenit_factor = 1.0 + 1.0 * (1.0 - cos_zenith)^2
+        # Zenith angle correction factor 
+        azen = radiation.zenith_amplitude
+        nzen = radiation.zenith_exponent
+
+        # Zenith angle correction to (downward) absorptivity
+        zenit_factor = 1 + azen * (1 - cos_zenith)^nzen
 
         # Cloud absorption term based on cloud base humidity (SPEEDY logic)
         q_base = nlayers > 1 ? humid[nlayers-1] : humid[nlayers]
@@ -310,7 +322,7 @@ function shortwave_radiation!(
             q = humid[k]
 
             # Aerosol factor: use mid-level sigma, squared
-            sigma_mid = 0.5 * (sigma_levels[k] + sigma_levels[k+1])
+            sigma_mid =  (sigma_levels[k] + sigma_levels[k+1]) / 2
             aerosol_factor = sigma_mid^2
             
             # Layer absorptivity (all humidity-based parameters are per kg/kg per 10^5 Pa)
@@ -327,7 +339,7 @@ function shortwave_radiation!(
             # Compute differential optical depth with zenith correction
             # CRITICAL: Normalize pressure to 10^5 Pa since absorptivities are per 10^5 Pa
             delta_sigma = sigma_levels[k+1] - sigma_levels[k]
-            normalized_pressure = surface_pressure / 1e5  # Convert Pa to units of 10^5 Pa
+            normalized_pressure = surface_pressure / 100000   # Convert Pa to units of 10^5 Pa
             optical_depth = layer_absorptivity * delta_sigma * normalized_pressure * zenit_factor
 
             # Transmittance through layer k
