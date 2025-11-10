@@ -31,7 +31,6 @@ $(TYPEDFIELDS)"""
     ZE,     # <:AbstractZenith,
     AL,     # <:AbstractAlbedo,
     BL,     # <:AbstractBoundaryLayer,
-    TR,     # <:AbstractTemperatureRelaxation,
     VD,     # <:AbstractVerticalDiffusion,
     SUT,    # <:AbstractSurfaceThermodynamics,
     SUW,    # <:AbstractSurfaceWind,
@@ -82,7 +81,6 @@ $(TYPEDFIELDS)"""
     # PHYSICS/PARAMETERIZATIONS
     physics::Bool = true
     boundary_layer_drag::BL = BulkRichardsonDrag(spectral_grid)
-    temperature_relaxation::TR = nothing
     vertical_diffusion::VD = BulkRichardsonDiffusion(spectral_grid)
     surface_thermodynamics::SUT = SurfaceThermodynamicsConstant(spectral_grid)
     surface_wind::SUW = SurfaceWind(spectral_grid)
@@ -141,7 +139,6 @@ function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
 
     # parameterizations
     initialize!(model.boundary_layer_drag, model)
-    initialize!(model.temperature_relaxation, model)
     initialize!(model.vertical_diffusion, model)
     initialize!(model.convection, model)
     initialize!(model.optical_depth, model)

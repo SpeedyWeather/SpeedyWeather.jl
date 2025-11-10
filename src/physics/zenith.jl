@@ -140,7 +140,7 @@ export SolarZenith
 
 """Solar zenith angle varying with daily and seasonal cycle.
 $(TYPEDFIELDS)"""
-Base.@kwdef struct SolarZenith{NF<:AbstractFloat} <: AbstractZenith
+@kwdef struct SolarZenith{NF<:AbstractFloat} <: AbstractZenith
     # OPTIONS
     length_of_day::Second = Hour(24)
     length_of_year::Second = Day(365.25)
@@ -153,6 +153,8 @@ Base.@kwdef struct SolarZenith{NF<:AbstractFloat} <: AbstractZenith
 
     initial_time::Base.RefValue{DateTime} = Ref(DEFAULT_DATE)
 end
+
+SolarZenith(SG::SpectralGrid; kwargs...) = SolarZenith{SG.NF}(; kwargs...)
 
 function initialize!(
     S::AbstractZenith,
@@ -239,7 +241,7 @@ export SolarZenithSeason
 
 """Solar zenith angle varying with seasonal cycle only.
 $(TYPEDFIELDS)"""
-Base.@kwdef struct SolarZenithSeason{NF<:AbstractFloat} <: AbstractZenith
+@kwdef struct SolarZenithSeason{NF<:AbstractFloat} <: AbstractZenith
     # OPTIONS
     length_of_day::Second = Hour(24)
     length_of_year::Second = Day(365.25)
@@ -250,6 +252,8 @@ Base.@kwdef struct SolarZenithSeason{NF<:AbstractFloat} <: AbstractZenith
 
     initial_time::Base.RefValue{DateTime} = Ref(DEFAULT_DATE)
 end
+
+SolarZenithSeason(SG::SpectralGrid; kwargs...) = SolarZenithSeason{SG.NF}(; kwargs...)
 
 """
 $(TYPEDSIGNATURES)
