@@ -421,7 +421,7 @@ Note this is now means that the 2nd element in the nested order is the 5th eleme
 ring order etc. Converting this back
 
 ```@example ringgrids
-field_ring = ring_order(field_nested)
+field_ring = RingGrids.ring_order(field_nested)
 ```
 
 On the nested order, changing the resolution is trivial as consecutive elements in chunks
