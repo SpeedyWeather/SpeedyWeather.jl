@@ -27,7 +27,7 @@ end
 initialize!(::LandGeometry, model::PrimitiveEquation) = nothing
 
 function Base.show(io::IO, geom::LandGeometry{V}) where {V}
-    (; nlayers) = geom
+    nlayers = length(geom.layer_thickness)
     println(io, "$nlayers-layer LandGeometry{$V}")
     print(io, "└ layer_thickness: $(geom.layer_thickness)")
 end
