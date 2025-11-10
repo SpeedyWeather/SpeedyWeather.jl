@@ -106,7 +106,7 @@ end
 
 @kernel inbounds=true function _divergence_kernel!(kernel_func::KernelOP{mode, flipsign, add}, div, u, v, grad_x_vordiv, grad_y_vordiv1, grad_y_vordiv2) where {mode, flipsign, add}
 
-    I = @index(Global, NTuple)
+    I = @index(Global, Cartesian)
     lm = I[1]
     lmmax = size(div, 1)
     k = ndims(div) == 1 ? CartesianIndex() : I[2]
