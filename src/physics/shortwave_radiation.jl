@@ -70,7 +70,7 @@ end
 
 """$(TYPEDSIGNATURES)
 Calculate shortwave radiation for an N-band (multi-spectral) radiation scheme.
-Computes downward and upward radiative fluxes through each layer using optical depth
+Computes downward and upward radiative fluxes through each layer using transmittance
 and radiative transfer equations, accumulating fluxes and outgoing shortwave radiation."""
 function shortwave_radiation!(
     column::ColumnVariables,
@@ -83,14 +83,14 @@ function shortwave_radiation!(
     (; solar_constant) = model.planet
 
     @inbounds for band in 1:nbands                  # loop over spectral bands
-        dτ = view(column.optical_depth_shortwave, :, band)   # differential optical depth per layer of that band
+        t = view(column.transmittance_shortwave, :, band)   # transmittance per layer in that band
 
         # DOWNWARD flux D
         D = solar_constant * cos_zenith             # top boundary condition of longwave flux
         column.flux_temp_downward[1] += D           # accumulate the top downward flux
 
         for k in 1:nlayers
-            D -= dτ[k]*D                            # flux through layer k with optical depth dτ, radiative transfer
+            D *= t[k]                               # flux through layer k with transmittance t, radiative transfer
             column.flux_temp_downward[k+1] += D
         end
 
@@ -100,7 +100,7 @@ function shortwave_radiation!(
 
         for k in nlayers:-1:1                       # integrate from surface up
             # Radiative transfer, e.g. Frierson et al. 2006, equation 6
-            U -= dτ[k]*U                            # negative because we integrate from surface up in -τ direction
+            U *= t[k]                               # transmittance through layer k
             column.flux_temp_upward[k] += U         # accumulate that flux
         end
 
