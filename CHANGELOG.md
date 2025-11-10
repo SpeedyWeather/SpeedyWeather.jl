@@ -3,6 +3,10 @@
 ## Unreleased
 
 - OneBandShortwave radiation implemented with diagnostic clouds [#888](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/888)
+- Vertical advection kernelized and GPU-ready [#895](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/895)
+- Remove double imports of `architecture` in SpeedyWeatherInternals/ext/ [#899](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/899)
+- Documentation typos [#894](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/894)
+- Seasonal ocean and land climatology models GPU-ready [#892](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/892)
 - Zenith constructors [#889](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/889)
 - More general forcing of pressure, vorticity and divergence [#855](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/855)
 
