@@ -15,10 +15,10 @@ UpwindVerticalAdvection(spectral_grid; order = 5)   =   UpwindVerticalAdvection{
 WENOVerticalAdvection(spectral_grid)                =     WENOVerticalAdvection{spectral_grid.NF}()
 
 @inline retrieve_previous_time_step(variables, var) = getproperty(variables, Symbol(var, :_grid_prev))
-@inline  retrieve_current_time_step(variables, var) = getproperty(variables, Symbol(var, :_grid))
+@inline retrieve_current_time_step(variables, var) = getproperty(variables, Symbol(var, :_grid))
 
 @inline retrieve_time_step(::DiffusiveVerticalAdvection,  variables, var) = retrieve_previous_time_step(variables, var)
-@inline retrieve_time_step(::DispersiveVerticalAdvection, variables, var) =  retrieve_current_time_step(variables, var)
+@inline retrieve_time_step(::DispersiveVerticalAdvection, variables, var) = retrieve_current_time_step(variables, var)
 
 @inline function retrieve_stencil(k, nlayers, ::VerticalAdvection{NF, B}) where {NF, B}
     # creates allocation-free tuples for k-B:k+B but clamped into (1, nlayers)
@@ -65,27 +65,34 @@ function _vertical_advection!(
     grids_match(ξ_tend, σ_tend, ξ) || throw(DimensionMismatch(ξ_tend, σ_tend, ξ))
 
     nlayers = size(ξ, 2)
-    @inbounds for k in 1:nlayers
-        Δσₖ⁻¹ = inv(Δσ[k])          # inverse layer thickness, compute inv only once
+    arch = architecture(ξ_tend)
 
-        # for k=1 "above" term (at k-1/2) is 0, for k==nlayers "below" term (at k+1/2) is zero
-        # avoid out-of-bounds indexing with k⁻, k⁺
-        k⁻ = max(1, k-1)    # TODO check that this actually zeros velocity at k=1/2
-        k⁺ = k
+    launch!(arch, RingGridWorkOrder, size(ξ_tend), 
+            vertical_advection_kernel!,
+            ξ_tend, σ_tend, ξ, Δσ, nlayers, adv)
+end
 
-        k_stencil = retrieve_stencil(k, nlayers, adv)
-
-        for ij in eachgridpoint(ξ_tend)
-            σ̇⁻ = σ_tend[ij, k⁻]       # velocity into layer k from above
-            σ̇⁺ = σ_tend[ij, k⁺]       # velocity out of layer k to below
-            
-            ξᶠ⁺ = reconstructed_at_face(ξ, ij, k_stencil[2:end],   σ̇⁺, adv)
-            ξᶠ⁻ = reconstructed_at_face(ξ, ij, k_stencil[1:end-1], σ̇⁻, adv)
-            
-            # -= as the tendencies already contain the parameterizations
-            ξ_tend[ij, k] -=  Δσₖ⁻¹ * (σ̇⁺ * ξᶠ⁺ - σ̇⁻ * ξᶠ⁻ - ξ[ij, k] * (σ̇⁺ - σ̇⁻))
-        end
-    end
+@kernel inbounds=true function vertical_advection_kernel!(
+    ξ_tend, σ_tend, ξ, @Const(Δσ), @Const(nlayers), adv
+)
+    ij, k = @index(Global, NTuple)
+    
+    Δσₖ⁻¹ = inv(Δσ[k])
+    
+    # for k=1 "above" term (at k-1/2) is 0, for k==nlayers "below" term (at k+1/2) is zero
+    k⁻ = max(1, k-1)
+    k⁺ = k
+    
+    k_stencil = retrieve_stencil(k, nlayers, adv)
+    
+    σ̇⁻ = σ_tend[ij, k⁻]
+    σ̇⁺ = σ_tend[ij, k⁺]
+    
+    ξᶠ⁺ = reconstructed_at_face(ξ, ij, k_stencil[2:end],   σ̇⁺, adv)
+    ξᶠ⁻ = reconstructed_at_face(ξ, ij, k_stencil[1:end-1], σ̇⁻, adv)
+    
+    # -= as the tendencies already contain the parameterizations
+    ξ_tend[ij, k] -= Δσₖ⁻¹ * (σ̇⁺ * ξᶠ⁺ - σ̇⁻ * ξᶠ⁻ - ξ[ij, k] * (σ̇⁺ - σ̇⁻))
 end
 
 # 1st order upwind
