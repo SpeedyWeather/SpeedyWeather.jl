@@ -1,5 +1,5 @@
-abstract type AbstractRadiation <: AbstractParameterization end
 abstract type AbstractLongwave <: AbstractRadiation end
+abstract type AbstractLongwaveRadiativeTransfer <: AbstractLongwave end
 
 # no longwave radiation
 longwave_radiation!(::ColumnVariables, ::Nothing, ::PrimitiveEquation) = nothing

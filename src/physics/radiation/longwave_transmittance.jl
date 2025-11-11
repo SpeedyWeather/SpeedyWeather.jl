@@ -1,21 +1,7 @@
-abstract type AbstractTransmittance <: AbstractParameterization end
-
-# function barrier to dispatch to type of model.transmittance
-function transmittance!(column::ColumnVariables, model::AbstractModel)
-    transmittance!(column, model.transmittance, model)
-end
-
-export TransparentTransmittance
-struct TransparentTransmittance{NF} <: AbstractTransmittance end
-TransparentTransmittance(SG::SpectralGrid) = TransparentTransmittance{SG.NF}()
-initialize!(od::TransparentTransmittance, ::AbstractModel) = nothing
-function transmittance!(column::ColumnVariables, ::TransparentTransmittance, ::AbstractModel)
-    column.transmittance_longwave .= 1
-    column.transmittance_shortwave .= 1
-end
+abstract type AbstractLongwaveTransmittance <: AbstractLongwave end
 
 export FriersonTransmittance
-@kwdef mutable struct FriersonTransmittance{NF} <: AbstractTransmittance
+@kwdef mutable struct FriersonTransmittance{NF} <: AbstractLongwaveTransmittance
     "[OPTION] Spectral band to use"
     band::Int = 1
 
