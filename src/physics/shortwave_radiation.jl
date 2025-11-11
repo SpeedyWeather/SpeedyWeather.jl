@@ -123,8 +123,8 @@ and a cloud albedo is applied to the downward beam. Fields and options are
 
 $(TYPEDFIELDS)"""
 @kwdef struct OneBandShortwave{NF} <: AbstractShortwave
-    "[OPTION] Relative humidity threshold for cloud cover = 0 [1]. Should match ImplicitCondensation.relative_humidity_threshold (default 0.95)."
-    relative_humidity_threshold_min::NF = 0.95
+    "[OPTION] Relative humidity threshold for cloud cover = 0 [1]."
+    relative_humidity_threshold_min::NF = 0.3
 
     "[OPTION] Relative humidity threshold for cloud cover = 1 [1]"
     relative_humidity_threshold_max::NF = 1
