@@ -41,12 +41,13 @@ dprogn = zero(progn)
 
 diagn = simulation.diagnostic_variables
 ddiag = make_zero(diagn)
+dmodel = make_zero(model)
 
 jldsave(string(savename_base,"temp-ic.jld2"); progn, diagn)
 
 println("Starting sensitivity computation...")
 
 # occasioanlly this gives a SegmentationFault (espacially on x86 and for large N), but not always
-@time res = autodiff(Enzyme.Reverse, checkpointed_timesteps!, Active, Duplicated(progn, d_progn), Duplicated(diagn, d_diag), Duplicated(model, d_model), Const(N), Const(checkpoint_scheme))
+@time res = autodiff(Enzyme.Reverse, checkpointed_timesteps!, Active, Duplicated(progn, dprogn), Duplicated(diagn, ddiag), Duplicated(model, dmodel), Const(N), Const(checkpoint_scheme))
 
-jldsave(string(savename_base,"temp.jld2"); d_progn)
+jldsave(string(savename_base,"temp.jld2"); dprogn)

@@ -4,10 +4,10 @@ Pkg.activate("test/differentiability/sensitivity_examples")
 using SpeedyWeather, Enzyme, JLD2, Checkpointing
 
 # Parse command line argument for N (number of timesteps)
-const N = length(ARGS) >= 1 ? parse(Int, ARGS[1]) : 100
+const N = length(ARGS) >= 1 ? parse(Int, ARGS[1]) : 1
 
 println("Running Sensitivity Analyis with N = $N")
-savename_base = "sensitivity-$N"
+savename_base = "new-sensitivity-$N"
 
 spectral_grid = SpectralGrid(trunc=32, nlayers=8)          # define resolution
 model = PrimitiveWetModel(; spectral_grid)                 # construct model
