@@ -68,47 +68,6 @@ function shortwave_radiation!(
     return nothing
 end
 
-"""$(TYPEDSIGNATURES)
-Calculate shortwave radiation for an N-band (multi-spectral) radiation scheme.
-Computes downward and upward radiative fluxes through each layer using transmittance
-and radiative transfer equations, accumulating fluxes and outgoing shortwave radiation."""
-function shortwave_radiation!(
-    column::ColumnVariables,
-    scheme::NBandRadiation,
-    model::PrimitiveEquation,
-)
-
-    (; nlayers, cos_zenith, albedo) = column
-    nbands = column.nbands_shortwave                # number of spectral bands
-    (; solar_constant) = model.planet
-
-    @inbounds for band in 1:nbands                  # loop over spectral bands
-        t = view(column.transmittance_shortwave, :, band)   # transmittance per layer in that band
-
-        # DOWNWARD flux D
-        D = solar_constant * cos_zenith             # top boundary condition of longwave flux
-        column.flux_temp_downward[1] += D           # accumulate the top downward flux
-
-        for k in 1:nlayers
-            D *= t[k]                               # flux through layer k with transmittance t, radiative transfer
-            column.flux_temp_downward[k+1] += D
-        end
-
-        # UPWARD flux U
-        U = D*albedo                                # boundary condition at surface, reflection from albedo
-        column.flux_temp_upward[nlayers+1] += U     # accumulate fluxes
-
-        for k in nlayers:-1:1                       # integrate from surface up
-            # Radiative transfer, e.g. Frierson et al. 2006, equation 6
-            U *= t[k]                               # transmittance through layer k
-            column.flux_temp_upward[k] += U         # accumulate that flux
-        end
-
-        # store outgoing shortwave radiation (OSR) for diagnostics, accumulate over bands (reset when column is reset)
-        column.outgoing_shortwave_radiation += U
-    end
-end
-
 export OneBandShortwave
 
 """
@@ -248,19 +207,16 @@ function shortwave_radiation!(
             # Calculate this layer's RH
             relative_humidity_k = humidity_k / qsat
             
-            # Check if RH exceeds the condensation threshold (95%, matching ImplicitCondensation)
+            # Check if RH exceeds the condensation threshold 
             if relative_humidity_k >= relative_humidity_threshold_min
                 # Cloud cover increases smoothly from RH=95% to RH=100%
                 rh_norm = max(0, (relative_humidity_k - relative_humidity_threshold_min) / (relative_humidity_threshold_max - relative_humidity_threshold_min))
                 humidity_term_k = min(1, rh_norm)^2
 
-                # SPEEDY algorithm: set kcltop to the TOPMOST (smallest k) layer with condensation
-                # Once we find a layer with condensation, we've found the cloud top, so break
-                if kcltop == nlayers + 1  # Only update if we haven't found cloud top yet
-                    kcltop = k
-                    humidity_term_kcltop = humidity_term_k
-                    break  # Found cloud top, stop searching
-                end
+                # Set kcltop to the TOPMOST (smallest k) layer with condensation
+                kcltop = k
+                humidity_term_kcltop = humidity_term_k
+                break
             end
         end
     end
@@ -313,6 +269,7 @@ function shortwave_radiation!(
         absorptivity_cloud_base, absorptivity_cloud_limit) = radiation
 
         sigma_levels = model.geometry.σ_levels_half
+        sigma_levels_full = model.geometry.σ_levels_full
         surface_pressure = column.pres[end]  # This is in Pa
 
         # Zenith angle correction factor 
@@ -331,8 +288,8 @@ function shortwave_radiation!(
             q = humid[k]
 
             # Aerosol factor: use mid-level sigma, squared
-            sigma_mid =  (sigma_levels[k] + sigma_levels[k+1]) / 2
-            aerosol_factor = sigma_mid^2
+            sigma_mid =  sigma_levels_full[k]
+            aerosol_factor = radiation.aerosols ? sigma_mid^2 : 0
             
             # Layer absorptivity (all humidity-based parameters are per kg/kg per 10^5 Pa)
             # Aerosol loading increases toward surface (proportional to σ²).
