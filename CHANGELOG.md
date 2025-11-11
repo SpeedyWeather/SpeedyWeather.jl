@@ -3,6 +3,7 @@
 ## Unreleased
 
 - OneBandShortwave radiation implemented with diagnostic clouds [#888](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/888)
+- Ring, nested and matrix order for OctaHEALPixGrid [#887](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/887)
 - Fixes a bug in the allocating spectral transforms on GPU [#906](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/906)
 - ScratchMemory allocation bug [#905](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/905)
 - Coriolis and adiabatic conv GPU-ready [#904](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/904)
