@@ -118,11 +118,12 @@ $(TYPEDFIELDS)"""
     # Tuples with symbols or instances of all parameterizations and parameter functions
     # Used to initiliaze variables and for the column-based parameterizations
     model_parameters::TS1 = (:time_stepping, :orography, :geopotential, :atmosphere, 
-                                                       :planet, :geometry, :land_sea_mask, :clausius_clapeyron)
-    parameterizations::TS2 = (:convection, :large_scale_condensation, :albedo, 
-                                                        :surface_condition, :surface_momentum_flux, 
-                                                        :surface_heat_flux, :surface_humidity_flux, 
-                                                        :stochastic_physics)
+                                :planet, :geometry, :land_sea_mask, :clausius_clapeyron)
+    parameterizations::TS2 = (:convection, :large_scale_condensation, :albedo,
+                                :shortwave_radiation,
+                                :surface_condition, :surface_momentum_flux, 
+                                :surface_heat_flux, :surface_humidity_flux, 
+                                :stochastic_physics)
     extra_parameterizations::TS3 = (:solar_zenith, :land, :ocean)
 end
 
