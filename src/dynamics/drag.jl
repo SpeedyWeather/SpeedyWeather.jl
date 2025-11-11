@@ -13,6 +13,64 @@ end
 ## NO DRAG
 drag!(diagn, progn, drag::Nothing, args...) = nothing
 
+export LinearDrag
+
+"""Linear boundary layer drag following Held and Suarez, 1996 BAMS
+$(TYPEDFIELDS)"""
+@kwdef struct LinearDrag{NF, VectorType} <: AbstractDrag
+    "[OPTION] Sigma coordinate below which linear drag is applied"
+    σb::NF = 0.7
+
+    "[OPTION] Time scale for linear drag coefficient at σ=1 (=1/kf in HS96)"
+    time_scale::Second = Day(1)
+
+    "[DERIVED] Precomputed drag coefficients for each layer"
+    drag_coefs::VectorType
+end
+
+"""
+$(TYPEDSIGNATURES)
+Generator function using `nlayers` from `SG::SpectralGrid`"""
+LinearDrag(SG::SpectralGrid; kwargs...) = LinearDrag{SG.NF, SG.VectorType}(drag_coefs=zeros(SG.NF, SG.nlayers); kwargs...)
+
+"""
+$(TYPEDSIGNATURES)
+Precomputes the drag coefficients for the `LinearDrag` scheme."""
+function initialize!(drag::LinearDrag, model::PrimitiveEquation)
+
+    (; σ_levels_full) = model.geometry
+    (; σb, time_scale, drag_coefs) = drag
+    kf = 1/time_scale.value
+    
+    # drag only below σb, lin increasing to kf at σ=1
+    @. drag_coefs = kf*max(0, (σ_levels_full-σb)/(1-σb))
+    return nothing
+end 
+
+"""
+$(TYPEDSIGNATURES)
+Compute tendency for boundary layer drag of a `column` and add to its tendencies fields"""
+function drag!(
+    diagn::DiagnosticVariables,
+    progn::PrognosticVariables,
+    drag::LinearDrag,
+    lf::Integer,
+    model::AbstractModel,
+)
+    u = diagn.grid.u_grid
+    v = diagn.grid.v_grid
+
+    Fu = diagn.tendencies.u_tend_grid
+    Fv = diagn.tendencies.v_tend_grid
+
+    # include radius scaling
+    c = diagn.scale[]
+    @. Fu -= c*drag.drag_coefs' .* u
+    @. Fv -= c*drag.drag_coefs' .* v
+
+    return nothing
+end
+
 # Quadratic drag
 export QuadraticDrag
 @parameterized @kwdef mutable struct QuadraticDrag{NF} <: AbstractDrag
@@ -40,35 +98,32 @@ function drag!(
     lf::Integer,
     model::AbstractModel,
 )
-    u = diagn.grid.u_grid
-    v = diagn.grid.v_grid
+    k = diagn.nlayers   # only apply to surface layer
+    u = field_view(diagn.grid.u_grid, :, k)
+    v = field_view(diagn.grid.v_grid, :, k)
 
-    Fu = diagn.tendencies.u_tend_grid
-    Fv = diagn.tendencies.v_tend_grid
+    Fu = field_view(diagn.tendencies.u_tend_grid, :, k)
+    Fv = field_view(diagn.tendencies.v_tend_grid, :, k)
 
     # total drag coefficient with radius scaling
     c = drag.c_D / model.atmosphere.layer_thickness
     c *= diagn.scale[]^2
 
-    k = diagn.nlayers   # only apply to surface layer
-    
-    # GPU kernel launch
-    arch = architecture(u) 
-    launch!(arch, LinearWorkOrder, (length(u.data),), quadratic_drag_kernel!,
-            Fu, Fv, u, v, c, k)
+    launch!(architecture(Fu), LinearWorkOrder, size(Fu), quadratic_drag_kernel!,
+            Fu, Fv, u, v, c)
 end
 
 @kernel inbounds=true function quadratic_drag_kernel!(
-    Fu, Fv, u, v, @Const(c), @Const(k) 
+    Fu, Fv, u, v, @Const(c)
 )
     ij = @index(Global, Linear)
     
     # Calculate speed at surface layer k
-    speed = sqrt(u[ij, k]^2 + v[ij, k]^2)
+    speed = sqrt(u[ij]^2 + v[ij]^2)
     
     # Apply quadratic drag, -= as the tendencies already contain forcing
-    Fu[ij, k] -= c * speed * u[ij, k]
-    Fv[ij, k] -= c * speed * v[ij, k]
+    Fu[ij] -= c * speed * u[ij]
+    Fv[ij] -= c * speed * v[ij]
 end
 
 export LinearVorticityDrag

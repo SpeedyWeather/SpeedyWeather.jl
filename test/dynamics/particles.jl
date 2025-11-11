@@ -130,3 +130,34 @@ end
         @test move(p,1,2) == p
     end
 end
+
+@testset "Set particles" begin
+    for NF in (Float32, Float64)
+        # set without arguments returns same particle
+        p = rand(Particle{NF})
+        p2 = SpeedyWeather.set(p)
+        @test p == p2
+        
+        # set to 0˚E, set back and compare
+        p2 = SpeedyWeather.set(p, lon=0)
+        @test p2.lon == 0
+        p3 = SpeedyWeather.set(p2, lon=p.lon)
+        @test p3 == p
+
+        # set to 0˚N
+        p2 = SpeedyWeather.set(p, lat=0)
+        @test p2.lat == 0
+        p3 = SpeedyWeather.set(p2, lat=p.lat)
+        @test p3 == p
+
+        # set to σ=1
+        p2 = SpeedyWeather.set(p, σ=1)
+        @test p2.σ == 1
+        p3 = SpeedyWeather.set(p2, σ=p.σ)
+        @test p3 == p
+
+        # set all
+        p2 = SpeedyWeather.set(p, lon=1, lat=2, σ=3)
+        @test p2 == Particle(1,2,3)
+    end
+end

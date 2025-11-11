@@ -32,7 +32,7 @@ struct SpectralGrid{
     "[OPTION] device architecture to run on"
     architecture::ArchitectureType 
 
-    "[OPTION] array type to use for all variables"
+    "[DERIVED] array type to use for all variables, customize by define a new architecture"
     ArrayType::Type{<:AbstractArray} 
 
     "[DERIVED] Type of vector"
@@ -129,10 +129,11 @@ end
 
 # Constructor that takes all [OPTION] parameters as keyword arguments
 # and calculates all derived fields
+"""$(TYPEDSIGNATURES) 
+Initialize a SpectralGrid from a given truncation and all [OPTION] parameters of SpectralGrid."""
 function SpectralGrid(;
     NF::Type{<:AbstractFloat} = DEFAULT_NF,
     architecture::Union{AbstractArchitecture, Type{<:AbstractArchitecture}} = DEFAULT_ARCHITECTURE,
-    ArrayType::Type{<:AbstractArray} = array_type(architecture),
     trunc::Int = DEFAULT_TRUNC,
     Grid::Type{<:AbstractGrid} = DEFAULT_GRID,
     dealiasing::Real = 2,
@@ -149,25 +150,66 @@ function SpectralGrid(;
     # grid
     nlat_half = SpeedyTransforms.get_nlat_half(trunc, dealiasing)
     grid = Grid(nlat_half, architecture)
-    nlat = RingGrids.get_nlat(grid)
-    npoints = RingGrids.get_npoints(grid)
 
     # default dealiasing or user-defined one? 
     dealiasing = SpeedyTransforms.get_dealiasing(trunc, grid.nlat_half)
     
+    # Spectral space
+    spectrum = Spectrum(trunc+2, trunc+1, architecture=architecture)
+
+    # Create the SpectralGrid with all fields
+    return SpectralGrid(NF, spectrum, grid, dealiasing, nparticles, nlayers, nlayers_soil)
+end
+
+"""
+$(TYPEDSIGNATURES)
+Initialize a SpectralGrid from a given grid.
+"""
+function SpectralGrid(grid::AbstractGrid;
+    NF::Type{<:AbstractFloat} = DEFAULT_NF,
+    dealiasing::Real = 2,
+    nparticles::Int = 0,
+    nlayers::Int = DEFAULT_NLAYERS,
+    nlayers_soil::Int = DEFAULT_NLAYERS_SOIL
+)
+    architecture = grid.architecture
+    
+    trunc = SpeedyTransforms.get_truncation(grid, dealiasing)
+    nlat_half = SpeedyTransforms.get_nlat_half(grid)
+    nlat = RingGrids.get_nlat(grid)
+    npoints = RingGrids.get_npoints(grid)
+
+    spectrum = Spectrum(trunc+2, trunc+1, architecture=architecture)
+
+    return SpectralGrid(NF, spectrum, grid, dealiasing, nparticles, nlayers, nlayers_soil)
+end
+
+# low level constructor, not intended to be used directly by users
+function SpectralGrid(NF::Type{<:AbstractFloat},
+    spectrum::Spectrum, 
+    grid::AbstractGrid, 
+    dealiasing,
+    nparticles,
+    nlayers::Int,
+    nlayers_soil::Int
+    )
+    @assert spectrum.architecture == grid.architecture "Architecture of grid and spectrum must match"
+
+    architecture = spectrum.architecture
+
+    # grid
+    nlat_half = SpeedyTransforms.get_nlat_half(grid)
+    nlat = RingGrids.get_nlat(grid)
+    npoints = RingGrids.get_npoints(grid)
+
     # Convert numeric parameters to Float64
     dealiasing_f64 = Float64(dealiasing)
 
     # Calculate derived fields
+    ArrayType = array_type(architecture)
     VectorType = array_type(architecture, NF, 1)
     MatrixType = array_type(architecture, NF, 2)
     TensorType = array_type(architecture, NF, 3)
-    
-    # Spectral space
-    spectrum = Spectrum(trunc+2, trunc+1, architecture=architecture)
-    
-    # Spectral space
-    spectrum = Spectrum(trunc+2, trunc+1, architecture=architecture)
     
     # Spectral variable types
     SpectralVariable2D = LowerTriangularArray{Complex{NF}, 1, array_type(architecture, Complex{NF}, 1), typeof(spectrum)}
@@ -190,7 +232,7 @@ function SpectralGrid(;
         VectorType,
         MatrixType,
         TensorType,
-        trunc,
+        truncation(spectrum),
         spectrum,
         SpectralVariable2D,
         SpectralVariable3D,
@@ -200,7 +242,7 @@ function SpectralGrid(;
         nlat,
         npoints,
         grid,
-        Grid,
+        nonparametric_type(grid),
         GridVariable2D,
         GridVariable3D,
         GridVariable4D,

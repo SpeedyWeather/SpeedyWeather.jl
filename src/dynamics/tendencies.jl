@@ -234,13 +234,15 @@ function surface_pressure_tendency!(
     (; ∇lnp_x, ∇lnp_y, u_mean_grid, v_mean_grid, div_mean, scratch_memory) = diagn.dynamics
     
     # in grid-point space the the (ū, v̄)⋅∇lnpₛ term (swap sign in spectral)
-    @. pres_tend_grid = u_mean_grid*∇lnp_x + v_mean_grid*∇lnp_y
-    transform!(pres_tend, pres_tend_grid, scratch_memory, S)
+    @. pres_tend_grid += u_mean_grid*∇lnp_x + v_mean_grid*∇lnp_y
+
+    ūv̄∇lnpₛ = diagn.dynamics.a_2D           # reuse 2D work array
+    transform!(ūv̄∇lnpₛ, pres_tend_grid, scratch_memory, S)
     
     # for semi-implicit div_mean is calc at time step i-1 in vertical_integration!
-    @. pres_tend = -pres_tend - div_mean    # add the -div_mean term in spectral, swap sign
+    @. pres_tend -= ūv̄∇lnpₛ + div_mean      # add the -div_mean term in spectral, swap sign
     
-    pres_tend[1] = 0                # for mass conservation
+    pres_tend[1] = 0                        # for mass conservation
     return nothing
 end
 
@@ -256,7 +258,11 @@ function vertical_velocity!(
     (; div_mean_grid) = diagn.dynamics          # vertical avrgd div to be added to ūv̄∇lnp
     (; σ_tend) = diagn.dynamics                 # vertical mass flux M = pₛσ̇ at k+1/2
     (; div_grid) = diagn.grid
-    ūv̄∇lnp = diagn.tendencies.pres_tend_grid    # calc'd in surface_pressure_tendency! (excl -D̄)
+    
+    # to calculate u_mean_grid*∇lnp_x + v_mean_grid*∇lnp_y again
+    (; ∇lnp_x, ∇lnp_y, u_mean_grid, v_mean_grid) = diagn.dynamics
+    ūv̄∇lnp = diagn.dynamics.a_2D_grid           # use scratch memory
+    @. ūv̄∇lnp = u_mean_grid*∇lnp_x + v_mean_grid*∇lnp_y
 
     grids_match(σ_tend, div_sum_above, div_grid, uv∇lnp_sum_above, uv∇lnp) ||
         throw(DimensionMismatch(σ_tend, div_sum_above, div_grid, uv∇lnp_sum_above, uv∇lnp))
@@ -332,8 +338,8 @@ function vordiv_tendencies!(
             coslat⁻¹j = coslat⁻¹[j]
             f_j = f[j]
             for ij in ring
-                ω = vor_grid[ij, k] + f_j               # absolute vorticity
-                RTᵥ = R_dry*temp_virt_grid[ij, k]       # dry gas constant * virtual temperature anomaly(!)
+                ω = vor_grid[ij, k] + f_j                   # absolute vorticity
+                RTᵥ = R_dry*temp_virt_grid[ij, k]           # dry gas constant * virtual temperature anomaly(!)
                 u_tend_grid[ij, k] = (u_tend_grid[ij, k] + v_grid[ij, k]*ω - RTᵥ*∇lnp_x[ij])*coslat⁻¹j
                 v_tend_grid[ij, k] = (v_tend_grid[ij, k] - u_grid[ij, k]*ω - RTᵥ*∇lnp_y[ij])*coslat⁻¹j
             end
@@ -348,8 +354,8 @@ function vordiv_tendencies!(
     transform!(u_tend, u_tend_grid, scratch_memory, S)
     transform!(v_tend, v_tend_grid, scratch_memory, S)
 
-    curl!(vor_tend, u_tend, v_tend, S)         # ∂ζ/∂t = ∇×(u_tend, v_tend)
-    divergence!(div_tend, u_tend, v_tend, S)   # ∂D/∂t = ∇⋅(u_tend, v_tend)
+    curl!(vor_tend, u_tend, v_tend, S, add=true)            # ∂ζ/∂t += ∇×(u_tend, v_tend)
+    divergence!(div_tend, u_tend, v_tend, S, add=true)      # ∂D/∂t += ∇⋅(u_tend, v_tend)
     return nothing
 end
 

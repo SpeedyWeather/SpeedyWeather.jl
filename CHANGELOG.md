@@ -1,7 +1,27 @@
 # Changelog
 
-# Unreleased
+## Unreleased
 
+- Set particle sigma to layer they are advected on [#902](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/902)
+- Vertical advection kernelized and GPU-ready [#895](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/895)
+- Remove double imports of `architecture` in SpeedyWeatherInternals/ext/ [#899](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/899)
+- Documentation typos [#894](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/894)
+- Seasonal ocean and land climatology models GPU-ready [#892](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/892)
+- Zenith constructors [#889](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/889)
+- More general forcing of pressure, vorticity and divergence [#855](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/855)
+
+## v0.17.3
+
+- Add missing compat entires for SpeedyWeatherInternals [#883](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/883)
+- Move SpeedyParameters to SpeedyWeatherInternals [#880](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/880)
+- Remove JOSS paper draft workflow [#874](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/874)
+- Change particle tracking to every 4 hours [#881](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/881)
+- SpectralGrid can now be initialized from a grid instance as well [#882](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/882)
+
+## v0.17.2
+
+- Expand scratch memory handling in spectral transforms for better differentiability with Enzyme and revise FFT plans [#791](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/791)
+- Increase version of RingGrids, LowerTriangularArrays and SpeedyTransforms to v0.1.1 [#875](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/875)
 - Pluto notebook example in README [#872](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/872/)
 - Reimplement RestartFile, ProgressTxt, ParamatersTxt as callback [#726](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/726/)
 - Implicit has reinitialize option [#726](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/726/)

@@ -32,18 +32,13 @@ function _apply_batched_fft!(
     rfft_plan = rfft_plans[j]       # FFT planned wrt nlon on ring
     nlayers = size(field, 2)        # number of vertical layers
 
-    # Construct views of the data to perform the FFT on
-    # views and copies necessary for stride-1 outputs required by FFTW
-    ring_layers = view(field.data, ilons, :)
-    out = reshape(view(S.scratch_memory_spec, 1:nfreq*nlayers), (nfreq, nlayers))
-
     # Perform the FFT
     if not_equator # skip FFT, redundant when north already did that latitude
-        LinearAlgebra.mul!(out, rfft_plan, ring_layers)
+        # this version currently allocates a small array, FFTW supports strided outputs, but FFTW.jl doesn't 
+        view(f_out, 1:nfreq, 1:nlayers, j) .= rfft_plan * view(field.data, ilons, :)
     else
-        fill!(out, 0)
+        fill!(view(f_out, 1:nfreq, 1:nlayers, j), 0)
     end
-    f_out[1:nfreq, 1:nlayers, j] .= out     # copy into correct stride
 end    
 
 # Inverse FFT Application Function for batched FFT
@@ -61,16 +56,9 @@ function _apply_batched_fft!(
     nlayers = size(field, 2)        # number of vertical layers
     nfreq = nlon÷2 + 1              
 
-    # Construct views of the data to perform the FFT on
-    # views and copies necessary for stride-1 outputs required by FFTW
-    out = reshape(view(S.scratch_memory_grid, 1:nlon*nlayers), (nlon, nlayers))
-
-    # PERFORM FFT, inverse complex to real, hence brfft
-    # FFTW is in-place writing into `out` via `mul`
-    # FFTW requires stride-1 output, hence view on scratch memory
     if not_equator  # skip FFT, redundant when north already did that latitude
-        LinearAlgebra.mul!(out, brfft_plan, view(g_in, 1:nfreq, 1:nlayers, j))
-        field[ilons, :] = out
+        # this version currently allocates a small array, FFTW supports strided outputs, but FFTW.jl doesn't 
+        view(field.data, ilons, :) .= brfft_plan * view(g_in, 1:nfreq, 1:nlayers, j)
     end
 end
 
@@ -89,14 +77,11 @@ function _apply_serial_fft!(
     rfft_plan = rfft_plans_1D[j]    # FFT planned wrt nlon on ring
     k_grid = eachlayer(field)[k]    # Precomputed ring index (as a Cartesian index)
 
-    field_jk = view(field.data, ilons, k_grid)  # data on northern ring, vertical layer k
-    out = view(S.scratch_memory_spec, 1:nfreq)  # view on scratch memory to store transformed data
     if not_equator 
-        LinearAlgebra.mul!(out, rfft_plan, field_jk)    # perform FFT
+        view(f_out, 1:nfreq, k, j) .= rfft_plan *  view(field.data, ilons, k_grid)
     else
-        fill!(out, 0)
+        fill!(view(f_out, 1:nfreq, k, j), 0)
     end
-    f_out[1:nfreq, k, j] = out
 end
 
 # Inverse FFT Application Function for serial FFT
@@ -114,16 +99,13 @@ function _apply_serial_fft!(
     brfft_plan = brfft_plans_1D[j]      # FFT planned wrt nlon on ring
     k_grid = eachlayer(field)[k]        # Precomputed ring index (as a Cartesian index)
 
-    g = view(g_in, 1:nfreq, k, j)           # data on northern ring, vertical layer k
-    out = view(field.data, ilons, k_grid)   # view on scratch memory to store transformed data
     if not_equator
-        LinearAlgebra.mul!(out, brfft_plan, g)  # perform FFT
+        view(field.data, ilons, k_grid) .= brfft_plan * view(g_in, 1:nfreq, k, j)
     end
 end
 
-
 """$(TYPEDSIGNATURES)
-(Forward) Fast Fourier transform (grid to spectral) in zonal direction of `grids`,
+(Forward) Fast Fourier transform (grid to spectral) in zonal direction of `field`,
 stored in scratch memories `f_north`, `f_south` to be passed on to the Legendre transform.
 Batched version that requires the number of vertical layers to be the same as precomputed in `S`.
 Not to be called directly, use `transform!` instead."""
@@ -161,9 +143,8 @@ function _fourier_batched!(                 # GRID TO SPECTRAL
     end
 end
 
-
 """$(TYPEDSIGNATURES)
-(Forward) Fast Fourier transform (grid to spectral) in zonal direction of `grids`,
+(Forward) Fast Fourier transform (grid to spectral) in zonal direction of `field`,
 stored in scratch memories `f_north`, `f_south` to be passed on to the Legendre transform.
 Serial version that does not require the number of vertical layers to be the same as precomputed in `S`.
 Not to be called directly, use `transform!` instead."""
@@ -241,7 +222,7 @@ end
 
 """$(TYPEDSIGNATURES)
 (Inverse) Fast Fourier transform (spectral to grid) of Legendre-transformed inputs `g_north` and `g_south`
-to be stored in `grids`. Serial version that does not require the number of vertical layers to be the same
+to be stored in `field`. Serial version that does not require the number of vertical layers to be the same
 as precomputed in `S`. Not to be called directly, use `transform!` instead."""
 function _fourier_serial!(                  # SPECTRAL TO GRID
     field::AbstractField,                   # gridded output
@@ -307,7 +288,7 @@ function plan_FFTs!(
         rfft_plans[j] = FFT_package.plan_rfft(real_matrix_input, 1)
         brfft_plans[j] = FFT_package.plan_brfft(complex_matrix_input, nlon, 1)
         rfft_plans_1D[j] = FFT_package.plan_rfft(real_vector_input, 1)
-        brfft_plans_1D[j] = FFT_package.plan_brfft(complex_vector_input, nlon, 1)
+        brfft_plans_1D[j] = FFT_package.plan_brfft(complex_vector_input, nlon, 1) 
     end
 
     return rfft_plans, brfft_plans, rfft_plans_1D, brfft_plans_1D
