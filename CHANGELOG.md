@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- ScratchMemory allocation bug [#905](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/905)
 - Coriolis and adiabatic conv GPU-ready [#904](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/904)
 - The barotropic model can now also be initiliazed on GPU [#903](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/903)
 - Set particle sigma to layer they are advected on [#902](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/902)
