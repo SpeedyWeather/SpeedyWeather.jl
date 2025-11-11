@@ -13,6 +13,7 @@ export rotate, rotate!
 import Base.Threads: Threads, @threads
 import KernelAbstractions: KernelAbstractions, @kernel, @index, @Const, synchronize
 import Adapt: Adapt, adapt, adapt_structure
+import GPUArrays: @allowscalar
 
 using  SpeedyWeatherInternals
 using  SpeedyWeatherInternals.Architectures
