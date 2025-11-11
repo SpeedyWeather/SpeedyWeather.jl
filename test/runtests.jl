@@ -29,6 +29,7 @@ if !FLAG_EXTENDED_TESTS && !FLAG_ENZYME_TESTS
     include("grids/interpolation.jl")
     include("grids/reverse.jl")
     include("grids/rotate.jl")
+    include("grids/reordering.jl")
 
     # GPU/KERNELABSTRACTIONS
     include("gpu/kernelabstractions.jl")

@@ -4,6 +4,13 @@
 
 - Diagnostic and prognostic variables partially revised to NamedTuples and variables system introduced to allow to add to them modularly [#885](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/885)
 - Parameterizations with KernelAbstractions [#873](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/873) [#878](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/878)
+- Ring, nested and matrix order for OctaHEALPixGrid [#887](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/887)
+- Fixes a bug in the allocating spectral transforms on GPU [#906](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/906)
+- ScratchMemory allocation bug [#905](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/905)
+- Coriolis and adiabatic conv GPU-ready [#904](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/904)
+- The barotropic model can now also be initiliazed on GPU [#903](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/903)
+- Set particle sigma to layer they are advected on [#902](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/902)
+- Vertical advection kernelized and GPU-ready [#895](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/895)
 - Remove double imports of `architecture` in SpeedyWeatherInternals/ext/ [#899](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/899)
 - Documentation typos [#894](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/894)
 - Seasonal ocean and land climatology models GPU-ready [#892](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/892)

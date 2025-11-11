@@ -37,7 +37,7 @@ end
 @kernel inbounds=true function coriolis_kernel!(f, lat, rotation, whichring)
     ij, k = @index(Global, NTuple)
     j = whichring[ij]
-    f[ij, k] .= 2rotation*sin(lat[j])
+    f[ij, k] = 2rotation*sin(lat[j])
 end
 
 """

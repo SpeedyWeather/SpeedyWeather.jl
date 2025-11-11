@@ -1,33 +1,33 @@
 abstract type AbstractLandGeometry <: AbstractModelComponent end
 
 export LandGeometry
-mutable struct LandGeometry{NF} <: AbstractLandGeometry
-    "[OPTION] number of soil layers"
-    nlayers::Int
-
+struct LandGeometry{VectorType} <: AbstractLandGeometry
     "[OPTION] thickness of each soil layer [m]"
-    layer_thickness::Vector{NF}
+    layer_thickness::VectorType
 end
 
 # default constructor
-function LandGeometry(SG::SpectralGrid; kwargs...)
-    (; NF) = SG
-    nlayers = SG.nlayers_soil
+function LandGeometry(SG::SpectralGrid; layer_thickness=nothing)
 
-    # for two layers use the default soil layer thickness of MITgcm's 2-layer model
-    if nlayers == 2
-        layer_thickness = NF[0.2, 2]
-    else
-        layer_thickness = ones(NF, nlayers)
+    if isnothing(layer_thickness)
+        (; NF) = SG
+        nlayers = SG.nlayers_soil
+
+        # for two layers use the default soil layer thickness of MITgcm's 2-layer model
+        if nlayers == 2
+            layer_thickness = NF[0.2, 2]
+        else
+            layer_thickness = ones(NF, nlayers)
+        end
     end
 
-    return LandGeometry{NF}(nlayers, layer_thickness)
+    return LandGeometry(layer_thickness)
 end
 
 initialize!(::LandGeometry, model::PrimitiveEquation) = nothing
 
-function Base.show(io::IO, geom::LandGeometry{T}) where {T}
-    (; nlayers) = geom
-    println(io, "$nlayers-layer LandGeometry{$T}")
+function Base.show(io::IO, geom::LandGeometry{V}) where {V}
+    nlayers = length(geom.layer_thickness)
+    println(io, "$nlayers-layer LandGeometry{$V}")
     print(io, "└ layer_thickness: $(geom.layer_thickness)")
 end

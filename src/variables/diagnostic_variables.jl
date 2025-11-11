@@ -258,27 +258,21 @@ end
 Generator function. If a `spectral_transform` is handed over, the same scratch memory is used."""
 function DynamicsVariables(SG::SpectralGrid; 
                            spectral_transform::Union{Nothing,SpectralTransform}=nothing) 
-    (; architecture, spectrum, grid, nlayers) = SG
+    (; architecture, spectrum, grid, nlayers, NF, ArrayType) = SG
     (; SpectralVariable2D, SpectralVariable3D) = SG
     (; GridVariable2D, GridVariable3D) = SG
 
-    if isnothing(spectral_transform)
-        return DynamicsVariables{typeof(spectrum), typeof(grid),
-            SpectralVariable2D, SpectralVariable3D,
-            GridVariable2D, GridVariable3D, 
-            SpeedyTransforms.ScratchMemory{array_type(architecture, Complex{NF}, 3), 
-            array_type(architecture, Complex{NF}, 1)}}(;
-                spectrum, grid, nlayers,
-            )
-    else 
-        scratch_memory = spectral_transform.scratch_memory 
+    if isnothing(spectral_transform)    # then create ScratchMemory now
+        scratch_memory = SpeedyTransforms.ScratchMemory(NF, architecture, grid, nlayers)
+    else                                # otherwise reuse existing ScratchMemory
+        scratch_memory = spectral_transform.scratch_memory
+    end
 
-        return DynamicsVariables{typeof(spectrum), typeof(grid),
-            SpectralVariable2D, SpectralVariable3D,
-            GridVariable2D, GridVariable3D, typeof(scratch_memory)}(;
-                spectrum, grid, nlayers, scratch_memory
-            )
-    end 
+    return DynamicsVariables{NF, ArrayType, typeof(spectrum), typeof(grid),
+        SpectralVariable2D, SpectralVariable3D,
+        GridVariable2D, GridVariable3D, typeof(scratch_memory)}(;
+            spectrum, grid, nlayers, scratch_memory
+        )
 end
 
 Adapt.@adapt_structure DynamicsVariables

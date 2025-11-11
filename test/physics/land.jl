@@ -41,3 +41,13 @@ end
         end
     end
 end
+
+@testset "LandGeometry default constructor" begin
+    SG = SpectralGrid(trunc=21, nlayers=2)
+    geom = LandGeometry(SG)
+    @test geom.layer_thickness isa Vector{<:AbstractFloat}
+
+    SG = SpectralGrid(trunc=21, nlayers=5)
+    geom = LandGeometry(SG)
+    @test geom.layer_thickness isa Vector{<:AbstractFloat}
+end
