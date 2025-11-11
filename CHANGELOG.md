@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fixes a bug in the allocating spectral transforms on GPU [#906](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/906)
 - ScratchMemory allocation bug [#905](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/905)
 - Coriolis and adiabatic conv GPU-ready [#904](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/904)
 - The barotropic model can now also be initiliazed on GPU [#903](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/903)
