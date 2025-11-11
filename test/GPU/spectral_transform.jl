@@ -108,6 +108,13 @@ end
 
     @test field_2d_cpu_res ≈ on_architecture(cpu_arch, field_2d_gpu_res)
     @test spec_2d_cpu_res ≈ on_architecture(cpu_arch, spec_2d_gpu_res)
+
+    # allocating version 
+    spec_2d_gpu_res_alloc = transform(field_2d_gpu)
+    field_2d_gpu_res_alloc = transform(spec_2d_gpu)
+
+    @test field_2d_cpu_res ≈ on_architecture(cpu_arch, field_2d_gpu_res_alloc)
+    @test spec_2d_cpu_res ≈ on_architecture(cpu_arch, spec_2d_gpu_res_alloc)
 end
 
 @testset "fourier_batched: compare forward pass to CPU" begin
