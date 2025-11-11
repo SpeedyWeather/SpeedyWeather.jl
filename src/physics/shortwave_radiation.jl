@@ -259,6 +259,7 @@ function shortwave_radiation!(
                 if kcltop == nlayers + 1  # Only update if we haven't found cloud top yet
                     kcltop = k
                     humidity_term_kcltop = humidity_term_k
+                    break  # Found cloud top, stop searching
                 end
             end
         end
