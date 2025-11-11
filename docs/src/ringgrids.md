@@ -400,6 +400,11 @@ field == transpose(column_field)    # transposing again returns the original Fie
 
 ## Nested order on the OctaHEALPixGrid
 
+!!! warning "Nested order is an experimental feature"
+    While we do provide this functionality as is for now this is an experimental feature and
+    may change anytime in the future. At the moment we do not store the information of the ordering
+    in the grid or field.
+
 HEALPix grids are also famous because of their hierarchial grid structure. While one can use a grid cell order
 on the HEALPix grid that starts at 0˚ on the north pole and runs first east then south (the _ring_ order,
 efficient for spectral transforms) other orderings are possible. The so-called nested order is an
@@ -424,6 +429,7 @@ ring order etc. Converting this back
 field_ring = RingGrids.ring_order(field_nested)
 ```
 
+Note that currently we do not store the information about the order inside the 
 On the nested order, changing the resolution is trivial as consecutive elements in chunks
 of 4 have to be averaged (reducing resolution) or every element has to be repeated 4 times
 (increasing resolution). But we don't have this functionality implemented yet.
@@ -440,7 +446,7 @@ N = RingGrids.get_npoints(grid)
 field = Field(collect(1:N), grid)               # assumed nested
 field_nested = RingGrids.ring_order(field)      # convert to ring order
 
-fig = Figure(size=(800, 800))
+fig = Figure(size=(800, 500))
 ax1 = GeoAxis(fig[1, 1], dest = "+proj=ortho +lon_0=30 +lat_0=45", title="OctaHEALPix, ring order")
 ax2 = GeoAxis(fig[1, 2], dest = "+proj=ortho +lon_0=30 +lat_0=45", title="OctaHEALPix, nested order")
 meshimage!(ax1, -180..180, -90..90, rotr90(GeoMakie.earth()); npoints = 100)
