@@ -16,7 +16,8 @@ Adapt.@adapt_structure AdiabaticConversion
 
 # generator function
 AdiabaticConversion(SG::SpectralGrid) = AdiabaticConversion(
-    zeros(SG.VectorType, SG.nlayers), zeros(SG.VectorType, SG.nlayers))
+    on_architecture(SG.architecture, zeros(SG.NF, SG.nlayers)),
+    on_architecture(SG.architecture, zeros(SG.NF, SG.nlayers)))
 
 function initialize!(
     adiabatic::AdiabaticConversion,

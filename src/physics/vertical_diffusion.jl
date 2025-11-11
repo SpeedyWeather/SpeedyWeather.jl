@@ -52,15 +52,21 @@ function initialize!(scheme::BulkRichardsonDiffusion, model::PrimitiveEquation)
     # also includes a 1/2 so that the diffusion coefficients on full levels can be added
     # which is equivalent to interpolating them on half levels for a ∂σ (K ∂σ) formulation
     # with σ-dependent diffusion coefficient K
-    σ = model.geometry.σ_levels_full
-    σ_half = model.geometry.σ_levels_half
+    σ = on_architecture(CPU(), model.geometry.σ_levels_full)
+    σ_half = on_architecture(CPU(), model.geometry.σ_levels_half)
+    ∇²_above = on_architecture(CPU(), scheme.∇²_above)
+    ∇²_below = on_architecture(CPU(), scheme.∇²_below)
 
     for k in 1:nlayers
         σ₋ = k <= 1       ? -Inf : σ[k-1]   # sets the gradient across surface and top to 0
         σ₊ = k >= nlayers ?  Inf : σ[k+1]   # = no flux boundary conditions
-        scheme.∇²_above[k] = inv(2*(σ[k] - σ₋) * (σ_half[k+1] - σ_half[k]))
-        scheme.∇²_below[k] = inv(2*(σ₊ - σ[k]) * (σ_half[k+1] - σ_half[k]))
+        ∇²_above[k] = inv(2*(σ[k] - σ₋) * (σ_half[k+1] - σ_half[k]))
+        ∇²_below[k] = inv(2*(σ₊ - σ[k]) * (σ_half[k+1] - σ_half[k]))
     end
+
+    arch = model.spectral_grid.architecture
+    scheme.∇²_above .= on_architecture(arch, ∇²_above)
+    scheme.∇²_below .= on_architecture(arch, ∇²_below)
 
     # Typical height Z of lowermost layer from geopotential of reference surface temperature
     # minus surface geopotential (orography * gravity), simplification compared to
@@ -68,8 +74,8 @@ function initialize!(scheme::BulkRichardsonDiffusion, model::PrimitiveEquation)
     # surface temperature variations
     (; temp_ref) = model.atmosphere
     (; gravity) = model.planet
-    (; Δp_geopot_full) = model.geopotential
-    Z = temp_ref * Δp_geopot_full[end] / gravity
+    Δp_geopot_full = on_architecture(CPU(), model.geopotential.Δp_geopot_full)
+    Z = GPUArrays.@allowscalar temp_ref * Δp_geopot_full[end] / gravity
     
     # maximum drag Cmax from that height, stable conditions would decrease Cmax towards 0
     # Frierson 2006, eq (12)

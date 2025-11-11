@@ -18,8 +18,8 @@ Adapt.@adapt_structure Geopotential
 
 # generator
 Geopotential(SG::SpectralGrid) = Geopotential(
-    zeros(SG.VectorType, SG.nlayers),
-    zeros(SG.VectorType, SG.nlayers)
+    on_architecture(SG.architecture, zeros(SG.NF, SG.nlayers)),
+    on_architecture(SG.architecture, zeros(SG.NF, SG.nlayers))
 )
 
 """

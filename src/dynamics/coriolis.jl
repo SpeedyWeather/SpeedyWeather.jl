@@ -9,7 +9,7 @@ end
 Adapt.@adapt_structure Coriolis
 
 # generator
-Coriolis(SG::SpectralGrid) = Coriolis(zeros(SG.VectorType, SG.nlayers))
+Coriolis(SG::SpectralGrid) = Coriolis(on_architecture(SG.architecture, zeros(SG.NF, SG.nlayers)))
 
 function initialize!(coriolis::Coriolis, model::AbstractModel)
     (; radius, rotation) = model.planet
