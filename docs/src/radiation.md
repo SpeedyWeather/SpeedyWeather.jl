@@ -210,7 +210,7 @@ model_on = PrimitiveWetModel(spectral_grid; shortwave_radiation=sw_on)
 sim_on = initialize!(model_on)
 run!(sim_on, period=Day(5))
 osr_on = sim_on.diagnostic_variables.physics.outgoing_shortwave_radiation
-heatmap(osr_on, title="cloud_top_reflection = true [W/m²]")
+heatmap(osr_on, title="cloud_top_reflection = true [W/m^2]")
 save("oneband_cloud_top_reflection_on.png", ans) # hide
 nothing # hide
 ```
@@ -224,7 +224,7 @@ model_off = PrimitiveWetModel(spectral_grid; shortwave_radiation=sw_off)
 sim_off = initialize!(model_off)
 run!(sim_off, period=Day(5))
 osr_off = sim_off.diagnostic_variables.physics.outgoing_shortwave_radiation
-heatmap(osr_off, title="cloud_top_reflection = false [W/m²]")
+heatmap(osr_off, title="cloud_top_reflection = false [W/m^2]")
 save("oneband_cloud_top_reflection_off.png", ans) # hide
 nothing # hide
 ```
@@ -246,7 +246,7 @@ model_on = PrimitiveWetModel(spectral_grid; shortwave_radiation=sw_on)
 sim_on = initialize!(model_on)
 run!(sim_on, period=Day(5))
 ssrd_on = sim_on.diagnostic_variables.physics.surface_shortwave_down
-heatmap(ssrd_on, title="use_stratocumulus = true [W/m²]")
+heatmap(ssrd_on, title="use_stratocumulus = true [W/m^2]")
 save("oneband_stratocumulus_on.png", ans) # hide
 nothing # hide
 ```
@@ -260,7 +260,7 @@ model_off = PrimitiveWetModel(spectral_grid; shortwave_radiation=sw_off)
 sim_off = initialize!(model_off)
 run!(sim_off, period=Day(5))
 ssrd_off = sim_off.diagnostic_variables.physics.surface_shortwave_down
-heatmap(ssrd_off, title="use_stratocumulus = false [W/m²]")
+heatmap(ssrd_off, title="use_stratocumulus = false [W/m^2]")
 save("oneband_stratocumulus_off.png", ans) # hide
 nothing # hide
 ```
@@ -282,7 +282,7 @@ model_on = PrimitiveWetModel(spectral_grid; shortwave_radiation=sw_on)
 sim_on = initialize!(model_on)
 run!(sim_on, period=Day(5))
 ssrd_on = sim_on.diagnostic_variables.physics.surface_shortwave_down
-heatmap(ssrd_on, title="use_speedy_transmittance = true [W/m²]")
+heatmap(ssrd_on, title="use_speedy_transmittance = true [W/m^2]")
 save("oneband_speedy_transmittance_on.png", ans) # hide
 nothing # hide
 ```
@@ -296,7 +296,7 @@ model_off = PrimitiveWetModel(spectral_grid; shortwave_radiation=sw_off)
 sim_off = initialize!(model_off)
 run!(sim_off, period=Day(5))
 ssrd_off = sim_off.diagnostic_variables.physics.surface_shortwave_down
-heatmap(ssrd_off, title="use_speedy_transmittance = false [W/m²]")
+heatmap(ssrd_off, title="use_speedy_transmittance = false [W/m^2]")
 save("oneband_speedy_transmittance_off.png", ans) # hide
 nothing # hide
 ```
