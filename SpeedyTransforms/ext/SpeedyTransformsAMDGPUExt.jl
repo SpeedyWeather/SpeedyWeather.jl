@@ -1,6 +1,6 @@
 module SpeedyTransformsAMDGPUExt
     
-    import AMDGPU: AMDGPU, rocFFT, RocArray
+    import AMDGPU: AMDGPU, ROCArray
     import AbstractFFTs
     import LinearAlgebra
     using DocStringExtensions
@@ -10,7 +10,7 @@ module SpeedyTransformsAMDGPUExt
     using SpeedyTransforms.LowerTriangularArrays
     
     # Override FFT package deciding function
-    SpeedyTransforms.which_FFT_package(::Type{<:RocArray{<:AbstractFloat}}) = rocFFT 
+    SpeedyTransforms.which_FFT_package(::Type{<:ROCArray{<:AbstractFloat}}) = AbstractFFTs
 
     """$(TYPEDSIGNATURES)
     Util function to generate FFT plans based on the array type of the fake Grid 
@@ -21,13 +21,13 @@ module SpeedyTransformsAMDGPUExt
         brfft_plans::Vector{AbstractFFTs.Plan},
         rfft_plans_1D::Vector{AbstractFFTs.Plan},
         brfft_plans_1D::Vector{AbstractFFTs.Plan},
-        fake_field_data::AbstractField{NF, N, <:RocArray{NF}},
-        scratch_memory_north::RocArray{Complex{NF}},
+        fake_field_data::AbstractField{NF, N, <:ROCArray{NF}},
+        scratch_memory_north::ROCArray{Complex{NF}},
         rings,
         nlons::Vector{<:Int}
     ) where {NF<:AbstractFloat, N}
         # Determine which FFT package to use
-        FFT_package = SpeedyTransforms.which_FFT_package(RocArray{NF})
+        FFT_package = SpeedyTransforms.which_FFT_package(ROCArray{NF})
 
         # For each ring generate an FFT plan (for all layers and for a single layer)
         for (j, nlon) in enumerate(nlons)
@@ -51,8 +51,8 @@ module SpeedyTransformsAMDGPUExt
     Uses indexing as we seemingly can't use views with the FFT planning with CUFFT.
     """
     function SpeedyTransforms._apply_batched_fft!(
-        f_out::RocArray{<:Complex, 3},
-        field::AbstractField{NF, N, <:RocArray},
+        f_out::ROCArray{<:Complex, 3},
+        field::AbstractField{NF, N, <:ROCArray},
         S::SpectralTransform, 
         j::Int,
         nfreq::Int,
@@ -75,8 +75,8 @@ module SpeedyTransformsAMDGPUExt
     Uses indexing as we seemingly can't use views with the FFT planning with CUFFT.
     """
     function SpeedyTransforms._apply_batched_fft!(
-        field::AbstractField{NF, N, <:RocArray},
-        g_in::RocArray{<:Complex, 3},
+        field::AbstractField{NF, N, <:ROCArray},
+        g_in::ROCArray{<:Complex, 3},
         S::SpectralTransform,
         j::Int,
         nlon::Int,
