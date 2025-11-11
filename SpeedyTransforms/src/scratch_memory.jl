@@ -63,8 +63,8 @@ function ScratchMemory(
     grid_type = nonparametric_type(grid)   # always use nonparametric concrete type
 
     # RESOLUTION PARAMETERS
-    nlon_max = get_nlon_max(grid_type, grid.nlat_half)    # number of longitudes around the equator
-                                            # number of longitudes per latitude ring (one hemisphere only)
+    nlon_max = get_nlon_max(grid_type, grid.nlat_half)  # number of longitudes around the equator
+                                                        # number of longitudes per latitude ring (one hemisphere only)
     nfreq_max = nlon_max÷2 + 1                      # maximum number of fourier frequencies (real FFTs)
 
     return ScratchMemory(NF, architecture, nfreq_max, nlayers, grid.nlat_half, nlon_max)
