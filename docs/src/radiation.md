@@ -70,9 +70,12 @@ subtypes(SpeedyWeather.AbstractShortwave)
 
 ## OneBandShortwave: Single-band shortwave radiation with diagnostic clouds
 
-*Note: Stratocumulus cloud parameterization and ozone-radiation interactions are currently not implemented in the `OneBandShortwave` scheme.*
+The `OneBandShortwave` scheme provides a single-band (broadband) shortwave radiation parameterization, including diagnostic cloud effects following [^KMB06]. For dry models without water vapor, use `OneBandGreyShortwave` instead, which automatically disables cloud effects and uses transparent transmittance.
 
-The `OneBandShortwave` scheme provides a single-band (broadband) shortwave radiation parameterization, including diagnostic cloud effects following [^KMB06].
+**Key differences:**
+
+- `OneBandShortwave`: Includes diagnostic clouds, water vapor absorption, and atmospheric transmittance effects (for wet models)
+- `OneBandGreyShortwave`: No clouds, transparent atmosphere (for dry models)
 
 **Cloud diagnosis:**
 Cloud properties are diagnosed from the relative humidity and total precipitation in the atmospheric column. The cloud base is set at the interface between the lowest two model layers, and the cloud top is the highest layer where both
@@ -158,8 +161,9 @@ with cloud reflection added at the cloud-top layer. The upward part is only mode
 
 ### Usage
 
-To use the new scheme, construct your model with the following and run as usual.
-The altered shortwave fluxes can be visualised as shown.
+To use the OneBandShortwave scheme, construct your model as follows and run as usual.
+
+**For wet models (with water vapor and clouds):**
 
 ```@example radiation
 using SpeedyWeather
@@ -187,121 +191,68 @@ nothing # hide
 
 ![Outgoing shortwave radiation](osr.png)
 
-### Parameterization flags
-
-The `OneBandShortwave` scheme includes several boolean flags that control which physical processes are included.
-
-#### `cloud_top_reflection` (default: `true`)
-
-Enables cloud reflection at the cloud top layer. When `true`, a fraction of incoming radiation is reflected back to space at the cloud-top layer, consistent with the radiative transfer equation:
-
-$$F_{k+h}^{\downarrow, SR} = F_{k-h}^{\downarrow, SR} (1 - A_{cl} \, \mathrm{CLC}) \, \tau_{k}^{SR}$$
-
-When `false`, this term is omitted, allowing more radiation to penetrate through clouds and reach the surface.
+**For dry models (no water vapor or clouds):**
+Use `OneBandGreyShortwave` instead, which automatically uses `NoClouds` and `TransparentShortwaveTransmittance`:
 
 ```@example radiation
-using SpeedyWeather, CairoMakie
-
+using SpeedyWeather
 spectral_grid = SpectralGrid(trunc=31, nlayers=8)
+model = PrimitiveDryModel(spectral_grid; shortwave_radiation=OneBandGreyShortwave(spectral_grid))
+simulation = initialize!(model)
+run!(simulation, period=Week(1))
 
-# Run with cloud_top_reflection ON
-sw_on = OneBandShortwave(spectral_grid; cloud_top_reflection=true)
-model_on = PrimitiveWetModel(spectral_grid; shortwave_radiation=sw_on)
-sim_on = initialize!(model_on)
-run!(sim_on, period=Day(5))
-osr_on = sim_on.diagnostic_variables.physics.outgoing_shortwave_radiation
-heatmap(osr_on, title="cloud_top_reflection = true [W/m^2]")
-save("oneband_cloud_top_reflection_on.png", ans) # hide
+# The shortwave fluxes can be visualised
+ssrd = simulation.diagnostic_variables.physics.surface_shortwave_down
+heatmap(ssrd, title="Surface shortwave radiation (dry model) [W/m^2]")
+save("ssrd_dry.png", ans) # hide
 nothing # hide
 ```
 
-![cloud_top_reflection = true](oneband_cloud_top_reflection_on.png)
+![Surface shortwave radiation (dry model)](ssrd_dry.png)
 
-```@example radiation
-# Run with cloud_top_reflection OFF
-sw_off = OneBandShortwave(spectral_grid; cloud_top_reflection=false)
-model_off = PrimitiveWetModel(spectral_grid; shortwave_radiation=sw_off)
-sim_off = initialize!(model_off)
-run!(sim_off, period=Day(5))
-osr_off = sim_off.diagnostic_variables.physics.outgoing_shortwave_radiation
-heatmap(osr_off, title="cloud_top_reflection = false [W/m^2]")
-save("oneband_cloud_top_reflection_off.png", ans) # hide
-nothing # hide
-```
+### Parameterization options
 
-![cloud_top_reflection = false](oneband_cloud_top_reflection_off.png)
+The `OneBandShortwave` scheme includes several configurable components:
 
-#### `use_stratocumulus` (default: `true`)
+#### Cloud schemes
 
-Enables the diagnostic stratocumulus cloud parameterization over oceans. When `false`, only large-scale condensation and convective clouds are included.
+The cloud scheme can be specified when constructing the radiation scheme:
 
-```@example radiation
-using SpeedyWeather, CairoMakie
+- `DiagnosticClouds(spectral_grid)` (default): Diagnoses clouds from humidity and precipitation
+- `NoClouds(spectral_grid)`: No clouds (used in `OneBandGreyShortwave`)
 
-spectral_grid = SpectralGrid()
+#### Transmittance schemes
 
-# Run with use_stratocumulus ON
-sw_on = OneBandShortwave(spectral_grid; use_stratocumulus=true)
-model_on = PrimitiveWetModel(spectral_grid; shortwave_radiation=sw_on)
-sim_on = initialize!(model_on)
-run!(sim_on, period=Day(5))
-ssrd_on = sim_on.diagnostic_variables.physics.surface_shortwave_down
-heatmap(ssrd_on, title="use_stratocumulus = true [W/m^2]")
-save("oneband_stratocumulus_on.png", ans) # hide
-nothing # hide
-```
+The atmospheric transmittance can be calculated using:
 
-![use_stratocumulus = true](oneband_stratocumulus_on.png)
+- `BackgroundShortwaveTransmittance(spectral_grid)` (default): SPEEDY-style transmittance with zenith correction and absorption by aerosols, water vapor, and clouds
+- `TransparentShortwaveTransmittance(spectral_grid)`: Transparent atmosphere (used in `OneBandGreyShortwave`)
 
-```@example radiation
-# Run with use_stratocumulus OFF
-sw_off = OneBandShortwave(spectral_grid; use_stratocumulus=false)
-model_off = PrimitiveWetModel(spectral_grid; shortwave_radiation=sw_off)
-sim_off = initialize!(model_off)
-run!(sim_off, period=Day(5))
-ssrd_off = sim_off.diagnostic_variables.physics.surface_shortwave_down
-heatmap(ssrd_off, title="use_stratocumulus = false [W/m^2]")
-save("oneband_stratocumulus_off.png", ans) # hide
-nothing # hide
-```
+#### Stratocumulus clouds
 
-![use_stratocumulus = false](oneband_stratocumulus_off.png)
-
-#### `use_speedy_transmittance` (default: `true`)
-
-Controls the transmittance calculation scheme. When `true`, uses the SPEEDY-style transmittance with zenith angle correction and explicit absorption by aerosols, water vapor, and clouds. When `false`, uses a simpler transmittance calculation.
+The `DiagnosticClouds` scheme includes a `use_stratocumulus` flag (default: `true`) that enables the diagnostic stratocumulus cloud parameterization over oceans:
 
 ```@example radiation
 using SpeedyWeather, CairoMakie
 
 spectral_grid = SpectralGrid()
 
-# Run with use_speedy_transmittance ON
-sw_on = OneBandShortwave(spectral_grid; use_speedy_transmittance=true)
-model_on = PrimitiveWetModel(spectral_grid; shortwave_radiation=sw_on)
-sim_on = initialize!(model_on)
-run!(sim_on, period=Day(5))
-ssrd_on = sim_on.diagnostic_variables.physics.surface_shortwave_down
-heatmap(ssrd_on, title="use_speedy_transmittance = true [W/m^2]")
-save("oneband_speedy_transmittance_on.png", ans) # hide
+# Create cloud scheme with stratocumulus disabled
+clouds_no_sc = DiagnosticClouds(spectral_grid; use_stratocumulus=false)
+sw_no_sc = OneBandShortwave(clouds_no_sc, 
+                           BackgroundShortwaveTransmittance(spectral_grid),
+                           OneBandShortwaveRadiativeTransfer(spectral_grid))
+
+model = PrimitiveWetModel(spectral_grid; shortwave_radiation=sw_no_sc)
+sim = initialize!(model)
+run!(sim, period=Day(5))
+ssrd = sim.diagnostic_variables.physics.surface_shortwave_down
+heatmap(ssrd, title="No stratocumulus clouds [W/m^2]")
+save("oneband_no_stratocumulus.png", ans) # hide
 nothing # hide
 ```
 
-![use_speedy_transmittance = true](oneband_speedy_transmittance_on.png)
-
-```@example radiation
-# Run with use_speedy_transmittance OFF
-sw_off = OneBandShortwave(spectral_grid; use_speedy_transmittance=false)
-model_off = PrimitiveWetModel(spectral_grid; shortwave_radiation=sw_off)
-sim_off = initialize!(model_off)
-run!(sim_off, period=Day(5))
-ssrd_off = sim_off.diagnostic_variables.physics.surface_shortwave_down
-heatmap(ssrd_off, title="use_speedy_transmittance = false [W/m^2]")
-save("oneband_speedy_transmittance_off.png", ans) # hide
-nothing # hide
-```
-
-![use_speedy_transmittance = false](oneband_speedy_transmittance_off.png)
+![No stratocumulus clouds](oneband_no_stratocumulus.png)
 
 ## References
 
