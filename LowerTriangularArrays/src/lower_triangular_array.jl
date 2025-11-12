@@ -141,7 +141,7 @@ end
 
 function Base.array_summary(io::IO, ::LowerTriangularArray{T, N, A}, inds::Tuple{Vararg{Base.OneTo}}) where {T, N, A}
     A_ = nonparametric_type(A)
-    print(io, Base.dims2string(length.(inds)), "LowerTriangularArray{$T, $N, $A_{...}}")
+    print(io, Base.dims2string(length.(inds)), " LowerTriangularArray{$T, $N, $A_{...}}")
 end
 
 function Base.show(io::IO, ::MIME"text/plain", L::LowerTriangularArray)
