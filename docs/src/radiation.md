@@ -175,7 +175,7 @@ run!(simulation, period=Week(1))
 
 # get surface shortwave radiation down
 ssrd = simulation.diagnostic_variables.physics.surface_shortwave_down
-heatmap(ssrd,title="Outgoing shortwave radiation [W/m^2]")
+heatmap(ssrd,title="Surface shortwave radiation down [W/m^2]")
 save("ssrd.png", ans) # hide
 nothing # hide
 ```
@@ -236,12 +236,10 @@ The `DiagnosticClouds` scheme includes a `use_stratocumulus` flag (default: `tru
 using SpeedyWeather, CairoMakie
 
 spectral_grid = SpectralGrid()
-
-# Create cloud scheme with stratocumulus disabled
-clouds_no_sc = DiagnosticClouds(spectral_grid; use_stratocumulus=false)
-sw_no_sc = OneBandShortwave(clouds_no_sc, 
-                           BackgroundShortwaveTransmittance(spectral_grid),
-                           OneBandShortwaveRadiativeTransfer(spectral_grid))
+clouds_no_sc = SpeedyWeather.DiagnosticClouds(spectral_grid; use_stratocumulus=false)
+transmittance_no_sc = SpeedyWeather.BackgroundShortwaveTransmittance(spectral_grid)
+radiative_transfer_no_sc = SpeedyWeather.OneBandShortwaveRadiativeTransfer(spectral_grid)
+sw_no_sc = OneBandShortwave(clouds_no_sc, transmittance_no_sc, radiative_transfer_no_sc)
 
 model = PrimitiveWetModel(spectral_grid; shortwave_radiation=sw_no_sc)
 sim = initialize!(model)
