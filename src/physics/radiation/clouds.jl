@@ -97,8 +97,8 @@ function clouds!(
         qsat = sat_humid[k]
 
         # Check if specific humidity is above the absolute threshold
-        if humidity_k > specific_humidity_threshold_min
-            # Calculate this layer's RH
+        if humidity_k > specific_humidity_threshold_min && qsat > 0
+            # Calculate this layer's RH (avoid division by zero in dry models)
             relative_humidity_k = humidity_k / qsat
             
             # Check if RH exceeds the condensation threshold 
@@ -145,7 +145,7 @@ function clouds!(
         stratocumulus_cover_ocean = F_ST * max(cover_max - clfact * cloud_cover, 0)
         
         # Over land, further modulate by surface RH
-        RH_N = humid[nlayers] / sat_humid[nlayers]
+        RH_N = sat_humid[nlayers] > 0 ? humid[nlayers] / sat_humid[nlayers] : 0
         stratocumulus_cover_land = stratocumulus_cover_ocean * RH_N
         
         # Land-sea mask weighted stratocumulus cover
