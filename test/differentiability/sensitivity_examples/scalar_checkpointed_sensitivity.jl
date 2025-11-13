@@ -19,6 +19,8 @@ run!(simulation, period=Day(20))
 (; Δt, Δt_millisec) = model.time_stepping
 dt = 2Δt
 
+const i_point = 443 # pick this kind of random point (it's ≈ Copenhagen)
+
 progn = prognostic_variables
 diagn = diagnostic_variables
 
