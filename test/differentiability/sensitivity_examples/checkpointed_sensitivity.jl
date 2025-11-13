@@ -4,7 +4,7 @@ Pkg.activate("test/differentiability/sensitivity_examples")
 using SpeedyWeather, Enzyme, JLD2, Checkpointing
 
 # Parse command line argument for N (number of timesteps)
-const N = length(ARGS) >= 1 ? parse(Int, ARGS[1]) : 1
+const N = length(ARGS) >= 1 ? parse(Int, ARGS[1]) : 5
 
 println("Running Sensitivity Analyis with N = $N")
 savename_base = "new-sensitivity-$N"
