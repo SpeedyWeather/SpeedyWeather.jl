@@ -14,8 +14,7 @@ module SpeedyTransformsAMDGPUExt
 
     """$(TYPEDSIGNATURES)
     Util function to generate FFT plans based on the array type of the fake Grid 
-    data provided. Uses indexing as we seemingly can't use views for FFT planning 
-    with CUFFT."""
+    data provided.."""
     function SpeedyTransforms.plan_FFTs!(
         rfft_plans::Vector{AbstractFFTs.Plan},
         brfft_plans::Vector{AbstractFFTs.Plan},
@@ -47,8 +46,7 @@ module SpeedyTransformsAMDGPUExt
 
     """$(TYPEDSIGNATURES)
     (Forward) FFT, applied in zonal direction of `field` provided. This is the 
-    GPU/CUDA equivalent of the `apply_batched_fft!` function in the CPU version. 
-    Uses indexing as we seemingly can't use views with the FFT planning with CUFFT.
+    AMDGPU equivalent of the `apply_batched_fft!` function in the CPU version. 
     """
     function SpeedyTransforms._apply_batched_fft!(
         f_out::ROCArray{<:Complex, 3},
@@ -71,8 +69,7 @@ module SpeedyTransformsAMDGPUExt
 
     """$(TYPEDSIGNATURES)
     (Inverse) FFT, applied in zonal direction of `field` provided. This is the
-    GPU/CUDA equivalent of the `apply_batched_fft!` function in the CPU version.
-    Uses indexing as we seemingly can't use views with the FFT planning with CUFFT.
+    AMDGPU equivalent of the `apply_batched_fft!` function in the CPU version.
     """
     function SpeedyTransforms._apply_batched_fft!(
         field::AbstractField{NF, N, <:ROCArray},
