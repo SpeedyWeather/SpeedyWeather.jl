@@ -408,7 +408,7 @@ function shortwave_radiation!(
         clouds = clouds!(column, radiation.clouds, model, band)
         
         # Compute band-specific transmittance
-        transmittance = transmittance!(column, clouds, radiation.transmittance[band], model)
+        transmittance = transmittance!(column, clouds, radiation.transmittance[band], model, band)
         
         # Compute band-specific radiative transfer
         shortwave_radiative_transfer_bands!(column, transmittance, clouds, radiation.radiative_transfer[band], model, band)

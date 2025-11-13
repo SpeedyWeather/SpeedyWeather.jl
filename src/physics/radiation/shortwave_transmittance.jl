@@ -9,9 +9,9 @@ export TransparentShortwaveTransmittance
 struct TransparentShortwaveTransmittance{NF} <: AbstractShortwaveTransmittance end
 TransparentShortwaveTransmittance(SG::SpectralGrid) = TransparentShortwaveTransmittance{SG.NF}()
 initialize!(::TransparentShortwaveTransmittance, ::AbstractModel) = nothing
-function transmittance!(column::ColumnVariables, clouds, ::TransparentShortwaveTransmittance, ::AbstractModel)
+function transmittance!(column::ColumnVariables, clouds, ::TransparentShortwaveTransmittance, ::AbstractModel, band::Int = 1)
     column.transmittance_longwave .= 1
-    return view(column.transmittance_shortwave, :, 1)
+    return view(column.transmittance_shortwave, :, band)
 end
 
 @kwdef struct BackgroundShortwaveTransmittance{NF} <: AbstractShortwaveTransmittance
@@ -53,8 +53,9 @@ function transmittance!(
     clouds,    # NamedTuple from clouds!
     transmittance::BackgroundShortwaveTransmittance,
     model::AbstractModel,
+    band::Int = 1,  # Which spectral band to compute
 )
-    t = view(column.transmittance_shortwave, :, 1)
+    t = view(column.transmittance_shortwave, :, band)
  
     (; absorptivity_dry_air, absorptivity_aerosol, absorptivity_water_vapor,
     absorptivity_cloud_base, absorptivity_cloud_limit) = transmittance
