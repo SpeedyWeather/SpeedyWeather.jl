@@ -11,5 +11,6 @@ Fields are: $(TYPEDFIELDS)"""
     keepbits::Int = 7
 end
 
-path(::RandomPatternOutput, simulation) =
+function path(::RandomPatternOutput, simulation)
     simulation.diagnostic_variables.grid.random_pattern
+end

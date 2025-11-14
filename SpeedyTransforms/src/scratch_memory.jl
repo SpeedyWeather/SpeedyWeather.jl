@@ -11,11 +11,11 @@ end
 """
 ScratchMemory holds scratch memory for the `SpectralTransform` that's used both by the Fourier and Legendre transform. Fields are
 $(TYPEDFIELDS)"""
-struct ScratchMemory{ 
-    NF,                       
+struct ScratchMemory{
+    NF,
     ArrayComplexType,         # <: ArrayType{Complex{NF}, 3},
     VectorType,               # <: ArrayType{NF, 1},
-    VectorComplexType,        # <: ArrayType{Complex{NF}, 1},
+    VectorComplexType        # <: ArrayType{Complex{NF}, 1},
 }
     # SCRATCH MEMORY FOR FOURIER NOT YET LEGENDRE TRANSFORMED AND VICE VERSA
     # state is undetermined, only read after writing to it
@@ -23,15 +23,15 @@ struct ScratchMemory{
     south::ArrayComplexType
 
     column::ColumnScratchMemory{NF, VectorComplexType}
-end 
+end
 
 function ScratchMemory(
-    ::Type{NF},                     
-    architecture::AbstractArchitecture, 
-    nfreq_max::Integer, 
-    nlayers::Integer, 
-    nlat_half::Integer,
-    nlon_max::Integer) where NF
+        ::Type{NF},
+        architecture::AbstractArchitecture,
+        nfreq_max::Integer,
+        nlayers::Integer,
+        nlat_half::Integer,
+        nlon_max::Integer) where {NF}
 
     # SCRATCH MEMORY FOR FOURIER NOT YET LEGENDRE TRANSFORMED AND VICE VERSA
     scratch_memory_north = zeros(Complex{NF}, nfreq_max, nlayers, nlat_half)
@@ -43,30 +43,28 @@ function ScratchMemory(
 
     return ScratchMemory{
         NF,
-        array_type(architecture, Complex{NF}, 3), 
+        array_type(architecture, Complex{NF}, 3),
         array_type(architecture, NF, 1),
-        array_type(architecture, Complex{NF}, 1),
-    }(scratch_memory_north, scratch_memory_south, 
-    ColumnScratchMemory{NF, array_type(architecture, Complex{NF}, 1)}(
-    scratch_memory_column_north, scratch_memory_column_south))
-end 
+        array_type(architecture, Complex{NF}, 1)
+    }(scratch_memory_north, scratch_memory_south,
+        ColumnScratchMemory{NF, array_type(architecture, Complex{NF}, 1)}(
+            scratch_memory_column_north, scratch_memory_column_south))
+end
 
 """$(TYPEDSIGNATURES)
 Generator function for a `ScratchMemory` that holds the scratch memory for SpeedyTransforms.
 """
 function ScratchMemory(
-    ::Type{NF},                     
-    architecture::AbstractArchitecture, 
-    grid::AbstractGrid,
-    nlayers::Integer) where NF
-
+        ::Type{NF},
+        architecture::AbstractArchitecture,
+        grid::AbstractGrid,
+        nlayers::Integer) where {NF}
     grid_type = nonparametric_type(grid)   # always use nonparametric concrete type
 
     # RESOLUTION PARAMETERS
     nlon_max = get_nlon_max(grid_type, grid.nlat_half)  # number of longitudes around the equator
-                                                        # number of longitudes per latitude ring (one hemisphere only)
+    # number of longitudes per latitude ring (one hemisphere only)
     nfreq_max = nlon_max÷2 + 1                      # maximum number of fourier frequencies (real FFTs)
 
     return ScratchMemory(NF, architecture, nfreq_max, nlayers, grid.nlat_half, nlon_max)
-end 
-
+end

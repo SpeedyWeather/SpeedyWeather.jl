@@ -14,4 +14,4 @@ export AbstractWorkOrder, SpectralWorkOrder, RingGridWorkOrder, SpectralInnerWor
 export DiagonalWorkOrder, Array3DWorkOrder, LinearWorkOrder
 include("kernel_launching.jl")
 
-end 
+end

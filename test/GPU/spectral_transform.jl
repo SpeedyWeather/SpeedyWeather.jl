@@ -4,38 +4,34 @@ nlayers_list = (8,)# 8, 32]
 grid_list = [
     FullGaussianGrid,
     # FullClenshawGrid,
-    OctahedralGaussianGrid,
-    # OctahedralClenshawGrid,
-    # HEALPixGrid,
-    # OctaHEALPixGrid,
+    OctahedralGaussianGrid    # OctahedralClenshawGrid,    # HEALPixGrid,    # OctaHEALPixGrid,
 ]
 # CUDA.cu now implicitly converts to Float32 so that's the only relevant type to 
 # test here
 NFs = (Float32,)
 
-
 # Function to generate random inputs 
 function get_test_data(; trunc, nlayers, Grid, NF)
     # We use dealiasing=3 to ensure that the transform is exact for both 
     # Clenshaw and Gaussian grids
-    spectral_grid_cpu = SpectralGrid(; NF, trunc, nlayers, Grid, dealiasing=3)
-    spectral_grid_gpu = SpectralGrid(; NF, trunc, nlayers, Grid, architecture=SpeedyWeather.GPU, dealiasing=3)
+    spectral_grid_cpu = SpectralGrid(; NF, trunc, nlayers, Grid, dealiasing = 3)
+    spectral_grid_gpu = SpectralGrid(;
+        NF, trunc, nlayers, Grid, architecture = SpeedyWeather.GPU, dealiasing = 3)
 
     S_cpu = SpectralTransform(spectral_grid_cpu)
     S_gpu = SpectralTransform(spectral_grid_gpu)
 
-    field_cpu  = rand(NF, spectral_grid_cpu.grid,
-                        spectral_grid_cpu.nlayers)
-    coeffs_cpu = rand(LowerTriangularArray{Complex{NF}}, 
-                        spectral_grid_cpu.spectrum, 
-                        spectral_grid_cpu.nlayers)
-    
+    field_cpu = rand(NF, spectral_grid_cpu.grid,
+        spectral_grid_cpu.nlayers)
+    coeffs_cpu = rand(LowerTriangularArray{Complex{NF}},
+        spectral_grid_cpu.spectrum,
+        spectral_grid_cpu.nlayers)
+
     grid_gpu = on_architecture(S_gpu.architecture, field_cpu)
     spec_gpu = on_architecture(S_gpu.architecture, coeffs_cpu)
-    
+
     return S_cpu, S_gpu, field_cpu, grid_gpu, coeffs_cpu, spec_gpu
 end
-
 
 @testset "Whole transform: test a round trip" begin
     @testset for NF in NFs
@@ -43,13 +39,17 @@ end
             @testset for nlayers in nlayers_list
                 @testset for Grid in grid_list
                     # Generate test data
-                    S_cpu, S_gpu, grid_cpu, grid_gpu, spec_cpu, spec_gpu = get_test_data(
-                        trunc=trunc, nlayers=nlayers, Grid=Grid, NF=NF
+                    S_cpu, S_gpu,
+                    grid_cpu,
+                    grid_gpu,
+                    spec_cpu,
+                    spec_gpu = get_test_data(
+                        trunc = trunc, nlayers = nlayers, Grid = Grid, NF = NF
                     )
 
                     gpu_arch = S_gpu.architecture
                     cpu_arch = S_cpu.architecture
-                    
+
                     # Full return journey starting from grid
                     spec_ = SpeedyTransforms.transform(grid_cpu, S_cpu)
                     grid_cpu = SpeedyTransforms.transform(spec_, S_cpu)
@@ -88,20 +88,24 @@ end
 end
 
 @testset "Whole transform: works in 2D" begin
-    S_cpu, S_gpu, field_cpu, field_gpu, spec_cpu, spec_gpu = get_test_data(
-                        trunc=spectral_resolutions[1], nlayers=nlayers_list[1], Grid=grid_list[1], NF=NFs[1]
-                    )
+    S_cpu, S_gpu,
+    field_cpu,
+    field_gpu,
+    spec_cpu,
+    spec_gpu = get_test_data(
+        trunc = spectral_resolutions[1], nlayers = nlayers_list[1], Grid = grid_list[1], NF = NFs[1]
+    )
 
     cpu_arch = S_cpu.architecture
-                    
-    field_2d_cpu = field_cpu[:,1]
-    spec_2d_cpu = spec_cpu[:,1]
+
+    field_2d_cpu = field_cpu[:, 1]
+    spec_2d_cpu = spec_cpu[:, 1]
 
     spec_2d_cpu_res = transform(field_2d_cpu, S_cpu)
     field_2d_cpu_res = transform(spec_2d_cpu, S_cpu)
 
-    field_2d_gpu = field_gpu[:,1]
-    spec_2d_gpu = spec_gpu[:,1]
+    field_2d_gpu = field_gpu[:, 1]
+    spec_2d_gpu = spec_gpu[:, 1]
 
     spec_2d_gpu_res = transform(field_2d_gpu, S_gpu)
     field_2d_gpu_res = transform(spec_2d_gpu, S_gpu)
@@ -128,25 +132,29 @@ end
             @testset for Grid in grid_list
                 @testset for NF in NFs
                     # Generate test data
-                    S_cpu, S_gpu, grid_cpu, grid_gpu, spec_cpu, spec_gpu = get_test_data(
-                        trunc=trunc, nlayers=nlayers, Grid=Grid, NF=NF
+                    S_cpu, S_gpu,
+                    grid_cpu,
+                    grid_gpu,
+                    spec_cpu,
+                    spec_gpu = get_test_data(
+                        trunc = trunc, nlayers = nlayers, Grid = Grid, NF = NF
                     )
 
                     cpu_arch = S_cpu.architecture
                     gpu_arch = S_gpu.architecture
-                    
+
                     # CPU forward transform
                     SpeedyTransforms._fourier_batched!(
-                        S_cpu.scratch_memory.north, 
-                        S_cpu.scratch_memory.south, 
-                        grid_cpu, 
+                        S_cpu.scratch_memory.north,
+                        S_cpu.scratch_memory.south,
+                        grid_cpu,
                         S_cpu
                     )
                     # GPU forward transform
                     SpeedyTransforms._fourier_batched!(
-                        S_gpu.scratch_memory.north, 
-                        S_gpu.scratch_memory.south, 
-                        grid_gpu, 
+                        S_gpu.scratch_memory.north,
+                        S_gpu.scratch_memory.south,
+                        grid_gpu,
                         S_gpu
                     )
 
@@ -156,7 +164,7 @@ end
                     # NOTE: This is probably unnecessary, we can do a coarser 
                     # check for broad comparison of equivalence 
                     # for ij in eachindex(grid_cpu, grid_gpu_compare)
-                        # @test grid_cpu[ij] ≈ grid_gpu_compare[ij]
+                    # @test grid_cpu[ij] ≈ grid_gpu_compare[ij]
                     # end
                     @test grid_cpu ≈ grid_gpu_compare
                 end
@@ -171,8 +179,12 @@ end
             @testset for Grid in grid_list
                 @testset for NF in NFs
                     # Generate test data
-                    S_cpu, S_gpu, grid_cpu, grid_gpu, spec_cpu, spec_gpu = get_test_data(
-                        trunc=trunc, nlayers=nlayers, Grid=Grid, NF=NF
+                    S_cpu, S_gpu,
+                    grid_cpu,
+                    grid_gpu,
+                    spec_cpu,
+                    spec_gpu = get_test_data(
+                        trunc = trunc, nlayers = nlayers, Grid = Grid, NF = NF
                     )
 
                     cpu_arch = S_cpu.architecture
@@ -181,10 +193,11 @@ end
                     # Use scratch memory to store mid-transform data, using the 
                     # CPU legendre transform to generate the intermediate data
                     # NOTE: assumption of working Legendre transform
-                    g_north_cpu = S_cpu.scratch_memory.north    
-                    g_south_cpu = S_cpu.scratch_memory.south  
-                    scratch = S_cpu.scratch_memory.column 
-                    SpeedyTransforms._legendre!(g_north_cpu, g_south_cpu, spec_cpu, scratch, S_cpu)
+                    g_north_cpu = S_cpu.scratch_memory.north
+                    g_south_cpu = S_cpu.scratch_memory.south
+                    scratch = S_cpu.scratch_memory.column
+                    SpeedyTransforms._legendre!(
+                        g_north_cpu, g_south_cpu, spec_cpu, scratch, S_cpu)
                     # Copy to GPU
                     g_north_gpu = cu(g_north_cpu)
                     g_south_gpu = cu(g_south_cpu);
@@ -200,18 +213,17 @@ end
 
                     # Copy back to CPU again for comparison
                     grid_gpu_compare = on_architecture(cpu_arch, grid_gpu)
-                    
+
                     # NOTE: again, not necessary to be so fine-grained here
                     # for ij in eachindex(grid_cpu, grid_gpu_compare)
                     #     @test grid_cpu[ij] ≈ grid_gpu_compare[ij]
                     # end
-                    @test grid_cpu ≈ grid_gpu_compare 
+                    @test grid_cpu ≈ grid_gpu_compare
                 end
             end
         end
     end
 end
-
 
 @testset "fourier_serial: compare forward pass to CPU" begin
     @testset for trunc in spectral_resolutions
@@ -219,32 +231,36 @@ end
             @testset for Grid in grid_list
                 @testset for NF in NFs
                     # Generate test data
-                    S_cpu, S_gpu, grid_cpu, grid_gpu, spec_cpu, spec_gpu = get_test_data(
-                        trunc=trunc, nlayers=nlayers, Grid=Grid, NF=NF
+                    S_cpu, S_gpu,
+                    grid_cpu,
+                    grid_gpu,
+                    spec_cpu,
+                    spec_gpu = get_test_data(
+                        trunc = trunc, nlayers = nlayers, Grid = Grid, NF = NF
                     )
 
                     gpu_arch = S_gpu.architecture
                     cpu_arch = S_cpu.architecture
-                    
+
                     # CPU forward transform
                     SpeedyTransforms._fourier_serial!(
-                        S_cpu.scratch_memory.north, 
-                        S_cpu.scratch_memory.south, 
-                        grid_cpu, 
+                        S_cpu.scratch_memory.north,
+                        S_cpu.scratch_memory.south,
+                        grid_cpu,
                         S_cpu
                     )
                     # GPU forward transform
                     SpeedyTransforms._fourier_serial!(
-                        S_gpu.scratch_memory.north, 
-                        S_gpu.scratch_memory.south, 
-                        grid_gpu, 
+                        S_gpu.scratch_memory.north,
+                        S_gpu.scratch_memory.south,
+                        grid_gpu,
                         S_gpu
                     )
 
                     # Convert GPU to CPU for comparison
                     grid_gpu_compare = on_architecture(cpu_arch, grid_gpu)
 
-                    @test grid_cpu ≈ grid_gpu_compare 
+                    @test grid_cpu ≈ grid_gpu_compare
                 end
             end
         end
@@ -283,7 +299,7 @@ end
 
 #                     # Copy back to CPU again for comparison
 #                     grid_gpu_compare = adapt(Array, grid_gpu)
-                    
+
 #                     @test grid_cpu ≈ grid_gpu_compare
 #                 end
 #             end
@@ -297,23 +313,27 @@ end
             @testset for nlayers in nlayers_list
                 @testset for Grid in grid_list
                     # Generate test data
-                    S_cpu, S_gpu, grid_cpu, grid_gpu, spec_cpu, spec_gpu = get_test_data(
-                        trunc=trunc, nlayers=nlayers, Grid=Grid, NF=NF
+                    S_cpu, S_gpu,
+                    grid_cpu,
+                    grid_gpu,
+                    spec_cpu,
+                    spec_gpu = get_test_data(
+                        trunc = trunc, nlayers = nlayers, Grid = Grid, NF = NF
                     )
 
                     gpu_arch = S_gpu.architecture
-                    cpu_arch = S_cpu.architecture   
-                    
+                    cpu_arch = S_cpu.architecture
+
                     # CPU inverse transform
                     SpeedyTransforms._legendre!(
-                        S_cpu.scratch_memory.north, 
-                        S_cpu.scratch_memory.south, 
+                        S_cpu.scratch_memory.north,
+                        S_cpu.scratch_memory.south,
                         spec_cpu, S_cpu.scratch_memory.column, S_cpu
                     )
                     # GPU inverse transform
                     SpeedyTransforms._legendre!(
-                        S_gpu.scratch_memory.north, 
-                        S_gpu.scratch_memory.south, 
+                        S_gpu.scratch_memory.north,
+                        S_gpu.scratch_memory.south,
                         spec_gpu, S_gpu.scratch_memory.column, S_gpu
                     )
 
@@ -338,8 +358,12 @@ end
             @testset for nlayers in nlayers_list
                 @testset for Grid in grid_list
                     # Generate test data
-                    S_cpu, S_gpu, grid_cpu, grid_gpu, spec_cpu, spec_gpu = get_test_data(
-                        trunc=trunc, nlayers=nlayers, Grid=Grid, NF=NF
+                    S_cpu, S_gpu,
+                    grid_cpu,
+                    grid_gpu,
+                    spec_cpu,
+                    spec_gpu = get_test_data(
+                        trunc = trunc, nlayers = nlayers, Grid = Grid, NF = NF
                     )
 
                     gpu_arch = S_gpu.architecture
@@ -347,17 +371,17 @@ end
 
                     # Use scratch memory to store mid-transform data, using the 
                     # CPU fourier transform to generate the intermediate data
-                    f_north_cpu = S_cpu.scratch_memory.north    
-                    f_south_cpu = S_cpu.scratch_memory.south   
+                    f_north_cpu = S_cpu.scratch_memory.north
+                    f_south_cpu = S_cpu.scratch_memory.south
                     SpeedyTransforms._fourier!(f_north_cpu, f_south_cpu, grid_cpu, S_cpu)
                     # Copy to GPU
                     f_north_gpu = cu(f_north_cpu)
                     f_south_gpu = cu(f_south_cpu)
-                    
+
                     # CPU inverse transform
                     SpeedyTransforms._legendre!(
-                        spec_cpu,    
-                        f_north_cpu, 
+                        spec_cpu,
+                        f_north_cpu,
                         f_south_cpu,
                         S_cpu.scratch_memory.column,
                         S_cpu
@@ -365,8 +389,8 @@ end
                     # GPU inverse transform
                     SpeedyTransforms._legendre!(
                         spec_gpu,
-                        f_north_gpu, 
-                        f_south_gpu, 
+                        f_north_gpu,
+                        f_south_gpu,
                         S_gpu.scratch_memory.column,
                         S_gpu
                     )

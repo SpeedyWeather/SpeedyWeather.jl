@@ -2,18 +2,20 @@ full_grid_type(G::Type{<:AbstractFullGrid}) = nonparametric_type(G)
 
 ## SIZE
 get_nlon_max(Grid::Type{<:AbstractFullGrid}, nlat_half::Integer) = get_nlon(Grid, nlat_half)
-get_nlon_per_ring(Grid::Type{<:AbstractFullGrid}, nlat_half::Integer, j::Integer) =
+function get_nlon_per_ring(Grid::Type{<:AbstractFullGrid}, nlat_half::Integer, j::Integer)
     get_nlon(Grid, nlat_half)
-matrix_size(Grid::Type{<:AbstractFullGrid}, nlat_half::Integer) =
+end
+function matrix_size(Grid::Type{<:AbstractFullGrid}, nlat_half::Integer)
     (get_nlon(Grid, nlat_half), get_nlat(Grid, nlat_half))
+end
 
 ## INDEXING
 """$(TYPEDSIGNATURES) `UnitRange` for every grid point of full grid `Grid` of resolution `nlat_half`
 on ring `j` (`j=1` is closest ring around north pole, `j=nlat` around south pole)."""
 function each_index_in_ring(
-    Grid::Type{<:AbstractFullGrid},     # function for full grids
-    j::Integer,                         # ring index north to south
-    nlat_half::Integer,
+        Grid::Type{<:AbstractFullGrid},     # function for full grids
+        j::Integer,                         # ring index north to south
+        nlat_half::Integer
 )
     @boundscheck 0 < j <= get_nlat(Grid, nlat_half) || throw(BoundsError)    # valid ring index?
     nlon = get_nlon(Grid, nlat_half)    # number of longitudes per ring (const)
@@ -23,16 +25,16 @@ function each_index_in_ring(
 end
 
 # precompute ring indices for full grids
-function each_index_in_ring!(   
-    rings,
-    Grid::Type{<:AbstractFullGrid},
-    nlat_half::Integer,
+function each_index_in_ring!(
+        rings,
+        Grid::Type{<:AbstractFullGrid},
+        nlat_half::Integer
 )
     nlat = length(rings)                # number of latitude rings
     @boundscheck nlat == get_nlat(Grid, nlat_half) || throw(BoundsError)
 
     nlon = get_nlon(Grid, nlat_half)    # number of longitudes
-    index_end = 0                       
+    index_end = 0
     @inbounds for j in 1:nlat
         index_1st = index_end + 1       # 1st index is +1 from prev ring's last index
         index_end += nlon               # only calculate last index per ring
@@ -48,7 +50,6 @@ function get_lon(Grid::Type{<:AbstractFullGrid}, nlat_half::Integer)
 end
 
 function get_londlatds(Grid::Type{<:AbstractFullGrid}, nlat_half::Integer)
-
     lond = get_lond(Grid, nlat_half)        # vector of longitudes [0, 2π)
     latd = get_latd(Grid, nlat_half)        # vector of latitudes [90, -90]
     nlon = get_nlon(Grid, nlat_half)        # number of longitudes

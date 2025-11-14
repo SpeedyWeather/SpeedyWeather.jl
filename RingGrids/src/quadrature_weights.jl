@@ -10,7 +10,6 @@ of at least 96x48 (nlon x nlat) is sufficient for an exact transform with a T=31
 truncation."""
 gaussian_weights(nlat_half::Integer) = FastGaussQuadrature.gausslegendre(2nlat_half)[2]
 
-
 """$(TYPEDSIGNATURES)
 The Clenshaw-Curtis weights for a Clenshaw grid (full or octahedral) of size nlat_half.
 Clenshaw-Curtis weights are of length `nlat`, i.e. a vector for every latitude ring, pole to pole.
@@ -45,7 +44,9 @@ function equal_area_weights(Grid::Type{<:AbstractGrid}, nlat_half::Integer)
 end
 
 # SOLID ANGLES ΔΩ = sinθ Δθ Δϕ
-get_solid_angles(Grid::Type{<:AbstractGrid}, nlat_half::Integer) =
-    get_quadrature_weights(Grid, nlat_half) .* (2π./get_nlons(Grid, nlat_half))
-get_solid_angles(Grid::Type{<:Union{HEALPixGrid, OctaHEALPixGrid}}, nlat_half::Integer) =
+function get_solid_angles(Grid::Type{<:AbstractGrid}, nlat_half::Integer)
+    get_quadrature_weights(Grid, nlat_half) .* (2π ./ get_nlons(Grid, nlat_half))
+end
+function get_solid_angles(Grid::Type{<:Union{HEALPixGrid, OctaHEALPixGrid}}, nlat_half::Integer)
     4π/get_npoints(Grid, nlat_half)*ones(get_nlat(Grid, nlat_half))
+end

@@ -1,5 +1,5 @@
 @testset "Tracers: add!, delete!" begin
-    spectral_grid = SpectralGrid(nlayers=1)
+    spectral_grid = SpectralGrid(nlayers = 1)
     model = BarotropicModel(spectral_grid)
 
     add!(model, Tracer(:abc))
@@ -28,7 +28,7 @@
 end
 
 @testset "Tracers: activate!, deactivate!" begin
-    spectral_grid = SpectralGrid(nlayers=1)
+    spectral_grid = SpectralGrid(nlayers = 1)
     model = BarotropicModel(spectral_grid)
 
     add!(model, Tracer(:abc))
@@ -46,12 +46,12 @@ end
     @test model.tracers[:abc].active
 
     set!(simulation, abc = (λ, φ, σ) -> exp(-(λ-180)^2/10^2))
-    run!(simulation, period=Day(0))
+    run!(simulation, period = Day(0))
 
     # initial conditions
     abc0_spec = get_step(simulation.prognostic_variables.tracers[:abc], 1)
     abc0 = deepcopy(simulation.diagnostic_variables.grid.tracers_grid[:abc])
-    
+
     # set some grid in the same way and check that the tracer abc is correctly set
     # but compare in spectral space due to transform errors
     def = zero(abc0)
@@ -59,7 +59,7 @@ end
     @test abc0_spec == transform(def, model.spectral_transform)
 
     # check that everything is different after 10 days
-    run!(simulation, period=Day(10))
+    run!(simulation, period = Day(10))
     abc1 = simulation.diagnostic_variables.grid.tracers_grid[:abc]
 
     for ij in eachindex(abc0, abc1)
@@ -68,7 +68,7 @@ end
 
     # check that everything is the same if tracer deactivated
     deactivate!(simulation, Tracer(:abc))
-    run!(simulation, period=Day(10))
+    run!(simulation, period = Day(10))
     abc2 = simulation.diagnostic_variables.grid.tracers_grid[:abc]
 
     for ij in eachindex(abc1, abc2)
@@ -78,17 +78,17 @@ end
 
 @testset "Tracers primitive equation models" begin
     @testset for Model in (PrimitiveDryModel, PrimitiveWetModel)
-        spectral_grid = SpectralGrid(nlayers=8)
+        spectral_grid = SpectralGrid(nlayers = 8)
         model = Model(spectral_grid)
 
         add!(model, Tracer(:abc))
         simulation = initialize!(model)
         set!(simulation, abc = (λ, φ, σ) -> σ*exp(-(λ-180)^2/10^2))
-        run!(simulation, period=Day(0))
+        run!(simulation, period = Day(0))
         abc0 = simulation.diagnostic_variables.grid.tracers_grid[:abc][:, :]
 
         # check that everything is different after simulation
-        run!(simulation, period=Day(1))
+        run!(simulation, period = Day(1))
         abc1 = simulation.diagnostic_variables.grid.tracers_grid[:abc][:, :]
 
         for ij in eachindex(abc0, abc1)

@@ -1,6 +1,6 @@
-using BenchmarkTools 
+using BenchmarkTools
 
-abstract type AbstractBenchmarkSuite end 
+abstract type AbstractBenchmarkSuite end
 @kwdef mutable struct BenchmarkSuite <: AbstractBenchmarkSuite
     title::String
     nruns::Int = 1
@@ -38,7 +38,7 @@ function run_benchmark_suite!(suite::BenchmarkSuite)
         dynamics = suite.dynamics[i]
         physics = suite.physics[i]
 
-        spectral_grid = SpectralGrid(;NF, trunc, Grid, nlayers)
+        spectral_grid = SpectralGrid(; NF, trunc, Grid, nlayers)
         suite.nlat[i] = spectral_grid.nlat
 
         model = Model(spectral_grid)
@@ -54,10 +54,11 @@ function run_benchmark_suite!(suite::BenchmarkSuite)
         suite.memory[i] = Base.summarysize(simulation)
 
         nsteps = n_timesteps(trunc, nlayers)
-        period = Second(round(Int,model.time_stepping.Δt_sec * (nsteps+1)))
+        period = Second(round(Int, model.time_stepping.Δt_sec * (nsteps+1)))
         run!(simulation; period)
 
-        time_elapsed = model.feedback.progress_meter.tlast - model.feedback.progress_meter.tinit
+        time_elapsed = model.feedback.progress_meter.tlast -
+                       model.feedback.progress_meter.tinit
         sypd = model.time_stepping.Δt_sec*nsteps / (time_elapsed * 365.25)
 
         suite.Δt[i] = model.time_stepping.Δt_sec
@@ -66,12 +67,11 @@ function run_benchmark_suite!(suite::BenchmarkSuite)
 end
 
 function write_results(md, suite::BenchmarkSuite)
-
     write(md, "\n## $(suite.title)\n\n")
 
     print_NF = any(suite.NF .!= suite.NF[1])
     print_Grid = any(suite.Grid .!= suite.Grid[1])
-    print_nlat = any(suite.nlat .!= suite.nlat[1]) 
+    print_nlat = any(suite.nlat .!= suite.nlat[1])
     print_dynamics = any(suite.dynamics .!= suite.dynamics[1])
     print_physics = any(suite.physics .!= suite.physics[1])
 
@@ -85,14 +85,13 @@ function write_results(md, suite::BenchmarkSuite)
     column_header *= print_physics ? "| Physics " : ""
     column_header *= "| Δt | SYPD | Memory|"
 
-    ncolumns = length(findall('|',column_header)) - 1
+    ncolumns = length(findall('|', column_header)) - 1
     second_row = repeat("| - ", ncolumns) * "|"
 
-    write(md,"$column_header\n")
-    write(md,"$second_row\n")
+    write(md, "$column_header\n")
+    write(md, "$second_row\n")
 
     for i in 1:suite.nruns
-
         row = "| $(suite.model[i]) "
         row *= print_NF ? "| $(suite.NF[i]) " : ""
         row *= "| $(suite.trunc[i]) "
@@ -100,19 +99,19 @@ function write_results(md, suite::BenchmarkSuite)
         row *= print_Grid ? "| $(suite.Grid[i]) " : ""
         row *= print_nlat ? "| $(suite.nlat[i]) " : ""
         row *= print_dynamics ? "| $(suite.dynamics[i]) " : ""
-        row *= print_physics  ? "| $(suite.physics[i]) " : ""
+        row *= print_physics ? "| $(suite.physics[i]) " : ""
 
-        Δt = round(Int,suite.Δt[i])
+        Δt = round(Int, suite.Δt[i])
         sypd = suite.SYPD[i]
         SYPD = isfinite(sypd) ? round(Int, sypd) : 0
         memory = prettymemory(suite.memory[i])
         row *= "| $Δt | $SYPD | $memory |"
 
-        write(md,"$row\n")
+        write(md, "$row\n")
     end
-end 
+end
 
-abstract type AbstractBenchmarkSuiteTimed <: AbstractBenchmarkSuite end 
+abstract type AbstractBenchmarkSuiteTimed <: AbstractBenchmarkSuite end
 
 @kwdef mutable struct BenchmarkSuiteDynamics <: AbstractBenchmarkSuiteTimed
     title::String
@@ -124,34 +123,39 @@ abstract type AbstractBenchmarkSuiteTimed <: AbstractBenchmarkSuite end
     Grid::Vector = fill(SpeedyWeather.DEFAULT_GRID, nruns)
     nlat::Vector{Int} = fill(0, nruns)
     function_names::Vector{String} = default_function_names()
-    time::Vector{Vector{Float64}} = [fill(0.0, length(function_names)) for i=1:nruns]
-    memory::Vector{Vector{Int}} = [fill(0, length(function_names)) for i=1:nruns]
-    allocs::Vector{Vector{Int}} = [fill(0, length(function_names)) for i=1:nruns]
-end 
+    time::Vector{Vector{Float64}} = [fill(0.0, length(function_names)) for i in 1:nruns]
+    memory::Vector{Vector{Int}} = [fill(0, length(function_names)) for i in 1:nruns]
+    allocs::Vector{Vector{Int}} = [fill(0, length(function_names)) for i in 1:nruns]
+end
 
-default_function_names() = ["pressure_gradient_flux!", "linear_virtual_temperature!", "temperature_anomaly!", "geopotential!", "vertical_integration!", "surface_pressure_tendency!", "vertical_velocity!", "linear_pressure_gradient!", "vertical_advection!","vordiv_tendencies!", "temperature_tendency!", "humidity_tendency!", "bernoulli_potential!"]
+function default_function_names()
+    ["pressure_gradient_flux!", "linear_virtual_temperature!",
+        "temperature_anomaly!", "geopotential!", "vertical_integration!",
+        "surface_pressure_tendency!", "vertical_velocity!",
+        "linear_pressure_gradient!", "vertical_advection!", "vordiv_tendencies!",
+        "temperature_tendency!", "humidity_tendency!", "bernoulli_potential!"]
+end
 
-function add_results!(suite::AbstractBenchmarkSuiteTimed, trial::BenchmarkTools.Trial, i_run::Integer, i_func::Integer)
-
+function add_results!(suite::AbstractBenchmarkSuiteTimed,
+        trial::BenchmarkTools.Trial, i_run::Integer, i_func::Integer)
     t = minimum(trial)
 
-    suite.time[i_run][i_func] = t.time 
-    suite.memory[i_run][i_func] = t.memory 
+    suite.time[i_run][i_func] = t.time
+    suite.memory[i_run][i_func] = t.memory
     suite.allocs[i_run][i_func] = t.allocs
 
     return suite
-end 
+end
 
 function run_benchmark_suite!(suite::BenchmarkSuiteDynamics)
     for i in 1:suite.nruns
-
         Model = suite.model[i]
         NF = suite.NF[i]
         trunc = suite.trunc[i]
         nlayers = suite.nlayers[i]
         Grid = suite.Grid[i]
 
-        spectral_grid = SpectralGrid(;NF, trunc, Grid, nlayers)
+        spectral_grid = SpectralGrid(; NF, trunc, Grid, nlayers)
         suite.nlat[i] = spectral_grid.nlat
 
         model = Model(spectral_grid)
@@ -159,9 +163,10 @@ function run_benchmark_suite!(suite::BenchmarkSuiteDynamics)
         simulation = initialize!(model)
 
         diagn = simulation.diagnostic_variables
-        progn = simulation.prognostic_variables 
-        lf = 2 
-        (; orography, geometry, spectral_transform, geopotential, atmosphere, implicit) = model
+        progn = simulation.prognostic_variables
+        lf = 2
+        (; orography, geometry, spectral_transform,
+            geopotential, atmosphere, implicit) = model
         lf_implicit = implicit.α == 0 ? lf : 1
 
         b = @benchmark SpeedyWeather.pressure_gradient_flux!($diagn, $progn, $lf, $spectral_transform)
@@ -185,7 +190,8 @@ function run_benchmark_suite!(suite::BenchmarkSuiteDynamics)
         b = @benchmark SpeedyWeather.vertical_velocity!($diagn, $geometry)
         add_results!(suite, b, i, 7)
 
-        b = @benchmark SpeedyWeather.linear_pressure_gradient!($diagn, $progn, $lf_implicit, $atmosphere, $implicit)
+        b = @benchmark SpeedyWeather.linear_pressure_gradient!(
+            $diagn, $progn, $lf_implicit, $atmosphere, $implicit)
         add_results!(suite, b, i, 8)
 
         b = @benchmark SpeedyWeather.vertical_advection!($diagn, $model)
@@ -205,36 +211,33 @@ function run_benchmark_suite!(suite::BenchmarkSuiteDynamics)
     end
 
     return suite
-end 
+end
 
 function write_results(md, suite::AbstractBenchmarkSuiteTimed)
-
     write(md, "\n## $(suite.title)\n\n")
 
     for i_run in 1:suite.nruns
-
         title_row = "$(suite.model[i_run]) "
-        title_row *= "| $(suite.NF[i_run]) " 
+        title_row *= "| $(suite.NF[i_run]) "
         title_row *= "| T$(suite.trunc[i_run]) "
         title_row *= "L$(suite.nlayers[i_run]) "
-        title_row *= "| $(suite.Grid[i_run]) " 
-        title_row *= "| $(suite.nlat[i_run]) Rings" 
+        title_row *= "| $(suite.Grid[i_run]) "
+        title_row *= "| $(suite.nlat[i_run]) Rings"
 
         write(md, "\n### $title_row\n\n")
 
         column_header = "| Function "
         column_header *= "| Time "
         column_header *= "| Memory "
-        column_header *= "| Allocations |" 
+        column_header *= "| Allocations |"
 
-        ncolumns = length(findall('|',column_header)) - 1
+        ncolumns = length(findall('|', column_header)) - 1
         second_row = repeat("| - ", ncolumns) * "|"
 
-        write(md,"$column_header\n")
-        write(md,"$second_row\n")
+        write(md, "$column_header\n")
+        write(md, "$second_row\n")
 
         for i_func in 1:length(suite.function_names)
-
             time = BenchmarkTools.prettytime(suite.time[i_run][i_func])
             memory = BenchmarkTools.prettymemory(suite.memory[i_run][i_func])
 
@@ -243,7 +246,7 @@ function write_results(md, suite::AbstractBenchmarkSuiteTimed)
             row *= "| $memory"
             row *= "| $(suite.allocs[i_run][i_func]) |"
 
-            write(md,"$row\n")
+            write(md, "$row\n")
         end
     end
-end 
+end

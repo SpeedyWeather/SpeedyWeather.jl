@@ -50,59 +50,58 @@ animate(nc_file, variable="temp", projection="+proj=ortho +lon_0=0 +lat_0=30")
 ```
 """
 function SpeedyWeather.animate(
-    ds::NCDataset;
-    variable::String = "temp",
-    level::Int = 1,
-    transient_timesteps::Int = 0,
-    output_file::String = "animation.mp4",
-    plot_func = :meshimage,
-    colormap = :viridis,
-    framerate::Int = 15,
-    title::String = "",
-    colorrange = nothing,
-    projection = "+proj=robin",
-    figure_size = (800, 600),
-    coastlines::Bool = true,
-    time_label::Bool = true,
-    show_colorbar::Bool = true,
-    colorbar_kwargs = (),
-    geoaxis_kwargs = (:xgridvisible => false, :ygridvisible => false, :titlesize => 20),
-    plot_kwargs = ()
-)   
-
+        ds::NCDataset;
+        variable::String = "temp",
+        level::Int = 1,
+        transient_timesteps::Int = 0,
+        output_file::String = "animation.mp4",
+        plot_func = :meshimage,
+        colormap = :viridis,
+        framerate::Int = 15,
+        title::String = "",
+        colorrange = nothing,
+        projection = "+proj=robin",
+        figure_size = (800, 600),
+        coastlines::Bool = true,
+        time_label::Bool = true,
+        show_colorbar::Bool = true,
+        colorbar_kwargs = (),
+        geoaxis_kwargs = (:xgridvisible => false, :ygridvisible => false, :titlesize => 20),
+        plot_kwargs = ()
+)
     @assert plot_func in (:surface, :heatmap, :meshimage) "plot_func must be :surface, :heatmap or :meshimage"
 
     # Get dimensions
     lon = longitude_shift_180(ds["lon"][:]) # longitudes -180 to 180
     lat = ds["lat"][:]
     time = ds["time"][:]
-    
+
     # Get time units for proper labeling
     time_units = ds["time"].attrib["units"]
-    
+
     # Get variable metadata
     var_long_name = get(ds[variable].attrib, "long_name", variable)
     var_units = get(ds[variable].attrib, "units", "")
-    
+
     # Set title if not provided
     if isempty(title)
         title = var_long_name
     end
-    
+
     # Check if the variable is 3D (has a vertical dimension)
     is_3d = "layer" in dimnames(ds[variable])
-    
+
     # Create the figure
     fig = Figure(size = figure_size)
-    
+
     # Create the axis
     ax = GeoAxis(
-            fig[1, 1],
-            title = title,
-            dest = projection;
-            geoaxis_kwargs...
-        )
-    
+        fig[1, 1],
+        title = title,
+        dest = projection;
+        geoaxis_kwargs...
+    )
+
     tsteps = Observable(transient_timesteps + 1)
 
     # Create data based on tsteps
@@ -113,17 +112,18 @@ function SpeedyWeather.animate(
         # For 2D variables
         data = @lift ds[variable][:, :, $tsteps]
     end
-    
+
     # Determine color range if not specified
     if isnothing(colorrange)
         # Sample data to determine a good color range
         sample_indices = min(10, length(time))
 
-        sample_data = is_3d ? ds[variable][:, :, level, 1:sample_indices] : ds[variable][:, :, 1:sample_indices]
-        
+        sample_data = is_3d ? ds[variable][:, :, level, 1:sample_indices] :
+                      ds[variable][:, :, 1:sample_indices]
+
         # Calculate min and max across samples
         sample_data = filter(!isnan, sample_data)
-        
+
         if !isempty(sample_data)
             data_min, data_max = extrema(sample_data)
             # Add a small buffer to the range
@@ -133,21 +133,24 @@ function SpeedyWeather.animate(
             colorrange = (-1, 1)  # Fallback if all data is NaN
         end
     end
-    
+
     # Create the plot
     if plot_func == :surface
-        hm = surface!(ax, lon, lat, data; colormap=colormap, colorrange=colorrange, plot_kwargs...)
+        hm = surface!(ax, lon, lat, data; colormap = colormap,
+            colorrange = colorrange, plot_kwargs...)
     elseif plot_func == :heatmap
-        hm = heatmap!(ax, lon, lat, data; colormap=colormap, colorrange=colorrange, plot_kwargs...)
+        hm = heatmap!(ax, lon, lat, data; colormap = colormap,
+            colorrange = colorrange, plot_kwargs...)
     elseif plot_func == :meshimage
-        hm = meshimage!(ax, lon[1]..lon[end], lat[1]..lat[end], data; colormap=colormap, colorrange=colorrange, plot_kwargs...)
+        hm = meshimage!(ax, lon[1]..lon[end], lat[1]..lat[end], data;
+            colormap = colormap, colorrange = colorrange, plot_kwargs...)
     end
-    
+
     # Add colorbar
     if show_colorbar
         cb = Colorbar(fig[1, 2], hm, label = var_units; colorbar_kwargs...)
     end
-    
+
     # Add time label
     if time_label
         x_position = show_colorbar ? (1:2) : 1
@@ -156,14 +159,14 @@ function SpeedyWeather.animate(
 
     # Add coastlines 
     if coastlines
-        lines!(GeoMakie.coastlines(); color=:white)
+        lines!(GeoMakie.coastlines(); color = :white)
     end
 
     # remove grid and grid labels
     hidedecorations!(ax)
-    
+
     # Create the animation
-    record(fig, output_file, (transient_timesteps + 1):length(time); framerate=framerate) do frame
+    record(fig, output_file, (transient_timesteps + 1):length(time); framerate = framerate) do frame
         # Update the Observable
         tsteps[] = frame
 
@@ -172,7 +175,7 @@ function SpeedyWeather.animate(
             t_label.text = "Time: $(time[frame]) $(time_units)"
         end
     end
-    
+
     return output_file
 end
 
@@ -183,10 +186,9 @@ CairoMakie or GtkMakie to be loaded at the time of calling this function.
 Takes the same keyword arguments as [`SpeedyWeather.animate`](@ref).
 """
 function SpeedyWeather.animate(
-    file_path::String;
-    kwargs...
+        file_path::String;
+        kwargs...
 )
-
     file = NCDataset(file_path)
     output_file = animate(file; kwargs...)
     close(file)
@@ -202,8 +204,8 @@ CairoMakie or GtkMakie to be loaded at the time of calling this function.
 Takes the same keyword arguments as [`SpeedyWeather.animate`](@ref).
 """
 function SpeedyWeather.animate(
-    simulation::Simulation;
-    kwargs...
+        simulation::Simulation;
+        kwargs...
 )
     # Extract the NetCDF file path from the simulation object
     if simulation.model.output.active
@@ -211,12 +213,12 @@ function SpeedyWeather.animate(
     else
         error("NetCDF output is not active. Make sure the simulation has been run with NetCDF output enabled.")
     end
-    
+
     # Check if the NetCDF file exists
     if !isfile(nc_file)
         error("NetCDF file $(nc_file) not found. Make sure the simulation has been run with NetCDF output enabled.")
     end
-    
+
     # Call animate with the extracted file path
     return animate(
         nc_file;

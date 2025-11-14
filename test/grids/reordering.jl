@@ -1,12 +1,14 @@
 @testset "Reordering identity" begin
-
     @testset for nlat_half in (4, 8, 16, 32, 64)
         grid = OctaHEALPixGrid(nlat_half)
         N = RingGrids.get_npoints(grid)
 
-        @test [RingGrids.rcq2ring(RingGrids.ring2rcq(ij, grid)..., grid) for ij in 1:N] == 1:N
-        @test [RingGrids.nest2ring(RingGrids.ring2nest(ij, grid)..., grid) for ij in 1:N] == 1:N
-        @test [RingGrids.rcq2nest(RingGrids.nest2rcq(ij, grid)..., grid) for ij in 1:N] == 1:N
+        @test [RingGrids.rcq2ring(RingGrids.ring2rcq(ij, grid)..., grid) for ij in 1:N] ==
+              1:N
+        @test [RingGrids.nest2ring(RingGrids.ring2nest(ij, grid)..., grid) for ij in 1:N] ==
+              1:N
+        @test [RingGrids.rcq2nest(RingGrids.nest2rcq(ij, grid)..., grid) for ij in 1:N] ==
+              1:N
 
         field = rand(grid)
         field2 = RingGrids.ring_order(RingGrids.nested_order(field))

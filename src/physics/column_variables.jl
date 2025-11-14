@@ -1,13 +1,13 @@
 # function barrier
-function get_column!(   
-    C::ColumnVariables,
-    D::DiagnosticVariables,
-    P::PrognosticVariables,
-    ij::Integer,        # grid point index
-    jring::Integer,     # ring index 1 around North Pole to J around South Pole
-    model::PrimitiveEquation,
+function get_column!(
+        C::ColumnVariables,
+        D::DiagnosticVariables,
+        P::PrognosticVariables,
+        ij::Integer,        # grid point index
+        jring::Integer,     # ring index 1 around North Pole to J around South Pole
+        model::PrimitiveEquation
 )
-    get_column!(C, D, P, ij, jring, 
+    get_column!(C, D, P, ij, jring,
         model.geometry,
         model.planet,
         model.orography,
@@ -19,19 +19,18 @@ end
 $(TYPEDSIGNATURES)
 Update `C::ColumnVariables` by copying the prognostic variables from `D::DiagnosticVariables`
 at gridpoint index `ij`. Provide `G::Geometry` for coordinate information."""
-function get_column!(   
-    C::ColumnVariables,
-    D::DiagnosticVariables,
-    P::PrognosticVariables,
-    ij::Integer,        # grid point index
-    jring::Integer,     # ring index 1 around North Pole to J around South Pole
-    geometry::Geometry,
-    planet::AbstractPlanet,
-    orography::AbstractOrography,
-    land_sea_mask::AbstractLandSeaMask,
-    implicit::AbstractImplicit,
+function get_column!(
+        C::ColumnVariables,
+        D::DiagnosticVariables,
+        P::PrognosticVariables,
+        ij::Integer,        # grid point index
+        jring::Integer,     # ring index 1 around North Pole to J around South Pole
+        geometry::Geometry,
+        planet::AbstractPlanet,
+        orography::AbstractOrography,
+        land_sea_mask::AbstractLandSeaMask,
+        implicit::AbstractImplicit
 )
-
     (; σ_levels_full, ln_σ_levels_full) = geometry
     (; temp_profile) = implicit     # reference temperature
 
@@ -49,7 +48,7 @@ function get_column!(
     lnpₛ = D.grid.pres_grid[ij]             # logarithm of surf pressure used in dynamics
     pₛ = exp(lnpₛ)                          # convert back here
     C.ln_pres .= ln_σ_levels_full .+ lnpₛ   # log pressure on every level ln(p) = ln(σ) + ln(pₛ)
-    C.pres[1:end-1] .= σ_levels_full.*pₛ    # pressure on every level p = σ*pₛ
+    C.pres[1:(end - 1)] .= σ_levels_full .* pₛ    # pressure on every level p = σ*pₛ
     C.pres[end] = pₛ                        # last element is surface pressure pₛ
 
     (; u_grid_prev, v_grid_prev, temp_grid_prev, humid_grid_prev) = D.grid
@@ -60,7 +59,7 @@ function get_column!(
         C.u[k] = u_grid_prev[ij, k]
         C.v[k] = v_grid_prev[ij, k]
         C.temp[k] = temp_grid_prev[ij, k] + temp_profile[k]
-        C.humid[k] = humid_grid_prev[ij, k] 
+        C.humid[k] = humid_grid_prev[ij, k]
     end
 
     # extract value from random pattern for this column
@@ -79,30 +78,30 @@ end
 
 """Recalculate ring index if not provided."""
 function get_column!(
-    C::ColumnVariables,
-    D::DiagnosticVariables,
-    P::PrognosticVariables,
-    ij::Int,            # grid point index
-    model::PrimitiveEquation
+        C::ColumnVariables,
+        D::DiagnosticVariables,
+        P::PrognosticVariables,
+        ij::Int,            # grid point index
+        model::PrimitiveEquation
 )
     rings = eachring(D.grid.vor_grid)
     jring = whichring(ij, rings)
     get_column!(C, D, P, ij, jring, model)
 end
 
-function get_column(    S::AbstractSimulation,
-                        ij::Integer,
-                        verbose::Bool = true)
+function get_column(S::AbstractSimulation,
+        ij::Integer,
+        verbose::Bool = true)
     (; prognostic_variables, diagnostic_variables, model) = S
 
     column = deepcopy(S.diagnostic_variables.column)
     reset_column!(column)
 
     get_column!(column,
-                diagnostic_variables,
-                prognostic_variables,
-                ij,
-                model)
+        diagnostic_variables,
+        prognostic_variables,
+        ij,
+        model)
 
     # execute all parameterizations for this column to return a consistent state
     parameterization_tendencies!(column, S.prognostic_variables, S.model)
@@ -113,10 +112,10 @@ end
 
 # function barrier
 function write_column_tendencies!(
-    diagn::DiagnosticVariables,
-    column::ColumnVariables,
-    model::PrimitiveEquation,
-    ij::Integer,                                # grid point index
+        diagn::DiagnosticVariables,
+        column::ColumnVariables,
+        model::PrimitiveEquation,
+        ij::Integer                                # grid point index
 )
     write_column_tendencies!(diagn, column, model.planet, model.atmosphere, ij)
 end
@@ -126,11 +125,11 @@ $(TYPEDSIGNATURES)
 Write the parametrization tendencies from `C::ColumnVariables` into the horizontal fields
 of tendencies stored in `D::DiagnosticVariables` at gridpoint index `ij`."""
 function write_column_tendencies!(
-    diagn::DiagnosticVariables,
-    column::ColumnVariables,
-    planet::AbstractPlanet,
-    atmosphere::AbstractAtmosphere,
-    ij::Integer,                                # grid point index
+        diagn::DiagnosticVariables,
+        column::ColumnVariables,
+        planet::AbstractPlanet,
+        atmosphere::AbstractAtmosphere,
+        ij::Integer                                # grid point index
 )
     (; nlayers) = column
     @boundscheck nlayers == diagn.nlayers || throw(BoundsError)
@@ -149,17 +148,19 @@ function write_column_tendencies!(
     # accumulate snow [m]
     diagn.physics.snow_large_scale[ij] += column.snow_large_scale
     diagn.physics.snow_convection[ij] += column.snow_convection
-    
+
     # total precipitation rate (rain+snow) [kg/m²/s]
     ρ = atmosphere.water_density
-    diagn.physics.total_precipitation_rate[ij] =
-        (column.rain_rate_large_scale + column.rain_rate_convection +
-         column.snow_rate_large_scale + column.snow_rate_convection) * ρ
+    diagn.physics.total_precipitation_rate[ij] = (column.rain_rate_large_scale +
+                                                  column.rain_rate_convection +
+                                                  column.snow_rate_large_scale +
+                                                  column.snow_rate_convection) * ρ
 
     # Cloud top in height [m] from geopotential height divided by gravity, 0 for no clouds
-    diagn.physics.cloud_top[ij] = column.cloud_top == nlayers+1 ? 0 : column.geopot[column.cloud_top]
+    diagn.physics.cloud_top[ij] = column.cloud_top == nlayers+1 ? 0 :
+                                  column.geopot[column.cloud_top]
     diagn.physics.cloud_top[ij] /= planet.gravity
-    
+
     # just use layer index 1 (top) to nlayers (surface) for analysis, but 0 for no clouds
     # diagn.physics.cloud_top[ij] = column.cloud_top == nlayers+1 ? 0 : column.cloud_top
 
@@ -182,11 +183,11 @@ function write_column_tendencies!(
     diagn.physics.surface_shortwave_up[ij] = column.surface_shortwave_up
     diagn.physics.ocean.surface_shortwave_up[ij] = column.surface_shortwave_up_ocean
     diagn.physics.land.surface_shortwave_up[ij] = column.surface_shortwave_up_land
-    
+
     # longwave
     # longwave down is indepedendent of ocean/land
     diagn.physics.surface_longwave_down[ij] = column.surface_longwave_down
-    
+
     diagn.physics.surface_longwave_up[ij] = column.surface_longwave_up
     diagn.physics.ocean.surface_longwave_up[ij] = column.surface_longwave_up_ocean
     diagn.physics.land.surface_longwave_up[ij] = column.surface_longwave_up_land
@@ -196,7 +197,8 @@ function write_column_tendencies!(
 
     # store land-sea mask weighted albedo
     (; land_fraction) = column
-    diagn.physics.albedo[ij] = (1 - land_fraction)*column.albedo_ocean + land_fraction*column.albedo_land
+    diagn.physics.albedo[ij] = (1 - land_fraction)*column.albedo_ocean +
+                               land_fraction*column.albedo_land
 
     return nothing
 end
@@ -205,7 +207,7 @@ end
 $(TYPEDSIGNATURES)
 Set the accumulators (tendencies but also vertical sums and similar) back to zero
 for `column` to be reused at other grid points."""
-function reset_column!(column::ColumnVariables{NF}) where NF
+function reset_column!(column::ColumnVariables{NF}) where {NF}
 
     # set tendencies to 0 for += accumulation
     column.u_tend .= 0
@@ -229,7 +231,7 @@ function reset_column!(column::ColumnVariables{NF}) where NF
     column.rain_large_scale = 0
     column.rain_rate_convection = 0         # instantaneously overwritten, but convection may escape early
     column.rain_rate_large_scale = 0
-    
+
     # same for snow
     column.snow_convection = 0              # set back to zero to accumulate in the vertical
     column.snow_large_scale = 0

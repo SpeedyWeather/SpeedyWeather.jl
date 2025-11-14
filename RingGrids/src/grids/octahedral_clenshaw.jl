@@ -33,15 +33,19 @@ Architectures.nonparametric_type(::Type{<:OctahedralClenshawGrid}) = OctahedralC
 full_grid_type(::Type{<:OctahedralClenshawGrid}) = FullClenshawGrid
 
 # FIELD
-const OctahedralClenshawField{T, N} = Field{T, N, ArrayType, Grid} where {ArrayType, Grid<:OctahedralClenshawGrid}
+const OctahedralClenshawField{
+    T, N} = Field{T, N, ArrayType, Grid} where {ArrayType, Grid <: OctahedralClenshawGrid}
 
 # define grid_type (i) without T, N, (ii) with T, (iii) with T, N but not with <:?Field
 # to not have precendence over grid_type(::Type{Field{...})
 grid_type(::Type{OctahedralClenshawField}) = OctahedralClenshawGrid
-grid_type(::Type{OctahedralClenshawField{T}}) where T = OctahedralClenshawGrid
+grid_type(::Type{OctahedralClenshawField{T}}) where {T} = OctahedralClenshawGrid
 grid_type(::Type{OctahedralClenshawField{T, N}}) where {T, N} = OctahedralClenshawGrid
 
-function Base.showarg(io::IO, F::Field{T, N, ArrayType, Grid}, toplevel) where {T, N, ArrayType, Grid<:OctahedralClenshawGrid{A}} where A <: AbstractArchitecture
+function Base.showarg(io::IO,
+        F::Field{T, N, ArrayType, Grid},
+        toplevel) where {T, N, ArrayType,
+        Grid <: OctahedralClenshawGrid{A}} where {A <: AbstractArchitecture}
     print(io, "OctahedralClenshawField{$T, $N}")
     toplevel && print(io, " as ", nonparametric_type(ArrayType))
     toplevel && print(io, " on ", F.grid.architecture)
@@ -53,50 +57,59 @@ npoints_pole(::Type{<:OctahedralClenshawGrid}) = 16
 npoints_added_per_ring(::Type{<:OctahedralClenshawGrid}) = 4
 
 function get_npoints(::Type{<:OctahedralClenshawGrid}, nlat_half::Integer)
-    m, o = npoints_added_per_ring(OctahedralClenshawGrid), npoints_pole(OctahedralClenshawGrid)
+    m,
+    o = npoints_added_per_ring(OctahedralClenshawGrid), npoints_pole(OctahedralClenshawGrid)
     return max(0, m*nlat_half^2 + 2o*nlat_half - o)     # to avoid negative for nlat_half = 0
 end
 
 function get_nlat_half(::Type{<:OctahedralClenshawGrid}, npoints::Integer)
-    m, o = npoints_added_per_ring(OctahedralClenshawGrid), npoints_pole(OctahedralClenshawGrid)
+    m,
+    o = npoints_added_per_ring(OctahedralClenshawGrid), npoints_pole(OctahedralClenshawGrid)
     return round(Int, -o/m + sqrt(((o/m)^2 + (o+npoints)/m)))
 end
 
 function get_nlon_per_ring(Grid::Type{<:OctahedralClenshawGrid}, nlat_half::Integer, j::Integer)
     nlat = get_nlat(Grid, nlat_half)
     @assert 0 < j <= nlat "Ring $j is outside O$nlat_half grid."
-    m, o = npoints_added_per_ring(OctahedralClenshawGrid), npoints_pole(OctahedralClenshawGrid)
+    m,
+    o = npoints_added_per_ring(OctahedralClenshawGrid), npoints_pole(OctahedralClenshawGrid)
     j = j > nlat_half ? nlat - j + 1 : j      # flip north south due to symmetry
     return o + m*j
 end
 
-matrix_size(grid::Grid) where {Grid<:OctahedralClenshawGrid} = matrix_size(Grid, grid.nlat_half)
+function matrix_size(grid::Grid) where {Grid <: OctahedralClenshawGrid}
+    matrix_size(Grid, grid.nlat_half)
+end
 function matrix_size(::Type{<:OctahedralClenshawGrid}, nlat_half::Integer)
-    m, o = npoints_added_per_ring(OctahedralClenshawGrid), npoints_pole(OctahedralClenshawGrid)
+    m,
+    o = npoints_added_per_ring(OctahedralClenshawGrid), npoints_pole(OctahedralClenshawGrid)
     m != 4 && @warn "This algorithm has not been generalised for m!=4."
     N = (o + 4nlat_half)÷2
     return (N, N)
 end
 
 ## COORDINATES
-get_latd(::Type{<:OctahedralClenshawGrid}, nlat_half::Integer) = get_latd(FullClenshawGrid, nlat_half)
+function get_latd(::Type{<:OctahedralClenshawGrid}, nlat_half::Integer)
+    get_latd(FullClenshawGrid, nlat_half)
+end
 function get_lond_per_ring(Grid::Type{<:OctahedralClenshawGrid}, nlat_half::Integer, j::Integer)
     nlon = get_nlon_per_ring(Grid, nlat_half, j)
-    return collect(0:360/nlon:360-180/nlon)
+    return collect(0:(360 / nlon):(360 - 180 / nlon))
 end
 
 ## QUADRATURE
-get_quadrature_weights(::Type{<:OctahedralClenshawGrid}, nlat_half::Integer) =
+function get_quadrature_weights(::Type{<:OctahedralClenshawGrid}, nlat_half::Integer)
     clenshaw_curtis_weights(nlat_half)
+end
 
 ## INDEXING
-function each_index_in_ring!(   rings,
-                                Grid::Type{<:OctahedralClenshawGrid},
-                                nlat_half::Integer) # resolution param
-
+function each_index_in_ring!(rings,
+        Grid::Type{<:OctahedralClenshawGrid},
+        nlat_half::Integer) # resolution param
     nlat = length(rings)
     @boundscheck nlat == get_nlat(Grid, nlat_half) || throw(BoundsError)
-    m, o = npoints_added_per_ring(OctahedralClenshawGrid), npoints_pole(OctahedralClenshawGrid)
+    m,
+    o = npoints_added_per_ring(OctahedralClenshawGrid), npoints_pole(OctahedralClenshawGrid)
 
     index_end = 0
     @inbounds for j in 1:nlat_half                  # North incl Eq only
@@ -104,9 +117,8 @@ function each_index_in_ring!(   rings,
         index_end += o + m*j                        # add number of grid points per ring
         rings[j] = index_1st:index_end              # turn into UnitRange
     end
-    @inbounds for (j, j_mirrored) in zip(   nlat_half+1:nlat,       # South only
-                                            nlat-nlat_half:-1:1)    # reverse index
-
+    @inbounds for (j, j_mirrored) in zip((nlat_half + 1):nlat,       # South only
+        (nlat - nlat_half):-1:1)    # reverse index
         index_1st = index_end + 1                   # 1st index is +1 from prev ring's last index
         index_end += o + m*j_mirrored               # add number of grid points per ring
         rings[j] = index_1st:index_end              # turn into UnitRange
@@ -138,7 +150,7 @@ Adapt.@adapt_structure OctahedralClenshawGrid
 #                     quadrant_rotation::NTuple{4, Integer}=(0, 1, 2, 3),     # = 0˚, 90˚, 180˚, 270˚ anti-clockwise
 #                     matrix_quadrant::NTuple{4, Tuple{Integer, Integer}}=((2, 2), (1, 2), (1, 1), (2, 1)),
 #                     ) where T
-    
+
 #     # TODO make m, o dependent
 #     m, o = npoints_added_per_ring(OctahedralGaussianArray), npoints_pole(OctahedralGaussianArray)
 #     m != 4 || o != 16 && @warn "This algorithm has not been generalised for m!=4, o!=16."

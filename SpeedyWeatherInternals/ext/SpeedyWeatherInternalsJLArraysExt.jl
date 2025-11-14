@@ -1,33 +1,37 @@
 module SpeedyWeatherInternalsJLArraysExt
 
-    using JLArrays
-    import SpeedyWeatherInternals.Architectures: Architectures, ismatching, CPU, GPU, architecture, array_type, compatible_array_types, nonparametric_type
+using JLArrays
+import SpeedyWeatherInternals.Architectures: Architectures, ismatching, CPU, GPU,
+                                             architecture, array_type,
+                                             compatible_array_types, nonparametric_type
 
-    const JLGPU = GPU{JLBackend}
-    # make JLArrays compatible with standard GPU Architecture
-    Architectures.ismatching(arch::GPU, array_type::Type{<:JLArray}) = true
-    Architectures.ismatching(arch::Type{<:GPU}, array_type::Type{<:JLArray}) = true
-    Architectures.ismatching(arch::GPU, array_type::Type{<:JLArrays.JLDeviceArray}) = true
-    Architectures.ismatching(arch::Type{<:GPU}, array_type::Type{<:JLArrays.JLDeviceArray}) = true
+const JLGPU = GPU{JLBackend}
+# make JLArrays compatible with standard GPU Architecture
+Architectures.ismatching(arch::GPU, array_type::Type{<:JLArray}) = true
+Architectures.ismatching(arch::Type{<:GPU}, array_type::Type{<:JLArray}) = true
+Architectures.ismatching(arch::GPU, array_type::Type{<:JLArrays.JLDeviceArray}) = true
+function Architectures.ismatching(arch::Type{<:GPU}, array_type::Type{<:JLArrays.JLDeviceArray})
+    true
+end
 
-    Architectures.architecture(::JLArray) = GPU(JLArrays.JLBackend())
-    Architectures.architecture(::Type{<:JLArray}) = GPU(JLArrays.JLBackend())
-    Architectures.architecture(::Type{<:JLArrays.JLDeviceArray}) = GPU(JLArrays.JLBackend())
+Architectures.architecture(::JLArray) = GPU(JLArrays.JLBackend())
+Architectures.architecture(::Type{<:JLArray}) = GPU(JLArrays.JLBackend())
+Architectures.architecture(::Type{<:JLArrays.JLDeviceArray}) = GPU(JLArrays.JLBackend())
 
-    Architectures.on_architecture(::CPU, a::JLArray) = Array(a)
-    Architectures.on_architecture(::JLGPU, a::JLArray) = a
-    Architectures.on_architecture(::CPU, a::SubArray{<:Any, <:Any, <:JLArray}) = Array(a)
+Architectures.on_architecture(::CPU, a::JLArray) = Array(a)
+Architectures.on_architecture(::JLGPU, a::JLArray) = a
+Architectures.on_architecture(::CPU, a::SubArray{<:Any, <:Any, <:JLArray}) = Array(a)
 
-    Architectures.on_architecture(::JLGPU, a::Array) = JLArray(a)
-    Architectures.on_architecture(::JLGPU, a::BitArray) = JLArray(a)
-    Architectures.on_architecture(::JLGPU, a::SubArray{<:Any, <:Any, <:Array}) = JLArray(a)
-    Architectures.on_architecture(::JLGPU, a::SubArray{<:Any, <:Any, <:JLArray}) = a
-    Architectures.on_architecture(::JLGPU, a::StepRangeLen) = a
-    
-    Architectures.array_type(::Type{JLGPU}) = JLArray
-    Architectures.array_type(::JLGPU) = JLArray
-    Architectures.array_type(::JLGPU, NF::Type, N::Int) = JLArray{NF, N}
-    Architectures.compatible_array_types(::JLGPU) = (JLArray, JLArrays.JLDeviceArray)
-    Architectures.nonparametric_type(::Type{<:JLArray}) = JLArray
+Architectures.on_architecture(::JLGPU, a::Array) = JLArray(a)
+Architectures.on_architecture(::JLGPU, a::BitArray) = JLArray(a)
+Architectures.on_architecture(::JLGPU, a::SubArray{<:Any, <:Any, <:Array}) = JLArray(a)
+Architectures.on_architecture(::JLGPU, a::SubArray{<:Any, <:Any, <:JLArray}) = a
+Architectures.on_architecture(::JLGPU, a::StepRangeLen) = a
+
+Architectures.array_type(::Type{JLGPU}) = JLArray
+Architectures.array_type(::JLGPU) = JLArray
+Architectures.array_type(::JLGPU, NF::Type, N::Int) = JLArray{NF, N}
+Architectures.compatible_array_types(::JLGPU) = (JLArray, JLArrays.JLDeviceArray)
+Architectures.nonparametric_type(::Type{<:JLArray}) = JLArray
 
 end

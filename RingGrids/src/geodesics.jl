@@ -20,12 +20,12 @@ between two tuples of  longitude-latitude points in degrees ˚E, ˚N. Use keywor
 to change the radius of the sphere (default 6371e3 meters, Earth's radius), use `radius=1`
 to return the central angle in radians or `radius=360/2π` to return degrees."""
 function Haversine(             # functor for Haversine struct
-    lonlat1::Tuple,             # point 1 in spherical coordinates
-    lonlat2::Tuple;             # point 2
-    radius = DEFAULT_RADIUS,    # radius of the sphere [m]
+        lonlat1::Tuple,             # point 1 in spherical coordinates
+        lonlat2::Tuple;             # point 2
+        radius = DEFAULT_RADIUS    # radius of the sphere [m]
 )
     # promote lon and lat to common precision to avoid rounding errors in Haversine formula
-    lon1, lat1, lon2, lat2 = promote(lonlat1..., lonlat2...)    
+    lon1, lat1, lon2, lat2 = promote(lonlat1..., lonlat2...)
 
     φ1 = deg2rad(lat1)
     φ2 = deg2rad(lat2)
@@ -40,17 +40,18 @@ function Haversine(             # functor for Haversine struct
 end
 
 # allow for any <:AbstractSphericalDistance also non-tupled arguments lon1, lat1, lon2, lat2
-(F::Type{<:AbstractSphericalDistance})(lon1, lat1, lon2, lat2; kwargs...) = F((lon1, lat1), (lon2, lat2); kwargs...) 
+function (F::Type{<:AbstractSphericalDistance})(lon1, lat1, lon2, lat2; kwargs...)
+    F((lon1, lat1), (lon2, lat2); kwargs...)
+end
 
 export spherical_distance
 
 """$(TYPEDSIGNATURES)
 Spherical distance, or great-circle distance, between two points `lonlat1` and `lonlat2`
 using the `Formula` (default `Haversine`)."""
-spherical_distance(Formula::Type{<:AbstractSphericalDistance}, args...; kwargs...) =
+function spherical_distance(Formula::Type{<:AbstractSphericalDistance}, args...; kwargs...)
     Formula(args...; kwargs...)
+end
 
 # define Haversine as default
 spherical_distance(args...; kwargs...) = spherical_distance(Haversine, args...; kwargs...)
-
-

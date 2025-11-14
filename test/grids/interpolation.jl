@@ -2,16 +2,14 @@ import Random
 
 @testset "Interpolate constant field" begin
     npoints = 100
-    
-    @testset for Grid in (   FullGaussianGrid,
-                    OctahedralGaussianGrid,
-                    OctahedralClenshawGrid,
-                    OctaminimalGaussianGrid,
-                    HEALPixGrid,
-                    OctaHEALPixGrid)
-        
+
+    @testset for Grid in (FullGaussianGrid,
+        OctahedralGaussianGrid,
+        OctahedralClenshawGrid,
+        OctaminimalGaussianGrid,
+        HEALPixGrid,
+        OctaHEALPixGrid)
         @testset for NF in (Float32, Float64)
-        
             grid = Grid(8)
             A = randn(NF, grid)             # a very low resolution grid
             c = randn(NF)
@@ -22,7 +20,7 @@ import Random
             As = RingGrids.interpolate(λs, θs, A)
 
             for a in As
-                @test a ≈ c 
+                @test a ≈ c
             end
         end
     end
@@ -30,23 +28,21 @@ end
 
 @testset "Interpolate zonally-constant field" begin
     npoints = 1000
-    
-    @testset for Grid in (   FullGaussianGrid,
-                    OctahedralGaussianGrid,
-                    OctahedralClenshawGrid,
-                    OctaminimalGaussianGrid,
-                    HEALPixGrid,
-                    OctaHEALPixGrid)
-        
+
+    @testset for Grid in (FullGaussianGrid,
+        OctahedralGaussianGrid,
+        OctahedralClenshawGrid,
+        OctaminimalGaussianGrid,
+        HEALPixGrid,
+        OctaHEALPixGrid)
         @testset for NF in (Float32, Float64)
-        
             grid = Grid(32)
             A = zeros(NF, grid)                 # some resolution
             G = RingGrids.GridGeometry(A)
             lat1 = G.latd[2]                    # latitude of first ring
-            
+
             for (j, ring) in enumerate(RingGrids.eachring(A))
-                θ = G.latd[j+1]     # G.latd also includes 90˚N hence +1
+                θ = G.latd[j + 1]     # G.latd also includes 90˚N hence +1
                 for ij in ring
                     A[ij] = θ
                 end
@@ -57,11 +53,11 @@ end
             # first ring, same for south pole
             λs = 360*rand(NF, npoints)              # some longitudes in [0˚, 360˚E]
             θs = 2lat1*rand(NF, npoints) .- lat1    # some latitudes in [-90˚, 90˚N]
-            
+
             As = RingGrids.interpolate(λs, θs, A; NF)
 
             for (a, θ) in zip(As, θs)
-                @test a ≈ θ 
+                @test a ≈ θ
             end
         end
     end
@@ -69,21 +65,19 @@ end
 
 @testset "Interpolate meridionally-constant field" begin
     npoints = 1000
-    
-    @testset for Grid in (  FullGaussianGrid,
-                            OctahedralGaussianGrid,
-                            OctahedralClenshawGrid,
-                            OctaminimalGaussianGrid,
-                            HEALPixGrid,
-                            OctaHEALPixGrid)
-        
+
+    @testset for Grid in (FullGaussianGrid,
+        OctahedralGaussianGrid,
+        OctahedralClenshawGrid,
+        OctaminimalGaussianGrid,
+        HEALPixGrid,
+        OctaHEALPixGrid)
         @testset for NF in (Float32, Float64)
-        
             grid = Grid(32)
             A = zeros(NF, grid)             # some resolution
             G = RingGrids.GridGeometry(A)
             lat1 = G.latd[2]                # latitude of first ring
-            
+
             # TEST FROM 60˚ to 300˚ to not interpolate across 0/360˚E
             # where this test won't work because lon have a sharp jump
             # and aren't linear across the prime meridian
@@ -99,7 +93,7 @@ end
             # first ring, same for south pole
             λs = 240*rand(NF, npoints) .+ 60        # some longitudes in [60˚, 300˚E]
             θs = 2lat1*rand(NF, npoints) .- lat1    # some latitudes in (-90˚, 90˚N)
-            
+
             As = RingGrids.interpolate(λs, θs, A; NF)
 
             for (a, λ) in zip(As, λs)
@@ -121,7 +115,7 @@ end
             # first ring, same for south pole
             λs = 240*rand(NF, npoints) .- 120       # some longitudes in [-120˚, 120˚E]
             θs = 2lat1*rand(NF, npoints) .- lat1    # some latitudes in (-90˚, 90˚N)
-            
+
             As = RingGrids.interpolate(λs, θs, A; NF)
 
             for (a, λ) in zip(As, λs)
@@ -132,14 +126,13 @@ end
 end
 
 @testset "Find latitude rings and weights" begin
-    @testset for Grid in (   FullGaussianGrid,
-                    OctahedralGaussianGrid,
-                    OctahedralClenshawGrid,
-                    OctaminimalGaussianGrid,
-                    HEALPixGrid,
-                    OctaHEALPixGrid)
-
-        @testset for nlat_half in [4, 8, 16] 
+    @testset for Grid in (FullGaussianGrid,
+        OctahedralGaussianGrid,
+        OctahedralClenshawGrid,
+        OctaminimalGaussianGrid,
+        HEALPixGrid,
+        OctaHEALPixGrid)
+        @testset for nlat_half in [4, 8, 16]
             grid = Grid(nlat_half)
             G = RingGrids.GridGeometry(grid)
             latd = G.latd
@@ -148,7 +141,7 @@ end
             Δs = rand(n)
 
             r = Random.randperm(n)
-            θs = latd[1:end-1] .+ diff(latd).*Δs
+            θs = latd[1:(end - 1)] .+ diff(latd) .* Δs
 
             θs = θs[r]
             Δs = Δs[r]
@@ -164,13 +157,13 @@ end
 
 @testset "Interpolate between grids" begin
     @testset for NF in (Float32, Float64)
-        @testset for Grid in (  FullGaussianGrid,
-                                FullClenshawGrid,
-                                OctahedralGaussianGrid,
-                                OctahedralClenshawGrid,
-                                OctaminimalGaussianGrid,
-                                HEALPixGrid,
-                                OctaHEALPixGrid)
+        @testset for Grid in (FullGaussianGrid,
+            FullClenshawGrid,
+            OctahedralGaussianGrid,
+            OctahedralClenshawGrid,
+            OctaminimalGaussianGrid,
+            HEALPixGrid,
+            OctaHEALPixGrid)
 
             # create some smooth gridded field
             trunc = 10
@@ -186,7 +179,7 @@ end
             RingGrids.interpolate!(A2, A_interpolated)
 
             # just check that it's not completely off
-            @test A ≈ A2 rtol=5e-1 atol=5e-1
+            @test A≈A2 rtol=5e-1 atol=5e-1
         end
     end
 end
@@ -216,16 +209,14 @@ end
 end
 
 @testset "Grid cell average" begin
-    for Grid in (   FullGaussianGrid,
-                    FullClenshawGrid,
-                    OctahedralGaussianGrid,
-                    OctahedralClenshawGrid,
-                    OctaminimalGaussianGrid,
-                    HEALPixGrid,
-                    OctaHEALPixGrid)
-                
+    for Grid in (FullGaussianGrid,
+        FullClenshawGrid,
+        OctahedralGaussianGrid,
+        OctahedralClenshawGrid,
+        OctaminimalGaussianGrid,
+        HEALPixGrid,
+        OctaHEALPixGrid)
         for trunc in (31, 42, 63)
-
             spectral_grid = SpectralGrid(; trunc, Grid)
 
             land_sea_mask = LandSeaMask(spectral_grid)

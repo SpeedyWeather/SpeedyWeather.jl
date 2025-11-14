@@ -41,14 +41,18 @@ add!(vars::AbstractVariables, tracer_dict::TRACER_DICT) = add!(vars, values(trac
 export activate!
 
 """$(TYPEDSIGNATURES) Activate a deactivated (=frozen) tracers in a simulation, which is a setting in `simulation.model` only."""
-activate!(simulation::AbstractSimulation, tracers::Tracer...) = activate!(simulation.model, tracers...)
+function activate!(simulation::AbstractSimulation, tracers::Tracer...)
+    activate!(simulation.model, tracers...)
+end
 
 # propagate activate! from simulation to model to the `model.tracers` dictionary
 activate!(model::AbstractModel, tracers::Tracer...) = activate!(model.tracers, tracers...)
 
 # pass on "value" to also allow _activate! to be used for decativation
-activate!(dict::TRACER_DICT, tracers::Tracer...) = _activate!(dict, tracers..., value=true)
-function _activate!(dict::TRACER_DICT, tracers::Tracer...; value::Bool=true)
+function activate!(dict::TRACER_DICT, tracers::Tracer...)
+    _activate!(dict, tracers..., value = true)
+end
+function _activate!(dict::TRACER_DICT, tracers::Tracer...; value::Bool = true)
     for tracer in tracers
         dict[tracer.name].active = value
     end
@@ -57,10 +61,15 @@ end
 export deactivate!
 
 """$(TYPEDSIGNATURES) Deactivate a tracer in a simulation, which is a setting in `simulation.model` only."""
-deactivate!(simulation::AbstractSimulation, tracers::Tracer...) = deactivate!(simulation.model, tracers...)
-deactivate!(model::AbstractModel, tracers::Tracer...) = deactivate!(model.tracers, tracers...)
-deactivate!(dict::TRACER_DICT, tracers::Tracer...) = _activate!(dict, tracers..., value=false)
-
+function deactivate!(simulation::AbstractSimulation, tracers::Tracer...)
+    deactivate!(simulation.model, tracers...)
+end
+function deactivate!(model::AbstractModel, tracers::Tracer...)
+    deactivate!(model.tracers, tracers...)
+end
+function deactivate!(dict::TRACER_DICT, tracers::Tracer...)
+    _activate!(dict, tracers..., value = false)
+end
 
 """$(TYPEDSIGNATURES) Delete a tracer from a simulation, deleted from the model and the variables."""
 function Base.delete!(simulation::AbstractSimulation, tracer::Tracer)

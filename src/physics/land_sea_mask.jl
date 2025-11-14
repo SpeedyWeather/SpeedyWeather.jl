@@ -33,16 +33,16 @@ function Base.show(io::IO, L::AbstractLandSeaMask)
 end
 
 function mask!(
-    field::AbstractField,
-    mask::AbstractField,
-    land_or_sea::Symbol;
-    masked_value = NaN,
+        field::AbstractField,
+        mask::AbstractField,
+        land_or_sea::Symbol;
+        masked_value = NaN
 )
-
     val = land_or_sea == :land ? 1 : 0
     masked_val = convert(eltype(field), masked_value)
 
-    @boundscheck fields_match(field, mask, horizontal_only=true) || throw(DimensionMismatch(field, mask))
+    @boundscheck fields_match(field, mask, horizontal_only = true) ||
+                 throw(DimensionMismatch(field, mask))
     @boundscheck ndims(mask) == 1 || throw(DimensionMismatch(field, mask))
 
     for k in eachlayer(field)
@@ -57,8 +57,9 @@ function mask!(
 end
 
 # also allow for land_sea_mask struct to be passed on, use .mask in that case
-mask!(field::AbstractField, mask::AbstractLandSeaMask, args...; kwargs...) =
+function mask!(field::AbstractField, mask::AbstractLandSeaMask, args...; kwargs...)
     mask!(field, mask.mask, args...; kwargs...)
+end
 
 # make available when using SpeedyWeather
 export EarthLandSeaMask
@@ -111,7 +112,6 @@ $(TYPEDSIGNATURES)
 Reads a high-resolution land-sea mask from file and interpolates (grid-cell average)
 onto the model grid for a fractional sea mask."""
 function initialize!(land_sea_mask::EarthLandSeaMask, model::PrimitiveEquation)
-
     (; file_Grid) = land_sea_mask
 
     # LOAD NETCDF FILE
@@ -121,9 +121,9 @@ function initialize!(land_sea_mask::EarthLandSeaMask, model::PrimitiveEquation)
         path = joinpath(land_sea_mask.path, land_sea_mask.file)
     end
     ncfile = NCDataset(path)
-    
+
     # high resolution land-sea mask
-    lsm_highres = land_sea_mask.file_Grid(ncfile["lsm"].var[:, :], input_as=Matrix)
+    lsm_highres = land_sea_mask.file_Grid(ncfile["lsm"].var[:, :], input_as = Matrix)
 
     # average onto grid cells of the model 
     if typeof(architecture(model.spectral_grid.architecture)) <: CPU

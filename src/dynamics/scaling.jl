@@ -3,9 +3,9 @@ $(TYPEDSIGNATURES)
 Scale the variable `var` inside `progn` with scalar `scale`.
 """
 function scale!(
-    progn::PrognosticVariables,
-    var::Symbol,
-    scale::Real,
+        progn::PrognosticVariables,
+        var::Symbol,
+        scale::Real
 )
     var = getfield(progn, var)
     var .*= scale
@@ -16,9 +16,9 @@ $(TYPEDSIGNATURES)
 Scale the variable `var` inside `diagn` with scalar `scale`.
 """
 function scale!(
-    diagn::DiagnosticVariables,
-    var::Symbol,
-    scale::Real,
+        diagn::DiagnosticVariables,
+        var::Symbol,
+        scale::Real
 )
     variable = getfield(diagn.grid, var)
     variable .*= scale
@@ -29,9 +29,8 @@ $(TYPEDSIGNATURES)
 Scales the prognostic variables vorticity and divergence with
 the Earth's radius which is used in the dynamical core."""
 function scale!(progn::PrognosticVariables,
-                diagn::DiagnosticVariables,
-                scale::Real)
-                
+        diagn::DiagnosticVariables,
+        scale::Real)
     new_scale = scale/progn.scale[]     # undo previous scale and new scale in one go
     scale!(progn, :vor, new_scale)
     scale!(progn, :div, new_scale)
@@ -64,7 +63,7 @@ end
 """
 $(TYPEDSIGNATURES)
 Undo the radius-scaling for any variable. Method used for netcdf output."""
-function unscale!(  variable::AbstractArray,
-                    scale::Real)
+function unscale!(variable::AbstractArray,
+        scale::Real)
     variable ./= scale
 end

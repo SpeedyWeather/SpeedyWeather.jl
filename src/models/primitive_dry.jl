@@ -46,12 +46,11 @@ $(TYPEDFIELDS)"""
     HD,     # <:AbstractHorizontalDiffusion,
     VA,     # <:AbstractVerticalAdvection,
     OU,     # <:AbstractOutput,
-    FB,     # <:AbstractFeedback,
+    FB     # <:AbstractFeedback,
 } <: PrimitiveDry
-
     spectral_grid::SpectralGrid
     architecture::AR = spectral_grid.architecture
-    
+
     # DYNAMICS
     dynamics::Bool = true
     geometry::GE = Geometry(spectral_grid)
@@ -77,7 +76,7 @@ $(TYPEDFIELDS)"""
     land::LA = DryLandModel(spectral_grid)
     solar_zenith::ZE = WhichZenith(spectral_grid, planet)
     albedo::AL = DefaultAlbedo(spectral_grid)
-    
+
     # PHYSICS/PARAMETERIZATIONS
     physics::Bool = true
     boundary_layer_drag::BL = BulkRichardsonDrag(spectral_grid)
@@ -90,14 +89,14 @@ $(TYPEDFIELDS)"""
     shortwave_radiation::SW = TransparentShortwave(spectral_grid)
     longwave_radiation::LW = JeevanjeeRadiation(spectral_grid)
     stochastic_physics::SP = nothing
-    
+
     # NUMERICS
     time_stepping::TS = Leapfrog(spectral_grid)
     spectral_transform::ST = SpectralTransform(spectral_grid)
     implicit::IM = ImplicitPrimitiveEquation(spectral_grid)
     horizontal_diffusion::HD = HyperDiffusion(spectral_grid)
     vertical_advection::VA = CenteredVerticalAdvection(spectral_grid)
-    
+
     # OUTPUT
     output::OU = NetCDFOutput(spectral_grid, PrimitiveDry)
     callbacks::Dict{Symbol, AbstractCallback} = Dict{Symbol, AbstractCallback}()
@@ -153,12 +152,12 @@ function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
     # allocate prognostic and diagnostic variables
     prognostic_variables = PrognosticVariables(spectral_grid, model)
     diagnostic_variables = DiagnosticVariables(spectral_grid, model)
-    
+
     # initialize non-atmosphere prognostic variables
     (; particles, ocean, land) = prognostic_variables
     initialize!(particles, prognostic_variables, diagnostic_variables, model)
-    initialize!(ocean,     prognostic_variables, diagnostic_variables, model)
-    initialize!(land,      prognostic_variables, diagnostic_variables, model)
+    initialize!(ocean, prognostic_variables, diagnostic_variables, model)
+    initialize!(land, prognostic_variables, diagnostic_variables, model)
 
     # set the initial conditions (may overwrite variables set in intialize! ocean/land)
     initialize!(prognostic_variables, model.initial_conditions, model)

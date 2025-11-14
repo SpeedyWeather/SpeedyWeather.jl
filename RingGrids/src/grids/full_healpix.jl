@@ -14,15 +14,19 @@ end
 Architectures.nonparametric_type(::Type{<:FullHEALPixGrid}) = FullHEALPixGrid
 
 # FIELD
-const FullHEALPixField{T, N} = Field{T, N, ArrayType, Grid} where {ArrayType, Grid<:FullHEALPixGrid}
+const FullHEALPixField{
+    T, N} = Field{T, N, ArrayType, Grid} where {ArrayType, Grid <: FullHEALPixGrid}
 
 # define grid_type (i) without T, N, (ii) with T, (iii) with T, N but not with <:?Field
 # to not have precendence over grid_type(::Type{Field{...})
 grid_type(::Type{FullHEALPixField}) = FullHEALPixGrid
-grid_type(::Type{FullHEALPixField{T}}) where T = FullHEALPixGrid
+grid_type(::Type{FullHEALPixField{T}}) where {T} = FullHEALPixGrid
 grid_type(::Type{FullHEALPixField{T, N}}) where {T, N} = FullHEALPixGrid
 
-function Base.showarg(io::IO, F::Field{T, N, ArrayType, Grid}, toplevel) where {T, N, ArrayType, Grid<:FullHEALPixGrid{A}} where A <: AbstractArchitecture
+function Base.showarg(io::IO,
+        F::Field{T, N, ArrayType, Grid},
+        toplevel) where {
+        T, N, ArrayType, Grid <: FullHEALPixGrid{A}} where {A <: AbstractArchitecture}
     print(io, "FullHEALPixField{$T, $N}")
     toplevel && print(io, " as ", nonparametric_type(ArrayType))
     toplevel && print(io, " on ", F.grid.architecture)
@@ -31,15 +35,20 @@ end
 # SIZE
 nlat_odd(::Type{<:FullHEALPixGrid}) = true
 get_npoints(::Type{<:FullHEALPixGrid}, nlat_half::Integer) = 4nlat_half * (2nlat_half-1)
-get_nlat_half(::Type{<:FullHEALPixGrid}, npoints::Integer) = round(Int, 1/4 + sqrt(1/16 + npoints/8))
+function get_nlat_half(::Type{<:FullHEALPixGrid}, npoints::Integer)
+    round(Int, 1/4 + sqrt(1/16 + npoints/8))
+end
 get_nlon(::Type{<:FullHEALPixGrid}, nlat_half::Integer) = 4nlat_half
 
 ## COORDINATES
 get_latd(::Type{<:FullHEALPixGrid}, nlat_half::Integer) = get_latd(HEALPixGrid, nlat_half)
-get_lond(::Type{<:FullHEALPixGrid}, nlat_half::Integer) = get_lond(FullGaussianGrid, nlat_half)
+function get_lond(::Type{<:FullHEALPixGrid}, nlat_half::Integer)
+    get_lond(FullGaussianGrid, nlat_half)
+end
 
 # QUADRATURE (use weights from reduced grids though!)
-get_quadrature_weights(::Type{<:FullHEALPixGrid}, nlat_half::Integer) =
+function get_quadrature_weights(::Type{<:FullHEALPixGrid}, nlat_half::Integer)
     equal_area_weights(HEALPixGrid, nlat_half)
+end
 
 Adapt.@adapt_structure FullHEALPixGrid

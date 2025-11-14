@@ -10,5 +10,6 @@
     transform::F = (x) -> x
 end
 
-path(tracer::TracerOutput, simulation) = 
+function path(tracer::TracerOutput, simulation)
     simulation.diagnostic_variables.grid.tracers_grid[Symbol(tracer.name)]
+end

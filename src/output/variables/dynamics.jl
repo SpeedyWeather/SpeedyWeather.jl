@@ -11,7 +11,6 @@ Custom element-wise variable transforms, e.g. scale and/or offset to change
 units, or even exp(x)/100 to change from log surface pressure to hPa
 are passed on as `transform::Function = x -> exp(x)/100`."""
 @kwdef mutable struct VorticityOutput <: AbstractOutputVariable
-
     "[Required] short name of variable (unique) used in netCDF file and key for dictionary"
     name::String = "vor"
 
@@ -103,7 +102,9 @@ Fields are: $(TYPEDFIELDS)"""
     keepbits::Int = 7
 end
 
-path(::InterfaceDisplacementOutput, simulation) = simulation.diagnostic_variables.grid.pres_grid
+function path(::InterfaceDisplacementOutput, simulation)
+    simulation.diagnostic_variables.grid.pres_grid
+end
 
 """Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
@@ -136,16 +137,17 @@ Fields are: $(TYPEDFIELDS)"""
 end
 
 # points to surface not mean sea level pressure but core variable to read in
-path(::MeanSeaLevelPressureOutput, simulation) = simulation.diagnostic_variables.grid.pres_grid
+function path(::MeanSeaLevelPressureOutput, simulation)
+    simulation.diagnostic_variables.grid.pres_grid
+end
 
 function output!(
-    output::NetCDFOutput,
-    variable::MeanSeaLevelPressureOutput,
-    simulation::AbstractSimulation,
+        output::NetCDFOutput,
+        variable::MeanSeaLevelPressureOutput,
+        simulation::AbstractSimulation
 )
     # escape immediately after first call if variable doesn't have a time dimension
     ~hastime(variable) && output.output_counter > 1 && return nothing
-
 
     lnpₛ = path(variable, simulation)
     h = simulation.model.orography.orography
@@ -209,14 +211,16 @@ end
 path(::HumidityOutput, simulation) = simulation.diagnostic_variables.grid.humid_grid
 
 # collect all in one for convenience
-DynamicsOutput() = (
-    VorticityOutput(),
-    ZonalVelocityOutput(),
-    MeridionalVelocityOutput(),
-    DivergenceOutput(),
-    InterfaceDisplacementOutput(),
-    SurfacePressureOutput(),
-    MeanSeaLevelPressureOutput(),
-    TemperatureOutput(),
-    HumidityOutput(),
-)
+function DynamicsOutput()
+    (
+        VorticityOutput(),
+        ZonalVelocityOutput(),
+        MeridionalVelocityOutput(),
+        DivergenceOutput(),
+        InterfaceDisplacementOutput(),
+        SurfacePressureOutput(),
+        MeanSeaLevelPressureOutput(),
+        TemperatureOutput(),
+        HumidityOutput()
+    )
+end

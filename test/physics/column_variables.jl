@@ -1,6 +1,6 @@
 @testset "ColumnVariables initialisation" begin
     @testset for NF in (Float16, Float32, Float64)
-        column = ColumnVariables{NF}(nlayers=8)
+        column = ColumnVariables{NF}(nlayers = 8)
 
         @test eltype(column.temp) == NF
         SpeedyWeather.reset_column!(column)
@@ -21,7 +21,6 @@ end
 
 @testset "ColumnVariables initialisation" begin
     @testset for NF in (Float32, Float64)
-
         nlayers = 8
         spectral_grid = SpectralGrid(; NF, nlayers)
         model = PrimitiveDryModel(spectral_grid)

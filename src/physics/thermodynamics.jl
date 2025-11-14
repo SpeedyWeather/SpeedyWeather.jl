@@ -9,7 +9,7 @@ Parameters for computing saturation vapour pressure of water using the Clausis-C
 
 where T is in Kelvin, Lᵥ the the latent heat of condensation and Rᵥ the gas constant of water vapour
 $(TYPEDFIELDS)"""
-@kwdef struct ClausiusClapeyron{NF<:AbstractFloat} <: AbstractClausiusClapeyron
+@kwdef struct ClausiusClapeyron{NF <: AbstractFloat} <: AbstractClausiusClapeyron
     "Saturation water vapour pressure at 0°C [Pa]"
     e₀::NF = 610.78
 
@@ -34,7 +34,7 @@ $(TYPEDFIELDS)"""
     "Gas constant of dry air [J/kg/K]"
     R_dry::NF = 287.04
 
-    "[DERIVED] Latent heat of condensation divided by gas constant of water vapour [K]"    
+    "[DERIVED] Latent heat of condensation divided by gas constant of water vapour [K]"
     Lᵥ_Rᵥ::NF = latent_heat_condensation/R_vapour
 
     "[DERIVED] Inverse of T₀, one over 0°C in Kelvin"
@@ -47,7 +47,8 @@ end
 # generator function
 function ClausiusClapeyron(SG::SpectralGrid, atm::AbstractAtmosphere; kwargs...)
     (; R_dry, R_vapour, latent_heat_condensation, heat_capacity) = atm
-    return ClausiusClapeyron{SG.NF}(; latent_heat_condensation, R_dry, R_vapour, heat_capacity, kwargs...)
+    return ClausiusClapeyron{SG.NF}(;
+        latent_heat_condensation, R_dry, R_vapour, heat_capacity, kwargs...)
 end
 
 """
@@ -59,26 +60,26 @@ Clausius-Clapeyron equation,
 
 where T is in Kelvin, Lᵥ the the latent heat of vaporization and Rᵥ the gas constant
 of water vapour, T₀ is 0˚C in Kelvin."""
-function (CC::ClausiusClapeyron{NF})(temp_kelvin::NF) where NF
+function (CC::ClausiusClapeyron{NF})(temp_kelvin::NF) where {NF}
     (; e₀, T₀⁻¹, Lᵥ_Rᵥ) = CC
     return e₀ * exp(Lᵥ_Rᵥ*(T₀⁻¹ - inv(temp_kelvin)))
 end
 
 # convert to number format of struct
-function (CC::ClausiusClapeyron{NF})(temp_kelvin) where NF
+function (CC::ClausiusClapeyron{NF})(temp_kelvin) where {NF}
     CC(convert(NF, temp_kelvin))
 end
 
 """
 $(TYPEDSIGNATURES)
 Gradient of Clausius-Clapeyron wrt to temperature, evaluated at `temp_kelvin`."""
-function grad(CC::ClausiusClapeyron{NF}, temp_kelvin::NF) where NF
+function grad(CC::ClausiusClapeyron{NF}, temp_kelvin::NF) where {NF}
     e = CC(temp_kelvin)
     return e*CC.Lᵥ_Rᵥ/temp_kelvin^2
 end
 
 # convert to input argument to number format from struct
-grad(CC::ClausiusClapeyron{NF}, temp_kelvin) where NF = grad(CC, convert(NF, temp_kelvin))
+grad(CC::ClausiusClapeyron{NF}, temp_kelvin) where {NF} = grad(CC, convert(NF, temp_kelvin))
 
 """
 $(TYPEDSIGNATURES)
@@ -88,10 +89,10 @@ Saturation humidity from saturation vapour pressure and pressure via
 
 with both pressures in same units and qsat in kg/kg."""
 function saturation_humidity(
-    sat_vap_pres::NF,                   # saturation vapour pressure [Pa]
-    pres::NF;                           # pressure [Pa]
-    mol_ratio::NF = NF(287.04/461.5)    # ratio of mol masses dry air - water vapour
-) where NF
+        sat_vap_pres::NF,                   # saturation vapour pressure [Pa]
+        pres::NF;                           # pressure [Pa]
+        mol_ratio::NF = NF(287.04/461.5)    # ratio of mol masses dry air - water vapour
+) where {NF}
     # simpler version given that pres >> sat_vap_pres for most temperatures T<40˚C
     return mol_ratio*sat_vap_pres / pres
     # more accurate version, with a more complicated derivative though
@@ -105,18 +106,18 @@ Saturation humidity [kg/kg] from temperature [K], pressure [Pa] via
     sat_vap_pres = clausius_clapeyron(temperature)
     saturation humidity = mol_ratio * sat_vap_pres / pressure"""
 function saturation_humidity(
-    temp_kelvin::NF,
-    pres::NF,
-    clausius_clapeyron::AbstractClausiusClapeyron,
-) where NF
+        temp_kelvin::NF,
+        pres::NF,
+        clausius_clapeyron::AbstractClausiusClapeyron
+) where {NF}
     sat_vap_pres = clausius_clapeyron(temp_kelvin)
-    return saturation_humidity(sat_vap_pres, pres; mol_ratio=clausius_clapeyron.mol_ratio)
+    return saturation_humidity(sat_vap_pres, pres; mol_ratio = clausius_clapeyron.mol_ratio)
 end
 
 """
 $(TYPEDSIGNATURES)
 Gradient of Clausius-Clapeyron wrt to temperature, evaluated at `temp_kelvin`."""
-function grad_saturation_humidity(CC::ClausiusClapeyron{NF}, temp_kelvin::NF, pres::NF) where NF
+function grad_saturation_humidity(CC::ClausiusClapeyron{NF}, temp_kelvin::NF, pres::NF) where {NF}
     qsat = saturation_humidity(temp_kelvin, pres, CC)
     return qsat*CC.Lᵥ_Rᵥ/temp_kelvin^2
 end
@@ -135,8 +136,8 @@ $(TYPEDSIGNATURES)
 Compute the dry static energy SE = cₚT + Φ (latent heat times temperature plus geopotential)
 for the column."""
 function dry_static_energy!(
-    column::ColumnVariables,
-    atmosphere::AbstractAtmosphere
+        column::ColumnVariables,
+        atmosphere::AbstractAtmosphere
 )
     cₚ = atmosphere.heat_capacity
     (; dry_static_energy, geopot, temp) = column
@@ -152,8 +153,8 @@ end
 Compute the saturation water vapour pressure [Pa], the saturation humidity [kg/kg]
 and the relative humidity following `clausius_clapeyron`."""
 function saturation_humidity!(
-    column::ColumnVariables,
-    clausius_clapeyron::AbstractClausiusClapeyron,
+        column::ColumnVariables,
+        clausius_clapeyron::AbstractClausiusClapeyron
 )
     # use previous time step for temperature for stability of large-scale condensation
     # TODO also use previous pressure, but sat_humid is only weakly dependent on it, skip for now
@@ -173,8 +174,8 @@ with the static energy `SE`, the latent heat of condensation `Lc`,
 the geopotential `Φ`. As well as the saturation moist static energy
 which replaces Q with Q_sat"""
 function moist_static_energy!(
-    column::ColumnVariables,
-    clausius_clapeyron::AbstractClausiusClapeyron
+        column::ColumnVariables,
+        clausius_clapeyron::AbstractClausiusClapeyron
 )
     (; Lᵥ) = clausius_clapeyron      # latent heat of vaporization
     (; sat_moist_static_energy, moist_static_energy, dry_static_energy) = column
@@ -196,7 +197,7 @@ Parameters for computing saturation vapour pressure of water using the Tetens' e
 where T is in Kelvin and i = 1, 2 for saturation above and below freezing,
 respectively. From Tetens (1930), and Murray (1967) for below freezing.
 $(TYPEDFIELDS)"""
-@kwdef struct TetensEquation{NF<:AbstractFloat} <: AbstractClausiusClapeyron
+@kwdef struct TetensEquation{NF <: AbstractFloat} <: AbstractClausiusClapeyron
     "Saturation water vapour pressure at 0°C [Pa]"
     e₀::NF = 610.78
 
@@ -225,7 +226,7 @@ Tetens equation,
 
 where T is in Kelvin and i = 1, 2 for saturation above and below freezing,
 respectively."""
-function (TetensCoefficients::TetensEquation{NF})(temp_kelvin::NF) where NF
+function (TetensCoefficients::TetensEquation{NF})(temp_kelvin::NF) where {NF}
     (; e₀, T₀, C₁, C₂, T₁, T₂) = TetensCoefficients
     C, T = temp_kelvin > T₀ ? (C₁, T₁) : (C₂, T₂)      # change coefficients above/below freezing
     temp_celsius = temp_kelvin - T₀
@@ -235,7 +236,7 @@ end
 """
 $(TYPEDSIGNATURES)
 Gradient of the Tetens equation wrt to temperature, evaluated at `temp_kelvin`."""
-function grad(TetensCoefficients::TetensEquation{NF}, temp_kelvin::NF) where NF
+function grad(TetensCoefficients::TetensEquation{NF}, temp_kelvin::NF) where {NF}
     (; T₀, C₁, C₂, T₁, T₂) = TetensCoefficients
     e = TetensCoefficients(temp_kelvin)             # saturation vapour pressure
     C, T = temp_kelvin > T₀ ? (C₁, T₁) : (C₂, T₂)   # change coefficients above/below freezing

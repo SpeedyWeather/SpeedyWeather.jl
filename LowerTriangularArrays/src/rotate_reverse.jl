@@ -6,7 +6,7 @@ Rotate the field(s) represented by a LowerTriangularArray zonally by `degree`
 by multiplication of the spherical harmonics by exp(-i*m*2π*degree/360),
 with `m` the order of the spherical harmonic."""
 function rotate!(L::LowerTriangularArray, degree::Real)
-    lmax, mmax = size(L, OneBased, as=Matrix)
+    lmax, mmax = size(L, OneBased, as = Matrix)
 
     for k in eachmatrix(L)
         lm = 0
@@ -35,7 +35,7 @@ represent the coefficients of the spherical harmonics. Reversal
 in latitude direction is obtained by flipping the sign of the
 odd harmonics. Reverses `L` in place."""
 function Base._reverse!(L::LowerTriangularArray, ::Val{:lat})
-    lmax, mmax = size(L, OneBased, as=Matrix)
+    lmax, mmax = size(L, OneBased, as = Matrix)
 
     for k in eachmatrix(L)      # loop over any additional dimensions
         lm = 0

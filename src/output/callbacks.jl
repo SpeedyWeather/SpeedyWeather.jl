@@ -5,7 +5,7 @@ const RANDSTRING_LENGTH = 4
 export CallbackDict
 function CallbackDict(callbacks::AbstractCallback...)
     callback_pairs = (Pair(Symbol("callback_"*randstring(RANDSTRING_LENGTH)), callback)
-                        for callback in callbacks)
+    for callback in callbacks)
     CALLBACK_DICT(callback_pairs...)
 end
 
@@ -66,12 +66,15 @@ Add a or several callbacks to a model::AbstractModel. To be used like
     add!(model, :my_callback => callback)
     add!(model, :my_callback1 => callback, :my_callback2 => other_callback)
 """
-add!(model::AbstractModel, key_callbacks::Pair{Symbol, <:AbstractCallback}...) =
+function add!(model::AbstractModel, key_callbacks::Pair{Symbol, <:AbstractCallback}...)
     add!(model.callbacks, key_callbacks...)
-add!(D::CALLBACK_DICT, key::Symbol, callback::AbstractCallback) = add!(D, Pair(key, callback))
-add!(model::AbstractModel, key::Symbol, callback::AbstractCallback) =
+end
+function add!(D::CALLBACK_DICT, key::Symbol, callback::AbstractCallback)
+    add!(D, Pair(key, callback))
+end
+function add!(model::AbstractModel, key::Symbol, callback::AbstractCallback)
     add!(model.callbacks, Pair(key, callback))
-
+end
 
 # also with string but flag conversion
 function add!(D::CALLBACK_DICT, key::String, callback::AbstractCallback)
@@ -87,7 +90,7 @@ key which is randomly created like callback_????. To be used like
 
     add!(model.callbacks, callback)
     add!(model.callbacks, callback1, callback2)."""
-function add!(D::CALLBACK_DICT, callbacks::AbstractCallback...; verbose=true)
+function add!(D::CALLBACK_DICT, callbacks::AbstractCallback...; verbose = true)
     for callback in callbacks
         key = Symbol("callback_"*Random.randstring(4))
         verbose && @info "$(typeof(callback)) callback added with key $key"
@@ -102,8 +105,9 @@ key which is randomly created like callback_????. To be used like
 
     add!(model.callbacks, callback)
     add!(model.callbacks, callback1, callback2)."""
-add!(model::AbstractModel, callbacks::AbstractCallback...) =
+function add!(model::AbstractModel, callbacks::AbstractCallback...)
     add!(model.callbacks, callbacks..., verbose = model.feedback.verbose)
+end
 
 # delete!(dict, key) already defined in Base
 
@@ -117,7 +121,9 @@ Base.@kwdef mutable struct GlobalSurfaceTemperatureCallback{NF} <: AbstractCallb
     temp::Vector{NF} = zeros(DEFAULT_NF, 0)
 end
 
-GlobalSurfaceTemperatureCallback(SG::SpectralGrid) = GlobalSurfaceTemperatureCallback{SG.NF}()
+function GlobalSurfaceTemperatureCallback(SG::SpectralGrid)
+    GlobalSurfaceTemperatureCallback{SG.NF}()
+end
 
 """
 $(TYPEDSIGNATURES)
@@ -125,11 +131,11 @@ Initializes callback.temp vector that records the global mean surface temperatur
 Allocates vector of correct length (number of elements = total time steps plus one) and stores the
 global surface temperature of the initial conditions"""
 function initialize!(
-    callback::GlobalSurfaceTemperatureCallback{NF},
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
-    model::AbstractModel,
-) where NF
+        callback::GlobalSurfaceTemperatureCallback{NF},
+        progn::PrognosticVariables,
+        diagn::DiagnosticVariables,
+        model::AbstractModel
+) where {NF}
     callback.temp = Vector{NF}(undef, progn.clock.n_timesteps+1)    # replace with vector of correct length
     callback.temp[1] = diagn.temp_average[diagn.nlayers]            # set initial conditions
     callback.timestep_counter = 1                                   # (re)set counter to 1
@@ -140,10 +146,10 @@ $(TYPEDSIGNATURES)
 Pulls the average temperature from the lowermost layer and stores it in the next
 element of the callback.temp vector."""
 function callback!(
-    callback::GlobalSurfaceTemperatureCallback,
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
-    model::AbstractModel,
+        callback::GlobalSurfaceTemperatureCallback,
+        progn::PrognosticVariables,
+        diagn::DiagnosticVariables,
+        model::AbstractModel
 )
     callback.timestep_counter += 1
     i = callback.timestep_counter

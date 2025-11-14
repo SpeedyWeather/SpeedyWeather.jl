@@ -4,17 +4,17 @@ import Random
 @testset "LowerTriangularMatrix" begin
     @testset for NF in (Float32, Float64)
         mmax = 32
-        @testset for lmax = (mmax, mmax+1)
+        @testset for lmax in (mmax, mmax+1)
             A = randn(Complex{NF}, lmax, mmax)
 
             spectral_truncation!(A)
 
             L = LowerTriangularMatrix(A)
 
-            @test size(L, as=Matrix) == size(A)
+            @test size(L, as = Matrix) == size(A)
 
-            @test size(A) == size(L, as=Matrix)
-            @test size(L.data) == size(L, as=Vector)
+            @test size(A) == size(L, as = Matrix)
+            @test size(L.data) == size(L, as = Vector)
 
             for m in 1:mmax
                 for l in 1:lmax
@@ -22,27 +22,27 @@ import Random
                 end
             end
 
-            @test_throws BoundsError L[lmax+1, mmax]
-            @test_throws BoundsError L[lmax, mmax+1]
-            
+            @test_throws BoundsError L[lmax + 1, mmax]
+            @test_throws BoundsError L[lmax, mmax + 1]
+
             @test_throws BoundsError L[1, 2] = 1
-            @test_throws BoundsError L[lmax*mmax+1] = 1
+            @test_throws BoundsError L[lmax * mmax + 1] = 1
 
             @test Matrix(L) == A
 
-            @test all(L[:,1] .== A[:,1])
-            @test all(L[:,2] .== A[:,2])
-            @test all(L[1,:] .== A[1,:])
-            @test all(L[2,:] .== A[2,:])
+            @test all(L[:, 1] .== A[:, 1])
+            @test all(L[:, 2] .== A[:, 2])
+            @test all(L[1, :] .== A[1, :])
+            @test all(L[2, :] .== A[2, :])
         end
     end
 end
 
-@testset "LowerTriangularArray: N-dim" begin 
+@testset "LowerTriangularArray: N-dim" begin
     @testset for NF in (Float32, Float64)
         mmax = 32
-        @testset for idims = ((), (5,), (5,5))
-            @testset for lmax = (mmax, mmax+1)
+        @testset for idims in ((), (5,), (5, 5))
+            @testset for lmax in (mmax, mmax+1)
                 A = randn(Complex{NF}, lmax, mmax, idims...)
 
                 # replaces spectraltrunction! here, we just set the elements zero manually
@@ -52,20 +52,21 @@ end
 
                 L = LowerTriangularArray(A)
 
-                @test size(L, as=Matrix) == size(A)
-                @test size(L.data) == size(L, as=Vector)
+                @test size(L, as = Matrix) == size(A)
+                @test size(L.data) == size(L, as = Vector)
                 @test size(L)[2:end] == size(A)[3:end]
-                @test size(L)[1] == SpeedyWeather.LowerTriangularArrays.nonzeros(size(A,1), size(A,2))
-                
+                @test size(L)[1] ==
+                      SpeedyWeather.LowerTriangularArrays.nonzeros(size(A, 1), size(A, 2))
+
                 # with integer to request length of one specific dimension
                 @test size(L)[1] == size(L, 1)
-                @test size(L)[1] == size(L, 1, as=Vector)
-                @test size(L)[1] == size(L, 1, OneBased, as=Vector)
+                @test size(L)[1] == size(L, 1, as = Vector)
+                @test size(L)[1] == size(L, 1, OneBased, as = Vector)
 
-                @test size(L, 1, as=Matrix) == lmax
-                @test size(L, 2, as=Matrix) == mmax
-                @test size(L, 1, ZeroBased, as=Matrix) == lmax-1
-                @test size(L, 2, ZeroBased, as=Matrix) == mmax-1
+                @test size(L, 1, as = Matrix) == lmax
+                @test size(L, 2, as = Matrix) == mmax
+                @test size(L, 1, ZeroBased, as = Matrix) == lmax-1
+                @test size(L, 2, ZeroBased, as = Matrix) == mmax-1
 
                 # all additional dimensions are or size 1, as defined for Array too
                 @test size(L, 2+length(idims)) == 1
@@ -73,105 +74,106 @@ end
                 @test size(L, 4+length(idims)) == 1
                 @test size(L, 5+length(idims)) == 1
 
-                @test size(L, 3+length(idims), as=Matrix) == 1
-                @test size(L, 4+length(idims), as=Matrix) == 1
-                @test size(L, 5+length(idims), as=Matrix) == 1
+                @test size(L, 3+length(idims), as = Matrix) == 1
+                @test size(L, 4+length(idims), as = Matrix) == 1
+                @test size(L, 5+length(idims), as = Matrix) == 1
 
                 for m in 1:mmax
                     for l in 1:lmax
-                        @test A[l, m, [Colon() for i=1:length(idims)]...] == L[l, m, [Colon() for i=1:length(idims)]...]
+                        @test A[l, m, [Colon() for i in 1:length(idims)]...] ==
+                              L[l, m, [Colon() for i in 1:length(idims)]...]
                     end
                 end
 
-                @test_throws BoundsError L[lmax+1, mmax, [1 for i=1:length(idims)]...]
-                @test_throws BoundsError L[lmax, mmax+1, [1 for i=1:length(idims)]...]
-                
-                @test_throws BoundsError L[1, 2, [1 for i=1:length(idims)]...] = 1
-                @test_throws BoundsError L[lmax*mmax+1, [1 for i=1:length(idims)]...] = 1
+                @test_throws BoundsError L[lmax + 1, mmax, [1 for i in 1:length(idims)]...]
+                @test_throws BoundsError L[lmax, mmax + 1, [1 for i in 1:length(idims)]...]
+
+                @test_throws BoundsError L[1, 2, [1 for i in 1:length(idims)]...] = 1
+                @test_throws BoundsError L[lmax * mmax + 1, [1
+                                                                                for i in 1:length(idims)]...] = 1
 
                 @test Array(L) == A
 
-                if length(idims) == 1 
-                    L1 = L[:,1] 
+                if length(idims) == 1
+                    L1 = L[:, 1]
                     @test typeof(L1) <: LowerTriangularArray
-                    @test all(L1.data .== L.data[:,1])
-                    @test all([L1[i] == L[i,1] for i=1:size(L.data,1)])
+                    @test all(L1.data .== L.data[:, 1])
+                    @test all([L1[i] == L[i, 1] for i in 1:size(L.data, 1)])
                 end
             end
         end
     end
 end
 
-@testset "LowerTriangularArray: OneBased vs ZeroBased" begin 
-
+@testset "LowerTriangularArray: OneBased vs ZeroBased" begin
     L = zeros(LowerTriangularMatrix, 5, 5)
 
-    @test size(L) == size(L, as=Vector)
-    @test size(L, as=Matrix) == (5, 5)
+    @test size(L) == size(L, as = Vector)
+    @test size(L, as = Matrix) == (5, 5)
     @test size(L, 1) == 15
-    @test size(L, 1, as=Matrix) == 5
-    @test size(L, 2, as=Matrix) == 5
-    @test size(L, 1, ZeroBased, as=Matrix) == 4
-    @test size(L, 2, ZeroBased, as=Matrix) == 4
-    @test size(L, OneBased, as=Matrix) == (5, 5)
+    @test size(L, 1, as = Matrix) == 5
+    @test size(L, 2, as = Matrix) == 5
+    @test size(L, 1, ZeroBased, as = Matrix) == 4
+    @test size(L, 2, ZeroBased, as = Matrix) == 4
+    @test size(L, OneBased, as = Matrix) == (5, 5)
     @test_throws MethodError size(L, ZeroBased)
-    @test_throws MethodError size(L, ZeroBased, as=Vector)
+    @test_throws MethodError size(L, ZeroBased, as = Vector)
 
     L = zeros(LowerTriangularArray, 5, 5, 2)
-    m, n = size(L, as=Matrix)
+    m, n = size(L, as = Matrix)
     @test (m, n) == (5, 5)
 
-    lmax, mmax = size(L, ZeroBased, as=Matrix)
+    lmax, mmax = size(L, ZeroBased, as = Matrix)
     @test (lmax, mmax) == (4, 4)
-end 
+end
 
 @testset "LowerTriangularMatrix: @inbounds" begin
     m, n = 5, 5
     A = randn(LowerTriangularMatrix, m, n)
-    
+
     # @testset "getindex" begin
-        @test_throws BoundsError A[m, n+1]  # outside of i, j range
-        @test_throws BoundsError A[m+1, n]  # outside of i, j range
+    @test_throws BoundsError A[m, n + 1]  # outside of i, j range
+    @test_throws BoundsError A[m + 1, n]  # outside of i, j range
 
-        mn = LowerTriangularArrays.nonzeros(m, n)
-        @test_throws BoundsError A[mn+1]    # outside of k range
+    mn = LowerTriangularArrays.nonzeros(m, n)
+    @test_throws BoundsError A[mn + 1]    # outside of k range
 
-        # with @inbounds accessing [1,2] should return [5]
-        # because the j > 1 is skipped and lm2i(1, 2, 5) = 5
-        # which isn't correct but would never be called without @inbounds
-        f(A, i) = @inbounds A[i]             # wrap into function
-        f(A, i, j) = @inbounds A[i, j]
+    # with @inbounds accessing [1,2] should return [5]
+    # because the j > 1 is skipped and lm2i(1, 2, 5) = 5
+    # which isn't correct but would never be called without @inbounds
+    f(A, i) = @inbounds A[i]             # wrap into function
+    f(A, i, j) = @inbounds A[i, j]
 
-        @test f(A, 1) == A[1]       # valid
-        @test f(A, 2, 1) == A[2]    # valid
-        # @test f(A, 1, 2) == A[m]    # invalid
+    @test f(A, 1) == A[1]       # valid
+    @test f(A, 2, 1) == A[2]    # valid
+    # @test f(A, 1, 2) == A[m]    # invalid
 
-        @test f(A, CartesianIndex(2, 1)) == A[2, 1]
-        # @test f(A, CartesianIndex(1, 2)) == A[n, 1] # invalid, disable for CI (*)
+    @test f(A, CartesianIndex(2, 1)) == A[2, 1]
+    # @test f(A, CartesianIndex(1, 2)) == A[n, 1] # invalid, disable for CI (*)
     # end
 
     # @testset "setindex!" begin
-        @test_throws BoundsError A[m+1, n] = 1  # invalid
-        @test_throws BoundsError A[m, n+1] = 1  # invalid
-        @test_throws BoundsError A[1, 2] = 1    # upper triangle
+    @test_throws BoundsError A[m + 1, n] = 1  # invalid
+    @test_throws BoundsError A[m, n + 1] = 1  # invalid
+    @test_throws BoundsError A[1, 2] = 1    # upper triangle
 
-        mn = LowerTriangularArrays.nonzeros(m, n)
-        @test_throws BoundsError A[mn+1] = 1
+    mn = LowerTriangularArrays.nonzeros(m, n)
+    @test_throws BoundsError A[mn + 1] = 1
 
-        # with @inbounds accessing [1,2] should return [5]
-        # because the j > 1 is skipped and lm2i(1, 2, 5) = 5
-        # which isn't correct but would never be called without @inbounds
-        g!(A, i) = @inbounds A[i] = 1               # wrap into function
-        g!(A, i, j) = @inbounds A[i, j] = 1
+    # with @inbounds accessing [1,2] should return [5]
+    # because the j > 1 is skipped and lm2i(1, 2, 5) = 5
+    # which isn't correct but would never be called without @inbounds
+    g!(A, i) = @inbounds A[i] = 1               # wrap into function
+    g!(A, i, j) = @inbounds A[i, j] = 1
 
-        g!(A, 1)                                    # valid
-        @test f(A, 1) == A[1] == 1
+    g!(A, 1)                                    # valid
+    @test f(A, 1) == A[1] == 1
 
-        g!(A, 2, 1)                                 # valid
-        @test f(A, 2, 1) == A[2] == A[2,1] == 1
+    g!(A, 2, 1)                                 # valid
+    @test f(A, 2, 1) == A[2] == A[2, 1] == 1
 
-        # g!(A, 1, 2)                                 # invalid, disable for CI (*)
-        # @test f(A, 1, 2) == A[n] == A[n,1] == 1
+    # g!(A, 1, 2)                                 # invalid, disable for CI (*)
+    # @test f(A, 1, 2) == A[n] == A[n,1] == 1
     # end
 
     # (*) github actions CI is by default set to _always_ checkbounds
@@ -182,66 +184,66 @@ end
 @testset "LowerTriangularArray: @inbounds" begin
     m, n, p = 5, 5, 5
     A = randn(LowerTriangularArray, m, n, p)
-    
+
     # @testset "getindex" begin
-        @test_throws BoundsError A[m, n+1, p+1]  # outside or range
-        @test_throws BoundsError A[m, n+1, p  ]  # outside or range
-        @test_throws BoundsError A[m+1, n, p  ]  # outside or range
+    @test_throws BoundsError A[m, n + 1, p + 1]  # outside or range
+    @test_throws BoundsError A[m, n + 1, p]  # outside or range
+    @test_throws BoundsError A[m + 1, n, p]  # outside or range
 
-        mnp = LowerTriangularArrays.nonzeros(m, n)*p
-        @test_throws BoundsError A[mnp+1]       # outside of k range
+    mnp = LowerTriangularArrays.nonzeros(m, n)*p
+    @test_throws BoundsError A[mnp + 1]       # outside of k range
 
-        # with @inbounds accessing [1,2] should return [5]
-        # because the j > 1 boundscheck is skipped and lm2i(1, 2, 5) = 5
-        # which isn't correct but would never be called without @inbounds
-        f(A, i) = @inbounds A[i]            # wrap into function
-        f(A, i, j) = @inbounds A[i, j]
-        f(A, i, j, k) = @inbounds A[i, j, k]
+    # with @inbounds accessing [1,2] should return [5]
+    # because the j > 1 boundscheck is skipped and lm2i(1, 2, 5) = 5
+    # which isn't correct but would never be called without @inbounds
+    f(A, i) = @inbounds A[i]            # wrap into function
+    f(A, i, j) = @inbounds A[i, j]
+    f(A, i, j, k) = @inbounds A[i, j, k]
 
-        @test f(A, 1) == A[1]               # valid
-        @test f(A, 2, 1) == A[2]            # valid
-        # @test f(A, 1, 2, 3) == A[m, 1, 3]   # invalid, disable for CI (*)
-        @test f(A, 1, 1, 1) == A[1, 1, 1]   # valid
+    @test f(A, 1) == A[1]               # valid
+    @test f(A, 2, 1) == A[2]            # valid
+    # @test f(A, 1, 2, 3) == A[m, 1, 3]   # invalid, disable for CI (*)
+    @test f(A, 1, 1, 1) == A[1, 1, 1]   # valid
 
-        @test f(A, CartesianIndex(3)) == A[3]
-        @test f(A, CartesianIndex(2, 1)) == A[2, 1]
-        @test f(A, CartesianIndex(2, 1, 1)) == A[2, 1]
-        # @test f(A, CartesianIndex(1, 2, 1)) == A[n, 1]  # invalid, disable for CI (*)
+    @test f(A, CartesianIndex(3)) == A[3]
+    @test f(A, CartesianIndex(2, 1)) == A[2, 1]
+    @test f(A, CartesianIndex(2, 1, 1)) == A[2, 1]
+    # @test f(A, CartesianIndex(1, 2, 1)) == A[n, 1]  # invalid, disable for CI (*)
     # end
 
     # @testset "setindex!" begin
-        @test_throws BoundsError A[m+1, n, p  ] = 1  # invalid
-        @test_throws BoundsError A[m, n+1, p  ] = 1  # invalid
-        @test_throws BoundsError A[m, n+1, p+1] = 1  # invalid
-        @test_throws BoundsError A[1, 2,   1  ] = 1  # upper triangle
+    @test_throws BoundsError A[m + 1, n, p] = 1  # invalid
+    @test_throws BoundsError A[m, n + 1, p] = 1  # invalid
+    @test_throws BoundsError A[m, n + 1, p + 1] = 1  # invalid
+    @test_throws BoundsError A[1, 2, 1] = 1  # upper triangle
 
-        mnp = LowerTriangularArrays.nonzeros(m, n)*p
-        @test_throws BoundsError A[mnp+1] = 1
+    mnp = LowerTriangularArrays.nonzeros(m, n)*p
+    @test_throws BoundsError A[mnp + 1] = 1
 
-        # with @inbounds accessing [1,2] should return [5]
-        # because the j > 1 is skipped and lm2i(1, 2, 5) = 5
-        # which isn't correct but would never be called without @inbounds
-        g!(A, i) = @inbounds A[i] = 1               # wrap into function
-        g!(A, i, j) = @inbounds A[i, j] = 1
-        g!(A, i, j, k) = @inbounds A[i, j, k] = 1
+    # with @inbounds accessing [1,2] should return [5]
+    # because the j > 1 is skipped and lm2i(1, 2, 5) = 5
+    # which isn't correct but would never be called without @inbounds
+    g!(A, i) = @inbounds A[i] = 1               # wrap into function
+    g!(A, i, j) = @inbounds A[i, j] = 1
+    g!(A, i, j, k) = @inbounds A[i, j, k] = 1
 
-        g!(A, 1)                                    # valid
-        @test f(A, 1) == A[1] == 1
+    g!(A, 1)                                    # valid
+    @test f(A, 1) == A[1] == 1
 
-        g!(A, 2, 1)                                 # valid
-        @test f(A, 2, 1) == A[2] == A[2,1] == 1
+    g!(A, 2, 1)                                 # valid
+    @test f(A, 2, 1) == A[2] == A[2, 1] == 1
 
-        g!(A, 1, 2)                                 # valid
-        @test f(A, 1, 2) == A[1, 2] == 1
+    g!(A, 1, 2)                                 # valid
+    @test f(A, 1, 2) == A[1, 2] == 1
 
-        # g!(A, 1, 2, 1)                              # invalid, disable for CI (*)
-        # @test f(A, 1, 2, 1) == A[n] == A[n, 1] == A[n, 1, 1] == 1
+    # g!(A, 1, 2, 1)                              # invalid, disable for CI (*)
+    # @test f(A, 1, 2, 1) == A[n] == A[n, 1] == A[n, 1, 1] == 1
     # end
 end
 
 @testset "4D LowerTriangularArray: @inbounds" begin
     A = randn(LowerTriangularArray, 33, 32, 1, 1)
-    
+
     @testset "getindex" begin
         @test_throws BoundsError A[34, 32, 1, 1]    # outside of i, j range
         @test_throws BoundsError A[561, 1, 1]       # outside of k range
@@ -252,8 +254,8 @@ end
     @testset "setindex!" begin
         @test_throws BoundsError A[34, 32, 1, 1] = 1
         @test_throws BoundsError A[561, 1, 1] = 1
-        @test_throws BoundsError A[33, 32, 2, 1] = 1 
-        @test_throws BoundsError A[33, 32, 1, 2] = 1 
+        @test_throws BoundsError A[33, 32, 2, 1] = 1
+        @test_throws BoundsError A[33, 32, 1, 2] = 1
     end
 end
 
@@ -261,7 +263,7 @@ end
     for f in (ones, zeros, rand, randn)
         s = (5, 5)
         spectrum = Spectrum(s...)
-        spectrum_jlarray = Spectrum(spectrum, architecture=SpeedyWeather.architecture(JLArray))
+        spectrum_jlarray = Spectrum(spectrum, architecture = SpeedyWeather.architecture(JLArray))
         jl_arch = spectrum_jlarray.architecture
 
         # for 2D doesn't matter whether you say Matrix or Array, size is determined by s
@@ -274,7 +276,7 @@ end
         L2 = f(LowerTriangularArray, spectrum)
         @test typeof(L) == typeof(L2)
         @test size(L) == size(L2)
-        
+
         L = f(LowerTriangularMatrix{Float16}, s...)
         L2 = f(LowerTriangularArray{Float16}, s...)
         @test typeof(L) == typeof(L2)
@@ -285,15 +287,17 @@ end
         L3 = f(Float16, spectrum)
         @test typeof(L) == typeof(L2) == typeof(L3)
         @test size(L) == size(L2) == size(L3)
-        
+
         JL = on_architecture(jl_arch, L)
         JL2 = on_architecture(jl_arch, L2)
         @test typeof(JL) == typeof(JL2) == typeof(zero(JL))
         @test size(JL) == size(JL2) == size(zero(JL))
-        
+
         L = f(LowerTriangularMatrix{Float16}, s...)
         L2 = f(LowerTriangularArray{Float16, 1, Vector{Float16}, typeof(spectrum)}, s...)
-        JL = f(LowerTriangularArray{Float16, 1, JLArray{Float16, 1}, typeof(spectrum_jlarray)}, s...)
+        JL = f(
+            LowerTriangularArray{
+                Float16, 1, JLArray{Float16, 1}, typeof(spectrum_jlarray)}, s...)
         @test typeof(L) == typeof(L2)
         @test size(L) == size(L2)
         @test typeof(L) != typeof(JL)
@@ -301,7 +305,8 @@ end
 
         L = f(LowerTriangularMatrix{Float16}, spectrum)
         L2 = f(LowerTriangularArray{Float16, 1, Vector{Float16}, typeof(spectrum)}, spectrum)
-        JL = f(LowerTriangularArray{Float16, 1, JLArray{Float16, 1}, typeof(spectrum_jlarray)}, spectrum_jlarray)
+        JL = f(
+            LowerTriangularArray{Float16, 1, JLArray{Float16, 1}, typeof(spectrum_jlarray)}, spectrum_jlarray)
         @test typeof(L) == typeof(L2)
         @test size(L) == size(L2)
         @test typeof(L) != typeof(JL)
@@ -311,9 +316,11 @@ end
         for s in ((2, 3, 4), (2, 3, 4, 5))
             N = length(s)
             Random.seed!(123)
-            L =  f(LowerTriangularArray{Float16, N-1, Array{Float16, N-1}, typeof(spectrum)}, s...)
+            L = f(LowerTriangularArray{Float16, N-1, Array{Float16, N-1}, typeof(spectrum)}, s...)
             Random.seed!(123)
-            JL = f(LowerTriangularArray{Float16, N-1, JLArray{Float16, N-1}, typeof(spectrum_jlarray)}, s...)
+            JL = f(
+                LowerTriangularArray{
+                    Float16, N-1, JLArray{Float16, N-1}, typeof(spectrum_jlarray)}, s...)
             JL2 = on_architecture(jl_arch, L)
             @test all(JL2 .== JL)   # equality via broadcasting
             @test JL2 == JL         # checks for type and data equality
@@ -325,12 +332,16 @@ end
         end
 
         # higher dims - spectrum 
-        for s in ((2, ), (2, 3))
+        for s in ((2,), (2, 3))
             N = length(s)
             Random.seed!(123)
-            L =  f(LowerTriangularArray{Float16, N+1, Array{Float16, N+1}, typeof(spectrum)}, spectrum, s...)
+            L = f(LowerTriangularArray{Float16, N+1, Array{Float16, N+1}, typeof(spectrum)}, spectrum, s...)
             Random.seed!(123)
-            JL = f(LowerTriangularArray{Float16, N+1, JLArray{Float16, N+1}, typeof(spectrum_jlarray)}, spectrum_jlarray, s...)
+            JL = f(
+                LowerTriangularArray{
+                    Float16, N+1, JLArray{Float16, N+1}, typeof(spectrum_jlarray)},
+                spectrum_jlarray,
+                s...)
             JL2 = on_architecture(jl_arch, L)
             @test all(JL2 .== JL)   # equality via broadcasting
             @test JL2 == JL         # checks for type and data equality
@@ -350,8 +361,8 @@ end
 @testset "LowerTriangularArray: fill, copy, randn, convert, repeat" begin
     @testset for NF in (Float32, Float64)
         mmax = 32
-        @testset for idims = ((), (5,), (5,5))
-            @testset for lmax = (mmax, mmax+1)
+        @testset for idims in ((), (5,), (5, 5))
+            @testset for lmax in (mmax, mmax+1)
                 spectrum = Spectrum(lmax, mmax)
                 A = randn(Complex{NF}, lmax, mmax, idims...)
 
@@ -365,27 +376,32 @@ end
                 # fill
                 fill!(L, 2)
                 for lm in SpeedyWeather.eachharmonic(L)
-                    @test all(L[lm, [Colon() for i=1:length(idims)]...] .== 2)
+                    @test all(L[lm, [Colon() for i in 1:length(idims)]...] .== 2)
                 end
 
                 # copy
                 L2 = copy(L)
                 @test L2 == L
 
-                L2[1, [1 for i=1:length(idims)]...] = 3
-                @test L[1, [1 for i=1:length(idims)]...] == 2     # should be a deep copy
-                @test L2[1, [1 for i=1:length(idims)]...] == 3
+                L2[1, [1 for i in 1:length(idims)]...] = 3
+                @test L[1, [1 for i in 1:length(idims)]...] == 2     # should be a deep copy
+                @test L2[1, [1 for i in 1:length(idims)]...] == 3
 
                 # convert
                 L = randn(LowerTriangularArray{NF}, lmax, mmax, idims...)
-                L3 = convert(LowerTriangularArray{Float16, 1+length(idims), Array{Float16,1+length(idims)}, typeof(spectrum)}, L)
+                L3 = convert(
+                    LowerTriangularArray{Float16, 1+length(idims),
+                        Array{Float16, 1+length(idims)}, typeof(spectrum)},
+                    L)
                 for lm in SpeedyWeather.eachharmonic(L, L3)
-                    @test Float16(L[lm, [1 for i=1:length(idims)]...]) == L3[lm, [1 for i=1:length(idims)]...] 
+                    @test Float16(L[lm, [1 for i in 1:length(idims)]...]) ==
+                          L3[lm, [1 for i in 1:length(idims)]...]
                 end
 
-                L_rep = repeat(L, 1, [2 for i=1:length(idims)]...)
+                L_rep = repeat(L, 1, [2 for i in 1:length(idims)]...)
                 @test typeof(L_rep) <: LowerTriangularArray
-                @test size(L_rep, as=Vector) == (size(L,1), [10 for i=1:length(idims)]...) # 10 = 2 * 5 = 2*idims[i]
+                @test size(L_rep, as = Vector) ==
+                      (size(L, 1), [10 for i in 1:length(idims)]...) # 10 = 2 * 5 = 2*idims[i]
             end
         end
     end
@@ -394,31 +410,31 @@ end
 @testset "LowerTriangularMatrix: fill, copy, randn, convert" begin
     @testset for NF in (Float32, Float64)
         mmax = 32
-        @testset for lmax = (mmax, mmax+1)
-                A = randn(Complex{NF}, lmax, mmax)
-                SpeedyWeather.spectral_truncation!(A)
-                L = SpeedyWeather.LowerTriangularMatrix(A)
+        @testset for lmax in (mmax, mmax+1)
+            A = randn(Complex{NF}, lmax, mmax)
+            SpeedyWeather.spectral_truncation!(A)
+            L = SpeedyWeather.LowerTriangularMatrix(A)
 
-                # fill
-                fill!(L, 2)
-                for lm in SpeedyWeather.eachharmonic(L)
-                    @test L[lm] == 2
-                end
+            # fill
+            fill!(L, 2)
+            for lm in SpeedyWeather.eachharmonic(L)
+                @test L[lm] == 2
+            end
 
-                # copy
-                L2 = deepcopy(L)
-                @test L2 == L
+            # copy
+            L2 = deepcopy(L)
+            @test L2 == L
 
-                L2[1] = 3
-                @test L[1] == 2     # should be a deep copy
-                @test L2[1] == 3
+            L2[1] = 3
+            @test L[1] == 2     # should be a deep copy
+            @test L2[1] == 3
 
-                # convert
-                L = randn(LowerTriangularMatrix{NF}, lmax, mmax)
-                L3 = convert(LowerTriangularMatrix{Float16}, L)
-                for lm in SpeedyWeather.eachharmonic(L, L3)
-                    @test Float16(L[lm]) == L3[lm] 
-                end
+            # convert
+            L = randn(LowerTriangularMatrix{NF}, lmax, mmax)
+            L3 = convert(LowerTriangularMatrix{Float16}, L)
+            for lm in SpeedyWeather.eachharmonic(L, L3)
+                @test Float16(L[lm]) == L3[lm]
+            end
         end
     end
 end
@@ -439,22 +455,22 @@ end
 
         @test size(similar(L)) == size(L)
         @test eltype(L) == eltype(similar(L, eltype(L)))
-        
+
         # TODO: before this was (5, 7), but now it is (5, 5)
         # why did we even do (5,7) in the first place?
-        @test (5, 5) == size(similar(L, 5, 5), as=Matrix)
-        @test (5, 5) == size(similar(L, (5, 5)), as=Matrix)
+        @test (5, 5) == size(similar(L, 5, 5), as = Matrix)
+        @test (5, 5) == size(similar(L, (5, 5)), as = Matrix)
 
         @test similar(L) isa LowerTriangularMatrix
         @test similar(L, Float64) isa LowerTriangularMatrix{Float64}
-        
+
         # spectrum should be the same
         @test similar(L).spectrum === L.spectrum
     end
 end
 
 @testset "LowerTriangularArray: *, +, eachindex, similar" begin
-    @testset for idims = ((), (5,), (5,5))
+    @testset for idims in ((), (5,), (5, 5))
         @testset for NF in (Float16, Float32, Float64)
             L = randn(LowerTriangularArray{NF}, 3, 3, idims...)
 
@@ -471,8 +487,8 @@ end
             @test size(similar(L)) == size(L)
             @test eltype(L) == eltype(similar(L, eltype(L)))
 
-            @test (5, 5, idims...) == size(similar(L, 5, 5, idims...), as=Matrix)
-            @test (5, 5, idims...) == size(similar(L, (5, 5,  idims...)), as=Matrix)
+            @test (5, 5, idims...) == size(similar(L, 5, 5, idims...), as = Matrix)
+            @test (5, 5, idims...) == size(similar(L, (5, 5, idims...)), as = Matrix)
 
             @test similar(L) isa LowerTriangularArray
             @test similar(L, Float64) isa LowerTriangularArray{Float64}
@@ -482,14 +498,14 @@ end
     end
 end
 
-@testset "LowerTriangularArray: sum" begin 
-    @testset for idims = ((5,), (5,5))
+@testset "LowerTriangularArray: sum" begin
+    @testset for idims in ((5,), (5, 5))
         L = randn(LowerTriangularArray{Float32}, 3, 3, idims...)
-    
-        @test sum(L, dims=1) == sum(L.data, dims=1)
-        @test sum(L, dims=2) == sum(L.data, dims=2)
-    end 
-end 
+
+        @test sum(L, dims = 1) == sum(L.data, dims = 1)
+        @test sum(L, dims = 2) == sum(L.data, dims = 2)
+    end
+end
 
 @testset "LowerTriangularMatrix: copyto!" begin
     @testset for NF in (Float16, Float32, Float64)
@@ -515,7 +531,7 @@ end
         # with ranges
         L1 = zeros(LowerTriangularMatrix{NF}, 33, 32);
         L2 = randn(LowerTriangularMatrix{NF}, 65, 64);
-        L2T = spectral_truncation(L2, size(L1, ZeroBased, as=Matrix)...)
+        L2T = spectral_truncation(L2, size(L1, ZeroBased, as = Matrix)...)
 
         copyto!(L1, L2, 1:33, 1:32)     # size of smaller matrix
         @test L1 == L2T
@@ -529,7 +545,7 @@ end
 end
 
 @testset "LowerTriangularArray: copyto!" begin
-    @testset for idims = ((), (5,), (5,5))
+    @testset for idims in ((), (5,), (5, 5))
         @testset for NF in (Float16, Float32, Float64)
 
             # copyto! same size 
@@ -541,10 +557,10 @@ end
 
             # copyto! Vector 
             L1 = randn(LowerTriangularArray{NF}, 10, 10, idims...)
-            V = randn(size(L1, as=Vector)...)
+            V = randn(size(L1, as = Vector)...)
             copyto!(L1, V)
 
-            @test L1.data == NF.(V) 
+            @test L1.data == NF.(V)
 
             # copyto! Array 
             M = zeros(NF, 10, 10, idims...)
@@ -578,7 +594,7 @@ end
             # with ranges
             L1 = zeros(LowerTriangularArray{NF}, 33, 32, idims...);
             L2 = randn(LowerTriangularArray{NF}, 65, 64, idims...);
-            L2T = spectral_truncation(L2, (size(L1, ZeroBased,  as=Matrix)[1:2])...)
+            L2T = spectral_truncation(L2, (size(L1, ZeroBased, as = Matrix)[1:2])...)
 
             copyto!(L1, L2, 1:33, 1:32)     # size of smaller matrix
             @test L1 == L2T
@@ -592,19 +608,19 @@ end
     end
 end
 
-@testset "LowerTriangularMatrix: broadcast" begin 
+@testset "LowerTriangularMatrix: broadcast" begin
     @testset for NF in (Float16, Float32, Float64)
         L1 = randn(LowerTriangularMatrix{NF}, 10, 10)
-        L2 = deepcopy(L1) 
+        L2 = deepcopy(L1)
 
         L2 .*= NF(5)
-        @test L1 .* NF(5) ≈ L2 
+        @test L1 .* NF(5) ≈ L2
 
         L1 = randn(LowerTriangularMatrix{NF}, 10, 10)
-        L2 = deepcopy(L1) 
+        L2 = deepcopy(L1)
 
         L2 ./= NF(5)
-        @test L1 ./ NF(5) ≈ L2 
+        @test L1 ./ NF(5) ≈ L2
 
         L1 = randn(LowerTriangularMatrix{NF}, 10, 10)
         L2 = deepcopy(L1)
@@ -612,15 +628,14 @@ end
         L2 .^= NF(2)
         @test L1 .^ NF(2) ≈ L2
     end
-end 
+end
 
-
-@testset "LowerTriangularArray: GPU (JLArrays)" begin 
+@testset "LowerTriangularArray: GPU (JLArrays)" begin
     # TODO: so far very basic GPU test, might integrate them into the other tests, as I already did with the broadcast test, but there are some key differences to avoid scalar indexing
     NF = Float32
     idims = (5,)
     spectrum = Spectrum(10, 10)
-    spectrum_jlarray = Spectrum(spectrum, architecture=SpeedyWeather.architecture(JLArray))
+    spectrum_jlarray = Spectrum(spectrum, architecture = SpeedyWeather.architecture(JLArray))
     jl_arch = spectrum_jlarray.architecture
 
     L_cpu = randn(LowerTriangularArray{NF}, spectrum, idims...)
@@ -628,42 +643,44 @@ end
     # constructors/adapt
     L = on_architecture(jl_arch, L_cpu)
     L2 = LowerTriangularArray(on_architecture(jl_arch, L_cpu.data), spectrum_jlarray)
-    @test all(L .== L2) 
+    @test all(L .== L2)
 
     # getindex 
-    @test typeof(L[1,:]) <: JLArray 
+    @test typeof(L[1, :]) <: JLArray
     for lm in SpeedyWeather.eachharmonic(L)
-        @test Array(L[lm,:]) == L_cpu[lm,:]  
-    end 
+        @test Array(L[lm, :]) == L_cpu[lm, :]
+    end
 
     # setindex! 
-    A_test = JLArray(rand(NF,size(L_cpu,2)))
-    L[1,:] = A_test
-    @test L[1,:] == A_test
+    A_test = JLArray(rand(NF, size(L_cpu, 2)))
+    L[1, :] = A_test
+    @test L[1, :] == A_test
 
     # fill 
     fill!(L, 2)
     for lm in SpeedyWeather.eachharmonic(L2)
-        @test all(L[lm, [Colon() for i=1:length(idims)]...] .== 2)
-    end 
+        @test all(L[lm, [Colon() for i in 1:length(idims)]...] .== 2)
+    end
 
     # copy 
     L2 = deepcopy(L)
     @test all(L2 .== L)
 
-    rand_array = JLArray(rand(NF,5))
-    L2[1,:] = rand_array
-    @test all(L[1,:] .== 2)     # should be a deep copy
-    @test all(L2[1,:] .== rand_array)
+    rand_array = JLArray(rand(NF, 5))
+    L2[1, :] = rand_array
+    @test all(L[1, :] .== 2)     # should be a deep copy
+    @test all(L2[1, :] .== rand_array)
 
     # rand + convert
     L3 = on_architecture(jl_arch, randn(LowerTriangularArray{NF}, spectrum, idims...))
-    L4 = convert(LowerTriangularArray{Float16,2,JLArray{Float16,2},typeof(spectrum_jlarray)}, L3)
+    L4 = convert(
+        LowerTriangularArray{
+            Float16, 2, JLArray{Float16, 2}, typeof(spectrum_jlarray)}, L3)
 
     for lm in SpeedyWeather.eachharmonic(L, L3)
         @test all(Float16.(L3[lm, :]) .== L4[lm, :])
-    end 
-    
+    end
+
     # * 
     @test all((L+L) .== L*2)
     @test all((L-L) .== zero(L))
@@ -672,8 +689,8 @@ end
     @test size(similar(L)) == size(L)
     @test eltype(L) == eltype(similar(L, eltype(L)))
 
-    @test (5, 5, idims...) == size(similar(L, 5, 5, idims...), as=Matrix)
-    @test (5, 5, idims...) == size(similar(L, (5, 5,  idims...)), as=Matrix)
+    @test (5, 5, idims...) == size(similar(L, 5, 5, idims...), as = Matrix)
+    @test (5, 5, idims...) == size(similar(L, (5, 5, idims...)), as = Matrix)
 
     @test similar(L) isa LowerTriangularArray
 
@@ -684,7 +701,7 @@ end
     copyto!(L2, L1)
 
     @test all(L2 .== L1)
-    
+
     # test the truncating copyto! function 
     # we can't do this with JLArrays, as they don't support mixed indexing with BitArrays
     # like Array and CuArray do
@@ -694,7 +711,7 @@ end
     L1 = zeros(LowerTriangularArray{NF}, 33, 32, idims...)
     L2 = randn(LowerTriangularArray{NF}, 65, 64, idims...)
 
-    L2T = spectral_truncation(L2, (size(L1, ZeroBased; as=Matrix)[1:2])...)
+    L2T = spectral_truncation(L2, (size(L1, ZeroBased; as = Matrix)[1:2])...)
     L3 = zeros(LowerTriangularArray{NF}, 33, 32, idims...)
 
     SpeedyWeather.LowerTriangularArrays._copyto_core!(L1, L2, 1:33, 1:32)     # size of smaller matrix
@@ -702,35 +719,34 @@ end
 
     # test that GPU and CPU method yield the same
     SpeedyWeather.LowerTriangularArrays.copyto!(L3, L2, 1:33, 1:32)     # size of smaller matrix
-    @test L1 == L3 
+    @test L1 == L3
 
     SpeedyWeather.LowerTriangularArrays._copyto_core!(L1, L2, 1:65, 1:64)     # size of bigger matrix
     @test L1 == L2T
 
     SpeedyWeather.LowerTriangularArrays.copyto!(L3, L2, 1:65, 1:64)     # size of bigger matrix
-    @test L1 == L3 
+    @test L1 == L3
 
     SpeedyWeather.LowerTriangularArrays._copyto_core!(L1, L2, 1:50, 1:50)     # in between
     @test L1 == L2T
 
     SpeedyWeather.LowerTriangularArrays.copyto!(L3, L2, 1:50, 1:50)     # in between
     @test L3 == L1
-end 
+end
 
-@testset "LowerTriangularArray: broadcast" begin 
-    @testset for idims = ((), (2,), (2, 2))
+@testset "LowerTriangularArray: broadcast" begin
+    @testset for idims in ((), (2,), (2, 2))
         @testset for NF in (Float32, Float64)
             @testset for ArrayType in (Array, JLArray)
-
                 arch = architecture(ArrayType)
                 L1 = on_architecture(arch, randn(LowerTriangularArray{NF}, 10, 10, idims...))
-                L2 = deepcopy(L1) 
+                L2 = deepcopy(L1)
 
                 L2 .*= 5
                 @test 5L1 == L2
 
                 L1 = on_architecture(arch, randn(LowerTriangularArray{NF}, 10, 10, idims...))
-                L2 = deepcopy(L1) 
+                L2 = deepcopy(L1)
 
                 L2 ./= 5
                 @test (L1.data ./ 5) == L2.data
@@ -739,7 +755,7 @@ end
                 L2 = deepcopy(L1)
 
                 L2 .^= 2
-                @test L1.data.^2 == L2.data
+                @test L1.data .^ 2 == L2.data
 
                 # tests mirroring usage in dynamical core
                 L1 = on_architecture(arch, randn(LowerTriangularArray{NF}, 10, 10, idims...))
@@ -759,7 +775,7 @@ end
                 L2 = on_architecture(arch, randn(LowerTriangularArray{NF}, 10, 10, idims...))
                 L3 = deepcopy(L2)
 
-                L2 .+= L1 
+                L2 .+= L1
                 L3.data .+= L1.data
                 @test L2.data == L3.data
 
@@ -775,7 +791,7 @@ end
             end
         end
     end
-end 
+end
 
 @testset "Rotate LowerTriangularArray" begin
     # import SpeedyWeather.LowerTriangularArrays: rotate!
@@ -818,19 +834,19 @@ end
                     L = rand(LowerTriangularArray{Complex{NF}}, trunc, trunc, k)
                 end
 
-                L2 = reverse(L, dims=:lat)
-                L3 = reverse(L, dims=:lon)
+                L2 = reverse(L, dims = :lat)
+                L3 = reverse(L, dims = :lon)
 
                 # reversing twice is back to the beginning
-                @test reverse(L2, dims=:lat) == L
-                @test reverse(L3, dims=:lon) == L
+                @test reverse(L2, dims = :lat) == L
+                @test reverse(L3, dims = :lon) == L
 
                 # order of reversals doesn't matter
-                @test reverse(L2, dims=:lon) == reverse(L3, dims=:lat)
+                @test reverse(L2, dims = :lon) == reverse(L3, dims = :lat)
 
                 # in place
-                reverse!(L2, dims=:lat)
-                reverse!(L3, dims=:lon)
+                reverse!(L2, dims = :lat)
+                reverse!(L3, dims = :lon)
                 @test L2 == L
                 @test L3 == L
             end
@@ -838,23 +854,23 @@ end
     end
 end
 
-@testset "Spectrum" begin 
+@testset "Spectrum" begin
     # truncation vs lmax, mmax constructors 
-    @test Spectrum(5,5) == Spectrum(4, one_degree_more=false) 
-    @test Spectrum(5,5) == Spectrum(trunc=4, one_degree_more=false)
-    @test Spectrum(6,5) == Spectrum(trunc=4, one_degree_more=true) 
+    @test Spectrum(5, 5) == Spectrum(4, one_degree_more = false)
+    @test Spectrum(5, 5) == Spectrum(trunc = 4, one_degree_more = false)
+    @test Spectrum(6, 5) == Spectrum(trunc = 4, one_degree_more = true)
 
-    s = Spectrum(5,5)
+    s = Spectrum(5, 5)
     L = rand(Float32, s)
-    
+
     for lms in eachorder(L)
         for lm in lms
             l, m = SpeedyWeather.LowerTriangularArrays.i2lm(lm, s.mmax)
             @test l == s.l_indices[lm]
             @test m == s.m_indices[lm]
-        end 
-    end 
-end 
+        end
+    end
+end
 
 @testset "LTA view" begin
     L = randn(LowerTriangularArray{Float32}, 5, 5, 2)

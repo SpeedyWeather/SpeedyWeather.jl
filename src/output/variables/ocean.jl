@@ -12,8 +12,9 @@ Fields are: $(TYPEDFIELDS)"""
     transform::F = (x) -> x - 273.15
 end
 
-path(::SeaSurfaceTemperatureOutput, simulation) =
+function path(::SeaSurfaceTemperatureOutput, simulation)
     simulation.prognostic_variables.ocean.sea_surface_temperature
+end
 
 """Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
@@ -28,10 +29,11 @@ Fields are: $(TYPEDFIELDS)"""
     keepbits::Int = 10
 end
 
-path(::SeaIceConcentrationOutput, simulation) =
+function path(::SeaIceConcentrationOutput, simulation)
     simulation.prognostic_variables.ocean.sea_ice_concentration
+end
 
 OceanOutput() = (
     SeaSurfaceTemperatureOutput(),
-    SeaIceConcentrationOutput(),
+    SeaIceConcentrationOutput()
 )

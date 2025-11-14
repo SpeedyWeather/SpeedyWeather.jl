@@ -2,7 +2,9 @@ abstract type AbstractImplicit <: AbstractModelComponent end
 
 # model.implicit=nothing (for BarotropicModel)
 initialize!(::Nothing, dt::Real, ::DiagnosticVariables, ::AbstractModel) = nothing
-implicit_correction!(::DiagnosticVariables, ::PrognosticVariables, ::Nothing, ::AbstractModel) = nothing
+function implicit_correction!(::DiagnosticVariables, ::PrognosticVariables, ::Nothing, ::AbstractModel)
+    nothing
+end
 
 # SHALLOW WATER MODEL
 export ImplicitShallowWater
@@ -23,7 +25,7 @@ $(TYPEDFIELDS)"""
 @kwdef mutable struct ImplicitShallowWater{NF} <: AbstractImplicit
     "[OPTION] coefficient for semi-implicit computations to filter gravity waves, 0.5 <= α <= 1"
     α::NF = 1
-    
+
     "Time step [s], = αdt = 2αΔt (for leapfrog)"
     time_step::NF = 0
 end
@@ -50,13 +52,12 @@ Apply correction to the tendencies in `diagn` to prevent the gravity waves from 
 The correction is implicitly evaluated using the parameter `implicit.α` to switch between
 forward, centered implicit or backward evaluation of the gravity wave terms."""
 function implicit_correction!(
-    diagn::DiagnosticVariables,
-    progn::PrognosticVariables,
-    implicit::ImplicitShallowWater,
-    model::ShallowWater)
-
+        diagn::DiagnosticVariables,
+        progn::PrognosticVariables,
+        implicit::ImplicitShallowWater,
+        model::ShallowWater)
     (; div_tend, pres_tend) = diagn.tendencies  # tendency of divergence and pressure/η
-    div_old, div_new   = get_steps(progn.div)   # divergence at t, t+dt
+    div_old, div_new = get_steps(progn.div)   # divergence at t, t+dt
     pres_old, pres_new = get_steps(progn.pres)  # pressure/η at t, t+dt
 
     # unpack with [] as stored in a RefValue for mutation during initialization
@@ -64,7 +65,7 @@ function implicit_correction!(
     g = model.planet.gravity                    # gravitational acceleration [m/s²]
     ξ = implicit.time_step                      # new implicit timestep ξ = α*dt = 2αΔt (for leapfrog)
 
-    lmax, mmax = size(div_tend, OneBased, as=Matrix)
+    lmax, mmax = size(div_tend, OneBased, as = Matrix)
 
     @inbounds for k in eachmatrix(div_tend)
         lm = 0
@@ -78,7 +79,7 @@ function implicit_correction!(
                 # N is the right hand side of ∂V\∂t = N(V)
                 # NI is the part of N that's calculated semi-implicitily: N = NE + NI
                 G_div = div_tend[lm, k] - g*∇²*(pres_old[lm] - pres_new[lm])
-                G_η   = pres_tend[lm] - H*(div_old[lm, k] - div_new[lm, k])
+                G_η = pres_tend[lm] - H*(div_old[lm, k] - div_new[lm, k])
 
                 # using the Gs correct the tendencies for semi-implicit time stepping
                 S⁻¹ = inv(1 - ξ^2*H*g*∇²)                   # operator to invert
@@ -99,7 +100,7 @@ $(TYPEDFIELDS)"""
     NF,             # number format
     VectorType,
     MatrixType,
-    TensorType,
+    TensorType
 } <: AbstractImplicit
 
     # DIMENSIONS
@@ -170,10 +171,10 @@ end
 
 # function barrier to unpack the constants struct for primitive eq models
 function initialize!(
-    I::ImplicitPrimitiveEquation,
-    dt::Real,
-    diagn::DiagnosticVariables,
-    model::PrimitiveEquation,
+        I::ImplicitPrimitiveEquation,
+        dt::Real,
+        diagn::DiagnosticVariables,
+        model::PrimitiveEquation
 )
     (; geometry, geopotential, atmosphere, adiabatic_conversion) = model
     initialize!(I, dt, diagn, geometry, geopotential, atmosphere, adiabatic_conversion)
@@ -182,14 +183,14 @@ end
 """$(TYPEDSIGNATURES)
 Initialize the implicit terms for the PrimitiveEquation models."""
 function initialize!(
-    implicit::ImplicitPrimitiveEquation,
-    dt::Real,                                           # the scaled time step radius*dt
-    diagn::DiagnosticVariables{NF},
-    geometry::AbstractGeometry,
-    geopotential::AbstractGeopotential,
-    atmosphere::AbstractAtmosphere,
-    adiabatic_conversion::AbstractAdiabaticConversion,
-) where NF
+        implicit::ImplicitPrimitiveEquation,
+        dt::Real,                                           # the scaled time step radius*dt
+        diagn::DiagnosticVariables{NF},
+        geometry::AbstractGeometry,
+        geopotential::AbstractGeopotential,
+        atmosphere::AbstractAtmosphere,
+        adiabatic_conversion::AbstractAdiabaticConversion
+) where {NF}
 
     # option to skip reinitialization at restart
     (implicit.initialized && !implicit.reinitialize) && return nothing
@@ -225,14 +226,14 @@ function initialize!(
     # DIVERGENCE OPERATORS (called g in Hoskins and Simmons 1975, eq 11 and Appendix 1)
     @inbounds for k in 1:nlayers                # vertical geopotential integration as matrix operator
         R[1:k, k] .= -Δp_geopot_full[k]         # otherwise equivalent to geopotential! with zero orography
-        R[1:k-1, k] .+= -Δp_geopot_half[k]      # incl the minus but excluding the eigenvalues as with U
+        R[1:(k - 1), k] .+= -Δp_geopot_half[k]      # incl the minus but excluding the eigenvalues as with U
     end
     U .= -R_dry*temp_profile        # the R_d*Tₖ∇² term excl the eigenvalues from ∇² for divergence
 
     # TEMPERATURE OPERATOR (called τ in Hoskins and Simmons 1975, eq 9 and Appendix 1)
     L0 .= 1 ./ 2σ_levels_thick
-    L2 .= κ*temp_profile.*σ_lnp_A    # factor in front of the div_sum_above term
-    L4 .= κ*temp_profile.*σ_lnp_B    # factor in front of div term in Dlnps/Dt
+    L2 .= κ*temp_profile .* σ_lnp_A    # factor in front of the div_sum_above term
+    L4 .= κ*temp_profile .* σ_lnp_B    # factor in front of div term in Dlnps/Dt
 
     @inbounds for k in 1:nlayers
         Tₖ = temp_profile[k]                    # average temperature at k
@@ -253,7 +254,7 @@ function initialize!(
 
         # _sum_above operator itself
         L3[1:k, k] .= 0                              # fill upper triangle + diagonal with zeros
-        L3[k+1:end, k] .= σ_levels_thick[k]          # vert integration top to k-1
+        L3[(k + 1):end, k] .= σ_levels_thick[k]          # vert integration top to k-1
     end
 
     L .= Diagonal(L0)*L1 .+ Diagonal(L2)*L3 .+ Diagonal(L4)  # combine all operators into L
@@ -265,7 +266,7 @@ function initialize!(
     # δD = SG, with G = G_D + ξRG_T + ξUG_lnps and the operator S
     # S = 1 - ξ²(RL + UW) that has to be inverted to obtain δD from the Gs
     I = LinearAlgebra.I(nlayers)
-    @inbounds for l in 1:trunc+1
+    @inbounds for l in 1:(trunc + 1)
         eigenvalue = -l*(l-1)           # 1-based, -l*(l+1) → -l*(l-1)
         S .= I .- ξ^2*eigenvalue*(R*L .+ U*W')
 
@@ -283,10 +284,10 @@ set_initialized!(implicit::ImplicitPrimitiveEquation) = (implicit.initialized = 
 """$(TYPEDSIGNATURES)
 Apply the implicit corrections to dampen gravity waves in the primitive equation models."""
 function implicit_correction!(
-    diagn::DiagnosticVariables,
-    progn::PrognosticVariables,
-    implicit::ImplicitPrimitiveEquation,
-    model::PrimitiveEquation,
+        diagn::DiagnosticVariables,
+        progn::PrognosticVariables,
+        implicit::ImplicitPrimitiveEquation,
+        model::PrimitiveEquation
 )
     # escape immediately if explicit
     implicit.α == 0 && return nothing
@@ -328,12 +329,13 @@ function implicit_correction!(
 
         # 2. the G = G_D + ξRG_T + ξUG_lnps terms using geopot from above
         lm = 0
-        for m in 1:trunc+1              # loops over all columns/order m
-            for l in m:trunc+1          # but skips the lmax+2 degree (1-based)
+        for m in 1:(trunc + 1)              # loops over all columns/order m
+            for l in m:(trunc + 1)          # but skips the lmax+2 degree (1-based)
                 lm += 1                 # single index lm corresponding to harmonic l, m
-                                        # ∇² not part of U so *eigenvalues here
+                # ∇² not part of U so *eigenvalues here
                 eigenvalue = -l*(l-1)   # 1-based, -l*(l+1) → -l*(l-1)
-                G[lm, k] = div_tend[lm, k] + ξ*eigenvalue*(U[k]*pres_tend[lm] + geopot[lm, k])
+                G[lm, k] = div_tend[lm, k] +
+                           ξ*eigenvalue*(U[k]*pres_tend[lm] + geopot[lm, k])
 
                 # div_tend is now in G, fill with zeros here so that it can be used as an accumulator
                 # in the δD = S⁻¹G calculation below
@@ -347,8 +349,8 @@ function implicit_correction!(
     for k in eachmatrix(div_tend, G)
         for r in eachmatrix(div_tend, G)
             lm = 0
-            for m in 1:trunc+1      # loops over all columns/order m
-                for l in m:trunc+1  # but skips the lmax+2 degree (1-based)
+            for m in 1:(trunc + 1)      # loops over all columns/order m
+                for l in m:(trunc + 1)  # but skips the lmax+2 degree (1-based)
                     lm += 1         # single index lm corresponding to harmonic l, m
                     div_tend[lm, k] += S⁻¹[l, k, r]*G[lm, r]
                 end

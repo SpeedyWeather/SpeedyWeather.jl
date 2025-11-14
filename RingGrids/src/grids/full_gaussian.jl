@@ -24,15 +24,19 @@ end
 Architectures.nonparametric_type(::Type{<:FullGaussianGrid}) = FullGaussianGrid
 
 # FIELD
-const FullGaussianField{T, N} = Field{T, N, ArrayType, Grid} where {ArrayType, Grid<:FullGaussianGrid}
+const FullGaussianField{
+    T, N} = Field{T, N, ArrayType, Grid} where {ArrayType, Grid <: FullGaussianGrid}
 
 # define grid_type (i) without T, N, (ii) with T, (iii) with T, N but not with <:FullGaussianField
 # to not have precendence over grid_type(::Type{Field{...})
 grid_type(::Type{FullGaussianField}) = FullGaussianGrid
-grid_type(::Type{FullGaussianField{T}}) where T = FullGaussianGrid
+grid_type(::Type{FullGaussianField{T}}) where {T} = FullGaussianGrid
 grid_type(::Type{FullGaussianField{T, N}}) where {T, N} = FullGaussianGrid
 
-function Base.showarg(io::IO, F::Field{T, N, ArrayType, Grid}, toplevel) where {T, N, ArrayType, Grid<:FullGaussianGrid{A}} where A <: AbstractArchitecture
+function Base.showarg(io::IO,
+        F::Field{T, N, ArrayType, Grid},
+        toplevel) where {
+        T, N, ArrayType, Grid <: FullGaussianGrid{A}} where {A <: AbstractArchitecture}
     print(io, "FullGaussianField{$T, $N}")
     toplevel && print(io, " as ", nonparametric_type(ArrayType))
     toplevel && print(io, " on ", F.grid.architecture)
@@ -52,10 +56,12 @@ end
 function get_lond(::Type{<:FullGaussianGrid}, nlat_half::Integer)
     nlat_half == 0 && return Float64[]      # necessary to avoid error from /0 below
     nlon = get_nlon(FullGaussianGrid, nlat_half)
-    return collect(range(0, 360 - 180/nlon, step=360/nlon))
+    return collect(range(0, 360 - 180/nlon, step = 360/nlon))
 end
 
 # QUADRATURE
-get_quadrature_weights(::Type{<:FullGaussianGrid}, nlat_half::Integer) = gaussian_weights(nlat_half)
+function get_quadrature_weights(::Type{<:FullGaussianGrid}, nlat_half::Integer)
+    gaussian_weights(nlat_half)
+end
 
 Adapt.@adapt_structure FullGaussianGrid

@@ -1,7 +1,7 @@
 @testset "Geopotential reasonable" begin
     for NF in (Float32, Float64)
         nlayers = 8
-        spectral_grid = SpectralGrid(; NF, nlayers, Grid=FullGaussianGrid)
+        spectral_grid = SpectralGrid(; NF, nlayers, Grid = FullGaussianGrid)
         model = PrimitiveWetModel(spectral_grid)
         simulation = initialize!(model)
         progn = simulation.prognostic_variables
@@ -19,9 +19,9 @@
         SpeedyWeather.linear_virtual_temperature!(diagn, progn, lf, model)
         SpeedyWeather.geopotential!(diagn, model.geopotential, model.orography)
         geopot_grid = transform(diagn.dynamics.geopot, model.spectral_transform)
-        
+
         # approximate heights [m] for this setup
-        heights = [27000, 18000, 13000, 9000, 6000, 3700, 1800, 700] 
+        heights = [27000, 18000, 13000, 9000, 6000, 3700, 1800, 700]
 
         height_over_ocean = geopot_grid[2304, :]/model.planet.gravity       # somwhere in the tropics
         for k in eachmatrix(temp)
@@ -32,7 +32,7 @@ end
 
 @testset "Add geopotential and kinetic energy, compute -∇²B term, no errors" begin
     for NF in (Float32, Float64)
-        spectral_grid = SpectralGrid(; NF, nlayers=8, Grid=FullGaussianGrid)
+        spectral_grid = SpectralGrid(; NF, nlayers = 8, Grid = FullGaussianGrid)
         model = PrimitiveWetModel(spectral_grid)
         simulation = initialize!(model)
         progn = simulation.prognostic_variables
@@ -55,7 +55,7 @@ end
 
 @testset "Virtual temperature calculation" begin
     for NF in (Float32, Float64)
-        spectral_grid = SpectralGrid(; NF, nlayers=8, Grid=FullGaussianGrid)
+        spectral_grid = SpectralGrid(; NF, nlayers = 8, Grid = FullGaussianGrid)
         model = PrimitiveWetModel(spectral_grid)
         simulation = initialize!(model)
         progn = simulation.prognostic_variables
@@ -68,15 +68,16 @@ end
         temp0 = 280      # in Kelvin
         temp .= 0
         temp[1, :] .= temp0 * model.spectral_transform.norm_sphere
-        
+
         humid .= 0
-        humid[1, :] .= 1e-2*(rand(spectral_grid.nlayers) .+ 0.1) * model.spectral_transform.norm_sphere
+        humid[1, :] .= 1e-2 * (rand(spectral_grid.nlayers) .+ 0.1) *
+                       model.spectral_transform.norm_sphere
 
         lf = 1      # leapfrog time step
         SpeedyWeather.transform!(diagn, progn, lf, model)
         SpeedyWeather.virtual_temperature!(diagn, model)
 
-        T  = diagn.grid.temp_grid
+        T = diagn.grid.temp_grid
         Tv = diagn.grid.temp_virt_grid
 
         for ijk in eachindex(T, Tv)

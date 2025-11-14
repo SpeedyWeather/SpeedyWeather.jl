@@ -5,11 +5,11 @@ General transform for `random processes <: AbstractRandomProcess`.
 Takes the spectral `random_pattern` in the prognostic variables
 and transforms it to spectral space in `diagn.grid.random_pattern`."""
 function SpeedyTransforms.transform!(
-    diagn::DiagnosticVariables,
-    progn::PrognosticVariables,
-    lf::Integer,
-    random_process::AbstractRandomProcess,
-    spectral_transform::SpectralTransform,
+        diagn::DiagnosticVariables,
+        progn::PrognosticVariables,
+        lf::Integer,
+        random_process::AbstractRandomProcess,
+        spectral_transform::SpectralTransform
 )
     grid = diagn.grid.random_pattern
     spec = progn.random_pattern
@@ -24,11 +24,11 @@ end
 `random_process=nothing` does not need to transform any random pattern from
 spectral to grid space."""
 function SpeedyTransforms.transform!(
-    diagn::DiagnosticVariables,
-    progn::PrognosticVariables,
-    lf::Integer,
-    random_process::Nothing,
-    spectral_transform::SpectralTransform,
+        diagn::DiagnosticVariables,
+        progn::PrognosticVariables,
+        lf::Integer,
+        random_process::Nothing,
+        spectral_transform::SpectralTransform
 )
     return nothing
 end
@@ -72,11 +72,13 @@ that is reseeded on every `initialize!`. Fields are: $(TYPEDFIELDS)"""
 end
 
 # generator function
-SpectralAR1Process(SG::SpectralGrid; kwargs...) = SpectralAR1Process{SG.NF, SG.VectorType}(trunc=SG.trunc; kwargs...)
+function SpectralAR1Process(SG::SpectralGrid; kwargs...)
+    SpectralAR1Process{SG.NF, SG.VectorType}(trunc = SG.trunc; kwargs...)
+end
 
 function initialize!(
-    process::SpectralAR1Process,
-    model::AbstractModel,
+        process::SpectralAR1Process,
+        model::AbstractModel
 )
     # auto-regressive factor in the AR1 process
     dt = model.time_stepping.Δt_sec         # in seconds
@@ -109,12 +111,11 @@ function initialize!(
 end
 
 function random_process!(
-    progn::PrognosticVariables,
-    process::SpectralAR1Process{NF},
-) where NF
-
+        progn::PrognosticVariables,
+        process::SpectralAR1Process{NF}
+) where {NF}
     (; random_pattern) = progn
-    lmax, mmax = size(random_pattern, OneBased, as=Matrix)  # max degree l, order m of harmonics (1-based)
+    lmax, mmax = size(random_pattern, OneBased, as = Matrix)  # max degree l, order m of harmonics (1-based)
 
     a = process.autoregressive_factor[]
     RNG = process.random_number_generator

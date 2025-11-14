@@ -22,7 +22,7 @@ end
 
 # MATRIX rotations
 """$(TYPEDSIGNATURES)
-Rotate indices `i, j` of a square matrix of size s x s anti-clockwise by 90˚.""" 
+Rotate indices `i, j` of a square matrix of size s x s anti-clockwise by 90˚."""
 @inline function rotate_matrix_indices_90(i::Integer, j::Integer, s::Integer)
     @boundscheck 0 < i <= s || throw(BoundsError)
     @boundscheck 0 < j <= s || throw(BoundsError)
@@ -32,7 +32,7 @@ Rotate indices `i, j` of a square matrix of size s x s anti-clockwise by 90˚.""
 end
 
 """$(TYPEDSIGNATURES)
-Rotate indices `i, j` of a square matrix of size s x s by 180˚.""" 
+Rotate indices `i, j` of a square matrix of size s x s by 180˚."""
 @inline function rotate_matrix_indices_180(i::Integer, j::Integer, s::Integer)
     @boundscheck 0 < i <= s || throw(BoundsError)
     @boundscheck 0 < j <= s || throw(BoundsError)
@@ -42,7 +42,7 @@ Rotate indices `i, j` of a square matrix of size s x s by 180˚."""
 end
 
 """$(TYPEDSIGNATURES)
-Rotate indices `i, j` of a square matrix of size s x s anti-clockwise by 270˚.""" 
+Rotate indices `i, j` of a square matrix of size s x s anti-clockwise by 270˚."""
 @inline function rotate_matrix_indices_270(i::Integer, j::Integer, s::Integer)
     @boundscheck 0 < i <= s || throw(BoundsError)
     @boundscheck 0 < j <= s || throw(BoundsError)

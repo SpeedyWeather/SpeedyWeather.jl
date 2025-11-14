@@ -6,11 +6,11 @@ RINGGRIDS_DEFAULT_NF = Float32
 @testset "ColumnField types" begin
     # Test type hierarchy and properties
     @test ColumnField <: AbstractField
-    
+
     # Test type aliases
-    @test ColumnField2D == ColumnField{T, 1} where T
-    @test ColumnField3D == ColumnField{T, 2} where T  
-    @test ColumnField4D == ColumnField{T, 3} where T
+    @test ColumnField2D == ColumnField{T, 1} where {T}
+    @test ColumnField3D == ColumnField{T, 2} where {T}
+    @test ColumnField4D == ColumnField{T, 3} where {T}
 end
 
 @testset "ColumnField constructors" begin
@@ -166,7 +166,7 @@ end
             # Create ColumnField directly
             column_data = rand(NF, nlayers, npoints)
             column_field = ColumnField(column_data, grid)
-            
+
             # Test unsafe transpose back
             column_copy = ColumnField(copy(column_data), grid)
             field_unsafe = transpose!(column_copy)
@@ -182,7 +182,7 @@ end
             nlat_half = 4
             nlayers = 6
             grid = Grid(nlat_half)
-            
+
             field = ColumnField(rand(NF, nlayers, RingGrids.get_npoints(grid)), grid)
 
             # Test similar with same type, new size
@@ -203,7 +203,8 @@ end
 
             # Test similar with additional dimensions
             similar_field_3d = similar(field, new_nlayers, new_nlat_half, 3)
-            @test size(similar_field_3d) == (new_nlayers, RingGrids.get_npoints(Grid, new_nlat_half), 3)
+            @test size(similar_field_3d) ==
+                  (new_nlayers, RingGrids.get_npoints(Grid, new_nlat_half), 3)
         end
     end
 end
@@ -278,7 +279,7 @@ end
     @testset for Grid in (
         FullClenshawGrid,
         OctahedralGaussianGrid,
-        HEALPixGrid,
+        HEALPixGrid
     )
         nlat_half = 4
         nlayers = 6

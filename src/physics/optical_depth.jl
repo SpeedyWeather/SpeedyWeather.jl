@@ -16,7 +16,6 @@ end
 
 export FriersonOpticalDepth
 @kwdef mutable struct FriersonOpticalDepth{NF} <: AbstractOpticalDepth
-    
     "[OPTION] Spectral band to use"
     band::Int = 1
 
@@ -34,10 +33,10 @@ FriersonOpticalDepth(SG::SpectralGrid; kwargs...) = FriersonOpticalDepth{SG.NF}(
 initialize!(od::FriersonOpticalDepth, model::AbstractModel) = nothing
 
 function optical_depth!(
-    column::ColumnVariables{NF},
-    od::FriersonOpticalDepth,
-    model::AbstractModel,
-) where NF
+        column::ColumnVariables{NF},
+        od::FriersonOpticalDepth,
+        model::AbstractModel
+) where {NF}
 
     # escape immediately if fewer bands defined in longwave radiation scheme
     od.band > column.nbands_longwave && return nothing
@@ -61,9 +60,9 @@ function optical_depth!(
 
     local τ_above::NF = 0
     τ₀ = τ₀_equator + (τ₀_pole - τ₀_equator)*sind(θ)^2
-    for k in 2:nlayers+1     # loop over half levels below
+    for k in 2:(nlayers + 1)     # loop over half levels below
         τ_below = τ₀*(fₗ*σ[k] + (1 - fₗ)*σ[k]^4)
-        optical_depth[k-1, band] = τ_below - τ_above
+        optical_depth[k - 1, band] = τ_below - τ_above
         τ_above = τ_below
     end
 end

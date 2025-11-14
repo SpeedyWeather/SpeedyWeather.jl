@@ -11,14 +11,16 @@ include("tracers.jl")         # TracerOutput()
 include("boundary_layer.jl")  # BoundaryLayerOutput()
 
 # collect all together for conveneince
-AllOutputVariables() = (
-    DynamicsOutput()...,
-    PrecipitationOutput()...,
-    BoundaryOutput()...,
-    RadiationOutput()...,
-    RandomPatternOutput(),
-    SurfaceFluxesOutput()...,
-    LandOutput()...,
-    OceanOutput()...,
-    BoundaryLayerOutput()...,
-)
+function AllOutputVariables()
+    (
+        DynamicsOutput()...,
+        PrecipitationOutput()...,
+        BoundaryOutput()...,
+        RadiationOutput()...,
+        RandomPatternOutput(),
+        SurfaceFluxesOutput()...,
+        LandOutput()...,
+        OceanOutput()...,
+        BoundaryLayerOutput()...
+    )
+end

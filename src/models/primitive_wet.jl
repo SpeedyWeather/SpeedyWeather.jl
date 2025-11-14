@@ -50,12 +50,11 @@ $(TYPEDFIELDS)"""
     VA,     # <:AbstractVerticalAdvection,
     HO,     # <:AbstractHoleFilling,
     OU,     # <:AbstractOutput,
-    FB,     # <:AbstractFeedback,
+    FB     # <:AbstractFeedback,
 } <: PrimitiveWet
-
     spectral_grid::SpectralGrid
     architecture::AR = spectral_grid.architecture
-    
+
     # DYNAMICS
     dynamics::Bool = true
     geometry::GE = Geometry(spectral_grid)
@@ -72,7 +71,7 @@ $(TYPEDFIELDS)"""
     # VARIABLES
     random_process::RP = nothing
     tracers::TRACER_DICT = TRACER_DICT()
-    
+
     # BOUNDARY CONDITIONS
     orography::OR = EarthOrography(spectral_grid)
     land_sea_mask::LS = EarthLandSeaMask(spectral_grid)
@@ -81,7 +80,7 @@ $(TYPEDFIELDS)"""
     land::LA = LandModel(spectral_grid)
     solar_zenith::ZE = WhichZenith(spectral_grid, planet)
     albedo::AL = DefaultAlbedo(spectral_grid)
-    
+
     # PHYSICS/PARAMETERIZATIONS
     physics::Bool = true
     clausius_clapeyron::CC = ClausiusClapeyron(spectral_grid, atmosphere)
@@ -105,7 +104,7 @@ $(TYPEDFIELDS)"""
     horizontal_diffusion::HD = HyperDiffusion(spectral_grid)
     vertical_advection::VA = CenteredVerticalAdvection(spectral_grid)
     hole_filling::HO = ClipNegatives(spectral_grid)
-    
+
     # OUTPUT
     output::OU = NetCDFOutput(spectral_grid, PrimitiveWet)
     callbacks::Dict{Symbol, AbstractCallback} = Dict{Symbol, AbstractCallback}()
@@ -114,7 +113,7 @@ end
 
 prognostic_variables(::Type{<:PrimitiveWet}) = (:vor, :div, :temp, :humid, :pres)
 default_concrete_model(::Type{PrimitiveWet}) = PrimitiveWetModel
- 
+
 """
 $(TYPEDSIGNATURES)
 Calls all `initialize!` functions for components of `model`,
@@ -167,8 +166,8 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
     # initialize non-atmosphere prognostic variables
     (; particles, ocean, land) = prognostic_variables
     initialize!(particles, prognostic_variables, diagnostic_variables, model)
-    initialize!(ocean,     prognostic_variables, diagnostic_variables, model)
-    initialize!(land,      prognostic_variables, diagnostic_variables, model)
+    initialize!(ocean, prognostic_variables, diagnostic_variables, model)
+    initialize!(land, prognostic_variables, diagnostic_variables, model)
 
     # set the initial conditions (may overwrite variables set in intialize! ocean/land)
     initialize!(prognostic_variables, model.initial_conditions, model)

@@ -1,7 +1,6 @@
 @testset "Power spectrum" begin
     @testset for T in (Float16, Float32, Float64)
         @testset for trunc in (31, 42)
-
             ks = 2
 
             L = randn(LowerTriangularArray{complex(T)}, trunc+1, trunc+1, ks)
@@ -24,7 +23,7 @@
             end
 
             # normalization should change things!
-            @test p != SpeedyTransforms.power_spectrum(L, normalize=false)
+            @test p != SpeedyTransforms.power_spectrum(L, normalize = false)
         end
     end
 end

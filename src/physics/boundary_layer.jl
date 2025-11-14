@@ -1,8 +1,8 @@
 abstract type AbstractBoundaryLayer <: AbstractParameterization end
 
 # function barrier for all boundary layer drags
-function boundary_layer_drag!(  column::ColumnVariables,
-                                model::PrimitiveEquation)
+function boundary_layer_drag!(column::ColumnVariables,
+        model::PrimitiveEquation)
     boundary_layer_drag!(column, model.boundary_layer_drag, model)
 end
 
@@ -16,9 +16,9 @@ end
 
 ConstantDrag(SG::SpectralGrid; kwargs...) = ConstantDrag{SG.NF}(; kwargs...)
 initialize!(::ConstantDrag, ::PrimitiveEquation) = nothing
-function boundary_layer_drag!(  column::ColumnVariables,
-                                scheme::ConstantDrag,
-                                model::PrimitiveEquation)
+function boundary_layer_drag!(column::ColumnVariables,
+        scheme::ConstantDrag,
+        model::PrimitiveEquation)
     column.boundary_layer_drag = scheme.drag
 end
 
@@ -58,18 +58,17 @@ function initialize!(scheme::BulkRichardsonDrag, model::PrimitiveEquation)
     scheme.drag_max[] = (κ/log(Z/z₀))^2
 end
 
-function boundary_layer_drag!(  column::ColumnVariables,
-                                scheme::BulkRichardsonDrag,
-                                model::PrimitiveEquation)
+function boundary_layer_drag!(column::ColumnVariables,
+        scheme::BulkRichardsonDrag,
+        model::PrimitiveEquation)
     boundary_layer_drag!(column, scheme, model.atmosphere)
 end
 
 function boundary_layer_drag!(
-    column::ColumnVariables,
-    scheme::BulkRichardsonDrag,
-    atmopshere::AbstractAtmosphere,
+        column::ColumnVariables,
+        scheme::BulkRichardsonDrag,
+        atmopshere::AbstractAtmosphere
 )
-    
     (; Ri_c) = scheme
     drag_max = scheme.drag_max[]
 
@@ -93,8 +92,8 @@ $(TYPEDSIGNATURES)
 Calculate the bulk richardson number following Frierson, 2007.
 For vertical stability in the boundary layer."""
 function bulk_richardson_surface(
-    column::ColumnVariables,
-    atmosphere::AbstractAtmosphere,
+        column::ColumnVariables,
+        atmosphere::AbstractAtmosphere
 )
     cₚ = atmosphere.heat_capacity
     (; u, v, geopot, temp_virt) = column
@@ -106,4 +105,3 @@ function bulk_richardson_surface(
     bulk_richardson = geopot[surface]*(Θ₁ - Θ₀) / (Θ₀*V²)
     return bulk_richardson
 end
-

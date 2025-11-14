@@ -5,7 +5,7 @@ $(TYPEDSIGNATURES)
 Simulation is a container struct to be used with `run!(::Simulation)`.
 It contains
 $(TYPEDFIELDS)"""
-struct Simulation{Model<:AbstractModel, Progn, Diagn} <: AbstractSimulation{Model}
+struct Simulation{Model <: AbstractModel, Progn, Diagn} <: AbstractSimulation{Model}
     "define the current state of the model"
     prognostic_variables::Progn
 
@@ -20,10 +20,12 @@ function Base.show(io::IO, S::AbstractSimulation)
     println(io, "Simulation{$(model_type(S.model))}")
     println(io, "├ prognostic_variables::PrognosticVariables{...}")
     println(io, "├ diagnostic_variables::DiagnosticVariables{...}")
-    print(io,   "└ model::$(model_type(S.model)){...}")
+    print(io, "└ model::$(model_type(S.model)){...}")
 end
 
-unpack(sim::AbstractSimulation) = (sim.prognostic_variables, sim.diagnostic_variables, sim.model)
+function unpack(sim::AbstractSimulation)
+    (sim.prognostic_variables, sim.diagnostic_variables, sim.model)
+end
 
 const DEFAULT_PERIOD = Day(10)
 const DEFAULT_TIMESTEPS = -1    # -1 means unspecified = use the period kwarg
@@ -34,10 +36,10 @@ export run!
 $(TYPEDSIGNATURES)
 Run a SpeedyWeather.jl `simulation`. The `simulation.model` is assumed to be initialized."""
 function run!(
-    simulation::AbstractSimulation;
-    period::Period = DEFAULT_PERIOD,
-    steps::Int = DEFAULT_TIMESTEPS,
-    output::Bool = false,
+        simulation::AbstractSimulation;
+        period::Period = DEFAULT_PERIOD,
+        steps::Int = DEFAULT_TIMESTEPS,
+        output::Bool = false
 )
     initialize!(simulation; period, steps, output)      # scaling, initialize output, store initial conditions
     time_stepping!(simulation)                          # run it, yeah!
@@ -54,10 +56,10 @@ the output, stores initial conditions, initializes the progress meter feedback,
 callbacks and performs the first two initial time steps to spin up the
 leapfrogging scheme."""
 function initialize!(
-    simulation::AbstractSimulation;
-    period::Period = DEFAULT_PERIOD,
-    steps::Int = DEFAULT_TIMESTEPS,
-    output::Bool = false,
+        simulation::AbstractSimulation;
+        period::Period = DEFAULT_PERIOD,
+        steps::Int = DEFAULT_TIMESTEPS,
+        output::Bool = false
 )
     progn, diagn, model = unpack(simulation)
 
@@ -67,14 +69,14 @@ function initialize!(
     if steps != DEFAULT_TIMESTEPS
         # sets the steps, calculate period from it, store the start date, reset counter
         @assert period == DEFAULT_PERIOD "Period and steps cannot be set simultaneously"
-        initialize!(clock, time_stepping, steps)    
+        initialize!(clock, time_stepping, steps)
     else
         # set period = how long to integrate for, tore the start date, reset counter
         initialize!(clock, time_stepping, period)
     end
 
     # OUTPUT, enable/disable output
-    set!(simulation.model.output, active=output, reset_path=true)
+    set!(simulation.model.output, active = output, reset_path = true)
 
     # SCALING: we use vorticity*radius, divergence*radius in the dynamical core
     scale!(progn, diagn, model.planet.radius)
@@ -82,13 +84,14 @@ function initialize!(
     # OUTPUT INITIALISATION AND STORING INITIAL CONDITIONS + FEEDBACK
     # propagate spectral state to grid variables for initial condition output
     lf = model.time_stepping.first_step_euler ? 1 : 2       # use 2nd leapfrog index when restarting
-    
+
     # raise a warning if starting with leapfrog but there's zero vorticity
     vor = get_step(progn.vor, lf)
-    lf == 2 && all(vor .== 0) && @warn "Vorticity is zero on 2nd leapfrog index though you use it to calculate tendencies."*
-        " You may wanted to continue with a leapfrog step without data for it in the 2nd step."
+    lf == 2 && all(vor .== 0) &&
+        @warn "Vorticity is zero on 2nd leapfrog index though you use it to calculate tendencies." *
+              " You may wanted to continue with a leapfrog step without data for it in the 2nd step."
 
-    transform!(diagn, progn, lf, model, initialize=true)
+    transform!(diagn, progn, lf, model, initialize = true)
     initialize!(diagn, progn.particles, progn, model)
     initialize!(model.output, model.feedback, progn, diagn, model)
     initialize!(model.callbacks, progn, diagn, model)

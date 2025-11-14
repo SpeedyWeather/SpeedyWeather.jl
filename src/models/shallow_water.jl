@@ -27,9 +27,8 @@ $(TYPEDFIELDS)"""
     IM,     # <:AbstractImplicit,
     HD,     # <:AbstractHorizontalDiffusion,
     OU,     # <:AbstractOutput,
-    FB,     # <:AbstractFeedback,
+    FB     # <:AbstractFeedback,
 } <: ShallowWater
-    
     spectral_grid::SpectralGrid
     architecture::AR = spectral_grid.architecture
 
@@ -43,7 +42,7 @@ $(TYPEDFIELDS)"""
     drag::DR = nothing
     particle_advection::PA = nothing
     initial_conditions::IC = InitialConditions(ShallowWater)
-    
+
     # VARIABLES
     random_process::RP = nothing
     tracers::TRACER_DICT = TRACER_DICT()

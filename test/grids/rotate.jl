@@ -9,8 +9,7 @@
         HEALPixGrid,
         OctaHEALPixGrid,
         OctaminimalGaussianGrid
-        )
-
+    )
         @testset for nlat_half in (4, 6, 8)
             @testset for k in 0:3
                 if k == 0

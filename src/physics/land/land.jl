@@ -44,11 +44,11 @@ export LandModel
 end
 
 # also allow spectral grid to be passed on as first an only positional argument to model constructors
-(L::Type{<:AbstractLand})(SG::SpectralGrid; kwargs...) = L(spectral_grid=SG; kwargs...)
+(L::Type{<:AbstractLand})(SG::SpectralGrid; kwargs...) = L(spectral_grid = SG; kwargs...)
 
 # initializing the land model initializes its components
-function initialize!(   land::LandModel,
-                        model::PrimitiveEquation)
+function initialize!(land::LandModel,
+        model::PrimitiveEquation)
     initialize!(model.land.geometry, model)
     initialize!(model.land.thermodynamics, model)
     initialize!(model.land.temperature, model)
@@ -72,14 +72,15 @@ function initialize!(land::DryLandModel, model::PrimitiveEquation)
 end
 
 # unpack land model and call general timestep! function
-land_timestep!(progn::PrognosticVariables, diagn::DiagnosticVariables, model::PrimitiveEquation) =
+function land_timestep!(progn::PrognosticVariables, diagn::DiagnosticVariables, model::PrimitiveEquation)
     timestep!(progn, diagn, model.land, model)
+end
 
 function timestep!(
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
-    land::AbstractLand,
-    model::PrimitiveEquation,
+        progn::PrognosticVariables,
+        diagn::DiagnosticVariables,
+        land::AbstractLand,
+        model::PrimitiveEquation
 )
     if model isa PrimitiveWet && land isa AbstractWetLand
         # TODO think about the order of these
@@ -91,28 +92,28 @@ function timestep!(
 end
 
 function initialize!(
-    land::PrognosticVariablesLand,  # for dispatch
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
-    model::PrimitiveEquation,
+        land::PrognosticVariablesLand,  # for dispatch
+        progn::PrognosticVariables,
+        diagn::DiagnosticVariables,
+        model::PrimitiveEquation
 )
     # unpack model.land to dispatch over it and so that model.land = nothing is valid
     initialize!(land, progn, diagn, model.land, model)
 end
 
 function initialize!(
-    land::PrognosticVariablesLand,  # for dispatch
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
-    land_model::AbstractLand,
-    model::PrimitiveEquation,
+        land::PrognosticVariablesLand,  # for dispatch
+        progn::PrognosticVariables,
+        diagn::DiagnosticVariables,
+        land_model::AbstractLand,
+        model::PrimitiveEquation
 )
     initialize!(progn, diagn, land_model.temperature, model)
 
     # only initialize soil moisture, vegetation, rivers if atmosphere and land are wet
     if model isa PrimitiveWet && land_model isa AbstractWetLand
-        initialize!(progn, diagn, land_model.soil_moisture, model)      
-        initialize!(progn, diagn, land_model.vegetation, model)     
+        initialize!(progn, diagn, land_model.soil_moisture, model)
+        initialize!(progn, diagn, land_model.vegetation, model)
         initialize!(progn, diagn, land_model.rivers, model)
     end
 end

@@ -1,4 +1,5 @@
-export Barotropic, ShallowWater, PrimitiveEquation, PrimitiveDry, PrimitiveWet, AbstractModel
+export Barotropic, ShallowWater, PrimitiveEquation, PrimitiveDry, PrimitiveWet,
+       AbstractModel
 
 abstract type AbstractSimulation{Model} end
 abstract type AbstractModel end
@@ -35,7 +36,9 @@ end
 """$(TYPEDSIGNATURES)
 Returns true if the model `M` has a prognostic variable `var_name`, false otherwise.
 The default fallback is that all variables are included. """
-has(Model::Type{<:AbstractModel}, var_name::Symbol) = var_name in prognostic_variables(Model)
+function has(Model::Type{<:AbstractModel}, var_name::Symbol)
+    var_name in prognostic_variables(Model)
+end
 has(model::AbstractModel, var_name) = has(typeof(model), var_name)
 prognostic_variables(model::AbstractModel) = prognostic_variables(typeof(model))
 
@@ -54,7 +57,9 @@ model_type(::Type{<:PrimitiveDry}) = PrimitiveDryModel
 model_type(::Type{<:PrimitiveWet}) = PrimitiveWetModel
 model_type(model::AbstractModel) = model_type(typeof(model))
 
-initialize!(model::AbstractModel, ps::Union{ComponentVector,SpeedyParams}; kwargs...) = initialize!(reconstruct(model, ps); kwargs...)
+function initialize!(model::AbstractModel, ps::Union{ComponentVector, SpeedyParams}; kwargs...)
+    initialize!(reconstruct(model, ps); kwargs...)
+end
 
 function Base.show(io::IO, M::AbstractModel)
     println(io, "$(model_type(M)) <: $(model_class(M))")

@@ -4,21 +4,29 @@ abstract type AbstractSurfaceHeatFlux <: AbstractParameterization end
 abstract type AbstractSurfaceHumidityFlux <: AbstractParameterization end
 
 # skip immediately for sensi_heat_flux or 
-surface_heat_flux!(c::ColumnVariables, f::Nothing, ::PrognosticVariables, ::PrimitiveEquation) = nothing
-surface_humidity_flux!(c::ColumnVariables, f::Nothing, ::PrognosticVariables, ::PrimitiveEquation) = nothing
+function surface_heat_flux!(c::ColumnVariables, f::Nothing, ::PrognosticVariables, ::PrimitiveEquation)
+    nothing
+end
+function surface_humidity_flux!(c::ColumnVariables, f::Nothing, ::PrognosticVariables, ::PrimitiveEquation)
+    nothing
+end
 
 # skip the prognostic variables if not defined (needed to read in prescribed fluxes)
-surface_heat_flux!(c::ColumnVariables, f::AbstractSurfaceHeatFlux,
-    p::PrognosticVariables, m::PrimitiveEquation) = surface_heat_flux!(c, f, m)
+function surface_heat_flux!(c::ColumnVariables, f::AbstractSurfaceHeatFlux,
+        p::PrognosticVariables, m::PrimitiveEquation)
+    surface_heat_flux!(c, f, m)
+end
 
-surface_humidity_flux!(c::ColumnVariables, f::AbstractSurfaceHumidityFlux,
-    p::PrognosticVariables, m::PrimitiveEquation) = surface_humidity_flux!(c, f, m)
+function surface_humidity_flux!(c::ColumnVariables, f::AbstractSurfaceHumidityFlux,
+        p::PrognosticVariables, m::PrimitiveEquation)
+    surface_humidity_flux!(c, f, m)
+end
 
 # defines the order in which they are called und unpacks to dispatch
 function surface_fluxes!(
-    column::ColumnVariables,
-    progn::PrognosticVariables,
-    model::PrimitiveEquation)
+        column::ColumnVariables,
+        progn::PrognosticVariables,
+        model::PrimitiveEquation)
 
     # get temperature, humidity and density at surface
     surface_thermodynamics!(column, model.surface_thermodynamics, model)
@@ -28,18 +36,19 @@ function surface_fluxes!(
 
     # now call other heat (wet and dry) and humidity fluxes (PrimitiveWet only)
     surface_heat_flux!(column, model.surface_heat_flux, progn, model)
-    model isa PrimitiveWet && surface_humidity_flux!(column, model.surface_humidity_flux, progn, model)
+    model isa PrimitiveWet &&
+        surface_humidity_flux!(column, model.surface_humidity_flux, progn, model)
 end
 
 ## SURFACE THERMODYNAMICS
 export SurfaceThermodynamicsConstant
 struct SurfaceThermodynamicsConstant <: AbstractSurfaceThermodynamics end
 SurfaceThermodynamicsConstant(SG::SpectralGrid) = SurfaceThermodynamicsConstant()
-initialize!(::SurfaceThermodynamicsConstant,::PrimitiveEquation) = nothing
+initialize!(::SurfaceThermodynamicsConstant, ::PrimitiveEquation) = nothing
 
-function surface_thermodynamics!(   column::ColumnVariables,
-                                    ::SurfaceThermodynamicsConstant,
-                                    model::PrimitiveWet)
+function surface_thermodynamics!(column::ColumnVariables,
+        ::SurfaceThermodynamicsConstant,
+        model::PrimitiveWet)
 
     # surface value is same as lowest model level, use previous time step
     # for numerical stability
@@ -52,9 +61,9 @@ function surface_thermodynamics!(   column::ColumnVariables,
     column.surface_air_density = column.pres[end]/(R_dry*Tᵥ)
 end
 
-function surface_thermodynamics!(   column::ColumnVariables,
-                                    ::SurfaceThermodynamicsConstant,
-                                    model::PrimitiveDry)
+function surface_thermodynamics!(column::ColumnVariables,
+        ::SurfaceThermodynamicsConstant,
+        model::PrimitiveDry)
     (; R_dry) = model.atmosphere
     # surface value is same as lowest model level, but use previous
     # time step for numerical stability

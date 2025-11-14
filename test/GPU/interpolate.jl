@@ -3,11 +3,11 @@
     grid_in = FullClenshawGrid(50, arch)
     grid_out = HEALPixGrid(26, arch)
     interp = RingGrids.interpolator(grid_out, grid_in)
-    
+
     field_in = on_architecture(arch, rand(grid_in))
     field_out = on_architecture(arch, zeros(grid_out))
     RingGrids.interpolate!(field_out, field_in, interp)
-    
+
     cpu_arch = SpeedyWeather.CPU()
     grid_in_cpu = on_architecture(cpu_arch, grid_in)
     grid_out_cpu = on_architecture(cpu_arch, grid_out)
@@ -17,10 +17,9 @@
     RingGrids.interpolate!(field_out_cpu, field_in_cpu, interp_cpu)
     @test on_architecture(cpu_arch, field_out) ≈ field_out_cpu
 
-    
     field_out_cpu = rand(grid_out_cpu)
     field_out_gpu = on_architecture(arch, field_out_cpu)
-   
+
     SpeedyWeather.RingGrids.update_locator!(interp_cpu, field_out_cpu)
     SpeedyWeather.RingGrids.update_locator!(interp, field_out_gpu)
 
@@ -33,5 +32,3 @@
     @test interp_cpu.locator.Δabs == on_architecture(cpu_arch, interp.locator.Δabs)
     @test interp_cpu.locator.Δcds == on_architecture(cpu_arch, interp.locator.Δcds)
 end
-
-

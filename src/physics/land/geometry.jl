@@ -7,8 +7,7 @@ mutable struct LandGeometry{VectorType} <: AbstractLandGeometry
 end
 
 # default constructor
-function LandGeometry(SG::SpectralGrid; layer_thickness=nothing)
-
+function LandGeometry(SG::SpectralGrid; layer_thickness = nothing)
     if isnothing(layer_thickness)
         (; NF) = SG
         nlayers = SG.nlayers_soil

@@ -21,11 +21,11 @@ function Base.show(io::IO, S::SpectralTransform{NF, ArrayType}) where {NF, Array
     # add information about size of Legendre polynomials and scratch memory
     polysize_str = prettymemory(Base.summarysize(S.legendre_polynomials))
     memorysize_str = prettymemory(
-                Base.summarysize(S.scratch_memory.north) +      # add all scratch_memories
-                Base.summarysize(S.scratch_memory.south) + 
-                Base.summarysize(S.scratch_memory.column.north) + 
-                Base.summarysize(S.scratch_memory.column.south)
-            )
+        Base.summarysize(S.scratch_memory.north) +      # add all scratch_memories
+        Base.summarysize(S.scratch_memory.south) +
+        Base.summarysize(S.scratch_memory.column.north) +
+        Base.summarysize(S.scratch_memory.column.south)
+    )
 
     dealias = get_dealiasing(mmax-1, nlat_half) # -1 for zero-based
     truncations = ["<linear", "linear", "quadratic", "cubic", ">cubic"]
@@ -38,5 +38,5 @@ function Base.show(io::IO, S::SpectralTransform{NF, ArrayType}) where {NF, Array
     println(io, "├ Truncation:   dealiasing = $dealiasing ($truncation)")
     println(io, "├ Legendre:     Polynomials $polysize_str, shortcut: $(short_name(S.LegendreShortcut))")
     println(io, "├ Architecture: $architecture")
-    print(io,   "└ Memory:       for $nlayers layers ($memorysize_str)")
+    print(io, "└ Memory:       for $nlayers layers ($memorysize_str)")
 end

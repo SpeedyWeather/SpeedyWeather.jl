@@ -9,11 +9,11 @@ using SpeedyWeather.ProgressMeter
 
 # this lock is part of the ProgressMeter that's part of the Feedback of all models
 @inline function Enzyme.make_zero(
-    ::Type{ProgressMeter.ProgressCore}, 
-    seen::IdDict, 
-    prev::ProgressMeter.ProgressCore, 
-    ::Val{copy_if_inactive} = Val(false),
-)::ProgressMeter.ProgressCore where {copy_if_inactive} 
+        ::Type{ProgressMeter.ProgressCore},
+        seen::IdDict,
+        prev::ProgressMeter.ProgressCore,
+        ::Val{copy_if_inactive} = Val(false)
+)::ProgressMeter.ProgressCore where {copy_if_inactive}
     return prev
 end
 

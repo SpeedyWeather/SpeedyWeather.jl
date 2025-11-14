@@ -22,12 +22,12 @@ $(TYPEDFIELDS)"""
 Base.@kwdef mutable struct Schedule <: AbstractSchedule
     "[OPTION] Execute every time period, first timestep excluded. Default=never."
     every::Second = Second(typemax(Int))
-    
+
     "[OPTION] Events scheduled at times"
-    times::Vector{DateTime} = zeros(DateTime,0)
+    times::Vector{DateTime} = zeros(DateTime, 0)
 
     "Actual schedule, true=execute this timestep, false=don't"
-    schedule::BitVector = BitVector(undef,0)
+    schedule::BitVector = BitVector(undef, 0)
 
     "Number of scheduled executions"
     steps::Int = length(schedule)
@@ -40,7 +40,7 @@ end
 $(TYPEDSIGNATURES)
 A Schedule based on DateTime arguments, For two consecutive time steps i, i+1, an event is
 scheduled at i+1 when it occurs in (i,i+1]."""
-Schedule(times::DateTime...) = Schedule(times=DateTime[times...])
+Schedule(times::DateTime...) = Schedule(times = DateTime[times...])
 
 """
 $(TYPEDSIGNATURES)
@@ -81,7 +81,7 @@ function initialize!(scheduler::Schedule, clock::Clock)
 end
 
 # otherwise one needs to write SpeedyWeather.isscheduled inside custom callbacks
-export isscheduled  
+export isscheduled
 
 """
 $(TYPEDSIGNATURES)

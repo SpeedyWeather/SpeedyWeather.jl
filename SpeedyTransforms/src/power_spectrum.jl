@@ -4,14 +4,13 @@ Compute the power spectrum of the spherical harmonic coefficients
 For any additional dimensions in `spec`, the power spectrum is
 computed along the first/spherical harmonic dimension."""
 function power_spectrum(
-    spec::LowerTriangularArray;
-    normalize::Bool=true,
+        spec::LowerTriangularArray;
+        normalize::Bool = true
 )
-    
-    lmax, mmax = size(spec, OneBased, as=Matrix)    # 1-based max degree l, order m
+    lmax, mmax = size(spec, OneBased, as = Matrix)    # 1-based max degree l, order m
     trunc = min(lmax, mmax)                         # consider only the triangle
-                                                    # ignore higher degrees if lmax > mmax
-    spectrum = zeros(real(eltype(spec)), trunc, size(spec)[2:end]...)   
+    # ignore higher degrees if lmax > mmax
+    spectrum = zeros(real(eltype(spec)), trunc, size(spec)[2:end]...)
 
     @inbounds for k in eachmatrix(spec)
         # zonal modes m = 0, *1 as not mirrored at -m

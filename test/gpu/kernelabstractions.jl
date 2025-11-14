@@ -1,6 +1,7 @@
 using KernelAbstractions
-import SpeedyWeather: on_architecture, CPU, launch!, SpectralWorkOrder, RingGridWorkOrder, LinearWorkOrder
-@testset "KernelAbstractions tests" begin 
+import SpeedyWeather: on_architecture, CPU, launch!, SpectralWorkOrder, RingGridWorkOrder,
+                      LinearWorkOrder
+@testset "KernelAbstractions tests" begin
 
     # To-Do write tests for each type of dims_type in the kernel launching util, 
     # the tests currently below will be removed when the KA becomes the only one
@@ -9,7 +10,6 @@ import SpeedyWeather: on_architecture, CPU, launch!, SpectralWorkOrder, RingGrid
 
     # Test the kernel with LowerTriangularArrays
     @testset "LowerTriangularArrays kernel test" begin
-
         @kernel function test_lta_kernel!(A, B, C)
             I = @index(Global, Linear)
             A[I] = B[I] * C[I]
@@ -39,7 +39,6 @@ import SpeedyWeather: on_architecture, CPU, launch!, SpectralWorkOrder, RingGrid
     end
 
     @testset "RingGrids kernel test" begin
-
         Grid = HEALPixGrid
         @kernel function test_ringgrids_kernel!(A, B, C)
             I = @index(Global, Linear)
@@ -66,11 +65,9 @@ import SpeedyWeather: on_architecture, CPU, launch!, SpectralWorkOrder, RingGrid
 
         # Verify results
         @test A ≈ expected
+    end
 
-    end 
-    
     @testset "Linear kernel test" begin
-
         @kernel function test_linear_kernel!(A, B, C)
             I = @index(Global, Linear)
             A[I] = B[I] * C[I]
@@ -96,5 +93,4 @@ import SpeedyWeather: on_architecture, CPU, launch!, SpectralWorkOrder, RingGrid
         # Verify results
         @test A ≈ expected
     end
-
-end 
+end

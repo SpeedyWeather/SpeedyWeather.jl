@@ -1,7 +1,7 @@
 import SpeedyWeather: on_architecture, GPU, launch!, SpectralWorkOrder, synchronize
-import KernelAbstractions: KernelAbstractions, @kernel 
+import KernelAbstractions: KernelAbstractions, @kernel
 
-@testset "KernelAbstractions GPU tests" begin 
+@testset "KernelAbstractions GPU tests" begin
 
     # To-Do write tests for each type of dims_type in the kernel launching util, 
     # the tests currently below will be removed when the KA becomes the only one
@@ -10,7 +10,6 @@ import KernelAbstractions: KernelAbstractions, @kernel
 
     # Test the kernel with LowerTriangularArrays
     @testset "LowerTriangularArrays kernel test" begin
-
         @kernel function test_lta_kernel!(A, B, C)
             I = @index(Global, Linear)
             A[I] = B[I] * C[I]
@@ -38,4 +37,4 @@ import KernelAbstractions: KernelAbstractions, @kernel
         # Verify results
         @test A ≈ expected
     end
-end 
+end

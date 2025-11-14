@@ -1,15 +1,15 @@
 @testset "Dry land models" begin
-    spectral_grid = SpectralGrid(trunc=31, nlayers=8)
+    spectral_grid = SpectralGrid(trunc = 31, nlayers = 8)
 
-    for Temperature in (SeasonalLandTemperature, ConstantLandTemperature, LandBucketTemperature)
+    for Temperature in
+        (SeasonalLandTemperature, ConstantLandTemperature, LandBucketTemperature)
         for Model in (PrimitiveDryModel, PrimitiveWetModel)
-
             temperature = Temperature(spectral_grid)
             land = DryLandModel(spectral_grid; temperature)
 
             model = Model(spectral_grid; land)
             simulation = initialize!(model)
-            
+
             progn = simulation.prognostic_variables
             diagn = simulation.diagnostic_variables
             SpeedyWeather.land_timestep!(progn, diagn, model)
@@ -18,13 +18,13 @@
 end
 
 @testset "Wet land models" begin
-    spectral_grid = SpectralGrid(trunc=31, nlayers=8)
+    spectral_grid = SpectralGrid(trunc = 31, nlayers = 8)
 
-    for Temperature in (SeasonalLandTemperature, ConstantLandTemperature, LandBucketTemperature)
+    for Temperature in
+        (SeasonalLandTemperature, ConstantLandTemperature, LandBucketTemperature)
         for SoilMoisture in (Nothing, SeasonalSoilMoisture, LandBucketMoisture)
             for Vegetation in (NoVegetation, VegetationClimatology)
                 for Model in (PrimitiveDryModel, PrimitiveWetModel)
-
                     temperature = Temperature(spectral_grid)
                     soil_moisture = SoilMoisture(spectral_grid)
                     vegetation = Vegetation(spectral_grid)
@@ -43,11 +43,11 @@ end
 end
 
 @testset "LandGeometry default constructor" begin
-    SG = SpectralGrid(trunc=21, nlayers=2)
+    SG = SpectralGrid(trunc = 21, nlayers = 2)
     geom = LandGeometry(SG)
     @test geom.layer_thickness isa Vector{<:AbstractFloat}
 
-    SG = SpectralGrid(trunc=21, nlayers=5)
+    SG = SpectralGrid(trunc = 21, nlayers = 5)
     geom = LandGeometry(SG)
     @test geom.layer_thickness isa Vector{<:AbstractFloat}
 end

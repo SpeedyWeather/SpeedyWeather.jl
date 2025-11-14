@@ -16,7 +16,8 @@ Options are $(TYPEDFIELDS)"""
     write_only_with_output::Bool = true
 
     "[DERIVED] package version to track possible incompatibilities"
-    pkg_version::VersionNumber = isnothing(pkgversion(SpeedyWeather)) ? v"0.0.0" : pkgversion(SpeedyWeather)
+    pkg_version::VersionNumber = isnothing(pkgversion(SpeedyWeather)) ? v"0.0.0" :
+                                 pkgversion(SpeedyWeather)
 end
 
 initialize!(::RestartFile, args...) = nothing
@@ -29,10 +30,10 @@ to the output folder (or current path) that can be used to restart the model.
 `restart.jld2` will then be used as initial conditions.
 Variables in restart file are not scaled."""
 function finalize!(
-    restart::RestartFile,
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
-    model::AbstractModel,
+        restart::RestartFile,
+        progn::PrognosticVariables,
+        diagn::DiagnosticVariables,
+        model::AbstractModel
 )
     # escape in case of no output
     restart.write_only_with_output && (model.output.active || return nothing)
@@ -49,5 +50,6 @@ function finalize!(
         f["description"] = "Restart file created by SpeedyWeather.jl"
     end
 
-    model.output.active || @info "Restart file written to $(joinpath(path, filename)) although output=false"
+    model.output.active ||
+        @info "Restart file written to $(joinpath(path, filename)) although output=false"
 end

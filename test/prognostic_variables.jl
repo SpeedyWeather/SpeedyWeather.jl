@@ -1,14 +1,13 @@
 @testset "PrognosticVariables initialize, zero, fill!, one" begin
-    
     NF = Float32
-    nlayers = 2 
-    spectral_grid = SpectralGrid(; NF, nlayers, Grid=FullGaussianGrid)
+    nlayers = 2
+    spectral_grid = SpectralGrid(; NF, nlayers, Grid = FullGaussianGrid)
     model = PrimitiveWetModel(spectral_grid)
     add!(model, Tracer(:abc))
     simulation = initialize!(model)
-    
+
     # evolve a bit to have nonzero elements 
-    run!(simulation, period=Day(1), output=false)
+    run!(simulation, period = Day(1), output = false)
 
     # zero test 
     progn = simulation.prognostic_variables
@@ -48,10 +47,10 @@
         @test all(progn_new.humid[i] .== one(NF))
         @test all(progn_new.pres[i] .== one(NF))
     end
-    
+
     for (key, value) in progn_new.tracers
-        for value_i in value 
+        for value_i in value
             @test all(value_i .== one(NF))
-        end 
-    end 
+        end
+    end
 end

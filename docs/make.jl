@@ -1,71 +1,73 @@
 using Documenter
-using SpeedyWeatherInternals, LowerTriangularArrays, RingGrids, SpeedyTransforms, SpeedyWeather
+using SpeedyWeatherInternals, LowerTriangularArrays, RingGrids, SpeedyTransforms,
+      SpeedyWeather
 
 makedocs(
-    format = Documenter.HTML(prettyurls=get(ENV, "CI", nothing)=="true",
-                             ansicolor=true,
-                             collapselevel=1,
-                             canonical = "https://speedyweather.github.io/SpeedyWeatherDocumentation/stable/",
-                             size_threshold = 600_000),      # in bytes
+    format = Documenter.HTML(prettyurls = get(ENV, "CI", nothing)=="true",
+        ansicolor = true,
+        collapselevel = 1,
+        canonical = "https://speedyweather.github.io/SpeedyWeatherDocumentation/stable/",
+        size_threshold = 600_000),      # in bytes
     sitename = "SpeedyWeather.jl",
     authors = "M Klöwer and SpeedyWeather contributors",
-    modules = [SpeedyWeather, SpeedyWeatherInternals, LowerTriangularArrays, RingGrids, SpeedyTransforms],
+    modules = [SpeedyWeather, SpeedyWeatherInternals,
+        LowerTriangularArrays, RingGrids, SpeedyTransforms],
     checkdocs = :exports,
     pages = ["Home"=>"index.md",
-            "Installation"=>"installation.md",
-            "Running SpeedyWeather" => [
-                "How to run SpeedyWeather"=>"how_to_run_speedy.md",
-                "Examples 2D"=>"examples_2D.md",
-                "Examples 3D"=>"examples_3D.md",
-                "Initial conditions" => "initial_conditions.md",
-                "Time integration" => "time_integration.md",
-                "Tracer advection"=>"tracers.md",
-                "Particle advection"=>"particles.md",
-                "Stochastic physics" => "stochastic_physics.md",
-                "Ocean models" => "ocean.md",
-                "Sea ice models" => "sea_ice.md",
-                "Land surface models" => "land.md",
-                "Analysis"=>"analysis.md",
-                "Tree structure"=>"structure.md",
-                "Differentiability and Adjoint Model"=>"differentiability.md",
-                "NetCDF output"=>"output.md",
-                "Other output"=>"other_output.md",
-                "GPU & Architectures" => "architectures_gpu.md",
-            ],
-            "Extending SpeedyWeather" => [
-                "Extensions"=>"extensions.md",
-                "Forcing and drag"=>"forcing_drag.md",
-                "Parameterizations"=>"parameterizations.md",
-                "Orography"=>"orography.md",
-                "Land-Sea Mask"=>"land_sea_mask.md",
-                "Ocean"=>"custom_ocean.md",
-                "NetCDF output variables"=>"custom_netcdf_output.md",
-                "Callbacks"=>"callbacks.md",
-            ],
-            "Dynamics" => [
-                "Barotropic model"=>"barotropic.md",
-                "Shallow water model"=>"shallowwater.md",
-                "Primitive equation model"=>"primitiveequation.md",
-            ],
-            "Physics" => [
-                "Large-scale condensation"=>"large_scale_condensation.md",
-                "Convection"=>"convection.md",
-                "Radiation"=>"radiation.md",
-                "Vertical diffusion"=>"vertical_diffusion.md",
-                "Surface fluxes"=>"surface_fluxes.md",
-            ],
-            "Discretization" => [
-                "Spherical Harmonic Transform"=>"spectral_transform.md",
-                "Grids"=>"grids.md",
-            ],
-            "RingGrids"=>"ringgrids.md",
-            "LowerTriangularArrays"=>"lowertriangularmatrices.md",
-            "SpeedyTransforms" => [
-                "Spectral transforms" => "speedytransforms.md",
-                "Gradient operators" => "gradients.md",
-            ],
-            "Function and type index"=>"functions.md",
-            ]
+        "Installation"=>"installation.md",
+        "Running SpeedyWeather" => [
+            "How to run SpeedyWeather"=>"how_to_run_speedy.md",
+            "Examples 2D"=>"examples_2D.md",
+            "Examples 3D"=>"examples_3D.md",
+            "Initial conditions" => "initial_conditions.md",
+            "Time integration" => "time_integration.md",
+            "Tracer advection"=>"tracers.md",
+            "Particle advection"=>"particles.md",
+            "Stochastic physics" => "stochastic_physics.md",
+            "Ocean models" => "ocean.md",
+            "Sea ice models" => "sea_ice.md",
+            "Land surface models" => "land.md",
+            "Analysis"=>"analysis.md",
+            "Tree structure"=>"structure.md",
+            "Differentiability and Adjoint Model"=>"differentiability.md",
+            "NetCDF output"=>"output.md",
+            "Other output"=>"other_output.md",
+            "GPU & Architectures" => "architectures_gpu.md"
+        ],
+        "Extending SpeedyWeather" => [
+            "Extensions"=>"extensions.md",
+            "Forcing and drag"=>"forcing_drag.md",
+            "Parameterizations"=>"parameterizations.md",
+            "Orography"=>"orography.md",
+            "Land-Sea Mask"=>"land_sea_mask.md",
+            "Ocean"=>"custom_ocean.md",
+            "NetCDF output variables"=>"custom_netcdf_output.md",
+            "Callbacks"=>"callbacks.md"
+        ],
+        "Dynamics" => [
+            "Barotropic model"=>"barotropic.md",
+            "Shallow water model"=>"shallowwater.md",
+            "Primitive equation model"=>"primitiveequation.md"
+        ],
+        "Physics" => [
+            "Large-scale condensation"=>"large_scale_condensation.md",
+            "Convection"=>"convection.md",
+            "Radiation"=>"radiation.md",
+            "Vertical diffusion"=>"vertical_diffusion.md",
+            "Surface fluxes"=>"surface_fluxes.md"
+        ],
+        "Discretization" => [
+            "Spherical Harmonic Transform"=>"spectral_transform.md",
+            "Grids"=>"grids.md"
+        ],
+        "RingGrids"=>"ringgrids.md",
+        "LowerTriangularArrays"=>"lowertriangularmatrices.md",
+        "SpeedyTransforms" => [
+            "Spectral transforms" => "speedytransforms.md",
+            "Gradient operators" => "gradients.md"
+        ],
+        "Function and type index"=>"functions.md"
+    ]
 )
 
 """
@@ -96,17 +98,17 @@ end
 #    push_preview = true)
 if get(ENV, "GITHUB_EVENT_NAME", "") == "pull_request"
     deploydocs(repo = "github.com/SpeedyWeather/SpeedyWeather.jl",
-               repo_previews = "github.com/SpeedyWeather/SpeedyWeatherDocumentation",
-               devbranch = "main",
-               forcepush = true,
-               push_preview = true,
-               versions = ["stable" => "v^", "v#.#.#", "dev" => "dev"])
+        repo_previews = "github.com/SpeedyWeather/SpeedyWeatherDocumentation",
+        devbranch = "main",
+        forcepush = true,
+        push_preview = true,
+        versions = ["stable" => "v^", "v#.#.#", "dev" => "dev"])
 else
     repo = "github.com/SpeedyWeather/SpeedyWeatherDocumentation"
     withenv("GITHUB_REPOSITORY" => repo) do
         deploydocs(repo = repo,
-                   devbranch = "main",
-                   forcepush = true,
-                   versions = ["stable" => "v^", "v#.#.#", "dev" => "dev"])
+            devbranch = "main",
+            forcepush = true,
+            versions = ["stable" => "v^", "v#.#.#", "dev" => "dev"])
     end
 end

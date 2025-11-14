@@ -10,12 +10,16 @@ function perturb_parameterization_tendencies!(column::AbstractColumnVariables, m
 end
 
 # no perturbations
-perturb_parameterization_inputs!(::ColumnVariables, ::Nothing, ::PrimitiveEquation) = nothing
-perturb_parameterization_tendencies!(::ColumnVariables, ::Nothing, ::PrimitiveEquation) = nothing
+function perturb_parameterization_inputs!(::ColumnVariables, ::Nothing, ::PrimitiveEquation)
+    nothing
+end
+function perturb_parameterization_tendencies!(::ColumnVariables, ::Nothing, ::PrimitiveEquation)
+    nothing
+end
 
 export StochasticallyPerturbedParameterizationTendencies
-@kwdef struct StochasticallyPerturbedParameterizationTendencies{NF, VectorType} <: AbstractStochasticPhysics
-    
+@kwdef struct StochasticallyPerturbedParameterizationTendencies{NF, VectorType} <:
+              AbstractStochasticPhysics
     "Number of vertical layers"
     nlayers::Int
 
@@ -39,17 +43,16 @@ end
 
 # only perturb tendencies (=outputs) not inputs
 function perturb_parameterization_inputs!(
-    ::AbstractColumnVariables,
-    ::StochasticallyPerturbedParameterizationTendencies,
-    ::PrimitiveEquation)
+        ::AbstractColumnVariables,
+        ::StochasticallyPerturbedParameterizationTendencies,
+        ::PrimitiveEquation)
     return nothing
 end
 
 function perturb_parameterization_tendencies!(
-    column::AbstractColumnVariables,
-    sppt::StochasticallyPerturbedParameterizationTendencies,
-    model::PrimitiveEquation)
-    
+        column::AbstractColumnVariables,
+        sppt::StochasticallyPerturbedParameterizationTendencies,
+        model::PrimitiveEquation)
     r = column.random_value
     (; taper) = sppt
     (; u_tend, v_tend, temp_tend, humid_tend) = column

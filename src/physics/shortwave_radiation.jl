@@ -20,17 +20,17 @@ TransparentShortwave(SG::SpectralGrid) = TransparentShortwave()
 initialize!(::TransparentShortwave, ::PrimitiveEquation) = nothing
 
 function shortwave_radiation!(
-    column::ColumnVariables,
-    scheme::TransparentShortwave,
-    model::PrimitiveEquation,
+        column::ColumnVariables,
+        scheme::TransparentShortwave,
+        model::PrimitiveEquation
 )
     shortwave_radiation!(column, scheme, model.planet)
 end
 
 function shortwave_radiation!(
-    column::ColumnVariables,
-    scheme::TransparentShortwave,
-    planet::AbstractPlanet,
+        column::ColumnVariables,
+        scheme::TransparentShortwave,
+        planet::AbstractPlanet
 )
     (; cos_zenith, land_fraction, albedo_ocean, albedo_land) = column
     (; solar_constant) = planet
@@ -44,7 +44,7 @@ function shortwave_radiation!(
 
     # land-sea mask-weighted, transparent shortwave so surface = outgoing
     column.surface_shortwave_up = (1 - land_fraction)*column.surface_shortwave_up_ocean +
-                                            land_fraction*column.surface_shortwave_up_land
+                                  land_fraction*column.surface_shortwave_up_land
     column.outgoing_shortwave_radiation = column.surface_shortwave_up
 
     return nothing
@@ -52,11 +52,10 @@ end
 
 # NBandRadiation is defined in longwave_radiation.jl
 function shortwave_radiation!(
-    column::ColumnVariables,
-    scheme::NBandRadiation,
-    model::PrimitiveEquation,
+        column::ColumnVariables,
+        scheme::NBandRadiation,
+        model::PrimitiveEquation
 )
-
     (; nlayers, cos_zenith, albedo) = column
     nbands = column.nbands_shortwave                # number of spectral bands
     (; solar_constant) = model.planet
@@ -70,12 +69,12 @@ function shortwave_radiation!(
 
         for k in 1:nlayers
             D -= dτ[k]*D                            # flux through layer k with optical depth dτ, radiative transfer
-            column.flux_temp_downward[k+1] += D
+            column.flux_temp_downward[k + 1] += D
         end
 
         # UPWARD flux U
         U = D*albedo                                # boundary condition at surface, reflection from albedo
-        column.flux_temp_upward[nlayers+1] += U     # accumulate fluxes
+        column.flux_temp_upward[nlayers + 1] += U     # accumulate fluxes
 
         for k in nlayers:-1:1                       # integrate from surface up
             # Radiative transfer, e.g. Frierson et al. 2006, equation 6

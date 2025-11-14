@@ -36,26 +36,28 @@ the field is defined on."""
 abstract type AbstractField{T, N, ArrayType, Grid} <: AbstractArray{T, N} end
 
 """Abstract supertype for all fields on full grids, i.e. grids with a constant number of longitude points across latitude rings."""
-const AbstractFullField = AbstractField{T, N, ArrayType, Grid} where {T, N, ArrayType, Grid<:AbstractFullGrid}
+const AbstractFullField = AbstractField{
+    T, N, ArrayType, Grid} where {T, N, ArrayType, Grid <: AbstractFullGrid}
 
 """Abstract supertype for all fields on reduced grids, i.e. grids with a reduced number of longitude points towards the poles."""
-const AbstractReducedField = AbstractField{T, N, ArrayType, Grid} where {T, N, ArrayType, Grid<:AbstractReducedGrid}
+const AbstractReducedField = AbstractField{
+    T, N, ArrayType, Grid} where {T, N, ArrayType, Grid <: AbstractReducedGrid}
 
 """Abstract supertype for all 2D fields, i.e. fields with the horizontal dimensions only. Note that this is a `<:AbstractVector`
 as the horizontal dimensions are unravelled into a vector for all grids to be conistent with the reduced grids that cannot be
 represented as a matrix."""
-const AbstractField2D = AbstractField{T, 1} where T
+const AbstractField2D = AbstractField{T, 1} where {T}
 
 """Abstract supertype for all 3D fields, i.e. fields with horizontal and one vertical (or time etc) dimension."""
-const AbstractField3D = AbstractField{T, 2} where T
+const AbstractField3D = AbstractField{T, 2} where {T}
 
 """Abstract supertype for all 4D fields, i.e. fields with horizontal and (in most cases) a vertical and a time dimensions,
 though these additional dimensions are arbitrary."""
-const AbstractField4D = AbstractField{T, 3} where T
+const AbstractField4D = AbstractField{T, 3} where {T}
 
-const AbstractFullField2D = AbstractFullField{T, 1} where T
-const AbstractFullField3D = AbstractFullField{T, 2} where T
-const AbstractFullField4D = AbstractFullField{T, 3} where T
-const AbstractReducedField2D = AbstractReducedField{T, 1} where T
-const AbstractReducedField3D = AbstractReducedField{T, 2} where T
-const AbstractReducedField4D = AbstractReducedField{T, 3} where T
+const AbstractFullField2D = AbstractFullField{T, 1} where {T}
+const AbstractFullField3D = AbstractFullField{T, 2} where {T}
+const AbstractFullField4D = AbstractFullField{T, 3} where {T}
+const AbstractReducedField2D = AbstractReducedField{T, 1} where {T}
+const AbstractReducedField3D = AbstractReducedField{T, 2} where {T}
+const AbstractReducedField4D = AbstractReducedField{T, 3} where {T}

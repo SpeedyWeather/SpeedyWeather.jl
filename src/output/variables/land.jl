@@ -13,8 +13,9 @@ Fields are: $(TYPEDFIELDS)"""
     transform::F = (x) -> x - 273.15
 end
 
-path(::SoilTemperatureOutput, simulation) =
+function path(::SoilTemperatureOutput, simulation)
     simulation.prognostic_variables.land.soil_temperature
+end
 
 """Defines netCDF output for a specific variable, see [`VorticityOutput`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
@@ -30,8 +31,7 @@ Fields are: $(TYPEDFIELDS)"""
     keepbits::Int = 10
 end
 
-path(::SoilMoistureOutput, simulation) =
-    simulation.prognostic_variables.land.soil_moisture
+path(::SoilMoistureOutput, simulation) = simulation.prognostic_variables.land.soil_moisture
 
 """Defines netCDF output for a specific variable, see [`VorticityOutput`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
@@ -46,8 +46,9 @@ Fields are: $(TYPEDFIELDS)"""
     keepbits::Int = 10
 end
 
-path(::SoilMoistureAvailabilityOutput, simulation) =
+function path(::SoilMoistureAvailabilityOutput, simulation)
     simulation.diagnostic_variables.physics.land.soil_moisture_availability
+end
 
 """Defines netCDF output for a specific variable, see [`VorticityOutput`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
@@ -62,8 +63,9 @@ Fields are: $(TYPEDFIELDS)"""
     keepbits::Int = 15
 end
 
-path(::RiverRunoffOutput, simulation) =
+function path(::RiverRunoffOutput, simulation)
     simulation.diagnostic_variables.physics.land.river_runoff
+end
 
 """Defines netCDF output for a specific variable, see [`VorticityOutput`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
@@ -78,13 +80,14 @@ Fields are: $(TYPEDFIELDS)"""
     keepbits::Int = 10
 end
 
-path(::LandSeaMaskOutput, simulation) =
-    simulation.model.land_sea_mask.mask
+path(::LandSeaMaskOutput, simulation) = simulation.model.land_sea_mask.mask
 
-LandOutput() = (
-    SoilTemperatureOutput(),
-    SoilMoistureOutput(),
-    SoilMoistureAvailabilityOutput(),
-    RiverRunoffOutput(),
-    LandSeaMaskOutput(),
-)
+function LandOutput()
+    (
+        SoilTemperatureOutput(),
+        SoilMoistureOutput(),
+        SoilMoistureAvailabilityOutput(),
+        RiverRunoffOutput(),
+        LandSeaMaskOutput()
+    )
+end

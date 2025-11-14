@@ -26,7 +26,9 @@ Fields are: $(TYPEDFIELDS)"""
     keepbits::Int = 12
 end
 
-path(::MeridionalVelocity10mOutput, simulation) = simulation.diagnostic_variables.grid.v_grid
+function path(::MeridionalVelocity10mOutput, simulation)
+    simulation.diagnostic_variables.grid.v_grid
+end
 
 """$(TYPEDSIGNATURES)
 10m wind is defined using a logarithmic profile from the lowermost model layer.
@@ -39,9 +41,9 @@ z_{bottom} = z_{surf} + T_{bottom} * Δp_geopot_{bottom} / g
 ```
 """
 function output!(
-    output::NetCDFOutput,
-    variable::Union{ZonalVelocity10mOutput, MeridionalVelocity10mOutput},
-    simulation::AbstractSimulation,
+        output::NetCDFOutput,
+        variable::Union{ZonalVelocity10mOutput, MeridionalVelocity10mOutput},
+        simulation::AbstractSimulation
 )
     # escape immediately after first call if variable doesn't have a time dimension
     ~hastime(variable) && output.output_counter > 1 && return nothing
@@ -50,15 +52,15 @@ function output!(
     u_or_v_grid = path(variable, simulation)
     nlayers = size(u_or_v_grid, 2)
     u_or_v_bottom = field_view(u_or_v_grid, :, nlayers)
-    
+
     z_bottom = simulation.diagnostic_variables.dynamics.a_2D_grid
     u_or_v10 = simulation.diagnostic_variables.dynamics.b_2D_grid
-    
+
     # Compute z_bottom as z_surf + T_bottom * Δp_geopot / g, start with z_surf
     z_bottom .= max.(simulation.model.orography.orography, 0)   # [m] set negative values to zero
     T_bottom = field_view(simulation.diagnostic_variables.grid.temp_grid, :, nlayers)
     Δp_geopot = simulation.model.geopotential.Δp_geopot_full[end]
-    
+
     # accumulate the second term in
     @. z_bottom += T_bottom * Δp_geopot / simulation.model.planet.gravity
 
@@ -96,12 +98,14 @@ Fields are: $(TYPEDFIELDS)"""
 end
 
 # not the actual surface temperature but the core variable to read in
-path(::SurfaceTemperatureOutput, simulation) = simulation.diagnostic_variables.grid.temp_grid
+function path(::SurfaceTemperatureOutput, simulation)
+    simulation.diagnostic_variables.grid.temp_grid
+end
 
 function output!(
-    output::NetCDFOutput,
-    variable::SurfaceTemperatureOutput,
-    simulation::AbstractSimulation,
+        output::NetCDFOutput,
+        variable::SurfaceTemperatureOutput,
+        simulation::AbstractSimulation
 )
     # escape immediately after first call if variable doesn't have a time dimension
     ~hastime(variable) && output.output_counter > 1 && return nothing
@@ -138,8 +142,10 @@ function output!(
 end
 
 # collect all in one for convenience
-BoundaryLayerOutput() = (
-    ZonalVelocity10mOutput(),
-    MeridionalVelocity10mOutput(),
-    SurfaceTemperatureOutput(),
-)
+function BoundaryLayerOutput()
+    (
+        ZonalVelocity10mOutput(),
+        MeridionalVelocity10mOutput(),
+        SurfaceTemperatureOutput()
+    )
+end

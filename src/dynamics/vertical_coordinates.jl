@@ -9,13 +9,17 @@ struct SigmaCoordinates{NF, VectorType} <: AbstractVerticalCoordinate
     nlayers::Int
     σ_half::VectorType
 
-    SigmaCoordinates{T, V}(nlayers::Integer, σ_half::AbstractVector) where {T, V} = sigma_okay(nlayers, σ_half) ?
-    new{T, V}(nlayers, σ_half) : error("σ_half = $σ_half cannot be used for $nlayers-level SigmaCoordinates")
+    function SigmaCoordinates{T, V}(nlayers::Integer, σ_half::AbstractVector) where {T, V}
+        sigma_okay(nlayers, σ_half) ?
+        new{T, V}(nlayers, σ_half) :
+        error("σ_half = $σ_half cannot be used for $nlayers-level SigmaCoordinates")
+    end
 end
 
 # constructor using default sigma coordinates if only nlayers provided, also collect to allow for AbstractRange
-SigmaCoordinates(nlayers::Integer, σ_half::AbstractVector = default_sigma_coordinates(nlayers)) =
+function SigmaCoordinates(nlayers::Integer, σ_half::AbstractVector = default_sigma_coordinates(nlayers))
     SigmaCoordinates{eltype(σ_half), typeof(collect(σ_half))}(nlayers, collect(σ_half))
+end
 
 # constructor obtaining nlayers from σ_half
 SigmaCoordinates(σ_half::AbstractVector) = SigmaCoordinates(length(σ_half)-1, σ_half)
@@ -23,17 +27,18 @@ SigmaCoordinates(σ_half::AbstractVector) = SigmaCoordinates(length(σ_half)-1, 
 # constructor using default nlayers if nothing provided
 SigmaCoordinates() = SigmaCoordinates(DEFAULT_NLAYERS)
 
-
 function Base.show(io::IO, σ::SigmaCoordinates)
     println(io, "$(σ.nlayers)-layer $(typeof(σ))")
     nchars = length(string(σ.nlayers))
     format = Printf.Format("%$(nchars)d")
-    for k=1:σ.nlayers
-        println(io, "├─ ", @sprintf("%1.4f", σ.σ_half[k]), "  k = ", Printf.format(format, k-1), ".5")
-        σk = (σ.σ_half[k] + σ.σ_half[k+1])/2
+    for k in 1:σ.nlayers
+        println(io, "├─ ", @sprintf("%1.4f", σ.σ_half[k]),
+            "  k = ", Printf.format(format, k-1), ".5")
+        σk = (σ.σ_half[k] + σ.σ_half[k + 1])/2
         println(io, "│× ", @sprintf("%1.4f", σk), "  k = ", Printf.format(format, k))
     end
-    print(io, "└─ ", @sprintf("%1.4f", σ.σ_half[end]), "  k = ", Printf.format(format, σ.nlayers), ".5")
+    print(io, "└─ ", @sprintf("%1.4f", σ.σ_half[end]),
+        "  k = ", Printf.format(format, σ.nlayers), ".5")
 end
 
 """

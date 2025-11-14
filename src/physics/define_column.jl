@@ -10,8 +10,8 @@ $(TYPEDFIELDS)"""
 @kwdef mutable struct ColumnVariables{
     NF,
     VectorType,
-    MatrixType,
-    } <: AbstractColumnVariables
+    MatrixType
+} <: AbstractColumnVariables
 
     # DIMENSIONS
     const nlayers::Int = 0                  # number of vertical levels
@@ -51,7 +51,7 @@ $(TYPEDFIELDS)"""
 
     const flux_temp_upward::VectorType = zeros(NF, nlayers+1)
     const flux_temp_downward::VectorType = zeros(NF, nlayers+1)
-    
+
     const flux_humid_upward::VectorType = zeros(NF, nlayers+1)
     const flux_humid_downward::VectorType = zeros(NF, nlayers+1)
 
@@ -111,11 +111,11 @@ $(TYPEDFIELDS)"""
     # downward fluxes are independent of ocean vs land
     surface_shortwave_down::NF = 0          # surface shortwave radiation down (into land/sea)
     surface_longwave_down::NF = 0           # surface longwave radiation down (into land/sea)
-    
+
     surface_shortwave_up::NF = 0            # surface shortwave radiation up (reflected)
     surface_shortwave_up_ocean::NF = 0
     surface_shortwave_up_land::NF = 0
-    
+
     # surface longwave radiation up (into atmosphere)
     surface_longwave_up::NF = 0             # land-sea mask weighted flux   
     surface_longwave_up_ocean::NF = 0       # ocean only
@@ -136,10 +136,14 @@ $(TYPEDFIELDS)"""
     const d::VectorType = zeros(NF, nlayers)
 end
 
-Base.eltype(::ColumnVariables{NF}) where NF = NF
+Base.eltype(::ColumnVariables{NF}) where {NF} = NF
 
 # generator based on spectral grid
-ColumnVariables(SG::SpectralGrid; kwargs...) = ColumnVariables{SG.NF, SG.VectorType, SG.MatrixType}(; nlayers=SG.nlayers, kwargs...)
+function ColumnVariables(SG::SpectralGrid; kwargs...)
+    ColumnVariables{SG.NF, SG.VectorType, SG.MatrixType}(; nlayers = SG.nlayers, kwargs...)
+end
 
 # generator assuming Julia Arrays
-ColumnVariables{NF}(; kwargs...) where NF = ColumnVariables{NF, Vector{NF}, Matrix{NF}}(; kwargs...)
+function ColumnVariables{NF}(; kwargs...) where {NF}
+    ColumnVariables{NF, Vector{NF}, Matrix{NF}}(; kwargs...)
+end

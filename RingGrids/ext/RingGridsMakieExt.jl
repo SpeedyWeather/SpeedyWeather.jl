@@ -15,25 +15,23 @@ $(TYPEDSIGNATURES)
 Defines Makie's `heatmap` function for a`field::AbstractField2D` via interpolation
 to `::AbstractFullField2D` (which can be reshaped into a matrix.)"""
 function Makie.heatmap(
-    field::RingGrids.AbstractField2D;
-    title::String = default_title(field),
-    kwargs...   # pass on to Makie.heatmap
+        field::RingGrids.AbstractField2D;
+        title::String = default_title(field),
+        kwargs...   # pass on to Makie.heatmap
 )
     full_field = RingGrids.interpolate(RingGrids.full_grid_type(field.grid), field.grid.nlat_half, field)
     heatmap(full_field; title, kwargs...)
 end
 
-
 """
 $(TYPEDSIGNATURES)
 Defines Makie's `heatmap` function for a `field::AbstractFullField2D` which can be reshaped into a matrix."""
 function Makie.heatmap(
-    field::RingGrids.AbstractFullField2D;
-    title::String = default_title(field),
-    size = (600,300),
-    kwargs...
+        field::RingGrids.AbstractFullField2D;
+        title::String = default_title(field),
+        size = (600, 300),
+        kwargs...
 )
-
     mat = Matrix(field)                 # reshapes a full field into a matrix
     lond = RingGrids.get_lond(field)    # get lon, lat axes in degrees
     latd = RingGrids.get_latd(field)
@@ -48,7 +46,7 @@ function Makie.heatmap(
         xticklabelsize = 10,
         yticklabelsize = 10,
         xtickformat = values -> ["$(round(Int, value))˚E" for value in values],
-        ytickformat = values -> ["$(round(Int, value))˚N" for value in values],
+        ytickformat = values -> ["$(round(Int, value))˚N" for value in values]
     )
 
     hm = heatmap!(ax, lond, latd, mat; kwargs...)

@@ -11,8 +11,9 @@ Fields are: $(TYPEDFIELDS)"""
     keepbits::Int = 7
 end
 
-path(::SurfaceSensibleHeatFluxOutput, simulation) =
+function path(::SurfaceSensibleHeatFluxOutput, simulation)
     simulation.diagnostic_variables.physics.sensible_heat_flux
+end
 
 """Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
@@ -27,8 +28,9 @@ Fields are: $(TYPEDFIELDS)"""
     keepbits::Int = 7
 end
 
-path(::SurfaceHumidityFluxOutput, simulation) =
+function path(::SurfaceHumidityFluxOutput, simulation)
     simulation.diagnostic_variables.physics.surface_humidity_flux
+end
 
 """Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
@@ -43,11 +45,12 @@ Fields are: $(TYPEDFIELDS)"""
     keepbits::Int = 7
 end
 
-path(::SurfaceLatentHeatFluxOutput, simulation) =
+function path(::SurfaceLatentHeatFluxOutput, simulation)
     simulation.diagnostic_variables.physics.surface_latent_heat_flux
+end
 
 SurfaceFluxesOutput() = (
     SurfaceSensibleHeatFluxOutput(),
     # SurfaceHumidityFluxOutput(),      # don't output by default as it is proportional to latent heat flux
-    SurfaceLatentHeatFluxOutput(),
+    SurfaceLatentHeatFluxOutput()
 )

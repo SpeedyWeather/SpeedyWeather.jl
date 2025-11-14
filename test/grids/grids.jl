@@ -3,7 +3,7 @@ using JLArrays
 RINGGRIDS_DEFAULT_NF = SpeedyWeather.RingGrids.DEFAULT_NF
 @testset "Grid types" begin
     # TODO: These grid/field types should be pulled out into constants rather than copy-pasted
-    for G in (  
+    for G in (
         FullClenshawGrid,
         FullGaussianGrid,
         OctahedralGaussianGrid,
@@ -13,8 +13,7 @@ RINGGRIDS_DEFAULT_NF = SpeedyWeather.RingGrids.DEFAULT_NF
         OctaHEALPixGrid,
         FullHEALPixGrid,
         FullOctaHEALPixGrid
-        )
-
+    )
         full = RingGrids.full_grid_type(G)
         @test RingGrids.isfull(full)
         @test ~RingGrids.isreduced(full)
@@ -28,13 +27,12 @@ end
 
 @testset "Field types" begin
     # full ones
-    for F in (  
+    for F in (
         FullClenshawField,
         FullGaussianField,
         FullHEALPixField,
         FullOctaHEALPixField
-        )
-
+    )
         @test RingGrids.isfull(F)
         @test ~RingGrids.isreduced(F)
         G = RingGrids.grid_type(F)
@@ -47,9 +45,8 @@ end
         OctahedralClenshawField,
         OctaminimalGaussianField,
         HEALPixField,
-        OctaHEALPixField,
+        OctaHEALPixField
     )
-
         @test RingGrids.isreduced(F)
         @test ~RingGrids.isfull(F)
         G = RingGrids.grid_type(F)
@@ -72,9 +69,8 @@ end
             OctaHEALPixGrid,
             FullHEALPixGrid,
             FullOctaHEALPixGrid
-            )
+        )
             for nlat_half in (4, 8, 16, 24, 32)
-                
                 npoints = RingGrids.get_npoints(Grid, nlat_half)
                 grid = Grid(nlat_half)
 
@@ -86,10 +82,14 @@ end
                 @test_throws DimensionMismatch Field(zeros(npoints-1), grid)
 
                 # getindex
-                for ij in eachindex(field1) field1[ij] end
+                for ij in eachindex(field1)
+                    field1[ij]
+                end
 
                 # setindex
-                for ij in eachindex(field1) field1[ij] = 0 end
+                for ij in eachindex(field1)
+                    field1[ij] = 0
+                end
 
                 @test all(field1 .== 0)
                 @test field1 == field3
@@ -100,17 +100,16 @@ end
 
 @testset "Field generators" begin
     for NF in (Float32, Float64)
-        for G in (  FullClenshawGrid,
-                    FullGaussianGrid,
-                    OctahedralGaussianGrid,
-                    OctahedralClenshawGrid,
-                    OctaminimalGaussianGrid,
-                    HEALPixGrid,
-                    OctaHEALPixGrid,
-                    FullHEALPixGrid,
-                    FullOctaHEALPixGrid
-                    )
-
+        for G in (FullClenshawGrid,
+            FullGaussianGrid,
+            OctahedralGaussianGrid,
+            OctahedralClenshawGrid,
+            OctaminimalGaussianGrid,
+            HEALPixGrid,
+            OctaHEALPixGrid,
+            FullHEALPixGrid,
+            FullOctaHEALPixGrid
+        )
             n = 4      # resolution parameter nlat_half
             grid = G(n)
 
@@ -159,17 +158,16 @@ end
 
 @testset "Field generators: ones" begin
     for NF in (Float32, Float64)
-        for F in (  FullClenshawField,
-                    FullGaussianField,
-                    OctahedralGaussianField,
-                    OctahedralClenshawField,
-                    OctaminimalGaussianField,
-                    HEALPixField,
-                    OctaHEALPixField,
-                    FullHEALPixField,
-                    FullOctaHEALPixField,
-                    )
-
+        for F in (FullClenshawField,
+            FullGaussianField,
+            OctahedralGaussianField,
+            OctahedralClenshawField,
+            OctaminimalGaussianField,
+            HEALPixField,
+            OctaHEALPixField,
+            FullHEALPixField,
+            FullOctaHEALPixField
+        )
             n = 4      # resolution parameter nlat_half
             f1 = ones(F, n)
             @test all(f1 .== 1)
@@ -184,27 +182,26 @@ end
 
 @testset "Field generators: rand, randn" begin
     for NF in (Float32, Float64)
-        for G in (  FullClenshawGrid,
-                    FullGaussianGrid,
-                    OctahedralGaussianGrid,
-                    OctahedralClenshawGrid,
-                    OctaminimalGaussianGrid,
-                    HEALPixGrid,
-                    OctaHEALPixGrid,
-                    FullHEALPixGrid,
-                    FullOctaHEALPixGrid
-                    )
-
+        for G in (FullClenshawGrid,
+            FullGaussianGrid,
+            OctahedralGaussianGrid,
+            OctahedralClenshawGrid,
+            OctaminimalGaussianGrid,
+            HEALPixGrid,
+            OctaHEALPixGrid,
+            FullHEALPixGrid,
+            FullOctaHEALPixGrid
+        )
             n = 4      # resolution parameter nlat_half
-            G1 = rand(G, n) 
+            G1 = rand(G, n)
             @test eltype(G1) == RINGGRIDS_DEFAULT_NF # that's the default
-            
+
             G1 = randn(G, n)
             @test eltype(G1) == RINGGRIDS_DEFAULT_NF # that's the default
-            
+
             G1 = rand(NF, G, n)
             @test eltype(G1) == NF
-            
+
             G1 = randn(NF, G, n)
             @test eltype(G1) == NF
         end
@@ -213,66 +210,64 @@ end
 
 @testset "Field generators: undef" begin
     for NF in (Float32, Float64)
-        for F in (  FullClenshawField,
-                    FullGaussianField,
-                    OctahedralGaussianField,
-                    OctahedralClenshawField,
-                    OctaminimalGaussianField,
-                    HEALPixField,
-                    OctaHEALPixField,
-                    FullHEALPixField,
-                    FullOctaHEALPixField,
-                    )
-
+        for F in (FullClenshawField,
+            FullGaussianField,
+            OctahedralGaussianField,
+            OctahedralClenshawField,
+            OctaminimalGaussianField,
+            HEALPixField,
+            OctaHEALPixField,
+            FullHEALPixField,
+            FullOctaHEALPixField
+        )
             n = 4      # resolution parameter nlat_half
             field1 = F(undef, n)
             @test eltype(field1) == RINGGRIDS_DEFAULT_NF     # that's the default NF
-            
+
             field2 = F{NF}(undef, n)
             @test eltype(field2) == NF
         end
     end
 end
 
-@testset "FullGrids conversions to/from Arrays" begin 
-    for idims in ((), (5,), (5,5))
+@testset "FullGrids conversions to/from Arrays" begin
+    for idims in ((), (5,), (5, 5))
         NF = Float64
         N = length(idims)+1
-        data = rand(8,4, idims...)
-        field = FullGaussianField(data, input_as=Matrix)
-        @test Array(field, as=Matrix) == data
+        data = rand(8, 4, idims...)
+        field = FullGaussianField(data, input_as = Matrix)
+        @test Array(field, as = Matrix) == data
 
-        data = rand(8,3, idims...)
-        field = FullClenshawField(data, input_as=Matrix)
-        @test Array(field, as=Matrix) == data
+        data = rand(8, 3, idims...)
+        field = FullClenshawField(data, input_as = Matrix)
+        @test Array(field, as = Matrix) == data
 
-        data = rand(8,3, idims...)
-        field = FullHEALPixField(data, input_as=Matrix)
-        @test Array(field, as=Matrix) == data
+        data = rand(8, 3, idims...)
+        field = FullHEALPixField(data, input_as = Matrix)
+        @test Array(field, as = Matrix) == data
 
-        data = rand(8,3, idims...)
-        field = FullOctaHEALPixField(data, input_as=Matrix)
-        @test Array(field, as=Matrix) == data
-    end   
-end 
+        data = rand(8, 3, idims...)
+        field = FullOctaHEALPixField(data, input_as = Matrix)
+        @test Array(field, as = Matrix) == data
+    end
+end
 
 @testset "Grid indices" begin
-    for G in (  FullClenshawGrid,
-                FullGaussianGrid,
-                OctahedralGaussianGrid,
-                OctahedralClenshawGrid,
-                OctaminimalGaussianGrid,
-                HEALPixGrid,
-                OctaHEALPixGrid,
-                FullHEALPixGrid,
-                FullOctaHEALPixGrid,
-                )
-
+    for G in (FullClenshawGrid,
+        FullGaussianGrid,
+        OctahedralGaussianGrid,
+        OctahedralClenshawGrid,
+        OctaminimalGaussianGrid,
+        HEALPixGrid,
+        OctaHEALPixGrid,
+        FullHEALPixGrid,
+        FullOctaHEALPixGrid
+    )
         n = 4      # resolution parameter nlat_half
         field = zeros(G, n)
 
         # precompute indices and boundscheck
-        rings = RingGrids.eachring(field, field)   
+        rings = RingGrids.eachring(field, field)
 
         for (j, ring) in enumerate(rings)
             for ij in ring
@@ -289,23 +284,23 @@ end
 end
 
 @testset "Ring indices" begin
-    @testset for G in (  FullClenshawGrid,
-                FullGaussianGrid,
-                OctahedralGaussianGrid,
-                OctahedralClenshawGrid,
-                OctaminimalGaussianGrid,
-                HEALPixGrid,
-                OctaHEALPixGrid,
-                FullHEALPixGrid,
-                FullOctaHEALPixGrid,
-                )
-
+    @testset for G in (FullClenshawGrid,
+        FullGaussianGrid,
+        OctahedralGaussianGrid,
+        OctahedralClenshawGrid,
+        OctaminimalGaussianGrid,
+        HEALPixGrid,
+        OctaHEALPixGrid,
+        FullHEALPixGrid,
+        FullOctaHEALPixGrid
+    )
         for n in [8, 16, 24, 32]      # resolution parameter nlat_half
             grid = G(n)
 
             # precompute indices and boundscheck
-            rings = RingGrids.eachring(grid)   
-            rings2 = [RingGrids.each_index_in_ring(grid, j) for j in 1:RingGrids.get_nlat(grid)]
+            rings = RingGrids.eachring(grid)
+            rings2 = [RingGrids.each_index_in_ring(grid, j)
+                      for j in 1:RingGrids.get_nlat(grid)]
 
             @test rings == rings2
         end
@@ -313,7 +308,6 @@ end
 end
 
 @testset "Ring indices from fields" begin
-
     f1 = zeros(OctahedralGaussianGrid, 2)
     f2 = zeros(OctahedralGaussianGrid, 2, 1)    # matches above
     f3 = zeros(OctahedralGaussianGrid, 2, 2)    # matches horizontally only
@@ -327,8 +321,8 @@ end
 
     @test RingGrids.fields_match(f1, f3) == false
     @test RingGrids.fields_match(f2, f3) == false
-    @test RingGrids.fields_match(f1, f3, horizontal_only=true)
-    @test RingGrids.fields_match(f2, f3, horizontal_only=true)
+    @test RingGrids.fields_match(f1, f3, horizontal_only = true)
+    @test RingGrids.fields_match(f2, f3, horizontal_only = true)
 end
 
 @testset "Ring indices from grids" begin
@@ -346,19 +340,15 @@ end
 
 @testset "Field broadcasting" begin
     n = 2
-    @testset for F in ( FullClenshawField,
-                        FullGaussianField,            # don't test all to speed up CI
-                        OctahedralGaussianField,
-                        # OctahedralClenshawGrid,
-                        # OctaminimalGaussianGrid,
-                        HEALPixField,
-                        # OctaHEALPixGrid,
-                        # FullHEALPixGrid,
-                        # FullOctaHEALPixGrid,
-                        )
-
+    @testset for F in (FullClenshawField,
+        FullGaussianField,            # don't test all to speed up CI
+        OctahedralGaussianField,
+        # OctahedralClenshawGrid,
+        # OctaminimalGaussianGrid,
+        HEALPixField        # OctaHEALPixGrid,        # FullHEALPixGrid,        # FullOctaHEALPixGrid,
+    )
         @test zeros(F, n) .+ 1 == ones(F, n)
-        @test ones(F, n)  .- 1 == zeros(F, n)
+        @test ones(F, n) .- 1 == zeros(F, n)
         @test ones(F, n)/1 == ones(F, n)
         @test zeros(F, n) + ones(F, n) == ones(F, n)
         @test 2ones(F, n) == ones(F, n) + ones(F, n)
@@ -377,27 +367,27 @@ end
 
         # promote types, Field{Float16} -> Field{Float64} etc
         @test all(ones(F{Float16}, n)*2.0 .=== 2.0)
-        @test all(ones(F{Float16}, n)*2f0 .=== 2f0)
+        @test all(ones(F{Float16}, n)*2.0f0 .=== 2.0f0)
         @test all(ones(F{Float32}, n)*2.0 .=== 2.0)
 
         # promote types across grids
-        @test all(ones(F{Float16}, n) + ones(F{Float32}, n) .=== 2f0)
+        @test all(ones(F{Float16}, n) + ones(F{Float32}, n) .=== 2.0f0)
         @test all(ones(F{Float16}, n) + ones(F{Float64}, n) .=== 2.0)
         @test all(ones(F{Float32}, n) + ones(F{Float64}, n) .=== 2.0)
 
         # promote types across grids
-        @test all(ones(F{Float16}, n) - ones(F{Float32}, n) .=== 0f0)
+        @test all(ones(F{Float16}, n) - ones(F{Float32}, n) .=== 0.0f0)
         @test all(ones(F{Float16}, n) - ones(F{Float64}, n) .=== 0.0)
         @test all(ones(F{Float32}, n) - ones(F{Float64}, n) .=== 0.0)
 
         # promote types across grids
         # f3 = ones(F{Float16}, n) .* ones(F{Float32}, n)
-        @test all((ones(F{Float16}, n) .* ones(F{Float32}, n)) .=== 1f0)
+        @test all((ones(F{Float16}, n) .* ones(F{Float32}, n)) .=== 1.0f0)
         @test all(ones(F{Float16}, n) .* ones(F{Float64}, n) .=== 1.0)
         @test all(ones(F{Float32}, n) .* ones(F{Float64}, n) .=== 1.0)
 
         # promote types across grids
-        @test all(ones(F{Float16}, n) ./ ones(F{Float32}, n) .=== 1f0)
+        @test all(ones(F{Float16}, n) ./ ones(F{Float32}, n) .=== 1.0f0)
         @test all(ones(F{Float16}, n) ./ ones(F{Float64}, n) .=== 1.0)
         @test all(ones(F{Float32}, n) ./ ones(F{Float64}, n) .=== 1.0)
 
@@ -407,27 +397,26 @@ end
         field2_2 = rand(F, n, 2)
         field3 = rand(F, n, 1, 1)
 
-        @test (field1 .* field2)[:,1]   == (field1 .*      field2[:,1])
-        @test (field2 .* field1)[:,1]   == (field1 .*      field2[:,1])
-        @test (field2 .* field3)[:,1,1] == (field2[:,1] .* field3[:,1,1])
-        @test (field1 .* field2_2)[:,1] == (field1 .*      field2_2[:,1])
-        @test (field1 .* field2_2)[:,2] == (field1 .*      field2_2[:,2])
-    end 
+        @test (field1 .* field2)[:, 1] == (field1 .* field2[:, 1])
+        @test (field2 .* field1)[:, 1] == (field1 .* field2[:, 1])
+        @test (field2 .* field3)[:, 1, 1] == (field2[:, 1] .* field3[:, 1, 1])
+        @test (field1 .* field2_2)[:, 1] == (field1 .* field2_2[:, 1])
+        @test (field1 .* field2_2)[:, 2] == (field1 .* field2_2[:, 2])
+    end
 end
 
 @testset "N-dimensional indexing" begin
     m, n, p = 2, 3, 4
-    @testset for F in ( FullClenshawField,
-                        FullGaussianField,
-                        OctahedralGaussianField,
-                        OctahedralClenshawField,
-                        OctaminimalGaussianField,
-                        HEALPixField,
-                        OctaHEALPixField,
-                        FullHEALPixField,
-                        FullOctaHEALPixField,
-                        )
-
+    @testset for F in (FullClenshawField,
+        FullGaussianField,
+        OctahedralGaussianField,
+        OctahedralClenshawField,
+        OctaminimalGaussianField,
+        HEALPixField,
+        OctaHEALPixField,
+        FullHEALPixField,
+        FullOctaHEALPixField
+    )
         field = rand(F, m, n, p)
         @test field[:, 1, 1] isa F
         @test field[1] == field.data[1]
@@ -439,7 +428,7 @@ end
 
         idx = CartesianIndex((1, 2, 3))
         @test field[idx] == field.data[idx]
-        
+
         ids = CartesianIndices((m, n, p))
         @test field[ids] == field.data[ids]
         @test field[ids] isa Array
@@ -448,17 +437,16 @@ end
 
 @testset "Loop indexing" begin
     n = 2
-    @testset for F in ( FullClenshawField,
-                        FullGaussianField,
-                        OctahedralGaussianField,
-                        OctahedralClenshawField,
-                        OctaminimalGaussianField,
-                        HEALPixField,
-                        OctaHEALPixField,
-                        FullHEALPixField,
-                        FullOctaHEALPixField,
-                        )
-
+    @testset for F in (FullClenshawField,
+        FullGaussianField,
+        OctahedralGaussianField,
+        OctahedralClenshawField,
+        OctaminimalGaussianField,
+        HEALPixField,
+        OctaHEALPixField,
+        FullHEALPixField,
+        FullOctaHEALPixField
+    )
         for s in ((n,), (n, n), (n, n, n), (n, n, n, n))
             field = zeros(F, s...)
 
@@ -474,18 +462,15 @@ end
     end
 end
 
-@testset "AbstractField: GPU (JLArrays)" begin 
+@testset "AbstractField: GPU (JLArrays)" begin
     NF = Float32
-    @testset for F in ( 
+    @testset for F in (
         FullClenshawField,
         # FullGaussianField,            # don't test all for CI speedup
         OctahedralGaussianField,
         # OctahedralClenshawField,
         # OctaminimalGaussianField,
-        HEALPixField,
-        # OctaHEALPixField,
-        # FullHEALPixField,
-        # FullOctaHEALPixField,
+        HEALPixField        # OctaHEALPixField,        # FullHEALPixField,        # FullOctaHEALPixField,
     )
         s = (2, 3, 4)
         ndims = length(s)
@@ -498,15 +483,15 @@ end
         @test field == field2
 
         # broadcasting doesn't escape
-        @test field  + field isa Field{NF, ndims, JLArray{NF, ndims}}
+        @test field + field isa Field{NF, ndims, JLArray{NF, ndims}}
         @test field .+ field isa Field{NF, ndims, JLArray{NF, ndims}}
-        @test field_cpu  + field_cpu isa Field{NF, ndims, Array{NF, ndims}}
+        @test field_cpu + field_cpu isa Field{NF, ndims, Array{NF, ndims}}
         @test field_cpu .+ field_cpu isa Field{NF, ndims, Array{NF, ndims}}
 
         # getindex 
         @test field[1, :, :] isa JLArray{NF, 2}
         @test field[:, 1, 1] isa Field{NF, 1, JLArray{NF, 1}}
-        for ring in eachring(field) 
+        for ring in eachring(field)
             @test field[ring, :, :] == on_architecture(jl_arch, field_cpu[ring, :, :])
             @test Array(field[ring, :, :]) == field_cpu[ring, :, :]
         end
@@ -538,7 +523,7 @@ end
 
 @testset "Zonal mean" begin
     @testset for NF in (Int32, Int64, Float16, Float32, Float64)
-        @testset for Grid in ( 
+        @testset for Grid in (
             FullClenshawGrid,
             FullGaussianGrid,
             OctahedralGaussianGrid,
@@ -547,17 +532,19 @@ end
             HEALPixGrid,
             OctaHEALPixGrid,
             FullHEALPixGrid,
-            FullOctaHEALPixGrid,
+            FullOctaHEALPixGrid
         )
             nlat_half = 4
             grid = Grid(nlat_half)
             npoints = RingGrids.get_npoints(grid)
             field = Field(1:npoints, grid)
-        
+
             zm = zonal_mean(field)
 
             for (j, m) in enumerate(zonal_mean(field))
-                @test m == sum(RingGrids.eachring(field)[j]) / RingGrids.get_nlon_per_ring(grid, j)
+                @test m ==
+                      sum(RingGrids.eachring(field)[j]) /
+                      RingGrids.get_nlon_per_ring(grid, j)
             end
         end
     end

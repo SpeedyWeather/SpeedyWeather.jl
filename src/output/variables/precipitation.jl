@@ -13,11 +13,14 @@ Fields are: $(TYPEDFIELDS)"""
     rate::R = ConvectiveRainRateOutput()    # include here to be called at finalize!
 end
 
-path(::ConvectiveRainOutput, simulation) =
+function path(::ConvectiveRainOutput, simulation)
     simulation.diagnostic_variables.physics.rain_convection
+end
 
 # at finalize step postprocess the convective rain to get the rate
-finalize!(output::NetCDFOutput, variable::ConvectiveRainOutput, args...) = output!(output, variable.rate, variable)
+function finalize!(output::NetCDFOutput, variable::ConvectiveRainOutput, args...)
+    output!(output, variable.rate, variable)
+end
 
 abstract type AbstractRateOutputVariable <: AbstractOutputVariable end
 
@@ -39,9 +42,9 @@ end
 Post-process the netCDF `output` file to convert accumulated precipitation rain/snow to
 rates."""
 function output!(
-    output::NetCDFOutput,
-    variable::AbstractRateOutputVariable,
-    acc_variable::AbstractOutputVariable,
+        output::NetCDFOutput,
+        variable::AbstractRateOutputVariable,
+        acc_variable::AbstractOutputVariable
 )
     # use .var to prevent Union{Missing, Float32} that NCDatasets uses
     accumulated = output.netcdf_file[acc_variable.name].var[:, :, :]
@@ -50,7 +53,7 @@ function output!(
     # convert from accumulated [m] to [mm/hr] rain rate over output time step (e.g. 6hours)
     s = Hour(1)/output.output_dt
     nx, ny = size(accumulated)
-    rate = cat(zeros(eltype(accumulated), nx, ny), diff(accumulated, dims=3), dims=3)
+    rate = cat(zeros(eltype(accumulated), nx, ny), diff(accumulated, dims = 3), dims = 3)
     rate .*= s
 
     # DEFINE NEW NETCDF VARIABLE AND WRITE
@@ -75,11 +78,14 @@ Fields are: $(TYPEDFIELDS)"""
     rate::R = LargeScaleRainRateOutput()    # include here to be called at finalize!
 end
 
-path(::LargeScaleRainOutput, simulation) =
+function path(::LargeScaleRainOutput, simulation)
     simulation.diagnostic_variables.physics.rain_large_scale
+end
 
 # at finalize step postprocess the accumulated rain to get the rate
-finalize!(output::NetCDFOutput, variable::LargeScaleRainOutput, args...) = output!(output, variable.rate, variable)
+function finalize!(output::NetCDFOutput, variable::LargeScaleRainOutput, args...)
+    output!(output, variable.rate, variable)
+end
 
 """Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
@@ -110,11 +116,14 @@ Fields are: $(TYPEDFIELDS)"""
     rate::R = ConvectiveSnowRateOutput()   # include here to be called at finalize!
 end
 
-path(::ConvectiveSnowOutput, simulation) =
+function path(::ConvectiveSnowOutput, simulation)
     simulation.diagnostic_variables.physics.snow_convection
+end
 
 # at finalize step postprocess the convective snow to get the rate
-finalize!(output::NetCDFOutput, variable::ConvectiveSnowOutput, args...) = output!(output, variable.rate, variable)
+function finalize!(output::NetCDFOutput, variable::ConvectiveSnowOutput, args...)
+    output!(output, variable.rate, variable)
+end
 
 """Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
@@ -145,11 +154,14 @@ Fields are: $(TYPEDFIELDS)"""
     rate::R = LargeScaleSnowRateOutput()    # include here to be called at finalize!
 end
 
-path(::LargeScaleSnowOutput, simulation) =
+function path(::LargeScaleSnowOutput, simulation)
     simulation.diagnostic_variables.physics.snow_large_scale
+end
 
 # at finalize step postprocess the convective snow to get the rate
-finalize!(output::NetCDFOutput, variable::LargeScaleSnowOutput, args...) = output!(output, variable.rate, variable)
+function finalize!(output::NetCDFOutput, variable::LargeScaleSnowOutput, args...)
+    output!(output, variable.rate, variable)
+end
 
 """Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
@@ -179,8 +191,9 @@ Fields are: $(TYPEDFIELDS)"""
     transform::F = (x) -> x
 end
 
-path(::TotalPrecipitationOutput, simulation) =
+function path(::TotalPrecipitationOutput, simulation)
     simulation.diagnostic_variables.physics.total_precipitation_rate
+end
 
 """Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
@@ -195,14 +208,15 @@ Fields are: $(TYPEDFIELDS)"""
     keepbits::Int = 7
 end
 
-path(::CloudTopOutput, simulation) =
-    simulation.diagnostic_variables.physics.cloud_top
+path(::CloudTopOutput, simulation) = simulation.diagnostic_variables.physics.cloud_top
 
 # collect all in one for convenience
-PrecipitationOutput() = (
-    ConvectiveRainOutput(),
-    LargeScaleRainOutput(),
-    # ConvectiveSnowOutput(),
-    LargeScaleSnowOutput(),
-    CloudTopOutput(),
-)
+function PrecipitationOutput()
+    (
+        ConvectiveRainOutput(),
+        LargeScaleRainOutput(),
+        # ConvectiveSnowOutput(),
+        LargeScaleSnowOutput(),
+        CloudTopOutput()
+    )
+end

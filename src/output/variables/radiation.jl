@@ -1,10 +1,16 @@
 names = (
-    (:OutgoingShortwaveRadiationOutput, "osr",  "Outgoing shortwave radiation",     :outgoing_shortwave_radiation),
-    (:OutgoingLongwaveRadiationOutput,  "olr",  "Outgoing longwave radiation",      :outgoing_longwave_radiation),
-    (:SurfaceShortwaveUpOutput,         "sru",  "Surface shortwave radiation up",   :surface_shortwave_up),
-    (:SurfaceShortwaveDownOutput,       "srd",  "Surface shortwave radiation down", :surface_shortwave_down),
-    (:SurfaceLongwaveUpOutput,          "lru",  "Surface longwave radiation up",    :surface_longwave_up),
-    (:SurfaceLongwaveDownOutput,        "lrd",  "Surface longwave radiation down",  :surface_longwave_down),
+    (:OutgoingShortwaveRadiationOutput, "osr",
+        "Outgoing shortwave radiation", :outgoing_shortwave_radiation),
+    (:OutgoingLongwaveRadiationOutput, "olr",
+        "Outgoing longwave radiation", :outgoing_longwave_radiation),
+    (:SurfaceShortwaveUpOutput, "sru",
+        "Surface shortwave radiation up", :surface_shortwave_up),
+    (:SurfaceShortwaveDownOutput, "srd",
+        "Surface shortwave radiation down", :surface_shortwave_down),
+    (:SurfaceLongwaveUpOutput, "lru",
+        "Surface longwave radiation up", :surface_longwave_up),
+    (:SurfaceLongwaveDownOutput, "lrd",
+        "Surface longwave radiation down", :surface_longwave_down)
 )
 
 for name in names
@@ -21,8 +27,7 @@ for name in names
             keepbits::Int = 7
         end
 
-        path(::$typename, simulation) =
-            simulation.diagnostic_variables.physics.$varname
+        path(::$typename, simulation) = simulation.diagnostic_variables.physics.$varname
     end
 end
 
@@ -41,12 +46,14 @@ end
 
 path(::AlbedoOutput, simulation) = simulation.diagnostic_variables.physics.albedo
 
-RadiationOutput() = (
-    OutgoingLongwaveRadiationOutput(),
-    OutgoingShortwaveRadiationOutput(),
-    SurfaceShortwaveUpOutput(),
-    SurfaceShortwaveDownOutput(),
-    SurfaceLongwaveUpOutput(),
-    SurfaceLongwaveDownOutput(),
-    AlbedoOutput(),
-)
+function RadiationOutput()
+    (
+        OutgoingLongwaveRadiationOutput(),
+        OutgoingShortwaveRadiationOutput(),
+        SurfaceShortwaveUpOutput(),
+        SurfaceShortwaveDownOutput(),
+        SurfaceLongwaveUpOutput(),
+        SurfaceLongwaveDownOutput(),
+        AlbedoOutput()
+    )
+end

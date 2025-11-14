@@ -26,12 +26,11 @@ $(TYPEDFIELDS)"""
     IM,     # <:AbstractImplicit,
     HD,     # <:AbstractHorizontalDiffusion,
     OU,     # <:AbstractOutput,
-    FB,     # <:AbstractFeedback,
+    FB     # <:AbstractFeedback,
 } <: Barotropic
-    
     spectral_grid::SpectralGrid
     architecture::AR = spectral_grid.architecture
-    
+
     # DYNAMICS
     geometry::GE = Geometry(spectral_grid)
     planet::PL = Earth(spectral_grid)
@@ -41,7 +40,7 @@ $(TYPEDFIELDS)"""
     drag::DR = LinearVorticityDrag(spectral_grid)
     particle_advection::PA = nothing
     initial_conditions::IC = InitialConditions(Barotropic)
-    
+
     # VARIABLES
     random_process::RP = nothing
     tracers::TRACER_DICT = TRACER_DICT()
@@ -61,12 +60,14 @@ end
 prognostic_variables(::Type{<:Barotropic}) = (:vor,)
 default_concrete_model(::Type{Barotropic}) = BarotropicModel
 
-parameters(model::Barotropic; kwargs...) = SpeedyParams(
-    planet = parameters(model.planet; component=:planet, kwargs...),
-    atmosphere = parameters(model.atmosphere; component=:atmosphere, kwargs...),
-    forcing = parameters(model.forcing; component=:forcing, kwargs...),
-    drag = parameters(model.drag; component=:drag, kwargs...),
-)
+function parameters(model::Barotropic; kwargs...)
+    SpeedyParams(
+        planet = parameters(model.planet; component = :planet, kwargs...),
+        atmosphere = parameters(model.atmosphere; component = :atmosphere, kwargs...),
+        forcing = parameters(model.forcing; component = :forcing, kwargs...),
+        drag = parameters(model.drag; component = :drag, kwargs...)
+    )
+end
 
 """
 $(TYPEDSIGNATURES)
@@ -92,10 +93,10 @@ function initialize!(model::Barotropic; time::DateTime = DEFAULT_DATE)
     # allocate prognostic and diagnostic variables
     prognostic_variables = PrognosticVariables(spectral_grid, model)
     diagnostic_variables = DiagnosticVariables(spectral_grid, model)
-    
+
     # initialize particles (or other non-atmosphere prognostic variables)
     initialize!(prognostic_variables.particles, prognostic_variables, diagnostic_variables, model)
-    
+
     # set the initial conditions 
     initialize!(prognostic_variables, model.initial_conditions, model)
     (; clock) = prognostic_variables
