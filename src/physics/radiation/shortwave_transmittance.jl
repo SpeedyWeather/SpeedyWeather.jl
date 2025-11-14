@@ -14,6 +14,7 @@ function transmittance!(column::ColumnVariables, clouds, ::TransparentShortwaveT
     return view(column.transmittance_shortwave, :, band)
 end
 
+export BackgroundShortwaveTransmittance
 @kwdef struct BackgroundShortwaveTransmittance{NF} <: AbstractShortwaveTransmittance
     "[OPTION] Zenith correction amplitude (SPEEDY azen) [1]"
     zenith_amplitude::NF = 1

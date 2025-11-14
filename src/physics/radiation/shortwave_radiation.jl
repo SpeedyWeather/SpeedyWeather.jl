@@ -209,6 +209,7 @@ function shortwave_radiation!(
     shortwave_radiative_transfer!(column, t, clouds, radiation.radiative_transfer, model)
 end
 
+export OneBandShortwaveRadiativeTransfer
 @kwdef struct OneBandShortwaveRadiativeTransfer{NF} <: AbstractShortwaveRadiativeTransfer
     "[OPTION] Ozone absorption in upper stratosphere (W/m^2)"
     ozone_absorp_upper::NF = 0
