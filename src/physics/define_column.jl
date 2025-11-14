@@ -8,9 +8,9 @@ to iterate over horizontal grid points. Most column vectors have `nlayers` entri
 [end] at the lowermost model level at the planetary boundary layer.
 $(TYPEDFIELDS)"""
 @kwdef mutable struct ColumnVariables{
-    NF,
-    VectorType,
-    MatrixType,
+        NF,
+        VectorType,
+        MatrixType,
     } <: AbstractColumnVariables
 
     # DIMENSIONS
@@ -33,8 +33,8 @@ $(TYPEDFIELDS)"""
     const humid::VectorType = zeros(NF, nlayers)        # specific humidity [kg/kg]
 
     # (log) pressure per layer, surface is prognostic, last element here, but precompute other layers too
-    const ln_pres::VectorType = zeros(NF, nlayers+1)    # logarithm of pressure [log(Pa)]
-    const pres::VectorType = zeros(NF, nlayers+1)       # pressure [Pa]
+    const ln_pres::VectorType = zeros(NF, nlayers + 1)    # logarithm of pressure [log(Pa)]
+    const pres::VectorType = zeros(NF, nlayers + 1)       # pressure [Pa]
 
     # TENDENCIES to accumulate the parametrizations into
     const u_tend::VectorType = zeros(NF, nlayers)       # zonal velocity [m/s²]
@@ -43,17 +43,17 @@ $(TYPEDFIELDS)"""
     const humid_tend::VectorType = zeros(NF, nlayers)   # specific humidity [kg/kg/s]
 
     # FLUXES, arrays to be used for various parameterizations, on half levels incl top and bottom
-    const flux_u_upward::VectorType = zeros(NF, nlayers+1)
-    const flux_u_downward::VectorType = zeros(NF, nlayers+1)
+    const flux_u_upward::VectorType = zeros(NF, nlayers + 1)
+    const flux_u_downward::VectorType = zeros(NF, nlayers + 1)
 
-    const flux_v_upward::VectorType = zeros(NF, nlayers+1)
-    const flux_v_downward::VectorType = zeros(NF, nlayers+1)
+    const flux_v_upward::VectorType = zeros(NF, nlayers + 1)
+    const flux_v_downward::VectorType = zeros(NF, nlayers + 1)
 
-    const flux_temp_upward::VectorType = zeros(NF, nlayers+1)
-    const flux_temp_downward::VectorType = zeros(NF, nlayers+1)
-    
-    const flux_humid_upward::VectorType = zeros(NF, nlayers+1)
-    const flux_humid_downward::VectorType = zeros(NF, nlayers+1)
+    const flux_temp_upward::VectorType = zeros(NF, nlayers + 1)
+    const flux_temp_downward::VectorType = zeros(NF, nlayers + 1)
+
+    const flux_humid_upward::VectorType = zeros(NF, nlayers + 1)
+    const flux_humid_downward::VectorType = zeros(NF, nlayers + 1)
 
     # random value (scalar) from random pattern controlled by model.random_process
     random_value::NF = 0
@@ -74,11 +74,11 @@ $(TYPEDFIELDS)"""
     soil_moisture_availability::NF = 0
 
     # surface fluxes
-    surface_humidity_flux::NF = 0           # land-sea mask fraction-weighted flux 
+    surface_humidity_flux::NF = 0           # land-sea mask fraction-weighted flux
     surface_humidity_flux_ocean::NF = 0     # flux from ocean only
     surface_humidity_flux_land::NF = 0      # and from land
 
-    sensible_heat_flux::NF = 0              # land-sea mask fraction-weighted flux 
+    sensible_heat_flux::NF = 0              # land-sea mask fraction-weighted flux
     sensible_heat_flux_ocean::NF = 0        # flux from ocean only
     sensible_heat_flux_land::NF = 0         # and from land
 
@@ -90,7 +90,7 @@ $(TYPEDFIELDS)"""
     const geopot::VectorType = zeros(NF, nlayers)                   # gepotential height [m]
 
     # CONVECTION AND PRECIPITATION
-    cloud_top::Int = nlayers+1              # layer index k of top-most layer with clouds
+    cloud_top::Int = nlayers + 1              # layer index k of top-most layer with clouds
     rain_convection::NF = 0                 # rain due to convection [m]
     rain_large_scale::NF = 0                # rain due to large-scale condensation [m]
     rain_rate_convection::NF = 0            # rain rate due to convection [m/s]
@@ -105,19 +105,19 @@ $(TYPEDFIELDS)"""
     # RADIATION
     cos_zenith::NF = 0                      # cosine of solar zenith angle [1]
     albedo_ocean::NF = 0                    # surface albedo over ocean [1]
-    albedo_land::NF = 0                     # surface albedo over land [1]    
+    albedo_land::NF = 0                     # surface albedo over land [1]
 
     # surface fluxes, positive down
     # downward fluxes are independent of ocean vs land
     surface_shortwave_down::NF = 0          # surface shortwave radiation down (into land/sea)
     surface_longwave_down::NF = 0           # surface longwave radiation down (into land/sea)
-    
+
     surface_shortwave_up::NF = 0            # surface shortwave radiation up (reflected)
     surface_shortwave_up_ocean::NF = 0
     surface_shortwave_up_land::NF = 0
-    
+
     # surface longwave radiation up (into atmosphere)
-    surface_longwave_up::NF = 0             # land-sea mask weighted flux   
+    surface_longwave_up::NF = 0             # land-sea mask weighted flux
     surface_longwave_up_ocean::NF = 0       # ocean only
     surface_longwave_up_land::NF = 0        # land only
 
@@ -136,10 +136,10 @@ $(TYPEDFIELDS)"""
     const d::VectorType = zeros(NF, nlayers)
 end
 
-Base.eltype(::ColumnVariables{NF}) where NF = NF
+Base.eltype(::ColumnVariables{NF}) where {NF} = NF
 
 # generator based on spectral grid
-ColumnVariables(SG::SpectralGrid; kwargs...) = ColumnVariables{SG.NF, SG.VectorType, SG.MatrixType}(; nlayers=SG.nlayers, kwargs...)
+ColumnVariables(SG::SpectralGrid; kwargs...) = ColumnVariables{SG.NF, SG.VectorType, SG.MatrixType}(; nlayers = SG.nlayers, kwargs...)
 
 # generator assuming Julia Arrays
-ColumnVariables{NF}(; kwargs...) where NF = ColumnVariables{NF, Vector{NF}, Matrix{NF}}(; kwargs...)
+ColumnVariables{NF}(; kwargs...) where {NF} = ColumnVariables{NF, Vector{NF}, Matrix{NF}}(; kwargs...)

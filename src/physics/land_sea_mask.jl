@@ -29,20 +29,20 @@ abstract type AbstractLandSeaMask end
 function Base.show(io::IO, L::AbstractLandSeaMask)
     println(io, "$(typeof(L)) <: AbstractLandSeaMask")
     keys = propertynames(L)
-    print_fields(io, L, keys)
+    return print_fields(io, L, keys)
 end
 
 function mask!(
-    field::AbstractField,
-    mask::AbstractField,
-    land_or_sea::Symbol;
-    masked_value = NaN,
-)
+        field::AbstractField,
+        mask::AbstractField,
+        land_or_sea::Symbol;
+        masked_value = NaN,
+    )
 
     val = land_or_sea == :land ? 1 : 0
     masked_val = convert(eltype(field), masked_value)
 
-    @boundscheck fields_match(field, mask, horizontal_only=true) || throw(DimensionMismatch(field, mask))
+    @boundscheck fields_match(field, mask, horizontal_only = true) || throw(DimensionMismatch(field, mask))
     @boundscheck ndims(mask) == 1 || throw(DimensionMismatch(field, mask))
 
     for k in eachlayer(field)
@@ -121,11 +121,11 @@ function initialize!(land_sea_mask::EarthLandSeaMask, model::PrimitiveEquation)
         path = joinpath(land_sea_mask.path, land_sea_mask.file)
     end
     ncfile = NCDataset(path)
-    
-    # high resolution land-sea mask
-    lsm_highres = land_sea_mask.file_Grid(ncfile["lsm"].var[:, :], input_as=Matrix)
 
-    # average onto grid cells of the model 
+    # high resolution land-sea mask
+    lsm_highres = land_sea_mask.file_Grid(ncfile["lsm"].var[:, :], input_as = Matrix)
+
+    # average onto grid cells of the model
     if typeof(architecture(model.spectral_grid.architecture)) <: CPU
         RingGrids.grid_cell_average!(land_sea_mask.mask, lsm_highres)
     else
@@ -142,7 +142,7 @@ function initialize!(land_sea_mask::EarthLandSeaMask, model::PrimitiveEquation)
     # TODO this shouldn't be necessary, but at the moment grid_cell_average! can return values > 1
     # lo, hi = extrema(land_sea_mask.mask)
     # (lo < 0 || hi > 1) && @warn "Land-sea mask has values in [$lo, $hi], clamping to [0, 1]."
-    clamp!(land_sea_mask.mask, 0, 1)
+    return clamp!(land_sea_mask.mask, 0, 1)
 end
 
 export AquaPlanetMask

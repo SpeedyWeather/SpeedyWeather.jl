@@ -16,18 +16,21 @@ function Base.show(io::IO, A::Albedo)
         p = i == n ? print : println
         p(io, "$s $key: $(typeof(val))")
     end
+    return
 end
 
 export DefaultAlbedo
-function DefaultAlbedo(SG::SpectralGrid;
-    ocean = OceanSeaIceAlbedo(SG),
-    land = AlbedoClimatology(SG))
+function DefaultAlbedo(
+        SG::SpectralGrid;
+        ocean = OceanSeaIceAlbedo(SG),
+        land = AlbedoClimatology(SG)
+    )
     return Albedo(ocean, land)
 end
 
 function initialize!(albedo::Albedo, model::PrimitiveEquation)
     initialize!(albedo.ocean, model)
-    initialize!(albedo.land, model)
+    return initialize!(albedo.land, model)
 end
 
 # dispatch over model.albedo
@@ -36,34 +39,34 @@ albedo!(diagn::DiagnosticVariables, progn::PrognosticVariables, model::Primitive
 
 # composite albedos: call separately for ocean and land with .ocean and .land
 function albedo!(
-    diagn::DiagnosticVariables,
-    progn::PrognosticVariables,
-    albedo::Albedo,
-    model::PrimitiveEquation,
-)
+        diagn::DiagnosticVariables,
+        progn::PrognosticVariables,
+        albedo::Albedo,
+        model::PrimitiveEquation,
+    )
     albedo!(diagn.physics.ocean, progn, albedo.ocean, model)
-    albedo!(diagn.physics.land, progn, albedo.land, model)
+    return albedo!(diagn.physics.land, progn, albedo.land, model)
 end
 
 # single albedo: call separately for ocean and land with the same albedo
 function albedo!(
-    diagn::DiagnosticVariables,
-    progn::PrognosticVariables,
-    albedo::AbstractAlbedo,
-    model::PrimitiveEquation,
-)
+        diagn::DiagnosticVariables,
+        progn::PrognosticVariables,
+        albedo::AbstractAlbedo,
+        model::PrimitiveEquation,
+    )
     albedo!(diagn.physics.ocean, progn, albedo, model)
-    albedo!(diagn.physics.land, progn, albedo, model)
+    return albedo!(diagn.physics.land, progn, albedo, model)
 end
 
 # single albedo, copy over the constant albedo
 function albedo!(
-    diagn::AbstractDiagnosticVariables,     # ocean or land!
-    progn::PrognosticVariables,
-    albedo::AbstractAlbedo,
-    model::PrimitiveEquation,
-)
-    diagn.albedo .= albedo.albedo           # copy over the constant albedo
+        diagn::AbstractDiagnosticVariables,     # ocean or land!
+        progn::PrognosticVariables,
+        albedo::AbstractAlbedo,
+        model::PrimitiveEquation,
+    )
+    return diagn.albedo .= albedo.albedo           # copy over the constant albedo
 end
 
 ## GLOBAL CONSTANT ALBEDO
@@ -112,7 +115,7 @@ end
 function AlbedoClimatology(SG::SpectralGrid; kwargs...)
     (; NF, GridVariable2D, grid) = SG
     albedo = zeros(GridVariable2D, grid)
-    AlbedoClimatology{NF, GridVariable2D}(; albedo, kwargs...)
+    return AlbedoClimatology{NF, GridVariable2D}(; albedo, kwargs...)
 end
 
 # set albedo with grid, scalar, function; just define path `albedo.albedo` to grid here
@@ -128,8 +131,8 @@ function initialize!(albedo::AlbedoClimatology, model::PrimitiveEquation)
     end
     ncfile = NCDataset(path)
 
-    a = albedo.file_Grid(ncfile[albedo.varname].var[:, :], input_as=Matrix)
-    interpolate!(albedo.albedo, a)
+    a = albedo.file_Grid(ncfile[albedo.varname].var[:, :], input_as = Matrix)
+    return interpolate!(albedo.albedo, a)
 end
 
 ## OceanSeaIceAlbedo
@@ -140,18 +143,18 @@ export OceanSeaIceAlbedo
     albedo_ice::NF = 0.6
 end
 
-OceanSeaIceAlbedo(SG::SpectralGrid; kwargs...) = OceanSeaIceAlbedo{SG.NF}(;kwargs...)
+OceanSeaIceAlbedo(SG::SpectralGrid; kwargs...) = OceanSeaIceAlbedo{SG.NF}(; kwargs...)
 initialize!(albedo::OceanSeaIceAlbedo, model::PrimitiveEquation) = nothing
 
 function albedo!(
-    diagn::AbstractDiagnosticVariables,
-    progn::PrognosticVariables,
-    albedo::OceanSeaIceAlbedo,
-    model::PrimitiveEquation,
-)
-    (; sea_ice_concentration ) = progn.ocean
+        diagn::AbstractDiagnosticVariables,
+        progn::PrognosticVariables,
+        albedo::OceanSeaIceAlbedo,
+        model::PrimitiveEquation,
+    )
+    (; sea_ice_concentration) = progn.ocean
     (; albedo_ocean, albedo_ice) = albedo
 
     # set ocean albedo linearly between ocean and ice depending on sea ice concentration
-    diagn.albedo .= albedo_ocean .+ sea_ice_concentration .* (albedo_ice .- albedo_ocean)
+    return diagn.albedo .= albedo_ocean .+ sea_ice_concentration .* (albedo_ice .- albedo_ocean)
 end

@@ -21,7 +21,7 @@ $(TYPEDFIELDS)"""
 
     "[DERIVED] struct containing everything progress related"
     progress_meter::ProgressMeter.Progress =
-        ProgressMeter.Progress(1, enabled=verbose)
+        ProgressMeter.Progress(1, enabled = verbose)
 
     "[DERIVED] did NaNs occur in the simulation?"
     nans_detected::Bool = false
@@ -30,13 +30,13 @@ end
 function Base.show(io::IO, F::AbstractFeedback)
     println(io, "$(typeof(F)) <: AbstractFeedback")
     keys = propertynames(F)
-    print_fields(io, F, keys)
+    return print_fields(io, F, keys)
 end
 
 function Base.show(io::IO, P::ProgressMeter.Progress)
     println(io, "$(typeof(P)) <: ProgressMeter.AbstractProgress")
     keys = propertynames(P)
-    print_fields(io, P, keys)
+    return print_fields(io, P, keys)
 end
 
 """
@@ -54,14 +54,14 @@ function initialize!(feedback::Feedback, clock::Clock, model::AbstractModel)
     # only do now for benchmark accuracy
     (; showspeed, description, verbose) = feedback
     desc = description * (model.output.active ? " $(model.output.run_folder) " : " ")
-    feedback.progress_meter = ProgressMeter.Progress(clock.n_timesteps-1; enabled=verbose, showspeed, desc)
+    return feedback.progress_meter = ProgressMeter.Progress(clock.n_timesteps - 1; enabled = verbose, showspeed, desc)
 end
 
 progress!(feedback::Feedback) = ProgressMeter.next!(feedback.progress_meter)
 
 function progress!(feedback::Feedback, progn::PrognosticVariables)
     progress!(feedback)
-    feedback.debug && nan_detection!(feedback, progn)
+    return feedback.debug && nan_detection!(feedback, progn)
 end
 
 """
@@ -80,7 +80,7 @@ function nan_detection!(feedback::Feedback, progn::PrognosticVariables)
     # just check first harmonic, spectral transform propagates NaNs globally anyway
     nans_detected_here = ~all(isfinite, vor0)
     nans_detected_here && @warn "NaN or Inf detected at time step $i"
-    feedback.nans_detected = nans_detected_here
+    return feedback.nans_detected = nans_detected_here
 end
 
 """
@@ -92,12 +92,14 @@ function speedstring(sec_per_iter, dt_in_sec)
         return "  N/A  days/day"
     end
 
-    sim_time_per_time = dt_in_sec/sec_per_iter
+    sim_time_per_time = dt_in_sec / sec_per_iter
 
-    for (divideby, unit) in (   (365*1_000, "millenia"),
-                                (365, "years"),
-                                (1, "days"),
-                                (1/24, "hours"))    
+    for (divideby, unit) in (
+            (365 * 1_000, "millenia"),
+            (365, "years"),
+            (1, "days"),
+            (1 / 24, "hours"),
+        )
         if (sim_time_per_time / divideby) > 2
             return @sprintf "%5.2f %2s/day" (sim_time_per_time / divideby) unit
         end
@@ -114,7 +116,7 @@ const DT_IN_SEC = Ref(1.0)
 # not just ::Any to effectively overwrite it
 function ProgressMeter.speedstring(sec_per_iter::AbstractFloat)
     dt_in_sec = SpeedyWeather.DT_IN_SEC[]   # pull global "constant"
-    speedstring(sec_per_iter, dt_in_sec)
+    return speedstring(sec_per_iter, dt_in_sec)
 end
 
 """
@@ -147,7 +149,7 @@ export ParametersTxt
 """ParametersTxt callback. Writes a parameters.txt file with all model parameters.
 Options are $(TYPEDFIELDS)"""
 @kwdef mutable struct ParametersTxt <: AbstractCallback
-    "[OPTION] Path for parameters.txt file, uses model.output.run_path if not specified" 
+    "[OPTION] Path for parameters.txt file, uses model.output.run_path if not specified"
     path::String = ""
 
     "[OPTION] File name for parameters.txt file"
@@ -172,7 +174,7 @@ function initialize!(parameters_txt::ParametersTxt, progn, diagn, model)
     file = open(joinpath(path, filename), "w")
     for property in propertynames(model)
         println(file, "model.$property")
-        println(file, getfield(model, property,), "\n")
+        println(file, getfield(model, property), "\n")
     end
     close(file)
 
@@ -218,13 +220,13 @@ function initialize!(progress_txt::ProgressTxt, progn, diagn, model)
     (; run_folder, run_path) = model.output
     SG = model.spectral_grid
     L = model.time_stepping
-    days = Second(progn.clock.period).value/(3600*24)
-        
+    days = Second(progn.clock.period).value / (3600 * 24)
+
     # create progress.txt file in run_????/
     file = open(joinpath(path, filename), "w")
-    s = "Starting SpeedyWeather.jl $run_folder on "*
-            Dates.format(Dates.now(), Dates.RFC1123Format)
-    write(file, s*"\n")
+    s = "Starting SpeedyWeather.jl $run_folder on " *
+        Dates.format(Dates.now(), Dates.RFC1123Format)
+    write(file, s * "\n")
     write(file, "Integrating:\n")
     write(file, "$SG\n")
     write(file, "Time: $days days at Δt = $(L.Δt_sec)s\n")
@@ -247,15 +249,15 @@ function callback!(progress_txt::ProgressTxt, progn, diagn, model)
     (; file, every_n_percent) = progress_txt
 
     # occasionally write progress to txt file
-    if (counter/n*100 % 1) > ((counter+1)/n*100 % 1)  
-        percent = round(Int, (counter+1)/n*100)             # % of time steps completed
-        if (percent % every_n_percent == 0)                 # write every p% step in txt 
+    return if (counter / n * 100 % 1) > ((counter + 1) / n * 100 % 1)
+        percent = round(Int, (counter + 1) / n * 100)             # % of time steps completed
+        if (percent % every_n_percent == 0)                 # write every p% step in txt
             write(file, @sprintf("\n%3d%%", percent))
             r = remaining_time(progress_meter)
             write(file, ", ETA: $r")
 
             time_elapsed = progress_meter.tlast - progress_meter.tinit
-            s = speedstring(time_elapsed/counter, DT_IN_SEC[])
+            s = speedstring(time_elapsed / counter, DT_IN_SEC[])
             write(file, ", $s")
 
             nans_detected && write(file, ", NaN/Inf detected.")
@@ -287,7 +289,7 @@ function remaining_time(p::ProgressMeter.Progress)
     elapsed_time = time() - p.tinit
     est_total_time = elapsed_time * (p.n - p.start) / (p.counter - p.start)
     if 0 <= est_total_time <= typemax(Int)
-        eta_sec = round(Int, est_total_time - elapsed_time )
+        eta_sec = round(Int, est_total_time - elapsed_time)
         eta = ProgressMeter.durationstring(eta_sec)
     else
         eta = "N/A"

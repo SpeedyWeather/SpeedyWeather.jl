@@ -2,11 +2,11 @@ abstract type AbstractStochasticPhysics <: AbstractParameterization end
 
 # fucntion barriers
 function perturb_parameterization_inputs!(column::AbstractColumnVariables, model::PrimitiveEquation)
-    perturb_parameterization_inputs!(column, model.stochastic_physics, model)
+    return perturb_parameterization_inputs!(column, model.stochastic_physics, model)
 end
 
 function perturb_parameterization_tendencies!(column::AbstractColumnVariables, model::PrimitiveEquation)
-    perturb_parameterization_tendencies!(column, model.stochastic_physics, model)
+    return perturb_parameterization_tendencies!(column, model.stochastic_physics, model)
 end
 
 # no perturbations
@@ -15,7 +15,7 @@ perturb_parameterization_tendencies!(::ColumnVariables, ::Nothing, ::PrimitiveEq
 
 export StochasticallyPerturbedParameterizationTendencies
 @kwdef struct StochasticallyPerturbedParameterizationTendencies{NF, VectorType} <: AbstractStochasticPhysics
-    
+
     "Number of vertical layers"
     nlayers::Int
 
@@ -39,26 +39,29 @@ end
 
 # only perturb tendencies (=outputs) not inputs
 function perturb_parameterization_inputs!(
-    ::AbstractColumnVariables,
-    ::StochasticallyPerturbedParameterizationTendencies,
-    ::PrimitiveEquation)
+        ::AbstractColumnVariables,
+        ::StochasticallyPerturbedParameterizationTendencies,
+        ::PrimitiveEquation
+    )
     return nothing
 end
 
 function perturb_parameterization_tendencies!(
-    column::AbstractColumnVariables,
-    sppt::StochasticallyPerturbedParameterizationTendencies,
-    model::PrimitiveEquation)
-    
+        column::AbstractColumnVariables,
+        sppt::StochasticallyPerturbedParameterizationTendencies,
+        model::PrimitiveEquation
+    )
+
     r = column.random_value
     (; taper) = sppt
     (; u_tend, v_tend, temp_tend, humid_tend) = column
 
     for k in eachlayer(column)
-        R = 1 + r*taper[k]
+        R = 1 + r * taper[k]
         u_tend[k] *= R
         v_tend[k] *= R
         temp_tend[k] *= R
         humid_tend[k] *= R
     end
+    return
 end

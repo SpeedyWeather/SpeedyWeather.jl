@@ -5,25 +5,26 @@ export SurfaceHumidityFlux
 end
 
 function SurfaceHumidityFlux(
-    SG::SpectralGrid; 
-    ocean = SurfaceOceanHumidityFlux(SG),
-    land = SurfaceLandHumidityFlux(SG))
+        SG::SpectralGrid;
+        ocean = SurfaceOceanHumidityFlux(SG),
+        land = SurfaceLandHumidityFlux(SG)
+    )
     return SurfaceHumidityFlux(; ocean, land)
 end
 
 function initialize!(S::SurfaceHumidityFlux, model::PrimitiveWet)
     initialize!(S.ocean, model)
-    initialize!(S.land, model)
+    return initialize!(S.land, model)
 end
 
-function surface_humidity_flux!(   
-    column::ColumnVariables,
-    humidity_flux::SurfaceHumidityFlux,
-    progn::PrognosticVariables,
-    model::PrimitiveWet,
-)   
+function surface_humidity_flux!(
+        column::ColumnVariables,
+        humidity_flux::SurfaceHumidityFlux,
+        progn::PrognosticVariables,
+        model::PrimitiveWet,
+    )
     surface_humidity_flux!(column, humidity_flux.ocean, progn, model)
-    surface_humidity_flux!(column, humidity_flux.land, progn, model)
+    return surface_humidity_flux!(column, humidity_flux.land, progn, model)
 end
 
 ## ----
@@ -34,7 +35,7 @@ surface_humidity_flux!(::ColumnVariables, ::Nothing, ::PrimitiveWet) = nothing
 ## ----
 
 export SurfaceOceanHumidityFlux
-@kwdef struct SurfaceOceanHumidityFlux{NF<:AbstractFloat} <: AbstractSurfaceHumidityFlux
+@kwdef struct SurfaceOceanHumidityFlux{NF <: AbstractFloat} <: AbstractSurfaceHumidityFlux
     "[OPTION] Use column.boundary_layer_drag coefficient"
     use_boundary_layer_drag::Bool = true
 
@@ -46,10 +47,10 @@ SurfaceOceanHumidityFlux(SG::SpectralGrid; kwargs...) = SurfaceOceanHumidityFlux
 initialize!(::SurfaceOceanHumidityFlux, ::PrimitiveWet) = nothing
 
 function surface_humidity_flux!(
-    column::ColumnVariables{NF},
-    humidity_flux::SurfaceOceanHumidityFlux,
-    model::PrimitiveWet,
-) where NF
+        column::ColumnVariables{NF},
+        humidity_flux::SurfaceOceanHumidityFlux,
+        model::PrimitiveWet,
+    ) where {NF}
 
     (; skin_temperature_sea, pres) = column
     (; drag) = humidity_flux
@@ -68,8 +69,8 @@ function surface_humidity_flux!(
 
     # SPEEDY documentation eq. 55/57, zero flux if sea surface temperature not available
     # but remove the max( ,0) to allow for surface condensation
-    flux_sea = isfinite(skin_temperature_sea) ? ρ*drag_sea*V₀*(sat_humid_sea  - surface_humid) :
-                                                    zero(skin_temperature_sea)
+    flux_sea = isfinite(skin_temperature_sea) ? ρ * drag_sea * V₀ * (sat_humid_sea - surface_humid) :
+        zero(skin_temperature_sea)
     column.surface_humidity_flux_ocean = flux_sea       # store without weighting by land fraction for coupling
 
     flux_sea *= (1 - land_fraction)             # weight by ocean fraction of land-sea mask
@@ -81,22 +82,22 @@ end
 ## ----
 
 export SurfaceLandHumidityFlux
-@kwdef struct SurfaceLandHumidityFlux{NF<:AbstractFloat} <: AbstractSurfaceHumidityFlux
+@kwdef struct SurfaceLandHumidityFlux{NF <: AbstractFloat} <: AbstractSurfaceHumidityFlux
     "[OPTION] Use column.boundary_layer_drag coefficient"
     use_boundary_layer_drag::Bool = true
 
     "[OPTION] Otherwise, use the following drag coefficient for humidity flux (evaporation) over land"
     drag::NF = 1.2e-3
 end
-    
+
 SurfaceLandHumidityFlux(SG::SpectralGrid; kwargs...) = SurfaceLandHumidityFlux{SG.NF}(; kwargs...)
 initialize!(::SurfaceLandHumidityFlux, ::PrimitiveWet) = nothing
 
 function surface_humidity_flux!(
-    column::ColumnVariables{NF},
-    humidity_flux::SurfaceLandHumidityFlux,
-    model::PrimitiveWet,
-) where NF
+        column::ColumnVariables{NF},
+        humidity_flux::SurfaceLandHumidityFlux,
+        model::PrimitiveWet,
+    ) where {NF}
 
     (; skin_temperature_land, pres) = column
     (; drag) = humidity_flux
@@ -117,7 +118,7 @@ function surface_humidity_flux!(
     # SPEEDY documentation eq. 55/57, zero flux if land / soil moisture availability not available (=ocean)
     # but remove the max( ,0) to allow for surface condensation
     flux_land = isfinite(skin_temperature_land) && isfinite(α) ?
-                ρ*drag_land*V₀*(α*sat_humid_land  - surface_humid) : zero(NF)
+        ρ * drag_land * V₀ * (α * sat_humid_land - surface_humid) : zero(NF)
     column.surface_humidity_flux_land = flux_land   # store flux separately for land
     flux_land *= land_fraction                      # weight by land fraction of land-sea mask
     column.flux_humid_upward[end] += flux_land      # end=lowermost layer, accumulate with (+=) to total flux
@@ -133,10 +134,11 @@ PrescribedOceanHumidityFlux(::SpectralGrid) = PrescribedOceanHumidityFlux()
 initialize!(::PrescribedOceanHumidityFlux, ::PrimitiveWet) = nothing
 
 function surface_humidity_flux!(
-    column::ColumnVariables,
-    ::PrescribedOceanHumidityFlux,
-    progn::PrognosticVariables,
-    model::PrimitiveWet)
+        column::ColumnVariables,
+        ::PrescribedOceanHumidityFlux,
+        progn::PrognosticVariables,
+        model::PrimitiveWet
+    )
 
     land_fraction = column.land_fraction
 
@@ -144,9 +146,9 @@ function surface_humidity_flux!(
     flux = progn.ocean.surface_humidity_flux[column.ij]
     column.surface_humidity_flux_ocean = flux   # store ocean-only flux separately too
 
-    flux *= (1-land_fraction)                   # weight by ocean fraction of land-sea mask
+    flux *= (1 - land_fraction)                   # weight by ocean fraction of land-sea mask
     column.flux_humid_upward[end] += flux       # end=lowermost layer, accumulate with (+=) to total flux
-    column.surface_humidity_flux = flux         # ocean sets the flux (=), land accumulates (+=)
+    return column.surface_humidity_flux = flux         # ocean sets the flux (=), land accumulates (+=)
 end
 
 ## ----
@@ -157,10 +159,11 @@ PrescribedLandHumidityFlux(::SpectralGrid) = PrescribedLandHumidityFlux()
 initialize!(::PrescribedLandHumidityFlux, ::PrimitiveWet) = nothing
 
 function surface_humidity_flux!(
-    column::ColumnVariables,
-    ::PrescribedLandHumidityFlux,
-    progn::PrognosticVariables,
-    model::PrimitiveWet)
+        column::ColumnVariables,
+        ::PrescribedLandHumidityFlux,
+        progn::PrognosticVariables,
+        model::PrimitiveWet
+    )
 
     land_fraction = column.land_fraction
 
@@ -170,5 +173,5 @@ function surface_humidity_flux!(
 
     flux *= land_fraction
     column.flux_humid_upward[end] += flux       # end=lowermost layer
-    column.surface_humidity_flux += flux        # ocean sets the flux (=), land accumulates (+=)
+    return column.surface_humidity_flux += flux        # ocean sets the flux (=), land accumulates (+=)
 end

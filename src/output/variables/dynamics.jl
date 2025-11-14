@@ -116,7 +116,7 @@ Fields are: $(TYPEDFIELDS)"""
     compression_level::Int = 3
     shuffle::Bool = true
     keepbits::Int = 12
-    transform::F = (x) -> exp(x)/100     # log(Pa) to hPa
+    transform::F = (x) -> exp(x) / 100     # log(Pa) to hPa
 end
 
 path(::SurfacePressureOutput, simulation) = simulation.diagnostic_variables.grid.pres_grid
@@ -132,17 +132,17 @@ Fields are: $(TYPEDFIELDS)"""
     compression_level::Int = 3
     shuffle::Bool = true
     keepbits::Int = 12
-    transform::F = (x) -> exp(x)/100     # log(Pa) to hPa
+    transform::F = (x) -> exp(x) / 100     # log(Pa) to hPa
 end
 
 # points to surface not mean sea level pressure but core variable to read in
 path(::MeanSeaLevelPressureOutput, simulation) = simulation.diagnostic_variables.grid.pres_grid
 
 function output!(
-    output::NetCDFOutput,
-    variable::MeanSeaLevelPressureOutput,
-    simulation::AbstractSimulation,
-)
+        output::NetCDFOutput,
+        variable::MeanSeaLevelPressureOutput,
+        simulation::AbstractSimulation,
+    )
     # escape immediately after first call if variable doesn't have a time dimension
     ~hastime(variable) && output.output_counter > 1 && return nothing
 
@@ -160,7 +160,7 @@ function output!(
     # calculate mean sea-level pressure on model grid
     mslp = simulation.diagnostic_variables.dynamics.a_2D_grid
     (; transform) = variable                    # to change units from log(Pa) to hPa
-    @. mslp = transform(g*h/R_dry/Tᵥ + lnpₛ)    # Pa to hPa
+    @. mslp = transform(g * h / R_dry / Tᵥ + lnpₛ)    # Pa to hPa
 
     # interpolate 2D/3D variables
     mslp_output = output.field2D

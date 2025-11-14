@@ -1,6 +1,6 @@
 @testset "ColumnVariables initialisation" begin
     @testset for NF in (Float16, Float32, Float64)
-        column = ColumnVariables{NF}(nlayers=8)
+        column = ColumnVariables{NF}(nlayers = 8)
 
         @test eltype(column.temp) == NF
         SpeedyWeather.reset_column!(column)
@@ -11,7 +11,7 @@
         @test all(column.v_tend .=== zero(NF))
 
         # Convection
-        @test column.cloud_top === column.nlayers+1
+        @test column.cloud_top === column.nlayers + 1
 
         # Large-scale condensation
         @test column.rain_large_scale === zero(NF)

@@ -2,7 +2,7 @@ abstract type AbstractOpticalDepth <: AbstractParameterization end
 
 # function barrier to dispatch to type of model.optical_depth
 function optical_depth!(column::ColumnVariables, model::AbstractModel)
-    optical_depth!(column, model.optical_depth, model)
+    return optical_depth!(column, model.optical_depth, model)
 end
 
 export ZeroOpticalDepth
@@ -11,12 +11,12 @@ ZeroOpticalDepth(SG::SpectralGrid) = ZeroOpticalDepth{SG.NF}()
 initialize!(od::ZeroOpticalDepth, ::AbstractModel) = nothing
 function optical_depth!(column::ColumnVariables, od::ZeroOpticalDepth, model::AbstractModel)
     column.optical_depth_longwave .= 0
-    column.optical_depth_shortwave .= 0
+    return column.optical_depth_shortwave .= 0
 end
 
 export FriersonOpticalDepth
 @kwdef mutable struct FriersonOpticalDepth{NF} <: AbstractOpticalDepth
-    
+
     "[OPTION] Spectral band to use"
     band::Int = 1
 
@@ -34,10 +34,10 @@ FriersonOpticalDepth(SG::SpectralGrid; kwargs...) = FriersonOpticalDepth{SG.NF}(
 initialize!(od::FriersonOpticalDepth, model::AbstractModel) = nothing
 
 function optical_depth!(
-    column::ColumnVariables{NF},
-    od::FriersonOpticalDepth,
-    model::AbstractModel,
-) where NF
+        column::ColumnVariables{NF},
+        od::FriersonOpticalDepth,
+        model::AbstractModel,
+    ) where {NF}
 
     # escape immediately if fewer bands defined in longwave radiation scheme
     od.band > column.nbands_longwave && return nothing
@@ -49,7 +49,7 @@ function optical_depth!(
     optical_depth = column.optical_depth_longwave
     (; τ₀_equator, τ₀_pole, fₗ, band) = od
 
-    # coordinates 
+    # coordinates
     σ = model.geometry.σ_levels_half
     θ = column.latd
     (; nlayers) = column
@@ -60,10 +60,11 @@ function optical_depth!(
     # --- τ(k=1+1/2)                # half level below
 
     local τ_above::NF = 0
-    τ₀ = τ₀_equator + (τ₀_pole - τ₀_equator)*sind(θ)^2
-    for k in 2:nlayers+1     # loop over half levels below
-        τ_below = τ₀*(fₗ*σ[k] + (1 - fₗ)*σ[k]^4)
-        optical_depth[k-1, band] = τ_below - τ_above
+    τ₀ = τ₀_equator + (τ₀_pole - τ₀_equator) * sind(θ)^2
+    for k in 2:(nlayers + 1)     # loop over half levels below
+        τ_below = τ₀ * (fₗ * σ[k] + (1 - fₗ) * σ[k]^4)
+        optical_depth[k - 1, band] = τ_below - τ_above
         τ_above = τ_below
     end
+    return
 end

@@ -24,8 +24,8 @@ function get_vertices(Grid::Type{<:AbstractGrid}, nlat_half::Integer)
     # use the locator to find the neighbouring grid points
     # to control the direction of "neighbouring" use a small offset Δ
     # to add/subtract from the coordinates
-    Δ = 1e-4
-    
+    Δ = 1.0e-4
+
     I = AnvilInterpolator(Grid, nlat_half, npoints)
     update_locator!(I, londs .+ Δ, latds .+ Δ)
 
@@ -43,15 +43,15 @@ function get_vertices(Grid::Type{<:AbstractGrid}, nlat_half::Integer)
             # account for averages across prime meridian in 0..360˚ coordinates
             λa = londs[b] < londs[a] ? londs[a] - 360 : londs[a]
             λb = londs[b]
-            north[1, ij] = mod((λa + λb)/2, 360)
-            north[2, ij] = (latds[a] + latds[b])/2
+            north[1, ij] = mod((λa + λb) / 2, 360)
+            north[2, ij] = (latds[a] + latds[b]) / 2
         end
 
         # account for averages across prime meridian in 0..360˚ coordinates
         λc = londs[d] < londs[c] ? londs[c] - 360 : londs[c]
         λd = londs[d]
-        east[1, ij] = mod((λc + λd)/2, 360)
-        east[2, ij] = (latds[c] + latds[d])/2
+        east[1, ij] = mod((λc + λd) / 2, 360)
+        east[2, ij] = (latds[c] + latds[d]) / 2
     end
 
     update_locator!(I, londs .- Δ, latds .- Δ)
@@ -65,15 +65,15 @@ function get_vertices(Grid::Type{<:AbstractGrid}, nlat_half::Integer)
             # account for averages across prime meridian in 0..360˚ coordinates
             λc = londs[c] > londs[d] ? londs[c] - 360 : londs[c]
             λd = londs[d]
-            south[1, ij] = mod((λc + λd)/2, 360)
-            south[2, ij] = (latds[c] + latds[d])/2
+            south[1, ij] = mod((λc + λd) / 2, 360)
+            south[2, ij] = (latds[c] + latds[d]) / 2
         end
 
         # account for averages across prime meridian in 0..360˚ coordinates
         λa = londs[b] < londs[a] ? londs[a] - 360 : londs[a]
         λb = londs[b]
-        west[1, ij] = mod((λa + λb)/2, 360)
-        west[2, ij] = (latds[a] + latds[b])/2
+        west[1, ij] = mod((λa + λb) / 2, 360)
+        west[2, ij] = (latds[a] + latds[b]) / 2
     end
 
     return east, south, west, north
@@ -99,19 +99,19 @@ function get_vertices(Grid::Type{<:AbstractFullGrid}, nlat_half::Integer)
     neast = zeros(2, npoints)
 
     # longitude is just shifted
-    west = mod.(lond .- dλ/2, 360)
-    east = mod.(lond .+ dλ/2, 360)
+    west = mod.(lond .- dλ / 2, 360)
+    east = mod.(lond .+ dλ / 2, 360)
 
     @inbounds for j in 1:nlat
-        ring = nlon*(j-1) + 1 : nlon*j
+        ring = (nlon * (j - 1) + 1):(nlon * j)
         nwest[1, ring] = west
         swest[1, ring] = west
         neast[1, ring] = east
         seast[1, ring] = east
 
         # average ring latitudes
-        φ_north = j == 1 ? 90 : (latd[j] + latd[j-1])/2
-        φ_south = j == nlat ? -90 : (latd[j] + latd[j+1])/2
+        φ_north = j == 1 ? 90 : (latd[j] + latd[j - 1]) / 2
+        φ_south = j == nlat ? -90 : (latd[j] + latd[j + 1]) / 2
         nwest[2, ring] .= φ_north
         swest[2, ring] .= φ_south
         neast[2, ring] .= φ_north
@@ -128,10 +128,10 @@ are the vertices (E, S, W, N) of every grid points ij in 1:N, row 5 is duplicate
 to close the grid cell. Use keyword arguemnt `add_nan=true` (default `false`) to add a 6th row
 with (NaN, NaN) to separate grid cells when drawing them as a continuous line with `vec(polygons)`."""
 function get_gridcell_polygons(
-    Grid::Type{<:AbstractGrid},
-    nlat_half::Integer;
-    add_nan::Bool = false,
-)
+        Grid::Type{<:AbstractGrid},
+        nlat_half::Integer;
+        add_nan::Bool = false,
+    )
     npoints = get_npoints(Grid, nlat_half)
 
     # vertex east, south, west, north (i.e. clockwise for every grid point)
@@ -152,7 +152,7 @@ function get_gridcell_polygons(
         polygons[2, ij] = (S[1, ij], S[2, ij])
         polygons[3, ij] = (W[1, ij], W[2, ij])
         polygons[4, ij] = (N[1, ij], N[2, ij])
-        polygons[5, ij] = (E[1, ij], E[2, ij])  # back to east to close the polygon        
+        polygons[5, ij] = (E[1, ij], E[2, ij])  # back to east to close the polygon
     end
 
     if add_nan  # add a NaN to separate grid cells

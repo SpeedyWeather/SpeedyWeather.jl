@@ -1,4 +1,4 @@
-const DEFAULT_RADIUS = 6371000  # Earth mean radius in meters, defined as integer for more type stability 
+const DEFAULT_RADIUS = 6371000  # Earth mean radius in meters, defined as integer for more type stability
 
 """
     abstract type AbstractSphericalDistance end
@@ -20,12 +20,12 @@ between two tuples of  longitude-latitude points in degrees ˚E, ˚N. Use keywor
 to change the radius of the sphere (default 6371e3 meters, Earth's radius), use `radius=1`
 to return the central angle in radians or `radius=360/2π` to return degrees."""
 function Haversine(             # functor for Haversine struct
-    lonlat1::Tuple,             # point 1 in spherical coordinates
-    lonlat2::Tuple;             # point 2
-    radius = DEFAULT_RADIUS,    # radius of the sphere [m]
-)
+        lonlat1::Tuple,             # point 1 in spherical coordinates
+        lonlat2::Tuple;             # point 2
+        radius = DEFAULT_RADIUS,    # radius of the sphere [m]
+    )
     # promote lon and lat to common precision to avoid rounding errors in Haversine formula
-    lon1, lat1, lon2, lat2 = promote(lonlat1..., lonlat2...)    
+    lon1, lat1, lon2, lat2 = promote(lonlat1..., lonlat2...)
 
     φ1 = deg2rad(lat1)
     φ2 = deg2rad(lat2)
@@ -36,11 +36,11 @@ function Haversine(             # functor for Haversine struct
     # Haversine formula, see https://en.wikipedia.org/wiki/Haversine_formula
     a = sin(Δφ / 2)^2 + cos(φ1) * cos(φ2) * sin(Δλ / 2)^2
     c = 2 * atan(sqrt(a), sqrt(1 - a))
-    return c*radius             # in meters
+    return c * radius             # in meters
 end
 
 # allow for any <:AbstractSphericalDistance also non-tupled arguments lon1, lat1, lon2, lat2
-(F::Type{<:AbstractSphericalDistance})(lon1, lat1, lon2, lat2; kwargs...) = F((lon1, lat1), (lon2, lat2); kwargs...) 
+(F::Type{<:AbstractSphericalDistance})(lon1, lat1, lon2, lat2; kwargs...) = F((lon1, lat1), (lon2, lat2); kwargs...)
 
 export spherical_distance
 
@@ -52,5 +52,3 @@ spherical_distance(Formula::Type{<:AbstractSphericalDistance}, args...; kwargs..
 
 # define Haversine as default
 spherical_distance(args...; kwargs...) = spherical_distance(Haversine, args...; kwargs...)
-
-
