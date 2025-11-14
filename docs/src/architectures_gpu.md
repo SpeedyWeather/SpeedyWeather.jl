@@ -6,7 +6,7 @@
 Some of SpeedyWeather.jl already supports GPU acceleration, e.g. the barotropic model. Our development focuses on CUDA GPUs, but other architectures are thinkable in the future as well, as our approach relies on the device agnostic `KernelAbstractions.jl`. An experimental port to AMD GPUs using the `AMDGPU` package is available but AMD-specific performance optimizations are not implemented yet. The SpeedyWeather.jl submodule `Architectures` encodes all the information of the device we run our models on. In order to initialize a model on a GPU, we need to load the `CUDA` or `AMDGPU` package and pass the architecture to the model constructor. For example, to initialize a barotropic model on a GPU, we can do the following:  
 
 ```julia
-using SpeedyWeather, CUDA/AMDGPU 
+using SpeedyWeather, CUDA # For AMD GPUs, replace `CUDA` with `AMDGPU`
 architecture = SpeedyWeather.GPU()
 spectral_grid = SpectralGrid(trunc=41, nlayers=1, architecture=architecture)           
 
@@ -20,7 +20,7 @@ run!(simulation, period=Day(10))
 In order to easily transfer our structures between CPU (e.g. for plotting and output) and GPU, we have the following utilities that can make use of the `architecture` object defined above and the `on_architecture` function, e.g. as follows: 
 
 ```julia
-using SpeedyWeather, CUDA/AMDGPU
+using SpeedyWeather, CUDA # For AMD GPUs, replace `CUDA` with `AMDGPU`
 nlat_half = 6
 arch_cpu = SpeedyWeather.CPU()
 arch_gpu = SpeedyWeather.GPU()
