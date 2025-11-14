@@ -3,6 +3,10 @@
 ## Unreleased
 
 - AMDGPU extension [#901](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/901)
+
+## v0.17.4
+
+- Show for LowerTriangularArray/Matrix on CPU/GPU [#907](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/907)
 - Ring, nested and matrix order for OctaHEALPixGrid [#887](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/887)
 - Fixes a bug in the allocating spectral transforms on GPU [#906](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/906)
 - ScratchMemory allocation bug [#905](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/905)
