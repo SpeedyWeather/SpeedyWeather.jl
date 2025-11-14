@@ -108,10 +108,10 @@ function SpeedyWeather.animate(
     # Create data based on tsteps
     if is_3d
         # For 3D variables, extract the specified level
-        data = @lift ds[variable][:, :, level, $tsteps]
+        data = @lift ds[variable].var[:, :, level, $tsteps]
     else
         # For 2D variables
-        data = @lift ds[variable][:, :, $tsteps]
+        data = @lift ds[variable].var[:, :, $tsteps]
     end
     
     # Determine color range if not specified
@@ -119,7 +119,7 @@ function SpeedyWeather.animate(
         # Sample data to determine a good color range
         sample_indices = min(10, length(time))
 
-        sample_data = is_3d ? ds[variable][:, :, level, 1:sample_indices] : ds[variable][:, :, 1:sample_indices]
+        sample_data = is_3d ? ds[variable].var[:, :, level, 1:sample_indices] : ds[variable].var[:, :, 1:sample_indices]
         
         # Calculate min and max across samples
         sample_data = filter(!isnan, sample_data)

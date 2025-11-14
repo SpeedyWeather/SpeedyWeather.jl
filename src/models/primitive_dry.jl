@@ -36,7 +36,6 @@ $(TYPEDFIELDS)"""
     SUW,    # <:AbstractSurfaceWind,
     SH,     # <:AbstractSurfaceHeatFlux,
     CV,     # <:AbstractConvection,
-    OD,     # <:AbstractOpticalDepth,
     SW,     # <:AbstractShortwave,
     LW,     # <:AbstractLongwave,
     SP,     # <:AbstractStochasticPhysics,
@@ -86,7 +85,6 @@ $(TYPEDFIELDS)"""
     surface_wind::SUW = SurfaceWind(spectral_grid)
     surface_heat_flux::SH = SurfaceHeatFlux(spectral_grid)
     convection::CV = DryBettsMiller(spectral_grid)
-    optical_depth::OD = ZeroOpticalDepth(spectral_grid)
     shortwave_radiation::SW = TransparentShortwave(spectral_grid)
     longwave_radiation::LW = JeevanjeeRadiation(spectral_grid)
     stochastic_physics::SP = nothing
@@ -141,7 +139,6 @@ function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
     initialize!(model.boundary_layer_drag, model)
     initialize!(model.vertical_diffusion, model)
     initialize!(model.convection, model)
-    initialize!(model.optical_depth, model)
     initialize!(model.shortwave_radiation, model)
     initialize!(model.longwave_radiation, model)
     initialize!(model.surface_thermodynamics, model)
