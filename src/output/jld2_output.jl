@@ -83,6 +83,7 @@ function initialize!(
     diagn::DiagnosticVariables,
     model::AbstractModel,
 )
+    @nospecialize model
     output.active || return nothing     # exit immediately for no output
     
     # GET RUN ID, CREATE FOLDER

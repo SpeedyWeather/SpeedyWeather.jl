@@ -313,6 +313,7 @@ function SpectralFilter(spectral_grid::SpectralGrid; kwargs...)
 end
 
 function initialize!(diffusion::SpectralFilter, model::AbstractModel)
+    @nospecialize model
     initialize!(diffusion, model.time_stepping)
 end
 

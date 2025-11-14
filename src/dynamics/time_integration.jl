@@ -103,6 +103,7 @@ Initialize leapfrogging `L` by recalculating the time step given the output time
 be a divisor such that an integer number of time steps matches exactly with the output
 time step."""
 function initialize!(L::Leapfrog, model::AbstractModel)
+    @nospecialize model
     (; output_dt) = model.output
     (; radius) = model.planet
 

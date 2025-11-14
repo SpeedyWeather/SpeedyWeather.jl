@@ -43,6 +43,7 @@ function initialize!(
     particle_advection::ParticleAdvection2D,
     model::AbstractModel,
 )
+    @nospecialize model
     (; nlayers) = model.spectral_grid
     (; layer) = particle_advection
     nlayers < layer && @warn "Particle advection on layer $layer on spectral grid with nlayers=$nlayers."
@@ -66,6 +67,7 @@ function initialize!(
     particle_advection::ParticleAdvection2D,
     model::AbstractModel,
 ) where {P <: Particle}
+    @nospecialize model
     for i in eachindex(particles)
         # uniform random in lon (360*rand), lat (cos-distribution), σ (rand)
         particles[i] = rand(P)
@@ -83,6 +85,7 @@ function initialize!(
     model::AbstractModel,
 ) where {P<:Particle}
 
+    @nospecialize model
     # escape immediately for no particles
     length(particles) == 0 && return nothing
 

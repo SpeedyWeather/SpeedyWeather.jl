@@ -12,6 +12,7 @@ function SurfaceHumidityFlux(
 end
 
 function initialize!(S::SurfaceHumidityFlux, model::PrimitiveWet)
+    @nospecialize model
     initialize!(S.ocean, model)
     initialize!(S.land, model)
 end

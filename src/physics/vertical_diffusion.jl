@@ -47,7 +47,7 @@ BulkRichardsonDiffusion(SG::SpectralGrid; kwargs...) =
     BulkRichardsonDiffusion{SG.NF, SG.VectorType}(; nlayers=SG.nlayers, kwargs...)
 
 function initialize!(scheme::BulkRichardsonDiffusion, model::PrimitiveEquation)
-    
+    @nospecialize model
     (; nlayers) = model.geometry
     nlayers == 1 && return nothing     # no diffusion for 1-layer model
 

@@ -462,7 +462,7 @@ ConvectiveHeating(SG::SpectralGrid; kwargs...) = ConvectiveHeating{SG.NF}(nlat=S
 
 # precompute latitudinal mask
 function initialize!(C::ConvectiveHeating, model::PrimitiveEquation)
-    
+    @nospecialize model
     (; latd) = model.geometry
     (; θ₀, σθ) = C
     

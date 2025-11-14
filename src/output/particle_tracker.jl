@@ -48,6 +48,7 @@ function initialize!(
     diagn::DiagnosticVariables,
     model::AbstractModel,
 ) where NF
+    @nospecialize model
 
     initialize!(particle_tracker.schedule, progn.clock)
 

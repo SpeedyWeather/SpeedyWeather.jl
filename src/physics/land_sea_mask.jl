@@ -111,7 +111,7 @@ $(TYPEDSIGNATURES)
 Reads a high-resolution land-sea mask from file and interpolates (grid-cell average)
 onto the model grid for a fractional sea mask."""
 function initialize!(land_sea_mask::EarthLandSeaMask, model::PrimitiveEquation)
-
+    @nospecialize model
     (; file_Grid) = land_sea_mask
 
     # LOAD NETCDF FILE
@@ -158,6 +158,7 @@ end
 $(TYPEDSIGNATURES)
 Sets all grid points to 0 = sea."""
 function initialize!(land_sea_mask::AquaPlanetMask, model::PrimitiveEquation)
+    @nospecialize model
     land_sea_mask.mask .= 0    # set all to sea
     return nothing
 end
@@ -175,6 +176,7 @@ end
 $(TYPEDSIGNATURES)
 Sets all grid points to 1 = land."""
 function initialize!(land_sea_mask::RockyPlanetMask, model::PrimitiveEquation)
+    @nospecialize model
     land_sea_mask.mask .= 1    # set all to land
     return nothing
 end

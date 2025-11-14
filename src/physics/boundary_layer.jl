@@ -44,7 +44,7 @@ end
 BulkRichardsonDrag(SG::SpectralGrid, kwargs...) = BulkRichardsonDrag{SG.NF}(; kwargs...)
 
 function initialize!(scheme::BulkRichardsonDrag, model::PrimitiveEquation)
-
+    @nospecialize model
     # Typical height Z of lowermost layer from geopotential of reference surface temperature
     # minus surface geopotential (orography * gravity)
     (; temp_ref) = model.atmosphere

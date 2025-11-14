@@ -33,6 +33,7 @@ function StochasticallyPerturbedParameterizationTendencies(SG::SpectralGrid; kwa
 end
 
 function initialize!(sppt::StochasticallyPerturbedParameterizationTendencies, model::PrimitiveEquation)
+    @nospecialize model
     sppt.taper .= sppt.tapering.(model.geometry.σ_levels_full)
     return nothing
 end

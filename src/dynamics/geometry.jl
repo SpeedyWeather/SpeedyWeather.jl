@@ -112,6 +112,7 @@ end
 
 # take over radius from model.planet
 function initialize!(geometry::Geometry, model::AbstractModel)
+    @nospecialize model
     geometry.radius[] = model.planet.radius
     return geometry
 end
