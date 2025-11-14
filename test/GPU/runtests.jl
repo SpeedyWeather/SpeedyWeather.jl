@@ -48,7 +48,6 @@ include("barotropic.jl")
 if gpu_backend === :CUDA
 
     include("CUDA/architecture.jl")
-    include("CUDA/spectral_transform.jl")
 
 elseif gpu_backend === :AMDGPU
 
