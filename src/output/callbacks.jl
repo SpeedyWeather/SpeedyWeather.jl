@@ -130,6 +130,7 @@ function initialize!(
     diagn::DiagnosticVariables,
     model::AbstractModel,
 ) where NF
+    @nospecialize model
     callback.temp = Vector{NF}(undef, progn.clock.n_timesteps+1)    # replace with vector of correct length
     callback.temp[1] = diagn.temp_average[diagn.nlayers]            # set initial conditions
     callback.timestep_counter = 1                                   # (re)set counter to 1

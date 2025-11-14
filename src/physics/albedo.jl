@@ -26,6 +26,7 @@ function DefaultAlbedo(SG::SpectralGrid;
 end
 
 function initialize!(albedo::Albedo, model::PrimitiveEquation)
+    @nospecialize model
     initialize!(albedo.ocean, model)
     initialize!(albedo.land, model)
 end
@@ -119,7 +120,7 @@ end
 set!(albedo::AbstractAlbedo, args...; kwargs...) = set!(albedo.albedo, args...; kwargs...)
 
 function initialize!(albedo::AlbedoClimatology, model::PrimitiveEquation)
-
+    @nospecialize model
     # LOAD NETCDF FILE
     if albedo.path == "SpeedyWeather.jl/input_data"
         path = joinpath(@__DIR__, "../../input_data", albedo.file)

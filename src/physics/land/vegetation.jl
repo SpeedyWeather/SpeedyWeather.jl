@@ -93,7 +93,7 @@ function VegetationClimatology(SG::SpectralGrid; kwargs...)
 end
 
 function initialize!(vegetation::VegetationClimatology, model::PrimitiveEquation)
-
+    @nospecialize model
     # LOAD NETCDF FILE
     if vegetation.path == "SpeedyWeather.jl/input_data"
         path = joinpath(@__DIR__, "../../../input_data", vegetation.file)

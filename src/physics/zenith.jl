@@ -161,6 +161,7 @@ function initialize!(
     initial_time::DateTime,
     model::AbstractModel
 )
+    @nospecialize model
     S.initial_time[] = initial_time     # to fix the season if no seasonal cycle
 end
 

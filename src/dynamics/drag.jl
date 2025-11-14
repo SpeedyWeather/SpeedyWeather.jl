@@ -37,7 +37,7 @@ LinearDrag(SG::SpectralGrid; kwargs...) = LinearDrag{SG.NF, SG.VectorType}(drag_
 $(TYPEDSIGNATURES)
 Precomputes the drag coefficients for the `LinearDrag` scheme."""
 function initialize!(drag::LinearDrag, model::PrimitiveEquation)
-
+    @nospecialize model
     (; σ_levels_full) = model.geometry
     (; σb, time_scale, drag_coefs) = drag
     kf = 1/time_scale.value
@@ -182,6 +182,7 @@ function JetDrag(SG::SpectralGrid; kwargs...)
 end
 
 function initialize!(drag::JetDrag, model::AbstractModel)
+    @nospecialize model
     (; spectral_grid, geometry) = model
     (; grid, NF) = spectral_grid
     u = zeros(NF, grid)

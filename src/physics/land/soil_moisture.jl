@@ -37,6 +37,7 @@ end
 initialize!(soil::SeasonalSoilMoisture, model::PrimitiveDry) = nothing
 
 function initialize!(soil::SeasonalSoilMoisture, model::PrimitiveEquation)
+    @nospecialize model
     (; monthly_soil_moisture) = soil
 
     # LOAD NETCDF FILE
@@ -155,6 +156,7 @@ end
 
 LandBucketMoisture(SG::SpectralGrid; kwargs...) = LandBucketMoisture{SG.NF}(; kwargs...)
 function initialize!(soil::LandBucketMoisture, model::PrimitiveEquation)
+    @nospecialize model
     (; nlayers_soil) = model.spectral_grid
     @assert nlayers_soil == 2 "LandBucketMoisture only works with 2 soil layers "*
     "but spectral_grid.nlayers_soil = $nlayers_soil given. Ignoring additional layers."
@@ -184,6 +186,7 @@ function initialize!(
     soil::LandBucketMoisture,
     model::PrimitiveEquation,
 )
+    @nospecialize model
     # create a seasonal model, initialize it and the variables
     seasonal_model = SeasonalSoilMoisture(model.spectral_grid)
     initialize!(seasonal_model, model)

@@ -12,6 +12,7 @@ function SurfaceHeatFlux(
 end
 
 function initialize!(S::SurfaceHeatFlux, model::PrimitiveEquation)
+    @nospecialize model
     initialize!(S.ocean, model)
     initialize!(S.land, model)
 end

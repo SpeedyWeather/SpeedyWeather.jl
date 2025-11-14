@@ -88,6 +88,7 @@ function initialize!(
     initial_conditions::RandomVorticity,
     model::Barotropic
 ) where NF
+    @nospecialize model
 
     # reseed the random number generator, for seed=0 randomly seed from Julia's global RNG
     seed = initial_conditions.seed == 0 ? rand(UInt) : initial_conditions.seed
@@ -169,6 +170,7 @@ Start with random vorticity as initial conditions"""
 function initialize!(   progn::PrognosticVariables{NF},
                         initial_conditions::RandomVelocity,
                         model::Barotropic) where NF
+    @nospecialize model
 
     # reseed the random number generator, for seed=0 randomly seed from Julia's global RNG
     seed = initial_conditions.seed == 0 ? rand(UInt) : initial_conditions.seed
@@ -241,6 +243,7 @@ Initial conditions from Galewsky, 2004, Tellus"""
 function initialize!(   progn::PrognosticVariables,
                         initial_conditions::ZonalJet,
                         model::AbstractModel)
+    @nospecialize model
 
     (; latitude, width, umax) = initial_conditions               # for jet
     (; perturb_lat, perturb_lon, perturb_xwidth,                 # for perturbation
@@ -390,6 +393,7 @@ function initialize!(   progn::PrognosticVariables{NF},
                         initial_conditions::ZonalWind,
                         model::PrimitiveEquation) where NF
 
+    @nospecialize model
     (; u₀, η₀) = initial_conditions
     (; perturb_uₚ, perturb_radius) = initial_conditions
     λc = initial_conditions.perturb_lon
@@ -448,6 +452,7 @@ function initialize!(
     initial_conditions::RossbyHaurwitzWave,
     model::AbstractModel,
 )
+
     (; m, ω, K, c) = initial_conditions
     (; geometry) = model
     Ω = model.planet.rotation
@@ -513,6 +518,7 @@ function initialize!(   progn::PrognosticVariables{NF},
                         initial_conditions::JablonowskiTemperature,
                         model::PrimitiveEquation) where NF
 
+    @nospecialize model
     (; u₀, η₀, ΔT, Tmin) = initial_conditions
     (; σ_tropopause) = initial_conditions
     lapse_rate = model.atmosphere.moist_lapse_rate
@@ -618,6 +624,7 @@ Applies interpolation in the horizontal but not in the vertical."""
 function initialize!(   progn_new::PrognosticVariables,
                         initial_conditions::StartFromFile,
                         model::AbstractModel)
+    @nospecialize model
 
     (; path, run_prefix, id, run_number, run_digits, filename) = initial_conditions
 
@@ -698,6 +705,7 @@ hydrostatic equation with the reference temperature lapse rate."""
 function initialize!(   progn::PrognosticVariables,
                         ::PressureOnOrography,
                         model::PrimitiveEquation)
+    @nospecialize model
 
     # temp_ref:     Reference absolute T [K] at surface z = 0
     # lapse_rate:   Reference temperature lapse rate -dT/dz [K/m]
@@ -731,6 +739,7 @@ struct ConstantPressure <: AbstractInitialConditions end
 function initialize!(   progn::PrognosticVariables,
                         ::ConstantPressure,
                         model::PrimitiveEquation)
+    @nospecialize model
 
     # logarithm of reference surface pressure [log(Pa)]
     set!(progn, model; pres=log(model.atmosphere.pres_ref))

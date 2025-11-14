@@ -43,6 +43,7 @@ end
 $(TYPEDSIGNATURES)
 Initializes the a `Feedback` struct."""
 function initialize!(feedback::Feedback, clock::Clock, model::AbstractModel)
+    @nospecialize model
     # set to false to recheck for NaNs
     feedback.nans_detected = false
 
@@ -160,7 +161,7 @@ end
 """$(TYPEDSIGNATURES)
 Initialize ParametersTxt by writing the model parameters (via defined show of model components) into a text file."""
 function initialize!(parameters_txt::ParametersTxt, progn, diagn, model)
-
+    @nospecialize model
     # escape in case of no output
     parameters_txt.write_only_with_output && (model.output.active || return nothing)
 
@@ -208,6 +209,7 @@ end
 """$(TYPEDSIGNATURES)
 Initializes the ProgressTxt callback by creating a progress.txt file and writing some initial information to it."""
 function initialize!(progress_txt::ProgressTxt, progn, diagn, model)
+    @nospecialize model
     # escape in case of no output
     progress_txt.write_only_with_output && (model.output.active || return nothing)
 

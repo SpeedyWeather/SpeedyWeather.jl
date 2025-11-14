@@ -30,6 +30,7 @@ function SeasonalLandTemperature(SG::SpectralGrid; kwargs...)
 end
 
 function initialize!(land::SeasonalLandTemperature, model::PrimitiveEquation)
+    @nospecialize model
     (; monthly_temperature) = land
 
     # LOAD NETCDF FILE
@@ -119,6 +120,7 @@ function initialize!(
     land::ConstantLandTemperature,
     model::PrimitiveEquation,
 )
+    @nospecialize model
     set!(progn.land.soil_temperature, land.temperature)
     land.mask && mask!(progn.land.soil_temperature, model.land_sea_mask, :ocean)
 end
@@ -141,6 +143,7 @@ end
 # generator function
 LandBucketTemperature(SG::SpectralGrid; kwargs...) = LandBucketTemperature{SG.NF}(; kwargs...)
 function initialize!(land::LandBucketTemperature, model::PrimitiveEquation)
+    @nospecialize model
     (; nlayers_soil) = model.spectral_grid
     @assert nlayers_soil == 2 "LandBucketTemperature only works with 2 soil layers "*
         "but spectral_grid.nlayers_soil = $nlayers_soil given. Ignoring additional layers."
@@ -153,6 +156,7 @@ function initialize!(
     land::LandBucketTemperature,
     model::PrimitiveEquation,
 )
+    @nospecialize model
     # create a seasonal model, initialize it and the variables
     seasonal_model = SeasonalLandTemperature(model.spectral_grid)
     initialize!(seasonal_model, model)

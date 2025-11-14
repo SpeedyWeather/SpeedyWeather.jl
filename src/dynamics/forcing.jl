@@ -57,7 +57,7 @@ end
 
 function initialize!(   forcing::JetStreamForcing,
                         model::AbstractModel)
-
+    @nospecialize model
     (; latitude, width, speed, time_scale, amplitude) = forcing
     (; radius) = model.planet
     
@@ -148,7 +148,8 @@ end
 function initialize!(
     forcing::StochasticStirring,
     model::AbstractModel)
-    
+    @nospecialize model
+
     model.random_process isa Nothing &&
         @warn "StochasticStirring needs a random process. model.random_process is nothing."
 
@@ -300,7 +301,7 @@ initialize the HeldSuarez temperature relaxation by precomputing terms for the
 equilibrium temperature Teq."""
 function initialize!(   forcing::HeldSuarez,
                         model::PrimitiveEquation)
-
+    @nospecialize model
     (; coslat, sinlat) = model.geometry
     σ = model.geometry.σ_levels_full
     (; σb, ΔTy, Δθz, relax_time_slow, relax_time_fast, Tmax) = forcing

@@ -21,6 +21,7 @@ function initialize!(
     adiabatic::AdiabaticConversion,
     model::PrimitiveEquation,
 )
+    @nospecialize model
     (; σ_lnp_A, σ_lnp_B) = adiabatic
 
     # Transfer arrays to CPU for computation

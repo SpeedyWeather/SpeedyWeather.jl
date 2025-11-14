@@ -108,6 +108,7 @@ function SeasonalOceanClimatology(SG::SpectralGrid; kwargs...)
 end
 
 function initialize!(ocean::SeasonalOceanClimatology, model::PrimitiveEquation)
+    @nospecialize model
     (; monthly_temperature) = ocean
 
     # LOAD NETCDF FILE
@@ -224,6 +225,7 @@ function initialize!(
     ocean_model::ConstantOceanClimatology,
     model::PrimitiveEquation,
 )
+    @nospecialize model
     # create a seasonal model, initialize it and the variables
     (; path, file, varname, file_Grid, missing_value) = ocean_model
     (; NF, GridVariable3D, grid) = model.spectral_grid
@@ -279,6 +281,7 @@ function initialize!(
     ocean_model::AquaPlanet,
     model::PrimitiveEquation,
 )
+    @nospecialize model
     (; sea_surface_temperature) = ocean
     Te, Tp = ocean_model.temp_equator, ocean_model.temp_poles
     sst(λ, φ) = (Te - Tp)*cosd(φ)^2 + Tp
@@ -340,6 +343,7 @@ function initialize!(
     ocean_model::SlabOcean,
     model::PrimitiveEquation,
 )
+    @nospecialize model
     # create a seasonal model, initialize it and the variables
     seasonal_model = SeasonalOceanClimatology(model.spectral_grid)
     initialize!(seasonal_model, model)

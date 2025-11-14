@@ -78,6 +78,7 @@ function initialize!(
     process::SpectralAR1Process,
     model::AbstractModel,
 )
+    @nospecialize model
     # auto-regressive factor in the AR1 process
     dt = model.time_stepping.Δt_sec         # in seconds
     process.autoregressive_factor[] = exp(-dt/Second(process.time_scale).value)
