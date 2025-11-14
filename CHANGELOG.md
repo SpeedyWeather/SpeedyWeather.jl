@@ -2,7 +2,9 @@
 
 ## Unreleased
 
-## v0.17.4
+- @nospecialize model for initialize! methods [#914](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/914)
+
+## v0.17.4
 
 - Show for LowerTriangularArray/Matrix on CPU/GPU [#907](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/907)
 - Ring, nested and matrix order for OctaHEALPixGrid [#887](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/887)
