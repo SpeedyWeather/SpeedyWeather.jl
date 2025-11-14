@@ -25,9 +25,7 @@ import LowerTriangularArrays: lm2i, get_lm_range, get_2lm_range
 # TRANSFORM
 export  SpectralTransform,
         transform!,
-        transform,
-	_fourier!,
-	_legendre!
+        transform
 
 # ALIASING
 export  get_nlat_half
