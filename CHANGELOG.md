@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Code formatted with Runic [#912](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/912)
+
 ## v0.17.4
 
 - Show for LowerTriangularArray/Matrix on CPU/GPU [#907](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/907)
