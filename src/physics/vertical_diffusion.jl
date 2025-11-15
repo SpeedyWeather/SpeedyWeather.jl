@@ -36,6 +36,9 @@ export BulkRichardsonDiffusion
     ∇²_below::VectorType
 end
 
+Adapt.@adapt_structure BulkRichardsonDiffusion
+
+# generator function
 function BulkRichardsonDiffusion(SG::SpectralGrid; kwargs...)
     arch = SG.architecture
     ∇²_above = on_architecture(arch, zeros(SG.NF, SG.nlayers))
@@ -43,8 +46,19 @@ function BulkRichardsonDiffusion(SG::SpectralGrid; kwargs...)
     return BulkRichardsonDiffusion{SG.NF, SG.VectorType}(; ∇²_above, ∇²_below, kwargs...)
 end
 
+variables(::BulkRichardsonDiffusion) = (
+    # TODO change to height in meters or index?
+    DiagnosticVariable(name=:boundary_layer_height, dims=Grid2D(), desc="Boundary layer height", units="1"),
+)
+
+# function barrier to unpack only model components needed
 function initialize!(scheme::BulkRichardsonDiffusion, model::PrimitiveEquation)
-    
+    model_parameters = get_model_parameters(model)
+    initialize!(scheme, model_parameters)
+end
+
+function initialize!(scheme::BulkRichardsonDiffusion, model)
+
     (; nlayers) = model.geometry
     nlayers == 1 && return nothing     # no diffusion for 1-layer model
 
@@ -64,7 +78,7 @@ function initialize!(scheme::BulkRichardsonDiffusion, model::PrimitiveEquation)
         ∇²_below[k] = inv(2*(σ₊ - σ[k]) * (σ_half[k+1] - σ_half[k]))
     end
 
-    arch = model.spectral_grid.architecture
+    arch = model.architecture
     scheme.∇²_above .= on_architecture(arch, ∇²_above)
     scheme.∇²_below .= on_architecture(arch, ∇²_below)
 
@@ -163,6 +177,8 @@ function get_diffusion_coefficients!(
         kₕ -= 1
     end
     kₕ += 1  # uppermost layer where Ri < Ri_c
+
+    # for output, TODO as layer index or height?
     diagn.physics.boundary_layer_depth[ij] = kₕ
 
     # diffusion above boundary layer is 0

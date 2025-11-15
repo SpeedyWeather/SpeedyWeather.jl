@@ -126,23 +126,21 @@ function initialize!(land_sea_mask::EarthLandSeaMask, model::PrimitiveEquation)
     lsm_highres = land_sea_mask.file_Grid(ncfile["lsm"].var[:, :], input_as=Matrix)
 
     # average onto grid cells of the model 
-    if typeof(architecture(model.spectral_grid.architecture)) <: CPU
-        RingGrids.grid_cell_average!(land_sea_mask.mask, lsm_highres)
-    else
-        temp_mask = on_architecture(CPU(), land_sea_mask.mask)
-        RingGrids.grid_cell_average!(temp_mask, lsm_highres)
-        land_sea_mask.mask .= on_architecture(model.spectral_grid.architecture, temp_mask)
-    end
+    cpu_mask = on_architecture(CPU(), land_sea_mask.mask)
+    RingGrids.grid_cell_average!(cpu_mask, lsm_highres)
+    land_sea_mask.mask .= on_architecture(model.spectral_grid.architecture, cpu_mask)
 
     if land_sea_mask.quantization > 0
         q = land_sea_mask.quantization
         land_sea_mask.mask .= round.(land_sea_mask.mask ./ q) .* q
     end
 
-    # TODO this shouldn't be necessary, but at the moment grid_cell_average! can return values > 1
-    # lo, hi = extrema(land_sea_mask.mask)
-    # (lo < 0 || hi > 1) && @warn "Land-sea mask has values in [$lo, $hi], clamping to [0, 1]."
-    clamp!(land_sea_mask.mask, 0, 1)
+    lo, hi = extrema(land_sea_mask.mask.data)
+    if (lo < 0 || hi > 1)
+        # @warn "Land-sea mask has values in [$lo, $hi], clamping to [0, 1]."
+        land_sea_mask.mask .= clamp.(land_sea_mask.mask, 0, 1)
+    end
+    return nothing
 end
 
 export AquaPlanetMask

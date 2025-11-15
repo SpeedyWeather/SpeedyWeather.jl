@@ -21,8 +21,15 @@ different surface roughness characteristics. Fields are $(TYPEDFIELDS)"""
     drag_land::NF = 2.4e-3
 end
 
+Adapt.@adapt_structure SurfaceMomentumFlux
+
 SurfaceMomentumFlux(SG::SpectralGrid; kwargs...) = SurfaceMomentumFlux{SG.NF}(; kwargs...)
 initialize!(::SurfaceMomentumFlux, ::PrimitiveEquation) = nothing
+
+function variables(::AbstractSurfaceMomentumFlux)
+    # No additional diagnostic variables, tendencies are directly applied to u and v
+    return (DiagnosticVariable(name=:boundary_layer_drag, dims=Grid2D()),)
+end
 
 # function barrier
 function parameterization!(ij, diagn, progn, momentum_flux::SurfaceMomentumFlux, model)
@@ -58,10 +65,4 @@ function surface_wind_stress!(ij, diagn, momentum_flux::SurfaceMomentumFlux, mod
     diagn.tendencies.v_tend_grid[ij, nlayers] += surface_flux_to_tendency(flux_v_upward, pₛ, model)
 
     return nothing
-end
-
-Adapt.@adapt_structure SurfaceMomentumFlux
-
-function variables(::AbstractSurfaceMomentumFlux)
-    return (DiagnosticVariable(name=:boundary_layer_drag, dims=Grid2D()),)  # No additional diagnostic variables, tendencies are directly applied to u and v
 end

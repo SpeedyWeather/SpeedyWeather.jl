@@ -1,25 +1,21 @@
 abstract type AbstractBoundaryLayer <: AbstractParameterization end
 
-# function barrier for all boundary layer drags
-function boundary_layer_drag!(  column::ColumnVariables,
-                                model::PrimitiveEquation)
-    boundary_layer_drag!(column, model.boundary_layer_drag, model)
-end
-
-# no boundary layer drag
-boundary_layer_drag!(::ColumnVariables, ::Nothing, ::PrimitiveEquation) = nothing
+variables(::AbstractBoundaryLayer) = (
+    DiagnosticVariable(name=:boundary_layer_drag, dims=Grid2D(), desc="Boundary layer drag coefficient", units="1"),
+    )
 
 export ConstantDrag
 @kwdef struct ConstantDrag{NF} <: AbstractBoundaryLayer
     drag::NF = 1e-3
 end
 
+Adapt.@adapt_structure ConstantDrag
+
 ConstantDrag(SG::SpectralGrid; kwargs...) = ConstantDrag{SG.NF}(; kwargs...)
 initialize!(::ConstantDrag, ::PrimitiveEquation) = nothing
-function boundary_layer_drag!(  column::ColumnVariables,
-                                scheme::ConstantDrag,
-                                model::PrimitiveEquation)
-    column.boundary_layer_drag = scheme.drag
+parameterization!(ij, diagn, drag::ConstantDrag, model) = boundary_layer_drag!(ij, diagn, drag)
+function boundary_layer_drag!(ij, diagn, scheme::ConstantDrag)
+    diagn.physics.boundary_layer_drag[ij] = scheme.drag
 end
 
 export BulkRichardsonDrag
@@ -50,7 +46,7 @@ function initialize!(scheme::BulkRichardsonDrag, model::PrimitiveEquation)
     (; temp_ref) = model.atmosphere
     (; gravity) = model.planet
     (; Δp_geopot_full) = model.geopotential
-    Z = temp_ref * Δp_geopot_full[end] / gravity
+    GPUArrays.@allowscalar Z = temp_ref * Δp_geopot_full[end] / gravity
 
     # maximum drag Cmax from that height, stable conditions would decrease Cmax towards 0
     # Frierson 2006, eq (12)
@@ -58,24 +54,23 @@ function initialize!(scheme::BulkRichardsonDrag, model::PrimitiveEquation)
     scheme.drag_max[] = (κ/log(Z/z₀))^2
 end
 
-function boundary_layer_drag!(  column::ColumnVariables,
-                                scheme::BulkRichardsonDrag,
-                                model::PrimitiveEquation)
-    boundary_layer_drag!(column, scheme, model.atmosphere)
+# function barrier
+function parameterization!(ij, diagn, drag::BulkRichardsonDrag, model)
+    boundary_layer_drag!(ij, diagn, drag, model.atmosphere)
 end
 
 function boundary_layer_drag!(
-    column::ColumnVariables,
-    scheme::BulkRichardsonDrag,
-    atmopshere::AbstractAtmosphere,
+    ij,
+    diagn,
+    drag::BulkRichardsonDrag,
+    atmosphere::AbstractAtmosphere,
 )
-    
-    (; Ri_c) = scheme
-    drag_max = scheme.drag_max[]
+    (; Ri_c) = drag
+    drag_max = drag.drag_max[]
 
     # bulk Richardson number at lowermost layer N from Frierson, 2006, eq. (15)
     # they call it Ri_a = Ri_N here
-    Ri_N = bulk_richardson_surface(column, atmopshere)
+    Ri_N = bulk_richardson_surface(ij, diagn, atmosphere)
 
     # clamp to get the cases, eq (12-14)
     # if Ri_N > Ri_c then C = 0
@@ -85,25 +80,25 @@ function boundary_layer_drag!(
     # which doesn't change much with instantaneous temperature variations but with
     # vertical resolution, hence κ^2/log(Z/z₀)^2 is precalculated in initialize!
     Ri_N = clamp(Ri_N, 0, Ri_c)
-    column.boundary_layer_drag = drag_max*(1-Ri_N/Ri_c)^2
+    diagn.physics.boundary_layer_drag[ij] = drag_max*(1-Ri_N/Ri_c)^2
 end
 
 """
 $(TYPEDSIGNATURES)
 Calculate the bulk richardson number following Frierson, 2007.
 For vertical stability in the boundary layer."""
-function bulk_richardson_surface(
-    column::ColumnVariables,
-    atmosphere::AbstractAtmosphere,
-)
+function bulk_richardson_surface(ij, diagn, atmosphere)
     cₚ = atmosphere.heat_capacity
-    (; u, v, geopot, temp_virt) = column
-    surface = column.nlayers    # surface index = nlayers
+    surface = diagn.grid.nlayers    # surface index = nlayers
 
-    V² = u[surface]^2 + v[surface]^2
-    Θ₀ = cₚ*temp_virt[surface]
-    Θ₁ = Θ₀ + geopot[surface]
-    bulk_richardson = geopot[surface]*(Θ₁ - Θ₀) / (Θ₀*V²)
+    u = diagn.grid.u_grid_prev[ij, surface]
+    v = diagn.grid.v_grid_prev[ij, surface]
+    geopot = diagn.grid.geopotential[ij, surface]
+    temp_virt = diagn.grid.temp_virt_grid[ij, surface]
+
+    V² = u^2 + v^2
+    Θ₀ = cₚ*temp_virt
+    Θ₁ = Θ₀ + geopot
+    bulk_richardson = geopot*(Θ₁ - Θ₀) / (Θ₀*V²)
     return bulk_richardson
 end
-
