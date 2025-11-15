@@ -22,6 +22,15 @@ Geopotential(SG::SpectralGrid) = Geopotential(
     on_architecture(SG.architecture, zeros(SG.NF, SG.nlayers))
 )
 
+# function barrier to unpack only model components needed
+function initialize!(
+    geopotential::Geopotential,
+    model::PrimitiveEquation
+)
+    model_parameters = (atmosphere=model.atmosphere, geometry=model.geometry)
+    initialize!(geopotential, model_parameters)
+end
+
 """
 $(TYPEDSIGNATURES)
 Precomputes constants for the vertical integration of the geopotential, defined as
@@ -32,11 +41,12 @@ Precomputes constants for the vertical integration of the geopotential, defined 
 Same formula but `k → k-1/2`."""
 function initialize!(
     geopotential::Geopotential,
-    model::PrimitiveEquation
+    model,
 )
-    (; Δp_geopot_half, Δp_geopot_full, nlayers) = geopotential
+    (; Δp_geopot_half, Δp_geopot_full) = geopotential
     (; R_dry) = model.atmosphere
     (; σ_levels_full, σ_levels_half) = model.geometry
+    nlayers = length(σ_levels_full)
 
     # 1. integration onto half levels
     # used for: Φ_{k+1/2} = Φ_{k+1} + R*T_{k+1}*(ln(p_{k+1}) - ln(p_{k+1/2}))
