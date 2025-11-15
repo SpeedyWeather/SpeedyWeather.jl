@@ -405,6 +405,12 @@ Base.:(==)(F1::AbstractField, F2::AbstractField) = fields_match(F1, F2) && F1.da
 Base.all(F::AbstractField) = all(F.data)
 Base.any(F::AbstractField) = any(F.data)
 
+# reductions
+Base.minimum(F::AbstractField) = minimum(F.data)
+Base.maximum(F::AbstractField) = maximum(F.data)
+Base.sum(F::AbstractField) = sum(F.data)
+Base.extrema(F::AbstractField) = extrema(F.data)
+
 grids_match(A::AbstractField, Bs::AbstractField...) = grids_match(A.grid, (B.grid for B in Bs)...)
 
 """$(TYPEDSIGNATURES) True if both `A` and `B` are of the same nonparametric grid type
