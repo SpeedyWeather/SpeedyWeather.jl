@@ -64,8 +64,7 @@ to provide an easy-to-use interface yet modular enough to allow for extensive cu
 
 Finding a good balance is difficult, but we try our best.
 
-Despite our commitment to simplicity and ease-of-use, many more physical processes and other features are continuing to be developed.
-On our TODO is
+Despite our commitment to simplicity and ease-of-use, many more physical processes and other features are continuing to be developed. On our TODO list are
 
 - A more realistic radiation scheme depending on clouds and humidity
 - Longwave radiation that depends on (globally averaged) greenhouse gas concentrations to represent climate change
