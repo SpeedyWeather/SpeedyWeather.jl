@@ -70,7 +70,7 @@ and the uncorrected sea ice concentration ``c_i^*`` in ``[0, 1]`` by
 
 ```math
 \begin{aligned}
-SST_i &= max(SST_i^*, T_f) \\
+SST_i &= \max(SST_i^*, T_f) \\
 c_i &= \max( \min( c_i^*, 1) , 0)
 \end{aligned}
 ```
