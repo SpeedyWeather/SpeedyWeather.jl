@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fixes some formatting/LaTeX rendering in Docs [#916](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/916)
+
 ## v0.17.4
 
 - Show for LowerTriangularArray/Matrix on CPU/GPU [#907](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/907)
