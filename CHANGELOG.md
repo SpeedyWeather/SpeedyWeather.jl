@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- README updates [#915](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/915#pullrequestreview-3469109183)
+
 ## v0.17.4
 
 - Show for LowerTriangularArray/Matrix on CPU/GPU [#907](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/907)
