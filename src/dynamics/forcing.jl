@@ -201,7 +201,7 @@ end
     vor_tend, 
     S_masked
 )
-    I = @index(Global, Cartesian)
+    I = @index(Global, NTuple)
     lm = I[1]  # spectral coefficient index
     k = I[2]   # layer index
     

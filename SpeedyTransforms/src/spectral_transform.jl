@@ -309,7 +309,7 @@ function SpectralTransform(
 )
     # get trunc from dealiasing if not provided
     trunc = trunc > 0 ? trunc : get_truncation(grid, dealiasing)
-    spectrum = Spectrum(trunc+1+one_more_degree, trunc+1)
+    spectrum = Spectrum(trunc+1+one_more_degree, trunc+1; architecture=architecture(grid))
     return SpectralTransform(spectrum, grid; kwargs...)
 end
 
@@ -323,7 +323,7 @@ function SpectralTransform(
 )
     # get nlat_half from dealiasing if not provided
     nlat_half = nlat_half > 0 ? nlat_half : get_nlat_half(spectrum.mmax - 1, dealiasing)
-    grid = Grid(nlat_half)                  # create grid with nlat_half
+    grid = Grid(nlat_half, spectrum.architecture)                  # create grid with nlat_half
     return SpectralTransform(spectrum, grid; kwargs...)
 end
 

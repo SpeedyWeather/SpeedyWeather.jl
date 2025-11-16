@@ -398,6 +398,80 @@ column_field = transpose(field)
 field == transpose(column_field)    # transposing again returns the original Field
 ```
 
+## Nested order on the OctaHEALPixGrid
+
+!!! warning "Nested order is an experimental feature"
+    While we do provide this functionality as is for now this is an experimental feature and
+    may change anytime in the future. At the moment we do not store the information of the ordering
+    in the grid or field.
+
+HEALPix grids are also famous because of their hierarchial grid structure. While one can use a grid cell order
+on the HEALPix grid that starts at 0˚ on the north pole and runs first east then south (the _ring_ order,
+efficient for spectral transforms) other orderings are possible. The so-called nested order is an
+order whereby 2x2 cells are indexed in the same patterns as the embedding 2x2 cells of 2x2 cells and so on.
+For a visualisation see [Gorski's HEALPix paper](https://iopscience.iop.org/article/10.1086/427976)
+or [#887](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/887). We don't implement (yet?) nested
+order for the HEALPix grid but have defined the equivalent on the OctaHEALPixGrid, e.g.
+
+```@example ringgrids
+nlat_half = 2
+grid = OctaHEALPixGrid(nlat_half)
+N = RingGrids.get_npoints(grid)
+
+field = Field(collect(1:N), grid)
+field_nested = RingGrids.nested_order(field)
+```
+
+Note this is now means that the 2nd element in the nested order is the 5th element in the
+ring order etc. Converting this back
+
+```@example ringgrids
+field_ring = RingGrids.ring_order(field_nested)
+```
+
+Note that currently we do not store the information about the order inside the 
+On the nested order, changing the resolution is trivial as consecutive elements in chunks
+of 4 have to be averaged (reducing resolution) or every element has to be repeated 4 times
+(increasing resolution). But we don't have this functionality implemented yet.
+
+Visualising nested order via
+
+```@example ringgrids
+using CairoMakie, GeoMakie
+
+nlat_half = 8
+grid = OctaHEALPixGrid(nlat_half)
+N = RingGrids.get_npoints(grid)
+
+field = Field(collect(1:N), grid)               # assumed nested
+field_nested = RingGrids.ring_order(field)      # convert to ring order
+
+fig = Figure(size=(800, 500))
+ax1 = GeoAxis(fig[1, 1], dest = "+proj=ortho +lon_0=30 +lat_0=45", title="OctaHEALPix, ring order")
+ax2 = GeoAxis(fig[1, 2], dest = "+proj=ortho +lon_0=30 +lat_0=45", title="OctaHEALPix, nested order")
+meshimage!(ax1, -180..180, -90..90, rotr90(GeoMakie.earth()); npoints = 100)
+meshimage!(ax2, -180..180, -90..90, rotr90(GeoMakie.earth()); npoints = 100)
+
+londs, latds = RingGrids.get_londlatds(grid)
+
+for ij in 1:N
+    text!(ax1, londs[ij], latds[ij], text=string(field[ij]), color=:black, align=(:center, :center))    
+    text!(ax2, londs[ij], latds[ij], text=string(field_nested[ij]), color=:black, align=(:center, :center))    
+end
+
+faces = RingGrids.get_gridcell_polygons(typeof(grid), grid.nlat_half, add_nan=true)
+lines!(ax1, vec(faces); color=:black)
+lines!(ax2, vec(faces); color=:black)
+
+hidedecorations!(ax1)
+hidedecorations!(ax2)
+fig
+save("octahealpix_nested.png", fig) # hide
+nothing # hide
+```
+![Nested OctaHEALPix](octahealpix_nested.png)
+
+
 ## Function index
 
 ```@autodocs
