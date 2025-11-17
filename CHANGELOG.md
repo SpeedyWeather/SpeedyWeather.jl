@@ -4,6 +4,7 @@
 
 - Diagnostic and prognostic variables partially revised to NamedTuples and variables system introduced to allow to add to them modularly [#885](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/885)
 - Parameterizations with KernelAbstractions [#873](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/873) [#878](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/878)
+- Fixes some formatting/LaTeX rendering in Docs [#916](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/916)
 
 ## v0.17.4
 
