@@ -37,23 +37,16 @@ function _apply_batched_fft!(
 
     # Perform the FFT
     if not_equator # skip FFT, redundant when north already did that latitude
-        _apply_batched_fft_core!(f_out, nfreq, nlayers, j, rfft_plan, field, ilons)
+        view(f_out, 1:nfreq, 1:nlayers, j) .= rfft_plan * view_only_on_cpu(field.data, ilons, :)
     else
         f_out[1:nfreq, 1:nlayers, j] .= 0
     end
 end
 
-# FFT Forward CPU/fallback version
-# this version currently allocates a small array, FFTW supports strided outputs, but FFTW.jl doesn't 
-@inline _apply_batched_fft_core!(f_out, nfreq, nlayers, j, plan, field::AbstractField, ilons) =
-    view(f_out, 1:nfreq, 1:nlayers, j) .= plan * view(field.data, ilons, :)
-
-# FFT Forward GPU version without view
-@inline function _apply_batched_fft_core!(f_out, nfreq, nlayers, j, plan,
-    field::AbstractField{NF, N, <:AbstractGPUArray}, ilons,
-) where {NF, N}
-    view(f_out, 1:nfreq, 1:nlayers, j) .= plan * field.data[ilons, :]
-end
+# CPU version with view
+@inline view_only_on_cpu(A::AbstractArray, I...) = view(A, I...)
+# GPU version without view
+@inline view_only_on_cpu(A::AbstractGPUArray, I...) = A[I...]
 
 """$(TYPEDSIGNATURES)
 (Inverse) FFT, applied in zonal direction of `field` provided. Depending on
@@ -74,21 +67,8 @@ function _apply_batched_fft!(
     nfreq = nlon÷2 + 1              
 
     if not_equator  # skip FFT, redundant when north already did that latitude
-        _apply_batched_fft_core!(field, ilons, brfft_plan, g_in, nfreq, nlayers, j)
+        view(field.data, ilons, :) .= brfft_plan * view_only_on_cpu(g_in, 1:nfreq, 1:nlayers, j)
     end
-end
-
-# CPU/fallback version
-# this version currently allocates a small array, FFTW supports strided outputs, but FFTW.jl doesn't 
-@inline _apply_batched_fft_core!(field::AbstractField, ilons, plan, g_in, nfreq, nlayers, j) =
-    view(field.data, ilons, :) .= plan * view(g_in, 1:nfreq, 1:nlayers, j)
-
-# GPU version without view
-@inline function _apply_batched_fft_core!(
-    field::AbstractField{NF, N, <:AbstractGPUArray},
-    ilons, plan, g_in, nfreq, nlayers, j,
-) where {NF, N}
-    view(field.data, ilons, :) .= plan * g_in[1:nfreq, 1:nlayers, j]
 end
 
 # Forward FFT Application Function for serial FFT
@@ -311,10 +291,10 @@ function plan_FFTs!(
 
     # For each ring generate an FFT plan (for all layers and for a single layer)
     for (j, nlon) in enumerate(nlons)
-        real_matrix_input = view(fake_grid_data.data, rings[j], :)
-        complex_matrix_input = view(scratch_memory_north, 1:nlon÷2 + 1, :, j)
-        real_vector_input = view(fake_grid_data.data, rings[j], 1)
-        complex_vector_input = view(scratch_memory_north, 1:nlon÷2 + 1, 1, j)
+        real_matrix_input = view_only_on_cpu(fake_grid_data.data, rings[j], :)
+        complex_matrix_input = view_only_on_cpu(scratch_memory_north, 1:nlon÷2 + 1, :, j)
+        real_vector_input = view_only_on_cpu(fake_grid_data.data, rings[j], 1)
+        complex_vector_input = view_only_on_cpu(scratch_memory_north, 1:nlon÷2 + 1, 1, j)
 
         rfft_plans[j] = FFT_library.plan_rfft(real_matrix_input, 1)
         brfft_plans[j] = FFT_library.plan_brfft(complex_matrix_input, nlon, 1)
