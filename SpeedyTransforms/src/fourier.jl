@@ -267,9 +267,6 @@ function _fourier_serial!(                  # SPECTRAL TO GRID
     end
 end
 
-which_FFT_library(A::AbstractArray) = which_FFT_library(typeof(A))
-which_FFT_library(::Type{<:Array{NF}}) where NF = real(NF) <: Union{Float32, Float64} ? FFTW : GenericFFT
-
 """$(TYPEDSIGNATURES)
 Util function to generate FFT plans based on the array type of the fake Grid 
 data provided. Uses views, which is less allocate-y than indexing but breaks 
@@ -286,9 +283,6 @@ function plan_FFTs!(
     nlons::Vector{<:Int}
 ) where {NF<:AbstractFloat, N}
 
-    # Determine which FFT package to use
-    FFT_library = which_FFT_library(fake_grid_data.data)
-
     # For each ring generate an FFT plan (for all layers and for a single layer)
     for (j, nlon) in enumerate(nlons)
         real_matrix_input = view_only_on_cpu(fake_grid_data.data, rings[j], :)
@@ -296,10 +290,10 @@ function plan_FFTs!(
         real_vector_input = view_only_on_cpu(fake_grid_data.data, rings[j], 1)
         complex_vector_input = view_only_on_cpu(scratch_memory_north, 1:nlon÷2 + 1, 1, j)
 
-        rfft_plans[j] = FFT_library.plan_rfft(real_matrix_input, 1)
-        brfft_plans[j] = FFT_library.plan_brfft(complex_matrix_input, nlon, 1)
-        rfft_plans_1D[j] = FFT_library.plan_rfft(real_vector_input, 1)
-        brfft_plans_1D[j] = FFT_library.plan_brfft(complex_vector_input, nlon, 1) 
+        rfft_plans[j] = AbstractFFTs.plan_rfft(real_matrix_input, 1)
+        brfft_plans[j] = AbstractFFTs.plan_brfft(complex_matrix_input, nlon, 1)
+        rfft_plans_1D[j] = AbstractFFTs.plan_rfft(real_vector_input, 1)
+        brfft_plans_1D[j] = AbstractFFTs.plan_brfft(complex_vector_input, nlon, 1) 
     end
 
     return rfft_plans, brfft_plans, rfft_plans_1D, brfft_plans_1D

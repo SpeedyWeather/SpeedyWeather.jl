@@ -9,7 +9,6 @@ using SpeedyTransforms
 using SpeedyTransforms.RingGrids
 using SpeedyTransforms.LowerTriangularArrays
 
-# RocFFT is automatically chosen for ROCArray
-SpeedyTransforms.which_FFT_library(::ROCArray) = AbstractFFTs
+# place holder for AMDGPU-specific methods in SpeedyTransforms
     
 end 

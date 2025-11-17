@@ -9,7 +9,6 @@ using SpeedyTransforms
 using SpeedyTransforms.RingGrids
 using SpeedyTransforms.LowerTriangularArrays
 
-# Use CUFFT for CuArrays
-SpeedyTransforms.which_FFT_library(::CuArray) = CUFFT 
-    
+# place holder for CUDA-specific methods in SpeedyTransforms
+
 end 

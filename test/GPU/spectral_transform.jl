@@ -204,8 +204,8 @@ end
                     scratch = S_cpu.scratch_memory.column 
                     SpeedyTransforms._legendre!(g_north_cpu, g_south_cpu, spec_cpu, scratch, S_cpu)
                     # Copy to GPU
-		    g_north_gpu = on_architecture(gpu_arch, g_north_cpu)
-		    g_south_gpu = on_architecture(gpu_arch, g_south_cpu)
+		            g_north_gpu = on_architecture(gpu_arch, g_north_cpu)
+		            g_south_gpu = on_architecture(gpu_arch, g_south_cpu)
 
                     # CPU inverse transform
                     SpeedyTransforms._fourier_batched!(
