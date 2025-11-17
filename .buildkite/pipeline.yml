@@ -19,7 +19,7 @@ steps:
       queue: "juliagpu"
       cuda: "*"
     if: build.message !~ /\[skip tests\]/
-    timeout_in_minutes: 60
+    timeout_in_minutes: 30
 
   - label: "AMDGPU Julia {{matrix.version}}"
     matrix:
@@ -42,4 +42,4 @@ steps:
       queue: "juliagpu"
       rocm: "*"
       rocmgpu: "*"
-    timeout_in_minutes: 60
+    timeout_in_minutes: 30
