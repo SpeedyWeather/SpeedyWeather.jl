@@ -55,8 +55,6 @@ function initialize!(land::SeasonalLandTemperature, model::PrimitiveEquation)
     @boundscheck fields_match(monthly_temperature, lst, vertical_only=true) ||
         throw(DimensionMismatch(monthly_temperature, lst))
 
-    @info typeof(lst)
-
     # create interpolator from grid in file to grid used in model
     interp = RingGrids.interpolator(monthly_temperature, lst, NF=Float32)
     interpolate!(monthly_temperature, lst, interp)
