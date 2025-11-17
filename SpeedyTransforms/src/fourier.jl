@@ -18,7 +18,10 @@ function _fourier!(field::AbstractField, f_north, f_south, S::SpectralTransform)
     return _fourier!(field, f_north, f_south, S)
 end
 
-# Forward FFT Application Function for batched FFT
+"""$(TYPEDSIGNATURES)
+(Forward) FFT, applied in zonal direction of `field` provided. Depending on
+the field's array type (CPU/GPU) the actual application of the FFT is slightly
+different because of strided array/view support of the GPU FFT libraries."""
 function _apply_batched_fft!(
     f_out::AbstractArray{<:Complex, 3},
     field::AbstractField,
@@ -34,14 +37,28 @@ function _apply_batched_fft!(
 
     # Perform the FFT
     if not_equator # skip FFT, redundant when north already did that latitude
-        # this version currently allocates a small array, FFTW supports strided outputs, but FFTW.jl doesn't 
-        view(f_out, 1:nfreq, 1:nlayers, j) .= rfft_plan * view(field.data, ilons, :)
+        _apply_batched_fft_core!(f_out, nfreq, nlayers, j, rfft_plan, field, ilons)
     else
-        fill!(view(f_out, 1:nfreq, 1:nlayers, j), 0)
+        f_out[1:nfreq, 1:nlayers, j] .= 0
     end
-end    
+end
 
-# Inverse FFT Application Function for batched FFT
+# FFT Forward CPU/fallback version
+# this version currently allocates a small array, FFTW supports strided outputs, but FFTW.jl doesn't 
+@inline _apply_batched_fft_core!(f_out, nfreq, nlayers, j, plan, field::AbstractField, ilons) =
+    view(f_out, 1:nfreq, 1:nlayers, j) .= plan * view(field.data, ilons, :)
+
+# FFT Forward GPU version without view
+@inline function _apply_batched_fft_core!(f_out, nfreq, nlayers, j, plan,
+    field::AbstractField{NF, N, <:AbstractGPUArray}, ilons,
+) where {NF, N}
+    view(f_out, 1:nfreq, 1:nlayers, j) .= plan * field.data[ilons, :]
+end
+
+"""$(TYPEDSIGNATURES)
+(Inverse) FFT, applied in zonal direction of `field` provided. Depending on
+the field's array type (CPU/GPU) the actual application of the FFT is slightly
+different because of strided array/view support of the GPU FFT libraries."""
 function _apply_batched_fft!(
     field::AbstractField,
     g_in::AbstractArray{<:Complex, 3},
@@ -57,9 +74,21 @@ function _apply_batched_fft!(
     nfreq = nlon÷2 + 1              
 
     if not_equator  # skip FFT, redundant when north already did that latitude
-        # this version currently allocates a small array, FFTW supports strided outputs, but FFTW.jl doesn't 
-        view(field.data, ilons, :) .= brfft_plan * view(g_in, 1:nfreq, 1:nlayers, j)
+        _apply_batched_fft_core!(field, ilons, brfft_plan, g_in, nfreq, nlayers, j)
     end
+end
+
+# CPU/fallback version
+# this version currently allocates a small array, FFTW supports strided outputs, but FFTW.jl doesn't 
+@inline _apply_batched_fft_core!(field::AbstractField, ilons, plan, g_in, nfreq, nlayers, j) =
+    view(field.data, ilons, :) .= plan * view(g_in, 1:nfreq, 1:nlayers, j)
+
+# GPU version without view
+@inline function _apply_batched_fft_core!(
+    field::AbstractField{NF, N, <:AbstractGPUArray},
+    ilons, plan, g_in, nfreq, nlayers, j,
+) where {NF, N}
+    view(field.data, ilons, :) .= plan * g_in[1:nfreq, 1:nlayers, j]
 end
 
 # Forward FFT Application Function for serial FFT
@@ -258,7 +287,8 @@ function _fourier_serial!(                  # SPECTRAL TO GRID
     end
 end
 
-which_FFT_package(::Type{<:AbstractArray{NF}}) where NF<:AbstractFloat = NF <: Union{Float32, Float64} ? FFTW : GenericFFT
+which_FFT_library(A::AbstractArray) = which_FFT_library(typeof(A))
+which_FFT_library(::Type{<:Array{NF}}) where NF = real(NF) <: Union{Float32, Float64} ? FFTW : GenericFFT
 
 """$(TYPEDSIGNATURES)
 Util function to generate FFT plans based on the array type of the fake Grid 
@@ -275,8 +305,9 @@ function plan_FFTs!(
     rings,
     nlons::Vector{<:Int}
 ) where {NF<:AbstractFloat, N}
-    # Determine which FFT package to use (currently either FFTW or GenericFFT)
-    FFT_package = which_FFT_package(Array{NF})
+
+    # Determine which FFT package to use
+    FFT_library = which_FFT_library(fake_grid_data.data)
 
     # For each ring generate an FFT plan (for all layers and for a single layer)
     for (j, nlon) in enumerate(nlons)
@@ -285,10 +316,10 @@ function plan_FFTs!(
         real_vector_input = view(fake_grid_data.data, rings[j], 1)
         complex_vector_input = view(scratch_memory_north, 1:nlon÷2 + 1, 1, j)
 
-        rfft_plans[j] = FFT_package.plan_rfft(real_matrix_input, 1)
-        brfft_plans[j] = FFT_package.plan_brfft(complex_matrix_input, nlon, 1)
-        rfft_plans_1D[j] = FFT_package.plan_rfft(real_vector_input, 1)
-        brfft_plans_1D[j] = FFT_package.plan_brfft(complex_vector_input, nlon, 1) 
+        rfft_plans[j] = FFT_library.plan_rfft(real_matrix_input, 1)
+        brfft_plans[j] = FFT_library.plan_brfft(complex_matrix_input, nlon, 1)
+        rfft_plans_1D[j] = FFT_library.plan_rfft(real_vector_input, 1)
+        brfft_plans_1D[j] = FFT_library.plan_brfft(complex_vector_input, nlon, 1) 
     end
 
     return rfft_plans, brfft_plans, rfft_plans_1D, brfft_plans_1D
