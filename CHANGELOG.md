@@ -3,6 +3,7 @@
 ## Unreleased
 
 - AMDGPU extension [#901](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/901)
+- Fixes some formatting/LaTeX rendering in Docs [#916](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/916)
 
 ## v0.17.4
 
