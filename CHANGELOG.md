@@ -3,9 +3,10 @@
 ## Unreleased
 
 - AMDGPU extension [#901](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/901)
+- README updates [#915](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/915#pullrequestreview-3469109183)
 - Fixes some formatting/LaTeX rendering in Docs [#916](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/916)
 
-## v0.17.4
+## v0.17.4
 
 - Show for LowerTriangularArray/Matrix on CPU/GPU [#907](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/907)
 - Ring, nested and matrix order for OctaHEALPixGrid [#887](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/887)
