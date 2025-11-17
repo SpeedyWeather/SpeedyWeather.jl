@@ -88,7 +88,7 @@ function _shortwave_radiative_transfer_core!(
    
     # Apply ozone absorption at TOA
     D_TOA = model.planet.solar_constant * cos_zenith
-    D = D_TOA - ozone_upper - ozone_lower
+    D = max(zero(D_TOA), D_TOA - ozone_upper - ozone_lower)
     flux_temp_downward[1] += D
 
     # Clear sky portion until cloud top
