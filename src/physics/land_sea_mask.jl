@@ -45,15 +45,16 @@ function mask!(
     @boundscheck fields_match(field, mask, horizontal_only=true) || throw(DimensionMismatch(field, mask))
     @boundscheck ndims(mask) == 1 || throw(DimensionMismatch(field, mask))
 
-    for k in eachlayer(field)
-        for ij in eachgridpoint(mask)
-            if mask[ij] == val
-                field[ij, k] = masked_val
-            end
-        end
-    end
-
+    arch = architecture(field)    
+    launch!(arch, RingGridWorkOrder, size(field), mask_kernel!, field, mask, val, masked_val)
     return field
+end
+
+@kernel inbounds=true function mask_kernel!(field, mask, val, masked_val)
+    ij, k = @index(Global, NTuple)
+    if mask[ij] == val
+        field[ij, k] = masked_val
+    end
 end
 
 # also allow for land_sea_mask struct to be passed on, use .mask in that case
@@ -135,7 +136,7 @@ function initialize!(land_sea_mask::EarthLandSeaMask, model::PrimitiveEquation)
         land_sea_mask.mask .= round.(land_sea_mask.mask ./ q) .* q
     end
 
-    lo, hi = extrema(land_sea_mask.mask.data)
+    lo, hi = extrema(land_sea_mask.mask)
     if (lo < 0 || hi > 1)
         # @warn "Land-sea mask has values in [$lo, $hi], clamping to [0, 1]."
         land_sea_mask.mask .= clamp.(land_sea_mask.mask, 0, 1)

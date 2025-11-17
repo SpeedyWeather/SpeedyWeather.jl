@@ -120,7 +120,7 @@ $(TYPEDFIELDS)"""
     model_parameters::TS1 = (:architecture, :time_stepping, :orography, :geopotential, :atmosphere, 
                                 :planet, :geometry, :land_sea_mask, :clausius_clapeyron)
     parameterizations::TS2 = (:convection, :large_scale_condensation, :albedo,
-                                :shortwave_radiation, :boundary_layer_drag
+                                :shortwave_radiation, :boundary_layer_drag,
                                 :surface_condition, :surface_momentum_flux, 
                                 :surface_heat_flux, :surface_humidity_flux, 
                                 :stochastic_physics)

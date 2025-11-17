@@ -74,7 +74,7 @@ export PrognosticVariables
     particles::ParticleVector = zeros(ParticleVector, nparticles)
 
     "Scaling for vor, div. scale=1 outside simulation, =radius during simulation"
-    scale::RefValueNF = Ref(one(typeof(real(vor[1]))))
+    scale::RefValueNF = Ref(one(real(eltype(vor))))
 
     "Clock that keeps track of time, number of timesteps to integrate for."
     clock::ClockType = Clock()

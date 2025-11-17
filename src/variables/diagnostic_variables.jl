@@ -268,7 +268,7 @@ function DynamicsVariables(SG::SpectralGrid;
         scratch_memory = spectral_transform.scratch_memory
     end
 
-    return DynamicsVariables{NF, ArrayType, typeof(spectrum), typeof(grid),
+    return DynamicsVariables{typeof(spectrum), typeof(grid),
         SpectralVariable2D, SpectralVariable3D,
         GridVariable2D, GridVariable3D, typeof(scratch_memory)}(;
             spectrum, grid, nlayers, scratch_memory
