@@ -1,22 +1,7 @@
-abstract type AbstractOpticalDepth <: AbstractParameterization end
+abstract type AbstractLongwaveTransmittance <: AbstractLongwave end
 
-# function barrier to dispatch to type of model.optical_depth
-function optical_depth!(column::ColumnVariables, model::AbstractModel)
-    optical_depth!(column, model.optical_depth, model)
-end
-
-export ZeroOpticalDepth
-struct ZeroOpticalDepth{NF} <: AbstractOpticalDepth end
-ZeroOpticalDepth(SG::SpectralGrid) = ZeroOpticalDepth{SG.NF}()
-initialize!(od::ZeroOpticalDepth, ::AbstractModel) = nothing
-function optical_depth!(column::ColumnVariables, od::ZeroOpticalDepth, model::AbstractModel)
-    column.optical_depth_longwave .= 0
-    column.optical_depth_shortwave .= 0
-end
-
-export FriersonOpticalDepth
-@kwdef mutable struct FriersonOpticalDepth{NF} <: AbstractOpticalDepth
-    
+export FriersonTransmittance
+@kwdef mutable struct FriersonTransmittance{NF} <: AbstractLongwaveTransmittance
     "[OPTION] Spectral band to use"
     band::Int = 1
 
@@ -30,12 +15,12 @@ export FriersonOpticalDepth
     fₗ::NF = 0.1
 end
 
-FriersonOpticalDepth(SG::SpectralGrid; kwargs...) = FriersonOpticalDepth{SG.NF}(; kwargs...)
-initialize!(od::FriersonOpticalDepth, model::AbstractModel) = nothing
+FriersonTransmittance(SG::SpectralGrid; kwargs...) = FriersonTransmittance{SG.NF}(; kwargs...)
+initialize!(od::FriersonTransmittance, model::AbstractModel) = nothing
 
-function optical_depth!(
+function transmittance!(
     column::ColumnVariables{NF},
-    od::FriersonOpticalDepth,
+    od::FriersonTransmittance,
     model::AbstractModel,
 ) where NF
 
@@ -43,10 +28,10 @@ function optical_depth!(
     od.band > column.nbands_longwave && return nothing
 
     # Frierson et al. 2006 uses a transparent atmosphere for shortwave radiation
-    column.optical_depth_shortwave .= 0
+    column.transmittance_shortwave .= 1
 
     # but the longwave optical depth follows some idealised humidity lat-vert distribution
-    optical_depth = column.optical_depth_longwave
+    transmittance = column.transmittance_longwave
     (; τ₀_equator, τ₀_pole, fₗ, band) = od
 
     # coordinates 
@@ -63,7 +48,7 @@ function optical_depth!(
     τ₀ = τ₀_equator + (τ₀_pole - τ₀_equator)*sind(θ)^2
     for k in 2:nlayers+1     # loop over half levels below
         τ_below = τ₀*(fₗ*σ[k] + (1 - fₗ)*σ[k]^4)
-        optical_depth[k-1, band] = τ_below - τ_above
+        transmittance[k-1, band] = exp(-(τ_below - τ_above))
         τ_above = τ_below
     end
 end

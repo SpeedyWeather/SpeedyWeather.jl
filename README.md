@@ -10,7 +10,7 @@
 SpeedyWeather.jl is a global atmospheric model with simple physics developed as a research playground
 with an everything-flexible attitude as long as it is speedy. It is easy to use and easy to extend, making 
 atmospheric modelling an interactive experience -- in the terminal, in a notebook or conventionally through scripts.
-With minimal code redundancies it supports
+With minimal code redundancies, it supports
 
 **Dynamics and physics**
 - Different physical equations (barotropic vorticity, shallow water, primitive equations, with and without humidity)
@@ -25,7 +25,7 @@ With minimal code redundancies it supports
 - Different spatial grids (full and octahedral, Gaussian and Clenshaw-Curtis, HEALPix, OctaHEALPix)
 - Different resolutions (T31 to T1023 and higher, i.e. 400km to 10km using linear, quadratic or cubic truncation)
 - Different arithmetics: Float32 (default), Float64, and (experimental) BFloat16, stochastic rounding
-- a very fast and flexible spherical harmonics transform library SpeedyTransforms
+- A very fast and flexible spherical harmonics transform library SpeedyTransforms
 
 **User interface**
 - Data visualisation: 2D, 3D, interactive (you can zoom and rotate!) powered by Makie
@@ -53,17 +53,18 @@ individual terms of the equations, and analyse and visualise output on the fly.
 We do not necessarily aim to make SpeedyWeather an atmospheric model for the purpose of production-ready
 weather forecasting, at least not at the cost of our current level of interactivity and ease of
 use or extensibility. If someone wants to implement a parameterization that is very complicated
-and expensive to run then they are more than encouraged to do so. We are happy to provide a general interface
-to do so and support you to move this to its own repository, leveraging modularity. This may note become
-the default to not oppose the "easy and fast by default"-philosophy but that does not mean we don't
-appreciate your efforts or reject your contributions. In fact, we would love to show case more how
-easy to complex, laptop to HPC can work seamlessly within the same model.
-But SpeedyWeather's defaults should be balanced: Physically accurate yet general; as independently as possible
-from other components and parameter choices; not too complicated to implement and understand; and computationally cheap.
-Finding a good balance is difficult but we try our best. 
+and computationally expensive, then they are more than encouraged to do so. We are happy to provide a general interface
+to enable and support such extensions, which can even be developed as their own independent projects in separate repositories
+thanks to the modular structure of SpeedyWeather. Since SpeedyWeather follows an "easy and fast by default" philosophy, these
+complex extensions likely will not be used by default. We would nevertheless appreciate such efforts since we aim for SpeedyWeather
+to enable a "hierarchy of models" spanning multiple levels process and computational complexity and runnable on hardware ranging from
+a single laptop to a large HPC cluster. It is important, however, that SpeedyWeather's defaults be balanced: physically accurate yet
+fast enough to run on a laptop; comprehensive enough to simulate realistic weather yet understandable for newcomers; holistic enough
+to provide an easy-to-use interface yet modular enough to allow for extensive customization.
 
-This means in practice, that while SpeedyWeather is currently developed, many more physical processes
-and other features will be implemented. On our TODO is
+Finding a good balance is difficult, but we try our best.
+
+Despite our commitment to simplicity and ease-of-use, many more physical processes and other features are continuing to be developed. On our TODO list are
 
 - A more realistic radiation scheme depending on clouds and humidity
 - Longwave radiation that depends on (globally averaged) greenhouse gas concentrations to represent climate change
@@ -73,8 +74,8 @@ and other features will be implemented. On our TODO is
 
 Currently in development are
 
-- single GPU and CPU multi-threading support via KernelAbstractions
-- differentiability with Enzyme
+- Single GPU and CPU multi-threading support via KernelAbstractions
+- Differentiability with Enzyme
 
 ## Contributing
 

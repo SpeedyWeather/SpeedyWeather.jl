@@ -11,15 +11,13 @@ architecture = SpeedyWeather.GPU()
 spectral_grid = SpectralGrid(trunc=41, nlayers=1, architecture=architecture)           
 
 model = BarotropicModel(spectral_grid=spectral_grid)
-CUDA.@allowscalar simulation = initialize!(model)
+simulation = initialize!(model)
 run!(simulation, period=Day(10))
 ```
 
-Note that we need to use `CUDA.@allowscalar` here during initialization. Currently we do not yet support a fully GPU-accelerated model construction and initialization.
-
 ## Architectures Utilities 
 
-In order to easily transfer our structures between CPU (e.g. for plotting and output) and GPU, we have the following utilities that make can make use of the `architecture` object defined above and the `on_architecture` function, e.g. as follows: 
+In order to easily transfer our structures between CPU (e.g. for plotting and output) and GPU, we have the following utilities that can make use of the `architecture` object defined above and the `on_architecture` function, e.g. as follows: 
 
 ```julia
 using SpeedyWeather, CUDA 
