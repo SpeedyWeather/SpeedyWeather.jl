@@ -20,10 +20,10 @@ spectral_resolutions = (31,)#, 63, 127)
 nlayers_list = (8,)# 8, 32]
 # TODO: can uncomment this when we push to main  
 grid_list = [
-    FullGaussianGrid,
+    # FullGaussianGrid,
     # FullClenshawGrid,
     OctahedralGaussianGrid,
-    # OctahedralClenshawGrid,
+    OctahedralClenshawGrid,
     # HEALPixGrid,
     # OctaHEALPixGrid,
 ]
