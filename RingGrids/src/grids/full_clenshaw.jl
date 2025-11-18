@@ -50,5 +50,3 @@ get_lond(::Type{<:FullClenshawGrid}, nlat_half::Integer) = get_lond(FullGaussian
 
 # QUADRATURE
 get_quadrature_weights(::Type{<:FullClenshawGrid}, nlat_half::Integer) = clenshaw_curtis_weights(nlat_half)
-
-Adapt.@adapt_structure FullClenshawGrid

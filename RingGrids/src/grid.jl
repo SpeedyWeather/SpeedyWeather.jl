@@ -66,8 +66,7 @@ end
 
 # change the architecture of a grid, keep all other fields 
 function (::Type{Grid})(grid::Grid, architecture::AbstractArchitecture) where {Grid<:AbstractGrid}
-    Grid_ = nonparametric_type(Grid)                # strip away parameters of type, obtain from arguments
-    return Grid_(grid.nlat_half, architecture, adapt(array_type(architecture), grid.rings), adapt(array_type(architecture), grid.whichring))
+    return on_architecture(architecture, grid)
 end
 
 function (::Type{Grid})(
@@ -172,7 +171,6 @@ and then each grid point per ring. To be used like
 
 Accesses precomputed `grid.rings`."""
 @inline eachring(grid::AbstractGrid) = grid.rings
-@inline eachring(grid::AbstractGrid{<:GPU}) = Vector(grid.rings) # on GPU transfer indices back to CPU first 
 
 """$(TYPEDSIGNATURES)
 Computes the ring indices `i0:i1` for start and end of every longitudinal point
@@ -274,7 +272,20 @@ Architectures.ismatching(grid::AbstractGrid, array::AbstractArray) = ismatching(
 
 Architectures.architecture(grid::AbstractGrid) = grid.architecture
 
+# only transfer the whichring on GPU
 function Architectures.on_architecture(arch::AbstractArchitecture, grid::Grid) where Grid<:AbstractGrid 
     Grid_ = nonparametric_type(Grid)
-    return Grid_(grid, arch)
+    return Grid_(grid.nlat_half, 
+                arch, 
+                grid.rings, 
+                on_architecture(arch, grid.whichring))
 end 
+
+# don't adapt the CPU-only rings 
+function adapt_structure(to, grid::AbstractGrid)
+    Grid_ = nonparametric_type(typeof(grid))
+    return Grid_(grid.nlat_half, 
+                adapt_structure(to, grid.architecture), 
+                nothing, 
+                adapt_structure(to, grid.whichring))
+end
