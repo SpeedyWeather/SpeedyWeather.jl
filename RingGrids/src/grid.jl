@@ -282,10 +282,10 @@ function Architectures.on_architecture(arch::AbstractArchitecture, grid::Grid) w
 end 
 
 # don't adapt the CPU-only rings 
-function adapt_structure(to, grid::AbstractGrid)
+function Adapt.adapt_structure(to, grid::AbstractGrid)
     Grid_ = nonparametric_type(typeof(grid))
     return Grid_(grid.nlat_half, 
-                adapt_structure(to, grid.architecture), 
+                Adapt.adapt_structure(to, grid.architecture), 
                 nothing, 
-                adapt_structure(to, grid.whichring))
+                Adapt.adapt_structure(to, grid.whichring))
 end
