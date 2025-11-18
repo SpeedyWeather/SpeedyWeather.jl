@@ -79,7 +79,7 @@ function clouds!(
     )
 end
 
-"""$(TYPEDSIGNATURE)
+"""$(TYPEDSIGNATURES)
 Core cloud diagnosis algorithm shared by DiagnosticClouds and SpectralDiagnosticClouds.
 Returns (cloud_cover, cloud_top, stratocumulus_cover) tuple."""
 function diagnose_cloud_properties(column::ColumnVariables, clouds::DiagnosticClouds)
