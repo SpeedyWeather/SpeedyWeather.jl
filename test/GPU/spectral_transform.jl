@@ -18,7 +18,7 @@ end
 
 spectral_resolutions = (31,)#, 63, 127)
 nlayers_list = (8,)# 8, 32]
-# TODO: can uncomment this when we push to main  
+# TODO: at the moment only tests for even grids (no ring on equator) pass for some reason
 grid_list = [
     FullGaussianGrid,
     # FullClenshawGrid,
