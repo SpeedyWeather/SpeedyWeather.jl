@@ -982,4 +982,4 @@ function temperature_average!(
         # average from l=m=0 harmonic divided by norm of the sphere
         diagn.temp_average[k] = real(temp[1, k]) / S.norm_sphere
     end
-end 
+end

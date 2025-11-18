@@ -97,4 +97,4 @@ function FiniteDifferences.to_vec(x::Integer)
     return Bool[], Integer_from_vec
 end
 
-end 
+end
