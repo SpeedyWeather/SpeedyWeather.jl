@@ -21,62 +21,6 @@ function clouds!(
     )
 end
 
-"""
-Core cloud diagnosis algorithm shared by DiagnosticClouds and SpectralDiagnosticClouds.
-Returns (cloud_cover, cloud_top, stratocumulus_cover) tuple.
-"""
-function _diagnose_cloud_properties(
-    column::ColumnVariables,
-    rh_min, rh_max, q_min, precip_weight, precip_max,
-    use_strat, stab_min, stab_max, cover_max, clfact
-)
-    (; nlayers, land_fraction, humid, sat_humid, dry_static_energy) = column
-
-    # Precipitation contribution
-    P = precip_weight * sqrt(min(precip_max, (86400 * (column.rain_rate_large_scale + column.rain_rate_convection) / 1000)))
-    
-    kprtop = column.cloud_top
-    humidity_term_kcltop = zero(P)
-    kcltop = nlayers + 1
-
-    # Find cloud top from RH threshold
-    for k in 1:(nlayers-1)
-        humidity_k = humid[k]
-        qsat = sat_humid[k]
-
-        if humidity_k > q_min && qsat > 0
-            relative_humidity_k = humidity_k / qsat
-            
-            if relative_humidity_k >= rh_min
-                rh_norm = max(0, (relative_humidity_k - rh_min) / (rh_max - rh_min))
-                humidity_term_kcltop = min(1, rh_norm)^2
-                kcltop = k
-                break
-            end
-        end
-    end
-    
-    # Combined cloud cover
-    cloud_cover = min(1, P + humidity_term_kcltop)
-    cloud_top = min(kcltop, kprtop)
-    column.cloud_top = cloud_top
-
-    # Stratocumulus parameterization
-    stratocumulus_cover = zero(P)
-    if use_strat
-        GSEN = dry_static_energy[nlayers] - dry_static_energy[nlayers-1]
-        F_ST = max(0, min(1, (GSEN - stab_min) / (stab_max - stab_min)))
-        
-        stratocumulus_cover_ocean = F_ST * max(cover_max - clfact * cloud_cover, 0)
-        RH_N = sat_humid[nlayers] > 0 ? humid[nlayers] / sat_humid[nlayers] : 0
-        stratocumulus_cover_land = stratocumulus_cover_ocean * RH_N
-        
-        stratocumulus_cover = (1 - land_fraction) * stratocumulus_cover_ocean + land_fraction * stratocumulus_cover_land
-    end
-
-    return (cloud_cover, cloud_top, stratocumulus_cover)
-end
-
 export DiagnosticClouds
 @kwdef struct DiagnosticClouds{NF} <: AbstractShortwaveClouds
     "[OPTION] Relative humidity threshold for cloud cover = 0 [1]."
@@ -123,21 +67,8 @@ function clouds!(
     clouds::DiagnosticClouds,
     model::AbstractModel,
 )
-
     # Diagnose cloud cover and cloud top
-    (cloud_cover, cloud_top, stratocumulus_cover) = _diagnose_cloud_properties(
-        column,
-        clouds.relative_humidity_threshold_min,
-        clouds.relative_humidity_threshold_max,
-        clouds.specific_humidity_threshold_min,
-        clouds.precipitation_weight,    
-        clouds.precipitation_max,
-        clouds.use_stratocumulus,
-        clouds.stratocumulus_stability_min,
-        clouds.stratocumulus_stability_max,
-        clouds.stratocumulus_cover_max,
-        clouds.stratocumulus_clfact,
-    )
+    (cloud_cover, cloud_top, stratocumulus_cover) = diagnose_cloud_properties(column, clouds)
 
     return (    # NamedTuple
         cloud_cover=cloud_cover,
@@ -148,5 +79,66 @@ function clouds!(
     )
 end
 
-# Add clouds! method for regular DiagnosticClouds with band parameter (ignores band)
-clouds!(column, clouds::DiagnosticClouds, model, band) = clouds!(column, clouds, model)
+"""$(TYPEDSIGNATURE)
+Core cloud diagnosis algorithm shared by DiagnosticClouds and SpectralDiagnosticClouds.
+Returns (cloud_cover, cloud_top, stratocumulus_cover) tuple."""
+function diagnose_cloud_properties(column::ColumnVariables, clouds::DiagnosticClouds)
+
+    # rename for brevity
+    rh_min = clouds.relative_humidity_threshold_min
+    rh_max = clouds.relative_humidity_threshold_max
+    q_min =  clouds.specific_humidity_threshold_min
+    precip_weight = clouds.precipitation_weight    
+    precip_max = clouds.precipitation_max
+    use_strat = clouds.use_stratocumulus
+    stab_min = clouds.stratocumulus_stability_min
+    stab_max = clouds.stratocumulus_stability_max
+    cover_max = clouds.stratocumulus_cover_max
+    clfact = clouds.stratocumulus_clfact
+
+    (; nlayers, land_fraction, humid, sat_humid, dry_static_energy) = column
+
+    # Precipitation contribution
+    P = precip_weight * sqrt(min(precip_max, (86400 * (column.rain_rate_large_scale + column.rain_rate_convection) / 1000)))
+    
+    kprtop = column.cloud_top
+    humidity_term_kcltop = zero(P)
+    kcltop = nlayers + 1
+
+    # Find cloud top from RH threshold
+    for k in 1:(nlayers-1)
+        humidity_k = humid[k]
+        qsat = sat_humid[k]
+
+        if humidity_k > q_min && qsat > 0
+            relative_humidity_k = humidity_k / qsat
+            
+            if relative_humidity_k >= rh_min
+                rh_norm = max(0, (relative_humidity_k - rh_min) / (rh_max - rh_min))
+                humidity_term_kcltop = min(1, rh_norm)^2
+                kcltop = k
+                break
+            end
+        end
+    end
+    
+    # Combined cloud cover
+    cloud_cover = min(1, P + humidity_term_kcltop)
+    cloud_top = min(kcltop, kprtop)
+    column.cloud_top = cloud_top
+
+    # Stratocumulus parameterization
+    stratocumulus_cover = zero(P)
+    if use_strat
+        GSEN = dry_static_energy[nlayers] - dry_static_energy[nlayers-1]
+        F_ST = max(0, min(1, (GSEN - stab_min) / (stab_max - stab_min)))
+        
+        stratocumulus_cover_ocean = F_ST * max(cover_max - clfact * cloud_cover, 0)
+        RH_N = sat_humid[nlayers] > 0 ? humid[nlayers] / sat_humid[nlayers] : 0
+        stratocumulus_cover_land = stratocumulus_cover_ocean * RH_N
+        
+        stratocumulus_cover = (1 - land_fraction) * stratocumulus_cover_ocean + land_fraction * stratocumulus_cover_land
+    end
+
+    return (cloud_cover, cloud_top, stratocumulus_cover)
+end

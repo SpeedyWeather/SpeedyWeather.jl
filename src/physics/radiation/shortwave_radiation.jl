@@ -70,76 +70,6 @@ function shortwave_radiation!(
     return nothing
 end
 
-"""
-Core shortwave radiative transfer algorithm shared by OneBand and Spectral schemes.
-Takes explicit albedo and ozone parameters to handle both single-value and band-specific cases.
-"""
-
-function _shortwave_radiative_transfer_core!(
-    column::ColumnVariables,
-    t,          # Transmittance array
-    clouds,     # NamedTuple from clouds!
-    ozone_upper, ozone_lower,  # Can be scalars or band-specific
-    albedo_ocean, albedo_land, # Can be scalars or band-specific
-    model::PrimitiveEquation,
-)
-    (; cloud_cover, cloud_top, stratocumulus_cover, cloud_albedo, stratocumulus_albedo) = clouds
-    (; cos_zenith, land_fraction, nlayers, flux_temp_downward, flux_temp_upward) = column
-   
-    # Apply ozone absorption at TOA
-    D_TOA = model.planet.solar_constant * cos_zenith
-    D = max(zero(D_TOA), D_TOA - ozone_upper - ozone_lower)
-    flux_temp_downward[1] += D
-
-    # Clear sky portion until cloud top
-    for k in 1:(cloud_top - 1)
-        D *= t[k]
-        flux_temp_downward[k+1] += D
-    end
-
-    # Cloud reflection at cloud top
-    U_reflected = zero(D)
-    if cloud_top <= nlayers
-        R = cloud_albedo * cloud_cover
-        U_reflected = D * R
-        D *= (1 - R)
-
-        for k in cloud_top:nlayers
-            D *= t[k]
-            flux_temp_downward[k+1] += D
-        end
-    end
-
-    # Surface stratocumulus reflection
-    U_stratocumulus = D * stratocumulus_albedo * stratocumulus_cover
-    D_surface = D - U_stratocumulus
-    column.surface_shortwave_down = D_surface
-
-    # Surface albedo reflections (can handle both scalar and band-specific albedos)
-    up_ocean = albedo_ocean * D_surface
-    up_land  = albedo_land * D_surface
-    column.surface_shortwave_up_ocean = up_ocean
-    column.surface_shortwave_up_land  = up_land
-
-    # Weighted surface albedo and reflected flux
-    albedo = (1 - land_fraction) * albedo_ocean + land_fraction * albedo_land
-    U_surface_albedo = albedo * D_surface
-    column.surface_shortwave_up = U_surface_albedo
-
-    U = U_surface_albedo + U_stratocumulus
-    
-    # Upward beam
-    flux_temp_upward[nlayers+1] += U
-    for k in nlayers:-1:1
-        U *= t[k]
-        U += k == cloud_top ? U_reflected : zero(U)
-        flux_temp_upward[k] += U
-    end
-
-    column.outgoing_shortwave_radiation = U
-    return nothing
-end
-
 export OneBandShortwave
 
 """
@@ -222,10 +152,7 @@ end
 OneBandShortwaveRadiativeTransfer(SG::SpectralGrid; kwargs...) = OneBandShortwaveRadiativeTransfer{SG.NF}(; kwargs...)
 initialize!(::OneBandShortwaveRadiativeTransfer, ::PrimitiveEquation) = nothing
 
-"""$(TYPEDSIGNATURES)
-One-band shortwave radiative transfer with cloud reflection and ozone absorption.
-"""
-
+# function barrier to unpack model
 function shortwave_radiative_transfer!(
     column::ColumnVariables,
     t,          # Transmittance array
@@ -233,13 +160,73 @@ function shortwave_radiative_transfer!(
     radiation::OneBandShortwaveRadiativeTransfer,
     model::PrimitiveEquation
 )
-    # Use shared core with scalar albedos from column
-    _shortwave_radiative_transfer_core!(
-        column, t, clouds,
-        radiation.ozone_absorp_upper,
-        radiation.ozone_absorp_lower,
-        column.albedo_ocean,  # scalar
-        column.albedo_land,   # scalar
-        model
-    )
+    shortwave_radiative_transfer!(column, t, clouds, radiation, model.planet)
+end
+
+"""$(TYPEDSIGNATURES)
+One-band shortwave radiative transfer with cloud reflection and ozone absorption."""
+function shortwave_radiative_transfer!(
+    column::ColumnVariables,
+    t,          # Transmittance array
+    clouds,     # NamedTuple from clouds!
+    radiation::OneBandShortwaveRadiativeTransfer,
+    planet::AbstractPlanet,
+)
+    (; ozone_absorp_upper, ozone_absorp_lower) = radiation
+    (; albedo_ocean, albedo_land) = column
+    (; cloud_cover, cloud_top, stratocumulus_cover, cloud_albedo, stratocumulus_albedo) = clouds
+    (; cos_zenith, land_fraction, nlayers, flux_temp_downward, flux_temp_upward) = column
+   
+    # Apply ozone absorption at TOA
+    D_TOA = planet.solar_constant * cos_zenith
+    D = max(zero(D_TOA), D_TOA - ozone_absorp_upper - ozone_absorp_lower)
+    flux_temp_downward[1] += D
+
+    # Clear sky portion until cloud top
+    for k in 1:(cloud_top - 1)
+        D *= t[k]
+        flux_temp_downward[k+1] += D
+    end
+
+    # Cloud reflection at cloud top
+    U_reflected = zero(D)
+    if cloud_top <= nlayers
+        R = cloud_albedo * cloud_cover
+        U_reflected = D * R
+        D *= (1 - R)
+
+        for k in cloud_top:nlayers
+            D *= t[k]
+            flux_temp_downward[k+1] += D
+        end
+    end
+
+    # Surface stratocumulus reflection
+    U_stratocumulus = D * stratocumulus_albedo * stratocumulus_cover
+    D_surface = D - U_stratocumulus
+    column.surface_shortwave_down = D_surface
+
+    # Surface albedo reflections (can handle both scalar and band-specific albedos)
+    up_ocean = albedo_ocean * D_surface
+    up_land  = albedo_land * D_surface
+    column.surface_shortwave_up_ocean = up_ocean
+    column.surface_shortwave_up_land  = up_land
+
+    # Weighted surface albedo and reflected flux
+    albedo = (1 - land_fraction) * albedo_ocean + land_fraction * albedo_land
+    U_surface_albedo = albedo * D_surface
+    column.surface_shortwave_up = U_surface_albedo
+
+    U = U_surface_albedo + U_stratocumulus
+    
+    # Upward beam
+    flux_temp_upward[nlayers+1] += U
+    for k in nlayers:-1:1
+        U *= t[k]
+        U += k == cloud_top ? U_reflected : zero(U)
+        flux_temp_upward[k] += U
+    end
+
+    column.outgoing_shortwave_radiation = U
+    return nothing
 end

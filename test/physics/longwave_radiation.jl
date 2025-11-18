@@ -1,6 +1,6 @@
 @testset "Longwave radiation" begin
     spectral_grid = SpectralGrid(trunc=31, nlayers=8)
-    @testset for LW in (Nothing, UniformCooling, JeevanjeeRadiation, )#NBandRadiation)
+    @testset for LW in (Nothing, UniformCooling, JeevanjeeRadiation)
         longwave_radiation = LW(spectral_grid)
 
         # with no longwave radiation or uniform cooling there are no 
