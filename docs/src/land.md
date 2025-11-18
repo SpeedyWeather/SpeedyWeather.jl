@@ -154,8 +154,8 @@ The equations are
 
 ```math
 \begin{aligned}
-\Delta z_1 C_1 \frac{dT_1}{dt} &= F - \lambda\frac{T_1 - T_2}{(\Delta z_1 + \Delta z_2)/2} \\
-\Delta z_2 C_2 \frac{dT_2}{dt} &= \lambda\frac{T_1 - T_2}{(\Delta z_1 + \Delta z_2)/2}
+\Delta z_1 C_1 \frac{\mathrm{d}T_1}{\mathrm{d}t} &= F - \lambda\frac{T_1 - T_2}{(\Delta z_1 + \Delta z_2)/2} \\
+\Delta z_2 C_2 \frac{\mathrm{d}T_2}{\mathrm{d}t} &= \lambda\frac{T_1 - T_2}{(\Delta z_1 + \Delta z_2)/2}
 \end{aligned}
 ```
 
@@ -213,8 +213,8 @@ The equations are
 
 ```math
 \begin{aligned}
-\frac{dW_1}{dt} &= \frac{P - E - R}{f_1} + \frac{W_2 - W_1}{\tau} \\
-\frac{dW_2}{dt} &= -\frac{f_1}{f_2}\frac{W_2 - W_1}{\tau} \\
+\frac{\mathrm{d}W_1}{\mathrm{d}t} &= \frac{P - E - R}{f_1} + \frac{W_2 - W_1}{\tau} \\
+\frac{\mathrm{d}W_2}{\mathrm{d}t} &= -\frac{f_1}{f_2}\frac{W_2 - W_1}{\tau} \\
 \end{aligned}
 ```
 
