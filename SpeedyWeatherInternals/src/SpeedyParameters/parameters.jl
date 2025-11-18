@@ -172,18 +172,20 @@ parameterof(::Type{PT}, obj::T, ::Val{propname}; kwargs...) where {PT<:AbstractP
 Reconstructs the given (possibly nested) data structure with the given `values`. If `values` is a `NamedTuple`,
 the nested structure must match that of `obj`. This function is used to reconstruct model types from `SpeedyParams`.
 """
-reconstruct(obj::T, value::T) where {T} = value
-reconstruct(obj::AbstractParam, value::T) where {T} = ModelParameters.update(obj, Tuple(value))
-reconstruct(obj::NamedTuple{keys,V}, values::NamedTuple{keys,V}) where {keys,V<:Tuple} = values
-reconstruct(obj, values::ComponentArray) = reconstruct(obj, NamedTuple(values))
-reconstruct(obj, values::SpeedyParams) = reconstruct(obj, stripparams(values))
-@generated function reconstruct(obj, values::NamedTuple{keys}) where {keys}
-    recursive_calls = map(k -> :(reconstruct(obj.$k, values.$k)), keys)
+@inline reconstruct(obj::T, value::T) where {T} = value
+@inline reconstruct(obj::AbstractParam, value::T) where {T} = ModelParameters.update(obj, Tuple(value))
+@inline reconstruct(obj::NamedTuple{keys,V}, values::NamedTuple{keys,V}) where {keys,V<:Tuple} = values
+# @inline reconstruct(obj, values::ComponentArray) = reconstruct(obj, NamedTuple(values))
+@inline reconstruct(obj, values::SpeedyParams) = reconstruct(obj, stripparams(values))
+@generated function reconstruct(obj, values::Union{NamedTuple, ComponentArray})
+    keysof(::Type{<:NamedTuple{keys}}) where {keys} = keys
+    keysof(::Type{<:ComponentArray{T, N, A, Tuple{Axis{coords}}}}) where {T, N, A, coords} = keys(coords)
+    recursive_calls = map(k -> :(reconstruct(obj.$k, values.$k)), keysof(values))
     quote
         # recursively call reconstruct for all keys specified in values
         patchvals = tuple($(recursive_calls...))
         # construct a named tuple with the reconstructed values and apply with setproperties
-        patch = NamedTuple{keys}(patchvals)
+        patch = NamedTuple{$(keysof(values))}(patchvals)
         return setproperties(obj, patch)
     end
 end
@@ -202,7 +204,7 @@ end
 where here `x` will be treated as a parameter field and `y` will not. Parameters will be then automatically
 generated in a corresponding `parameters(::Foo)` method definition with descriptions set to the corresponding
 struct field docstring, if present. Additional parameter attributes can be supplied as keywords after the parameter,
-e.g. `@param p::T = 0.5 bounds=UnitInterval()` or `@param p::T = 0.5 (bounds=UnitInterval(), constant=false)`.
+e.g. `@param p::T = 0.5 bounds=UnitInterval` or `@param p::T = 0.5 (bounds=UnitInterval, constant=false)`.
 
 ## Known limitations
 
@@ -234,6 +236,16 @@ macro parameterized(expr)
             typedef
         end
     end
+    function parse_attributes(attrs)
+        if isempty(attrs)
+                (;)
+        elseif length(attrs) == 1
+            # handle both singleton attr=value syntax as well as named tuple syntax (attr1=value1, attr2=value2, ...)
+            attrs[1].head == :tuple ? :($(attrs[1])) : :(($(attrs...),))
+        else
+            error("invalid syntax for parameter attributes: $(QuoteNode(attrs))")
+        end
+    end
     # process struct definition
     ## first declare local variables for capturing metadata
     params = []
@@ -257,14 +269,7 @@ macro parameterized(expr)
         elseif MacroTools.@capture(ex, @param fieldname_::FT_ = defval_ attrs__) || MacroTools.@capture(ex, @param fieldname_::FT_ attrs__)
             # use last seen docstring as description, if present
             desc = isnothing(lastdoc) ? "" : lastdoc
-            attrs = if isempty(attrs)
-                (;)
-            elseif length(attrs) == 1
-                # handle both singleton attr=value syntax as well as named tuple syntax (attr1=value1, attr2=value2, ...)
-                attrs[1].head == :tuple ? Core.eval(@__MODULE__, attrs[1]) : Core.eval(@__MODULE__, :($(attrs...),))
-            else
-                error("invalid syntax for parameter attributes: $(QuoteNode(attrs))")
-            end
+            attrs = parse_attributes(attrs)
             paraminfo = (name=fieldname, type=FT, desc=desc, attrs=attrs)
             push!(params, paraminfo)
             # reset lastdoc to nothing to prevent duplication
@@ -282,7 +287,16 @@ macro parameterized(expr)
             # reset lastdoc variable to prevent confusing docstrings between parameteter and non-parameter fields
             lastdoc = nothing
             ex
-        # case 3: field documentation
+        # case 3: subcomponent
+        elseif MacroTools.@capture(ex, @component fieldname_::FT_ = defval_ attrs__) || MacroTools.@capture(ex, @component fieldname_::FT_ attrs__)
+            attrs = parse_attributes(attrs)
+            # add component name to attributes
+            paraminfo = (name=fieldname, type=FT, desc="", attrs=(component=fieldname, attrs...))
+            push!(params, paraminfo)
+            # reset lastdoc
+            lastdoc = nothing
+            isnothing(defval) ? :($fieldname::$FT;) : :($fieldname::$FT = $defval;)
+        # case 4: field documentation
         elseif MacroTools.@capture(ex, docs_String)
             # store in lastdoc field
             lastdoc = docs
@@ -297,23 +311,23 @@ macro parameterized(expr)
     typesig = typedef2sig(typedef)
     # emit parameterof calls for each parsed parameter
     param_constructors = map(params) do info
-        :($(QuoteNode(info.name)) => SpeedyWeather.parameterof(obj, Val{$(QuoteNode(info.name))}(); desc=$(info.desc), $(info.attrs)..., kwargs...))
+        :($(QuoteNode(info.name)) => SpeedyParameters.parameterof(obj, Val{$(QuoteNode(info.name))}(); desc=$(info.desc), $(info.attrs)..., kwargs...))
     end
     # construct final expression block
     block = Expr(:block)
     ## 1. struct definition
     push!(block.args, esc(new_expr))
     ## 2. parameters method dispatch
-    push!(block.args, esc(:(SpeedyWeather.parameters(obj::$(typename); kwargs...) = SpeedyWeather.SpeedyParams((; $(param_constructors...))))))
+    push!(block.args, esc(:(SpeedyParameters.parameters(obj::$(typename); kwargs...) = SpeedyParameters.SpeedyParams((; $(param_constructors...))))))
     ## 3. override ConstructionBase.setproperties if @kwdef is used; we do this so that internal logic in the keyword defaults gets preserved
     if has_kwdef && typesig.head == :curly
         # handle type arguments; first extract argument names (discarding upper type bounds)
         typeargs = map(typedef2sig, typesig.args[2:end])
         # then build method signature
-        push!(block.args, esc(:(setproperties(obj::$(typename){$(typeargs...)}, patch::NamedTuple) where {$(typesig.args[2:end]...)} = $(typename){$(typeargs...)}(; patch...))))
+        push!(block.args, esc(:(SpeedyParameters.setproperties(obj::$(typename){$(typeargs...)}, patch::NamedTuple) where {$(typesig.args[2:end]...)} = $(typename){$(typeargs...)}(; patch...))))
     elseif has_kwdef
         # otherwise we can just use the typename
-        push!(block.args, esc(:(setproperties(obj::$(typename), patch::NamedTuple) = $(typename)(; patch...))))
+        push!(block.args, esc(:(SpeedyParameters.setproperties(obj::$(typename), patch::NamedTuple) = $(typename)(; patch...))))
     end
     return block
 end

@@ -144,8 +144,14 @@ function initialize!(   progn::PrognosticVariables{NF},
     (; GridVariable2D, grid, nlayers) = model.spectral_grid
     (; radius) = model.planet
     A = convert(NF, initial_conditions.max_speed) * 2
-    u = 2A*rand(GridVariable2D, grid) .- A
-    v = 2A*rand(GridVariable2D, grid) .- A
+
+    # sample vector to use RNG (not implemented for RingGrids)
+    npoints = RingGrids.get_npoints(grid)
+    u_data = on_architecture(grid.architecture, rand(RNG, NF, npoints))
+    v_data = on_architecture(grid.architecture, rand(RNG, NF, npoints))
+
+    u = 2A*Field(u_data, grid) .- A  
+    v = 2A*Field(v_data, grid) .- A
 
     u_spectral = transform(u, model.spectral_transform)
     v_spectral = transform(v, model.spectral_transform)
@@ -154,7 +160,10 @@ function initialize!(   progn::PrognosticVariables{NF},
     spectral_truncation!(v_spectral, initial_conditions.truncation)
 
     ξ = curl(u_spectral, v_spectral, model.spectral_transform; radius)
-    ξ[1] = 0        # remove mean
+    
+    ξ[1:1] .= 0        # remove mean in a ugly hacky way that doesn't use scalar indexing for GPU compat
+    # TODO: do this better, we could also just use the @allowscalar macro in cases like this, 
+    # but currenlty CUDA isn't a dependency of SpeedyWeather, so we can't use it here 
 
     # repeat over vertical layers
     ξks = repeat(ξ, 1, nlayers)
@@ -517,6 +526,9 @@ $(TYPEDFIELDS)"""
 
     "directly specify the run folder, e.q. 'run_0001'"
     run_folder::String = ""
+
+    "File name of restart file, default 'restart.jld2'"
+    filename::String = "restart.jld2"
 end
 
 """
@@ -527,7 +539,7 @@ function initialize!(   progn_new::PrognosticVariables,
                         initial_conditions::StartFromFile,
                         model::AbstractModel)
 
-    (; path, run_prefix, id, run_number, run_digits) = initial_conditions
+    (; path, run_prefix, id, run_number, run_digits, filename) = initial_conditions
 
     if length(initial_conditions.run_folder) == 0
         # run_folder not specified, determine from run_prefix, id, run_number
@@ -536,11 +548,11 @@ function initialize!(   progn_new::PrognosticVariables,
     else    # use as specified
         run_folder = initial_conditions.run_folder
     end
-    restart_file = jldopen(joinpath(path, run_folder, "restart.jld2"))
+    restart_file = jldopen(joinpath(path, run_folder, filename))
     progn_old = restart_file["prognostic_variables"]
     version = restart_file["version"]
     if version != pkgversion(SpeedyWeather)
-        @info "Restart file created with SpeedyWeather $version loaded "*
+        @warn "Restart file created with SpeedyWeather $version loaded "*
                 "but currently used is $(pkgversion(SpeedyWeather))"
     end
     return copy!(progn_new, progn_old)

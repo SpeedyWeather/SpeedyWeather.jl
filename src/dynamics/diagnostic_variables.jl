@@ -246,14 +246,16 @@ end
 Generator function. If a `spectral_transform` is handed over, the same scratch memory is used."""
 function DynamicsVariables(SG::SpectralGrid; 
                            spectral_transform::Union{Nothing,SpectralTransform}=nothing) 
-    (; spectrum, grid, nlayers, NF, ArrayType) = SG
+    (; architecture, spectrum, grid, nlayers, NF, ArrayType) = SG
     (; SpectralVariable2D, SpectralVariable3D) = SG
     (; GridVariable2D, GridVariable3D) = SG
 
     if isnothing(spectral_transform)
         return DynamicsVariables{NF, ArrayType, typeof(spectrum), typeof(grid),
             SpectralVariable2D, SpectralVariable3D,
-            GridVariable2D, GridVariable3D, SpeedyTransforms.ScratchMemory{NF, ArrayType{Complex{NF}, 3}}}(;
+            GridVariable2D, GridVariable3D, 
+            SpeedyTransforms.ScratchMemory{NF, array_type(architecture, Complex{NF}, 3), 
+            array_type(architecture, NF, 1), array_type(architecture, Complex{NF}, 1)}}(;
                 spectrum, grid, nlayers,
             )
     else 

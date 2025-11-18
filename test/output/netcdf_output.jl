@@ -132,7 +132,7 @@ end
         SpeedyWeather.MeridionalVelocity10mOutput(), 
         SpeedyWeather.SurfaceTemperatureOutput(),
 #         SpeedyWeather.MeanSeaLevelPressureOutput(),   # this should be default now
-#         SpeedyWeather.SurfacePressureOutput(),        # don't output surface pressure too
+#         SpeedyWeather.SurfacePressureOutput(),        # don't output surface pressure too
     )
 
     simulation = initialize!(model)
@@ -147,8 +147,8 @@ end
     @test ~haskey(ds, "pres")   # with MSLP as default this should not be contained in the nc file
     @test haskey(ds, "mslp")    # but this variable
 
-    # Test reasonable scale for mean
-    (; pres_ref) = model.atmosphere     # unpack reference pressure
+    # Test reasonable scale for mean
+    (; pres_ref) = model.atmosphere     # unpack reference pressure
     pres_ref = pres_ref / 100           # Pa -> hPa  
     mslp = ds["mslp"].var[:, :, end]    # variable at last time step `.var` to read the raw data ignoring any mask
     
@@ -171,7 +171,7 @@ end
     @test all(0.6 .< (Tsurf ./ temp_ref) .< 1.3)
 end
 
-@testset "Restart from output file" begin
+@testset "Restart from restart file" begin
     tmp_output_path = mktempdir(pwd(), prefix = "tmp_testruns_")  # Cleaned up when the process exits
 
     spectral_grid = SpectralGrid()
@@ -188,8 +188,31 @@ end
     progn_new = simulation_new.prognostic_variables
 
     for varname in (:vor, :div, :temp, :pres)
-        var_old = getfield(progn_old, varname)[1]
-        var_new = getfield(progn_new, varname)[1]
+        var_old = getfield(progn_old, varname)
+        var_new = getfield(progn_new, varname)
+        @test all(var_old .== var_new)
+    end
+end 
+
+@testset "Restart from restart file without output" begin
+    tmp_output_path = mktempdir(pwd(), prefix = "tmp_restart_")  # Cleaned up when the process exits
+
+    spectral_grid = SpectralGrid()
+    model = PrimitiveDryModel(spectral_grid)
+    simulation = initialize!(model)
+    add!(model, :restart_file => RestartFile(path=tmp_output_path, write_only_with_output=false, filename="myrestart.jld2"))
+    run!(simulation, period=Day(1))
+
+    initial_conditions = StartFromFile(run_folder=tmp_output_path, filename="myrestart.jld2")
+    model_new = PrimitiveDryModel(spectral_grid; initial_conditions)
+    simulation_new = initialize!(model_new)
+
+    progn_old = simulation.prognostic_variables
+    progn_new = simulation_new.prognostic_variables
+
+    for varname in (:vor, :div, :temp, :pres)
+        var_old = getfield(progn_old, varname)
+        var_new = getfield(progn_new, varname)
         @test all(var_old .== var_new)
     end
 end 
@@ -244,3 +267,4 @@ end
     @test t == manual_time_axis(model.output.startdate, model.time_stepping.Δt_millisec, progn.clock.n_timesteps)
     @test t == SpeedyWeather.load_trajectory("time", model)
 end
+

@@ -43,12 +43,13 @@ export initialize!, finalize!
 # import utilities
 using SpeedyWeatherInternals.Utils 
 
-include("SpeedyParameters/SpeedyParameters.jl")
-using .SpeedyParameters
-import .SpeedyParameters: parameters
+# parameter handling
+using SpeedyWeatherInternals.SpeedyParameters
+
+import SpeedyWeatherInternals.SpeedyParameters: parameters
 
 # export user-facing parameter handling types and methods
-export  SpeedyParam, SpeedyParams, parameters, stripparams
+export SpeedyParam, SpeedyParams, parameters, stripparams
 
 # DATA STRUCTURES
 # LowerTriangularArrays for spherical harmonics
@@ -175,10 +176,10 @@ include("physics/land/land.jl")
 
 # OUTPUT
 include("output/schedule.jl")
+include("output/callbacks.jl")
 include("output/feedback.jl")
 include("output/netcdf_output.jl")
 include("output/restart_file.jl")
-include("output/callbacks.jl")
 include("output/particle_tracker.jl")
 include("output/jld2_output.jl")
 

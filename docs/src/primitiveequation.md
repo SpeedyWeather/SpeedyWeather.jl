@@ -834,6 +834,8 @@ Now loop over
 
 ## Scaled primitive equations
 
+TODO
+
 ## References
 
 [^GFDL1]: Geophysical Fluid Dynamics Laboratory, [Idealized models with spectral dynamics](https://www.gfdl.noaa.gov/idealized-models-with-spectral-dynamics/)
