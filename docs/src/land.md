@@ -55,17 +55,11 @@ other components of the land surface model `land`.
 land.thermodynamics
 ```
 
-To change these you can either mutate the fields
-
-```@example land
-land.thermodynamics.heat_conductivity = 0.25
-```
-
-or create a new model component `thermodynamics` 
+To change these you can either mutate the fields or create a new model component `thermodynamics` 
 passed on to the land model constructor
 
 ```@example land
-thermodynamics = LandThermodynamics(spectral_grid, heat_conductivity=0.25)
+thermodynamics = LandThermodynamics(spectral_grid, heat_conductivity_dry_soil=0.25)
 land = LandModel(spectral_grid; thermodynamics)
 land.thermodynamics
 ```
