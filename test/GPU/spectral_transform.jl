@@ -23,7 +23,7 @@ grid_list = [
     FullGaussianGrid,
     # FullClenshawGrid,
     OctahedralGaussianGrid,
-    # OctahedralClenshawGrid,
+    OctahedralClenshawGrid,
     # HEALPixGrid,
     # OctaHEALPixGrid,
 ]
