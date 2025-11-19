@@ -80,74 +80,74 @@ The `OneBandShortwave` scheme provides a single-band (broadband) shortwave radia
 **Cloud diagnosis:**
 Cloud properties are diagnosed from the relative humidity and total precipitation in the atmospheric column. The cloud base is set at the interface between the lowest two model layers, and the cloud top is the highest layer where both
 
-$$
+```math
 \mathrm{RH}_k > \mathrm{RH}_{cl} \quad \text{and} \quad Q_k > Q_{cl}
-$$
+```
 
 are satisfied. The cloud cover (CLC) in a layer is then given by
 
-$$
+```math
 \mathrm{CLC} = \min\left[1,\ w_{pcl} \sqrt{\min(p_{mcl}, P_{lsc} + P_{cnv})}+ \min\left(1, \left(\frac{\mathrm{RH}_k - \mathrm{RH}_{cl}}{\mathrm{RH}'_{cl} - \mathrm{RH}_{cl}}\right)^2\right)\right]
-$$
+```
 
 where $w_{pcl}$ and $p_{mcl}$ are parameters, $P_{lsc}$ and $P_{cnv}$ are large-scale and convective precipitation, and $\mathrm{RH}_{cl}$ is a threshold.
 
 **Stratocumulus clouds:**
 Stratocumulus cloud cover over oceans is parameterized based on boundary layer static stability (GSEN):
 
-$$
+```math
 \mathrm{CLS} = F_{ST} \max(\mathrm{CLS}_{\max} - \mathrm{CLC}, 0)
-$$
+```
 
 with
 
-$$
+```math
 F_{ST} = \max\left(0, \min\left(1, \frac{\mathrm{GSE}_N - \mathrm{GSES}_0}{\mathrm{GSES}_1 - \mathrm{GSES}_0}\right)\right)
-$$
+```
 
 Over land, the stratocumulus cover $\mathrm{CLS}$ is further modified to be proportional to the surface relative humidity:
 
-$$
+```math
 \mathrm{CLS}_L = \mathrm{CLS} \cdot \mathrm{RH}_N
-$$
+```
 where $\mathrm{RH}_N$ is the surface (lowest model layer) relative humidity.
 
 **Radiative transfer:**
 The incoming solar flux at the top of the atmosphere is computed from astronomical formulae. Ozone absorption in the lower and upper stratosphere is subtracted, yielding the downward flux into the first model layer:
 
-$$
+```math
 F_{h}^{\downarrow, SR} = F_{0}^{\downarrow, sol} - \Delta F_{ust}^{ozone} - \Delta F_{lst}^{ozone}
-$$
+```
 
 Shortwave radiation is then propagated downward through each layer using a transmissivity $\tau_{k}^{SR}$, which depends on zenith angle, layer depth, humidity, and cloud properties:
 
-$$
+```math
 F_{k+h}^{\downarrow, SR} = F_{k-h}^{\downarrow, SR} \, \tau_k^{SR}
-$$
+```
 
 In the cloud-top layer, cloud reflection is included:
 
-$$
+```math
 F_{k+h}^{\downarrow, SR} = F_{k-h}^{\downarrow, SR} (1 - A_{cl} \, \mathrm{CLC}) \, \tau_{k}^{SR}
-$$
+```
 
 At the surface, stratocumulus reflection and surface albedo are applied:
 
-$$
+```math
 F_{N+h}^{\downarrow, SR} = F_{N-h}^{\downarrow, SR} (1 - A_{cls} \, \mathrm{CLS}) \, \tau_{N}^{SR}
-$$
+```
 
 The upward flux at the surface is
 
-$$
+```math
 F_{s}^{\uparrow, SR} = F_{s}^{\downarrow, SR} \, A_s
-$$
+```
 
 and is propagated upward as
 
-$$
+```math
 F_{k-h}^{\uparrow, SR} =  F_{k+h}^{\uparrow, SR} \, \tau_{k}^{SR}
-$$
+```
 
 with cloud reflection added at the cloud-top layer. The upward part is only modeled for the visible band, as near-infrared is mostly absorbed downward.
 
