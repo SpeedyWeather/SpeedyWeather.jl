@@ -1,7 +1,7 @@
 abstract type AbstractVerticalDiffusion <: AbstractParameterization end
 
 export BulkRichardsonDiffusion
-@kwdef struct BulkRichardsonDiffusion{NF, VectorType} <: AbstractVerticalDiffusion
+@kwdef struct BulkRichardsonDiffusion{NF, RefNF <: Ref{NF}, VectorType} <: AbstractVerticalDiffusion
     "[OPTION] von Kármán constant [1]"
     κ::NF = 0.4
 
@@ -24,10 +24,10 @@ export BulkRichardsonDiffusion
     diffuse_humidity::Bool = true
 
     "[DERIVED] Logarithm of typical lowermost layer height Z over roughness length z₀"
-    logZ_z₀::Base.RefValue{NF} = Ref(zero(NF))
+    logZ_z₀::RefNF = Ref(zero(NF))
 
     "[DERIVED] Sqrt of maximum diffusion coefficient C"
-    sqrtC_max::Base.RefValue{NF} = Ref(zero(NF))
+    sqrtC_max::RefNF = Ref(zero(NF))
 
     "[DERIVED] Vertical Laplace operator, operator for cells above"
     ∇²_above::VectorType
@@ -43,7 +43,7 @@ function BulkRichardsonDiffusion(SG::SpectralGrid; kwargs...)
     arch = SG.architecture
     ∇²_above = on_architecture(arch, zeros(SG.NF, SG.nlayers))
     ∇²_below = on_architecture(arch, zeros(SG.NF, SG.nlayers))
-    return BulkRichardsonDiffusion{SG.NF, SG.VectorType}(; ∇²_above, ∇²_below, kwargs...)
+    return BulkRichardsonDiffusion{SG.NF, Ref{SG.NF}, SG.VectorType}(; ∇²_above, ∇²_below, kwargs...)
 end
 
 variables(::BulkRichardsonDiffusion) = (

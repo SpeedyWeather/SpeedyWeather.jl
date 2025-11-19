@@ -61,6 +61,9 @@ end
 mask!(field::AbstractField, mask::AbstractLandSeaMask, args...; kwargs...) =
     mask!(field, mask.mask, args...; kwargs...)
 
+# adapt on GPU only the mask itself
+Adapt.adapt_structure(to, land_sea_mask::AbstractLandSeaMask) = (mask=land_sea_mask.mask, )
+
 # make available when using SpeedyWeather
 export EarthLandSeaMask
 
@@ -177,5 +180,3 @@ function initialize!(land_sea_mask::RockyPlanetMask, model::PrimitiveEquation)
     land_sea_mask.mask .= 1    # set all to land
     return nothing
 end
-
-Adapt.adapt_structure(to, land_sea_mask::AbstractLandSeaMask) = (mask=land_sea_mask.mask, )

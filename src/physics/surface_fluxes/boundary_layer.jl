@@ -23,7 +23,7 @@ export BulkRichardsonDrag
 """Boundary layer drag coefficient from the bulk Richardson number,
 following Frierson, 2006, Journal of the Atmospheric Sciences.
 $(TYPEDFIELDS)"""
-@kwdef struct BulkRichardsonDrag{NF} <: AbstractBoundaryLayer
+@kwdef struct BulkRichardsonDrag{NF, RefNF <: Ref{NF}} <: AbstractBoundaryLayer
     "von Kármán constant [1]"
     κ::NF = 0.4
 
@@ -34,10 +34,12 @@ $(TYPEDFIELDS)"""
     Ri_c::NF = 10
 
     "Maximum drag coefficient, κ²/log(zₐ/z₀) for zₐ from reference temperature"
-    drag_max::Base.RefValue{NF} = Ref(zero(NF))
+    drag_max::RefNF = Ref(zero(NF))
 end
 
-BulkRichardsonDrag(SG::SpectralGrid, kwargs...) = BulkRichardsonDrag{SG.NF}(; kwargs...)
+Adapt.@adapt_structure BulkRichardsonDrag
+
+BulkRichardsonDrag(SG::SpectralGrid, kwargs...) = BulkRichardsonDrag{SG.NF, Ref{SG.NF}}(; kwargs...)
 
 function initialize!(scheme::BulkRichardsonDrag, model::PrimitiveEquation)
 

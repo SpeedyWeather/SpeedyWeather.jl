@@ -1,4 +1,8 @@
 abstract type AbstractOrography <: AbstractModelComponent end
+
+# adapt to GPU only the fields themselves
+Adapt.adapt_structure(to, orog::AbstractOrography) = (orography=orog.orography, geopot_surf=orog.geopot_surf)
+
 export NoOrography
 
 """Orography with zero height in `orography` and zero surface geopotential `geopot_surf`.
@@ -208,5 +212,3 @@ function initialize!(   orog::EarthOrography,
     spectral_truncation!(geopot_surf)       # set the lmax+1 harmonics to zero
     return nothing    
 end
-
-Adapt.adapt_structure(to, orog::AbstractOrography) = (orography=orog.orography, )
