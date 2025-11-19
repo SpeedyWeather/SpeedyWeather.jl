@@ -337,12 +337,12 @@ end
                   1e-2,   # HEALPixGrid
                   1e-2]   # OctaHEALPixGrid
     @testset for trunc in [42, 61]
-        @testset for (i_grid, Grid) in enumerate(FullGaussianGrid,
+        @testset for (i_grid, Grid) in enumerate((FullGaussianGrid,
                               FullClenshawGrid,
                               OctahedralGaussianGrid,
                               OctahedralClenshawGrid,
                               HEALPixGrid,
-                              OctaHEALPixGrid,)
+                              OctaHEALPixGrid,))
 
             # TODO: other dealising for other grids?
             dealiasing = 3 
