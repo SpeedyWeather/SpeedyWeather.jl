@@ -531,11 +531,10 @@ Architectures.on_architecture(field::AbstractField, x) = on_architecture(archite
 
 function Architectures.on_architecture(arch, field::Field{T, N, ArrayType, Grid}) where {T, N, ArrayType, Grid} 
     adapted_data = on_architecture(arch, field.data)
-    if ismatching(field.grid, typeof(adapted_data))
-        return Field(adapted_data, on_architecture(arch, field.grid))
-    else # if not matching, create new grid with other architecture
-        #@warn "Adapting field to new architecture with $(typeof(adapted_data))"
-        return Field(adapted_data, Grid(field.grid, architecture(typeof(adapted_data))))
-    end
+
+    # if not matching, create new grid with other architecture
+    arch = ismatching(field.grid, typeof(adapted_data)) ? arch : architecture(typeof(adapted_data))
+    
+    return Field(adapted_data, on_architecture(arch, field.grid))
 end 
     

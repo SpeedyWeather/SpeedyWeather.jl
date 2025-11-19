@@ -1,6 +1,24 @@
+@testset "GPU spectral transform roundtrip " begin
+    spectral_grid = SpectralGrid(trunc=41, nlayers=8, architecture=GPU())
+    S = SpectralTransform(spectral_grid)
+    
+    # first roundtrip
+    L = randn(ComplexF32, spectral_grid.spectrum, 8)
+    field = zeros(Float32, spectral_grid.grid, 8)
+    transform!(field, L, S)
+    transform!(L, field, S)
+
+    # 2nd roundtrip
+    L2 = deepcopy(L)
+    transform!(field, L, S)
+    transform!(L, field, S)
+
+    @test L ≈ L2
+end
+
 spectral_resolutions = (31,)#, 63, 127)
 nlayers_list = (8,)# 8, 32]
-# TODO: can uncomment this when we push to main  
+# TODO: at the moment only tests for even grids (no ring on equator) pass for some reason
 grid_list = [
     FullGaussianGrid,
     # FullClenshawGrid,
@@ -186,8 +204,8 @@ end
                     scratch = S_cpu.scratch_memory.column 
                     SpeedyTransforms._legendre!(g_north_cpu, g_south_cpu, spec_cpu, scratch, S_cpu)
                     # Copy to GPU
-                    g_north_gpu = cu(g_north_cpu)
-                    g_south_gpu = cu(g_south_cpu);
+		            g_north_gpu = on_architecture(gpu_arch, g_north_cpu)
+		            g_south_gpu = on_architecture(gpu_arch, g_south_cpu)
 
                     # CPU inverse transform
                     SpeedyTransforms._fourier_batched!(
@@ -351,8 +369,8 @@ end
                     f_south_cpu = S_cpu.scratch_memory.south   
                     SpeedyTransforms._fourier!(f_north_cpu, f_south_cpu, grid_cpu, S_cpu)
                     # Copy to GPU
-                    f_north_gpu = cu(f_north_cpu)
-                    f_south_gpu = cu(f_south_cpu)
+                    f_north_gpu = on_architecture(gpu_arch, f_north_cpu)
+                    f_south_gpu = on_architecture(gpu_arch, f_south_cpu)
                     
                     # CPU inverse transform
                     SpeedyTransforms._legendre!(

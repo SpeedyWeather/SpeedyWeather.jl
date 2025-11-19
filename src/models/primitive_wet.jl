@@ -39,7 +39,6 @@ $(TYPEDFIELDS)"""
     HF,     # <:AbstractSurfaceHumidityFlux,
     LC,     # <:AbstractCondensation,
     CV,     # <:AbstractConvection,
-    OD,     # <:AbstractOpticalDepth,
     SW,     # <:AbstractShortwave,
     LW,     # <:AbstractLongwave,
     SP,     # <:AbstractStochasticPhysics,
@@ -94,9 +93,8 @@ $(TYPEDFIELDS)"""
     surface_momentum_flux::SM = SurfaceMomentumFlux(spectral_grid)
     surface_heat_flux::SH = SurfaceHeatFlux(spectral_grid)
     surface_humidity_flux::HF = SurfaceHumidityFlux(spectral_grid)
-    large_scale_condensation::LC = ImplicitCondensation(spectral_grid)
-    convection::CV = BettsMillerConvection(spectral_grid)
-    optical_depth::OD = ZeroOpticalDepth(spectral_grid)
+    large_scale_condensation::LSC = ImplicitCondensation(spectral_grid)
+    convection::CV = SimplifiedBettsMiller(spectral_grid)
     shortwave_radiation::SW = TransparentShortwave(spectral_grid)
     longwave_radiation::LW = JeevanjeeRadiation(spectral_grid)
     stochastic_physics::SP = nothing
@@ -165,7 +163,6 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
     initialize!(model.vertical_diffusion, model)
     initialize!(model.large_scale_condensation, model)
     initialize!(model.convection, model)
-    initialize!(model.optical_depth, model)
     initialize!(model.shortwave_radiation, model)
     initialize!(model.longwave_radiation, model)
     initialize!(model.surface_condition, model)

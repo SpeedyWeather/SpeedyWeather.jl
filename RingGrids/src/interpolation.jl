@@ -6,7 +6,7 @@ struct GridGeometry{
     Grid,
     VectorType,
     VectorIntType,
-    RangeTupleType,
+    VectorRange,
 } <: AbstractGridGeometry
     grid::Grid                  # grid, e.g. FullGaussianGrid
 
@@ -19,8 +19,8 @@ struct GridGeometry{
     nlons::VectorIntType        # number of longitudinal points per ring
     lon_offsets::VectorType     # longitude offsets of first grid point per ring
 
-    # rings, but as a tuple (for GPU compat reasons)
-    rings_tuple::RangeTupleType
+    # rings, GPU/architecture copy (if needed) of grid.rings
+    rings::VectorRange
 end
 
 GridGeometry(field::AbstractField; kwargs...) = GridGeometry(field.grid; NF=eltype(field), kwargs...)
@@ -60,12 +60,10 @@ function GridGeometry(
     # vector type
     VectorType = array_type(architecture, NF, 1)
     VectorIntType = array_type(architecture, Int, 1)
+    device_rings = on_architecture(architecture, grid.rings)
 
-    # rings as tuple (for GPU compat reasons)
-    rings_tuple = Tuple(grid.rings)
-
-    return GridGeometry{typeof(grid), VectorType, VectorIntType, typeof(rings_tuple)}(
-        grid, nlat_half, nlat, npoints, londs, latd_poles, nlons, lon_offsets, rings_tuple)
+    return GridGeometry{typeof(grid), VectorType, VectorIntType, typeof(device_rings)}(
+        grid, nlat_half, nlat, npoints, londs, latd_poles, nlons, lon_offsets, device_rings)
 end
 
 Base.show(io::IO,G::GridGeometry) = print(io,"GridGeometry for $(G.grid)")
@@ -272,16 +270,17 @@ function _interpolate!(
     geometry::GridGeometry,
     architecture::AbstractArchitecture      
 )
-    (; npoints_output, ij_as, ij_bs, ij_cs, ij_ds, Δabs, Δcds, Δys) = locator
-    (; npoints, rings_tuple) = geometry
-    
+    (; npoints_output, ij_as, ij_bs, ij_cs, ij_ds, Δabs, Δcds, Δys) = interpolator.locator
+    (; npoints) = interpolator.geometry
+    (; rings) = interpolator.geometry.grid # CPU version even on GPU
+
     # 1) Aout's length must match the interpolator
     # 2) input A must match the interpolator's geometry points (do not check grids for view support)
     @boundscheck size(Aout, 1) == length(ij_as) || throw(DimensionMismatchArray(Aout, ij_as))
     @boundscheck length(A) == npoints ||
         throw(DimensionMismatch("Interpolator ($npoints points) mismatches input grid ($(length(A)) points)."))
 
-    A_northpole, A_southpole = average_on_poles(A, rings_tuple)
+    A_northpole, A_southpole = average_on_poles(A, rings)
 
     #TODO ij_cs, ij_ds shouldn't be 0...
     @boundscheck extrema_in(ij_as,  0, npoints) || throw(BoundsError)
@@ -609,10 +608,10 @@ function find_grid_indices!(locator::AbstractLocator,   # update indices arrays
                            λs::AbstractArray,           # based on new longitudes λ
                            architecture::AbstractArchitecture=architecture(λs))
                            
-    (; js, ij_as, ij_bs, ij_cs, ij_ds ) = locator
-    (; Δabs, Δcds ) = locator
-    (; nlons, lon_offsets, nlat ) = geometry
-    (; rings ) = geometry.grid
+    (; js, ij_as, ij_bs, ij_cs, ij_ds ) = I.locator
+    (; Δabs, Δcds ) = I.locator
+    (; nlons, lon_offsets, nlat ) = I.geometry
+    (; rings ) = I.geometry # architecture version (GPU if needed)
     
     # Convert λs to the same type as lon_offsets if needed
     λs_converted = convert.(eltype(lon_offsets), λs)

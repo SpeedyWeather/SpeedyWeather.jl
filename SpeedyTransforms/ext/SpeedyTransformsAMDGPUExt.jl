@@ -1,6 +1,6 @@
-module SpeedyTransformsCUDAExt
+module SpeedyTransformsAMDGPUExt
     
-import CUDA: CUDA, CUFFT, CuArray
+import AMDGPU: AMDGPU, ROCArray
 import AbstractFFTs
 import LinearAlgebra
 using DocStringExtensions
@@ -9,6 +9,6 @@ using SpeedyTransforms
 using SpeedyTransforms.RingGrids
 using SpeedyTransforms.LowerTriangularArrays
 
-# place holder for CUDA-specific methods in SpeedyTransforms
-
+# place holder for AMDGPU-specific methods in SpeedyTransforms
+    
 end 
