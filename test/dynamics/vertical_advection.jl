@@ -16,18 +16,22 @@
 end
 
 @testset "Vertical advection runs" begin
-    spectral_grid = SpectralGrid(trunc=31, nlayers=8)
+    spectral_grid = SpectralGrid(trunc = 31, nlayers = 8)
 
-    advection_schemes = (SpeedyWeather.WENOVerticalAdvection,
-                        SpeedyWeather.CenteredVerticalAdvection,
-                        SpeedyWeather.UpwindVerticalAdvection)
+    advection_schemes = (
+        SpeedyWeather.WENOVerticalAdvection,
+        SpeedyWeather.CenteredVerticalAdvection,
+        SpeedyWeather.UpwindVerticalAdvection,
+    )
 
     for VerticalAdvection in advection_schemes
-        model = PrimitiveWetModel(spectral_grid;
-                        vertical_advection = VerticalAdvection(spectral_grid),
-                        physics=false)
+        model = PrimitiveWetModel(
+            spectral_grid;
+            vertical_advection = VerticalAdvection(spectral_grid),
+            physics = false
+        )
         simulation = initialize!(model)
-        run!(simulation, period=Day(1))
-        @test simulation.model.feedback.nans_detected == false    
+        run!(simulation, period = Day(1))
+        @test simulation.model.feedback.nans_detected == false
     end
 end

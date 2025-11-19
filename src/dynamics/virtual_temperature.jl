@@ -9,15 +9,15 @@ With absolute temperature T, specific humidity q and
 
 in grid-point space."""
 function virtual_temperature!(
-    diagn::DiagnosticVariables,
-    model::PrimitiveWet,
+        diagn::DiagnosticVariables,
+        model::PrimitiveWet,
     )
 
     (; temp_grid, humid_grid, temp_virt_grid) = diagn.grid
     μ = model.atmosphere.μ_virt_temp
 
-    @inbounds for ijk in eachindex(temp_virt_grid, temp_grid, humid_grid)
-        temp_virt_grid[ijk] = temp_grid[ijk]*(1 + μ*humid_grid[ijk])
+    return @inbounds for ijk in eachindex(temp_virt_grid, temp_grid, humid_grid)
+        temp_virt_grid[ijk] = temp_grid[ijk] * (1 + μ * humid_grid[ijk])
     end
 end
 
@@ -26,9 +26,9 @@ $(TYPEDSIGNATURES)
 Virtual temperature in grid-point space: For the PrimitiveDry temperature
 and virtual temperature are the same (humidity=0). Just copy over the arrays."""
 function virtual_temperature!(
-    diagn::DiagnosticVariables,
-    model::PrimitiveDry,
-)
+        diagn::DiagnosticVariables,
+        model::PrimitiveDry,
+    )
     (; temp_grid, temp_virt_grid) = diagn.grid
     # Tᵥ = T(1 + μ*q) with humid=q=0
     temp_virt_grid .= temp_grid
@@ -36,20 +36,20 @@ function virtual_temperature!(
 end
 
 function virtual_temperature!(
-    column::ColumnVariables,
-    model::PrimitiveEquation,
-)
+        column::ColumnVariables,
+        model::PrimitiveEquation,
+    )
     (; temp, temp_virt, humid) = column
     μ = model.atmosphere.μ_virt_temp
 
-    @. temp_virt = temp*(1 + μ*humid)
+    @. temp_virt = temp * (1 + μ * humid)
     return nothing
 end
 
 function virtual_temperature!(
-    column::ColumnVariables,
-    model::PrimitiveDry,
-)
+        column::ColumnVariables,
+        model::PrimitiveDry,
+    )
     (; temp, temp_virt) = column
     @. temp_virt = temp             # temp = temp_virt for PrimitiveDry
     return nothing
@@ -61,14 +61,14 @@ Linear virtual temperature for `model::PrimitiveDry`: Just copy over
 arrays from `temp` to `temp_virt` at timestep `lf` in spectral space
 as humidity is zero in this `model`."""
 function linear_virtual_temperature!(
-    diagn::DiagnosticVariables,
-    progn::PrognosticVariables,
-    lf::Integer,
-    model::PrimitiveDry,
-)
+        diagn::DiagnosticVariables,
+        progn::PrognosticVariables,
+        lf::Integer,
+        model::PrimitiveDry,
+    )
     (; temp_virt) = diagn.dynamics
     temp = get_step(progn.temp, lf)
-    copyto!(temp_virt, temp)
+    return copyto!(temp_virt, temp)
 end
 
 """
@@ -84,15 +84,15 @@ specific humidity q and
 
 in spectral space."""
 function linear_virtual_temperature!(
-    diagn::DiagnosticVariables,
-    progn::PrognosticVariables,
-    lf::Integer,
-    model::PrimitiveEquation,
-)
+        diagn::DiagnosticVariables,
+        progn::PrognosticVariables,
+        lf::Integer,
+        model::PrimitiveEquation,
+    )
     (; temp_virt) = diagn.dynamics
     μ = model.atmosphere.μ_virt_temp
     (; temp_average) = diagn
-    temp  = get_step(progn.temp, lf)
+    temp = get_step(progn.temp, lf)
     humid = get_step(progn.humid, lf)
 
     # TODO check that doing a non-linear virtual temperature in grid-point space
@@ -104,7 +104,8 @@ function linear_virtual_temperature!(
     for k in eachmatrix(temp_virt, temp, humid)
         Tₖ = temp_average[k]
         for lm in eachharmonic(temp_virt, temp, humid)
-            temp_virt[lm, k] = temp[lm, k] + (Tₖ*μ)*humid[lm, k]
+            temp_virt[lm, k] = temp[lm, k] + (Tₖ * μ) * humid[lm, k]
         end
     end
+    return
 end

@@ -6,7 +6,7 @@ longwave_radiation!(::ColumnVariables, ::Nothing, ::PrimitiveEquation) = nothing
 
 # function barrier for all AbstractLongwave
 function longwave_radiation!(column::ColumnVariables, model::PrimitiveEquation)
-    longwave_radiation!(column, model.longwave_radiation, model)
+    return longwave_radiation!(column, model.longwave_radiation, model)
 end
 
 ## UNIFORM COOLING
@@ -41,26 +41,26 @@ UniformCooling(SG::SpectralGrid; kwargs...) = UniformCooling{SG.NF}(; kwargs...)
 initialize!(radiation::UniformCooling, model::PrimitiveEquation) = nothing
 
 function longwave_radiation!(
-    column::ColumnVariables,
-    radiation::UniformCooling,
-    model::PrimitiveEquation,
-)
-    longwave_radiation!(column, radiation)
+        column::ColumnVariables,
+        radiation::UniformCooling,
+        model::PrimitiveEquation,
+    )
+    return longwave_radiation!(column, radiation)
 end
 
 function longwave_radiation!(
-    column::ColumnVariables{NF},
-    radiation::UniformCooling,
-) where NF
+        column::ColumnVariables{NF},
+        radiation::UniformCooling,
+    ) where {NF}
     (; temp, temp_tend) = column
     (; temp_min, temp_stratosphere) = radiation
-    
+
     cooling = -inv(convert(NF, radiation.time_scale.value))
     τ⁻¹ = inv(radiation.time_scale_stratosphere.value)
 
-    @inbounds for k in eachlayer(column)
+    return @inbounds for k in eachlayer(column)
         # Paulius and Garner, 2006, eq (1) and (2)
-        temp_tend[k] += temp[k] > temp_min ? cooling : (temp_stratosphere - temp[k])*τ⁻¹
+        temp_tend[k] += temp[k] > temp_min ? cooling : (temp_stratosphere - temp[k]) * τ⁻¹
     end
 end
 
@@ -103,18 +103,18 @@ initialize!(radiation::JeevanjeeRadiation, model::PrimitiveEquation) = nothing
 
 # function barrier
 function longwave_radiation!(
-    column::ColumnVariables,
-    radiation::JeevanjeeRadiation,
-    model::PrimitiveEquation,
-)
-    longwave_radiation!(column, radiation, model.atmosphere)
+        column::ColumnVariables,
+        radiation::JeevanjeeRadiation,
+        model::PrimitiveEquation,
+    )
+    return longwave_radiation!(column, radiation, model.atmosphere)
 end
 
 function longwave_radiation!(
-    column::ColumnVariables{NF},
-    radiation::JeevanjeeRadiation,
-    atmosphere::AbstractAtmosphere,
-) where NF
+        column::ColumnVariables{NF},
+        radiation::JeevanjeeRadiation,
+        atmosphere::AbstractAtmosphere,
+    ) where {NF}
 
     (; nlayers, temp_tend) = column
     T = column.temp                 # to match Seeley, 2023 notation
@@ -124,41 +124,41 @@ function longwave_radiation!(
     ϵ_land = radiation.emissivity_land
     σ = atmosphere.stefan_boltzmann
     Tₜ = radiation.temp_tropopause
-    
+
     (; skin_temperature_sea, skin_temperature_land, land_fraction) = column
 
     # extension to Jeevanjee: Include temperature flux (Stefan-Boltzmann)
     # between surface and lowermost air temperature
     # but zero flux if land/sea not available
     Fₖ_ocean = isfinite(skin_temperature_sea) ?
-        ϵ_ocean*σ*skin_temperature_sea^4 : 
+        ϵ_ocean * σ * skin_temperature_sea^4 :
         zero(skin_temperature_sea)
     column.surface_longwave_up_ocean = Fₖ_ocean
 
     Fₖ_land = isfinite(skin_temperature_land) ?
-        ϵ_land*σ*skin_temperature_land^4 : 
+        ϵ_land * σ * skin_temperature_land^4 :
         zero(skin_temperature_land)
     column.surface_longwave_up_land = Fₖ_land
 
     # land-sea mask weighted combined flux from land and ocean
     local Fₖ::NF
-    Fₖ = (1-land_fraction)*Fₖ_ocean + land_fraction*Fₖ_land
+    Fₖ = (1 - land_fraction) * Fₖ_ocean + land_fraction * Fₖ_land
     F[end] += Fₖ                        # accumulate into total flux
     column.surface_longwave_up = Fₖ     # store for output/diagnostics
 
     # integrate from surface up, skipping surface (k=nlayers+1) and top-of-atmosphere flux (k=1)
     @inbounds for k in nlayers:-1:2
         # Seeley and Wordsworth, 2023 eq (1)
-        Fₖ += (T[k-1] - T[k]) * α * (Tₜ - T[k]) # upward flux from layer k into k-1
+        Fₖ += (T[k - 1] - T[k]) * α * (Tₜ - T[k]) # upward flux from layer k into k-1
         F[k] += Fₖ                              # accumulate fluxes
     end
 
     # Relax the uppermost level towards prescribed "tropopause temperature"
-    temp_tend[1] += (Tₜ - T[1])/time_scale.value
+    temp_tend[1] += (Tₜ - T[1]) / time_scale.value
 
     # for diagnostic, use Fₖ as the outgoing longwave radiation although it's technically into the
     # uppermost layer from below (not out of it)
-    column.outgoing_longwave_radiation = Fₖ
+    return column.outgoing_longwave_radiation = Fₖ
 end
 
 export NBandRadiation
@@ -170,10 +170,10 @@ NBandRadiation(SG::SpectralGrid; kwargs...) = NBandRadiation(; kwargs...)
 initialize!(radiation::NBandRadiation, model::PrimitiveEquation) = nothing
 
 function longwave_radiation!(
-    column::ColumnVariables,
-    radiation::NBandRadiation,
-    model::PrimitiveEquation,
-)
+        column::ColumnVariables,
+        radiation::NBandRadiation,
+        model::PrimitiveEquation,
+    )
 
     (; nlayers) = column
     nbands = column.nbands_longwave                 # number of spectral bands
@@ -183,19 +183,19 @@ function longwave_radiation!(
     B = column.b                                    # reuse scratch vector b
     (; temp) = column
     @inbounds for k in eachindex(B, temp)
-        B[k] = σ*temp[k]^4
+        B[k] = σ * temp[k]^4
     end
 
-    @inbounds for band in 1:nbands                  # loop over spectral bands
+    return @inbounds for band in 1:nbands                  # loop over spectral bands
         dτ = view(column.optical_depth_longwave, :, band)   # differential optical depth per layer in that band
 
         # UPWARD flux U
-        U = σ*column.surface_temp^4                 # boundary condition at surface U(τ=τ(z=0)) = σTₛ⁴
-        column.flux_temp_upward[nlayers+1] += U     # accumulate fluxes
+        U = σ * column.surface_temp^4                 # boundary condition at surface U(τ=τ(z=0)) = σTₛ⁴
+        column.flux_temp_upward[nlayers + 1] += U     # accumulate fluxes
 
         for k in nlayers:-1:1                       # integrate from surface up
             # Radiative transfer, e.g. Frierson et al. 2006, equation 6
-            U -= dτ[k]*(U - B[k])                   # negative because we integrate from surface up in -τ direction
+            U -= dτ[k] * (U - B[k])                   # negative because we integrate from surface up in -τ direction
             column.flux_temp_upward[k] += U         # accumulate that flux
         end
 
@@ -204,11 +204,11 @@ function longwave_radiation!(
 
         # DOWNWARD flux D
         D = zero(U)                                 # top boundary condition of longwave flux
-                                                    # no need to accumulate 0 at top downward flux
+        # no need to accumulate 0 at top downward flux
         for k in 1:nlayers
             # Radiative transfer, Frierson et al. 2006, equation 7
-            D += dτ[k]*(B[k] - D)
-            column.flux_temp_downward[k+1] += D
+            D += dτ[k] * (B[k] - D)
+            column.flux_temp_downward[k + 1] += D
         end
     end
 end

@@ -4,10 +4,10 @@
 
             ks = 2
 
-            L = randn(LowerTriangularArray{complex(T)}, trunc+1, trunc+1, ks)
+            L = randn(LowerTriangularArray{complex(T)}, trunc + 1, trunc + 1, ks)
 
             # one more degree that shouldbe ignored
-            L2 = randn(LowerTriangularArray{complex(T)}, trunc+2, trunc+1, ks)
+            L2 = randn(LowerTriangularArray{complex(T)}, trunc + 2, trunc + 1, ks)
 
             # make trunc x trunc identical random numbers
             copyto!(L2, L)
@@ -24,7 +24,7 @@
             end
 
             # normalization should change things!
-            @test p != SpeedyTransforms.power_spectrum(L, normalize=false)
+            @test p != SpeedyTransforms.power_spectrum(L, normalize = false)
         end
     end
 end

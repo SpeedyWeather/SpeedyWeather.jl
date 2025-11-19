@@ -2,7 +2,7 @@ using SpeedyWeather.RingGrids
 using CairoMakie, GeoMakie
 using Test
 
-RingGrids.globe(FullGaussianGrid, 12, interactive=true)
+RingGrids.globe(FullGaussianGrid, 12, interactive = true)
 plt = RingGrids.globe(randn(FullGaussianGrid(12)))
 
 const grid_types = (
@@ -14,7 +14,7 @@ const grid_types = (
     HEALPixGrid,
     OctaHEALPixGrid,
     FullHEALPixGrid,
-    FullOctaHEALPixGrid
+    FullOctaHEALPixGrid,
 )
 
 

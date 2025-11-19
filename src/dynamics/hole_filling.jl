@@ -9,13 +9,13 @@ ClipNegatives(SG::SpectralGrid) = ClipNegatives()
 
 # function barrier
 function hole_filling!(
-    q::AbstractField,
-    H::ClipNegatives,
-    model::AbstractModel,
-)
-    hole_filling!(q, H)
+        q::AbstractField,
+        H::ClipNegatives,
+        model::AbstractModel,
+    )
+    return hole_filling!(q, H)
 end
 
 function hole_filling!(q::AbstractField, ::ClipNegatives)
-    @. q = max(q, 0)
+    return @. q = max(q, 0)
 end

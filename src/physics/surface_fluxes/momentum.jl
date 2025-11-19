@@ -2,7 +2,7 @@
 surface_wind_stress!(::ColumnVariables, ::Nothing, ::PrimitiveEquation) = nothing
 
 export SurfaceWind
-Base.@kwdef struct SurfaceWind{NF<:AbstractFloat} <: AbstractSurfaceWind
+Base.@kwdef struct SurfaceWind{NF <: AbstractFloat} <: AbstractSurfaceWind
     "Ratio of near-surface wind to lowest-level wind [1]"
     f_wind::NF = 0.95
 
@@ -14,7 +14,7 @@ Base.@kwdef struct SurfaceWind{NF<:AbstractFloat} <: AbstractSurfaceWind
 
     "Otherwise, drag coefficient over land (orography = 0) [1]"
     drag_land::NF = 2.4e-3
-    
+
     "Otherwise, Drag coefficient over sea [1]"
     drag_sea::NF = 1.8e-3
 end
@@ -22,16 +22,18 @@ end
 SurfaceWind(SG::SpectralGrid; kwargs...) = SurfaceWind{SG.NF}(; kwargs...)
 initialize!(::SurfaceWind, ::PrimitiveEquation) = nothing
 
-function surface_wind_stress!(  column::ColumnVariables{NF},
-                                surface_wind::SurfaceWind,
-                                model::PrimitiveEquation) where NF
+function surface_wind_stress!(
+        column::ColumnVariables{NF},
+        surface_wind::SurfaceWind,
+        model::PrimitiveEquation
+    ) where {NF}
 
     (; land_fraction) = column
     (; f_wind, V_gust, drag_land, drag_sea) = surface_wind
 
     # SPEEDY documentation eq. 49, but use previous time step for numerical stability
-    column.surface_u = f_wind*column.u[end] 
-    column.surface_v = f_wind*column.v[end]
+    column.surface_u = f_wind * column.u[end]
+    column.surface_v = f_wind * column.v[end]
     (; surface_u, surface_v) = column
 
     # SPEEDY documentation eq. 50
@@ -39,17 +41,17 @@ function surface_wind_stress!(  column::ColumnVariables{NF},
 
     # drag coefficient either from SurfaceWind or from a central drag coefficient
     drag_sea, drag_land = surface_wind.use_boundary_layer_drag ?
-                                (column.boundary_layer_drag, column.boundary_layer_drag) : 
-                                (drag_sea, drag_land)
-    
+        (column.boundary_layer_drag, column.boundary_layer_drag) :
+        (drag_sea, drag_land)
+
     # surface wind stress: quadratic drag, fractional land-sea mask
     ρ = column.surface_air_density
     V₀ = column.surface_wind_speed
-    drag = land_fraction*drag_land + (one(NF)-land_fraction)*drag_sea
+    drag = land_fraction * drag_land + (one(NF) - land_fraction) * drag_sea
 
     # SPEEDY documentation eq. 52, 53, accumulate fluxes with +=
-    column.flux_u_upward[end] -= ρ*drag*V₀*surface_u
-    column.flux_v_upward[end] -= ρ*drag*V₀*surface_v
-    
+    column.flux_u_upward[end] -= ρ * drag * V₀ * surface_u
+    column.flux_v_upward[end] -= ρ * drag * V₀ * surface_v
+
     return nothing
 end

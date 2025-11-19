@@ -42,35 +42,35 @@ function initialize!(land::SeasonalLandTemperature, model::PrimitiveEquation)
 
     # read out netCDF data
     fill_value = ncfile[land.varname].attrib["_FillValue"]
-    lst = land.file_Grid(ncfile[land.varname].var[:, :, :], input_as=Matrix)
+    lst = land.file_Grid(ncfile[land.varname].var[:, :, :], input_as = Matrix)
     lst[lst .=== fill_value] .= land.missing_value      # === to include NaN
     lst = on_architecture(model.architecture, lst)
-    
-    @boundscheck fields_match(monthly_temperature, lst, vertical_only=true) ||
+
+    @boundscheck fields_match(monthly_temperature, lst, vertical_only = true) ||
         throw(DimensionMismatch(monthly_temperature, lst))
 
     # create interpolator from grid in file to grid used in model
-    interp = RingGrids.interpolator(monthly_temperature, lst, NF=Float32)
+    interp = RingGrids.interpolator(monthly_temperature, lst, NF = Float32)
     interpolate!(monthly_temperature, lst, interp)
     return nothing
 end
 
 function initialize!(
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
-    land::SeasonalLandTemperature,
-    model::PrimitiveEquation,
-)
+        progn::PrognosticVariables,
+        diagn::DiagnosticVariables,
+        land::SeasonalLandTemperature,
+        model::PrimitiveEquation,
+    )
     # initialize land temperature by "running" the step at the current time
-    timestep!(progn, diagn, land, model)
+    return timestep!(progn, diagn, land, model)
 end
 
 function timestep!(
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
-    land::SeasonalLandTemperature,
-    model::PrimitiveEquation,
-)
+        progn::PrognosticVariables,
+        diagn::DiagnosticVariables,
+        land::SeasonalLandTemperature,
+        model::PrimitiveEquation,
+    )
     (; time) = progn.clock
 
     this_month = Dates.month(time)
@@ -81,22 +81,24 @@ function timestep!(
     (; monthly_temperature) = land
     (; soil_temperature) = progn.land
     NF = eltype(soil_temperature)
-    weight = convert(NF, Dates.days(time-Dates.firstdayofmonth(time))/Dates.daysinmonth(time))
+    weight = convert(NF, Dates.days(time - Dates.firstdayofmonth(time)) / Dates.daysinmonth(time))
 
-    launch!(architecture(soil_temperature), RingGridWorkOrder, size(soil_temperature),
-            seasonal_land_temperature_kernel!,
-            soil_temperature, monthly_temperature, weight, this_month, next_month)
+    launch!(
+        architecture(soil_temperature), RingGridWorkOrder, size(soil_temperature),
+        seasonal_land_temperature_kernel!,
+        soil_temperature, monthly_temperature, weight, this_month, next_month
+    )
 
     return nothing
 end
 
-@kernel inbounds=true function seasonal_land_temperature_kernel!(
-    soil_temperature, monthly_temperature, weight, this_month, next_month
-)
-    ij, k  = @index(Global, NTuple)
-    
-    soil_temperature[ij, k] = (1 - weight) * monthly_temperature[ij, this_month] + 
-                            weight * monthly_temperature[ij, next_month]
+@kernel inbounds = true function seasonal_land_temperature_kernel!(
+        soil_temperature, monthly_temperature, weight, this_month, next_month
+    )
+    ij, k = @index(Global, NTuple)
+
+    soil_temperature[ij, k] = (1 - weight) * monthly_temperature[ij, this_month] +
+        weight * monthly_temperature[ij, next_month]
 end
 
 ## CONSTANT LAND CLIMATOLOGY
@@ -113,14 +115,14 @@ end
 ConstantLandTemperature(SG::SpectralGrid; kwargs...) = ConstantLandTemperature{SG.NF}(; kwargs...)
 
 initialize!(land::ConstantLandTemperature, model::PrimitiveEquation) = nothing
-function initialize!(   
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
-    land::ConstantLandTemperature,
-    model::PrimitiveEquation,
-)
+function initialize!(
+        progn::PrognosticVariables,
+        diagn::DiagnosticVariables,
+        land::ConstantLandTemperature,
+        model::PrimitiveEquation,
+    )
     set!(progn.land.soil_temperature, land.temperature)
-    land.mask && mask!(progn.land.soil_temperature, model.land_sea_mask, :ocean)
+    return land.mask && mask!(progn.land.soil_temperature, model.land_sea_mask, :ocean)
 end
 
 # temperature is constant so do nothing during land timestep
@@ -133,7 +135,7 @@ $(TYPEDFIELDS)"""
 @kwdef mutable struct LandBucketTemperature{NF} <: AbstractLandTemperature
     "[OPTION] Apply land-sea mask to set ocean-only points?"
     mask::Bool = true
-    
+
     "[OPTION] Initial soil temperature over ocean [K]"
     ocean_temperature::NF = 285
 end
@@ -142,17 +144,17 @@ end
 LandBucketTemperature(SG::SpectralGrid; kwargs...) = LandBucketTemperature{SG.NF}(; kwargs...)
 function initialize!(land::LandBucketTemperature, model::PrimitiveEquation)
     (; nlayers_soil) = model.spectral_grid
-    @assert nlayers_soil == 2 "LandBucketTemperature only works with 2 soil layers "*
+    @assert nlayers_soil == 2 "LandBucketTemperature only works with 2 soil layers " *
         "but spectral_grid.nlayers_soil = $nlayers_soil given. Ignoring additional layers."
     return nothing
 end
 
 function initialize!(
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
-    land::LandBucketTemperature,
-    model::PrimitiveEquation,
-)
+        progn::PrognosticVariables,
+        diagn::DiagnosticVariables,
+        land::LandBucketTemperature,
+        model::PrimitiveEquation,
+    )
     # create a seasonal model, initialize it and the variables
     seasonal_model = SeasonalLandTemperature(model.spectral_grid)
     initialize!(seasonal_model, model)
@@ -161,7 +163,7 @@ function initialize!(
 
     # set ocean "land" temperature points (100% ocean only)
     masked_value = land.ocean_temperature
-    if land.mask
+    return if land.mask
         lst = progn.land.soil_temperature
         progn.land.soil_temperature[isnan.(lst)] .= masked_value
         mask!(progn.land.soil_temperature, model.land_sea_mask, :ocean; masked_value)
@@ -169,11 +171,11 @@ function initialize!(
 end
 
 function timestep!(
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
-    land::LandBucketTemperature,
-    model::PrimitiveEquation,
-)
+        progn::PrognosticVariables,
+        diagn::DiagnosticVariables,
+        land::LandBucketTemperature,
+        model::PrimitiveEquation,
+    )
     (; soil_temperature, soil_moisture) = progn.land
     Lᵥ = model.atmosphere.latent_heat_condensation
     Δt = model.time_stepping.Δt_sec
@@ -189,10 +191,10 @@ function timestep!(
     Ev = diagn.physics.land.surface_humidity_flux       # except this in [kg/s/m²]
     S = diagn.physics.land.sensible_heat_flux
 
-    @boundscheck fields_match(soil_temperature, Rsd, Rsu, Rld, Rlu, Ev, S, horizontal_only=true) ||
+    @boundscheck fields_match(soil_temperature, Rsd, Rsu, Rld, Rlu, Ev, S, horizontal_only = true) ||
         throw(DimensionMismatch(soil_temperature, Rs))
     @boundscheck size(soil_moisture, 2) == size(soil_temperature, 2) == 2 || throw(DimensionMismatch)
-    
+
     λ = thermodynamics.heat_conductivity
     γ = thermodynamics.field_capacity
     Cw = thermodynamics.heat_capacity_water
@@ -200,34 +202,36 @@ function timestep!(
     z₁ = geometry.layer_thickness[1]
     z₂ = geometry.layer_thickness[2]
 
-    Δ =  2λ/(z₁ + z₂)   # thermal diffusion operator [W/(m² K)]
+    Δ = 2λ / (z₁ + z₂)   # thermal diffusion operator [W/(m² K)]
 
-    launch!(architecture(soil_temperature), LinearWorkOrder, (size(soil_temperature, 1),),
+    launch!(
+        architecture(soil_temperature), LinearWorkOrder, (size(soil_temperature, 1),),
         land_bucket_temperature_kernel!, soil_temperature, mask, soil_moisture, Rsd, Rsu, Rlu, Rld, Ev, S,
-        Lᵥ, γ, Cw, Cs, z₁, z₂, Δ, Δt)
+        Lᵥ, γ, Cw, Cs, z₁, z₂, Δ, Δt
+    )
 
     return nothing
 end
 
-@kernel inbounds=true function land_bucket_temperature_kernel!(
-    soil_temperature, mask, soil_moisture, Rsd, Rsu, Rlu, Rld, Ev, S,
-    @Const(Lᵥ), @Const(γ), @Const(Cw), @Const(Cs), @Const(z₁), @Const(z₂), @Const(Δ), @Const(Δt),
-)
+@kernel inbounds = true function land_bucket_temperature_kernel!(
+        soil_temperature, mask, soil_moisture, Rsd, Rsu, Rlu, Rld, Ev, S,
+        @Const(Lᵥ), @Const(γ), @Const(Cw), @Const(Cs), @Const(z₁), @Const(z₂), @Const(Δ), @Const(Δt),
+    )
     ij = @index(Global, Linear)
 
     if mask[ij] > 0                         # at least partially land
         # total surface downward heat flux
-        F = Rsd[ij] - Rsu[ij] - Rlu[ij] + Rld[ij] - Lᵥ*Ev[ij] - S[ij]
+        F = Rsd[ij] - Rsu[ij] - Rlu[ij] + Rld[ij] - Lᵥ * Ev[ij] - S[ij]
 
         # heat capacity of the (wet) soil layers 1 and 2 [J/(m³ K)]
         C₁ = Cw * soil_moisture[ij, 1] * γ + Cs
         C₂ = Cw * soil_moisture[ij, 2] * γ + Cs
 
         # vertical diffusion term between layers
-        D = Δ*(soil_temperature[ij, 1] - soil_temperature[ij, 2])
+        D = Δ * (soil_temperature[ij, 1] - soil_temperature[ij, 2])
 
         # Equation in 8.5.2.2 of the MITgcm users guide (Land package)
-        soil_temperature[ij, 1] += Δt/(z₁*C₁)*(F - D)
-        soil_temperature[ij, 2] += Δt/(z₂*C₂)*D
+        soil_temperature[ij, 1] += Δt / (z₁ * C₁) * (F - D)
+        soil_temperature[ij, 2] += Δt / (z₂ * C₂) * D
     end
 end

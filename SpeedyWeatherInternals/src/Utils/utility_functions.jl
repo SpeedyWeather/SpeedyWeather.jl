@@ -4,7 +4,7 @@ Check whether elements of a vector `v` are strictly increasing."""
 function isincreasing(v::AbstractVector)
     is_increasing = true
     for i in 2:length(v)
-        is_increasing &= v[i-1] < v[i] ? true : false
+        is_increasing &= v[i - 1] < v[i] ? true : false
     end
     return is_increasing
 end
@@ -16,7 +16,7 @@ Check whether elements of a vector `v` are strictly decreasing."""
 function isdecreasing(v::AbstractVector)
     is_decreasing = true
     for i in 2:length(v)
-        is_decreasing &= v[i-1] > v[i] ? true : false
+        is_decreasing &= v[i - 1] > v[i] ? true : false
     end
     return is_decreasing
 end
@@ -25,8 +25,8 @@ end
     clip_negatives!(A::AbstractArray)
 
 Set all negative entries `a` in `A` to zero."""
-function clip_negatives!(A::AbstractArray{T}) where T
-    @inbounds for i in eachindex(A)
+function clip_negatives!(A::AbstractArray{T}) where {T}
+    return @inbounds for i in eachindex(A)
         A[i] = max(A[i], zero(T))
     end
 end
@@ -35,9 +35,9 @@ end
     underflow!(A::AbstractArray, ϵ::Real)
 
 Underflows element `a` in `A` to zero if `abs(a) < ϵ`."""
-function underflow!(A::AbstractArray{T}, ϵ::Real) where T
+function underflow!(A::AbstractArray{T}, ϵ::Real) where {T}
     ϵT = convert(T, abs(ϵ))
-    @inbounds for i in eachindex(A)
+    return @inbounds for i in eachindex(A)
         A[i] = abs(A[i]) < ϵT ? zero(T) : A[i]
     end
 end
@@ -50,14 +50,14 @@ function flipsign!(A::AbstractArray)
     @inbounds for i in eachindex(A)
         A[i] = -A[i]
     end
-    A
+    return A
 end
 
 """
     A = nans(T, dims...)
 
 Allocate array A with NaNs of type T. Similar to `zeros(T, dims...)`."""
-function nans(::Type{T}, dims...) where T
+function nans(::Type{T}, dims...) where {T}
     return fill(convert(T, NaN), dims...)
 end
 
@@ -71,7 +71,7 @@ nans(dims...) = nans(Float64, dims...)
 $(TYPEDSIGNATURES)
 Prints to `io` all fields of a struct `A` identified by their
 `keys`."""
-function print_fields(io::IO, A, keys; arrays::Bool=false)
+function print_fields(io::IO, A, keys; arrays::Bool = false)
     keys_filtered = arrays ? keys : filter(key -> ~(getfield(A, key) isa AbstractArray), keys)
     n = length(keys_filtered)
     filtered = n < length(keys)
@@ -80,9 +80,9 @@ function print_fields(io::IO, A, keys; arrays::Bool=false)
         key = keys_filtered[i]
         val = getfield(A, key)
         ~last ? println(io, "├ $key::$(typeof(val)) = $val") :
-                print(io,   "└ $key::$(typeof(val)) = $val")
+            print(io, "└ $key::$(typeof(val)) = $val")
     end
-    if filtered                 # add the names of arrays
+    return if filtered                 # add the names of arrays
         s = "└── arrays: "
         for key in keys
             if ~(key in keys_filtered)

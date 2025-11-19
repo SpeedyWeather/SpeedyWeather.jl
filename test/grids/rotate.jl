@@ -1,14 +1,14 @@
 @testset "Rotate grids" begin
     @testset for Grid in (
-        FullGaussianGrid,
-        FullClenshawGrid,
-        FullHEALPixGrid,
-        FullOctaHEALPixGrid,
-        OctahedralGaussianGrid,
-        OctahedralClenshawGrid,
-        HEALPixGrid,
-        OctaHEALPixGrid,
-        OctaminimalGaussianGrid
+            FullGaussianGrid,
+            FullClenshawGrid,
+            FullHEALPixGrid,
+            FullOctaHEALPixGrid,
+            OctahedralGaussianGrid,
+            OctahedralClenshawGrid,
+            HEALPixGrid,
+            OctaHEALPixGrid,
+            OctaminimalGaussianGrid,
         )
 
         @testset for nlat_half in (4, 6, 8)

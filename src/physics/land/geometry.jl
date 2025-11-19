@@ -7,7 +7,7 @@ mutable struct LandGeometry{VectorType} <: AbstractLandGeometry
 end
 
 # default constructor
-function LandGeometry(SG::SpectralGrid; layer_thickness=nothing)
+function LandGeometry(SG::SpectralGrid; layer_thickness = nothing)
 
     if isnothing(layer_thickness)
         (; NF) = SG
@@ -29,5 +29,5 @@ initialize!(::LandGeometry, model::PrimitiveEquation) = nothing
 function Base.show(io::IO, geom::LandGeometry{V}) where {V}
     nlayers = length(geom.layer_thickness)
     println(io, "$nlayers-layer LandGeometry{$V}")
-    print(io, "└ layer_thickness: $(geom.layer_thickness)")
+    return print(io, "└ layer_thickness: $(geom.layer_thickness)")
 end

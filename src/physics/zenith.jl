@@ -19,7 +19,7 @@ SinSolarDeclination(SG::SpectralGrid; kwargs...) = SinSolarDeclination{SG.NF}(; 
 solar declination calculation."""
 function SinSolarDeclination(SG::SpectralGrid, P::AbstractPlanet)
     (; axial_tilt, equinox, length_of_year, length_of_day) = P
-    SinSolarDeclination{SG.NF}(; axial_tilt, equinox, length_of_year, length_of_day)
+    return SinSolarDeclination{SG.NF}(; axial_tilt, equinox, length_of_year, length_of_day)
 end
 
 """
@@ -27,10 +27,10 @@ $(TYPEDSIGNATURES)
 SinSolarDeclination functor, computing the solar declination angle of
 angular fraction of year g [radians] using the coefficients of the
 SinSolarDeclination struct."""
-function (S::SinSolarDeclination)(g::NF) where NF
+function (S::SinSolarDeclination)(g::NF) where {NF}
     axial_tilt = deg2rad(S.axial_tilt)
-    equinox = S.length_of_day.value*Dates.dayofyear(S.equinox)/S.length_of_year.value
-    return axial_tilt*sin(g-2*(π*convert(NF, equinox)))
+    equinox = S.length_of_day.value * Dates.dayofyear(S.equinox) / S.length_of_year.value
+    return axial_tilt * sin(g - 2 * (π * convert(NF, equinox)))
 end
 
 """Coefficients to calculate the solar declination angle δ from
@@ -42,13 +42,13 @@ end
 with g the angular fraction of the year in radians. Following Spencer 1971,
 Fourier series representation of the position of the sun. Search 2(5):172.
 $(TYPEDFIELDS)"""
-Base.@kwdef struct SolarDeclination{NF<:AbstractFloat} <: AbstractSolarDeclination
-    a::NF =   0.006918      # the offset +
-    s1::NF =  0.070257      # s1*sin(g) +
+Base.@kwdef struct SolarDeclination{NF <: AbstractFloat} <: AbstractSolarDeclination
+    a::NF = 0.006918      # the offset +
+    s1::NF = 0.070257      # s1*sin(g) +
     c1::NF = -0.399912      # c1*cos(g) +
-    s2::NF =  0.000907      # s2*sin(2g) +
+    s2::NF = 0.000907      # s2*sin(2g) +
     c2::NF = -0.006758      # c2*cos(2g) +
-    s3::NF =  0.001480      # s3*sin(3g) +
+    s3::NF = 0.00148      # s3*sin(3g) +
     c3::NF = -0.002697      # c3*cos(3g)
 end
 
@@ -65,22 +65,22 @@ function (SD::SolarDeclination)(g)
     sin1g, cos1g = sincos(g)
     sin2g, cos2g = sincos(2g)
     sin3g, cos3g = sincos(3g)
-    return a + s1*sin1g + c1*cos1g + s2*sin2g + c2*cos2g + s3*sin3g + c3*cos3g
+    return a + s1 * sin1g + c1 * cos1g + s2 * sin2g + c2 * cos2g + s3 * sin3g + c3 * cos3g
 end
 
 function Base.show(io::IO, L::AbstractSolarDeclination)
     println(io, "$(typeof(L)) <: AbstractSolarDeclination")
     keys = propertynames(L)
-    print_fields(io, L, keys)
+    return print_fields(io, L, keys)
 end
 
 """Coefficients for the solar time correction (also called
 Equation of time) which adjusts the solar hour to an oscillation
 of sunrise/set by about +-16min throughout the year."""
-Base.@kwdef struct SolarTimeCorrection{NF<:AbstractFloat} <: AbstractSolarTimeCorrection
-    a::NF =   0.004297      # the offset +
+Base.@kwdef struct SolarTimeCorrection{NF <: AbstractFloat} <: AbstractSolarTimeCorrection
+    a::NF = 0.004297      # the offset +
     s1::NF = -1.837877      # s1*sin(g) +
-    c1::NF =  0.107029      # c1*cos(g) +
+    c1::NF = 0.107029      # c1*cos(g) +
     s2::NF = -2.340475      # s2*sin(2g) +
     c2::NF = -0.837378      # c2*cos(2g)
 end
@@ -93,13 +93,13 @@ function (STC::SolarTimeCorrection)(g)
     (; a, s1, s2, c1, c2) = STC
     sin1g, cos1g = sincos(g)
     sin2g, cos2g = sincos(2g)
-    return deg2rad(a + s1*sin1g + c1*cos1g + s2*sin2g + c2*cos2g)
+    return deg2rad(a + s1 * sin1g + c1 * cos1g + s2 * sin2g + c2 * cos2g)
 end
 
 function Base.show(io::IO, L::AbstractSolarTimeCorrection)
     println(io, "$(typeof(L)) <: AbstractSolarTimeCorrection")
     keys = propertynames(L)
-    print_fields(io, L, keys)
+    return print_fields(io, L, keys)
 end
 
 """
@@ -115,11 +115,13 @@ function WhichZenith(SG::SpectralGrid, P::AbstractPlanet; kwargs...)
 
     if daily_cycle
         return SolarZenith{NF}(;
-            length_of_day, length_of_year, solar_declination, seasonal_cycle, kwargs...)
+            length_of_day, length_of_year, solar_declination, seasonal_cycle, kwargs...
+        )
 
     else
         return SolarZenithSeason{NF}(;
-            length_of_day, length_of_year, solar_declination, seasonal_cycle, kwargs...)
+            length_of_day, length_of_year, solar_declination, seasonal_cycle, kwargs...
+        )
     end
 end
 
@@ -127,20 +129,20 @@ end
 function cos_zenith!(diagn::DiagnosticVariables, time::DateTime, model::PrimitiveEquation)
     (; solar_zenith, geometry) = model
     (; cos_zenith) = diagn.physics
-    cos_zenith!(cos_zenith, solar_zenith, time, geometry)
+    return cos_zenith!(cos_zenith, solar_zenith, time, geometry)
 end
 
 function Base.show(io::IO, L::AbstractZenith)
     println(io, "$(typeof(L)) <: AbstractZenith")
     keys = propertynames(L)
-    print_fields(io, L, keys)
+    return print_fields(io, L, keys)
 end
 
 export SolarZenith
 
 """Solar zenith angle varying with daily and seasonal cycle.
 $(TYPEDFIELDS)"""
-@kwdef struct SolarZenith{NF<:AbstractFloat} <: AbstractZenith
+@kwdef struct SolarZenith{NF <: AbstractFloat} <: AbstractZenith
     # OPTIONS
     length_of_day::Second = Hour(24)
     length_of_year::Second = Day(365.25)
@@ -157,11 +159,11 @@ end
 SolarZenith(SG::SpectralGrid; kwargs...) = SolarZenith{SG.NF}(; kwargs...)
 
 function initialize!(
-    S::AbstractZenith,
-    initial_time::DateTime,
-    model::AbstractModel
-)
-    S.initial_time[] = initial_time     # to fix the season if no seasonal cycle
+        S::AbstractZenith,
+        initial_time::DateTime,
+        model::AbstractModel
+    )
+    return S.initial_time[] = initial_time     # to fix the season if no seasonal cycle
 end
 
 """
@@ -169,10 +171,10 @@ $(TYPEDSIGNATURES)
 Fraction of year as angle in radians [0...2π].
 TODO: Takes length of day/year as argument, but calls to Dates.Time(), Dates.dayofyear()
 currently have these hardcoded."""
-function year_angle(::Type{T}, time::DateTime, length_of_day::Second, length_of_year::Second) where T
-    year2rad = convert(T, 2π/length_of_year.value)
+function year_angle(::Type{T}, time::DateTime, length_of_day::Second, length_of_year::Second) where {T}
+    year2rad = convert(T, 2π / length_of_year.value)
     sec_of_day = Dates.second(Dates.Time(time).instant)
-    return year2rad*(Dates.dayofyear(time)*length_of_day.value + sec_of_day)
+    return year2rad * (Dates.dayofyear(time) * length_of_day.value + sec_of_day)
 end
 
 """
@@ -181,15 +183,15 @@ Fraction of day as angle in radians [0...2π].
 TODO: Takes length of day as argument, but a call to Dates.Time()
 currently have this hardcoded anyway."""
 function solar_hour_angle(
-    ::Type{T},
-    time::DateTime,
-    λ,                      # longitude in radians
-    length_of_day::Second
-) where T
-    day2rad = convert(T, 2π/length_of_day.value)
+        ::Type{T},
+        time::DateTime,
+        λ,                      # longitude in radians
+        length_of_day::Second
+    ) where {T}
+    day2rad = convert(T, 2π / length_of_day.value)
     noon_in_sec = length_of_day.value ÷ 2
     sec_of_day = Dates.second(Dates.Time(time).instant)
-    return (sec_of_day - noon_in_sec)*day2rad + convert(T, λ)
+    return (sec_of_day - noon_in_sec) * day2rad + convert(T, λ)
 end
 
 """
@@ -198,11 +200,11 @@ Calculate cos of solar zenith angle with a daily cycle
 at time `time`. Seasonal cycle or time correction may be disabled,
 depending on parameters in SolarZenith."""
 function cos_zenith!(
-    cos_zenith::AbstractField,
-    S::SolarZenith,
-    time::DateTime,
-    geometry::AbstractGeometry,
-)
+        cos_zenith::AbstractField,
+        S::SolarZenith,
+        time::DateTime,
+        geometry::AbstractGeometry,
+    )
     NF = eltype(cos_zenith)
     (; sinlat, coslat, lons) = geometry
     (; length_of_day, length_of_year) = S
@@ -215,7 +217,7 @@ function cos_zenith!(
 
     # time correction [radians] due to the equation of time (sunrise/set oscillation)
     tc = S.equation_of_time ? S.time_correction(g) : zero(NF)
-    
+
     # solar hour angle at 0˚E (longtiude offset added later)
     λ = 0
     solar_hour_angle_0E = solar_hour_angle(NF, time, λ, length_of_day) + tc
@@ -227,12 +229,12 @@ function cos_zenith!(
 
     rings = eachring(cos_zenith)
 
-    @inbounds for (j, ring) in enumerate(rings)                         
-        sinδsinϕ = sinδ*sinlat[j]
-        cosδcosϕ = cosδ*coslat[j]
+    return @inbounds for (j, ring) in enumerate(rings)
+        sinδsinϕ = sinδ * sinlat[j]
+        cosδcosϕ = cosδ * coslat[j]
         for ij in ring
             h = solar_hour_angle_0E + lons[ij]      # solar hour angle at longitude λ in radians
-            cos_zenith[ij] = max(0, sinδsinϕ + cosδcosϕ*cos(h))
+            cos_zenith[ij] = max(0, sinδsinϕ + cosδcosϕ * cos(h))
         end
     end
 end
@@ -241,7 +243,7 @@ export SolarZenithSeason
 
 """Solar zenith angle varying with seasonal cycle only.
 $(TYPEDFIELDS)"""
-@kwdef struct SolarZenithSeason{NF<:AbstractFloat} <: AbstractZenith
+@kwdef struct SolarZenithSeason{NF <: AbstractFloat} <: AbstractZenith
     # OPTIONS
     length_of_day::Second = Hour(24)
     length_of_year::Second = Day(365.25)
@@ -261,11 +263,11 @@ Calculate cos of solar zenith angle as daily average
 at time `time`. Seasonal cycle or time correction may be disabled,
 depending on parameters in SolarZenithSeason."""
 function cos_zenith!(
-    cos_zenith::AbstractField,
-    S::SolarZenithSeason,
-    time::DateTime,
-    geometry::AbstractGeometry,
-)
+        cos_zenith::AbstractField,
+        S::SolarZenithSeason,
+        time::DateTime,
+        geometry::AbstractGeometry,
+    )
     NF = eltype(cos_zenith)
     (; sinlat, coslat, lat) = geometry
     (; length_of_day, length_of_year) = S
@@ -275,7 +277,7 @@ function cos_zenith!(
     # g: angular fraction of year [0...2π] for Jan-01 to Dec-31
     time_of_year = S.seasonal_cycle ? time : S.initial_time[]
     g = year_angle(NF, time_of_year, length_of_day, length_of_year)
-    
+
     # solar declination angle [radians] changing from tropic of cancer to capricorn
     # throughout the year measured by g [radians]
     δ = S.solar_declination(g)
@@ -285,15 +287,15 @@ function cos_zenith!(
     local cos_zenith_j::NF      # at latitude j
 
     rings = eachring(cos_zenith)
-    @inbounds for (j, ring) in enumerate(rings)
-            
+    return @inbounds for (j, ring) in enumerate(rings)
+
         ϕ = lat[j]
-        h₀ = abs(δ) + abs(ϕ) < π/2 ?        # polar day/night?
-        acos(-tan(ϕ) * tan(δ)) :            # if not: calculate length of day
-        ϕ*δ > 0 ? π : zero(NF)              # polar day if signs are equal, otherwise polar night
-        
+        h₀ = abs(δ) + abs(ϕ) < π / 2 ?        # polar day/night?
+            acos(-tan(ϕ) * tan(δ)) :            # if not: calculate length of day
+            ϕ * δ > 0 ? π : zero(NF)              # polar day if signs are equal, otherwise polar night
+
         sinϕ, cosϕ = sinlat[j], coslat[j]
-        cos_zenith_j = h₀*sinδ*sinϕ + cosδ*cosϕ*sin(h₀)
+        cos_zenith_j = h₀ * sinδ * sinϕ + cosδ * cosϕ * sin(h₀)
         cos_zenith_j /= π
 
         for ij in ring

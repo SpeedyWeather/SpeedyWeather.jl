@@ -8,10 +8,10 @@ $(TYPEDFIELDS)"""
 
     # FILE OPTIONS
     active::Bool = false
-    
+
     "[OPTION] path to output folder, run_???? will be created within"
     path::String = pwd()
-    
+
     "[OPTION] Prefix for run folder where data is stored, e.g. 'run_'"
     run_prefix::String = "run"
 
@@ -32,10 +32,10 @@ $(TYPEDFIELDS)"""
 
     "[OPTION] Overwrite an existing run folder?"
     overwrite::Bool = false
-    
+
     "[OPTION] name of the output jld2 file"
     filename::String = "output.jld2"
-    
+
     "[OPTION] also write restart file if output=true?"
     write_restart::Bool = true
 
@@ -51,11 +51,11 @@ $(TYPEDFIELDS)"""
     "[OPTION] will reopen and resave the file to merge everything in one big vector. Turn off if the file is too large for memory."
     merge_output::Bool = true
 
-    "[OPTION] output the PrognosticVariables" 
-    output_prognostic::Bool = true 
+    "[OPTION] output the PrognosticVariables"
+    output_prognostic::Bool = true
 
-    "[OPTION] output the DiagnosticVariables as well" 
-    output_diagnostic::Bool = true 
+    "[OPTION] output the DiagnosticVariables as well"
+    output_diagnostic::Bool = true
 
     # TIME STEPS AND COUNTERS (initialize later)
     output_every_n_steps::Int = 0           # output frequency
@@ -63,37 +63,41 @@ $(TYPEDFIELDS)"""
     output_counter::Int = 0                 # output step counter
 
     jld2_file::Union{JLDFile, Nothing} = nothing
-end 
+end
 
-function Base.show(io::IO, output::JLD2Output) 
+function Base.show(io::IO, output::JLD2Output)
     println(io, "JLD2Output")
     println(io, "├ status: $(output.active ? "active" : "inactive/uninitialized")")
     println(io, "├ write restart file: $(output.write_restart) (if active)")
     println(io, "├ path: $(joinpath(output.run_path, output.filename))")
-    println(io, "└ frequency: $(output.output_dt)")
+    return println(io, "└ frequency: $(output.output_dt)")
 end
 
 """$(TYPEDSIGNATURES)
 Initialize JLD2 `output` by creating a JLD2 file. 
 To be called just before the first timesteps."""
-function initialize!(   
-    output::JLD2Output,
-    feedback::AbstractFeedback,
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
-    model::AbstractModel,
-)
+function initialize!(
+        output::JLD2Output,
+        feedback::AbstractFeedback,
+        progn::PrognosticVariables,
+        diagn::DiagnosticVariables,
+        model::AbstractModel,
+    )
     output.active || return nothing     # exit immediately for no output
-    
+
     # GET RUN ID, CREATE FOLDER
     # get new id only if not already specified
     determine_run_folder!(output)
     create_run_folder!(output)
 
     # OUTPUT FREQUENCY
-    output.output_every_n_steps = max(1, round(Int,
-            Millisecond(output.output_dt).value/model.time_stepping.Δt_millisec.value))
-    output.output_dt = Second(round(Int, output.output_every_n_steps*model.time_stepping.Δt_sec))
+    output.output_every_n_steps = max(
+        1, round(
+            Int,
+            Millisecond(output.output_dt).value / model.time_stepping.Δt_millisec.value
+        )
+    )
+    output.output_dt = Second(round(Int, output.output_every_n_steps * model.time_stepping.Δt_sec))
 
     # RESET COUNTERS
     output.timestep_counter = 0         # time step counter
@@ -102,10 +106,10 @@ function initialize!(
     # CREATE JLD2 FILE
     (; run_path, filename) = output
 
-    jld2_file = jldopen(joinpath(run_path, filename), "w") 
+    jld2_file = jldopen(joinpath(run_path, filename), "w")
     output.jld2_file = jld2_file
 
-    # write initial condition 
+    # write initial condition
     output_jld2!(output, Simulation(progn, diagn, model))
 
     # CALLBACKS
@@ -116,7 +120,7 @@ function initialize!(
     output.write_progress_txt && add!(model.callbacks, :progress_txt => ProgressTxt())
 
     # add RestartFile callback
-    output.write_restart && add!(model.callbacks, :restart_file => RestartFile())
+    return output.write_restart && add!(model.callbacks, :restart_file => RestartFile())
 end
 
 Base.close(output::JLD2Output) = close(output.jld2_file)
@@ -124,37 +128,37 @@ Base.close(output::JLD2Output) = close(output.jld2_file)
 function output!(output::JLD2Output, simulation::AbstractSimulation)
     output.timestep_counter += 1
 
-    (; active, jld2_file, output_every_n_steps, timestep_counter) = output 
+    (; active, jld2_file, output_every_n_steps, timestep_counter) = output
     active || return nothing                                        # escape immediately for no jld2 output
     timestep_counter % output_every_n_steps == 0 || return nothing  # escape if output not written on this step
-    
-    output_jld2!(output, simulation)
-end 
+
+    return output_jld2!(output, simulation)
+end
 
 function output_jld2!(output::JLD2Output, simulation::AbstractSimulation)
     (; jld2_file, output_diagnostic, output_prognostic) = output
-    
+
     output.output_counter += 1                                      # output counter increases when writing time
     i = output.output_counter
 
-    if output_diagnostic & output_prognostic
+    return if output_diagnostic & output_prognostic
         jld2_file["$i"] = (simulation.prognostic_variables, simulation.diagnostic_variables)
-    elseif output_prognostic 
+    elseif output_prognostic
         jld2_file["$i"] = simulation.prognostic_variables
     elseif output_diagnostic
         jld2_file["$i"] = simulation.diagnostic_variables
-    end 
-end 
+    end
+end
 
 function finalize!(
-    output::JLD2Output,
-    simulation::AbstractSimulation,
-)   
-    if output.merge_output && output.output_counter > 0
+        output::JLD2Output,
+        simulation::AbstractSimulation,
+    )
+    return if output.merge_output && output.output_counter > 0
         merge_output(output)
-    else  
+    else
         close(output)
-    end 
+    end
 end
 
 """
@@ -166,15 +170,15 @@ is a concern.
 """
 function merge_output(output::JLD2Output)
     (; output_counter, jld2_file, run_path, filename) = output
-        
+
     output_vector = Vector{typeof(jld2_file["1"])}(undef, output_counter)
 
     for i in 1:output_counter
         output_vector[i] = jld2_file["$i"]
-    end  
-    
-    # close and overwrite old file 
+    end
+
+    # close and overwrite old file
     close(jld2_file)
 
-    jldsave(joinpath(run_path, filename); output_vector)
-end 
+    return jldsave(joinpath(run_path, filename); output_vector)
+end
