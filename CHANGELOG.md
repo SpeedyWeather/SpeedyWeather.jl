@@ -3,11 +3,8 @@
 ## Unreleased
 - Updated docs CairoMakie compatibility to "0.12, 0.13, 0.14, 0.15"
 - OneBandShortwave radiation implemented with diagnostic clouds [#888](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/888)
-<<<<<<< HEAD
-=======
 - AMDGPU extension [#901](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/901)
 - Don't adapt rings in RingGrids on GPU [#920](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/920)
->>>>>>> main
 - README updates [#915](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/915#pullrequestreview-3469109183)
 - Fixes some formatting/LaTeX rendering in Docs [#916](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/916)
 
