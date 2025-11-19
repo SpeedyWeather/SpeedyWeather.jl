@@ -67,11 +67,7 @@ function clouds!(
     clouds::DiagnosticClouds,
     model::AbstractModel,
 )
-<<<<<<< HEAD
-    # Diagnose cloud cover and cloud top
-=======
     # Diagnose cloud cover and cloud top.
->>>>>>> main
     (cloud_cover, cloud_top, stratocumulus_cover) = diagnose_cloud_properties(column, clouds)
 
     return (    # NamedTuple
