@@ -61,6 +61,7 @@ end
             @test all(isfinite.(progn.land.snow_depth))
         end
     end
+end
 @testset "LandGeometry default constructor" begin
     SG = SpectralGrid(trunc=21, nlayers=2)
     geom = LandGeometry(SG)

@@ -237,26 +237,41 @@ maximum and add a fraction ``p = 0.5`` of that excess water to the layer below
 water is put into the river runoff.
 
 ### LandSnowModel
-Snow is accumulated at the surface based on the column integrated snow (large scale and convective) and on the surface temperature, which must exceed a threshold ``T_{freeze}``. The surface snow depth budget depends on two processes: snow_melt and snow_sublimation.
 
-If the soil top layer temperature ``T_1 > T_{freeze}``, then a melting potential term ``δT_{melt}`` is computed, and from it the available energy ``E_{avail}`` [J/m²/s]:
+Snow is accumulated at the surface based on the column integrated snow (large scale and
+convective) and on the surface temperature, which must exceed a threshold ``T_{freeze}``.
+The surface snow depth budget depends on two processes: snow_melt and snow_sublimation,
+and we additionally include a simple runoff tendency that drains long-lived snow packs.
+
+If the soil top layer temperature ``T_1 > T_{freeze}``, then a melting potential term
+``δT_{melt}`` is computed, and from it the available energy ``E_{avail}`` [J/m²/s]:
 
 ```math
-E_{avail} = cₛ * δT_{melt} * ρ_{soil} * z₁ / Δt 
+E_{avail} = cₛ \, δT_{melt} \, ρ_{soil} \, \frac{z₁}{Δt}.
 ```
-This available energy is then used to compute the top soil cooling that results from the latent heat conversion: 
+
+This available energy is then used to compute the top soil cooling that results from the latent
+heat conversion:
 
 ```math
 \begin{aligned}
-melt_{rate_{max}} = E_{avail} / (ρ_w * Lᵢ) \\
-melt_{depth} = melt_{rate} * Δt \\
-Q_{melt} = ρ_w * Lᵢ * melt_{depth}
-δT = -Q_{melt} / C_{soil}
+\text{melt}_{rate_{max}} &= \frac{E_{avail}}{ρ_w Lᵢ}, \\
+\text{melt}_{depth} &= \text{melt}_{rate} \, Δt, \\
+Q_{melt} &= ρ_w Lᵢ \, \text{melt}_{depth}, \\
+δT &= -\frac{Q_{melt}}{C_{soil}}.
 \end{aligned}
 ```
-where ...
 
-Snow depth is finally available from the updated budget, and a snow cover, σₛ, is computed from it:
+In addition to evaporation/sublimation losses we diagnose a relaxation runoff term
+
+```math
+R = \frac{D}{\tau},
+```
+
+controlled through the ``runoff_time_scale`` parameter. This prevents the accumulation of
+arbitrarily deep snow in regions that remain below freezing and routes the corresponding liquid
+water into the soil moisture scheme. Both melt and runoff fluxes are exposed via
+`snow_melt_rate` and `snow_runoff_rate`.
 
 ```math
 σₛ = min(1.0, Sₐ / snow_{depth_{scale}}) 

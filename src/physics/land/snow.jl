@@ -1,9 +1,26 @@
 abstract type AbstractSnow <: AbstractParameterization end
 
 export SnowModel    # maybe change for a more concise name later
+
+"""
+    SnowModel(; melting_threshold=275, runoff_time_scale=Year(1))
+
+Single-column snow bucket model in equivalent liquid water depth. Snow accumulates
+from the diagnosed precipitation, melts once the top soil layer exceeds
+`melting_threshold`, and relaxes back to zero on the `runoff_time_scale`.
+
+```math
+\frac{dD}{dt} = \frac{P}{\rho_w} - M - R, \qquad R = \frac{D}{\tau}
+```
+
+Both `M` (melt) and `R` (runoff) are exposed as diagnostics so that water removed
+from snow feeds the soil moisture scheme.
+
+$(TYPEDFIELDS)
+"""
 @kwdef mutable struct SnowModel{NF} <: AbstractSnow
     melting_threshold::NF = 275
-    runoff_time_scale::Second = Year(1)
+    runoff_time_scale::Second = Year(1) 
 end
 
 # generator function
@@ -32,8 +49,8 @@ function timestep!(
     (; snow_depth) = progn.land                             # in equivalent liquid water height [m]
     (; soil_temperature) = progn.land
     
-	(; mask) = model.land_sea_mask
-
+    (; mask) = model.land_sea_mask
+    
     # Some thermodynamics needed by snow
 	ρ_soil = model.land.thermodynamics.soil_density			# soil density [kg/m³]
 	ρ_water = model.atmosphere.water_density				# water density [kg/m³]
@@ -43,7 +60,7 @@ function timestep!(
     (; melting_threshold) = snow
     r⁻¹ = 1 / Second(snow.runoff_time_scale).value
 
-	# Snowfall rate in [kg/m²/s]
+    # Snowfall rate in [kg/m²/s]
     snow_fall_rate = diagn.physics.snow_rate
     snow_melt_rate = diagn.physics.land.snow_melt_rate
     snow_runoff_rate = diagn.physics.land.snow_runoff_rate
