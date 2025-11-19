@@ -8,16 +8,7 @@ export SnowModel    # maybe change for a more concise name later
 Single-column snow bucket model in equivalent liquid water depth. Snow accumulates
 from the diagnosed precipitation, melts once the top soil layer exceeds
 `melting_threshold`, and relaxes back to zero on the `runoff_time_scale`.
-
-```math
-\frac{dD}{dt} = \frac{P}{\rho_w} - M - R, \qquad R = \frac{D}{\tau}
-```
-
-Both `M` (melt) and `R` (runoff) are exposed as diagnostics so that water removed
-from snow feeds the soil moisture scheme.
-
-$(TYPEDFIELDS)
-"""
+$(TYPEDFIELDS)"""
 @kwdef mutable struct SnowModel{NF} <: AbstractSnow
     melting_threshold::NF = 275
     runoff_time_scale::Second = Year(1) 
