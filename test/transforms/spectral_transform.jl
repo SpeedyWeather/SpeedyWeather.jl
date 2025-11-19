@@ -325,6 +325,46 @@ end
     end
 end
 
+@testset "Transform roundtrip accuracy" begin 
+    # only Gaussian transforms are exact, that's why we need have different tolerenaces
+    # the tolerances below were just emperically found and are kept to ensure 
+    # we don't introduce bugs 
+
+    tolerances = [1e-13,  # FullGaussianGrid
+                  1e-12,  # FullClenshawGrid
+                  1e-13,  # OctahedralGaussianGrid
+                  1e-12,  # OctahedralClenshawGrid
+                  1e-2,   # HEALPixGrid
+                  1e-2]   # OctaHEALPixGrid
+    @testset for trunc in [42, 61]
+        @testset for (i_grid, Grid) in enumerate(FullGaussianGrid,
+                              FullClenshawGrid,
+                              OctahedralGaussianGrid,
+                              OctahedralClenshawGrid,
+                              HEALPixGrid,
+                              OctaHEALPixGrid,)
+
+            # TODO: other dealising for other grids?
+            dealiasing = 3 
+            NF = Float64
+            nlayers = 8
+
+            SG = SpectralGrid(; NF, trunc, Grid, dealiasing, nlayers)
+            S = SpectralTransform(SG)
+
+            # start in spectral space but compare in grid space to 
+            # avoid inaccuracies due to filtering out higher frequencies
+            spec = rand(Complex{NF}, SG.spectrum, nlayers)
+            grid = transform(spec, S)
+
+            spec_roundtrip = transform(grid, S)
+            grid_roundtrip = transform(spec_roundtrip, S)
+
+            @test grid_roundtrip ≈ grid rtol=tolerances[i_grid]
+        end 
+    end
+end 
+
 @testset "Scratch memory allocation" begin
     SG = SpectralGrid(trunc=21, nlayers=3)
     S = SpectralTransform(SG)
