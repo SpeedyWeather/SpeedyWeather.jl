@@ -207,8 +207,8 @@ function timestep!(
     Δ =  2λ/(z₁ + z₂)   # thermal diffusion operator [W/(m² K)]
 
     launch!(architecture(soil_temperature), LinearWorkOrder, (size(soil_temperature, 1),),
-        land_bucket_temperature_kernel!, soil_temperature, mask, soil_moisture, Rsd, Rsu, Rlu, Rld, Ev, S,
-        Lᵥ, γ, Cw, Cs, z₁, z₂, Δ, Δt)
+        land_bucket_temperature_kernel!, soil_temperature, mask, soil_moisture, Rsd, Rsu, Rlu, Rld, Ev, S, M,
+        Lᵥ, Lᵢ, γ, Cw, Cs, z₁, z₂, Δ, Δt)
 
     return nothing
 end
