@@ -176,25 +176,25 @@ end
 
 # set Field <- Func
 function set!(
-    var::AbstractField,
+    var::AbstractField3D,
     f::Function,
     geometry::Geometry,
     S::Union{Nothing, SpectralTransform}=nothing;
     add::Bool=false,
 )
     (; londs, latds, σ_levels_full) = geometry
-    kernel_func = add ? (a,b) -> a+b : (a,b) -> b
+    kernel_func = add ? (a, b) -> a+b : (a, b) -> b
 
-    launch!(architecture(var), RingGridWorkOrder, size(var), set_field_3d_kernel!, var, londs, latds, σ_levels_full, f, kernel_func)
+    @boundscheck size(var) == (length(londs), length(σ_levels_full)) || throw(DimensionMismatch())
+
+    launch!(architecture(var), RingGridWorkOrder, size(var), set_field_3d_kernel!,
+        var, londs, latds, σ_levels_full, f, kernel_func)
 
     return var
 end
 
-@kernel inbounds=true function set_field_3d_kernel!(var, @Const(londs), @Const(latds), @Const(σ_levels_full), @Const(f), @Const(kernel_func))
-    # Get indices
+@kernel function set_field_3d_kernel!(var, londs, latds, σ_levels_full, f, kernel_func)
     ij, k = @index(Global, NTuple)
-    
-    # compute 
     var[ij, k] = kernel_func(var[ij, k], f(londs[ij], latds[ij], σ_levels_full[k]))
 end
 
