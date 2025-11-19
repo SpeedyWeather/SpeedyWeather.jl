@@ -113,8 +113,6 @@ function each_index_in_ring!(   rings,
     end
 end
 
-Adapt.@adapt_structure OctahedralClenshawGrid
-
 ## CONVERSION
 # Base.Matrix(G::OctahedralClenshawGrid{T}; kwargs...) where T =
 #     Matrix!(zeros(T, matrix_size(G)...), G; kwargs...)
