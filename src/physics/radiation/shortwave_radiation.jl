@@ -2,71 +2,61 @@ abstract type AbstractRadiation <: AbstractParameterization end
 abstract type AbstractShortwave <: AbstractRadiation end
 abstract type AbstractShortwaveRadiativeTransfer <: AbstractShortwave end
 
-"""$(TYPEDSIGNATURES)
-Get the number of spectral bands for a radiation scheme. Returns the `nbands` field
-if it exists on the radiation scheme type, otherwise returns 0."""
 function get_nbands(radiation::Union{AbstractRadiation, Nothing})
     hasfield(typeof(radiation), :nbands) && return radiation.nbands
     return 0
 end
 
-"""$(TYPEDSIGNATURES)
-Function barrier for shortwave radiation. Dispatches to the appropriate shortwave
-radiation calculation based on the scheme type."""
-function shortwave_radiation!(column::ColumnVariables, model::PrimitiveEquation)
-    shortwave_radiation!(column, model.shortwave_radiation, model)
-end
-
-"""$(TYPEDSIGNATURES)
-No-op for cases where shortwave radiation is not included in the model."""
-shortwave_radiation!(::ColumnVariables, ::Nothing, ::PrimitiveEquation) = nothing
-
 ## SHORTWAVE RADIATION FOR A FULLY TRANSPARENT ATMOSPHERE
 export TransparentShortwave
-
-"""
-    TransparentShortwave <: AbstractShortwave
-
-A shortwave radiation scheme for a fully transparent atmosphere where radiation
-passes through without absorption or scattering."""
 struct TransparentShortwave <: AbstractShortwave end
 TransparentShortwave(SG::SpectralGrid) = TransparentShortwave()
-initialize!(::TransparentShortwave, ::PrimitiveEquation) = nothing
 
-"""$(TYPEDSIGNATURES)
-Dispatch to shortwave radiation calculation with planet information."""
-function shortwave_radiation!(
-    column::ColumnVariables,
-    scheme::TransparentShortwave,
-    model::PrimitiveEquation,
-)
-    shortwave_radiation!(column, scheme, model.planet)
+function variables(::TransparentShortwave)
+    return (
+        DiagnosticVariable(name=:surface_shortwave_down, dims=Grid2D(), desc="Surface shortwave radiation down", units="W/m^2"),
+        DiagnosticVariable(name=:surface_shortwave_down, dims=Grid2D(), desc="Surface shortwave radiation down over ocean", units="W/m^2", namespace=:ocean),
+        DiagnosticVariable(name=:surface_shortwave_down, dims=Grid2D(), desc="Surface shortwave radiation down over land", units="W/m^2", namespace=:land),
+        DiagnosticVariable(name=:surface_shortwave_up,   dims=Grid2D(), desc="Surface shortwave radiation up",   units="W/m^2"),
+        DiagnosticVariable(name=:outgoing_shortwave,     dims=Grid2D(), desc="TOA Shortwave radiation up",       units="W/m^2"),
+        DiagnosticVariable(name=:cos_zenith,             dims=Grid2D(), desc="Cos zenith angle",                 units="1"),
+        DiagnosticVariable(name=:albedo, dims=Grid2D(), desc="Albedo over ocean", units="1", namespace=:ocean),
+        DiagnosticVariable(name=:albedo, dims=Grid2D(), desc="Albedo over land", units="1", namespace=:land),
+    )
 end
 
-"""$(TYPEDSIGNATURES)
-Calculate shortwave radiation for a transparent atmosphere. Radiation equals
-solar constant times cosine of zenith angle at the top of the atmosphere and
-surface. Surface reflection is determined by ocean and land albedos."""
-function shortwave_radiation!(
-    column::ColumnVariables,
-    scheme::TransparentShortwave,
-    planet::AbstractPlanet,
-)
-    (; cos_zenith, land_fraction, albedo_ocean, albedo_land) = column
-    (; solar_constant) = planet
+initialize!(::TransparentShortwave, ::PrimitiveEquation) = nothing
 
-    D = solar_constant * cos_zenith         # top of atmosphere downward radiation
-    column.surface_shortwave_down = D       # transparent atmosphere so same at surface (before albedo)
+# function barrier
+parameterization!(ij, diagn, progn, shortwave::TransparentShortwave, model) =
+    shortwave_radiation!(ij, diagn, shortwave, model.planet, model.land_sea_mask)
+
+function shortwave_radiation!(ij, diagn, shortwave::TransparentShortwave, planet, land_sea_mask)
+
+    (; surface_shortwave_down, surface_shortwave_up) = diagn.physics
+    (; outgoing_shortwave) = diagn.physics
+    ssrd_ocean = diagn.physics.ocean.surface_shortwave_down
+    ssrd_land = diagn.physics.land.surface_shortwave_down
+
+    cos_zenith = diagn.physics.cos_zenith[ij]
+    land_fraction = land_sea_mask[ij]
+    albedo_ocean = diagn.physics.ocean.albedo[ij]
+    albedo_land = diagn.physics.land.albedo[ij]
+    S₀ = planet.solar_constant
+
+    D = S₀ * cos_zenith             # top of atmosphere downward radiation
+    surface_shortwave_down[ij] = D  # transparent atmosphere so same at surface (before albedo)
 
     # shortwave up is after albedo reflection, separated by ocean/land
-    column.surface_shortwave_up_ocean = albedo_ocean * D
-    column.surface_shortwave_up_land = albedo_land * D
+    ssrd_ocean[ij] = albedo_ocean * D
+    ssrd_land[ij]  = albedo_land * D
 
-    # land-sea mask-weighted, transparent shortwave so surface = outgoing
-    column.surface_shortwave_up = (1 - land_fraction)*column.surface_shortwave_up_ocean +
-                                            land_fraction*column.surface_shortwave_up_land
-    column.outgoing_shortwave_radiation = column.surface_shortwave_up
+    # land-sea mask-weighted
+    albedo = (1 - land_fraction)*albedo_ocean + land_fraction*albedo_land
+    surface_shortwave_up[ij] = albedo * D
 
+    # transparent also for reflected shortwave radiation travelling up
+    outgoing_shortwave[ij] = surface_shortwave_up[ij]
     return nothing
 end
 
