@@ -326,8 +326,11 @@ export DynamicsVariablesLand
     "River runoff [m/s], diagnostic overflow from soil moisture"
     river_runoff::GridVariable2D = zeros(GridVariable2D, grid)
 
-    "Snow melt rate []"
+    "Snow melt rate [kg/m²/s]"
     snow_melt_rate::GridVariable2D = zeros(GridVariable2D, grid)
+
+    "Snow runoff rate [kg/m²/s]"
+    snow_runoff_rate::GridVariable2D = zeros(GridVariable2D, grid)
 end
 
 DynamicsVariablesLand(SG::SpectralGrid) =
