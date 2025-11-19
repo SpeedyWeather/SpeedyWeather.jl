@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- OneBandShortwave radiation implemented with diagnostic clouds [#888](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/888)
 - AMDGPU extension [#901](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/901)
 - Don't adapt rings in RingGrids on GPU [#920](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/920)
 - README updates [#915](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/915#pullrequestreview-3469109183)
@@ -22,6 +23,7 @@
 - Seasonal ocean and land climatology models GPU-ready [#892](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/892)
 - Zenith constructors [#889](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/889)
 - More general forcing of pressure, vorticity and divergence [#855](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/855)
+
 
 ## v0.17.3
 
