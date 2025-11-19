@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fixes a bug affecting GPU transforms of Clenshaw and HealPix grids [#921](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/921)
 - AMDGPU extension [#901](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/901)
 - Don't adapt rings in RingGrids on GPU [#920](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/920)
 - README updates [#915](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/915#pullrequestreview-3469109183)
