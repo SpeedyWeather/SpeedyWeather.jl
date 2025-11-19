@@ -334,6 +334,7 @@ end
                   1e-12,  # FullClenshawGrid
                   1e-13,  # OctahedralGaussianGrid
                   1e-12,  # OctahedralClenshawGrid
+                  5e-4,   # OctaminimalGaussianGrid
                   1e-2,   # HEALPixGrid
                   1e-2]   # OctaHEALPixGrid
     @testset for trunc in [42, 61]
@@ -354,7 +355,7 @@ end
 
             # start in spectral space but compare in grid space to 
             # avoid inaccuracies due to filtering out higher frequencies
-            spec = rand(Complex{NF}, SG.spectrum, nlayers)
+            spec = randn(Complex{NF}, SG.spectrum, nlayers)
             grid = transform(spec, S)
 
             spec_roundtrip = transform(grid, S)
