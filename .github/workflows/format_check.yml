@@ -2,7 +2,7 @@ name: Runic Formatting Check
 on:
   push:
     branches:
-      - 'master'
+      - 'main'
       - 'release-'
     tags:
       - '*'
