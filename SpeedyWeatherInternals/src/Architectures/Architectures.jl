@@ -4,7 +4,7 @@ module Architectures
 
     export AbstractArchitecture
     export CPU, CPUStatic, GPU
-    export CUDAGPU, MetalGPU
+    export CUDAGPU, MetalGPU, ROCGPU
     export array_type, on_architecture, architecture, device
     export convert_to_device, ismatching, compatible_array_types, nonparametric_type
     export synchronize 
@@ -54,6 +54,7 @@ module Architectures
     function GPU end 
     function CUDAGPU end
     function MetalGPU end
+    function ROCGPU end
 
     #####
     ##### These methods are extended in SpeedyWeatherCUDAExt
