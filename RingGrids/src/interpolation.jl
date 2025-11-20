@@ -270,9 +270,9 @@ function _interpolate!(
     geometry::GridGeometry,
     architecture::AbstractArchitecture      
 )
-    (; npoints_output, ij_as, ij_bs, ij_cs, ij_ds, Δabs, Δcds, Δys) = interpolator.locator
-    (; npoints) = interpolator.geometry
-    (; rings) = interpolator.geometry.grid # CPU version even on GPU
+    (; npoints_output, ij_as, ij_bs, ij_cs, ij_ds, Δabs, Δcds, Δys) = locator
+    (; npoints) = geometry
+    (; rings) = geometry.grid # CPU version even on GPU
 
     # 1) Aout's length must match the interpolator
     # 2) input A must match the interpolator's geometry points (do not check grids for view support)
@@ -608,10 +608,10 @@ function find_grid_indices!(locator::AbstractLocator,   # update indices arrays
                            λs::AbstractArray,           # based on new longitudes λ
                            architecture::AbstractArchitecture=architecture(λs))
                            
-    (; js, ij_as, ij_bs, ij_cs, ij_ds ) = I.locator
-    (; Δabs, Δcds ) = I.locator
-    (; nlons, lon_offsets, nlat ) = I.geometry
-    (; rings ) = I.geometry # architecture version (GPU if needed)
+    (; js, ij_as, ij_bs, ij_cs, ij_ds ) = locator
+    (; Δabs, Δcds ) = locator
+    (; nlons, lon_offsets, nlat ) = geometry
+    (; rings ) = geometry # architecture version (GPU if needed)
     
     # Convert λs to the same type as lon_offsets if needed
     λs_converted = convert.(eltype(lon_offsets), λs)
