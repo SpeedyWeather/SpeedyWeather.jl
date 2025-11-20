@@ -28,10 +28,10 @@ end
 initialize!(::TransparentShortwave, ::PrimitiveEquation) = nothing
 
 # function barrier
-parameterization!(ij, diagn, progn, shortwave::TransparentShortwave, model) =
-    shortwave_radiation!(ij, diagn, shortwave, model.planet, model.land_sea_mask)
+@inline parameterization!(ij, diagn, progn, shortwave::TransparentShortwave, model) =
+    shortwave_radiation!(ij, diagn, shortwave, model.planet, model.land_sea_mask.mask)
 
-function shortwave_radiation!(ij, diagn, shortwave::TransparentShortwave, planet, land_sea_mask)
+@inline function shortwave_radiation!(ij, diagn, shortwave::TransparentShortwave, planet, land_sea_mask)
 
     (; surface_shortwave_down, surface_shortwave_up) = diagn.physics
     (; outgoing_shortwave) = diagn.physics
@@ -52,7 +52,7 @@ function shortwave_radiation!(ij, diagn, shortwave::TransparentShortwave, planet
     ssrd_land[ij]  = albedo_land * D
 
     # land-sea mask-weighted
-    albedo = (1 - land_fraction)*albedo_ocean + land_fraction*albedo_land
+    albedo = (one(albedo_ocean) - land_fraction)*albedo_ocean + land_fraction*albedo_land
     surface_shortwave_up[ij] = albedo * D
 
     # transparent also for reflected shortwave radiation travelling up
