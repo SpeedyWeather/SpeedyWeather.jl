@@ -1,7 +1,7 @@
 abstract type AbstractOrography <: AbstractModelComponent end
 
 # adapt to GPU only the fields themselves
-Adapt.adapt_structure(to, orog::AbstractOrography) = (orography=orog.orography, geopot_surf=orog.geopot_surf)
+Adapt.adapt_structure(to, orog::AbstractOrography) = (orography=adapt_structure(to, orog.orography), geopot_surf=adapt_structure(to, orog.geopot_surf))
 
 export NoOrography
 
