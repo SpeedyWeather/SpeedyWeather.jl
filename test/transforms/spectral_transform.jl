@@ -342,6 +342,7 @@ end
                               FullClenshawGrid,
                               OctahedralGaussianGrid,
                               OctahedralClenshawGrid,
+                              OctaminimalGaussianGrid,
                               HEALPixGrid,
                               OctaHEALPixGrid,))
 
