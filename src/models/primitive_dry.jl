@@ -108,9 +108,16 @@ $(TYPEDFIELDS)"""
     # Used to initiliaze variables and for the column-based parameterizations
     model_parameters::TS1 = (:architecture, :time_stepping, :orography, :geopotential, :atmosphere, 
                                 :planet, :geometry, :land_sea_mask, :clausius_clapeyron)
-    parameterizations::TS2 = (:vertical_diffusion, :convection, :albedo, :optical_depth,
-                                :shortwave_radiation, :longwave_radiation, :boundary_layer_drag,
-                                :surface_condition, :surface_momentum_flux, :surface_heat_flux,
+    parameterizations::TS2 = (  # mixing
+                                :vertical_diffusion, :convection,
+
+                                # radiation
+                                :albedo, :shortwave_radiation, :longwave_radiation,
+
+                                # surface fluxes
+                                :boundary_layer_drag, :surface_condition, :surface_momentum_flux, :surface_heat_flux,
+
+                                # perturbations
                                 :stochastic_physics)
     extra_parameterizations::TS3 = (:solar_zenith, :land, :ocean)
 end

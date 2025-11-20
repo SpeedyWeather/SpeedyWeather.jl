@@ -674,7 +674,7 @@ function homogeneous_temperature!(
         progn::PrognosticVariables,
         model::PrimitiveEquation
     )
-    (; geopot_surf) = model.orography       # spectral surface geopotential [m²/s²] (orography*gravity)
+    (; surface_geopotential) = model.orography       # spectral surface geopotential [m²/s²] (orography*gravity)
 
     # temp_ref:     Reference absolute T [K] at surface z = 0, constant lapse rate
     # temp_top:     Reference absolute T in the stratosphere [K], lapse rate = 0
@@ -694,7 +694,7 @@ function homogeneous_temperature!(
     temp_surf = lta_view(progn.temp, :, nlayers, 1)     # spectral temperature at k=nlayers+1/2
 
     @allowscalar temp_surf[1] = norm_sphere * temp_ref  # set global mean surface temperature
-    temp_surf .-= Γg⁻¹ .* geopot_surf # lower temperature for higher mountains
+    temp_surf .-= Γg⁻¹ .* surface_geopotential # lower temperature for higher mountains
 
     # Use lapserate and vertical coordinate σ for profile
     temp = get_step(progn.temp, 1)                      # 1 = first leapfrog timestep

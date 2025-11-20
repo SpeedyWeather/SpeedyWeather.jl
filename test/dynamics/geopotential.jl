@@ -18,7 +18,7 @@
         SpeedyWeather.transform!(diagn, progn, lf, model)
         SpeedyWeather.linear_virtual_temperature!(diagn, progn, lf, model)
         SpeedyWeather.geopotential!(diagn, model.geopotential, model.orography)
-        geopot_grid = transform(diagn.dynamics.geopot, model.spectral_transform)
+        geopot_grid = transform(diagn.dynamics.geopotential, model.spectral_transform)
         
         # approximate heights [m] for this setup
         heights = [27000, 18000, 13000, 9000, 6000, 3700, 1800, 700] 

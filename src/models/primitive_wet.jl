@@ -115,13 +115,22 @@ $(TYPEDFIELDS)"""
     # COMPONENTS
     # Tuples with symbols or instances of all parameterizations and parameter functions
     # Used to initiliaze variables and for the column-based parameterizations
+    # also determine order in which parameterizations are called
     model_parameters::TS1 = (:architecture, :time_stepping, :orography, :geopotential, :atmosphere, 
                                 :planet, :geometry, :land_sea_mask, :clausius_clapeyron)
-    parameterizations::TS2 = (:convection, :large_scale_condensation, :albedo,
-                                :shortwave_radiation, :boundary_layer_drag,
-                                :surface_condition, :surface_momentum_flux,
-                                :surface_heat_flux, :surface_humidity_flux,
-                                :stochastic_physics)
+    parameterizations::TS2 = (  # mixing and precipitation
+                                :vertical_diffusion, :large_scale_condensation, :convection,
+
+                                # radiation
+                                :albedo, :shortwave_radiation, :longwave_radiation,
+
+                                # surface fluxes
+                                :boundary_layer_drag, :surface_condition,
+                                :surface_momentum_flux, :surface_heat_flux, :surface_humidity_flux,
+
+                                # perturbations
+                                :stochastic_physics,
+                            )
     extra_parameterizations::TS3 = (:solar_zenith, :land, :ocean)
 end
 

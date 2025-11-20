@@ -43,11 +43,8 @@ Precomputes constants for the vertical integration of the geopotential, defined 
 `Φ_k = Φ_{k+1/2} + R*T_k*(ln(p_{k+1/2}) - ln(p_k))` (full levels)
 
 Same formula but `k → k-1/2`."""
-function initialize!(
-    geopotential::Geopotential,
-    model,
-)
-    (; Δp_geopot_half, Δp_geopot_full) = geopotential
+function initialize!(G::Geopotential, model)
+    (; Δp_geopot_half, Δp_geopot_full) = G
     (; R_dry) = model.atmosphere
     (; σ_levels_full, σ_levels_half) = model.geometry
     nlayers = length(σ_levels_full)
@@ -64,16 +61,16 @@ end
 
 """
 $(TYPEDSIGNATURES)
-Compute spectral geopotential `geopot` from spectral temperature `temp`
-and spectral surface geopotential `geopot_surf` (orography*gravity)."""
+Compute spectral geopotential `geopotential` from spectral temperature `temp`
+and spectral `surface_geopotential` (orography*gravity)."""
 function geopotential!( 
     diagn::DiagnosticVariables,
-    geopotential::Geopotential,
+    G::Geopotential,
     orography::AbstractOrography,
 )
-    (; geopot, temp_virt) = diagn.dynamics
-    (; geopot_surf) = orography                          # = orography*gravity
-    (; Δp_geopot_half, Δp_geopot_full) = geopotential    # = R*Δlnp either on half or full levels
+    (; geopotential, temp_virt) = diagn.dynamics
+    (; surface_geopotential) = orography                          # = orography*gravity
+    (; Δp_geopot_half, Δp_geopot_full) = G    # = R*Δlnp either on half or full levels
     (; nlayers) = diagn                                 # number of vertical levels
 
     @boundscheck nlayers == length(Δp_geopot_full) || throw(BoundsError)
@@ -83,15 +80,15 @@ function geopotential!(
     
     # BOTTOM FULL LAYER
     local k::Int = nlayers
-    @inbounds for lm in eachharmonic(geopot, geopot_surf, temp_virt)
-        geopot[lm, k] = geopot_surf[lm] + temp_virt[lm, k]*Δp_geopot_full[k]
+    @inbounds for lm in eachharmonic(geopotential, surface_geopotential, temp_virt)
+        geopotential[lm, k] = surface_geopotential[lm] + temp_virt[lm, k]*Δp_geopot_full[k]
     end
 
     # OTHER FULL LAYERS, integrate two half-layers from bottom to top
     @inbounds for k in nlayers-1:-1:1
-        for lm in eachharmonic(geopot, temp_virt)
-            geopot_k½ = geopot[lm, k+1] + temp_virt[lm, k+1]*Δp_geopot_half[k+1] # 1st half layer integration
-            geopot[lm, k] = geopot_k½  + temp_virt[lm, k]*Δp_geopot_full[k]      # 2nd onto full layer
+        for lm in eachharmonic(geopotential, temp_virt)
+            geopot_k½ = geopotential[lm, k+1] + temp_virt[lm, k+1]*Δp_geopot_half[k+1] # 1st half layer integration
+            geopotential[lm, k] = geopot_k½  + temp_virt[lm, k]*Δp_geopot_full[k]      # 2nd onto full layer
         end      
     end
 end
@@ -103,7 +100,7 @@ Used for parameterizations that need the geopotential in a single column,
 convection and vertical diffusion."""
 function geopotential!(
     ij,                         # horizontal grid point index
-    geopot,                     # ::AbstractField3D, geopotential to be filled
+    geopotential,                     # ::AbstractField3D, geopotential to be filled
     temp,                       # ::AbstractField3D, temperature field (virtual temperature for PrimitiveWet)
     orography,                  # ::AbstractField2D, orography field
     gravity,                    # ::Real, gravity [m/s^2]
@@ -112,26 +109,15 @@ function geopotential!(
     (; nlayers, Δp_geopot_half, Δp_geopot_full) = G  # = R*Δlnp either on half or full levels
 
     # bottom layer
-    geopot[ij, end] = gravity*orography[ij] + temp[ij, nlayers]*Δp_geopot_full[end]
+    geopotential[ij, end] = gravity*orography[ij] + temp[ij, nlayers]*Δp_geopot_full[end]
 
     # OTHER FULL LAYERS, integrate two half-layers from bottom to top
     @inbounds for k in nlayers-1:-1:1
-        geopot[ij, k] = geopot[ij, k+1] + temp[ij, k+1]*Δp_geopot_half[k+1] + temp[ij, k]*Δp_geopot_full[k]
+        geopotential[ij, k] = geopotential[ij, k+1] + temp[ij, k+1]*Δp_geopot_half[k+1] + temp[ij, k]*Δp_geopot_full[k]
     end
 end
 
-"""
-$(TYPEDSIGNATURES)
-Non-mutating version that creates a new geopotential vector from temperature.
-Calculates the geopotential based on `temp` in a single column, excluding
-the surface geopotential. Returns a new vector containing the computed
-geopotential values. Convenience function for analysis and post-processing."""
-function geopotential(  temp::Vector,
-                        G::Geopotential) 
-    geopot = zero(temp)
-    geopotential!(geopot, temp, G)
-    return geopot
-end
+# TODO provide a convenience function to calculate geopotential?
 
 """
 $(TYPEDSIGNATURES)
@@ -140,11 +126,10 @@ i.e. gravity times the interface displacement (field `pres`)"""
 function geopotential!( diagn::DiagnosticVariables,
                         pres::LowerTriangularArray,
                         planet::AbstractPlanet)
-    (; geopot) = diagn.dynamics
 
-    # don't use broadcasting as geopot will have size Nxnlayers but pres N
-    # [lm] indexing bypasses the incompatible sizes (necessary for primitive models)
-    for lm in eachindex(geopot, pres)
-        geopot[lm] = pres[lm] * planet.gravity
-    end
+    # note this only works in 2D models with nlayers=1 otherwise gepotential is actually 3D and not just 2D x 1
+    # one would need to use lta_view(gepotential, :, nlayers) to make it 2D again
+    (; geopotential) = diagn.dynamics
+    geopotential .= planet.gravity .* pres
+    return nothing
 end

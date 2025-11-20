@@ -44,7 +44,7 @@ function convection!(ij, diagn, SBM::BettsMillerConvection, model)
     temp = diagn.grid.temp_grid_prev
     temp_virt = diagn.grid.temp_virt_grid
     humid = diagn.grid.humid_grid_prev
-    geopot = diagn.dynamics.geopot
+    geopotential = diagn.grid.geopotential
     temp_tend = diagn.tendencies.temp_tend_grid
     humid_tend = diagn.tendencies.humid_tend_grid
     pₛ = diagn.grid.pres_grid_prev[ij]
@@ -56,10 +56,9 @@ function convection!(ij, diagn, SBM::BettsMillerConvection, model)
     # use scratch arrays for temp_ref_profile, humid_ref_profile
     temp_ref_profile =  diagn.dynamics.a_grid               # temperature [K] reference profile to adjust to
     humid_ref_profile = diagn.dynamics.b_grid               # specific humidity [kg/kg] profile to adjust to
-    geopot = diagn.dynamics.uv∇lnp                          # geopotential [m²/s²] on full levels
 
     # TODO move this to its own parameterization?
-    geopotential!(ij, geopot, temp_virt, model.orography.orography, planet.gravity, model.geopotential)
+    geopotential!(ij, geopotential, temp_virt, model.orography.orography, planet.gravity, model.geopotential)
 
     # CONVECTIVE CRITERIA AND FIRST GUESS RELAXATION
     # Create pseudo column for surface_temp_humid function (this needs to be updated later)
@@ -69,7 +68,7 @@ function convection!(ij, diagn, SBM::BettsMillerConvection, model)
 
     level_zero_buoyancy = pseudo_adiabat!(ij, temp_ref_profile,
                                             temp_parcel, humid_parcel,
-                                            temp_virt, geopot, pₛ, σ,
+                                            temp_virt, geopotential, pₛ, σ,
                                             clausius_clapeyron)
             
     for k in level_zero_buoyancy:nlayers
@@ -177,7 +176,7 @@ function pseudo_adiabat!(
     temp_parcel,
     humid_parcel,
     temp_virt_environment,
-    geopot,
+    geopotential,
     pres,
     σ,
     clausius_clapeyron,
@@ -224,7 +223,7 @@ function pseudo_adiabat!(
             B = q*Lᵥ^2 / ((1-q)^2 * cₚ * R_vapour)
             Γ = (1 + A/Tᵥ) / (1 + B/T^2)
                 
-            ΔΦ = geopot[ij, k] - geopot[ij, k+1]                    # vertical gradient in geopotential
+            ΔΦ = geopotential[ij, k] - geopotential[ij, k+1]                    # vertical gradient in geopotential
             temp_parcel = temp_parcel - ΔΦ/cₚ*Γ                     # new temperature of parcel at k
                 
             # at new (lower) temperature condensation occurs immediately

@@ -95,12 +95,12 @@ function bulk_richardson_surface(ij, diagn, atmosphere)
 
     u = diagn.grid.u_grid_prev[ij, surface]
     v = diagn.grid.v_grid_prev[ij, surface]
-    geopot = diagn.grid.geopotential[ij, surface]
+    geopotential = diagn.grid.geopotential[ij, surface]
     temp_virt = diagn.grid.temp_virt_grid[ij, surface]
 
     V² = u^2 + v^2
     Θ₀ = cₚ*temp_virt
-    Θ₁ = Θ₀ + geopot
-    bulk_richardson = geopot*(Θ₁ - Θ₀) / (Θ₀*V²)
+    Θ₁ = Θ₀ + geopotential
+    bulk_richardson = geopotential*(Θ₁ - Θ₀) / (Θ₀*V²)
     return bulk_richardson
 end

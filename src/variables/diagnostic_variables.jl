@@ -133,11 +133,12 @@ $TYPEDFIELDS."""
     v_grid          ::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
     "Logarithm of surface pressure [Pa]"
     pres_grid       ::GridVariable2D = zeros(GridVariable2D, grid)
-    "Tracers [?]"
-    tracers_grid    ::GridTracerTuple = NamedTuple()
-
+    "Geopotential [m²/s²]"
+    geopotential    ::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
     "Random pattern controlled by random process [1]"
     random_pattern  ::GridVariable2D = zeros(GridVariable2D, grid)
+    "Tracers [?]"
+    tracers_grid    ::GridTracerTuple = NamedTuple()
 
     # PREVIOUS TIME STEP
     "Absolute temperature [K] at previous time step"
@@ -227,7 +228,7 @@ $(TYPEDFIELDS)"""
     temp_virt::SpectralVariable3D = zeros(SpectralVariable3D, spectrum, nlayers)
 
     "Geopotential [m²/s²] on full layers"
-    geopot::SpectralVariable3D = zeros(SpectralVariable3D, spectrum, nlayers)
+    geopotential::SpectralVariable3D = zeros(SpectralVariable3D, spectrum, nlayers)
 
     "Vertical velocity (dσ/dt), on half levels k+1/2 below, pointing to the surface (σ=1)"
     σ_tend::GridVariable3D = zeros(GridVariable3D, grid, nlayers)

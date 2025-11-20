@@ -10,6 +10,7 @@ end
 ## SHORTWAVE RADIATION FOR A FULLY TRANSPARENT ATMOSPHERE
 export TransparentShortwave
 struct TransparentShortwave <: AbstractShortwave end
+Adapt.@adapt_struct TransparentShortwave
 TransparentShortwave(SG::SpectralGrid) = TransparentShortwave()
 
 function variables(::TransparentShortwave)

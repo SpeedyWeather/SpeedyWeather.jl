@@ -693,7 +693,7 @@ function bernoulli_potential!(
     S::SpectralTransform,
 )   
     (; u_grid, v_grid ) = diagn.grid
-    (; geopot, scratch_memory ) = diagn.dynamics
+    (; geopotential, scratch_memory ) = diagn.dynamics
     bernoulli = diagn.dynamics.a                            # reuse work arrays a, a_grid
     bernoulli_grid = diagn.dynamics.a_grid
     (; div_tend ) = diagn.tendencies
@@ -701,7 +701,7 @@ function bernoulli_potential!(
     half = convert(eltype(bernoulli_grid), 0.5)
     @. bernoulli_grid = half*(u_grid^2 + v_grid^2)          # = ½(u² + v²) on grid
     transform!(bernoulli, bernoulli_grid, scratch_memory, S)                # to spectral space
-    bernoulli .+= geopot                                    # add geopotential Φ
+    bernoulli .+= geopotential                                    # add geopotential Φ
     ∇²!(div_tend, bernoulli, S, add=true, flipsign=true)    # add -∇²(½(u² + v²) + ϕ)
     return nothing
 end
@@ -726,16 +726,16 @@ function linear_pressure_gradient!(
     (; R_dry) = atmosphere                  # dry gas constant 
     (; temp_profile) = implicit             # reference profile at layer k
     pres = get_step(progn.pres, lf)         # logarithm of surface pressure at leapfrog index lf
-    (; geopot) = diagn.dynamics
+    (; geopotential) = diagn.dynamics
 
     # -R_dry*Tₖ*∇²lnpₛ, linear part of the ∇⋅RTᵥ∇lnpₛ pressure gradient term
     # Tₖ being the reference temperature profile, the anomaly term T' = Tᵥ - Tₖ is calculated
     # vordiv_tendencies! include as R_dry*Tₖ*lnpₛ into the geopotential on which the operator
     # -∇² is applied in bernoulli_potential!
-    @inbounds for k in eachmatrix(geopot)
+    @inbounds for k in eachmatrix(geopotential)
         R_dryTₖ = R_dry*temp_profile[k]
         for lm in eachharmonic(pres)
-            geopot[lm, k] += R_dryTₖ*pres[lm]
+            geopotential[lm, k] += R_dryTₖ*pres[lm]
         end
     end
 end
