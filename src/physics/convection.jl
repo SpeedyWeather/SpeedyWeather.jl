@@ -50,16 +50,13 @@ function convection!(ij, diagn, SBM::BettsMillerConvection, model)
     pₛ = diagn.grid.pres_grid_prev[ij]
 
     # thermodynamics
-    Lᵥ = clausius_clapeyron.latent_heat_condensation  # latent heat of vaporization
-    cₚ = clausius_clapeyron.heat_capacity             # heat capacity
+    Lᵥ = clausius_clapeyron.latent_heat_condensation    # latent heat of vaporization
+    cₚ = clausius_clapeyron.heat_capacity               # heat capacity
 
     # use scratch arrays for temp_ref_profile, humid_ref_profile
-    temp_ref_profile =  diagn.dynamics.a_grid               # temperature [K] reference profile to adjust to
-    humid_ref_profile = diagn.dynamics.b_grid               # specific humidity [kg/kg] profile to adjust to
-
-    # TODO move this to its own parameterization?
-    geopotential!(ij, geopotential, temp_virt, model.orography.orography, planet.gravity, model.geopotential)
-
+    temp_ref_profile =  diagn.dynamics.a_grid           # temperature [K] reference profile to adjust to
+    humid_ref_profile = diagn.dynamics.b_grid           # specific humidity [kg/kg] profile to adjust to
+    
     # CONVECTIVE CRITERIA AND FIRST GUESS RELAXATION
     # Create pseudo column for surface_temp_humid function (this needs to be updated later)
     # For now, use surface values directly

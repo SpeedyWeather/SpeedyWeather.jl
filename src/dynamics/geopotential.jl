@@ -59,77 +59,53 @@ function initialize!(G::Geopotential, model)
     return nothing
 end
 
-"""
-$(TYPEDSIGNATURES)
-Compute spectral geopotential `geopotential` from spectral temperature `temp`
-and spectral `surface_geopotential` (orography*gravity)."""
-function geopotential!( 
+# calculate geopotential in grid-point space for parameterizations
+function geopotential!(
     diagn::DiagnosticVariables,
-    G::Geopotential,
-    orography::AbstractOrography,
+    model::PrimitiveEquation,
 )
-    (; geopotential, temp_virt) = diagn.dynamics
-    (; surface_geopotential) = orography                          # = orography*gravity
-    (; Δp_geopot_half, Δp_geopot_full) = G    # = R*Δlnp either on half or full levels
-    (; nlayers) = diagn                                 # number of vertical levels
+    temp = diagn.grid.temp_grid
+    humid = diagn.grid.humid_grid
+    g = model.planet.gravity
+    G = model.geopotential
+    (; geopotential) = diagn.grid
+    (; orography) = model.orography
 
-    @boundscheck nlayers == length(Δp_geopot_full) || throw(BoundsError)
+    # this triggers a fallback to use virtual temperature = absolute temperature for PrimitiveDry
+    A = model isa PrimitiveWet ? model.atmosphere : nothing
 
-    # for PrimitiveDry virtual temperature = absolute temperature here
-    # note these are not anomalies here as they are only in grid-point fields
-    
-    # BOTTOM FULL LAYER
-    local k::Int = nlayers
-    @inbounds for lm in eachharmonic(geopotential, surface_geopotential, temp_virt)
-        geopotential[lm, k] = surface_geopotential[lm] + temp_virt[lm, k]*Δp_geopot_full[k]
-    end
-
-    # OTHER FULL LAYERS, integrate two half-layers from bottom to top
-    @inbounds for k in nlayers-1:-1:1
-        for lm in eachharmonic(geopotential, temp_virt)
-            geopot_k½ = geopotential[lm, k+1] + temp_virt[lm, k+1]*Δp_geopot_half[k+1] # 1st half layer integration
-            geopotential[lm, k] = geopot_k½  + temp_virt[lm, k]*Δp_geopot_full[k]      # 2nd onto full layer
-        end      
-    end
+    arch = architecture(temp)
+    launch!(arch, RingGridWorkOrder, size(temp, 1), geopotential_kernel!, geopotential, temp, humid, orography, g, G, A)
 end
 
-"""
-$(TYPEDSIGNATURES)
-Calculate the geopotential based on `temp` in the column `ij`.
-Used for parameterizations that need the geopotential in a single column,
-convection and vertical diffusion."""
-function geopotential!(
-    ij,                         # horizontal grid point index
-    geopotential,                     # ::AbstractField3D, geopotential to be filled
-    temp,                       # ::AbstractField3D, temperature field (virtual temperature for PrimitiveWet)
-    orography,                  # ::AbstractField2D, orography field
-    gravity,                    # ::Real, gravity [m/s^2]
-    G::Geopotential,            # precomputed integration constants
-)
-    (; nlayers, Δp_geopot_half, Δp_geopot_full) = G  # = R*Δlnp either on half or full levels
+@kernel function geopotential_kernel!(geopotential, temp, humid, orography, gravity, Geopotential, atmosphere)
+    ij = @index(Global, Linear)
+
+    nlayers = size(temp, 2)
+    (; Δp_geopot_half, Δp_geopot_full) = Geopotential  # = R*Δlnp on half or full levels
 
     # bottom layer
-    geopotential[ij, end] = gravity*orography[ij] + temp[ij, nlayers]*Δp_geopot_full[end]
+    Tᵥ = virtual_temperature(temp[ij, nlayers], humid[ij, nlayers], atmosphere)
+    geopotential[ij, nlayers] = gravity*orography[ij] + Tᵥ*Δp_geopot_full[nlayers]
 
     # OTHER FULL LAYERS, integrate two half-layers from bottom to top
     @inbounds for k in nlayers-1:-1:1
-        geopotential[ij, k] = geopotential[ij, k+1] + temp[ij, k+1]*Δp_geopot_half[k+1] + temp[ij, k]*Δp_geopot_full[k]
+        Tᵥ_below = Tᵥ
+        Tᵥ = virtual_temperature(temp[ij, k], humid[ij, k], atmosphere)
+        geopotential[ij, k] = geopotential[ij, k+1] + Tᵥ_below*Δp_geopot_half[k+1] + Tᵥ*Δp_geopot_full[k]
     end
 end
-
-# TODO provide a convenience function to calculate geopotential?
 
 """
 $(TYPEDSIGNATURES)
 calculates the geopotential in the ShallowWaterModel as g*η,
 i.e. gravity times the interface displacement (field `pres`)"""
 function geopotential!( diagn::DiagnosticVariables,
-                        pres::LowerTriangularArray,
                         planet::AbstractPlanet)
 
     # note this only works in 2D models with nlayers=1 otherwise gepotential is actually 3D and not just 2D x 1
-    # one would need to use lta_view(gepotential, :, nlayers) to make it 2D again
-    (; geopotential) = diagn.dynamics
-    geopotential .= planet.gravity .* pres
+    # one would need to use lta/field_view(gepotential, :, nlayers) to make it 2D again
+    (; geopotential, pres_grid) = diagn.grid
+    geopotential .= planet.gravity .* pres_grid
     return nothing
 end

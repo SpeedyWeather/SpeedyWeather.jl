@@ -10,10 +10,10 @@ end
 ## SHORTWAVE RADIATION FOR A FULLY TRANSPARENT ATMOSPHERE
 export TransparentShortwave
 struct TransparentShortwave <: AbstractShortwave end
-Adapt.@adapt_struct TransparentShortwave
+Adapt.@adapt_structure TransparentShortwave
 TransparentShortwave(SG::SpectralGrid) = TransparentShortwave()
 
-function variables(::TransparentShortwave)
+function variables(::AbstractShortwave)
     return (
         DiagnosticVariable(name=:surface_shortwave_down, dims=Grid2D(), desc="Surface shortwave radiation down", units="W/m^2"),
         DiagnosticVariable(name=:surface_shortwave_down, dims=Grid2D(), desc="Surface shortwave radiation down over ocean", units="W/m^2", namespace=:ocean),
@@ -53,7 +53,7 @@ initialize!(::TransparentShortwave, ::PrimitiveEquation) = nothing
     ssrd_land[ij]  = albedo_land * D
 
     # land-sea mask-weighted
-    albedo = (one(albedo_ocean) - land_fraction)*albedo_ocean + land_fraction*albedo_land
+    albedo = (1 - land_fraction)*albedo_ocean + land_fraction*albedo_land
     surface_shortwave_up[ij] = albedo * D
 
     # transparent also for reflected shortwave radiation travelling up
