@@ -22,6 +22,7 @@ Don't use any dynamic dispatches, try to avoid allocations and branches in your 
 indexing of arrays. 
 """
 parameterization!(ij, diagn, progn, parameterization::AbstractParameterization, model_parameters) = nothing
+parameterization!(ij, diagn, progn, parameterization::Nothing, model_parameters) = nothing
 
 """
     $(TYPEDSIGNATURES)

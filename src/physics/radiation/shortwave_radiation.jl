@@ -31,7 +31,7 @@ initialize!(::TransparentShortwave, ::PrimitiveEquation) = nothing
 @inline parameterization!(ij, diagn, progn, shortwave::TransparentShortwave, model) =
     shortwave_radiation!(ij, diagn, shortwave, model.planet, model.land_sea_mask.mask)
 
-@inline function shortwave_radiation!(ij, diagn, shortwave::TransparentShortwave, planet, land_sea_mask)
+@inline function shortwave_radiation!(ij, diagn, ::TransparentShortwave, planet, land_sea_mask)
 
     (; surface_shortwave_down, surface_shortwave_up) = diagn.physics
     (; outgoing_shortwave) = diagn.physics
