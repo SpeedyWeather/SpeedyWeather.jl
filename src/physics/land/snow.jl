@@ -13,6 +13,19 @@ $(TYPEDFIELDS)"""
     melting_threshold::NF = 275
     runoff_time_scale::Second = Year(1) 
 end
+# parameters struct for kernel
+@kwdef struct SnowParams{
+    Tth, Tc, Tρs, Tz, Tdt, Tρw, TL, Tr
+}
+    melting_threshold::Tth
+    cₛ::Tc
+    ρ_soil::Tρs
+    z₁::Tz
+    Δt::Tdt
+    ρ_water::Tρw
+    Lᵢ::TL
+    r⁻¹::Tr
+end
 
 # generator function
 SnowModel(SG::SpectralGrid; kwargs...) = SnowModel{SG.NF}(; kwargs...)
@@ -56,22 +69,32 @@ function timestep!(
     snow_melt_rate = diagn.physics.land.snow_melt_rate
     snow_runoff_rate = diagn.physics.land.snow_runoff_rate
 
+    params = SnowParams(
+    melting_threshold = melting_threshold,
+    cₛ = cₛ,
+    ρ_soil = ρ_soil,
+    z₁ = z₁,
+    Δt = Δt,
+    ρ_water = ρ_water,
+    Lᵢ = Lᵢ,
+    r⁻¹ = r⁻¹,
+    )
+
     launch!(architecture(snow_depth), LinearWorkOrder, size(snow_depth), land_snow_kernel!,
         snow_depth, soil_temperature, snow_melt_rate, snow_runoff_rate, snow_fall_rate, mask,
-        melting_threshold, cₛ, ρ_soil, z₁, Δt,
-        ρ_water, Lᵢ, r⁻¹,
+        params,
     )
 	synchronize(architecture(snow_depth))
 end
 
 @kernel inbounds=true function land_snow_kernel!(
     snow_depth, soil_temperature, snow_melt_rate, snow_runoff_rate, snow_fall_rate, mask,
-    @Const(melting_threshold), @Const(cₛ), @Const(ρ_soil), @Const(z₁), @Const(Δt),
-    @Const(ρ_water), @Const(Lᵢ), @Const(r⁻¹),
+    @Const(params),
 )
     ij = @index(Global, Linear)             # every grid point ij
 
     if mask[ij] > 0                         # at least partially land
+        (; melting_threshold, cₛ, ρ_soil, z₁, Δt, ρ_water, Lᵢ, r⁻¹) = params
 
 		# check for melting of snow if temperature above melting threshold
 		δT_melt = max(soil_temperature[ij, 1] - melting_threshold, 0)
