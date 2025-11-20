@@ -37,7 +37,7 @@ $(TYPEDFIELDS)"""
     SM,     # <:AbstractSurfaceMomentumFlux,
     SH,     # <:AbstractSurfaceHeatFlux,
     HF,     # <:AbstractSurfaceHumidityFlux,
-    LC,     # <:AbstractCondensation,
+    LSC,    # <:AbstractCondensation,
     CV,     # <:AbstractConvection,
     SW,     # <:AbstractShortwave,
     LW,     # <:AbstractLongwave,
@@ -94,7 +94,7 @@ $(TYPEDFIELDS)"""
     surface_heat_flux::SH = SurfaceHeatFlux(spectral_grid)
     surface_humidity_flux::HF = SurfaceHumidityFlux(spectral_grid)
     large_scale_condensation::LSC = ImplicitCondensation(spectral_grid)
-    convection::CV = SimplifiedBettsMiller(spectral_grid)
+    convection::CV = BettsMillerConvection(spectral_grid)
     shortwave_radiation::SW = TransparentShortwave(spectral_grid)
     longwave_radiation::LW = JeevanjeeRadiation(spectral_grid)
     stochastic_physics::SP = nothing
