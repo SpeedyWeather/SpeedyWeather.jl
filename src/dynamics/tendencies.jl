@@ -67,8 +67,8 @@ function dynamics_tendencies!(
     # temperature relative to profile
     temperature_anomaly!(diagn, implicit)
 
-    # from ∂Φ/∂ln(pₛ) = -RTᵥ for bernoulli_potential!
-    geopotential!(diagn, geopotential, orography)
+    # # from ∂Φ/∂ln(pₛ) = -RTᵥ for bernoulli_potential!
+    # geopotential!(diagn, geopotential, orography)
 
     # get ū, v̄, D̄ on grid; D̄ in spectral
     vertical_integration!(diagn, progn, lf_implicit, geometry)
