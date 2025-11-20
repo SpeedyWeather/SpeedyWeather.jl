@@ -1,6 +1,8 @@
 # Changelog
 
 ## Unreleased
+
+- Fixes round trip transform tests [#921](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/921)
 - Updated docs CairoMakie compatibility to "0.12, 0.13, 0.14, 0.15"
 - OneBandShortwave radiation implemented with diagnostic clouds [#888](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/888)
 - AMDGPU extension [#901](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/901)

@@ -23,7 +23,7 @@ grid_list = [
     FullGaussianGrid,
     # FullClenshawGrid,
     OctahedralGaussianGrid,
-    # OctahedralClenshawGrid,
+    OctahedralClenshawGrid,
     # HEALPixGrid,
     # OctaHEALPixGrid,
 ]
@@ -70,13 +70,13 @@ end
                     
                     # Full return journey starting from grid
                     spec_ = SpeedyTransforms.transform(grid_cpu, S_cpu)
-                    grid_cpu = SpeedyTransforms.transform(spec_, S_cpu)
+                    grid_cpu_roundtrip = SpeedyTransforms.transform(spec_, S_cpu)
                     # @test grid_cpu ≈ grid_test
                     # grid_cpu = grid_test
 
                     # Full return journey starting from spec
                     grid_ = SpeedyTransforms.transform(spec_cpu, S_cpu)
-                    spec_cpu = SpeedyTransforms.transform(grid_, S_cpu)
+                    spec_cpu_roundtrip = SpeedyTransforms.transform(grid_, S_cpu)
                     # @test spec_cpu ≈ spec_test
                     # spec_cpu = spec_test
 
@@ -92,13 +92,13 @@ end
                     transform!(spec_gpu_test, grid_gpu, S_gpu)
                     transform!(grid_gpu_test, spec_gpu_test, S_gpu)
                     grid_test = on_architecture(cpu_arch, grid_gpu_test)
-                    @test grid_cpu ≈ grid_test rtol=sqrt(eps(Float32))
+                    @test grid_cpu_roundtrip ≈ grid_test rtol=sqrt(eps(Float32))
 
                     # Full return journey starting from spec on GPU
                     transform!(grid_gpu_test, spec_gpu, S_gpu)
                     transform!(spec_gpu_test, grid_gpu_test, S_gpu)
                     spec_test = on_architecture(cpu_arch, spec_gpu_test)
-                    @test spec_cpu ≈ spec_test rtol=sqrt(eps(Float32))
+                    @test spec_cpu_roundtrip ≈ spec_test rtol=sqrt(eps(Float32))
                 end
             end
         end
