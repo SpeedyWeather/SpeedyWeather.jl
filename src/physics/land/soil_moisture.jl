@@ -233,15 +233,8 @@ function timestep!(
     τ⁻¹ = inv(convert(eltype(soil_moisture), Second(soil.time_scale).value))
     f₁_f₂ = f₁/f₂
     Δt_f₁ = Δt/f₁
-    params = (
-        ρ= ρ,
-        Δt= Δt,
-        f₁= f₁,
-        Δt_f₁= Δt_f₁,
-        f₁_f₂= f₁_f₂,
-        p= p,
-        τ⁻¹= τ⁻¹,
-    )
+    params = (;ρ,Δt,f₁,Δt_f₁,f₁_f₂,p,τ⁻¹)
+
     launch!(architecture(soil_moisture), LinearWorkOrder, (size(soil_moisture, 1),),
         land_bucket_soil_moisture_kernel!, soil_moisture, mask, P, Sₘ, Sᵣ, E, R,
         params, 
@@ -260,6 +253,7 @@ end
         # river runoff only diagnostic, i.e. R=0 here but drain excess water below
         # convert to [m/s] by dividing by density
        (; ρ, Δt, f₁, Δt_f₁, f₁_f₂, p, τ⁻¹) = params
+       
        F = (P[ij] + Sₘ[ij] + Sᵣ[ij] - E[ij])/ρ         # - R[ij]
 
         # vertical diffusion term between layers
