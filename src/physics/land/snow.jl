@@ -56,22 +56,35 @@ function timestep!(
     snow_melt_rate = diagn.physics.land.snow_melt_rate
     snow_runoff_rate = diagn.physics.land.snow_runoff_rate
 
+    params = (
+        melting_threshold= melting_threshold,
+        cₛ= cₛ,
+        ρ_soil= ρ_soil,
+        z₁= z₁,
+        Δt= Δt,
+        ρ_water= ρ_water,
+        Lᵢ= Lᵢ,
+        r⁻¹= r⁻¹,
+    )
+
     launch!(architecture(snow_depth), LinearWorkOrder, size(snow_depth), land_snow_kernel!,
         snow_depth, soil_temperature, snow_melt_rate, snow_runoff_rate, snow_fall_rate, mask,
-        melting_threshold, cₛ, ρ_soil, z₁, Δt, ρ_water, Lᵢ, r⁻¹,
+        params,
     )
 	synchronize(architecture(snow_depth))
 end
 
 @kernel inbounds=true function land_snow_kernel!(
     snow_depth, soil_temperature, snow_melt_rate, snow_runoff_rate, snow_fall_rate, mask,
-    melting_threshold, cₛ, ρ_soil, z₁, Δt, ρ_water, Lᵢ, r⁻¹,
+    params,
     )
     ij = @index(Global, Linear)             # every grid point ij
 
     if mask[ij] > 0                         # at least partially land
-		# check for melting of snow if temperature above melting threshold
-		δT_melt = max(soil_temperature[ij, 1] - melting_threshold, 0)
+		
+		(;melting_threshold, cₛ, ρ_soil, z₁, Δt, ρ_water, Lᵢ, r⁻¹) = params
+        # check for melting of snow if temperature above melting threshold
+        δT_melt = max(soil_temperature[ij, 1] - melting_threshold, 0)
 	
         # energy available from soil warming above melting threshold [J/m²/s]
         E_avail = cₛ * δT_melt * ρ_soil * z₁ / Δt  
@@ -89,7 +102,7 @@ end
         snow_runoff_rate[ij] = runoff_rate * ρ_water
 
         # change snow depth by falling snow minus melting and runoff [m/s]
-        dsnow = snow_fall_rate[ij] / ρ_water - melt_rate - runoff_rate
+        dsnow = snow_fall_rate[ij] / ρ_water - melt_rate  - runoff_rate
 
         # Euler forward time step but cap at 0 depth to not melt more snow than available
         snow_depth[ij] = max(snow_depth[ij] + Δt * dsnow, 0)
