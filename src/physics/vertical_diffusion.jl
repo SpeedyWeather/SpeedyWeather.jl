@@ -102,7 +102,7 @@ end
 
 # function barrier
 parameterization!(ij, diagn, progn, diffusion::BulkRichardsonDiffusion, model) =
-    vertical_diffusion!(ij, diagn, diffusion, model.atmosphere, model.planet, model.orography)
+    vertical_diffusion!(ij, diagn, diffusion, model.atmosphere, model.planet, model.orography, model.class)
 
 function vertical_diffusion!(
     ij,
@@ -111,6 +111,7 @@ function vertical_diffusion!(
     atmosphere,
     planet,
     orography,
+    Model,
 )
     (; diffuse_momentum, diffuse_static_energy, diffuse_humidity) = diffusion
 
@@ -129,9 +130,9 @@ function vertical_diffusion!(
     v = diagn.grid.v_grid
     humid = diagn.grid.humid_grid
 
-    diffuse_momentum                            && vertical_diffusion!(ij, u_tend, u, K, kₕ, scheme)
-    diffuse_momentum                            && vertical_diffusion!(ij, v_tend, v, K, kₕ, scheme)
-    model isa PrimitiveWet && diffuse_humidity  && vertical_diffusion!(ij, humid_tend, humid, K, kₕ, scheme)
+    diffuse_momentum                            && vertical_diffusion!(ij, u_tend, u, K, kₕ, diffusion)
+    diffuse_momentum                            && vertical_diffusion!(ij, v_tend, v, K, kₕ, diffusion)
+    Model <: PrimitiveWet && diffuse_humidity   && vertical_diffusion!(ij, humid_tend, humid, K, kₕ, diffusion)
 
     if diffuse_static_energy
         # compute dry static energy on the fly
@@ -145,7 +146,7 @@ function vertical_diffusion!(
             K[ij, k] /= cₚ        # put temperature => dry static energy conversion into K
         end
 
-        vertical_diffusion!(ij, temp_tend, dry_static_energy, K, kₕ, scheme)
+        vertical_diffusion!(ij, temp_tend, dry_static_energy, K, kₕ, diffusion)
     end
     return nothing
 end
@@ -179,7 +180,7 @@ function get_diffusion_coefficients!(
     kₕ += 1  # uppermost layer where Ri < Ri_c
 
     # for output, TODO as layer index or height?
-    diagn.physics.boundary_layer_depth[ij] = kₕ
+    diagn.physics.boundary_layer_height[ij] = kₕ
 
     # diffusion above boundary layer is 0
     for k in 1:nlayers  # set for all layers 
@@ -259,7 +260,7 @@ end
 
 """
 $(TYPEDSIGNATURES)
-Calculate the bulk richardson number following Frierson, 2007.
+Calculate the bulk Richardson number following Frierson, 2007.
 For vertical stability in the boundary layer."""
 function bulk_richardson!(
     ij,
@@ -268,7 +269,8 @@ function bulk_richardson!(
 )
     # reuse work array
     Ri = diagn.dynamics.a_grid
-    surface = size(Ri, 2)    # surface index = nlayers
+    nlayers = size(Ri, 2)
+    surface = nlayers       # surface index
     cₚ = atmosphere.heat_capacity
 
     # TODO previous time step?

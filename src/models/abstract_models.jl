@@ -78,7 +78,8 @@ as NamedTuple. These are the GPU-compatible components of the model."""
 function get_model_parameters(model::PrimitiveEquation)
     names = map(field -> _get_param_name(model, field), model.model_parameters)
     values = map(field -> _get_param(model, field), model.model_parameters)
-    return NamedTuple{names}(values)
+    # also include the model class for dispatching inside kernels
+    return merge(NamedTuple{names}(values), (class=model_class(model),))
 end
 
 """$(TYPEDSIGNATURES)

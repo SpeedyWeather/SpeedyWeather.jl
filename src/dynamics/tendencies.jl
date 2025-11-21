@@ -695,7 +695,6 @@ function bernoulli_potential!(
     S = model.spectral_transform
 
     (; R_dry) = model.atmosphere                        # dry gas constant
-    (; u_grid, v_grid, geopotential) = diagn.grid
     u = diagn.grid.u_grid
     v = diagn.grid.v_grid
     Φ = diagn.grid.geopotential
@@ -716,14 +715,15 @@ function bernoulli_potential!(
         # So that the second term inside the Laplace operator can be added to the geopotential.
         # Rd is the gas constant, Tᵥ the virtual temperature and Tᵥ' its anomaly wrt to the
         # average or reference temperature Tₖ, lnpₛ is the logarithm of surface pressure.
-        RdTlnpₛ .= R_dry * Tₖ .* lnpₛ'
+        # broadcast 1D Tₖ (1 value per layer) over 2D lnpₛ (one value per grid point) to 3D
+        RdTlnpₛ .= R_dry * Tₖ' .* lnpₛ
     else
         RdTlnpₛ .= 0
     end     
 
     # add ½(u² + v²) + Φ on grid and the linear pressure gradient for primitive models
     half = convert(eltype(bernoulli_grid), 0.5)
-    @. bernoulli_grid = half*(u_grid^2 + v_grid^2) + geopotential + RdTlnpₛ
+    @. bernoulli_grid = half*(u^2 + v^2) + Φ + RdTlnpₛ
     transform!(bernoulli, bernoulli_grid, scratch_memory, S)        # to spectral space
     ∇²!(div_tend, bernoulli, S, add=true, flipsign=true)            # add -∇²(½(u² + v²) + ϕ)
     return nothing
