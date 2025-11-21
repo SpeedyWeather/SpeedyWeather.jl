@@ -188,11 +188,11 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
     # initialize non-atmosphere prognostic variables
     (; particles, ocean, land) = prognostic_variables
     initialize!(particles, prognostic_variables, diagnostic_variables, model.particle_advection, model)
-    # initialize!(ocean,     prognostic_variables, diagnostic_variables, model.ocean, model)
-    # initialize!(land,      prognostic_variables, diagnostic_variables, model.land, model)
+    initialize!(ocean,     prognostic_variables, diagnostic_variables, model.ocean, model)
+    initialize!(land,      prognostic_variables, diagnostic_variables, model.land, model)
 
     # set the initial conditions (may overwrite variables set in intialize! ocean/land)
-    # initialize!(prognostic_variables, model.initial_conditions, model)
+    initialize!(prognostic_variables, model.initial_conditions, model)
     (; clock) = prognostic_variables
     clock.time = time       # set the current time
     clock.start = time      # and store the start time

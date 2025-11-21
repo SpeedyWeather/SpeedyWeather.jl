@@ -75,7 +75,7 @@ function geopotential!(
     A = model isa PrimitiveWet ? model.atmosphere : nothing
 
     arch = architecture(temp)
-    launch!(arch, RingGridWorkOrder, size(temp, 1), geopotential_kernel!, geopotential, temp, humid, orography, g, G, A)
+    launch!(arch, RingGridWorkOrder, (size(temp, 1),), geopotential_kernel!, geopotential, temp, humid, orography, g, G, A)
 end
 
 @kernel function geopotential_kernel!(geopotential, temp, humid, orography, gravity, Geopotential, atmosphere)

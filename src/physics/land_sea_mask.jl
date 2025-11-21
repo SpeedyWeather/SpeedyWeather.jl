@@ -45,17 +45,19 @@ function mask!(
     @boundscheck fields_match(field, mask, horizontal_only=true) || throw(DimensionMismatch(field, mask))
     @boundscheck ndims(mask) == 1 || throw(DimensionMismatch(field, mask))
 
-    arch = architecture(field)    
+    arch = architecture(field)
     launch!(arch, RingGridWorkOrder, size(field), mask_kernel!, field, mask, val, masked_val)
     return field
 end
 
+# 2D, 3D or ND variant via Cartesian indexing
 @kernel inbounds=true function mask_kernel!(field, mask, val, masked_val)
-    ij, k = @index(Global, NTuple)
-    if mask[ij] == val
-        field[ij, k] = masked_val
+    ijk = @index(Global, Cartesian)
+    if mask[ijk[1]] == val
+        field[ijk] = masked_val
     end
 end
+
 
 # also allow for land_sea_mask struct to be passed on, use .mask in that case
 mask!(field::AbstractField, mask::AbstractLandSeaMask, args...; kwargs...) =
