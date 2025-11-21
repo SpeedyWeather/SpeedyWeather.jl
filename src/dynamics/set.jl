@@ -183,23 +183,26 @@ function set!(
     add::Bool=false,
     enforce_static_func = false, 
 )
+    (; londs, latds, σ_levels_full) = geometry
 
     # on GPU no dynamically generated function are allowd in kernels, transfer them to CPU and back
     if typeof(architecture(var)) <: GPU && enforce_static_func==false
         arch_cpu = CPU()
 
         var_cpu = on_architecture(arch_cpu, var)
-        set!(var_cpu, f, adapt(Array, geometry); add=add)
+        _set_function_3d!(var_cpu, f, adapt(Array, londs), adapt(Array, latds), adapt(Array, σ_levels_full); add=add)
         var .= on_architecture(var, var_cpu)
     else  
-        (; londs, latds, σ_levels_full) = geometry
-        kernel_func = add ? (a,b) -> a+b : (a,b) -> b
-
-        launch!(architecture(var), RingGridWorkOrder, size(var), set_field_3d_kernel!, var, londs, latds, σ_levels_full, f, kernel_func)
+        _set_function_3d!(var, f, londs, latds, σ_levels_full; add=add)
     end 
 
     return var
 end
+
+function _set_function_3d!(var::AbstractField, f::Function, londs::AbstractVector, latds::AbstractVector, σ_levels_full::AbstractVector; add::Bool=false)
+    kernel_func = add ? (a,b) -> a+b : (a,b) -> b
+    launch!(architecture(var), RingGridWorkOrder, size(var), set_field_3d_kernel!, var, londs, latds, σ_levels_full, f, kernel_func)
+end 
 
 @kernel inbounds=true function set_field_3d_kernel!(var, @Const(londs), @Const(latds), @Const(σ_levels_full), @Const(f), @Const(kernel_func))
     # Get indices
