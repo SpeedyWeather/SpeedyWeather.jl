@@ -191,7 +191,7 @@ function set!(
 
         var_cpu = on_architecture(arch_cpu, var)
         _set_function_3d!(var_cpu, f, adapt(Array, londs), adapt(Array, latds), adapt(Array, σ_levels_full); add=add)
-        var .= on_architecture(var, var_cpu)
+        copy!(var, on_architecture(architecture(var), var_cpu))
     else  
         _set_function_3d!(var, f, londs, latds, σ_levels_full; add=add)
     end 
