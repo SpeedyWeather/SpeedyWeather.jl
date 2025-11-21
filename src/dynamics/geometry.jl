@@ -91,6 +91,8 @@ $(TYPEDFIELDS)
     full_to_half_interpolation::VectorType = σ_interpolation_weights(σ_levels_full, σ_levels_half)
 end
 
+Adapt.@adapt_structure Geometry
+
 """
 $(TYPEDSIGNATURES)
 Generator function for `Geometry` struct based on `spectral_grid`."""

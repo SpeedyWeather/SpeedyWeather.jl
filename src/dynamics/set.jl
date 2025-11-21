@@ -189,7 +189,7 @@ function set!(
         arch_cpu = CPU()
 
         var_cpu = on_architecture(arch_cpu, var)
-        set!(var_cpu, f, geometry, S; add=add)
+        set!(var_cpu, f, adapt(Array, geometry); add=add)
         var .= on_architecture(var, var_cpu)
     else  
         (; londs, latds, σ_levels_full) = geometry

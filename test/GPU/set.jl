@@ -20,7 +20,7 @@
     geometry_cpu = Geometry(spectral_grid_cpu)
     field_cpu = zeros(Float32, spectral_grid_cpu.grid, 8)
 
-    set!(field_cpu, SpeedyWeather.zfac, geometry_cpu; enforce_static_func=true)
+    set!(field_cpu, SpeedyWeather.zfac, geometry_cpu)
 
     @test field_cpu ≈ on_architecture(architecture_cpu, field)
 
