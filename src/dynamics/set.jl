@@ -181,11 +181,22 @@ function set!(
     geometry::Geometry,
     S::Union{Nothing, SpectralTransform}=nothing;
     add::Bool=false,
+    enforce_static_func = false, 
 )
-    (; londs, latds, σ_levels_full) = geometry
-    kernel_func = add ? (a,b) -> a+b : (a,b) -> b
 
-    launch!(architecture(var), RingGridWorkOrder, size(var), set_field_3d_kernel!, var, londs, latds, σ_levels_full, f, kernel_func)
+    # on GPU no dynamically generated function are allowd in kernels, transfer them to CPU and back
+    if typeof(architecture(var)) <: GPU && enforce_static_func==false
+        arch_cpu = CPU()
+
+        var_cpu = on_architecture(arch_cpu, var)
+        set!(var_cpu, f, geometry, S; add=add)
+        var .= on_architecture(var, var_cpu)
+    else  
+        (; londs, latds, σ_levels_full) = geometry
+        kernel_func = add ? (a,b) -> a+b : (a,b) -> b
+
+        launch!(architecture(var), RingGridWorkOrder, size(var), set_field_3d_kernel!, var, londs, latds, σ_levels_full, f, kernel_func)
+    end 
 
     return var
 end
