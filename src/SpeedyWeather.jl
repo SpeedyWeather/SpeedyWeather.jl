@@ -13,6 +13,7 @@ export rotate, rotate!
 import Base.Threads: Threads, @threads
 import KernelAbstractions: KernelAbstractions, @kernel, @index, @Const, synchronize
 import Adapt: Adapt, adapt, adapt_structure
+import GPUArrays: @allowscalar
 
 using  SpeedyWeatherInternals
 using  SpeedyWeatherInternals.Architectures
@@ -163,9 +164,11 @@ include("physics/surface_fluxes/heat.jl")
 include("physics/surface_fluxes/humidity.jl")
 include("physics/convection.jl")
 include("physics/zenith.jl")
-include("physics/optical_depth.jl")
-include("physics/longwave_radiation.jl")
-include("physics/shortwave_radiation.jl")
+include("physics/radiation/shortwave_radiation.jl")
+include("physics/radiation/shortwave_transmittance.jl")
+include("physics/radiation/clouds.jl")
+include("physics/radiation/longwave_radiation.jl")
+include("physics/radiation/longwave_transmittance.jl")
 include("physics/stochastic_physics.jl")
 
 # OCEAN AND LAND

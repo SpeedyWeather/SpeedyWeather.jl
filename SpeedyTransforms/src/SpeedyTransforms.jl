@@ -13,6 +13,9 @@ import Adapt: adapt
 import KernelAbstractions: @kernel, @index, @Const, synchronize
 import Atomix
 
+# GPU
+import GPUArrays: GPUArrays, AbstractGPUArray
+
 # SPEEDYWEATHER MODULES
 using SpeedyWeatherInternals.Architectures
 using SpeedyWeatherInternals.Utils

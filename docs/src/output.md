@@ -188,7 +188,7 @@ specifically for the output. If these output variables are not requested then th
 **Mean sea-level pressure** is computed as 
 
 ```math
-p_{surf} \times \exp\left(\frac{g h}{R_d T_v}\right)
+p_{surf} \exp\left(\frac{g h}{R_d T_v}\right)
 ```
 
 with gravity ``g``, orographic height ``h``, dry gas constant ``R_d`` and ``T_v`` virtual temperature
@@ -198,16 +198,16 @@ at the surface.
 level
 
 ```math
-T_{surf} = T_{bottom} (\frac{p_{bottom}}{p_{surf}})^\kappa
+T_{surf} = T_{bottom} \left(\frac{p_{\rm bottom}}{p_{surf}}\right)^\kappa
 ```
 
-where ``\kappa = R_d / C_p``, and ``\frac{p_{bottom}}{p_{surf}}`` is equal to
+where ``\kappa = R_d / C_p``, and ``p_{\rm bottom}/p_{\rm surf}`` is equal to
 ``\sigma`` at the bottom level.
 
 **10 winds** are computed assuming a logarithmic profile down to a height ``h_0 = 10~\text{m}``
 
 ```math
-u_{10} = u_{bottom} \frac{\log(h_0/z_0)}{\log(z_{bottom}/z_0)}
+u_{10} = u_{\rm bottom} \frac{\log(h_0/z_0)}{\log(z_{\rm bottom}/z_0)}
 ```
 
 (same for ``v``), with ``z_0`` the surface roughness length.
