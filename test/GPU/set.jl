@@ -1,7 +1,7 @@
 @testset "set! functions on GPU" begin 
     
     # 3D 
-    architecture = GPU()
+    architecture = SpeedyWeather.GPU()
     spectral_grid = SpectralGrid(; architecture)
     geometry = Geometry(spectral_grid)
     field = zeros(Float32, spectral_grid.grid, 8)
@@ -15,7 +15,7 @@
     set!(field, SpeedyWeather.zfac, geometry; enforce_static_func=true)
     
     # just compare to CPU version 
-    architecture_cpu = CPU()
+    architecture_cpu = SpeedyWeather.CPU()
     spectral_grid_cpu = SpectralGrid(; architecture_cpu)
     geometry_cpu = Geometry(spectral_grid_cpu)
     field_cpu = zeros(Float32, spectral_grid_cpu.grid, 8)
