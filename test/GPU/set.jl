@@ -16,7 +16,7 @@
     
     # just compare to CPU version 
     architecture_cpu = SpeedyWeather.CPU()
-    spectral_grid_cpu = SpectralGrid(; architecture_cpu)
+    spectral_grid_cpu = SpectralGrid(; architecture=architecture_cpu)
     geometry_cpu = Geometry(spectral_grid_cpu)
     field_cpu = zeros(Float32, spectral_grid_cpu.grid, 8)
 
