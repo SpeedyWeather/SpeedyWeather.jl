@@ -27,6 +27,5 @@
     # 2D 
     field = zeros(Float32, spectral_grid.grid)
     set!(field, (λ, φ) -> φ, geometry)
-    @test on_architecture(CPU(), field) ≈ RingGrids.get_londlatds(spectral_grid.grid)[2]
-
+    @test on_architecture(SpeedyWeather.CPU(), field) ≈ RingGrids.get_londlatds(spectral_grid.grid)[2]
 end
