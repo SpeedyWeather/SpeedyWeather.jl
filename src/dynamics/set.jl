@@ -247,7 +247,7 @@ function _set!(
     add::Bool=false,
 )   
     kernel_func = add ? (a,b) -> a+b : (a,b) -> b
-    var .= kernel_func.(var, f.(londs, latds))
+    var.data .= kernel_func.(var.data, f.(londs, latds))
     return var
 end
 
