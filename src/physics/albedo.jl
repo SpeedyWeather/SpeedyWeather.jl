@@ -158,10 +158,28 @@ function albedo!(
     diagn.albedo .= albedo_ocean .+ sea_ice_concentration .* (albedo_ice .- albedo_ocean)
 end
 
+
+"""Marker type for snow-cover-to-albedo schemes."""
+abstract type AbstractSnowAlbedoScheme end
+
+"""Linear ramp: snow cover grows from 0 to 1 at `snow_depth_scale`."""
+struct LinearSnowAlbedo <: AbstractSnowAlbedoScheme end
+
+"""Saturating ramp: snow cover grows as `S/(S+scale)`."""
+struct SaturatingSnowAlbedo  <: AbstractSnowAlbedoScheme end
+
+"""$(TYPEDSIGNATURES) Snow cover fraction for the linear scheme, clamped to 1."""
+@inline snow_cover_fraction(::LinearSnowAlbedo, S, scale) =
+    min(S / scale, 1)
+
+"""$(TYPEDSIGNATURES) Snow cover fraction for the saturating scheme."""
+@inline snow_cover_fraction(::SaturatingSnowAlbedo, S, scale) =
+    S / (S + scale)
+
 ## LandSnowAlbedo
 export LandSnowAlbedo
 
-@kwdef struct LandSnowAlbedo{NF} <: AbstractAlbedo
+@kwdef struct LandSnowAlbedo{NF, Scheme<:AbstractSnowAlbedoScheme} <: AbstractAlbedo
     "Albedo of bare land (excluding vegetation) [1]"
     albedo_land::NF = 0.3
 
@@ -173,9 +191,16 @@ export LandSnowAlbedo
 
     "Conversion from snow depth to snow cover [m]"
     snow_depth_scale::NF = 0.1
+
+    "Snow cover-albedo scheme"
+    scheme::Scheme = SaturatingSnowAlbedo()
+
 end
 
-LandSnowAlbedo(SG::SpectralGrid; kwargs...) = LandSnowAlbedo{SG.NF}(;kwargs...)
+function LandSnowAlbedo(SG::SpectralGrid; scheme = SaturatingSnowAlbedo(), kwargs...)
+    return LandSnowAlbedo{SG.NF, typeof(scheme)}(; scheme, kwargs...)
+end
+
 initialize!(albedo::LandSnowAlbedo, model::PrimitiveEquation) = nothing
 
 function albedo!(
@@ -186,11 +211,13 @@ function albedo!(
     model::PrimitiveEquation,
 )
     (; snow_depth) = progn.land
-    (; albedo_land, albedo_vegetation, albedo_snow, snow_depth_scale) = albedo
+    (; albedo_land, albedo_vegetation, albedo_snow, snow_depth_scale, scheme) = albedo
 
     snow_cover = diagn_all.dynamics.a_2D_grid       # scratch memory
-    snow_cover .= min.(snow_depth, 1)
-
+    
+    # compute snow-cover fraction using the chosen scheme and clamp to [0, 1]
+    @. snow_cover = snow_cover_fraction(scheme, snow_depth, snow_depth_scale)
+    @. snow_cover = min(max(snow_cover, 0), 1)
 	# ## Now compute the snow area cover fraction based on snow depth
 	# #σₛ = Sₐ / (10. * drag_snow + Sₐ) #JULES, from Betts et al.
 	# σₛ[ij] = min(1.0, Sₐ[ij] / snow_depth_scale)   # e.g. snow_depth_scale ≈ 0.1 m
