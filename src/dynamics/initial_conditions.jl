@@ -485,8 +485,8 @@ function initialize!(
 
     η(λ, θ) = R^2 / g * (A(λ, θ) + B(λ, θ) * cosd(m * λ) + C(λ, θ) * cosd(2m * λ))
 
-    set!(progn, geometry, vor = ζ)
-    model isa ShallowWater && set!(progn, geometry, pres = η)
+    set!(progn, geometry, vor = ζ, static_func=false)
+    model isa ShallowWater && set!(progn, geometry, pres = η, static_func=false)
     set!(progn, geometry, div = 0)  # technically not needed, but set to zero for completeness
 
     # filter low values below cutoff amplitude c
