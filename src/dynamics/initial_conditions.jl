@@ -20,33 +20,35 @@ function initialize!(
     return nothing
 end
 
-InitialConditions(::Type{<:Barotropic}) = InitialConditions(; vordiv = RandomVelocity())
-InitialConditions(::Type{<:ShallowWater}) = InitialConditions(; vordiv = ZonalJet())
-function InitialConditions(::Type{<:PrimitiveDry})
-    vordiv = ZonalWind()
-    pres = PressureOnOrography()
-    temp = JablonowskiTemperature()
+InitialConditions(spectral_grid, ::Type{<:Barotropic}) = InitialConditions(; vordiv = RandomVelocity(spectral_grid))
+InitialConditions(spectral_grid, ::Type{<:ShallowWater}) = InitialConditions(; vordiv = ZonalJet(spectral_grid))
+function InitialConditions(spectral_grid, ::Type{<:PrimitiveDry})
+    vordiv = ZonalWind(spectral_grid)
+    pres = PressureOnOrography(spectral_grid)
+    temp = JablonowskiTemperature(spectral_grid)
     return InitialConditions(; vordiv, pres, temp)
 end
 
-function InitialConditions(::Type{<:PrimitiveWet})
-    vordiv = ZonalWind()
-    pres = PressureOnOrography()
-    temp = JablonowskiTemperature()
-    humid = ConstantRelativeHumidity()
+function InitialConditions(spectral_grid, ::Type{<:PrimitiveWet})
+    vordiv = ZonalWind(spectral_grid)
+    pres = PressureOnOrography(spectral_grid)
+    temp = JablonowskiTemperature(spectral_grid)
+    humid = ConstantRelativeHumidity(spectral_grid)
     return InitialConditions(; vordiv, pres, temp, humid)
 end
 
 export ZeroInitially
 struct ZeroInitially <: AbstractInitialConditions end
+ZeroInitially(SG::SpectralGrid) = ZeroInitially()
 initialize!(::PrognosticVariables, ::ZeroInitially, ::AbstractModel) = nothing
 
 # to avoid a breaking change, like ZeroInitially
 export StartFromRest
-@kwdef struct StartFromRest{P, T, H} <: AbstractInitialConditions
-    pres::P = ConstantPressure()
-    temp::T = JablonowskiTemperature()
-    humid::H = ZeroInitially()
+@kwdef struct StartFromRest{SG, P, T, H} <: AbstractInitialConditions
+    spectral_grid::SG
+    pres::P = ConstantPressure(spectral_grid)
+    temp::T = JablonowskiTemperature(spectral_grid)
+    humid::H = ZeroInitially(spectral_grid)
 end
 
 initialize!(::PrognosticVariables, ::StartFromRest, ::Barotropic) = nothing
@@ -66,12 +68,12 @@ export RandomVorticity
 
 """Start with random vorticity as initial conditions
 $(TYPEDFIELDS)"""
-@kwdef mutable struct RandomVorticity <: AbstractInitialConditions
+@kwdef mutable struct RandomVorticity{NF} <: AbstractInitialConditions
     "[OPTION] Power of the spectral distribution k^power"
-    power::Float64 = -3
+    power::NF = -3
 
     "[OPTION] the (approximate) amplitude in [1/s], used as standard deviation of spherical harmonic coefficients"
-    amplitude::Float64 = 1.0e-4
+    amplitude::NF = 1.0e-4
 
     "[OPTION] Maximum wavenumber"
     max_wavenumber::Int = 20
@@ -83,6 +85,8 @@ $(TYPEDFIELDS)"""
     random_number_generator::Random.Xoshiro = Random.Xoshiro(seed)
 end
 
+RandomVorticity(SG::SpectralGrid; kwargs...) = RandomVorticity{SG.NF}(; kwargs...)
+
 """$(TYPEDSIGNATURES)
 Kernel version of initialize! for RandomVorticity initial conditions."""
 function initialize!(
@@ -90,7 +94,7 @@ function initialize!(
         initial_conditions::RandomVorticity,
         model::Barotropic
     )
-    NF = eltype(progn)
+    NF = eltype(progn)  #
 
     # reseed the random number generator, for seed=0 randomly seed from Julia's global RNG
     seed = initial_conditions.seed == 0 ? rand(UInt) : initial_conditions.seed
@@ -155,9 +159,9 @@ export RandomVelocity
 
 """Start with random velocity as initial conditions
 $(TYPEDFIELDS)"""
-@kwdef mutable struct RandomVelocity <: AbstractInitialConditions
+@kwdef mutable struct RandomVelocity{NF} <: AbstractInitialConditions
     "[OPTION] maximum speed [ms⁻¹]"
-    max_speed::Float64 = 60
+    max_speed::NF = 60
 
     "[OPTION] Maximum wavenumber after truncation"
     truncation::Int = 15
@@ -168,6 +172,8 @@ $(TYPEDFIELDS)"""
     "Independent random number generator for this random process"
     random_number_generator::Random.Xoshiro = Random.Xoshiro(seed)
 end
+
+RandomVelocity(SG::SpectralGrid; kwargs...) = RandomVelocity{SG.NF}(; kwargs...)
 
 """$(TYPEDSIGNATURES)
 Start with random vorticity as initial conditions"""
@@ -218,31 +224,33 @@ export ZonalJet
 """A struct that contains all parameters for the Galewsky et al, 2004 zonal jet
 intitial conditions for the ShallowWaterModel. Default values as in Galewsky.
 $(TYPEDFIELDS)"""
-@kwdef mutable struct ZonalJet <: AbstractInitialConditions
+@kwdef mutable struct ZonalJet{NF} <: AbstractInitialConditions
     "jet latitude [˚N]"
-    latitude::Float64 = 45
+    latitude::NF = 45
 
     "jet width [˚], default ≈ 19.29˚"
-    width::Float64 = (1 / 4 - 1 / 7) * 180
+    width::NF = (1 / 4 - 1 / 7) * 180
 
     "jet maximum velocity [m/s]"
-    umax::Float64 = 80
+    umax::NF = 80
 
     "perturbation latitude [˚N], position in jet by default"
-    perturb_lat::Float64 = latitude
+    perturb_lat::NF = latitude
 
     "perturbation longitude [˚E]"
-    perturb_lon::Float64 = 270
+    perturb_lon::NF = 270
 
     "perturbation zonal extent [˚], default ≈ 19.1˚"
-    perturb_xwidth::Float64 = 1 / 3 * 360 / 2π
+    perturb_xwidth::NF = 1 / 3 * 360 / 2π
 
     "perturbation meridinoal extent [˚], default ≈ 3.8˚"
-    perturb_ywidth::Float64 = 1 / 15 * 360 / 2π
+    perturb_ywidth::NF = 1 / 15 * 360 / 2π
 
     "perturbation amplitude [m]"
-    perturb_height::Float64 = 120
+    perturb_height::NF = 120
 end
+
+ZonalJet(SG::SpectralGrid; kwargs...) = ZonalJet{SG.NF}(; kwargs...)
 
 """
 $(TYPEDSIGNATURES)
@@ -377,26 +385,28 @@ $(TYPEDSIGNATURES)
 Create a struct that contains all parameters for the Jablonowski and Williamson, 2006
 intitial conditions for the primitive equation model. Default values as in Jablonowski.
 $(TYPEDFIELDS)"""
-@kwdef struct ZonalWind <: AbstractInitialConditions
+@kwdef struct ZonalWind{NF} <: AbstractInitialConditions
     "conversion from σ to Jablonowski's ηᵥ-coordinates"
-    η₀::Float64 = 0.252
+    η₀::NF = 0.252
 
     "[OPTION] max amplitude of zonal wind [m/s]"
-    u₀::Float64 = 35
+    u₀::NF = 35
 
     # PERTURBATION
     "[OPTION] perturbation centred at [˚N]"
-    perturb_lat::Float64 = 40
+    perturb_lat::NF = 40
 
     "[OPTION] perturbation centred at [˚E]"
-    perturb_lon::Float64 = 20
+    perturb_lon::NF = 20
 
     "[OPTION] perturbation strength [m/s]"
-    perturb_uₚ::Float64 = 1
+    perturb_uₚ::NF = 1
 
     "[OPTION] radius of Gaussian perturbation in units of Earth's radius [1]"
-    perturb_radius::Float64 = 1 / 10
+    perturb_radius::NF = 1 / 10
 end
+
+ZonalWind(SG::SpectralGrid; kwargs...) = ZonalWind{SG.NF}(; kwargs...)
 
 """
 $(TYPEDSIGNATURES)
@@ -414,38 +424,66 @@ function initialize!(
     (; radius) = model.planet
     R = radius * perturb_radius         # spatial extent of perturbation
 
-    # global references are not allowed on the GPU, two options:
-    # 1) define additional parameters as `const` (global scope only)
-    # 2) add @eval and string interpolate with $ those parameters inside the function
-    @eval function initial_vorticity(λ, φ, η)         # longitude, latitude (degree), sigma coordinate
-
-        # great circle distance to perturbation
-        X = clamp($sinφc * sind(φ) + $cosφc * cosd(φ) * cosd(λ - $λc), 0, 1)
-        r = $radius * acos(X)
-
-        # Eq (3), the unperturbed zonal wind
-        ζ = -4 * $u₀ / $radius * cos((η - $η₀) * π / 2)^(3 / 2) * sind(φ) * cosd(φ) * (2 - 5sind(φ)^2)
-
-        # Eq (12), the perturbation
-        perturbation = $perturb_uₚ / $radius * exp(-(r / $R)^2) *
-            (tand(φ) - 2 * ($radius / $R)^2 * acos(X) * ($sinφc * cosd(φ) - $cosφc * sind(φ) * cosd(λ - $λc)) / sqrt(1 - X^2))
-
-        return ζ + perturbation
-    end
-
-    @eval function initial_divergence(λ, φ, η)               # longitude, latitude (degree), sigma coordinate
-
-        # great circle distance to perturbation
-        X = clamp($sinφc * sind(φ) + $cosφc * cosd(φ) * cosd(λ - $λc), 0, 1)
-        r = $radius * acos(X)
-
-        # Eq (13)
-        return -2 * $perturb_uₚ * $radius / $R^2 * exp(-(r / $R)^2) * acos(X) / sqrt(1 - X^2) * $cosφc * sind(λ - $λc)
-    end
+    vor_ic = JablonowskiVorticity(sinφc, cosφc, λc, radius, u₀, η₀, perturb_uₚ, R)
+    div_ic = JablonowskiDivergence(sinφc, cosφc, λc, radius, u₀, η₀, perturb_uₚ, R)
 
     # apply those to set the initial conditions for vor, div
-    set!(progn, model; vor = initial_vorticity, div = initial_divergence, lf = 1, static_func=false)
+    set!(progn, model; vor = vor_ic, div = div_ic, lf = 1, static_func = true)
     return nothing
+end
+
+struct JablonowskiVorticity{NF}
+    sinφc::NF
+    cosφc::NF
+    λc::NF
+    radius::NF
+    u₀::NF
+    η₀::NF
+    perturb_uₚ::NF
+    R::NF
+end
+
+Adapt.@adapt_structure JablonowskiVorticity
+
+@inline function (J::JablonowskiVorticity)(λ, φ, η)
+    (; sinφc, cosφc, λc, radius, u₀, η₀, perturb_uₚ, R) = J
+
+    # great circle distance to perturbation
+    X = clamp(sinφc * sind(φ) + cosφc * cosd(φ) * cosd(λ - λc), 0, 1)
+    r = radius * acos(X)
+
+    # Eq (3), the unperturbed zonal wind
+    ζ = -4 * u₀ / radius * cos((η - η₀) * π / 2)^(3 / 2) * sind(φ) * cosd(φ) * (2 - 5sind(φ)^2)
+
+    # Eq (12), the perturbation
+    perturbation = perturb_uₚ / radius * exp(-(r / R)^2) *
+        (tand(φ) - 2 * (radius / R)^2 * acos(X) * (sinφc * cosd(φ) - cosφc * sind(φ) * cosd(λ - λc)) / sqrt(1 - X^2))
+
+    return ζ + perturbation
+end
+
+struct JablonowskiDivergence{NF}
+    sinφc::NF
+    cosφc::NF
+    λc::NF
+    radius::NF
+    u₀::NF
+    η₀::NF
+    perturb_uₚ::NF
+    R::NF
+end
+
+Adapt.@adapt_structure JablonowskiDivergence
+
+@inline function (J::JablonowskiDivergence)(λ, φ, η)
+    (; sinφc, cosφc, λc, radius, u₀, η₀, perturb_uₚ, R) = J
+
+    # great circle distance to perturbation
+    X = clamp(sinφc * sind(φ) + cosφc * cosd(φ) * cosd(λ - λc), 0, 1)
+    r = radius * acos(X)
+
+    # Eq (13)
+    return -2 * perturb_uₚ * radius / R^2 * exp(-(r / R)^2) * acos(X) / sqrt(1 - X^2) * cosφc * sind(λ - λc)
 end
 
 export RossbyHaurwitzWave
@@ -453,12 +491,14 @@ export RossbyHaurwitzWave
 """Rossby-Haurwitz wave initial conditions as in Williamson et al. 1992, J Computational Physics
 with an additional cut-off amplitude `c` to filter out tiny harmonics in the vorticity field.
 Parameters are $(TYPEDFIELDS)"""
-@kwdef struct RossbyHaurwitzWave <: AbstractInitialConditions
+@kwdef struct RossbyHaurwitzWave{NF} <: AbstractInitialConditions
     m::Int = 4
-    ω::Float64 = 7.848e-6
-    K::Float64 = 7.848e-6
-    c::Float64 = 1.0e-10
+    ω::NF = 7.848e-6
+    K::NF = 7.848e-6
+    c::NF = 1.0e-10
 end
+
+RossbyHaurwitzWave(SG::SpectralGrid; kwargs...) = RossbyHaurwitzWave{SG.NF}(; kwargs...)
 
 """$(TYPEDSIGNATURES)
 Rossby-Haurwitz wave initial conditions as in Williamson et al. 1992, J Computational Physics
@@ -485,8 +525,8 @@ function initialize!(
 
     η(λ, θ) = R^2 / g * (A(λ, θ) + B(λ, θ) * cosd(m * λ) + C(λ, θ) * cosd(2m * λ))
 
-    set!(progn, geometry, vor = ζ, static_func=false)
-    model isa ShallowWater && set!(progn, geometry, pres = η, static_func=false)
+    set!(progn, geometry, vor = ζ, static_func = false)
+    model isa ShallowWater && set!(progn, geometry, pres = η, static_func = false)
     set!(progn, geometry, div = 0)  # technically not needed, but set to zero for completeness
 
     # filter low values below cutoff amplitude c
@@ -509,22 +549,24 @@ $(TYPEDSIGNATURES)
 Create a struct that contains all parameters for the Jablonowski and Williamson, 2006
 intitial conditions for the primitive equation model. Default values as in Jablonowski.
 $(TYPEDFIELDS)"""
-@kwdef struct JablonowskiTemperature <: AbstractInitialConditions
+@kwdef struct JablonowskiTemperature{NF} <: AbstractInitialConditions
     "conversion from σ to Jablonowski's ηᵥ-coordinates"
-    η₀::Float64 = 0.252
+    η₀::NF = 0.252
 
     "Sigma coordinates of the tropopause [1]"
-    σ_tropopause::Float64 = 0.2
+    σ_tropopause::NF = 0.2
 
     "max amplitude of zonal wind [m/s]"
-    u₀::Float64 = 35
+    u₀::NF = 35
 
     "temperature difference used for stratospheric lapse rate [K], Jablonowski uses ΔT = 4.8e5 [K]"
-    ΔT::Float64 = 0
+    ΔT::NF = 0
 
     "minimum temperature [K] of profile"
-    Tmin::Float64 = 200
+    Tmin::NF = 200
 end
+
+JablonowskiTemperature(SG::SpectralGrid; kwargs...) = JablonowskiTemperature{SG.NF}(; kwargs...)
 
 """
 $(TYPEDSIGNATURES)
@@ -641,6 +683,8 @@ $(TYPEDFIELDS)"""
     filename::String = "restart.jld2"
 end
 
+StartFromFile(SG::SpectralGrid; kwargs...) = StartFromFile(; kwargs...)
+
 """
 $(TYPEDSIGNATURES)
 Restart from a previous SpeedyWeather.jl simulation via the restart file restart.jld2
@@ -726,6 +770,7 @@ end
 
 export PressureOnOrography
 struct PressureOnOrography <: AbstractInitialConditions end
+PressureOnOrography(SG::SpectralGrid) = PressureOnOrography()
 
 """
 $(TYPEDSIGNATURES)
@@ -766,6 +811,8 @@ end
 export ConstantPressure
 struct ConstantPressure <: AbstractInitialConditions end
 
+ConstantPressure(SG::SpectralGrid) = ConstantPressure()
+
 function initialize!(
         progn::PrognosticVariables,
         ::ConstantPressure,
@@ -781,9 +828,11 @@ end
 initialize!(::PrognosticVariables, ::ConstantPressure, ::ShallowWater) = nothing
 
 export ConstantRelativeHumidity
-@kwdef struct ConstantRelativeHumidity <: AbstractInitialConditions
-    relhumid_ref::Float64 = 0.7
+@kwdef struct ConstantRelativeHumidity{NF} <: AbstractInitialConditions
+    relhumid_ref::NF = 0.7
 end
+
+ConstantRelativeHumidity(SG::SpectralGrid; kwargs...) = ConstantRelativeHumidity{SG.NF}(; kwargs...)
 
 function initialize!(
         progn::PrognosticVariables,
@@ -847,14 +896,14 @@ export RandomWaves
 """Parameters for random initial conditions for the interface displacement η
 in the shallow water equations.
 $(TYPEDFIELDS)"""
-@kwdef struct RandomWaves <: AbstractInitialConditions
+@kwdef struct RandomWaves{NF} <: AbstractInitialConditions
     # random interface displacement field
-    A::Float64 = 2000       # amplitude [m]
+    A::NF = 2000       # amplitude [m]
     lmin::Int64 = 10        # minimum wavenumber
     lmax::Int64 = 30        # maximum wavenumber
 end
 
-RandomWaves(S::SpectralGrid; kwargs...) = RandomWaves(; kwargs...)
+RandomWaves(SG::SpectralGrid; kwargs...) = RandomWaves{SG.NF}(; kwargs...)
 
 """
 $(TYPEDSIGNATURES)
