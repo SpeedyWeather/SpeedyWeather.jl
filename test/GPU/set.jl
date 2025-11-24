@@ -6,13 +6,13 @@
     geometry = Geometry(spectral_grid)
     field = zeros(Float32, spectral_grid.grid, 8)
 
-    set!(field, (λ, φ, η) -> 1f0 - η, geometry)
+    set!(field, (λ, φ, η) -> 1f0 - η, geometry, static_func=false)
 
     @test field[1,:] ≈ (1f0 .- geometry.σ_levels_full)
     
     # zfac is just a pretty random function from Speedy with three input 
     # arguments, that's compiled and not dynamically generated
-    set!(field, SpeedyWeather.zfac, geometry; enforce_static_func=true)
+    set!(field, SpeedyWeather.zfac, geometry; static_func=true)
     
     # just compare to CPU version 
     architecture_cpu = SpeedyWeather.CPU()
