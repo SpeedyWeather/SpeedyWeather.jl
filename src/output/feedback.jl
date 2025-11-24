@@ -74,58 +74,13 @@ Detect NaN (Not-a-Number, or Inf) in the prognostic variables."""
 function nan_detection!(feedback::Feedback, progn::PrognosticVariables)
 
     feedback.nans_detected && return nothing    # escape immediately if nans already detected
-    timestep = feedback.progress_meter.counter  # time step
+    i = feedback.progress_meter.counter         # time step
+    vor0 = progn.vor[1:1, end, 2]               # only check 0-0 mode of surface vorticity
 
-    # helper to locate the first offending entry in any array-like variable and count all non-finite values
-    function collect_nonfinite(name, arr)
-        count_nonfinite = count(x -> !isfinite(x), arr)
-        count_nonfinite == 0 && return nothing
-        idx = findfirst(x -> !isfinite(x), arr)
-        cart = idx === nothing ? nothing : Tuple(CartesianIndices(arr)[idx])
-        val = idx === nothing ? nothing : arr[idx]
-        return (; name, count = count_nonfinite, first_index = cart, first_value = val)
-    end
-
-    checks = (
-        (:vor, progn.vor),
-        (:div, progn.div),
-        (:temp, progn.temp),
-        (:humid, progn.humid),
-        (:pres, progn.pres),
-        (:random_pattern, progn.random_pattern),
-        (:sea_surface_temperature, progn.ocean.sea_surface_temperature),
-        (:sea_ice_concentration, progn.ocean.sea_ice_concentration),
-        (:ocean_sensible_heat_flux, progn.ocean.sensible_heat_flux),
-        (:ocean_surface_humidity_flux, progn.ocean.surface_humidity_flux),
-        (:soil_temperature, progn.land.soil_temperature),
-        (:soil_moisture, progn.land.soil_moisture),
-        (:snow_depth, progn.land.snow_depth),
-        (:land_sensible_heat_flux, progn.land.sensible_heat_flux),
-        (:land_surface_humidity_flux, progn.land.surface_humidity_flux),
-    )
-
-    results = NamedTuple[]
-
-    for (name, arr) in checks
-        result = collect_nonfinite(name, arr)
-        result === nothing || push!(results, result)
-    end
-
-    # also search through tracers if present
-    for (tracer_name, arr) in progn.tracers
-        result = collect_nonfinite(Symbol("tracer_", tracer_name), arr)
-        result === nothing || push!(results, result)
-    end
-
-    isempty(results) && return nothing
-    feedback.nans_detected = true
-
-    # emit one warning per variable where non-finite values were found
-    for result in results
-        @warn "NaN or Inf detected at time step $timestep" variable=result.name count=result.count first_index=result.first_index first_value=result.first_value
-    end
-
-    return nothing
+    # just check first harmonic, spectral transform propagates NaNs globally anyway
+    nans_detected_here = ~all(isfinite, vor0)
+    nans_detected_here && @warn "NaN or Inf detected at time step $i"
+    feedback.nans_detected = nans_detected_here
 end
 
 """
