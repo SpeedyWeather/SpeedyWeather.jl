@@ -11,6 +11,7 @@ passed on as keyword arguments, e.g. `planet=Earth(spectral_grid)`. Fields, repr
 model components, are
 $(TYPEDFIELDS)"""
 @kwdef mutable struct PrimitiveDryModel{
+    SG,     # <:SpectralGrid
     AR,     # <:AbstractArchitecture,
     GE,     # <:AbstractGeometry,
     PL,     # <:AbstractPlanet,
@@ -51,7 +52,7 @@ $(TYPEDFIELDS)"""
     TS3,    # <:Tuple{Symbol}
 } <: PrimitiveDry
 
-    spectral_grid::SpectralGrid
+    spectral_grid::SG
     architecture::AR = spectral_grid.architecture
     
     # DYNAMICS
@@ -63,7 +64,7 @@ $(TYPEDFIELDS)"""
     geopotential::GO = Geopotential(spectral_grid)
     adiabatic_conversion::AC = AdiabaticConversion(spectral_grid)
     particle_advection::PA = nothing
-    initial_conditions::IC = InitialConditions(PrimitiveDry)
+    initial_conditions::IC = InitialConditions(spectral_grid, PrimitiveDry)
     forcing::FR = nothing
     drag::DR = nothing
 
@@ -87,7 +88,7 @@ $(TYPEDFIELDS)"""
     surface_condition::SC = SurfaceCondition(spectral_grid)
     surface_momentum_flux::SM = SurfaceMomentumFlux(spectral_grid)
     surface_heat_flux::SH = SurfaceHeatFlux(spectral_grid)
-    convection::CV = DryBettsMiller(spectral_grid)
+    convection::CV = BettsMillerDryConvection(spectral_grid)
     shortwave_radiation::SW = TransparentShortwave(spectral_grid)
     longwave_radiation::LW = JeevanjeeRadiation(spectral_grid)
     stochastic_physics::SP = nothing
