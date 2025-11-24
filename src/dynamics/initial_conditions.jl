@@ -101,14 +101,14 @@ function initialize!(
     RNG = initial_conditions.random_number_generator
     Random.seed!(RNG, seed)
 
-    lmax = progn.trunc + 1
+    lmax = model.spectral_grid.trunc + 1
     power = initial_conditions.power + 1    # +1 as power is summed of orders m
 
     (; spectrum, nlayers) = progn
     A = convert(NF, initial_conditions.amplitude)
 
     # Pre-generate random values on CPU, then transfer to device
-    nlm = length(spectrum)
+    nlm = nonzeros(spectrum)
     random_values_cpu = 2 .* rand(RNG, Complex{NF}, nlm, nlayers) .- (1 + 1im)
 
     # Transfer to device architecture
