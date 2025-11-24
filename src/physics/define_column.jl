@@ -71,6 +71,7 @@ $(TYPEDFIELDS)"""
     # land
     skin_temperature_sea::NF = 0
     skin_temperature_land::NF = 0
+    snow_depth::NF = 0
     soil_moisture_availability::NF = 0
 
     # surface fluxes

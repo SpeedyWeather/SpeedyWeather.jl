@@ -83,6 +83,9 @@ export SurfaceLandHeatFlux
 
     "Otherwise, use the following drag coefficient for heat fluxes over land"
     heat_exchange::NF = 1.2e-3    # for neutral stability
+
+    "e-folding depth [m] controlling how snow insulates surface heat fluxes"
+    snow_insulation_depth::NF = 0.05
 end
 
 SurfaceLandHeatFlux(SG::SpectralGrid; kwargs...) = SurfaceLandHeatFlux{SG.NF}(; kwargs...)
@@ -94,7 +97,7 @@ function surface_heat_flux!(
     model::PrimitiveEquation,
 ) where NF
     cₚ = model.atmosphere.heat_capacity
-    (; heat_exchange) = heat_flux
+    (; heat_exchange, snow_insulation_depth) = heat_flux
 
     ρ = column.surface_air_density
     V₀ = column.surface_wind_speed
@@ -108,6 +111,9 @@ function surface_heat_flux!(
     # SPEEDY documentation Eq. 54/56, land/sea fraction included
     # Only flux from sea if available (not NaN) otherwise zero flux
     flux_land  = isfinite(T_skin_land) ? ρ*drag_land*V₀*cₚ*(T_skin_land  - T) : zero(T_skin_land)
+    # snow insulation: deeper snow ⇒ smaller flux (S / S₀ depth scaling)
+    insulation = inv(one(NF) + column.snow_depth / snow_insulation_depth)
+    flux_land *= insulation
     column.sensible_heat_flux_land = flux_land  # store land flux separately too
     flux_land *= land_fraction                  # weight by land fraction of land-sea mask
     

@@ -87,6 +87,9 @@ export SurfaceLandHumidityFlux
 
     "[OPTION] Otherwise, use the following drag coefficient for humidity flux (evaporation) over land"
     drag::NF = 1.2e-3
+
+    "e-folding depth [m] controlling how snow insulates surface humidity fluxes"
+    snow_insulation_depth::NF = 0.05
 end
     
 SurfaceLandHumidityFlux(SG::SpectralGrid; kwargs...) = SurfaceLandHumidityFlux{SG.NF}(; kwargs...)
@@ -99,7 +102,7 @@ function surface_humidity_flux!(
 ) where NF
 
     (; skin_temperature_land, pres) = column
-    (; drag) = humidity_flux
+    (; drag, snow_insulation_depth) = humidity_flux
     α = column.soil_moisture_availability
 
     # SATURATION HUMIDITY OVER LAND
@@ -118,6 +121,9 @@ function surface_humidity_flux!(
     # but remove the max( ,0) to allow for surface condensation
     flux_land = isfinite(skin_temperature_land) && isfinite(α) ?
                 ρ*drag_land*V₀*(α*sat_humid_land  - surface_humid) : zero(NF)
+    # snow insulation: deeper snow ⇒ smaller flux (S / S₀ depth scaling)
+    insulation = inv(one(NF) + column.snow_depth / snow_insulation_depth)
+    flux_land *= insulation
     column.surface_humidity_flux_land = flux_land   # store flux separately for land
     flux_land *= land_fraction                      # weight by land fraction of land-sea mask
     column.flux_humid_upward[end] += flux_land      # end=lowermost layer, accumulate with (+=) to total flux
