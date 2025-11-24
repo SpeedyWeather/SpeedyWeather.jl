@@ -159,7 +159,7 @@ function albedo!(
 end
 
 
-"""Marker type for snow-cover-to-albedo schemes."""
+export AbstractSnowAlbedoScheme, LinearSnowAlbedo, SaturatingSnowAlbedo
 abstract type AbstractSnowAlbedoScheme end
 
 """Linear ramp: snow cover grows from 0 to 1 at `snow_depth_scale`."""
