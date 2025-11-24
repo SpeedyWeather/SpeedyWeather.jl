@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Initial conditions revised to take in a `SpectralGrid` to ensure correct number type [#927](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/927)
+- Initial conditions revised to take in a `SpectralGrid` to ensure correct number type [#927](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/927)[#928](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/928)
 - Diagnostic and prognostic variables partially revised to NamedTuples and variables system introduced to allow to add to them modularly [#885](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/885)
 - Parameterizations with KernelAbstractions [#873](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/873) [#878](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/878) [#924](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/924)
 - `set!(::Field,::Functions,...)` works now on GPU (however by explicitly transfering between GPU and CPU) [#925](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/925)
