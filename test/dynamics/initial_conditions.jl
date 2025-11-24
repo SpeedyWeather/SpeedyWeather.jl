@@ -227,7 +227,8 @@
         spectral_grid = SpectralGrid(nlayers = 8)
 
         # Test with default relative humidity
-        ic = ConstantRelativeHumidity(spectral_grid)
+        # we need a nonzero temperature to set the humidity, so we use the Jablonowski temperature
+        ic = InitialConditions(; humid = ConstantRelativeHumidity(spectral_grid), temp = JablonowskiTemperature(spectral_grid))
         model = PrimitiveWetModel(spectral_grid)
         prognostic_variables = PrognosticVariables(model)
         initialize!(prognostic_variables, ic, model)
@@ -238,7 +239,7 @@
         @test !any(isnan.(humid))
 
         # Test different parameters produce different results
-        ic_custom = ConstantRelativeHumidity(spectral_grid; relhumid_ref = 0.5)
+        ic_custom = InitialConditions(; humid = ConstantRelativeHumidity(spectral_grid; relhumid_ref = 0.5), temp = JablonowskiTemperature(spectral_grid))
         model_custom = PrimitiveWetModel(spectral_grid)
         prognostic_variables_custom = PrognosticVariables(model_custom)
         initialize!(prognostic_variables_custom, ic_custom, model_custom)

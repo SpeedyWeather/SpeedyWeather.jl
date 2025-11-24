@@ -17,7 +17,7 @@ function initialize!(coriolis::Coriolis, model::PrimitiveEquation)
     initialize!(coriolis, model_parameters)
 end
 
-function initialize!(coriolis::Coriolis, model)
+function initialize!(coriolis::Coriolis, model::AbstractModel)
     (; radius, rotation) = model.planet
     (; sinlat) = model.geometry
 
