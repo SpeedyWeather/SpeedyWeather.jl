@@ -417,7 +417,7 @@ function initialize!(
     # global references are not allowed on the GPU, two options:
     # 1) define additional parameters as `const` (global scope only)
     # 2) add @eval and string interpolate with $ those parameters inside the function
-    @eval function vor(λ, φ, η)         # longitude, latitude (degree), sigma coordinate
+    @eval function initial_vorticity(λ, φ, η)         # longitude, latitude (degree), sigma coordinate
 
         # great circle distance to perturbation
         X = clamp($sinφc * sind(φ) + $cosφc * cosd(φ) * cosd(λ - $λc), 0, 1)
@@ -433,7 +433,7 @@ function initialize!(
         return ζ + perturbation
     end
 
-    @eval function div(λ, φ, η)         # longitude, latitude (degree), sigma coordinate
+    @eval function initial_divergence(λ, φ, η)               # longitude, latitude (degree), sigma coordinate
 
         # great circle distance to perturbation
         X = clamp($sinφc * sind(φ) + $cosφc * cosd(φ) * cosd(λ - $λc), 0, 1)
@@ -444,7 +444,7 @@ function initialize!(
     end
 
     # apply those to set the initial conditions for vor, div
-    set!(progn, model; vor = vor, div = div, lf = 1)
+    set!(progn, model; vor = initial_vorticity, div = initial_divergence, lf = 1, static_func=false)
     return nothing
 end
 
@@ -485,8 +485,8 @@ function initialize!(
 
     η(λ, θ) = R^2 / g * (A(λ, θ) + B(λ, θ) * cosd(m * λ) + C(λ, θ) * cosd(2m * λ))
 
-    set!(progn, geometry, vor = ζ)
-    model isa ShallowWater && set!(progn, geometry, pres = η)
+    set!(progn, geometry, vor = ζ, static_func=false)
+    model isa ShallowWater && set!(progn, geometry, pres = η, static_func=false)
     set!(progn, geometry, div = 0)  # technically not needed, but set to zero for completeness
 
     # filter low values below cutoff amplitude c
