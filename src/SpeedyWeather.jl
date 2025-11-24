@@ -20,6 +20,7 @@ using  SpeedyWeatherInternals.Architectures
 import SpeedyWeatherInternals.Architectures: AbstractArchitecture, CPU, GPU, 
        on_architecture, architecture, array_type, ismatching, nonparametric_type
 export CPU, GPU, on_architecture, architecture                # export device functions 
+export SpeedyWeatherInternals, Architectures
 
 # INPUT OUTPUT
 import TOML
@@ -42,6 +43,7 @@ export DateTime, Millisecond, Second, Minute, Hour, Day, Week, Month, Year, Cent
 export initialize!, finalize!
 
 # import utilities
+export Utils
 using SpeedyWeatherInternals.Utils 
 
 # parameter handling
@@ -55,7 +57,6 @@ export SpeedyParam, SpeedyParams, parameters, stripparams
 # DATA STRUCTURES
 # LowerTriangularArrays for spherical harmonics
 using  LowerTriangularArrays
-
 export  LowerTriangularArrays, 
         LowerTriangularArray,
         LowerTriangularMatrix
@@ -66,7 +67,6 @@ export  Spectrum
 export  OneBased, ZeroBased
 export  eachmatrix, eachharmonic, eachorder
         
-
 # RingGrids
 using  RingGrids
 

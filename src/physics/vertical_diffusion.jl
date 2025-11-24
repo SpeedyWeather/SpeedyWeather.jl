@@ -157,7 +157,7 @@ function get_diffusion_coefficients!(
     scheme::BulkRichardsonDiffusion,
     atmosphere::AbstractAtmosphere,
     planet::AbstractPlanet,
-    orography,
+    orog,
 )
     # reuse scratch array for diffusion coefficients
     K = diagn.dynamics.b_grid
@@ -169,6 +169,7 @@ function get_diffusion_coefficients!(
     u = diagn.grid.u_grid
     v = diagn.grid.v_grid
     geopotential = diagn.grid.geopotential
+    (; orography) = orog
 
     # Boundary layer depth is highest layer for which Ri < Ri_c (the "critical" threshold)
     # as well as all layers below
