@@ -41,6 +41,9 @@ include("spectral_transform.jl")
 # INTERPOLATION OF RINGGRIDS
 include("interpolate.jl")
 
+# SET FUNCTIONS, GPU SPECIFIC 
+include("set.jl")
+
 # FULL MODELS
 include("barotropic.jl")
 #include("primitive_dry.jl")
