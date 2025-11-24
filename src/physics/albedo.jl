@@ -216,7 +216,7 @@ function albedo!(
     snow_cover = diagn_all.dynamics.a_2D_grid       # scratch memory
     
     # compute snow-cover fraction using the chosen scheme and clamp to [0, 1]
-    @. snow_cover = snow_cover_fraction(scheme, snow_depth, snow_depth_scale)
+    snow_cover .= snow_cover_fraction.(Ref(scheme), snow_depth, snow_depth_scale)
     @. snow_cover = min(max(snow_cover, 0), 1)
 	# ## Now compute the snow area cover fraction based on snow depth
 	# #σₛ = Sₐ / (10. * drag_snow + Sₐ) #JULES, from Betts et al.
