@@ -51,6 +51,8 @@ export StartFromRest
     humid::H = ZeroInitially(spectral_grid)
 end
 
+StartFromRest(SG::SpectralGrid; kwargs...) = StartFromRest(; spectral_grid = SG, kwargs...)
+
 initialize!(::PrognosticVariables, ::StartFromRest, ::Barotropic) = nothing
 
 function initialize!(
@@ -280,7 +282,7 @@ function initialize!(
     (; grid, NF) = model.spectral_grid
     (; coslat⁻¹) = model.geometry
 
-    u_grid = zeros(NF, grid)
+    u_grid = zeros(NF, grid, 1)
     η_perturb_grid = zeros(NF, grid)
     lat = RingGrids.get_lat(grid)
     lons, _ = RingGrids.get_lonlats(grid)
