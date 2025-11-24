@@ -95,7 +95,7 @@ end
         runoff_rate = min(runoff_rate, max(max_sink - melt_rate, 0))
         
         # store to pass to soil moisture [kg/m²/s]
-        snow_runoff_rate[ij] = max(runoff_rate * ρ_water, 0)
+        snow_runoff_rate[ij] = runoff_rate * ρ_water
 
         # change snow depth by falling snow minus melting and runoff [m/s]
         dsnow = snow_fall_rate[ij] / ρ_water - melt_rate  - runoff_rate
