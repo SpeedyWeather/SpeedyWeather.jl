@@ -434,7 +434,9 @@ function initialize!(
     return nothing
 end
 
-struct JablonowskiVorticity{NF}
+
+# <: Function so that it works with our `set!`
+struct JablonowskiVorticity{NF} <: Function 
     sinφc::NF
     cosφc::NF
     λc::NF
@@ -464,7 +466,8 @@ Adapt.@adapt_structure JablonowskiVorticity
     return ζ + perturbation
 end
 
-struct JablonowskiDivergence{NF}
+# <: Function so that it works with our `set!`
+struct JablonowskiDivergence{NF} <: Function
     sinφc::NF
     cosφc::NF
     λc::NF
@@ -862,7 +865,6 @@ function initialize!(
         constant_relative_humidity_kernel!, humid_grid, temp_grid, pres_grid,
         σ_levels_full, relhumid_ref, e₀, T₀⁻¹, Lᵥ_Rᵥ, mol_ratio
     )
-
     set!(progn, model; humid = humid_grid, lf = 1)
 
     return nothing
