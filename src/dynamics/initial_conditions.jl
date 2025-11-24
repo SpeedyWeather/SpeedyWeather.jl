@@ -108,7 +108,7 @@ function initialize!(
     A = convert(NF, initial_conditions.amplitude)
 
     # Pre-generate random values on CPU, then transfer to device
-    nlm = nonzeros(spectrum)
+    nlm = LowerTriangularArrays.nonzeros(spectrum)
     random_values_cpu = 2 .* rand(RNG, Complex{NF}, nlm, nlayers) .- (1 + 1im)
 
     # Transfer to device architecture
@@ -139,7 +139,7 @@ end
         @Const(l_indices),
         lmax
     )
-    I = @index(Global, NTuple)
+    I = @index(Global, Cartesian)
     lm = I[1]  # spectral coefficient index
     k = I[2]   # layer index
 
@@ -280,7 +280,7 @@ function initialize!(
     (; grid, NF) = model.spectral_grid
     (; coslat⁻¹) = model.geometry
 
-    u_grid = zeros(NF, grid, 1)
+    u_grid = zeros(NF, grid)
     η_perturb_grid = zeros(NF, grid)
     lat = RingGrids.get_lat(grid)
     lons, _ = RingGrids.get_lonlats(grid)
