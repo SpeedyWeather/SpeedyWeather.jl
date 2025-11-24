@@ -7,7 +7,10 @@ prognostic variable struct `progn` at timestep index `lf`. If `add==true` they a
 current value instead. If a `SpectralTransform` S is provided, it is used when needed to set 
 the variable, otherwise it is recomputed. In case `u` and `v` are provied, actually the divergence
 and vorticity are set and `coslat_scaling_included` specficies whether or not the 1/cos(lat) 
-scaling is already included in the arrays or not (default: `false`)
+scaling is already included in the arrays or not (default: `false`). If a function or callable 
+object is provided, `static_func` specficies whether or not the function is static (i.e. does not 
+contain any dynamic code) or not (default: `true`). On GPU, only static functions are executed 
+efficiently.
 
 The input may be:
 * A function or callable object `f(lond, latd, σ) -> value` (multilevel variables) 
@@ -35,32 +38,33 @@ function set!(
     add::Bool = false,
     spectral_transform::Union{Nothing, SpectralTransform} = nothing,
     coslat_scaling_included::Bool = false,
+    static_func::Bool = true,
     kwargs...
 )
     # ATMOSPHERE
-    isnothing(vor)   || set!(get_step(progn.vor, lf),     vor, geometry, spectral_transform; add)
-    isnothing(div)   || set!(get_step(progn.div, lf),     div, geometry, spectral_transform; add)
-    isnothing(temp)  || set!(get_step(progn.temp, lf),   temp, geometry, spectral_transform; add)
-    isnothing(humid) || set!(get_step(progn.humid, lf), humid, geometry, spectral_transform; add)
-    isnothing(pres)  || set!(get_step(progn.pres, lf),   pres, geometry, spectral_transform; add)
+    isnothing(vor)   || set!(get_step(progn.vor, lf),     vor, geometry, spectral_transform; add, static_func)
+    isnothing(div)   || set!(get_step(progn.div, lf),     div, geometry, spectral_transform; add, static_func)
+    isnothing(temp)  || set!(get_step(progn.temp, lf),   temp, geometry, spectral_transform; add, static_func)
+    isnothing(humid) || set!(get_step(progn.humid, lf), humid, geometry, spectral_transform; add, static_func)
+    isnothing(pres)  || set!(get_step(progn.pres, lf),   pres, geometry, spectral_transform; add, static_func)
     
     # or provide u, v instead of vor, div
-    isnothing(u) | isnothing(v) || set_vordiv!(get_step(progn.vor, lf), get_step(progn.div, lf), u, v, geometry, spectral_transform; add, coslat_scaling_included)
+    isnothing(u) | isnothing(v) || set_vordiv!(get_step(progn.vor, lf), get_step(progn.div, lf), u, v, geometry, spectral_transform; add, coslat_scaling_included, static_func)
     
     # OCEAN
-    isnothing(sea_surface_temperature)  || set!(progn.ocean.sea_surface_temperature, sea_surface_temperature, geometry, spectral_transform; add)
-    isnothing(sea_ice_concentration)    || set!(progn.ocean.sea_ice_concentration, sea_ice_concentration, geometry, spectral_transform; add)
+    isnothing(sea_surface_temperature)  || set!(progn.ocean.sea_surface_temperature, sea_surface_temperature, geometry, spectral_transform; add, static_func)
+    isnothing(sea_ice_concentration)    || set!(progn.ocean.sea_ice_concentration, sea_ice_concentration, geometry, spectral_transform; add, static_func)
 
     # LAND
-    isnothing(soil_temperature)         || set!(progn.land.soil_temperature, soil_temperature, geometry, spectral_transform; add)
-    isnothing(snow_depth)               || set!(progn.land.snow_depth, snow_depth, geometry, spectral_transform; add)
-    isnothing(soil_moisture)            || set!(progn.land.soil_moisture, soil_moisture, geometry, spectral_transform; add)
+    isnothing(soil_temperature)         || set!(progn.land.soil_temperature, soil_temperature, geometry, spectral_transform; add, static_func)
+    isnothing(snow_depth)               || set!(progn.land.snow_depth, snow_depth, geometry, spectral_transform; add, static_func)
+    isnothing(soil_moisture)            || set!(progn.land.soil_moisture, soil_moisture, geometry, spectral_transform; add, static_func)
     
     # TRACERS
     for varname in keys(kwargs)
         if varname in keys(progn.tracers)
             tracer_var = get_step(progn.tracers[varname], lf)
-            set!(tracer_var, kwargs[varname], geometry, spectral_transform; add)
+            set!(tracer_var, kwargs[varname], geometry, spectral_transform; add, static_func)
         else
             throw(UndefVarError(varname))
         end
@@ -73,7 +77,8 @@ function set!(
     var::LowerTriangularArray,
     L::LowerTriangularArray,
     varargs...;
-    add::Bool=false,
+    add::Bool=false, 
+    kwargs...,
 )
     if add 
         if size(var) == size(L)
@@ -96,6 +101,7 @@ function set!(
     geometry::Union{Geometry, Nothing}=nothing,
     S::Union{Nothing, SpectralTransform}=nothing;
     add::Bool=false,
+    kwargs...,
 )
     if isnothing(S)
         specs = transform(field)
@@ -104,7 +110,7 @@ function set!(
         field = convert.(eltype(S), field)
         specs = transform(field, S)
     end
-    set!(var, specs; add)
+    set!(var, specs; add, kwargs...)
 end
 
 # set LTA <- func 
@@ -114,11 +120,12 @@ function set!(
     geometry::Geometry,
     S::Union{SpectralTransform, Nothing}=nothing;
     add::Bool=false,
+    kwargs...,
 )
     (; grid, nlayers, NF) = geometry.spectral_grid
     field = ndims(var) == 1 ? zeros(NF, grid) : zeros(NF, grid, nlayers)
-    set!(field, f, geometry, S; add=false)
-    set!(var, field, geometry, S; add)
+    set!(field, f, geometry, S; add=false, kwargs...)
+    set!(var, field, geometry, S; add, kwargs...)
 end
 
 # set LTA <- number
@@ -128,6 +135,7 @@ function set!(
     geometry::Geometry,
     S::Union{SpectralTransform, Nothing}=nothing;
     add::Bool=false,
+    kwargs...,
 )
     # appropiate normalization, assume standard 2√π normalisation if no transform is given 
     norm_sphere = isnothing(S) ? 2sqrt(π) : S.norm_sphere
@@ -139,7 +147,7 @@ function set!(
         var_new[1, k] = norm_sphere * s
     end 
 
-    set!(var, var_new, geometry, S; add)
+    set!(var, var_new, geometry, S; add, kwargs...)
 end 
 
 # set Field <- Field
@@ -149,6 +157,7 @@ function set!(
     geometry::Geometry,
     S::Union{Nothing, SpectralTransform}=nothing;
     add::Bool=false,
+    kwargs...,
 )
     if add 
         if fields_match(var, field)
@@ -169,9 +178,10 @@ function set!(
     geometry::Geometry,
     S::Union{Nothing, SpectralTransform}=nothing;
     add::Bool=false,
+    kwargs...,
 )
     field = isnothing(S) ? transform(specs) : transform(specs, S)
-    set!(var, field, geometry, S; add)
+    set!(var, field, geometry, S; add, kwargs...)
 end
 
 # set Field <- Func
@@ -181,7 +191,7 @@ function set!(
     geometry::Geometry,
     S::Union{Nothing, SpectralTransform}=nothing;
     add::Bool=false,
-    enforce_static_func = false, 
+    static_func = true, 
 )
     (; londs, latds, σ_levels_full) = geometry
 
@@ -245,6 +255,7 @@ function _set!(
     londs::AbstractVector,
     latds::AbstractVector;
     add::Bool=false,
+    kwargs...,
 )   
     kernel_func = add ? (a,b) -> a+b : (a,b) -> b
     var.data .= kernel_func.(var.data, f.(londs, latds))
@@ -258,6 +269,7 @@ function set!(
     geometry::Union{Geometry, Nothing}=nothing, 
     S::Union{Nothing, SpectralTransform}=nothing;
     add::Bool=false,
+    kwargs...,
 )
     kernel = add ? (a,b) -> a+b : (a,b) -> b
     s = convert(eltype(var), s)
@@ -274,13 +286,14 @@ function set_vordiv!(
     S::Union{Nothing, SpectralTransform}=nothing;
     add::Bool=false,
     coslat_scaling_included::Bool=false,
+    kwargs...,
 )
     u_L = similar(vor) 
-    set!(u_L, u_func, geometry, S)
+    set!(u_L, u_func, geometry, S; kwargs...)
     v_L = similar(vor)
-    set!(v_L, v_func, geometry, S)
+    set!(v_L, v_func, geometry, S; kwargs...)
 
-    set_vordiv!(vor, div, u_L, v_L, geometry, S; add, coslat_scaling_included)
+    set_vordiv!(vor, div, u_L, v_L, geometry, S; add, coslat_scaling_included, kwargs...)
 end
 
 # set vor_div <- grid 
@@ -293,6 +306,7 @@ function set_vordiv!(
     S::SpectralTransform = SpectralTransform(geometry.spectral_grid);
     add::Bool=false,
     coslat_scaling_included::Bool=false,
+    kwargs...,
 )
     u_ = coslat_scaling_included ? u : RingGrids.scale_coslat⁻¹(u)
     v_ = coslat_scaling_included ? v : RingGrids.scale_coslat⁻¹(v)
@@ -304,7 +318,7 @@ function set_vordiv!(
     u_spec = transform(u_, S)
     v_spec = transform(v_, S)
 
-    set_vordiv!(vor, div, u_spec, v_spec, geometry, S; add, coslat_scaling_included=true)
+    set_vordiv!(vor, div, u_spec, v_spec, geometry, S; add, coslat_scaling_included=true, kwargs...)
 end 
 
 # set vor_div <- LTA
@@ -317,6 +331,7 @@ function set_vordiv!(
     S::SpectralTransform = SpectralTransform(geometry.spectral_grid);
     add::Bool=false,
     coslat_scaling_included::Bool=false,
+    kwargs...,
 ) 
     u_ = coslat_scaling_included ? u : transform(RingGrids.scale_coslat⁻¹(transform(u, S)), S)
     v_ = coslat_scaling_included ? v : transform(RingGrids.scale_coslat⁻¹(transform(u, S)), S)
