@@ -11,12 +11,6 @@ Adapt.@adapt_structure Coriolis
 # generator
 Coriolis(SG::SpectralGrid) = Coriolis(on_architecture(SG.architecture, zeros(SG.NF, SG.nlat)))
 
-# function barrier to unpack only model components needed
-function initialize!(coriolis::Coriolis, model::PrimitiveEquation)
-    model_parameters = (planet=model.planet, geometry=model.geometry)
-    initialize!(coriolis, model_parameters)
-end
-
 function initialize!(coriolis::Coriolis, model::AbstractModel)
     (; radius, rotation) = model.planet
     (; sinlat) = model.geometry
