@@ -117,4 +117,23 @@ module SpeedyTransformsEnzymeExt
         return (nothing, nothing, nothing, nothing)
     end
 
+    ### FORWARD RULES 
+    function forward(config, func::Const{typeof(_fourier!)}, ::Type{<:Union{Const,DuplicatedNoNeed,Duplicated}}, 
+        grids::Duplicated{<:AbstractField}, f_north::Duplicated, f_south::Duplicated, S::Union{Const, MixedDuplicated})
+
+        func.val(grids.val, f_north.val, f_south.val, S.val) # 
+        func.val(grids.dval, f_north.dval, f_south.dval, S.val)
+
+        return nothing # because the function actually returns nothing
+    end 
+
+    function forward(config, func::Const{typeof(_fourier!)}, ::Type{<:Const}, 
+        f_north::Duplicated, f_south::Duplicated, grid::Duplicated{<:AbstractField}, S::Union{Const, MixedDuplicated})
+
+        func.val(f_north.val, f_south.val, grid.val, S.val) # 
+        func.val(f_north.dval, f_south.dval, grid.dval, S.val)
+
+        return nothing # because the function actually returns nothing
+    end 
+    
 end 
