@@ -196,7 +196,7 @@ function set!(
     (; londs, latds, σ_levels_full) = geometry
 
     # on GPU no dynamically generated function are allowd in kernels, transfer them to CPU and back
-    if typeof(architecture(var)) <: GPU && enforce_static_func==false
+    if typeof(architecture(var)) <: GPU && static_func==false
         arch_cpu = CPU()
 
         var_cpu = on_architecture(arch_cpu, var)
