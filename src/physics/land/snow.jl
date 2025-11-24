@@ -11,7 +11,7 @@ from the diagnosed precipitation, melts once the top soil layer exceeds
 $(TYPEDFIELDS)"""
 @kwdef mutable struct SnowModel{NF} <: AbstractSnow
     melting_threshold::NF = 275
-    runoff_time_scale::Second = Year(1) 
+    runoff_time_scale::Second = Year(4) 
 end
 
 # generator function
