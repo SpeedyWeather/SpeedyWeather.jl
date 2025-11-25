@@ -111,7 +111,7 @@ function vertical_diffusion!(
     atmosphere,
     planet,
     orography,
-    Model,
+    model_class,
 )
     (; diffuse_momentum, diffuse_static_energy, diffuse_humidity) = diffusion
 
@@ -130,9 +130,9 @@ function vertical_diffusion!(
     v = diagn.grid.v_grid
     humid = diagn.grid.humid_grid
 
-    diffuse_momentum                            && vertical_diffusion!(ij, u_tend, u, K, kₕ, diffusion)
-    diffuse_momentum                            && vertical_diffusion!(ij, v_tend, v, K, kₕ, diffusion)
-    Model <: PrimitiveWet && diffuse_humidity   && vertical_diffusion!(ij, humid_tend, humid, K, kₕ, diffusion)
+    diffuse_momentum                                    && vertical_diffusion!(ij, u_tend, u, K, kₕ, diffusion)
+    diffuse_momentum                                    && vertical_diffusion!(ij, v_tend, v, K, kₕ, diffusion)
+    model_class isa PrimitiveWet && diffuse_humidity    && vertical_diffusion!(ij, humid_tend, humid, K, kₕ, diffusion)
 
     if diffuse_static_energy
         # compute dry static energy on the fly

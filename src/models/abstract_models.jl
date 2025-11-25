@@ -58,6 +58,11 @@ struct ShallowWaterDummy <: ShallowWater end
 struct PrimitiveDryDummy <: PrimitiveDry end
 struct PrimitiveWetDummy <: PrimitiveWet end
 
+Adapt.@adapt_structure BarotropicDummy
+Adapt.@adapt_structure ShallowWaterDummy
+Adapt.@adapt_structure PrimitiveDryDummy
+Adapt.@adapt_structure PrimitiveWetDummy
+
 model_dummy(::Type{<:Barotropic}) = BarotropicDummy()
 model_dummy(::Type{<:ShallowWater}) = ShallowWaterDummy()
 model_dummy(::Type{<:PrimitiveDry}) = PrimitiveDryDummy()
