@@ -24,16 +24,16 @@ export BulkRichardsonDrag
 following Frierson, 2006, Journal of the Atmospheric Sciences.
 $(TYPEDFIELDS)"""
 @kwdef struct BulkRichardsonDrag{NF, RefNF <: Ref{NF}} <: AbstractBoundaryLayer
-    "von Kármán constant [1]"
-    κ::NF = 0.4
+    "[OPTION] von Kármán constant [1]"
+    von_Karman::NF = 0.4
 
-    "roughness length [m]"
-    z₀::NF = 3.21e-5
+    "[OPTION] roughness length [m]"
+    roughness_length::NF = 3.21e-5
 
-    "Critical Richardson number for stable mixing cutoff [1]"
-    Ri_c::NF = 10
+    "[OPTION] Critical Richardson number for stable mixing cutoff [1]"
+    critical_Richardson::NF = 10
 
-    "Maximum drag coefficient, κ²/log(zₐ/z₀) for zₐ from reference temperature"
+    "[DERIVED] Maximum drag coefficient, κ²/log(zₐ/z₀) for zₐ from reference temperature"
     drag_max::RefNF = Ref(zero(NF))
 end
 
@@ -41,8 +41,7 @@ Adapt.@adapt_structure BulkRichardsonDrag
 
 BulkRichardsonDrag(SG::SpectralGrid, kwargs...) = BulkRichardsonDrag{SG.NF, Ref{SG.NF}}(; kwargs...)
 
-function initialize!(scheme::BulkRichardsonDrag, model::PrimitiveEquation)
-
+function initialize!(drag::BulkRichardsonDrag, model::PrimitiveEquation)
     # Typical height Z of lowermost layer from geopotential of reference surface temperature
     # minus surface geopotential (orography * gravity)
     (; temp_ref) = model.atmosphere
@@ -52,8 +51,9 @@ function initialize!(scheme::BulkRichardsonDrag, model::PrimitiveEquation)
 
     # maximum drag Cmax from that height, stable conditions would decrease Cmax towards 0
     # Frierson 2006, eq (12)
-    (; κ, z₀) = scheme
-    scheme.drag_max[] = (κ/log(Z/z₀))^2
+    κ = drag.von_Karman
+    z₀ = drag.roughness_length
+    drag.drag_max[] = (κ/log(Z/z₀))^2
 end
 
 # function barrier
@@ -67,7 +67,7 @@ function boundary_layer_drag!(
     drag::BulkRichardsonDrag,
     atmosphere::AbstractAtmosphere,
 )
-    (; Ri_c) = drag
+    Ri_c = drag.critical_Richardson
     drag_max = drag.drag_max[]
 
     # bulk Richardson number at lowermost layer N from Frierson, 2006, eq. (15)
