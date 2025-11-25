@@ -130,9 +130,9 @@ function vertical_diffusion!(
     v = diagn.grid.v_grid
     humid = diagn.grid.humid_grid
 
-    diffuse_momentum                                    && vertical_diffusion!(ij, u_tend, u, K, kₕ, diffusion)
-    diffuse_momentum                                    && vertical_diffusion!(ij, v_tend, v, K, kₕ, diffusion)
-    model_class isa PrimitiveWet && diffuse_humidity    && vertical_diffusion!(ij, humid_tend, humid, K, kₕ, diffusion)
+    diffuse_momentum                                    && _vertical_diffusion!(ij, u_tend, u, K, kₕ, diffusion)
+    diffuse_momentum                                    && _vertical_diffusion!(ij, v_tend, v, K, kₕ, diffusion)
+    model_class isa PrimitiveWet && diffuse_humidity    && _vertical_diffusion!(ij, humid_tend, humid, K, kₕ, diffusion)
 
     if diffuse_static_energy
         # compute dry static energy on the fly
@@ -146,7 +146,7 @@ function vertical_diffusion!(
             K[ij, k] /= cₚ        # put temperature => dry static energy conversion into K
         end
 
-        vertical_diffusion!(ij, temp_tend, dry_static_energy, K, kₕ, diffusion)
+        _vertical_diffusion!(ij, temp_tend, dry_static_energy, K, kₕ, diffusion)
     end
     return nothing
 end
@@ -235,12 +235,12 @@ end
     return inv(1 + Ri_Ri_c * logz_z₀ / (1 - Ri_Ri_c))
 end
 
-function vertical_diffusion!(   
-    ij,                     # horizontal grid point ij
-    tend::AbstractField,    # tendency to accumulate diffusion into
-    var::AbstractField,     # variable calculate diffusion from
-    K::AbstractField,       # diffusion coefficients
-    kₕ::Int,                # uppermost layer that's still within the boundary layer
+function _vertical_diffusion!(   
+    ij,     # horizontal grid point ij
+    tend,   # tendency to accumulate diffusion into
+    var,    # variable calculate diffusion from
+    K,      # diffusion coefficients
+    kₕ,     # uppermost layer that's still within the boundary layer
     diffusion::BulkRichardsonDiffusion,
 )
     (; ∇²_above, ∇²_below) = diffusion
