@@ -3,16 +3,16 @@ abstract type AbstractVerticalDiffusion <: AbstractParameterization end
 export BulkRichardsonDiffusion
 @kwdef struct BulkRichardsonDiffusion{NF, RefNF <: Ref{NF}, VectorType} <: AbstractVerticalDiffusion
     "[OPTION] von Kármán constant [1]"
-    κ::NF = 0.4
+    von_Karman::NF = 0.4
 
     "[OPTION] roughness length [m]"
-    z₀::NF = 3.21e-5
+    roughness_length::NF = 3.21e-5
 
     "[OPTION] Critical Richardson number for stable mixing cutoff [1]"
-    Ri_c::NF = 10
+    critical_Richardson::NF = 10
 
     "[OPTION] Fraction of surface boundary layer"
-    fb::NF = 0.1
+    surface_layer_fraction::NF = 0.1
 
     "[OPTION] diffuse static energy?"
     diffuse_static_energy::Bool = true
@@ -52,12 +52,12 @@ variables(::BulkRichardsonDiffusion) = (
 )
 
 # function barrier to unpack only model components needed
-function initialize!(scheme::BulkRichardsonDiffusion, model::PrimitiveEquation)
+function initialize!(diffusion::BulkRichardsonDiffusion, model::PrimitiveEquation)
     model_parameters = get_model_parameters(model)
-    initialize!(scheme, model_parameters)
+    initialize!(diffusion, model_parameters)
 end
 
-function initialize!(scheme::BulkRichardsonDiffusion, model)
+function initialize!(diffusion::BulkRichardsonDiffusion, model)
 
     (; nlayers) = model.geometry
     nlayers == 1 && return nothing     # no diffusion for 1-layer model
@@ -68,8 +68,8 @@ function initialize!(scheme::BulkRichardsonDiffusion, model)
     # with σ-dependent diffusion coefficient K
     σ = on_architecture(CPU(), model.geometry.σ_levels_full)
     σ_half = on_architecture(CPU(), model.geometry.σ_levels_half)
-    ∇²_above = on_architecture(CPU(), scheme.∇²_above)
-    ∇²_below = on_architecture(CPU(), scheme.∇²_below)
+    ∇²_above = on_architecture(CPU(), diffusion.∇²_above)
+    ∇²_below = on_architecture(CPU(), diffusion.∇²_below)
 
     for k in 1:nlayers
         σ₋ = k <= 1       ? -Inf : σ[k-1]   # sets the gradient across surface and top to 0
@@ -79,8 +79,8 @@ function initialize!(scheme::BulkRichardsonDiffusion, model)
     end
 
     arch = model.architecture
-    scheme.∇²_above .= on_architecture(arch, ∇²_above)
-    scheme.∇²_below .= on_architecture(arch, ∇²_below)
+    diffusion.∇²_above .= on_architecture(arch, ∇²_above)
+    diffusion.∇²_below .= on_architecture(arch, ∇²_below)
 
     # Typical height Z of lowermost layer from geopotential of reference surface temperature
     # minus surface geopotential (orography * gravity), simplification compared to
@@ -93,9 +93,10 @@ function initialize!(scheme::BulkRichardsonDiffusion, model)
     
     # maximum drag Cmax from that height, stable conditions would decrease Cmax towards 0
     # Frierson 2006, eq (12)
-    (; κ, z₀) = scheme
-    scheme.logZ_z₀[] = log(Z/z₀)        # ≈ log(z/z₀) avoid log during integration
-    scheme.sqrtC_max[] = κ/log(Z/z₀)
+    κ = diffusion.von_Karman
+    z₀ = diffusion.roughness_length
+    diffusion.logZ_z₀[] = log(Z/z₀)        # ≈ log(z/z₀) avoid log during integration
+    diffusion.sqrtC_max[] = κ/log(Z/z₀)
 
     return nothing
 end
@@ -154,7 +155,7 @@ end
 function get_diffusion_coefficients!(
     ij,
     diagn,
-    scheme::BulkRichardsonDiffusion,
+    diffusion::BulkRichardsonDiffusion,
     atmosphere::AbstractAtmosphere,
     planet::AbstractPlanet,
     orog,
@@ -162,8 +163,14 @@ function get_diffusion_coefficients!(
     # reuse scratch array for diffusion coefficients
     K = diagn.dynamics.b_grid
     nlayers = size(K, 2)
-    (; Ri_c, κ, z₀, fb) = scheme
-    logZ_z₀ = scheme.logZ_z₀[]
+
+    # parameters
+    Ri_c = diffusion.critical_Richardson
+    fb = diffusion.surface_layer_fraction
+    κ = diffusion.von_Karman
+    z₀ = diffusion.roughness_length
+
+    logZ_z₀ = diffusion.logZ_z₀[]
     gravity⁻¹ = inv(planet.gravity)
 
     u = diagn.grid.u_grid
@@ -195,7 +202,7 @@ function get_diffusion_coefficients!(
         h = max(geopotential[ij, kₕ]*gravity⁻¹ - orography[ij], 0)  
         Ri_N = Ri[ij, nlayers]                      # surface bulk Richardson number
         Ri_N = clamp(Ri_N, 0, Ri_c)                 # cases of eq. 12-14
-        sqrtC = scheme.sqrtC_max[]*(1-Ri_N/Ri_c)    # sqrt of eq. 12-14
+        sqrtC = diffusion.sqrtC_max[]*(1-Ri_N/Ri_c)    # sqrt of eq. 12-14
         surface_speed = sqrt(u[ij, nlayers]^2 + v[ij, nlayers]^2)
         K0 = κ * surface_speed * sqrtC              # height-independent K eq. 19, 20                           
 
