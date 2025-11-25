@@ -46,19 +46,43 @@ model_class(::Type{<:PrimitiveWet}) = PrimitiveWet
 model_class(model::AbstractModel) = model_class(typeof(model))
 
 # model type is the parameter-free type of a model
-# TODO what happens if we have several concrete types under each abstract type?
 model_type(::Type{<:Barotropic}) = BarotropicModel
 model_type(::Type{<:ShallowWater}) = ShallowWaterModel
 model_type(::Type{<:PrimitiveDry}) = PrimitiveDryModel
 model_type(::Type{<:PrimitiveWet}) = PrimitiveWetModel
 model_type(model::AbstractModel) = model_type(typeof(model))
 
-initialize!(model::AbstractModel, ps::Union{ComponentVector, SpeedyParams}; kwargs...) = initialize!(reconstruct(model, ps); kwargs...)
+# model dummy: Empty concrete instances
+struct BarotropicDummy <: Barotropic end
+struct ShallowWaterDummy <: ShallowWater end
+struct PrimitiveDryDummy <: PrimitiveDry end
+struct PrimitiveWetDummy <: PrimitiveWet end
+
+model_dummy(::Type{<:Barotropic}) = BarotropicDummy()
+model_dummy(::Type{<:ShallowWater}) = ShallowWaterDummy()
+model_dummy(::Type{<:PrimitiveDry}) = PrimitiveDryDummy()
+model_dummy(::Type{<:PrimitiveWet}) = PrimitiveWetDummy()
+model_dummy(model::AbstractModel) = model_dummy(typeof(model))
+
+model_type(::Type{BarotropicDummy}) = BarotropicDummy
+model_type(::Type{ShallowWaterDummy}) = ShallowWaterDummy
+model_type(::Type{PrimitiveDryDummy}) = PrimitiveDryDummy
+model_type(::Type{PrimitiveWetDummy}) = PrimitiveWetDummy
+
+model_class(::Type{<:Barotropic}) = Barotropic
+model_class(::Type{<:ShallowWater}) = ShallowWater
+model_class(::Type{<:PrimitiveDry}) = PrimitiveDry
+model_class(::Type{<:PrimitiveWet}) = PrimitiveWet
+model_class(model::AbstractModel) = model_class(typeof(model))
+
+initialize!(model::AbstractModel, ps::Union{ComponentVector, SpeedyParams}; kwargs...) =
+    initialize!(reconstruct(model, ps); kwargs...)
 
 function Base.show(io::IO, M::AbstractModel)
-    println(io, "$(model_type(M)) <: $(model_class(M))")
     properties = propertynames(M)
     n = length(properties)
+    s = "$(model_type(M)) <: $(model_class(M))"
+    n == 0 ? print(io, s) : println(io, s)
     for (i, key) in enumerate(properties)
         val = getfield(M, key)
         s = i == n ? "└" : "├"  # choose ending └ for last property
@@ -79,7 +103,7 @@ function get_model_parameters(model::PrimitiveEquation)
     names = map(field -> _get_param_name(model, field), model.model_parameters)
     values = map(field -> _get_param(model, field), model.model_parameters)
     # also include the model class for dispatching inside kernels
-    return merge(NamedTuple{names}(values), (class=model_class(model),))
+    return merge(NamedTuple{names}(values), (class=model_dummy(model),))
 end
 
 """$(TYPEDSIGNATURES)
