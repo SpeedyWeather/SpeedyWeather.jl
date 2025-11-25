@@ -58,6 +58,14 @@ function timestep!(
 
     params = (;melting_threshold,cₛ,ρ_soil,z₁,Δt,ρ_water,Lᵢ,r⁻¹)
 
+    # sanitize inputs to avoid propagating NaNs from climatologies or I/O
+    soil_temperature .= ifelse.(isfinite.(soil_temperature), soil_temperature, melting_threshold)
+    snow_depth       .= ifelse.(isfinite.(snow_depth), snow_depth, zero(eltype(snow_depth)))
+    snow_fall_rate   .= ifelse.(isfinite.(snow_fall_rate), snow_fall_rate, zero(eltype(snow_fall_rate)))
+    # clear ocean points explicitly
+    mask!(snow_depth, model.land_sea_mask, :ocean; masked_value=zero(eltype(snow_depth)))
+    mask!(soil_temperature, model.land_sea_mask, :ocean; masked_value=melting_threshold)
+
     launch!(architecture(snow_depth), LinearWorkOrder, size(snow_depth), land_snow_kernel!,
         snow_depth, soil_temperature, snow_melt_rate, snow_runoff_rate, snow_fall_rate, mask,
         params,
