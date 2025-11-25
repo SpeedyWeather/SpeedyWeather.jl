@@ -7,7 +7,7 @@
         # longwave surface radiative fluxes cooling the soil
         # which will heat up like crazy, use prescribed instead
         if longwave_radiation isa Union{Nothing, UniformCooling}
-            soil_temperature = ConstantLandTemperature(spectral_grid)
+            soil_temperature = SeasonalLandTemperature(spectral_grid)
         else
             soil_temperature = LandBucketTemperature(spectral_grid)
         end
