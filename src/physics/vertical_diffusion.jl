@@ -1,7 +1,7 @@
 abstract type AbstractVerticalDiffusion <: AbstractParameterization end
 
 export BulkRichardsonDiffusion
-@kwdef struct BulkRichardsonDiffusion{NF, RefNF <: Ref{NF}, VectorType} <: AbstractVerticalDiffusion
+@kwdef struct BulkRichardsonDiffusion{NF, VectorType} <: AbstractVerticalDiffusion
     "[OPTION] von Kármán constant [1]"
     von_Karman::NF = 0.4
 
@@ -23,12 +23,6 @@ export BulkRichardsonDiffusion
     "[OPTION] diffuse humidity? Ignored for PrimitiveDryModels"
     diffuse_humidity::Bool = true
 
-    "[DERIVED] Logarithm of typical lowermost layer height Z over roughness length z₀"
-    logZ_z₀::RefNF = Ref(zero(NF))
-
-    "[DERIVED] Sqrt of maximum diffusion coefficient C"
-    sqrtC_max::RefNF = Ref(zero(NF))
-
     "[DERIVED] Vertical Laplace operator, operator for cells above"
     ∇²_above::VectorType
 
@@ -43,7 +37,7 @@ function BulkRichardsonDiffusion(SG::SpectralGrid; kwargs...)
     arch = SG.architecture
     ∇²_above = on_architecture(arch, zeros(SG.NF, SG.nlayers))
     ∇²_below = on_architecture(arch, zeros(SG.NF, SG.nlayers))
-    return BulkRichardsonDiffusion{SG.NF, Ref{SG.NF}, SG.VectorType}(; ∇²_above, ∇²_below, kwargs...)
+    return BulkRichardsonDiffusion{SG.NF, SG.VectorType}(; ∇²_above, ∇²_below, kwargs...)
 end
 
 variables(::BulkRichardsonDiffusion) = (
@@ -81,29 +75,12 @@ function initialize!(diffusion::BulkRichardsonDiffusion, model)
     arch = model.architecture
     diffusion.∇²_above .= on_architecture(arch, ∇²_above)
     diffusion.∇²_below .= on_architecture(arch, ∇²_below)
-
-    # Typical height Z of lowermost layer from geopotential of reference surface temperature
-    # minus surface geopotential (orography * gravity), simplification compared to
-    # Frierson to reduce the number of expensive log calls given that z ≈ Z for most
-    # surface temperature variations
-    (; temp_ref) = model.atmosphere
-    (; gravity) = model.planet
-    Δp_geopot_full = on_architecture(CPU(), model.geopotential.Δp_geopot_full)
-    Z = GPUArrays.@allowscalar temp_ref * Δp_geopot_full[end] / gravity
-    
-    # maximum drag Cmax from that height, stable conditions would decrease Cmax towards 0
-    # Frierson 2006, eq (12)
-    κ = diffusion.von_Karman
-    z₀ = diffusion.roughness_length
-    diffusion.logZ_z₀[] = log(Z/z₀)        # ≈ log(z/z₀) avoid log during integration
-    diffusion.sqrtC_max[] = κ/log(Z/z₀)
-
     return nothing
 end
 
 # function barrier
 parameterization!(ij, diagn, progn, diffusion::BulkRichardsonDiffusion, model) =
-    vertical_diffusion!(ij, diagn, diffusion, model.atmosphere, model.planet, model.orography, model.class)
+    vertical_diffusion!(ij, diagn, diffusion, model.atmosphere, model.planet, model.orography, model.geopotential, model.class)
 
 function vertical_diffusion!(
     ij,
@@ -112,6 +89,7 @@ function vertical_diffusion!(
     atmosphere,
     planet,
     orography,
+    geopot,
     model_class,
 )
     (; diffuse_momentum, diffuse_static_energy, diffuse_humidity) = diffusion
@@ -119,7 +97,7 @@ function vertical_diffusion!(
     # escape immediately if all diffusions disabled
     any((diffuse_momentum, diffuse_static_energy, diffuse_humidity)) || return nothing
     
-    K, kₕ = get_diffusion_coefficients!(ij, diagn, diffusion, atmosphere, planet, orography)
+    K, kₕ = get_diffusion_coefficients!(ij, diagn, diffusion, atmosphere, planet, orography, geopot)
 
     u_tend = diagn.tendencies.u_tend_grid
     v_tend = diagn.tendencies.v_tend_grid
@@ -159,6 +137,7 @@ function get_diffusion_coefficients!(
     atmosphere::AbstractAtmosphere,
     planet::AbstractPlanet,
     orog,
+    geopot::AbstractGeopotential,
 )
     # reuse scratch array for diffusion coefficients
     K = diagn.dynamics.b_grid
@@ -169,9 +148,17 @@ function get_diffusion_coefficients!(
     fb = diffusion.surface_layer_fraction
     κ = diffusion.von_Karman
     z₀ = diffusion.roughness_length
-
-    logZ_z₀ = diffusion.logZ_z₀[]
     gravity⁻¹ = inv(planet.gravity)
+
+    # Typical height Z of lowermost layer from geopotential of reference surface temperature
+    # minus surface geopotential (orography * gravity), simplification compared to
+    # Frierson to reduce the number of expensive log calls given that z ≈ Z for most
+    # surface temperature variations
+    temp_ref = atmosphere.temp_ref
+    gravity = planet.gravity
+    Δp_geopot_full = geopot.Δp_geopot_full
+    Z = temp_ref * Δp_geopot_full[nlayers] / gravity
+    logZ_z₀ = log(Z/z₀)
 
     u = diagn.grid.u_grid
     v = diagn.grid.v_grid
@@ -202,7 +189,7 @@ function get_diffusion_coefficients!(
         h = max(geopotential[ij, kₕ]*gravity⁻¹ - orography[ij], 0)  
         Ri_N = Ri[ij, nlayers]                      # surface bulk Richardson number
         Ri_N = clamp(Ri_N, 0, Ri_c)                 # cases of eq. 12-14
-        sqrtC = diffusion.sqrtC_max[]*(1-Ri_N/Ri_c)    # sqrt of eq. 12-14
+        sqrtC = (κ/logZ_z₀)*(1-Ri_N/Ri_c)           # sqrt of eq. 12-14
         surface_speed = sqrt(u[ij, nlayers]^2 + v[ij, nlayers]^2)
         K0 = κ * surface_speed * sqrtC              # height-independent K eq. 19, 20                           
 
