@@ -30,8 +30,9 @@ function coriolis!(f::AbstractField; rotation = DEFAULT_ROTATION)
     lat = on_architecture(f, get_lat(f))     # in radians [-π/2, π/2]
 
     arch = architecture(f)
-    (; whichring) = field.grid
+    (; whichring) = f.grid
     launch!(arch, RingGridWorkOrder, size(f), coriolis_kernel!, f, lat, rotation, whichring)
+    return f
 end
 
 @kernel inbounds=true function coriolis_kernel!(f, lat, rotation, whichring)
