@@ -46,7 +46,7 @@ function transmittance!(
 
     local τ_above::NF = 0
     τ₀ = τ₀_equator + (τ₀_pole - τ₀_equator)*sind(θ)^2
-    for k in 2:nlayers+1     # loop over half levels below
+    @inbounds for k in 2:nlayers+1     # loop over half levels below
         τ_below = τ₀*(fₗ*σ[k] + (1 - fₗ)*σ[k]^4)
         transmittance[k-1, band] = exp(-(τ_below - τ_above))
         τ_above = τ_below

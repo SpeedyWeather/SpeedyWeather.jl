@@ -39,9 +39,10 @@ end
 function parameterization_tendencies_cpu!(diagn, progn, parameterizations, model)
     _call_parameterizations_cpu!(diagn, progn, parameterizations, model)
 
+    radius = model.planet.radius
     for ij in 1:model.geometry.npoints
         # tendencies have to be scaled by the radius for the dynamical core
-        scale!(ij, diagn.tendencies, model.planet.radius)
+        scale!(ij, diagn.tendencies, radius)
     end
 end
 

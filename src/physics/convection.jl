@@ -68,7 +68,7 @@ function convection!(ij, diagn, SBM::BettsMillerConvection, model)
                                             temp_virt, geopotential, pₛ, σ,
                                             clausius_clapeyron)
             
-    for k in level_zero_buoyancy:nlayers
+    @inbounds for k in level_zero_buoyancy:nlayers
         qsat = saturation_humidity(temp_ref_profile[ij, k], pₛ*σ[k], clausius_clapeyron)
         humid_ref_profile[ij, k] = qsat*SBM.relative_humidity
     end
@@ -137,7 +137,7 @@ function convection!(ij, diagn, SBM::BettsMillerConvection, model)
     rain_convection = zero(NF)
 
     # GET TENDENCIES FROM ADJUSTED PROFILES
-    for k in level_zero_buoyancy:nlayers
+    @inbounds for k in level_zero_buoyancy:nlayers
         temp_tend[ij, k] -= (temp[ij, k] - temp_ref_profile[ij,k]) / SBM.time_scale.value
         δq = (humid[ij, k] - humid_ref_profile[ij,k]) / SBM.time_scale.value
         humid_tend[ij, k] -= δq
@@ -190,7 +190,7 @@ function pseudo_adiabat!(
     μ = (1-ε)/ε                             # for virtual temperature
 
     nlayers = length(σ)                         # number of vertical levels
-    for i in 1:nlayers
+    @inbounds for i in 1:nlayers
         temp_ref_profile[ij, i] = NF(NaN)           # reset profile from any previous calculation, TODO necessary?
     end
     temp_ref_profile[ij, nlayers] = temp_parcel     # start profile at surface with parcel temperature
@@ -309,7 +309,7 @@ function convection!(ij, diagn, DBM::BettsMillerDryConvection, model)
     local ΔT::NF = 0        # vertically uniform temperature profile adjustment
 
     # skip constants compared to Frierson 2007, i.e. no /τ, /gravity, *cₚ/Lᵥ
-    for k in level_zero_buoyancy:nlayers
+    @inbounds for k in level_zero_buoyancy:nlayers
         # Frierson's equation (1)
         # δT = -(temp[ij, k] - temp_ref_profile[ij, k])/DBM.time_scale.value
         # PT += δT*Δσ[k]/gravity*cₚ/Lᵥ
@@ -325,7 +325,7 @@ function convection!(ij, diagn, DBM::BettsMillerDryConvection, model)
     # height of zero buoyancy level in σ coordinates
     Δσ_lzb = σ_half[nlayers+1] - σ_half[level_zero_buoyancy]   
     ΔT = PT/Δσ_lzb                          # eq (5) or (14) but reusing PT
-    for k in level_zero_buoyancy:nlayers
+    @inbounds for k in level_zero_buoyancy:nlayers
         temp_ref_profile[ij, k] -= ΔT           # equation (6) or equation (15)
         temp_tend[ij, k] -= (temp[ij, k] - temp_ref_profile[ij, k]) / DBM.time_scale.value
     end
@@ -353,7 +353,7 @@ function dry_adiabat!(
 
     nlayers = length(temp_ref_profile)      # number of vertical levels
 
-    for i in 1:nlayers
+    @inbounds for i in 1:nlayers
         temp_ref_profile[ij, i] = NF(NaN)          # reset profile from any previous calculation
     end
     temp_ref_profile[ij, nlayers] = temp_parcel    # start profile at surface with parcel temperature

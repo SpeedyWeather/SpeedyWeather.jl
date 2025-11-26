@@ -89,14 +89,16 @@ end
 $(TYPEDSIGNATURES)
 Calculate the bulk richardson number following Frierson, 2007.
 For vertical stability in the boundary layer."""
-function bulk_richardson_surface(ij, diagn, atmosphere)
+@inline function bulk_richardson_surface(ij, diagn, atmosphere)
     cₚ = atmosphere.heat_capacity
     surface = diagn.grid.nlayers    # surface index = nlayers
 
-    u = diagn.grid.u_grid_prev[ij, surface]
-    v = diagn.grid.v_grid_prev[ij, surface]
-    geopotential = diagn.grid.geopotential[ij, surface]
-    temp_virt = diagn.grid.temp_virt_grid[ij, surface]
+    @inbounds begin
+        u = diagn.grid.u_grid_prev[ij, surface]
+        v = diagn.grid.v_grid_prev[ij, surface]
+        geopotential = diagn.grid.geopotential[ij, surface]
+        temp_virt = diagn.grid.temp_virt_grid[ij, surface]
+    end
 
     V² = u^2 + v^2
     Θ₀ = cₚ*temp_virt

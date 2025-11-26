@@ -39,10 +39,12 @@ initialize!(::TransparentShortwave, ::PrimitiveEquation) = nothing
     ssrd_ocean = diagn.physics.ocean.surface_shortwave_down
     ssrd_land = diagn.physics.land.surface_shortwave_down
 
-    cos_zenith = diagn.physics.cos_zenith[ij]
-    land_fraction = land_sea_mask[ij]
-    albedo_ocean = diagn.physics.ocean.albedo[ij]
-    albedo_land = diagn.physics.land.albedo[ij]
+    @inbounds begin 
+        cos_zenith = diagn.physics.cos_zenith[ij]
+        land_fraction = land_sea_mask[ij]
+        albedo_ocean = diagn.physics.ocean.albedo[ij]
+        albedo_land = diagn.physics.land.albedo[ij]
+    end
     S₀ = planet.solar_constant
 
     D = S₀ * cos_zenith             # top of atmosphere downward radiation
@@ -174,7 +176,7 @@ function shortwave_radiative_transfer!(
     flux_temp_downward[1] += D
 
     # Clear sky portion until cloud top
-    for k in 1:(cloud_top - 1)
+    @inbounds for k in 1:(cloud_top - 1)
         D *= t[k]
         flux_temp_downward[k+1] += D
     end
@@ -186,7 +188,7 @@ function shortwave_radiative_transfer!(
         U_reflected = D * R
         D *= (1 - R)
 
-        for k in cloud_top:nlayers
+        @inbounds for k in cloud_top:nlayers
             D *= t[k]
             flux_temp_downward[k+1] += D
         end
@@ -212,7 +214,7 @@ function shortwave_radiative_transfer!(
     
     # Upward beam
     flux_temp_upward[nlayers+1] += U
-    for k in nlayers:-1:1
+    @inbounds for k in nlayers:-1:1
         U *= t[k]
         U += k == cloud_top ? U_reflected : zero(U)
         flux_temp_upward[k] += U
