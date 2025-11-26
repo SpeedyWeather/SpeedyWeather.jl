@@ -78,7 +78,7 @@ Fields are: $(TYPEDFIELDS)"""
     keepbits::Int = 12
 end
 
-path(::SnowRunoffOutput, simulation) =
+path(::SnowMeltOutput, simulation) =
     simulation.diagnostic_variables.physics.land.snow_melt_rate
 
 """Defines netCDF output for a specific variable, see [`VorticityOutput`](@ref) for details.

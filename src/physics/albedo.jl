@@ -21,7 +21,7 @@ end
 export DefaultAlbedo
 function DefaultAlbedo(SG::SpectralGrid;
     ocean = OceanSeaIceAlbedo(SG),
-    land = AlbedoClimatology(SG))
+    land = LandSnowAlbedo(SG))
     return Albedo(ocean, land)
 end
 
@@ -158,26 +158,25 @@ function albedo!(
     diagn.albedo .= albedo_ocean .+ sea_ice_concentration .* (albedo_ice .- albedo_ocean)
 end
 
+abstract type AbstractSnowCover end
 
-export AbstractSnowAlbedoScheme, LinearSnowAlbedo, SaturatingSnowAlbedo
-abstract type AbstractSnowAlbedoScheme end
+export LinearSnowCover, SaturatingSnowCover
+"""Linear ramp: snow cover grows with snow depth from 0 to 1 at `snow_depth_scale`."""
+struct LinearSnowCover <: AbstractSnowCover end
 
-"""Linear ramp: snow cover grows from 0 to 1 at `snow_depth_scale`."""
-struct LinearSnowAlbedo <: AbstractSnowAlbedoScheme end
-
-"""Saturating ramp: snow cover grows as `S/(S+scale)`."""
-struct SaturatingSnowAlbedo  <: AbstractSnowAlbedoScheme end
+"""Saturating ramp: snow cover grows with snow depth S as `S/(S+scale)`."""
+struct SaturatingSnowCover  <: AbstractSnowCover end
 
 """$(TYPEDSIGNATURES) Snow cover fraction for the linear scheme, clamped to 1."""
-@inline snow_cover(::LinearSnowAlbedo, snow_depth, scale) = min(snow_depth / scale, 1)
+@inline (::LinearSnowCover)(snow_depth, scale) = min(snow_depth / scale, 1)
 
 """$(TYPEDSIGNATURES) Snow cover fraction for the saturating scheme."""
-@inline snow_cover(::SaturatingSnowAlbedo, snow_depth, scale) = snow_depth / (snow_depth + scale)
+@inline (::SaturatingSnowCover)(snow_depth, scale) = snow_depth / (snow_depth + scale)
 
 ## LandSnowAlbedo
 export LandSnowAlbedo
 
-@kwdef struct LandSnowAlbedo{NF, Scheme<:AbstractSnowAlbedoScheme} <: AbstractAlbedo
+@kwdef struct LandSnowAlbedo{NF, Scheme<:AbstractSnowCover} <: AbstractAlbedo
     "Albedo of bare land (excluding vegetation) [1]"
     albedo_land::NF = 0.3
 
@@ -191,11 +190,11 @@ export LandSnowAlbedo
     snow_depth_scale::NF = 0.1
 
     "Snow cover-albedo scheme"
-    scheme::Scheme = SaturatingSnowAlbedo()
+    snow_cover::Scheme = SaturatingSnowCover()
 end
 
-function LandSnowAlbedo(SG::SpectralGrid; scheme = SaturatingSnowAlbedo(), kwargs...)
-    return LandSnowAlbedo{SG.NF, typeof(scheme)}(; scheme, kwargs...)
+function LandSnowAlbedo(SG::SpectralGrid; snow_cover = SaturatingSnowCover(), kwargs...)
+    return LandSnowAlbedo{SG.NF, typeof(snow_cover)}(; snow_cover, kwargs...)
 end
 
 initialize!(albedo::LandSnowAlbedo, model::PrimitiveEquation) = nothing
@@ -208,12 +207,13 @@ function albedo!(
     model::PrimitiveEquation,
 )
     (; snow_depth) = progn.land
-    (; albedo_land, albedo_vegetation, albedo_snow, snow_depth_scale, scheme) = albedo
+    (; albedo_land, albedo_snow, snow_depth_scale) = albedo
+    snow_cover_scheme = albedo.snow_cover
 
     snow_cover = diagn_all.dynamics.a_2D_grid       # scratch memory
     
     # compute snow-cover fraction using the chosen scheme and clamp to [0, 1]
-    snow_cover .= snow_cover.(scheme, snow_depth, snow_depth_scale)
+    snow_cover .= snow_cover_scheme.(snow_depth, snow_depth_scale)
 
     # set land albedo linearly between bare land and snow depending on snow cover [0, 1]
     diagn.albedo .= albedo_land .+ snow_cover .* (albedo_snow - albedo_land)
