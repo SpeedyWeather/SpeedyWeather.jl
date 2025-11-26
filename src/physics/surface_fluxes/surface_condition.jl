@@ -32,8 +32,8 @@ function surface_condition!(ij, diagn, surface_condition::SurfaceCondition, mode
     surface_u = wind_slowdown*diagn.grid.u_grid_prev[ij, nlayers] 
     surface_v = wind_slowdown*diagn.grid.v_grid_prev[ij, nlayers]
 
-    # Fortran SPEEDY documentation eq. 50
-    surface_wind_speed = sqrt(surface_u^2 + surface_v^2 + gust_speed^2)
+    # Fortran SPEEDY documentation eq. 50, sqrt(u² + v² + gust_speed²)
+    surface_wind_speed = sqrt(muladd(surface_u, surface_u, muladd(surface_v, surface_v, gust_speed^2)))
     diagn.physics.surface_wind_speed[ij] = surface_wind_speed
 
     # Surface air density
