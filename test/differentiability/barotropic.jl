@@ -173,8 +173,8 @@ end
     @info "Running reverse-mode AD"
     @time autodiff(Reverse, SpeedyWeather.transform!, Const, Duplicated(diagn, ddiagn), Duplicated(progn, dprogn), Const(lf2), Const(model))
 
-    function transform_step(diagn_new::DiagnosticVariables, diagn::DiagnosticVariables, progn, lf, model)
-        copy!(diagn_new, diagn)
+    function transform_step(diagn::DiagnosticVariables, progn, lf, model)
+        diagn_new = deepcopy(diagn)
         SpeedyWeather.transform!(diagn_new, progn, lf, model)
         return diagn_new
     end 
@@ -184,9 +184,9 @@ end
     diagn_new = deepcopy(fdsim.diagvars)
 
     @info "Running finite differences"
-    fd_vjp = @time FiniteDifferences.j′vp(central_fdm(5,1), x -> transform_step(diagn_new, fdsim.diagvars, x, lf2, model), one(dprogn), fdsim.diagvars)
+    fd_vjp = @time FiniteDifferences.j′vp(central_fdm(5,1), x -> transform_step(diagn_new, x, lf2, model), one(diagn_new), progn_new)
 
-    @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dtend)[1], rtol=1e-3, atol=1e-3))
+    @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dprogn)[1], rtol=1e-3, atol=1e-3))
 
 end
 
