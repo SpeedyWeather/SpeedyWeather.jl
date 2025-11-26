@@ -508,7 +508,15 @@ function lorenz_ncycle_timestep!(
     # Step 1: Accumulate weighted explicit tendencies (Eq. 19)
     for (varname, tendname) in zip(prognostic_variables(model), tendency_names(model))
         var = getfield(progn, varname)
-        G = selectdim(var, ndims(var), 2)  # Accumulated tendency (works for 2D and 3D)
+        
+        # Get G based on dimensionality
+        if ndims(var) == 2
+            # 2D array (e.g., pres in shallow water): direct access
+            G = var[:, 2]
+        else
+            # 3D array (e.g., vor, div): access slice
+            G = var[:, :, 2]
+        end
         
         var_tend = getfield(tend, tendname)
         spectral_truncation!(var_tend)
@@ -520,7 +528,12 @@ function lorenz_ncycle_timestep!(
     for (name, tracer) in model.tracers
         if tracer.active
             var = progn.tracers[name]
-            G = selectdim(var, ndims(var), 2)
+            
+            if ndims(var) == 2
+                G = var[:, 2]
+            else
+                G = var[:, :, 2]
+            end
             
             var_tend = tend.tracers_tend[name]
             spectral_truncation!(var_tend)
@@ -536,8 +549,14 @@ function lorenz_ncycle_timestep!(
     # Step 3: Update states with corrected tendencies (Eq. 21)
     for varname in prognostic_variables(model)
         var = getfield(progn, varname)
-        x = selectdim(var, ndims(var), 1)  # Current state
-        G = selectdim(var, ndims(var), 2)  # Now contains dx after implicit correction
+        
+        if ndims(var) == 2
+            x = var[:, 1]
+            G = var[:, 2]
+        else
+            x = var[:, :, 1]
+            G = var[:, :, 2]
+        end
         
         update_state!(x, G, dt, L)
     end
@@ -546,8 +565,14 @@ function lorenz_ncycle_timestep!(
     for (name, tracer) in model.tracers
         if tracer.active
             var = progn.tracers[name]
-            x = selectdim(var, ndims(var), 1)
-            G = selectdim(var, ndims(var), 2)
+            
+            if ndims(var) == 2
+                x = var[:, 1]
+                G = var[:, 2]
+            else
+                x = var[:, :, 1]
+                G = var[:, :, 2]
+            end
             
             update_state!(x, G, dt, L)
         end

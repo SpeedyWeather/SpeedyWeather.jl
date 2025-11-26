@@ -383,21 +383,21 @@ end
 Apply implicit correction for Lorenz N-cycle (shallow water).
 
 Key difference from Leapfrog: adds L_I*x (current state) instead of L_I*(x_old - x_new).
-Works directly on G arrays in progn[:,:,2] without copying to diagn.tendencies.
+Works directly on G arrays in progn without copying to diagn.tendencies.
 """
-function lorenz_implicit_correction!(
+function lorenz_implicit_correction!( #TODO: avoid code duplications -> dispatch
     diagn::DiagnosticVariables,
     progn::PrognosticVariables,
     implicit::ImplicitShallowWater,
     model::ShallowWater,
 )
     # Get G (accumulated tendency) and x (current state)
-    # Use selectdim to handle both 2D (pres) and 3D (div) arrays
-    div_G = selectdim(progn.div, ndims(progn.div), 2)
-    pres_G = selectdim(progn.pres, ndims(progn.pres), 2)
+    # Handle dimensionality: div is 3D, pres is 2D
+    div_G = progn.div[:, :, 2]
+    div_x = progn.div[:, :, 1]
     
-    div_x = selectdim(progn.div, ndims(progn.div), 1)
-    pres_x = selectdim(progn.pres, ndims(progn.pres), 1)
+    pres_G = progn.pres[:, 2]
+    pres_x = progn.pres[:, 1]
 
     H = model.atmosphere.layer_thickness
     g = model.planet.gravity
@@ -432,7 +432,7 @@ end
 Apply implicit correction for Lorenz N-cycle (primitive equations).
 
 Key difference from Leapfrog: adds L*div_x and U*pres_x (current state) 
-instead of L*(div_old - div_new). Works directly on G arrays in progn[:,:,2].
+instead of L*(div_old - div_new). Works directly on G arrays.
 """
 function lorenz_implicit_correction!(
     diagn::DiagnosticVariables,
@@ -447,21 +447,18 @@ function lorenz_implicit_correction!(
     (; S⁻¹, R, U, L, W) = implicit
     ξ = implicit.ξ[]
 
-    # Get G (accumulated tendency) and x (current state)
-    # Use selectdim to handle mixed dimensionality
-    div_G = selectdim(progn.div, ndims(progn.div), 2)
-    temp_G = selectdim(progn.temp, ndims(progn.temp), 2)
-    pres_G = selectdim(progn.pres, ndims(progn.pres), 2)
-    
-    div_x = selectdim(progn.div, ndims(progn.div), 1)
-    pres_x = selectdim(progn.pres, ndims(progn.pres), 1)
+    # Get the full arrays (not views) to work with eachmatrix
+    div_full = progn.div
+    temp_full = progn.temp
+    pres_full = progn.pres
 
     # ADD IMPLICIT TERMS FROM CURRENT STATE x (not old-new difference!)
     # Temperature: add L*div_x to temp_G
-    for k in eachmatrix(temp_G, div_x)
-        for r in eachmatrix(temp_G, div_x)
-            for lm in eachharmonic(temp_G, div_x)
-                temp_G[lm, k] += L[k, r] * div_x[lm, r]
+    # Access each layer directly to avoid SubArray issues
+    @inbounds for k in 1:nlayers
+        for r in 1:nlayers
+            for lm in eachharmonic(div_full, temp_full)
+                temp_full[lm, k, 2] += L[k, r] * div_full[lm, r, 1]
             end
         end
     end
@@ -472,11 +469,11 @@ function lorenz_implicit_correction!(
     geopot = diagn.dynamics.b
 
     fill!(geopot, 0)
-    for k in 1:nlayers
+    @inbounds for k in 1:nlayers
         for r in k:nlayers
-            for lm in eachharmonic(temp_G, div_x)
+            for lm in eachharmonic(temp_full)
                 # Vertical integration for geopotential
-                geopot[lm, k] += R[k, r] * temp_G[lm, r]
+                geopot[lm, k] += R[k, r] * temp_full[lm, r, 2]
             end
         end
 
@@ -487,23 +484,24 @@ function lorenz_implicit_correction!(
                 eigenvalue = -l*(l-1)
                 
                 # Combine: G_D + ξ*eigenvalue*(U*G_lnps + R*G_T) + implicit term from state
-                G[lm, k] = div_G[lm, k] + ξ*eigenvalue*(U[k]*pres_G[lm] + geopot[lm, k]) + 
-                           eigenvalue*U[k]*pres_x[lm]  # Add L_I*x for divergence
+                G[lm, k] = div_full[lm, k, 2] + 
+                           ξ*eigenvalue*(U[k]*pres_full[lm, 2] + geopot[lm, k]) + 
+                           eigenvalue*U[k]*pres_full[lm, 1]  # Add L_I*x for divergence
                 
-                div_G[lm, k] = 0  # Reset for accumulation below
+                div_full[lm, k, 2] = 0  # Reset for accumulation below
             end
             lm += 1
         end
     end
 
     # SOLVE δD = S⁻¹G (same as Leapfrog)
-    for k in eachmatrix(div_G, G)
-        for r in eachmatrix(div_G, G)
+    @inbounds for k in 1:nlayers
+        for r in 1:nlayers
             lm = 0
             for m in 1:trunc+1
                 for l in m:trunc+1
                     lm += 1
-                    div_G[lm, k] += S⁻¹[l, k, r] * G[lm, r]
+                    div_full[lm, k, 2] += S⁻¹[l, k, r] * G[lm, r]
                 end
                 lm += 1
             end
@@ -511,17 +509,17 @@ function lorenz_implicit_correction!(
     end
 
     # SEMI IMPLICIT CORRECTIONS FOR PRESSURE AND TEMPERATURE (same as Leapfrog)
-    for k in eachmatrix(div_G, temp_G)
-        for r in eachmatrix(div_G, temp_G)
-            for lm in eachharmonic(div_G, temp_G)
+    @inbounds for k in 1:nlayers
+        for r in 1:nlayers
+            for lm in eachharmonic(div_full, temp_full)
                 # δT = G_T + ξLδD
-                temp_G[lm, k] += ξ * L[k, r] * div_G[lm, r]
+                temp_full[lm, k, 2] += ξ * L[k, r] * div_full[lm, r, 2]
             end
         end
 
-        for lm in eachharmonic(div_G, pres_G)
+        for lm in eachharmonic(div_full, pres_full)
             # δlnpₛ = G_lnpₛ + ξWδD
-            pres_G[lm] += ξ * W[k] * div_G[lm, k]
+            pres_full[lm, 2] += ξ * W[k] * div_full[lm, k, 2]
         end
     end
     
