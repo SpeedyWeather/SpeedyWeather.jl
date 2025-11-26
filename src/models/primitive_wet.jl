@@ -118,7 +118,7 @@ $(TYPEDFIELDS)"""
     # Used to initiliaze variables and for the column-based parameterizations
     # also determine order in which parameterizations are called
     model_parameters::TS1 = (:architecture, :time_stepping, :orography, :geopotential, :atmosphere, 
-                                :planet, :geometry, :land_sea_mask, :clausius_clapeyron)
+                                :planet, :geometry, :land_sea_mask, :clausius_clapeyron, :class => PrimitiveWetDummy())
     parameterizations::TS2 = (  # mixing and precipitation
                                 :vertical_diffusion, :large_scale_condensation, :convection,
 
