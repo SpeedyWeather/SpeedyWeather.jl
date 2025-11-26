@@ -111,9 +111,11 @@ function surface_heat_flux!(
     # SPEEDY documentation Eq. 54/56, land/sea fraction included
     # Only flux from sea if available (not NaN) otherwise zero flux
     flux_land  = isfinite(T_skin_land) ? ρ*drag_land*V₀*cₚ*(T_skin_land  - T) : zero(T_skin_land)
+    
     # snow insulation: deeper snow ⇒ smaller flux (S / S₀ depth scaling)
     insulation = inv(one(NF) + column.snow_depth / snow_insulation_depth)
     flux_land *= insulation
+
     column.sensible_heat_flux_land = flux_land  # store land flux separately too
     flux_land *= land_fraction                  # weight by land fraction of land-sea mask
     

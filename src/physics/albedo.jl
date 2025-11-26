@@ -169,12 +169,10 @@ struct LinearSnowAlbedo <: AbstractSnowAlbedoScheme end
 struct SaturatingSnowAlbedo  <: AbstractSnowAlbedoScheme end
 
 """$(TYPEDSIGNATURES) Snow cover fraction for the linear scheme, clamped to 1."""
-@inline snow_cover_fraction(::LinearSnowAlbedo, S, scale) =
-    min(S / scale, 1)
+@inline snow_cover(::LinearSnowAlbedo, snow_depth, scale) = min(snow_depth / scale, 1)
 
 """$(TYPEDSIGNATURES) Snow cover fraction for the saturating scheme."""
-@inline snow_cover_fraction(::SaturatingSnowAlbedo, S, scale) =
-    S / (S + scale)
+@inline snow_cover(::SaturatingSnowAlbedo, snow_depth, scale) = snow_depth / (snow_depth + scale)
 
 ## LandSnowAlbedo
 export LandSnowAlbedo
@@ -194,7 +192,6 @@ export LandSnowAlbedo
 
     "Snow cover-albedo scheme"
     scheme::Scheme = SaturatingSnowAlbedo()
-
 end
 
 function LandSnowAlbedo(SG::SpectralGrid; scheme = SaturatingSnowAlbedo(), kwargs...)
@@ -216,14 +213,7 @@ function albedo!(
     snow_cover = diagn_all.dynamics.a_2D_grid       # scratch memory
     
     # compute snow-cover fraction using the chosen scheme and clamp to [0, 1]
-    snow_cover .= snow_cover_fraction.(Ref(scheme), snow_depth, snow_depth_scale)
-    @. snow_cover = min(max(snow_cover, 0), 1)
-	# ## Now compute the snow area cover fraction based on snow depth
-	# #σₛ = Sₐ / (10. * drag_snow + Sₐ) #JULES, from Betts et al.
-	# σₛ[ij] = min(1.0, Sₐ[ij] / snow_depth_scale)   # e.g. snow_depth_scale ≈ 0.1 m
-	# ## Now compute the change in albedo
-	# albedo_snow[ij] = snow_albedo_old + (snow_albedo_fresh - snow_albedo_old) * exp(-Δt_snow / τˢ) # time needs to be expresssed in days. 
-	# column.albedo_land[ij] = (1-σₛ[ij]) * albedo_land + σₛ[ij] * albedo_snow[ij]
+    snow_cover .= snow_cover.(scheme, snow_depth, snow_depth_scale)
 
     # set land albedo linearly between bare land and snow depending on snow cover [0, 1]
     diagn.albedo .= albedo_land .+ snow_cover .* (albedo_snow - albedo_land)

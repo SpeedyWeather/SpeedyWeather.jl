@@ -225,13 +225,11 @@ end
         # Cooling from snow melt rate
         Q_melt = Lᵢ * M[ij]                 # in [W/m²] = [J/kg] * [kg/m²/s]
 
-        # # soil heat capacity [J/m²/K]
-        # C_soil = ρ_soil * cₛ * z₁
-
         # total surface downward heat flux [W/m^2]
         F = Rsd[ij] - Rsu[ij] - Rlu[ij] + Rld[ij] - Lᵥ*Ev[ij] - S[ij] - Q_melt
 
         # heat capacity of the (wet) soil layers 1 and 2 [J/(m³ K)]
+        # ignore snow here
         C₁ = Cw * soil_moisture[ij, 1] * γ + Cs
         C₂ = Cw * soil_moisture[ij, 2] * γ + Cs
 

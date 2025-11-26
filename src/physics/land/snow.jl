@@ -39,11 +39,9 @@ function timestep!(
     Δt = model.time_stepping.Δt_sec
     (; snow_depth) = progn.land                             # in equivalent liquid water height [m]
     (; soil_temperature) = progn.land
-    
     (; mask) = model.land_sea_mask
     
     # Some thermodynamics needed by snow
-	ρ_soil = model.land.thermodynamics.soil_density			# soil density [kg/m³]
 	ρ_water = model.atmosphere.water_density				# water density [kg/m³]
     Lᵢ = model.clausius_clapeyron.latent_heat_fusion      	# latent heat of fusion
     cₛ = model.land.thermodynamics.heat_capacity_dry_soil
@@ -56,7 +54,7 @@ function timestep!(
     snow_melt_rate = diagn.physics.land.snow_melt_rate
     snow_runoff_rate = diagn.physics.land.snow_runoff_rate
 
-    params = (;melting_threshold,cₛ,ρ_soil,z₁,Δt,ρ_water,Lᵢ,r⁻¹)
+    params = (; melting_threshold, cₛ, z₁, Δt, ρ_water, Lᵢ, r⁻¹)
 
     # sanitize inputs to avoid propagating NaNs from climatologies or I/O
     soil_temperature .= ifelse.(isfinite.(soil_temperature), soil_temperature, melting_threshold)
@@ -81,32 +79,38 @@ end
 
     if mask[ij] > 0                         # at least partially land
 		
-		(;melting_threshold, cₛ, ρ_soil, z₁, Δt, ρ_water, Lᵢ, r⁻¹) = params
+		(; melting_threshold, cₛ, z₁, Δt, ρ_water, Lᵢ, r⁻¹) = params
         # check for melting of snow if temperature above melting threshold
         δT_melt = max(soil_temperature[ij, 1] - melting_threshold, 0)
 	
         # energy available from soil warming above melting threshold [J/m²/s]
-        E_avail = cₛ * δT_melt * z₁ / Δt  # [J/(m³ K)] * [K] * [kg/m³] * [m] / [s] = [J/m²/s] => we remove ρ_soil?
+        # heat capacity per volume, so not *density needed
+        E_avail = cₛ * δT_melt * z₁ / Δt  # [J/(m³ K)] * [K] * [m] / [s] = [J/m²/s]
 
-		# max melt rate allowed by available energy [m/s]
+        # Term 1: snow fall rate from precipitation schemes [kg/m^2/s] -> [m/s]
+        snow_fall_rate_max = snow_fall_rate[ij] / ρ_water
+
+		# Term 2: max melt rate allowed by available energy [m/s]
         melt_rate_max = E_avail / (ρ_water * Lᵢ)
 
-	    # actual melt rate [m/s], limited by snow available
-        melt_rate = min(snow_depth[ij] / Δt, melt_rate_max)
-        snow_melt_rate[ij] = max(melt_rate * ρ_water, 0)     # store to pass to soil moisture [kg/m²/s]
+        # Term 3: runoff rate [m/s], a leakage term to prevent too much snow, leaks into soil moisture
+        # maximum allowed by existing snow depth
+        runoff_rate_max = r⁻¹ * snow_depth[ij]
 
-        # runoff rate [m/s], limited by available snow and melt + snowfall rate
-        runoff_rate = r⁻¹ * snow_depth[ij]
-        # maximum sink rate [m/s]
-        max_sink = max(snow_depth[ij] / Δt + snow_fall_rate[ij] / ρ_water, 0)
-        # limit runoff to not exceed available snow after melt and snowfall
-        runoff_rate = min(runoff_rate, max(max_sink - melt_rate, 0))
-        
-        # store to pass to soil moisture [kg/m²/s]
-        snow_runoff_rate[ij] = runoff_rate * ρ_water
+        # Adding the terms change snow depth by falling snow minus melting and runoff [m/s]
+        # maximum amount of snow change
+        dsnow_max = snow_fall_rate_max - melt_rate_max - runoff_rate_max
 
-        # change snow depth by falling snow minus melting and runoff [m/s]
-        dsnow = snow_fall_rate[ij] / ρ_water - melt_rate  - runoff_rate
+        # don't melt or runoff more than there is snow + snow that is falling down this time step
+        # limited amount of snow change by how much there is
+        dsnow = -min(-snow_depth[ij] / Δt, dsnow_max)
+
+        # snow that we tried to melt/runoff that isn't available though
+        dsnow_excess = dsnow_max - dsnow
+
+        # store to pass to soil moisture [kg/m²/s], combined runoff with melt rate
+        # limited to what's available to melt/runoff
+        snow_melt_rate[ij] = melt_rate_max + runoff_rate_max + dsnow_excess
 
         # Euler forward time step but cap at 0 depth to not melt more snow than available
         snow_depth[ij] = max(snow_depth[ij] + Δt * dsnow, 0)

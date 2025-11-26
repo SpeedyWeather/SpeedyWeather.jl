@@ -328,9 +328,6 @@ export DynamicsVariablesLand
 
     "Snow melt rate [kg/m²/s]"
     snow_melt_rate::GridVariable2D = zeros(GridVariable2D, grid)
-
-    "Snow runoff rate [kg/m²/s]"
-    snow_runoff_rate::GridVariable2D = zeros(GridVariable2D, grid)
 end
 
 DynamicsVariablesLand(SG::SpectralGrid) =

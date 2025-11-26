@@ -67,8 +67,8 @@ path(::RiverRunoffOutput, simulation) =
 
 """Defines netCDF output for a specific variable, see [`VorticityOutput`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct SnowRunoffOutput <: AbstractOutputVariable
-    name::String = "sroff"
+@kwdef mutable struct SnowMeltOutput <: AbstractOutputVariable
+    name::String = "smelt"
     unit::String = "kg m^-2 s^-1"
     long_name::String = "snow runoff rate"
     dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
@@ -79,7 +79,7 @@ Fields are: $(TYPEDFIELDS)"""
 end
 
 path(::SnowRunoffOutput, simulation) =
-    simulation.diagnostic_variables.physics.land.snow_runoff_rate
+    simulation.diagnostic_variables.physics.land.snow_melt_rate
 
 """Defines netCDF output for a specific variable, see [`VorticityOutput`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
@@ -118,7 +118,7 @@ LandOutput() = (
     SoilMoistureOutput(),
     SoilMoistureAvailabilityOutput(),
     RiverRunoffOutput(),
-    SnowRunoffOutput(),
+    SnowMeltOutput(),
     SnowDepthOutput(),
     LandSeaMaskOutput(),
 )

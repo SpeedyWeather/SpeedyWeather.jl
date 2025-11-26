@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Land snow model [#833](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/833)
 - GitHub Actions Checkout updated to version 6 [#926](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/926)
 - `set!(::Field,::Functions,...)` works now on GPU (however by explicitly transfering between GPU and CPU) [#925](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/925)
 - Fixes round trip transform tests [#921](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/921)
@@ -62,7 +63,6 @@
 
 ## v0.17
 
-- Land snow model [#833](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/833)
 - More documentation on GPU and on_architecture [#845](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/845)
 - The documentation has a logo now as well [#842](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/842)
 - Move radius to model.planet [#838](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/838)
