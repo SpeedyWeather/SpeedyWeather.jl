@@ -74,12 +74,6 @@ model_type(::Type{ShallowWaterDummy}) = ShallowWaterDummy
 model_type(::Type{PrimitiveDryDummy}) = PrimitiveDryDummy
 model_type(::Type{PrimitiveWetDummy}) = PrimitiveWetDummy
 
-model_class(::Type{<:Barotropic}) = Barotropic
-model_class(::Type{<:ShallowWater}) = ShallowWater
-model_class(::Type{<:PrimitiveDry}) = PrimitiveDry
-model_class(::Type{<:PrimitiveWet}) = PrimitiveWet
-model_class(model::AbstractModel) = model_class(typeof(model))
-
 initialize!(model::AbstractModel, ps::Union{ComponentVector, SpeedyParams}; kwargs...) =
     initialize!(reconstruct(model, ps); kwargs...)
 
