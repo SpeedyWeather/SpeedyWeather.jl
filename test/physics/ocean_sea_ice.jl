@@ -3,7 +3,7 @@
     spectral_grid = SpectralGrid(trunc=31, nlayers=5)
 
     # just test that these parameters can be set
-    SlabOcean(spectral_grid, sea_ice_insulation = (x) -> x)
+    SlabOcean(spectral_grid)
     ThermodynamicSeaIce(spectral_grid, temp_freeze=-1.8)
 
     @testset for OceanModel in ( SeasonalOceanClimatology, 
