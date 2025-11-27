@@ -211,12 +211,17 @@ function albedo!(
 )
     # 1. Albedo of vegetation + bare soil (no snow)
     (; albedo_land, albedo_high_vegetation, albedo_low_vegetation) = albedo
-    (; high_cover, low_cover) = model.land.vegetation
 
-    # linear combination of high and low vegetation and bare soil
-    diagn.albedo .= high_cover .* albedo_high_vegetation .+
-                            low_cover .* albedo_low_vegetation .+
-                            albedo_land .* (1 .- high_cover .- low_cover)
+    if model.land isa AbstractWetLand
+        (; high_cover, low_cover) = model.land.vegetation
+
+        # linear combination of high and low vegetation and bare soil
+        diagn.albedo .= high_cover .* albedo_high_vegetation .+
+                                low_cover .* albedo_low_vegetation .+
+                                albedo_land .* (1 .- high_cover .- low_cover)
+    else
+        diagn.albedo .= albedo_land
+    end
 
     # 2. Add snow cover
     (; snow_depth) = progn.land
