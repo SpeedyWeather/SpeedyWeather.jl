@@ -232,55 +232,63 @@ water is put into the river runoff.
 
 ### LandSnowModel
 
-Snow is accumulated at the surface based on the column integrated snow (large scale and
-convective) and on the surface temperature, which must exceed a threshold ``T_{freeze}``.
-The surface snow depth budget depends on two processes: snow_melt and snow_sublimation,
-and we additionally include a simple runoff tendency that drains long-lived snow packs.
-
-If the soil top layer temperature ``T_1 > T_{freeze}``, then a melting potential term
-``δT_{melt}`` is computed, and from it the available energy ``E_{avail}`` [J/m²/s]:
+`SnowModel` stores a single snow bucket with depth ``S`` in units of equivalent liquid water height
+(``prognostic_variables.land.snow_depth``). Snow accumulates from the column-integrated large-scale and
+convective snow precipitation rate ``snow_rate`` (``kg/m²/s``) and melts once the top soil layer
+exceeds the melt threshold ``T_{melt}`` (default ``275~K``). The available melt energy in the top
+layer of thickness ``z₁`` uses the dry-soil heat capacity ``cₛ``:
 
 ```math
-E_{avail} = cₛ \, δT_{melt} \, ρ_{soil} \, \frac{z₁}{Δt}.
+E_{avail} = cₛ \, \max(T_1 - T_{melt}, 0) \, \frac{z₁}{Δt}.
 ```
 
-This available energy is then used to compute the top soil cooling that results from the latent
-heat conversion:
+This caps the maximum melt rate
 
 ```math
-\begin{aligned}
-\text{melt}_{rate_{max}} &= \frac{E_{avail}}{ρ_w Lᵢ}, \\
-\text{melt}_{depth} &= \text{melt}_{rate} \, Δt, \\
-Q_{melt} &= ρ_w Lᵢ \, \text{melt}_{depth}, \\
-δT &= -\frac{Q_{melt}}{C_{soil}}.
-\end{aligned}
+\text{melt}_{rate_{max}} = \frac{E_{avail}}{ρ_w Lᵢ},
 ```
 
-In addition to evaporation/sublimation losses we diagnose a relaxation runoff term
+with ``ρ_w`` water density and ``Lᵢ`` latent heat of fusion. A slow runoff/relaxation term prevents
+perennial snow packs from growing without bound,
 
 ```math
-R = \frac{D}{\tau},
+\text{runoff}_{rate_{max}} = \frac{S}{\tau_{runoff}},
 ```
 
-controlled through the ``runoff_time_scale`` parameter. This prevents the accumulation of
-arbitrarily deep snow in regions that remain below freezing and routes the corresponding liquid
-water into the soil moisture scheme. Both melt and runoff fluxes are exposed via
-`snow_melt_rate` and `snow_runoff_rate`.
+controlled by ``runoff_time_scale`` (default ``4`` years). Snowfall, melt and runoff form a raw
+tendency ``\text{d}S_{max}`` that is further limited so we never remove more snow than is present
+(including what falls during the current step). The actual removal is reported as
 
 ```math
-σₛ = min(1.0, Sₐ / snow_{depth_{scale}}) 
+\text{snow\_melt\_rate} = \text{melt}_{rate_{max}} + \text{runoff}_{rate_{max}} + \text{excess},
 ```
 
-The land surface albedo is then updated based on the relative area cover of soil, vegetation and snow:
+in ``kg/m²/s``, where the `excess` term only appears when the naive tendency would overdraw the bucket.
+`snow_melt_rate` therefore combines true melt with the runoff leak and is zero over ocean points.
+Snow depth is clipped to zero and stored as equivalent liquid water height, not physical snow thickness.
+
+The snow budget links into other surface schemes:
+
+- `snow_melt_rate` provides the latent heat sink ``Lᵢ\,\text{snow\_melt\_rate}`` in the land temperature budget.
+- The same flux (converted to ``m/s`` by dividing by ``ρ_w``) feeds the soil moisture tendency alongside rain.
+- Snow depth drives the snow-albedo calculation and insulates surface heat/humidity fluxes (see below).
+
+Snow cover over land is diagnosed from snow depth using either a linear ramp
+``σₛ = \min(S / \text{snow\_depth\_scale}, 1)`` or the default saturating form
+
 ```math
-albedo_{land} = (1-σₛ) * albedo_{land} + σₛ * albedo_{snow}
+σₛ = \frac{S}{S + \text{snow\_depth\_scale}},
 ```
 
-where albedo_snow starts with a high value (snow_albedo_fresh) and decays to a minimum value ((snow_albedo_old)) over a prescribed time scale:
+set via the `snow_cover` keyword of `LandSnowAlbedo`. The land albedo then blends between bare land
+and snow,
+
 ```math
-albedo_{snow} = snow_{albedo_{old}} + (snow_{albedo_{fresh}} - snow_{albedo_{old}}) * exp(-Δt_{snow} / τˢ)
+albedo_{land} = albedo_{land} + σₛ \, (albedo_{snow} - albedo_{land}),
 ```
-where ``τˢ`` is a decay time sale, and ``Δt_{snow}`` is the time since the last significant snowfall, expresssed in days.
+
+so snow depth from the snow bucket immediately brightens land grid cells. `DefaultAlbedo` already
+uses `LandSnowAlbedo`; there is currently no time-evolving snow albedo.
 
 ## Albedo
 
@@ -295,14 +303,12 @@ The following albedo's are currently implemented
 subtypes(SpeedyWeather.AbstractAlbedo)
 ```
 Albedo is generally a 2D global diagnostic variable for ocean and land separately.
-Meaning it is possible it define albedo as a constant in time but also
-to let it be diagnosed as a function of other variables on every time step
-(e.g. snow cover). However, this specifically is currently not implemented.
-In general you have to think of the albedo not as a boundary condition that
-is set once but reset on every time step. This is so that, e.g. snow cover
-can increase the albedo without losing the information of the underlying
-bare surface albedo. If you do want to set the albedo manually with
-`set!` then use `ManualAlbedo` which has it's own albedo 2D field
+You can keep it constant or diagnose it from other fields on every time step:
+`OceanSeaIceAlbedo` mixes in sea ice concentration and `LandSnowAlbedo` uses the
+snow depth bucket described above. Conceptually albedo is not a static boundary
+condition but recomputed each step so transient surface changes (e.g. snowfall)
+brighten the surface without losing the underlying bare albedo. If you want to set
+albedo manually with `set!` then use `ManualAlbedo` which has its own albedo 2D field
 that is copied into the diagnostic variables on every time step.
 See example below.
 `AlbedoClimatology` does the same but `ManualAlbedo` does not need
