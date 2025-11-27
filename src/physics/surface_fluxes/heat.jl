@@ -40,18 +40,21 @@ export SurfaceOceanHeatFlux
 
     "Otherwise, use the following drag coefficient for heat fluxes over ocean"
     heat_exchange::NF = 0.9e-3
+
+    "Sea ice insulating surface heat fluxes []"
+    sea_ice_insulation::NF = 0.01
 end
 
 SurfaceOceanHeatFlux(SG::SpectralGrid; kwargs...) = SurfaceOceanHeatFlux{SG.NF}(; kwargs...)
 initialize!(::SurfaceOceanHeatFlux, ::PrimitiveEquation) = nothing
 
 function surface_heat_flux!(
-    column::ColumnVariables{NF},
+    column::ColumnVariables,
     heat_flux::SurfaceOceanHeatFlux,
     model::PrimitiveEquation,
-) where NF
+)
     cₚ = model.atmosphere.heat_capacity
-    (; heat_exchange) = heat_flux
+    (; heat_exchange, sea_ice_insulation) = heat_flux
 
     ρ = column.surface_air_density
     V₀ = column.surface_wind_speed
@@ -65,6 +68,10 @@ function surface_heat_flux!(
     # SPEEDY documentation Eq. 54/56, land/sea fraction included
     # Only flux from sea if available (not NaN) otherwise zero flux
     flux_ocean  = isfinite(T_skin_ocean) ? ρ*drag_ocean*V₀*cₚ*(T_skin_ocean  - T) : zero(T_skin_ocean)
+    
+    # sea ice insulation: more sea ice ⇒ smaller flux (ℵ / ℵ₀ scaling)
+    flux_ocean /= 1 + column.sea_ice_concentration / sea_ice_insulation
+    
     column.sensible_heat_flux_ocean = flux_ocean    # to store ocean flux separately too
     
     flux_ocean *= (1-land_fraction)                 # weight by ocean fraction of land-sea mask
@@ -92,10 +99,10 @@ SurfaceLandHeatFlux(SG::SpectralGrid; kwargs...) = SurfaceLandHeatFlux{SG.NF}(; 
 initialize!(::SurfaceLandHeatFlux, ::PrimitiveEquation) = nothing
 
 function surface_heat_flux!(
-    column::ColumnVariables{NF},
+    column::ColumnVariables,
     heat_flux::SurfaceLandHeatFlux,
     model::PrimitiveEquation,
-) where NF
+)
     cₚ = model.atmosphere.heat_capacity
     (; heat_exchange, snow_insulation_depth) = heat_flux
 
@@ -113,8 +120,7 @@ function surface_heat_flux!(
     flux_land  = isfinite(T_skin_land) ? ρ*drag_land*V₀*cₚ*(T_skin_land  - T) : zero(T_skin_land)
     
     # snow insulation: deeper snow ⇒ smaller flux (S / S₀ depth scaling)
-    insulation = inv(one(NF) + column.snow_depth / snow_insulation_depth)
-    flux_land *= insulation
+    flux_land /= 1 + column.snow_depth / snow_insulation_depth
 
     column.sensible_heat_flux_land = flux_land  # store land flux separately too
     flux_land *= land_fraction                  # weight by land fraction of land-sea mask

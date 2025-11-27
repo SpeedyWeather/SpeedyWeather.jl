@@ -7,10 +7,15 @@ export SnowModel    # maybe change for a more concise name later
 
 Single-column snow bucket model in equivalent liquid water depth. Snow accumulates
 from the diagnosed precipitation, melts once the top soil layer exceeds
-`melting_threshold`, and relaxes back to zero on the `runoff_time_scale`.
+`melting_threshold`, and relaxes back to zero on the `runoff_time_scale` to prevent
+unrealistic snow buildup as in reality the snow would turn into ice and a glacier / 
+ice sheet would form instead.
 $(TYPEDFIELDS)"""
 @kwdef mutable struct SnowModel{NF} <: AbstractSnow
+    "[OPTION] Temperature threshold for snow melting [K]"
     melting_threshold::NF = 275
+
+    "[OPTION] Time scale for snow runoff/leakage into soil moisture [s]"
     runoff_time_scale::Second = Year(4) 
 end
 
@@ -49,30 +54,19 @@ function timestep!(
     (; melting_threshold) = snow
     r⁻¹ = inv(Second(snow.runoff_time_scale).value)
 
-    # Snowfall rate in [kg/m²/s]
-    snow_fall_rate = diagn.physics.snow_rate
-    snow_melt_rate = diagn.physics.land.snow_melt_rate
-    snow_runoff_rate = diagn.physics.land.snow_runoff_rate
+    snow_fall_rate = diagn.physics.snow_rate                # from precipitation schemes [kg/m²/s]
+    snow_melt_rate = diagn.physics.land.snow_melt_rate      # for soil moisture model
 
     params = (; melting_threshold, cₛ, z₁, Δt, ρ_water, Lᵢ, r⁻¹)
 
-    # sanitize inputs to avoid propagating NaNs from climatologies or I/O
-    soil_temperature .= ifelse.(isfinite.(soil_temperature), soil_temperature, melting_threshold)
-    snow_depth       .= ifelse.(isfinite.(snow_depth), snow_depth, zero(eltype(snow_depth)))
-    snow_fall_rate   .= ifelse.(isfinite.(snow_fall_rate), snow_fall_rate, zero(eltype(snow_fall_rate)))
-    # clear ocean points explicitly
-    mask!(snow_depth, model.land_sea_mask, :ocean; masked_value=zero(eltype(snow_depth)))
-    mask!(soil_temperature, model.land_sea_mask, :ocean; masked_value=melting_threshold)
-
     launch!(architecture(snow_depth), LinearWorkOrder, size(snow_depth), land_snow_kernel!,
-        snow_depth, soil_temperature, snow_melt_rate, snow_runoff_rate, snow_fall_rate, mask,
+        snow_depth, soil_temperature, snow_melt_rate, snow_fall_rate, mask,
         params,
     )
-	synchronize(architecture(snow_depth))
 end
 
 @kernel inbounds=true function land_snow_kernel!(
-    snow_depth, soil_temperature, snow_melt_rate, snow_runoff_rate, snow_fall_rate, mask,
+    snow_depth, soil_temperature, snow_melt_rate, snow_fall_rate, mask,
     params,
     )
     ij = @index(Global, Linear)             # every grid point ij
@@ -103,7 +97,7 @@ end
 
         # don't melt or runoff more than there is snow + snow that is falling down this time step
         # limited amount of snow change by how much there is
-        dsnow = -min(-snow_depth[ij] / Δt, dsnow_max)
+        dsnow = -min(snow_depth[ij] / Δt, -dsnow_max)
 
         # snow that we tried to melt/runoff that isn't available though
         dsnow_excess = dsnow_max - dsnow

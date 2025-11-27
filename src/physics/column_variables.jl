@@ -70,6 +70,7 @@ function get_column!(
     C.skin_temperature_sea = P.ocean.sea_surface_temperature[ij]
     C.skin_temperature_land = P.land.soil_temperature[ij, 1]
     C.snow_depth = P.land.snow_depth[ij]
+    C.sea_ice_concentration = P.ocean.sea_ice_concentration[ij]
     C.soil_moisture_availability = D.physics.land.soil_moisture_availability[ij]
 
     # RADIATION

@@ -69,8 +69,8 @@ path(::RiverRunoffOutput, simulation) =
 Fields are: $(TYPEDFIELDS)"""
 @kwdef mutable struct SnowMeltOutput <: AbstractOutputVariable
     name::String = "smelt"
-    unit::String = "kg m^-2 s^-1"
-    long_name::String = "snow runoff rate"
+    unit::String = "kg/m^2/s"
+    long_name::String = "snow melt+runoff rate"
     dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
     missing_value::Float64 = NaN
     compression_level::Int = 3
