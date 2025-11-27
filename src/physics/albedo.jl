@@ -178,16 +178,19 @@ export LandSnowAlbedo
 
 @kwdef struct LandSnowAlbedo{NF, Scheme<:AbstractSnowCover} <: AbstractAlbedo
     "Albedo of bare land (excluding vegetation) [1]"
-    albedo_land::NF = 0.3
+    albedo_land::NF = 0.4
 
-    "Albedo of vegetation [1]"
-    albedo_vegetation::NF = 0.15
+    "Albedo of high vegetation [1]"
+    albedo_high_vegetation::NF = 0.15
 
-    "Albedo of snow [1]"
-    albedo_snow::NF = 0.8
+    "Albedo of low vegetation [1]"
+    albedo_low_vegetation::NF = 0.20
+
+    "Albedo of snow [1], additive to land"
+    albedo_snow::NF = 0.4
 
     "Conversion from snow depth to snow cover [m]"
-    snow_depth_scale::NF = 0.1
+    snow_depth_scale::NF = 0.05
 
     "Snow cover-albedo scheme"
     snow_cover::Scheme = SaturatingSnowCover()
@@ -206,15 +209,26 @@ function albedo!(
     albedo::LandSnowAlbedo,
     model::PrimitiveEquation,
 )
-    (; snow_depth) = progn.land
-    (; albedo_land, albedo_snow, snow_depth_scale) = albedo
-    snow_cover_scheme = albedo.snow_cover
+    # 1. Albedo of vegetation + bare soil (no snow)
+    (; albedo_land, albedo_high_vegetation, albedo_low_vegetation) = albedo
+    (; high_cover, low_cover) = model.land.vegetation
 
+    # linear combination of high and low vegetation and bare soil
+    diagn.albedo .= high_cover .* albedo_high_vegetation .+
+                            low_cover .* albedo_low_vegetation .+
+                            albedo_land .* (1 .- high_cover .- low_cover)
+
+    # 2. Add snow cover
+    (; snow_depth) = progn.land
+    (; albedo_snow, snow_depth_scale) = albedo
+
+    # compute snow cover from snow depth
+    snow_cover_scheme = albedo.snow_cover
     snow_cover = diagn_all.dynamics.a_2D_grid       # scratch memory
     
     # compute snow-cover fraction using the chosen scheme and clamp to [0, 1]
     snow_cover .= snow_cover_scheme.(snow_depth, snow_depth_scale)
 
     # set land albedo linearly between bare land and snow depending on snow cover [0, 1]
-    diagn.albedo .= albedo_land .+ snow_cover .* (albedo_snow - albedo_land)
+    diagn.albedo .+= snow_cover .* albedo_snow
 end
