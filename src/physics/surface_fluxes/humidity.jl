@@ -105,7 +105,7 @@ function surface_humidity_flux!(
     column::ColumnVariables,
     humidity_flux::SurfaceLandHumidityFlux,
     model::PrimitiveWet,
-) where NF
+)
     (; skin_temperature_land, pres) = column
     (; drag, snow_insulation_depth) = humidity_flux
     α = column.soil_moisture_availability
