@@ -9,17 +9,17 @@ function parameterization_tendencies!(
     (; time) = progn.clock
     cos_zenith!(diagn, time, model)
 
-    model_parameters = get_model_parameters(model)      # subset of GPU-compatible model components
-    parameterizations = get_parameterizations(model)    # subset of model: parameterizations only
+    #model_parameters = get_model_parameters(model)      # subset of GPU-compatible model components
+    #parameterizations = get_parameterizations(model)    # subset of model: parameterizations only
 
     (; architecture, npoints) = model.spectral_grid
     if architecture isa Architectures.AbstractCPU
         # bypass kernel launch on CPU
-        parameterization_tendencies_cpu!(diagn, progn, parameterizations, model_parameters)
+        parameterization_tendencies_cpu!(diagn, progn, model)
     else
         # GPU: all other parameterizations are fused into a single kernel over horizontal grid point index ij
         launch!(architecture, LinearWorkOrder, (npoints,), parameterization_tendencies_kernel!,
-            diagn, progn, parameterizations, model_parameters)
+            diagn, progn, model)
     end
     return nothing
 end
@@ -39,8 +39,8 @@ end
 # CPU without kernel, just a loop, change loop order compared to GPU though:
 # outer loop over parameterizations, inner loop over horizontal grid points
 # this yields a more contiguous memory access pattern on CPU
-function parameterization_tendencies_cpu!(diagn, progn, parameterizations, model)
-    _call_parameterizations_cpu!(diagn, progn, parameterizations, model)
+function parameterization_tendencies_cpu!(diagn, progn, model)
+    _call_parameterizations_cpu!(diagn, progn, model)
 
     radius = model.planet.radius
     for ij in 1:model.geometry.npoints
@@ -49,19 +49,41 @@ function parameterization_tendencies_cpu!(diagn, progn, parameterizations, model
     end
 end
 
-# Use @generated to unroll NamedTuple iteration at compile time for GPU compatibility
-@generated function _call_parameterizations!(ij, diagn, progn, parameterizations::NamedTuple{names}, model) where {names}
-    calls = [:(parameterization!(ij, diagn, progn, parameterizations.$name, model)) for name in names]
+# GPU kernel version - unroll at compile time using params Val type parameter
+@generated function _call_parameterizations!(ij, diagn, progn, model)
+    # Extract the Val type parameter from the params field
+    params_type = fieldtype(model, :params)
+    
+    # params_type is Val{tuple_of_symbols}
+    # Extract the tuple from Val{T} -> T is params_type.parameters[1]
+    params_tuple = params_type.parameters[1]
+    
+    # Generate unrolled calls with literal field access
+    calls = Expr[]
+    for param_name in params_tuple
+        # Use literal field access: model.field_name
+        push!(calls, :(parameterization!(ij, diagn, progn, model.$param_name, model)))
+    end
+    
     return Expr(:block, calls...)
 end
 
-# Use @generated to unroll NamedTuple iteration at compile time also on CPU for performance
-@generated function _call_parameterizations_cpu!(diagn, progn, parameterizations::NamedTuple{names}, model) where {names}
-    calls = [:(
-        for ij in 1:model.geometry.npoints      # horizontal grid points inner loop
-            parameterization!(ij, diagn, progn, parameterizations.$name, model)
-        end
-        ) for name in names]                    # parameterizations outer loop
+# CPU version - unroll outer loop over parameterizations at compile time
+@generated function _call_parameterizations_cpu!(diagn, progn, model)
+    # Extract the Val type parameter from the params field
+    params_type = fieldtype(model, :params)
+    params_tuple = params_type.parameters[1]
+    
+    # Generate nested loops: outer over parameterizations, inner over grid points
+    calls = Expr[]
+    for param_name in params_tuple
+        push!(calls, quote
+            for ij in 1:model.geometry.npoints
+                parameterization!(ij, diagn, progn, model.$param_name, model)
+            end
+        end)
+    end
+    
     return Expr(:block, calls...)
 end
 

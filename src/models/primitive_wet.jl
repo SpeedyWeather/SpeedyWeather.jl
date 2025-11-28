@@ -10,7 +10,7 @@ with `spectral_grid::SpectralGrid` used to initalize all non-default components
 passed on as keyword arguments, e.g. `planet=Earth(spectral_grid)`. Fields, representing
 model components, are
 $(TYPEDFIELDS)"""
-@kwdef mutable struct PrimitiveWetModel{
+@kwdef struct PrimitiveWetModel{
     SG,     # <:SpectralGrid
     AR,     # <:AbstractArchitecture,
     GE,     # <:AbstractGeometry,
@@ -54,6 +54,7 @@ $(TYPEDFIELDS)"""
     TS1,    # <:Tuple{Symbol}
     TS2,    # <:Tuple{Symbol}
     TS3,    # <:Tuple{Symbol}
+    PV,     # <:Val
 } <: PrimitiveWet
 
     spectral_grid::SG
@@ -118,7 +119,7 @@ $(TYPEDFIELDS)"""
     # Used to initiliaze variables and for the column-based parameterizations
     # also determine order in which parameterizations are called
     model_parameters::TS1 = (:architecture, :time_stepping, :orography, :geopotential, :atmosphere, 
-                                :planet, :geometry, :land_sea_mask, :clausius_clapeyron, :class => PrimitiveWetDummy())
+                                :planet, :geometry, :land_sea_mask, :clausius_clapeyron)
     parameterizations::TS2 = (  # mixing and precipitation
                                 :vertical_diffusion, :large_scale_condensation, :convection,
 
@@ -133,6 +134,11 @@ $(TYPEDFIELDS)"""
                                 :stochastic_physics,
                             )
     extra_parameterizations::TS3 = (:solar_zenith, :land, :ocean)
+
+    # DERIVED 
+    # used to infer parameterizations at compile-time 
+    params::PV = Val(parameterizations)
+
 end
 
 prognostic_variables(::Type{<:PrimitiveWet}) = (:vor, :div, :temp, :humid, :pres)

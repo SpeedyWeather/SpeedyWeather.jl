@@ -52,28 +52,6 @@ model_type(::Type{<:PrimitiveDry}) = PrimitiveDryModel
 model_type(::Type{<:PrimitiveWet}) = PrimitiveWetModel
 model_type(model::AbstractModel) = model_type(typeof(model))
 
-# model dummy: Empty concrete instances
-struct BarotropicDummy <: Barotropic end
-struct ShallowWaterDummy <: ShallowWater end
-struct PrimitiveDryDummy <: PrimitiveDry end
-struct PrimitiveWetDummy <: PrimitiveWet end
-
-Adapt.@adapt_structure BarotropicDummy
-Adapt.@adapt_structure ShallowWaterDummy
-Adapt.@adapt_structure PrimitiveDryDummy
-Adapt.@adapt_structure PrimitiveWetDummy
-
-model_dummy(::Type{<:Barotropic}) = BarotropicDummy()
-model_dummy(::Type{<:ShallowWater}) = ShallowWaterDummy()
-model_dummy(::Type{<:PrimitiveDry}) = PrimitiveDryDummy()
-model_dummy(::Type{<:PrimitiveWet}) = PrimitiveWetDummy()
-model_dummy(model::AbstractModel) = model_dummy(typeof(model))
-
-model_type(::Type{BarotropicDummy}) = BarotropicDummy
-model_type(::Type{ShallowWaterDummy}) = ShallowWaterDummy
-model_type(::Type{PrimitiveDryDummy}) = PrimitiveDryDummy
-model_type(::Type{PrimitiveWetDummy}) = PrimitiveWetDummy
-
 initialize!(model::AbstractModel, ps::Union{ComponentVector, SpeedyParams}; kwargs...) =
     initialize!(reconstruct(model, ps); kwargs...)
 
@@ -94,7 +72,6 @@ end
 
 # Functions to get parameters and parameterization to 
 # a) initialize variables 
-# b) assemble compnents necessary for column parameterizations
 """$(TYPEDSIGNATURES)
 Extract the model components with parameters needed for the parameterizations
 as NamedTuple. These are the GPU-compatible components of the model."""
@@ -130,12 +107,6 @@ get_extra_parameterizations(model::Barotropic) = NamedTuple()
 get_parameterizations(model::ShallowWater) = NamedTuple()
 get_extra_parameterizations(model::ShallowWater) = NamedTuple()
 
-"""$(TYPEDSIGNATURES)
-Extract the parameterizations from the model including land and ocean, to infer variables."""
-function get_all_parameterizations(model::PrimitiveEquation)
-    return merge(get_parameterizations(model), get_extra_parameterizations(model))
-end
-
 # helper function to extract parameterizations from model tuples
 _get_param(model, field::Symbol) = getfield(model, field)
 _get_param(model, obj::Pair{Symbol}) = obj.second
@@ -144,3 +115,10 @@ _get_param(model, obj) = error("Unknown parameterization type: $(typeof(obj)), n
 _get_param_name(model, field::Symbol) = field
 _get_param_name(model, obj::Pair{Symbol}) = obj.first
 _get_param_name(model, obj) = error("Unknown parameterization type: $(typeof(obj)), needs to be <:Symbol or <:Pair{Symbol, obj}")
+
+function Adapt.adapt_structure(to, model::ModelType) where ModelType <: PrimitiveEquation
+    return ModelType(NamedTuple{fieldnames(model)}(
+        field in merge(model.model_parameters, model.parameterizations) ? adapt_structure(to, getfield(model, field)) : nothing 
+        for field in fieldnames(ModelType)
+    )...)
+end 
