@@ -348,13 +348,15 @@ function timestep!(
     fill!(diagn.tendencies, 0, ShallowWater)
 
     # GET TENDENCIES, CORRECT THEM FOR SEMI-IMPLICIT INTEGRATION
-    dynamics_tendencies!(diagn, progn, lf2, model)
-    implicit_correction!(diagn, progn, model.implicit, model)
-    
-    # APPLY DIFFUSION, STEP FORWARD IN TIME, AND TRANSFORM NEW TIME STEP TO GRID
-    horizontal_diffusion!(diagn, progn, model.horizontal_diffusion, model)
-    leapfrog!(progn, diagn.tendencies, dt, lf1, model)
-    transform!(diagn, progn, lf2, model)
+    if model.dynamics
+        dynamics_tendencies!(diagn, progn, lf2, model)
+        implicit_correction!(diagn, progn, model.implicit, model)
+        
+        # APPLY DIFFUSION, STEP FORWARD IN TIME, AND TRANSFORM NEW TIME STEP TO GRID
+        horizontal_diffusion!(diagn, progn, model.horizontal_diffusion, model)
+        leapfrog!(progn, diagn.tendencies, dt, lf1, model)
+        transform!(diagn, progn, lf2, model)
+    end
     
     # PARTICLE ADVECTION (always skip 1st step of first_timesteps!)
     not_first_timestep = lf2 == 2
