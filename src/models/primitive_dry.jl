@@ -192,3 +192,11 @@ function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
     # pack prognostic, diagnostic variables and model into a simulation
     return Simulation(prognostic_variables, diagnostic_variables, model)
 end
+
+function Adapt.adapt_structure(to, model::PrimitiveDryModel) 
+    adapt_fields = (model.model_parameters..., model.parameterizations...)
+    return PrimitiveDryModel(NamedTuple{fieldnames(PrimitiveDryModel)}(
+        field in adapt_fields ? adapt_structure(to, getfield(model, field)) : nothing 
+        for field in fieldnames(PrimitiveDryModel)
+    )...)
+end 

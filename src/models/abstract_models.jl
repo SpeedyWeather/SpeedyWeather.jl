@@ -115,10 +115,3 @@ _get_param(model, obj) = error("Unknown parameterization type: $(typeof(obj)), n
 _get_param_name(model, field::Symbol) = field
 _get_param_name(model, obj::Pair{Symbol}) = obj.first
 _get_param_name(model, obj) = error("Unknown parameterization type: $(typeof(obj)), needs to be <:Symbol or <:Pair{Symbol, obj}")
-
-function Adapt.adapt_structure(to, model::ModelType) where ModelType <: PrimitiveEquation
-    return ModelType(NamedTuple{fieldnames(model)}(
-        field in merge(model.model_parameters, model.parameterizations) ? adapt_structure(to, getfield(model, field)) : nothing 
-        for field in fieldnames(ModelType)
-    )...)
-end 

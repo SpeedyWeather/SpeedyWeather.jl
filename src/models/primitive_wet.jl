@@ -13,6 +13,7 @@ $(TYPEDFIELDS)"""
 @kwdef struct PrimitiveWetModel{
     SG,     # <:SpectralGrid
     AR,     # <:AbstractArchitecture,
+    BO,     # <:Union{Bool, Nothing},
     GE,     # <:AbstractGeometry,
     PL,     # <:AbstractPlanet,
     AT,     # <:AbstractAtmosphere,
@@ -24,6 +25,7 @@ $(TYPEDFIELDS)"""
     FR,     # <:AbstractForcing,
     DR,     # <:AbstractDrag,
     RP,     # <:AbstractRandomProcess,
+    TD,     # <:Union{Dict{Symbol, Tracer}, Nothing},
     OR,     # <:AbstractOrography,
     LS,     # <:AbstractLandSeaMask,
     OC,     # <:AbstractOcean,
@@ -50,6 +52,7 @@ $(TYPEDFIELDS)"""
     VA,     # <:AbstractVerticalAdvection,
     HO,     # <:AbstractHoleFilling,
     OU,     # <:AbstractOutput,
+    CD,     # <:Union{Dict{Symbol, AbstractCallback}, Nothing},
     FB,     # <:AbstractFeedback,
     TS1,    # <:Tuple{Symbol}
     TS2,    # <:Tuple{Symbol}
@@ -61,7 +64,7 @@ $(TYPEDFIELDS)"""
     architecture::AR = spectral_grid.architecture
     
     # DYNAMICS
-    dynamics::Bool = true
+    dynamics::BO = true
     geometry::GE = Geometry(spectral_grid)
     planet::PL = Earth(spectral_grid)
     atmosphere::AT = EarthAtmosphere(spectral_grid)
@@ -75,7 +78,7 @@ $(TYPEDFIELDS)"""
 
     # VARIABLES
     random_process::RP = nothing
-    tracers::TRACER_DICT = TRACER_DICT()
+    tracers::TD = TRACER_DICT()
     
     # BOUNDARY CONDITIONS
     orography::OR = EarthOrography(spectral_grid)
@@ -87,7 +90,7 @@ $(TYPEDFIELDS)"""
     albedo::AL = DefaultAlbedo(spectral_grid)
     
     # PHYSICS/PARAMETERIZATIONS
-    physics::Bool = true
+    physics::BO = true
     clausius_clapeyron::CC = ClausiusClapeyron(spectral_grid, atmosphere)
     boundary_layer_drag::BL = BulkRichardsonDrag(spectral_grid)
     vertical_diffusion::VD = BulkRichardsonDiffusion(spectral_grid)
@@ -111,7 +114,7 @@ $(TYPEDFIELDS)"""
     
     # OUTPUT
     output::OU = NetCDFOutput(spectral_grid, PrimitiveWet)
-    callbacks::Dict{Symbol, AbstractCallback} = Dict{Symbol, AbstractCallback}()
+    callbacks::CD = Dict{Symbol, AbstractCallback}()
     feedback::FB = Feedback()
 
     # COMPONENTS
@@ -138,7 +141,6 @@ $(TYPEDFIELDS)"""
     # DERIVED 
     # used to infer parameterizations at compile-time 
     params::PV = Val(parameterizations)
-
 end
 
 prognostic_variables(::Type{<:PrimitiveWet}) = (:vor, :div, :temp, :humid, :pres)
@@ -207,3 +209,11 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
     # pack prognostic, diagnostic variables and model into a simulation
     return Simulation(prognostic_variables, diagnostic_variables, model)
 end
+
+function Adapt.adapt_structure(to, model::PrimitiveWetModel) 
+    adapt_fields = (model.model_parameters..., model.parameterizations...)
+    return PrimitiveWetModel(NamedTuple{fieldnames(PrimitiveWetModel)}(
+        field in adapt_fields ? adapt_structure(to, getfield(model, field)) : nothing 
+        for field in fieldnames(PrimitiveWetModel)
+    )...)
+end 

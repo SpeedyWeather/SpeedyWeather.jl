@@ -25,12 +25,12 @@ function parameterization_tendencies!(
 end
 
 # GPU kernel, unrolling NamedTuple iteration at compile time, fuses all parameterizations
-@kernel function parameterization_tendencies_kernel!(diagn, progn, @Const(parameterizations), @Const(model))
+@kernel function parameterization_tendencies_kernel!(diagn, progn, model)
     
     ij = @index(Global, Linear)     # every horizontal grid point ij
 
     # manually unroll loop over all parameterizations (NamedTuple iteration not GPU-compatible)
-    _call_parameterizations!(ij, diagn, progn, parameterizations, model)
+    _call_parameterizations!(ij, diagn, progn, model)
 
     # tendencies have to be scaled by the radius for the dynamical core
     scale!(ij, diagn.tendencies, model.planet.radius)
@@ -49,29 +49,23 @@ function parameterization_tendencies_cpu!(diagn, progn, model)
     end
 end
 
-# GPU kernel version - unroll at compile time using params Val type parameter
-@generated function _call_parameterizations!(ij, diagn, progn, model)
-    # Extract the Val type parameter from the params field
-    params_type = fieldtype(model, :params)
+# GPU kernel version - unroll at compile time using @generated
+@generated function _call_parameterizations!(ij, diagn, progn, model::ModelType) where ModelType <: PrimitiveEquation
+    # Get the type of the parameterizations field - it's an NTuple with length in the type
+    parameterizations_type = fieldtype(ModelType, :parameterizations)
+    N = length(parameterizations_type.parameters)
     
-    # params_type is Val{tuple_of_symbols}
-    # Extract the tuple from Val{T} -> T is params_type.parameters[1]
-    params_tuple = params_type.parameters[1]
-    
-    # Generate unrolled calls with literal field access
-    calls = Expr[]
-    for param_name in params_tuple
-        # Use literal field access: model.field_name
-        push!(calls, :(parameterization!(ij, diagn, progn, model.$param_name, model)))
+    # Generate a loop with compile-time known bounds
+    return quote
+        Base.@nexprs $N i -> parameterization!(ij, diagn, progn, model.parameterizations[i], model)
+        return nothing
     end
-    
-    return Expr(:block, calls...)
 end
 
 # CPU version - unroll outer loop over parameterizations at compile time
-@generated function _call_parameterizations_cpu!(diagn, progn, model)
+@generated function _call_parameterizations_cpu!(diagn, progn, model::ModelType) where ModelType <: PrimitiveEquation
     # Extract the Val type parameter from the params field
-    params_type = fieldtype(model, :params)
+    params_type = fieldtype(ModelType, :params)
     params_tuple = params_type.parameters[1]
     
     # Generate nested loops: outer over parameterizations, inner over grid points
