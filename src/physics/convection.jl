@@ -283,7 +283,7 @@ and relaxes current vertical profiles to the adjusted references."""
 function convection!(ij, diagn, DBM::BettsMillerDryConvection, model)
 
     (; geometry, atmosphere) = model
-    NF = eltype(diagn.grid.temp_grid)
+    NF = eltype(diagn.grid.temp_grid_prev)
     σ = geometry.σ_levels_full
     σ_half = geometry.σ_levels_half
     Δσ = geometry.σ_levels_thick

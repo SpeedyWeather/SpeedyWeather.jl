@@ -59,7 +59,7 @@ function surface_humidity_flux!(ij, diagn, progn, humidity_flux::SurfaceOceanHum
     ρ = diagn.physics.surface_air_density[ij]
     V₀ = diagn.physics.surface_wind_speed[ij]
     land_fraction = model.land_sea_mask.mask[ij]
-    surface_humid = diagn.grid.humid_grid[ij, nlayers]
+    surface_humid = diagn.grid.humid_grid_prev[ij, nlayers]
 
     # drag coefficient either from SurfaceHumidityFlux or from a central drag coefficient
     d = diagn.physics.boundary_layer_drag[ij]
@@ -107,7 +107,7 @@ function surface_humidity_flux!(ij, diagn, progn, humidity_flux::SurfaceLandHumi
     V₀ = diagn.physics.surface_wind_speed[ij]
     land_fraction = model.land_sea_mask.mask[ij]
     nlayers = model.geometry.nlayers
-    surface_humid = diagn.grid.humid_grid[ij, nlayers]
+    surface_humid = diagn.grid.humid_grid_prev[ij, nlayers]
 
     # drag coefficient either from SurfaceLandHumidityFlux or from a central drag coefficient
     d = diagn.physics.boundary_layer_drag[ij]

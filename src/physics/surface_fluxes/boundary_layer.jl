@@ -97,8 +97,8 @@ For vertical stability in the boundary layer."""
         u = diagn.grid.u_grid_prev[ij, surface]
         v = diagn.grid.v_grid_prev[ij, surface]
         Φ = diagn.grid.geopotential[ij, surface]
-        T = diagn.grid.temp_grid[ij, surface]
-        q = diagn.grid.humid_grid[ij, surface]
+        T = diagn.grid.temp_grid_prev[ij, surface]
+        q = diagn.grid.humid_grid_prev[ij, surface]
         Tᵥ = virtual_temperature(T, q, atmosphere)
     end
 

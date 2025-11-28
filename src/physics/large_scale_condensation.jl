@@ -52,10 +52,10 @@ function large_scale_condensation!(
     time_stepping,
 )
     # use previous time step for more stable Euler forward step of the parameterizations
-    temp = diagn.grid.temp_grid_prev        # temperature [K] TODO add temperature profile!!!
-    humid = diagn.grid.humid_grid_prev
-    temp_tend = diagn.tendencies.temp_tend_grid
-    humid_tend = diagn.tendencies.humid_tend_grid
+    temp = diagn.grid.temp_grid_prev                    # temperature [K]
+    humid = diagn.grid.humid_grid_prev                  # specific humidity [kg/kg]
+    temp_tend = diagn.tendencies.temp_tend_grid         # temperature tendency [K/s]
+    humid_tend = diagn.tendencies.humid_tend_grid       # specific humidity tendency [kg/kg/s]
 
     # precompute scaling constants to minimize divisions (used to convert between humidity [kg/kg] and precipitation [m])
     pₛ = diagn.grid.pres_grid_prev[ij]                  # surface pressure [Pa]

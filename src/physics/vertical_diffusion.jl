@@ -276,7 +276,7 @@ function bulk_richardson!(
 
     # surface layer
     V² = u[ij, surface]^2 + v[ij, surface]^2
-    Θ₀ = cₚ*Tᵥ[ij, surface]
+    Θ₀ = cₚ * virtual_temperature(T[ij, surface], q[ij, surface], atmosphere)
     Θ₁ = Θ₀ + Φ[ij, surface]
     Ri[ij, surface] = Φ[ij, surface]*(Θ₁ - Θ₀) / (Θ₀*V²)
 

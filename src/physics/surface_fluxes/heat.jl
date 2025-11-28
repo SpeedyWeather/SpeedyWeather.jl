@@ -10,6 +10,8 @@ $(TYPEDFIELDS)"""
     land::Land = SurfaceLandHeatFlux()
 end
 
+Adapt.@adapt_structure SurfaceHeatFlux
+
 # generator function
 function SurfaceHeatFlux(
     SG::SpectralGrid; 
@@ -29,8 +31,6 @@ function parameterization!(ij, diagn, progn, heat_flux::SurfaceHeatFlux, model)
     surface_heat_flux!(ij, diagn, progn, heat_flux.land,  model)
 end
 
-Adapt.@adapt_structure SurfaceHeatFlux
-
 export SurfaceOceanHeatFlux
 
 """Surface sensible heat flux parameterization over ocean. Calculates the 
@@ -45,6 +45,7 @@ with drag coefficients. Fields are $(TYPEDFIELDS)"""
     drag::NF = 0.9e-3
 end
 
+Adapt.@adapt_structure SurfaceOceanHeatFlux
 SurfaceOceanHeatFlux(SG::SpectralGrid; kwargs...) = SurfaceOceanHeatFlux{SG.NF}(; kwargs...)
 initialize!(::SurfaceOceanHeatFlux, ::PrimitiveEquation) = nothing
 
@@ -83,7 +84,6 @@ function surface_heat_flux!(ij, diagn, progn, heat_flux::SurfaceOceanHeatFlux, m
     return nothing
 end
 
-Adapt.@adapt_structure SurfaceOceanHeatFlux
 
 export SurfaceLandHeatFlux
 
@@ -100,6 +100,7 @@ Fields are $(TYPEDFIELDS)"""
     drag::NF = 1.2e-3       # for neutral stability
 end
 
+Adapt.@adapt_structure SurfaceLandHeatFlux
 SurfaceLandHeatFlux(SG::SpectralGrid; kwargs...) = SurfaceLandHeatFlux{SG.NF}(; kwargs...)
 initialize!(::SurfaceLandHeatFlux, ::PrimitiveEquation) = nothing
 
@@ -137,8 +138,6 @@ function surface_heat_flux!(ij, diagn, progn, heat_flux::SurfaceLandHeatFlux, mo
     return nothing
 end
 
-Adapt.@adapt_structure SurfaceLandHeatFlux
-
 ## ----
 
 export PrescribedOceanHeatFlux
@@ -148,6 +147,7 @@ from external data sources instead of calculating them dynamically. Useful for
 coupled model runs where ocean heat fluxes are provided by an ocean model
 or for sensitivity experiments with fixed flux patterns."""
 struct PrescribedOceanHeatFlux <: AbstractSurfaceHeatFlux end
+Adapt.@adapt_structure PrescribedOceanHeatFlux
 PrescribedOceanHeatFlux(::SpectralGrid) = PrescribedOceanHeatFlux()
 initialize!(::PrescribedOceanHeatFlux, ::PrimitiveEquation) = nothing
 
@@ -172,8 +172,6 @@ function surface_heat_flux!(ij, diagn, progn, ::PrescribedOceanHeatFlux, model)
     return nothing
 end
 
-Adapt.@adapt_structure PrescribedOceanHeatFlux
-
 ## ----
 
 export PrescribedLandHeatFlux
@@ -183,6 +181,7 @@ from external data sources instead of calculating them dynamically. Useful for
 coupled model runs where land heat fluxes are provided by a land model
 or for sensitivity experiments with fixed flux patterns."""
 struct PrescribedLandHeatFlux <: AbstractSurfaceHeatFlux end
+Adapt.@adapt_structure PrescribedLandHeatFlux
 PrescribedLandHeatFlux(::SpectralGrid) = PrescribedLandHeatFlux()
 initialize!(::PrescribedLandHeatFlux, ::PrimitiveEquation) = nothing
 
@@ -206,8 +205,6 @@ function surface_heat_flux!(ij, diagn, progn, ::PrescribedLandHeatFlux, model)
     diagn.tendencies.temp_tend_grid[ij, nlayers] += surface_flux_to_tendency(flux_land, pₛ, model)
     return nothing
 end 
-
-Adapt.@adapt_structure PrescribedLandHeatFlux
 
 function variables(::AbstractSurfaceHeatFlux)
     return (

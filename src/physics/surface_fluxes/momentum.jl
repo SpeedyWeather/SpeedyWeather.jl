@@ -27,8 +27,9 @@ SurfaceMomentumFlux(SG::SpectralGrid; kwargs...) = SurfaceMomentumFlux{SG.NF}(; 
 initialize!(::SurfaceMomentumFlux, ::PrimitiveEquation) = nothing
 
 function variables(::AbstractSurfaceMomentumFlux)
-    # No additional diagnostic variables, tendencies are directly applied to u and v
-    return (DiagnosticVariable(name=:boundary_layer_drag, dims=Grid2D()),)
+    return (
+        DiagnosticVariable(name=:boundary_layer_drag, dims=Grid2D(), desc="Boundary layer drag coefficient", units="1"),
+    )
 end
 
 # function barrier
