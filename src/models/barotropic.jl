@@ -33,6 +33,7 @@ $(TYPEDFIELDS)"""
     architecture::AR = spectral_grid.architecture
     
     # DYNAMICS
+    dynamics::Bool = true
     geometry::GE = Geometry(spectral_grid)
     planet::PL = Earth(spectral_grid)
     atmosphere::AT = EarthAtmosphere(spectral_grid)

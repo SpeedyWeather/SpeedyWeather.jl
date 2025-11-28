@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Dynamics switch of BarotropicModel and backwards particles [#932](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/932)
 - Updated extended differentiability tests [#929](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/929)
 - GitHub Actions Checkout updated to version 6 [#926](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/926)
 - `set!(::Field,::Functions,...)` works now on GPU (however by explicitly transfering between GPU and CPU) [#925](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/925)

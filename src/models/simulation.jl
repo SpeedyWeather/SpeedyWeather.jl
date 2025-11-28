@@ -85,10 +85,10 @@ function initialize!(
     
     # raise a warning if starting with leapfrog but there's zero vorticity
     vor = get_step(progn.vor, lf)
-    lf == 2 && all(vor .== 0) && @warn "Vorticity is zero on 2nd leapfrog index though you use it to calculate tendencies."*
+    lf == 2 && all(vor .== 0) && model.dynamics && @warn "Vorticity is zero on 2nd leapfrog index though you use it to calculate tendencies."*
         " You may wanted to continue with a leapfrog step without data for it in the 2nd step."
 
-    transform!(diagn, progn, lf, model, initialize=true)
+    model.dynamics && transform!(diagn, progn, lf, model, initialize=true)
     initialize!(diagn, progn.particles, progn, model)
     initialize!(model.output, model.feedback, progn, diagn, model)
     initialize!(model.callbacks, progn, diagn, model)
