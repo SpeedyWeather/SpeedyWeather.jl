@@ -178,7 +178,6 @@ function pseudo_adiabat!(
     σ,
     clausius_clapeyron,
 )
-    NF = eltype(temp_ref_profile)
 
     # thermodynamics
     (; R_dry, R_vapour) = clausius_clapeyron
@@ -190,8 +189,8 @@ function pseudo_adiabat!(
     μ = (1-ε)/ε                             # for virtual temperature
 
     nlayers = length(σ)                         # number of vertical levels
-    @inbounds for i in 1:nlayers
-        temp_ref_profile[ij, i] = NF(NaN)           # reset profile from any previous calculation, TODO necessary?
+    for k in 1:nlayers
+        temp_ref_profile[ij, k] = NaN           # reset profile from any previous calculation, TODO necessary?
     end
     temp_ref_profile[ij, nlayers] = temp_parcel     # start profile at surface with parcel temperature
 
@@ -309,7 +308,7 @@ function convection!(ij, diagn, DBM::BettsMillerDryConvection, model)
     local ΔT::NF = 0        # vertically uniform temperature profile adjustment
 
     # skip constants compared to Frierson 2007, i.e. no /τ, /gravity, *cₚ/Lᵥ
-    @inbounds for k in level_zero_buoyancy:nlayers
+    for k in level_zero_buoyancy:nlayers
         # Frierson's equation (1)
         # δT = -(temp[ij, k] - temp_ref_profile[ij, k])/DBM.time_scale.value
         # PT += δT*Δσ[k]/gravity*cₚ/Lᵥ
@@ -325,7 +324,7 @@ function convection!(ij, diagn, DBM::BettsMillerDryConvection, model)
     # height of zero buoyancy level in σ coordinates
     Δσ_lzb = σ_half[nlayers+1] - σ_half[level_zero_buoyancy]   
     ΔT = PT/Δσ_lzb                          # eq (5) or (14) but reusing PT
-    @inbounds for k in level_zero_buoyancy:nlayers
+    for k in level_zero_buoyancy:nlayers
         temp_ref_profile[ij, k] -= ΔT           # equation (6) or equation (15)
         temp_tend[ij, k] -= (temp[ij, k] - temp_ref_profile[ij, k]) / DBM.time_scale.value
     end
@@ -346,15 +345,13 @@ function dry_adiabat!(
     σ,
     atmosphere,
 )
+    NF = eltype(temp_ref_profile)
     κ = atmosphere.heat_capacity
 
-    @boundscheck length(temp_ref_profile) ==
-        length(σ) == length(temp_environment) || throw(BoundsError)
+    nlayers = length(σ)                     # number of vertical levels
 
-    nlayers = length(temp_ref_profile)      # number of vertical levels
-
-    @inbounds for i in 1:nlayers
-        temp_ref_profile[ij, i] = NF(NaN)          # reset profile from any previous calculation
+    for k in 1:nlayers
+        temp_ref_profile[ij, k] = NaN       # reset profile from any previous calculation
     end
     temp_ref_profile[ij, nlayers] = temp_parcel    # start profile at surface with parcel temperature
 
