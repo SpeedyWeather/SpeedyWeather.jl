@@ -198,7 +198,7 @@ function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
 end
 
 function Adapt.adapt_structure(to, model::PrimitiveDryModel) 
-    adapt_fields = (model.model_parameters..., model.parameterizations...)
+    adapt_fields = model.model_parameters
     return NamedTuple{fieldnames(PrimitiveDryModel)}(
         adapt_structure(to, getfield(model, field)) for field in adapt_fields)
 end 

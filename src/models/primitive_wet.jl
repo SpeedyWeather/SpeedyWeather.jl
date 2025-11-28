@@ -212,7 +212,7 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
 end
 
 function Adapt.adapt_structure(to, model::PrimitiveWetModel) 
-    adapt_fields = (model.model_parameters..., model.parameterizations...)
+    adapt_fields = model.model_parameters
     return NamedTuple{fieldnames(PrimitiveWetModel)}(
         adapt_structure(to, getfield(model, field)) for field in adapt_fields)
 end 
