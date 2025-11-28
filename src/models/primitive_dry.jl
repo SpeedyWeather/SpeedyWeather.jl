@@ -199,6 +199,6 @@ end
 
 function Adapt.adapt_structure(to, model::PrimitiveDryModel) 
     adapt_fields = model.model_parameters
-    return NamedTuple{fieldnames(PrimitiveDryModel)}(
+    return NamedTuple{adapt_fields}(
         adapt_structure(to, getfield(model, field)) for field in adapt_fields)
 end 
