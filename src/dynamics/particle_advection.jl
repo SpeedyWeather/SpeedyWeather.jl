@@ -32,7 +32,7 @@ export ParticleAdvection2D
     "[OPTION] Advect with velocities from this vertical layer index"
     layer::Int = 1
 
-    "[OPTION] Advect backwards in time if true (for e.g. backtracking trajectories)"
+    "[OPTION] Advect backwards in time if true (for backtracking trajectories)"
     backwards::Bool = false
 
     "[DERIVED] Time step used for particle advection (scaled by radius, converted to degrees) [s*˚/m]"
@@ -97,8 +97,8 @@ function initialize!(
     (; interpolator) = diagn.particles
     
     # interpolate initial velocity on initial locations
-    lats = diagn.particles.u    # reuse u,v arrays as only used for u, v
-    lons = diagn.particles.v    # after update_locator!
+    lons = diagn.particles.u    # reuse u,v arrays as only used for u, v
+    lats = diagn.particles.v    # after update_locator!
     σ = model.geometry.σ_levels_full[k]
     
     for i in eachindex(particles)
@@ -146,12 +146,12 @@ function particle_advection!(
     clock.timestep_counter % n == (n-1) || return nothing   
 
     # HEUN: PREDICTOR STEP, use u, v at previous time step and location
-    Δt = particle_advection.Δt[]        # time step [s*˚/m]
-    Δt = particle_advection.backwards ? -Δt : Δt
-    Δt_half = Δt/2                      # /2 because Heun is average of Euler+corrected step
+    # /2 because Heun is average of Euler+corrected step
+    Δt_half = particle_advection.Δt[] / 2   # time step [s*˚/m]
+    Δt_half *= particle_advection.backwards ? -1 : 1    # instead of -(u, v) switch sign of Δt                 
 
-    u_old = diagn.particles.u           # from previous time step and location
-    v_old = diagn.particles.v           # from previous time step and location
+    u_old = diagn.particles.u               # from previous time step and location
+    v_old = diagn.particles.v               # from previous time step and location
     
     # HACK: reuse u, v arrays (old velocity) on the fly for interpolation
     # as they're not needed anymore after new (predicted) location is found
