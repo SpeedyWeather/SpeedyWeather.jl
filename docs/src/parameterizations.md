@@ -172,7 +172,7 @@ model = PrimitiveWetModel(spectral_grid)
 model.parameterizations
 ```
 
-You can change the order in which the parametrizations are executed by reordering the tuple or you can add your own, additional parametrization to the model by adding a `Pair` `:name_of_parametrization => MyParam(spectral_grid)` to the tuple. Below we will demonstrate this in an example. 
+You can change the order in which the parametrizations are executed by reordering the tuple or you can add your own, additional parametrization to the model by adding it with `custom_parameterization` keyword argument. Below we will demonstrate this in an example. 
 
 ## Example: Albedo 
 
@@ -240,8 +240,8 @@ Now, let's demonstrate how to add our new parameterization to the model by addin
 to fit one of our pre-defined ones.
 
 ```@example custom-parameterization
-model = PrimitiveWetModel(spectral_grid; parameterizations=(
-:convection, :large_scale_condensation, :simple_albedo => SimpleAlbedo(), :surface_condition, :surface_momentum_flux, 
+model = PrimitiveWetModel(spectral_grid; custom_parameterization= SimpleAlbedo(), parameterizations=(
+:convection, :large_scale_condensation, :custom_parameterization, :surface_condition, :surface_momentum_flux, 
 :surface_heat_flux, :surface_humidity_flux, :stochastic_physics))
 
 simulation = initialize!(model) 

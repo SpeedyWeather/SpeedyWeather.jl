@@ -10,10 +10,9 @@ with `spectral_grid::SpectralGrid` used to initalize all non-default components
 passed on as keyword arguments, e.g. `planet=Earth(spectral_grid)`. Fields, representing
 model components, are
 $(TYPEDFIELDS)"""
-@kwdef struct PrimitiveWetModel{
+@kwdef mutable struct PrimitiveWetModel{
     SG,     # <:SpectralGrid
     AR,     # <:AbstractArchitecture,
-    BO,     # <:Union{Bool, Nothing},
     GE,     # <:AbstractGeometry,
     PL,     # <:AbstractPlanet,
     AT,     # <:AbstractAtmosphere,
@@ -25,7 +24,6 @@ $(TYPEDFIELDS)"""
     FR,     # <:AbstractForcing,
     DR,     # <:AbstractDrag,
     RP,     # <:AbstractRandomProcess,
-    TD,     # <:Union{Dict{Symbol, Tracer}, Nothing},
     OR,     # <:AbstractOrography,
     LS,     # <:AbstractLandSeaMask,
     OC,     # <:AbstractOcean,
@@ -45,6 +43,7 @@ $(TYPEDFIELDS)"""
     SW,     # <:AbstractShortwave,
     LW,     # <:AbstractLongwave,
     SP,     # <:AbstractStochasticPhysics,
+    CP,     # <:AbstractParameterization
     TS,     # <:AbstractTimeStepper,
     ST,     # <:SpectralTransform{NF},
     IM,     # <:AbstractImplicit,
@@ -52,19 +51,19 @@ $(TYPEDFIELDS)"""
     VA,     # <:AbstractVerticalAdvection,
     HO,     # <:AbstractHoleFilling,
     OU,     # <:AbstractOutput,
-    CD,     # <:Union{Dict{Symbol, AbstractCallback}, Nothing},
     FB,     # <:AbstractFeedback,
     TS1,    # <:Tuple{Symbol}
     TS2,    # <:Tuple{Symbol}
     TS3,    # <:Tuple{Symbol}
     PV,     # <:Val
+    MC,     # <:Type
 } <: PrimitiveWet
 
     spectral_grid::SG
     architecture::AR = spectral_grid.architecture
     
     # DYNAMICS
-    dynamics::BO = true
+    dynamics::Bool = true
     geometry::GE = Geometry(spectral_grid)
     planet::PL = Earth(spectral_grid)
     atmosphere::AT = EarthAtmosphere(spectral_grid)
@@ -78,7 +77,7 @@ $(TYPEDFIELDS)"""
 
     # VARIABLES
     random_process::RP = nothing
-    tracers::TD = TRACER_DICT()
+    tracers::TRACER_DICT = TRACER_DICT()
     
     # BOUNDARY CONDITIONS
     orography::OR = EarthOrography(spectral_grid)
@@ -90,7 +89,7 @@ $(TYPEDFIELDS)"""
     albedo::AL = DefaultAlbedo(spectral_grid)
     
     # PHYSICS/PARAMETERIZATIONS
-    physics::BO = true
+    physics::Bool = true
     clausius_clapeyron::CC = ClausiusClapeyron(spectral_grid, atmosphere)
     boundary_layer_drag::BL = BulkRichardsonDrag(spectral_grid)
     vertical_diffusion::VD = BulkRichardsonDiffusion(spectral_grid)
@@ -103,6 +102,7 @@ $(TYPEDFIELDS)"""
     shortwave_radiation::SW = TransparentShortwave(spectral_grid)
     longwave_radiation::LW = JeevanjeeRadiation(spectral_grid)
     stochastic_physics::SP = nothing
+    custom_parameterization::CP = nothing
 
     # NUMERICS
     time_stepping::TS = Leapfrog(spectral_grid)
@@ -114,14 +114,14 @@ $(TYPEDFIELDS)"""
     
     # OUTPUT
     output::OU = NetCDFOutput(spectral_grid, PrimitiveWet)
-    callbacks::CD = Dict{Symbol, AbstractCallback}()
+    callbacks::Dict{Symbol, AbstractCallback} = Dict{Symbol, AbstractCallback}()
     feedback::FB = Feedback()
 
     # COMPONENTS
     # Tuples with symbols or instances of all parameterizations and parameter functions
     # Used to initiliaze variables and for the column-based parameterizations
     # also determine order in which parameterizations are called
-    model_parameters::TS1 = (:time_stepping, :orography, :geopotential, :atmosphere, 
+    model_parameters::TS1 = (:model_class, :architecture, :time_stepping, :orography, :geopotential, :atmosphere, 
                                 :planet, :geometry, :land_sea_mask, :clausius_clapeyron)
     parameterizations::TS2 = (  # mixing and precipitation
                                 :vertical_diffusion, :large_scale_condensation, :convection,
@@ -141,6 +141,7 @@ $(TYPEDFIELDS)"""
     # DERIVED 
     # used to infer parameterizations at compile-time 
     params::PV = Val(parameterizations)
+    model_class::MC = PrimitiveWetDummy()
 end
 
 prognostic_variables(::Type{<:PrimitiveWet}) = (:vor, :div, :temp, :humid, :pres)
@@ -212,8 +213,6 @@ end
 
 function Adapt.adapt_structure(to, model::PrimitiveWetModel) 
     adapt_fields = (model.model_parameters..., model.parameterizations...)
-    return PrimitiveWetModel(NamedTuple{fieldnames(PrimitiveWetModel)}(
-        field in adapt_fields ? adapt_structure(to, getfield(model, field)) : nothing 
-        for field in fieldnames(PrimitiveWetModel)
-    )...)
+    return NamedTuple{fieldnames(PrimitiveWetModel)}(
+        adapt_structure(to, getfield(model, field)) for field in adapt_fields)
 end 

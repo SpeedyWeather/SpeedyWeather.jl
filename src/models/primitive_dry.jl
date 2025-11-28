@@ -10,7 +10,7 @@ with `spectral_grid::SpectralGrid` used to initalize all non-default components
 passed on as keyword arguments, e.g. `planet=Earth(spectral_grid)`. Fields, representing
 model components, are
 $(TYPEDFIELDS)"""
-@kwdef struct PrimitiveDryModel{
+@kwdef mutable struct PrimitiveDryModel{
     SG,     # <:SpectralGrid
     AR,     # <:AbstractArchitecture,
     GE,     # <:AbstractGeometry,
@@ -40,6 +40,7 @@ $(TYPEDFIELDS)"""
     SW,     # <:AbstractShortwave,
     LW,     # <:AbstractLongwave,
     SP,     # <:AbstractStochasticPhysics,
+    CP,     # <:AbstractParameterization,
     TS,     # <:AbstractTimeStepper,
     ST,     # <:SpectralTransform{NF},
     IM,     # <:AbstractImplicit,
@@ -50,7 +51,8 @@ $(TYPEDFIELDS)"""
     TS1,    # <:Tuple{Symbol}
     TS2,    # <:Tuple{Symbol}
     TS3,    # <:Tuple{Symbol}
-    PV      # <:Val
+    PV,     # <:Val
+    MC,     # <:Type
 } <: PrimitiveDry
 
     spectral_grid::SG
@@ -93,6 +95,7 @@ $(TYPEDFIELDS)"""
     shortwave_radiation::SW = TransparentShortwave(spectral_grid)
     longwave_radiation::LW = JeevanjeeRadiation(spectral_grid)
     stochastic_physics::SP = nothing
+    custom_parameterization::CP = nothing
     
     # NUMERICS
     time_stepping::TS = Leapfrog(spectral_grid)
@@ -126,6 +129,7 @@ $(TYPEDFIELDS)"""
     # DERIVED 
     # used to infer parameterizations at compile-time 
     params::PV = Val(parameterizations)
+    model_class::MC = PrimitiveDryDummy()
 end
 
 prognostic_variables(::Type{<:PrimitiveDry}) = (:vor, :div, :temp, :pres)
@@ -195,8 +199,6 @@ end
 
 function Adapt.adapt_structure(to, model::PrimitiveDryModel) 
     adapt_fields = (model.model_parameters..., model.parameterizations...)
-    return PrimitiveDryModel(NamedTuple{fieldnames(PrimitiveDryModel)}(
-        field in adapt_fields ? adapt_structure(to, getfield(model, field)) : nothing 
-        for field in fieldnames(PrimitiveDryModel)
-    )...)
+    return NamedTuple{fieldnames(PrimitiveDryModel)}(
+        adapt_structure(to, getfield(model, field)) for field in adapt_fields)
 end 

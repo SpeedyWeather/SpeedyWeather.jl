@@ -50,7 +50,7 @@ using Adapt
 
 
     # now do the same but with manually adding the albedo to the list of parameterizations
-    model = PrimitiveWetModel(spectral_grid; parameterizations=(:convection, :large_scale_condensation, :simple_albedo => SimpleAlbedo(), 
+    model = PrimitiveWetModel(spectral_grid; custom_parameterization = SimpleAlbedo(), parameterizations=(:convection, :large_scale_condensation, :custom_parameterization, 
                                                             :surface_condition, :surface_momentum_flux, 
                                                             :surface_heat_flux, :surface_humidity_flux, 
                                                             :stochastic_physics))

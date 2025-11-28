@@ -45,13 +45,7 @@ variables(::BulkRichardsonDiffusion) = (
     DiagnosticVariable(name=:boundary_layer_height, dims=Grid2D(), desc="Boundary layer height", units="1"),
 )
 
-# function barrier to unpack only model components needed
 function initialize!(diffusion::BulkRichardsonDiffusion, model::PrimitiveEquation)
-    model_parameters = get_model_parameters(model)
-    initialize!(diffusion, model_parameters)
-end
-
-function initialize!(diffusion::BulkRichardsonDiffusion, model)
 
     (; nlayers) = model.geometry
     nlayers == 1 && return nothing     # no diffusion for 1-layer model
@@ -80,18 +74,20 @@ end
 
 # function barrier
 parameterization!(ij, diagn, progn, diffusion::BulkRichardsonDiffusion, model) =
-    vertical_diffusion!(ij, diagn, diffusion, model)
+    vertical_diffusion!(ij, diagn, diffusion, model.atmosphere, model.planet, model.orography, model.geopotential, model.model_class)
 
 function vertical_diffusion!(
     ij,
     diagn,
     diffusion::BulkRichardsonDiffusion,
-    model
+    atmosphere,
+    planet,
+    orography,
+    geopot,
+    model_class
 )
 
-    (; atmosphere, planet, orography) = model 
     (; diffuse_momentum, diffuse_static_energy, diffuse_humidity) = diffusion
-    geopot = model.geopotential
 
     # escape immediately if all diffusions disabled
     any((diffuse_momentum, diffuse_static_energy, diffuse_humidity)) || return nothing
@@ -108,9 +104,9 @@ function vertical_diffusion!(
     v = diagn.grid.v_grid
     humid = diagn.grid.humid_grid
 
-    diffuse_momentum                                    && _vertical_diffusion!(ij, u_tend, u, K, kₕ, diffusion)
-    diffuse_momentum                                    && _vertical_diffusion!(ij, v_tend, v, K, kₕ, diffusion)
-    model isa PrimitiveWet && diffuse_humidity    && _vertical_diffusion!(ij, humid_tend, humid, K, kₕ, diffusion)
+    diffuse_momentum                                   && _vertical_diffusion!(ij, u_tend, u, K, kₕ, diffusion)
+    diffuse_momentum                                   && _vertical_diffusion!(ij, v_tend, v, K, kₕ, diffusion)
+    model_class isa PrimitiveWet && diffuse_humidity    && _vertical_diffusion!(ij, humid_tend, humid, K, kₕ, diffusion)
 
     if diffuse_static_energy
         # compute dry static energy on the fly
