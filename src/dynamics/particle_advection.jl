@@ -23,6 +23,8 @@ particle_advection!(progn, diagn, model) = particle_advection!(progn, diagn, mod
 particle_advection!(progn, diagn, ::Nothing, ::AbstractModel) = nothing
 
 export ParticleAdvection2D
+
+"""Particle advection for every model in 2D. $(TYPEDFIELDS)"""
 @kwdef struct ParticleAdvection2D{NF} <: AbstractParticleAdvection
     "[OPTION] Execute particle advection every n timesteps"
     every_n_timesteps::Int = 6
@@ -30,7 +32,10 @@ export ParticleAdvection2D
     "[OPTION] Advect with velocities from this vertical layer index"
     layer::Int = 1
 
-    "Time step used for particle advection (scaled by radius, converted to degrees) [s*˚/m]"
+    "[OPTION] Advect backwards in time if true (for e.g. backtracking trajectories)"
+    backwards::Bool = false
+
+    "[DERIVED] Time step used for particle advection (scaled by radius, converted to degrees) [s*˚/m]"
     Δt::Base.RefValue{NF} = Ref(zero(NF))
 end
 
@@ -142,6 +147,7 @@ function particle_advection!(
 
     # HEUN: PREDICTOR STEP, use u, v at previous time step and location
     Δt = particle_advection.Δt[]        # time step [s*˚/m]
+    Δt = particle_advection.backwards ? -Δt : Δt
     Δt_half = Δt/2                      # /2 because Heun is average of Euler+corrected step
 
     u_old = diagn.particles.u           # from previous time step and location
