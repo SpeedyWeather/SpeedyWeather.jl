@@ -104,8 +104,13 @@ end
 """$(TYPEDSIGNATURES)
 Extract the parameterizations from the model as NamedTuple.
 These are the GPU-compatible components of the model."""
-@inline function get_parameterizations(model::PrimitiveEquation)
-    return NamedTuple{model.parameterizations}(map(field -> getfield(model, field), model.parameterizations))
+@generated function get_parameterizations(model::ModelType) where {ModelType <: PrimitiveEquation}
+    # Extract parameterization symbols from the type
+    params_type = fieldtype(ModelType, :params)
+    param_names = params_type.parameters[1]  # Extract tuple from Val{tuple}
+    
+    # Generate literal field accesses for type stability
+    return :(NamedTuple{$param_names}(tuple($([:(model.$name) for name in param_names]...))))
 end
 
 # TODO: better name? 
