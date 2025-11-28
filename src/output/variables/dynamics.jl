@@ -146,7 +146,7 @@ function output!(
     # escape immediately after first call if variable doesn't have a time dimension
     ~hastime(variable) && output.output_counter > 1 && return nothing
 
-
+    # get log(surface pressure) field
     lnpₛ = path(variable, simulation)
     h = simulation.model.orography.orography
     (; R_dry) = simulation.model.atmosphere

@@ -65,7 +65,6 @@ function dynamics_tendencies!(
     linear_virtual_temperature!(diagn, progn, lf_implicit, model)
 
     # temperature relative to profile
-    # temperature_anomaly!(diagn, implicit)
     diagn.grid.temp_grid .-= implicit.temp_profile'
 
     # from ∂Φ/∂ln(pₛ) = -RTᵥ for bernoulli_potential!
@@ -139,18 +138,6 @@ function pressure_gradient_flux!(
             uv∇lnp[ij, k] = u_grid[ij, k]*∇lnp_x[ij] + v_grid[ij, k]*∇lnp_y[ij]
         end
     end
-end
-
-"""$(TYPEDSIGNATURES)
-Convert absolute and virtual temperature to anomalies wrt to the reference profile"""
-function temperature_anomaly!(
-    diagn::DiagnosticVariables,
-    implicit::ImplicitPrimitiveEquation,
-)
-    Tₖ = implicit.temp_profile     # reference temperature profile
-    T = diagn.grid.temp_grid
-    T .-= Tₖ'                       # convert to anomaly
-    return nothing
 end
 
 """$(TYPEDSIGNATURES)
@@ -328,11 +315,11 @@ function vordiv_tendencies!(
 
      # tendencies already contain parameterizations + advection, therefore accumulate
     (; u_tend_grid, v_tend_grid) = diagn.tendencies
-    (; u_grid, v_grid, vor_grid, temp_virt_grid) = diagn.grid   # velocities, vorticity
+    (; u_grid, v_grid, vor_grid, temp_grid, humid_grid) = diagn.grid   # velocities, vorticity
     (; ∇lnp_x, ∇lnp_y, scratch_memory) = diagn.dynamics         # zonal/meridional gradient of logarithm of surface pressure
 
     # precompute ring indices and boundscheck
-    rings = eachring(u_tend_grid, v_tend_grid, u_grid, v_grid, vor_grid, temp_virt_grid)
+    rings = eachring(u_tend_grid, v_tend_grid, u_grid, v_grid, vor_grid, temp_grid, humid_grid)
 
     @inbounds for k in eachlayer(u_tend_grid, v_tend_grid)
         for (j, ring) in enumerate(rings)
@@ -340,7 +327,11 @@ function vordiv_tendencies!(
             f_j = f[j]
             for ij in ring
                 ω = vor_grid[ij, k] + f_j                       # absolute vorticity
-                RTᵥ = R_dry*(temp_virt_grid[ij, k] - Tₖ[k])     # dry gas constant * virtual temperature anomaly
+
+                # compute virtual temperature on the fly, temp_grid is anomaly
+                Tᵥ = virtual_temperature(temp_grid[ij, k] + Tₖ[k], humid_grid[ij, k], atmosphere)
+                RTᵥ = R_dry*(Tᵥ - Tₖ[k])                        # dry gas constant * virtual temperature anomaly
+
                 u_tend_grid[ij, k] = (u_tend_grid[ij, k] + v_grid[ij, k]*ω - RTᵥ*∇lnp_x[ij])*coslat⁻¹j
                 v_tend_grid[ij, k] = (v_tend_grid[ij, k] - u_grid[ij, k]*ω - RTᵥ*∇lnp_y[ij])*coslat⁻¹j
             end
@@ -910,8 +901,8 @@ function SpeedyTransforms.transform!(
 
     (; scratch_memory) = diagn.dynamics
 
-    U = diagn.dynamics.a            # reuse work arrays
-    V = diagn.dynamics.b            # U = u*coslat, V=v*coslat
+    U = diagn.dynamics.a                # reuse work arrays
+    V = diagn.dynamics.b                # U = u*coslat, V=v*coslat
     S = model.spectral_transform
 
     # retain previous time step for vertical advection and parameterizations
@@ -950,7 +941,7 @@ function SpeedyTransforms.transform!(
     
     # include humidity effect into temp for everything stability-related
     temperature_average!(diagn, temp, S)
-    virtual_temperature!(diagn, model)      # temp = virt temp for dry core
+    # virtual_temperature!(diagn, model)      # temp = virt temp for dry core
     geopotential!(diagn, model)             # calculate geopotential
 
     if initialize   # at initial step store prev <- current

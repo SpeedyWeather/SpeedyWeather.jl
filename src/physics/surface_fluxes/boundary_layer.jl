@@ -96,13 +96,15 @@ For vertical stability in the boundary layer."""
     @inbounds begin
         u = diagn.grid.u_grid_prev[ij, surface]
         v = diagn.grid.v_grid_prev[ij, surface]
-        geopotential = diagn.grid.geopotential[ij, surface]
-        temp_virt = diagn.grid.temp_virt_grid[ij, surface]
+        Φ = diagn.grid.geopotential[ij, surface]
+        T = diagn.grid.temp_grid[ij, surface]
+        q = diagn.grid.humid_grid[ij, surface]
+        Tᵥ = virtual_temperature(T, q, atmosphere)
     end
 
     V² = u^2 + v^2
-    Θ₀ = cₚ*temp_virt
-    Θ₁ = Θ₀ + geopotential
-    bulk_richardson = geopotential*(Θ₁ - Θ₀) / (Θ₀*V²)
+    Θ₀ = cₚ*Tᵥ
+    Θ₁ = Θ₀ + Φ
+    bulk_richardson = Φ*(Θ₁ - Θ₀) / (Θ₀*V²)
     return bulk_richardson
 end

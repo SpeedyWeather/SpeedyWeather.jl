@@ -27,6 +27,7 @@ function surface_condition!(ij, diagn, surface_condition::SurfaceCondition, mode
 
     (; wind_slowdown, gust_speed) = surface_condition
     nlayers = model.geometry.nlayers
+    (; atmosphere) = model
 
     # Fortran SPEEDY documentation eq. 49 but use previous time step for numerical stability
     surface_u = wind_slowdown*diagn.grid.u_grid_prev[ij, nlayers] 
@@ -40,15 +41,15 @@ function surface_condition!(ij, diagn, surface_condition::SurfaceCondition, mode
     (; R_dry, κ) = model.atmosphere
     σ = model.geometry.σ_levels_full[nlayers]       # σ vertical coordinate at lowest model level
     pₛ = diagn.grid.pres_grid_prev[ij]              # surface pressure [Pa]
-    Tᵥ = diagn.grid.temp_virt_grid[ij, nlayers]     # virtual temperature at lowest model level [K]
+    T = diagn.grid.temp_grid_prev[ij, nlayers]      # virtual temperature at lowest model level [K]
+    q = diagn.grid.humid_grid_prev[ij, nlayers]     # specific humidity at lowest model level [kg/kg]
+    Tᵥ = virtual_temperature(T, q, atmosphere)      # virtual temperature at lowest model level [K]
     σ⁻ᵏ = σ^(-κ)                                    # precalculate
     Tᵥ *= σ⁻ᵏ                                       # lower to surface assuming dry adiabatic lapse rate
     ρ = pₛ/(R_dry*Tᵥ)                               # surface air density [kg/m³] from ideal gas law
     diagn.physics.surface_air_density[ij] = ρ       # store for surface temp/humidity fluxes
 
     # Surface air temperature
-    # TODO use _prev and add implicit.temperature_profile!
-    T = diagn.grid.temp_grid[ij, nlayers]           # virtual temperature at lowest model level [K]
     T *= σ⁻ᵏ                                        # lower to surface assuming dry adiabatic lapse rate
     diagn.physics.surface_air_temperature[ij] = T   # store for surface temp/humidity fluxes
     return nothing

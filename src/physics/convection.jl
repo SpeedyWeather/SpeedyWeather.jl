@@ -42,7 +42,6 @@ function convection!(ij, diagn, SBM::BettsMillerConvection, model)
     
     # use previous time step for more stable calculations
     temp = diagn.grid.temp_grid_prev
-    temp_virt = diagn.grid.temp_virt_grid
     humid = diagn.grid.humid_grid_prev
     geopotential = diagn.grid.geopotential
     temp_tend = diagn.tendencies.temp_tend_grid
@@ -65,7 +64,7 @@ function convection!(ij, diagn, SBM::BettsMillerConvection, model)
 
     level_zero_buoyancy = pseudo_adiabat!(ij, temp_ref_profile,
                                             temp_parcel, humid_parcel,
-                                            temp_virt, geopotential, pₛ, σ,
+                                            temp, humid, geopotential, pₛ, σ,
                                             clausius_clapeyron)
             
     @inbounds for k in level_zero_buoyancy:nlayers
@@ -172,7 +171,8 @@ function pseudo_adiabat!(
     temp_ref_profile,
     temp_parcel,
     humid_parcel,
-    temp_virt_environment,
+    temp_environment,
+    humid_environment,
     geopotential,
     pres,
     σ,
@@ -235,8 +235,8 @@ function pseudo_adiabat!(
 
         # check whether parcel is still buoyant wrt to environment
         # use virtual temperature as it's equivalent to density
-        temp_virt_parcel = temp_parcel*(1 + μ*humid_parcel)         # virtual temperature of parcel
-        buoyant = temp_virt_parcel > temp_virt_environment[ij, k]     
+        temp_virt_parcel = virtual_temperature(temp_parcel, humid_parcel, μ)         # virtual temperature of parcel
+        buoyant = temp_virt_parcel > virtual_temperature(temp_environment[ij, k], humid_environment[ij, k], μ)     
     end
     
     # if parcel isn't buoyant anymore set last temperature (with negative buoyancy) back to NaN

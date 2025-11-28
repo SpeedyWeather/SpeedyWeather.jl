@@ -268,11 +268,11 @@ function bulk_richardson!(
     surface = nlayers       # surface index
     cₚ = atmosphere.heat_capacity
 
-    # TODO previous time step?
-    u = diagn.grid.u_grid
-    v = diagn.grid.v_grid
+    u = diagn.grid.u_grid_prev
+    v = diagn.grid.v_grid_prev
     Φ = diagn.grid.geopotential
-    Tᵥ = diagn.grid.temp_virt_grid
+    T = diagn.grid.temp_grid_prev
+    q = diagn.grid.humid_grid_prev
 
     # surface layer
     V² = u[ij, surface]^2 + v[ij, surface]^2
@@ -282,7 +282,8 @@ function bulk_richardson!(
 
     @inbounds for k in 1:nlayers-1
         V² = u[ij, k]^2 + v[ij, k]^2
-        virtual_dry_static_energy = cₚ * Tᵥ[ij, k] + Φ[ij, k]
+        Tᵥ = virtual_temperature(T[ij, k], q[ij, k], atmosphere)
+        virtual_dry_static_energy = cₚ * Tᵥ + Φ[ij, k]
         Ri[ij, k] = Φ[ij, k]*(virtual_dry_static_energy - Θ₁) / (Θ₁*V²)
     end
 
