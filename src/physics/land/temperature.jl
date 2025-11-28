@@ -15,7 +15,13 @@ export SeasonalLandTemperature
     file_Grid::Type{<:AbstractGrid} = FullGaussianGrid
 
     "[OPTION] The missing value in the data respresenting ocean"
-    missing_value::NF = NF(NaN)
+    missing_value::NF = NaN
+
+    "[OPTION] Apply land-sea mask to use fallback ocean temperature for ocean-only points?"
+    mask::Bool = true
+
+    "[OPTION] Fallback ocean temperature when mask=true [K]"
+    ocean_temperature::NF = 285
 
     # to be filled from file
     "Monthly land surface temperatures [K], interpolated onto Grid"
@@ -52,7 +58,18 @@ function initialize!(land::SeasonalLandTemperature, model::PrimitiveEquation)
     # create interpolator from grid in file to grid used in model
     interp = RingGrids.interpolator(monthly_temperature, lst, NF=Float32)
     interpolate!(monthly_temperature, lst, interp)
-    return nothing
+
+    # mask ocean points to fallback ocean temperature
+    # set ocean "land" temperature points (100% ocean only)
+    masked_value = land.ocean_temperature
+    if land.mask
+        # Replace NaN values in soil temperature with a fallback ocean temperature
+        monthly_temperature[isnan.(monthly_temperature)] .= masked_value
+
+        # but land-sea mask may not align so also set those 100% ocean points to
+        # the same fallback ocean temperature
+        mask!(monthly_temperature, model.land_sea_mask, :ocean; masked_value)
+    end
 end
 
 function initialize!(
@@ -163,7 +180,11 @@ function initialize!(
     masked_value = land.ocean_temperature
     if land.mask
         lst = progn.land.soil_temperature
+        # Replace NaN values in soil temperature with a fallback ocean temperature
         progn.land.soil_temperature[isnan.(lst)] .= masked_value
+
+        # but land-sea mask may not align so also set those 100% ocean points to
+        # the same fallback ocean temperature
         mask!(progn.land.soil_temperature, model.land_sea_mask, :ocean; masked_value)
     end
 end

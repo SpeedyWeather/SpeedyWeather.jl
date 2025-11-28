@@ -75,7 +75,10 @@ end
 		
 		(; melting_threshold, cₛ, z₁, Δt, ρ_water, Lᵢ, r⁻¹) = params
         # check for melting of snow if temperature above melting threshold
-        δT_melt = max(soil_temperature[ij, 1] - melting_threshold, 0)
+        # check for NaNs here to prevent land temperatures read from NetCDF data
+        # to cause an immediate blow up in case the land-sea mask doesn't align
+        δT_melt = isfinite(soil_temperature[ij, 1]) ?
+            max(soil_temperature[ij, 1] - melting_threshold, 0) : zero(soil_temperature[ij, 1])
 	
         # energy available from soil warming above melting threshold [J/m²/s]
         # heat capacity per volume, so not *density needed

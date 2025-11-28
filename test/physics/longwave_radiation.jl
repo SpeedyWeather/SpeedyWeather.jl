@@ -12,7 +12,6 @@
             soil_temperature = LandBucketTemperature(spectral_grid)
         end
 
-        
         land = LandModel(spectral_grid, temperature=soil_temperature)
 
         model = PrimitiveWetModel(spectral_grid; land, longwave_radiation)

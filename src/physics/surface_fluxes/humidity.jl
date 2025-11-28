@@ -41,7 +41,7 @@ export SurfaceOceanHumidityFlux
     "[OPTION] Or fixed drag coefficient for humidity flux over ocean"
     drag::NF = 0.9e-3
 
-    "Sea ice insulating surface humidity fluxes []"
+    "Sea ice insulating surface humidity fluxes [1]"
     sea_ice_insulation::NF = 0.01
 end
 
@@ -125,7 +125,7 @@ function surface_humidity_flux!(
     # SPEEDY documentation eq. 55/57, zero flux if land / soil moisture availability not available (=ocean)
     # but remove the max( ,0) to allow for surface condensation
     flux_land = isfinite(skin_temperature_land) && isfinite(α) ?
-                ρ*drag_land*V₀*(α*sat_humid_land  - surface_humid) : zero(NF)
+                ρ*drag_land*V₀*(α*sat_humid_land  - surface_humid) : zero(skin_temperature_land)
     
     # snow insulation: deeper snow ⇒ smaller flux (S / S₀ depth scaling)
     flux_land /= 1 + column.snow_depth / snow_insulation_depth
