@@ -4,7 +4,7 @@
 
 - Initial conditions revised to take in a `SpectralGrid` to ensure correct number type [#927](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/927)[#928](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/928)
 - Diagnostic and prognostic variables partially revised to NamedTuples and variables system introduced to allow to add to them modularly [#885](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/885)
-- Parameterizations with KernelAbstractions [#873](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/873) [#878](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/878) [#924](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/924) [#930](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/930)
+- Parameterizations with KernelAbstractions [#873](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/873) [#878](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/878) [#924](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/924) [#931](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/931)
 - `set!(::Field,::Functions,...)` works now on GPU (however by explicitly transfering between GPU and CPU) [#925](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/925)
 - Fixes round trip transform tests [#921](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/921)
 - Updated docs CairoMakie compatibility to "0.12, 0.13, 0.14, 0.15"
