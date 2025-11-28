@@ -178,6 +178,7 @@ function pseudo_adiabat!(
     σ,
     clausius_clapeyron,
 )
+    NF = eltype(temp_ref_profile)
 
     # thermodynamics
     (; R_dry, R_vapour) = clausius_clapeyron
