@@ -75,3 +75,5 @@ converted to tendency [?/s]."""
 Flux `flux` into layer `k` of thickness `Δσ`  converted to tendency [?/s].
 Using surface pressure `pₛ` [Pa] and gravity `g` [m/s^2]."""
 @inline flux_to_tendency(flux::Real, pₛ::Real, g::Real, Δσ_k::Real) = g/(pₛ*Δσ_k) * flux
+@inline flux_to_tendency(flux::Real, pₛ::Real, k::Int, model) = 
+    flux_to_tendency(flux, pₛ, model.planet.gravity, model.geometry.σ_levels_thick[k])

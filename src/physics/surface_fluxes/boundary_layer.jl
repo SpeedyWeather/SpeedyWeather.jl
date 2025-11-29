@@ -59,7 +59,7 @@ function initialize!(drag::BulkRichardsonDrag, model::PrimitiveEquation)
 end
 
 # function barrier
-function parameterization!(ij, diagn, drag::BulkRichardsonDrag, model)
+function parameterization!(ij, diagn, progn, drag::BulkRichardsonDrag, model)
     boundary_layer_drag!(ij, diagn, drag, model.atmosphere)
 end
 
