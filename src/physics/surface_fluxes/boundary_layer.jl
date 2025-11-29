@@ -12,7 +12,6 @@ export ConstantDrag
 end
 
 Adapt.@adapt_structure ConstantDrag
-
 ConstantDrag(SG::SpectralGrid; kwargs...) = ConstantDrag{SG.NF}(; kwargs...)
 initialize!(::ConstantDrag, ::PrimitiveEquation) = nothing
 parameterization!(ij, diagn, drag::ConstantDrag, model) = boundary_layer_drag!(ij, diagn, drag)
@@ -34,29 +33,11 @@ $(TYPEDFIELDS)"""
 
     "[OPTION] Critical Richardson number for stable mixing cutoff [1]"
     critical_Richardson::NF = 10
-
-    "[DERIVED] Maximum drag coefficient, κ²/log(zₐ/z₀) for zₐ from reference temperature"
-    drag_max::RefNF = Ref(zero(NF))
 end
 
 Adapt.@adapt_structure BulkRichardsonDrag
-
-BulkRichardsonDrag(SG::SpectralGrid, kwargs...) = BulkRichardsonDrag{SG.NF, Ref{SG.NF}}(; kwargs...)
-
-function initialize!(drag::BulkRichardsonDrag, model::PrimitiveEquation)
-    # Typical height Z of lowermost layer from geopotential of reference surface temperature
-    # minus surface geopotential (orography * gravity)
-    (; temp_ref) = model.atmosphere
-    (; gravity) = model.planet
-    (; Δp_geopot_full) = model.geopotential
-    GPUArrays.@allowscalar Z = temp_ref * Δp_geopot_full[end] / gravity
-
-    # maximum drag Cmax from that height, stable conditions would decrease Cmax towards 0
-    # Frierson 2006, eq (12)
-    κ = drag.von_Karman
-    z₀ = drag.roughness_length
-    drag.drag_max[] = (κ/log(Z/z₀))^2
-end
+BulkRichardsonDrag(SG::SpectralGrid, kwargs...) = BulkRichardsonDrag{SG.NF}(; kwargs...)
+initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
 
 # function barrier
 function parameterization!(ij, diagn, progn, drag::BulkRichardsonDrag, model)
@@ -68,13 +49,26 @@ function boundary_layer_drag!(
     diagn,
     drag::BulkRichardsonDrag,
     atmosphere::AbstractAtmosphere,
+    planet::AbstractPlanet,
+    geopotential::AbstractGeopotential
 )
-    Ri_c = drag.critical_Richardson
-    drag_max = drag.drag_max[]
+    # Typical height Z of lowermost layer from geopotential of reference surface temperature
+    # minus surface geopotential (orography * gravity)
+    (; temp_ref) = atmosphere
+    (; gravity) = planet
+    (; Δp_geopot_full) = geopotential
+    Z = temp_ref * Δp_geopot_full[end] / gravity
+
+    # maximum drag Cmax from that height, stable conditions would decrease Cmax towards 0
+    # Frierson 2006, eq (12)
+    κ = drag.von_Karman
+    z₀ = drag.roughness_length
+    drag_max = (κ/log(Z/z₀))^2
 
     # bulk Richardson number at lowermost layer N from Frierson, 2006, eq. (15)
     # they call it Ri_a = Ri_N here
     Ri_N = bulk_richardson_surface(ij, diagn, atmosphere)
+    Ri_c = drag.critical_Richardson
 
     # clamp to get the cases, eq (12-14)
     # if Ri_N > Ri_c then C = 0
