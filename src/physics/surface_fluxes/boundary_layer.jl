@@ -5,7 +5,9 @@ variables(::AbstractBoundaryLayer) = (
     )
 
 export ConstantDrag
+"""Constant boundary layer drag coefficient. Fields are $(TYPEDFIELDS)"""
 @kwdef struct ConstantDrag{NF} <: AbstractBoundaryLayer
+    "[OPTION] Constant drag coefficient [1]"
     drag::NF = 1e-3
 end
 

@@ -36,9 +36,9 @@ end
 parameterization!(ij, diagn, progn, sppt::StochasticallyPerturbedParameterizationTendencies, model) =
     sppt!(ij, diagn, sppt)
 
-"$(TYPEDFIELDS)
+"""$(TYPEDFIELDS)
 Apply stochastically perturbed parameterization tendencies to u, v, temperature and humidity
-in column ij."
+in column ij."""
 function sppt!(ij, diagn, sppt)
     
     r = diagn.grid.random_pattern[ij]

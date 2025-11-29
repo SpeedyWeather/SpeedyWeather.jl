@@ -50,6 +50,8 @@ function dynamics_tendencies!(
     lf::Integer,                # leapfrog index for tendencies
     model::PrimitiveEquation,
 )
+    forcing!(diagn, progn, lf, model)
+    drag!(diagn, progn, lf, model)
 
     (; orography, geometry, spectral_transform, geopotential, atmosphere, implicit) = model
 

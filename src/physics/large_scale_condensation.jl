@@ -1,8 +1,7 @@
 abstract type AbstractCondensation <: AbstractParameterization end
 
 export ImplicitCondensation
-"""
-Large-scale condensation with implicit time stepping.
+"""Large-scale condensation with implicit latent heat release.
 $(TYPEDFIELDS)"""
 @kwdef struct ImplicitCondensation{NF} <: AbstractCondensation
     "[OPTION] Relative humidity threshold [1 = 100%] to trigger condensation"
@@ -24,10 +23,9 @@ $(TYPEDFIELDS)"""
     time_scale::NF = 3
 end
 
+Adapt.@adapt_structure ImplicitCondensation
 ImplicitCondensation(SG::SpectralGrid; kwargs...) = ImplicitCondensation{SG.NF}(; kwargs...)
 initialize!(::ImplicitCondensation, ::PrimitiveEquation) = nothing
-
-Adapt.@adapt_structure ImplicitCondensation
 
 # function barrier
 function parameterization!(ij, diagn, progn, lsc::ImplicitCondensation, model)
@@ -156,6 +154,11 @@ function large_scale_condensation!(
     # and the rain/snow fall rate [m/s]
     # diagn.physics.rain_rate_large_scale[ij] = rain_flux_down
     # diagn.physics.snow_rate_large_scale[ij] = snow_flux_down
+
+    # TODO add to total precipitation
+    # diagn.physics.total_precipitation_rate[ij] =
+    # (column.rain_rate_large_scale + column.rain_rate_convection +
+    #  column.snow_rate_large_scale + column.snow_rate_convection) * ρ
 
     return nothing
 end

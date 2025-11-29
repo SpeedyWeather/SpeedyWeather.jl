@@ -48,6 +48,6 @@ path(::SurfaceLatentHeatFluxOutput, simulation) =
 
 SurfaceFluxesOutput() = (
     SurfaceSensibleHeatFluxOutput(),
-    # SurfaceHumidityFluxOutput(),      # don't output by default as it is proportional to latent heat flux
-    SurfaceLatentHeatFluxOutput(),
+    SurfaceHumidityFluxOutput(),      # don't output by default as it is proportional to latent heat flux
+    # SurfaceLatentHeatFluxOutput(),
 )
