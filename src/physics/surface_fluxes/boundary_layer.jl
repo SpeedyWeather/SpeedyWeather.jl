@@ -24,7 +24,7 @@ export BulkRichardsonDrag
 """Boundary layer drag coefficient from the bulk Richardson number,
 following Frierson, 2006, Journal of the Atmospheric Sciences.
 $(TYPEDFIELDS)"""
-@kwdef struct BulkRichardsonDrag{NF, RefNF <: Ref{NF}} <: AbstractBoundaryLayer
+@kwdef struct BulkRichardsonDrag{NF} <: AbstractBoundaryLayer
     "[OPTION] von Kármán constant [1]"
     von_Karman::NF = 0.4
 
@@ -40,9 +40,8 @@ BulkRichardsonDrag(SG::SpectralGrid, kwargs...) = BulkRichardsonDrag{SG.NF}(; kw
 initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
 
 # function barrier
-function parameterization!(ij, diagn, progn, drag::BulkRichardsonDrag, model)
-    boundary_layer_drag!(ij, diagn, drag, model.atmosphere)
-end
+parameterization!(ij, diagn, progn, drag::BulkRichardsonDrag, model) =
+    boundary_layer_drag!(ij, diagn, drag, model.atmosphere, model.planet, model.geopotential)
 
 function boundary_layer_drag!(
     ij,
