@@ -202,7 +202,7 @@ function pseudo_adiabat!(
 
     while buoyant && k > 1                  # calculate moist adiabat while buoyant till top
         k -= 1                              # one level up
-            
+    
         if !saturated                       # if not saturated yet follow dry adiabat
             # dry adiabatic ascent and saturation humidity of that temperature 
             temp_parcel_dry = temp_parcel*(σ[k]/σ[k+1])^κ
@@ -211,8 +211,8 @@ function pseudo_adiabat!(
             # set to saturated when the dry adiabatic ascent would reach saturation
             # then follow moist adiabat instead (see below)
             saturated = humid_parcel >= sat_humid
-        end
-    
+        end 
+            
         if saturated            
             # calculate moist/pseudo adiabatic lapse rate, dT/dΦ = -Γ/cp
             T, Tᵥ, q = temp_parcel, temp_virt_parcel, humid_parcel  # for brevity

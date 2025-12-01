@@ -9,23 +9,20 @@ function parameterization_tendencies!(
     (; time) = progn.clock
     cos_zenith!(diagn, time, model)
 
-    model_parameters = get_model_parameters(model)      # subset of GPU-compatible model components
-    parameterizations = get_parameterizations(model)    # subset of model: parameterizations only
-
     (; architecture, npoints) = model.spectral_grid
     if architecture isa Architectures.AbstractCPU
         # bypass kernel launch on CPU
-        parameterization_tendencies_cpu!(diagn, progn, parameterizations, model_parameters)
+        parameterization_tendencies_cpu!(diagn, progn, model)
     else
         # GPU: all other parameterizations are fused into a single kernel over horizontal grid point index ij
         launch!(architecture, LinearWorkOrder, (npoints,), parameterization_tendencies_kernel!,
-            diagn, progn, parameterizations, model_parameters)
+            diagn, progn, get_parameterizations(model), model)
     end
     return nothing
 end
 
 # GPU kernel, unrolling NamedTuple iteration at compile time, fuses all parameterizations
-@kernel function parameterization_tendencies_kernel!(diagn, progn, @Const(parameterizations), @Const(model))
+@kernel function parameterization_tendencies_kernel!(diagn, progn, parameterizations, model)
     
     ij = @index(Global, Linear)     # every horizontal grid point ij
 
@@ -39,8 +36,8 @@ end
 # CPU without kernel, just a loop, change loop order compared to GPU though:
 # outer loop over parameterizations, inner loop over horizontal grid points
 # this yields a more contiguous memory access pattern on CPU
-function parameterization_tendencies_cpu!(diagn, progn, parameterizations, model)
-    _call_parameterizations_cpu!(diagn, progn, parameterizations, model)
+function parameterization_tendencies_cpu!(diagn, progn, model)
+    _call_parameterizations_cpu!(diagn, progn, get_parameterizations(model), model)
 
     radius = model.planet.radius
     for ij in 1:model.geometry.npoints
@@ -50,18 +47,18 @@ function parameterization_tendencies_cpu!(diagn, progn, parameterizations, model
 end
 
 # Use @generated to unroll NamedTuple iteration at compile time for GPU compatibility
-@generated function _call_parameterizations!(ij, diagn, progn, parameterizations::NamedTuple{names}, model) where {names}
+@generated function _call_parameterizations!(ij, diagn, progn, parameterizations::NamedTuple{names}, model) where names
     calls = [:(parameterization!(ij, diagn, progn, parameterizations.$name, model)) for name in names]
     return Expr(:block, calls...)
 end
 
 # Use @generated to unroll NamedTuple iteration at compile time also on CPU for performance
 @generated function _call_parameterizations_cpu!(diagn, progn, parameterizations::NamedTuple{names}, model) where {names}
-    calls = [:(
+    calls = [quote
         for ij in 1:model.geometry.npoints      # horizontal grid points inner loop
             parameterization!(ij, diagn, progn, parameterizations.$name, model)
         end
-        ) for name in names]                    # parameterizations outer loop
+    end for name in names]                    # parameterizations outer loop
     return Expr(:block, calls...)
 end
 

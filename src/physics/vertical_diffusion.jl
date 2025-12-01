@@ -45,13 +45,7 @@ variables(::BulkRichardsonDiffusion) = (
     DiagnosticVariable(name=:boundary_layer_height, dims=Grid2D(), desc="Boundary layer height", units="1"),
 )
 
-# function barrier to unpack only model components needed
 function initialize!(diffusion::BulkRichardsonDiffusion, model::PrimitiveEquation)
-    model_parameters = get_model_parameters(model)
-    initialize!(diffusion, model_parameters)
-end
-
-function initialize!(diffusion::BulkRichardsonDiffusion, model)
 
     (; nlayers) = model.geometry
     nlayers == 1 && return nothing     # no diffusion for 1-layer model
@@ -90,8 +84,9 @@ function vertical_diffusion!(
     planet,
     orography,
     geopot,
-    model_class,
+    class
 )
+
     (; diffuse_momentum, diffuse_static_energy, diffuse_humidity) = diffusion
 
     # escape immediately if all diffusions disabled
@@ -109,9 +104,9 @@ function vertical_diffusion!(
     v = diagn.grid.v_grid
     humid = diagn.grid.humid_grid
 
-    diffuse_momentum                                    && _vertical_diffusion!(ij, u_tend, u, K, kₕ, diffusion)
-    diffuse_momentum                                    && _vertical_diffusion!(ij, v_tend, v, K, kₕ, diffusion)
-    model_class isa PrimitiveWet && diffuse_humidity    && _vertical_diffusion!(ij, humid_tend, humid, K, kₕ, diffusion)
+    diffuse_momentum                                   && _vertical_diffusion!(ij, u_tend, u, K, kₕ, diffusion)
+    diffuse_momentum                                   && _vertical_diffusion!(ij, v_tend, v, K, kₕ, diffusion)
+    class isa PrimitiveWet && diffuse_humidity    && _vertical_diffusion!(ij, humid_tend, humid, K, kₕ, diffusion)
 
     if diffuse_static_energy
         # compute dry static energy on the fly

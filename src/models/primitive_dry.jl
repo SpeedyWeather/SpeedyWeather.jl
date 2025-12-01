@@ -40,6 +40,7 @@ $(TYPEDFIELDS)"""
     SW,     # <:AbstractShortwave,
     LW,     # <:AbstractLongwave,
     SP,     # <:AbstractStochasticPhysics,
+    CP,     # <:AbstractParameterization,
     TS,     # <:AbstractTimeStepper,
     ST,     # <:SpectralTransform{NF},
     IM,     # <:AbstractImplicit,
@@ -50,6 +51,8 @@ $(TYPEDFIELDS)"""
     TS1,    # <:Tuple{Symbol}
     TS2,    # <:Tuple{Symbol}
     TS3,    # <:Tuple{Symbol}
+    PV,     # <:Val
+    MC,     # <:Type
 } <: PrimitiveDry
 
     spectral_grid::SG
@@ -92,6 +95,7 @@ $(TYPEDFIELDS)"""
     shortwave_radiation::SW = TransparentShortwave(spectral_grid)
     longwave_radiation::LW = JeevanjeeRadiation(spectral_grid)
     stochastic_physics::SP = nothing
+    custom_parameterization::CP = nothing
     
     # NUMERICS
     time_stepping::TS = Leapfrog(spectral_grid)
@@ -107,8 +111,8 @@ $(TYPEDFIELDS)"""
     
     # Tuples with symbols or instances of all parameterizations and parameter functions
     # Used to initiliaze variables and for the column-based parameterizations
-    model_parameters::TS1 = (:architecture, :time_stepping, :orography, :geopotential, :atmosphere, 
-                                :planet, :geometry, :land_sea_mask, :class => PrimitiveDryDummy())
+    model_parameters::TS1 = (:class, :time_stepping, :orography, :geopotential, :atmosphere, 
+                                :planet, :geometry, :land_sea_mask)
     parameterizations::TS2 = (  # mixing
                                 :vertical_diffusion, :convection,
 
@@ -121,6 +125,11 @@ $(TYPEDFIELDS)"""
                                 # perturbations
                                 :stochastic_physics)
     extra_parameterizations::TS3 = (:solar_zenith, :land, :ocean)
+
+    # DERIVED 
+    # used to infer parameterizations at compile-time 
+    params::PV = Val(parameterizations)
+    class::MC = PrimitiveDryDummy()
 end
 
 prognostic_variables(::Type{<:PrimitiveDry}) = (:vor, :div, :temp, :pres)
@@ -187,3 +196,9 @@ function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
     # pack prognostic, diagnostic variables and model into a simulation
     return Simulation(prognostic_variables, diagnostic_variables, model)
 end
+
+function Adapt.adapt_structure(to, model::PrimitiveDryModel) 
+    adapt_fields = model.model_parameters
+    return NamedTuple{adapt_fields}(
+        adapt_structure(to, getfield(model, field)) for field in adapt_fields)
+end 
