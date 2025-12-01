@@ -55,8 +55,8 @@ end
 # Use @generated to unroll NamedTuple iteration at compile time also on CPU for performance
 @generated function _call_parameterizations_cpu!(diagn, progn, parameterizations::NamedTuple{names}, model) where {names}
     calls = [quote
-        @simd for ij in 1:model.geometry.npoints      # horizontal grid points inner loop
-            @inbounds parameterization!(ij, diagn, progn, parameterizations.$name, model)
+        for ij in 1:model.geometry.npoints      # horizontal grid points inner loop
+            parameterization!(ij, diagn, progn, parameterizations.$name, model)
         end
     end for name in names]                    # parameterizations outer loop
     return Expr(:block, calls...)
