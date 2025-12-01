@@ -33,11 +33,11 @@ function variables(::AbstractSurfaceMomentumFlux)
 end
 
 # function barrier
-function parameterization!(ij, diagn, progn, momentum_flux::SurfaceMomentumFlux, model)
+@propagate_inbounds function parameterization!(ij, diagn, progn, momentum_flux::SurfaceMomentumFlux, model)
     surface_wind_stress!(ij, diagn, momentum_flux, model)
 end
 
-function surface_wind_stress!(ij, diagn, momentum_flux::SurfaceMomentumFlux, model)
+@propagate_inbounds function surface_wind_stress!(ij, diagn, momentum_flux::SurfaceMomentumFlux, model)
 
     (; drag_land, drag_ocean) = momentum_flux
     # TODO: is this the right land_fraction used here?

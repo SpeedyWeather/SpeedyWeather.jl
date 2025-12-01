@@ -30,7 +30,7 @@ function initialize!(S::SurfaceHumidityFlux, model::PrimitiveWet)
 end
 
 # call first ocean flux then land flux
-function parameterization!(ij, diagn, progn, humidity_flux::SurfaceHumidityFlux, model)
+@propagate_inbounds function parameterization!(ij, diagn, progn, humidity_flux::SurfaceHumidityFlux, model)
     surface_humidity_flux!(ij, diagn, progn, humidity_flux.ocean, model)
     surface_humidity_flux!(ij, diagn, progn, humidity_flux.land,  model)
 end
@@ -50,7 +50,7 @@ Adapt.@adapt_structure SurfaceOceanHumidityFlux
 SurfaceOceanHumidityFlux(SG::SpectralGrid; kwargs...) = SurfaceOceanHumidityFlux{SG.NF}(; kwargs...)
 initialize!(::SurfaceOceanHumidityFlux, ::PrimitiveWet) = nothing
 
-function surface_humidity_flux!(ij, diagn, progn, humidity_flux::SurfaceOceanHumidityFlux, model)
+@propagate_inbounds function surface_humidity_flux!(ij, diagn, progn, humidity_flux::SurfaceOceanHumidityFlux, model)
 
     surface = model.geometry.nlayers
     T = progn.ocean.sea_surface_temperature[ij]
@@ -97,7 +97,7 @@ end
 SurfaceLandHumidityFlux(SG::SpectralGrid; kwargs...) = SurfaceLandHumidityFlux{SG.NF}(; kwargs...)
 initialize!(::SurfaceLandHumidityFlux, ::PrimitiveWet) = nothing
 
-function surface_humidity_flux!(ij, diagn, progn, humidity_flux::SurfaceLandHumidityFlux, model)
+@propagate_inbounds function surface_humidity_flux!(ij, diagn, progn, humidity_flux::SurfaceLandHumidityFlux, model)
 
     # TODO use a skin temperature?
     T = progn.land.soil_temperature[ij, 1]  # uppermost land layer with index 1
@@ -146,7 +146,7 @@ Adapt.@adapt_structure PrescribedOceanHumidityFlux
 PrescribedOceanHumidityFlux(::SpectralGrid) = PrescribedOceanHumidityFlux()
 initialize!(::PrescribedOceanHumidityFlux, ::PrimitiveWet) = nothing
 
-function surface_humidity_flux!(ij, diagn, progn, ::PrescribedOceanHumidityFlux, model)
+@propagate_inbounds function surface_humidity_flux!(ij, diagn, progn, ::PrescribedOceanHumidityFlux, model)
     land_fraction = model.land_sea_mask.mask[ij]
     pₛ = diagn.grid.pres_grid_prev[ij]          # surface pressure [Pa]
 
@@ -177,7 +177,7 @@ Adapt.@adapt_structure PrescribedLandHumidityFlux
 PrescribedLandHumidityFlux(::SpectralGrid) = PrescribedLandHumidityFlux()
 initialize!(::PrescribedLandHumidityFlux, ::PrimitiveWet) = nothing
 
-function surface_humidity_flux!(ij, diagn, progn, ::PrescribedLandHumidityFlux, model)
+@propagate_inbounds function surface_humidity_flux!(ij, diagn, progn, ::PrescribedLandHumidityFlux, model)
     land_fraction = model.land_sea_mask.mask[ij]
     pₛ = diagn.grid.pres_grid_prev[ij]          # surface pressure [Pa]
 

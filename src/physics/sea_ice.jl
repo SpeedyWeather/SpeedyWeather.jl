@@ -1,7 +1,7 @@
 abstract type AbstractSeaIce <: AbstractModelComponent end
 
 # function barrier for all oceans
-function sea_ice_timestep!( progn::PrognosticVariables,
+@propagate_inbounds function sea_ice_timestep!( progn::PrognosticVariables,
                             diagn::DiagnosticVariables,
                             model::PrimitiveEquation)
     timestep!(progn, diagn, model.sea_ice, model)

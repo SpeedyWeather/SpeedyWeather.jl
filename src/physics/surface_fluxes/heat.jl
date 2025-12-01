@@ -26,7 +26,7 @@ function initialize!(S::SurfaceHeatFlux, model::PrimitiveEquation)
 end
 
 # call first ocean flux then land flux
-function parameterization!(ij, diagn, progn, heat_flux::SurfaceHeatFlux, model)
+@propagate_inbounds function parameterization!(ij, diagn, progn, heat_flux::SurfaceHeatFlux, model)
     surface_heat_flux!(ij, diagn, progn, heat_flux.ocean, model)
     surface_heat_flux!(ij, diagn, progn, heat_flux.land,  model)
 end
@@ -104,7 +104,7 @@ Adapt.@adapt_structure SurfaceLandHeatFlux
 SurfaceLandHeatFlux(SG::SpectralGrid; kwargs...) = SurfaceLandHeatFlux{SG.NF}(; kwargs...)
 initialize!(::SurfaceLandHeatFlux, ::PrimitiveEquation) = nothing
 
-function surface_heat_flux!(ij, diagn, progn, heat_flux::SurfaceLandHeatFlux, model)
+@propagate_inbounds function surface_heat_flux!(ij, diagn, progn, heat_flux::SurfaceLandHeatFlux, model)
     
     cₚ = model.atmosphere.heat_capacity
     pₛ = diagn.grid.pres_grid_prev[ij]                  # surface pressure [Pa]
@@ -151,7 +151,7 @@ Adapt.@adapt_structure PrescribedOceanHeatFlux
 PrescribedOceanHeatFlux(::SpectralGrid) = PrescribedOceanHeatFlux()
 initialize!(::PrescribedOceanHeatFlux, ::PrimitiveEquation) = nothing
 
-function surface_heat_flux!(ij, diagn, progn, ::PrescribedOceanHeatFlux, model)
+@propagate_inbounds function surface_heat_flux!(ij, diagn, progn, ::PrescribedOceanHeatFlux, model)
     land_fraction = model.land_sea_mask.mask[ij]
     pₛ = diagn.grid.pres_grid_prev[ij]          # surface pressure [Pa]
 
@@ -185,7 +185,7 @@ Adapt.@adapt_structure PrescribedLandHeatFlux
 PrescribedLandHeatFlux(::SpectralGrid) = PrescribedLandHeatFlux()
 initialize!(::PrescribedLandHeatFlux, ::PrimitiveEquation) = nothing
 
-function surface_heat_flux!(ij, diagn, progn, ::PrescribedLandHeatFlux, model)
+@propagate_inbounds function surface_heat_flux!(ij, diagn, progn, ::PrescribedLandHeatFlux, model)
     land_fraction = model.land_sea_mask.mask[ij]
     pₛ = diagn.grid.pres_grid_prev[ij]          # surface pressure [Pa]
 

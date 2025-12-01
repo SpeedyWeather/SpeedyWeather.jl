@@ -60,7 +60,7 @@ end
 
 
 # also allow for land_sea_mask struct to be passed on, use .mask in that case
-mask!(field::AbstractField, mask::AbstractLandSeaMask, args...; kwargs...) =
+@propagate_inbounds mask!(field::AbstractField, mask::AbstractLandSeaMask, args...; kwargs...) =
     mask!(field, mask.mask, args...; kwargs...)
 
 # adapt on GPU only the mask itself

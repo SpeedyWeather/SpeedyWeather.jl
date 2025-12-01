@@ -73,10 +73,10 @@ function initialize!(diffusion::BulkRichardsonDiffusion, model::PrimitiveEquatio
 end
 
 # function barrier
-parameterization!(ij, diagn, progn, diffusion::BulkRichardsonDiffusion, model) =
+@propagate_inbounds parameterization!(ij, diagn, progn, diffusion::BulkRichardsonDiffusion, model) =
     vertical_diffusion!(ij, diagn, diffusion, model.atmosphere, model.planet, model.orography, model.geopotential, model.class)
 
-function vertical_diffusion!(
+@propagate_inbounds function vertical_diffusion!(
     ij,
     diagn,
     diffusion::BulkRichardsonDiffusion,
@@ -125,7 +125,7 @@ function vertical_diffusion!(
     return nothing
 end
 
-function get_diffusion_coefficients!(
+@propagate_inbounds function get_diffusion_coefficients!(
     ij,
     diagn,
     diffusion::BulkRichardsonDiffusion,
@@ -224,7 +224,7 @@ end
     return inv(1 + Ri_Ri_c * logz_z₀ / (1 - Ri_Ri_c))
 end
 
-function _vertical_diffusion!(   
+@propagate_inbounds function _vertical_diffusion!(   
     ij,     # horizontal grid point ij
     tend,   # tendency to accumulate diffusion into
     var,    # variable calculate diffusion from
@@ -252,7 +252,7 @@ end
 $(TYPEDSIGNATURES)
 Calculate the bulk Richardson number following Frierson, 2007.
 For vertical stability in the boundary layer."""
-function bulk_richardson!(
+@propagate_inbounds function bulk_richardson!(
     ij,
     diagn,
     atmosphere::AbstractAtmosphere,
