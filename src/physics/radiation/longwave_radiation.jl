@@ -1,16 +1,6 @@
 abstract type AbstractLongwave <: AbstractRadiation end
 abstract type AbstractLongwaveRadiativeTransfer <: AbstractLongwave end
 
-# no longwave radiation
-longwave_radiation!(::ColumnVariables, ::Nothing, ::PrimitiveEquation) = nothing
-
-# function barrier for all AbstractLongwave
-function longwave_radiation!(column::ColumnVariables, model::PrimitiveEquation)
-    longwave_radiation!(column, model.longwave_radiation, model)
-end
-
-## UNIFORM COOLING
-
 export UniformCooling
 
 """
@@ -21,8 +11,7 @@ relaxation term with `time_scale_stratosphere` towards `temp_stratosphere` is ap
 
     dT/dt = -1.5K/day for T > 207.5K else (200K-T) / 5 days
 
-Fields are
-$(TYPEDFIELDS)"""
+Fields are $(TYPEDFIELDS)"""
 @kwdef struct UniformCooling{NF} <: AbstractLongwave
     "[OPTION] time scale of cooling, default = -1.5K/day = -1K/16hrs"
     time_scale::Second = Hour(16)
@@ -37,30 +26,27 @@ $(TYPEDFIELDS)"""
     time_scale_stratosphere::Second = Day(5)
 end
 
+Adapt.@adapt_structure UniformCooling
 UniformCooling(SG::SpectralGrid; kwargs...) = UniformCooling{SG.NF}(; kwargs...)
 initialize!(radiation::UniformCooling, model::PrimitiveEquation) = nothing
 
-function longwave_radiation!(
-    column::ColumnVariables,
-    radiation::UniformCooling,
-    model::PrimitiveEquation,
-)
-    longwave_radiation!(column, radiation)
-end
+# function barrier
+parameterization!(ij, diagn, progn, longwave::UniformCooling, model) =
+    longwave_radiation!(ij, diagn, progn, longwave)
 
-function longwave_radiation!(
-    column::ColumnVariables{NF},
-    radiation::UniformCooling,
-) where NF
-    (; temp, temp_tend) = column
+function longwave_radiation!(ij, diagn, progn, longwave::UniformCooling)
+    T = diagn.grid.temp_grid_prev
+    dTdt = diagn.tendencies.temp_tend_grid
     (; temp_min, temp_stratosphere) = radiation
+    nlayers = size(T, 2)
     
+    NF = eltype(T)
     cooling = -inv(convert(NF, radiation.time_scale.value))
-    τ⁻¹ = inv(radiation.time_scale_stratosphere.value)
+    τ⁻¹ = inv(convert(NF, radiation.time_scale_stratosphere.value))
 
-    @inbounds for k in eachlayer(column)
+    for k in 1:nlayers
         # Paulius and Garner, 2006, eq (1) and (2)
-        temp_tend[k] += temp[k] > temp_min ? cooling : (temp_stratosphere - temp[k])*τ⁻¹
+        dTdt[ij, k] += T[ij, k] > temp_min ? cooling : (temp_stratosphere - T[ij, k])*τ⁻¹
     end
 end
 
@@ -85,6 +71,9 @@ $(TYPEDFIELDS)"""
     "[OPTION] Radiative forcing constant (W/m²/K²)"
     α::NF = 0.025
 
+    "[OPTION] Eemissivity of the atmosphere [1]"
+    emissivity_atmosphere::NF = 0.98
+
     "[OPTION] Effective emissivity for surface flux over ocean [1]"
     emissivity_ocean::NF = 0.6
 
@@ -98,65 +87,75 @@ $(TYPEDFIELDS)"""
     time_scale::Second = Hour(24)
 end
 
+Adapt.@adapt_structure JeevanjeeRadiation
 JeevanjeeRadiation(SG::SpectralGrid; kwargs...) = JeevanjeeRadiation{SG.NF}(; kwargs...)
-initialize!(radiation::JeevanjeeRadiation, model::PrimitiveEquation) = nothing
+initialize!(::JeevanjeeRadiation, ::PrimitiveEquation) = nothing
 
 # function barrier
-function longwave_radiation!(
-    column::ColumnVariables,
-    radiation::JeevanjeeRadiation,
-    model::PrimitiveEquation,
-)
-    longwave_radiation!(column, radiation, model.atmosphere)
-end
+parameterization!(ij, diagn, progn, longwave::JeevanjeeRadiation, model) = 
+    longwave_radiation!(ij, diagn, progn, longwave, model)
 
-function longwave_radiation!(
-    column::ColumnVariables{NF},
-    radiation::JeevanjeeRadiation,
-    atmosphere::AbstractAtmosphere,
-) where NF
+function longwave_radiation!(ij, diagn, progn, longwave::JeevanjeeRadiation, model)
 
-    (; nlayers, temp_tend) = column
-    T = column.temp                 # to match Seeley, 2023 notation
-    F = column.flux_temp_upward
-    (; α, time_scale) = radiation
-    ϵ_ocean = radiation.emissivity_ocean
-    ϵ_land = radiation.emissivity_land
-    σ = atmosphere.stefan_boltzmann
-    Tₜ = radiation.temp_tropopause
+    T = diagn.grid.temp_grid                            # to match Seeley, 2023 notation
+    dTdt = diagn.tendencies.temp_tend_grid
+    pₛ = diagn.grid.pres_grid_prev[ij]                  # surface pressure [Pa]
+    nlayers = size(T, 2)
+    (; temp_tend_grid) = diagn.tendencies
+
+    (; α) = longwave
+    τ⁻¹ = inv(convert(eltype(T), Second(longwave.time_scale).value))
+    ϵ_ocean = longwave.emissivity_ocean
+    ϵ_land = longwave.emissivity_land
+    ϵ = longwave.emissivity_atmosphere
+    σ = model.atmosphere.stefan_boltzmann
+    Tₜ = longwave.temp_tropopause
     
-    (; skin_temperature_sea, skin_temperature_land, land_fraction) = column
+    land_fraction = model.land_sea_mask.mask[ij]
+    sst = progn.ocean.sea_surface_temperature[ij]
+    lst = progn.land.soil_temperature[ij, 1]            # TODO use skin temperature?
 
     # extension to Jeevanjee: Include temperature flux (Stefan-Boltzmann)
     # between surface and lowermost air temperature
     # but zero flux if land/sea not available
-    Fₖ_ocean = isfinite(skin_temperature_sea) ?
-        ϵ_ocean*σ*skin_temperature_sea^4 : 
-        zero(skin_temperature_sea)
-    column.surface_longwave_up_ocean = Fₖ_ocean
+    Fₖ_ocean = isfinite(sst) ? ϵ_ocean*σ*sst^4 : zero(sst)
+    diagn.physics.ocean.surface_longwave_up[ij] = Fₖ_ocean      # for ocean model forcing
 
-    Fₖ_land = isfinite(skin_temperature_land) ?
-        ϵ_land*σ*skin_temperature_land^4 : 
-        zero(skin_temperature_land)
-    column.surface_longwave_up_land = Fₖ_land
+    Fₖ_land = isfinite(lst) ? ϵ_land*σ*lst^4 : zero(lst)
+    diagn.physics.land.surface_longwave_up[ij] = Fₖ_land        # for land model forcing
+
+    # Fₖ_down = ϵ*σ*T[ij, nlayers]^4
+    # diagn.physics.surface_longwave_down[ij] = Fₖ_down          # for surface energy budget
+    # dTdt[ij, nlayers] -= surface_flux_to_tendency(Fₖ_down, pₛ, model)   # out of layer k
 
     # land-sea mask weighted combined flux from land and ocean
-    local Fₖ::NF
+    local Fₖ::eltype(T)
     Fₖ = (1-land_fraction)*Fₖ_ocean + land_fraction*Fₖ_land
-    F[end] += Fₖ                        # accumulate into total flux
-    column.surface_longwave_up = Fₖ     # store for output/diagnostics
+    dTdt[ij, nlayers] += surface_flux_to_tendency(Fₖ, pₛ, model)
+    diagn.physics.surface_longwave_up[ij] = Fₖ     # store for output/diagnostics
 
-    # integrate from surface up, skipping surface (k=nlayers+1) and top-of-atmosphere flux (k=1)
-    @inbounds for k in nlayers:-1:2
+    # integrate from surface up
+    for k in nlayers:-1:2
         # Seeley and Wordsworth, 2023 eq (1)
-        Fₖ += (T[k-1] - T[k]) * α * (Tₜ - T[k]) # upward flux from layer k into k-1
-        F[k] += Fₖ                              # accumulate fluxes
+        Fₖ += (T[ij, k-1] - T[ij, k]) * α * (Tₜ - T[ij, k])     # upward flux from layer k into k-1
+        dTdt[ij, k]   -= flux_to_tendency(Fₖ, pₛ, k,   model)   # out of layer k
+        dTdt[ij, k-1] += flux_to_tendency(Fₖ, pₛ, k-1, model)   # into layer k-1
     end
 
     # Relax the uppermost level towards prescribed "tropopause temperature"
-    temp_tend[1] += (Tₜ - T[1])/time_scale.value
+    temp_tend_grid[ij, 1] += (Tₜ - T[ij, 1])*τ⁻¹
 
     # for diagnostic, use Fₖ as the outgoing longwave radiation although it's technically into the
     # uppermost layer from below (not out of it)
-    column.outgoing_longwave_radiation = Fₖ
+    diagn.physics.outgoing_longwave[ij] = Fₖ
+end
+
+function variables(::JeevanjeeRadiation)
+    return (
+        DiagnosticVariable(name=:surface_longwave_down, dims=Grid2D(), desc="Surface longwave radiation down", units="W/m^2"),
+        DiagnosticVariable(name=:surface_longwave_up,   dims=Grid2D(), desc="Surface longwave radiation up over ocean", units="W/m^2", namespace=:ocean),
+        DiagnosticVariable(name=:surface_longwave_up,   dims=Grid2D(), desc="Surface longwave radiation up over land", units="W/m^2", namespace=:land),
+        DiagnosticVariable(name=:surface_longwave_up,   dims=Grid2D(), desc="Surface longwave radiation up",   units="W/m^2"),
+        DiagnosticVariable(name=:outgoing_longwave,     dims=Grid2D(), desc="TOA Longwave radiation up",       units="W/m^2"),
+    )
 end

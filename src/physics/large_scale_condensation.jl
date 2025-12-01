@@ -1,8 +1,7 @@
 abstract type AbstractCondensation <: AbstractParameterization end
 
 export ImplicitCondensation
-"""
-Large-scale condensation with implicit time stepping.
+"""Large-scale condensation with implicit latent heat release.
 $(TYPEDFIELDS)"""
 @kwdef struct ImplicitCondensation{NF} <: AbstractCondensation
     "[OPTION] Relative humidity threshold [1 = 100%] to trigger condensation"
@@ -24,10 +23,9 @@ $(TYPEDFIELDS)"""
     time_scale::NF = 3
 end
 
+Adapt.@adapt_structure ImplicitCondensation
 ImplicitCondensation(SG::SpectralGrid; kwargs...) = ImplicitCondensation{SG.NF}(; kwargs...)
 initialize!(::ImplicitCondensation, ::PrimitiveEquation) = nothing
-
-Adapt.@adapt_structure ImplicitCondensation
 
 # function barrier
 function parameterization!(ij, diagn, progn, lsc::ImplicitCondensation, model)
@@ -52,10 +50,10 @@ function large_scale_condensation!(
     time_stepping,
 )
     # use previous time step for more stable Euler forward step of the parameterizations
-    temp = diagn.grid.temp_grid_prev        # temperature [K] TODO add temperature profile!!!
-    humid = diagn.grid.humid_grid_prev
-    temp_tend = diagn.tendencies.temp_tend_grid
-    humid_tend = diagn.tendencies.humid_tend_grid
+    temp = diagn.grid.temp_grid_prev                    # temperature [K]
+    humid = diagn.grid.humid_grid_prev                  # specific humidity [kg/kg]
+    temp_tend = diagn.tendencies.temp_tend_grid         # temperature tendency [K/s]
+    humid_tend = diagn.tendencies.humid_tend_grid       # specific humidity tendency [kg/kg/s]
 
     # precompute scaling constants to minimize divisions (used to convert between humidity [kg/kg] and precipitation [m])
     pₛ = diagn.grid.pres_grid_prev[ij]                  # surface pressure [Pa]
@@ -156,6 +154,11 @@ function large_scale_condensation!(
     # and the rain/snow fall rate [m/s]
     # diagn.physics.rain_rate_large_scale[ij] = rain_flux_down
     # diagn.physics.snow_rate_large_scale[ij] = snow_flux_down
+
+    # TODO add to total precipitation
+    # diagn.physics.total_precipitation_rate[ij] =
+    # (column.rain_rate_large_scale + column.rain_rate_convection +
+    #  column.snow_rate_large_scale + column.snow_rate_convection) * ρ
 
     return nothing
 end

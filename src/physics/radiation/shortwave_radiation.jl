@@ -21,6 +21,7 @@ function variables(::AbstractShortwave)
         DiagnosticVariable(name=:surface_shortwave_up,   dims=Grid2D(), desc="Surface shortwave radiation up",   units="W/m^2"),
         DiagnosticVariable(name=:outgoing_shortwave,     dims=Grid2D(), desc="TOA Shortwave radiation up",       units="W/m^2"),
         DiagnosticVariable(name=:cos_zenith,             dims=Grid2D(), desc="Cos zenith angle",                 units="1"),
+        DiagnosticVariable(name=:albedo, dims=Grid2D(), desc="Albedo", units="1"),
         DiagnosticVariable(name=:albedo, dims=Grid2D(), desc="Albedo over ocean", units="1", namespace=:ocean),
         DiagnosticVariable(name=:albedo, dims=Grid2D(), desc="Albedo over land", units="1", namespace=:land),
     )
@@ -35,7 +36,6 @@ initialize!(::TransparentShortwave, ::PrimitiveEquation) = nothing
 @inline function shortwave_radiation!(ij, diagn, ::TransparentShortwave, planet, land_sea_mask)
 
     (; surface_shortwave_down, surface_shortwave_up) = diagn.physics
-    (; outgoing_shortwave) = diagn.physics
     ssrd_ocean = diagn.physics.ocean.surface_shortwave_down
     ssrd_land = diagn.physics.land.surface_shortwave_down
 
@@ -57,9 +57,10 @@ initialize!(::TransparentShortwave, ::PrimitiveEquation) = nothing
     # land-sea mask-weighted
     albedo = (1 - land_fraction)*albedo_ocean + land_fraction*albedo_land
     surface_shortwave_up[ij] = albedo * D
+    diagn.physics.albedo[ij] = albedo   # store weighted albedo
 
     # transparent also for reflected shortwave radiation travelling up
-    outgoing_shortwave[ij] = surface_shortwave_up[ij]
+    diagn.physics.outgoing_shortwave[ij] = surface_shortwave_up[ij]
     return nothing
 end
 

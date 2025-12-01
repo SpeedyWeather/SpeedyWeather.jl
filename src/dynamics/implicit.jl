@@ -317,6 +317,7 @@ function implicit_correction!(
     (; pres_tend, div_tend) = diagn.tendencies
     G = diagn.dynamics.a                # reuse work arrays, used for combined tendency G
     geopotential = diagn.dynamics.b
+    geopotential .= 0                   # reset geopotential work array for accumulation below
 
     for k in 1:nlayers
         for r in k:nlayers      # skip 1:k-1 as integration is surface to k
@@ -371,4 +372,6 @@ function implicit_correction!(
             pres_tend[lm] += ξ*W[k]*div_tend[lm, k]
         end
     end
+    pres_tend[1] = 0    # mass conservation
+    return nothing
 end

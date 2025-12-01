@@ -7,21 +7,17 @@ integration constants for vertical hydrostatic integration from temperature to
 geopotential on both full and half pressure levels using the hypsometric equation.
 Fields are $(TYPEDFIELDS)"""
 @kwdef struct Geopotential{VectorType} <: AbstractGeopotential
-    # number of vertical levels
-    nlayers::Int 
+    "[DERIVED] Used to compute the geopotential on half layers"
+    Δp_geopot_half::VectorType
 
-    "Used to compute the geopotential on half layers"
-    Δp_geopot_half::VectorType = zero(VectorType(undef, nlayers))
-
-    "Used to compute the geopotential on full layers"
-    Δp_geopot_full::VectorType = zero(VectorType(undef, nlayers))
+    "[DERIVED] Used to compute the geopotential on full layers"
+    Δp_geopot_full::VectorType
 end
 
 Adapt.@adapt_structure Geopotential
 
 # generator
 Geopotential(SG::SpectralGrid) = Geopotential(
-    SG.nlayers,
     on_architecture(SG.architecture, zeros(SG.NF, SG.nlayers)),
     on_architecture(SG.architecture, zeros(SG.NF, SG.nlayers))
 )
@@ -93,6 +89,41 @@ end
         Tᵥ_below = Tᵥ
         Tᵥ = virtual_temperature(temp[ij, k], humid[ij, k], atmosphere)
         geopotential[ij, k] = geopotential[ij, k+1] + Tᵥ_below*Δp_geopot_half[k+1] + Tᵥ*Δp_geopot_full[k]
+    end
+end
+
+"""
+$(TYPEDSIGNATURES)
+Compute spectral geopotential `geopot` from spectral temperature `temp`
+and spectral surface geopotential `geopot_surf` (orography*gravity)."""
+function geopotential!( 
+    diagn::DiagnosticVariables,
+    G::Geopotential,
+    orography::AbstractOrography,
+)
+    (; temp_virt) = diagn.dynamics
+    geopot = diagn.dynamics.geopotential                # spectral geopotential to fill
+    geopot_surf = orography.surface_geopotential        # = orography*gravity
+    (; Δp_geopot_half, Δp_geopot_full) = G              # = R*Δlnp either on half or full levels
+    (; nlayers) = diagn                                 # number of vertical levels
+
+    @boundscheck nlayers == length(Δp_geopot_full) || throw(BoundsError)
+
+    # for PrimitiveDry virtual temperature = absolute temperature here
+    # note these are not anomalies here as they are only in grid-point fields
+    
+    # BOTTOM FULL LAYER
+    local k::Int = nlayers
+    @inbounds for lm in eachharmonic(geopot, geopot_surf, temp_virt)
+        geopot[lm, k] = geopot_surf[lm] + temp_virt[lm, k]*Δp_geopot_full[k]
+    end
+
+    # OTHER FULL LAYERS, integrate two half-layers from bottom to top
+    @inbounds for k in nlayers-1:-1:1
+        for lm in eachharmonic(geopot, temp_virt)
+            geopot_k½ = geopot[lm, k+1] + temp_virt[lm, k+1]*Δp_geopot_half[k+1] # 1st half layer integration
+            geopot[lm, k] = geopot_k½  + temp_virt[lm, k]*Δp_geopot_full[k]      # 2nd onto full layer
+        end      
     end
 end
 

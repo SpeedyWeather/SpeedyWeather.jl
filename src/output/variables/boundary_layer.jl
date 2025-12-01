@@ -63,7 +63,7 @@ function output!(
     @. z_bottom += T_bottom * Δp_geopot / simulation.model.planet.gravity
 
     # Compute u10, TODO should this be the same z₀ as in vertical diffusion or surface fluxes?
-    z₀ = simulation.model.vertical_diffusion.z₀
+    z₀ = simulation.model.vertical_diffusion.roughness_length
     @. u_or_v10 = u_or_v_bottom .* log(10/z₀) ./ log.(z_bottom/z₀)
 
     # interpolate 2D/3D variables
