@@ -74,7 +74,7 @@ end
 
 # function barrier
 parameterization!(ij, diagn, progn, diffusion::BulkRichardsonDiffusion, model) =
-    vertical_diffusion!(ij, diagn, diffusion, model.atmosphere, model.planet, model.orography, model.geopotential, model.model_class)
+    vertical_diffusion!(ij, diagn, diffusion, model.atmosphere, model.planet, model.orography, model.geopotential, model.class)
 
 function vertical_diffusion!(
     ij,
@@ -84,7 +84,7 @@ function vertical_diffusion!(
     planet,
     orography,
     geopot,
-    model_class
+    class
 )
 
     (; diffuse_momentum, diffuse_static_energy, diffuse_humidity) = diffusion
@@ -106,7 +106,7 @@ function vertical_diffusion!(
 
     diffuse_momentum                                   && _vertical_diffusion!(ij, u_tend, u, K, kₕ, diffusion)
     diffuse_momentum                                   && _vertical_diffusion!(ij, v_tend, v, K, kₕ, diffusion)
-    model_class isa PrimitiveWet && diffuse_humidity    && _vertical_diffusion!(ij, humid_tend, humid, K, kₕ, diffusion)
+    class isa PrimitiveWet && diffuse_humidity    && _vertical_diffusion!(ij, humid_tend, humid, K, kₕ, diffusion)
 
     if diffuse_static_energy
         # compute dry static energy on the fly

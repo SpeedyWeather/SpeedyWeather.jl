@@ -111,7 +111,7 @@ $(TYPEDFIELDS)"""
     
     # Tuples with symbols or instances of all parameterizations and parameter functions
     # Used to initiliaze variables and for the column-based parameterizations
-    model_parameters::TS1 = (:time_stepping, :orography, :geopotential, :atmosphere, 
+    model_parameters::TS1 = (:class, :time_stepping, :orography, :geopotential, :atmosphere, 
                                 :planet, :geometry, :land_sea_mask)
     parameterizations::TS2 = (  # mixing
                                 :vertical_diffusion, :convection,
@@ -129,7 +129,7 @@ $(TYPEDFIELDS)"""
     # DERIVED 
     # used to infer parameterizations at compile-time 
     params::PV = Val(parameterizations)
-    model_class::MC = PrimitiveDryDummy()
+    class::MC = PrimitiveDryDummy()
 end
 
 prognostic_variables(::Type{<:PrimitiveDry}) = (:vor, :div, :temp, :pres)
