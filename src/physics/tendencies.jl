@@ -9,9 +9,6 @@ function parameterization_tendencies!(
     (; time) = progn.clock
     cos_zenith!(diagn, time, model)
 
-    #model_parameters = get_model_parameters(model)      # subset of GPU-compatible model components
-    #parameterizations = get_parameterizations(model)    # subset of model: parameterizations only
-
     (; architecture, npoints) = model.spectral_grid
     if architecture isa Architectures.AbstractCPU
         # bypass kernel launch on CPU
