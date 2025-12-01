@@ -20,9 +20,8 @@ BettsMillerConvection(SG::SpectralGrid; kwargs...) = BettsMillerConvection{SG.NF
 initialize!(::BettsMillerConvection, ::PrimitiveEquation) = nothing
 
 # function barrier
-@propagate_inbounds function parameterization!(ij, diagn, progn, convection_scheme::BettsMillerConvection, model)
+@propagate_inbounds parameterization!(ij, diagn, progn, convection_scheme::BettsMillerConvection, model) =
     convection!(ij, diagn, convection_scheme, model)
-end
 
 """
 $(TYPEDSIGNATURES)
@@ -49,6 +48,7 @@ and relaxes current vertical profiles to the adjusted references."""
     pₛ = diagn.grid.pres_grid_prev[ij]
 
     # thermodynamics
+    ρ = atmosphere.water_density                        # density of water [kg/m³]
     Lᵥ = clausius_clapeyron.latent_heat_condensation    # latent heat of vaporization
     cₚ = clausius_clapeyron.heat_capacity               # heat capacity
 
@@ -67,7 +67,7 @@ and relaxes current vertical profiles to the adjusted references."""
                                             temp, humid, geopotential, pₛ, σ,
                                             clausius_clapeyron)
             
-    @inbounds for k in level_zero_buoyancy:nlayers
+    for k in level_zero_buoyancy:nlayers
         qsat = saturation_humidity(temp_ref_profile[ij, k], pₛ*σ[k], clausius_clapeyron)
         humid_ref_profile[ij, k] = qsat*SBM.relative_humidity
     end
@@ -136,7 +136,7 @@ and relaxes current vertical profiles to the adjusted references."""
     rain_convection = zero(NF)
 
     # GET TENDENCIES FROM ADJUSTED PROFILES
-    @inbounds for k in level_zero_buoyancy:nlayers
+    for k in level_zero_buoyancy:nlayers
         temp_tend[ij, k] -= (temp[ij, k] - temp_ref_profile[ij,k]) / SBM.time_scale.value
         δq = (humid[ij, k] - humid_ref_profile[ij,k]) / SBM.time_scale.value
         humid_tend[ij, k] -= δq
@@ -146,18 +146,29 @@ and relaxes current vertical profiles to the adjusted references."""
         rain_convection += rain                 # integrate vertically, Formula 25, unit [m]
     end
  
-    pₛΔt_gρ = (pₛ * Δt_sec / gravity / water_density) * deep_convection # enforce no precip for shallow conv
-	rain_convection *= pₛΔt_gρ                                           # convert to [m] of rain during Δt
+    # CONVECTIVE PRECIPITATION
+    # enforce no precip for shallow conv via * deep_convection flag
+    pₛΔt_gρ = (pₛ * Δt_sec / gravity / water_density) * deep_convection 
+	rain_convection *= pₛΔt_gρ                  # convert to [m] of rain during Δt
+    rain_convection = max(rain_convection, 0)   # ensure non-negative precipitation, rounding errors
     
     # Store precipitation in diagnostic arrays
-    diagn.physics.rain_convection[ij] += rain_convection
+    diagn.physics.rain_convection[ij] += rain_convection                # accumulated rain [m] for output
 
-    # TODO: double check, because preivously this was rain_rate_convection, which didn't exist
-    diagn.physics.total_precipitation_rate[ij] = rain_convection / Δt_sec    # rate: convert to [m/s] of rain
+    # TODO use [kg/m²/s] units? then * ρ here
+    diagn.physics.rain_rate_convection[ij] = rain_convection / Δt_sec   # instantaneous rate [m/s] for coupling
 
     # Update cloud top
     diagn.physics.cloud_top[ij] = min(diagn.physics.cloud_top[ij], level_zero_buoyancy)       # clouds reach to top of convection
     return nothing
+end
+
+function variables(::BettsMillerConvection)
+    return (
+        DiagnosticVariable(name=:rain_convection, dims=Grid2D(), desc="Convective precipitation (accumulated)", units="m"),
+        DiagnosticVariable(name=:rain_rate_convection, dims=Grid2D(), desc="Convective precipitation rate", units="m/s"),
+        DiagnosticVariable(name=:cloud_top, dims=Grid2D(), desc="Cloud top layer index", units="1"),
+    )
 end
 
 """
@@ -259,18 +270,15 @@ $(TYPEDFIELDS)"""
     time_scale::Second = Hour(4)
 end
 
-function Adapt.adapt_structure(to, DBM::BettsMillerDryConvection{NF}) where NF
-    return BettsMillerDryConvection{NF}(adapt_structure(to, DBM.time_scale))
-end
+Adapt.@adapt_structure BettsMillerDryConvection
 
 # generator function
 BettsMillerDryConvection(SG::SpectralGrid; kwargs...) = BettsMillerDryConvection{SG.NF}(; kwargs...)
 initialize!(::BettsMillerDryConvection, ::PrimitiveEquation) = nothing
 
 # function barrier
-@propagate_inbounds function parameterization!(ij, diagn, progn, convection_scheme::BettsMillerDryConvection, model)
+@propagate_inbounds parameterization!(ij, diagn, progn, convection_scheme::BettsMillerDryConvection, model) =
     convection!(ij, diagn, convection_scheme, model)
-end
 
 """
 $(TYPEDSIGNATURES)
@@ -419,7 +427,8 @@ function initialize!(C::ConvectiveHeating, model::PrimitiveEquation)
 end
 
 # function barrier
-parameterization!(ij, diagn, progn, convection_scheme::ConvectiveHeating, model) = convection!(ij, diagn, convection_scheme, model)
+@propagate_inbounds parameterization!(ij, diagn, progn, convection_scheme::ConvectiveHeating, model) =
+    convection!(ij, diagn, convection_scheme, model)
 
 @propagate_inbounds function convection!(
     ij,
@@ -452,12 +461,4 @@ parameterization!(ij, diagn, progn, convection_scheme::ConvectiveHeating, model)
         temp_tend[ij, k] += Qmax*exp(-((p-p₀)/σₚ)^2 / 2)*cos²θ_term
     end
     return nothing
-end
-
-function variables(::AbstractConvection)
-    return (
-        DiagnosticVariable(name=:rain_convection, dims=Grid2D(), desc="Convective precipitation", units="m"),
-        DiagnosticVariable(name=:cloud_top, dims=Grid2D(), desc="Cloud top level", units="1"),
-        DiagnosticVariable(name=:total_precipitation_rate, dims=Grid2D(), desc="Total precipitation rate", units="m/s"),
-    )
 end

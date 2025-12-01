@@ -54,13 +54,15 @@ large-scale precipitation vertically for output."""
     humid = diagn.grid.humid_grid_prev                  # specific humidity [kg/kg]
     temp_tend = diagn.tendencies.temp_tend_grid         # temperature tendency [K/s]
     humid_tend = diagn.tendencies.humid_tend_grid       # specific humidity tendency [kg/kg/s]
+    nlayers = size(temp, 2)
 
     # precompute scaling constants to minimize divisions (used to convert between humidity [kg/kg] and precipitation [m])
     pₛ = diagn.grid.pres_grid_prev[ij]                  # surface pressure [Pa]
-    (; Δt_sec) = time_stepping
+    (; Δt_sec) = time_stepping                          # time step [s]
     σ = geometry.σ_levels_full                          # vertical sigma coordinate [1]
     Δσ = geometry.σ_levels_thick                        # layer thickness in sigma coordinates
-    pₛ_gρ = pₛ/(planet.gravity * atmosphere.water_density)
+    ρ = atmosphere.water_density                        # air density [kg/m³]
+    pₛ_gρ = pₛ/(planet.gravity * ρ)                     # [Pa / (m/s² * kg/m³)] = [Pa m² * s² / kg] = [m]
 
     # thermodynamics
     Lᵥ = clausius_clapeyron.latent_heat_condensation    # latent heat of vaporization
@@ -76,7 +78,7 @@ large-scale precipitation vertically for output."""
     rain_flux_down = zero(eltype(temp))                 # start with zero rain/snow flux at top of atmosphere
     snow_flux_down = zero(eltype(temp))                 # both have units of [m/s] (precipitation)
 
-    @inbounds for k in eachlayer(temp, humid)
+    for k in 1:nlayers
 
         # Condensation from humidity in this layer (for a negative humidity tendency)
         # relative to threshold that can be <100%, e.g. 95%
@@ -122,7 +124,7 @@ large-scale precipitation vertically for output."""
             # If there is large-scale condensation at a level higher (i.e. smaller k) than
             # the cloud-top previously diagnosed due to convection, then increase the cloud-top
             # Fortran SPEEDY documentation Page 7 (last sentence)
-            # diagn.physics.cloud_top = min(column.cloud_top, k)
+            diagn.physics.cloud_top[ij] = min(diagn.physics.cloud_top[ij], k)
 
             # 2. Precipitation (rain) due to large-scale condensation [kg/m²/s] /ρ for [m/s]
             δq_rain = min(0, δq)                # precipitation only for negative humidity tendency
@@ -151,21 +153,20 @@ large-scale precipitation vertically for output."""
     diagn.physics.rain_large_scale[ij] += Δt_sec*rain_flux_down
 	diagn.physics.snow_large_scale[ij] += Δt_sec*snow_flux_down
 
+    # TODO use [kg/m²/s] units? then * ρ here
     # and the rain/snow fall rate [m/s]
-    # diagn.physics.rain_rate_large_scale[ij] = rain_flux_down
-    # diagn.physics.snow_rate_large_scale[ij] = snow_flux_down
-
-    # TODO add to total precipitation
-    # diagn.physics.total_precipitation_rate[ij] =
-    # (column.rain_rate_large_scale + column.rain_rate_convection +
-    #  column.snow_rate_large_scale + column.snow_rate_convection) * ρ
+    diagn.physics.rain_rate_large_scale[ij] = rain_flux_down
+    diagn.physics.snow_rate_large_scale[ij] = snow_flux_down
 
     return nothing
 end
 
-function variables(::AbstractCondensation)
+function variables(::ImplicitCondensation)
     return (
-        DiagnosticVariable(name=:rain_large_scale, dims=Grid2D(), desc="Large-scale precipitation (rain)", units="m"),
-        DiagnosticVariable(name=:snow_large_scale, dims=Grid2D(), desc="Large-scale precipitation (snow)", units="m"),
+        DiagnosticVariable(name=:rain_large_scale, dims=Grid2D(), desc="Large-scale precipitation (rain, accumulated)", units="m"),
+        DiagnosticVariable(name=:snow_large_scale, dims=Grid2D(), desc="Large-scale precipitation (snow, accumulated)", units="m"),
+        DiagnosticVariable(name=:rain_rate_large_scale, dims=Grid2D(), desc="Large-scale precipitation (rain)", units="m/s"),
+        DiagnosticVariable(name=:snow_rate_large_scale, dims=Grid2D(), desc="Large-scale precipitation (snow)", units="m/s"),
+        DiagnosticVariable(name=:cloud_top, dims=Grid2D(), desc="Cloud top layer index", units="1"),
     )
 end

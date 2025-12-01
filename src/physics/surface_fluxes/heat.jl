@@ -71,13 +71,13 @@ function surface_heat_flux!(ij, diagn, progn, heat_flux::SurfaceOceanHeatFlux, m
     # leave out *cₚ here but include below to avoid division
     flux_ocean  = isfinite(T_skin_ocean) ? ρ*drag_ocean*V₀*(T_skin_ocean  - T) : zero(T_skin_ocean)
     
-    # store without weighting by land fraction for coupling
+    # store without weighting by land fraction for coupling [W/m²]
     diagn.physics.ocean.sensible_heat_flux[ij] = flux_ocean*cₚ  # to store ocean flux separately too
     
     flux_ocean *= (1-land_fraction)                             # weight by ocean fraction of land-sea mask
     
     # output/diagnostics: ocean sets the flux (=), land accumulates (+=)
-    diagn.physics.sensible_heat_flux[ij] = flux_ocean*cₚ
+    diagn.physics.sensible_heat_flux[ij] = flux_ocean*cₚ        # [W/m²]
     
     # accumulate with += into end=lowermost layer total flux
     diagn.tendencies.temp_tend_grid[ij, nlayers] += surface_flux_to_tendency(flux_ocean, pₛ, model)
@@ -125,12 +125,12 @@ initialize!(::SurfaceLandHeatFlux, ::PrimitiveEquation) = nothing
     # leave out *cₚ here but include below to avoid division
     flux_land  = isfinite(T_skin_land) ? ρ*drag_land*V₀*(T_skin_land  - T) : zero(T_skin_land)
     
-    # store without weighting by land fraction for coupling
+    # store without weighting by land fraction for coupling [W/m²]
     diagn.physics.land.sensible_heat_flux[ij] = flux_land*cₚ  # store land flux separately too
     flux_land *= land_fraction                  # weight by land fraction of land-sea mask
     
     # output/diagnose: ocean sets flux (=), land accumulates (+=)
-    diagn.physics.sensible_heat_flux[ij] += flux_land*cₚ
+    diagn.physics.sensible_heat_flux[ij] += flux_land*cₚ    # [W/m²]
     
     # accumulate with += into end=lowermost layer total flux
     nlayers = model.geometry.nlayers

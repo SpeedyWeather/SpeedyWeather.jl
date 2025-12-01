@@ -97,41 +97,6 @@ end
 
 """Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct ConvectiveSnowOutput{F, R} <: AbstractOutputVariable
-    name::String = "snow_conv"
-    unit::String = "mm"
-    long_name::String = "accumulated convective snow"
-    dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
-    missing_value::Float64 = NaN
-    compression_level::Int = 3
-    shuffle::Bool = true
-    keepbits::Int = 20
-    transform::F = (x) -> 1000x                     # [m] to [mm]
-    rate::R = ConvectiveSnowRateOutput()   # include here to be called at finalize!
-end
-
-path(::ConvectiveSnowOutput, simulation) =
-    simulation.diagnostic_variables.physics.snow_convection
-
-# at finalize step postprocess the convective snow to get the rate
-finalize!(output::NetCDFOutput, variable::ConvectiveSnowOutput, args...) = output!(output, variable.rate, variable)
-
-"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
-Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct ConvectiveSnowRateOutput{F} <: AbstractRateOutputVariable
-    name::String = "snow_conv_rate"
-    unit::String = "mm/hr"
-    long_name::String = "convective snow rate"
-    dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
-    missing_value::Float64 = NaN
-    compression_level::Int = 3
-    shuffle::Bool = true
-    keepbits::Int = 7
-    transform::F = (x) -> 1000x     # [m] to [mm]
-end
-
-"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
-Fields are: $(TYPEDFIELDS)"""
 @kwdef mutable struct LargeScaleSnowOutput{F, R} <: AbstractOutputVariable
     name::String = "snow_cond"
     unit::String = "mm"
@@ -167,23 +132,6 @@ end
 
 """Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
-@kwdef mutable struct TotalPrecipitationOutput{F, R} <: AbstractOutputVariable
-    name::String = "precip_rate"
-    unit::String = "kg/m^2/s"
-    long_name::String = "total precipitation rate (rain+snow)"
-    dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
-    missing_value::Float64 = NaN
-    compression_level::Int = 3
-    shuffle::Bool = true
-    keepbits::Int = 20
-    transform::F = (x) -> x
-end
-
-path(::TotalPrecipitationOutput, simulation) =
-    simulation.diagnostic_variables.physics.total_precipitation_rate
-
-"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
-Fields are: $(TYPEDFIELDS)"""
 @kwdef mutable struct CloudTopOutput <: AbstractOutputVariable
     name::String = "cloud_top"
     unit::String = "m"
@@ -202,7 +150,6 @@ path(::CloudTopOutput, simulation) =
 PrecipitationOutput() = (
     ConvectiveRainOutput(),
     LargeScaleRainOutput(),
-    # ConvectiveSnowOutput(),
     LargeScaleSnowOutput(),
     CloudTopOutput(),
 )

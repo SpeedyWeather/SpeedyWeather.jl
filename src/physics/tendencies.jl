@@ -8,6 +8,7 @@ function parameterization_tendencies!(
     # parameterizations with their own kernel
     (; time) = progn.clock
     cos_zenith!(diagn, time, model)
+    reset_variables!(diagn)
 
     (; architecture, npoints) = model.spectral_grid
     if architecture isa Architectures.AbstractCPU
@@ -48,7 +49,9 @@ end
 
 # Use @generated to unroll NamedTuple iteration at compile time for GPU compatibility
 @generated function _call_parameterizations!(ij, diagn, progn, parameterizations::NamedTuple{names}, model) where names
-    calls = [:(parameterization!(ij, diagn, progn, parameterizations.$name, model)) for name in names]
+    calls = [:(
+        parameterization!(ij, diagn, progn, parameterizations.$name, model)
+    ) for name in names]
     return quote
         Base.@_propagate_inbounds_meta
         $(Expr(:block, calls...))
@@ -71,12 +74,21 @@ end
 """$(TYPEDSIGNATURES)
 Flux `flux` into surface layer with surface pressure `pₛ` [Pa] and gravity `g` [m/s^2]
 converted to tendency [?/s]."""
-@inline surface_flux_to_tendency(flux::Real, pₛ::Real, model) =
+@propagate_inbounds surface_flux_to_tendency(flux::Real, pₛ::Real, model) =
     flux_to_tendency(flux, pₛ, model.planet.gravity, model.geometry.σ_levels_thick[end])
 
 """$(TYPEDSIGNATURES)
 Flux `flux` into layer `k` of thickness `Δσ`  converted to tendency [?/s].
 Using surface pressure `pₛ` [Pa] and gravity `g` [m/s^2]."""
-@inline flux_to_tendency(flux::Real, pₛ::Real, g::Real, Δσ_k::Real) = g/(pₛ*Δσ_k) * flux
-@inline flux_to_tendency(flux::Real, pₛ::Real, k::Int, model) = 
+@propagate_inbounds flux_to_tendency(flux::Real, pₛ::Real, g::Real, Δσ_k::Real) = g/(pₛ*Δσ_k) * flux
+@propagate_inbounds flux_to_tendency(flux::Real, pₛ::Real, k::Int, model) = 
     flux_to_tendency(flux, pₛ, model.planet.gravity, model.geometry.σ_levels_thick[k])
+
+# hacky, temporary placement, and also modularize this? 
+function reset_variables!(diagn::DiagnosticVariables)
+    if haskey(diagn.physics, :cloud_top)
+        (; cloud_top) = diagn.physics
+        cloud_top .= diagn.nlayers + 1    # reset to below top layer
+    end
+    return nothing
+end

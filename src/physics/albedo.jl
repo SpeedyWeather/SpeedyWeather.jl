@@ -75,7 +75,8 @@ end
 
 GlobalConstantAlbedo(SG::SpectralGrid; kwargs...) = GlobalConstantAlbedo{SG.NF}(; kwargs...)
 initialize!(albedo::GlobalConstantAlbedo, ::PrimitiveEquation) = nothing
-parameterization!(ij, diagn, progn, albedo::GlobalConstantAlbedo, model) = albedo!(ij, diagn.albedo, albedo.albedo)
+@propagate_inbounds parameterization!(ij, diagn, progn, albedo::GlobalConstantAlbedo, model) =
+    albedo!(ij, diagn.albedo, albedo.albedo)
 @propagate_inbounds function albedo!(ij, diagn_albedo::AbstractArray, albedo::Real)
     diagn_albedo[ij] = albedo
 end

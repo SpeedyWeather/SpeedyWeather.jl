@@ -41,11 +41,11 @@ end
     (; atmosphere) = model
 
     # Fortran SPEEDY documentation eq. 49 but use previous time step for numerical stability
-    surface_u = wind_slowdown*diagn.grid.u_grid_prev[ij, nlayers] 
-    surface_v = wind_slowdown*diagn.grid.v_grid_prev[ij, nlayers]
+    uₛ = wind_slowdown*diagn.grid.u_grid_prev[ij, nlayers] 
+    vₛ = wind_slowdown*diagn.grid.v_grid_prev[ij, nlayers]
 
     # Fortran SPEEDY documentation eq. 50, sqrt(u² + v² + gust_speed²)
-    surface_wind_speed = sqrt(muladd(surface_u, surface_u, muladd(surface_v, surface_v, gust_speed^2)))
+    surface_wind_speed = sqrt(muladd(uₛ, uₛ, muladd(vₛ, vₛ, gust_speed^2)))
     diagn.physics.surface_wind_speed[ij] = surface_wind_speed
 
     # Surface air density

@@ -14,8 +14,10 @@ end
 Adapt.@adapt_structure ConstantDrag
 ConstantDrag(SG::SpectralGrid; kwargs...) = ConstantDrag{SG.NF}(; kwargs...)
 initialize!(::ConstantDrag, ::PrimitiveEquation) = nothing
-parameterization!(ij, diagn, drag::ConstantDrag, model) = boundary_layer_drag!(ij, diagn, drag)
-function boundary_layer_drag!(ij, diagn, scheme::ConstantDrag)
+@propagate_inbounds parameterization!(ij, diagn, drag::ConstantDrag, model) =
+    boundary_layer_drag!(ij, diagn, drag)
+
+@propagate_inbounds function boundary_layer_drag!(ij, diagn, scheme::ConstantDrag)
     diagn.physics.boundary_layer_drag[ij] = scheme.drag
 end
 
@@ -51,6 +53,7 @@ initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
     planet::AbstractPlanet,
     geopotential::AbstractGeopotential
 )
+    # TODO use actual height via geopotential/gravity?
     # Typical height Z of lowermost layer from geopotential of reference surface temperature
     # minus surface geopotential (orography * gravity)
     (; temp_ref) = atmosphere

@@ -200,10 +200,10 @@ function timestep!(
     Rsu = diagn.physics.land.surface_shortwave_up       # only albedo reflection
     Rld = diagn.physics.surface_longwave_down           # all in [W/m²]
     Rlu = diagn.physics.land.surface_longwave_up
-    Ev = diagn.physics.land.surface_humidity_flux       # except this in [kg/s/m²]
+    H = diagn.physics.land.surface_humidity_flux       # except this in [kg/s/m²]
     S = diagn.physics.land.sensible_heat_flux
 
-    @boundscheck fields_match(soil_temperature, Rsd, Rsu, Rld, Rlu, Ev, S, horizontal_only=true) ||
+    @boundscheck fields_match(soil_temperature, Rsd, Rsu, Rld, Rlu, H, S, horizontal_only=true) ||
         throw(DimensionMismatch(soil_temperature, Rs))
     @boundscheck size(soil_moisture, 2) == size(soil_temperature, 2) == 2 || throw(DimensionMismatch)
     
@@ -213,25 +213,28 @@ function timestep!(
     Cs = thermodynamics.heat_capacity_dry_soil
     z₁ = geometry.layer_thickness[1]
     z₂ = geometry.layer_thickness[2]
-
     Δ =  2λ/(z₁ + z₂)   # thermal diffusion operator [W/(m² K)]
+    params = (; Lᵥ, γ, Cw, Cs, z₁, z₂, Δ, Δt)   # pack into NamedTuple
 
     launch!(architecture(soil_temperature), LinearWorkOrder, (size(soil_temperature, 1),),
-        land_bucket_temperature_kernel!, soil_temperature, mask, soil_moisture, Rsd, Rsu, Rlu, Rld, Ev, S,
-        Lᵥ, γ, Cw, Cs, z₁, z₂, Δ, Δt)
+        land_bucket_temperature_kernel!, soil_temperature, mask, soil_moisture, Rsd, Rsu, Rlu, Rld, H, S,
+        params)
 
     return nothing
 end
 
 @kernel inbounds=true function land_bucket_temperature_kernel!(
-    soil_temperature, mask, soil_moisture, Rsd, Rsu, Rlu, Rld, Ev, S,
-    @Const(Lᵥ), @Const(γ), @Const(Cw), @Const(Cs), @Const(z₁), @Const(z₂), @Const(Δ), @Const(Δt),
+    soil_temperature, mask, soil_moisture, Rsd, Rsu, Rlu, Rld, H, S,
+    params,
 )
     ij = @index(Global, Linear)
 
     if mask[ij] > 0                         # at least partially land
+
+        (; Lᵥ, γ, Cw, Cs, z₁, z₂, Δ, Δt) = params
+
         # total surface downward heat flux
-        F = Rsd[ij] - Rsu[ij] - Rlu[ij] + Rld[ij] - Lᵥ*Ev[ij] - S[ij]
+        F = Rsd[ij] - Rsu[ij] - Rlu[ij] + Rld[ij] - Lᵥ*H[ij] - S[ij]
 
         # heat capacity of the (wet) soil layers 1 and 2 [J/(m³ K)]
         C₁ = Cw * soil_moisture[ij, 1] * γ + Cs

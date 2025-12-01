@@ -226,35 +226,42 @@ function timestep!(
     ρ = model.atmosphere.water_density
     (; mask) = model.land_sea_mask
 
-    P = diagn.physics.total_precipitation_rate      # precipitation (rain+snow) in [m/s]
-    E = diagn.physics.land.surface_humidity_flux    # [kg/s/m²], divide by density for [m/s]
+    Plsc = diagn.physics.rain_rate_large_scale      # precipitation in [m/s]
+    Pconv = diagn.physics.rain_rate_convection      # precipitation in [m/s]
+    H = diagn.physics.land.surface_humidity_flux    # [kg/s/m²], divide by density for [m/s]
     R = diagn.physics.land.river_runoff             # diagnosed [m/s]
 
-    @boundscheck fields_match(soil_moisture, P, E, R, horizontal_only=true) ||
-        throw(DimensionMismatch(soil_moisture, P))
+    @boundscheck fields_match(soil_moisture, Plsc, Pconv, H, R, horizontal_only=true) ||
+        throw(DimensionMismatch(soil_moisture, Plsc , Pconv, H, R))
     @boundscheck size(soil_moisture, 2) >= 2 || throw(DimensionMismatch)
+    
     f₁, f₂ = soil.f₁, soil.f₂
     p = soil.infiltration_fraction        # Infiltration fraction: fraction of top layer runoff put into lower layer
     τ⁻¹ = inv(convert(eltype(soil_moisture), Second(soil.time_scale).value))
     f₁_f₂ = f₁/f₂
     Δt_f₁ = Δt/f₁
 
+    params = (; ρ, Δt, f₁, Δt_f₁, f₁_f₂, p, τ⁻¹)
+
     launch!(architecture(soil_moisture), LinearWorkOrder, (size(soil_moisture, 1),),
-        land_bucket_soil_moisture_kernel!, soil_moisture, mask, P, E, R, ρ, Δt, f₁, Δt_f₁, f₁_f₂, p, τ⁻¹)
+        land_bucket_soil_moisture_kernel!, soil_moisture, mask, Plsc, Pconv, H, R, params)
     synchronize(architecture(soil_moisture))
 end
 
 @kernel inbounds=true function land_bucket_soil_moisture_kernel!(
-    soil_moisture, mask, P, E, R,
-    @Const(ρ), @Const(Δt), @Const(f₁), @Const(Δt_f₁), @Const(f₁_f₂), @Const(p), @Const(τ⁻¹),
+    soil_moisture, mask, Plsc, Pconv, H, R,
+    params,
 )
     ij = @index(Global, Linear)             # every grid point ij
 
     if mask[ij] > 0                         # at least partially land
+
+        (; ρ, Δt, f₁, Δt_f₁, f₁_f₂, p, τ⁻¹) = params
+
         # precipitation (rain+snow, convection + large-scale) minus evaporation (or condensation)
         # river runoff only diagnostic, i.e. R=0 here but drain excess water below
         # convert to [m/s] by dividing by density
-        F = (P[ij] - E[ij])/ρ               # - R[ij]
+        F = Plsc[ij] + Pconv[ij] - H[ij]/ρ
   
         # vertical diffusion term between layers
         D = τ⁻¹*(soil_moisture[ij, 1] - soil_moisture[ij, 2])
@@ -282,7 +289,8 @@ function variables(::LandBucketMoisture)
         # Diagnostic variables written to diagn.physics
         DiagnosticVariable(name=:river_runoff, dims=Grid2D(), desc="River runoff from soil moisture", units="m/s", namespace=:land),
         # Diagnostic variables read from diagn.physics
-        DiagnosticVariable(name=:total_precipitation_rate, dims=Grid2D(), desc="Total precipitation rate", units="m/s"),
+        DiagnosticVariable(name=:rain_rate_convection, dims=Grid2D(), desc="Convective precipitation rate", units="m/s"),
+        DiagnosticVariable(name=:rain_rate_large_scale, dims=Grid2D(), desc="Large-scale precipitation (rain)", units="m/s"),
         DiagnosticVariable(name=:surface_humidity_flux, dims=Grid2D(), desc="Surface humidity flux", units="kg/s/m²", namespace=:land),
     )
 end
