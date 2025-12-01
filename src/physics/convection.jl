@@ -203,8 +203,7 @@ function pseudo_adiabat!(
     while buoyant && k > 1                  # calculate moist adiabat while buoyant till top
         k -= 1                              # one level up
     
-        if !saturated
-            # if not saturated yet follow dry adiabat
+        if !saturated                       # if not saturated yet follow dry adiabat
             # dry adiabatic ascent and saturation humidity of that temperature 
             temp_parcel_dry = temp_parcel*(σ[k]/σ[k+1])^κ
             sat_humid = saturation_humidity(temp_parcel_dry, σ[k]*pres, clausius_clapeyron)
@@ -228,7 +227,6 @@ function pseudo_adiabat!(
             # new humidity equals to that saturation humidity
             humid_parcel = saturation_humidity(temp_parcel, σ[k]*pres, clausius_clapeyron)
         else
-            
             temp_parcel = temp_parcel_dry       # else parcel temperature following dry adiabat
         end
     
