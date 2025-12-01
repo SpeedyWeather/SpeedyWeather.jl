@@ -22,7 +22,7 @@ function parameterization_tendencies!(
 end
 
 # GPU kernel, unrolling NamedTuple iteration at compile time, fuses all parameterizations
-@kernel function parameterization_tendencies_kernel!(diagn, progn, parameterizations, model)
+@kernel inbounds=true function parameterization_tendencies_kernel!(diagn, progn, parameterizations, model)
     
     ij = @index(Global, Linear)     # every horizontal grid point ij
 
@@ -37,10 +37,10 @@ end
 # outer loop over parameterizations, inner loop over horizontal grid points
 # this yields a more contiguous memory access pattern on CPU
 function parameterization_tendencies_cpu!(diagn, progn, model)
-    _call_parameterizations_cpu!(diagn, progn, get_parameterizations(model), model)
+    @inbounds _call_parameterizations_cpu!(diagn, progn, get_parameterizations(model), model)
 
     radius = model.planet.radius
-    for ij in 1:model.geometry.npoints
+    @inbounds for ij in 1:model.geometry.npoints
         # tendencies have to be scaled by the radius for the dynamical core
         scale!(ij, diagn.tendencies, radius)
     end
@@ -49,7 +49,10 @@ end
 # Use @generated to unroll NamedTuple iteration at compile time for GPU compatibility
 @generated function _call_parameterizations!(ij, diagn, progn, parameterizations::NamedTuple{names}, model) where names
     calls = [:(parameterization!(ij, diagn, progn, parameterizations.$name, model)) for name in names]
-    return Expr(:block, calls...)
+    return quote
+        Base.@_propagate_inbounds_meta
+        $(Expr(:block, calls...))
+    end
 end
 
 # Use @generated to unroll NamedTuple iteration at compile time also on CPU for performance
@@ -59,7 +62,10 @@ end
             parameterization!(ij, diagn, progn, parameterizations.$name, model)
         end
     end for name in names]                    # parameterizations outer loop
-    return Expr(:block, calls...)
+    return quote
+        Base.@_propagate_inbounds_meta
+        $(Expr(:block, calls...))
+    end
 end
 
 """$(TYPEDSIGNATURES)

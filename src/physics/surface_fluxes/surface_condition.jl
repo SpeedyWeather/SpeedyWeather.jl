@@ -30,11 +30,11 @@ end
 initialize!(::SurfaceCondition, ::PrimitiveEquation) = nothing
 
 # function barrier
-function parameterization!(ij, diagn, progn, sc::SurfaceCondition, model)
+@propagate_inbounds function parameterization!(ij, diagn, progn, sc::SurfaceCondition, model)
     surface_condition!(ij, diagn, sc, model)
 end
 
-function surface_condition!(ij, diagn, surface_condition::SurfaceCondition, model)
+@propagate_inbounds function surface_condition!(ij, diagn, surface_condition::SurfaceCondition, model)
 
     (; wind_slowdown, gust_speed) = surface_condition
     nlayers = model.geometry.nlayers

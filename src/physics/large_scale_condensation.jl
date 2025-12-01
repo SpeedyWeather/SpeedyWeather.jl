@@ -28,7 +28,7 @@ ImplicitCondensation(SG::SpectralGrid; kwargs...) = ImplicitCondensation{SG.NF}(
 initialize!(::ImplicitCondensation, ::PrimitiveEquation) = nothing
 
 # function barrier
-function parameterization!(ij, diagn, progn, lsc::ImplicitCondensation, model)
+@propagate_inbounds function parameterization!(ij, diagn, progn, lsc::ImplicitCondensation, model)
     (; clausius_clapeyron, geometry, planet, atmosphere, time_stepping) = model
     large_scale_condensation!(ij, diagn, lsc, clausius_clapeyron, geometry, planet, atmosphere, time_stepping)
 end
@@ -39,7 +39,7 @@ Large-scale condensation for a `column` by relaxation back to 100%
 relative humidity. Calculates the tendencies for specific humidity
 and temperature from latent heat release and integrates the
 large-scale precipitation vertically for output."""
-function large_scale_condensation!(
+@propagate_inbounds function large_scale_condensation!(
     ij,
     diagn::DiagnosticVariables,
     condensation::ImplicitCondensation,

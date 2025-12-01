@@ -43,7 +43,7 @@ function initialize!(albedo::OceanLandAlbedo, model::PrimitiveEquation)
 end
 
 # composite OceanLandAlbedo: call separately for ocean and land with .ocean and .land
-function parameterization!(ij, diagn::DiagnosticVariables, progn, albedo::OceanLandAlbedo, model)
+@propagate_inbounds function parameterization!(ij, diagn::DiagnosticVariables, progn, albedo::OceanLandAlbedo, model)
     parameterization!(ij, diagn.physics.ocean, progn, albedo.ocean, model)
     parameterization!(ij, diagn.physics.land, progn, albedo.land, model)
 end
@@ -57,7 +57,7 @@ function variables(::OceanLandAlbedo)
 end
 
 # single albedo: call separately for ocean and land with the same albedo
-function parameterization!(ij, diagn::DiagnosticVariables, progn, albedo::AbstractAlbedo, model)
+ @propagate_inbounds function parameterization!(ij, diagn::DiagnosticVariables, progn, albedo::AbstractAlbedo, model)
     parameterization!(ij, diagn.physics.ocean, progn, albedo, model)
     parameterization!(ij, diagn.physics.land, progn, albedo, model)
 end
@@ -76,7 +76,7 @@ end
 GlobalConstantAlbedo(SG::SpectralGrid; kwargs...) = GlobalConstantAlbedo{SG.NF}(; kwargs...)
 initialize!(albedo::GlobalConstantAlbedo, ::PrimitiveEquation) = nothing
 parameterization!(ij, diagn, progn, albedo::GlobalConstantAlbedo, model) = albedo!(ij, diagn.albedo, albedo.albedo)
-@inline function albedo!(ij, diagn_albedo::AbstractArray, albedo::Real)
+@propagate_inbounds function albedo!(ij, diagn_albedo::AbstractArray, albedo::Real)
     diagn_albedo[ij] = albedo
 end
 
@@ -96,8 +96,8 @@ end
 
 ManualAlbedo(SG::SpectralGrid) = ManualAlbedo{SG.GridVariable2D}(zeros(SG.GridVariable2D, SG.grid))
 initialize!(albedo::ManualAlbedo, model::PrimitiveEquation) = nothing
-parameterization!(ij, diagn, progn, albedo::ManualAlbedo, model) = albedo!(ij, diagn.albedo, albedo.albedo)
-@inline function albedo!(ij, diagn_albedo::AbstractArray, albedo::AbstractArray)
+@propagate_inbounds parameterization!(ij, diagn, progn, albedo::ManualAlbedo, model) = albedo!(ij, diagn.albedo, albedo.albedo)
+@propagate_inbounds function albedo!(ij, diagn_albedo::AbstractArray, albedo::AbstractArray)
     diagn_albedo[ij] = albedo[ij]
 end
 
@@ -148,7 +148,7 @@ function initialize!(albedo::AlbedoClimatology, model::PrimitiveEquation)
     interpolate!(albedo.albedo, a)
 end
 
-parameterization!(ij, diagn, progn, albedo::AlbedoClimatology, model) = albedo!(ij, diagn.albedo, albedo.albedo)
+@propagate_inbounds parameterization!(ij, diagn, progn, albedo::AlbedoClimatology, model) = albedo!(ij, diagn.albedo, albedo.albedo)
 
 # For GPU usage just discard the extra information and treat it as a `ManualAlbedo`
 Adapt.adapt_structure(to, albedo::AlbedoClimatology) = adapt(to, ManualAlbedo(albedo.albedo))
@@ -169,9 +169,9 @@ end
 Adapt.@adapt_structure OceanSeaIceAlbedo
 OceanSeaIceAlbedo(SG::SpectralGrid; kwargs...) = OceanSeaIceAlbedo{SG.NF}(;kwargs...)
 initialize!(::OceanSeaIceAlbedo, ::PrimitiveEquation) = nothing
-parameterization!(ij, diagn, progn, albedo::OceanSeaIceAlbedo, model) = albedo!(ij, diagn.albedo, progn.ocean, albedo)
+@propagate_inbounds parameterization!(ij, diagn, progn, albedo::OceanSeaIceAlbedo, model) = albedo!(ij, diagn.albedo, progn.ocean, albedo)
 
-@inline function albedo!(ij, diagn_albedo::AbstractArray, ocean, albedo::OceanSeaIceAlbedo)
+@propagate_inbounds function albedo!(ij, diagn_albedo::AbstractArray, ocean, albedo::OceanSeaIceAlbedo)
     (; sea_ice_concentration ) = ocean
     (; albedo_ocean, albedo_ice) = albedo
 

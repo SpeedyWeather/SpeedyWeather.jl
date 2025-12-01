@@ -111,7 +111,7 @@ $(TYPEDFIELDS)"""
     
     # Tuples with symbols or instances of all parameterizations and parameter functions
     # Used to initiliaze variables and for the column-based parameterizations
-    model_parameters::TS1 = (:class, :time_stepping, :orography, :geopotential, :atmosphere, 
+    model_parameters::TS1 = (:class, :architecture, :time_stepping, :orography, :geopotential, :atmosphere, 
                                 :planet, :geometry, :land_sea_mask)
     parameterizations::TS2 = (  # mixing
                                 :vertical_diffusion, :convection,

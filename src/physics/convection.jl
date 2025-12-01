@@ -20,7 +20,7 @@ BettsMillerConvection(SG::SpectralGrid; kwargs...) = BettsMillerConvection{SG.NF
 initialize!(::BettsMillerConvection, ::PrimitiveEquation) = nothing
 
 # function barrier
-function parameterization!(ij, diagn, progn, convection_scheme::BettsMillerConvection, model)
+@propagate_inbounds function parameterization!(ij, diagn, progn, convection_scheme::BettsMillerConvection, model)
     convection!(ij, diagn, convection_scheme, model)
 end
 
@@ -31,7 +31,7 @@ simplified Betts-Miller convection. Starts with a first-guess relaxation to dete
 the convective criteria (none, dry/shallow or deep), then adjusts reference profiles
 for thermodynamic consistency (e.g. in dry convection the humidity profile is non-precipitating),
 and relaxes current vertical profiles to the adjusted references."""
-function convection!(ij, diagn, SBM::BettsMillerConvection, model)
+@propagate_inbounds function convection!(ij, diagn, SBM::BettsMillerConvection, model)
 
     (; geometry, clausius_clapeyron, planet, atmosphere, time_stepping) = model
     NF = eltype(diagn.grid.temp_grid)
@@ -166,7 +166,7 @@ Calculates the moist pseudo adiabat given temperature and humidity of surface pa
 Follows the dry adiabat till condensation and then continues on the pseudo moist-adiabat
 with immediate condensation to the level of zero buoyancy. Levels above are skipped,
 set to NaN instead and should be skipped in the relaxation."""
-function pseudo_adiabat!(
+@propagate_inbounds function pseudo_adiabat!(
     ij,
     temp_ref_profile,
     temp_parcel,
@@ -268,7 +268,7 @@ BettsMillerDryConvection(SG::SpectralGrid; kwargs...) = BettsMillerDryConvection
 initialize!(::BettsMillerDryConvection, ::PrimitiveEquation) = nothing
 
 # function barrier
-function parameterization!(ij, diagn, progn, convection_scheme::BettsMillerDryConvection, model)
+@propagate_inbounds function parameterization!(ij, diagn, progn, convection_scheme::BettsMillerDryConvection, model)
     convection!(ij, diagn, convection_scheme, model)
 end
 
@@ -280,7 +280,7 @@ Starts with a first-guess relaxation to determine the convective criterion,
 then adjusts the reference profiles
 for thermodynamic consistency (e.g. in dry convection the humidity profile is non-precipitating),
 and relaxes current vertical profiles to the adjusted references."""
-function convection!(ij, diagn, DBM::BettsMillerDryConvection, model)
+@propagate_inbounds function convection!(ij, diagn, DBM::BettsMillerDryConvection, model)
 
     (; geometry, atmosphere) = model
     NF = eltype(diagn.grid.temp_grid_prev)
@@ -338,7 +338,7 @@ Calculates the moist pseudo adiabat given temperature and humidity of surface pa
 Follows the dry adiabat till condensation and then continues on the pseudo moist-adiabat
 with immediate condensation to the level of zero buoyancy. Levels above are skipped,
 set to NaN instead and should be skipped in the relaxation."""
-function dry_adiabat!(
+@propagate_inbounds function dry_adiabat!(
     ij,
     temp_ref_profile,
     temp_environment,
@@ -421,7 +421,7 @@ end
 # function barrier
 parameterization!(ij, diagn, progn, convection_scheme::ConvectiveHeating, model) = convection!(ij, diagn, convection_scheme, model)
 
-@inline function convection!(
+@propagate_inbounds function convection!(
     ij,
     diagn::DiagnosticVariables,
     scheme::ConvectiveHeating,

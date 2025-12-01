@@ -33,13 +33,13 @@ function initialize!(sppt::StochasticallyPerturbedParameterizationTendencies, mo
 end
 
 # function barrier
-parameterization!(ij, diagn, progn, sppt::StochasticallyPerturbedParameterizationTendencies, model) =
+@propagate_inbounds parameterization!(ij, diagn, progn, sppt::StochasticallyPerturbedParameterizationTendencies, model) =
     sppt!(ij, diagn, sppt)
 
 """$(TYPEDFIELDS)
 Apply stochastically perturbed parameterization tendencies to u, v, temperature and humidity
 in column ij."""
-function sppt!(ij, diagn, sppt)
+@propagate_inbounds function sppt!(ij, diagn, sppt)
     
     r = diagn.grid.random_pattern[ij]
     (; taper) = sppt

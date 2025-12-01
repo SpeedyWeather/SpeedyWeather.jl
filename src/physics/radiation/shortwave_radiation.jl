@@ -30,10 +30,10 @@ end
 initialize!(::TransparentShortwave, ::PrimitiveEquation) = nothing
 
 # function barrier
-@inline parameterization!(ij, diagn, progn, shortwave::TransparentShortwave, model) =
+@propagate_inbounds parameterization!(ij, diagn, progn, shortwave::TransparentShortwave, model) =
     shortwave_radiation!(ij, diagn, shortwave, model.planet, model.land_sea_mask.mask)
 
-@inline function shortwave_radiation!(ij, diagn, ::TransparentShortwave, planet, land_sea_mask)
+@propagate_inbounds function shortwave_radiation!(ij, diagn, ::TransparentShortwave, planet, land_sea_mask)
 
     (; surface_shortwave_down, surface_shortwave_up) = diagn.physics
     ssrd_ocean = diagn.physics.ocean.surface_shortwave_down

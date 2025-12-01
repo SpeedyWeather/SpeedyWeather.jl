@@ -78,6 +78,7 @@ if !FLAG_EXTENDED_TESTS && !FLAG_ENZYME_TESTS
     include("physics/surface_fluxes.jl")
     include("physics/random_process.jl")
     include("physics/stochastic_physics.jl")
+    include("physics/all_parametrizations.jl")
 
     # OUTPUT/EXTENSION
     include("output/callbacks.jl")

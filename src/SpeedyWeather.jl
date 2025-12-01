@@ -35,6 +35,7 @@ import ProgressMeter
 
 # UTILITIES
 using  DomainSets.IntervalSets
+import Base: @propagate_inbounds
 
 # to avoid a `using Dates` to pass on DateTime arguments
 export DateTime, Millisecond, Second, Minute, Hour, Day, Week, Month, Year, Century, Millenium

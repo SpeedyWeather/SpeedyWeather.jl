@@ -2,7 +2,7 @@
 $(TYPEDSIGNATURES)
 Scale the variable `var` inside `progn` with scalar `scale`.
 """
-function scale!(
+@propagate_inbounds function scale!(
     progn::PrognosticVariables,
     var::Symbol,
     scale::Real,
@@ -15,7 +15,7 @@ end
 $(TYPEDSIGNATURES)
 Scale the variable `var` inside `diagn` with scalar `scale`.
 """
-function scale!(
+@propagate_inbounds function scale!(
     diagn::DiagnosticVariables,
     var::Symbol,
     scale::Real,
@@ -28,7 +28,7 @@ end
 $(TYPEDSIGNATURES)
 Scales the prognostic variables vorticity and divergence with
 the Earth's radius which is used in the dynamical core."""
-function scale!(progn::PrognosticVariables,
+@propagate_inbounds function scale!(progn::PrognosticVariables,
                 diagn::DiagnosticVariables,
                 scale::Real)
                 
@@ -45,7 +45,7 @@ end
 Scale the tendencies inside `diagn` with scalar `scale`.
 Intended use to scale the tendencies of the parameterizations
 by the radius for the dynamical core."""
-@inline function scale!(ij, diagn::Tendencies, scale::Real)
+@propagate_inbounds function scale!(ij, diagn::Tendencies, scale::Real)
     @inbounds for k in eachlayer(diagn.u_tend_grid)
         diagn.u_tend_grid[ij, k] *= scale
         diagn.v_tend_grid[ij, k] *= scale

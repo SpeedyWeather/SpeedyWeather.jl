@@ -40,10 +40,10 @@ BulkRichardsonDrag(SG::SpectralGrid, kwargs...) = BulkRichardsonDrag{SG.NF}(; kw
 initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
 
 # function barrier
-parameterization!(ij, diagn, progn, drag::BulkRichardsonDrag, model) =
+@propagate_inbounds parameterization!(ij, diagn, progn, drag::BulkRichardsonDrag, model) =
     boundary_layer_drag!(ij, diagn, drag, model.atmosphere, model.planet, model.geopotential)
 
-function boundary_layer_drag!(
+@propagate_inbounds function boundary_layer_drag!(
     ij,
     diagn,
     drag::BulkRichardsonDrag,
@@ -84,7 +84,7 @@ end
 $(TYPEDSIGNATURES)
 Calculate the bulk richardson number following Frierson, 2007.
 For vertical stability in the boundary layer."""
-@inline function bulk_richardson_surface(ij, diagn, atmosphere)
+@propagate_inbounds function bulk_richardson_surface(ij, diagn, atmosphere)
     cₚ = atmosphere.heat_capacity
     surface = diagn.grid.nlayers    # surface index = nlayers
 
