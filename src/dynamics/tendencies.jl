@@ -1180,12 +1180,12 @@ function SpeedyTransforms.transform!(
         # the Tₖ is added for the physics parameterizations again
         # technically Tₖ is from model.implicit (which is held constant throughout) integration
         # but given it's the initial step here using the instantaneous diagn.temp_average is the same
-        @inbounds for k in eachlayer(temp_grid_prev, temp_grid)
-            Tₖ = diagn.temp_average[k]
-            for ij in eachgridpoint(temp_grid_prev, temp_grid)
-                temp_grid_prev[ij, k] = temp_grid[ij, k] - Tₖ
-            end
-        end
+        
+        # Use kernel for temperature initialization
+        arch = architecture(temp_grid_prev)
+        launch!(arch, RingGridWorkOrder, size(temp_grid_prev), 
+                _initialize_temp_prev_kernel!,
+                temp_grid_prev, temp_grid, diagn.temp_average)
 
         @. humid_grid_prev = humid_grid
         @. u_grid_prev = u_grid
@@ -1207,6 +1207,19 @@ function SpeedyTransforms.transform!(
     transform!(diagn, progn, lf, model.random_process, S)
 
     return nothing
+end
+
+@kernel inbounds=true function _initialize_temp_prev_kernel!(
+    temp_grid_prev,         # Output: previous temperature grid (anomaly)
+    @Const(temp_grid),      # Input: current temperature grid
+    @Const(temp_average),   # Input: reference temperature profile Tₖ
+)
+    ij, k = @index(Global, NTuple)  # global index: grid point ij, layer k
+    
+    # Subtract reference temperature profile to get anomaly
+    # temp_grid_prev stores the temperature anomaly T' = T - Tₖ
+    Tₖ = temp_average[k]
+    temp_grid_prev[ij, k] = temp_grid[ij, k] - Tₖ
 end
 
 """ 
