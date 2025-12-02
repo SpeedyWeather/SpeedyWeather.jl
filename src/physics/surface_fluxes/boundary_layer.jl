@@ -14,7 +14,7 @@ end
 Adapt.@adapt_structure ConstantDrag
 ConstantDrag(SG::SpectralGrid; kwargs...) = ConstantDrag{SG.NF}(; kwargs...)
 initialize!(::ConstantDrag, ::PrimitiveEquation) = nothing
-@propagate_inbounds parameterization!(ij, diagn, drag::ConstantDrag, model) =
+@propagate_inbounds parameterization!(ij, diagn, progn, drag::ConstantDrag, model) =
     boundary_layer_drag!(ij, diagn, drag)
 
 @propagate_inbounds function boundary_layer_drag!(ij, diagn, scheme::ConstantDrag)
@@ -31,10 +31,13 @@ $(TYPEDFIELDS)"""
     von_Karman::NF = 0.4
 
     "[OPTION] roughness length [m]"
-    roughness_length::NF = 3.21e-5
+    roughness_length::NF = 0.01
 
     "[OPTION] Critical Richardson number for stable mixing cutoff [1]"
     critical_Richardson::NF = 10
+
+    "[OPTION] Drag minimum to avoid zero surface fluxes in stable conditions [1]"
+    drag_min::NF = 1e-5
 end
 
 Adapt.@adapt_structure BulkRichardsonDrag
@@ -43,7 +46,7 @@ initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
 
 # function barrier
 @propagate_inbounds parameterization!(ij, diagn, progn, drag::BulkRichardsonDrag, model) =
-    boundary_layer_drag!(ij, diagn, drag, model.atmosphere, model.planet, model.geopotential)
+    boundary_layer_drag!(ij, diagn, drag, model.atmosphere, model.planet, model.orography)
 
 @propagate_inbounds function boundary_layer_drag!(
     ij,
@@ -51,58 +54,54 @@ initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
     drag::BulkRichardsonDrag,
     atmosphere::AbstractAtmosphere,
     planet::AbstractPlanet,
-    geopotential::AbstractGeopotential
+    orography::AbstractOrography,
 )
-    # TODO use actual height via geopotential/gravity?
-    # Typical height Z of lowermost layer from geopotential of reference surface temperature
-    # minus surface geopotential (orography * gravity)
-    (; temp_ref) = atmosphere
+    # Height z [m] of lowermost layer above ground
+    surface = diagn.nlayers
     (; gravity) = planet
-    (; Δp_geopot_full) = geopotential
-    Z = temp_ref * Δp_geopot_full[end] / gravity
-
+    z = diagn.grid.geopotential[ij, surface]/gravity - orography.orography[ij]
+    
     # maximum drag Cmax from that height, stable conditions would decrease Cmax towards 0
     # Frierson 2006, eq (12)
     κ = drag.von_Karman
     z₀ = drag.roughness_length
-    drag_max = (κ/log(Z/z₀))^2
-
+    # should be z > z₀, z=z₀ means an infinitely high drag
+    # 0 < z < z₀ doesn't make sense so cap here
+    z = max(z, z₀)  
+    drag_max = (κ/log(z/z₀))^2
+    
     # bulk Richardson number at lowermost layer N from Frierson, 2006, eq. (15)
     # they call it Ri_a = Ri_N here
-    Ri_N = bulk_richardson_surface(ij, diagn, atmosphere)
+    ΔΦ₀ = gravity*z     # geopotential high relative to surface
+    Ri_N = bulk_richardson_surface(ij, ΔΦ₀, diagn, atmosphere)
     Ri_c = drag.critical_Richardson
+    (; drag_min) = drag
 
     # clamp to get the cases, eq (12-14)
     # if Ri_N > Ri_c then C = 0
     # if Ri_c > Ri_N > 0 then = κ^2/log(z_N/z₀)^2 * (1-Ri_N/Ri_c)^2
     # if Ri_c < 0 then κ^2/log(z_N/z₀)^2
-    # but Z ≈ z_N given that the lowermost layer height is proportional to temperature
-    # which doesn't change much with instantaneous temperature variations but with
-    # vertical resolution, hence κ^2/log(Z/z₀)^2 is precalculated in initialize!
     Ri_N = clamp(Ri_N, 0, Ri_c)
-    diagn.physics.boundary_layer_drag[ij] = drag_max*(1-Ri_N/Ri_c)^2
+    diagn.physics.boundary_layer_drag[ij] = max(drag_min, drag_max*(1-Ri_N/Ri_c)^2)
+    return nothing
 end
 
 """
 $(TYPEDSIGNATURES)
 Calculate the bulk richardson number following Frierson, 2007.
 For vertical stability in the boundary layer."""
-@propagate_inbounds function bulk_richardson_surface(ij, diagn, atmosphere)
+@propagate_inbounds function bulk_richardson_surface(ij, ΔΦ₀, diagn, atmosphere)
     cₚ = atmosphere.heat_capacity
-    surface = diagn.grid.nlayers    # surface index = nlayers
+    surface = diagn.nlayers     # surface index = nlayers
 
-    @inbounds begin
-        u = diagn.grid.u_grid_prev[ij, surface]
-        v = diagn.grid.v_grid_prev[ij, surface]
-        Φ = diagn.grid.geopotential[ij, surface]
-        T = diagn.grid.temp_grid_prev[ij, surface]
-        q = diagn.grid.humid_grid_prev[ij, surface]
-        Tᵥ = virtual_temperature(T, q, atmosphere)
-    end
+    Vₛ = diagn.physics.surface_wind_speed[ij, surface]
+    T = diagn.grid.temp_grid_prev[ij, surface]
+    q = diagn.grid.humid_grid_prev[ij, surface]
+    Tᵥ = virtual_temperature(T, q, atmosphere)
 
-    V² = u^2 + v^2
+    # bulk Richardson number at lowermost layer N from Frierson, 2006, eq. (15)
     Θ₀ = cₚ*Tᵥ
-    Θ₁ = Θ₀ + Φ
-    bulk_richardson = Φ*(Θ₁ - Θ₀) / (Θ₀*V²)
+    Θ₁ = Θ₀ + ΔΦ₀
+    bulk_richardson = ΔΦ₀*(Θ₁ - Θ₀) / (Θ₀*Vₛ^2)
     return bulk_richardson
 end
