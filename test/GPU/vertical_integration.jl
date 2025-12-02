@@ -5,4 +5,10 @@
 
 @testset "Vertical Integration" begin
     # TODO: Add actual tests for vertical integration
+
+    spectral_grid_cpu = SpectralGrid(architecture=CPU())
+    spectral_grid_gpu = SpectralGrid(architecture=GPU())
+
+    model_cpu = PrimitiveWetModel(spectral_grid_cpu)
+    model_gpu = PrimitiveWetModel(spectral_grid_gpu)
 end
