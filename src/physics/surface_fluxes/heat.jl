@@ -188,6 +188,7 @@ initialize!(::PrescribedLandHeatFlux, ::PrimitiveEquation) = nothing
 @propagate_inbounds function surface_heat_flux!(ij, diagn, progn, ::PrescribedLandHeatFlux, model)
     land_fraction = model.land_sea_mask.mask[ij]
     pₛ = diagn.grid.pres_grid_prev[ij]          # surface pressure [Pa]
+    surface = diagn.nlayers                     # indexing top to bottom
 
     # read in a prescribed flux
     flux_land = progn.land.sensible_heat_flux[ij]
@@ -201,8 +202,7 @@ initialize!(::PrescribedLandHeatFlux, ::PrimitiveEquation) = nothing
     diagn.physics.sensible_heat_flux[ij] += flux_land
     
     # accumulate with += into end=lowermost layer total flux
-    nlayers = model.geometry.nlayers
-    diagn.tendencies.temp_tend_grid[ij, nlayers] += surface_flux_to_tendency(flux_land, pₛ, model)
+    diagn.tendencies.temp_tend_grid[ij, surface] += surface_flux_to_tendency(flux_land, pₛ, model)
     return nothing
 end 
 
