@@ -45,8 +45,8 @@ initialize!(::TransparentShortwave, ::PrimitiveEquation) = nothing
         albedo_ocean = diagn.physics.ocean.albedo[ij]
         albedo_land = diagn.physics.land.albedo[ij]
     end
+    
     S₀ = planet.solar_constant
-
     D = S₀ * cos_zenith             # top of atmosphere downward radiation
     surface_shortwave_down[ij] = D  # transparent atmosphere so same at surface (before albedo)
 

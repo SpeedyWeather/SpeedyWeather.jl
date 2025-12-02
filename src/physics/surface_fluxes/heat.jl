@@ -106,6 +106,7 @@ initialize!(::SurfaceLandHeatFlux, ::PrimitiveEquation) = nothing
 
 @propagate_inbounds function surface_heat_flux!(ij, diagn, progn, heat_flux::SurfaceLandHeatFlux, model)
     
+    surface = model.geometry.nlayers
     cₚ = model.atmosphere.heat_capacity
     pₛ = diagn.grid.pres_grid_prev[ij]                  # surface pressure [Pa]
     ρ = diagn.physics.surface_air_density[ij]
@@ -133,8 +134,7 @@ initialize!(::SurfaceLandHeatFlux, ::PrimitiveEquation) = nothing
     diagn.physics.sensible_heat_flux[ij] += flux_land*cₚ    # [W/m²]
     
     # accumulate with += into end=lowermost layer total flux
-    nlayers = model.geometry.nlayers
-    diagn.tendencies.temp_tend_grid[ij, nlayers] += surface_flux_to_tendency(flux_land, pₛ, model)
+    diagn.tendencies.temp_tend_grid[ij, surface] += surface_flux_to_tendency(flux_land, pₛ, model)
     return nothing
 end
 
@@ -154,6 +154,8 @@ initialize!(::PrescribedOceanHeatFlux, ::PrimitiveEquation) = nothing
 @propagate_inbounds function surface_heat_flux!(ij, diagn, progn, ::PrescribedOceanHeatFlux, model)
     land_fraction = model.land_sea_mask.mask[ij]
     pₛ = diagn.grid.pres_grid_prev[ij]          # surface pressure [Pa]
+    cₚ = model.atmosphere.heat_capacity
+    surface = model.geometry.nlayers
 
     # read in a prescribed flux
     flux_ocean = progn.ocean.sensible_heat_flux[ij]
@@ -167,8 +169,8 @@ initialize!(::PrescribedOceanHeatFlux, ::PrimitiveEquation) = nothing
     diagn.physics.sensible_heat_flux[ij] = flux_ocean
     
     # accumulate with += into end=lowermost layer total flux
-    nlayers = model.geometry.nlayers
-    diagn.tendencies.temp_tend_grid[ij, nlayers] += surface_flux_to_tendency(flux_ocean, pₛ, model)
+    flux_ocean /= cₚ                            # [W/m²] -> [K/s]
+    diagn.tendencies.temp_tend_grid[ij, surface] += surface_flux_to_tendency(flux_ocean, pₛ, model)
     return nothing
 end
 
@@ -188,6 +190,7 @@ initialize!(::PrescribedLandHeatFlux, ::PrimitiveEquation) = nothing
 @propagate_inbounds function surface_heat_flux!(ij, diagn, progn, ::PrescribedLandHeatFlux, model)
     land_fraction = model.land_sea_mask.mask[ij]
     pₛ = diagn.grid.pres_grid_prev[ij]          # surface pressure [Pa]
+    cₚ = model.atmosphere.heat_capacity
     surface = diagn.nlayers                     # indexing top to bottom
 
     # read in a prescribed flux
@@ -202,6 +205,7 @@ initialize!(::PrescribedLandHeatFlux, ::PrimitiveEquation) = nothing
     diagn.physics.sensible_heat_flux[ij] += flux_land
     
     # accumulate with += into end=lowermost layer total flux
+    flux_land /= cₚ                             # [W/m²] -> [K/s]
     diagn.tendencies.temp_tend_grid[ij, surface] += surface_flux_to_tendency(flux_land, pₛ, model)
     return nothing
 end 

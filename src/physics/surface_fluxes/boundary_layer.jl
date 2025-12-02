@@ -31,7 +31,7 @@ $(TYPEDFIELDS)"""
     von_Karman::NF = 0.4
 
     "[OPTION] roughness length [m]"
-    roughness_length::NF = 0.01
+    roughness_length::NF = 0.5
 
     "[OPTION] Critical Richardson number for stable mixing cutoff [1]"
     critical_Richardson::NF = 10

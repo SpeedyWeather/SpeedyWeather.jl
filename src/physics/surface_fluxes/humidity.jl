@@ -148,6 +148,7 @@ initialize!(::PrescribedOceanHumidityFlux, ::PrimitiveWet) = nothing
 @propagate_inbounds function surface_humidity_flux!(ij, diagn, progn, ::PrescribedOceanHumidityFlux, model)
     land_fraction = model.land_sea_mask.mask[ij]
     pₛ = diagn.grid.pres_grid_prev[ij]          # surface pressure [Pa]
+    surface = model.geometry.nlayers
 
     # read in a prescribed flux
     flux_ocean = progn.ocean.surface_humidity_flux[ij]
@@ -160,8 +161,7 @@ initialize!(::PrescribedOceanHumidityFlux, ::PrimitiveWet) = nothing
     diagn.physics.surface_humidity_flux[ij] = flux_ocean
     
     # accumulate with += into end=lowermost layer total flux
-    nlayers = model.geometry.nlayers
-    diagn.tendencies.humid_tend_grid[ij, nlayers] += surface_flux_to_tendency(flux_ocean, pₛ, model)
+    diagn.tendencies.humid_tend_grid[ij, surface] += surface_flux_to_tendency(flux_ocean, pₛ, model)
     return nothing
 end
 
@@ -179,6 +179,7 @@ initialize!(::PrescribedLandHumidityFlux, ::PrimitiveWet) = nothing
 @propagate_inbounds function surface_humidity_flux!(ij, diagn, progn, ::PrescribedLandHumidityFlux, model)
     land_fraction = model.land_sea_mask.mask[ij]
     pₛ = diagn.grid.pres_grid_prev[ij]          # surface pressure [Pa]
+    surface = model.geometry.nlayers
 
     # read in a prescribed flux
     flux_land = progn.land.surface_humidity_flux[ij]
@@ -191,8 +192,7 @@ initialize!(::PrescribedLandHumidityFlux, ::PrimitiveWet) = nothing
     diagn.physics.surface_humidity_flux[ij] += flux_land
     
     # accumulate with += into end=lowermost layer total flux
-    nlayers = model.geometry.nlayers
-    diagn.tendencies.humid_tend_grid[ij, nlayers] += surface_flux_to_tendency(flux_land, pₛ, model)
+    diagn.tendencies.humid_tend_grid[ij, surface] += surface_flux_to_tendency(flux_land, pₛ, model)
     return nothing
 end
 
