@@ -238,10 +238,8 @@ function timestep!(
     f₁, f₂ = soil.f₁, soil.f₂
     p = soil.infiltration_fraction        # Infiltration fraction: fraction of top layer runoff put into lower layer
     τ⁻¹ = inv(convert(eltype(soil_moisture), Second(soil.time_scale).value))
-    f₁_f₂ = f₁/f₂
-    Δt_f₁ = Δt/f₁
 
-    params = (; ρ, Δt, f₁, Δt_f₁, f₁_f₂, p, τ⁻¹)
+    params = (; ρ, Δt, f₁, f₂, p, τ⁻¹)
 
     launch!(architecture(soil_moisture), LinearWorkOrder, (size(soil_moisture, 1),),
         land_bucket_soil_moisture_kernel!, soil_moisture, mask, Plsc, Pconv, H, R, params)
@@ -256,7 +254,7 @@ end
 
     if mask[ij] > 0                         # at least partially land
 
-        (; ρ, Δt, f₁, Δt_f₁, f₁_f₂, p, τ⁻¹) = params
+        (; ρ, Δt, f₁, f₂, p, τ⁻¹) = params
 
         # precipitation (rain+snow, convection + large-scale) minus evaporation (or condensation)
         # river runoff only diagnostic, i.e. R=0 here but drain excess water below
@@ -267,14 +265,14 @@ end
         D = τ⁻¹*(soil_moisture[ij, 1] - soil_moisture[ij, 2])
 
         # Equation in 8.5.2.2 of the MITgcm users guide (Land package)
-        soil_moisture[ij, 1] += Δt_f₁*F - Δt*D
-        soil_moisture[ij, 2] += Δt*f₁_f₂*D
+        soil_moisture[ij, 1] += Δt/f₁*F - Δt*D
+        soil_moisture[ij, 2] += Δt*f₁/f₂*D
 
         # river runoff
         W₁ = soil_moisture[ij, 1]           # wrt to field capacity so maximum is 1
         δW₁ = W₁ - min(W₁, 1)               # excess moisture in top layer, cap at field capacity
         soil_moisture[ij, 1] -= δW₁         # remove excess from top layer
-        soil_moisture[ij, 2] += p*δW₁*f₁_f₂ # add fraction to lower layer
+        soil_moisture[ij, 2] += p*δW₁*f₁/f₂ # add fraction to lower layer
         R[ij] += Δt*(1-p)*δW₁*f₁            # accumulate river runoff [m] of top layer
 
         # remove excess water from lower layer (this disappears)
