@@ -170,10 +170,10 @@ end
 
 @kernel inbounds=true function _pressure_gradient_flux_kernel!(
     uv∇lnp,                 # Output: (u, v)⋅∇lnp_s term
-    u_grid,                 # Input: zonal velocity
-    v_grid,                 # Input: meridional velocity
-    ∇lnp_x,                 # Input: zonal gradient of log surface pressure
-    ∇lnp_y,                 # Input: meridional gradient of log surface pressure
+    @Const(u_grid),         # Input: zonal velocity
+    @Const(v_grid),         # Input: meridional velocity
+    @Const(∇lnp_x),         # Input: zonal gradient of log surface pressure
+    @Const(∇lnp_y),         # Input: meridional gradient of log surface pressure
 )
     ij, k = @index(Global, NTuple)  # global index: grid point ij, layer k
     # the (u, v)⋅∇lnp_s term
@@ -1257,7 +1257,7 @@ end
 
 @kernel inbounds=true function _linear_pressure_gradient_kernel!(
     geopot,                 # Input/Output: geopotential in spectral space
-    pres,                   # Input: logarithm of surface pressure (spectral)
+    @Const(pres),           # Input: logarithm of surface pressure (spectral)
     @Const(temp_profile),   # Input: reference temperature profile
     R_dry,                  # Input: dry gas constant
 )

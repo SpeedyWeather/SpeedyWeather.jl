@@ -21,7 +21,7 @@ function create_test_model(; trunc=31, nlayers=8)
 end
 
 # Benchmark a function
-function benchmark_function(func!, args...; samples=50, evals=5)
+function benchmark_function(func!, args...; samples=100, evals=5)
     # Warmup
     for _ in 1:2
         func!(args...)
