@@ -75,10 +75,10 @@ $(TYPEDFIELDS)"""
     emissivity_atmosphere::NF = 0.98
 
     "[OPTION] Effective emissivity for surface flux over ocean [1]"
-    emissivity_ocean::NF = 0.6
+    emissivity_ocean::NF = 0.98
 
     "[OPTION] Effective emissivity for surface flux over land [1]"
-    emissivity_land::NF = 0.65
+    emissivity_land::NF = 0.98
 
     "[OPTION] Tropopause temperature [K]"
     temp_tropopause::NF = 200
@@ -109,6 +109,7 @@ initialize!(::JeevanjeeRadiation, ::PrimitiveEquation) = nothing
     ϵ_land = longwave.emissivity_land
     ϵ = longwave.emissivity_atmosphere
     σ = model.atmosphere.stefan_boltzmann
+    cₚ = model.atmosphere.heat_capacity
     Tₜ = longwave.temp_tropopause
     
     land_fraction = model.land_sea_mask.mask[ij]
@@ -118,28 +119,28 @@ initialize!(::JeevanjeeRadiation, ::PrimitiveEquation) = nothing
     # extension to Jeevanjee: Include temperature flux (Stefan-Boltzmann)
     # between surface and lowermost air temperature
     # but zero flux if land/sea not available
-    Fₖ_ocean = isfinite(sst) ? ϵ_ocean*σ*sst^4 : zero(sst)
+    Fₖ_ocean = isfinite(sst) ? ϵ_ocean*σ*sst^4 : zero(sst)      # [W/m²]
     diagn.physics.ocean.surface_longwave_up[ij] = Fₖ_ocean      # for ocean model forcing
 
-    Fₖ_land = isfinite(lst) ? ϵ_land*σ*lst^4 : zero(lst)
+    Fₖ_land = isfinite(lst) ? ϵ_land*σ*lst^4 : zero(lst)        # [W/m²]
     diagn.physics.land.surface_longwave_up[ij] = Fₖ_land        # for land model forcing
 
-    # Fₖ_down = ϵ*σ*T[ij, nlayers]^4
-    # diagn.physics.surface_longwave_down[ij] = Fₖ_down          # for surface energy budget
-    # dTdt[ij, nlayers] -= surface_flux_to_tendency(Fₖ_down, pₛ, model)   # out of layer k
+    Fₖ_down = ϵ*σ*T[ij, nlayers]^4
+    diagn.physics.surface_longwave_down[ij] = Fₖ_down          # for surface energy budget
+    dTdt[ij, nlayers] -= surface_flux_to_tendency(Fₖ_down/cₚ, pₛ, model)   # out of layer k
 
     # land-sea mask weighted combined flux from land and ocean
     local Fₖ::eltype(T)
     Fₖ = (1-land_fraction)*Fₖ_ocean + land_fraction*Fₖ_land
-    dTdt[ij, nlayers] += surface_flux_to_tendency(Fₖ, pₛ, model)
-    diagn.physics.surface_longwave_up[ij] = Fₖ     # store for output/diagnostics
+    dTdt[ij, nlayers] += surface_flux_to_tendency(Fₖ/cₚ, pₛ, model) # convert [W/m²] / cₚ to K·Pa/s
+    diagn.physics.surface_longwave_up[ij] = Fₖ                      # [W/m²] store for output/diagnostics
 
     # integrate from surface up
     for k in nlayers:-1:2
         # Seeley and Wordsworth, 2023 eq (1)
-        Fₖ += (T[ij, k-1] - T[ij, k]) * α * (Tₜ - T[ij, k])     # upward flux from layer k into k-1
-        dTdt[ij, k]   -= flux_to_tendency(Fₖ, pₛ, k,   model)   # out of layer k
-        dTdt[ij, k-1] += flux_to_tendency(Fₖ, pₛ, k-1, model)   # into layer k-1
+        Fₖ += (T[ij, k-1] - T[ij, k]) * α * (Tₜ - T[ij, k])         # upward flux from layer k into k-1
+        dTdt[ij, k]   -= flux_to_tendency(Fₖ/cₚ, pₛ, k,   model)    # out of layer k
+        dTdt[ij, k-1] += flux_to_tendency(Fₖ/cₚ, pₛ, k-1, model)    # into layer k-1
     end
 
     # Relax the uppermost level towards prescribed "tropopause temperature"

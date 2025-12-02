@@ -200,8 +200,8 @@ function timestep!(
     Rsu = diagn.physics.land.surface_shortwave_up       # only albedo reflection
     Rld = diagn.physics.surface_longwave_down           # all in [W/m²]
     Rlu = diagn.physics.land.surface_longwave_up
-    H = diagn.physics.land.surface_humidity_flux       # except this in [kg/s/m²]
     S = diagn.physics.land.sensible_heat_flux
+    H = diagn.physics.land.surface_humidity_flux        # except this in [kg/s/m²]
 
     @boundscheck fields_match(soil_temperature, Rsd, Rsu, Rld, Rlu, H, S, horizontal_only=true) ||
         throw(DimensionMismatch(soil_temperature, Rs))
