@@ -165,7 +165,6 @@ function initialize!(
     land::LandBucketTemperature,
     model::PrimitiveEquation,
 )
-
     # create a seasonal model, initialize it and the variables
     seasonal_model = SeasonalLandTemperature(model.spectral_grid)
     initialize!(seasonal_model, model)
@@ -175,9 +174,9 @@ function initialize!(
     # set ocean "land" temperature points (100% ocean only)
     if land.mask
         masked_value = land.ocean_temperature
-        lst = progn.land.soil_temperature
-        # TODO currently requries .data and fill! instead of .= because of broadcasting issues
-        fill!(progn.land.soil_temperature[isnan.(lst).data], masked_value)
+        # TODO currently requries .data because of broadcasting issues
+        lst = progn.land.soil_temperature.data
+        lst[isnan.(lst)] .= masked_value
         mask!(progn.land.soil_temperature, model.land_sea_mask, :ocean; masked_value)
     end
 end
