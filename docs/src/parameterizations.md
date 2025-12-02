@@ -199,7 +199,7 @@ SpeedyWeather.variables(::SimpleAlbedo) = (
     DiagnosticVariable(name=:albedo, dims=Grid2D(), desc="Albedo", units="1"),
 )
 
-function SpeedyWeather.parameterization!(
+Base.@propagate_inbounds function SpeedyWeather.parameterization!(
     ij,
     diagn::DiagnosticVariables,
     progn::PrognosticVariables,
@@ -217,6 +217,8 @@ function SpeedyWeather.parameterization!(
     end
 end 
 ```
+
+Note that for good CPU performance, we recommend to always define all parameterization functions with `@propagate_inbounds` to avoid bounds checking overhead and inline the function.
 
 Now, we can use our new parameterization in a model. We'll first demonstrate how to simply
 replace the existing albedo: 
