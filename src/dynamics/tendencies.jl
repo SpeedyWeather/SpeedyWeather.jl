@@ -309,78 +309,78 @@ function vertical_integration_kernel!(
     fill!(div_mean, 0)
 
     # GRID-POINT SPACE: u, v, D with thickness weighting Δσₖ
-    # Step 1: Launch kernel over all grid points and layers to accumulate weighted sums
     arch = architecture(u_mean_grid)
-    launch!(arch, RingGridWorkOrder, (size(u_mean_grid, 1), nlayers), _vertical_integration_kernel!,
-            u_mean_grid, v_mean_grid, div_mean_grid, u_grid, v_grid, div_grid, σ_levels_thick)
+    launch!(arch, RingGridWorkOrder, (size(u_mean_grid, 1),), _vertical_integration_kernel!,
+            u_mean_grid, v_mean_grid, div_mean_grid, div_sum_above, uv∇lnp_sum_above,
+            u_grid, v_grid, div_grid, ∇lnp_x, ∇lnp_y, σ_levels_thick, nlayers)
     
-    # Step 2: Compute sum_above arrays (requires results from step 1)
-    launch!(arch, RingGridWorkOrder, (size(u_mean_grid, 1), nlayers), _vertical_integration_sum_above_kernel!,
-            div_sum_above, uv∇lnp_sum_above, u_grid, v_grid, div_grid, 
-            ∇lnp_x, ∇lnp_y, σ_levels_thick)
-    
-    # SPECTRAL SPACE: divergence (computed separately)
-    @inbounds for k in 1:nlayers
-        Δσₖ = σ_levels_thick[k]
-        for lm in eachharmonic(div, div_mean)
-            div_mean[lm] += div[lm, k]*Δσₖ
-        end
-    end
+    # SPECTRAL SPACE: divergence (computed with kernel)
+    launch!(arch, SpectralWorkOrder, (size(div_mean, 1),), _vertical_integration_spectral_kernel!,
+            div_mean, div, σ_levels_thick, nlayers)
 end
 
 @kernel inbounds=true function _vertical_integration_kernel!(
-    u_mean_grid,            # Input/Output: vertically averaged zonal velocity
-    v_mean_grid,            # Input/Output: vertically averaged meridional velocity
-    div_mean_grid,          # Input/Output: vertically averaged divergence
-    u_grid,                 # Input: zonal velocity
-    v_grid,                 # Input: meridional velocity
-    div_grid,               # Input: divergence
-    @Const(σ_levels_thick), # Input: layer thicknesses
-)
-    ij, k = @index(Global, NTuple)  # global index: grid point ij, layer k
-    
-    Δσₖ = σ_levels_thick[k]
-    
-    # Compute weighted contribution from this layer
-    u_contrib = u_grid[ij, k] * Δσₖ
-    v_contrib = v_grid[ij, k] * Δσₖ
-    div_contrib = div_grid[ij, k] * Δσₖ
-    
-    # Atomic add to accumulate across layers
-    # Note: This requires atomic operations for correctness across parallel layer computations
-    KernelAbstractions.@atomic u_mean_grid[ij] += u_contrib
-    KernelAbstractions.@atomic v_mean_grid[ij] += v_contrib
-    KernelAbstractions.@atomic div_mean_grid[ij] += div_contrib
-end
-
-@kernel inbounds=true function _vertical_integration_sum_above_kernel!(
+    u_mean_grid,            # Output: vertically averaged zonal velocity
+    v_mean_grid,            # Output: vertically averaged meridional velocity
+    div_mean_grid,          # Output: vertically averaged divergence
     div_sum_above,          # Output: sum of div from layers above
     uv∇lnp_sum_above,       # Output: sum of uv∇lnp from layers above
     u_grid,                 # Input: zonal velocity
     v_grid,                 # Input: meridional velocity
     div_grid,               # Input: divergence
-    @Const(∇lnp_x),        # Input: zonal gradient of log surface pressure
-    @Const(∇lnp_y),        # Input: meridional gradient of log surface pressure
-    @Const(σ_levels_thick), # Input: layer thicknesses
+    ∇lnp_x,                 # Input: zonal gradient of log surface pressure
+    ∇lnp_y,                 # Input: meridional gradient of log surface pressure
+    σ_levels_thick,         # Input: layer thicknesses
+    nlayers,                # Input: number of layers
 )
-    ij, k = @index(Global, NTuple)  # global index: grid point ij, layer k
+    ij = @index(Global, Linear)  # global index: grid point ij
     
-    # Compute sum from layers 1:k-1 for the Σ_r=1^k-1 Δσᵣ(Dᵣ + u̲⋅∇lnpₛ) vertical integration
-    # Simmons and Burridge, 1981 eq 3.12 split into div and u̲⋅∇lnpₛ
-    u_sum = zero(eltype(u_grid))
-    v_sum = zero(eltype(v_grid))
-    div_sum = zero(eltype(div_grid))
+    # Initialize accumulators for this grid point
+    u_mean = zero(eltype(u_mean_grid))
+    v_mean = zero(eltype(v_mean_grid))
+    div_mean = zero(eltype(div_mean_grid))
     
-    for r in 1:k-1
-        Δσᵣ = σ_levels_thick[r]
-        u_sum += u_grid[ij, r] * Δσᵣ
-        v_sum += v_grid[ij, r] * Δσᵣ
-        div_sum += div_grid[ij, r] * Δσᵣ
+    # Loop over layers, integrating from top to bottom
+    for k in 1:nlayers
+        Δσₖ = σ_levels_thick[k]
+        
+        # Store sum from layers 1:k-1 before adding k-th layer
+        # for the Σ_r=1^k-1 Δσᵣ(Dᵣ + u̲⋅∇lnpₛ) vertical integration
+        # Simmons and Burridge, 1981 eq 3.12 split into div and u̲⋅∇lnpₛ
+        div_sum_above[ij, k] = div_mean
+        uv∇lnp_sum_above[ij, k] = u_mean * ∇lnp_x[ij] + v_mean * ∇lnp_y[ij]
+        
+        # Add k-th layer contribution to the running sum
+        u_mean += u_grid[ij, k] * Δσₖ
+        v_mean += v_grid[ij, k] * Δσₖ
+        div_mean += div_grid[ij, k] * Δσₖ
     end
     
-    # Store the sums
-    div_sum_above[ij, k] = div_sum
-    uv∇lnp_sum_above[ij, k] = u_sum * ∇lnp_x[ij] + v_sum * ∇lnp_y[ij]
+    # Store final accumulated values
+    u_mean_grid[ij] = u_mean
+    v_mean_grid[ij] = v_mean
+    div_mean_grid[ij] = div_mean
+end
+
+@kernel inbounds=true function _vertical_integration_spectral_kernel!(
+    div_mean,               # Output: vertically averaged divergence (spectral)
+    div,                    # Input: divergence (spectral)
+    @Const(σ_levels_thick), # Input: layer thicknesses
+    @Const(nlayers),       # Input: number of layers
+)
+    lm = @index(Global, Linear)  # global index: harmonic lm
+    
+    # Initialize accumulator for this harmonic
+    div_sum = zero(eltype(div_mean))
+    
+    # Loop over layers, accumulating weighted divergence
+    for k in 1:nlayers
+        Δσₖ = σ_levels_thick[k]
+        div_sum += div[lm, k] * Δσₖ
+    end
+    
+    # Store final accumulated value
+    div_mean[lm] = div_sum
 end
         
 """
@@ -415,7 +415,7 @@ function surface_pressure_tendency!(
     # for semi-implicit div_mean is calc at time step i-1 in vertical_integration!
     @. pres_tend -= ūv̄∇lnpₛ + div_mean      # add the -div_mean term in spectral, swap sign
     
-    GPUArrays.@allowscalar pres_tend[1] = 0                        # for mass conservation
+    @allowscalar pres_tend[1] = 0                        # for mass conservation
     return nothing
 end
 
@@ -460,7 +460,7 @@ end
 
 """$(TYPEDSIGNATURES)
 Kernelized version: Compute vertical velocity (mass flux). Uses KernelAbstractions for GPU/CPU portability.
-Kernel runs over all grid points and layers simultaneously."""
+Kernel runs over grid points with layer loop inside."""
 function vertical_velocity_kernel!(
     diagn::DiagnosticVariables,
     geometry::Geometry,
@@ -482,11 +482,11 @@ function vertical_velocity_kernel!(
     grids_match(σ_tend, div_sum_above, div_grid, uv∇lnp_sum_above, uv∇lnp) ||
         throw(DimensionMismatch(σ_tend, div_sum_above, div_grid, uv∇lnp_sum_above, uv∇lnp))
 
-    # Launch kernel over all grid points and layers (excluding bottom layer)
+    # Launch kernel over grid points with layer loop inside
     arch = architecture(σ_tend)
-    launch!(arch, RingGridWorkOrder, (size(σ_tend, 1), nlayers-1), _vertical_velocity_kernel!,
+    launch!(arch, RingGridWorkOrder, (size(σ_tend, 1),), _vertical_velocity_kernel!,
             σ_tend, div_mean_grid, ūv̄∇lnp, div_sum_above, div_grid,
-            uv∇lnp_sum_above, uv∇lnp, σ_levels_half, σ_levels_thick)
+            uv∇lnp_sum_above, uv∇lnp, σ_levels_half, σ_levels_thick, nlayers)
 
     # mass flux σ̇ is zero at k=1/2 (not explicitly stored) and k=nlayers+1/2 (stored in layer k)
     # set to zero for bottom layer then
@@ -495,7 +495,7 @@ function vertical_velocity_kernel!(
 end
 
 @kernel inbounds=true function _vertical_velocity_kernel!(
-    σ_tend,                 #  Output: vertical mass flux
+    σ_tend,                 # Output: vertical mass flux
     div_mean_grid,          # Input: vertically averaged divergence
     ūv̄∇lnp,                 # Input: vertically averaged (u,v)⋅∇lnp
     div_sum_above,          # Input: sum of div from layers above
@@ -504,16 +504,20 @@ end
     uv∇lnp,                 # Input: (u,v)⋅∇lnp
     @Const(σ_levels_half),  # Input: σ levels at half levels
     @Const(σ_levels_thick), # Input: σ layer thicknesses
+    @Const(nlayers),       # Input: number of layers
 )
-    ij, k = @index(Global, NTuple)  # global index: grid point ij, layer k
+    ij = @index(Global, Linear)  # global index: grid point ij
     
-    Δσₖ = σ_levels_thick[k]
-    σₖ_half = σ_levels_half[k+1]
-    
-    # Hoskins and Simmons, 1975 just before eq. (6)
-    σ_tend[ij, k] = σₖ_half*(div_mean_grid[ij] + ūv̄∇lnp[ij]) -
-        (div_sum_above[ij, k] + Δσₖ*div_grid[ij, k]) -
-        (uv∇lnp_sum_above[ij, k] + Δσₖ*uv∇lnp[ij, k])
+    # Loop over layers (excluding bottom layer where σ̇ = 0)
+    for k in 1:nlayers-1
+        Δσₖ = σ_levels_thick[k]
+        σₖ_half = σ_levels_half[k+1]
+        
+        # Hoskins and Simmons, 1975 just before eq. (6)
+        σ_tend[ij, k] = σₖ_half*(div_mean_grid[ij] + ūv̄∇lnp[ij]) -
+            (div_sum_above[ij, k] + Δσₖ*div_grid[ij, k]) -
+            (uv∇lnp_sum_above[ij, k] + Δσₖ*uv∇lnp[ij, k])
+    end
 end
 
 """
@@ -1491,6 +1495,6 @@ function temperature_average!(
 )
     @inbounds for k in eachmatrix(temp)
         # average from l=m=0 harmonic divided by norm of the sphere
-        GPUArrays.@allowscalar diagn.temp_average[k] = real(temp[1, k])/S.norm_sphere
+        @allowscalar diagn.temp_average[k] = real(temp[1, k])/S.norm_sphere
     end
 end 
