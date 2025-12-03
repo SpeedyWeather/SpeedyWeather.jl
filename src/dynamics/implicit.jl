@@ -675,10 +675,7 @@ function implicit_correction_cpu!(
                 geopot[lm, k] += R[k, r]*temp_tend[lm, r]
             end
         end
-    end 
 
-    
-    for k in 1:nlayers
         # 2. the G = G_D + ξRG_T + ξUG_lnps terms using geopot from above
         lm = 0
         for m in 1:trunc+1              # loops over all columns/order m
@@ -715,7 +712,7 @@ function implicit_correction_cpu!(
         for r in eachmatrix(div_tend, temp_tend)
             for lm in eachharmonic(div_tend, temp_tend)
                 # δT = G_T + ξLδD
-                #temp_tend[lm, k] += ξ*L[k, r]*div_tend[lm, r]
+                temp_tend[lm, k] += ξ*L[k, r]*div_tend[lm, r]
             end
         end
 
