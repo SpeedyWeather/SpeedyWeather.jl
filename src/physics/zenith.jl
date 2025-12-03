@@ -5,22 +5,14 @@ abstract type AbstractZenith end
 """Coefficients to calculate the solar declination angle δ [radians] based on a simple
 sine function, with Earth's axial tilt as amplitude, equinox as phase shift.
 $(TYPEDFIELDS)"""
-@parameterized Base.@kwdef struct SinSolarDeclination{NF} <: AbstractSolarDeclination
-    @param axial_tilt::NF = 23.44 (bounds=-90..90,)
-    equinox::DateTime = DateTime(2000, 3, 20)
-    length_of_year::Second = Day(365.25)
-    length_of_day::Second = Hour(24)
+struct SinSolarDeclination{P} <: AbstractSolarDeclination
+    planet::P
 end
-
-"""Generator function pulling the number format NF from a SpectralGrid."""
-SinSolarDeclination(SG::SpectralGrid; kwargs...) = SinSolarDeclination{SG.NF}(; kwargs...)
 
 """Generator function using the planet's orbital parameters to adapt the
 solar declination calculation."""
-function SinSolarDeclination(SG::SpectralGrid, P::AbstractPlanet)
-    (; axial_tilt, equinox, length_of_year, length_of_day) = P
-    SinSolarDeclination{SG.NF}(; axial_tilt, equinox, length_of_year, length_of_day)
-end
+SinSolarDeclination(SG::SpectralGrid, P::AbstractPlanet) = SinSolarDeclination(P)
+SinSolarDeclination(P::AbstractPlanet) = SinSolarDeclination(P)
 
 """
 $(TYPEDSIGNATURES)
@@ -28,9 +20,10 @@ SinSolarDeclination functor, computing the solar declination angle of
 angular fraction of year g [radians] using the coefficients of the
 SinSolarDeclination struct."""
 function (S::SinSolarDeclination)(g::NF) where NF
-    axial_tilt = deg2rad(S.axial_tilt)
-    equinox = S.length_of_day.value*Dates.dayofyear(S.equinox)/S.length_of_year.value
-    return axial_tilt*sin(g-2*(π*convert(NF, equinox)))
+    axial_tilt = deg2rad(S.planet.axial_tilt)
+    equinox = Second(S.planet.length_of_day).value *
+        Dates.dayofyear(S.planet.equinox) / Second(S.planet.length_of_year).value
+    return axial_tilt * sin(g - 2 * (π * convert(NF, equinox)))
 end
 
 """Coefficients to calculate the solar declination angle δ from
