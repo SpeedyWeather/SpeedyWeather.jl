@@ -22,12 +22,12 @@ function _scale_lat!(field::AbstractField, v::AbstractVector)
     arch = architecture(field)
     # Ensure worksize is always 2D by adding layer dimension dim=1
     worksize = ndims(field) == 1 ? (size(field, 1), 1) : size(field)
-    launch!(arch, RingGridWorkOrder, worksize, scale_lat_kernel!, field, v)
+    launch!(arch, RingGridWorkOrder, worksize, scale_lat_kernel!, field, v, whichring(field.grid))
     return field
 end
 
-@kernel inbounds=true function scale_lat_kernel!(field, v)
+@kernel inbounds=true function scale_lat_kernel!(field, v, @Const(whichring))
     ij, k = @index(Global, NTuple)
-    j = whichring(ij, field)   # get ring index for grid point ij
+    j = whichring[ij]   # get ring index for grid point ij
     field[ij, k] *= v[j]
 end
