@@ -41,8 +41,8 @@ initialize!(radiation::UniformCooling, model::PrimitiveEquation) = nothing
     nlayers = size(T, 2)
     
     NF = eltype(T)
-    cooling = -inv(convert(NF, radiation.time_scale.value))
-    τ⁻¹ = inv(convert(NF, radiation.time_scale_stratosphere.value))
+    cooling = -inv(convert(NF, Second(longwave.time_scale).value))
+    τ⁻¹ = inv(convert(NF, Second(longwave.time_scale_stratosphere).value))
 
     for k in 1:nlayers
         # Paulius and Garner, 2006, eq (1) and (2)
@@ -71,14 +71,14 @@ $(TYPEDFIELDS)"""
     "[OPTION] Radiative forcing constant (W/m²/K²)"
     α::NF = 0.025
 
-    "[OPTION] Eemissivity of the atmosphere [1]"
-    emissivity_atmosphere::NF = 0.98
+    "[OPTION] Emissivity of the atmosphere [1]"
+    emissivity_atmosphere::NF = 0.7
 
-    "[OPTION] Effective emissivity for surface flux over ocean [1]"
-    emissivity_ocean::NF = 0.98
+    "[OPTION] Emissivity for surface flux over ocean [1]"
+    emissivity_ocean::NF = 0.96
 
-    "[OPTION] Effective emissivity for surface flux over land [1]"
-    emissivity_land::NF = 0.98
+    "[OPTION] Emissivity for surface flux over land [1]"
+    emissivity_land::NF = 0.9
 
     "[OPTION] Tropopause temperature [K]"
     temp_tropopause::NF = 200

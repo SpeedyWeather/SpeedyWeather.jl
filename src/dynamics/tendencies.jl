@@ -899,8 +899,6 @@ function SpeedyTransforms.transform!(
     humid = get_step(progn.humid, lf)   # humidity at leapfrog step lf
     pres  = get_step(progn.pres, lf)    # logarithm of surface pressure at leapfrog step lf
 
-    # @info progn.pres[1, :]
-
     (; scratch_memory) = diagn.dynamics
 
     U = diagn.dynamics.a                # reuse work arrays

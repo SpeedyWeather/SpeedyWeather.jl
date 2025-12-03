@@ -237,36 +237,36 @@ initialize!(albedo::LandSnowAlbedo, model::PrimitiveEquation) = nothing
     albedo!(ij, diagn.albedo, progn.land, albedo, model)
 
 @propagate_inbounds function albedo!(
-    ij,                                     # grid point index
-    diagn,                                  # land only
-    land,
-    albedo::LandSnowAlbedo,
+    ij,                                 # grid point index
+    albedo,                             # land albedo field
+    land,                               # land prognostic variables
+    albedo_scheme::LandSnowAlbedo,
     model::PrimitiveEquation,
 )
     # 1. Albedo of vegetation + bare soil (no snow)
-    (; albedo_land, albedo_high_vegetation, albedo_low_vegetation) = albedo
+    (; albedo_land, albedo_high_vegetation, albedo_low_vegetation) = albedo_scheme
 
     if model.land isa AbstractWetLand
         (; high_cover, low_cover) = model.land.vegetation
 
         # linear combination of high and low vegetation and bare soil
-        diagn.albedo[ij] = high_cover[ij] * albedo_high_vegetation +
-                                low_cover[ij] * albedo_low_vegetation +
-                                albedo_land * (1 - high_cover[ij] - low_cover[ij])
+        albedo[ij] = high_cover[ij] * albedo_high_vegetation +
+                        low_cover[ij] * albedo_low_vegetation +
+                        albedo_land * (1 - high_cover[ij] - low_cover[ij])
     else
-        diagn.albedo[ij] = albedo_land
+        albedo[ij] = albedo_land
     end
 
     # 2. Add snow cover
     (; snow_depth) = land
-    (; albedo_snow, snow_depth_scale) = albedo
+    (; albedo_snow, snow_depth_scale) = albedo_scheme
 
     # how to compute snow cover from snow depth
-    snow_cover_scheme = albedo.snow_cover
+    snow_cover_scheme = albedo_scheme.snow_cover
 
     # compute snow-cover fraction using the chosen scheme and clamp to [0, 1]
     snow_cover = snow_cover_scheme(snow_depth[ij], snow_depth_scale)
 
     # set land albedo linearly between bare land and snow depending on snow cover [0, 1]
-    diagn.albedo[ij] += snow_cover * albedo_snow
+    albedo[ij] += snow_cover * albedo_snow
 end

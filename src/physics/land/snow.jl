@@ -52,9 +52,9 @@ function timestep!(
     cₛ = model.land.thermodynamics.heat_capacity_dry_soil
     z₁ = model.land.geometry.layer_thickness[1]
     (; melting_threshold) = snow
-    r⁻¹ = inv(Second(snow.runoff_time_scale).value)
+    r⁻¹ = inv(convert(eltype(snow_depth), Second(snow.runoff_time_scale).value))
 
-    snow_fall_rate = diagn.physics.snow_rate                # from precipitation schemes [kg/m²/s]
+    snow_fall_rate = diagn.physics.snow_rate                # from precipitation schemes [m/s]
     snow_melt_rate = diagn.physics.land.snow_melt_rate      # for soil moisture model
 
     params = (; melting_threshold, cₛ, z₁, Δt, ρ_water, Lᵢ, r⁻¹)
@@ -74,6 +74,7 @@ end
     if mask[ij] > 0                         # at least partially land
 		
 		(; melting_threshold, cₛ, z₁, Δt, ρ_water, Lᵢ, r⁻¹) = params
+
         # check for melting of snow if temperature above melting threshold
         # check for NaNs here to prevent land temperatures read from NetCDF data
         # to cause an immediate blow up in case the land-sea mask doesn't align
@@ -84,8 +85,8 @@ end
         # heat capacity per volume, so not *density needed
         E_avail = cₛ * δT_melt * z₁ / Δt  # [J/(m³ K)] * [K] * [m] / [s] = [J/m²/s]
 
-        # Term 1: snow fall rate from precipitation schemes [kg/m^2/s] -> [m/s]
-        snow_fall_rate_max = snow_fall_rate[ij] / ρ_water
+        # Term 1: snow fall rate from precipitation schemes [m/s]
+        snow_fall_rate_max = snow_fall_rate[ij]
 
 		# Term 2: max melt rate allowed by available energy [m/s]
         melt_rate_max = E_avail / (ρ_water * Lᵢ)
@@ -107,9 +108,15 @@ end
 
         # store to pass to soil moisture [kg/m²/s], combined runoff with melt rate
         # limited to what's available to melt/runoff
-        snow_melt_rate[ij] = melt_rate_max + runoff_rate_max + dsnow_excess
+        snow_melt_rate[ij] = (melt_rate_max + runoff_rate_max + dsnow_excess) * ρ_water
 
         # Euler forward time step but cap at 0 depth to not melt more snow than available
         snow_depth[ij] = max(snow_depth[ij] + Δt * dsnow, 0)
     end
+end
+
+function variables(::SnowModel)
+    return (
+        PrognosticVariable(name=:snow_depth, dims=Grid2D(), namespace=:land, units="m", desc="Snow depth in equivalent liquid water height"),
+        )
 end

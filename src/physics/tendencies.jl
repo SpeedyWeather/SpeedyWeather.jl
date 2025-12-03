@@ -86,9 +86,16 @@ Using surface pressure `pₛ` [Pa] and gravity `g` [m/s^2]."""
 
 # hacky, temporary placement, and also modularize this? 
 function reset_variables!(diagn::DiagnosticVariables)
-    if haskey(diagn.physics, :cloud_top)
-        (; cloud_top) = diagn.physics
-        cloud_top .= diagn.nlayers + 1    # reset to below top layer
+    reset_variable!(diagn.physics, :cloud_top, diagn.nlayers + 1)   # reset to below top layer
+    reset_variable!(diagn.physics, :rain_rate, 0)
+    reset_variable!(diagn.physics, :snow_rate, 0)
+    reset_variable!(diagn.physics, :surface_humidity_flux, 0)
+    reset_variable!(diagn.physics, :sensible_heat_flux, 0)
+end
+
+function reset_variable!(diagn, var::Symbol, reset_value)
+    if haskey(diagn, var)
+        field = getfield(diagn.physics, var)
+        field .= reset_value
     end
-    return nothing
 end

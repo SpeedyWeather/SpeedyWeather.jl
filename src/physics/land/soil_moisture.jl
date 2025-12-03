@@ -226,7 +226,7 @@ function timestep!(
     ρ = model.atmosphere.water_density
     (; mask) = model.land_sea_mask
 
-    P = diagn.physics.rain_rate                     # precipitation (rain only) in [kg/m²/s]
+    P = diagn.physics.rain_rate                     # precipitation (rain only) in [m/s]
     S = diagn.physics.land.snow_melt_rate           # [kg/m²/s] includes snow runoff leakage water
     H = diagn.physics.land.surface_humidity_flux    # [kg/m²/s], divide by density for [m/s], positive up
     R = diagn.physics.land.river_runoff             # diagnosed here, accumulated [m]
@@ -258,8 +258,8 @@ end
 
         # Soil top sources and sinks
         # note: rain water can increase soil moisture regardless of snow cover
-        # [kg/m²/s] -> [m/s] for humidity flux H
-        F = P[ij] + S[ij] - H[ij]/ρ
+        # [kg/m²/s] -> [m/s] for humidity flux H and snow melt rate S
+        F = P[ij] + (S[ij] - H[ij])/ρ
   
         # vertical diffusion term between layers
         D = τ⁻¹*(soil_moisture[ij, 1] - soil_moisture[ij, 2])

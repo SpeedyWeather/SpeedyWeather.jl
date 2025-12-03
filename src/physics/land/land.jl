@@ -60,8 +60,10 @@ function initialize!(   land::LandModel,
     initialize!(model.land.rivers, model)
 end
 
-variables(land::LandModel) = (variables(land.temperature)...,
+# allocate variables as defined by land components
+variables(land::LandModel) = ( variables(land.temperature)...,
                                variables(land.soil_moisture)...,
+                               variables(land.snow)...,
                                variables(land.vegetation)...,
                                variables(land.rivers)...,
                                )
@@ -80,8 +82,9 @@ function initialize!(land::DryLandModel, model::PrimitiveEquation)
     initialize!(model.land.temperature, model)
 end
 
-variables(land::DryLandModel) = (variables(land.temperature)...,
-                               )
+# initializing the land model initializes its components
+variables(land::DryLandModel) = (variables(land.temperature)...,)
+
 # unpack land model and call general timestep! function
 land_timestep!(progn::PrognosticVariables, diagn::DiagnosticVariables, model::PrimitiveEquation) =
     timestep!(progn, diagn, model.land, model)
