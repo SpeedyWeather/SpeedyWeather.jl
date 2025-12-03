@@ -93,9 +93,9 @@ function reset_variables!(diagn::DiagnosticVariables)
     reset_variable!(diagn.physics, :sensible_heat_flux, 0)
 end
 
-function reset_variable!(diagn, var::Symbol, reset_value)
-    if haskey(diagn, var)
-        field = getfield(diagn.physics, var)
+function reset_variable!(vars, var::Symbol, reset_value)
+    if haskey(vars, var)
+        field = getfield(vars, var)
         field .= reset_value
     end
 end
