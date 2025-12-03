@@ -736,12 +736,13 @@ end
         @Const(coslat⁻¹),       # Input: 1/cos(latitude) for scaling
         @Const(whichring),      # Input: mapping from grid point to latitude ring
     )
-    ij, k = @index(Global, NTuple)
-    j = whichring[ij]               # latitude ring index for this grid point
+    I = @index(Global, Cartesian)
+
+    j = whichring[I[1]]               # latitude ring index for this grid point
     coslat⁻¹j = coslat⁻¹[j]         # get coslat⁻¹ for this latitude
-    Acoslat⁻¹j = A_grid[ij, k] * coslat⁻¹j
-    uA_grid[ij, k] = u_grid[ij, k] * Acoslat⁻¹j
-    vA_grid[ij, k] = v_grid[ij, k] * Acoslat⁻¹j
+    Acoslat⁻¹j = A_grid[I] * coslat⁻¹j
+    uA_grid[I] = u_grid[I] * Acoslat⁻¹j
+    vA_grid[I] = v_grid[I] * Acoslat⁻¹j
 end
 
 """
