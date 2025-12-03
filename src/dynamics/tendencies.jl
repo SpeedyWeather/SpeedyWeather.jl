@@ -9,7 +9,9 @@ function dynamics_tendencies!(
     forcing!(diagn, progn, lf, model)   # = (Fᵤ, Fᵥ) forcing for u, v
     drag!(diagn, progn, lf, model)      # drag term for u, v
     vorticity_flux!(diagn, model)       # = ∇×(v(ζ+f) + Fᵤ, -u(ζ+f) + Fᵥ)
-    return tracer_advection!(diagn, model)
+    tracer_advection!(diagn, model)
+
+    return nothing 
 end
 
 """
@@ -39,7 +41,9 @@ function dynamics_tendencies!(
     volume_flux_divergence!(diagn, orography, atmosphere, geometry, spectral_transform)
 
     # advect all tracers
-    return tracer_advection!(diagn, model)
+    tracer_advection!(diagn, model)
+
+    return nothing
 end
 
 """$(TYPEDSIGNATURES)
@@ -129,7 +133,9 @@ function pressure_gradient_flux!(
     (; uv∇lnp) = diagn.dynamics
 
     # PRESSURE GRADIENT FLUX
-    return uv∇lnp .= u_grid .* ∇lnp_x .+ v_grid .* ∇lnp_y
+    uv∇lnp .= u_grid .* ∇lnp_x .+ v_grid .* ∇lnp_y
+
+    return nothing
 end
 
 """$(TYPEDSIGNATURES)
@@ -143,7 +149,9 @@ function temperature_anomaly!(
     (; temp_grid, temp_virt_grid) = diagn.grid
 
     temp_grid .-= temp_profile'
-    return temp_virt_grid .-= temp_profile'
+    temp_virt_grid .-= temp_profile'
+
+    return nothing
 end
 
 """$(TYPEDSIGNATURES)
@@ -241,10 +249,12 @@ function vertical_integration!(
     )
 
     # SPECTRAL SPACE: divergence (computed with kernel)
-    return launch!(
+    launch!(
         arch, SpectralWorkOrder, (size(div_mean, 1),), _vertical_integration_spectral_kernel!,
         div_mean, div, σ_levels_thick, nlayers
     )
+
+    return nothing
 end
 
 @kernel inbounds = true function _vertical_integration_kernel!(
@@ -604,7 +614,9 @@ function humidity_tendency!(
     (; humid_grid) = diagn.grid
 
     # add horizontal advection to parameterization + vertical advection tendencies
-    return horizontal_advection!(humid_tend, humid_tend_grid, humid_grid, diagn, G, S, add = true)
+    horizontal_advection!(humid_tend, humid_tend_grid, humid_grid, diagn, G, S, add = true)
+
+    return nothing
 end
 
 # no humidity tendency for dry core
@@ -655,7 +667,9 @@ function horizontal_advection!(
     transform!(A_tend, A_tend_grid, scratch_memory, S)  # for +A*div in spectral space
 
     # now add the -∇⋅((u, v)*A) term
-    return flux_divergence!(A_tend, A_grid, diagn, G, S, add = true, flipsign = true)
+    flux_divergence!(A_tend, A_grid, diagn, G, S, add = true, flipsign = true)
+
+    return nothing
 end
 
 @kernel inbounds = true function _horizontal_advection_kernel!(
@@ -899,7 +913,9 @@ function linear_pressure_gradient!(
     # vordiv_tendencies! include as R_dry*Tₖ*lnpₛ into the geopotential on which the operator
     # -∇² is applied in bernoulli_potential!
     # TODO: Broadcast issue with LTA, conflicting broadcast styles
-    return geopot.data .+= R_dry .* temp_profile' .* pres.data
+    geopot.data .+= R_dry .* temp_profile' .* pres.data
+
+    return nothing
 end
 
 """
@@ -926,7 +942,9 @@ function volume_flux_divergence!(
     pres_grid .+= H .- orography
 
     # now do -∇⋅(uh, vh) and store in pres_tend
-    return flux_divergence!(pres_tend, pres_grid, diagn, G, S, add = true, flipsign = true)
+    flux_divergence!(pres_tend, pres_grid, diagn, G, S, add = true, flipsign = true)
+
+    return nothing
 end
 
 """
