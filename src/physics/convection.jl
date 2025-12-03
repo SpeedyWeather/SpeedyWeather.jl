@@ -30,14 +30,14 @@ simplified Betts-Miller convection. Starts with a first-guess relaxation to dete
 the convective criteria (none, dry/shallow or deep), then adjusts reference profiles
 for thermodynamic consistency (e.g. in dry convection the humidity profile is non-precipitating),
 and relaxes current vertical profiles to the adjusted references."""
-@propagate_inbounds function convection!(ij, diagn, SBM::BettsMillerConvection, model)
+@propagate_inbounds function convection!(ij, diagn, convection::BettsMillerConvection, model)
 
     (; geometry, clausius_clapeyron, planet, atmosphere, time_stepping) = model
-    NF = eltype(diagn.grid.temp_grid)
     σ = geometry.σ_levels_full
     σ_half = geometry.σ_levels_half
     Δσ = geometry.σ_levels_thick
     nlayers = length(σ)
+    Δt = time_stepping.Δt_sec
     
     # use previous time step for more stable calculations
     temp = diagn.grid.temp_grid_prev
@@ -45,10 +45,12 @@ and relaxes current vertical profiles to the adjusted references."""
     geopotential = diagn.grid.geopotential
     temp_tend = diagn.tendencies.temp_tend_grid
     humid_tend = diagn.tendencies.humid_tend_grid
-    pₛ = diagn.grid.pres_grid_prev[ij]
+    pₛ = diagn.grid.pres_grid_prev[ij]                  # surface pressure [Pa]
+    NF = eltype(temp)
 
     # thermodynamics
     ρ = atmosphere.water_density                        # density of water [kg/m³]
+    g = planet.gravity                                  # gravity [m/s²]
     Lᵥ = clausius_clapeyron.latent_heat_condensation    # latent heat of vaporization
     cₚ = clausius_clapeyron.heat_capacity               # heat capacity
 
@@ -57,25 +59,17 @@ and relaxes current vertical profiles to the adjusted references."""
     humid_ref_profile = diagn.dynamics.b_grid           # specific humidity [kg/kg] profile to adjust to
     
     # CONVECTIVE CRITERIA AND FIRST GUESS RELAXATION
-    # Create pseudo column for surface_temp_humid function (this needs to be updated later)
-    # For now, use surface values directly
-    temp_parcel = temp[ij, nlayers]                         # TODO use surface or skin temperature?
-    humid_parcel = humid[ij, nlayers]
-
-    level_zero_buoyancy = pseudo_adiabat!(ij, temp_ref_profile,
-                                            temp_parcel, humid_parcel,
-                                            temp, humid, geopotential, pₛ, σ,
-                                            clausius_clapeyron)
+    level_zero_buoyancy = pseudo_adiabat!(ij, temp_ref_profile, temp, humid, geopotential, pₛ, σ, clausius_clapeyron)
             
     for k in level_zero_buoyancy:nlayers
         qsat = saturation_humidity(temp_ref_profile[ij, k], pₛ*σ[k], clausius_clapeyron)
-        humid_ref_profile[ij, k] = qsat*SBM.relative_humidity
+        humid_ref_profile[ij, k] = qsat * convection.relative_humidity
     end
 
-    local Pq::NF = 0        # precipitation due to drying
-    local PT::NF = 0        # precipitation due to cooling
-    local ΔT::NF = 0        # vertically uniform temperature profile adjustment
-    local Qref::NF = 0      # = ∫_pₛ^p_LZB -humid_ref_profile dp
+    Pq::NF = 0        # precipitation due to drying
+    PT::NF = 0        # precipitation due to cooling
+    ΔT::NF = 0        # vertically uniform temperature profile adjustment
+    Qref::NF = 0      # = ∫_pₛ^p_LZB -humid_ref_profile dp
 
     # skip constants compared to Frierson 2007, i.e. no /τ, /gravity, *cₚ/Lᵥ
     for k in level_zero_buoyancy:nlayers
@@ -87,8 +81,8 @@ and relaxes current vertical profiles to the adjusted references."""
         # PT += δT*Δσ[k]/gravity*cₚ/Lᵥ
 
         # shorter form with same sign (τ, gravity, cₚ, Lᵥ all positive) to be reused
-        Pq += (humid[ij, k] - humid_ref_profile[ij, k])*Δσ[k]
-        PT -= (temp[ij, k] - temp_ref_profile[ij, k])*Δσ[k]
+        Pq += (humid[ij, k] - humid_ref_profile[ij, k]) * Δσ[k]
+        PT -= (temp[ij, k] - temp_ref_profile[ij, k]) * Δσ[k]
     end
 
     # ADJUST PROFILES FOLLOWING FRIERSON 2007
@@ -113,7 +107,7 @@ and relaxes current vertical profiles to the adjusted references."""
     elseif shallow_convection
         
         # FRIERSON'S QREF SCHEME
-        # "changing the reference profiles for both temperature and humidity so the
+        # changing the reference profiles for both temperature and humidity so the
         # precipitation is zero.
 
         for k in level_zero_buoyancy:nlayers
@@ -128,38 +122,35 @@ and relaxes current vertical profiles to the adjusted references."""
         end
     end
 
-	(; gravity) = planet
-	(; water_density) = atmosphere
-	(; Δt_sec) = time_stepping
-
     # Initialize rain accumulation for this grid point
-    rain_convection = zero(NF)
+    rain_convection::NF = 0
 
     # GET TENDENCIES FROM ADJUSTED PROFILES
+    τ⁻¹ = inv(convert(NF, Second(convection.time_scale).value))
     for k in level_zero_buoyancy:nlayers
-        temp_tend[ij, k] -= (temp[ij, k] - temp_ref_profile[ij,k]) / SBM.time_scale.value
-        δq = (humid[ij, k] - humid_ref_profile[ij,k]) / SBM.time_scale.value
+        temp_tend[ij, k] -= (temp[ij, k] - temp_ref_profile[ij, k]) * τ⁻¹
+        δq = (humid[ij, k] - humid_ref_profile[ij, k]) * τ⁻¹
         humid_tend[ij, k] -= δq
 
         # convective precipitation (rain), integrate dq\dt [(kg/kg)/s] vertically
-        rain = max(δq * Δσ[k], zero(δq))        # only integrate excess humidity for precip (no reevaporation)
-        rain_convection += rain                 # integrate vertically, Formula 25, unit [m]
+        rain = max(δq * Δσ[k], 0)       # only integrate excess humidity for precip (no reevaporation)
+        rain_convection += rain         # integrate vertically, Formula 25, unit [m]
     end
  
     # CONVECTIVE PRECIPITATION
     # enforce no precip for shallow conv via * deep_convection flag
-    pₛΔt_gρ = (pₛ * Δt_sec / gravity / water_density) * deep_convection 
+    pₛΔt_gρ = (pₛ * Δt / (g * ρ)) * deep_convection 
 	rain_convection *= pₛΔt_gρ                  # convert to [m] of rain during Δt
     rain_convection = max(rain_convection, 0)   # ensure non-negative precipitation, rounding errors
     
     # Store precipitation in diagnostic arrays
-    diagn.physics.rain_convection[ij] += rain_convection                # accumulated rain [m] for output
+    diagn.physics.rain_convection[ij] += rain_convection            # accumulated rain [m] for output
 
     # TODO use [kg/m²/s] units? then * ρ here
-    diagn.physics.rain_rate_convection[ij] = rain_convection / Δt_sec   # instantaneous rate [m/s] for coupling
+    diagn.physics.rain_rate_convection[ij] = rain_convection / Δt   # instantaneous rate [m/s] for coupling
 
-    # Update cloud top
-    diagn.physics.cloud_top[ij] = min(diagn.physics.cloud_top[ij], level_zero_buoyancy)       # clouds reach to top of convection
+    # clouds reach to top of convection
+    diagn.physics.cloud_top[ij] = min(diagn.physics.cloud_top[ij], level_zero_buoyancy)
     return nothing
 end
 
@@ -180,8 +171,6 @@ set to NaN instead and should be skipped in the relaxation."""
 @propagate_inbounds function pseudo_adiabat!(
     ij,
     temp_ref_profile,
-    temp_parcel,
-    humid_parcel,
     temp_environment,
     humid_environment,
     geopotential,
@@ -189,7 +178,8 @@ set to NaN instead and should be skipped in the relaxation."""
     σ,
     clausius_clapeyron,
 )
-    NF = eltype(temp_ref_profile)
+    NF = eltype(temp_ref_profile)                       # number format
+    nlayers = length(σ)                                 # number of vertical layers
 
     # thermodynamics
     (; R_dry, R_vapour) = clausius_clapeyron
@@ -198,9 +188,11 @@ set to NaN instead and should be skipped in the relaxation."""
 
     κ = R_dry/cₚ                         
     ε = clausius_clapeyron.mol_ratio
-    μ = (1-ε)/ε                             # for virtual temperature
+    μ = (1-ε)/ε                                         # for virtual temperature
 
-    nlayers = length(σ)                         # number of vertical levels
+    temp_parcel::NF = temp_environment[ij, nlayers]     # start at surface with environment temperature [K]
+    humid_parcel::NF = humid_environment[ij, nlayers]   # and humidity [kg/kg]
+
     for k in 1:nlayers
         temp_ref_profile[ij, k] = NaN           # reset profile from any previous calculation, TODO necessary?
     end
@@ -231,7 +223,7 @@ set to NaN instead and should be skipped in the relaxation."""
             B = q*Lᵥ^2 / ((1-q)^2 * cₚ * R_vapour)
             Γ = (1 + A/Tᵥ) / (1 + B/T^2)
                 
-            ΔΦ = geopotential[ij, k] - geopotential[ij, k+1]                    # vertical gradient in geopotential
+            ΔΦ = geopotential[ij, k] - geopotential[ij, k+1]        # vertical gradient in geopotential
             temp_parcel = temp_parcel - ΔΦ/cₚ*Γ                     # new temperature of parcel at k
                 
             # at new (lower) temperature condensation occurs immediately
@@ -251,7 +243,7 @@ set to NaN instead and should be skipped in the relaxation."""
     end
     
     # if parcel isn't buoyant anymore set last temperature (with negative buoyancy) back to NaN
-    temp_ref_profile[ij, k] = !buoyant ? NF(NaN) : temp_ref_profile[ij, k]
+    temp_ref_profile[ij, k] = !buoyant ? NaN32 : temp_ref_profile[ij, k]
     
     # level of zero buoyancy is reached when the loop stops, but in case it's at the top it's still buoyant
     level_zero_buoyancy = k + (1-buoyant)
@@ -418,7 +410,6 @@ ConvectiveHeating(SG::SpectralGrid; kwargs...) = ConvectiveHeating{SG.NF, SG.Vec
 
 # precompute latitudinal mask
 function initialize!(C::ConvectiveHeating, model::PrimitiveEquation)
-    
     θ = model.geometry.latd
     (; θ₀, σθ) = C
     
@@ -436,6 +427,11 @@ end
     scheme::ConvectiveHeating,
     model::PrimitiveEquation,
 )
+    pₛ = diagn.grid.pres_grid_prev
+    temp_tend = diagn.tendencies.temp_tend_grid
+    nlayers = size(temp_tend, 2)
+    NF = eltype(temp_tend)
+
     # Get latitude ring index and latitude
     j = whichring(diagn.grid.temp_grid.grid, ij)
     latd = model.geometry.latd[j]
@@ -444,18 +440,13 @@ end
     # escape immediately if not in the tropics
     abs(latd) >= scheme.σθ && return nothing
 
-    p₀ = scheme.p₀*100      # hPa -> Pa
-    σₚ = scheme.σₚ*100      # hPa -> Pa
+    p₀ = scheme.p₀ * 100     # hPa -> Pa
+    σₚ = scheme.σₚ * 100     # hPa -> Pa
     cos²θ_term = scheme.lat_mask[j]
-    Qmax = 1/Second(scheme.time_scale).value
+    Qmax = inv(convert(NF, Second(scheme.time_scale).value))
 
-    # get pressure levels for this grid point
-    pres = diagn.grid.pres_grid_prev
-    temp_tend = diagn.tendencies.temp_tend_grid
-    nlayers = size(temp_tend, 2)
-    
-    @inbounds for k in 1:nlayers
-        p = pres[ij] * σ[k]      # Pressure in Pa
+    for k in 1:nlayers
+        p = pₛ[ij] * σ[k]      # Pressure in Pa on layer k
 
         # Lee and Kim, 2003, eq. 2
         temp_tend[ij, k] += Qmax*exp(-((p-p₀)/σₚ)^2 / 2)*cos²θ_term

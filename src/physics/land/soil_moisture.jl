@@ -227,40 +227,40 @@ function timestep!(
     ρ = model.atmosphere.water_density
     (; mask) = model.land_sea_mask
 
-    Plsc = diagn.physics.rain_rate_large_scale      # precipitation in [m/s]
-    Pconv = diagn.physics.rain_rate_convection      # precipitation in [m/s]
-    H = diagn.physics.land.surface_humidity_flux    # [kg/s/m²], divide by density for [m/s]
-    R = diagn.physics.land.river_runoff             # diagnosed [m/s]
+    P = diagn.physics.rain_rate                     # precipitation (rain only) in [kg/m²/s]
+    S = diagn.physics.land.snow_melt_rate           # [kg/m²/s] includes snow runoff leakage water
+    H = diagn.physics.land.surface_humidity_flux    # [kg/m²/s], divide by density for [m/s], positive up
+    R = diagn.physics.land.river_runoff             # diagnosed here, accumulated [m]
 
-    @boundscheck fields_match(soil_moisture, Plsc, Pconv, H, R, horizontal_only=true) ||
-        throw(DimensionMismatch(soil_moisture, Plsc , Pconv, H, R))
+    @boundscheck fields_match(soil_moisture, P, S, H, R, horizontal_only=true) ||
+        throw(DimensionMismatch(soil_moisture, P))
     @boundscheck size(soil_moisture, 2) >= 2 || throw(DimensionMismatch)
     
     f₁, f₂ = soil.f₁, soil.f₂
-    p = soil.infiltration_fraction        # Infiltration fraction: fraction of top layer runoff put into lower layer
+    p = soil.infiltration_fraction      # Infiltration fraction: fraction of top layer runoff put into lower layer
     τ⁻¹ = inv(convert(eltype(soil_moisture), Second(soil.time_scale).value))
 
-    params = (; ρ, Δt, f₁, f₂, p, τ⁻¹)
+    params = (; ρ, Δt, f₁, f₂, p, τ⁻¹)  # pack into NamedTuple for kernel
 
     launch!(architecture(soil_moisture), LinearWorkOrder, (size(soil_moisture, 1),),
-        land_bucket_soil_moisture_kernel!, soil_moisture, mask, Plsc, Pconv, H, R, params)
-    synchronize(architecture(soil_moisture))
+        land_bucket_soil_moisture_kernel!, soil_moisture, mask, P, S, H, R, params)
 end
 
 @kernel inbounds=true function land_bucket_soil_moisture_kernel!(
-    soil_moisture, mask, Plsc, Pconv, H, R,
-    params,
-)
+    soil_moisture, mask, P, S, H, R, params)
+    
     ij = @index(Global, Linear)             # every grid point ij
 
     if mask[ij] > 0                         # at least partially land
-
         (; ρ, Δt, f₁, f₂, p, τ⁻¹) = params
-
-        # precipitation (rain+snow, convection + large-scale) minus evaporation (or condensation)
-        # river runoff only diagnostic, i.e. R=0 here but drain excess water below
+        # precipitation (rain only, convection + large-scale) minus evaporation (or condensation, = humidity flux)
+        # river runoff via drain excess water below (that's just gone)
         # convert to [m/s] by dividing by density
-        F = Plsc[ij] + Pconv[ij] - H[ij]/ρ
+
+        # Soil top sources and sinks
+        # note: rain water can increase soil moisture regardless of snow cover
+        # [kg/m²/s] -> [m/s] for humidity flux H
+        F = P[ij] + S[ij] - H[ij]/ρ
   
         # vertical diffusion term between layers
         D = τ⁻¹*(soil_moisture[ij, 1] - soil_moisture[ij, 2])
@@ -284,12 +284,12 @@ end
 function variables(::LandBucketMoisture)
     return (
         # Prognostic variables
-        PrognosticVariable(name=:soil_moisture, dims=Grid3D(), namespace=:land),
+        PrognosticVariable(name=:soil_moisture, dims=Grid3D(), desc="Soil moisture content (fraction of capacity)", units="1", namespace=:land),
         # Diagnostic variables written to diagn.physics
         DiagnosticVariable(name=:river_runoff, dims=Grid2D(), desc="River runoff from soil moisture", units="m/s", namespace=:land),
         # Diagnostic variables read from diagn.physics
-        DiagnosticVariable(name=:rain_rate_convection, dims=Grid2D(), desc="Convective precipitation rate", units="m/s"),
-        DiagnosticVariable(name=:rain_rate_large_scale, dims=Grid2D(), desc="Large-scale precipitation (rain)", units="m/s"),
+        DiagnosticVariable(name=:rain_rate, dims=Grid2D(), desc="Convective precipitation rate", units="m/s"),
         DiagnosticVariable(name=:surface_humidity_flux, dims=Grid2D(), desc="Surface humidity flux", units="kg/s/m²", namespace=:land),
+        DiagnosticVariable(name=:snow_melt_rate, dims=Grid2D(), desc="Snow melt rate + snow runoff", units="m/s", namespace=:land),
     )
 end
