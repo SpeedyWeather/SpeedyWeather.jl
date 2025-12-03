@@ -10,6 +10,8 @@ $(TYPEDFIELDS)"""
     land::Land = SurfaceLandHeatFlux()
 end
 
+Adapt.@adapt_structure SurfaceHeatFlux
+
 # generator function
 function SurfaceHeatFlux(
     SG::SpectralGrid; 
@@ -24,12 +26,10 @@ function initialize!(S::SurfaceHeatFlux, model::PrimitiveEquation)
 end
 
 # call first ocean flux then land flux
-function parameterization!(ij, diagn, progn, heat_flux::SurfaceHeatFlux, model)
+@propagate_inbounds function parameterization!(ij, diagn, progn, heat_flux::SurfaceHeatFlux, model)
     surface_heat_flux!(ij, diagn, progn, heat_flux.ocean, model)
     surface_heat_flux!(ij, diagn, progn, heat_flux.land,  model)
 end
-
-Adapt.@adapt_structure SurfaceHeatFlux
 
 export SurfaceOceanHeatFlux
 
@@ -45,6 +45,7 @@ with drag coefficients. Fields are $(TYPEDFIELDS)"""
     drag::NF = 0.9e-3
 end
 
+Adapt.@adapt_structure SurfaceOceanHeatFlux
 SurfaceOceanHeatFlux(SG::SpectralGrid; kwargs...) = SurfaceOceanHeatFlux{SG.NF}(; kwargs...)
 initialize!(::SurfaceOceanHeatFlux, ::PrimitiveEquation) = nothing
 
@@ -70,20 +71,19 @@ function surface_heat_flux!(ij, diagn, progn, heat_flux::SurfaceOceanHeatFlux, m
     # leave out *cₚ here but include below to avoid division
     flux_ocean  = isfinite(T_skin_ocean) ? ρ*drag_ocean*V₀*(T_skin_ocean  - T) : zero(T_skin_ocean)
     
-    # store without weighting by land fraction for coupling
+    # store without weighting by land fraction for coupling [W/m²]
     diagn.physics.ocean.sensible_heat_flux[ij] = flux_ocean*cₚ  # to store ocean flux separately too
     
     flux_ocean *= (1-land_fraction)                             # weight by ocean fraction of land-sea mask
     
     # output/diagnostics: ocean sets the flux (=), land accumulates (+=)
-    diagn.physics.sensible_heat_flux[ij] = flux_ocean*cₚ
+    diagn.physics.sensible_heat_flux[ij] = flux_ocean*cₚ        # [W/m²]
     
     # accumulate with += into end=lowermost layer total flux
     diagn.tendencies.temp_tend_grid[ij, nlayers] += surface_flux_to_tendency(flux_ocean, pₛ, model)
     return nothing
 end
 
-Adapt.@adapt_structure SurfaceOceanHeatFlux
 
 export SurfaceLandHeatFlux
 
@@ -100,11 +100,13 @@ Fields are $(TYPEDFIELDS)"""
     drag::NF = 1.2e-3       # for neutral stability
 end
 
+Adapt.@adapt_structure SurfaceLandHeatFlux
 SurfaceLandHeatFlux(SG::SpectralGrid; kwargs...) = SurfaceLandHeatFlux{SG.NF}(; kwargs...)
 initialize!(::SurfaceLandHeatFlux, ::PrimitiveEquation) = nothing
 
-function surface_heat_flux!(ij, diagn, progn, heat_flux::SurfaceLandHeatFlux, model)
+@propagate_inbounds function surface_heat_flux!(ij, diagn, progn, heat_flux::SurfaceLandHeatFlux, model)
     
+    surface = model.geometry.nlayers
     cₚ = model.atmosphere.heat_capacity
     pₛ = diagn.grid.pres_grid_prev[ij]                  # surface pressure [Pa]
     ρ = diagn.physics.surface_air_density[ij]
@@ -124,20 +126,17 @@ function surface_heat_flux!(ij, diagn, progn, heat_flux::SurfaceLandHeatFlux, mo
     # leave out *cₚ here but include below to avoid division
     flux_land  = isfinite(T_skin_land) ? ρ*drag_land*V₀*(T_skin_land  - T) : zero(T_skin_land)
     
-    # store without weighting by land fraction for coupling
+    # store without weighting by land fraction for coupling [W/m²]
     diagn.physics.land.sensible_heat_flux[ij] = flux_land*cₚ  # store land flux separately too
     flux_land *= land_fraction                  # weight by land fraction of land-sea mask
     
     # output/diagnose: ocean sets flux (=), land accumulates (+=)
-    diagn.physics.sensible_heat_flux[ij] += flux_land*cₚ
+    diagn.physics.sensible_heat_flux[ij] += flux_land*cₚ    # [W/m²]
     
     # accumulate with += into end=lowermost layer total flux
-    nlayers = model.geometry.nlayers
-    diagn.tendencies.temp_tend_grid[ij, nlayers] += surface_flux_to_tendency(flux_land, pₛ, model)
+    diagn.tendencies.temp_tend_grid[ij, surface] += surface_flux_to_tendency(flux_land, pₛ, model)
     return nothing
 end
-
-Adapt.@adapt_structure SurfaceLandHeatFlux
 
 ## ----
 
@@ -148,12 +147,15 @@ from external data sources instead of calculating them dynamically. Useful for
 coupled model runs where ocean heat fluxes are provided by an ocean model
 or for sensitivity experiments with fixed flux patterns."""
 struct PrescribedOceanHeatFlux <: AbstractSurfaceHeatFlux end
+Adapt.@adapt_structure PrescribedOceanHeatFlux
 PrescribedOceanHeatFlux(::SpectralGrid) = PrescribedOceanHeatFlux()
 initialize!(::PrescribedOceanHeatFlux, ::PrimitiveEquation) = nothing
 
-function surface_heat_flux!(ij, diagn, progn, ::PrescribedOceanHeatFlux, model)
+@propagate_inbounds function surface_heat_flux!(ij, diagn, progn, ::PrescribedOceanHeatFlux, model)
     land_fraction = model.land_sea_mask.mask[ij]
     pₛ = diagn.grid.pres_grid_prev[ij]          # surface pressure [Pa]
+    cₚ = model.atmosphere.heat_capacity
+    surface = model.geometry.nlayers
 
     # read in a prescribed flux
     flux_ocean = progn.ocean.sensible_heat_flux[ij]
@@ -167,12 +169,10 @@ function surface_heat_flux!(ij, diagn, progn, ::PrescribedOceanHeatFlux, model)
     diagn.physics.sensible_heat_flux[ij] = flux_ocean
     
     # accumulate with += into end=lowermost layer total flux
-    nlayers = model.geometry.nlayers
-    diagn.tendencies.temp_tend_grid[ij, nlayers] += surface_flux_to_tendency(flux_ocean, pₛ, model)
+    flux_ocean /= cₚ                            # [W/m²] -> [K/s]
+    diagn.tendencies.temp_tend_grid[ij, surface] += surface_flux_to_tendency(flux_ocean, pₛ, model)
     return nothing
 end
-
-Adapt.@adapt_structure PrescribedOceanHeatFlux
 
 ## ----
 
@@ -183,12 +183,15 @@ from external data sources instead of calculating them dynamically. Useful for
 coupled model runs where land heat fluxes are provided by a land model
 or for sensitivity experiments with fixed flux patterns."""
 struct PrescribedLandHeatFlux <: AbstractSurfaceHeatFlux end
+Adapt.@adapt_structure PrescribedLandHeatFlux
 PrescribedLandHeatFlux(::SpectralGrid) = PrescribedLandHeatFlux()
 initialize!(::PrescribedLandHeatFlux, ::PrimitiveEquation) = nothing
 
-function surface_heat_flux!(ij, diagn, progn, ::PrescribedLandHeatFlux, model)
+@propagate_inbounds function surface_heat_flux!(ij, diagn, progn, ::PrescribedLandHeatFlux, model)
     land_fraction = model.land_sea_mask.mask[ij]
     pₛ = diagn.grid.pres_grid_prev[ij]          # surface pressure [Pa]
+    cₚ = model.atmosphere.heat_capacity
+    surface = diagn.nlayers                     # indexing top to bottom
 
     # read in a prescribed flux
     flux_land = progn.land.sensible_heat_flux[ij]
@@ -202,12 +205,10 @@ function surface_heat_flux!(ij, diagn, progn, ::PrescribedLandHeatFlux, model)
     diagn.physics.sensible_heat_flux[ij] += flux_land
     
     # accumulate with += into end=lowermost layer total flux
-    nlayers = model.geometry.nlayers
-    diagn.tendencies.temp_tend_grid[ij, nlayers] += surface_flux_to_tendency(flux_land, pₛ, model)
+    flux_land /= cₚ                             # [W/m²] -> [K/s]
+    diagn.tendencies.temp_tend_grid[ij, surface] += surface_flux_to_tendency(flux_land, pₛ, model)
     return nothing
 end 
-
-Adapt.@adapt_structure PrescribedLandHeatFlux
 
 function variables(::AbstractSurfaceHeatFlux)
     return (

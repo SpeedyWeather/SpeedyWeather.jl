@@ -9,7 +9,7 @@ end
 Adapt.@adapt_structure Coriolis
 
 # generator
-Coriolis(SG::SpectralGrid) = Coriolis(zeros(SG.VectorType, SG.nlayers))
+Coriolis(SG::SpectralGrid) = Coriolis(on_architecture(SG.architecture, zeros(SG.NF, SG.nlat)))
 
 function initialize!(coriolis::Coriolis, model::AbstractModel)
     (; radius, rotation) = model.planet
@@ -30,14 +30,15 @@ function coriolis!(f::AbstractField; rotation = DEFAULT_ROTATION)
     lat = on_architecture(f, get_lat(f))     # in radians [-π/2, π/2]
 
     arch = architecture(f)
-    (; whichring) = field.grid
+    (; whichring) = f.grid
     launch!(arch, RingGridWorkOrder, size(f), coriolis_kernel!, f, lat, rotation, whichring)
+    return f
 end
 
 @kernel inbounds=true function coriolis_kernel!(f, lat, rotation, whichring)
     ij, k = @index(Global, NTuple)
     j = whichring[ij]
-    f[ij, k] .= 2rotation*sin(lat[j])
+    f[ij, k] = 2rotation*sin(lat[j])
 end
 
 """

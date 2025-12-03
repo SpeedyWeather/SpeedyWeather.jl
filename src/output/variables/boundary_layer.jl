@@ -63,7 +63,7 @@ function output!(
     @. z_bottom += T_bottom * Δp_geopot / simulation.model.planet.gravity
 
     # Compute u10, TODO should this be the same z₀ as in vertical diffusion or surface fluxes?
-    z₀ = simulation.model.vertical_diffusion.z₀
+    z₀ = simulation.model.vertical_diffusion.roughness_length
     @. u_or_v10 = u_or_v_bottom .* log(10/z₀) ./ log.(z_bottom/z₀)
 
     # interpolate 2D/3D variables
@@ -106,7 +106,7 @@ function output!(
     # escape immediately after first call if variable doesn't have a time dimension
     ~hastime(variable) && output.output_counter > 1 && return nothing
 
-    # resuse scratch array to avoid allocations
+    # reuse scratch array to avoid allocations
     Ts = simulation.diagnostic_variables.dynamics.a_2D_grid
 
     # Retrieve T_bottom
@@ -137,9 +137,27 @@ function output!(
     return nothing
 end
 
+
+"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+Fields are: $(TYPEDFIELDS)"""
+@kwdef mutable struct BoundaryLayerDragOutput <: AbstractOutputVariable
+    name::String = "bld"
+    unit::String = "1"
+    long_name::String = "Boundary layer drag coefficient"
+    dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
+    missing_value::Float64 = NaN
+    compression_level::Int = 3
+    shuffle::Bool = true
+    keepbits::Int = 7
+end
+
+path(::BoundaryLayerDragOutput, simulation) =
+    simulation.diagnostic_variables.physics.boundary_layer_drag
+
 # collect all in one for convenience
 BoundaryLayerOutput() = (
     ZonalVelocity10mOutput(),
     MeridionalVelocity10mOutput(),
     SurfaceTemperatureOutput(),
+    BoundaryLayerDragOutput(),
 )

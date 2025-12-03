@@ -10,15 +10,17 @@ import LinearAlgebra: LinearAlgebra, Diagonal
 export rotate, rotate!
 
 # GPU, PARALLEL
-import Base.Threads: Threads, @threads
 import KernelAbstractions: KernelAbstractions, @kernel, @index, @Const, synchronize
+import GPUArrays: GPUArrays, @allowscalar
 import Adapt: Adapt, adapt, adapt_structure
+import GPUArrays: @allowscalar
 
 using  SpeedyWeatherInternals
 using  SpeedyWeatherInternals.Architectures
 import SpeedyWeatherInternals.Architectures: AbstractArchitecture, CPU, GPU, 
        on_architecture, architecture, array_type, ismatching, nonparametric_type
 export CPU, GPU, on_architecture, architecture                # export device functions 
+export SpeedyWeatherInternals, Architectures
 
 # INPUT OUTPUT
 import TOML
@@ -33,6 +35,7 @@ import ProgressMeter
 
 # UTILITIES
 using  DomainSets.IntervalSets
+import Base: @propagate_inbounds
 
 # to avoid a `using Dates` to pass on DateTime arguments
 export DateTime, Millisecond, Second, Minute, Hour, Day, Week, Month, Year, Century, Millenium
@@ -41,6 +44,7 @@ export DateTime, Millisecond, Second, Minute, Hour, Day, Week, Month, Year, Cent
 export initialize!, finalize!
 
 # import utilities
+export Utils
 using SpeedyWeatherInternals.Utils 
 
 # parameter handling
@@ -54,7 +58,6 @@ export SpeedyParam, SpeedyParams, parameters, stripparams
 # DATA STRUCTURES
 # LowerTriangularArrays for spherical harmonics
 using  LowerTriangularArrays
-
 export  LowerTriangularArrays, 
         LowerTriangularArray,
         LowerTriangularMatrix
@@ -65,7 +68,6 @@ export  Spectrum
 export  OneBased, ZeroBased
 export  eachmatrix, eachharmonic, eachorder
         
-
 # RingGrids
 using  RingGrids
 
@@ -98,7 +100,6 @@ using SpeedyTransforms
 
 export SpeedyTransforms, SpectralTransform
 export transform, transform!
-export spectral_truncation, spectral_truncation!
 export curl, divergence, curl!, divergence!
 export ∇, ∇², ∇⁻², ∇!, ∇²!, ∇⁻²!
 export power_spectrum
@@ -156,7 +157,6 @@ include("physics/albedo.jl")
 include("physics/tendencies.jl")
 include("physics/column_variables.jl")
 include("physics/thermodynamics.jl")
-include("physics/temperature_relaxation.jl")
 include("physics/vertical_diffusion.jl")
 include("physics/large_scale_condensation.jl")
 include("physics/surface_fluxes/boundary_layer.jl")
@@ -166,9 +166,11 @@ include("physics/surface_fluxes/heat.jl")
 include("physics/surface_fluxes/humidity.jl")
 include("physics/convection.jl")
 include("physics/zenith.jl")
-include("physics/optical_depth.jl")
-include("physics/longwave_radiation.jl")
-include("physics/shortwave_radiation.jl")
+include("physics/radiation/shortwave_radiation.jl")
+include("physics/radiation/shortwave_transmittance.jl")
+include("physics/radiation/clouds.jl")
+include("physics/radiation/longwave_radiation.jl")
+include("physics/radiation/longwave_transmittance.jl")
 include("physics/stochastic_physics.jl")
 
 # OCEAN AND LAND

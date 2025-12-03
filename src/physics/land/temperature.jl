@@ -29,6 +29,12 @@ function SeasonalLandTemperature(SG::SpectralGrid, geometry::LandGeometry; kwarg
     return SeasonalLandTemperature{NF, GridVariable3D}(; monthly_temperature, kwargs...)
 end
 
+function variables(::SeasonalLandTemperature)
+    return (
+        PrognosticVariable(name=:soil_temperature, dims=Grid3D(), namespace=:land),
+    )
+end
+
 function initialize!(land::SeasonalLandTemperature, model::PrimitiveEquation)
     (; monthly_temperature) = land
 
@@ -83,20 +89,20 @@ function timestep!(
     NF = eltype(soil_temperature)
     weight = convert(NF, Dates.days(time-Dates.firstdayofmonth(time))/Dates.daysinmonth(time))
 
-    for k in eachlayer(soil_temperature)
-        for ij in eachgridpoint(soil_temperature)
-            soil_temperature[ij, k] = (1-weight) * monthly_temperature[ij, this_month] +
-                                    weight  * monthly_temperature[ij, next_month]
-        end
-    end
+    launch!(architecture(soil_temperature), RingGridWorkOrder, size(soil_temperature),
+            seasonal_land_temperature_kernel!,
+            soil_temperature, monthly_temperature, weight, this_month, next_month)
 
     return nothing
 end
 
-function variables(::SeasonalLandTemperature)
-    return (
-        PrognosticVariable(name=:soil_temperature, dims=Grid3D(), namespace=:land),
-    )
+@kernel inbounds=true function seasonal_land_temperature_kernel!(
+    soil_temperature, monthly_temperature, weight, this_month, next_month
+)
+    ij, k  = @index(Global, NTuple)
+    
+    soil_temperature[ij, k] = (1 - weight) * monthly_temperature[ij, this_month] + 
+                            weight * monthly_temperature[ij, next_month]
 end
 
 ## CONSTANT LAND CLIMATOLOGY
@@ -166,10 +172,11 @@ function initialize!(
     # (seasonal model will be garbage collected hereafter)
 
     # set ocean "land" temperature points (100% ocean only)
-    masked_value = land.ocean_temperature
     if land.mask
-        lst = progn.land.soil_temperature
-        progn.land.soil_temperature[isnan.(lst)] .= masked_value
+        masked_value = land.ocean_temperature
+        # TODO currently requries .data because of broadcasting issues
+        lst = progn.land.soil_temperature.data
+        lst[isnan.(lst)] .= masked_value
         mask!(progn.land.soil_temperature, model.land_sea_mask, :ocean; masked_value)
     end
 end
@@ -192,10 +199,10 @@ function timestep!(
     Rsu = diagn.physics.land.surface_shortwave_up       # only albedo reflection
     Rld = diagn.physics.surface_longwave_down           # all in [W/m²]
     Rlu = diagn.physics.land.surface_longwave_up
-    Ev = diagn.physics.land.surface_humidity_flux       # except this in [kg/s/m²]
     S = diagn.physics.land.sensible_heat_flux
+    H = diagn.physics.land.surface_humidity_flux        # except this in [kg/s/m²]
 
-    @boundscheck fields_match(soil_temperature, Rsd, Rsu, Rld, Rlu, Ev, S, horizontal_only=true) ||
+    @boundscheck fields_match(soil_temperature, Rsd, Rsu, Rld, Rlu, H, S, horizontal_only=true) ||
         throw(DimensionMismatch(soil_temperature, Rs))
     @boundscheck size(soil_moisture, 2) == size(soil_temperature, 2) == 2 || throw(DimensionMismatch)
     
@@ -205,25 +212,28 @@ function timestep!(
     Cs = thermodynamics.heat_capacity_dry_soil
     z₁ = geometry.layer_thickness[1]
     z₂ = geometry.layer_thickness[2]
-
     Δ =  2λ/(z₁ + z₂)   # thermal diffusion operator [W/(m² K)]
+    params = (; Lᵥ, γ, Cw, Cs, z₁, z₂, Δ, Δt)   # pack into NamedTuple
 
     launch!(architecture(soil_temperature), LinearWorkOrder, (size(soil_temperature, 1),),
-        land_bucket_temperature_kernel!, soil_temperature, mask, soil_moisture, Rsd, Rsu, Rlu, Rld, Ev, S,
-        Lᵥ, γ, Cw, Cs, z₁, z₂, Δ, Δt)
+        land_bucket_temperature_kernel!, soil_temperature, mask, soil_moisture, Rsd, Rsu, Rlu, Rld, H, S,
+        params)
 
     return nothing
 end
 
 @kernel inbounds=true function land_bucket_temperature_kernel!(
-    soil_temperature, mask, soil_moisture, Rsd, Rsu, Rlu, Rld, Ev, S,
-    @Const(Lᵥ), @Const(γ), @Const(Cw), @Const(Cs), @Const(z₁), @Const(z₂), @Const(Δ), @Const(Δt),
+    soil_temperature, mask, soil_moisture, Rsd, Rsu, Rlu, Rld, H, S,
+    params,
 )
     ij = @index(Global, Linear)
 
     if mask[ij] > 0                         # at least partially land
+
+        (; Lᵥ, γ, Cw, Cs, z₁, z₂, Δ, Δt) = params
+
         # total surface downward heat flux
-        F = Rsd[ij] - Rsu[ij] - Rlu[ij] + Rld[ij] - Lᵥ*Ev[ij] - S[ij]
+        F = Rsd[ij] - Rsu[ij] - Rlu[ij] + Rld[ij] - Lᵥ*H[ij] - S[ij]
 
         # heat capacity of the (wet) soil layers 1 and 2 [J/(m³ K)]
         C₁ = Cw * soil_moisture[ij, 1] * γ + Cs

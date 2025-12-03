@@ -29,6 +29,7 @@ if !FLAG_EXTENDED_TESTS && !FLAG_ENZYME_TESTS
     include("grids/interpolation.jl")
     include("grids/reverse.jl")
     include("grids/rotate.jl")
+    include("grids/reordering.jl")
 
     # GPU/KERNELABSTRACTIONS
     include("gpu/kernelabstractions.jl")
@@ -51,6 +52,7 @@ if !FLAG_EXTENDED_TESTS && !FLAG_ENZYME_TESTS
     include("dynamics/dates.jl")
     include("dynamics/set.jl")
     include("dynamics/orography.jl")
+    include("dynamics/initial_conditions.jl")
     include("dynamics/run_speedy.jl")
 
     # VERTICAL LEVELS
@@ -60,6 +62,7 @@ if !FLAG_EXTENDED_TESTS && !FLAG_ENZYME_TESTS
     # PHYSICS
     include("physics/variables.jl")
     include("physics/custom_parametrization.jl")
+    include("physics/zenith.jl")
     include("physics/column_variables.jl")
     include("physics/land_sea_mask.jl")
     include("physics/ocean_sea_ice.jl")
@@ -69,12 +72,13 @@ if !FLAG_EXTENDED_TESTS && !FLAG_ENZYME_TESTS
 
     include("physics/albedo.jl")
     include("physics/land.jl")
-    include("physics/optical_depth.jl")
+    include("physics/transmittance.jl")
     include("physics/longwave_radiation.jl")
-    # include("physics/shortwave_radiation.jl")
+    include("physics/shortwave_radiation.jl")
     include("physics/surface_fluxes.jl")
     include("physics/random_process.jl")
     include("physics/stochastic_physics.jl")
+    include("physics/all_parametrizations.jl")
 
     # OUTPUT/EXTENSION
     include("output/callbacks.jl")

@@ -169,10 +169,17 @@ function timestep!(
     NF = eltype(sea_surface_temperature)
     weight = convert(NF, Dates.days(time-Dates.firstdayofmonth(time))/Dates.daysinmonth(time))
 
-    @inbounds for ij in eachgridpoint(sea_surface_temperature)
-        sea_surface_temperature[ij] = (1-weight) * monthly_temperature[ij, this_month] +
-                                          weight  * monthly_temperature[ij, next_month]
-    end
+    launch!(architecture(sea_surface_temperature), LinearWorkOrder, size(sea_surface_temperature),
+            seasonal_ocean_kernel!,
+            sea_surface_temperature, monthly_temperature, weight, this_month, next_month)
+end
+
+@kernel inbounds=true function seasonal_ocean_kernel!(
+    sst, monthly_temp, weight, this_month, next_month)
+    
+    ij = @index(Global, Linear)
+    
+    sst[ij] = (1 - weight) * monthly_temp[ij, this_month] + weight * monthly_temp[ij, next_month]
 end
 
 ## CONSTANT OCEAN CLIMATOLOGY
@@ -360,10 +367,11 @@ function initialize!(
     # (seasonal model will be garbage collected hereafter)
 
     # set land "sst" points (100% land only)
-    masked_value = ocean_model.land_temperature
     if ocean_model.mask
-        sst = progn.ocean.sea_surface_temperature
-        progn.ocean.sea_surface_temperature[isnan.(sst)] .= masked_value
+        masked_value = ocean_model.land_temperature
+        sst = progn.ocean.sea_surface_temperature.data
+        # TODO: broadcasting over views of Fields of GPUArrays doesn't work
+        sst[isnan.(sst)] .= masked_value
         mask!(progn.ocean.sea_surface_temperature, model.land_sea_mask, :land; masked_value)
     end
 end

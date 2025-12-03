@@ -99,7 +99,7 @@ end
 # grid is inherently 2D, for field distinguish between get_npoints (3D+) and get_npoints2D
 get_npoints2D(field::AbstractField) = get_npoints(field.grid)
 get_npoints(field::AbstractField) = get_npoints(field.grid, size(field)[2:end]...)
-matrix_size(field::AbstractField) = matrix_size(field.grid)
+matrix_size(field::AbstractField) = (matrix_size(field.grid)..., size(field)[2:end]...)
 
 # needed for unalias
 @inline Base.dataids(field::AbstractField) = Base.dataids(field.data)
@@ -405,6 +405,12 @@ Base.:(==)(F1::AbstractField, F2::AbstractField) = fields_match(F1, F2) && F1.da
 Base.all(F::AbstractField) = all(F.data)
 Base.any(F::AbstractField) = any(F.data)
 
+# reductions
+Base.minimum(F::AbstractField) = minimum(F.data)
+Base.maximum(F::AbstractField) = maximum(F.data)
+Base.sum(F::AbstractField) = sum(F.data)
+Base.extrema(F::AbstractField) = extrema(F.data)
+
 grids_match(A::AbstractField, Bs::AbstractField...) = grids_match(A.grid, (B.grid for B in Bs)...)
 
 """$(TYPEDSIGNATURES) True if both `A` and `B` are of the same nonparametric grid type
@@ -417,7 +423,7 @@ function fields_match(
     horizontal_only::Bool = false,
     vertical_only::Bool = false,
 )
-    @assert ~(horizontal_only && vertical_only) "Conflicting options: horizontal_only = $horizontal_ony and vertical_only = $vertical_only"
+    @assert ~(horizontal_only && vertical_only) "Conflicting options: horizontal_only = $horizontal_only and vertical_only = $vertical_only"
 
     horizontal_only && return grids_match(A, B)
     vertical_only && return size(A)[2:end] == size(B)[2:end]
@@ -525,11 +531,10 @@ Architectures.on_architecture(field::AbstractField, x) = on_architecture(archite
 
 function Architectures.on_architecture(arch, field::Field{T, N, ArrayType, Grid}) where {T, N, ArrayType, Grid} 
     adapted_data = on_architecture(arch, field.data)
-    if ismatching(field.grid, typeof(adapted_data))
-        return Field(adapted_data, on_architecture(arch, field.grid))
-    else # if not matching, create new grid with other architecture
-        #@warn "Adapting field to new architecture with $(typeof(adapted_data))"
-        return Field(adapted_data, Grid(field.grid, architecture(typeof(adapted_data))))
-    end
+
+    # if not matching, create new grid with other architecture
+    arch = ismatching(field.grid, typeof(adapted_data)) ? arch : architecture(typeof(adapted_data))
+    
+    return Field(adapted_data, on_architecture(arch, field.grid))
 end 
     

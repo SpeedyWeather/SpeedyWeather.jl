@@ -34,7 +34,13 @@ function SeasonalSoilMoisture(SG::SpectralGrid, geometry::LandGeometry; kwargs..
     return SeasonalSoilMoisture{NF, GridVariable4D}(; monthly_soil_moisture, kwargs...)
 end
 
-# don't both initializing for the dry model
+function variables(::SeasonalSoilMoisture)
+    return (
+        PrognosticVariable(name=:soil_moisture, dims=Grid3D(), namespace=:land),
+    )
+end
+
+# don't bother initializing for the dry model
 initialize!(soil::SeasonalSoilMoisture, model::PrimitiveDry) = nothing
 
 function initialize!(soil::SeasonalSoilMoisture, model::PrimitiveEquation)
@@ -116,20 +122,20 @@ function timestep!(
     (; monthly_soil_moisture) = soil
     (; soil_moisture) = progn.land
 
-    for k in eachlayer(soil_moisture)
-        for ij in eachgridpoint(soil_moisture)
-            soil_moisture[ij, k] = (1-weight) * monthly_soil_moisture[ij, k, this_month] +
-                                    weight  * monthly_soil_moisture[ij, k, next_month]
-        end
-    end
+    launch!(architecture(soil_moisture), RingGridWorkOrder, size(soil_moisture),
+            seasonal_soil_moisture_kernel!,
+            soil_moisture, monthly_soil_moisture, weight, this_month, next_month)
 
     return nothing
 end
 
-function variables(::SeasonalSoilMoisture)
-    return (
-        PrognosticVariable(name=:soil_moisture, dims=Grid3D(), namespace=:land),
-    )
+@kernel inbounds=true function seasonal_soil_moisture_kernel!(
+    soil_moisture, monthly_soil_moisture, weight, this_month, next_month
+)
+    ij, k = @index(Global, NTuple)
+    
+    soil_moisture[ij, k] = (1 - weight) * monthly_soil_moisture[ij, k, this_month] + 
+                         weight * monthly_soil_moisture[ij, k, next_month]
 end
 
 export LandBucketMoisture
@@ -194,8 +200,9 @@ function initialize!(
     # set ocean "soil" moisture points (100% ocean only)
     masked_value = soil.ocean_moisture
     if soil.mask
-        sm = progn.land.soil_moisture
-        progn.land.soil_moisture[isnan.(sm)] .= masked_value
+        # TODO: broadcasting over views of Fields of GPUArrays doesn't work
+        sm = progn.land.soil_moisture.data
+        sm[isnan.(sm)] .= masked_value
         mask!(progn.land.soil_moisture, model.land_sea_mask, :ocean; masked_value)
     end
 end
@@ -220,48 +227,53 @@ function timestep!(
     ρ = model.atmosphere.water_density
     (; mask) = model.land_sea_mask
 
-    P = diagn.physics.total_precipitation_rate      # precipitation (rain+snow) in [m/s]
-    E = diagn.physics.land.surface_humidity_flux    # [kg/s/m²], divide by density for [m/s]
+    Plsc = diagn.physics.rain_rate_large_scale      # precipitation in [m/s]
+    Pconv = diagn.physics.rain_rate_convection      # precipitation in [m/s]
+    H = diagn.physics.land.surface_humidity_flux    # [kg/s/m²], divide by density for [m/s]
     R = diagn.physics.land.river_runoff             # diagnosed [m/s]
 
-    @boundscheck fields_match(soil_moisture, P, E, R, horizontal_only=true) ||
-        throw(DimensionMismatch(soil_moisture, P))
+    @boundscheck fields_match(soil_moisture, Plsc, Pconv, H, R, horizontal_only=true) ||
+        throw(DimensionMismatch(soil_moisture, Plsc , Pconv, H, R))
     @boundscheck size(soil_moisture, 2) >= 2 || throw(DimensionMismatch)
+    
     f₁, f₂ = soil.f₁, soil.f₂
     p = soil.infiltration_fraction        # Infiltration fraction: fraction of top layer runoff put into lower layer
     τ⁻¹ = inv(convert(eltype(soil_moisture), Second(soil.time_scale).value))
-    f₁_f₂ = f₁/f₂
-    Δt_f₁ = Δt/f₁
+
+    params = (; ρ, Δt, f₁, f₂, p, τ⁻¹)
 
     launch!(architecture(soil_moisture), LinearWorkOrder, (size(soil_moisture, 1),),
-        land_bucket_soil_moisture_kernel!, soil_moisture, mask, P, E, R, ρ, Δt, f₁, Δt_f₁, f₁_f₂, p, τ⁻¹)
+        land_bucket_soil_moisture_kernel!, soil_moisture, mask, Plsc, Pconv, H, R, params)
     synchronize(architecture(soil_moisture))
 end
 
 @kernel inbounds=true function land_bucket_soil_moisture_kernel!(
-    soil_moisture, mask, P, E, R,
-    @Const(ρ), @Const(Δt), @Const(f₁), @Const(Δt_f₁), @Const(f₁_f₂), @Const(p), @Const(τ⁻¹),
+    soil_moisture, mask, Plsc, Pconv, H, R,
+    params,
 )
     ij = @index(Global, Linear)             # every grid point ij
 
     if mask[ij] > 0                         # at least partially land
+
+        (; ρ, Δt, f₁, f₂, p, τ⁻¹) = params
+
         # precipitation (rain+snow, convection + large-scale) minus evaporation (or condensation)
         # river runoff only diagnostic, i.e. R=0 here but drain excess water below
         # convert to [m/s] by dividing by density
-        F = (P[ij] - E[ij])/ρ               # - R[ij]
+        F = Plsc[ij] + Pconv[ij] - H[ij]/ρ
   
         # vertical diffusion term between layers
         D = τ⁻¹*(soil_moisture[ij, 1] - soil_moisture[ij, 2])
 
         # Equation in 8.5.2.2 of the MITgcm users guide (Land package)
-        soil_moisture[ij, 1] += Δt_f₁*F - Δt*D
-        soil_moisture[ij, 2] += Δt*f₁_f₂*D
+        soil_moisture[ij, 1] += Δt/f₁*F - Δt*D
+        soil_moisture[ij, 2] += Δt*f₁/f₂*D
 
         # river runoff
         W₁ = soil_moisture[ij, 1]           # wrt to field capacity so maximum is 1
         δW₁ = W₁ - min(W₁, 1)               # excess moisture in top layer, cap at field capacity
         soil_moisture[ij, 1] -= δW₁         # remove excess from top layer
-        soil_moisture[ij, 2] += p*δW₁*f₁_f₂ # add fraction to lower layer
+        soil_moisture[ij, 2] += p*δW₁*f₁/f₂ # add fraction to lower layer
         R[ij] += Δt*(1-p)*δW₁*f₁            # accumulate river runoff [m] of top layer
 
         # remove excess water from lower layer (this disappears)
@@ -276,7 +288,8 @@ function variables(::LandBucketMoisture)
         # Diagnostic variables written to diagn.physics
         DiagnosticVariable(name=:river_runoff, dims=Grid2D(), desc="River runoff from soil moisture", units="m/s", namespace=:land),
         # Diagnostic variables read from diagn.physics
-        DiagnosticVariable(name=:total_precipitation_rate, dims=Grid2D(), desc="Total precipitation rate", units="m/s"),
+        DiagnosticVariable(name=:rain_rate_convection, dims=Grid2D(), desc="Convective precipitation rate", units="m/s"),
+        DiagnosticVariable(name=:rain_rate_large_scale, dims=Grid2D(), desc="Large-scale precipitation (rain)", units="m/s"),
         DiagnosticVariable(name=:surface_humidity_flux, dims=Grid2D(), desc="Surface humidity flux", units="kg/s/m²", namespace=:land),
     )
 end

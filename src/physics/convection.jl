@@ -1,11 +1,11 @@
 abstract type AbstractConvection <: AbstractParameterization end
 
-export SimplifiedBettsMiller
+export BettsMillerConvection
 
 """The simplified Betts-Miller convection scheme from Frierson, 2007,
 https://doi.org/10.1175/JAS3935.1. This implements the qref-formulation
 in their paper. Fields and options are $(TYPEDFIELDS)"""
-@kwdef struct SimplifiedBettsMiller{NF} <: AbstractConvection
+@kwdef struct BettsMillerConvection{NF} <: AbstractConvection
     "[OPTION] Relaxation time for profile adjustment"
     time_scale::Second = Hour(4)
 
@@ -13,16 +13,15 @@ in their paper. Fields and options are $(TYPEDFIELDS)"""
     relative_humidity::NF = 0.7
 end
 
-Adapt.@adapt_structure SimplifiedBettsMiller
+Adapt.@adapt_structure BettsMillerConvection
 
 # generator function 
-SimplifiedBettsMiller(SG::SpectralGrid; kwargs...) = SimplifiedBettsMiller{SG.NF}(; kwargs...)
-initialize!(::SimplifiedBettsMiller, ::PrimitiveEquation) = nothing
+BettsMillerConvection(SG::SpectralGrid; kwargs...) = BettsMillerConvection{SG.NF}(; kwargs...)
+initialize!(::BettsMillerConvection, ::PrimitiveEquation) = nothing
 
 # function barrier
-function parameterization!(ij, diagn, progn, convection_scheme::SimplifiedBettsMiller, model)
+@propagate_inbounds parameterization!(ij, diagn, progn, convection_scheme::BettsMillerConvection, model) =
     convection!(ij, diagn, convection_scheme, model)
-end
 
 """
 $(TYPEDSIGNATURES)
@@ -31,7 +30,7 @@ simplified Betts-Miller convection. Starts with a first-guess relaxation to dete
 the convective criteria (none, dry/shallow or deep), then adjusts reference profiles
 for thermodynamic consistency (e.g. in dry convection the humidity profile is non-precipitating),
 and relaxes current vertical profiles to the adjusted references."""
-function convection!(ij, diagn, SBM::SimplifiedBettsMiller, model)
+@propagate_inbounds function convection!(ij, diagn, SBM::BettsMillerConvection, model)
 
     (; geometry, clausius_clapeyron, planet, atmosphere, time_stepping) = model
     NF = eltype(diagn.grid.temp_grid)
@@ -42,25 +41,21 @@ function convection!(ij, diagn, SBM::SimplifiedBettsMiller, model)
     
     # use previous time step for more stable calculations
     temp = diagn.grid.temp_grid_prev
-    temp_virt = diagn.grid.temp_virt_grid
     humid = diagn.grid.humid_grid_prev
-    geopot = diagn.dynamics.geopot
+    geopotential = diagn.grid.geopotential
     temp_tend = diagn.tendencies.temp_tend_grid
     humid_tend = diagn.tendencies.humid_tend_grid
     pₛ = diagn.grid.pres_grid_prev[ij]
 
     # thermodynamics
-    Lᵥ = clausius_clapeyron.latent_heat_condensation  # latent heat of vaporization
-    cₚ = clausius_clapeyron.heat_capacity             # heat capacity
+    ρ = atmosphere.water_density                        # density of water [kg/m³]
+    Lᵥ = clausius_clapeyron.latent_heat_condensation    # latent heat of vaporization
+    cₚ = clausius_clapeyron.heat_capacity               # heat capacity
 
     # use scratch arrays for temp_ref_profile, humid_ref_profile
-    temp_ref_profile =  diagn.dynamics.a_grid               # temperature [K] reference profile to adjust to
-    humid_ref_profile = diagn.dynamics.b_grid               # specific humidity [kg/kg] profile to adjust to
-    geopot = diagn.dynamics.uv∇lnp                          # geopotential [m²/s²] on full levels
-
-    # TODO move this to its own parameterization?
-    geopotential!(ij, geopot, temp_virt, model.orography.orography, planet.gravity, model.geopotential)
-
+    temp_ref_profile =  diagn.dynamics.a_grid           # temperature [K] reference profile to adjust to
+    humid_ref_profile = diagn.dynamics.b_grid           # specific humidity [kg/kg] profile to adjust to
+    
     # CONVECTIVE CRITERIA AND FIRST GUESS RELAXATION
     # Create pseudo column for surface_temp_humid function (this needs to be updated later)
     # For now, use surface values directly
@@ -69,7 +64,7 @@ function convection!(ij, diagn, SBM::SimplifiedBettsMiller, model)
 
     level_zero_buoyancy = pseudo_adiabat!(ij, temp_ref_profile,
                                             temp_parcel, humid_parcel,
-                                            temp_virt, geopot, pₛ, σ,
+                                            temp, humid, geopotential, pₛ, σ,
                                             clausius_clapeyron)
             
     for k in level_zero_buoyancy:nlayers
@@ -151,18 +146,29 @@ function convection!(ij, diagn, SBM::SimplifiedBettsMiller, model)
         rain_convection += rain                 # integrate vertically, Formula 25, unit [m]
     end
  
-    pₛΔt_gρ = (pₛ * Δt_sec / gravity / water_density) * deep_convection # enforce no precip for shallow conv
-	rain_convection *= pₛΔt_gρ                                           # convert to [m] of rain during Δt
+    # CONVECTIVE PRECIPITATION
+    # enforce no precip for shallow conv via * deep_convection flag
+    pₛΔt_gρ = (pₛ * Δt_sec / gravity / water_density) * deep_convection 
+	rain_convection *= pₛΔt_gρ                  # convert to [m] of rain during Δt
+    rain_convection = max(rain_convection, 0)   # ensure non-negative precipitation, rounding errors
     
     # Store precipitation in diagnostic arrays
-    diagn.physics.rain_convection[ij] += rain_convection
+    diagn.physics.rain_convection[ij] += rain_convection                # accumulated rain [m] for output
 
-    # TODO: double check, because preivously this was rain_rate_convection, which didn't exist
-    diagn.physics.total_precipitation_rate[ij] = rain_convection / Δt_sec    # rate: convert to [m/s] of rain
+    # TODO use [kg/m²/s] units? then * ρ here
+    diagn.physics.rain_rate_convection[ij] = rain_convection / Δt_sec   # instantaneous rate [m/s] for coupling
 
     # Update cloud top
     diagn.physics.cloud_top[ij] = min(diagn.physics.cloud_top[ij], level_zero_buoyancy)       # clouds reach to top of convection
     return nothing
+end
+
+function variables(::BettsMillerConvection)
+    return (
+        DiagnosticVariable(name=:rain_convection, dims=Grid2D(), desc="Convective precipitation (accumulated)", units="m"),
+        DiagnosticVariable(name=:rain_rate_convection, dims=Grid2D(), desc="Convective precipitation rate", units="m/s"),
+        DiagnosticVariable(name=:cloud_top, dims=Grid2D(), desc="Cloud top layer index", units="1"),
+    )
 end
 
 """
@@ -171,13 +177,14 @@ Calculates the moist pseudo adiabat given temperature and humidity of surface pa
 Follows the dry adiabat till condensation and then continues on the pseudo moist-adiabat
 with immediate condensation to the level of zero buoyancy. Levels above are skipped,
 set to NaN instead and should be skipped in the relaxation."""
-function pseudo_adiabat!(
+@propagate_inbounds function pseudo_adiabat!(
     ij,
     temp_ref_profile,
     temp_parcel,
     humid_parcel,
-    temp_virt_environment,
-    geopot,
+    temp_environment,
+    humid_environment,
+    geopotential,
     pres,
     σ,
     clausius_clapeyron,
@@ -194,8 +201,8 @@ function pseudo_adiabat!(
     μ = (1-ε)/ε                             # for virtual temperature
 
     nlayers = length(σ)                         # number of vertical levels
-    for i in 1:nlayers
-        temp_ref_profile[ij, i] = NF(NaN)           # reset profile from any previous calculation, TODO necessary?
+    for k in 1:nlayers
+        temp_ref_profile[ij, k] = NaN           # reset profile from any previous calculation, TODO necessary?
     end
     temp_ref_profile[ij, nlayers] = temp_parcel     # start profile at surface with parcel temperature
 
@@ -206,7 +213,7 @@ function pseudo_adiabat!(
 
     while buoyant && k > 1                  # calculate moist adiabat while buoyant till top
         k -= 1                              # one level up
-            
+    
         if !saturated                       # if not saturated yet follow dry adiabat
             # dry adiabatic ascent and saturation humidity of that temperature 
             temp_parcel_dry = temp_parcel*(σ[k]/σ[k+1])^κ
@@ -215,8 +222,8 @@ function pseudo_adiabat!(
             # set to saturated when the dry adiabatic ascent would reach saturation
             # then follow moist adiabat instead (see below)
             saturated = humid_parcel >= sat_humid
-        end
-    
+        end 
+            
         if saturated            
             # calculate moist/pseudo adiabatic lapse rate, dT/dΦ = -Γ/cp
             T, Tᵥ, q = temp_parcel, temp_virt_parcel, humid_parcel  # for brevity
@@ -224,7 +231,7 @@ function pseudo_adiabat!(
             B = q*Lᵥ^2 / ((1-q)^2 * cₚ * R_vapour)
             Γ = (1 + A/Tᵥ) / (1 + B/T^2)
                 
-            ΔΦ = geopot[ij, k] - geopot[ij, k+1]                    # vertical gradient in geopotential
+            ΔΦ = geopotential[ij, k] - geopotential[ij, k+1]                    # vertical gradient in geopotential
             temp_parcel = temp_parcel - ΔΦ/cₚ*Γ                     # new temperature of parcel at k
                 
             # at new (lower) temperature condensation occurs immediately
@@ -239,8 +246,8 @@ function pseudo_adiabat!(
 
         # check whether parcel is still buoyant wrt to environment
         # use virtual temperature as it's equivalent to density
-        temp_virt_parcel = temp_parcel*(1 + μ*humid_parcel)         # virtual temperature of parcel
-        buoyant = temp_virt_parcel > temp_virt_environment[ij, k]     
+        temp_virt_parcel = virtual_temperature(temp_parcel, humid_parcel, μ)         # virtual temperature of parcel
+        buoyant = temp_virt_parcel > virtual_temperature(temp_environment[ij, k], humid_environment[ij, k], μ)     
     end
     
     # if parcel isn't buoyant anymore set last temperature (with negative buoyancy) back to NaN
@@ -251,30 +258,27 @@ function pseudo_adiabat!(
     return level_zero_buoyancy
 end
 
-export DryBettsMiller
+export BettsMillerDryConvection
 
 """
 The simplified Betts-Miller convection scheme from Frierson, 2007,
 https://doi.org/10.1175/JAS3935.1 but with humidity set to zero.
 Fields and options are
 $(TYPEDFIELDS)"""
-@kwdef struct DryBettsMiller{NF} <: AbstractConvection
+@kwdef struct BettsMillerDryConvection{NF} <: AbstractConvection
     "[OPTION] Relaxation time for profile adjustment"
     time_scale::Second = Hour(4)
 end
 
-function Adapt.adapt_structure(to, DBM::DryBettsMiller{NF}) where NF
-    return DryBettsMiller{NF}(adapt_structure(to, DBM.time_scale))
-end
+Adapt.@adapt_structure BettsMillerDryConvection
 
 # generator function
-DryBettsMiller(SG::SpectralGrid; kwargs...) = DryBettsMiller{SG.NF}(; kwargs...)
-initialize!(::DryBettsMiller, ::PrimitiveEquation) = nothing
+BettsMillerDryConvection(SG::SpectralGrid; kwargs...) = BettsMillerDryConvection{SG.NF}(; kwargs...)
+initialize!(::BettsMillerDryConvection, ::PrimitiveEquation) = nothing
 
 # function barrier
-function parameterization!(ij, diagn, progn, convection_scheme::DryBettsMiller, model)
+@propagate_inbounds parameterization!(ij, diagn, progn, convection_scheme::BettsMillerDryConvection, model) =
     convection!(ij, diagn, convection_scheme, model)
-end
 
 """
 $(TYPEDSIGNATURES)
@@ -284,10 +288,10 @@ Starts with a first-guess relaxation to determine the convective criterion,
 then adjusts the reference profiles
 for thermodynamic consistency (e.g. in dry convection the humidity profile is non-precipitating),
 and relaxes current vertical profiles to the adjusted references."""
-function convection!(ij, diagn, DBM::DryBettsMiller, model)
+@propagate_inbounds function convection!(ij, diagn, DBM::BettsMillerDryConvection, model)
 
     (; geometry, atmosphere) = model
-    NF = eltype(diagn.grid.temp_grid)
+    NF = eltype(diagn.grid.temp_grid_prev)
     σ = geometry.σ_levels_full
     σ_half = geometry.σ_levels_half
     Δσ = geometry.σ_levels_thick
@@ -342,7 +346,7 @@ Calculates the moist pseudo adiabat given temperature and humidity of surface pa
 Follows the dry adiabat till condensation and then continues on the pseudo moist-adiabat
 with immediate condensation to the level of zero buoyancy. Levels above are skipped,
 set to NaN instead and should be skipped in the relaxation."""
-function dry_adiabat!(
+@propagate_inbounds function dry_adiabat!(
     ij,
     temp_ref_profile,
     temp_environment,
@@ -350,15 +354,13 @@ function dry_adiabat!(
     σ,
     atmosphere,
 )
+    NF = eltype(temp_ref_profile)
     κ = atmosphere.heat_capacity
 
-    @boundscheck length(temp_ref_profile) ==
-        length(σ) == length(temp_environment) || throw(BoundsError)
+    nlayers = length(σ)                     # number of vertical levels
 
-    nlayers = length(temp_ref_profile)      # number of vertical levels
-
-    for i in 1:nlayers
-        temp_ref_profile[ij, i] = NF(NaN)          # reset profile from any previous calculation
+    for k in 1:nlayers
+        temp_ref_profile[ij, k] = NaN       # reset profile from any previous calculation
     end
     temp_ref_profile[ij, nlayers] = temp_parcel    # start profile at surface with parcel temperature
 
@@ -425,9 +427,10 @@ function initialize!(C::ConvectiveHeating, model::PrimitiveEquation)
 end
 
 # function barrier
-parameterization!(ij, diagn, progn, convection_scheme::ConvectiveHeating, model) = convection!(ij, diagn, convection_scheme, model)
+@propagate_inbounds parameterization!(ij, diagn, progn, convection_scheme::ConvectiveHeating, model) =
+    convection!(ij, diagn, convection_scheme, model)
 
-@inline function convection!(
+@propagate_inbounds function convection!(
     ij,
     diagn::DiagnosticVariables,
     scheme::ConvectiveHeating,
@@ -458,12 +461,4 @@ parameterization!(ij, diagn, progn, convection_scheme::ConvectiveHeating, model)
         temp_tend[ij, k] += Qmax*exp(-((p-p₀)/σₚ)^2 / 2)*cos²θ_term
     end
     return nothing
-end
-
-function variables(::AbstractConvection)
-    return (
-        DiagnosticVariable(name=:rain_convection, dims=Grid2D(), desc="Convective precipitation", units="m"),
-        DiagnosticVariable(name=:cloud_top, dims=Grid2D(), desc="Cloud top level", units="1"),
-        DiagnosticVariable(name=:total_precipitation_rate, dims=Grid2D(), desc="Total precipitation rate", units="m/s"),
-    )
 end

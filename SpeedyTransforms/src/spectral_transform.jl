@@ -40,6 +40,7 @@ struct SpectralTransform{
     nlon_max::Int                   # Maximum number of longitude points (at Equator)
     nlons::Vector{Int}              # Number of longitude points per ring
     nlat::Int                       # Number of latitude rings
+    rings::Vector{UnitRange{Int}}   # precomputed ring indices
 
     # CORRESPONDING GRID VECTORS
     coslat::VectorType              # Cosine of latitudes, north to south
@@ -120,6 +121,7 @@ function SpectralTransform(
                                     # number of longitudes per latitude ring (one hemisphere only)
     nlons = [RingGrids.get_nlon_per_ring(grid, j) for j in 1:nlat_half]
     nfreq_max = nlon_max÷2 + 1              # maximum number of fourier frequencies (real FFTs)
+    rings = on_architecture(CPU(), eachring(grid))  # precomputed ring indices
 
     # LATITUDE VECTORS (based on Gaussian, equi-angle or HEALPix latitudes)
     latd = RingGrids.get_latd(grid)         # latitude in degrees (90˚Nto -90˚N)
@@ -280,7 +282,7 @@ function SpectralTransform(
         spectrum, nfreq_max, 
         LegendreShortcut, mmax_truncation,
         grid, nlayers,
-        nlon_max, nlons, nlat,
+        nlon_max, nlons, nlat, rings,
         coslat, coslat⁻¹, lon_offsets,
         norm_sphere,
         rfft_plans, brfft_plans, rfft_plans_1D, brfft_plans_1D,
@@ -309,7 +311,7 @@ function SpectralTransform(
 )
     # get trunc from dealiasing if not provided
     trunc = trunc > 0 ? trunc : get_truncation(grid, dealiasing)
-    spectrum = Spectrum(trunc+1+one_more_degree, trunc+1)
+    spectrum = Spectrum(trunc+1+one_more_degree, trunc+1; architecture=architecture(grid))
     return SpectralTransform(spectrum, grid; kwargs...)
 end
 
@@ -323,7 +325,7 @@ function SpectralTransform(
 )
     # get nlat_half from dealiasing if not provided
     nlat_half = nlat_half > 0 ? nlat_half : get_nlat_half(spectrum.mmax - 1, dealiasing)
-    grid = Grid(nlat_half)                  # create grid with nlat_half
+    grid = Grid(nlat_half, spectrum.architecture)                  # create grid with nlat_half
     return SpectralTransform(spectrum, grid; kwargs...)
 end
 

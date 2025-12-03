@@ -84,7 +84,9 @@ function UnicodePlots.heatmap(A::RingGrids.AbstractFullField2D; title::String=de
 end
 
 # add a method for Simulation when the extension is loaded to trigger a unicodeplot after run!(simulation)
-SpeedyWeather.unicodeplot(simulation::SpeedyWeather.AbstractSimulation) = 
-    UnicodePlots.heatmap(simulation.diagnostic_variables.grid.vor_grid[:, end], title="Surface vorticity [1/s]")
+function SpeedyWeather.unicodeplot(simulation::SpeedyWeather.AbstractSimulation)
+    vor = on_architecture(CPU(), simulation.diagnostic_variables.grid.vor_grid[:, end])
+    UnicodePlots.heatmap(vor, title="Surface vorticity [1/s]")
+end
 
 end # module

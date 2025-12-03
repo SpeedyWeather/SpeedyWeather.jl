@@ -154,6 +154,8 @@ $(TYPEDFIELDS)"""
     initial_time::Base.RefValue{DateTime} = Ref(DEFAULT_DATE)
 end
 
+SolarZenith(SG::SpectralGrid; kwargs...) = SolarZenith{SG.NF}(; kwargs...)
+
 function initialize!(
     S::AbstractZenith,
     initial_time::DateTime,
@@ -229,7 +231,9 @@ function cos_zenith!(
 end
 
 # Kernel for solar zenith calculation with daily cycle
-@kernel inbounds=true function solar_zenith_kernel!(cos_zenith, @Const(solar_hour_angle_0E), @Const(sinδ), @Const(cosδ), @Const(sinlat), @Const(coslat), @Const(lons), @Const(whichring))
+@kernel inbounds=true function solar_zenith_kernel!(cos_zenith,
+    @Const(solar_hour_angle_0E), @Const(sinδ), @Const(cosδ), @Const(sinlat), @Const(coslat), @Const(lons), @Const(whichring))
+
     ij = @index(Global, Linear)
     j = whichring[ij]
     
@@ -243,7 +247,7 @@ export SolarZenithSeason
 
 """Solar zenith angle varying with seasonal cycle only.
 $(TYPEDFIELDS)"""
-Base.@kwdef struct SolarZenithSeason{NF<:AbstractFloat} <: AbstractZenith
+@kwdef struct SolarZenithSeason{NF<:AbstractFloat} <: AbstractZenith
     # OPTIONS
     length_of_day::Second = Hour(24)
     length_of_year::Second = Day(365.25)
@@ -254,6 +258,8 @@ Base.@kwdef struct SolarZenithSeason{NF<:AbstractFloat} <: AbstractZenith
 
     initial_time::Base.RefValue{DateTime} = Ref(DEFAULT_DATE)
 end
+
+SolarZenithSeason(SG::SpectralGrid; kwargs...) = SolarZenithSeason{SG.NF}(; kwargs...)
 
 """
 $(TYPEDSIGNATURES)
@@ -287,7 +293,9 @@ function cos_zenith!(
 end
 
 # Kernel for seasonal solar zenith calculation (daily average)
-@kernel inbounds=true function solar_zenith_season_kernel!(cos_zenith, @Const(δ), @Const(sinδ), @Const(cosδ), @Const(sinlat), @Const(coslat), @Const(lat), @Const(whichring))
+@kernel inbounds=true function solar_zenith_season_kernel!(cos_zenith,
+    @Const(δ), @Const(sinδ), @Const(cosδ), @Const(sinlat), @Const(coslat), @Const(lat), @Const(whichring))
+
     ij = @index(Global, Linear)
     j = whichring[ij]
     
@@ -307,4 +315,8 @@ end
     cos_zenith[ij] = cos_zenith_j
 end
 
-variables(::AbstractZenith) = (DiagnosticVariable(name=:cos_zenith, dims=Grid2D(), desc="Cosine of solar zenith angle", units="1"),)
+function variables(::AbstractZenith)
+    return (
+        DiagnosticVariable(name=:cos_zenith, dims=Grid2D(), desc="Cosine of solar zenith angle", units="1"),
+    )
+end

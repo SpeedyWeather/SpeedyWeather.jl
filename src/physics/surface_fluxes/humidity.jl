@@ -6,8 +6,11 @@ export SurfaceHumidityFlux
 for ocean and land (each of any type) separately. Fields are
 $(TYPEDFIELDS)"""
 @kwdef struct SurfaceHumidityFlux{Ocean, Land} <: AbstractSurfaceHumidityFlux
-    ocean::Ocean = SurfaceOceanHumidityFlux()
-    land::Land = SurfaceLandHumidityFlux()
+    "[OPTION] Surface humidity flux parameterization for ocean surfaces"
+    ocean::Ocean
+
+    "[OPTION] Surface humidity flux parameterization for land surfaces"
+    land::Land
 end
 
 Adapt.@adapt_structure SurfaceHumidityFlux
@@ -27,13 +30,15 @@ function initialize!(S::SurfaceHumidityFlux, model::PrimitiveWet)
 end
 
 # call first ocean flux then land flux
-function parameterization!(ij, diagn, progn, humidity_flux::SurfaceHumidityFlux, model)
+# order important as ocean sets the flux (=) and land accumulates (+=)
+@propagate_inbounds function parameterization!(ij, diagn, progn, humidity_flux::SurfaceHumidityFlux, model)
     surface_humidity_flux!(ij, diagn, progn, humidity_flux.ocean, model)
     surface_humidity_flux!(ij, diagn, progn, humidity_flux.land,  model)
 end
 
 export SurfaceOceanHumidityFlux
-@kwdef struct SurfaceOceanHumidityFlux{NF<:AbstractFloat} <: AbstractSurfaceHumidityFlux
+"""Humidity flux parameterization over ocean surfaces. Fields are $(TYPEDFIELDS)"""
+@kwdef struct SurfaceOceanHumidityFlux{NF} <: AbstractSurfaceHumidityFlux
     "[OPTION] Use drag coefficient from calculated following model.boundary_layer_drag"
     use_boundary_layer_drag::Bool = true
 
@@ -42,14 +47,12 @@ export SurfaceOceanHumidityFlux
 end
 
 Adapt.@adapt_structure SurfaceOceanHumidityFlux
-
 SurfaceOceanHumidityFlux(SG::SpectralGrid; kwargs...) = SurfaceOceanHumidityFlux{SG.NF}(; kwargs...)
 initialize!(::SurfaceOceanHumidityFlux, ::PrimitiveWet) = nothing
 
-function surface_humidity_flux!(ij, diagn, progn, humidity_flux::SurfaceOceanHumidityFlux, model)
+@propagate_inbounds function surface_humidity_flux!(ij, diagn, progn, humidity_flux::SurfaceOceanHumidityFlux, model)
 
-    nlayers = model.geometry.nlayers
-    # TODO use a skin temperature?
+    surface = model.geometry.nlayers
     T = progn.ocean.sea_surface_temperature[ij]
 
     # SATURATION HUMIDITY OVER OCEAN
@@ -59,7 +62,7 @@ function surface_humidity_flux!(ij, diagn, progn, humidity_flux::SurfaceOceanHum
     ρ = diagn.physics.surface_air_density[ij]
     V₀ = diagn.physics.surface_wind_speed[ij]
     land_fraction = model.land_sea_mask.mask[ij]
-    surface_humid = diagn.grid.humid_grid[ij, nlayers]
+    surface_humid = diagn.grid.humid_grid_prev[ij, surface]
 
     # drag coefficient either from SurfaceHumidityFlux or from a central drag coefficient
     d = diagn.physics.boundary_layer_drag[ij]
@@ -77,23 +80,25 @@ function surface_humidity_flux!(ij, diagn, progn, humidity_flux::SurfaceOceanHum
     diagn.physics.surface_humidity_flux[ij] = flux_ocean
     
     # accumulate with += into end=lowermost layer total flux
-    diagn.tendencies.humid_tend_grid[ij, nlayers] += surface_flux_to_tendency(flux_ocean, pₛ, model)
+    diagn.tendencies.humid_tend_grid[ij, surface] += surface_flux_to_tendency(flux_ocean, pₛ, model)
     return nothing
 end
 
 export SurfaceLandHumidityFlux
-@kwdef struct SurfaceLandHumidityFlux{NF<:AbstractFloat} <: AbstractSurfaceHumidityFlux
+"""Humidity flux parameterization over land surfaces. Fields are $(TYPEDFIELDS)"""
+@kwdef struct SurfaceLandHumidityFlux{NF} <: AbstractSurfaceHumidityFlux
     "[OPTION] Use column.boundary_layer_drag coefficient"
     use_boundary_layer_drag::Bool = true
 
     "[OPTION] Or fixed drag coefficient for humidity flux over land"
     drag::NF = 1.2e-3
 end
-    
+
+Adapt.@adapt_structure SurfaceLandHumidityFlux
 SurfaceLandHumidityFlux(SG::SpectralGrid; kwargs...) = SurfaceLandHumidityFlux{SG.NF}(; kwargs...)
 initialize!(::SurfaceLandHumidityFlux, ::PrimitiveWet) = nothing
 
-function surface_humidity_flux!(ij, diagn, progn, humidity_flux::SurfaceLandHumidityFlux, model)
+@propagate_inbounds function surface_humidity_flux!(ij, diagn, progn, humidity_flux::SurfaceLandHumidityFlux, model)
 
     # TODO use a skin temperature?
     T = progn.land.soil_temperature[ij, 1]  # uppermost land layer with index 1
@@ -106,8 +111,8 @@ function surface_humidity_flux!(ij, diagn, progn, humidity_flux::SurfaceLandHumi
     ρ = diagn.physics.surface_air_density[ij]
     V₀ = diagn.physics.surface_wind_speed[ij]
     land_fraction = model.land_sea_mask.mask[ij]
-    nlayers = model.geometry.nlayers
-    surface_humid = diagn.grid.humid_grid[ij, nlayers]
+    surface = model.geometry.nlayers            # indexing top to bottom
+    surface_humid = diagn.grid.humid_grid_prev[ij, surface]
 
     # drag coefficient either from SurfaceLandHumidityFlux or from a central drag coefficient
     d = diagn.physics.boundary_layer_drag[ij]
@@ -115,32 +120,35 @@ function surface_humidity_flux!(ij, diagn, progn, humidity_flux::SurfaceLandHumi
 
     # SPEEDY documentation eq. 55/57, zero flux if land / soil moisture availability not available (=ocean)
     # but remove the max( ,0) to allow for surface condensation
-    flux_land = isfinite(T) && isfinite(α) ? ρ*drag_land*V₀*(α*sat_humid_land  - surface_humid) : zero(T)
+    flux_land = isfinite(T) && isfinite(α) ? ρ*drag_land*V₀*(α*sat_humid_land - surface_humid) : zero(T)
     
     # store without weighting by land fraction for coupling
-    diagn.physics.land.surface_humidity_flux[ij] = flux_land         
+    # TODO multiply by Lᵥ for W/m^2 here?
+    diagn.physics.land.surface_humidity_flux[ij] = flux_land    # [kg/m²/s]
     flux_land *= land_fraction             # weight by land fraction of land-sea mask
 
     # output/diagnose: ocean sets flux (=), land accumulates (+=)
     diagn.physics.surface_humidity_flux[ij] += flux_land
     
     # accumulate with += into end=lowermost layer total flux
-    diagn.tendencies.humid_tend_grid[ij, end] += surface_flux_to_tendency(flux_land, pₛ, model)
+    diagn.tendencies.humid_tend_grid[ij, surface] += surface_flux_to_tendency(flux_land, pₛ, model)
     return nothing
 end
-
-Adapt.@adapt_structure SurfaceLandHumidityFlux
 
 ## ----
 
 export PrescribedOceanHumidityFlux
+"""Prescribed humidity flux over ocean surfaces. Applies surface humidity flux from
+`progn.ocean.surface_humidity_flux`. $(TYPEDFIELDS)"""
 struct PrescribedOceanHumidityFlux <: AbstractSurfaceHumidityFlux end
+Adapt.@adapt_structure PrescribedOceanHumidityFlux
 PrescribedOceanHumidityFlux(::SpectralGrid) = PrescribedOceanHumidityFlux()
 initialize!(::PrescribedOceanHumidityFlux, ::PrimitiveWet) = nothing
 
-function surface_humidity_flux!(ij, diagn, progn, ::PrescribedOceanHumidityFlux, model)
+@propagate_inbounds function surface_humidity_flux!(ij, diagn, progn, ::PrescribedOceanHumidityFlux, model)
     land_fraction = model.land_sea_mask.mask[ij]
     pₛ = diagn.grid.pres_grid_prev[ij]          # surface pressure [Pa]
+    surface = model.geometry.nlayers
 
     # read in a prescribed flux
     flux_ocean = progn.ocean.surface_humidity_flux[ij]
@@ -153,23 +161,25 @@ function surface_humidity_flux!(ij, diagn, progn, ::PrescribedOceanHumidityFlux,
     diagn.physics.surface_humidity_flux[ij] = flux_ocean
     
     # accumulate with += into end=lowermost layer total flux
-    nlayers = model.geometry.nlayers
-    diagn.tendencies.humid_tend_grid[ij, nlayers] += surface_flux_to_tendency(flux_ocean, pₛ, model)
+    diagn.tendencies.humid_tend_grid[ij, surface] += surface_flux_to_tendency(flux_ocean, pₛ, model)
     return nothing
 end
 
-Adapt.@adapt_structure PrescribedOceanHumidityFlux
 
 ## ----
 
 export PrescribedLandHumidityFlux
+"""Prescribed humidity flux over land surfaces. Applies surface humidity flux from
+`progn.land.surface_humidity_flux`. $(TYPEDFIELDS)"""
 struct PrescribedLandHumidityFlux <: AbstractSurfaceHumidityFlux end
+Adapt.@adapt_structure PrescribedLandHumidityFlux
 PrescribedLandHumidityFlux(::SpectralGrid) = PrescribedLandHumidityFlux()
 initialize!(::PrescribedLandHumidityFlux, ::PrimitiveWet) = nothing
 
-function surface_humidity_flux!(ij, diagn, progn, ::PrescribedLandHumidityFlux, model)
+@propagate_inbounds function surface_humidity_flux!(ij, diagn, progn, ::PrescribedLandHumidityFlux, model)
     land_fraction = model.land_sea_mask.mask[ij]
     pₛ = diagn.grid.pres_grid_prev[ij]          # surface pressure [Pa]
+    surface = model.geometry.nlayers
 
     # read in a prescribed flux
     flux_land = progn.land.surface_humidity_flux[ij]
@@ -182,12 +192,9 @@ function surface_humidity_flux!(ij, diagn, progn, ::PrescribedLandHumidityFlux, 
     diagn.physics.surface_humidity_flux[ij] += flux_land
     
     # accumulate with += into end=lowermost layer total flux
-    nlayers = model.geometry.nlayers
-    diagn.tendencies.humid_tend_grid[ij, nlayers] += surface_flux_to_tendency(flux_land, pₛ, model)
+    diagn.tendencies.humid_tend_grid[ij, surface] += surface_flux_to_tendency(flux_land, pₛ, model)
     return nothing
 end
-
-Adapt.@adapt_structure PrescribedLandHumidityFlux
 
 function variables(::AbstractSurfaceHumidityFlux)
     return (

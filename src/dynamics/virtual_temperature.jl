@@ -35,26 +35,6 @@ function virtual_temperature!(
     return nothing
 end
 
-function virtual_temperature!(
-    column::ColumnVariables,
-    model::PrimitiveEquation,
-)
-    (; temp, temp_virt, humid) = column
-    μ = model.atmosphere.μ_virt_temp
-
-    @. temp_virt = temp*(1 + μ*humid)
-    return nothing
-end
-
-function virtual_temperature!(
-    column::ColumnVariables,
-    model::PrimitiveDry,
-)
-    (; temp, temp_virt) = column
-    @. temp_virt = temp             # temp = temp_virt for PrimitiveDry
-    return nothing
-end
-
 """
 $(TYPEDSIGNATURES)
 Linear virtual temperature for `model::PrimitiveDry`: Just copy over
@@ -108,3 +88,16 @@ function linear_virtual_temperature!(
         end
     end
 end
+
+@inline virtual_temperature(T, q, A::AbstractAtmosphere) = virtual_temperature(T, q, A.μ_virt_temp)
+@inline linear_virtual_temperature(T, q, Tₖ, A::AbstractAtmosphere) = linear_virtual_temperature(T, q, Tₖ, A.μ_virt_temp)
+@inline absolute_temperature(Tᵥ, q, A::AbstractAtmosphere) = absolute_temperature(Tᵥ, q, A.μ_virt_temp)
+
+@inline virtual_temperature(T, q, μ) = T * (1 + μ * q)
+@inline linear_virtual_temperature(T, q, Tₖ, μ) = T + (Tₖ * μ) * q
+@inline absolute_temperature(Tᵥ, q, μ) = Tᵥ / (1 + μ * q)
+
+# used to fallback to PrimtiveDry, maybe there's a more elegant way to do this?
+@inline virtual_temperature(T, q, ::Nothing) = T
+@inline linear_virtual_temperature(T, q, ::Nothing) = T
+@inline absolute_temperature(T, q, ::Nothing) = T

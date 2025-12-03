@@ -133,11 +133,12 @@ $TYPEDFIELDS."""
     v_grid          ::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
     "Logarithm of surface pressure [Pa]"
     pres_grid       ::GridVariable2D = zeros(GridVariable2D, grid)
-    "Tracers [?]"
-    tracers_grid    ::GridTracerTuple = NamedTuple()
-
+    "Geopotential [m²/s²]"
+    geopotential    ::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
     "Random pattern controlled by random process [1]"
     random_pattern  ::GridVariable2D = zeros(GridVariable2D, grid)
+    "Tracers [?]"
+    tracers_grid    ::GridTracerTuple = NamedTuple()
 
     # PREVIOUS TIME STEP
     "Absolute temperature [K] at previous time step"
@@ -227,7 +228,7 @@ $(TYPEDFIELDS)"""
     temp_virt::SpectralVariable3D = zeros(SpectralVariable3D, spectrum, nlayers)
 
     "Geopotential [m²/s²] on full layers"
-    geopot::SpectralVariable3D = zeros(SpectralVariable3D, spectrum, nlayers)
+    geopotential::SpectralVariable3D = zeros(SpectralVariable3D, spectrum, nlayers)
 
     "Vertical velocity (dσ/dt), on half levels k+1/2 below, pointing to the surface (σ=1)"
     σ_tend::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
@@ -258,27 +259,21 @@ end
 Generator function. If a `spectral_transform` is handed over, the same scratch memory is used."""
 function DynamicsVariables(SG::SpectralGrid; 
                            spectral_transform::Union{Nothing,SpectralTransform}=nothing) 
-    (; architecture, spectrum, grid, nlayers) = SG
+    (; architecture, spectrum, grid, nlayers, NF, ArrayType) = SG
     (; SpectralVariable2D, SpectralVariable3D) = SG
     (; GridVariable2D, GridVariable3D) = SG
 
-    if isnothing(spectral_transform)
-        return DynamicsVariables{typeof(spectrum), typeof(grid),
-            SpectralVariable2D, SpectralVariable3D,
-            GridVariable2D, GridVariable3D, 
-            SpeedyTransforms.ScratchMemory{array_type(architecture, Complex{NF}, 3), 
-            array_type(architecture, Complex{NF}, 1)}}(;
-                spectrum, grid, nlayers,
-            )
-    else 
-        scratch_memory = spectral_transform.scratch_memory 
+    if isnothing(spectral_transform)    # then create ScratchMemory now
+        scratch_memory = SpeedyTransforms.ScratchMemory(NF, architecture, grid, nlayers)
+    else                                # otherwise reuse existing ScratchMemory
+        scratch_memory = spectral_transform.scratch_memory
+    end
 
-        return DynamicsVariables{typeof(spectrum), typeof(grid),
-            SpectralVariable2D, SpectralVariable3D,
-            GridVariable2D, GridVariable3D, typeof(scratch_memory)}(;
-                spectrum, grid, nlayers, scratch_memory
-            )
-    end 
+    return DynamicsVariables{typeof(spectrum), typeof(grid),
+        SpectralVariable2D, SpectralVariable3D,
+        GridVariable2D, GridVariable3D, typeof(scratch_memory)}(;
+            spectrum, grid, nlayers, scratch_memory
+        )
 end
 
 Adapt.@adapt_structure DynamicsVariables

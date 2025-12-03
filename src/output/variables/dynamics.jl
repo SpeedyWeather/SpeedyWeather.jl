@@ -146,7 +146,7 @@ function output!(
     # escape immediately after first call if variable doesn't have a time dimension
     ~hastime(variable) && output.output_counter > 1 && return nothing
 
-
+    # get log(surface pressure) field
     lnpₛ = path(variable, simulation)
     h = simulation.model.orography.orography
     (; R_dry) = simulation.model.atmosphere
@@ -155,7 +155,10 @@ function output!(
     # virtual temperature in 3D view on surface-most 2D layer
     temp_virt_grid = simulation.diagnostic_variables.grid.temp_virt_grid
     nlayers = size(temp_virt_grid, 2)
-    Tᵥ = field_view(simulation.diagnostic_variables.grid.temp_virt_grid, :, nlayers)
+    T = simulation.diagnostic_variables.physics.surface_air_temperature
+    q = field_view(simulation.diagnostic_variables.grid.humid_grid, :, nlayers)
+    Tᵥ = simulation.diagnostic_variables.dynamics.a_2D_grid
+    @. Tᵥ = virtual_temperature(T, q, simulation.model.atmosphere.μ_virt_temp)
 
     # calculate mean sea-level pressure on model grid
     mslp = simulation.diagnostic_variables.dynamics.a_2D_grid

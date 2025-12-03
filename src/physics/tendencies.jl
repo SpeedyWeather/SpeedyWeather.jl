@@ -8,41 +8,87 @@ function parameterization_tendencies!(
     # parameterizations with their own kernel
     (; time) = progn.clock
     cos_zenith!(diagn, time, model)
+    reset_variables!(diagn)
 
-    model_parameters = get_model_parameters(model)      # subset of GPU-compatible model components
-    parameterizations = get_parameterizations(model)    # subset of model: parameterizations only
-
-    # all other parameterizations are fused into a single kernel over horizontal grid point index ij
     (; architecture, npoints) = model.spectral_grid
-    launch!(architecture, LinearWorkOrder, (npoints,), parameterization_tendencies_kernel!,
-        diagn, progn, parameterizations, model_parameters)
+    if architecture isa Architectures.AbstractCPU
+        # bypass kernel launch on CPU
+        parameterization_tendencies_cpu!(diagn, progn, model)
+    else
+        # GPU: all other parameterizations are fused into a single kernel over horizontal grid point index ij
+        launch!(architecture, LinearWorkOrder, (npoints,), parameterization_tendencies_kernel!,
+            diagn, progn, get_parameterizations(model), model)
+    end
     return nothing
 end
 
-@kernel function parameterization_tendencies_kernel!(diagn, progn, @Const(parameterizations), @Const(model_parameters))
+# GPU kernel, unrolling NamedTuple iteration at compile time, fuses all parameterizations
+@kernel inbounds=true function parameterization_tendencies_kernel!(diagn, progn, parameterizations, model)
     
     ij = @index(Global, Linear)     # every horizontal grid point ij
 
     # manually unroll loop over all parameterizations (NamedTuple iteration not GPU-compatible)
-    _call_parameterizations!(ij, diagn, progn, parameterizations, model_parameters)
+    _call_parameterizations!(ij, diagn, progn, parameterizations, model)
 
     # tendencies have to be scaled by the radius for the dynamical core
-    scale!(ij, diagn.tendencies, model_parameters.planet.radius)
+    scale!(ij, diagn.tendencies, model.planet.radius)
+end
+
+# CPU without kernel, just a loop, change loop order compared to GPU though:
+# outer loop over parameterizations, inner loop over horizontal grid points
+# this yields a more contiguous memory access pattern on CPU
+function parameterization_tendencies_cpu!(diagn, progn, model)
+    @inbounds _call_parameterizations_cpu!(diagn, progn, get_parameterizations(model), model)
+
+    radius = model.planet.radius
+    @inbounds for ij in 1:model.geometry.npoints
+        # tendencies have to be scaled by the radius for the dynamical core
+        scale!(ij, diagn.tendencies, radius)
+    end
 end
 
 # Use @generated to unroll NamedTuple iteration at compile time for GPU compatibility
-@generated function _call_parameterizations!(ij, diagn, progn, parameterizations::NamedTuple{names}, model_parameters) where {names}
-    calls = [:(parameterization!(ij, diagn, progn, parameterizations.$name, model_parameters)) for name in names]
-    return Expr(:block, calls...)
+@generated function _call_parameterizations!(ij, diagn, progn, parameterizations::NamedTuple{names}, model) where names
+    calls = [:(
+        parameterization!(ij, diagn, progn, parameterizations.$name, model)
+    ) for name in names]
+    return quote
+        Base.@_propagate_inbounds_meta
+        $(Expr(:block, calls...))
+    end
+end
+
+# Use @generated to unroll NamedTuple iteration at compile time also on CPU for performance
+@generated function _call_parameterizations_cpu!(diagn, progn, parameterizations::NamedTuple{names}, model) where {names}
+    calls = [quote
+        for ij in 1:model.geometry.npoints      # horizontal grid points inner loop
+            parameterization!(ij, diagn, progn, parameterizations.$name, model)
+        end
+    end for name in names]                    # parameterizations outer loop
+    return quote
+        Base.@_propagate_inbounds_meta
+        $(Expr(:block, calls...))
+    end
 end
 
 """$(TYPEDSIGNATURES)
 Flux `flux` into surface layer with surface pressure `pₛ` [Pa] and gravity `g` [m/s^2]
 converted to tendency [?/s]."""
-@inline surface_flux_to_tendency(flux::Real, pₛ::Real, model) =
+@propagate_inbounds surface_flux_to_tendency(flux::Real, pₛ::Real, model) =
     flux_to_tendency(flux, pₛ, model.planet.gravity, model.geometry.σ_levels_thick[end])
 
 """$(TYPEDSIGNATURES)
 Flux `flux` into layer `k` of thickness `Δσ`  converted to tendency [?/s].
 Using surface pressure `pₛ` [Pa] and gravity `g` [m/s^2]."""
-@inline flux_to_tendency(flux::Real, pₛ::Real, g::Real, Δσ_k::Real) = g/(pₛ*Δσ_k) * flux
+@propagate_inbounds flux_to_tendency(flux::Real, pₛ::Real, g::Real, Δσ_k::Real) = g/(pₛ*Δσ_k) * flux
+@propagate_inbounds flux_to_tendency(flux::Real, pₛ::Real, k::Int, model) = 
+    flux_to_tendency(flux, pₛ, model.planet.gravity, model.geometry.σ_levels_thick[k])
+
+# hacky, temporary placement, and also modularize this? 
+function reset_variables!(diagn::DiagnosticVariables)
+    if haskey(diagn.physics, :cloud_top)
+        (; cloud_top) = diagn.physics
+        cloud_top .= diagn.nlayers + 1    # reset to below top layer
+    end
+    return nothing
+end

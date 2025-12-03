@@ -157,7 +157,7 @@ function write_column_tendencies!(
          column.snow_rate_large_scale + column.snow_rate_convection) * ρ
 
     # Cloud top in height [m] from geopotential height divided by gravity, 0 for no clouds
-    diagn.physics.cloud_top[ij] = column.cloud_top == nlayers+1 ? 0 : column.geopot[column.cloud_top]
+    diagn.physics.cloud_top[ij] = column.cloud_top == nlayers+1 ? 0 : column.geopotential[column.cloud_top]
     diagn.physics.cloud_top[ij] /= planet.gravity
     
     # just use layer index 1 (top) to nlayers (surface) for analysis, but 0 for no clouds

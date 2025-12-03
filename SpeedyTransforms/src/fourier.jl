@@ -18,7 +18,10 @@ function _fourier!(field::AbstractField, f_north, f_south, S::SpectralTransform)
     return _fourier!(field, f_north, f_south, S)
 end
 
-# Forward FFT Application Function for batched FFT
+"""$(TYPEDSIGNATURES)
+(Forward) FFT, applied in zonal direction of `field` provided. Depending on
+the field's array type (CPU/GPU) the actual application of the FFT is slightly
+different because of strided array/view support of the GPU FFT libraries."""
 function _apply_batched_fft!(
     f_out::AbstractArray{<:Complex, 3},
     field::AbstractField,
@@ -34,14 +37,21 @@ function _apply_batched_fft!(
 
     # Perform the FFT
     if not_equator # skip FFT, redundant when north already did that latitude
-        # this version currently allocates a small array, FFTW supports strided outputs, but FFTW.jl doesn't 
-        view(f_out, 1:nfreq, 1:nlayers, j) .= rfft_plan * view(field.data, ilons, :)
+        view(f_out, 1:nfreq, 1:nlayers, j) .= rfft_plan * view_only_on_cpu(field.data, ilons, :)
     else
-        fill!(view(f_out, 1:nfreq, 1:nlayers, j), 0)
+        f_out[1:nfreq, 1:nlayers, j] .= 0
     end
-end    
+end
 
-# Inverse FFT Application Function for batched FFT
+# CPU version with view
+@inline view_only_on_cpu(A::AbstractArray, I...) = view(A, I...)
+# GPU version without view
+@inline view_only_on_cpu(A::AbstractGPUArray, I...) = A[I...]
+
+"""$(TYPEDSIGNATURES)
+(Inverse) FFT, applied in zonal direction of `field` provided. Depending on
+the field's array type (CPU/GPU) the actual application of the FFT is slightly
+different because of strided array/view support of the GPU FFT libraries."""
 function _apply_batched_fft!(
     field::AbstractField,
     g_in::AbstractArray{<:Complex, 3},
@@ -57,8 +67,7 @@ function _apply_batched_fft!(
     nfreq = nlon÷2 + 1              
 
     if not_equator  # skip FFT, redundant when north already did that latitude
-        # this version currently allocates a small array, FFTW supports strided outputs, but FFTW.jl doesn't 
-        view(field.data, ilons, :) .= brfft_plan * view(g_in, 1:nfreq, 1:nlayers, j)
+        view(field.data, ilons, :) .= brfft_plan * view_only_on_cpu(g_in, 1:nfreq, 1:nlayers, j)
     end
 end
 
@@ -115,7 +124,7 @@ function _fourier_batched!(                 # GRID TO SPECTRAL
     field::AbstractField,                   # gridded input
     S::SpectralTransform;                   # precomputed transform
 )
-    (; nlat, nlons) = S                     # dimensions
+    (; nlat, nlons, rings) = S              # dimensions
     (; nlat_half) = S.grid
     nlayers = size(field, 2)                # number of vertical layers
 
@@ -124,7 +133,6 @@ function _fourier_batched!(                 # GRID TO SPECTRAL
     @boundscheck nlayers == S.nlayers || throw(DimensionMismatch(S, field))
     @boundscheck size(f_north) == size(f_south) == (S.nfreq_max, S.nlayers, nlat_half) || throw(DimensionMismatch(S, field))
 
-    rings = eachring(field)                 # precomputed ring indices
     @inbounds for j_north in 1:nlat_half    # symmetry: loop over northern latitudes only
         j = j_north                         # symmetric index / ring-away from pole index
         j_south = nlat - j_north + 1        # corresponding southern latitude index
@@ -154,7 +162,7 @@ function _fourier_serial!(                  # GRID TO SPECTRAL
     field::AbstractField,                   # gridded input
     S::SpectralTransform;                   # precomputed transform
 )
-    (; nlat, nlons) = S                     # dimensions
+    (; nlat, nlons, rings) = S              # dimensions
     (; nlat_half) = S.grid
     nlayers = size(field, 2)                # number of vertical layers
 
@@ -163,7 +171,6 @@ function _fourier_serial!(                  # GRID TO SPECTRAL
     @boundscheck nlayers <= S.nlayers || throw(DimensionMismatch(S, field))
     @boundscheck size(f_north) == size(f_south) == (S.nfreq_max, S.nlayers, nlat_half) || throw(DimensionMismatch(S, field))
 
-    rings = eachring(field)                     # precomputed ring indices
     @inbounds for (k, k_grid) in zip(1:nlayers, eachlayer(field))
         for j_north in 1:nlat_half              # symmetry: loop over northern latitudes only
             j = j_north                         # symmetric index / ring-away from pole index
@@ -193,7 +200,7 @@ function _fourier_batched!(                 # SPECTRAL TO GRID
     g_south::AbstractArray{<:Complex, 3},   # and for southern latitudes
     S::SpectralTransform;                   # precomputed transform
 )
-    (; nlat, nlons) = S                     # dimensions
+    (; nlat, nlons, rings) = S              # dimensions
     (; nlat_half) = S.grid
     nlayers = size(field, 2)                # number of vertical layers
 
@@ -201,7 +208,6 @@ function _fourier_batched!(                 # SPECTRAL TO GRID
     @boundscheck nlayers == S.nlayers || throw(DimensionMismatch(S, field))     # otherwise FFTW complains
     @boundscheck size(g_north) == size(g_south) == (S.nfreq_max, S.nlayers, nlat_half) || throw(DimensionMismatch(S, field))
 
-    rings = eachring(field)                 # precomputed ring indices
     @inbounds for j_north in 1:nlat_half    # symmetry: loop over northern latitudes only
         j = j_north                         # symmetric index / ring-away from pole index
         j_south = nlat - j_north + 1        # southern latitude index
@@ -230,7 +236,7 @@ function _fourier_serial!(                  # SPECTRAL TO GRID
     g_south::AbstractArray{<:Complex, 3},   # and for southern latitudes
     S::SpectralTransform;                   # precomputed transform
 )
-    (; nlat, nlons) = S                     # dimensions   
+    (; nlat, nlons, rings) = S              # dimensions   
     (; nlat_half) = S.grid       
     nlayers = size(field, 2)                # number of vertical layers
 
@@ -238,7 +244,6 @@ function _fourier_serial!(                  # SPECTRAL TO GRID
     @boundscheck nlayers <= S.nlayers || throw(DimensionMismatch(S, field))     # otherwise FFTW complains
     @boundscheck size(g_north) == size(g_south) == (S.nfreq_max, S.nlayers, nlat_half) || throw(DimensionMismatch(S, field))
 
-    rings = eachring(field)                     # precomputed ring indices
     @inbounds for (k, k_grid) in zip(1:nlayers, eachlayer(field))
         for j_north in 1:nlat_half              # symmetry: loop over northern latitudes only
             j = j_north                         # symmetric index / ring-away from pole index
@@ -258,8 +263,6 @@ function _fourier_serial!(                  # SPECTRAL TO GRID
     end
 end
 
-which_FFT_package(::Type{<:AbstractArray{NF}}) where NF<:AbstractFloat = NF <: Union{Float32, Float64} ? FFTW : GenericFFT
-
 """$(TYPEDSIGNATURES)
 Util function to generate FFT plans based on the array type of the fake Grid 
 data provided. Uses views, which is less allocate-y than indexing but breaks 
@@ -275,20 +278,18 @@ function plan_FFTs!(
     rings,
     nlons::Vector{<:Int}
 ) where {NF<:AbstractFloat, N}
-    # Determine which FFT package to use (currently either FFTW or GenericFFT)
-    FFT_package = which_FFT_package(Array{NF})
 
     # For each ring generate an FFT plan (for all layers and for a single layer)
     for (j, nlon) in enumerate(nlons)
-        real_matrix_input = view(fake_grid_data.data, rings[j], :)
-        complex_matrix_input = view(scratch_memory_north, 1:nlon÷2 + 1, :, j)
-        real_vector_input = view(fake_grid_data.data, rings[j], 1)
-        complex_vector_input = view(scratch_memory_north, 1:nlon÷2 + 1, 1, j)
+        real_matrix_input = view_only_on_cpu(fake_grid_data.data, rings[j], :)
+        complex_matrix_input = view_only_on_cpu(scratch_memory_north, 1:nlon÷2 + 1, :, j)
+        real_vector_input = view_only_on_cpu(fake_grid_data.data, rings[j], 1)
+        complex_vector_input = view_only_on_cpu(scratch_memory_north, 1:nlon÷2 + 1, 1, j)
 
-        rfft_plans[j] = FFT_package.plan_rfft(real_matrix_input, 1)
-        brfft_plans[j] = FFT_package.plan_brfft(complex_matrix_input, nlon, 1)
-        rfft_plans_1D[j] = FFT_package.plan_rfft(real_vector_input, 1)
-        brfft_plans_1D[j] = FFT_package.plan_brfft(complex_vector_input, nlon, 1) 
+        rfft_plans[j] = AbstractFFTs.plan_rfft(real_matrix_input, 1)
+        brfft_plans[j] = AbstractFFTs.plan_brfft(complex_matrix_input, nlon, 1)
+        rfft_plans_1D[j] = AbstractFFTs.plan_rfft(real_vector_input, 1)
+        brfft_plans_1D[j] = AbstractFFTs.plan_brfft(complex_vector_input, nlon, 1) 
     end
 
     return rfft_plans, brfft_plans, rfft_plans_1D, brfft_plans_1D

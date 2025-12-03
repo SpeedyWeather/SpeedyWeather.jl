@@ -1,8 +1,7 @@
 @testset "Longwave radiation" begin
     spectral_grid = SpectralGrid(trunc=31, nlayers=8)
-    @testset for LW in (Nothing, UniformCooling, JeevanjeeRadiation, )#NBandRadiation)
+    @testset for LW in (Nothing, UniformCooling, JeevanjeeRadiation)
         longwave_radiation = LW(spectral_grid)
-        optical_depth = FriersonOpticalDepth(spectral_grid)
 
         # with no longwave radiation or uniform cooling there are no 
         # longwave surface radiative fluxes cooling the soil
@@ -15,7 +14,7 @@
 
         land = LandModel(spectral_grid, temperature=soil_temperature)
 
-        model = PrimitiveWetModel(spectral_grid; land, optical_depth, longwave_radiation)
+        model = PrimitiveWetModel(spectral_grid; land, longwave_radiation)
         simulation = initialize!(model)
         run!(simulation, period=Day(5))
         

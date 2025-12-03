@@ -315,25 +315,26 @@ function implicit_correction!(
     # SEMI IMPLICIT CORRECTIONS FOR DIVERGENCE
     # calculate the combined tendency G = G_D + ξRG_T + ξUG_lnps to solve for divergence δD
     (; pres_tend, div_tend) = diagn.tendencies
-    G = diagn.dynamics.a        # reuse work arrays, used for combined tendency G
-    geopot = diagn.dynamics.b   # used for geopotential
+    G = diagn.dynamics.a                # reuse work arrays, used for combined tendency G
+    geopotential = diagn.dynamics.b
+    geopotential .= 0                   # reset geopotential work array for accumulation below
 
     for k in 1:nlayers
         for r in k:nlayers      # skip 1:k-1 as integration is surface to k
             for lm in eachharmonic(temp_tend, div_old, div_new)
                 # 1. the ξ*R*G_T term, vertical integration of geopotential (excl ξ, this is done in 2.)
-                geopot[lm, k] += R[k, r]*temp_tend[lm, r]
+                geopotential[lm, k] += R[k, r]*temp_tend[lm, r]
             end
         end
 
-        # 2. the G = G_D + ξRG_T + ξUG_lnps terms using geopot from above
+        # 2. the G = G_D + ξRG_T + ξUG_lnps terms using geopotential from above
         lm = 0
         for m in 1:trunc+1              # loops over all columns/order m
             for l in m:trunc+1          # but skips the lmax+2 degree (1-based)
                 lm += 1                 # single index lm corresponding to harmonic l, m
                                         # ∇² not part of U so *eigenvalues here
                 eigenvalue = -l*(l-1)   # 1-based, -l*(l+1) → -l*(l-1)
-                G[lm, k] = div_tend[lm, k] + ξ*eigenvalue*(U[k]*pres_tend[lm] + geopot[lm, k])
+                G[lm, k] = div_tend[lm, k] + ξ*eigenvalue*(U[k]*pres_tend[lm] + geopotential[lm, k])
 
                 # div_tend is now in G, fill with zeros here so that it can be used as an accumulator
                 # in the δD = S⁻¹G calculation below
@@ -371,4 +372,6 @@ function implicit_correction!(
             pres_tend[lm] += ξ*W[k]*div_tend[lm, k]
         end
     end
+    pres_tend[1] = 0    # mass conservation
+    return nothing
 end
