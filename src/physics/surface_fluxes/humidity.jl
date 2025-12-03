@@ -11,6 +11,11 @@ function SurfaceHumidityFlux(
     return SurfaceHumidityFlux(; ocean, land)
 end
 
+parameters(flux::SurfaceHumidityFlux; kwargs...) = SpeedyParams(
+    ocean = parameters(flux.ocean; component=:ocean, kwargs...),
+    land = parameters(flux.land; component=:land, kwargs...),
+)
+
 function initialize!(S::SurfaceHumidityFlux, model::PrimitiveWet)
     initialize!(S.ocean, model)
     initialize!(S.land, model)

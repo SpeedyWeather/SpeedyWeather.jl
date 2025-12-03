@@ -25,6 +25,11 @@ function DefaultAlbedo(SG::SpectralGrid;
     return Albedo(ocean, land)
 end
 
+parameters(albedo::Albedo; kwargs...) = SpeedyParams(
+    ocean = parameters(albedo.ocean; component=:ocean, kwargs...),
+    land = parameters(albedo.land; component=:land, kwargs...),
+)
+
 function initialize!(albedo::Albedo, model::PrimitiveEquation)
     initialize!(albedo.ocean, model)
     initialize!(albedo.land, model)

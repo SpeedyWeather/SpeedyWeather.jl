@@ -106,6 +106,12 @@ OneBandGreyShortwave(SG::SpectralGrid) = OneBandShortwave(
 
 get_nbands(::OneBandShortwave) = 1
 
+parameters(sw::OneBandShortwave; kwargs...) = SpeedyParams(
+    clouds = parameters(sw.clouds; component=:clouds, kwargs...),
+    transmittance = parameters(sw.transmittance; component=:transmittance, kwargs...),
+    radiative_transfer = parameters(sw.radiative_transfer; component=:radiative_transfer, kwargs...),
+)
+
 function Base.show(io::IO, M::OneBandShortwave)
     println(io, "OneBandShortwave <: AbstractShortwave")
     properties = propertynames(M)

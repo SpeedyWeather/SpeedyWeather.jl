@@ -11,6 +11,11 @@ function SurfaceHeatFlux(
     return SurfaceHeatFlux(; ocean, land)
 end
 
+parameters(flux::SurfaceHeatFlux; kwargs...) = SpeedyParams(
+    ocean = parameters(flux.ocean; component=:ocean, kwargs...),
+    land = parameters(flux.land; component=:land, kwargs...),
+)
+
 function initialize!(S::SurfaceHeatFlux, model::PrimitiveEquation)
     initialize!(S.ocean, model)
     initialize!(S.land, model)
