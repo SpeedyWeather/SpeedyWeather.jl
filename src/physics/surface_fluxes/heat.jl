@@ -34,15 +34,15 @@ surface_heat_flux!(::ColumnVariables, ::Nothing, ::PrimitiveEquation) = nothing
 ## ----
 
 export SurfaceOceanHeatFlux
-@kwdef struct SurfaceOceanHeatFlux{NF} <: AbstractSurfaceHeatFlux
+@parameterized @kwdef struct SurfaceOceanHeatFlux{NF} <: AbstractSurfaceHeatFlux
     "Use (possibly) flow-dependent column.boundary_layer_drag coefficient"
     use_boundary_layer_drag::Bool = true
 
     "Otherwise, use the following drag coefficient for heat fluxes over ocean"
-    heat_exchange::NF = 0.9e-3
+    @param heat_exchange::NF = 0.9e-3 (bounds=Nonnegative,)
 
     "Sea ice insulating surface heat fluxes []"
-    sea_ice_insulation::NF = 0.01
+    @param sea_ice_insulation::NF = 0.01 (bounds=Positive,)
 end
 
 SurfaceOceanHeatFlux(SG::SpectralGrid; kwargs...) = SurfaceOceanHeatFlux{SG.NF}(; kwargs...)
@@ -84,15 +84,15 @@ end
 ## ----
 
 export SurfaceLandHeatFlux
-@kwdef struct SurfaceLandHeatFlux{NF} <: AbstractSurfaceHeatFlux
+@parameterized @kwdef struct SurfaceLandHeatFlux{NF} <: AbstractSurfaceHeatFlux
     "Use (possibly) flow-dependent column.boundary_layer_drag coefficient"
     use_boundary_layer_drag::Bool = true
 
     "Otherwise, use the following drag coefficient for heat fluxes over land"
-    heat_exchange::NF = 1.2e-3    # for neutral stability
+    @param heat_exchange::NF = 1.2e-3 (bounds=Nonnegative,)    # for neutral stability
 
     "e-folding depth [m] controlling how snow insulates surface heat fluxes"
-    snow_insulation_depth::NF = 0.05
+    @param snow_insulation_depth::NF = 0.05 (bounds=Positive,)
 end
 
 SurfaceLandHeatFlux(SG::SpectralGrid; kwargs...) = SurfaceLandHeatFlux{SG.NF}(; kwargs...)

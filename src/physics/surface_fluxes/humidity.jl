@@ -34,15 +34,15 @@ surface_humidity_flux!(::ColumnVariables, ::Nothing, ::PrimitiveWet) = nothing
 ## ----
 
 export SurfaceOceanHumidityFlux
-@kwdef struct SurfaceOceanHumidityFlux{NF<:AbstractFloat} <: AbstractSurfaceHumidityFlux
+@parameterized @kwdef struct SurfaceOceanHumidityFlux{NF<:AbstractFloat} <: AbstractSurfaceHumidityFlux
     "[OPTION] Use column.boundary_layer_drag coefficient"
     use_boundary_layer_drag::Bool = true
 
     "[OPTION] Or fixed drag coefficient for humidity flux over ocean"
-    drag::NF = 0.9e-3
+    @param drag::NF = 0.9e-3 (bounds=0..1,)
 
     "Sea ice insulating surface humidity fluxes [1]"
-    sea_ice_insulation::NF = 0.01
+    @param sea_ice_insulation::NF = 0.01 (bounds=0..1,)
 end
 
 SurfaceOceanHumidityFlux(SG::SpectralGrid; kwargs...) = SurfaceOceanHumidityFlux{SG.NF}(; kwargs...)
@@ -87,15 +87,15 @@ end
 ## ----
 
 export SurfaceLandHumidityFlux
-@kwdef struct SurfaceLandHumidityFlux{NF<:AbstractFloat} <: AbstractSurfaceHumidityFlux
+@parameterized @kwdef struct SurfaceLandHumidityFlux{NF<:AbstractFloat} <: AbstractSurfaceHumidityFlux
     "[OPTION] Use column.boundary_layer_drag coefficient"
     use_boundary_layer_drag::Bool = true
 
     "[OPTION] Otherwise, use the following drag coefficient for humidity flux (evaporation) over land"
-    drag::NF = 1.2e-3
+    @param drag::NF = 1.2e-3 (bounds=0..1,)
 
     "e-folding depth [m] controlling how snow insulates surface humidity fluxes"
-    snow_insulation_depth::NF = 0.05
+    @param snow_insulation_depth::NF = 0.05 (bounds=0..1,)
 end
     
 SurfaceLandHumidityFlux(SG::SpectralGrid; kwargs...) = SurfaceLandHumidityFlux{SG.NF}(; kwargs...)
