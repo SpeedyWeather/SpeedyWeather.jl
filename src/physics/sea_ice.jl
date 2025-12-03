@@ -8,15 +8,15 @@ function sea_ice_timestep!( progn::PrognosticVariables,
 end
 
 export ThermodynamicSeaIce
-@kwdef mutable struct ThermodynamicSeaIce{NF} <: AbstractSeaIce
+@parameterized @kwdef mutable struct ThermodynamicSeaIce{NF} <: AbstractSeaIce
     "[OPTION] Freezing temperature of sea water [K]"
-    temp_freeze::NF = 273.15-1.8
+    @param temp_freeze::NF = 273.15-1.8 (bounds=Positive,)
 
     "[OPTION] Melting rate of sea ice [m²/m²/s/K]"
-    melt_rate::NF = 1e-6
+    @param melt_rate::NF = 1e-6 (bounds=Nonnegative,)
 
     "[OPTION] Freezing rate of sea ice [m²/m²/K]"
-    freeze_rate::NF = 0.1
+    @param freeze_rate::NF = 0.1 (bounds=Nonnegative,)
 end
 
 ThermodynamicSeaIce(SG::SpectralGrid; kwargs...) = ThermodynamicSeaIce{SG.NF}(;kwargs...)
