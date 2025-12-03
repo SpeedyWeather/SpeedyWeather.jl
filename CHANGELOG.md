@@ -1,7 +1,7 @@
 # Changelog
 
 ## Unreleased
-
+- Follow-up to #783: finalize @param/@component markers [#935](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/935)
 - Land snow model [#833](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/833)
 - Updated extended differentiability tests [#929](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/929)
 - GitHub Actions Checkout updated to version 6 [#926](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/926)
