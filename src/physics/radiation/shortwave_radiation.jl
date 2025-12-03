@@ -140,12 +140,12 @@ function shortwave_radiation!(
 end
 
 export OneBandShortwaveRadiativeTransfer
-@kwdef struct OneBandShortwaveRadiativeTransfer{NF} <: AbstractShortwaveRadiativeTransfer
+@parameterized @kwdef struct OneBandShortwaveRadiativeTransfer{NF} <: AbstractShortwaveRadiativeTransfer
     "[OPTION] Ozone absorption in upper stratosphere (W/m^2)"
-    ozone_absorp_upper::NF = 0
+    @param ozone_absorp_upper::NF = 0 (bounds=Nonnegative,)
     
     "[OPTION] Ozone absorption in lower stratosphere (W/m^2)"
-    ozone_absorp_lower::NF = 0
+    @param ozone_absorp_lower::NF = 0 (bounds=Nonnegative,)
 end
 
 # generator function
