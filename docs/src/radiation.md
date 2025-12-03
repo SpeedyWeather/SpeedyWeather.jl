@@ -238,12 +238,12 @@ For each layer ``k``, the transmissivity is
 
 with
 
-- ``\mu = 1 + a_{zen}(1-\cos\theta)^{n_{zen}}`` (zenith-path correction; ``\theta`` is the zenith angle, ``\cos\theta = \texttt{column.cos_zenith}``)
+- ``\mu = 1 + a_{zen}(1-\cos\theta)^{n_{zen}}`` (zenith-path correction; ``\theta`` is the zenith angle)
 - ``\Delta\sigma_k = \sigma_{k+1} - \sigma_k`` from the half-levels in the grid geometry
 - ``p_s`` the column surface pressure
-- ``a_{dry}`` dry-air absorptivity (``absorptivity_dry_air``)
-- ``a_{aer}`` aerosol absorptivity (``absorptivity_aerosol``), scaled by ``\sigma_k^2`` when ``aerosols = true``
-- ``a_{wv}`` water-vapor absorptivity (``absorptivity_water_vapor``) times specific humidity ``q_k``
+- ``a_{dry}`` dry-air absorptivity (`absorptivity_dry_air`)
+- ``a_{aer}`` aerosol absorptivity (`absorptivity_aerosol`), scaled by ``\sigma_k^2`` when `aerosols = true`
+- ``a_{wv}`` water-vapor absorptivity (`absorptivity_water_vapor`) times specific humidity ``q_k``
 - ``a_{cl}(q_\mathrm{base}) = \min(a_{cl,base} q_\mathrm{base}, a_{cl,limit})`` cloud absorptivity added below the diagnosed cloud top, scaled by cloud cover ``\mathrm{CLC}``
 
 All absorptivity coefficients are per ``10^5`` Pa. The resulting ``\tau_k^{SR}`` values are stored in `column.transmittance_shortwave[:, band]` and reused for both the downward and upward sweeps in `OneBandShortwaveRadiativeTransfer`.
