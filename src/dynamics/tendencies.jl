@@ -615,8 +615,8 @@ function tracer_advection!(
 end
 
 """$(TYPEDSIGNATURES)
-Compute horizontal advection"""
-function horizontal_advection_kernel!( 
+Compute the horizontal advection"""
+function horizontal_advection!( 
     A_tend::LowerTriangularArray,       # Output: tendency to write into
     A_tend_grid::AbstractField,         # Input: tendency incl prev terms
     A_grid::AbstractField,              # Input: grid field to be advected
