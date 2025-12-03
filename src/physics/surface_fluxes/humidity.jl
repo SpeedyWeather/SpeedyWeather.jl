@@ -40,19 +40,21 @@ export SurfaceOceanHumidityFlux
 
     "[OPTION] Or fixed drag coefficient for humidity flux over ocean"
     drag::NF = 0.9e-3
+
+    "Sea ice insulating surface humidity fluxes [1]"
+    sea_ice_insulation::NF = 0.01
 end
 
 SurfaceOceanHumidityFlux(SG::SpectralGrid; kwargs...) = SurfaceOceanHumidityFlux{SG.NF}(; kwargs...)
 initialize!(::SurfaceOceanHumidityFlux, ::PrimitiveWet) = nothing
 
 function surface_humidity_flux!(
-    column::ColumnVariables{NF},
+    column::ColumnVariables,
     humidity_flux::SurfaceOceanHumidityFlux,
     model::PrimitiveWet,
-) where NF
-
+)
     (; skin_temperature_sea, pres) = column
-    (; drag) = humidity_flux
+    (; drag, sea_ice_insulation) = humidity_flux
 
     # SATURATION HUMIDITY OVER OCEAN
     surface_pressure = pres[end]
@@ -70,6 +72,10 @@ function surface_humidity_flux!(
     # but remove the max( ,0) to allow for surface condensation
     flux_sea = isfinite(skin_temperature_sea) ? ρ*drag_sea*V₀*(sat_humid_sea  - surface_humid) :
                                                     zero(skin_temperature_sea)
+
+    # sea ice insulation: more sea ice ⇒ smaller flux (ℵ / ℵ₀ scaling)
+    flux_sea /= 1 + column.sea_ice_concentration / sea_ice_insulation
+
     column.surface_humidity_flux_ocean = flux_sea       # store without weighting by land fraction for coupling
 
     flux_sea *= (1 - land_fraction)             # weight by ocean fraction of land-sea mask
@@ -87,19 +93,21 @@ export SurfaceLandHumidityFlux
 
     "[OPTION] Otherwise, use the following drag coefficient for humidity flux (evaporation) over land"
     drag::NF = 1.2e-3
+
+    "e-folding depth [m] controlling how snow insulates surface humidity fluxes"
+    snow_insulation_depth::NF = 0.05
 end
     
 SurfaceLandHumidityFlux(SG::SpectralGrid; kwargs...) = SurfaceLandHumidityFlux{SG.NF}(; kwargs...)
 initialize!(::SurfaceLandHumidityFlux, ::PrimitiveWet) = nothing
 
 function surface_humidity_flux!(
-    column::ColumnVariables{NF},
+    column::ColumnVariables,
     humidity_flux::SurfaceLandHumidityFlux,
     model::PrimitiveWet,
-) where NF
-
+)
     (; skin_temperature_land, pres) = column
-    (; drag) = humidity_flux
+    (; drag, snow_insulation_depth) = humidity_flux
     α = column.soil_moisture_availability
 
     # SATURATION HUMIDITY OVER LAND
@@ -117,7 +125,11 @@ function surface_humidity_flux!(
     # SPEEDY documentation eq. 55/57, zero flux if land / soil moisture availability not available (=ocean)
     # but remove the max( ,0) to allow for surface condensation
     flux_land = isfinite(skin_temperature_land) && isfinite(α) ?
-                ρ*drag_land*V₀*(α*sat_humid_land  - surface_humid) : zero(NF)
+                ρ*drag_land*V₀*(α*sat_humid_land  - surface_humid) : zero(skin_temperature_land)
+    
+    # snow insulation: deeper snow ⇒ smaller flux (S / S₀ depth scaling)
+    flux_land /= 1 + column.snow_depth / snow_insulation_depth
+    
     column.surface_humidity_flux_land = flux_land   # store flux separately for land
     flux_land *= land_fraction                      # weight by land fraction of land-sea mask
     column.flux_humid_upward[end] += flux_land      # end=lowermost layer, accumulate with (+=) to total flux

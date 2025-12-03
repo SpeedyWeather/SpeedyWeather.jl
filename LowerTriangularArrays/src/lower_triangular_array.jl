@@ -100,9 +100,10 @@ Base.sizeof(L::LowerTriangularArray) = sizeof(L.data)
 
 function Base.show(io::IO, ::MIME"text/plain", L::LowerTriangularMatrix)
     Base.array_summary(io, L, axes(L))
-    
+    L_print = on_architecture(CPU(), L)
+
     # the following is copied over from base/arrayshow.jl
-    X = Matrix(L)
+    X = Matrix(L_print)
     # 2) compute new IOContext
     if !haskey(io, :compact) && length(axes(X, 2)) > 1
         io = IOContext(io, :compact => true)
@@ -132,9 +133,15 @@ function Base.show(io::IO, ::MIME"text/plain", L::LowerTriangularMatrix)
     Base.print_array(recur_io, X)
 end
 
-function Base.array_summary(io::IO, L::LowerTriangularMatrix{T}, inds::Tuple{Vararg{Base.OneTo}}) where T
+function Base.array_summary(io::IO, L::LowerTriangularMatrix{T, A}, inds::Tuple{Vararg{Base.OneTo}}) where {T, A}
     mn = size(L; as=Matrix)
-    print(io, Base.dims2string(length.(inds)), ", $(mn[1])x$(mn[2]) LowerTriangularMatrix{$T}")
+    A_ = nonparametric_type(A)
+    print(io, Base.dims2string(length.(inds)), ", $(mn[1])x$(mn[2]) LowerTriangularMatrix{$T, $A_{...}}")
+end
+
+function Base.array_summary(io::IO, ::LowerTriangularArray{T, N, A}, inds::Tuple{Vararg{Base.OneTo}}) where {T, N, A}
+    A_ = nonparametric_type(A)
+    print(io, Base.dims2string(length.(inds)), " LowerTriangularArray{$T, $N, $A_{...}}")
 end
 
 function Base.show(io::IO, ::MIME"text/plain", L::LowerTriangularArray)

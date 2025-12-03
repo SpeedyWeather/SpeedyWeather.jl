@@ -124,7 +124,6 @@ model are called. See also [Tree structure](@ref), and therein [PrimitiveDryMode
 and [PrimitiveWetModel](@ref)
 
 - `model.boundary_layer_drag`
-- `model.temperature_relaxation`
 - `model.vertical_diffusion`
 - `model.convection`
 - `model.large_scale_condensation` (`PrimitiveWetModel` only)

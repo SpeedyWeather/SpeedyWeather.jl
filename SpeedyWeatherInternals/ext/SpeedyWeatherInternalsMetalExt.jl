@@ -2,7 +2,7 @@ module SpeedyWeatherInternalsMetalExt
 
     import  Metal: Metal, MtlArray, MtlDeviceArray
     import  SpeedyWeatherInternals.Architectures: Architectures, 
-            GPU, CPU, MetalGPU, array_type, architecture, on_architecture, architecture,
+            GPU, CPU, MetalGPU, array_type, architecture, on_architecture,
             compatible_array_types, nonparametric_type
 
 

@@ -68,9 +68,13 @@ $(TYPEDFIELDS)"""
     surface_humid::NF = 0
     surface_wind_speed::NF = 0
 
-    # land
+    # ocean
     skin_temperature_sea::NF = 0
+    sea_ice_concentration::NF = 0
+    
+    # land
     skin_temperature_land::NF = 0
+    snow_depth::NF = 0
     soil_moisture_availability::NF = 0
 
     # surface fluxes
@@ -125,9 +129,10 @@ $(TYPEDFIELDS)"""
     outgoing_longwave_radiation::NF = 0     # OLR [W/m^2]
     outgoing_shortwave_radiation::NF = 0    # same for shortwave reflection [W/m^2]
 
-    # optical depth of the atmosphere, on half levels, for shortwave and longwave radiation
-    const optical_depth_shortwave::MatrixType = zeros(NF, nlayers, nbands_shortwave)
-    const optical_depth_longwave::MatrixType = zeros(NF, nlayers, nbands_longwave)
+    # transmittance t = exp(-τ) with optical depth τ of every atmosphere layer, on full levels
+    # for shortwave and longwave radiation, start with 1 for transparent atmosphere
+    const transmittance_shortwave::MatrixType = ones(NF, nlayers, nbands_shortwave)
+    const transmittance_longwave::MatrixType = ones(NF, nlayers, nbands_longwave)
 
     # WORK ARRAYS
     const a::VectorType = zeros(NF, nlayers)

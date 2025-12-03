@@ -45,12 +45,10 @@ function parameterization_tendencies!(
     model::PrimitiveEquation,
 )
     get_thermodynamics!(column, model)
-    temperature_relaxation!(column, model)
     boundary_layer_drag!(column, model)
     vertical_diffusion!(column, model)
     convection!(column, model)
     large_scale_condensation!(column, model)
-    optical_depth!(column, model)
     shortwave_radiation!(column, model)
     longwave_radiation!(column, model)
     surface_fluxes!(column, progn, model)   # pass on prognostic variables for prescribed fluxes
