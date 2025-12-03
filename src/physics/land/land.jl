@@ -48,6 +48,16 @@ end
 # also allow spectral grid to be passed on as first an only positional argument to model constructors
 (L::Type{<:AbstractLand})(SG::SpectralGrid; kwargs...) = L(spectral_grid=SG; kwargs...)
 
+parameters(land::LandModel; kwargs...) = SpeedyParams(
+    geometry = parameters(land.geometry; component=:geometry, kwargs...),
+    thermodynamics = parameters(land.thermodynamics; component=:thermodynamics, kwargs...),
+    temperature = parameters(land.temperature; component=:temperature, kwargs...),
+    soil_moisture = parameters(land.soil_moisture; component=:soil_moisture, kwargs...),
+    snow = parameters(land.snow; component=:snow, kwargs...),
+    vegetation = parameters(land.vegetation; component=:vegetation, kwargs...),
+    rivers = parameters(land.rivers; component=:rivers, kwargs...),
+)
+
 # initializing the land model initializes its components
 function initialize!(   land::LandModel,
                         model::PrimitiveEquation)
@@ -67,6 +77,12 @@ export DryLandModel
     thermodynamics::TD = LandThermodynamics(spectral_grid)
     temperature::T = LandBucketTemperature(spectral_grid)
 end
+
+parameters(land::DryLandModel; kwargs...) = SpeedyParams(
+    geometry = parameters(land.geometry; component=:geometry, kwargs...),
+    thermodynamics = parameters(land.thermodynamics; component=:thermodynamics, kwargs...),
+    temperature = parameters(land.temperature; component=:temperature, kwargs...),
+)
 
 function initialize!(land::DryLandModel, model::PrimitiveEquation)
     initialize!(model.land.geometry, model)
