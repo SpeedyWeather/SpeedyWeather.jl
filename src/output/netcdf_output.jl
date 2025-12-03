@@ -85,7 +85,7 @@ $(TYPEDFIELDS)"""
     # SCRATCH FIELDS TO INTERPOLATE ONTO
     const field2D::Field2D
     const field3D::Field3D
-    const field3Dland::Field3D
+    field3Dland::Field3D
 end
 
 """
@@ -110,11 +110,13 @@ function NetCDFOutput(
     interpolator = RingGrids.interpolator(output_grid, input_grid, NF=DEFAULT_OUTPUT_NF)
     
     # CREATE FULL FIELDS TO INTERPOLATE ONTO BEFORE WRITING DATA OUT
-    (; nlayers, nlayers_soil) = SG
-    # TODO: infer nlayers_soil from somewhere
+    (; nlayers) = SG
+
     field2D = Field(output_NF, output_grid)
     field3D = Field(output_NF, output_grid, nlayers)
-    field3Dland = Field(output_NF, output_grid, nlayers_soil)
+
+    # TODO: revise this, currenlty this isn't ideal, here we allocate a dummy, and then it's set again in initialize
+    field3Dland = Field(output_NF, output_grid, 2)
 
     output = NetCDFOutput(;
         output_dt=Second(output_dt),    # convert to seconds for dispatch
@@ -239,7 +241,13 @@ function initialize!(
     model::AbstractModel,
 )
     output.active || return nothing             # exit immediately for no output
-    
+    output_NF = eltype(output.field2D)
+
+    # SOIL/LAND OUTPUT SETUP 
+    # TODO: not ideal to do it here, but we don't know soil layers earlier?
+    nlayers_soil = model.land.nlayers
+    output.field3Dland = Field(output_NF, output.field2D.grid, nlayers_soil)
+
     # GET RUN ID, CREATE FOLDER
     # get new id only if not already specified
     determine_run_folder!(output)
@@ -272,7 +280,7 @@ function initialize!(
     lond = get_lond(output.field2D)
     latd = get_latd(output.field2D)
     σ = model.geometry.σ_levels_full
-    soil_indices = collect(1:model.spectral_grid.nlayers_soil)
+    soil_indices = collect(1:nlayers_soil)
         
     defVar(dataset, "lon", lond, ("lon",), attrib=Dict("units"=>"degrees_east", "long_name"=>"longitude"))
     defVar(dataset, "lat", latd, ("lat",), attrib=Dict("units"=>"degrees_north", "long_name"=>"latitude"))
@@ -280,9 +288,8 @@ function initialize!(
     defVar(dataset, "soil_layer", soil_indices, ("soil_layer",), attrib=Dict("units"=>"1", "long_name"=>"soil layer index"))
 
     # VARIABLES, define every output variable in the netCDF file and write initial conditions
-    output_NF = eltype(output.field2D)
     for (key, var) in output.variables
-        define_variable!(dataset, var, output_NF)
+        define_variable!(dataset, var, eltype(output.field2D))
         output!(output, var, Simulation(progn, diagn, model))
     end
 
