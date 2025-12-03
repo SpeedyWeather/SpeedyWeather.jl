@@ -1,18 +1,18 @@
 abstract type AbstractLongwaveTransmittance <: AbstractLongwave end
 
 export FriersonTransmittance
-@kwdef mutable struct FriersonTransmittance{NF} <: AbstractLongwaveTransmittance
+@parameterized @kwdef mutable struct FriersonTransmittance{NF} <: AbstractLongwaveTransmittance
     "[OPTION] Spectral band to use"
     band::Int = 1
 
     "[OPTION] Optical depth at the equator"
-    τ₀_equator::NF = 6
+    @param τ₀_equator::NF = 6 (bounds=Nonnegative,)
 
     "[OPTION] Optical depth at the poles"
-    τ₀_pole::NF = 1.5
+    @param τ₀_pole::NF = 1.5 (bounds=Nonnegative,)
 
     "[OPTION] Fraction to mix linear and quadratic profile"
-    fₗ::NF = 0.1
+    @param fₗ::NF = 0.1 (bounds=0..1,)
 end
 
 FriersonTransmittance(SG::SpectralGrid; kwargs...) = FriersonTransmittance{SG.NF}(; kwargs...)
