@@ -128,22 +128,8 @@ function pressure_gradient_flux!(
     (; u_grid, v_grid) = diagn.grid
     (; uv∇lnp) = diagn.dynamics
 
-    # PRESSURE GRADIENT FLUX - launch kernel over all grid points and layers
-    arch = architecture(uv∇lnp)
-    launch!(arch, RingGridWorkOrder, size(uv∇lnp), _pressure_gradient_flux_kernel!,
-            uv∇lnp, u_grid, v_grid, ∇lnp_x, ∇lnp_y)
-end
-
-@kernel inbounds=true function _pressure_gradient_flux_kernel!(
-    uv∇lnp,                 # Output: (u, v)⋅∇lnp_s term
-    @Const(u_grid),         # Input: zonal velocity
-    @Const(v_grid),         # Input: meridional velocity
-    @Const(∇lnp_x),         # Input: zonal gradient of log surface pressure
-    @Const(∇lnp_y),         # Input: meridional gradient of log surface pressure
-)
-    ij, k = @index(Global, NTuple)  # global index: grid point ij, layer k
-    # the (u, v)⋅∇lnp_s term
-    uv∇lnp[ij, k] = u_grid[ij, k]*∇lnp_x[ij] + v_grid[ij, k]*∇lnp_y[ij]
+    # PRESSURE GRADIENT FLUX 
+    uv∇lnp .= u_grid .* ∇lnp_x .+ v_grid .* ∇lnp_y
 end
 
 """$(TYPEDSIGNATURES)
@@ -156,21 +142,8 @@ function temperature_anomaly!(
     (; temp_profile) = implicit     # reference temperature profile
     (; temp_grid, temp_virt_grid) = diagn.grid
 
-    # Launch kernel over all grid points and layers
-    arch = architecture(temp_grid)
-    launch!(arch, RingGridWorkOrder, size(temp_grid), _temperature_anomaly_kernel!,
-            temp_grid, temp_virt_grid, temp_profile)
-end
-
-@kernel inbounds=true function _temperature_anomaly_kernel!(
-    temp_grid,              # Input/Output: absolute temperature -> anomaly
-    temp_virt_grid,         # Input/Output: virtual temperature -> anomaly
-    @Const(temp_profile),   # Input: reference temperature profile
-)
-    ij, k = @index(Global, NTuple)  # global index: grid point ij, layer k
-    Tₖ = temp_profile[k]
-    temp_grid[ij, k]      -= Tₖ  # absolute temperature -> anomaly
-    temp_virt_grid[ij, k] -= Tₖ  # virtual temperature -> anomaly
+    temp_grid .-= temp_profile'
+    temp_virt_grid .-= temp_profile'
 end
 
 """$(TYPEDSIGNATURES)
@@ -372,52 +345,7 @@ end
 
 """$(TYPEDSIGNATURES)
 Compute vertical velocity."""
-@inline vertical_velocity!(diagn::DiagnosticVariables, geometry::Geometry) = vertical_velocity!(geometry.spectral_grid.architecture, diagn, geometry)
-
-# similar to vertical_integration! this function vectorizes very poorly on CPU in the KA version becasue we flipped the loop order
-# we therefore keep both versions
 function vertical_velocity!(
-    ::CPU, 
-    diagn::DiagnosticVariables,
-    geometry::Geometry,
-)
-    (; σ_levels_thick, σ_levels_half, nlayers) = geometry
-    (; σ_tend) = diagn.dynamics                  
-    
-    # sum of Δσ-weighted div, uv∇lnp from 1:k-1
-    (; div_sum_above, uv∇lnp, uv∇lnp_sum_above) = diagn.dynamics
-    (; div_mean_grid) = diagn.dynamics          # vertical avrgd div to be added to ūv̄∇lnp
-    (; σ_tend) = diagn.dynamics                 # vertical mass flux M = pₛσ̇ at k+1/2
-    (; div_grid) = diagn.grid
-    
-    # to calculate u_mean_grid*∇lnp_x + v_mean_grid*∇lnp_y again
-    (; ∇lnp_x, ∇lnp_y, u_mean_grid, v_mean_grid) = diagn.dynamics
-    ūv̄∇lnp = diagn.dynamics.a_2D_grid           # use scratch memory
-    @. ūv̄∇lnp = u_mean_grid*∇lnp_x + v_mean_grid*∇lnp_y
-
-    grids_match(σ_tend, div_sum_above, div_grid, uv∇lnp_sum_above, uv∇lnp) ||
-        throw(DimensionMismatch(σ_tend, div_sum_above, div_grid, uv∇lnp_sum_above, uv∇lnp))
-
-    @inbounds for k in 1:nlayers-1
-        Δσₖ = σ_levels_thick[k]
-        σₖ_half = σ_levels_half[k+1]
-
-        for ij in eachgridpoint(σ_tend)
-            # Hoskins and Simmons, 1975 just before eq. (6)
-            σ_tend[ij, k] = σₖ_half*(div_mean_grid[ij] + ūv̄∇lnp[ij]) -
-                (div_sum_above[ij, k] + Δσₖ*div_grid[ij, k]) -
-                (uv∇lnp_sum_above[ij, k] + Δσₖ*uv∇lnp[ij, k])
-        end
-    end
-
-    # mass flux σ̇ is zero at k=1/2 (not explicitly stored) and k=nlayers+1/2 (stored in layer k)
-    # set to zero for bottom layer then
-    σ_tend[:, nlayers] .= 0
-    return nothing
-end 
-
-function vertical_velocity!(
-    ::GPU,
     diagn::DiagnosticVariables,
     geometry::Geometry,
 )
@@ -438,42 +366,17 @@ function vertical_velocity!(
     grids_match(σ_tend, div_sum_above, div_grid, uv∇lnp_sum_above, uv∇lnp) ||
         throw(DimensionMismatch(σ_tend, div_sum_above, div_grid, uv∇lnp_sum_above, uv∇lnp))
 
-    # Launch kernel over grid points with layer loop inside
-    arch = architecture(σ_tend)
-    launch!(arch, RingGridWorkOrder, (size(σ_tend, 1),), _vertical_velocity_kernel!,
-            σ_tend, div_mean_grid, ūv̄∇lnp, div_sum_above, div_grid,
-            uv∇lnp_sum_above, uv∇lnp, σ_levels_half, σ_levels_thick, nlayers)
+    # Hoskins and Simmons, 1975 just before eq. (6)
+    Δσₖ = view(σ_levels_thick, 1:nlayers-1)'
+    σₖ_half = view(σ_levels_half, 2:nlayers)'
+    σ_tend[:, 1:(nlayers-1)] .= σₖ_half .* (div_mean_grid .+ ūv̄∇lnp) .-
+                (div_sum_above[:, 1:nlayers-1] .+ Δσₖ.*div_grid[:, 1:nlayers-1]) .-
+                (uv∇lnp_sum_above[:, 1:nlayers-1] .+ Δσₖ.*uv∇lnp[:, 1:nlayers-1])
 
     # mass flux σ̇ is zero at k=1/2 (not explicitly stored) and k=nlayers+1/2 (stored in layer k)
     # set to zero for bottom layer then
     σ_tend[:, nlayers] .= 0
     return nothing
-end
-
-@kernel inbounds=true function _vertical_velocity_kernel!(
-    σ_tend,                 # Output: vertical mass flux
-    div_mean_grid,          # Input: vertically averaged divergence
-    ūv̄∇lnp,                 # Input: vertically averaged (u,v)⋅∇lnp
-    div_sum_above,          # Input: sum of div from layers above
-    div_grid,               # Input: divergence
-    uv∇lnp_sum_above,       # Input: sum of uv∇lnp from layers above
-    uv∇lnp,                 # Input: (u,v)⋅∇lnp
-    @Const(σ_levels_half),  # Input: σ levels at half levels
-    @Const(σ_levels_thick), # Input: σ layer thicknesses
-    @Const(nlayers),        # Input: number of layers
-)
-    ij = @index(Global, Linear)  # global index: grid point ij
-    
-    # Loop over layers (excluding bottom layer where σ̇ = 0)
-    for k in 1:nlayers-1
-        Δσₖ = σ_levels_thick[k]
-        σₖ_half = σ_levels_half[k+1]
-        
-        # Hoskins and Simmons, 1975 just before eq. (6)
-        σ_tend[ij, k] = σₖ_half*(div_mean_grid[ij] + ūv̄∇lnp[ij]) -
-            (div_sum_above[ij, k] + Δσₖ*div_grid[ij, k]) -
-            (uv∇lnp_sum_above[ij, k] + Δσₖ*uv∇lnp[ij, k])
-    end
 end
 
 """
@@ -974,21 +877,8 @@ function linear_pressure_gradient!(
     # Tₖ being the reference temperature profile, the anomaly term T' = Tᵥ - Tₖ is calculated
     # vordiv_tendencies! include as R_dry*Tₖ*lnpₛ into the geopotential on which the operator
     # -∇² is applied in bernoulli_potential!
-    # Launch kernel over all spectral harmonics and layers
-    arch = architecture(geopot)
-    launch!(arch, SpectralWorkOrder, size(geopot), _linear_pressure_gradient_kernel!,
-            geopot, pres, temp_profile, R_dry)
-end
-
-@kernel inbounds=true function _linear_pressure_gradient_kernel!(
-    geopot,                 # Input/Output: geopotential in spectral space
-    @Const(pres),           # Input: logarithm of surface pressure (spectral)
-    @Const(temp_profile),   # Input: reference temperature profile
-    R_dry,                  # Input: dry gas constant
-)
-    lm, k = @index(Global, NTuple)  
-    R_dryTₖ = R_dry * temp_profile[k]
-    geopot[lm, k] += R_dryTₖ * pres[lm]
+    # TODO: Broadcast issue with LTA, conflicting broadcast styles
+    geopot.data .+= R_dry .* temp_profile' .* pres.data
 end
 
 """
