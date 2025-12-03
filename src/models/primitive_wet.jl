@@ -112,6 +112,29 @@ end
 
 prognostic_variables(::Type{<:PrimitiveWet}) = (:vor, :div, :temp, :humid, :pres)
 default_concrete_model(::Type{PrimitiveWet}) = PrimitiveWetModel
+
+parameters(model::PrimitiveWet; kwargs...) = SpeedyParams(
+    planet = parameters(model.planet; component=:planet, kwargs...),
+    atmosphere = parameters(model.atmosphere; component=:atmosphere, kwargs...),
+    forcing = parameters(model.forcing; component=:forcing, kwargs...),
+    drag = parameters(model.drag; component=:drag, kwargs...),
+    clausius_clapeyron = parameters(model.clausius_clapeyron; component=:clausius_clapeyron, kwargs...),
+    boundary_layer_drag = parameters(model.boundary_layer_drag; component=:boundary_layer_drag, kwargs...),
+    vertical_diffusion = parameters(model.vertical_diffusion; component=:vertical_diffusion, kwargs...),
+    surface_thermodynamics = parameters(model.surface_thermodynamics; component=:surface_thermodynamics, kwargs...),
+    surface_wind = parameters(model.surface_wind; component=:surface_wind, kwargs...),
+    surface_heat_flux = parameters(model.surface_heat_flux; component=:surface_heat_flux, kwargs...),
+    surface_humidity_flux = parameters(model.surface_humidity_flux; component=:surface_humidity_flux, kwargs...),
+    large_scale_condensation = parameters(model.large_scale_condensation; component=:large_scale_condensation, kwargs...),
+    convection = parameters(model.convection; component=:convection, kwargs...),
+    shortwave_radiation = parameters(model.shortwave_radiation; component=:shortwave_radiation, kwargs...),
+    longwave_radiation = parameters(model.longwave_radiation; component=:longwave_radiation, kwargs...),
+    albedo = parameters(model.albedo; component=:albedo, kwargs...),
+    ocean = parameters(model.ocean; component=:ocean, kwargs...),
+    sea_ice = parameters(model.sea_ice; component=:sea_ice, kwargs...),
+    land = parameters(model.land; component=:land, kwargs...),
+    solar_zenith = parameters(model.solar_zenith; component=:solar_zenith, kwargs...),
+)
  
 """
 $(TYPEDSIGNATURES)
