@@ -9,7 +9,6 @@ const DEFAULT_ARRAYTYPE = Array
 const DEFAULT_GRID = OctahedralGaussianGrid
 const DEFAULT_TRUNC = 31
 const DEFAULT_NLAYERS = 8
-const DEFAULT_NLAYERS_SOIL = 2
 
 export SpectralGrid
 
@@ -98,13 +97,10 @@ struct SpectralGrid{
     # VERTICAL
     "[OPTION] number of vertical layers in the atmosphere"
     nlayers::Int
-
-    "[OPTION] number of vertical layers in the soil/land"
-    nlayers_soil::Int
 end
 
 function Base.show(io::IO, SG::SpectralGrid)
-    (; NF, trunc, grid, nlat, npoints, nlayers, nlayers_soil) = SG
+    (; NF, trunc, grid, nlat, npoints, nlayers) = SG
     (; architecture, ArrayType) = SG
     (; nparticles) = SG
     Grid = nonparametric_type(grid)
@@ -123,7 +119,7 @@ function Base.show(io::IO, SG::SpectralGrid)
     println(io, "├ Resolution:    $(s(average_degrees))°, $(s(average_resolution))km (at $(radius_str)km radius)")
     nparticles > 0 &&
     println(io, "├ Particles:     $nparticles")
-    println(io, "├ Vertical:      $nlayers-layer atmosphere, $nlayers_soil-layer land")
+    println(io, "├ Vertical:      $nlayers-layer atmosphere")
     print(io,   "└ Architecture:  $architecture using $ArrayType")
 end
 
@@ -139,7 +135,6 @@ function SpectralGrid(;
     dealiasing::Real = 2,
     nparticles::Int = 0,
     nlayers::Int = DEFAULT_NLAYERS,
-    nlayers_soil::Int = DEFAULT_NLAYERS_SOIL
 )
 
     # Convert architecture to instance if it is a type
@@ -158,7 +153,7 @@ function SpectralGrid(;
     spectrum = Spectrum(trunc+2, trunc+1, architecture=architecture)
 
     # Create the SpectralGrid with all fields
-    return SpectralGrid(NF, spectrum, grid, dealiasing, nparticles, nlayers, nlayers_soil)
+    return SpectralGrid(NF, spectrum, grid, dealiasing, nparticles, nlayers)
 end
 
 """
@@ -170,7 +165,6 @@ function SpectralGrid(grid::AbstractGrid;
     dealiasing::Real = 2,
     nparticles::Int = 0,
     nlayers::Int = DEFAULT_NLAYERS,
-    nlayers_soil::Int = DEFAULT_NLAYERS_SOIL
 )
     architecture = grid.architecture
     
@@ -181,7 +175,7 @@ function SpectralGrid(grid::AbstractGrid;
 
     spectrum = Spectrum(trunc+2, trunc+1, architecture=architecture)
 
-    return SpectralGrid(NF, spectrum, grid, dealiasing, nparticles, nlayers, nlayers_soil)
+    return SpectralGrid(NF, spectrum, grid, dealiasing, nparticles, nlayers)
 end
 
 # low level constructor, not intended to be used directly by users
@@ -191,7 +185,6 @@ function SpectralGrid(NF::Type{<:AbstractFloat},
     dealiasing,
     nparticles,
     nlayers::Int,
-    nlayers_soil::Int
     )
     @assert spectrum.architecture == grid.architecture "Architecture of grid and spectrum must match"
 
@@ -249,7 +242,6 @@ function SpectralGrid(NF::Type{<:AbstractFloat},
         nparticles,
         ParticleVector,
         nlayers,
-        nlayers_soil
     )
 end
 

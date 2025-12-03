@@ -2,7 +2,7 @@ abstract type AbstractVegetation <: AbstractParameterization end
 
 export NoVegetation
 struct NoVegetation <: AbstractVegetation end
-NoVegetation(SG::SpectralGrid) = NoVegetation()
+NoVegetation(SG::SpectralGrid, geometry::LandGeometry) = NoVegetation()
 initialize!(vegetation::NoVegetation, model::PrimitiveEquation) = nothing
 
 function initialize!(
@@ -92,7 +92,7 @@ export VegetationClimatology
 end
 
 # generator function
-function VegetationClimatology(SG::SpectralGrid; kwargs...)
+function VegetationClimatology(SG::SpectralGrid, geometry::LandGeometry; kwargs...)
     (; NF, GridVariable2D, grid) = SG
     high_cover = zeros(GridVariable2D, grid)
     low_cover  = zeros(GridVariable2D, grid)
