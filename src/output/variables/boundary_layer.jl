@@ -86,7 +86,7 @@ Fields are: $(TYPEDFIELDS)"""
 @kwdef mutable struct SurfaceTemperatureOutput{F} <: AbstractOutputVariable
     name::String = "tsurf"
     unit::String = "degC"
-    long_name::String = "Surface Temperature"
+    long_name::String = "Surface air temperature"
     dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
     missing_value::Float64 = NaN
     compression_level::Int = 3
