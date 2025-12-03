@@ -302,15 +302,12 @@ end
 
 export SlabOcean
 
-@kwdef mutable struct SlabOcean{NF, F} <: AbstractOcean
+@kwdef mutable struct SlabOcean{NF} <: AbstractOcean
     "[OPTION] Specific heat capacity of water [J/kg/K]"
     specific_heat_capacity::NF = 4184
 
     "[OPTION] Average mixed-layer depth [m]"
     mixed_layer_depth::NF = 50
-
-    "[OPTION] Sea ice insulation to reduce air-sea fluxes [0-1], 0->1 for no->full insulation"
-    sea_ice_insulation::F
 
     "[OPTION] Density of water [kg/m³]"
     density::NF = 1000
@@ -326,13 +323,7 @@ export SlabOcean
 end
 
 # generator function
-function SlabOcean(
-    SG::SpectralGrid;
-    sea_ice_insulation = (x) -> x,  # default is linear reduction of air-sea fluxes with sea ice concentration
-    kwargs...,
-)
-    return SlabOcean{SG.NF, typeof(sea_ice_insulation)}(; sea_ice_insulation, kwargs...)
-end
+SlabOcean(SG::SpectralGrid; kwargs...) = SlabOcean{SG.NF}(; kwargs...)
 
 function variables(::SlabOcean)
     return (
@@ -383,8 +374,6 @@ function timestep!(
     model::PrimitiveEquation,
 )
     sst = progn.ocean.sea_surface_temperature
-    ice = progn.ocean.sea_ice_concentration
-    insulation = ocean_model.sea_ice_insulation
 
     Lᵥ = model.atmosphere.latent_heat_condensation
     C₀ = ocean_model.heat_capacity_mixed_layer
@@ -393,30 +382,25 @@ function timestep!(
 
     (; mask) = model.land_sea_mask
 
-    # Frierson et al. 2006, eq (1)
+    # Frierson et al. 2006, eq (1), all W/m² except humidity flux in kg/m²/s
     Rsd = diagn.physics.surface_shortwave_down          # before albedo
     Rsu = diagn.physics.ocean.surface_shortwave_up      # reflected from albedo
     Rld = diagn.physics.surface_longwave_down
     Rlu = diagn.physics.ocean.surface_longwave_up
-    Ev = diagn.physics.ocean.surface_humidity_flux
     S = diagn.physics.ocean.sensible_heat_flux
+    H = diagn.physics.ocean.surface_humidity_flux       # [kg/m²/s]
+
+    params = (; Δt_C₀, Lᵥ)                              # pack into NamedTuple for kernel
 
     launch!(architecture(sst), LinearWorkOrder, size(sst), slab_ocean_kernel!,
-        sst, ice, mask, Rsd, Rsu, Rld, Rlu, Ev, S,
-        insulation, Δt_C₀, Lᵥ)
-
+        sst, mask, Rsd, Rsu, Rld, Rlu, H, S, params)
     return nothing
 end
 
-@kernel inbounds=true function slab_ocean_kernel!(
-    sst, ice, mask, Rsd, Rsu, Rld, Rlu, Ev, S,
-    @Const(insulation), @Const(Δt_C₀), @Const(Lᵥ),
-)
+@kernel inbounds=true function slab_ocean_kernel!(sst, mask, Rsd, Rsu, Rld, Rlu, H, S, params)
     ij = @index(Global, Linear)         # every grid point ij
-
     if mask[ij] < 1                     # at least partially ocean
-        # TODO this reduces the flux on the SST side only not on the atmosphere side
-        r = 1 - insulation(ice[ij])     # formulate as reduction of the net flux
-        sst[ij] += Δt_C₀*r*(Rsd[ij] - Rsu[ij] - Rlu[ij] + Rld[ij] - Lᵥ*Ev[ij] - S[ij])
+        (; Δt_C₀, Lᵥ) = params
+        sst[ij] += Δt_C₀*(Rsd[ij] - Rsu[ij] - Rlu[ij] + Rld[ij] - Lᵥ*H[ij] - S[ij])
     end
 end

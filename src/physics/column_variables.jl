@@ -69,6 +69,8 @@ function get_column!(
     # TODO skin = surface approximation for now
     C.skin_temperature_sea = P.ocean.sea_surface_temperature[ij]
     C.skin_temperature_land = P.land.soil_temperature[ij, 1]
+    C.snow_depth = P.land.snow_depth[ij]
+    C.sea_ice_concentration = P.ocean.sea_ice_concentration[ij]
     C.soil_moisture_availability = D.physics.land.soil_moisture_availability[ij]
 
     # RADIATION
@@ -150,11 +152,13 @@ function write_column_tendencies!(
     diagn.physics.snow_large_scale[ij] += column.snow_large_scale
     diagn.physics.snow_convection[ij] += column.snow_convection
     
-    # total precipitation rate (rain+snow) [kg/m²/s]
+    # rain and snow rate [kg/m²/s]
     ρ = atmosphere.water_density
-    diagn.physics.total_precipitation_rate[ij] =
-        (column.rain_rate_large_scale + column.rain_rate_convection +
-         column.snow_rate_large_scale + column.snow_rate_convection) * ρ
+    diagn.physics.rain_rate[ij] = (column.rain_rate_large_scale + column.rain_rate_convection) * ρ
+    diagn.physics.snow_rate[ij] = (column.snow_rate_large_scale + column.snow_rate_convection) * ρ
+    
+    # total precipitation rate (rain+snow) [kg/m²/s]
+    diagn.physics.total_precipitation_rate[ij] = diagn.physics.rain_rate[ij] + diagn.physics.snow_rate[ij]
 
     # Cloud top in height [m] from geopotential height divided by gravity, 0 for no clouds
     diagn.physics.cloud_top[ij] = column.cloud_top == nlayers+1 ? 0 : column.geopotential[column.cloud_top]
@@ -163,7 +167,7 @@ function write_column_tendencies!(
     # just use layer index 1 (top) to nlayers (surface) for analysis, but 0 for no clouds
     # diagn.physics.cloud_top[ij] = column.cloud_top == nlayers+1 ? 0 : column.cloud_top
 
-    # surface humidity flux [kg/s/m²], positive up
+    # surface humidity flux [kg/m²/s], positive up
     Lᵥ = atmosphere.latent_heat_condensation
     diagn.physics.surface_humidity_flux[ij] = column.surface_humidity_flux
     diagn.physics.surface_latent_heat_flux[ij] = column.surface_humidity_flux * Lᵥ      # in [W/m²]

@@ -15,7 +15,13 @@ export SeasonalLandTemperature
     file_Grid::Type{<:AbstractGrid} = FullGaussianGrid
 
     "[OPTION] The missing value in the data respresenting ocean"
-    missing_value::NF = NF(NaN)
+    missing_value::NF = NaN
+
+    "[OPTION] Apply land-sea mask to use fallback ocean temperature for ocean-only points?"
+    mask::Bool = true
+
+    "[OPTION] Fallback ocean temperature when mask=true [K]"
+    ocean_temperature::NF = 285
 
     # to be filled from file
     "Monthly land surface temperatures [K], interpolated onto Grid"
@@ -58,7 +64,18 @@ function initialize!(land::SeasonalLandTemperature, model::PrimitiveEquation)
     # create interpolator from grid in file to grid used in model
     interp = RingGrids.interpolator(monthly_temperature, lst, NF=Float32)
     interpolate!(monthly_temperature, lst, interp)
-    return nothing
+
+    # mask ocean points to fallback ocean temperature
+    # set ocean "land" temperature points (100% ocean only)
+    masked_value = land.ocean_temperature
+    if land.mask
+        # Replace NaN values in soil temperature with a fallback ocean temperature
+        monthly_temperature[isnan.(monthly_temperature)] .= masked_value
+
+        # but land-sea mask may not align so also set those 100% ocean points to
+        # the same fallback ocean temperature
+        mask!(monthly_temperature, model.land_sea_mask, :ocean; masked_value)
+    end
 end
 
 function initialize!(
@@ -189,7 +206,10 @@ function timestep!(
 )
     (; soil_temperature, soil_moisture) = progn.land
     Lᵥ = model.atmosphere.latent_heat_condensation
+    Lᵢ = model.atmosphere.latent_heat_sublimation
+    # ρ = model.atmosphere.water_density
     Δt = model.time_stepping.Δt_sec
+    
     (; mask) = model.land_sea_mask
     (; thermodynamics, geometry) = model.land
 
@@ -201,41 +221,45 @@ function timestep!(
     Rlu = diagn.physics.land.surface_longwave_up
     S = diagn.physics.land.sensible_heat_flux
     H = diagn.physics.land.surface_humidity_flux        # except this in [kg/s/m²]
+    M = diagn.physics.land.snow_melt_rate               # in [kg/s/m²] from snow model
 
-    @boundscheck fields_match(soil_temperature, Rsd, Rsu, Rld, Rlu, H, S, horizontal_only=true) ||
+    @boundscheck fields_match(soil_temperature, Rsd, Rsu, Rld, Rlu, H, S, M, horizontal_only=true) ||
         throw(DimensionMismatch(soil_temperature, Rs))
     @boundscheck size(soil_moisture, 2) == size(soil_temperature, 2) == 2 || throw(DimensionMismatch)
     
-    λ = thermodynamics.heat_conductivity
+    λ = thermodynamics.heat_conductivity_dry_soil
     γ = thermodynamics.field_capacity
     Cw = thermodynamics.heat_capacity_water
     Cs = thermodynamics.heat_capacity_dry_soil
     z₁ = geometry.layer_thickness[1]
     z₂ = geometry.layer_thickness[2]
     Δ =  2λ/(z₁ + z₂)   # thermal diffusion operator [W/(m² K)]
-    params = (; Lᵥ, γ, Cw, Cs, z₁, z₂, Δ, Δt)   # pack into NamedTuple
+    
+    params = (; Lᵥ, Lᵢ, γ, Cw, Cs, z₁, z₂, Δ, Δt)
 
     launch!(architecture(soil_temperature), LinearWorkOrder, (size(soil_temperature, 1),),
-        land_bucket_temperature_kernel!, soil_temperature, mask, soil_moisture, Rsd, Rsu, Rlu, Rld, H, S,
+        land_bucket_temperature_kernel!, soil_temperature, mask, soil_moisture, Rsd, Rsu, Rlu, Rld, H, S, M,
         params)
 
     return nothing
 end
 
 @kernel inbounds=true function land_bucket_temperature_kernel!(
-    soil_temperature, mask, soil_moisture, Rsd, Rsu, Rlu, Rld, H, S,
-    params,
-)
+    soil_temperature, mask, soil_moisture, Rsd, Rsu, Rlu, Rld, H, S, M, params)
+    
     ij = @index(Global, Linear)
 
     if mask[ij] > 0                         # at least partially land
+        (; Lᵥ, Lᵢ, γ, Cw, Cs, z₁, z₂, Δ, Δt) = params
+        
+        # Cooling from snow melt rate
+        Q_melt = Lᵢ * M[ij]                 # in [W/m²] = [J/kg] * [kg/m²/s]
 
-        (; Lᵥ, γ, Cw, Cs, z₁, z₂, Δ, Δt) = params
-
-        # total surface downward heat flux
-        F = Rsd[ij] - Rsu[ij] - Rlu[ij] + Rld[ij] - Lᵥ*H[ij] - S[ij]
+        # total surface downward heat flux [W/m^2]
+        F = Rsd[ij] - Rsu[ij] - Rlu[ij] + Rld[ij] - Lᵥ*H[ij] - S[ij] - Q_melt
 
         # heat capacity of the (wet) soil layers 1 and 2 [J/(m³ K)]
+        # ignore snow here
         C₁ = Cw * soil_moisture[ij, 1] * γ + Cs
         C₂ = Cw * soil_moisture[ij, 2] * γ + Cs
 

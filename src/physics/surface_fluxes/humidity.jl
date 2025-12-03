@@ -44,6 +44,9 @@ export SurfaceOceanHumidityFlux
 
     "[OPTION] Or fixed drag coefficient for humidity flux over ocean"
     drag::NF = 0.9e-3
+
+    "[OPTION] Sea ice insulating surface humidity fluxes [1]"
+    sea_ice_insulation::NF = 0.01
 end
 
 Adapt.@adapt_structure SurfaceOceanHumidityFlux
@@ -51,7 +54,6 @@ SurfaceOceanHumidityFlux(SG::SpectralGrid; kwargs...) = SurfaceOceanHumidityFlux
 initialize!(::SurfaceOceanHumidityFlux, ::PrimitiveWet) = nothing
 
 @propagate_inbounds function surface_humidity_flux!(ij, diagn, progn, humidity_flux::SurfaceOceanHumidityFlux, model)
-
     surface = model.geometry.nlayers
     T = progn.ocean.sea_surface_temperature[ij]
 
@@ -63,6 +65,7 @@ initialize!(::SurfaceOceanHumidityFlux, ::PrimitiveWet) = nothing
     V₀ = diagn.physics.surface_wind_speed[ij]
     land_fraction = model.land_sea_mask.mask[ij]
     surface_humid = diagn.grid.humid_grid_prev[ij, surface]
+    sea_ice_concentration = progn.ocean.sea_ice_concentration[ij]
 
     # drag coefficient either from SurfaceHumidityFlux or from a central drag coefficient
     d = diagn.physics.boundary_layer_drag[ij]
@@ -71,6 +74,9 @@ initialize!(::SurfaceOceanHumidityFlux, ::PrimitiveWet) = nothing
     # SPEEDY documentation eq. 55/57, zero flux if sea surface temperature not available
     # but remove the max( ,0) to allow for surface condensation
     flux_ocean = isfinite(T) ? ρ*drag_ocean*V₀*(sat_humid_ocean  - surface_humid) : zero(T)
+
+    # sea ice insulation: more sea ice ⇒ smaller flux (ℵ / ℵ₀ scaling)
+    flux_ocean /= 1 + sea_ice_concentration / humidity_flux.sea_ice_insulation
 
     # store without weighting by land fraction for coupling
     diagn.physics.ocean.surface_humidity_flux[ij] = flux_ocean         
@@ -92,6 +98,9 @@ export SurfaceLandHumidityFlux
 
     "[OPTION] Or fixed drag coefficient for humidity flux over land"
     drag::NF = 1.2e-3
+
+    "[OPTION] Snow insulation depth [m], e-folding depth controlling how snow insulates surface humidity fluxes"
+    snow_insulation_depth::NF = 0.05
 end
 
 Adapt.@adapt_structure SurfaceLandHumidityFlux
@@ -102,6 +111,7 @@ initialize!(::SurfaceLandHumidityFlux, ::PrimitiveWet) = nothing
 
     # TODO use a skin temperature?
     T = progn.land.soil_temperature[ij, 1]  # uppermost land layer with index 1
+    snow_depth = progn.land.snow_depth[ij]
     α = diagn.physics.land.soil_moisture_availability[ij]
 
     # SATURATION HUMIDITY OVER LAND
@@ -122,8 +132,10 @@ initialize!(::SurfaceLandHumidityFlux, ::PrimitiveWet) = nothing
     # but remove the max( ,0) to allow for surface condensation
     flux_land = isfinite(T) && isfinite(α) ? ρ*drag_land*V₀*(α*sat_humid_land - surface_humid) : zero(T)
     
+    # snow insulation: deeper snow ⇒ smaller flux (S / S₀ depth scaling)
+    flux_land /= 1 + snow_depth / humidity_flux.snow_insulation_depth
+
     # store without weighting by land fraction for coupling
-    # TODO multiply by Lᵥ for W/m^2 here?
     diagn.physics.land.surface_humidity_flux[ij] = flux_land    # [kg/m²/s]
     flux_land *= land_fraction             # weight by land fraction of land-sea mask
 
