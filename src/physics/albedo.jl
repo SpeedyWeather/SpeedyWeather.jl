@@ -69,8 +69,8 @@ end
 
 ## GLOBAL CONSTANT ALBEDO
 export GlobalConstantAlbedo
-@kwdef mutable struct GlobalConstantAlbedo{NF} <: AbstractAlbedo
-    albedo::NF = 0.3
+@parameterized @kwdef mutable struct GlobalConstantAlbedo{NF} <: AbstractAlbedo
+    @param albedo::NF = 0.3 (bounds=0..1,)
 end
 
 GlobalConstantAlbedo(SG::SpectralGrid; kwargs...) = GlobalConstantAlbedo{SG.NF}(; kwargs...)
@@ -136,9 +136,9 @@ end
 ## OceanSeaIceAlbedo
 export OceanSeaIceAlbedo
 
-@kwdef struct OceanSeaIceAlbedo{NF} <: AbstractAlbedo
-    albedo_ocean::NF = 0.06
-    albedo_ice::NF = 0.6
+@parameterized @kwdef struct OceanSeaIceAlbedo{NF} <: AbstractAlbedo
+    @param albedo_ocean::NF = 0.06 (bounds = 0..1,)
+    @param albedo_ice::NF = 0.6 (bounds=0..1,)
 end
 
 OceanSeaIceAlbedo(SG::SpectralGrid; kwargs...) = OceanSeaIceAlbedo{SG.NF}(;kwargs...)
@@ -176,21 +176,21 @@ struct SaturatingSnowCover  <: AbstractSnowCover end
 ## LandSnowAlbedo
 export LandSnowAlbedo
 
-@kwdef struct LandSnowAlbedo{NF, Scheme<:AbstractSnowCover} <: AbstractAlbedo
+@parameterized @kwdef struct LandSnowAlbedo{NF, Scheme<:AbstractSnowCover} <: AbstractAlbedo
     "Albedo of bare land (excluding vegetation) [1]"
-    albedo_land::NF = 0.4
+    @param albedo_land::NF = 0.4 (bounds=0..1,)
 
     "Albedo of high vegetation [1]"
-    albedo_high_vegetation::NF = 0.15
+    @param albedo_high_vegetation::NF = 0.15 (bounds=0..1,)
 
     "Albedo of low vegetation [1]"
-    albedo_low_vegetation::NF = 0.20
+    @param albedo_low_vegetation::NF = 0.20 (bounds=0..1,)
 
     "Albedo of snow [1], additive to land"
-    albedo_snow::NF = 0.4
+    @param albedo_snow::NF = 0.4 (bounds=0..1,)
 
     "Conversion from snow depth to snow cover [m]"
-    snow_depth_scale::NF = 0.05
+    @param snow_depth_scale::NF = 0.05 (bounds=Positive,)
 
     "Snow cover-albedo scheme"
     snow_cover::Scheme = SaturatingSnowCover()
