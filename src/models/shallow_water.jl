@@ -63,6 +63,13 @@ end
 prognostic_variables(::Type{<:ShallowWater}) = (:vor, :div, :pres)
 default_concrete_model(::Type{ShallowWater}) = ShallowWaterModel
 
+parameters(model::ShallowWater; kwargs...) = SpeedyParams(
+    planet = parameters(model.planet; component=:planet, kwargs...),
+    atmosphere = parameters(model.atmosphere; component=:atmosphere, kwargs...),
+    forcing = parameters(model.forcing; component=:forcing, kwargs...),
+    drag = parameters(model.drag; component=:drag, kwargs...),
+)
+
 """
 $(TYPEDSIGNATURES)
 Calls all `initialize!` functions for most components (=fields) of `model`,
