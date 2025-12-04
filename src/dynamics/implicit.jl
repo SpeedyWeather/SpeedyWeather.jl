@@ -627,7 +627,7 @@ implicit_correction!(
     progn::PrognosticVariables,
     implicit::ImplicitPrimitiveEquation,
     model::PrimitiveEquation,
-) = implicit_correction_lm_only!(diagn, progn, implicit, model)
+) = implicit_correction_kernels!(diagn, progn, implicit, model)
     
 
 # CPU version (original implementation)
