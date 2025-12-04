@@ -726,8 +726,6 @@ function implicit_correction_cpu!(
     zero_last_degree!(pres_tend)
     zero_last_degree!(temp_tend)
 
-    println("Implicit correction completed CPU version")
-
     return nothing
 end
 
