@@ -622,8 +622,16 @@ end
     end
 end
 
+implicit_correction!(
+    diagn::DiagnosticVariables,
+    progn::PrognosticVariables,
+    implicit::ImplicitPrimitiveEquation,
+    model::PrimitiveEquation,
+) = implicit_correction_cpu!(diagn, progn, implicit, model)
+    
+
 # CPU version (original implementation)
-function implicit_correction!(
+function implicit_correction_cpu!(
     diagn::DiagnosticVariables,
     progn::PrognosticVariables,
     implicit::ImplicitPrimitiveEquation,

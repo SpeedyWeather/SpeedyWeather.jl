@@ -68,7 +68,7 @@ using Test, BenchmarkTools
         model_cpu = PrimitiveDryModel(; spectral_grid=spectral_grid_cpu)
         sim_cpu = initialize!(model_cpu)
         
-        run!(sim_cpu, steps=2)
+        run!(sim_cpu, steps=10)
         diagn_cpu = sim_cpu.diagnostic_variables
         progn_cpu = sim_cpu.prognostic_variables
 
@@ -95,7 +95,7 @@ using Test, BenchmarkTools
         model_gpu_copy = deepcopy(model_cpu)
         
         #@btime SpeedyWeather.implicit_correction!($diagn_gpu_copy, $progn_gpu_copy, $model_gpu_copy.implicit, $model_gpu_copy)
-        SpeedyWeather.implicit_correction!(diagn_gpu_copy, progn_gpu_copy, model_gpu_copy.implicit, model_gpu_copy)
+        SpeedyWeather.implicit_correction_kernels!(diagn_gpu_copy, progn_gpu_copy, model_gpu_copy.implicit, model_gpu_copy)
 
         div_tend_gpu = copy(diagn_gpu_copy.tendencies.div_tend)
         temp_tend_gpu = copy(diagn_gpu_copy.tendencies.temp_tend)
