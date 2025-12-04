@@ -72,13 +72,13 @@ $(TYPEDFIELDS)"""
     α::NF = 0.025
 
     "[OPTION] Emissivity of the atmosphere [1]"
-    emissivity_atmosphere::NF = 0.7
+    emissivity_atmosphere::NF = 0
 
     "[OPTION] Emissivity for surface flux over ocean [1]"
-    emissivity_ocean::NF = 0.96
+    emissivity_ocean::NF = 0.65
 
     "[OPTION] Emissivity for surface flux over land [1]"
-    emissivity_land::NF = 0.9
+    emissivity_land::NF = 0.6
 
     "[OPTION] Tropopause temperature [K]"
     temp_tropopause::NF = 200
