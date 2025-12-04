@@ -1,5 +1,6 @@
 @testset "Particle advection" begin
-    @testset for Model in (  BarotropicModel,
+    @testset for Model in (
+                    BarotropicModel,
                     ShallowWaterModel,
                     PrimitiveDryModel,
                     PrimitiveWetModel)
