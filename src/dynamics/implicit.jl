@@ -402,29 +402,29 @@ function implicit_correction!(
     # Kernel 2: Calculate G = G_D + ξRG_T + ξUG_lnps
     launch!(arch, SpectralWorkOrder, size(div_tend),
             implicit_calculate_G_kernel!,
-            G, div_tend, geopot, pres_tend, U, l_indices, ξ, nlayers, trunc)
+            G, div_tend, geopot, pres_tend, U, l_indices, ξ)
     
     # Kernel 3: Solve for divergence δD = S⁻¹G
     launch!(arch, SpectralWorkOrder, size(div_tend),
             implicit_solve_divergence_kernel!,
-            div_tend, G, S⁻¹, l_indices, nlayers, trunc)
+            div_tend, G, S⁻¹, l_indices, nlayers)
     
     # Kernel 4: Correct temperature
     launch!(arch, SpectralWorkOrder, size(temp_tend),
             implicit_correct_temp_kernel!,
-            temp_tend, div_tend, L, l_indices, ξ, nlayers, trunc)
+            temp_tend, div_tend, L, ξ, nlayers)
     
     # Kernel 5: Correct pressure (parallelize only over lm, not k)
     lm_size = size(pres_tend, 1)
     launch!(arch, SpectralWorkOrder, (lm_size,),
             implicit_correct_pres_kernel!,
-            pres_tend, div_tend, W, l_indices, ξ, nlayers, trunc)
+            pres_tend, div_tend, W, ξ, nlayers)
 
     zero_last_degree!(div_tend)
     zero_last_degree!(pres_tend)
     zero_last_degree!(temp_tend)
 
-    return 
+    return nothing
 end
 
 # Alternative single-kernel version (parallelize only over lm, not k)
@@ -435,6 +435,7 @@ function implicit_correction_lm_only!(
     implicit::ImplicitPrimitiveEquation,
     model::PrimitiveEquation,
 )
+
     # escape immediately if explicit
     implicit.α == 0 && return nothing
 
@@ -464,7 +465,7 @@ function implicit_correction_lm_only!(
     zero_last_degree!(pres_tend)
     zero_last_degree!(temp_tend)
 
-    return geopot
+    return nothing
 end
 
 # Single kernel that does all steps for one spectral mode
@@ -488,9 +489,11 @@ end
 
     for k in 1:nlayers
         # skip 1:k-1 as integration is surface to k
+        geopot_val = zero(eltype(geopot))
         for r in k:nlayers
-            geopot[lm, k] += R[k, r] * temp_tend[lm, r]
+            geopot_val += R[k, r] * temp_tend[lm, r]
         end
+        geopot[lm, k] = geopot_val
     end
             
     eigenvalue = -l*(l-1)  # 1-based, -l*(l+1) → -l*(l-1)
@@ -505,32 +508,36 @@ end
     end
         
     # Step 4: Now solve δD = S⁻¹G to correct divergence tendency
-    # Zero div_tend first so it can be used as an accumulator
     for k in 1:nlayers
-        div_tend[lm, k] = 0
+        div_val = zero(eltype(div_tend))
         for r in 1:nlayers
-            div_tend[lm, k] += S⁻¹[l, k, r] * G[lm, r]
+            div_val += S⁻¹[l, k, r] * G[lm, r]
         end
+        div_tend[lm, k] = div_val
     end
         
     # Step 5: Semi implicit corrections for temperature and pressure
         
     # Step 5a: Temperature correction δT = G_T + ξLδD
     for k in 1:nlayers
+        temp_correction = zero(eltype(temp_tend))
         for r in 1:nlayers
-            temp_tend[lm, k] += ξ * L[k, r] * div_tend[lm, r]
+            temp_correction += ξ * L[k, r] * div_tend[lm, r]
         end
+        temp_tend[lm, k] += temp_correction
     end
         
     # Step 5b: Pressure correction δlnpₛ = G_lnpₛ + ξWδD
+    pres_correction = zero(eltype(pres_tend))
     for k in 1:nlayers
-        pres_tend[lm] += ξ * W[k] * div_tend[lm, k]
+        pres_correction += ξ * W[k] * div_tend[lm, k]
     end
+    pres_tend[lm] += pres_correction
 end
 
 # Kernel 1: Combined temperature update and geopotential calculation
 @kernel inbounds=true function implicit_temp_geopot_kernel!(
-    temp_tend, geopot, div_old, div_new, R, L, @Const(nlayers)
+    temp_tend, geopot, div_old, div_new, R, L, nlayers
 )
     I = @index(Global, Cartesian)
     lm = I[1]
@@ -545,23 +552,20 @@ end
     # Calculate the ξ*R*G_T term, vertical integration of geopotential
     # (excl ξ, this is done in kernel 2)
     # skip 1:k-1 as integration is surface to k
-    sum_val = zero(eltype(geopot))
+    geopot_val = zero(eltype(geopot))
     for r in k:nlayers
-        sum_val += R[k, r] * temp_tend[lm, r]
+        geopot_val += R[k, r] * temp_tend[lm, r]
     end
-    geopot[I] = sum_val
+    geopot[I] = geopot_val
 end
 
 
 # Kernel 2: Calculate G (must complete before kernel 3)
 @kernel inbounds=true function implicit_calculate_G_kernel!(
-    G, div_tend, geopot, pres_tend, U, l_indices,
-    @Const(ξ), @Const(nlayers), @Const(trunc)
+    G, div_tend, geopot, pres_tend, U, l_indices, ξ,
 )
-    I = @index(Global, Cartesian)
-    lm = I[1]
-    k = I[2]
-    
+    lm, k = @index(Global, NTuple)
+ 
     # Use precomputed l index from spectrum
     l = l_indices[lm]
     
@@ -575,13 +579,10 @@ end
 
 # Kernel 3: Solve for divergence δD = S⁻¹G
 @kernel inbounds=true function implicit_solve_divergence_kernel!(
-    div_tend, G, S⁻¹, l_indices,
-    @Const(nlayers), @Const(trunc)
+    div_tend, G, S⁻¹, l_indices, nlayers,
 )
-    I = @index(Global, Cartesian)
-    lm = I[1]
-    k = I[2]
-    
+    lm, k = @index(Global, NTuple)
+
     # Use precomputed l index from spectrum
     l = l_indices[lm]
     
@@ -596,15 +597,10 @@ end
 
 # Kernel 4: Correct temperature
 @kernel inbounds=true function implicit_correct_temp_kernel!(
-    temp_tend, div_tend, L, l_indices, @Const(ξ), @Const(nlayers), @Const(trunc)
+    temp_tend, div_tend, L, ξ, nlayers
 )
-    I = @index(Global, Cartesian)
-    lm = I[1]
-    k = I[2]
+    lm, k = @index(Global, NTuple)
     
-    # Get degree l
-    l = l_indices[lm]
- 
     # Semi implicit correction for temperature
     # δT = G_T + ξLδD
     for r in 1:nlayers
@@ -614,14 +610,10 @@ end
 
 # Kernel 5: Correct pressure
 @kernel inbounds=true function implicit_correct_pres_kernel!(
-    pres_tend, div_tend, W, l_indices, @Const(ξ), @Const(nlayers), @Const(trunc)
+    pres_tend, div_tend, W, ξ, nlayers
 )
     lm = @index(Global, Linear)
     
-    # Get degree l
-    l = l_indices[lm]
-    
-    # Skip out-of-bounds modes
     # Semi implicit correction for pressure
     # δlnpₛ = G_lnpₛ + ξWδD
     # Accumulate contributions from all layers for this spectral mode
@@ -726,5 +718,9 @@ function implicit_correction_cpu!(
     zero_last_degree!(pres_tend)
     zero_last_degree!(temp_tend)
 
+    println("Implicit correction completed CPU version")
+
     return nothing
 end
+
+

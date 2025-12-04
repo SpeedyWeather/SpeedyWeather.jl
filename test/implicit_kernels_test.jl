@@ -6,7 +6,7 @@ as the CPU versions within numerical tolerance.
 """
 
 using SpeedyWeather
-using Test
+using Test, BenchmarkTools
 
 @testset "Implicit Kernel Tests" begin
     
@@ -81,8 +81,9 @@ using Test
         progn_cpu_copy = deepcopy(progn_cpu)
         model_cpu_copy = deepcopy(model_cpu)
         
-        @btime SpeedyWeather.implicit_correction_cpu!($diagn_cpu_copy, $progn_cpu_copy, $model_cpu_copy.implicit, $model_cpu_copy)
-        
+        #@btime SpeedyWeather.implicit_correction_cpu!($diagn_cpu_copy, $progn_cpu_copy, $model_cpu_copy.implicit, $model_cpu_copy)
+        SpeedyWeather.implicit_correction_cpu!(diagn_cpu_copy, progn_cpu_copy, model_cpu_copy.implicit, model_cpu_copy)
+
         div_tend_cpu = copy(diagn_cpu_copy.tendencies.div_tend)
         temp_tend_cpu = copy(diagn_cpu_copy.tendencies.temp_tend)
         pres_tend_cpu = copy(diagn_cpu_copy.tendencies.pres_tend)
@@ -93,8 +94,9 @@ using Test
         progn_gpu_copy = deepcopy(progn_cpu)
         model_gpu_copy = deepcopy(model_cpu)
         
-        @btime SpeedyWeather.implicit_correction!($diagn_gpu_copy, $progn_gpu_copy, $model_gpu_copy.implicit, $model_gpu_copy)
-        
+        #@btime SpeedyWeather.implicit_correction!($diagn_gpu_copy, $progn_gpu_copy, $model_gpu_copy.implicit, $model_gpu_copy)
+        SpeedyWeather.implicit_correction!(diagn_gpu_copy, progn_gpu_copy, model_gpu_copy.implicit, model_gpu_copy)
+
         div_tend_gpu = copy(diagn_gpu_copy.tendencies.div_tend)
         temp_tend_gpu = copy(diagn_gpu_copy.tendencies.temp_tend)
         pres_tend_gpu = copy(diagn_gpu_copy.tendencies.pres_tend)
@@ -112,8 +114,9 @@ using Test
         progn_lm_copy = deepcopy(progn_cpu)
         model_lm_copy = deepcopy(model_cpu)
         
-        @btime SpeedyWeather.implicit_correction_lm_only!($diagn_lm_copy, $progn_lm_copy, $model_lm_copy.implicit, $model_lm_copy)
-        
+        #@btime SpeedyWeather.implicit_correction_lm_only!($diagn_lm_copy, $progn_lm_copy, $model_lm_copy.implicit, $model_lm_copy)
+        SpeedyWeather.implicit_correction_lm_only!(diagn_lm_copy, progn_lm_copy, model_lm_copy.implicit, model_lm_copy)
+
         div_tend_lm = diagn_lm_copy.tendencies.div_tend
         temp_tend_lm = diagn_lm_copy.tendencies.temp_tend
         pres_tend_lm = diagn_lm_copy.tendencies.pres_tend

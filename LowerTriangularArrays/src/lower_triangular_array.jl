@@ -719,19 +719,19 @@ function zero_last_degree!(L::LowerTriangularArray)
     (; lmax, l_indices) = L.spectrum
     arch = architecture(L)
     
-    launch!(arch, LinearWorkOrder, size(L.data), 
+    launch!(arch, SpectralWorkOrder, size(L), 
             zero_last_degree_kernel!, 
-            L.data, l_indices, lmax)
+            L, l_indices, lmax)
     
-    return L
+    return nothing
 end
 
-@kernel inbounds=true function zero_last_degree_kernel!(data, @Const(l_indices), @Const(lmax))
-    lm = @index(Global, Linear)
+@kernel inbounds=true function zero_last_degree_kernel!(data, @Const(l_indices), lmax)
+    I = @index(Global, Cartesian)
     
-    l = l_indices[lm]
+    l = l_indices[I[1]]
     if l == lmax
-        data[lm] = 0
+        data[I] = 0
     end
 end
 
