@@ -363,7 +363,7 @@ set_initialized!(implicit::ImplicitPrimitiveEquation) = (implicit.initialized = 
 
 """$(TYPEDSIGNATURES)
 Apply the implicit corrections to dampen gravity waves in the primitive equation models."""
-function implicit_correction!(
+function implicit_correction_kernels!(
     diagn::DiagnosticVariables,
     progn::PrognosticVariables,
     implicit::ImplicitPrimitiveEquation,
@@ -623,7 +623,7 @@ end
 end
 
 # CPU version (original implementation)
-function implicit_correction_cpu!(
+function implicit_correction!(
     diagn::DiagnosticVariables,
     progn::PrognosticVariables,
     implicit::ImplicitPrimitiveEquation,
