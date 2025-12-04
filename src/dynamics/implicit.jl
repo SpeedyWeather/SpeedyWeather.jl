@@ -528,9 +528,15 @@ end
     end
         
     # Step 5b: Pressure correction δlnpₛ = G_lnpₛ + ξWδD
+    # Use Kahan summation for better numerical accuracy
     pres_correction = zero(eltype(pres_tend))
+    c = zero(eltype(pres_tend))  # compensation for lost low-order bits
     for k in 1:nlayers
-        pres_correction += ξ * W[k] * div_tend[lm, k]
+        val = ξ * W[k] * div_tend[lm, k]
+        y = val - c
+        t = pres_correction + y
+        c = (t - pres_correction) - y
+        pres_correction = t
     end
     pres_tend[lm] += pres_correction
 end
@@ -545,9 +551,12 @@ end
     
     # Move implicit terms of temperature equation from time step i to i-1
     # RHS_expl(Vⁱ) + RHS_impl(Vⁱ⁻¹) = RHS(Vⁱ) + RHS_impl(Vⁱ⁻¹ - Vⁱ)
+    # Use local accumulator to ensure consistent floating-point order of operations
+    temp_correction = zero(eltype(temp_tend))
     for r in 1:nlayers
-        temp_tend[I] += L[k, r] * (div_old[lm, r] - div_new[lm, r])
+        temp_correction += L[k, r] * (div_old[lm, r] - div_new[lm, r])
     end
+    temp_tend[I] += temp_correction
     
     # Calculate the ξ*R*G_T term, vertical integration of geopotential
     # (excl ξ, this is done in kernel 2)
@@ -603,9 +612,12 @@ end
     
     # Semi implicit correction for temperature
     # δT = G_T + ξLδD
+    # Use local accumulator to ensure consistent floating-point order of operations
+    temp_correction = zero(eltype(temp_tend))
     for r in 1:nlayers
-        temp_tend[lm, k] += ξ * L[k, r] * div_tend[lm, r]
+        temp_correction += ξ * L[k, r] * div_tend[lm, r]
     end
+    temp_tend[lm, k] += temp_correction
 end
 
 # Kernel 5: Correct pressure
@@ -617,9 +629,17 @@ end
     # Semi implicit correction for pressure
     # δlnpₛ = G_lnpₛ + ξWδD
     # Accumulate contributions from all layers for this spectral mode
+    # Use Kahan summation for better numerical accuracy
+    pres_correction = zero(eltype(pres_tend))
+    c = zero(eltype(pres_tend))  # compensation for lost low-order bits
     for k in 1:nlayers
-        pres_tend[lm] += ξ * W[k] * div_tend[lm, k]
+        val = ξ * W[k] * div_tend[lm, k]
+        y = val - c
+        t = pres_correction + y
+        c = (t - pres_correction) - y
+        pres_correction = t
     end
+    pres_tend[lm] += pres_correction
 end
 
 implicit_correction!(
