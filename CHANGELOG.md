@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Particle advection GPU ready [#897](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/897)
 - Land snow model [#833](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/833)
 - Updated extended differentiability tests [#929](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/929)
 - GitHub Actions Checkout updated to version 6 [#926](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/926)
