@@ -879,7 +879,7 @@ end
             L_copy = copy(L.data)
             
             # Zero the last degree
-            zero_last_degree!(L)
+            LowerTriangularArrays.zero_last_degree!(L)
             
             # Check that all elements with l == lmax are zero
             for m in 1:mmax
@@ -901,7 +901,7 @@ end
             L_copy = copy(L.data)
             
             # Zero the last degree
-            zero_last_degree!(L)
+            LowerTriangularArrays.zero_last_degree!(L)
             
             # Check that all elements with l == lmax are zero across all layers
             for k in 1:nlayers
