@@ -94,6 +94,8 @@ end
     model = BarotropicModel(; spectral_grid)
     simulation = initialize_with_spinup!(model)
 
+    (; Δt, Δt_millisec) = simulation.model.time_stepping
+    dt = 2Δt
     lf1 = 2
     lf2 = 2 
 
@@ -146,6 +148,46 @@ end
     w2 = L.robert_filter*(1-L.williams_filter)/2   
     @test all(dtendency .≈ dt*(1+w1-w2))
     # ∂(tend) needs to be: dt* ( 1 + w1 - w2) (for every coefficient)
+end
+
+@testset "Differentiability: transform!(::Diagnostic, ::Prognostic)" begin
+    spectral_grid = SpectralGrid(trunc=9, nlayers=1)
+    model = BarotropicModel(; spectral_grid)
+    simulation = initialize_with_spinup!(model)
+
+    (; Δt, Δt_millisec) = simulation.model.time_stepping
+    dt = 2Δt
+    lf1 = 2
+    lf2 = 2 
+
+    adsim = ADSimulation(simulation)
+    progn, dprogn = prognosticseed(adsim)
+    diagn, ddiagn = diagnosticseed(adsim)
+
+    # run all steps to get tendencies to have realistic fields in the transform!
+    fill!(diagn.tendencies, 0, Barotropic)
+    SpeedyWeather.dynamics_tendencies!(diagn, progn, lf2, model)
+    SpeedyWeather.horizontal_diffusion!(diagn, progn, model.horizontal_diffusion, model)
+    SpeedyWeather.leapfrog!(progn, diagn.tendencies, dt, lf1, model)
+
+    @info "Running reverse-mode AD"
+    @time autodiff(Reverse, SpeedyWeather.transform!, Const, Duplicated(diagn, ddiagn), Duplicated(progn, dprogn), Const(lf2), Const(model))
+
+    function transform_step(diagn::DiagnosticVariables, progn, lf, model)
+        diagn_new = deepcopy(diagn)
+        SpeedyWeather.transform!(diagn_new, progn, lf, model)
+        return diagn_new
+    end 
+
+    fdsim = ADSimulation(simulation)
+    progn_new = deepcopy(fdsim.progvars)
+    diagn_new = deepcopy(fdsim.diagvars)
+
+    @info "Running finite differences"
+    fd_vjp = @time FiniteDifferences.j′vp(central_fdm(5,1), x -> transform_step(diagn_new, x, lf2, model), one(diagn_new), progn_new)
+
+    @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dprogn)[1], rtol=1e-3, atol=1e-3))
+
 end
 
 @testset "Differentiability: timestep! on Barotropic model" begin

@@ -16,8 +16,6 @@ _scale_coslat!(field::AbstractField; power=1) = _scale_lat!(field, cos.(get_lat(
 """
 $(TYPEDSIGNATURES)
 Generic latitude scaling applied to `field` in-place with latitude-like vector `v`."""
-
-
 function _scale_lat!(field::AbstractField, v::AbstractVector)
     @boundscheck get_nlat(field) == length(v) || throw(DimensionMismatch(field, v))
     

@@ -103,7 +103,7 @@ is given by
 
 
 ```math
-C_0 \frac{d SST}{dt} = (1-r) \left( R_{sd} - R_{su} - R_{lu} + R_{ld} - L_v*E_v - S \right)
+C_0 \frac{\mathrm{d} SST}{\mathrm{d}t} = (1-r) \left( R_{sd} - R_{su} - R_{lu} + R_{ld} - L_v E_v - S \right)
 ```
 
 with ``r \in [0, 1]`` an insulating factor due to sea ice, see [Thermodynamic sea ice model](@ref),

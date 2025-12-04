@@ -246,29 +246,23 @@ end
 Generator function. If a `spectral_transform` is handed over, the same scratch memory is used."""
 function DynamicsVariables(SG::SpectralGrid; 
                            spectral_transform::Union{Nothing,SpectralTransform}=nothing) 
+    
     (; architecture, spectrum, grid, nlayers, NF, ArrayType) = SG
     (; SpectralVariable2D, SpectralVariable3D) = SG
     (; GridVariable2D, GridVariable3D) = SG
 
-    if isnothing(spectral_transform)
-        return DynamicsVariables{NF, ArrayType, typeof(spectrum), typeof(grid),
-            SpectralVariable2D, SpectralVariable3D,
-            GridVariable2D, GridVariable3D, 
-            SpeedyTransforms.ScratchMemory{NF, array_type(architecture, Complex{NF}, 3), 
-            array_type(architecture, NF, 1), array_type(architecture, Complex{NF}, 1)}}(;
-                spectrum, grid, nlayers,
-            )
-    else 
-        scratch_memory = spectral_transform.scratch_memory 
+    if isnothing(spectral_transform)    # then create ScratchMemory now
+        scratch_memory = SpeedyTransforms.ScratchMemory(NF, architecture, grid, nlayers)
+    else                                # otherwise reuse existing ScratchMemory
+        scratch_memory = spectral_transform.scratch_memory
+    end
 
-        return DynamicsVariables{NF, ArrayType, typeof(spectrum), typeof(grid),
-            SpectralVariable2D, SpectralVariable3D,
-            GridVariable2D, GridVariable3D, typeof(scratch_memory)}(;
-                spectrum, grid, nlayers, scratch_memory
-            )
-    end 
+    return DynamicsVariables{NF, ArrayType, typeof(spectrum), typeof(grid),
+        SpectralVariable2D, SpectralVariable3D,
+        GridVariable2D, GridVariable3D, typeof(scratch_memory)}(;
+            spectrum, grid, nlayers, scratch_memory
+        )
 end
-
 
 export DynamicsVariablesOcean
 @kwdef struct DynamicsVariablesOcean{
@@ -331,6 +325,9 @@ export DynamicsVariablesLand
 
     "River runoff [m/s], diagnostic overflow from soil moisture"
     river_runoff::GridVariable2D = zeros(GridVariable2D, grid)
+
+    "Snow melt rate [kg/m²/s]"
+    snow_melt_rate::GridVariable2D = zeros(GridVariable2D, grid)
 end
 
 DynamicsVariablesLand(SG::SpectralGrid) =
@@ -367,6 +364,12 @@ $(TYPEDFIELDS)"""
     "Accumulated convective snow [m]"
     snow_convection::GridVariable2D = zeros(GridVariable2D, grid)
     
+    "Rate of liquid precipitation [kg/m²/s]"
+    rain_rate::GridVariable2D = zeros(GridVariable2D, grid)
+
+    "Rate of frozen precipitation [kg/m²/s]"
+    snow_rate::GridVariable2D = zeros(GridVariable2D, grid)
+
     "Rate of total precipitation (rain+snow) [kg/m²/s]"
     total_precipitation_rate::GridVariable2D = zeros(GridVariable2D, grid)
 

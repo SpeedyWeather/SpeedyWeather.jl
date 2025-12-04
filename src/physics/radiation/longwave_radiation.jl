@@ -1,5 +1,5 @@
-abstract type AbstractRadiation <: AbstractParameterization end
 abstract type AbstractLongwave <: AbstractRadiation end
+abstract type AbstractLongwaveRadiativeTransfer <: AbstractLongwave end
 
 # no longwave radiation
 longwave_radiation!(::ColumnVariables, ::Nothing, ::PrimitiveEquation) = nothing
@@ -159,56 +159,4 @@ function longwave_radiation!(
     # for diagnostic, use Fₖ as the outgoing longwave radiation although it's technically into the
     # uppermost layer from below (not out of it)
     column.outgoing_longwave_radiation = Fₖ
-end
-
-export NBandRadiation
-@kwdef struct NBandRadiation <: AbstractRadiation
-    nbands::Int = 1
-end
-
-NBandRadiation(SG::SpectralGrid; kwargs...) = NBandRadiation(; kwargs...)
-initialize!(radiation::NBandRadiation, model::PrimitiveEquation) = nothing
-
-function longwave_radiation!(
-    column::ColumnVariables,
-    radiation::NBandRadiation,
-    model::PrimitiveEquation,
-)
-
-    (; nlayers) = column
-    nbands = column.nbands_longwave                 # number of spectral bands
-
-    # precompute Stefan-Boltzmann emissions σT^4
-    σ = model.atmosphere.stefan_boltzmann
-    B = column.b                                    # reuse scratch vector b
-    (; temp) = column
-    @inbounds for k in eachindex(B, temp)
-        B[k] = σ*temp[k]^4
-    end
-
-    @inbounds for band in 1:nbands                  # loop over spectral bands
-        dτ = view(column.optical_depth_longwave, :, band)   # differential optical depth per layer in that band
-
-        # UPWARD flux U
-        U = σ*column.surface_temp^4                 # boundary condition at surface U(τ=τ(z=0)) = σTₛ⁴
-        column.flux_temp_upward[nlayers+1] += U     # accumulate fluxes
-
-        for k in nlayers:-1:1                       # integrate from surface up
-            # Radiative transfer, e.g. Frierson et al. 2006, equation 6
-            U -= dτ[k]*(U - B[k])                   # negative because we integrate from surface up in -τ direction
-            column.flux_temp_upward[k] += U         # accumulate that flux
-        end
-
-        # store outgoing longwave radiation (OLR) for diagnostics, accumulate over bands (reset when column is reset)
-        column.outgoing_longwave_radiation += U
-
-        # DOWNWARD flux D
-        D = zero(U)                                 # top boundary condition of longwave flux
-                                                    # no need to accumulate 0 at top downward flux
-        for k in 1:nlayers
-            # Radiative transfer, Frierson et al. 2006, equation 7
-            D += dτ[k]*(B[k] - D)
-            column.flux_temp_downward[k+1] += D
-        end
-    end
 end

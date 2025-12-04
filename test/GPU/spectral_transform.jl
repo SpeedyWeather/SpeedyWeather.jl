@@ -1,11 +1,29 @@
+@testset "GPU spectral transform roundtrip " begin
+    spectral_grid = SpectralGrid(trunc=41, nlayers=8, architecture=GPU())
+    S = SpectralTransform(spectral_grid)
+    
+    # first roundtrip
+    L = randn(ComplexF32, spectral_grid.spectrum, 8)
+    field = zeros(Float32, spectral_grid.grid, 8)
+    transform!(field, L, S)
+    transform!(L, field, S)
+
+    # 2nd roundtrip
+    L2 = deepcopy(L)
+    transform!(field, L, S)
+    transform!(L, field, S)
+
+    @test L ≈ L2
+end
+
 spectral_resolutions = (31,)#, 63, 127)
 nlayers_list = (8,)# 8, 32]
-# TODO: can uncomment this when we push to main  
+# TODO: at the moment only tests for even grids (no ring on equator) pass for some reason
 grid_list = [
     FullGaussianGrid,
     # FullClenshawGrid,
     OctahedralGaussianGrid,
-    # OctahedralClenshawGrid,
+    OctahedralClenshawGrid,
     # HEALPixGrid,
     # OctaHEALPixGrid,
 ]
@@ -52,13 +70,13 @@ end
                     
                     # Full return journey starting from grid
                     spec_ = SpeedyTransforms.transform(grid_cpu, S_cpu)
-                    grid_cpu = SpeedyTransforms.transform(spec_, S_cpu)
+                    grid_cpu_roundtrip = SpeedyTransforms.transform(spec_, S_cpu)
                     # @test grid_cpu ≈ grid_test
                     # grid_cpu = grid_test
 
                     # Full return journey starting from spec
                     grid_ = SpeedyTransforms.transform(spec_cpu, S_cpu)
-                    spec_cpu = SpeedyTransforms.transform(grid_, S_cpu)
+                    spec_cpu_roundtrip = SpeedyTransforms.transform(grid_, S_cpu)
                     # @test spec_cpu ≈ spec_test
                     # spec_cpu = spec_test
 
@@ -74,13 +92,13 @@ end
                     transform!(spec_gpu_test, grid_gpu, S_gpu)
                     transform!(grid_gpu_test, spec_gpu_test, S_gpu)
                     grid_test = on_architecture(cpu_arch, grid_gpu_test)
-                    @test grid_cpu ≈ grid_test rtol=sqrt(eps(Float32))
+                    @test grid_cpu_roundtrip ≈ grid_test rtol=sqrt(eps(Float32))
 
                     # Full return journey starting from spec on GPU
                     transform!(grid_gpu_test, spec_gpu, S_gpu)
                     transform!(spec_gpu_test, grid_gpu_test, S_gpu)
                     spec_test = on_architecture(cpu_arch, spec_gpu_test)
-                    @test spec_cpu ≈ spec_test rtol=sqrt(eps(Float32))
+                    @test spec_cpu_roundtrip ≈ spec_test rtol=sqrt(eps(Float32))
                 end
             end
         end
@@ -108,6 +126,18 @@ end
 
     @test field_2d_cpu_res ≈ on_architecture(cpu_arch, field_2d_gpu_res)
     @test spec_2d_cpu_res ≈ on_architecture(cpu_arch, spec_2d_gpu_res)
+
+    # allocating version 
+    # GPU 
+    spec_2d_gpu_res_alloc = transform(field_2d_gpu)
+    field_2d_gpu_res_alloc = transform(spec_2d_gpu)
+
+    # CPU
+    spec_2d_cpu_res_alloc = transform(field_2d_cpu)
+    field_2d_cpu_res_alloc = transform(spec_2d_cpu)
+
+    @test spec_2d_cpu_res_alloc ≈ on_architecture(cpu_arch, spec_2d_gpu_res_alloc)
+    @test field_2d_cpu_res_alloc ≈ on_architecture(cpu_arch, field_2d_gpu_res_alloc)
 end
 
 @testset "fourier_batched: compare forward pass to CPU" begin
@@ -174,8 +204,8 @@ end
                     scratch = S_cpu.scratch_memory.column 
                     SpeedyTransforms._legendre!(g_north_cpu, g_south_cpu, spec_cpu, scratch, S_cpu)
                     # Copy to GPU
-                    g_north_gpu = cu(g_north_cpu)
-                    g_south_gpu = cu(g_south_cpu);
+		            g_north_gpu = on_architecture(gpu_arch, g_north_cpu)
+		            g_south_gpu = on_architecture(gpu_arch, g_south_cpu)
 
                     # CPU inverse transform
                     SpeedyTransforms._fourier_batched!(
@@ -339,8 +369,8 @@ end
                     f_south_cpu = S_cpu.scratch_memory.south   
                     SpeedyTransforms._fourier!(f_north_cpu, f_south_cpu, grid_cpu, S_cpu)
                     # Copy to GPU
-                    f_north_gpu = cu(f_north_cpu)
-                    f_south_gpu = cu(f_south_cpu)
+                    f_north_gpu = on_architecture(gpu_arch, f_north_cpu)
+                    f_south_gpu = on_architecture(gpu_arch, f_south_cpu)
                     
                     # CPU inverse transform
                     SpeedyTransforms._legendre!(

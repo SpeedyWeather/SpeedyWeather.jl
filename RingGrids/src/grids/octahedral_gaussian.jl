@@ -108,5 +108,3 @@ function each_index_in_ring!(   rings,
         rings[j] = index_1st:index_end              # turn into UnitRange
     end
 end
-
-Adapt.@adapt_structure OctahedralGaussianGrid
