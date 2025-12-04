@@ -102,9 +102,9 @@ using Test, BenchmarkTools
         pres_tend_gpu = copy(diagn_gpu_copy.tendencies.pres_tend)
         
         # Compare results
-        @test div_tend_cpu ≈ div_tend_gpu rtol=1e-5
-        @test temp_tend_cpu ≈ temp_tend_gpu rtol=1e-5
-        @test pres_tend_cpu ≈ pres_tend_gpu rtol=1e-5
+        @test div_tend_cpu ≈ div_tend_gpu rtol=1e-6
+        @test temp_tend_cpu ≈ temp_tend_gpu rtol=1e-6
+        @test pres_tend_cpu ≈ pres_tend_gpu rtol=1e-6
         
         println("  ✓ Primitive Equation kernels (4-kernel version) produce correct results")
         
@@ -122,9 +122,9 @@ using Test, BenchmarkTools
         pres_tend_lm = diagn_lm_copy.tendencies.pres_tend
         
         # Compare single-kernel results with CPU
-        @test div_tend_cpu ≈ div_tend_lm rtol=1e-5
-        @test temp_tend_cpu ≈ temp_tend_lm rtol=1e-5
-        @test pres_tend_cpu ≈ pres_tend_lm rtol=1e-5
+        @test div_tend_cpu ≈ div_tend_lm rtol=1e-6
+        @test temp_tend_cpu ≈ temp_tend_lm rtol=1e-6
+        @test pres_tend_cpu ≈ pres_tend_lm rtol=1e-6
         
         println("  ✓ Primitive Equation kernels (single-kernel version) produce correct results")
     end
