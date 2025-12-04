@@ -81,8 +81,7 @@ export VegetationClimatology
     file_Grid::Type{<:AbstractGrid} = FullGaussianGrid
 
     "[OPTION] The missing value in the data respresenting ocean"
-    missing_value::NF = NF(NaN)
-
+    missing_value::NF = NaN
     # to be filled from file
     "High vegetation cover [1], interpolated onto Grid"
     high_cover::GridVariable2D
@@ -159,38 +158,47 @@ function soil_moisture_availability!(
     vegetation::VegetationClimatology,
     model::PrimitiveWet,
 )
-    (; soil_moisture_availability) = diagn.physics.land
+    (; vegetation_high, vegetation_low, soil_moisture_availability) = diagn.physics.land
     (; soil_moisture) = progn.land
-    (; high_cover, low_cover, low_veg_factor) = vegetation
+    (; low_veg_factor) = vegetation
+    
+    # copy over vegetation fields into diagnostic variables
+    vegetation_high .= vegetation.high_cover
+    vegetation_low  .= vegetation.low_cover
+
     W_cap = model.land.thermodynamics.field_capacity
     W_wilt = model.land.thermodynamics.wilting_point
     D_top = model.land.geometry.layer_thickness[1]
     D_root = model.land.geometry.layer_thickness[2]
 
-    @boundscheck fields_match(high_cover, low_cover, soil_moisture_availability) || throws(BoundsError)
+    @boundscheck fields_match(vegetation_high, vegetation_low, soil_moisture_availability) || throws(BoundsError)
     @boundscheck fields_match(soil_moisture, soil_moisture_availability, horizontal_only=true) || throws(BoundsError)
     @boundscheck size(soil_moisture, 2) >= 2    # defined for two layers
 
     # precalculate denominator
     r = 1/(D_top*W_cap + D_root*(W_cap - W_wilt))
 
+    # pack parameters into named tuple for kernel
+    params = (; low_veg_factor, r, W_cap, W_wilt, D_top, D_root)
+
     launch!(architecture(soil_moisture_availability), LinearWorkOrder,
         (size(soil_moisture_availability, 1),), soil_moisture_availability_kernel!,
-        soil_moisture_availability, soil_moisture, high_cover, low_cover,
-        low_veg_factor, r, W_cap, W_wilt, D_top, D_root,
+        soil_moisture_availability, soil_moisture, vegetation_high, vegetation_low,
+        params
     )
     
     return nothing 
 end
 
 @kernel inbounds=true function soil_moisture_availability_kernel!(
-    soil_moisture_availability, soil_moisture, high_cover, low_cover,
-    @Const(low_veg_factor), @Const(r), @Const(W_cap), @Const(W_wilt), @Const(D_top), @Const(D_root)
-)
+    soil_moisture_availability, soil_moisture, vegetation_high, vegetation_low, params)
+
     ij = @index(Global, Linear)    # every grid point ij
 
+    (; low_veg_factor, r, W_cap, W_wilt, D_top, D_root) = params
+
     # Fortran SPEEDY source/land_model.f90 line 111 origin unclear
-    veg = max(0, high_cover[ij] + low_veg_factor*low_cover[ij])
+    veg = max(0, vegetation_high[ij] + low_veg_factor*vegetation_low[ij])
 
     # Fortran SPEEDY documentation eq. 51, original formulation
     # soil_moisture_availability[ij] = r*(D_top*soil_moisture[ij, 1] +
@@ -203,6 +211,8 @@ end
 
 function variables(::VegetationClimatology)
     return (
+        DiagnosticVariable(name=:vegetation_high, dims=Grid2D(), desc="Vegetation high cover", units="1", namespace=:land),
+        DiagnosticVariable(name=:vegetation_low,  dims=Grid2D(), desc="Vegetation low cover",  units="1", namespace=:land),
         DiagnosticVariable(name=:soil_moisture_availability, dims=Grid2D(), desc="Soil moisture availability for evaporation", units="1", namespace=:land),
         PrognosticVariable(name=:soil_moisture, dims=Grid2D(), namespace=:land),
     )

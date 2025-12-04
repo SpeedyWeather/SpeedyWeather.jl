@@ -234,39 +234,40 @@ LandSnowAlbedo(SG::SpectralGrid; snow_cover = SaturatingSnowCover(), kwargs...) 
 initialize!(albedo::LandSnowAlbedo, model::PrimitiveEquation) = nothing
 
 @propagate_inbounds parameterization!(ij, diagn, progn, albedo::LandSnowAlbedo, model) = 
-    albedo!(ij, diagn.albedo, progn.land, albedo, model)
+    albedo!(ij, diagn, progn.land, albedo)
 
 @propagate_inbounds function albedo!(
-    ij,                                 # grid point index
-    albedo,                             # land albedo field
-    land,                               # land prognostic variables
+    ij,                             # grid point index
+    diagn,                          # diagnostic physics land variables
+    land,                           # land prognostic variables
     albedo_scheme::LandSnowAlbedo,
-    model::PrimitiveEquation,
 )
     # 1. Albedo of vegetation + bare soil (no snow)
     (; albedo_land, albedo_high_vegetation, albedo_low_vegetation) = albedo_scheme
 
-    if model.land isa AbstractWetLand
-        (; high_cover, low_cover) = model.land.vegetation
+    if haskey(diagn, :vegetation_high) && haskey(diagn, :vegetation_low)
+        (; vegetation_high, vegetation_low) = diagn
 
         # linear combination of high and low vegetation and bare soil
-        albedo[ij] = high_cover[ij] * albedo_high_vegetation +
-                        low_cover[ij] * albedo_low_vegetation +
-                        albedo_land * (1 - high_cover[ij] - low_cover[ij])
+        diagn.albedo[ij] = vegetation_high[ij] * albedo_high_vegetation +
+                        vegetation_low[ij] * albedo_low_vegetation +
+                        albedo_land * (1 - vegetation_high[ij] - vegetation_low[ij])
     else
-        albedo[ij] = albedo_land
+        diagn.albedo[ij] = albedo_land
     end
 
     # 2. Add snow cover
-    (; snow_depth) = land
-    (; albedo_snow, snow_depth_scale) = albedo_scheme
+    if haskey(land, :snow_depth)
+        (; snow_depth) = land
+        (; albedo_snow, snow_depth_scale) = albedo_scheme
 
-    # how to compute snow cover from snow depth
-    snow_cover_scheme = albedo_scheme.snow_cover
+        # how to compute snow cover from snow depth
+        snow_cover_scheme = albedo_scheme.snow_cover
 
-    # compute snow-cover fraction using the chosen scheme and clamp to [0, 1]
-    snow_cover = snow_cover_scheme(snow_depth[ij], snow_depth_scale)
+        # compute snow-cover fraction using the chosen scheme and clamp to [0, 1]
+        snow_cover = snow_cover_scheme(snow_depth[ij], snow_depth_scale)
 
-    # set land albedo linearly between bare land and snow depending on snow cover [0, 1]
-    albedo[ij] += snow_cover * albedo_snow
+        # set land albedo linearly between bare land and snow depending on snow cover [0, 1]
+        diagn.albedo[ij] += snow_cover * albedo_snow
+    end
 end
