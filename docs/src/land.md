@@ -55,17 +55,11 @@ other components of the land surface model `land`.
 land.thermodynamics
 ```
 
-To change these you can either mutate the fields
-
-```@example land
-land.thermodynamics.heat_conductivity = 0.25
-```
-
-or create a new model component `thermodynamics` 
+To change these you can either mutate the fields or create a new model component `thermodynamics` 
 passed on to the land model constructor
 
 ```@example land
-thermodynamics = LandThermodynamics(spectral_grid, heat_conductivity=0.25)
+thermodynamics = LandThermodynamics(spectral_grid, heat_conductivity_dry_soil=0.25)
 land = LandModel(spectral_grid; thermodynamics)
 land.thermodynamics
 ```
@@ -236,6 +230,96 @@ maximum and add a fraction ``p = 0.5`` of that excess water to the layer below
 ``W_2 = W_2 + p \delta W_1 \tfrac{f_1}{f_2}`` the other half of that excess
 water is put into the river runoff.
 
+## Snow model
+
+SpeedyWeather has a simple snow model that allows for snow to lie on land
+and impact albedo and isolate air-land fluxes. Snow is created from
+the precipitation schemes, can melt on the ground depending on soil temperature
+where it is then passed to the soil moisture. We also include a
+runoff/relaxation term to prevent snow piling up without bounds as
+soil temperatures below freezing would never remove such snow.
+In reality this is where one needs a ice sheet model to convert the
+snow to ice and simulate ice flow like in a glacier or in the
+Greenland and Antarctic ice sheets.
+
+### LandSnowModel
+
+`SnowModel` stores a single snow bucket with depth ``S`` in units of equivalent liquid water height
+(`prognostic_variables.land.snow_depth`) and solves the following equation
+
+```math
+\frac{dS}{dt} = P - M - R
+```
+with precipitation ``P``, melting ``M`` and runoff ``R``.
+Snow accumulates from the column-integrated large-scale
+(currently not from convection) snow precipitation rate ``P``, `snow_rate` (``kg/m²/s``),
+and melts once the top soil layer exceeds the melt threshold ``T_{melt}`` (default ``275~K``)
+through the term ``M`` and the runoff is implemented as a weak relaxation term
+back to 0 with a multi-year time scale.
+
+The available melt energy in the top
+layer of thickness ``z₁`` uses the dry-soil heat capacity ``cₛ``:
+
+```math
+E_{avail} = cₛ \, \max(T_1 - T_{melt}, 0) \, \frac{z₁}{Δt}.
+```
+
+This is the maximum melt rate
+
+```math
+\text{melt}_{rate_{max}} = \frac{E_{avail}}{ρ_w Lᵢ},
+```
+
+with ``ρ_w`` water density and ``Lᵢ`` latent heat of fusion. But note that
+this formulation allows to melt more snow than there actually is, so we need
+to cap the amount to not end up with negative snow. We implement this constrain
+not for terms individually but for the sum of all terms, see below.
+
+A slow runoff/relaxation term prevents perennial snow packs from growing without bound,
+
+```math
+\text{runoff}_{rate_{max}} = \frac{S}{\tau_{runoff}},
+```
+
+controlled by `runoff_time_scale` (default ``4`` years). Snowfall, melt and runoff form a raw
+tendency ``\text{d}S_{max}`` that is further limited so we never remove more snow than is present
+(including what falls during the current step). The actual removal is reported as
+
+```math
+\text{snow\_melt\_rate} = \text{melt}_{rate_{max}} + \text{runoff}_{rate_{max}} + \text{excess},
+```
+
+in ``kg/m²/s``, where the `excess` term (negative for melting/runoff trying to remove more snow than there is)
+only appears when the naive tendency would overdraw the bucket.
+`snow_melt_rate` therefore combines true melt with the runoff leak and is zero over ocean points.
+Snow depth is clipped to zero and stored as equivalent liquid water height, not physical snow thickness.
+
+The snow budget links into other surface schemes:
+
+- `snow_melt_rate` provides a latent heat sink to the land temperature budget.
+- The same flux (converted to ``m/s`` by dividing by ``ρ_w``) feeds the soil moisture tendency alongside rain.
+- Snow depth drives the snow-albedo calculation and insulates surface heat/humidity fluxes (see below).
+
+Snow cover over land is diagnosed from snow depth using either a linear ramp
+``σₛ = \min(S / \text{snow\_depth\_scale}, 1)`` or the default saturating form
+
+```math
+σₛ = \frac{S}{S + \text{snow\_depth\_scale}},
+```
+
+set via the `snow_cover` keyword of `LandSnowAlbedo`. Snow then adds an albedo to the land albedo
+(diagnosed from vegetation cover)
+
+```math
+albedo_{land} = albedo_{land} + σₛ albedo_{snow}
+```
+
+so snow depth from the snow bucket immediately brightens land grid cells.
+The total albedo is higher over already brighter areas (low vegetation cover)
+and lower over darker areas. This somewhat reflects that in forests the
+snow cover is broken up and snow lies in between trees.
+`DefaultAlbedo` uses `LandSnowAlbedo`; there is currently no time-evolving snow albedo.
+
 ## Albedo
 
 Albedo is the surface reflectivity to downward solar shortwave radiation.
@@ -249,14 +333,12 @@ The following albedo's are currently implemented
 subtypes(SpeedyWeather.AbstractAlbedo)
 ```
 Albedo is generally a 2D global diagnostic variable for ocean and land separately.
-Meaning it is possible it define albedo as a constant in time but also
-to let it be diagnosed as a function of other variables on every time step
-(e.g. snow cover). However, this specifically is currently not implemented.
-In general you have to think of the albedo not as a boundary condition that
-is set once but reset on every time step. This is so that, e.g. snow cover
-can increase the albedo without losing the information of the underlying
-bare surface albedo. If you do want to set the albedo manually with
-`set!` then use `ManualAlbedo` which has it's own albedo 2D field
+You can keep it constant or diagnose it from other fields on every time step:
+`OceanSeaIceAlbedo` mixes in sea ice concentration and `LandSnowAlbedo` uses the
+snow depth bucket described above. Conceptually albedo is not a static boundary
+condition but recomputed each step so transient surface changes (e.g. snowfall)
+brighten the surface without losing the underlying bare albedo. If you want to set
+albedo manually with `set!` then use `ManualAlbedo` which has its own albedo 2D field
 that is copied into the diagnostic variables on every time step.
 See example below.
 `AlbedoClimatology` does the same but `ManualAlbedo` does not need
