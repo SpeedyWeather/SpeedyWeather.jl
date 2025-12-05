@@ -489,15 +489,9 @@ end
 
     for k in 1:nlayers
         # skip 1:k-1 as integration is surface to k
-        # Use Kahan summation for better numerical accuracy
         geopot_val = zero(eltype(geopot))
-        c = zero(eltype(geopot))  # compensation for lost low-order bits
         for r in k:nlayers
-            val = R[k, r] * temp_tend[lm, r]
-            y = val - c
-            t = geopot_val + y
-            c = (t - geopot_val) - y
-            geopot_val = t
+            geopot_val += R[k, r] * temp_tend[lm, r]
         end
         geopot[lm, k] = geopot_val
     end
@@ -514,16 +508,10 @@ end
     end
         
     # Step 4: Now solve δD = S⁻¹G to correct divergence tendency
-    # Use Kahan summation for better numerical accuracy
     for k in 1:nlayers
         div_val = zero(eltype(div_tend))
-        c = zero(eltype(div_tend))  # compensation for lost low-order bits
         for r in 1:nlayers
-            val = S⁻¹[l, k, r] * G[lm, r]
-            y = val - c
-            t = div_val + y
-            c = (t - div_val) - y
-            div_val = t
+            div_val += S⁻¹[l, k, r] * G[lm, r]
         end
         div_tend[lm, k] = div_val
     end
@@ -584,15 +572,9 @@ end
     # Calculate the ξ*R*G_T term, vertical integration of geopotential
     # (excl ξ, this is done in kernel 2)
     # skip 1:k-1 as integration is surface to k
-    # Use Kahan summation for better numerical accuracy
     geopot_val = zero(eltype(geopot))
-    c = zero(eltype(geopot))  # compensation for lost low-order bits
     for r in k:nlayers
-        val = R[k, r] * temp_tend[lm, r]
-        y = val - c
-        t = geopot_val + y
-        c = (t - geopot_val) - y
-        geopot_val = t
+        geopot_val += R[k, r] * temp_tend[lm, r]
     end
     geopot[I] = geopot_val
 end
@@ -626,15 +608,9 @@ end
     
     # Skip out-of-bounds modes
     # Now solve δD = S⁻¹G to correct divergence tendency
-    # Use Kahan summation for better numerical accuracy
     sum_val = zero(eltype(div_tend))
-    c = zero(eltype(div_tend))  # compensation for lost low-order bits
     for r in 1:nlayers
-        val = S⁻¹[l, k, r] * G[lm, r]
-        y = val - c
-        t = sum_val + y
-        c = (t - sum_val) - y
-        sum_val = t
+        sum_val += S⁻¹[l, k, r] * G[lm, r]
     end
     div_tend[lm, k] = sum_val   
 end
