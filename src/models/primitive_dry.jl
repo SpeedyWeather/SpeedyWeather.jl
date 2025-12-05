@@ -157,7 +157,7 @@ function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
     initialize!(ocean,     prognostic_variables, diagnostic_variables, model)
     initialize!(land,      prognostic_variables, diagnostic_variables, model)
 
-    # set the initial conditions (may overwrite variables set in intialize! ocean/land)
+    # set the initial conditions (may overwrite variables set in initialize! ocean/land)
     initialize!(prognostic_variables, model.initial_conditions, model)
     (; clock) = prognostic_variables
     clock.time = time       # set the current time
