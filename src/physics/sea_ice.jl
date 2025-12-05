@@ -13,10 +13,10 @@ export ThermodynamicSeaIce
     temp_freeze::NF = 273.15-1.8
 
     "[OPTION] Melting rate of sea ice [m²/m²/s/K]"
-    melt_rate::NF = 5e-5
+    melt_rate::NF = 1e-6
 
     "[OPTION] Freezing rate of sea ice [m²/m²/K]"
-    freeze_rate::NF = 0.12
+    freeze_rate::NF = 0.1
 end
 
 ThermodynamicSeaIce(SG::SpectralGrid; kwargs...) = ThermodynamicSeaIce{SG.NF}(;kwargs...)

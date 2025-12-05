@@ -219,11 +219,12 @@ function timestep!(
     ρ = model.atmosphere.water_density
     (; mask) = model.land_sea_mask
 
-    P = diagn.physics.total_precipitation_rate      # precipitation (rain+snow) in [m/s]
-    E = diagn.physics.land.surface_humidity_flux    # [kg/s/m²], divide by density for [m/s]
-    R = diagn.physics.land.river_runoff             # diagnosed [m/s]
+    P = diagn.physics.rain_rate                     # precipitation (rain only) in [kg/m²/s]
+    S = diagn.physics.land.snow_melt_rate           # [kg/m²/s] includes snow runoff leakage water
+    H = diagn.physics.land.surface_humidity_flux    # [kg/m²/s], divide by density for [m/s], positive up
+    R = diagn.physics.land.river_runoff             # accumulated [m]
 
-    @boundscheck fields_match(soil_moisture, P, E, R, horizontal_only=true) ||
+    @boundscheck fields_match(soil_moisture, P, S, H, R, horizontal_only=true) ||
         throw(DimensionMismatch(soil_moisture, P))
     @boundscheck size(soil_moisture, 2) >= 2 || throw(DimensionMismatch)
     f₁, f₂ = soil.f₁, soil.f₂
@@ -231,24 +232,31 @@ function timestep!(
     τ⁻¹ = inv(convert(eltype(soil_moisture), Second(soil.time_scale).value))
     f₁_f₂ = f₁/f₂
     Δt_f₁ = Δt/f₁
+    params = (; ρ, Δt, f₁, Δt_f₁, f₁_f₂, p, τ⁻¹)
 
     launch!(architecture(soil_moisture), LinearWorkOrder, (size(soil_moisture, 1),),
-        land_bucket_soil_moisture_kernel!, soil_moisture, mask, P, E, R, ρ, Δt, f₁, Δt_f₁, f₁_f₂, p, τ⁻¹)
+        land_bucket_soil_moisture_kernel!, soil_moisture, mask, P, S, H, R,
+        params, 
+        )
     synchronize(architecture(soil_moisture))
 end
 
 @kernel inbounds=true function land_bucket_soil_moisture_kernel!(
-    soil_moisture, mask, P, E, R,
-    @Const(ρ), @Const(Δt), @Const(f₁), @Const(Δt_f₁), @Const(f₁_f₂), @Const(p), @Const(τ⁻¹),
+    soil_moisture, mask, P, S, H, R,
+    params,
 )
     ij = @index(Global, Linear)             # every grid point ij
 
     if mask[ij] > 0                         # at least partially land
-        # precipitation (rain+snow, convection + large-scale) minus evaporation (or condensation)
-        # river runoff only diagnostic, i.e. R=0 here but drain excess water below
+        # precipitation (rain only, convection + large-scale) minus evaporation (or condensation)
+        # river runoff via drain excess water below (that's just gone)
         # convert to [m/s] by dividing by density
-        F = (P[ij] - E[ij])/ρ               # - R[ij]
-  
+        (; ρ, Δt, f₁, Δt_f₁, f₁_f₂, p, τ⁻¹) = params
+       
+        # rain water can increase soil moisture regardless of snow cover
+        # [kg/m²/s] -> [m/s]
+        F = (P[ij] + S[ij] - H[ij])/ρ
+
         # vertical diffusion term between layers
         D = τ⁻¹*(soil_moisture[ij, 1] - soil_moisture[ij, 2])
 
