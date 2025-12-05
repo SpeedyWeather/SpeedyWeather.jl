@@ -53,19 +53,22 @@ Adapt.@adapt_structure SurfaceOceanHumidityFlux
 SurfaceOceanHumidityFlux(SG::SpectralGrid; kwargs...) = SurfaceOceanHumidityFlux{SG.NF}(; kwargs...)
 initialize!(::SurfaceOceanHumidityFlux, ::PrimitiveWet) = nothing
 
-@propagate_inbounds function surface_humidity_flux!(ij, diagn, progn, humidity_flux::SurfaceOceanHumidityFlux, model)
+@propagate_inbounds function surface_humidity_flux!(
+    ij, diagn, progn, humidity_flux::SurfaceOceanHumidityFlux, model)
+    
     surface = model.geometry.nlayers
-    T = progn.ocean.sea_surface_temperature[ij]
+    SST = progn.ocean.sea_surface_temperature[ij]
 
     # SATURATION HUMIDITY OVER OCEAN
     pₛ = diagn.grid.pres_grid_prev[ij]          # surface pressure [Pa]
-    sat_humid_ocean = saturation_humidity(T, pₛ, model.clausius_clapeyron)
+    sat_humid_ocean = saturation_humidity(SST, pₛ, model.clausius_clapeyron)
 
     ρ = diagn.physics.surface_air_density[ij]
     V₀ = diagn.physics.surface_wind_speed[ij]
     land_fraction = model.land_sea_mask.mask[ij]
     surface_humid = diagn.grid.humid_grid_prev[ij, surface]
-    sea_ice_concentration = progn.ocean.sea_ice_concentration[ij]
+    sea_ice_concentration = haskey(progn.ocean, :sea_ice_concentration) ?
+        progn.ocean.sea_ice_concentration[ij] : zero(SST)
 
     # drag coefficient either from SurfaceHumidityFlux or from a central drag coefficient
     d = diagn.physics.boundary_layer_drag[ij]
@@ -73,7 +76,7 @@ initialize!(::SurfaceOceanHumidityFlux, ::PrimitiveWet) = nothing
 
     # SPEEDY documentation eq. 55/57, zero flux if sea surface temperature not available
     # but remove the max( ,0) to allow for surface condensation
-    flux_ocean = isfinite(T) ? ρ*drag_ocean*V₀*(sat_humid_ocean  - surface_humid) : zero(T)
+    flux_ocean = isfinite(SST) ? ρ*drag_ocean*V₀*(sat_humid_ocean  - surface_humid) : zero(SST)
 
     # sea ice insulation: more sea ice ⇒ smaller flux (ℵ / ℵ₀ scaling)
     flux_ocean /= 1 + sea_ice_concentration / humidity_flux.sea_ice_insulation

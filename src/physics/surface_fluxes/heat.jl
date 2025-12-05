@@ -58,10 +58,11 @@ initialize!(::SurfaceOceanHeatFlux, ::PrimitiveEquation) = nothing
     cₚ = model.atmosphere.heat_capacity
     ρ = diagn.physics.surface_air_density[ij]
     V₀ = diagn.physics.surface_wind_speed[ij]
-    sea_ice_concentration = progn.ocean.sea_ice_concentration[ij]
+    sea_ice_concentration = haskey(progn.ocean, :sea_ice_concentration) ?
+        progn.ocean.sea_ice_concentration[ij] : zero(ρ)
 
     # TODO actually implement skin temperature?
-    T_skin_ocean = progn.ocean.sea_surface_temperature[ij]
+    SST = progn.ocean.sea_surface_temperature[ij]
     T = diagn.physics.surface_air_temperature[ij]
     land_fraction = model.land_sea_mask.mask[ij]
     pₛ = diagn.grid.pres_grid_prev[ij]
@@ -73,7 +74,7 @@ initialize!(::SurfaceOceanHeatFlux, ::PrimitiveEquation) = nothing
     # SPEEDY documentation Eq. 54/56, land/sea fraction included
     # Only flux from ocean if available (not NaN) otherwise zero flux
     # leave out *cₚ here but include below to avoid division
-    flux_ocean  = isfinite(T_skin_ocean) ? ρ*drag_ocean*V₀*(T_skin_ocean  - T) : zero(T_skin_ocean)
+    flux_ocean  = isfinite(SST) ? ρ*drag_ocean*V₀*(SST  - T) : zero(SST)
 
     # sea ice insulation: more sea ice ⇒ smaller flux (ℵ / ℵ₀ scaling)
     flux_ocean /= 1 + sea_ice_concentration / heat_flux.sea_ice_insulation
@@ -126,7 +127,7 @@ initialize!(::SurfaceLandHeatFlux, ::PrimitiveEquation) = nothing
     T_skin_land = progn.land.soil_temperature[ij, 1]    # uppermost land layer with index 1
     T = diagn.physics.surface_air_temperature[ij]
     land_fraction = model.land_sea_mask.mask[ij]
-    snow_depth = progn.land.snow_depth[ij]
+    snow_depth = haskey(progn.land, :snow_depth) ? progn.land.snow_depth[ij] : zero(T)
 
     # drag coefficient
     d = diagn.physics.boundary_layer_drag[ij]
@@ -135,10 +136,10 @@ initialize!(::SurfaceLandHeatFlux, ::PrimitiveEquation) = nothing
     # SPEEDY documentation Eq. 54/56, land/sea fraction included
     # Only flux from land if available (not NaN) otherwise zero flux
     # leave out *cₚ here but include below to avoid division
-    flux_land  = isfinite(T_skin_land) ? ρ*drag_land*V₀*(T_skin_land  - T) : zero(T_skin_land)
+    flux_land  = isfinite(T_skin_land) ? ρ*drag_land*V₀*(T_skin_land  - T) : zero(T)
     
     # snow insulation: deeper snow ⇒ smaller flux (S / S₀ depth scaling)
-    flux_land /= 1 + snow_depth[ij] / heat_flux.snow_insulation_depth
+    flux_land /= 1 + snow_depth / heat_flux.snow_insulation_depth
 
     # store without weighting by land fraction for coupling [W/m²]
     diagn.physics.land.sensible_heat_flux[ij] = flux_land*cₚ  # store land flux separately too

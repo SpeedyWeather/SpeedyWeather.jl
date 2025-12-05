@@ -220,10 +220,12 @@ function timestep!(
     Rld = diagn.physics.surface_longwave_down           # all in [W/m²]
     Rlu = diagn.physics.land.surface_longwave_up
     S = diagn.physics.land.sensible_heat_flux
-    H = diagn.physics.land.surface_humidity_flux        # except this in [kg/s/m²]
-    M = diagn.physics.land.snow_melt_rate               # in [kg/s/m²] from snow model
 
-    @boundscheck fields_match(soil_temperature, Rsd, Rsu, Rld, Rlu, H, S, M, horizontal_only=true) ||
+    # except these in [kg/s/m²]
+    H = haskey(diagn.physics.land, :surface_humidity_flux) ? diagn.physics.land.surface_humidity_flux : nothing
+    M = haskey(diagn.physics.land, :snow_melt_rate) ? diagn.physics.land.snow_melt_rate : nothing
+
+    @boundscheck fields_match(soil_temperature, Rsd, Rsu, Rld, Rlu, S, horizontal_only=true) ||
         throw(DimensionMismatch(soil_temperature, Rs))
     @boundscheck size(soil_moisture, 2) == size(soil_temperature, 2) == 2 || throw(DimensionMismatch)
     
@@ -238,25 +240,28 @@ function timestep!(
     params = (; Lᵥ, Lᵢ, γ, Cw, Cs, z₁, z₂, Δ, Δt)
 
     launch!(architecture(soil_temperature), LinearWorkOrder, (size(soil_temperature, 1),),
-        land_bucket_temperature_kernel!, soil_temperature, mask, soil_moisture, Rsd, Rsu, Rlu, Rld, H, S, M,
+        land_bucket_temperature_kernel!, soil_temperature, mask, soil_moisture, Rsd, Rsu, Rlu, Rld, S, H, M,
         params)
 
     return nothing
 end
 
 @kernel inbounds=true function land_bucket_temperature_kernel!(
-    soil_temperature, mask, soil_moisture, Rsd, Rsu, Rlu, Rld, H, S, M, params)
+    soil_temperature, mask, soil_moisture, Rsd, Rsu, Rlu, Rld, S, H, M, params)
     
     ij = @index(Global, Linear)
 
     if mask[ij] > 0                         # at least partially land
         (; Lᵥ, Lᵢ, γ, Cw, Cs, z₁, z₂, Δ, Δt) = params
         
-        # Cooling from snow melt rate
-        Q_melt = Lᵢ * M[ij]                 # in [W/m²] = [J/kg] * [kg/m²/s]
+        # Cooling from snow melt rate, in [W/m²] = [J/kg] * [kg/m²/s]
+        Q_melt = isnothing(M) ? zero(Lᵢ) : Lᵢ * M[ij]
+
+        # latent heat flux [W/m²], zero if H not available
+        L = isnothing(H) ? zero(Lᵥ) : Lᵥ*H[ij]
 
         # total surface downward heat flux [W/m^2]
-        F = Rsd[ij] - Rsu[ij] - Rlu[ij] + Rld[ij] - Lᵥ*H[ij] - S[ij] - Q_melt
+        F = Rsd[ij] - Rsu[ij] - Rlu[ij] + Rld[ij] - L - S[ij] - Q_melt
 
         # heat capacity of the (wet) soil layers 1 and 2 [J/(m³ K)]
         # ignore snow here
@@ -282,7 +287,6 @@ function variables(::LandBucketTemperature)
         DiagnosticVariable(name=:surface_shortwave_up, dims=Grid2D(), desc="Surface shortwave radiation up", units="W/m²", namespace=:land),
         DiagnosticVariable(name=:surface_longwave_down, dims=Grid2D(), desc="Surface longwave radiation down", units="W/m²"),
         DiagnosticVariable(name=:surface_longwave_up, dims=Grid2D(), desc="Surface longwave radiation up", units="W/m²", namespace=:land),
-        DiagnosticVariable(name=:surface_humidity_flux, dims=Grid2D(), desc="Surface humidity flux", units="kg/s/m²", namespace=:land),
         DiagnosticVariable(name=:sensible_heat_flux, dims=Grid2D(), desc="Sensible heat flux", units="W/m²", namespace=:land),
     )
 end
