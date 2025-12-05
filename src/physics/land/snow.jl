@@ -11,12 +11,12 @@ from the diagnosed precipitation, melts once the top soil layer exceeds
 unrealistic snow buildup as in reality the snow would turn into ice and a glacier / 
 ice sheet would form instead.
 $(TYPEDFIELDS)"""
-@kwdef mutable struct SnowModel{NF} <: AbstractSnow
+@parameterized @kwdef mutable struct SnowModel{NF} <: AbstractSnow
     "[OPTION] Temperature threshold for snow melting [K]"
-    melting_threshold::NF = 275
+    @param melting_threshold::NF = 275 (bounds=Positive,)
 
     "[OPTION] Time scale for snow runoff/leakage into soil moisture [s]"
-    runoff_time_scale::Second = Year(4) 
+    @param runoff_time_scale::Second = Year(4) (bounds=Positive,)
 end
 
 # generator function

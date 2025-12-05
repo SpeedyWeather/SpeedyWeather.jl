@@ -72,6 +72,12 @@ end
 
 export OneBandShortwave
 
+@parameterized struct OneBandShortwave{C, T, R} <: AbstractShortwave
+    @component clouds::C
+    @component transmittance::T
+    @component radiative_transfer::R
+end
+
 """
     OneBandShortwave <: AbstractShortwave
 
@@ -83,11 +89,7 @@ Cloud cover is calculated as a combination of relative humidity and precipitatio
 and a cloud albedo is applied to the downward beam. Fields and options are
 
 $(TYPEDFIELDS)"""
-struct OneBandShortwave{C, T, R} <: AbstractShortwave
-    clouds::C
-    transmittance::T
-    radiative_transfer::R
-end
+OneBandShortwave
 
 # primitive wet model version
 OneBandShortwave(SG::SpectralGrid) = OneBandShortwave(
@@ -140,12 +142,12 @@ function shortwave_radiation!(
 end
 
 export OneBandShortwaveRadiativeTransfer
-@kwdef struct OneBandShortwaveRadiativeTransfer{NF} <: AbstractShortwaveRadiativeTransfer
+@parameterized @kwdef struct OneBandShortwaveRadiativeTransfer{NF} <: AbstractShortwaveRadiativeTransfer
     "[OPTION] Ozone absorption in upper stratosphere (W/m^2)"
-    ozone_absorp_upper::NF = 0
+    @param ozone_absorp_upper::NF = 0 (bounds=Nonnegative,)
     
     "[OPTION] Ozone absorption in lower stratosphere (W/m^2)"
-    ozone_absorp_lower::NF = 0
+    @param ozone_absorp_lower::NF = 0 (bounds=Nonnegative,)
 end
 
 # generator function

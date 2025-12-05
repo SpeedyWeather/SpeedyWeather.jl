@@ -10,7 +10,7 @@ with `spectral_grid::SpectralGrid` used to initalize all non-default components
 passed on as keyword arguments, e.g. `planet=Earth(spectral_grid)`. Fields, representing
 model components, are
 $(TYPEDFIELDS)"""
-@kwdef mutable struct ShallowWaterModel{
+@parameterized @kwdef mutable struct ShallowWaterModel{
     AR,     # <:AbstractArchitecture,
     GE,     # <:AbstractGeometry,
     PL,     # <:AbstractPlanet,
@@ -34,15 +34,15 @@ $(TYPEDFIELDS)"""
     architecture::AR = spectral_grid.architecture
 
     # DYNAMICS
-    geometry::GE = Geometry(spectral_grid)
-    planet::PL = Earth(spectral_grid)
-    atmosphere::AT = EarthAtmosphere(spectral_grid)
-    coriolis::CO = Coriolis(spectral_grid)
-    orography::OR = EarthOrography(spectral_grid)
-    forcing::FR = nothing
-    drag::DR = nothing
-    particle_advection::PA = nothing
-    initial_conditions::IC = InitialConditions(ShallowWater)
+    @component geometry::GE = Geometry(spectral_grid)
+    @component planet::PL = Earth(spectral_grid)
+    @component atmosphere::AT = EarthAtmosphere(spectral_grid)
+    @component coriolis::CO = Coriolis(spectral_grid)
+    @component orography::OR = EarthOrography(spectral_grid)
+    @component forcing::FR = nothing
+    @component drag::DR = nothing
+    @component particle_advection::PA = nothing
+    @component initial_conditions::IC = InitialConditions(ShallowWater)
     
     # VARIABLES
     random_process::RP = nothing

@@ -10,7 +10,7 @@ with `spectral_grid::SpectralGrid` used to initalize all non-default components
 passed on as keyword arguments, e.g. `planet=Earth(spectral_grid)`. Fields, representing
 model components, are
 $(TYPEDFIELDS)"""
-@kwdef mutable struct PrimitiveWetModel{
+@parameterized @kwdef mutable struct PrimitiveWetModel{
     AR,     # <:AbstractArchitecture,
     GE,     # <:AbstractGeometry,
     PL,     # <:AbstractPlanet,
@@ -57,43 +57,43 @@ $(TYPEDFIELDS)"""
     
     # DYNAMICS
     dynamics::Bool = true
-    geometry::GE = Geometry(spectral_grid)
-    planet::PL = Earth(spectral_grid)
-    atmosphere::AT = EarthAtmosphere(spectral_grid)
-    coriolis::CO = Coriolis(spectral_grid)
-    geopotential::GO = Geopotential(spectral_grid)
-    adiabatic_conversion::AC = AdiabaticConversion(spectral_grid)
-    particle_advection::PA = nothing
-    initial_conditions::IC = InitialConditions(PrimitiveWet)
-    forcing::FR = nothing
-    drag::DR = nothing
+    @component geometry::GE = Geometry(spectral_grid)
+    @component planet::PL = Earth(spectral_grid)
+    @component atmosphere::AT = EarthAtmosphere(spectral_grid)
+    @component coriolis::CO = Coriolis(spectral_grid)
+    @component geopotential::GO = Geopotential(spectral_grid)
+    @component adiabatic_conversion::AC = AdiabaticConversion(spectral_grid)
+    @component particle_advection::PA = nothing
+    @component initial_conditions::IC = InitialConditions(PrimitiveWet)
+    @component forcing::FR = nothing
+    @component drag::DR = nothing
 
     # VARIABLES
     random_process::RP = nothing
     tracers::TRACER_DICT = TRACER_DICT()
     
     # BOUNDARY CONDITIONS
-    orography::OR = EarthOrography(spectral_grid)
-    land_sea_mask::LS = EarthLandSeaMask(spectral_grid)
-    ocean::OC = SlabOcean(spectral_grid)
-    sea_ice::SI = ThermodynamicSeaIce(spectral_grid)
-    land::LA = LandModel(spectral_grid)
-    solar_zenith::ZE = WhichZenith(spectral_grid, planet)
-    albedo::AL = DefaultAlbedo(spectral_grid)
+    @component orography::OR = EarthOrography(spectral_grid)
+    @component land_sea_mask::LS = EarthLandSeaMask(spectral_grid)
+    @component ocean::OC = SlabOcean(spectral_grid)
+    @component sea_ice::SI = ThermodynamicSeaIce(spectral_grid)
+    @component land::LA = LandModel(spectral_grid)
+    @component solar_zenith::ZE = WhichZenith(spectral_grid, planet)
+    @component albedo::AL = DefaultAlbedo(spectral_grid)
     
     # PHYSICS/PARAMETERIZATIONS
     physics::Bool = true
-    clausius_clapeyron::CC = ClausiusClapeyron(spectral_grid, atmosphere)
-    boundary_layer_drag::BL = BulkRichardsonDrag(spectral_grid)
-    vertical_diffusion::VD = BulkRichardsonDiffusion(spectral_grid)
-    surface_thermodynamics::SUT = SurfaceThermodynamicsConstant(spectral_grid)
-    surface_wind::SUW = SurfaceWind(spectral_grid)
-    surface_heat_flux::SH = SurfaceHeatFlux(spectral_grid)
-    surface_humidity_flux::HF = SurfaceHumidityFlux(spectral_grid)
-    large_scale_condensation::LSC = ImplicitCondensation(spectral_grid)
-    convection::CV = SimplifiedBettsMiller(spectral_grid)
-    shortwave_radiation::SW = TransparentShortwave(spectral_grid)
-    longwave_radiation::LW = JeevanjeeRadiation(spectral_grid)
+    @component clausius_clapeyron::CC = ClausiusClapeyron(spectral_grid, atmosphere)
+    @component boundary_layer_drag::BL = BulkRichardsonDrag(spectral_grid)
+    @component vertical_diffusion::VD = BulkRichardsonDiffusion(spectral_grid)
+    @component surface_thermodynamics::SUT = SurfaceThermodynamicsConstant(spectral_grid)
+    @component surface_wind::SUW = SurfaceWind(spectral_grid)
+    @component surface_heat_flux::SH = SurfaceHeatFlux(spectral_grid)
+    @component surface_humidity_flux::HF = SurfaceHumidityFlux(spectral_grid)
+    @component large_scale_condensation::LSC = ImplicitCondensation(spectral_grid)
+    @component convection::CV = SimplifiedBettsMiller(spectral_grid)
+    @component shortwave_radiation::SW = TransparentShortwave(spectral_grid)
+    @component longwave_radiation::LW = JeevanjeeRadiation(spectral_grid)
     stochastic_physics::SP = nothing
 
     # NUMERICS
@@ -112,7 +112,7 @@ end
 
 prognostic_variables(::Type{<:PrimitiveWet}) = (:vor, :div, :temp, :humid, :pres)
 default_concrete_model(::Type{PrimitiveWet}) = PrimitiveWetModel
- 
+
 """
 $(TYPEDSIGNATURES)
 Calls all `initialize!` functions for components of `model`,

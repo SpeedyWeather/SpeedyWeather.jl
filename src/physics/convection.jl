@@ -37,12 +37,12 @@ export SimplifiedBettsMiller
 https://doi.org/10.1175/JAS3935.1. This implements the qref-formulation
 in their paper. Fields and options are
 $(TYPEDFIELDS)"""
-@kwdef mutable struct SimplifiedBettsMiller{NF, SP} <: AbstractConvection
+@parameterized @kwdef mutable struct SimplifiedBettsMiller{NF, SP} <: AbstractConvection
     "[OPTION] Relaxation time for profile adjustment"
     time_scale::Second = Hour(4)
 
     "[OPTION] Relative humidity for reference profile [1]"
-    relative_humidity::NF = 0.7
+    @param relative_humidity::NF = 0.7 (bounds=0..1,)
 
     "[OPTION] Surface perturbation of temp, humid to calculate the moist pseudo adiabat"
     surface_temp_humid::SP  # don't specify default here but in generator below
@@ -294,12 +294,12 @@ The simplified Betts-Miller convection scheme from Frierson, 2007,
 https://doi.org/10.1175/JAS3935.1 but with humidity set to zero.
 Fields and options are
 $(TYPEDFIELDS)"""
-@kwdef struct DryBettsMiller{NF, SP} <: AbstractConvection
+@parameterized @kwdef struct DryBettsMiller{NF, SP} <: AbstractConvection
     "[OPTION] Relaxation time for profile adjustment"
     time_scale::Second = Hour(4)
 
     "[OPTION] Surface perturbation of temp to calculate the dry adiabat"
-    surface_temp::SP    # don't set default here but in generator below
+    @param surface_temp::SP    # don't set default here but in generator below
 end
 
 # generator function
@@ -434,7 +434,7 @@ export ConvectiveHeating
 """Convective heating as defined by Lee and Kim, 2003, JAS
 implemented as convection parameterization. Fields are
 $(TYPEDFIELDS)"""
-@kwdef struct ConvectiveHeating{NF} <: AbstractConvection
+@parameterized @kwdef struct ConvectiveHeating{NF} <: AbstractConvection
     # DIMENSION
     nlat::Int
     
@@ -442,16 +442,16 @@ $(TYPEDFIELDS)"""
     time_scale::Second = Hour(12)
 
     "[OPTION] Pressure of maximum heating [hPa]"
-    p₀::NF = 525
+    @param p₀::NF = 525 (bounds=Positive,)
 
     "[OPTION] Vertical extent of heating [hPa]"
-    σₚ::NF = 200
+    @param σₚ::NF = 200 (bounds=Positive,)
 
     "[OPTION] Latitude of heating [˚N]"
-    θ₀::NF = 0
+    @param θ₀::NF = 0 (bounds=-90..90,)
 
     "[OPTION] Latitudinal width of heating [˚]"
-    σθ::NF = 20
+    @param σθ::NF = 20 (bounds=Positive,)
 
     # precomputed latitude mask
     lat_mask::Vector{NF} = zeros(NF, nlat)

@@ -60,7 +60,7 @@ SpeedyWeather also provides automated parameter handling for all models and subc
 
 ```julia
 spectral_grid = SpectralGrid(trunc=23, nlayers=1) 
-model = Barotropic(; spectral_grid)
+model = BarotropicModel(; spectral_grid)
 params = parameters(model)
 
 # output (truncated)
