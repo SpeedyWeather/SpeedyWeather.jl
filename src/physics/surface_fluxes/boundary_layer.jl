@@ -30,9 +30,12 @@ $(TYPEDFIELDS)"""
     "[OPTION] von Kármán constant [1]"
     von_Karman::NF = 0.4
 
-    "[OPTION] roughness length [m]"
-    roughness_length::NF = 0.5
+    "[OPTION] roughness length over land [m]"
+    roughness_length_land::NF = 0.5
 
+    "[OPTION] roughness length over ocean [m]"
+    roughness_length_ocean::NF = 1e-4
+    
     "[OPTION] Critical Richardson number for stable mixing cutoff [1]"
     critical_Richardson::NF = 10
 
@@ -46,16 +49,19 @@ initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
 
 # function barrier
 @propagate_inbounds parameterization!(ij, diagn, progn, drag::BulkRichardsonDrag, model) =
-    boundary_layer_drag!(ij, diagn, drag, model.atmosphere, model.planet, model.orography)
+    boundary_layer_drag!(ij, diagn, drag, model.land_sea_mask, model.atmosphere, model.planet, model.orography)
 
 @propagate_inbounds function boundary_layer_drag!(
     ij,
     diagn,
     drag::BulkRichardsonDrag,
+    land_sea_mask,
     atmosphere::AbstractAtmosphere,
     planet::AbstractPlanet,
     orography::AbstractOrography,
 )
+    land_fraction = land_sea_mask.mask[ij]
+
     # Height z [m] of lowermost layer above ground
     surface = diagn.nlayers
     (; gravity) = planet
@@ -64,7 +70,8 @@ initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
     # maximum drag Cmax from that height, stable conditions would decrease Cmax towards 0
     # Frierson 2006, eq (12)
     κ = drag.von_Karman
-    z₀ = drag.roughness_length
+    z₀ = land_fraction*drag.roughness_length_land + (1 - land_fraction)*drag.roughness_length_ocean
+
     # should be z > z₀, z=z₀ means an infinitely high drag
     # 0 < z < z₀ doesn't make sense so cap here
     z = max(z, z₀)  
