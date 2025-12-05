@@ -16,9 +16,9 @@
     L_grid = transform(L, model.spectral_transform)
     
     L2 = rand(spectral_grid.SpectralVariable3D, trunc-5, trunc-6, nlayers)      # smaller  
-    L2_trunc = spectral_truncation(L2, size(L, 1, ZeroBased, as=Matrix), size(L, 2, ZeroBased, as=Matrix))
+    L2_trunc = SpeedyTransforms.spectral_truncation(L2, size(L, 1, ZeroBased, as=Matrix), size(L, 2, ZeroBased, as=Matrix))
     L3 = rand(spectral_grid.SpectralVariable3D, trunc+6, trunc+5, nlayers)      # bigger 
-    L3_trunc = spectral_truncation(L3, size(L, 1, ZeroBased, as=Matrix), size(L, 2, ZeroBased, as=Matrix))
+    L3_trunc = SpeedyTransforms.spectral_truncation(L3, size(L, 1, ZeroBased, as=Matrix), size(L, 2, ZeroBased, as=Matrix))
     
     A = rand(NF, spectral_grid.grid, nlayers)                                   # same grid 
     A_spec = transform(A, model.spectral_transform)
@@ -94,8 +94,8 @@
     SpeedyTransforms.zero_imaginary_zonal_modes!(u)
     SpeedyTransforms.zero_imaginary_zonal_modes!(v)
 
-    spectral_truncation!(u, 25)     # truncate to lowest 11 wavenumbers
-    spectral_truncation!(v, 25)
+    SpeedyTransforms.spectral_truncation!(u, 25)     # truncate to lowest 11 wavenumbers
+    SpeedyTransforms.spectral_truncation!(v, 25)
 
     u_grid = transform(u, model.spectral_transform)
     v_grid = transform(v, model.spectral_transform)   

@@ -362,8 +362,13 @@ function output!(
 
     # interpolate 2D/3D variables
     var = is3D(variable) ? (is_land(variable) ? output.field3Dland : output.field3D) : output.field2D
-    raw = on_architecture(CPU(), path(variable, simulation))
-    RingGrids.interpolate!(var, raw, output.interpolator)
+
+    try
+        raw = on_architecture(CPU(), path(variable, simulation))
+        RingGrids.interpolate!(var, raw, output.interpolator)
+    catch FieldError
+        var .= variable.missing_value
+    end
 
     # unscale if variable.unscale == true and exists
     if hasproperty(variable, :unscale)

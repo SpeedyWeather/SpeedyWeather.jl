@@ -33,7 +33,13 @@ function SeasonalSoilMoisture(SG::SpectralGrid; kwargs...)
     return SeasonalSoilMoisture{NF, GridVariable4D}(; monthly_soil_moisture, kwargs...)
 end
 
-# don't both initializing for the dry model
+function variables(::SeasonalSoilMoisture)
+    return (
+        PrognosticVariable(name=:soil_moisture, dims=Grid3D(), namespace=:land),
+    )
+end
+
+# don't bother initializing for the dry model
 initialize!(soil::SeasonalSoilMoisture, model::PrimitiveDry) = nothing
 
 function initialize!(soil::SeasonalSoilMoisture, model::PrimitiveEquation)
@@ -193,8 +199,9 @@ function initialize!(
     # set ocean "soil" moisture points (100% ocean only)
     masked_value = soil.ocean_moisture
     if soil.mask
-        sm = progn.land.soil_moisture
-        progn.land.soil_moisture[isnan.(sm)] .= masked_value
+        # TODO: broadcasting over views of Fields of GPUArrays doesn't work
+        sm = progn.land.soil_moisture.data
+        sm[isnan.(sm)] .= masked_value
         mask!(progn.land.soil_moisture, model.land_sea_mask, :ocean; masked_value)
     end
 end
@@ -219,59 +226,69 @@ function timestep!(
     ρ = model.atmosphere.water_density
     (; mask) = model.land_sea_mask
 
-    P = diagn.physics.rain_rate                     # precipitation (rain only) in [kg/m²/s]
+    P = diagn.physics.rain_rate                     # precipitation (rain only) in [m/s]
     S = diagn.physics.land.snow_melt_rate           # [kg/m²/s] includes snow runoff leakage water
     H = diagn.physics.land.surface_humidity_flux    # [kg/m²/s], divide by density for [m/s], positive up
-    R = diagn.physics.land.river_runoff             # accumulated [m]
+    R = diagn.physics.land.river_runoff             # diagnosed here, accumulated [m]
 
     @boundscheck fields_match(soil_moisture, P, S, H, R, horizontal_only=true) ||
         throw(DimensionMismatch(soil_moisture, P))
     @boundscheck size(soil_moisture, 2) >= 2 || throw(DimensionMismatch)
+    
     f₁, f₂ = soil.f₁, soil.f₂
-    p = soil.infiltration_fraction        # Infiltration fraction: fraction of top layer runoff put into lower layer
+    p = soil.infiltration_fraction      # Infiltration fraction: fraction of top layer runoff put into lower layer
     τ⁻¹ = inv(convert(eltype(soil_moisture), Second(soil.time_scale).value))
-    f₁_f₂ = f₁/f₂
-    Δt_f₁ = Δt/f₁
-    params = (; ρ, Δt, f₁, Δt_f₁, f₁_f₂, p, τ⁻¹)
+
+    params = (; ρ, Δt, f₁, f₂, p, τ⁻¹)  # pack into NamedTuple for kernel
 
     launch!(architecture(soil_moisture), LinearWorkOrder, (size(soil_moisture, 1),),
-        land_bucket_soil_moisture_kernel!, soil_moisture, mask, P, S, H, R,
-        params, 
-        )
-    synchronize(architecture(soil_moisture))
+        land_bucket_soil_moisture_kernel!, soil_moisture, mask, P, S, H, R, params)
 end
 
 @kernel inbounds=true function land_bucket_soil_moisture_kernel!(
-    soil_moisture, mask, P, S, H, R,
-    params,
-)
+    soil_moisture, mask, P, S, H, R, params)
+    
     ij = @index(Global, Linear)             # every grid point ij
 
     if mask[ij] > 0                         # at least partially land
-        # precipitation (rain only, convection + large-scale) minus evaporation (or condensation)
+        (; ρ, Δt, f₁, f₂, p, τ⁻¹) = params
+        # precipitation (rain only, convection + large-scale) minus evaporation (or condensation, = humidity flux)
         # river runoff via drain excess water below (that's just gone)
         # convert to [m/s] by dividing by density
-        (; ρ, Δt, f₁, Δt_f₁, f₁_f₂, p, τ⁻¹) = params
-       
-        # rain water can increase soil moisture regardless of snow cover
-        # [kg/m²/s] -> [m/s]
-        F = (P[ij] + S[ij] - H[ij])/ρ
 
+        # Soil top sources and sinks
+        # note: rain water can increase soil moisture regardless of snow cover
+        # [kg/m²/s] -> [m/s] for humidity flux H and snow melt rate S
+        F = P[ij] + (S[ij] - H[ij])/ρ
+  
         # vertical diffusion term between layers
         D = τ⁻¹*(soil_moisture[ij, 1] - soil_moisture[ij, 2])
 
         # Equation in 8.5.2.2 of the MITgcm users guide (Land package)
-        soil_moisture[ij, 1] += Δt_f₁*F - Δt*D
-        soil_moisture[ij, 2] += Δt*f₁_f₂*D
+        soil_moisture[ij, 1] += Δt/f₁*F - Δt*D
+        soil_moisture[ij, 2] += Δt*f₁/f₂*D
 
         # river runoff
         W₁ = soil_moisture[ij, 1]           # wrt to field capacity so maximum is 1
         δW₁ = W₁ - min(W₁, 1)               # excess moisture in top layer, cap at field capacity
         soil_moisture[ij, 1] -= δW₁         # remove excess from top layer
-        soil_moisture[ij, 2] += p*δW₁*f₁_f₂ # add fraction to lower layer
+        soil_moisture[ij, 2] += p*δW₁*f₁/f₂ # add fraction to lower layer
         R[ij] += Δt*(1-p)*δW₁*f₁            # accumulate river runoff [m] of top layer
 
         # remove excess water from lower layer (this disappears)
         soil_moisture[ij, 2] = min(soil_moisture[ij, 2], 1)
     end
+end
+
+function variables(::LandBucketMoisture)
+    return (
+        # Prognostic variables
+        PrognosticVariable(name=:soil_moisture, dims=Grid3D(), desc="Soil moisture content (fraction of capacity)", units="1", namespace=:land),
+        # Diagnostic variables written to diagn.physics
+        DiagnosticVariable(name=:river_runoff, dims=Grid2D(), desc="River runoff from soil moisture", units="m/s", namespace=:land),
+        # Diagnostic variables read from diagn.physics
+        DiagnosticVariable(name=:rain_rate, dims=Grid2D(), desc="Convective precipitation rate", units="m/s"),
+        DiagnosticVariable(name=:surface_humidity_flux, dims=Grid2D(), desc="Surface humidity flux", units="kg/s/m²", namespace=:land),
+        DiagnosticVariable(name=:snow_melt_rate, dims=Grid2D(), desc="Snow melt rate + snow runoff", units="m/s", namespace=:land),
+    )
 end

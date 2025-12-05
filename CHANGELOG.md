@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Initial conditions revised to take in a `SpectralGrid` to ensure correct number type [#927](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/927)[#928](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/928)
+- Diagnostic and prognostic variables partially revised to NamedTuples and variables system introduced to allow to add to them modularly [#885](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/885)
+- Parameterizations with KernelAbstractions [#873](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/873) [#878](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/878) [#924](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/924) [#931](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/931) [#933](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/933)
 - Land snow model [#833](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/833)
 - Updated extended differentiability tests [#929](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/929)
 - GitHub Actions Checkout updated to version 6 [#926](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/926)

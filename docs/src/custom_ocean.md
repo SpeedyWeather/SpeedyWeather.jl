@@ -46,7 +46,7 @@ function initialize!(
 end
 
 function initialize!(
-    ocean::PrognosticVariablesOcean,
+    ocean,
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
     ocean_model::CustomOceanModel,

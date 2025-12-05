@@ -1,55 +1,71 @@
-# no surface wind stress
-surface_wind_stress!(::ColumnVariables, ::Nothing, ::PrimitiveEquation) = nothing
+abstract type AbstractSurfaceMomentumFlux <: AbstractParameterization end
 
-export SurfaceWind
-Base.@kwdef struct SurfaceWind{NF<:AbstractFloat} <: AbstractSurfaceWind
-    "Ratio of near-surface wind to lowest-level wind [1]"
-    f_wind::NF = 0.95
+export SurfaceMomentumFlux
 
-    "Wind speed of sub-grid scale gusts [m/s]"
-    V_gust::NF = 5
+"""Surface momentum flux parameterization for wind stress. Calculates the 
+turbulent exchange of momentum between the surface and atmosphere, representing
+surface drag that slows down near-surface winds. Uses bulk aerodynamic formulas
+with separate drag coefficients for ocean and land surfaces to account for
+different surface roughness characteristics. Fields are $(TYPEDFIELDS)"""
+@kwdef struct SurfaceMomentumFlux{NF} <: AbstractSurfaceMomentumFlux
+    "[OPTION] Near-surface wind slowdown"
+    wind_slowdown::NF = 0.95
 
-    "Use (possibly) flow-dependent column.boundary_layer_drag coefficient"
+    "[OPTION] Use drag coefficient from calculated following model.boundary_layer_drag"
     use_boundary_layer_drag::Bool = true
 
-    "Otherwise, drag coefficient over land (orography = 0) [1]"
+    "[OPTION] Or fixed drag coefficient for momentum fluxes over ocean"
+    drag_ocean::NF = 1.8e-3
+
+    "[OPTION] Or fixed drag coefficient for momentum fluxes over land"
     drag_land::NF = 2.4e-3
-    
-    "Otherwise, Drag coefficient over sea [1]"
-    drag_sea::NF = 1.8e-3
 end
 
-SurfaceWind(SG::SpectralGrid; kwargs...) = SurfaceWind{SG.NF}(; kwargs...)
-initialize!(::SurfaceWind, ::PrimitiveEquation) = nothing
+Adapt.@adapt_structure SurfaceMomentumFlux
+SurfaceMomentumFlux(SG::SpectralGrid; kwargs...) = SurfaceMomentumFlux{SG.NF}(; kwargs...)
+initialize!(::SurfaceMomentumFlux, ::PrimitiveEquation) = nothing
 
-function surface_wind_stress!(  column::ColumnVariables{NF},
-                                surface_wind::SurfaceWind,
-                                model::PrimitiveEquation) where NF
+function variables(::SurfaceMomentumFlux)
+    return (
+        DiagnosticVariable(name=:boundary_layer_drag, dims=Grid2D(), desc="Boundary layer drag coefficient", units="1"),
+        DiagnosticVariable(name=:surface_wind_speed, dims=Grid2D(), desc="Surface wind speed", units="m/s"),
+        DiagnosticVariable(name=:surface_air_density, dims=Grid2D(), desc="Surface air density", units="kg/m³"),
+        DiagnosticVariable(name=:surface_air_temperature, dims=Grid2D(), desc="Surface air temperature", units="K"),
+    )
+end
 
-    (; land_fraction) = column
-    (; f_wind, V_gust, drag_land, drag_sea) = surface_wind
+# function barrier
+@propagate_inbounds function parameterization!(ij, diagn, progn, momentum_flux::SurfaceMomentumFlux, model)
+    surface_wind_stress!(ij, diagn, momentum_flux, model)
+end
 
-    # SPEEDY documentation eq. 49, but use previous time step for numerical stability
-    column.surface_u = f_wind*column.u[end] 
-    column.surface_v = f_wind*column.v[end]
-    (; surface_u, surface_v) = column
+@propagate_inbounds function surface_wind_stress!(ij, diagn, momentum_flux::SurfaceMomentumFlux, model)
 
-    # SPEEDY documentation eq. 50
-    column.surface_wind_speed = sqrt(surface_u^2 + surface_v^2 + V_gust^2)
+    (; drag_land, drag_ocean) = momentum_flux
+    land_fraction = model.land_sea_mask.mask[ij]
+    surface = model.geometry.nlayers 
 
-    # drag coefficient either from SurfaceWind or from a central drag coefficient
-    drag_sea, drag_land = surface_wind.use_boundary_layer_drag ?
-                                (column.boundary_layer_drag, column.boundary_layer_drag) : 
-                                (drag_sea, drag_land)
+    # drag coefficient either from SurfaceMomentumFlux or from a central drag coefficient
+    d = diagn.physics.boundary_layer_drag[ij]
+    drag = momentum_flux.use_boundary_layer_drag ?
+        d : land_fraction*drag_land + (1-land_fraction)*drag_ocean
     
-    # surface wind stress: quadratic drag, fractional land-sea mask
-    ρ = column.surface_air_density
-    V₀ = column.surface_wind_speed
-    drag = land_fraction*drag_land + (one(NF)-land_fraction)*drag_sea
-
-    # SPEEDY documentation eq. 52, 53, accumulate fluxes with +=
-    column.flux_u_upward[end] -= ρ*drag*V₀*surface_u
-    column.flux_v_upward[end] -= ρ*drag*V₀*surface_v
+    # Fortran SPEEDY documentation eq. 52, 53, accumulate fluxes with +=
+    V₀ = diagn.physics.surface_wind_speed[ij]
+    ρ = diagn.physics.surface_air_density[ij]
+    u = diagn.grid.u_grid_prev[ij, surface]
+    v = diagn.grid.v_grid_prev[ij, surface]
     
+    # fraction to slow down the lowermost layer wind u,v to surface wind
+    f = momentum_flux.wind_slowdown
+
+    # flux into lowermost layer [kg/m³ * m/s * m/s = kg/(m·s²) = Pa]
+    flux_u_upward = -ρ*drag*V₀*f*u
+    flux_v_upward = -ρ*drag*V₀*f*v
+    
+    # convert fluxes to tendencies
+    pₛ = diagn.grid.pres_grid_prev[ij]          # surface pressure [Pa]
+    diagn.tendencies.u_tend_grid[ij, surface] += surface_flux_to_tendency(flux_u_upward, pₛ, model)
+    diagn.tendencies.v_tend_grid[ij, surface] += surface_flux_to_tendency(flux_v_upward, pₛ, model)
     return nothing
 end

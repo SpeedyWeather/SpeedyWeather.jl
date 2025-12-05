@@ -40,7 +40,7 @@ which are
 - For `EarthOrography` a high-resolution orography is loaded and interpolated to the resolution as defined by `spectral_grid`.
 
 all orographies need to be created with `spectral_grid::SpectralGrid` as the first argument,
-so that the respective fields for `geopot_surf`, i.e. ``\Phi_s`` and `orography`, i.e. ``H_b``
+so that the respective fields for `surface_geopotential`, i.e. ``\Phi_s`` and `orography`, i.e. ``H_b``
 can be allocated in the right size and number format.
 
 ## Earth's orography
@@ -106,7 +106,7 @@ You can use smoothing as above.
 
 You can also change orography manually, that means by mutating the elements
 in either `orography.orography` (to set it for the shallow-water model)
-or `orography.geopot_surf` (for the primitive equations, but this is in
+or `orography.surface_geopotential` (for the primitive equations, but this is in
 spectral space, advanced!). This should be done _after_ the orography has been
 initialised which will overwrite these arrays (again).
 You can just initialize orography with `initialize!(orography, model)`
@@ -133,7 +133,7 @@ we have now muted the arrays within - so do not be confused that it is
 not the Earth's orography anymore.
 
 The `set!` function automatically propagates the grid array in
-`orography.orography` to spectral space in `orography.geopot_surf`
+`orography.orography` to spectral space in `orography.surface_geopotential`
 to synchronize those two arrays that are supposed to hold essentially
 the same information just one in grid the other in spectral space.
 `set!` also allows for the `add` keyword, making it possible to
@@ -155,13 +155,13 @@ nothing # hide
 ![Orography with super Hawaii](orography_hawaii.png)
 
 If you don't use `set!`, you want to reflect any changes to `orography.orography`
-in the surface geopotential `orography.geopot_surf`
+in the surface geopotential `orography.surface_geopotential`
 (which is used in the primitive equations) manually by
 
 ```@example orography
-transform!(orography.geopot_surf, orography.orography, model.spectral_transform)
-orography.geopot_surf .*= model.planet.gravity
-spectral_truncation!(orography.geopot_surf)
+transform!(orography.surface_geopotential, orography.orography, model.spectral_transform)
+orography.surface_geopotential .*= model.planet.gravity
+spectral_truncation!(orography.surface_geopotential)
 nothing # hide
 ```
 
@@ -233,16 +233,16 @@ The following explains what's necessary for this. The new `MyOrography` has to b
 
     # mandatory, every <:AbstractOrography needs those (same name, same type)
     orography::GridVariable2D           # in grid-point space [m]
-    geopot_surf::SpectralVariable2D     # in spectral space *gravity [m^2/s^2]
+    surface_geopotential::SpectralVariable2D     # in spectral space *gravity [m^2/s^2]
 end
 
 # constructor
 function MyOrography(spectral_grid::SpectralGrid; kwargs...)
     (; NF, GridVariable2D, SpectralVariable2D, nlat_half, trunc) = spectral_grid
     orography   = zeros(GridVariable2D, nlat_half)
-    geopot_surf = zeros(SpectralVariable2D, trunc+2, trunc+1)
+    surface_geopotential = zeros(SpectralVariable2D, trunc+2, trunc+1)
     return MyOrography{NF, GridVariable2D, SpectralVariable2D}(;
-        orography, geopot_surf, kwargs...)
+        orography, surface_geopotential, kwargs...)
 end
 ```
 
@@ -262,7 +262,7 @@ function SpeedyWeather.initialize!(
     orog::MyOrography,         # first argument as to be ::MyOrography, i.e. your new type
     model::AbstractModel,      # second argument, use anything from model read-only
 )
-    (; orography, geopot_surf) = orog   # unpack
+    (; orography, surface_geopotential) = orog   # unpack
 
     # maybe use lat, lon coordinates (in degree or radians)
     (; latds, londs, lats, lons) = model.geometry
@@ -272,9 +272,9 @@ function SpeedyWeather.initialize!(
 
     # then also calculate the surface geopotential for primitive equations
     # given orography we just set
-    transform!(geopot_surf, orography, model.spectral_transform)
-    geopot_surf .*= model.planet.gravity
-    spectral_truncation!(geopot_surf)
+    transform!(surface_geopotential, orography, model.spectral_transform)
+    surface_geopotential .*= model.planet.gravity
+    spectral_truncation!(surface_geopotential)
     return nothing
 end
 ```

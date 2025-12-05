@@ -6,7 +6,7 @@ $(TYPEDSIGNATURES)
 Create a struct `EarthAtmosphere <: AbstractAtmosphere`, with the following physical/chemical
 characteristics. Keyword arguments are
 $(TYPEDFIELDS)"""
-@parameterized Base.@kwdef mutable struct EarthAtmosphere{NF<:AbstractFloat} <: AbstractAtmosphere
+@parameterized @kwdef struct EarthAtmosphere{NF<:AbstractFloat} <: AbstractAtmosphere
     "molar mass of dry air [g/mol]"
     @param mol_mass_dry_air::NF = 28.9649 (bounds=Positive,)
 
@@ -61,6 +61,8 @@ $(TYPEDFIELDS)"""
     "layer thickness for the shallow water model [m]"
     @param layer_thickness::NF = 8500 (bounds=Positive,)
 end
+
+Adapt.@adapt_structure EarthAtmosphere
 
 EarthAtmosphere(SG::SpectralGrid; kwargs...) = EarthAtmosphere{SG.NF}(; kwargs...)
 EarthAtmosphere(::Type{NF}; kwargs...) where NF = EarthAtmosphere{NF}(; kwargs...)

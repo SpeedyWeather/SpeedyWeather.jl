@@ -22,7 +22,7 @@
     my_surface_perturbation = MySurfacePerturbation(noise_scale_temp=1)
 
     # construct convection with that perturbation
-    convection = SimplifiedBettsMiller(spectral_grid, surface_temp_humid=my_surface_perturbation)
+    convection = BettsMillerConvection(spectral_grid, surface_temp_humid=my_surface_perturbation)
 
     # don't forget the random process otherwise your `column.random_value` is always 0!
     random_process = SpectralAR1Process(spectral_grid, seed=1)
@@ -51,7 +51,7 @@
     end
 
     # for the dry model too
-    convection = DryBettsMiller(spectral_grid, surface_temp=my_surface_perturbation)
+    convection = BettsMillerDryConvection(spectral_grid, surface_temp=my_surface_perturbation)
     model = PrimitiveDryModel(spectral_grid; random_process, convection)
     simulation = initialize!(model)
     run!(simulation, period=Day(5))

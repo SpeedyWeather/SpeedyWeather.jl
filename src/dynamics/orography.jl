@@ -1,22 +1,26 @@
 abstract type AbstractOrography <: AbstractModelComponent end
+
+# adapt to GPU only the fields themselves
+Adapt.adapt_structure(to, orog::AbstractOrography) = (orography=adapt_structure(to, orog.orography), surface_geopotential=adapt_structure(to, orog.surface_geopotential))
+
 export NoOrography
 
-"""Orography with zero height in `orography` and zero surface geopotential `geopot_surf`.
+"""Orography with zero height in `orography` and zero surface geopotential `surface_geopotential`.
 $(TYPEDFIELDS)"""
 @kwdef struct NoOrography{NF, GridVariable2D, SpectralVariable2D} <: AbstractOrography
     "height [m] on grid-point space."
     orography::GridVariable2D
     
     "surface geopotential, height*gravity [m²/s²]"
-    geopot_surf::SpectralVariable2D
+    surface_geopotential::SpectralVariable2D
 end
 
 # constructor
 function NoOrography(spectral_grid::SpectralGrid)
     (; NF, GridVariable2D, SpectralVariable2D, nlat_half, trunc) = spectral_grid
     orography   = zeros(GridVariable2D, nlat_half)
-    geopot_surf = zeros(SpectralVariable2D, trunc+2, trunc+1)
-    return NoOrography{NF, GridVariable2D, SpectralVariable2D}(; orography, geopot_surf)
+    surface_geopotential = zeros(SpectralVariable2D, trunc+2, trunc+1)
+    return NoOrography{NF, GridVariable2D, SpectralVariable2D}(; orography, surface_geopotential)
 end
 
 # no further initialization needed
@@ -34,9 +38,9 @@ function set!(
     set!(orography.orography, v, geometry, spectral_transform; add)
 
     # now synchronize with geopotential in spectral space (used in primitive models)
-    transform!(orography.geopot_surf, orography.orography, spectral_transform)
-    orography.geopot_surf .*= gravity
-    spectral_truncation!(orography.geopot_surf)     # set the lmax+1 harmonics to zero
+    transform!(orography.surface_geopotential, orography.orography, spectral_transform)
+    orography.surface_geopotential .*= gravity
+    spectral_truncation!(orography.surface_geopotential)     # set the lmax+1 harmonics to zero
     return nothing
 end
 
@@ -57,16 +61,16 @@ $(TYPEDFIELDS)"""
     orography::GridVariable2D
     
     "surface geopotential, height*gravity [m²/s²]"
-    geopot_surf::SpectralVariable2D
+    surface_geopotential::SpectralVariable2D
 end
 
 # constructor
 function ZonalRidge(spectral_grid::SpectralGrid; kwargs...)
     (; NF, GridVariable2D, SpectralVariable2D, nlat_half, trunc) = spectral_grid
     orography   = zeros(GridVariable2D, nlat_half)
-    geopot_surf = zeros(SpectralVariable2D, trunc+2, trunc+1)
+    surface_geopotential = zeros(SpectralVariable2D, trunc+2, trunc+1)
     return ZonalRidge{NF, GridVariable2D, SpectralVariable2D}(;
-        orography, geopot_surf, kwargs...)
+        orography, surface_geopotential, kwargs...)
 end
 
 # function barrier
@@ -77,7 +81,7 @@ end
 
 """
 $(TYPEDSIGNATURES)
-Initialize the arrays `orography`, `geopot_surf` in `orog` following 
+Initialize the arrays `orography`, `surface_geopotential` in `orog` following 
 Jablonowski and Williamson, 2006."""
 function initialize!(   orog::ZonalRidge,
                         P::AbstractPlanet,
@@ -87,7 +91,7 @@ function initialize!(   orog::ZonalRidge,
     (; radius, gravity, rotation) = P
     φ = G.latds                         # latitude for each grid point [˚N]
 
-    (; orography, geopot_surf, η₀, u₀) = orog
+    (; orography, surface_geopotential, η₀, u₀) = orog
 
     ηᵥ = (1-η₀)*π/2                     # ηᵥ-coordinate of the surface [1]
     A = u₀*cos(ηᵥ)^(3/2)                # amplitude [m/s]
@@ -103,9 +107,9 @@ function initialize!(   orog::ZonalRidge,
         orography[ij] = g⁻¹*A*(A*(-2*sinφ^6*(cosφ^2 + 1/3) + 10/63) + (8/5*cosφ^3*(sinφ^2 + 2/3) - π/4)*RΩ)
     end
 
-    transform!(geopot_surf, orography, S)   # to grid-point space
-    geopot_surf .*= gravity                 # turn orography into surface geopotential
-    spectral_truncation!(geopot_surf)       # set the lmax+1 harmonics to zero
+    transform!(surface_geopotential, orography, S)   # to grid-point space
+    surface_geopotential .*= gravity                 # turn orography into surface geopotential
+    spectral_truncation!(surface_geopotential)       # set the lmax+1 harmonics to zero
     return nothing
 end
 
@@ -145,16 +149,16 @@ $(TYPEDFIELDS)"""
     orography::GridVariable2D
     
     "surface geopotential, height*gravity [m²/s²]"
-    geopot_surf::SpectralVariable2D
+    surface_geopotential::SpectralVariable2D
 end
 
 # constructor
 function EarthOrography(spectral_grid::SpectralGrid; kwargs...)
     (; architecture, NF, GridVariable2D, SpectralVariable2D, grid, spectrum) = spectral_grid
     orography   = on_architecture(architecture, zeros(GridVariable2D, grid))
-    geopot_surf = on_architecture(architecture, zeros(SpectralVariable2D, spectrum))
+    surface_geopotential = on_architecture(architecture, zeros(SpectralVariable2D, spectrum))
     return EarthOrography{NF, GridVariable2D, SpectralVariable2D}(;
-        orography, geopot_surf, kwargs...)
+        orography, surface_geopotential, kwargs...)
 end
 
 # function barrier
@@ -165,14 +169,14 @@ end
 
 """
 $(TYPEDSIGNATURES)
-Initialize the arrays `orography`, `geopot_surf` in `orog` by reading the
+Initialize the arrays `orography`, `surface_geopotential` in `orog` by reading the
 orography field from file.
 """
 function initialize!(   orog::EarthOrography,
                         P::AbstractPlanet,
                         S::SpectralTransform)
 
-    (; orography, geopot_surf, scale) = orog
+    (; orography, surface_geopotential, scale) = orog
     (; gravity) = P
 
     # LOAD NETCDF FILE
@@ -191,20 +195,20 @@ function initialize!(   orog::EarthOrography,
     # Interpolate/coarsen to desired resolution
     interpolate!(orography, orography_highres)
     orography .*= scale                     # scale orography (default 1)
-    transform!(geopot_surf, orography, S)   # no *gravity yet
+    transform!(surface_geopotential, orography, S)   # no *gravity yet
   
     if orog.smoothing                       # smooth orography in spectral space?
-        # get trunc=lmax from size of geopot_surf
-        trunc = (size(geopot_surf, 1, as=Matrix) - 2)
+        # get trunc=lmax from size of surface_geopotential
+        trunc = (size(surface_geopotential, 1, as=Matrix) - 2)
         # degree of harmonics to be truncated
         truncation = round(Int, trunc * (1-orog.smoothing_fraction))
         c = orog.smoothing_strength
         power = orog.smoothing_power
-        SpeedyTransforms.spectral_smoothing!(geopot_surf, c; power, truncation)
+        SpeedyTransforms.spectral_smoothing!(surface_geopotential, c; power, truncation)
     end
 
-    transform!(orography, geopot_surf, S)   # to grid-point space
-    geopot_surf .*= gravity                 # turn orography into surface geopotential
-    spectral_truncation!(geopot_surf)       # set the lmax+1 harmonics to zero
+    transform!(orography, surface_geopotential, S)   # to grid-point space
+    surface_geopotential .*= gravity                 # turn orography into surface geopotential
+    spectral_truncation!(surface_geopotential)       # set the lmax+1 harmonics to zero
     return nothing    
 end

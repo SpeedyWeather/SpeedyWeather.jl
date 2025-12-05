@@ -2,7 +2,7 @@
 $(TYPEDSIGNATURES)
 Scale the variable `var` inside `progn` with scalar `scale`.
 """
-function scale!(
+@propagate_inbounds function scale!(
     progn::PrognosticVariables,
     var::Symbol,
     scale::Real,
@@ -15,7 +15,7 @@ end
 $(TYPEDSIGNATURES)
 Scale the variable `var` inside `diagn` with scalar `scale`.
 """
-function scale!(
+@propagate_inbounds function scale!(
     diagn::DiagnosticVariables,
     var::Symbol,
     scale::Real,
@@ -28,7 +28,7 @@ end
 $(TYPEDSIGNATURES)
 Scales the prognostic variables vorticity and divergence with
 the Earth's radius which is used in the dynamical core."""
-function scale!(progn::PrognosticVariables,
+@propagate_inbounds function scale!(progn::PrognosticVariables,
                 diagn::DiagnosticVariables,
                 scale::Real)
                 
@@ -41,8 +41,20 @@ function scale!(progn::PrognosticVariables,
     # overwritten by the transform of the prognostic variables anyway
 end
 
-"""
-$(TYPEDSIGNATURES)
+"""$(TYPEDSIGNATURES)
+Scale the tendencies inside `diagn` with scalar `scale`.
+Intended use to scale the tendencies of the parameterizations
+by the radius for the dynamical core."""
+@propagate_inbounds function scale!(ij, diagn::Tendencies, scale::Real)
+    @inbounds for k in eachlayer(diagn.u_tend_grid)
+        diagn.u_tend_grid[ij, k] *= scale
+        diagn.v_tend_grid[ij, k] *= scale
+        diagn.temp_tend_grid[ij, k] *= scale
+        diagn.humid_tend_grid[ij, k] *= scale
+    end
+end
+
+"""$(TYPEDSIGNATURES)
 Undo the radius-scaling of vorticity and divergence from scale!(progn, scale::Real)."""
 function unscale!(progn::PrognosticVariables)
     inv_scale = inv(progn.scale[])
@@ -51,8 +63,7 @@ function unscale!(progn::PrognosticVariables)
     progn.scale[] = 1                   # set scale back to 1=unscaled
 end
 
-"""
-$(TYPEDSIGNATURES)
+"""$(TYPEDSIGNATURES)
 Undo the radius-scaling of vorticity and divergence from scale!(diagn, scale::Real)."""
 function unscale!(diagn::DiagnosticVariables)
     inv_scale = inv(diagn.scale[])

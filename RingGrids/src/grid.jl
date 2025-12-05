@@ -243,7 +243,7 @@ end
 
 """$(TYPEDSIGNATURES) Obtain ring index `j` from gridpoint `ij` and `rings`
 describing rind indices as obtained from `eachring(::Grid)`"""
-function whichring(ij::Integer, rings)
+function whichring(ij, rings::AbstractVector)
     @boundscheck 0 < ij <= rings[end][end] || throw(BoundsError)
     j = 1
     @inbounds while ij > rings[j][end]
@@ -252,7 +252,9 @@ function whichring(ij::Integer, rings)
     return j
 end
 
-whichring(ij::Integer, grid::AbstractGrid) = whichring(ij, grid.rings)
+# access precomputed whichring
+whichring(ij, field::AbstractField) = whichring(ij, field.grid)
+whichring(ij, grid::AbstractGrid) = grid.whichring[ij]
 
 """$(TYPEDSIGNATURES) Vector of ring indices for every grid point in `grid`."""
 function whichring(Grid::Type{<:AbstractGrid}, nlat_half, rings)
@@ -263,7 +265,7 @@ function whichring(Grid::Type{<:AbstractGrid}, nlat_half, rings)
     return w
 end
 
-whichring(grid::AbstractGrid) = whichring(typeof(grid), grid.nlat_half, grid.rings)
+whichring(grid::AbstractGrid) = grid.whichring
 whichring(Grid::Type{<:AbstractGrid}, nlat_half::Integer) = whichring(Grid, nlat_half, eachring(Grid, nlat_half))
 
 # for architectures / adapt 
@@ -271,6 +273,7 @@ Architectures.ismatching(grid::AbstractGrid, array_type::Type{<:AbstractArray}) 
 Architectures.ismatching(grid::AbstractGrid, array::AbstractArray) = ismatching(grid.architecture, typeof(array))
 
 Architectures.architecture(grid::AbstractGrid) = grid.architecture
+Architectures.on_architecture(grid::AbstractGrid, x) = on_architecture(architecture(grid), x)
 
 # only transfer the whichring on GPU
 function Architectures.on_architecture(arch::AbstractArchitecture, grid::Grid) where Grid<:AbstractGrid 

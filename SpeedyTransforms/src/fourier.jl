@@ -124,7 +124,7 @@ function _fourier_batched!(                 # GRID TO SPECTRAL
     field::AbstractField,                   # gridded input
     S::SpectralTransform;                   # precomputed transform
 )
-    (; nlat, nlons) = S                     # dimensions
+    (; nlat, nlons, rings) = S              # dimensions
     (; nlat_half) = S.grid
     nlayers = size(field, 2)                # number of vertical layers
 
@@ -133,7 +133,6 @@ function _fourier_batched!(                 # GRID TO SPECTRAL
     @boundscheck nlayers == S.nlayers || throw(DimensionMismatch(S, field))
     @boundscheck size(f_north) == size(f_south) == (S.nfreq_max, S.nlayers, nlat_half) || throw(DimensionMismatch(S, field))
 
-    rings = eachring(field)                 # precomputed ring indices
     @inbounds for j_north in 1:nlat_half    # symmetry: loop over northern latitudes only
         j = j_north                         # symmetric index / ring-away from pole index
         j_south = nlat - j_north + 1        # corresponding southern latitude index
@@ -163,7 +162,7 @@ function _fourier_serial!(                  # GRID TO SPECTRAL
     field::AbstractField,                   # gridded input
     S::SpectralTransform;                   # precomputed transform
 )
-    (; nlat, nlons) = S                     # dimensions
+    (; nlat, nlons, rings) = S              # dimensions
     (; nlat_half) = S.grid
     nlayers = size(field, 2)                # number of vertical layers
 
@@ -172,7 +171,6 @@ function _fourier_serial!(                  # GRID TO SPECTRAL
     @boundscheck nlayers <= S.nlayers || throw(DimensionMismatch(S, field))
     @boundscheck size(f_north) == size(f_south) == (S.nfreq_max, S.nlayers, nlat_half) || throw(DimensionMismatch(S, field))
 
-    rings = eachring(field)                     # precomputed ring indices
     @inbounds for (k, k_grid) in zip(1:nlayers, eachlayer(field))
         for j_north in 1:nlat_half              # symmetry: loop over northern latitudes only
             j = j_north                         # symmetric index / ring-away from pole index
@@ -202,7 +200,7 @@ function _fourier_batched!(                 # SPECTRAL TO GRID
     g_south::AbstractArray{<:Complex, 3},   # and for southern latitudes
     S::SpectralTransform;                   # precomputed transform
 )
-    (; nlat, nlons) = S                     # dimensions
+    (; nlat, nlons, rings) = S              # dimensions
     (; nlat_half) = S.grid
     nlayers = size(field, 2)                # number of vertical layers
 
@@ -210,7 +208,6 @@ function _fourier_batched!(                 # SPECTRAL TO GRID
     @boundscheck nlayers == S.nlayers || throw(DimensionMismatch(S, field))     # otherwise FFTW complains
     @boundscheck size(g_north) == size(g_south) == (S.nfreq_max, S.nlayers, nlat_half) || throw(DimensionMismatch(S, field))
 
-    rings = eachring(field)                 # precomputed ring indices
     @inbounds for j_north in 1:nlat_half    # symmetry: loop over northern latitudes only
         j = j_north                         # symmetric index / ring-away from pole index
         j_south = nlat - j_north + 1        # southern latitude index
@@ -239,7 +236,7 @@ function _fourier_serial!(                  # SPECTRAL TO GRID
     g_south::AbstractArray{<:Complex, 3},   # and for southern latitudes
     S::SpectralTransform;                   # precomputed transform
 )
-    (; nlat, nlons) = S                     # dimensions   
+    (; nlat, nlons, rings) = S              # dimensions   
     (; nlat_half) = S.grid       
     nlayers = size(field, 2)                # number of vertical layers
 
@@ -247,7 +244,6 @@ function _fourier_serial!(                  # SPECTRAL TO GRID
     @boundscheck nlayers <= S.nlayers || throw(DimensionMismatch(S, field))     # otherwise FFTW complains
     @boundscheck size(g_north) == size(g_south) == (S.nfreq_max, S.nlayers, nlat_half) || throw(DimensionMismatch(S, field))
 
-    rings = eachring(field)                     # precomputed ring indices
     @inbounds for (k, k_grid) in zip(1:nlayers, eachlayer(field))
         for j_north in 1:nlat_half              # symmetry: loop over northern latitudes only
             j = j_north                         # symmetric index / ring-away from pole index

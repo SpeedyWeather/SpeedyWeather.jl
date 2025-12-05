@@ -45,20 +45,26 @@ function mask!(
     @boundscheck fields_match(field, mask, horizontal_only=true) || throw(DimensionMismatch(field, mask))
     @boundscheck ndims(mask) == 1 || throw(DimensionMismatch(field, mask))
 
-    for k in eachlayer(field)
-        for ij in eachgridpoint(mask)
-            if mask[ij] == val
-                field[ij, k] = masked_val
-            end
-        end
-    end
-
+    arch = architecture(field)
+    launch!(arch, RingGridWorkOrder, size(field), mask_kernel!, field, mask, val, masked_val)
     return field
 end
 
+# 2D, 3D or ND variant via Cartesian indexing
+@kernel inbounds=true function mask_kernel!(field, mask, val, masked_val)
+    ijk = @index(Global, Cartesian)
+    if mask[ijk[1]] == val
+        field[ijk] = masked_val
+    end
+end
+
+
 # also allow for land_sea_mask struct to be passed on, use .mask in that case
-mask!(field::AbstractField, mask::AbstractLandSeaMask, args...; kwargs...) =
+@propagate_inbounds mask!(field::AbstractField, mask::AbstractLandSeaMask, args...; kwargs...) =
     mask!(field, mask.mask, args...; kwargs...)
+
+# adapt on GPU only the mask itself
+Adapt.adapt_structure(to, land_sea_mask::AbstractLandSeaMask) = (mask=adapt_structure(to, land_sea_mask.mask), )
 
 # make available when using SpeedyWeather
 export EarthLandSeaMask
@@ -126,23 +132,21 @@ function initialize!(land_sea_mask::EarthLandSeaMask, model::PrimitiveEquation)
     lsm_highres = land_sea_mask.file_Grid(ncfile["lsm"].var[:, :], input_as=Matrix)
 
     # average onto grid cells of the model 
-    if typeof(architecture(model.spectral_grid.architecture)) <: CPU
-        RingGrids.grid_cell_average!(land_sea_mask.mask, lsm_highres)
-    else
-        temp_mask = on_architecture(CPU(), land_sea_mask.mask)
-        RingGrids.grid_cell_average!(temp_mask, lsm_highres)
-        land_sea_mask.mask .= on_architecture(model.spectral_grid.architecture, temp_mask)
-    end
+    cpu_mask = on_architecture(CPU(), land_sea_mask.mask)
+    RingGrids.grid_cell_average!(cpu_mask, lsm_highres)
+    land_sea_mask.mask .= on_architecture(model.spectral_grid.architecture, cpu_mask)
 
     if land_sea_mask.quantization > 0
         q = land_sea_mask.quantization
         land_sea_mask.mask .= round.(land_sea_mask.mask ./ q) .* q
     end
 
-    # TODO this shouldn't be necessary, but at the moment grid_cell_average! can return values > 1
-    # lo, hi = extrema(land_sea_mask.mask)
-    # (lo < 0 || hi > 1) && @warn "Land-sea mask has values in [$lo, $hi], clamping to [0, 1]."
-    clamp!(land_sea_mask.mask, 0, 1)
+    lo, hi = extrema(land_sea_mask.mask)
+    if (lo < 0 || hi > 1)
+        # @warn "Land-sea mask has values in [$lo, $hi], clamping to [0, 1]."
+        land_sea_mask.mask .= clamp.(land_sea_mask.mask, 0, 1)
+    end
+    return nothing
 end
 
 export AquaPlanetMask

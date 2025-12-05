@@ -7,7 +7,7 @@
     drag = JetDrag(spectral_grid, time_scale=Day(6))
     forcing = StochasticStirring(spectral_grid)
     random_process = SpectralAR1Process(spectral_grid)
-    initial_conditions = StartFromRest()
+    initial_conditions = StartFromRest(spectral_grid)
 
     @testset for Model in (BarotropicModel, ShallowWaterModel)
         model = Model(spectral_grid; initial_conditions, forcing, drag, random_process, output)
@@ -27,7 +27,7 @@ end
     drag = JetDrag(spectral_grid, time_scale=Day(6))
     forcing = StochasticStirring(spectral_grid)
     random_process = SpectralAR1Process(spectral_grid)
-    initial_conditions = StartFromRest()
+    initial_conditions = StartFromRest(spectral_grid)
 
     @testset for Model in (PrimitiveDryModel, PrimitiveWetModel)
         model = Model(spectral_grid; initial_conditions, forcing, drag, random_process, output)
