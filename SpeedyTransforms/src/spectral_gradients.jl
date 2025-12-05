@@ -288,7 +288,6 @@ end
     end
 end
 
-
 """
 $(TYPEDSIGNATURES)
 Get U, V (=(u, v)*coslat) from vorticity ζ and divergence D in spectral space.
@@ -327,7 +326,7 @@ end
     l = l_indices[lm]
     
     # Get the coefficients for the current lm index
-    z = vordiv_to_uv_x[lm]
+    z = im*vordiv_to_uv_x[lm]
     vordiv_uv1 = vordiv_to_uv1[lm]
     vordiv_uv2 = vordiv_to_uv2[lm]
     
