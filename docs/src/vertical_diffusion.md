@@ -40,7 +40,7 @@ That way the diffusion preserves the integral of the variable ``u`` from
 
 ```math
 \frac{\partial}{\partial t} \int_0^1 u d\sigma  = \int_0^1 \frac{\partial}{\partial \sigma} K
-\frac{\partial u}{\partial \sigma} d\sigma = 
+\frac{\partial u}{\partial \sigma} d\sigma =
 K\frac{\partial u}{\partial \sigma} \vert_{\sigma = 1} - K\frac{\partial u}{\partial \sigma} \vert_{\sigma = 0}
 = 0
 ```
@@ -52,7 +52,7 @@ coordinates ``\sigma_k`` that are generally not equally spaced using centred fin
 ```math
 \frac{\partial}{\partial \sigma} K \frac{\partial u}{\partial \sigma} \approx
 \frac{
-    \frac{K_{k+1} + K_k}{2}     \frac{u_{k+1} - u_k    }{\sigma_k+1 - \sigma_k} - 
+    \frac{K_{k+1} + K_k}{2}     \frac{u_{k+1} - u_k    }{\sigma_k+1 - \sigma_k} -
     \frac{K_{k}   + K_{k-1}}{2} \frac{u_{k}   - u_{k-1}}{\sigma_k   - \sigma_{k-1}}
 }{
     \sigma_{k+1/2} - \sigma_{k-1/2}
@@ -120,7 +120,7 @@ dry static energy ``SE = c_p T + gz``, i.e.
 
 ```math
 \frac{\partial T}{\partial t} = \frac{1}{c_p}\frac{\partial}{\partial \sigma} K
-\frac{\partial SE}{\partial \sigma} 
+\frac{\partial SE}{\partial \sigma}
 ```
 
 where we just fold the heat capacity ``c_p`` into the diffusion coefficient ``K \to K/c_p``.

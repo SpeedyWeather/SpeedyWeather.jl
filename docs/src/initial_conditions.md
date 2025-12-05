@@ -106,7 +106,7 @@ a simulation for some days
 run!(simulation, period=Day(3))
 
 # a running simulation always transforms spectral variables
-# so we don't have to do the transform manually but just pull 
+# so we don't have to do the transform manually but just pull
 # layer 1 (there's only 1) from the diagnostic variables
 vor = simulation.diagnostic_variables.grid.vor_grid[:, 1]
 
@@ -125,7 +125,7 @@ details.
 
 ## Rossby-Haurwitz wave in a ShallowWater model
 
-For the shallow water model Williamson et al., 1992[^Williamson92] also give 
+For the shallow water model Williamson et al., 1992[^Williamson92] also give
 initial conditions for the prognostic variable height ``h = h_0 + \eta`` (equivalent to geopotential).
 The layer thickness is ``h_0`` and ``\eta`` is the interface displacement
 of that layer. SpeedyWeather however, uses as prognostic variable ``\eta``
@@ -133,13 +133,13 @@ for which the initial conditions are
 
 ```math
 \begin{align}
-η(λ, θ) &= \frac{R^2}{g} \left( A(θ) + B(θ) \cos(mλ) + C(θ) \cos(2mλ) \right), \\
+η(λ, θ) &= \frac{R^2}{g} \left[ A(θ) + B(θ) \cos(mλ) + C(θ) \cos(2mλ) \right], \\
 
-A(θ) &= \frac{ω(2Ω + ω)}{2}\cos(θ)^2 + \frac{1}{4}K^2\cos(θ)^{2m}\left((m+1)\cos(θ)^2 + (2m^2 - m - 2) - \frac{2m^2}{\cos(θ)^2}\right), \\
+A(θ) &= \frac{ω(2Ω + ω)}{2}\cos(θ)^2 + \frac{1}{4}K^2\cos(θ)^{2m}\left[(m+1)\cos(θ)^2 + (2m^2 - m - 2) - \frac{2m^2}{\cos(θ)^2}\right], \\
 
-B(θ) &= \frac{2(Ω + ω)K}{(m+1)(m+2)} \cos(θ)^m\left((m^2 + 2m + 2) - (m+1)^2\cos(θ)^2\right), \\
+B(θ) &= \frac{2(Ω + ω)K}{(m+1)(m+2)} \cos(θ)^m\left[(m^2 + 2m + 2) - (m+1)^2\cos(θ)^2\right], \\
 
-C(θ) &= \frac{1}{4}K^2 \cos(θ)^{2m}\left((m+1)\cos(θ)^2 - (m + 2)\right).
+C(θ) &= \frac{1}{4}K^2 \cos(θ)^{2m}\left[(m+1)\cos(θ)^2 - (m + 2)\right].
 
 \end{align}
 ```
@@ -172,7 +172,7 @@ save("haurwitz_sw.png", ans) # hide
 nothing # hide
 ```
 
-There is a noticable difference from the result in the barotropic model, where
+There is a noticeable difference from the result in the barotropic model, where
 the wave moves around the globe keeping its shape. Here, it deforms around the
 poles and the vorticity patches develop an internal structure.
 
@@ -223,7 +223,7 @@ nothing # hide
 ```
 ![Rossby-Haurwitz wave in primitive equations](haurwitz_primitive.png)
 
-As you can see the actual Rossby-Haurwitz wave is not as stable anymore
+As you can see the actual Rossby-Haurwitz wave is not as stable any more
 (because those initial conditions are not a stable solution of the primitive equations)
 and so the 3-day integration looks already different from the barotropic model!
 
