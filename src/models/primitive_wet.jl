@@ -100,7 +100,7 @@ $(TYPEDFIELDS)"""
     large_scale_condensation::LSC = ImplicitCondensation(spectral_grid)
     convection::CV = BettsMillerConvection(spectral_grid)
     shortwave_radiation::SW = TransparentShortwave(spectral_grid)
-    longwave_radiation::LW = JeevanjeeRadiation(spectral_grid)
+    longwave_radiation::LW = OneBandLongwave(spectral_grid)
     stochastic_physics::SP = nothing
     custom_parameterization::CP = nothing
 
