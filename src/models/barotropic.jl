@@ -33,14 +33,14 @@ $(TYPEDFIELDS)"""
     architecture::AR = spectral_grid.architecture
     
     # DYNAMICS
-    geometry::GE = Geometry(spectral_grid)
+    @component geometry::GE = Geometry(spectral_grid)
     @component planet::PL = Earth(spectral_grid)
     @component atmosphere::AT = EarthAtmosphere(spectral_grid)
-    coriolis::CO = Coriolis(spectral_grid)
+    @component coriolis::CO = Coriolis(spectral_grid)
     @component forcing::FR = KolmogorovFlow(spectral_grid)
     @component drag::DR = LinearVorticityDrag(spectral_grid)
-    particle_advection::PA = nothing
-    initial_conditions::IC = InitialConditions(Barotropic)
+    @component particle_advection::PA = nothing
+    @component initial_conditions::IC = InitialConditions(Barotropic)
     
     # VARIABLES
     random_process::RP = nothing

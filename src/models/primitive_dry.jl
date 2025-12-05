@@ -53,14 +53,14 @@ $(TYPEDFIELDS)"""
     
     # DYNAMICS
     dynamics::Bool = true
-    geometry::GE = Geometry(spectral_grid)
+    @component geometry::GE = Geometry(spectral_grid)
     @component planet::PL = Earth(spectral_grid)
     @component atmosphere::AT = EarthAtmosphere(spectral_grid)
-    coriolis::CO = Coriolis(spectral_grid)
-    geopotential::GO = Geopotential(spectral_grid)
-    adiabatic_conversion::AC = AdiabaticConversion(spectral_grid)
-    particle_advection::PA = nothing
-    initial_conditions::IC = InitialConditions(PrimitiveDry)
+    @component coriolis::CO = Coriolis(spectral_grid)
+    @component geopotential::GO = Geopotential(spectral_grid)
+    @component adiabatic_conversion::AC = AdiabaticConversion(spectral_grid)
+    @component particle_advection::PA = nothing
+    @component initial_conditions::IC = InitialConditions(PrimitiveDry)
     @component forcing::FR = nothing
     @component drag::DR = nothing
 
@@ -69,8 +69,8 @@ $(TYPEDFIELDS)"""
     tracers::TRACER_DICT = TRACER_DICT()
 
     # BOUNDARY CONDITIONS
-    orography::OR = EarthOrography(spectral_grid)
-    land_sea_mask::LS = EarthLandSeaMask(spectral_grid)
+    @component orography::OR = EarthOrography(spectral_grid)
+    @component land_sea_mask::LS = EarthLandSeaMask(spectral_grid)
     @component ocean::OC = SlabOcean(spectral_grid)
     @component sea_ice::SI = ThermodynamicSeaIce(spectral_grid)
     @component land::LA = DryLandModel(spectral_grid)
