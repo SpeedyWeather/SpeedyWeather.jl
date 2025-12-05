@@ -48,7 +48,7 @@ export StartFromRest
     spectral_grid::SG
     pres::P = ConstantPressure(spectral_grid)
     temp::T = JablonowskiTemperature(spectral_grid)
-    humid::H = ZeroInitially(spectral_grid)
+    humid::H = ConstantRelativeHumidity(spectral_grid)
 end
 
 StartFromRest(SG::SpectralGrid; kwargs...) = StartFromRest(; spectral_grid = SG, kwargs...)
@@ -263,6 +263,9 @@ function initialize!(
         model::AbstractModel
     )
 
+    model.spectral_grid.nlayers == 1 ||
+        throw(ArgumentError("ZonalJet initial conditions can only be used with ShallowWaterModel (1 layer)"))
+
     (; latitude, width, umax) = initial_conditions               # for jet
     (;
         perturb_lat, perturb_lon, perturb_xwidth,                 # for perturbation
@@ -336,7 +339,7 @@ function initialize!(
     # add perturbation (reuse u array)
     η_perturb = transform(η_perturb_grid, model.spectral_transform)
     pres .+= η_perturb
-    spectral_truncation!(pres)
+    SpeedyTransforms.spectral_truncation!(pres)
     return nothing
 end
 

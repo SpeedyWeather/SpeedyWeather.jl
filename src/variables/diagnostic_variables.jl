@@ -123,8 +123,6 @@ $TYPEDFIELDS."""
     div_grid        ::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
     "Absolute temperature [K]"
     temp_grid       ::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
-    "Virtual temperature [K]"
-    temp_virt_grid  ::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
     "Specific_humidity [kg/kg]"
     humid_grid      ::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
     "Zonal velocity [m/s]"
@@ -179,7 +177,7 @@ export DynamicsVariables
 $(TYPEDFIELDS)"""
 @kwdef struct DynamicsVariables{
     SpectrumType,           # <: AbstractSpectrum
-    GridType,               # <:AbstractGrid
+    GridType,               # <: AbstractGrid
     SpectralVariable2D,     # <: LowerTriangularArray
     SpectralVariable3D,     # <: LowerTriangularArray
     GridVariable2D,         # <: AbstractField
@@ -187,8 +185,8 @@ $(TYPEDFIELDS)"""
     ScratchMemoryType,      # <: ScratchMemory{ArrayType{Complex{NF},3}}
 } <: AbstractDiagnosticVariables
     
-    spectrum::SpectrumType            # spectral resolution: maximum degree and order of spherical harmonics
-    grid::GridType              # grid resolution: number of latitude rings on one hemisphere (Eq. incl.)
+    spectrum::SpectrumType  # spectral resolution: maximum degree and order of spherical harmonics
+    grid::GridType          # grid resolution: number of latitude rings on one hemisphere (Eq. incl.)
     nlayers::Int            # number of vertical layers
 
     "Multi-purpose a, 3D work array to be reused in various places"
