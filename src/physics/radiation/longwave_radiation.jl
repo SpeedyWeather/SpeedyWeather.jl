@@ -214,10 +214,10 @@ end
 export OneBandLongwaveRadiativeTransfer
 @kwdef struct OneBandLongwaveRadiativeTransfer{NF} <: AbstractLongwaveRadiativeTransfer
     "[OPTION] Emissivity for surface flux over ocean [1]"
-    emissivity_ocean::NF = 0.6
+    emissivity_ocean::NF = 1
 
     "[OPTION] Emissivity for surface flux over land [1]"
-    emissivity_land::NF = 0.6
+    emissivity_land::NF = 1
 end
 
 # generator function
