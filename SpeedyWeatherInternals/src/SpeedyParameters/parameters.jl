@@ -326,10 +326,10 @@ macro parameterized(expr)
         # handle type arguments; first extract argument names (discarding upper type bounds)
         typeargs = map(typedef2sig, typesig.args[2:end])
         # then build method signature - merge original properties with patch to preserve non-parameter fields
-        push!(block.args, esc(:(SpeedyParameters.setproperties(obj::$(typename){$(typeargs...)}, patch::NamedTuple) where {$(typesig.args[2:end]...)} = $(typename){$(typeargs...)}(; SpeedyParameters.getproperties(obj)..., patch...))))
+        push!(block.args, esc(:(SpeedyParameters.setproperties(obj::$(typename){$(typeargs...)}, patch::NamedTuple) where {$(typesig.args[2:end]...)} = $(typename){$(typeargs...)}(; merge(SpeedyParameters.getproperties(obj), patch)...))))
     elseif has_kwdef
         # otherwise we can just use the typename
-        push!(block.args, esc(:(SpeedyParameters.setproperties(obj::$(typename), patch::NamedTuple) = $(typename)(; SpeedyParameters.getproperties(obj)..., patch...))))
+        push!(block.args, esc(:(SpeedyParameters.setproperties(obj::$(typename), patch::NamedTuple) = $(typename)(; merge(SpeedyParameters.getproperties(obj), patch)...))))
     end
     return block
 end
