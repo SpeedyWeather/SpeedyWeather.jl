@@ -264,7 +264,7 @@ end
     l = l_indices[lm]
 
     # Get the coefficients for the current lm index
-    z = im*vordiv_to_uv_x[lm]
+    z = vordiv_to_uv_x[lm]
     vordiv_uv1 = vordiv_to_uv1[lm]
     vordiv_uv2 = vordiv_to_uv2[lm]
     
@@ -273,10 +273,10 @@ end
         # U = -∂/∂lat(Ψ) - no lm-1 term for first element
         U[I] = vordiv_uv2 * vor[lm+1, k]
         # V = ∂/∂λ(Ψ)
-        V[I] = z * vor[I]
+        V[I] = im * (z * vor[I])
     elseif l==(lmax-1)     # extra in case vor[lmax,:] != 0, see comment in UV_from_vordiv!
         U[I] = -vordiv_uv1 * vor[lm-1, k]    # meridional gradient again (but only 2nd term from above)
-        V[I] = z * vor[I]          # zonal gradient again (as above)
+        V[I] = im * (z * vor[I])          # zonal gradient again (as above)
     elseif l==lmax         # extra in case vor[lmax,:] != 0, see comment in UV_from_vordiv!
         U[I] = -vordiv_uv1 * vor[lm-1, k]
         V[I] = 0
@@ -284,7 +284,7 @@ end
         # U = -∂/∂lat(Ψ) combined with Laplace inversion ∇⁻²
         U[I] = muladd(vordiv_uv2, vor[lm+1, k], -vordiv_uv1*vor[lm-1, k])
         # V = ∂/∂λ(Ψ)
-        V[I] = z * vor[I]
+        V[I] = im * (z * vor[I])
     end
 end
 
