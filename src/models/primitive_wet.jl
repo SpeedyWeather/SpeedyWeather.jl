@@ -10,7 +10,7 @@ with `spectral_grid::SpectralGrid` used to initalize all non-default components
 passed on as keyword arguments, e.g. `planet=Earth(spectral_grid)`. Fields, representing
 model components, are
 $(TYPEDFIELDS)"""
-@kwdef mutable struct PrimitiveWetModel{
+@parameterized @kwdef mutable struct PrimitiveWetModel{
     AR,     # <:AbstractArchitecture,
     GE,     # <:AbstractGeometry,
     PL,     # <:AbstractPlanet,
@@ -58,15 +58,15 @@ $(TYPEDFIELDS)"""
     # DYNAMICS
     dynamics::Bool = true
     geometry::GE = Geometry(spectral_grid)
-    planet::PL = Earth(spectral_grid)
-    atmosphere::AT = EarthAtmosphere(spectral_grid)
+    @component planet::PL = Earth(spectral_grid)
+    @component atmosphere::AT = EarthAtmosphere(spectral_grid)
     coriolis::CO = Coriolis(spectral_grid)
     geopotential::GO = Geopotential(spectral_grid)
     adiabatic_conversion::AC = AdiabaticConversion(spectral_grid)
     particle_advection::PA = nothing
     initial_conditions::IC = InitialConditions(PrimitiveWet)
-    forcing::FR = nothing
-    drag::DR = nothing
+    @component forcing::FR = nothing
+    @component drag::DR = nothing
 
     # VARIABLES
     random_process::RP = nothing
@@ -75,25 +75,25 @@ $(TYPEDFIELDS)"""
     # BOUNDARY CONDITIONS
     orography::OR = EarthOrography(spectral_grid)
     land_sea_mask::LS = EarthLandSeaMask(spectral_grid)
-    ocean::OC = SlabOcean(spectral_grid)
-    sea_ice::SI = ThermodynamicSeaIce(spectral_grid)
-    land::LA = LandModel(spectral_grid)
-    solar_zenith::ZE = WhichZenith(spectral_grid, planet)
-    albedo::AL = DefaultAlbedo(spectral_grid)
+    @component ocean::OC = SlabOcean(spectral_grid)
+    @component sea_ice::SI = ThermodynamicSeaIce(spectral_grid)
+    @component land::LA = LandModel(spectral_grid)
+    @component solar_zenith::ZE = WhichZenith(spectral_grid, planet)
+    @component albedo::AL = DefaultAlbedo(spectral_grid)
     
     # PHYSICS/PARAMETERIZATIONS
     physics::Bool = true
-    clausius_clapeyron::CC = ClausiusClapeyron(spectral_grid, atmosphere)
-    boundary_layer_drag::BL = BulkRichardsonDrag(spectral_grid)
-    vertical_diffusion::VD = BulkRichardsonDiffusion(spectral_grid)
-    surface_thermodynamics::SUT = SurfaceThermodynamicsConstant(spectral_grid)
-    surface_wind::SUW = SurfaceWind(spectral_grid)
-    surface_heat_flux::SH = SurfaceHeatFlux(spectral_grid)
-    surface_humidity_flux::HF = SurfaceHumidityFlux(spectral_grid)
-    large_scale_condensation::LSC = ImplicitCondensation(spectral_grid)
-    convection::CV = SimplifiedBettsMiller(spectral_grid)
-    shortwave_radiation::SW = TransparentShortwave(spectral_grid)
-    longwave_radiation::LW = JeevanjeeRadiation(spectral_grid)
+    @component clausius_clapeyron::CC = ClausiusClapeyron(spectral_grid, atmosphere)
+    @component boundary_layer_drag::BL = BulkRichardsonDrag(spectral_grid)
+    @component vertical_diffusion::VD = BulkRichardsonDiffusion(spectral_grid)
+    @component surface_thermodynamics::SUT = SurfaceThermodynamicsConstant(spectral_grid)
+    @component surface_wind::SUW = SurfaceWind(spectral_grid)
+    @component surface_heat_flux::SH = SurfaceHeatFlux(spectral_grid)
+    @component surface_humidity_flux::HF = SurfaceHumidityFlux(spectral_grid)
+    @component large_scale_condensation::LSC = ImplicitCondensation(spectral_grid)
+    @component convection::CV = SimplifiedBettsMiller(spectral_grid)
+    @component shortwave_radiation::SW = TransparentShortwave(spectral_grid)
+    @component longwave_radiation::LW = JeevanjeeRadiation(spectral_grid)
     stochastic_physics::SP = nothing
 
     # NUMERICS
@@ -113,29 +113,6 @@ end
 prognostic_variables(::Type{<:PrimitiveWet}) = (:vor, :div, :temp, :humid, :pres)
 default_concrete_model(::Type{PrimitiveWet}) = PrimitiveWetModel
 
-parameters(model::PrimitiveWet; kwargs...) = SpeedyParams(
-    planet = parameters(model.planet; component=:planet, kwargs...),
-    atmosphere = parameters(model.atmosphere; component=:atmosphere, kwargs...),
-    forcing = parameters(model.forcing; component=:forcing, kwargs...),
-    drag = parameters(model.drag; component=:drag, kwargs...),
-    clausius_clapeyron = parameters(model.clausius_clapeyron; component=:clausius_clapeyron, kwargs...),
-    boundary_layer_drag = parameters(model.boundary_layer_drag; component=:boundary_layer_drag, kwargs...),
-    vertical_diffusion = parameters(model.vertical_diffusion; component=:vertical_diffusion, kwargs...),
-    surface_thermodynamics = parameters(model.surface_thermodynamics; component=:surface_thermodynamics, kwargs...),
-    surface_wind = parameters(model.surface_wind; component=:surface_wind, kwargs...),
-    surface_heat_flux = parameters(model.surface_heat_flux; component=:surface_heat_flux, kwargs...),
-    surface_humidity_flux = parameters(model.surface_humidity_flux; component=:surface_humidity_flux, kwargs...),
-    large_scale_condensation = parameters(model.large_scale_condensation; component=:large_scale_condensation, kwargs...),
-    convection = parameters(model.convection; component=:convection, kwargs...),
-    shortwave_radiation = parameters(model.shortwave_radiation; component=:shortwave_radiation, kwargs...),
-    longwave_radiation = parameters(model.longwave_radiation; component=:longwave_radiation, kwargs...),
-    albedo = parameters(model.albedo; component=:albedo, kwargs...),
-    ocean = parameters(model.ocean; component=:ocean, kwargs...),
-    sea_ice = parameters(model.sea_ice; component=:sea_ice, kwargs...),
-    land = parameters(model.land; component=:land, kwargs...),
-    solar_zenith = parameters(model.solar_zenith; component=:solar_zenith, kwargs...),
-)
- 
 """
 $(TYPEDSIGNATURES)
 Calls all `initialize!` functions for components of `model`,

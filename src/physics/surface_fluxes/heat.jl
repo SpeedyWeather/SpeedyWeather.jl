@@ -1,7 +1,7 @@
 export SurfaceHeatFlux
-@kwdef struct SurfaceHeatFlux{Ocean, Land} <: AbstractSurfaceHeatFlux
-    ocean::Ocean = SurfaceOceanHeatFlux()
-    land::Land = SurfaceLandHeatFlux()
+@parameterized @kwdef struct SurfaceHeatFlux{Ocean, Land} <: AbstractSurfaceHeatFlux
+    @component ocean::Ocean = SurfaceOceanHeatFlux()
+    @component land::Land = SurfaceLandHeatFlux()
 end
 
 function SurfaceHeatFlux(
@@ -10,11 +10,6 @@ function SurfaceHeatFlux(
     land = SurfaceLandHeatFlux(SG))
     return SurfaceHeatFlux(; ocean, land)
 end
-
-parameters(flux::SurfaceHeatFlux; kwargs...) = SpeedyParams(
-    ocean = parameters(flux.ocean; component=:ocean, kwargs...),
-    land = parameters(flux.land; component=:land, kwargs...),
-)
 
 function initialize!(S::SurfaceHeatFlux, model::PrimitiveEquation)
     initialize!(S.ocean, model)

@@ -1,9 +1,9 @@
 abstract type AbstractAlbedo <: AbstractModelComponent end
 
 export Albedo
-@kwdef struct Albedo{Ocean, Land} <: AbstractAlbedo
-    ocean::Ocean
-    land::Land
+@parameterized @kwdef struct Albedo{Ocean, Land} <: AbstractAlbedo
+    @component ocean::Ocean
+    @component land::Land
 end
 
 function Base.show(io::IO, A::Albedo)
@@ -24,11 +24,6 @@ function DefaultAlbedo(SG::SpectralGrid;
     land = LandSnowAlbedo(SG))
     return Albedo(ocean, land)
 end
-
-parameters(albedo::Albedo; kwargs...) = SpeedyParams(
-    ocean = parameters(albedo.ocean; component=:ocean, kwargs...),
-    land = parameters(albedo.land; component=:land, kwargs...),
-)
 
 function initialize!(albedo::Albedo, model::PrimitiveEquation)
     initialize!(albedo.ocean, model)

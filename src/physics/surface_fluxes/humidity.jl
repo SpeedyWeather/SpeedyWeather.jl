@@ -1,7 +1,7 @@
 export SurfaceHumidityFlux
-@kwdef struct SurfaceHumidityFlux{Ocean, Land} <: AbstractSurfaceHumidityFlux
-    ocean::Ocean = SurfaceOceanHumidityFlux()
-    land::Land = SurfaceLandHumidityFlux()
+@parameterized @kwdef struct SurfaceHumidityFlux{Ocean, Land} <: AbstractSurfaceHumidityFlux
+    @component ocean::Ocean = SurfaceOceanHumidityFlux()
+    @component land::Land = SurfaceLandHumidityFlux()
 end
 
 function SurfaceHumidityFlux(
@@ -10,11 +10,6 @@ function SurfaceHumidityFlux(
     land = SurfaceLandHumidityFlux(SG))
     return SurfaceHumidityFlux(; ocean, land)
 end
-
-parameters(flux::SurfaceHumidityFlux; kwargs...) = SpeedyParams(
-    ocean = parameters(flux.ocean; component=:ocean, kwargs...),
-    land = parameters(flux.land; component=:land, kwargs...),
-)
 
 function initialize!(S::SurfaceHumidityFlux, model::PrimitiveWet)
     initialize!(S.ocean, model)

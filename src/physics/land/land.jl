@@ -34,29 +34,19 @@ include("rivers.jl")
 
 # LandModel defined through its components
 export LandModel
-@kwdef mutable struct LandModel{G, TD, T, SM, SN, V, R} <: AbstractWetLand
+@parameterized @kwdef mutable struct LandModel{G, TD, T, SM, SN, V, R} <: AbstractWetLand
     spectral_grid::SpectralGrid
-    geometry::G = LandGeometry(spectral_grid)
-    thermodynamics::TD = LandThermodynamics(spectral_grid)
-    temperature::T = LandBucketTemperature(spectral_grid)
-    soil_moisture::SM = LandBucketMoisture(spectral_grid)
-    snow::SN = SnowModel(spectral_grid)
-    vegetation::V = VegetationClimatology(spectral_grid)
-    rivers::R = nothing
+    @component geometry::G = LandGeometry(spectral_grid)
+    @component thermodynamics::TD = LandThermodynamics(spectral_grid)
+    @component temperature::T = LandBucketTemperature(spectral_grid)
+    @component soil_moisture::SM = LandBucketMoisture(spectral_grid)
+    @component snow::SN = SnowModel(spectral_grid)
+    @component vegetation::V = VegetationClimatology(spectral_grid)
+    @component rivers::R = nothing
 end
 
 # also allow spectral grid to be passed on as first an only positional argument to model constructors
 (L::Type{<:AbstractLand})(SG::SpectralGrid; kwargs...) = L(spectral_grid=SG; kwargs...)
-
-parameters(land::LandModel; kwargs...) = SpeedyParams(
-    geometry = parameters(land.geometry; component=:geometry, kwargs...),
-    thermodynamics = parameters(land.thermodynamics; component=:thermodynamics, kwargs...),
-    temperature = parameters(land.temperature; component=:temperature, kwargs...),
-    soil_moisture = parameters(land.soil_moisture; component=:soil_moisture, kwargs...),
-    snow = parameters(land.snow; component=:snow, kwargs...),
-    vegetation = parameters(land.vegetation; component=:vegetation, kwargs...),
-    rivers = parameters(land.rivers; component=:rivers, kwargs...),
-)
 
 # initializing the land model initializes its components
 function initialize!(   land::LandModel,
@@ -71,18 +61,12 @@ function initialize!(   land::LandModel,
 end
 
 export DryLandModel
-@kwdef struct DryLandModel{G, TD, T} <: AbstractDryLand
+@parameterized @kwdef struct DryLandModel{G, TD, T} <: AbstractDryLand
     spectral_grid::SpectralGrid
-    geometry::G = LandGeometry(spectral_grid)
-    thermodynamics::TD = LandThermodynamics(spectral_grid)
-    temperature::T = LandBucketTemperature(spectral_grid)
+    @component geometry::G = LandGeometry(spectral_grid)
+    @component thermodynamics::TD = LandThermodynamics(spectral_grid)
+    @component temperature::T = LandBucketTemperature(spectral_grid)
 end
-
-parameters(land::DryLandModel; kwargs...) = SpeedyParams(
-    geometry = parameters(land.geometry; component=:geometry, kwargs...),
-    thermodynamics = parameters(land.thermodynamics; component=:thermodynamics, kwargs...),
-    temperature = parameters(land.temperature; component=:temperature, kwargs...),
-)
 
 function initialize!(land::DryLandModel, model::PrimitiveEquation)
     initialize!(model.land.geometry, model)
