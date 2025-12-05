@@ -519,10 +519,16 @@ end
     # Step 5: Semi implicit corrections for temperature and pressure
         
     # Step 5a: Temperature correction δT = G_T + ξLδD
+    # Use Kahan summation for better numerical accuracy
     for k in 1:nlayers
         temp_correction = zero(eltype(temp_tend))
+        c = zero(eltype(temp_tend))  # compensation for lost low-order bits
         for r in 1:nlayers
-            temp_correction += ξ * L[k, r] * div_tend[lm, r]
+            val = ξ * L[k, r] * div_tend[lm, r]
+            y = val - c
+            t = temp_correction + y
+            c = (t - temp_correction) - y
+            temp_correction = t
         end
         temp_tend[lm, k] += temp_correction
     end
@@ -551,10 +557,15 @@ end
     
     # Move implicit terms of temperature equation from time step i to i-1
     # RHS_expl(Vⁱ) + RHS_impl(Vⁱ⁻¹) = RHS(Vⁱ) + RHS_impl(Vⁱ⁻¹ - Vⁱ)
-    # Use local accumulator to ensure consistent floating-point order of operations
+    # Use Kahan summation for better numerical accuracy
     temp_correction = zero(eltype(temp_tend))
+    c = zero(eltype(temp_tend))  # compensation for lost low-order bits
     for r in 1:nlayers
-        temp_correction += L[k, r] * (div_old[lm, r] - div_new[lm, r])
+        val = L[k, r] * (div_old[lm, r] - div_new[lm, r])
+        y = val - c
+        t = temp_correction + y
+        c = (t - temp_correction) - y
+        temp_correction = t
     end
     temp_tend[I] += temp_correction
     
@@ -612,10 +623,15 @@ end
     
     # Semi implicit correction for temperature
     # δT = G_T + ξLδD
-    # Use local accumulator to ensure consistent floating-point order of operations
+    # Use Kahan summation for better numerical accuracy
     temp_correction = zero(eltype(temp_tend))
+    c = zero(eltype(temp_tend))  # compensation for lost low-order bits
     for r in 1:nlayers
-        temp_correction += ξ * L[k, r] * div_tend[lm, r]
+        val = ξ * L[k, r] * div_tend[lm, r]
+        y = val - c
+        t = temp_correction + y
+        c = (t - temp_correction) - y
+        temp_correction = t
     end
     temp_tend[lm, k] += temp_correction
 end
