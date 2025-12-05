@@ -72,6 +72,12 @@ end
 
 export OneBandShortwave
 
+@parameterized struct OneBandShortwave{C, T, R} <: AbstractShortwave
+    @component clouds::C
+    @component transmittance::T
+    @component radiative_transfer::R
+end
+
 """
     OneBandShortwave <: AbstractShortwave
 
@@ -83,11 +89,7 @@ Cloud cover is calculated as a combination of relative humidity and precipitatio
 and a cloud albedo is applied to the downward beam. Fields and options are
 
 $(TYPEDFIELDS)"""
-@parameterized struct OneBandShortwave{C, T, R} <: AbstractShortwave
-    @component clouds::C
-    @component transmittance::T
-    @component radiative_transfer::R
-end
+OneBandShortwave
 
 # primitive wet model version
 OneBandShortwave(SG::SpectralGrid) = OneBandShortwave(
