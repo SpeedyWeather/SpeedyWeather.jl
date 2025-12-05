@@ -482,9 +482,11 @@ end
     # Step 1: Move implicit terms of temperature equation from time step i to i-1
     # RHS_expl(Vⁱ) + RHS_impl(Vⁱ⁻¹) = RHS(Vⁱ) + RHS_impl(Vⁱ⁻¹ - Vⁱ)
     for k in 1:nlayers
+        temp_tend_val = zero(eltype(temp_tend))
         for r in 1:nlayers
-            temp_tend[lm, k] += L[k, r] * (div_old[lm, r] - div_new[lm, r])
+            temp_tend_val += L[k, r] * (div_old[lm, r] - div_new[lm, r])
         end
+        temp_tend[lm, k] += temp_tend_val
     end
 
     for k in 1:nlayers
@@ -519,10 +521,97 @@ end
     # Step 5: Semi implicit corrections for temperature and pressure
         
     # Step 5a: Temperature correction δT = G_T + ξLδD
+    for k in 1:nlayers
+        temp_correction = zero(eltype(temp_tend))
+        for r in 1:nlayers
+            temp_correction += ξ * L[k, r] * div_tend[lm, r]
+        end
+        temp_tend[lm, k] += temp_correction
+    end
+        
+    # Step 5b: Pressure correction δlnpₛ = G_lnpₛ + ξWδD
+    pres_correction = zero(eltype(pres_tend))
+    for k in 1:nlayers
+        pres_correction += ξ * W[k] * div_tend[lm, k]
+    end
+    pres_tend[lm] += pres_correction
+end
+
+# Single kernel with Kahan summation everywhere for maximum accuracy
+@kernel inbounds=true function implicit_primitive_single_kernel_kahan!(
+    temp_tend, pres_tend, div_tend, G, geopot,
+    div_old, div_new, @Const(S⁻¹), @Const(R), @Const(U), @Const(L), @Const(W), @Const(l_indices),
+    @Const(ξ), @Const(nlayers)
+)
+    lm = @index(Global, Linear)
+    
+    # Get degree l for this spectral mode
+    l = l_indices[lm]
+    
+    # Step 1: Move implicit terms of temperature equation from time step i to i-1
+    # RHS_expl(Vⁱ) + RHS_impl(Vⁱ⁻¹) = RHS(Vⁱ) + RHS_impl(Vⁱ⁻¹ - Vⁱ)
     # Use Kahan summation for better numerical accuracy
     for k in 1:nlayers
         temp_correction = zero(eltype(temp_tend))
-        c = zero(eltype(temp_tend))  # compensation for lost low-order bits
+        c = zero(eltype(temp_tend))
+        for r in 1:nlayers
+            val = L[k, r] * (div_old[lm, r] - div_new[lm, r])
+            y = val - c
+            t = temp_correction + y
+            c = (t - temp_correction) - y
+            temp_correction = t
+        end
+        temp_tend[lm, k] += temp_correction
+    end
+
+    # Geopotential calculation with Kahan summation
+    for k in 1:nlayers
+        # skip 1:k-1 as integration is surface to k
+        geopot_val = zero(eltype(geopot))
+        c = zero(eltype(geopot))
+        for r in k:nlayers
+            val = R[k, r] * temp_tend[lm, r]
+            y = val - c
+            t = geopot_val + y
+            c = (t - geopot_val) - y
+            geopot_val = t
+        end
+        geopot[lm, k] = geopot_val
+    end
+            
+    eigenvalue = -l*(l-1)  # 1-based, -l*(l+1) → -l*(l-1)
+        
+    # Step 2: Calculate the ξ*R*G_T term, vertical integration of geopotential
+    # (excl ξ, this is done in step 3)
+        
+    # Step 3: Calculate the G = G_D + ξRG_T + ξUG_lnps terms
+    # ∇² not part of U so *eigenvalues here
+    for k in 1:nlayers
+        G[lm, k] = div_tend[lm, k] + ξ*eigenvalue*(U[k]*pres_tend[lm] + geopot[lm, k])
+    end
+        
+    # Step 4: Now solve δD = S⁻¹G to correct divergence tendency
+    # Use Kahan summation for better numerical accuracy
+    for k in 1:nlayers
+        div_val = zero(eltype(div_tend))
+        c = zero(eltype(div_tend))
+        for r in 1:nlayers
+            val = S⁻¹[l, k, r] * G[lm, r]
+            y = val - c
+            t = div_val + y
+            c = (t - div_val) - y
+            div_val = t
+        end
+        div_tend[lm, k] = div_val
+    end
+        
+    # Step 5: Semi implicit corrections for temperature and pressure
+        
+    # Step 5a: Temperature correction δT = G_T + ξLδD
+    # Use Kahan summation for better numerical accuracy
+    for k in 1:nlayers
+        temp_correction = zero(eltype(temp_tend))
+        c = zero(eltype(temp_tend))
         for r in 1:nlayers
             val = ξ * L[k, r] * div_tend[lm, r]
             y = val - c
@@ -536,7 +625,7 @@ end
     # Step 5b: Pressure correction δlnpₛ = G_lnpₛ + ξWδD
     # Use Kahan summation for better numerical accuracy
     pres_correction = zero(eltype(pres_tend))
-    c = zero(eltype(pres_tend))  # compensation for lost low-order bits
+    c = zero(eltype(pres_tend))
     for k in 1:nlayers
         val = ξ * W[k] * div_tend[lm, k]
         y = val - c
@@ -545,6 +634,44 @@ end
         pres_correction = t
     end
     pres_tend[lm] += pres_correction
+end
+
+# Function to call the Kahan version
+function implicit_correction_lm_kahan!(
+    diagn::DiagnosticVariables,
+    progn::PrognosticVariables,
+    implicit::ImplicitPrimitiveEquation,
+    model::PrimitiveEquation,
+)
+    (; temp_tend, pres_tend, div_tend) = diagn.tendencies
+    div_old, div_new = get_steps(progn.div)
+    (; S⁻¹, R, U, L, W) = implicit
+    ξ = implicit.ξ[]
+    nlayers = model.geometry.nlayers
+
+    # Allocate temporary arrays
+    G = similar(div_tend)
+    geopot = similar(div_tend)
+    G .= 0
+    geopot .= 0
+
+    # Get precomputed l_indices from the spectrum
+    l_indices = temp_tend.spectrum.l_indices
+
+    arch = architecture(temp_tend)
+    
+    # Single kernel with Kahan summation: All implicit correction steps for each spectral mode
+    lm_size = size(pres_tend, 1)
+    launch!(arch, LinearWorkOrder, (lm_size,),
+            implicit_primitive_single_kernel_kahan!,
+            temp_tend, pres_tend, div_tend, G, geopot,
+            div_old, div_new, S⁻¹, R, U, L, W, l_indices, ξ, nlayers)
+
+    zero_last_degree!(div_tend)
+    zero_last_degree!(pres_tend)
+    zero_last_degree!(temp_tend)
+
+    return nothing
 end
 
 # Kernel 1: Combined temperature update and geopotential calculation
@@ -557,15 +684,9 @@ end
     
     # Move implicit terms of temperature equation from time step i to i-1
     # RHS_expl(Vⁱ) + RHS_impl(Vⁱ⁻¹) = RHS(Vⁱ) + RHS_impl(Vⁱ⁻¹ - Vⁱ)
-    # Use Kahan summation for better numerical accuracy
     temp_correction = zero(eltype(temp_tend))
-    c = zero(eltype(temp_tend))  # compensation for lost low-order bits
     for r in 1:nlayers
-        val = L[k, r] * (div_old[lm, r] - div_new[lm, r])
-        y = val - c
-        t = temp_correction + y
-        c = (t - temp_correction) - y
-        temp_correction = t
+        temp_correction += L[k, r] * (div_old[lm, r] - div_new[lm, r])
     end
     temp_tend[I] += temp_correction
     
@@ -623,15 +744,9 @@ end
     
     # Semi implicit correction for temperature
     # δT = G_T + ξLδD
-    # Use Kahan summation for better numerical accuracy
     temp_correction = zero(eltype(temp_tend))
-    c = zero(eltype(temp_tend))  # compensation for lost low-order bits
     for r in 1:nlayers
-        val = ξ * L[k, r] * div_tend[lm, r]
-        y = val - c
-        t = temp_correction + y
-        c = (t - temp_correction) - y
-        temp_correction = t
+        temp_correction += ξ * L[k, r] * div_tend[lm, r]
     end
     temp_tend[lm, k] += temp_correction
 end
@@ -645,15 +760,9 @@ end
     # Semi implicit correction for pressure
     # δlnpₛ = G_lnpₛ + ξWδD
     # Accumulate contributions from all layers for this spectral mode
-    # Use Kahan summation for better numerical accuracy
     pres_correction = zero(eltype(pres_tend))
-    c = zero(eltype(pres_tend))  # compensation for lost low-order bits
     for k in 1:nlayers
-        val = ξ * W[k] * div_tend[lm, k]
-        y = val - c
-        t = pres_correction + y
-        c = (t - pres_correction) - y
-        pres_correction = t
+        pres_correction += ξ * W[k] * div_tend[lm, k]
     end
     pres_tend[lm] += pres_correction
 end
