@@ -1,12 +1,8 @@
-using Adapt
-
-@testset "Test the variable system for the parameterization" begin
+@testset "Variable system for parameterizations" begin
     
     struct MyParam end 
     
     MyParam(::SpectralGrid) = MyParam()
-
-    Adapt.@adapt_structure MyParam
 
     SpeedyWeather.variables(::MyParam) = (DiagnosticVariable(name=:myvar_grid2d, dims=Grid2D(), desc="My variable", units="1"),
     
