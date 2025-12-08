@@ -9,7 +9,8 @@ using Adapt
         ocean_albedo::NF=0.06
     end 
 
-    Adapt.@adapt_structure SimpleAlbedo
+    # adapt not actually needed for this test as we don't actually run it on GPU
+    #Adapt.@adapt_structure SimpleAlbedo
 
     SimpleAlbedo(SG::SpectralGrid; kwargs...) = SimpleAlbedo(; kwargs...)
 
@@ -20,11 +21,10 @@ using Adapt
     )
 
     function SpeedyWeather.parameterization!(ij, diagn::DiagnosticVariables, progn::PrognosticVariables, albedo::SimpleAlbedo, model_parameters) 
-        
         (; land_sea_mask) = model_parameters
         (; sea_ice_concentration) = progn.ocean
         (; land_albedo, seaice_albedo, ocean_albedo) = albedo
-        
+
         if land_sea_mask.mask[ij] > 0.95 # if mostly land 
             diagn.physics.albedo[ij] = land_albedo
         else # if ocean
@@ -37,7 +37,7 @@ using Adapt
     albedo = SimpleAlbedo()
     model = PrimitiveWetModel(spectral_grid; albedo=albedo)
     simulation = initialize!(model) 
-    run!(simulation, period=Day(5)) # spin up the model a little
+    run!(simulation, steps=10) # spin up the model a little
     progn, diagn, model = SpeedyWeather.unpack(simulation)
 
     # check if albedo in diagn 
@@ -46,8 +46,7 @@ using Adapt
     # check if albedo is set correctly 
     #heatmap(diagn.physics.albedo)
 
-    @test all(diagn.physics.albedo[model.land_sea_mask.mask .> 0.95] .≈ albedo.land_albedo)
-
+    @test all(diagn.physics.albedo[model.land_sea_mask.mask.data .> 0.95] .≈ albedo.land_albedo)
 
     # now do the same but with manually adding the albedo to the list of parameterizations
     model = PrimitiveWetModel(spectral_grid; custom_parameterization = SimpleAlbedo(), parameterizations=(:convection, :large_scale_condensation, :custom_parameterization, 
@@ -56,12 +55,12 @@ using Adapt
                                                             :stochastic_physics))
 
     simulation = initialize!(model) 
-    run!(simulation, period=Day(5)) # spin up the model a little
+    run!(simulation, steps=10) # spin up the model a little
     progn, diagn, model = SpeedyWeather.unpack(simulation)
 
     # check if albedo is set correctly 
     #heatmap(diagn.physics.albedo)
 
-    @test all(diagn.physics.albedo[model.land_sea_mask.mask .> 0.95] .≈ albedo.land_albedo)
+    @test all(diagn.physics.albedo[model.land_sea_mask.mask.data .> 0.95] .≈ albedo.land_albedo)
 
 end

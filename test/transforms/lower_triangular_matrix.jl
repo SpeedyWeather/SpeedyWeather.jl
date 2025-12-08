@@ -7,7 +7,7 @@ import Random
         @testset for lmax = (mmax, mmax+1)
             A = randn(Complex{NF}, lmax, mmax)
 
-            spectral_truncation!(A)
+            SpeedyWeather.spectral_truncation!(A)
 
             L = LowerTriangularMatrix(A)
 
@@ -515,7 +515,7 @@ end
         # with ranges
         L1 = zeros(LowerTriangularMatrix{NF}, 33, 32);
         L2 = randn(LowerTriangularMatrix{NF}, 65, 64);
-        L2T = spectral_truncation(L2, size(L1, ZeroBased, as=Matrix)...)
+        L2T = SpeedyWeather.spectral_truncation(L2, size(L1, ZeroBased, as=Matrix)...)
 
         copyto!(L1, L2, 1:33, 1:32)     # size of smaller matrix
         @test L1 == L2T
@@ -578,7 +578,7 @@ end
             # with ranges
             L1 = zeros(LowerTriangularArray{NF}, 33, 32, idims...);
             L2 = randn(LowerTriangularArray{NF}, 65, 64, idims...);
-            L2T = spectral_truncation(L2, (size(L1, ZeroBased,  as=Matrix)[1:2])...)
+            L2T = SpeedyWeather.spectral_truncation(L2, (size(L1, ZeroBased,  as=Matrix)[1:2])...)
 
             copyto!(L1, L2, 1:33, 1:32)     # size of smaller matrix
             @test L1 == L2T

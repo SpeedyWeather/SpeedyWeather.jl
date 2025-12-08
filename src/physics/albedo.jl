@@ -48,7 +48,7 @@ end
     parameterization!(ij, diagn.physics.land, progn, albedo.land, model)
 end
 
-function variables(::AbstractAlbedo)
+function variables(::OceanLandAlbedo)
     return (
         DiagnosticVariable(name=:albedo, dims=Grid2D(), desc="Albedo", units="1"),
         DiagnosticVariable(name=:albedo, dims=Grid2D(), desc="Albedo over the ocean", units="1", namespace=:ocean),
@@ -73,7 +73,6 @@ Fields are $(TYPEDFIELDS)"""
     albedo::NF = 0.3
 end
 
-Adapt.@adapt_structure GlobalConstantAlbedo
 GlobalConstantAlbedo(SG::SpectralGrid; kwargs...) = GlobalConstantAlbedo{SG.NF}(; kwargs...)
 initialize!(albedo::GlobalConstantAlbedo, ::PrimitiveEquation) = nothing
 @propagate_inbounds parameterization!(ij, diagn, progn, albedo::GlobalConstantAlbedo, model) =

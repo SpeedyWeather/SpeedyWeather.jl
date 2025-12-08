@@ -101,7 +101,7 @@ For vertical stability in the boundary layer."""
     cₚ = atmosphere.heat_capacity
     surface = diagn.nlayers     # surface index = nlayers
 
-    Vₛ = diagn.physics.surface_wind_speed[ij, surface]
+    Vₛ = diagn.physics.surface_wind_speed[ij]
     T = diagn.grid.temp_grid_prev[ij, surface]
     q = diagn.grid.humid_grid_prev[ij, surface]
     Tᵥ = virtual_temperature(T, q, atmosphere)

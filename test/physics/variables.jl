@@ -1,11 +1,12 @@
 using Adapt
-@testset "Test the variable system for the parameterization" begin
+@testset "Variable system for parameterizations" begin
     
     struct MyParam end 
     
     MyParam(::SpectralGrid) = MyParam()
 
-    Adapt.@adapt_structure MyParam
+    # adapt not required for this test as we don't actually run it on GPU
+    #Adapt.@adapt_structure MyParam
 
     SpeedyWeather.variables(::MyParam) = (DiagnosticVariable(name=:myvar_grid2d, dims=Grid2D(), desc="My variable", units="1"),
     DiagnosticVariable(name=:myvar_grid3d, dims=Grid3D(), desc="My variable", units="1"),
@@ -18,7 +19,7 @@ using Adapt
     spectral_grid = SpectralGrid()
 
     # only parameter and paremterization is the above defined one and land and ocean as they are required in the initalize!
-    model = PrimitiveWetModel(spectral_grid, parameterizations=(:myparam => MyParam(), ), extra_parameterizations=(:land, :ocean))
+    model = PrimitiveWetModel(spectral_grid, custom_parameterization = MyParam(), parameterizations=(:custom_parameterization, ), extra_parameterizations=(:land, :ocean))
     simulation = initialize!(model)
 
     # check that the variables are there and have the right dimension
