@@ -328,7 +328,6 @@ SlabOcean(SG::SpectralGrid; kwargs...) = SlabOcean{SG.NF}(; kwargs...)
 function variables(::SlabOcean)
     return (
     PrognosticVariable(name=:sea_surface_temperature, dims=Grid2D(), namespace=:ocean, desc="Sea surface temperature", units="K"),
-    PrognosticVariable(name=:sea_ice_concentration,   dims=Grid2D(), namespace=:ocean, desc="Sea ice concentration", units="1"),
     
     DiagnosticVariable(name=:surface_shortwave_down, dims=Grid2D(), desc="Surface shortwave radiation down", units="W/m^2"),
     DiagnosticVariable(name=:surface_shortwave_up,   dims=Grid2D(), desc="Surface shortwave radiation up over ocean", units="W/m^2", namespace=:ocean),

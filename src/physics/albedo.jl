@@ -174,17 +174,11 @@ initialize!(::OceanSeaIceAlbedo, ::PrimitiveEquation) = nothing
 @propagate_inbounds parameterization!(ij, diagn, progn, albedo::OceanSeaIceAlbedo, model) = albedo!(ij, diagn.albedo, progn.ocean, albedo)
 
 @propagate_inbounds function albedo!(ij, diagn_albedo::AbstractArray, ocean, albedo::OceanSeaIceAlbedo)
-    (; sea_ice_concentration ) = ocean
     (; albedo_ocean, albedo_ice) = albedo
+    ℵ = haskey(ocean, :sea_ice_concentration) ? ocean.sea_ice_concentration[ij] : zero(eltype(diagn_albedo))
 
     # set ocean albedo linearly between ocean and ice depending on sea ice concentration
-    diagn_albedo[ij] = albedo_ocean + sea_ice_concentration[ij] * (albedo_ice - albedo_ocean)
-end
-
-function variables(::AbstractAlbedo)
-    return (
-        DiagnosticVariable(name=:albedo, dims=Grid2D(), desc="Albedo", units="1"),
-    )
+    diagn_albedo[ij] = albedo_ocean + ℵ * (albedo_ice - albedo_ocean)
 end
 
 abstract type AbstractSnowCover end
