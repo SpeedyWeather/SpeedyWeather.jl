@@ -10,8 +10,8 @@ end
 boundary_layer_drag!(::ColumnVariables, ::Nothing, ::PrimitiveEquation) = nothing
 
 export ConstantDrag
-@kwdef struct ConstantDrag{NF} <: AbstractBoundaryLayer
-    drag::NF = 1e-3
+@parameterized @kwdef struct ConstantDrag{NF} <: AbstractBoundaryLayer
+    @param drag::NF = 1e-3 (bounds=Nonnegative,)
 end
 
 ConstantDrag(SG::SpectralGrid; kwargs...) = ConstantDrag{SG.NF}(; kwargs...)
@@ -27,15 +27,15 @@ export BulkRichardsonDrag
 """Boundary layer drag coefficient from the bulk Richardson number,
 following Frierson, 2006, Journal of the Atmospheric Sciences.
 $(TYPEDFIELDS)"""
-@kwdef struct BulkRichardsonDrag{NF} <: AbstractBoundaryLayer
+@parameterized @kwdef struct BulkRichardsonDrag{NF} <: AbstractBoundaryLayer
     "von Kármán constant [1]"
-    κ::NF = 0.4
+    κ::NF = 0.4 
 
     "roughness length [m]"
-    z₀::NF = 3.21e-5
+    @param z₀::NF = 3.21e-5 (bounds=Positive,)
 
     "Critical Richardson number for stable mixing cutoff [1]"
-    Ri_c::NF = 10
+    @param Ri_c::NF = 10 (bounds=Positive,)
 
     "Maximum drag coefficient, κ²/log(zₐ/z₀) for zₐ from reference temperature"
     drag_max::Base.RefValue{NF} = Ref(zero(NF))

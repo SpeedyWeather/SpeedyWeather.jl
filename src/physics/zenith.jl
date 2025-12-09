@@ -5,22 +5,14 @@ abstract type AbstractZenith end
 """Coefficients to calculate the solar declination angle δ [radians] based on a simple
 sine function, with Earth's axial tilt as amplitude, equinox as phase shift.
 $(TYPEDFIELDS)"""
-Base.@kwdef struct SinSolarDeclination{NF} <: AbstractSolarDeclination
-    axial_tilt::NF = 23.44
-    equinox::DateTime = DateTime(2000, 3, 20)
-    length_of_year::Second = Day(365.25)
-    length_of_day::Second = Hour(24)
+struct SinSolarDeclination{P} <: AbstractSolarDeclination
+    planet::P
 end
-
-"""Generator function pulling the number format NF from a SpectralGrid."""
-SinSolarDeclination(SG::SpectralGrid; kwargs...) = SinSolarDeclination{SG.NF}(; kwargs...)
 
 """Generator function using the planet's orbital parameters to adapt the
 solar declination calculation."""
-function SinSolarDeclination(SG::SpectralGrid, P::AbstractPlanet)
-    (; axial_tilt, equinox, length_of_year, length_of_day) = P
-    SinSolarDeclination{SG.NF}(; axial_tilt, equinox, length_of_year, length_of_day)
-end
+SinSolarDeclination(SG::SpectralGrid, P::AbstractPlanet) = SinSolarDeclination(P)
+SinSolarDeclination(P::AbstractPlanet) = SinSolarDeclination{typeof(P)}(P)
 
 """
 $(TYPEDSIGNATURES)
@@ -28,9 +20,10 @@ SinSolarDeclination functor, computing the solar declination angle of
 angular fraction of year g [radians] using the coefficients of the
 SinSolarDeclination struct."""
 function (S::SinSolarDeclination)(g::NF) where NF
-    axial_tilt = deg2rad(S.axial_tilt)
-    equinox = S.length_of_day.value*Dates.dayofyear(S.equinox)/S.length_of_year.value
-    return axial_tilt*sin(g-2*(π*convert(NF, equinox)))
+    axial_tilt = deg2rad(S.planet.axial_tilt)
+    equinox = Second(S.planet.length_of_day).value *
+        Dates.dayofyear(S.planet.equinox) / Second(S.planet.length_of_year).value
+    return axial_tilt * sin(g - 2 * (π * convert(NF, equinox)))
 end
 
 """Coefficients to calculate the solar declination angle δ from
@@ -42,14 +35,14 @@ end
 with g the angular fraction of the year in radians. Following Spencer 1971,
 Fourier series representation of the position of the sun. Search 2(5):172.
 $(TYPEDFIELDS)"""
-Base.@kwdef struct SolarDeclination{NF<:AbstractFloat} <: AbstractSolarDeclination
-    a::NF =   0.006918      # the offset +
-    s1::NF =  0.070257      # s1*sin(g) +
-    c1::NF = -0.399912      # c1*cos(g) +
-    s2::NF =  0.000907      # s2*sin(2g) +
-    c2::NF = -0.006758      # c2*cos(2g) +
-    s3::NF =  0.001480      # s3*sin(3g) +
-    c3::NF = -0.002697      # c3*cos(3g)
+@parameterized Base.@kwdef struct SolarDeclination{NF<:AbstractFloat} <: AbstractSolarDeclination
+    @param a::NF =   0.006918      # the offset +
+    @param s1::NF =  0.070257      # s1*sin(g) +
+    @param c1::NF = -0.399912      # c1*cos(g) +
+    @param s2::NF =  0.000907      # s2*sin(2g) +
+    @param c2::NF = -0.006758      # c2*cos(2g) +
+    @param s3::NF =  0.001480      # s3*sin(3g) +
+    @param c3::NF = -0.002697      # c3*cos(3g)
 end
 
 """Generator function pulling the number format NF from a SpectralGrid."""
@@ -77,12 +70,12 @@ end
 """Coefficients for the solar time correction (also called
 Equation of time) which adjusts the solar hour to an oscillation
 of sunrise/set by about +-16min throughout the year."""
-Base.@kwdef struct SolarTimeCorrection{NF<:AbstractFloat} <: AbstractSolarTimeCorrection
-    a::NF =   0.004297      # the offset +
-    s1::NF = -1.837877      # s1*sin(g) +
-    c1::NF =  0.107029      # c1*cos(g) +
-    s2::NF = -2.340475      # s2*sin(2g) +
-    c2::NF = -0.837378      # c2*cos(2g)
+@parameterized Base.@kwdef struct SolarTimeCorrection{NF<:AbstractFloat} <: AbstractSolarTimeCorrection
+    @param a::NF =   0.004297      # the offset +
+    @param s1::NF = -1.837877      # s1*sin(g) +
+    @param c1::NF =  0.107029      # c1*cos(g) +
+    @param s2::NF = -2.340475      # s2*sin(2g) +
+    @param c2::NF = -0.837378      # c2*cos(2g)
 end
 
 """
@@ -114,11 +107,11 @@ function WhichZenith(SG::SpectralGrid, P::AbstractPlanet; kwargs...)
     solar_declination = SinSolarDeclination(SG, P)
 
     if daily_cycle
-        return SolarZenith{NF}(;
+        return SolarZenith{NF, typeof(solar_declination)}(;
             length_of_day, length_of_year, solar_declination, seasonal_cycle, kwargs...)
 
     else
-        return SolarZenithSeason{NF}(;
+        return SolarZenithSeason{NF, typeof(solar_declination)}(;
             length_of_day, length_of_year, solar_declination, seasonal_cycle, kwargs...)
     end
 end
@@ -140,7 +133,7 @@ export SolarZenith
 
 """Solar zenith angle varying with daily and seasonal cycle.
 $(TYPEDFIELDS)"""
-@kwdef struct SolarZenith{NF<:AbstractFloat} <: AbstractZenith
+@parameterized @kwdef struct SolarZenith{NF<:AbstractFloat, SD<:AbstractSolarDeclination} <: AbstractZenith
     # OPTIONS
     length_of_day::Second = Hour(24)
     length_of_year::Second = Day(365.25)
@@ -148,13 +141,13 @@ $(TYPEDFIELDS)"""
     seasonal_cycle::Bool = true
 
     # COEFFICIENTS
-    solar_declination::SinSolarDeclination{NF} = SinSolarDeclination{NF}()
-    time_correction::SolarTimeCorrection{NF} = SolarTimeCorrection{NF}()
+    @param solar_declination::SD = SinSolarDeclination(Earth{NF}()) (group=:solar_declination,)
+    @param time_correction::SolarTimeCorrection{NF} = SolarTimeCorrection{NF}() (group=:time_correction,)
 
     initial_time::Base.RefValue{DateTime} = Ref(DEFAULT_DATE)
 end
 
-SolarZenith(SG::SpectralGrid; kwargs...) = SolarZenith{SG.NF}(; kwargs...)
+SolarZenith(SG::SpectralGrid; kwargs...) = SolarZenith{SG.NF, SinSolarDeclination{Earth{SG.NF}}}(; kwargs...)
 
 function initialize!(
     S::AbstractZenith,
@@ -241,19 +234,19 @@ export SolarZenithSeason
 
 """Solar zenith angle varying with seasonal cycle only.
 $(TYPEDFIELDS)"""
-@kwdef struct SolarZenithSeason{NF<:AbstractFloat} <: AbstractZenith
+@parameterized @kwdef struct SolarZenithSeason{NF<:AbstractFloat, SD<:AbstractSolarDeclination} <: AbstractZenith
     # OPTIONS
     length_of_day::Second = Hour(24)
     length_of_year::Second = Day(365.25)
     seasonal_cycle::Bool = true
 
     # COEFFICIENTS
-    solar_declination::SinSolarDeclination{NF} = SinSolarDeclination{NF}()
+    @param solar_declination::SD = SinSolarDeclination(Earth{NF}()) (group=:solar_declination,)
 
     initial_time::Base.RefValue{DateTime} = Ref(DEFAULT_DATE)
 end
 
-SolarZenithSeason(SG::SpectralGrid; kwargs...) = SolarZenithSeason{SG.NF}(; kwargs...)
+SolarZenithSeason(SG::SpectralGrid; kwargs...) = SolarZenithSeason{SG.NF, SinSolarDeclination{Earth{SG.NF}}}(; kwargs...)
 
 """
 $(TYPEDSIGNATURES)

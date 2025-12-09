@@ -1,7 +1,7 @@
 # Changelog
 
 ## Unreleased
-
+- Follow-up to #783: finalize @param/@component markers [#935](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/935)
 - uv_from_vordiv! kernel version used [#893](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/893)
 - Fixes some typos and formatting/LaTeX rendering in Docs [#939](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/939)
 - Land snow model [#833](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/833)
