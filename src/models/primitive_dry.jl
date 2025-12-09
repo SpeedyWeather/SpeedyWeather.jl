@@ -93,7 +93,7 @@ $(TYPEDFIELDS)"""
     surface_heat_flux::SH = SurfaceHeatFlux(spectral_grid)
     convection::CV = BettsMillerDryConvection(spectral_grid)
     shortwave_radiation::SW = TransparentShortwave(spectral_grid)
-    longwave_radiation::LW = OneBandLongwave(spectral_grid)
+    longwave_radiation::LW = OneBandGreyLongwave(spectral_grid)
     stochastic_physics::SP = nothing
     custom_parameterization::CP = nothing
     

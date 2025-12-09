@@ -84,19 +84,23 @@ struct OneBandShortwave{C, T, R} <: AbstractShortwave
 end
 
 # primitive wet model version
-OneBandShortwave(SG::SpectralGrid) = OneBandShortwave(
-    DiagnosticClouds(SG),
-    BackgroundShortwaveTransmissivity(SG),
-    OneBandShortwaveRadiativeTransfer(SG),
+function OneBandShortwave(SG::SpectralGrid;
+    clouds = DiagnosticClouds(SG),
+    transmissivity = BackgroundShortwaveTransmissivity(SG),
+    radiative_transfer = OneBandShortwaveRadiativeTransfer(SG),
 )
+    return OneBandShortwave(clouds, transmissivity, radiative_transfer)
+end
 
 # primitive dry model version
 export OneBandGreyShortwave
-OneBandGreyShortwave(SG::SpectralGrid) = OneBandShortwave(
-    NoClouds(SG),
-    TransparentShortwaveTransmissivity(SG),
-    OneBandShortwaveRadiativeTransfer(SG),
+function OneBandGreyShortwave(SG::SpectralGrid;
+    clouds = NoClouds(SG),
+    transmissivity = TransparentShortwaveTransmissivity(SG),
+    radiative_transfer = OneBandShortwaveRadiativeTransfer(SG),
 )
+    return OneBandShortwave(clouds, transmissivity, radiative_transfer)
+end
 
 get_nbands(::OneBandShortwave) = 1
 

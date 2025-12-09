@@ -1,5 +1,19 @@
 abstract type AbstractLongwaveTransmissivity <: AbstractLongwave end
 
+export TransparentLongwaveTransmissivity
+struct TransparentLongwaveTransmissivity <: AbstractLongwaveTransmissivity end
+TransparentLongwaveTransmissivity(SG::SpectralGrid) = TransparentLongwaveTransmissivity()
+initialize!(::TransparentLongwaveTransmissivity, ::AbstractModel) = nothing
+@propagate_inbounds function transmissivity!(ij, diagn, progn, transmissivity::TransparentLongwaveTransmissivity, model)
+    # transmissivity is 1 everywhere (no absorption)
+    t = diagn.dynamics.a_grid   # use scratch array
+    nlayers = size(t, 2)
+    for k in 1:nlayers
+        t[ij, k] = one(eltype(t))
+    end
+    return t
+end
+
 export FriersonLongwaveTransmissivity
 @kwdef mutable struct FriersonLongwaveTransmissivity{NF} <: AbstractLongwaveTransmissivity
     "[OPTION] Optical depth at the equator"
@@ -15,13 +29,8 @@ end
 FriersonLongwaveTransmissivity(SG::SpectralGrid; kwargs...) = FriersonLongwaveTransmissivity{SG.NF}(; kwargs...)
 initialize!(::FriersonLongwaveTransmissivity, ::AbstractModel) = nothing
 
-@propagate_inbounds function transmissivity!(
-    ij,
-    diagn,
-    progn,
-    transmissivity::FriersonLongwaveTransmissivity,
-    model,
-)
+@propagate_inbounds function transmissivity!(ij, diagn, progn, transmissivity::FriersonLongwaveTransmissivity, model)
+
     # use scratch array to compute transmissivity t
     t = diagn.dynamics.a_grid
     nlayers = size(t, 2)

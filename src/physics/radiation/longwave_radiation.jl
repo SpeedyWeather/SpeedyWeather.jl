@@ -32,12 +32,13 @@ initialize!(radiation::UniformCooling, model::PrimitiveEquation) = nothing
 
 # function barrier
 @propagate_inbounds parameterization!(ij, diagn, progn, longwave::UniformCooling, model) =
-    longwave_radiation!(ij, diagn, progn, longwave)
+    longwave_radiation!(ij, diagn, longwave)
 
-@propagate_inbounds function longwave_radiation!(ij, diagn, progn, longwave::UniformCooling)
+@propagate_inbounds function longwave_radiation!(ij, diagn, longwave::UniformCooling)
+    
     T = diagn.grid.temp_grid_prev
     dTdt = diagn.tendencies.temp_tend_grid
-    (; temp_min, temp_stratosphere) = radiation
+    (; temp_min, temp_stratosphere) = longwave
     nlayers = size(T, 2)
     
     NF = eltype(T)
@@ -169,17 +170,21 @@ struct OneBandLongwave{T, R} <: AbstractLongwave
 end
 
 # primitive wet model version
-OneBandLongwave(SG::SpectralGrid) = OneBandLongwave(
-    FriersonLongwaveTransmissivity(SG),
-    OneBandLongwaveRadiativeTransfer(SG),
+function OneBandLongwave(SG::SpectralGrid;
+    transmissivity = FriersonLongwaveTransmissivity(SG),
+    radiative_transfer = OneBandLongwaveRadiativeTransfer(SG),
 )
+    return OneBandLongwave(transmissivity, radiative_transfer)
+end
 
 # primitive dry model version
 export OneBandGreyLongwave
-OneBandGreyLongwave(SG::SpectralGrid) = OneBandLongwave(
-    TransparentLongwaveTransmissivity(SG),
-    OneBandLongwaveRadiativeTransfer(SG),
+function OneBandGreyLongwave(SG::SpectralGrid;
+    transmissivity = TransparentLongwaveTransmissivity(SG),
+    radiative_transfer = OneBandLongwaveRadiativeTransfer(SG),
 )
+    return OneBandLongwave(transmissivity, radiative_transfer)
+end
 
 get_nbands(::OneBandLongwave) = 1
 
