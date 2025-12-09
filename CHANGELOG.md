@@ -2,10 +2,11 @@
 
 ## Unreleased
 - Follow-up to #783: finalize @param/@component markers [#935](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/935)
+- Fixes some typos and formatting/LaTeX rendering in Docs [#939](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/939)
 - Land snow model [#833](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/833)
 - Updated extended differentiability tests [#929](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/929)
 - GitHub Actions Checkout updated to version 6 [#926](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/926)
-- `set!(::Field,::Functions,...)` works now on GPU (however by explicitly transfering between GPU and CPU) [#925](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/925)
+- `set!(::Field,::Functions,...)` works now on GPU (however by explicitly transferring between GPU and CPU) [#925](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/925)
 - Fixes round trip transform tests [#921](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/921)
 - Updated docs CairoMakie compatibility to "0.12, 0.13, 0.14, 0.15"
 - OneBandShortwave radiation implemented with diagnostic clouds [#888](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/888)
@@ -33,7 +34,7 @@
 
 ## v0.17.3
 
-- Add missing compat entires for SpeedyWeatherInternals [#883](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/883)
+- Add missing compat entries for SpeedyWeatherInternals [#883](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/883)
 - Move SpeedyParameters to SpeedyWeatherInternals [#880](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/880)
 - Remove JOSS paper draft workflow [#874](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/874)
 - Change particle tracking to every 4 hours [#881](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/881)
@@ -70,7 +71,7 @@
 - Soil moisture initial conditions [#830](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/830)
 - Diagnose snow fall from large-scale condensation [#817](https://github.dev/SpeedyWeather/SpeedyWeather.jl/pull/817)
 - Fix output_dt for JLD2Output [#829](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/829)
-- Fix some missign scratch memory usage in the transforms [#828](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/828)
+- Fix some missing scratch memory usage in the transforms [#828](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/828)
 - GitHub actions checkout v5 [#826](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/826)
 - Compatibility for JLD2 v0.6 [#825](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/825)
 - Introduce `nothing` as valid model component [#822](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/822)
