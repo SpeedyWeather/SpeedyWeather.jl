@@ -1,7 +1,7 @@
-abstract type AbstractLongwaveTransmittance <: AbstractLongwave end
+abstract type AbstractLongwaveTransmissivity <: AbstractLongwave end
 
-export FriersonLongwaveTransmittance
-@kwdef mutable struct FriersonLongwaveTransmittance{NF} <: AbstractLongwaveTransmittance
+export FriersonLongwaveTransmissivity
+@kwdef mutable struct FriersonLongwaveTransmissivity{NF} <: AbstractLongwaveTransmissivity
     "[OPTION] Optical depth at the equator"
     τ₀_equator::NF = 6
 
@@ -12,23 +12,23 @@ export FriersonLongwaveTransmittance
     fₗ::NF = 0.1
 end
 
-FriersonLongwaveTransmittance(SG::SpectralGrid; kwargs...) = FriersonLongwaveTransmittance{SG.NF}(; kwargs...)
-initialize!(::FriersonLongwaveTransmittance, ::AbstractModel) = nothing
+FriersonLongwaveTransmissivity(SG::SpectralGrid; kwargs...) = FriersonLongwaveTransmissivity{SG.NF}(; kwargs...)
+initialize!(::FriersonLongwaveTransmissivity, ::AbstractModel) = nothing
 
-@propagate_inbounds function transmittance!(
+@propagate_inbounds function transmissivity!(
     ij,
     diagn,
     progn,
-    transmittance::FriersonLongwaveTransmittance,
+    transmissivity::FriersonLongwaveTransmissivity,
     model,
 )
-    # use scratch array to compute transmittance t
+    # use scratch array to compute transmissivity t
     t = diagn.dynamics.a_grid
     nlayers = size(t, 2)
     NF = eltype(t)
 
     # but the longwave optical depth follows some idealised humidity lat-vert distribution
-    (; τ₀_equator, τ₀_pole, fₗ) = transmittance
+    (; τ₀_equator, τ₀_pole, fₗ) = transmissivity
 
     # coordinates 
     σ = model.geometry.σ_levels_half

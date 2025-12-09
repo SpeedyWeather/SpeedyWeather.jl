@@ -70,11 +70,11 @@ subtypes(SpeedyWeather.AbstractShortwave)
 
 ## OneBandShortwave: Single-band shortwave radiation with diagnostic clouds
 
-The `OneBandShortwave` scheme provides a single-band (broadband) shortwave radiation parameterization, including diagnostic cloud effects following [^KMB06]. For dry models without water vapor, use `OneBandGreyShortwave` instead, which automatically disables cloud effects and uses transparent transmittance.
+The `OneBandShortwave` scheme provides a single-band (broadband) shortwave radiation parameterization, including diagnostic cloud effects following [^KMB06]. For dry models without water vapor, use `OneBandGreyShortwave` instead, which automatically disables cloud effects and uses transparent transmissivity ``t=1``.
 
 **Key differences:**
 
-- `OneBandShortwave`: Includes diagnostic clouds, water vapor absorption, and atmospheric transmittance effects (for wet models)
+- `OneBandShortwave`: Includes diagnostic clouds, water vapor absorption, and atmospheric transmissivity effects (for wet models)
 - `OneBandGreyShortwave`: No clouds, transparent atmosphere (for dry models)
 
 **Cloud diagnosis:**
@@ -192,7 +192,7 @@ nothing # hide
 ![Outgoing shortwave radiation](osr.png)
 
 **For dry models (no water vapor or clouds):**
-Use `OneBandGreyShortwave` instead, which automatically uses `NoClouds` and `TransparentShortwaveTransmittance`:
+Use `OneBandGreyShortwave` instead, which automatically uses `NoClouds` and `TransparentShortwaveTransmissivity`:
 
 ```@example radiation
 using SpeedyWeather
@@ -221,14 +221,14 @@ The cloud scheme can be specified when constructing the radiation scheme:
 - `DiagnosticClouds(spectral_grid)` (default): Diagnoses clouds from humidity and precipitation
 - `NoClouds(spectral_grid)`: No clouds (used in `OneBandGreyShortwave`)
 
-#### Transmittance schemes
+#### Transmissivity schemes
 
-The atmospheric transmittance can be calculated using:
+The atmospheric transmissivity can be calculated using:
 
-- `BackgroundShortwaveTransmittance(spectral_grid)` (default): SPEEDY-style transmittance with zenith correction and absorption by aerosols, water vapor, and clouds
-- `TransparentShortwaveTransmittance(spectral_grid)`: Transparent atmosphere (used in `OneBandGreyShortwave`)
+- `BackgroundShortwaveTransmissivity(spectral_grid)` (default): SPEEDY-style transmissivity with zenith correction and absorption by aerosols, water vapor, and clouds
+- `TransparentShortwaveTransmissivity(spectral_grid)`: Transparent atmosphere (used in `OneBandGreyShortwave`)
 
-##### BackgroundShortwaveTransmittance 
+##### BackgroundShortwaveTransmissivity 
 
 For each layer ``k``, the transmissivity is
 
@@ -246,9 +246,9 @@ with
 - ``a_{wv}`` water-vapor absorptivity (`absorptivity_water_vapor`) times specific humidity ``q_k``
 - ``a_{cl}(q_\mathrm{base}) = \min(a_{cl,base} q_\mathrm{base}, a_{cl,limit})`` cloud absorptivity added below the diagnosed cloud top, scaled by cloud cover ``\mathrm{CLC}``
 
-All absorptivity coefficients are per ``10^5`` Pa. The resulting ``\tau_k^{SR}`` values are stored in `column.transmittance_shortwave[:, band]` and reused for both the downward and upward sweeps in `OneBandShortwaveRadiativeTransfer`.
+All absorptivity coefficients are per ``10^5`` Pa. The resulting ``\tau_k^{SR}`` values are stored in `column.transmissivity_shortwave[:, band]` and reused for both the downward and upward sweeps in `OneBandShortwaveRadiativeTransfer`.
 
-##### TransparentShortwaveTransmittance details
+##### TransparentShortwaveTransmissivity details
 
 Sets ``\tau_k^{SR} = 1`` for all layers and bands, effectively skipping atmospheric attenuation while still computing surface and cloud reflections in the radiative transfer step.
 
@@ -261,9 +261,9 @@ using SpeedyWeather, CairoMakie
 
 spectral_grid = SpectralGrid()
 clouds_no_sc = SpeedyWeather.DiagnosticClouds(spectral_grid; use_stratocumulus=false)
-transmittance_no_sc = SpeedyWeather.BackgroundShortwaveTransmittance(spectral_grid)
+transmissivity_no_sc = SpeedyWeather.BackgroundShortwaveTransmissivity(spectral_grid)
 radiative_transfer_no_sc = SpeedyWeather.OneBandShortwaveRadiativeTransfer(spectral_grid)
-sw_no_sc = OneBandShortwave(clouds_no_sc, transmittance_no_sc, radiative_transfer_no_sc)
+sw_no_sc = OneBandShortwave(clouds_no_sc, transmissivity_no_sc, radiative_transfer_no_sc)
 
 model = PrimitiveWetModel(spectral_grid; shortwave_radiation=sw_no_sc)
 sim = initialize!(model)

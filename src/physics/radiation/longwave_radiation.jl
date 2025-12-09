@@ -164,20 +164,20 @@ export OneBandLongwave
 """One-band longwave radiation scheme with transmissivity and radiative transfer components.
 Following Frierson, 2006, JAS, https://doi.org/10.1175/JAS3706.1. Fields are $(TYPEDFIELDS)"""
 struct OneBandLongwave{T, R} <: AbstractLongwave
-    transmittance::T
+    transmissivity::T
     radiative_transfer::R
 end
 
 # primitive wet model version
 OneBandLongwave(SG::SpectralGrid) = OneBandLongwave(
-    FriersonLongwaveTransmittance(SG),
+    FriersonLongwaveTransmissivity(SG),
     OneBandLongwaveRadiativeTransfer(SG),
 )
 
 # primitive dry model version
 export OneBandGreyLongwave
 OneBandGreyLongwave(SG::SpectralGrid) = OneBandLongwave(
-    TransparentLongwaveTransmittance(SG),
+    TransparentLongwaveTransmissivity(SG),
     OneBandLongwaveRadiativeTransfer(SG),
 )
 
@@ -197,7 +197,7 @@ end
 
 # initialize one after another
 function initialize!(radiation::OneBandLongwave, model::PrimitiveEquation)
-    initialize!(radiation.transmittance, model)
+    initialize!(radiation.transmissivity, model)
     initialize!(radiation.radiative_transfer, model)
 end
 
@@ -206,8 +206,8 @@ Calculate shortwave radiation using the one-band scheme with diagnostic clouds.
 Computes cloud cover fraction from relative humidity and precipitation, then
 integrates downward and upward radiative fluxes accounting for cloud albedo effects."""
 @propagate_inbounds function parameterization!(ij, diagn, progn, radiation::OneBandLongwave, model)
-    # pass on array that was used to compute transmittance (scratch array)
-    t = transmittance!(ij, diagn, progn, radiation.transmittance, model)
+    # pass on array that was used to compute transmissivity (scratch array)
+    t = transmissivity!(ij, diagn, progn, radiation.transmissivity, model)
     longwave_radiative_transfer!(ij, diagn, t, progn, radiation.radiative_transfer, model)
 end
 
@@ -229,7 +229,7 @@ One-band shortwave radiative transfer with cloud reflection and ozone absorption
 @propagate_inbounds function longwave_radiative_transfer!(
     ij,
     diagn,
-    transmittance,
+    transmissivity,
     progn,
     longwave::OneBandLongwaveRadiativeTransfer,
     model,
@@ -262,14 +262,14 @@ One-band shortwave radiative transfer with cloud reflection and ozone absorption
 
     # UPWARD BEAM
     for k in nlayers:-1:2
-        t = transmittance[ij, k]
+        t = transmissivity[ij, k]
         U = U*t + (1-t)*σ*T[ij, k]^4
         dTdt[ij, k]   -= flux_to_tendency(U/cₚ, pₛ, k,   model)     # out of layer k
         dTdt[ij, k-1] += flux_to_tendency(U/cₚ, pₛ, k-1, model)     # into layer k-1
     end
 
     # Outgoing longwave radiation at TOA
-    t = transmittance[ij, 1]
+    t = transmissivity[ij, 1]
     U = U*t + (1-t) * σ*T[ij, 1]^4
     dTdt[ij, 1] -= flux_to_tendency(U/cₚ, pₛ, 1,   model)           # out of layer 1
     diagn.physics.outgoing_longwave[ij] = U
@@ -277,14 +277,14 @@ One-band shortwave radiative transfer with cloud reflection and ozone absorption
     # DOWNWARD BEAM
     D::NF = 0               # top boundary condition (no longwave coming from space)
     for k in 1:nlayers-1
-        t = transmittance[ij, k]
+        t = transmissivity[ij, k]
         D = D*t + (1-t) * σ*T[ij, k]^4
         dTdt[ij, k]   -= flux_to_tendency(D/cₚ, pₛ, k,   model)     # out of layer k
         dTdt[ij, k+1] += flux_to_tendency(D/cₚ, pₛ, k+1, model)     # into layer k+1
     end
 
     # Surface downward longwave radiation
-    t = transmittance[ij, nlayers]
+    t = transmissivity[ij, nlayers]
     D = D*t + (1-t) * σ*T[ij, nlayers]^4
     diagn.physics.surface_longwave_down[ij] = D
     dTdt[ij, nlayers] -= surface_flux_to_tendency(D/cₚ, pₛ, model)   # out of layer k

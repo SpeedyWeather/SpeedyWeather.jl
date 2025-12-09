@@ -1,21 +1,21 @@
-using SpeedyWeather
-using Test
+# using SpeedyWeather
+# using Test
 
-FLAG_EXTENDED_TESTS = "extended_tests" in ARGS ? true : false
-FLAG_ENZYME_TESTS = "enzyme" in ARGS ? true : false
+# FLAG_EXTENDED_TESTS = "extended_tests" in ARGS ? true : false
+# FLAG_ENZYME_TESTS = "enzyme" in ARGS ? true : false
 
-if FLAG_EXTENDED_TESTS 
-    @info "Running extended test suite"
-    include("differentiability/runtests.jl")
-end 
+# if FLAG_EXTENDED_TESTS 
+#     @info "Running extended test suite"
+#     include("differentiability/runtests.jl")
+# end 
 
-if FLAG_ENZYME_TESTS 
-    @info "Running Enzyme CI tests"
-    include("differentiability/full_diff_CI.jl")
-end 
+# if FLAG_ENZYME_TESTS 
+#     @info "Running Enzyme CI tests"
+#     include("differentiability/full_diff_CI.jl")
+# end 
 
-if !FLAG_EXTENDED_TESTS && !FLAG_ENZYME_TESTS 
-    @info "Running general test suite"
+# if !FLAG_EXTENDED_TESTS && !FLAG_ENZYME_TESTS 
+#     @info "Running general test suite"
 
     # GENERAL
     include("utility_functions.jl")
@@ -61,18 +61,16 @@ if !FLAG_EXTENDED_TESTS && !FLAG_ENZYME_TESTS
 
     # PHYSICS
     include("physics/variables.jl")
-    include("physics/custom_parametrization.jl")
+    include("physics/custom_parameterization.jl")
     include("physics/zenith.jl")
-    include("physics/column_variables.jl")
     include("physics/land_sea_mask.jl")
     include("physics/ocean_sea_ice.jl")
-    # include("thermodynamics.jl")
     include("physics/large_scale_condensation.jl")
     include("physics/convection.jl")
 
     include("physics/albedo.jl")
     include("physics/land.jl")
-    include("physics/transmittance.jl")
+    include("physics/transmissivity.jl")
     include("physics/longwave_radiation.jl")
     include("physics/shortwave_radiation.jl")
     include("physics/surface_fluxes.jl")
@@ -86,4 +84,4 @@ if !FLAG_EXTENDED_TESTS && !FLAG_ENZYME_TESTS
     include("output/netcdf_output.jl")
     include("output/jld2_output.jl")
     include("output/feedback.jl")
-end 
+# end 

@@ -12,7 +12,7 @@
     end
     
     @testset "OneBandShortwave component testing" begin
-        """Test different cloud and transmittance combinations using convenience constructors."""
+        """Test different cloud and transmissivity combinations using convenience constructors."""
         
         # Test the full wet model version (with clouds)
         @testset "OneBandShortwave (wet model with clouds)" begin
@@ -73,7 +73,7 @@
             )
             sw = OneBandShortwave(
                 clouds,
-                TransparentShortwaveTransmittance(spectral_grid),
+                TransparentShortwaveTransmissivity(spectral_grid),
                 OneBandShortwave(spectral_grid).radiative_transfer
             )
             model = PrimitiveWetModel(spectral_grid; shortwave_radiation=sw)

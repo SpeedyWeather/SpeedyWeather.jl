@@ -167,10 +167,10 @@ include("physics/surface_fluxes/humidity.jl")
 include("physics/convection.jl")
 include("physics/zenith.jl")
 include("physics/radiation/shortwave_radiation.jl")
-include("physics/radiation/shortwave_transmittance.jl")
+include("physics/radiation/shortwave_transmissivity.jl")
 include("physics/radiation/clouds.jl")
 include("physics/radiation/longwave_radiation.jl")
-include("physics/radiation/longwave_transmittance.jl")
+include("physics/radiation/longwave_transmissivity.jl")
 include("physics/stochastic_physics.jl")
 
 # OCEAN AND LAND

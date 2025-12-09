@@ -79,14 +79,14 @@ and a cloud albedo is applied to the downward beam. Fields and options are
 $(TYPEDFIELDS)"""
 struct OneBandShortwave{C, T, R} <: AbstractShortwave
     clouds::C
-    transmittance::T
+    transmissivity::T
     radiative_transfer::R
 end
 
 # primitive wet model version
 OneBandShortwave(SG::SpectralGrid) = OneBandShortwave(
     DiagnosticClouds(SG),
-    BackgroundShortwaveTransmittance(SG),
+    BackgroundShortwaveTransmissivity(SG),
     OneBandShortwaveRadiativeTransfer(SG),
 )
 
@@ -94,7 +94,7 @@ OneBandShortwave(SG::SpectralGrid) = OneBandShortwave(
 export OneBandGreyShortwave
 OneBandGreyShortwave(SG::SpectralGrid) = OneBandShortwave(
     NoClouds(SG),
-    TransparentShortwaveTransmittance(SG),
+    TransparentShortwaveTransmissivity(SG),
     OneBandShortwaveRadiativeTransfer(SG),
 )
 
@@ -115,7 +115,7 @@ end
 # initialize one after another
 function initialize!(radiation::OneBandShortwave, model::PrimitiveEquation)
     initialize!(radiation.clouds, model)
-    initialize!(radiation.transmittance, model)
+    initialize!(radiation.transmissivity, model)
     initialize!(radiation.radiative_transfer, model)
 end
 
@@ -129,7 +129,7 @@ function shortwave_radiation!(
     model::PrimitiveEquation,
 )
     clouds = clouds!(column, radiation.clouds, model)
-    t = transmittance!(column, clouds, radiation.transmittance, model)
+    t = transmissivity!(column, clouds, radiation.transmissivity, model)
     shortwave_radiative_transfer!(column, t, clouds, radiation.radiative_transfer, model)
 end
 
@@ -149,7 +149,7 @@ initialize!(::OneBandShortwaveRadiativeTransfer, ::PrimitiveEquation) = nothing
 # function barrier to unpack model
 function shortwave_radiative_transfer!(
     column::ColumnVariables,
-    t,          # Transmittance array
+    t,          # Transmissivity array
     clouds,     # NamedTuple from clouds!
     radiation::OneBandShortwaveRadiativeTransfer,
     model::PrimitiveEquation
@@ -161,7 +161,7 @@ end
 One-band shortwave radiative transfer with cloud reflection and ozone absorption."""
 function shortwave_radiative_transfer!(
     column::ColumnVariables,
-    t,          # Transmittance array
+    t,          # Transmissivity array
     clouds,     # NamedTuple from clouds!
     radiation::OneBandShortwaveRadiativeTransfer,
     planet::AbstractPlanet,
