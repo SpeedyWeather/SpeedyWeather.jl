@@ -118,5 +118,7 @@ end
 function variables(::SnowModel)
     return (
         PrognosticVariable(name=:snow_depth, dims=Grid2D(), namespace=:land, units="m", desc="Snow depth in equivalent liquid water height"),
+        PrognosticVariable(name=:soil_temperature, dims=Grid3D(), namespace=:land, units="K", desc="Soil temperature"),
+        DiagnosticVariable(name=:snow_melt_rate, dims=Grid2D(), namespace=:land, units="kg/m²/s", desc="Snow melt rate"),
         )
 end
