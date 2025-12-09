@@ -2,6 +2,8 @@ abstract type AbstractLand <: AbstractModelComponent end
 abstract type AbstractWetLand <: AbstractLand end
 abstract type AbstractDryLand <: AbstractLand end
 
+const DEFAULT_NLAYERS_SOIL = 2
+
 # model class is the abstract supertype
 model_class(::Type{<:AbstractWetLand}) = AbstractWetLand
 model_class(::Type{<:AbstractDryLand}) = AbstractDryLand
@@ -36,12 +38,13 @@ include("rivers.jl")
 export LandModel
 @kwdef mutable struct LandModel{G, TD, T, SM, SN, V, R} <: AbstractWetLand
     spectral_grid::SpectralGrid
-    geometry::G = LandGeometry(spectral_grid)
-    thermodynamics::TD = LandThermodynamics(spectral_grid)
-    temperature::T = LandBucketTemperature(spectral_grid)
-    soil_moisture::SM = LandBucketMoisture(spectral_grid)
-    snow::SN = SnowModel(spectral_grid)
-    vegetation::V = VegetationClimatology(spectral_grid)
+    nlayers::Int = DEFAULT_NLAYERS_SOIL
+    geometry::G = LandGeometry(spectral_grid, nlayers)
+    thermodynamics::TD = LandThermodynamics(spectral_grid, geometry)
+    temperature::T = LandBucketTemperature(spectral_grid, geometry)
+    snow::SN = SnowModel(spectral_grid, geometry)
+    soil_moisture::SM = LandBucketMoisture(spectral_grid, geometry)
+    vegetation::V = VegetationClimatology(spectral_grid, geometry)
     rivers::R = nothing
 end
 
@@ -71,9 +74,10 @@ variables(land::LandModel) = ( variables(land.temperature)...,
 export DryLandModel
 @kwdef struct DryLandModel{G, TD, T} <: AbstractDryLand
     spectral_grid::SpectralGrid
-    geometry::G = LandGeometry(spectral_grid)
-    thermodynamics::TD = LandThermodynamics(spectral_grid)
-    temperature::T = LandBucketTemperature(spectral_grid)
+    nlayers::Int
+    geometry::G = LandGeometry(spectral_grid, nlayers)
+    thermodynamics::TD = LandThermodynamics(spectral_grid, geometry)
+    temperature::T = LandBucketTemperature(spectral_grid, geometry)
 end
 
 function initialize!(land::DryLandModel, model::PrimitiveEquation)

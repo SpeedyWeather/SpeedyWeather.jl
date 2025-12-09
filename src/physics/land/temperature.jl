@@ -29,7 +29,7 @@ export SeasonalLandTemperature
 end
 
 # generator function
-function SeasonalLandTemperature(SG::SpectralGrid; kwargs...)
+function SeasonalLandTemperature(SG::SpectralGrid, geometry::LandGeometry; kwargs...)
     (; NF, GridVariable3D, grid) = SG
     monthly_temperature = zeros(GridVariable3D, grid, 12)  # 12 months
     return SeasonalLandTemperature{NF, GridVariable3D}(; monthly_temperature, kwargs...)
@@ -168,11 +168,11 @@ $(TYPEDFIELDS)"""
 end
 
 # generator function
-LandBucketTemperature(SG::SpectralGrid; kwargs...) = LandBucketTemperature{SG.NF}(; kwargs...)
+LandBucketTemperature(SG::SpectralGrid, geometry::LandGeometry; kwargs...) = LandBucketTemperature{SG.NF}(; kwargs...)
 function initialize!(land::LandBucketTemperature, model::PrimitiveEquation)
-    (; nlayers_soil) = model.spectral_grid
+    nlayers_soil = model.land.nlayers
     @assert nlayers_soil == 2 "LandBucketTemperature only works with 2 soil layers "*
-        "but spectral_grid.nlayers_soil = $nlayers_soil given. Ignoring additional layers."
+        "but model.land.nlayers = $nlayers_soil given. Ignoring additional layers."
     return nothing
 end
 

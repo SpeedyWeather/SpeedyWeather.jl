@@ -7,7 +7,7 @@ struct LandGeometry{VectorType} <: AbstractLandGeometry
 end
 
 # default constructor
-function LandGeometry(SG::SpectralGrid; layer_thickness=nothing)
+function LandGeometry(SG::SpectralGrid, nlayers::Int; layer_thickness=nothing, kwargs...)
 
     if isnothing(layer_thickness)
         (; NF) = SG
