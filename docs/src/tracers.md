@@ -13,7 +13,7 @@ Humidity, for example, is an _active_ tracer as it changes the [Geopotential](@r
 (and therefore the pressure gradient force) through the [Virtual temperature](@ref).
 A tracer is conserved in the absence of sources or sinks (the zero on the right-hand side above).
 Aerosols from wildfires might be considered to be a passive tracer, but the
-source term should increase the aerosol concentration whereever and whenever there is 
+source term should increase the aerosol concentration wherever and whenever there is
 a wildfire. And also a sink term should be added representing aerosols being washed out
 in rainfall, or deposited on the ground. However, aerosols should be considered
 _active_ and not _passive_ if they influence the radiation and hence the temperature
@@ -23,11 +23,11 @@ tracer is passive, but if a forcing or parameterization is defined that depends
 on the tracer it becomes active, affecting the flow. A tracer definition
 in itself therefore does not make distinction between active or passive
 tracers but a forcing/parameterization definition can make existing tracers
-active. 
+active.
 
 # Eulerian advection
 
-Numerically we solve ``Dq/Dt`` as 
+Numerically we solve ``Dq/Dt`` as
 
 ```math
 \frac{\partial q}{\partial t} = -\nabla\cdot(\mathbf{u}q) + q\mathcal{D} - W(q)
@@ -86,7 +86,7 @@ based on dictionaries so the order of the tracers is arbitrary,
 they are always defined by their `key` instead.
 
 Note that a tracer can be added to or deleted from a simulation at _any time_.
-So you can run a simulation, add a tracer, continute the simulation,
+So you can run a simulation, add a tracer, continue the simulation,
 or delete a tracer and continue. You can also just activate them or
 deactivate them, see below.
 
