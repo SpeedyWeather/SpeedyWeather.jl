@@ -7,7 +7,7 @@
                     relative_humidity_threshold=r, snow, reevaporation)
                 model = PrimitiveWetModel(spectral_grid; large_scale_condensation)
                 simulation = initialize!(model)
-                run!(simulation, period=Day(5))
+                run!(simulation, period=Day(1))
                 
                 rain_fall = simulation.diagnostic_variables.physics.rain_large_scale
                 snow_fall = simulation.diagnostic_variables.physics.snow_large_scale

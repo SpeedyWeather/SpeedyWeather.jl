@@ -2,12 +2,13 @@
     
     spectral_grid = SpectralGrid(trunc=31, nlayers=8)
 
-    for Convection in ( Nothing,
-                        BettsMillerConvection,
-                        BettsMillerDryConvection,
-                        ConvectiveHeating)
-        for Model in (  PrimitiveDryModel,
-                        PrimitiveWetModel)
+    @testset for Convection in ( Nothing,
+                                BettsMillerConvection,
+                                BettsMillerDryConvection,
+                                ConvectiveHeating)
+            
+        @testset for Model in (  PrimitiveDryModel,
+                                PrimitiveWetModel)
 
             # that combination is not defined
             if ~(Convection == BettsMillerConvection && Model == PrimitiveDryModel)

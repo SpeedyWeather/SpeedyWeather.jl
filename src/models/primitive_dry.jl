@@ -124,7 +124,7 @@ $(TYPEDFIELDS)"""
 
                                 # perturbations
                                 :stochastic_physics)
-    extra_parameterizations::TS3 = (:solar_zenith, :land, :ocean)
+    extra_parameterizations::TS3 = (:solar_zenith, :land, :ocean, :sea_ice)
 
     # DERIVED 
     # used to infer parameterizations at compile-time 

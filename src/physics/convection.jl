@@ -412,7 +412,7 @@ Adapt.@adapt_structure ConvectiveHeating
 ConvectiveHeating(SG::SpectralGrid; kwargs...) = ConvectiveHeating{SG.NF, SG.VectorType}(lat_mask=zeros(SG.nlat); kwargs...)
 
 # precompute latitudinal mask
-function initialize!(C::ConvectiveHeating, model::PrimitiveEquation)
+function initialize!(C::ConvectiveHeating, model)
     θ = model.geometry.latd
     (; θ₀, σθ) = C
     
@@ -428,7 +428,7 @@ end
     ij,
     diagn::DiagnosticVariables,
     scheme::ConvectiveHeating,
-    model::PrimitiveEquation,
+    model,
 )
     pₛ = diagn.grid.pres_grid_prev
     temp_tend = diagn.tendencies.temp_tend_grid
@@ -436,7 +436,7 @@ end
     NF = eltype(temp_tend)
 
     # Get latitude ring index and latitude
-    j = whichring(diagn.grid.temp_grid.grid, ij)
+    j = model.geometry.whichring[ij]
     latd = model.geometry.latd[j]
     σ = model.geometry.σ_levels_full
     
