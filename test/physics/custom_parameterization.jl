@@ -1,6 +1,3 @@
-using Adapt
-
-
 @testset "Custom Parameterization" begin
 
     @kwdef struct SimpleAlbedo{NF<:Number} <: SpeedyWeather.AbstractAlbedo
@@ -9,18 +6,15 @@ using Adapt
         ocean_albedo::NF = 0.06
     end 
 
-    Adapt.@adapt_structure SimpleAlbedo
     SimpleAlbedo(SG::SpectralGrid; kwargs...) = SimpleAlbedo{SG.NF}(; kwargs...)
     SpeedyWeather.initialize!(::SimpleAlbedo, model::PrimitiveEquation) = nothing 
     SpeedyWeather.variables(::SimpleAlbedo) = (
         DiagnosticVariable(name=:my_albedo, dims=Grid2D(), desc="Albedo", units="1"),
     )
 
-    # note that for albedos the diagn::DiagnosticVariables is needed to indicate that this
-    # is evaluated on the land-fraction averaged albedo in diagn. physics.my_albedo not independently for land and ocean
-    # like the OceanLandAlbedo does
-    # note that this conflicts with the shortwave radiation scheme though as this requires either a composite albedo like OceanLandAlbedo
-    # or the `::DiagnosticVariables` removed where then `diagn` = `diagn.physics.land` and `diagn.physics.ocean` one after another
+    # note that for albedos should actually define `albedo!(ij, diagn, progn, albedo, model_parameters)`
+    # as they are applied to ocean/land separately but ignore this here and implement this like any other parameterization
+    # in practice this conflicts with the shortwave radiation scheme that also doesn't know about the `my_albedo` variable
     function SpeedyWeather.parameterization!(ij, diagn::DiagnosticVariables, progn, albedo::SimpleAlbedo, model_parameters) 
         
         (; land_sea_mask) = model_parameters
@@ -79,5 +73,4 @@ using Adapt
             @test albedo.ocean_albedo <= my_albedo[ij] <= albedo.seaice_albedo
         end
     end
-
 end
