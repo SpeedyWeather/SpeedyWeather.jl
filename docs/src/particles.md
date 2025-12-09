@@ -22,8 +22,8 @@ particle location can generally be anywhere on the sphere, the velocity ``\mathb
 is only available on the discrete grid points of the simulation, such that
 ``\mathbf{u}(\mathbf{x}_p)`` requires an interpolation in order to obtain a velocity
 at the particles location ``\mathbf{x}_p`` to move it around. Dropping the subscript
-``p`` in favour a subscript ``i`` denoting the time step, with Euler forward 
-the equation can be discretized as 
+``p`` in favour a subscript ``i`` denoting the time step, with Euler forward
+the equation can be discretized as
 
 ```math
 \mathbf{x}_{i+1} = \mathbf{x}_i + \Delta t~\mathbf{u}_i (\mathbf{x}_i)
@@ -61,10 +61,10 @@ advection time step. Remember that this does not need to be the time step for th
 momentum equations and could be much further in the past. We could either store
 ``\mathbf{u}_i`` as a grid-point field or only its interpolated values. In the case
 of fewer particles than grid points the latter is more efficient and this is also
-what we do in SpeedyWeather. Let square brackets ``[]`` denote
+what we do in SpeedyWeather. Let square brackets ``[\,]`` denote
 an interpolation then we perform the interpolation
 ``\mathbf{u}_i [\mathbf{x}_i]`` that's required to step from ``i`` to ``i+1`` already
-on the time step that goes from ``i-1`` to ``i``. 
+on the time step that goes from ``i-1`` to ``i``.
 
 ```math
 \begin{aligned}
@@ -172,7 +172,7 @@ zeros(Particle{Float32}, 3)
 rand(Particle{Float64}, 5)
 ```
 which is how particles are represented inside a SpeedyWeather [`Simulation`](@ref).
-Note that the default initial state of particles is active. In SpeedyWeather all 
+Note that the default initial state of particles is active. In SpeedyWeather all
 particles can be activated or deactivated at any time using the [`activate`](@ref)
 and [`deactivate`](@ref) functions.
 
@@ -252,7 +252,7 @@ model = ShallowWaterModel(spectral_grid; particle_advection)
 add!(model.callbacks, particle_tracker)
 ```
 
-which will give it a random key too in case you need to remove it again (more on this in 
+which will give it a random key too in case you need to remove it again (more on this in
 [Callbacks](@ref)). If you now run the simulation the particle tracker is called on
 `particle_tracker.every_n_timesteps` and it continuously writes into `particle_tracker.netcdf_file`
 which is placed in the run folder similar to other [NetCDF output](@ref). For example,
@@ -300,7 +300,7 @@ because this is probably how you will first look at your data too. As you can se
 in the Northern Hemisphere have been advected with a zonal jet and perform some wavy motions as
 the jet does too. However, there are also some horizontal lines which are automatically plotted
 when a particles travels across the prime meridian 0˚E = 360˚E. Ideally you would want to use
-a more advanced projection and plot the particle trajectories as geodetics. 
+a more advanced projection and plot the particle trajectories as geodetics.
 
 With [GeoMakie.jl](https://github.com/MakieOrg/GeoMakie.jl) you can do
 
