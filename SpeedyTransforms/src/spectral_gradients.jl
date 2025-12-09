@@ -288,7 +288,6 @@ end
     end
 end
 
-
 """
 $(TYPEDSIGNATURES)
 Get U, V (=(u, v)*coslat) from vorticity ζ and divergence D in spectral space.
@@ -303,9 +302,9 @@ function UV_from_vordiv!(
     V::LowerTriangularArray,
     vor::LowerTriangularArray,
     div::LowerTriangularArray,
-    S::SpectralTransform;
+    S::SpectralTransform{NF, <:CPU};
     radius = DEFAULT_RADIUS,
-)
+) where NF
     (; vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2 ) = S
     @boundscheck ismatching(S, U) || throw(DimensionMismatch(S, U))
 
@@ -382,15 +381,24 @@ function UV_from_vordiv!(
     return U, V
 end
 
-# New kernel-based implementation, currently unused because of problems with Enzyme
-function UV_from_vordiv_kernel!(   
+#TODO: This version is for GPU only, currently this version has a bug that stops Enzyme differentiability
+"""
+$(TYPEDSIGNATURES)
+Get U, V (=(u, v)*coslat) from vorticity ζ and divergence D in spectral space.
+Two operations are combined into a single linear operation. First, invert the
+spherical Laplace ∇² operator to get stream function from vorticity and
+velocity potential from divergence. Then compute zonal and meridional gradients
+to get U, V.
+Acts on the unit sphere, i.e. it omits any radius scaling as all inplace gradient operators.
+"""
+function UV_from_vordiv!(   
     U::LowerTriangularArray,
     V::LowerTriangularArray,
     vor::LowerTriangularArray,
     div::LowerTriangularArray,
-    S::SpectralTransform;
+    S::SpectralTransform{NF, <:GPU};
     radius = DEFAULT_RADIUS,
-)
+) where NF
     (; vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2 ) = S
     @boundscheck ismatching(S, U) || throw(DimensionMismatch(S, U))
 
@@ -412,7 +420,7 @@ end
     l = l_indices[lm]
     
     # Get the coefficients for the current lm index
-    z = vordiv_to_uv_x[lm]
+    z = im*vordiv_to_uv_x[lm]
     vordiv_uv1 = vordiv_to_uv1[lm]
     vordiv_uv2 = vordiv_to_uv2[lm]
     
