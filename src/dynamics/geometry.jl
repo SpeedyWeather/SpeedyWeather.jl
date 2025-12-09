@@ -108,9 +108,9 @@ function Geometry(SG::SpectralGrid; vertical_coordinates=SigmaCoordinates(SG.nla
         "$(vertical_coordinates.nlayers) in spectral_grid.vertical_coordinates."
     @assert nlayers == vertical_coordinates.nlayers error_message
 
-    (; NF, VectorType) = SG
+    (; NF, VectorIntType, VectorType) = SG
     (; σ_half) = vertical_coordinates
-    return Geometry{typeof(SG), Base.RefValue{NF}, VectorType}(; spectral_grid=SG, σ_levels_half=σ_half)
+    return Geometry{typeof(SG), Base.RefValue{NF}, VectorIntType, VectorType}(; spectral_grid=SG, σ_levels_half=σ_half)
 end
 
 function Base.show(io::IO, G::Geometry)
