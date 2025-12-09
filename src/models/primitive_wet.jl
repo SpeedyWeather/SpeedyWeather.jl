@@ -94,7 +94,7 @@ $(TYPEDFIELDS)"""
     @component convection::CV = SimplifiedBettsMiller(spectral_grid)
     @component shortwave_radiation::SW = TransparentShortwave(spectral_grid)
     @component longwave_radiation::LW = JeevanjeeRadiation(spectral_grid)
-    stochastic_physics::SP = nothing
+    @component stochastic_physics::SP = nothing
 
     # NUMERICS
     time_stepping::TS = Leapfrog(spectral_grid)
