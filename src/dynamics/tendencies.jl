@@ -353,7 +353,7 @@ function surface_pressure_tendency!(
     # for semi-implicit div_mean is calc at time step i-1 in vertical_integration!
     @. pres_tend -= ūv̄∇lnpₛ + div_mean      # add the -div_mean term in spectral, swap sign
 
-    @allowscalar pres_tend[1] = 0                        # for mass conservation
+    pres_tend[1:1] .= 0                        # for mass conservation
     return nothing
 end
 
@@ -1165,8 +1165,5 @@ function temperature_average!(
         temp::LowerTriangularArray,
         S::SpectralTransform,
     )
-    return @inbounds for k in eachmatrix(temp)
-        # average from l=m=0 harmonic divided by norm of the sphere
-        @allowscalar diagn.temp_average[k] = real(temp[1, k]) / S.norm_sphere
-    end
+    diagn.temp_average .= real.(temp[1, :]) ./ S.norm_sphere
 end 
