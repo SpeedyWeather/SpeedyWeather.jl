@@ -197,7 +197,7 @@ Let's get started. First we define our albedo parameterization with all the func
 ```@example custom-parameterization
 using SpeedyWeather, Adapt, CairoMakie
 
-@kwdef struct SimpleAlbedo{NF <: Number} <: SpeedyWeather.AbstractParameterization
+@kwdef struct SimpleAlbedo{NF <: Number} <: SpeedyWeather.AbstractAlbedo
     land_albedo::NF = 0.35
     seaice_albedo::NF = 0.6
     ocean_albedo::NF = 0.06
@@ -211,7 +211,7 @@ SimpleAlbedo(SG::SpectralGrid; kwargs...) = SimpleAlbedo{SG.NF}(; kwargs...)
 # what has to be done to initialize SimpleAlbedo: nothing
 SpeedyWeather.initialize!(::SimpleAlbedo, model::PrimitiveEquation) = nothing 
 
-# define variables required
+# define variables required (composite albedo and ocean/land independently)
 SpeedyWeather.variables(::SimpleAlbedo) = (
     DiagnosticVariable(name=:albedo, dims=Grid2D(), desc="Albedo", units="1"),
     DiagnosticVariable(name=:albedo, dims=Grid2D(), desc="Albedo", units="1", namespace=:ocean),
@@ -254,7 +254,7 @@ replace the existing albedo:
 
 ```@example custom-parameterization
 spectral_grid = SpectralGrid(trunc=31, nlayers=8)
-albedo = SimpleAlbedo(spectra_grid)
+albedo = SimpleAlbedo(spectral_grid)
 model = PrimitiveWetModel(spectral_grid; albedo=albedo)
 simulation = initialize!(model) 
 run!(simulation, period=Day(5)) # spin up the model a little

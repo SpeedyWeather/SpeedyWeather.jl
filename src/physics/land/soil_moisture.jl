@@ -149,7 +149,7 @@ export LandBucketMoisture
 """LandBucketMoisture model with two soil layers exchanging moisture via vertical diffusion.
 Forced by precipitation, evaporation, surface condensation, snow melt and river runoff drainage.
 $(TYPEDFIELDS)"""
-@kwdef struct LandBucketMoisture{NF} <: AbstractSoilMoisture
+@kwdef mutable struct LandBucketMoisture{NF} <: AbstractSoilMoisture
     "[OPTION] Time scale of vertical diffusion [s]"
     time_scale::Second = Day(2)
 
@@ -176,6 +176,7 @@ function initialize!(soil::LandBucketMoisture, model::PrimitiveEquation)
     @assert nlayers_soil == 2 "LandBucketMoisture only works with 2 soil layers "*
     "but spectral_grid.nlayers_soil = $nlayers_soil given. Ignoring additional layers."
     
+    # TODO this requires a mutable LandBucketMoisture struct, change for GPU compatibility?
     # set the field capacity given layer thickness and 
     γ = model.land.thermodynamics.field_capacity
     z₁ = model.land.geometry.layer_thickness[1]
