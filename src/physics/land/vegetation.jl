@@ -1,4 +1,4 @@
-abstract type AbstractVegetation <: AbstractParameterization end
+abstract type AbstractVegetation <: AbstractLandComponent end
 
 export NoVegetation
 struct NoVegetation <: AbstractVegetation end
@@ -61,7 +61,7 @@ function variables(::NoVegetation)
 end
 
 export VegetationClimatology
-@kwdef mutable struct VegetationClimatology{NF, GridVariable2D} <: AbstractVegetation
+@kwdef struct VegetationClimatology{NF, GridVariable2D} <: AbstractVegetation
     "[OPTION] Combine high and low vegetation factor, a in high + a*low [1]"
     low_veg_factor::NF = 0.8
 
@@ -89,6 +89,10 @@ export VegetationClimatology
     "Low vegetation cover [1], interpolated onto Grid"
     low_cover::GridVariable2D
 end
+
+# TODO to adapt create a ManualVegetationClimatology component like AlbedoClimatology is adapted to ManualAlbedo
+# do all vegetations need a low_veg_factor?
+# Adapt.adapt_structure(to, veg::VegetationClimatology) = adapt(to, ManualVegetationClimatology(veg.high_cover, veg.low_cover))
 
 # generator function
 function VegetationClimatology(SG::SpectralGrid; kwargs...)

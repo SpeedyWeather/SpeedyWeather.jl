@@ -1,4 +1,5 @@
 abstract type AbstractLand <: AbstractModelComponent end
+abstract type AbstractLandComponent <: AbstractModelComponent end
 abstract type AbstractWetLand <: AbstractLand end
 abstract type AbstractDryLand <: AbstractLand end
 
@@ -23,14 +24,6 @@ function Base.show(io::IO, M::AbstractLand)
         p(io, "$s $key: $(typeof(val))")
     end
 end
-
-include("geometry.jl")
-include("thermodynamics.jl")
-include("temperature.jl")
-include("soil_moisture.jl")
-include("snow.jl")
-include("vegetation.jl")
-include("rivers.jl")
 
 # LandModel defined through its components
 export LandModel

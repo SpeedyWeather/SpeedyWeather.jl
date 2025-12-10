@@ -1,7 +1,11 @@
-abstract type AbstractSoilMoisture <: AbstractParameterization end
+abstract type AbstractSoilMoisture <: AbstractLandComponent end
 
 export SeasonalSoilMoisture
-@kwdef mutable struct SeasonalSoilMoisture{NF, GridVariable4D} <: AbstractSoilMoisture
+
+"""SeasonalSoilMoisture model that prescribes soil moisture from a monthly climatology file.
+The soil moisture is linearly interpolated between months based on the model time.
+$(TYPEDFIELDS)"""
+@kwdef struct SeasonalSoilMoisture{NF, GridVariable4D} <: AbstractSoilMoisture
     # READ CLIMATOLOGY FROM FILE
     "[OPTION] path to the folder containing the soil moisture file, pkg path default"
     path::String = "SpeedyWeather.jl/input_data"
@@ -25,6 +29,9 @@ export SeasonalSoilMoisture
     "Monthly soil moisture volume fraction [1], interpolated onto Grid"
     monthly_soil_moisture::GridVariable4D
 end
+
+# TODO to adapt create a ManualSeasonalSoilMoisture component like AlbedoClimatology is adapted to ManualAlbedo
+# Adapt.adapt_structure(to, soil::SeasonalSoilMoisture) = adapt(to, ManualSeasonalSoilMoisture(soil.monthly_soil_moisture))
 
 # generator function
 function SeasonalSoilMoisture(SG::SpectralGrid; kwargs...)
@@ -139,7 +146,10 @@ end
 
 export LandBucketMoisture
 
-@kwdef mutable struct LandBucketMoisture{NF} <: AbstractSoilMoisture
+"""LandBucketMoisture model with two soil layers exchanging moisture via vertical diffusion.
+Forced by precipitation, evaporation, surface condensation, snow melt and river runoff drainage.
+$(TYPEDFIELDS)"""
+@kwdef struct LandBucketMoisture{NF} <: AbstractSoilMoisture
     "[OPTION] Time scale of vertical diffusion [s]"
     time_scale::Second = Day(2)
 
@@ -153,12 +163,13 @@ export LandBucketMoisture
     ocean_moisture::NF = 0
 
     "[DERIVED] Water at field capacity [m], top layer, f = γz, set at initialize from by land.thermodynamics and .geometry"
-    f₁::NF = zero(NF)
+    f₁::NF = 0
 
     "[DERIVED] Water at field capacity [m], lower layer, f = γz, set at initialize from by land.thermodynamics and .geometry"
-    f₂::NF = zero(NF)
+    f₂::NF = 0
 end
 
+Adapt.@adapt_structure LandBucketMoisture
 LandBucketMoisture(SG::SpectralGrid; kwargs...) = LandBucketMoisture{SG.NF}(; kwargs...)
 function initialize!(soil::LandBucketMoisture, model::PrimitiveEquation)
     (; nlayers_soil) = model.spectral_grid

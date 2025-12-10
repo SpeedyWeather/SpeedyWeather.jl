@@ -1,7 +1,7 @@
-abstract type AbstractLandThermodynamics <: AbstractModelComponent end
+abstract type AbstractLandThermodynamics <: AbstractLandComponent end
 
 export LandThermodynamics
-@kwdef mutable struct LandThermodynamics{NF} <: AbstractLandThermodynamics
+@kwdef struct LandThermodynamics{NF} <: AbstractLandThermodynamics
     "[OPTION] Heat conductivity λ_{soil} of the soil [W/(m K)]" 
     heat_conductivity_dry_soil::NF = 0.42
 
@@ -27,5 +27,6 @@ export LandThermodynamics
     wilting_point::NF = 0.17
 end
 
+Adapt.@adapt_structure LandThermodynamics
 LandThermodynamics(SG::SpectralGrid; kwargs...) = LandThermodynamics{SG.NF}(; kwargs...)
 initialize!(land::LandThermodynamics, model::PrimitiveEquation) = nothing

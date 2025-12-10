@@ -132,7 +132,6 @@ and [PrimitiveWetModel](@ref)
 - `model.convection`
 - `model.large_scale_condensation` (`PrimitiveWetModel` only)
 - `model.albedo`
-- `model.optical_depth`
 - `model.shortwave_radiation`
 - `model.longwave_radiation`
 - `model.boundary_layer_drag`
@@ -159,7 +158,16 @@ A parameterization is expected to implement the following functions:
 
 Our existing parameterizations also define further abstract subtypes of `AbstractParameterization` 
 that can also be used to used to reuse some of the functionality of existing parameterizations. 
-These include among others: `AbstractBoundaryLayers`, `AbstractLargeScaleCondensation`, `AbstractTemperatureRelaxation`, `AbstractVerticalDiffusion`,`AbstractConvection`, `AbstractAlbedo`, `AbstractOpticalDepth`, `AbstractShortwaveRadiation`, `AbstractLongwaveRadiation`, `AbstractBoundaryLayerDrag`, `AbstractSurfaceCondition`, `AbstractSurfaceMomentumFlux`, `AbstractSurfaceHeatFlux`, `AbstractSurfaceHumidityFlux`, `AbstractStochasticPhysics`, `AbstractSurfaceWind`. If you extend on these parameterizations, you can inherit from them and only need to implement the functions that are not already implemented by the parent parameterization. It's best to check the source code of the parent parameterization to see what functions are already implemented.
+These include:
+
+```@exaple parameterization
+using InteractiveUtils # hide
+subtypes(SpeedyWeather.AbstractParameterization)
+```
+
+If you extend on these parameterizations, you can inherit from them and only need to implement the functions 
+that are not already implemented by the parent parameterization.
+It's best to check the source code of the parent parameterization to see what functions are already implemented.
 
 ### Registering a new parameterization
 

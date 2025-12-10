@@ -1,7 +1,11 @@
-abstract type AbstractLandTemperature <: AbstractParameterization end
+abstract type AbstractLandTemperature <: AbstractLandComponent end
 
 export SeasonalLandTemperature
-@kwdef mutable struct SeasonalLandTemperature{NF, GridVariable3D} <: AbstractLandTemperature
+
+"""SeasonalLandTemperature model that prescribes land surface temperature from a monthly climatology file.
+The temperature is linearly interpolated between months based on the model time.
+$(TYPEDFIELDS)"""
+@kwdef struct SeasonalLandTemperature{NF, GridVariable3D} <: AbstractLandTemperature
     "[OPTION] path to the folder containing the land temperature file, pkg path default"
     path::String = "SpeedyWeather.jl/input_data"
 
@@ -27,6 +31,9 @@ export SeasonalLandTemperature
     "Monthly land surface temperatures [K], interpolated onto Grid"
     monthly_temperature::GridVariable3D
 end
+
+# TODO to adapt create a ManualSeasonalLandTemperature component like AlbedoClimatology is adapted to ManualAlbedo
+# Adapt.adapt_structure(to, temp::SeasonalLandTemperature) = adapt(to, ManualSeasonalLandTemperature(temp.monthly_temperature))
 
 # generator function
 function SeasonalLandTemperature(SG::SpectralGrid; kwargs...)
@@ -126,7 +133,7 @@ end
 
 ## CONSTANT LAND CLIMATOLOGY
 export ConstantLandTemperature
-@kwdef mutable struct ConstantLandTemperature{NF} <: AbstractLandTemperature
+@kwdef struct ConstantLandTemperature{NF} <: AbstractLandTemperature
     "[OPTION] Globally constant temperature"
     temperature::NF = 285
 
@@ -159,15 +166,17 @@ end
 
 export LandBucketTemperature
 
-"""MITgcm's two-layer soil model (https://mitgcm.readthedocs.io/en/latest/phys_pkgs/land.html). Fields assert
-$(TYPEDFIELDS)"""
-@kwdef mutable struct LandBucketTemperature{NF} <: AbstractLandTemperature
+"""MITgcm's two-layer soil model (https://mitgcm.readthedocs.io/en/latest/phys_pkgs/land.html).
+Fields are $(TYPEDFIELDS)"""
+@kwdef struct LandBucketTemperature{NF} <: AbstractLandTemperature
     "[OPTION] Apply land-sea mask to set ocean-only points?"
     mask::Bool = true
     
     "[OPTION] Initial soil temperature over ocean [K]"
     ocean_temperature::NF = 285
 end
+
+Adapt.@adapt_structure LandBucketTemperature
 
 # generator function
 LandBucketTemperature(SG::SpectralGrid; kwargs...) = LandBucketTemperature{SG.NF}(; kwargs...)

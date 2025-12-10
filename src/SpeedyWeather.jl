@@ -177,6 +177,13 @@ include("physics/stochastic_physics.jl")
 include("physics/ocean.jl")
 include("physics/sea_ice.jl")
 include("physics/land/land.jl")
+include("physics/land/geometry.jl")
+include("physics/land/thermodynamics.jl")
+include("physics/land/temperature.jl")
+include("physics/land/soil_moisture.jl")
+include("physics/land/snow.jl")
+include("physics/land/vegetation.jl")
+include("physics/land/rivers.jl")
 
 # OUTPUT
 include("output/schedule.jl")
