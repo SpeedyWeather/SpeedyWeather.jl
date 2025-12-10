@@ -34,7 +34,7 @@ function dynamics_tendencies!(
     # = ∇⋅(v(ζ+f) + Fᵤ, -u(ζ+f) + Fᵥ), tendency for divergence
     vorticity_flux!(diagn, model)
 
-    geopotential!(diagn, get_step(progn.pres, lf), planet)  # geopotential Φ = gη in shallow water
+    geopotential!(diagn, planet)  # geopotential Φ = gη in shallow water
     bernoulli_potential!(diagn, spectral_transform)         # = -∇²(E+Φ), tendency for divergence
 
     # = -∇⋅(uh, vh), tendency for "pressure" η
@@ -54,6 +54,8 @@ function dynamics_tendencies!(
         lf::Integer,                # leapfrog index for tendencies
         model::PrimitiveEquation,
     )
+    forcing!(diagn, progn, lf, model)
+    drag!(diagn, progn, lf, model)
 
     (; orography, geometry, spectral_transform, geopotential, atmosphere, implicit) = model
 
@@ -69,7 +71,7 @@ function dynamics_tendencies!(
     linear_virtual_temperature!(diagn, progn, lf_implicit, model)
 
     # temperature relative to profile
-    temperature_anomaly!(diagn, implicit)
+    diagn.grid.temp_grid .-= implicit.temp_profile'
 
     # from ∂Φ/∂ln(pₛ) = -RTᵥ for bernoulli_potential!
     geopotential!(diagn, geopotential, orography)
@@ -104,6 +106,9 @@ function dynamics_tendencies!(
     # advect all tracers
     tracer_advection!(diagn, model)
 
+    # back to absolute temperature
+    diagn.grid.temp_grid .+= implicit.temp_profile'
+
     return nothing
 end
 
@@ -134,22 +139,6 @@ function pressure_gradient_flux!(
 
     # PRESSURE GRADIENT FLUX
     uv∇lnp .= u_grid .* ∇lnp_x .+ v_grid .* ∇lnp_y
-
-    return nothing
-end
-
-"""$(TYPEDSIGNATURES)
-Convert absolute and virtual temperature to anomalies wrt to the
-reference profile. Uses KernelAbstractions for GPU/CPU portability."""
-function temperature_anomaly!(
-        diagn::DiagnosticVariables,
-        implicit::ImplicitPrimitiveEquation,
-    )
-    (; temp_profile) = implicit     # reference temperature profile
-    (; temp_grid, temp_virt_grid) = diagn.grid
-
-    temp_grid .-= temp_profile'
-    temp_virt_grid .-= temp_profile'
 
     return nothing
 end
@@ -400,8 +389,8 @@ function vordiv_tendencies!(
         diagn::DiagnosticVariables,
         model::PrimitiveEquation,
     )
-    (; coriolis, atmosphere, geometry, spectral_transform) = model
-    return vordiv_tendencies!(diagn, coriolis, atmosphere, geometry, spectral_transform)
+    (; coriolis, atmosphere, geometry, implicit, spectral_transform) = model
+    return vordiv_tendencies!(diagn, coriolis, atmosphere, geometry, implicit, spectral_transform)
 end
 
 """$(TYPEDSIGNATURES)
@@ -427,15 +416,18 @@ function vordiv_tendencies!(
         coriolis::AbstractCoriolis,
         atmosphere::AbstractAtmosphere,
         geometry::AbstractGeometry,
+        implicit::ImplicitPrimitiveEquation,
         S::SpectralTransform,
     )
     (; R_dry) = atmosphere                      # gas constant for dry air
+
     (; f) = coriolis                            # coriolis parameter
+    Tₖ = implicit.temp_profile      # reference temperature profile
     (; coslat⁻¹) = geometry
 
     # tendencies already contain parameterizations + advection, therefore accumulate
     (; u_tend_grid, v_tend_grid) = diagn.tendencies
-    (; u_grid, v_grid, vor_grid, temp_virt_grid) = diagn.grid   # velocities, vorticity
+    (; u_grid, v_grid, vor_grid, temp_grid, humid_grid) = diagn.grid   # velocities, vorticity
     (; ∇lnp_x, ∇lnp_y, scratch_memory) = diagn.dynamics         # zonal/meridional gradient of logarithm of surface pressure
 
     # Launch kernel to compute u_tend and v_tend with vorticity flux and pressure gradient
@@ -443,7 +435,7 @@ function vordiv_tendencies!(
     arch = architecture(u_tend_grid)
     launch!(
         arch, RingGridWorkOrder, size(u_tend_grid), _vordiv_tendencies_kernel!,
-        u_tend_grid, v_tend_grid, u_grid, v_grid, vor_grid, temp_virt_grid,
+        u_tend_grid, v_tend_grid, u_grid, v_grid, vor_grid, temp_grid, humid_grid,
         ∇lnp_x, ∇lnp_y, f, coslat⁻¹, whichring, R_dry
     )
 
@@ -466,7 +458,8 @@ end
         u_grid,                 # Input: zonal velocity
         v_grid,                 # Input: meridional velocity
         vor_grid,               # Input: relative vorticity
-        temp_virt_grid,         # Input: virtual temperature anomaly
+        temp_grid,              # Input: temperature anomaly
+        humid_grid,             # Input: humidity
         ∇lnp_x,                 # Input: zonal gradient of log surface pressure
         ∇lnp_y,                 # Input: meridional gradient of log surface pressure
         @Const(f),              # Input: coriolis parameter
@@ -480,7 +473,11 @@ end
     f_j = f[j]                      # coriolis parameter for this latitude
 
     ω = vor_grid[ij, k] + f_j                   # absolute vorticity
-    RTᵥ = R_dry * temp_virt_grid[ij, k]           # dry gas constant * virtual temperature anomaly(!)
+
+    # compute virtual temperature on the fly, temp_grid is anomaly
+    Tᵥ = virtual_temperature(temp_grid[ij, k] + Tₖ[k], humid_grid[ij, k], atmosphere)
+    RTᵥ = R_dry*(Tᵥ - Tₖ[k])                        # dry gas constant * virtual temperature anomaly
+
     u_tend_grid[ij, k] = (u_tend_grid[ij, k] + v_grid[ij, k] * ω - RTᵥ * ∇lnp_x[ij]) * coslat⁻¹j
     v_tend_grid[ij, k] = (v_tend_grid[ij, k] - u_grid[ij, k] * ω - RTᵥ * ∇lnp_y[ij]) * coslat⁻¹j
 end
@@ -546,10 +543,10 @@ function temperature_tendency!(
         S::SpectralTransform,
     )
     (; temp_tend, temp_tend_grid) = diagn.tendencies
-    (; div_grid, temp_grid) = diagn.grid
+    (; div_grid, temp_grid, humid_grid) = diagn.grid
     (; uv∇lnp, uv∇lnp_sum_above, div_sum_above, scratch_memory) = diagn.dynamics
     (; κ) = atmosphere              # thermodynamic kappa = R_Dry/heat_capacity
-    Tᵥ = diagn.grid.temp_virt_grid  # anomaly wrt to Tₖ
+    # Tᵥ = diagn.grid.temp_virt_grid  # anomaly wrt to Tₖ
     (; temp_profile) = implicit
 
     # semi-implicit: terms here are explicit+implicit evaluated at time step i
@@ -560,7 +557,7 @@ function temperature_tendency!(
     arch = architecture(temp_tend_grid)
     launch!(
         arch, RingGridWorkOrder, size(temp_tend_grid), _temperature_tendency_kernel!,
-        temp_tend_grid, temp_grid, div_grid, Tᵥ, div_sum_above, uv∇lnp_sum_above,
+        temp_tend_grid, temp_grid, div_grid, humid_grid, div_sum_above, uv∇lnp_sum_above,
         uv∇lnp, temp_profile, adiabatic_conversion.σ_lnp_A, adiabatic_conversion.σ_lnp_B, κ
     )
 
@@ -576,7 +573,7 @@ end
         temp_tend_grid,         # Input/Output: temperature tendency
         temp_grid,              # Input: temperature anomaly
         div_grid,               # Input: divergence
-        Tᵥ,                     # Input: virtual temperature anomaly
+        humid_grid,             # Input: humidity
         div_sum_above,          # Input: sum of div from layers above
         uv∇lnp_sum_above,       # Input: sum of uv∇lnp from layers above
         uv∇lnp,                 # Input: (u,v)⋅∇lnp term
@@ -594,13 +591,17 @@ end
 
     # Adiabatic conversion term following Simmons and Burridge 1981 but for σ coordinates
     # += as tend already contains parameterizations + vertical advection
+
+    # TODO use dispatch to simplify calculation for dry core where Tᵥ = T
+    Tᵥ = virtual_temperature(temp_grid[ij, k] + Tₖ, humid_grid[ij, k], atmosphere)
+
     temp_tend_grid[ij, k] +=
         temp_grid[ij, k] * div_grid[ij, k] +            # +T'D term of hori advection
-        κ * (Tᵥ[ij, k] + Tₖ) * (                          # +κTᵥ*Dlnp/Dt, adiabatic term
-        σ_lnp_A_k * (div_sum_above[ij, k] + uv∇lnp_sum_above[ij, k]) +    # eq. 3.12 1st term
+        κ * Tᵥ * (                                      # +κTᵥ*Dlnp/Dt, adiabatic term
+            σ_lnp_A_k * (div_sum_above[ij, k] + uv∇lnp_sum_above[ij, k]) +    # eq. 3.12 1st term
             σ_lnp_B_k * (div_grid[ij, k] + uv∇lnp[ij, k]) +                   # eq. 3.12 2nd term
-            uv∇lnp[ij, k]
-    )                                                  # eq. 3.13
+            uv∇lnp[ij, k])                                                    # eq. 3.13
+                                                      
 end
 
 function humidity_tendency!(
@@ -875,7 +876,8 @@ function bernoulli_potential!(
         S::SpectralTransform,
     )
     (; u_grid, v_grid) = diagn.grid
-    (; geopot, scratch_memory) = diagn.dynamics
+    (; scratch_memory) = diagn.dynamics
+    geopot = diagn.dynamics.geopotential
     bernoulli = diagn.dynamics.a                            # reuse work arrays a, a_grid
     bernoulli_grid = diagn.dynamics.a_grid
     (; div_tend) = diagn.tendencies
@@ -885,37 +887,6 @@ function bernoulli_potential!(
     transform!(bernoulli, bernoulli_grid, scratch_memory, S)                # to spectral space
     bernoulli .+= geopot                                    # add geopotential Φ
     ∇²!(div_tend, bernoulli, S, add = true, flipsign = true)    # add -∇²(½(u² + v²) + ϕ)
-    return nothing
-end
-
-"""$(TYPEDSIGNATURES)
-Add the linear contribution of the pressure gradient to the geopotential.
-The pressure gradient in the divergence equation takes the form
-
-    -∇⋅(Rd * Tᵥ * ∇lnpₛ) = -∇⋅(Rd * Tᵥ' * ∇lnpₛ) - ∇²(Rd * Tₖ * lnpₛ)
-
-So that the second term inside the Laplace operator can be added to the geopotential.
-Rd is the gas constant, Tᵥ the virtual temperature and Tᵥ' its anomaly wrt to the
-average or reference temperature Tₖ, lnpₛ is the logarithm of surface pressure."""
-function linear_pressure_gradient!(
-        diagn::DiagnosticVariables,
-        progn::PrognosticVariables,
-        lf::Int,                # leapfrog index to evaluate tendencies on
-        atmosphere::AbstractAtmosphere,
-        implicit::ImplicitPrimitiveEquation,
-    )
-    (; R_dry) = atmosphere                  # dry gas constant
-    (; temp_profile) = implicit             # reference profile at layer k
-    pres = get_step(progn.pres, lf)         # logarithm of surface pressure at leapfrog index lf
-    (; geopot) = diagn.dynamics
-
-    # -R_dry*Tₖ*∇²lnpₛ, linear part of the ∇⋅RTᵥ∇lnpₛ pressure gradient term
-    # Tₖ being the reference temperature profile, the anomaly term T' = Tᵥ - Tₖ is calculated
-    # vordiv_tendencies! include as R_dry*Tₖ*lnpₛ into the geopotential on which the operator
-    # -∇² is applied in bernoulli_potential!
-    # TODO: Broadcast issue with LTA, conflicting broadcast styles
-    geopot.data .+= R_dry .* temp_profile' .* pres.data
-
     return nothing
 end
 
@@ -1053,10 +1024,8 @@ function SpeedyTransforms.transform!(
         model::PrimitiveEquation;
         initialize::Bool = false,
     )
-    (;
-        vor_grid, div_grid, pres_grid, u_grid, v_grid, temp_grid, humid_grid,
-        temp_grid_prev, humid_grid_prev, u_grid_prev, v_grid_prev,
-    ) = diagn.grid
+    (; vor_grid, div_grid, pres_grid, u_grid, v_grid, temp_grid, humid_grid,
+    pres_grid_prev, u_grid_prev, v_grid_prev, temp_grid_prev, humid_grid_prev) = diagn.grid
 
     vor = get_step(progn.vor, lf)     # relative vorticity at leapfrog step lf
     div = get_step(progn.div, lf)     # divergence at leapfrog step lf
@@ -1070,12 +1039,13 @@ function SpeedyTransforms.transform!(
     V = diagn.dynamics.b            # U = u*coslat, V=v*coslat
     S = model.spectral_transform
 
-    # retain previous time step for vertical advection and some parameterizations
+    # retain previous time step for vertical advection and parameterizations
     if initialize == false              # only store prev after initial step
-        @. temp_grid_prev = temp_grid   # this is temperature anomaly wrt to implicit reference profile!
-        @. humid_grid_prev = humid_grid
         @. u_grid_prev = u_grid
         @. v_grid_prev = v_grid
+        @. temp_grid_prev = temp_grid   
+        @. humid_grid_prev = humid_grid
+        @. pres_grid_prev = exp(pres_grid)
 
         for (name, tracer) in model.tracers
             if tracer.active
@@ -1105,25 +1075,15 @@ function SpeedyTransforms.transform!(
 
     # include humidity effect into temp for everything stability-related
     temperature_average!(diagn, temp, S)
-    virtual_temperature!(diagn, model)      # temp = virt temp for dry core
+    # virtual_temperature!(diagn, model)      # temp = virt temp for dry core
+    geopotential!(diagn, model)             # calculate geopotential
 
     if initialize   # at initial step store prev <- current
-        # subtract the reference temperature profile Tₖ as temp_grid is too after every time step
-        # the Tₖ is added for the physics parameterizations again
-        # technically Tₖ is from model.implicit (which is held constant throughout) integration
-        # but given it's the initial step here using the instantaneous diagn.temp_average is the same
-
-        # Use kernel for temperature initialization
-        arch = architecture(temp_grid_prev)
-        launch!(
-            arch, RingGridWorkOrder, size(temp_grid_prev),
-            _initialize_temp_prev_kernel!,
-            temp_grid_prev, temp_grid, diagn.temp_average
-        )
-
-        @. humid_grid_prev = humid_grid
         @. u_grid_prev = u_grid
         @. v_grid_prev = v_grid
+        @. temp_grid_prev = temp_grid
+        @. humid_grid_prev = humid_grid
+        @. pres_grid_prev = pres_grid
 
         for (name, tracer) in model.tracers
             if tracer.active
@@ -1143,19 +1103,6 @@ function SpeedyTransforms.transform!(
     return nothing
 end
 
-@kernel inbounds = true function _initialize_temp_prev_kernel!(
-        temp_grid_prev,         # Output: previous temperature grid (anomaly)
-        @Const(temp_grid),      # Input: current temperature grid
-        @Const(temp_average),   # Input: reference temperature profile Tₖ
-    )
-    ij, k = @index(Global, NTuple)  # global index: grid point ij, layer k
-
-    # Subtract reference temperature profile to get anomaly
-    # temp_grid_prev stores the temperature anomaly T' = T - Tₖ
-    Tₖ = temp_average[k]
-    temp_grid_prev[ij, k] = temp_grid[ij, k] - Tₖ
-end
-
 """ 
 $(TYPEDSIGNATURES)
 Calculates the average temperature of a layer from the l=m=0 harmonic
@@ -1165,5 +1112,36 @@ function temperature_average!(
         temp::LowerTriangularArray,
         S::SpectralTransform,
     )
-    diagn.temp_average .= real.(temp[1, :]) ./ S.norm_sphere
+    @. diagn.temp_average = real(temp[1, :]) / S.norm_sphere
 end 
+
+"""$(TYPEDSIGNATURES)
+Add the linear contribution of the pressure gradient to the geopotential.
+The pressure gradient in the divergence equation takes the form
+
+    -∇⋅(Rd * Tᵥ * ∇lnpₛ) = -∇⋅(Rd * Tᵥ' * ∇lnpₛ) - ∇²(Rd * Tₖ * lnpₛ)
+
+So that the second term inside the Laplace operator can be added to the geopotential.
+Rd is the gas constant, Tᵥ the virtual temperature and Tᵥ' its anomaly wrt to the
+average or reference temperature Tₖ, lnpₛ is the logarithm of surface pressure."""
+function linear_pressure_gradient!(
+        diagn::DiagnosticVariables,
+        progn::PrognosticVariables,
+        lf::Int,                # leapfrog index to evaluate tendencies on
+        atmosphere::AbstractAtmosphere,
+        implicit::ImplicitPrimitiveEquation,
+    )
+    (; R_dry) = atmosphere                  # dry gas constant
+    (; temp_profile) = implicit             # reference profile at layer k
+    pres = get_step(progn.pres, lf)         # logarithm of surface pressure at leapfrog index lf
+    geopot = diagn.dynamics.geopotential
+
+    # -R_dry*Tₖ*∇²lnpₛ, linear part of the ∇⋅RTᵥ∇lnpₛ pressure gradient term
+    # Tₖ being the reference temperature profile, the anomaly term T' = Tᵥ - Tₖ is calculated
+    # vordiv_tendencies! include as R_dry*Tₖ*lnpₛ into the geopotential on which the operator
+    # -∇² is applied in bernoulli_potential!
+    # TODO: Broadcast issue with LTA, conflicting broadcast styles
+    geopot.data .+= R_dry .* temp_profile' .* pres.data
+
+    return nothing
+end
