@@ -234,9 +234,9 @@ function timestep!(
     @boundscheck size(soil_moisture, 2) >= 2 || throw(DimensionMismatch)
     
     # Water at field capacity [m], top and lower layer γ*z₁ and γ*z₂
-    γ = model.land.thermodynamics.field_capacity
-    f₁ ≈ γ*model.land.geometry.layer_thickness[1]
-    f₂ ≈ γ*model.land.geometry.layer_thickness[2]
+    γ  = model.land.thermodynamics.field_capacity
+    f₁ = γ*model.land.geometry.layer_thickness[1]
+    f₂ = γ*model.land.geometry.layer_thickness[2]
 
     p = soil.infiltration_fraction      # Infiltration fraction: fraction of top layer runoff put into lower layer
     τ⁻¹ = inv(convert(eltype(soil_moisture), Second(soil.time_scale).value))
