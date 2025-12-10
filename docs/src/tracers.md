@@ -150,7 +150,7 @@ Let us illustrate some tracer advection in practice
 using SpeedyWeather
 spectral_grid = SpectralGrid(trunc=85, nlayers=1)
 model = ShallowWaterModel(spectral_grid)
-add!(simulation, Tracer(:abc))
+add!(model, Tracer(:abc))
 simulation = initialize!(model)
 
 # add and set tracer and run a 0-day simulation

@@ -163,7 +163,8 @@ These include among others: `AbstractBoundaryLayers`, `AbstractLargeScaleCondens
 
 ### Registering a new parameterization
 
-If you want to implement a new parameterization that doesn't replace an existing one, you can register it by providing a custom `parametrizations` tuple of symbols as a keyword argument to the model constructor. 
+If you want to implement a new parameterization that doesn't replace an existing one, you can register it by
+providing a custom `parametrizations` tuple of symbols as a keyword argument to the model constructor. 
 
 The default parameterizations of the `PrimitiveWetModel` currently are:
 
@@ -172,60 +173,80 @@ model = PrimitiveWetModel(spectral_grid)
 model.parameterizations
 ```
 
-You can change the order in which the parametrizations are executed by reordering the tuple or you can add your own, additional parametrization to the model by adding it with `custom_parameterization` keyword argument. Below we will demonstrate this in an example. 
+You can change the order in which the parametrizations are executed by reordering the tuple or you can add your own,
+additional parametrization to the model by adding it with `custom_parameterization` keyword argument.
+Below we will demonstrate this in an example. 
 
 ## Example: Albedo 
 
-Let's implement a very simple albedo parameterization as an example how to define a new parameterization. All this parametrization does is to set the albedo to a constant value over land and to linearly interpolate between the albedo of the ocean and the seaice depending on the current sea ice concentration. This albedo is written into the diagnostic variable `diagn.physics.albedo` and used later by subsequent parameterizations. 
+Let's implement a very simple albedo parameterization as an example how to define a new parameterization.
+All this parametrization does is to set the albedo to a constant value over land and to linearly interpolate
+between the albedo of the ocean and the sea ice depending on the current sea ice concentration.
+This albedo is written into the diagnostic variable `diagn.physics.albedo` and used later by subsequent parameterizations. 
 
 Let's get started. First we define our albedo parameterization with all the functions we need to implement for our parameterization interface: 
 
 ```@example custom-parameterization
 using SpeedyWeather, Adapt, CairoMakie
 
- @kwdef struct SimpleAlbedo{NF<:Number} <: SpeedyWeather.AbstractParameterization
-    land_albedo::NF=0.35
-    seaice_albedo::NF=0.6
-    ocean_albedo::NF=0.06
+@kwdef struct SimpleAlbedo{NF <: Number} <: SpeedyWeather.AbstractParameterization
+    land_albedo::NF = 0.35
+    seaice_albedo::NF = 0.6
+    ocean_albedo::NF = 0.06
 end 
 
 Adapt.@adapt_structure SimpleAlbedo # this is needed to make it GPU compatible
 
-SimpleAlbedo(SG::SpectralGrid; kwargs...) = SimpleAlbedo(; kwargs...)
+# generator function
+SimpleAlbedo(SG::SpectralGrid; kwargs...) = SimpleAlbedo{SG.NF}(; kwargs...)
 
+# what has to be done to initialize SimpleAlbedo: nothing
 SpeedyWeather.initialize!(::SimpleAlbedo, model::PrimitiveEquation) = nothing 
 
+# define variables required
 SpeedyWeather.variables(::SimpleAlbedo) = (
     DiagnosticVariable(name=:albedo, dims=Grid2D(), desc="Albedo", units="1"),
+    DiagnosticVariable(name=:albedo, dims=Grid2D(), desc="Albedo", units="1", namespace=:ocean),
+    DiagnosticVariable(name=:albedo, dims=Grid2D(), desc="Albedo", units="1", namespace=:land),
 )
 
-Base.@propagate_inbounds function SpeedyWeather.parameterization!(
-    ij,
-    diagn::DiagnosticVariables,
+Base.@propagate_inbounds function SpeedyWeather.albedo!(
+    ij,                             # horizontal grid index ij
+    diagn,                          # not ::DiagnosticVariables as called with `diagn.physics.ocean` then `diagn.physics.land`
     progn::PrognosticVariables,
     albedo::SimpleAlbedo,
-    model_parameters,
+    model_parameters,               # model unpacked into a NamedTuple
 )        
     (; land_sea_mask) = model_parameters
     (; sea_ice_concentration) = progn.ocean
     (; land_albedo, seaice_albedo, ocean_albedo) = albedo
         
     if land_sea_mask.mask[ij] > 0.95 # if mostly land 
-        diagn.physics.albedo[ij] = land_albedo
+        diagn.albedo[ij] = land_albedo
     else # if ocean
-        diagn.physics.albedo[ij] = ocean_albedo + sea_ice_concentration[ij] * (seaice_albedo - ocean_albedo)
+        diagn.albedo[ij] = ocean_albedo + sea_ice_concentration[ij] * (seaice_albedo - ocean_albedo)
     end
 end 
 ```
 
-Note that for good CPU performance, we recommend to always define all parameterization functions with `@propagate_inbounds` to avoid bounds checking overhead and inline the function.
+!!! info "Albedos extend albedo!"
+    In contrast to other parameterizations that are supposed to extend
+    `parameterization!(ij, diagn, progn, p::MyParameterization, model)`
+    albedos are expected to extend `albedo!` instead. That way they can be
+    used of ocean, land or both. As long as they write into `diagn.albedo[ij]`
+    as shown above, the shortwave radiation scheme will correctly use that
+    to compute radiative surface fluxes over both ocean and land.
+
+Note that for good CPU performance, we recommend to always define all parameterization functions
+with `@propagate_inbounds` to avoid bounds checking overhead and inline the function.
+Mostly this should enable vectorization across different grid points
 
 Now, we can use our new parameterization in a model. We'll first demonstrate how to simply
 replace the existing albedo: 
 
 ```@example custom-parameterization
 spectral_grid = SpectralGrid(trunc=31, nlayers=8)
-albedo = SimpleAlbedo()
+albedo = SimpleAlbedo(spectra_grid)
 model = PrimitiveWetModel(spectral_grid; albedo=albedo)
 simulation = initialize!(model) 
 run!(simulation, period=Day(5)) # spin up the model a little
@@ -242,9 +263,10 @@ Now, let's demonstrate how to add our new parameterization to the model by addin
 to fit one of our pre-defined ones.
 
 ```@example custom-parameterization
-model = PrimitiveWetModel(spectral_grid; custom_parameterization= SimpleAlbedo(), parameterizations=(
-:convection, :large_scale_condensation, :custom_parameterization, :surface_condition, :surface_momentum_flux, 
-:surface_heat_flux, :surface_humidity_flux, :stochastic_physics))
+model = PrimitiveWetModel(spectral_grid;
+    custom_parameterization = SimpleAlbedo(spectral_grid),
+    parameterizations=(:convection, :large_scale_condensation, :custom_parameterization, :surface_condition, :surface_momentum_flux, 
+        :surface_heat_flux, :surface_humidity_flux, :stochastic_physics))
 
 simulation = initialize!(model) 
 run!(simulation, period=Day(5)) # spin up the model a little

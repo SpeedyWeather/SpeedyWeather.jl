@@ -139,8 +139,7 @@ add!(model, SpeedyWeather.SeaSurfaceTemperatureOutput())
 or collectively with sea ice concentration
 
 ```@example ocean
-add!(model, SpeedyWeather.OceanOutput()...)
+add!(model, SpeedyWeather.OceanOutput())
 ```
 
-where the splatting operator `...` has to be applied to unpack all output variables in
-the tuple, all output variable groups are defined as tuples.
+All output variable groups are defined as tuples which are implicitly splatted (`...`).
