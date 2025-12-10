@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- uv_from_vordiv! kernel version used [#893](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/893)
+- uv_from_vordiv! kernel version used [#893](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/893) [#940](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/940)
 - Fixes some typos and formatting/LaTeX rendering in Docs [#939](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/939)
 - Land snow model [#833](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/833)
 - Updated extended differentiability tests [#929](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/929)
