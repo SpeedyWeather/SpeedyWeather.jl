@@ -9,15 +9,15 @@ SpeedyWeather.jl uses `LowerTriangularArray` which is defined as a subtype of `A
 the spherical harmonic coefficients (see [Spectral packing](@ref)).
 For 2D `LowerTriangularArray` the alias `LowerTriangularMatrix` exists.
 Higher dimensional `LowerTriangularArray` are 'batches' of 2D `LowerTriangularMatrix`.
-So, for example a ``(10\times 10\times 10)`` `LowerTriangularArray` holds 10 `LowerTriangularMatrix` of size ``(10\times 10)`` in one array.  
+So, for example a ``(10\times 10\times 10)`` `LowerTriangularArray` holds 10 `LowerTriangularMatrix` of size ``(10\times 10)`` in one array.
 
-!!! warn "LowerTriangularMatrix is actually a vector"
+!!! warning "LowerTriangularMatrix is actually a vector"
     `LowerTriangularMatrix` and `LowerTriangularArray` can in many ways be used very much like a `Matrix` or `Array`, however,
     because they unravel the lower triangle into a vector their dimensionality is one less than their `Array` counterparts.
     A `LowerTriangularMatrix` should therefore be treated as a vector rather than a matrix with some (limited) added
     functionality to allow for matrix-indexing (vector or flat-indexing is the default though). More details below.
 
-## Creation of `LowerTriangularArray` 
+## Creation of `LowerTriangularArray`
 
 A `LowerTriangularMatrix` and `LowerTriangularArray` can be created using `zeros`, `ones`, `rand`, or `randn`
 ```@repl LowerTriangularArrays
@@ -111,7 +111,7 @@ which would point to the first element in the upper triangle (hence zero).
 
 In performance-critical code a single index should be used, as this directly maps
 to the index of the underlying data vector. The matrix index is somewhat slower
-as it first has to be converted to the corresponding single index. 
+as it first has to be converted to the corresponding single index.
 
 Consequently, many loops in SpeedyWeather.jl are build with the following structure
 ```@repl LowerTriangularArrays
@@ -127,12 +127,12 @@ which loops over all lower triangle entries of `L::LowerTriangularArray` and the
 index `ij` is simply counted up. However, one could also use `[i, j]` as indices in the
 loop body or to perform any calculation (`i+j` here).
 
-!!! warn "`end` doesn't work for matrix indexing"
-    Indexing `LowerTriangularMatrix` and `LowerTriangularArray` in matrix style (`[i, j]`) with 
-    `end` doesn't work. It either returns an error or wrong results as the `end` is lowered by 
+!!! warning "`end` doesn't work for matrix indexing"
+    Indexing `LowerTriangularMatrix` and `LowerTriangularArray` in matrix style (`[i, j]`) with
+    `end` doesn't work. It either returns an error or wrong results as the `end` is lowered by
     Julia to the size of the underlying flat array dimension.
 
-The `setindex!` functionality of matrixes will throw a `BoundsError` when trying to write
+The `setindex!` functionality of matrices will throw a `BoundsError` when trying to write
 into the upper triangle of a `LowerTriangularArray`, for example
 ```@repl LowerTriangularArrays
 L[2, 1] = 0    # valid index
@@ -146,17 +146,17 @@ But reading from it will just return a zero
 L[2, 3]     # in the upper triangle
 ```
 
-Higher dimensional `LowerTriangularArray` can be indexed with multidimensional array indices 
-like most other arrays types. Both the vector index and the matrix index for the lower 
+Higher dimensional `LowerTriangularArray` can be indexed with multidimensional array indices
+like most other arrays types. Both the vector index and the matrix index for the lower
 triangle work as shown here
 ```@repl LowerTriangularArrays
 L = rand(LowerTriangularArray{Float32}, 3, 3, 5)
 
-L[2, 1] # second lower triangle element of the first lower triangle matrix 
+L[2, 1] # second lower triangle element of the first lower triangle matrix
 
-L[2, 1, 1] # (2,1) element of the first lower triangle matrix 
+L[2, 1, 1] # (2,1) element of the first lower triangle matrix
 ```
-The `setindex!` functionality follows accordingly. 
+The `setindex!` functionality follows accordingly.
 
 ### Iterators
 
@@ -217,11 +217,11 @@ L' * L
 ```
 
 Summation with `sum` follows the flat, single index logic
-```@repl 
+```@repl
 L = rand(LowerTriangularArray{Float32}, 3, 3, 5)
-sum(L, dims=2) 
+sum(L, dims=2)
 ```
-sums along the second dimension of the underlying vector, not of the full matrix representation. 
+sums along the second dimension of the underlying vector, not of the full matrix representation.
 
 ## Rotation of `LowerTriangularArray`
 
@@ -291,7 +291,7 @@ L + L
 @. L + 2L - 1.1*L / L^2
 ```
 
-## GPU 
+## GPU
 
 `LowerTriangularArray{T, N, ArrayType, S}` wraps around an array of type `ArrayType`.
 If this array is a GPU array (e.g. `CuArray`), all operations are performed on GPU as well (work in progress).
@@ -299,7 +299,7 @@ The implementation was written so that scalar indexing is avoided in almost all 
 so that GPU operation should be performant.
 To use `LowerTriangularArray` on GPU you can e.g. just `adapt` an existing `LowerTriangularArray`.
 
-```julia 
+```julia
 using Adapt
 L = rand(LowerTriangularArray{Float32}, 5, 5, 5)
 L_gpu = adapt(CuArray, L)
@@ -310,7 +310,7 @@ L_gpu = adapt(CuArray, L)
 Internally, a `LowerTriangularArray` is represented by an array that holds all non-zero elements of the matrices and a `Spectrum` type that holds all spectral discretization information and the architecture the array is on. The `Spectrum` can also be used to create new `LowerTriangularArray`s with the same spectral discretization:
 
 ```@repl LowerTriangularArrays
-spectrum = Spectrum(5, 5) # initailize 
+spectrum = Spectrum(5, 5) # initailize
 ```
 
 ```@repl LowerTriangularArrays
@@ -321,7 +321,7 @@ L = rand(Float32, spectrum)
 L = rand(ComplexF32, spectrum, 5)
 ```
 
-In the SpeedyWeather.jl model, the `Spectrum` is stored just once in the `SpectralGrid` type, and all `LowerTriangularArray`s are created with the same `Spectrum`. Therefore, once you've initialized the `SpectralGrid`, you can create `LowerTriangularArray`s with the same spectral discretization as follows: 
+In the SpeedyWeather.jl model, the `Spectrum` is stored just once in the `SpectralGrid` type, and all `LowerTriangularArray`s are created with the same `Spectrum`. Therefore, once you've initialized the `SpectralGrid`, you can create `LowerTriangularArray`s with the same spectral discretization as follows:
 
 ```@repl LowerTriangularArrays
 SG = SpectralGrid(trunc=31)
