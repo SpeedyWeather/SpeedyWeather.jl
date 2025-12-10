@@ -338,11 +338,11 @@ end
         ∂Dθ = -vordiv_uv2 * div[lm+1, k]       # lm-1 term is zero
         
         # Zonal gradient contributions
-        U[I] = im*muladd(z, div[I], ∂ζθ)          # = ∂Dλ + ∂ζθ
-        V[I] = im*muladd(z, vor[I], ∂Dθ)          # = ∂ζλ + ∂Dθ
+        U[I] = muladd(z, div[I], ∂ζθ)          # = ∂Dλ + ∂ζθ
+        V[I] = muladd(z, vor[I], ∂Dθ)          # = ∂ζλ + ∂Dθ
     elseif l == (lmax-1)  # Second last row
-        U[I] = im*muladd(z, div[I], -vordiv_uv1 * vor[lm-1, k])
-        V[I] = im*muladd(z, vor[I], vordiv_uv1 * div[lm-1, k])
+        U[I] = muladd(z, div[I], -vordiv_uv1 * vor[lm-1, k])
+        V[I] = muladd(z, vor[I], vordiv_uv1 * div[lm-1, k])
     elseif l == lmax  # Last row
         U[I] = -vordiv_uv1 * vor[lm-1, k]      # only last term from 2nd last row
         V[I] =  vordiv_uv1 * div[lm-1, k]      # only last term from 2nd last row
@@ -352,8 +352,8 @@ end
         ∂Dθ = muladd(vordiv_uv1, div[lm-1, k], -vordiv_uv2 * div[lm+1, k])
         
         # Zonal gradient contributions
-        U[I] = im*muladd(z, div[I], ∂ζθ)          # = ∂Dλ + ∂ζθ
-        V[I] = im*muladd(z, vor[I], ∂Dθ)          # = ∂ζλ + ∂Dθ
+        U[I] = muladd(z, div[I], ∂ζθ)          # = ∂Dλ + ∂ζθ
+        V[I] = muladd(z, vor[I], ∂Dθ)          # = ∂ζλ + ∂Dθ
     end
 end
 
