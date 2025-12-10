@@ -56,9 +56,9 @@ initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
     diagn,
     drag::BulkRichardsonDrag,
     land_sea_mask,
-    atmosphere::AbstractAtmosphere,
-    planet::AbstractPlanet,
-    orography::AbstractOrography,
+    atmosphere,
+    planet,
+    orography,
 )
     land_fraction = land_sea_mask.mask[ij]
 

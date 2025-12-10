@@ -389,21 +389,21 @@ function timestep!(
         land_timestep!(progn, diagn, model)     # soil moisture and temperature, vegetation, maybe rivers
     end
 
-    if model.dynamics                                               # switch on/off all dynamics
-        dynamics_tendencies!(diagn, progn, lf2, model)              # dynamical core
-        implicit_correction!(diagn, progn, model.implicit, model)   # semi-implicit time stepping corrections
-    else    # just transform physics tendencies to spectral space
-        physics_tendencies_only!(diagn, model)
-    end
+    # if model.dynamics                                               # switch on/off all dynamics
+    #     dynamics_tendencies!(diagn, progn, lf2, model)              # dynamical core
+    #     implicit_correction!(diagn, progn, model.implicit, model)   # semi-implicit time stepping corrections
+    # else    # just transform physics tendencies to spectral space
+    #     physics_tendencies_only!(diagn, model)
+    # end
 
-    # APPLY DIFFUSION, STEP FORWARD IN TIME, AND TRANSFORM NEW TIME STEP TO GRID
+    # # APPLY DIFFUSION, STEP FORWARD IN TIME, AND TRANSFORM NEW TIME STEP TO GRID
     horizontal_diffusion!(diagn, progn, model.horizontal_diffusion, model)
     leapfrog!(progn, diagn.tendencies, dt, lf1, model)
-    transform!(diagn, progn, lf2, model)
+    # transform!(diagn, progn, lf2, model)
 
-    # PARTICLE ADVECTION (always skip 1st step of first_timesteps!)
-    not_first_timestep = lf2 == 2
-    not_first_timestep && particle_advection!(progn, diagn, model)
+    # # PARTICLE ADVECTION (always skip 1st step of first_timesteps!)
+    # not_first_timestep = lf2 == 2
+    # not_first_timestep && particle_advection!(progn, diagn, model)
 
     return nothing 
 end

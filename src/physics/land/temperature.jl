@@ -70,7 +70,9 @@ function initialize!(land::SeasonalLandTemperature, model::PrimitiveEquation)
     masked_value = land.ocean_temperature
     if land.mask
         # Replace NaN values in soil temperature with a fallback ocean temperature
-        monthly_temperature[isnan.(monthly_temperature)] .= masked_value
+        # unpack via .data due to broadcasting issues
+        mtd = monthly_temperature.data
+        mtd[isnan.(mtd)] .= masked_value
 
         # but land-sea mask may not align so also set those 100% ocean points to
         # the same fallback ocean temperature

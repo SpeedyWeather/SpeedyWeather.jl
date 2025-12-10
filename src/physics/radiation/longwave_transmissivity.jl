@@ -2,6 +2,7 @@ abstract type AbstractLongwaveTransmissivity <: AbstractLongwave end
 
 export TransparentLongwaveTransmissivity
 struct TransparentLongwaveTransmissivity <: AbstractLongwaveTransmissivity end
+Adapt.@adapt_structure TransparentLongwaveTransmissivity
 TransparentLongwaveTransmissivity(SG::SpectralGrid) = TransparentLongwaveTransmissivity()
 initialize!(::TransparentLongwaveTransmissivity, ::AbstractModel) = nothing
 @propagate_inbounds function transmissivity!(ij, diagn, progn, transmissivity::TransparentLongwaveTransmissivity, model)
@@ -15,7 +16,7 @@ initialize!(::TransparentLongwaveTransmissivity, ::AbstractModel) = nothing
 end
 
 export FriersonLongwaveTransmissivity
-@kwdef mutable struct FriersonLongwaveTransmissivity{NF} <: AbstractLongwaveTransmissivity
+@kwdef struct FriersonLongwaveTransmissivity{NF} <: AbstractLongwaveTransmissivity
     "[OPTION] Optical depth at the equator"
     τ₀_equator::NF = 6
 
@@ -26,6 +27,7 @@ export FriersonLongwaveTransmissivity
     fₗ::NF = 0.1
 end
 
+Adapt.@adapt_structure FriersonLongwaveTransmissivity
 FriersonLongwaveTransmissivity(SG::SpectralGrid; kwargs...) = FriersonLongwaveTransmissivity{SG.NF}(; kwargs...)
 initialize!(::FriersonLongwaveTransmissivity, ::AbstractModel) = nothing
 

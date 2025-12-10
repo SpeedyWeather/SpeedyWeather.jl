@@ -969,10 +969,9 @@ function temperature_average!(
     temp::LowerTriangularArray,
     S::SpectralTransform,
 )
-    @inbounds for k in eachmatrix(temp)
-        # average from l=m=0 harmonic divided by norm of the sphere
-        diagn.temp_average[k] = real(temp[1, k])/S.norm_sphere
-    end
+    # average from l=m=0 harmonic divided by norm of the sphere
+    @. diagn.temp_average = real(temp[1, :]) / S.norm_sphere
+    return nothing
 end 
 
 

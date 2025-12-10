@@ -169,6 +169,8 @@ struct OneBandLongwave{T, R} <: AbstractLongwave
     radiative_transfer::R
 end
 
+Adapt.@adapt_structure OneBandLongwave
+
 # primitive wet model version
 function OneBandLongwave(SG::SpectralGrid;
     transmissivity = FriersonLongwaveTransmissivity(SG),
@@ -224,6 +226,8 @@ export OneBandLongwaveRadiativeTransfer
     "[OPTION] Emissivity for surface flux over land [1]"
     emissivity_land::NF = 1
 end
+
+Adapt.@adapt_structure OneBandLongwaveRadiativeTransfer
 
 # generator function
 OneBandLongwaveRadiativeTransfer(SG::SpectralGrid; kwargs...) = OneBandLongwaveRadiativeTransfer{SG.NF}(; kwargs...)
