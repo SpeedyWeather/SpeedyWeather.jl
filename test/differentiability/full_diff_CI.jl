@@ -10,7 +10,7 @@ if VERSION <= v"1.11.0"
         # we don't commit some kind of problem for the Enzyme differentiability
         # so, we test here if we get a non-zero gradient from the timestepping.  
         spectral_grid = SpectralGrid(trunc=5, nlayers=1)          # define resolution
-        model = ShallowWater(spectral_grid)   # construct model
+        model = ShallowWaterModel(; spectral_grid)   # construct model
         simulation = initialize!(model)  
         initialize!(simulation)
         run!(simulation, period=Hour(6))
