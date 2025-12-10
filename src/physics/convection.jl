@@ -412,7 +412,7 @@ Adapt.@adapt_structure ConvectiveHeating
 ConvectiveHeating(SG::SpectralGrid; kwargs...) = ConvectiveHeating{SG.NF, SG.VectorType}(lat_mask=zeros(SG.nlat); kwargs...)
 
 # precompute latitudinal mask
-function initialize!(C::ConvectiveHeating, model)
+function initialize!(C::ConvectiveHeating, model::PrimitiveEquation)
     θ = model.geometry.latd
     (; θ₀, σθ) = C
     
