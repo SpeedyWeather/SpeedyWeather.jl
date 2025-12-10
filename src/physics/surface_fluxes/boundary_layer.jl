@@ -77,25 +77,25 @@ initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
     z = max(z, z₀)  
     drag_max = (κ/log(z/z₀))^2
     
-    # bulk Richardson number at lowermost layer N from Frierson, 2006, eq. (15)
-    # they call it Ri_a = Ri_N here
+    # bulk Richardson number at lowermost layer from Frierson, 2006, eq. (15)
+    # they call it Ri_a = Ri here
     ΔΦ₀ = gravity*z     # geopotential high relative to surface
-    Ri_N = bulk_richardson_surface(ij, ΔΦ₀, diagn, atmosphere)
+    Ri = bulk_richardson_surface(ij, ΔΦ₀, diagn, atmosphere)
     Ri_c = drag.critical_Richardson
     (; drag_min) = drag
 
     # clamp to get the cases, eq (12-14)
-    # if Ri_N > Ri_c then C = 0
-    # if Ri_c > Ri_N > 0 then = κ^2/log(z_N/z₀)^2 * (1-Ri_N/Ri_c)^2
-    # if Ri_c < 0 then κ^2/log(z_N/z₀)^2
-    Ri_N = clamp(Ri_N, 0, Ri_c)
-    diagn.physics.boundary_layer_drag[ij] = max(drag_min, drag_max*(1-Ri_N/Ri_c)^2)
+    # if Ri > Ri_c then C = 0
+    # if Ri_c > Ri > 0 then = κ^2/log(z/z₀)^2 * (1-Ri/Ri_c)^2
+    # if Ri_c < 0 then κ^2/log(z/z₀)^2
+    Ri = clamp(Ri, 0, Ri_c)
+    diagn.physics.boundary_layer_drag[ij] = max(drag_min, drag_max*(1-Ri/Ri_c)^2)
     return nothing
 end
 
 """
 $(TYPEDSIGNATURES)
-Calculate the bulk richardson number following Frierson, 2007.
+Calculate the bulk richardson number following Frierson, 2006.
 For vertical stability in the boundary layer."""
 @propagate_inbounds function bulk_richardson_surface(ij, ΔΦ₀, diagn, atmosphere)
     cₚ = atmosphere.heat_capacity
@@ -107,8 +107,8 @@ For vertical stability in the boundary layer."""
     Tᵥ = virtual_temperature(T, q, atmosphere)
 
     # bulk Richardson number at lowermost layer N from Frierson, 2006, eq. (15)
-    Θ₀ = cₚ*Tᵥ
-    Θ₁ = Θ₀ + ΔΦ₀
+    Θ₀ = cₚ*Tᵥ          # virtual dry static energy at surface (z=0)
+    Θ₁ = Θ₀ + ΔΦ₀       # virtual dry static energy at first model level (z=z)
     bulk_richardson = ΔΦ₀*(Θ₁ - Θ₀) / (Θ₀*Vₛ^2)
     return bulk_richardson
 end

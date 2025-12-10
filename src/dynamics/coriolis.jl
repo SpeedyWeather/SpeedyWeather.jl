@@ -1,6 +1,9 @@
 abstract type AbstractCoriolis <: AbstractModelComponent end
 
 export Coriolis
+
+"""Model component holding the Coriolis parameter `f` on the model grid,
+a vector over the latitude rings. $(TYPEDFIELDS)"""
 @kwdef struct Coriolis{VectorType} <: AbstractCoriolis
     "[DERIVED] Coriolis frequency [s^-1], scaled by radius as is vorticity = 2Ω*sin(lat)*radius"
     f::VectorType
@@ -22,8 +25,7 @@ end
 
 export coriolis
 
-"""
-$(TYPEDSIGNATURES)
+"""$(TYPEDSIGNATURES)
 Return the Coriolis parameter `f` on the grid `Grid` of resolution `nlat_half`
 on a planet of `rotation` [1/s]. Default rotation of Earth."""
 function coriolis!(f::AbstractField; rotation = DEFAULT_ROTATION)                  
@@ -36,9 +38,9 @@ function coriolis!(f::AbstractField; rotation = DEFAULT_ROTATION)
 end
 
 @kernel inbounds=true function coriolis_kernel!(f, lat, rotation, whichring)
-    ij, k = @index(Global, NTuple)
-    j = whichring[ij]
-    f[ij, k] = 2rotation*sin(lat[j])
+    ijk = @index(Global, Cartesian)     # for 2D, 3D, ... simultaneously
+    j = whichring[ijk[1]]               # latitude ring index
+    f[ijk] = 2rotation*sin(lat[j])
 end
 
 """
