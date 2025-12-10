@@ -70,7 +70,13 @@ subtypes(SpeedyWeather.AbstractShortwave)
 
 ## OneBandShortwave: Single-band shortwave radiation with diagnostic clouds
 
-The `OneBandShortwave` scheme provides a single-band (broadband) shortwave radiation parameterization, including diagnostic cloud effects following [^KMB06]. For dry models without water vapor, use `OneBandGreyShortwave` instead, which automatically disables cloud effects and uses transparent transmissivity ``t=1``.
+!!! warn "OneBandShortwave currently not available"
+    With internal structure change for GPU acceleration this parameterization is currently unavailable.
+
+The `OneBandShortwave` scheme provides a single-band (broadband) shortwave radiation parameterization,
+including diagnostic cloud effects following [^KMB06]. For dry models without water vapor, use
+`OneBandGreyShortwave` instead, which automatically disables cloud effects and uses transparent
+transmissivity ``t=1``.
 
 **Key differences:**
 
@@ -78,7 +84,9 @@ The `OneBandShortwave` scheme provides a single-band (broadband) shortwave radia
 - `OneBandGreyShortwave`: No clouds, transparent atmosphere (for dry models)
 
 **Cloud diagnosis:**
-Cloud properties are diagnosed from the relative humidity and total precipitation in the atmospheric column. The cloud base is set at the interface between the lowest two model layers, and the cloud top is the highest layer where both
+Cloud properties are diagnosed from the relative humidity and total precipitation in the atmospheric column.
+The cloud base is set at the interface between the lowest two model layers, and the cloud top is the
+highest layer where both
 
 ```math
 \mathrm{RH}_k > \mathrm{RH}_{cl} \quad \text{and} \quad Q_k > Q_{cl}
@@ -90,7 +98,8 @@ are satisfied. The cloud cover (CLC) in a layer is then given by
 \mathrm{CLC} = \min\left[1,\ w_{pcl} \sqrt{\min(p_{mcl}, P_{lsc} + P_{cnv})}+ \min\left(1, \left(\frac{\mathrm{RH}_k - \mathrm{RH}_{cl}}{\mathrm{RH}'_{cl} - \mathrm{RH}_{cl}}\right)^2\right)\right]
 ```
 
-where $w_{pcl}$ and $p_{mcl}$ are parameters, $P_{lsc}$ and $P_{cnv}$ are large-scale and convective precipitation, and $\mathrm{RH}_{cl}$ is a threshold.
+where $w_{pcl}$ and $p_{mcl}$ are parameters, $P_{lsc}$ and $P_{cnv}$ are large-scale and convective precipitation,
+and $\mathrm{RH}_{cl}$ is a threshold.
 
 **Stratocumulus clouds:**
 Stratocumulus cloud cover over oceans is parameterized based on boundary layer static stability (GSEN):
@@ -113,13 +122,15 @@ Over land, the stratocumulus cover $\mathrm{CLS}$ is further modified to be prop
 where $\mathrm{RH}_N$ is the surface (lowest model layer) relative humidity.
 
 **Radiative transfer:**
-The incoming solar flux at the top of the atmosphere is computed from astronomical formulae. Ozone absorption in the lower and upper stratosphere is subtracted, yielding the downward flux into the first model layer:
+The incoming solar flux at the top of the atmosphere is computed from astronomical formulae. Ozone absorption in the
+lower and upper stratosphere is subtracted, yielding the downward flux into the first model layer:
 
 ```math
 F_{h}^{\downarrow, SR} = F_{0}^{\downarrow, sol} - \Delta F_{ust}^{ozone} - \Delta F_{lst}^{ozone}
 ```
 
-Shortwave radiation is then propagated downward through each layer using a transmissivity $\tau_{k}^{SR}$, which depends on zenith angle, layer depth, humidity, and cloud properties:
+Shortwave radiation is then propagated downward through each layer using a transmissivity $\tau_{k}^{SR}$,
+which depends on zenith angle, layer depth, humidity, and cloud properties:
 
 ```math
 F_{k+h}^{\downarrow, SR} = F_{k-h}^{\downarrow, SR} \, \tau_k^{SR}
@@ -149,7 +160,8 @@ and is propagated upward as
 F_{k-h}^{\uparrow, SR} =  F_{k+h}^{\uparrow, SR} \, \tau_{k}^{SR}
 ```
 
-with cloud reflection added at the cloud-top layer. The upward part is only modeled for the visible band, as near-infrared is mostly absorbed downward.
+with cloud reflection added at the cloud-top layer. The upward part is only modeled for the visible band,
+as near-infrared is mostly absorbed downward.
 
 **Key features:**
 
@@ -165,7 +177,7 @@ To use the OneBandShortwave scheme, construct your model as follows and run as u
 
 **For wet models (with water vapor and clouds):**
 
-```@example radiation
+```julia
 using SpeedyWeather
 using CairoMakie
 spectral_grid = SpectralGrid(trunc=31, nlayers=8)
@@ -180,21 +192,22 @@ save("ssrd.png", ans) # hide
 nothing # hide
 ```
 
-![Surface shortwave radiation down](ssrd.png)
+<!-- ![Surface shortwave radiation down](ssrd.png) -->
 
-```@example radiation
+```julia
 osr = simulation.diagnostic_variables.physics.outgoing_shortwave_radiation
 heatmap(osr,title="Outgoing shortwave radiation [W/m^2]")
 save("osr.png", ans) # hide
 nothing # hide
 ```
 
-![Outgoing shortwave radiation](osr.png)
+<!-- ![Outgoing shortwave radiation](osr.png) -->
 
 **For dry models (no water vapor or clouds):**
+
 Use `OneBandGreyShortwave` instead, which automatically uses `NoClouds` and `TransparentShortwaveTransmissivity`:
 
-```@example radiation
+```julia
 using SpeedyWeather
 spectral_grid = SpectralGrid(trunc=31, nlayers=8)
 model = PrimitiveDryModel(spectral_grid; shortwave_radiation=OneBandGreyShortwave(spectral_grid))
@@ -208,7 +221,7 @@ save("ssrd_dry.png", ans) # hide
 nothing # hide
 ```
 
-![Surface shortwave radiation (dry model)](ssrd_dry.png)
+<!-- ![Surface shortwave radiation (dry model)](ssrd_dry.png) -->
 
 ### Parameterization options
 
@@ -225,7 +238,7 @@ The cloud scheme can be specified when constructing the radiation scheme:
 
 The atmospheric transmissivity can be calculated using:
 
-- `BackgroundShortwaveTransmissivity(spectral_grid)` (default): SPEEDY-style transmissivity with zenith correction and absorption by aerosols, water vapor, and clouds
+- `BackgroundShortwaveTransmissivity(spectral_grid)` (default): Fortran SPEEDY-based transmissivity with zenith correction and absorption by aerosols, water vapor, and clouds
 - `TransparentShortwaveTransmissivity(spectral_grid)`: Transparent atmosphere (used in `OneBandGreyShortwave`)
 
 ##### BackgroundShortwaveTransmissivity 
@@ -256,14 +269,11 @@ Sets ``\tau_k^{SR} = 1`` for all layers and bands, effectively skipping atmosphe
 
 The `DiagnosticClouds` scheme includes a `use_stratocumulus` flag (default: `true`) that enables the diagnostic stratocumulus cloud parameterization over oceans:
 
-```@example radiation
+```julia
 using SpeedyWeather, CairoMakie
 
 spectral_grid = SpectralGrid()
-clouds_no_sc = SpeedyWeather.DiagnosticClouds(spectral_grid; use_stratocumulus=false)
-transmissivity_no_sc = SpeedyWeather.BackgroundShortwaveTransmissivity(spectral_grid)
-radiative_transfer_no_sc = SpeedyWeather.OneBandShortwaveRadiativeTransfer(spectral_grid)
-sw_no_sc = OneBandShortwave(clouds_no_sc, transmissivity_no_sc, radiative_transfer_no_sc)
+sw_no_sc = OneBandShortwave(spectral_grid, clouds = DiagnosticClouds(spectral_grid; use_stratocumulus=false))
 
 model = PrimitiveWetModel(spectral_grid; shortwave_radiation=sw_no_sc)
 sim = initialize!(model)
@@ -274,7 +284,7 @@ save("oneband_no_stratocumulus.png", ans) # hide
 nothing # hide
 ```
 
-![No stratocumulus clouds](oneband_no_stratocumulus.png)
+<!-- ![No stratocumulus clouds](oneband_no_stratocumulus.png) -->
 
 ## References
 

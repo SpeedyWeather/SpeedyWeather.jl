@@ -16,9 +16,9 @@ spectral_grid = SpectralGrid(trunc=31, nlayers=8, Grid=FullGaussianGrid, dealias
 
 orography = ZonalRidge(spectral_grid)
 initial_conditions = InitialConditions(
-    vordiv = ZonalWind(),
-    temp = JablonowskiTemperature(),
-    pres = ConstantPressure())
+    vordiv = ZonalWind(spectral_grid),
+    temp = JablonowskiTemperature(spectral_grid),
+    pres = ConstantPressure(spectral_grid))
 
 model = PrimitiveDryModel(spectral_grid; orography, initial_conditions, physics=false)
 simulation = initialize!(model)

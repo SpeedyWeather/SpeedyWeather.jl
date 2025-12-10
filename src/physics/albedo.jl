@@ -22,6 +22,13 @@ Fields are $(TYPEDFIELDS)"""
     land::Land
 end
 
+Adapt.@adapt_structure OceanLandAlbedo
+function OceanLandAlbedo(SG::SpectralGrid;
+    ocean = OceanSeaIceAlbedo(SG),      # default ocean albedo
+    land = LandSnowAlbedo(SG))          # default land albedo
+    return OceanLandAlbedo(ocean, land)
+end
+
 function Base.show(io::IO, A::OceanLandAlbedo)
     println(io, "OceanLandAlbedo <: SpeedyWeather.AbstractAlbedo")
     properties = propertynames(A)
@@ -34,18 +41,11 @@ function Base.show(io::IO, A::OceanLandAlbedo)
     end
 end
 
-Adapt.@adapt_structure OceanLandAlbedo
-
+# TODO deprecate?
 export DefaultAlbedo
 
-"""$(TYPEDSIGNATURES)
-Default albedo parameterization with `OceanSeaIceAlbedo`
-for ocean and `AlbedoClimatology` for land surfaces."""
-function DefaultAlbedo(SG::SpectralGrid;
-    ocean = OceanSeaIceAlbedo(SG),
-    land = LandSnowAlbedo(SG))
-    return OceanLandAlbedo(ocean, land)
-end
+"""$(TYPEDSIGNATURES) Default albedo parameterization."""
+DefaultAlbedo(SG::SpectralGrid; kwargs...) = OceanLandAlbedo(SG; kwargs...)
 
 function initialize!(albedo::OceanLandAlbedo, model::PrimitiveEquation)
     initialize!(albedo.ocean, model)
@@ -77,8 +77,7 @@ end
 export GlobalConstantAlbedo
 
 """Global constant albedo parameterization. To be used for land and ocean 
-or only one of them within a `OceanLandAlbedo`.
-Fields are $(TYPEDFIELDS)"""
+or only one of them within a `OceanLandAlbedo`. Fields are $(TYPEDFIELDS)"""
 @kwdef struct GlobalConstantAlbedo{NF} <: AbstractAlbedo
     "[OPTION] Albedo value [1]"
     albedo::NF = 0.3
@@ -113,8 +112,7 @@ Adapt.@adapt_structure ManualAlbedo
 ## ALBEDO CLIMATOLOGY
 export AlbedoClimatology
 
-"""Albedo climatology loaded from netcdf file.
-Fields are $(TYPEDFIELDS)"""
+"""Albedo climatology loaded from netcdf file. Fields are $(TYPEDFIELDS)"""
 @kwdef struct AlbedoClimatology{GridVariable2D} <: AbstractAlbedo
     "[OPTION] path to the folder containing the albedo file, pkg path default"
     path::String = "SpeedyWeather.jl/input_data"
@@ -193,7 +191,7 @@ struct LinearSnowCover <: AbstractSnowCover end
 Adapt.@adapt_structure LinearSnowCover
 
 """Saturating ramp: snow cover grows with snow depth S as `S/(S+scale)`."""
-struct SaturatingSnowCover  <: AbstractSnowCover end
+struct SaturatingSnowCover <: AbstractSnowCover end
 Adapt.@adapt_structure SaturatingSnowCover
 
 """$(TYPEDSIGNATURES) Snow cover fraction for the linear scheme, clamped to 1."""
@@ -205,6 +203,8 @@ Adapt.@adapt_structure SaturatingSnowCover
 ## LandSnowAlbedo
 export LandSnowAlbedo
 
+"""Albedo over land based on bare soil, vegetation (high and low cover) and snow cover.
+Fields are $(TYPEDFIELDS)"""
 @kwdef struct LandSnowAlbedo{NF, Scheme <: AbstractSnowCover} <: AbstractAlbedo
     "Albedo of bare land (excluding vegetation) [1]"
     albedo_land::NF = 0.4
