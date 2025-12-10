@@ -59,6 +59,71 @@ flux from below at interface ``k+1/2`` (``k`` increases downwards, see
 ``\Delta p = p_{k+1/2} - p_{k-1/2}`` is the pressure thickness of layer ``k``,
 gravity ``g`` and heat capacity ``c_p``.
 
+## OneBandLongwave
+
+Solves the standard two-stream approximation to calculate longwave radiative fluxes
+up ``U`` and down ``D`` following Frierson et al. 2006 [^FH06].
+
+```math
+\frac{dU}{d\tau} = (U - B), \qquad \frac{dD}{d\tau} = (B - D)
+```
+
+using optical depth ``\tau`` as vertical coordinate. Longwave emittance is
+``\sigma T^4`` following Stefan-Boltzmann with emittance of 1. Boundary conditions
+are ``U = \sigma T_s^4`` at the surface, i.e. the surface emitting with its surface
+temperature ``T_s`` (sea surface temperature, skin or soil temperature); and
+``D = 0`` at the top (no longwave radiation from space). Instead of optical depth
+we solve these equations using the transmissivity ``t = exp(-\tau)``.
+
+```math
+U_{k-1} = t_k U_k + (1-t_k) σ T_k^4
+```
+
+such that the upward flux ``U_k`` of layer ``k`` is reduced by transmissivity
+``t_k`` of that layer but increased by longwave emittance going up. Similarly
+on the downwards pass
+
+```math
+D_{k+1} = t_k D_k + (1-t_k) σ T_k^4
+```
+
+Note that the sign change in the differential formulation with optical
+depth only occurs because the optical depth as vertical coordinate
+strictly increases towards the surface.
+
+To be used like (currently the default anyway)
+
+```@example radiation
+spectral_grid = SpectralGrid()
+longwave_radiation = OneBandLongwave(spectral_grid)
+model = PrimitiveWetModel(spectral_grid; longwave_radiation)
+model.longwave_radiation
+```
+
+The transmissivity is defined as in Frierson et al. 2006 [^FH06]
+using the following parameters
+
+```@example radiation
+FriersonLongwaveTransmissivity(spectral_grid)
+```
+
+to compute
+
+```math
+\tau_0 = \tau_{0e} + (\tau_{0p} - \tau_{0e}) \sin^2(\theta)
+```
+
+with surface values of optical depth at the equator ``\tau_{0e}`` and
+at the poles ``\tau_{0p}`` and a transition in between with
+latitude ``\theta``. Then the optical depth changes in the vertical
+as
+
+```math
+\tau = \tau_0 \left[ f_l \left( \frac{p}{p_s} \right) + (1 - f_l) \left( \frac{p}{p_s} \right)^4 \right]
+```
+
+For details see Frierson et al. 2006 [^FH06].
+
 ## Shortwave radiation
 
 Currently implemented schemes:
@@ -295,3 +360,5 @@ nothing # hide
 [^JZ22]: Jeevanjee, N. & Zhou, L. On the Resolution‐Dependence of Anvil Cloud Fraction and Precipitation Efficiency in Radiative‐Convective Equilibrium. J Adv Model Earth Syst 14, e2021MS002759 (2022). DOI:[10.1029/2021MS002759](https://doi.org/10.1029/2021MS002759)
 
 [^KMB06]: Kucharski, F., Molteni, F., & Bracco, A. SPEEDY: A simplified atmospheric general circulation model. ICTP, Trieste, Italy. Appendix A: Model Equations and Parameters (2006). [PDF](https://users.ictp.it/~kucharsk/speedy_description/km_ver41_appendixA.pdf)
+
+[^FH06]: Frierson DMW, IM Held, P Zurita-Gotor. A Gray-Radiation Aquaplanet Moist GCM. Part I: Static Stability and Eddy Scale (2006). Journal of the Atmospheric Sciences 63:10. DOI: [10.1175/JAS3753.1](https://doi.org/10.1175/JAS3753.1)
