@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Implicit correction kernelized and GPU-ready [#891](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/891)
 - The dynamical core of the primitive equations is now GPU-ready with kernelized implementations [#934](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/934)
 - Land snow model [#833](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/833)
 - Updated extended differentiability tests [#929](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/929)
