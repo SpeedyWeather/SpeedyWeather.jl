@@ -149,7 +149,7 @@ export LandBucketMoisture
 """LandBucketMoisture model with two soil layers exchanging moisture via vertical diffusion.
 Forced by precipitation, evaporation, surface condensation, snow melt and river runoff drainage.
 $(TYPEDFIELDS)"""
-@kwdef mutable struct LandBucketMoisture{NF} <: AbstractSoilMoisture
+@kwdef struct LandBucketMoisture{NF} <: AbstractSoilMoisture
     "[OPTION] Time scale of vertical diffusion [s]"
     time_scale::Second = Day(2)
 
@@ -161,12 +161,6 @@ $(TYPEDFIELDS)"""
 
     "[OPTION] Initial soil moisture over ocean, volume fraction [1]"
     ocean_moisture::NF = 0
-
-    "[DERIVED] Water at field capacity [m], top layer, f = γz, set at initialize from by land.thermodynamics and .geometry"
-    f₁::NF = 0
-
-    "[DERIVED] Water at field capacity [m], lower layer, f = γz, set at initialize from by land.thermodynamics and .geometry"
-    f₂::NF = 0
 end
 
 Adapt.@adapt_structure LandBucketMoisture
@@ -175,14 +169,6 @@ function initialize!(soil::LandBucketMoisture, model::PrimitiveEquation)
     (; nlayers_soil) = model.spectral_grid
     @assert nlayers_soil == 2 "LandBucketMoisture only works with 2 soil layers "*
     "but spectral_grid.nlayers_soil = $nlayers_soil given. Ignoring additional layers."
-    
-    # TODO this requires a mutable LandBucketMoisture struct, change for GPU compatibility?
-    # set the field capacity given layer thickness and 
-    γ = model.land.thermodynamics.field_capacity
-    z₁ = model.land.geometry.layer_thickness[1]
-    z₂ = model.land.geometry.layer_thickness[2]
-    soil.f₁ = γ*z₁    # amount of water at field capacity in first layer [m]
-    soil.f₂ = γ*z₂    # amount of water at field capacity in second layer [m]
 
     return nothing
 end
@@ -247,7 +233,11 @@ function timestep!(
         throw(DimensionMismatch(soil_moisture, P))
     @boundscheck size(soil_moisture, 2) >= 2 || throw(DimensionMismatch)
     
-    f₁, f₂ = soil.f₁, soil.f₂
+    # Water at field capacity [m], top and lower layer γ*z₁ and γ*z₂
+    γ = model.land.thermodynamics.field_capacity
+    f₁ ≈ γ*model.land.geometry.layer_thickness[1]
+    f₂ ≈ γ*model.land.geometry.layer_thickness[2]
+
     p = soil.infiltration_fraction      # Infiltration fraction: fraction of top layer runoff put into lower layer
     τ⁻¹ = inv(convert(eltype(soil_moisture), Second(soil.time_scale).value))
 
