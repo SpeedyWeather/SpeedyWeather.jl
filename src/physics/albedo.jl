@@ -52,7 +52,7 @@ function initialize!(albedo::OceanLandAlbedo, model::PrimitiveEquation)
     initialize!(albedo.land, model)
 end
 
-# composite OceanLandAlbedo: call separately for ocean and land with .ocean and .land
+"""$(TYPEDSIGNATURES) Composite OceanLandAlbedo: Call albedo.ocean over ocean and albedo.land over land."""
 @propagate_inbounds function parameterization!(ij, diagn::DiagnosticVariables, progn, albedo::OceanLandAlbedo, model)
     albedo!(ij, diagn.physics.ocean, progn, albedo.ocean, model)
     albedo!(ij, diagn.physics.land, progn, albedo.land, model)
@@ -67,7 +67,7 @@ function variables(::AbstractAlbedo)
     )
 end
 
-# single albedo: call separately for ocean and land with the same albedo
+"""$(TYPEDSIGNATURES) Single Albedo: Call same albedo over ocean and land."""
  @propagate_inbounds function parameterization!(ij, diagn::DiagnosticVariables, progn, albedo::AbstractAlbedo, model)
     albedo!(ij, diagn.physics.ocean, progn, albedo, model)
     albedo!(ij, diagn.physics.land, progn, albedo, model)
