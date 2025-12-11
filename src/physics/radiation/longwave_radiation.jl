@@ -208,10 +208,6 @@ function initialize!(radiation::OneBandLongwave, model::PrimitiveEquation)
     initialize!(radiation.radiative_transfer, model)
 end
 
-"""$(TYPEDSIGNATURES)
-Calculate shortwave radiation using the one-band scheme with diagnostic clouds.
-Computes cloud cover fraction from relative humidity and precipitation, then
-integrates downward and upward radiative fluxes accounting for cloud albedo effects."""
 @propagate_inbounds function parameterization!(ij, diagn, progn, radiation::OneBandLongwave, model)
     # pass on array that was used to compute transmissivity (scratch array)
     t = transmissivity!(ij, diagn, progn, radiation.transmissivity, model)
@@ -219,6 +215,10 @@ integrates downward and upward radiative fluxes accounting for cloud albedo effe
 end
 
 export OneBandLongwaveRadiativeTransfer
+
+"""Radiative transfer solver for OneBandLongwave radiation scheme.
+Computes longwave radiative transfer with upward and downward beams including surface fluxes.
+Fields are $(TYPEDFIELDS)"""
 @kwdef struct OneBandLongwaveRadiativeTransfer{NF} <: AbstractLongwaveRadiativeTransfer
     "[OPTION] Emissivity for surface flux over ocean [1]"
     emissivity_ocean::NF = 1
@@ -233,8 +233,6 @@ Adapt.@adapt_structure OneBandLongwaveRadiativeTransfer
 OneBandLongwaveRadiativeTransfer(SG::SpectralGrid; kwargs...) = OneBandLongwaveRadiativeTransfer{SG.NF}(; kwargs...)
 initialize!(::OneBandLongwaveRadiativeTransfer, ::PrimitiveEquation) = nothing
 
-"""$(TYPEDSIGNATURES)
-One-band shortwave radiative transfer with cloud reflection and ozone absorption."""
 @propagate_inbounds function longwave_radiative_transfer!(
     ij,
     diagn,

@@ -26,8 +26,8 @@ and signatures they have to extend.
 
 ## Define your own parameterizations
 
-When defining a new paramerization it is required to subtype `AbstractParameterization` 
-and implement the [`variables`](@ref), [`initialize!`](@ref), and [`parameterization!`](@ref) 
+When defining a new paramerization it is required to subtype `AbstractParameterization`
+and extend the `variables`, `initialize!`, and `parameterization!` functions
 that define its behaviour. We'll first introduce the general idea here, before 
 giving a concrete example.
 
@@ -63,7 +63,7 @@ to retain information after that parameterization has been executed.
 
 ## Define the parameterization! function 
 
-The actual parameterization computation is defined in the [`parameterization!`](@ref) function. 
+The actual parameterization computation is defined in the `parameterization!` function. 
 This function takes in the prognostic and diagnostic variables as well as the model 
 object and should compute the tendencies and fluxes that are then accumulated into 
 the respective arrays. It is computed within a KernelAbstraction.jl kernel and therefore
