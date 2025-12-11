@@ -280,13 +280,14 @@ between the albedo of the ocean and the seaice depending on the current sea ice 
 
 Now, let's demonstrate how to add our new parameterization to the model by adding it to the
 `parametrizations` tuple. This way you can add parametrizations to the model that don't have
-to fit one of our pre-defined ones.
+to fit one of our pre-defined ones. Leaving parameterizations out also effectively disables them
+even though they are initialized and variables are created nevertheless
 
 ```@example custom-parameterization
 model = PrimitiveWetModel(spectral_grid;
     custom_parameterization = SimpleAlbedo(spectral_grid),
-    parameterizations=(:convection, :large_scale_condensation, :custom_parameterization, :surface_condition, :surface_momentum_flux, 
-        :surface_heat_flux, :surface_humidity_flux, :stochastic_physics))
+    parameterizations=(:convection, :large_scale_condensation, :custom_parameterization, :shortwave_radiation,
+        :surface_condition, :surface_momentum_flux, :surface_heat_flux, :surface_humidity_flux, :stochastic_physics))
 
 simulation = initialize!(model) 
 run!(simulation, period=Day(5)) # spin up the model a little
@@ -295,7 +296,9 @@ progn, diagn, model = SpeedyWeather.unpack(simulation)
 heatmap(diagn.physics.albedo)
 ```
 
-Again, it worked! 
+Again, it worked! Note that it's important here to call the `:shortwave_radiation` after our
+`:custom_parameterization` as the shortwave radiation will use the albedo over ocean and land
+for respective flux computations and average the albedo then according to the land-sea mask.
 
 In order to write more complex parameterization that access other variabels and parameters of our models,
 it's best to familiarize yourself with our data structures that we explain in [Tree structure](@ref),

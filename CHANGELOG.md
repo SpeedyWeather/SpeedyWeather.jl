@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Sea ice and snow insulation in surface flux computation [#873](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/873)
 - Boundary layer drag revisited with ocean/land roughness and new defaults [#873](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/873)
 - OneBandLongwave radiation implemented and default [#873](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/873)
 - Initial conditions revised to take in a `SpectralGrid` to ensure correct number type [#927](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/927)[#928](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/928)
