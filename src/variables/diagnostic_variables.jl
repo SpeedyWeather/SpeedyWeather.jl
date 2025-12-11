@@ -481,7 +481,7 @@ function DiagnosticVariables(model::AbstractModel)
     grid_variables = GridVariables(SG; tracers)
     dynamics = DynamicsVariables(SG; spectral_transform)
     particles = ParticleVariables(SG)
-    temp_average = SG.VectorType(undef, nlayers)
+    temp_average = on_architecture(SG.architecture, zeros(NF, nlayers))
 
     # allocate parameterization variables 
     variable_names = get_diagnostic_variables(model)
