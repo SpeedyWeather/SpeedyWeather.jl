@@ -42,7 +42,7 @@ end
 
 function variables(::SeasonalSoilMoisture)
     return (
-        PrognosticVariable(name=:soil_moisture, dims=Grid3D(), namespace=:land),
+        PrognosticVariable(name=:soil_moisture, dims=Grid3D(), desc="Soil moisture content (fraction of capacity)", units="1", namespace=:land),
     )
 end
 

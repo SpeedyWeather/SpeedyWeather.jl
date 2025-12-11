@@ -291,8 +291,8 @@ end
 function variables(::LandBucketTemperature)
     return (
         # Prognostic variables
-        PrognosticVariable(name=:soil_temperature, dims=Grid3D(), namespace=:land),
-        PrognosticVariable(name=:soil_moisture, dims=Grid3D(), namespace=:land),
+        PrognosticVariable(name=:soil_temperature, dims=Grid3D(), desc="Soil temperature", units="K", namespace=:land),
+        PrognosticVariable(name=:soil_moisture, dims=Grid3D(), desc="Soil moisture content (fraction of capacity)", units="1", namespace=:land),
         # Diagnostic variables read from diagn.physics
         DiagnosticVariable(name=:surface_shortwave_down, dims=Grid2D(), desc="Surface shortwave radiation down", units="W/m²"),
         DiagnosticVariable(name=:surface_shortwave_up, dims=Grid2D(), desc="Surface shortwave radiation up", units="W/m²", namespace=:land),

@@ -8,10 +8,10 @@
             land = DryLandModel(spectral_grid; temperature)
 
             model = Model(spectral_grid; land)
-            simulation = initialize!(model)
+            initialize!(model.land, model)
             
-            progn = simulation.prognostic_variables
-            diagn = simulation.diagnostic_variables
+            progn = PrognosticVariables(model)
+            diagn = DiagnosticVariables(model)
             SpeedyWeather.land_timestep!(progn, diagn, model)
         end
     end

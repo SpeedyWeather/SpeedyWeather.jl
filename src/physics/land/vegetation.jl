@@ -55,7 +55,7 @@ end
 
 function variables(::NoVegetation)
     return (
-        PrognosticVariable(name=:soil_moisture, dims=Grid3D(), namespace=:land),
+        PrognosticVariable(name=:soil_moisture, dims=Grid3D(), desc="Soil moisture content (fraction of capacity)", units="1", namespace=:land),
         DiagnosticVariable(name=:soil_moisture_availability, dims=Grid2D(), desc="Soil moisture availability for evaporation", units="1", namespace=:land),
     )
 end
@@ -177,7 +177,8 @@ function soil_moisture_availability!(
 
     @boundscheck fields_match(vegetation_high, vegetation_low, soil_moisture_availability) || throws(BoundsError)
     @boundscheck fields_match(soil_moisture, soil_moisture_availability, horizontal_only=true) || throws(BoundsError)
-    @boundscheck size(soil_moisture, 2) >= 2    # defined for two layers
+    @boundscheck size(soil_moisture, 2) >= 2                # defined for two layers
+    @boundscheck size(soil_moisture_availability, 2) == 1   # 2D only 
 
     # precalculate denominator
     r = 1/(D_top*W_cap + D_root*(W_cap - W_wilt))
@@ -186,9 +187,8 @@ function soil_moisture_availability!(
     params = (; low_veg_factor, r, W_cap, W_wilt, D_top, D_root)
 
     launch!(architecture(soil_moisture_availability), LinearWorkOrder,
-        (size(soil_moisture_availability, 1),), soil_moisture_availability_kernel!,
-        soil_moisture_availability, soil_moisture, vegetation_high, vegetation_low,
-        params
+        size(soil_moisture_availability), soil_moisture_availability_kernel!,
+        soil_moisture_availability, soil_moisture, vegetation_high, vegetation_low, params
     )
     
     return nothing 
@@ -218,6 +218,6 @@ function variables(::VegetationClimatology)
         DiagnosticVariable(name=:vegetation_high, dims=Grid2D(), desc="Vegetation high cover", units="1", namespace=:land),
         DiagnosticVariable(name=:vegetation_low,  dims=Grid2D(), desc="Vegetation low cover",  units="1", namespace=:land),
         DiagnosticVariable(name=:soil_moisture_availability, dims=Grid2D(), desc="Soil moisture availability for evaporation", units="1", namespace=:land),
-        PrognosticVariable(name=:soil_moisture, dims=Grid2D(), namespace=:land),
+        PrognosticVariable(name=:soil_moisture, dims=Grid3D(), desc="Soil moisture content (fraction of capacity)", units="1", namespace=:land),
     )
 end
