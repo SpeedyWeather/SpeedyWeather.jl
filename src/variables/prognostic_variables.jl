@@ -132,7 +132,8 @@ function PrognosticVariables(model::AbstractModel)
     clock = Clock()
 
     return PrognosticVariables{typeof(spectrum), typeof(grid),
-        SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, typeof(ocean), typeof(land), typeof(physics), typeof(tracer_tuple), ParticleVector, Base.RefValue{NF}, typeof(clock)}(;
+        SpectralVariable2D, SpectralVariable3D, SpectralVariable4D,
+        typeof(ocean), typeof(land), typeof(physics), typeof(tracer_tuple), ParticleVector, Base.RefValue{NF}, typeof(clock)}(;
             spectrum, grid, nlayers, nlayers_soil, nparticles, nsteps, ocean, land, physics, tracers = tracer_tuple, clock
         )
 end
@@ -234,30 +235,31 @@ end
 function Base.zero(
     progn::PrognosticVariables{
         SpectrumType, GridType,
-        SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, TracerTuple, ParticleVector, RefValueNF, ClockType,
+        SpectralVariable2D, SpectralVariable3D, SpectralVariable4D,
+        OceanType, LandType, PhysicsType, TracerTuple, ParticleVector, RefValueNF, ClockType,
         }) where {
         SpectrumType, GridType,
-        SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, TracerTuple, ParticleVector, RefValueNF, ClockType,
+        SpectralVariable2D, SpectralVariable3D, SpectralVariable4D,
+        OceanType, LandType, PhysicsType, TracerTuple, ParticleVector, RefValueNF, ClockType,
         }
 
     (; spectrum, grid, nlayers, nlayers_soil, nparticles, nsteps) = progn
     
-    # initialize regular progn variables 
-    progn_new = PrognosticVariables{SpectrumType, GridType,
-        SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, TracerTuple,
-        ParticleVector, RefValueNF, ClockType}(;
-            spectrum, grid, nlayers, nlayers_soil, nparticles, nsteps
+    ocean = NamedTuple{keys(progn.ocean)}(zero(value) for value in values(progn.ocean))
+    land = NamedTuple{keys(progn.land)}(zero(value) for value in values(progn.land))
+    physics = NamedTuple{keys(progn.physics)}(zero(value) for value in values(progn.physics))
+    tracers = NamedTuple{keys(progn.tracers)}(zero(value) for value in values(progn.tracers))
+    (; scale, clock) = progn   # use the same scale, same clock
+
+    return PrognosticVariables{
+        SpectrumType, GridType,
+        SpectralVariable2D, SpectralVariable3D, SpectralVariable4D,
+        OceanType, LandType, PhysicsType, TracerTuple, ParticleVector, RefValueNF, ClockType,
+        }(;
+            spectrum, grid, nlayers, nlayers_soil, nparticles, nsteps,
+            ocean, land, physics,
+            tracers, scale, clock
         )
-
-    # add tracers with zero 
-    for (key, value) in progn.tracers 
-        progn_new.tracers[key] = zeros(SpectralVariable4D, spectrum, nlayers, nsteps)
-    end 
-
-    # use the same scale 
-    progn_new.scale[] = progn.scale[]
-
-    return progn_new
 end 
 
 function Base.fill!(progn::PrognosticVariables, value::Number)
