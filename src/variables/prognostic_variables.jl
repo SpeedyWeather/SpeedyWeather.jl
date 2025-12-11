@@ -179,29 +179,36 @@ function Base.show(
     print(io,   "└ clock: $(progn.clock.time)")
 end
 
+function copy_if_key_exists!(to, from, key)
+    # use hasproperty here as a union for haskey (works with NamedTuples) and hasfield (works with structs)
+    if hasproperty(to, key) && hasproperty(from, key)
+        getfield(to, key) .= getfield(from, key)
+    end
+end
+
 """$(TYPEDSIGNATURES)
 Copies entries of `progn_old` into `progn_new`."""
 function Base.copy!(progn_new::PrognosticVariables, progn_old::PrognosticVariables)
 
-    # Core variables using broadcast
-    progn_new.vor .= progn_old.vor
-    progn_new.div .= progn_old.div
-    progn_new.temp .= progn_old.temp
-    progn_new.humid .= progn_old.humid
-    progn_new.pres .= progn_old.pres
+    # Atmospheric variables
+    copy_if_key_exists!(progn_new, progn_old, :vor)
+    copy_if_key_exists!(progn_new, progn_old, :div)
+    copy_if_key_exists!(progn_new, progn_old, :temp)
+    copy_if_key_exists!(progn_new, progn_old, :humid)
+    copy_if_key_exists!(progn_new, progn_old, :pres)
 
     # Ocean variables
-    progn_new.ocean.sea_surface_temperature .= progn_old.ocean.sea_surface_temperature
-    progn_new.ocean.sea_ice_concentration .= progn_old.ocean.sea_ice_concentration
-    progn_new.ocean.sensible_heat_flux .= progn_old.ocean.sensible_heat_flux
-    progn_new.ocean.surface_humidity_flux .= progn_old.ocean.surface_humidity_flux
+    copy_if_key_exists!(progn_new.ocean, progn_old.ocean, :sea_surface_temperature)
+    copy_if_key_exists!(progn_new.ocean, progn_old.ocean, :sea_ice_concentration)
+    copy_if_key_exists!(progn_new.ocean, progn_old.ocean, :sensible_heat_flux)
+    copy_if_key_exists!(progn_new.ocean, progn_old.ocean, :surface_humidity_flux)
 
     # Land variables
-    progn_new.land.soil_temperature .= progn_old.land.soil_temperature
-    progn_new.land.snow_depth .= progn_old.land.snow_depth
-    progn_new.land.soil_moisture .= progn_old.land.soil_moisture
-    progn_new.land.sensible_heat_flux .= progn_old.land.sensible_heat_flux
-    progn_new.land.surface_humidity_flux .= progn_old.land.surface_humidity_flux
+    copy_if_key_exists!(progn_new.land, progn_old.land, :soil_temperature)
+    copy_if_key_exists!(progn_new.land, progn_old.land, :snow_depth)
+    copy_if_key_exists!(progn_new.land, progn_old.land, :soil_moisture)
+    copy_if_key_exists!(progn_new.land, progn_old.land, :sensible_heat_flux)
+    copy_if_key_exists!(progn_new.land, progn_old.land, :surface_humidity_flux)
 
     # Tracers - using broadcast assignment
     for (key, value) in progn_old.tracers
