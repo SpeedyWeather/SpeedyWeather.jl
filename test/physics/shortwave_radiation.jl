@@ -12,18 +12,28 @@
         (; time) = progn.clock
         SpeedyWeather.cos_zenith!(diagn, time, model)
 
-        ij = rand(1:model.spectral_grid.npoints)
-        diagn.physics.ocean.albedo[ij] = 0.5
-        SpeedyWeather.parameterization!(ij, diagn, progn, model.shortwave_radiation, model)
+        for ij in 1:model.spectral_grid.npoints
+            diagn.physics.ocean.albedo[ij] = 0.5
+            SpeedyWeather.parameterization!(ij, diagn, progn, model.shortwave_radiation, model)
 
-        trd = model.planet.solar_constant * diagn.physics.cos_zenith[ij]
+            # top of atmosphere radiation down
+            trd = model.planet.solar_constant * diagn.physics.cos_zenith[ij]
+
+            if !(sw isa Nothing)
+                osr = diagn.physics.outgoing_shortwave[ij]
+                ssrd = diagn.physics.surface_shortwave_down[ij]
+                @test 0 <= osr <= ssrd <= trd
+                @test isfinite(osr)
+                @test isfinite(ssrd)
+            end
+        end
 
         if !(sw isa Nothing)
-            osr = diagn.physics.outgoing_shortwave[ij]
-            ssrd = diagn.physics.surface_shortwave_down[ij]
-            @test 0 < osr < ssrd <= trd
-            @test isfinite(osr)
-            @test isfinite(ssrd)
+            @test any(diagn.physics.outgoing_shortwave .> 0)
+            @test any(diagn.physics.surface_shortwave_down .> 0)
+        else
+            @test !haskey(diagn.physics, :outgoing_shortwave)
+            @test all(diagn.physics.surface_shortwave_down .== 0)
         end
     end
 end

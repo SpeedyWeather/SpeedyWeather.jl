@@ -26,10 +26,10 @@ end
         progn = PrognosticVariables(model)
         diagn = DiagnosticVariables(model)
 
-        ij = rand(1:model.spectral_grid.npoints)
-        SpeedyWeather.parameterization!(ij, diagn, progn, model.longwave_radiation, model)
-        t = SpeedyWeather.transmissivity!(ij, diagn, progn, model.longwave_radiation.transmissivity, model)
-
-        @test all(0 .<= t[ij, :] .<= 1)
+        for ij in 1:model.spectral_grid.npoints
+            SpeedyWeather.parameterization!(ij, diagn, progn, model.longwave_radiation, model)
+            t = SpeedyWeather.transmissivity!(ij, diagn, progn, model.longwave_radiation.transmissivity, model)
+            @test all(0 .<= t[ij, :] .<= 1)
+        end
     end
 end
