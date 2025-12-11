@@ -2,11 +2,6 @@ abstract type AbstractRadiation <: AbstractParameterization end
 abstract type AbstractShortwave <: AbstractRadiation end
 abstract type AbstractShortwaveRadiativeTransfer <: AbstractShortwave end
 
-function get_nbands(radiation::Union{AbstractRadiation, Nothing})
-    hasfield(typeof(radiation), :nbands) && return radiation.nbands
-    return 0
-end
-
 ## SHORTWAVE RADIATION FOR A FULLY TRANSPARENT ATMOSPHERE
 export TransparentShortwave
 struct TransparentShortwave <: AbstractShortwave end
@@ -101,8 +96,6 @@ function OneBandGreyShortwave(SG::SpectralGrid;
 )
     return OneBandShortwave(clouds, transmissivity, radiative_transfer)
 end
-
-get_nbands(::OneBandShortwave) = 1
 
 function Base.show(io::IO, M::OneBandShortwave)
     println(io, "OneBandShortwave <: AbstractShortwave")

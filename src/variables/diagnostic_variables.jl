@@ -465,13 +465,6 @@ function DiagnosticVariables(model::AbstractModel)
     SG = model.spectral_grid
     (; spectral_transform, tracers) = model
 
-    if typeof(model) <: PrimitiveEquation
-        nbands_shortwave = get_nbands(model.shortwave_radiation)
-        nbands_longwave = get_nbands(model.longwave_radiation)
-    else 
-        nbands_shortwave = nbands_longwave = 0
-    end
-
     (; spectrum, grid, nparticles, NF, nlayers, nlayers_soil) = SG
     (; SpectralVariable2D, SpectralVariable3D) = SG
     (; GridVariable2D, GridVariable3D) = SG

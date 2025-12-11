@@ -188,8 +188,6 @@ function OneBandGreyLongwave(SG::SpectralGrid;
     return OneBandLongwave(transmissivity, radiative_transfer)
 end
 
-get_nbands(::OneBandLongwave) = 1
-
 function Base.show(io::IO, M::OneBandLongwave)
     println(io, "OneBandLongwave <: AbstractLongwave")
     properties = propertynames(M)
