@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- copyto! for LowerTriangularArray revised [#941](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/941)
 - uv_from_vordiv! kernel version used [#893](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/893)
 - Fixes some typos and formatting/LaTeX rendering in Docs [#939](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/939)
 - Land snow model [#833](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/833)
