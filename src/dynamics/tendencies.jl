@@ -32,8 +32,8 @@ function dynamics_tendencies!(
     # = ∇⋅(v(ζ+f) + Fᵤ, -u(ζ+f) + Fᵥ), tendency for divergence
     vorticity_flux!(diagn, model)
 
-    geopotential!(diagn, planet)                    # geopotential Φ = gη in shallow water
-    bernoulli_potential!(diagn, spectral_transform) # = -∇²(E+Φ), tendency for divergence
+    geopotential!(diagn, planet)            # geopotential Φ = gη in shallow water
+    bernoulli_potential_swm!(diagn, model)  # = -∇²(E+Φ), tendency for divergence
     
     # = -∇⋅(uh, vh), tendency for "pressure" η
     volume_flux_divergence!(diagn, orography, atmosphere, geometry, spectral_transform)
@@ -678,47 +678,46 @@ function vorticity_flux!(diagn::DiagnosticVariables, model::Barotropic)
     vorticity_flux_curldiv!(diagn, C, G, S, div=false, add=true)
 end
 
-# # version currently not used
-# function bernoulli_potential!(
-#     diagn::DiagnosticVariables,
-#     model::AbstractModel
-# )   
-#     S = model.spectral_transform
+function bernoulli_potential_swm!(
+    diagn::DiagnosticVariables,
+    model::AbstractModel
+)   
+    S = model.spectral_transform
+    (; R_dry) = model.atmosphere                        # dry gas constant
+    u = diagn.grid.u_grid
+    v = diagn.grid.v_grid
+    Φ = diagn.grid.geopotential
 
-#     (; R_dry) = model.atmosphere                        # dry gas constant
-#     u = diagn.grid.u_grid
-#     v = diagn.grid.v_grid
-#     Φ = diagn.grid.geopotential
-#     Tₖ = model.implicit.temp_profile                    # average layer temperature (1D)
-#     lnpₛ = diagn.grid.pres_grid                         # 2D
+    (; scratch_memory) = diagn.dynamics
+    bernoulli = diagn.dynamics.a                        # reuse work arrays a, a_grid
+    bernoulli_grid = diagn.dynamics.a_grid
+    RdTlnpₛ = diagn.dynamics.a_grid                     # reuse same work array for Tₖ*lnpₛ on grid
+    (; div_tend) = diagn.tendencies
 
-#     (; scratch_memory) = diagn.dynamics
-#     bernoulli = diagn.dynamics.a                        # reuse work arrays a, a_grid
-#     bernoulli_grid = diagn.dynamics.a_grid
-#     RdTlnpₛ = diagn.dynamics.a_grid                     # reuse same work array for Tₖ*lnpₛ on grid
-#     (; div_tend) = diagn.tendencies
+    if model isa PrimitiveEquation
+        Tₖ = model.implicit.temp_profile                # average layer temperature (1D)
+        pₛ = diagn.grid.pres_grid_prev                  # 2D not prev is in Pa
 
-#     if model isa PrimitiveEquation
-#         # Tₖ*lnpₛ on grid, use broadcasting as T is 3D but surface pressure is 2D
-#         # Add the linear contribution of the pressure gradient to the geopotential.
-#         # The pressure gradient in the divergence equation takes the form
-#         #     -∇⋅(Rd * Tᵥ * ∇lnpₛ) = -∇⋅(Rd * Tᵥ' * ∇lnpₛ) - ∇²(Rd * Tₖ * lnpₛ)
-#         # So that the second term inside the Laplace operator can be added to the geopotential.
-#         # Rd is the gas constant, Tᵥ the virtual temperature and Tᵥ' its anomaly wrt to the
-#         # average or reference temperature Tₖ, lnpₛ is the logarithm of surface pressure.
-#         # broadcast 1D Tₖ (1 value per layer) over 2D lnpₛ (one value per grid point) to 3D
-#         RdTlnpₛ .= R_dry * Tₖ' .* lnpₛ
-#     else
-#         RdTlnpₛ .= 0
-#     end     
+        # Tₖ*lnpₛ on grid, use broadcasting as T is 3D but surface pressure is 2D
+        # Add the linear contribution of the pressure gradient to the geopotential.
+        # The pressure gradient in the divergence equation takes the form
+        #     -∇⋅(Rd * Tᵥ * ∇lnpₛ) = -∇⋅(Rd * Tᵥ' * ∇lnpₛ) - ∇²(Rd * Tₖ * lnpₛ)
+        # So that the second term inside the Laplace operator can be added to the geopotential.
+        # Rd is the gas constant, Tᵥ the virtual temperature and Tᵥ' its anomaly wrt to the
+        # average or reference temperature Tₖ, pₛ is the surface pressure.
+        # broadcast 1D Tₖ (1 value per layer) over 2D pₛ (one value per grid point) to 3D
+        RdTlnpₛ .= R_dry * Tₖ' .* log.(pₛ)
+    else
+        RdTlnpₛ .= 0
+    end
 
-#     # add ½(u² + v²) + Φ on grid and the linear pressure gradient for primitive models
-#     half = convert(eltype(bernoulli_grid), 0.5)
-#     @. bernoulli_grid = half*(u^2 + v^2) + Φ + RdTlnpₛ
-#     transform!(bernoulli, bernoulli_grid, scratch_memory, S)        # to spectral space
-#     ∇²!(div_tend, bernoulli, S, add=true, flipsign=true)            # add -∇²(½(u² + v²) + ϕ)
-#     return nothing
-# end
+    # add ½(u² + v²) + Φ on grid and the linear pressure gradient for primitive models
+    half = convert(eltype(bernoulli_grid), 0.5)
+    @. bernoulli_grid = half*(u^2 + v^2) + Φ + RdTlnpₛ
+    transform!(bernoulli, bernoulli_grid, scratch_memory, S)        # to spectral space
+    ∇²!(div_tend, bernoulli, S, add=true, flipsign=true)            # add -∇²(½(u² + v²) + ϕ)
+    return nothing
+end
 
 """
 $(TYPEDSIGNATURES)
@@ -932,8 +931,8 @@ function SpeedyTransforms.transform!(
     
     # include humidity effect into temp for everything stability-related
     temperature_average!(diagn, temp, S)
-    # virtual_temperature!(diagn, model)      # temp = virt temp for dry core
-    geopotential!(diagn, model)             # calculate geopotential
+    # virtual_temperature!(diagn, model)        # temp = virt temp for dry core
+    geopotential!(diagn, model)                 # calculate geopotential
 
     if initialize   # at initial step store prev <- current
         @. u_grid_prev = u_grid

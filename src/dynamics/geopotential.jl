@@ -74,7 +74,7 @@ function geopotential!(
     launch!(arch, RingGridWorkOrder, (size(temp, 1),), geopotential_kernel!, geopotential, temp, humid, orography, g, G, A)
 end
 
-@kernel function geopotential_kernel!(geopotential, temp, humid, orography, gravity, Geopotential, atmosphere)
+@kernel inbounds=true function geopotential_kernel!(geopotential, temp, humid, orography, gravity, Geopotential, atmosphere)
     ij = @index(Global, Linear)
 
     nlayers = size(temp, 2)

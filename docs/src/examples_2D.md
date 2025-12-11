@@ -101,7 +101,7 @@ still initialize zero-arrays of the correct size and element type. Awesome.
 This time the initial conditions should be set the the Galewsky et al.[^G04] zonal
 jet, which is already defined as
 ```@example galewsky_setup
-initial_conditions = ZonalJet()
+initial_conditions = ZonalJet(spectral_grid)
 ```
 The jet sits at 45˚N with a maximum velocity of 80m/s and a perturbation as described in their paper.
 Now we construct a model, but this time a `ShallowWaterModel`
