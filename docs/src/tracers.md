@@ -78,6 +78,7 @@ What you should not do is add a tracer to the `model` _after_ it has been initia
 You can check that the tracers exists in the variables with
 
 ```@example tracers
+simulation = initialize!(model)
 simulation.prognostic_variables
 ```
 

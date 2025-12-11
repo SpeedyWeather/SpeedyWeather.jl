@@ -44,13 +44,19 @@ Instead, you can define new prognostic and diagnostic variables for the
 parameterization to write into with the `variables` function: 
 
 ```julia 
-variables(::MyParameterization) = (DiagnosticVariable(name=:flux_variable, dims=Grid2D(), units="W/m^2", desc="custom flux variable"), PrognosticVariable(name=:my_prognostic_variable, dims=Spectral2D(), units="K/s", desc="custom prognostic variable"))
+function variables(::MyParameterization)
+    return (
+        DiagnosticVariable(name=:flux_variable, dims=Grid2D(), units="W/m^2", desc="custom flux variable"),
+        PrognosticVariable(name=:my_prognostic_variable, dims=Spectral2D(), units="K/s", desc="custom prognostic variable"),
+    )
 ```
 
-In this example we allocate a new diagnostic variable `flux_variable` and a new prognostic variable `my_prognostic_variable` for our parameterization. The flux variable is defined as a two-dimensional
-variable on our grid, and the prognostic variable is defined as a spectral variable. Three-dimensional variables are also possible by using `Grid3D` and `Spectral3D` as `dims`.
+In this example we allocate a new diagnostic variable `flux_variable` and a new prognostic variable `my_prognostic_variable`
+for our parameterization. The flux variable is defined as a two-dimensional variable on our grid, and the prognostic variable
+is defined as a spectral variable. Three-dimensional variables are also possible by using `Grid3D` and `Spectral3D` as `dims`.
 
-These variables are then passed to the `parameterization!` function inside of the regular `PrognosticVariables` and `DiagnosticVariables` objects. Additionally, `DiagnosticVariables` has several work 
+These variables are then passed to the `parameterization!` function inside of the regular `PrognosticVariables` and
+`DiagnosticVariables` objects. Additionally, `DiagnosticVariables` has several work 
 arrays that you canreuse `diagn.grid.a` and `.b`, `.c`, `.d`. These work arrays have 
 an unknown state so you should overwrite every entry and you also should not use them 
 to retain information after that parameterization has been executed.
@@ -62,11 +68,17 @@ This function takes in the prognostic and diagnostic variables as well as the mo
 object and should compute the tendencies and fluxes that are then accumulated into 
 the respective arrays. It is computed within a KernelAbstraction.jl kernel and therefore
 has to be defined with GPU support in mind. This means e.g. no dynamic dispatches, only scalar 
-indexing and ideally no allocations. For more details see [KernelAbstraction.jl](https://github.com/JuliaClimate/KernelAbstractions.jl) and our example parameterzations that we implemented. The signature of the function is 
+indexing and ideally no allocations. For more details see
+[KernelAbstraction.jl](https://github.com/JuliaClimate/KernelAbstractions.jl) and our example parameterzations that we implemented.
+The signature of the function is 
 
-```@docs 
-parameterization!(ij, diagn::DiagnosticVariables, progn::PrognosticVariables, parameterization::AbstractParameterization, model_parameters)
+```julia
+parameterization!(ij, diagn::DiagnosticVariables, progn::PrognosticVariables, parameterization::MyParameterization, model_parameters)
 ```
+
+Note that
+- albedos should extend `albedo!(ij, ...)` instead, see [Example: Albedo](@ref) below
+- `model_parameters` is a subset of `model` adapted to GPU and passed on as `NamedTuple` instead
 
 ## Accumulate do not overwrite
 
