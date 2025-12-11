@@ -259,6 +259,7 @@ end
     output = NetCDFOutput(spectral_grid, PrimitiveDry, path=tmp_output_path, id="long-output-test", output_dt=Day(3650))
     model = PrimitiveDryModel(spectral_grid; output, time_stepping)
     simulation = initialize!(model)
+    model.implicit.reinitialize = false     # bypass implicit initialization with this insanely large timestep (threw SingularException)
     run!(simulation, output=true, period=Day(365000))
 
     progn = simulation.prognostic_variables
