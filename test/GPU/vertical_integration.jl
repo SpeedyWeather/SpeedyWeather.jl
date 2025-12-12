@@ -22,8 +22,8 @@
     diagn_gpu, progn_gpu, model_gpu = SpeedyWeather.unpack(simulation_gpu)
 
     # copy all values needed to have have them equal
-    diagn_gpu.∇lnp_x .= on_architecture(arch_gpu, diagn_cpu.∇lnp_x)
-    diagn_gpu.∇lnp_y .= on_architecture(arch_gpu, diagn_cpu.∇lnp_y)
+    diagn_gpu.dynamics.∇lnp_x .= on_architecture(arch_gpu, diagn_cpu.dynamics.∇lnp_x)
+    diagn_gpu.dynamics.∇lnp_y .= on_architecture(arch_gpu, diagn_cpu.dynamics.∇lnp_y)
 
     diagn_gpu.grid.u_grid = on_architecture(arch_gpu, diagn_cpu.grid.u_grid)
     diagn_gpu.grid.v_grid = on_architecture(arch_gpu, diagn_cpu.grid.v_grid)
