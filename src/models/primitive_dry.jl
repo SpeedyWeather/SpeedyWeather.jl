@@ -62,7 +62,7 @@ $(TYPEDFIELDS)"""
     dynamics::Bool = true
     geometry::GE = Geometry(spectral_grid)
     planet::PL = Earth(spectral_grid)
-    atmosphere::AT = EarthAtmosphere(spectral_grid)
+    atmosphere::AT = EarthDryAtmosphere(spectral_grid)
     coriolis::CO = Coriolis(spectral_grid)
     geopotential::GO = Geopotential(spectral_grid)
     adiabatic_conversion::AC = AdiabaticConversion(spectral_grid)
@@ -111,7 +111,7 @@ $(TYPEDFIELDS)"""
     
     # Tuples with symbols or instances of all parameterizations and parameter functions
     # Used to initiliaze variables and for the column-based parameterizations
-    model_parameters::TS1 = (:class, :architecture, :time_stepping, :orography, :geopotential, :atmosphere, 
+    model_parameters::TS1 = (:architecture, :time_stepping, :orography, :geopotential, :atmosphere, 
                                 :planet, :geometry, :land_sea_mask)
     parameterizations::TS2 = (  # mixing
                                 :vertical_diffusion, :convection,
@@ -129,7 +129,6 @@ $(TYPEDFIELDS)"""
     # DERIVED 
     # used to infer parameterizations at compile-time 
     params::PV = Val(parameterizations)
-    class::MC = PrimitiveDryDummy()
 end
 
 prognostic_variables(::Type{<:PrimitiveDry}) = (:vor, :div, :temp, :pres)

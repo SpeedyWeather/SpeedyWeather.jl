@@ -350,7 +350,7 @@ set to NaN instead and should be skipped in the relaxation."""
     atmosphere,
 )
     NF = eltype(temp_ref_profile)
-    κ = atmosphere.heat_capacity
+    (; κ) = atmosphere
 
     nlayers = length(σ)                     # number of vertical levels
 

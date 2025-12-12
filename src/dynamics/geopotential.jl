@@ -66,16 +66,13 @@ function geopotential!(
     G = model.geopotential
     (; geopotential) = diagn.grid
     (; orography) = model.orography
-
-    # this triggers a fallback to use virtual temperature = absolute temperature for PrimitiveDry
-    A = model isa PrimitiveWet ? model.atmosphere : nothing
-
-    arch = architecture(temp)
+    (; atmosphere) = model
 
     if typeof(arch) <: GPU
-        launch!(arch, LinearWorkOrder, size(temp, 1), geopotential_kernel!, geopotential, temp, humid, orography, g, G, A)
+        arch = architecture(temp)
+        launch!(arch, LinearWorkOrder, size(temp, 1), geopotential_kernel!, geopotential, temp, humid, orography, g, G, atmosphere)
     else 
-        geopotential_cpu!(geopotential, temp, humid, orography, g, G, A)
+        geopotential_cpu!(geopotential, temp, humid, orography, g, G, atmosphere)
     end 
 end
 

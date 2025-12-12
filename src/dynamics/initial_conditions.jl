@@ -588,7 +588,8 @@ function initialize!(
     NF = eltype(progn)
     (; u₀, η₀, ΔT, Tmin) = initial_conditions
     (; σ_tropopause) = initial_conditions
-    lapse_rate = model.atmosphere.moist_lapse_rate
+
+    Γ = lapse_rate(model.atmosphere)
     (; temp_ref, R_dry) = model.atmosphere
     (; grid, nlayers) = model.spectral_grid
     (; radius, rotation, gravity) = model.planet
@@ -603,10 +604,10 @@ function initialize!(
     Tη = similar(σ_levels_full_cpu)
     for k in 1:nlayers
         σ = σ_levels_full_cpu[k]
-        Tη[k] = temp_ref * σ^(R_dry * lapse_rate / gravity)   # Jablonowski and Williamson eq. 4
+        Tη[k] = temp_ref * σ^(R_dry * Γ / gravity)      # Jablonowski and Williamson eq. 4
 
         if σ < σ_tropopause
-            Tη[k] += ΔT * (σ_tropopause - σ)^5              # Jablonowski and Williamson eq. 5
+            Tη[k] += ΔT * (σ_tropopause - σ)^5          # Jablonowski and Williamson eq. 5
         end
     end
 
@@ -733,13 +734,13 @@ function homogeneous_temperature!(
     # lapse_rate:   Reference temperature lapse rate -dT/dz [K/km]
     # gravity:      Gravitational acceleration [m/s^2]
     # R_dry:        Specific gas constant for dry air [J/kg/K]
-    (; temp_ref, lapse_rate, R_dry) = model.atmosphere
+    (; temp_ref, R_dry) = model.atmosphere
     (; gravity) = model.planet
     (; nlayers, σ_levels_full) = model.geometry
     (; norm_sphere) = model.spectral_transform # normalization of the l=m=0 spherical harmonic
 
     # Lapse rate scaled by gravity [K/m / (m²/s²)]
-    Γg⁻¹ = lapse_rate / gravity
+    Γg⁻¹ = lapse_rate(model.atmosphere) / gravity
 
     # SURFACE TEMPERATURE (store in k = nlayers, but it's actually surface, i.e. k=nlayers+1/2)
     # overwrite with lowermost layer further down
@@ -791,14 +792,12 @@ function initialize!(
     )
 
     # temp_ref:     Reference absolute T [K] at surface z = 0
-    # lapse_rate:   Reference temperature lapse rate -dT/dz [K/m]
+    # lapse_rate:   Reference temperature lapse rate (dry or moist) -dT/dz [K/m]
     # gravity:      Gravitational acceleration [m/s^2]
     # R_dry:        Specific gas constant for dry air [J/kg/K]
     # pres_ref:     Reference surface pressure [hPa]
 
-    (; atmosphere) = model
-    lapse_rate = model isa PrimitiveDry ? atmosphere.dry_lapse_rate : atmosphere.moist_lapse_rate
-
+    Γ = lapse_rate(model.atmosphere)
     (; temp_ref, pres_ref, R_dry) = model.atmosphere
     (; gravity) = model.planet
     (; orography) = model.orography    # orography on the grid
@@ -806,8 +805,8 @@ function initialize!(
     lnp₀ = log(pres_ref)                # logarithm of reference surface pressure [log(Pa)]
     lnp_grid = similar(orography)       # allocate log surface pressure on grid
 
-    RΓg⁻¹ = R_dry * lapse_rate / gravity    # for convenience
-    ΓT⁻¹ = lapse_rate / temp_ref
+    RΓg⁻¹ = R_dry * Γ / gravity    # for convenience
+    ΓT⁻¹ = Γ / temp_ref
 
     @. lnp_grid = lnp₀ + log(1 - ΓT⁻¹ * orography) / RΓg⁻¹
 
