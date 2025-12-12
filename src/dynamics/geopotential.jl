@@ -129,17 +129,27 @@ function geopotential!(
     # note these are not anomalies here as they are only in grid-point fields
     
     # BOTTOM FULL LAYER
-    local k::Int = nlayers
-    @inbounds for lm in eachharmonic(geopot, geopot_surf, temp_virt)
-        geopot[lm, k] = geopot_surf[lm] + temp_virt[lm, k]*Δp_geopot_full[k]
-    end
+    geopot[:, nlayers] .= geopot_surf .+ temp_virt[:, nlayers] .* Δp_geopot_full[nlayers]
 
     # OTHER FULL LAYERS, integrate two half-layers from bottom to top
-    @inbounds for k in nlayers-1:-1:1
-        for lm in eachharmonic(geopot, temp_virt)
-            geopot_k½ = geopot[lm, k+1] + temp_virt[lm, k+1]*Δp_geopot_half[k+1] # 1st half layer integration
-            geopot[lm, k] = geopot_k½  + temp_virt[lm, k]*Δp_geopot_full[k]      # 2nd onto full layer
-        end      
+    arch = architecture(geopot)
+    launch!(arch, SpectralWorkOrder, (size(geopot, 1),), geopotential_spectral_kernel!,
+            geopot, temp_virt, Δp_geopot_half, Δp_geopot_full, nlayers)
+end
+
+@kernel inbounds = true function geopotential_spectral_kernel!(
+    geopot,                     # Output: spectral geopotential
+    temp_virt,                  # Input: spectral virtual temperature
+    @Const(Δp_geopot_half),     # Input: integration constant for half levels
+    @Const(Δp_geopot_full),     # Input: integration constant for full levels
+    @Const(nlayers),            # Input: number of vertical layers
+)
+    lm = @index(Global, Linear)  # global index: harmonic lm
+
+    # Integrate from bottom to top over all layers except bottom (already computed)
+    for k in nlayers-1:-1:1
+        geopot_k½ = geopot[lm, k+1] + temp_virt[lm, k+1] * Δp_geopot_half[k+1]  # 1st half layer integration
+        geopot[lm, k] = geopot_k½ + temp_virt[lm, k] * Δp_geopot_full[k]        # 2nd onto full layer
     end
 end
 
