@@ -1,7 +1,7 @@
 abstract type AbstractLandGeometry <: AbstractModelComponent end
 
 export LandGeometry
-mutable struct LandGeometry{VectorType} <: AbstractLandGeometry
+struct LandGeometry{VectorType} <: AbstractLandGeometry
     "[OPTION] thickness of each soil layer [m]"
     layer_thickness::VectorType
 end

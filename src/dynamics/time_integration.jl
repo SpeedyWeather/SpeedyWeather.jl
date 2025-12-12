@@ -147,6 +147,10 @@ end
 # also allow for keyword arguments
 set!(L::AbstractTimeStepper; Δt::Period) = set!(L, Δt)
 
+function Adapt.adapt_structure(to, L::Leapfrog)
+    return (; Δt=L.Δt, Δt_sec=L.Δt_sec, Δt_millisec=L.Δt_millisec)
+end
+    
 """$(TYPEDSIGNATURES)
 Performs one leapfrog time step with (`lf=2`) or without (`lf=1`) Robert+Williams filter
 (see Williams (2009), Montly Weather Review, Eq. 7-9)."""
@@ -372,31 +376,27 @@ function timestep!(
     lf1::Integer = 2,               # leapfrog index 1 (dis/enables Robert+Williams filter)
     lf2::Integer = 2,               # leapfrog index 2 (time step used for tendencies)
 )
-
     model.feedback.nans_detected && return nothing  # exit immediately if NaRs already present
-    (; time) = progn.clock                           # current time
 
     # set the tendencies back to zero for accumulation
     fill!(diagn.tendencies, 0, typeof(model))
 
-    if model.physics                                # switch on/off all physics parameterizations
+    if model.physics                            # switch on/off all physics parameterizations
         # calculate all parameterizations
-        parameterization_tendencies!(diagn, progn, time, model)
+        parameterization_tendencies!(diagn, progn, model)
         ocean_timestep!(progn, diagn, model)    # sea surface temperature and maybe in the future sea ice
         sea_ice_timestep!(progn, diagn, model)  # sea ice
         land_timestep!(progn, diagn, model)     # soil moisture and temperature, vegetation, maybe rivers
     end
 
-    if model.dynamics                                           # switch on/off all dynamics
-        forcing!(diagn, progn, lf2, model)
-        drag!(diagn, progn, lf2, model)
+    if model.dynamics                                               # switch on/off all dynamics
         dynamics_tendencies!(diagn, progn, lf2, model)              # dynamical core
         implicit_correction!(diagn, progn, model.implicit, model)   # semi-implicit time stepping corrections
     else    # just transform physics tendencies to spectral space
         physics_tendencies_only!(diagn, model)
     end
 
-    # APPLY DIFFUSION, STEP FORWARD IN TIME, AND TRANSFORM NEW TIME STEP TO GRID
+    # # APPLY DIFFUSION, STEP FORWARD IN TIME, AND TRANSFORM NEW TIME STEP TO GRID
     horizontal_diffusion!(diagn, progn, model.horizontal_diffusion, model)
     leapfrog!(progn, diagn.tendencies, dt, lf1, model)
     transform!(diagn, progn, lf2, model)

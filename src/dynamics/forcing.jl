@@ -44,7 +44,6 @@ $(TYPEDFIELDS)
     
     "[DERIVED] precomputed vertical tapering"
     tapering::VectorType
-
 end
 
 function JetStreamForcing(SG::SpectralGrid; kwargs...)

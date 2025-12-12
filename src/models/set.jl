@@ -9,7 +9,7 @@ function set!(
     #TODO add vegetation?
     kwargs...
 )
-    # orography also needs spectral transform and gravity for corresponding geopot_surf
+    # orography also needs spectral transform and gravity for corresponding surface_geopotential
     isnothing(orography) || set!(model.orography, orography, model.geometry, model.spectral_transform;
         gravity=model.planet.gravity, kwargs...)
 

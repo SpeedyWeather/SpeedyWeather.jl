@@ -1,3 +1,1 @@
-abstract type AbstractRivers <: AbstractParameterization end
-
-# no rivers defined as rivers=nothing
+abstract type AbstractRivers <: AbstractLandComponent end

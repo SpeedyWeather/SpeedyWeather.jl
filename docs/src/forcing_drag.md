@@ -204,6 +204,7 @@ function SpeedyWeather.forcing!(
     forcing!(diagn, forcing, model.spectral_transform)
 end
 ```
+
 The function signature (types and number of its arguments) has to be as outlined above.
 The first argument has to be of type `DiagnosticVariables` as the diagnostic variables,
 are the ones you want to change (likely the tendencies within) to apply a forcing.
@@ -311,7 +312,7 @@ and just put them together as you like, and as long as you follow some rules.
 ```@example extend
 spectral_grid = SpectralGrid(trunc=85, nlayers=1)
 stochastic_stirring = StochasticStirring(spectral_grid, latitude=-45)
-initial_conditions = StartFromRest()
+initial_conditions = StartFromRest(spectral_grid)
 model = BarotropicModel(spectral_grid; initial_conditions, forcing=stochastic_stirring)
 simulation = initialize!(model)
 run!(simulation)
