@@ -25,17 +25,17 @@
     diagn_gpu.dynamics.∇lnp_x .= on_architecture(arch_gpu, diagn_cpu.dynamics.∇lnp_x)
     diagn_gpu.dynamics.∇lnp_y .= on_architecture(arch_gpu, diagn_cpu.dynamics.∇lnp_y)
 
-    diagn_gpu.grid.u_grid = on_architecture(arch_gpu, diagn_cpu.grid.u_grid)
-    diagn_gpu.grid.v_grid = on_architecture(arch_gpu, diagn_cpu.grid.v_grid)
-    diagn_gpu.grid.div_grid = on_architecture(arch_gpu, diagn_cpu.grid.div_grid)
+    diagn_gpu.grid.u_grid .= on_architecture(arch_gpu, diagn_cpu.grid.u_grid)
+    diagn_gpu.grid.v_grid .= on_architecture(arch_gpu, diagn_cpu.grid.v_grid)
+    diagn_gpu.grid.div_grid .= on_architecture(arch_gpu, diagn_cpu.grid.div_grid)
 
-    diagn_gpu.dynamics.u_mean_grid = on_architecture(arch_gpu, diagn_cpu.dynamics.u_mean_grid)
-    diagn_gpu.dynamics.v_mean_grid = on_architecture(arch_gpu, diagn_cpu.dynamics.v_mean_grid)
-    diagn_gpu.dynamics.div_mean_grid = on_architecture(arch_gpu, diagn_cpu.dynamics.div_mean_grid)
-    diagn_gpu.dynamics.div_mean = on_architecture(arch_gpu, diagn_cpu.dynamics.div_mean)
+    diagn_gpu.dynamics.u_mean_grid .= on_architecture(arch_gpu, diagn_cpu.dynamics.u_mean_grid)
+    diagn_gpu.dynamics.v_mean_grid .= on_architecture(arch_gpu, diagn_cpu.dynamics.v_mean_grid)
+    diagn_gpu.dynamics.div_mean_grid .= on_architecture(arch_gpu, diagn_cpu.dynamics.div_mean_grid)
+    diagn_gpu.dynamics.div_mean .= on_architecture(arch_gpu, diagn_cpu.dynamics.div_mean)
 
-    diagn_gpu.dynamics.div_sum_above = on_architecture(arch_gpu, diagn_cpu.dynamics.div_sum_above)
-    diagn_gpu.dynamics.uv∇lnp_sum_above = on_architecture(arch_gpu, diagn_cpu.dynamics.uv∇lnp_sum_above)
+    diagn_gpu.dynamics.div_sum_above .= on_architecture(arch_gpu, diagn_cpu.dynamics.div_sum_above)
+    diagn_gpu.dynamics.uv∇lnp_sum_above .= on_architecture(arch_gpu, diagn_cpu.dynamics.uv∇lnp_sum_above)
 
     progn_gpu.div .= on_architecture(arch_gpu, progn_cpu.div)
 
