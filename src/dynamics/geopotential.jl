@@ -73,7 +73,7 @@ function geopotential!(
     arch = architecture(temp)
 
     if typeof(arch) <: GPU
-        launch!(arch, LinearWorkOrder, size(temp, 1), geopotential_kernel!, geopotential, temp, humid, orography, g, G, A)
+        launch!(arch, LinearWorkOrder, (size(temp, 1),), geopotential_kernel!, geopotential, temp, humid, orography, g, G, A)
     else 
         geopotential_cpu!(geopotential, temp, humid, orography, g, G, A)
     end 

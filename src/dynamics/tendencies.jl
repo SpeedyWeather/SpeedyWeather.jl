@@ -71,7 +71,8 @@ function dynamics_tendencies!(
     linear_virtual_temperature!(diagn, progn, lf_implicit, model)
 
     # temperature relative to profile
-    diagn.grid.temp_grid .-= implicit.temp_profile'
+    # TODO: broadcast with LTA doesn't work here becasue of a broadcast conflict (temp profile and temp_grid are different dimensions and array types)
+    diagn.grid.temp_grid.data .-= implicit.temp_profile'
 
     # from ∂Φ/∂ln(pₛ) = -RTᵥ for bernoulli_potential!
     geopotential!(diagn, geopotential, orography)
@@ -107,7 +108,7 @@ function dynamics_tendencies!(
     tracer_advection!(diagn, model)
 
     # back to absolute temperature
-    diagn.grid.temp_grid .+= implicit.temp_profile'
+    diagn.grid.temp_grid.data .+= implicit.temp_profile'
 
     return nothing
 end
