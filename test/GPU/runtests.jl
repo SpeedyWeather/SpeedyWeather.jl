@@ -44,9 +44,12 @@ include("interpolate.jl")
 # SET FUNCTIONS, GPU SPECIFIC 
 include("set.jl")
 
+# VERTICAL, GPU SPECIFIC 
+include("vertical_integration.jl")
+
 # FULL MODELS
 include("barotropic.jl")
-#include("primitive_dry.jl")
+include("primitive_wet.jl")
 
 if gpu_backend === :CUDA
 
