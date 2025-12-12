@@ -18,8 +18,8 @@
 
     run!(simulation_cpu, steps=2)
 
-    diagn_cpu, progn_cpu, model_cpu = SpeedyWeather.unpack(simulation_cpu)
-    diagn_gpu, progn_gpu, model_gpu = SpeedyWeather.unpack(simulation_gpu)
+    progn_cpu, diagn_cpu, model_cpu = SpeedyWeather.unpack(simulation_cpu)
+    progn_gpu, diagn_gpu, model_gpu = SpeedyWeather.unpack(simulation_gpu)
 
     # copy all values needed to have have them equal
     diagn_gpu.dynamics.∇lnp_x .= on_architecture(arch_gpu, diagn_cpu.dynamics.∇lnp_x)
