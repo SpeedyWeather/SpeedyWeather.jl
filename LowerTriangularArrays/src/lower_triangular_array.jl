@@ -564,15 +564,15 @@ end
     m = m_indices[I[1]]
 
     if (l_min <= l <= l_max) && (m_min <= m <= m_max)
-        L1[I] = L2[lm2i(l, m, l_max_L2), I[2:end]...] # convert indices here because L2 is different size
+        L1[I...] = L2[lm2i(l, m, l_max_L2), I[2:end]...] # convert indices here because L2 is different size
     end 
 end 
 
 # version for 2D arrays/vectors
 @kernel inbounds=true function _copyto_kernel!(L1::AbstractVector, L2::AbstractVector, l_min, l_max, m_min, m_max, l_indices, m_indices, l_max_L2)
-    I = @index(Global, NTuple) 
-    l = l_indices[I[1]]
-    m = m_indices[I[1]]
+    I = @index(Global, Linear) 
+    l = l_indices[I]
+    m = m_indices[I]
 
     if (l_min <= l <= l_max) && (m_min <= m <= m_max)
         L1[I] = L2[lm2i(l, m, l_max_L2)]
