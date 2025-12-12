@@ -686,34 +686,26 @@ end
     @test all(L2 .== L1)
     
     # test the truncating copyto! function 
-    # we can't do this with JLArrays, as they don't support mixed indexing with BitArrays
-    # like Array and CuArray do
-    # So, we do this with regular Array but with the _copyto_core! function that implements 
-    # the core of this copyto! in a GPU compatible way, and is called by copyto! with CuArrays
-
-    L1 = zeros(LowerTriangularArray{NF}, 33, 32, idims...)
-    L2 = randn(LowerTriangularArray{NF}, 65, 64, idims...)
+   
+    L1 = on_architecture(jl_arch, zeros(LowerTriangularArray{NF}, 33, 32, idims...))
+    L2 = on_architecture(jl_arch, randn(LowerTriangularArray{NF}, 65, 64, idims...))
 
     L2T = spectral_truncation(L2, (size(L1, ZeroBased; as=Matrix)[1:2])...)
-    L3 = zeros(LowerTriangularArray{NF}, 33, 32, idims...)
+    L3 = on_architecture(jl_arch, zeros(LowerTriangularArray{NF}, 33, 32, idims...))
 
-    SpeedyWeather.LowerTriangularArrays._copyto_core!(L1, L2, 1:33, 1:32)     # size of smaller matrix
+    copyto!(L1, L2, 1:33, 1:32)     # size of smaller matrix
     @test L1 == L2T
 
-    # test that GPU and CPU method yield the same
-    SpeedyWeather.LowerTriangularArrays.copyto!(L3, L2, 1:33, 1:32)     # size of smaller matrix
+    copyto!(L3, L2, 1:33, 1:32)     # size of smaller matrix
     @test L1 == L3 
 
-    SpeedyWeather.LowerTriangularArrays._copyto_core!(L1, L2, 1:65, 1:64)     # size of bigger matrix
-    @test L1 == L2T
-
-    SpeedyWeather.LowerTriangularArrays.copyto!(L3, L2, 1:65, 1:64)     # size of bigger matrix
+    copyto!(L3, L2, 1:65, 1:64)     # size of bigger matrix
     @test L1 == L3 
 
-    SpeedyWeather.LowerTriangularArrays._copyto_core!(L1, L2, 1:50, 1:50)     # in between
+    copyto!(L1, L2, 1:50, 1:50)     # in between
     @test L1 == L2T
 
-    SpeedyWeather.LowerTriangularArrays.copyto!(L3, L2, 1:50, 1:50)     # in between
+    copyto!(L3, L2, 1:50, 1:50)     # in between
     @test L3 == L1
 end 
 
