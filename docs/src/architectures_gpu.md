@@ -1,4 +1,4 @@
-# GPU & Architectures
+# GPU and Architectures
 
 !!! warning "Work in progress"
     The GPU support of SpeedyWeather.jl is still work in progress and some parts of this documentation might not be always updated to the latest state. We will extend this documentation over time. Don't hesitate to contact us via GitHub issues or mail when you have questions or want to collaborate.

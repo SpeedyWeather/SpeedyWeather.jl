@@ -30,7 +30,7 @@ makedocs(
                 "Differentiability and Adjoint Model"=>"differentiability.md",
                 "NetCDF output"=>"output.md",
                 "Other output"=>"other_output.md",
-                "GPU & Architectures" => "architectures_gpu.md",
+                "GPU and Architectures" => "architectures_gpu.md",
             ],
             "Extending SpeedyWeather" => [
                 "Extensions"=>"extensions.md",

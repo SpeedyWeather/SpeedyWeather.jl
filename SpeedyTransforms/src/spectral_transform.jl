@@ -40,6 +40,7 @@ struct SpectralTransform{
     nlon_max::Int                   # Maximum number of longitude points (at Equator)
     nlons::Vector{Int}              # Number of longitude points per ring
     nlat::Int                       # Number of latitude rings
+    rings::Vector{UnitRange{Int}}   # precomputed ring indices
 
     # CORRESPONDING GRID VECTORS
     coslat::VectorType              # Cosine of latitudes, north to south
@@ -62,7 +63,7 @@ struct SpectralTransform{
     
     # SCRATCH MEMORY FOR FOURIER NOT YET LEGENDRE TRANSFORMED AND VICE VERSA
     # state is undetermined, only read after writing to it
-    scratch_memory::ScratchMemory{NF, ArrayComplexType, VectorType, VectorComplexType} 
+    scratch_memory::ScratchMemory{ArrayComplexType, VectorComplexType} 
 
     jm_index_size::Int                             # number of indices per layer in kjm_indices
     kjm_indices::ArrayTypeIntMatrix                # precomputed kjm loop indices map for legendre transform
@@ -120,6 +121,7 @@ function SpectralTransform(
                                     # number of longitudes per latitude ring (one hemisphere only)
     nlons = [RingGrids.get_nlon_per_ring(grid, j) for j in 1:nlat_half]
     nfreq_max = nlon_max÷2 + 1              # maximum number of fourier frequencies (real FFTs)
+    rings = on_architecture(CPU(), eachring(grid))  # precomputed ring indices
 
     # LATITUDE VECTORS (based on Gaussian, equi-angle or HEALPix latitudes)
     latd = RingGrids.get_latd(grid)         # latitude in degrees (90˚Nto -90˚N)
@@ -280,7 +282,7 @@ function SpectralTransform(
         spectrum, nfreq_max, 
         LegendreShortcut, mmax_truncation,
         grid, nlayers,
-        nlon_max, nlons, nlat,
+        nlon_max, nlons, nlat, rings,
         coslat, coslat⁻¹, lon_offsets,
         norm_sphere,
         rfft_plans, brfft_plans, rfft_plans_1D, brfft_plans_1D,

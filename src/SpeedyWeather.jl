@@ -10,8 +10,8 @@ import LinearAlgebra: LinearAlgebra, Diagonal
 export rotate, rotate!
 
 # GPU, PARALLEL
-import Base.Threads: Threads, @threads
 import KernelAbstractions: KernelAbstractions, @kernel, @index, @Const, synchronize
+import GPUArrays: GPUArrays, @allowscalar
 import Adapt: Adapt, adapt, adapt_structure
 import GPUArrays: @allowscalar
 
@@ -20,6 +20,7 @@ using  SpeedyWeatherInternals.Architectures
 import SpeedyWeatherInternals.Architectures: AbstractArchitecture, CPU, GPU, 
        on_architecture, architecture, array_type, ismatching, nonparametric_type
 export CPU, GPU, on_architecture, architecture                # export device functions 
+export SpeedyWeatherInternals, Architectures
 
 # INPUT OUTPUT
 import TOML
@@ -34,6 +35,7 @@ import ProgressMeter
 
 # UTILITIES
 using  DomainSets.IntervalSets
+import Base: @propagate_inbounds
 
 # to avoid a `using Dates` to pass on DateTime arguments
 export DateTime, Millisecond, Second, Minute, Hour, Day, Week, Month, Year, Century, Millenium
@@ -42,6 +44,7 @@ export DateTime, Millisecond, Second, Minute, Hour, Day, Week, Month, Year, Cent
 export initialize!, finalize!
 
 # import utilities
+export Utils
 using SpeedyWeatherInternals.Utils 
 
 # parameter handling
@@ -55,7 +58,6 @@ export SpeedyParam, SpeedyParams, parameters, stripparams
 # DATA STRUCTURES
 # LowerTriangularArrays for spherical harmonics
 using  LowerTriangularArrays
-
 export  LowerTriangularArrays, 
         LowerTriangularArray,
         LowerTriangularMatrix
@@ -66,7 +68,6 @@ export  Spectrum
 export  OneBased, ZeroBased
 export  eachmatrix, eachharmonic, eachorder
         
-
 # RingGrids
 using  RingGrids
 
@@ -99,10 +100,10 @@ using SpeedyTransforms
 
 export SpeedyTransforms, SpectralTransform
 export transform, transform!
-export spectral_truncation, spectral_truncation!
 export curl, divergence, curl!, divergence!
 export ∇, ∇², ∇⁻², ∇!, ∇²!, ∇⁻²!
 export power_spectrum
+export spectral_truncation, spectral_truncation!
 
 import SpeedyTransforms: prettymemory
 
@@ -112,7 +113,8 @@ function animate end
 
 # abstract types
 include("models/abstract_models.jl")
-include("dynamics/abstract_types.jl")
+include("variables/abstract_types.jl")
+include("models/parameterizations.jl")
 
 # GEOMETRY CONSTANTS ETC
 include("dynamics/vertical_coordinates.jl")
@@ -126,13 +128,14 @@ include("dynamics/orography.jl")
 include("physics/land_sea_mask.jl")
 
 # VARIABLES
+include("variables/variables.jl")
 include("dynamics/tracers.jl")
 include("dynamics/particles.jl")
 include("dynamics/clock.jl")
-include("dynamics/prognostic_variables.jl")
-include("dynamics/set.jl")
+include("variables/prognostic_variables.jl")
+include("variables/set.jl")
 include("physics/define_column.jl")
-include("dynamics/diagnostic_variables.jl")
+include("variables/diagnostic_variables.jl")
 
 # MODEL COMPONENTS
 include("dynamics/time_integration.jl")
@@ -153,28 +156,34 @@ include("dynamics/random_process.jl")
 # PARAMETERIZATIONS
 include("physics/albedo.jl")
 include("physics/tendencies.jl")
-include("physics/column_variables.jl")
 include("physics/thermodynamics.jl")
-include("physics/boundary_layer.jl")
 include("physics/vertical_diffusion.jl")
 include("physics/large_scale_condensation.jl")
-include("physics/surface_fluxes/surface_fluxes.jl")
+include("physics/surface_fluxes/boundary_layer.jl")
+include("physics/surface_fluxes/surface_condition.jl")
 include("physics/surface_fluxes/momentum.jl")
 include("physics/surface_fluxes/heat.jl")
 include("physics/surface_fluxes/humidity.jl")
 include("physics/convection.jl")
 include("physics/zenith.jl")
 include("physics/radiation/shortwave_radiation.jl")
-include("physics/radiation/shortwave_transmittance.jl")
+include("physics/radiation/shortwave_transmissivity.jl")
 include("physics/radiation/clouds.jl")
 include("physics/radiation/longwave_radiation.jl")
-include("physics/radiation/longwave_transmittance.jl")
+include("physics/radiation/longwave_transmissivity.jl")
 include("physics/stochastic_physics.jl")
 
 # OCEAN AND LAND
 include("physics/ocean.jl")
 include("physics/sea_ice.jl")
 include("physics/land/land.jl")
+include("physics/land/geometry.jl")
+include("physics/land/thermodynamics.jl")
+include("physics/land/temperature.jl")
+include("physics/land/soil_moisture.jl")
+include("physics/land/snow.jl")
+include("physics/land/vegetation.jl")
+include("physics/land/rivers.jl")
 
 # OUTPUT
 include("output/schedule.jl")

@@ -160,7 +160,7 @@ Rossby-Haurwitz wave in the shallow water model without any influences from orog
 
 ```@example haurwitz
 spectral_grid = SpectralGrid(trunc=63, nlayers=1)
-initial_conditions = RossbyHaurwitzWave()
+initial_conditions = RossbyHaurwitzWave(spectral_grid)
 orography = NoOrography(spectral_grid)
 model = ShallowWaterModel(; spectral_grid, initial_conditions, orography)
 simulation = initialize!(model)
@@ -197,9 +197,9 @@ and let's switch off all physics parameterizations with `physics=false`.
 ```@example haurwitz
 spectral_grid = SpectralGrid(trunc=42, nlayers=8)
 initial_conditions = InitialConditions(
-                        vordiv=RossbyHaurwitzWave(),
-                        temp=JablonowskiTemperature(),
-                        pres=PressureOnOrography())
+                        vordiv=RossbyHaurwitzWave(spectral_grid),
+                        temp=JablonowskiTemperature(spectral_grid),
+                        pres=PressureOnOrography(spectral_grid))
 
 orography = NoOrography(spectral_grid)
 time_stepping = Leapfrog(spectral_grid, Δt_at_T31=Minute(30))   # 30min timestep scaled linearly

@@ -74,28 +74,11 @@ Tracers are just defined through their `key`, e.g. `:co2`, so while you can do
 the same tracer -- and no two tracers with the same key can exist inside `model`
 (and `simulation`).
 
-You can also add a tracer to a `simulation`, i.e. after the model is initialized.
+What you should not do is add a tracer to the `model` _after_ it has been initialized.
+You can check that the tracers exists in the variables with
 
 ```@example tracers
 simulation = initialize!(model)
-add!(simulation, Tracer(:xyz))
-```
-
-which will add the tracer to `model.tracers` as above but also add
-it to the prognostic and diagnostic variables (otherwise done at `initialize!`).
-There is no difference between adding a tracer to model versus adding it
-to the simulation. Conceptually, the existence of a tracer should be
-defined in `model` in the same way as `PrimitiveWetModel` defines the existence
-of humidity as an (active) tracer. But for convenience and the ability
-to add (or remove) a tracer at any time it is also possible to add
-a tracer to `simulation` (which will add it to the `model`, and the variables, too).
-
-What you should not do is add a tracer to the `model` _after_ it has been initialized.
-Then you end up with an additional tracer in `model` without there
-being variables for it, throwing an error. You can check that
-the tracers exists in the variables with
-
-```@example tracers
 simulation.prognostic_variables
 ```
 
@@ -168,10 +151,10 @@ Let us illustrate some tracer advection in practice
 using SpeedyWeather
 spectral_grid = SpectralGrid(trunc=85, nlayers=1)
 model = ShallowWaterModel(spectral_grid)
+add!(model, Tracer(:abc))
 simulation = initialize!(model)
 
 # add and set tracer and run a 0-day simulation
-add!(simulation, Tracer(:abc))
 set!(simulation, abc = (λ, φ, σ) -> exp(-(λ-180)^2/10^2))
 run!(simulation, period=Day(0))
 

@@ -227,6 +227,7 @@ function initialize!(
     diagn::DiagnosticVariables,
     model::PrimitiveEquation,
 )
+    model.dynamics || return nothing    # escape immediately if no dynamics
     (; geometry, geopotential, atmosphere, adiabatic_conversion) = model
     initialize!(I, dt, diagn, geometry, geopotential, atmosphere, adiabatic_conversion)
 end
@@ -236,13 +237,13 @@ Initialize the implicit terms for the PrimitiveEquation models."""
 function initialize!(
     implicit::ImplicitPrimitiveEquation,
     dt::Real,                                           # the scaled time step radius*dt
-    diagn::DiagnosticVariables{NF},
+    diagn::DiagnosticVariables,
     geometry::AbstractGeometry,
     geopotential::AbstractGeopotential,
     atmosphere::AbstractAtmosphere,
     adiabatic_conversion::AbstractAdiabaticConversion,
-) where NF
-
+) 
+    NF = eltype(diagn)
     # option to skip reinitialization at restart
     (implicit.initialized && !implicit.reinitialize) && return nothing
 
@@ -378,9 +379,9 @@ function implicit_correction_kernels!(
 
     (; temp_tend, pres_tend, div_tend) = diagn.tendencies
     div_old, div_new = get_steps(progn.div)
-    G = diagn.dynamics.a        # reuse work arrays, used for combined tendency G
-    geopot = diagn.dynamics.b   # used for geopotential
-    geopot .= 0
+    G = diagn.dynamics.a              # reuse work arrays, used for combined tendency G
+    geopotential = diagn.dynamics.b   # used for geopotential
+    geopotential .= 0
 
     # Get precomputed l_indices from the spectrum
     l_indices = temp_tend.spectrum.l_indices
@@ -397,12 +398,12 @@ function implicit_correction_kernels!(
     # Kernel 1: Temperature update and geopotential calculation
     launch!(arch, SpectralWorkOrder, size(temp_tend), 
             implicit_temp_geopot_kernel!, 
-            temp_tend, geopot, div_old, div_new, R, L, nlayers)
+            temp_tend, geopotential, div_old, div_new, R, L, nlayers)
     
     # Kernel 2: Calculate G = G_D + ξRG_T + ξUG_lnps
     launch!(arch, SpectralWorkOrder, size(div_tend),
             implicit_calculate_G_kernel!,
-            G, div_tend, geopot, pres_tend, U, l_indices, ξ)
+            G, div_tend, geopotential, pres_tend, U, l_indices, ξ)
     
     # Kernel 3: Solve for divergence δD = S⁻¹G
     launch!(arch, SpectralWorkOrder, size(div_tend),
@@ -423,6 +424,8 @@ function implicit_correction_kernels!(
     zero_last_degree!(div_tend)
     zero_last_degree!(pres_tend)
     zero_last_degree!(temp_tend)
+  
+    pres_tend[1:1] .= 0    # mass conservation
 
     return nothing
 end
@@ -445,9 +448,9 @@ function implicit_correction_lm_only!(
 
     (; temp_tend, pres_tend, div_tend) = diagn.tendencies
     div_old, div_new = get_steps(progn.div)
-    G = diagn.dynamics.a        # reuse work arrays, used for combined tendency G
-    geopot = diagn.dynamics.b   # used for geopotential
-    geopot .= 0
+    G = diagn.dynamics.a              # reuse work arrays, used for combined tendency G
+    geopotential = diagn.dynamics.b   # used for geopotential
+    geopotential .= 0
 
     # Get precomputed l_indices from the spectrum
     l_indices = temp_tend.spectrum.l_indices
@@ -464,13 +467,15 @@ function implicit_correction_lm_only!(
     zero_last_degree!(div_tend)
     zero_last_degree!(pres_tend)
     zero_last_degree!(temp_tend)
-
+  
+    pres_tend[1:1] .= 0    # mass conservation
+  
     return nothing
 end
 
 # Single kernel that does all steps for one spectral mode
 @kernel inbounds=true function implicit_primitive_single_kernel!(
-    temp_tend, pres_tend, div_tend, G, geopot,
+    temp_tend, pres_tend, div_tend, G, geopotential,
     div_old, div_new, @Const(S⁻¹), @Const(R), @Const(U), @Const(L), @Const(W), @Const(l_indices),
     @Const(ξ), @Const(nlayers)
 )
@@ -491,11 +496,11 @@ end
 
     for k in 1:nlayers
         # skip 1:k-1 as integration is surface to k
-        geopot_val = zero(eltype(geopot))
+        geopotential_val = zero(eltype(geopot))
         for r in k:nlayers
-            geopot_val += R[k, r] * temp_tend[lm, r]
+            geopotential_val += R[k, r] * temp_tend[lm, r]
         end
-        geopot[lm, k] = geopot_val
+        geopotential[lm, k] = geopotential_val
     end
             
     eigenvalue = -l*(l-1)  # 1-based, -l*(l+1) → -l*(l-1)
@@ -537,146 +542,9 @@ end
     pres_tend[lm] += pres_correction
 end
 
-# Single kernel with Kahan summation everywhere for maximum accuracy
-@kernel inbounds=true function implicit_primitive_single_kernel_kahan!(
-    temp_tend, pres_tend, div_tend, G, geopot,
-    div_old, div_new, @Const(S⁻¹), @Const(R), @Const(U), @Const(L), @Const(W), @Const(l_indices),
-    @Const(ξ), @Const(nlayers)
-)
-    lm = @index(Global, Linear)
-    
-    # Get degree l for this spectral mode
-    l = l_indices[lm]
-    
-    # Step 1: Move implicit terms of temperature equation from time step i to i-1
-    # RHS_expl(Vⁱ) + RHS_impl(Vⁱ⁻¹) = RHS(Vⁱ) + RHS_impl(Vⁱ⁻¹ - Vⁱ)
-    # Use Kahan summation for better numerical accuracy
-    for k in 1:nlayers
-        temp_correction = zero(eltype(temp_tend))
-        c = zero(eltype(temp_tend))
-        for r in 1:nlayers
-            val = L[k, r] * (div_old[lm, r] - div_new[lm, r])
-            y = val - c
-            t = temp_correction + y
-            c = (t - temp_correction) - y
-            temp_correction = t
-        end
-        temp_tend[lm, k] += temp_correction
-    end
-
-    # Geopotential calculation with Kahan summation
-    for k in 1:nlayers
-        # skip 1:k-1 as integration is surface to k
-        geopot_val = zero(eltype(geopot))
-        c = zero(eltype(geopot))
-        for r in k:nlayers
-            val = R[k, r] * temp_tend[lm, r]
-            y = val - c
-            t = geopot_val + y
-            c = (t - geopot_val) - y
-            geopot_val = t
-        end
-        geopot[lm, k] = geopot_val
-    end
-            
-    eigenvalue = -l*(l-1)  # 1-based, -l*(l+1) → -l*(l-1)
-        
-    # Step 2: Calculate the ξ*R*G_T term, vertical integration of geopotential
-    # (excl ξ, this is done in step 3)
-        
-    # Step 3: Calculate the G = G_D + ξRG_T + ξUG_lnps terms
-    # ∇² not part of U so *eigenvalues here
-    for k in 1:nlayers
-        G[lm, k] = div_tend[lm, k] + ξ*eigenvalue*(U[k]*pres_tend[lm] + geopot[lm, k])
-    end
-        
-    # Step 4: Now solve δD = S⁻¹G to correct divergence tendency
-    # Use Kahan summation for better numerical accuracy
-    for k in 1:nlayers
-        div_val = zero(eltype(div_tend))
-        c = zero(eltype(div_tend))
-        for r in 1:nlayers
-            val = S⁻¹[l, k, r] * G[lm, r]
-            y = val - c
-            t = div_val + y
-            c = (t - div_val) - y
-            div_val = t
-        end
-        div_tend[lm, k] = div_val
-    end
-        
-    # Step 5: Semi implicit corrections for temperature and pressure
-        
-    # Step 5a: Temperature correction δT = G_T + ξLδD
-    # Use Kahan summation for better numerical accuracy
-    for k in 1:nlayers
-        temp_correction = zero(eltype(temp_tend))
-        c = zero(eltype(temp_tend))
-        for r in 1:nlayers
-            val = ξ * L[k, r] * div_tend[lm, r]
-            y = val - c
-            t = temp_correction + y
-            c = (t - temp_correction) - y
-            temp_correction = t
-        end
-        temp_tend[lm, k] += temp_correction
-    end
-        
-    # Step 5b: Pressure correction δlnpₛ = G_lnpₛ + ξWδD
-    # Use Kahan summation for better numerical accuracy
-    pres_correction = zero(eltype(pres_tend))
-    c = zero(eltype(pres_tend))
-    for k in 1:nlayers
-        val = ξ * W[k] * div_tend[lm, k]
-        y = val - c
-        t = pres_correction + y
-        c = (t - pres_correction) - y
-        pres_correction = t
-    end
-    pres_tend[lm] += pres_correction
-end
-
-# Function to call the Kahan version
-function implicit_correction_lm_kahan!(
-    diagn::DiagnosticVariables,
-    progn::PrognosticVariables,
-    implicit::ImplicitPrimitiveEquation,
-    model::PrimitiveEquation,
-)
-    (; temp_tend, pres_tend, div_tend) = diagn.tendencies
-    div_old, div_new = get_steps(progn.div)
-    (; S⁻¹, R, U, L, W) = implicit
-    ξ = implicit.ξ[]
-    nlayers = model.geometry.nlayers
-
-    # Allocate temporary arrays
-    G = similar(div_tend)
-    geopot = similar(div_tend)
-    G .= 0
-    geopot .= 0
-
-    # Get precomputed l_indices from the spectrum
-    l_indices = temp_tend.spectrum.l_indices
-
-    arch = architecture(temp_tend)
-    
-    # Single kernel with Kahan summation: All implicit correction steps for each spectral mode
-    lm_size = size(pres_tend, 1)
-    launch!(arch, LinearWorkOrder, (lm_size,),
-            implicit_primitive_single_kernel_kahan!,
-            temp_tend, pres_tend, div_tend, G, geopot,
-            div_old, div_new, S⁻¹, R, U, L, W, l_indices, ξ, nlayers)
-
-    zero_last_degree!(div_tend)
-    zero_last_degree!(pres_tend)
-    zero_last_degree!(temp_tend)
-
-    return nothing
-end
-
 # Kernel 1: Combined temperature update and geopotential calculation
 @kernel inbounds=true function implicit_temp_geopot_kernel!(
-    temp_tend, geopot, div_old, div_new, R, L, nlayers
+    temp_tend, geopotential, div_old, div_new, R, L, nlayers
 )
     I = @index(Global, Cartesian)
     lm = I[1]
@@ -693,11 +561,11 @@ end
     # Calculate the ξ*R*G_T term, vertical integration of geopotential
     # (excl ξ, this is done in kernel 2)
     # skip 1:k-1 as integration is surface to k
-    geopot_val = zero(eltype(geopot))
+    geopotential_val = zero(eltype(geopot))
     for r in k:nlayers
-        geopot_val += R[k, r] * temp_tend[lm, r]
+        geopotential_val += R[k, r] * temp_tend[lm, r]
     end
-    geopot[I] = geopot_val
+    geopotential[I] = geopotential_val
 end
 
 
@@ -809,26 +677,27 @@ function implicit_correction_cpu!(
     # SEMI IMPLICIT CORRECTIONS FOR DIVERGENCE
     # calculate the combined tendency G = G_D + ξRG_T + ξUG_lnps to solve for divergence δD
     (; pres_tend, div_tend) = diagn.tendencies
-    G = diagn.dynamics.a        # reuse work arrays, used for combined tendency G
-    geopot = diagn.dynamics.b   # used for geopotential
-    geopot .= 0
+
+    G = diagn.dynamics.a                # reuse work arrays, used for combined tendency G
+    geopotential = diagn.dynamics.b
+    geopotential .= 0                   # reset geopotential work array for accumulation below
 
     for k in 1:nlayers
         for r in k:nlayers      # skip 1:k-1 as integration is surface to k
             for lm in eachharmonic(temp_tend, div_old, div_new)
                 # 1. the ξ*R*G_T term, vertical integration of geopotential (excl ξ, this is done in 2.)
-                geopot[lm, k] += R[k, r]*temp_tend[lm, r]
+                geopotential[lm, k] += R[k, r]*temp_tend[lm, r]
             end
         end
 
-        # 2. the G = G_D + ξRG_T + ξUG_lnps terms using geopot from above
+        # 2. the G = G_D + ξRG_T + ξUG_lnps terms using geopotential from above
         lm = 0
         for m in 1:trunc+1              # loops over all columns/order m
             for l in m:trunc+1          # but skips the lmax+2 degree (1-based)
                 lm += 1                 # single index lm corresponding to harmonic l, m
                                         # ∇² not part of U so *eigenvalues here
                 eigenvalue = -l*(l-1)   # 1-based, -l*(l+1) → -l*(l-1)
-                G[lm, k] = div_tend[lm, k] + ξ*eigenvalue*(U[k]*pres_tend[lm] + geopot[lm, k])
+                G[lm, k] = div_tend[lm, k] + ξ*eigenvalue*(U[k]*pres_tend[lm] + geopotential[lm, k])
 
                 # div_tend is now in G, fill with zeros here so that it can be used as an accumulator
                 # in the δD = S⁻¹G calculation below
@@ -871,7 +740,6 @@ function implicit_correction_cpu!(
     zero_last_degree!(pres_tend)
     zero_last_degree!(temp_tend)
 
+    pres_tend[1:1] .= 0    # mass conservation
     return nothing
 end
-
-
