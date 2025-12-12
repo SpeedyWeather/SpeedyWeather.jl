@@ -225,16 +225,22 @@ function cos_zenith!(
     δ = S.solar_declination(g)
     sinδ, cosδ = sincos(δ)
 
-    rings = eachring(cos_zenith)
+    # Launch kernel for solar zenith calculation
+    launch!(architecture(cos_zenith), LinearWorkOrder, size(cos_zenith), solar_zenith_kernel!, 
+            cos_zenith, solar_hour_angle_0E, sinδ, cosδ, sinlat, coslat, lons, cos_zenith.grid.whichring)
+end
 
-    @inbounds for (j, ring) in enumerate(rings)                         
-        sinδsinϕ = sinδ*sinlat[j]
-        cosδcosϕ = cosδ*coslat[j]
-        for ij in ring
-            h = solar_hour_angle_0E + lons[ij]      # solar hour angle at longitude λ in radians
-            cos_zenith[ij] = max(0, sinδsinϕ + cosδcosϕ*cos(h))
-        end
-    end
+# Kernel for solar zenith calculation with daily cycle
+@kernel inbounds=true function solar_zenith_kernel!(cos_zenith,
+    @Const(solar_hour_angle_0E), @Const(sinδ), @Const(cosδ), @Const(sinlat), @Const(coslat), @Const(lons), @Const(whichring))
+
+    ij = @index(Global, Linear)
+    j = whichring[ij]
+    
+    sinδsinϕ = sinδ * sinlat[j]
+    cosδcosϕ = cosδ * coslat[j]
+    h = solar_hour_angle_0E + lons[ij]      # solar hour angle at longitude λ in radians
+    cos_zenith[ij] = max(0, sinδsinϕ + cosδcosϕ * cos(h))
 end
 
 export SolarZenithSeason
@@ -281,23 +287,36 @@ function cos_zenith!(
     δ = S.solar_declination(g)
     sinδ, cosδ = sincos(δ)
 
-    local h₀::NF                # hour angle sunrise to sunset
-    local cos_zenith_j::NF      # at latitude j
+    # Launch kernel for seasonal solar zenith calculation
+    launch!(architecture(cos_zenith), LinearWorkOrder, size(cos_zenith), solar_zenith_season_kernel!,
+            cos_zenith, δ, sinδ, cosδ, sinlat, coslat, lat, cos_zenith.grid.whichring)
+end
 
-    rings = eachring(cos_zenith)
-    @inbounds for (j, ring) in enumerate(rings)
-            
-        ϕ = lat[j]
-        h₀ = abs(δ) + abs(ϕ) < π/2 ?        # polar day/night?
-        acos(-tan(ϕ) * tan(δ)) :            # if not: calculate length of day
-        ϕ*δ > 0 ? π : zero(NF)              # polar day if signs are equal, otherwise polar night
-        
-        sinϕ, cosϕ = sinlat[j], coslat[j]
-        cos_zenith_j = h₀*sinδ*sinϕ + cosδ*cosϕ*sin(h₀)
-        cos_zenith_j /= π
+# Kernel for seasonal solar zenith calculation (daily average)
+@kernel inbounds=true function solar_zenith_season_kernel!(cos_zenith,
+    @Const(δ), @Const(sinδ), @Const(cosδ), @Const(sinlat), @Const(coslat), @Const(lat), @Const(whichring))
 
-        for ij in ring
-            cos_zenith[ij] = cos_zenith_j
-        end
-    end
+    ij = @index(Global, Linear)
+    j = whichring[ij]
+    
+    NF = eltype(cos_zenith)         # force type stability
+    local h₀::NF                    # hour angle sunrise to sunset
+    local cos_zenith_j::NF          # at latitude j
+
+    ϕ = lat[j]
+    h₀ = abs(δ) + abs(ϕ) < π/2 ?    # polar day/night?
+         acos(-tan(ϕ) * tan(δ)) :   # if not: calculate length of day
+         ϕ*δ > 0 ? π : 0            # polar day if signs are equal, otherwise polar night
+    
+    sinϕ, cosϕ = sinlat[j], coslat[j]
+    cos_zenith_j = h₀*sinδ*sinϕ + cosδ*cosϕ*sin(h₀)
+    cos_zenith_j /= π
+    
+    cos_zenith[ij] = cos_zenith_j
+end
+
+function variables(::AbstractZenith)
+    return (
+        DiagnosticVariable(name=:cos_zenith, dims=Grid2D(), desc="Cosine of solar zenith angle", units="1"),
+    )
 end

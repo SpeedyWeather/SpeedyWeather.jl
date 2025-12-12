@@ -1,6 +1,6 @@
 names = (
-    (:OutgoingShortwaveRadiationOutput, "osr",  "Outgoing shortwave radiation",     :outgoing_shortwave_radiation),
-    (:OutgoingLongwaveRadiationOutput,  "olr",  "Outgoing longwave radiation",      :outgoing_longwave_radiation),
+    (:OutgoingShortwaveRadiationOutput, "osr",  "Outgoing shortwave radiation",     :outgoing_shortwave),
+    (:OutgoingLongwaveRadiationOutput,  "olr",  "Outgoing longwave radiation",      :outgoing_longwave),
     (:SurfaceShortwaveUpOutput,         "sru",  "Surface shortwave radiation up",   :surface_shortwave_up),
     (:SurfaceShortwaveDownOutput,       "srd",  "Surface shortwave radiation down", :surface_shortwave_down),
     (:SurfaceLongwaveUpOutput,          "lru",  "Surface longwave radiation up",    :surface_longwave_up),

@@ -47,16 +47,17 @@ In Julia this introduces a new (so-called compound) type that is a subtype of `A
 we have a bunch of these abstract super types defined (see [Abstract model components](@ref))
 and you want to piggy-back on them because of multiple-dispatch. This new type could also be 
 a `mutable struct`, could have keywords defined with `@kwdef` and can
-also be parametric with respect to the number format `NF` or grid, but let's skip
-those details for now. Conceptually you include into the type any parameters
-(example the float `a` here) that you may need and especially those that you want to change
-(ideally not work arrays, see discussion in [Use `ColumnVariables` work arrays](@ref)).
+also be parametric with respect to the number format `NF` (as we do in the example)
+or grid, but let's skip those details for now. Conceptually you include into the type any parameters
+(example the float `a` here) that you may need and especially those that you want to be able to change.
 This type will get a user-facing interface so that one can quickly create a new
 forcing but with altered parameters. Generally you should also include any
 kind of precomputed arrays (here a vector `v`). For example, you want to
 apply your forcing only in certain parts of the globe? Then you probably want
 to define a mask here that somehow includes the information of your region.
 For a more concrete example see [Custom forcing and drag](@ref).
+But note that once you include `Vector`, `Matrix`, or generally `Array`,
+there are some changes needed for GPU compatibility, see [GPU and Architectures](@ref).
 
 To define the new type's initialization, at the most basic level you need
 to extend the `initialize!` function for this new type. A dummy example:

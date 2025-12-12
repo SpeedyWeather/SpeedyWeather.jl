@@ -8,10 +8,10 @@
             land = DryLandModel(spectral_grid; temperature)
 
             model = Model(spectral_grid; land)
-            simulation = initialize!(model)
+            initialize!(model.land, model)
             
-            progn = simulation.prognostic_variables
-            diagn = simulation.diagnostic_variables
+            progn = PrognosticVariables(model)
+            diagn = DiagnosticVariables(model)
             SpeedyWeather.land_timestep!(progn, diagn, model)
         end
     end
@@ -33,8 +33,8 @@ end
 
                     # just test that no errors are thrown
                     initialize!(land, model)
-                    progn = PrognosticVariables(spectral_grid)
-                    diagn = DiagnosticVariables(spectral_grid, model)
+                    progn = PrognosticVariables(model)
+                    diagn = DiagnosticVariables(model)
                     SpeedyWeather.land_timestep!(progn, diagn, model)
                 end
             end
@@ -54,14 +54,19 @@ end
 
             # just test that no errors are thrown
             initialize!(land, model)
-            progn = PrognosticVariables(spectral_grid)
-            diagn = DiagnosticVariables(spectral_grid, model)
+            progn = PrognosticVariables(model)
+            diagn = DiagnosticVariables(model)
             SpeedyWeather.land_timestep!(progn, diagn, model)
 
-            @test all(isfinite.(progn.land.snow_depth))
+            if snow isa SnowModel
+                @test all(isfinite.(progn.land.snow_depth))
+            else
+                @test !haskey(progn.land, :snow_depth)
+            end
         end
     end
 end
+
 @testset "LandGeometry default constructor" begin
     SG = SpectralGrid(trunc=21, nlayers=2)
     geom = LandGeometry(SG)

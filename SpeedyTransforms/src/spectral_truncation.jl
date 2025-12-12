@@ -173,7 +173,7 @@ function spectral_smoothing!(
 end
 
 @kernel function spectral_smoothing_kernel!(
-    L::LowerTriangularArray,
+    L,
     @Const(c),
     @Const(power),
     @Const(eigenvalue_norm),

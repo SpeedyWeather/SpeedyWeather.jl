@@ -4,18 +4,20 @@ export AdiabaticConversion
 
 """Terms used to compute the adiabatic conversion term in the spectral model.
 Fields are: $(TYPEDFIELDS)"""
-@kwdef struct AdiabaticConversion{NF, VectorType} <: AbstractAdiabaticConversion
-    nlayers::Int
-
+@kwdef struct AdiabaticConversion{VectorType} <: AbstractAdiabaticConversion
     "σ-related factor A needed for adiabatic conversion term"
-    σ_lnp_A::VectorType = zeros(NF, nlayers)
+    σ_lnp_A::VectorType
 
     "σ-related factor B needed for adiabatic conversion term"
-    σ_lnp_B::VectorType = zeros(NF, nlayers)
+    σ_lnp_B::VectorType
 end
 
-AdiabaticConversion(SG::SpectralGrid; kwargs...) =
-    AdiabaticConversion{SG.NF, SG.VectorType}(; nlayers=SG.nlayers, kwargs...)
+Adapt.@adapt_structure AdiabaticConversion
+
+# generator function
+AdiabaticConversion(SG::SpectralGrid) = AdiabaticConversion(
+    on_architecture(SG.architecture, zeros(SG.NF, SG.nlayers)),
+    on_architecture(SG.architecture, zeros(SG.NF, SG.nlayers)))
 
 function initialize!(
     adiabatic::AdiabaticConversion,

@@ -11,6 +11,7 @@ passed on as keyword arguments, e.g. `planet=Earth(spectral_grid)`. Fields, repr
 model components, are
 $(TYPEDFIELDS)"""
 @kwdef mutable struct PrimitiveDryModel{
+    SG,     # <:SpectralGrid
     AR,     # <:AbstractArchitecture,
     GE,     # <:AbstractGeometry,
     PL,     # <:AbstractPlanet,
@@ -32,13 +33,14 @@ $(TYPEDFIELDS)"""
     AL,     # <:AbstractAlbedo,
     BL,     # <:AbstractBoundaryLayer,
     VD,     # <:AbstractVerticalDiffusion,
-    SUT,    # <:AbstractSurfaceThermodynamics,
-    SUW,    # <:AbstractSurfaceWind,
+    SC,    # <:AbstractSurfaceCondition,
+    SM,    # <:AbstractSurfaceMomentumFlux,
     SH,     # <:AbstractSurfaceHeatFlux,
     CV,     # <:AbstractConvection,
     SW,     # <:AbstractShortwave,
     LW,     # <:AbstractLongwave,
     SP,     # <:AbstractStochasticPhysics,
+    CP,     # <:AbstractParameterization,
     TS,     # <:AbstractTimeStepper,
     ST,     # <:SpectralTransform{NF},
     IM,     # <:AbstractImplicit,
@@ -46,9 +48,14 @@ $(TYPEDFIELDS)"""
     VA,     # <:AbstractVerticalAdvection,
     OU,     # <:AbstractOutput,
     FB,     # <:AbstractFeedback,
+    TS1,    # <:Tuple{Symbol}
+    TS2,    # <:Tuple{Symbol}
+    TS3,    # <:Tuple{Symbol}
+    PV,     # <:Val
+    MC,     # <:Type
 } <: PrimitiveDry
 
-    spectral_grid::SpectralGrid
+    spectral_grid::SG
     architecture::AR = spectral_grid.architecture
     
     # DYNAMICS
@@ -60,7 +67,7 @@ $(TYPEDFIELDS)"""
     geopotential::GO = Geopotential(spectral_grid)
     adiabatic_conversion::AC = AdiabaticConversion(spectral_grid)
     particle_advection::PA = nothing
-    initial_conditions::IC = InitialConditions(PrimitiveDry)
+    initial_conditions::IC = InitialConditions(spectral_grid, PrimitiveDry)
     forcing::FR = nothing
     drag::DR = nothing
 
@@ -81,13 +88,14 @@ $(TYPEDFIELDS)"""
     physics::Bool = true
     boundary_layer_drag::BL = BulkRichardsonDrag(spectral_grid)
     vertical_diffusion::VD = BulkRichardsonDiffusion(spectral_grid)
-    surface_thermodynamics::SUT = SurfaceThermodynamicsConstant(spectral_grid)
-    surface_wind::SUW = SurfaceWind(spectral_grid)
+    surface_condition::SC = SurfaceCondition(spectral_grid)
+    surface_momentum_flux::SM = SurfaceMomentumFlux(spectral_grid)
     surface_heat_flux::SH = SurfaceHeatFlux(spectral_grid)
-    convection::CV = DryBettsMiller(spectral_grid)
+    convection::CV = BettsMillerDryConvection(spectral_grid)
     shortwave_radiation::SW = TransparentShortwave(spectral_grid)
-    longwave_radiation::LW = JeevanjeeRadiation(spectral_grid)
+    longwave_radiation::LW = OneBandGreyLongwave(spectral_grid)
     stochastic_physics::SP = nothing
+    custom_parameterization::CP = nothing
     
     # NUMERICS
     time_stepping::TS = Leapfrog(spectral_grid)
@@ -100,6 +108,28 @@ $(TYPEDFIELDS)"""
     output::OU = NetCDFOutput(spectral_grid, PrimitiveDry)
     callbacks::Dict{Symbol, AbstractCallback} = Dict{Symbol, AbstractCallback}()
     feedback::FB = Feedback()
+    
+    # Tuples with symbols or instances of all parameterizations and parameter functions
+    # Used to initiliaze variables and for the column-based parameterizations
+    model_parameters::TS1 = (:class, :architecture, :time_stepping, :orography, :geopotential, :atmosphere, 
+                                :planet, :geometry, :land_sea_mask)
+    parameterizations::TS2 = (  # mixing
+                                :vertical_diffusion, :convection,
+
+                                # radiation
+                                :albedo, :shortwave_radiation, :longwave_radiation,
+
+                                # surface fluxes
+                                :boundary_layer_drag, :surface_condition, :surface_momentum_flux, :surface_heat_flux,
+
+                                # perturbations
+                                :stochastic_physics)
+    extra_parameterizations::TS3 = (:solar_zenith, :land, :ocean, :sea_ice)
+
+    # DERIVED 
+    # used to infer parameterizations at compile-time 
+    params::PV = Val(parameterizations)
+    class::MC = PrimitiveDryDummy()
 end
 
 prognostic_variables(::Type{<:PrimitiveDry}) = (:vor, :div, :temp, :pres)
@@ -141,21 +171,21 @@ function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
     initialize!(model.convection, model)
     initialize!(model.shortwave_radiation, model)
     initialize!(model.longwave_radiation, model)
-    initialize!(model.surface_thermodynamics, model)
-    initialize!(model.surface_wind, model)
+    initialize!(model.surface_condition, model)
+    initialize!(model.surface_momentum_flux, model)
     initialize!(model.surface_heat_flux, model)
     initialize!(model.stochastic_physics, model)
     initialize!(model.particle_advection, model)
 
     # allocate prognostic and diagnostic variables
-    prognostic_variables = PrognosticVariables(spectral_grid, model)
-    diagnostic_variables = DiagnosticVariables(spectral_grid, model)
+    prognostic_variables = PrognosticVariables(model)
+    diagnostic_variables = DiagnosticVariables(model)
     
     # initialize non-atmosphere prognostic variables
     (; particles, ocean, land) = prognostic_variables
-    initialize!(particles, prognostic_variables, diagnostic_variables, model)
-    initialize!(ocean,     prognostic_variables, diagnostic_variables, model)
-    initialize!(land,      prognostic_variables, diagnostic_variables, model)
+    initialize!(particles, prognostic_variables, diagnostic_variables, model.particle_advection, model)
+    initialize!(ocean,     prognostic_variables, diagnostic_variables, model.ocean, model)
+    initialize!(land,      prognostic_variables, diagnostic_variables, model.land, model)
 
     # set the initial conditions (may overwrite variables set in initialize! ocean/land)
     initialize!(prognostic_variables, model.initial_conditions, model)
@@ -166,3 +196,9 @@ function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
     # pack prognostic, diagnostic variables and model into a simulation
     return Simulation(prognostic_variables, diagnostic_variables, model)
 end
+
+function Adapt.adapt_structure(to, model::PrimitiveDryModel) 
+    adapt_fields = model.model_parameters
+    return NamedTuple{adapt_fields}(
+        adapt_structure(to, getfield(model, field)) for field in adapt_fields)
+end 

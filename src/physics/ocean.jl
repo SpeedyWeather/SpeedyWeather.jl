@@ -14,7 +14,7 @@ the following functions
     end
 
     function initialize!(
-        ocean::PrognosticVariablesOcean,
+        ocean,
         progn::PrognosticVariables,
         diagn::DiagnosticVariables,
         ocean_model::CustomOceanModel,
@@ -50,12 +50,18 @@ function Base.show(io::IO, O::AbstractOcean)
     print_fields(io, O, keys)
 end
 
+# variable that AbstractOcean requires
+variables(::AbstractOcean) =
+    (PrognosticVariable(name=:sea_surface_temperature, dims=Grid2D(),
+        namespace=:ocean, units="K", desc="Sea surface temperature"),)
+
 # function barrier for all oceans
 function initialize!(   ocean::PrognosticVariablesOcean,
                         progn::PrognosticVariables,
                         diagn::DiagnosticVariables,
-                        model::PrimitiveEquation)
-    initialize!(ocean, progn, diagn, model.ocean, model)
+                        ocean_model::AbstractOcean,
+                        model::PrimitiveEquation) where PrognosticVariablesOcean
+    initialize!(ocean, progn, diagn, ocean_model, model)
     initialize!(ocean, progn, diagn, model.sea_ice, model)
 end
 
@@ -141,7 +147,7 @@ function initialize!(
     diagn::DiagnosticVariables,
     ocean_model::SeasonalOceanClimatology,
     model::PrimitiveEquation,
-)
+) where PrognosticVariablesOcean
     timestep!(progn, diagn, ocean_model, model)
 end
 
@@ -208,10 +214,8 @@ $(TYPEDFIELDS)"""
     missing_value::Float64 = NaN
 end
 
-# generator function, just pass on kwargs
-function ConstantOceanClimatology(SG::SpectralGrid; kwargs...)
-    ConstantOceanClimatology(; kwargs...)
-end
+# generator
+ConstantOceanClimatology(SG::SpectralGrid; kwargs...) = ConstantOceanClimatology(; kwargs...)
 
 # nothing to initialize for model.ocean
 initialize!(::ConstantOceanClimatology, ::PrimitiveEquation) = nothing
@@ -223,7 +227,7 @@ function initialize!(
     diagn::DiagnosticVariables,
     ocean_model::ConstantOceanClimatology,
     model::PrimitiveEquation,
-)
+) where PrognosticVariablesOcean
     # create a seasonal model, initialize it and the variables
     (; path, file, varname, file_Grid, missing_value) = ocean_model
     (; NF, GridVariable3D, grid) = model.spectral_grid
@@ -278,7 +282,7 @@ function initialize!(
     diagn::DiagnosticVariables,
     ocean_model::AquaPlanet,
     model::PrimitiveEquation,
-)
+) where PrognosticVariablesOcean
     (; sea_surface_temperature) = ocean
     Te, Tp = ocean_model.temp_equator, ocean_model.temp_poles
     sst(λ, φ) = (Te - Tp)*cosd(φ)^2 + Tp
@@ -294,6 +298,7 @@ function timestep!(
 )
     return nothing
 end
+
 
 export SlabOcean
 
@@ -320,6 +325,20 @@ end
 # generator function
 SlabOcean(SG::SpectralGrid; kwargs...) = SlabOcean{SG.NF}(; kwargs...)
 
+function variables(::SlabOcean)
+    return (
+    PrognosticVariable(name=:sea_surface_temperature, dims=Grid2D(), namespace=:ocean, desc="Sea surface temperature", units="K"),
+    
+    DiagnosticVariable(name=:surface_shortwave_down, dims=Grid2D(), desc="Surface shortwave radiation down", units="W/m^2"),
+    DiagnosticVariable(name=:surface_shortwave_up,   dims=Grid2D(), desc="Surface shortwave radiation up over ocean", units="W/m^2", namespace=:ocean),
+    DiagnosticVariable(name=:surface_longwave_down,  dims=Grid2D(), desc="Surface longwave radiation down", units="W/m^2"),
+    DiagnosticVariable(name=:surface_longwave_up,    dims=Grid2D(), desc="Surface longwave radiation up over ocean", units="W/m^2", namespace=:ocean),
+
+    DiagnosticVariable(name=:surface_humidity_flux,      dims=Grid2D(), desc="Surface humidity flux", units="kg/s/m^2", namespace=:ocean),
+    DiagnosticVariable(name=:surface_sensible_heat_flux, dims=Grid2D(), desc="Surface sensible heat flux", units="kg/s/m^2", namespace=:ocean),
+    ) 
+end
+
 # nothing to initialize for SlabOcean
 initialize!(ocean_model::SlabOcean, model::PrimitiveEquation) = nothing
 
@@ -330,7 +349,7 @@ function initialize!(
     diagn::DiagnosticVariables,
     ocean_model::SlabOcean,
     model::PrimitiveEquation,
-)
+) where PrognosticVariablesOcean
     # create a seasonal model, initialize it and the variables
     seasonal_model = SeasonalOceanClimatology(model.spectral_grid)
     initialize!(seasonal_model, model)
@@ -338,10 +357,11 @@ function initialize!(
     # (seasonal model will be garbage collected hereafter)
 
     # set land "sst" points (100% land only)
-    masked_value = ocean_model.land_temperature
     if ocean_model.mask
-        sst = progn.ocean.sea_surface_temperature
-        progn.ocean.sea_surface_temperature[isnan.(sst)] .= masked_value
+        masked_value = ocean_model.land_temperature
+        sst = progn.ocean.sea_surface_temperature.data
+        # TODO: broadcasting over views of Fields of GPUArrays doesn't work
+        sst[isnan.(sst)] .= masked_value
         mask!(progn.ocean.sea_surface_temperature, model.land_sea_mask, :land; masked_value)
     end
 end
@@ -361,24 +381,25 @@ function timestep!(
 
     (; mask) = model.land_sea_mask
 
-    # Frierson et al. 2006, eq (1)
+    # Frierson et al. 2006, eq (1), all W/m² except humidity flux in kg/m²/s
     Rsd = diagn.physics.surface_shortwave_down          # before albedo
     Rsu = diagn.physics.ocean.surface_shortwave_up      # reflected from albedo
     Rld = diagn.physics.surface_longwave_down
     Rlu = diagn.physics.ocean.surface_longwave_up
-    Ev = diagn.physics.ocean.surface_humidity_flux
     S = diagn.physics.ocean.sensible_heat_flux
+    H = diagn.physics.ocean.surface_humidity_flux       # [kg/m²/s]
+
+    params = (; Δt_C₀, Lᵥ)                              # pack into NamedTuple for kernel
 
     launch!(architecture(sst), LinearWorkOrder, size(sst), slab_ocean_kernel!,
-        sst, mask, Rsd, Rsu, Rld, Rlu, Ev, S, Δt_C₀, Lᵥ)
-
+        sst, mask, Rsd, Rsu, Rld, Rlu, H, S, params)
     return nothing
 end
 
-@kernel inbounds=true function slab_ocean_kernel!(sst, mask, Rsd, Rsu, Rld, Rlu, Ev, S, Δt_C₀, Lᵥ)
+@kernel inbounds=true function slab_ocean_kernel!(sst, mask, Rsd, Rsu, Rld, Rlu, H, S, params)
     ij = @index(Global, Linear)         # every grid point ij
-
     if mask[ij] < 1                     # at least partially ocean
-        sst[ij] += Δt_C₀*(Rsd[ij] - Rsu[ij] - Rlu[ij] + Rld[ij] - Lᵥ*Ev[ij] - S[ij])
+        (; Δt_C₀, Lᵥ) = params
+        sst[ij] += Δt_C₀*(Rsd[ij] - Rsu[ij] - Rlu[ij] + Rld[ij] - Lᵥ*H[ij] - S[ij])
     end
 end

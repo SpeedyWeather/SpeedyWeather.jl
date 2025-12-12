@@ -29,7 +29,7 @@ end
 # A version of the generic fallback from FiniteDifferences that excludes some of the fields 
 # that we don't want to be varied for our big data structures 
 # also replaces NaNs that are expected in land and ocean variables
-function FiniteDifferences.to_vec(x::T) where {T <: Union{PrognosticVariables, PrognosticVariablesOcean, PrognosticVariablesLand, DiagnosticVariables, Tendencies, GridVariables, DynamicsVariables, PhysicsVariables, ParticleVariables}}
+function FiniteDifferences.to_vec(x::T) where {T <: Union{PrognosticVariables, DiagnosticVariables, Tendencies, GridVariables, DynamicsVariables, ParticleVariables}}
 
     excluded_fields_pre, included_fields, excluded_fields_post = determine_included_fields(T)
 
@@ -56,7 +56,7 @@ function determine_included_fields(T::Type)
     names = fieldnames(T)
 
     included_field_types = Union{SpeedyWeather.AbstractDiagnosticVariables, 
-    SpeedyWeather.AbstractPrognosticVariables, SpeedyWeather.ColumnVariables,
+    SpeedyWeather.AbstractPrognosticVariables,
     NTuple, Dict{Symbol, <:Tuple}, Dict{Symbol, <:AbstractArray}, AbstractArray}
 
     excluded_fields_pre = []
@@ -79,7 +79,7 @@ function determine_included_fields(T::Type)
 end 
 
 # in the ocean and land variables we have NaNs, FiniteDifferences can't deal with those, so we replace them
-function replace_NaN(x_type::T, vec) where {T <: Union{PrognosticVariablesOcean, PrognosticVariablesLand, PhysicsVariables}}
+function replace_NaN(x_type::T, vec) where {T <: NamedTuple}
     nan_indices = isnan.(vec)
     vec[nan_indices] .= 0 
     return vec

@@ -13,7 +13,7 @@ characteristics. Note that `radius` is not part of it as this should be chosen
 in `SpectralGrid`. Keyword arguments are
 $(TYPEDFIELDS)
 """
-@parameterized @kwdef mutable struct Earth{NF<:AbstractFloat} <: AbstractPlanet
+@parameterized @kwdef struct Earth{NF<:AbstractFloat} <: AbstractPlanet
 
     "Earth's radius [m]"
     @param radius::NF = DEFAULT_RADIUS
@@ -45,6 +45,8 @@ $(TYPEDFIELDS)
     "Total solar irradiance at the distance of 1 AU [W/m²]"
     @param solar_constant::NF = 1365 (bounds=Nonnegative,)
 end
+
+Adapt.@adapt_structure Earth
 
 Earth(SG::SpectralGrid; kwargs...) = Earth{SG.NF}(; kwargs...)
 Earth(::Type{NF}; kwargs...) where NF = Earth{NF}(; kwargs...)
