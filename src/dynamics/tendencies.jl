@@ -436,7 +436,7 @@ function vordiv_tendencies!(
     launch!(
         arch, RingGridWorkOrder, size(u_tend_grid), _vordiv_tendencies_kernel!,
         u_tend_grid, v_tend_grid, u_grid, v_grid, vor_grid, temp_grid, humid_grid,
-        ∇lnp_x, ∇lnp_y, f, coslat⁻¹, whichring, R_dry
+        Tₖ, ∇lnp_x, ∇lnp_y, f, coslat⁻¹, whichring, R_dry
     )
 
     # divergence and curl of that u, v_tend vector for vor, div tendencies
@@ -462,6 +462,7 @@ end
         humid_grid,             # Input: humidity
         ∇lnp_x,                 # Input: zonal gradient of log surface pressure
         ∇lnp_y,                 # Input: meridional gradient of log surface pressure
+        Tₖ,                     # Input: reference temperature profile
         @Const(f),              # Input: coriolis parameter
         @Const(coslat⁻¹),       # Input: 1/cos(latitude) for scaling
         @Const(whichring),      # Input: mapping from grid point to latitude ring
