@@ -71,26 +71,42 @@ function geopotential!(
     A = model isa PrimitiveWet ? model.atmosphere : nothing
 
     arch = architecture(temp)
-    launch!(arch, RingGridWorkOrder, (size(temp, 1),), geopotential_kernel!, geopotential, temp, humid, orography, g, G, A)
+
+    if typeof(arch) <: GPU
+        launch!(arch, LinearWorkOrder, size(temp, 1), geopotential_kernel!, geopotential, temp, humid, orography, g, G, A)
+    else 
+        geopotential_cpu!(geopotential, temp, humid, orography, g, G, A)
+    end 
 end
 
-@kernel inbounds=true function geopotential_kernel!(geopotential, temp, humid, orography, gravity, Geopotential, atmosphere)
-    ij = @index(Global, Linear)
-
+function geopotential_cpu!(geopotential, temp, humid, orography, gravity, Geopotential, atmosphere)
     nlayers = size(temp, 2)
-    (; Δp_geopot_half, Δp_geopot_full) = Geopotential  # = R*Δlnp on half or full levels
+    @inbounds for lm in eachharmonic(temp)
+        geopotential_compute!(lm, geopotential, temp, humid, orography, gravity, Geopotential.Δp_geopot_half, Geopotential.Δp_geopot_full, nlayers, atmosphere)
+    end
+end 
 
+@kernel function geopotential_kernel!(geopotential, temp, humid, orography, gravity, Geopotential, atmosphere)
+    ij = @index(Global, Linear)
+    nlayers = size(temp, 2)
+
+    @inbounds geopotential_compute!(ij, geopotential, temp, humid, orography, gravity, Geopotential.Δp_geopot_half, Geopotential.Δp_geopot_full, nlayers, atmosphere)
+end
+
+@propagate_inbounds function geopotential_compute!(ij, geopotential, temp, humid, orography, gravity, Δp_geopot_half, Δp_geopot_full, nlayers, atmosphere)
     # bottom layer
     Tᵥ = virtual_temperature(temp[ij, nlayers], humid[ij, nlayers], atmosphere)
     geopotential[ij, nlayers] = gravity*orography[ij] + Tᵥ*Δp_geopot_full[nlayers]
 
     # OTHER FULL LAYERS, integrate two half-layers from bottom to top
-    @inbounds for k in nlayers-1:-1:1
+    for k in nlayers-1:-1:1
         Tᵥ_below = Tᵥ
         Tᵥ = virtual_temperature(temp[ij, k], humid[ij, k], atmosphere)
         geopotential[ij, k] = geopotential[ij, k+1] + Tᵥ_below*Δp_geopot_half[k+1] + Tᵥ*Δp_geopot_full[k]
     end
 end
+
+
 
 """
 $(TYPEDSIGNATURES)
