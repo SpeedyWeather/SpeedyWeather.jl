@@ -487,7 +487,7 @@ end
     # Step 1: Move implicit terms of temperature equation from time step i to i-1
     # RHS_expl(Vⁱ) + RHS_impl(Vⁱ⁻¹) = RHS(Vⁱ) + RHS_impl(Vⁱ⁻¹ - Vⁱ)
     for k in 1:nlayers
-        temp_tend_val = 0 * temp_tend[lm, k]
+        temp_tend_val = zero(eltype(temp_tend))
         for r in 1:nlayers
             temp_tend_val += L[k, r] * (div_old[lm, r] - div_new[lm, r])
         end
@@ -496,7 +496,7 @@ end
 
     for k in 1:nlayers
         # skip 1:k-1 as integration is surface to k
-        geopotential_val = 0 * geopotential[lm, k]
+        geopotential_val = zero(eltype(geopotential))
         for r in k:nlayers
             geopotential_val += R[k, r] * temp_tend[lm, r]
         end
@@ -516,7 +516,7 @@ end
         
     # Step 4: Now solve δD = S⁻¹G to correct divergence tendency
     for k in 1:nlayers
-        div_val = 0 * div_tend[lm, k]
+        div_val = zero(eltype(div_tend))
         for r in 1:nlayers
             div_val += S⁻¹[l, k, r] * G[lm, r]
         end
@@ -527,7 +527,7 @@ end
         
     # Step 5a: Temperature correction δT = G_T + ξLδD
     for k in 1:nlayers
-        temp_correction = 0 * temp_tend[lm, k]
+        temp_correction = zero(eltype(temp_tend))
         for r in 1:nlayers
             temp_correction += ξ * L[k, r] * div_tend[lm, r]
         end
@@ -535,7 +535,7 @@ end
     end
         
     # Step 5b: Pressure correction δlnpₛ = G_lnpₛ + ξWδD
-    pres_correction = 0 * pres_tend[lm]
+    pres_correction = zero(eltype(pres_tend))
     for k in 1:nlayers
         pres_correction += ξ * W[k] * div_tend[lm, k]
     end
@@ -552,7 +552,7 @@ end
     
     # Move implicit terms of temperature equation from time step i to i-1
     # RHS_expl(Vⁱ) + RHS_impl(Vⁱ⁻¹) = RHS(Vⁱ) + RHS_impl(Vⁱ⁻¹ - Vⁱ)
-    temp_correction = 0 * temp_tend[I]
+    temp_correction = zero(eltype(temp_tend))
     for r in 1:nlayers
         temp_correction += L[k, r] * (div_old[lm, r] - div_new[lm, r])
     end
@@ -561,7 +561,7 @@ end
     # Calculate the ξ*R*G_T term, vertical integration of geopotential
     # (excl ξ, this is done in kernel 2)
     # skip 1:k-1 as integration is surface to k
-    geopotential_val = 0 * geopotential[I]
+    geopotential_val = zero(eltype(geopotential))
     for r in k:nlayers
         geopotential_val += R[k, r] * temp_tend[lm, r]
     end
@@ -597,7 +597,7 @@ end
     
     # Skip out-of-bounds modes
     # Now solve δD = S⁻¹G to correct divergence tendency
-    sum_val = 0 * div_tend[lm, k]
+    sum_val = zero(eltype(div_tend))
     for r in 1:nlayers
         sum_val += S⁻¹[l, k, r] * G[lm, r]
     end
@@ -612,7 +612,7 @@ end
     
     # Semi implicit correction for temperature
     # δT = G_T + ξLδD
-    temp_correction = 0 * temp_tend[lm, k]
+    temp_correction = zero(eltype(temp_tend))
     for r in 1:nlayers
         temp_correction += ξ * L[k, r] * div_tend[lm, r]
     end
@@ -628,7 +628,7 @@ end
     # Semi implicit correction for pressure
     # δlnpₛ = G_lnpₛ + ξWδD
     # Accumulate contributions from all layers for this spectral mode
-    pres_correction = 0 * pres_tend[lm]
+    pres_correction = zero(eltype(pres_tend))
     for k in 1:nlayers
         pres_correction += ξ * W[k] * div_tend[lm, k]
     end
