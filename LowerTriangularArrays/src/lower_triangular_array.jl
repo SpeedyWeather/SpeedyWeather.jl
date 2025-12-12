@@ -549,21 +549,32 @@ function Base.copyto!(
     @boundscheck maximum(ls) <= lmax || throw(BoundsError)
     @boundscheck maximum(ms) <= mmax || throw(BoundsError)
 
-    spectrum = L1.spectrum
     arch = architecture(L1)
 
-    launch!(arch, SpectralWorkOrder, size(L1), _copyto_kernel!, L1, L2, minimum(ls), maximum(ls), minimum(ms), maximum(ms), spectrum.l_indices, spectrum.m_indices)
+    launch!(arch, SpectralWorkOrder, size(L1), _copyto_kernel!, L1, L2, minimum(ls), maximum(ls), minimum(ms), maximum(ms), spectrum.l_indices, spectrum.m_indices, lmax_L2)
 
     return L1
 end
 
-@kernel inbounds=true function _copyto_kernel!(L1, L2, l_min, l_max, m_min, m_max, l_indices, m_indices)
+# n-dim kernel 
+@kernel inbounds=true function _copyto_kernel!(L1, L2, l_min, l_max, m_min, m_max, l_indices, m_indices, l_max_L2)
+    I = @index(Global, NTuple) 
+    l = l_indices[I[1]]
+    m = m_indices[I[1]]
+
+    if (l_min <= l <= l_max) && (m_min <= m <= m_max)
+        L1[I] = L2[lm2i(l, m, l_max_L2), I[2:end]] # convert indices here because L2 is different size
+    end 
+end 
+
+# version for 2D arrays/vectors
+@kernel inbounds=true function _copyto_kernel!(L1::AbstractVector, L2::AbstractVector, l_min, l_max, m_min, m_max, l_indices, m_indices, l_max_L2)
     I = @index(Global, Cartesian) 
     l = l_indices[I[1]]
     m = m_indices[I[1]]
 
     if (l_min <= l <= l_max) && (m_min <= m <= m_max)
-        L1[I] = L2[I]
+        L1[I] = L2[lm2i(l, m, l_max_L2)]
     end 
 end 
 
