@@ -81,8 +81,8 @@ end
 
 function geopotential_cpu!(geopotential, temp, humid, orography, gravity, Geopotential, atmosphere)
     nlayers = size(temp, 2)
-    @inbounds for lm in eachharmonic(temp)
-        geopotential_compute!(lm, geopotential, temp, humid, orography, gravity, Geopotential.Δp_geopot_half, Geopotential.Δp_geopot_full, nlayers, atmosphere)
+    @inbounds for ij in eachgridpoint(geopotential)
+        geopotential_compute!(ij, geopotential, temp, humid, orography, gravity, Geopotential.Δp_geopot_half, Geopotential.Δp_geopot_full, nlayers, atmosphere)
     end
 end 
 
