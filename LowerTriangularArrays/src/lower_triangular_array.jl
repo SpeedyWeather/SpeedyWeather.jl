@@ -538,87 +538,46 @@ function Base.copyto!(
     return L1
 end
 
-# CPU version
-function Base.copyto!(  
-    L1::LowerTriangularArray{T,N,ArrayType1,SP1},   # copy to L1
-    L2::LowerTriangularArray{S,N,ArrayType2,SP2},   # copy from L2
-    ls::AbstractUnitRange,                      # range of indices in 1st dim
-    ms::AbstractUnitRange,                      # range of indices in 2nd dim
-) where {T, S, N, SP1 <: AbstractSpectrum, SP2 <: AbstractSpectrum, ArrayType1<:Array{T,N}, ArrayType2<:Array{S,N}}
+function Base.copyto!(
+    L1::LowerTriangularArray,
+    L2::LowerTriangularArray,
+    ls::AbstractUnitRange,
+    ms::AbstractUnitRange
+) 
 
     lmax, mmax = size(L2; as=Matrix)            # use the size of L2 for boundscheck
     @boundscheck maximum(ls) <= lmax || throw(BoundsError)
     @boundscheck maximum(ms) <= mmax || throw(BoundsError)
 
-    lmax, mmax = size(L1; as=Matrix)            # but the size of L1 to loop
-    lm = 0
-    @inbounds for m in 1:mmax
-        for l in m:lmax
-            lm += 1
-            L1[lm,[Colon() for i=1:(N-1)]...] = (l in ls) && (m in ms) ?
-                                                T.(L2[l, m, [Colon() for i=1:(N-1)]...]) :
-                                                L1[lm, [Colon() for i=1:(N-1)]...]
-        end
-    end
+    arch = architecture(L1)
+    spectrum = L1.spectrum 
+
+    launch!(arch, SpectralWorkOrder, size(L1), _copyto_kernel!, L1.data, L2.data, minimum(ls), maximum(ls), minimum(ms), maximum(ms), spectrum.l_indices, spectrum.m_indices, lmax)
 
     return L1
-end 
-
-# Fallback / GPU version (the two versions _copyto! and copyto! are there to enable tests of this function with regular Arrays)
-function Base.copyto!(
-    L1::LowerTriangularArray{T, N, ArrayType1, SP1},
-    L2::LowerTriangularArray{S, N, ArrayType2, SP2},
-    ls::AbstractUnitRange,
-    ms::AbstractUnitRange
-) where {T, S, N, SP1 <: AbstractSpectrum, SP2 <: AbstractSpectrum, ArrayType1<:AbstractArray{T}, ArrayType2<:AbstractArray{S}}
-    return _copyto_core!(L1, L2, ls, ms)
 end
 
-function _copyto_core!( 
-    L1::LowerTriangularArray{T,N,ArrayType1,SP1},   # copy to L1
-    L2::LowerTriangularArray{S,N,ArrayType2,SP2},   # copy from L2
-    ls::AbstractUnitRange,                      # range of indices in 1st dim
-    ms::AbstractUnitRange,                      # range of indices in 2nd dim
-) where {T, S, N, SP1 <: AbstractSpectrum, SP2 <: AbstractSpectrum, ArrayType1<:AbstractArray{T}, ArrayType2<:AbstractArray{S}}
+# n-dim kernel 
+@kernel inbounds=true function _copyto_kernel!(L1, L2, l_min, l_max, m_min, m_max, l_indices, m_indices, l_max_L2)
+    I = @index(Global, NTuple) 
+    l = l_indices[I[1]]
+    m = m_indices[I[1]]
 
-    lmax_2, mmax_2 = size(L2, as=Matrix)     # use the size of L2 for boundscheck
-    @boundscheck maximum(ls) <= lmax_2 || throw(BoundsError)
-    @boundscheck maximum(ms) <= mmax_2 || throw(BoundsError)
-
-    lmax_1, mmax_1 = size(L1, as=Matrix)
-
-    # we'll setup the 1D-indices that correspond to the given range here
-    ind_L1 = lowertriangle_indices(lmax_1, mmax_1)
-    ind_L1_smaller = deepcopy(ind_L1) # threshold the lower triangular based on the ls and ms
-    if maximum(ls) < lmax_1 # threshold L1 based on ls 
-        ind_L1_smaller[ls[end]+1:end, :] .= 0
+    if (l_min <= l <= l_max) && (m_min <= m <= m_max)
+        L1[I...] = L2[lm2i(l, m, l_max_L2), I[2:end]...] # convert indices here because L2 is different size
     end 
-    if maximum(ms) < mmax_1 # threshold L1 based on ms
-        ind_L1_smaller[:, ms[end]+1:end] .= 0 
-    end 
-    ind_L1 = ind_L1_smaller[ind_L1] # also flattens the indices into indices for the L1.data array
-
-    ind_L2 = lowertriangle_indices(lmax_2, mmax_2)
-    ind_L2_smaller = deepcopy(ind_L2) # threshold the lower triangular based on the ls and ms and L1,L2
-    if maximum(ls) > lmax_1 # so that L2 can fit into L1 
-        ind_L2_smaller[lmax_1+1:end, :] .= 0 
-    end 
-    if maximum(ls) < lmax_2 # threshold L2 based on ls
-        ind_L2_smaller[ls[end]+1:end, :] .= 0
-    end 
-    if maximum(ms) > mmax_1 # so that L2 can fit into L1 
-        ind_L2_smaller[:, mmax_1+1:end] .= 0 
-    end
-    if maximum(ms) < mmax_2 # threshold L2 based on ms
-        ind_L2_smaller[:, ms[end]+1:end] .= 0 
-    end 
-    ind_L2 = ind_L2_smaller[ind_L2] # also flattens the indices into indices for the L2.data array
-
-    L1.data[ind_L1,[Colon() for i=1:(N-1)]...] = T.(L2.data[ind_L2,[Colon() for i=1:(N-1)]...])
-
-    return L1
 end 
 
+# version for 2D arrays/vectors
+@kernel inbounds=true function _copyto_kernel!(L1::AbstractVector, L2::AbstractVector, l_min, l_max, m_min, m_max, l_indices, m_indices, l_max_L2)
+    I = @index(Global, Linear) 
+    l = l_indices[I]
+    m = m_indices[I]
+
+    if (l_min <= l <= l_max) && (m_min <= m <= m_max)
+        L1[I] = L2[lm2i(l, m, l_max_L2)]
+    end 
+end 
 
 # copyto! using matrix indexing from Matrix/Array
 function Base.copyto!(  L::LowerTriangularArray{T},  # copy to L
