@@ -569,7 +569,7 @@ end
 
 # version for 2D arrays/vectors
 @kernel inbounds=true function _copyto_kernel!(L1::AbstractVector, L2::AbstractVector, l_min, l_max, m_min, m_max, l_indices, m_indices, l_max_L2)
-    I = @index(Global, Cartesian) 
+    I = @index(Global, NTuple) 
     l = l_indices[I[1]]
     m = m_indices[I[1]]
 
