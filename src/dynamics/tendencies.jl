@@ -344,7 +344,7 @@ function surface_pressure_tendency!(
     # for semi-implicit div_mean is calc at time step i-1 in vertical_integration!
     @. pres_tend -= ūv̄∇lnpₛ + div_mean      # add the -div_mean term in spectral, swap sign
 
-    pres_tend[1:1] .= 0                        # for mass conservation
+    pres_tend.data[1:1] .= 0                # for mass conservation
     return nothing
 end
 
@@ -374,13 +374,14 @@ function vertical_velocity!(
     # Hoskins and Simmons, 1975 just before eq. (6)
     Δσₖ = view(σ_levels_thick, 1:(nlayers - 1))'
     σₖ_half = view(σ_levels_half, 2:nlayers)'
-    σ_tend[:, 1:(nlayers - 1)] .= σₖ_half .* (div_mean_grid .+ ūv̄∇lnp) .-
-        (div_sum_above[:, 1:(nlayers - 1)] .+ Δσₖ .* div_grid[:, 1:(nlayers - 1)]) .-
-        (uv∇lnp_sum_above[:, 1:(nlayers - 1)] .+ Δσₖ .* uv∇lnp[:, 1:(nlayers - 1)])
+    # TODO: broadcast issue here, that's why the .data are neeeded
+    σ_tend.data[:, 1:(nlayers - 1)] .= σₖ_half .* (div_mean_grid.data .+ ūv̄∇lnp.data) .-
+        (div_sum_above.data[:, 1:(nlayers - 1)] .+ Δσₖ .* div_grid.data[:, 1:(nlayers - 1)]) .-
+        (uv∇lnp_sum_above.data[:, 1:(nlayers - 1)] .+ Δσₖ .* uv∇lnp.data[:, 1:(nlayers - 1)])
 
     # mass flux σ̇ is zero at k=1/2 (not explicitly stored) and k=nlayers+1/2 (stored in layer k)
     # set to zero for bottom layer then
-    σ_tend[:, nlayers] .= 0
+    σ_tend.data[:, nlayers] .= 0
     return nothing
 end
 
@@ -437,7 +438,7 @@ function vordiv_tendencies!(
     launch!(
         arch, RingGridWorkOrder, size(u_tend_grid), _vordiv_tendencies_kernel!,
         u_tend_grid, v_tend_grid, u_grid, v_grid, vor_grid, temp_grid, humid_grid,
-        Tₖ, ∇lnp_x, ∇lnp_y, f, coslat⁻¹, whichring, R_dry
+        Tₖ, ∇lnp_x, ∇lnp_y, f, coslat⁻¹, whichring, atmosphere.μ_virt_temp, R_dry
     )
 
     # divergence and curl of that u, v_tend vector for vor, div tendencies
@@ -467,6 +468,7 @@ end
         @Const(f),              # Input: coriolis parameter
         @Const(coslat⁻¹),       # Input: 1/cos(latitude) for scaling
         @Const(whichring),      # Input: mapping from grid point to latitude ring
+        μ_virt_temp,             # Input: virtual temparture calc const
         R_dry,                  # Input: dry gas constant
     )
     ij, k = @index(Global, NTuple)
@@ -477,7 +479,7 @@ end
     ω = vor_grid[ij, k] + f_j                   # absolute vorticity
 
     # compute virtual temperature on the fly, temp_grid is anomaly
-    Tᵥ = virtual_temperature(temp_grid[ij, k] + Tₖ[k], humid_grid[ij, k], atmosphere)
+    Tᵥ = virtual_temperature(temp_grid[ij, k] + Tₖ[k], humid_grid[ij, k], μ_virt_temp)
     RTᵥ = R_dry*(Tᵥ - Tₖ[k])                        # dry gas constant * virtual temperature anomaly
 
     u_tend_grid[ij, k] = (u_tend_grid[ij, k] + v_grid[ij, k] * ω - RTᵥ * ∇lnp_x[ij]) * coslat⁻¹j
@@ -560,7 +562,7 @@ function temperature_tendency!(
     launch!(
         arch, RingGridWorkOrder, size(temp_tend_grid), _temperature_tendency_kernel!,
         temp_tend_grid, temp_grid, div_grid, humid_grid, div_sum_above, uv∇lnp_sum_above,
-        uv∇lnp, temp_profile, adiabatic_conversion.σ_lnp_A, adiabatic_conversion.σ_lnp_B, κ
+        uv∇lnp, temp_profile, adiabatic_conversion.σ_lnp_A, adiabatic_conversion.σ_lnp_B, atmosphere.μ_virt_temp, κ
     )
 
     transform!(temp_tend, temp_tend_grid, scratch_memory, S)
@@ -584,7 +586,8 @@ end
         @Const(temp_profile),   # Input: reference temperature profile
         @Const(σ_lnp_A),        # Input: adiabatic conversion coefficient A
         @Const(σ_lnp_B),        # Input: adiabatic conversion coefficient B
-        κ,             # Input: thermodynamic kappa = R_Dry/heat_capacity
+        μ_virt_temp,            # Input: virtual temperature calc const
+        κ,                      # Input: thermodynamic kappa = R_Dry/heat_capacity
     )
     ij, k = @index(Global, NTuple)
     Tₖ = temp_profile[k]    # average layer temperature from reference profile
@@ -597,7 +600,7 @@ end
     # += as tend already contains parameterizations + vertical advection
 
     # TODO use dispatch to simplify calculation for dry core where Tᵥ = T
-    Tᵥ = virtual_temperature(temp_grid[ij, k] + Tₖ, humid_grid[ij, k], atmosphere)
+    Tᵥ = virtual_temperature(temp_grid[ij, k] + Tₖ, humid_grid[ij, k], μ_virt_temp)
 
     temp_tend_grid[ij, k] +=
         temp_grid[ij, k] * div_grid[ij, k] +            # +T'D term of hori advection

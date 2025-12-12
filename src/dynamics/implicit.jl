@@ -461,7 +461,7 @@ function implicit_correction_lm_only!(
     lm_size = size(pres_tend, 1)
     launch!(arch, LinearWorkOrder, (lm_size,),
             implicit_primitive_single_kernel!,
-            temp_tend, pres_tend, div_tend, G, geopot,
+            temp_tend, pres_tend, div_tend, G, geopotential,
             div_old, div_new, S⁻¹, R, U, L, W, l_indices, ξ, nlayers)
 
     zero_last_degree!(div_tend)
@@ -487,7 +487,7 @@ end
     # Step 1: Move implicit terms of temperature equation from time step i to i-1
     # RHS_expl(Vⁱ) + RHS_impl(Vⁱ⁻¹) = RHS(Vⁱ) + RHS_impl(Vⁱ⁻¹ - Vⁱ)
     for k in 1:nlayers
-        temp_tend_val = zero(eltype(temp_tend))
+        temp_tend_val = 0 * temp_tend[lm, k]
         for r in 1:nlayers
             temp_tend_val += L[k, r] * (div_old[lm, r] - div_new[lm, r])
         end
@@ -496,7 +496,7 @@ end
 
     for k in 1:nlayers
         # skip 1:k-1 as integration is surface to k
-        geopotential_val = zero(eltype(geopot))
+        geopotential_val = 0 * geopotential[lm, k]
         for r in k:nlayers
             geopotential_val += R[k, r] * temp_tend[lm, r]
         end
@@ -511,12 +511,12 @@ end
     # Step 3: Calculate the G = G_D + ξRG_T + ξUG_lnps terms
     # ∇² not part of U so *eigenvalues here
     for k in 1:nlayers
-        G[lm, k] = div_tend[lm, k] + ξ*eigenvalue*(U[k]*pres_tend[lm] + geopot[lm, k])
+        G[lm, k] = div_tend[lm, k] + ξ*eigenvalue*(U[k]*pres_tend[lm] + geopotential[lm, k])
     end
         
     # Step 4: Now solve δD = S⁻¹G to correct divergence tendency
     for k in 1:nlayers
-        div_val = zero(eltype(div_tend))
+        div_val = 0 * div_tend[lm, k]
         for r in 1:nlayers
             div_val += S⁻¹[l, k, r] * G[lm, r]
         end
@@ -527,7 +527,7 @@ end
         
     # Step 5a: Temperature correction δT = G_T + ξLδD
     for k in 1:nlayers
-        temp_correction = zero(eltype(temp_tend))
+        temp_correction = 0 * temp_tend[lm, k]
         for r in 1:nlayers
             temp_correction += ξ * L[k, r] * div_tend[lm, r]
         end
@@ -535,7 +535,7 @@ end
     end
         
     # Step 5b: Pressure correction δlnpₛ = G_lnpₛ + ξWδD
-    pres_correction = zero(eltype(pres_tend))
+    pres_correction = 0 * pres_tend[lm]
     for k in 1:nlayers
         pres_correction += ξ * W[k] * div_tend[lm, k]
     end
@@ -552,7 +552,7 @@ end
     
     # Move implicit terms of temperature equation from time step i to i-1
     # RHS_expl(Vⁱ) + RHS_impl(Vⁱ⁻¹) = RHS(Vⁱ) + RHS_impl(Vⁱ⁻¹ - Vⁱ)
-    temp_correction = zero(eltype(temp_tend))
+    temp_correction = 0 * temp_tend[I]
     for r in 1:nlayers
         temp_correction += L[k, r] * (div_old[lm, r] - div_new[lm, r])
     end
@@ -561,7 +561,7 @@ end
     # Calculate the ξ*R*G_T term, vertical integration of geopotential
     # (excl ξ, this is done in kernel 2)
     # skip 1:k-1 as integration is surface to k
-    geopotential_val = zero(eltype(geopot))
+    geopotential_val = 0 * geopotential[I]
     for r in k:nlayers
         geopotential_val += R[k, r] * temp_tend[lm, r]
     end
@@ -571,7 +571,7 @@ end
 
 # Kernel 2: Calculate G (must complete before kernel 3)
 @kernel inbounds=true function implicit_calculate_G_kernel!(
-    G, div_tend, geopot, pres_tend, U, l_indices, ξ,
+    G, div_tend, geopotential, pres_tend, U, l_indices, ξ,
 )
     lm, k = @index(Global, NTuple)
  
@@ -581,9 +581,9 @@ end
     # Skip out-of-bounds modes
     eigenvalue = -l*(l-1)  # 1-based, -l*(l+1) → -l*(l-1)
     
-    # Calculate the G = G_D + ξRG_T + ξUG_lnps terms using geopot from kernel 1
+    # Calculate the G = G_D + ξRG_T + ξUG_lnps terms using geopotential from kernel 1
     # ∇² not part of U so *eigenvalues here
-    G[lm, k] = div_tend[lm, k] + ξ*eigenvalue*(U[k]*pres_tend[lm] + geopot[lm, k])
+    G[lm, k] = div_tend[lm, k] + ξ*eigenvalue*(U[k]*pres_tend[lm] + geopotential[lm, k])
 end
 
 # Kernel 3: Solve for divergence δD = S⁻¹G
@@ -597,7 +597,7 @@ end
     
     # Skip out-of-bounds modes
     # Now solve δD = S⁻¹G to correct divergence tendency
-    sum_val = zero(eltype(div_tend))
+    sum_val = 0 * div_tend[lm, k]
     for r in 1:nlayers
         sum_val += S⁻¹[l, k, r] * G[lm, r]
     end
@@ -612,7 +612,7 @@ end
     
     # Semi implicit correction for temperature
     # δT = G_T + ξLδD
-    temp_correction = zero(eltype(temp_tend))
+    temp_correction = 0 * temp_tend[lm, k]
     for r in 1:nlayers
         temp_correction += ξ * L[k, r] * div_tend[lm, r]
     end
@@ -628,7 +628,7 @@ end
     # Semi implicit correction for pressure
     # δlnpₛ = G_lnpₛ + ξWδD
     # Accumulate contributions from all layers for this spectral mode
-    pres_correction = zero(eltype(pres_tend))
+    pres_correction = 0 * pres_tend[lm]
     for k in 1:nlayers
         pres_correction += ξ * W[k] * div_tend[lm, k]
     end

@@ -129,7 +129,8 @@ function geopotential!(
     # note these are not anomalies here as they are only in grid-point fields
     
     # BOTTOM FULL LAYER
-    geopot[:, nlayers] .= geopot_surf .+ temp_virt[:, nlayers] .* Δp_geopot_full[nlayers]
+    # TODO: broadcasting with LTA issue here
+    geopot.data[:, nlayers] .= geopot_surf.data .+ temp_virt.data[:, nlayers] .* Δp_geopot_full[nlayers:nlayers]
 
     # OTHER FULL LAYERS, integrate two half-layers from bottom to top
     arch = architecture(geopot)
