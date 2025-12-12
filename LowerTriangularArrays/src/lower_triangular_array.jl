@@ -550,8 +550,9 @@ function Base.copyto!(
     @boundscheck maximum(ms) <= mmax || throw(BoundsError)
 
     arch = architecture(L1)
+    spectrum = L1.spectrum 
 
-    launch!(arch, SpectralWorkOrder, size(L1), _copyto_kernel!, L1, L2, minimum(ls), maximum(ls), minimum(ms), maximum(ms), spectrum.l_indices, spectrum.m_indices, lmax_L2)
+    launch!(arch, SpectralWorkOrder, size(L1), _copyto_kernel!, L1.data, L2.data, minimum(ls), maximum(ls), minimum(ms), maximum(ms), spectrum.l_indices, spectrum.m_indices, lmax)
 
     return L1
 end
@@ -563,7 +564,7 @@ end
     m = m_indices[I[1]]
 
     if (l_min <= l <= l_max) && (m_min <= m <= m_max)
-        L1[I] = L2[lm2i(l, m, l_max_L2), I[2:end]] # convert indices here because L2 is different size
+        L1[I] = L2[lm2i(l, m, l_max_L2), I[2:end]...] # convert indices here because L2 is different size
     end 
 end 
 
