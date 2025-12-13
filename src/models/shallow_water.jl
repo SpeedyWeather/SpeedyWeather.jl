@@ -37,7 +37,7 @@ $(TYPEDFIELDS)"""
     # DYNAMICS
     geometry::GE = Geometry(spectral_grid)
     planet::PL = Earth(spectral_grid)
-    atmosphere::AT = EarthAtmosphere(spectral_grid)
+    atmosphere::AT = EarthDryAtmosphere(spectral_grid)
     coriolis::CO = Coriolis(spectral_grid)
     orography::OR = EarthOrography(spectral_grid)
     forcing::FR = nothing

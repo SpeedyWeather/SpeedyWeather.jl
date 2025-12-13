@@ -52,15 +52,15 @@ function linear_virtual_temperature!(
     end
 end
 
-@inline virtual_temperature(T, q, A::AbstractAtmosphere) = virtual_temperature(T, q, A.μ_virt_temp)
-@inline linear_virtual_temperature(T, q, Tₖ, A::AbstractAtmosphere) = linear_virtual_temperature(T, q, Tₖ, A.μ_virt_temp)
-@inline absolute_temperature(Tᵥ, q, A::AbstractAtmosphere) = absolute_temperature(Tᵥ, q, A.μ_virt_temp)
+@inline virtual_temperature(T, q, A::AbstractWetAtmosphere) = virtual_temperature(T, q, A.μ_virt_temp)
+@inline linear_virtual_temperature(T, q, Tₖ, A::AbstractWetAtmosphere) = linear_virtual_temperature(T, q, Tₖ, A.μ_virt_temp)
+@inline absolute_temperature(Tᵥ, q, A::AbstractWetAtmosphere) = absolute_temperature(Tᵥ, q, A.μ_virt_temp)
 
 @inline virtual_temperature(T, q, μ) = T * (1 + μ * q)
 @inline linear_virtual_temperature(T, q, Tₖ, μ) = T + (Tₖ * μ) * q
 @inline absolute_temperature(Tᵥ, q, μ) = Tᵥ / (1 + μ * q)
 
-# used to fallback to PrimtiveDry, maybe there's a more elegant way to do this?
-@inline virtual_temperature(T, q, ::Nothing) = T
-@inline linear_virtual_temperature(T, q, ::Nothing) = T
-@inline absolute_temperature(T, q, ::Nothing) = T
+# For dry atmospheres, virtual temperature is just (absolute) temperature
+@inline virtual_temperature(T, q, ::AbstractDryAtmosphere) = T
+@inline linear_virtual_temperature(T, q, ::AbstractDryAtmosphere) = T
+@inline absolute_temperature(T, q, ::AbstractDryAtmosphere) = T

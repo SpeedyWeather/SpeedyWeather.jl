@@ -168,7 +168,7 @@ function output!(
 
     q = field_view(simulation.diagnostic_variables.grid.humid_grid, :, nlayers)
     Tᵥ = simulation.diagnostic_variables.dynamics.a_2D_grid
-    @. Tᵥ = virtual_temperature(T, q, simulation.model.atmosphere.μ_virt_temp)
+    @. Tᵥ = virtual_temperature(T, q, simulation.model.atmosphere)
 
     # calculate mean sea-level pressure on model grid
     mslp = simulation.diagnostic_variables.dynamics.b_2D_grid

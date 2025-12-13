@@ -74,7 +74,7 @@ end
 
 # function barrier
 @propagate_inbounds parameterization!(ij, diagn, progn, diffusion::BulkRichardsonDiffusion, model) =
-    vertical_diffusion!(ij, diagn, diffusion, model.atmosphere, model.planet, model.orography, model.geopotential, model.class)
+    vertical_diffusion!(ij, diagn, diffusion, model.atmosphere, model.planet, model.orography, model.geopotential)
 
 @propagate_inbounds function vertical_diffusion!(
     ij,
@@ -84,7 +84,6 @@ end
     planet,
     orography,
     geopot,
-    class
 )
 
     (; diffuse_momentum, diffuse_static_energy, diffuse_humidity) = diffusion
@@ -104,9 +103,9 @@ end
     v = diagn.grid.v_grid
     humid = diagn.grid.humid_grid
 
-    diffuse_momentum                                   && _vertical_diffusion!(ij, u_tend, u, K, kₕ, diffusion)
-    diffuse_momentum                                   && _vertical_diffusion!(ij, v_tend, v, K, kₕ, diffusion)
-    class isa PrimitiveWet && diffuse_humidity    && _vertical_diffusion!(ij, humid_tend, humid, K, kₕ, diffusion)
+    diffuse_momentum && _vertical_diffusion!(ij, u_tend, u, K, kₕ, diffusion)
+    diffuse_momentum && _vertical_diffusion!(ij, v_tend, v, K, kₕ, diffusion)
+    atmosphere isa AbstractWetAtmosphere && diffuse_humidity    && _vertical_diffusion!(ij, humid_tend, humid, K, kₕ, diffusion)
 
     if diffuse_static_energy
         # compute dry static energy on the fly
@@ -275,7 +274,7 @@ For vertical stability in the boundary layer."""
     Θ₁ = Θ₀ + Φ[ij, surface]
     Ri[ij, surface] = Φ[ij, surface]*(Θ₁ - Θ₀) / (Θ₀*V²)
 
-    @inbounds for k in 1:nlayers-1
+    for k in 1:nlayers-1
         V² = u[ij, k]^2 + v[ij, k]^2
         Tᵥ = virtual_temperature(T[ij, k], q[ij, k], atmosphere)
         virtual_dry_static_energy = cₚ * Tᵥ + Φ[ij, k]

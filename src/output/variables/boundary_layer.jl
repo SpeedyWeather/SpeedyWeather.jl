@@ -118,7 +118,7 @@ function output!(
     κ = simulation.model.atmosphere.κ
     σ_bottom = simulation.model.geometry.σ_levels_full[end]
 
-    # Compute Ts
+    # Compute Ts assuming dry adiabatic profile
     (; transform) = variable
     @. Ts = transform(T_bottom * σ_bottom ^ (-κ))   # Convert to °C
 

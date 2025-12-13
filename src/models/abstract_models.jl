@@ -52,28 +52,6 @@ model_type(::Type{<:PrimitiveDry}) = PrimitiveDryModel
 model_type(::Type{<:PrimitiveWet}) = PrimitiveWetModel
 model_type(model::AbstractModel) = model_type(typeof(model))
 
-# model dummy: Empty concrete instances
-struct BarotropicDummy <: Barotropic end
-struct ShallowWaterDummy <: ShallowWater end
-struct PrimitiveDryDummy <: PrimitiveDry end
-struct PrimitiveWetDummy <: PrimitiveWet end
-
-Adapt.@adapt_structure BarotropicDummy
-Adapt.@adapt_structure ShallowWaterDummy
-Adapt.@adapt_structure PrimitiveDryDummy
-Adapt.@adapt_structure PrimitiveWetDummy
-
-model_dummy(::Type{<:Barotropic}) = BarotropicDummy()
-model_dummy(::Type{<:ShallowWater}) = ShallowWaterDummy()
-model_dummy(::Type{<:PrimitiveDry}) = PrimitiveDryDummy()
-model_dummy(::Type{<:PrimitiveWet}) = PrimitiveWetDummy()
-model_dummy(model::AbstractModel) = model_dummy(typeof(model))
-
-model_type(::Type{BarotropicDummy}) = BarotropicDummy
-model_type(::Type{ShallowWaterDummy}) = ShallowWaterDummy
-model_type(::Type{PrimitiveDryDummy}) = PrimitiveDryDummy
-model_type(::Type{PrimitiveWetDummy}) = PrimitiveWetDummy
-
 initialize!(model::AbstractModel, ps::Union{ComponentVector, SpeedyParams}; kwargs...) =
     initialize!(reconstruct(model, ps); kwargs...)
 
