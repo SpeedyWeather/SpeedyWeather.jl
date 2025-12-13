@@ -67,6 +67,7 @@ EarthAtmosphere(SG::SpectralGrid; kwargs...) = EarthAtmosphere{SG.NF}(; kwargs..
 EarthAtmosphere(::Type{NF}; kwargs...) where {NF} = EarthAtmosphere{NF}(; kwargs...)
 Base.eltype(::EarthAtmosphere{NF}) where {NF} = NF
 
+export EarthDryAtmosphere
 @parameterized @kwdef struct EarthDryAtmosphere{NF <: AbstractFloat} <: AbstractDryAtmosphere
     "[OPTION] Molar mass of dry air [g/mol]"
     @param mol_mass_dry_air::NF = 28.9649 (bounds = Positive,)
