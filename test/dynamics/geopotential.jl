@@ -65,7 +65,7 @@ end
             @test Tv == T
             @test typeof(Tv) == typeof(T) == NF
 
-            Tv = SpeedyWeather.linear_virtual_temperature(T, T, 0, atmosphere)
+            Tv = SpeedyWeather.linear_virtual_temperature(T, 0, T, atmosphere)
             @test Tv == T
             @test typeof(Tv) == typeof(T) == NF
 
@@ -74,7 +74,7 @@ end
                 @test 1.03*T > Tv > T       # within a few percent
                 @test typeof(Tv) == typeof(T) == NF
 
-                Tv = SpeedyWeather.linear_virtual_temperature(T, T, q, atmosphere)
+                Tv = SpeedyWeather.linear_virtual_temperature(T, q, T, atmosphere)
                 @test 1.03*T > Tv > T
                 @test typeof(Tv) == typeof(T) == NF
             end
@@ -88,7 +88,7 @@ end
             @test Tv == T
             @test typeof(Tv) == typeof(T) == NF
 
-            Tv = SpeedyWeather.linear_virtual_temperature(T, T, 0, atmosphere)
+            Tv = SpeedyWeather.linear_virtual_temperature(T, 0, T, atmosphere)
             @test Tv == T
             @test typeof(Tv) == typeof(T) == NF
 
@@ -97,7 +97,7 @@ end
                 @test Tv == T
                 @test typeof(Tv) == typeof(T) == NF
 
-                Tv = SpeedyWeather.linear_virtual_temperature(T, T, q, atmosphere)
+                Tv = SpeedyWeather.linear_virtual_temperature(T, q, T, atmosphere)
                 @test Tv == T
                 @test typeof(Tv) == typeof(T) == NF
             end

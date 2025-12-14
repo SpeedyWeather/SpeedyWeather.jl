@@ -62,5 +62,5 @@ end
 
 # For dry atmospheres, virtual temperature is just (absolute) temperature
 @inline virtual_temperature(T, q, ::AbstractDryAtmosphere) = T
-@inline linear_virtual_temperature(T, q, ::AbstractDryAtmosphere) = T
+@inline linear_virtual_temperature(T, q, Tₖ, ::AbstractDryAtmosphere) = T
 @inline absolute_temperature(T, q, ::AbstractDryAtmosphere) = T
