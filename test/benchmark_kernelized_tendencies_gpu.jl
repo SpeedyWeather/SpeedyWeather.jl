@@ -234,6 +234,15 @@ function run_benchmarks_gpu(; trunc=31, nlayers=8, check_correctness=false)
     
     results = Dict{String, Any}()
     
+    # Test 0: transform!
+    results["transform"] = compare_performance_gpu(
+        "transform!",
+        SpeedyWeather.transform!,
+        SpeedyWeather.transform!,
+        [diagn_cpu.grid.vor_grid, progn_cpu.vor, model_cpu.spectral_transform],
+        [diagn_gpu.grid.vor_grid, progn_gpu.vor, model_gpu.spectral_transform]
+    )
+
     # Test 1: vertical_integration!
     results["vertical_integration"] = compare_performance_gpu(
         "vertical_integration!",
