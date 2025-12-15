@@ -422,7 +422,7 @@ function vordiv_tendencies!(
         implicit::ImplicitPrimitiveEquation,
         S::SpectralTransform,
     )
-    (; R_dry) = atmosphere                      # gas constant for dry air
+    (; R_dry, μ_virt_temp) = atmosphere         # gas constant for dry air and virtual temperature calculation
     (; f) = coriolis                            # coriolis parameter
     Tₖ = implicit.temp_profile                  # reference temperature profile
     (; coslat⁻¹) = geometry
@@ -438,9 +438,8 @@ function vordiv_tendencies!(
     launch!(
         arch, RingGridWorkOrder, size(u_tend_grid), _vordiv_tendencies_kernel!,
         u_tend_grid, v_tend_grid, u_grid, v_grid, vor_grid, temp_grid, humid_grid,
-        Tₖ, ∇lnp_x, ∇lnp_y, f, coslat⁻¹, whichring, atmosphere.μ_virt_temp, R_dry
+        ∇lnp_x, ∇lnp_y, Tₖ, f, coslat⁻¹, whichring, μ_virt_temp, R_dry
     )
-
     # divergence and curl of that u, v_tend vector for vor, div tendencies
     (; vor_tend, div_tend) = diagn.tendencies
     u_tend = diagn.dynamics.a
@@ -464,11 +463,11 @@ end
         humid_grid,             # Input: humidity
         ∇lnp_x,                 # Input: zonal gradient of log surface pressure
         ∇lnp_y,                 # Input: meridional gradient of log surface pressure
-        Tₖ,                     # Input: reference temperature profile
+        Tₖ,                      # Input: reference temperature profile
         @Const(f),              # Input: coriolis parameter
         @Const(coslat⁻¹),       # Input: 1/cos(latitude) for scaling
         @Const(whichring),      # Input: mapping from grid point to latitude ring
-        μ_virt_temp,             # Input: virtual temparture calc const
+        μ_virt_temp,            # Input: virtual temparture calc const
         R_dry,                  # Input: dry gas constant
     )
     ij, k = @index(Global, NTuple)
