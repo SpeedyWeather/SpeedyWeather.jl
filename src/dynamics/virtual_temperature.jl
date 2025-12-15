@@ -23,7 +23,7 @@ Calculates a linearised virtual temperature Tᵥ as
 With absolute temperature T, layer-average temperarture Tₖ (computed in `temperature_average!`),
 specific humidity q and
 
-    μ = (1-ξ)/ξ, ξ = R_dry/R_vapour.
+    μ = (1-ξ)/ξ, ξ = R_dry/R_vapor.
 
 in spectral space."""
 function linear_virtual_temperature!(

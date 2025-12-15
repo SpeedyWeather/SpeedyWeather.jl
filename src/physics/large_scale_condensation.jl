@@ -68,7 +68,7 @@ large-scale precipitation vertically for output."""
     Lᵥ = clausius_clapeyron.latent_heat_condensation    # latent heat of vaporization
     Lᵢ = clausius_clapeyron.latent_heat_fusion          # latent heat of fusion
     cₚ = clausius_clapeyron.heat_capacity               # heat capacity
-    Rᵥ = clausius_clapeyron.R_vapour                    # gas constant for water vapour
+    Rᵥ = clausius_clapeyron.R_vapor                    # gas constant for water vapor
     Lᵥ_cₚ = Lᵥ / cₚ
     Lᵢ_cₚ = Lᵢ / cₚ
     cₚ_Lᵢ = cₚ / Lᵢ

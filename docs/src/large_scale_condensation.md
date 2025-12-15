@@ -2,7 +2,7 @@
 
 Large-scale condensation in an atmospheric general circulation represents the
 micro-physics that kick in when an air parcel reaches saturation.
-Subsequently, the water vapour inside it condenses, forms droplets around
+Subsequently, the water vapor inside it condenses, forms droplets around
 condensation nuclei, which grow, become heavy and eventually fall out
 as precipitation. This process is never actually representable at the resolution
 of global (or even regional) atmospheric models as typical cloud droplets
@@ -222,14 +222,14 @@ The according latent heat required for melting is
 ```
 
 But note that we do not add ``\delta q_m`` to the humidity tendency as this is a
-phase transition from snow to rain water and so does not increase water vapour ``q``.
+phase transition from snow to rain water and so does not increase water vapor ``q``.
 We solely use this to calculate the rain water concentration in ``[kg/kg]`` from melting,
 and translate it to latent heat.
 
 We calculate the melting of a downward snow flux before [Re-evaporation](@ref).
 This is such that melting snow becomes rain water and is subject to reevaporation
 within one layer. This is effectively equivalent to allowing sublimation of snow
-to water vapour.
+to water vapor.
 
 Snow can be enabled/disabled with the `snow` keyword argument, and
 ``T_f`` and ``T_m`` (both in Kelvin) can be passed on too, e.g.

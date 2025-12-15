@@ -61,13 +61,13 @@ Then it follows the pseudoadiabatic lapse rate
 
 with gravity ``g``, heat capacity ``c_p``, the saturation specific humidity of the parcel ``q^\star``
 (which is its specific humidity given that it has already reached saturation),
-latent heat of vaporization ``L_v``, dry gas constant ``R_d``, water vapour
+latent heat of vaporization ``L_v``, dry gas constant ``R_d``, water vapor
 gas constant ``R_v``, and [Virtual temperature](@ref) ``T_v``.
 Starting with a temperature ``T`` and humidity ``q = q^\star`` at the lifting condensation level 
 temperature aloft changes with $dT = -\frac{d\Phi}{c_p}(...)$ between two layers separated
 ``d\Phi`` in geopotential ``\Phi`` apart. On that new layer, ``q^\star`` is recalculated
 as well as the virtual temperature ``T_v = T(1 + \mu q^\star)``. ``\mu`` is derived from
-the ratio of dry to vapour gas constants see [Virtual temperature](@ref).
+the ratio of dry to vapor gas constants see [Virtual temperature](@ref).
 Note that the pseudoadiabatic ascent is independent of the environmental temperature
 and humidity and function of temperature and humidity of the parcel only
 (although that one starts with surface temperature and humidity from the environment).

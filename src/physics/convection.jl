@@ -185,7 +185,7 @@ set to NaN instead and should be skipped in the relaxation."""
     nlayers = length(σ)                                 # number of vertical layers
 
     # thermodynamics
-    (; R_dry, R_vapour) = clausius_clapeyron
+    (; R_dry, R_vapor) = clausius_clapeyron
     Lᵥ = clausius_clapeyron.latent_heat_condensation    # latent heat of vaporization
     cₚ = clausius_clapeyron.heat_capacity               # heat capacity
 
@@ -223,7 +223,7 @@ set to NaN instead and should be skipped in the relaxation."""
             # calculate moist/pseudo adiabatic lapse rate, dT/dΦ = -Γ/cp
             T, Tᵥ, q = temp_parcel, temp_virt_parcel, humid_parcel  # for brevity
             A = q*Lᵥ / ((1-q)^2 * R_dry)
-            B = q*Lᵥ^2 / ((1-q)^2 * cₚ * R_vapour)
+            B = q*Lᵥ^2 / ((1-q)^2 * cₚ * R_vapor)
             Γ = (1 + A/Tᵥ) / (1 + B/T^2)
                 
             ΔΦ = geopotential[ij, k] - geopotential[ij, k+1]        # vertical gradient in geopotential
