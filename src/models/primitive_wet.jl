@@ -31,7 +31,6 @@ $(TYPEDFIELDS)"""
         LA,     # <:AbstractLand,
         ZE,     # <:AbstractZenith,
         AL,     # <:AbstractAlbedo,
-        CC,     # <:AbstractClausiusClapeyron,
         BL,     # <:AbstractBoundaryLayer,
         VD,     # <:AbstractVerticalDiffusion,
         SC,     # <:AbstractSurfaceCondition,
@@ -89,7 +88,6 @@ $(TYPEDFIELDS)"""
 
     # PHYSICS/PARAMETERIZATIONS
     physics::Bool = true
-    clausius_clapeyron::CC = ClausiusClapeyron(spectral_grid, atmosphere)
     boundary_layer_drag::BL = BulkRichardsonDrag(spectral_grid)
     vertical_diffusion::VD = BulkRichardsonDiffusion(spectral_grid)
     surface_condition::SC = SurfaceCondition(spectral_grid)
@@ -122,7 +120,7 @@ $(TYPEDFIELDS)"""
     # also determine order in which parameterizations are called
     model_parameters::TS1 = (
         :architecture, :time_stepping, :orography, :geopotential, :atmosphere,
-        :planet, :geometry, :land_sea_mask, :clausius_clapeyron,
+        :planet, :geometry, :land_sea_mask,
     )
     parameterizations::TS2 = (  # mixing and precipitation
         :vertical_diffusion, :large_scale_condensation, :convection,
