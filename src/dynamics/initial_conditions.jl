@@ -849,6 +849,7 @@ function initialize!(
     )
     (; relhumid_ref) = IC
     (; nlayers, σ_levels_full) = model.geometry
+    (; atmosphere) = model
 
     # get pressure [Pa] on grid
     lnpₛ = get_step(progn.pres, 1)  # 1 = first leapfrog timestep

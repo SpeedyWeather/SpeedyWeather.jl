@@ -200,7 +200,7 @@ set to NaN instead and should be skipped in the relaxation."""
     local saturated::Bool = false           # did the parcel reach saturation yet?
     local buoyant::Bool = true              # is the parcel still buoyant?
     local k::Int = nlayers                  # layer index top to surface
-    local temp_virt_parcel::NF = temp_parcel * (1 + μ*humid_parcel)
+    local temp_virt_parcel::NF = virtual_temperature(temp_parcel, humid_parcel, atmosphere)
 
     while buoyant && k > 1                  # calculate moist adiabat while buoyant till top
         k -= 1                              # one level up

@@ -2,6 +2,8 @@ abstract type AbstractAtmosphere <: AbstractModelComponent end
 abstract type AbstractWetAtmosphere <: AbstractAtmosphere end
 abstract type AbstractDryAtmosphere <: AbstractAtmosphere end
 
+Base.broadcastable(A::AbstractAtmosphere) = Ref(A)
+
 export EarthAtmosphere
 
 """
@@ -164,7 +166,7 @@ Parameters for computing saturation vapor pressure of water using the Tetens' eq
 where T is in Kelvin and i = 1, 2 for saturation above and below freezing,
 respectively. From Tetens (1930), and Murray (1967) for below freezing.
 $(TYPEDFIELDS)"""
-@kwdef struct TetensEquation{NF<:AbstractFloat} <: AbstractClausiusClapeyron
+@kwdef struct TetensEquation{NF<:AbstractFloat}
     "Saturation water vapor pressure at 0°C [Pa]"
     e₀::NF = 610.78
 
