@@ -341,6 +341,7 @@ function full_benchmark_gpu()
     configs = [
         (trunc=42, nlayers=8, name="Small (T42, 8 layers)"),
         (trunc=63, nlayers=16, name="Medium (T63, 16 layers)"),
+        (trunc=125, nlayers=16, name="Large (T125, 16 layers)"),
     ]
     
     all_results = Dict{String, Any}()
