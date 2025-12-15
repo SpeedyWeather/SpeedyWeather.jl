@@ -156,7 +156,6 @@ include("dynamics/random_process.jl")
 # PARAMETERIZATIONS
 include("physics/albedo.jl")
 include("physics/tendencies.jl")
-include("physics/thermodynamics.jl")
 include("physics/vertical_diffusion.jl")
 include("physics/large_scale_condensation.jl")
 include("physics/surface_fluxes/boundary_layer.jl")
