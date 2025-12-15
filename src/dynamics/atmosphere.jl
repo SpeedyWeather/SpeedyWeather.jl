@@ -50,10 +50,10 @@ $(TYPEDFIELDS)"""
     stefan_boltzmann::NF = 5.67e-8
 
     "[OPTION] Surface reference pressure [Pa]"
-    @param pres_ref::NF = 1.0e5 (bounds = Positive,)
+    @param pressure_reference::NF = 1.0e5 (bounds = Positive,)
 
     "[OPTION] Surface reference temperature [K]"
-    @param temp_ref::NF = 288.0 (bounds = Nonnegative,)
+    @param temperature_reference::NF = 288.0 (bounds = Nonnegative,)
 
     "[OPTION] Reference moist-adiabatic temperature lapse rate [K/m]"
     @param moist_lapse_rate::NF = 5 / 1000
@@ -88,10 +88,10 @@ export EarthDryAtmosphere
     stefan_boltzmann::NF = 5.67e-8
 
     "[OPTION] Surface reference pressure [Pa]"
-    @param pres_ref::NF = 1.0e5 (bounds = Positive,)
+    @param pressure_reference::NF = 1.0e5 (bounds = Positive,)
 
     "[OPTION] Surface reference temperature [K]"
-    @param temp_ref::NF = 288.0 (bounds = Nonnegative,)
+    @param temperature_reference::NF = 288.0 (bounds = Nonnegative,)
 
     "[OPTION] Reference dry-adiabatic temperature lapse rate [K/m]"
     @param dry_lapse_rate::NF = 9.8 / 1000
@@ -113,3 +113,4 @@ latent_heat_condensation(A::AbstractDryAtmosphere) = zero(eltype(A))
 
 latent_heat_sublimation(A::AbstractWetAtmosphere) = A.latent_heat_sublimation
 latent_heat_sublimation(A::AbstractDryAtmosphere) = zero(eltype(A))
+

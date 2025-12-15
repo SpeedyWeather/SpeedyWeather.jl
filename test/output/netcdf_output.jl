@@ -148,12 +148,11 @@ end
     @test haskey(ds, "mslp")    # but this variable
 
     # Test reasonable scale for mean
-    (; pres_ref) = model.atmosphere     # unpack reference pressure
-    pres_ref = pres_ref / 100           # Pa -> hPa  
+    p₀ = model.atmosphere.pressure_reference / 100      # Pa -> hPa  
     mslp = ds["mslp"].var[:, :, end]    # variable at last time step `.var` to read the raw data ignoring any mask
     
     # should be within ~800 to ~1200hPa
-    @test all(0.8 .< mslp./pres_ref .< 1.2)
+    @test all(0.8 .< mslp./p₀ .< 1.2)
 
     ## test u10, v10 existence
     @test haskey(ds, "u")
@@ -166,9 +165,9 @@ end
     @test maximum(abs.(ds["v10"].var[:, :, end])) < maximum(abs.(ds["u"].var[:, :, end, end]))
 
     ## surface temperature should be within 60-130% of 
-    (; temp_ref) = model.atmosphere                 # in K
+    T₀ = model.atmosphere.temperature_reference     # in K
     Tsurf = ds["tsurf"].var[:, :, end] .+ 273.15    # last timestep from ˚C to K
-    @test all(0.6 .< (Tsurf ./ temp_ref) .< 1.3)
+    @test all(0.6 .< (Tsurf ./ T₀) .< 1.3)
 end
 
 @testset "Restart from restart file" begin
