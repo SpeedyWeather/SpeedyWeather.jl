@@ -3,12 +3,12 @@
 !!! warning "Work in progress"
     The GPU support of SpeedyWeather.jl is still work in progress and some parts of this documentation might not be always updated to the latest state. We will extend this documentation over time. Don't hesitate to contact us via GitHub issues or mail when you have questions or want to collaborate.
 
-Most of SpeedyWeather.jl supports GPU acceleration. All of our models can run GPUs, however as our development of this is still very recent, there still might be issues with the GPU models. If you encounter any, please file a GitHub issue. Our development focuses on CUDA GPUs, but other architectures are thinkable in the future as well, as our approach relies on the device agnostic `KernelAbstractions.jl`. An experimental port to AMD GPUs using the `AMDGPU` package is available but AMD-specific performance optimizations are not implemented yet. The SpeedyWeather.jl submodule `Architectures` encodes all the information of the device we run our models on. In order to initialize a model on a GPU, we need to load the `CUDA` or `AMDGPU` package and pass the architecture to the model constructor. For example, to initialize a barotropic model on a GPU, we can do the following:  
+Most of SpeedyWeather.jl supports GPU acceleration. All of our models can run GPUs, however as our development of this is still very recent, there still might be issues with the GPU models and do not consider them fully optimized yet. If you encounter any issues, please report them via GitHub issues. Our development focuses on CUDA GPUs, but other architectures are thinkable in the future as well, as our approach relies on the device agnostic `KernelAbstractions.jl`. An experimental port to AMD GPUs using the `AMDGPU` package is available but AMD-specific performance optimizations are not implemented yet. The SpeedyWeather.jl submodule `Architectures` encodes all the information of the device we run our models on. In order to initialize a model on a GPU, we need to load the `CUDA` or `AMDGPU` package and pass the architecture to the model constructor. For example, to initialize a barotropic model on a GPU, we can do the following:  
 
 ```julia
 using SpeedyWeather, CUDA # For AMD GPUs, replace `CUDA` with `AMDGPU`
 architecture = SpeedyWeather.GPU()
-spectral_grid = SpectralGrid(trunc=41, nlayers=1, architecture=architecture)           
+spectral_grid = SpectralGrid(trunc=63, nlayers=8, architecture=architecture)           
 
 model = PrimitiveWetModel(spectral_grid=spectral_grid)
 simulation = initialize!(model)
