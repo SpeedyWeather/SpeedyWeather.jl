@@ -50,7 +50,7 @@ function timestep!(
     
     # Some thermodynamics needed by snow
 	ρ_water = model.atmosphere.water_density				# water density [kg/m³]
-    Lᵢ = model.clausius_clapeyron.latent_heat_fusion      	# latent heat of fusion
+    Lᵢ = model.atmosphere.latent_heat_fusion      	        # latent heat of fusion
     cₛ = model.land.thermodynamics.heat_capacity_dry_soil
     z₁ = model.land.geometry.layer_thickness[1]
     (; melting_threshold) = snow

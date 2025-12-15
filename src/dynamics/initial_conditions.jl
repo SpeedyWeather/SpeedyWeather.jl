@@ -859,14 +859,11 @@ function initialize!(
     temp_grid = transform(temp, model.spectral_transform)
     humid_grid = zero(temp_grid)
 
-    # Extract Clausius-Clapeyron parameters for kernel
-    (; e₀, T₀⁻¹, Lᵥ_Rᵥ, mol_ratio) = model.clausius_clapeyron
-
     # Launch kernel
     launch!(
         architecture(humid_grid), RingGridWorkOrder, size(humid_grid),
         constant_relative_humidity_kernel!, humid_grid, temp_grid, pres_grid,
-        σ_levels_full, relhumid_ref, e₀, T₀⁻¹, Lᵥ_Rᵥ, mol_ratio
+        σ_levels_full, relhumid_ref, atmosphere,
     )
     set!(progn, model; humid = humid_grid, lf = 1)
 
@@ -879,23 +876,16 @@ end
         pres_grid,
         @Const(σ_levels_full),
         relhumid_ref,
-        e₀,
-        T₀⁻¹,
-        Lᵥ_Rᵥ,
-        mol_ratio
+        atmosphere,
     )
     ij, k = @index(Global, NTuple)
 
     # Compute pressure at this level
     pₖ = σ_levels_full[k] * pres_grid[ij]
-
-    # Compute saturation humidity using Clausius-Clapeyron
-    temp = temp_grid[ij, k]
-    sat_vap_pres = e₀ * exp(Lᵥ_Rᵥ * (T₀⁻¹ - inv(temp)))
-    q_sat = mol_ratio * sat_vap_pres / pₖ
+    T = temp_grid[ij, k]
 
     # Set humidity as fraction of saturation
-    humid_grid[ij, k] = relhumid_ref * q_sat
+    humid_grid[ij, k] = relhumid_ref * saturation_humidity(T, pₖ, atmosphere)
 end
 
 export RandomWaves
