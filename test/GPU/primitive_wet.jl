@@ -1,4 +1,4 @@
-@testset "GPU PrimitiveDryModel" begin
+@testset "GPU PrimitiveWetModel" begin
     arch = SpeedyWeather.GPU()
     spectral_grid = SpectralGrid(trunc=32, nlayers=8, architecture=arch)
     model = PrimitiveWetModel(spectral_grid=spectral_grid)

@@ -395,10 +395,15 @@ function implicit_correction_kernels!(
     # SEMI IMPLICIT CORRECTIONS FOR DIVERGENCE
     # calculate the combined tendency G = G_D + ξRG_T + ξUG_lnps to solve for divergence δD
 
-    # Kernel 1: Temperature update and geopotential calculation
+    # Kernel 1a: Temperature update (move implicit terms from time step i to i-1)
     launch!(arch, SpectralWorkOrder, size(temp_tend), 
-            implicit_temp_geopot_kernel!, 
-            temp_tend, geopotential, div_old, div_new, R, L, nlayers)
+            implicit_temp_update_kernel!, 
+            temp_tend, div_old, div_new, L, nlayers)
+    
+    # Kernel 1b: Geopotential calculation (must run after temp update completes)
+    launch!(arch, SpectralWorkOrder, size(temp_tend), 
+            implicit_geopot_kernel!, 
+            geopotential, temp_tend, R, nlayers)
     
     # Kernel 2: Calculate G = G_D + ξRG_T + ξUG_lnps
     launch!(arch, SpectralWorkOrder, size(div_tend),
@@ -468,7 +473,7 @@ function implicit_correction_lm_only!(
     zero_last_degree!(pres_tend)
     zero_last_degree!(temp_tend)
   
-    pres_tend[1:1] .= 0    # mass conservation
+    pres_tend.data[1:1] .= 0    # mass conservation
   
     return nothing
 end
@@ -542,9 +547,9 @@ end
     pres_tend[lm] += pres_correction
 end
 
-# Kernel 1: Combined temperature update and geopotential calculation
-@kernel inbounds=true function implicit_temp_geopot_kernel!(
-    temp_tend, geopotential, div_old, div_new, R, L, nlayers
+# Kernel 1a: Temperature update only
+@kernel inbounds=true function implicit_temp_update_kernel!(
+    temp_tend, div_old, div_new, L, nlayers
 )
     I = @index(Global, Cartesian)
     lm = I[1]
@@ -557,6 +562,15 @@ end
         temp_correction += L[k, r] * (div_old[lm, r] - div_new[lm, r])
     end
     temp_tend[I] += temp_correction
+end
+
+# Kernel 1b: Geopotential calculation (runs after temp update)
+@kernel inbounds=true function implicit_geopot_kernel!(
+    geopotential, temp_tend, R, nlayers
+)
+    I = @index(Global, Cartesian)
+    lm = I[1]
+    k = I[2]
     
     # Calculate the ξ*R*G_T term, vertical integration of geopotential
     # (excl ξ, this is done in kernel 2)
