@@ -63,3 +63,19 @@ function run_benchmark_suite!(suite::BenchmarkSuiteTransform)
 
     return suite
 end 
+
+@kwdef mutable struct BenchmarkSuiteModel <: AbstractBenchmarkSuiteTimed
+    title::String 
+    nruns::Int = 1
+    model::Vector = fill(:CPU, nruns)
+    NF::Vector = fill(SpeedyWeather.DEFAULT_NF, nruns)
+    trunc::Vector{Int} = fill(SpeedyWeather.DEFAULT_TRUNC, nruns)
+    nlayers::Vector{Int} = fill(SpeedyWeather.DEFAULT_NLAYERS, nruns)
+    Grid::Vector = fill(SpeedyWeather.DEFAULT_GRID, nruns)
+    nlat::Vector{Int} = fill(0, nruns)
+    function_names::Vector{String} = default_function_names()
+    time::Vector{Vector{Float64}} = [fill(0.0, length(function_names)) for i=1:nruns]
+    memory::Vector{Vector{Int}} = [fill(0, length(function_names)) for i=1:nruns]
+    allocs::Vector{Vector{Int}} = [fill(0, length(function_names)) for i=1:nruns]
+
+end 
