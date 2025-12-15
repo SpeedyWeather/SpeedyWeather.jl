@@ -21,7 +21,7 @@ if !HAS_GPU
 end
 
 # Create test model with specified architecture
-function create_test_model(; trunc=31, nlayers=8, architecture=CPU())
+function create_test_model(; trunc=42, nlayers=8, architecture=CPU())
     spectral_grid = SpectralGrid(; trunc, nlayers, Grid=FullGaussianGrid, NF=Float64, architecture)
     model = PrimitiveWetModel(; spectral_grid)
     simulation = initialize!(model)
