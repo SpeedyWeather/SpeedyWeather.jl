@@ -85,7 +85,7 @@ function set!(
         if size(var) == size(L)
             var .+= L
         else
-            L_var = spectral_truncation(L, size(var, 1, as = Matrix), size(var, 2, as = Matrix))
+            L_var = SpeedyTransforms.spectral_truncation(L, size(var, 1, as = Matrix), size(var, 2, as = Matrix))
             var .+= L_var
         end
     else

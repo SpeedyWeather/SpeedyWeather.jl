@@ -59,9 +59,9 @@ using SpeedyWeather, CairoMakie
 # create some data with wave numbers 0,1,2,3,4
 trunc = 64                  # 1-based maximum degree of spherical harmonics
 L = randn(LowerTriangularMatrix{ComplexF32}, trunc, trunc)
-spectral_truncation!(L, 5)              # remove higher wave numbers
+SpeedyTransform.spectral_truncation!(L, 5)  # remove higher wave numbers
 G = transform(L)
-heatmap(G, title="Some fake data G")    # requires `using CairoMakie`
+heatmap(G, title="Some fake data G")        # requires `using CairoMakie`
 save("gradient_data.png", ans) # hide
 nothing # hide
 ```
@@ -162,7 +162,7 @@ additional degree, but in the returned lower triangular matrix this row is set t
     All gradient operators expect the input lower triangular matrices of shape ``(N+1) \times N``.
     This one more degree of the spherical harmonics is required for the meridional derivative.
     Scalar quantities contain this degree too for size compatibility but they should not
-    make use of it. Use `spectral_truncation` to add or remove this degree manually.
+    make use of it. Use `SpeedyTransform.spectral_truncation` to add or remove this degree manually.
 
 You may also generally assume that a `SpectralTransform` struct precomputed for
 some truncation, say ``l_{max} = m_{max} = T`` could also be used for smaller

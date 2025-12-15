@@ -127,7 +127,7 @@ function initialize!(
     )
 
     # Apply spectral truncation
-    spectral_truncation!(ξ, initial_conditions.max_wavenumber)
+    SpeedyTransforms.spectral_truncation!(ξ, initial_conditions.max_wavenumber)
 
     # Set the prognostic variable
     return set!(progn, model; vor = ξ, lf = 1)
@@ -207,8 +207,8 @@ function initialize!(
     u_spectral = transform(u, model.spectral_transform)
     v_spectral = transform(v, model.spectral_transform)
 
-    spectral_truncation!(u_spectral, initial_conditions.truncation)
-    spectral_truncation!(v_spectral, initial_conditions.truncation)
+    SpeedyTransforms.spectral_truncation!(u_spectral, initial_conditions.truncation)
+    SpeedyTransforms.spectral_truncation!(v_spectral, initial_conditions.truncation)
 
     ξ = curl(u_spectral, v_spectral, model.spectral_transform; radius)
 
