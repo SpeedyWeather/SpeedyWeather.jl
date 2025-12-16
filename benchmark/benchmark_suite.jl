@@ -170,38 +170,35 @@ function run_benchmark_suite!(suite::BenchmarkSuiteDynamics)
         b = @benchmark SpeedyWeather.linear_virtual_temperature!($diagn, $progn, $lf_implicit, $model)
         add_results!(suite, b, i, 2)
 
-        b = @benchmark SpeedyWeather.temperature_anomaly!($diagn, $implicit)
+        b = @benchmark SpeedyWeather.geopotential!($diagn, $geopotential, $orography)
         add_results!(suite, b, i, 3)
 
-        b = @benchmark SpeedyWeather.geopotential!($diagn, $geopotential, $orography)
+        b = @benchmark SpeedyWeather.vertical_integration!($diagn, $progn, $lf_implicit, $geometry)
         add_results!(suite, b, i, 4)
 
-        b = @benchmark SpeedyWeather.vertical_integration!($diagn, $progn, $lf_implicit, $geometry)
+        b = @benchmark SpeedyWeather.surface_pressure_tendency!($diagn, $spectral_transform)
         add_results!(suite, b, i, 5)
 
-        b = @benchmark SpeedyWeather.surface_pressure_tendency!($diagn, $spectral_transform)
+        b = @benchmark SpeedyWeather.vertical_velocity!($diagn, $geometry)
         add_results!(suite, b, i, 6)
 
-        b = @benchmark SpeedyWeather.vertical_velocity!($diagn, $geometry)
+        b = @benchmark SpeedyWeather.linear_pressure_gradient!($diagn, $progn, $lf_implicit, $atmosphere, $implicit)
         add_results!(suite, b, i, 7)
 
-        b = @benchmark SpeedyWeather.linear_pressure_gradient!($diagn, $progn, $lf_implicit, $atmosphere, $implicit)
+        b = @benchmark SpeedyWeather.vertical_advection!($diagn, $model)
         add_results!(suite, b, i, 8)
 
-        b = @benchmark SpeedyWeather.vertical_advection!($diagn, $model)
+        b = @benchmark SpeedyWeather.vordiv_tendencies!($diagn, $model)
         add_results!(suite, b, i, 9)
 
-        b = @benchmark SpeedyWeather.vordiv_tendencies!($diagn, $model)
+        b = @benchmark SpeedyWeather.temperature_tendency!($diagn, $model)
         add_results!(suite, b, i, 10)
 
-        b = @benchmark SpeedyWeather.temperature_tendency!($diagn, $model)
+        b = @benchmark SpeedyWeather.humidity_tendency!($diagn, $model)
         add_results!(suite, b, i, 11)
 
-        b = @benchmark SpeedyWeather.humidity_tendency!($diagn, $model)
-        add_results!(suite, b, i, 12)
-
         b = @benchmark SpeedyWeather.bernoulli_potential!($diagn, $spectral_transform)
-        add_results!(suite, b, i, 13)
+        add_results!(suite, b, i, 12)
     end
 
     return suite
