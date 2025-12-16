@@ -422,7 +422,6 @@ function vordiv_tendencies!(
         implicit::ImplicitPrimitiveEquation,
         S::SpectralTransform,
     )
-    (; R_dry, μ_virt_temp) = atmosphere         # gas constant for dry air and virtual temperature calculation
     (; f) = coriolis                            # coriolis parameter
     Tₖ = implicit.temp_profile                  # reference temperature profile
     (; coslat⁻¹) = geometry
@@ -438,7 +437,7 @@ function vordiv_tendencies!(
     launch!(
         arch, RingGridWorkOrder, size(u_tend_grid), _vordiv_tendencies_kernel!,
         u_tend_grid, v_tend_grid, u_grid, v_grid, vor_grid, temp_grid, humid_grid,
-        ∇lnp_x, ∇lnp_y, Tₖ, f, coslat⁻¹, whichring, μ_virt_temp, R_dry
+        ∇lnp_x, ∇lnp_y, Tₖ, f, coslat⁻¹, whichring, atmosphere,
     )
     # divergence and curl of that u, v_tend vector for vor, div tendencies
     (; vor_tend, div_tend) = diagn.tendencies
@@ -463,24 +462,23 @@ end
         humid_grid,             # Input: humidity
         ∇lnp_x,                 # Input: zonal gradient of log surface pressure
         ∇lnp_y,                 # Input: meridional gradient of log surface pressure
-        Tₖ,                      # Input: reference temperature profile
+        Tₖ,                     # Input: reference temperature profile
         @Const(f),              # Input: coriolis parameter
         @Const(coslat⁻¹),       # Input: 1/cos(latitude) for scaling
         @Const(whichring),      # Input: mapping from grid point to latitude ring
-        μ_virt_temp,            # Input: virtual temparture calc const
-        R_dry,                  # Input: dry gas constant
+        atmosphere,             # Input: atmosphere for R_dry and μ_virt_temp
     )
     ij, k = @index(Global, NTuple)
-    j = whichring[ij]               # latitude ring index for this grid point
-    coslat⁻¹j = coslat⁻¹[j]         # get coslat⁻¹ for this latitude
-    f_j = f[j]                      # coriolis parameter for this latitude
+    j = whichring[ij]           # latitude ring index for this grid point
+    coslat⁻¹j = coslat⁻¹[j]     # get coslat⁻¹ for this latitude
+    f_j = f[j]                  # coriolis parameter for this latitude
 
-    ω = vor_grid[ij, k] + f_j                   # absolute vorticity
+    ω = vor_grid[ij, k] + f_j   # absolute vorticity
 
     # compute virtual temperature on the fly, temp_grid is anomaly
-    Tᵥ = virtual_temperature(temp_grid[ij, k] + Tₖ[k], humid_grid[ij, k], μ_virt_temp)
-    RTᵥ = R_dry*(Tᵥ - Tₖ[k])                        # dry gas constant * virtual temperature anomaly
-
+    (; R_dry) = atmosphere
+    Tᵥ = virtual_temperature(temp_grid[ij, k] + Tₖ[k], humid_grid[ij, k], atmosphere)
+    RTᵥ = R_dry*(Tᵥ - Tₖ[k])    # dry gas constant * virtual temperature anomaly
     u_tend_grid[ij, k] = (u_tend_grid[ij, k] + v_grid[ij, k] * ω - RTᵥ * ∇lnp_x[ij]) * coslat⁻¹j
     v_tend_grid[ij, k] = (v_tend_grid[ij, k] - u_grid[ij, k] * ω - RTᵥ * ∇lnp_y[ij]) * coslat⁻¹j
 end
@@ -548,8 +546,6 @@ function temperature_tendency!(
     (; temp_tend, temp_tend_grid) = diagn.tendencies
     (; div_grid, temp_grid, humid_grid) = diagn.grid
     (; uv∇lnp, uv∇lnp_sum_above, div_sum_above, scratch_memory) = diagn.dynamics
-    (; κ) = atmosphere              # thermodynamic kappa = R_Dry/heat_capacity
-    # Tᵥ = diagn.grid.temp_virt_grid  # anomaly wrt to Tₖ
     (; temp_profile) = implicit
 
     # semi-implicit: terms here are explicit+implicit evaluated at time step i
@@ -561,15 +557,13 @@ function temperature_tendency!(
     launch!(
         arch, RingGridWorkOrder, size(temp_tend_grid), _temperature_tendency_kernel!,
         temp_tend_grid, temp_grid, div_grid, humid_grid, div_sum_above, uv∇lnp_sum_above,
-        uv∇lnp, temp_profile, adiabatic_conversion.σ_lnp_A, adiabatic_conversion.σ_lnp_B, atmosphere.μ_virt_temp, κ
+        uv∇lnp, temp_profile, adiabatic_conversion.σ_lnp_A, adiabatic_conversion.σ_lnp_B, atmosphere
     )
 
     transform!(temp_tend, temp_tend_grid, scratch_memory, S)
 
     # now add the -∇⋅((u, v)*T') term
-    # temp_grid .-= temp_profile'     # convert to anomaly
     flux_divergence!(temp_tend, temp_grid, diagn, G, S, add = true, flipsign = true)
-    # temp_grid .+= temp_profile'     # convert back to absolute temperature
     
     return nothing
 end
@@ -585,9 +579,9 @@ end
         @Const(temp_profile),   # Input: reference temperature profile
         @Const(σ_lnp_A),        # Input: adiabatic conversion coefficient A
         @Const(σ_lnp_B),        # Input: adiabatic conversion coefficient B
-        μ_virt_temp,            # Input: virtual temperature calc const
-        κ,                      # Input: thermodynamic kappa = R_Dry/heat_capacity
+        atmosphere,             # Input: atmosphere for κ and μ_virt_temp
     )
+
     ij, k = @index(Global, NTuple)
     Tₖ = temp_profile[k]    # average layer temperature from reference profile
 
@@ -597,10 +591,9 @@ end
 
     # Adiabatic conversion term following Simmons and Burridge 1981 but for σ coordinates
     # += as tend already contains parameterizations + vertical advection
-
-    # TODO use dispatch to simplify calculation for dry core where Tᵥ = T
-    Tᵥ = virtual_temperature(temp_grid[ij, k] + Tₖ, humid_grid[ij, k], μ_virt_temp)
-
+    Tᵥ = virtual_temperature(temp_grid[ij, k] + Tₖ, humid_grid[ij, k], atmosphere)
+    
+    (; κ) = atmosphere
     temp_tend_grid[ij, k] +=
         temp_grid[ij, k] * div_grid[ij, k] +            # +T'D term of hori advection
         κ * Tᵥ * (                                      # +κTᵥ*Dlnp/Dt, adiabatic term
@@ -1122,7 +1115,6 @@ function SpeedyTransforms.transform!(
 
     # include humidity effect into temp for everything stability-related
     temperature_average!(diagn, temp, S)
-    # virtual_temperature!(diagn, model)        # temp = virt temp for dry core
     geopotential!(diagn, model)                 # calculate geopotential
 
     if initialize   # at initial step store prev <- current
