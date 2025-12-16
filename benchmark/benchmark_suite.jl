@@ -129,7 +129,7 @@ abstract type AbstractBenchmarkSuiteTimed <: AbstractBenchmarkSuite end
     allocs::Vector{Vector{Int}} = [fill(0, length(function_names)) for i=1:nruns]
 end 
 
-default_function_names() = ["pressure_gradient_flux!", "linear_virtual_temperature!", "temperature_anomaly!", "geopotential!", "vertical_integration!", "surface_pressure_tendency!", "vertical_velocity!", "linear_pressure_gradient!", "vertical_advection!","vordiv_tendencies!", "temperature_tendency!", "humidity_tendency!", "bernoulli_potential!"]
+default_function_names() = ["pressure_gradient_flux!", "linear_virtual_temperature!", "geopotential!", "vertical_integration!", "surface_pressure_tendency!", "vertical_velocity!", "linear_pressure_gradient!", "vertical_advection!","vordiv_tendencies!", "temperature_tendency!", "humidity_tendency!", "bernoulli_potential!"]
 
 function add_results!(suite::AbstractBenchmarkSuiteTimed, trial::BenchmarkTools.Trial, i_run::Integer, i_func::Integer)
 
