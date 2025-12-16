@@ -40,7 +40,7 @@ function set!(
     # now synchronize with geopotential in spectral space (used in primitive models)
     transform!(orography.surface_geopotential, orography.orography, spectral_transform)
     orography.surface_geopotential .*= gravity
-    spectral_truncation!(orography.surface_geopotential)     # set the lmax+1 harmonics to zero
+    SpeedyTransforms.spectral_truncation!(orography.surface_geopotential)     # set the lmax+1 harmonics to zero
     return nothing
 end
 
@@ -109,7 +109,7 @@ function initialize!(   orog::ZonalRidge,
 
     transform!(surface_geopotential, orography, S)   # to grid-point space
     surface_geopotential .*= gravity                 # turn orography into surface geopotential
-    spectral_truncation!(surface_geopotential)       # set the lmax+1 harmonics to zero
+    SpeedyTransforms.spectral_truncation!(surface_geopotential)       # set the lmax+1 harmonics to zero
     return nothing
 end
 
@@ -207,8 +207,8 @@ function initialize!(   orog::EarthOrography,
         SpeedyTransforms.spectral_smoothing!(surface_geopotential, c; power, truncation)
     end
 
-    transform!(orography, surface_geopotential, S)   # to grid-point space
-    surface_geopotential .*= gravity                 # turn orography into surface geopotential
-    spectral_truncation!(surface_geopotential)       # set the lmax+1 harmonics to zero
+    transform!(orography, surface_geopotential, S)                  # to grid-point space
+    surface_geopotential .*= gravity                                # turn orography into surface geopotential
+    SpeedyTransforms.spectral_truncation!(surface_geopotential)     # set the lmax+1 harmonics to zero
     return nothing    
 end
