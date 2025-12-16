@@ -44,12 +44,8 @@ function linear_virtual_temperature!(
     # virtual temperature in both grid and spectral space
     # transform!(temp_virt, temp_virt_grid, diagn.dynamics.scratch_memory, S)
 
-    for k in eachmatrix(temp_virt, temp, humid)
-        Tₖ = temp_average[k]
-        for lm in eachharmonic(temp_virt, temp, humid)
-            temp_virt[lm, k] = temp[lm, k] + (Tₖ*μ)*humid[lm, k]
-        end
-    end
+    # TODO: broadcast with LTA doesn't work here becasue of a broadcast conflict (Tₖ and humid are different dimensions and array types)
+    @. temp_virt.data = temp.data + (temp_average'*μ)*humid.data 
 end
 
 @inline virtual_temperature(T, q, A::AbstractWetAtmosphere) = virtual_temperature(T, q, A.μ_virt_temp)

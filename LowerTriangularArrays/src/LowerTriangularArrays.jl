@@ -8,7 +8,7 @@ import Adapt: Adapt, adapt
 import GPUArrays
 import KernelAbstractions
 import KernelAbstractions: @kernel, @index, @Const
-
+ 
 import SpeedyWeatherInternals.Architectures: Architectures, AbstractArchitecture, on_architecture, 
     array_type, ismatching, CPU, GPU, architecture, nonparametric_type
 
@@ -23,6 +23,7 @@ export LowerTriangularMatrix, LowerTriangularArray
 export eachharmonic, eachmatrix, eachorder, orders
 export OneBased, ZeroBased
 export lta_view
+export zero_last_degree!
 
 include("spectrum.jl")
 include("lower_triangular_array.jl")

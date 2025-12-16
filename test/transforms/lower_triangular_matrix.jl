@@ -860,3 +860,56 @@ end
     @test LowerTriangularArrays.lta_view(L, 1) isa SubArray
     @test LowerTriangularArrays.lta_view(L, :) isa LowerTriangularArray     # this is LTA representable though!
 end
+
+@testset "zero_last_degree!" begin
+    @testset for NF in (Float32, Float64)
+        # Test 1D LowerTriangularMatrix
+        @testset "1D LowerTriangularMatrix" begin
+            lmax, mmax = 6, 5
+            L = randn(LowerTriangularMatrix{NF}, lmax, mmax)
+            L_copy = copy(L.data)
+            
+            # Zero the last degree
+            LowerTriangularArrays.zero_last_degree!(L)
+            
+            # Check that all elements with l == lmax are zero
+            for m in 1:mmax
+                @test L[lmax, m] == 0
+            end
+            
+            # Check that other elements are unchanged
+            for m in 1:mmax
+                for l in m:lmax-1
+                    @test L[l, m] == L_copy[SpeedyWeather.LowerTriangularArrays.lm2i(l, m, lmax)]
+                end
+            end
+        end
+        
+        # Test 2D LowerTriangularArray (with vertical layers)
+        @testset "2D LowerTriangularArray" begin
+            lmax, mmax, nlayers = 6, 5, 3
+            L = randn(LowerTriangularArray{NF}, lmax, mmax, nlayers)
+            L_copy = copy(L.data)
+            
+            # Zero the last degree
+            LowerTriangularArrays.zero_last_degree!(L)
+            
+            # Check that all elements with l == lmax are zero across all layers
+            for k in 1:nlayers
+                for m in 1:mmax
+                    @test L[lmax, m, k] == 0
+                end
+            end
+            
+            # Check that other elements are unchanged
+            for k in 1:nlayers
+                for m in 1:mmax
+                    for l in m:lmax-1
+                        lm = SpeedyWeather.LowerTriangularArrays.lm2i(l, m, lmax)
+                        @test L[l, m, k] == L_copy[lm, k]
+                    end
+                end
+            end
+        end
+    end
+end

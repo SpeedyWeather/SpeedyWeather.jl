@@ -261,7 +261,7 @@ $(TYPEDFIELDS)"""
     time_scale::Second = Hour(4)
 end
 
-Adapt.@adapt_structure BettsMillerDryConvection
+Adapt.adapt_structure(to, bmdc::BettsMillerDryConvection{NF}) where NF = BettsMillerDryConvection{NF}(adapt_structure(to, bmdc.time_scale))
 
 # generator function
 BettsMillerDryConvection(SG::SpectralGrid; kwargs...) = BettsMillerDryConvection{SG.NF}(; kwargs...)
