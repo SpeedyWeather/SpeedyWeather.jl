@@ -1,4 +1,5 @@
 abstract type AbstractLand <: AbstractModelComponent end
+abstract type AbstractLandComponent <: AbstractModelComponent end
 abstract type AbstractWetLand <: AbstractLand end
 abstract type AbstractDryLand <: AbstractLand end
 
@@ -24,21 +25,15 @@ function Base.show(io::IO, M::AbstractLand)
     end
 end
 
-include("geometry.jl")
-include("thermodynamics.jl")
-include("temperature.jl")
-include("soil_moisture.jl")
-include("vegetation.jl")
-include("rivers.jl")
-
 # LandModel defined through its components
 export LandModel
-@kwdef mutable struct LandModel{G, TD, T, SM, V, R} <: AbstractWetLand
+@kwdef mutable struct LandModel{G, TD, T, SM, SN, V, R} <: AbstractWetLand
     spectral_grid::SpectralGrid
     geometry::G = LandGeometry(spectral_grid)
     thermodynamics::TD = LandThermodynamics(spectral_grid)
     temperature::T = LandBucketTemperature(spectral_grid)
     soil_moisture::SM = LandBucketMoisture(spectral_grid)
+    snow::SN = SnowModel(spectral_grid)
     vegetation::V = VegetationClimatology(spectral_grid)
     rivers::R = nothing
 end
@@ -53,9 +48,18 @@ function initialize!(   land::LandModel,
     initialize!(model.land.thermodynamics, model)
     initialize!(model.land.temperature, model)
     initialize!(model.land.soil_moisture, model)
+    initialize!(model.land.snow, model)
     initialize!(model.land.vegetation, model)
     initialize!(model.land.rivers, model)
 end
+
+# allocate variables as defined by land components
+variables(land::LandModel) = ( variables(land.temperature)...,
+                               variables(land.soil_moisture)...,
+                               variables(land.snow)...,
+                               variables(land.vegetation)...,
+                               variables(land.rivers)...,
+                               )
 
 export DryLandModel
 @kwdef struct DryLandModel{G, TD, T} <: AbstractDryLand
@@ -71,6 +75,9 @@ function initialize!(land::DryLandModel, model::PrimitiveEquation)
     initialize!(model.land.temperature, model)
 end
 
+# initializing the land model initializes its components
+variables(land::DryLandModel) = (variables(land.temperature)...,)
+
 # unpack land model and call general timestep! function
 land_timestep!(progn::PrognosticVariables, diagn::DiagnosticVariables, model::PrimitiveEquation) =
     timestep!(progn, diagn, model.land, model)
@@ -83,6 +90,7 @@ function timestep!(
 )
     if model isa PrimitiveWet && land isa AbstractWetLand
         # TODO think about the order of these
+        timestep!(progn, diagn, land.snow, model)
         timestep!(progn, diagn, land.soil_moisture, model)
         timestep!(progn, diagn, land.rivers, model)
         timestep!(progn, diagn, land.vegetation, model)
@@ -94,24 +102,15 @@ function initialize!(
     land::PrognosticVariablesLand,  # for dispatch
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
-    model::PrimitiveEquation,
-)
-    # unpack model.land to dispatch over it and so that model.land = nothing is valid
-    initialize!(land, progn, diagn, model.land, model)
-end
-
-function initialize!(
-    land::PrognosticVariablesLand,  # for dispatch
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
     land_model::AbstractLand,
     model::PrimitiveEquation,
-)
+) where PrognosticVariablesLand
     initialize!(progn, diagn, land_model.temperature, model)
 
     # only initialize soil moisture, vegetation, rivers if atmosphere and land are wet
     if model isa PrimitiveWet && land_model isa AbstractWetLand
-        initialize!(progn, diagn, land_model.soil_moisture, model)      
+        initialize!(progn, diagn, land_model.soil_moisture, model)   
+        initialize!(progn, diagn, land_model.snow, model)
         initialize!(progn, diagn, land_model.vegetation, model)     
         initialize!(progn, diagn, land_model.rivers, model)
     end

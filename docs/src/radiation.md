@@ -59,6 +59,71 @@ flux from below at interface ``k+1/2`` (``k`` increases downwards, see
 ``\Delta p = p_{k+1/2} - p_{k-1/2}`` is the pressure thickness of layer ``k``,
 gravity ``g`` and heat capacity ``c_p``.
 
+## OneBandLongwave
+
+Solves the standard two-stream approximation to calculate longwave radiative fluxes
+up ``U`` and down ``D`` following Frierson et al. 2006 [^FH06].
+
+```math
+\frac{dU}{d\tau} = (U - B), \qquad \frac{dD}{d\tau} = (B - D)
+```
+
+using optical depth ``\tau`` as vertical coordinate. Longwave emittance is
+``\sigma T^4`` following Stefan-Boltzmann with emittance of 1. Boundary conditions
+are ``U = \sigma T_s^4`` at the surface, i.e. the surface emitting with its surface
+temperature ``T_s`` (sea surface temperature, skin or soil temperature); and
+``D = 0`` at the top (no longwave radiation from space). Instead of optical depth
+we solve these equations using the transmissivity ``t = exp(-\tau)``.
+
+```math
+U_{k-1} = t_k U_k + (1-t_k) σ T_k^4
+```
+
+such that the upward flux ``U_k`` of layer ``k`` is reduced by transmissivity
+``t_k`` of that layer but increased by longwave emittance going up. Similarly
+on the downwards pass
+
+```math
+D_{k+1} = t_k D_k + (1-t_k) σ T_k^4
+```
+
+Note that the sign change in the differential formulation with optical
+depth only occurs because the optical depth as vertical coordinate
+strictly increases towards the surface.
+
+To be used like (currently the default anyway)
+
+```@example radiation
+spectral_grid = SpectralGrid()
+longwave_radiation = OneBandLongwave(spectral_grid)
+model = PrimitiveWetModel(spectral_grid; longwave_radiation)
+model.longwave_radiation
+```
+
+The transmissivity is defined as in Frierson et al. 2006 [^FH06]
+using the following parameters
+
+```@example radiation
+FriersonLongwaveTransmissivity(spectral_grid)
+```
+
+to compute
+
+```math
+\tau_0 = \tau_{0e} + (\tau_{0p} - \tau_{0e}) \sin^2(\theta)
+```
+
+with surface values of optical depth at the equator ``\tau_{0e}`` and
+at the poles ``\tau_{0p}`` and a transition in between with
+latitude ``\theta``. Then the optical depth changes in the vertical
+as
+
+```math
+\tau = \tau_0 \left[ f_l \left( \frac{p}{p_s} \right) + (1 - f_l) \left( \frac{p}{p_s} \right)^4 \right]
+```
+
+For details see Frierson et al. 2006 [^FH06].
+
 ## Shortwave radiation
 
 Currently implemented schemes:
@@ -70,15 +135,23 @@ subtypes(SpeedyWeather.AbstractShortwave)
 
 ## OneBandShortwave: Single-band shortwave radiation with diagnostic clouds
 
-The `OneBandShortwave` scheme provides a single-band (broadband) shortwave radiation parameterization, including diagnostic cloud effects following [^KMB06]. For dry models without water vapor, use `OneBandGreyShortwave` instead, which automatically disables cloud effects and uses transparent transmittance.
+!!! warn "OneBandShortwave currently not available"
+    With internal structure change for GPU acceleration this parameterization is currently unavailable.
+
+The `OneBandShortwave` scheme provides a single-band (broadband) shortwave radiation parameterization,
+including diagnostic cloud effects following [^KMB06]. For dry models without water vapor, use
+`OneBandGreyShortwave` instead, which automatically disables cloud effects and uses transparent
+transmissivity ``t=1``.
 
 **Key differences:**
 
-- `OneBandShortwave`: Includes diagnostic clouds, water vapor absorption, and atmospheric transmittance effects (for wet models)
+- `OneBandShortwave`: Includes diagnostic clouds, water vapor absorption, and atmospheric transmissivity effects (for wet models)
 - `OneBandGreyShortwave`: No clouds, transparent atmosphere (for dry models)
 
 **Cloud diagnosis:**
-Cloud properties are diagnosed from the relative humidity and total precipitation in the atmospheric column. The cloud base is set at the interface between the lowest two model layers, and the cloud top is the highest layer where both
+Cloud properties are diagnosed from the relative humidity and total precipitation in the atmospheric column.
+The cloud base is set at the interface between the lowest two model layers, and the cloud top is the
+highest layer where both
 
 ```math
 \mathrm{RH}_k > \mathrm{RH}_{cl} \quad \text{and} \quad Q_k > Q_{cl}
@@ -90,7 +163,8 @@ are satisfied. The cloud cover (CLC) in a layer is then given by
 \mathrm{CLC} = \min\left[1,\ w_{pcl} \sqrt{\min(p_{mcl}, P_{lsc} + P_{cnv})}+ \min\left(1, \left(\frac{\mathrm{RH}_k - \mathrm{RH}_{cl}}{\mathrm{RH}'_{cl} - \mathrm{RH}_{cl}}\right)^2\right)\right]
 ```
 
-where $w_{pcl}$ and $p_{mcl}$ are parameters, $P_{lsc}$ and $P_{cnv}$ are large-scale and convective precipitation, and $\mathrm{RH}_{cl}$ is a threshold.
+where $w_{pcl}$ and $p_{mcl}$ are parameters, $P_{lsc}$ and $P_{cnv}$ are large-scale and convective precipitation,
+and $\mathrm{RH}_{cl}$ is a threshold.
 
 **Stratocumulus clouds:**
 Stratocumulus cloud cover over oceans is parameterized based on boundary layer static stability (GSEN):
@@ -113,13 +187,15 @@ Over land, the stratocumulus cover $\mathrm{CLS}$ is further modified to be prop
 where $\mathrm{RH}_N$ is the surface (lowest model layer) relative humidity.
 
 **Radiative transfer:**
-The incoming solar flux at the top of the atmosphere is computed from astronomical formulae. Ozone absorption in the lower and upper stratosphere is subtracted, yielding the downward flux into the first model layer:
+The incoming solar flux at the top of the atmosphere is computed from astronomical formulae. Ozone absorption in the
+lower and upper stratosphere is subtracted, yielding the downward flux into the first model layer:
 
 ```math
 F_{h}^{\downarrow, SR} = F_{0}^{\downarrow, sol} - \Delta F_{ust}^{ozone} - \Delta F_{lst}^{ozone}
 ```
 
-Shortwave radiation is then propagated downward through each layer using a transmissivity $\tau_{k}^{SR}$, which depends on zenith angle, layer depth, humidity, and cloud properties:
+Shortwave radiation is then propagated downward through each layer using a transmissivity $\tau_{k}^{SR}$,
+which depends on zenith angle, layer depth, humidity, and cloud properties:
 
 ```math
 F_{k+h}^{\downarrow, SR} = F_{k-h}^{\downarrow, SR} \, \tau_k^{SR}
@@ -149,7 +225,8 @@ and is propagated upward as
 F_{k-h}^{\uparrow, SR} =  F_{k+h}^{\uparrow, SR} \, \tau_{k}^{SR}
 ```
 
-with cloud reflection added at the cloud-top layer. The upward part is only modeled for the visible band, as near-infrared is mostly absorbed downward.
+with cloud reflection added at the cloud-top layer. The upward part is only modeled for the visible band,
+as near-infrared is mostly absorbed downward.
 
 **Key features:**
 
@@ -165,7 +242,7 @@ To use the OneBandShortwave scheme, construct your model as follows and run as u
 
 **For wet models (with water vapor and clouds):**
 
-```@example radiation
+```julia
 using SpeedyWeather
 using CairoMakie
 spectral_grid = SpectralGrid(trunc=31, nlayers=8)
@@ -178,23 +255,23 @@ ssrd = simulation.diagnostic_variables.physics.surface_shortwave_down
 heatmap(ssrd,title="Surface shortwave radiation down [W/m^2]")
 save("ssrd.png", ans) # hide
 nothing # hide
+# show ![Surface shortwave radiation down](ssrd.png)
 ```
 
-![Surface shortwave radiation down](ssrd.png)
 
-```@example radiation
+```julia
 osr = simulation.diagnostic_variables.physics.outgoing_shortwave_radiation
 heatmap(osr,title="Outgoing shortwave radiation [W/m^2]")
 save("osr.png", ans) # hide
 nothing # hide
+# show ![Outgoing shortwave radiation](osr.png)
 ```
 
-![Outgoing shortwave radiation](osr.png)
-
 **For dry models (no water vapor or clouds):**
-Use `OneBandGreyShortwave` instead, which automatically uses `NoClouds` and `TransparentShortwaveTransmittance`:
 
-```@example radiation
+Use `OneBandGreyShortwave` instead, which automatically uses `NoClouds` and `TransparentShortwaveTransmissivity`:
+
+```julia
 using SpeedyWeather
 spectral_grid = SpectralGrid(trunc=31, nlayers=8)
 model = PrimitiveDryModel(spectral_grid; shortwave_radiation=OneBandGreyShortwave(spectral_grid))
@@ -206,9 +283,8 @@ ssrd = simulation.diagnostic_variables.physics.surface_shortwave_down
 heatmap(ssrd, title="Surface shortwave radiation (dry model) [W/m^2]")
 save("ssrd_dry.png", ans) # hide
 nothing # hide
+# show ![Surface shortwave radiation (dry model)](ssrd_dry.png)
 ```
-
-![Surface shortwave radiation (dry model)](ssrd_dry.png)
 
 ### Parameterization options
 
@@ -221,25 +297,46 @@ The cloud scheme can be specified when constructing the radiation scheme:
 - `DiagnosticClouds(spectral_grid)` (default): Diagnoses clouds from humidity and precipitation
 - `NoClouds(spectral_grid)`: No clouds (used in `OneBandGreyShortwave`)
 
-#### Transmittance schemes
+#### Transmissivity schemes
 
-The atmospheric transmittance can be calculated using:
+The atmospheric transmissivity can be calculated using:
 
-- `BackgroundShortwaveTransmittance(spectral_grid)` (default): SPEEDY-style transmittance with zenith correction and absorption by aerosols, water vapor, and clouds
-- `TransparentShortwaveTransmittance(spectral_grid)`: Transparent atmosphere (used in `OneBandGreyShortwave`)
+- `BackgroundShortwaveTransmissivity(spectral_grid)` (default): Fortran SPEEDY-based transmissivity with zenith correction and absorption by aerosols, water vapor, and clouds
+- `TransparentShortwaveTransmissivity(spectral_grid)`: Transparent atmosphere (used in `OneBandGreyShortwave`)
+
+##### BackgroundShortwaveTransmissivity 
+
+For each layer ``k``, the transmissivity is
+
+```math
+\tau_k^{SR} = \exp\left(-\mu \, \Delta\sigma_k \, \frac{p_s}{10^5} \, \left[a_{dry} + a_{aer}\,\sigma_k^2 + a_{wv}\,q_k + a_{cl}(q_\mathrm{base})\,\mathrm{CLC}\right]\right)
+```
+
+with
+
+- ``\mu = 1 + a_{zen}(1-\cos\theta)^{n_{zen}}`` (zenith-path correction; ``\theta`` is the zenith angle)
+- ``\Delta\sigma_k = \sigma_{k+1} - \sigma_k`` from the half-levels in the grid geometry
+- ``p_s`` the column surface pressure
+- ``a_{dry}`` dry-air absorptivity (`absorptivity_dry_air`)
+- ``a_{aer}`` aerosol absorptivity (`absorptivity_aerosol`), scaled by ``\sigma_k^2`` when `aerosols = true`
+- ``a_{wv}`` water-vapor absorptivity (`absorptivity_water_vapor`) times specific humidity ``q_k``
+- ``a_{cl}(q_\mathrm{base}) = \min(a_{cl,base} q_\mathrm{base}, a_{cl,limit})`` cloud absorptivity added below the diagnosed cloud top, scaled by cloud cover ``\mathrm{CLC}``
+
+All absorptivity coefficients are per ``10^5`` Pa. The resulting ``\tau_k^{SR}`` values are stored in `column.transmissivity_shortwave[:, band]` and reused for both the downward and upward sweeps in `OneBandShortwaveRadiativeTransfer`.
+
+##### TransparentShortwaveTransmissivity details
+
+Sets ``\tau_k^{SR} = 1`` for all layers and bands, effectively skipping atmospheric attenuation while still computing surface and cloud reflections in the radiative transfer step.
 
 #### Stratocumulus clouds
 
 The `DiagnosticClouds` scheme includes a `use_stratocumulus` flag (default: `true`) that enables the diagnostic stratocumulus cloud parameterization over oceans:
 
-```@example radiation
+```julia
 using SpeedyWeather, CairoMakie
 
 spectral_grid = SpectralGrid()
-clouds_no_sc = SpeedyWeather.DiagnosticClouds(spectral_grid; use_stratocumulus=false)
-transmittance_no_sc = SpeedyWeather.BackgroundShortwaveTransmittance(spectral_grid)
-radiative_transfer_no_sc = SpeedyWeather.OneBandShortwaveRadiativeTransfer(spectral_grid)
-sw_no_sc = OneBandShortwave(clouds_no_sc, transmittance_no_sc, radiative_transfer_no_sc)
+sw_no_sc = OneBandShortwave(spectral_grid, clouds = DiagnosticClouds(spectral_grid; use_stratocumulus=false))
 
 model = PrimitiveWetModel(spectral_grid; shortwave_radiation=sw_no_sc)
 sim = initialize!(model)
@@ -248,9 +345,8 @@ ssrd = sim.diagnostic_variables.physics.surface_shortwave_down
 heatmap(ssrd, title="No stratocumulus clouds [W/m^2]")
 save("oneband_no_stratocumulus.png", ans) # hide
 nothing # hide
+# show ![No stratocumulus clouds](oneband_no_stratocumulus.png)
 ```
-
-![No stratocumulus clouds](oneband_no_stratocumulus.png)
 
 ## References
 
@@ -261,3 +357,5 @@ nothing # hide
 [^JZ22]: Jeevanjee, N. & Zhou, L. On the Resolution‐Dependence of Anvil Cloud Fraction and Precipitation Efficiency in Radiative‐Convective Equilibrium. J Adv Model Earth Syst 14, e2021MS002759 (2022). DOI:[10.1029/2021MS002759](https://doi.org/10.1029/2021MS002759)
 
 [^KMB06]: Kucharski, F., Molteni, F., & Bracco, A. SPEEDY: A simplified atmospheric general circulation model. ICTP, Trieste, Italy. Appendix A: Model Equations and Parameters (2006). [PDF](https://users.ictp.it/~kucharsk/speedy_description/km_ver41_appendixA.pdf)
+
+[^FH06]: Frierson DMW, IM Held, P Zurita-Gotor. A Gray-Radiation Aquaplanet Moist GCM. Part I: Static Stability and Eddy Scale (2006). Journal of the Atmospheric Sciences 63:10. DOI: [10.1175/JAS3753.1](https://doi.org/10.1175/JAS3753.1)

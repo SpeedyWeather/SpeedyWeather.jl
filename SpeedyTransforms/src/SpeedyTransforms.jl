@@ -9,7 +9,7 @@ import FFTW
 import GenericFFT
 import LinearAlgebra
 import Primes
-import Adapt: adapt
+import Adapt: Adapt, adapt, adapt_structure
 import KernelAbstractions: @kernel, @index, @Const, synchronize
 import Atomix
 

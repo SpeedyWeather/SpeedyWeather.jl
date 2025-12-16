@@ -3,18 +3,18 @@
 
 # We do this seperate struct here for purely technical reasons to avoid that we have memory 
 # alias each other in the call to `_legendre!`.
-struct ColumnScratchMemory{NF, VectorComplexType}
+struct ColumnScratchMemory{VectorComplexType}
     north::VectorComplexType        # scratch memory for vertically batched Legendre transform
     south::VectorComplexType        # scratch memory for vertically batched Legendre transform
 end
+
+Adapt.@adapt_structure ColumnScratchMemory
 
 """
 ScratchMemory holds scratch memory for the `SpectralTransform` that's used both by the Fourier and Legendre transform. Fields are
 $(TYPEDFIELDS)"""
 struct ScratchMemory{ 
-    NF,                       
     ArrayComplexType,         # <: ArrayType{Complex{NF}, 3},
-    VectorType,               # <: ArrayType{NF, 1},
     VectorComplexType,        # <: ArrayType{Complex{NF}, 1},
 }
     # SCRATCH MEMORY FOR FOURIER NOT YET LEGENDRE TRANSFORMED AND VICE VERSA
@@ -22,8 +22,10 @@ struct ScratchMemory{
     north::ArrayComplexType
     south::ArrayComplexType
 
-    column::ColumnScratchMemory{NF, VectorComplexType}
+    column::ColumnScratchMemory{VectorComplexType}
 end 
+
+Adapt.@adapt_structure ScratchMemory
 
 function ScratchMemory(
     ::Type{NF},                     
@@ -42,12 +44,10 @@ function ScratchMemory(
     scratch_memory_column_south = zeros(Complex{NF}, nlayers)
 
     return ScratchMemory{
-        NF,
         array_type(architecture, Complex{NF}, 3), 
-        array_type(architecture, NF, 1),
         array_type(architecture, Complex{NF}, 1),
     }(scratch_memory_north, scratch_memory_south, 
-    ColumnScratchMemory{NF, array_type(architecture, Complex{NF}, 1)}(
+    ColumnScratchMemory{array_type(architecture, Complex{NF}, 1)}(
     scratch_memory_column_north, scratch_memory_column_south))
 end 
 

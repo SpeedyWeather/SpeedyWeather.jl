@@ -175,7 +175,7 @@ end
             # create some smooth gridded field
             trunc = 10
             alms = randn(LowerTriangularMatrix{Complex{NF}}, 5, 5)
-            alms = spectral_truncation(alms, trunc+2, trunc+1)
+            alms = SpeedyTransforms.spectral_truncation(alms, trunc+2, trunc+1)
             A = transform(alms; Grid)
 
             # interpolate to FullGaussianGrid and back and compare
@@ -225,9 +225,7 @@ end
                     OctaHEALPixGrid)
                 
         for trunc in (31, 42, 63)
-
             spectral_grid = SpectralGrid(; trunc, Grid)
-
             land_sea_mask = LandSeaMask(spectral_grid)
             initialize!(land_sea_mask, PrimitiveDryModel(spectral_grid))
         end

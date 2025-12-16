@@ -11,6 +11,7 @@ passed on as keyword arguments, e.g. `planet=Earth(spectral_grid)`. Fields, repr
 model components, are
 $(TYPEDFIELDS)"""
 @kwdef mutable struct BarotropicModel{
+    SG,     # <:SpectralGrid
     AR,     # <:AbstractArchitecture,
     GE,     # <:AbstractGeometry,
     PL,     # <:AbstractPlanet,
@@ -29,7 +30,7 @@ $(TYPEDFIELDS)"""
     FB,     # <:AbstractFeedback,
 } <: Barotropic
     
-    spectral_grid::SpectralGrid
+    spectral_grid::SG
     architecture::AR = spectral_grid.architecture
     
     # DYNAMICS
@@ -41,7 +42,7 @@ $(TYPEDFIELDS)"""
     forcing::FR = KolmogorovFlow(spectral_grid)
     drag::DR = LinearVorticityDrag(spectral_grid)
     particle_advection::PA = nothing
-    initial_conditions::IC = InitialConditions(Barotropic)
+    initial_conditions::IC = InitialConditions(spectral_grid, Barotropic)
     
     # VARIABLES
     random_process::RP = nothing
@@ -91,8 +92,8 @@ function initialize!(model::Barotropic; time::DateTime = DEFAULT_DATE)
     initialize!(model.particle_advection, model)
 
     # allocate prognostic and diagnostic variables
-    prognostic_variables = PrognosticVariables(spectral_grid, model)
-    diagnostic_variables = DiagnosticVariables(spectral_grid, model)
+    prognostic_variables = PrognosticVariables(model)
+    diagnostic_variables = DiagnosticVariables(model)
     
     # initialize particles (or other non-atmosphere prognostic variables)
     initialize!(prognostic_variables.particles, prognostic_variables, diagnostic_variables, model)

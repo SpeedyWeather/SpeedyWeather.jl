@@ -1,9 +1,18 @@
+abstract type AbstractSurfaceHeatFlux <: AbstractParameterization end
+
 export SurfaceHeatFlux
+
+"""Composite surface (sensible) heat flux type that holds flux
+for ocean and land (each of any type) separately. Fields are
+$(TYPEDFIELDS)"""
 @kwdef struct SurfaceHeatFlux{Ocean, Land} <: AbstractSurfaceHeatFlux
     ocean::Ocean = SurfaceOceanHeatFlux()
     land::Land = SurfaceLandHeatFlux()
 end
 
+Adapt.@adapt_structure SurfaceHeatFlux
+
+# generator function
 function SurfaceHeatFlux(
     SG::SpectralGrid; 
     ocean = SurfaceOceanHeatFlux(SG),
@@ -16,151 +25,212 @@ function initialize!(S::SurfaceHeatFlux, model::PrimitiveEquation)
     initialize!(S.land, model)
 end
 
-function surface_heat_flux!(   
-    column::ColumnVariables,
-    heat_flux::SurfaceHeatFlux,
-    progn::PrognosticVariables,
-    model::PrimitiveEquation,
-)   
-    surface_heat_flux!(column, heat_flux.ocean, progn, model)
-    surface_heat_flux!(column, heat_flux.land, progn, model)
+# call first ocean flux then land flux
+@propagate_inbounds function parameterization!(ij, diagn, progn, heat_flux::SurfaceHeatFlux, model)
+    surface_heat_flux!(ij, diagn, progn, heat_flux.ocean, model)
+    surface_heat_flux!(ij, diagn, progn, heat_flux.land,  model)
 end
-
-## ----
-
-# no surface heat flux
-surface_heat_flux!(::ColumnVariables, ::Nothing, ::PrimitiveEquation) = nothing
-
-## ----
 
 export SurfaceOceanHeatFlux
+
+"""Surface sensible heat flux parameterization over ocean. Calculates the 
+turbulent exchange of sensible heat between the ocean surface and the atmosphere
+based on temperature differences and wind speed. Uses bulk aerodynamic formulas
+with drag coefficients. Fields are $(TYPEDFIELDS)"""
 @kwdef struct SurfaceOceanHeatFlux{NF} <: AbstractSurfaceHeatFlux
-    "Use (possibly) flow-dependent column.boundary_layer_drag coefficient"
+    "[OPTION] Use drag coefficient from calculated following model.boundary_layer_drag"
     use_boundary_layer_drag::Bool = true
 
-    "Otherwise, use the following drag coefficient for heat fluxes over ocean"
-    heat_exchange::NF = 0.9e-3
+    "[OPTION] Or fixed drag coefficient for heat fluxes over ocean"
+    drag::NF = 0.9e-3
+
+    "[OPTION] Sea ice insulating surface heat fluxes [1]"
+    sea_ice_insulation::NF = 0.01
 end
 
+Adapt.@adapt_structure SurfaceOceanHeatFlux
 SurfaceOceanHeatFlux(SG::SpectralGrid; kwargs...) = SurfaceOceanHeatFlux{SG.NF}(; kwargs...)
 initialize!(::SurfaceOceanHeatFlux, ::PrimitiveEquation) = nothing
 
-function surface_heat_flux!(
-    column::ColumnVariables{NF},
-    heat_flux::SurfaceOceanHeatFlux,
-    model::PrimitiveEquation,
-) where NF
+@propagate_inbounds function surface_heat_flux!(ij, diagn, progn, heat_flux::SurfaceOceanHeatFlux, model)
+    
+    nlayers = model.geometry.nlayers
     cₚ = model.atmosphere.heat_capacity
-    (; heat_exchange) = heat_flux
+    ρ = diagn.physics.surface_air_density[ij]
+    V₀ = diagn.physics.surface_wind_speed[ij]
+    sea_ice_concentration = haskey(progn.ocean, :sea_ice_concentration) ?
+        progn.ocean.sea_ice_concentration[ij] : zero(ρ)
 
-    ρ = column.surface_air_density
-    V₀ = column.surface_wind_speed
-    T_skin_ocean = column.skin_temperature_sea
-    T = column.surface_temp
-    land_fraction = column.land_fraction
+    # TODO actually implement skin temperature?
+    SST = progn.ocean.sea_surface_temperature[ij]
+    T = diagn.physics.surface_air_temperature[ij]
+    land_fraction = model.land_sea_mask.mask[ij]
+    pₛ = diagn.grid.pres_grid_prev[ij]
 
     # drag coefficient
-    drag_ocean = heat_flux.use_boundary_layer_drag ? column.boundary_layer_drag : heat_exchange
+    d = diagn.physics.boundary_layer_drag[ij]
+    drag_ocean = heat_flux.use_boundary_layer_drag ? d : heat_flux.drag
 
     # SPEEDY documentation Eq. 54/56, land/sea fraction included
-    # Only flux from sea if available (not NaN) otherwise zero flux
-    flux_ocean  = isfinite(T_skin_ocean) ? ρ*drag_ocean*V₀*cₚ*(T_skin_ocean  - T) : zero(T_skin_ocean)
-    column.sensible_heat_flux_ocean = flux_ocean    # to store ocean flux separately too
-    
-    flux_ocean *= (1-land_fraction)                 # weight by ocean fraction of land-sea mask
-    column.flux_temp_upward[end] += flux_ocean      # accumulate with += for sum of all fluxes
-    column.sensible_heat_flux = flux_ocean          # output/diagnostics: ocean sets the flux (=), land accumulates (+=)
+    # Only flux from ocean if available (not NaN) otherwise zero flux
+    # leave out *cₚ here but include below to avoid division
+    flux_ocean  = isfinite(SST) ? ρ*drag_ocean*V₀*(SST  - T) : zero(SST)
 
+    # sea ice insulation: more sea ice ⇒ smaller flux (ℵ / ℵ₀ scaling)
+    flux_ocean /= 1 + sea_ice_concentration / heat_flux.sea_ice_insulation
+    
+    # store without weighting by land fraction for coupling [W/m²]
+    diagn.physics.ocean.sensible_heat_flux[ij] = flux_ocean*cₚ  # to store ocean flux separately too
+    
+    flux_ocean *= (1-land_fraction)                             # weight by ocean fraction of land-sea mask
+    
+    # output/diagnostics: ocean sets the flux (=), land accumulates (+=)
+    diagn.physics.sensible_heat_flux[ij] = flux_ocean*cₚ        # [W/m²]
+    
+    # accumulate with += into end=lowermost layer total flux
+    diagn.tendencies.temp_tend_grid[ij, nlayers] += surface_flux_to_tendency(flux_ocean, pₛ, model)
     return nothing
 end
 
-## ----
 
 export SurfaceLandHeatFlux
+
+"""Surface sensible heat flux parameterization over land. Calculates the 
+turbulent exchange of sensible heat between the land surface and the atmosphere
+based on soil temperature differences and wind speed. Uses bulk aerodynamic 
+formulas with drag coefficients that can account for surface roughness. 
+Fields are $(TYPEDFIELDS)"""
 @kwdef struct SurfaceLandHeatFlux{NF} <: AbstractSurfaceHeatFlux
-    "Use (possibly) flow-dependent column.boundary_layer_drag coefficient"
+    "[OPTION] Use drag coefficient from calculated following model.boundary_layer_drag"
     use_boundary_layer_drag::Bool = true
 
-    "Otherwise, use the following drag coefficient for heat fluxes over land"
-    heat_exchange::NF = 1.2e-3    # for neutral stability
+    "[OPTION] Or fixed drag coefficient for heat fluxes over land"
+    drag::NF = 1.2e-3       # for neutral stability
+
+    "[OPTION] Snow insulation depth [m], e-folding depth reducing surface heat fluxes"
+    snow_insulation_depth::NF = 0.05
 end
 
+Adapt.@adapt_structure SurfaceLandHeatFlux
 SurfaceLandHeatFlux(SG::SpectralGrid; kwargs...) = SurfaceLandHeatFlux{SG.NF}(; kwargs...)
 initialize!(::SurfaceLandHeatFlux, ::PrimitiveEquation) = nothing
 
-function surface_heat_flux!(
-    column::ColumnVariables{NF},
-    heat_flux::SurfaceLandHeatFlux,
-    model::PrimitiveEquation,
-) where NF
+@propagate_inbounds function surface_heat_flux!(ij, diagn, progn, heat_flux::SurfaceLandHeatFlux, model)
+    
+    surface = model.geometry.nlayers
     cₚ = model.atmosphere.heat_capacity
-    (; heat_exchange) = heat_flux
+    pₛ = diagn.grid.pres_grid_prev[ij]                  # surface pressure [Pa]
+    ρ = diagn.physics.surface_air_density[ij]
+    V₀ = diagn.physics.surface_wind_speed[ij]
 
-    ρ = column.surface_air_density
-    V₀ = column.surface_wind_speed
-    T_skin_land = column.skin_temperature_land
-    T = column.surface_temp
-    land_fraction = column.land_fraction
+    # TODO actually implement skin temperature?
+    T_skin_land = progn.land.soil_temperature[ij, 1]    # uppermost land layer with index 1
+    T = diagn.physics.surface_air_temperature[ij]
+    land_fraction = model.land_sea_mask.mask[ij]
+    snow_depth = haskey(progn.land, :snow_depth) ? progn.land.snow_depth[ij] : zero(T)
 
     # drag coefficient
-    drag_land = heat_flux.use_boundary_layer_drag ? column.boundary_layer_drag : heat_exchange
+    d = diagn.physics.boundary_layer_drag[ij]
+    drag_land = heat_flux.use_boundary_layer_drag ? d : heat_flux.drag
 
     # SPEEDY documentation Eq. 54/56, land/sea fraction included
-    # Only flux from sea if available (not NaN) otherwise zero flux
-    flux_land  = isfinite(T_skin_land) ? ρ*drag_land*V₀*cₚ*(T_skin_land  - T) : zero(T_skin_land)
-    column.sensible_heat_flux_land = flux_land  # store land flux separately too
+    # Only flux from land if available (not NaN) otherwise zero flux
+    # leave out *cₚ here but include below to avoid division
+    flux_land  = isfinite(T_skin_land) ? ρ*drag_land*V₀*(T_skin_land  - T) : zero(T)
+    
+    # snow insulation: deeper snow ⇒ smaller flux (S / S₀ depth scaling)
+    flux_land /= 1 + snow_depth / heat_flux.snow_insulation_depth
+
+    # store without weighting by land fraction for coupling [W/m²]
+    diagn.physics.land.sensible_heat_flux[ij] = flux_land*cₚ  # store land flux separately too
     flux_land *= land_fraction                  # weight by land fraction of land-sea mask
     
-    column.flux_temp_upward[end] += flux_land   # accumulate with += for total flux
-    column.sensible_heat_flux += flux_land      # diagnose/output: ocean sets the flux (=), land accumulates (+=)
+    # output/diagnose: ocean sets flux (=), land accumulates (+=)
+    diagn.physics.sensible_heat_flux[ij] += flux_land*cₚ    # [W/m²]
     
+    # accumulate with += into end=lowermost layer total flux
+    diagn.tendencies.temp_tend_grid[ij, surface] += surface_flux_to_tendency(flux_land, pₛ, model)
     return nothing
 end
 
 ## ----
 
 export PrescribedOceanHeatFlux
+
+"""Prescribed surface sensible heat flux over ocean. Reads heat flux values
+from external data sources instead of calculating them dynamically. Useful for
+coupled model runs where ocean heat fluxes are provided by an ocean model
+or for sensitivity experiments with fixed flux patterns."""
 struct PrescribedOceanHeatFlux <: AbstractSurfaceHeatFlux end
+Adapt.@adapt_structure PrescribedOceanHeatFlux
 PrescribedOceanHeatFlux(::SpectralGrid) = PrescribedOceanHeatFlux()
 initialize!(::PrescribedOceanHeatFlux, ::PrimitiveEquation) = nothing
 
-function surface_heat_flux!(
-    column::ColumnVariables,
-    fluxes::PrescribedOceanHeatFlux,
-    progn::PrognosticVariables,
-    model::PrimitiveEquation,
-)
-    land_fraction = column.land_fraction
+@propagate_inbounds function surface_heat_flux!(ij, diagn, progn, ::PrescribedOceanHeatFlux, model)
+    land_fraction = model.land_sea_mask.mask[ij]
+    pₛ = diagn.grid.pres_grid_prev[ij]          # surface pressure [Pa]
+    cₚ = model.atmosphere.heat_capacity
+    surface = model.geometry.nlayers
 
     # read in a prescribed flux
-    flux_ocean = progn.ocean.sensible_heat_flux[column.ij]
-    column.sensible_heat_flux_ocean = flux_ocean    # store ocean flux separately too
+    flux_ocean = progn.ocean.sensible_heat_flux[ij]
+    
+    # store without weighting by land fraction for coupling
+    diagn.physics.ocean.sensible_heat_flux[ij] = flux_ocean    # store ocean flux separately too
     
     flux_ocean *= (1-land_fraction)             # weight by ocean fraction of land-sea mask
-    column.flux_temp_upward[end] += flux_ocean  # end=lowermost layer, accumulate with += 
-    column.sensible_heat_flux = flux_ocean      # diagnose/output: ocean sets the flux (=), land accumulates (+=)
+    
+    # output/diagnose: ocean sets flux (=), land accumulates (+=)
+    diagn.physics.sensible_heat_flux[ij] = flux_ocean
+    
+    # accumulate with += into end=lowermost layer total flux
+    flux_ocean /= cₚ                            # [W/m²] -> [K/s]
+    diagn.tendencies.temp_tend_grid[ij, surface] += surface_flux_to_tendency(flux_ocean, pₛ, model)
+    return nothing
 end
 
 ## ----
 
 export PrescribedLandHeatFlux
+
+"""Prescribed surface sensible heat flux over land. Reads heat flux values
+from external data sources instead of calculating them dynamically. Useful for
+coupled model runs where land heat fluxes are provided by a land model
+or for sensitivity experiments with fixed flux patterns."""
 struct PrescribedLandHeatFlux <: AbstractSurfaceHeatFlux end
+Adapt.@adapt_structure PrescribedLandHeatFlux
 PrescribedLandHeatFlux(::SpectralGrid) = PrescribedLandHeatFlux()
 initialize!(::PrescribedLandHeatFlux, ::PrimitiveEquation) = nothing
 
-function surface_heat_flux!(
-    column::ColumnVariables,
-    fluxes::PrescribedLandHeatFlux,
-    progn::PrognosticVariables,
-    model::PrimitiveEquation,
-)
-    land_fraction = column.land_fraction
+@propagate_inbounds function surface_heat_flux!(ij, diagn, progn, ::PrescribedLandHeatFlux, model)
+    land_fraction = model.land_sea_mask.mask[ij]
+    pₛ = diagn.grid.pres_grid_prev[ij]          # surface pressure [Pa]
+    cₚ = model.atmosphere.heat_capacity
+    surface = diagn.nlayers                     # indexing top to bottom
 
     # read in a prescribed flux
-    flux_land = progn.land.sensible_heat_flux[column.ij]
-    column.sensible_heat_flux_land = flux_land  # store land flux separately too
+    flux_land = progn.land.sensible_heat_flux[ij]
     
-    flux_land *= land_fraction
-    column.flux_temp_upward[end] += flux_land   # end=lowermost layer, accumulate for total flux with +=
-    column.sensible_heat_flux += flux_land      # ocean sets the flux (=), land accumulates (+=)
+    # store without weighting by land fraction for coupling
+    diagn.physics.land.sensible_heat_flux[ij] = flux_land  # store land flux separately too
+
+    flux_land *= land_fraction                  # weight by land fraction of land-sea mask
+    
+    # output/diagnose: ocean sets flux (=), land accumulates (+=)
+    diagn.physics.sensible_heat_flux[ij] += flux_land
+    
+    # accumulate with += into end=lowermost layer total flux
+    flux_land /= cₚ                             # [W/m²] -> [K/s]
+    diagn.tendencies.temp_tend_grid[ij, surface] += surface_flux_to_tendency(flux_land, pₛ, model)
+    return nothing
+end 
+
+function variables(::AbstractSurfaceHeatFlux)
+    return (
+        DiagnosticVariable(name=:sensible_heat_flux, dims=Grid2D(), desc="Total surface sensible heat flux", units="W/m²"),
+        DiagnosticVariable(name=:sensible_heat_flux, dims=Grid2D(), desc="Ocean sensible heat flux", units="W/m²", namespace=:ocean),
+        DiagnosticVariable(name=:sensible_heat_flux, dims=Grid2D(), desc="Land sensible heat flux", units="W/m²", namespace=:land),
+        PrognosticVariable(name=:sensible_heat_flux, dims=Grid2D(), desc="Prescribed Ocean sensible heat flux", units="W/m²", namespace=:ocean),
+        PrognosticVariable(name=:sensible_heat_flux, dims=Grid2D(), desc="Prescribed Land sensible heat flux", units="W/m²", namespace=:land),
+    )
 end

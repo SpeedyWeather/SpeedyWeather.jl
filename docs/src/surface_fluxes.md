@@ -18,14 +18,16 @@ Currently implemented surface fluxes of momentum are
 ```@example surface_fluxes
 using InteractiveUtils # hide
 using SpeedyWeather
-subtypes(SpeedyWeather.AbstractSurfaceWind)
+subtypes(SpeedyWeather.AbstractSurfaceMomentumFlux)
 ```
 
 !!! note "Interdependence of surface flux computations"
-    `SurfaceWind` computes the surface fluxes of momentum but also the computation
-    of the surface wind (which by default includes wind gusts) meaning that `surface_wind_speed=nothing`
-    will also effectively disable other surface fluxes unless custom surface fluxes
-    have been implemented that do not rely on `column.surface_wind_speed`.
+    `model.surface_condition` extrapolates atmospheric variables (wind, temperature, humidity)
+    to the surface. `model.boundary_layer` computes centrally a drag coefficient for surface
+    momentum, heat and humidity fluxes. Setting `model.surface_condition = nothing` or
+    `model.boundar_layer = nothing` will therefore disable all other surface fluxes unless
+    those are have `use_boundar_layer_drag = false` which lets them use independently their
+    own drag coefficient.
 
 with more explanation below. The surface heat fluxes currently implemented are
 
@@ -44,7 +46,7 @@ The calculation of thermodynamic quantities at the surface (air density, tempera
 are handled by
 
 ```@example surface_fluxes
-subtypes(SpeedyWeather.AbstractSurfaceThermodynamics)
+subtypes(SpeedyWeather.AbstractSurfaceCondition)
 ```
 
 and the computation of drag coefficients (which is used by default for the surface fluxes above)
@@ -53,11 +55,6 @@ is handled through the `model.boundary_layer` where currently implemented are
 ```@example surface_fluxes
 subtypes(SpeedyWeather.AbstractBoundaryLayer)
 ```
-
-Note that `LinearDrag` is the linear drag following Held and Suarez (see [Held-Suarez forcing](@ref))
-which does not compute a drag coefficient and therefore by default effectively disables other
-surface fluxes (as the Held and Suarez forcing and drag is supposed to be used instead of
-physical parameterizations).
 
 ## Fluxes to tendencies
 
@@ -126,31 +123,22 @@ C = \begin{cases}
     \end{cases}
 ```
 
-with ``\kappa = 0.4`` the von Kármán constant, ``z_0 = 3.21 \cdot 10^{-5}`` the 
-roughness length. There is a maximum drag ``C`` for negative bulk Richardson numbers ``Ri_N``
+with ``\kappa = 0.4`` the von Kármán constant, ``z_0`` the 
+roughness length (we currently use different values over ocean and land).
+There is a maximum drag ``C`` for negative bulk Richardson numbers ``Ri_N``
 but the drag becomes 0 for bulk Richardson numbers being larger than a critical
-``Ri_c = 1`` with a smooth transition in between. The height of the ``N``-th
+``Ri_c = 10`` with a smooth transition in between. The height of the ``N``-th
 model layer is ``z_N = \tfrac{\Phi_N - \Phi_0}{g}`` with the geopotential
 ```math
 \Phi_N = \Phi_{0} + T_N R_d ( \log p_{N+h} - \log p_N)
 ```
-which depends on the temperature ``T_N`` of that layer. To simplify this calculation
-and avoid the logarithm we use a constant ``Z \approx z_N`` from a reference temperature
-``T_{ref}`` instead of ``T_N`` in the calculation of ``log(z_N/z_0)``.
-While ``z_N`` depends on the vertical resolution (``\Delta p_N`` of the lowermost layer)
-it is proportional to that layer's temperature which in Kelvin does not change much
-in space and in time, especially with the logarithm applied.
-For ``T_{ref} = 200K`` with specific gas constant ``R_d = 287 J/kg/K``
-on sigma level ``\sigma_N = 0.95`` we have ``log(z_N/z_0) \approx 16.1`` for
-``T_{ref} = 300K`` this increases to ``log(z_N/z_0) \approx 16.5`` a 2.5%
-increase which we are happy to approximate. Note that we do
-not apply this approximation within the bulk Richardson number ``Ri_N``.
-So we calculate once a typical height of the lowermost layer
-``Z = T_{ref}R_d \log(1/\sigma_N)g^{-1}`` for the given parameter choices
-and then define a maximum drag constant
+which depends on the temperature ``T_N`` of that layer. This model layer
+height above the surface ``z_N`` is recalculated on every time step for
+every grid cell as it depends on temperature. The maximum drag coefficient
+then follows as
 
 ```math
-C_{max} = \left(\frac{\kappa}{\log(\frac{Z}{z_0})} \right)^2
+C_{max} = \left(\frac{\kappa}{\log(\frac{z}{z_0})} \right)^2
 ```
 
 to simplify the drag coefficient calculation to
