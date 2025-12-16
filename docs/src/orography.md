@@ -161,12 +161,13 @@ in the surface geopotential `orography.surface_geopotential`
 ```@example orography
 transform!(orography.surface_geopotential, orography.orography, model.spectral_transform)
 orography.surface_geopotential .*= model.planet.gravity
-spectral_truncation!(orography.surface_geopotential)
+SpeedyTransforms.spectral_truncation!(orography.surface_geopotential)
 nothing # hide
 ```
 
 In the first line, the surface geopotential is still missing the gravity,
 which is multiplied in the second line. The `spectral_truncation!`
+(`export`ed only when `using SpeedyTransforms`)
 removes the ``l_{max}+1`` degree of the spherical harmonics
 as illustrated in the spectral representation or the surface geopotential
 here. This is because scalar fields do not use that last degree,
@@ -274,7 +275,7 @@ function SpeedyWeather.initialize!(
     # given orography we just set
     transform!(surface_geopotential, orography, model.spectral_transform)
     surface_geopotential .*= model.planet.gravity
-    spectral_truncation!(surface_geopotential)
+    SpeedyTransforms.spectral_truncation!(surface_geopotential)
     return nothing
 end
 ```

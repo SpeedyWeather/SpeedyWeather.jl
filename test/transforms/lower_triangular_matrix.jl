@@ -7,7 +7,7 @@ import Random
         @testset for lmax = (mmax, mmax+1)
             A = randn(Complex{NF}, lmax, mmax)
 
-            SpeedyWeather.spectral_truncation!(A)
+            SpeedyTransforms.spectral_truncation!(A)
 
             L = LowerTriangularMatrix(A)
 
@@ -356,15 +356,14 @@ end
                 A = randn(Complex{NF}, lmax, mmax, idims...)
 
                 # replaces spectraltrunction! here, we just set the elements zero manually
-                ind = SpeedyWeather.LowerTriangularArrays.lowertriangle_indices(A)
+                ind = LowerTriangularArrays.lowertriangle_indices(A)
                 ind = @. ~(ind)
                 A[ind] .= zero(Complex{NF})
 
-                L = SpeedyWeather.LowerTriangularArray(A)
-
+                L = LowerTriangularArray(A)
                 # fill
                 fill!(L, 2)
-                for lm in SpeedyWeather.eachharmonic(L)
+                for lm in LowerTriangularArrays.eachharmonic(L)
                     @test all(L[lm, [Colon() for i=1:length(idims)]...] .== 2)
                 end
 
@@ -379,7 +378,7 @@ end
                 # convert
                 L = randn(LowerTriangularArray{NF}, lmax, mmax, idims...)
                 L3 = convert(LowerTriangularArray{Float16, 1+length(idims), Array{Float16,1+length(idims)}, typeof(spectrum)}, L)
-                for lm in SpeedyWeather.eachharmonic(L, L3)
+                for lm in LowerTriangularArrays.eachharmonic(L, L3)
                     @test Float16(L[lm, [1 for i=1:length(idims)]...]) == L3[lm, [1 for i=1:length(idims)]...] 
                 end
 
@@ -396,12 +395,12 @@ end
         mmax = 32
         @testset for lmax = (mmax, mmax+1)
                 A = randn(Complex{NF}, lmax, mmax)
-                SpeedyWeather.spectral_truncation!(A)
-                L = SpeedyWeather.LowerTriangularMatrix(A)
+                SpeedyTransforms.spectral_truncation!(A)
+                L = LowerTriangularMatrix(A)
 
                 # fill
                 fill!(L, 2)
-                for lm in SpeedyWeather.eachharmonic(L)
+                for lm in LowerTriangularArrays.eachharmonic(L)
                     @test L[lm] == 2
                 end
 
@@ -416,7 +415,7 @@ end
                 # convert
                 L = randn(LowerTriangularMatrix{NF}, lmax, mmax)
                 L3 = convert(LowerTriangularMatrix{Float16}, L)
-                for lm in SpeedyWeather.eachharmonic(L, L3)
+                for lm in LowerTriangularArrays.eachharmonic(L, L3)
                     @test Float16(L[lm]) == L3[lm] 
                 end
         end
@@ -515,7 +514,7 @@ end
         # with ranges
         L1 = zeros(LowerTriangularMatrix{NF}, 33, 32);
         L2 = randn(LowerTriangularMatrix{NF}, 65, 64);
-        L2T = SpeedyWeather.spectral_truncation(L2, size(L1, ZeroBased, as=Matrix)...)
+        L2T = SpeedyTransforms.spectral_truncation(L2, size(L1, ZeroBased, as=Matrix)...)
 
         copyto!(L1, L2, 1:33, 1:32)     # size of smaller matrix
         @test L1 == L2T
@@ -578,7 +577,7 @@ end
             # with ranges
             L1 = zeros(LowerTriangularArray{NF}, 33, 32, idims...);
             L2 = randn(LowerTriangularArray{NF}, 65, 64, idims...);
-            L2T = SpeedyWeather.spectral_truncation(L2, (size(L1, ZeroBased,  as=Matrix)[1:2])...)
+            L2T = SpeedyTransforms.spectral_truncation(L2, (size(L1, ZeroBased,  as=Matrix)[1:2])...)
 
             copyto!(L1, L2, 1:33, 1:32)     # size of smaller matrix
             @test L1 == L2T
@@ -632,7 +631,7 @@ end
 
     # getindex 
     @test typeof(L[1,:]) <: JLArray 
-    for lm in SpeedyWeather.eachharmonic(L)
+    for lm in LowerTriangularArrays.eachharmonic(L)
         @test Array(L[lm,:]) == L_cpu[lm,:]  
     end 
 
@@ -643,7 +642,7 @@ end
 
     # fill 
     fill!(L, 2)
-    for lm in SpeedyWeather.eachharmonic(L2)
+    for lm in LowerTriangularArrays.eachharmonic(L2)
         @test all(L[lm, [Colon() for i=1:length(idims)]...] .== 2)
     end 
 
@@ -660,7 +659,7 @@ end
     L3 = on_architecture(jl_arch, randn(LowerTriangularArray{NF}, spectrum, idims...))
     L4 = convert(LowerTriangularArray{Float16,2,JLArray{Float16,2},typeof(spectrum_jlarray)}, L3)
 
-    for lm in SpeedyWeather.eachharmonic(L, L3)
+    for lm in LowerTriangularArrays.eachharmonic(L, L3)
         @test all(Float16.(L3[lm, :]) .== L4[lm, :])
     end 
     
@@ -686,34 +685,26 @@ end
     @test all(L2 .== L1)
     
     # test the truncating copyto! function 
-    # we can't do this with JLArrays, as they don't support mixed indexing with BitArrays
-    # like Array and CuArray do
-    # So, we do this with regular Array but with the _copyto_core! function that implements 
-    # the core of this copyto! in a GPU compatible way, and is called by copyto! with CuArrays
+   
+    L1 = on_architecture(jl_arch, zeros(LowerTriangularArray{NF}, 33, 32, idims...))
+    L2 = on_architecture(jl_arch, randn(LowerTriangularArray{NF}, 65, 64, idims...))
 
-    L1 = zeros(LowerTriangularArray{NF}, 33, 32, idims...)
-    L2 = randn(LowerTriangularArray{NF}, 65, 64, idims...)
+    L2T = SpeedyTransforms.spectral_truncation(L2, (size(L1, ZeroBased; as=Matrix)[1:2])...)
+    L3 = on_architecture(jl_arch, zeros(LowerTriangularArray{NF}, 33, 32, idims...))
 
-    L2T = spectral_truncation(L2, (size(L1, ZeroBased; as=Matrix)[1:2])...)
-    L3 = zeros(LowerTriangularArray{NF}, 33, 32, idims...)
-
-    SpeedyWeather.LowerTriangularArrays._copyto_core!(L1, L2, 1:33, 1:32)     # size of smaller matrix
+    copyto!(L1, L2, 1:33, 1:32)     # size of smaller matrix
     @test L1 == L2T
 
-    # test that GPU and CPU method yield the same
-    SpeedyWeather.LowerTriangularArrays.copyto!(L3, L2, 1:33, 1:32)     # size of smaller matrix
+    copyto!(L3, L2, 1:33, 1:32)     # size of smaller matrix
     @test L1 == L3 
 
-    SpeedyWeather.LowerTriangularArrays._copyto_core!(L1, L2, 1:65, 1:64)     # size of bigger matrix
-    @test L1 == L2T
-
-    SpeedyWeather.LowerTriangularArrays.copyto!(L3, L2, 1:65, 1:64)     # size of bigger matrix
+    copyto!(L3, L2, 1:65, 1:64)     # size of bigger matrix
     @test L1 == L3 
 
-    SpeedyWeather.LowerTriangularArrays._copyto_core!(L1, L2, 1:50, 1:50)     # in between
+    copyto!(L1, L2, 1:50, 1:50)     # in between
     @test L1 == L2T
 
-    SpeedyWeather.LowerTriangularArrays.copyto!(L3, L2, 1:50, 1:50)     # in between
+    copyto!(L3, L2, 1:50, 1:50)     # in between
     @test L3 == L1
 end 
 

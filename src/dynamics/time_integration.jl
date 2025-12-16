@@ -211,7 +211,7 @@ function leapfrog!(
         var = getfield(progn, varname)
         var_old, var_new = get_steps(var)
         var_tend = getfield(tend, tendname)
-        spectral_truncation!(var_tend)
+        SpeedyTransforms.spectral_truncation!(var_tend)
         leapfrog!(var_old, var_new, var_tend, dt, lf, model.time_stepping)
     end
 
@@ -220,7 +220,7 @@ function leapfrog!(
         if tracer.active
             var_old, var_new = get_steps(progn.tracers[name])
             var_tend = tend.tracers_tend[name]
-            spectral_truncation!(var_tend)
+            SpeedyTransforms.spectral_truncation!(var_tend)
             leapfrog!(var_old, var_new, var_tend, dt, lf, model.time_stepping)
         end
     end
