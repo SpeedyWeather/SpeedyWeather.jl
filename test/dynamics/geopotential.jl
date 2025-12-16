@@ -65,7 +65,7 @@ end
             @test Tv == T
             @test typeof(Tv) == typeof(T) == NF
 
-            Tv = SpeedyWeather.linear_virtual_temperature(T, T, 0, atmosphere)
+            Tv = SpeedyWeather.linear_virtual_temperature(T, 0, T, atmosphere)
             @test Tv == T
             @test typeof(Tv) == typeof(T) == NF
 
@@ -74,8 +74,31 @@ end
                 @test 1.03*T > Tv > T       # within a few percent
                 @test typeof(Tv) == typeof(T) == NF
 
-                Tv = SpeedyWeather.linear_virtual_temperature(T, T, q, atmosphere)
+                Tv = SpeedyWeather.linear_virtual_temperature(T, q, T, atmosphere)
                 @test 1.03*T > Tv > T
+                @test typeof(Tv) == typeof(T) == NF
+            end
+        end
+
+        atmosphere = EarthDryAtmosphere(spectral_grid)
+        for T in NF[250.0, 280.0, 310.0]
+
+            # zero humidity
+            Tv = SpeedyWeather.virtual_temperature(T, 0, atmosphere)
+            @test Tv == T
+            @test typeof(Tv) == typeof(T) == NF
+
+            Tv = SpeedyWeather.linear_virtual_temperature(T, 0, T, atmosphere)
+            @test Tv == T
+            @test typeof(Tv) == typeof(T) == NF
+
+            for q in NF[0.01, 0.02, 0.03, 0.04]
+                Tv = SpeedyWeather.virtual_temperature(T, q, atmosphere)
+                @test Tv == T
+                @test typeof(Tv) == typeof(T) == NF
+
+                Tv = SpeedyWeather.linear_virtual_temperature(T, q, T, atmosphere)
+                @test Tv == T
                 @test typeof(Tv) == typeof(T) == NF
             end
         end

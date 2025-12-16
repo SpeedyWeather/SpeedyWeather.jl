@@ -4,6 +4,7 @@
 
 - Implicit correction kernelized and GPU-ready [#891](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/891)
 - The dynamical core of the primitive equations is now GPU-ready with kernelized implementations [#934](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/934)
+- EarthDryAtmosphere to dispatch like PrimitiveDryModel inside kernels [#944](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/944)
 - copyto! for LowerTriangularArray revised [#941](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/941)
 - Sea ice and snow insulation in surface flux computation [#873](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/873)
 - Boundary layer drag revisited with ocean/land roughness and new defaults [#873](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/873)

@@ -216,9 +216,8 @@ function timestep!(
     model::PrimitiveEquation,
 )
     (; soil_temperature, soil_moisture) = progn.land
-    Lᵥ = model.atmosphere.latent_heat_condensation
-    Lᵢ = model.atmosphere.latent_heat_sublimation
-    # ρ = model.atmosphere.water_density
+    Lᵥ = latent_heat_condensation(model.atmosphere)
+    Lᵢ = latent_heat_sublimation(model.atmosphere)
     Δt = model.time_stepping.Δt_sec
     
     (; mask) = model.land_sea_mask

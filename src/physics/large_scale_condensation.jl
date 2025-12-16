@@ -29,8 +29,8 @@ initialize!(::ImplicitCondensation, ::PrimitiveEquation) = nothing
 
 # function barrier
 @propagate_inbounds function parameterization!(ij, diagn, progn, lsc::ImplicitCondensation, model)
-    (; clausius_clapeyron, geometry, planet, atmosphere, time_stepping) = model
-    large_scale_condensation!(ij, diagn, lsc, clausius_clapeyron, geometry, planet, atmosphere, time_stepping)
+    (; geometry, planet, atmosphere, time_stepping) = model
+    large_scale_condensation!(ij, diagn, lsc, geometry, planet, atmosphere, time_stepping)
 end
 
 """
@@ -43,32 +43,31 @@ large-scale precipitation vertically for output."""
     ij,
     diagn::DiagnosticVariables,
     condensation::ImplicitCondensation,
-    clausius_clapeyron::AbstractClausiusClapeyron,
     geometry::Geometry,
     planet::AbstractPlanet,
     atmosphere::AbstractAtmosphere,
     time_stepping,
 )
     # use previous time step for more stable Euler forward step of the parameterizations
-    temp = diagn.grid.temp_grid_prev                    # temperature [K]
-    humid = diagn.grid.humid_grid_prev                  # specific humidity [kg/kg]
-    temp_tend = diagn.tendencies.temp_tend_grid         # temperature tendency [K/s]
-    humid_tend = diagn.tendencies.humid_tend_grid       # specific humidity tendency [kg/kg/s]
+    temp = diagn.grid.temp_grid_prev                # temperature [K]
+    humid = diagn.grid.humid_grid_prev              # specific humidity [kg/kg]
+    temp_tend = diagn.tendencies.temp_tend_grid     # temperature tendency [K/s]
+    humid_tend = diagn.tendencies.humid_tend_grid   # specific humidity tendency [kg/kg/s]
     nlayers = size(temp, 2)
 
     # precompute scaling constants to minimize divisions (used to convert between humidity [kg/kg] and precipitation [m])
-    pₛ = diagn.grid.pres_grid_prev[ij]                  # surface pressure [Pa]
-    (; Δt_sec) = time_stepping                          # time step [s]
-    σ = geometry.σ_levels_full                          # vertical sigma coordinate [1]
-    Δσ = geometry.σ_levels_thick                        # layer thickness in sigma coordinates
-    ρ = atmosphere.water_density                        # air density [kg/m³]
-    pₛ_gρ = pₛ/(planet.gravity * ρ)                     # [Pa / (m/s² * kg/m³)] = [Pa m² * s² / kg] = [m]
+    pₛ = diagn.grid.pres_grid_prev[ij]              # surface pressure [Pa]
+    (; Δt_sec) = time_stepping                      # time step [s]
+    σ = geometry.σ_levels_full                      # vertical sigma coordinate [1]
+    Δσ = geometry.σ_levels_thick                    # layer thickness in sigma coordinates
+    ρ = atmosphere.water_density                    # air density [kg/m³]
+    pₛ_gρ = pₛ/(planet.gravity * ρ)                 # [Pa / (m/s² * kg/m³)] = [Pa m² * s² / kg] = [m]
 
     # thermodynamics
-    Lᵥ = clausius_clapeyron.latent_heat_condensation    # latent heat of vaporization
-    Lᵢ = clausius_clapeyron.latent_heat_fusion          # latent heat of fusion
-    cₚ = clausius_clapeyron.heat_capacity               # heat capacity
-    Rᵥ = clausius_clapeyron.R_vapour                    # gas constant for water vapour
+    Lᵥ = atmosphere.latent_heat_condensation        # latent heat of vaporization
+    Lᵢ = atmosphere.latent_heat_fusion              # latent heat of fusion
+    cₚ = atmosphere.heat_capacity                   # heat capacity
+    Rᵥ = atmosphere.R_vapor                         # gas constant for water vapor
     Lᵥ_cₚ = Lᵥ / cₚ
     Lᵢ_cₚ = Lᵢ / cₚ
     cₚ_Lᵢ = cₚ / Lᵢ
@@ -82,7 +81,7 @@ large-scale precipitation vertically for output."""
 
         # Condensation from humidity in this layer (for a negative humidity tendency)
         # relative to threshold that can be <100%, e.g. 95%
-        sat_humid_k = saturation_humidity(temp[ij, k], σ[k]*pₛ, clausius_clapeyron)
+        sat_humid_k = saturation_humidity(temp[ij, k], σ[k]*pₛ, atmosphere)
         δq_cond = sat_humid_k * relative_humidity_threshold - humid[ij, k]
         
         # skip if no condensation has occurred yet in this layer or above

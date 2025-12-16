@@ -156,7 +156,7 @@ function output!(
     (; nlayers) = simulation.diagnostic_variables
     T = simulation.diagnostic_variables.physics.surface_air_temperature
 
-    if !simulation.model.physics
+    if !simulation.model.physics    # otherwise this has been computed already
         # calculate the surface air temperature from lowest model level temperature
         # via dry adiabatic lapse rate
         T .= field_view(simulation.diagnostic_variables.grid.temp_grid, :, nlayers)
@@ -168,7 +168,9 @@ function output!(
 
     q = field_view(simulation.diagnostic_variables.grid.humid_grid, :, nlayers)
     Tᵥ = simulation.diagnostic_variables.dynamics.a_2D_grid
-    @. Tᵥ = virtual_temperature(T, q, simulation.model.atmosphere.μ_virt_temp)
+
+    (; atmosphere) = simulation.model
+    Tᵥ .= virtual_temperature.(T, q, atmosphere)
 
     # calculate mean sea-level pressure on model grid
     mslp = simulation.diagnostic_variables.dynamics.b_2D_grid
