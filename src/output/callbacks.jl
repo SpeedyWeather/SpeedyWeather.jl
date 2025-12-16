@@ -105,6 +105,9 @@ key which is randomly created like callback_????. To be used like
 add!(model::AbstractModel, callbacks::AbstractCallback...) =
     add!(model.callbacks, callbacks..., verbose = model.feedback.verbose)
 
+# adding via tuple splats the tuple
+add!(model::AbstractModel, tuple::Tuple) = add!(model, tuple...)
+
 # delete!(dict, key) already defined in Base
 
 export GlobalSurfaceTemperatureCallback

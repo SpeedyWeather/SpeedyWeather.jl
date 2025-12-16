@@ -9,7 +9,6 @@ abstract type PrimitiveDry <: PrimitiveEquation end
 abstract type PrimitiveWet <: PrimitiveEquation end
 
 abstract type AbstractModelComponent end
-abstract type AbstractParameterization <: AbstractModelComponent end
 
 # any model component set to nothing needs no initialization or finalize!
 initialize!(::Nothing, ::AbstractModel) = nothing
@@ -47,19 +46,42 @@ model_class(::Type{<:PrimitiveWet}) = PrimitiveWet
 model_class(model::AbstractModel) = model_class(typeof(model))
 
 # model type is the parameter-free type of a model
-# TODO what happens if we have several concrete types under each abstract type?
 model_type(::Type{<:Barotropic}) = BarotropicModel
 model_type(::Type{<:ShallowWater}) = ShallowWaterModel
 model_type(::Type{<:PrimitiveDry}) = PrimitiveDryModel
 model_type(::Type{<:PrimitiveWet}) = PrimitiveWetModel
 model_type(model::AbstractModel) = model_type(typeof(model))
 
-initialize!(model::AbstractModel, ps::Union{ComponentVector,SpeedyParams}; kwargs...) = initialize!(reconstruct(model, ps); kwargs...)
+# model dummy: Empty concrete instances
+struct BarotropicDummy <: Barotropic end
+struct ShallowWaterDummy <: ShallowWater end
+struct PrimitiveDryDummy <: PrimitiveDry end
+struct PrimitiveWetDummy <: PrimitiveWet end
+
+Adapt.@adapt_structure BarotropicDummy
+Adapt.@adapt_structure ShallowWaterDummy
+Adapt.@adapt_structure PrimitiveDryDummy
+Adapt.@adapt_structure PrimitiveWetDummy
+
+model_dummy(::Type{<:Barotropic}) = BarotropicDummy()
+model_dummy(::Type{<:ShallowWater}) = ShallowWaterDummy()
+model_dummy(::Type{<:PrimitiveDry}) = PrimitiveDryDummy()
+model_dummy(::Type{<:PrimitiveWet}) = PrimitiveWetDummy()
+model_dummy(model::AbstractModel) = model_dummy(typeof(model))
+
+model_type(::Type{BarotropicDummy}) = BarotropicDummy
+model_type(::Type{ShallowWaterDummy}) = ShallowWaterDummy
+model_type(::Type{PrimitiveDryDummy}) = PrimitiveDryDummy
+model_type(::Type{PrimitiveWetDummy}) = PrimitiveWetDummy
+
+initialize!(model::AbstractModel, ps::Union{ComponentVector, SpeedyParams}; kwargs...) =
+    initialize!(reconstruct(model, ps); kwargs...)
 
 function Base.show(io::IO, M::AbstractModel)
-    println(io, "$(model_type(M)) <: $(model_class(M))")
     properties = propertynames(M)
     n = length(properties)
+    s = "$(model_type(M)) <: $(model_class(M))"
+    n == 0 ? print(io, s) : println(io, s)
     for (i, key) in enumerate(properties)
         val = getfield(M, key)
         s = i == n ? "└" : "├"  # choose ending └ for last property
@@ -69,3 +91,38 @@ function Base.show(io::IO, M::AbstractModel)
         p(io, a)
     end
 end
+
+# Functions to get parameters and parameterization to 
+# a) initialize variables 
+"""$(TYPEDSIGNATURES)
+Extract the model components with parameters needed for the parameterizations
+as NamedTuple. These are the GPU-compatible components of the model."""
+@inline function get_model_parameters(model::PrimitiveEquation)
+    return NamedTuple{model.model_parameters}(map(field -> getfield(model, field), model.model_parameters))
+end
+
+"""$(TYPEDSIGNATURES)
+Extract the parameterizations from the model as NamedTuple.
+These are the GPU-compatible components of the model."""
+@generated function get_parameterizations(model::ModelType) where {ModelType <: PrimitiveEquation}
+    # Extract parameterization symbols from the type
+    params_type = fieldtype(ModelType, :params)
+    param_names = params_type.parameters[1]  # Extract tuple from Val{tuple}
+    
+    # Generate literal field accesses for type stability
+    return :(NamedTuple{$param_names}(tuple($([:(model.$name) for name in param_names]...))))
+end
+
+# TODO: better name? 
+"""$(TYPEDSIGNATURES)
+Extract the extra parameterizations from the model that are not part of the 
+column-based parameterizations, but define variables such as land and ocean."""
+@inline function get_extra_parameterizations(model::PrimitiveEquation)
+    return NamedTuple{model.extra_parameterizations}(map(field -> getfield(model, field), model.extra_parameterizations))
+end
+
+@inline get_parameterizations(model::Barotropic) = NamedTuple()
+@inline get_extra_parameterizations(model::Barotropic) = NamedTuple()
+
+@inline get_parameterizations(model::ShallowWater) = NamedTuple()
+@inline get_extra_parameterizations(model::ShallowWater) = NamedTuple()

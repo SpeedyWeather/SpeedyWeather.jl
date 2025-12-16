@@ -191,8 +191,8 @@ end
         SpeedyTransforms.zero_imaginary_zonal_modes!(vor)
         SpeedyTransforms.zero_imaginary_zonal_modes!(div)
 
-        spectral_truncation!(vor)      # set unusued last row (l=lmax+1) to zero
-        spectral_truncation!(div)
+        SpeedyTransforms.spectral_truncation!(vor)      # set unusued last row (l=lmax+1) to zero
+        SpeedyTransforms.spectral_truncation!(div)
 
         # get corresponding u_grid, v_grid (excl *coslat scaling)
         lf = 1
@@ -284,7 +284,7 @@ end
             diagn = simulation.diagnostic_variables
 
             a = randn(LowerTriangularArray{Complex{NF}}, spectral_grid.spectrum, nlayers)
-            spectral_truncation!(a)
+            SpeedyTransforms.spectral_truncation!(a)
             SpeedyTransforms.zero_imaginary_zonal_modes!(a)
 
             dadx, dady = ∇(a, model.spectral_transform)

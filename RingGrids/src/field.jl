@@ -147,12 +147,16 @@ and 3rd dimension. To be used like
                 
 With `vertical_only=true` (default) only checks whether the non-horizontal dimensions of the fields match.
 E.g. one can loop over two fields of each n layers on different grids."""
-function eachlayer(field1::AbstractField, fields::AbstractField...; vertical_only=true, kwargs...)
+@inline function eachlayer(field1::AbstractField, fields::AbstractField...; vertical_only=true, kwargs...)
     fields_match(field1, fields...; vertical_only, kwargs...) || throw(DimensionMismatch(field1, fields...))
     return eachlayer(field1)
 end
 
-eachlayer(field::AbstractField) = CartesianIndices(size(field)[2:end])
+@inline eachlayer(field::AbstractField) = CartesianIndices(size(field)[2:end])
+
+#TODO: This is a bit of a stop-gap solution here while we work on the GPU column parametrization. This might be removed again
+@inline eachlayer(array_field::AbstractArray{T,2}) where T = 1:size(array_field, 2)
+@inline eachlayer(array_field::AbstractArray{T,2}, array_fields::AbstractArray{T,2}...) where T = 1:size(array_field, 2)
 
 """$(TYPEDSIGNATURES)
 Iterator over all 2D grid points of a field (or fields), i.e. the horizontal dimension only.
@@ -401,6 +405,12 @@ Base.:(==)(F1::AbstractField, F2::AbstractField) = fields_match(F1, F2) && F1.da
 Base.all(F::AbstractField) = all(F.data)
 Base.any(F::AbstractField) = any(F.data)
 
+# reductions
+Base.minimum(F::AbstractField) = minimum(F.data)
+Base.maximum(F::AbstractField) = maximum(F.data)
+Base.sum(F::AbstractField) = sum(F.data)
+Base.extrema(F::AbstractField) = extrema(F.data)
+
 grids_match(A::AbstractField, Bs::AbstractField...) = grids_match(A.grid, (B.grid for B in Bs)...)
 
 """$(TYPEDSIGNATURES) True if both `A` and `B` are of the same nonparametric grid type
@@ -413,7 +423,7 @@ function fields_match(
     horizontal_only::Bool = false,
     vertical_only::Bool = false,
 )
-    @assert ~(horizontal_only && vertical_only) "Conflicting options: horizontal_only = $horizontal_ony and vertical_only = $vertical_only"
+    @assert ~(horizontal_only && vertical_only) "Conflicting options: horizontal_only = $horizontal_only and vertical_only = $vertical_only"
 
     horizontal_only && return grids_match(A, B)
     vertical_only && return size(A)[2:end] == size(B)[2:end]
@@ -517,6 +527,7 @@ end
 Adapt.adapt_structure(to, field::AbstractField) = Adapt.adapt(to, field.data)
   
 Architectures.architecture(field::AbstractField) = architecture(field.grid)
+Architectures.on_architecture(field::AbstractField, x) = on_architecture(architecture(field), x)
 
 function Architectures.on_architecture(arch, field::Field{T, N, ArrayType, Grid}) where {T, N, ArrayType, Grid} 
     adapted_data = on_architecture(arch, field.data)

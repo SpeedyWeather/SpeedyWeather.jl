@@ -23,20 +23,31 @@ particle_advection!(progn, diagn, model) = particle_advection!(progn, diagn, mod
 particle_advection!(progn, diagn, ::Nothing, ::AbstractModel) = nothing
 
 export ParticleAdvection2D
-@kwdef struct ParticleAdvection2D{NF} <: AbstractParticleAdvection
+
+export ParticleAdvection2D
+@kwdef struct ParticleAdvection2D{NF, 
+    GeometryType # <: AbstractGridGeometry
+    } <: AbstractParticleAdvection
     "[OPTION] Execute particle advection every n timesteps"
     every_n_timesteps::Int = 6
 
     "[OPTION] Advect with velocities from this vertical layer index"
     layer::Int = 1
 
-    "Time step used for particle advection (scaled by radius, converted to degrees) [s*˚/m]"
+    "[DERIVED] Time step used for particle advection (scaled by radius, converted to degrees) [s*˚/m]"
     Δt::Base.RefValue{NF} = Ref(zero(NF))
+
+    "[DERIVED] Interpolation geometry used during advection"
+    geometry::GeometryType
 end
 
 function ParticleAdvection2D(SG::SpectralGrid; kwargs...)
     SG.nparticles == 0 && @warn "ParticleAdvection2D created but nparticles = 0 in spectral grid."
-    ParticleAdvection2D{SG.NF}(; kwargs...)
+    geometry = GridGeometry(SG.grid; NF=SG.NF)
+    ParticleAdvection2D{SG.NF, typeof(geometry)}(;
+        geometry,
+        kwargs...
+    )
 end
 
 function initialize!(
@@ -89,7 +100,9 @@ function initialize!(
     k = particle_advection.layer
     u_grid = field_view(diagn.grid.u_grid, :, k)
     v_grid = field_view(diagn.grid.v_grid, :, k)
-    (; interpolator) = diagn.particles
+    (; locator) = diagn.particles
+    (; geometry) = particle_advection
+    
     
     # interpolate initial velocity on initial locations
     lats = diagn.particles.u    # reuse u,v arrays as only used for u, v
@@ -105,11 +118,11 @@ function initialize!(
         lats[i] = particles[i].lat
     end
 
-    RingGrids.update_locator!(interpolator, lons, lats)
+     RingGrids.update_locator!(locator, geometry, lons, lats)
     u0 = diagn.particles.u      # now reused arrays are actually u, v
     v0 = diagn.particles.v
-    interpolate!(u0, u_grid, interpolator)
-    interpolate!(v0, v_grid, interpolator)
+    interpolate!(u0, u_grid, locator, geometry)
+    interpolate!(v0, v_grid, locator, geometry)
 end
 
 # function barrier, unpack what's needed
@@ -126,6 +139,9 @@ function particle_advection!(
 
     # escape immediately for no particles
     length(particles) == 0 && return nothing
+
+    (; locator) = diagn.particles
+    (; geometry) = particle_advection
 
     # decide whether to execute on this time step:
     # execute always on last time step *before* time step is divisible by
@@ -173,14 +189,13 @@ function particle_advection!(
     k = particle_advection.layer
     u_grid = field_view(diagn.grid.u_grid, :, k)
     v_grid = field_view(diagn.grid.v_grid, :, k)
-    (; interpolator) = diagn.particles
-    RingGrids.update_locator!(interpolator, lons, lats)
+    RingGrids.update_locator!(locator, geometry, lons, lats)
 
     # interpolate new velocity on predicted new locations
     u_new = diagn.particles.u
     v_new = diagn.particles.v
-    interpolate!(u_new, u_grid, interpolator)
-    interpolate!(v_new, v_grid, interpolator)
+    interpolate!(u_new, u_grid, locator, geometry)
+    interpolate!(v_new, v_grid, locator, geometry)
 
     for i in eachindex(particles, u_new, v_new)
         isactive(particles[i]) || continue
@@ -195,9 +210,9 @@ function particle_advection!(
 
     # store new velocities at new (corrected locations) to be used on
     # next particle advection time step
-    RingGrids.update_locator!(interpolator, lons, lats)
-    interpolate!(u_new, u_grid, interpolator)
-    interpolate!(v_new, v_grid, interpolator)
+    RingGrids.update_locator!(locator, geometry, lons, lats)
+    interpolate!(u_new, u_grid, locator, geometry)
+    interpolate!(v_new, v_grid, locator, geometry)
     return nothing
 end
 
