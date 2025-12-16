@@ -150,7 +150,7 @@ end
 
     # Test with default parameters
     ic = JablonowskiTemperature(spectral_grid)
-    model = PrimitiveDryModel(spectral_grid)
+    model = PrimitiveWetModel(spectral_grid)
     prognostic_variables = PrognosticVariables(model)
     initialize!(prognostic_variables, ic, model)
     temp = prognostic_variables.temp
@@ -161,7 +161,7 @@ end
 
     # Test different parameters produce different results
     ic_custom = JablonowskiTemperature(spectral_grid; ΔT = 4.8e5)
-    model_custom = PrimitiveDryModel(spectral_grid)
+    model_custom = PrimitiveWetModel(spectral_grid)
     prognostic_variables_custom = PrognosticVariables(model_custom)
     initialize!(prognostic_variables_custom, ic_custom, model_custom)
     temp_custom = prognostic_variables_custom.temp

@@ -32,7 +32,7 @@ for thermodynamic consistency (e.g. in dry convection the humidity profile is no
 and relaxes current vertical profiles to the adjusted references."""
 @propagate_inbounds function convection!(ij, diagn, convection::BettsMillerConvection, model)
 
-    (; geometry, clausius_clapeyron, planet, atmosphere, time_stepping) = model
+    (; geometry, planet, atmosphere, time_stepping) = model
     σ = geometry.σ_levels_full
     σ_half = geometry.σ_levels_half
     Δσ = geometry.σ_levels_thick
@@ -45,24 +45,24 @@ and relaxes current vertical profiles to the adjusted references."""
     geopotential = diagn.grid.geopotential
     temp_tend = diagn.tendencies.temp_tend_grid
     humid_tend = diagn.tendencies.humid_tend_grid
-    pₛ = diagn.grid.pres_grid_prev[ij]                  # surface pressure [Pa]
+    pₛ = diagn.grid.pres_grid_prev[ij]          # surface pressure [Pa]
     NF = eltype(temp)
 
     # thermodynamics
-    ρ = atmosphere.water_density                        # density of water [kg/m³]
-    g = planet.gravity                                  # gravity [m/s²]
-    Lᵥ = clausius_clapeyron.latent_heat_condensation    # latent heat of vaporization
-    cₚ = clausius_clapeyron.heat_capacity               # heat capacity
+    ρ = atmosphere.water_density                # density of water [kg/m³]
+    g = planet.gravity                          # gravity [m/s²]
+    Lᵥ = atmosphere.latent_heat_condensation    # latent heat of vaporization
+    cₚ = atmosphere.heat_capacity               # heat capacity
 
     # use scratch arrays for temp_ref_profile, humid_ref_profile
-    temp_ref_profile =  diagn.dynamics.a_grid           # temperature [K] reference profile to adjust to
-    humid_ref_profile = diagn.dynamics.b_grid           # specific humidity [kg/kg] profile to adjust to
+    temp_ref_profile =  diagn.dynamics.a_grid   # temperature [K] reference profile to adjust to
+    humid_ref_profile = diagn.dynamics.b_grid   # specific humidity [kg/kg] profile to adjust to
     
     # CONVECTIVE CRITERIA AND FIRST GUESS RELAXATION
-    level_zero_buoyancy = pseudo_adiabat!(ij, temp_ref_profile, temp, humid, geopotential, pₛ, σ, clausius_clapeyron)
+    level_zero_buoyancy = pseudo_adiabat!(ij, temp_ref_profile, temp, humid, geopotential, pₛ, σ, atmosphere)
             
     for k in level_zero_buoyancy:nlayers
-        qsat = saturation_humidity(temp_ref_profile[ij, k], pₛ*σ[k], clausius_clapeyron)
+        qsat = saturation_humidity(temp_ref_profile[ij, k], pₛ*σ[k], atmosphere)
         humid_ref_profile[ij, k] = qsat * convection.relative_humidity
     end
 
@@ -179,19 +179,15 @@ set to NaN instead and should be skipped in the relaxation."""
     geopotential,
     pres,
     σ,
-    clausius_clapeyron,
+    atmosphere
 )
-    NF = eltype(temp_ref_profile)                       # number format
-    nlayers = length(σ)                                 # number of vertical layers
+    NF = eltype(temp_ref_profile)             # number format
+    nlayers = length(σ)                       # number of vertical layers
 
     # thermodynamics
-    (; R_dry, R_vapour) = clausius_clapeyron
-    Lᵥ = clausius_clapeyron.latent_heat_condensation    # latent heat of vaporization
-    cₚ = clausius_clapeyron.heat_capacity               # heat capacity
-
-    κ = R_dry/cₚ                         
-    ε = clausius_clapeyron.mol_ratio
-    μ = (1-ε)/ε                                         # for virtual temperature
+    (; κ, R_dry, R_vapor) = atmosphere
+    Lᵥ = atmosphere.latent_heat_condensation    # latent heat of vaporization
+    cₚ = atmosphere.heat_capacity               # heat capacity
 
     temp_parcel::NF = temp_environment[ij, nlayers]     # start at surface with environment temperature [K]
     humid_parcel::NF = humid_environment[ij, nlayers]   # and humidity [kg/kg]
@@ -204,7 +200,7 @@ set to NaN instead and should be skipped in the relaxation."""
     local saturated::Bool = false           # did the parcel reach saturation yet?
     local buoyant::Bool = true              # is the parcel still buoyant?
     local k::Int = nlayers                  # layer index top to surface
-    local temp_virt_parcel::NF = temp_parcel * (1 + μ*humid_parcel)
+    local temp_virt_parcel::NF = virtual_temperature(temp_parcel, humid_parcel, atmosphere)
 
     while buoyant && k > 1                  # calculate moist adiabat while buoyant till top
         k -= 1                              # one level up
@@ -212,7 +208,7 @@ set to NaN instead and should be skipped in the relaxation."""
         if !saturated                       # if not saturated yet follow dry adiabat
             # dry adiabatic ascent and saturation humidity of that temperature 
             temp_parcel_dry = temp_parcel*(σ[k]/σ[k+1])^κ
-            sat_humid = saturation_humidity(temp_parcel_dry, σ[k]*pres, clausius_clapeyron)
+            sat_humid = saturation_humidity(temp_parcel_dry, σ[k]*pres, atmosphere)
                     
             # set to saturated when the dry adiabatic ascent would reach saturation
             # then follow moist adiabat instead (see below)
@@ -223,7 +219,7 @@ set to NaN instead and should be skipped in the relaxation."""
             # calculate moist/pseudo adiabatic lapse rate, dT/dΦ = -Γ/cp
             T, Tᵥ, q = temp_parcel, temp_virt_parcel, humid_parcel  # for brevity
             A = q*Lᵥ / ((1-q)^2 * R_dry)
-            B = q*Lᵥ^2 / ((1-q)^2 * cₚ * R_vapour)
+            B = q*Lᵥ^2 / ((1-q)^2 * cₚ * R_vapor)
             Γ = (1 + A/Tᵥ) / (1 + B/T^2)
                 
             ΔΦ = geopotential[ij, k] - geopotential[ij, k+1]        # vertical gradient in geopotential
@@ -231,7 +227,7 @@ set to NaN instead and should be skipped in the relaxation."""
                 
             # at new (lower) temperature condensation occurs immediately
             # new humidity equals to that saturation humidity
-            humid_parcel = saturation_humidity(temp_parcel, σ[k]*pres, clausius_clapeyron)
+            humid_parcel = saturation_humidity(temp_parcel, σ[k]*pres, atmosphere)
         else
             temp_parcel = temp_parcel_dry       # else parcel temperature following dry adiabat
         end
@@ -241,8 +237,8 @@ set to NaN instead and should be skipped in the relaxation."""
 
         # check whether parcel is still buoyant wrt to environment
         # use virtual temperature as it's equivalent to density
-        temp_virt_parcel = virtual_temperature(temp_parcel, humid_parcel, μ)         # virtual temperature of parcel
-        buoyant = temp_virt_parcel > virtual_temperature(temp_environment[ij, k], humid_environment[ij, k], μ)     
+        temp_virt_parcel = virtual_temperature(temp_parcel, humid_parcel, atmosphere)         # virtual temperature of parcel
+        buoyant = temp_virt_parcel > virtual_temperature(temp_environment[ij, k], humid_environment[ij, k], atmosphere)     
     end
     
     # if parcel isn't buoyant anymore set last temperature (with negative buoyancy) back to NaN
@@ -350,7 +346,7 @@ set to NaN instead and should be skipped in the relaxation."""
     atmosphere,
 )
     NF = eltype(temp_ref_profile)
-    κ = atmosphere.heat_capacity
+    (; κ) = atmosphere
 
     nlayers = length(σ)                     # number of vertical levels
 

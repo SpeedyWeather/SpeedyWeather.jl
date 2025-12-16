@@ -11,57 +11,55 @@ passed on as keyword arguments, e.g. `planet=Earth(spectral_grid)`. Fields, repr
 model components, are
 $(TYPEDFIELDS)"""
 @kwdef mutable struct PrimitiveWetModel{
-    SG,     # <:SpectralGrid
-    AR,     # <:AbstractArchitecture,
-    GE,     # <:AbstractGeometry,
-    PL,     # <:AbstractPlanet,
-    AT,     # <:AbstractAtmosphere,
-    CO,     # <:AbstractCoriolis,
-    GO,     # <:AbstractGeopotential,
-    AC,     # <:AbstractAdiabaticConversion,
-    PA,     # <:AbstractParticleAdvection,
-    IC,     # <:AbstractInitialConditions,
-    FR,     # <:AbstractForcing,
-    DR,     # <:AbstractDrag,
-    RP,     # <:AbstractRandomProcess,
-    OR,     # <:AbstractOrography,
-    LS,     # <:AbstractLandSeaMask,
-    OC,     # <:AbstractOcean,
-    SI,     # <:AbstractSeaIce,
-    LA,     # <:AbstractLand,
-    ZE,     # <:AbstractZenith,
-    AL,     # <:AbstractAlbedo,
-    CC,     # <:AbstractClausiusClapeyron,
-    BL,     # <:AbstractBoundaryLayer,
-    VD,     # <:AbstractVerticalDiffusion,
-    SC,     # <:AbstractSurfaceCondition,
-    SM,     # <:AbstractSurfaceMomentumFlux,
-    SH,     # <:AbstractSurfaceHeatFlux,
-    HF,     # <:AbstractSurfaceHumidityFlux,
-    LSC,    # <:AbstractCondensation,
-    CV,     # <:AbstractConvection,
-    SW,     # <:AbstractShortwave,
-    LW,     # <:AbstractLongwave,
-    SP,     # <:AbstractStochasticPhysics,
-    CP,     # <:AbstractParameterization
-    TS,     # <:AbstractTimeStepper,
-    ST,     # <:SpectralTransform{NF},
-    IM,     # <:AbstractImplicit,
-    HD,     # <:AbstractHorizontalDiffusion,
-    VA,     # <:AbstractVerticalAdvection,
-    HO,     # <:AbstractHoleFilling,
-    OU,     # <:AbstractOutput,
-    FB,     # <:AbstractFeedback,
-    TS1,    # <:Tuple{Symbol}
-    TS2,    # <:Tuple{Symbol}
-    TS3,    # <:Tuple{Symbol}
-    PV,     # <:Val
-    MC,     # <:Type
-} <: PrimitiveWet
+        SG,     # <:SpectralGrid
+        AR,     # <:AbstractArchitecture,
+        GE,     # <:AbstractGeometry,
+        PL,     # <:AbstractPlanet,
+        AT,     # <:AbstractAtmosphere,
+        CO,     # <:AbstractCoriolis,
+        GO,     # <:AbstractGeopotential,
+        AC,     # <:AbstractAdiabaticConversion,
+        PA,     # <:AbstractParticleAdvection,
+        IC,     # <:AbstractInitialConditions,
+        FR,     # <:AbstractForcing,
+        DR,     # <:AbstractDrag,
+        RP,     # <:AbstractRandomProcess,
+        OR,     # <:AbstractOrography,
+        LS,     # <:AbstractLandSeaMask,
+        OC,     # <:AbstractOcean,
+        SI,     # <:AbstractSeaIce,
+        LA,     # <:AbstractLand,
+        ZE,     # <:AbstractZenith,
+        AL,     # <:AbstractAlbedo,
+        BL,     # <:AbstractBoundaryLayer,
+        VD,     # <:AbstractVerticalDiffusion,
+        SC,     # <:AbstractSurfaceCondition,
+        SM,     # <:AbstractSurfaceMomentumFlux,
+        SH,     # <:AbstractSurfaceHeatFlux,
+        HF,     # <:AbstractSurfaceHumidityFlux,
+        LSC,    # <:AbstractCondensation,
+        CV,     # <:AbstractConvection,
+        SW,     # <:AbstractShortwave,
+        LW,     # <:AbstractLongwave,
+        SP,     # <:AbstractStochasticPhysics,
+        CP,     # <:AbstractParameterization
+        TS,     # <:AbstractTimeStepper,
+        ST,     # <:SpectralTransform{NF},
+        IM,     # <:AbstractImplicit,
+        HD,     # <:AbstractHorizontalDiffusion,
+        VA,     # <:AbstractVerticalAdvection,
+        HO,     # <:AbstractHoleFilling,
+        OU,     # <:AbstractOutput,
+        FB,     # <:AbstractFeedback,
+        TS1,    # <:Tuple{Symbol}
+        TS2,    # <:Tuple{Symbol}
+        TS3,    # <:Tuple{Symbol}
+        PV,     # <:Val
+    } <: PrimitiveWet
 
     spectral_grid::SG
     architecture::AR = spectral_grid.architecture
-    
+
     # DYNAMICS
     dynamics::Bool = true
     geometry::GE = Geometry(spectral_grid)
@@ -78,7 +76,7 @@ $(TYPEDFIELDS)"""
     # VARIABLES
     random_process::RP = nothing
     tracers::TRACER_DICT = TRACER_DICT()
-    
+
     # BOUNDARY CONDITIONS
     orography::OR = EarthOrography(spectral_grid)
     land_sea_mask::LS = EarthLandSeaMask(spectral_grid)
@@ -87,10 +85,9 @@ $(TYPEDFIELDS)"""
     land::LA = LandModel(spectral_grid)
     solar_zenith::ZE = WhichZenith(spectral_grid, planet)
     albedo::AL = DefaultAlbedo(spectral_grid)
-    
+
     # PHYSICS/PARAMETERIZATIONS
     physics::Bool = true
-    clausius_clapeyron::CC = ClausiusClapeyron(spectral_grid, atmosphere)
     boundary_layer_drag::BL = BulkRichardsonDrag(spectral_grid)
     vertical_diffusion::VD = BulkRichardsonDiffusion(spectral_grid)
     surface_condition::SC = SurfaceCondition(spectral_grid)
@@ -111,7 +108,7 @@ $(TYPEDFIELDS)"""
     horizontal_diffusion::HD = HyperDiffusion(spectral_grid)
     vertical_advection::VA = CenteredVerticalAdvection(spectral_grid)
     hole_filling::HO = ClipNegatives(spectral_grid)
-    
+
     # OUTPUT
     output::OU = NetCDFOutput(spectral_grid, PrimitiveWet)
     callbacks::Dict{Symbol, AbstractCallback} = Dict{Symbol, AbstractCallback}()
@@ -121,32 +118,33 @@ $(TYPEDFIELDS)"""
     # Tuples with symbols or instances of all parameterizations and parameter functions
     # Used to initiliaze variables and for the column-based parameterizations
     # also determine order in which parameterizations are called
-    model_parameters::TS1 = (:class, :architecture, :time_stepping, :orography, :geopotential, :atmosphere, 
-                                :planet, :geometry, :land_sea_mask, :clausius_clapeyron)
+    model_parameters::TS1 = (
+        :architecture, :time_stepping, :orography, :geopotential, :atmosphere,
+        :planet, :geometry, :land_sea_mask,
+    )
     parameterizations::TS2 = (  # mixing and precipitation
-                                :vertical_diffusion, :large_scale_condensation, :convection,
+        :vertical_diffusion, :large_scale_condensation, :convection,
 
-                                # radiation
-                                :albedo, :shortwave_radiation, :longwave_radiation,
+        # radiation
+        :albedo, :shortwave_radiation, :longwave_radiation,
 
-                                # surface fluxes
-                                :boundary_layer_drag, :surface_condition,
-                                :surface_momentum_flux, :surface_heat_flux, :surface_humidity_flux,
+        # surface fluxes
+        :boundary_layer_drag, :surface_condition,
+        :surface_momentum_flux, :surface_heat_flux, :surface_humidity_flux,
 
-                                # perturbations
-                                :stochastic_physics,
-                            )
+        # perturbations
+        :stochastic_physics,
+    )
     extra_parameterizations::TS3 = (:solar_zenith, :land, :ocean, :sea_ice)
 
-    # DERIVED 
-    # used to infer parameterizations at compile-time 
+    # DERIVED
+    # used to infer parameterizations at compile-time
     params::PV = Val(parameterizations)
-    class::MC = PrimitiveWetDummy()
 end
 
 prognostic_variables(::Type{<:PrimitiveWet}) = (:vor, :div, :temp, :humid, :pres)
 default_concrete_model(::Type{PrimitiveWet}) = PrimitiveWetModel
- 
+
 """
 $(TYPEDSIGNATURES)
 Calls all `initialize!` functions for components of `model`,
@@ -198,8 +196,8 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
     # initialize non-atmosphere prognostic variables
     (; particles, ocean, land) = prognostic_variables
     initialize!(particles, prognostic_variables, diagnostic_variables, model.particle_advection, model)
-    initialize!(ocean,     prognostic_variables, diagnostic_variables, model.ocean, model)
-    initialize!(land,      prognostic_variables, diagnostic_variables, model.land, model)
+    initialize!(ocean, prognostic_variables, diagnostic_variables, model.ocean, model)
+    initialize!(land, prognostic_variables, diagnostic_variables, model.land, model)
 
     # set the initial conditions (may overwrite variables set in initialize! ocean/land)
     initialize!(prognostic_variables, model.initial_conditions, model)
@@ -211,8 +209,9 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
     return Simulation(prognostic_variables, diagnostic_variables, model)
 end
 
-function Adapt.adapt_structure(to, model::PrimitiveWetModel) 
+function Adapt.adapt_structure(to, model::PrimitiveWetModel)
     adapt_fields = model.model_parameters
     return NamedTuple{adapt_fields}(
-        adapt_structure(to, getfield(model, field)) for field in adapt_fields)
+        adapt_structure(to, getfield(model, field)) for field in adapt_fields
+    )
 end 

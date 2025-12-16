@@ -588,25 +588,25 @@ function initialize!(
     NF = eltype(progn)
     (; u₀, η₀, ΔT, Tmin) = initial_conditions
     (; σ_tropopause) = initial_conditions
-    lapse_rate = model.atmosphere.moist_lapse_rate
-    (; temp_ref, R_dry) = model.atmosphere
+
+    Γ = lapse_rate(model.atmosphere)
+    (; R_dry) = model.atmosphere
+    T₀ = model.atmosphere.temperature_reference
     (; grid, nlayers) = model.spectral_grid
     (; radius, rotation, gravity) = model.planet
 
     (; σ_levels_full) = model.geometry
     σ_levels_full_cpu = on_architecture(CPU(), σ_levels_full)
-
-    φ, λ = model.geometry.latds, model.geometry.londs
-    S = model.spectral_transform
+    φ = model.geometry.latds
 
     # vertical profile
     Tη = similar(σ_levels_full_cpu)
     for k in 1:nlayers
         σ = σ_levels_full_cpu[k]
-        Tη[k] = temp_ref * σ^(R_dry * lapse_rate / gravity)   # Jablonowski and Williamson eq. 4
+        Tη[k] = T₀ * σ^(R_dry * Γ / gravity)      # Jablonowski and Williamson eq. 4
 
         if σ < σ_tropopause
-            Tη[k] += ΔT * (σ_tropopause - σ)^5              # Jablonowski and Williamson eq. 5
+            Tη[k] += ΔT * (σ_tropopause - σ)^5          # Jablonowski and Williamson eq. 5
         end
     end
 
@@ -728,25 +728,27 @@ function homogeneous_temperature!(
     )
     (; surface_geopotential) = model.orography       # spectral surface geopotential [m²/s²] (orography*gravity)
 
-    # temp_ref:     Reference absolute T [K] at surface z = 0, constant lapse rate
+    # T₀:           Reference absolute T [K] at surface z = 0, constant lapse rate
     # temp_top:     Reference absolute T in the stratosphere [K], lapse rate = 0
     # lapse_rate:   Reference temperature lapse rate -dT/dz [K/km]
     # gravity:      Gravitational acceleration [m/s^2]
     # R_dry:        Specific gas constant for dry air [J/kg/K]
-    (; temp_ref, lapse_rate, R_dry) = model.atmosphere
+
+    (; R_dry) = model.atmosphere
+    T₀ = model.atmosphere.temperature_reference
     (; gravity) = model.planet
     (; nlayers, σ_levels_full) = model.geometry
-    (; norm_sphere) = model.spectral_transform # normalization of the l=m=0 spherical harmonic
+    (; norm_sphere) = model.spectral_transform          # normalization of the l=m=0 spherical harmonic
 
     # Lapse rate scaled by gravity [K/m / (m²/s²)]
-    Γg⁻¹ = lapse_rate / gravity
+    Γg⁻¹ = lapse_rate(model.atmosphere) / gravity
 
     # SURFACE TEMPERATURE (store in k = nlayers, but it's actually surface, i.e. k=nlayers+1/2)
     # overwrite with lowermost layer further down
     temp_surf = lta_view(progn.temp, :, nlayers, 1)     # spectral temperature at k=nlayers+1/2
 
-    @allowscalar temp_surf[1] = norm_sphere * temp_ref  # set global mean surface temperature
-    temp_surf .-= Γg⁻¹ .* surface_geopotential # lower temperature for higher mountains
+    @allowscalar temp_surf[1] = norm_sphere * T₀        # set global mean surface temperature
+    temp_surf .-= Γg⁻¹ .* surface_geopotential          # lower temperature for higher mountains
 
     # Use lapserate and vertical coordinate σ for profile
     temp = get_step(progn.temp, 1)                      # 1 = first leapfrog timestep
@@ -790,29 +792,27 @@ function initialize!(
         model::PrimitiveEquation
     )
 
-    # temp_ref:     Reference absolute T [K] at surface z = 0
-    # lapse_rate:   Reference temperature lapse rate -dT/dz [K/m]
-    # gravity:      Gravitational acceleration [m/s^2]
-    # R_dry:        Specific gas constant for dry air [J/kg/K]
-    # pres_ref:     Reference surface pressure [hPa]
+    # T₀:       Reference absolute T [K] at surface z = 0
+    # Γ:        Reference temperature lapse rate (dry or moist) -dT/dz [K/m]
+    # gravity:  Gravitational acceleration [m/s^2]
+    # R_dry:    Specific gas constant for dry air [J/kg/K]
+    # p₀:       Reference surface pressure [hPa]
+    
+    Γ = lapse_rate(model.atmosphere)
+    (; R_dry) = model.atmosphere
+    T₀ = model.atmosphere.temperature_reference
+    p₀ = model.atmosphere.pressure_reference
 
-    (; atmosphere) = model
-    lapse_rate = model isa PrimitiveDry ? atmosphere.dry_lapse_rate : atmosphere.moist_lapse_rate
-
-    (; temp_ref, pres_ref, R_dry) = model.atmosphere
     (; gravity) = model.planet
-    (; orography) = model.orography    # orography on the grid
+    (; orography) = model.orography     # orography on the grid
 
-    lnp₀ = log(pres_ref)                # logarithm of reference surface pressure [log(Pa)]
+    lnp₀ = log(p₀)                      # logarithm of reference surface pressure [log(Pa)]
     lnp_grid = similar(orography)       # allocate log surface pressure on grid
 
-    RΓg⁻¹ = R_dry * lapse_rate / gravity    # for convenience
-    ΓT⁻¹ = lapse_rate / temp_ref
-
-    @. lnp_grid = lnp₀ + log(1 - ΓT⁻¹ * orography) / RΓg⁻¹
-
+    RΓg⁻¹ = R_dry * Γ / gravity         # for convenience
+    ΓT₀⁻¹ = Γ / T₀
+    @. lnp_grid = lnp₀ + log(1 - ΓT₀⁻¹ * orography) / RΓg⁻¹
     set!(progn, model; pres = lnp_grid, lf = 1)
-
     return nothing
 end
 
@@ -828,7 +828,7 @@ function initialize!(
     )
 
     # logarithm of reference surface pressure [log(Pa)]
-    set!(progn, model; pres = log(model.atmosphere.pres_ref))
+    set!(progn, model; pres = log(model.atmosphere.pressure_reference))
     return nothing
 end
 
@@ -849,6 +849,7 @@ function initialize!(
     )
     (; relhumid_ref) = IC
     (; nlayers, σ_levels_full) = model.geometry
+    (; atmosphere) = model
 
     # get pressure [Pa] on grid
     lnpₛ = get_step(progn.pres, 1)  # 1 = first leapfrog timestep
@@ -859,14 +860,11 @@ function initialize!(
     temp_grid = transform(temp, model.spectral_transform)
     humid_grid = zero(temp_grid)
 
-    # Extract Clausius-Clapeyron parameters for kernel
-    (; e₀, T₀⁻¹, Lᵥ_Rᵥ, mol_ratio) = model.clausius_clapeyron
-
     # Launch kernel
     launch!(
         architecture(humid_grid), RingGridWorkOrder, size(humid_grid),
         constant_relative_humidity_kernel!, humid_grid, temp_grid, pres_grid,
-        σ_levels_full, relhumid_ref, e₀, T₀⁻¹, Lᵥ_Rᵥ, mol_ratio
+        σ_levels_full, relhumid_ref, atmosphere,
     )
     set!(progn, model; humid = humid_grid, lf = 1)
 
@@ -879,23 +877,16 @@ end
         pres_grid,
         @Const(σ_levels_full),
         relhumid_ref,
-        e₀,
-        T₀⁻¹,
-        Lᵥ_Rᵥ,
-        mol_ratio
+        atmosphere,
     )
     ij, k = @index(Global, NTuple)
 
     # Compute pressure at this level
     pₖ = σ_levels_full[k] * pres_grid[ij]
-
-    # Compute saturation humidity using Clausius-Clapeyron
-    temp = temp_grid[ij, k]
-    sat_vap_pres = e₀ * exp(Lᵥ_Rᵥ * (T₀⁻¹ - inv(temp)))
-    q_sat = mol_ratio * sat_vap_pres / pₖ
+    T = temp_grid[ij, k]
 
     # Set humidity as fraction of saturation
-    humid_grid[ij, k] = relhumid_ref * q_sat
+    humid_grid[ij, k] = relhumid_ref * saturation_humidity(T, pₖ, atmosphere)
 end
 
 export RandomWaves

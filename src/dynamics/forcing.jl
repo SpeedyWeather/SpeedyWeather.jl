@@ -303,9 +303,8 @@ function initialize!(   forcing::HeldSuarez,
     (; coslat, sinlat) = model.geometry
     σ = model.geometry.σ_levels_full
     (; σb, ΔTy, Δθz, relax_time_slow, relax_time_fast, Tmax) = forcing
-    (; logσ, temp_relax_freq, temp_equil_a, temp_equil_b) = forcing
-                           
-    (; pres_ref) = model.atmosphere
+    (; logσ, temp_relax_freq, temp_equil_a, temp_equil_b) = forcing                   
+    p₀ = model.atmosphere.pressure_reference
 
     # slow relaxation everywhere, fast in the tropics
     kₐ = 1/relax_time_slow.value
@@ -318,7 +317,7 @@ function initialize!(   forcing::HeldSuarez,
 
     # Held and Suarez equation 3, split into max(Tmin, (a - b*ln(p))*(p/p₀)^κ)
     # precompute a, b to simplify online calculation
-    @. temp_equil_a = Tmax - ΔTy*sinlat^2 + Δθz*log(pres_ref)*coslat^2
+    @. temp_equil_a = Tmax - ΔTy*sinlat^2 + Δθz*log(p₀)*coslat^2
     @. temp_equil_b = -Δθz*coslat^2
 end
 

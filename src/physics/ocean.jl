@@ -374,7 +374,7 @@ function timestep!(
 )
     sst = progn.ocean.sea_surface_temperature
 
-    Lᵥ = model.atmosphere.latent_heat_condensation
+    Lᵥ = latent_heat_condensation(model.atmosphere)
     C₀ = ocean_model.heat_capacity_mixed_layer
     Δt = model.time_stepping.Δt_sec
     Δt_C₀ = Δt / C₀
