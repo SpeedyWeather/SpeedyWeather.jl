@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- copyto! for LowerTriangularArray revised [#941](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/941)
 - Sea ice and snow insulation in surface flux computation [#873](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/873)
 - Boundary layer drag revisited with ocean/land roughness and new defaults [#873](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/873)
 - OneBandLongwave radiation implemented and default [#873](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/873)

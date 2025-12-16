@@ -103,7 +103,6 @@ export transform, transform!
 export curl, divergence, curl!, divergence!
 export ∇, ∇², ∇⁻², ∇!, ∇²!, ∇⁻²!
 export power_spectrum
-export spectral_truncation, spectral_truncation!
 
 import SpeedyTransforms: prettymemory
 
