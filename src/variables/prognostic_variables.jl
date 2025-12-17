@@ -273,17 +273,14 @@ function Base.fill!(progn::PrognosticVariables, value::Number)
     #TODO copy over random pattern?
 
     # ocean
-    progn.ocean.sea_surface_temperature .= value
-    progn.ocean.sea_ice_concentration .= value
-    progn.ocean.sensible_heat_flux .= value
-    progn.ocean.surface_humidity_flux .= value
+    for (key, value) in progn.ocean
+        value .= value
+    end 
 
     # land
-    progn.land.soil_temperature .= value
-    progn.land.snow_depth .= value
-    progn.land.soil_moisture .= value
-    progn.land.sensible_heat_flux .= value
-    progn.land.surface_humidity_flux .= value
+    for (key, value) in progn.land
+        value .= value
+    end 
 
     # fill tracers
     for (key, value) in progn.tracers 
