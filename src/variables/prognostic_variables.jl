@@ -273,18 +273,18 @@ function Base.fill!(progn::PrognosticVariables, value::Number)
     #TODO copy over random pattern?
 
     # ocean
-    for (key, value) in progn.ocean
-        value .= value
+    for (key, var) in progn.ocean
+        var .= value
     end 
 
     # land
-    for (key, value) in progn.land
-        value .= value
+    for (key, var) in progn.land
+        var .= value
     end 
 
     # fill tracers
-    for (key, value) in progn.tracers 
-        for value_i in value # istep of nsteps tuple 
+    for (key, var) in progn.tracers 
+        for value_i in var # istep of nsteps tuple 
             value_i .= value
         end 
     end 
