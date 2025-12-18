@@ -29,20 +29,20 @@ abstract type AbstractLandSeaMask end
 function Base.show(io::IO, L::AbstractLandSeaMask)
     println(io, "$(typeof(L)) <: AbstractLandSeaMask")
     keys = propertynames(L)
-    print_fields(io, L, keys)
+    return print_fields(io, L, keys)
 end
 
 function mask!(
-    field::AbstractField,
-    mask::AbstractField,
-    land_or_sea::Symbol;
-    masked_value = NaN,
-)
+        field::AbstractField,
+        mask::AbstractField,
+        land_or_sea::Symbol;
+        masked_value = NaN,
+    )
 
     val = land_or_sea == :land ? 1 : 0
     masked_val = convert(eltype(field), masked_value)
 
-    @boundscheck fields_match(field, mask, horizontal_only=true) || throw(DimensionMismatch(field, mask))
+    @boundscheck fields_match(field, mask, horizontal_only = true) || throw(DimensionMismatch(field, mask))
     @boundscheck ndims(mask) == 1 || throw(DimensionMismatch(field, mask))
 
     arch = architecture(field)
@@ -51,7 +51,7 @@ function mask!(
 end
 
 # 2D, 3D or ND variant via Cartesian indexing
-@kernel inbounds=true function mask_kernel!(field, mask, val, masked_val)
+@kernel inbounds = true function mask_kernel!(field, mask, val, masked_val)
     ijk = @index(Global, Cartesian)
     if mask[ijk[1]] == val
         field[ijk] = masked_val
@@ -64,7 +64,7 @@ end
     mask!(field, mask.mask, args...; kwargs...)
 
 # adapt on GPU only the mask itself
-Adapt.adapt_structure(to, land_sea_mask::AbstractLandSeaMask) = (mask=adapt_structure(to, land_sea_mask.mask), )
+Adapt.adapt_structure(to, land_sea_mask::AbstractLandSeaMask) = (mask = adapt_structure(to, land_sea_mask.mask),)
 
 # make available when using SpeedyWeather
 export EarthLandSeaMask
@@ -127,11 +127,11 @@ function initialize!(land_sea_mask::EarthLandSeaMask, model::PrimitiveEquation)
         path = joinpath(land_sea_mask.path, land_sea_mask.file)
     end
     ncfile = NCDataset(path)
-    
-    # high resolution land-sea mask
-    lsm_highres = land_sea_mask.file_Grid(ncfile["lsm"].var[:, :], input_as=Matrix)
 
-    # average onto grid cells of the model 
+    # high resolution land-sea mask
+    lsm_highres = land_sea_mask.file_Grid(ncfile["lsm"].var[:, :], input_as = Matrix)
+
+    # average onto grid cells of the model
     cpu_mask = on_architecture(CPU(), land_sea_mask.mask)
     RingGrids.grid_cell_average!(cpu_mask, lsm_highres)
     land_sea_mask.mask .= on_architecture(model.spectral_grid.architecture, cpu_mask)

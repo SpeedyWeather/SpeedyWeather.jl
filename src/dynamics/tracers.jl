@@ -36,11 +36,12 @@ activate!(simulation::AbstractSimulation, tracers::Tracer...) = activate!(simula
 activate!(model::AbstractModel, tracers::Tracer...) = activate!(model.tracers, tracers...)
 
 # pass on "value" to also allow _activate! to be used for decativation
-activate!(dict::TRACER_DICT, tracers::Tracer...) = _activate!(dict, tracers..., value=true)
-function _activate!(dict::TRACER_DICT, tracers::Tracer...; value::Bool=true)
+activate!(dict::TRACER_DICT, tracers::Tracer...) = _activate!(dict, tracers..., value = true)
+function _activate!(dict::TRACER_DICT, tracers::Tracer...; value::Bool = true)
     for tracer in tracers
         dict[tracer.name].active = value
     end
+    return
 end
 
 export deactivate!
@@ -48,7 +49,7 @@ export deactivate!
 """$(TYPEDSIGNATURES) Deactivate a tracer in a simulation, which is a setting in `simulation.model` only."""
 deactivate!(simulation::AbstractSimulation, tracers::Tracer...) = deactivate!(simulation.model, tracers...)
 deactivate!(model::AbstractModel, tracers::Tracer...) = deactivate!(model.tracers, tracers...)
-deactivate!(dict::TRACER_DICT, tracers::Tracer...) = _activate!(dict, tracers..., value=false)
+deactivate!(dict::TRACER_DICT, tracers::Tracer...) = _activate!(dict, tracers..., value = false)
 
 # delete from tracer dictionary, identified by its `name::Symbol`
 Base.delete!(model::AbstractModel, tracer::Tracer) = delete!(model.tracers, tracer.name)

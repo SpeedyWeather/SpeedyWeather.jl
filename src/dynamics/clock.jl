@@ -27,21 +27,21 @@ $(TYPEDFIELDS)"""
     Δt::Millisecond = Millisecond(0)
 end
 
-# we don't want to adapt the clock, it has to stay mutable, 
-# we just explicitly transfer nothing to the kernels 
+# we don't want to adapt the clock, it has to stay mutable,
+# we just explicitly transfer nothing to the kernels
 Adapt.adapt_structure(to, ::Clock) = nothing
-    
-function timestep!(clock::Clock, Δt; increase_counter::Bool=true)
+
+function timestep!(clock::Clock, Δt; increase_counter::Bool = true)
     clock.time += Δt
     # the first timestep is a half-step and doesn't count
-    clock.timestep_counter += increase_counter
+    return clock.timestep_counter += increase_counter
 end
 
 # pretty printing
 function Base.show(io::IO, C::Clock)
     println(io, "$(typeof(C))")
     keys = propertynames(C)
-    print_fields(io, C, keys)
+    return print_fields(io, C, keys)
 end
 
 # copy!
@@ -66,8 +66,8 @@ Initialize the clock with the time step `Δt` and `period` to integrate for."""
 function initialize!(clock::Clock, Δt::Period, period::Period)
     clock.Δt = Δt
     clock.period = period
-    clock.n_timesteps = ceil(Int, Millisecond(period).value/Millisecond(Δt).value)
-    initialize!(clock)      # set start time, reset counter
+    clock.n_timesteps = ceil(Int, Millisecond(period).value / Millisecond(Δt).value)
+    return initialize!(clock)      # set start time, reset counter
 end
 
 """$(TYPEDSIGNATURES)
@@ -76,7 +76,7 @@ function initialize!(clock::Clock, Δt::Period, n_timesteps::Integer)
     clock.Δt = Δt
     clock.n_timesteps = n_timesteps
     clock.period = Δt * n_timesteps
-    initialize!(clock)
+    return initialize!(clock)
 end
 
 """$(TYPEDSIGNATURES)
@@ -92,7 +92,7 @@ $(TYPEDSIGNATURES)
 Create and initialize a clock from `time_stepping`."""
 function Clock(time_stepping::AbstractTimeStepper; kwargs...)
     clock = Clock(; kwargs...)
-    initialize!(clock, time_stepping, clock.period)
+    return initialize!(clock, time_stepping, clock.period)
 end
 
 """
@@ -110,7 +110,7 @@ Century(p::Period) = convert(Century, p)
 Dates._units(m::Century) = m.value == 1 ? " century" : " centuries"
 
 # convert Century -> Year
-Base.convert(::Type{Year}, c::Century) = Year(c.value*100)
+Base.convert(::Type{Year}, c::Century) = Year(c.value * 100)
 
 # promotion rules
 Base.promote_rule(::Type{Century}, ::Type{Year}) = Year
@@ -134,7 +134,7 @@ Millenium(p::Period) = convert(Millenium, p)
 Dates._units(m::Millenium) = m.value == 1 ? " millenium" : " millenia"
 
 # convert Millenium -> Century and Year
-Base.convert(::Type{Century}, m::Millenium) = Century(m.value*10)
+Base.convert(::Type{Century}, m::Millenium) = Century(m.value * 10)
 Base.convert(::Type{Year}, m::Millenium) = Year(Century(m))
 
 # promotion rules for converting to common types, e.g. in collections
@@ -150,20 +150,20 @@ Dates.coarserperiod(::Type{Year}) = (Century, 100)
 Dates.coarserperiod(::Type{Century}) = (Millenium, 10)
 
 # conversion rules for floating point -> time types
-Dates.Second(       x::AbstractFloat) = convert(Second, x)
-Dates.Minute(       x::AbstractFloat) = Second(60x)
-Dates.Hour(         x::AbstractFloat) = Minute(60x)
-Dates.Day(          x::AbstractFloat) = Hour(24x)
-Dates.Week(         x::AbstractFloat) = Day(7x)
-Dates.Month(        x::AbstractFloat) = Day(30x)  # approximate
-Dates.Year(         x::AbstractFloat) = Day(365x) # approximate
-Century(      x::AbstractFloat) = Year(100x)
-Millenium(    x::AbstractFloat) = Century(10x)
+Dates.Second(x::AbstractFloat) = convert(Second, x)
+Dates.Minute(x::AbstractFloat) = Second(60x)
+Dates.Hour(x::AbstractFloat) = Minute(60x)
+Dates.Day(x::AbstractFloat) = Hour(24x)
+Dates.Week(x::AbstractFloat) = Day(7x)
+Dates.Month(x::AbstractFloat) = Day(30x)  # approximate
+Dates.Year(x::AbstractFloat) = Day(365x) # approximate
+Century(x::AbstractFloat) = Year(100x)
+Millenium(x::AbstractFloat) = Century(10x)
 
 # use Dates.second to round to integer seconds
-Dates.second(x::Dates.Nanosecond) = round(Int, x.value*1e-9)
-Dates.second(x::Dates.Microsecond) = round(Int, x.value*1e-6)
-Dates.second(x::Dates.Millisecond) = round(Int, x.value*1e-3)
+Dates.second(x::Dates.Nanosecond) = round(Int, x.value * 1.0e-9)
+Dates.second(x::Dates.Microsecond) = round(Int, x.value * 1.0e-6)
+Dates.second(x::Dates.Millisecond) = round(Int, x.value * 1.0e-3)
 
 # defined to convert from floats to Dates.Second (which require ints by default) via rounding
 function Base.convert(::Type{Second}, x::AbstractFloat)

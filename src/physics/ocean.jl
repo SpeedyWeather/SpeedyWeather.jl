@@ -47,29 +47,37 @@ abstract type AbstractOcean <: AbstractModelComponent end
 function Base.show(io::IO, O::AbstractOcean)
     println(io, "$(typeof(O)) <: AbstractOcean")
     keys = propertynames(O)
-    print_fields(io, O, keys)
+    return print_fields(io, O, keys)
 end
 
 # variable that AbstractOcean requires
 variables(::AbstractOcean) =
-    (PrognosticVariable(name=:sea_surface_temperature, dims=Grid2D(),
-        namespace=:ocean, units="K", desc="Sea surface temperature"),)
+    (
+    PrognosticVariable(
+        name = :sea_surface_temperature, dims = Grid2D(),
+        namespace = :ocean, units = "K", desc = "Sea surface temperature"
+    ),
+)
 
 # function barrier for all oceans
-function initialize!(   ocean::PrognosticVariablesOcean,
-                        progn::PrognosticVariables,
-                        diagn::DiagnosticVariables,
-                        ocean_model::AbstractOcean,
-                        model::PrimitiveEquation) where PrognosticVariablesOcean
+function initialize!(
+        ocean::PrognosticVariablesOcean,
+        progn::PrognosticVariables,
+        diagn::DiagnosticVariables,
+        ocean_model::AbstractOcean,
+        model::PrimitiveEquation
+    ) where {PrognosticVariablesOcean}
     initialize!(ocean, progn, diagn, ocean_model, model)
-    initialize!(ocean, progn, diagn, model.sea_ice, model)
+    return initialize!(ocean, progn, diagn, model.sea_ice, model)
 end
 
 # function barrier for all oceans
-function ocean_timestep!(   progn::PrognosticVariables,
-                            diagn::DiagnosticVariables,
-                            model::PrimitiveEquation)
-    timestep!(progn, diagn, model.ocean, model)
+function ocean_timestep!(
+        progn::PrognosticVariables,
+        diagn::DiagnosticVariables,
+        model::PrimitiveEquation
+    )
+    return timestep!(progn, diagn, model.ocean, model)
 end
 
 
@@ -126,37 +134,37 @@ function initialize!(ocean::SeasonalOceanClimatology, model::PrimitiveEquation)
 
     # create interpolator from grid in file to grid used in model
     fill_value = ncfile[ocean.varname].attrib["_FillValue"]
-    sst = ocean.file_Grid(ncfile[ocean.varname].var[:, :, :], input_as=Matrix)
+    sst = ocean.file_Grid(ncfile[ocean.varname].var[:, :, :], input_as = Matrix)
     sst[sst .=== fill_value] .= ocean.missing_value      # === to include NaN
 
-    # transfer to architecture of model if needed 
+    # transfer to architecture of model if needed
     sst = on_architecture(model.architecture, sst)
 
-    @boundscheck fields_match(monthly_temperature, sst, vertical_only=true) ||
+    @boundscheck fields_match(monthly_temperature, sst, vertical_only = true) ||
         throw(DimensionMismatch(monthly_temperature, sst))
 
     # create interpolator from grid in file to grid used in model
-    interp = RingGrids.interpolator(monthly_temperature, sst, NF=Float32)
+    interp = RingGrids.interpolator(monthly_temperature, sst, NF = Float32)
     interpolate!(monthly_temperature, sst, interp)
     return nothing
 end
 
 function initialize!(
-    ocean::PrognosticVariablesOcean,
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
-    ocean_model::SeasonalOceanClimatology,
-    model::PrimitiveEquation,
-) where PrognosticVariablesOcean
-    timestep!(progn, diagn, ocean_model, model)
+        ocean::PrognosticVariablesOcean,
+        progn::PrognosticVariables,
+        diagn::DiagnosticVariables,
+        ocean_model::SeasonalOceanClimatology,
+        model::PrimitiveEquation,
+    ) where {PrognosticVariablesOcean}
+    return timestep!(progn, diagn, ocean_model, model)
 end
 
 function timestep!(
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
-    ocean::SeasonalOceanClimatology,
-    model::PrimitiveEquation,
-)
+        progn::PrognosticVariables,
+        diagn::DiagnosticVariables,
+        ocean::SeasonalOceanClimatology,
+        model::PrimitiveEquation,
+    )
     (; time) = progn.clock
 
     this_month = Dates.month(time)
@@ -167,18 +175,21 @@ function timestep!(
     (; monthly_temperature) = ocean
     (; sea_surface_temperature) = progn.ocean
     NF = eltype(sea_surface_temperature)
-    weight = convert(NF, Dates.days(time-Dates.firstdayofmonth(time))/Dates.daysinmonth(time))
+    weight = convert(NF, Dates.days(time - Dates.firstdayofmonth(time)) / Dates.daysinmonth(time))
 
-    launch!(architecture(sea_surface_temperature), LinearWorkOrder, size(sea_surface_temperature),
-            seasonal_ocean_kernel!,
-            sea_surface_temperature, monthly_temperature, weight, this_month, next_month)
+    return launch!(
+        architecture(sea_surface_temperature), LinearWorkOrder, size(sea_surface_temperature),
+        seasonal_ocean_kernel!,
+        sea_surface_temperature, monthly_temperature, weight, this_month, next_month
+    )
 end
 
-@kernel inbounds=true function seasonal_ocean_kernel!(
-    sst, monthly_temp, weight, this_month, next_month)
-    
+@kernel inbounds = true function seasonal_ocean_kernel!(
+        sst, monthly_temp, weight, this_month, next_month
+    )
+
     ij = @index(Global, Linear)
-    
+
     sst[ij] = (1 - weight) * monthly_temp[ij, this_month] + weight * monthly_temp[ij, next_month]
 end
 
@@ -222,28 +233,29 @@ initialize!(::ConstantOceanClimatology, ::PrimitiveEquation) = nothing
 
 # initialize
 function initialize!(
-    ocean::PrognosticVariablesOcean,
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
-    ocean_model::ConstantOceanClimatology,
-    model::PrimitiveEquation,
-) where PrognosticVariablesOcean
+        ocean::PrognosticVariablesOcean,
+        progn::PrognosticVariables,
+        diagn::DiagnosticVariables,
+        ocean_model::ConstantOceanClimatology,
+        model::PrimitiveEquation,
+    ) where {PrognosticVariablesOcean}
     # create a seasonal model, initialize it and the variables
     (; path, file, varname, file_Grid, missing_value) = ocean_model
     (; NF, GridVariable3D, grid) = model.spectral_grid
     seasonal_model = SeasonalOceanClimatology{NF, typeof(grid), GridVariable3D}(;
-                                grid, path, file, varname, file_Grid, missing_value)
+        grid, path, file, varname, file_Grid, missing_value
+    )
     initialize!(seasonal_model, model)
-    initialize!(ocean, progn, diagn, seasonal_model, model)
+    return initialize!(ocean, progn, diagn, seasonal_model, model)
     # (seasonal model will be garbage collected hereafter)
 end
 
 function timestep!(
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
-    ocean_model::ConstantOceanClimatology,
-    model::PrimitiveEquation,
-)
+        progn::PrognosticVariables,
+        diagn::DiagnosticVariables,
+        ocean_model::ConstantOceanClimatology,
+        model::PrimitiveEquation,
+    )
     return nothing
 end
 
@@ -277,25 +289,25 @@ initialize!(::AquaPlanet, ::PrimitiveEquation) = nothing
 
 # initialize
 function initialize!(
-    ocean::PrognosticVariablesOcean,
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
-    ocean_model::AquaPlanet,
-    model::PrimitiveEquation,
-) where PrognosticVariablesOcean
+        ocean::PrognosticVariablesOcean,
+        progn::PrognosticVariables,
+        diagn::DiagnosticVariables,
+        ocean_model::AquaPlanet,
+        model::PrimitiveEquation,
+    ) where {PrognosticVariablesOcean}
     (; sea_surface_temperature) = ocean
     Te, Tp = ocean_model.temp_equator, ocean_model.temp_poles
-    sst(λ, φ) = (Te - Tp)*cosd(φ)^2 + Tp
+    sst(λ, φ) = (Te - Tp) * cosd(φ)^2 + Tp
     set!(sea_surface_temperature, sst, model.geometry)
-    ocean_model.mask && mask!(sea_surface_temperature, model.land_sea_mask, :land)
+    return ocean_model.mask && mask!(sea_surface_temperature, model.land_sea_mask, :land)
 end
 
 function timestep!(
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
-    ocean_model::AquaPlanet,
-    model::PrimitiveEquation,
-)
+        progn::PrognosticVariables,
+        diagn::DiagnosticVariables,
+        ocean_model::AquaPlanet,
+        model::PrimitiveEquation,
+    )
     return nothing
 end
 
@@ -319,7 +331,7 @@ export SlabOcean
     land_temperature::NF = 283
 
     "[DERIVED] Effective mixed-layer heat capacity [J/K/m²]"
-    heat_capacity_mixed_layer::NF = specific_heat_capacity*mixed_layer_depth*density
+    heat_capacity_mixed_layer::NF = specific_heat_capacity * mixed_layer_depth * density
 end
 
 # generator function
@@ -327,16 +339,16 @@ SlabOcean(SG::SpectralGrid; kwargs...) = SlabOcean{SG.NF}(; kwargs...)
 
 function variables(::SlabOcean)
     return (
-    PrognosticVariable(name=:sea_surface_temperature, dims=Grid2D(), namespace=:ocean, desc="Sea surface temperature", units="K"),
-    
-    DiagnosticVariable(name=:surface_shortwave_down, dims=Grid2D(), desc="Surface shortwave radiation down", units="W/m^2"),
-    DiagnosticVariable(name=:surface_shortwave_up,   dims=Grid2D(), desc="Surface shortwave radiation up over ocean", units="W/m^2", namespace=:ocean),
-    DiagnosticVariable(name=:surface_longwave_down,  dims=Grid2D(), desc="Surface longwave radiation down", units="W/m^2"),
-    DiagnosticVariable(name=:surface_longwave_up,    dims=Grid2D(), desc="Surface longwave radiation up over ocean", units="W/m^2", namespace=:ocean),
+        PrognosticVariable(name = :sea_surface_temperature, dims = Grid2D(), namespace = :ocean, desc = "Sea surface temperature", units = "K"),
 
-    DiagnosticVariable(name=:surface_humidity_flux,      dims=Grid2D(), desc="Surface humidity flux", units="kg/s/m^2", namespace=:ocean),
-    DiagnosticVariable(name=:surface_sensible_heat_flux, dims=Grid2D(), desc="Surface sensible heat flux", units="kg/s/m^2", namespace=:ocean),
-    ) 
+        DiagnosticVariable(name = :surface_shortwave_down, dims = Grid2D(), desc = "Surface shortwave radiation down", units = "W/m^2"),
+        DiagnosticVariable(name = :surface_shortwave_up, dims = Grid2D(), desc = "Surface shortwave radiation up over ocean", units = "W/m^2", namespace = :ocean),
+        DiagnosticVariable(name = :surface_longwave_down, dims = Grid2D(), desc = "Surface longwave radiation down", units = "W/m^2"),
+        DiagnosticVariable(name = :surface_longwave_up, dims = Grid2D(), desc = "Surface longwave radiation up over ocean", units = "W/m^2", namespace = :ocean),
+
+        DiagnosticVariable(name = :surface_humidity_flux, dims = Grid2D(), desc = "Surface humidity flux", units = "kg/s/m^2", namespace = :ocean),
+        DiagnosticVariable(name = :surface_sensible_heat_flux, dims = Grid2D(), desc = "Surface sensible heat flux", units = "kg/s/m^2", namespace = :ocean),
+    )
 end
 
 # nothing to initialize for SlabOcean
@@ -344,12 +356,12 @@ initialize!(ocean_model::SlabOcean, model::PrimitiveEquation) = nothing
 
 # initialize
 function initialize!(
-    ocean::PrognosticVariablesOcean,
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
-    ocean_model::SlabOcean,
-    model::PrimitiveEquation,
-) where PrognosticVariablesOcean
+        ocean::PrognosticVariablesOcean,
+        progn::PrognosticVariables,
+        diagn::DiagnosticVariables,
+        ocean_model::SlabOcean,
+        model::PrimitiveEquation,
+    ) where {PrognosticVariablesOcean}
     # create a seasonal model, initialize it and the variables
     seasonal_model = SeasonalOceanClimatology(model.spectral_grid)
     initialize!(seasonal_model, model)
@@ -357,7 +369,7 @@ function initialize!(
     # (seasonal model will be garbage collected hereafter)
 
     # set land "sst" points (100% land only)
-    if ocean_model.mask
+    return if ocean_model.mask
         masked_value = ocean_model.land_temperature
         sst = progn.ocean.sea_surface_temperature.data
         # TODO: broadcasting over views of Fields of GPUArrays doesn't work
@@ -367,11 +379,11 @@ function initialize!(
 end
 
 function timestep!(
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
-    ocean_model::SlabOcean,
-    model::PrimitiveEquation,
-)
+        progn::PrognosticVariables,
+        diagn::DiagnosticVariables,
+        ocean_model::SlabOcean,
+        model::PrimitiveEquation,
+    )
     sst = progn.ocean.sea_surface_temperature
 
     Lᵥ = latent_heat_condensation(model.atmosphere)
@@ -391,15 +403,17 @@ function timestep!(
 
     params = (; Δt_C₀, Lᵥ)                              # pack into NamedTuple for kernel
 
-    launch!(architecture(sst), LinearWorkOrder, size(sst), slab_ocean_kernel!,
-        sst, mask, Rsd, Rsu, Rld, Rlu, H, S, params)
+    launch!(
+        architecture(sst), LinearWorkOrder, size(sst), slab_ocean_kernel!,
+        sst, mask, Rsd, Rsu, Rld, Rlu, H, S, params
+    )
     return nothing
 end
 
-@kernel inbounds=true function slab_ocean_kernel!(sst, mask, Rsd, Rsu, Rld, Rlu, H, S, params)
+@kernel inbounds = true function slab_ocean_kernel!(sst, mask, Rsd, Rsu, Rld, Rlu, H, S, params)
     ij = @index(Global, Linear)         # every grid point ij
     if mask[ij] < 1                     # at least partially ocean
         (; Δt_C₀, Lᵥ) = params
-        sst[ij] += Δt_C₀*(Rsd[ij] - Rsu[ij] - Rlu[ij] + Rld[ij] - Lᵥ*H[ij] - S[ij])
+        sst[ij] += Δt_C₀ * (Rsd[ij] - Rsu[ij] - Rlu[ij] + Rld[ij] - Lᵥ * H[ij] - S[ij])
     end
 end

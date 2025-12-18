@@ -11,28 +11,28 @@ passed on as keyword arguments, e.g. `planet=Earth(spectral_grid)`. Fields, repr
 model components, are
 $(TYPEDFIELDS)"""
 @kwdef mutable struct BarotropicModel{
-    SG,     # <:SpectralGrid
-    AR,     # <:AbstractArchitecture,
-    GE,     # <:AbstractGeometry,
-    PL,     # <:AbstractPlanet,
-    AT,     # <:AbstractAtmosphere,
-    CO,     # <:AbstractCoriolis,
-    FR,     # <:AbstractForcing,
-    DR,     # <:AbstractDrag,
-    PA,     # <:AbstractParticleAdvection,
-    IC,     # <:AbstractInitialConditions,
-    RP,     # <:AbstractRandomProcess,
-    TS,     # <:AbstractTimeStepper,
-    ST,     # <:SpectralTransform{NF},
-    IM,     # <:AbstractImplicit,
-    HD,     # <:AbstractHorizontalDiffusion,
-    OU,     # <:AbstractOutput,
-    FB,     # <:AbstractFeedback,
-} <: Barotropic
-    
+        SG,     # <:SpectralGrid
+        AR,     # <:AbstractArchitecture,
+        GE,     # <:AbstractGeometry,
+        PL,     # <:AbstractPlanet,
+        AT,     # <:AbstractAtmosphere,
+        CO,     # <:AbstractCoriolis,
+        FR,     # <:AbstractForcing,
+        DR,     # <:AbstractDrag,
+        PA,     # <:AbstractParticleAdvection,
+        IC,     # <:AbstractInitialConditions,
+        RP,     # <:AbstractRandomProcess,
+        TS,     # <:AbstractTimeStepper,
+        ST,     # <:SpectralTransform{NF},
+        IM,     # <:AbstractImplicit,
+        HD,     # <:AbstractHorizontalDiffusion,
+        OU,     # <:AbstractOutput,
+        FB,     # <:AbstractFeedback,
+    } <: Barotropic
+
     spectral_grid::SG
     architecture::AR = spectral_grid.architecture
-    
+
     # DYNAMICS
     geometry::GE = Geometry(spectral_grid)
     planet::PL = Earth(spectral_grid)
@@ -42,7 +42,7 @@ $(TYPEDFIELDS)"""
     drag::DR = LinearVorticityDrag(spectral_grid)
     particle_advection::PA = nothing
     initial_conditions::IC = InitialConditions(spectral_grid, Barotropic)
-    
+
     # VARIABLES
     random_process::RP = nothing
     tracers::TRACER_DICT = TRACER_DICT()
@@ -63,10 +63,10 @@ prognostic_variables(::Type{<:Barotropic}) = (:vor,)
 default_concrete_model(::Type{Barotropic}) = BarotropicModel
 
 parameters(model::Barotropic; kwargs...) = SpeedyParams(
-    planet = parameters(model.planet; component=:planet, kwargs...),
-    atmosphere = parameters(model.atmosphere; component=:atmosphere, kwargs...),
-    forcing = parameters(model.forcing; component=:forcing, kwargs...),
-    drag = parameters(model.drag; component=:drag, kwargs...),
+    planet = parameters(model.planet; component = :planet, kwargs...),
+    atmosphere = parameters(model.atmosphere; component = :atmosphere, kwargs...),
+    forcing = parameters(model.forcing; component = :forcing, kwargs...),
+    drag = parameters(model.drag; component = :drag, kwargs...),
 )
 
 """
@@ -93,11 +93,11 @@ function initialize!(model::Barotropic; time::DateTime = DEFAULT_DATE)
     # allocate prognostic and diagnostic variables
     prognostic_variables = PrognosticVariables(model)
     diagnostic_variables = DiagnosticVariables(model)
-    
+
     # initialize particles (or other non-atmosphere prognostic variables)
     initialize!(prognostic_variables.particles, prognostic_variables, diagnostic_variables, model)
-    
-    # set the initial conditions 
+
+    # set the initial conditions
     initialize!(prognostic_variables, model.initial_conditions, model)
     (; clock) = prognostic_variables
     clock.time = time       # set the current time

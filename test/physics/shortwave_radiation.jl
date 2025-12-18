@@ -1,8 +1,8 @@
 @testset "Shortwave radiation" begin
-    spectral_grid = SpectralGrid(trunc=31, nlayers=8)
-    @testset for SW in (Nothing, TransparentShortwave,)# OneBandShortwave, OneBandGreyShortwave)
+    spectral_grid = SpectralGrid(trunc = 31, nlayers = 8)
+    @testset for SW in (Nothing, TransparentShortwave) # OneBandShortwave, OneBandGreyShortwave)
         sw = SW(spectral_grid)
-        model = PrimitiveWetModel(spectral_grid; shortwave_radiation=sw)
+        model = PrimitiveWetModel(spectral_grid; shortwave_radiation = sw)
 
         initialize!(model.shortwave_radiation, model)
 

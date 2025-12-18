@@ -15,11 +15,11 @@ import GPUArrays: GPUArrays, @allowscalar
 import Adapt: Adapt, adapt, adapt_structure
 import GPUArrays: @allowscalar
 
-using  SpeedyWeatherInternals
-using  SpeedyWeatherInternals.Architectures
-import SpeedyWeatherInternals.Architectures: AbstractArchitecture, CPU, GPU, 
-       on_architecture, architecture, array_type, ismatching, nonparametric_type
-export CPU, GPU, on_architecture, architecture                # export device functions 
+using SpeedyWeatherInternals
+using SpeedyWeatherInternals.Architectures
+import SpeedyWeatherInternals.Architectures: AbstractArchitecture, CPU, GPU,
+    on_architecture, architecture, array_type, ismatching, nonparametric_type
+export CPU, GPU, on_architecture, architecture                # export device functions
 export SpeedyWeatherInternals, Architectures
 
 # INPUT OUTPUT
@@ -28,13 +28,13 @@ import Dates: Dates, DateTime, Period, Millisecond, Second, Minute, Hour, Day, W
 import Printf: Printf, @sprintf
 import Random: randstring
 import NCDatasets: NCDatasets, NCDataset, defDim, defVar
-import JLD2: jldopen, jldsave, JLDFile 
+import JLD2: jldopen, jldsave, JLDFile
 import CodecZlib
 import BitInformation: round, round!
 import ProgressMeter
 
 # UTILITIES
-using  DomainSets.IntervalSets
+using DomainSets.IntervalSets
 import Base: @propagate_inbounds
 
 # to avoid a `using Dates` to pass on DateTime arguments
@@ -45,7 +45,7 @@ export initialize!, finalize!
 
 # import utilities
 export Utils
-using SpeedyWeatherInternals.Utils 
+using SpeedyWeatherInternals.Utils
 
 # parameter handling
 using SpeedyWeatherInternals.SpeedyParameters
@@ -57,43 +57,43 @@ export SpeedyParam, SpeedyParams, parameters, stripparams
 
 # DATA STRUCTURES
 # LowerTriangularArrays for spherical harmonics
-using  LowerTriangularArrays
-export  LowerTriangularArrays, 
-        LowerTriangularArray,
-        LowerTriangularMatrix
+using LowerTriangularArrays
+export LowerTriangularArrays,
+    LowerTriangularArray,
+    LowerTriangularMatrix
 
-export  Spectrum
+export Spectrum
 
 # indexing styles for LowerTriangularArray/Matrix
-export  OneBased, ZeroBased
-export  eachmatrix, eachharmonic, eachorder
-        
+export OneBased, ZeroBased
+export eachmatrix, eachharmonic, eachorder
+
 # RingGrids
-using  RingGrids
+using RingGrids
 
-export  RingGrids
-export  AbstractGrid, AbstractFullGrid, AbstractReducedGrid
-export  AbstractField, AbstractField2D, AbstractField3D
-export  Field, Field2D, Field3D,
-        FullClenshawField, FullGaussianField,
-        FullHEALPixField, FullOctaHEALPixField,
-        OctahedralGaussianField, OctahedralClenshawField,
-        HEALPixField, OctaHEALPixField,
-        OctaminimalGaussianField
+export RingGrids
+export AbstractGrid, AbstractFullGrid, AbstractReducedGrid
+export AbstractField, AbstractField2D, AbstractField3D
+export Field, Field2D, Field3D,
+    FullClenshawField, FullGaussianField,
+    FullHEALPixField, FullOctaHEALPixField,
+    OctahedralGaussianField, OctahedralClenshawField,
+    HEALPixField, OctaHEALPixField,
+    OctaminimalGaussianField
 
-export  ColumnField, ColumnField2D, ColumnField3D, ColumnField4D,
-        FullColumnField, ReducedColumnField, transpose!
+export ColumnField, ColumnField2D, ColumnField3D, ColumnField4D,
+    FullColumnField, ReducedColumnField, transpose!
 
-export  FullClenshawGrid, FullGaussianGrid,
-        FullHEALPixGrid, FullOctaHEALPixGrid,
-        OctahedralGaussianGrid, OctahedralClenshawGrid,
-        HEALPixGrid, OctaHEALPixGrid,
-        OctaminimalGaussianGrid
-        
-export  eachring, eachlayer, eachgridpoint
-export  AnvilInterpolator
-export  spherical_distance
-export  zonal_mean
+export FullClenshawGrid, FullGaussianGrid,
+    FullHEALPixGrid, FullOctaHEALPixGrid,
+    OctahedralGaussianGrid, OctahedralClenshawGrid,
+    HEALPixGrid, OctaHEALPixGrid,
+    OctaminimalGaussianGrid
+
+export eachring, eachlayer, eachgridpoint
+export AnvilInterpolator
+export spherical_distance
+export zonal_mean
 
 # SpeedyTransforms
 using SpeedyTransforms

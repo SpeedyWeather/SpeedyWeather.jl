@@ -2,7 +2,7 @@ abstract type AbstractShortwaveTransmissivity <: AbstractShortwave end
 
 # function barrier to dispatch to type of model.transmissivity
 function transmissivity!(column::ColumnVariables, model::AbstractModel)
-    transmissivity!(column, model.transmissivity, model)
+    return transmissivity!(column, model.transmissivity, model)
 end
 
 export TransparentShortwaveTransmissivity
@@ -50,16 +50,18 @@ BackgroundShortwaveTransmissivity(SG::SpectralGrid; kwargs...) = BackgroundShort
 initialize!(::BackgroundShortwaveTransmissivity, ::AbstractModel) = nothing
 
 function transmissivity!(
-    column::ColumnVariables,
-    clouds,    # NamedTuple from clouds!
-    transmissivity::BackgroundShortwaveTransmissivity,
-    model::AbstractModel,
-    band::Int = 1,  # Which spectral band to compute
-)
+        column::ColumnVariables,
+        clouds,    # NamedTuple from clouds!
+        transmissivity::BackgroundShortwaveTransmissivity,
+        model::AbstractModel,
+        band::Int = 1,  # Which spectral band to compute
+    )
     t = view(column.transmissivity_shortwave, :, band)
- 
-    (; absorptivity_dry_air, absorptivity_aerosol, absorptivity_water_vapor,
-    absorptivity_cloud_base, absorptivity_cloud_limit) = transmissivity
+
+    (;
+        absorptivity_dry_air, absorptivity_aerosol, absorptivity_water_vapor,
+        absorptivity_cloud_base, absorptivity_cloud_limit,
+    ) = transmissivity
     (; cloud_top, cloud_cover) = clouds
     (; humid, cos_zenith, nlayers) = column
 
@@ -67,7 +69,7 @@ function transmissivity!(
     sigma_levels_full = model.geometry.σ_levels_full
     surface_pressure = column.pres[end]  # This is in Pa
 
-    # Zenith angle correction factor 
+    # Zenith angle correction factor
     azen = transmissivity.zenith_amplitude
     nzen = transmissivity.zenith_exponent
 
@@ -75,21 +77,25 @@ function transmissivity!(
     zenit_factor = 1 + azen * (1 - cos_zenith)^nzen
 
     # Cloud absorption term based on cloud base humidity (SPEEDY logic)
-    q_base = nlayers > 1 ? humid[nlayers-1] : humid[nlayers]
-    cloud_absorptivity_term = min(absorptivity_cloud_base * q_base,
-                                absorptivity_cloud_limit)
+    q_base = nlayers > 1 ? humid[nlayers - 1] : humid[nlayers]
+    cloud_absorptivity_term = min(
+        absorptivity_cloud_base * q_base,
+        absorptivity_cloud_limit
+    )
 
     for k in 1:nlayers
         q = humid[k]
 
         # Aerosol factor: use mid-level sigma, squared
         aerosol_factor = transmissivity.aerosols ? sigma_levels_full[k]^2 : 0
-        
+
         # Layer absorptivity (all humidity-based parameters are per kg/kg per 10^5 Pa)
         # Aerosol loading increases toward surface (proportional to σ²).
-        layer_absorptivity = (absorptivity_dry_air +
-                            absorptivity_aerosol * aerosol_factor +
-                            absorptivity_water_vapor * q)
+        layer_absorptivity = (
+            absorptivity_dry_air +
+                absorptivity_aerosol * aerosol_factor +
+                absorptivity_water_vapor * q
+        )
 
         # Add cloud absorption below the FINAL cloud top
         if k >= cloud_top
@@ -98,7 +104,7 @@ function transmissivity!(
 
         # Compute differential optical depth with zenith correction
         # CRITICAL: Normalize pressure to 10^5 Pa since absorptivities are per 10^5 Pa
-        delta_sigma = sigma_levels[k+1] - sigma_levels[k]
+        delta_sigma = sigma_levels[k + 1] - sigma_levels[k]
         normalized_pressure = surface_pressure / 100000   # Convert Pa to units of 10^5 Pa
         optical_depth = layer_absorptivity * delta_sigma * normalized_pressure * zenit_factor
 

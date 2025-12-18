@@ -30,7 +30,7 @@ initialize!(::ImplicitCondensation, ::PrimitiveEquation) = nothing
 # function barrier
 @propagate_inbounds function parameterization!(ij, diagn, progn, lsc::ImplicitCondensation, model)
     (; geometry, planet, atmosphere, time_stepping) = model
-    large_scale_condensation!(ij, diagn, lsc, geometry, planet, atmosphere, time_stepping)
+    return large_scale_condensation!(ij, diagn, lsc, geometry, planet, atmosphere, time_stepping)
 end
 
 """
@@ -40,14 +40,14 @@ relative humidity. Calculates the tendencies for specific humidity
 and temperature from latent heat release and integrates the
 large-scale precipitation vertically for output."""
 @propagate_inbounds function large_scale_condensation!(
-    ij,
-    diagn::DiagnosticVariables,
-    condensation::ImplicitCondensation,
-    geometry::Geometry,
-    planet::AbstractPlanet,
-    atmosphere::AbstractAtmosphere,
-    time_stepping,
-)
+        ij,
+        diagn::DiagnosticVariables,
+        condensation::ImplicitCondensation,
+        geometry::Geometry,
+        planet::AbstractPlanet,
+        atmosphere::AbstractAtmosphere,
+        time_stepping,
+    )
     # use previous time step for more stable Euler forward step of the parameterizations
     temp = diagn.grid.temp_grid_prev                # temperature [K]
     humid = diagn.grid.humid_grid_prev              # specific humidity [kg/kg]
@@ -61,7 +61,7 @@ large-scale precipitation vertically for output."""
     σ = geometry.σ_levels_full                      # vertical sigma coordinate [1]
     Δσ = geometry.σ_levels_thick                    # layer thickness in sigma coordinates
     ρ = atmosphere.water_density                    # air density [kg/m³]
-    pₛ_gρ = pₛ/(planet.gravity * ρ)                 # [Pa / (m/s² * kg/m³)] = [Pa m² * s² / kg] = [m]
+    pₛ_gρ = pₛ / (planet.gravity * ρ)                 # [Pa / (m/s² * kg/m³)] = [Pa m² * s² / kg] = [m]
 
     # thermodynamics
     Lᵥ = atmosphere.latent_heat_condensation        # latent heat of vaporization
@@ -81,15 +81,15 @@ large-scale precipitation vertically for output."""
 
         # Condensation from humidity in this layer (for a negative humidity tendency)
         # relative to threshold that can be <100%, e.g. 95%
-        sat_humid_k = saturation_humidity(temp[ij, k], σ[k]*pₛ, atmosphere)
+        sat_humid_k = saturation_humidity(temp[ij, k], σ[k] * pₛ, atmosphere)
         δq_cond = sat_humid_k * relative_humidity_threshold - humid[ij, k]
-        
+
         # skip if no condensation has occurred yet in this layer or above
         if δq_cond < 0 || snow_flux_down > 0 || rain_flux_down > 0
 
             # 0. convert between humidity tendency [kg/kg/s] and precipitation amount [m] or rate [m/s]
             Δp_gρ = Δσ[k] * pₛ_gρ                           # pressure thickness of layer Δp times 1/g/ρ [m]
-            Δp_Δtgρ = Δp_gρ/Δt_sec                          # pressure thickness of layer Δp times 1/Δt/g/ρ [m/s]
+            Δp_Δtgρ = Δp_gρ / Δt_sec                          # pressure thickness of layer Δp times 1/Δt/g/ρ [m/s]
             Δtgρ_Δp = inv(Δp_Δtgρ)                          # [s/m]
 
             # 1. Melting of snow from layer above
@@ -101,7 +101,7 @@ large-scale precipitation vertically for output."""
             rain_flux_down += melt_rate                     # this can evaporate now too
             δq_melt = melt_rate * Δtgρ_Δp                   # convert back to humidity increase over timestep [kg/kg]
             δT = -Lᵢ_cₚ * δq_melt                           # just to calculate the latent heat required (explicit in time)
-                                                            # don't use δq_melt as humidity tendency as it's only snow->rain
+            # don't use δq_melt as humidity tendency as it's only snow->rain
 
             # 2. Reevaporation and condensation
             dq = sat_humid_k - humid[ij, k]                 # reevaporation relative to 100% humidity
@@ -110,14 +110,14 @@ large-scale precipitation vertically for output."""
             rain_flux_down -= rain_evaporated               # remove reevaporated rain
             δq_evap = rain_evaporated * Δtgρ_Δp             # convert to humidity tendency over timestep [kg/kg]
             δq = min(0, δq_cond) + δq_evap                  # [kg/kg] sum with condensation (negative) and evaporation (positive)
-                                                            # division by timestep for tendency below
+            # division by timestep for tendency below
 
             # Solve for melting of snow, condensation, reevaporation (and possibly sublimation) implicitly in time
             # implicit correction, Frierson et al. 2006 eq. (21)
             # derivative of qsat wrt to temp
-            T = temp[ij, k] + Δt_sec*δT                     # use temperature minus latent heat for melting in gradient
-            dqsat_dT = sat_humid_k * relative_humidity_threshold * Lᵥ_cₚ/(Rᵥ*T^2)
-            δq /= ((1 + Lᵥ_cₚ*dqsat_dT) * time_scale*Δt_sec)
+            T = temp[ij, k] + Δt_sec * δT                     # use temperature minus latent heat for melting in gradient
+            dqsat_dT = sat_humid_k * relative_humidity_threshold * Lᵥ_cₚ / (Rᵥ * T^2)
+            δq /= ((1 + Lᵥ_cₚ * dqsat_dT) * time_scale * Δt_sec)
             δT = -Lᵥ_cₚ * δq                                # latent heat release for enthalpy conservation
 
             # If there is large-scale condensation at a level higher (i.e. smaller k) than
@@ -144,13 +144,13 @@ large-scale precipitation vertically for output."""
         end
     end
 
-    # avoid negative precipitation from rounding errors 
+    # avoid negative precipitation from rounding errors
     rain_flux_down = max(rain_flux_down, 0)
     snow_flux_down = max(snow_flux_down, 0)
 
-    # precipitation from rain/snow [m] during time step whatever is fluxed out 
-    diagn.physics.rain_large_scale[ij] += Δt_sec*rain_flux_down
-	diagn.physics.snow_large_scale[ij] += Δt_sec*snow_flux_down
+    # precipitation from rain/snow [m] during time step whatever is fluxed out
+    diagn.physics.rain_large_scale[ij] += Δt_sec * rain_flux_down
+    diagn.physics.snow_large_scale[ij] += Δt_sec * snow_flux_down
 
     # and the rain/snow fall rate [m/s]
     diagn.physics.rain_rate_large_scale[ij] = rain_flux_down
@@ -165,12 +165,12 @@ end
 
 function variables(::ImplicitCondensation)
     return (
-        DiagnosticVariable(name=:rain_large_scale, dims=Grid2D(), desc="Large-scale precipitation (rain, accumulated)", units="m"),
-        DiagnosticVariable(name=:snow_large_scale, dims=Grid2D(), desc="Large-scale precipitation (snow, accumulated)", units="m"),
-        DiagnosticVariable(name=:rain_rate_large_scale, dims=Grid2D(), desc="Large-scale precipitation (rain)", units="m/s"),
-        DiagnosticVariable(name=:snow_rate_large_scale, dims=Grid2D(), desc="Large-scale precipitation (snow)", units="m/s"),
-        DiagnosticVariable(name=:rain_rate, dims=Grid2D(), desc="Rain rate (large-scale + convection)", units="m/s"),
-        DiagnosticVariable(name=:snow_rate, dims=Grid2D(), desc="Snow rate (large-scale + convection)", units="m/s"),
-        DiagnosticVariable(name=:cloud_top, dims=Grid2D(), desc="Cloud top layer index", units="1"),
+        DiagnosticVariable(name = :rain_large_scale, dims = Grid2D(), desc = "Large-scale precipitation (rain, accumulated)", units = "m"),
+        DiagnosticVariable(name = :snow_large_scale, dims = Grid2D(), desc = "Large-scale precipitation (snow, accumulated)", units = "m"),
+        DiagnosticVariable(name = :rain_rate_large_scale, dims = Grid2D(), desc = "Large-scale precipitation (rain)", units = "m/s"),
+        DiagnosticVariable(name = :snow_rate_large_scale, dims = Grid2D(), desc = "Large-scale precipitation (snow)", units = "m/s"),
+        DiagnosticVariable(name = :rain_rate, dims = Grid2D(), desc = "Rain rate (large-scale + convection)", units = "m/s"),
+        DiagnosticVariable(name = :snow_rate, dims = Grid2D(), desc = "Snow rate (large-scale + convection)", units = "m/s"),
+        DiagnosticVariable(name = :cloud_top, dims = Grid2D(), desc = "Cloud top layer index", units = "1"),
     )
 end

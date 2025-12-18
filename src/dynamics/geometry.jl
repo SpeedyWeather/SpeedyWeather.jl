@@ -8,11 +8,11 @@ and the vertical levels. Pass on `SpectralGrid` to calculate the following field
 $(TYPEDFIELDS)
 """
 @kwdef struct Geometry{
-    SpectralGridType,   # <:Union{SpectralGrid, Nothing}, the latter only matter inside GPU kernels
-    RefValueNF,         # <:Union{Base.RefValue{NF}, CUDA.RefValue{NF}}
-    VectorIntType,
-    VectorType,
-} <: AbstractGeometry
+        SpectralGridType,   # <:Union{SpectralGrid, Nothing}, the latter only matter inside GPU kernels
+        RefValueNF,         # <:Union{Base.RefValue{NF}, CUDA.RefValue{NF}}
+        VectorIntType,
+        VectorType,
+    } <: AbstractGeometry
 
     "SpectralGrid that defines spectral and grid resolution"
     spectral_grid::SpectralGridType
@@ -74,7 +74,7 @@ $(TYPEDFIELDS)
     coslat⁻¹::VectorType = 1 ./ coslat
 
     "= cos²(lat)"
-    coslat²::VectorType = coslat.^2
+    coslat²::VectorType = coslat .^ 2
 
     "# = 1/cos²(lat)"
     coslat⁻²::VectorType = 1 ./ coslat²
@@ -84,10 +84,10 @@ $(TYPEDFIELDS)
     σ_levels_half::VectorType = default_sigma_coordinates(nlayers)
 
     "σ at full levels, σₖ"
-    σ_levels_full::VectorType = 0.5*(σ_levels_half[2:end] + σ_levels_half[1:end-1])
+    σ_levels_full::VectorType = 0.5 * (σ_levels_half[2:end] + σ_levels_half[1:(end - 1)])
 
     "σ level thicknesses, σₖ₊₁ - σₖ"
-    σ_levels_thick::VectorType = σ_levels_half[2:end] - σ_levels_half[1:end-1]
+    σ_levels_thick::VectorType = σ_levels_half[2:end] - σ_levels_half[1:(end - 1)]
 
     "log of σ at full levels, include surface (σ=1) as last element"
     ln_σ_levels_full::VectorType = log.(vcat(σ_levels_full, 1))
@@ -101,20 +101,20 @@ Adapt.@adapt_structure Geometry
 """
 $(TYPEDSIGNATURES)
 Generator function for `Geometry` struct based on `spectral_grid`."""
-function Geometry(SG::SpectralGrid; vertical_coordinates=SigmaCoordinates(SG.nlayers))
+function Geometry(SG::SpectralGrid; vertical_coordinates = SigmaCoordinates(SG.nlayers))
 
     (; nlayers) = SG
-    error_message = "nlayers=$(SG.nlayers) does not match length nlayers="*
+    error_message = "nlayers=$(SG.nlayers) does not match length nlayers=" *
         "$(vertical_coordinates.nlayers) in spectral_grid.vertical_coordinates."
     @assert nlayers == vertical_coordinates.nlayers error_message
 
     (; NF, VectorIntType, VectorType) = SG
     (; σ_half) = vertical_coordinates
-    return Geometry{typeof(SG), Base.RefValue{NF}, VectorIntType, VectorType}(; spectral_grid=SG, σ_levels_half=σ_half)
+    return Geometry{typeof(SG), Base.RefValue{NF}, VectorIntType, VectorType}(; spectral_grid = SG, σ_levels_half = σ_half)
 end
 
 function Base.show(io::IO, G::Geometry)
-    print(io, "Geometry for $(G.spectral_grid)")
+    return print(io, "Geometry for $(G.spectral_grid)")
 end
 
 # take over radius from model.planet
@@ -128,20 +128,21 @@ $(TYPEDSIGNATURES)
 Interpolation weights for full to half level interpolation
 on sigma coordinates. Following Fortran SPEEDY documentation eq. (1)."""
 function σ_interpolation_weights(
-    σ_levels_full::AbstractVector,
-    σ_levels_half::AbstractVector)
+        σ_levels_full::AbstractVector,
+        σ_levels_half::AbstractVector
+    )
 
     weights = zero(σ_levels_full)
     nlayers = length(weights)
     nlayers == 1 && return weights     # escape early for 1 layer to avoid out-of-bounds access
 
-    for k in 1:nlayers-1
-        weights[k] = (log(σ_levels_half[k+1]) - log(σ_levels_full[k])) /
-                        (log(σ_levels_full[k+1]) - log(σ_levels_full[k]))
+    for k in 1:(nlayers - 1)
+        weights[k] = (log(σ_levels_half[k + 1]) - log(σ_levels_full[k])) /
+            (log(σ_levels_full[k + 1]) - log(σ_levels_full[k]))
     end
     # was log(0.99) in Fortran SPEEDY code but doesn't make sense to me
-    weights[end] =  (log(σ_levels_half[nlayers+1]) - log(σ_levels_full[nlayers])) /
-                        (log(σ_levels_full[nlayers]) - log(σ_levels_full[nlayers-1]))
+    weights[end] = (log(σ_levels_half[nlayers + 1]) - log(σ_levels_full[nlayers])) /
+        (log(σ_levels_full[nlayers]) - log(σ_levels_full[nlayers - 1]))
 
     return weights
 end
@@ -153,10 +154,10 @@ Given a vector in column defined at full levels, do a linear interpolation in
 log(σ) to calculate its values at half-levels, skipping top (k=1/2), extrapolating to bottom (k=nlayers+1/2).
 """
 function vertical_interpolate!(
-    A_half::Vector,             # quantity A on half levels (excl top)
-    A_full::Vector,             # quantity A on full levels
-    G::Geometry,
-)
+        A_half::Vector,             # quantity A on half levels (excl top)
+        A_full::Vector,             # quantity A on full levels
+        G::Geometry,
+    )
     nlayers = length(A_half)
     weights = G.full_to_half_interpolation
 
@@ -168,12 +169,12 @@ function vertical_interpolate!(
 
     # For A at each full level k, compute A at the half-level below, i.e. at the boundary
     # between the full levels k and k+1. Fortran SPEEDY documentation eq. (1)
-    for k = 1:nlayers-1
-        A_half[k] = A_full[k] + weights[k]*(A_full[k+1] - A_full[k])
+    for k in 1:(nlayers - 1)
+        A_half[k] = A_full[k] + weights[k] * (A_full[k + 1] - A_full[k])
     end
 
     # Compute the values at the surface separately
-    A_half[nlayers] = A_full[nlayers] + weights[nlayers]*(A_full[nlayers] - A_full[nlayers-1])
+    A_half[nlayers] = A_full[nlayers] + weights[nlayers] * (A_full[nlayers] - A_full[nlayers - 1])
 
     return nothing
 end

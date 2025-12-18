@@ -25,7 +25,7 @@ function load_gpu_package()
         end
     end
     if gpu_backend === nothing
-	throw(ErrorException("No compatible GPU backend found. Neither CUDA, AMDGPU, nor Metal is available. Please ensure that a supported GPU and the corresponding Julia package are installed."))
+        throw(ErrorException("No compatible GPU backend found. Neither CUDA, AMDGPU, nor Metal is available. Please ensure that a supported GPU and the corresponding Julia package are installed."))
     end
     return gpu_backend
 end
@@ -41,10 +41,10 @@ include("spectral_transform.jl")
 # INTERPOLATION OF RINGGRIDS
 include("interpolate.jl")
 
-# SET FUNCTIONS, GPU SPECIFIC 
+# SET FUNCTIONS, GPU SPECIFIC
 include("set.jl")
 
-# VERTICAL, GPU SPECIFIC 
+# VERTICAL, GPU SPECIFIC
 include("vertical_integration.jl")
 
 # FULL MODELS

@@ -11,26 +11,26 @@ passed on as keyword arguments, e.g. `planet=Earth(spectral_grid)`. Fields, repr
 model components, are
 $(TYPEDFIELDS)"""
 @kwdef mutable struct ShallowWaterModel{
-    SG,     # <:SpectralGrid
-    AR,     # <:AbstractArchitecture,
-    GE,     # <:AbstractGeometry,
-    PL,     # <:AbstractPlanet,
-    AT,     # <:AbstractAtmosphere,
-    CO,     # <:AbstractCoriolis,
-    OR,     # <:AbstractOrography,
-    FR,     # <:AbstractForcing,
-    DR,     # <:AbstractDrag,
-    PA,     # <:AbstractParticleAdvection,
-    IC,     # <:AbstractInitialConditions,
-    RP,     # <:AbstractRandomProcess,
-    TS,     # <:AbstractTimeStepper,
-    ST,     # <:SpectralTransform{NF},
-    IM,     # <:AbstractImplicit,
-    HD,     # <:AbstractHorizontalDiffusion,
-    OU,     # <:AbstractOutput,
-    FB,     # <:AbstractFeedback,
-} <: ShallowWater
-    
+        SG,     # <:SpectralGrid
+        AR,     # <:AbstractArchitecture,
+        GE,     # <:AbstractGeometry,
+        PL,     # <:AbstractPlanet,
+        AT,     # <:AbstractAtmosphere,
+        CO,     # <:AbstractCoriolis,
+        OR,     # <:AbstractOrography,
+        FR,     # <:AbstractForcing,
+        DR,     # <:AbstractDrag,
+        PA,     # <:AbstractParticleAdvection,
+        IC,     # <:AbstractInitialConditions,
+        RP,     # <:AbstractRandomProcess,
+        TS,     # <:AbstractTimeStepper,
+        ST,     # <:SpectralTransform{NF},
+        IM,     # <:AbstractImplicit,
+        HD,     # <:AbstractHorizontalDiffusion,
+        OU,     # <:AbstractOutput,
+        FB,     # <:AbstractFeedback,
+    } <: ShallowWater
+
     spectral_grid::SG
     architecture::AR = spectral_grid.architecture
 
@@ -44,7 +44,7 @@ $(TYPEDFIELDS)"""
     drag::DR = nothing
     particle_advection::PA = nothing
     initial_conditions::IC = InitialConditions(spectral_grid, ShallowWater)
-    
+
     # VARIABLES
     random_process::RP = nothing
     tracers::TRACER_DICT = TRACER_DICT()

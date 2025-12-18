@@ -41,7 +41,7 @@ initialize!(::FriersonLongwaveTransmissivity, ::AbstractModel) = nothing
     # but the longwave optical depth follows some idealised humidity lat-vert distribution
     (; τ₀_equator, τ₀_pole, fₗ) = transmissivity
 
-    # coordinates 
+    # coordinates
     σ = model.geometry.σ_levels_half
     θ = model.geometry.latds[ij]
 
@@ -51,10 +51,10 @@ initialize!(::FriersonLongwaveTransmissivity, ::AbstractModel) = nothing
     # --- τ(k=1+1/2)                # half level below
 
     τ_above::NF = 0
-    τ₀ = τ₀_equator + (τ₀_pole - τ₀_equator)*sind(θ)^2
-    for k in 2:nlayers+1        # loop over half levels below
-        τ_below = τ₀*(fₗ*σ[k] + (1 - fₗ)*σ[k]^4)
-        t[ij, k-1] = exp(-(τ_below - τ_above))
+    τ₀ = τ₀_equator + (τ₀_pole - τ₀_equator) * sind(θ)^2
+    for k in 2:(nlayers + 1)        # loop over half levels below
+        τ_below = τ₀ * (fₗ * σ[k] + (1 - fₗ) * σ[k]^4)
+        t[ij, k - 1] = exp(-(τ_below - τ_above))
         τ_above = τ_below
     end
 

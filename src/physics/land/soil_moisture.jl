@@ -42,7 +42,7 @@ end
 
 function variables(::SeasonalSoilMoisture)
     return (
-        PrognosticVariable(name=:soil_moisture, dims=Grid3D(), desc="Soil moisture content (fraction of capacity)", units="1", namespace=:land),
+        PrognosticVariable(name = :soil_moisture, dims = Grid3D(), desc = "Soil moisture content (fraction of capacity)", units = "1", namespace = :land),
     )
 end
 
@@ -62,7 +62,7 @@ function initialize!(soil::SeasonalSoilMoisture, model::PrimitiveEquation)
 
     # read out netCDF data
     nx, ny, nt = ncfile.dim["lon"], ncfile.dim["lat"], ncfile.dim["time"]
-    nlat_half = RingGrids.get_nlat_half(soil.file_Grid, nx*ny)
+    nlat_half = RingGrids.get_nlat_half(soil.file_Grid, nx * ny)
     grid = soil.file_Grid(nlat_half)
 
     # the soil moisture from file but wrapped into a grid
@@ -80,41 +80,41 @@ function initialize!(soil::SeasonalSoilMoisture, model::PrimitiveEquation)
     fill_value1 === fill_value2 || @warn "Fill values are different for the two soil layers, use only from layer 1"
     soil_moisture_file[soil_moisture_file .=== fill_value1] .= soil.missing_value      # === to include NaN
     soil_moisture_file = on_architecture(model.architecture, soil_moisture_file)
-    
-    @boundscheck fields_match(monthly_soil_moisture, soil_moisture_file, vertical_only=true) ||
+
+    @boundscheck fields_match(monthly_soil_moisture, soil_moisture_file, vertical_only = true) ||
         throw(DimensionMismatch(monthly_soil_moisture, soil_moisture_file))
 
     # create interpolator from grid in file to grid used in model
-    interp = RingGrids.interpolator(monthly_soil_moisture, soil_moisture_file, NF=Float32)
+    interp = RingGrids.interpolator(monthly_soil_moisture, soil_moisture_file, NF = Float32)
     interpolate!(monthly_soil_moisture, soil_moisture_file, interp)
     return nothing
 end
 
 function initialize!(
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
-    soil::SeasonalSoilMoisture,
-    model::PrimitiveEquation,
-)
+        progn::PrognosticVariables,
+        diagn::DiagnosticVariables,
+        soil::SeasonalSoilMoisture,
+        model::PrimitiveEquation,
+    )
     # initialize soil_moisture by "running" the step at the current time
-    timestep!(progn, diagn, soil, model)
+    return timestep!(progn, diagn, soil, model)
 end
 
 function timestep!(
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
-    soil::SeasonalSoilMoisture,
-    model::PrimitiveDry,
-)
+        progn::PrognosticVariables,
+        diagn::DiagnosticVariables,
+        soil::SeasonalSoilMoisture,
+        model::PrimitiveDry,
+    )
     return nothing
 end
 
 function timestep!(
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
-    soil::SeasonalSoilMoisture,
-    model::PrimitiveEquation,
-)
+        progn::PrognosticVariables,
+        diagn::DiagnosticVariables,
+        soil::SeasonalSoilMoisture,
+        model::PrimitiveEquation,
+    )
     (; time) = progn.clock
 
     this_month = Dates.month(time)
@@ -123,25 +123,27 @@ function timestep!(
     # linear interpolation weight between the two months
     # TODO check whether this shifts the climatology by 1/2 a month
     NF = eltype(progn.land.soil_moisture)
-    weight = convert(NF, Dates.days(time-Dates.firstdayofmonth(time))/Dates.daysinmonth(time))
+    weight = convert(NF, Dates.days(time - Dates.firstdayofmonth(time)) / Dates.daysinmonth(time))
 
     (; monthly_soil_moisture) = soil
     (; soil_moisture) = progn.land
 
-    launch!(architecture(soil_moisture), RingGridWorkOrder, size(soil_moisture),
-            seasonal_soil_moisture_kernel!,
-            soil_moisture, monthly_soil_moisture, weight, this_month, next_month)
+    launch!(
+        architecture(soil_moisture), RingGridWorkOrder, size(soil_moisture),
+        seasonal_soil_moisture_kernel!,
+        soil_moisture, monthly_soil_moisture, weight, this_month, next_month
+    )
 
     return nothing
 end
 
-@kernel inbounds=true function seasonal_soil_moisture_kernel!(
-    soil_moisture, monthly_soil_moisture, weight, this_month, next_month
-)
+@kernel inbounds = true function seasonal_soil_moisture_kernel!(
+        soil_moisture, monthly_soil_moisture, weight, this_month, next_month
+    )
     ij, k = @index(Global, NTuple)
-    
-    soil_moisture[ij, k] = (1 - weight) * monthly_soil_moisture[ij, k, this_month] + 
-                         weight * monthly_soil_moisture[ij, k, next_month]
+
+    soil_moisture[ij, k] = (1 - weight) * monthly_soil_moisture[ij, k, this_month] +
+        weight * monthly_soil_moisture[ij, k, next_month]
 end
 
 export LandBucketMoisture
@@ -167,27 +169,27 @@ Adapt.@adapt_structure LandBucketMoisture
 LandBucketMoisture(SG::SpectralGrid; kwargs...) = LandBucketMoisture{SG.NF}(; kwargs...)
 function initialize!(soil::LandBucketMoisture, model::PrimitiveEquation)
     (; nlayers_soil) = model.spectral_grid
-    @assert nlayers_soil == 2 "LandBucketMoisture only works with 2 soil layers "*
-    "but spectral_grid.nlayers_soil = $nlayers_soil given. Ignoring additional layers."
+    @assert nlayers_soil == 2 "LandBucketMoisture only works with 2 soil layers " *
+        "but spectral_grid.nlayers_soil = $nlayers_soil given. Ignoring additional layers."
 
     return nothing
 end
 
 function initialize!(
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
-    soil::LandBucketMoisture,
-    model::PrimitiveDry,
-)
+        progn::PrognosticVariables,
+        diagn::DiagnosticVariables,
+        soil::LandBucketMoisture,
+        model::PrimitiveDry,
+    )
     return nothing
 end
 
 function initialize!(
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
-    soil::LandBucketMoisture,
-    model::PrimitiveEquation,
-)
+        progn::PrognosticVariables,
+        diagn::DiagnosticVariables,
+        soil::LandBucketMoisture,
+        model::PrimitiveEquation,
+    )
     # create a seasonal model, initialize it and the variables
     seasonal_model = SeasonalSoilMoisture(model.spectral_grid)
     initialize!(seasonal_model, model)
@@ -196,7 +198,7 @@ function initialize!(
 
     # set ocean "soil" moisture points (100% ocean only)
     masked_value = soil.ocean_moisture
-    if soil.mask
+    return if soil.mask
         # TODO: broadcasting over views of Fields of GPUArrays doesn't work
         sm = progn.land.soil_moisture.data
         sm[isnan.(sm)] .= masked_value
@@ -205,20 +207,20 @@ function initialize!(
 end
 
 function timestep!(
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
-    soil::LandBucketMoisture,
-    model::PrimitiveDry,
-)
+        progn::PrognosticVariables,
+        diagn::DiagnosticVariables,
+        soil::LandBucketMoisture,
+        model::PrimitiveDry,
+    )
     return nothing
 end
 
 function timestep!(
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
-    soil::LandBucketMoisture,
-    model::PrimitiveEquation,
-)
+        progn::PrognosticVariables,
+        diagn::DiagnosticVariables,
+        soil::LandBucketMoisture,
+        model::PrimitiveEquation,
+    )
     (; soil_moisture) = progn.land
     Δt = model.time_stepping.Δt_sec
     ρ = model.atmosphere.water_density
@@ -229,27 +231,30 @@ function timestep!(
     H = diagn.physics.land.surface_humidity_flux    # [kg/m²/s], divide by density for [m/s], positive up
     R = diagn.physics.land.river_runoff             # diagnosed here, accumulated [m]
 
-    @boundscheck fields_match(soil_moisture, P, S, H, R, horizontal_only=true) ||
+    @boundscheck fields_match(soil_moisture, P, S, H, R, horizontal_only = true) ||
         throw(DimensionMismatch(soil_moisture, P))
     @boundscheck size(soil_moisture, 2) >= 2 || throw(DimensionMismatch)
-    
+
     # Water at field capacity [m], top and lower layer γ*z₁ and γ*z₂
-    γ  = model.land.thermodynamics.field_capacity
-    f₁ = γ*model.land.geometry.layer_thickness[1]
-    f₂ = γ*model.land.geometry.layer_thickness[2]
+    γ = model.land.thermodynamics.field_capacity
+    f₁ = γ * model.land.geometry.layer_thickness[1]
+    f₂ = γ * model.land.geometry.layer_thickness[2]
 
     p = soil.infiltration_fraction      # Infiltration fraction: fraction of top layer runoff put into lower layer
     τ⁻¹ = inv(convert(eltype(soil_moisture), Second(soil.time_scale).value))
 
     params = (; ρ, Δt, f₁, f₂, p, τ⁻¹)  # pack into NamedTuple for kernel
 
-    launch!(architecture(soil_moisture), LinearWorkOrder, (size(soil_moisture, 1),),
-        land_bucket_soil_moisture_kernel!, soil_moisture, mask, P, S, H, R, params)
+    return launch!(
+        architecture(soil_moisture), LinearWorkOrder, (size(soil_moisture, 1),),
+        land_bucket_soil_moisture_kernel!, soil_moisture, mask, P, S, H, R, params
+    )
 end
 
-@kernel inbounds=true function land_bucket_soil_moisture_kernel!(
-    soil_moisture, mask, P, S, H, R, params)
-    
+@kernel inbounds = true function land_bucket_soil_moisture_kernel!(
+        soil_moisture, mask, P, S, H, R, params
+    )
+
     ij = @index(Global, Linear)             # every grid point ij
 
     if mask[ij] > 0                         # at least partially land
@@ -261,21 +266,21 @@ end
         # Soil top sources and sinks
         # note: rain water can increase soil moisture regardless of snow cover
         # [kg/m²/s] -> [m/s] for humidity flux H and snow melt rate S
-        F = P[ij] + (S[ij] - H[ij])/ρ
-  
+        F = P[ij] + (S[ij] - H[ij]) / ρ
+
         # vertical diffusion term between layers
-        D = τ⁻¹*(soil_moisture[ij, 1] - soil_moisture[ij, 2])
+        D = τ⁻¹ * (soil_moisture[ij, 1] - soil_moisture[ij, 2])
 
         # Equation in 8.5.2.2 of the MITgcm users guide (Land package)
-        soil_moisture[ij, 1] += Δt/f₁*F - Δt*D
-        soil_moisture[ij, 2] += Δt*f₁/f₂*D
+        soil_moisture[ij, 1] += Δt / f₁ * F - Δt * D
+        soil_moisture[ij, 2] += Δt * f₁ / f₂ * D
 
         # river runoff
         W₁ = soil_moisture[ij, 1]           # wrt to field capacity so maximum is 1
         δW₁ = W₁ - min(W₁, 1)               # excess moisture in top layer, cap at field capacity
         soil_moisture[ij, 1] -= δW₁         # remove excess from top layer
-        soil_moisture[ij, 2] += p*δW₁*f₁/f₂ # add fraction to lower layer
-        R[ij] += Δt*(1-p)*δW₁*f₁            # accumulate river runoff [m] of top layer
+        soil_moisture[ij, 2] += p * δW₁ * f₁ / f₂ # add fraction to lower layer
+        R[ij] += Δt * (1 - p) * δW₁ * f₁            # accumulate river runoff [m] of top layer
 
         # remove excess water from lower layer (this disappears)
         soil_moisture[ij, 2] = min(soil_moisture[ij, 2], 1)
@@ -285,12 +290,12 @@ end
 function variables(::LandBucketMoisture)
     return (
         # Prognostic variables
-        PrognosticVariable(name=:soil_moisture, dims=Grid3D(), desc="Soil moisture content (fraction of capacity)", units="1", namespace=:land),
+        PrognosticVariable(name = :soil_moisture, dims = Grid3D(), desc = "Soil moisture content (fraction of capacity)", units = "1", namespace = :land),
         # Diagnostic variables written to diagn.physics
-        DiagnosticVariable(name=:river_runoff, dims=Grid2D(), desc="River runoff from soil moisture", units="m/s", namespace=:land),
+        DiagnosticVariable(name = :river_runoff, dims = Grid2D(), desc = "River runoff from soil moisture", units = "m/s", namespace = :land),
         # Diagnostic variables read from diagn.physics
-        DiagnosticVariable(name=:rain_rate, dims=Grid2D(), desc="Convective precipitation rate", units="m/s"),
-        DiagnosticVariable(name=:surface_humidity_flux, dims=Grid2D(), desc="Surface humidity flux", units="kg/s/m²", namespace=:land),
-        DiagnosticVariable(name=:snow_melt_rate, dims=Grid2D(), desc="Snow melt rate + snow runoff", units="m/s", namespace=:land),
+        DiagnosticVariable(name = :rain_rate, dims = Grid2D(), desc = "Convective precipitation rate", units = "m/s"),
+        DiagnosticVariable(name = :surface_humidity_flux, dims = Grid2D(), desc = "Surface humidity flux", units = "kg/s/m²", namespace = :land),
+        DiagnosticVariable(name = :snow_melt_rate, dims = Grid2D(), desc = "Snow melt rate + snow runoff", units = "m/s", namespace = :land),
     )
 end

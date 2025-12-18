@@ -4,17 +4,17 @@ using Test
 FLAG_EXTENDED_TESTS = "extended_tests" in ARGS ? true : false
 FLAG_ENZYME_TESTS = "enzyme" in ARGS ? true : false
 
-if FLAG_EXTENDED_TESTS 
+if FLAG_EXTENDED_TESTS
     @info "Running extended test suite"
     include("differentiability/runtests.jl")
-end 
+end
 
-if FLAG_ENZYME_TESTS 
+if FLAG_ENZYME_TESTS
     @info "Running Enzyme CI tests"
     include("differentiability/full_diff_CI.jl")
-end 
+end
 
-if !FLAG_EXTENDED_TESTS && !FLAG_ENZYME_TESTS 
+if !FLAG_EXTENDED_TESTS && !FLAG_ENZYME_TESTS
     @info "Running general test suite"
 
     # GENERAL
@@ -39,7 +39,7 @@ if !FLAG_EXTENDED_TESTS && !FLAG_ENZYME_TESTS
     include("transforms/spectral_transform.jl")
     include("transforms/spectral_gradients.jl")
     include("transforms/spectrum.jl")
-    include("transforms/spectral_transform_ad_rules.jl") 
+    include("transforms/spectral_transform_ad_rules.jl")
     include("transforms/resolutions.jl")
 
     # DYNAMICS
@@ -83,4 +83,4 @@ if !FLAG_EXTENDED_TESTS && !FLAG_ENZYME_TESTS
     include("output/netcdf_output.jl")
     include("output/jld2_output.jl")
     include("output/feedback.jl")
-end 
+end

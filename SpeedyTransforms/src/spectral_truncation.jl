@@ -4,39 +4,39 @@ Triangular truncation to degree `ltrunc` and order `mtrunc` (both 0-based). Trun
 by setting all coefficients for which the degree `l` is larger than the truncation `ltrunc` or order `m` larger
 than the truncaction `mtrunc`."""
 function spectral_truncation!(
-    alms::LowerTriangularArray,     # spectral field to be truncated
-    ltrunc::Integer,                # truncate to max degree ltrunc (0-based)
-    mtrunc::Integer,                # truncate to max order mtrunc (0-based)
-)   
+        alms::LowerTriangularArray,     # spectral field to be truncated
+        ltrunc::Integer,                # truncate to max degree ltrunc (0-based)
+        mtrunc::Integer,                # truncate to max order mtrunc (0-based)
+    )
     (; l_indices, m_indices) = alms.spectrum
-    
+
     # Convert to 1-based indexing
     ltrunc += 1     # 0-based to 1-based
     mtrunc += 1
-    
+
     # TODO: there's currently a bug that prevents this from working on GPU without the .data
     # that's mostly related to the custom broadcasting
     alms.data[(l_indices .> ltrunc) .|| (m_indices .> mtrunc), :] .= 0
-    
+
     return alms
 end
 
 # version just for matrices with the colon in the indexing
 function spectral_truncation!(
-    alms::LowerTriangularMatrix,     # spectral field to be truncated
-    ltrunc::Integer,                # truncate to max degree ltrunc (0-based)
-    mtrunc::Integer,                # truncate to max order mtrunc (0-based)
-)   
+        alms::LowerTriangularMatrix,     # spectral field to be truncated
+        ltrunc::Integer,                # truncate to max degree ltrunc (0-based)
+        mtrunc::Integer,                # truncate to max order mtrunc (0-based)
+    )
     (; l_indices, m_indices) = alms.spectrum
-    
+
     # Convert to 1-based indexing
     ltrunc += 1     # 0-based to 1-based
     mtrunc += 1
-    
+
     # TODO: there's currently a bug that prevents this from working on GPU without the .data
     # that's mostly related to the custom broadcasting
     alms.data[(l_indices .> ltrunc) .|| (m_indices .> mtrunc)] .= 0
-    
+
     return alms
 end
 
@@ -49,7 +49,7 @@ function spectral_truncation!(A::AbstractMatrix)
 
     for m in 1:mmax
         for l in 1:lmax
-            if  m > l
+            if m > l
                 A[l, m] = 0
             end
         end
@@ -65,7 +65,7 @@ spectral_truncation!(alms::LowerTriangularArray, trunc::Integer) = spectral_trun
 """
 $(TYPEDSIGNATURES)
 Triangular truncation of `alms` to the size of it, sets additional rows to zero."""
-spectral_truncation!(alms::LowerTriangularArray) = spectral_truncation!(alms, size(alms, 2, ZeroBased, as=Matrix))
+spectral_truncation!(alms::LowerTriangularArray) = spectral_truncation!(alms, size(alms, 2, ZeroBased, as = Matrix))
 
 
 """
@@ -75,20 +75,20 @@ both inputs are 0-based. If `ltrunc` or `mtrunc` is larger than the correspondin
 `spectral_interpolation` is automatically called instead, returning a LowerTriangularArray padded zero
 coefficients for higher wavenumbers."""
 function spectral_truncation(
-    ::Type{NF},                 # number format NF (can be complex)
-    alms::LowerTriangularArray{T, N, ArrayType, S}, # spectral field to be truncated
-    ltrunc::Integer,            # truncate to max degree ltrunc (0-based)
-    mtrunc::Integer,            # truncate to max order mtrunc (0-based)
-) where {NF, T, N, S, ArrayType}
-    
-    lmax, mmax, k... = size(alms, ZeroBased, as=Matrix)
-    
+        ::Type{NF},                 # number format NF (can be complex)
+        alms::LowerTriangularArray{T, N, ArrayType, S}, # spectral field to be truncated
+        ltrunc::Integer,            # truncate to max degree ltrunc (0-based)
+        mtrunc::Integer,            # truncate to max order mtrunc (0-based)
+    ) where {NF, T, N, S, ArrayType}
+
+    lmax, mmax, k... = size(alms, ZeroBased, as = Matrix)
+
     # interpolate to higher resolution if output larger than input
     (ltrunc > lmax || mtrunc > mmax) && return spectral_interpolation(NF, alms, ltrunc, mtrunc)
 
     # preallocate new (smaller) array
     ArrayType_ = nonparametric_type(ArrayType)
-    alms_trunc = zeros(LowerTriangularArray{NF, N, ArrayType_{NF, N}, S}, Spectrum(ltrunc+1, mtrunc+1, architecture=architecture(alms)), k...)  
+    alms_trunc = zeros(LowerTriangularArray{NF, N, ArrayType_{NF, N}, S}, Spectrum(ltrunc + 1, mtrunc + 1, architecture = architecture(alms)), k...)
 
     # copy data over, copyto! copies the largest matching subset of harmonics
     copyto!(alms_trunc, alms)
@@ -105,20 +105,20 @@ both inputs are 0-based, by padding zeros for higher wavenumbers. If `ltrunc` or
 corresponding size of`alms` than `spectral_truncation` is automatically called instead, returning a smaller
 LowerTriangularArray."""
 function spectral_interpolation(
-    ::Type{NF},                 # number format NF (can be complex)
-    alms::LowerTriangularArray{T, N, ArrayType, S}, # spectral field to be truncated
-    ltrunc::Integer,            # truncate to max degree ltrunc (0-based)
-    mtrunc::Integer,            # truncate to max order mtrunc (0-based)
-) where {NF, T, N, S, ArrayType}                
-    
-    lmax, mmax, k... = size(alms, ZeroBased, as=Matrix)
-    
+        ::Type{NF},                 # number format NF (can be complex)
+        alms::LowerTriangularArray{T, N, ArrayType, S}, # spectral field to be truncated
+        ltrunc::Integer,            # truncate to max degree ltrunc (0-based)
+        mtrunc::Integer,            # truncate to max order mtrunc (0-based)
+    ) where {NF, T, N, S, ArrayType}
+
+    lmax, mmax, k... = size(alms, ZeroBased, as = Matrix)
+
     # truncate to lower resolution if output smaller than input
     (ltrunc <= lmax && mtrunc <= mmax) && return spectral_truncation(NF, alms, ltrunc, mtrunc)
 
     # preallocate new (larger) array
     ArrayType_ = nonparametric_type(ArrayType)
-    alms_interp = zeros(LowerTriangularArray{NF, N, ArrayType_{NF, N}, S}, Spectrum(ltrunc+1, mtrunc+1, architecture=architecture(alms)), k...)  
+    alms_interp = zeros(LowerTriangularArray{NF, N, ArrayType_{NF, N}, S}, Spectrum(ltrunc + 1, mtrunc + 1, architecture = architecture(alms)), k...)
 
     # copy data over, copyto! copies the largest matching subset of harmonics
     copyto!(alms_interp, alms)
@@ -131,9 +131,9 @@ spectral_interpolation(alms::LowerTriangularArray, trunc::Integer) = spectral_in
 $(TYPEDSIGNATURES)
 Set imaginary component of m=0 modes (the zonal modes in the first column) to 0."""
 function zero_imaginary_zonal_modes!(
-    alms::LowerTriangularArray,
-)
-    lmax, mmax = size(alms, OneBased, as=Matrix)
+        alms::LowerTriangularArray,
+    )
+    lmax, mmax = size(alms, OneBased, as = Matrix)
 
     for k in eachmatrix(alms)
         for l in 1:lmax
@@ -146,7 +146,7 @@ end
 """$(TYPEDSIGNATURES)
 Smooth the spectral field `A` following A_smooth = (1-c*∇²ⁿ)A with power n of a normalised Laplacian
 so that the highest degree lmax is dampened by multiplication with c. Anti-diffusion for c<0."""
-function spectral_smoothing(A::LowerTriangularArray, c::Real; power::Real=1)
+function spectral_smoothing(A::LowerTriangularArray, c::Real; power::Real = 1)
     A_smooth = copy(A)
     spectral_smoothing!(A_smooth, c; power)
     return A_smooth
@@ -157,37 +157,39 @@ $(TYPEDSIGNATURES)
 Smooth the spectral field `A` following A *= (1-(1-c)*∇²ⁿ) with power n of a normalised Laplacian
 so that the highest degree lmax is dampened by multiplication with c. Anti-diffusion for c>1."""
 function spectral_smoothing!(
-    L::LowerTriangularArray,
-    c::Real;
-    power::Real=1,          # power of Laplacian used for smoothing
-    truncation::Int=-1      # smoothing wrt wavenumber (0 = largest)
-)
-    lmax, mmax = size(L; as=Matrix)
-    
+        L::LowerTriangularArray,
+        c::Real;
+        power::Real = 1,          # power of Laplacian used for smoothing
+        truncation::Int = -1      # smoothing wrt wavenumber (0 = largest)
+    )
+    lmax, mmax = size(L; as = Matrix)
+
     # normalize by largest eigenvalue by default, or wrt to given truncation
-    eigenvalue_norm = truncation == -1 ? -mmax*(mmax+1) : -truncation*(truncation+1)
-    
+    eigenvalue_norm = truncation == -1 ? -mmax * (mmax + 1) : -truncation * (truncation + 1)
+
     # Launch kernel
-    launch!(architecture(L), SpectralWorkOrder, size(L), spectral_smoothing_kernel!, 
-            L, c, power, eigenvalue_norm, L.spectrum.l_indices)
+    return launch!(
+        architecture(L), SpectralWorkOrder, size(L), spectral_smoothing_kernel!,
+        L, c, power, eigenvalue_norm, L.spectrum.l_indices
+    )
 end
 
 @kernel function spectral_smoothing_kernel!(
-    L,
-    @Const(c),
-    @Const(power),
-    @Const(eigenvalue_norm),
-    @Const(l_indices)
-)
+        L,
+        @Const(c),
+        @Const(power),
+        @Const(eigenvalue_norm),
+        @Const(l_indices)
+    )
     I = @index(Global, Cartesian)  # I[1] == lm, I[2] == k
-    
+
     # Get the degree l for this coefficient
     l = l_indices[I[1]]
-    
+
     # Calculate eigenvalue_normalised
-    eigenvalue_normalised = -l*(l-1)/eigenvalue_norm
-    
+    eigenvalue_normalised = -l * (l - 1) / eigenvalue_norm
+
     # Apply smoothing: for eigenvalue_norm < largest eigenvalue the factor becomes negative
     # set to zero in that case
-    L[I] *= max(1 - (1-c)*eigenvalue_normalised^power, 0)
+    L[I] *= max(1 - (1 - c) * eigenvalue_normalised^power, 0)
 end

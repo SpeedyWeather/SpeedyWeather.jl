@@ -5,10 +5,10 @@ using SpeedyWeather: AbstractSimulation
 # TODO: think about how this might be adapted into an extension simulation type;
 # this type could potentially also implement the `AbstractSimulation` interface?
 struct ADSimulation{
-    ModelType<:AbstractModel,
-    PrognosticType,
-    DiagnosticType,
-}
+        ModelType <: AbstractModel,
+        PrognosticType,
+        DiagnosticType,
+    }
     model::ModelType
     progvars::PrognosticType
     diagvars::DiagnosticType
@@ -33,16 +33,16 @@ prognosticseed(adsim::ADSimulation) = deepcopy(adsim.progvars), one(adsim.progva
 
 diagnosticseed(adsim::ADSimulation) = deepcopy(adsim.diagvars), one(adsim.diagvars)
 
-function Base.one(diag::DiagnosticVariables{NF}) where NF
+function Base.one(diag::DiagnosticVariables{NF}) where {NF}
     vec, re = to_vec(diag)
     vec .= NF(1)
     return re(vec)
-end 
+end
 
-function initialize_with_spinup!(model::AbstractModel, spinup_period=Day(5), init_period=Day(1))
-    simulation = initialize!(model)  
+function initialize_with_spinup!(model::AbstractModel, spinup_period = Day(5), init_period = Day(1))
+    simulation = initialize!(model)
     initialize!(simulation)
-    run!(simulation, period=spinup_period) # spin-up to get nonzero values for all fields
-    initialize!(simulation; period=init_period)
+    run!(simulation, period = spinup_period) # spin-up to get nonzero values for all fields
+    initialize!(simulation; period = init_period)
     return simulation
 end

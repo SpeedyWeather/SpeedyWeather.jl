@@ -18,17 +18,17 @@ export NetCDFOutput
 Interpolates non-rectangular grids. Fields are
 $(TYPEDFIELDS)"""
 @kwdef mutable struct NetCDFOutput{
-    Field2D,
-    Field3D,
-    Interpolator,
-} <: AbstractOutput
+        Field2D,
+        Field3D,
+        Interpolator,
+    } <: AbstractOutput
 
     # FILE OPTIONS
     active::Bool = false
 
     "[OPTION] path to output parent folder, run folders will be created within"
     path::String = pwd()
-    
+
     "[OPTION] Prefix for run folder where data is stored, e.g. 'run_'"
     run_prefix::String = "run"
 
@@ -49,7 +49,7 @@ $(TYPEDFIELDS)"""
 
     "[OPTION] Overwrite an existing run folder?"
     overwrite::Bool = false
-    
+
     "[OPTION] name of the output netcdf file"
     filename::String = "output.nc"
 
@@ -76,7 +76,7 @@ $(TYPEDFIELDS)"""
     output_every_n_steps::Int = 0           # output frequency
     timestep_counter::Int = 0               # time step counter
     output_counter::Int = 0                 # output step counter
-    
+
     # the netcdf file to be written into, will be created
     netcdf_file::Union{NCDataset, Nothing} = nothing
 
@@ -96,19 +96,20 @@ The output grid is optionally determined by keyword arguments `output_Grid` (its
 `nlat_half` (resolution) and `output_NF` (number format). By default, uses the full grid
 equivalent of the grid and resolution used in `SpectralGrid` `S`."""
 function NetCDFOutput(
-    SG::SpectralGrid,
-    Model::Type{<:AbstractModel} = Barotropic;
-    output_grid::AbstractFullGrid = on_architecture(CPU(), RingGrids.full_grid_type(SG.grid)(SG.grid.nlat_half)),
-    output_NF::DataType = DEFAULT_OUTPUT_NF,
-    output_dt::Period = Second(DEFAULT_OUTPUT_DT),  # only needed for dispatch
-    kwargs...)
+        SG::SpectralGrid,
+        Model::Type{<:AbstractModel} = Barotropic;
+        output_grid::AbstractFullGrid = on_architecture(CPU(), RingGrids.full_grid_type(SG.grid)(SG.grid.nlat_half)),
+        output_NF::DataType = DEFAULT_OUTPUT_NF,
+        output_dt::Period = Second(DEFAULT_OUTPUT_DT),  # only needed for dispatch
+        kwargs...
+    )
 
     # INPUT GRID (but on CPU)
     input_grid = on_architecture(CPU(), SG.grid)
 
     # CREATE INTERPOLATOR
-    interpolator = RingGrids.interpolator(output_grid, input_grid, NF=DEFAULT_OUTPUT_NF)
-    
+    interpolator = RingGrids.interpolator(output_grid, input_grid, NF = DEFAULT_OUTPUT_NF)
+
     # CREATE FULL FIELDS TO INTERPOLATE ONTO BEFORE WRITING DATA OUT
     (; nlayers, nlayers_soil) = SG
     field2D = Field(output_NF, output_grid)
@@ -116,29 +117,31 @@ function NetCDFOutput(
     field3Dland = Field(output_NF, output_grid, nlayers_soil)
 
     output = NetCDFOutput(;
-        output_dt=Second(output_dt),    # convert to seconds for dispatch
+        output_dt = Second(output_dt),    # convert to seconds for dispatch
         interpolator,
         field2D,
         field3D,
         field3Dland,
-        kwargs...)
+        kwargs...
+    )
 
     add_default!(output.variables, Model)
     return output
 end
 
-function Base.show(io::IO, output::NetCDFOutput{F}) where F
+function Base.show(io::IO, output::NetCDFOutput{F}) where {F}
     println(io, "NetCDFOutput{$F}")
     println(io, "├ status: $(output.active ? "active" : "inactive/uninitialized")")
     println(io, "├ write restart file: $(output.write_restart) (if active)")
     println(io, "├ interpolator: $(typeof(output.interpolator))")
     println(io, "├ path: $(joinpath(output.run_path, output.filename)) (overwrite=$(output.overwrite))")
     println(io, "├ frequency: $(output.output_dt)")
-    print(io,   "└┐ variables:")
+    print(io, "└┐ variables:")
     nvars = length(output.variables)
     for (i, (key, var)) in enumerate(output.variables)
-        print(io, "\n $(i==nvars ? "└" : "├") $key: $(var.long_name) [$(var.unit)]")
+        print(io, "\n $(i == nvars ? "└" : "├") $key: $(var.long_name) [$(var.unit)]")
     end
+    return
 end
 
 """
@@ -179,46 +182,46 @@ end
 """$(TYPEDSIGNATURES)
 Add default variables to output for a `Barotropic` model: Vorticity, zonal and meridional velocity."""
 function add_default!(
-    output_variables::OUTPUT_VARIABLES_DICT,
-    Model::Type{<:Barotropic},
-)
-    add!(output_variables, VorticityOutput(), ZonalVelocityOutput(), MeridionalVelocityOutput())
+        output_variables::OUTPUT_VARIABLES_DICT,
+        Model::Type{<:Barotropic},
+    )
+    return add!(output_variables, VorticityOutput(), ZonalVelocityOutput(), MeridionalVelocityOutput())
 end
 
 """$(TYPEDSIGNATURES)
 Add default variables to output for a `ShallowWater` model, same as for a `Barotropic` model but also
 the interface displacement."""
 function add_default!(
-    variables::Dict{Symbol, AbstractOutputVariable},
-    Model::Type{<:ShallowWater},
-)
+        variables::Dict{Symbol, AbstractOutputVariable},
+        Model::Type{<:ShallowWater},
+    )
     add_default!(variables, Barotropic)
-    add!(variables, InterfaceDisplacementOutput())
+    return add!(variables, InterfaceDisplacementOutput())
 end
 
 """$(TYPEDSIGNATURES)
 Add default variables to output for a `PrimitiveDry` model, same as for a `Barotropic` model but also
 the surface pressure and temperature."""
 function add_default!(
-    variables::Dict{Symbol, AbstractOutputVariable},
-    Model::Type{<:PrimitiveDry},
-)
+        variables::Dict{Symbol, AbstractOutputVariable},
+        Model::Type{<:PrimitiveDry},
+    )
     add_default!(variables, Barotropic)
-    add!(variables, MeanSeaLevelPressureOutput(), TemperatureOutput())
+    return add!(variables, MeanSeaLevelPressureOutput(), TemperatureOutput())
 end
 
 """$(TYPEDSIGNATURES)
 Add default variables to output for a `PrimitiveWet` model, same as for a `PrimitiveDry` model but also
 the specific humidity."""
 function add_default!(
-    variables::Dict{Symbol, AbstractOutputVariable},
-    Model::Type{<:PrimitiveWet},
-)
+        variables::Dict{Symbol, AbstractOutputVariable},
+        Model::Type{<:PrimitiveWet},
+    )
     add_default!(variables, PrimitiveDry)
-    add!(variables, HumidityOutput())
+    return add!(variables, HumidityOutput())
 end
 
-function set!(output::AbstractOutput; active, reset_path=true)
+function set!(output::AbstractOutput; active, reset_path = true)
     output.active = active
     if reset_path
         output.run_folder = ""
@@ -230,24 +233,28 @@ end
 """$(TYPEDSIGNATURES)
 Initialize NetCDF `output` by creating a netCDF file and storing the initial conditions
 of `diagn` (and `progn`). To be called just before the first timesteps."""
-function initialize!(   
-    output::NetCDFOutput,
-    feedback::AbstractFeedback,
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
-    model::AbstractModel,
-)
+function initialize!(
+        output::NetCDFOutput,
+        feedback::AbstractFeedback,
+        progn::PrognosticVariables,
+        diagn::DiagnosticVariables,
+        model::AbstractModel,
+    )
     output.active || return nothing             # exit immediately for no output
-    
+
     # GET RUN ID, CREATE FOLDER
     # get new id only if not already specified
     determine_run_folder!(output)
     create_run_folder!(output)
 
     # OUTPUT FREQUENCY
-    output.output_every_n_steps = max(1, round(Int,
-            Millisecond(output.output_dt).value/model.time_stepping.Δt_millisec.value))
-    output.output_dt = Second(round(Int, output.output_every_n_steps*model.time_stepping.Δt_sec))
+    output.output_every_n_steps = max(
+        1, round(
+            Int,
+            Millisecond(output.output_dt).value / model.time_stepping.Δt_millisec.value
+        )
+    )
+    output.output_dt = Second(round(Int, output.output_every_n_steps * model.time_stepping.Δt_sec))
 
     # RESET COUNTERS
     output.timestep_counter = 0         # time step counter
@@ -257,14 +264,18 @@ function initialize!(
     (; run_path, filename) = output
     dataset = NCDataset(joinpath(run_path, filename), "c")
     output.netcdf_file = dataset
-    
+
     # DEFINE NETCDF DIMENSIONS TIME and write current (=initial) time
     (; startdate) = output
     time_string = "hours since $(Dates.format(startdate, "yyyy-mm-dd HH:MM:0.0"))"
     defDim(dataset, "time", Inf)        # unlimited time dimension
-    defVar(dataset, "time", Float64, ("time",),
-           attrib=Dict("units"=>time_string, "long_name"=>"time",
-                       "standard_name"=>"time", "calendar"=>"proleptic_gregorian"))
+    defVar(
+        dataset, "time", Float64, ("time",),
+        attrib = Dict(
+            "units" => time_string, "long_name" => "time",
+            "standard_name" => "time", "calendar" => "proleptic_gregorian"
+        )
+    )
     output!(output, progn.clock.time)   # write initial time
 
     # DEFINE NETCDF DIMENSIONS SPACE
@@ -272,11 +283,11 @@ function initialize!(
     latd = get_latd(output.field2D)
     σ = model.geometry.σ_levels_full
     soil_indices = collect(1:model.spectral_grid.nlayers_soil)
-        
-    defVar(dataset, "lon", lond, ("lon",), attrib=Dict("units"=>"degrees_east", "long_name"=>"longitude"))
-    defVar(dataset, "lat", latd, ("lat",), attrib=Dict("units"=>"degrees_north", "long_name"=>"latitude"))
-    defVar(dataset, "layer", σ, ("layer",), attrib=Dict("units"=>"1", "long_name"=>"sigma layer"))
-    defVar(dataset, "soil_layer", soil_indices, ("soil_layer",), attrib=Dict("units"=>"1", "long_name"=>"soil layer index"))
+
+    defVar(dataset, "lon", lond, ("lon",), attrib = Dict("units" => "degrees_east", "long_name" => "longitude"))
+    defVar(dataset, "lat", latd, ("lat",), attrib = Dict("units" => "degrees_north", "long_name" => "latitude"))
+    defVar(dataset, "layer", σ, ("layer",), attrib = Dict("units" => "1", "long_name" => "sigma layer"))
+    defVar(dataset, "soil_layer", soil_indices, ("soil_layer",), attrib = Dict("units" => "1", "long_name" => "soil layer index"))
 
     # VARIABLES, define every output variable in the netCDF file and write initial conditions
     output_NF = eltype(output.field2D)
@@ -301,12 +312,12 @@ Base.close(output::NetCDFOutput) = NCDatasets.close(output.netcdf_file)
 Base.close(::Nothing) = nothing     # in case of no netCDF output nothing to close
 
 function define_variable!(
-    dataset::NCDataset,
-    var::AbstractOutputVariable,
-    output_NF::Type{<:AbstractFloat} = DEFAULT_OUTPUT_NF,
-)
+        dataset::NCDataset,
+        var::AbstractOutputVariable,
+        output_NF::Type{<:AbstractFloat} = DEFAULT_OUTPUT_NF,
+    )
     missing_value = hasfield(typeof(var), :missing_value) ? var.missing_value : DEFAULT_MISSING_VALUE
-    attributes = Dict("long_name"=>var.long_name, "units"=>var.unit, "_FillValue"=>output_NF(missing_value))
+    attributes = Dict("long_name" => var.long_name, "units" => var.unit, "_FillValue" => output_NF(missing_value))
 
     # land variables have a different vertical dimension
     all_dims = is_land(var) ? ("lon", "lat", "soil_layer", "time") : ("lon", "lat", "layer", "time")
@@ -316,7 +327,7 @@ function define_variable!(
     deflatelevel = hasproperty(var, :compression_level) ? var.compression_level : DEFAULT_COMPRESSION_LEVEL
     shuffle = hasproperty(var, :shuffle) ? var.shuffle : DEFAULT_SHUFFLE
 
-    defVar(dataset, var.name, output_NF, dims, attrib=attributes; deflatelevel, shuffle)
+    return defVar(dataset, var.name, output_NF, dims, attrib = attributes; deflatelevel, shuffle)
 end
 
 """
@@ -327,13 +338,13 @@ Interpolates onto output grid and resolution as specified in `output`, converts 
 number format, truncates the mantissa for higher compression and applies lossless compression."""
 function output!(output::AbstractOutput, simulation::AbstractSimulation)
     output.timestep_counter += 1                                        # increase counter
-    (; active, output_every_n_steps, timestep_counter ) = output
+    (; active, output_every_n_steps, timestep_counter) = output
     active || return nothing                                            # escape immediately for no netcdf output
     timestep_counter % output_every_n_steps == 0 || return nothing      # escape if output not written on this step
 
     (; clock) = simulation.prognostic_variables
     output!(output, clock.time)                                         # increase counter write time
-    output!(output, output.variables, simulation)                       # write variables
+    return output!(output, output.variables, simulation)                       # write variables
 end
 
 get_indices(i, variable::AbstractOutputVariable) = get_indices(i, Val.(variable.dims_xyzt)...)
@@ -353,10 +364,10 @@ Method used for all output variables `<: AbstractOutputVariable`
 with dispatch over the second argument. Interpolates, scales,
 custom transform, bitrounding and writes to file."""
 function output!(
-    output::NetCDFOutput,
-    variable::AbstractOutputVariable,
-    simulation::AbstractSimulation,
-)
+        output::NetCDFOutput,
+        variable::AbstractOutputVariable,
+        simulation::AbstractSimulation,
+    )
     # escape immediately after first call if variable doesn't have a time dimension
     ~hastime(variable) && output.output_counter > 1 && return nothing
 
@@ -395,15 +406,15 @@ end
 $(TYPEDSIGNATURES)
 Write the current time `time::DateTime` to the netCDF file in `output`."""
 function output!(
-    output::NetCDFOutput,
-    time::DateTime,
-)
+        output::NetCDFOutput,
+        time::DateTime,
+    )
     output.output_counter += 1      # output counter increases when writing time
     i = output.output_counter
 
-    (; netcdf_file, startdate ) = output
-    time_passed = Millisecond(time-startdate)
-    time_hrs = time_passed.value/3600_000       # [ms] -> [hrs]
+    (; netcdf_file, startdate) = output
+    time_passed = Millisecond(time - startdate)
+    time_hrs = time_passed.value / 3600_000       # [ms] -> [hrs]
     netcdf_file["time"][i] = time_hrs
     NCDatasets.sync(netcdf_file)
 
@@ -414,13 +425,14 @@ end
 Loop over every variable in `output.variables` to call the respective `output!` method
 to write into the `output.netcdf_file`."""
 function output!(
-    output::AbstractOutput,
-    output_variables::OUTPUT_VARIABLES_DICT,
-    simulation::AbstractSimulation,
-)
+        output::AbstractOutput,
+        output_variables::OUTPUT_VARIABLES_DICT,
+        simulation::AbstractSimulation,
+    )
     for var in values(output_variables)
         output!(output, var, simulation)
     end
+    return
 end
 
 function Base.show(io::IO, outputvariable::AbstractOutputVariable)
@@ -429,26 +441,27 @@ function Base.show(io::IO, outputvariable::AbstractOutputVariable)
         value = getfield(outputvariable, field)
         print(io, "\n├ $field::$(typeof(value)) = $value")
     end
+    return
 end
 
 function finalize!(
-    output::AbstractOutput,
-    simulation::AbstractSimulation,
-)
+        output::AbstractOutput,
+        simulation::AbstractSimulation,
+    )
     if output.active    # only finalize if active otherwise output.netcdf_file is nothing
         for var in values(output.variables)
             finalize!(output, var, simulation)
         end
     end
-    close(output)
+    return close(output)
 end
 
 # default finalize method for output variables
 function finalize!(
-    output::AbstractOutput,
-    var::AbstractOutputVariable,
-    args...
-)
+        output::AbstractOutput,
+        var::AbstractOutputVariable,
+        args...
+    )
     # do nothing unless finalize! is defined for var <: AbstractOutputVariable
     return nothing
 end
@@ -477,7 +490,7 @@ function determine_run_folder!(output::AbstractOutput)
         end
     end # else use the run_number exactly as specified in output.run_number
 
-    output.run_folder = run_folder_name(run_prefix, id, output.run_number; fmt)
+    return output.run_folder = run_folder_name(run_prefix, id, output.run_number; fmt)
 end
 
 """$(TYPEDSIGNATURES)
@@ -490,7 +503,7 @@ function create_run_folder!(output::AbstractOutput)
     # unless overwrite is true and the folder exists
     # otherwise throws an error if the folder already exists
     (output.overwrite && isdir(run_path)) || mkdir(run_path)
-    output.run_path = run_path
+    return output.run_path = run_path
 end
 
 """$(TYPEDSIGNATURES)
@@ -509,7 +522,7 @@ get_full_output_file_path(output::AbstractOutput) = joinpath(output.run_path, ou
 """$(TYPEDSIGNATURES)
 Loads a `var_name` trajectory of the model `M` that has been saved in
 a netCDF file during the time stepping."""
-function load_trajectory(var_name::Union{Symbol, String}, model::AbstractModel) 
+function load_trajectory(var_name::Union{Symbol, String}, model::AbstractModel)
     @assert model.output.active "Output is turned off"
     return Array(NCDataset(get_full_output_file_path(model.output))[string(var_name)])
 end

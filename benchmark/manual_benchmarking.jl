@@ -30,7 +30,7 @@ write(md, "All benchmark simulation were single-threaded on a CPU:\n")
 
 write(md, "```julia\njulia> versioninfo()\n")
 versioninfo(md)
-write(md,"```\n\n")
+write(md, "```\n\n")
 
 write(md, "### Explanation\n\n")
 write(md, "Abbreviations in the tables below are as follows, omitted columns use defaults.\n")

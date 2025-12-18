@@ -28,7 +28,7 @@ finalize!(::AbstractModelComponent, ::AbstractModel) = nothing
 function Base.show(io::IO, P::AbstractModelComponent)
     println(io, "$(typeof(P)) <: $(supertype(typeof(P)))")
     keys = propertynames(P)
-    print_fields(io, P, keys)
+    return print_fields(io, P, keys)
 end
 
 """$(TYPEDSIGNATURES)
@@ -68,10 +68,11 @@ function Base.show(io::IO, M::AbstractModel)
         a = textwidth(a) > 100 ? string(a[1:97], "...") : a  # truncate long strings
         p(io, a)
     end
+    return
 end
 
-# Functions to get parameters and parameterization to 
-# a) initialize variables 
+# Functions to get parameters and parameterization to
+# a) initialize variables
 """$(TYPEDSIGNATURES)
 Extract the model components with parameters needed for the parameterizations
 as NamedTuple. These are the GPU-compatible components of the model."""
@@ -86,12 +87,12 @@ These are the GPU-compatible components of the model."""
     # Extract parameterization symbols from the type
     params_type = fieldtype(ModelType, :params)
     param_names = params_type.parameters[1]  # Extract tuple from Val{tuple}
-    
+
     # Generate literal field accesses for type stability
     return :(NamedTuple{$param_names}(tuple($([:(model.$name) for name in param_names]...))))
 end
 
-# TODO: better name? 
+# TODO: better name?
 """$(TYPEDSIGNATURES)
 Extract the extra parameterizations from the model that are not part of the 
 column-based parameterizations, but define variables such as land and ocean."""

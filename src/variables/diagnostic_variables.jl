@@ -12,36 +12,37 @@ function Base.show(io::IO, A::AbstractDiagnosticVariables)
             NF = first_parameter(T)
             nlat = RingGrids.get_nlat(val)
             Grid = nonparametric_type(T)
-            s = Base.dims2string(size(val))*", $nlat-ring $Grid{$NF}"
+            s = Base.dims2string(size(val)) * ", $nlat-ring $Grid{$NF}"
         elseif T <: LowerTriangularArray
             NF = first_parameter(T)
             trunc = LowerTriangularArrays.truncation(val.spectrum)
-            s = Base.dims2string(size(val, as=Matrix))*", T$trunc LowerTriangularArray{$NF}"
+            s = Base.dims2string(size(val, as = Matrix)) * ", T$trunc LowerTriangularArray{$NF}"
         else
             s = "$T"
         end
 
         ~last ? println(io, "├ $key: $s") :
-                print(io,  "└ $key: $s")
+            print(io, "└ $key: $s")
     end
+    return
 end
 
-first_parameter(::Type{<:AbstractArray{T}}) where T = T
+first_parameter(::Type{<:AbstractArray{T}}) where {T} = T
 
 export Tendencies
 
 """Tendencies of the prognostic variables in spectral and grid-point space
 $(TYPEDFIELDS)"""
 @kwdef struct Tendencies{
-    SpectrumType,           # <: AbstractSpectrum
-    GridType,               # <: AbstractGrid
-    SpectralVariable2D,     # <: LowerTriangularArray
-    SpectralVariable3D,     # <: LowerTriangularArray
-    GridVariable2D,         # <: AbstractField
-    GridVariable3D,         # <: AbstractField
-    SpectralTracerTuple,    # <: NamedTuple{Tuple{Symbol}, Tuple{SpectralVariable3D}}
-    GridTracerTuple,        # <: NamedTuple{Tuple{Symbol}, Tuple{GridVariable3D}}
-} <: AbstractDiagnosticVariables
+        SpectrumType,           # <: AbstractSpectrum
+        GridType,               # <: AbstractGrid
+        SpectralVariable2D,     # <: LowerTriangularArray
+        SpectralVariable3D,     # <: LowerTriangularArray
+        GridVariable2D,         # <: AbstractField
+        GridVariable3D,         # <: AbstractField
+        SpectralTracerTuple,    # <: NamedTuple{Tuple{Symbol}, Tuple{SpectralVariable3D}}
+        GridTracerTuple,        # <: NamedTuple{Tuple{Symbol}, Tuple{GridVariable3D}}
+    } <: AbstractDiagnosticVariables
 
     spectrum::SpectrumType            # spectral resolution: maximum degree and order of spherical harmonics
     grid::GridType                    # grid resolution: number of latitude rings on one hemisphere (Eq. incl.)
@@ -49,39 +50,39 @@ $(TYPEDFIELDS)"""
 
     # SPECTRAL TENDENCIES
     "Vorticity of horizontal wind field [1/s]"
-    vor_tend  ::SpectralVariable3D = zeros(SpectralVariable3D, spectrum, nlayers)
+    vor_tend::SpectralVariable3D = zeros(SpectralVariable3D, spectrum, nlayers)
     "Divergence of horizontal wind field [1/s]"
-    div_tend  ::SpectralVariable3D = zeros(SpectralVariable3D, spectrum, nlayers)
+    div_tend::SpectralVariable3D = zeros(SpectralVariable3D, spectrum, nlayers)
     "Absolute temperature [K]"
-    temp_tend ::SpectralVariable3D = zeros(SpectralVariable3D, spectrum, nlayers)
+    temp_tend::SpectralVariable3D = zeros(SpectralVariable3D, spectrum, nlayers)
     "Specific humidity [kg/kg]"
     humid_tend::SpectralVariable3D = zeros(SpectralVariable3D, spectrum, nlayers)
     "Zonal velocity [m/s]"
-    u_tend    ::SpectralVariable3D = zeros(SpectralVariable3D, spectrum, nlayers)
+    u_tend::SpectralVariable3D = zeros(SpectralVariable3D, spectrum, nlayers)
     "Meridional velocity [m/s]"
-    v_tend    ::SpectralVariable3D = zeros(SpectralVariable3D, spectrum, nlayers)
+    v_tend::SpectralVariable3D = zeros(SpectralVariable3D, spectrum, nlayers)
     "Logarithm of surface pressure [Pa]"
-    pres_tend ::SpectralVariable2D = zeros(SpectralVariable2D, spectrum)
+    pres_tend::SpectralVariable2D = zeros(SpectralVariable2D, spectrum)
     "Tracers [?]"
     tracers_tend::SpectralTracerTuple = NamedTuple()
 
     "Zonal velocity [m/s], grid"
-    u_tend_grid     ::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
+    u_tend_grid::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
     "Meridinoal velocity [m/s], grid"
-    v_tend_grid     ::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
+    v_tend_grid::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
     "Absolute temperature [K], grid"
-    temp_tend_grid  ::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
+    temp_tend_grid::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
     "Specific humidity [kg/kg], grid"
-    humid_tend_grid ::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
+    humid_tend_grid::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
     "Logarith of surface pressure [Pa], grid"
-    pres_tend_grid  ::GridVariable2D = zeros(GridVariable2D, grid)
+    pres_tend_grid::GridVariable2D = zeros(GridVariable2D, grid)
     "Tracers [?], grid"
     tracers_tend_grid::GridTracerTuple = NamedTuple()
 end
 
 """$(TYPEDSIGNATURES)
 Generator function."""
-function Tendencies(SG::SpectralGrid; tracers::TRACER_DICT=TRACER_DICT())
+function Tendencies(SG::SpectralGrid; tracers::TRACER_DICT = TRACER_DICT())
     (; spectrum, grid, nlayers) = SG
     (; SpectralVariable2D, SpectralVariable3D) = SG
     (; GridVariable2D, GridVariable3D) = SG
@@ -108,54 +109,54 @@ export GridVariables
 """Transformed prognostic variables (and u, v, temp_virt) into grid-point space.
 $TYPEDFIELDS."""
 @kwdef struct GridVariables{
-    GridType,               # <:AbstractGrid
-    GridVariable2D,         # <: AbstractField
-    GridVariable3D,         # <: AbstractField
-    GridTracerTuple,        # <: NamedTuple{Tuple{Symbol}, Tuple{GridVariable3D}}
-} <: AbstractDiagnosticVariables
+        GridType,               # <:AbstractGrid
+        GridVariable2D,         # <: AbstractField
+        GridVariable3D,         # <: AbstractField
+        GridTracerTuple,        # <: NamedTuple{Tuple{Symbol}, Tuple{GridVariable3D}}
+    } <: AbstractDiagnosticVariables
 
     grid::GridType          # grid resolution: number of latitude rings on one hemisphere (Eq. incl.)
     nlayers::Int            # number of vertical layers
 
     "Relative vorticity of the horizontal wind [1/s]"
-    vor_grid        ::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
+    vor_grid::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
     "Divergence of the horizontal wind [1/s]"
-    div_grid        ::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
+    div_grid::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
     "Absolute temperature [K]"
-    temp_grid       ::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
+    temp_grid::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
     "Specific_humidity [kg/kg]"
-    humid_grid      ::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
+    humid_grid::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
     "Zonal velocity [m/s]"
-    u_grid          ::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
+    u_grid::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
     "Meridional velocity [m/s]"
-    v_grid          ::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
+    v_grid::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
     "Logarithm of surface pressure [Pa]"
-    pres_grid       ::GridVariable2D = zeros(GridVariable2D, grid)
+    pres_grid::GridVariable2D = zeros(GridVariable2D, grid)
     "Geopotential [m²/s²]"
-    geopotential    ::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
+    geopotential::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
     "Random pattern controlled by random process [1]"
-    random_pattern  ::GridVariable2D = zeros(GridVariable2D, grid)
+    random_pattern::GridVariable2D = zeros(GridVariable2D, grid)
     "Tracers [?]"
-    tracers_grid    ::GridTracerTuple = NamedTuple()
+    tracers_grid::GridTracerTuple = NamedTuple()
 
     # PREVIOUS TIME STEP
     "Absolute temperature [K] at previous time step"
-    temp_grid_prev  ::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
+    temp_grid_prev::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
     "Specific humidity [kg/kg] at previous time step"
-    humid_grid_prev ::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
+    humid_grid_prev::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
     "Zonal velocity [m/s] at previous time step"
-    u_grid_prev     ::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
+    u_grid_prev::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
     "Meridional velocity [m/s] at previous time step"
-    v_grid_prev     ::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
+    v_grid_prev::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
     "Surface pressure [Pa] at previous time step (not logarithm!)"
-    pres_grid_prev  ::GridVariable2D = zeros(GridVariable2D, grid)
+    pres_grid_prev::GridVariable2D = zeros(GridVariable2D, grid)
     "Tracers [?] at previous time step"
     tracers_grid_prev::GridTracerTuple = NamedTuple()
 end
 
 """$(TYPEDSIGNATURES)
 Generator function."""
-function GridVariables(SG::SpectralGrid; tracers::TRACER_DICT=TRACER_DICT())
+function GridVariables(SG::SpectralGrid; tracers::TRACER_DICT = TRACER_DICT())
     (; grid, nlayers) = SG
     (; GridVariable2D, GridVariable3D) = SG
 
@@ -164,9 +165,9 @@ function GridVariables(SG::SpectralGrid; tracers::TRACER_DICT=TRACER_DICT())
     tracers_grid_prev = (; [key => zeros(GridVariable3D, grid, nlayers) for key in keys(tracers)]...)
 
     return GridVariables{typeof(grid), GridVariable2D, GridVariable3D, typeof(tracers_grid)}(;
-            grid, nlayers,
-            tracers_grid, tracers_grid_prev
-        )
+        grid, nlayers,
+        tracers_grid, tracers_grid_prev
+    )
 end
 
 Adapt.@adapt_structure GridVariables
@@ -176,52 +177,52 @@ export DynamicsVariables
 """Intermediate quantities for the dynamics of a given layer.
 $(TYPEDFIELDS)"""
 @kwdef struct DynamicsVariables{
-    SpectrumType,           # <: AbstractSpectrum
-    GridType,               # <: AbstractGrid
-    SpectralVariable2D,     # <: LowerTriangularArray
-    SpectralVariable3D,     # <: LowerTriangularArray
-    GridVariable2D,         # <: AbstractField
-    GridVariable3D,         # <: AbstractField
-    ScratchMemoryType,      # <: ScratchMemory{ArrayType{Complex{NF},3}}
-} <: AbstractDiagnosticVariables
-    
+        SpectrumType,           # <: AbstractSpectrum
+        GridType,               # <: AbstractGrid
+        SpectralVariable2D,     # <: LowerTriangularArray
+        SpectralVariable3D,     # <: LowerTriangularArray
+        GridVariable2D,         # <: AbstractField
+        GridVariable3D,         # <: AbstractField
+        ScratchMemoryType,      # <: ScratchMemory{ArrayType{Complex{NF},3}}
+    } <: AbstractDiagnosticVariables
+
     spectrum::SpectrumType  # spectral resolution: maximum degree and order of spherical harmonics
     grid::GridType          # grid resolution: number of latitude rings on one hemisphere (Eq. incl.)
     nlayers::Int            # number of vertical layers
 
     "Multi-purpose a, 3D work array to be reused in various places"
     a::SpectralVariable3D = zeros(SpectralVariable3D, spectrum, nlayers)
-    
+
     "Multi-purpose b, 3D work array to be reused in various places"
     b::SpectralVariable3D = zeros(SpectralVariable3D, spectrum, nlayers)
-    
+
     "Multi-purpose a, 3D work array to be reused in various places"
     a_grid::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
-    
+
     "Multi-purpose b, 3D work array to be reused in various places"
     b_grid::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
-    
+
     "Multi-purpose a, work array to be reused in various places"
     a_2D::SpectralVariable2D = zeros(SpectralVariable2D, spectrum)
-    
+
     "Multi-purpose b, work array to be reused in various places"
     b_2D::SpectralVariable2D = zeros(SpectralVariable2D, spectrum)
-    
+
     "Multi-purpose a, work array to be reused in various places"
     a_2D_grid::GridVariable2D = zeros(GridVariable2D, grid)
-    
+
     "Multi-purpose b, work array to be reused in various places"
     b_2D_grid::GridVariable2D = zeros(GridVariable2D, grid)
 
     "Pressure flux (uₖ, vₖ)⋅∇ln(pₛ)"
     uv∇lnp::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
-    
+
     "Sum of Δσₖ-weighted uv∇lnp above"
     uv∇lnp_sum_above::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
-    
+
     "Sum of div_weighted from top to k"
     div_sum_above::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
-    
+
     "Virtual temperature [K], spectral, used for geopotential"
     temp_virt::SpectralVariable3D = zeros(SpectralVariable3D, spectrum, nlayers)
 
@@ -233,7 +234,7 @@ $(TYPEDFIELDS)"""
 
     "Zonal gradient of log surf pressure"
     ∇lnp_x::GridVariable2D = zeros(GridVariable2D, grid)
-    
+
     "Meridional gradient of log surf pressure"
     ∇lnp_y::GridVariable2D = zeros(GridVariable2D, grid)
 
@@ -255,8 +256,10 @@ end
 
 """$(TYPEDSIGNATURES)
 Generator function. If a `spectral_transform` is handed over, the same scratch memory is used."""
-function DynamicsVariables(SG::SpectralGrid; 
-                           spectral_transform::Union{Nothing,SpectralTransform}=nothing) 
+function DynamicsVariables(
+        SG::SpectralGrid;
+        spectral_transform::Union{Nothing, SpectralTransform} = nothing
+    )
     (; architecture, spectrum, grid, nlayers, NF, ArrayType) = SG
     (; SpectralVariable2D, SpectralVariable3D) = SG
     (; GridVariable2D, GridVariable3D) = SG
@@ -267,11 +270,13 @@ function DynamicsVariables(SG::SpectralGrid;
         scratch_memory = spectral_transform.scratch_memory
     end
 
-    return DynamicsVariables{typeof(spectrum), typeof(grid),
+    return DynamicsVariables{
+        typeof(spectrum), typeof(grid),
         SpectralVariable2D, SpectralVariable3D,
-        GridVariable2D, GridVariable3D, typeof(scratch_memory)}(;
-            spectrum, grid, nlayers, scratch_memory
-        )
+        GridVariable2D, GridVariable3D, typeof(scratch_memory),
+    }(;
+        spectrum, grid, nlayers, scratch_memory
+    )
 end
 
 Adapt.@adapt_structure DynamicsVariables
@@ -281,10 +286,10 @@ export ParticleVariables
 """Diagnostic variables for the particle advection
 $(TYPEDFIELDS)"""
 @kwdef struct ParticleVariables{
-    ParticleVector,         # <: AbstractField
-    VectorNF,               # Vector{NF} or CuVector{NF}
-    LocatorType,           # <:AbstractLocator
-} <: AbstractDiagnosticVariables
+        ParticleVector,         # <: AbstractField
+        VectorNF,               # Vector{NF} or CuVector{NF}
+        LocatorType,           # <:AbstractLocator
+    } <: AbstractDiagnosticVariables
     "Number of particles"
     nparticles::Int
 
@@ -312,7 +317,8 @@ function ParticleVariables(SG::SpectralGrid)
     VectorNF = array_type(architecture, NF, 1)
     locator = RingGrids.AnvilLocator(NF, nparticles; architecture)
     return ParticleVariables{ParticleVector, VectorNF, typeof(locator)}(;
-            nparticles, locator)
+        nparticles, locator
+    )
 end
 
 Adapt.@adapt_structure ParticleVariables
@@ -322,21 +328,21 @@ export DiagnosticVariables
 """All diagnostic variables.
 $(TYPEDFIELDS)"""
 struct DiagnosticVariables{
-    SpectrumType,           # <: AbstractSpectrum
-    GridType,               # <:AbstractGrid
-    SpectralVariable2D,     # <: LowerTriangularArray
-    SpectralVariable3D,     # <: LowerTriangularArray
-    GridVariable2D,         # <: AbstractField
-    GridVariable3D,         # <: AbstractField
-    SpectralTracerTuple,    # <: NamedTuple{Symbol, SpectralVariable3D}
-    GridTracerTuple,        # <: NamedTuple{Symbol, GridVariable3D}
-    ParticleVector,         # <: AbstractField
-    VectorType,             # <: AbstractVector
-    PhysicsTuple,           # <: NamedTyple{Symbol, ...} 
-    ScratchMemoryType,      # <: ArrayType{Complex{NF}, 3}
-    LocatorType,            # <: AbstractLocator
-    RefValueNF,             # <: Base.RefValue{NF}
-} <: AbstractDiagnosticVariables
+        SpectrumType,           # <: AbstractSpectrum
+        GridType,               # <:AbstractGrid
+        SpectralVariable2D,     # <: LowerTriangularArray
+        SpectralVariable3D,     # <: LowerTriangularArray
+        GridVariable2D,         # <: AbstractField
+        GridVariable3D,         # <: AbstractField
+        SpectralTracerTuple,    # <: NamedTuple{Symbol, SpectralVariable3D}
+        GridTracerTuple,        # <: NamedTuple{Symbol, GridVariable3D}
+        ParticleVector,         # <: AbstractField
+        VectorType,             # <: AbstractVector
+        PhysicsTuple,           # <: NamedTyple{Symbol, ...}
+        ScratchMemoryType,      # <: ArrayType{Complex{NF}, 3}
+        LocatorType,            # <: AbstractLocator
+        RefValueNF,             # <: Base.RefValue{NF}
+    } <: AbstractDiagnosticVariables
 
     # DIMENSIONS
     "Spectral resolution: Max degree of spherical harmonics"
@@ -353,20 +359,20 @@ struct DiagnosticVariables{
 
     "Tendencies (spectral and grid) of the prognostic variables"
     tendencies::Tendencies{SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, SpectralTracerTuple, GridTracerTuple}
-    
+
     "Gridded prognostic variables"
     grid::GridVariables{GridType, GridVariable2D, GridVariable3D, GridTracerTuple}
-    
+
     "Intermediate variables for the dynamical core"
     dynamics::DynamicsVariables{SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, ScratchMemoryType}
-    
-    # TODO: different parameteric type here? 
+
+    # TODO: different parameteric type here?
     "Global fields returned from physics parameterizations, including land and ocean"
     physics::PhysicsTuple
-    
+
     "Intermediate variables for the particle advection"
     particles::ParticleVariables{ParticleVector, VectorType, LocatorType}
-    
+
     "Average temperature of every horizontal layer [K]"
     temp_average::VectorType
 
@@ -375,39 +381,39 @@ struct DiagnosticVariables{
 
     # full constructor that infers correct type parameters, mainly for adapt_structure / GPU etc.
     function DiagnosticVariables(
-        spectrum::SpectrumType,
-        grid::GridType,
-        nlayers::Int,
-        nparticles::Int,
-        tendencies::Tendencies{SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, SpectralTracerTuple, GridTracerTuple},
-        grid_variables::GridVariables{GridType, GridVariable2D, GridVariable3D, GridTracerTuple},
-        dynamics::DynamicsVariables{SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, ScratchMemoryType},
-        physics::PhysicsTuple,
-        particles::ParticleVariables{ParticleVector, VectorType, LocatorType},
-        temp_average::VectorType,
-        scale::RefValueNF,
-    ) where {
-        SpectrumType,           # <: AbstractSpectrum
-        GridType,               # <: AbstractGrid
-        SpectralVariable2D,     # <: LowerTriangularArray
-        SpectralVariable3D,     # <: LowerTriangularArray
-        GridVariable2D,         # <: AbstractField
-        GridVariable3D,         # <: AbstractField
-        SpectralTracerTuple,    # <: NamedTuple{Symbol, SpectralVariable3D}
-        GridTracerTuple,        # <: NamedTuple{Symbol, GridVariable3D}
-        ParticleVector,         # <: AbstractField
-        VectorType,             # <: AbstractVector
-        PhysicsTuple,
-        ScratchMemoryType,      # <: ArrayType{Complex{NF}, 3}
-        LocatorType,            # <: AbstractLocator
-        RefValueNF,             # <: Base.RefValue{NF}
-    }
+            spectrum::SpectrumType,
+            grid::GridType,
+            nlayers::Int,
+            nparticles::Int,
+            tendencies::Tendencies{SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, SpectralTracerTuple, GridTracerTuple},
+            grid_variables::GridVariables{GridType, GridVariable2D, GridVariable3D, GridTracerTuple},
+            dynamics::DynamicsVariables{SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, ScratchMemoryType},
+            physics::PhysicsTuple,
+            particles::ParticleVariables{ParticleVector, VectorType, LocatorType},
+            temp_average::VectorType,
+            scale::RefValueNF,
+        ) where {
+            SpectrumType,           # <: AbstractSpectrum
+            GridType,               # <: AbstractGrid
+            SpectralVariable2D,     # <: LowerTriangularArray
+            SpectralVariable3D,     # <: LowerTriangularArray
+            GridVariable2D,         # <: AbstractField
+            GridVariable3D,         # <: AbstractField
+            SpectralTracerTuple,    # <: NamedTuple{Symbol, SpectralVariable3D}
+            GridTracerTuple,        # <: NamedTuple{Symbol, GridVariable3D}
+            ParticleVector,         # <: AbstractField
+            VectorType,             # <: AbstractVector
+            PhysicsTuple,
+            ScratchMemoryType,      # <: ArrayType{Complex{NF}, 3}
+            LocatorType,            # <: AbstractLocator
+            RefValueNF,             # <: Base.RefValue{NF}
+        }
         return new{
             typeof(spectrum), typeof(grid), SpectralVariable2D, SpectralVariable3D,
             GridVariable2D, GridVariable3D, SpectralTracerTuple, GridTracerTuple,
             ParticleVector, VectorType, typeof(physics),
-            typeof(dynamics.scratch_memory), typeof(particles.locator), 
-            typeof(scale)
+            typeof(dynamics.scratch_memory), typeof(particles.locator),
+            typeof(scale),
         }(
             spectrum, grid, nlayers, nparticles,
             tendencies, grid_variables, dynamics, physics, particles,
@@ -417,30 +423,30 @@ struct DiagnosticVariables{
 
     # full constructor with parameters
     function DiagnosticVariables{
-        SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D,
-        GridVariable2D, GridVariable3D, SpectralTracerTuple, GridTracerTuple,
-        ParticleVector, VectorType, PhysicsTuple,
-        ScratchMemoryType, LocatorType, RefValueNF
-    }(
-        spectrum, grid, nlayers, nparticles,
-        tendencies, grid_variables, dynamics, physics, particles,
-        temp_average, scale,
-    ) where {
-        SpectrumType,           # <: AbstractSpectrum
-        GridType,               # <: AbstractGrid
-        SpectralVariable2D,     # <: LowerTriangularArray
-        SpectralVariable3D,     # <: LowerTriangularArray
-        GridVariable2D,         # <: AbstractField
-        GridVariable3D,         # <: AbstractField
-        SpectralTracerTuple,    # <: NamedTuple{Symbol, SpectralVariable3D}
-        GridTracerTuple,        # <: NamedTuple{Symbol, GridVariable3D}
-        ParticleVector,         # <: AbstractField
-        VectorType,             # <: AbstractVector
-        PhysicsTuple,
-        ScratchMemoryType,      # <: ArrayType{Complex{NF}, 3}
-        LocatorType,            # <: AbstractLocator
-        RefValueNF,             # <: Base.RefValue{NF}
-    }
+            SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D,
+            GridVariable2D, GridVariable3D, SpectralTracerTuple, GridTracerTuple,
+            ParticleVector, VectorType, PhysicsTuple,
+            ScratchMemoryType, LocatorType, RefValueNF,
+        }(
+            spectrum, grid, nlayers, nparticles,
+            tendencies, grid_variables, dynamics, physics, particles,
+            temp_average, scale,
+        ) where {
+            SpectrumType,           # <: AbstractSpectrum
+            GridType,               # <: AbstractGrid
+            SpectralVariable2D,     # <: LowerTriangularArray
+            SpectralVariable3D,     # <: LowerTriangularArray
+            GridVariable2D,         # <: AbstractField
+            GridVariable3D,         # <: AbstractField
+            SpectralTracerTuple,    # <: NamedTuple{Symbol, SpectralVariable3D}
+            GridTracerTuple,        # <: NamedTuple{Symbol, GridVariable3D}
+            ParticleVector,         # <: AbstractField
+            VectorType,             # <: AbstractVector
+            PhysicsTuple,
+            ScratchMemoryType,      # <: ArrayType{Complex{NF}, 3}
+            LocatorType,            # <: AbstractLocator
+            RefValueNF,             # <: Base.RefValue{NF}
+        }
         return new{
             SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D,
             GridVariable2D, GridVariable3D, SpectralTracerTuple, GridTracerTuple,
@@ -454,7 +460,7 @@ struct DiagnosticVariables{
     end
 end
 
-Base.eltype(::DiagnosticVariables{SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, GridVariable2D}) where {SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, GridVariable2D <: AbstractField{NF}} where NF = NF 
+Base.eltype(::DiagnosticVariables{SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, GridVariable2D}) where {SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, GridVariable2D <: AbstractField{NF}} where {NF} = NF
 Architectures.array_type(::DiagnosticVariables{SpectrumType, GridType, SpectralVariable2D}) where {SpectrumType, GridType, SpectralVariable2D <: LowerTriangularArray{NF, N, ArrayType}} where {NF, N, ArrayType <: AbstractArray} = nonparametric_type(ArrayType)
 Architectures.array_type(::DiagnosticVariables{SpectrumType, GridType, SpectralVariable2D}) where {SpectrumType, GridType, SpectralVariable2D <: AbstractArray} = SpectralVariable2D
 
@@ -476,7 +482,7 @@ function DiagnosticVariables(model::AbstractModel)
     particles = ParticleVariables(SG)
     temp_average = on_architecture(SG.architecture, zeros(NF, nlayers))
 
-    # allocate parameterization variables 
+    # allocate parameterization variables
     variable_names = get_diagnostic_variables(model)
 
     # TODO: currently this is just a drop-in replacement, later we should have nlayers_soil from the land model and not from the SpectralGrid
@@ -484,7 +490,7 @@ function DiagnosticVariables(model::AbstractModel)
     atmosphere = initialize_variables(SG, nlayers, variable_names.atmosphere...)
     ocean = initialize_variables(SG, 1, variable_names.ocean...)
 
-    physics = merge(atmosphere, (ocean=ocean, land=land))
+    physics = merge(atmosphere, (ocean = ocean, land = land))
 
     scale = Ref(one(NF))
 
@@ -495,7 +501,7 @@ function DiagnosticVariables(model::AbstractModel)
         typeof(spectrum), typeof(grid), SpectralVariable2D, SpectralVariable3D,
         GridVariable2D, GridVariable3D, SpectralTracerTuple, GridTracerTuple,
         ParticleVector, VectorType, typeof(physics),
-        typeof(dynamics.scratch_memory), typeof(particles.locator), typeof(scale)
+        typeof(dynamics.scratch_memory), typeof(particles.locator), typeof(scale),
     }(
         spectrum, grid, nlayers, nparticles,
         tendencies, grid_variables, dynamics, physics, particles,
@@ -506,15 +512,15 @@ end
 Adapt.@adapt_structure DiagnosticVariables
 
 function Base.show(
-    io::IO,
-    diagn::DiagnosticVariables,
-)
+        io::IO,
+        diagn::DiagnosticVariables,
+    )
 
     NF = eltype(diagn)
     ArrayType = array_type(diagn)
 
     println(io, "DiagnosticVariables{$NF, $ArrayType}")
-    
+
     (; spectrum, nlayers, nparticles) = diagn
     grid = diagn.grid_used   # TODO grid is used by 'GridVariables'
     nlat = RingGrids.get_nlat(grid)
@@ -529,7 +535,7 @@ function Base.show(
     println(io, "├ physics::PhysicsVariables")
     println(io, "├ particles::ParticleVariables, $nparticles particles")
     println(io, "├ temp_average::$(typeof(diagn.temp_average))")
-    print(io,   "└ scale: $(diagn.scale[])")
+    return print(io, "└ scale: $(diagn.scale[])")
 end
 
 """$(TYPEDSIGNATURES)
@@ -564,7 +570,7 @@ end
 Set the tendencies for the primitive dry model to `x`."""
 function Base.fill!(tendencies::Tendencies, x, ::Type{<:PrimitiveDry})
     fill!(tendencies, x, ShallowWater)  # all tendencies also in ShallowWater
-    fill!(tendencies.temp_tend, x)      # plus temperature 
+    fill!(tendencies.temp_tend, x)      # plus temperature
     fill!(tendencies.temp_tend_grid, x)
     return tendencies
 end
