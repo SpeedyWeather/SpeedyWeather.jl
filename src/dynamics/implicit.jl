@@ -385,19 +385,18 @@ Apply implicit correction for Lorenz N-cycle (shallow water).
 Key difference from Leapfrog: adds L_I*x (current state) instead of L_I*(x_old - x_new).
 Works directly on G arrays in progn without copying to diagn.tendencies.
 """
-function lorenz_implicit_correction!( #TODO: avoid code duplications -> dispatch
+function lorenz_implicit_correction!(
     diagn::DiagnosticVariables,
     progn::PrognosticVariables,
     implicit::ImplicitShallowWater,
     model::ShallowWater,
 )
-    # Get G (accumulated tendency) and x (current state)
-    # Handle dimensionality: div is 3D, pres is 2D
-    div_G = progn.div[:, :, 2]
-    div_x = progn.div[:, :, 1]
+    # Get G (accumulated tendency) and x (current state) using get_step
+    div_x = get_step(progn.div, 1)    # Current state
+    div_G = get_step(progn.div, 2)    # Accumulated tendency
     
-    pres_G = progn.pres[:, 2]
-    pres_x = progn.pres[:, 1]
+    pres_x = get_step(progn.pres, 1)
+    pres_G = get_step(progn.pres, 2)
 
     H = model.atmosphere.layer_thickness
     g = model.planet.gravity
@@ -413,11 +412,10 @@ function lorenz_implicit_correction!( #TODO: avoid code duplications -> dispatch
                 ∇² = -l*(l-1)
 
                 # Add L_I*x terms to G (not the x_old - x_new difference!)
-                # This gives us (G + L_I*x) as required by Hotta et al. (2016) Eq. 20
                 G_div_total = div_G[lm, k] + g*∇²*pres_x[lm]
                 G_pres_total = pres_G[lm] + H*div_x[lm, k]
 
-                # Apply implicit operator inversion (same as Leapfrog)
+                # Apply implicit operator inversion
                 S⁻¹ = inv(1 - ξ^2*H*g*∇²)
                 div_G[lm, k] = S⁻¹*(G_div_total - ξ*g*∇²*G_pres_total)
                 pres_G[lm] = G_pres_total - ξ*H*div_G[lm, k]
