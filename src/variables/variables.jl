@@ -40,9 +40,9 @@ Base.zero(::AbstractVariable{Spectral3D}, SG::SpectralGrid, nlayers::Int) = zero
 Represents a prognostic variable with the given `name` and `dims`.
 """
 @kwdef struct PrognosticVariable{
-    VD, # <:VarDims
-    UT, # <:Units
-} <: AbstractVariable{VD}
+        VD, # <:VarDims
+        UT, # <:Units
+    } <: AbstractVariable{VD}
     "Name of the prognostic variable"
     name::Symbol
 
@@ -65,9 +65,9 @@ end
 Represents a diagnostic variable with the given `name` and `dims`.
 """
 @kwdef struct DiagnosticVariable{
-    VD, # <:VarDims
-    UT, # <:Units
-} <: AbstractVariable{VD}
+        VD, # <:VarDims
+        UT, # <:Units
+    } <: AbstractVariable{VD}
     "Name of the diagnostic variable"
     name::Symbol
 
@@ -90,7 +90,7 @@ end
 Remove duplicate variables based on their `name` and `namespace`.
 Only the first occurrence of each unique combination is kept.
 """
-function remove_duplicate_variables(variables::AbstractVariable...) 
+function remove_duplicate_variables(variables::AbstractVariable...)
     seen = Set{Tuple{Symbol, Symbol}}()
     unique_vars = []
     for v in variables
@@ -129,19 +129,19 @@ result = get_diagnostic_variables(vars)
 function get_diagnostic_variables(variables::AbstractVariable...)
     # Filter only DiagnosticVariables
     diag_vars = filter(v -> v isa DiagnosticVariable, variables)
-    
+
     # Remove duplicates
     unique_vars = remove_duplicate_variables(diag_vars...)
-    
+
     # Currently hardcoded (might change in the future)
     namespaces = (:atmosphere, :land, :ocean)
- 
+
     # Split by namespace
     namespace_dict = Dict{Symbol, Vector{DiagnosticVariable}}()
     for ns in namespaces
         namespace_dict[ns] = [v for v in unique_vars if v.namespace == ns]
     end
-    
+
     # Convert to NamedTuple with tuples instead of vectors
     return NamedTuple{Tuple(namespaces)}(Tuple(Tuple(namespace_dict[ns]) for ns in namespaces))
 end
@@ -172,19 +172,19 @@ result = get_prognostic_variables(vars)
 function get_prognostic_variables(variables::AbstractVariable...)
     # Filter only PrognosticVariable
     prog_vars = filter(v -> v isa PrognosticVariable, variables)
-    
+
     # Remove duplicates
     unique_vars = remove_duplicate_variables(prog_vars...)
-    
+
     # Currently hardcoded (might change in the future)
     namespaces = (:atmosphere, :land, :ocean)
-    
+
     # Split by namespace
     namespace_dict = Dict{Symbol, Vector{PrognosticVariable}}()
     for ns in namespaces
         namespace_dict[ns] = [v for v in unique_vars if v.namespace == ns]
     end
-    
+
     # Convert to NamedTuple with tuples instead of vectors
     return NamedTuple{Tuple(namespaces)}(Tuple(Tuple(namespace_dict[ns]) for ns in namespaces))
 end
@@ -193,7 +193,7 @@ get_prognostic_variables(model::AbstractModel) = get_prognostic_variables(variab
 get_diagnostic_variables(model::AbstractModel) = get_diagnostic_variables(variables(model)...)
 
 # TODO: not quite sure yet about the nlayers or where it'll go
-# initialize a NamedTuple from variables 
-function initialize_variables(SG::SpectralGrid, nlayers::Integer, variables...) 
+# initialize a NamedTuple from variables
+function initialize_variables(SG::SpectralGrid, nlayers::Integer, variables...)
     return NamedTuple{Tuple(map(v -> v.name, variables))}(Tuple(map(var -> zero(var, SG, nlayers), variables)))
 end 

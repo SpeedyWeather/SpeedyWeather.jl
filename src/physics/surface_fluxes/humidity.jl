@@ -17,23 +17,24 @@ Adapt.@adapt_structure SurfaceHumidityFlux
 
 # generator function and defaults
 function SurfaceHumidityFlux(
-    SG::SpectralGrid; 
-    ocean = SurfaceOceanHumidityFlux(SG),
-    land = SurfaceLandHumidityFlux(SG))
+        SG::SpectralGrid;
+        ocean = SurfaceOceanHumidityFlux(SG),
+        land = SurfaceLandHumidityFlux(SG)
+    )
     return SurfaceHumidityFlux(; ocean, land)
 end
 
 # initialize both
 function initialize!(S::SurfaceHumidityFlux, model::PrimitiveWet)
     initialize!(S.ocean, model)
-    initialize!(S.land, model)
+    return initialize!(S.land, model)
 end
 
 # call first ocean flux then land flux
 # order important as ocean sets the flux (=) and land accumulates (+=)
 @propagate_inbounds function parameterization!(ij, diagn, progn, humidity_flux::SurfaceHumidityFlux, model)
     surface_humidity_flux!(ij, diagn, progn, humidity_flux.ocean, model)
-    surface_humidity_flux!(ij, diagn, progn, humidity_flux.land,  model)
+    return surface_humidity_flux!(ij, diagn, progn, humidity_flux.land, model)
 end
 
 export SurfaceOceanHumidityFlux
@@ -54,8 +55,9 @@ SurfaceOceanHumidityFlux(SG::SpectralGrid; kwargs...) = SurfaceOceanHumidityFlux
 initialize!(::SurfaceOceanHumidityFlux, ::PrimitiveWet) = nothing
 
 @propagate_inbounds function surface_humidity_flux!(
-    ij, diagn, progn, humidity_flux::SurfaceOceanHumidityFlux, model)
-    
+        ij, diagn, progn, humidity_flux::SurfaceOceanHumidityFlux, model
+    )
+
     surface = model.geometry.nlayers
     SST = progn.ocean.sea_surface_temperature[ij]
 
@@ -76,18 +78,18 @@ initialize!(::SurfaceOceanHumidityFlux, ::PrimitiveWet) = nothing
 
     # SPEEDY documentation eq. 55/57, zero flux if sea surface temperature not available
     # but remove the max( ,0) to allow for surface condensation
-    flux_ocean = isfinite(SST) ? ρ*drag_ocean*V₀*(sat_humid_ocean  - surface_humid) : zero(SST)
+    flux_ocean = isfinite(SST) ? ρ * drag_ocean * V₀ * (sat_humid_ocean - surface_humid) : zero(SST)
 
     # sea ice insulation: more sea ice ⇒ smaller flux (ℵ / ℵ₀ scaling)
     flux_ocean /= 1 + sea_ice_concentration / humidity_flux.sea_ice_insulation
 
     # store without weighting by land fraction for coupling
-    diagn.physics.ocean.surface_humidity_flux[ij] = flux_ocean         
+    diagn.physics.ocean.surface_humidity_flux[ij] = flux_ocean
     flux_ocean *= (1 - land_fraction)             # weight by ocean fraction of land-sea mask
 
     # output/diagnose: ocean sets flux (=), land accumulates (+=)
     diagn.physics.surface_humidity_flux[ij] = flux_ocean
-    
+
     # accumulate with += into end=lowermost layer total flux
     diagn.tendencies.humid_tend_grid[ij, surface] += surface_flux_to_tendency(flux_ocean, pₛ, model)
     return nothing
@@ -133,8 +135,8 @@ initialize!(::SurfaceLandHumidityFlux, ::PrimitiveWet) = nothing
 
     # SPEEDY documentation eq. 55/57, zero flux if land / soil moisture availability not available (=ocean)
     # but remove the max( ,0) to allow for surface condensation
-    flux_land = isfinite(T) && isfinite(α) ? ρ*drag_land*V₀*(α*sat_humid_land - surface_humid) : zero(T)
-    
+    flux_land = isfinite(T) && isfinite(α) ? ρ * drag_land * V₀ * (α * sat_humid_land - surface_humid) : zero(T)
+
     # snow insulation: deeper snow ⇒ smaller flux (S / S₀ depth scaling)
     flux_land /= 1 + snow_depth / humidity_flux.snow_insulation_depth
 
@@ -144,7 +146,7 @@ initialize!(::SurfaceLandHumidityFlux, ::PrimitiveWet) = nothing
 
     # output/diagnose: ocean sets flux (=), land accumulates (+=)
     diagn.physics.surface_humidity_flux[ij] += flux_land
-    
+
     # accumulate with += into end=lowermost layer total flux
     diagn.tendencies.humid_tend_grid[ij, surface] += surface_flux_to_tendency(flux_land, pₛ, model)
     return nothing
@@ -169,12 +171,12 @@ initialize!(::PrescribedOceanHumidityFlux, ::PrimitiveWet) = nothing
     flux_ocean = progn.ocean.surface_humidity_flux[ij]
 
     # store without weighting by land fraction for coupling
-    diagn.physics.ocean.surface_humidity_flux[ij] = flux_ocean         
+    diagn.physics.ocean.surface_humidity_flux[ij] = flux_ocean
     flux_ocean *= (1 - land_fraction)             # weight by ocean fraction of land-sea mask
 
     # output/diagnose: ocean sets flux (=), land accumulates (+=)
     diagn.physics.surface_humidity_flux[ij] = flux_ocean
-    
+
     # accumulate with += into end=lowermost layer total flux
     diagn.tendencies.humid_tend_grid[ij, surface] += surface_flux_to_tendency(flux_ocean, pₛ, model)
     return nothing
@@ -200,12 +202,12 @@ initialize!(::PrescribedLandHumidityFlux, ::PrimitiveWet) = nothing
     flux_land = progn.land.surface_humidity_flux[ij]
 
     # store without weighting by land fraction for coupling
-    diagn.physics.land.surface_humidity_flux[ij] = flux_land       
+    diagn.physics.land.surface_humidity_flux[ij] = flux_land
     flux_land *= land_fraction                  # weight by ocean fraction of land-sea mask
 
     # output/diagnose: ocean sets flux (=), land accumulates (+=)
     diagn.physics.surface_humidity_flux[ij] += flux_land
-    
+
     # accumulate with += into end=lowermost layer total flux
     diagn.tendencies.humid_tend_grid[ij, surface] += surface_flux_to_tendency(flux_land, pₛ, model)
     return nothing
@@ -213,10 +215,10 @@ end
 
 function variables(::AbstractSurfaceHumidityFlux)
     return (
-        DiagnosticVariable(name=:surface_humidity_flux, dims=Grid2D(), desc="Total surface humidity flux", units="kg/m²/s"),
-        DiagnosticVariable(name=:surface_humidity_flux, dims=Grid2D(), desc="Ocean surface humidity flux", units="kg/m²/s", namespace=:ocean),
-        DiagnosticVariable(name=:surface_humidity_flux, dims=Grid2D(), desc="Land surface humidity flux", units="kg/m²/s", namespace=:land),
-        PrognosticVariable(name=:surface_humidity_flux, dims=Grid2D(), desc="Prescribed Ocean surface humidity flux", units="kg/m²/s", namespace=:ocean),
-        PrognosticVariable(name=:surface_humidity_flux, dims=Grid2D(), desc="Prescribed Land surface humidity flux", units="kg/m²/s", namespace=:land),
+        DiagnosticVariable(name = :surface_humidity_flux, dims = Grid2D(), desc = "Total surface humidity flux", units = "kg/m²/s"),
+        DiagnosticVariable(name = :surface_humidity_flux, dims = Grid2D(), desc = "Ocean surface humidity flux", units = "kg/m²/s", namespace = :ocean),
+        DiagnosticVariable(name = :surface_humidity_flux, dims = Grid2D(), desc = "Land surface humidity flux", units = "kg/m²/s", namespace = :land),
+        PrognosticVariable(name = :surface_humidity_flux, dims = Grid2D(), desc = "Prescribed Ocean surface humidity flux", units = "kg/m²/s", namespace = :ocean),
+        PrognosticVariable(name = :surface_humidity_flux, dims = Grid2D(), desc = "Prescribed Land surface humidity flux", units = "kg/m²/s", namespace = :land),
     )
 end

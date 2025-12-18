@@ -1,5 +1,5 @@
 @testset "Longwave radiation" begin
-    spectral_grid = SpectralGrid(trunc=31, nlayers=8)
+    spectral_grid = SpectralGrid(trunc = 31, nlayers = 8)
     @testset for LW in (Nothing, UniformCooling, JeevanjeeRadiation, OneBandGreyLongwave, OneBandLongwave)
         longwave_radiation = LW(spectral_grid)
         model = PrimitiveWetModel(spectral_grid; longwave_radiation)
@@ -15,7 +15,7 @@
 end
 
 @testset "Longwave Transmissivity" begin
-    spectral_grid = SpectralGrid(trunc=31, nlayers=8)
+    spectral_grid = SpectralGrid(trunc = 31, nlayers = 8)
 
     @testset for T in (FriersonLongwaveTransmissivity, TransparentLongwaveTransmissivity)
         transmissivity = T(spectral_grid)

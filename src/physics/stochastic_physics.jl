@@ -14,9 +14,10 @@ struct StochasticallyPerturbedParameterizationTendencies{F, VectorType} <: Abstr
 end
 
 # generator function
-function StochasticallyPerturbedParameterizationTendencies(SG::SpectralGrid; 
-    tapering = σ -> 1, # σ < 0.8 ? 1 : 1 - (σ - 0.8)/0.2
-)
+function StochasticallyPerturbedParameterizationTendencies(
+        SG::SpectralGrid;
+        tapering = σ -> 1, # σ < 0.8 ? 1 : 1 - (σ - 0.8)/0.2
+    )
     taper = on_architecture(SG.architecture, zeros(SG.nlayers))
     return StochasticallyPerturbedParameterizationTendencies(tapering, taper)
 end
@@ -40,13 +41,13 @@ end
 Apply stochastically perturbed parameterization tendencies (SPPT) to
 u, v, temperature and humidity in column ij."""
 @propagate_inbounds function sppt!(ij, diagn, sppt)
-    
+
     r = diagn.grid.random_pattern[ij]
     (; taper) = sppt
     (; u_tend_grid, v_tend_grid, temp_tend_grid, humid_tend_grid) = diagn.tendencies
 
-    @inbounds for k in eachlayer(u_tend_grid, v_tend_grid, temp_tend_grid, humid_tend_grid)
-        R = 1 + r*taper[k]          # r in [-1, 1], R in [0, 2] (don't change sign of tendency)
+    return @inbounds for k in eachlayer(u_tend_grid, v_tend_grid, temp_tend_grid, humid_tend_grid)
+        R = 1 + r * taper[k]          # r in [-1, 1], R in [0, 2] (don't change sign of tendency)
         u_tend_grid[ij, k] *= R     # perturb all prognostic variables in the same way
         v_tend_grid[ij, k] *= R
         temp_tend_grid[ij, k] *= R

@@ -69,8 +69,8 @@ function geopotential!(
     (; atmosphere) = model
 
     arch = architecture(temp)
-    if typeof(arch) <: GPU
-        launch!(arch, LinearWorkOrder, (size(temp, 1), ), geopotential_kernel!, geopotential, temp, humid, orography, g, G, atmosphere)
+    return if typeof(arch) <: GPU
+        launch!(arch, LinearWorkOrder, (size(temp, 1),), geopotential_kernel!, geopotential, temp, humid, orography, g, G, atmosphere)
     else
         geopotential_cpu!(geopotential, temp, humid, orography, g, G, atmosphere)
     end
@@ -78,7 +78,7 @@ end
 
 function geopotential_cpu!(geopotential, temp, humid, orography, gravity, Geopotential, atmosphere)
     nlayers = size(temp, 2)
-    @inbounds for ij in eachgridpoint(geopotential)
+    return @inbounds for ij in eachgridpoint(geopotential)
         geopotential_compute!(ij, geopotential, temp, humid, orography, gravity, Geopotential.Δp_geopot_half, Geopotential.Δp_geopot_full, nlayers, atmosphere)
     end
 end
@@ -131,22 +131,24 @@ function geopotential!(
 
     # OTHER FULL LAYERS, integrate two half-layers from bottom to top
     arch = architecture(geopot)
-    launch!(arch, SpectralWorkOrder, (size(geopot, 1),), geopotential_spectral_kernel!,
-            geopot, temp_virt, Δp_geopot_half, Δp_geopot_full, nlayers)
+    return launch!(
+        arch, SpectralWorkOrder, (size(geopot, 1),), geopotential_spectral_kernel!,
+        geopot, temp_virt, Δp_geopot_half, Δp_geopot_full, nlayers
+    )
 end
 
 @kernel inbounds = true function geopotential_spectral_kernel!(
-    geopot,                     # Output: spectral geopotential
-    temp_virt,                  # Input: spectral virtual temperature
-    @Const(Δp_geopot_half),     # Input: integration constant for half levels
-    @Const(Δp_geopot_full),     # Input: integration constant for full levels
-    @Const(nlayers),            # Input: number of vertical layers
-)
+        geopot,                     # Output: spectral geopotential
+        temp_virt,                  # Input: spectral virtual temperature
+        @Const(Δp_geopot_half),     # Input: integration constant for half levels
+        @Const(Δp_geopot_full),     # Input: integration constant for full levels
+        @Const(nlayers),            # Input: number of vertical layers
+    )
     lm = @index(Global, Linear)  # global index: harmonic lm
 
     # Integrate from bottom to top over all layers except bottom (already computed)
-    for k in nlayers-1:-1:1
-        geopot_k½ = geopot[lm, k + 1] + temp_virt[lm, k +1 ] * Δp_geopot_half[k + 1]  # 1st half layer integration
+    for k in (nlayers - 1):-1:1
+        geopot_k½ = geopot[lm, k + 1] + temp_virt[lm, k + 1] * Δp_geopot_half[k + 1]  # 1st half layer integration
         geopot[lm, k] = geopot_k½ + temp_virt[lm, k] * Δp_geopot_full[k]        # 2nd onto full layer
     end
 end

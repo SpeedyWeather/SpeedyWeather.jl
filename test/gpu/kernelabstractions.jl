@@ -1,11 +1,11 @@
 using KernelAbstractions
 import SpeedyWeather: on_architecture, CPU, launch!, SpectralWorkOrder, RingGridWorkOrder, LinearWorkOrder
-@testset "KernelAbstractions tests" begin 
+@testset "KernelAbstractions tests" begin
 
-    # To-Do write tests for each type of dims_type in the kernel launching util, 
+    # To-Do write tests for each type of dims_type in the kernel launching util,
     # the tests currently below will be removed when the KA becomes the only one
 
-    # standard LTA + running index kernel 
+    # standard LTA + running index kernel
 
     # Test the kernel with LowerTriangularArrays
     @testset "LowerTriangularArrays kernel test" begin
@@ -67,8 +67,8 @@ import SpeedyWeather: on_architecture, CPU, launch!, SpectralWorkOrder, RingGrid
         # Verify results
         @test A ≈ expected
 
-    end 
-    
+    end
+
     @testset "Linear kernel test" begin
 
         @kernel function test_linear_kernel!(A, B, C)

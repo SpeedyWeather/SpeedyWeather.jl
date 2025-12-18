@@ -24,7 +24,7 @@ truncation."""
 function clenshaw_curtis_weights(nlat_half::Integer)
     nlat = get_nlat(FullClenshawGrid, nlat_half)
     θs = get_colat(FullClenshawGrid, nlat_half)
-    return [4sin(θj)/(nlat+1)*sum([sin(p*θj)/p for p in 1:2:nlat]) for θj in θs]
+    return [4sin(θj) / (nlat + 1) * sum([sin(p * θj) / p for p in 1:2:nlat]) for θj in θs]
 end
 
 """$(TYPEDSIGNATURES)
@@ -39,13 +39,13 @@ function equal_area_weights(Grid::Type{<:AbstractGrid}, nlat_half::Integer)
     weights = zeros(nlat)
     for j in 1:nlat
         nlon = get_nlon_per_ring(Grid, nlat_half, j)
-        weights[j] = 2nlon/npoints
+        weights[j] = 2nlon / npoints
     end
     return weights
 end
 
 # SOLID ANGLES ΔΩ = sinθ Δθ Δϕ
 get_solid_angles(Grid::Type{<:AbstractGrid}, nlat_half::Integer) =
-    get_quadrature_weights(Grid, nlat_half) .* (2π./get_nlons(Grid, nlat_half))
+    get_quadrature_weights(Grid, nlat_half) .* (2π ./ get_nlons(Grid, nlat_half))
 get_solid_angles(Grid::Type{<:Union{HEALPixGrid, OctaHEALPixGrid}}, nlat_half::Integer) =
-    4π/get_npoints(Grid, nlat_half)*ones(get_nlat(Grid, nlat_half))
+    4π / get_npoints(Grid, nlat_half) * ones(get_nlat(Grid, nlat_half))

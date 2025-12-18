@@ -13,4 +13,4 @@ Abstract type for all types of variables declared by [`variables`](@ref).
 Currently only [`PrognosticVariable`](@ref) and [`DiagnosticVariable`](@ref) 
 are possible.
 """
-abstract type AbstractVariable{VD<:AbstractVariableDims} end
+abstract type AbstractVariable{VD <: AbstractVariableDims} end

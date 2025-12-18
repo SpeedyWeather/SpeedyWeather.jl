@@ -1,19 +1,19 @@
 @testset "Spherical distance on Earth" begin
-    earth_circumference = 2π*RingGrids.DEFAULT_RADIUS
+    earth_circumference = 2π * RingGrids.DEFAULT_RADIUS
     for (point1, point2, expected) in [
 
-        # longitude 
-        ((0, 0), (1, 0), earth_circumference / 360),
-        ((0, 0), (359, 0), earth_circumference / 360),
-        ((0, 0), (180, 0), earth_circumference / 2),
-        ((0, 0), (90, 0), earth_circumference / 4),
+            # longitude
+            ((0, 0), (1, 0), earth_circumference / 360),
+            ((0, 0), (359, 0), earth_circumference / 360),
+            ((0, 0), (180, 0), earth_circumference / 2),
+            ((0, 0), (90, 0), earth_circumference / 4),
 
-        # latitude
-        ((0, 0), (0, 1), earth_circumference / 360),
-        ((0, 0), (0, 10), 10*earth_circumference / 360),
-        ((0, 0), (0, 90), earth_circumference / 4),
-        ((0, 0), (0, -90), earth_circumference / 4),
-    ]
+            # latitude
+            ((0, 0), (0, 1), earth_circumference / 360),
+            ((0, 0), (0, 10), 10 * earth_circumference / 360),
+            ((0, 0), (0, 90), earth_circumference / 4),
+            ((0, 0), (0, -90), earth_circumference / 4),
+        ]
         @test spherical_distance(point1, point2) ≈ expected
     end
 end
@@ -31,8 +31,8 @@ end
     shift((lon, lat), lon_shift) = ((lon + lon_shift) % 360, lat)
     for _ in 1:100
         p1, p2 = rand_lonlat(), rand_lonlat()
-        lon_shift = 360 * rand() 
-        
+        lon_shift = 360 * rand()
+
         # Invariance in longitude shift.
         @test spherical_distance(p1, p2) ≈ spherical_distance(shift(p1, lon_shift), shift(p2, lon_shift))
         # Commutative.
@@ -53,18 +53,18 @@ end
     custom_radius = 100
     circumference = 2 * π * custom_radius
     for (point1, point2, expected) in [
-        ((0, 0), (1, 0), circumference / 360),
-        ((0, 0), (359, 0), circumference / 360),
-        ((0, 0), (180, 0), circumference / 2),
-        ((0, 0), (90, 0), circumference / 4),
+            ((0, 0), (1, 0), circumference / 360),
+            ((0, 0), (359, 0), circumference / 360),
+            ((0, 0), (180, 0), circumference / 2),
+            ((0, 0), (90, 0), circumference / 4),
 
-        ((0, 0), (0, 1), circumference / 360),
-        ((0, 0), (0, 10), 10*circumference / 360),
-        ((0, 0), (0, 90), circumference / 4),
-        ((0, 0), (0, -90), circumference / 4),
-    ]
+            ((0, 0), (0, 1), circumference / 360),
+            ((0, 0), (0, 10), 10 * circumference / 360),
+            ((0, 0), (0, 90), circumference / 4),
+            ((0, 0), (0, -90), circumference / 4),
+        ]
         # There's a small numerical error, hence only approximate equality.
-        @test spherical_distance(point1, point2, radius=custom_radius) ≈ expected
+        @test spherical_distance(point1, point2, radius = custom_radius) ≈ expected
     end
 end
 
@@ -75,7 +75,7 @@ end
 
         # but if radius provided promote to that type
         for Tradius in (Float16, Float32, Float64)
-            @test typeof(spherical_distance(p1, p2, radius=Tradius(1))) == promote_type(T, Tradius)
+            @test typeof(spherical_distance(p1, p2, radius = Tradius(1))) == promote_type(T, Tradius)
         end
     end
 
@@ -88,7 +88,7 @@ end
 end
 
 @testset "Haversine: Rounding errors" begin
-    
+
     # some coordinates in Float64
     λ₀ = -56.2842
     φ₀ = 76.07610000000003
@@ -99,5 +99,5 @@ end
 
     # this used to error from sqrt of negative number
     # just test for almost antipodal points (and therefore no error)
-    @test spherical_distance((λ, φ), (λ₀, φ₀), radius=360/2π) > 179
+    @test spherical_distance((λ, φ), (λ₀, φ₀), radius = 360 / 2π) > 179
 end

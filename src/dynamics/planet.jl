@@ -13,20 +13,20 @@ characteristics. Note that `radius` is not part of it as this should be chosen
 in `SpectralGrid`. Keyword arguments are
 $(TYPEDFIELDS)
 """
-@parameterized @kwdef struct Earth{NF<:AbstractFloat} <: AbstractPlanet
+@parameterized @kwdef struct Earth{NF <: AbstractFloat} <: AbstractPlanet
 
     "Earth's radius [m]"
     @param radius::NF = DEFAULT_RADIUS
 
     "angular frequency of Earth's rotation [rad/s]"
     @param rotation::NF = DEFAULT_ROTATION
-    
+
     "gravitational acceleration [m/s^2]"
-    @param gravity::NF = DEFAULT_GRAVITY (bounds=Nonnegative,)
-    
+    @param gravity::NF = DEFAULT_GRAVITY (bounds = Nonnegative,)
+
     "switch on/off daily cycle"
     daily_cycle::Bool = true
-    
+
     "Seconds in a daily rotation"
     length_of_day::Second = Hour(24)
 
@@ -35,18 +35,18 @@ $(TYPEDFIELDS)
 
     "Seconds in an orbit around the sun"
     length_of_year::Second = Day(365.25)
-    
+
     "time of spring equinox (year irrelevant)"
-    equinox::DateTime = DateTime(2000, 3, 20) 
+    equinox::DateTime = DateTime(2000, 3, 20)
 
     "angle [˚] rotation axis tilt wrt to orbit"
-    @param axial_tilt::NF = 23.4 (bounds=-90..90,)
+    @param axial_tilt::NF = 23.4 (bounds = -90 .. 90,)
 
     "Total solar irradiance at the distance of 1 AU [W/m²]"
-    @param solar_constant::NF = 1365 (bounds=Nonnegative,)
+    @param solar_constant::NF = 1365 (bounds = Nonnegative,)
 end
 
 Adapt.@adapt_structure Earth
 
 Earth(SG::SpectralGrid; kwargs...) = Earth{SG.NF}(; kwargs...)
-Earth(::Type{NF}; kwargs...) where NF = Earth{NF}(; kwargs...)
+Earth(::Type{NF}; kwargs...) where {NF} = Earth{NF}(; kwargs...)

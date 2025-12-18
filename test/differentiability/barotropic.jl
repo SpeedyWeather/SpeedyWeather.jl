@@ -1,7 +1,7 @@
 ### Experiments going a bit deeper into the timestepping of the barotropic model
 
 #
-# We go individually through all components of the time stepping and check 
+# We go individually through all components of the time stepping and check
 # correctness
 #
 
@@ -10,10 +10,10 @@
 #
 @testset "Differentiability: dynamics_tendencies! on Barotropic model" begin
     # T15 still yields somewhat sensible dynamics, that's why it's chosen here
-    spectral_grid = SpectralGrid(trunc=9, nlayers=1) # define resolution
+    spectral_grid = SpectralGrid(trunc = 9, nlayers = 1) # define resolution
     model = BarotropicModel(; spectral_grid) # construct model
     simulation = initialize_with_spinup!(model)
-    lf2 = 2 
+    lf2 = 2
 
     adsim = ADSimulation(simulation)
     diagn, ddiagn = diagnosticseed(adsim)
@@ -36,20 +36,20 @@
         SpeedyWeather.dynamics_tendencies!(diagn_new, deepcopy(progn), lf, deepcopy(model))
         return diagn_new
     end
-    
+
     fdsim = ADSimulation(simulation)
     @info "Running finite differences"
-    fd_vjp = @time FiniteDifferences.j′vp(central_fdm(15,1), x -> dynamics_tendencies(fdsim.diagvars, x, lf2, model), one(ddiagn), fdsim.progvars)
-    
+    fd_vjp = @time FiniteDifferences.j′vp(central_fdm(15, 1), x -> dynamics_tendencies(fdsim.diagvars, x, lf2, model), one(ddiagn), fdsim.progvars)
+
     # this is currently failing, possibly due to problems with finite diff?
-    @test_broken all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(adsim.dprogvars)[1], rtol=1e-1, atol=1e-1))
+    @test_broken all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(adsim.dprogvars)[1], rtol = 1.0e-1, atol = 1.0e-1))
 end
 
 #
 # horizontal_diffusion!
 #
 @testset "Differentiability: horizontal_diffusion! on Barotropic model" begin
-    spectral_grid = SpectralGrid(trunc=9, nlayers=1)
+    spectral_grid = SpectralGrid(trunc = 9, nlayers = 1)
     model = BarotropicModel(; spectral_grid)
     simulation = initialize_with_spinup!(model)
 
@@ -60,44 +60,44 @@ end
 
     @time autodiff(Reverse, SpeedyWeather.horizontal_diffusion!, Const, Duplicated(diagn, ddiagn), Duplicated(adsim.progvars, adsim.dprogvars), Const(model.horizontal_diffusion), Const(model), Const(lf1))
 
-    # FD comparision not necessary, we have the exact values 
+    # FD comparision not necessary, we have the exact values
     #function horizontal_diffusion(diagn, progn, diffusion, model, lf)
     #    diagn_new = deepcopy(diagn)
     #    SpeedyWeather.horizontal_diffusion!(diagn_new, progn, diffusion, model, lf)
     #    return diagn_new
-    #end 
+    #end
 
     #fd_vjp = FiniteDifferences.j′vp(central_fdm(5,1), x -> horizontal_diffusion(diagn_copy, x, model.horizontal_diffusion, model, lf1), ddiag_copy, progn_copy)
     #@test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dprogn)[1],rtol=1e-4,atol=1e-2))
 
     # ∂(progn)
     # should be row-wise `model.horizontal_diffusion.impl .* model.horizontal_diffusion.expl`
-    # for all variables that are diffused 
+    # for all variables that are diffused
     diff_coefficient = model.horizontal_diffusion.impl .* model.horizontal_diffusion.expl
-    l_indices = [(1:l) for l=1:spectral_grid.spectrum.mmax]
-    for (i,il) in enumerate(l_indices)
-        @test all(real.(Matrix(dprogn.vor[:,1,lf1])[i, il]) .≈ diff_coefficient[i])
-    end 
+    l_indices = [(1:l) for l in 1:spectral_grid.spectrum.mmax]
+    for (i, il) in enumerate(l_indices)
+        @test all(real.(Matrix(dprogn.vor[:, 1, lf1])[i, il]) .≈ diff_coefficient[i])
+    end
 
     # ∂(tend_old)
-    # should be row-wise `model.horizontal_diffusion.impl` 
-    for (i,il) in enumerate(l_indices)
-        @test all(real.(Matrix(ddiagn.tendencies.vor_tend[:,1])[i, il]) .≈ model.horizontal_diffusion.impl[i])
+    # should be row-wise `model.horizontal_diffusion.impl`
+    for (i, il) in enumerate(l_indices)
+        @test all(real.(Matrix(ddiagn.tendencies.vor_tend[:, 1])[i, il]) .≈ model.horizontal_diffusion.impl[i])
     end
 end
 
 #
-# Test the leapfrog 
-# 
+# Test the leapfrog
+#
 @testset "Differentiability: leapfrog! on Barotropic model" begin
-    spectral_grid = SpectralGrid(trunc=9, nlayers=1)
+    spectral_grid = SpectralGrid(trunc = 9, nlayers = 1)
     model = BarotropicModel(; spectral_grid)
     simulation = initialize_with_spinup!(model)
 
     (; Δt, Δt_millisec) = simulation.model.time_stepping
     dt = 2Δt
     lf1 = 2
-    lf2 = 2 
+    lf2 = 2
 
     adsim = ADSimulation(simulation)
     progn, dprogn = prognosticseed(adsim)
@@ -113,25 +113,25 @@ end
         copy!(progn_new, progn)
         SpeedyWeather.leapfrog!(progn_new, tend, dt, lf, model)
         return progn_new
-    end 
+    end
 
     fdsim = ADSimulation(simulation)
     progn_new = deepcopy(fdsim.progvars)
 
     @info "Running finite differences"
-    fd_vjp = @time FiniteDifferences.j′vp(central_fdm(5,1), x -> leapfrog_step(progn_new, fdsim.progvars, x, dt, lf1, model), one(dprogn), tend_copy)
+    fd_vjp = @time FiniteDifferences.j′vp(central_fdm(5, 1), x -> leapfrog_step(progn_new, fdsim.progvars, x, dt, lf1, model), one(dprogn), tend_copy)
 
-    @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dtend)[1], rtol=1e-3, atol=1e-3))
+    @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dtend)[1], rtol = 1.0e-3, atol = 1.0e-3))
 
-    # 
-    # single variable leapfrog step 
-    # 
+    #
+    # single variable leapfrog step
+    #
 
-    A_old = progn.vor[:,:,1]
+    A_old = progn.vor[:, :, 1]
     A_old_copy = deepcopy(A_old)
     dA_old = one(A_old)
 
-    A_new = progn.vor[:,:,2]
+    A_new = progn.vor[:, :, 2]
     A_new_copy = deepcopy(A_new)
     dA_new = one(A_new)
 
@@ -144,21 +144,21 @@ end
     @info "Running reverse-mode AD"
     @time autodiff(Reverse, SpeedyWeather.leapfrog!, Const, Duplicated(A_old, dA_old), Duplicated(A_new, dA_new), Duplicated(tendency, dtendency), Const(dt), Const(lf1), Const(L))
 
-    w1 = L.robert_filter*L.williams_filter/2   
-    w2 = L.robert_filter*(1-L.williams_filter)/2   
-    @test all(dtendency .≈ dt*(1+w1-w2))
+    w1 = L.robert_filter * L.williams_filter / 2
+    w2 = L.robert_filter * (1 - L.williams_filter) / 2
+    @test all(dtendency .≈ dt * (1 + w1 - w2))
     # ∂(tend) needs to be: dt* ( 1 + w1 - w2) (for every coefficient)
 end
 
 @testset "Differentiability: transform!(::Diagnostic, ::Prognostic)" begin
-    spectral_grid = SpectralGrid(trunc=9, nlayers=1)
+    spectral_grid = SpectralGrid(trunc = 9, nlayers = 1)
     model = BarotropicModel(; spectral_grid)
     simulation = initialize_with_spinup!(model)
 
     (; Δt, Δt_millisec) = simulation.model.time_stepping
     dt = 2Δt
     lf1 = 2
-    lf2 = 2 
+    lf2 = 2
 
     adsim = ADSimulation(simulation)
     progn, dprogn = prognosticseed(adsim)
@@ -177,22 +177,22 @@ end
         diagn_new = deepcopy(diagn)
         SpeedyWeather.transform!(diagn_new, progn, lf, model)
         return diagn_new
-    end 
+    end
 
     fdsim = ADSimulation(simulation)
     progn_new = deepcopy(fdsim.progvars)
     diagn_new = deepcopy(fdsim.diagvars)
 
     @info "Running finite differences"
-    fd_vjp = @time FiniteDifferences.j′vp(central_fdm(5,1), x -> transform_step(diagn_new, x, lf2, model), one(diagn_new), progn_new)
+    fd_vjp = @time FiniteDifferences.j′vp(central_fdm(5, 1), x -> transform_step(diagn_new, x, lf2, model), one(diagn_new), progn_new)
 
-    @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dprogn)[1], rtol=1e-3, atol=1e-3))
+    @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dprogn)[1], rtol = 1.0e-3, atol = 1.0e-3))
 
 end
 
 @testset "Differentiability: timestep! on Barotropic model" begin
     # T15 still yields somewhat sensible dynamics, that's why it's chosen here
-    spectral_grid = SpectralGrid(trunc=9, nlayers=1)
+    spectral_grid = SpectralGrid(trunc = 9, nlayers = 1)
     model = BarotropicModel(; spectral_grid)
     simulation = initialize_with_spinup!(model)
     (; Δt, Δt_millisec) = simulation.model.time_stepping
@@ -200,9 +200,9 @@ end
 
     fdsim = ADSimulation(simulation)
     @info "Running finite differences"
-    # for the full timestep, we need a bit higher precision 
+    # for the full timestep, we need a bit higher precision
     fd_vjp = @time FiniteDifferences.j′vp(
-        central_fdm(15,1),
+        central_fdm(15, 1),
         x -> timestep_oop(x, deepcopy(fdsim.diagvars), dt, deepcopy(fdsim.model)),
         one(fdsim.progvars),
         deepcopy(fdsim.progvars)
@@ -210,7 +210,7 @@ end
 
     adsim = ADSimulation(simulation)
     progn_new, dprogn_new = prognosticseed(adsim)
-    
+
     @info "Running reverse-mode AD"
     # test that we can differentiate wrt to everything
     @time autodiff(
@@ -228,10 +228,10 @@ end
     dprogn = adsim.dprogvars
     @test sum(to_vec(dprogn)[1]) != 0
 
-    @test_broken isapprox(to_vec(fd_vjp[1])[1], to_vec(dprogn)[1], rtol=0.05) # we have to go really quite high with the tolerances here
+    @test_broken isapprox(to_vec(fd_vjp[1])[1], to_vec(dprogn)[1], rtol = 0.05) # we have to go really quite high with the tolerances here
     @test mean(abs.(to_vec(fd_vjp[1])[1] - to_vec(dprogn)[1])) < 0.002 # so we check a few extra statistics
     @test maximum(to_vec(fd_vjp[1].vor)[1] - to_vec(dprogn.vor)[1]) < 0.05
-    
+
     # test that we can differentiante with Const(Model) only wrt to the state
     adsim2 = ADSimulation(simulation)
     progn_new, dprogn_new = prognosticseed(adsim2)
@@ -247,9 +247,9 @@ end
         Const(model)
     )
 
-    # use the same FD comparision 
+    # use the same FD comparision
 
-    @test_broken isapprox(to_vec(fd_vjp[1])[1], to_vec(d_progn)[1], rtol=0.05) # we have to go really quite high with the tolerances here
+    @test_broken isapprox(to_vec(fd_vjp[1])[1], to_vec(d_progn)[1], rtol = 0.05) # we have to go really quite high with the tolerances here
     @test mean(abs.(to_vec(fd_vjp[1])[1] - to_vec(d_progn)[1])) < 0.002 # so we check a few extra statistics
     @test maximum(to_vec(fd_vjp[1].vor)[1] - to_vec(d_progn.vor)[1]) < 0.05
 end
@@ -276,7 +276,7 @@ end
 #         diag_copy = deepcopy(diag)
 #         transform!(diag_copy, progn, lf2, model)
 #         return diag_copy
-#     end 
+#     end
 
 #     fd_vjp = FiniteDifferences.j′vp(central_fdm(12,1), x -> transform_diagn(diag_copy, x, lf2, model), ddiag_copy, progn_copy)
 
@@ -285,7 +285,7 @@ end
 
 @testset "Differentiability: Barotropic model parameters" begin
     # T15 still yields somewhat sensible dynamics, that's why it's chosen here
-    spectral_grid = SpectralGrid(trunc=9, nlayers=1)          # define resolution
+    spectral_grid = SpectralGrid(trunc = 9, nlayers = 1)          # define resolution
     model = BarotropicModel(; spectral_grid)   # construct model
     simulation = initialize_with_spinup!(model)
     (; Δt, Δt_sec) = simulation.model.time_stepping
@@ -310,10 +310,10 @@ end
 
     fdsim = ADSimulation(simulation)
     fd_vjp = @time FiniteDifferences.j′vp(
-        central_fdm(10,1),
+        central_fdm(10, 1),
         x -> timestep_oop(deepcopy(fdsim.progvars), deepcopy(fdsim.diagvars), dt, deepcopy(fdsim.model), x),
         one(fdsim.progvars),
         copy(pvec),
     )
-    @test all(isapprox.(dp, fd_vjp[1], atol=1e-5, rtol=1e-3))
+    @test all(isapprox.(dp, fd_vjp[1], atol = 1.0e-5, rtol = 1.0e-3))
 end

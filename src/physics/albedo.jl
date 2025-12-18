@@ -23,9 +23,11 @@ Fields are $(TYPEDFIELDS)"""
 end
 
 Adapt.@adapt_structure OceanLandAlbedo
-function OceanLandAlbedo(SG::SpectralGrid;
-    ocean = OceanSeaIceAlbedo(SG),      # default ocean albedo
-    land = LandSnowAlbedo(SG))          # default land albedo
+function OceanLandAlbedo(
+        SG::SpectralGrid;
+        ocean = OceanSeaIceAlbedo(SG),      # default ocean albedo
+        land = LandSnowAlbedo(SG)
+    )          # default land albedo
     return OceanLandAlbedo(ocean, land)
 end
 
@@ -39,6 +41,7 @@ function Base.show(io::IO, A::OceanLandAlbedo)
         p = i == n ? print : println
         p(io, "$s $key: $(typeof(val))")
     end
+    return
 end
 
 # TODO deprecate?
@@ -49,28 +52,28 @@ DefaultAlbedo(SG::SpectralGrid; kwargs...) = OceanLandAlbedo(SG; kwargs...)
 
 function initialize!(albedo::OceanLandAlbedo, model::PrimitiveEquation)
     initialize!(albedo.ocean, model)
-    initialize!(albedo.land, model)
+    return initialize!(albedo.land, model)
 end
 
 """$(TYPEDSIGNATURES) Composite OceanLandAlbedo: Call albedo.ocean over ocean and albedo.land over land."""
 @propagate_inbounds function parameterization!(ij, diagn::DiagnosticVariables, progn, albedo::OceanLandAlbedo, model)
     albedo!(ij, diagn.physics.ocean, progn, albedo.ocean, model)
-    albedo!(ij, diagn.physics.land, progn, albedo.land, model)
+    return albedo!(ij, diagn.physics.land, progn, albedo.land, model)
 end
 
 # all albedos need to define albedo for ocean/land separately and combined
 function variables(::AbstractAlbedo)
     return (
-        DiagnosticVariable(name=:albedo, dims=Grid2D(), desc="Albedo", units="1"),
-        DiagnosticVariable(name=:albedo, dims=Grid2D(), desc="Albedo over the ocean", units="1", namespace=:ocean),
-        DiagnosticVariable(name=:albedo, dims=Grid2D(), desc="Albedo over the land", units="1", namespace=:land),
+        DiagnosticVariable(name = :albedo, dims = Grid2D(), desc = "Albedo", units = "1"),
+        DiagnosticVariable(name = :albedo, dims = Grid2D(), desc = "Albedo over the ocean", units = "1", namespace = :ocean),
+        DiagnosticVariable(name = :albedo, dims = Grid2D(), desc = "Albedo over the land", units = "1", namespace = :land),
     )
 end
 
 """$(TYPEDSIGNATURES) Single Albedo: Call same albedo over ocean and land."""
- @propagate_inbounds function parameterization!(ij, diagn::DiagnosticVariables, progn, albedo::AbstractAlbedo, model)
+@propagate_inbounds function parameterization!(ij, diagn::DiagnosticVariables, progn, albedo::AbstractAlbedo, model)
     albedo!(ij, diagn.physics.ocean, progn, albedo, model)
-    albedo!(ij, diagn.physics.land, progn, albedo, model)
+    return albedo!(ij, diagn.physics.land, progn, albedo, model)
 end
 
 ## GLOBAL CONSTANT ALBEDO
@@ -136,7 +139,7 @@ Adapt.adapt_structure(to, albedo::AlbedoClimatology) = adapt(to, ManualAlbedo(al
 function AlbedoClimatology(SG::SpectralGrid; kwargs...)
     (; GridVariable2D, grid) = SG
     albedo = zeros(GridVariable2D, grid)
-    AlbedoClimatology{GridVariable2D}(; albedo, kwargs...)
+    return AlbedoClimatology{GridVariable2D}(; albedo, kwargs...)
 end
 
 # set albedo with grid, scalar, function; just define path `albedo.albedo` to grid here
@@ -152,11 +155,11 @@ function initialize!(albedo::AlbedoClimatology, model::PrimitiveEquation)
     end
     ncfile = NCDataset(path)
 
-    a = on_architecture(model.architecture, albedo.file_Grid(ncfile[albedo.varname].var[:, :], input_as=Matrix))
-    interpolate!(albedo.albedo, a)
+    a = on_architecture(model.architecture, albedo.file_Grid(ncfile[albedo.varname].var[:, :], input_as = Matrix))
+    return interpolate!(albedo.albedo, a)
 end
 
- @propagate_inbounds albedo!(ij, diagn, progn, albedo::AlbedoClimatology, model) =
+@propagate_inbounds albedo!(ij, diagn, progn, albedo::AlbedoClimatology, model) =
     diagn.albedo[ij] = albedo.albedo[ij]
 
 ## OceanSeaIceAlbedo
@@ -173,14 +176,14 @@ Fields are $(TYPEDFIELDS)"""
 end
 
 Adapt.@adapt_structure OceanSeaIceAlbedo
-OceanSeaIceAlbedo(SG::SpectralGrid; kwargs...) = OceanSeaIceAlbedo{SG.NF}(;kwargs...)
+OceanSeaIceAlbedo(SG::SpectralGrid; kwargs...) = OceanSeaIceAlbedo{SG.NF}(; kwargs...)
 initialize!(::OceanSeaIceAlbedo, ::PrimitiveEquation) = nothing
 @propagate_inbounds function albedo!(ij, diagn, progn, albedo::OceanSeaIceAlbedo, model)
     (; albedo_ocean, albedo_ice) = albedo
     ℵ = haskey(progn.ocean, :sea_ice_concentration) ? progn.ocean.sea_ice_concentration[ij] : zero(eltype(diagn.albedo))
 
     # set ocean albedo linearly between ocean and ice depending on sea ice concentration
-    diagn.albedo[ij] = albedo_ocean + ℵ * (albedo_ice - albedo_ocean)
+    return diagn.albedo[ij] = albedo_ocean + ℵ * (albedo_ice - albedo_ocean)
 end
 
 abstract type AbstractSnowCover end
@@ -213,7 +216,7 @@ Fields are $(TYPEDFIELDS)"""
     albedo_high_vegetation::NF = 0.15
 
     "Albedo of low vegetation [1]"
-    albedo_low_vegetation::NF = 0.20
+    albedo_low_vegetation::NF = 0.2
 
     "Albedo of snow [1], additive to land"
     albedo_snow::NF = 0.4
@@ -241,14 +244,14 @@ initialize!(albedo::LandSnowAlbedo, model::PrimitiveEquation) = nothing
 
         # linear combination of high and low vegetation and bare soil
         diagn.albedo[ij] = vegetation_high[ij] * albedo_high_vegetation +
-                        vegetation_low[ij] * albedo_low_vegetation +
-                        albedo_land * (1 - vegetation_high[ij] - vegetation_low[ij])
+            vegetation_low[ij] * albedo_low_vegetation +
+            albedo_land * (1 - vegetation_high[ij] - vegetation_low[ij])
     else
         diagn.albedo[ij] = albedo_land
     end
 
     # 2. Add snow cover
-    if haskey(progn.land, :snow_depth)
+    return if haskey(progn.land, :snow_depth)
         (; snow_depth) = progn.land
         (; albedo_snow, snow_depth_scale) = albedo_scheme
 
