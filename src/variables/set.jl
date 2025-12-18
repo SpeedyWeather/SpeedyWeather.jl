@@ -4,7 +4,7 @@ export set!
 $(TYPEDSIGNATURES)
 Sets new values for the keyword arguments (velocities, vorticity, divergence, etc..) into the
 prognostic variable struct `progn` at timestep index `lf`. If `add==true` they are added to the 
-current value instead. If a `SpectralTransform` S is provided, it is used when needed to set 
+current value instead. If a `AbstractSpectralTransform` S is provided, it is used when needed to set 
 the variable, otherwise it is recomputed. In case `u` and `v` are provied, actually the divergence
 and vorticity are set and `coslat_scaling_included` specficies whether or not the 1/cos(lat) 
 scaling is already included in the arrays or not (default: `false`). If a function or callable 
@@ -36,7 +36,7 @@ function set!(
         soil_moisture = nothing,
         lf::Integer = 1,
         add::Bool = false,
-        spectral_transform::Union{Nothing, SpectralTransform} = nothing,
+        spectral_transform::Union{Nothing, AbstractSpectralTransform} = nothing,
         coslat_scaling_included::Bool = false,
         static_func::Bool = true,
         kwargs...
@@ -100,7 +100,7 @@ function set!(
         var::LowerTriangularArray,
         field::AbstractField,
         geometry::Union{Geometry, Nothing} = nothing,
-        S::Union{Nothing, SpectralTransform} = nothing;
+        S::Union{Nothing, AbstractSpectralTransform} = nothing;
         add::Bool = false,
         kwargs...,
     )
@@ -119,7 +119,7 @@ function set!(
         var::LowerTriangularArray,
         f::Function,
         geometry::Geometry,
-        S::Union{SpectralTransform, Nothing} = nothing;
+        S::Union{AbstractSpectralTransform, Nothing} = nothing;
         add::Bool = false,
         kwargs...,
     )
@@ -134,7 +134,7 @@ function set!(
         var::LowerTriangularArray,
         s::Number,
         geometry::Geometry,
-        S::Union{SpectralTransform, Nothing} = nothing;
+        S::Union{AbstractSpectralTransform, Nothing} = nothing;
         add::Bool = false,
         kwargs...,
     )
@@ -156,7 +156,7 @@ function set!(
         var::AbstractField,
         field::AbstractField,
         geometry::Geometry,
-        S::Union{Nothing, SpectralTransform} = nothing;
+        S::Union{Nothing, AbstractSpectralTransform} = nothing;
         add::Bool = false,
         kwargs...,
     )
@@ -177,7 +177,7 @@ function set!(
         var::AbstractField,
         specs::LowerTriangularArray,
         geometry::Geometry,
-        S::Union{Nothing, SpectralTransform} = nothing;
+        S::Union{Nothing, AbstractSpectralTransform} = nothing;
         add::Bool = false,
         kwargs...,
     )
@@ -190,7 +190,7 @@ function set!(
         var::AbstractField3D,
         f::Function,
         geometry::Geometry,
-        S::Union{Nothing, SpectralTransform} = nothing;
+        S::Union{Nothing, AbstractSpectralTransform} = nothing;
         add::Bool = false,
         static_func = true,
     )
@@ -230,7 +230,7 @@ function set!(
         var::AbstractField2D,
         f::Function,
         geometry::Geometry,
-        S::Union{Nothing, SpectralTransform} = nothing;
+        S::Union{Nothing, AbstractSpectralTransform} = nothing;
         kwargs...
     )
 
@@ -242,7 +242,7 @@ end
 function set!(
         var::AbstractField2D,
         f::Function,
-        S::Union{Nothing, SpectralTransform} = nothing;
+        S::Union{Nothing, AbstractSpectralTransform} = nothing;
         kwargs...
     )
     # otherwise recompute longitude, latitude vectors
@@ -271,7 +271,7 @@ function set!(
         var::AbstractField,
         s::Number,
         geometry::Union{Geometry, Nothing} = nothing,
-        S::Union{Nothing, SpectralTransform} = nothing;
+        S::Union{Nothing, AbstractSpectralTransform} = nothing;
         add::Bool = false,
         kwargs...,
     )
@@ -287,7 +287,7 @@ function set_vordiv!(
         u_func,
         v_func,
         geometry::Geometry,
-        S::Union{Nothing, SpectralTransform} = nothing;
+        S::Union{Nothing, AbstractSpectralTransform} = nothing;
         add::Bool = false,
         coslat_scaling_included::Bool = false,
         kwargs...,
@@ -307,7 +307,7 @@ function set_vordiv!(
         u::AbstractField,
         v::AbstractField,
         geometry::Geometry,
-        S::SpectralTransform = SpectralTransform(geometry.spectral_grid);
+        S::AbstractSpectralTransform = SpectralTransform(geometry.spectral_grid);
         add::Bool = false,
         coslat_scaling_included::Bool = false,
         kwargs...,
@@ -332,7 +332,7 @@ function set_vordiv!(
         u::LowerTriangularArray,
         v::LowerTriangularArray,
         geometry::Geometry,
-        S::SpectralTransform = SpectralTransform(geometry.spectral_grid);
+        S::AbstractSpectralTransform = SpectralTransform(geometry.spectral_grid);
         add::Bool = false,
         coslat_scaling_included::Bool = false,
         kwargs...,
