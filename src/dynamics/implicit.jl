@@ -1,116 +1,179 @@
 abstract type AbstractImplicit <: AbstractModelComponent end
 
-# model.implicit=nothing (for BarotropicModel)
-initialize!(::Nothing, dt::Real, ::DiagnosticVariables, ::AbstractModel) = nothing
-implicit_correction!(::DiagnosticVariables, ::PrognosticVariables, ::Nothing, ::AbstractModel) = nothing
+# For barotrpoic model 
+initialize!(::Nothing, dt::Real, α::Real, ::AbstractModel) = nothing
+lorenz_implicit_correction!(::DiagnosticVariables, ::PrognosticVariables, ::Nothing, ::AbstractModel) = nothing
+set_initialized!(::Nothing) = nothing
 
-# SHALLOW WATER MODEL
+# Shallow water implicit 
 export ImplicitShallowWater
 
-"""Struct that holds various precomputed arrays for the semi-implicit correction to
-prevent gravity waves from amplifying in the shallow water model. The implicit time step
-between i-1 and i+1 is controlled by the parameter `α` in the range [0, 1]
-    
-    α = 0   means the gravity wave terms are evaluated at i-1 (forward)
-    α = 0.5 evaluates at i+1 and i-1 (centered implicit)
-    α = 1   evaluates at i+1 (backward implicit)
-    α ∈ [0.5, 1] are also possible which controls the strength of the gravity wave dampening.
-    α = 0.5 slows gravity waves and prevents them from amplifying
-    α > 0.5 will dampen the gravity waves within days to a few timesteps (α=1)
+"""
+Struct that holds parameters for the semi-implicit correction in shallow water equations.
 
-Fields are
-$(TYPEDFIELDS)"""
+The implicit correction prevents gravity waves from amplifying. The parameter `α` controls
+the centering of the implicit scheme:
+    α = 0.5: Crank-Nicolson (2nd order, centered implicit)
+    α = 1.0: Backward Euler (1st order)
+    α ∈ [0.5, 1]: Controls gravity wave dampening strength
+
+Fields are:
+$(TYPEDFIELDS)
+"""
 @kwdef mutable struct ImplicitShallowWater{NF} <: AbstractImplicit
-    "[OPTION] coefficient for semi-implicit computations to filter gravity waves, 0.5 <= α <= 1"
-    α::NF = 1
+    "[OPTION] Coefficient for semi-implicit computations, 0.5 <= α <= 1"
+    α::NF = 0.5
     
-    "Time step [s], = αdt = 2αΔt (for leapfrog)"
+    "[DERIVED] Time step ξ = α*Δt (set during initialization)"
     time_step::NF = 0
 end
 
-"""
-$(TYPEDSIGNATURES)
+"""$(TYPEDSIGNATURES)
 Generator using the resolution from `spectral_grid`."""
 ImplicitShallowWater(SG::SpectralGrid; kwargs...) = ImplicitShallowWater{SG.NF}(; kwargs...)
 
+"""$(TYPEDSIGNATURES)
+Initialize implicit solver with time step Δt and centering parameter α.
+
+For Lorenz N-cycle: ξ = α*Δt (not 2α*Δt like Leapfrog)
 """
-$(TYPEDSIGNATURES)
-Update the implicit terms in `implicit` for the shallow water model as they depend on the time step `dt`."""
-function initialize!(implicit::ImplicitShallowWater, dt::Real, args...)
-    implicit.time_step = implicit.α*dt  # new implicit timestep ξ = α*dt = 2αΔt (for leapfrog) from input dt
+function initialize!(implicit::ImplicitShallowWater, dt::Real, α::Real, args...)
+    implicit.α = α
+    implicit.time_step = α * dt  # ξ = α*Δt for Lorenz N-cycle
 end
 
-# implicit shallow water has no precomputed arrays, so implicit.initialized is not defined
 set_initialized!(implicit::ImplicitShallowWater) = nothing
-set_initialized!(implicit::Nothing) = nothing
 
+
+"""$(TYPEDSIGNATURES)
+Apply implicit correction for Lorenz N-cycle (shallow water).
+
+Algorithm (Hotta et al. 2016, Eq. 20):
+1. Form complete tendencies: G_total = G_accumulated + L_I*x_current
+2. Apply implicit operator inversion: (I - ξ²Hg∇²)^(-1)
+3. Update G arrays with corrected tendencies
+Apply semi-implicit correction to the accumulated tendencies for the Lorenz N-cycle
+time stepping scheme.
+
+This is the direct analog of the leapfrog implicit correction, but rewritten
+for a single-time-level formulation following Hotta et al. (2016).
+
+The governing equations are:
+
+    ∂D/∂t = N_D + g ∇² η
+    ∂η/∂t = N_η + H D
+
+where the gravity-wave terms are treated semi-implicitly.
+
+The Lorenz N-cycle implicit step solves:
+
+    (I - ξ² g H ∇²) δD = G_D + g ∇² η
+    δη = G_η + H δD
+
+with ξ = α Δt.
 """
-$(TYPEDSIGNATURES)
-Apply correction to the tendencies in `diagn` to prevent the gravity waves from amplifying.
-The correction is implicitly evaluated using the parameter `implicit.α` to switch between
-forward, centered implicit or backward evaluation of the gravity wave terms."""
-function implicit_correction!(
+function lorenz_implicit_correction!(
     diagn::DiagnosticVariables,
     progn::PrognosticVariables,
     implicit::ImplicitShallowWater,
-    model::ShallowWater)
+    model::ShallowWater,
+)
 
-    (; div_tend, pres_tend) = diagn.tendencies  # tendency of divergence and pressure/η
-    div_old, div_new   = get_steps(progn.div)   # divergence at t, t+dt
-    pres_old, pres_new = get_steps(progn.pres)  # pressure/η at t, t+dt
+    # Accumulated tendencies G from the N-cycle
+    (; div_tend, pres_tend) = diagn.tendencies
 
-    # unpack with [] as stored in a RefValue for mutation during initialization
-    H = model.atmosphere.layer_thickness        # layer thickness [m], undisturbed, no mountains
-    g = model.planet.gravity                    # gravitational acceleration [m/s²]
-    ξ = implicit.time_step                      # new implicit timestep ξ = α*dt = 2αΔt (for leapfrog)
+    # Current prognostic state (single time level!)
+    div = get_step(progn.div, 1)
+    pres = get_step(progn.pres, 1)
 
-    # Get precomputed l_indices from the spectrum
+    # Physical parameters
+    H = model.atmosphere.layer_thickness   # layer thickness [m]
+    g = model.planet.gravity               # gravity [m/s²]
+
+    # Implicit time step ξ = α Δt
+    ξ = implicit.time_step
+
+    # Spectral indices
     l_indices = div_tend.spectrum.l_indices
 
-    # GPU kernel launch
+    # GPU / CPU kernel launch
     arch = architecture(div_tend)
-    launch!(arch, SpectralWorkOrder, size(div_tend), implicit_shallow_water_kernel!,
-            div_tend, pres_tend, div_old, div_new, pres_old, pres_new, l_indices, H, g, ξ)
+    launch!(
+        arch,
+        SpectralWorkOrder,
+        size(div_tend),
+        lorenz_implicit_shallow_water_kernel!,
+        div_tend,
+        pres_tend,
+        div,
+        pres,
+        l_indices,
+        H,
+        g,
+        ξ,
+    )
 
     zero_last_degree!(div_tend)
     zero_last_degree!(pres_tend)
+
+    return nothing
 end
 
-@kernel inbounds=true function implicit_shallow_water_kernel!(
-    div_tend, pres_tend, div_old, div_new, pres_old, pres_new, l_indices,
+
+@kernel inbounds=true function lorenz_implicit_shallow_water_kernel!(
+    div_tend, pres_tend, div, pres, l_indices,
     @Const(H), @Const(g), @Const(ξ)
 )
     I = @index(Global, Cartesian)
-    lm = I[1]  # single index lm corresponding to harmonic l, m
-    k = I[2]   # layer index
-    
-    # Use precomputed l index from spectrum
+    lm = I[1]
+    k  = I[2]
+
+    # Spherical harmonic degree l
     l = l_indices[lm]
-    
-    # eigenvalue, with without 1/radius², 1-based -l*(l+1) → -l*(l-1)
+
+    # Laplacian eigenvalue (dimensionless, radius-scaled)
     ∇² = -l*(l-1)
-    
-    # Calculate the G = N(Vⁱ) + NI(Vⁱ⁻¹ - Vⁱ) term.
-    # Vⁱ is a prognostic variable at time step i
-    # N is the right hand side of ∂V\∂t = N(V)
-    # NI is the part of N that's calculated semi-implicitily: N = NE + NI
-    G_div = div_tend[lm, k] - g*∇²*(pres_old[lm] - pres_new[lm])
-    G_η   = pres_tend[lm] - H*(div_old[lm, k] - div_new[lm, k])
-    
-    # Using the Gs correct the tendencies for semi-implicit time stepping
-    S⁻¹ = inv(1 - ξ^2*H*g*∇²)  # operator to invert
-    div_tend[lm, k] = S⁻¹*(G_div - ξ*g*∇²*G_η)
-    pres_tend[lm] = G_η - ξ*H*div_tend[lm, k]
+
+    # Form the total tendencies G + L_I x 
+    #   G_D = G_D + g∇² η
+    #   G_η = G_η + H D
+    G_div = div_tend[lm, k] + g * ∇² * pres[lm]
+    G_η   = pres_tend[lm]  + H * div[lm, k]
+
+    # Implicit solve:
+    #   (1 - ξ² g H ∇²) δD = G_div - ξ g ∇² G_η
+    #
+    @assert isfinite(1 - ξ^2 * H * g * ∇²)
+
+    S⁻¹ = inv(1 - ξ^2*H*g*∇²)
+
+    δdiv = S⁻¹*(G_div-ξ*g*∇²*G_η)
+
+    #Back-substitution for η
+    δη = G_η-ξ*H*δdiv
+
+    # Store corrected tendencies
+    div_tend[lm, k] = δdiv
+    pres_tend[lm]   = δη
 end
+
+
+# ============================================================================
+# PRIMITIVE EQUATION IMPLICIT
+# ============================================================================
 
 export ImplicitPrimitiveEquation
 
 """
-Struct that holds various precomputed arrays for the semi-implicit correction to
-prevent gravity waves from amplifying in the primitive equation model.
-$(TYPEDFIELDS)"""
+Struct that holds precomputed arrays for the semi-implicit correction in primitive equations.
+
+The implicit correction prevents gravity waves from amplifying. Operators are precomputed
+for efficiency and applied at each timestep.
+
+$(TYPEDFIELDS)
+"""
 @kwdef mutable struct ImplicitPrimitiveEquation{
-    NF,             # number format
+    NF,
     VectorType,
     MatrixType,
     TensorType,
@@ -124,8 +187,8 @@ $(TYPEDFIELDS)"""
     nlayers::Int
 
     # PARAMETERS
-    "Time-step coefficient: 0=explicit, 0.5=centred implicit, 1=backward implicit"
-    α::NF = 1
+    "Time-step coefficient: 0.5=Crank-Nicolson (2nd order), 1.0=Backward Euler (1st order)"
+    α::NF = 0.5
 
     "Reinitialize at restart when initialized=true"
     reinitialize::Bool = true
@@ -133,44 +196,46 @@ $(TYPEDFIELDS)"""
     "Flag automatically set to true when initialize! has been called"
     initialized::Bool = false
 
-    # PRECOMPUTED ARRAYS, to be initiliazed with initialize!
-    "vertical temperature profile, obtained from diagn on first time step"
+    # PRECOMPUTED ARRAYS (initialized in initialize!)
+    "Vertical temperature profile, obtained from diagn on first time step"
     temp_profile::VectorType = zeros(NF, nlayers)
 
-    "time step 2α*Δt packed in RefValue for mutability"
+    "Time step ξ = α*Δt packed in RefValue for mutability"
     ξ::Base.RefValue{NF} = Ref{NF}(0)
 
-    "divergence: operator for the geopotential calculation"
+    "Divergence: operator for geopotential calculation"
     R::MatrixType = zeros(NF, nlayers, nlayers)
 
-    "divergence: the -RdTₖ∇² term excl the eigenvalues from ∇² for divergence"
+    "Divergence: the -RdTₖ∇² term excl eigenvalues for divergence"
     U::VectorType = zeros(NF, nlayers)
 
-    "temperature: operator for the TₖD + κTₖDlnps/Dt term"
+    "Temperature: operator for TₖD + κTₖDlnps/Dt term"
     L::MatrixType = zeros(NF, nlayers, nlayers)
 
-    "pressure: vertical averaging of the -D̄ term in the log surface pres equation"
+    "Pressure: vertical averaging of -D̄ term in log surface pressure equation"
     W::VectorType = zeros(NF, nlayers)
 
-    "components to construct L, 1/ 2Δσ"
+    # Components to construct L
+    "1/(2Δσ)"
     L0::VectorType = zeros(NF, nlayers)
 
-    "vert advection term in the temperature equation (below+above)"
+    "Vertical advection term (below+above)"
     L1::MatrixType = zeros(NF, nlayers, nlayers)
 
-    "factor in front of the div_sum_above term"
+    "Factor in front of div_sum_above term"
     L2::VectorType = zeros(NF, nlayers)
 
-    "_sum_above operator itself"
+    "Sum_above operator"
     L3::MatrixType = zeros(NF, nlayers, nlayers)
 
-    "factor in front of div term in Dlnps/Dt"
+    "Factor in front of div term in Dlnps/Dt"
     L4::VectorType = zeros(NF, nlayers)
 
-    "for every l the matrix to be inverted"
+    # Inversion matrices
+    "Temporary matrix for inversion"
     S::MatrixType = zeros(NF, nlayers, nlayers)
 
-    "combined inverted operator: S = 1 - ξ²(RL + UW)"
+    "Combined inverted operator: S⁻¹ = (I - ξ²*∇²*(RL + UW'))^(-1)"
     S⁻¹::TensorType = zeros(NF, trunc+2, nlayers, nlayers)
 end
 
@@ -182,23 +247,25 @@ function ImplicitPrimitiveEquation(spectral_grid::SpectralGrid; kwargs...)
         trunc, nlayers, kwargs...)
 end
 
-# function barrier to unpack the constants struct for primitive eq models
+# Function barrier to unpack the constants struct for primitive eq models
 function initialize!(
     I::ImplicitPrimitiveEquation,
     dt::Real,
+    α::Real,
     diagn::DiagnosticVariables,
     model::PrimitiveEquation,
 )
-    model.dynamics || return nothing    # escape immediately if no dynamics
+    model.dynamics || return nothing
     (; geometry, geopotential, atmosphere, adiabatic_conversion) = model
-    initialize!(I, dt, diagn, geometry, geopotential, atmosphere, adiabatic_conversion)
+    initialize!(I, dt, α, diagn, geometry, geopotential, atmosphere, adiabatic_conversion)
 end
 
 """$(TYPEDSIGNATURES)
 Initialize the implicit terms for the PrimitiveEquation models."""
 function initialize!(
     implicit::ImplicitPrimitiveEquation,
-    dt::Real,                                           # the scaled time step radius*dt
+    dt::Real,
+    α::Real,
     diagn::DiagnosticVariables,
     geometry::AbstractGeometry,
     geopotential::AbstractGeopotential,
@@ -209,7 +276,7 @@ function initialize!(
     # option to skip reinitialization at restart
     (implicit.initialized && !implicit.reinitialize) && return nothing
 
-    (; trunc, nlayers, α) = implicit
+    (; trunc, nlayers) = implicit
     (; σ_levels_full, σ_levels_thick) = geometry
     (; R_dry, κ) = atmosphere
     (; Δp_geopot_half, Δp_geopot_full) = geopotential
@@ -233,7 +300,7 @@ function initialize!(
     # use current vertical temperature profile
     temp_profile_cpu .= temp_average_cpu
 
-    # return immediately if temp_profile contains NaRs, model blew up in that case
+    # return immediately if temp_profile contains NaNs, model blew up in that case
     all(isfinite.(temp_profile_cpu)) || return nothing
 
     # set up R, U, L, W operators from
@@ -241,16 +308,18 @@ function initialize!(
     # δT = G_T + ξLδD                   temperature T correction
     # δlnps = G_lnps + ξWδD             log surface pressure lnps correction
     #
-    # G_X is the uncorrected explicit tendency calculated as RHS_expl(Xⁱ) + RHS_impl(Xⁱ⁻¹)
-    # with RHS_expl being the nonlinear terms calculated from the centered time step i
-    # and RHS_impl are the linear terms that are supposed to be calcualted semi-implicitly
-    # however, they have sofar only been evaluated explicitly at time step i-1
-    # and are subject to be corrected to δX following the equations above
-    # R, U, L, W are linear operators that are therefore defined here and inverted
-    # to obtain δD first, and then δT and δlnps through substitution
+    # For Lorenz N-cycle (Hotta et al. 2016, Eq. 20):
+    # G_X is the accumulated weighted tendency: G = w*F_E(x) + (1-w)*G
+    # The implicit terms L_I*x from the current state x are added to G
+    # Then G is corrected: G ← (I - ξ*L_I)^(-1) * (G + L_I*x)
+    #
+    # R, U, L, W are linear operators that define the implicit coupling
+    # S = I - ξ²*∇²*(RL + UW') is precomputed and inverted for each wavenumber
 
-    ξ = α*dt                        # dt = 2Δt for leapfrog, but = Δt, Δ/2 in first_timesteps!
-    implicit.ξ[] = ξ                # also store in Implicit struct
+    # Update the implicit α and compute ξ
+    implicit.α = α
+    ξ = α * dt                      # ξ = α*Δt for Lorenz N-cycle (not 2α*Δt like leapfrog)
+    implicit.ξ[] = ξ
 
     # DIVERGENCE OPERATORS (called g in Hoskins and Simmons 1975, eq 11 and Appendix 1)
     @inbounds for k in 1:nlayers                # vertical geopotential integration as matrix operator
@@ -260,9 +329,9 @@ function initialize!(
     U_cpu .= -R_dry*temp_profile_cpu        # the R_d*Tₖ∇² term excl the eigenvalues from ∇² for divergence
 
     # TEMPERATURE OPERATOR (called τ in Hoskins and Simmons 1975, eq 9 and Appendix 1)
-    L0_cpu .= 1 ./ 2σ_levels_thick_cpu
-    L2_cpu .= κ*temp_profile_cpu.*σ_lnp_A_cpu    # factor in front of the div_sum_above term
-    L4_cpu .= κ*temp_profile_cpu.*σ_lnp_B_cpu    # factor in front of div term in Dlnps/Dt
+    L0_cpu .= 1 ./ (2 * σ_levels_thick_cpu)
+    L2_cpu .= κ * temp_profile_cpu .* σ_lnp_A_cpu    # factor in front of the div_sum_above term
+    L4_cpu .= κ * temp_profile_cpu .* σ_lnp_B_cpu    # factor in front of div term in Dlnps/Dt
 
     @inbounds for k in 1:nlayers
         Tₖ = temp_profile_cpu[k]                    # average temperature at k
@@ -274,11 +343,11 @@ function initialize!(
         σₖ_above = σ_levels_full_cpu[k_above]
 
         for r in 1:nlayers
-            L1_cpu[k, r] = ΔT_below*σ_levels_thick_cpu[r]*σₖ         # vert advection operator below
-            L1_cpu[k, r] -= k>=r ? σ_levels_thick_cpu[r] : zero(NF)
+            L1_cpu[k, r] = ΔT_below * σ_levels_thick_cpu[r] * σₖ         # vert advection operator below
+            L1_cpu[k, r] -= k >= r ? σ_levels_thick_cpu[r] : zero(NF)
 
-            L1_cpu[k, r] += ΔT_above*σ_levels_thick_cpu[r]*σₖ_above   # vert advection operator above
-            L1_cpu[k, r] -= (k-1)>=r ? σ_levels_thick_cpu[r] : zero(NF)
+            L1_cpu[k, r] += ΔT_above * σ_levels_thick_cpu[r] * σₖ_above   # vert advection operator above
+            L1_cpu[k, r] -= (k-1) >= r ? σ_levels_thick_cpu[r] : zero(NF)
         end
 
         # _sum_above operator itself
@@ -286,23 +355,23 @@ function initialize!(
         L3_cpu[k+1:end, k] .= σ_levels_thick_cpu[k]      # vert integration top to k-1
     end
 
-    L_cpu .= Diagonal(L0_cpu)*L1_cpu .+ Diagonal(L2_cpu)*L3_cpu .+ Diagonal(L4_cpu)  # combine all operators into L
+    L_cpu .= Diagonal(L0_cpu) * L1_cpu .+ Diagonal(L2_cpu) * L3_cpu .+ Diagonal(L4_cpu)  # combine all operators into L
 
     # PRESSURE OPERATOR (called πᵣ in Hoskins and Simmons, 1975 Appendix 1)
     W_cpu .= -σ_levels_thick_cpu                # the -D̄ term in the log surface pres equation
 
     # solving the equations above for δD yields
-    # δD = SG, with G = G_D + ξRG_T + ξUG_lnps and the operator S
-    # S = 1 - ξ²(RL + UW) that has to be inverted to obtain δD from the Gs
-    I = LinearAlgebra.I(nlayers)
+    # δD = S⁻¹*G, with G = G_D + ξ*∇²*(R*G_T + U*G_lnps) and the operator S
+    # S = I - ξ²*∇²*(RL + UW') that has to be inverted to obtain δD from the Gs
+    I_matrix = LinearAlgebra.I(nlayers)
     @inbounds for l in 1:trunc+1
         eigenvalue = -l*(l-1)           # 1-based, -l*(l+1) → -l*(l-1)
-        S_cpu .= I .- ξ^2*eigenvalue*(R_cpu*L_cpu .+ U_cpu*W_cpu')
+        S_cpu .= I_matrix .- ξ^2 * eigenvalue * (R_cpu * L_cpu .+ U_cpu * W_cpu')
 
         # inv(S) but saving memory:
         luS = LinearAlgebra.lu!(S_cpu)      # in-place LU decomposition (overwriting S)
         Sinv = L1_cpu                       # reuse L1 matrix to store inv(S)
-        Sinv .= I                           # use ldiv! so last arg needs to be unity matrix
+        Sinv .= I_matrix                    # use ldiv! so last arg needs to be unity matrix
         LinearAlgebra.ldiv!(luS, Sinv)      # now do S\I = S⁻¹ via LU decomposition
         S⁻¹_cpu[l, :, :] .= Sinv            # store in array
     end
@@ -325,14 +394,28 @@ end
 set_initialized!(implicit::ImplicitPrimitiveEquation) = (implicit.initialized = true)
 
 """$(TYPEDSIGNATURES)
-Apply the implicit corrections to dampen gravity waves in the primitive equation models."""
-function implicit_correction!(
+Apply implicit correction for Lorenz N-cycle (primitive equations).
+
+Following Hotta et al. (2016), Equation 20:
+    dx = (I - ξ*L_I)^(-1) * (G + L_I*x)
+
+where G is the accumulated weighted tendency and x is the current state.
+
+Key difference from Leapfrog:
+- Leapfrog: Corrects using (x^(i-1) - x^(i+1)), the difference between time steps
+- Lorenz N-cycle: Adds implicit terms from current state x^(i) to G, then applies correction
+
+Algorithm:
+1. Compute G_total = G_accumulated + L_I*x_current
+2. Solve for corrected divergence: δD = S⁻¹*G_total  
+3. Back-substitute to get corrected temperature and pressure tendencies
+"""
+function lorenz_implicit_correction!(
     diagn::DiagnosticVariables,
     progn::PrognosticVariables,
     implicit::ImplicitPrimitiveEquation,
     model::PrimitiveEquation,
 )
-
     # escape immediately if explicit
     implicit.α == 0 && return nothing
 
@@ -341,97 +424,126 @@ function implicit_correction!(
     ξ = implicit.ξ[]
 
     (; temp_tend, pres_tend, div_tend) = diagn.tendencies
-    div_old, div_new = get_steps(progn.div)
-    G = diagn.dynamics.a              # reuse work arrays, used for combined tendency G
-    geopotential = diagn.dynamics.b   # used for geopotential
-    geopotential .= 0
+    div_x, _ = get_steps(progn.div)   # Current state (index 1)
+    
+    G = diagn.dynamics.a              # Combined tendency workspace
+    geopot_from_Gtemp = diagn.dynamics.b   # R*G_temp workspace
 
-    # Get precomputed l_indices from the spectrum
     l_indices = temp_tend.spectrum.l_indices
 
     arch = architecture(temp_tend)
-    
-    # Single kernel: All implicit correction steps for each spectral mode
     lm_size = size(pres_tend, 1)
+    
+    # Launch kernel for all spectral modes
     launch!(arch, LinearWorkOrder, (lm_size,),
-            implicit_primitive_single_kernel!,
-            temp_tend, pres_tend, div_tend, G, geopotential,
-            div_old, div_new, S⁻¹, R, U, L, W, l_indices, ξ, nlayers)
+            lorenz_implicit_primitive_kernel!,
+            temp_tend, pres_tend, div_tend, G, geopot_from_Gtemp,
+            div_x, S⁻¹, R, U, L, W, l_indices, ξ, nlayers)
 
     zero_last_degree!(div_tend)
     zero_last_degree!(pres_tend)
     zero_last_degree!(temp_tend)
-  
-    pres_tend.data[1:1] .= 0    # mass conservation
-  
+    pres_tend.data[1:1] .= 0    # Mass conservation
+    
     return nothing
 end
 
-# Single kernel that does all steps for one spectral mode
-@kernel inbounds=true function implicit_primitive_single_kernel!(
-    temp_tend, pres_tend, div_tend, G, geopotential,
-    div_old, div_new, @Const(S⁻¹), @Const(R), @Const(U), @Const(L), @Const(W), @Const(l_indices),
-    @Const(ξ), @Const(nlayers)
+@kernel inbounds=true function lorenz_implicit_primitive_kernel!(
+    temp_tend, pres_tend, div_tend, G, geopot_from_Gtemp,
+    div_x, @Const(S⁻¹), @Const(R), @Const(U), @Const(L), @Const(W), 
+    @Const(l_indices), @Const(ξ), @Const(nlayers)
 )
     lm = @index(Global, Linear)
     
-    # Get degree l for this spectral mode
     l = l_indices[lm]
+    eigenvalue = -l*(l-1)
     
-    # Step 1: Move implicit terms of temperature equation from time step i to i-1
-    # RHS_expl(Vⁱ) + RHS_impl(Vⁱ⁻¹) = RHS(Vⁱ) + RHS_impl(Vⁱ⁻¹ - Vⁱ)
+    # ============================================================================
+    # Step 1: Compute geopotential from ORIGINAL temperature tendency
+    # ============================================================================
+    # geopot = R*G_temp (using accumulated temp_tend, before adding implicit terms)
+    # This is the same calculation as in leapfrog, but temp_tend is already the
+    # accumulated weighted tendency G, not a difference between time steps
     for k in 1:nlayers
-        temp_tend_val = zero(eltype(temp_tend))
+        geopot_val = zero(eltype(geopot_from_Gtemp))
+        for r in k:nlayers  # Integration from k to surface
+            geopot_val += R[k, r] * temp_tend[lm, r]
+        end
+        geopot_from_Gtemp[lm, k] = geopot_val
+    end
+    
+    # ============================================================================
+    # Step 2: Form combined divergence tendency
+    # ============================================================================
+    # For Lorenz N-cycle: G = G_div + ∇²*U*div_x + ξ*∇²*(U*G_pres + R*G_temp)
+    # 
+    # Contrast with Leapfrog: G_div + ∇²*U*(pres_old - pres_new) + ...
+    # 
+    # The key difference: we add the implicit term ∇²*U*div_x from the CURRENT state
+    # rather than a difference (pres_old - pres_new)
+    for k in 1:nlayers
+        G[lm, k] = div_tend[lm, k] + 
+                   eigenvalue * U[k] * div_x[lm, k] +  # L_I*x term from current state
+                   ξ * eigenvalue * (U[k] * pres_tend[lm] + geopot_from_Gtemp[lm, k])
+    end
+    
+    # ============================================================================
+    # Step 3: Solve for corrected divergence: δD = S⁻¹*G
+    # ============================================================================
+    # This step is identical to leapfrog
+    # Store temporarily in geopot_from_Gtemp (reuse workspace)
+    for k in 1:nlayers
+        corrected_div = zero(eltype(div_tend))
         for r in 1:nlayers
-            temp_tend_val += L[k, r] * (div_old[lm, r] - div_new[lm, r])
+            corrected_div += S⁻¹[l, k, r] * G[lm, r]
         end
-        temp_tend[lm, k] += temp_tend_val
+        geopot_from_Gtemp[lm, k] = corrected_div  # Temporary storage
     end
-
+    
+    # Copy corrected divergence back
     for k in 1:nlayers
-        # skip 1:k-1 as integration is surface to k
-        geopotential_val = zero(eltype(geopotential))
-        for r in k:nlayers
-            geopotential_val += R[k, r] * temp_tend[lm, r]
-        end
-        geopotential[lm, k] = geopotential_val
+        div_tend[lm, k] = geopot_from_Gtemp[lm, k]
     end
-            
-    eigenvalue = -l*(l-1)  # 1-based, -l*(l+1) → -l*(l-1)
-        
-    # Step 2: Calculate the ξ*R*G_T term, vertical integration of geopotential
-    # (excl ξ, this is done in step 3)
-        
-    # Step 3: Calculate the G = G_D + ξRG_T + ξUG_lnps terms
-    # ∇² not part of U so *eigenvalues here
-    for k in 1:nlayers
-        G[lm, k] = div_tend[lm, k] + ξ*eigenvalue*(U[k]*pres_tend[lm] + geopotential[lm, k])
-    end
-        
-    # Step 4: Now solve δD = S⁻¹G to correct divergence tendency
-    for k in 1:nlayers
-        div_val = zero(eltype(div_tend))
-        for r in 1:nlayers
-            div_val += S⁻¹[l, k, r] * G[lm, r]
-        end
-        div_tend[lm, k] = div_val
-    end
-        
-    # Step 5: Semi implicit corrections for temperature and pressure
-        
-    # Step 5a: Temperature correction δT = G_T + ξLδD
+    
+    # ============================================================================
+    # Step 4: Back-substitute for temperature
+    # ============================================================================
+    # For Lorenz N-cycle: δT = G_temp + L*div_x + ξ*L*δD
+    #
+    # Contrast with Leapfrog: δT = G_temp + L*(div_old - div_new) + ξ*L*δD
+    #
+    # Again, we add L*div_x from the CURRENT state, not a difference
     for k in 1:nlayers
         temp_correction = zero(eltype(temp_tend))
+        
+        # Add L*div_x (implicit term from current state)
+        for r in 1:nlayers
+            temp_correction += L[k, r] * div_x[lm, r]
+        end
+        
+        # Add ξ*L*δD (coupling to corrected divergence)
         for r in 1:nlayers
             temp_correction += ξ * L[k, r] * div_tend[lm, r]
         end
+        
         temp_tend[lm, k] += temp_correction
     end
-        
-    # Step 5b: Pressure correction δlnpₛ = G_lnpₛ + ξWδD
+    
+    # ============================================================================
+    # Step 5: Back-substitute for pressure
+    # ============================================================================
+    # For Lorenz N-cycle: δln(pₛ) = G_pres + W*div_x + ξ*W*δD
+    #
+    # Contrast with Leapfrog: δln(pₛ) = G_pres + W*(div_old - div_new) + ξ*W*δD
     pres_correction = zero(eltype(pres_tend))
+    
     for k in 1:nlayers
+        # W*div_x (implicit term from current state)
+        pres_correction += W[k] * div_x[lm, k]
+        
+        # ξ*W*δD (coupling to corrected divergence)
         pres_correction += ξ * W[k] * div_tend[lm, k]
     end
+    
     pres_tend[lm] += pres_correction
 end
