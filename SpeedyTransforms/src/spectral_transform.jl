@@ -295,19 +295,19 @@ SpectralTransform(coeffs::LowerTriangularArray, field::AbstractField; kwargs...)
 Spectral transform `S` and lower triangular matrix `L` match if the
 spectral dimensions `(lmax, mmax)` match and the number of vertical layers is
 equal or larger in the transform (constraints due to allocated scratch memory size)."""
-function Architectures.ismatching(S::AbstractSpectralTransform, L::LowerTriangularArray)
-    resolution_math = resolution(S.spectrum) == size(L, OneBased, as = Matrix)[1:2]
-    vertical_match = length(axes(L, 2)) <= S.nlayers
-    return resolution_math && vertical_match
+function Architectures.ismatching(S::AbstractSpectralTransform, L::LowerTriangularArray; horizontal_only::Bool = false)
+    resolution_match = resolution(S.spectrum) == size(L, OneBased, as = Matrix)[1:2]
+    vertical_match = horizontal_only ? true : length(axes(L, 2)) <= S.nlayers
+    return resolution_match && vertical_match
 end
 
 """$(TYPEDSIGNATURES)
 Spectral transform `S` and `grid` match if the resolution `nlat_half` and the
 type of the grid match and the number of vertical layers is equal or larger in
 the transform (constraints due to allocated scratch memory size)."""
-function Architectures.ismatching(S::AbstractSpectralTransform, field::AbstractField)
+function Architectures.ismatching(S::AbstractSpectralTransform, field::AbstractField; horizontal_only::Bool = false)
     grid_match = S.grid == field.grid   # grid type and resolution match
-    vertical_match = size(field, 2) <= S.nlayers
+    vertical_match = horizontal_only ? true : size(field, 2) <= S.nlayers
     return grid_match && vertical_match
 end
 
