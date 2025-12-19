@@ -183,7 +183,7 @@ orography field from file.
 function initialize!(
         orog::EarthOrography,
         P::AbstractPlanet,
-        S::SpectralTransform
+        S::AbstractSpectralTransform
     )
 
     (; orography, surface_geopotential, scale) = orog

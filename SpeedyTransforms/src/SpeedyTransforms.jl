@@ -1,6 +1,7 @@
 module SpeedyTransforms
 
 using DocStringExtensions, Printf
+import ProgressMeter
 
 # NUMERICS
 import AssociatedLegendrePolynomials as Legendre
@@ -30,6 +31,8 @@ export SpectralTransform,
     transform!,
     transform
 
+export MatrixSpectralTransform
+
 # ALIASING
 export get_nlat_half
 
@@ -54,7 +57,9 @@ export power_spectrum
 include("aliasing.jl")
 include("legendre_shortcuts.jl")
 include("scratch_memory.jl")
+include("gradient_arrays.jl")
 include("spectral_transform.jl")
+include("matrix_transform.jl")
 include("fourier.jl")
 include("legendre.jl")
 include("legendre_ka.jl")

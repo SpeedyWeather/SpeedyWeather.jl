@@ -9,7 +9,7 @@ function SpeedyTransforms.transform!(
         progn::PrognosticVariables,
         lf::Integer,
         random_process::AbstractRandomProcess,
-        spectral_transform::SpectralTransform,
+        spectral_transform::AbstractSpectralTransform,
     )
     grid = diagn.grid.random_pattern
     spec = progn.random_pattern
@@ -28,7 +28,7 @@ function SpeedyTransforms.transform!(
         progn::PrognosticVariables,
         lf::Integer,
         random_process::Nothing,
-        spectral_transform::SpectralTransform,
+        spectral_transform::AbstractSpectralTransform,
     )
     return nothing
 end
