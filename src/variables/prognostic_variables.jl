@@ -201,20 +201,17 @@ function Base.copy!(progn_new::PrognosticVariables, progn_old::PrognosticVariabl
     copy_if_key_exists!(progn_new, progn_old, :pres)
 
     # Ocean variables
-    copy_if_key_exists!(progn_new.ocean, progn_old.ocean, :sea_surface_temperature)
-    copy_if_key_exists!(progn_new.ocean, progn_old.ocean, :sea_ice_concentration)
-    copy_if_key_exists!(progn_new.ocean, progn_old.ocean, :sensible_heat_flux)
-    copy_if_key_exists!(progn_new.ocean, progn_old.ocean, :surface_humidity_flux)
+    for (key, value) in pairs(progn_old.ocean)
+        progn_new.ocean[key] .= progn_old.ocean[key]
+    end
 
     # Land variables
-    copy_if_key_exists!(progn_new.land, progn_old.land, :soil_temperature)
-    copy_if_key_exists!(progn_new.land, progn_old.land, :snow_depth)
-    copy_if_key_exists!(progn_new.land, progn_old.land, :soil_moisture)
-    copy_if_key_exists!(progn_new.land, progn_old.land, :sensible_heat_flux)
-    copy_if_key_exists!(progn_new.land, progn_old.land, :surface_humidity_flux)
+    for (key, value) in pairs(progn_old.land)
+        progn_new.land[key] .= progn_old.land[key]
+    end
 
     # Tracers - using broadcast assignment
-    for (key, value) in progn_old.tracers
+    for (key, value) in pairs(progn_old.tracers)
         progn_new.tracers[key] .= value
     end
 
@@ -276,17 +273,17 @@ function Base.fill!(progn::PrognosticVariables, value::Number)
     #TODO copy over random pattern?
 
     # ocean
-    for (key, var) in progn.ocean
+    for (key, var) in pairs(progn.ocean)
         var .= value
     end 
 
     # land
-    for (key, var) in progn.land
+    for (key, var) in pairs(progn.land)
         var .= value
     end 
 
     # fill tracers
-    for (key, var) in progn.tracers 
+    for (key, var) in pairs(progn.tracers) 
         for value_i in var # istep of nsteps tuple 
             value_i .= value
         end
