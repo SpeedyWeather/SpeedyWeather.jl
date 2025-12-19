@@ -1,6 +1,7 @@
 module SpeedyTransforms
 
 using DocStringExtensions, Printf
+import ProgressMeter
 
 # NUMERICS
 import AssociatedLegendrePolynomials as Legendre
