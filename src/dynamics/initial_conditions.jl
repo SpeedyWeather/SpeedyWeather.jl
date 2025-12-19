@@ -439,7 +439,7 @@ end
 
 
 # <: Function so that it works with our `set!`
-struct JablonowskiVorticity{NF} <: Function 
+struct JablonowskiVorticity{NF} <: Function
     sinφc::NF
     cosφc::NF
     λc::NF
@@ -797,7 +797,7 @@ function initialize!(
     # gravity:  Gravitational acceleration [m/s^2]
     # R_dry:    Specific gas constant for dry air [J/kg/K]
     # p₀:       Reference surface pressure [hPa]
-    
+
     Γ = lapse_rate(model.atmosphere)
     (; R_dry) = model.atmosphere
     T₀ = model.atmosphere.temperature_reference

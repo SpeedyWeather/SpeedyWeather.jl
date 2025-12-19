@@ -214,4 +214,4 @@ function Adapt.adapt_structure(to, model::PrimitiveWetModel)
     return NamedTuple{adapt_fields}(
         adapt_structure(to, getfield(model, field)) for field in adapt_fields
     )
-end 
+end

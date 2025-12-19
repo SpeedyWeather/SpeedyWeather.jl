@@ -11,7 +11,7 @@ function dynamics_tendencies!(
     vorticity_flux!(diagn, model)       # = ∇×(v(ζ+f) + Fᵤ, -u(ζ+f) + Fᵥ)
     tracer_advection!(diagn, model)
 
-    return nothing 
+    return nothing
 end
 
 """
@@ -36,7 +36,7 @@ function dynamics_tendencies!(
 
     geopotential!(diagn, planet)            # geopotential Φ = gη in shallow water
     bernoulli_potential_swm!(diagn, model)  # = -∇²(E+Φ), tendency for divergence
-    
+
     # = -∇⋅(uh, vh), tendency for "pressure" η
     volume_flux_divergence!(diagn, orography, atmosphere, geometry, spectral_transform)
 
@@ -478,7 +478,7 @@ end
     # compute virtual temperature on the fly, temp_grid is anomaly
     (; R_dry) = atmosphere
     Tᵥ = virtual_temperature(temp_grid[ij, k] + Tₖ[k], humid_grid[ij, k], atmosphere)
-    RTᵥ = R_dry*(Tᵥ - Tₖ[k])    # dry gas constant * virtual temperature anomaly
+    RTᵥ = R_dry * (Tᵥ - Tₖ[k])    # dry gas constant * virtual temperature anomaly
     u_tend_grid[ij, k] = (u_tend_grid[ij, k] + v_grid[ij, k] * ω - RTᵥ * ∇lnp_x[ij]) * coslat⁻¹j
     v_tend_grid[ij, k] = (v_tend_grid[ij, k] - u_grid[ij, k] * ω - RTᵥ * ∇lnp_y[ij]) * coslat⁻¹j
 end
@@ -564,7 +564,7 @@ function temperature_tendency!(
 
     # now add the -∇⋅((u, v)*T') term
     flux_divergence!(temp_tend, temp_grid, diagn, G, S, add = true, flipsign = true)
-    
+
     return nothing
 end
 
@@ -592,15 +592,16 @@ end
     # Adiabatic conversion term following Simmons and Burridge 1981 but for σ coordinates
     # += as tend already contains parameterizations + vertical advection
     Tᵥ = virtual_temperature(temp_grid[ij, k] + Tₖ, humid_grid[ij, k], atmosphere)
-    
+
     (; κ) = atmosphere
     temp_tend_grid[ij, k] +=
         temp_grid[ij, k] * div_grid[ij, k] +            # +T'D term of hori advection
         κ * Tᵥ * (                                      # +κTᵥ*Dlnp/Dt, adiabatic term
-            σ_lnp_A_k * (div_sum_above[ij, k] + uv∇lnp_sum_above[ij, k]) +    # eq. 3.12 1st term
+        σ_lnp_A_k * (div_sum_above[ij, k] + uv∇lnp_sum_above[ij, k]) +    # eq. 3.12 1st term
             σ_lnp_B_k * (div_grid[ij, k] + uv∇lnp[ij, k]) +                   # eq. 3.12 2nd term
-            uv∇lnp[ij, k])                                                    # eq. 3.13
-                                                      
+            uv∇lnp[ij, k]
+    )                                                    # eq. 3.13
+
 end
 
 function humidity_tendency!(
@@ -861,9 +862,9 @@ function vorticity_flux!(diagn::DiagnosticVariables, model::Barotropic)
 end
 
 function bernoulli_potential_swm!(
-    diagn::DiagnosticVariables,
-    model::AbstractModel
-)   
+        diagn::DiagnosticVariables,
+        model::AbstractModel
+    )
     S = model.spectral_transform
     (; R_dry) = model.atmosphere                        # dry gas constant
     u = diagn.grid.u_grid
@@ -895,9 +896,9 @@ function bernoulli_potential_swm!(
 
     # add ½(u² + v²) + Φ on grid and the linear pressure gradient for primitive models
     half = convert(eltype(bernoulli_grid), 0.5)
-    @. bernoulli_grid = half*(u^2 + v^2) + Φ + RdTlnpₛ
+    @. bernoulli_grid = half * (u^2 + v^2) + Φ + RdTlnpₛ
     transform!(bernoulli, bernoulli_grid, scratch_memory, S)        # to spectral space
-    ∇²!(div_tend, bernoulli, S, add=true, flipsign=true)            # add -∇²(½(u² + v²) + ϕ)
+    ∇²!(div_tend, bernoulli, S, add = true, flipsign = true)            # add -∇²(½(u² + v²) + ϕ)
     return nothing
 end
 
@@ -1058,18 +1059,20 @@ diagnostic variables in `diagn` for primitive equation models. Updates grid vort
 grid divergence, grid temperature, pressure (`pres_grid`) and the velocities
 u, v."""
 function SpeedyTransforms.transform!(
-    diagn::DiagnosticVariables,
-    progn::PrognosticVariables,
-    lf::Integer,
-    model::PrimitiveEquation;
-    initialize::Bool = false,
-)   
-    (; vor_grid, div_grid, pres_grid, u_grid, v_grid, temp_grid, humid_grid, 
-    pres_grid_prev, u_grid_prev, v_grid_prev, temp_grid_prev, humid_grid_prev) = diagn.grid
+        diagn::DiagnosticVariables,
+        progn::PrognosticVariables,
+        lf::Integer,
+        model::PrimitiveEquation;
+        initialize::Bool = false,
+    )
+    (;
+        vor_grid, div_grid, pres_grid, u_grid, v_grid, temp_grid, humid_grid,
+        pres_grid_prev, u_grid_prev, v_grid_prev, temp_grid_prev, humid_grid_prev,
+    ) = diagn.grid
 
-    vor   = get_step(progn.vor, lf)     # relative vorticity at leapfrog step lf
-    div   = get_step(progn.div, lf)     # divergence at leapfrog step lf
-    temp  = get_step(progn.temp, lf)    # temperature at leapfrog step lf
+    vor = get_step(progn.vor, lf)     # relative vorticity at leapfrog step lf
+    div = get_step(progn.div, lf)     # divergence at leapfrog step lf
+    temp = get_step(progn.temp, lf)    # temperature at leapfrog step lf
     humid = get_step(progn.humid, lf)   # humidity at leapfrog step lf
     pres = get_step(progn.pres, lf)    # logarithm of surface pressure at leapfrog step lf
 
@@ -1147,14 +1150,14 @@ $(TYPEDSIGNATURES)
 Calculates the average temperature of a layer from the l=m=0 harmonic
 and stores the result in `diagn.temp_average`"""
 function temperature_average!(
-    diagn::DiagnosticVariables,
-    temp::LowerTriangularArray,
-    S::SpectralTransform,
-)
+        diagn::DiagnosticVariables,
+        temp::LowerTriangularArray,
+        S::SpectralTransform,
+    )
     # average from l=m=0 harmonic divided by norm of the sphere
     @. diagn.temp_average = real(temp[1, :]) / S.norm_sphere
     return nothing
-end 
+end
 
 
 """

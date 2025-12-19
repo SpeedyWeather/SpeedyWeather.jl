@@ -194,7 +194,7 @@ end
     @test !any(isnan.(pres_wet))
 
     # Different models should give same results for pressure
-    @test pres_wet == pres  
+    @test pres_wet == pres
 end
 
 @testset "ConstantPressure" begin

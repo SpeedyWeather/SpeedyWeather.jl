@@ -22,7 +22,7 @@ end
 
 @testset "Interleaving bits" begin
     @testset for T in (Int8, Int16, Int32, Int64, UInt8, UInt16, UInt32, UInt64)
-        m = min(typemax(T) >> (sizeof(T)*4), 2^18 - 1)  # limit to 18 bits for performance
+        m = min(typemax(T) >> (sizeof(T) * 4), 2^18 - 1)  # limit to 18 bits for performance
         for i in 0:m
             ui = T(i)
             @test RingGrids.deinterleave(RingGrids.interleave_with_zeros(ui)) == ui

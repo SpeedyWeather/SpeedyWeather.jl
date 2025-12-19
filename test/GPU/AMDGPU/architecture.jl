@@ -13,7 +13,7 @@ import SpeedyWeather: array_type
 
     grid_cpu = Grid(nlat_half, arch_cpu)
 
-    # transfering Grid 
+    # transfering Grid
     grid_gpu = on_architecture(arch_gpu, grid_cpu)
     @test typeof(grid_gpu.architecture) <: typeof(arch_gpu)
     @test typeof(architecture(grid_gpu)) <: typeof(arch_gpu)
@@ -21,19 +21,19 @@ import SpeedyWeather: array_type
     # transfering Field
     field_cpu = rand(NF, grid_cpu, nlayers)
     field_gpu = on_architecture(arch_gpu, field_cpu)
-    
+
     @test array_type(field_gpu) <: array_type(arch_gpu) <: AMDGPU.ROCArray
     @test typeof(field_gpu.grid.architecture) <: typeof(arch_gpu) <: SpeedyWeather.GPU
 
-    spectrum_cpu = Spectrum(; trunc, architecture=arch_cpu)
+    spectrum_cpu = Spectrum(; trunc, architecture = arch_cpu)
 
     # transfering Spectrum
     spectrum_gpu = on_architecture(arch_gpu, spectrum_cpu)
     @test typeof(spectrum_gpu.architecture) <: typeof(arch_gpu) <: SpeedyWeather.GPU
-    
+
     spec_cpu = rand(LowerTriangularArray{Complex{NF}}, spectrum_cpu, nlayers)
     spec_gpu = on_architecture(arch_gpu, spec_cpu)
-    
+
     @test array_type(spec_gpu) <: array_type(arch_gpu) <: AMDGPU.ROCArray
     @test typeof(spec_gpu.spectrum.architecture) <: typeof(arch_gpu) <: SpeedyWeather.GPU
-end 
+end

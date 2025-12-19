@@ -1,14 +1,18 @@
 @testset "Convection" begin
-    
-    spectral_grid = SpectralGrid(trunc=31, nlayers=8)
 
-    @testset for Convection in ( Nothing,
-                                BettsMillerConvection,
-                                BettsMillerDryConvection,
-                                ConvectiveHeating)
-            
-        @testset for Model in (  PrimitiveDryModel,
-                                PrimitiveWetModel)
+    spectral_grid = SpectralGrid(trunc = 31, nlayers = 8)
+
+    @testset for Convection in (
+            Nothing,
+            BettsMillerConvection,
+            BettsMillerDryConvection,
+            ConvectiveHeating,
+        )
+
+        @testset for Model in (
+                PrimitiveDryModel,
+                PrimitiveWetModel,
+            )
 
             # that combination is not defined
             if ~(Convection == BettsMillerConvection && Model == PrimitiveDryModel)
@@ -17,7 +21,7 @@
                 model.feedback.verbose = false
                 simulation = initialize!(model)
 
-                run!(simulation, steps=36)
+                run!(simulation, steps = 36)
             end
         end
     end

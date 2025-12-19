@@ -141,7 +141,7 @@ function saturation_vapor_pressure(T, A::AbstractWetAtmosphere)
     Lᵥ = A.latent_heat_condensation
     (; R_vapor) = A
     T₀ = A.temperature_freezing
-    return e₀ * exp(Lᵥ/R_vapor*(inv(T₀) - inv(T)))
+    return e₀ * exp(Lᵥ / R_vapor * (inv(T₀) - inv(T)))
 end
 
 saturation_humidity(T, p, A::AbstractDryAtmosphere) = zero(T)
@@ -166,7 +166,7 @@ Parameters for computing saturation vapor pressure of water using the Tetens' eq
 where T is in Kelvin and i = 1, 2 for saturation above and below freezing,
 respectively. From Tetens (1930), and Murray (1967) for below freezing.
 $(TYPEDFIELDS)"""
-@kwdef struct TetensEquation{NF<:AbstractFloat}
+@kwdef struct TetensEquation{NF <: AbstractFloat}
     "Saturation water vapor pressure at 0°C [Pa]"
     e₀::NF = 610.78
 
@@ -195,7 +195,7 @@ Tetens equation,
 
 where T is in Kelvin and i = 1, 2 for saturation above and below freezing,
 respectively."""
-@inline function saturation_vapor_pressure(TetensCoefficients::TetensEquation{NF}, temp_kelvin::NF) where NF
+@inline function saturation_vapor_pressure(TetensCoefficients::TetensEquation{NF}, temp_kelvin::NF) where {NF}
     (; e₀, T₀, C₁, C₂, T₁, T₂) = TetensCoefficients
     C, T = temp_kelvin > T₀ ? (C₁, T₁) : (C₂, T₂)      # change coefficients above/below freezing
     temp_celsius = temp_kelvin - T₀
@@ -208,9 +208,9 @@ end
 """
 $(TYPEDSIGNATURES)
 Gradient of the Tetens equation wrt to temperature, evaluated at `temp_kelvin`."""
-@inline function grad(TetensCoefficients::TetensEquation{NF}, temp_kelvin::NF) where NF
+@inline function grad(TetensCoefficients::TetensEquation{NF}, temp_kelvin::NF) where {NF}
     (; T₀, C₁, C₂, T₁, T₂) = TetensCoefficients
     e = saturation_vapor_pressure(TetensCoefficients, temp_kelvin)  # saturation vapor pressure
     C, T = temp_kelvin > T₀ ? (C₁, T₁) : (C₂, T₂)   # change coefficients above/below freezing
-    return e*C*T/(temp_kelvin - T₀ - T)^2           # chain rule: times derivative of inner function
+    return e * C * T / (temp_kelvin - T₀ - T)^2           # chain rule: times derivative of inner function
 end

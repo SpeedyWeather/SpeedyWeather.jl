@@ -21,9 +21,9 @@ SurfaceCondition(SG::SpectralGrid; kwargs...) = SurfaceCondition{SG.NF}(; kwargs
 
 function variables(::AbstractSurfaceCondition)
     return (
-        DiagnosticVariable(name=:surface_wind_speed, dims=Grid2D(), desc="Surface wind speed", units="m/s"),
-        DiagnosticVariable(name=:surface_air_density, dims=Grid2D(), desc="Surface air density", units="kg/m³"),
-        DiagnosticVariable(name=:surface_air_temperature, dims=Grid2D(), desc="Surface air temperature", units="K"),
+        DiagnosticVariable(name = :surface_wind_speed, dims = Grid2D(), desc = "Surface wind speed", units = "m/s"),
+        DiagnosticVariable(name = :surface_air_density, dims = Grid2D(), desc = "Surface air density", units = "kg/m³"),
+        DiagnosticVariable(name = :surface_air_temperature, dims = Grid2D(), desc = "Surface air temperature", units = "K"),
     )
 end
 
@@ -31,7 +31,7 @@ initialize!(::SurfaceCondition, ::PrimitiveEquation) = nothing
 
 # function barrier
 @propagate_inbounds function parameterization!(ij, diagn, progn, sc::SurfaceCondition, model)
-    surface_condition!(ij, diagn, sc, model)
+    return surface_condition!(ij, diagn, sc, model)
 end
 
 @propagate_inbounds function surface_condition!(ij, diagn, surface_condition::SurfaceCondition, model)
@@ -41,8 +41,8 @@ end
     (; atmosphere) = model
 
     # Fortran SPEEDY documentation eq. 49 but use previous time step for numerical stability
-    uₛ = wind_slowdown*diagn.grid.u_grid_prev[ij, nlayers] 
-    vₛ = wind_slowdown*diagn.grid.v_grid_prev[ij, nlayers]
+    uₛ = wind_slowdown * diagn.grid.u_grid_prev[ij, nlayers]
+    vₛ = wind_slowdown * diagn.grid.v_grid_prev[ij, nlayers]
 
     # Fortran SPEEDY documentation eq. 50, sqrt(u² + v² + gust_speed²)
     surface_wind_speed = sqrt(muladd(uₛ, uₛ, muladd(vₛ, vₛ, gust_speed^2)))
@@ -57,7 +57,7 @@ end
     Tᵥ = virtual_temperature(T, q, atmosphere)      # virtual temperature at lowest model level [K]
     σ⁻ᵏ = σ^(-κ)                                    # precalculate
     Tᵥ *= σ⁻ᵏ                                       # lower to surface assuming dry adiabatic lapse rate
-    ρ = pₛ/(R_dry*Tᵥ)                               # surface air density [kg/m³] from ideal gas law
+    ρ = pₛ / (R_dry * Tᵥ)                               # surface air density [kg/m³] from ideal gas law
     diagn.physics.surface_air_density[ij] = ρ       # store for surface temp/humidity fluxes
 
     # Surface air temperature

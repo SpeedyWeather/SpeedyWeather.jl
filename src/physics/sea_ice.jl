@@ -1,10 +1,12 @@
 abstract type AbstractSeaIce <: AbstractModelComponent end
 
 # function barrier for all sea ice
-@propagate_inbounds function sea_ice_timestep!( progn::PrognosticVariables,
-                            diagn::DiagnosticVariables,
-                            model::PrimitiveEquation)
-    timestep!(progn, diagn, model.sea_ice, model)
+@propagate_inbounds function sea_ice_timestep!(
+        progn::PrognosticVariables,
+        diagn::DiagnosticVariables,
+        model::PrimitiveEquation
+    )
+    return timestep!(progn, diagn, model.sea_ice, model)
 end
 
 export ThermodynamicSeaIce
@@ -14,43 +16,45 @@ prognostic variable, also modifies sea surface temperature as
 cooling below freezing grows sea ice. Fields are $(TYPEDFIELDS)"""
 @kwdef mutable struct ThermodynamicSeaIce{NF} <: AbstractSeaIce
     "[OPTION] Freezing temperature of sea water [K]"
-    temp_freeze::NF = 273.15-1.8
+    temp_freeze::NF = 273.15 - 1.8
 
     "[OPTION] Melting rate of sea ice [m²/m²/s/K]"
-    melt_rate::NF = 1e-6
+    melt_rate::NF = 1.0e-6
 
     "[OPTION] Freezing rate of sea ice [m²/m²/K]"
     freeze_rate::NF = 0.1
 end
 
-ThermodynamicSeaIce(SG::SpectralGrid; kwargs...) = ThermodynamicSeaIce{SG.NF}(;kwargs...)
+ThermodynamicSeaIce(SG::SpectralGrid; kwargs...) = ThermodynamicSeaIce{SG.NF}(; kwargs...)
 initialize!(::ThermodynamicSeaIce, ::AbstractModel) = nothing
 
 function variables(::ThermodynamicSeaIce)
     return (
-        PrognosticVariable(name=:sea_ice_concentration, dims=Grid2D(), namespace=:ocean, desc="Sea ice concentration", units="1"),
+        PrognosticVariable(name = :sea_ice_concentration, dims = Grid2D(), namespace = :ocean, desc = "Sea ice concentration", units = "1"),
     )
 end
 
 # don't affect concentration (may be set with set!)
 function initialize!(
-    ocean::PrognosticVariablesOcean,
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
-    sea_ice_model::ThermodynamicSeaIce,
-    model::PrimitiveEquation,
-) where PrognosticVariablesOcean
+        ocean::PrognosticVariablesOcean,
+        progn::PrognosticVariables,
+        diagn::DiagnosticVariables,
+        sea_ice_model::ThermodynamicSeaIce,
+        model::PrimitiveEquation,
+    ) where {PrognosticVariablesOcean}
     return nothing
 end
 
-function timestep!( progn::PrognosticVariables,
-                    diagn::DiagnosticVariables,
-                    sea_ice_model::ThermodynamicSeaIce,
-                    model::PrimitiveEquation)
-    
+function timestep!(
+        progn::PrognosticVariables,
+        diagn::DiagnosticVariables,
+        sea_ice_model::ThermodynamicSeaIce,
+        model::PrimitiveEquation
+    )
+
     sst = progn.ocean.sea_surface_temperature
     ℵ = progn.ocean.sea_ice_concentration   # sea ice concentration [0, 1] as \aleph yay!
-    
+
     Δt = model.time_stepping.Δt_sec
     (; mask) = model.land_sea_mask
 
@@ -59,12 +63,14 @@ function timestep!( progn::PrognosticVariables,
     temp_freeze = sea_ice_model.temp_freeze
     parameters = (; m, f, temp_freeze, Δt)
 
-    launch!(architecture(ℵ), LinearWorkOrder, size(ℵ), sea_ice_kernel!,
-        ℵ, sst, mask, parameters)
+    launch!(
+        architecture(ℵ), LinearWorkOrder, size(ℵ), sea_ice_kernel!,
+        ℵ, sst, mask, parameters
+    )
     return nothing
 end
 
-@kernel inbounds=true function sea_ice_kernel!(ℵ, sst, mask, parameters)
+@kernel inbounds = true function sea_ice_kernel!(ℵ, sst, mask, parameters)
     ij = @index(Global, Linear)    # every grid point ij
 
     if mask[ij] < 1 && isfinite(sst[ij])        # at least partially ocean, SST not NaN (=masked)
@@ -74,11 +80,11 @@ end
         # ice-sst flux as a relaxation term wrt to freezing, with different melt/freeze rates
         # include 1/Δt here as SST below freezing is proportional to Δt
         dT = sst[ij] - temp_freeze              # uncorrected difference to freezing temperature
-        F = -m*max(dT, 0) - f/Δt*min(dT, 0)     # melt if above freezing, freeze if below
+        F = -m * max(dT, 0) - f / Δt * min(dT, 0)     # melt if above freezing, freeze if below
         sst[ij] = max(sst[ij], temp_freeze)     # cap sst at freezing
 
         # Euler forward step to update sea ice concentration, cap between [0, 1]
-        ℵ[ij] += Δt*F
+        ℵ[ij] += Δt * F
         ℵ[ij] = max(min(ℵ[ij], 1), 0)
     end
 end

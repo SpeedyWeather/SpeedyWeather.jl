@@ -15,13 +15,13 @@ using SpeedyWeather.LowerTriangularArrays
 function test_prognostic_variables_stability()
     # Create a spectral grid with standard parameters
     spectral_grid = SpectralGrid(
-        trunc=31,                    # T31 spectral truncation
-        nlayers=8,                   # 8 vertical levels
+        trunc = 31,                    # T31 spectral truncation
+        nlayers = 8,                   # 8 vertical levels
     )
 
     # Initialize PrognosticVariables
     prognostic = PrognosticVariables(spectral_grid)
-    
+
     return prognostic
 end
 
@@ -30,7 +30,7 @@ end
 println("Testing PrognosticVariables initialization type stability...")
 println("\nTesting SpectralGrid constructor:")
 
-@code_warntype SpectralGrid(trunc=20)
+@code_warntype SpectralGrid(trunc = 20)
 @code_warntype test_prognostic_variables_stability()
 
 # Run the test functions to see if they work correctly
