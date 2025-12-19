@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- MatrixSpectralTransform implemented [#952](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/952)
 - Code formatting with Runic applied [#950](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/950)
 - Implicit correction kernelized and GPU-ready [#891](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/891)
 - The dynamical core of the primitive equations is now GPU-ready with kernelized implementations [#934](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/934)

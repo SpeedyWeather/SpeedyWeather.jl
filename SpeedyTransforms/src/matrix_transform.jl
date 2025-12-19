@@ -102,9 +102,9 @@ function transform!(                        # GRID TO SPECTRAL
         coeffs::LowerTriangularArray,       # output: spectral coefficients
         field::AbstractField,               # input: gridded values
         scratch_memory,                     # explicit scratch memory (not used only in spectral to grid)
-        S::MatrixSpectralTransform,         # precomputed spectral transform
+        M::MatrixSpectralTransform,         # precomputed spectral transform
     )
-    LinearAlgebra.mul!(coeffs.data, S.forward, field.data)
+    LinearAlgebra.mul!(coeffs.data, M.forward, field.data)
     return coeffs
 end
 
@@ -112,11 +112,17 @@ function transform!(                        # SPECTRAL TO GRID
         field::AbstractField,               # gridded output
         coeffs::LowerTriangularArray,       # spectral coefficients input
         scratch_memory,                     # explicit scratch memory to use
-        S::MatrixSpectralTransform;         # precomputed transform
+        M::MatrixSpectralTransform;         # precomputed transform
         unscale_coslat::Bool = false,       # unscale with cos(lat) on the fly?
     )
-    scratch = view(scratch_memory, :, 1:size(field, 2))   # use first n layers of scratch memory
-    field.data .= real.(LinearAlgebra.mul!(scratch, S.backward, coeffs.data))
-    # TODO unscale coslat
+    # use first n layers of scratch memory
+    scratch = view(scratch_memory, :, 1:size(coeffs, 2))
+    
+    # multiply into scratch which is complex typed and then take real part into field
+    # imaginary part should be zero but destination is used to store intermediate results
+    # explicitly convert to real also for NaN + NaN*im results
+    LinearAlgebra.mul!(scratch, M.backward, coeffs.data)
+    field.data .= real.(scratch)
+    unscale_coslat && RingGrids._scale_lat!(field, M.coslat⁻¹)
     return field
 end
