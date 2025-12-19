@@ -65,7 +65,7 @@ function MatrixSpectralTransform(
     # Create another SpectralTransform to calculate the transform matrices from (do this on the CPU)
     spectrum_cpu = on_architecture(CPU(), spectrum)
     grid_cpu = on_architecture(CPU(), grid)
-    S = SpectralTransform(spectrum_cpu, grid_cpu; NF, ArrayType=Array, nlayers, LegendreShortcut, architecture=CPU())
+    S = SpectralTransform(spectrum_cpu, grid_cpu; NF, ArrayType = Array, nlayers, LegendreShortcut, architecture = CPU())
 
     npoints = get_npoints(grid)
     nharmonics = LowerTriangularArrays.nonzeros(spectrum)
@@ -75,9 +75,9 @@ function MatrixSpectralTransform(
     field2D = zeros(NF, grid_cpu)
     coeffs2D = zeros(Complex{NF}, spectrum_cpu)
 
-    progress = ProgressMeter.Progress(length(field2D) + length(coeffs2D); dt=2, desc="Precalculate matrices:")
+    progress = ProgressMeter.Progress(length(field2D); dt = 2, desc = "Precalculate matrices:")
     forward_matrix!(forward, S, field2D, coeffs2D, progress)
-    backward_matrix!(backward, S, field2D, coeffs2D, progress)
+    backward_matrix!(backward, forward)
 
     forward = on_architecture(architecture, forward)
     backward = on_architecture(architecture, backward)
@@ -113,7 +113,7 @@ end
 Compute the forward transform matrix `F` from grid to spectral space using the precomputed
 spectral transform `S`. The matrix is computed such that multiplying it by flattened grid
 data yields spectral coefficients. This function is not yet implemented."""
-function forward_matrix!(F, S::AbstractSpectralTransform, field::AbstractField2D, coeffs::LowerTriangularMatrix, progress=nothing)
+function forward_matrix!(F, S::AbstractSpectralTransform, field::AbstractField2D, coeffs::LowerTriangularMatrix, progress = nothing)
     for ij in eachindex(field)
         field .= 0                              # unit vector of input
         GPUArrays.@allowscalar field[ij] = 1
@@ -121,20 +121,16 @@ function forward_matrix!(F, S::AbstractSpectralTransform, field::AbstractField2D
         F[:, ij] .= coeffs.data                 # are the columns of the transformation matrix F
         isnothing(progress) || ProgressMeter.next!(progress)
     end
+    return nothing
 end
 
 """$(TYPEDSIGNATURES)
 Compute the backward transform matrix `B` from spectral to grid space using the precomputed
 spectral transform `S`. The matrix is computed such that multiplying it by spectral
 coefficients yields flattened grid data. This function is not yet implemented."""
-function backward_matrix!(B, S::AbstractSpectralTransform, field::AbstractField2D, coeffs::LowerTriangularMatrix, progress=nothing)
-    for ij in eachindex(coeffs)
-        coeffs .= 0                             # unit vector of input
-        GPUArrays.@allowscalar coeffs[ij] = 1   # TODO what's the unit vector that should be used here?
-        transform!(field, coeffs, S)            # backward transforms of unit vectors
-        B[:, ij] .= field.data                  # are the columns of the transformation matrix B
-        isnothing(progress) || ProgressMeter.next!(progress)
-    end
+function backward_matrix!(B, F)
+    B .= LinearAlgebra.pinv(F)              # Moore Penrose pseudo-inverse
+    return B
 end
 
 """$(TYPEDSIGNATURES)
@@ -151,8 +147,8 @@ function transform!(                        # GRID TO SPECTRAL
     )
 
     # catch incorrect sizes early
-    @boundscheck ismatching(M, field, horizontal_only=true) || throw(DimensionMismatch(M, field))
-    @boundscheck ismatching(M, coeffs, horizontal_only=true) || throw(DimensionMismatch(M, coeffs))
+    @boundscheck ismatching(M, field, horizontal_only = true) || throw(DimensionMismatch(M, field))
+    @boundscheck ismatching(M, coeffs, horizontal_only = true) || throw(DimensionMismatch(M, coeffs))
     @boundscheck size(coeffs, 2) == size(field, 2) || throw(DimensionMismatch(field.data, coeffs.data))
     LinearAlgebra.mul!(coeffs.data, M.forward, field.data)
     return coeffs
@@ -180,7 +176,7 @@ function transform!(                        # SPECTRAL TO GRID
     if nlayers < size(scratch_memory, 2)
         # use first n layers of scratch memory
         scratch = view(scratch_memory, :, 1:nlayers)
-    
+
         # multiply into scratch which is complex typed and then take real part into field
         # imaginary part should be zero but destination is used to store intermediate results
         # explicitly convert to real also for NaN + NaN*im results
