@@ -10,13 +10,14 @@ function recursion_factors(
         spectrum::Spectrum,
     ) where {NF}
 
-    ϵ_lm = zeros(NF, spectrum)                              # store in lower triangular matrix
-    for (m, degrees) in enumerate(orders(spectrum))         # loop over 1-based l, m
+    spectrum_cpu = on_architecture(CPU(), spectrum)         # always construct on CPU
+    ϵ_lm = zeros(NF, spectrum_cpu)                          # store in lower triangular matrix
+    for (m, degrees) in enumerate(orders(spectrum_cpu))     # loop over 1-based l, m
         for l in degrees
             ϵ_lm[l, m] = recursion_factor(l - 1, m - 1)     # convert to 0-based l, m for function arguments
         end
     end
-    return ϵ_lm
+    return on_architecture(spectrum, ϵ_lm)                  # move to architecture of spectrum
 end
 
 # if number format not provided use DEFAULT_NF
@@ -35,10 +36,11 @@ function meridional_gradient_factors(
     ϵ_lm = recursion_factors(NF, Spectrum(lmax + 1, mmax))
 
     # meridional gradient for scalars (coslat scaling included)
-    grad_y1 = zeros(NF, spectrum)                           # term 1, mul with harmonic l-1, m
-    grad_y2 = zeros(NF, spectrum)                           # term 2, mul with harmonic l+1, m
+    spectrum_cpu = on_architecture(CPU(), spectrum)         # always construct on CPU
+    grad_y1 = zeros(NF, spectrum_cpu)                       # term 1, mul with harmonic l-1, m
+    grad_y2 = zeros(NF, spectrum_cpu)                       # term 2, mul with harmonic l+1, m
 
-    for (m, degrees) in enumerate(orders(spectrum))         # 1-based degree l, order m
+    for (m, degrees) in enumerate(orders(spectrum_cpu))     # 1-based degree l, order m
         for l in degrees
             grad_y1[l, m] = -(l - 2) * ϵ_lm[l, m]
             grad_y2[l, m] = (l + 1) * ϵ_lm[l + 1, m]
@@ -48,10 +50,10 @@ function meridional_gradient_factors(
     end
 
     # meridional gradient used to get from u, v/coslat to vorticity and divergence
-    grad_y_vordiv1 = zeros(NF, spectrum)                    # term 1, mul with harmonic l-1, m
-    grad_y_vordiv2 = zeros(NF, spectrum)                    # term 2, mul with harmonic l+1, m
+    grad_y_vordiv1 = zeros(NF, spectrum_cpu)                # term 1, mul with harmonic l-1, m
+    grad_y_vordiv2 = zeros(NF, spectrum_cpu)                # term 2, mul with harmonic l+1, m
 
-    for (m, degrees) in enumerate(orders(spectrum))         # 1-based degree l, order m
+    for (m, degrees) in enumerate(orders(spectrum_cpu))     # 1-based degree l, order m
         for l in degrees
             grad_y_vordiv1[l, m] = l * ϵ_lm[l, m]
             grad_y_vordiv2[l, m] = (l - 1) * ϵ_lm[l + 1, m]
@@ -61,7 +63,11 @@ function meridional_gradient_factors(
         grad_y_vordiv2[degrees[end], m] = 0
     end
 
-    return grad_y1, grad_y2, grad_y_vordiv1, grad_y_vordiv2
+    # move to architecture of spectrum
+    return (on_architecture(spectrum, grad_y1), 
+            on_architecture(spectrum, grad_y2),
+            on_architecture(spectrum, grad_y_vordiv1),
+            on_architecture(spectrum, grad_y_vordiv2))
 end
 
 # if number format not provided use default
@@ -71,15 +77,16 @@ meridional_gradient_factors(spectrum::Spectrum) = meridional_gradient_factors(DE
 function zonal_gradient_factors(
         spectrum::Spectrum,
     )
-    grad_x_vordiv = zeros(Int, spectrum)                    # allocate as int, can be converted later
-    for (m, degrees) in enumerate(orders(spectrum))         # 1-based degree l, order m
+    spectrum_cpu = on_architecture(CPU(), spectrum)         # always construct on CPU
+    grad_x_vordiv = zeros(Int, spectrum_cpu)                # allocate as int, can be converted later
+    for (m, degrees) in enumerate(orders(spectrum_cpu))     # 1-based degree l, order m
         for l in degrees
-            grad_x_vordiv[l, m] = m - 1                       # just the 0-based order (=zonal wavenumber), omit imaginary unit
+            grad_x_vordiv[l, m] = m - 1                     # just the 0-based order (=zonal wavenumber), omit imaginary unit
         end # last row zero to get vor and div correct
         grad_x_vordiv[degrees[end], m] = 0
     end
 
-    return grad_x_vordiv
+    return on_architecture(spectrum, grad_x_vordiv)         # move to architecture of spectrum
 end
 
 # zonal integration (sort of) to get from vorticity and divergence to u, v*coslat
@@ -87,15 +94,17 @@ function zonal_integration_factors(
         ::Type{NF},             # number format NF
         spectrum::Spectrum,
     ) where {NF}
-    vordiv_to_uv_x = zeros(NF, spectrum)
-    for (m, degrees) in enumerate(orders(spectrum))         # 1-based degree l, order m
+
+    spectrum_cpu = on_architecture(CPU(), spectrum)         # always construct on CPU
+    vordiv_to_uv_x = zeros(NF, spectrum_cpu)
+    for (m, degrees) in enumerate(orders(spectrum_cpu))     # 1-based degree l, order m
         for l in degrees
             # -m/(l*(l+1)) is the 0-based integration factor, 1-based with m->m-1, l->l-1
             vordiv_to_uv_x[l, m] = -(m - 1) / (l * (l - 1))
         end
     end
     vordiv_to_uv_x[1] = 0                                   # remove NaN from 0/0
-    return vordiv_to_uv_x
+    return on_architecture(spectrum, vordiv_to_uv_x)        # move to architecture of spectrum
 end
 
 # if number format not provided use default
@@ -111,10 +120,11 @@ function meridional_integration_factors(
     (; lmax, mmax) = spectrum
     ϵ_lm = recursion_factors(NF, Spectrum(lmax + 1, mmax))
 
-    vordiv_to_uv1 = zeros(NF, spectrum)                     # term 1, to be mul with harmonic l-1, m
-    vordiv_to_uv2 = zeros(NF, spectrum)                     # term 2, to be mul with harmonic l+1, m
+    spectrum_cpu = on_architecture(CPU(), spectrum)         # always construct on CPU
+    vordiv_to_uv1 = zeros(NF, spectrum_cpu)                 # term 1, to be mul with harmonic l-1, m
+    vordiv_to_uv2 = zeros(NF, spectrum_cpu)                 # term 2, to be mul with harmonic l+1, m
 
-    for (m, degrees) in enumerate(orders(spectrum))         # 1-based degree l, order m
+    for (m, degrees) in enumerate(orders(spectrum_cpu))     # 1-based degree l, order m
         for l in degrees
             vordiv_to_uv1[l, m] = ϵ_lm[l, m] / (l - 1)
             vordiv_to_uv2[l, m] = ϵ_lm[l + 1, m] / l
@@ -124,7 +134,9 @@ function meridional_integration_factors(
     end
 
     vordiv_to_uv1[1] = 0                 # remove NaN from 0/0
-    return vordiv_to_uv1, vordiv_to_uv2
+
+    # move to architecture of spectrum
+    return on_architecture(spectrum, vordiv_to_uv1), on_architecture(spectrum, vordiv_to_uv2)
 end
 
 # if number format not provided use default
@@ -135,7 +147,8 @@ Get the eigenvalues of the spherical harmonics up to degree `lmax` and order `mm
 as determined by the `spectrum` in number format `NF`."""
 function get_eigenvalues(::Type{NF}, spectrum::Spectrum) where {NF}
     (; lmax, mmax) = spectrum
-    return eigenvalues = [NF(-l * (l + 1)) for l in 0:(lmax - 1)]      # 0:lmax-1 for 0-based indexing
+    eigenvalues = [NF(-l * (l + 1)) for l in 0:(lmax - 1)]  # 0:lmax-1 for 0-based indexing
+    return on_architecture(spectrum, eigenvalues)           # move to architecture of spectrum
 end
 
 get_eigenvalues(spectrum::Spectrum) = get_eigenvalues(DEFAULT_NF, spectrum)
@@ -155,7 +168,7 @@ function gradient_arrays(::Type{NF}, spectrum::Spectrum) where {NF}
 
     eigenvalues = get_eigenvalues(NF, spectrum)     # = -l*(l+1), degree l of spherical harmonic
     eigenvalues⁻¹ = inv.(eigenvalues)
-    eigenvalues⁻¹[1] = 0                            # set the integration constant to 0
+    GPUArrays.@allowscalar eigenvalues⁻¹[1] = 0     # set the integration constant to 0
 
     gradients = (;
         # GRADIENTS

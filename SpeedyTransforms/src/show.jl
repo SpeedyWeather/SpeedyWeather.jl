@@ -21,10 +21,10 @@ function Base.show(io::IO, S::SpectralTransform{NF, AR, AT}) where {NF, AR, AT}
     # add information about size of Legendre polynomials and scratch memory
     polysize_str = prettymemory(Base.summarysize(S.legendre_polynomials))
     memorysize_str = prettymemory(
-        Base.summarysize(S.scratch_memory.north) +      # add all scratch_memories
-            Base.summarysize(S.scratch_memory.south) +
-            Base.summarysize(S.scratch_memory.column.north) +
-            Base.summarysize(S.scratch_memory.column.south)
+        sizeof(S.scratch_memory.north) +      # add all scratch_memories
+        sizeof(S.scratch_memory.south) +
+        sizeof(S.scratch_memory.column.north) +
+        sizeof(S.scratch_memory.column.south)
     )
 
     dealias = get_dealiasing(mmax - 1, nlat_half) # -1 for zero-based
@@ -49,8 +49,8 @@ function Base.show(io::IO, S::MatrixSpectralTransform{NF, AR, AT}) where {NF, AR
     Grid = nonparametric_type(grid)
 
     # add information about size of Legendre polynomials and scratch memory
-    matrixsize_str = prettymemory(2*Base.summarysize(S.forward))
-    scratchsize_str = prettymemory(Base.summarysize(S.scratch_memory))
+    matrixsize_str = prettymemory(2*Base.sizeof(S.forward))
+    scratchsize_str = prettymemory(Base.sizeof(S.scratch_memory))
 
     dealias = get_dealiasing(mmax - 1, nlat_half) # -1 for zero-based
     truncations = ["<linear", "linear", "quadratic", "cubic", ">cubic"]
