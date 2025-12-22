@@ -276,7 +276,7 @@ heatmap(diagn.physics.albedo)
 ```
 
 As you can see, it worked! The albedo is set to a constant value over land and to linearly interpolate
-between the albedo of the ocean and the seaice depending on the current sea ice concentration.
+between the albedo of the ocean and the sea ice depending on the current sea ice concentration.
 
 Now, let's demonstrate how to add our new parameterization to the model by adding it to the
 `parametrizations` tuple. This way you can add parametrizations to the model that don't have
@@ -300,6 +300,6 @@ Again, it worked! Note that it's important here to call the `:shortwave_radiatio
 `:custom_parameterization` as the shortwave radiation will use the albedo over ocean and land
 for respective flux computations and average the albedo then according to the land-sea mask.
 
-In order to write more complex parameterization that access other variabels and parameters of our models,
+In order to write more complex parameterization that access other variables and parameters of our models,
 it's best to familiarize yourself with our data structures that we explain in [Tree structure](@ref),
 and therein [PrimitiveDryModel](@ref) and [PrimitiveWetModel](@ref)
