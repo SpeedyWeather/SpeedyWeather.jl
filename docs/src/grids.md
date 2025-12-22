@@ -86,7 +86,7 @@ one hemisphere, Equator included. The Gaussian grids (full and reduced) do not h
 a ring on the equator, so their total number of rings `nlat` is always even and
 twice `nlat_half`. Clenshaw-Curtis grids and the HEALPix grids have a ring on the
 equator such their total number of rings is always odd and one less than the
-Gaussian grids at the same `nlat_half`. 
+Gaussian grids at the same `nlat_half`.
 
 !!! info "HEALPix grids do not use Nside as resolution parameter"
     The original formulation for HEALPix grids use ``N_{side}``, the number of grid
@@ -167,7 +167,7 @@ globe(grid)
 using CairoMakie, GeoMakie    # when using GLMakie, use interactive=true (default) for zoom and rotation
 globe(FullGaussianGrid, 24, interactive=false)
 save("full_gaussian_grid.png", ans) # hide
-nothing # hide
+nothing #hide
 ```
 ![FullGaussianGrid](full_gaussian_grid.png)
 
@@ -189,7 +189,7 @@ i.e. ``N_\phi = 2N_\theta``. The latitudes, however, are not regular, but chosen
 [Legendre polynomial](https://en.wikipedia.org/wiki/Legendre_polynomials).
 For ``\theta`` in latitudes
 ```math
-\sin(\theta_j) = z_j(l) 
+\sin(\theta_j) = z_j(l)
 ```
 As it can be easy to mix up latitudes, colatitudes and as the Legendre polynomials are defined in ``[0, 1]``
 an overview of the first Gaussian latitudes (approximated for ``l>2`` for brevity)
@@ -203,7 +203,7 @@ an overview of the first Gaussian latitudes (approximated for ``l>2`` for brevit
 Only even Legendre polynomials are used, such that there is always an even number of latitudes,
 with no latitude on the Equator. As you can already see from this short table, the Gaussian
 latitudes do not nest, i.e. different resolutions through different ``l`` do not share
-latitudes. The latitudes are also only approximately evenly spaced. 
+latitudes. The latitudes are also only approximately evenly spaced.
 Due to the Gaussian latitudes, a spectral transform with a full Gaussian grid is *exact*
 as long as the truncation is at least quadratic, see [Matching spectral and grid resolution](@ref).
 Exactness here means that only rounding errors occur in the transform, meaning that the
@@ -224,7 +224,7 @@ But no points are on the poles as ``z=-1`` or ``1`` is never a zero crossing of 
 using CairoMakie, GeoMakie    # when using GLMakie, use interactive=true (default) for zoom and rotation
 globe(OctahedralGaussianGrid, 24, interactive=false)
 save("octahedral_gaussian_grid.png", ans) # hide
-nothing # hide
+nothing #hide
 ```
 ![OctahedralGaussianGrid](octahedral_gaussian_grid.png)
 
@@ -246,7 +246,7 @@ For more details see Malardel, 2016[^M16].
 
 Note that starting with 20 grid points on the first ring is a choice that ECMWF made with their grid
 for accuracy reasons. An octahedral Gaussian grid can also be defined starting with fewer grid points
-on the first ring. However, in SpeedyWeather.jl we follow ECMWF's definition. 
+on the first ring. However, in SpeedyWeather.jl we follow ECMWF's definition.
 
 The grid cells of an octahedral Gaussian grid are not exactly equal area, but are usually within
 a factor of two. This largely solves the efficiency problem of having too many grid points near
@@ -260,7 +260,7 @@ the poles for computational, memory and data storage reasons.
 using CairoMakie, GeoMakie    # when using GLMakie, use interactive=true (default) for zoom and rotation
 globe(OctaminimalGaussianGrid, 24, interactive=false)
 save("octaminimal_gaussian_grid.png", ans) # hide
-nothing # hide
+nothing #hide
 ```
 ![OctaminimalGaussianGrid](octaminimal_gaussian_grid.png)
 
@@ -271,7 +271,7 @@ Gaussian grids at the cost of a (somewhat) inexact spectral transform. But for `
 to 2400, i.e. -24% which speeds up the computation on the grid (dynamics and physics) as well
 as the spectral transform. The octaminimal Gaussian grid is intended to be used for low
 resolutions as for higher resolutions the relative increase in the number of grid points
-with the octahedral Gaussian grid becomes negligible. 
+with the octahedral Gaussian grid becomes negligible.
 
 Furthermore the longitudes are rotated: Instead of no offset where the first point on
 every ring starts at 0˚E, an offset of ``360/2n`` degrees is chosen similar to how
@@ -287,7 +287,7 @@ are chosen. This allows for a more even distribution of grid points near the pol
 using CairoMakie, GeoMakie    # when using GLMakie, use interactive=true (default) for zoom and rotation
 globe(FullClenshawGrid, 24, interactive=false)
 save("full_clenshaw_grid.png", ans) # hide
-nothing # hide
+nothing #hide
 ```
 ![FullClenshawGrid](full_clenshaw_grid.png)
 
@@ -323,7 +323,7 @@ masked anyway.
 using CairoMakie, GeoMakie    # when using GLMakie, use interactive=true (default) for zoom and rotation
 globe(OctahedralClenshawGrid, 24, interactive=false)
 save("octahedral_clenshaw_grid.png", ans) # hide
-nothing # hide
+nothing #hide
 ```
 ![OctahedralClenshawGrid](octahedral_clenshaw_grid.png)
 
@@ -350,7 +350,7 @@ and memory than the full grid. Hotta and Ujiie[^HU18] describe this grid in more
 using CairoMakie, GeoMakie    # when using GLMakie, use interactive=true (default) for zoom and rotation
 globe(HEALPixGrid, 24, interactive=false)
 save("healpix_grid.png", ans) # hide
-nothing # hide
+nothing #hide
 ```
 ![HEALPixGrid](healpix_grid.png)
 
@@ -363,7 +363,7 @@ of zonal grid points is constant (always ``2N``, so 32 at ``N=16``) and there ar
 the equatorial zone with the border at  ``\cos(\theta) = 2/3`` (``\theta`` in colatitudes).
 
 Following Górski, 2004[^G04], the ``z=cos(\theta)`` colatitude of the ``j``-th ring in the north polar cap,
-``j=1, ..., N_{side}`` with ``2N_{side} = N`` is 
+``j=1, ..., N_{side}`` with ``2N_{side} = N`` is
 
 ```math
 z = 1 - \frac{j^2}{3N_{side}^2}
@@ -409,7 +409,7 @@ z = \frac{2}{3}-\frac{4k}{3N_{side}} \pm \frac{8\phi}{3\pi}
 using CairoMakie, GeoMakie    # when using GLMakie, use interactive=true (default) for zoom and rotation
 globe(OctaHEALPixGrid, 24, interactive=false)
 save("octahealpix_grid.png", ans) # hide
-nothing # hide
+nothing #hide
 ```
 ![OctaHEALPixGrid](octahealpix_grid.png)
 
@@ -419,7 +419,7 @@ there are in zonal/meridional direction. With ``N_\varphi = 4`` and ``N_\theta =
 is based on an octahedron, which has the convenient property that there are twice as many longitude points around
 the equator than there are latitude rings between the poles. This is a desirable for truncation as this matches
 the distances too, ``2\pi`` around the Equator versus ``\pi`` between the poles. ``N_\varphi = 6, N_\theta = 2``
-or ``N_\varphi = 8, N_\theta = 3`` are other possible choices for this, but also more complicated. See 
+or ``N_\varphi = 8, N_\theta = 3`` are other possible choices for this, but also more complicated. See
 Górski, 2004[^G04] for further examples and visualizations of these grids.
 
 We call the ``N_\varphi = 4, N_\theta = 1`` HEALPix grid the OctaHEALPix grid, which combines the equal-area

@@ -57,7 +57,7 @@ them as keyword arguments either with `key=argument` or just `; key` which match
 the argument name with the keyword
 ```@example barotropic_setup
 model = BarotropicModel(spectral_grid; initial_conditions, planet=still_earth, forcing, drag)
-nothing # hide
+nothing #hide
 ```
 The `model` contains all the parameters, but isn't initialized yet, which we can do
 with and then run it.
@@ -146,7 +146,7 @@ lon = ds["lon"][:]
 using CairoMakie
 heatmap(lon, lat, vor)
 save("galewsky0.png", ans) # hide
-nothing # hide
+nothing #hide
 ```
 ![Galewsky jet](galewsky0.png)
 
@@ -166,7 +166,7 @@ vor_grid = FullGaussianGrid(vor, input_as=Matrix)
 using CairoMakie    # this will load the extension so that Makie can plot grids directly
 heatmap(vor_grid, title="Relative vorticity [1/s]")
 save("galewsky1.png", ans) # hide
-nothing # hide
+nothing #hide
 ```
 ![Galewsky jet plot1](galewsky1.png)
 
@@ -188,7 +188,7 @@ only vertical layer)
 vor = simulation.diagnostic_variables.grid.vor_grid[:, 1]
 heatmap(vor, title="Relative vorticity [1/s]")
 save("galewsky2.png", ans) # hide
-nothing # hide
+nothing #hide
 ```
 ![Galewsky jet](galewsky2.png)
 
@@ -229,7 +229,7 @@ Let's try it out! We create an `EarthOrography` struct like so
 ```@example galewsky_setup2
 using SpeedyWeather # hide
 spectral_grid = SpectralGrid(trunc=63, nlayers=1) # hide
-initial_conditions = ZonalJet(spectral_grid) # hide                    
+initial_conditions = ZonalJet(spectral_grid) # hide
 orography = EarthOrography(spectral_grid)
 ```
 
@@ -255,7 +255,7 @@ using NCDatasets
 ds = NCDataset("$run_folder/output.nc")
 ```
 
-While you could plot the [NetCDF output](@ref) manually as before, 
+While you could plot the [NetCDF output](@ref) manually as before,
 we'll be plotting directly from the current state of the `simulation` using
 the Makie extension
 
@@ -264,7 +264,7 @@ using CairoMakie
 vor = simulation.diagnostic_variables.grid.vor_grid[:, 1]   # 1 to index surface
 heatmap(vor, title="Relative vorticity [1/s]")
 save("galewsky3.png", ans) # hide
-nothing # hide
+nothing #hide
 ```
 ![Galewsky jet](galewsky3.png)
 
@@ -286,7 +286,7 @@ drag = LinearVorticityDrag(spectral_grid)
 model = ShallowWaterModel(spectral_grid; drag, forcing)
 simulation = initialize!(model)
 run!(simulation, period=Day(40))
-nothing # hide
+nothing #hide
 ```
 
 We want to simulate polar jet streams in the shallow water model. We add a `JetStreamForcing`
@@ -301,7 +301,7 @@ using CairoMakie
 u = simulation.diagnostic_variables.grid.u_grid[:, 1]
 heatmap(u, title="Zonal wind [m/s]")
 save("polar_jets.png", ans) # hide
-nothing # hide
+nothing #hide
 ```
 ![Polar jets plot](polar_jets.png)
 
@@ -324,7 +324,7 @@ initial_conditions = RandomWaves(spectral_grid, lmin=10, lmax=30)      # between
 model = ShallowWaterModel(spectral_grid; orography, initial_conditions, implicit)
 simulation = initialize!(model)
 run!(simulation, period=Day(2))
-nothing # hide
+nothing #hide
 ```
 
 How are gravity waves propagating around the globe? We want to use the shallow water model
@@ -349,7 +349,7 @@ model.time_stepping.Δt_sec
 ```
 seconds. Note that the gravity wave speed here is ``\sqrt{gH}`` so almost 300m/s,
 given the speed of gravity waves we don't have to integrate for long.
-Visualise the dynamic layer thickness ``h = \eta + H + H_b`` 
+Visualise the dynamic layer thickness ``h = \eta + H + H_b``
 (interface displacement ``\eta``, layer thickness at rest ``H`` and orography ``H_b``)
 with
 
@@ -363,7 +363,7 @@ h = @. η + H - Hb   # @. to broadcast grid + scalar - grid
 
 heatmap(h, title="Dynamic layer thickness h", colormap=:oslo)
 save("gravity_waves.png", ans) # hide
-nothing # hide
+nothing #hide
 ```
 ![Gravity waves plot](gravity_waves.png)
 

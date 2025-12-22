@@ -44,7 +44,7 @@ simulation = initialize!(model)     # triggers also initialization of model.land
 using CairoMakie
 heatmap(land_sea_mask.mask, title="Land-sea mask at T31 resolution")
 save("land-sea_mask.png", ans) # hide
-nothing # hide
+nothing #hide
 ```
 ![Land-sea mask](land-sea_mask.png)
 
@@ -53,7 +53,7 @@ changes) you could manually change the land-sea mask with the `set!` function
 which can take scalars as global constants or functions of two arguments
 longitude ``\lambda`` and ``\varphi``. You can use an anonymous function
 `(λ, φ) -> ...` but you do not have to, defining `function f(λ, φ)` and
-then using `land_sea_mask = f` works too. 
+then using `land_sea_mask = f` works too.
 
 ```@example landseamask
 set!(model, land_sea_mask=0)                    # aqua planet
@@ -70,7 +70,7 @@ set!(model, land_sea_mask=(λ, φ) -> φ > 0 ? -1 : 0, add=true)
 # visualise
 heatmap(land_sea_mask.mask, title="Land-sea mask with Northern Hemisphere ocean")
 save("nh_ocean.png", ans) # hide
-nothing # hide
+nothing #hide
 ```
 ![NH ocean](nh_ocean.png)
 
@@ -81,7 +81,7 @@ And now you can run the simulation as usual with `run!(simulation)`.
 The [`EarthLandSeaMask`](@ref) has itself the option to load another
 land-sea mask from file, but you also have to specify the grid that mask
 from files comes on. It will then attempt to read it via `NCDatasets`
-and interpolate onto the model grid. 
+and interpolate onto the model grid.
 
 ## AquaPlanetMask
 
@@ -174,7 +174,7 @@ simulation = initialize!(model, time=DateTime(1999,12,29))
 run!(simulation, period=Day(5))
 heatmap(model.land_sea_mask.mask, title="Land-sea mask after MilleniumFlood callback")
 save("land-sea_mask2.png", ans) # hide
-nothing # hide
+nothing #hide
 ```
 ![Land-sea mask2](land-sea_mask2.png)
 

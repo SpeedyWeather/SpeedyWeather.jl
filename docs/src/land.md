@@ -55,7 +55,7 @@ other components of the land surface model `land`.
 land.thermodynamics
 ```
 
-To change these you can either mutate the fields or create a new model component `thermodynamics` 
+To change these you can either mutate the fields or create a new model component `thermodynamics`
 passed on to the land model constructor
 
 ```@example land
@@ -134,7 +134,7 @@ retain thermal energy and release this back to the atmosphere either
 in the form of longwave radiative fluxes or sensible heat fluxes
 (latent heat fluxes depend on soil moisture, see [Surface fluxes](@ref)).
 It is a bucket model such that interaction between neighbouring
-grid cells ("buckets") of the land surface only interact through the 
+grid cells ("buckets") of the land surface only interact through the
 atmosphere with another, there are no direct horizontal fluxes
 between cells. In the sense of soil moisture, you can fill a bucket
 from above with rainfall, it may leak/drain at the bottom but buckets
@@ -215,7 +215,7 @@ The equations are
 for soil moistures ``W_1, W_2`` in the respective layers (1 top, 2 below)
 defined as ratio of available water to field capacity, ``f_i = \gamma \Delta z_i``
 with ``\gamma = 0.24`` the field capacity per meter soil and
-``\Delta z_1 = 0.1~m`` the top layer thickness by default, and 
+``\Delta z_1 = 0.1~m`` the top layer thickness by default, and
 ``\Delta z_2 = 4.0~m`` the layer below. The top layer is forced by precipitation
 ``P`` minus evaporation ``E`` minus river runoff ``R``. The second term is a
 diffusion term of soil moisture between the two layers, acting on a time scale
@@ -323,7 +323,7 @@ snow cover is broken up and snow lies in between trees.
 ## Albedo
 
 Albedo is the surface reflectivity to downward solar shortwave radiation.
-A value of 1 indicates that all of the radiative flux is reflected at 
+A value of 1 indicates that all of the radiative flux is reflected at
 the Earth's surface and sent back up through the atmospheric column.
 In contrast, a value of 0 means no reflection and all of that radiative
 flux is absorbed, typically heating ocean or land surface.
@@ -393,7 +393,7 @@ model.albedo
 
 The albedo in the `model` is now the one defined just in the lines above,
 using a globally constant albedo of 0.1 for the ocean but a higher albedo
-over land which also increases to 0.5 towards the poles. 
+over land which also increases to 0.5 towards the poles.
 
 You can always output the land-sea mask weighted albedo with
 `add!(model, SpeedyWeather.AlbedoOutput())` or inspect it as follows
@@ -406,6 +406,6 @@ using CairoMakie
 (; albedo) = simulation.diagnostic_variables.physics
 heatmap(albedo, title="Custom albedo, separately defined for ocean/land")
 save("ocean_land_albedo.png", ans) # hide
-nothing # hide
+nothing #hide
 ```
 ![Ocean-land albedo](ocean_land_albedo.png)

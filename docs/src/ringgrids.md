@@ -58,7 +58,7 @@ would be a 2D field (though represented as a vector), temperature on several ver
 the atmosphere would be 3D (data represented as a matrix, horizontal x vertical), including
 time would make it 4D. Several fields can share the same grid. Given that the grid is always
 two-dimensional, a 2D and 3D field can also share the same grid, leaving the 3rd dimension
-not further specified for flexibility. 
+not further specified for flexibility.
 
 ## Creating a grid
 
@@ -71,7 +71,7 @@ grid = FullGaussianGrid(24)
 ```
 
 As a second argument `architecture` can be provided which helps to share information on the
-computing architecture (CPU/GPU) but this will not be further explained here. 
+computing architecture (CPU/GPU) but this will not be further explained here.
 
 ## Accessing coordinates
 
@@ -229,7 +229,7 @@ request an interpolated value on some coordinates. Using a `OctahedralGaussianFi
 grid = OctahedralGaussianGrid(4)
 field = randn(Float32, grid)
 interpolate(FullGaussianGrid, field)
-nothing # hide
+nothing #hide
 ```
 By default this will linearly interpolate (it's an [Anvil interpolator](@ref), see below) onto a grid with the same
 `nlat_half`, but we can also coarse-grain or fine-grain by specifying any other `grid` as an instance not a type
@@ -238,13 +238,13 @@ By default this will linearly interpolate (it's an [Anvil interpolator](@ref), s
 output_grid = HEALPixGrid(6)
 interpolate(output_grid, field)
 interpolate(HEALPixGrid, 6, field)  # equivalent
-nothing # hide
+nothing #hide
 ```
 To change the number format during interpolation you can preallocate the output field
 ```@example ringgrids
 output_field = Field(Float16, output_grid)
 interpolate!(output_field, field)
-nothing # hide
+nothing #hide
 ```
 Which will convert from `Float64` to `Float16` on the fly too. Note that we use `interpolate!` here not
 `interpolate` without `!` as the former writes into `output_field` and therefore changes it in place.
@@ -299,7 +299,7 @@ the data (it has only seen grids, no fields). We can now do
 field_in = rand(grid_in)
 field_out = zeros(grid_out)
 interpolate!(field_out, field_in, interp)
-nothing # hide
+nothing #hide
 ```
 which is identical to `interpolate(field_out, field_in)` but you can reuse `interp` for other data.
 The interpolation can also handle various element types (the interpolator `interp` does not have
@@ -307,7 +307,7 @@ to be updated for this either)
 ```@example ringgrids
 field_out = zeros(Float16, grid_out)
 interpolate!(field_out, field_in, interp)
-nothing # hide
+nothing #hide
 ```
 and we have converted data from a `HEALPixField{Float64}` (`Float64` is always default if not specified)
 to a `FullClenshawField{Float16}` including the type conversion Float64-Float16 on the fly.
@@ -321,7 +321,7 @@ field_in = randn(OctahedralGaussianField{Float16}, 24)
 field_out = zeros(FullClenshawField{Float16}, 24)
 interp = RingGrids.interpolator(field_out, field_in, NF=Float32)
 interpolate!(field_out, field_in, interp)
-nothing # hide
+nothing #hide
 ```
 
 As a last example we want to illustrate a situation where we would always want to interpolate onto
@@ -339,7 +339,7 @@ Let's define them, but note that we already decided there's only 10 of them abov
 ```@example ringgrids
 londs = collect(-10.0:2.0:8.0)
 latds = collect(0.0:5.0:45.0)
-nothing # hide
+nothing #hide
 ```
 now we can update the locator inside our interpolator as follows
 ```@example ringgrids
@@ -349,7 +349,7 @@ With data matching the input from above, a `nlat_half=24` HEALPixGrid, and alloc
 ```@example ringgrids
 output_vec = zeros(10)
 field_in = rand(grid)
-nothing # hide
+nothing #hide
 ```
 we can use the interpolator as follows
 ```@example ringgrids
@@ -375,7 +375,7 @@ Note that a, c and b, d do not necessarily share the same longitude/x-coordinate
 0^      a -------- o - b    # anvil-shaped average of a, b, c, d at location x
 .Δy                |
 .                  |
-.v                 x 
+.v                 x
 .                  |
 1         c ------ o ---- d
 
@@ -387,13 +387,13 @@ Note that a, c and b, d do not necessarily share the same longitude/x-coordinate
 This interpolation is chosen as by definition of the ring grids, a and b share the same latitude, so do c and d,
 but the longitudes can be different for all four, a, b, c, d.
 
-## ColumnField 
+## ColumnField
 
 Additionally to `Field` there is also a `ColumnField` type. `ColumnField` store the data in a column-major format, which is more efficient for column-based computations. As such, when indexing `ColumnField` the first dimension is the vertical dimension, while the second dimension is the horizontal dimension. Otherwise it behaves just like `Field`. To create a `ColumnField` from a `Field` one can use the `transpose` function, which will transpose the data in place and return a `ColumnField`:
 
 ```@example ringgrids
 grid = OctahedralClenshawGrid(5)    # define a grid
-field = randn(grid, 5)  
+field = randn(grid, 5)
 column_field = transpose(field)
 field == transpose(column_field)    # transposing again returns the original Field
 ```
@@ -429,7 +429,7 @@ ring order etc. Converting this back
 field_ring = RingGrids.ring_order(field_nested)
 ```
 
-Note that currently we do not store the information about the order inside the 
+Note that currently we do not store the information about the order inside the
 On the nested order, changing the resolution is trivial as consecutive elements in chunks
 of 4 have to be averaged (reducing resolution) or every element has to be repeated 4 times
 (increasing resolution). But we don't have this functionality implemented yet.
@@ -455,8 +455,8 @@ meshimage!(ax2, -180..180, -90..90, rotr90(GeoMakie.earth()); npoints = 100)
 londs, latds = RingGrids.get_londlatds(grid)
 
 for ij in 1:N
-    text!(ax1, londs[ij], latds[ij], text=string(field[ij]), color=:black, align=(:center, :center))    
-    text!(ax2, londs[ij], latds[ij], text=string(field_nested[ij]), color=:black, align=(:center, :center))    
+    text!(ax1, londs[ij], latds[ij], text=string(field[ij]), color=:black, align=(:center, :center))
+    text!(ax2, londs[ij], latds[ij], text=string(field_nested[ij]), color=:black, align=(:center, :center))
 end
 
 faces = RingGrids.get_gridcell_polygons(typeof(grid), grid.nlat_half, add_nan=true)
@@ -467,7 +467,7 @@ hidedecorations!(ax1)
 hidedecorations!(ax2)
 fig
 save("octahealpix_nested.png", fig) # hide
-nothing # hide
+nothing #hide
 ```
 ![Nested OctaHEALPix](octahealpix_nested.png)
 

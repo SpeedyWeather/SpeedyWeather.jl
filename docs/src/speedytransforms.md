@@ -22,7 +22,7 @@ the maximum degree ``l`` and order ``m`` of the spherical harmonics (e.g. ``l_{m
 or the size of the lower triangular matrix, e.g. 32x32. In this example, they are all equivalent.
 We often use the truncation, i.e. T31, for brevity but sometimes it is important to describe
 degree and order independently (see for example [One more degree for spectral fields](@ref)).
-Note also how truncation, degree and order are 0-based, but matrix sizes are 1-based. 
+Note also how truncation, degree and order are 0-based, but matrix sizes are 1-based.
 
 
 ## Example transform
@@ -68,7 +68,7 @@ Now let's go back to spectral space with `transform`
 alms2 = transform(map)
 ```
 Comparing with `alms` from above you can see that the transform is exact up to a typical rounding error
-from `Float64`. 
+from `Float64`.
 ```@example speedytransforms
 alms ≈ alms2
 ```
@@ -112,7 +112,7 @@ More on that now.
 
 The function `transform` only with arguments as shown above,
 will create an instance of `SpectralTransform` under the hood.
-This object contains all precomputed information that is required for the transform, either way: 
+This object contains all precomputed information that is required for the transform, either way:
 The Legendre polynomials, pre-planned Fourier transforms, precomputed gradient, divergence and
 curl operators, the spherical harmonic eigenvalues among others. Maybe the most intuitive way to
 create a `SpectralTransform` is to start with a `SpectralGrid`, which already defines
@@ -238,7 +238,7 @@ map = FullClenshawGrid(m, input_as=Matrix)
 using CairoMakie
 heatmap(map)
 save("random_pattern.png", ans) # hide
-nothing # hide
+nothing #hide
 ```
 ![Random pattern](random_pattern.png)
 
@@ -246,7 +246,7 @@ Now we transform into spectral space and call `power_spectrum(::LowerTriangularM
 ```@example speedytransforms2
 alms = transform(map)
 power = power_spectrum(alms)
-nothing # hide
+nothing #hide
 ```
 
 Which returns a vector of power at every wavenumber. By default this is normalized
@@ -291,7 +291,7 @@ map = transform(alms)
 using CairoMakie
 heatmap(map, title="k⁻²-distributed noise")
 save("random_noise.png", ans) # hide
-nothing # hide
+nothing #hide
 ```
 ![Random noise](random_noise.png)
 
@@ -323,20 +323,20 @@ spectral_grid = SpectralGrid(trunc=127, nlayers=8)
 SpectralTransform(spectral_grid)
 ```
 
-## Batched Transforms 
+## Batched Transforms
 
 SpeedyTransforms also supports batched transforms. With batched input data the `transform`
 is performed along the leading dimension, and all further dimensions are interpreted as
-batch dimensions. Take for example 
+batch dimensions. Take for example
 
 ```@example speedytransforms2
-alms = randn(LowerTriangularArray{Complex{Float32}}, 32, 32, 5) 
+alms = randn(LowerTriangularArray{Complex{Float32}}, 32, 32, 5)
 grids = transform(alms)
 ```
 
 In this case we first randomly generated five (32x32) `LowerTriangularArray` that hold the
-coefficients and then transformed all five matrices batched to the grid space with the 
-transform command, yielding 5 `RingGrids` with each 48-rings. 
+coefficients and then transformed all five matrices batched to the grid space with the
+transform command, yielding 5 `RingGrids` with each 48-rings.
 
 ## Batched power spectra
 
@@ -345,8 +345,8 @@ to the leading spherical harmonic dimension (it is unravelled as a vector so the
 only, not the first two...). But the power spectrum is always calculated along that
 first spherical-harmonic dimension. For example
 
-```@example speedytransforms2 
-alms = randn(LowerTriangularArray{Complex{Float32}}, 5, 5, 2) 
+```@example speedytransforms2
+alms = randn(LowerTriangularArray{Complex{Float32}}, 5, 5, 2)
 power_spectrum(alms)
 ```
 returns the power spectrum for `[..., 1]` in the first column and `[..., 2]` in the second.

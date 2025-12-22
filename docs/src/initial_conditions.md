@@ -76,7 +76,7 @@ c = 1e-10       # cut-off amplitude
 vor = get_step(simulation.prognostic_variables.vor, 1)      # get the first leapfrog step
 low_values = abs.(vor) .< c
 vor[low_values] .= 0
-nothing # hide
+nothing #hide
 ```
 which is just treating `vor` as an array of something and tweaking the values within!
 
@@ -94,7 +94,7 @@ using CairoMakie
 heatmap(vor_grid, title="Relative vorticity [1/s] of Rossby-Haurwitz wave")
 
 save("haurwitz.png", ans) # hide
-nothing # hide
+nothing #hide
 ```
 ![Rossby-Haurwitz wave](haurwitz.png)
 
@@ -112,7 +112,7 @@ vor = simulation.diagnostic_variables.grid.vor_grid[:, 1]
 
 heatmap(vor, title="Relative vorticity [1/s], Rossby Haurwitz wave after 3 days")
 save("haurwitz_day10.png", ans) # hide
-nothing # hide
+nothing #hide
 ```
 ![Rossby-Haurwitz wave after day 10](haurwitz_day10.png)
 
@@ -169,7 +169,7 @@ run!(simulation, period=Day(8))
 vor = simulation.diagnostic_variables.grid.vor_grid[:, 1]
 heatmap(vor, title="Relative vorticity [1/s], shallow water Rossby Haurwitz wave after 8 days")
 save("haurwitz_sw.png", ans) # hide
-nothing # hide
+nothing #hide
 ```
 
 There is a noticeable difference from the result in the barotropic model, where
@@ -207,7 +207,7 @@ time_stepping = Leapfrog(spectral_grid, Δt_at_T31=Minute(30))   # 30min timeste
 model = PrimitiveDryModel(spectral_grid; time_stepping, initial_conditions, orography, physics=false)
 simulation = initialize!(model)
 run!(simulation, period=Day(5))
-nothing # hide
+nothing #hide
 ```
 
 Note that we chose a lower resolution here (T42) as we are simulating
@@ -219,7 +219,7 @@ vor = simulation.diagnostic_variables.grid.vor_grid[:, 8]
 heatmap(vor, title="Relative vorticity [1/s], primitive Rossby-Haurwitz wave")
 
 save("haurwitz_primitive.png", ans) # hide
-nothing # hide
+nothing #hide
 ```
 ![Rossby-Haurwitz wave in primitive equations](haurwitz_primitive.png)
 

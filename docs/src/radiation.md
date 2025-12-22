@@ -254,7 +254,7 @@ run!(simulation, period=Week(1))
 ssrd = simulation.diagnostic_variables.physics.surface_shortwave_down
 heatmap(ssrd,title="Surface shortwave radiation down [W/m^2]")
 save("ssrd.png", ans) # hide
-nothing # hide
+nothing #hide
 # show ![Surface shortwave radiation down](ssrd.png)
 ```
 
@@ -263,7 +263,7 @@ nothing # hide
 osr = simulation.diagnostic_variables.physics.outgoing_shortwave_radiation
 heatmap(osr,title="Outgoing shortwave radiation [W/m^2]")
 save("osr.png", ans) # hide
-nothing # hide
+nothing #hide
 # show ![Outgoing shortwave radiation](osr.png)
 ```
 
@@ -282,7 +282,7 @@ run!(simulation, period=Week(1))
 ssrd = simulation.diagnostic_variables.physics.surface_shortwave_down
 heatmap(ssrd, title="Surface shortwave radiation (dry model) [W/m^2]")
 save("ssrd_dry.png", ans) # hide
-nothing # hide
+nothing #hide
 # show ![Surface shortwave radiation (dry model)](ssrd_dry.png)
 ```
 
@@ -344,7 +344,7 @@ run!(sim, period=Day(5))
 ssrd = sim.diagnostic_variables.physics.surface_shortwave_down
 heatmap(ssrd, title="No stratocumulus clouds [W/m^2]")
 save("oneband_no_stratocumulus.png", ans) # hide
-nothing # hide
+nothing #hide
 # show ![No stratocumulus clouds](oneband_no_stratocumulus.png)
 ```
 

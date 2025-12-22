@@ -164,7 +164,7 @@ abc0 = simulation.diagnostic_variables.grid.tracers_grid[:abc][:, 1]
 
 heatmap(abc0, title="Tracer abc, initial conditions")
 save("tracer_abc.png", ans) # hide
-nothing # hide
+nothing #hide
 ```
 ![Tracer abc](tracer_abc.png)
 
@@ -180,7 +180,7 @@ run!(simulation, period=Day(3))
 abc1 = simulation.diagnostic_variables.grid.tracers_grid[:abc][:, 1]
 heatmap(abc1, title="Tracer abc, after 3 days")
 save("tracer2.png", ans) # hide
-nothing # hide
+nothing #hide
 ```
 ![Tracer after 3 days](tracer2.png)
 
