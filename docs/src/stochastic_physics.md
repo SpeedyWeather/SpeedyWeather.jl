@@ -93,7 +93,7 @@ humid = simulation.diagnostic_variables.grid.humid_grid[:, k]*1000
 using CairoMakie
 heatmap(humid, title="Surface humidity [g/kg], with SPPT", colormap=:oslo)
 save("humid_sppt.png", ans) # hide
-nothing #hide
+nothing # hide
 ```
 ![Surface humidity with SPPT](humid_sppt.png)
 
@@ -109,7 +109,7 @@ humid = simulation.diagnostic_variables.grid.humid_grid[:, k]*1000
 
 heatmap(humid, title="Surface humidity [g/kg], with SPPT, other seed", colormap=:oslo)
 save("humid_sppt2.png", ans) # hide
-nothing #hide
+nothing # hide
 ```
 ![Surface humidity with SPPT](humid_sppt2.png)
 

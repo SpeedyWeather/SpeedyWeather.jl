@@ -29,7 +29,7 @@ But any `NetCDFOutput` can be passed onto the model constructor with the `output
 ```@example netcdf
 output = NetCDFOutput(spectral_grid, Barotropic)
 model = ShallowWaterModel(spectral_grid, output=output)
-nothing #hide
+nothing # hide
 ```
 
 Here, we created `NetCDFOutput` for the model class `Barotropic` (2nd positional argument, outputting only vorticity and velocity)

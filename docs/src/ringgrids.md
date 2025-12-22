@@ -229,7 +229,7 @@ request an interpolated value on some coordinates. Using a `OctahedralGaussianFi
 grid = OctahedralGaussianGrid(4)
 field = randn(Float32, grid)
 interpolate(FullGaussianGrid, field)
-nothing #hide
+nothing # hide
 ```
 By default this will linearly interpolate (it's an [Anvil interpolator](@ref), see below) onto a grid with the same
 `nlat_half`, but we can also coarse-grain or fine-grain by specifying any other `grid` as an instance not a type
@@ -238,13 +238,13 @@ By default this will linearly interpolate (it's an [Anvil interpolator](@ref), s
 output_grid = HEALPixGrid(6)
 interpolate(output_grid, field)
 interpolate(HEALPixGrid, 6, field)  # equivalent
-nothing #hide
+nothing # hide
 ```
 To change the number format during interpolation you can preallocate the output field
 ```@example ringgrids
 output_field = Field(Float16, output_grid)
 interpolate!(output_field, field)
-nothing #hide
+nothing # hide
 ```
 Which will convert from `Float64` to `Float16` on the fly too. Note that we use `interpolate!` here not
 `interpolate` without `!` as the former writes into `output_field` and therefore changes it in place.
@@ -299,7 +299,7 @@ the data (it has only seen grids, no fields). We can now do
 field_in = rand(grid_in)
 field_out = zeros(grid_out)
 interpolate!(field_out, field_in, interp)
-nothing #hide
+nothing # hide
 ```
 which is identical to `interpolate(field_out, field_in)` but you can reuse `interp` for other data.
 The interpolation can also handle various element types (the interpolator `interp` does not have
@@ -307,7 +307,7 @@ to be updated for this either)
 ```@example ringgrids
 field_out = zeros(Float16, grid_out)
 interpolate!(field_out, field_in, interp)
-nothing #hide
+nothing # hide
 ```
 and we have converted data from a `HEALPixField{Float64}` (`Float64` is always default if not specified)
 to a `FullClenshawField{Float16}` including the type conversion Float64-Float16 on the fly.
@@ -321,7 +321,7 @@ field_in = randn(OctahedralGaussianField{Float16}, 24)
 field_out = zeros(FullClenshawField{Float16}, 24)
 interp = RingGrids.interpolator(field_out, field_in, NF=Float32)
 interpolate!(field_out, field_in, interp)
-nothing #hide
+nothing # hide
 ```
 
 As a last example we want to illustrate a situation where we would always want to interpolate onto
@@ -339,7 +339,7 @@ Let's define them, but note that we already decided there's only 10 of them abov
 ```@example ringgrids
 londs = collect(-10.0:2.0:8.0)
 latds = collect(0.0:5.0:45.0)
-nothing #hide
+nothing # hide
 ```
 now we can update the locator inside our interpolator as follows
 ```@example ringgrids
@@ -349,7 +349,7 @@ With data matching the input from above, a `nlat_half=24` HEALPixGrid, and alloc
 ```@example ringgrids
 output_vec = zeros(10)
 field_in = rand(grid)
-nothing #hide
+nothing # hide
 ```
 we can use the interpolator as follows
 ```@example ringgrids
@@ -467,7 +467,7 @@ hidedecorations!(ax1)
 hidedecorations!(ax2)
 fig
 save("octahealpix_nested.png", fig) # hide
-nothing #hide
+nothing # hide
 ```
 ![Nested OctaHEALPix](octahealpix_nested.png)
 

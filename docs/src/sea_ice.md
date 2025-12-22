@@ -98,7 +98,7 @@ albedo (basically an ocean-coloured sea ice), then passed on to the model constr
 
 ```@example sea_ice
 model = PrimitiveWetModel(spectral_grid; sea_ice, albedo)
-nothing #hide
+nothing # hide
 ```
 
 Note that the insulating factor (``r`` above) of sea ice on air-sea fluxes is controlled

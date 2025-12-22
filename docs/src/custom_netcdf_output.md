@@ -107,7 +107,7 @@ w = FullGaussianGrid(ds["w"].var[:, :, :, :], input_as=Matrix)
 using CairoMakie
 heatmap(w[:, 4, end], title="vertical velocity dσ/dt at k=4")
 save("sigma_tend.png", ans) # hide
-nothing #hide
+nothing # hide
 ```
 ![Sigma tendency](sigma_tend.png)
 

@@ -64,7 +64,7 @@ initialize!(orography, model)   # happens also in simulation = initialize!(model
 using CairoMakie
 heatmap(orography.orography, title="Earth's orography at T85 resolution, no smoothing")
 save("earth_orography.png", ans) # hide
-nothing #hide
+nothing # hide
 ```
 ![EarthOrography](earth_orography.png)
 
@@ -79,7 +79,7 @@ initialize!(orography, model)
 
 heatmap(orography.orography, title="Earth's orography at T85 resolution, smoothed to T42")
 save("earth_orography_smooth.png", ans) # hide
-nothing #hide
+nothing # hide
 ```
 ![EarthOrography_smooth](earth_orography_smooth.png)
 
@@ -122,7 +122,7 @@ set!(model, orography=(λ,φ) -> 2000*cosd(φ) + 300*sind(λ) + 100*randn())
 using CairoMakie
 heatmap(model.orography.orography, title="Zonal 2000m ridge [m] with noise")
 save("orography_set.png", ans) # hide
-nothing #hide
+nothing # hide
 ```
 ![Orography with set!](orography_set.png)
 
@@ -150,7 +150,7 @@ H, λ₀, φ₀, σ = 4000, 200, 20, 5         # height, lon, lat position, and 
 set!(model, orography=(λ,φ) -> H*exp((-(λ-λ₀)^2 - (φ-φ₀)^2)/2σ^2), add=true)
 heatmap(model.orography.orography, title="Super Hawaii orography [m]")
 save("orography_hawaii.png", ans) # hide
-nothing #hide
+nothing # hide
 ```
 ![Orography with super Hawaii](orography_hawaii.png)
 
@@ -162,7 +162,7 @@ in the surface geopotential `orography.surface_geopotential`
 transform!(orography.surface_geopotential, orography.orography, model.spectral_transform)
 orography.surface_geopotential .*= model.planet.gravity
 SpeedyTransforms.spectral_truncation!(orography.surface_geopotential)
-nothing #hide
+nothing # hide
 ```
 
 In the first line, the surface geopotential is still missing the gravity,
@@ -197,7 +197,7 @@ or spherical distance. Compare
 set!(model, orography=(λ,φ) -> H*exp((-(λ-λ₀)^2 - (φ-φ₀)^2)/2σ^2))
 heatmap(model.orography.orography, title="Mountain [m] on prime meridian, cartesian coordinates")
 save("mountain_cartesian.png", ans) # hide
-nothing #hide
+nothing # hide
 ```
 ![Mountain in cartesian coordinates](mountain_cartesian.png)
 
@@ -211,7 +211,7 @@ orography (`add=false` is the default). Rewrite this as
 set!(model, orography=(λ,φ) -> H*exp(-spherical_distance((λ,φ), (λ₀,φ₀), radius=360/2π)^2/2σ^2))
 heatmap(model.orography.orography, title="Mountain [m] on prime meridian, spherical distance")
 save("mountain_spherical.png", ans) # hide
-nothing #hide
+nothing # hide
 ```
 ![Mountain in spherical coordinates](mountain_spherical.png)
 

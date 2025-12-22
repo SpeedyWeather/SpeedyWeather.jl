@@ -291,7 +291,7 @@ fig = lines(lon[1, :], lat[1, :])                               # first particle
 # display updated figure
 fig
 save("particles.png", fig) # hide
-nothing #hide
+nothing # hide
 ```
 ![Particle trajectories](particles.png)
 
@@ -312,6 +312,6 @@ ga = GeoAxis(fig[1, 1]; dest = "+proj=ortho +lon_0=45 +lat_0=45")
 [lines!(ga, lon[i,:], lat[i,:]) for i in 1:nparticles]
 fig
 save("particles_geomakie.png", fig) # hide
-nothing #hide
+nothing # hide
 ```
 ![Particle advection](particles_geomakie.png)

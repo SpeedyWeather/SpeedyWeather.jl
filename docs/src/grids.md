@@ -167,7 +167,7 @@ globe(grid)
 using CairoMakie, GeoMakie    # when using GLMakie, use interactive=true (default) for zoom and rotation
 globe(FullGaussianGrid, 24, interactive=false)
 save("full_gaussian_grid.png", ans) # hide
-nothing #hide
+nothing # hide
 ```
 ![FullGaussianGrid](full_gaussian_grid.png)
 
@@ -224,7 +224,7 @@ But no points are on the poles as ``z=-1`` or ``1`` is never a zero crossing of 
 using CairoMakie, GeoMakie    # when using GLMakie, use interactive=true (default) for zoom and rotation
 globe(OctahedralGaussianGrid, 24, interactive=false)
 save("octahedral_gaussian_grid.png", ans) # hide
-nothing #hide
+nothing # hide
 ```
 ![OctahedralGaussianGrid](octahedral_gaussian_grid.png)
 
@@ -260,7 +260,7 @@ the poles for computational, memory and data storage reasons.
 using CairoMakie, GeoMakie    # when using GLMakie, use interactive=true (default) for zoom and rotation
 globe(OctaminimalGaussianGrid, 24, interactive=false)
 save("octaminimal_gaussian_grid.png", ans) # hide
-nothing #hide
+nothing # hide
 ```
 ![OctaminimalGaussianGrid](octaminimal_gaussian_grid.png)
 
@@ -287,7 +287,7 @@ are chosen. This allows for a more even distribution of grid points near the pol
 using CairoMakie, GeoMakie    # when using GLMakie, use interactive=true (default) for zoom and rotation
 globe(FullClenshawGrid, 24, interactive=false)
 save("full_clenshaw_grid.png", ans) # hide
-nothing #hide
+nothing # hide
 ```
 ![FullClenshawGrid](full_clenshaw_grid.png)
 
@@ -323,7 +323,7 @@ masked anyway.
 using CairoMakie, GeoMakie    # when using GLMakie, use interactive=true (default) for zoom and rotation
 globe(OctahedralClenshawGrid, 24, interactive=false)
 save("octahedral_clenshaw_grid.png", ans) # hide
-nothing #hide
+nothing # hide
 ```
 ![OctahedralClenshawGrid](octahedral_clenshaw_grid.png)
 
@@ -350,7 +350,7 @@ and memory than the full grid. Hotta and Ujiie[^HU18] describe this grid in more
 using CairoMakie, GeoMakie    # when using GLMakie, use interactive=true (default) for zoom and rotation
 globe(HEALPixGrid, 24, interactive=false)
 save("healpix_grid.png", ans) # hide
-nothing #hide
+nothing # hide
 ```
 ![HEALPixGrid](healpix_grid.png)
 
@@ -409,7 +409,7 @@ z = \frac{2}{3}-\frac{4k}{3N_{side}} \pm \frac{8\phi}{3\pi}
 using CairoMakie, GeoMakie    # when using GLMakie, use interactive=true (default) for zoom and rotation
 globe(OctaHEALPixGrid, 24, interactive=false)
 save("octahealpix_grid.png", ans) # hide
-nothing #hide
+nothing # hide
 ```
 ![OctaHEALPixGrid](octahealpix_grid.png)
 

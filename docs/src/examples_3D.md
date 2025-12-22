@@ -23,7 +23,7 @@ initial_conditions = InitialConditions(
 model = PrimitiveDryModel(spectral_grid; orography, initial_conditions, physics=false)
 simulation = initialize!(model)
 run!(simulation, period=Day(9))
-nothing #hide
+nothing # hide
 ```
 
 The Jablonowski-Williamson baroclinic wave test case[^JW06] using the
@@ -43,7 +43,7 @@ using CairoMakie
 vor = simulation.diagnostic_variables.grid.vor_grid[:, end]
 heatmap(vor, title="Surface relative vorticity")
 save("jablonowski.png", ans) # hide
-nothing #hide
+nothing # hide
 ```
 ![Jablonowski plot](jablonowski.png)
 
@@ -70,7 +70,7 @@ model = PrimitiveDryModel(
 
 simulation = initialize!(model)
 run!(simulation, period=Day(20))
-nothing #hide
+nothing # hide
 ```
 
 The code above defines the Held-Suarez forcing [^HS94] in terms of temperature relaxation
@@ -94,7 +94,7 @@ temp = simulation.diagnostic_variables.grid.temp_grid[:, end]
 heatmap(temp, title="Surface temperature [K]", colormap=:thermal)
 
 save("heldsuarez.png", ans) # hide
-nothing #hide
+nothing # hide
 ```
 ![Held-Suarez](heldsuarez.png)
 
@@ -113,7 +113,7 @@ orography = NoOrography(spectral_grid)
 model = PrimitiveWetModel(spectral_grid; ocean, land_sea_mask, orography)
 simulation = initialize!(model)
 run!(simulation, period=Day(20))
-nothing #hide
+nothing # hide
 ```
 
 Here we have defined an aquaplanet simulation by
@@ -143,7 +143,7 @@ humid = simulation.diagnostic_variables.grid.humid_grid[:, end]
 heatmap(humid, title="Surface specific humidity [kg/kg]", colormap=:oslo)
 
 save("aquaplanet.png", ans) # hide
-nothing #hide
+nothing # hide
 ```
 ![Aquaplanet](aquaplanet.png)
 
@@ -172,7 +172,7 @@ run!(simulation, period=Day(20))
 humid = simulation.diagnostic_variables.grid.humid_grid[:, end]
 heatmap(humid, title="No deep convection: Surface specific humidity [kg/kg]", colormap=:oslo)
 save("aquaplanet_nodeepconvection.png", ans) # hide
-nothing #hide
+nothing # hide
 ```
 
 But we also want to compare this to a setup where convection is completely
@@ -191,7 +191,7 @@ run!(simulation, period=Day(20))
 humid = simulation.diagnostic_variables.grid.humid_grid[:, end]
 heatmap(humid, title="No convection: Surface specific humidity [kg/kg]", colormap=:oslo)
 save("aquaplanet_noconvection.png", ans) # hide
-nothing #hide
+nothing # hide
 ```
 
 And the comparison looks like
@@ -213,7 +213,7 @@ convection = BettsMillerConvection(spectral_grid)
 model = PrimitiveWetModel(spectral_grid; large_scale_condensation, convection)
 simulation = initialize!(model)
 run!(simulation, period=Day(10))
-nothing #hide
+nothing # hide
 ```
 
 We run the default `PrimitiveWetModel` with `ImplicitCondensation` as large-scale condensation
@@ -234,7 +234,7 @@ using CairoMakie
 m2mm = 1000     # convert from [m] to [mm]
 heatmap(m2mm*rain_large_scale, title="Large-scale precipiation (rain) [mm]: Accumulated over 10 days", colormap=:dense)
 save("large-scale_precipitation_acc.png", ans) # hide
-nothing #hide
+nothing # hide
 ```
 ![Large-scale precipitation](large-scale_precipitation_acc.png)
 
@@ -257,7 +257,7 @@ heatmap(m2mm_hr*rain_large_scale, title="Large-scale precipiation (rain) [mm/hr]
 save("large-scale_precipitation.png", ans) # hide
 heatmap(m2mm_hr*rain_convection, title="Convective precipiation (rain) [mm/hr]", colormap=:dense)
 save("convective_precipitation.png", ans) # hide
-nothing #hide
+nothing # hide
 ```
 ![Large-scale precipitation](large-scale_precipitation.png)
 ![Convective precipitation](convective_precipitation.png)

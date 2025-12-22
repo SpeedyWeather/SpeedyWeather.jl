@@ -242,9 +242,8 @@ To use the OneBandShortwave scheme, construct your model as follows and run as u
 
 **For wet models (with water vapor and clouds):**
 
-```julia
+```julia radiation
 using SpeedyWeather
-using CairoMakie
 spectral_grid = SpectralGrid(trunc=31, nlayers=8)
 model = PrimitiveWetModel(spectral_grid; shortwave_radiation=OneBandShortwave(spectral_grid))
 simulation = initialize!(model)
@@ -254,24 +253,24 @@ run!(simulation, period=Week(1))
 ssrd = simulation.diagnostic_variables.physics.surface_shortwave_down
 heatmap(ssrd,title="Surface shortwave radiation down [W/m^2]")
 save("ssrd.png", ans) # hide
-nothing #hide
-# show ![Surface shortwave radiation down](ssrd.png)
+nothing # hide
+# ![Surface shortwave radiation down](ssrd.png) #hide
 ```
 
 
-```julia
+```julia radiation
 osr = simulation.diagnostic_variables.physics.outgoing_shortwave_radiation
 heatmap(osr,title="Outgoing shortwave radiation [W/m^2]")
 save("osr.png", ans) # hide
-nothing #hide
-# show ![Outgoing shortwave radiation](osr.png)
+nothing # hide
+# ![Outgoing shortwave radiation](osr.png) #hide
 ```
 
 **For dry models (no water vapor or clouds):**
 
 Use `OneBandGreyShortwave` instead, which automatically uses `NoClouds` and `TransparentShortwaveTransmissivity`:
 
-```julia
+```julia radiation2
 using SpeedyWeather
 spectral_grid = SpectralGrid(trunc=31, nlayers=8)
 model = PrimitiveDryModel(spectral_grid; shortwave_radiation=OneBandGreyShortwave(spectral_grid))
@@ -282,8 +281,8 @@ run!(simulation, period=Week(1))
 ssrd = simulation.diagnostic_variables.physics.surface_shortwave_down
 heatmap(ssrd, title="Surface shortwave radiation (dry model) [W/m^2]")
 save("ssrd_dry.png", ans) # hide
-nothing #hide
-# show ![Surface shortwave radiation (dry model)](ssrd_dry.png)
+nothing # hide
+# ![Surface shortwave radiation (dry model)](ssrd_dry.png) #hide
 ```
 
 ### Parameterization options
@@ -332,7 +331,7 @@ Sets ``\tau_k^{SR} = 1`` for all layers and bands, effectively skipping atmosphe
 
 The `DiagnosticClouds` scheme includes a `use_stratocumulus` flag (default: `true`) that enables the diagnostic stratocumulus cloud parameterization over oceans:
 
-```julia
+```julia radiation3
 using SpeedyWeather, CairoMakie
 
 spectral_grid = SpectralGrid()
@@ -344,8 +343,8 @@ run!(sim, period=Day(5))
 ssrd = sim.diagnostic_variables.physics.surface_shortwave_down
 heatmap(ssrd, title="No stratocumulus clouds [W/m^2]")
 save("oneband_no_stratocumulus.png", ans) # hide
-nothing #hide
-# show ![No stratocumulus clouds](oneband_no_stratocumulus.png)
+nothing # hide
+# ![No stratocumulus clouds](oneband_no_stratocumulus.png) #hide
 ```
 
 ## References

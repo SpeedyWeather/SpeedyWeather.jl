@@ -361,7 +361,7 @@ add!(model.callbacks, north_pole_temp_at_noon_jan9)
 # start simulation 7 days earlier
 simulation = initialize!(model, time = DateTime(2000,1,2,12))
 run!(simulation, period=Day(10))
-nothing #hide
+nothing # hide
 ```
 
 So the callback gives us the temperature at the North Pole exactly when scheduled.
@@ -375,7 +375,7 @@ add!(model.callbacks, north_pole_temp_daily)
 
 # resume simulation, start time is now 2000-1-12 noon
 run!(simulation, period=Day(5))
-nothing #hide
+nothing # hide
 ```
 
 Note that the previous callback is still part of the model, we haven't
@@ -425,7 +425,7 @@ add!(model.callbacks, odd_schedule)
 
 # resume simulation for 4 hours
 run!(simulation, period=Hour(4))
-nothing #hide
+nothing # hide
 ```
 
 Now we get two empty schedules, one from callback that's supposed to

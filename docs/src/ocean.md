@@ -46,7 +46,7 @@ and passed to the model constructor as follows
 ```@example ocean
 model = PrimitiveWetModel(spectral_grid, ocean=ocean)
 simulation = initialize!(model, time=DateTime(2000, 6, 1))
-nothing #hide
+nothing # hide
 ```
 
 Or, equivalently, `; ocean` as Julia can match keyword arguments by name,
@@ -74,7 +74,7 @@ To be passed on to the model constructor like
 
 ```@example ocean
 model = PrimitiveWetModel(spectral_grid; ocean)
-nothing #hide
+nothing # hide
 ```
 
 The time of the year is determined by the clock in `prognostic_variables.clock`
@@ -124,7 +124,7 @@ as with all other ocean models
 
 ```@example ocean
 model = PrimitiveWetModel(spectral_grid; ocean)
-nothing #hide
+nothing # hide
 ```
 
 ## Output

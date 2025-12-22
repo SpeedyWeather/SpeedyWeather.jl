@@ -63,14 +63,14 @@ SpeedyTransforms.spectral_truncation!(L, 5)  # remove higher wave numbers
 G = transform(L)
 heatmap(G, title="Some fake data G")        # requires `using CairoMakie`
 save("gradient_data.png", ans) # hide
-nothing #hide
+nothing # hide
 ```
 ![Gradient data](gradient_data.png)
 
 Now we can take the gradient as follows
 ```@example gradient
 dGdx, dGdy = ∇(G)
-nothing #hide
+nothing # hide
 ```
 this transforms internally back to spectral space takes the gradients in
 zonal and meridional direction, transforms to grid-point space again
@@ -84,7 +84,7 @@ heatmap(dGdx, title="dG/dx on the unit sphere")
 save("dGdx.png", ans) # hide
 heatmap(dGdy, title="dG/dy on the unit sphere")
 save("dGdy.png", ans) # hide
-nothing #hide
+nothing # hide
 ```
 ![dGdx](dGdx.png)
 ![dGdy](dGdy.png)
@@ -115,7 +115,7 @@ drag = LinearVorticityDrag(spectral_grid)
 model = ShallowWaterModel(spectral_grid; forcing, drag)
 simulation = initialize!(model);
 run!(simulation, period=Day(30))
-nothing #hide
+nothing # hide
 ```
 
 Now pretend you only have `u, v` to get vorticity (which is actually the prognostic variable in the model,
@@ -124,7 +124,7 @@ so calculated anyway...).
 u = simulation.diagnostic_variables.grid.u_grid[:, 1]   # [:, 1] for 1st layer
 v = simulation.diagnostic_variables.grid.v_grid[:, 1]
 vor = curl(u, v, radius = model.planet.radius)
-nothing #hide
+nothing # hide
 ```
 Here, `u, v` are the grid-point velocity fields, and the function `curl` takes in either
 `LowerTriangularMatrix`s (no transform needed as all gradient operators act in spectral space),
@@ -182,7 +182,7 @@ vor_grid = transform(vor, S)
 f = coriolis(vor_grid)      # create Coriolis parameter f on same grid with default rotation
 g = model.planet.gravity
 fζ_g = @. vor_grid * f / g  # in-place and element-wise
-nothing #hide
+nothing # hide
 ```
 Now we need to apply the inverse Laplace operator to ``f\zeta/g`` which we do as follows
 
@@ -192,14 +192,14 @@ fζ_g_spectral = transform(fζ_g, S)
 R = model.planet.radius
 η = SpeedyTransforms.∇⁻²(fζ_g_spectral) * R^2
 η_grid = transform(η, S)
-nothing #hide
+nothing # hide
 ```
 Note the manual scaling with the radius ``R^2`` here. We now compare the results
 ```@example gradient
 using CairoMakie
 heatmap(η_grid, title="Geostrophic interface displacement η [m]")
 save("eta_geostrophic.png", ans) # hide
-nothing #hide
+nothing # hide
 ```
 ![Geostrophic eta](eta_geostrophic.png)
 
@@ -209,7 +209,7 @@ The actual interface displacement contains also ageostrophy
 η_grid2 = simulation.diagnostic_variables.grid.pres_grid
 heatmap(η_grid2, title="Interface displacement η [m] with ageostrophy")
 save("eta_ageostrophic.png", ans) # hide
-nothing #hide
+nothing # hide
 ```
 ![Ageostrophic eta](eta_ageostrophic.png)
 

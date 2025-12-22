@@ -406,6 +406,6 @@ using CairoMakie
 (; albedo) = simulation.diagnostic_variables.physics
 heatmap(albedo, title="Custom albedo, separately defined for ocean/land")
 save("ocean_land_albedo.png", ans) # hide
-nothing #hide
+nothing # hide
 ```
 ![Ocean-land albedo](ocean_land_albedo.png)

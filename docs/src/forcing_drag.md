@@ -322,7 +322,7 @@ using CairoMakie
 vor = simulation.diagnostic_variables.grid.vor_grid[:, 1]
 heatmap(vor, title="Stochastically stirred vorticity")
 save("stochastic_stirring.png", ans) # hide
-nothing #hide
+nothing # hide
 ```
 ![Stochastic stirring](stochastic_stirring.png)
 

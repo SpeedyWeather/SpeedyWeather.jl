@@ -44,7 +44,7 @@ simulation = initialize!(model)     # triggers also initialization of model.land
 using CairoMakie
 heatmap(land_sea_mask.mask, title="Land-sea mask at T31 resolution")
 save("land-sea_mask.png", ans) # hide
-nothing #hide
+nothing # hide
 ```
 ![Land-sea mask](land-sea_mask.png)
 
@@ -70,7 +70,7 @@ set!(model, land_sea_mask=(λ, φ) -> φ > 0 ? -1 : 0, add=true)
 # visualise
 heatmap(land_sea_mask.mask, title="Land-sea mask with Northern Hemisphere ocean")
 save("nh_ocean.png", ans) # hide
-nothing #hide
+nothing # hide
 ```
 ![NH ocean](nh_ocean.png)
 
@@ -174,7 +174,7 @@ simulation = initialize!(model, time=DateTime(1999,12,29))
 run!(simulation, period=Day(5))
 heatmap(model.land_sea_mask.mask, title="Land-sea mask after MilleniumFlood callback")
 save("land-sea_mask2.png", ans) # hide
-nothing #hide
+nothing # hide
 ```
 ![Land-sea mask2](land-sea_mask2.png)
 

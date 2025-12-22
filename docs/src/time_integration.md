@@ -172,7 +172,7 @@ e.g. for the `PrimitiveDryModel`
 
 ```@example leapfrog
 model = PrimitiveDryModel(spectral_grid; time_stepping)
-nothing #hide
+nothing # hide
 ```
 
 where `;` matches the `time_stepping` keyword argument by name. If you name `leapfrog = Leapfrog(spectral_grid)` then you

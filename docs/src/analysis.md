@@ -220,24 +220,23 @@ h = @. η + H - Hb
 
 # potential vorticity
 q = @. (f + ζ) / h
-nothing #hide
+nothing # hide
 ```
 
-and we can compare the relative vorticity field to
+and we can compare the relative vorticity field
 ```@example analysis
 using CairoMakie
 heatmap(ζ, title="Relative vorticity [1/s]")
 save("analysis_vor.png", ans) # hide
-nothing #hide
+nothing # hide
 ```
 ![Relative vorticity](analysis_vor.png)
 
-
-the potential vorticity
+to the potential vorticity
 ```@example analysis
 heatmap(q, title="Potential vorticity [1/m/s]")
 save("analysis_pv.png", ans) # hide
-nothing #hide
+nothing # hide
 ```
 ![Potential vorticity](analysis_pv.png)
 
@@ -574,7 +573,7 @@ add!(model.callbacks, :diagnostics_recorder => diagnostics_recorder)
 simulation = initialize!(model)
 
 run!(simulation, period=Day(20))
-nothing #hide
+nothing # hide
 ```
 
 Then one could check the output file `global_diagnostics.nc`,
@@ -617,6 +616,6 @@ axs[3,2].title = "Potential enstrophy"
 axs[3,2].xlabel = "time [day]"
 fig
 save("global_diagnostics.png", fig) # hide
-nothing #hide
+nothing # hide
 ```
 ![Global diagnostics](global_diagnostics.png)
