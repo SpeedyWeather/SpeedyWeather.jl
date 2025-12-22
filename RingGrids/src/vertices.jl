@@ -1,6 +1,6 @@
 """$(TYPEDSIGNATURES)
 Vertices are defined for every grid point on a ring grid through 4 points: east, south, west, north.
-    
+
     - east: longitude mid-point with the next grid point east
     - south: longitude mid-point between the two closest grid points on one ring to the south
     - west: longitude mid-point with the next grid point west
@@ -15,7 +15,7 @@ Example
          o ----- s ------ o
 
 with cell center c (the grid point), e, s, w, n the vertices and o the surrounding grid points.
-Returns 2xnpoints arrays for east, south, west, north each containing the longitude and latitude of the vertices."""
+Returns 2 x npoints arrays for east, south, west, north each containing the longitude and latitude of the vertices."""
 function get_vertices(Grid::Type{<:AbstractGrid}, nlat_half::Integer)
 
     npoints = get_npoints(Grid, nlat_half)
@@ -125,7 +125,7 @@ end
 """$(TYPEDSIGNATURES)
 Return a 5xN matrix `polygons` (or grid cells) of `NTuple{2, Float64}` where the first 4 rows
 are the vertices (E, S, W, N) of every grid points ij in 1:N, row 5 is duplicated north vertex
-to close the grid cell. Use keyword arguemnt `add_nan=true` (default `false`) to add a 6th row
+to close the grid cell. Use keyword argument `add_nan=true` (default `false`) to add a 6th row
 with (NaN, NaN) to separate grid cells when drawing them as a continuous line with `vec(polygons)`."""
 function get_gridcell_polygons(
         Grid::Type{<:AbstractGrid},
