@@ -330,7 +330,7 @@ Q = \iint \frac{1}{2}q^2 dA
 In the absence of source and sink for potential vorticiy,
 this quantity should also conserve during the integration.
 
-We define a function ``total_enstrophy`` for this
+We define a function `total_enstrophy` for this
 
 ```@example analysis
 function total_enstrophy(ζ, η, model)
@@ -344,7 +344,8 @@ function total_enstrophy(ζ, η, model)
     Q = @. q^2 / 2      # Potential enstrophy
 
     # transform to spectral, take l=m=0 mode at [1] and normalize for mean
-    return Q_mean = real(transform(Q)[1]) / model.spectral_transform.norm_sphere
+    Q_mean = real(transform(Q)[1]) / model.spectral_transform.norm_sphere
+    return Q_mean
 end
 ```
 
@@ -355,7 +356,7 @@ check how ``Q`` is changing over time.
 Q = total_enstrophy(ζ, η, model)
 run!(simulation, period=Day(10))
 Q_later = total_enstrophy(ζ, η, model)
-Q_later/Q
+Q_later / Q
 ```
 
 !!! note "Less conservative enstrophy"
