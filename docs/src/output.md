@@ -306,6 +306,7 @@ run!(simulation, period=Day(5), output=true)
 
 # animate mean sea-level pressure
 animate(simulation, output_file="test_mslp_animation.mp4", variable="mslp")
+nothing # hide
 ```
 ![test_mslp_animation](test_mslp_animation.mp4)
 
