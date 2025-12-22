@@ -1,10 +1,10 @@
 """$(TYPEDSIGNATURES)
 Vertices are defined for every grid point on a ring grid through 4 points: east, south, west, north.
 
-    - east: longitude mid-point with the next grid point east
-    - south: longitude mid-point between the two closest grid points on one ring to the south
-    - west: longitude mid-point with the next grid point west
-    - north: longitude mid-point between the two closest grid points on one ring to the north
+- east: longitude mid-point with the next grid point east
+- south: longitude mid-point between the two closest grid points on one ring to the south
+- west: longitude mid-point with the next grid point west
+- north: longitude mid-point between the two closest grid points on one ring to the north
 
 Example
 

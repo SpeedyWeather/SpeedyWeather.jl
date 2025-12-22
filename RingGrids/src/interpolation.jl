@@ -141,7 +141,7 @@ abstract type AbstractInterpolator end
 
 """
 $(TYPEDSIGNATURES)
-Interpolator type for [`anvil_anverage`](@ref).
+Interpolator type for [`anvil_average`](@ref).
 
 NF is the number format used to calculate the interpolation, which can be
 different from the input data and/or the interpolated data on the new grid.
