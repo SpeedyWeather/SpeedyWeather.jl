@@ -2,15 +2,19 @@ abstract type AbstractShortwaveClouds <: AbstractShortwave end
 
 export NoClouds
 struct NoClouds <: AbstractShortwaveClouds end
+Adapt.@adapt_structure NoClouds
 NoClouds(SG::SpectralGrid) = NoClouds()
 initialize!(clouds::NoClouds, ::AbstractModel) = nothing
-function clouds!(
-        column::ColumnVariables{NF},
+@propagate_inbounds function clouds!(
+        ij,
+        diagn,
+        progn,
         ::NoClouds,
-        model::AbstractModel,
-    ) where {NF}
-    cloud_cover = zero(NF)          # no cloud cover
-    cloud_top = column.nlayers + 1    # below surface
+        model,
+    )
+    NF = eltype(diagn.grid.temp_grid_prev)
+    cloud_cover = zero(NF)           # no cloud cover
+    cloud_top = diagn.nlayers + 1    # below surface
 
     return (    # NamedTuple
         cloud_cover = cloud_cover,
@@ -60,15 +64,18 @@ export DiagnosticClouds
     stratocumulus_clfact::NF = 1.2
 end
 
+Adapt.@adapt_structure DiagnosticClouds
 DiagnosticClouds(SG::SpectralGrid; kwargs...) = DiagnosticClouds{SG.NF}(; kwargs...)
 initialize!(clouds::DiagnosticClouds, model::AbstractModel) = nothing
-function clouds!(
-        column::ColumnVariables,
+@propagate_inbounds function clouds!(
+        ij,
+        diagn,
+        progn,
         clouds::DiagnosticClouds,
-        model::AbstractModel,
+        model,
     )
     # Diagnose cloud cover and cloud top.
-    (cloud_cover, cloud_top, stratocumulus_cover) = diagnose_cloud_properties(column, clouds)
+    (cloud_cover, cloud_top, stratocumulus_cover) = diagnose_cloud_properties(ij, diagn, clouds, model)
 
     return (    # NamedTuple
         cloud_cover = cloud_cover,
@@ -82,7 +89,16 @@ end
 """$(TYPEDSIGNATURES)
 Core cloud diagnosis algorithm shared by DiagnosticClouds and SpectralDiagnosticClouds.
 Returns (cloud_cover, cloud_top, stratocumulus_cover) tuple."""
-function diagnose_cloud_properties(column::ColumnVariables, clouds::DiagnosticClouds)
+@propagate_inbounds function diagnose_cloud_properties(ij, diagn, clouds::DiagnosticClouds, model)
+    temp = diagn.grid.temp_grid_prev
+    humid = diagn.grid.humid_grid_prev
+    geopotential = diagn.grid.geopotential
+    p_s = diagn.grid.pres_grid_prev[ij]
+    nlayers = size(temp, 2)
+    sigma_levels = model.geometry.σ_levels_full
+    land_fraction = model.land_sea_mask.mask[ij]
+    c_p = model.atmosphere.heat_capacity
+    NF = eltype(temp)
 
     # rename for brevity
     rh_min = clouds.relative_humidity_threshold_min
@@ -96,20 +112,21 @@ function diagnose_cloud_properties(column::ColumnVariables, clouds::DiagnosticCl
     cover_max = clouds.stratocumulus_cover_max
     clfact = clouds.stratocumulus_clfact
 
-    (; nlayers, land_fraction, humid, sat_humid, dry_static_energy) = column
+    # Precipitation contribution (rain rate is in m/s)
+    rain_rate = diagn.physics.rain_rate[ij]
+    precip_term = min(precip_max, (86400 * rain_rate) / 1000)  # convert to mm/day
+    P = precip_weight * sqrt(precip_term)
 
-    # Precipitation contribution
-    P = precip_weight * sqrt(min(precip_max, (86400 * (column.rain_rate_large_scale + column.rain_rate_convection) / 1000)))
-
-    kprtop = column.cloud_top
+    kprtop = diagn.physics.cloud_top[ij]
+    # Adjust cloud top if below surface (i.e., no cloud)
+    kprtop = kprtop < 1 ? nlayers + 1 : kprtop
     humidity_term_kcltop = zero(P)
     kcltop = nlayers + 1
 
     # Find cloud top from RH threshold
     for k in 1:(nlayers - 1)
-        humidity_k = humid[k]
-        qsat = sat_humid[k]
-
+        humidity_k = humid[ij, k]
+        qsat = saturation_humidity(temp[ij, k], sigma_levels[k] * p_s, model.atmosphere)
         if humidity_k > q_min && qsat > 0
             relative_humidity_k = humidity_k / qsat
 
@@ -125,17 +142,19 @@ function diagnose_cloud_properties(column::ColumnVariables, clouds::DiagnosticCl
     # Combined cloud cover
     cloud_cover = min(1, P + humidity_term_kcltop)
     cloud_top = min(kcltop, kprtop)
-    column.cloud_top = cloud_top
+    diagn.physics.cloud_top[ij] = cloud_top
 
     # Stratocumulus parameterization
-    stratocumulus_cover = zero(P)
+    stratocumulus_cover = zero(NF)
     if use_strat
-        GSEN = dry_static_energy[nlayers] - dry_static_energy[nlayers - 1]
-        F_ST = max(0, min(1, (GSEN - stab_min) / (stab_max - stab_min)))
+        GSEN = (c_p * temp[ij, nlayers] + geopotential[ij, nlayers]) -
+            (c_p * temp[ij, nlayers - 1] + geopotential[ij, nlayers - 1])
+        F_ST = clamp((GSEN - stab_min) / (stab_max - stab_min), zero(NF), one(NF))
 
         stratocumulus_cover_ocean = F_ST * max(cover_max - clfact * cloud_cover, 0)
-        RH_N = sat_humid[nlayers] > 0 ? humid[nlayers] / sat_humid[nlayers] : 0
-        stratocumulus_cover_land = stratocumulus_cover_ocean * RH_N
+        qsat_surface = saturation_humidity(temp[ij, nlayers], sigma_levels[nlayers] * p_s, model.atmosphere)
+        RH_N = qsat_surface > zero(NF) ? humid[ij, nlayers] / qsat_surface : 0
+        stratocumulus_cover_land = stratocumulus_cover_ocean * RH_N 
 
         stratocumulus_cover = (1 - land_fraction) * stratocumulus_cover_ocean + land_fraction * stratocumulus_cover_land
     end
