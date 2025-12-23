@@ -161,13 +161,13 @@ $(TYPEDFIELDS)"""
     "vert advection term in the temperature equation (below+above)"
     L1::MatrixType = zeros(NF, nlayers, nlayers)
 
-    "factor in front of the div_sum_above term"
+    "factor in front of the `div_sum_above` term"
     L2::VectorType = zeros(NF, nlayers)
 
-    "_sum_above operator itself"
+    "`_sum_above` operator itself"
     L3::MatrixType = zeros(NF, nlayers, nlayers)
 
-    "factor in front of div term in Dlnps/Dt"
+    "factor in front of div term in Dlnpₛ/Dt"
     L4::VectorType = zeros(NF, nlayers)
 
     "for every l the matrix to be inverted"
