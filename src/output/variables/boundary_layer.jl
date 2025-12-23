@@ -31,11 +31,11 @@ path(::MeridionalVelocity10mOutput, simulation) = simulation.diagnostic_variable
 """$(TYPEDSIGNATURES)
 10m wind is defined using a logarithmic profile from the lowermost model layer.
 ```math
-u_{10}=u_{bottom} * ln(10/z₀) / ln(z_{bottom}/z₀)
-``` (with z in m), 
-with 
+u_{10}=u_{bottom} * \ln(10/z₀) / \ln(z_{bottom}/z₀)
+``` (with z in m),
+with
 ```math
-z_{bottom} = z_{surf} + T_{bottom} * Δp_geopot_{bottom} / g
+z_{bottom} = z_{surf} + T_{bottom} * Δpgeopot_{bottom} / g
 ```
 """
 function output!(
