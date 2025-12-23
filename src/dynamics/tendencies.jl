@@ -686,7 +686,7 @@ end
 end
 
 """$(TYPEDSIGNATURES)
-Computes ∇⋅((u, v)*A) with the option to add/overwrite `A_tend` and to
+Computes `∇⋅((u, v)*A)` with the option to add/overwrite `A_tend` and to
 `flip_sign` of the flux divergence by doing so.
 
 - `A_tend =  ∇⋅((u, v)*A)` for `add=false`, `flip_sign=false`
@@ -750,13 +750,13 @@ end
 $(TYPEDSIGNATURES)
 Compute the vorticity advection as the curl/div of the vorticity fluxes
 
-`∂ζ/∂t = ∇×(u_tend, v_tend)`
-`∂D/∂t = ∇⋅(u_tend, v_tend)`
+    ∂ζ/∂t = ∇×(u_tend, v_tend)
+    ∂D/∂t = ∇⋅(u_tend, v_tend)
 
 with
 
-`u_tend = Fᵤ + v*(ζ+f)`
-`v_tend = Fᵥ - u*(ζ+f)`
+    u_tend = Fᵤ + v*(ζ+f)
+    v_tend = Fᵥ - u*(ζ+f)
 
 with `Fᵤ, Fᵥ` from `u_tend_grid`/`v_tend_grid` that are assumed to be alread
 set in `forcing!`. Set `div=false` for the BarotropicModel which doesn't
