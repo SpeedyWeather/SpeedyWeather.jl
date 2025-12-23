@@ -824,13 +824,13 @@ end
 $(TYPEDSIGNATURES)
 Vorticity flux tendency in the shallow water equations
 
-`∂ζ/∂t = ∇×(u_tend, v_tend)`
-`∂D/∂t = ∇⋅(u_tend, v_tend)`
+    ∂ζ/∂t = ∇×(u_tend, v_tend)
+    ∂D/∂t = ∇⋅(u_tend, v_tend)
 
 with
 
-`u_tend = Fᵤ + v*(ζ+f)`
-`v_tend = Fᵥ - u*(ζ+f)`
+    u_tend = Fᵤ + v*(ζ+f)
+    v_tend = Fᵥ - u*(ζ+f)
 
 with Fᵤ, Fᵥ the forcing from `forcing!` already in `u_tend_grid`/`v_tend_grid` and
 vorticity ζ, coriolis f."""
@@ -845,12 +845,12 @@ end
 $(TYPEDSIGNATURES)
 Vorticity flux tendency in the barotropic vorticity equation
 
-`∂ζ/∂t = ∇×(u_tend, v_tend)`
+    ∂ζ/∂t = ∇×(u_tend, v_tend)
 
 with
 
-`u_tend = Fᵤ + v*(ζ+f)`
-`v_tend = Fᵥ - u*(ζ+f)`
+    u_tend = Fᵤ + v*(ζ+f)
+    v_tend = Fᵥ - u*(ζ+f)
 
 with Fᵤ, Fᵥ the forcing from `forcing!` already in `u_tend_grid`/`v_tend_grid` and
 vorticity ζ, coriolis f."""
