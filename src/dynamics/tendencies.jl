@@ -401,12 +401,12 @@ Tendencies for vorticity and divergence. Excluding Bernoulli potential with geop
 and linear pressure gradient inside the Laplace operator, which are added later in
 spectral space.
 
-    u_tend +=  v*(f+ζ) - RTᵥ'*∇lnp_x
-    v_tend += -u*(f+ζ) - RTᵥ'*∇lnp_y
+    u_tend +=  v*(f+ζ) - RTᵥ'*∇lnpₛ_x
+    v_tend += -u*(f+ζ) - RTᵥ'*∇lnpₛ_y
 
 `+=` because the tendencies already contain the parameterizations and vertical advection.
 `f` is coriolis, `ζ` relative vorticity, `R` the gas constant `Tᵥ'` the virtual temperature
-anomaly, `∇lnp` the gradient of surface pressure and `_x` and `_y` its zonal/meridional
+anomaly, `∇lnpₛ` the gradient of surface pressure and `_x` and `_y` its zonal/meridional
 components. The tendencies are then curled/dived to get the tendencies for vorticity/divergence in
 spectral space
 
