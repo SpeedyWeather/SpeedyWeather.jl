@@ -35,9 +35,9 @@ end
 
 """Coefficients to calculate the solar declination angle δ from
 
-    δ = 0.006918    - 0.399912*cos(g)  + 0.070257*sin(g)
-                    - 0.006758*cos(2g) + 0.000907*sin(2g)
-                    - 0.002697*cos(3g) + 0.001480*sin(3g)
+    δ = 0.006918 - 0.399912*cos(g)  + 0.070257*sin(g)
+                 - 0.006758*cos(2g) + 0.000907*sin(2g)
+                 - 0.002697*cos(3g) + 0.001480*sin(3g)
 
 with g the angular fraction of the year in radians. Following Spencer 1971,
 Fourier series representation of the position of the sun. Search 2(5):172.

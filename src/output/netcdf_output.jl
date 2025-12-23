@@ -474,7 +474,7 @@ include("variables/output_variables.jl")
 
 """$(TYPEDSIGNATURES)
 Checks existing folders in `path` and determine `run_number`by counting up.
-E.g. if folder run_0001 exists then run_number is 2.
+E.g. if folder `run_0001` exists then `run_number` is 2.
 Does not create a folder for the returned run id."""
 function determine_run_folder!(output::AbstractOutput)
     (; run_prefix, id, run_digits) = output

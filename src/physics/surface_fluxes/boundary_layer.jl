@@ -95,7 +95,7 @@ end
 
 """
 $(TYPEDSIGNATURES)
-Calculate the bulk richardson number following Frierson, 2006.
+Calculate the bulk Richardson number following Frierson, 2006.
 For vertical stability in the boundary layer."""
 @propagate_inbounds function bulk_richardson_surface(ij, ΔΦ₀, diagn, atmosphere)
     cₚ = atmosphere.heat_capacity

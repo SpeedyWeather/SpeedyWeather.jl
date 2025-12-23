@@ -672,22 +672,22 @@ $(TYPEDFIELDS)"""
     "path for restart file"
     path::String = pwd()
 
-    "run prefix, e.g. 'run' in 'run_0001/restart.jld2'"
+    "run prefix, e.g. 'run' in `run_0001/restart.jld2`"
     run_prefix::String = "run"
 
-    "identification of run folder, e.g. 'set1' in 'run_set1_0001/restart.jld2'"
+    "identification of run folder, e.g. 'set1' in `run_set1_0001/restart.jld2`"
     id::String = ""
 
-    "run number, e.g. 1 in 'run_set1_0001/restart.jld2'"
+    "run number, e.g. 1 in `run_set1_0001/restart.jld2`"
     run_number::Int = 1
 
-    "run digits, e.g. 4 in 'run_set1_0001/restart.jld2' for run_number=1"
+    "run digits, e.g. 4 in `run_set1_0001/restart.jld2` for run_number=1"
     run_digits::Int = 4
 
-    "directly specify the run folder, e.q. 'run_0001'"
+    "directly specify the run folder, e.q. `run_0001`"
     run_folder::String = ""
 
-    "File name of restart file, default 'restart.jld2'"
+    "File name of restart file, default `restart.jld2`"
     filename::String = "restart.jld2"
 end
 
@@ -695,7 +695,7 @@ StartFromFile(SG::SpectralGrid; kwargs...) = StartFromFile(; kwargs...)
 
 """
 $(TYPEDSIGNATURES)
-Restart from a previous SpeedyWeather.jl simulation via the restart file restart.jld2
+Restart from a previous SpeedyWeather.jl simulation via the restart file `restart.jld2`.
 Applies interpolation in the horizontal but not in the vertical."""
 function initialize!(
         progn_new::PrognosticVariables,
