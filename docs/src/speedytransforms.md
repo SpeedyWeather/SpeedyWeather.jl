@@ -235,7 +235,7 @@ therefore to associate it with the necessary grid information like its coordinat
 map = FullClenshawGrid(m, input_as=Matrix)
 
 using CairoMakie
-CairoMakie.heatmap(map)
+heatmap(map)
 save("random_pattern.png", ans) # hide
 nothing # hide
 ```
@@ -282,13 +282,24 @@ We first create a Julia `Matrix` so that the matrix-vector broadcasting `.*= k`
 is correctly applied across dimensions of `A` and then convert to a
 `LowerTriangularMatrix`.
 
+```@setup speedytransforms2a
+using RingGrids
+using LowerTriangularArrays
+using SpeedyTransforms
+using CairoMakie
+k = 1:32
+A = randn(Complex{Float32}, 32, 32)
+A .*= k.^-2
+alms = LowerTriangularArray(A)
+```
+
 Awesome. For higher degrees and orders the amplitude clearly decreases!
 Now to grid-point space and let us visualize the result
-```@example speedytransforms2
+```@example speedytransforms2a
 map = transform(alms)
 
 using CairoMakie
-CairoMakie.heatmap(map, title="k⁻²-distributed noise")
+heatmap(map, title="k⁻²-distributed noise")
 save("random_noise.png", ans) # hide
 nothing # hide
 ```
