@@ -114,8 +114,8 @@ function dynamics_tendencies!(
 end
 
 """$(TYPEDSIGNATURES)
-Compute the gradient ∇lnp_s of the logarithm of surface pressure,
-followed by its flux, (u,v) * ∇lnp_s."""
+Compute the gradient ∇ln(pₛ) of the logarithm of surface pressure,
+followed by its flux, (u,v) * ∇ln(pₛ)."""
 function pressure_gradient_flux!(
         diagn::DiagnosticVariables,
         progn::PrognosticVariables,
@@ -146,7 +146,7 @@ end
 
 """$(TYPEDSIGNATURES)
 Calculates the vertically averaged (weighted by the thickness of the σ level)
-velocities (*coslat) and divergence. E.g.
+velocities (`*coslat`) and divergence. E.g.
 
     u_mean = ∑_k=1^nlayers Δσ_k * u_k
 
@@ -322,9 +322,9 @@ Computes the tendency of the logarithm of surface pressure as
     -(ū*px + v̄*py) - D̄
 
 with ū, v̄ being the vertically averaged velocities; px, py the gradients
-of the logarithm of surface pressure ln(p_s) and D̄ the vertically averaged divergence.
-1. Calculate ∇ln(p_s) in spectral space, convert to grid.
-2. Multiply ū, v̄ with ∇ln(p_s) in grid-point space, convert to spectral.
+of the logarithm of surface pressure ln(pₛ) and D̄ the vertically averaged divergence.
+1. Calculate ∇ln(pₛ) in spectral space, convert to grid.
+2. Multiply ū, v̄ with ∇ln(pₛ) in grid-point space, convert to spectral.
 3. D̄ is subtracted in spectral space.
 4. Set tendency of the l=m=0 mode to 0 for better mass conservation."""
 function surface_pressure_tendency!(
@@ -399,7 +399,7 @@ end
 """$(TYPEDSIGNATURES)
 Tendencies for vorticity and divergence. Excluding Bernoulli potential with geopotential
 and linear pressure gradient inside the Laplace operator, which are added later in
-spectral space. 
+spectral space.
 
     u_tend +=  v*(f+ζ) - RTᵥ'*∇lnp_x
     v_tend += -u*(f+ζ) - RTᵥ'*∇lnp_y
@@ -909,7 +909,7 @@ Computes the Laplace operator ∇² of the Bernoulli potential `B` in spectral s
   2. transforms KE to spectral space
   3. adds geopotential for the Bernoulli potential in spectral space
   4. takes the Laplace operator.
-    
+
 This version is used for both ShallowWater and PrimitiveEquation, only the geopotential
 calculation in geopotential! differs."""
 function bernoulli_potential!(
@@ -1145,7 +1145,7 @@ function SpeedyTransforms.transform!(
     return nothing
 end
 
-""" 
+"""
 $(TYPEDSIGNATURES)
 Calculates the average temperature of a layer from the l=m=0 harmonic
 and stores the result in `diagn.temp_average`"""
@@ -1168,8 +1168,8 @@ The pressure gradient in the divergence equation takes the form
     -∇⋅(Rd * Tᵥ * ∇lnpₛ) = -∇⋅(Rd * Tᵥ' * ∇lnpₛ) - ∇²(Rd * Tₖ * lnpₛ)
 
 So that the second term inside the Laplace operator can be added to the geopotential.
-Rd is the gas constant, Tᵥ the virtual temperature and Tᵥ' its anomaly wrt to the
-average or reference temperature Tₖ, lnpₛ is the logarithm of surface pressure."""
+Rd is the gas constant, Tᵥ the virtual temperature, Tᵥ' its anomaly wrt to the
+average or reference temperature Tₖ, and ln(pₛ) is the logarithm of surface pressure."""
 function linear_pressure_gradient!(
         diagn::DiagnosticVariables,
         progn::PrognosticVariables,
