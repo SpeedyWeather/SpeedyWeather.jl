@@ -275,7 +275,7 @@ end
 
 """$TYPEDSIGNATURES
 Convert ring index ij to matrix index xy of grid. All 1-based.
-xy is a running index in a 2D matrix of size (`2*nlat_half`, `2*nlat_half``),
+xy is a running index in a 2D matrix of size (`2*nlat_half`, `2*nlat_half`),
 with a polar-centric view on the north pole in the middle of that matrix,
 the South Pole divided into 4 in the corners. Like a stereographic projection."""
 ring2xy(ij::Integer, grid::OctaHEALPixGrid; kwargs...) = rcq2xy(ring2rcq(ij, grid)..., grid; kwargs...)
