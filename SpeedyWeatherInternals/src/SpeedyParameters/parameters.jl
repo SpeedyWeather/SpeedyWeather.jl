@@ -206,7 +206,7 @@ generated in a corresponding `parameters(::Foo)` method definition with descript
 struct field docstring, if present. Additional parameter attributes can be supplied as keywords after the parameter,
 e.g. `@param p::T = 0.5 bounds=UnitInterval` or `@param p::T = 0.5 (bounds=UnitInterval, constant=false)`.
 
-!!! warn "Known limitations"
+!!! warning "Known limitations"
     This macro will fail to behave correctly in the following known corner cases:
 
     1. **Untyped struct fields without default values**. The macro will not work if the struct has untyped

@@ -135,7 +135,7 @@ subtypes(SpeedyWeather.AbstractShortwave)
 
 ## OneBandShortwave: Single-band shortwave radiation with diagnostic clouds
 
-!!! warn "OneBandShortwave currently not available"
+!!! warning "OneBandShortwave currently not available"
     With internal structure change for GPU acceleration this parameterization is currently unavailable.
 
 The [`OneBandShortwave`](@ref) scheme provides a single-band (broadband) shortwave radiation parameterization,
