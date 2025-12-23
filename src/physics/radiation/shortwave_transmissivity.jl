@@ -1,17 +1,25 @@
 abstract type AbstractShortwaveTransmissivity <: AbstractShortwave end
 
-# function barrier to dispatch to type of model.transmissivity
-function transmissivity!(column::ColumnVariables, model::AbstractModel)
-    return transmissivity!(column, model.transmissivity, model)
-end
-
 export TransparentShortwaveTransmissivity
-struct TransparentShortwaveTransmissivity{NF} <: AbstractShortwaveTransmissivity end
-TransparentShortwaveTransmissivity(SG::SpectralGrid) = TransparentShortwaveTransmissivity{SG.NF}()
+struct TransparentShortwaveTransmissivity <: AbstractShortwaveTransmissivity end
+Adapt.@adapt_structure TransparentShortwaveTransmissivity
+TransparentShortwaveTransmissivity(SG::SpectralGrid) = TransparentShortwaveTransmissivity()
 initialize!(::TransparentShortwaveTransmissivity, ::AbstractModel) = nothing
-function transmissivity!(column::ColumnVariables, clouds, ::TransparentShortwaveTransmissivity, ::AbstractModel, band::Int = 1)
-    column.transmissivity_longwave .= 1
-    return view(column.transmissivity_shortwave, :, band)
+
+@propagate_inbounds function transmissivity!(
+        ij,
+        diagn,
+        progn,
+        clouds,
+        ::TransparentShortwaveTransmissivity,
+        model,
+    )
+    t = diagn.dynamics.a_grid
+    nlayers = size(t, 2)
+    for k in 1:nlayers
+        t[ij, k] = one(eltype(t))
+    end
+    return t
 end
 
 export BackgroundShortwaveTransmissivity
@@ -46,45 +54,48 @@ export BackgroundShortwaveTransmissivity
     absorptivity_cloud_limit::NF = 0.14
 end
 
+Adapt.@adapt_structure BackgroundShortwaveTransmissivity
 BackgroundShortwaveTransmissivity(SG::SpectralGrid; kwargs...) = BackgroundShortwaveTransmissivity{SG.NF}(; kwargs...)
 initialize!(::BackgroundShortwaveTransmissivity, ::AbstractModel) = nothing
 
-function transmissivity!(
-        column::ColumnVariables,
+@propagate_inbounds function transmissivity!(
+        ij,
+        diagn,
+        progn,
         clouds,    # NamedTuple from clouds!
         transmissivity::BackgroundShortwaveTransmissivity,
-        model::AbstractModel,
-        band::Int = 1,  # Which spectral band to compute
+        model,
     )
-    t = view(column.transmissivity_shortwave, :, band)
+    t = diagn.dynamics.a_grid
 
     (;
         absorptivity_dry_air, absorptivity_aerosol, absorptivity_water_vapor,
         absorptivity_cloud_base, absorptivity_cloud_limit,
     ) = transmissivity
     (; cloud_top, cloud_cover) = clouds
-    (; humid, cos_zenith, nlayers) = column
+
+    humid = diagn.grid.humid_grid_prev
+    cos_zenith = diagn.physics.cos_zenith[ij]
+    nlayers = size(t, 2)
 
     sigma_levels = model.geometry.σ_levels_half
     sigma_levels_full = model.geometry.σ_levels_full
-    surface_pressure = column.pres[end]  # This is in Pa
+    surface_pressure = diagn.grid.pres_grid_prev[ij]  # Pa
 
     # Zenith angle correction factor
     azen = transmissivity.zenith_amplitude
     nzen = transmissivity.zenith_exponent
-
-    # Zenith angle correction to (downward) absorptivity
     zenit_factor = 1 + azen * (1 - cos_zenith)^nzen
 
     # Cloud absorption term based on cloud base humidity (SPEEDY logic)
-    q_base = nlayers > 1 ? humid[nlayers - 1] : humid[nlayers]
+    q_base = nlayers > 1 ? humid[ij, nlayers - 1] : humid[ij, nlayers]
     cloud_absorptivity_term = min(
         absorptivity_cloud_base * q_base,
         absorptivity_cloud_limit
     )
 
     for k in 1:nlayers
-        q = humid[k]
+        q = humid[ij, k]
 
         # Aerosol factor: use mid-level sigma, squared
         aerosol_factor = transmissivity.aerosols ? sigma_levels_full[k]^2 : 0
@@ -97,19 +108,19 @@ function transmissivity!(
                 absorptivity_water_vapor * q
         )
 
-        # Add cloud absorption below the FINAL cloud top
+        # Add cloud absorption below the final cloud top
         if k >= cloud_top
             layer_absorptivity += cloud_absorptivity_term * cloud_cover
         end
 
         # Compute differential optical depth with zenith correction
-        # CRITICAL: Normalize pressure to 10^5 Pa since absorptivities are per 10^5 Pa
+        # Normalize pressure to 1e5 Pa since absorptivities are per 1e5 Pa
         delta_sigma = sigma_levels[k + 1] - sigma_levels[k]
-        normalized_pressure = surface_pressure / 100000   # Convert Pa to units of 10^5 Pa
+        normalized_pressure = surface_pressure / 100000
         optical_depth = layer_absorptivity * delta_sigma * normalized_pressure * zenit_factor
 
         # Transmissivity through layer k
-        t[k] = exp(-optical_depth)
+        t[ij, k] = exp(-optical_depth)
     end
 
     return t
