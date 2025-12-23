@@ -76,7 +76,7 @@ $(TYPEDFIELDS)
     "= cos²(lat)"
     coslat²::VectorType = coslat .^ 2
 
-    "# = 1/cos²(lat)"
+    "= 1/cos²(lat)"
     coslat⁻²::VectorType = 1 ./ coslat²
 
     # VERTICAL SIGMA COORDINATE σ = p/p0 (fraction of surface pressure)
