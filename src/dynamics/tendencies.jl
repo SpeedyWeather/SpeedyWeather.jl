@@ -83,7 +83,7 @@ function dynamics_tendencies!(
     # ∂ln(pₛ)/∂t = -(ū, v̄)⋅∇ln(pₛ) - D̄
     surface_pressure_tendency!(diagn, spectral_transform)
 
-    # calculate vertical velocity σ̇ in sigma coordinates for the vertical mass flux M = p_s*σ̇
+    # calculate vertical velocity σ̇ in sigma coordinates for the vertical mass flux M = pₛ * σ̇
     vertical_velocity!(diagn, geometry)
 
     # add the RTₖlnpₛ term to geopotential
@@ -101,7 +101,7 @@ function dynamics_tendencies!(
     # horizontal advection of humidity (nothing for wetcore)
     humidity_tendency!(diagn, model)
 
-    # add -∇²(E+ϕ+RTₖlnpₛ) term to div tendency
+    # add -∇²(E + ϕ + RTₖlnpₛ) term to div tendency
     bernoulli_potential!(diagn, spectral_transform)
 
     # advect all tracers
