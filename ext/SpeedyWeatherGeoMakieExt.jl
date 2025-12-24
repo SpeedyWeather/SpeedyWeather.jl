@@ -74,7 +74,7 @@ function SpeedyWeather.animate(
 
     # Get dimensions
     lon = longitude_shift_180(ds["lon"][:]) # longitudes -180 to 180
-    lat = ds["lat"][:]
+    lat = reverse(ds["lat"][:]) # latitudes -90 to 90
     time = ds["time"][:]
 
     # Get time units for proper labeling
@@ -105,13 +105,28 @@ function SpeedyWeather.animate(
 
     tsteps = Observable(transient_timesteps + 1)
 
-    # Create data based on tsteps
-    if is_3d
-        # For 3D variables, extract the specified level
-        data = @lift ds[variable].var[:, :, level, $tsteps]
-    else
-        # For 2D variables
-        data = @lift ds[variable].var[:, :, $tsteps]
+    spatial_dims = dimnames(ds[variable])
+    lon_idx = findfirst(==("lon"), spatial_dims)
+    lat_idx = findfirst(==("lat"), spatial_dims)
+
+    n_lon = length(lon)
+    shift_amt = div(n_lon, 2)
+
+    data = @lift begin
+        raw_slice = if is_3d
+             ds[variable].var[:, :, level, $tsteps]
+        else
+             ds[variable].var[:, :, $tsteps]
+        end
+
+        # Make sure the array is shaped correctly
+        standardized = permutedims(raw_slice, (lon_idx, lat_idx))
+
+        # Apply same transformations as the lat/lons
+        rolled = circshift(standardized, (shift_amt, 0))
+        transf_data = reverse(rolled, dims=lat_idx)
+
+        transf_data
     end
 
     # Determine color range if not specified
