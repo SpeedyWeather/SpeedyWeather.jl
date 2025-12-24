@@ -49,11 +49,12 @@ initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
 
 # function barrier
 @propagate_inbounds parameterization!(ij, diagn, progn, drag::BulkRichardsonDrag, model) =
-    boundary_layer_drag!(ij, diagn, drag, model.land_sea_mask, model.atmosphere, model.planet, model.orography)
+    boundary_layer_drag!(ij, diagn, progn, drag, model.land_sea_mask, model.atmosphere, model.planet, model.orography)
 
 @propagate_inbounds function boundary_layer_drag!(
         ij,
         diagn,
+        progn,
         drag::BulkRichardsonDrag,
         land_sea_mask,
         atmosphere,
@@ -70,7 +71,8 @@ initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
     # maximum drag Cmax from that height, stable conditions would decrease Cmax towards 0
     # Frierson 2006, eq (12)
     κ = drag.von_Karman
-    z₀ = land_fraction * drag.roughness_length_land + (1 - land_fraction) * drag.roughness_length_ocean
+    # z₀ = land_fraction * drag.roughness_length_land + (1 - land_fraction) * drag.roughness_length_ocean
+    z₀ = land_fraction * surface_roughness_land(ij, diagn, progn) + (1 - land_fraction) * surface_roughness_ocean(ij, diagn, progn)
 
     # should be z > z₀, z=z₀ means an infinitely high drag
     # 0 < z < z₀ doesn't make sense so cap here
@@ -92,6 +94,86 @@ initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
     diagn.physics.boundary_layer_drag[ij] = max(drag_min, drag_max * (1 - Ri / Ri_c)^2)
     return nothing
 end
+
+const OCEAN_ROUGHNESS_MODEL_REF = Ref{ONNXRunTime.InferenceSession}()
+const LAND_ROUGHNESS_MODEL_REF = Ref{ONNXRunTime.InferenceSession}()
+
+# 2. A private helper function to avoid repeating code
+function _load_model_safe!(ref_container, filename)
+    path = joinpath(@__DIR__, "../../../input_data", filename)
+
+    if !isfile(path)
+        @warn "ONNX Model not found at $path"
+    else
+        # Load directly into the container passed as argument
+        ref_container[] = ONNXRunTime.load_inference(path)
+    end
+end
+
+# 3. The SINGLE __init__ function
+function __init__()
+    # Load Ocean Model
+    _load_model_safe!(OCEAN_ROUGHNESS_MODEL_REF, "ocean_model/model.onnx")
+
+    # Load Land Model
+    _load_model_safe!(LAND_ROUGHNESS_MODEL_REF, "land_model/rf_z0_land_model.onnx")
+end
+
+
+const O_INPUT_MEANS = Float32[0.14675693, 0.24450141, 0.17968568, 7.6465526]
+const O_INPUT_STDS  = Float32[0.3357911, 6.3831706, 5.53958, 3.6144474]
+const O_OUTPUT_MEAN = Float32(-8.76918)
+const O_OUTPUT_STD  = Float32(1.2418048)
+
+const L_INPUT_MEANS = Float32[0.100255094, 0.154690117, 16791.6582, 6.33934355]
+const L_INPUT_STDS  = Float32[0.27687377, 0.32951584, 11649.544, 4.8004246]
+const L_OUTPUT_MEAN = Float32(-5.0261893)
+const L_OUTPUT_STD  = Float32(2.4474483)
+
+@propagate_inbounds function surface_roughness_ocean(ij, diagn, progn)
+    surface = diagn.nlayers
+
+    UVₛ = diagn.physics.surface_wind_speed[ij]
+    Uₛ = diagn.grid.u_grid[ij, surface]
+    Vₛ = diagn.grid.v_grid[ij, surface]
+    ℵ = progn.ocean.sea_ice_concentration[ij]
+    
+    norm_ℵ   = (ℵ - O_INPUT_MEANS[1]) / O_INPUT_STDS[1]
+    norm_Uₛ  = (Uₛ - O_INPUT_MEANS[2]) / O_INPUT_STDS[2]
+    norm_Vₛ  = (Vₛ - O_INPUT_MEANS[3]) / O_INPUT_STDS[3]
+    norm_UVₛ = (UVₛ - O_INPUT_MEANS[4]) / O_INPUT_STDS[4]
+
+    predictors = [norm_ℵ  norm_Uₛ  norm_Vₛ  norm_UVₛ]
+    input = Dict("x_input" => predictors)
+
+    prediction = OCEAN_ROUGHNESS_MODEL_REF[](input)["linear_5"][1]
+    log_surface_roughness = (prediction * O_OUTPUT_STD) + O_OUTPUT_MEAN
+    surface_roughness = exp(log_surface_roughness)
+    return Float32(surface_roughness)
+end
+
+@propagate_inbounds function surface_roughness_land(ij, diagn, progn)
+    sd = progn.land.snow_depth[ij]
+    g = diagn.dynamics.geopotential[ij]
+    vₕ = diagn.physics.land.vegetation_high[ij]
+    vₗ = diagn.physics.land.vegetation_low[ij]
+    
+    norm_vₕ = (vₕ - L_INPUT_MEANS[1]) / L_INPUT_STDS[1]
+    norm_vₗ = (vₗ - L_INPUT_MEANS[2]) / L_INPUT_STDS[2]
+    norm_g = (g - L_INPUT_MEANS[3]) / L_INPUT_STDS[3]
+    norm_sd = (sd - L_INPUT_MEANS[4]) / L_INPUT_STDS[4]
+
+    raw_predictors = [norm_vₕ norm_vₗ norm_g norm_sd]
+    predictors = Float32.(real.(raw_predictors))
+    input = Dict("float_input" => predictors)
+
+    prediction = LAND_ROUGHNESS_MODEL_REF[](input)["variable"][1]
+    log_surface_roughness = (prediction * L_OUTPUT_STD) + L_OUTPUT_MEAN
+    surface_roughness = exp(log_surface_roughness)
+    return Float32(surface_roughness)
+end
+
+
 
 """
 $(TYPEDSIGNATURES)
