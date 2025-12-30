@@ -74,7 +74,7 @@ function SpeedyWeather.animate(
 
     # Get dimensions
     lon = longitude_shift_180(ds["lon"][:]) # longitudes -180 to 180
-    lat = reverse(ds["lat"][:]) # latitudes -90 to 90
+    lat = sort(ds["lat"][:]) # lats -90 to 90
     time = ds["time"][:]
 
     # Get time units for proper labeling
@@ -105,12 +105,14 @@ function SpeedyWeather.animate(
 
     tsteps = Observable(transient_timesteps + 1)
 
+    # Find index of each dimension before transforming
     spatial_dims = dimnames(ds[variable])
     lon_idx = findfirst(==("lon"), spatial_dims)
     lat_idx = findfirst(==("lat"), spatial_dims)
 
+    # Translation length depends on number of gridboxes
     n_lon = length(lon)
-    shift_amt = div(n_lon, 2)
+    shift_amt = div(n_lon, 2)  # Num lons is usually even
 
     data = @lift begin
         raw_slice = if is_3d
