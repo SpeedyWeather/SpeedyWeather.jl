@@ -1,11 +1,11 @@
 abstract type AbstractSurfaceHeatFlux <: AbstractParameterization end
 
 export SurfaceHeatFlux
-@parameterized 
+
 """Composite surface (sensible) heat flux type that holds flux
 for ocean and land (each of any type) separately. Fields are
 $(TYPEDFIELDS)"""
-@kwdef struct SurfaceHeatFlux{Ocean, Land} <: AbstractSurfaceHeatFlux
+@parameterized @kwdef struct SurfaceHeatFlux{Ocean, Land} <: AbstractSurfaceHeatFlux
     @component ocean::Ocean = SurfaceOceanHeatFlux()
     @component land::Land = SurfaceLandHeatFlux()
 end
@@ -33,12 +33,12 @@ end
 end
 
 export SurfaceOceanHeatFlux
-@parameterized 
+
 """Surface sensible heat flux parameterization over ocean. Calculates the 
 turbulent exchange of sensible heat between the ocean surface and the atmosphere
 based on temperature differences and wind speed. Uses bulk aerodynamic formulas
 with drag coefficients. Fields are $(TYPEDFIELDS)"""
-@kwdef struct SurfaceOceanHeatFlux{NF} <: AbstractSurfaceHeatFlux
+@parameterized @kwdef struct SurfaceOceanHeatFlux{NF} <: AbstractSurfaceHeatFlux
     "[OPTION] Use drag coefficient from calculated following model.boundary_layer_drag"
     use_boundary_layer_drag::Bool = true
 
@@ -95,13 +95,13 @@ end
 
 
 export SurfaceLandHeatFlux
-@parameterized 
+ 
 """Surface sensible heat flux parameterization over land. Calculates the 
 turbulent exchange of sensible heat between the land surface and the atmosphere
 based on soil temperature differences and wind speed. Uses bulk aerodynamic 
 formulas with drag coefficients that can account for surface roughness. 
 Fields are $(TYPEDFIELDS)"""
-@kwdef struct SurfaceLandHeatFlux{NF} <: AbstractSurfaceHeatFlux
+@parameterized @kwdef struct SurfaceLandHeatFlux{NF} <: AbstractSurfaceHeatFlux
     "[OPTION] Use drag coefficient from calculated following model.boundary_layer_drag"
     use_boundary_layer_drag::Bool = true
 

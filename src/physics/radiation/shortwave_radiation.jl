@@ -61,12 +61,6 @@ end
 
 export OneBandShortwave
 
-@parameterized struct OneBandShortwave{C, T, R} <: AbstractShortwave
-    @component clouds::C
-    @component transmittance::T
-    @component radiative_transfer::R
-end
-
 """
     OneBandShortwave <: AbstractShortwave
 
@@ -77,11 +71,12 @@ based on relative humidity and precipitation, with radiative transfer through cl
 Cloud cover is calculated as a combination of relative humidity and precipitation contributions,
 and a cloud albedo is applied to the downward beam. Fields and options are
 
-$(TYPEDFIELDS)"""
-struct OneBandShortwave{C, T, R} <: AbstractShortwave
-    clouds::C
-    transmissivity::T
-    radiative_transfer::R
+$(TYPEDFIELDS)
+"""
+@parameterized @kwdef struct OneBandShortwave{C, T, R} <: AbstractShortwave
+    @component clouds::C
+    @component transmittance::T
+    @component radiative_transfer::R
 end
 
 # primitive wet model version

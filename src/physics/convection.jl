@@ -384,7 +384,7 @@ export ConvectiveHeating
 """Convective heating as defined by Lee and Kim, 2003, JAS
 implemented as convection parameterization. Fields are
 $(TYPEDFIELDS)"""
-@kwdef struct ConvectiveHeating{NF, VectorType} <: AbstractConvection
+@parameterized @kwdef struct ConvectiveHeating{NF, VectorType} <: AbstractConvection
     "[OPTION] Q_max heating strength as 1K/time_scale"
     time_scale::Second = Hour(12)
 

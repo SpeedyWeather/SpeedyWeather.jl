@@ -5,7 +5,7 @@ export SurfaceHumidityFlux
 """Composite surface humidity flux type that holds flux
 for ocean and land (each of any type) separately. Fields are
 $(TYPEDFIELDS)"""
-@kwdef struct SurfaceHumidityFlux{Ocean, Land} <: AbstractSurfaceHumidityFlux
+@parameterized @kwdef struct SurfaceHumidityFlux{Ocean, Land} <: AbstractSurfaceHumidityFlux
     "[OPTION] Surface humidity flux parameterization for ocean surfaces"
     @component ocean::Ocean
 
@@ -14,12 +14,6 @@ $(TYPEDFIELDS)"""
 end
 
 Adapt.@adapt_structure SurfaceHumidityFlux
-
-# generator function and defaults
-@parameterized @kwdef struct SurfaceHumidityFlux{Ocean, Land} <: AbstractSurfaceHumidityFlux
-    @component ocean::Ocean = SurfaceOceanHumidityFlux()
-    @component land::Land = SurfaceLandHumidityFlux()
-end
 
 function SurfaceHumidityFlux(
         SG::SpectralGrid;
@@ -43,8 +37,8 @@ end
 end
 
 export SurfaceOceanHumidityFlux
-@parameterized """Humidity flux parameterization over ocean surfaces. Fields are $(TYPEDFIELDS)"""
-@kwdef struct SurfaceOceanHumidityFlux{NF} <: AbstractSurfaceHumidityFlux
+"""Humidity flux parameterization over ocean surfaces. Fields are $(TYPEDFIELDS)"""
+@parameterized @kwdef struct SurfaceOceanHumidityFlux{NF} <: AbstractSurfaceHumidityFlux
     "[OPTION] Use drag coefficient from calculated following model.boundary_layer_drag"
     use_boundary_layer_drag::Bool = true
 
@@ -101,8 +95,8 @@ initialize!(::SurfaceOceanHumidityFlux, ::PrimitiveWet) = nothing
 end
 
 export SurfaceLandHumidityFlux
-@parameterized """Humidity flux parameterization over land surfaces. Fields are $(TYPEDFIELDS)"""
-@kwdef struct SurfaceLandHumidityFlux{NF} <: AbstractSurfaceHumidityFlux
+"""Humidity flux parameterization over land surfaces. Fields are $(TYPEDFIELDS)"""
+@parameterized @kwdef struct SurfaceLandHumidityFlux{NF} <: AbstractSurfaceHumidityFlux
     "[OPTION] Use column.boundary_layer_drag coefficient"
     use_boundary_layer_drag::Bool = true
 

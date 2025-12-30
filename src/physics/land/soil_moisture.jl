@@ -148,10 +148,10 @@ end
 
 export LandBucketMoisture
 
-@parameterized """LandBucketMoisture model with two soil layers exchanging moisture via vertical diffusion.
+"""LandBucketMoisture model with two soil layers exchanging moisture via vertical diffusion.
 Forced by precipitation, evaporation, surface condensation, snow melt and river runoff drainage.
 $(TYPEDFIELDS)"""
-@kwdef struct LandBucketMoisture{NF} <: AbstractSoilMoisture
+@parameterized @kwdef struct LandBucketMoisture{NF} <: AbstractSoilMoisture
     "[OPTION] Time scale of vertical diffusion [s]"
     time_scale::Second = Day(2)
 
