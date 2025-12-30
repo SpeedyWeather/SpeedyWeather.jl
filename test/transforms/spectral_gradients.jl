@@ -1,7 +1,7 @@
 @testset "Divergence of a non-divergent flow zero?" begin
     @testset for NF in (Float32, Float64)
 
-        spectral_grid = SpectralGrid(; NF, nlayers=1)
+        spectral_grid = SpectralGrid(; NF, nlayers = 1)
         model = ShallowWaterModel(spectral_grid)
         simulation = initialize!(model)
         progn = simulation.prognostic_variables
@@ -27,14 +27,14 @@
 
         RingGrids.scale_coslat⁻¹!(u_grid)
         RingGrids.scale_coslat⁻¹!(v_grid)
-        
+
         uω_coslat⁻¹ = diagn.dynamics.a
         vω_coslat⁻¹ = diagn.dynamics.b
-        
+
         S = model.spectral_transform
         SpeedyWeather.transform!(uω_coslat⁻¹, u_grid, S)
         SpeedyWeather.transform!(vω_coslat⁻¹, v_grid, S)
-    
+
         div = get_step(progn.div, 1)
         SpeedyWeather.divergence!(div, uω_coslat⁻¹, vω_coslat⁻¹, S)
 
@@ -47,7 +47,7 @@ end
 @testset "Curl of an irrotational flow zero?" begin
     @testset for NF in (Float32, Float64)
 
-        spectral_grid = SpectralGrid(; NF, nlayers=1)
+        spectral_grid = SpectralGrid(; NF, nlayers = 1)
         model = ShallowWaterModel(spectral_grid)
         simulation = initialize!(model)
         progn = simulation.prognostic_variables
@@ -77,7 +77,7 @@ end
 
         # calculate uω, vω in spectral space
         (; coriolis, geometry, spectral_transform) = model
-        SpeedyWeather.vorticity_flux_curldiv!(diagn, coriolis, geometry, spectral_transform, div=true)
+        SpeedyWeather.vorticity_flux_curldiv!(diagn, coriolis, geometry, spectral_transform, div = true)
 
         for div_lm in diagn.tendencies.div_tend
             @test abs(div_lm) < sqrt(eps(NF))
@@ -87,25 +87,27 @@ end
 
 @testset "Scale, unscale coslat" begin
     @testset for NF in (Float32, Float64)
-        for Grid in (   FullGaussianGrid,
-                        FullClenshawGrid,
-                        OctahedralGaussianGrid,
-                        OctahedralClenshawGrid,
-                        HEALPixGrid)
+        for Grid in (
+                FullGaussianGrid,
+                FullClenshawGrid,
+                OctahedralGaussianGrid,
+                OctahedralClenshawGrid,
+                HEALPixGrid,
+            )
 
-            SG = SpectralGrid(; NF, Grid, nlayers=1)
+            SG = SpectralGrid(; NF, Grid, nlayers = 1)
 
             A = Grid(randn(NF, SG.npoints))
             B = copy(A)
             RingGrids.scale_coslat⁻¹!(A)
             RingGrids.scale_coslat!(A)
 
-            @test all(isapprox.(A, B, rtol=10*eps(NF)))
+            @test all(isapprox.(A, B, rtol = 10 * eps(NF)))
 
             RingGrids.scale_coslat²!(A)
             RingGrids.scale_coslat⁻²!(A)
 
-            @test all(isapprox.(A, B, rtol=10*eps(NF)))
+            @test all(isapprox.(A, B, rtol = 10 * eps(NF)))
         end
     end
 end
@@ -121,12 +123,12 @@ end
         B = zeros(LowerTriangularMatrix{Complex{NF}}, S.spectrum)
         C = zeros(LowerTriangularMatrix{Complex{NF}}, S.spectrum)
 
-        SpeedyWeather.divergence!(B, A1, A2, S, flipsign=true)
-        SpeedyWeather.divergence!(C, A1, A2, S, flipsign=false)
+        SpeedyWeather.divergence!(B, A1, A2, S, flipsign = true)
+        SpeedyWeather.divergence!(C, A1, A2, S, flipsign = false)
         @test C == -B
 
-        SpeedyWeather.curl!(B, A1, A2, S, flipsign=true)
-        SpeedyWeather.curl!(C, A1, A2, S, flipsign=false)
+        SpeedyWeather.curl!(B, A1, A2, S, flipsign = true)
+        SpeedyWeather.curl!(C, A1, A2, S, flipsign = false)
         @test C == -B
     end
 end
@@ -142,23 +144,23 @@ end
         B = zeros(LowerTriangularMatrix{Complex{NF}}, S.spectrum)
         C = zeros(LowerTriangularMatrix{Complex{NF}}, S.spectrum)
 
-        SpeedyWeather.divergence!(B, A1, A2, S, add=true)
-        SpeedyWeather.divergence!(B, A1, A2, S, add=true)
-        SpeedyWeather.divergence!(C, A1, A2, S, add=false)
+        SpeedyWeather.divergence!(B, A1, A2, S, add = true)
+        SpeedyWeather.divergence!(B, A1, A2, S, add = true)
+        SpeedyWeather.divergence!(C, A1, A2, S, add = false)
         @test 2C == B
 
-        SpeedyWeather.divergence!(B, A1, A2, S, add=true)
-        SpeedyWeather.divergence!(B, A1, A2, S, add=true, flipsign=true)
+        SpeedyWeather.divergence!(B, A1, A2, S, add = true)
+        SpeedyWeather.divergence!(B, A1, A2, S, add = true, flipsign = true)
         @test all(2C .≈ B)
 
         fill!(B, 0)
-        SpeedyWeather.curl!(B, A1, A2, S, add=true)
-        SpeedyWeather.curl!(B, A1, A2, S, add=true)
-        SpeedyWeather.curl!(C, A1, A2, S, add=false)
+        SpeedyWeather.curl!(B, A1, A2, S, add = true)
+        SpeedyWeather.curl!(B, A1, A2, S, add = true)
+        SpeedyWeather.curl!(C, A1, A2, S, add = false)
         @test 2C == B
 
-        SpeedyWeather.curl!(B, A1, A2, S, add=true)
-        SpeedyWeather.curl!(B, A1, A2, S, add=true, flipsign=true)
+        SpeedyWeather.curl!(B, A1, A2, S, add = true)
+        SpeedyWeather.curl!(B, A1, A2, S, add = true, flipsign = true)
         @test all(2C .≈ B)
     end
 end
@@ -166,7 +168,7 @@ end
 @testset "D, ζ -> u, v -> D, ζ" begin
     @testset for NF in (Float32, Float64)
 
-        spectral_grid = SpectralGrid(; NF, nlayers=2)
+        spectral_grid = SpectralGrid(; NF, nlayers = 2)
         model = PrimitiveDryModel(spectral_grid)
         simulation = initialize!(model)
         progn = simulation.prognostic_variables
@@ -181,7 +183,7 @@ end
         # create initial conditions
         vor .= rand(Complex{NF}, size(vor)...)
         div .= rand(Complex{NF}, size(div)...)
-        
+
         for k in eachmatrix(vor, div)
             vor[1, k] = 0     # zero mean on every layer
             div[1, k] = 0
@@ -191,8 +193,8 @@ end
         SpeedyTransforms.zero_imaginary_zonal_modes!(vor)
         SpeedyTransforms.zero_imaginary_zonal_modes!(div)
 
-        spectral_truncation!(vor)      # set unusued last row (l=lmax+1) to zero
-        spectral_truncation!(div)
+        SpeedyTransforms.spectral_truncation!(vor)      # set unusued last row (l=lmax+1) to zero
+        SpeedyTransforms.spectral_truncation!(div)
 
         # get corresponding u_grid, v_grid (excl *coslat scaling)
         lf = 1
@@ -217,8 +219,8 @@ end
 
         for lm in eachindex(vor, div, vor2, div2)
             # increased to 30 as 10, 20 caused single fails every now and then
-            @test vor[lm] ≈ vor2[lm] rtol=30*sqrt(eps(NF))
-            @test div[lm] ≈ div2[lm] rtol=30*sqrt(eps(NF))
+            @test vor[lm] ≈ vor2[lm] rtol = 30 * sqrt(eps(NF))
+            @test div[lm] ≈ div2[lm] rtol = 30 * sqrt(eps(NF))
         end
     end
 end
@@ -233,41 +235,41 @@ end
         S = SpectralTransform(alms)
 
         # ∇⁻²! same as inverse=true
-        SpeedyWeather.∇²!(alms2, alms, S, inverse=true);
-        SpeedyWeather.∇⁻²!(alms3, alms, S);
+        SpeedyWeather.∇²!(alms2, alms, S, inverse = true)
+        SpeedyWeather.∇⁻²!(alms3, alms, S)
         @test alms2 == alms3
 
         # test add=true
         fill!(alms2, 0)
-        SpeedyWeather.∇²!(alms2, alms, S, add=true);
-        SpeedyWeather.∇²!(alms3, alms, S);
+        SpeedyWeather.∇²!(alms2, alms, S, add = true)
+        SpeedyWeather.∇²!(alms3, alms, S)
         @test alms2 == alms3
 
         # also for inverse
         fill!(alms2, 0)
-        SpeedyWeather.∇⁻²!(alms2, alms, S, add=true);
-        SpeedyWeather.∇⁻²!(alms3, alms, S);
+        SpeedyWeather.∇⁻²!(alms2, alms, S, add = true)
+        SpeedyWeather.∇⁻²!(alms3, alms, S)
         @test alms2 == alms3
 
         # test flipsign
-        SpeedyWeather.∇²!(alms2, alms, S, flipsign=true);
-        SpeedyWeather.∇²!(alms3, alms, S);
+        SpeedyWeather.∇²!(alms2, alms, S, flipsign = true)
+        SpeedyWeather.∇²!(alms3, alms, S)
         @test alms2 == -alms3
 
         # also for inverse
-        SpeedyWeather.∇⁻²!(alms2, alms, S, flipsign=true);
-        SpeedyWeather.∇⁻²!(alms3, alms, S);
+        SpeedyWeather.∇⁻²!(alms2, alms, S, flipsign = true)
+        SpeedyWeather.∇⁻²!(alms3, alms, S)
         @test alms2 == -alms3
 
         # test ∇²(∇⁻²) = 1
         alms[1] = 0     # remove 0-mode which is set to zero
-        SpeedyWeather.∇²!(alms2, alms, S);
-        SpeedyWeather.∇⁻²!(alms3, alms2, S);
+        SpeedyWeather.∇²!(alms2, alms, S)
+        SpeedyWeather.∇⁻²!(alms3, alms2, S)
         @test alms ≈ alms3
 
         # and ∇⁻²(∇²) = 1
-        SpeedyWeather.∇⁻²!(alms2, alms, S);
-        SpeedyWeather.∇²!(alms3, alms2, S);
+        SpeedyWeather.∇⁻²!(alms2, alms, S)
+        SpeedyWeather.∇²!(alms3, alms2, S)
         @test alms ≈ alms3
     end
 end
@@ -277,20 +279,20 @@ end
         for NF in (Float32, Float64)
 
             trunc = 31
-            spectral_grid = SpectralGrid(; NF, trunc, Grid=FullGaussianGrid, nlayers)
+            spectral_grid = SpectralGrid(; NF, trunc, Grid = FullGaussianGrid, nlayers)
             model = PrimitiveDryModel(spectral_grid)
             simulation = initialize!(model)
             progn = simulation.prognostic_variables
             diagn = simulation.diagnostic_variables
 
             a = randn(LowerTriangularArray{Complex{NF}}, spectral_grid.spectrum, nlayers)
-            spectral_truncation!(a)
+            SpeedyTransforms.spectral_truncation!(a)
             SpeedyTransforms.zero_imaginary_zonal_modes!(a)
 
             dadx, dady = ∇(a, model.spectral_transform)
             dadx_grid = transform(dadx, model.spectral_transform)
             dady_grid = transform(dady, model.spectral_transform)
-            
+
             RingGrids.scale_coslat⁻²!(dadx_grid)
             RingGrids.scale_coslat⁻²!(dady_grid)
 
@@ -301,15 +303,15 @@ end
             ∇x∇a = curl(dadx, dady, model.spectral_transform)
 
             for lm in eachharmonic(∇x∇a)
-                @test ∇x∇a[lm] ≈ 0 atol=5*sqrt(eps(NF))
+                @test ∇x∇a[lm] ≈ 0 atol = 5 * sqrt(eps(NF))
             end
-            
+
             # DIV(GRAD(A)) = LAPLACE(A)
             ∇dot∇a = divergence(dadx, dady, model.spectral_transform)
             ∇²a = ∇²(a, model.spectral_transform)
 
             for lm in eachindex(∇dot∇a, ∇²a)
-                @test ∇dot∇a[lm] ≈ ∇²a[lm] atol=5*sqrt(eps(NF)) rtol=5*sqrt(eps(NF))
+                @test ∇dot∇a[lm] ≈ ∇²a[lm] atol = 5 * sqrt(eps(NF)) rtol = 5 * sqrt(eps(NF))
             end
         end
     end

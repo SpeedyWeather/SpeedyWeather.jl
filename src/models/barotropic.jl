@@ -11,37 +11,38 @@ passed on as keyword arguments, e.g. `planet=Earth(spectral_grid)`. Fields, repr
 model components, are
 $(TYPEDFIELDS)"""
 @parameterized @kwdef mutable struct BarotropicModel{
-    AR,     # <:AbstractArchitecture,
-    GE,     # <:AbstractGeometry,
-    PL,     # <:AbstractPlanet,
-    AT,     # <:AbstractAtmosphere,
-    CO,     # <:AbstractCoriolis,
-    FR,     # <:AbstractForcing,
-    DR,     # <:AbstractDrag,
-    PA,     # <:AbstractParticleAdvection,
-    IC,     # <:AbstractInitialConditions,
-    RP,     # <:AbstractRandomProcess,
-    TS,     # <:AbstractTimeStepper,
-    ST,     # <:SpectralTransform{NF},
-    IM,     # <:AbstractImplicit,
-    HD,     # <:AbstractHorizontalDiffusion,
-    OU,     # <:AbstractOutput,
-    FB,     # <:AbstractFeedback,
-} <: Barotropic
-    
-    spectral_grid::SpectralGrid
+        SG,     # <:SpectralGrid
+        AR,     # <:AbstractArchitecture,
+        GE,     # <:AbstractGeometry,
+        PL,     # <:AbstractPlanet,
+        AT,     # <:AbstractAtmosphere,
+        CO,     # <:AbstractCoriolis,
+        FR,     # <:AbstractForcing,
+        DR,     # <:AbstractDrag,
+        PA,     # <:AbstractParticleAdvection,
+        IC,     # <:AbstractInitialConditions,
+        RP,     # <:AbstractRandomProcess,
+        TS,     # <:AbstractTimeStepper,
+        ST,     # <:SpectralTransform{NF},
+        IM,     # <:AbstractImplicit,
+        HD,     # <:AbstractHorizontalDiffusion,
+        OU,     # <:AbstractOutput,
+        FB,     # <:AbstractFeedback,
+    } <: Barotropic
+
+    spectral_grid::SG
     architecture::AR = spectral_grid.architecture
-    
+
     # DYNAMICS
     @component geometry::GE = Geometry(spectral_grid)
     @component planet::PL = Earth(spectral_grid)
-    @component atmosphere::AT = EarthAtmosphere(spectral_grid)
+    @component atmosphere::AT = EarthDryAtmosphere(spectral_grid)
     @component coriolis::CO = Coriolis(spectral_grid)
     @component forcing::FR = KolmogorovFlow(spectral_grid)
     @component drag::DR = LinearVorticityDrag(spectral_grid)
     @component particle_advection::PA = nothing
-    @component initial_conditions::IC = InitialConditions(Barotropic)
-    
+    @component initial_conditions::IC = InitialConditions(spectral_grid, Barotropic)
+
     # VARIABLES
     random_process::RP = nothing
     tracers::TRACER_DICT = TRACER_DICT()
@@ -60,6 +61,13 @@ end
 
 prognostic_variables(::Type{<:Barotropic}) = (:vor,)
 default_concrete_model(::Type{Barotropic}) = BarotropicModel
+
+parameters(model::Barotropic; kwargs...) = SpeedyParams(
+    planet = parameters(model.planet; component = :planet, kwargs...),
+    atmosphere = parameters(model.atmosphere; component = :atmosphere, kwargs...),
+    forcing = parameters(model.forcing; component = :forcing, kwargs...),
+    drag = parameters(model.drag; component = :drag, kwargs...),
+)
 
 """
 $(TYPEDSIGNATURES)
@@ -83,13 +91,13 @@ function initialize!(model::Barotropic; time::DateTime = DEFAULT_DATE)
     initialize!(model.particle_advection, model)
 
     # allocate prognostic and diagnostic variables
-    prognostic_variables = PrognosticVariables(spectral_grid, model)
-    diagnostic_variables = DiagnosticVariables(spectral_grid, model)
-    
+    prognostic_variables = PrognosticVariables(model)
+    diagnostic_variables = DiagnosticVariables(model)
+
     # initialize particles (or other non-atmosphere prognostic variables)
     initialize!(prognostic_variables.particles, prognostic_variables, diagnostic_variables, model)
-    
-    # set the initial conditions 
+
+    # set the initial conditions
     initialize!(prognostic_variables, model.initial_conditions, model)
     (; clock) = prognostic_variables
     clock.time = time       # set the current time

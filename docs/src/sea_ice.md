@@ -90,7 +90,7 @@ sea_ice = ThermodynamicSeaIce(spectral_grid)
 and most often together with an albedo that scales linearly with sea ice concentration
 
 ```@example sea_ice
-albedo = Albedo(ocean=OceanSeaIceAlbedo(spectral_grid), land=AlbedoClimatology(spectral_grid))
+albedo = OceanLandAlbedo(ocean=OceanSeaIceAlbedo(spectral_grid), land=AlbedoClimatology(spectral_grid))
 ```
 
 Using `ocean=GlobalConstantAlbedo(0.06)` instead would disable the effect of sea ice on
@@ -115,9 +115,8 @@ And output is added like
 add!(model, SpeedyWeather.SeaIceConcentrationOutput())
 ```
 
-or as part of `SpeedyWeather.OceanOutput()` which however needs splatting `...`
-to unpack the tuple
+or as part of `SpeedyWeather.OceanOutput()`
 
 ```@example sea_ice
-add!(model, SpeedyWeather.OceanOutput()...)
+add!(model, SpeedyWeather.OceanOutput())
 ```

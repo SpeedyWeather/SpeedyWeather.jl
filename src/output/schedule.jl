@@ -22,12 +22,12 @@ $(TYPEDFIELDS)"""
 Base.@kwdef mutable struct Schedule <: AbstractSchedule
     "[OPTION] Execute every time period, first timestep excluded. Default=never."
     every::Second = Second(typemax(Int))
-    
+
     "[OPTION] Events scheduled at times"
-    times::Vector{DateTime} = zeros(DateTime,0)
+    times::Vector{DateTime} = zeros(DateTime, 0)
 
     "Actual schedule, true=execute this timestep, false=don't"
-    schedule::BitVector = BitVector(undef,0)
+    schedule::BitVector = BitVector(undef, 0)
 
     "Number of scheduled executions"
     steps::Int = length(schedule)
@@ -40,7 +40,7 @@ end
 $(TYPEDSIGNATURES)
 A Schedule based on DateTime arguments, For two consecutive time steps i, i+1, an event is
 scheduled at i+1 when it occurs in (i,i+1]."""
-Schedule(times::DateTime...) = Schedule(times=DateTime[times...])
+Schedule(times::DateTime...) = Schedule(times = DateTime[times...])
 
 """
 $(TYPEDSIGNATURES)
@@ -53,11 +53,11 @@ function initialize!(scheduler::Schedule, clock::Clock)
 
     # PERIODIC SCHEDULE, always AFTER scheduler.every time period has passed
     if scheduler.every.value < typemax(Int)
-        every_n_timesteps = max(1, round(Int, scheduler.every/clock.Δt))
+        every_n_timesteps = max(1, round(Int, scheduler.every / clock.Δt))
         schedule[every_n_timesteps:every_n_timesteps:end] .= true
 
         prev_every = readable_secs(scheduler.every.value)
-        scheduler.every = Second(Dates.second(every_n_timesteps*clock.Δt))
+        scheduler.every = Second(Dates.second(every_n_timesteps * clock.Δt))
         now_every = readable_secs(scheduler.every.value)
         s = "Scheduler adjusted from every $prev_every to every $now_every to match timestep."
         now_every != prev_every && @info s
@@ -66,9 +66,9 @@ function initialize!(scheduler::Schedule, clock::Clock)
     # ADD EVENT SCHEDULE, on first timestep ON or AFTER the scheduled time
     # event on clock.start will not be executed, ()
     for event in scheduler.times
-        i = ceil(Int, (event - clock.start)/clock.Δt)   #
-        if 0 < i <= clock.n_timesteps   # event needs to take place in (start, end] 
-            schedule[i] = true          # add to schedule, 
+        i = ceil(Int, (event - clock.start) / clock.Δt)   #
+        if 0 < i <= clock.n_timesteps   # event needs to take place in (start, end]
+            schedule[i] = true          # add to schedule,
         end
     end
 
@@ -81,7 +81,7 @@ function initialize!(scheduler::Schedule, clock::Clock)
 end
 
 # otherwise one needs to write SpeedyWeather.isscheduled inside custom callbacks
-export isscheduled  
+export isscheduled
 
 """
 $(TYPEDSIGNATURES)

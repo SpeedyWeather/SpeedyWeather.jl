@@ -2,6 +2,18 @@
 
 ## Unreleased
 - Follow-up to #783: finalize @param/@component markers [#935](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/935)
+- Adjust fill!(::PrognosticVariables, x) to new variable system [#949](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/949)
+- Code formatting with Runic applied [#950](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/950)
+- Implicit correction kernelized and GPU-ready [#891](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/891)
+- The dynamical core of the primitive equations is now GPU-ready with kernelized implementations [#934](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/934)
+- EarthDryAtmosphere to dispatch like PrimitiveDryModel inside kernels [#944](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/944)
+- copyto! for LowerTriangularArray revised [#941](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/941)
+- Sea ice and snow insulation in surface flux computation [#873](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/873)
+- Boundary layer drag revisited with ocean/land roughness and new defaults [#873](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/873)
+- OneBandLongwave radiation implemented and default [#873](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/873)
+- Initial conditions revised to take in a `SpectralGrid` to ensure correct number type [#927](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/927)[#928](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/928)
+- Diagnostic and prognostic variables partially revised to NamedTuples and variables system introduced to allow to add to them modularly [#885](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/885)
+- Parameterizations with KernelAbstractions [#873](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/873) [#878](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/878) [#924](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/924) [#931](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/931) [#933](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/933) [#942](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/942)
 - uv_from_vordiv! kernel version used [#893](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/893)
 - Fixes some typos and formatting/LaTeX rendering in Docs [#939](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/939)
 - Land snow model [#833](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/833)

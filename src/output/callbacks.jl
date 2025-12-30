@@ -4,9 +4,11 @@ const RANDSTRING_LENGTH = 4
 
 export CallbackDict
 function CallbackDict(callbacks::AbstractCallback...)
-    callback_pairs = (Pair(Symbol("callback_"*randstring(RANDSTRING_LENGTH)), callback)
-                        for callback in callbacks)
-    CALLBACK_DICT(callback_pairs...)
+    callback_pairs = (
+        Pair(Symbol("callback_" * randstring(RANDSTRING_LENGTH)), callback)
+            for callback in callbacks
+    )
+    return CALLBACK_DICT(callback_pairs...)
 end
 
 """$(TYPEDSIGNATURES)
@@ -20,7 +22,7 @@ CallbackDict(pairs::Pair{Symbol, <:AbstractCallback}...) = CALLBACK_DICT(pairs..
 function Base.show(io::IO, C::AbstractCallback)
     println(io, "$(typeof(C)) <: AbstractCallback")
     keys = propertynames(C)
-    print_fields(io, C, keys)
+    return print_fields(io, C, keys)
 end
 
 # dummy callback
@@ -39,6 +41,7 @@ for func in (:initialize!, :callback!, :finalize!)
             for key in keys(callbacks)
                 $func(callbacks[key], args...)
             end
+            return
         end
     end
 end
@@ -57,6 +60,7 @@ function add!(D::CALLBACK_DICT, key_callbacks::Pair{Symbol, <:AbstractCallback}.
         callback = key_callback.second
         D[key] = callback
     end
+    return
 end
 
 """
@@ -77,7 +81,7 @@ add!(model::AbstractModel, key::Symbol, callback::AbstractCallback) =
 function add!(D::CALLBACK_DICT, key::String, callback::AbstractCallback)
     key_symbol = Symbol(key)
     @warn "Callback keys are Symbols. String \"$key\" converted to Symbol :$key_symbol."
-    add!(D, key_symbol, callback)
+    return add!(D, key_symbol, callback)
 end
 
 """
@@ -87,12 +91,13 @@ key which is randomly created like callback_????. To be used like
 
     add!(model.callbacks, callback)
     add!(model.callbacks, callback1, callback2)."""
-function add!(D::CALLBACK_DICT, callbacks::AbstractCallback...; verbose=true)
+function add!(D::CALLBACK_DICT, callbacks::AbstractCallback...; verbose = true)
     for callback in callbacks
-        key = Symbol("callback_"*Random.randstring(4))
+        key = Symbol("callback_" * Random.randstring(4))
         verbose && @info "$(typeof(callback)) callback added with key $key"
         add!(D, key => callback)
     end
+    return
 end
 
 """
@@ -104,6 +109,9 @@ key which is randomly created like callback_????. To be used like
     add!(model.callbacks, callback1, callback2)."""
 add!(model::AbstractModel, callbacks::AbstractCallback...) =
     add!(model.callbacks, callbacks..., verbose = model.feedback.verbose)
+
+# adding via tuple splats the tuple
+add!(model::AbstractModel, tuple::Tuple) = add!(model, tuple...)
 
 # delete!(dict, key) already defined in Base
 
@@ -125,14 +133,14 @@ Initializes callback.temp vector that records the global mean surface temperatur
 Allocates vector of correct length (number of elements = total time steps plus one) and stores the
 global surface temperature of the initial conditions"""
 function initialize!(
-    callback::GlobalSurfaceTemperatureCallback{NF},
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
-    model::AbstractModel,
-) where NF
-    callback.temp = Vector{NF}(undef, progn.clock.n_timesteps+1)    # replace with vector of correct length
+        callback::GlobalSurfaceTemperatureCallback{NF},
+        progn::PrognosticVariables,
+        diagn::DiagnosticVariables,
+        model::AbstractModel,
+    ) where {NF}
+    callback.temp = Vector{NF}(undef, progn.clock.n_timesteps + 1)    # replace with vector of correct length
     callback.temp[1] = diagn.temp_average[diagn.nlayers]            # set initial conditions
-    callback.timestep_counter = 1                                   # (re)set counter to 1
+    return callback.timestep_counter = 1                                   # (re)set counter to 1
 end
 
 """
@@ -140,14 +148,14 @@ $(TYPEDSIGNATURES)
 Pulls the average temperature from the lowermost layer and stores it in the next
 element of the callback.temp vector."""
 function callback!(
-    callback::GlobalSurfaceTemperatureCallback,
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
-    model::AbstractModel,
-)
+        callback::GlobalSurfaceTemperatureCallback,
+        progn::PrognosticVariables,
+        diagn::DiagnosticVariables,
+        model::AbstractModel,
+    )
     callback.timestep_counter += 1
     i = callback.timestep_counter
-    callback.temp[i] = diagn.temp_average[diagn.nlayers]
+    return callback.temp[i] = diagn.temp_average[diagn.nlayers]
 end
 
 # nothing to finalize

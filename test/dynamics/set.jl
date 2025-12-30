@@ -1,4 +1,4 @@
-@testset "Test PrognosticVariables set!" begin 
+@testset "Test PrognosticVariables set!" begin
 
     nlayers = 8
     nlayers_soil = 2
@@ -8,24 +8,24 @@
     spectral_grid = SpectralGrid(; NF, trunc, nlayers)  # define resolution
     model = PrimitiveWetModel(spectral_grid)            # construct model
     simulation = initialize!(model)                     # initialize all model components
- 
+
     lf = 2
 
-    # test data 
-    L = rand(spectral_grid.SpectralVariable3D, trunc+2, trunc+1, nlayers)
+    # test data
+    L = rand(spectral_grid.SpectralVariable3D, trunc + 2, trunc + 1, nlayers)
     L_grid = transform(L, model.spectral_transform)
-    
-    L2 = rand(spectral_grid.SpectralVariable3D, trunc-5, trunc-6, nlayers)      # smaller  
-    L2_trunc = spectral_truncation(L2, size(L, 1, ZeroBased, as=Matrix), size(L, 2, ZeroBased, as=Matrix))
-    L3 = rand(spectral_grid.SpectralVariable3D, trunc+6, trunc+5, nlayers)      # bigger 
-    L3_trunc = spectral_truncation(L3, size(L, 1, ZeroBased, as=Matrix), size(L, 2, ZeroBased, as=Matrix))
-    
-    A = rand(NF, spectral_grid.grid, nlayers)                                   # same grid 
+
+    L2 = rand(spectral_grid.SpectralVariable3D, trunc - 5, trunc - 6, nlayers)      # smaller
+    L2_trunc = SpeedyTransforms.spectral_truncation(L2, size(L, 1, ZeroBased, as = Matrix), size(L, 2, ZeroBased, as = Matrix))
+    L3 = rand(spectral_grid.SpectralVariable3D, trunc + 6, trunc + 5, nlayers)      # bigger
+    L3_trunc = SpeedyTransforms.spectral_truncation(L3, size(L, 1, ZeroBased, as = Matrix), size(L, 2, ZeroBased, as = Matrix))
+
+    A = rand(NF, spectral_grid.grid, nlayers)                                   # same grid
     A_spec = transform(A, model.spectral_transform)
-    B = rand(NF, OctaHEALPixGrid, spectral_grid.nlat_half, nlayers)             # different grid 
+    B = rand(NF, OctaHEALPixGrid, spectral_grid.nlat_half, nlayers)             # different grid
     D = rand(spectral_grid.GridVariable3D, spectral_grid.grid, nlayers_soil)    # 3D land data
 
-    f(lon, lat, sig) = sind(lon)*cosd(lat)*(1 - sig)
+    f(lon, lat, sig) = sind(lon) * cosd(lat) * (1 - sig)
 
     prog_new = simulation.prognostic_variables
     prog_old = deepcopy(prog_new)
@@ -33,74 +33,74 @@
     # set things ...
 
     # LTA
-    set!(simulation, vor=L, lf = lf)
+    set!(simulation, vor = L, lf = lf)
     @test get_step(prog_new.vor, lf) == L
 
-    set!(simulation, div=L, lf = lf; add=true)
+    set!(simulation, div = L, lf = lf; add = true)
     @test get_step(prog_new.div, lf) == (get_step(prog_old.div, lf) .+ L)
 
-    set!(simulation, temp=L2, lf=lf)
+    set!(simulation, temp = L2, lf = lf)
     @test get_step(prog_new.temp, lf) ≈ L2_trunc
 
-    set!(simulation, humid=L3, lf=lf)
+    set!(simulation, humid = L3, lf = lf)
     @test get_step(prog_new.humid, lf) ≈ L3_trunc
-    
-    set!(simulation, pres=L[:,1], lf=lf)
-    @test get_step(prog_new.pres, lf) == L[:,1]
 
-    set!(simulation, vor=A, lf=lf)
+    set!(simulation, pres = L[:, 1], lf = lf)
+    @test get_step(prog_new.pres, lf) == L[:, 1]
+
+    set!(simulation, vor = A, lf = lf)
     @test get_step(prog_new.vor, lf) == A_spec
 
-    set!(simulation, vor=A, lf=lf, add=true)
+    set!(simulation, vor = A, lf = lf, add = true)
     @test get_step(prog_new.vor, lf) == (2 .* A_spec)
 
-    # grids 
-    set!(simulation, sea_surface_temperature=A[:,1], lf=lf)
-    @test prog_new.ocean.sea_surface_temperature == A[:,1]
+    # grids
+    set!(simulation, sea_surface_temperature = A[:, 1], lf = lf)
+    @test prog_new.ocean.sea_surface_temperature == A[:, 1]
 
-    set!(simulation, sea_ice_concentration=B[:,1], lf=lf, add=true)
-    C = similar(A[:,1])
-    RingGrids.interpolate!(C, B[:,1]; NF)
-    @test all(isapprox(prog_new.ocean.sea_ice_concentration, prog_old.ocean.sea_ice_concentration .+ C, atol=1e-6))
+    set!(simulation, sea_ice_concentration = B[:, 1], lf = lf, add = true)
+    C = similar(A[:, 1])
+    RingGrids.interpolate!(C, B[:, 1]; NF)
+    @test all(isapprox(prog_new.ocean.sea_ice_concentration, prog_old.ocean.sea_ice_concentration .+ C, atol = 1.0e-6))
 
     Di = deepcopy(prog_new.land.soil_temperature)
     RingGrids.interpolate!(Di, D; NF)
-    set!(simulation, soil_temperature=D, lf=lf)
+    set!(simulation, soil_temperature = D, lf = lf)
     @test prog_new.land.soil_temperature == Di
 
-    set!(simulation, soil_moisture=D, lf=lf)   
+    set!(simulation, soil_moisture = D, lf = lf)
     @test prog_new.land.soil_moisture == Di
 
     # numbers
-    set!(simulation, vor=Float32(3.), lf=lf)
-    M3 = zeros(NF, spectral_grid.grid, nlayers) .+ 3    # same grid 
+    set!(simulation, vor = Float32(3.0), lf = lf)
+    M3 = zeros(NF, spectral_grid.grid, nlayers) .+ 3    # same grid
     M3_spec = transform(M3, model.spectral_transform)
     @test get_step(prog_new.vor, lf) ≈ M3_spec
 
-    set!(simulation, vor=Float32(3.), lf=lf, add=true)
+    set!(simulation, vor = Float32(3.0), lf = lf, add = true)
     @test get_step(prog_new.vor, lf) ≈ (2 .* M3_spec)
 
-    set!(simulation, sea_surface_temperature=Float16(3.))
-    @test all(prog_new.ocean.sea_surface_temperature .≈ 3.)
+    set!(simulation, sea_surface_temperature = Float16(3.0))
+    @test all(prog_new.ocean.sea_surface_temperature .≈ 3.0)
 
-    set!(simulation, sea_surface_temperature=Float16(3.), add=true)
-    @test all(prog_new.ocean.sea_surface_temperature .≈ 6.)
+    set!(simulation, sea_surface_temperature = Float16(3.0), add = true)
+    @test all(prog_new.ocean.sea_surface_temperature .≈ 6.0)
 
     # vor_div, create u,v first in spectral space
-    u = randn(spectral_grid.SpectralVariable3D, trunc+2, trunc+1, nlayers)
-    v = randn(spectral_grid.SpectralVariable3D, trunc+2, trunc+1, nlayers)
-    
+    u = randn(spectral_grid.SpectralVariable3D, trunc + 2, trunc + 1, nlayers)
+    v = randn(spectral_grid.SpectralVariable3D, trunc + 2, trunc + 1, nlayers)
+
     # set imaginary component of m=0 to 0 as the rotation of zonal modes is arbitrary
     SpeedyTransforms.zero_imaginary_zonal_modes!(u)
     SpeedyTransforms.zero_imaginary_zonal_modes!(v)
 
-    spectral_truncation!(u, 25)     # truncate to lowest 11 wavenumbers
-    spectral_truncation!(v, 25)
+    SpeedyTransforms.spectral_truncation!(u, 25)     # truncate to lowest 11 wavenumbers
+    SpeedyTransforms.spectral_truncation!(v, 25)
 
     u_grid = transform(u, model.spectral_transform)
-    v_grid = transform(v, model.spectral_transform)   
+    v_grid = transform(v, model.spectral_transform)
 
-    set!(simulation, u=u_grid, v=v_grid, coslat_scaling_included=false, lf=lf)
+    set!(simulation, u = u_grid, v = v_grid, coslat_scaling_included = false, lf = lf)
 
     # now obtain U, V (scaled with coslat) from vor, div
     U = similar(u)
@@ -109,8 +109,8 @@
     SpeedyTransforms.UV_from_vordiv!(U, V, get_step(prog_new.vor, lf), get_step(prog_new.div, lf), model.spectral_transform)
 
     # back to grid and unscale on the fly
-    u_grid2 = transform(U, model.spectral_transform, unscale_coslat=true)
-    v_grid2 = transform(V, model.spectral_transform, unscale_coslat=true)
+    u_grid2 = transform(U, model.spectral_transform, unscale_coslat = true)
+    v_grid2 = transform(V, model.spectral_transform, unscale_coslat = true)
 
     u2 = transform(u_grid2, model.spectral_transform)
     v2 = transform(v_grid2, model.spectral_transform)
@@ -120,25 +120,27 @@
     #     @test v[lm] ≈ v2[lm] atol = sqrt(sqrt(eps(spectral_grid.NF)))
     # end
 
-    # functions 
+    # functions
     (; londs, latds, σ_levels_full) = model.geometry
     for k in RingGrids.eachlayer(A)
         for ij in RingGrids.eachgridpoint(A)
-            A[ij,k] = f(londs[ij], latds[ij], σ_levels_full[k])
-        end 
-    end 
+            A[ij, k] = f(londs[ij], latds[ij], σ_levels_full[k])
+        end
+    end
     transform!(A_spec, A, model.spectral_transform)
 
-    set!(simulation, vor=f; lf)
+    set!(simulation, vor = f; lf)
     @test get_step(prog_new.vor, lf) ≈ A_spec
 end
 
 @testset "Set! grids" begin
-    @testset for Grid in (FullGaussianGrid,
-                        OctahedralGaussianGrid,
-                        FullClenshawGrid,
-                        OctahedralClenshawGrid,
-                        OctaminimalGaussianGrid)
+    @testset for Grid in (
+            FullGaussianGrid,
+            OctahedralGaussianGrid,
+            FullClenshawGrid,
+            OctahedralClenshawGrid,
+            OctaminimalGaussianGrid,
+        )
         spectral_grid = SpectralGrid(; Grid)
         (; GridVariable2D, nlat_half) = spectral_grid
 
@@ -156,18 +158,20 @@ end
 end
 
 @testset "Set! albedo" begin
-    @testset for Grid in (FullGaussianGrid,
-                        OctahedralGaussianGrid,
-                        FullClenshawGrid,
-                        OctahedralClenshawGrid,
-                        OctaminimalGaussianGrid)
+    @testset for Grid in (
+            FullGaussianGrid,
+            OctahedralGaussianGrid,
+            FullClenshawGrid,
+            OctahedralClenshawGrid,
+            OctaminimalGaussianGrid,
+        )
 
         spectral_grid = SpectralGrid(; Grid)
         geometry = Geometry(spectral_grid)
         albedo = ManualAlbedo(spectral_grid)
 
         @test all(set!(albedo, 0.0625) .== 0.0625)
-        set!(albedo.albedo, (λ, φ) -> clamp(sind(λ)*cosd(φ), 0.1, 1))
+        set!(albedo.albedo, (λ, φ) -> clamp(sind(λ) * cosd(φ), 0.1, 1))
         @test all(0.1 .<= albedo.albedo .<= 1)
 
         # with geometry

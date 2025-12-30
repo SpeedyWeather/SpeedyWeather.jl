@@ -3,13 +3,13 @@ using Statistics
 @testset "Random process standard deviation" begin
     for trunc in (31, 42, 63, 85)
         for wavenumber in (12, 16, 20, 24)
-            for σ in (1/16, 1/4, 1, 4, 16)
+            for σ in (1 / 16, 1 / 4, 1, 4, 16)
 
                 # use equal-area HEALPixGrid, for unweighted mean and standard deviation later
-                spectral_grid = SpectralGrid(; trunc, nlayers=1, Grid=HEALPixGrid)
+                spectral_grid = SpectralGrid(; trunc, nlayers = 1, Grid = HEALPixGrid)
 
                 seed = 123
-                random_process = SpectralAR1Process(spectral_grid; seed, wavenumber, standard_deviation=σ)
+                random_process = SpectralAR1Process(spectral_grid; seed, wavenumber, standard_deviation = σ)
                 model = BarotropicModel(spectral_grid; random_process)
                 simulation = initialize!(model)
 
@@ -24,8 +24,8 @@ using Statistics
                 spec = simulation.prognostic_variables.random_pattern
                 transform!(grid, spec, model.spectral_transform)
 
-                @test mean(grid) ≈ 0 atol=1e-2
-                @test std(grid) ≈ σ rtol=1e-1
+                @test mean(grid) ≈ 0 atol = 1.0e-2
+                @test std(grid) ≈ σ rtol = 1.0e-1
             end
         end
     end
@@ -34,7 +34,7 @@ end
 @testset "Random process seed" begin
     for seed in (0, 123, 1234, 12345)
 
-        spectral_grid = SpectralGrid(trunc=31, nlayers=1)
+        spectral_grid = SpectralGrid(trunc = 31, nlayers = 1)
         random_process = SpectralAR1Process(spectral_grid; seed)
 
         model = BarotropicModel(spectral_grid; random_process)

@@ -1,64 +1,56 @@
 abstract type AbstractStochasticPhysics <: AbstractParameterization end
 
-# fucntion barriers
-function perturb_parameterization_inputs!(column::AbstractColumnVariables, model::PrimitiveEquation)
-    perturb_parameterization_inputs!(column, model.stochastic_physics, model)
-end
-
-function perturb_parameterization_tendencies!(column::AbstractColumnVariables, model::PrimitiveEquation)
-    perturb_parameterization_tendencies!(column, model.stochastic_physics, model)
-end
-
-# no perturbations
-perturb_parameterization_inputs!(::ColumnVariables, ::Nothing, ::PrimitiveEquation) = nothing
-perturb_parameterization_tendencies!(::ColumnVariables, ::Nothing, ::PrimitiveEquation) = nothing
-
 export StochasticallyPerturbedParameterizationTendencies
-@kwdef struct StochasticallyPerturbedParameterizationTendencies{NF, VectorType} <: AbstractStochasticPhysics
-    
-    "Number of vertical layers"
-    nlayers::Int
 
+"""Defines the stochastically perturbed parameterization tendencies (SPPT)
+including an optional tapering as a function of the vertical sigma level
+$(TYPEDFIELDS)"""
+struct StochasticallyPerturbedParameterizationTendencies{F, VectorType} <: AbstractStochasticPhysics
     "[OPTION] Vertical tapering function, reduce strength towards surface (σ=1)"
-    tapering::Function = σ -> 1 # σ < 0.8 ? 1 : 1 - (σ - 0.8)/0.2
+    tapering::F
 
     "[DERIVED] Precalculate vertical tapering during initialization"
-    taper::VectorType = zeros(NF, nlayers)
+    taper::VectorType
 end
 
 # generator function
-function StochasticallyPerturbedParameterizationTendencies(SG::SpectralGrid; kwargs...)
-    (; nlayers, NF, VectorType) = SG
-    return StochasticallyPerturbedParameterizationTendencies{NF, VectorType}(; nlayers, kwargs...)
+function StochasticallyPerturbedParameterizationTendencies(
+        SG::SpectralGrid;
+        tapering = σ -> 1, # σ < 0.8 ? 1 : 1 - (σ - 0.8)/0.2
+    )
+    taper = on_architecture(SG.architecture, zeros(SG.nlayers))
+    return StochasticallyPerturbedParameterizationTendencies(tapering, taper)
 end
 
+Adapt.@adapt_structure StochasticallyPerturbedParameterizationTendencies
+
+# No additional variables required, return empty tuple
+variables(::AbstractStochasticPhysics) = ()
+
+# precompute the taper
 function initialize!(sppt::StochasticallyPerturbedParameterizationTendencies, model::PrimitiveEquation)
     sppt.taper .= sppt.tapering.(model.geometry.σ_levels_full)
     return nothing
 end
 
-# only perturb tendencies (=outputs) not inputs
-function perturb_parameterization_inputs!(
-    ::AbstractColumnVariables,
-    ::StochasticallyPerturbedParameterizationTendencies,
-    ::PrimitiveEquation)
-    return nothing
-end
+# function barrier
+@propagate_inbounds parameterization!(ij, diagn, progn, sppt::StochasticallyPerturbedParameterizationTendencies, model) =
+    sppt!(ij, diagn, sppt)
 
-function perturb_parameterization_tendencies!(
-    column::AbstractColumnVariables,
-    sppt::StochasticallyPerturbedParameterizationTendencies,
-    model::PrimitiveEquation)
-    
-    r = column.random_value
+"""$(TYPEDSIGNATURES)
+Apply stochastically perturbed parameterization tendencies (SPPT) to
+u, v, temperature and humidity in column ij."""
+@propagate_inbounds function sppt!(ij, diagn, sppt)
+
+    r = diagn.grid.random_pattern[ij]
     (; taper) = sppt
-    (; u_tend, v_tend, temp_tend, humid_tend) = column
+    (; u_tend_grid, v_tend_grid, temp_tend_grid, humid_tend_grid) = diagn.tendencies
 
-    for k in eachlayer(column)
-        R = 1 + r*taper[k]
-        u_tend[k] *= R
-        v_tend[k] *= R
-        temp_tend[k] *= R
-        humid_tend[k] *= R
+    return @inbounds for k in eachlayer(u_tend_grid, v_tend_grid, temp_tend_grid, humid_tend_grid)
+        R = 1 + r * taper[k]          # r in [-1, 1], R in [0, 2] (don't change sign of tendency)
+        u_tend_grid[ij, k] *= R     # perturb all prognostic variables in the same way
+        v_tend_grid[ij, k] *= R
+        temp_tend_grid[ij, k] *= R
+        humid_tend_grid[ij, k] *= R
     end
 end

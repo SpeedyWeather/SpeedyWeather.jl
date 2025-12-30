@@ -12,10 +12,10 @@ function LongitudeRotation(degree::Integer)
     throw(ArgumentError("Rotation degree must be multiples of 0, 90, 180, or 270"))
 end
 
-rotate( field::AbstractField, args...) = rotate!(deepcopy(field), args...)
+rotate(field::AbstractField, args...) = rotate!(deepcopy(field), args...)
 rotate!(field::AbstractField, degree::Integer) = rotate!(field, LongitudeRotation(degree))
 rotate!(field::AbstractField, ::LongitudeRotation{0}) = field
-rotate!(field::AbstractField, ::LongitudeRotation{90}) =  _rotate!(field, 1)
+rotate!(field::AbstractField, ::LongitudeRotation{90}) = _rotate!(field, 1)
 rotate!(field::AbstractField, ::LongitudeRotation{180}) = _rotate!(field, 2)
 rotate!(field::AbstractField, ::LongitudeRotation{270}) = _rotate!(field, 3)
 
@@ -25,7 +25,7 @@ function _rotate!(field::AbstractField, quarter::Integer)
     for k in eachlayer(field)
         for ring in eachring(field)
             v = view(field, ring, k)
-            shift = quarter*(length(ring) ÷ 4)
+            shift = quarter * (length(ring) ÷ 4)
             LinearAlgebra.circshift!(v, shift)
         end
     end

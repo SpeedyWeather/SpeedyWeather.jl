@@ -22,7 +22,7 @@ write(md, "### Machine details\n\n")
 write(md, "All benchmark simulatons were run on a server with access to an NVIDIA A100 GPU.\n")
 write(md, "```julia\njulia> CUDA.versioninfo()\n")
 CUDA.versioninfo(md)
-write(md,"```\n\n")
+write(md, "```\n\n")
 
 write(md, "### Explanation\n\n")
 write(md, "Abbreviations in the tables below are as follows, omitted columns use defaults.\n")
@@ -32,7 +32,6 @@ write(md, "- L: Number of vertical layers, default: $(SpeedyWeather.DEFAULT_NLAY
 write(md, "- Grid: Horizontal grid, default: $(SpeedyWeather.DEFAULT_GRID)\n")
 write(md, "- Rings: Grid-point resolution, number of latitude rings pole to pole\n")
 write(md, "- Model: whether run on a CPU or GPU, default: true\n")
-
 
 
 write(md, "### Running the benchmarks\n\n")

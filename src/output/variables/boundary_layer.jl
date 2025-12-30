@@ -39,10 +39,10 @@ z_{bottom} = z_{surf} + T_{bottom} * Δp_geopot_{bottom} / g
 ```
 """
 function output!(
-    output::NetCDFOutput,
-    variable::Union{ZonalVelocity10mOutput, MeridionalVelocity10mOutput},
-    simulation::AbstractSimulation,
-)
+        output::NetCDFOutput,
+        variable::Union{ZonalVelocity10mOutput, MeridionalVelocity10mOutput},
+        simulation::AbstractSimulation,
+    )
     # escape immediately after first call if variable doesn't have a time dimension
     ~hastime(variable) && output.output_counter > 1 && return nothing
 
@@ -50,21 +50,21 @@ function output!(
     u_or_v_grid = path(variable, simulation)
     nlayers = size(u_or_v_grid, 2)
     u_or_v_bottom = field_view(u_or_v_grid, :, nlayers)
-    
+
     z_bottom = simulation.diagnostic_variables.dynamics.a_2D_grid
     u_or_v10 = simulation.diagnostic_variables.dynamics.b_2D_grid
-    
+
     # Compute z_bottom as z_surf + T_bottom * Δp_geopot / g, start with z_surf
     z_bottom .= max.(simulation.model.orography.orography, 0)   # [m] set negative values to zero
     T_bottom = field_view(simulation.diagnostic_variables.grid.temp_grid, :, nlayers)
     Δp_geopot = simulation.model.geopotential.Δp_geopot_full[end]
-    
+
     # accumulate the second term in
     @. z_bottom += T_bottom * Δp_geopot / simulation.model.planet.gravity
 
     # Compute u10, TODO should this be the same z₀ as in vertical diffusion or surface fluxes?
-    z₀ = simulation.model.vertical_diffusion.z₀
-    @. u_or_v10 = u_or_v_bottom .* log(10/z₀) ./ log.(z_bottom/z₀)
+    z₀ = simulation.model.vertical_diffusion.roughness_length
+    @. u_or_v10 = u_or_v_bottom .* log(10 / z₀) ./ log.(z_bottom / z₀)
 
     # interpolate 2D/3D variables
     u_or_v10_output = output.field2D
@@ -86,7 +86,7 @@ Fields are: $(TYPEDFIELDS)"""
 @kwdef mutable struct SurfaceTemperatureOutput{F} <: AbstractOutputVariable
     name::String = "tsurf"
     unit::String = "degC"
-    long_name::String = "Surface Temperature"
+    long_name::String = "Surface air temperature"
     dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
     missing_value::Float64 = NaN
     compression_level::Int = 3
@@ -99,14 +99,14 @@ end
 path(::SurfaceTemperatureOutput, simulation) = simulation.diagnostic_variables.grid.temp_grid
 
 function output!(
-    output::NetCDFOutput,
-    variable::SurfaceTemperatureOutput,
-    simulation::AbstractSimulation,
-)
+        output::NetCDFOutput,
+        variable::SurfaceTemperatureOutput,
+        simulation::AbstractSimulation,
+    )
     # escape immediately after first call if variable doesn't have a time dimension
     ~hastime(variable) && output.output_counter > 1 && return nothing
 
-    # resuse scratch array to avoid allocations
+    # reuse scratch array to avoid allocations
     Ts = simulation.diagnostic_variables.dynamics.a_2D_grid
 
     # Retrieve T_bottom
@@ -118,9 +118,9 @@ function output!(
     κ = simulation.model.atmosphere.κ
     σ_bottom = simulation.model.geometry.σ_levels_full[end]
 
-    # Compute Ts
+    # Compute Ts assuming dry adiabatic profile
     (; transform) = variable
-    @. Ts = transform(T_bottom * σ_bottom ^ (-κ))   # Convert to °C
+    @. Ts = transform(T_bottom * σ_bottom^(-κ))   # Convert to °C
 
     # interpolate 2D/3D variables
     Ts_output = output.field2D
@@ -137,9 +137,27 @@ function output!(
     return nothing
 end
 
+
+"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+Fields are: $(TYPEDFIELDS)"""
+@kwdef mutable struct BoundaryLayerDragOutput <: AbstractOutputVariable
+    name::String = "bld"
+    unit::String = "1"
+    long_name::String = "Boundary layer drag coefficient"
+    dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
+    missing_value::Float64 = NaN
+    compression_level::Int = 3
+    shuffle::Bool = true
+    keepbits::Int = 7
+end
+
+path(::BoundaryLayerDragOutput, simulation) =
+    simulation.diagnostic_variables.physics.boundary_layer_drag
+
 # collect all in one for convenience
 BoundaryLayerOutput() = (
     ZonalVelocity10mOutput(),
     MeridionalVelocity10mOutput(),
     SurfaceTemperatureOutput(),
+    BoundaryLayerDragOutput(),
 )

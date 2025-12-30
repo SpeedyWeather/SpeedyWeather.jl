@@ -11,39 +11,40 @@ passed on as keyword arguments, e.g. `planet=Earth(spectral_grid)`. Fields, repr
 model components, are
 $(TYPEDFIELDS)"""
 @parameterized @kwdef mutable struct ShallowWaterModel{
-    AR,     # <:AbstractArchitecture,
-    GE,     # <:AbstractGeometry,
-    PL,     # <:AbstractPlanet,
-    AT,     # <:AbstractAtmosphere,
-    CO,     # <:AbstractCoriolis,
-    OR,     # <:AbstractOrography,
-    FR,     # <:AbstractForcing,
-    DR,     # <:AbstractDrag,
-    PA,     # <:AbstractParticleAdvection,
-    IC,     # <:AbstractInitialConditions,
-    RP,     # <:AbstractRandomProcess,
-    TS,     # <:AbstractTimeStepper,
-    ST,     # <:SpectralTransform{NF},
-    IM,     # <:AbstractImplicit,
-    HD,     # <:AbstractHorizontalDiffusion,
-    OU,     # <:AbstractOutput,
-    FB,     # <:AbstractFeedback,
-} <: ShallowWater
-    
-    spectral_grid::SpectralGrid
+        SG,     # <:SpectralGrid
+        AR,     # <:AbstractArchitecture,
+        GE,     # <:AbstractGeometry,
+        PL,     # <:AbstractPlanet,
+        AT,     # <:AbstractAtmosphere,
+        CO,     # <:AbstractCoriolis,
+        OR,     # <:AbstractOrography,
+        FR,     # <:AbstractForcing,
+        DR,     # <:AbstractDrag,
+        PA,     # <:AbstractParticleAdvection,
+        IC,     # <:AbstractInitialConditions,
+        RP,     # <:AbstractRandomProcess,
+        TS,     # <:AbstractTimeStepper,
+        ST,     # <:SpectralTransform{NF},
+        IM,     # <:AbstractImplicit,
+        HD,     # <:AbstractHorizontalDiffusion,
+        OU,     # <:AbstractOutput,
+        FB,     # <:AbstractFeedback,
+    } <: ShallowWater
+
+    spectral_grid::SG
     architecture::AR = spectral_grid.architecture
 
     # DYNAMICS
     @component geometry::GE = Geometry(spectral_grid)
     @component planet::PL = Earth(spectral_grid)
-    @component atmosphere::AT = EarthAtmosphere(spectral_grid)
+    @component atmosphere::AT = EarthDryAtmosphere(spectral_grid)
     @component coriolis::CO = Coriolis(spectral_grid)
     @component orography::OR = EarthOrography(spectral_grid)
     @component forcing::FR = nothing
     @component drag::DR = nothing
     @component particle_advection::PA = nothing
-    @component initial_conditions::IC = InitialConditions(ShallowWater)
-    
+    @component initial_conditions::IC = InitialConditions(spectral_grid, ShallowWater)
+
     # VARIABLES
     random_process::RP = nothing
     tracers::TRACER_DICT = TRACER_DICT()
@@ -87,8 +88,8 @@ function initialize!(model::ShallowWater; time::DateTime = DEFAULT_DATE)
     initialize!(model.particle_advection, model)
 
     # allocate variables
-    prognostic_variables = PrognosticVariables(spectral_grid, model)
-    diagnostic_variables = DiagnosticVariables(spectral_grid, model)
+    prognostic_variables = PrognosticVariables(model)
+    diagnostic_variables = DiagnosticVariables(model)
 
     # initialize non-atmosphere prognostic variables
     initialize!(prognostic_variables.particles, prognostic_variables, diagnostic_variables, model)

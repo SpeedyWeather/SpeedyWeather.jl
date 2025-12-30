@@ -1,91 +1,74 @@
 @testset "Shortwave radiation" begin
-    spectral_grid = SpectralGrid(trunc=31, nlayers=8)
-    
-    @testset for SW in (TransparentShortwave, OneBandShortwave, OneBandGreyShortwave)
-            sw = SW(spectral_grid)
-            model = PrimitiveWetModel(spectral_grid; shortwave_radiation=sw)
-            simulation = initialize!(model)
-            run!(simulation, period=Day(5))
-            ssrd = simulation.diagnostic_variables.physics.surface_shortwave_down
-            TRD = model.planet.solar_constant * simulation.diagnostic_variables.physics.cos_zenith
-            @test all(0 .<= ssrd .<= TRD)
-    end
-    
-    @testset "OneBandShortwave component testing" begin
-        """Test different cloud and transmittance combinations using convenience constructors."""
-        
-        # Test the full wet model version (with clouds)
-        @testset "OneBandShortwave (wet model with clouds)" begin
-            sw = OneBandShortwave(spectral_grid)
-            model = PrimitiveWetModel(spectral_grid; shortwave_radiation=sw)
-            sim = initialize!(model)
-            run!(sim, period=Day(3))
-            
-            osr = sim.diagnostic_variables.physics.outgoing_shortwave_radiation
-            ssrd = sim.diagnostic_variables.physics.surface_shortwave_down
-            @test all(osr .>= 0)
-            @test all(ssrd .>= 0)
-            @test !any(isnan, osr)
-            @test !any(isnan, ssrd)
+    spectral_grid = SpectralGrid(trunc = 31, nlayers = 8)
+    @testset for SW in (Nothing, TransparentShortwave) # OneBandShortwave, OneBandGreyShortwave)
+        sw = SW(spectral_grid)
+        model = PrimitiveWetModel(spectral_grid; shortwave_radiation = sw)
+
+        initialize!(model.shortwave_radiation, model)
+
+        progn = PrognosticVariables(model)
+        diagn = DiagnosticVariables(model)
+
+        (; time) = progn.clock
+        SpeedyWeather.cos_zenith!(diagn, time, model)
+
+        for ij in 1:model.spectral_grid.npoints
+            diagn.physics.ocean.albedo[ij] = 0.5
+            SpeedyWeather.parameterization!(ij, diagn, progn, model.shortwave_radiation, model)
+
+            # top of atmosphere radiation down
+            trd = model.planet.solar_constant * diagn.physics.cos_zenith[ij]
+
+            if !(sw isa Nothing)
+                osr = diagn.physics.outgoing_shortwave[ij]
+                ssrd = diagn.physics.surface_shortwave_down[ij]
+                @test 0 <= osr <= ssrd <= trd
+                @test isfinite(osr)
+                @test isfinite(ssrd)
+            end
         end
-        
-        # Test the dry model version (no clouds)
-        @testset "OneBandGreyShortwave (dry model, no clouds)" begin
-            sw = OneBandGreyShortwave(spectral_grid)
-            model = PrimitiveWetModel(spectral_grid; shortwave_radiation=sw)
-            sim = initialize!(model)
-            run!(sim, period=Day(3))
-            
-            osr = sim.diagnostic_variables.physics.outgoing_shortwave_radiation
-            ssrd = sim.diagnostic_variables.physics.surface_shortwave_down
-            @test all(osr .>= 0)
-            @test all(ssrd .>= 0)
-            @test !any(isnan, osr)
-            @test !any(isnan, ssrd)
-        end
-        
-        # Test transparent shortwave (reference case)
-        @testset "TransparentShortwave (transparent atmosphere)" begin
-            sw = TransparentShortwave(spectral_grid)
-            model = PrimitiveWetModel(spectral_grid; shortwave_radiation=sw)
-            sim = initialize!(model)
-            run!(sim, period=Day(3))
-            
-            osr = sim.diagnostic_variables.physics.outgoing_shortwave_radiation
-            ssrd = sim.diagnostic_variables.physics.surface_shortwave_down
-            @test all(osr .>= 0)
-            @test all(ssrd .>= 0)
-            @test !any(isnan, osr)
-            @test !any(isnan, ssrd)
-            
-            # For transparent atmosphere, surface shortwave down should equal outgoing shortwave
-            # (since it's just surface albedo reflection)
-            @test all(ssrd .>= osr)  # Surface down >= reflected (outgoing)
-        end
-        
-        # Test cloud parameterization with different settings
-        @testset "DiagnosticClouds parameter variations" begin
-            # Test with different cloud parameters
-            clouds = DiagnosticClouds(
-                spectral_grid,
-                cloud_albedo = 0.6,  # Higher cloud albedo
-                use_stratocumulus = false  # Disable stratocumulus
-            )
-            sw = OneBandShortwave(
-                clouds,
-                TransparentShortwaveTransmittance(spectral_grid),
-                OneBandShortwave(spectral_grid).radiative_transfer
-            )
-            model = PrimitiveWetModel(spectral_grid; shortwave_radiation=sw)
-            sim = initialize!(model)
-            run!(sim, period=Day(3))
-            
-            osr = sim.diagnostic_variables.physics.outgoing_shortwave_radiation
-            ssrd = sim.diagnostic_variables.physics.surface_shortwave_down
-            @test all(osr .>= 0)
-            @test all(ssrd .>= 0)
-            @test !any(isnan, osr)
-            @test !any(isnan, ssrd)
+
+        if !(sw isa Nothing)
+            @test any(diagn.physics.outgoing_shortwave .> 0)
+            @test any(diagn.physics.surface_shortwave_down .> 0)
+        else
+            @test !haskey(diagn.physics, :outgoing_shortwave)
+            @test all(diagn.physics.surface_shortwave_down .== 0)
         end
     end
 end
+
+# To be adapted when translated to new ij-based structure
+# @testset "Shortwave radiation transmissivity" begin
+#     spectral_grid = SpectralGrid(trunc=31, nlayers=8)
+#     @testset for T in (TransparentShortwaveTransmissivity, BackgroundShortwaveTransmissivity)
+#         transmissivity = T(spectral_grid)
+#         sw = OneBandShortwave(spectral_grid; transmissivity=transmissivity)
+#         model = PrimitiveWetModel(spectral_grid; shortwave_radiation=sw)
+
+#         initialize!(model.shortwave_radiation, model)
+
+#         progn = PrognosticVariables(model)
+#         diagn = DiagnosticVariables(model)
+
+#         ij = rand(1:model.spectral_grid.npoints)
+#         SpeedyWeather.parameterization!(ij, diagn, progn, model.shortwave_radiation, model)
+#     end
+# end
+
+# @testset "Shortwave radiation clouds" begin
+#     spectral_grid = SpectralGrid(trunc=31, nlayers=8)
+#     @testset for C in (DiagnosticClouds, NoClouds)
+#         clouds = C(spectral_grid)
+#         sw = OneBandShortwave(spectral_grid; clouds=clouds)
+#         model = PrimitiveWetModel(spectral_grid; shortwave_radiation=sw)
+
+#         initialize!(model.shortwave_radiation, model)
+
+#         progn = PrognosticVariables(model)
+#         diagn = DiagnosticVariables(model)
+
+#         ij = rand(1:model.spectral_grid.npoints)
+#         SpeedyWeather.parameterization!(ij, diagn, progn, model.shortwave_radiation, model)
+#     end
+# end
