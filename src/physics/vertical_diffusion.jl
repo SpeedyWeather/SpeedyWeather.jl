@@ -1,18 +1,18 @@
 abstract type AbstractVerticalDiffusion <: AbstractParameterization end
 
 export BulkRichardsonDiffusion
-@kwdef struct BulkRichardsonDiffusion{NF, VectorType} <: AbstractVerticalDiffusion
+@parameterized @kwdef struct BulkRichardsonDiffusion{NF, VectorType} <: AbstractVerticalDiffusion
     "[OPTION] von Kármán constant [1]"
     von_Karman::NF = 0.4
 
     "[OPTION] roughness length [m]"
-    roughness_length::NF = 3.21e-5
+    @param roughness_length::NF = 3.21e-5 (bounds=Positive,)
 
     "[OPTION] Critical Richardson number for stable mixing cutoff [1]"
-    critical_Richardson::NF = 10
+    @param critical_Richardson::NF = 10 (bounds=Positive,)
 
     "[OPTION] Fraction of surface boundary layer"
-    surface_layer_fraction::NF = 0.1
+    @param surface_layer_fraction::NF = 0.1 (bounds=0..1,)
 
     "[OPTION] diffuse static energy?"
     diffuse_static_energy::Bool = true
