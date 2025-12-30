@@ -16,7 +16,7 @@ $(TYPEDFIELDS)"""
     @param melting_threshold::NF = 275 (bounds=Positive,)
 
     "[OPTION] Time scale for snow runoff/leakage into soil moisture [s]"
-    @param runoff_time_scale::Second = Year(4)(bounds=Positive,)
+    @param runoff_time_scale::Second = Year(4) (bounds=Positive,)
 end
 
 Adapt.@adapt_structure SnowModel
