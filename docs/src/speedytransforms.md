@@ -222,6 +222,9 @@ spectral_truncation!(alms, 10)
 map = transform(alms, Grid=FullClenshawGrid)
 m = Matrix(map)
 ```
+We have created `m` from some random data here in spectral space, truncated it and transformed it,
+and applied `Matrix` to drop the grid information. You can ignore these steps
+and simply assume you have some data in some matrix.
 You hopefully know which grid this data comes on, let us assume it is a regular
 latitude-longitude grid, which we call the `FullClenshawGrid` (in analogy to the Gaussian grid based
 on the Gaussian quadrature). Note that for the spectral transform this should not include the poles,
@@ -259,7 +262,8 @@ lineplot(k, power, yscale=:log10, ylim=(1e-15, 10), xlim=extrema(k),
 ```
 
 The power spectrum of our data is about 1 up to wavenumber 10 and then close to zero for
-higher wavenumbers (which is in fact how we constructed this fake data). Let us
+higher wavenumbers (which is in fact how we constructed this fake data, see the code
+example in the beginning which led to the definition of our data matrix `m`). Let us
 turn this around and use SpeedyTransforms to create random noise in spectral space
 to be used in grid-point space!
 
@@ -293,7 +297,7 @@ A .*= k.^-2
 alms = LowerTriangularArray(A)
 ```
 
-Awesome. For higher degrees and orders the amplitude clearly decreases!
+Awesome. For higher degrees and orders the amplitude is clearly lower!
 Now to grid-point space and let us visualize the result
 ```@example speedytransforms2a
 map = transform(alms)
