@@ -26,14 +26,13 @@ jobs:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
       - uses: julia-actions/cache@v2
-      - name: Julia 1.10, add local packages
+      - name: Julia ${{ matrix.version }}
         shell: julia --color=yes {0}
         run: |
           using Pkg
           Pkg.develop([PackageSpec(path = "SpeedyWeatherInternals")])
           Pkg.instantiate()
           Pkg.test()
-        if: ${{ matrix.version == '1.10' }}
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
         env:
