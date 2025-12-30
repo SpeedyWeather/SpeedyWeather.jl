@@ -9,13 +9,6 @@ struct SinSolarDeclination{P} <: AbstractSolarDeclination
     planet::P
 end
 
-"""Generator function using the planet's orbital parameters to adapt the
-solar declination calculation."""
-function SinSolarDeclination(SG::SpectralGrid, P::AbstractPlanet)
-    (; axial_tilt, equinox, length_of_year, length_of_day) = P
-    return SinSolarDeclination{SG.NF}(; axial_tilt, equinox, length_of_year, length_of_day)
-end
-
 """
 $(TYPEDSIGNATURES)
 SinSolarDeclination functor, computing the solar declination angle of
@@ -38,12 +31,12 @@ Fourier series representation of the position of the sun. Search 2(5):172.
 $(TYPEDFIELDS)"""
 @parameterized Base.@kwdef struct SolarDeclination{NF <: AbstractFloat} <: AbstractSolarDeclination
     @param a::NF = 0.006918      # the offset +
-    @param s1::NF = 0.070257      # s1*sin(g) +
-    @param c1::NF = -0.399912      # c1*cos(g) +
-    @param s2::NF = 0.000907      # s2*sin(2g) +
-    @param c2::NF = -0.006758      # c2*cos(2g) +
+    @param s1::NF = 0.070257     # s1*sin(g) +
+    @param c1::NF = -0.399912    # c1*cos(g) +
+    @param s2::NF = 0.000907     # s2*sin(2g) +
+    @param c2::NF = -0.006758    # c2*cos(2g) +
     @param s3::NF = 0.00148      # s3*sin(3g) +
-    @param c3::NF = -0.002697      # c3*cos(3g)
+    @param c3::NF = -0.002697    # c3*cos(3g)
 end
 
 """Generator function pulling the number format NF from a SpectralGrid."""
@@ -73,10 +66,10 @@ Equation of time) which adjusts the solar hour to an oscillation
 of sunrise/set by about +-16min throughout the year."""
 @parameterized Base.@kwdef struct SolarTimeCorrection{NF <: AbstractFloat} <: AbstractSolarTimeCorrection
     @param a::NF = 0.004297      # the offset +
-    @param s1::NF = -1.837877      # s1*sin(g) +
-    @param c1::NF = 0.107029      # c1*cos(g) +
-    @param s2::NF = -2.340475      # s2*sin(2g) +
-    @param c2::NF = -0.837378      # c2*cos(2g)
+    @param s1::NF = -1.837877    # s1*sin(g) +
+    @param c1::NF = 0.107029     # c1*cos(g) +
+    @param s2::NF = -2.340475    # s2*sin(2g) +
+    @param c2::NF = -0.837378    # c2*cos(2g)
 end
 
 """
@@ -105,7 +98,7 @@ instead of current time."""
 function WhichZenith(SG::SpectralGrid, P::AbstractPlanet; kwargs...)
     (; NF) = SG
     (; daily_cycle, seasonal_cycle, length_of_day, length_of_year) = P
-    solar_declination = SinSolarDeclination(SG, P)
+    solar_declination = SinSolarDeclination(P)
 
     if daily_cycle
         return SolarZenith{NF, typeof(solar_declination)}(;
