@@ -26,12 +26,12 @@ jobs:
           arch: ${{ matrix.arch }}
       - uses: julia-actions/cache@v2
       - name: Julia 1.10, add local packages
-        shell: julia --color=yes --project=. {0}
+        shell: julia --color=yes --project=SpeedyTransforms/ {0}
         run: |
           using Pkg
           Pkg.develop([PackageSpec(; path) for path in ("SpeedyWeatherInternals", "LowerTriangularArrays", "RingGrids", "SpeedyTransforms")])
           Pkg.instantiate()
-        if: ${{ matrix.version == '1.10' }}
+          Pkg.test()
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
         env:

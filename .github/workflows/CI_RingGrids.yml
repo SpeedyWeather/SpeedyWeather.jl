@@ -26,7 +26,7 @@ jobs:
           arch: ${{ matrix.arch }}
       - uses: julia-actions/cache@v2
       - name: Julia 1.10, add local packages
-        shell: julia --color=yes {0}
+        shell: julia --project=RingGrids/ --color=yes {0}
         run: |
           using Pkg
           Pkg.develop([PackageSpec(path = "SpeedyWeatherInternals"), PackageSpec(path = "RingGrids")])

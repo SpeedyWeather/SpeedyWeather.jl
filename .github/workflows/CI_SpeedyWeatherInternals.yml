@@ -27,7 +27,7 @@ jobs:
           arch: ${{ matrix.arch }}
       - uses: julia-actions/cache@v2
       - name: Julia ${{ matrix.version }}
-        shell: julia --color=yes {0}
+        shell: julia --project=SpeedyWeatherInternals/--color=yes {0}
         run: |
           using Pkg
           Pkg.develop([PackageSpec(path = "SpeedyWeatherInternals")])
