@@ -1,0 +1,22 @@
+steps:
+  - label: "Julia CUDA {{matrix.version}}"
+    matrix:
+      setup:
+        version:
+          - "1.11"
+    plugins:
+      - JuliaCI/julia#v1:
+          version: "{{matrix.version}}"
+    command: |
+      julia -e 'println("---- :julia: Instantiating project")
+                using Pkg
+                Pkg.develop(; path=pwd())
+                Pkg.add(["CUDA", "Adapt", "KernelAbstractions"])'
+
+      julia -e 'println("+++ :julia: Running CUDA GPU tests")
+                include("SpeedyWeather/test/GPU/runtests.jl")'
+    agents:
+      queue: "juliagpu"
+      cuda: "*"
+    if: build.message !~ /\[skip tests\]/
+    timeout_in_minutes: 30
