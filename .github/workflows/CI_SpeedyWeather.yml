@@ -1,4 +1,4 @@
-name: CI
+name: SpeedyWeather CI
 on:
   pull_request:
     branches:
