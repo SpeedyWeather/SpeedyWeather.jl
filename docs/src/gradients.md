@@ -14,7 +14,7 @@ under the hood.
     The gradient operators in SpeedyTransforms generally assume a sphere of radius ``R=1``.
     For the transforms themselves that does not make a difference, but the gradient operators
     `divergence`, `curl`, `∇`, `∇²`, `∇⁻²` omit the radius scaling unless you provide the optional
-    keyword `radius` (or you can do `./= radius` manually). 
+    keyword `radius` (or you can do `./= radius` manually).
     Also note that meridional derivates in spectral space expect a ``\cos^{-1}(\theta)`` scaling.
     Details are always outlined in the respective docstrings, `?∇` for example.
 
@@ -51,7 +51,7 @@ And the Laplace operators omit a ``R^2`` (radius ``R``) scaling, i.e.
 ## Gradient `∇`
 
 We illustrate the usage of the gradient function `∇`. Let us create some fake
-data `G` on the grid first 
+data `G` on the grid first
 
 ```@example gradient
 using SpeedyWeather, CairoMakie
@@ -105,7 +105,7 @@ which becomes, if you take the divergence of these two equations
 Meaning that if we start with ``u, v`` we can obtain the relative vorticity
 ``\zeta`` and, using Coriolis parameter ``f`` and gravity ``g``, invert
 the Laplace operator to obtain displacement ``\eta``. How to do this with
-SpeedyTransforms? 
+SpeedyTransforms?
 
 Let us start by generating some data
 ```@example gradient

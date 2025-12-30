@@ -10,7 +10,7 @@ Often this also avoids the two-language problem that you will face if you
 run a simulation with a model in one language but then do the data
 analysis in another, treating the model as a blackbox although it likely
 has many of the functions you will need for analysis already defined.
-With SpeedyWeather we try to avoid this and are working towards a 
+With SpeedyWeather we try to avoid this and are working towards a
 more unified approach in atmospheric modelling where simulation
 and analysis are done interactively with the same library: SpeedyWeather.jl.
 
@@ -108,7 +108,7 @@ run!(simulation, period=Day(10))
 η_mean_later = real(simulation.prognostic_variables.pres[1, 1]) / a
 ```
 
-which is _exactly_ the same. So mass is conserved, woohoo. 
+which is _exactly_ the same. So mass is conserved, woohoo.
 
 Insight from a numerical perspective: The tendency of ``\eta`` is
 ``\partial_t \eta = -\nabla \cdot (\mathbf{u} h)`` which is a divergence of a flux.
@@ -141,7 +141,7 @@ function total_energy(u, v, η, model)
     H = model.atmosphere.layer_thickness
     Hb = model.orography.orography
     g = model.planet.gravity
-    
+
     h = @. η + H - Hb               # layer thickness between the bottom and free surface
     E = @. h/2*(u^2 + v^2) + g*h^2  # vertically-integrated mechanical energy
 
@@ -202,7 +202,7 @@ is defined as
 q = \frac{f + \zeta}{h}
 ```
 
-with ``f`` the Coriolis parameter, ``\zeta`` the relative vorticity, 
+with ``f`` the Coriolis parameter, ``\zeta`` the relative vorticity,
 and ``h`` the layer thickness as before. We can calculate this
 conveniently directly on the model grid (whichever you chose)
 as
@@ -223,7 +223,7 @@ q = @. (f + ζ) / h
 nothing # hide
 ```
 
-and we can compare the relative vorticity field to
+and we can compare the relative vorticity field
 ```@example analysis
 using CairoMakie
 heatmap(ζ, title="Relative vorticity [1/s]")
@@ -232,8 +232,7 @@ nothing # hide
 ```
 ![Relative vorticity](analysis_vor.png)
 
-
-the potential vorticity
+to the potential vorticity
 ```@example analysis
 heatmap(q, title="Potential vorticity [1/m/s]")
 save("analysis_pv.png", ans) # hide
@@ -266,7 +265,7 @@ function total_angular_momentum(u, η, model)
     Ω = model.planet.rotation
 
     r = R * cos.(model.geometry.lats)       # momentum arm for every grid point
-    
+
     h = @. η + H - Hb           # layer thickness between the bottom and free surface
     Λ = @. (u*r + Ω*r^2) * h    # vertically-integrated AAM
 
@@ -331,7 +330,7 @@ Q = \iint \frac{1}{2}q^2 dA
 In the absence of source and sink for potential vorticiy,
 this quantity should also conserve during the integration.
 
-We define a function ``total_enstrophy`` for this
+We define a function `total_enstrophy` for this
 
 ```@example analysis
 function total_enstrophy(ζ, η, model)
@@ -339,13 +338,14 @@ function total_enstrophy(ζ, η, model)
     H = model.atmosphere.layer_thickness
     Hb = model.orography.orography
     f = coriolis(ζ)     # create f on the grid
-    
+
     h = @. η + H - Hb   # thickness
     q = @. (ζ + f) / h  # Potential vorticity
     Q = @. q^2 / 2      # Potential enstrophy
 
     # transform to spectral, take l=m=0 mode at [1] and normalize for mean
-    return Q_mean = real(transform(Q)[1]) / model.spectral_transform.norm_sphere
+    Q_mean = real(transform(Q)[1]) / model.spectral_transform.norm_sphere
+    return Q_mean
 end
 ```
 
@@ -356,12 +356,12 @@ check how ``Q`` is changing over time.
 Q = total_enstrophy(ζ, η, model)
 run!(simulation, period=Day(10))
 Q_later = total_enstrophy(ζ, η, model)
-Q_later/Q
+Q_later / Q
 ```
 
 !!! note "Less conservative enstrophy"
     Note that the turbulent nature of the [shallow water model](@ref shallow_water_model)
-    (or generally 2D turbulence) cascades enstrophy to smaller scales where it 
+    (or generally 2D turbulence) cascades enstrophy to smaller scales where it
     is removed by [Horizontal diffusion](@ref diffusion) for numerical stability.
     As a result, it is decreasing more quickly than energy.
 
@@ -398,7 +398,7 @@ Now the `global_diagnostics` function is defined as
 
 ```@example analysis
 function global_diagnostics(u, v, ζ, η, model)
-    
+
     # constants from model
     NF = model.spectral_grid.NF     # number format used
     H = model.atmosphere.layer_thickness
@@ -409,7 +409,7 @@ function global_diagnostics(u, v, ζ, η, model)
 
     r = NF.(R * cos.(model.geometry.lats))  # create r on that grid
     f = coriolis(u)                         # create f on that grid
-    
+
     h = @. η + H - Hb           # thickness
     q = @. (ζ + f) / h          # potential vorticity
     λ = @. u * r + Ω * r^2      # angular momentum (in the right number format NF)
@@ -433,7 +433,7 @@ function global_diagnostics(diagn::DiagnosticVariables, model::AbstractModel)
     v = diagn.grid.v_grid[:, 1]
     ζR = diagn.grid.vor_grid[:, 1]
     η = diagn.grid.pres_grid
-    
+
     # vorticity during simulation is scaled by radius R, unscale here
     ζ = ζR ./ diagn.scale[]
 
@@ -461,7 +461,7 @@ details)
 # define a GlobalDiagnostics callback and the fields it needs
 Base.@kwdef mutable struct GlobalDiagnostics <: SpeedyWeather.AbstractCallback
     timestep_counter::Int = 0
-    
+
     time::Vector{DateTime} = []
     M::Vector{Float64} = []  # mean mass per time step
     C::Vector{Float64} = []  # mean circulation per time step
@@ -487,9 +487,9 @@ function SpeedyWeather.initialize!(
     callback.K = zeros(n)
     callback.P = zeros(n)
     callback.Q = zeros(n)
-    
+
     M, C, Λ, K, P, Q = global_diagnostics(diagn, model)
-    
+
     callback.time[1] = progn.clock.time
     callback.M[1] = M  # set initial conditions
     callback.C[1] = C  # set initial conditions
@@ -497,9 +497,9 @@ function SpeedyWeather.initialize!(
     callback.K[1] = K  # set initial conditions
     callback.P[1] = P  # set initial conditions
     callback.Q[1] = Q  # set initial conditions
-    
+
     callback.timestep_counter = 1  # (re)set counter to 1
-    
+
     return nothing
 end
 
@@ -510,19 +510,19 @@ function SpeedyWeather.callback!(
     diagn::DiagnosticVariables,
     model::AbstractModel,
 )
-    callback.timestep_counter += 1  
+    callback.timestep_counter += 1
     i = callback.timestep_counter
-    
+
     M, C, Λ, K, P, Q = global_diagnostics(diagn, model)
-    
+
     # store current time and diagnostics for timestep i
     callback.time[i] = progn.clock.time
-    callback.M[i] = M 
-    callback.C[i] = C 
-    callback.Λ[i] = Λ 
-    callback.K[i] = K 
-    callback.P[i] = P 
-    callback.Q[i] = Q 
+    callback.M[i] = M
+    callback.C[i] = C
+    callback.Λ[i] = Λ
+    callback.K[i] = K
+    callback.P[i] = P
+    callback.Q[i] = Q
 end
 
 using NCDatasets
@@ -538,7 +538,7 @@ function SpeedyWeather.finalize!(
 
     # create a netCDF file in current path
     ds = NCDataset(joinpath(pwd(), "global_diagnostics.nc"), "c")
-    
+
     # save diagnostics variables within
     defDim(ds, "time", n_timesteps)
     defVar(ds, "time",                  callback.time,  ("time",))
@@ -548,7 +548,7 @@ function SpeedyWeather.finalize!(
     defVar(ds, "kinetic energy",        callback.K,     ("time",))
     defVar(ds, "potential energy",      callback.P,     ("time",))
     defVar(ds, "potential enstrophy",   callback.Q,     ("time",))
-    
+
     close(ds)
 
     return nothing

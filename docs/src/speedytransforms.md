@@ -22,7 +22,7 @@ the maximum degree ``l`` and order ``m`` of the spherical harmonics (e.g. ``l_{m
 or the size of the lower triangular matrix, e.g. 32x32. In this example, they are all equivalent.
 We often use the truncation, i.e. T31, for brevity but sometimes it is important to describe
 degree and order independently (see for example [One more degree for spectral fields](@ref)).
-Note also how truncation, degree and order are 0-based, but matrix sizes are 1-based. 
+Note also how truncation, degree and order are 0-based, but matrix sizes are 1-based.
 
 
 ## Example transform
@@ -68,7 +68,7 @@ Now let's go back to spectral space with `transform`
 alms2 = transform(map)
 ```
 Comparing with `alms` from above you can see that the transform is exact up to a typical rounding error
-from `Float64`. 
+from `Float64`.
 ```@example speedytransforms
 alms ≈ alms2
 ```
@@ -112,7 +112,7 @@ More on that now.
 
 The function `transform` only with arguments as shown above,
 will create an instance of `SpectralTransform` under the hood.
-This object contains all precomputed information that is required for the transform, either way: 
+This object contains all precomputed information that is required for the transform, either way:
 The Legendre polynomials, pre-planned Fourier transforms, precomputed gradient, divergence and
 curl operators, the spherical harmonic eigenvalues among others. Maybe the most intuitive way to
 create a `SpectralTransform` is to start with a `SpectralGrid`, which already defines
@@ -214,15 +214,17 @@ docstrings at `?SpectralTransform`.
 How to take some data and compute a power spectrum with SpeedyTransforms you may ask.
 Say you have some global data in a matrix `m` that looks, for example, like
 ```@example speedytransforms2
-using RingGrids # hide
-using LowerTriangularArrays # hide
-using SpeedyTransforms # hide
-alms = randn(LowerTriangularMatrix{Complex{Float32}}, 32, 32) # hide
-spectral_truncation!(alms, 10) # hide
-map = transform(alms, Grid=FullClenshawGrid) # hide
-m = Matrix(map) # hide
-m
+using RingGrids
+using LowerTriangularArrays
+using SpeedyTransforms
+alms = randn(LowerTriangularMatrix{Complex{Float32}}, 32, 32)
+spectral_truncation!(alms, 10)
+map = transform(alms, Grid=FullClenshawGrid)
+m = Matrix(map)
 ```
+We have created `m` from some random data here in spectral space, truncated it and transformed it,
+and applied `Matrix` to drop the grid information. You can ignore these steps
+and simply assume you have some data in some matrix.
 You hopefully know which grid this data comes on, let us assume it is a regular
 latitude-longitude grid, which we call the `FullClenshawGrid` (in analogy to the Gaussian grid based
 on the Gaussian quadrature). Note that for the spectral transform this should not include the poles,
@@ -260,7 +262,8 @@ lineplot(k, power, yscale=:log10, ylim=(1e-15, 10), xlim=extrema(k),
 ```
 
 The power spectrum of our data is about 1 up to wavenumber 10 and then close to zero for
-higher wavenumbers (which is in fact how we constructed this fake data). Let us
+higher wavenumbers (which is in fact how we constructed this fake data, see the code
+example in the beginning which led to the definition of our data matrix `m`). Let us
 turn this around and use SpeedyTransforms to create random noise in spectral space
 to be used in grid-point space!
 
@@ -283,9 +286,20 @@ We first create a Julia `Matrix` so that the matrix-vector broadcasting `.*= k`
 is correctly applied across dimensions of `A` and then convert to a
 `LowerTriangularMatrix`.
 
-Awesome. For higher degrees and orders the amplitude clearly decreases!
+```@setup speedytransforms2a
+using RingGrids
+using LowerTriangularArrays
+using SpeedyTransforms
+using CairoMakie
+k = 1:32
+A = randn(Complex{Float32}, 32, 32)
+A .*= k.^-2
+alms = LowerTriangularArray(A)
+```
+
+Awesome. For higher degrees and orders the amplitude is clearly lower!
 Now to grid-point space and let us visualize the result
-```@example speedytransforms2
+```@example speedytransforms2a
 map = transform(alms)
 
 using CairoMakie
@@ -317,26 +331,26 @@ You get information about the size of that memory (both polynomials and required
 in the terminal "show" of a `SpectralTransform` object, e.g. at T127 resolution
 with 8 layers these are
 
-```@example speedytransforms2
+```@example speedytransforms3
 using SpeedyWeather
 spectral_grid = SpectralGrid(trunc=127, nlayers=8)
 SpectralTransform(spectral_grid)
 ```
 
-## Batched Transforms 
+## Batched Transforms
 
 SpeedyTransforms also supports batched transforms. With batched input data the `transform`
 is performed along the leading dimension, and all further dimensions are interpreted as
-batch dimensions. Take for example 
+batch dimensions. Take for example
 
-```@example speedytransforms2
-alms = randn(LowerTriangularArray{Complex{Float32}}, 32, 32, 5) 
+```@example speedytransforms3
+alms = randn(LowerTriangularArray{Complex{Float32}}, 32, 32, 5)
 grids = transform(alms)
 ```
 
 In this case we first randomly generated five (32x32) `LowerTriangularArray` that hold the
-coefficients and then transformed all five matrices batched to the grid space with the 
-transform command, yielding 5 `RingGrids` with each 48-rings. 
+coefficients and then transformed all five matrices batched to the grid space with the
+transform command, yielding 5 `RingGrids` with each 48-rings.
 
 ## Batched power spectra
 
@@ -345,17 +359,16 @@ to the leading spherical harmonic dimension (it is unravelled as a vector so the
 only, not the first two...). But the power spectrum is always calculated along that
 first spherical-harmonic dimension. For example
 
-```@example speedytransforms2 
-alms = randn(LowerTriangularArray{Complex{Float32}}, 5, 5, 2) 
+```@example speedytransforms3
+alms = randn(LowerTriangularArray{Complex{Float32}}, 5, 5, 2)
 power_spectrum(alms)
 ```
 returns the power spectrum for `[..., 1]` in the first column and `[..., 2]` in the second.
 This avoids to loop over these additional dimensions, but the result would be the same:
 
-```@example speedytransforms2
+```@example speedytransforms3
 power_spectrum(alms[:, 1])
 ```
-
 
 ## Functions and type index
 

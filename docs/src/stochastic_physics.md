@@ -26,14 +26,14 @@ subtypes(SpeedyWeather.AbstractStochasticPhysics)
 
 SPPT is based on the idea that the [dynamics](@ref primitive_equation_model) ``D`` have a higher certainty but that
 the [Parameterizations](@ref) ``P`` are more uncertain and hence any stochasticity should scale
-with the size of the tendencies coming from the parameterizations. 
+with the size of the tendencies coming from the parameterizations.
 Conceptually an atmospheric state ``\mathbf{x}`` is integrated in time ``t`` as
 
 ```math
 \frac{\partial \mathbf{x}}{\partial t} = D(\mathbf{x}) + P(\mathbf{x}, t; p)
 ```
 
-with the parameterizations being a function of the atmospheric state (column only for the single column 
+with the parameterizations being a function of the atmospheric state (column only for the single column
 parameterizations in SpeedyWeather), time ``t`` and parameters ``p``. Now SPPT changes this to
 
 ```math
@@ -70,7 +70,7 @@ from Julia's global random number generator. Now we define SPPT as
 stochastic_physics = StochasticallyPerturbedParameterizationTendencies(spectral_grid)
 ```
 
-`tapering` (by default an 
+`tapering` (by default an
 [anonymous function](https://docs.julialang.org/en/v1/manual/functions/#man-anonymous-functions)
 hence it looks like `var"#269#273" = #269` as the compiler assigns a "name")
 can be used to change vertically the amplitude of `r`, e.g

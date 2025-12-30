@@ -57,7 +57,7 @@ by the radius for the dynamical core."""
 end
 
 """$(TYPEDSIGNATURES)
-Undo the radius-scaling of vorticity and divergence from scale!(progn, scale::Real)."""
+Undo the radius-scaling of vorticity and divergence from `scale!(progn, scale::Real)`."""
 function unscale!(progn::PrognosticVariables)
     inv_scale = inv(progn.scale[])
     scale!(progn, :vor, inv_scale)
@@ -66,7 +66,7 @@ function unscale!(progn::PrognosticVariables)
 end
 
 """$(TYPEDSIGNATURES)
-Undo the radius-scaling of vorticity and divergence from scale!(diagn, scale::Real)."""
+Undo the radius-scaling of vorticity and divergence from `scale!(diagn, scale::Real)`."""
 function unscale!(diagn::DiagnosticVariables)
     inv_scale = inv(diagn.scale[])
     scale!(diagn, :vor_grid, inv_scale)

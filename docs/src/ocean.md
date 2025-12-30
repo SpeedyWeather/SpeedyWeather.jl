@@ -54,7 +54,7 @@ where `;` just means that every argument that follows is a keyword argument.
 
 This will use the sea surface temperature climatology from 1 June but
 not change it thereafter. Note that because nothing happens in the ocean time step
-you can use `set!(simulation, sea_surface_temperature=...)` to modify the 
+you can use `set!(simulation, sea_surface_temperature=...)` to modify the
 sea surface temperatures further at any point after `initialize!`.
 
 ## Seasonal ocean climatology
@@ -69,7 +69,7 @@ The `SeasonalOceanClimatology` reads monthly sea surface temperature
 fields from file, and interpolates them in time on every time step
 and writes them to the prognostic variables. Several options
 exist to load another `file` from `path` etc. For a full list of
-options type `?SeasonalOceanClimatology`. 
+options type `?SeasonalOceanClimatology`.
 To be passed on to the model constructor like
 
 ```@example ocean

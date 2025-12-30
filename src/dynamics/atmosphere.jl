@@ -131,7 +131,7 @@ saturation_vapor_pressure(T, A::AbstractDryAtmosphere) = zero(T)
 
 """$(TYPEDSIGNATURES)
 Saturation water vapor pressure as a function of temperature using the
-Clausius-Clapeyron equation, 
+Clausius-Clapeyron equation,
 
     e(T) = e₀ * exp( -Lᵥ/Rᵥ * (1/T - 1/T₀)),
 
@@ -149,7 +149,7 @@ saturation_humidity(T, p, A::AbstractDryAtmosphere) = zero(T)
 """$(TYPEDSIGNATURES)
 Saturation specific humidity as a function of temperature [K] and pressure [Pa], defined as
     qₛ = ε * eₛ(T) / p,
-with saturation vapor pressure eₛ(T), pressure p [Pa] and ratio of gas constants ε = R_dry/R_vapor."""
+with saturation vapor pressure eₛ(T), pressure p [Pa] and ratio of gas constants `ε = R_dry/R_vapor`."""
 function saturation_humidity(T, p, A::AbstractWetAtmosphere)
     e_s = saturation_vapor_pressure(T, A)
     ϵ = A.mol_ratio
