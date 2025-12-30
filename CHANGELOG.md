@@ -1,7 +1,7 @@
 # Changelog
 
 ## Unreleased
-
+- Follow-up to #783: finalize @param/@component markers [#935](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/935)
 - Adjust fill!(::PrognosticVariables, x) to new variable system [#949](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/949)
 - Code formatting with Runic applied [#950](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/950)
 - Implicit correction kernelized and GPU-ready [#891](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/891)

@@ -14,12 +14,12 @@ export OceanLandAlbedo
 
 """Composite type: Two albedo parameterizations, one for ocean and one for land surfaces.
 Fields are $(TYPEDFIELDS)"""
-@kwdef struct OceanLandAlbedo{Ocean, Land} <: AbstractAlbedo
+@parameterized @kwdef struct OceanLandAlbedo{Ocean, Land} <: AbstractAlbedo
     "[OPTION] Albedo parameterization for ocean surfaces"
-    ocean::Ocean
+    @component ocean::Ocean
 
     "[OPTION] Albedo parameterization for land surfaces"
-    land::Land
+    @component land::Land
 end
 
 Adapt.@adapt_structure OceanLandAlbedo
@@ -167,12 +167,12 @@ export OceanSeaIceAlbedo
 
 """Albedo that scales linearly between ocean and ice albedo depending on sea ice concentration.
 Fields are $(TYPEDFIELDS)"""
-@kwdef struct OceanSeaIceAlbedo{NF} <: AbstractAlbedo
+@parameterized @kwdef struct OceanSeaIceAlbedo{NF} <: AbstractAlbedo
     "[OPTION] Albedo over open ocean [1]"
-    albedo_ocean::NF = 0.06
+    @param albedo_ocean::NF = 0.06 (bounds=0..1,)
 
     "[OPTION] Albedo over sea ice at concentration=1 [1]"
-    albedo_ice::NF = 0.6
+    @param albedo_ice::NF = 0.6 (bounds=0..1,)
 end
 
 Adapt.@adapt_structure OceanSeaIceAlbedo
@@ -208,24 +208,24 @@ export LandSnowAlbedo
 
 """Albedo over land based on bare soil, vegetation (high and low cover) and snow cover.
 Fields are $(TYPEDFIELDS)"""
-@kwdef struct LandSnowAlbedo{NF, Scheme <: AbstractSnowCover} <: AbstractAlbedo
+@parameterized @kwdef struct LandSnowAlbedo{NF, Scheme <: AbstractSnowCover} <: AbstractAlbedo
     "Albedo of bare land (excluding vegetation) [1]"
-    albedo_land::NF = 0.4
+    @param albedo_land::NF = 0.4 (bounds=0..1,)
 
     "Albedo of high vegetation [1]"
-    albedo_high_vegetation::NF = 0.15
+    @param albedo_high_vegetation::NF = 0.15 (bounds=0..1,)
 
     "Albedo of low vegetation [1]"
-    albedo_low_vegetation::NF = 0.2
+    @param albedo_low_vegetation::NF = 0.2 (bounds=0..1,)
 
     "Albedo of snow [1], additive to land"
-    albedo_snow::NF = 0.4
+    @param albedo_snow::NF = 0.4 (bounds=0..1,)
 
     "Conversion from snow depth to snow cover [m]"
-    snow_depth_scale::NF = 0.05
+    @param snow_depth_scale::NF = 0.05 (bounds=Positive,)
 
     "Snow cover-albedo scheme"
-    snow_cover::Scheme = SaturatingSnowCover()
+    @param snow_cover::Scheme = SaturatingSnowCover() (group=:snow_cover,)
 end
 
 Adapt.@adapt_structure LandSnowAlbedo
