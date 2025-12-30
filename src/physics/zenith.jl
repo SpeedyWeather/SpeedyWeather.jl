@@ -15,8 +15,9 @@ SinSolarDeclination functor, computing the solar declination angle of
 angular fraction of year g [radians] using the coefficients of the
 SinSolarDeclination struct."""
 function (S::SinSolarDeclination)(g::NF) where {NF}
-    axial_tilt = deg2rad(S.axial_tilt)
-    equinox = S.length_of_day.value * Dates.dayofyear(S.equinox) / S.length_of_year.value
+    planet = S.planet
+    axial_tilt = deg2rad(planet.axial_tilt)
+    equinox = planet.length_of_day.value * Dates.dayofyear(planet.equinox) / planet.length_of_year.value
     return axial_tilt * sin(g - 2 * (π * convert(NF, equinox)))
 end
 
