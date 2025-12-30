@@ -270,12 +270,12 @@ but vary in latitude following a coslat². To be created like
 
 Fields and options are
 $(TYPEDFIELDS)"""
-@kwdef struct AquaPlanet{NF} <: AbstractOcean
+@parameterized @kwdef struct AquaPlanet{NF} <: AbstractOcean
     "[OPTION] Temperature on the Equator [K]"
-    temp_equator::NF = 302
+    @param temp_equator::NF = 302 (bounds=Positive,)
 
     "[OPTION] Temperature at the poles [K]"
-    temp_poles::NF = 273
+    @param temp_poles::NF = 273 (bounds=Positive,)
 
     "[OPTION] Mask the sea surface temperature according to model.land_sea_mask?"
     mask::Bool = true
@@ -314,12 +314,12 @@ end
 
 export SlabOcean
 
-@kwdef mutable struct SlabOcean{NF} <: AbstractOcean
+@parameterized @kwdef mutable struct SlabOcean{NF} <: AbstractOcean
     "[OPTION] Specific heat capacity of water [J/kg/K]"
     specific_heat_capacity::NF = 4184
 
     "[OPTION] Average mixed-layer depth [m]"
-    mixed_layer_depth::NF = 50
+    @param mixed_layer_depth::NF = 50 (bounds=Positive,)
 
     "[OPTION] Density of water [kg/m³]"
     density::NF = 1000

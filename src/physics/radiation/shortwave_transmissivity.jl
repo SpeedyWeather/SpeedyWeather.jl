@@ -15,35 +15,34 @@ function transmissivity!(column::ColumnVariables, clouds, ::TransparentShortwave
 end
 
 export BackgroundShortwaveTransmissivity
-@kwdef struct BackgroundShortwaveTransmissivity{NF} <: AbstractShortwaveTransmissivity
+@parameterized @kwdef struct BackgroundShortwaveTransmissivity{NF} <: AbstractShortwaveTransmissivity
     "[OPTION] Zenith correction amplitude (SPEEDY azen) [1]"
-    zenith_amplitude::NF = 1
+    @param zenith_amplitude::NF = 1 (bounds=Nonnegative,)
 
     "[OPTION] Zenith correction exponent (SPEEDY nzen)"
-    zenith_exponent::NF = 2
+    @param zenith_exponent::NF = 2 (bounds=Nonnegative,)
 
     "[OPTION] Absorptivity of dry air [per 10^5 Pa]"
     # Weighted visible + near-IR: 0.95*0.033 + 0.05*0.0 = 0.03135 (SPEEDY absdry, fband weights)
-    absorptivity_dry_air::NF = 0.03135
+    @param absorptivity_dry_air::NF = 0.03135 (bounds=0..1,)
 
     "[OPTION] Constant aerosol concentration?"
     aerosols::Bool = true
 
     "[OPTION] Absorptivity of aerosols [per 10^5 Pa]"
     # Weighted visible + near-IR: 0.95*0.033 + 0.05*0.0 = 0.03135 (SPEEDY absaer, fband weights)
-    absorptivity_aerosol::NF = 0.03135
+    @param absorptivity_aerosol::NF = 0.03135 (bounds=0..1,)
 
     "[OPTION] Absorptivity of water vapor [per kg/kg per 10^5 Pa]"
     # Weighted visible + near-IR: 0.95*0.022 + 0.05*15.0*0.2 = 0.171 per g/kg → 1.7e-4 per kg/kg (SPEEDY abswv1, abswv2)
-    absorptivity_water_vapor::NF = 0.00017
-
+    @param absorptivity_water_vapor::NF = 0.00017 (bounds=0..1,)
     "[OPTION] Base cloud absorptivity [per kg/kg per 10^5 Pa]"
     # Weighted visible band: 0.95*0.015 = 0.014 per g/kg → 1.4e-5 per kg/kg (SPEEDY abscl1)
-    absorptivity_cloud_base::NF = 0.000014
+    @param absorptivity_cloud_base::NF = 0.000014 (bounds=0..1,)
 
     "[OPTION] Maximum cloud absorptivity [per 10^5 Pa]"
     # Weighted one-band scaling: 0.95*0.15 = 0.1425 → rounded to 0.14 (SPEEDY abscl2)
-    absorptivity_cloud_limit::NF = 0.14
+    @param absorptivity_cloud_limit::NF = 0.14 (bounds=0..1,)
 end
 
 BackgroundShortwaveTransmissivity(SG::SpectralGrid; kwargs...) = BackgroundShortwaveTransmissivity{SG.NF}(; kwargs...)

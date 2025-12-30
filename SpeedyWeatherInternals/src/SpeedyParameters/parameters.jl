@@ -177,6 +177,7 @@ the nested structure must match that of `obj`. This function is used to reconstr
 @inline reconstruct(obj::NamedTuple{keys, V}, values::NamedTuple{keys, V}) where {keys, V <: Tuple} = values
 # @inline reconstruct(obj, values::ComponentArray) = reconstruct(obj, NamedTuple(values))
 @inline reconstruct(obj, values::SpeedyParams) = reconstruct(obj, stripparams(values))
+@inline reconstruct(obj, values::AbstractArray) = isempty(values) ? obj : error("Cannot reconstruct $(typeof(obj)) from non-empty array of type $(typeof(values))")
 @generated function reconstruct(obj, values::Union{NamedTuple, ComponentArray})
     keysof(::Type{<:NamedTuple{keys}}) where {keys} = keys
     keysof(::Type{<:ComponentArray{T, N, A, Tuple{Axis{coords}}}}) where {T, N, A, coords} = keys(coords)
@@ -323,11 +324,11 @@ macro parameterized(expr)
     if has_kwdef && typesig.head == :curly
         # handle type arguments; first extract argument names (discarding upper type bounds)
         typeargs = map(typedef2sig, typesig.args[2:end])
-        # then build method signature
-        push!(block.args, esc(:(SpeedyParameters.setproperties(obj::$(typename){$(typeargs...)}, patch::NamedTuple) where {$(typesig.args[2:end]...)} = $(typename){$(typeargs...)}(; patch...))))
+        # then build method signature - merge original properties with patch to preserve non-parameter fields
+        push!(block.args, esc(:(SpeedyParameters.setproperties(obj::$(typename){$(typeargs...)}, patch::NamedTuple) where {$(typesig.args[2:end]...)} = $(typename){$(typeargs...)}(; merge(SpeedyParameters.getproperties(obj), patch)...))))
     elseif has_kwdef
         # otherwise we can just use the typename
-        push!(block.args, esc(:(SpeedyParameters.setproperties(obj::$(typename), patch::NamedTuple) = $(typename)(; patch...))))
+        push!(block.args, esc(:(SpeedyParameters.setproperties(obj::$(typename), patch::NamedTuple) = $(typename)(; merge(SpeedyParameters.getproperties(obj), patch)...))))
     end
     return block
 end

@@ -151,18 +151,18 @@ export LandBucketMoisture
 """LandBucketMoisture model with two soil layers exchanging moisture via vertical diffusion.
 Forced by precipitation, evaporation, surface condensation, snow melt and river runoff drainage.
 $(TYPEDFIELDS)"""
-@kwdef struct LandBucketMoisture{NF} <: AbstractSoilMoisture
+@parameterized @kwdef struct LandBucketMoisture{NF} <: AbstractSoilMoisture
     "[OPTION] Time scale of vertical diffusion [s]"
     time_scale::Second = Day(2)
 
     "[OPTION] Infiltration fraction, that is, fraction of top layer runoff that is put into layer below [1]"
-    infiltration_fraction::NF = 0.25
+    @param infiltration_fraction::NF = 0.25 (bounds=0..1,)
 
     "[OPTION] Apply land-sea mask to set ocean-only points?"
     mask::Bool = true
 
     "[OPTION] Initial soil moisture over ocean, volume fraction [1]"
-    ocean_moisture::NF = 0
+    @param ocean_moisture::NF = 0 (bounds=0..1,)
 end
 
 Adapt.@adapt_structure LandBucketMoisture

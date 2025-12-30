@@ -56,8 +56,13 @@ end
     new_model2 = @inferred reconstruct(model, new_model_ps2)
     @test vec(parameters(new_model2.planet)) == new_model_ps2.planet
     @test vec(parameters(new_model2.atmosphere)).heat_capacity == new_model_ps2.atmosphere.heat_capacity
-    ## check if functional constraints are preserved
-    @test new_model2.atmosphere.κ ≈ model.atmosphere.κ / 2
+    ## κ is a parameter, so it gets updated like any other parameter in reconstruction
+    ## Partial reconstruction: κ not in patch, so it retains original value
+    @test new_model2.atmosphere.κ ≈ model.atmosphere.κ  # κ unchanged in partial reconstruction
+    # Full reconstruction: κ is in the parameter vector, so it gets doubled like other parameters
+    new_model_ps_full = 2*vec(parameters(model))
+    new_model_full = @inferred reconstruct(model, new_model_ps_full)
+    @test new_model_full.atmosphere.κ ≈ 2 * model.atmosphere.κ  # κ doubled in full reconstruction
 end
 
 @testset "@parameterized" begin

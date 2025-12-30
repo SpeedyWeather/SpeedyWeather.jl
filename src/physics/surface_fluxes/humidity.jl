@@ -5,17 +5,16 @@ export SurfaceHumidityFlux
 """Composite surface humidity flux type that holds flux
 for ocean and land (each of any type) separately. Fields are
 $(TYPEDFIELDS)"""
-@kwdef struct SurfaceHumidityFlux{Ocean, Land} <: AbstractSurfaceHumidityFlux
+@parameterized @kwdef struct SurfaceHumidityFlux{Ocean, Land} <: AbstractSurfaceHumidityFlux
     "[OPTION] Surface humidity flux parameterization for ocean surfaces"
-    ocean::Ocean
+    @component ocean::Ocean
 
     "[OPTION] Surface humidity flux parameterization for land surfaces"
-    land::Land
+    @component land::Land
 end
 
 Adapt.@adapt_structure SurfaceHumidityFlux
 
-# generator function and defaults
 function SurfaceHumidityFlux(
         SG::SpectralGrid;
         ocean = SurfaceOceanHumidityFlux(SG),
@@ -39,15 +38,15 @@ end
 
 export SurfaceOceanHumidityFlux
 """Humidity flux parameterization over ocean surfaces. Fields are $(TYPEDFIELDS)"""
-@kwdef struct SurfaceOceanHumidityFlux{NF} <: AbstractSurfaceHumidityFlux
+@parameterized @kwdef struct SurfaceOceanHumidityFlux{NF} <: AbstractSurfaceHumidityFlux
     "[OPTION] Use drag coefficient from calculated following model.boundary_layer_drag"
     use_boundary_layer_drag::Bool = true
 
     "[OPTION] Or fixed drag coefficient for humidity flux over ocean"
-    drag::NF = 0.9e-3
+    @param drag::NF = 0.9e-3 (bounds=0..1,)
 
     "[OPTION] Sea ice insulating surface humidity fluxes [1]"
-    sea_ice_insulation::NF = 0.01
+    @param sea_ice_insulation::NF = 0.01 (bounds=0..1,)
 end
 
 Adapt.@adapt_structure SurfaceOceanHumidityFlux
@@ -97,15 +96,15 @@ end
 
 export SurfaceLandHumidityFlux
 """Humidity flux parameterization over land surfaces. Fields are $(TYPEDFIELDS)"""
-@kwdef struct SurfaceLandHumidityFlux{NF} <: AbstractSurfaceHumidityFlux
+@parameterized @kwdef struct SurfaceLandHumidityFlux{NF} <: AbstractSurfaceHumidityFlux
     "[OPTION] Use column.boundary_layer_drag coefficient"
     use_boundary_layer_drag::Bool = true
 
     "[OPTION] Or fixed drag coefficient for humidity flux over land"
-    drag::NF = 1.2e-3
+    @param drag::NF = 1.2e-3 (bounds=0..1,)
 
     "[OPTION] Snow insulation depth [m], e-folding depth controlling how snow insulates surface humidity fluxes"
-    snow_insulation_depth::NF = 0.05
+    @param snow_insulation_depth::NF = 0.05 (bounds=0..1,)
 end
 
 Adapt.@adapt_structure SurfaceLandHumidityFlux
