@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Fixes a `SpeedyWeather.animate` projection issue [#958](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/958)
 - Follow-up to #783: finalize @param/@component markers [#935](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/935)
 - Adjust fill!(::PrognosticVariables, x) to new variable system [#949](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/949)
 - Code formatting with Runic applied [#950](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/950)
@@ -27,7 +28,6 @@
 - Don't adapt rings in RingGrids on GPU [#920](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/920)
 - README updates [#915](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/915#pullrequestreview-3469109183)
 - Fixes some formatting/LaTeX rendering in Docs [#916](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/916)
-- Fixes a `SpeedyWeather.animate` projection issue [#958](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/958)
 
 ## v0.17.4
 
