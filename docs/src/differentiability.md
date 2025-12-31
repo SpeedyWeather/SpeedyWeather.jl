@@ -59,8 +59,8 @@ dmodel.planet.gravity
 SpeedyWeather also provides automated parameter handling for all models and subcomponents via an extension of [ModelParameters.jl](https://github.com/rafaqz/ModelParameters.jl). Parameters can be automatically collected via the `parameters` method:
 
 ```julia
-spectral_grid = SpectralGrid(trunc=23, nlayers=1)
-model = Barotropic(; spectral_grid)
+spectral_grid = SpectralGrid(trunc=23, nlayers=1) 
+model = BarotropicModel(; spectral_grid)
 params = parameters(model)
 
 # output (truncated)
