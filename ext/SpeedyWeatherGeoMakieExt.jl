@@ -74,7 +74,7 @@ function SpeedyWeather.animate(
 
     # Get dimensions
     lon = longitude_shift_180(ds["lon"][:]) # longitudes -180 to 180
-    lat = sort(ds["lat"][:]) # lats -90 to 90
+    lat = sort(ds["lat"][:])                # lats -90 to 90
     time = ds["time"][:]
 
     # Get time units for proper labeling
@@ -116,9 +116,9 @@ function SpeedyWeather.animate(
 
     data = @lift begin
         raw_slice = if is_3d
-             ds[variable].var[:, :, level, $tsteps]
+            ds[variable].var[:, :, level, $tsteps]
         else
-             ds[variable].var[:, :, $tsteps]
+            ds[variable].var[:, :, $tsteps]
         end
 
         # Make sure the array is shaped correctly
@@ -126,7 +126,7 @@ function SpeedyWeather.animate(
 
         # Apply same transformations as the lat/lons
         rolled = circshift(standardized, (shift_amt, 0))
-        transf_data = reverse(rolled, dims=lat_idx)
+        transf_data = reverse(rolled, dims = lat_idx)
 
         transf_data
     end
