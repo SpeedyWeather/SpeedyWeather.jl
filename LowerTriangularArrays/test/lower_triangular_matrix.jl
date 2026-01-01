@@ -103,7 +103,7 @@ end
     end
 end
 
-@testset "LowerTriangularArray: OneBased vs ZeroBased" begin
+@testset "OneBased vs ZeroBased" begin
 
     L = zeros(LowerTriangularMatrix, 5, 5)
 
@@ -482,7 +482,7 @@ end
     end
 end
 
-@testset "LowerTriangularArray: sum" begin
+@testset "sum" begin
     @testset for idims in ((5,), (5, 5))
         L = randn(LowerTriangularArray{Float32}, 3, 3, idims...)
 
@@ -592,7 +592,7 @@ end
     end
 end
 
-@testset "LowerTriangularMatrix: broadcast" begin
+@testset "Simple broadcast" begin
     @testset for NF in (Float16, Float32, Float64)
         L1 = randn(LowerTriangularMatrix{NF}, 10, 10)
         L2 = deepcopy(L1)
@@ -615,7 +615,7 @@ end
 end
 
 
-@testset "LowerTriangularArray: GPU (JLArrays)" begin
+@testset "GPU (JLArrays)" begin
     # TODO: so far very basic GPU test, might integrate them into the other tests, as I already did with the broadcast test, but there are some key differences to avoid scalar indexing
     NF = Float32
     idims = (5,)
@@ -709,7 +709,7 @@ end
     @test L3 == L1
 end
 
-@testset "LowerTriangularArray: broadcast" begin
+@testset "Different architecture broadcast" begin
     @testset for idims in ((), (2,), (2, 2))
         @testset for NF in (Float32, Float64)
             @testset for ArrayType in (Array, JLArray)
@@ -769,7 +769,7 @@ end
     end
 end
 
-@testset "Rotate LowerTriangularArray" begin
+@testset "Rotate" begin
     @testset for NF in (Float16, Float32, Float64)
         @testset for trunc in (5, 10, 15)
             @testset for k in 0:3
@@ -798,7 +798,7 @@ end
     end
 end
 
-@testset "Reverse LowerTriangularArray" begin
+@testset "Reverse" begin
     @testset for NF in (Float16, Float32, Float64)
         @testset for trunc in (5, 10, 15)
             @testset for k in 0:3
