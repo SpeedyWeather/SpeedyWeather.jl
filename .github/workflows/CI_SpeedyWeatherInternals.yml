@@ -20,19 +20,13 @@ jobs:
         arch:
           - x64
     steps:
+      - working-directory: ./SpeedyWeatherInternals
       - uses: actions/checkout@v6
       - uses: julia-actions/setup-julia@v2
         with:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
       - uses: julia-actions/cache@v2
-      - name: Julia ${{ matrix.version }}
-        shell: julia --project=SpeedyWeatherInternals/--color=yes {0}
-        run: |
-          using Pkg
-          Pkg.develop([PackageSpec(path = "SpeedyWeatherInternals")])
-          Pkg.instantiate()
-          Pkg.test()
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
         env:

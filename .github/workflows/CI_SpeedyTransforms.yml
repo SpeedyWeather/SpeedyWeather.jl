@@ -19,19 +19,13 @@ jobs:
         arch:
           - x64
     steps:
+      - working-directory: ./SpeedyTransforms
       - uses: actions/checkout@v6
       - uses: julia-actions/setup-julia@v2
         with:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
       - uses: julia-actions/cache@v2
-      - name: Julia 1.10, add local packages
-        shell: julia --color=yes --project=SpeedyTransforms/ {0}
-        run: |
-          using Pkg
-          Pkg.develop([PackageSpec(; path) for path in ("SpeedyWeatherInternals", "LowerTriangularArrays", "RingGrids", "SpeedyTransforms")])
-          Pkg.instantiate()
-          Pkg.test()
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
         env:
