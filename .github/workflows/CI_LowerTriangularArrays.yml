@@ -10,6 +10,10 @@ on:
 jobs:
   test:
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: ./LowerTriangularArrays
     strategy:
       matrix:
         version:
@@ -20,7 +24,6 @@ jobs:
         arch:
           - x64
     steps:
-      - working-directory: ./LowerTriangularArrays
       - uses: actions/checkout@v6
       - uses: julia-actions/setup-julia@v2
         with:
