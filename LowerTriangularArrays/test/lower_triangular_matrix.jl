@@ -1,5 +1,6 @@
 using JLArrays
 import Random
+import SpeedyWeatherInternals.Architectures: architecture, on_architecture
 
 @testset "LowerTriangularMatrix" begin
     @testset for NF in (Float32, Float64)
@@ -261,7 +262,7 @@ end
     for f in (ones, zeros, rand, randn)
         s = (5, 5)
         spectrum = Spectrum(s...)
-        jl_arch = Architectures.architecture(JLArray)
+        jl_arch = architecture(JLArray)
         spectrum_jlarray = Spectrum(spectrum, architecture = jl_arch)
 
         # for 2D doesn't matter whether you say Matrix or Array, size is determined by s
@@ -619,7 +620,7 @@ end
     NF = Float32
     idims = (5,)
     spectrum = Spectrum(10, 10)
-    jl_arch = Architectures.architecture(JLArray)
+    jl_arch = architecture(JLArray)
     spectrum_jlarray = Spectrum(spectrum, architecture = jl_arch)
 
     L_cpu = randn(LowerTriangularArray{NF}, spectrum, idims...)
@@ -713,7 +714,7 @@ end
         @testset for NF in (Float32, Float64)
             @testset for ArrayType in (Array, JLArray)
 
-                arch = Architectures.architecture(ArrayType)
+                arch = architecture(ArrayType)
                 L1 = on_architecture(arch, randn(LowerTriangularArray{NF}, 10, 10, idims...))
                 L2 = deepcopy(L1)
 
