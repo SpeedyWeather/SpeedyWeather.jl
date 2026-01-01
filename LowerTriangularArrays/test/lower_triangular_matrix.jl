@@ -7,7 +7,7 @@ import Random
         @testset for lmax in (mmax, mmax + 1)
             A = randn(Complex{NF}, lmax, mmax)
 
-            LowerTriangularArrays.truncation!(A)
+            LowerTriangularArrays.truncate!(A)
 
             L = LowerTriangularMatrix(A)
 
@@ -261,7 +261,7 @@ end
     for f in (ones, zeros, rand, randn)
         s = (5, 5)
         spectrum = Spectrum(s...)
-        jl_arch = architecture(JLArray)
+        jl_arch = Architectures.architecture(JLArray)
         spectrum_jlarray = Spectrum(spectrum, architecture = jl_arch)
 
         # for 2D doesn't matter whether you say Matrix or Array, size is determined by s
@@ -395,7 +395,7 @@ end
         mmax = 32
         @testset for lmax in (mmax, mmax + 1)
             A = randn(Complex{NF}, lmax, mmax)
-            LowerTriangularArrays.truncation!(A)
+            LowerTriangularArrays.truncate!(A)
             L = LowerTriangularMatrix(A)
 
             # fill
@@ -514,7 +514,7 @@ end
         # with ranges
         L1 = zeros(LowerTriangularMatrix{NF}, 33, 32)
         L2 = randn(LowerTriangularMatrix{NF}, 65, 64)
-        L2T = LowerTriangularArrays.truncation(L2, size(L1, ZeroBased, as = Matrix)...)
+        L2T = LowerTriangularArrays.truncate(L2, size(L1, ZeroBased, as = Matrix)...)
 
         copyto!(L1, L2, 1:33, 1:32)     # size of smaller matrix
         @test L1 == L2T
@@ -577,7 +577,7 @@ end
             # with ranges
             L1 = zeros(LowerTriangularArray{NF}, 33, 32, idims...)
             L2 = randn(LowerTriangularArray{NF}, 65, 64, idims...)
-            L2T = LowerTriangularArrays.truncation(L2, (size(L1, ZeroBased, as = Matrix)[1:2])...)
+            L2T = LowerTriangularArrays.truncate(L2, (size(L1, ZeroBased, as = Matrix)[1:2])...)
 
             copyto!(L1, L2, 1:33, 1:32)     # size of smaller matrix
             @test L1 == L2T
@@ -619,7 +619,7 @@ end
     NF = Float32
     idims = (5,)
     spectrum = Spectrum(10, 10)
-    jl_arch = architecture(JLArray)
+    jl_arch = Architectures.architecture(JLArray)
     spectrum_jlarray = Spectrum(spectrum, architecture = jl_arch)
 
     L_cpu = randn(LowerTriangularArray{NF}, spectrum, idims...)
@@ -689,7 +689,7 @@ end
     L1 = on_architecture(jl_arch, zeros(LowerTriangularArray{NF}, 33, 32, idims...))
     L2 = on_architecture(jl_arch, randn(LowerTriangularArray{NF}, 65, 64, idims...))
 
-    L2T = LowerTriangularArrays.truncation(L2, (size(L1, ZeroBased; as = Matrix)[1:2])...)
+    L2T = LowerTriangularArrays.truncate(L2, (size(L1, ZeroBased; as = Matrix)[1:2])...)
     L3 = on_architecture(jl_arch, zeros(LowerTriangularArray{NF}, 33, 32, idims...))
 
     copyto!(L1, L2, 1:33, 1:32)     # size of smaller matrix
@@ -713,7 +713,7 @@ end
         @testset for NF in (Float32, Float64)
             @testset for ArrayType in (Array, JLArray)
 
-                arch = architecture(ArrayType)
+                arch = Architectures.architecture(ArrayType)
                 L1 = on_architecture(arch, randn(LowerTriangularArray{NF}, 10, 10, idims...))
                 L2 = deepcopy(L1)
 
