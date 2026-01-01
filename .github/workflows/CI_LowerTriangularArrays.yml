@@ -1,4 +1,4 @@
-name: LowerTriangularArrays CI
+name: LowerTriangularArrays
 on:
   pull_request:
     branches:
@@ -9,11 +9,16 @@ on:
 
 jobs:
   test:
+    name: Julia v${{ matrix.version }}, ${{ matrix.os }}, ${{ matrix.arch }}
     runs-on: ${{ matrix.os }}
     defaults:
       run:
         shell: bash
         working-directory: ./LowerTriangularArrays
+    timeout-minutes: 60
+    permissions: # needed to allow julia-actions/cache to proactively delete old caches that it has created
+      actions: write
+      contents: read
     strategy:
       matrix:
         version:

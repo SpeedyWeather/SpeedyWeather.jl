@@ -1,4 +1,4 @@
-name: RingGrids CI
+name: RingGrids
 on:
   pull_request:
     branches:
@@ -8,11 +8,16 @@ on:
       - main
 jobs:
   test:
+    name: Julia v${{ matrix.version }}, ${{ matrix.os }}, ${{ matrix.arch }}
     runs-on: ${{ matrix.os }}
     defaults:
       run:
         shell: bash
         working-directory: ./RingGrids
+    timeout-minutes: 60
+    permissions: # needed to allow julia-actions/cache to proactively delete old caches that it has created
+      actions: write
+      contents: read
     strategy:
       matrix:
         version:
