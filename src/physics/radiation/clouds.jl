@@ -153,7 +153,7 @@ Returns (cloud_cover, cloud_top, stratocumulus_cover) tuple."""
 
         stratocumulus_cover_ocean = F_ST * max(cover_max - clfact * cloud_cover, 0)
         qsat_surface = saturation_humidity(temp[ij, nlayers], sigma_levels[nlayers] * p_s, model.atmosphere)
-        RH_N = qsat_surface > zero(NF) ? humid[ij, nlayers] / qsat_surface : 0
+        RH_N::NF = qsat_surface > zero(NF) ? humid[ij, nlayers] / qsat_surface : zero(NF)
         stratocumulus_cover_land = stratocumulus_cover_ocean * RH_N 
 
         stratocumulus_cover = (1 - land_fraction) * stratocumulus_cover_ocean + land_fraction * stratocumulus_cover_land

@@ -139,9 +139,11 @@ initialize!(::JeevanjeeRadiation, ::PrimitiveEquation) = nothing
     # integrate from surface up
     for k in nlayers:-1:2
         # Seeley and Wordsworth, 2023 eq (1)
+        Fₖ_in = Fₖ
         Fₖ += (T[ij, k - 1] - T[ij, k]) * α * (Tₜ - T[ij, k])         # upward flux from layer k into k-1
-        dTdt[ij, k] -= flux_to_tendency(Fₖ / cₚ, pₛ, k, model)    # out of layer k
-        dTdt[ij, k - 1] += flux_to_tendency(Fₖ / cₚ, pₛ, k - 1, model)    # into layer k-1
+        Fₖ_out = Fₖ
+        dTdt[ij, k] -= flux_to_tendency((Fₖ_in - Fₖ_out) / cₚ, pₛ, k, model)    # out of layer k
+        dTdt[ij, k - 1] += flux_to_tendency((Fₖ_out - Fₖ_in) / cₚ, pₛ, k - 1, model)    # into layer k-1
     end
 
     # Relax the uppermost level towards prescribed "tropopause temperature"
@@ -271,10 +273,12 @@ initialize!(::OneBandLongwaveRadiativeTransfer, ::PrimitiveEquation) = nothing
 
     # UPWARD BEAM
     for k in nlayers:-1:2
-        t = transmissivity[ij, k]
-        U = U * t + (1 - t) * σ * T[ij, k]^4
-        dTdt[ij, k] -= flux_to_tendency(U / cₚ, pₛ, k, model)     # out of layer k
-        dTdt[ij, k - 1] += flux_to_tendency(U / cₚ, pₛ, k - 1, model)     # into layer k-1
+        t_val = transmissivity[ij, k]
+        U_in = U
+        U = U * t_val + (1 - t_val) * σ * T[ij, k]^4
+        U_out = U
+        dTdt[ij, k] -= flux_to_tendency((U_in - U_out) / cₚ, pₛ, k, model)     # out of layer k
+        dTdt[ij, k - 1] += flux_to_tendency((U_out - U_in) / cₚ, pₛ, k - 1, model)     # into layer k-1
     end
 
     # Outgoing longwave radiation at TOA
@@ -286,10 +290,12 @@ initialize!(::OneBandLongwaveRadiativeTransfer, ::PrimitiveEquation) = nothing
     # DOWNWARD BEAM
     D::NF = 0               # top boundary condition (no longwave coming from space)
     for k in 1:(nlayers - 1)
-        t = transmissivity[ij, k]
-        D = D * t + (1 - t) * σ * T[ij, k]^4
-        dTdt[ij, k] -= flux_to_tendency(D / cₚ, pₛ, k, model)     # out of layer k
-        dTdt[ij, k + 1] += flux_to_tendency(D / cₚ, pₛ, k + 1, model)     # into layer k+1
+        t_val = transmissivity[ij, k]
+        D_in = D
+        D = D * t_val + (1 - t_val) * σ * T[ij, k]^4
+        D_out = D
+        dTdt[ij, k] -= flux_to_tendency((D_in - D_out) / cₚ, pₛ, k, model)     # out of layer k
+        dTdt[ij, k + 1] += flux_to_tendency((D_out - D_in) / cₚ, pₛ, k + 1, model)     # into layer k+1
     end
 
     # Surface downward longwave radiation

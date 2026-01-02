@@ -36,12 +36,10 @@ initialize!(::TransparentShortwave, ::PrimitiveEquation) = nothing
     ssru_ocean = diagn.physics.ocean.surface_shortwave_up
     ssru_land = diagn.physics.land.surface_shortwave_up
 
-    @inbounds begin
-        cos_zenith = diagn.physics.cos_zenith[ij]
-        land_fraction = land_sea_mask[ij]
-        albedo_ocean = diagn.physics.ocean.albedo[ij]
-        albedo_land = diagn.physics.land.albedo[ij]
-    end
+    cos_zenith = diagn.physics.cos_zenith[ij]
+    land_fraction = land_sea_mask[ij]
+    albedo_ocean = diagn.physics.ocean.albedo[ij]
+    albedo_land = diagn.physics.land.albedo[ij]
 
     S₀ = planet.solar_constant
     D = S₀ * cos_zenith             # top of atmosphere downward radiation
@@ -174,11 +172,9 @@ One-band shortwave radiative transfer with cloud reflection and ozone absorption
     p_s = diagn.grid.pres_grid_prev[ij]
     nlayers = size(dTdt, 2)
 
-    @inbounds begin
-        cos_zenith = diagn.physics.cos_zenith[ij]
-        albedo_ocean = diagn.physics.ocean.albedo[ij]
-        albedo_land = diagn.physics.land.albedo[ij]
-    end
+    cos_zenith = diagn.physics.cos_zenith[ij]
+    albedo_ocean = diagn.physics.ocean.albedo[ij]
+    albedo_land = diagn.physics.land.albedo[ij]
     land_fraction = model.land_sea_mask.mask[ij]
     c_p = model.atmosphere.heat_capacity
 
@@ -188,7 +184,7 @@ One-band shortwave radiative transfer with cloud reflection and ozone absorption
 
     # Downward beam
     U_reflected = zero(D)
-    @inbounds for k in 1:nlayers
+    for k in 1:nlayers
         if k == cloud_top
             R = cloud_albedo * cloud_cover
             U_reflected = D * R
@@ -221,7 +217,7 @@ One-band shortwave radiative transfer with cloud reflection and ozone absorption
 
     # Upward beam
     U = U_surface_albedo + U_stratocumulus
-    @inbounds for k in nlayers:-1:1
+    for k in nlayers:-1:1
         U_out = U * t[ij, k]
         U_out += k == cloud_top ? U_reflected : zero(U)
         dTdt[ij, k] += flux_to_tendency((U - U_out) / c_p, p_s, k, model)

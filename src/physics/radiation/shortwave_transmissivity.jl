@@ -85,7 +85,7 @@ initialize!(::BackgroundShortwaveTransmissivity, ::AbstractModel) = nothing
     # Zenith angle correction factor
     azen = transmissivity.zenith_amplitude
     nzen = transmissivity.zenith_exponent
-    zenit_factor = 1 + azen * (1 - cos_zenith)^nzen
+    zenith_factor = 1 + azen * (1 - cos_zenith)^nzen
 
     # Cloud absorption term based on cloud base humidity (SPEEDY logic)
     q_base = nlayers > 1 ? humid[ij, nlayers - 1] : humid[ij, nlayers]
@@ -117,7 +117,7 @@ initialize!(::BackgroundShortwaveTransmissivity, ::AbstractModel) = nothing
         # Normalize pressure to 1e5 Pa since absorptivities are per 1e5 Pa
         delta_sigma = sigma_levels[k + 1] - sigma_levels[k]
         normalized_pressure = surface_pressure / 100000
-        optical_depth = layer_absorptivity * delta_sigma * normalized_pressure * zenit_factor
+        optical_depth = layer_absorptivity * delta_sigma * normalized_pressure * zenith_factor
 
         # Transmissivity through layer k
         t[ij, k] = exp(-optical_depth)
