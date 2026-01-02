@@ -1,3 +1,5 @@
+name: GPU
+
 steps:
   - label: "Julia CUDA {{matrix.version}}"
     matrix:
@@ -19,4 +21,28 @@ steps:
       queue: "juliagpu"
       cuda: "*"
     if: build.message !~ /\[skip tests\]/
+    timeout_in_minutes: 30
+
+steps:
+  - label: "AMDGPU Julia {{matrix.version}}"
+    matrix:
+      setup:
+        version:
+          - "1.11"
+    plugins:
+      - JuliaCI/julia#v1:
+          version: "{{matrix.version}}"
+    command: |
+
+      julia -e 'println("---- :julia: Instantiating project")
+                using Pkg
+                Pkg.develop(; path=pwd())
+                Pkg.add(["AMDGPU", "Adapt", "KernelAbstractions"])'
+
+      julia -e 'println("+++ :julia: Running AMDGPU tests")
+                include("SpeedyWeather/test/GPU/runtests.jl")'
+    agents:
+      queue: "juliagpu"
+      rocm: "*"
+      rocmgpu: "*"
     timeout_in_minutes: 30

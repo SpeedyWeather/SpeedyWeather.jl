@@ -5,6 +5,14 @@ on:
 
 jobs:
   changelog:
+    name: "Check changelog"
+    # don't run if any of these labels are present, changelog-enforcer also has skipLabels
+    # but for consistency do as with other workflows
+    if: >
+      !(  
+      contains(github.event.pull_request.labels.*.name, 'skip-ci') ||
+      contains(github.event.pull_request.labels.*.name, 'skip-changelog')
+      )
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v6
