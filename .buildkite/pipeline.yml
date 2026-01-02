@@ -19,11 +19,7 @@ steps:
       queue: "juliagpu"
       cuda: "*"
     # don't run GPU tests if 'skip-ci' or 'skip-gpu-ci' labels are present
-    if: >
-      !(  
-      contains(build.pull_request.labels.*.name, 'skip-ci') ||
-      contains(build.pull_request.labels.*.name, 'skip-gpu-ci')
-      )
+    if: !contains(build.pull_request.labels.*.name, 'skip-ci')
     timeout_in_minutes: 30
 
 steps:
@@ -49,9 +45,5 @@ steps:
       rocm: "*"
       rocmgpu: "*"
     # don't run GPU tests if 'skip-ci' or 'skip-gpu-ci' labels are present
-    if: >
-      !(  
-      contains(build.pull_request.labels.*.name, 'skip-ci') ||
-      contains(build.pull_request.labels.*.name, 'skip-gpu-ci')
-      )
+    if: !contains(build.pull_request.labels.*.name, 'skip-ci')
     timeout_in_minutes: 30
