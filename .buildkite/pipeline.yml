@@ -1,5 +1,5 @@
 steps:
-  - label: "Julia CUDA v${{matrix.version}}"
+  - label: "CUDA, Julia v1.11"
     matrix:
       setup:
         version:
@@ -27,7 +27,7 @@ steps:
     timeout_in_minutes: 30
 
 steps:
-  - label: "AMDGPU Julia v${{matrix.version}}"
+  - label: "AMDGPU, Julia v1.11"
     matrix:
       setup:
         version:
