@@ -22,7 +22,6 @@ steps:
     if: !contains(build.pull_request.labels.*.name, 'skip-ci')
     timeout_in_minutes: 30
 
-steps:
   - label: "AMDGPU, Julia v1.11"
     matrix:
       setup:
