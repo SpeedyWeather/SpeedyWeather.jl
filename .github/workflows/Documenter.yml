@@ -10,8 +10,9 @@ on:
 jobs:
   build:
     name: build
+    # don't run if any of these labels are present
     if: >
-      !(  # don't run if any of these labels are present
+      !(  
       contains(github.event.pull_request.labels.*.name, 'skip-ci') ||
       contains(github.event.pull_request.labels.*.name, 'skip-docs')
       )
