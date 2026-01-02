@@ -13,11 +13,11 @@ function LongitudeRotation(degree::Integer)
 end
 
 rotate(field::AbstractField, args...) = rotate!(deepcopy(field), args...)
-rotate!(field::AbstractField, degree::Integer) = rotate!(field, LongitudeRotation(degree))
-rotate!(field::AbstractField, ::LongitudeRotation{0}) = field
-rotate!(field::AbstractField, ::LongitudeRotation{90}) = _rotate!(field, 1)
-rotate!(field::AbstractField, ::LongitudeRotation{180}) = _rotate!(field, 2)
-rotate!(field::AbstractField, ::LongitudeRotation{270}) = _rotate!(field, 3)
+LinearAlgebra.rotate!(field::AbstractField, degree::Integer) = rotate!(field, LongitudeRotation(degree))
+LinearAlgebra.rotate!(field::AbstractField, ::LongitudeRotation{0}) = field
+LinearAlgebra.rotate!(field::AbstractField, ::LongitudeRotation{90}) = _rotate!(field, 1)
+LinearAlgebra.rotate!(field::AbstractField, ::LongitudeRotation{180}) = _rotate!(field, 2)
+LinearAlgebra.rotate!(field::AbstractField, ::LongitudeRotation{270}) = _rotate!(field, 3)
 
 function _rotate!(field::AbstractField, quarter::Integer)
     @assert quarter in (1, 2, 3) "Can only shift by 1, 2, or 3 quarters of a ring"

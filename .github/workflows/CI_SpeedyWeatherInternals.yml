@@ -1,4 +1,4 @@
-name: SpeedyWeatherInternals CI
+name: SpeedyWeatherInternals
 on:
   pull_request:
     branches:
@@ -8,7 +8,7 @@ on:
       - main
 jobs:
   test:
-    name: Julia ${{ matrix.version }} - ${{ matrix.os }} - ${{ matrix.arch }}
+    name: Julia v${{ matrix.version }}, ${{ matrix.os }}, ${{ matrix.arch }}
     runs-on: ${{ matrix.os }}
     defaults:
       run:
