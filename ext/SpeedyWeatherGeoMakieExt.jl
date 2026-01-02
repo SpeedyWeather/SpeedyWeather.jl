@@ -74,8 +74,12 @@ function SpeedyWeather.animate(
 
     # Get dimensions
     lon = longitude_shift_180(ds["lon"][:]) # longitudes -180 to 180
-    lat = sort(ds["lat"][:]) # lats -90 to 90
+    raw_lat = ds["lat"][:]
     time = ds["time"][:]
+
+    # Sort latitudes
+    lat_sort_idx = sortperm(raw_lat)
+    lat = raw_lat[lat_sort_idx]
 
     # Get time units for proper labeling
     time_units = ds["time"].attrib["units"]
@@ -114,11 +118,11 @@ function SpeedyWeather.animate(
     n_lon = length(lon)
     shift_amt = div(n_lon, 2)  # Num lons is usually even
 
-    data = @lift begin
+    data = lift(fig.scene, tsteps) do tstep
         raw_slice = if is_3d
-             ds[variable].var[:, :, level, $tsteps]
+            view(ds[variable], :, :, level, tstep)
         else
-             ds[variable].var[:, :, $tsteps]
+            view(ds[variable], :, :, tstep)
         end
 
         # Make sure the array is shaped correctly
@@ -126,9 +130,9 @@ function SpeedyWeather.animate(
 
         # Apply same transformations as the lat/lons
         rolled = circshift(standardized, (shift_amt, 0))
-        transf_data = reverse(rolled, dims=lat_idx)
+        transf_data = rolled[:, lat_sort_idx]
 
-        transf_data
+        return coalesce.(transf_data, NaN32)  # handle missing data for GeoMakie
     end
 
     # Determine color range if not specified
