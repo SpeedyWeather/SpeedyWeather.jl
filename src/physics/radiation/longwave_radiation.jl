@@ -271,8 +271,8 @@ initialize!(::OneBandLongwaveRadiativeTransfer, ::PrimitiveEquation) = nothing
 
     # UPWARD BEAM
     for k in nlayers:-1:2
-        t = transmissivity[ij, k]
-        U = U * t + (1 - t) * σ * T[ij, k]^4
+        t_val = transmissivity[ij, k]
+        U = U * t_val + (1 - t_val) * σ * T[ij, k]^4
         dTdt[ij, k] -= flux_to_tendency(U / cₚ, pₛ, k, model)     # out of layer k
         dTdt[ij, k - 1] += flux_to_tendency(U / cₚ, pₛ, k - 1, model)     # into layer k-1
     end
@@ -286,8 +286,8 @@ initialize!(::OneBandLongwaveRadiativeTransfer, ::PrimitiveEquation) = nothing
     # DOWNWARD BEAM
     D::NF = 0               # top boundary condition (no longwave coming from space)
     for k in 1:(nlayers - 1)
-        t = transmissivity[ij, k]
-        D = D * t + (1 - t) * σ * T[ij, k]^4
+        t_val = transmissivity[ij, k]
+        D = D * t_val + (1 - t_val) * σ * T[ij, k]^4
         dTdt[ij, k] -= flux_to_tendency(D / cₚ, pₛ, k, model)     # out of layer k
         dTdt[ij, k + 1] += flux_to_tendency(D / cₚ, pₛ, k + 1, model)     # into layer k+1
     end
