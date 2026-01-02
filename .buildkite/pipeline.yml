@@ -1,7 +1,8 @@
+# don't run GPU tests if 'skip-ci' or 'skip-gpu-ci' labels are present
 if: >
   !(  
-  contains(github.event.pull_request.labels.*.name, 'skip-ci') ||
-  contains(github.event.pull_request.labels.*.name, 'skip-gpu-ci')
+  contains(build.pull_request.labels.*.name, 'skip-ci') ||
+  contains(build.pull_request.labels.*.name, 'skip-gpu-ci')
   )
 
 steps:

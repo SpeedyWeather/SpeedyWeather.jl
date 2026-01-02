@@ -5,7 +5,7 @@ on:
 
 jobs:
   changelog:
-    name: "Check changelog"
+    name: "CHANGELOG.md changed?"
     # don't run if any of these labels are present, changelog-enforcer also has skipLabels
     # but for consistency do as with other workflows
     if: >
@@ -19,4 +19,4 @@ jobs:
     - uses: dangoslen/changelog-enforcer@v3
       with:
         changeLogPath: 'CHANGELOG.md'
-        skipLabels: 'skip-changelog','skip-ci'
+        # skipLabels: 'skip-changelog','skip-ci'
