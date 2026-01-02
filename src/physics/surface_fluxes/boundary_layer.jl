@@ -101,7 +101,7 @@ const LAND_ROUGHNESS_MODEL_REF = Ref{ONNXRunTime.InferenceSession}()
 function _load_model_safe!(ref_container, filename)
     path = joinpath(@__DIR__, "../../../input_data", filename)
 
-    if !isfile(path)
+    return if !isfile(path)
         @warn "ONNX Model not found at $path"
     else
         # Load directly into the container passed as argument
@@ -111,20 +111,20 @@ end
 
 function __init__()
     _load_model_safe!(OCEAN_ROUGHNESS_MODEL_REF, "ocean_model/model.onnx")
-    _load_model_safe!(LAND_ROUGHNESS_MODEL_REF, "land_model/rf_z0_land_model.onnx")
+    return _load_model_safe!(LAND_ROUGHNESS_MODEL_REF, "land_model/rf_z0_land_model.onnx")
 end
 
 # Ocean normalisation parameters
 const O_INPUT_MEANS = Float32[0.14675693, 0.24450141, 0.17968568, 7.6465526]
-const O_INPUT_STDS  = Float32[0.3357911, 6.3831706, 5.53958, 3.6144474]
+const O_INPUT_STDS = Float32[0.3357911, 6.3831706, 5.53958, 3.6144474]
 const O_OUTPUT_MEAN = Float32(-8.76918)
-const O_OUTPUT_STD  = Float32(1.2418048)
+const O_OUTPUT_STD = Float32(1.2418048)
 
 # Land normalisation parameters
 const L_INPUT_MEANS = Float32[0.100255094, 0.154690117, 16791.6582, 6.33934355]
-const L_INPUT_STDS  = Float32[0.27687377, 0.32951584, 11649.544, 4.8004246]
+const L_INPUT_STDS = Float32[0.27687377, 0.32951584, 11649.544, 4.8004246]
 const L_OUTPUT_MEAN = Float32(-5.0261893)
-const L_OUTPUT_STD  = Float32(2.4474483)
+const L_OUTPUT_STD = Float32(2.4474483)
 
 @propagate_inbounds function surface_roughness_ocean(ij, diagn, progn)
     surface = diagn.nlayers
@@ -133,10 +133,10 @@ const L_OUTPUT_STD  = Float32(2.4474483)
     Uₛ = diagn.grid.u_grid[ij, surface]
     Vₛ = diagn.grid.v_grid[ij, surface]
     ℵ = progn.ocean.sea_ice_concentration[ij]
-    
-    norm_ℵ   = (ℵ - O_INPUT_MEANS[1]) / O_INPUT_STDS[1]
-    norm_Uₛ  = (Uₛ - O_INPUT_MEANS[2]) / O_INPUT_STDS[2]
-    norm_Vₛ  = (Vₛ - O_INPUT_MEANS[3]) / O_INPUT_STDS[3]
+
+    norm_ℵ = (ℵ - O_INPUT_MEANS[1]) / O_INPUT_STDS[1]
+    norm_Uₛ = (Uₛ - O_INPUT_MEANS[2]) / O_INPUT_STDS[2]
+    norm_Vₛ = (Vₛ - O_INPUT_MEANS[3]) / O_INPUT_STDS[3]
     norm_UVₛ = (UVₛ - O_INPUT_MEANS[4]) / O_INPUT_STDS[4]
 
     predictors = [norm_ℵ  norm_Uₛ  norm_Vₛ  norm_UVₛ]
@@ -154,7 +154,7 @@ end
     g = diagn.dynamics.geopotential[ij]
     vₕ = diagn.physics.land.vegetation_high[ij]
     vₗ = diagn.physics.land.vegetation_low[ij]
-    
+
     norm_vₕ = (vₕ - L_INPUT_MEANS[1]) / L_INPUT_STDS[1]
     norm_vₗ = (vₗ - L_INPUT_MEANS[2]) / L_INPUT_STDS[2]
     norm_g = (g - L_INPUT_MEANS[3]) / L_INPUT_STDS[3]
@@ -170,7 +170,6 @@ end
     min_roughness = max(surface_roughness, 1.2999999e-3)
     return Float32(min_roughness)  # Min ERA5 value over land
 end
-
 
 
 """
