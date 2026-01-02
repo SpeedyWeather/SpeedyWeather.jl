@@ -1,58 +1,53 @@
-name: GPU
+if: >
+  !(  
+  contains(github.event.pull_request.labels.*.name, 'skip-ci') ||
+  contains(github.event.pull_request.labels.*.name, 'skip-gpu-ci')
+  )
 
-jobs:
-  test:
-    name: Julia v${{ matrix.version }}, ${{ matrix.os }}, ${{ matrix.arch }}
-    if: >
-      !(  
-      contains(github.event.pull_request.labels.*.name, 'skip-ci') ||
-      contains(github.event.pull_request.labels.*.name, 'skip-gpu-ci')
-      )
+steps:
+  - label: "Julia CUDA v${{matrix.version}}"
+    matrix:
+      setup:
+        version:
+          - "1.11"
+    plugins:
+      - JuliaCI/julia#v1:
+          version: "{{matrix.version}}"
+    command: |
+      julia -e 'println("---- :julia: Instantiating project")
+                using Pkg
+                Pkg.develop(; path=pwd())
+                Pkg.add(["CUDA", "Adapt", "KernelAbstractions"])'
 
-    steps:
-      - label: "Julia CUDA v${{matrix.version}}"
-        matrix:
-          setup:
-            version:
-              - "1.11"
-        plugins:
-          - JuliaCI/julia#v1:
-              version: "{{matrix.version}}"
-        command: |
-          julia -e 'println("---- :julia: Instantiating project")
-                    using Pkg
-                    Pkg.develop(; path=pwd())
-                    Pkg.add(["CUDA", "Adapt", "KernelAbstractions"])'
+      julia -e 'println("+++ :julia: Running CUDA GPU tests")
+                include("SpeedyWeather/test/GPU/runtests.jl")'
+    agents:
+      queue: "juliagpu"
+      cuda: "*"
+    if: build.message !~ /\[skip tests\]/
+    timeout_in_minutes: 30
 
-          julia -e 'println("+++ :julia: Running CUDA GPU tests")
-                    include("SpeedyWeather/test/GPU/runtests.jl")'
-        agents:
-          queue: "juliagpu"
-          cuda: "*"
-        if: build.message !~ /\[skip tests\]/
-        timeout_in_minutes: 30
+steps:
+  - label: "AMDGPU Julia v${{matrix.version}}"
+    matrix:
+      setup:
+        version:
+          - "1.11"
+    plugins:
+      - JuliaCI/julia#v1:
+          version: "{{matrix.version}}"
+    command: |
 
-    steps:
-      - label: "AMDGPU Julia v${{matrix.version}}"
-        matrix:
-          setup:
-            version:
-              - "1.11"
-        plugins:
-          - JuliaCI/julia#v1:
-              version: "{{matrix.version}}"
-        command: |
+      julia -e 'println("---- :julia: Instantiating project")
+                using Pkg
+                Pkg.develop(; path=pwd())
+                Pkg.add(["AMDGPU", "Adapt", "KernelAbstractions"])'
 
-          julia -e 'println("---- :julia: Instantiating project")
-                    using Pkg
-                    Pkg.develop(; path=pwd())
-                    Pkg.add(["AMDGPU", "Adapt", "KernelAbstractions"])'
-
-          julia -e 'println("+++ :julia: Running AMDGPU tests")
-                    include("SpeedyWeather/test/GPU/runtests.jl")'
-        agents:
-          queue: "juliagpu"
-          rocm: "*"
-          rocmgpu: "*"
-        if: build.message !~ /\[skip tests\]/
-        timeout_in_minutes: 30
+      julia -e 'println("+++ :julia: Running AMDGPU tests")
+                include("SpeedyWeather/test/GPU/runtests.jl")'
+    agents:
+      queue: "juliagpu"
+      rocm: "*"
+      rocmgpu: "*"
+    if: build.message !~ /\[skip tests\]/
+    timeout_in_minutes: 30
