@@ -121,7 +121,7 @@ end
 # initialize one after another
 function initialize!(radiation::OneBandShortwave, model::PrimitiveEquation)
     initialize!(radiation.clouds, model)
-    initialize!(radiation.transmissivity, model)
+    initialize!(radiation.transmittance, model)
     return initialize!(radiation.radiative_transfer, model)
 end
 
@@ -140,7 +140,7 @@ integrates downward and upward radiative fluxes accounting for cloud albedo effe
         model,
     )
     clouds = clouds!(ij, diagn, progn, radiation.clouds, model)
-    t = transmissivity!(ij, diagn, progn, clouds, radiation.transmissivity, model)
+    t = transmissivity!(ij, diagn, progn, clouds, radiation.transmittance, model)
     return shortwave_radiative_transfer!(ij, diagn, t, clouds, radiation.radiative_transfer, model)
 end
 
