@@ -79,7 +79,7 @@ $(TYPEDFIELDS)
 """
 @parameterized @kwdef struct OneBandShortwave{C, T, R} <: AbstractShortwave
     @component clouds::C
-    @component transmittance::T
+    @component transmissivity::T
     @component radiative_transfer::R
 end
 Adapt.@adapt_structure OneBandShortwave
@@ -121,7 +121,7 @@ end
 # initialize one after another
 function initialize!(radiation::OneBandShortwave, model::PrimitiveEquation)
     initialize!(radiation.clouds, model)
-    initialize!(radiation.transmittance, model)
+    initialize!(radiation.transmissivity, model)
     return initialize!(radiation.radiative_transfer, model)
 end
 
@@ -140,7 +140,7 @@ integrates downward and upward radiative fluxes accounting for cloud albedo effe
         model,
     )
     clouds = clouds!(ij, diagn, progn, radiation.clouds, model)
-    t = transmissivity!(ij, diagn, progn, clouds, radiation.transmittance, model)
+    t = transmissivity!(ij, diagn, progn, clouds, radiation.transmissivity, model)
     return shortwave_radiative_transfer!(ij, diagn, t, clouds, radiation.radiative_transfer, model)
 end
 
