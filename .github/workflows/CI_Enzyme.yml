@@ -10,9 +10,11 @@ jobs:
   test:
     runs-on: ${{ matrix.os }}
     if: >
-      !contains(github.event.pull_request.labels.*.name, 'skip-ci') ||
-      !contains(github.event.pull_request.labels.*.name, 'skip-speedyweather-ci') ||
-      !contains(github.event.pull_request.labels.*.name, 'skip-enzyme-ci')
+      !( # don't run if any of these labels are present
+      contains(github.event.pull_request.labels.*.name, 'skip-ci') ||
+      contains(github.event.pull_request.labels.*.name, 'skip-speedyweather-ci') ||
+      contains(github.event.pull_request.labels.*.name, 'skip-enzyme-ci')
+      )
     strategy:
       matrix:
         version:

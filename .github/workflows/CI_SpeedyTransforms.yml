@@ -10,9 +10,11 @@ jobs:
   test:
     name: Julia v${{ matrix.version }}, ${{ matrix.os }}, ${{ matrix.arch }}
     if: >
-      !contains(github.event.pull_request.labels.*.name, 'skip-ci') ||
-      !contains(github.event.pull_request.labels.*.name, 'skip-submodules-ci') ||
-      !contains(github.event.pull_request.labels.*.name, 'skip-speedytransforms-ci')
+      !( # don't run if any of these labels are present
+      contains(github.event.pull_request.labels.*.name, 'skip-ci') ||
+      contains(github.event.pull_request.labels.*.name, 'skip-submodules-ci') ||
+      contains(github.event.pull_request.labels.*.name, 'skip-speedytransforms-ci')
+      )
     runs-on: ${{ matrix.os }}
     defaults:
       run:
