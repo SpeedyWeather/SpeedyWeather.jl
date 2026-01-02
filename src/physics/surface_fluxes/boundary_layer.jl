@@ -149,8 +149,8 @@ const L_OUTPUT_STD  = Float32(2.4474483)
     prediction = OCEAN_ROUGHNESS_MODEL_REF[](input)["linear_5"][1]
     log_surface_roughness = (prediction * O_OUTPUT_STD) + O_OUTPUT_MEAN
     surface_roughness = exp(log_surface_roughness)
-    max_roughness = max(surface_roughness, 2.4361885e-5)
-    return Float32(max_roughness)  # Min ERA5 value over ocean
+    min_roughness = max(surface_roughness, 2.4361885e-5)
+    return Float32(min_roughness)  # Min ERA5 value over ocean
 end
 
 @propagate_inbounds function surface_roughness_land(ij, diagn, progn)
@@ -171,8 +171,8 @@ end
     prediction = LAND_ROUGHNESS_MODEL_REF[](input)["variable"][1]
     log_surface_roughness = (prediction * L_OUTPUT_STD) + L_OUTPUT_MEAN
     surface_roughness = exp(log_surface_roughness)
-    max_roughness = max(surface_roughness, 1.2999999e-3)
-    return Float32(max_roughness)  # Min ERA5 value over land
+    min_roughness = max(surface_roughness, 1.2999999e-3)
+    return Float32(min_roughness)  # Min ERA5 value over land
 end
 
 
