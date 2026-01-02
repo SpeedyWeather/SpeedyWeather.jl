@@ -98,7 +98,6 @@ end
 const OCEAN_ROUGHNESS_MODEL_REF = Ref{ONNXRunTime.InferenceSession}()
 const LAND_ROUGHNESS_MODEL_REF = Ref{ONNXRunTime.InferenceSession}()
 
-# 2. A private helper function to avoid repeating code
 function _load_model_safe!(ref_container, filename)
     path = joinpath(@__DIR__, "../../../input_data", filename)
 
@@ -110,21 +109,18 @@ function _load_model_safe!(ref_container, filename)
     end
 end
 
-# 3. The SINGLE __init__ function
 function __init__()
-    # Load Ocean Model
     _load_model_safe!(OCEAN_ROUGHNESS_MODEL_REF, "ocean_model/model.onnx")
-
-    # Load Land Model
     _load_model_safe!(LAND_ROUGHNESS_MODEL_REF, "land_model/rf_z0_land_model.onnx")
 end
 
-
+# Ocean normalisation parameters
 const O_INPUT_MEANS = Float32[0.14675693, 0.24450141, 0.17968568, 7.6465526]
 const O_INPUT_STDS  = Float32[0.3357911, 6.3831706, 5.53958, 3.6144474]
 const O_OUTPUT_MEAN = Float32(-8.76918)
 const O_OUTPUT_STD  = Float32(1.2418048)
 
+# Land normalisation parameters
 const L_INPUT_MEANS = Float32[0.100255094, 0.154690117, 16791.6582, 6.33934355]
 const L_INPUT_STDS  = Float32[0.27687377, 0.32951584, 11649.544, 4.8004246]
 const L_OUTPUT_MEAN = Float32(-5.0261893)
