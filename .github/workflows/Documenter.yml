@@ -9,6 +9,10 @@ on:
 
 jobs:
   build:
+    name: build
+    if: >
+      !contains(github.event.pull_request.labels.*.name, 'skip-ci') ||
+      !contains(github.event.pull_request.labels.*.name, 'skip-docs')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
