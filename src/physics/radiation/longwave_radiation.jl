@@ -142,7 +142,7 @@ initialize!(::JeevanjeeRadiation, ::PrimitiveEquation) = nothing
         Fₖ_in = Fₖ
         Fₖ += (T[ij, k - 1] - T[ij, k]) * α * (Tₜ - T[ij, k])         # upward flux from layer k into k-1
         Fₖ_out = Fₖ
-        dTdt[ij, k] -= flux_to_tendency((Fₖ_in - Fₖ_out) / cₚ, pₛ, k, model)    # out of layer k
+        dTdt[ij, k] -= flux_to_tendency((Fₖ_out - Fₖ_in) / cₚ, pₛ, k, model)    # out of layer k
         dTdt[ij, k - 1] += flux_to_tendency((Fₖ_out - Fₖ_in) / cₚ, pₛ, k - 1, model)    # into layer k-1
     end
 
@@ -277,7 +277,7 @@ initialize!(::OneBandLongwaveRadiativeTransfer, ::PrimitiveEquation) = nothing
         U_in = U
         U = U * t_val + (1 - t_val) * σ * T[ij, k]^4
         U_out = U
-        dTdt[ij, k] -= flux_to_tendency((U_in - U_out) / cₚ, pₛ, k, model)     # out of layer k
+        dTdt[ij, k] -= flux_to_tendency((U_out - U_in) / cₚ, pₛ, k, model)     # out of layer k
         dTdt[ij, k - 1] += flux_to_tendency((U_out - U_in) / cₚ, pₛ, k - 1, model)     # into layer k-1
     end
 
@@ -294,7 +294,7 @@ initialize!(::OneBandLongwaveRadiativeTransfer, ::PrimitiveEquation) = nothing
         D_in = D
         D = D * t_val + (1 - t_val) * σ * T[ij, k]^4
         D_out = D
-        dTdt[ij, k] -= flux_to_tendency((D_in - D_out) / cₚ, pₛ, k, model)     # out of layer k
+        dTdt[ij, k] -= flux_to_tendency((D_out - D_in) / cₚ, pₛ, k, model)     # out of layer k
         dTdt[ij, k + 1] += flux_to_tendency((D_out - D_in) / cₚ, pₛ, k + 1, model)     # into layer k+1
     end
 
