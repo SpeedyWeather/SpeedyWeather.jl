@@ -26,42 +26,42 @@ initialize!(clouds::NoClouds, ::AbstractModel) = nothing
 end
 
 export DiagnosticClouds
-@kwdef struct DiagnosticClouds{NF} <: AbstractShortwaveClouds
+@parameterized @kwdef struct DiagnosticClouds{NF} <: AbstractShortwaveClouds
     "[OPTION] Relative humidity threshold for cloud cover = 0 [1]."
-    relative_humidity_threshold_min::NF = 0.3
+    @param relative_humidity_threshold_min::NF = 0.3 (bounds=0..1,)
 
     "[OPTION] Relative humidity threshold for cloud cover = 1 [1]"
-    relative_humidity_threshold_max::NF = 1
+    @param relative_humidity_threshold_max::NF = 1 (bounds=0..1,)
 
     "[OPTION] Specific humidity threshold for cloud cover [Kg/kg]"
-    specific_humidity_threshold_min::NF = 0.0002
+    @param specific_humidity_threshold_min::NF = 0.0002 (bounds=0..1,)
 
     "[OPTION] Weight for √precip term [1]"
-    precipitation_weight::NF = 0.2
+    @param precipitation_weight::NF = 0.2 (bounds=Nonnegative,)
 
     "[OPTION] Cap on precip contributing to cloud cover [mm/day]"
-    precipitation_max::NF = 10
+    @param precipitation_max::NF = 10 (bounds=Positive,)
 
     "[OPTION] Cloud albedo for visible band at CLC=1 [1]"
-    cloud_albedo::NF = 0.43
+    @param cloud_albedo::NF = 0.43 (bounds=0..1,)
 
     "[OPTION] Stratocumulus cloud albedo (surface reflection/absorption) [1]"
-    stratocumulus_albedo::NF = 0.5
+    @param stratocumulus_albedo::NF = 0.5 (bounds=0..1,)
 
     "[OPTION] Static stability lower threshold for stratocumulus (GSEN, called GSES0 in the paper) [J/kg]"
-    stratocumulus_stability_min::NF = 0.25
+    @param stratocumulus_stability_min::NF = 0.25 (bounds=Nonnegative,)
 
     "[OPTION] Static stability upper threshold for stratocumulus (GSEN, called GSES1 in the paper) [J/kg]"
-    stratocumulus_stability_max::NF = 0.4
+    @param stratocumulus_stability_max::NF = 0.4 (bounds=Nonnegative,)
 
     "[OPTION] Maximum stratocumulus cloud cover (called CLSMAX in the paper) [1]"
-    stratocumulus_cover_max::NF = 0.6
+    @param stratocumulus_cover_max::NF = 0.6 (bounds=0..1,)
 
     "[OPTION] Enable stratocumulus cloud parameterization?"
     use_stratocumulus::Bool = true
 
     "[OPTION] Stratocumulus cloud factor (SPEEDY clfact) [1]"
-    stratocumulus_clfact::NF = 1.2
+    @param stratocumulus_clfact::NF = 1.2 (bounds=Nonnegative,)
 end
 
 Adapt.@adapt_structure DiagnosticClouds

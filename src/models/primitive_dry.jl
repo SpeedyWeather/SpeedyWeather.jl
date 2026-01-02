@@ -10,7 +10,7 @@ with `spectral_grid::SpectralGrid` used to initalize all non-default components
 passed on as keyword arguments, e.g. `planet=Earth(spectral_grid)`. Fields, representing
 model components, are
 $(TYPEDFIELDS)"""
-@kwdef mutable struct PrimitiveDryModel{
+@parameterized @kwdef mutable struct PrimitiveDryModel{
         SG,     # <:SpectralGrid
         AR,     # <:AbstractArchitecture,
         GE,     # <:AbstractGeometry,
@@ -59,16 +59,16 @@ $(TYPEDFIELDS)"""
 
     # DYNAMICS
     dynamics::Bool = true
-    geometry::GE = Geometry(spectral_grid)
-    planet::PL = Earth(spectral_grid)
-    atmosphere::AT = EarthDryAtmosphere(spectral_grid)
-    coriolis::CO = Coriolis(spectral_grid)
-    geopotential::GO = Geopotential(spectral_grid)
-    adiabatic_conversion::AC = AdiabaticConversion(spectral_grid)
-    particle_advection::PA = nothing
-    initial_conditions::IC = InitialConditions(spectral_grid, PrimitiveDry)
-    forcing::FR = nothing
-    drag::DR = nothing
+    @component geometry::GE = Geometry(spectral_grid)
+    @component planet::PL = Earth(spectral_grid)
+    @component atmosphere::AT = EarthDryAtmosphere(spectral_grid)
+    @component coriolis::CO = Coriolis(spectral_grid)
+    @component geopotential::GO = Geopotential(spectral_grid)
+    @component adiabatic_conversion::AC = AdiabaticConversion(spectral_grid)
+    @component particle_advection::PA = nothing
+    @component initial_conditions::IC = InitialConditions(spectral_grid, PrimitiveDry)
+    @component forcing::FR = nothing
+    @component drag::DR = nothing
 
     # VARIABLES
     random_process::RP = nothing
@@ -85,14 +85,14 @@ $(TYPEDFIELDS)"""
 
     # PHYSICS/PARAMETERIZATIONS
     physics::Bool = true
-    boundary_layer_drag::BL = BulkRichardsonDrag(spectral_grid)
-    vertical_diffusion::VD = BulkRichardsonDiffusion(spectral_grid)
-    surface_condition::SC = SurfaceCondition(spectral_grid)
-    surface_momentum_flux::SM = SurfaceMomentumFlux(spectral_grid)
-    surface_heat_flux::SH = SurfaceHeatFlux(spectral_grid)
-    convection::CV = BettsMillerDryConvection(spectral_grid)
-    shortwave_radiation::SW = TransparentShortwave(spectral_grid)
-    longwave_radiation::LW = OneBandGreyLongwave(spectral_grid)
+    @component boundary_layer_drag::BL = BulkRichardsonDrag(spectral_grid)
+    @component vertical_diffusion::VD = BulkRichardsonDiffusion(spectral_grid)
+    @component surface_condition::SC = SurfaceCondition(spectral_grid)
+    @component surface_momentum_flux::SM = SurfaceMomentumFlux(spectral_grid)
+    @component surface_heat_flux::SH = SurfaceHeatFlux(spectral_grid)
+    @component convection::CV = BettsMillerDryConvection(spectral_grid)
+    @component shortwave_radiation::SW = TransparentShortwave(spectral_grid)
+    @component longwave_radiation::LW = OneBandGreyLongwave(spectral_grid)
     stochastic_physics::SP = nothing
     custom_parameterization::CP = nothing
 
