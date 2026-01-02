@@ -74,8 +74,12 @@ function SpeedyWeather.animate(
 
     # Get dimensions
     lon = longitude_shift_180(ds["lon"][:]) # longitudes -180 to 180
-    lat = ds["lat"][:]
+    raw_lat = ds["lat"][:]
     time = ds["time"][:]
+
+    # Sort latitudes
+    lat_sort_idx = sortperm(raw_lat)
+    lat = raw_lat[lat_sort_idx]
 
     # Get time units for proper labeling
     time_units = ds["time"].attrib["units"]
@@ -105,13 +109,30 @@ function SpeedyWeather.animate(
 
     tsteps = Observable(transient_timesteps + 1)
 
-    # Create data based on tsteps
-    if is_3d
-        # For 3D variables, extract the specified level
-        data = @lift ds[variable].var[:, :, level, $tsteps]
-    else
-        # For 2D variables
-        data = @lift ds[variable].var[:, :, $tsteps]
+    # Find index of each dimension before transforming
+    spatial_dims = dimnames(ds[variable])
+    lon_idx = findfirst(==("lon"), spatial_dims)
+    lat_idx = findfirst(==("lat"), spatial_dims)
+
+    # Translation length depends on number of gridboxes
+    n_lon = length(lon)
+    shift_amt = div(n_lon, 2)  # Num lons is usually even
+
+    data = lift(fig.scene, tsteps) do tstep
+        raw_slice = if is_3d
+            view(ds[variable], :, :, level, tstep)
+        else
+            view(ds[variable], :, :, tstep)
+        end
+
+        # Make sure the array is shaped correctly
+        standardized = permutedims(raw_slice, (lon_idx, lat_idx))
+
+        # Apply same transformations as the lat/lons
+        rolled = circshift(standardized, (shift_amt, 0))
+        transf_data = rolled[:, lat_sort_idx]
+
+        return coalesce.(transf_data, NaN32)  # handle missing data for GeoMakie
     end
 
     # Determine color range if not specified
