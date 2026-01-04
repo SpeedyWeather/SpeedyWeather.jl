@@ -21,35 +21,161 @@ initialize!(::ConstantDrag, ::PrimitiveEquation) = nothing
     return diagn.physics.boundary_layer_drag[ij] = scheme.drag
 end
 
+abstract type AbstractSurfaceRoughness <: AbstractParameterization end
+
+export ConstantSurfaceRoughness
+@kwdef struct ConstantSurfaceRoughness{NF} <: AbstractSurfaceRoughness
+    "[OPTION] constant roughness length over land [m]"
+    roughness_length_land::NF = 0.5
+
+    "[OPTION] constant roughness length over ocean [m]"
+    roughness_length_ocean::NF = 1.0e-4
+end
+
+Adapt.@adapt_structure ConstantSurfaceRoughness
+ConstantSurfaceRoughness(SG::SpectralGrid, kwargs...) = ConstantSurfaceRoughness{SG.NF}(; kwargs...)
+initialize!(::ConstantSurfaceRoughness, ::PrimitiveEquation) = nothing
+
+export LearnedSurfaceRoughness
+@kwdef struct LearnedSurfaceRoughness{NF, M} <: AbstractSurfaceRoughness
+    "ONNX Inference Session for Ocean"
+    ocean_model::M
+
+    # Ocean normalisation parameters
+    ocean_input_means::Vector{NF} = Float32[0.14675693, 0.24450141, 0.17968568, 7.6465526]
+    ocean_input_stds::Vector{NF} = Float32[0.3357911, 6.3831706, 5.53958, 3.6144474]
+    ocean_output_mean::NF = -8.76918
+    ocean_output_std::NF = 1.2418048
+
+    "ONNX Inference Session for Land"
+    land_model::M
+
+    # Land normalisation parameters
+    land_input_means::Vector{NF} = Float32[0.100255094, 0.154690117, 16791.6582, 6.33934355]
+    land_input_stds::Vector{NF} = Float32[0.27687377, 0.32951584, 11649.544, 4.8004246]
+    land_output_mean::NF = -5.0261893
+    land_output_std::NF = 2.4474483
+end
+
+function LearnedSurfaceRoughness(
+        SG::SpectralGrid;
+        ocean_path = "ocean_model/z0_ocean_model_smol.onnx",
+        land_path = "land_model/rf_z0_land_model.onnx",
+        kwargs...
+    )
+
+    full_ocean_path = joinpath(@__DIR__, "../../../input_data", ocean_path)
+    full_land_path = joinpath(@__DIR__, "../../../input_data", land_path)
+
+    if !isfile(full_ocean_path) || !isfile(full_land_path)
+        @warn "ONNX models not found. Ensure paths are correct."
+    end
+
+    ocean_model = ONNXRunTime.load_inference(full_ocean_path)
+    land_model = ONNXRunTime.load_inference(full_land_path)
+
+    return LearnedSurfaceRoughness{SG.NF, typeof(ocean_model)}(;
+        ocean_model = ocean_model,
+        land_model = land_model,
+        kwargs...
+    )
+end
+
+Adapt.@adapt_structure LearnedSurfaceRoughness
+LearnedSurfaceRoughness(SG::SpectralGrid, kwargs...) = LearnedSurfaceRoughness{SG.NF}(; kwargs...)
+initialize!(::LearnedSurfaceRoughness, ::PrimitiveEquation) = nothing
+
+@propagate_inbounds function surface_roughness_land(ij, scheme::ConstantSurfaceRoughness, diagn, progn)
+    return scheme.roughness_length_land
+end
+
+@propagate_inbounds function surface_roughness_ocean(ij, scheme::ConstantSurfaceRoughness, diagn, progn)
+    return scheme.roughness_length_ocean
+end
+
+@propagate_inbounds function surface_roughness_land(ij, scheme::LearnedSurfaceRoughness, diagn, progn)
+    vₕ = diagn.physics.land.vegetation_high[ij]
+    vₗ = diagn.physics.land.vegetation_low[ij]
+    g = diagn.dynamics.geopotential[ij]
+    sd = progn.land.snow_depth[ij]
+
+    raw_inputs = [vₕ, vₗ, g, sd]
+    inputs_norm = Float32.(real.((raw_inputs .- scheme.land_input_means) ./ scheme.land_input_stds))
+    # predictors = reshape(inputs_norm, 1, 4)
+    # input = Dict("float_input" => predictors)
+
+    # # Run Inference using the model stored in the struct
+    # prediction = scheme.land_model(input)["variable"][1]
+
+    # log_surface_roughness = (prediction * L_OUTPUT_STD) + L_OUTPUT_MEAN
+    # surface_roughness = exp(log_surface_roughness)
+
+    # Symbolic regression replacement expression
+    surface_roughness = ((cos(inputs_norm[4]) / 0.1970652) ^ -7.5047336) * ((inputs_norm[1] + (2.305061 ^ sin(inputs_norm[1]))) ^ (1.3223927 ^ (0.3254184 ^ inputs_norm[2])))
+    return Float32(max(surface_roughness, 1.2999999e-3))
+end
+
+@propagate_inbounds function surface_roughness_ocean(ij, scheme::LearnedSurfaceRoughness, diagn, progn)
+    surface = diagn.nlayers
+
+    # Extract features
+    ℵ = progn.ocean.sea_ice_concentration[ij]
+    Uₛ = diagn.grid.u_grid[ij, surface]
+    Vₛ = diagn.grid.v_grid[ij, surface]
+    UVₛ = diagn.physics.surface_wind_speed[ij]
+
+    raw_inputs = [ℵ, Uₛ, Vₛ, UVₛ]
+    inputs_norm = Float32.((raw_inputs .- scheme.ocean_input_means) ./ scheme.ocean_input_stds)
+
+    predictors = reshape(inputs_norm, 1, 4)
+    input = Dict("x_input" => predictors)
+
+    # Run Inference using the model stored in the struct
+    prediction = scheme.ocean_model(input)["linear_5"][1]
+
+    # Post-process
+    log_surface_roughness = (prediction * scheme.ocean_output_std) + scheme.ocean_output_mean
+    surface_roughness = exp(log_surface_roughness)
+    return Float32(max(surface_roughness, 2.4361885e-5))
+end
+
 export BulkRichardsonDrag
 
 """Boundary layer drag coefficient from the bulk Richardson number,
 following Frierson, 2006, Journal of the Atmospheric Sciences.
 $(TYPEDFIELDS)"""
-@kwdef struct BulkRichardsonDrag{NF} <: AbstractBoundaryLayer
+@kwdef struct BulkRichardsonDrag{NF, SR} <: AbstractBoundaryLayer
     "[OPTION] von Kármán constant [1]"
     von_Karman::NF = 0.4
-
-    "[OPTION] roughness length over land [m]"
-    roughness_length_land::NF = 0.5
-
-    "[OPTION] roughness length over ocean [m]"
-    roughness_length_ocean::NF = 1.0e-4
 
     "[OPTION] Critical Richardson number for stable mixing cutoff [1]"
     critical_Richardson::NF = 10
 
     "[OPTION] Drag minimum to avoid zero surface fluxes in stable conditions [1]"
     drag_min::NF = 1.0e-5
+
+    surface_roughness::SR = ConstantSurfaceRoughness{NF}()
 end
 
 Adapt.@adapt_structure BulkRichardsonDrag
-BulkRichardsonDrag(SG::SpectralGrid, kwargs...) = BulkRichardsonDrag{SG.NF}(; kwargs...)
-initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
+function BulkRichardsonDrag(
+        SG::SpectralGrid;
+        surface_roughness = ConstantSurfaceRoughness(SG), # Default if not provided
+        kwargs...
+    )
+    SR = typeof(surface_roughness)
+    return BulkRichardsonDrag{SG.NF, SR}(; surface_roughness, kwargs...)
+end
+function initialize!(drag::BulkRichardsonDrag, model::PrimitiveEquation)
+    initialize!(drag.surface_roughness, model)
+    return nothing
+end
 
 # function barrier
-@propagate_inbounds parameterization!(ij, diagn, progn, drag::BulkRichardsonDrag, model) =
+@propagate_inbounds function parameterization!(ij, diagn, progn, drag::BulkRichardsonDrag, model)
     boundary_layer_drag!(ij, diagn, progn, drag, model.land_sea_mask, model.atmosphere, model.planet, model.orography)
+    return boundary_layer_drag!(ij, diagn, progn, drag, model.land_sea_mask, model.atmosphere, model.planet, model.orography)
+end
 
 @propagate_inbounds function boundary_layer_drag!(
         ij,
@@ -71,8 +197,12 @@ initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
     # maximum drag Cmax from that height, stable conditions would decrease Cmax towards 0
     # Frierson 2006, eq (12)
     κ = drag.von_Karman
-    # z₀ = land_fraction * drag.roughness_length_land + (1 - land_fraction) * drag.roughness_length_ocean
-    z₀ = land_fraction * surface_roughness_land(ij, diagn, progn) + (1 - land_fraction) * surface_roughness_ocean(ij, diagn, progn)
+
+    # Calculate land and ocean roughness lengths
+    z₀_land = surface_roughness_land(ij, drag.surface_roughness, diagn, progn)
+    z₀_ocean = surface_roughness_ocean(ij, drag.surface_roughness, diagn, progn)
+
+    z₀ = land_fraction * z₀_land + (1 - land_fraction) * z₀_ocean
 
     # should be z > z₀, z=z₀ means an infinitely high drag
     # 0 < z < z₀ doesn't make sense so cap here
@@ -94,83 +224,6 @@ initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
     diagn.physics.boundary_layer_drag[ij] = max(drag_min, drag_max * (1 - Ri / Ri_c)^2)
     return nothing
 end
-
-const OCEAN_ROUGHNESS_MODEL_REF = Ref{ONNXRunTime.InferenceSession}()
-const LAND_ROUGHNESS_MODEL_REF = Ref{ONNXRunTime.InferenceSession}()
-
-function _load_model_safe!(ref_container, filename)
-    path = joinpath(@__DIR__, "../../../input_data", filename)
-
-    return if !isfile(path)
-        @warn "ONNX Model not found at $path"
-    else
-        # Load directly into the container passed as argument
-        ref_container[] = ONNXRunTime.load_inference(path)
-    end
-end
-
-function __init__()
-    _load_model_safe!(OCEAN_ROUGHNESS_MODEL_REF, "ocean_model/model.onnx")
-    return _load_model_safe!(LAND_ROUGHNESS_MODEL_REF, "land_model/rf_z0_land_model.onnx")
-end
-
-# Ocean normalisation parameters
-const O_INPUT_MEANS = Float32[0.14675693, 0.24450141, 0.17968568, 7.6465526]
-const O_INPUT_STDS = Float32[0.3357911, 6.3831706, 5.53958, 3.6144474]
-const O_OUTPUT_MEAN = Float32(-8.76918)
-const O_OUTPUT_STD = Float32(1.2418048)
-
-# Land normalisation parameters
-const L_INPUT_MEANS = Float32[0.100255094, 0.154690117, 16791.6582, 6.33934355]
-const L_INPUT_STDS = Float32[0.27687377, 0.32951584, 11649.544, 4.8004246]
-const L_OUTPUT_MEAN = Float32(-5.0261893)
-const L_OUTPUT_STD = Float32(2.4474483)
-
-@propagate_inbounds function surface_roughness_ocean(ij, diagn, progn)
-    surface = diagn.nlayers
-
-    UVₛ = diagn.physics.surface_wind_speed[ij]
-    Uₛ = diagn.grid.u_grid[ij, surface]
-    Vₛ = diagn.grid.v_grid[ij, surface]
-    ℵ = progn.ocean.sea_ice_concentration[ij]
-
-    norm_ℵ = (ℵ - O_INPUT_MEANS[1]) / O_INPUT_STDS[1]
-    norm_Uₛ = (Uₛ - O_INPUT_MEANS[2]) / O_INPUT_STDS[2]
-    norm_Vₛ = (Vₛ - O_INPUT_MEANS[3]) / O_INPUT_STDS[3]
-    norm_UVₛ = (UVₛ - O_INPUT_MEANS[4]) / O_INPUT_STDS[4]
-
-    predictors = [norm_ℵ  norm_Uₛ  norm_Vₛ  norm_UVₛ]
-    input = Dict("x_input" => predictors)
-
-    prediction = OCEAN_ROUGHNESS_MODEL_REF[](input)["linear_5"][1]
-    log_surface_roughness = (prediction * O_OUTPUT_STD) + O_OUTPUT_MEAN
-    surface_roughness = exp(log_surface_roughness)
-    min_roughness = max(surface_roughness, 2.4361885e-5)
-    return Float32(min_roughness)  # Min ERA5 value over ocean
-end
-
-@propagate_inbounds function surface_roughness_land(ij, diagn, progn)
-    sd = progn.land.snow_depth[ij]
-    g = diagn.dynamics.geopotential[ij]
-    vₕ = diagn.physics.land.vegetation_high[ij]
-    vₗ = diagn.physics.land.vegetation_low[ij]
-
-    norm_vₕ = (vₕ - L_INPUT_MEANS[1]) / L_INPUT_STDS[1]
-    norm_vₗ = (vₗ - L_INPUT_MEANS[2]) / L_INPUT_STDS[2]
-    norm_g = (g - L_INPUT_MEANS[3]) / L_INPUT_STDS[3]
-    norm_sd = (sd - L_INPUT_MEANS[4]) / L_INPUT_STDS[4]
-
-    raw_predictors = [norm_vₕ norm_vₗ norm_g norm_sd]
-    predictors = Float32.(real.(raw_predictors))
-    input = Dict("float_input" => predictors)
-
-    prediction = LAND_ROUGHNESS_MODEL_REF[](input)["variable"][1]
-    log_surface_roughness = (prediction * L_OUTPUT_STD) + L_OUTPUT_MEAN
-    surface_roughness = exp(log_surface_roughness)
-    min_roughness = max(surface_roughness, 1.2999999e-3)
-    return Float32(min_roughness)  # Min ERA5 value over land
-end
-
 
 """
 $(TYPEDSIGNATURES)
