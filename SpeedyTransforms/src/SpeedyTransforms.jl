@@ -9,12 +9,12 @@ import FFTW
 import GenericFFT
 import LinearAlgebra
 import Primes
-import Adapt: Adapt, adapt, adapt_structure
-import KernelAbstractions: @kernel, @index, @Const, synchronize
-import Atomix
 
 # GPU
 import GPUArrays: GPUArrays, AbstractGPUArray
+import Adapt: Adapt, adapt, adapt_structure
+import KernelAbstractions: @kernel, @index, @Const, synchronize
+import Atomix
 
 # SPEEDYWEATHER MODULES
 using SpeedyWeatherInternals.Architectures

@@ -146,10 +146,8 @@ end
 """$(TYPEDSIGNATURES)
 Smooth the spectral field `A` following A_smooth = (1-c*∇²ⁿ)A with power n of a normalised Laplacian
 so that the highest degree lmax is dampened by multiplication with c. Anti-diffusion for c<0."""
-function spectral_smoothing(A::LowerTriangularArray, c::Real; power::Real = 1)
-    A_smooth = copy(A)
-    spectral_smoothing!(A_smooth, c; power)
-    return A_smooth
+function spectral_smoothing(A::LowerTriangularArray, args...; kwargs...)
+    return spectral_smoothing!(copy(A), args...; kwargs...)
 end
 
 """
@@ -168,10 +166,12 @@ function spectral_smoothing!(
     eigenvalue_norm = truncation == -1 ? -mmax * (mmax + 1) : -truncation * (truncation + 1)
 
     # Launch kernel
-    return launch!(
+    launch!(
         architecture(L), SpectralWorkOrder, size(L), spectral_smoothing_kernel!,
-        L, c, power, eigenvalue_norm, L.spectrum.l_indices
+        L, c, power, eigenvalue_norm, L.spectrum.l_indices,
     )
+
+    return L
 end
 
 @kernel function spectral_smoothing_kernel!(

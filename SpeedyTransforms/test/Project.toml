@@ -1,6 +1,8 @@
 [deps]
 Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
+Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
+EnzymeTestUtils = "12d8515a-0907-448a-8884-5fe00fdf1c5a"
 JLArrays = "27aeb0d3-9eb9-45fb-866b-73c2ecf80fcb"
 KernelAbstractions = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
 LowerTriangularArrays = "ed20b33f-a660-45d0-a353-9c8c20bb5814"

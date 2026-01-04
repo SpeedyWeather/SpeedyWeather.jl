@@ -1,13 +1,15 @@
 @testset "Power spectrum" begin
-    @testset for T in (Float16, Float32, Float64)
+    @testset for NF in (Float16, Float32, Float64)
         @testset for trunc in (31, 42)
 
-            ks = 2
+            nlayers = 2
 
-            L = randn(LowerTriangularArray{complex(T)}, trunc + 1, trunc + 1, ks)
+            spectrum = Spectrum(trunc)
+            L = randn(complex(NF), spectrum, nlayers)
 
             # one more degree that shouldbe ignored
-            L2 = randn(LowerTriangularArray{complex(T)}, trunc + 2, trunc + 1, ks)
+            spectrum2 = Spectrum(trunc, one_degree_more=true)
+            L2 = randn(complex(NF), spectrum2, nlayers)
 
             # make trunc x trunc identical random numbers
             copyto!(L2, L)
@@ -16,10 +18,10 @@
             p2 = SpeedyTransforms.power_spectrum(L2)
 
             @test p == p2
-            @test eltype(p) == T
-            @test eltype(p2) == T
+            @test eltype(p) == NF
+            @test eltype(p2) == NF
 
-            for k in 1:ks
+            for k in 1:nlayers
                 @test p[:, k] == SpeedyTransforms.power_spectrum(L[:, k])
             end
 
