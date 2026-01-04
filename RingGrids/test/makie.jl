@@ -1,6 +1,4 @@
-using SpeedyWeather.RingGrids
 using CairoMakie, GeoMakie
-using Test
 
 RingGrids.globe(FullGaussianGrid, 12, interactive = true)
 plt = RingGrids.globe(randn(FullGaussianGrid(12)))
@@ -16,7 +14,6 @@ const grid_types = (
     FullHEALPixGrid,
     FullOctaHEALPixGrid,
 )
-
 
 # Baisc tests for grid/field plotting functions to check for errors
 @testset "globe (Grid)" begin

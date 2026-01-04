@@ -1,6 +1,5 @@
 using JLArrays
 
-RINGGRIDS_DEFAULT_NF = SpeedyWeather.RingGrids.DEFAULT_NF
 @testset "Grid types" begin
     # TODO: These grid/field types should be pulled out into constants rather than copy-pasted
     for G in (
@@ -204,10 +203,10 @@ end
 
             n = 4      # resolution parameter nlat_half
             G1 = rand(G, n)
-            @test eltype(G1) == RINGGRIDS_DEFAULT_NF # that's the default
+            @test eltype(G1) == RingGrids.DEFAULT_NF # that's the default
 
             G1 = randn(G, n)
-            @test eltype(G1) == RINGGRIDS_DEFAULT_NF # that's the default
+            @test eltype(G1) == RingGrids.DEFAULT_NF # that's the default
 
             G1 = rand(NF, G, n)
             @test eltype(G1) == NF
@@ -234,7 +233,7 @@ end
 
             n = 4      # resolution parameter nlat_half
             field1 = F(undef, n)
-            @test eltype(field1) == RINGGRIDS_DEFAULT_NF     # that's the default NF
+            @test eltype(field1) == RingGrids.DEFAULT_NF     # that's the default NF
 
             field2 = F{NF}(undef, n)
             @test eltype(field2) == NF
@@ -577,12 +576,12 @@ end
 end
 
 @testset "nonparametric types" begin
-    @test SpeedyWeather.nonparametric_type(Array) == Array
-    @test SpeedyWeather.nonparametric_type(Array{Float32}) == Array
-    @test SpeedyWeather.nonparametric_type(Array{Float32, 1}) == Array
-    @test SpeedyWeather.nonparametric_type(SubArray) == SubArray
-    @test SpeedyWeather.nonparametric_type(SubArray{Float32}) == SubArray
-    @test SpeedyWeather.nonparametric_type(SubArray{Float32, 1}) == SubArray
-    @test SpeedyWeather.nonparametric_type(SubArray{Float32, 1, Array}) == Array
-    @test SpeedyWeather.nonparametric_type(SubArray{Float32, 1, Array{Float32, 1}}) == Array
+    @test RingGrids.nonparametric_type(Array) == Array
+    @test RingGrids.nonparametric_type(Array{Float32}) == Array
+    @test RingGrids.nonparametric_type(Array{Float32, 1}) == Array
+    @test RingGrids.nonparametric_type(SubArray) == SubArray
+    @test RingGrids.nonparametric_type(SubArray{Float32}) == SubArray
+    @test RingGrids.nonparametric_type(SubArray{Float32, 1}) == SubArray
+    @test RingGrids.nonparametric_type(SubArray{Float32, 1, Array}) == Array
+    @test RingGrids.nonparametric_type(SubArray{Float32, 1, Array{Float32, 1}}) == Array
 end

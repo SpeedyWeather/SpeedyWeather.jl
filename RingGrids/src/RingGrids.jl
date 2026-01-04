@@ -8,8 +8,8 @@ import Printf
 import Statistics: Statistics, mean
 import FastGaussQuadrature
 import LinearAlgebra
-export rotate, rotate!
 
+# GPU
 import Adapt: Adapt, adapt, adapt_structure
 import GPUArrays
 import KernelAbstractions: KernelAbstractions, @kernel, @index, @Const, synchronize

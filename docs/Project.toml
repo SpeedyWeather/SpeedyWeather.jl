@@ -15,7 +15,7 @@ UnicodePlots = "b8865327-cd53-5732-bb35-84acbb429228"
 LowerTriangularArrays = {path = "../LowerTriangularArrays"}
 RingGrids = {path = "../RingGrids"}
 SpeedyTransforms = {path = "../SpeedyTransforms"}
-SpeedyWeather = {path = ".."}
+SpeedyWeather = {path = "../SpeedyWeather"}
 SpeedyWeatherInternals = {path = "../SpeedyWeatherInternals"}
 
 [compat]

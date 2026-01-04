@@ -1,7 +1,5 @@
 using JLArrays
-
-RINGGRIDS_DEFAULT_NF = SpeedyWeather.RingGrids.DEFAULT_NF
-RINGGRIDS_DEFAULT_NF = Float32
+import SpeedyWeatherInternals.Architectures: architecture, on_architecture
 
 @testset "ColumnField types" begin
     # Test type hierarchy and properties
@@ -48,7 +46,7 @@ end
             field2 = ColumnField(NF, grid, nlayers)
             @test size(field1) == (nlayers, npoints)
             @test size(field2) == (nlayers, npoints)
-            @test eltype(field1) == RINGGRIDS_DEFAULT_NF
+            @test eltype(field1) == RingGrids.DEFAULT_NF
             @test eltype(field2) == NF
         end
     end

@@ -70,26 +70,6 @@ spectral_resolutions_inexact = (127, 255)
     end
 end
 
-# functionality deprecated
-# @testset "Transform: Recompute, precompute identical results" begin
-#     for trunc in spectral_resolutions
-#         for NF in (Float32, Float64)
-
-#             SG = SpectralGrid(; NF, trunc)
-#             S1 = SpectralTransform(SG, recompute_legendre=true)
-#             S2 = SpectralTransform(SG, recompute_legendre=false)
-
-#             alms = randn(LowerTriangularMatrix{Complex{NF}}, trunc+2, trunc+1)
-
-#             map1 = transform(alms, S1)
-#             map2 = transform(alms, S2)
-
-#             # is only approx as recompute_legendre may use a different precision
-#             @test map1 ≈ map2
-#         end
-#     end
-# end
-
 @testset "Transform: Individual Legendre polynomials" begin
     @testset for trunc in spectral_resolutions
         @testset for NF in (Float32, Float64)

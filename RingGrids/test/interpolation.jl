@@ -1,4 +1,5 @@
 import Random
+import Statistics
 
 @testset "Interpolate constant field" begin
     npoints = 100
@@ -182,11 +183,9 @@ end
                 OctaHEALPixGrid,
             )
 
-            # create some smooth gridded field
-            trunc = 10
-            alms = randn(LowerTriangularMatrix{Complex{NF}}, 5, 5)
-            alms = SpeedyTransforms.spectral_truncation(alms, trunc + 2, trunc + 1)
-            A = transform(alms; Grid)
+            # create some gridded field
+            nlat_half_src = 16
+            A = randn(NF, Grid(nlat_half_src))
 
             # interpolate to FullGaussianGrid and back and compare
             nlat_half = 32
@@ -235,11 +234,21 @@ end
             HEALPixGrid,
             OctaHEALPixGrid,
         )
+        for NF in (Float32, Float64)
 
-        for trunc in (31, 42, 63)
-            spectral_grid = SpectralGrid(; trunc, Grid)
-            land_sea_mask = LandSeaMask(spectral_grid)
-            initialize!(land_sea_mask, PrimitiveDryModel(spectral_grid))
+            for nlat_half in (8, 16)
+                full_grid = RingGrids.full_grid_type(Grid)(nlat_half)
+                full_field = randn(NF, full_grid) .+ 3
+
+                for nlat_half in (4, 8)
+                    grid = Grid(nlat_half)
+                    field = zeros(Float32, grid)
+                    RingGrids.grid_cell_average!(field, full_field)
+                    @test Statistics.std(field) < Statistics.std(full_field)
+                    @test minimum(field) >= minimum(full_field)
+                    @test maximum(field) <= maximum(full_field)
+                end
+            end
         end
     end
 end

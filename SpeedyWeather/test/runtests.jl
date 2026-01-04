@@ -22,25 +22,8 @@ if !FLAG_EXTENDED_TESTS && !FLAG_ENZYME_TESTS
     include("spectral_grid.jl")
     include("parameters.jl")
 
-    # GRIDS
-    include("grids/grids.jl")
-    include("grids/column_field.jl")
-    include("grids/geodesics.jl")
-    include("grids/interpolation.jl")
-    include("grids/reverse.jl")
-    include("grids/rotate.jl")
-    include("grids/reordering.jl")
-
     # GPU/KERNELABSTRACTIONS
     include("gpu/kernelabstractions.jl")
-
-    # SPECTRAL TRANSFORM
-    include("transforms/lower_triangular_matrix.jl")
-    include("transforms/spectral_transform.jl")
-    include("transforms/spectral_gradients.jl")
-    include("transforms/spectrum.jl")
-    include("transforms/spectral_transform_ad_rules.jl")
-    include("transforms/resolutions.jl")
 
     # DYNAMICS
     include("dynamics/diffusion.jl")
