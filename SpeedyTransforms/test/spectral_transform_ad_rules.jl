@@ -4,7 +4,7 @@ import AbstractFFTs
 using FiniteDifferences
 
 grid_types = [FullGaussianGrid, OctahedralGaussianGrid] # one full and one reduced grid, both Gaussian to have exact transforms
-grid_dealiasing = [2.0, 3.0]
+grid_dealiasing = [2, 3]
 fd_tests = [true, true]
 
 # currently there's an issue with EnzymeTestUtils not being able to work with structs with undefined fields like FFT plans
@@ -31,15 +31,16 @@ end
 @testset "SpeedyTransforms: AD Rules" begin
     @testset "_fourier! Enzyme rules" begin
         @testset "EnzymeTestUtils reverse rule test" begin
-            for (i_grid, grid_type) in enumerate(grid_types)
+            for (i_grid, Grid) in enumerate(grid_types)
 
                 # these tests don't pass for reduced grids
                 # this is likely due to FiniteDifferences and not our EnzymeRules
                 # see comments in https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/589
-                if !(grid_type <: AbstractReducedGrid) & fd_tests[i_grid]
-                    spectral_grid = SpectralGrid(Grid = grid_type, nlayers = 1, trunc = 5, dealiasing = grid_dealiasing[i_grid])
-                    S = SpectralTransform(spectral_grid)
-                    field = rand(spectral_grid.NF, spectral_grid.grid, spectral_grid.nlayers)
+                if !(Grid <: AbstractReducedGrid) & fd_tests[i_grid]
+                    spectrum = Spectrum(trunc=5, one_degree_more=true)
+                    grid = Grid(SpeedyTransforms.get_nlat_half(trunc), grid_dealiasing[i_grid])
+                    S = SpectralTransform(spectrum, grid)
+                    field = rand(grid, nlayers)
                     f_north = S.scratch_memory.north
                     f_south = S.scratch_memory.south
 
