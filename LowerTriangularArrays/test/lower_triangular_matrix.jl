@@ -869,6 +869,7 @@ end
             L_copy = copy(L.data)
 
             # Zero the last degree
+            zero_last_degree!(L)    # is exported
             LowerTriangularArrays.zero_last_degree!(L)
 
             # Check that all elements with l == lmax are zero

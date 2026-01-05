@@ -38,5 +38,6 @@ function Base.show(io::IO, S::SpectralTransform{NF, ArrayType}) where {NF, Array
     println(io, "├ Truncation:   dealiasing = $dealiasing ($truncation)")
     println(io, "├ Legendre:     Polynomials $polysize_str, shortcut: $(short_name(S.LegendreShortcut))")
     println(io, "├ Architecture: $architecture")
-    return print(io, "└ Memory:       for $nlayers layers ($memorysize_str)")
+    print(io, "└ Memory:       for $nlayers layers ($memorysize_str)")
+    return nothing
 end

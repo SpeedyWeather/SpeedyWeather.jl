@@ -19,11 +19,8 @@ import Atomix
 # SPEEDYWEATHER MODULES
 using SpeedyWeatherInternals.Architectures
 using SpeedyWeatherInternals.Utils
-
 using RingGrids
-
 using LowerTriangularArrays
-import LowerTriangularArrays: lm2i, get_lm_range, get_2lm_range
 
 # TRANSFORM
 export SpectralTransform,

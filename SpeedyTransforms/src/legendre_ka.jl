@@ -18,7 +18,7 @@
     m = kjm_indices[tid, 3]
 
     # are m, lmax 0-based here or 1-based?
-    lm_range = get_lm_range(m, lmax)    # assumes 1-based
+    lm_range = LowerTriangularArrays.get_lm_range(m, lmax)    # assumes 1-based
 
     # view on lower triangular column, but batched in vertical
     spec_view = view(specs_data, lm_range, :)
@@ -124,8 +124,8 @@ end
     j = kjm_indices[tid, 2]
     m = kjm_indices[tid, 3]
 
-    lm_range = get_lm_range(m, lmax)
-    lm2_range = get_2lm_range(m, lmax)
+    lm_range = LowerTriangularArrays.get_lm_range(m, lmax)
+    lm2_range = LowerTriangularArrays.get_2lm_range(m, lmax)
 
     ΔΩ = solid_angles[j]                # Solid angle for a grid point
     o = lon_offsets[m, j]               # Longitude offset rotation

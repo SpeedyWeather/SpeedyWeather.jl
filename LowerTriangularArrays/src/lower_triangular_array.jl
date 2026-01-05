@@ -554,7 +554,11 @@ function Base.copyto!(
     arch = architecture(L1)
     spectrum = L1.spectrum
 
-    launch!(arch, SpectralWorkOrder, size(L1), _copyto_kernel!, L1.data, L2.data, minimum(ls), maximum(ls), minimum(ms), maximum(ms), spectrum.l_indices, spectrum.m_indices, lmax)
+    launch!(
+        arch, SpectralWorkOrder, size(L1), _copyto_kernel!,
+        L1.data, L2.data, minimum(ls), maximum(ls), minimum(ms), maximum(ms),
+        spectrum.l_indices, spectrum.m_indices, lmax,
+    )
 
     return L1
 end

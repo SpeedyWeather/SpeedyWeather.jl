@@ -210,8 +210,8 @@ end
             vor = randn(complex(NF), spectrum, nlayers)
             div = randn(complex(NF), spectrum, nlayers)
             
-            LowerTriangularArrays.zero_last_degree!(vor)   # needed?
-            LowerTriangularArrays.zero_last_degree!(div)   # needed?
+            zero_last_degree!(vor)   # needed?
+            zero_last_degree!(div)   # needed?
 
             # zero mean on every layer
             vor[1, :] .= 0
