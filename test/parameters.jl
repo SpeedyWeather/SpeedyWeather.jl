@@ -63,6 +63,13 @@ end
     new_model_ps_full = 2*vec(parameters(model))
     new_model_full = @inferred reconstruct(model, new_model_ps_full)
     @test new_model_full.atmosphere.κ ≈ 2 * model.atmosphere.κ  # κ doubled in full reconstruction
+    # regression test for 20aa240611:
+    # we set all parameters to identical values and check that parameter subsets still work
+    model_ps_zero = parameters(reconstruct(model, zero(vec(model_ps))))
+    model_ps_zero_subset = model_ps_zero[["planet"]]
+    @test all(==(:planet), model_ps_zero_subset[:component])
+    @test all(iszero, vec(model_ps_zero_subset))
+    @test length(model_ps_zero_subset) == length(vec(model_ps).planet)
 end
 
 @testset "@parameterized" begin
