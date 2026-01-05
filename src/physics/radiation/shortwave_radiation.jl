@@ -27,10 +27,10 @@ end
 initialize!(::TransparentShortwave, ::PrimitiveEquation) = nothing
 
 # function barrier
-@propagate_inbounds parameterization!(ij, diagn, progn, shortwave::TransparentShortwave, model) =
-    shortwave_radiation!(ij, diagn, shortwave, model.planet, model.land_sea_mask.mask)
+@propagate_inbounds function parameterization!(ij, diagn, progn, ::TransparentShortwave, model)
 
-@propagate_inbounds function shortwave_radiation!(ij, diagn, ::TransparentShortwave, planet, land_sea_mask)
+    planet = model.planet
+    land_sea_mask = model.land_sea_mask.mask
 
     (; surface_shortwave_down, surface_shortwave_up) = diagn.physics
     ssrd_ocean = diagn.physics.ocean.surface_shortwave_down
@@ -129,10 +129,7 @@ end
 Calculate shortwave radiation using the one-band scheme with diagnostic clouds.
 Computes cloud cover fraction from relative humidity and precipitation, then
 integrates downward and upward radiative fluxes accounting for cloud albedo effects."""
-@propagate_inbounds parameterization!(ij, diagn, progn, shortwave::OneBandShortwave, model) =
-    shortwave_radiation!(ij, diagn, progn, shortwave, model)
-
-@propagate_inbounds function shortwave_radiation!(
+@propagate_inbounds function parameterization!(
         ij,
         diagn,
         progn,

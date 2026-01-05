@@ -31,10 +31,7 @@ UniformCooling(SG::SpectralGrid; kwargs...) = UniformCooling{SG.NF}(; kwargs...)
 initialize!(radiation::UniformCooling, model::PrimitiveEquation) = nothing
 
 # function barrier
-@propagate_inbounds parameterization!(ij, diagn, progn, longwave::UniformCooling, model) =
-    longwave_radiation!(ij, diagn, longwave)
-
-@propagate_inbounds function longwave_radiation!(ij, diagn, longwave::UniformCooling)
+@propagate_inbounds function parameterization!(ij, diagn, progn, longwave::UniformCooling, model)
 
     T = diagn.grid.temp_grid_prev
     dTdt = diagn.tendencies.temp_tend_grid
@@ -94,10 +91,7 @@ JeevanjeeRadiation(SG::SpectralGrid; kwargs...) = JeevanjeeRadiation{SG.NF}(; kw
 initialize!(::JeevanjeeRadiation, ::PrimitiveEquation) = nothing
 
 # function barrier
-@propagate_inbounds parameterization!(ij, diagn, progn, longwave::JeevanjeeRadiation, model) =
-    longwave_radiation!(ij, diagn, progn, longwave, model)
-
-@propagate_inbounds function longwave_radiation!(ij, diagn, progn, longwave::JeevanjeeRadiation, model)
+@propagate_inbounds function parameterization!(ij, diagn, progn, longwave::JeevanjeeRadiation, model)
 
     T = diagn.grid.temp_grid                            # to match Seeley, 2023 notation
     dTdt = diagn.tendencies.temp_tend_grid
