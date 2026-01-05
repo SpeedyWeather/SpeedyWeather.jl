@@ -76,7 +76,8 @@ function implicit_correction!(
     )
 
     zero_last_degree!(div_tend)
-    return zero_last_degree!(pres_tend)
+    zero_last_degree!(pres_tend)
+    return nothing
 end
 
 @kernel inbounds = true function implicit_shallow_water_kernel!(
