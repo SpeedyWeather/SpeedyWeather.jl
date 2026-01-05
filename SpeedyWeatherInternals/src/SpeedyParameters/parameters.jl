@@ -94,8 +94,12 @@ Base.getindex(ps::SpeedyParams, param_label::String) = getindex(ps, [param_label
     params = ModelParameters.params(ps)
     # get tuple of selected parameters
     selected_params = params[idx]
+    param_subset = _selectrecursive(parent(ps)) do query
+        # select only the parameters identical to (===) those in selected_params
+        any(map(key -> key === query, selected_params))
+    end
     # extract parameters from nested named tuple and reconstruct SpeedyParams
-    return SpeedyParams(_selectrecursive(∈(selected_params), parent(ps)))
+    return SpeedyParams(param_subset)
 end
 
 ## selecting columns
