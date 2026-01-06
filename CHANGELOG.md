@@ -1,6 +1,8 @@
 # Changelog
 
 ## Unreleased
+
+- Fixes some typos and LaTeX renderings in the docs [#953](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/953)
 - Fix bug in parameter subsetting [#960](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/960)
 - Follow-up to #783: finalize @param/@component markers [#935](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/935)
 - Adjust fill!(::PrognosticVariables, x) to new variable system [#949](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/949)

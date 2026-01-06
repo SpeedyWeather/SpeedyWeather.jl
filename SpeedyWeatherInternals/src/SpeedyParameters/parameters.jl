@@ -211,27 +211,27 @@ generated in a corresponding `parameters(::Foo)` method definition with descript
 struct field docstring, if present. Additional parameter attributes can be supplied as keywords after the parameter,
 e.g. `@param p::T = 0.5 bounds=UnitInterval` or `@param p::T = 0.5 (bounds=UnitInterval, constant=false)`.
 
-## Known limitations
-
-This macro will fail to behave correctly in the following known corner cases:
+!!! warning "Known limitations"
+    This macro will fail to behave correctly in the following known corner cases:
 
     1. **Untyped struct fields without default values**. The macro will not work if the struct has untyped
-    fields without default values specified using the `@kwdef` syntax. This is because untyped fields are
-    not distinguishable in the expression tree from symbols in other expressions (such as typed field definitions).
-    This problem can be avoided by always specifying types on struct fields (which should always be done anyway!).
+       fields without default values specified using the `@kwdef` syntax. This is because untyped fields are
+       not distinguishable in the expression tree from symbols in other expressions (such as typed field definitions).
+       This problem can be avoided by always specifying types on struct fields (which should always be done anyway!).
 
     2. **`@kwdef` struct with a single parameter field and no default value**. `@parameterized` has a buggy
-    interaction with `@kwdef` in this corner case:
-    ```julia
-    @parameterized @kwdef struct Foo{T}
-        @param x::T
-    end
-    ```
-    where the auto-generated constructors erroneously duplicate `T` as a function and type parameter. This is, however,
-    a fairly meaningless corner-case since there is no purpose in marking this struct as `@kwdef` if no default assignments
-    are made!
+       interaction with `@kwdef` in this corner case:
 
-If you encounter any other weird interactions or behaviors, please raise an issue.
+       ```julia
+       @parameterized @kwdef struct Foo{T}
+           @param x::T
+       end
+       ```
+       where the auto-generated constructors erroneously duplicate `T` as a function and type parameter. This is, however,
+       a fairly meaningless corner-case since there is no purpose in marking this struct as `@kwdef` if no default assignments
+       are made!
+
+    If you encounter any other weird interactions or behaviors, please raise [an issue](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/new).
 """
 macro parameterized(expr)
     function typedef2sig(typedef)
