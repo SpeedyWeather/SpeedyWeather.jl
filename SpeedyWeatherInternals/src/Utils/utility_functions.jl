@@ -95,3 +95,27 @@ function print_fields(io::IO, A, keys; arrays::Bool = false)
         print(io, s_without_comma)
     end
 end
+
+"""$(TYPEDSIGNATURES)
+Returns `Dates.CompoundPeriod` rounding to either (days, hours), (hours, minutes), (minutes,
+seconds), or seconds with 1 decimal place accuracy for >10s and two for less.
+E.g.
+```@example
+julia> using SpeedyWeather: readable_secs
+
+julia> readable_secs(12345)
+```
+"""
+function readable_secs(secs::Real)
+    millisecs = Dates.Millisecond(round(secs * 1000))
+    if millisecs >= Dates.Day(1)
+        return Dates.canonicalize(round(millisecs, Dates.Hour))
+    elseif millisecs >= Dates.Hour(1)
+        return Dates.canonicalize(round(millisecs, Dates.Minute))
+    elseif millisecs >= Dates.Minute(1)
+        return Dates.canonicalize(round(millisecs, Dates.Second))
+    elseif millisecs >= Dates.Second(10)
+        return Dates.canonicalize(round(millisecs, Dates.Millisecond(100)))
+    end
+    return Dates.canonicalize(round(millisecs, Dates.Millisecond(10)))
+end

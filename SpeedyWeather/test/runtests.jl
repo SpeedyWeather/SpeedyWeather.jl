@@ -18,7 +18,6 @@ if !FLAG_EXTENDED_TESTS && !FLAG_ENZYME_TESTS
     @info "Running general test suite"
 
     # GENERAL
-    include("utility_functions.jl")
     include("spectral_grid.jl")
     include("parameters.jl")
 

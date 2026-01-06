@@ -119,31 +119,6 @@ function ProgressMeter.speedstring(sec_per_iter::AbstractFloat)
     return speedstring(sec_per_iter, dt_in_sec)
 end
 
-"""
-$(TYPEDSIGNATURES)
-Returns `Dates.CompoundPeriod` rounding to either (days, hours), (hours, minutes), (minutes,
-seconds), or seconds with 1 decimal place accuracy for >10s and two for less.
-E.g.
-```@example
-julia> using SpeedyWeather: readable_secs
-
-julia> readable_secs(12345)
-```
-"""
-function readable_secs(secs::Real)
-    millisecs = Dates.Millisecond(round(secs * 1000))
-    if millisecs >= Dates.Day(1)
-        return Dates.canonicalize(round(millisecs, Dates.Hour))
-    elseif millisecs >= Dates.Hour(1)
-        return Dates.canonicalize(round(millisecs, Dates.Minute))
-    elseif millisecs >= Dates.Minute(1)
-        return Dates.canonicalize(round(millisecs, Dates.Second))
-    elseif millisecs >= Dates.Second(10)
-        return Dates.canonicalize(round(millisecs, Dates.Millisecond(100)))
-    end
-    return Dates.canonicalize(round(millisecs, Dates.Millisecond(10)))
-end
-
 export ParametersTxt
 
 """ParametersTxt callback. Writes a parameters.txt file with all model parameters.

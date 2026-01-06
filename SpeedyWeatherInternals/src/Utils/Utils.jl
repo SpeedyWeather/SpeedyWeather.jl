@@ -5,7 +5,7 @@ using ..Architectures
 
 # miscellaneous utility functions
 export isincreasing, isdecreasing, clip_negatives!, underflow!
-export flipsign!, nans, print_fields
+export flipsign!, nans, print_fields, readable_secs
 include("utility_functions.jl")
 
 # kernel
