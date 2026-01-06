@@ -2,6 +2,7 @@
 Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
 JLArrays = "27aeb0d3-9eb9-45fb-866b-73c2ecf80fcb"
 KernelAbstractions = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
+LowerTriangularArrays = "ed20b33f-a660-45d0-a353-9c8c20bb5814"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 SpeedyWeatherInternals = "34489162-d270-4603-8b96-37b04f830d73"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
