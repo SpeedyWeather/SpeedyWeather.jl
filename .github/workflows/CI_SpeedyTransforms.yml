@@ -46,7 +46,7 @@ jobs:
         shell: julia --color=yes --project=. {0}
         run: |
           using Pkg
-          Pkg.develop([PackageSpec(; path) for path in ("SpeedyWeatherInternals", "LowerTriangularArrays", "RingGrids", "SpeedyTransforms")])
+          Pkg.develop([PackageSpec(; path) for path in ("../SpeedyWeatherInternals", "../LowerTriangularArrays", "../RingGrids")])
           Pkg.instantiate()
         if: ${{ matrix.version == '1.10' }}
       - uses: julia-actions/julia-buildpkg@v1
