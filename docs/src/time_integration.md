@@ -153,7 +153,7 @@ See that section for more information.
 As a 2-step scheme, leapfrog time stepping has to be initialised with another scheme (e.g. Euler forward)
 to have information for the 2nd step if not otherwise known, see [Leapfrog initialisation](@ref).
 This is done by default as `time_stepping.start_with_euler` is `true`. If you `StartFromFile`
-as initial conditions then you may want to switch this to false. 
+as initial conditions then you may want to switch this to false.
 
 SpeedyWeather also allows the user to use several `run!(simulation)` calls after another to continue
 a simulation, possibly after some modification by the user. These subsequent `run!` calls use
@@ -183,5 +183,5 @@ would need to change this to `time_stepping=leapfrog` in the function call argum
 [^Robert66]: Robert, André. "The Integration of a Low Order Spectral Form of the Primitive Meteorological Equations." Journal of the Meteorological Society of Japan 44 (1966): 237-245.
 [^Asselin72]: ASSELIN, R., 1972: Frequency Filter for Time Integrations. Mon. Wea. Rev., 100, 487-490, doi:[10.1175/1520-0493(1972)100<0487:FFFTI>2.3.CO;2](https://doi.org/10.1175/1520-0493(1972)100<0487:FFFTI>2.3.CO;2.)
 [^Williams2009]: Williams, P. D., 2009: A Proposed Modification to the Robert-Asselin Time Filter. Mon. Wea. Rev., 137, 2538-2546, [10.1175/2009MWR2724.1](https://doi.org/10.1175/2009MWR2724.1).
-[^Amezcua2011]: Amezcua, J., E. Kalnay, and P. D. Williams, 2011: The Effects of the RAW Filter on the Climatology and Forecast Skill of the SPEEDY Model. Mon. Wea. Rev., 139, 608-619, doi:[10.1175/2010MWR3530.1](https://doi.org/10.1175/2010MWR3530.1). 
-[^Williams2011]: Williams, P. D., 2011: The RAW Filter: An Improvement to the Robert-Asselin Filter in Semi-Implicit Integrations. Mon. Wea. Rev., 139, 1996-2007, doi:[10.1175/2010MWR3601.1](https://doi.org/10.1175/2010MWR3601.1). 
+[^Amezcua2011]: Amezcua, J., E. Kalnay, and P. D. Williams, 2011: The Effects of the RAW Filter on the Climatology and Forecast Skill of the SPEEDY Model. Mon. Wea. Rev., 139, 608-619, doi:[10.1175/2010MWR3530.1](https://doi.org/10.1175/2010MWR3530.1).
+[^Williams2011]: Williams, P. D., 2011: The RAW Filter: An Improvement to the Robert-Asselin Filter in Semi-Implicit Integrations. Mon. Wea. Rev., 139, 1996-2007, doi:[10.1175/2010MWR3601.1](https://doi.org/10.1175/2010MWR3601.1).

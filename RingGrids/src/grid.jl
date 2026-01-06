@@ -26,7 +26,7 @@ full_grid_type(grid::AbstractGrid) = full_grid_type(typeof(grid))
 (*Grid{T, N, ...} returns *Array) but without any parameters `{T, N, ArrayType}`"""
 Architectures.nonparametric_type(grid::AbstractGrid) = nonparametric_type(typeof(grid))
 
-"""$(TYPEDSIGNATURES) Resolution paraemeters `nlat_half` of a `grid`.
+"""$(TYPEDSIGNATURES) Resolution parameters `nlat_half` of a `grid`.
 Number of latitude rings on one hemisphere, Equator included."""
 get_nlat_half(grid::AbstractGrid) = grid.nlat_half
 

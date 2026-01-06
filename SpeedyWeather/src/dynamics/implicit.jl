@@ -10,7 +10,7 @@ export ImplicitShallowWater
 """Struct that holds various precomputed arrays for the semi-implicit correction to
 prevent gravity waves from amplifying in the shallow water model. The implicit time step
 between i-1 and i+1 is controlled by the parameter `α` in the range [0, 1]
-    
+
     α = 0   means the gravity wave terms are evaluated at i-1 (forward)
     α = 0.5 evaluates at i+1 and i-1 (centered implicit)
     α = 1   evaluates at i+1 (backward implicit)
@@ -137,7 +137,7 @@ $(TYPEDFIELDS)"""
     "Flag automatically set to true when initialize! has been called"
     initialized::Bool = false
 
-    # PRECOMPUTED ARRAYS, to be initiliazed with initialize!
+    # PRECOMPUTED ARRAYS, to be initialized with initialize!
     "vertical temperature profile, obtained from diagn on first time step"
     temp_profile::VectorType = zeros(NF, nlayers)
 
@@ -150,7 +150,7 @@ $(TYPEDFIELDS)"""
     "divergence: the -RdTₖ∇² term excl the eigenvalues from ∇² for divergence"
     U::VectorType = zeros(NF, nlayers)
 
-    "temperature: operator for the TₖD + κTₖDlnps/Dt term"
+    "temperature: operator for the TₖD + κTₖD(ln pₛ)/Dt term"
     L::MatrixType = zeros(NF, nlayers, nlayers)
 
     "pressure: vertical averaging of the -D̄ term in the log surface pres equation"
@@ -162,13 +162,13 @@ $(TYPEDFIELDS)"""
     "vert advection term in the temperature equation (below+above)"
     L1::MatrixType = zeros(NF, nlayers, nlayers)
 
-    "factor in front of the div_sum_above term"
+    "factor in front of the `div_sum_above` term"
     L2::VectorType = zeros(NF, nlayers)
 
-    "_sum_above operator itself"
+    "`_sum_above` operator itself"
     L3::MatrixType = zeros(NF, nlayers, nlayers)
 
-    "factor in front of div term in Dlnps/Dt"
+    "factor in front of div term in Dlnpₛ/Dt"
     L4::VectorType = zeros(NF, nlayers)
 
     "for every l the matrix to be inverted"
