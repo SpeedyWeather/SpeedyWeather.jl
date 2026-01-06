@@ -31,7 +31,7 @@ Jeevanjee and Zhou [^JZ22] (eq. 2) define a longwave radiative flux ``F`` for at
 as (following Seeley and Wordsworth [^SW23], eq. 1)
 
 ```math
-\frac{dF}{dT} = α*(T_t - T)
+\frac{dF}{dT} = α (T_t - T)
 ```
 
 The flux ``F`` (in ``W/m^2/K``) is a vertical upward flux between two layers (vertically adjacent)
@@ -73,7 +73,7 @@ using optical depth ``\tau`` as vertical coordinate. Longwave emittance is
 are ``U = \sigma T_s^4`` at the surface, i.e. the surface emitting with its surface
 temperature ``T_s`` (sea surface temperature, skin or soil temperature); and
 ``D = 0`` at the top (no longwave radiation from space). Instead of optical depth
-we solve these equations using the transmissivity ``t = exp(-\tau)``.
+we solve these equations using the transmissivity ``t = \exp(-\tau)``.
 
 ```math
 U_{k-1} = t_k U_k + (1-t_k) σ T_k^4
@@ -110,7 +110,7 @@ FriersonLongwaveTransmissivity(spectral_grid)
 to compute
 
 ```math
-\tau_0 = \tau_{0e} + (\tau_{0p} - \tau_{0e}) \sin^2(\theta)
+\tau_0 = \tau_{0e} + (\tau_{0p} - \tau_{0e}) \sin^2 \theta
 ```
 
 with surface values of optical depth at the equator ``\tau_{0e}`` and
@@ -241,7 +241,6 @@ To use the OneBandShortwave scheme, construct your model as follows and run as u
 
 ```@example radiation
 using SpeedyWeather
-using CairoMakie
 spectral_grid = SpectralGrid(trunc=31, nlayers=8)
 model = PrimitiveWetModel(spectral_grid; shortwave_radiation=OneBandShortwave(spectral_grid))
 simulation = initialize!(model)

@@ -53,7 +53,7 @@ changes) you could manually change the land-sea mask with the `set!` function
 which can take scalars as global constants or functions of two arguments
 longitude ``\lambda`` and ``\varphi``. You can use an anonymous function
 `(λ, φ) -> ...` but you do not have to, defining `function f(λ, φ)` and
-then using `land_sea_mask = f` works too. 
+then using `land_sea_mask = f` works too.
 
 ```@example landseamask
 set!(model, land_sea_mask=0)                    # aqua planet
@@ -81,7 +81,7 @@ And now you can run the simulation as usual with `run!(simulation)`.
 The [`EarthLandSeaMask`](@ref) has itself the option to load another
 land-sea mask from file, but you also have to specify the grid that mask
 from files comes on. It will then attempt to read it via `NCDatasets`
-and interpolate onto the model grid. 
+and interpolate onto the model grid.
 
 ## AquaPlanetMask
 

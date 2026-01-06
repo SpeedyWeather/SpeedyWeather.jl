@@ -1,7 +1,7 @@
 # Orography
 
 Orography (in height above the surface) forms the surface boundary of the
-lowermost layer in SpeedyWeather. 
+lowermost layer in SpeedyWeather.
 
 In the [shallow-water equations](@ref shallow_water_model) the orography
 ``H_b`` enters the equations when computing the layer thickness ``h = \eta + H_0 - H_b``
@@ -33,7 +33,7 @@ using InteractiveUtils # hide
 using SpeedyWeather
 subtypes(SpeedyWeather.AbstractOrography)
 ```
-which are 
+which are
 
 - ``\Phi_s = z_s = H_b = 0`` for `NoOrography`
 - For `ZonalRidge` the zonal ridge from the Jablonowski and Williamson initial conditions, see [Jablonowski-Williamson baroclinic wave](@ref)
@@ -89,7 +89,7 @@ The easiest to load another orography from a netCDF file is to reuse the
 `EarthOrography`, e.g.
 
 ```julia
-mars_orography = EarthOrography(spectal_grid, 
+mars_orography = EarthOrography(spectal_grid,
                                 path="path/to/my/orography",
                                 file="mars_orography.nc",
                                 file_Grid=FullClenshawGrid)

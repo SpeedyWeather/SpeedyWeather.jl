@@ -16,7 +16,8 @@ A Schedule is supposed to be added into callbacks as fields
         other_fields
     end
 
-see also initialize!(::Schedule,::Clock) and isscheduled(::Schedule,::Clock).
+see also `initialize!(::Schedule,::Clock)` and `isscheduled(::Schedule,::Clock)`.
+
 Fields
 $(TYPEDFIELDS)"""
 Base.@kwdef mutable struct Schedule <: AbstractSchedule
@@ -46,7 +47,7 @@ Schedule(times::DateTime...) = Schedule(times = DateTime[times...])
 $(TYPEDSIGNATURES)
 Initialize a Schedule with a Clock (which is assumed to have been initialized).
 Takes both scheduler.every and scheduler.times into account, such that
-both periodic and events can be scheduled simulataneously. But execution will
+both periodic and events can be scheduled simultaneously. But execution will
 happen only once if they coincide on a given time step."""
 function initialize!(scheduler::Schedule, clock::Clock)
     schedule = falses(clock.n_timesteps)    # initialize schedule as BitVector

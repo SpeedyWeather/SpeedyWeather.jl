@@ -28,8 +28,8 @@ GridGeometry(field::AbstractField; kwargs...) = GridGeometry(field.grid; NF = el
 Adapt.@adapt_structure GridGeometry
 
 """
-$(TYPEDSIGNATURES)          
-Precomputed arrays describing the geometry of the Grid with resolution nlat_half.
+$(TYPEDSIGNATURES)
+Precomputed arrays describing the geometry of the Grid with resolution `nlat_half`.
 Contains longitudes, latitudes of grid points, their ring index j and their
 unravelled indices ij."""
 function GridGeometry(
@@ -101,7 +101,7 @@ Adapt.@adapt_structure AnvilLocator
 
 """
 $(TYPEDSIGNATURES)
-Zero generator function for the 4-point average AnvilLocator. Use update_locator! to
+Zero generator function for the 4-point average AnvilLocator. Use `update_locator!` to
 update the grid indices used for interpolation and their weights. The number format
 NF is the format used for the calculations within the interpolation, the input data
 and/or output data formats may differ."""
@@ -134,14 +134,14 @@ expected to have two fields,
  - geometry, which describes the grid G to interpolate from
  - locator, which locates the indices on G and their weights to interpolate
     onto a new grid.
-    
+
 NF is the number format used to calculate the interpolation, which can be
 different from the input data and/or the interpolated data on the new grid."""
 abstract type AbstractInterpolator end
 
 """
 $(TYPEDSIGNATURES)
-Interpolator type for `anvil_anverage`[@ref]. 
+Interpolator type for [`anvil_average`](@ref).
 
 NF is the number format used to calculate the interpolation, which can be
 different from the input data and/or the interpolated data on the new grid.
@@ -701,7 +701,7 @@ longitude/x-coordinate. See schematic:
     0^      a -------- o - b    # anvil-shaped average of a, b, c, d at location x
     .Δy                |
     .                  |
-    .v                 x 
+    .v                 x
     .                  |
     1         c ------ o ---- d
 
@@ -730,7 +730,7 @@ end
 """
 $TYPEDSIGNATURES
 Averages all grid points in `input` that are within one grid cell of
-`output` with coslat-weighting. The output grid cell boundaries 
+`output` with coslat-weighting. The output grid cell boundaries
 are assumed to be rectangles spanning half way to adjacent longitude
 and latitude points."""
 function grid_cell_average!(
@@ -812,7 +812,7 @@ end
 """
 $TYPEDSIGNATURES
 Averages all grid points in `input` that are within one grid cell of
-`output` with coslat-weighting. The output grid cell boundaries 
+`output` with coslat-weighting. The output grid cell boundaries
 are assumed to be rectangles spanning half way to adjacent longitude
 and latitude points."""
 function grid_cell_average(Grid::Type{<:AbstractGrid}, nlat_half::Integer, input::AbstractFullGrid)

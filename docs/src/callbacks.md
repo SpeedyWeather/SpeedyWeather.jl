@@ -25,7 +25,7 @@ time step in mind (valid for all models)
 This means that, at the current callsite, a callback can read the tendencies but writing
 into it would be overwritten by the zeroing of the tendencies in 1. anyway. At the moment,
 if a callback wants to implement an additional tendency then it currently should be
-implemented as a parameterization, forcing or drag term. 
+implemented as a parameterization, forcing or drag term.
 
 ## Defining a callback
 
@@ -72,16 +72,16 @@ function SpeedyWeather.initialize!(
     diagn::DiagnosticVariables,
     model::AbstractModel,
 )
-    # allocate recorder: number of time steps (incl initial conditions) in simulation  
+    # allocate recorder: number of time steps (incl initial conditions) in simulation
     callback.maximum_surface_wind_speed = zeros(progn.clock.n_timesteps + 1)
-    
+
     # where surface (=lowermost model layer) u, v on the grid are stored
     u_grid = diagn.grid.u_grid[:, diagn.nlayers]
     v_grid = diagn.grid.u_grid[:, diagn.nlayers]
 
     # maximum wind speed of initial conditions
     callback.maximum_surface_wind_speed[1] = max_2norm(u_grid, v_grid)
-    
+
     # (re)set counter to 1
     callback.timestep_counter = 1
 end
@@ -123,7 +123,7 @@ function SpeedyWeather.callback!(
 )
 
     # increase counter
-    callback.timestep_counter += 1  
+    callback.timestep_counter += 1
     i = callback.timestep_counter
 
     # where surface (=lowermost model layer) u, v on the grid are stored
@@ -232,7 +232,7 @@ model.callbacks[:temperature].temp
 ## [Intrusive callbacks](@id intrusive_callbacks)
 
 In the sections above, callbacks were introduced as a tool to define custom
-diagnostics or simulation output. This is the simpler and recommended way of using 
+diagnostics or simulation output. This is the simpler and recommended way of using
 them but nothing stops you from defining a callback that is *intrusive*, meaning
 that it can alter the prognostic or diagnostic variables or the model.
 
@@ -258,7 +258,7 @@ directly is not advised though possible because this can easily lead to stabilit
 It is generally easier to implement something like this as a parameterization, forcing or
 drag term (which can also be made time-dependent).
 
-Overall, callbacks give the user a wide range of possibilities to diagnose 
+Overall, callbacks give the user a wide range of possibilities to diagnose
 the simulation while running or to interfere with a simulation. We therefore
 encourage users to use callbacks as widely as possible, but if you run
 into any issues please open an issue in the repository and explain what
@@ -275,7 +275,7 @@ dates and times, e.g. Jan 1 at noon. Several examples how to create schedules
 using SpeedyWeather
 
 # execute on timestep at or after Jan 2 2000
-event_schedule = Schedule(DateTime(2000,1,2))   
+event_schedule = Schedule(DateTime(2000,1,2))
 
 # several events scheduled
 events = (DateTime(2000,1,3), DateTime(2000,1,5,12))
@@ -292,7 +292,7 @@ periodic_schedule = Schedule(every=Day(1))
 A `Schedule` has 5 fields, see [`Schedule`](@ref). `every` is an option
 to create a periodic schedule to execute every time that indicated
 period has passed. `steps` and `counter` will let you know how many
-callback execution steps there are and count them up. `times` is a 
+callback execution steps there are and count them up. `times` is a
 `Vector{DateTime}` containing scheduled events. `schedule` is the
 actual schedule inside a `Schedule`, implemented as `BitVector`
 indicating whether to execute on a given time step (`true`) or not
@@ -387,7 +387,7 @@ simulation start time was noon.
 
 ### Scheduling logic
 
-An event `Schedule` (created with `DateTime` object(s)) for callbacks, executes 
+An event `Schedule` (created with `DateTime` object(s)) for callbacks, executes
 on or after the specified times.
 For two consecutive time steps ``i``, ``i+1``, an event is scheduled at ``i+1``
 when it occurs in ``(i,i+1]``. So a simulation with timestep `i` on Jan-1 at 1am,
@@ -436,7 +436,7 @@ wanted our `odd_schedule` to execute every 70min, it has to adjust it
 to every 60min to match the simulation time step of 30min.
 
 After the model initialization you can always check the simulation time step
-from `model.time_stepping` 
+from `model.time_stepping`
 
 ```@example schedule
 model.time_stepping
