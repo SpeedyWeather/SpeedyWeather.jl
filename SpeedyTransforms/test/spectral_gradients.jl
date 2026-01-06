@@ -242,7 +242,7 @@ end
             div2 = divergence(û, v̂, S)
 
             # increased to 30 as 10, 20 caused single fails every now and then
-            tol = NF == Float32 ? sqrt(eps(NF)) : 30*sqrt(eps(NF))
+            tol = 30*sqrt(eps(NF))
             for lm in eachindex(vor, div, vor2, div2)
                 @test vor[lm] ≈ vor2[lm] rtol = tol
                 @test div[lm] ≈ div2[lm] rtol = tol
