@@ -1,8 +1,8 @@
 # These have been moved to LowerTriangularArrays
 # TODO remove, rename? Change 0 to 1-based indexing?
-spectral_truncation = LowerTriangularArrays.truncate
-spectral_truncation! = LowerTriangularArrays.truncate!
-spectral_interpolation = LowerTriangularArrays.interpolate
+const spectral_truncation = LowerTriangularArrays.truncate
+const spectral_truncation! = LowerTriangularArrays.truncate!
+const spectral_interpolation = LowerTriangularArrays.interpolate
 
 """$(TYPEDSIGNATURES)
 Set imaginary component of m=0 modes (the zonal modes in the first column) to 0."""
