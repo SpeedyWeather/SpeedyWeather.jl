@@ -240,7 +240,7 @@ To use the OneBandShortwave scheme, construct your model as follows and run as u
 **For wet models (with water vapor and clouds):**
 
 ```@example radiation
-using SpeedyWeather
+using SpeedyWeather, CairoMakie
 spectral_grid = SpectralGrid(trunc=31, nlayers=8)
 model = PrimitiveWetModel(spectral_grid; shortwave_radiation=OneBandShortwave(spectral_grid))
 simulation = initialize!(model)
@@ -269,7 +269,7 @@ nothing # hide
 Use `OneBandGreyShortwave` instead, which automatically uses `NoClouds` and `TransparentShortwaveTransmissivity`:
 
 ```@example radiation
-using SpeedyWeather
+using SpeedyWeather, CairoMakie
 spectral_grid = SpectralGrid(trunc=31, nlayers=8)
 model = PrimitiveDryModel(spectral_grid; shortwave_radiation=OneBandGreyShortwave(spectral_grid))
 simulation = initialize!(model)
