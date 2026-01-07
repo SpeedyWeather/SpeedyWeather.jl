@@ -9,7 +9,6 @@ on:
 jobs:
   test:
     name: Julia v${{ matrix.version }}, ${{ matrix.os }}, ${{ matrix.arch }}
-    runs-on: ${{ matrix.os }}
     # don't run if any of these labels are present
     if: >
       !( 
@@ -17,6 +16,15 @@ jobs:
       contains(github.event.pull_request.labels.*.name, 'skip-speedyweather-ci') ||
       contains(github.event.pull_request.labels.*.name, 'skip-enzyme-ci')
       )
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: ./SpeedyWeather
+    timeout-minutes: 60
+    permissions: # needed to allow julia-actions/cache to proactively delete old caches that it has created
+      actions: write
+      contents: read
     strategy:
       matrix:
         version:
@@ -32,16 +40,17 @@ jobs:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
       - uses: julia-actions/cache@v2
-      - name: Julia 1.10, add local packages
+      - name: Julia 1.10, add local packages as sources not supported yet
         shell: julia --color=yes --project=. {0}
         run: |
           using Pkg
-          Pkg.develop([PackageSpec(; path) for path in ("SpeedyWeatherInternals", "LowerTriangularArrays", "RingGrids", "SpeedyTransforms")])
+          Pkg.develop([PackageSpec(; path) for path in ("../SpeedyWeatherInternals", "../LowerTriangularArrays", "../RingGrids", "../SpeedyTransforms")])
           Pkg.instantiate()
         if: ${{ matrix.version == '1.10' }}
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
         with:
           test_args: 'enzyme'
+          project: SpeedyWeather
         env:
           GITHUB_AUTH: ${{ secrets.GITHUB_TOKEN }}
