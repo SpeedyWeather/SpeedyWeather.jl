@@ -10,7 +10,7 @@ steps:
     command: |
       julia -e 'println("---- :julia: Instantiating project")
                 using Pkg
-                Pkg.develop(; path=pwd())
+                Pkg.develop(; path=joinpath(pwd(), "SpeedyWeather"))
                 Pkg.add(["CUDA", "Adapt", "KernelAbstractions"])'
 
       julia -e 'println("+++ :julia: Running CUDA GPU tests")
@@ -32,7 +32,7 @@ steps:
     command: |
       julia -e 'println("---- :julia: Instantiating project")
                 using Pkg
-                Pkg.develop(; path=pwd())
+                Pkg.develop(; path=joinpath(pwd(), "SpeedyWeather"))
                 Pkg.add(["AMDGPU", "Adapt", "KernelAbstractions"])'
 
       julia -e 'println("+++ :julia: Running AMDGPU tests")
