@@ -1,3 +1,5 @@
+using SpeedyWeatherInternals.Utils
+
 @testset "Increasing/decresing vectors" begin
     @test isincreasing(collect(1:10))
     @test isincreasing(sort(rand(10)))
