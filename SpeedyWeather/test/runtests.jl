@@ -22,7 +22,7 @@ if !FLAG_EXTENDED_TESTS && !FLAG_ENZYME_TESTS
     include("parameters.jl")
 
     # GPU/KERNELABSTRACTIONS
-    include("gpu/kernelabstractions.jl")
+    include("GPU/kernelabstractions.jl")
 
     # DYNAMICS
     include("dynamics/diffusion.jl")
