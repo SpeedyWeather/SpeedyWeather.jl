@@ -8,4 +8,6 @@ include("power_spectrum.jl")
 include("resolutions.jl")
 
 # this will load Enzyme, EnzymeTestUtils
-include("spectral_transform_ad_rules.jl")
+if VERSION < v"1.12"
+    include("spectral_transform_ad_rules.jl")
+end
