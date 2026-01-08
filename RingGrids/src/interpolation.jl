@@ -758,24 +758,24 @@ function grid_cell_average!(
         Δϕ = 2π / length(ring)        # longitude spacing on this ring
 
         # indices for lat_out are shifted as north and south pole are included
-        θ0 = (colat_out[j] + colat_out[j + 1]) / 2    # northern edge
-        θ1 = (colat_out[j + 1] + colat_out[j + 2]) / 2    # southern edge
+        θ0 = (colat_out[j] + colat_out[j + 1]) / 2      # northern edge
+        θ1 = (colat_out[j + 1] + colat_out[j + 2]) / 2  # southern edge
 
         # matrix indices for input grid that lie in output grid cell
         j0 = findfirst(θ -> θ >= θ0, colat_in)
         j1 = findlast(θ -> θ < θ1, colat_in)
 
         for ij in ring
-            ϕ0 = mod(lons_out[ij] - Δϕ / 2, 2π)       # western edge
-            ϕ1 = ϕ0 + Δϕ                            # eastern edge
+            ϕ0 = mod(lons_out[ij] - Δϕ / 2, 2π)         # western edge
+            ϕ1 = ϕ0 + Δϕ                                # eastern edge
             # the last line does not require a mod and in fact throws
             # an error if, as long as the offset from prime meridian
             # is at most Δϕ/2 (true for HEALPixGrids, offset 0 for
             # Gaussian and Clenshaw grids)
 
             # matrix indices for input grid that lie in output grid cell
-            a = findlast(ϕ -> ϕ < ϕ0, lon_in)     # western edge
-            b = findfirst(ϕ -> ϕ >= ϕ1, lon_in)     # eastern edge
+            a = findlast(ϕ -> ϕ < ϕ0, lon_in)           # western edge
+            b = findfirst(ϕ -> ϕ >= ϕ1, lon_in)         # eastern edge
 
             # map around prime meridian if coordinates outside of range
             a = isnothing(a) ? nlon_in : a

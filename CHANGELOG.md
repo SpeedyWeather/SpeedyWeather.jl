@@ -1,6 +1,9 @@
 # Changelog
 
 ## Unreleased
+
+- Label-based modular skip CI mechanism for github and buildkite [#957](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/957)
+- Monorepo structure and separate tests [#957](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/957)
 - Changed OneBandShortwave to ij logic [#955](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/955)
 - Fixes some typos and LaTeX renderings in the docs [#953](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/953)
 - Fix bug in parameter subsetting [#960](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/960)

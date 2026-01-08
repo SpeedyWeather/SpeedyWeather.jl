@@ -28,5 +28,6 @@ export zero_last_degree!
 include("spectrum.jl")
 include("lower_triangular_array.jl")
 include("rotate_reverse.jl")
+include("truncation.jl")
 
 end
