@@ -141,6 +141,7 @@ function saturation_vapor_pressure(T, A::AbstractWetAtmosphere)
     Lᵥ = A.latent_heat_condensation
     (; R_vapor) = A
     T₀ = A.temperature_freezing
+    T = convert(eltype(T₀), T)      # ensure type of A
     return e₀ * exp(Lᵥ / R_vapor * (inv(T₀) - inv(T)))
 end
 
@@ -151,9 +152,9 @@ Saturation specific humidity as a function of temperature [K] and pressure [Pa],
     qₛ = ε * eₛ(T) / p,
 with saturation vapor pressure eₛ(T), pressure p [Pa] and ratio of gas constants `ε = R_dry/R_vapor`."""
 function saturation_humidity(T, p, A::AbstractWetAtmosphere)
-    e_s = saturation_vapor_pressure(T, A)
+    eₛ = saturation_vapor_pressure(T, A)
     ϵ = A.mol_ratio
-    return ϵ * e_s / p
+    return ϵ * eₛ / p
 end
 
 export TetensEquation

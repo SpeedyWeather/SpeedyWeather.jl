@@ -14,6 +14,8 @@ function variables(::AbstractShortwave)
         DiagnosticVariable(name = :surface_shortwave_down, dims = Grid2D(), desc = "Surface shortwave radiation down over ocean", units = "W/m^2", namespace = :ocean),
         DiagnosticVariable(name = :surface_shortwave_down, dims = Grid2D(), desc = "Surface shortwave radiation down over land", units = "W/m^2", namespace = :land),
         DiagnosticVariable(name = :surface_shortwave_up, dims = Grid2D(), desc = "Surface shortwave radiation up", units = "W/m^2"),
+        DiagnosticVariable(name = :surface_shortwave_up, dims = Grid2D(), desc = "Surface shortwave radiation up over ocean", units = "W/m^2", namespace = :ocean),
+        DiagnosticVariable(name = :surface_shortwave_up, dims = Grid2D(), desc = "Surface shortwave radiation up over land", units = "W/m^2", namespace = :land),
         DiagnosticVariable(name = :outgoing_shortwave, dims = Grid2D(), desc = "TOA Shortwave radiation up", units = "W/m^2"),
         DiagnosticVariable(name = :cos_zenith, dims = Grid2D(), desc = "Cos zenith angle", units = "1"),
         DiagnosticVariable(name = :albedo, dims = Grid2D(), desc = "Albedo", units = "1"),
@@ -25,29 +27,31 @@ end
 initialize!(::TransparentShortwave, ::PrimitiveEquation) = nothing
 
 # function barrier
-@propagate_inbounds parameterization!(ij, diagn, progn, shortwave::TransparentShortwave, model) =
-    shortwave_radiation!(ij, diagn, shortwave, model.planet, model.land_sea_mask.mask)
+@propagate_inbounds function parameterization!(ij, diagn, progn, ::TransparentShortwave, model)
 
-@propagate_inbounds function shortwave_radiation!(ij, diagn, ::TransparentShortwave, planet, land_sea_mask)
+    planet = model.planet
+    land_sea_mask = model.land_sea_mask.mask
 
     (; surface_shortwave_down, surface_shortwave_up) = diagn.physics
     ssrd_ocean = diagn.physics.ocean.surface_shortwave_down
     ssrd_land = diagn.physics.land.surface_shortwave_down
+    ssru_ocean = diagn.physics.ocean.surface_shortwave_up
+    ssru_land = diagn.physics.land.surface_shortwave_up
 
-    @inbounds begin
-        cos_zenith = diagn.physics.cos_zenith[ij]
-        land_fraction = land_sea_mask[ij]
-        albedo_ocean = diagn.physics.ocean.albedo[ij]
-        albedo_land = diagn.physics.land.albedo[ij]
-    end
+    cos_zenith = diagn.physics.cos_zenith[ij]
+    land_fraction = land_sea_mask[ij]
+    albedo_ocean = diagn.physics.ocean.albedo[ij]
+    albedo_land = diagn.physics.land.albedo[ij]
 
     S₀ = planet.solar_constant
     D = S₀ * cos_zenith             # top of atmosphere downward radiation
     surface_shortwave_down[ij] = D  # transparent atmosphere so same at surface (before albedo)
+    ssrd_ocean[ij] = D
+    ssrd_land[ij] = D
 
     # shortwave up is after albedo reflection, separated by ocean/land
-    ssrd_ocean[ij] = albedo_ocean * D
-    ssrd_land[ij] = albedo_land * D
+    ssru_ocean[ij] = albedo_ocean * D
+    ssru_land[ij] = albedo_land * D
 
     # land-sea mask-weighted
     albedo = (1 - land_fraction) * albedo_ocean + land_fraction * albedo_land
@@ -75,9 +79,10 @@ $(TYPEDFIELDS)
 """
 @parameterized @kwdef struct OneBandShortwave{C, T, R} <: AbstractShortwave
     @component clouds::C
-    @component transmittance::T
+    @component transmissivity::T
     @component radiative_transfer::R
 end
+Adapt.@adapt_structure OneBandShortwave
 
 # primitive wet model version
 function OneBandShortwave(
@@ -117,24 +122,32 @@ end
 function initialize!(radiation::OneBandShortwave, model::PrimitiveEquation)
     initialize!(radiation.clouds, model)
     initialize!(radiation.transmissivity, model)
-    return initialize!(radiation.radiative_transfer, model)
+    initialize!(radiation.radiative_transfer, model)
+    return nothing
 end
 
 """$(TYPEDSIGNATURES)
 Calculate shortwave radiation using the one-band scheme with diagnostic clouds.
 Computes cloud cover fraction from relative humidity and precipitation, then
 integrates downward and upward radiative fluxes accounting for cloud albedo effects."""
-function shortwave_radiation!(
-        column::ColumnVariables,
+@propagate_inbounds function parameterization!(
+        ij,
+        diagn,
+        progn,
         radiation::OneBandShortwave,
-        model::PrimitiveEquation,
+        model,
     )
-    clouds = clouds!(column, radiation.clouds, model)
-    t = transmissivity!(column, clouds, radiation.transmissivity, model)
-    return shortwave_radiative_transfer!(column, t, clouds, radiation.radiative_transfer, model)
+    clouds = clouds!(ij, diagn, progn, radiation.clouds, model)
+    t = transmissivity!(ij, diagn, progn, clouds, radiation.transmissivity, model)
+    shortwave_radiative_transfer!(ij, diagn, t, clouds, radiation.radiative_transfer, model)
+    return nothing
 end
 
 export OneBandShortwaveRadiativeTransfer
+"""
+    OneBandShortwaveRadiativeTransfer <: AbstractShortwaveRadiativeTransfer
+
+$(TYPEDFIELDS)."""
 @parameterized @kwdef struct OneBandShortwaveRadiativeTransfer{NF} <: AbstractShortwaveRadiativeTransfer
     "[OPTION] Ozone absorption in upper stratosphere (W/m^2)"
     @param ozone_absorp_upper::NF = 0 (bounds=Nonnegative,)
@@ -142,86 +155,81 @@ export OneBandShortwaveRadiativeTransfer
     "[OPTION] Ozone absorption in lower stratosphere (W/m^2)"
     @param ozone_absorp_lower::NF = 0 (bounds=Nonnegative,)
 end
+Adapt.@adapt_structure OneBandShortwaveRadiativeTransfer
 
 # generator function
 OneBandShortwaveRadiativeTransfer(SG::SpectralGrid; kwargs...) = OneBandShortwaveRadiativeTransfer{SG.NF}(; kwargs...)
 initialize!(::OneBandShortwaveRadiativeTransfer, ::PrimitiveEquation) = nothing
 
-# function barrier to unpack model
-function shortwave_radiative_transfer!(
-        column::ColumnVariables,
-        t,          # Transmissivity array
-        clouds,     # NamedTuple from clouds!
-        radiation::OneBandShortwaveRadiativeTransfer,
-        model::PrimitiveEquation
-    )
-    return shortwave_radiative_transfer!(column, t, clouds, radiation, model.planet)
-end
-
 """$(TYPEDSIGNATURES)
 One-band shortwave radiative transfer with cloud reflection and ozone absorption."""
-function shortwave_radiative_transfer!(
-        column::ColumnVariables,
+@propagate_inbounds function shortwave_radiative_transfer!(
+        ij,
+        diagn,
         t,          # Transmissivity array
         clouds,     # NamedTuple from clouds!
         radiation::OneBandShortwaveRadiativeTransfer,
-        planet::AbstractPlanet,
+        model,
     )
     (; ozone_absorp_upper, ozone_absorp_lower) = radiation
-    (; albedo_ocean, albedo_land) = column
     (; cloud_cover, cloud_top, stratocumulus_cover, cloud_albedo, stratocumulus_albedo) = clouds
-    (; cos_zenith, land_fraction, nlayers, flux_temp_downward, flux_temp_upward) = column
 
-    # Apply ozone absorption at TOA
-    D_TOA = planet.solar_constant * cos_zenith
-    D = max(zero(D_TOA), D_TOA - ozone_absorp_upper - ozone_absorp_lower)
-    flux_temp_downward[1] += D
+    dTdt = diagn.tendencies.temp_tend_grid
+    pₛ = diagn.grid.pres_grid_prev[ij]
+    nlayers = size(dTdt, 2)
 
-    # Clear sky portion until cloud top
-    @inbounds for k in 1:(cloud_top - 1)
-        D *= t[k]
-        flux_temp_downward[k + 1] += D
-    end
+    cos_zenith = diagn.physics.cos_zenith[ij]
+    albedo_ocean = diagn.physics.ocean.albedo[ij]
+    albedo_land = diagn.physics.land.albedo[ij]
+    land_fraction = model.land_sea_mask.mask[ij]
+    cₚ = model.atmosphere.heat_capacity
 
-    # Cloud reflection at cloud top
+    # Apply ozone absorption at top of atmosphere (TOA)
+    D_toa = model.planet.solar_constant * cos_zenith
+    D = max(0, D_toa - ozone_absorp_upper - ozone_absorp_lower)
+
+    # Downward beam
     U_reflected = zero(D)
-    if cloud_top <= nlayers
-        R = cloud_albedo * cloud_cover
-        U_reflected = D * R
-        D *= (1 - R)
-
-        @inbounds for k in cloud_top:nlayers
-            D *= t[k]
-            flux_temp_downward[k + 1] += D
+    for k in 1:nlayers
+        if k == cloud_top
+            R = cloud_albedo * cloud_cover
+            U_reflected = D * R
+            D *= (1 - R)
         end
+
+        D_out = D * t[ij, k]
+        # Update temperature tendency due to absorbed shortwave radiation
+        dTdt[ij, k] += flux_to_tendency((D - D_out) / cₚ, pₛ, k, model)
+        D = D_out
     end
 
     # Surface stratocumulus reflection
     U_stratocumulus = D * stratocumulus_albedo * stratocumulus_cover
     D_surface = D - U_stratocumulus
-    column.surface_shortwave_down = D_surface
+    diagn.physics.surface_shortwave_down[ij] = D_surface
+    diagn.physics.ocean.surface_shortwave_down[ij] = D_surface
+    diagn.physics.land.surface_shortwave_down[ij] = D_surface
 
-    # Surface albedo reflections (can handle both scalar and band-specific albedos)
+    # Surface albedo reflections
     up_ocean = albedo_ocean * D_surface
     up_land = albedo_land * D_surface
-    column.surface_shortwave_up_ocean = up_ocean
-    column.surface_shortwave_up_land = up_land
+    diagn.physics.ocean.surface_shortwave_up[ij] = up_ocean
+    diagn.physics.land.surface_shortwave_up[ij] = up_land
 
-    # Weighted surface albedo and reflected flux
     albedo = (1 - land_fraction) * albedo_ocean + land_fraction * albedo_land
     U_surface_albedo = albedo * D_surface
-    column.surface_shortwave_up = U_surface_albedo
-
-    U = U_surface_albedo + U_stratocumulus
+    diagn.physics.surface_shortwave_up[ij] = U_surface_albedo
+    diagn.physics.albedo[ij] = albedo
 
     # Upward beam
-    flux_temp_upward[nlayers + 1] += U
-    @inbounds for k in nlayers:-1:1
-        U *= t[k]
-        U += k == cloud_top ? U_reflected : zero(U)
-        flux_temp_upward[k] += U
+    U = U_surface_albedo + U_stratocumulus
+    for k in nlayers:-1:1
+        U_out = U * t[ij, k]
+        U_out += k == cloud_top ? U_reflected : zero(U)
+        dTdt[ij, k] += flux_to_tendency((U - U_out) / cₚ, pₛ, k, model)
+        U = U_out
     end
 
-    column.outgoing_shortwave_radiation = U
+    diagn.physics.outgoing_shortwave[ij] = U
     return nothing
 end
