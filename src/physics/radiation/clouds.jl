@@ -61,7 +61,7 @@ export DiagnosticClouds
     use_stratocumulus::Bool = true
 
     "[OPTION] Stratocumulus cloud factor (SPEEDY clfact) [1]"
-    @param stratocumulus_clfact::NF = 1.2 (bounds = Nonnegative,)
+    @param stratocumulus_cloud_factor::NF = 1.2 (bounds = Nonnegative,)
 end
 
 Adapt.@adapt_structure DiagnosticClouds
@@ -111,7 +111,7 @@ Returns (cloud_cover, cloud_top, stratocumulus_cover) tuple."""
     stab_min = clouds.stratocumulus_stability_min
     stab_max = clouds.stratocumulus_stability_max
     cover_max = clouds.stratocumulus_cover_max
-    clfact = clouds.stratocumulus_clfact
+    cloud_factor = clouds.stratocumulus_cloud_factor
 
     # Precipitation contribution (rain rate is in m/s)
     rain_rate = diagn.physics.rain_rate[ij]
@@ -154,9 +154,9 @@ Returns (cloud_cover, cloud_top, stratocumulus_cover) tuple."""
         # normalized static stability factor
         static_stability = clamp((G - stab_min) / (stab_max - stab_min), 0, 1)
 
-        stratocumulus_cover_ocean = static_stability * max(cover_max - clfact * cloud_cover, 0)
+        stratocumulus_cover_ocean = static_stability * max(cover_max - cloud_factor * cloud_cover, 0)
         qsat_surface = saturation_humidity(temp[ij, surface], sigma_levels[surface] * pₛ, model.atmosphere)
-        rh_surface::NF = qsat_surface > 0 ? humid[ij, surface] / qsat_surface : 0   # relative humidity at surface
+        rh_surface = humid[ij, surface] / qsat_surface      # relative humidity at surface
         stratocumulus_cover_land = stratocumulus_cover_ocean * rh_surface
 
         stratocumulus_cover =
