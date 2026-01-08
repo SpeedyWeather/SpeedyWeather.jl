@@ -28,40 +28,40 @@ end
 export DiagnosticClouds
 @parameterized @kwdef struct DiagnosticClouds{NF} <: AbstractShortwaveClouds
     "[OPTION] Relative humidity threshold for cloud cover = 0 [1]."
-    @param relative_humidity_threshold_min::NF = 0.3 (bounds=0..1,)
+    @param relative_humidity_threshold_min::NF = 0.3 (bounds = 0 .. 1,)
 
     "[OPTION] Relative humidity threshold for cloud cover = 1 [1]"
-    @param relative_humidity_threshold_max::NF = 1 (bounds=0..1,)
+    @param relative_humidity_threshold_max::NF = 1 (bounds = 0 .. 1,)
 
     "[OPTION] Specific humidity threshold for cloud cover [Kg/kg]"
-    @param specific_humidity_threshold_min::NF = 0.0002 (bounds=0..1,)
+    @param specific_humidity_threshold_min::NF = 0.0002 (bounds = 0 .. 1,)
 
     "[OPTION] Weight for √precip term [1]"
-    @param precipitation_weight::NF = 0.2 (bounds=Nonnegative,)
+    @param precipitation_weight::NF = 0.2 (bounds = Nonnegative,)
 
     "[OPTION] Cap on precip contributing to cloud cover [mm/day]"
-    @param precipitation_max::NF = 10 (bounds=Positive,)
+    @param precipitation_max::NF = 10 (bounds = Positive,)
 
     "[OPTION] Cloud albedo for visible band at CLC=1 [1]"
-    @param cloud_albedo::NF = 0.43 (bounds=0..1,)
+    @param cloud_albedo::NF = 0.43 (bounds = 0 .. 1,)
 
     "[OPTION] Stratocumulus cloud albedo (surface reflection/absorption) [1]"
-    @param stratocumulus_albedo::NF = 0.5 (bounds=0..1,)
+    @param stratocumulus_albedo::NF = 0.5 (bounds = 0 .. 1,)
 
     "[OPTION] Static stability lower threshold for stratocumulus (GSEN, called GSES0 in the paper) [J/kg]"
-    @param stratocumulus_stability_min::NF = 0.25 (bounds=Nonnegative,)
+    @param stratocumulus_stability_min::NF = 0.25 (bounds = Nonnegative,)
 
     "[OPTION] Static stability upper threshold for stratocumulus (GSEN, called GSES1 in the paper) [J/kg]"
-    @param stratocumulus_stability_max::NF = 0.4 (bounds=Nonnegative,)
+    @param stratocumulus_stability_max::NF = 0.4 (bounds = Nonnegative,)
 
     "[OPTION] Maximum stratocumulus cloud cover (called CLSMAX in the paper) [1]"
-    @param stratocumulus_cover_max::NF = 0.6 (bounds=0..1,)
+    @param stratocumulus_cover_max::NF = 0.6 (bounds = 0 .. 1,)
 
     "[OPTION] Enable stratocumulus cloud parameterization?"
     use_stratocumulus::Bool = true
 
     "[OPTION] Stratocumulus cloud factor (SPEEDY clfact) [1]"
-    @param stratocumulus_clfact::NF = 1.2 (bounds=Nonnegative,)
+    @param stratocumulus_clfact::NF = 1.2 (bounds = Nonnegative,)
 end
 
 Adapt.@adapt_structure DiagnosticClouds
@@ -95,9 +95,9 @@ Returns (cloud_cover, cloud_top, stratocumulus_cover) tuple."""
     humid = diagn.grid.humid_grid_prev
     geopotential = diagn.grid.geopotential
     NF = eltype(temp)
-    
-    pₛ = diagn.grid.pres_grid_prev[ij]
     nlayers = size(temp, 2)
+
+    pₛ = diagn.grid.pres_grid_prev[ij]
     sigma_levels = model.geometry.σ_levels_full
     land_fraction = model.land_sea_mask.mask[ij]
     cₚ = model.atmosphere.heat_capacity
@@ -143,22 +143,25 @@ Returns (cloud_cover, cloud_top, stratocumulus_cover) tuple."""
     diagn.physics.cloud_top[ij] = cloud_top
 
     # Stratocumulus parameterization
+    stratocumulus_cover::NF = 0         # fallback for no stratocumulus
     if clouds.use_stratocumulus
-        # Vertical gradient of dry static energy near surface
-        GSEN = (cₚ * temp[ij, nlayers] + geopotential[ij, nlayers]) -
-            (cₚ * temp[ij, nlayers - 1] + geopotential[ij, nlayers - 1])
+        # Vertical difference of dry static energy near surface
+        surface = nlayers               # surface index
+        above = max(1, nlayers - 1)     # layer above surface, max for 1 layer case, yields GSEN=0
+        G = (cₚ * temp[ij, surface] + geopotential[ij, surface]) -
+            (cₚ * temp[ij, above] + geopotential[ij, above])
 
-        # normalized stability factor
-        F_ST = clamp((GSEN - stab_min) / (stab_max - stab_min), 0, 1)
+        # normalized static stability factor
+        static_stability = clamp((G - stab_min) / (stab_max - stab_min), 0, 1)
 
-        stratocumulus_cover_ocean = F_ST * max(cover_max - clfact * cloud_cover, 0)
-        qsat_surface = saturation_humidity(temp[ij, nlayers], sigma_levels[nlayers] * pₛ, model.atmosphere)
-        RH_N::NF = qsat_surface > 0 ? humid[ij, nlayers] / qsat_surface : 0
-        stratocumulus_cover_land = stratocumulus_cover_ocean * RH_N 
+        stratocumulus_cover_ocean = static_stability * max(cover_max - clfact * cloud_cover, 0)
+        qsat_surface = saturation_humidity(temp[ij, surface], sigma_levels[surface] * pₛ, model.atmosphere)
+        rh_surface::NF = qsat_surface > 0 ? humid[ij, surface] / qsat_surface : 0   # relative humidity at surface
+        stratocumulus_cover_land = stratocumulus_cover_ocean * rh_surface
 
-        stratocumulus_cover = (1 - land_fraction) * stratocumulus_cover_ocean + land_fraction * stratocumulus_cover_land
-    else
-        stratocumulus_cover = zero(NF)
+        stratocumulus_cover =
+            (1 - land_fraction) * stratocumulus_cover_ocean +
+            land_fraction * stratocumulus_cover_land
     end
 
     return (; cloud_cover, cloud_top, stratocumulus_cover)
