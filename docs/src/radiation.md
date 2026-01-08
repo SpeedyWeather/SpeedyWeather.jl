@@ -135,10 +135,7 @@ subtypes(SpeedyWeather.AbstractShortwave)
 
 ## OneBandShortwave: Single-band shortwave radiation with diagnostic clouds
 
-!!! warning "OneBandShortwave currently not available"
-    With internal structure change for GPU acceleration this parameterization is currently unavailable.
-
-The [`OneBandShortwave`](@ref) scheme provides a single-band (broadband) shortwave radiation parameterization,
+The `OneBandShortwave` scheme provides a single-band (broadband) shortwave radiation parameterization,
 including diagnostic cloud effects following [^KMB06]. For dry models without water vapor, use
 `OneBandGreyShortwave` instead, which automatically disables cloud effects and uses transparent
 transmissivity ``t=1``.
@@ -242,8 +239,8 @@ To use the OneBandShortwave scheme, construct your model as follows and run as u
 
 **For wet models (with water vapor and clouds):**
 
-```julia radiation
-using SpeedyWeather
+```@example radiation
+using SpeedyWeather, CairoMakie
 spectral_grid = SpectralGrid(trunc=31, nlayers=8)
 model = PrimitiveWetModel(spectral_grid; shortwave_radiation=OneBandShortwave(spectral_grid))
 simulation = initialize!(model)
@@ -254,24 +251,25 @@ ssrd = simulation.diagnostic_variables.physics.surface_shortwave_down
 heatmap(ssrd,title="Surface shortwave radiation down [W/m^2]")
 save("ssrd.png", ans) # hide
 nothing # hide
-# ![Surface shortwave radiation down](ssrd.png) #hide
 ```
 
+![Surface shortwave radiation down](ssrd.png)
 
-```julia radiation
-osr = simulation.diagnostic_variables.physics.outgoing_shortwave_radiation
+```@example radiation
+osr = simulation.diagnostic_variables.physics.outgoing_shortwave
 heatmap(osr,title="Outgoing shortwave radiation [W/m^2]")
 save("osr.png", ans) # hide
 nothing # hide
-# ![Outgoing shortwave radiation](osr.png) #hide
 ```
+
+![Outgoing shortwave radiation](osr.png)
 
 **For dry models (no water vapor or clouds):**
 
 Use `OneBandGreyShortwave` instead, which automatically uses `NoClouds` and `TransparentShortwaveTransmissivity`:
 
-```julia radiation2
-using SpeedyWeather
+```@example radiation
+using SpeedyWeather, CairoMakie
 spectral_grid = SpectralGrid(trunc=31, nlayers=8)
 model = PrimitiveDryModel(spectral_grid; shortwave_radiation=OneBandGreyShortwave(spectral_grid))
 simulation = initialize!(model)
@@ -282,8 +280,9 @@ ssrd = simulation.diagnostic_variables.physics.surface_shortwave_down
 heatmap(ssrd, title="Surface shortwave radiation (dry model) [W/m^2]")
 save("ssrd_dry.png", ans) # hide
 nothing # hide
-# ![Surface shortwave radiation (dry model)](ssrd_dry.png) #hide
 ```
+
+![Surface shortwave radiation (dry model)](ssrd_dry.png)
 
 ### Parameterization options
 
@@ -321,7 +320,7 @@ with
 - ``a_{wv}`` water-vapor absorptivity (`absorptivity_water_vapor`) times specific humidity ``q_k``
 - ``a_{cl}(q_\mathrm{base}) = \min(a_{cl,base} q_\mathrm{base}, a_{cl,limit})`` cloud absorptivity added below the diagnosed cloud top, scaled by cloud cover ``\mathrm{CLC}``
 
-All absorptivity coefficients are per ``10^5`` Pa. The resulting ``\tau_k^{SR}`` values are stored in `column.transmissivity_shortwave[:, band]` and reused for both the downward and upward sweeps in `OneBandShortwaveRadiativeTransfer`.
+All absorptivity coefficients are per ``10^5`` Pa. The resulting ``\tau_k^{SR}`` values are computed once per column and reused for both the downward and upward sweeps in `OneBandShortwaveRadiativeTransfer`.
 
 ##### TransparentShortwaveTransmissivity details
 
@@ -331,7 +330,7 @@ Sets ``\tau_k^{SR} = 1`` for all layers and bands, effectively skipping atmosphe
 
 The `DiagnosticClouds` scheme includes a `use_stratocumulus` flag (default: `true`) that enables the diagnostic stratocumulus cloud parameterization over oceans:
 
-```julia radiation3
+```@example radiation
 using SpeedyWeather, CairoMakie
 
 spectral_grid = SpectralGrid()
@@ -344,8 +343,9 @@ ssrd = sim.diagnostic_variables.physics.surface_shortwave_down
 heatmap(ssrd, title="No stratocumulus clouds [W/m^2]")
 save("oneband_no_stratocumulus.png", ans) # hide
 nothing # hide
-# ![No stratocumulus clouds](oneband_no_stratocumulus.png) #hide
 ```
+
+![No stratocumulus clouds](oneband_no_stratocumulus.png)
 
 ## References
 
