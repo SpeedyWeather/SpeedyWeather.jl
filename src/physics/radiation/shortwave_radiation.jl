@@ -122,7 +122,8 @@ end
 function initialize!(radiation::OneBandShortwave, model::PrimitiveEquation)
     initialize!(radiation.clouds, model)
     initialize!(radiation.transmissivity, model)
-    return initialize!(radiation.radiative_transfer, model)
+    initialize!(radiation.radiative_transfer, model)
+    return nothing
 end
 
 """$(TYPEDSIGNATURES)
@@ -138,10 +139,15 @@ integrates downward and upward radiative fluxes accounting for cloud albedo effe
     )
     clouds = clouds!(ij, diagn, progn, radiation.clouds, model)
     t = transmissivity!(ij, diagn, progn, clouds, radiation.transmissivity, model)
-    return shortwave_radiative_transfer!(ij, diagn, t, clouds, radiation.radiative_transfer, model)
+    shortwave_radiative_transfer!(ij, diagn, t, clouds, radiation.radiative_transfer, model)
+    return nothing
 end
 
 export OneBandShortwaveRadiativeTransfer
+"""
+    OneBandShortwaveRadiativeTransfer <: AbstractShortwaveRadiativeTransfer
+
+$(TYPEDFIELDS)."""
 @parameterized @kwdef struct OneBandShortwaveRadiativeTransfer{NF} <: AbstractShortwaveRadiativeTransfer
     "[OPTION] Ozone absorption in upper stratosphere (W/m^2)"
     @param ozone_absorp_upper::NF = 0 (bounds=Nonnegative,)
@@ -169,18 +175,18 @@ One-band shortwave radiative transfer with cloud reflection and ozone absorption
     (; cloud_cover, cloud_top, stratocumulus_cover, cloud_albedo, stratocumulus_albedo) = clouds
 
     dTdt = diagn.tendencies.temp_tend_grid
-    p_s = diagn.grid.pres_grid_prev[ij]
+    pₛ = diagn.grid.pres_grid_prev[ij]
     nlayers = size(dTdt, 2)
 
     cos_zenith = diagn.physics.cos_zenith[ij]
     albedo_ocean = diagn.physics.ocean.albedo[ij]
     albedo_land = diagn.physics.land.albedo[ij]
     land_fraction = model.land_sea_mask.mask[ij]
-    c_p = model.atmosphere.heat_capacity
+    cₚ = model.atmosphere.heat_capacity
 
-    # Apply ozone absorption at TOA
+    # Apply ozone absorption at top of atmosphere (TOA)
     D_toa = model.planet.solar_constant * cos_zenith
-    D = max(zero(D_toa), D_toa - ozone_absorp_upper - ozone_absorp_lower)
+    D = max(0, D_toa - ozone_absorp_upper - ozone_absorp_lower)
 
     # Downward beam
     U_reflected = zero(D)
@@ -193,7 +199,7 @@ One-band shortwave radiative transfer with cloud reflection and ozone absorption
 
         D_out = D * t[ij, k]
         # Update temperature tendency due to absorbed shortwave radiation
-        dTdt[ij, k] += flux_to_tendency((D - D_out) / c_p, p_s, k, model)
+        dTdt[ij, k] += flux_to_tendency((D - D_out) / cₚ, pₛ, k, model)
         D = D_out
     end
 
@@ -220,7 +226,7 @@ One-band shortwave radiative transfer with cloud reflection and ozone absorption
     for k in nlayers:-1:1
         U_out = U * t[ij, k]
         U_out += k == cloud_top ? U_reflected : zero(U)
-        dTdt[ij, k] += flux_to_tendency((U - U_out) / c_p, p_s, k, model)
+        dTdt[ij, k] += flux_to_tendency((U - U_out) / cₚ, pₛ, k, model)
         U = U_out
     end
 

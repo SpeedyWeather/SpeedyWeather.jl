@@ -96,7 +96,8 @@ function reset_variables!(diagn::DiagnosticVariables)
     reset_variable!(diagn.physics, :rain_rate, 0)
     reset_variable!(diagn.physics, :snow_rate, 0)
     reset_variable!(diagn.physics, :surface_humidity_flux, 0)
-    return reset_variable!(diagn.physics, :sensible_heat_flux, 0)
+    reset_variable!(diagn.physics, :sensible_heat_flux, 0)
+    return nothing
 end
 
 function reset_variable!(vars, var::Symbol, reset_value)

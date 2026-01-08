@@ -142,8 +142,6 @@ Calls all `initialize!` functions for components of `model`,
 except for `model.output` and `model.feedback` which are always called
 at in `time_stepping!` and `model.implicit` which is done in `first_timesteps!`."""
 function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
-    (; spectral_grid) = model
-
     # NUMERICS (implicit is initialized later)
     initialize!(model.geometry, model)
     initialize!(model.time_stepping, model)
@@ -198,6 +196,12 @@ function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
     return Simulation(prognostic_variables, diagnostic_variables, model)
 end
 
+"""$(TYPEDSIGNATURES)
+A `model` is adapted to the GPU or CPU by wrapping some (but not all!)
+of its fields (determined by `model.model_parameters`) into a NamedTuple.
+Importantly, while accessing fields `model.field` still works as usual,
+one cannot use multiple dispatch on the model as a whole, e.g. `::PrimitiveDry`
+will not work on GPU-adapted models."""
 function Adapt.adapt_structure(to, model::PrimitiveDryModel)
     adapt_fields = model.model_parameters
     return NamedTuple{adapt_fields}(
