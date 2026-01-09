@@ -33,6 +33,7 @@ import CodecZlib
 import BitInformation: round, round!
 import ProgressMeter
 import ONNXRunTime
+import XGBoost
 
 # UTILITIES
 using DomainSets.IntervalSets

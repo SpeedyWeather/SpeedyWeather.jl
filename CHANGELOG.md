@@ -43,6 +43,7 @@
 - Seasonal ocean and land climatology models GPU-ready [#892](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/892)
 - Zenith constructors [#889](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/889)
 - More general forcing of pressure, vorticity and divergence [#855](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/855)
+- Data-driven surface roughness scheme [#959](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/959)
 
 
 ## v0.17.3

@@ -37,9 +37,9 @@ ConstantSurfaceRoughness(SG::SpectralGrid, kwargs...) = ConstantSurfaceRoughness
 initialize!(::ConstantSurfaceRoughness, ::PrimitiveEquation) = nothing
 
 export LearnedSurfaceRoughness
-@kwdef struct LearnedSurfaceRoughness{NF, M} <: AbstractSurfaceRoughness
+@kwdef struct LearnedSurfaceRoughness{NF, OM, LM} <: AbstractSurfaceRoughness
     "ONNX Inference Session for Ocean"
-    ocean_model::M
+    ocean_model::OM
 
     # Ocean normalisation parameters
     ocean_input_means::Vector{NF} = Float32[0.14675693, 0.24450141, 0.17968568, 7.6465526]
@@ -48,7 +48,7 @@ export LearnedSurfaceRoughness
     ocean_output_std::NF = 1.2418048
 
     "ONNX Inference Session for Land"
-    land_model::M
+    land_model::LM
 
     # Land normalisation parameters
     land_input_means::Vector{NF} = Float32[0.100255094, 0.154690117, 16791.6582, 6.33934355]
@@ -60,7 +60,7 @@ end
 function LearnedSurfaceRoughness(
         SG::SpectralGrid;
         ocean_path = "ocean_model/z0_ocean_model_smol.onnx",
-        land_path = "land_model/rf_z0_land_model.onnx",
+        land_path = "land_model/xgb_land",
         kwargs...
     )
 
@@ -72,9 +72,10 @@ function LearnedSurfaceRoughness(
     end
 
     ocean_model = ONNXRunTime.load_inference(full_ocean_path)
-    land_model = ONNXRunTime.load_inference(full_land_path)
+    # land_model = ONNXRunTime.load_inference(full_land_path)
+    land_model = XGBoost.load(XGBoost.Booster, full_land_path)
 
-    return LearnedSurfaceRoughness{SG.NF, typeof(ocean_model)}(;
+    return LearnedSurfaceRoughness{SG.NF, typeof(ocean_model), typeof(land_model)}(;
         ocean_model = ocean_model,
         land_model = land_model,
         kwargs...
@@ -82,7 +83,7 @@ function LearnedSurfaceRoughness(
 end
 
 Adapt.@adapt_structure LearnedSurfaceRoughness
-LearnedSurfaceRoughness(SG::SpectralGrid, kwargs...) = LearnedSurfaceRoughness{SG.NF}(; kwargs...)
+LearnedSurfaceRoughness(SG::SpectralGrid, kwargs...) = LearnedSurfaceRoughness{SG.NF, OM, LM}(; kwargs...)
 initialize!(::LearnedSurfaceRoughness, ::PrimitiveEquation) = nothing
 
 @propagate_inbounds function surface_roughness_land(ij, scheme::ConstantSurfaceRoughness, diagn, progn)
@@ -96,22 +97,15 @@ end
 @propagate_inbounds function surface_roughness_land(ij, scheme::LearnedSurfaceRoughness, diagn, progn)
     vₕ = diagn.physics.land.vegetation_high[ij]
     vₗ = diagn.physics.land.vegetation_low[ij]
-    g = diagn.dynamics.geopotential[ij]
+    g = diagn.grid.geopotential[ij, 8]  # surface layer
     sd = progn.land.snow_depth[ij]
 
-    raw_inputs = [vₕ, vₗ, g, sd]
+    raw_inputs = Float32[vₕ vₗ g sd]
     inputs_norm = Float32.(real.((raw_inputs .- scheme.land_input_means) ./ scheme.land_input_stds))
-    # predictors = reshape(inputs_norm, 1, 4)
-    # input = Dict("float_input" => predictors)
-
-    # # Run Inference using the model stored in the struct
-    # prediction = scheme.land_model(input)["variable"][1]
-
-    # log_surface_roughness = (prediction * L_OUTPUT_STD) + L_OUTPUT_MEAN
-    # surface_roughness = exp(log_surface_roughness)
+    # surface_roughness = XGBoost.predict(scheme.land_model, raw_inputs)[1]
 
     # Symbolic regression replacement expression
-    surface_roughness = ((cos(inputs_norm[4]) / 0.1970652) ^ -7.5047336) * ((inputs_norm[1] + (2.305061 ^ sin(inputs_norm[1]))) ^ (1.3223927 ^ (0.3254184 ^ inputs_norm[2])))
+    surface_roughness = min(max(0.0045800665, min(inputs_norm[1] / max(inputs_norm[2], 1.4739709), (1.2306644 + inputs_norm[4]) / -0.0021820515)), max(1.2238768 - inputs_norm[2], 0.6677175))
     return Float32(max(surface_roughness, 1.2999999e-3))
 end
 
