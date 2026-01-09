@@ -1,0 +1,69 @@
+using EnzymeTestUtils, Enzyme
+import EnzymeTestUtils: test_approx
+import AbstractFFTs
+using FiniteDifferences
+
+grid_types = [FullGaussianGrid, OctahedralGaussianGrid] # one full and one reduced grid, both Gaussian to have exact transforms
+grid_dealiasing = [2, 3]
+fd_tests = [true, true]
+
+# currently there's an issue with EnzymeTestUtils not being able to work with structs with undefined fields like FFT plans
+# https://github.com/EnzymeAD/Enzyme.jl/issues/1992
+# This is a very hacky workaround
+function EnzymeTestUtils.test_approx(x::AbstractFFTs.Plan, y::AbstractFFTs.Plan, msg; kwargs...)
+    EnzymeTestUtils.@test_msg "$msg: types must match" typeof(x) == typeof(y)
+    names = fieldnames(typeof(x))[1:(end - 1)] # exclude pinv field (which is the last field)
+    if isempty(names)
+        EnzymeTestUtils.@test_msg msg x == y
+    else
+        for k in names
+            if k isa Symbol && hasproperty(x, k)
+                msg_new = "$msg: ::$(typeof(x)).$k"
+            else
+                msg_new = "$msg: getfield(::$(typeof(x)), $k)"
+            end
+            EnzymeTestUtils.test_approx(getfield(x, k), getfield(y, k), msg_new; kwargs...)
+        end
+    end
+    return nothing
+end
+
+@testset "SpeedyTransforms: AD Rules" begin
+    @testset "_fourier! Enzyme rules" begin
+        @testset "EnzymeTestUtils reverse rule test" begin
+            for (i_grid, Grid) in enumerate(grid_types)
+
+                # these tests don't pass for reduced grids
+                # this is likely due to FiniteDifferences and not our EnzymeRules
+                # see comments in https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/589
+                if !(Grid <: AbstractReducedGrid) & fd_tests[i_grid]
+                    trunc = 5
+                    spectrum = Spectrum(trunc, one_degree_more = true)
+                    grid = Grid(SpeedyTransforms.get_nlat_half(trunc, grid_dealiasing[i_grid]))
+                    S = SpectralTransform(spectrum, grid)
+                    field = rand(grid)
+                    f_north = S.scratch_memory.north
+                    f_south = S.scratch_memory.south
+
+                    # forward transform
+                    test_reverse(
+                        SpeedyTransforms._fourier!, Const,
+                        (f_north, Duplicated), (f_south, Duplicated), (field, Duplicated), (S, Const);
+                        fdm = FiniteDifferences.central_fdm(5, 1), rtol = 1.0e-2, atol = 1.0e-2,
+                    )
+
+                    # inverse transform
+                    field = zero(field)
+                    test_reverse(
+                        SpeedyTransforms._fourier!, Const,
+                        (field, Duplicated), (f_north, Duplicated), (f_south, Duplicated), (S, Const);
+                        fdm = FiniteDifferences.central_fdm(5, 1), rtol = 1.0e-2, atol = 1.0e-2,
+                    )
+                end
+            end
+        end
+    end
+    @testset "Complete Transform ChainRules" begin
+        # WIP
+    end
+end

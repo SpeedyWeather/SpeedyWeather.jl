@@ -44,10 +44,10 @@ vorticity ``\zeta`` (which is the sole prognostic variable in the
 barotropic vorticity model) as
 
 ```math
-ζ(λ, θ) = 2ω*\sin(θ) - K*\sin(θ)*\cos(θ)^m*(m^2 + 3m + 2)*\cos(m*λ)
+ζ(λ, θ) = 2ω \sin(θ) - K \sin(θ) \cos(θ)^m (m^2 + 3m + 2) \cos(m λ)
 ```
 with longitude ``\lambda`` and latitude ``\theta``. The parameters
-are zonal wavenumber (order) ``m = 4``, frequencies ``\omega = 7.848e-6s^{-1}, K = 7.848e-6s^{-1}``.
+are zonal wavenumber (order) ``m = 4``, frequencies ``\omega = 7.848 \times 10^{-6}~s^{-1}``, ``K = 7.848  \times 10^{-6}~s^{-1}``.
 Now setting these initial conditions is as simple as
 
 ```@example haurwitz
