@@ -157,7 +157,7 @@ You can choose name and unit as you like, e.g. `SpeedyWeather.HumidityOutput(uni
 the compression options, e.g. `SpeedyWeather.HumidityOutput(keepbits = 5)` but more customisation
 is discussed in [Customizing netCDF output](@ref).
 
-We can add new output variables with `add!` 
+We can add new output variables with `add!`
 
 ```@example netcdf
 output = NetCDFOutput(spectral_grid)            # default variables
@@ -185,7 +185,7 @@ the key would change accordingly to `:divergence`.
 Mean sea-Level pressure (`mslp`), surface temperature (`tsurf`) and 10m winds (`u10`, `v10`) are computed
 specifically for the output. If these output variables are not requested then they will not be computed.
 
-**Mean sea-level pressure** is computed as 
+**Mean sea-level pressure** is computed as
 
 ```math
 p_{surf} \exp\left(\frac{g h}{R_d T_v}\right)
@@ -292,7 +292,7 @@ The actual options are declared as `[OPTION]` in the following
 
 The saved NetCDF files can be visualized with a wide range of tools, both in Julia, but also in other languages. In order to get a quick view into a NetCDF file, you can use command line tools like `ncview`. For actual visualizations in Julia, it's easy to use [NCDatasets.jl](https://github.com/JuliaGeo/NCDatasets.jl) for accessing the data and [GeoMakie.jl](https://github.com/JuliaGeo/GeoMakie.jl) for plotting it. For a standard animation we already provide the `animate` function within SpeedyWeather.jl's GeoMakie extension that makes it easy to animate a variable from a NetCDF output file or a `Simulation` object, as seen below:
 
-```@example netcdf 
+```@example netcdf
 using SpeedyWeather, GeoMakie, CairoMakie
 spectral_grid = SpectralGrid()
 model = PrimitiveWetModel(spectral_grid)
@@ -305,15 +305,16 @@ run!(simulation, period=Day(3), output=false) # some spin-up
 run!(simulation, period=Day(5), output=true)
 
 # animate mean sea-level pressure
-animate(simulation, output_file="test_mslp_animation.mp4", variable="mslp") 
+animate(simulation, output_file="test_mslp_animation.mp4", variable="mslp")
+nothing # hide
 ```
 ![test_mslp_animation](test_mslp_animation.mp4)
 
 
 For 3D variables you can provide e.g. `level=1` as keyword argumen to `animate`
-to specify the vertical level to visualise. For more options for `animate`, see below: 
+to specify the vertical level to visualise. For more options for `animate`, see below:
 
-```@example netcdf 
+```@example netcdf
 @doc SpeedyWeather.animate
 ```
 

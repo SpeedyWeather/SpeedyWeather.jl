@@ -14,7 +14,7 @@ know where the flow is not divergence-free, meaning that the horizontally
 converging or diverging motion is balanced by a vertical velocity.
 This leads to the variable ``\partial \sigma / \partial t``, which
 is the equivalent of [Vertical velocity](@ref) in the [Sigma coordinates](@ref).
-This variable is calculated and stored at every time step in 
+This variable is calculated and stored at every time step in
 
 ```julia
 simulation.diagnostic_variables.dynamics.σ_tend
@@ -67,7 +67,7 @@ dispatch we need to constrain the first argument's type to
 the simulation object.
 
 ```@example netcdf_custom
-SpeedyWeather.path(::VerticalVelocityOutput, simulation) = 
+SpeedyWeather.path(::VerticalVelocityOutput, simulation) =
     simulation.diagnostic_variables.dynamics.σ_tend
 ```
 
