@@ -36,7 +36,7 @@ $(TYPEDFIELDS)"""
     # DYNAMICS
     geometry::GE = Geometry(spectral_grid)
     planet::PL = Earth(spectral_grid)
-    atmosphere::AT = EarthAtmosphere(spectral_grid)
+    atmosphere::AT = EarthDryAtmosphere(spectral_grid)
     coriolis::CO = Coriolis(spectral_grid)
     forcing::FR = KolmogorovFlow(spectral_grid)
     drag::DR = LinearVorticityDrag(spectral_grid)

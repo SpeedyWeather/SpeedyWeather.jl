@@ -103,7 +103,6 @@ export transform, transform!
 export curl, divergence, curl!, divergence!
 export ∇, ∇², ∇⁻², ∇!, ∇²!, ∇⁻²!
 export power_spectrum
-export spectral_truncation, spectral_truncation!
 
 import SpeedyTransforms: prettymemory
 
@@ -156,7 +155,6 @@ include("dynamics/random_process.jl")
 # PARAMETERIZATIONS
 include("physics/albedo.jl")
 include("physics/tendencies.jl")
-include("physics/thermodynamics.jl")
 include("physics/vertical_diffusion.jl")
 include("physics/large_scale_condensation.jl")
 include("physics/surface_fluxes/boundary_layer.jl")

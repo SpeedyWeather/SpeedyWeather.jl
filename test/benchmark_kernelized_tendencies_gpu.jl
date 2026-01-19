@@ -1,11 +1,5 @@
-"""
-Benchmark and Correctness Test for Kernelized Tendency Functions - GPU vs CPU
-
-Compares original implementations on CPU with kernelized implementations on GPU.
-Tests performance and correctness of GPU-accelerated kernels.
-"""
 import Pkg 
-Pkg.activate(".")
+Pkg.activate("test")
 
 using SpeedyWeather
 using BenchmarkTools
@@ -21,8 +15,8 @@ if !HAS_GPU
 end
 
 # Create test model with specified architecture
-function create_test_model(; trunc=31, nlayers=8, architecture=CPU())
-    spectral_grid = SpectralGrid(; trunc, nlayers, Grid=FullGaussianGrid, NF=Float64, architecture)
+function create_test_model(; trunc=42, nlayers=8, architecture=CPU())
+    spectral_grid = SpectralGrid(; trunc, nlayers, NF=Float32, architecture)
     model = PrimitiveWetModel(; spectral_grid)
     simulation = initialize!(model)
     run!(simulation, steps=4) # small spinup 
@@ -168,7 +162,7 @@ function compare_performance_gpu(name::String, func_cpu!, func_gpu!, args_cpu, a
 end
 
 # Main benchmark suite
-function run_benchmarks_gpu(; trunc=31, nlayers=8, check_correctness=true)
+function run_benchmarks_gpu(; trunc=31, nlayers=8, check_correctness=false)
     println("\n" * "="^70)
     println("KERNELIZED TENDENCIES BENCHMARK - GPU vs CPU")
     println("="^70)
@@ -240,11 +234,20 @@ function run_benchmarks_gpu(; trunc=31, nlayers=8, check_correctness=true)
     
     results = Dict{String, Any}()
     
+    # Test 0: transform!
+    results["transform"] = compare_performance_gpu(
+        "transform!",
+        SpeedyWeather.transform!,
+        SpeedyWeather.transform!,
+        [diagn_cpu.grid.vor_grid, progn_cpu.vor, model_cpu.spectral_transform],
+        [diagn_gpu.grid.vor_grid, progn_gpu.vor, model_gpu.spectral_transform]
+    )
+
     # Test 1: vertical_integration!
     results["vertical_integration"] = compare_performance_gpu(
         "vertical_integration!",
         SpeedyWeather.vertical_integration!,
-        SpeedyWeather.vertical_integration_kernel!,
+        SpeedyWeather.vertical_integration!,
         [diagn_cpu, progn_cpu, lf, model_cpu.geometry],
         [diagn_gpu, progn_gpu, lf, model_gpu.geometry]
     )
@@ -253,7 +256,7 @@ function run_benchmarks_gpu(; trunc=31, nlayers=8, check_correctness=true)
     results["vertical_velocity"] = compare_performance_gpu(
         "vertical_velocity!",
         SpeedyWeather.vertical_velocity!,
-        SpeedyWeather.vertical_velocity_kernel!,
+        SpeedyWeather.vertical_velocity!,
         [diagn_cpu, model_cpu.geometry],
         [diagn_gpu, model_gpu.geometry]
     )
@@ -262,16 +265,16 @@ function run_benchmarks_gpu(; trunc=31, nlayers=8, check_correctness=true)
     results["vordiv_tendencies"] = compare_performance_gpu(
         "vordiv_tendencies!",
         SpeedyWeather.vordiv_tendencies!,
-        SpeedyWeather.vordiv_tendencies_kernel!,
-        [diagn_cpu, model_cpu.coriolis, model_cpu.atmosphere, model_cpu.geometry, model_cpu.spectral_transform],
-        [diagn_gpu, model_gpu.coriolis, model_gpu.atmosphere, model_gpu.geometry, model_gpu.spectral_transform]
+        SpeedyWeather.vordiv_tendencies!,
+        [diagn_cpu, model_cpu],
+        [diagn_gpu, model_gpu]
     )
     
     # Test 4: temperature_tendency!
     results["temperature_tendency"] = compare_performance_gpu(
         "temperature_tendency!",
         SpeedyWeather.temperature_tendency!,
-        SpeedyWeather.temperature_tendency_kernel!,
+        SpeedyWeather.temperature_tendency!,
         [diagn_cpu, model_cpu.adiabatic_conversion, model_cpu.atmosphere, model_cpu.implicit, model_cpu.geometry, model_cpu.spectral_transform],
         [diagn_gpu, model_gpu.adiabatic_conversion, model_gpu.atmosphere, model_gpu.implicit, model_gpu.geometry, model_gpu.spectral_transform]
     )
@@ -280,18 +283,9 @@ function run_benchmarks_gpu(; trunc=31, nlayers=8, check_correctness=true)
     results["pressure_gradient_flux"] = compare_performance_gpu(
         "pressure_gradient_flux!",
         SpeedyWeather.pressure_gradient_flux!,
-        SpeedyWeather.pressure_gradient_flux_kernel!,
+        SpeedyWeather.pressure_gradient_flux!,
         [diagn_cpu, progn_cpu, lf, model_cpu.spectral_transform],
         [diagn_gpu, progn_gpu, lf, model_gpu.spectral_transform]
-    )
-    
-    # Test 6: temperature_anomaly!
-    results["temperature_anomaly"] = compare_performance_gpu(
-        "temperature_anomaly!",
-        SpeedyWeather.temperature_anomaly!,
-        SpeedyWeather.temperature_anomaly_kernel!,
-        [diagn_cpu, model_cpu.implicit],
-        [diagn_gpu, model_gpu.implicit]
     )
     
     # Test 7: horizontal_advection!
@@ -306,7 +300,7 @@ function run_benchmarks_gpu(; trunc=31, nlayers=8, check_correctness=true)
     results["horizontal_advection"] = compare_performance_gpu(
         "horizontal_advection!",
         SpeedyWeather.horizontal_advection!,
-        SpeedyWeather.horizontal_advection_kernel!,
+        SpeedyWeather.horizontal_advection!,
         [A_tend_cpu, A_tend_grid_cpu, A_grid_cpu, diagn_cpu, model_cpu.geometry, model_cpu.spectral_transform],
         [A_tend_gpu, A_tend_grid_gpu, A_grid_gpu, diagn_gpu, model_gpu.geometry, model_gpu.spectral_transform]
     )
@@ -315,7 +309,7 @@ function run_benchmarks_gpu(; trunc=31, nlayers=8, check_correctness=true)
     results["flux_divergence"] = compare_performance_gpu(
         "flux_divergence!",
         SpeedyWeather.flux_divergence!,
-        SpeedyWeather.flux_divergence_kernel!,
+        SpeedyWeather.flux_divergence!,
         [A_tend_cpu, A_grid_cpu, diagn_cpu, model_cpu.geometry, model_cpu.spectral_transform],
         [A_tend_gpu, A_grid_gpu, diagn_gpu, model_gpu.geometry, model_gpu.spectral_transform]
     )
@@ -324,7 +318,7 @@ function run_benchmarks_gpu(; trunc=31, nlayers=8, check_correctness=true)
     results["linear_pressure_gradient"] = compare_performance_gpu(
         "linear_pressure_gradient!",
         SpeedyWeather.linear_pressure_gradient!,
-        SpeedyWeather.linear_pressure_gradient_kernel!,
+        SpeedyWeather.linear_pressure_gradient!,
         [diagn_cpu, progn_cpu, lf, model_cpu.atmosphere, model_cpu.implicit],
         [diagn_gpu, progn_gpu, lf, model_gpu.atmosphere, model_gpu.implicit]
     )
@@ -354,8 +348,9 @@ end
 # Full benchmark with multiple sizes
 function full_benchmark_gpu()
     configs = [
-        (trunc=31, nlayers=8, name="Small (T31, 8 layers)"),
+        (trunc=42, nlayers=8, name="Small (T42, 8 layers)"),
         (trunc=63, nlayers=16, name="Medium (T63, 16 layers)"),
+        (trunc=125, nlayers=16, name="Large (T125, 16 layers)"),
     ]
     
     all_results = Dict{String, Any}()

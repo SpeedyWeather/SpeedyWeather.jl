@@ -61,7 +61,7 @@ initialize!(::SurfaceOceanHumidityFlux, ::PrimitiveWet) = nothing
 
     # SATURATION HUMIDITY OVER OCEAN
     pₛ = diagn.grid.pres_grid_prev[ij]          # surface pressure [Pa]
-    sat_humid_ocean = saturation_humidity(SST, pₛ, model.clausius_clapeyron)
+    sat_humid_ocean = saturation_humidity(SST, pₛ, model.atmosphere)
 
     ρ = diagn.physics.surface_air_density[ij]
     V₀ = diagn.physics.surface_wind_speed[ij]
@@ -119,7 +119,7 @@ initialize!(::SurfaceLandHumidityFlux, ::PrimitiveWet) = nothing
 
     # SATURATION HUMIDITY OVER LAND
     pₛ = diagn.grid.pres_grid_prev[ij]          # surface pressure [Pa]
-    sat_humid_land = saturation_humidity(T, pₛ, model.clausius_clapeyron)
+    sat_humid_land = saturation_humidity(T, pₛ, model.atmosphere)
 
     ρ = diagn.physics.surface_air_density[ij]
     V₀ = diagn.physics.surface_wind_speed[ij]
