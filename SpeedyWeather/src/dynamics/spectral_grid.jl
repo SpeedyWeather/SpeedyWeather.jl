@@ -292,4 +292,4 @@ end
 Base.Nothing(::SpectralGrid) = Nothing()
 
 # we do not actually want to adapt SpectralGrid
-Adapt.adapt_structure(to, sg::SpectralGrid) = nothing 
+Adapt.adapt_structure(to, sg::SpectralGrid) = nothing

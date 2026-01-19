@@ -43,10 +43,10 @@ with drag coefficients. Fields are $(TYPEDFIELDS)"""
     use_boundary_layer_drag::Bool = true
 
     "[OPTION] Or fixed drag coefficient for heat fluxes over ocean"
-    @param drag::NF = 0.9e-3 (bounds=Nonnegative,)
+    @param drag::NF = 0.9e-3 (bounds = Nonnegative,)
 
     "[OPTION] Sea ice insulating surface heat fluxes [1]"
-    @param sea_ice_insulation::NF = 0.01 (bounds=Positive,)
+    @param sea_ice_insulation::NF = 0.01 (bounds = Positive,)
 end
 
 Adapt.@adapt_structure SurfaceOceanHeatFlux
@@ -95,7 +95,7 @@ end
 
 
 export SurfaceLandHeatFlux
- 
+
 """Surface sensible heat flux parameterization over land. Calculates the 
 turbulent exchange of sensible heat between the land surface and the atmosphere
 based on soil temperature differences and wind speed. Uses bulk aerodynamic 
@@ -106,10 +106,10 @@ Fields are $(TYPEDFIELDS)"""
     use_boundary_layer_drag::Bool = true
 
     "[OPTION] Or fixed drag coefficient for heat fluxes over land"
-    @param drag::NF = 1.2e-3 (bounds=Nonnegative,)       # for neutral stability
+    @param drag::NF = 1.2e-3 (bounds = Nonnegative,)       # for neutral stability
 
     "[OPTION] Snow insulation depth [m], e-folding depth reducing surface heat fluxes"
-    @param snow_insulation_depth::NF = 0.05 (bounds=Positive,)
+    @param snow_insulation_depth::NF = 0.05 (bounds = Positive,)
 end
 
 Adapt.@adapt_structure SurfaceLandHeatFlux

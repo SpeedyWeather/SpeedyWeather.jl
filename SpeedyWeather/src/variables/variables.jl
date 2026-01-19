@@ -196,4 +196,4 @@ get_diagnostic_variables(model::AbstractModel) = get_diagnostic_variables(variab
 # initialize a NamedTuple from variables
 function initialize_variables(SG::SpectralGrid, nlayers::Integer, variables...)
     return NamedTuple{Tuple(map(v -> v.name, variables))}(Tuple(map(var -> zero(var, SG, nlayers), variables)))
-end 
+end

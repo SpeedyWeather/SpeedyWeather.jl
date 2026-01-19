@@ -275,16 +275,16 @@ function Base.fill!(progn::PrognosticVariables, value::Number)
     # ocean
     for (key, var) in pairs(progn.ocean)
         var .= value
-    end 
+    end
 
     # land
     for (key, var) in pairs(progn.land)
         var .= value
-    end 
+    end
 
     # fill tracers
-    for (key, var) in pairs(progn.tracers) 
-        for value_i in var # istep of nsteps tuple 
+    for (key, var) in pairs(progn.tracers)
+        for value_i in var # istep of nsteps tuple
             value_i .= value
         end
     end

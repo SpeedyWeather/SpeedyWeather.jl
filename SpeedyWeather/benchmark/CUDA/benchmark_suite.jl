@@ -62,4 +62,4 @@ function run_benchmark_suite!(suite::BenchmarkSuiteTransform)
     end
 
     return suite
-end 
+end

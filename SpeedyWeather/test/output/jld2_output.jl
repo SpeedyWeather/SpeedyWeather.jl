@@ -36,4 +36,4 @@ using JLD2
     @test final_output.humid == simulation.prognostic_variables.humid
     @test final_output.pres == simulation.prognostic_variables.pres
     @test final_output.temp == simulation.prognostic_variables.temp
-end 
+end
