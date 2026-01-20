@@ -2,7 +2,7 @@ abstract type AbstractVegetation <: AbstractLandComponent end
 
 export NoVegetation
 struct NoVegetation <: AbstractVegetation end
-NoVegetation(SG::SpectralGrid, geometry::LandGeometry=nothing) = NoVegetation()
+NoVegetation(SG::SpectralGrid, geometry::LandGeometry = nothing) = NoVegetation()
 initialize!(vegetation::NoVegetation, model::PrimitiveEquation) = nothing
 
 function initialize!(

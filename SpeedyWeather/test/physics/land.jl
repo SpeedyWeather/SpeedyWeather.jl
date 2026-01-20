@@ -25,7 +25,7 @@ end
         for SoilMoisture in (Nothing, SeasonalSoilMoisture, LandBucketMoisture)
             for Vegetation in (NoVegetation, VegetationClimatology)
                 for Model in (PrimitiveDryModel, PrimitiveWetModel)
-                    
+
                     geometry = LandGeometry(spectral_grid)
                     temperature = Temperature(spectral_grid, geometry)
                     soil_moisture = SoilMoisture(spectral_grid, geometry)
