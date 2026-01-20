@@ -169,9 +169,9 @@ end
 Adapt.@adapt_structure LandBucketMoisture
 LandBucketMoisture(SG::SpectralGrid; kwargs...) = LandBucketMoisture{SG.NF}(; kwargs...)
 function initialize!(soil::LandBucketMoisture, model::PrimitiveEquation)
-    (; nlayers_soil) = model.spectral_grid
-    @assert nlayers_soil == 2 "LandBucketMoisture only works with 2 soil layers " *
-        "but spectral_grid.nlayers_soil = $nlayers_soil given. Ignoring additional layers."
+    (; nlayers) = model.land.geometry
+    @assert nlayers == 2 "LandBucketMoisture only works with 2 soil layers " *
+        "but geometry.nlayers = $nlayers given. Ignoring additional layers."
 
     return nothing
 end
