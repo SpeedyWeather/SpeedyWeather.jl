@@ -246,4 +246,4 @@ function write_results(md, suite::AbstractBenchmarkSuiteTimed)
         end
     end
     return
-end 
+end

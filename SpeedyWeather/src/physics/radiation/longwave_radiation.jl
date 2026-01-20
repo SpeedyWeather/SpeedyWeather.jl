@@ -17,10 +17,10 @@ Fields are $(TYPEDFIELDS)"""
     time_scale::Second = Hour(16)
 
     "[OPTION] temperature [K] below which stratospheric relaxation is applied"
-    @param temp_min::NF = 207.5 (bounds=Positive,)
+    @param temp_min::NF = 207.5 (bounds = Positive,)
 
     "[OPTION] target temperature [K] of stratospheric relaxation"
-    @param temp_stratosphere::NF = 200 (bounds=Positive,)
+    @param temp_stratosphere::NF = 200 (bounds = Positive,)
 
     "[OPTION] time scale of stratospheric relaxation"
     time_scale_stratosphere::Second = Day(5)
@@ -68,19 +68,19 @@ Fields are
 $(TYPEDFIELDS)"""
 @parameterized @kwdef struct JeevanjeeRadiation{NF} <: AbstractLongwave
     "[OPTION] Radiative forcing constant (W/m²/K²)"
-    @param α::NF = 0.025 (bounds=Nonnegative,)
+    @param α::NF = 0.025 (bounds = Nonnegative,)
 
     "[OPTION] Emissivity of the atmosphere [1]"
     emissivity_atmosphere::NF = 0
 
     "[OPTION] Emissivity for surface flux over ocean [1]"
-    @param emissivity_ocean::NF = 0.65 (bounds=0..1,)
+    @param emissivity_ocean::NF = 0.65 (bounds = 0 .. 1,)
 
     "[OPTION] Emissivity for surface flux over land [1]"
-    @param emissivity_land::NF = 0.6 (bounds=0..1,)
+    @param emissivity_land::NF = 0.6 (bounds = 0 .. 1,)
 
     "[OPTION] Tropopause temperature [K]"
-    @param temp_tropopause::NF = 200 (bounds=Positive,)
+    @param temp_tropopause::NF = 200 (bounds = Positive,)
 
     "[OPTION] Tropopause relaxation time scale to temp_tropopause"
     time_scale::Second = Hour(24)

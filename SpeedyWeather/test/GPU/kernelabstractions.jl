@@ -97,4 +97,4 @@ import SpeedyWeather: on_architecture, CPU, launch!, SpectralWorkOrder, RingGrid
         @test A ≈ expected
     end
 
-end 
+end

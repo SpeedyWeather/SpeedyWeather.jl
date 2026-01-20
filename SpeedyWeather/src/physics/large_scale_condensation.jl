@@ -5,22 +5,22 @@ export ImplicitCondensation
 $(TYPEDFIELDS)"""
 @parameterized @kwdef struct ImplicitCondensation{NF} <: AbstractCondensation
     "[OPTION] Relative humidity threshold [1 = 100%] to trigger condensation"
-    @param relative_humidity_threshold::NF = 0.95 (bounds=0..1,)
+    @param relative_humidity_threshold::NF = 0.95 (bounds = 0 .. 1,)
 
     "[OPTION] Reevaporation efficiency [1/(kg/kg)], 0 for no reevaporation"
-    @param reevaporation::NF = 30 (bounds=Nonnegative,)
+    @param reevaporation::NF = 30 (bounds = Nonnegative,)
 
     "[OPTION] Convert rain below freezing to snow?"
     snow::Bool = true
 
     "[OPTION] Freezing temperature for snow fall [K]"
-    @param freezing_threshold::NF = 263 (bounds=Positive,)
+    @param freezing_threshold::NF = 263 (bounds = Positive,)
 
     "[OPTION] Melting temperature for snow fall [K]"
-    @param melting_threshold::NF = 278 (bounds=Positive,)
+    @param melting_threshold::NF = 278 (bounds = Positive,)
 
     "[OPTION] Time scale in multiples of time step Δt, the larger the less immediate"
-    @param time_scale::NF = 3 (bounds=Positive,)
+    @param time_scale::NF = 3 (bounds = Positive,)
 end
 
 Adapt.@adapt_structure ImplicitCondensation

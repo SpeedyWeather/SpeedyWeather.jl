@@ -43,10 +43,10 @@ export SurfaceOceanHumidityFlux
     use_boundary_layer_drag::Bool = true
 
     "[OPTION] Or fixed drag coefficient for humidity flux over ocean"
-    @param drag::NF = 0.9e-3 (bounds=0..1,)
+    @param drag::NF = 0.9e-3 (bounds = 0 .. 1,)
 
     "[OPTION] Sea ice insulating surface humidity fluxes [1]"
-    @param sea_ice_insulation::NF = 0.01 (bounds=0..1,)
+    @param sea_ice_insulation::NF = 0.01 (bounds = 0 .. 1,)
 end
 
 Adapt.@adapt_structure SurfaceOceanHumidityFlux
@@ -101,10 +101,10 @@ export SurfaceLandHumidityFlux
     use_boundary_layer_drag::Bool = true
 
     "[OPTION] Or fixed drag coefficient for humidity flux over land"
-    @param drag::NF = 1.2e-3 (bounds=0..1,)
+    @param drag::NF = 1.2e-3 (bounds = 0 .. 1,)
 
     "[OPTION] Snow insulation depth [m], e-folding depth controlling how snow insulates surface humidity fluxes"
-    @param snow_insulation_depth::NF = 0.05 (bounds=0..1,)
+    @param snow_insulation_depth::NF = 0.05 (bounds = 0 .. 1,)
 end
 
 Adapt.@adapt_structure SurfaceLandHumidityFlux
