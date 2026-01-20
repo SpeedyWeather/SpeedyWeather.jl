@@ -34,30 +34,30 @@ function run_benchmark_suite!(suite::BenchmarkSuiteTransform)
         trunc = suite.trunc[i]
         nlayers = suite.nlayers[i]
         Grid = suite.Grid[i]
-        device = suite.model[i]
+        architecture = suite.model[i]
 
-        spectral_grid = SpectralGrid(; NF, trunc, Grid, nlayers, device)
+        spectral_grid = SpectralGrid(; NF, trunc, Grid, nlayers, architecture)
         suite.nlat[i] = spectral_grid.nlat
         S = SpectralTransform(spectral_grid)
 
         specs, grids = generate_random_inputs(spectral_grid)
 
-        println("Running benchmark for device=$device, trunc=$trunc, nlayers=$nlayers, NF=$NF \n")
+        println("Running benchmark for architecture=$architecture, trunc=$trunc, nlayers=$nlayers, NF=$NF \n")
 
         # Forward _legendre
-        b = @benchmark CUDA.@sync SpeedyTransforms._legendre!($specs, $S.scratch_memory_north, $S.scratch_memory_south, $S)
+        b = @benchmark CUDA.@sync SpeedyTransforms._legendre!($specs, $S.scratch_memory.north, $S.scratch_memory.south, $S.scratch_memory.column, $S)
         add_results!(suite, b, i, 1)
 
         # Inverse _legendre
-        b = @benchmark CUDA.@sync SpeedyTransforms._legendre!($S.scratch_memory_north, $S.scratch_memory_south, $specs, $S)
+        b = @benchmark CUDA.@sync SpeedyTransforms._legendre!($S.scratch_memory.north, $S.scratch_memory.south, $specs, $S.scratch_memory.column, $S)
         add_results!(suite, b, i, 2)
 
         # Forward _fourier!(..., grids, S)
-        b = @benchmark CUDA.@sync SpeedyTransforms._fourier!($S.scratch_memory_north, $S.scratch_memory_south, $grids, $S)
+        b = @benchmark CUDA.@sync SpeedyTransforms._fourier!($S.scratch_memory.north, $S.scratch_memory.south, $grids, $S)
         add_results!(suite, b, i, 3)
 
         # Reverse _fourier!(grids, ..., S)
-        b = @benchmark CUDA.@sync SpeedyTransforms._fourier!($grids, $S.scratch_memory_north, $S.scratch_memory_south, $S)
+        b = @benchmark CUDA.@sync SpeedyTransforms._fourier!($grids, $S.scratch_memory.north, $S.scratch_memory.south, $S)
         add_results!(suite, b, i, 4)
     end
 
@@ -98,7 +98,7 @@ function run_benchmark_suite!(suite::BenchmarkSuiteModel)
         progn, diagn, model = SpeedyWeather.unpack(simulation)
         fill!(diagn.tendencies, 0, typeof(model))
 
-        println("Running benchmark for device=$architecture, trunc=$trunc, nlayers=$nlayers, NF=$NF \n")
+        println("Running benchmark for architecture=$architecture, trunc=$trunc, nlayers=$nlayers, NF=$NF \n")
 
         b = @benchmark CUDA.@sync SpeedyWeather.parameterization_tendencies!($diagn, $progn, $model)
         add_results!(suite, b, i, 1)
