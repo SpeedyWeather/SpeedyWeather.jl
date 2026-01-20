@@ -26,11 +26,11 @@ end
             for Vegetation in (NoVegetation, VegetationClimatology)
                 for Model in (PrimitiveDryModel, PrimitiveWetModel)
                     
-                    geometry = LandGeometry(spectral_grid) # 2 because of bucket models as an "upper bound", allocating too much is not a problem
+                    geometry = LandGeometry(spectral_grid)
                     temperature = Temperature(spectral_grid, geometry)
                     soil_moisture = SoilMoisture(spectral_grid, geometry)
                     vegetation = Vegetation(spectral_grid, geometry)
-                    land = LandModel(spectral_grid; temperature, soil_moisture, vegetation)
+                    land = LandModel(spectral_grid; geometry, temperature, soil_moisture, vegetation)
                     model = Model(spectral_grid; land)
 
                     # just test that no errors are thrown
@@ -52,7 +52,7 @@ end
 
             geometry = LandGeometry(spectral_grid)
             snow = Snow(spectral_grid, geometry)
-            land = LandModel(spectral_grid; snow)
+            land = LandModel(spectral_grid; geometry, snow)
             model = Model(spectral_grid; land)
 
             # just test that no errors are thrown
