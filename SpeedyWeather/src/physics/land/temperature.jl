@@ -144,7 +144,7 @@ export ConstantLandTemperature
 end
 
 # generator function
-ConstantLandTemperature(SG::SpectralGrid; kwargs...) = ConstantLandTemperature{SG.NF}(; kwargs...)
+ConstantLandTemperature(SG::SpectralGrid, geometry::LandGeometry; kwargs...) = ConstantLandTemperature{SG.NF}(; kwargs...)
 
 initialize!(land::ConstantLandTemperature, model::PrimitiveEquation) = nothing
 function initialize!(
