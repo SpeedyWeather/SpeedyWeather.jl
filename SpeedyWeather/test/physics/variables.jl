@@ -27,6 +27,7 @@
 
     # check that the variables are there and have the right dimension
     progn, diagn, model = SpeedyWeather.unpack(simulation)
+    
     @test haskey(diagn.physics, :myvar_grid2d)
     @test ndims(diagn.physics.myvar_grid2d) == 1
     @test haskey(diagn.physics, :myvar_grid3d)

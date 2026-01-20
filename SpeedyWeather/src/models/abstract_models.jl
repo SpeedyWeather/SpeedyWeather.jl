@@ -87,6 +87,7 @@ These are the GPU-compatible components of the model."""
     # Extract parameterization symbols from the type
     params_type = fieldtype(ModelType, :params)
     param_names = params_type.parameters[1]  # Extract tuple from Val{tuple}
+    
     # Generate literal field accesses for type stability
     return :(NamedTuple{$param_names}(tuple($([:(model.$name) for name in param_names]...))))
 end

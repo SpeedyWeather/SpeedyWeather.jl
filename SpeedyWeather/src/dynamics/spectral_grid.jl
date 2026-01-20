@@ -216,6 +216,7 @@ function SpectralGrid(
     VectorType = array_type(architecture, NF, 1)
     MatrixType = array_type(architecture, NF, 2)
     TensorType = array_type(architecture, NF, 3)
+    
     VectorIntType = array_type(architecture, Int, 1)
     MatrixIntType = array_type(architecture, Int, 2)
     TensorIntType = array_type(architecture, Int, 3)

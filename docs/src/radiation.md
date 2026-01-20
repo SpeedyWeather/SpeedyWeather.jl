@@ -255,7 +255,6 @@ nothing # hide
 
 ![Surface shortwave radiation down](ssrd.png)
 
-
 ```@example radiation
 osr = simulation.diagnostic_variables.physics.outgoing_shortwave
 heatmap(osr,title="Outgoing shortwave radiation [W/m^2]")
