@@ -9,47 +9,44 @@ import FFTW
 import GenericFFT
 import LinearAlgebra
 import Primes
+
+# GPU
+import GPUArrays: GPUArrays, AbstractGPUArray
 import Adapt: Adapt, adapt, adapt_structure
 import KernelAbstractions: @kernel, @index, @Const, synchronize
 import Atomix
 
-# GPU
-import GPUArrays: GPUArrays, AbstractGPUArray
-
 # SPEEDYWEATHER MODULES
 using SpeedyWeatherInternals.Architectures
 using SpeedyWeatherInternals.Utils
-
 using RingGrids
-
 using LowerTriangularArrays
-import LowerTriangularArrays: lm2i, get_lm_range, get_2lm_range
 
 # TRANSFORM
-export  SpectralTransform,
-        transform!,
-        transform
+export SpectralTransform,
+    transform!,
+    transform
 
 # ALIASING
-export  get_nlat_half
+export get_nlat_half
 
 # GRADIENTS
-export  curl,
-        divergence,
-        curl!,
-        divergence!,
-        UV_from_vor!,
-        UV_from_vordiv!,
-        ∇²!, ∇⁻²!, ∇!,
-        ∇², ∇⁻², ∇
+export curl,
+    divergence,
+    curl!,
+    divergence!,
+    UV_from_vor!,
+    UV_from_vordiv!,
+    ∇²!, ∇⁻²!, ∇!,
+    ∇², ∇⁻², ∇
 
 # TRUNCATION
-export  spectral_truncation,
-        spectral_truncation!,
-        spectral_interpolation
+export spectral_truncation,
+    spectral_truncation!,
+    spectral_interpolation
 
 # ANALYSIS
-export  power_spectrum
+export power_spectrum
 
 include("aliasing.jl")
 include("legendre_shortcuts.jl")

@@ -1,7 +1,7 @@
 # Orography
 
 Orography (in height above the surface) forms the surface boundary of the
-lowermost layer in SpeedyWeather. 
+lowermost layer in SpeedyWeather.
 
 In the [shallow-water equations](@ref shallow_water_model) the orography
 ``H_b`` enters the equations when computing the layer thickness ``h = \eta + H_0 - H_b``
@@ -33,7 +33,7 @@ using InteractiveUtils # hide
 using SpeedyWeather
 subtypes(SpeedyWeather.AbstractOrography)
 ```
-which are 
+which are
 
 - ``\Phi_s = z_s = H_b = 0`` for `NoOrography`
 - For `ZonalRidge` the zonal ridge from the Jablonowski and Williamson initial conditions, see [Jablonowski-Williamson baroclinic wave](@ref)
@@ -89,7 +89,7 @@ The easiest to load another orography from a netCDF file is to reuse the
 `EarthOrography`, e.g.
 
 ```julia
-mars_orography = EarthOrography(spectal_grid, 
+mars_orography = EarthOrography(spectal_grid,
                                 path="path/to/my/orography",
                                 file="mars_orography.nc",
                                 file_Grid=FullClenshawGrid)
@@ -161,12 +161,13 @@ in the surface geopotential `orography.surface_geopotential`
 ```@example orography
 transform!(orography.surface_geopotential, orography.orography, model.spectral_transform)
 orography.surface_geopotential .*= model.planet.gravity
-spectral_truncation!(orography.surface_geopotential)
+SpeedyTransforms.spectral_truncation!(orography.surface_geopotential)
 nothing # hide
 ```
 
 In the first line, the surface geopotential is still missing the gravity,
 which is multiplied in the second line. The `spectral_truncation!`
+(`export`ed only when `using SpeedyTransforms`)
 removes the ``l_{max}+1`` degree of the spherical harmonics
 as illustrated in the spectral representation or the surface geopotential
 here. This is because scalar fields do not use that last degree,
@@ -274,7 +275,7 @@ function SpeedyWeather.initialize!(
     # given orography we just set
     transform!(surface_geopotential, orography, model.spectral_transform)
     surface_geopotential .*= model.planet.gravity
-    spectral_truncation!(surface_geopotential)
+    SpeedyTransforms.spectral_truncation!(surface_geopotential)
     return nothing
 end
 ```

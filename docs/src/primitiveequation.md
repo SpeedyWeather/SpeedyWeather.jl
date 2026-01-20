@@ -46,9 +46,9 @@ the following sections.
     effect of humidity on the density while replacing density through the
     ideal gas law with temperature.
 
-We assume the atmosphere to be composed of two ideal gases: Dry air and water vapour.
+We assume the atmosphere to be composed of two ideal gases: Dry air and water vapor.
 Given a specific humidity ``q`` both gases mix, their pressures ``p_d``, ``p_w``
-(``d`` for dry, ``w`` for water vapour), and densities ``\rho_d, \rho_w`` add in a given
+(``d`` for dry, ``w`` for water vapor), and densities ``\rho_d, \rho_w`` add in a given
 air parcel that has temperature ``T``. The ideal gas law then holds for both gases
 ```math
 \begin{aligned}
@@ -65,13 +65,13 @@ p = p_d + p_w = (\rho_d R_d + \rho_w R_w)T
 We ultimately want to replace the density ``\rho = \rho_w + \rho_d`` in the dynamical core,
 using the ideal gas law, with the temperature ``T``, so that we never have
 to calculate the density explicitly. However, in order to not deal with
-two densities (dry air and water vapour) we would like to replace
+two densities (dry air and water vapor) we would like to replace
 temperature with a virtual temperature that includes the effect of
 humidity on the density. So, wherever we use the ideal gas law
 to replace density with temperature, we would use the virtual temperature,
 which is a function of the absolute temperature and specific humidity,
 instead. A higher specific humidity in an air parcel lowers
-the density as water vapour is lighter than dry air. Consequently,
+the density as water vapor is lighter than dry air. Consequently,
 the virtual temperature of moist air is higher than its absolute temperature
 because warmer air is lighter too at constant pressure. We therefore
 think of the virtual temperature as the temperature dry air would need to have
@@ -89,7 +89,7 @@ Now we identify
 ```math
 \mu = \frac{1 - \tfrac{R_d}{R_w}}{\tfrac{R_d}{R_w}}
 ```
-as some constant that is positive for water vapour being lighter than dry air
+as some constant that is positive for water vapor being lighter than dry air
 (``\tfrac{R_d}{R_w} = \tfrac{m_w}{m_d} < 1``) and
 ```math
 q = \frac{\rho_w}{\rho_w + \rho_d}
