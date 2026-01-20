@@ -127,7 +127,7 @@ function Base.show(io::IO, SG::SpectralGrid)
     println(io, "├ Resolution:    $(s(average_degrees))°, $(s(average_resolution))km (at $(radius_str)km radius)")
     nparticles > 0 &&
         println(io, "├ Particles:     $nparticles")
-    println(io, "├ Vertical:      $nlayers-layer atmosphere, $nlayers_soil-layer land")
+    println(io, "├ Vertical:      $nlayers-layer atmosphere")
     return print(io, "└ Architecture:  $architecture using $ArrayType")
 end
 
@@ -143,7 +143,6 @@ function SpectralGrid(;
         dealiasing::Real = 2,
         nparticles::Int = 0,
         nlayers::Int = DEFAULT_NLAYERS,
-        nlayers_soil::Int = DEFAULT_NLAYERS_SOIL
     )
 
     # Convert architecture to instance if it is a type
@@ -175,7 +174,6 @@ function SpectralGrid(
         dealiasing::Real = 2,
         nparticles::Int = 0,
         nlayers::Int = DEFAULT_NLAYERS,
-        nlayers_soil::Int = DEFAULT_NLAYERS_SOIL
     )
     architecture = grid.architecture
 
@@ -197,7 +195,6 @@ function SpectralGrid(
         dealiasing,
         nparticles,
         nlayers::Int,
-        nlayers_soil::Int
     )
     @assert spectrum.architecture == grid.architecture "Architecture of grid and spectrum must match"
 
@@ -216,7 +213,7 @@ function SpectralGrid(
     VectorType = array_type(architecture, NF, 1)
     MatrixType = array_type(architecture, NF, 2)
     TensorType = array_type(architecture, NF, 3)
-    
+
     VectorIntType = array_type(architecture, Int, 1)
     MatrixIntType = array_type(architecture, Int, 2)
     TensorIntType = array_type(architecture, Int, 3)
