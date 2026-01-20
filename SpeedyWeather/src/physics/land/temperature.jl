@@ -268,7 +268,7 @@ end
 
     if mask[ij] > 0                         # at least partially land
         (; Lᵥ, Lᵢ, γ, Cw, Cs, z₁, z₂, Δ, Δt) = params
-        
+
         # Cooling from snow melt rate, in [W/m²] = [J/kg] * [kg/m²/s]
         Q_melt = isnothing(M) ? zero(Lᵢ) : Lᵢ * M[ij]
 

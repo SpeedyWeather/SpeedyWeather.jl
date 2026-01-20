@@ -9,7 +9,7 @@
 
             model = Model(spectral_grid; land)
             initialize!(model.land, model)
-            
+
             progn = PrognosticVariables(model)
             diagn = DiagnosticVariables(model)
             SpeedyWeather.land_timestep!(progn, diagn, model)
