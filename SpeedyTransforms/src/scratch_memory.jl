@@ -27,8 +27,6 @@ end
 
 Adapt.@adapt_structure ScratchMemory
 
-Adapt.@adapt_structure ScratchMemory
-
 function ScratchMemory(
         ::Type{NF},
         architecture::AbstractArchitecture,

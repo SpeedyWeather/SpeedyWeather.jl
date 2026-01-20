@@ -251,8 +251,9 @@ ssrd = simulation.diagnostic_variables.physics.surface_shortwave_down
 heatmap(ssrd,title="Surface shortwave radiation down [W/m^2]")
 save("ssrd.png", ans) # hide
 nothing # hide
-# show ![Surface shortwave radiation down](ssrd.png)
 ```
+
+![Surface shortwave radiation down](ssrd.png)
 
 
 ```@example radiation
@@ -260,8 +261,9 @@ osr = simulation.diagnostic_variables.physics.outgoing_shortwave
 heatmap(osr,title="Outgoing shortwave radiation [W/m^2]")
 save("osr.png", ans) # hide
 nothing # hide
-# show ![Outgoing shortwave radiation](osr.png)
 ```
+
+![Outgoing shortwave radiation](osr.png)
 
 **For dry models (no water vapor or clouds):**
 
@@ -279,8 +281,9 @@ ssrd = simulation.diagnostic_variables.physics.surface_shortwave_down
 heatmap(ssrd, title="Surface shortwave radiation (dry model) [W/m^2]")
 save("ssrd_dry.png", ans) # hide
 nothing # hide
-# show ![Surface shortwave radiation (dry model)](ssrd_dry.png)
 ```
+
+![Surface shortwave radiation (dry model)](ssrd_dry.png)
 
 ### Parameterization options
 
@@ -328,7 +331,7 @@ Sets ``\tau_k^{SR} = 1`` for all layers and bands, effectively skipping atmosphe
 
 The `DiagnosticClouds` scheme includes a `use_stratocumulus` flag (default: `true`) that enables the diagnostic stratocumulus cloud parameterization over oceans:
 
-```julia
+```@example radiation
 using SpeedyWeather, CairoMakie
 
 spectral_grid = SpectralGrid()
@@ -341,8 +344,9 @@ ssrd = sim.diagnostic_variables.physics.surface_shortwave_down
 heatmap(ssrd, title="No stratocumulus clouds [W/m^2]")
 save("oneband_no_stratocumulus.png", ans) # hide
 nothing # hide
-# show ![No stratocumulus clouds](oneband_no_stratocumulus.png)
 ```
+
+![No stratocumulus clouds](oneband_no_stratocumulus.png)
 
 ## References
 

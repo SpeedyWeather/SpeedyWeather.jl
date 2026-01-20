@@ -71,11 +71,6 @@ function initialize!(
     return initialize!(ocean, progn, diagn, model.sea_ice, model)
 end
 
-# variable that AbstractOcean requires
-variables(::AbstractOcean) =
-    (PrognosticVariable(name=:sea_surface_temperature, dims=Grid2D(),
-        namespace=:ocean, units="K", desc="Sea surface temperature"),)
-
 # function barrier for all oceans
 function ocean_timestep!(
         progn::PrognosticVariables,

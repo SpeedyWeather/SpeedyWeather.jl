@@ -269,11 +269,6 @@ end
         # [kg/m²/s] -> [m/s] for humidity flux H and snow melt rate S
         F = P[ij] + (S[ij] - H[ij]) / ρ
 
-        # Soil top sources and sinks
-        # note: rain water can increase soil moisture regardless of snow cover
-        # [kg/m²/s] -> [m/s] for humidity flux H and snow melt rate S
-        F = P[ij] + (S[ij] - H[ij])/ρ
-  
         # vertical diffusion term between layers
         D = τ⁻¹ * (soil_moisture[ij, 1] - soil_moisture[ij, 2])
 

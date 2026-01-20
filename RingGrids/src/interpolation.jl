@@ -27,8 +27,6 @@ GridGeometry(field::AbstractField; kwargs...) = GridGeometry(field.grid; NF = el
 
 Adapt.@adapt_structure GridGeometry
 
-Adapt.@adapt_structure GridGeometry
-
 """
 $(TYPEDSIGNATURES)
 Precomputed arrays describing the geometry of the Grid with resolution `nlat_half`.

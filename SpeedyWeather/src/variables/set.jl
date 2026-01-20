@@ -85,11 +85,7 @@ function set!(
         if size(var) == size(L)
             var .+= L
         else
-<<<<<<<< HEAD:src/variables/set.jl
-            L_var = spectral_truncation(L, size(var, 1, as = Matrix), size(var, 2, as = Matrix))
-========
             L_var = SpeedyTransforms.spectral_truncation(L, size(var, 1, as = Matrix), size(var, 2, as = Matrix))
->>>>>>>> main:SpeedyWeather/src/variables/set.jl
             var .+= L_var
         end
     else
