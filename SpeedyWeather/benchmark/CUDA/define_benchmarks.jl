@@ -10,7 +10,6 @@ benchmarks[:benchmark100] = BenchmarkSuiteTransform(
     model = fill(CPU(), 3),
 )
 
-
 benchmarks[:benchmark101] = BenchmarkSuiteTransform(
     title = "Transform benchmarks, GPU",
     nruns = 3,
@@ -29,7 +28,7 @@ benchmarks[:benchmark200] = BenchmarkSuiteModel(
     architecture = fill(CPU(), 5),
 )
 
-benchmarks[:benchmark200] = BenchmarkSuiteModel(
+benchmarks[:benchmark201] = BenchmarkSuiteModel(
     title = "PrimitiveWet benchmarks, GPU",
     nruns = 3,
     trunc = [31, 63, 127, 255, 511],
