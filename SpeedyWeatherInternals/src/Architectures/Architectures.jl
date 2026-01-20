@@ -90,11 +90,11 @@ array_type(::CPU) = Array
 array_type(::Type{<:CPU}) = Array
 
 """
-      array_type(::AbstractArchitecture, NF::Type, N::Int)
+    array_type(::AbstractArchitecture, NF::Type, N::Int)
 
-  Return the concrete array type that's used with the architecture 
-  for a number type `NF` and dimension `N`.
-  """
+Return the concrete array type that's used with the architecture 
+for a number type `NF` and dimension `N`.
+"""
 array_type(::CPU, NF::Type, N::Int) = Array{NF, N}
 
 """

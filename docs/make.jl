@@ -8,7 +8,7 @@ makedocs(
         collapselevel = 1,
         canonical = "https://speedyweather.github.io/SpeedyWeatherDocumentation/stable/",
         size_threshold = 600_000        # in bytes
-    ),      
+    ),
     sitename = "SpeedyWeather.jl",
     authors = "M Klöwer and SpeedyWeather contributors",
     modules = [SpeedyWeather, SpeedyWeatherInternals, LowerTriangularArrays, RingGrids, SpeedyTransforms],
@@ -93,7 +93,8 @@ for pattern in [r"\.jld2", r"\.nc"]
 end
 
 
- deploydocs(repo = "github.com/SpeedyWeather/SpeedyWeather.jl",
+deploydocs(
+    repo = "github.com/SpeedyWeather/SpeedyWeather.jl",
     deploy_repo = "github.com/SpeedyWeather/SpeedyWeatherDocumentation",
     devbranch = "main",
     push_preview = true,

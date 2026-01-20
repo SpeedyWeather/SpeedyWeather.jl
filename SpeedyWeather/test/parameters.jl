@@ -60,7 +60,7 @@ end
     ## Partial reconstruction: κ not in patch, so it retains original value
     @test new_model2.atmosphere.κ ≈ model.atmosphere.κ  # κ unchanged in partial reconstruction
     # Full reconstruction: κ is in the parameter vector, so it gets doubled like other parameters
-    new_model_ps_full = 2*vec(parameters(model))
+    new_model_ps_full = 2 * vec(parameters(model))
     new_model_full = @inferred reconstruct(model, new_model_ps_full)
     @test new_model_full.atmosphere.κ ≈ 2 * model.atmosphere.κ  # κ doubled in full reconstruction
     # regression test for 20aa240611:

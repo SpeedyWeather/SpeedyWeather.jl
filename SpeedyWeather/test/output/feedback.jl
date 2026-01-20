@@ -22,4 +22,4 @@
     # test that files are created even if output=false
     @test isfile(joinpath(tmp_output_path, "parameters.txt"))
     @test isfile(joinpath(tmp_output_path, "progress.txt"))
-end 
+end

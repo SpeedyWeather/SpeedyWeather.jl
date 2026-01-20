@@ -53,4 +53,3 @@ using Dates: CompoundPeriod, Day, Hour, Minute, Second, Millisecond, coarserperi
     @test readable_secs(1.23) == CompoundPeriod(Second(1), Millisecond(230))
     @test readable_secs(0.123) == CompoundPeriod(Second(0), Millisecond(120))
 end
-

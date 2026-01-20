@@ -2,7 +2,7 @@
     @testset for NF in (Float32, Float64)
         @testset for nlayers in (1, 2)
             trunc = 31
-            spectrum = Spectrum(trunc, one_degree_more=true)
+            spectrum = Spectrum(trunc, one_degree_more = true)
             grid = OctahedralGaussianGrid(SpeedyTransforms.get_nlat_half(trunc))
             S = SpectralTransform(spectrum, grid; NF, nlayers)
 
@@ -15,8 +15,8 @@
 
             # obtain u,v on grid
             SpeedyTransforms.UV_from_vordiv!(U, V, vor, div, S)
-            u = transform(U, S, unscale_coslat=true)
-            v = transform(V, S, unscale_coslat=true)
+            u = transform(U, S, unscale_coslat = true)
+            v = transform(V, S, unscale_coslat = true)
 
             # check we've actually created non-zero u,v excl coslat scaling
             @test all(u .!= 0)
@@ -27,8 +27,8 @@
             V2 = zero(V)
 
             SpeedyTransforms.UV_from_vor!(U2, V2, vor, S)
-            u2 = transform(U2, S, unscale_coslat=true)
-            v2 = transform(V2, S, unscale_coslat=true)
+            u2 = transform(U2, S, unscale_coslat = true)
+            v2 = transform(V2, S, unscale_coslat = true)
 
             @test u == u2
             @test v == v2
@@ -37,7 +37,7 @@
             RingGrids.scale_coslat⁻¹!(v)
 
             û = zero(U)
-            v̂ = zero(V) 
+            v̂ = zero(V)
 
             transform!(û, u, S)
             transform!(v̂, v, S)
@@ -55,7 +55,7 @@ end
     @testset for NF in (Float32, Float64)
         @testset for nlayers in (1, 2)
             trunc = 31
-            spectrum = Spectrum(trunc, one_degree_more=true)
+            spectrum = Spectrum(trunc, one_degree_more = true)
             grid = OctahedralGaussianGrid(SpeedyTransforms.get_nlat_half(trunc))
             S = SpectralTransform(spectrum, grid; NF, nlayers)
 
@@ -68,8 +68,8 @@ end
 
             # obtain u,v on grid
             SpeedyTransforms.UV_from_vordiv!(U, V, vor, div, S)
-            u = transform(U, S, unscale_coslat=true)
-            v = transform(V, S, unscale_coslat=true)
+            u = transform(U, S, unscale_coslat = true)
+            v = transform(V, S, unscale_coslat = true)
 
             # check we've actually created non-zero u,v excl coslat scaling
             @test all(u .!= 0)
@@ -79,7 +79,7 @@ end
             RingGrids.scale_coslat⁻¹!(v)
 
             û = zero(U)
-            v̂ = zero(V) 
+            v̂ = zero(V)
 
             transform!(û, u, S)
             transform!(v̂, v, S)
@@ -151,7 +151,7 @@ end
     @testset for NF in (Float32, Float64)
 
         trunc = 15
-        spectrum = Spectrum(15, one_degree_more=true)
+        spectrum = Spectrum(15, one_degree_more = true)
         grid = OctahedralGaussianGrid(SpeedyTransforms.get_nlat_half(trunc))
         S = SpectralTransform(spectrum, grid; NF)
 
@@ -162,16 +162,16 @@ end
         # general divergence properties
         @test D[1] == 0         # zero mean
 
-        for m in 1:trunc+1      # last degree is also zero
-            @test D[trunc+2, m] == 0
+        for m in 1:(trunc + 1)      # last degree is also zero
+            @test D[trunc + 2, m] == 0
         end
 
         # same for curl
         ζ = curl(U, V, S)
         @test ζ[1] == 0         # zero mean
 
-        for m in 1:trunc+1      # last degree is also zero
-            @test ζ[trunc+2, m] == 0
+        for m in 1:(trunc + 1)      # last degree is also zero
+            @test ζ[trunc + 2, m] == 0
         end
     end
 end
@@ -180,7 +180,7 @@ end
     @testset for NF in (Float32, Float64)
 
         trunc = 15
-        spectrum = Spectrum(15, one_degree_more=true)
+        spectrum = Spectrum(15, one_degree_more = true)
         grid = OctahedralGaussianGrid(SpeedyTransforms.get_nlat_half(trunc))
         S = SpectralTransform(spectrum, grid; NF)
 
@@ -188,13 +188,13 @@ end
         V = randn(Complex{NF}, spectrum)
 
         R = 10
-        D1 = divergence(U, V, S, radius=R)
+        D1 = divergence(U, V, S, radius = R)
         D2 = divergence(U, V, S)
-        @test D1 ≈ D2/R
+        @test D1 ≈ D2 / R
 
-        ζ1 = curl(U, V, S, radius=R)
+        ζ1 = curl(U, V, S, radius = R)
         ζ2 = curl(U, V, S)
-        @test ζ1 ≈ ζ2/R
+        @test ζ1 ≈ ζ2 / R
     end
 end
 
@@ -203,13 +203,13 @@ end
         @testset for nlayers in (1, 2)
 
             trunc = 31
-            spectrum = Spectrum(trunc, one_degree_more=true)
+            spectrum = Spectrum(trunc, one_degree_more = true)
             grid = OctahedralGaussianGrid(SpeedyTransforms.get_nlat_half(trunc))
             S = SpectralTransform(spectrum, grid; NF, nlayers)
 
             vor = randn(complex(NF), spectrum, nlayers)
             div = randn(complex(NF), spectrum, nlayers)
-            
+
             zero_last_degree!(vor)   # needed?
             zero_last_degree!(div)   # needed?
 
@@ -218,22 +218,22 @@ end
             div[1, :] .= 0
 
             # set imaginary component of m=0 to 0 as the rotation of zonal modes is arbitrary
-            vor[1:trunc+2, :] .= real(vor[1:trunc+2, :])
-            div[1:trunc+2, :] .= real(div[1:trunc+2, :])
+            vor[1:(trunc + 2), :] .= real(vor[1:(trunc + 2), :])
+            div[1:(trunc + 2), :] .= real(div[1:(trunc + 2), :])
 
             U = zero(div)
             V = zero(div)
 
             # obtain u,v on grid
             SpeedyTransforms.UV_from_vordiv!(U, V, vor, div, S)
-            u = transform(U, S, unscale_coslat=true)
-            v = transform(V, S, unscale_coslat=true)
+            u = transform(U, S, unscale_coslat = true)
+            v = transform(V, S, unscale_coslat = true)
 
             RingGrids.scale_coslat⁻¹!(u)
             RingGrids.scale_coslat⁻¹!(v)
 
             û = zero(U)
-            v̂ = zero(V) 
+            v̂ = zero(V)
 
             transform!(û, u, S)
             transform!(v̂, v, S)
@@ -242,7 +242,7 @@ end
             div2 = divergence(û, v̂, S)
 
             # increased to 30 as 10, 20 caused single fails every now and then
-            tol = 30*sqrt(eps(NF))
+            tol = 30 * sqrt(eps(NF))
             for lm in eachindex(vor, div, vor2, div2)
                 @test vor[lm] ≈ vor2[lm] rtol = tol
                 @test div[lm] ≈ div2[lm] rtol = tol
@@ -308,7 +308,7 @@ end
         @testset for NF in (Float32, Float64)
 
             trunc = 31
-            spectrum = Spectrum(trunc, one_degree_more=true)
+            spectrum = Spectrum(trunc, one_degree_more = true)
             grid = FullGaussianGrid(SpeedyTransforms.get_nlat_half(trunc))
             S = SpectralTransform(spectrum, grid; NF, nlayers)
 

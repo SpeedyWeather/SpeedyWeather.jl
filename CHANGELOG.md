@@ -10,7 +10,7 @@
 - Fix bug in parameter subsetting [#960](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/960)
 - Follow-up to #783: finalize @param/@component markers [#935](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/935)
 - Adjust fill!(::PrognosticVariables, x) to new variable system [#949](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/949)
-- Code formatting with Runic applied [#950](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/950)
+- Code formatting with Runic applied [#950](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/950) [#964](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/964)
 - Implicit correction kernelized and GPU-ready [#891](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/891)
 - The dynamical core of the primitive equations is now GPU-ready with kernelized implementations [#934](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/934)
 - EarthDryAtmosphere to dispatch like PrimitiveDryModel inside kernels [#944](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/944)

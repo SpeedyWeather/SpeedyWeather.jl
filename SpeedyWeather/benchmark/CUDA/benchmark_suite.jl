@@ -112,4 +112,3 @@ function run_benchmark_suite!(suite::BenchmarkSuiteModel)
 
     return suite
 end 
-

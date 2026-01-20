@@ -36,4 +36,4 @@ import SpeedyWeather: array_type
 
     @test array_type(spec_gpu) <: array_type(arch_gpu) <: CUDA.CuArray
     @test typeof(spec_gpu.spectrum.architecture) <: typeof(arch_gpu) <: SpeedyWeather.GPU
-end 
+end

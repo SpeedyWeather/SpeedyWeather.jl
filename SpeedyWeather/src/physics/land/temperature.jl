@@ -137,7 +137,7 @@ end
 export ConstantLandTemperature
 @parameterized @kwdef struct ConstantLandTemperature{NF} <: AbstractLandTemperature
     "[OPTION] Globally constant temperature"
-    @param temperature::NF = 285 (bounds=Positive,)
+    @param temperature::NF = 285 (bounds = Positive,)
 
     "[OPTION] Apply land-sea mask to NaN ocean-only points?"
     mask::Bool = true

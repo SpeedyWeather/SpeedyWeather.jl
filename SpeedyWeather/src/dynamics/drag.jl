@@ -19,7 +19,7 @@ export LinearDrag
 $(TYPEDFIELDS)"""
 @parameterized @kwdef struct LinearDrag{NF, VectorType} <: AbstractDrag
     "[OPTION] Sigma coordinate below which linear drag is applied"
-    @param σb::NF = 0.7 (bounds=0..1,)
+    @param σb::NF = 0.7 (bounds = 0 .. 1,)
 
     "[OPTION] Time scale for linear drag coefficient at σ=1 (=1/kf in HS96)"
     time_scale::Second = Day(1)

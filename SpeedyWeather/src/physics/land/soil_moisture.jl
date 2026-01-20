@@ -156,13 +156,13 @@ $(TYPEDFIELDS)"""
     time_scale::Second = Day(2)
 
     "[OPTION] Infiltration fraction, that is, fraction of top layer runoff that is put into layer below [1]"
-    @param infiltration_fraction::NF = 0.25 (bounds=0..1,)
+    @param infiltration_fraction::NF = 0.25 (bounds = 0 .. 1,)
 
     "[OPTION] Apply land-sea mask to set ocean-only points?"
     mask::Bool = true
 
     "[OPTION] Initial soil moisture over ocean, volume fraction [1]"
-    @param ocean_moisture::NF = 0 (bounds=0..1,)
+    @param ocean_moisture::NF = 0 (bounds = 0 .. 1,)
 end
 
 Adapt.@adapt_structure LandBucketMoisture
