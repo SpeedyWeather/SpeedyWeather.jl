@@ -99,7 +99,7 @@ equivalent of the grid and resolution used in `SpectralGrid` `S`."""
 function NetCDFOutput(
         SG::SpectralGrid,
         Model::Type{<:AbstractModel} = Barotropic, 
-        land_geometry::LandGeometry = LandGeometry(SG, layers=DEFAULT_NLAYERS_SOIL);
+        land_geometry::LandGeometry = LandGeometry(SG, nlayers=DEFAULT_NLAYERS_SOIL);
         output_grid::AbstractFullGrid = on_architecture(CPU(), RingGrids.full_grid_type(SG.grid)(SG.grid.nlat_half)),
         output_NF::DataType = DEFAULT_OUTPUT_NF,
         output_dt::Period = Second(DEFAULT_OUTPUT_DT),  # only needed for dispatch
