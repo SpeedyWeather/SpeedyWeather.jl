@@ -285,7 +285,7 @@ function initialize!(
     lond = get_lond(output.field2D)
     latd = get_latd(output.field2D)
     σ = model.geometry.σ_levels_full
-    soil_indices = collect(1:model.spectral_grid.nlayers_soil)
+    soil_indices = collect(1:get_soil_layers(model))
 
     defVar(dataset, "lon", lond, ("lon",), attrib = Dict("units" => "degrees_east", "long_name" => "longitude"))
     defVar(dataset, "lat", latd, ("lat",), attrib = Dict("units" => "degrees_north", "long_name" => "latitude"))

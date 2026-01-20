@@ -183,7 +183,7 @@ Adapt.@adapt_structure LandBucketTemperature
 # generator function
 LandBucketTemperature(SG::SpectralGrid, geometry::LandGeometry; kwargs...) = LandBucketTemperature{SG.NF}(; kwargs...)
 function initialize!(land::LandBucketTemperature, model::PrimitiveEquation)
-    (; nlayers) = model.land.geometry
+    nlayers = get_soil_layers(model)
     @assert nlayers == 2 "LandBucketTemperature only works with 2 soil layers " *
         "but geometry.nlayers = $nlayers given. Ignoring additional layers."
     return nothing
