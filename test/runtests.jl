@@ -61,18 +61,15 @@ if !FLAG_EXTENDED_TESTS && !FLAG_ENZYME_TESTS
 
     # PHYSICS
     include("physics/variables.jl")
-    include("physics/custom_parametrization.jl")
+    include("physics/custom_parameterization.jl")
     include("physics/zenith.jl")
-    include("physics/column_variables.jl")
     include("physics/land_sea_mask.jl")
     include("physics/ocean_sea_ice.jl")
-    # include("thermodynamics.jl")
     include("physics/large_scale_condensation.jl")
     include("physics/convection.jl")
 
     include("physics/albedo.jl")
     include("physics/land.jl")
-    include("physics/transmittance.jl")
     include("physics/longwave_radiation.jl")
     include("physics/shortwave_radiation.jl")
     include("physics/surface_fluxes.jl")

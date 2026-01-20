@@ -36,9 +36,9 @@ end
 @propagate_inbounds parameterization!(ij, diagn, progn, sppt::StochasticallyPerturbedParameterizationTendencies, model) =
     sppt!(ij, diagn, sppt)
 
-"""$(TYPEDFIELDS)
-Apply stochastically perturbed parameterization tendencies to u, v, temperature and humidity
-in column ij."""
+"""$(TYPEDSIGNATURES)
+Apply stochastically perturbed parameterization tendencies (SPPT) to
+u, v, temperature and humidity in column ij."""
 @propagate_inbounds function sppt!(ij, diagn, sppt)
     
     r = diagn.grid.random_pattern[ij]

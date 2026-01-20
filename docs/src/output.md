@@ -230,11 +230,13 @@ SpeedyWeather.OceanOutput()
 SpeedyWeather.AllOutputVariabesl()
 ```
 
-each of them has to be splatted by appending `...`, e.g.
+each of can but doesn't have to be splatted e.g.
 
 ```@example netcdf
-add!(model, SpeedyWeather.SurfaceFluxesOutput()...)
+add!(model, SpeedyWeather.SurfaceFluxesOutput())
 ```
+
+or `SpeedyWeather.SurfaceFluxesOutput()...` are equivalent.
 
 ## Output path, identification and number
 

@@ -32,17 +32,18 @@ initialize!(radiation::UniformCooling, model::PrimitiveEquation) = nothing
 
 # function barrier
 @propagate_inbounds parameterization!(ij, diagn, progn, longwave::UniformCooling, model) =
-    longwave_radiation!(ij, diagn, progn, longwave)
+    longwave_radiation!(ij, diagn, longwave)
 
-@propagate_inbounds function longwave_radiation!(ij, diagn, progn, longwave::UniformCooling)
+@propagate_inbounds function longwave_radiation!(ij, diagn, longwave::UniformCooling)
+    
     T = diagn.grid.temp_grid_prev
     dTdt = diagn.tendencies.temp_tend_grid
-    (; temp_min, temp_stratosphere) = radiation
+    (; temp_min, temp_stratosphere) = longwave
     nlayers = size(T, 2)
     
     NF = eltype(T)
-    cooling = -inv(convert(NF, radiation.time_scale.value))
-    τ⁻¹ = inv(convert(NF, radiation.time_scale_stratosphere.value))
+    cooling = -inv(convert(NF, Second(longwave.time_scale).value))
+    τ⁻¹ = inv(convert(NF, Second(longwave.time_scale_stratosphere).value))
 
     for k in 1:nlayers
         # Paulius and Garner, 2006, eq (1) and (2)
@@ -71,14 +72,14 @@ $(TYPEDFIELDS)"""
     "[OPTION] Radiative forcing constant (W/m²/K²)"
     α::NF = 0.025
 
-    "[OPTION] Eemissivity of the atmosphere [1]"
-    emissivity_atmosphere::NF = 0.98
+    "[OPTION] Emissivity of the atmosphere [1]"
+    emissivity_atmosphere::NF = 0
 
-    "[OPTION] Effective emissivity for surface flux over ocean [1]"
-    emissivity_ocean::NF = 0.98
+    "[OPTION] Emissivity for surface flux over ocean [1]"
+    emissivity_ocean::NF = 0.65
 
-    "[OPTION] Effective emissivity for surface flux over land [1]"
-    emissivity_land::NF = 0.98
+    "[OPTION] Emissivity for surface flux over land [1]"
+    emissivity_land::NF = 0.6
 
     "[OPTION] Tropopause temperature [K]"
     temp_tropopause::NF = 200
@@ -101,7 +102,6 @@ initialize!(::JeevanjeeRadiation, ::PrimitiveEquation) = nothing
     dTdt = diagn.tendencies.temp_tend_grid
     pₛ = diagn.grid.pres_grid_prev[ij]                  # surface pressure [Pa]
     nlayers = size(T, 2)
-    (; temp_tend_grid) = diagn.tendencies
 
     (; α) = longwave
     τ⁻¹ = inv(convert(eltype(T), Second(longwave.time_scale).value))
@@ -144,14 +144,14 @@ initialize!(::JeevanjeeRadiation, ::PrimitiveEquation) = nothing
     end
 
     # Relax the uppermost level towards prescribed "tropopause temperature"
-    temp_tend_grid[ij, 1] += (Tₜ - T[ij, 1])*τ⁻¹
+    dTdt[ij, 1] += (Tₜ - T[ij, 1])*τ⁻¹
 
     # for diagnostic, use Fₖ as the outgoing longwave radiation although it's technically into the
     # uppermost layer from below (not out of it)
     diagn.physics.outgoing_longwave[ij] = Fₖ
 end
 
-function variables(::JeevanjeeRadiation)
+function variables(::AbstractLongwave)
     return (
         DiagnosticVariable(name=:surface_longwave_down, dims=Grid2D(), desc="Surface longwave radiation down", units="W/m^2"),
         DiagnosticVariable(name=:surface_longwave_up,   dims=Grid2D(), desc="Surface longwave radiation up over ocean", units="W/m^2", namespace=:ocean),
@@ -159,4 +159,140 @@ function variables(::JeevanjeeRadiation)
         DiagnosticVariable(name=:surface_longwave_up,   dims=Grid2D(), desc="Surface longwave radiation up",   units="W/m^2"),
         DiagnosticVariable(name=:outgoing_longwave,     dims=Grid2D(), desc="TOA Longwave radiation up",       units="W/m^2"),
     )
+end
+
+export OneBandLongwave
+"""One-band longwave radiation scheme with transmissivity and radiative transfer components.
+Following Frierson, 2006, JAS, https://doi.org/10.1175/JAS3706.1. Fields are $(TYPEDFIELDS)"""
+struct OneBandLongwave{T, R} <: AbstractLongwave
+    transmissivity::T
+    radiative_transfer::R
+end
+
+Adapt.@adapt_structure OneBandLongwave
+
+# primitive wet model version
+function OneBandLongwave(SG::SpectralGrid;
+    transmissivity = FriersonLongwaveTransmissivity(SG),
+    radiative_transfer = OneBandLongwaveRadiativeTransfer(SG),
+)
+    return OneBandLongwave(transmissivity, radiative_transfer)
+end
+
+# primitive dry model version
+export OneBandGreyLongwave
+function OneBandGreyLongwave(SG::SpectralGrid;
+    transmissivity = TransparentLongwaveTransmissivity(SG),
+    radiative_transfer = OneBandLongwaveRadiativeTransfer(SG),
+)
+    return OneBandLongwave(transmissivity, radiative_transfer)
+end
+
+function Base.show(io::IO, M::OneBandLongwave)
+    println(io, "OneBandLongwave <: AbstractLongwave")
+    properties = propertynames(M)
+    n = length(properties)
+    for (i, key) in enumerate(properties)
+        val = getfield(M, key)
+        s = i == n ? "└" : "├"  # choose ending └ for last property
+        p = i == n ? print : println
+        p(io, "$s $key: $(typeof(val))")
+    end
+end
+
+# initialize one after another
+function initialize!(radiation::OneBandLongwave, model::PrimitiveEquation)
+    initialize!(radiation.transmissivity, model)
+    initialize!(radiation.radiative_transfer, model)
+end
+
+@propagate_inbounds function parameterization!(ij, diagn, progn, radiation::OneBandLongwave, model)
+    # pass on array that was used to compute transmissivity (scratch array)
+    t = transmissivity!(ij, diagn, progn, radiation.transmissivity, model)
+    longwave_radiative_transfer!(ij, diagn, t, progn, radiation.radiative_transfer, model)
+end
+
+export OneBandLongwaveRadiativeTransfer
+
+"""Radiative transfer solver for OneBandLongwave radiation scheme.
+Computes longwave radiative transfer with upward and downward beams including surface fluxes.
+Fields are $(TYPEDFIELDS)"""
+@kwdef struct OneBandLongwaveRadiativeTransfer{NF} <: AbstractLongwaveRadiativeTransfer
+    "[OPTION] Emissivity for surface flux over ocean [1]"
+    emissivity_ocean::NF = 1
+
+    "[OPTION] Emissivity for surface flux over land [1]"
+    emissivity_land::NF = 1
+end
+
+Adapt.@adapt_structure OneBandLongwaveRadiativeTransfer
+
+# generator function
+OneBandLongwaveRadiativeTransfer(SG::SpectralGrid; kwargs...) = OneBandLongwaveRadiativeTransfer{SG.NF}(; kwargs...)
+initialize!(::OneBandLongwaveRadiativeTransfer, ::PrimitiveEquation) = nothing
+
+@propagate_inbounds function longwave_radiative_transfer!(
+    ij,
+    diagn,
+    transmissivity,
+    progn,
+    longwave::OneBandLongwaveRadiativeTransfer,
+    model,
+)
+    T = diagn.grid.temp_grid_prev
+    NF = eltype(T)
+    dTdt = diagn.tendencies.temp_tend_grid
+    pₛ = diagn.grid.pres_grid_prev[ij]                  # surface pressure [Pa]
+    nlayers = size(T, 2)
+
+    ϵ_ocean = longwave.emissivity_ocean
+    ϵ_land = longwave.emissivity_land
+    σ = model.atmosphere.stefan_boltzmann
+    cₚ = model.atmosphere.heat_capacity
+    
+    land_fraction = model.land_sea_mask.mask[ij]
+    sst = progn.ocean.sea_surface_temperature[ij]
+    lst = progn.land.soil_temperature[ij, 1]            # TODO use skin temperature?
+
+    U_ocean = isfinite(sst) ? ϵ_ocean*σ*sst^4 : zero(sst)      # [W/m²]
+    diagn.physics.ocean.surface_longwave_up[ij] = U_ocean      # for ocean model forcing
+
+    U_land = isfinite(lst) ? ϵ_land*σ*lst^4 : zero(lst)        # [W/m²]
+    diagn.physics.land.surface_longwave_up[ij] = U_land        # for land model forcing
+
+    # land-sea mask weighted combined flux from land and ocean (surface boundary condition)
+    U::NF = (1-land_fraction)*U_ocean + land_fraction*U_land
+    dTdt[ij, nlayers] += surface_flux_to_tendency(U/cₚ, pₛ, model)     # convert [W/m²] / cₚ to K·Pa/s
+    diagn.physics.surface_longwave_up[ij] = U                          # [W/m²] store for output/diagnostics
+
+    # UPWARD BEAM
+    for k in nlayers:-1:2
+        t = transmissivity[ij, k]
+        U = U*t + (1-t)*σ*T[ij, k]^4
+        dTdt[ij, k]   -= flux_to_tendency(U/cₚ, pₛ, k,   model)     # out of layer k
+        dTdt[ij, k-1] += flux_to_tendency(U/cₚ, pₛ, k-1, model)     # into layer k-1
+    end
+
+    # Outgoing longwave radiation at TOA
+    t = transmissivity[ij, 1]
+    U = U*t + (1-t) * σ*T[ij, 1]^4
+    dTdt[ij, 1] -= flux_to_tendency(U/cₚ, pₛ, 1,   model)           # out of layer 1
+    diagn.physics.outgoing_longwave[ij] = U
+    
+    # DOWNWARD BEAM
+    D::NF = 0               # top boundary condition (no longwave coming from space)
+    for k in 1:nlayers-1
+        t = transmissivity[ij, k]
+        D = D*t + (1-t) * σ*T[ij, k]^4
+        dTdt[ij, k]   -= flux_to_tendency(D/cₚ, pₛ, k,   model)     # out of layer k
+        dTdt[ij, k+1] += flux_to_tendency(D/cₚ, pₛ, k+1, model)     # into layer k+1
+    end
+
+    # Surface downward longwave radiation
+    t = transmissivity[ij, nlayers]
+    D = D*t + (1-t) * σ*T[ij, nlayers]^4
+    diagn.physics.surface_longwave_down[ij] = D
+    dTdt[ij, nlayers] -= surface_flux_to_tendency(D/cₚ, pₛ, model)   # out of layer k
+
+    return nothing
 end

@@ -103,6 +103,7 @@ export transform, transform!
 export curl, divergence, curl!, divergence!
 export ∇, ∇², ∇⁻², ∇!, ∇²!, ∇⁻²!
 export power_spectrum
+export spectral_truncation, spectral_truncation!
 
 import SpeedyTransforms: prettymemory
 
@@ -155,7 +156,6 @@ include("dynamics/random_process.jl")
 # PARAMETERIZATIONS
 include("physics/albedo.jl")
 include("physics/tendencies.jl")
-include("physics/column_variables.jl")
 include("physics/thermodynamics.jl")
 include("physics/vertical_diffusion.jl")
 include("physics/large_scale_condensation.jl")
@@ -167,16 +167,23 @@ include("physics/surface_fluxes/humidity.jl")
 include("physics/convection.jl")
 include("physics/zenith.jl")
 include("physics/radiation/shortwave_radiation.jl")
-include("physics/radiation/shortwave_transmittance.jl")
+include("physics/radiation/shortwave_transmissivity.jl")
 include("physics/radiation/clouds.jl")
 include("physics/radiation/longwave_radiation.jl")
-include("physics/radiation/longwave_transmittance.jl")
+include("physics/radiation/longwave_transmissivity.jl")
 include("physics/stochastic_physics.jl")
 
 # OCEAN AND LAND
 include("physics/ocean.jl")
 include("physics/sea_ice.jl")
 include("physics/land/land.jl")
+include("physics/land/geometry.jl")
+include("physics/land/thermodynamics.jl")
+include("physics/land/temperature.jl")
+include("physics/land/soil_moisture.jl")
+include("physics/land/snow.jl")
+include("physics/land/vegetation.jl")
+include("physics/land/rivers.jl")
 
 # OUTPUT
 include("output/schedule.jl")

@@ -26,8 +26,8 @@ and signatures they have to extend.
 
 ## Define your own parameterizations
 
-When defining a new paramerization it is required to subtype `AbstractParameterization` 
-and implement the [`variables`](@ref), [`initialize!`](@ref), and [`parameterization!`](@ref) 
+When defining a new paramerization it is required to subtype `AbstractParameterization`
+and extend the `variables`, `initialize!`, and `parameterization!` functions
 that define its behaviour. We'll first introduce the general idea here, before 
 giving a concrete example.
 
@@ -44,29 +44,41 @@ Instead, you can define new prognostic and diagnostic variables for the
 parameterization to write into with the `variables` function: 
 
 ```julia 
-variables(::MyParameterization) = (DiagnosticVariable(name=:flux_variable, dims=Grid2D(), units="W/m^2", desc="custom flux variable"), PrognosticVariable(name=:my_prognostic_variable, dims=Spectral2D(), units="K/s", desc="custom prognostic variable"))
+function variables(::MyParameterization)
+    return (
+        DiagnosticVariable(name=:flux_variable, dims=Grid2D(), units="W/m^2", desc="custom flux variable"),
+        PrognosticVariable(name=:my_prognostic_variable, dims=Spectral2D(), units="K/s", desc="custom prognostic variable"),
+    )
 ```
 
-In this example we allocate a new diagnostic variable `flux_variable` and a new prognostic variable `my_prognostic_variable` for our parameterization. The flux variable is defined as a two-dimensional
-variable on our grid, and the prognostic variable is defined as a spectral variable. Three-dimensional variables are also possible by using `Grid3D` and `Spectral3D` as `dims`.
+In this example we allocate a new diagnostic variable `flux_variable` and a new prognostic variable `my_prognostic_variable`
+for our parameterization. The flux variable is defined as a two-dimensional variable on our grid, and the prognostic variable
+is defined as a spectral variable. Three-dimensional variables are also possible by using `Grid3D` and `Spectral3D` as `dims`.
 
-These variables are then passed to the `parameterization!` function inside of the regular `PrognosticVariables` and `DiagnosticVariables` objects. Additionally, `DiagnosticVariables` has several work 
+These variables are then passed to the `parameterization!` function inside of the regular `PrognosticVariables` and
+`DiagnosticVariables` objects. Additionally, `DiagnosticVariables` has several work 
 arrays that you canreuse `diagn.grid.a` and `.b`, `.c`, `.d`. These work arrays have 
 an unknown state so you should overwrite every entry and you also should not use them 
 to retain information after that parameterization has been executed.
 
 ## Define the parameterization! function 
 
-The actual parameterization computation is defined in the [`parameterization!`](@ref) function. 
+The actual parameterization computation is defined in the `parameterization!` function. 
 This function takes in the prognostic and diagnostic variables as well as the model 
 object and should compute the tendencies and fluxes that are then accumulated into 
 the respective arrays. It is computed within a KernelAbstraction.jl kernel and therefore
 has to be defined with GPU support in mind. This means e.g. no dynamic dispatches, only scalar 
-indexing and ideally no allocations. For more details see [KernelAbstraction.jl](https://github.com/JuliaClimate/KernelAbstractions.jl) and our example parameterzations that we implemented. The signature of the function is 
+indexing and ideally no allocations. For more details see
+[KernelAbstraction.jl](https://github.com/JuliaClimate/KernelAbstractions.jl) and our example parameterzations that we implemented.
+The signature of the function is 
 
-```@docs 
-parameterization!(ij, diagn::DiagnosticVariables, progn::PrognosticVariables, parameterization::AbstractParameterization, model_parameters)
+```julia
+parameterization!(ij, diagn::DiagnosticVariables, progn::PrognosticVariables, parameterization::MyParameterization, model_parameters)
 ```
+
+Note that
+- albedos should extend `albedo!(ij, ...)` instead, see [Example: Albedo](@ref) below
+- `model_parameters` is a subset of `model` adapted to GPU and passed on as `NamedTuple` instead
 
 ## Accumulate do not overwrite
 
@@ -132,7 +144,6 @@ and [PrimitiveWetModel](@ref)
 - `model.convection`
 - `model.large_scale_condensation` (`PrimitiveWetModel` only)
 - `model.albedo`
-- `model.optical_depth`
 - `model.shortwave_radiation`
 - `model.longwave_radiation`
 - `model.boundary_layer_drag`
@@ -159,11 +170,21 @@ A parameterization is expected to implement the following functions:
 
 Our existing parameterizations also define further abstract subtypes of `AbstractParameterization` 
 that can also be used to used to reuse some of the functionality of existing parameterizations. 
-These include among others: `AbstractBoundaryLayers`, `AbstractLargeScaleCondensation`, `AbstractTemperatureRelaxation`, `AbstractVerticalDiffusion`,`AbstractConvection`, `AbstractAlbedo`, `AbstractOpticalDepth`, `AbstractShortwaveRadiation`, `AbstractLongwaveRadiation`, `AbstractBoundaryLayerDrag`, `AbstractSurfaceCondition`, `AbstractSurfaceMomentumFlux`, `AbstractSurfaceHeatFlux`, `AbstractSurfaceHumidityFlux`, `AbstractStochasticPhysics`, `AbstractSurfaceWind`. If you extend on these parameterizations, you can inherit from them and only need to implement the functions that are not already implemented by the parent parameterization. It's best to check the source code of the parent parameterization to see what functions are already implemented.
+These include:
+
+```@exaple parameterization
+using InteractiveUtils # hide
+subtypes(SpeedyWeather.AbstractParameterization)
+```
+
+If you extend on these parameterizations, you can inherit from them and only need to implement the functions 
+that are not already implemented by the parent parameterization.
+It's best to check the source code of the parent parameterization to see what functions are already implemented.
 
 ### Registering a new parameterization
 
-If you want to implement a new parameterization that doesn't replace an existing one, you can register it by providing a custom `parametrizations` tuple of symbols as a keyword argument to the model constructor. 
+If you want to implement a new parameterization that doesn't replace an existing one, you can register it by
+providing a custom `parametrizations` tuple of symbols as a keyword argument to the model constructor. 
 
 The default parameterizations of the `PrimitiveWetModel` currently are:
 
@@ -172,60 +193,80 @@ model = PrimitiveWetModel(spectral_grid)
 model.parameterizations
 ```
 
-You can change the order in which the parametrizations are executed by reordering the tuple or you can add your own, additional parametrization to the model by adding it with `custom_parameterization` keyword argument. Below we will demonstrate this in an example. 
+You can change the order in which the parametrizations are executed by reordering the tuple or you can add your own,
+additional parametrization to the model by adding it with `custom_parameterization` keyword argument.
+Below we will demonstrate this in an example. 
 
 ## Example: Albedo 
 
-Let's implement a very simple albedo parameterization as an example how to define a new parameterization. All this parametrization does is to set the albedo to a constant value over land and to linearly interpolate between the albedo of the ocean and the seaice depending on the current sea ice concentration. This albedo is written into the diagnostic variable `diagn.physics.albedo` and used later by subsequent parameterizations. 
+Let's implement a very simple albedo parameterization as an example how to define a new parameterization.
+All this parametrization does is to set the albedo to a constant value over land and to linearly interpolate
+between the albedo of the ocean and the sea ice depending on the current sea ice concentration.
+This albedo is written into the diagnostic variable `diagn.physics.albedo` and used later by subsequent parameterizations. 
 
 Let's get started. First we define our albedo parameterization with all the functions we need to implement for our parameterization interface: 
 
 ```@example custom-parameterization
 using SpeedyWeather, Adapt, CairoMakie
 
- @kwdef struct SimpleAlbedo{NF<:Number} <: SpeedyWeather.AbstractParameterization
-    land_albedo::NF=0.35
-    seaice_albedo::NF=0.6
-    ocean_albedo::NF=0.06
+@kwdef struct SimpleAlbedo{NF <: Number} <: SpeedyWeather.AbstractAlbedo
+    land_albedo::NF = 0.35
+    seaice_albedo::NF = 0.6
+    ocean_albedo::NF = 0.06
 end 
 
 Adapt.@adapt_structure SimpleAlbedo # this is needed to make it GPU compatible
 
-SimpleAlbedo(SG::SpectralGrid; kwargs...) = SimpleAlbedo(; kwargs...)
+# generator function
+SimpleAlbedo(SG::SpectralGrid; kwargs...) = SimpleAlbedo{SG.NF}(; kwargs...)
 
+# what has to be done to initialize SimpleAlbedo: nothing
 SpeedyWeather.initialize!(::SimpleAlbedo, model::PrimitiveEquation) = nothing 
 
+# define variables required (composite albedo and ocean/land independently)
 SpeedyWeather.variables(::SimpleAlbedo) = (
     DiagnosticVariable(name=:albedo, dims=Grid2D(), desc="Albedo", units="1"),
+    DiagnosticVariable(name=:albedo, dims=Grid2D(), desc="Albedo", units="1", namespace=:ocean),
+    DiagnosticVariable(name=:albedo, dims=Grid2D(), desc="Albedo", units="1", namespace=:land),
 )
 
-Base.@propagate_inbounds function SpeedyWeather.parameterization!(
-    ij,
-    diagn::DiagnosticVariables,
+Base.@propagate_inbounds function SpeedyWeather.albedo!(
+    ij,                             # horizontal grid index ij
+    diagn,                          # not ::DiagnosticVariables as called with `diagn.physics.ocean` then `diagn.physics.land`
     progn::PrognosticVariables,
     albedo::SimpleAlbedo,
-    model_parameters,
+    model_parameters,               # model unpacked into a NamedTuple
 )        
     (; land_sea_mask) = model_parameters
     (; sea_ice_concentration) = progn.ocean
     (; land_albedo, seaice_albedo, ocean_albedo) = albedo
         
     if land_sea_mask.mask[ij] > 0.95 # if mostly land 
-        diagn.physics.albedo[ij] = land_albedo
+        diagn.albedo[ij] = land_albedo
     else # if ocean
-        diagn.physics.albedo[ij] = ocean_albedo + sea_ice_concentration[ij] * (seaice_albedo - ocean_albedo)
+        diagn.albedo[ij] = ocean_albedo + sea_ice_concentration[ij] * (seaice_albedo - ocean_albedo)
     end
 end 
 ```
 
-Note that for good CPU performance, we recommend to always define all parameterization functions with `@propagate_inbounds` to avoid bounds checking overhead and inline the function.
+!!! info "Albedos extend albedo!"
+    In contrast to other parameterizations that are supposed to extend
+    `parameterization!(ij, diagn, progn, p::MyParameterization, model)`
+    albedos are expected to extend `albedo!` instead. That way they can be
+    used of ocean, land or both. As long as they write into `diagn.albedo[ij]`
+    as shown above, the shortwave radiation scheme will correctly use that
+    to compute radiative surface fluxes over both ocean and land.
+
+Note that for good CPU performance, we recommend to always define all parameterization functions
+with `@propagate_inbounds` to avoid bounds checking overhead and inline the function.
+Mostly this should enable vectorization across different grid points
 
 Now, we can use our new parameterization in a model. We'll first demonstrate how to simply
 replace the existing albedo: 
 
 ```@example custom-parameterization
 spectral_grid = SpectralGrid(trunc=31, nlayers=8)
-albedo = SimpleAlbedo()
+albedo = SimpleAlbedo(spectral_grid)
 model = PrimitiveWetModel(spectral_grid; albedo=albedo)
 simulation = initialize!(model) 
 run!(simulation, period=Day(5)) # spin up the model a little
@@ -239,12 +280,14 @@ between the albedo of the ocean and the seaice depending on the current sea ice 
 
 Now, let's demonstrate how to add our new parameterization to the model by adding it to the
 `parametrizations` tuple. This way you can add parametrizations to the model that don't have
-to fit one of our pre-defined ones.
+to fit one of our pre-defined ones. Leaving parameterizations out also effectively disables them
+even though they are initialized and variables are created nevertheless
 
 ```@example custom-parameterization
-model = PrimitiveWetModel(spectral_grid; custom_parameterization= SimpleAlbedo(), parameterizations=(
-:convection, :large_scale_condensation, :custom_parameterization, :surface_condition, :surface_momentum_flux, 
-:surface_heat_flux, :surface_humidity_flux, :stochastic_physics))
+model = PrimitiveWetModel(spectral_grid;
+    custom_parameterization = SimpleAlbedo(spectral_grid),
+    parameterizations=(:convection, :large_scale_condensation, :custom_parameterization, :shortwave_radiation,
+        :surface_condition, :surface_momentum_flux, :surface_heat_flux, :surface_humidity_flux, :stochastic_physics))
 
 simulation = initialize!(model) 
 run!(simulation, period=Day(5)) # spin up the model a little
@@ -253,7 +296,9 @@ progn, diagn, model = SpeedyWeather.unpack(simulation)
 heatmap(diagn.physics.albedo)
 ```
 
-Again, it worked! 
+Again, it worked! Note that it's important here to call the `:shortwave_radiation` after our
+`:custom_parameterization` as the shortwave radiation will use the albedo over ocean and land
+for respective flux computations and average the albedo then according to the land-sea mask.
 
 In order to write more complex parameterization that access other variabels and parameters of our models,
 it's best to familiarize yourself with our data structures that we explain in [Tree structure](@ref),

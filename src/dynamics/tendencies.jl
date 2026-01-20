@@ -33,7 +33,7 @@ function dynamics_tendencies!(
     vorticity_flux!(diagn, model)
 
     geopotential!(diagn, planet)            # geopotential Φ = gη in shallow water
-    bernoulli_potential!(diagn, model)      # = -∇²(E+Φ), tendency for divergence
+    bernoulli_potential_swm!(diagn, model)  # = -∇²(E+Φ), tendency for divergence
     
     # = -∇⋅(uh, vh), tendency for "pressure" η
     volume_flux_divergence!(diagn, orography, atmosphere, geometry, spectral_transform)
@@ -678,28 +678,15 @@ function vorticity_flux!(diagn::DiagnosticVariables, model::Barotropic)
     vorticity_flux_curldiv!(diagn, C, G, S, div=false, add=true)
 end
 
-"""
-$(TYPEDSIGNATURES)
-Computes the Laplace operator ∇² of the Bernoulli potential `B` in spectral space.
-  1. computes the kinetic energy KE = ½(u²+v²) on the grid
-  2. transforms KE to spectral space
-  3. adds geopotential for the Bernoulli potential in spectral space
-  4. takes the Laplace operator.
-    
-This version is used for both ShallowWater and PrimitiveEquation, only the geopotential
-calculation in geopotential! differs."""
-function bernoulli_potential!(
+function bernoulli_potential_swm!(
     diagn::DiagnosticVariables,
     model::AbstractModel
 )   
     S = model.spectral_transform
-
     (; R_dry) = model.atmosphere                        # dry gas constant
     u = diagn.grid.u_grid
     v = diagn.grid.v_grid
     Φ = diagn.grid.geopotential
-    Tₖ = model.implicit.temp_profile                    # average layer temperature (1D)
-    lnpₛ = diagn.grid.pres_grid                         # 2D
 
     (; scratch_memory) = diagn.dynamics
     bernoulli = diagn.dynamics.a                        # reuse work arrays a, a_grid
@@ -708,18 +695,21 @@ function bernoulli_potential!(
     (; div_tend) = diagn.tendencies
 
     if model isa PrimitiveEquation
+        Tₖ = model.implicit.temp_profile                # average layer temperature (1D)
+        pₛ = diagn.grid.pres_grid_prev                  # 2D not prev is in Pa
+
         # Tₖ*lnpₛ on grid, use broadcasting as T is 3D but surface pressure is 2D
         # Add the linear contribution of the pressure gradient to the geopotential.
         # The pressure gradient in the divergence equation takes the form
         #     -∇⋅(Rd * Tᵥ * ∇lnpₛ) = -∇⋅(Rd * Tᵥ' * ∇lnpₛ) - ∇²(Rd * Tₖ * lnpₛ)
         # So that the second term inside the Laplace operator can be added to the geopotential.
         # Rd is the gas constant, Tᵥ the virtual temperature and Tᵥ' its anomaly wrt to the
-        # average or reference temperature Tₖ, lnpₛ is the logarithm of surface pressure.
-        # broadcast 1D Tₖ (1 value per layer) over 2D lnpₛ (one value per grid point) to 3D
-        RdTlnpₛ .= R_dry * Tₖ' .* lnpₛ
+        # average or reference temperature Tₖ, pₛ is the surface pressure.
+        # broadcast 1D Tₖ (1 value per layer) over 2D pₛ (one value per grid point) to 3D
+        RdTlnpₛ .= R_dry * Tₖ' .* log.(pₛ)
     else
         RdTlnpₛ .= 0
-    end     
+    end
 
     # add ½(u² + v²) + Φ on grid and the linear pressure gradient for primitive models
     half = convert(eltype(bernoulli_grid), 0.5)
@@ -899,8 +889,6 @@ function SpeedyTransforms.transform!(
     humid = get_step(progn.humid, lf)   # humidity at leapfrog step lf
     pres  = get_step(progn.pres, lf)    # logarithm of surface pressure at leapfrog step lf
 
-    # @info progn.pres[1, :]
-
     (; scratch_memory) = diagn.dynamics
 
     U = diagn.dynamics.a                # reuse work arrays
@@ -943,8 +931,8 @@ function SpeedyTransforms.transform!(
     
     # include humidity effect into temp for everything stability-related
     temperature_average!(diagn, temp, S)
-    # virtual_temperature!(diagn, model)      # temp = virt temp for dry core
-    geopotential!(diagn, model)             # calculate geopotential
+    # virtual_temperature!(diagn, model)        # temp = virt temp for dry core
+    geopotential!(diagn, model)                 # calculate geopotential
 
     if initialize   # at initial step store prev <- current
         @. u_grid_prev = u_grid
@@ -980,10 +968,9 @@ function temperature_average!(
     temp::LowerTriangularArray,
     S::SpectralTransform,
 )
-    @inbounds for k in eachmatrix(temp)
-        # average from l=m=0 harmonic divided by norm of the sphere
-        diagn.temp_average[k] = real(temp[1, k])/S.norm_sphere
-    end
+    # average from l=m=0 harmonic divided by norm of the sphere
+    @. diagn.temp_average = real(temp[1, :]) / S.norm_sphere
+    return nothing
 end 
 
 

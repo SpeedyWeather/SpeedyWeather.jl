@@ -1,3 +1,13 @@
+"""
+Albedo structs should be defined as MyAlbedo <: AbstractAlbedo and implement the following interface:
+
+- `initialize!(albedo::MyAlbedo, model)`
+- `albedo!(ij, diagn, progn, albedo::MyAlbedo, model)`
+
+`initialize!` is as for every model component but in contrast to other parameterizations albedos
+should not implement `parameterization!` but rather `albedo!`, which is called from within `parameterization!`.
+This is because every albedo needs to be used either as part of OceanLandAlbedo or the same albedo
+is called over both land and ocean surfaces."""
 abstract type AbstractAlbedo <: AbstractModelComponent end
 
 export OceanLandAlbedo
@@ -12,6 +22,13 @@ Fields are $(TYPEDFIELDS)"""
     land::Land
 end
 
+Adapt.@adapt_structure OceanLandAlbedo
+function OceanLandAlbedo(SG::SpectralGrid;
+    ocean = OceanSeaIceAlbedo(SG),      # default ocean albedo
+    land = LandSnowAlbedo(SG))          # default land albedo
+    return OceanLandAlbedo(ocean, land)
+end
+
 function Base.show(io::IO, A::OceanLandAlbedo)
     println(io, "OceanLandAlbedo <: SpeedyWeather.AbstractAlbedo")
     properties = propertynames(A)
@@ -24,30 +41,24 @@ function Base.show(io::IO, A::OceanLandAlbedo)
     end
 end
 
-Adapt.@adapt_structure OceanLandAlbedo
-
+# TODO deprecate?
 export DefaultAlbedo
 
-"""$(TYPEDSIGNATURES)
-Default albedo parameterization with `OceanSeaIceAlbedo`
-for ocean and `AlbedoClimatology` for land surfaces."""
-function DefaultAlbedo(SG::SpectralGrid;
-    ocean = OceanSeaIceAlbedo(SG),
-    land = LandSnowAlbedo(SG))
-    return OceanLandAlbedo(ocean, land)
-end
+"""$(TYPEDSIGNATURES) Default albedo parameterization."""
+DefaultAlbedo(SG::SpectralGrid; kwargs...) = OceanLandAlbedo(SG; kwargs...)
 
 function initialize!(albedo::OceanLandAlbedo, model::PrimitiveEquation)
     initialize!(albedo.ocean, model)
     initialize!(albedo.land, model)
 end
 
-# composite OceanLandAlbedo: call separately for ocean and land with .ocean and .land
+"""$(TYPEDSIGNATURES) Composite OceanLandAlbedo: Call albedo.ocean over ocean and albedo.land over land."""
 @propagate_inbounds function parameterization!(ij, diagn::DiagnosticVariables, progn, albedo::OceanLandAlbedo, model)
-    parameterization!(ij, diagn.physics.ocean, progn, albedo.ocean, model)
-    parameterization!(ij, diagn.physics.land, progn, albedo.land, model)
+    albedo!(ij, diagn.physics.ocean, progn, albedo.ocean, model)
+    albedo!(ij, diagn.physics.land, progn, albedo.land, model)
 end
 
+# all albedos need to define albedo for ocean/land separately and combined
 function variables(::AbstractAlbedo)
     return (
         DiagnosticVariable(name=:albedo, dims=Grid2D(), desc="Albedo", units="1"),
@@ -56,18 +67,17 @@ function variables(::AbstractAlbedo)
     )
 end
 
-# single albedo: call separately for ocean and land with the same albedo
+"""$(TYPEDSIGNATURES) Single Albedo: Call same albedo over ocean and land."""
  @propagate_inbounds function parameterization!(ij, diagn::DiagnosticVariables, progn, albedo::AbstractAlbedo, model)
-    parameterization!(ij, diagn.physics.ocean, progn, albedo, model)
-    parameterization!(ij, diagn.physics.land, progn, albedo, model)
+    albedo!(ij, diagn.physics.ocean, progn, albedo, model)
+    albedo!(ij, diagn.physics.land, progn, albedo, model)
 end
 
 ## GLOBAL CONSTANT ALBEDO
 export GlobalConstantAlbedo
 
 """Global constant albedo parameterization. To be used for land and ocean 
-or only one of them within a `OceanLandAlbedo`.
-Fields are $(TYPEDFIELDS)"""
+or only one of them within a `OceanLandAlbedo`. Fields are $(TYPEDFIELDS)"""
 @kwdef struct GlobalConstantAlbedo{NF} <: AbstractAlbedo
     "[OPTION] Albedo value [1]"
     albedo::NF = 0.3
@@ -76,13 +86,9 @@ end
 Adapt.@adapt_structure GlobalConstantAlbedo
 GlobalConstantAlbedo(SG::SpectralGrid; kwargs...) = GlobalConstantAlbedo{SG.NF}(; kwargs...)
 initialize!(albedo::GlobalConstantAlbedo, ::PrimitiveEquation) = nothing
-@propagate_inbounds parameterization!(ij, diagn, progn, albedo::GlobalConstantAlbedo, model) =
-    albedo!(ij, diagn.albedo, albedo.albedo)
-@propagate_inbounds function albedo!(ij, diagn_albedo::AbstractArray, albedo::Real)
-    diagn_albedo[ij] = albedo
-end
+@propagate_inbounds albedo!(ij, diagn, progn, albedo::GlobalConstantAlbedo, model) =
+    diagn.albedo[ij] = albedo.albedo
 
-Adapt.@adapt_structure GlobalConstantAlbedo
 
 ## MANUAL ALBEDO
 export ManualAlbedo
@@ -98,18 +104,15 @@ end
 
 ManualAlbedo(SG::SpectralGrid) = ManualAlbedo{SG.GridVariable2D}(zeros(SG.GridVariable2D, SG.grid))
 initialize!(albedo::ManualAlbedo, model::PrimitiveEquation) = nothing
-@propagate_inbounds parameterization!(ij, diagn, progn, albedo::ManualAlbedo, model) = albedo!(ij, diagn.albedo, albedo.albedo)
-@propagate_inbounds function albedo!(ij, diagn_albedo::AbstractArray, albedo::AbstractArray)
-    diagn_albedo[ij] = albedo[ij]
-end
+@propagate_inbounds albedo!(ij, diagn, progn, albedo::ManualAlbedo, model) =
+    diagn.albedo[ij] = albedo.albedo[ij]
 
 Adapt.@adapt_structure ManualAlbedo
 
 ## ALBEDO CLIMATOLOGY
 export AlbedoClimatology
 
-"""Albedo climatology loaded from netcdf file.
-Fields are $(TYPEDFIELDS)"""
+"""Albedo climatology loaded from netcdf file. Fields are $(TYPEDFIELDS)"""
 @kwdef struct AlbedoClimatology{GridVariable2D} <: AbstractAlbedo
     "[OPTION] path to the folder containing the albedo file, pkg path default"
     path::String = "SpeedyWeather.jl/input_data"
@@ -153,7 +156,8 @@ function initialize!(albedo::AlbedoClimatology, model::PrimitiveEquation)
     interpolate!(albedo.albedo, a)
 end
 
-@propagate_inbounds parameterization!(ij, diagn, progn, albedo::AlbedoClimatology, model) = albedo!(ij, diagn.albedo, albedo.albedo)
+ @propagate_inbounds albedo!(ij, diagn, progn, albedo::AlbedoClimatology, model) =
+    diagn.albedo[ij] = albedo.albedo[ij]
 
 ## OceanSeaIceAlbedo
 export OceanSeaIceAlbedo
@@ -171,20 +175,12 @@ end
 Adapt.@adapt_structure OceanSeaIceAlbedo
 OceanSeaIceAlbedo(SG::SpectralGrid; kwargs...) = OceanSeaIceAlbedo{SG.NF}(;kwargs...)
 initialize!(::OceanSeaIceAlbedo, ::PrimitiveEquation) = nothing
-@propagate_inbounds parameterization!(ij, diagn, progn, albedo::OceanSeaIceAlbedo, model) = albedo!(ij, diagn.albedo, progn.ocean, albedo)
-
-@propagate_inbounds function albedo!(ij, diagn_albedo::AbstractArray, ocean, albedo::OceanSeaIceAlbedo)
-    (; sea_ice_concentration ) = ocean
+@propagate_inbounds function albedo!(ij, diagn, progn, albedo::OceanSeaIceAlbedo, model)
     (; albedo_ocean, albedo_ice) = albedo
+    ℵ = haskey(progn.ocean, :sea_ice_concentration) ? progn.ocean.sea_ice_concentration[ij] : zero(eltype(diagn.albedo))
 
     # set ocean albedo linearly between ocean and ice depending on sea ice concentration
-    diagn_albedo[ij] = albedo_ocean + sea_ice_concentration[ij] * (albedo_ice - albedo_ocean)
-end
-
-function variables(::AbstractAlbedo)
-    return (
-        DiagnosticVariable(name=:albedo, dims=Grid2D(), desc="Albedo", units="1"),
-    )
+    diagn.albedo[ij] = albedo_ocean + ℵ * (albedo_ice - albedo_ocean)
 end
 
 abstract type AbstractSnowCover end
@@ -195,7 +191,7 @@ struct LinearSnowCover <: AbstractSnowCover end
 Adapt.@adapt_structure LinearSnowCover
 
 """Saturating ramp: snow cover grows with snow depth S as `S/(S+scale)`."""
-struct SaturatingSnowCover  <: AbstractSnowCover end
+struct SaturatingSnowCover <: AbstractSnowCover end
 Adapt.@adapt_structure SaturatingSnowCover
 
 """$(TYPEDSIGNATURES) Snow cover fraction for the linear scheme, clamped to 1."""
@@ -207,6 +203,8 @@ Adapt.@adapt_structure SaturatingSnowCover
 ## LandSnowAlbedo
 export LandSnowAlbedo
 
+"""Albedo over land based on bare soil, vegetation (high and low cover) and snow cover.
+Fields are $(TYPEDFIELDS)"""
 @kwdef struct LandSnowAlbedo{NF, Scheme <: AbstractSnowCover} <: AbstractAlbedo
     "Albedo of bare land (excluding vegetation) [1]"
     albedo_land::NF = 0.4
@@ -233,40 +231,34 @@ LandSnowAlbedo(SG::SpectralGrid; snow_cover = SaturatingSnowCover(), kwargs...) 
 
 initialize!(albedo::LandSnowAlbedo, model::PrimitiveEquation) = nothing
 
-@propagate_inbounds parameterization!(ij, diagn, progn, albedo::LandSnowAlbedo, model) = 
-    albedo!(ij, diagn.albedo, progn.land, albedo, model)
+@propagate_inbounds function albedo!(ij, diagn, progn, albedo_scheme::LandSnowAlbedo, model)
 
-@propagate_inbounds function albedo!(
-    ij,                                     # grid point index
-    diagn,                                  # land only
-    land,
-    albedo::LandSnowAlbedo,
-    model::PrimitiveEquation,
-)
     # 1. Albedo of vegetation + bare soil (no snow)
-    (; albedo_land, albedo_high_vegetation, albedo_low_vegetation) = albedo
+    (; albedo_land, albedo_high_vegetation, albedo_low_vegetation) = albedo_scheme
 
-    if model.land isa AbstractWetLand
-        (; high_cover, low_cover) = model.land.vegetation
+    if haskey(diagn, :vegetation_high) && haskey(diagn, :vegetation_low)
+        (; vegetation_high, vegetation_low) = diagn
 
         # linear combination of high and low vegetation and bare soil
-        diagn.albedo[ij] = high_cover[ij] * albedo_high_vegetation +
-                                low_cover[ij] * albedo_low_vegetation +
-                                albedo_land * (1 - high_cover[ij] - low_cover[ij])
+        diagn.albedo[ij] = vegetation_high[ij] * albedo_high_vegetation +
+                        vegetation_low[ij] * albedo_low_vegetation +
+                        albedo_land * (1 - vegetation_high[ij] - vegetation_low[ij])
     else
         diagn.albedo[ij] = albedo_land
     end
 
     # 2. Add snow cover
-    (; snow_depth) = land
-    (; albedo_snow, snow_depth_scale) = albedo
+    if haskey(progn.land, :snow_depth)
+        (; snow_depth) = progn.land
+        (; albedo_snow, snow_depth_scale) = albedo_scheme
 
-    # how to compute snow cover from snow depth
-    snow_cover_scheme = albedo.snow_cover
+        # how to compute snow cover from snow depth
+        snow_cover_scheme = albedo_scheme.snow_cover
 
-    # compute snow-cover fraction using the chosen scheme and clamp to [0, 1]
-    snow_cover = snow_cover_scheme(snow_depth[ij], snow_depth_scale)
+        # compute snow-cover fraction using the chosen scheme and clamp to [0, 1]
+        snow_cover = snow_cover_scheme(snow_depth[ij], snow_depth_scale)
 
-    # set land albedo linearly between bare land and snow depending on snow cover [0, 1]
-    diagn.albedo[ij] += snow_cover * albedo_snow
+        # set land albedo linearly between bare land and snow depending on snow cover [0, 1]
+        diagn.albedo[ij] += snow_cover * albedo_snow
+    end
 end

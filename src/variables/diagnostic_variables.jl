@@ -123,8 +123,6 @@ $TYPEDFIELDS."""
     div_grid        ::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
     "Absolute temperature [K]"
     temp_grid       ::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
-    "Virtual temperature [K]"
-    temp_virt_grid  ::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
     "Specific_humidity [kg/kg]"
     humid_grid      ::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
     "Zonal velocity [m/s]"
@@ -179,7 +177,7 @@ export DynamicsVariables
 $(TYPEDFIELDS)"""
 @kwdef struct DynamicsVariables{
     SpectrumType,           # <: AbstractSpectrum
-    GridType,               # <:AbstractGrid
+    GridType,               # <: AbstractGrid
     SpectralVariable2D,     # <: LowerTriangularArray
     SpectralVariable3D,     # <: LowerTriangularArray
     GridVariable2D,         # <: AbstractField
@@ -187,8 +185,8 @@ $(TYPEDFIELDS)"""
     ScratchMemoryType,      # <: ScratchMemory{ArrayType{Complex{NF},3}}
 } <: AbstractDiagnosticVariables
     
-    spectrum::SpectrumType            # spectral resolution: maximum degree and order of spherical harmonics
-    grid::GridType              # grid resolution: number of latitude rings on one hemisphere (Eq. incl.)
+    spectrum::SpectrumType  # spectral resolution: maximum degree and order of spherical harmonics
+    grid::GridType          # grid resolution: number of latitude rings on one hemisphere (Eq. incl.)
     nlayers::Int            # number of vertical layers
 
     "Multi-purpose a, 3D work array to be reused in various places"
@@ -466,14 +464,6 @@ function DiagnosticVariables(model::AbstractModel)
 
     SG = model.spectral_grid
     (; spectral_transform, tracers) = model
-
-    if typeof(model) <: PrimitiveEquation
-        nbands_shortwave = get_nbands(model.shortwave_radiation)
-        nbands_longwave = get_nbands(model.longwave_radiation)
-    else 
-        nbands_shortwave = nbands_longwave = 0
-    end
-
     (; spectrum, grid, nparticles, NF, nlayers) = SG
     (; SpectralVariable2D, SpectralVariable3D) = SG
     (; GridVariable2D, GridVariable3D) = SG
@@ -484,7 +474,7 @@ function DiagnosticVariables(model::AbstractModel)
     grid_variables = GridVariables(SG; tracers)
     dynamics = DynamicsVariables(SG; spectral_transform)
     particles = ParticleVariables(SG)
-    temp_average = SG.VectorType(undef, nlayers)
+    temp_average = on_architecture(SG.architecture, zeros(NF, nlayers))
 
     # allocate parameterization variables 
     variable_names = get_diagnostic_variables(model)

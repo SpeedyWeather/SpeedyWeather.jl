@@ -149,19 +149,29 @@ function output!(
     # get log(surface pressure) field
     lnpₛ = path(variable, simulation)
     h = simulation.model.orography.orography
-    (; R_dry) = simulation.model.atmosphere
+    (; R_dry, κ) = simulation.model.atmosphere
     g = simulation.model.planet.gravity
 
-    # virtual temperature in 3D view on surface-most 2D layer
-    temp_virt_grid = simulation.diagnostic_variables.grid.temp_virt_grid
-    nlayers = size(temp_virt_grid, 2)
+    # compute virtual temperature on the fly
+    (; nlayers) = simulation.diagnostic_variables
     T = simulation.diagnostic_variables.physics.surface_air_temperature
+
+    if !simulation.model.physics
+        # calculate the surface air temperature from lowest model level temperature
+        # via dry adiabatic lapse rate
+        T .= field_view(simulation.diagnostic_variables.grid.temp_grid, :, nlayers)
+        # σ vertical coordinate at lowest model level
+        GPUArrays.@allowscalar σ = simulation.model.geometry.σ_levels_full[nlayers]        
+        σ⁻ᵏ = σ^(-κ)    # precalculate adiabatic descent factor
+        T .*= σ⁻ᵏ       # lower to surface assuming dry adiabatic lapse rate
+    end
+
     q = field_view(simulation.diagnostic_variables.grid.humid_grid, :, nlayers)
     Tᵥ = simulation.diagnostic_variables.dynamics.a_2D_grid
     @. Tᵥ = virtual_temperature(T, q, simulation.model.atmosphere.μ_virt_temp)
 
     # calculate mean sea-level pressure on model grid
-    mslp = simulation.diagnostic_variables.dynamics.a_2D_grid
+    mslp = simulation.diagnostic_variables.dynamics.b_2D_grid
     (; transform) = variable                    # to change units from log(Pa) to hPa
     @. mslp = transform(g*h/R_dry/Tᵥ + lnpₛ)    # Pa to hPa
 

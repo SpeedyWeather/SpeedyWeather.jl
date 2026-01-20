@@ -36,7 +36,7 @@ but are only concerned with local freezing, ice growth and melt and the thermody
 The `ThermodynamicSeaIce` model defined here uses only sea ice concentration ``c`` in units of
 ``[\text{m}^2/\text{m}^2]`` as a prognostic variable.
 
-Melting and freezing is dependend on the sea surface temperature ``SST`` at the previous time step ``i-1``
+Melting and freezing is dependent on the sea surface temperature ``SST`` at the previous time step ``i-1``
 and the current ``i`` and air-sea fluxes applied to get from one time step to the other.
 Sea ice may modify the sea surface temperatures SST (particularly in the case of freezing) and so we denote the
 uncorrected SST with ``SST^*`` meaning that the sea ice time step has not been applied yet.
@@ -90,7 +90,7 @@ sea_ice = ThermodynamicSeaIce(spectral_grid)
 and most often together with an albedo that scales linearly with sea ice concentration
 
 ```@example sea_ice
-albedo = Albedo(ocean=OceanSeaIceAlbedo(spectral_grid), land=AlbedoClimatology(spectral_grid))
+albedo = OceanLandAlbedo(ocean=OceanSeaIceAlbedo(spectral_grid), land=AlbedoClimatology(spectral_grid))
 ```
 
 Using `ocean=GlobalConstantAlbedo(0.06)` instead would disable the effect of sea ice on
@@ -115,10 +115,8 @@ And output is added like
 add!(model, SpeedyWeather.SeaIceConcentrationOutput())
 ```
 
-or as part of `SpeedyWeather.OceanOutput()` which however needs splatting `...`
-to unpack the tuple
+or as part of `SpeedyWeather.OceanOutput()`
 
 ```@example sea_ice
-add!(model, SpeedyWeather.OceanOutput()...)
+add!(model, SpeedyWeather.OceanOutput())
 ```
-

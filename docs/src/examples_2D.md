@@ -13,7 +13,7 @@ See also [Examples 3D](@ref) for examples with the primitive equation models.
     using SpeedyWeather
     spectral_grid = SpectralGrid(trunc=63, nlayers=1)
     still_earth = Earth(spectral_grid, rotation=0)
-    initial_conditions = RandomVelocity()
+    initial_conditions = RandomVelocity(spectral_grid)
     forcing = nothing
     drag = nothing
     model = BarotropicModel(spectral_grid; initial_conditions, planet=still_earth, forcing, drag)
@@ -40,7 +40,7 @@ There are other options to create a planet but they are irrelevant for the
 barotropic vorticity equations. We also want to specify the initial conditions,
 randomly distributed velocity is already defined
 ```@example barotropic_setup
-initial_conditions = RandomVelocity()
+initial_conditions = RandomVelocity(spectral_grid)
 ```
 By default, the velocity has an approximate amplitude as given and also higher
 wavenumbers are truncated.
@@ -79,7 +79,7 @@ with default settings. More options on output in [NetCDF output](@ref).
     using SpeedyWeather
     spectral_grid = SpectralGrid(trunc=63, nlayers=1)
     orography = NoOrography(spectral_grid)
-    initial_conditions = ZonalJet()
+    initial_conditions = ZonalJet(spectral_grid)
     model = ShallowWaterModel(spectral_grid; orography, initial_conditions)
     simulation = initialize!(model)
     run!(simulation, period=Day(6))
@@ -101,7 +101,7 @@ still initialize zero-arrays of the correct size and element type. Awesome.
 This time the initial conditions should be set the the Galewsky et al.[^G04] zonal
 jet, which is already defined as
 ```@example galewsky_setup
-initial_conditions = ZonalJet()
+initial_conditions = ZonalJet(spectral_grid)
 ```
 The jet sits at 45˚N with a maximum velocity of 80m/s and a perturbation as described in their paper.
 Now we construct a model, but this time a `ShallowWaterModel`
@@ -212,13 +212,13 @@ needed.
 
 UnicodePlots look good in the Julia REPL, especially with the more colours
 a terminal like [iTerm](https://iterm2.com/) provides. But these plots are
-literally made up of unicode characters so the most you can expect is somthing like
+literally made up of unicode characters so the most you can expect is something like
 
 <img src="https://github.com/SpeedyWeather/SpeedyWeather.jl/assets/25530332/a04fbb10-1cc1-4f77-93f2-7bdf047f277d" width="450"><br>
 
 However, here in the documentation they are usually vertically spaced as the line
 spacing is by default higher than in the REPL.
-A similar issue arises in Jupyter notebooks by default. Well, they are unicode
+A similar issue arises in Jupyter notebooks by default. Well, these plots are unicode
 after all!
 
 ### Adding mountains
@@ -229,7 +229,7 @@ Let's try it out! We create an `EarthOrography` struct like so
 ```@example galewsky_setup2
 using SpeedyWeather # hide
 spectral_grid = SpectralGrid(trunc=63, nlayers=1) # hide
-initial_conditions = ZonalJet() # hide                    
+initial_conditions = ZonalJet(spectral_grid) # hide                    
 orography = EarthOrography(spectral_grid)
 ```
 
@@ -318,7 +318,7 @@ spectral_grid = SpectralGrid(trunc=127, nlayers=1)
 # model components
 implicit = ImplicitShallowWater(spectral_grid, α=0.5)
 orography = EarthOrography(spectral_grid, smoothing=false)
-initial_conditions = RandomWaves(lmin=10, lmax=30)      # between wavenumber 10 and 30
+initial_conditions = RandomWaves(spectral_grid, lmin=10, lmax=30)      # between wavenumber 10 and 30
 
 # construct, initialize, run
 model = ShallowWaterModel(spectral_grid; orography, initial_conditions, implicit)
@@ -336,7 +336,7 @@ But we also want to keep orography, and particularly no smoothing on it, to have
 as rough as possible. The initial conditions are set to `RandomWaves` which set the spherical
 harmonic coefficients of ``\eta`` to between given wavenumbers to some random values
 ```@example gravity_wave_setup
-RandomWaves()
+RandomWaves(spectral_grid)
 ```
 so that the amplitude `A` is as desired, here 2000m. Our layer thickness in meters is by default
 ```@example gravity_wave_setup

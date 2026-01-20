@@ -396,7 +396,7 @@ function timestep!(
         physics_tendencies_only!(diagn, model)
     end
 
-    # APPLY DIFFUSION, STEP FORWARD IN TIME, AND TRANSFORM NEW TIME STEP TO GRID
+    # # APPLY DIFFUSION, STEP FORWARD IN TIME, AND TRANSFORM NEW TIME STEP TO GRID
     horizontal_diffusion!(diagn, progn, model.horizontal_diffusion, model)
     leapfrog!(progn, diagn.tendencies, dt, lf1, model)
     transform!(diagn, progn, lf2, model)

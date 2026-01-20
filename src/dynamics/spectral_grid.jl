@@ -42,6 +42,15 @@ struct SpectralGrid{
 
     "[DERIVED] Type of 3D array"
     TensorType::Type{<:AbstractArray}
+
+    "[DERIVED] Type of vector of integers"
+    VectorIntType::Type{<:AbstractVector}
+
+    "[DERIVED] Type of matrix of integers"
+    MatrixIntType::Type{<:AbstractMatrix}
+
+    "[DERIVED] Type of 3D array of integers"
+    TensorIntType::Type{<:AbstractArray}
     
     # HORIZONTAL SPECTRAL
     "[OPTION] horizontal resolution as the maximum degree of spherical harmonics"
@@ -204,6 +213,10 @@ function SpectralGrid(NF::Type{<:AbstractFloat},
     MatrixType = array_type(architecture, NF, 2)
     TensorType = array_type(architecture, NF, 3)
     
+    VectorIntType = array_type(architecture, Int, 1)
+    MatrixIntType = array_type(architecture, Int, 2)
+    TensorIntType = array_type(architecture, Int, 3)
+
     # Spectral variable types
     SpectralVariable2D = LowerTriangularArray{Complex{NF}, 1, array_type(architecture, Complex{NF}, 1), typeof(spectrum)}
     SpectralVariable3D = LowerTriangularArray{Complex{NF}, 2, array_type(architecture, Complex{NF}, 2), typeof(spectrum)}
@@ -225,6 +238,9 @@ function SpectralGrid(NF::Type{<:AbstractFloat},
         VectorType,
         MatrixType,
         TensorType,
+        VectorIntType,
+        MatrixIntType,
+        TensorIntType,
         truncation(spectrum),
         spectrum,
         SpectralVariable2D,

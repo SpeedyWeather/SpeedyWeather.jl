@@ -153,10 +153,13 @@ large-scale precipitation vertically for output."""
     diagn.physics.rain_large_scale[ij] += Δt_sec*rain_flux_down
 	diagn.physics.snow_large_scale[ij] += Δt_sec*snow_flux_down
 
-    # TODO use [kg/m²/s] units? then * ρ here
     # and the rain/snow fall rate [m/s]
     diagn.physics.rain_rate_large_scale[ij] = rain_flux_down
     diagn.physics.snow_rate_large_scale[ij] = snow_flux_down
+
+    # accumulate into total rain/snow rate including convection [m/s]
+    diagn.physics.rain_rate[ij] += rain_flux_down
+    diagn.physics.snow_rate[ij] += snow_flux_down
 
     return nothing
 end
@@ -167,6 +170,8 @@ function variables(::ImplicitCondensation)
         DiagnosticVariable(name=:snow_large_scale, dims=Grid2D(), desc="Large-scale precipitation (snow, accumulated)", units="m"),
         DiagnosticVariable(name=:rain_rate_large_scale, dims=Grid2D(), desc="Large-scale precipitation (rain)", units="m/s"),
         DiagnosticVariable(name=:snow_rate_large_scale, dims=Grid2D(), desc="Large-scale precipitation (snow)", units="m/s"),
+        DiagnosticVariable(name=:rain_rate, dims=Grid2D(), desc="Rain rate (large-scale + convection)", units="m/s"),
+        DiagnosticVariable(name=:snow_rate, dims=Grid2D(), desc="Snow rate (large-scale + convection)", units="m/s"),
         DiagnosticVariable(name=:cloud_top, dims=Grid2D(), desc="Cloud top layer index", units="1"),
     )
 end

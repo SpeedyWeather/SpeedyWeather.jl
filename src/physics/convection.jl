@@ -145,9 +145,11 @@ and relaxes current vertical profiles to the adjusted references."""
     
     # Store precipitation in diagnostic arrays
     diagn.physics.rain_convection[ij] += rain_convection            # accumulated rain [m] for output
-
-    # TODO use [kg/m²/s] units? then * ρ here
-    diagn.physics.rain_rate_convection[ij] = rain_convection / Δt   # instantaneous rate [m/s] for coupling
+    rain_rate_convection = rain_convection / Δt                     # instantaneous rate [m/s] for coupling
+    diagn.physics.rain_rate_convection[ij] = rain_rate_convection   # instantaneous rate [m/s] for coupling
+    
+    # accumulate into total rain rate including large-scale condensation [m/s]
+    diagn.physics.rain_rate[ij] += rain_rate_convection             # instantaneous rate [m/s] for coupling
 
     # clouds reach to top of convection
     diagn.physics.cloud_top[ij] = min(diagn.physics.cloud_top[ij], level_zero_buoyancy)
@@ -158,6 +160,7 @@ function variables(::BettsMillerConvection)
     return (
         DiagnosticVariable(name=:rain_convection, dims=Grid2D(), desc="Convective precipitation (accumulated)", units="m"),
         DiagnosticVariable(name=:rain_rate_convection, dims=Grid2D(), desc="Convective precipitation rate", units="m/s"),
+        DiagnosticVariable(name=:rain_rate, dims=Grid2D(), desc="Rain rate (large-scale + convection)", units="m/s"),
         DiagnosticVariable(name=:cloud_top, dims=Grid2D(), desc="Cloud top layer index", units="1"),
     )
 end
@@ -425,7 +428,7 @@ end
     ij,
     diagn::DiagnosticVariables,
     scheme::ConvectiveHeating,
-    model::PrimitiveEquation,
+    model,
 )
     pₛ = diagn.grid.pres_grid_prev
     temp_tend = diagn.tendencies.temp_tend_grid
@@ -433,7 +436,7 @@ end
     NF = eltype(temp_tend)
 
     # Get latitude ring index and latitude
-    j = whichring(diagn.grid.temp_grid.grid, ij)
+    j = model.geometry.whichring[ij]
     latd = model.geometry.latd[j]
     σ = model.geometry.σ_levels_full
     

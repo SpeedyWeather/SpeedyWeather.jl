@@ -2,11 +2,6 @@ abstract type AbstractRadiation <: AbstractParameterization end
 abstract type AbstractShortwave <: AbstractRadiation end
 abstract type AbstractShortwaveRadiativeTransfer <: AbstractShortwave end
 
-function get_nbands(radiation::Union{AbstractRadiation, Nothing})
-    hasfield(typeof(radiation), :nbands) && return radiation.nbands
-    return 0
-end
-
 ## SHORTWAVE RADIATION FOR A FULLY TRANSPARENT ATMOSPHERE
 export TransparentShortwave
 struct TransparentShortwave <: AbstractShortwave end
@@ -79,26 +74,28 @@ and a cloud albedo is applied to the downward beam. Fields and options are
 $(TYPEDFIELDS)"""
 struct OneBandShortwave{C, T, R} <: AbstractShortwave
     clouds::C
-    transmittance::T
+    transmissivity::T
     radiative_transfer::R
 end
 
 # primitive wet model version
-OneBandShortwave(SG::SpectralGrid) = OneBandShortwave(
-    DiagnosticClouds(SG),
-    BackgroundShortwaveTransmittance(SG),
-    OneBandShortwaveRadiativeTransfer(SG),
+function OneBandShortwave(SG::SpectralGrid;
+    clouds = DiagnosticClouds(SG),
+    transmissivity = BackgroundShortwaveTransmissivity(SG),
+    radiative_transfer = OneBandShortwaveRadiativeTransfer(SG),
 )
+    return OneBandShortwave(clouds, transmissivity, radiative_transfer)
+end
 
 # primitive dry model version
 export OneBandGreyShortwave
-OneBandGreyShortwave(SG::SpectralGrid) = OneBandShortwave(
-    NoClouds(SG),
-    TransparentShortwaveTransmittance(SG),
-    OneBandShortwaveRadiativeTransfer(SG),
+function OneBandGreyShortwave(SG::SpectralGrid;
+    clouds = NoClouds(SG),
+    transmissivity = TransparentShortwaveTransmissivity(SG),
+    radiative_transfer = OneBandShortwaveRadiativeTransfer(SG),
 )
-
-get_nbands(::OneBandShortwave) = 1
+    return OneBandShortwave(clouds, transmissivity, radiative_transfer)
+end
 
 function Base.show(io::IO, M::OneBandShortwave)
     println(io, "OneBandShortwave <: AbstractShortwave")
@@ -115,7 +112,7 @@ end
 # initialize one after another
 function initialize!(radiation::OneBandShortwave, model::PrimitiveEquation)
     initialize!(radiation.clouds, model)
-    initialize!(radiation.transmittance, model)
+    initialize!(radiation.transmissivity, model)
     initialize!(radiation.radiative_transfer, model)
 end
 
@@ -129,7 +126,7 @@ function shortwave_radiation!(
     model::PrimitiveEquation,
 )
     clouds = clouds!(column, radiation.clouds, model)
-    t = transmittance!(column, clouds, radiation.transmittance, model)
+    t = transmissivity!(column, clouds, radiation.transmissivity, model)
     shortwave_radiative_transfer!(column, t, clouds, radiation.radiative_transfer, model)
 end
 
@@ -149,7 +146,7 @@ initialize!(::OneBandShortwaveRadiativeTransfer, ::PrimitiveEquation) = nothing
 # function barrier to unpack model
 function shortwave_radiative_transfer!(
     column::ColumnVariables,
-    t,          # Transmittance array
+    t,          # Transmissivity array
     clouds,     # NamedTuple from clouds!
     radiation::OneBandShortwaveRadiativeTransfer,
     model::PrimitiveEquation
@@ -161,7 +158,7 @@ end
 One-band shortwave radiative transfer with cloud reflection and ozone absorption."""
 function shortwave_radiative_transfer!(
     column::ColumnVariables,
-    t,          # Transmittance array
+    t,          # Transmissivity array
     clouds,     # NamedTuple from clouds!
     radiation::OneBandShortwaveRadiativeTransfer,
     planet::AbstractPlanet,

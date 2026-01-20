@@ -1,4 +1,5 @@
 abstract type AbstractLand <: AbstractModelComponent end
+abstract type AbstractLandComponent <: AbstractModelComponent end
 abstract type AbstractWetLand <: AbstractLand end
 abstract type AbstractDryLand <: AbstractLand end
 
@@ -25,14 +26,6 @@ function Base.show(io::IO, M::AbstractLand)
         p(io, "$s $key: $(typeof(val))")
     end
 end
-
-include("geometry.jl")
-include("thermodynamics.jl")
-include("temperature.jl")
-include("soil_moisture.jl")
-include("snow.jl")
-include("vegetation.jl")
-include("rivers.jl")
 
 # LandModel defined through its components
 export LandModel
@@ -63,8 +56,10 @@ function initialize!(   land::LandModel,
     initialize!(model.land.rivers, model)
 end
 
-variables(land::LandModel) = (variables(land.temperature)...,
+# allocate variables as defined by land components
+variables(land::LandModel) = ( variables(land.temperature)...,
                                variables(land.soil_moisture)...,
+                               variables(land.snow)...,
                                variables(land.vegetation)...,
                                variables(land.rivers)...,
                                )
@@ -84,8 +79,9 @@ function initialize!(land::DryLandModel, model::PrimitiveEquation)
     initialize!(model.land.temperature, model)
 end
 
-variables(land::DryLandModel) = (variables(land.temperature)...,
-                               )
+# initializing the land model initializes its components
+variables(land::DryLandModel) = (variables(land.temperature)...,)
+
 # unpack land model and call general timestep! function
 land_timestep!(progn::PrognosticVariables, diagn::DiagnosticVariables, model::PrimitiveEquation) =
     timestep!(progn, diagn, model.land, model)

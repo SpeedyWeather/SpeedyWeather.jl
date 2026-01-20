@@ -100,7 +100,7 @@ $(TYPEDFIELDS)"""
     large_scale_condensation::LSC = ImplicitCondensation(spectral_grid)
     convection::CV = BettsMillerConvection(spectral_grid)
     shortwave_radiation::SW = TransparentShortwave(spectral_grid)
-    longwave_radiation::LW = JeevanjeeRadiation(spectral_grid)
+    longwave_radiation::LW = OneBandLongwave(spectral_grid)
     stochastic_physics::SP = nothing
     custom_parameterization::CP = nothing
 
@@ -136,7 +136,7 @@ $(TYPEDFIELDS)"""
                                 # perturbations
                                 :stochastic_physics,
                             )
-    extra_parameterizations::TS3 = (:solar_zenith, :land, :ocean)
+    extra_parameterizations::TS3 = (:solar_zenith, :land, :ocean, :sea_ice)
 
     # DERIVED 
     # used to infer parameterizations at compile-time 
@@ -201,7 +201,7 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
     initialize!(ocean,     prognostic_variables, diagnostic_variables, model.ocean, model)
     initialize!(land,      prognostic_variables, diagnostic_variables, model.land, model)
 
-    # set the initial conditions (may overwrite variables set in intialize! ocean/land)
+    # set the initial conditions (may overwrite variables set in initialize! ocean/land)
     initialize!(prognostic_variables, model.initial_conditions, model)
     (; clock) = prognostic_variables
     clock.time = time       # set the current time

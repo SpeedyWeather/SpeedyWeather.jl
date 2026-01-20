@@ -360,12 +360,11 @@ and inspected with
 albedo.ocean
 ```
 
-etc. You can mix those albedos too, they are internally
-two independent fields that are applied to fluxes
-separately, e.g.
+and `albedo.land`. You can mix those albedos too, they are internally
+two independent albedos that are applied to fluxes separately, e.g.
 
 ```@example land
-albedo = Albedo(GlobalConstantAlbedo(spectral_grid), AlbedoClimatology(spectral_grid))
+albedo = OceanLandAlbedo(GlobalConstantAlbedo(spectral_grid), AlbedoClimatology(spectral_grid))
 ```
 
 constructs an albedo that is a global constant (default 0.3) for the ocean
@@ -385,7 +384,7 @@ and this definition of the albedo will be used for both ocean and land fluxes.
 In all cases you can then pass on the albedo to the model constructor, e.g.
 
 ```@example land
-albedo = Albedo(GlobalConstantAlbedo(spectral_grid, albedo=0.1), ManualAlbedo(spectral_grid))
+albedo = OceanLandAlbedo(GlobalConstantAlbedo(spectral_grid, albedo=0.1), ManualAlbedo(spectral_grid))
 set!(albedo.land, (λ, φ) -> 0.2 + 0.3*abs(φ)/90)
 
 model = PrimitiveWetModel(spectral_grid; albedo)

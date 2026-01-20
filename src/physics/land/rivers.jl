@@ -1,1 +1,1 @@
-abstract type AbstractRivers <: AbstractParameterization end
+abstract type AbstractRivers <: AbstractLandComponent end

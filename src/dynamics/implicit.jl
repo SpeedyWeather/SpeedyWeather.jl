@@ -175,6 +175,7 @@ function initialize!(
     diagn::DiagnosticVariables,
     model::PrimitiveEquation,
 )
+    model.dynamics || return nothing    # escape immediately if no dynamics
     (; geometry, geopotential, atmosphere, adiabatic_conversion) = model
     initialize!(I, dt, diagn, geometry, geopotential, atmosphere, adiabatic_conversion)
 end

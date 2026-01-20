@@ -1,6 +1,6 @@
 abstract type AbstractSeaIce <: AbstractModelComponent end
 
-# function barrier for all oceans
+# function barrier for all sea ice
 @propagate_inbounds function sea_ice_timestep!( progn::PrognosticVariables,
                             diagn::DiagnosticVariables,
                             model::PrimitiveEquation)
@@ -25,6 +25,12 @@ end
 
 ThermodynamicSeaIce(SG::SpectralGrid; kwargs...) = ThermodynamicSeaIce{SG.NF}(;kwargs...)
 initialize!(::ThermodynamicSeaIce, ::AbstractModel) = nothing
+
+function variables(::ThermodynamicSeaIce)
+    return (
+        PrognosticVariable(name=:sea_ice_concentration, dims=Grid2D(), namespace=:ocean, desc="Sea ice concentration", units="1"),
+    )
+end
 
 # don't affect concentration (may be set with set!)
 function initialize!(

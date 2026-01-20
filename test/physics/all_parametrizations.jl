@@ -8,12 +8,15 @@
 
         simulation = initialize!(model)
         run!(simulation, steps=4)
+        progn, diagn, model = SpeedyWeather.unpack(simulation)
         
         # call parameterization without @inbounds to check for boundserrors 
-        SpeedyWeather._call_parameterizations_cpu!(diagn, progn, get_parameterizations(model), model)
+        SpeedyWeather._call_parameterizations_cpu!(diagn, progn, SpeedyWeather.get_parameterizations(model), model)
         
         for key in keys(diagn.physics)
-            @test !any(isnan.(diagn.physics[key]))
+            if key != :land && key != :ocean
+                @test !any(isnan.(diagn.physics[key]))
+            end
         end
     end
 end

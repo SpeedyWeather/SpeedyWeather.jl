@@ -1,7 +1,11 @@
-abstract type AbstractSoilMoisture <: AbstractParameterization end
+abstract type AbstractSoilMoisture <: AbstractLandComponent end
 
 export SeasonalSoilMoisture
-@kwdef mutable struct SeasonalSoilMoisture{NF, GridVariable4D} <: AbstractSoilMoisture
+
+"""SeasonalSoilMoisture model that prescribes soil moisture from a monthly climatology file.
+The soil moisture is linearly interpolated between months based on the model time.
+$(TYPEDFIELDS)"""
+@kwdef struct SeasonalSoilMoisture{NF, GridVariable4D} <: AbstractSoilMoisture
     # READ CLIMATOLOGY FROM FILE
     "[OPTION] path to the folder containing the soil moisture file, pkg path default"
     path::String = "SpeedyWeather.jl/input_data"
@@ -26,6 +30,9 @@ export SeasonalSoilMoisture
     monthly_soil_moisture::GridVariable4D
 end
 
+# TODO to adapt create a ManualSeasonalSoilMoisture component like AlbedoClimatology is adapted to ManualAlbedo
+# Adapt.adapt_structure(to, soil::SeasonalSoilMoisture) = adapt(to, ManualSeasonalSoilMoisture(soil.monthly_soil_moisture))
+
 # generator function
 function SeasonalSoilMoisture(SG::SpectralGrid, geometry::LandGeometry; kwargs...)
     (; NF, GridVariable4D, grid) = SG
@@ -36,7 +43,7 @@ end
 
 function variables(::SeasonalSoilMoisture)
     return (
-        PrognosticVariable(name=:soil_moisture, dims=Grid3D(), namespace=:land),
+        PrognosticVariable(name=:soil_moisture, dims=Grid3D(), desc="Soil moisture content (fraction of capacity)", units="1", namespace=:land),
     )
 end
 
@@ -140,7 +147,10 @@ end
 
 export LandBucketMoisture
 
-@kwdef mutable struct LandBucketMoisture{NF} <: AbstractSoilMoisture
+"""LandBucketMoisture model with two soil layers exchanging moisture via vertical diffusion.
+Forced by precipitation, evaporation, surface condensation, snow melt and river runoff drainage.
+$(TYPEDFIELDS)"""
+@kwdef struct LandBucketMoisture{NF} <: AbstractSoilMoisture
     "[OPTION] Time scale of vertical diffusion [s]"
     time_scale::Second = Day(2)
 
@@ -152,26 +162,14 @@ export LandBucketMoisture
 
     "[OPTION] Initial soil moisture over ocean, volume fraction [1]"
     ocean_moisture::NF = 0
-
-    "[DERIVED] Water at field capacity [m], top layer, f = γz, set at initialize from by land.thermodynamics and .geometry"
-    f₁::NF = zero(NF)
-
-    "[DERIVED] Water at field capacity [m], lower layer, f = γz, set at initialize from by land.thermodynamics and .geometry"
-    f₂::NF = zero(NF)
 end
 
-LandBucketMoisture(SG::SpectralGrid, geometry::LandGeometry; kwargs...) = LandBucketMoisture{SG.NF}(; kwargs...)
+Adapt.@adapt_structure LandBucketMoisture
+LandBucketMoisture(SG::SpectralGrid; kwargs...) = LandBucketMoisture{SG.NF}(; kwargs...)
 function initialize!(soil::LandBucketMoisture, model::PrimitiveEquation)
-    (; nlayers) = model.land
-    @assert nlayers == 2 "LandBucketMoisture only works with 2 soil layers "*
-    "but model.land.nlayers = $nlayers given. Ignoring additional layers."
-    
-    # set the field capacity given layer thickness and 
-    γ = model.land.thermodynamics.field_capacity
-    z₁ = model.land.geometry.layer_thickness[1]
-    z₂ = model.land.geometry.layer_thickness[2]
-    soil.f₁ = γ*z₁    # amount of water at field capacity in first layer [m]
-    soil.f₂ = γ*z₂    # amount of water at field capacity in second layer [m]
+    (; nlayers_soil) = model.spectral_grid
+    @assert nlayers_soil == 2 "LandBucketMoisture only works with 2 soil layers "*
+    "but spectral_grid.nlayers_soil = $nlayers_soil given. Ignoring additional layers."
 
     return nothing
 end
@@ -227,7 +225,7 @@ function timestep!(
     ρ = model.atmosphere.water_density
     (; mask) = model.land_sea_mask
 
-    P = diagn.physics.rain_rate                     # precipitation (rain only) in [kg/m²/s]
+    P = diagn.physics.rain_rate                     # precipitation (rain only) in [m/s]
     S = diagn.physics.land.snow_melt_rate           # [kg/m²/s] includes snow runoff leakage water
     H = diagn.physics.land.surface_humidity_flux    # [kg/m²/s], divide by density for [m/s], positive up
     R = diagn.physics.land.river_runoff             # diagnosed here, accumulated [m]
@@ -236,7 +234,11 @@ function timestep!(
         throw(DimensionMismatch(soil_moisture, P))
     @boundscheck size(soil_moisture, 2) >= 2 || throw(DimensionMismatch)
     
-    f₁, f₂ = soil.f₁, soil.f₂
+    # Water at field capacity [m], top and lower layer γ*z₁ and γ*z₂
+    γ  = model.land.thermodynamics.field_capacity
+    f₁ = γ*model.land.geometry.layer_thickness[1]
+    f₂ = γ*model.land.geometry.layer_thickness[2]
+
     p = soil.infiltration_fraction      # Infiltration fraction: fraction of top layer runoff put into lower layer
     τ⁻¹ = inv(convert(eltype(soil_moisture), Second(soil.time_scale).value))
 
@@ -259,8 +261,8 @@ end
 
         # Soil top sources and sinks
         # note: rain water can increase soil moisture regardless of snow cover
-        # [kg/m²/s] -> [m/s] for humidity flux H
-        F = P[ij] + S[ij] - H[ij]/ρ
+        # [kg/m²/s] -> [m/s] for humidity flux H and snow melt rate S
+        F = P[ij] + (S[ij] - H[ij])/ρ
   
         # vertical diffusion term between layers
         D = τ⁻¹*(soil_moisture[ij, 1] - soil_moisture[ij, 2])

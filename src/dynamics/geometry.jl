@@ -10,53 +10,58 @@ $(TYPEDFIELDS)
 @kwdef struct Geometry{
     SpectralGridType,   # <:Union{SpectralGrid, Nothing}, the latter only matter inside GPU kernels
     RefValueNF,         # <:Union{Base.RefValue{NF}, CUDA.RefValue{NF}}
+    VectorIntType,
     VectorType,
 } <: AbstractGeometry
 
     "SpectralGrid that defines spectral and grid resolution"
     spectral_grid::SpectralGridType
 
-    "resolution parameter nlat_half of Grid, # of latitudes on one hemisphere (incl Equator)"
+    "Resolution parameter nlat_half of Grid, # of latitudes on one hemisphere (incl Equator)"
     nlat_half::Int = spectral_grid.nlat_half
 
-    "maximum number of longitudes (at/around Equator)"
+    "Maximum number of longitudes (at/around Equator)"
     nlon_max::Int = get_nlon_max(spectral_grid.Grid, nlat_half)
 
-    "number of latitude rings"
+    "Number of latitude rings"
     nlat::Int = spectral_grid.nlat
 
-    "number of vertical levels"
+    "Number of vertical levels"
     nlayers::Int = spectral_grid.nlayers
 
-    "total number of horizontal grid points"
+    "Total number of horizontal grid points"
     npoints::Int = spectral_grid.npoints
 
     "Planet's radius [m], set from model.planet during initialize!"
     radius::RefValueNF = RefValueNF(DEFAULT_RADIUS)
 
+    # INDEXING
+    "Latitude ring index j for every grid point ij"
+    whichring::VectorIntType = RingGrids.whichring(spectral_grid.grid)
+
     # ARRAYS OF LANGITUDES/LONGITUDES
-    "array of longitudes in degrees (0...360˚), empty for non-full grids"
+    "Array of longitudes in degrees (0...360˚), empty for non-full grids"
     lond::VectorType = get_lond(spectral_grid.Grid, nlat_half)
 
-    "array of latitudes in degrees (90˚...-90˚)"
+    "Array of latitudes in degrees (90˚...-90˚)"
     latd::VectorType = get_latd(spectral_grid.Grid, nlat_half)
 
-    "array of latitudes in radians (π...-π)"
+    "Array of latitudes in radians (π...-π)"
     lat::VectorType = get_lat(spectral_grid.Grid, nlat_half)
 
-    "array of colatitudes in radians (0...π)"
+    "Array of colatitudes in radians (0...π)"
     colat::VectorType = get_colat(spectral_grid.Grid, nlat_half)
 
-    "longitude (0˚...360˚) for each grid point in ring order"
+    "Longitude (0˚...360˚) for each grid point in ring order"
     londs::VectorType = get_londlatds(spectral_grid.Grid, nlat_half)[1]
 
-    "latitude (-90˚...˚90) for each grid point in ring order"
+    "Latitude (-90˚...˚90) for each grid point in ring order"
     latds::VectorType = get_londlatds(spectral_grid.Grid, nlat_half)[2]
 
-    "longitude (0...2π) for each grid point in ring order"
+    "Longitude (0...2π) for each grid point in ring order"
     lons::VectorType = RingGrids.get_lonlats(spectral_grid.Grid, nlat_half)[1]
 
-    "latitude (-π/2...π/2) for each grid point in ring order"
+    "Latitude (-π/2...π/2) for each grid point in ring order"
     lats::VectorType = RingGrids.get_lonlats(spectral_grid.Grid, nlat_half)[2]
 
     "sin of latitudes"
@@ -103,9 +108,9 @@ function Geometry(SG::SpectralGrid; vertical_coordinates=SigmaCoordinates(SG.nla
         "$(vertical_coordinates.nlayers) in spectral_grid.vertical_coordinates."
     @assert nlayers == vertical_coordinates.nlayers error_message
 
-    (; NF, VectorType) = SG
+    (; NF, VectorIntType, VectorType) = SG
     (; σ_half) = vertical_coordinates
-    return Geometry{typeof(SG), Base.RefValue{NF}, VectorType}(; spectral_grid=SG, σ_levels_half=σ_half)
+    return Geometry{typeof(SG), Base.RefValue{NF}, VectorIntType, VectorType}(; spectral_grid=SG, σ_levels_half=σ_half)
 end
 
 function Base.show(io::IO, G::Geometry)

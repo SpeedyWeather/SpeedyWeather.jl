@@ -1,7 +1,11 @@
-abstract type AbstractLandTemperature <: AbstractParameterization end
+abstract type AbstractLandTemperature <: AbstractLandComponent end
 
 export SeasonalLandTemperature
-@kwdef mutable struct SeasonalLandTemperature{NF, GridVariable3D} <: AbstractLandTemperature
+
+"""SeasonalLandTemperature model that prescribes land surface temperature from a monthly climatology file.
+The temperature is linearly interpolated between months based on the model time.
+$(TYPEDFIELDS)"""
+@kwdef struct SeasonalLandTemperature{NF, GridVariable3D} <: AbstractLandTemperature
     "[OPTION] path to the folder containing the land temperature file, pkg path default"
     path::String = "SpeedyWeather.jl/input_data"
 
@@ -27,6 +31,9 @@ export SeasonalLandTemperature
     "Monthly land surface temperatures [K], interpolated onto Grid"
     monthly_temperature::GridVariable3D
 end
+
+# TODO to adapt create a ManualSeasonalLandTemperature component like AlbedoClimatology is adapted to ManualAlbedo
+# Adapt.adapt_structure(to, temp::SeasonalLandTemperature) = adapt(to, ManualSeasonalLandTemperature(temp.monthly_temperature))
 
 # generator function
 function SeasonalLandTemperature(SG::SpectralGrid, geometry::LandGeometry; kwargs...)
@@ -70,7 +77,9 @@ function initialize!(land::SeasonalLandTemperature, model::PrimitiveEquation)
     masked_value = land.ocean_temperature
     if land.mask
         # Replace NaN values in soil temperature with a fallback ocean temperature
-        monthly_temperature[isnan.(monthly_temperature)] .= masked_value
+        # unpack via .data due to broadcasting issues
+        mtd = monthly_temperature.data
+        mtd[isnan.(mtd)] .= masked_value
 
         # but land-sea mask may not align so also set those 100% ocean points to
         # the same fallback ocean temperature
@@ -124,7 +133,7 @@ end
 
 ## CONSTANT LAND CLIMATOLOGY
 export ConstantLandTemperature
-@kwdef mutable struct ConstantLandTemperature{NF} <: AbstractLandTemperature
+@kwdef struct ConstantLandTemperature{NF} <: AbstractLandTemperature
     "[OPTION] Globally constant temperature"
     temperature::NF = 285
 
@@ -157,15 +166,17 @@ end
 
 export LandBucketTemperature
 
-"""MITgcm's two-layer soil model (https://mitgcm.readthedocs.io/en/latest/phys_pkgs/land.html). Fields assert
-$(TYPEDFIELDS)"""
-@kwdef mutable struct LandBucketTemperature{NF} <: AbstractLandTemperature
+"""MITgcm's two-layer soil model (https://mitgcm.readthedocs.io/en/latest/phys_pkgs/land.html).
+Fields are $(TYPEDFIELDS)"""
+@kwdef struct LandBucketTemperature{NF} <: AbstractLandTemperature
     "[OPTION] Apply land-sea mask to set ocean-only points?"
     mask::Bool = true
     
     "[OPTION] Initial soil temperature over ocean [K]"
     ocean_temperature::NF = 285
 end
+
+Adapt.@adapt_structure LandBucketTemperature
 
 # generator function
 LandBucketTemperature(SG::SpectralGrid, geometry::LandGeometry; kwargs...) = LandBucketTemperature{SG.NF}(; kwargs...)
@@ -220,10 +231,12 @@ function timestep!(
     Rld = diagn.physics.surface_longwave_down           # all in [W/m²]
     Rlu = diagn.physics.land.surface_longwave_up
     S = diagn.physics.land.sensible_heat_flux
-    H = diagn.physics.land.surface_humidity_flux        # except this in [kg/s/m²]
-    M = diagn.physics.land.snow_melt_rate               # in [kg/s/m²] from snow model
 
-    @boundscheck fields_match(soil_temperature, Rsd, Rsu, Rld, Rlu, H, S, M, horizontal_only=true) ||
+    # except these in [kg/s/m²]
+    H = haskey(diagn.physics.land, :surface_humidity_flux) ? diagn.physics.land.surface_humidity_flux : nothing
+    M = haskey(diagn.physics.land, :snow_melt_rate) ? diagn.physics.land.snow_melt_rate : nothing
+
+    @boundscheck fields_match(soil_temperature, Rsd, Rsu, Rld, Rlu, S, horizontal_only=true) ||
         throw(DimensionMismatch(soil_temperature, Rs))
     @boundscheck size(soil_moisture, 2) == size(soil_temperature, 2) == 2 || throw(DimensionMismatch)
     
@@ -238,25 +251,28 @@ function timestep!(
     params = (; Lᵥ, Lᵢ, γ, Cw, Cs, z₁, z₂, Δ, Δt)
 
     launch!(architecture(soil_temperature), LinearWorkOrder, (size(soil_temperature, 1),),
-        land_bucket_temperature_kernel!, soil_temperature, mask, soil_moisture, Rsd, Rsu, Rlu, Rld, H, S, M,
+        land_bucket_temperature_kernel!, soil_temperature, mask, soil_moisture, Rsd, Rsu, Rlu, Rld, S, H, M,
         params)
 
     return nothing
 end
 
 @kernel inbounds=true function land_bucket_temperature_kernel!(
-    soil_temperature, mask, soil_moisture, Rsd, Rsu, Rlu, Rld, H, S, M, params)
+    soil_temperature, mask, soil_moisture, Rsd, Rsu, Rlu, Rld, S, H, M, params)
     
     ij = @index(Global, Linear)
 
     if mask[ij] > 0                         # at least partially land
         (; Lᵥ, Lᵢ, γ, Cw, Cs, z₁, z₂, Δ, Δt) = params
         
-        # Cooling from snow melt rate
-        Q_melt = Lᵢ * M[ij]                 # in [W/m²] = [J/kg] * [kg/m²/s]
+        # Cooling from snow melt rate, in [W/m²] = [J/kg] * [kg/m²/s]
+        Q_melt = isnothing(M) ? zero(Lᵢ) : Lᵢ * M[ij]
+
+        # latent heat flux [W/m²], zero if H not available
+        L = isnothing(H) ? zero(Lᵥ) : Lᵥ*H[ij]
 
         # total surface downward heat flux [W/m^2]
-        F = Rsd[ij] - Rsu[ij] - Rlu[ij] + Rld[ij] - Lᵥ*H[ij] - S[ij] - Q_melt
+        F = Rsd[ij] - Rsu[ij] - Rlu[ij] + Rld[ij] - L - S[ij] - Q_melt
 
         # heat capacity of the (wet) soil layers 1 and 2 [J/(m³ K)]
         # ignore snow here
@@ -275,14 +291,13 @@ end
 function variables(::LandBucketTemperature)
     return (
         # Prognostic variables
-        PrognosticVariable(name=:soil_temperature, dims=Grid3D(), namespace=:land),
-        PrognosticVariable(name=:soil_moisture, dims=Grid3D(), namespace=:land),
+        PrognosticVariable(name=:soil_temperature, dims=Grid3D(), desc="Soil temperature", units="K", namespace=:land),
+        PrognosticVariable(name=:soil_moisture, dims=Grid3D(), desc="Soil moisture content (fraction of capacity)", units="1", namespace=:land),
         # Diagnostic variables read from diagn.physics
         DiagnosticVariable(name=:surface_shortwave_down, dims=Grid2D(), desc="Surface shortwave radiation down", units="W/m²"),
         DiagnosticVariable(name=:surface_shortwave_up, dims=Grid2D(), desc="Surface shortwave radiation up", units="W/m²", namespace=:land),
         DiagnosticVariable(name=:surface_longwave_down, dims=Grid2D(), desc="Surface longwave radiation down", units="W/m²"),
         DiagnosticVariable(name=:surface_longwave_up, dims=Grid2D(), desc="Surface longwave radiation up", units="W/m²", namespace=:land),
-        DiagnosticVariable(name=:surface_humidity_flux, dims=Grid2D(), desc="Surface humidity flux", units="kg/s/m²", namespace=:land),
         DiagnosticVariable(name=:sensible_heat_flux, dims=Grid2D(), desc="Sensible heat flux", units="W/m²", namespace=:land),
     )
 end

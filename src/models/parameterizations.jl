@@ -8,10 +8,7 @@ at definition.
 """
 abstract type AbstractParameterization <: AbstractModelComponent end
 
-"""
-    $(TYPEDSIGNATURES)
-
-Function that defines the actual parameterization of an `AbstractParameterization`. 
+"""Function that defines the actual parameterization of an `AbstractParameterization`. 
 
 Takes in the index of the column `ij`, the `DiagnosticVariables` and `PrognosticVariables`, the 
 parameterization itself and a tuple with all relevant model parameters (all fields in `model.parameters`). 
@@ -19,17 +16,17 @@ The latter includes - among others - land sea mask, orography and physical const
 
 This function is used within a KernelAbstractions kernel and is therefore expected to work on GPU as well. 
 Don't use any dynamic dispatches, try to avoid allocations and branches in your code and only use scalar 
-indexing of arrays. 
-"""
-# parameterization!(ij, diagn, progn, parameterization::AbstractParameterization, model_parameters) = nothing
+indexing of arrays."""
+parameterization!
+
+"""$(TYPEDSIGNATURES) Fallback when setting `parameterization=nothing` in the model constructor."""
 parameterization!(ij, diagn, progn, parameterization::Nothing, model_parameters) = nothing
 
 """
     $(TYPEDSIGNATURES)
 
 Initialize an `AbstractParameterization`. This is called once at when calling initialize!(model). 
-The default behaviour is to return `nothing`
-"""
+The default behaviour is to return `nothing`."""
 initialize!(parameterization::AbstractParameterization, model::AbstractModel) = nothing
 
 """
