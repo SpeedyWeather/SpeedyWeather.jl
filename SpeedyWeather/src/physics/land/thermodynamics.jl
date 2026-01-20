@@ -28,5 +28,5 @@ export LandThermodynamics
 end
 
 Adapt.@adapt_structure LandThermodynamics
-LandThermodynamics(SG::SpectralGrid, geometry::LandGeometry; kwargs...) = LandThermodynamics{SG.NF}(; kwargs...)
+LandThermodynamics(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothing; kwargs...) = LandThermodynamics{SG.NF}(; kwargs...)
 initialize!(land::LandThermodynamics, model::PrimitiveEquation) = nothing

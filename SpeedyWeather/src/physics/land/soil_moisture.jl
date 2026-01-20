@@ -167,7 +167,7 @@ $(TYPEDFIELDS)"""
 end
 
 Adapt.@adapt_structure LandBucketMoisture
-LandBucketMoisture(SG::SpectralGrid, geometry::LandGeometry; kwargs...) = LandBucketMoisture{SG.NF}(; kwargs...)
+LandBucketMoisture(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothing; kwargs...) = LandBucketMoisture{SG.NF}(; kwargs...)
 function initialize!(soil::LandBucketMoisture, model::PrimitiveEquation)
     nlayers = get_soil_layers(model)
     @assert nlayers == 2 "LandBucketMoisture only works with 2 soil layers " *

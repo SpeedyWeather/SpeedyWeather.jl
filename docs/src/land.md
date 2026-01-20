@@ -59,9 +59,8 @@ To change these you can either mutate the fields or create a new model component
 passed on to the land model constructor
 
 ```@example land
-geometry = LandGeometry(spectral_grid, nlayers=2)
-thermodynamics = LandThermodynamics(spectral_grid, geometry, heat_conductivity_dry_soil=0.25)
-land = LandModel(spectral_grid; geometry, thermodynamics)
+thermodynamics = LandThermodynamics(spectral_grid, heat_conductivity_dry_soil=0.25)
+land = LandModel(spectral_grid; thermodynamics)
 land.thermodynamics
 ```
 
@@ -108,9 +107,8 @@ You can use them by passing them on to a
 `LandModel`/`DryLandModel` model constructor
 
 ```@example land
-geometry = LandGeometry(spectral_grid, nlayers=2)
-temperature = LandBucketTemperature(spectral_grid, geometry)
-land = LandModel(spectral_grid; geometry, temperature)
+temperature = LandBucketTemperature(spectral_grid)
+land = LandModel(spectral_grid; temperature)
 ```
 
 such that

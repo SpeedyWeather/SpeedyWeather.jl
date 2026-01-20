@@ -9,6 +9,8 @@ struct LandGeometry{VectorType} <: AbstractLandGeometry
     layer_thickness::VectorType
 end
 
+const LandGeometryOrNothing = Union{LandGeometry, Nothing}
+
 # default constructor
 function LandGeometry(SG::SpectralGrid; nlayers = DEFAULT_NLAYERS_SOIL, layer_thickness = nothing)
 

@@ -36,7 +36,7 @@ end
 # Adapt.adapt_structure(to, temp::SeasonalLandTemperature) = adapt(to, ManualSeasonalLandTemperature(temp.monthly_temperature))
 
 # generator function
-function SeasonalLandTemperature(SG::SpectralGrid, geometry::LandGeometry; kwargs...)
+function SeasonalLandTemperature(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothing; kwargs...)
     (; NF, GridVariable3D, grid) = SG
     monthly_temperature = zeros(GridVariable3D, grid, 12)  # 12 months
     return SeasonalLandTemperature{NF, GridVariable3D}(; monthly_temperature, kwargs...)
@@ -144,7 +144,7 @@ export ConstantLandTemperature
 end
 
 # generator function
-ConstantLandTemperature(SG::SpectralGrid, geometry::LandGeometry; kwargs...) = ConstantLandTemperature{SG.NF}(; kwargs...)
+ConstantLandTemperature(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothing; kwargs...) = ConstantLandTemperature{SG.NF}(; kwargs...)
 
 initialize!(land::ConstantLandTemperature, model::PrimitiveEquation) = nothing
 function initialize!(
@@ -181,7 +181,7 @@ end
 Adapt.@adapt_structure LandBucketTemperature
 
 # generator function
-LandBucketTemperature(SG::SpectralGrid, geometry::LandGeometry; kwargs...) = LandBucketTemperature{SG.NF}(; kwargs...)
+LandBucketTemperature(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothing; kwargs...) = LandBucketTemperature{SG.NF}(; kwargs...)
 function initialize!(land::LandBucketTemperature, model::PrimitiveEquation)
     nlayers = get_soil_layers(model)
     @assert nlayers == 2 "LandBucketTemperature only works with 2 soil layers " *

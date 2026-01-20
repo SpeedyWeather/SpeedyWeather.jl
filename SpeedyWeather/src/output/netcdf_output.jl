@@ -85,19 +85,21 @@ $(TYPEDFIELDS)"""
     # SCRATCH FIELDS TO INTERPOLATE ONTO
     const field2D::Field2D
     const field3D::Field3D
-    field3Dland::Field3D
+    const field3Dland::Field3D
 end
 
 """
 $(TYPEDSIGNATURES)
 Constructor for NetCDFOutput based on `S::SpectralGrid` and optionally
-the `Model` type (e.g. `ShallowWater`, `PrimitiveWet`) as second positional argument.
+the `Model` type (e.g. `ShallowWater`, `PrimitiveWet`) as second positional argument. In case a 
+non-default number of soil layers is used, it also needs the respective `LandGeometry` to allocate those outputs
 The output grid is optionally determined by keyword arguments `output_Grid` (its type, full grid required),
 `nlat_half` (resolution) and `output_NF` (number format). By default, uses the full grid
 equivalent of the grid and resolution used in `SpectralGrid` `S`."""
 function NetCDFOutput(
         SG::SpectralGrid,
-        Model::Type{<:AbstractModel} = Barotropic;
+        Model::Type{<:AbstractModel} = Barotropic, 
+        land_geometry::LandGeometry = LandGeometry(SG, layers=DEFAULT_NLAYERS_SOIL);
         output_grid::AbstractFullGrid = on_architecture(CPU(), RingGrids.full_grid_type(SG.grid)(SG.grid.nlat_half)),
         output_NF::DataType = DEFAULT_OUTPUT_NF,
         output_dt::Period = Second(DEFAULT_OUTPUT_DT),  # only needed for dispatch
@@ -112,12 +114,11 @@ function NetCDFOutput(
 
     # CREATE FULL FIELDS TO INTERPOLATE ONTO BEFORE WRITING DATA OUT
     (; nlayers) = SG
+    nlayers_soil = land_geometry.nlayers
 
     field2D = Field(output_NF, output_grid)
     field3D = Field(output_NF, output_grid, nlayers)
-
-    # TODO: revise this, currenlty this isn't ideal, here we allocate a dummy, and then it's set again in initialize
-    field3Dland = Field(output_NF, output_grid, 2)
+    field3Dland = Field(output_NF, output_grid, nlayers_soil)
 
     output = NetCDFOutput(;
         output_dt = Second(output_dt),    # convert to seconds for dispatch
@@ -244,6 +245,8 @@ function initialize!(
         model::AbstractModel,
     )
     output.active || return nothing             # exit immediately for no output
+
+    @assert get_soil_layers(model) == size(output.field3Dland, 2) "Non-default soil layers initialized, please construct NetCDFOutput with your chosen LandGeometry."
 
     # GET RUN ID, CREATE FOLDER
     # get new id only if not already specified
