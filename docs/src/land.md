@@ -41,7 +41,7 @@ spectral_grid = SpectralGrid(trunc=31, nlayers=8, nlayers_soil=2)
 land = LandModel(spectral_grid)
 ```
 
-With `land.geometry` currently used to define the layer thickness
+With `land.geometry` currently used to define the number of layers and their layer thickness
 
 ```@example land
 land.geometry
@@ -59,8 +59,9 @@ To change these you can either mutate the fields or create a new model component
 passed on to the land model constructor
 
 ```@example land
-thermodynamics = LandThermodynamics(spectral_grid, heat_conductivity_dry_soil=0.25)
-land = LandModel(spectral_grid; thermodynamics)
+geometry = LandGeometry(spectral_grid, nlayers=2)
+thermodynamics = LandThermodynamics(spectral_grid, geometry, heat_conductivity_dry_soil=0.25)
+land = LandModel(spectral_grid; geometry, thermodynamics)
 land.thermodynamics
 ```
 
@@ -107,8 +108,9 @@ You can use them by passing them on to a
 `LandModel`/`DryLandModel` model constructor
 
 ```@example land
-temperature = LandBucketTemperature(spectral_grid)
-land = LandModel(spectral_grid; temperature)
+geometry = LandGeometry(spectral_grid, nlayers=2)
+temperature = LandBucketTemperature(spectral_grid, geometry)
+land = LandModel(spectral_grid; geometry, temperature)
 ```
 
 such that
