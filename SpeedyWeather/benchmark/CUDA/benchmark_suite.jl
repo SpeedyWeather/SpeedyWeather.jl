@@ -87,6 +87,7 @@ function run_benchmark_suite!(suite::BenchmarkSuiteModel)
         nlayers = suite.nlayers[i]
         Grid = suite.Grid[i]
         architecture = suite.architecture[i]
+        lf = 2 
 
         spectral_grid = SpectralGrid(;NF, trunc, Grid, nlayers, architecture)
         suite.nlat[i] = spectral_grid.nlat
@@ -103,10 +104,10 @@ function run_benchmark_suite!(suite::BenchmarkSuiteModel)
         b = @benchmark CUDA.@sync SpeedyWeather.parameterization_tendencies!($diagn, $progn, $model)
         add_results!(suite, b, i, 1)
 
-        b = @benchmark CUDA.@sync SpeedyWeather.dynamics_tendencies!($diagn, $progn, $model)
+        b = @benchmark CUDA.@sync SpeedyWeather.dynamics_tendencies!($diagn, $progn, $lf, $model)
         add_results!(suite, b, i, 2)
 
-        b = @benchmark CUDA.@sync SpeedyWeather.implicit_correction!($diagn, $progn, $model)
+        b = @benchmark CUDA.@sync SpeedyWeather.implicit_correction!($diagn, $progn, $model.implicit, $model)
         add_results!(suite, b, i, 3)
     end
 
