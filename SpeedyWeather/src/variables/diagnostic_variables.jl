@@ -471,10 +471,11 @@ function DiagnosticVariables(model::AbstractModel)
     SG = model.spectral_grid
     (; spectral_transform, tracers) = model
 
-    (; spectrum, grid, nparticles, NF, nlayers, nlayers_soil) = SG
+    (; spectrum, grid, nparticles, NF, nlayers) = SG
     (; SpectralVariable2D, SpectralVariable3D) = SG
     (; GridVariable2D, GridVariable3D) = SG
     (; VectorType, ParticleVector) = SG
+    nlayers_soil = get_soil_layers(model)
 
     tendencies = Tendencies(SG; tracers)
     grid_variables = GridVariables(SG; tracers)
@@ -485,7 +486,6 @@ function DiagnosticVariables(model::AbstractModel)
     # allocate parameterization variables
     variable_names = get_diagnostic_variables(model)
 
-    # TODO: currently this is just a drop-in replacement, later we should have nlayers_soil from the land model and not from the SpectralGrid
     land = initialize_variables(SG, nlayers_soil, variable_names.land...)
     atmosphere = initialize_variables(SG, nlayers, variable_names.atmosphere...)
     ocean = initialize_variables(SG, 1, variable_names.ocean...)

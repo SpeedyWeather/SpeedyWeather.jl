@@ -196,7 +196,7 @@ function initialize!(
         model::PrimitiveEquation,
     )
     # create a seasonal model, initialize it and the variables
-    seasonal_model = SeasonalLandTemperature(model.spectral_grid)
+    seasonal_model = SeasonalLandTemperature(model.spectral_grid, model.land.geometry)
     initialize!(seasonal_model, model)
     initialize!(progn, diagn, seasonal_model, model)
     # (seasonal model will be garbage collected hereafter)

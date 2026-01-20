@@ -105,3 +105,6 @@ end
 
 @inline get_parameterizations(model::ShallowWater) = NamedTuple()
 @inline get_extra_parameterizations(model::ShallowWater) = NamedTuple()
+
+# default to 0 soil layers / no land model 
+@inline get_soil_layers(model::AbstractModel) = 0 

@@ -167,7 +167,7 @@ $(TYPEDFIELDS)"""
 end
 
 Adapt.@adapt_structure LandBucketMoisture
-LandBucketMoisture(SG::SpectralGrid; kwargs...) = LandBucketMoisture{SG.NF}(; kwargs...)
+LandBucketMoisture(SG::SpectralGrid, geometry::LandGeometry; kwargs...) = LandBucketMoisture{SG.NF}(; kwargs...)
 function initialize!(soil::LandBucketMoisture, model::PrimitiveEquation)
     (; nlayers) = model.land.geometry
     @assert nlayers == 2 "LandBucketMoisture only works with 2 soil layers " *
@@ -192,7 +192,7 @@ function initialize!(
         model::PrimitiveEquation,
     )
     # create a seasonal model, initialize it and the variables
-    seasonal_model = SeasonalSoilMoisture(model.spectral_grid)
+    seasonal_model = SeasonalSoilMoisture(model.spectral_grid, model.land.geometry)
     initialize!(seasonal_model, model)
     initialize!(progn, diagn, seasonal_model, model)
     # (seasonal model will be garbage collected hereafter)

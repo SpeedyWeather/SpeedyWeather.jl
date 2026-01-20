@@ -15,6 +15,8 @@ model_type(::Type{<:AbstractWetLand}) = LandModel
 model_type(::Type{<:AbstractDryLand}) = DryLandModel
 model_type(model::AbstractLand) = model_type(typeof(model))
 
+@inline get_soil_layers(model::AbstractLand) = model.geometry.nlayers
+
 function Base.show(io::IO, M::AbstractLand)
     println(io, "$(model_type(M)) <: $(model_class(M))")
     properties = propertynames(M)
@@ -41,8 +43,8 @@ export LandModel
     @component rivers::R = nothing
 end
 
-# also allow spectral grid to be passed on as first an only positional argument to model constructors
-(L::Type{<:AbstractLand})(SG::SpectralGrid; kwargs...) = L(spectral_grid = SG; kwargs...)
+# also allow spectral grid to be passed on as first an only positional argument to model constructors and nlayers to be passed as keyword argument directly to the constructor
+(L::Type{<:AbstractLand})(SG::SpectralGrid; nlayers = DEFAULT_NLAYERS_SOIL, kwargs...) = L(spectral_grid = SG, geometry = LandGeometry(SG, nlayers = nlayers); kwargs...)
 
 # initializing the land model initializes its components
 function initialize!(
