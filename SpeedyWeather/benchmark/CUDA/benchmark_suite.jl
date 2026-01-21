@@ -42,7 +42,7 @@ function run_benchmark_suite!(suite::BenchmarkSuiteTransform)
 
         specs, grids = generate_random_inputs(spectral_grid)
 
-        println("Running benchmark for architecture=$architecture, trunc=$trunc, nlayers=$nlayers, NF=$NF \n")
+        println("Running BenchmarkSuiteTransform for architecture=$architecture, trunc=$trunc, nlayers=$nlayers, NF=$NF \n")
 
         # Forward _legendre
         b = @benchmark CUDA.@sync SpeedyTransforms._legendre!($specs, $S.scratch_memory.north, $S.scratch_memory.south, $S.scratch_memory.column, $S)
@@ -99,7 +99,7 @@ function run_benchmark_suite!(suite::BenchmarkSuiteModel)
         progn, diagn, model = SpeedyWeather.unpack(simulation)
         fill!(diagn.tendencies, 0, typeof(model))
 
-        println("Running benchmark for architecture=$architecture, trunc=$trunc, nlayers=$nlayers, NF=$NF \n")
+        println("Running BenchmarkSuiteModel for architecture=$architecture, trunc=$trunc, nlayers=$nlayers, NF=$NF \n")
 
         b = @benchmark CUDA.@sync SpeedyWeather.parameterization_tendencies!($diagn, $progn, $model)
         add_results!(suite, b, i, 1)
@@ -150,7 +150,7 @@ function run_benchmark_suite!(suite::BenchmarkSuiteDynamics)
         fill!(diagn.tendencies, 0, typeof(model))
         (; orography, geometry, spectral_transform, geopotential, atmosphere, implicit) = model
 
-        println("Running benchmark for architecture=$architecture, trunc=$trunc, nlayers=$nlayers, NF=$NF \n")
+        println("Running BenchmarkSuiteDynamics for architecture=$architecture, trunc=$trunc, nlayers=$nlayers, NF=$NF \n")
 
         b = @benchmark CUDA.@sync SpeedyWeather.forcing!($diagn, $progn, $lf, $model)
         add_results!(suite, b, i, 1)
