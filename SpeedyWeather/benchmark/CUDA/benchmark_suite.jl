@@ -86,7 +86,7 @@ function run_benchmark_suite!(suite::BenchmarkSuiteModel)
         trunc = suite.trunc[i]
         nlayers = suite.nlayers[i]
         Grid = suite.Grid[i]
-        architecture = suite.architecture[i]
+        architecture = suite.model[i]
         lf = 2 
 
         spectral_grid = SpectralGrid(;NF, trunc, Grid, nlayers, architecture)

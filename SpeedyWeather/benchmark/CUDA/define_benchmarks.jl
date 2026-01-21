@@ -25,7 +25,7 @@ benchmarks[:benchmark200] = BenchmarkSuiteModel(
     trunc = [31, 63, 127, 255, 511],
     nlayers = fill(16, 5),
     Grid = fill(SpeedyWeather.DEFAULT_GRID, 5),
-    architecture = fill(CPU(), 5),
+    model = fill(CPU(), 5),
 )
 
 benchmarks[:benchmark201] = BenchmarkSuiteModel(
@@ -34,5 +34,5 @@ benchmarks[:benchmark201] = BenchmarkSuiteModel(
     trunc = [31, 63, 127, 255, 511],
     nlayers = fill(16, 5),
     Grid = fill(SpeedyWeather.DEFAULT_GRID, 5),
-    architecture = fill(GPU(), 5),
+    model = fill(GPU(), 5),
 )
