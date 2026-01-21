@@ -16,7 +16,7 @@ model_type(::Type{<:AbstractDryLand}) = DryLandModel
 model_type(model::AbstractLand) = model_type(typeof(model))
 
 @inline get_soil_layers(model::AbstractLand) = model.geometry.nlayers
-@inline get_soil_layers(::Nothing) = 0 # fallback 
+@inline get_soil_layers(::Nothing) = 0 # fallback
 
 function Base.show(io::IO, M::AbstractLand)
     println(io, "$(model_type(M)) <: $(model_class(M))")

@@ -98,8 +98,8 @@ The output grid is optionally determined by keyword arguments `output_Grid` (its
 equivalent of the grid and resolution used in `SpectralGrid` `S`."""
 function NetCDFOutput(
         SG::SpectralGrid,
-        Model::Type{<:AbstractModel} = Barotropic, 
-        land_geometry::LandGeometry = LandGeometry(SG, nlayers=DEFAULT_NLAYERS_SOIL);
+        Model::Type{<:AbstractModel} = Barotropic,
+        land_geometry::LandGeometry = LandGeometry(SG, nlayers = DEFAULT_NLAYERS_SOIL);
         output_grid::AbstractFullGrid = on_architecture(CPU(), RingGrids.full_grid_type(SG.grid)(SG.grid.nlat_half)),
         output_NF::DataType = DEFAULT_OUTPUT_NF,
         output_dt::Period = Second(DEFAULT_OUTPUT_DT),  # only needed for dispatch
@@ -114,7 +114,7 @@ function NetCDFOutput(
 
     # CREATE FULL FIELDS TO INTERPOLATE ONTO BEFORE WRITING DATA OUT
     (; nlayers) = SG
-    nlayers_soil = (Model <: Barotropic || Model <: ShallowWater) ? 0 : land_geometry.nlayers
+    nlayers_soil = land_geometry.nlayers
 
     field2D = Field(output_NF, output_grid)
     field3D = Field(output_NF, output_grid, nlayers)
@@ -246,7 +246,10 @@ function initialize!(
     )
     output.active || return nothing             # exit immediately for no output
 
-    @assert get_soil_layers(model) == size(output.field3Dland, 2) "Non-default soil layers initialized, please construct NetCDFOutput with your chosen LandGeometry."
+    # only checked for models that have a land component
+    if hasfield(typeof(model), :land) && !isnothing(model.land)
+        @assert get_soil_layers(model) == size(output.field3Dland, 2) "$(size(output.field3Dland, 2)) soil layers initialized for output, but $(get_soil_layers(model)) soil layers initialized for model. Please construct NetCDFOutput with the same LandGeometry as the model."
+    end
 
     # GET RUN ID, CREATE FOLDER
     # get new id only if not already specified
