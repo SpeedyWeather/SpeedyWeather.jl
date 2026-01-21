@@ -399,7 +399,7 @@ end
 """$(TYPEDSIGNATURES)
 Tendencies for vorticity and divergence. Excluding Bernoulli potential with geopotential
 and linear pressure gradient inside the Laplace operator, which are added later in
-spectral space.
+spectral space. 
 
     u_tend +=  v*(f+ζ) - RTᵥ'*∇lnpₛ_x
     v_tend += -u*(f+ζ) - RTᵥ'*∇lnpₛ_y
@@ -564,7 +564,6 @@ function temperature_tendency!(
 
     # now add the -∇⋅((u, v)*T') term
     flux_divergence!(temp_tend, temp_grid, diagn, G, S, add = true, flipsign = true)
-
     return nothing
 end
 
@@ -592,7 +591,6 @@ end
     # Adiabatic conversion term following Simmons and Burridge 1981 but for σ coordinates
     # += as tend already contains parameterizations + vertical advection
     Tᵥ = virtual_temperature(temp_grid[ij, k] + Tₖ, humid_grid[ij, k], atmosphere)
-
     (; κ) = atmosphere
     temp_tend_grid[ij, k] +=
         temp_grid[ij, k] * div_grid[ij, k] +            # +T'D term of hori advection

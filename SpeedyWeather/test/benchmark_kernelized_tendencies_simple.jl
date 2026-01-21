@@ -63,13 +63,11 @@ function check_correctness(name::String, func_original!, func_kernel!, args_orig
             end
         end
     end
-
     if all_close
         println("  ✓ Correctness check PASSED (max diff: $(max_diff))")
     else
         println("  ✗ Correctness check FAILED (max diff: $(max_diff))")
     end
-
     return all_close
 end
 
@@ -192,7 +190,6 @@ function test_function_correctness(name::String, func_original!, func_kernel!, t
             println("    - $field")
         end
     end
-
     return all_close
 end
 
@@ -205,7 +202,6 @@ function run_benchmarks(; trunc = 31, nlayers = 8, check_correctness = true)
     println("Truncation: T$trunc")
     println("Layers: $nlayers")
     println("Architecture: CPU")
-
     # Run correctness tests first if requested
     if check_correctness
         println("\n" * "="^70)
@@ -237,7 +233,6 @@ function run_benchmarks(; trunc = 31, nlayers = 8, check_correctness = true)
             SpeedyWeather.temperature_tendency_kernel!,
             trunc, nlayers
         )
-
         # Summary
         println("\n" * "-"^70)
         all_passed = all(values(correctness_results))
@@ -252,7 +247,6 @@ function run_benchmarks(; trunc = 31, nlayers = 8, check_correctness = true)
             end
         end
     end
-
     # Now run performance benchmarks
     println("\n" * "="^70)
     println("PERFORMANCE BENCHMARKS")
@@ -271,7 +265,6 @@ function run_benchmarks(; trunc = 31, nlayers = 8, check_correctness = true)
         SpeedyWeather.vertical_integration_kernel!,
         diagn, progn, lf, model.geometry
     )
-
     # Test 2: vertical_velocity!
     results["vertical_velocity"] = compare_performance(
         "vertical_velocity!",
@@ -279,7 +272,6 @@ function run_benchmarks(; trunc = 31, nlayers = 8, check_correctness = true)
         SpeedyWeather.vertical_velocity_kernel!,
         diagn, model.geometry
     )
-
     # Test 3: vordiv_tendencies!
     results["vordiv_tendencies"] = compare_performance(
         "vordiv_tendencies!",
@@ -287,7 +279,6 @@ function run_benchmarks(; trunc = 31, nlayers = 8, check_correctness = true)
         SpeedyWeather.vordiv_tendencies_kernel!,
         diagn, model.coriolis, model.atmosphere, model.geometry, model.spectral_transform
     )
-
     # Test 4: temperature_tendency!
     results["temperature_tendency"] = compare_performance(
         "temperature_tendency!",
@@ -296,7 +287,6 @@ function run_benchmarks(; trunc = 31, nlayers = 8, check_correctness = true)
         diagn, model.adiabatic_conversion, model.atmosphere, model.implicit,
         model.geometry, model.spectral_transform
     )
-
     # Test 5: pressure_gradient_flux!
     results["pressure_gradient_flux"] = compare_performance(
         "pressure_gradient_flux!",
@@ -304,7 +294,6 @@ function run_benchmarks(; trunc = 31, nlayers = 8, check_correctness = true)
         SpeedyWeather.pressure_gradient_flux_kernel!,
         diagn, progn, lf, model.spectral_transform
     )
-
     # Test 6: temperature_anomaly!
     results["temperature_anomaly"] = compare_performance(
         "temperature_anomaly!",
@@ -312,19 +301,16 @@ function run_benchmarks(; trunc = 31, nlayers = 8, check_correctness = true)
         SpeedyWeather.temperature_anomaly_kernel!,
         diagn, model.implicit
     )
-
     # Test 7: horizontal_advection!
     A_tend = diagn.tendencies.temp_tend
     A_tend_grid = diagn.tendencies.temp_tend_grid
     A_grid = diagn.grid.temp_grid
-
     results["horizontal_advection"] = compare_performance(
         "horizontal_advection!",
         SpeedyWeather.horizontal_advection!,
         SpeedyWeather.horizontal_advection_kernel!,
         A_tend, A_tend_grid, A_grid, diagn, model.geometry, model.spectral_transform
     )
-
     # Test 8: flux_divergence!
     results["flux_divergence"] = compare_performance(
         "flux_divergence!",
@@ -332,7 +318,6 @@ function run_benchmarks(; trunc = 31, nlayers = 8, check_correctness = true)
         SpeedyWeather.flux_divergence_kernel!,
         A_tend, A_grid, diagn, model.geometry, model.spectral_transform
     )
-
     # Test 9: linear_pressure_gradient!
     results["linear_pressure_gradient"] = compare_performance(
         "linear_pressure_gradient!",
@@ -340,7 +325,6 @@ function run_benchmarks(; trunc = 31, nlayers = 8, check_correctness = true)
         SpeedyWeather.linear_pressure_gradient_kernel!,
         diagn, progn, lf, model.atmosphere, model.implicit
     )
-
     # Summary
     println("\n" * "="^70)
     println("SUMMARY")
@@ -385,12 +369,10 @@ function full_benchmark()
     println("\n\n" * "="^70)
     println("CROSS-CONFIGURATION SUMMARY")
     println("="^70)
-
     for (config_name, results) in all_results
         avg_speedup = mean([r.speedup for r in values(results)])
         @printf("%-30s: %.2fx average\n", config_name, avg_speedup)
     end
-
     return all_results
 end
 
