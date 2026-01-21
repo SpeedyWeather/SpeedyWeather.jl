@@ -22,7 +22,7 @@ end
 Adapt.@adapt_structure SnowModel
 
 # generator function
-SnowModel(SG::SpectralGrid; kwargs...) = SnowModel{SG.NF}(; kwargs...)
+SnowModel(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothing; kwargs...) = SnowModel{SG.NF}(; kwargs...)
 
 # initialize component
 initialize!(snow::SnowModel, model::PrimitiveEquation) = nothing

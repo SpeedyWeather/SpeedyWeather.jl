@@ -91,13 +91,15 @@ end
 """
 $(TYPEDSIGNATURES)
 Constructor for NetCDFOutput based on `S::SpectralGrid` and optionally
-the `Model` type (e.g. `ShallowWater`, `PrimitiveWet`) as second positional argument.
+the `Model` type (e.g. `ShallowWater`, `PrimitiveWet`) as second positional argument. In case a 
+non-default number of soil layers is used, it also needs the respective `LandGeometry` to allocate those outputs
 The output grid is optionally determined by keyword arguments `output_Grid` (its type, full grid required),
 `nlat_half` (resolution) and `output_NF` (number format). By default, uses the full grid
 equivalent of the grid and resolution used in `SpectralGrid` `S`."""
 function NetCDFOutput(
         SG::SpectralGrid,
-        Model::Type{<:AbstractModel} = Barotropic;
+        Model::Type{<:AbstractModel} = Barotropic,
+        land_geometry::LandGeometry = LandGeometry(SG, nlayers = DEFAULT_NLAYERS_SOIL);
         output_grid::AbstractFullGrid = on_architecture(CPU(), RingGrids.full_grid_type(SG.grid)(SG.grid.nlat_half)),
         output_NF::DataType = DEFAULT_OUTPUT_NF,
         output_dt::Period = Second(DEFAULT_OUTPUT_DT),  # only needed for dispatch
@@ -111,7 +113,9 @@ function NetCDFOutput(
     interpolator = RingGrids.interpolator(output_grid, input_grid, NF = DEFAULT_OUTPUT_NF)
 
     # CREATE FULL FIELDS TO INTERPOLATE ONTO BEFORE WRITING DATA OUT
-    (; nlayers, nlayers_soil) = SG
+    (; nlayers) = SG
+    nlayers_soil = land_geometry.nlayers
+
     field2D = Field(output_NF, output_grid)
     field3D = Field(output_NF, output_grid, nlayers)
     field3Dland = Field(output_NF, output_grid, nlayers_soil)
@@ -242,6 +246,11 @@ function initialize!(
     )
     output.active || return nothing             # exit immediately for no output
 
+    # only checked for models that have a land component
+    if hasfield(typeof(model), :land) && !isnothing(model.land)
+        @assert get_soil_layers(model) == size(output.field3Dland, 2) "$(size(output.field3Dland, 2)) soil layers initialized for output, but $(get_soil_layers(model)) soil layers initialized for model. Please construct NetCDFOutput with the same LandGeometry as the model."
+    end
+
     # GET RUN ID, CREATE FOLDER
     # get new id only if not already specified
     determine_run_folder!(output)
@@ -282,7 +291,7 @@ function initialize!(
     lond = get_lond(output.field2D)
     latd = get_latd(output.field2D)
     σ = model.geometry.σ_levels_full
-    soil_indices = collect(1:model.spectral_grid.nlayers_soil)
+    soil_indices = collect(1:get_soil_layers(model))
 
     defVar(dataset, "lon", lond, ("lon",), attrib = Dict("units" => "degrees_east", "long_name" => "longitude"))
     defVar(dataset, "lat", latd, ("lat",), attrib = Dict("units" => "degrees_north", "long_name" => "latitude"))
@@ -290,9 +299,8 @@ function initialize!(
     defVar(dataset, "soil_layer", soil_indices, ("soil_layer",), attrib = Dict("units" => "1", "long_name" => "soil layer index"))
 
     # VARIABLES, define every output variable in the netCDF file and write initial conditions
-    output_NF = eltype(output.field2D)
     for (key, var) in output.variables
-        define_variable!(dataset, var, output_NF)
+        define_variable!(dataset, var, eltype(output.field2D))
         output!(output, var, Simulation(progn, diagn, model))
     end
 
