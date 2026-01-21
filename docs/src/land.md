@@ -37,11 +37,12 @@ The default `LandModel` in SpeedyWeather contains
 (at the moment other than 2 soil layers are not supported or experimental)
 
 ```@example land
-spectral_grid = SpectralGrid(trunc=31, nlayers=8, nlayers_soil=2)
-land = LandModel(spectral_grid)
+spectral_grid = SpectralGrid(trunc=31, nlayers=8)
+land_geometry = LandGeometry(nlayers=2) # that's also the default, therefore it's optional here
+land = LandModel(spectral_grid, land_geometry)
 ```
 
-With `land.geometry` currently used to define the number of soil layers and their layer thickness
+With `LandGeometry` currently used to define the number of soil layers and their layer thickness
 
 ```@example land
 land.geometry
@@ -80,6 +81,12 @@ model.land
 ```
 
 is now the land defined above used when integrating a SpeedyWeather `model`.
+
+In case a non-default number of soil layers is used, the `LandGeometry` also needs to be passed to the `NetCDFOutput` constructor to allocate the correct dimensions of the output variables, when an output is desired:
+
+```julia
+output = NetCDFOutput("output.nc", model, land_geometry)
+```
 
 ### DryLandModel
 
