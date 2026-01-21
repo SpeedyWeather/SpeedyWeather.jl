@@ -1,7 +1,7 @@
 """
 $(TYPEDSIGNATURES)
 A lower triangular array implementation that only stores the non-zero entries explicitly.
-`L<:AbstractArray{T,N-1}` although we do allow both "flat" `N-1`-dimensional indexing and 
+`L<:AbstractArray{T,N-1}` although we do allow both "flat" `N-1`-dimensional indexing and
 additional `N`-dimensional or "matrix-style" indexing.
 
 Supports n-dimensional lower triangular arrays, so that for all trailing dimensions `L[:, :, ..]`
@@ -79,7 +79,7 @@ end
 
 """$(TYPEDSIGNATURES)
 Size of a `LowerTriangularArray` defined as size of the flattened array if `as <: AbstractVector`
-and as if it were a full matrix when `as <: AbstractMatrix`` ."""
+and as if it were a full matrix when `as <: AbstractMatrix`."""
 Base.size(L::LowerTriangularArray, base::Type{<:IndexBasis} = OneBased; as = Vector) = size(L, base, as)
 Base.size(L::LowerTriangularArray, i::Integer, base::Type{<:IndexBasis} = OneBased; as = Vector) = size(L, i, base, as)
 
@@ -284,21 +284,21 @@ only the lower triangle (the non-zero entries) of `L`."""
 """
 $(TYPEDSIGNATURES)
 range of the running indices lm in a l-column (degrees of spherical harmonics)
-given the column index m (order of harmonics) 
+given the column index m (order of harmonics)
 """
 get_lm_range(m, lmax) = lm2i(2 * m - 1, m, lmax):lm2i(lmax + m, m, lmax)
 
 """
 $(TYPEDSIGNATURES)
 range of the doubled running indices 2lm in a l-column (degrees of spherical harmonics)
-given the column index m (order of harmonics) 
+given the column index m (order of harmonics)
 """
 get_2lm_range(m, lmax) = (2 * lm2i(2 * m - 1, m, lmax) - 1):(2 * lm2i(lmax + m, m, lmax))
 
 """
 $(TYPEDSIGNATURES)
-Converts the linear index `i` in the lower triangle into a pair `(l, m)` of indices 
-of the matrix in column-major form. (Formula taken from 
+Converts the linear index `i` in the lower triangle into a pair `(l, m)` of indices
+of the matrix in column-major form. (Formula taken from
 Angeletti et al, 2019, https://hal.science/hal-02047514/document)
 """
 @inline function i2lm(k::Integer, mmax::Integer)
@@ -403,7 +403,7 @@ LowerTriangularArrays. To be used like
 
     for k in eachmatrix(L)
         L[1, k]
-    
+
 to loop over every non-horizontal dimension of L."""
 eachmatrix(L::LowerTriangularArray) = CartesianIndices(size(L)[2:end])
 
@@ -415,15 +415,15 @@ function eachmatrix(L1::LowerTriangularArray, Ls::LowerTriangularArray...)
     return eachmatrix(L1)
 end
 
-"""$(TYPEDSIGNATURES) Iterator for the order m, for each m return all ls, 
+"""$(TYPEDSIGNATURES) Iterator for the order m, for each m return all ls,
 therefore the columns in the lower triangular matrix.
 
     for lms in eachorder(L)
         for lm in lms
-            L[lm] 
+            L[lm]
         end
     end
-    
+
 to loop over every order of L."""
 eachorder(L1::LowerTriangularArray) = eachorder(L1.spectrum)
 
@@ -463,7 +463,7 @@ function Base.DimensionMismatch(L1::LowerTriangularArray, Ls::LowerTriangularArr
 end
 
 # CONVERSIONS
-""" 
+"""
 $(TYPEDSIGNATURES)
 Create a LowerTriangularArray `L` from Matrix `M` by copying over the non-zero elements in `M`."""
 function LowerTriangularMatrix(M::Matrix{T}, spectrum::AbstractSpectrum) where {T} # CPU version
@@ -480,7 +480,7 @@ function LowerTriangularMatrix(M::Matrix{T}, spectrum::AbstractSpectrum) where {
     return L
 end
 
-""" 
+"""
 $(TYPEDSIGNATURES)
 Create a LowerTriangularArray `L` from Matrix `M` by copying over the non-zero elements in `M`."""
 function LowerTriangularMatrix(M::Matrix{T}) where {T} # GPU version
@@ -554,7 +554,11 @@ function Base.copyto!(
     arch = architecture(L1)
     spectrum = L1.spectrum
 
-    launch!(arch, SpectralWorkOrder, size(L1), _copyto_kernel!, L1.data, L2.data, minimum(ls), maximum(ls), minimum(ms), maximum(ms), spectrum.l_indices, spectrum.m_indices, lmax)
+    launch!(
+        arch, SpectralWorkOrder, size(L1), _copyto_kernel!,
+        L1.data, L2.data, minimum(ls), maximum(ls), minimum(ms), maximum(ms),
+        spectrum.l_indices, spectrum.m_indices, lmax,
+    )
 
     return L1
 end
@@ -670,7 +674,7 @@ Base.prod(L::LowerTriangularArray{NF}) where {NF} = zero(NF)
 
 """
 $(TYPEDSIGNATURES)
-Fills the elements of `L` with `x`. Faster than fill!(::AbstractArray, x)
+Fills the elements of `L` with `x`. Faster than `fill!(::AbstractArray, x)`
 as only the non-zero elements in `L` are assigned with x."""
 function Base.fill!(L::LowerTriangularArray, x)
     fill!(L.data, x)
@@ -751,7 +755,7 @@ LowerTriangularStyle{N, ArrayType, S}(::Val{M}) where {N, ArrayType, S, M} =
 LowerTriangularGPUStyle{N, ArrayType, S}(::Val{M}) where {N, ArrayType, S, M} =
     LowerTriangularGPUStyle{N, ArrayType, S}()
 
-"`L = find_L(Ls)` returns the first LowerTriangularArray among the arguments. 
+"`L = find_L(Ls)` returns the first LowerTriangularArray among the arguments.
 Adapted from Julia documentation of Broadcast interface"
 find_L(bc::Base.Broadcast.Broadcasted) = find_L(bc.args)
 find_L(args::Tuple) = find_L(find_L(args[1]), Base.tail(args))

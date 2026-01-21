@@ -94,8 +94,12 @@ Base.getindex(ps::SpeedyParams, param_label::String) = getindex(ps, [param_label
     params = ModelParameters.params(ps)
     # get tuple of selected parameters
     selected_params = params[idx]
+    param_subset = _selectrecursive(parent(ps)) do query
+        # select only the parameters identical to (===) those in selected_params
+        any(map(key -> key === query, selected_params))
+    end
     # extract parameters from nested named tuple and reconstruct SpeedyParams
-    return SpeedyParams(_selectrecursive(∈(selected_params), parent(ps)))
+    return SpeedyParams(param_subset)
 end
 
 ## selecting columns
@@ -177,6 +181,7 @@ the nested structure must match that of `obj`. This function is used to reconstr
 @inline reconstruct(obj::NamedTuple{keys, V}, values::NamedTuple{keys, V}) where {keys, V <: Tuple} = values
 # @inline reconstruct(obj, values::ComponentArray) = reconstruct(obj, NamedTuple(values))
 @inline reconstruct(obj, values::SpeedyParams) = reconstruct(obj, stripparams(values))
+@inline reconstruct(obj, values::AbstractArray) = isempty(values) ? obj : error("Cannot reconstruct $(typeof(obj)) from non-empty array of type $(typeof(values))")
 @generated function reconstruct(obj, values::Union{NamedTuple, ComponentArray})
     keysof(::Type{<:NamedTuple{keys}}) where {keys} = keys
     keysof(::Type{<:ComponentArray{T, N, A, Tuple{Axis{coords}}}}) where {T, N, A, coords} = keys(coords)
@@ -206,27 +211,27 @@ generated in a corresponding `parameters(::Foo)` method definition with descript
 struct field docstring, if present. Additional parameter attributes can be supplied as keywords after the parameter,
 e.g. `@param p::T = 0.5 bounds=UnitInterval` or `@param p::T = 0.5 (bounds=UnitInterval, constant=false)`.
 
-## Known limitations
-
-This macro will fail to behave correctly in the following known corner cases:
+!!! warning "Known limitations"
+    This macro will fail to behave correctly in the following known corner cases:
 
     1. **Untyped struct fields without default values**. The macro will not work if the struct has untyped
-    fields without default values specified using the `@kwdef` syntax. This is because untyped fields are
-    not distinguishable in the expression tree from symbols in other expressions (such as typed field definitions).
-    This problem can be avoided by always specifying types on struct fields (which should always be done anyway!).
+       fields without default values specified using the `@kwdef` syntax. This is because untyped fields are
+       not distinguishable in the expression tree from symbols in other expressions (such as typed field definitions).
+       This problem can be avoided by always specifying types on struct fields (which should always be done anyway!).
 
     2. **`@kwdef` struct with a single parameter field and no default value**. `@parameterized` has a buggy
-    interaction with `@kwdef` in this corner case:
-    ```julia
-    @parameterized @kwdef struct Foo{T}
-        @param x::T
-    end
-    ```
-    where the auto-generated constructors erroneously duplicate `T` as a function and type parameter. This is, however,
-    a fairly meaningless corner-case since there is no purpose in marking this struct as `@kwdef` if no default assignments
-    are made!
+       interaction with `@kwdef` in this corner case:
 
-If you encounter any other weird interactions or behaviors, please raise an issue.
+       ```julia
+       @parameterized @kwdef struct Foo{T}
+           @param x::T
+       end
+       ```
+       where the auto-generated constructors erroneously duplicate `T` as a function and type parameter. This is, however,
+       a fairly meaningless corner-case since there is no purpose in marking this struct as `@kwdef` if no default assignments
+       are made!
+
+    If you encounter any other weird interactions or behaviors, please raise [an issue](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/new).
 """
 macro parameterized(expr)
     function typedef2sig(typedef)
@@ -323,11 +328,11 @@ macro parameterized(expr)
     if has_kwdef && typesig.head == :curly
         # handle type arguments; first extract argument names (discarding upper type bounds)
         typeargs = map(typedef2sig, typesig.args[2:end])
-        # then build method signature
-        push!(block.args, esc(:(SpeedyParameters.setproperties(obj::$(typename){$(typeargs...)}, patch::NamedTuple) where {$(typesig.args[2:end]...)} = $(typename){$(typeargs...)}(; patch...))))
+        # then build method signature - merge original properties with patch to preserve non-parameter fields
+        push!(block.args, esc(:(SpeedyParameters.setproperties(obj::$(typename){$(typeargs...)}, patch::NamedTuple) where {$(typesig.args[2:end]...)} = $(typename){$(typeargs...)}(; merge(SpeedyParameters.getproperties(obj), patch)...))))
     elseif has_kwdef
         # otherwise we can just use the typename
-        push!(block.args, esc(:(SpeedyParameters.setproperties(obj::$(typename), patch::NamedTuple) = $(typename)(; patch...))))
+        push!(block.args, esc(:(SpeedyParameters.setproperties(obj::$(typename), patch::NamedTuple) = $(typename)(; merge(SpeedyParameters.getproperties(obj), patch)...))))
     end
     return block
 end

@@ -241,4 +241,4 @@ function Architectures.on_architecture(arch, field::ColumnField{T, N, ArrayType,
         #@warn "Adapting field to new architecture with $(typeof(adapted_data))"
         return ColumnField(adapted_data, Grid(field.grid, architecture(typeof(adapted_data))))
     end
-end 
+end

@@ -31,7 +31,7 @@ Jeevanjee and Zhou [^JZ22] (eq. 2) define a longwave radiative flux ``F`` for at
 as (following Seeley and Wordsworth [^SW23], eq. 1)
 
 ```math
-\frac{dF}{dT} = α*(T_t - T)
+\frac{dF}{dT} = α (T_t - T)
 ```
 
 The flux ``F`` (in ``W/m^2/K``) is a vertical upward flux between two layers (vertically adjacent)
@@ -73,7 +73,7 @@ using optical depth ``\tau`` as vertical coordinate. Longwave emittance is
 are ``U = \sigma T_s^4`` at the surface, i.e. the surface emitting with its surface
 temperature ``T_s`` (sea surface temperature, skin or soil temperature); and
 ``D = 0`` at the top (no longwave radiation from space). Instead of optical depth
-we solve these equations using the transmissivity ``t = exp(-\tau)``.
+we solve these equations using the transmissivity ``t = \exp(-\tau)``.
 
 ```math
 U_{k-1} = t_k U_k + (1-t_k) σ T_k^4
@@ -110,7 +110,7 @@ FriersonLongwaveTransmissivity(spectral_grid)
 to compute
 
 ```math
-\tau_0 = \tau_{0e} + (\tau_{0p} - \tau_{0e}) \sin^2(\theta)
+\tau_0 = \tau_{0e} + (\tau_{0p} - \tau_{0e}) \sin^2 \theta
 ```
 
 with surface values of optical depth at the equator ``\tau_{0e}`` and
@@ -134,9 +134,6 @@ subtypes(SpeedyWeather.AbstractShortwave)
 ```
 
 ## OneBandShortwave: Single-band shortwave radiation with diagnostic clouds
-
-!!! warn "OneBandShortwave currently not available"
-    With internal structure change for GPU acceleration this parameterization is currently unavailable.
 
 The `OneBandShortwave` scheme provides a single-band (broadband) shortwave radiation parameterization,
 including diagnostic cloud effects following [^KMB06]. For dry models without water vapor, use
@@ -242,9 +239,8 @@ To use the OneBandShortwave scheme, construct your model as follows and run as u
 
 **For wet models (with water vapor and clouds):**
 
-```julia
-using SpeedyWeather
-using CairoMakie
+```@example radiation
+using SpeedyWeather, CairoMakie
 spectral_grid = SpectralGrid(trunc=31, nlayers=8)
 model = PrimitiveWetModel(spectral_grid; shortwave_radiation=OneBandShortwave(spectral_grid))
 simulation = initialize!(model)
@@ -255,24 +251,25 @@ ssrd = simulation.diagnostic_variables.physics.surface_shortwave_down
 heatmap(ssrd,title="Surface shortwave radiation down [W/m^2]")
 save("ssrd.png", ans) # hide
 nothing # hide
-# show ![Surface shortwave radiation down](ssrd.png)
 ```
 
+![Surface shortwave radiation down](ssrd.png)
 
-```julia
-osr = simulation.diagnostic_variables.physics.outgoing_shortwave_radiation
+```@example radiation
+osr = simulation.diagnostic_variables.physics.outgoing_shortwave
 heatmap(osr,title="Outgoing shortwave radiation [W/m^2]")
 save("osr.png", ans) # hide
 nothing # hide
-# show ![Outgoing shortwave radiation](osr.png)
 ```
+
+![Outgoing shortwave radiation](osr.png)
 
 **For dry models (no water vapor or clouds):**
 
 Use `OneBandGreyShortwave` instead, which automatically uses `NoClouds` and `TransparentShortwaveTransmissivity`:
 
-```julia
-using SpeedyWeather
+```@example radiation
+using SpeedyWeather, CairoMakie
 spectral_grid = SpectralGrid(trunc=31, nlayers=8)
 model = PrimitiveDryModel(spectral_grid; shortwave_radiation=OneBandGreyShortwave(spectral_grid))
 simulation = initialize!(model)
@@ -283,8 +280,9 @@ ssrd = simulation.diagnostic_variables.physics.surface_shortwave_down
 heatmap(ssrd, title="Surface shortwave radiation (dry model) [W/m^2]")
 save("ssrd_dry.png", ans) # hide
 nothing # hide
-# show ![Surface shortwave radiation (dry model)](ssrd_dry.png)
 ```
+
+![Surface shortwave radiation (dry model)](ssrd_dry.png)
 
 ### Parameterization options
 
@@ -304,7 +302,7 @@ The atmospheric transmissivity can be calculated using:
 - `BackgroundShortwaveTransmissivity(spectral_grid)` (default): Fortran SPEEDY-based transmissivity with zenith correction and absorption by aerosols, water vapor, and clouds
 - `TransparentShortwaveTransmissivity(spectral_grid)`: Transparent atmosphere (used in `OneBandGreyShortwave`)
 
-##### BackgroundShortwaveTransmissivity 
+##### BackgroundShortwaveTransmissivity
 
 For each layer ``k``, the transmissivity is
 
@@ -322,7 +320,7 @@ with
 - ``a_{wv}`` water-vapor absorptivity (`absorptivity_water_vapor`) times specific humidity ``q_k``
 - ``a_{cl}(q_\mathrm{base}) = \min(a_{cl,base} q_\mathrm{base}, a_{cl,limit})`` cloud absorptivity added below the diagnosed cloud top, scaled by cloud cover ``\mathrm{CLC}``
 
-All absorptivity coefficients are per ``10^5`` Pa. The resulting ``\tau_k^{SR}`` values are stored in `column.transmissivity_shortwave[:, band]` and reused for both the downward and upward sweeps in `OneBandShortwaveRadiativeTransfer`.
+All absorptivity coefficients are per ``10^5`` Pa. The resulting ``\tau_k^{SR}`` values are computed once per column and reused for both the downward and upward sweeps in `OneBandShortwaveRadiativeTransfer`.
 
 ##### TransparentShortwaveTransmissivity details
 
@@ -332,7 +330,7 @@ Sets ``\tau_k^{SR} = 1`` for all layers and bands, effectively skipping atmosphe
 
 The `DiagnosticClouds` scheme includes a `use_stratocumulus` flag (default: `true`) that enables the diagnostic stratocumulus cloud parameterization over oceans:
 
-```julia
+```@example radiation
 using SpeedyWeather, CairoMakie
 
 spectral_grid = SpectralGrid()
@@ -345,8 +343,9 @@ ssrd = sim.diagnostic_variables.physics.surface_shortwave_down
 heatmap(ssrd, title="No stratocumulus clouds [W/m^2]")
 save("oneband_no_stratocumulus.png", ans) # hide
 nothing # hide
-# show ![No stratocumulus clouds](oneband_no_stratocumulus.png)
 ```
+
+![No stratocumulus clouds](oneband_no_stratocumulus.png)
 
 ## References
 

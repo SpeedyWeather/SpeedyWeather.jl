@@ -5,3 +5,12 @@ updates:
     directory: "/" # Location of package manifests
     schedule:
       interval: "weekly"
+  - package-ecosystem: "julia"
+    directories:
+      - SpeedyWeather
+      - RingGrids
+      - LowerTriangularArrays
+      - SpeedyTransforms
+      - SpeedyWeatherInternals
+    schedule:
+      interval: "weekly"

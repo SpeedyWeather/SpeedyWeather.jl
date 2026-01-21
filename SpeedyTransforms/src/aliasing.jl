@@ -61,10 +61,3 @@ function roundup_fft(n::Integer; small_primes::Vector{T} = [2, 3, 5]) where {T <
     end
     return n - 2      # subtract unnecessary last += 2 addition
 end
-
-"""
-    true/false = is_power_2(i::Integer)
-
-Checks whether an integer `i` is a power of 2, i.e. i = 2^k, with k = 0, 1, 2, 3, ...."""
-is_power_2(i::Integer) = i != 0 ? i & (i - 1) == 0 : false
-is_power_2_or_0(i::Integer) = i & (i - 1) == 0

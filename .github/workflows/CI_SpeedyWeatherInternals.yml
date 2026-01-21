@@ -1,0 +1,51 @@
+name: SpeedyWeatherInternals
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+jobs:
+  test:
+    name: Julia v${{ matrix.version }}, ${{ matrix.os }}, ${{ matrix.arch }}
+    # only run if none of these labels are present
+    if: >
+      !(  
+      contains(github.event.pull_request.labels.*.name, 'skip-ci') ||
+      contains(github.event.pull_request.labels.*.name, 'skip-submodules-ci') ||
+      contains(github.event.pull_request.labels.*.name, 'skip-speedyweatherinternals-ci')
+      )
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: ./SpeedyWeatherInternals
+    timeout-minutes: 60
+    permissions: # needed to allow julia-actions/cache to proactively delete old caches that it has created
+      actions: write
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        version:
+          - '1.12'
+          - '1.11'
+          - '1.10'
+        os:
+          - ubuntu-latest
+        arch:
+          - x64
+    steps:
+      - uses: actions/checkout@v6
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: ${{ matrix.version }}
+          arch: ${{ matrix.arch }}
+      - uses: julia-actions/cache@v2
+      - uses: julia-actions/julia-buildpkg@v1
+      - uses: julia-actions/julia-runtest@v1
+        with:
+          project: SpeedyWeatherInternals
+        env:
+          GITHUB_AUTH: ${{ secrets.GITHUB_TOKEN }}
