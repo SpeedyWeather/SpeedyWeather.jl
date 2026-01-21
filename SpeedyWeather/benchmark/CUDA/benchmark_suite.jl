@@ -91,7 +91,9 @@ function run_benchmark_suite!(suite::BenchmarkSuiteModel)
 
         spectral_grid = SpectralGrid(; NF, trunc, Grid, nlayers, architecture)
         suite.nlat[i] = spectral_grid.nlat
-        model = PrimitiveWetModel(spectral_grid)
+
+        M = MatrixSpectralTransform(spectral_grid)
+        model = PrimitiveWetModel(spectral_grid; spectral_transform = M)
         simulation = initialize!(model)
         # spin up
         run!(simulation; steps = 10)
@@ -141,7 +143,9 @@ function run_benchmark_suite!(suite::BenchmarkSuiteDynamics)
 
         spectral_grid = SpectralGrid(; NF, trunc, Grid, nlayers, architecture)
         suite.nlat[i] = spectral_grid.nlat
-        model = PrimitiveWetModel(spectral_grid)
+
+        M = MatrixSpectralTransform(spectral_grid)
+        model = PrimitiveWetModel(spectral_grid; spectral_transform = M)
         simulation = initialize!(model)
         # spin up
         run!(simulation; steps = 10)
@@ -204,13 +208,13 @@ function run_benchmark_suite!(suite::BenchmarkSuiteDynamics)
         diagn.grid.temp_grid.data .+= implicit.temp_profile'
 
         # now just transforms as comparisions
-        b = @benchmark CUDA.@sync SpeedyWeather.transform!($diagn.grid.vor_grid, $progn.vor, $spectral_transform)
+        vor = progn.vor[:, :, lf]
+        b = @benchmark CUDA.@sync SpeedyWeather.transform!($diagn.grid.vor_grid, $vor, $spectral_transform)
         add_results!(suite, b, i, 16)
 
         # and inverse
-        b = @benchmark CUDA.@sync SpeedyWeather.transform!($progn.vor, $diagn.grid.vor_grid, $spectral_transform)
+        b = @benchmark CUDA.@sync SpeedyWeather.transform!($vor, $diagn.grid.vor_grid, $spectral_transform)
         add_results!(suite, b, i, 17)
-
     end
 
     return suite
