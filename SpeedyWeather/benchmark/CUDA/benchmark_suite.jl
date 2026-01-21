@@ -67,7 +67,7 @@ end
 @kwdef mutable struct BenchmarkSuiteModel <: AbstractBenchmarkSuiteTimed
     title::String 
     nruns::Int = 1
-    architecture::Vector = fill(SpeedyWeather.CPU, nruns)
+    model::Vector = fill(SpeedyWeather.CPU, nruns)
     NF::Vector = fill(SpeedyWeather.DEFAULT_NF, nruns)
     trunc::Vector{Int} = fill(SpeedyWeather.DEFAULT_TRUNC, nruns)
     nlayers::Vector{Int} = fill(SpeedyWeather.DEFAULT_NLAYERS, nruns)
