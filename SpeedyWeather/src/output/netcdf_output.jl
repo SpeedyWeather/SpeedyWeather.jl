@@ -114,7 +114,7 @@ function NetCDFOutput(
 
     # CREATE FULL FIELDS TO INTERPOLATE ONTO BEFORE WRITING DATA OUT
     (; nlayers) = SG
-    nlayers_soil = land_geometry.nlayers
+    nlayers_soil = (Model <: Barotropic || Model <: ShallowWater) ? 0 : land_geometry.nlayers
 
     field2D = Field(output_NF, output_grid)
     field3D = Field(output_NF, output_grid, nlayers)
