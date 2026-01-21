@@ -34,12 +34,12 @@ end
 # Adapt.adapt_structure(to, soil::SeasonalSoilMoisture) = adapt(to, ManualSeasonalSoilMoisture(soil.monthly_soil_moisture))
 
 # generator function
-function SeasonalSoilMoisture(SG::SpectralGrid, geometry::LandGeometry; kwargs...)
+function SeasonalSoilMoisture(SG::SpectralGrid, nlayers::Int = DEFAULT_NLAYERS_SOIL; kwargs...)
     (; NF, GridVariable4D, grid) = SG
-    (; nlayers) = geometry
     monthly_soil_moisture = zeros(GridVariable4D, grid, nlayers, 12)
     return SeasonalSoilMoisture{NF, GridVariable4D}(; monthly_soil_moisture, kwargs...)
 end
+SeasonalSoilMoisture(SG::SpectralGrid, geometry::LandGeometry; kwargs...) = SeasonalSoilMoisture(SG, geometry.nlayers; kwargs...)
 
 function variables(::SeasonalSoilMoisture)
     return (
