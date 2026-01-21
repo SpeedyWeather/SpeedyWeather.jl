@@ -1,4 +1,4 @@
-import Pkg 
+import Pkg
 Pkg.activate("benchmark/CUDA")
 
 using CUDA
@@ -32,7 +32,7 @@ function run_benchmarks(trunc_list, nlayers_list, float_types, device)
         for (j, nlayers) in enumerate(nlayers_list)
             for (i, trunc) in enumerate(trunc_list)
                 # Generate inputs
-                spectral_grid = SpectralGrid(; NF, trunc, Grid, nlayers, architecture=device)
+                spectral_grid = SpectralGrid(; NF, trunc, Grid, nlayers, architecture = device)
                 model = PrimitiveWetModel(spectral_grid)
                 simulation = initialize!(model)
 

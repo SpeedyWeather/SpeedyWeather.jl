@@ -62,10 +62,10 @@ function run_benchmark_suite!(suite::BenchmarkSuiteTransform)
     end
 
     return suite
-end 
+end
 
 @kwdef mutable struct BenchmarkSuiteModel <: AbstractBenchmarkSuiteTimed
-    title::String 
+    title::String
     nruns::Int = 1
     model::Vector = fill(SpeedyWeather.CPU, nruns)
     NF::Vector = fill(SpeedyWeather.DEFAULT_NF, nruns)
@@ -74,10 +74,10 @@ end
     Grid::Vector = fill(SpeedyWeather.DEFAULT_GRID, nruns)
     nlat::Vector{Int} = fill(0, nruns)
     function_names::Vector{String} = ["parameterization_tendencies", "dynamics_tendencies", "implicit_correction"]
-    time::Vector{Vector{Float64}} = [fill(0.0, length(function_names)) for i=1:nruns]
-    memory::Vector{Vector{Int}} = [fill(0, length(function_names)) for i=1:nruns]
-    allocs::Vector{Vector{Int}} = [fill(0, length(function_names)) for i=1:nruns]
-end 
+    time::Vector{Vector{Float64}} = [fill(0.0, length(function_names)) for i in 1:nruns]
+    memory::Vector{Vector{Int}} = [fill(0, length(function_names)) for i in 1:nruns]
+    allocs::Vector{Vector{Int}} = [fill(0, length(function_names)) for i in 1:nruns]
+end
 
 function run_benchmark_suite!(suite::BenchmarkSuiteModel)
 
@@ -87,13 +87,13 @@ function run_benchmark_suite!(suite::BenchmarkSuiteModel)
         nlayers = suite.nlayers[i]
         Grid = suite.Grid[i]
         architecture = suite.model[i]
-        lf = 2 
+        lf = 2
 
-        spectral_grid = SpectralGrid(;NF, trunc, Grid, nlayers, architecture)
+        spectral_grid = SpectralGrid(; NF, trunc, Grid, nlayers, architecture)
         suite.nlat[i] = spectral_grid.nlat
         model = PrimitiveWetModel(spectral_grid)
         simulation = initialize!(model)
-        # spin up 
+        # spin up
         run!(simulation; steps = 10)
         initialize!(simulation)
         progn, diagn, model = SpeedyWeather.unpack(simulation)
@@ -112,4 +112,4 @@ function run_benchmark_suite!(suite::BenchmarkSuiteModel)
     end
 
     return suite
-end 
+end

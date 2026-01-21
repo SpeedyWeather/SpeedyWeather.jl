@@ -1,18 +1,18 @@
 # The vertical_integration! function is
-# one of the few functions that have distinct GPU version. 
+# one of the few functions that have distinct GPU version.
 # Here, we just test that they are identical to the CPU version
 # The CPU version is in turn tested more properly in the regular unit test
 
 @testset "Vertical Integration" begin
     arch_gpu = SpeedyWeather.GPU()
     arch_cpu = SpeedyWeather.CPU()
-    
-    spectral_grid_cpu = SpectralGrid(architecture=arch_cpu)
-    spectral_grid_gpu = SpectralGrid(architecture=arch_gpu)
+
+    spectral_grid_cpu = SpectralGrid(architecture = arch_cpu)
+    spectral_grid_gpu = SpectralGrid(architecture = arch_gpu)
 
     # don't initialize parameterizations
-    model_cpu = PrimitiveWetModel(spectral_grid_cpu, physics=false)
-    model_gpu = PrimitiveWetModel(spectral_grid_gpu, physics=false)
+    model_cpu = PrimitiveWetModel(spectral_grid_cpu, physics = false)
+    model_gpu = PrimitiveWetModel(spectral_grid_gpu, physics = false)
 
     simulation_cpu = initialize!(model_cpu)
     simulation_gpu = initialize!(model_gpu)
