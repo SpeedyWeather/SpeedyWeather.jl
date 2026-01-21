@@ -1,6 +1,5 @@
-using Pkg
-Pkg.activate(".")
-Pkg.status()
+import Pkg
+Pkg.activate("benchmark/CUDA")
 
 using CUDA
 using SpeedyWeather
@@ -14,7 +13,7 @@ include("benchmark_suite.jl")
 trunc_list = [15, 31, 63, 127, 255, 511, 1023]
 nlayers_list = [1, 8, 32, 64]
 float_types = [Float32]
-grid_list = [FullGaussianGrid]
+grid_list = [OctahedralGaussianGrid]
 
 # Single run_benchmarks function with device parameter
 function run_benchmarks(trunc_list, nlayers_list, float_types, device)
@@ -27,33 +26,48 @@ function run_benchmarks(trunc_list, nlayers_list, float_types, device)
         times_legendre_backward = Matrix{Float64}(undef, length(trunc_list), length(nlayers_list))
         times_fourier_forward = Matrix{Float64}(undef, length(trunc_list), length(nlayers_list))
         times_fourier_backward = Matrix{Float64}(undef, length(trunc_list), length(nlayers_list))
+        times_parameterization = Matrix{Float64}(undef, length(trunc_list), length(nlayers_list))
+        times_dynamics = Matrix{Float64}(undef, length(trunc_list), length(nlayers_list))
 
         for (j, nlayers) in enumerate(nlayers_list)
             for (i, trunc) in enumerate(trunc_list)
                 # Generate inputs
-                spectral_grid = SpectralGrid(; NF, trunc, Grid, nlayers, device)
-                S = SpectralTransform(spectral_grid)
+                spectral_grid = SpectralGrid(; NF, trunc, Grid, nlayers, architecture = device)
+                model = PrimitiveWetModel(spectral_grid)
+                simulation = initialize!(model)
+
+                progn, diagn, model = SpeedyWeather.unpack(simulation)
+                S = model.spectral_transform
                 specs, grids = generate_random_inputs(spectral_grid)
+                lf = 2
                 # S, specs, grids = generate_random_inputs(N, nlayers, T, device)
 
                 println("Running benchmark for device=$device, trunc=$trunc, nlayers=$nlayers, NF=$NF")
                 println()
 
                 # Time forward legendre
-                b = @benchmark CUDA.@sync SpeedyTransforms._legendre!($specs, $S.scratch_memory_north, $S.scratch_memory_south, $S)
+                b = @benchmark CUDA.@sync SpeedyTransforms._legendre!($specs, $S.scratch_memory.north, $S.scratch_memory.south, $S.scratch_memory.column, $S)
                 times_legendre_forward[i, j] = minimum(b).time
 
                 # Time inverse legendre
-                b = @benchmark CUDA.@sync SpeedyTransforms._legendre!($S.scratch_memory_north, $S.scratch_memory_south, $specs, $S)
+                b = @benchmark CUDA.@sync SpeedyTransforms._legendre!($S.scratch_memory.north, $S.scratch_memory.south, $specs, $S.scratch_memory.column, $S)
                 times_legendre_backward[i, j] = minimum(b).time
 
                 # Time _fourier!(..., grids, S)
-                b = @benchmark CUDA.@sync SpeedyTransforms._fourier!($S.scratch_memory_north, $S.scratch_memory_south, $grids, $S)
+                b = @benchmark CUDA.@sync SpeedyTransforms._fourier!($S.scratch_memory.north, $S.scratch_memory.south, $grids, $S)
                 times_fourier_backward[i, j] = minimum(b).time
 
                 # Time _fourier!(grids, ..., S)
-                b = @benchmark CUDA.@sync SpeedyTransforms._fourier!($grids, $S.scratch_memory_north, $S.scratch_memory_south, $S)
+                b = @benchmark CUDA.@sync SpeedyTransforms._fourier!($grids, $S.scratch_memory.north, $S.scratch_memory.south, $S)
                 times_fourier_forward[i, j] = minimum(b).time
+
+                # Time parameterization
+                b = @benchmark CUDA.@sync SpeedyWeather.parameterization_tendencies!($diagn, $progn, $model)
+                times_parameterization[i, j] = minimum(b).time
+
+                # Time dynamics
+                b = @benchmark CUDA.@sync SpeedyWeather.dynamics_tendencies!($diagn, $progn, $lf, $model)
+                times_dynamics[i, j] = minimum(b).time
             end
         end
 
@@ -69,6 +83,12 @@ function run_benchmarks(trunc_list, nlayers_list, float_types, device)
 
         results["inverse_fourier"] = get(results, "inverse_fourier", Dict{DataType, Matrix{Float64}}())
         results["inverse_fourier"][NF] = times_fourier_backward
+
+        results["parameterization"] = get(results, "parameterization", Dict{DataType, Matrix{Float64}}())
+        results["parameterization"][NF] = times_parameterization
+
+        results["dynamics"] = get(results, "dynamics", Dict{DataType, Matrix{Float64}}())
+        results["dynamics"][NF] = times_dynamics
     end
     return results
 end
@@ -125,6 +145,11 @@ function plot_times(cpu_results, gpu_results, figx = 500, figy = 1000)
         ax = axes[j]
 
         for (i, (func_name, type_results)) in enumerate(cpu_results)
+
+            if func_name in ["parameterization", "dynamics"] # very different timing scales, just skip
+                continue
+            end
+
             cpu_times = cpu_results[func_name][Float32] ./ 1.0e9
             gpu_times = gpu_results[func_name][Float32] ./ 1.0e9
             cpu_points = [Point2(trunc_list[i], cpu_times[i, j]) for i in 1:length(trunc_list)]

@@ -6,6 +6,7 @@
 @testset "Vertical Integration" begin
     arch_gpu = SpeedyWeather.GPU()
     arch_cpu = SpeedyWeather.CPU()
+
     spectral_grid_cpu = SpectralGrid(architecture = arch_cpu)
     spectral_grid_gpu = SpectralGrid(architecture = arch_gpu)
 
