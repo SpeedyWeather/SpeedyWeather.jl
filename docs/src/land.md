@@ -41,7 +41,7 @@ spectral_grid = SpectralGrid(trunc=31, nlayers=8, nlayers_soil=2)
 land = LandModel(spectral_grid)
 ```
 
-With `land.geometry` currently used to define the number of layers and their layer thickness
+With `land.geometry` currently used to define the number of soil layers and their layer thickness
 
 ```@example land
 land.geometry
