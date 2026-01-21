@@ -38,7 +38,7 @@ The default `LandModel` in SpeedyWeather contains
 
 ```@example land
 spectral_grid = SpectralGrid(trunc=31, nlayers=8)
-land_geometry = LandGeometry(nlayers=2) # that's also the default, therefore it's optional here
+land_geometry = LandGeometry(spectral_grid, nlayers=2) # that's also the default, therefore it's optional here
 land = LandModel(spectral_grid, land_geometry)
 ```
 
