@@ -36,3 +36,21 @@ benchmarks[:benchmark201] = BenchmarkSuiteModel(
     Grid = fill(SpeedyWeather.DEFAULT_GRID, 5),
     model = fill(GPU(), 5),
 )
+
+benchmarks[:benchmark300] = BenchmarkSuiteDynamics(
+    title = "PrimitiveWet dynamical core benchmarks, CPU",
+    nruns = 5,
+    trunc = [31, 63, 127, 255, 511],
+    nlayers = fill(16, 5),
+    Grid = fill(SpeedyWeather.DEFAULT_GRID, 5),
+    model = fill(CPU(), 5),
+)
+
+benchmarks[:benchmark301] = BenchmarkSuiteDynamics(
+    title = "PrimitiveWet dynamical core benchmarks, GPU",
+    nruns = 5,
+    trunc = [31, 63, 127, 255, 511],
+    nlayers = fill(16, 5),
+    Grid = fill(SpeedyWeather.DEFAULT_GRID, 5),
+    model = fill(GPU(), 5),
+)
