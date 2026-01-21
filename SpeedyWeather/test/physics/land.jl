@@ -25,7 +25,13 @@ end
         for SoilMoisture in (Nothing, SeasonalSoilMoisture, LandBucketMoisture)
             for Vegetation in (NoVegetation, VegetationClimatology)
                 for Model in (PrimitiveDryModel, PrimitiveWetModel)
-
+                    
+                    # constructors construct without geometry
+                    temperature = Temperature(spectral_grid)
+                    soil_moisture = SoilMoisture(spectral_grid)
+                    vegetation = Vegetation(spectral_grid)
+ 
+                    # ... and with geometry
                     geometry = LandGeometry(spectral_grid)
                     temperature = Temperature(spectral_grid, geometry)
                     soil_moisture = SoilMoisture(spectral_grid, geometry)
@@ -51,6 +57,7 @@ end
         for Model in (PrimitiveDryModel, PrimitiveWetModel)
 
             geometry = LandGeometry(spectral_grid)
+            snow = Snow(spectral_grid) # redundant but tests constructor 
             snow = Snow(spectral_grid, geometry)
             land = LandModel(spectral_grid; geometry, snow)
             model = Model(spectral_grid; land)
