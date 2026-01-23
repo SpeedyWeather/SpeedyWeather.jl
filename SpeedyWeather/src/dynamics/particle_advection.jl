@@ -72,14 +72,14 @@ Initialize particle locations uniformly in latitude, longitude and in the
 vertical σ coordinates. This uses a cosin-distribution in latitude for
 an equal-area uniformity."""
 function initialize!(
-    particles::AbstractVector{P},
-    progn::PrognosticVariables,     # used for dispatch as all sub components
-    diagn::DiagnosticVariables,     # have this function signature
-    particle_advection::ParticleAdvection2D,
-    model::AbstractModel,
-) where {P <: Particle}
+        particles::AbstractVector{P},
+        progn::PrognosticVariables,     # used for dispatch as all sub components
+        diagn::DiagnosticVariables,     # have this function signature
+        particle_advection::ParticleAdvection2D,
+        model::AbstractModel,
+    ) where {P <: Particle}
 
-    particles .= rand(P, length(particles))
+    return particles .= rand(P, length(particles))
 end
 
 """$(TYPEDSIGNATURES)
@@ -107,12 +107,12 @@ function initialize!(
     lats = diagn.particles.u    # reuse u,v arrays as only used for u, v
     lons = diagn.particles.v    # after update_locator!
     σ = model.geometry.σ_levels_full[k]
-    
+
     for i in eachindex(particles)
         # modulo all particles here
         # i.e. one can start with a particle at -120˚E which moduloed to 240˚E here
         # also given this is 2D advection on a given layer set that vertical coordinate σ here
-        particles[i] = mod(set(particles[i]; σ=σ))
+        particles[i] = mod(set(particles[i]; σ = σ))
         lons[i] = particles[i].lon
         lats[i] = particles[i].lat
     end
@@ -125,14 +125,14 @@ function initialize!(
 end
 
 # Kernel to modulo particles and extract their coordinates
-@kernel inbounds=true function _initialize_particles_kernel!(
-    particles, lons, lats, σ
-)
+@kernel inbounds = true function _initialize_particles_kernel!(
+        particles, lons, lats, σ
+    )
     i = @index(Global, Linear)
-    
+
     # modulo all particles here
     # i.e. one can start with a particle at -120˚E which moduloed to 240˚E here
-    particles[i] = mod(set(particles[i]; σ=σ))
+    particles[i] = mod(set(particles[i]; σ = σ))
     lons[i] = particles[i].lon
     lats[i] = particles[i].lat
 end
@@ -183,8 +183,10 @@ function particle_advection!(
     lats = diagn.particles.v
 
     # Launch predictor step kernel
-    launch!(architecture(u_old), LinearWorkOrder, (length(particles),),
-            predictor_step_kernel!, particles, diagn.particles.locations, u_old, v_old, lons, lats, Δt_half)
+    launch!(
+        architecture(u_old), LinearWorkOrder, (length(particles),),
+        predictor_step_kernel!, particles, diagn.particles.locations, u_old, v_old, lons, lats, Δt_half
+    )
 
     # CORRECTOR STEP, use u, v at new location and new time step
     k = particle_advection.layer
@@ -200,8 +202,10 @@ function particle_advection!(
     interpolate!(v_new, v_grid, interpolator)
 
     # Launch corrector step kernel
-    launch!(architecture(u_new), LinearWorkOrder, (length(particles),),
-            corrector_step_kernel!, particles, u_new, v_new, lons, lats, Δt_half)
+    launch!(
+        architecture(u_new), LinearWorkOrder, (length(particles),),
+        corrector_step_kernel!, particles, u_new, v_new, lons, lats, Δt_half
+    )
 
     # store new velocities at new (corrected locations) to be used on
     # next particle advection time step
@@ -216,11 +220,11 @@ $(TYPEDSIGNATURES)
 CPU version of particle advection using for loops for comparison with kernel version.
 This version uses explicit for loops instead of GPU kernels."""
 function particle_advection_cpu!(
-    particles::AbstractVector{P},
-    diagn::AbstractVariables,
-    clock::Clock,
-    particle_advection::ParticleAdvection2D,
-) where {P<:Particle}
+        particles::AbstractVector{P},
+        diagn::AbstractVariables,
+        clock::Clock,
+        particle_advection::ParticleAdvection2D,
+    ) where {P <: Particle}
 
     # escape immediately for no particles
     length(particles) == 0 && return nothing
@@ -239,7 +243,7 @@ function particle_advection_cpu!(
 
     # escape immediately if advection not on this timestep
     n = particle_advection.every_n_timesteps
-    clock.timestep_counter % n == (n-1) || return nothing   
+    clock.timestep_counter % n == (n - 1) || return nothing
 
     # also escape if no particle is active
     any(isactive.(particles)) || return nothing
@@ -307,11 +311,11 @@ function particle_advection_cpu!(
 end
 
 @inline function advect_2D(
-    particle::Particle{NF},         # particle to advect
-    u::NF,                          # zonal velocity [m/s]
-    v::NF,                          # meridional velocity [m/s]
-    dt::NF,                         # scaled time step [s*˚/m]    
-) where NF
+        particle::Particle{NF},         # particle to advect
+        u::NF,                          # zonal velocity [m/s]
+        v::NF,                          # meridional velocity [m/s]
+        dt::NF,                         # scaled time step [s*˚/m]
+    ) where {NF}
 
     dlat = v * dt                               # increment in latitude [˚N]
     coslat = max(cosd(particle.lat), eps(NF))   # prevents division by zero
@@ -320,16 +324,16 @@ end
 end
 
 # Kernel for predictor step in Heun's method
-@kernel inbounds=true function predictor_step_kernel!(
-    particles, locations, u_old, v_old, lons, lats, @Const(Δt_half)
-)
+@kernel inbounds = true function predictor_step_kernel!(
+        particles, locations, u_old, v_old, lons, lats, @Const(Δt_half)
+    )
     i = @index(Global, Linear)
-    
+
     if isactive(particles[i])
         # sum up Heun's first term in 1/2*Δt*(uv_old + uv_new) on the fly
         # use only Δt/2
         particles[i] = advect_2D(particles[i], u_old[i], v_old[i], Δt_half)
-        
+
         # predictor step, used to evaluate u_new, v_new
         # now again with Δt/2 to have an Euler timestep with Δt together with prev line
         locations[i] = advect_2D(particles[i], u_old[i], v_old[i], Δt_half)
@@ -341,11 +345,11 @@ end
 end
 
 # Kernel for corrector step in Heun's method
-@kernel inbounds=true function corrector_step_kernel!(
-    particles, u_new, v_new, lons, lats, @Const(Δt_half)
-)
+@kernel inbounds = true function corrector_step_kernel!(
+        particles, u_new, v_new, lons, lats, @Const(Δt_half)
+    )
     i = @index(Global, Linear)
-    
+
     if isactive(particles[i])
         # sum up Heun's 2nd term in 1/2*Δt*(uv_old + uv_new) on the fly
         particles[i] = advect_2D(particles[i], u_new[i], v_new[i], Δt_half)
