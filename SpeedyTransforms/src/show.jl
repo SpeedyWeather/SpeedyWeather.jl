@@ -1,13 +1,13 @@
 # from BenchmarkTools.jl but using KB instead of KiB etc
 function prettymemory(b)
-    if b < 1e3
+    if b < 1.0e3
         return string(b, " bytes")
-    elseif b < 1e6
-        value, units = b * 1e-3, "KB"
-    elseif b < 1e9
-        value, units = b * 1e-6, "MB"
+    elseif b < 1.0e6
+        value, units = b * 1.0e-3, "KB"
+    elseif b < 1.0e9
+        value, units = b * 1.0e-6, "MB"
     else
-        value, units = b * 1e-9, "GB"
+        value, units = b * 1.0e-9, "GB"
     end
     return string(@sprintf("%.2f", value), " ", units)
 end
@@ -21,22 +21,23 @@ function Base.show(io::IO, S::SpectralTransform{NF, ArrayType}) where {NF, Array
     # add information about size of Legendre polynomials and scratch memory
     polysize_str = prettymemory(Base.summarysize(S.legendre_polynomials))
     memorysize_str = prettymemory(
-                Base.summarysize(S.scratch_memory.north) +      # add all scratch_memories
-                Base.summarysize(S.scratch_memory.south) + 
-                Base.summarysize(S.scratch_memory.column.north) + 
-                Base.summarysize(S.scratch_memory.column.south)
-            )
+        Base.summarysize(S.scratch_memory.north) +      # add all scratch_memories
+            Base.summarysize(S.scratch_memory.south) +
+            Base.summarysize(S.scratch_memory.column.north) +
+            Base.summarysize(S.scratch_memory.column.south)
+    )
 
-    dealias = get_dealiasing(mmax-1, nlat_half) # -1 for zero-based
+    dealias = get_dealiasing(mmax - 1, nlat_half) # -1 for zero-based
     truncations = ["<linear", "linear", "quadratic", "cubic", ">cubic"]
-    truncation = truncations[clamp(floor(Int, dealias)+1, 1, 5)]
+    truncation = truncations[clamp(floor(Int, dealias) + 1, 1, 5)]
     dealiasing = @sprintf("%.3g", dealias)
 
     println(io, "SpectralTransform{$NF, $ArrayType}:")
-    println(io, "├ Spectral:     T$(mmax-1), $(lmax)x$(mmax) LowerTriangularMatrix{Complex{$NF}}")
+    println(io, "├ Spectral:     T$(mmax - 1), $(lmax)x$(mmax) LowerTriangularMatrix{Complex{$NF}}")
     println(io, "├ Grid:         Field{$NF}, $(RingGrids.get_nlat(grid))-ring $Grid")
     println(io, "├ Truncation:   dealiasing = $dealiasing ($truncation)")
     println(io, "├ Legendre:     Polynomials $polysize_str, shortcut: $(short_name(S.LegendreShortcut))")
     println(io, "├ Architecture: $architecture")
-    print(io,   "└ Memory:       for $nlayers layers ($memorysize_str)")
+    print(io, "└ Memory:       for $nlayers layers ($memorysize_str)")
+    return nothing
 end

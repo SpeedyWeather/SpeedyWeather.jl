@@ -8,7 +8,7 @@ as defined in [Vallis et al., 2004](https://doi.org/10.1175/1520-0469(2004)061%3
 ```math
 \begin{aligned}
 \frac{\partial \zeta}{\partial t} &+ \nabla \cdot (\mathbf{u}(\zeta + f)) =
-S - r\zeta - \nu\nabla^{4}\zeta \\ 
+S - r\zeta - \nu\nabla^{4}\zeta \\
 S_{l, m}^i &= A(1-\exp(-2\tfrac{\Delta t}{\tau}))Q^i_{l, m} + \exp(-\tfrac{dt}{\tau})S_{l, m}^{i-1} \\
 \end{aligned}
 ```
@@ -20,7 +20,7 @@ in spectral space, because that's where the forcing is defined: for degree
 ``l`` and order ``m`` of the spherical harmonics. ``A`` is a real amplitude.
 ``\Delta t`` the time step of the model, ``\tau`` the decorrelation time scale
 of the stochastic process. ``Q`` is for every spherical harmonic a complex random uniform
-number in ``[-1, 1]`` in both its real and imaginary components. 
+number in ``[-1, 1]`` in both its real and imaginary components.
 So we actually define our `StochasticStirring` forcing as follows and
 will explain the details in second
 
@@ -91,7 +91,7 @@ creation unless its elements have mutable fields, like the elements in vectors).
 to make it mutable, we could write `mutable struct` instead, or as outlined here use `RefValue`s.
 Another option would be to just recalculate `a, b` in `forcing!` on every time step.
 Depending on exactly what you would like to do, you can choose your way.
-Anyway, we decide to include `a, b` as `RefValue`s so that we can always access the scalar 
+Anyway, we decide to include `a, b` as `RefValue`s so that we can always access the scalar
 underneath with `a[]` and `b[]` and also change it with `a[] = 1` etc.
 
 Lastly, the [Vallis et al., 2004](https://doi.org/10.1175/1520-0469(2004)061%3C0264:AMASDM%3E2.0.CO;2)
@@ -137,21 +137,21 @@ actually do
 ```@example extend
 function SpeedyWeather.initialize!( forcing::StochasticStirring,
                                     model::AbstractModel)
-    
+
     # precompute forcing strength, scale with radius^2 as is the vorticity equation
     (; radius) = model.planet
     A = radius^2 * forcing.strength
-    
+
     # precompute noise and auto-regressive factor, packed in RefValue for mutability
     dt = model.time_stepping.Δt_sec
     τ = forcing.decorrelation_time.value        # in seconds
     forcing.a[] = A*sqrt(1 - exp(-2dt/τ))
     forcing.b[] = exp(-dt/τ)
-    
+
     # precompute the latitudinal mask
     (; grid) = model.spectral_grid
     latd = RingGrids.get_latd(grid)
-    
+
     for j in eachindex(forcing.lat_mask)
         # Gaussian centred at forcing.latitude of width forcing.width
         forcing.lat_mask[j] = exp(-(forcing.latitude-latd[j])^2/forcing.width^2*2)
@@ -204,6 +204,7 @@ function SpeedyWeather.forcing!(
     forcing!(diagn, forcing, model.spectral_transform)
 end
 ```
+
 The function signature (types and number of its arguments) has to be as outlined above.
 The first argument has to be of type `DiagnosticVariables` as the diagnostic variables,
 are the ones you want to change (likely the tendencies within) to apply a forcing.
@@ -241,11 +242,11 @@ function forcing!(
     forcing::StochasticStirring{NF},
     spectral_transform::SpectralTransform
 ) where NF
-    
+
     # noise and auto-regressive factors
     a = forcing.a[]    # = sqrt(1 - exp(-2dt/τ))
     b = forcing.b[]    # = exp(-dt/τ)
-    
+
     (; S) = forcing
     for lm in eachindex(S)
         # Barnes and Hartmann, 2011 Eq. 2
@@ -256,10 +257,10 @@ function forcing!(
     # to grid-point space
     S_grid = diagn.dynamics.a_grid  # use scratch array "a"
     transform!(S_grid, S, spectral_transform)
-    
+
     # mask everything but mid-latitudes
     RingGrids._scale_lat!(S_grid, forcing.lat_mask)
-    
+
     # back to spectral space
     (; vor_tend) = diagn.tendencies
     transform!(vor_tend, S_grid, spectral_transform)
@@ -280,7 +281,7 @@ grid-point space using the `a_grid` work array that is in `dynamics_variables`,
 `b_grid` is another one you can use, so are `a, b` in spectral space.
 However, these are really work arrays, meaning you should expect them
 to be overwritten momentarily once the function concludes and no information
-will remain. Equivalently, these arrays may have an undefined state 
+will remain. Equivalently, these arrays may have an undefined state
 prior to the `forcing!` call. We then use the `_scale_lat!` function
 from `RingGrids` which takes every element in the latitude mask `lat_mask`
 and multiplies it with every grid-point on the respective latitude ring.
@@ -311,7 +312,7 @@ and just put them together as you like, and as long as you follow some rules.
 ```@example extend
 spectral_grid = SpectralGrid(trunc=85, nlayers=1)
 stochastic_stirring = StochasticStirring(spectral_grid, latitude=-45)
-initial_conditions = StartFromRest()
+initial_conditions = StartFromRest(spectral_grid)
 model = BarotropicModel(spectral_grid; initial_conditions, forcing=stochastic_stirring)
 simulation = initialize!(model)
 run!(simulation)
@@ -374,7 +375,7 @@ be forced in spectral space only in grid space.
 These restrictions exist because of the way how SpeedyWeather transforms
 between spaces to obtain tendencies. Pressure (or interface displacement
 in the shallow water) can be forced both in spectral or grid space.
-Note that if you write into the pressure tendency for the primitie equation model
+Note that if you write into the pressure tendency for the primitive equation model
 these need to correspond to ``\partial_t \ln p_s`` so not in units of Pa/s but
 including the logarithm! In the shallow water model, this should have
 the normal units of m/s instead.

@@ -37,11 +37,12 @@ The default `LandModel` in SpeedyWeather contains
 (at the moment other than 2 soil layers are not supported or experimental)
 
 ```@example land
-spectral_grid = SpectralGrid(trunc=31, nlayers=8, nlayers_soil=2)
-land = LandModel(spectral_grid)
+spectral_grid = SpectralGrid(trunc=31, nlayers=8)
+geometry = LandGeometry(spectral_grid, nlayers=2) # that's also the default, therefore it's optional here
+land = LandModel(spectral_grid; geometry)
 ```
 
-With `land.geometry` currently used to define the layer thickness
+With `LandGeometry` currently used to define the number of soil layers and their layer thickness
 
 ```@example land
 land.geometry
@@ -55,7 +56,7 @@ other components of the land surface model `land`.
 land.thermodynamics
 ```
 
-To change these you can either mutate the fields or create a new model component `thermodynamics` 
+To change these you can either mutate the fields or create a new model component `thermodynamics`
 passed on to the land model constructor
 
 ```@example land
@@ -80,6 +81,12 @@ model.land
 ```
 
 is now the land defined above used when integrating a SpeedyWeather `model`.
+
+In case a non-default number of soil layers is used, the `LandGeometry` also needs to be passed to the `NetCDFOutput` constructor to allocate the correct dimensions of the output variables, when an output is desired:
+
+```julia
+output = NetCDFOutput("output.nc", model, land_geometry)
+```
 
 ### DryLandModel
 
@@ -134,7 +141,7 @@ retain thermal energy and release this back to the atmosphere either
 in the form of longwave radiative fluxes or sensible heat fluxes
 (latent heat fluxes depend on soil moisture, see [Surface fluxes](@ref)).
 It is a bucket model such that interaction between neighbouring
-grid cells ("buckets") of the land surface only interact through the 
+grid cells ("buckets") of the land surface only interact through the
 atmosphere with another, there are no direct horizontal fluxes
 between cells. In the sense of soil moisture, you can fill a bucket
 from above with rainfall, it may leak/drain at the bottom but buckets
@@ -215,7 +222,7 @@ The equations are
 for soil moistures ``W_1, W_2`` in the respective layers (1 top, 2 below)
 defined as ratio of available water to field capacity, ``f_i = \gamma \Delta z_i``
 with ``\gamma = 0.24`` the field capacity per meter soil and
-``\Delta z_1 = 0.1~m`` the top layer thickness by default, and 
+``\Delta z_1 = 0.1~m`` the top layer thickness by default, and
 ``\Delta z_2 = 4.0~m`` the layer below. The top layer is forced by precipitation
 ``P`` minus evaporation ``E`` minus river runoff ``R``. The second term is a
 diffusion term of soil moisture between the two layers, acting on a time scale
@@ -323,7 +330,7 @@ snow cover is broken up and snow lies in between trees.
 ## Albedo
 
 Albedo is the surface reflectivity to downward solar shortwave radiation.
-A value of 1 indicates that all of the radiative flux is reflected at 
+A value of 1 indicates that all of the radiative flux is reflected at
 the Earth's surface and sent back up through the atmospheric column.
 In contrast, a value of 0 means no reflection and all of that radiative
 flux is absorbed, typically heating ocean or land surface.
@@ -360,12 +367,11 @@ and inspected with
 albedo.ocean
 ```
 
-etc. You can mix those albedos too, they are internally
-two independent fields that are applied to fluxes
-separately, e.g.
+and `albedo.land`. You can mix those albedos too, they are internally
+two independent albedos that are applied to fluxes separately, e.g.
 
 ```@example land
-albedo = Albedo(GlobalConstantAlbedo(spectral_grid), AlbedoClimatology(spectral_grid))
+albedo = OceanLandAlbedo(GlobalConstantAlbedo(spectral_grid), AlbedoClimatology(spectral_grid))
 ```
 
 constructs an albedo that is a global constant (default 0.3) for the ocean
@@ -385,7 +391,7 @@ and this definition of the albedo will be used for both ocean and land fluxes.
 In all cases you can then pass on the albedo to the model constructor, e.g.
 
 ```@example land
-albedo = Albedo(GlobalConstantAlbedo(spectral_grid, albedo=0.1), ManualAlbedo(spectral_grid))
+albedo = OceanLandAlbedo(GlobalConstantAlbedo(spectral_grid, albedo=0.1), ManualAlbedo(spectral_grid))
 set!(albedo.land, (λ, φ) -> 0.2 + 0.3*abs(φ)/90)
 
 model = PrimitiveWetModel(spectral_grid; albedo)
@@ -394,7 +400,7 @@ model.albedo
 
 The albedo in the `model` is now the one defined just in the lines above,
 using a globally constant albedo of 0.1 for the ocean but a higher albedo
-over land which also increases to 0.5 towards the poles. 
+over land which also increases to 0.5 towards the poles.
 
 You can always output the land-sea mask weighted albedo with
 `add!(model, SpeedyWeather.AlbedoOutput())` or inspect it as follows

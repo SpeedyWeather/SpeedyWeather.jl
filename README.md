@@ -1,14 +1,15 @@
 # SpeedyWeather.jl <img src="docs/src/assets/logo.png" width="100" />
 
-
 [![CI](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI.yml) 
 [![status](https://joss.theoj.org/papers/515c81a4d6a69e31cc71ded65ac9c36a/status.svg)](https://joss.theoj.org/papers/515c81a4d6a69e31cc71ded65ac9c36a)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.6510139.svg)](https://doi.org/10.5281/zenodo.6510139)  
 [![docs](https://img.shields.io/badge/documentation-latest_release-blue.svg)](https://speedyweather.github.io/SpeedyWeatherDocumentation/stable/)
 [![docs](https://img.shields.io/badge/documentation-main-blue.svg)](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/)
+[![code style: runic](https://img.shields.io/badge/code_style-%E1%9A%B1%E1%9A%A2%E1%9A%BE%E1%9B%81%E1%9A%B2-black)](https://github.com/fredrikekre/Runic.jl)
 
-SpeedyWeather.jl is a global atmospheric model with simple physics developed as a research playground
-with an everything-flexible attitude as long as it is speedy. It is easy to use and easy to extend, making 
+SpeedyWeather.jl is a global atmospheric model developed as a research playground
+with an everything-flexible attitude as long as it is speedy. Technically it is a climate model with simple,
+yet interactive representations of ocean, land and sea-ice. It is easy to use and easy to extend, making 
 atmospheric modelling an interactive experience -- in the terminal, in a notebook or conventionally through scripts.
 With minimal code redundancies, it supports
 
@@ -16,10 +17,10 @@ With minimal code redundancies, it supports
 - Different physical equations (barotropic vorticity, shallow water, primitive equations, with and without humidity)
 - Particle advection in 2D for all equations
 - Tracer advection in 2D/3D that can be added, deleted, (de)activated anytime
-- Physics parameterizations for convection, precipitation, boundary layer, etc.
+- Physics parameterizations for convection, precipitation, boundary layer, radiation, etc.
 - Various more or less realistic planets and what-if scenarios by easily modifying initial and boundary conditions
 - A slab ocean and thermodynamic sea ice model
-- A 2-layer land bucket model with soil temperature, moisture and vegetation
+- A 2-layer land bucket model with soil temperature, moisture, vegetation and snow
 
 **Numerics and computing**
 - Different spatial grids (full and octahedral, Gaussian and Clenshaw-Curtis, HEALPix, OctaHEALPix)
@@ -52,8 +53,9 @@ individual terms of the equations, and analyse and visualise output on the fly.
 
 We do not necessarily aim to make SpeedyWeather an atmospheric model for the purpose of production-ready
 weather forecasting, at least not at the cost of our current level of interactivity and ease of
-use or extensibility. If someone wants to implement a parameterization that is very complicated
-and computationally expensive, then they are more than encouraged to do so. We are happy to provide a general interface
+use or extensibility. It is more build with a climate application scope in mind.
+If someone wants to implement a parameterization that is very complicated and computationally expensive,
+then they are more than encouraged to do so. We are happy to provide a general interface
 to enable and support such extensions, which can even be developed as their own independent projects in separate repositories
 thanks to the modular structure of SpeedyWeather. Since SpeedyWeather follows an "easy and fast by default" philosophy, these
 complex extensions likely will not be used by default. We would nevertheless appreciate such efforts since we aim for SpeedyWeather
@@ -64,11 +66,10 @@ to provide an easy-to-use interface yet modular enough to allow for extensive cu
 
 Finding a good balance is difficult, but we try our best.
 
-Despite our commitment to simplicity and ease-of-use, many more physical processes and other features are continuing to be developed. On our TODO list are
+Despite our commitment to simplicity and ease-of-use, many more physical processes and other features are continuing to be developed.
+On our TODO list are
 
-- A more realistic radiation scheme depending on clouds and humidity
-- Longwave radiation that depends on (globally averaged) greenhouse gas concentrations to represent climate change
-- Snow affecting surface fluxes including albedo
+- Radiation depending on greenhouse gas concentrations to represent climate change
 - Exoplanet support with more flexibility on the atmospheric composition
 - 3D particle advection
 
