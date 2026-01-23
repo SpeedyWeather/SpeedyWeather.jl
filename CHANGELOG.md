@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- MatrixSpectralTransform implemented [#952](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/952)
 - The number of soil layers is now solely defined by the land model and not in the `SpectralGrid` anymore [#898](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/898)   
 - Revised GPU benchmarks to include full GPU models [#946](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/946) and the dynamical core [#967](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/967)
 - Label-based modular skip CI mechanism for github and buildkite [#957](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/957)
@@ -51,7 +52,6 @@
 - Seasonal ocean and land climatology models GPU-ready [#892](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/892)
 - Zenith constructors [#889](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/889)
 - More general forcing of pressure, vorticity and divergence [#855](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/855)
-
 
 ## v0.17.3
 
