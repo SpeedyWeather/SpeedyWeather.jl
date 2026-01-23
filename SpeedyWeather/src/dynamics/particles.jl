@@ -160,3 +160,5 @@ function set(p::P; lon = nothing, lat = nothing, σ = nothing) where {P <: Parti
     pσ = isnothing(σ) ? p.σ : σ
     return P(p.active, plon, plat, pσ)
 end
+
+Adapt.@adapt_structure Particle
