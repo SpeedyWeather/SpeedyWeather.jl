@@ -117,7 +117,7 @@ function initialize!(
         lats[i] = particles[i].lat
     end
 
-    RingGrids.update_locator!(interpolator, lons, lats)
+    RingGrids.update_locator!(locator, geometry, lons, lats)
     u0 = diagn.particles.u      # now reused arrays are actually u, v
     v0 = diagn.particles.v
     interpolate!(u0, u_grid, locator, geometry)
