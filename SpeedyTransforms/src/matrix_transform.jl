@@ -221,7 +221,7 @@ function transform!(                        # SPECTRAL TO GRID
     @boundscheck ismatching(M, coeffs) || throw(DimensionMismatch(M, coeffs))
 
     nlayers = size(coeffs, 2)
-    scratch = nlayers < size(scratch_memory, 2) ? view(scratch_memory, :, 1:nlayers) : scratch_memory
+    scratch = ndims(coeffs) == 1 ? view(scratch_memory, :, 1) : nlayers < size(scratch_memory, 2) ? view(scratch_memory, :, 1:nlayers) : scratch_memory
 
     # the result is real-valued, therefore we can split the complex multiplication 
     # into two real-valued multiplications
