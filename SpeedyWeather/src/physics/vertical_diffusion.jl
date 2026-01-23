@@ -6,13 +6,13 @@ export BulkRichardsonDiffusion
     von_Karman::NF = 0.4
 
     "[OPTION] roughness length [m]"
-    @param roughness_length::NF = 3.21e-5 (bounds=Positive,)
+    @param roughness_length::NF = 3.21e-5 (bounds = Positive,)
 
     "[OPTION] Critical Richardson number for stable mixing cutoff [1]"
-    @param critical_Richardson::NF = 10 (bounds=Positive,)
+    @param critical_Richardson::NF = 10 (bounds = Positive,)
 
     "[OPTION] Fraction of surface boundary layer"
-    @param surface_layer_fraction::NF = 0.1 (bounds=0..1,)
+    @param surface_layer_fraction::NF = 0.1 (bounds = 0 .. 1,)
 
     "[OPTION] diffuse static energy?"
     diffuse_static_energy::Bool = true

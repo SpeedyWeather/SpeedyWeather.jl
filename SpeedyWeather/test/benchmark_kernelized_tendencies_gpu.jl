@@ -29,12 +29,10 @@ function benchmark_function(func!, args...; samples = 100, evals = 5)
     for _ in 1:2
         func!(args...)
     end
-
     # Synchronize GPU if needed
     if any(arg -> arg isa CuArray || (hasproperty(arg, :data) && arg.data isa CuArray), args)
         CUDA.synchronize()
     end
-
     # Benchmark
     b = @benchmark begin
         $func!($(args)...)
@@ -89,7 +87,6 @@ function test_function_correctness_gpu(name::String, func_cpu!, func_gpu!, trunc
     func_cpu!(args_cpu...)
     func_gpu!(args_gpu...)
     CUDA.synchronize()
-
     # Compare results - check all arrays in diagn.grid, diagn.dynamics, and diagn.tendencies
     max_diff = 0.0
     all_close = true
@@ -137,7 +134,6 @@ function test_function_correctness_gpu(name::String, func_cpu!, func_gpu!, trunc
             println("    - $field")
         end
     end
-
     return all_close
 end
 
@@ -181,7 +177,6 @@ function run_benchmarks_gpu(; trunc = 31, nlayers = 8, check_correctness = false
     println("CPU Architecture: $(CPU())")
     println("GPU Architecture: $(GPU())")
     println("GPU Device: $(CUDA.device())")
-
     # Run correctness tests first if requested
     if check_correctness
         println("\n" * "="^70)
@@ -213,7 +208,6 @@ function run_benchmarks_gpu(; trunc = 31, nlayers = 8, check_correctness = false
             SpeedyWeather.temperature_tendency_kernel!,
             trunc, nlayers
         )
-
         # Summary
         println("\n" * "-"^70)
         all_passed = all(values(correctness_results))
@@ -228,7 +222,6 @@ function run_benchmarks_gpu(; trunc = 31, nlayers = 8, check_correctness = false
             end
         end
     end
-
     # Now run performance benchmarks
     println("\n" * "="^70)
     println("PERFORMANCE BENCHMARKS (CPU vs GPU)")
@@ -260,7 +253,6 @@ function run_benchmarks_gpu(; trunc = 31, nlayers = 8, check_correctness = false
         [diagn_cpu, progn_cpu, lf, model_cpu.geometry],
         [diagn_gpu, progn_gpu, lf, model_gpu.geometry]
     )
-
     # Test 2: vertical_velocity!
     results["vertical_velocity"] = compare_performance_gpu(
         "vertical_velocity!",
@@ -269,7 +261,6 @@ function run_benchmarks_gpu(; trunc = 31, nlayers = 8, check_correctness = false
         [diagn_cpu, model_cpu.geometry],
         [diagn_gpu, model_gpu.geometry]
     )
-
     # Test 3: vordiv_tendencies!
     results["vordiv_tendencies"] = compare_performance_gpu(
         "vordiv_tendencies!",
@@ -278,7 +269,6 @@ function run_benchmarks_gpu(; trunc = 31, nlayers = 8, check_correctness = false
         [diagn_cpu, model_cpu],
         [diagn_gpu, model_gpu]
     )
-
     # Test 4: temperature_tendency!
     results["temperature_tendency"] = compare_performance_gpu(
         "temperature_tendency!",
@@ -287,7 +277,6 @@ function run_benchmarks_gpu(; trunc = 31, nlayers = 8, check_correctness = false
         [diagn_cpu, model_cpu.adiabatic_conversion, model_cpu.atmosphere, model_cpu.implicit, model_cpu.geometry, model_cpu.spectral_transform],
         [diagn_gpu, model_gpu.adiabatic_conversion, model_gpu.atmosphere, model_gpu.implicit, model_gpu.geometry, model_gpu.spectral_transform]
     )
-
     # Test 5: pressure_gradient_flux!
     results["pressure_gradient_flux"] = compare_performance_gpu(
         "pressure_gradient_flux!",
@@ -296,7 +285,6 @@ function run_benchmarks_gpu(; trunc = 31, nlayers = 8, check_correctness = false
         [diagn_cpu, progn_cpu, lf, model_cpu.spectral_transform],
         [diagn_gpu, progn_gpu, lf, model_gpu.spectral_transform]
     )
-
     # Test 7: horizontal_advection!
     A_tend_cpu = diagn_cpu.tendencies.temp_tend
     A_tend_grid_cpu = diagn_cpu.tendencies.temp_tend_grid
@@ -313,7 +301,6 @@ function run_benchmarks_gpu(; trunc = 31, nlayers = 8, check_correctness = false
         [A_tend_cpu, A_tend_grid_cpu, A_grid_cpu, diagn_cpu, model_cpu.geometry, model_cpu.spectral_transform],
         [A_tend_gpu, A_tend_grid_gpu, A_grid_gpu, diagn_gpu, model_gpu.geometry, model_gpu.spectral_transform]
     )
-
     # Test 8: flux_divergence!
     results["flux_divergence"] = compare_performance_gpu(
         "flux_divergence!",
@@ -322,7 +309,6 @@ function run_benchmarks_gpu(; trunc = 31, nlayers = 8, check_correctness = false
         [A_tend_cpu, A_grid_cpu, diagn_cpu, model_cpu.geometry, model_cpu.spectral_transform],
         [A_tend_gpu, A_grid_gpu, diagn_gpu, model_gpu.geometry, model_gpu.spectral_transform]
     )
-
     # Test 9: linear_pressure_gradient!
     results["linear_pressure_gradient"] = compare_performance_gpu(
         "linear_pressure_gradient!",
@@ -331,7 +317,6 @@ function run_benchmarks_gpu(; trunc = 31, nlayers = 8, check_correctness = false
         [diagn_cpu, progn_cpu, lf, model_cpu.atmosphere, model_cpu.implicit],
         [diagn_gpu, progn_gpu, lf, model_gpu.atmosphere, model_gpu.implicit]
     )
-
     # Summary
     println("\n" * "="^70)
     println("SUMMARY")
@@ -377,12 +362,10 @@ function full_benchmark_gpu()
     println("\n\n" * "="^70)
     println("CROSS-CONFIGURATION SUMMARY")
     println("="^70)
-
     for (config_name, results) in all_results
         avg_speedup = sum([r.speedup for r in values(results)]) / length(results)
         @printf("%-30s: %.2fx average\n", config_name, avg_speedup)
     end
-
     return all_results
 end
 

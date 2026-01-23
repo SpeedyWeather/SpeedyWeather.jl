@@ -193,7 +193,7 @@ end
     field1 = zeros(Float32, grid)
     field2 = zeros(Float32, grid)
 
-    S = SpectralTransform(spectrum, grid, NF=Float32)
+    S = SpectralTransform(spectrum, grid, NF = Float32)
 
     transform!(field1, L_f64, S)    # Float64 -> Float32
     transform!(field2, L_f32, S)    # Float32 -> Float32
@@ -300,19 +300,19 @@ end
                 S = SpectralTransform(spectrum, grid; NF)
 
                 # field that could be orography
-                orography_rough = 5000*rand(NF, grid).^2
+                orography_rough = 5000 * rand(NF, grid) .^ 2
                 oro_spec = transform(orography_rough, S)
 
                 # spectral smoothing
                 t = round(Int, trunc * 0.95)
-                oro_spec = SpeedyTransforms.spectral_smoothing(oro_spec, 0.1, power=1, truncation=t)
+                oro_spec = SpeedyTransforms.spectral_smoothing(oro_spec, 0.1, power = 1, truncation = t)
 
                 oro_grid1 = transform(oro_spec, S)
                 oro_spec1 = transform(oro_grid1, S)
                 oro_grid2 = transform(oro_spec1, S)
                 oro_spec2 = transform(oro_grid2, S)
 
-                tol = NF == Float32 ? sqrt(eps(NF)) : 5e-7
+                tol = NF == Float32 ? sqrt(eps(NF)) : 5.0e-7
 
                 for lm in eachharmonic(oro_spec1, oro_spec2)
                     @test oro_spec1[lm] ≈ oro_spec2[lm] atol = tol rtol = tol

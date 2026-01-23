@@ -11,7 +11,7 @@
             grid = Grid(24)
             A = randn(NF, grid)
             B = copy(A)
-            
+
             RingGrids.scale_coslat⁻¹!(A)
             RingGrids.scale_coslat!(A)
 

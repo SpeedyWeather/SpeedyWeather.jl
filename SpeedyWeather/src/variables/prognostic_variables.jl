@@ -117,13 +117,13 @@ function PrognosticVariables(model::AbstractModel)
     tracers = model.tracers
     nsteps = model.time_stepping.nsteps
 
-    (; NF, spectrum, grid, nlayers, nlayers_soil, nparticles) = SG
+    (; NF, spectrum, grid, nlayers, nparticles) = SG
     (; SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, ParticleVector) = SG
+    nlayers_soil = get_soil_layers(model)
 
     # allocate parameterization variables
     variable_names = get_prognostic_variables(model)
 
-    # TODO: currently this is just a drop-in replacement, later we should have nlayers_soil from the land model and not from the SpectralGrid
     land = initialize_variables(SG, nlayers_soil, variable_names.land...)
     physics = initialize_variables(SG, nlayers, variable_names.atmosphere...)
     ocean = initialize_variables(SG, 1, variable_names.ocean...)
@@ -275,16 +275,16 @@ function Base.fill!(progn::PrognosticVariables, value::Number)
     # ocean
     for (key, var) in pairs(progn.ocean)
         var .= value
-    end 
+    end
 
     # land
     for (key, var) in pairs(progn.land)
         var .= value
-    end 
+    end
 
     # fill tracers
-    for (key, var) in pairs(progn.tracers) 
-        for value_i in var # istep of nsteps tuple 
+    for (key, var) in pairs(progn.tracers)
+        for value_i in var # istep of nsteps tuple
             value_i .= value
         end
     end

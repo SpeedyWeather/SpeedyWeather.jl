@@ -2,7 +2,7 @@ abstract type AbstractVegetation <: AbstractLandComponent end
 
 export NoVegetation
 struct NoVegetation <: AbstractVegetation end
-NoVegetation(SG::SpectralGrid) = NoVegetation()
+NoVegetation(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothing) = NoVegetation()
 initialize!(vegetation::NoVegetation, model::PrimitiveEquation) = nothing
 
 function initialize!(
@@ -97,7 +97,7 @@ end
 # Adapt.adapt_structure(to, veg::VegetationClimatology) = adapt(to, ManualVegetationClimatology(veg.high_cover, veg.low_cover))
 
 # generator function
-function VegetationClimatology(SG::SpectralGrid; kwargs...)
+function VegetationClimatology(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothing; kwargs...)
     (; NF, GridVariable2D, grid) = SG
     high_cover = zeros(GridVariable2D, grid)
     low_cover = zeros(GridVariable2D, grid)

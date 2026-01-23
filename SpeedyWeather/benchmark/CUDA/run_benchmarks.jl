@@ -1,3 +1,6 @@
+import Pkg
+Pkg.activate("benchmark/CUDA")
+
 using CUDA, SpeedyWeather, Dates
 using Adapt
 using BenchmarkTools
