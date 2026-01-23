@@ -192,14 +192,13 @@ function particle_advection!(
     k = particle_advection.layer
     u_grid = field_view(diagn.grid.u_grid, :, k)
     v_grid = field_view(diagn.grid.v_grid, :, k)
-    (; interpolator) = diagn.particles
-    RingGrids.update_locator!(interpolator, lons, lats)
+    RingGrids.update_locator!(locator, geometry, lons, lats)
 
     # interpolate new velocity on predicted new locations
     u_new = diagn.particles.u
     v_new = diagn.particles.v
-    interpolate!(u_new, u_grid, interpolator)
-    interpolate!(v_new, v_grid, interpolator)
+    interpolate!(u_new, u_grid, locator, geometry)
+    interpolate!(v_new, v_grid, locator, geometry)
 
     # Launch corrector step kernel
     launch!(
@@ -209,9 +208,9 @@ function particle_advection!(
 
     # store new velocities at new (corrected locations) to be used on
     # next particle advection time step
-    RingGrids.update_locator!(interpolator, lons, lats)
-    interpolate!(u_new, u_grid, interpolator)
-    interpolate!(v_new, v_grid, interpolator)
+    RingGrids.update_locator!(locator, geometry, lons, lats)
+    interpolate!(u_new, u_grid, locator, geometry)
+    interpolate!(v_new, v_grid, locator, geometry)
     return nothing
 end
 
