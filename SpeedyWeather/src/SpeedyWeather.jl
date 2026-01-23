@@ -105,7 +105,7 @@ export curl, divergence, curl!, divergence!
 export ∇, ∇², ∇⁻², ∇!, ∇²!, ∇⁻²!
 export power_spectrum
 
-import SpeedyTransforms: AbstractSpectralTransform,prettymemory
+import SpeedyTransforms: AbstractSpectralTransform, prettymemory
 
 # to be defined in GeoMakie extension
 export animate, globe

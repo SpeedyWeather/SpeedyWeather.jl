@@ -8,6 +8,7 @@ struct MatrixSpectralTransform{
         SpectrumType,               # <: AbstractSpectrum
         GridType,                   # <: AbstractGrid
         VectorType,                 # <: ArrayType{NF, 1},
+        MatrixType,                 # <: ArrayType{NF, 2},
         MatrixComplexType,          # <: ArrayType{Complex{NF}, 2},
         GradientType,               # <: NamedTuple for gradients
     } <: AbstractSpectralTransform{NF, AR, ArrayType}
@@ -31,8 +32,12 @@ struct MatrixSpectralTransform{
     forward::MatrixComplexType          # forward transform matrix
     backward::MatrixComplexType         # backward transform matrix
 
+    backward_real::MatrixType           # real part of backward transform matrix
+    backward_imag::MatrixType           # imag part of backward transform matrix
+
     # SCRATCH MEMORY
-    scratch_memory::MatrixComplexType   # state is undetermined, only read after writing to it
+    scratch_memory::MatrixType
+    scratch_memory_old::MatrixComplexType   # state is undetermined, only read after writing to it
 
     gradients::GradientType             # precomputed gradient and integration matrices
 end
@@ -82,8 +87,12 @@ function MatrixSpectralTransform(
     forward = on_architecture(architecture, forward)
     backward = on_architecture(architecture, backward)
 
+    backward_real = real(backward)
+    backward_imag = imag(backward)
+
     # SCRATCH MEMORY FOR FOURIER NOT YET LEGENDRE TRANSFORMED AND VICE VERSA
-    scratch_memory = on_architecture(architecture, zeros(Complex{NF}, grid, nlayers).data)
+    scratch_memory = on_architecture(architecture, zeros(NF, spectrum, nlayers).data)
+    scratch_memory_old = on_architecture(architecture, zeros(Complex{NF}, grid, nlayers).data)
 
     # PRECOMPUTE GRADIENT AND INTEGRATION MATRICES
     gradients = gradient_arrays(NF, spectrum)
@@ -95,6 +104,7 @@ function MatrixSpectralTransform(
         typeof(spectrum),
         typeof(grid),
         typeof(coslat),
+        typeof(backward_real),
         typeof(forward),
         typeof(gradients),
     }(
@@ -104,7 +114,10 @@ function MatrixSpectralTransform(
         S.norm_sphere,
         forward,
         backward,
+        backward_real,
+        backward_imag,
         scratch_memory,
+        scratch_memory_old,
         gradients,
     )
 end
@@ -160,7 +173,7 @@ coefficients to an n-dimensional array `field`. Uses precomputed dense transform
 the transformation. The spectral transform is number format-flexible but `field` and the spectral
 transform `M` have to have the same number format. The spectral transform is grid-flexible as long
 as `field.grid` and `M.grid` match."""
-function transform!(                        # SPECTRAL TO GRID
+function transform_old!(                        # SPECTRAL TO GRID
         field::AbstractField,               # gridded output
         coeffs::LowerTriangularArray,       # spectral coefficients input
         scratch_memory,                     # explicit scratch memory to use
@@ -190,6 +203,33 @@ function transform!(                        # SPECTRAL TO GRID
         LinearAlgebra.mul!(scratch_memory, M.backward, coeffs.data)
         field.data .= real.(scratch_memory)
     end
+
+    unscale_coslat && RingGrids._scale_lat!(field, M.coslat⁻¹)
+    return field
+end
+
+function transform!(                        # SPECTRAL TO GRID
+        field::AbstractField,               # gridded output
+        coeffs::LowerTriangularArray,       # spectral coefficients input
+        scratch_memory,                     # explicit scratch memory to use
+        M::MatrixSpectralTransform;         # precomputed transform
+        unscale_coslat::Bool = false,       # unscale with cos(lat) on the fly?
+    )
+
+    # catch incorrect sizes early
+    @boundscheck ismatching(M, field) || throw(DimensionMismatch(M, field))
+    @boundscheck ismatching(M, coeffs) || throw(DimensionMismatch(M, coeffs))
+
+    nlayers = size(coeffs, 2)
+    scratch = nlayers < size(scratch_memory, 2) ? view(scratch_memory, :, 1:nlayers) : scratch_memory
+
+    # the result is real-valued, therefore we can split the complex multiplication 
+    # into two real-valued multiplications
+    scratch .= real.(coeffs.data)
+    LinearAlgebra.mul!(field.data, M.backward_real, scratch)
+
+    scratch .= imag.(coeffs.data)
+    LinearAlgebra.mul!(field.data, M.backward_imag, scratch, -1, 1)
 
     unscale_coslat && RingGrids._scale_lat!(field, M.coslat⁻¹)
     return field
