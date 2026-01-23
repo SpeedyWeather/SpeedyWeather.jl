@@ -106,16 +106,10 @@ function initialize!(
     # interpolate initial velocity on initial locations
     lats = diagn.particles.u    # reuse u,v arrays as only used for u, v
     lons = diagn.particles.v    # after update_locator!
-    σ = model.geometry.σ_levels_full[k]
+    σ = Vector(model.geometry.σ_levels_full)[k] # explicitly on CPU
 
-    for i in eachindex(particles)
-        # modulo all particles here
-        # i.e. one can start with a particle at -120˚E which moduloed to 240˚E here
-        # also given this is 2D advection on a given layer set that vertical coordinate σ here
-        particles[i] = mod(set(particles[i]; σ = σ))
-        lons[i] = particles[i].lon
-        lats[i] = particles[i].lat
-    end
+    # modulo particles and extract their coordinates
+    launch!(architecture(particles), LinearWorkOrder, (length(particles),), _initialize_particles_kernel!, particles, lons, lats, σ)
 
     RingGrids.update_locator!(locator, geometry, lons, lats)
     u0 = diagn.particles.u      # now reused arrays are actually u, v
