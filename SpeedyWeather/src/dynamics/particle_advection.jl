@@ -79,7 +79,7 @@ function initialize!(
         model::AbstractModel,
     ) where {P <: Particle}
 
-    return particles .= rand(P, length(particles))
+    return particles .= on_architecture(architecture(particles), rand(P, length(particles)))
 end
 
 """$(TYPEDSIGNATURES)
