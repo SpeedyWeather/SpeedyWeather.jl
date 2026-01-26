@@ -3,7 +3,7 @@ module Architectures
 import KernelAbstractions
 
 export AbstractArchitecture
-export CPU, CPUStatic, GPU
+export CPU, CPUStatic, GPU, ReactantDevice
 export CUDAGPU, MetalGPU, ROCGPU
 export array_type, on_architecture, architecture, device
 export convert_to_device, ismatching, compatible_array_types, nonparametric_type
@@ -67,6 +67,7 @@ function GPU end
 function CUDAGPU end
 function MetalGPU end
 function ROCGPU end
+function ReactantDevice end
 
 #####
 ##### These methods are extended in SpeedyWeatherCUDAExt
