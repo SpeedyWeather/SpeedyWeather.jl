@@ -60,7 +60,7 @@ struct ReactantDevice{D} <: AbstractArchitecture
     device::D
 end
 
-Base.show(io::IO, a::ReactantDevice) = print(io, "ReactantDevice($(device(a)))")
+Base.show(io::IO, a::ReactantDevice) = print(io, "ReactantDevice")
 
 # defined here so that it can be extended
 function GPU end

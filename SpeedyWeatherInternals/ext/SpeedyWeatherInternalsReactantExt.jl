@@ -1,6 +1,8 @@
 module SpeedyWeatherInternalsReactantExt 
 
-using Reactant: AnyConcreteRArray
+using KernelAbstractions
+using SpeedyWeatherInternals
+using Reactant 
 
 import SpeedyWeatherInternals.Architectures: Architectures, ReactantDevice, array_type, architecture, on_architecture, compatible_array_types, nonparametric_type
 
@@ -15,7 +17,7 @@ Architectures.ReactantDevice() = ReactantDevice(ReactantBackend())
 
 Architectures.array_type(::ReactantDevice) = ConcreteRArray
 Architectures.array_type(::Type{<:ReactantDevice}) = ConcreteRArray
-Architectures.array_type(::ReactantDevice, NF::Type, N::Int) = ConcreteRArray{NF, N, Runtime.Mem.HIPBuffer}
+Architectures.array_type(::ReactantDevice, NF::Type, N::Int) = ConcretePJRTArray{NF, N, 1}
 
 Architectures.compatible_array_types(::ReactantDevice) = (ConcreteRArray, AnyConcreteReactantArray)
 Architectures.compatible_array_types(::Type{<:ReactantDevice}) = (ConcreteRArray, AnyConcreteReactantArray)

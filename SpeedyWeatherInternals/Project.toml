@@ -25,7 +25,7 @@ SpeedyWeatherInternalsAMDGPUExt = "AMDGPU"
 SpeedyWeatherInternalsCUDAExt = "CUDA"
 SpeedyWeatherInternalsJLArraysExt = "JLArrays"
 SpeedyWeatherInternalsMetalExt = "Metal"
-SpeedyWeatherInternalsReactantExt = "Reactant"
+SpeedyWeatherInternalsReactantExt = ["Reactant", "KernelAbstractions"]
 
 [compat]
 AMDGPU = "2.1.2"
