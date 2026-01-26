@@ -50,6 +50,18 @@ end
 
 Base.show(io::IO, a::GPU) = print(io, "GPU($(device(a)))")
 
+"""
+    ReactantDevice(device)
+
+Return a Reactant architecture to run SpeedyWeather using Reactant.
+The actual device it's running on depends on the Reactant settings.
+"""
+struct ReactantDevice{D} <: AbstractArchitecture
+    device::D
+end
+
+Base.show(io::IO, a::ReactantDevice) = print(io, "ReactantDevice($(device(a)))")
+
 # defined here so that it can be extended
 function GPU end
 function CUDAGPU end

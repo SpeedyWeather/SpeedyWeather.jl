@@ -18,12 +18,14 @@ AMDGPU = "21141c5a-9bdb-4563-92ae-f87d6854732e"
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 JLArrays = "27aeb0d3-9eb9-45fb-866b-73c2ecf80fcb"
 Metal = "dde4c033-4e86-420c-a63e-0dd931031962"
+Reactant = "3c362404-f566-11ee-1572-e11a4b42c853"
 
 [extensions]
 SpeedyWeatherInternalsAMDGPUExt = "AMDGPU"
 SpeedyWeatherInternalsCUDAExt = "CUDA"
 SpeedyWeatherInternalsJLArraysExt = "JLArrays"
 SpeedyWeatherInternalsMetalExt = "Metal"
+SpeedyWeatherInternalsReactantExt = "Reactant"
 
 [compat]
 AMDGPU = "2.1.2"
@@ -38,4 +40,5 @@ KernelAbstractions = "0.9"
 MacroTools = "0.5"
 Metal = "1.8.0"
 ModelParameters = "0.4"
+Reactant = "0.2.209"
 julia = "1.10"
