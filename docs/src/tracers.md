@@ -13,7 +13,7 @@ Humidity, for example, is an _active_ tracer as it changes the [Geopotential](@r
 (and therefore the pressure gradient force) through the [Virtual temperature](@ref).
 A tracer is conserved in the absence of sources or sinks (the zero on the right-hand side above).
 Aerosols from wildfires might be considered to be a passive tracer, but the
-source term should increase the aerosol concentration whereever and whenever there is 
+source term should increase the aerosol concentration wherever and whenever there is
 a wildfire. And also a sink term should be added representing aerosols being washed out
 in rainfall, or deposited on the ground. However, aerosols should be considered
 _active_ and not _passive_ if they influence the radiation and hence the temperature
@@ -23,11 +23,11 @@ tracer is passive, but if a forcing or parameterization is defined that depends
 on the tracer it becomes active, affecting the flow. A tracer definition
 in itself therefore does not make distinction between active or passive
 tracers but a forcing/parameterization definition can make existing tracers
-active. 
+active.
 
 # Eulerian advection
 
-Numerically we solve ``Dq/Dt`` as 
+Numerically we solve ``Dq/Dt`` as
 
 ```math
 \frac{\partial q}{\partial t} = -\nabla\cdot(\mathbf{u}q) + q\mathcal{D} - W(q)
@@ -74,28 +74,11 @@ Tracers are just defined through their `key`, e.g. `:co2`, so while you can do
 the same tracer -- and no two tracers with the same key can exist inside `model`
 (and `simulation`).
 
-You can also add a tracer to a `simulation`, i.e. after the model is initialized.
+What you should not do is add a tracer to the `model` _after_ it has been initialized.
+You can check that the tracers exists in the variables with
 
 ```@example tracers
 simulation = initialize!(model)
-add!(simulation, Tracer(:xyz))
-```
-
-which will add the tracer to `model.tracers` as above but also add
-it to the prognostic and diagnostic variables (otherwise done at `initialize!`).
-There is no difference between adding a tracer to model versus adding it
-to the simulation. Conceptually, the existence of a tracer should be
-defined in `model` in the same way as `PrimitiveWetModel` defines the existence
-of humidity as an (active) tracer. But for convenience and the ability
-to add (or remove) a tracer at any time it is also possible to add
-a tracer to `simulation` (which will add it to the `model`, and the variables, too).
-
-What you should not do is add a tracer to the `model` _after_ it has been initialized.
-Then you end up with an additional tracer in `model` without there
-being variables for it, throwing an error. You can check that
-the tracers exists in the variables with
-
-```@example tracers
 simulation.prognostic_variables
 ```
 
@@ -104,7 +87,7 @@ based on dictionaries so the order of the tracers is arbitrary,
 they are always defined by their `key` instead.
 
 Note that a tracer can be added to or deleted from a simulation at _any time_.
-So you can run a simulation, add a tracer, continute the simulation,
+So you can run a simulation, add a tracer, continue the simulation,
 or delete a tracer and continue. You can also just activate them or
 deactivate them, see below.
 
@@ -168,10 +151,10 @@ Let us illustrate some tracer advection in practice
 using SpeedyWeather
 spectral_grid = SpectralGrid(trunc=85, nlayers=1)
 model = ShallowWaterModel(spectral_grid)
+add!(model, Tracer(:abc))
 simulation = initialize!(model)
 
 # add and set tracer and run a 0-day simulation
-add!(simulation, Tracer(:abc))
 set!(simulation, abc = (λ, φ, σ) -> exp(-(λ-180)^2/10^2))
 run!(simulation, period=Day(0))
 

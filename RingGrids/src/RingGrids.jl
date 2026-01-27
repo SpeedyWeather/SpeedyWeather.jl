@@ -1,120 +1,120 @@
 module RingGrids
 
 # DOCUMENTATION
-using  DocStringExtensions
+using DocStringExtensions
 import Printf
 
 # NUMERICS
 import Statistics: Statistics, mean
 import FastGaussQuadrature
 import LinearAlgebra
-export rotate, rotate!
 
+# GPU
 import Adapt: Adapt, adapt, adapt_structure
 import GPUArrays
 import KernelAbstractions: KernelAbstractions, @kernel, @index, @Const, synchronize
 
 # SPEEDYWEATHER SUBMODULES
-import SpeedyWeatherInternals.Architectures: Architectures, AbstractArchitecture, CPU, GPU, 
-        on_architecture, architecture, array_type, ismatching, nonparametric_type
+import SpeedyWeatherInternals.Architectures: Architectures, AbstractArchitecture, CPU, GPU,
+    on_architecture, architecture, array_type, ismatching, nonparametric_type
 
 using SpeedyWeatherInternals.Architectures
-using SpeedyWeatherInternals.Utils 
+using SpeedyWeatherInternals.Utils
 
 # ABSTRACT GRIDS
-export  AbstractGrid,
-        AbstractFullGrid,
-        AbstractReducedGrid
+export AbstractGrid,
+    AbstractFullGrid,
+    AbstractReducedGrid
 
 # CONCRETE GRIDS
-export  FullGaussianGrid,
-        FullClenshawGrid,
-        FullHEALPixGrid,
-        FullOctaHEALPixGrid
+export FullGaussianGrid,
+    FullClenshawGrid,
+    FullHEALPixGrid,
+    FullOctaHEALPixGrid
 
-export  OctahedralGaussianGrid,
-        OctahedralClenshawGrid,
-        HEALPixGrid,
-        OctaHEALPixGrid,
-        OctaminimalGaussianGrid
+export OctahedralGaussianGrid,
+    OctahedralClenshawGrid,
+    HEALPixGrid,
+    OctaHEALPixGrid,
+    OctaminimalGaussianGrid
 
 # FIELDS (Data on grids)
-export  AbstractField, AbstractField2D, AbstractField3D,
-        Field, Field2D, Field3D
+export AbstractField, AbstractField2D, AbstractField3D,
+    Field, Field2D, Field3D
 
-export  FullGaussianField,
-        FullClenshawField,
-        FullHEALPixField,
-        FullOctaHEALPixField,
-        OctahedralGaussianField,
-        OctahedralClenshawField,
-        HEALPixField,
-        OctaHEALPixField,
-        OctaminimalGaussianField
+export FullGaussianField,
+    FullClenshawField,
+    FullHEALPixField,
+    FullOctaHEALPixField,
+    OctahedralGaussianField,
+    OctahedralClenshawField,
+    HEALPixField,
+    OctaHEALPixField,
+    OctaminimalGaussianField
 
-export  ColumnField,
-        FullColumnField,
-        ReducedColumnField,
-        ColumnField2D,
-        ColumnField3D,
-        ColumnField4D,
-        transpose!
+export ColumnField,
+    FullColumnField,
+    ReducedColumnField,
+    ColumnField2D,
+    ColumnField3D,
+    ColumnField4D,
+    transpose!
 
-export  field_view
+export field_view
 
 # SIZE
-export  grids_match,
-        fields_match,
-        get_nlat,
-        get_nlat_half,
-        get_npoints,
-        get_npoints2D
+export grids_match,
+    fields_match,
+    get_nlat,
+    get_nlat_half,
+    get_npoints,
+    get_npoints2D
 
 # COORDINATES
-export  get_londlatds,
-        get_lonlats,
-        get_loncolats,
-        get_lat,
-        get_colat,
-        get_latd,
-        get_lond,
-        get_nlons,
-        get_nlon_max
+export get_londlatds,
+    get_lonlats,
+    get_loncolats,
+    get_lat,
+    get_colat,
+    get_latd,
+    get_lond,
+    get_nlons,
+    get_nlon_max
 
 # INTEGRATION
-export  get_quadrature_weights,
-        get_solid_angles
+export get_quadrature_weights,
+    get_solid_angles
 
 # ITERATORS
-export  eachlayer,
-        eachring,
-        whichring,
-        eachgridpoint,
-        each_index_in_ring,
-        each_index_in_ring!
+export eachlayer,
+    eachring,
+    whichring,
+    eachgridpoint,
+    each_index_in_ring,
+    each_index_in_ring!
 
 # SCALING
-export  scale_coslat!,
-        scale_coslat²!,
-        scale_coslat⁻¹!,
-        scale_coslat⁻²!,
-        scale_coslat,
-        scale_coslat²,
-        scale_coslat⁻¹,
-        scale_coslat⁻²
+export scale_coslat!,
+    scale_coslat²!,
+    scale_coslat⁻¹!,
+    scale_coslat⁻²!,
+    scale_coslat,
+    scale_coslat²,
+    scale_coslat⁻¹,
+    scale_coslat⁻²
 
 # INTERPOLATION
-export  AbstractInterpolator,
-        GridGeometry,
-        AbstractLocator,
-        AnvilLocator,
-        AnvilInterpolator,
-        DEFAULT_INTERPOLATOR
+export AbstractInterpolator,
+    GridGeometry,
+    AbstractLocator,
+    AnvilLocator,
+    AnvilInterpolator,
+    DEFAULT_INTERPOLATOR
 
-export  interpolate,
-        interpolate!,
-        update_locator,
-        update_locator!
+export interpolate,
+    interpolate!,
+    update_locator,
+    update_locator!
 
 # STATISTICS
 export zonal_mean
@@ -139,6 +139,7 @@ include("scaling.jl")
 include("geodesics.jl")
 include("reverse.jl")
 include("rotate.jl")
+include("reordering.jl")
 
 # FULL GRIDS
 include("grids/full_grids.jl")

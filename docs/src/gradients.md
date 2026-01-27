@@ -14,7 +14,7 @@ under the hood.
     The gradient operators in SpeedyTransforms generally assume a sphere of radius ``R=1``.
     For the transforms themselves that does not make a difference, but the gradient operators
     `divergence`, `curl`, `∇`, `∇²`, `∇⁻²` omit the radius scaling unless you provide the optional
-    keyword `radius` (or you can do `./= radius` manually). 
+    keyword `radius` (or you can do `./= radius` manually).
     Also note that meridional derivates in spectral space expect a ``\cos^{-1}(\theta)`` scaling.
     Details are always outlined in the respective docstrings, `?∇` for example.
 
@@ -51,7 +51,7 @@ And the Laplace operators omit a ``R^2`` (radius ``R``) scaling, i.e.
 ## Gradient `∇`
 
 We illustrate the usage of the gradient function `∇`. Let us create some fake
-data `G` on the grid first 
+data `G` on the grid first
 
 ```@example gradient
 using SpeedyWeather, CairoMakie
@@ -59,9 +59,9 @@ using SpeedyWeather, CairoMakie
 # create some data with wave numbers 0,1,2,3,4
 trunc = 64                  # 1-based maximum degree of spherical harmonics
 L = randn(LowerTriangularMatrix{ComplexF32}, trunc, trunc)
-spectral_truncation!(L, 5)              # remove higher wave numbers
+SpeedyTransforms.spectral_truncation!(L, 5)  # remove higher wave numbers
 G = transform(L)
-heatmap(G, title="Some fake data G")    # requires `using CairoMakie`
+heatmap(G, title="Some fake data G")        # requires `using CairoMakie`
 save("gradient_data.png", ans) # hide
 nothing # hide
 ```
@@ -105,7 +105,7 @@ which becomes, if you take the divergence of these two equations
 Meaning that if we start with ``u, v`` we can obtain the relative vorticity
 ``\zeta`` and, using Coriolis parameter ``f`` and gravity ``g``, invert
 the Laplace operator to obtain displacement ``\eta``. How to do this with
-SpeedyTransforms? 
+SpeedyTransforms?
 
 Let us start by generating some data
 ```@example gradient
@@ -162,7 +162,7 @@ additional degree, but in the returned lower triangular matrix this row is set t
     All gradient operators expect the input lower triangular matrices of shape ``(N+1) \times N``.
     This one more degree of the spherical harmonics is required for the meridional derivative.
     Scalar quantities contain this degree too for size compatibility but they should not
-    make use of it. Use `spectral_truncation` to add or remove this degree manually.
+    make use of it. Use `SpeedyTransforms.spectral_truncation` to add or remove this degree manually.
 
 You may also generally assume that a `SpectralTransform` struct precomputed for
 some truncation, say ``l_{max} = m_{max} = T`` could also be used for smaller

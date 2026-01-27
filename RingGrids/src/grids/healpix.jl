@@ -23,31 +23,31 @@ Architectures.nonparametric_type(::Type{<:HEALPixGrid}) = HEALPixGrid
 full_grid_type(::Type{<:HEALPixGrid}) = FullHEALPixGrid
 
 # FIELD
-const HEALPixField{T, N} = Field{T, N, ArrayType, Grid} where {ArrayType, Grid<:HEALPixGrid}
+const HEALPixField{T, N} = Field{T, N, ArrayType, Grid} where {ArrayType, Grid <: HEALPixGrid}
 
 # define grid_type (i) without T, N, (ii) with T, (iii) with T, N but not with <:?Field
 # to not have precendence over grid_type(::Type{Field{...})
 grid_type(::Type{HEALPixField}) = HEALPixGrid
-grid_type(::Type{HEALPixField{T}}) where T = HEALPixGrid
+grid_type(::Type{HEALPixField{T}}) where {T} = HEALPixGrid
 grid_type(::Type{HEALPixField{T, N}}) where {T, N} = HEALPixGrid
 
-function Base.showarg(io::IO, F::Field{T, N, ArrayType, Grid}, toplevel) where {T, N, ArrayType, Grid<:HEALPixGrid{A}} where A <: AbstractArchitecture
+function Base.showarg(io::IO, F::Field{T, N, ArrayType, Grid}, toplevel) where {T, N, ArrayType, Grid <: HEALPixGrid{A}} where {A <: AbstractArchitecture}
     print(io, "HEALPixField{$T, $N}")
     toplevel && print(io, " as ", nonparametric_type(ArrayType))
-    toplevel && print(io, " on ", F.grid.architecture)
+    return toplevel && print(io, " on ", F.grid.architecture)
 end
 
 ## SIZE
 nlat_odd(::Type{<:HEALPixGrid}) = true
-get_npoints(::Type{<:HEALPixGrid}, nlat_half::Integer) = 3*nlat_half^2
-get_nlat_half(::Type{<:HEALPixGrid}, npoints::Integer) = round(Int, sqrt(npoints/3))
+get_npoints(::Type{<:HEALPixGrid}, nlat_half::Integer) = 3 * nlat_half^2
+get_nlat_half(::Type{<:HEALPixGrid}, npoints::Integer) = round(Int, sqrt(npoints / 3))
 
 """$(TYPEDSIGNATURES) Number of longitude points for ring `j` on `Grid` of resolution
 `nlat_half`."""
 function get_nlon_per_ring(Grid::Type{<:HEALPixGrid}, nlat_half::Integer, j::Integer)
     nlat = get_nlat(Grid, nlat_half)
     @assert 0 < j <= nlat "Ring $j is outside H$nlat_half grid."
-    return min(4j, 2nlat_half, 8nlat_half-4j)
+    return min(4j, 2nlat_half, 8nlat_half - 4j)
 end
 
 """$(TYPEDSIGNATURES) The original `Nside` resolution parameter of the HEALPix grids.
@@ -56,7 +56,7 @@ While we use `nlat_half` across all ring grids, this function translates this to
 Nside. Even `nlat_half` only."""
 function nside_healpix(nlat_half::Integer)
     iseven(nlat_half) || throw(DimensionMismatch("Only even nlat_half supported for HEAlPixGrid, nlat_half=$nlat_half provided."))
-    return nlat_half÷2
+    return nlat_half ÷ 2
 end
 
 # for future reordering the HEALPix ring order into a matrix consisting of the
@@ -74,11 +74,17 @@ function get_latd(::Type{<:HEALPixGrid}, nlat_half::Integer)
     nlat = get_nlat(HEALPixGrid, nlat_half)
     nside = nside_healpix(nlat_half)
     latd = zeros(nlat)
-    
+
     # Górski et al 2005 eq 4 and 8
-    for j in 1:nside        latd[j] = 90 - acosd(1-j^2/3nside^2)              end     # north polar cap
-    for j in nside+1:3nside latd[j] = 90 - acosd(4/3 - 2j/3nside)             end     # equatorial belt
-    for j in 3nside+1:nlat  latd[j] = 90 - acosd((2nlat_half-j)^2/3nside^2-1) end     # south polar cap
+    for j in 1:nside
+        latd[j] = 90 - acosd(1 - j^2 / 3nside^2)
+    end     # north polar cap
+    for j in (nside + 1):3nside
+        latd[j] = 90 - acosd(4 / 3 - 2j / 3nside)
+    end     # equatorial belt
+    for j in (3nside + 1):nlat
+        latd[j] = 90 - acosd((2nlat_half - j)^2 / 3nside^2 - 1)
+    end     # south polar cap
 
     return latd
 end
@@ -93,42 +99,46 @@ function get_lond_per_ring(Grid::Type{<:HEALPixGrid}, nlat_half::Integer, j::Int
     # Górski et al 2005 eq 5 and 9
     # s = 1 for polar caps, s=2, 1, 2, 1, ... in the equatorial zone
     s = (j < nside) || (j >= 3nside) ? 1 : ((j - nside) % 2 + 1)
-    lond = [180/(nlon÷2)*(i - s/2) for i in 1:nlon]
+    lond = [180 / (nlon ÷ 2) * (i - s / 2) for i in 1:nlon]
     return lond
 end
 
 ## INDEXING
-function each_index_in_ring(::Type{<:HEALPixGrid},
-                            j::Integer,                     # ring index north to south
-                            nlat_half::Integer)             # resolution param
+function each_index_in_ring(
+        ::Type{<:HEALPixGrid},
+        j::Integer,                     # ring index north to south
+        nlat_half::Integer
+    )             # resolution param
     nside = nside_healpix(nlat_half)
 
     @boundscheck 0 < j < 4nside || throw(BoundsError)       # ring index valid?
     if j < nside                                            # northern polar cap
-        index_1st = 2j*(j-1) + 1                            # first in-ring index i
-        index_end = 2j*(j+1)                                # last in-ring index i
+        index_1st = 2j * (j - 1) + 1                            # first in-ring index i
+        index_end = 2j * (j + 1)                                # last in-ring index i
     elseif j <= 3nside                                      # equatorial zone with const nlon
-        n = 2nside^2-2nside                                 # points in polar cap
+        n = 2nside^2 - 2nside                                 # points in polar cap
         nlon = 4nside                                       # points on latitude rings
         j = j - nside + 1                                   # offset ring index into eq zone
-        index_1st = n + (j-1)*nlon + 1                      # add constant nlon per ring
-        index_end = n + j*nlon
+        index_1st = n + (j - 1) * nlon + 1                      # add constant nlon per ring
+        index_end = n + j * nlon
     else                                                    # southern polar cap
         n = 12nside^2                                       # total number of points
         j = 4nside - j                                      # count ring index from south pole
-        index_1st = n - 2j*(j+1) + 1                        # count backwards
-        index_end = n - 2j*(j-1)
+        index_1st = n - 2j * (j + 1) + 1                        # count backwards
+        index_end = n - 2j * (j - 1)
     end
     return index_1st:index_end                              # range of i's in ring
 end
 
-function each_index_in_ring!(   rings::AbstractVector,
-                                Grid::Type{<:HEALPixGrid},
-                                nlat_half::Integer) # resolution param
+function each_index_in_ring!(
+        rings::AbstractVector,
+        Grid::Type{<:HEALPixGrid},
+        nlat_half::Integer
+    ) # resolution param
 
     nlat = length(rings)
     @boundscheck nlat == get_nlat(Grid, nlat_half) || throw(BoundsError)
-    
+
     # HEALPix not defined for odd nlat_half, the last rings would not be written
     @boundscheck iseven(nlat_half) ||
         throw(AssertionError("HEALPixGrids only defined for even nlat_half, nlat_half=$nlat_half provided."))
@@ -137,7 +147,7 @@ function each_index_in_ring!(   rings::AbstractVector,
     nside = nside_healpix(nlat_half)                # side length of a basepixel
 
     # North polar cap
-    @inbounds for j in 1:nside-1
+    @inbounds for j in 1:(nside - 1)
         index_1st = index_end + 1                   # 1st index is +1 from prev ring's last index
         index_end += 4j                             # add number of grid points per ring
         rings[j] = index_1st:index_end              # turn into UnitRange
@@ -152,13 +162,13 @@ function each_index_in_ring!(   rings::AbstractVector,
     end
 
     # South polar cap
-    @inbounds for (j, j_mirrored) in zip(   3nside+1:nlat,  # South only
-                                            nside-1:-1:1)   # mirror index
+    return @inbounds for (j, j_mirrored) in zip(
+            (3nside + 1):nlat,  # South only
+            (nside - 1):-1:1
+        )   # mirror index
 
         index_1st = index_end + 1                   # 1st index is +1 from prev ring's last index
         index_end += 4j_mirrored                    # add number of grid points per ring
         rings[j] = index_1st:index_end              # turn into UnitRange
     end
 end
-
-Adapt.@adapt_structure HEALPixGrid

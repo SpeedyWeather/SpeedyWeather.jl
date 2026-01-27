@@ -1,148 +1,149 @@
-module Architectures 
-    
-    import KernelAbstractions 
+module Architectures
 
-    export AbstractArchitecture
-    export CPU, CPUStatic, GPU
-    export CUDAGPU, MetalGPU
-    export array_type, on_architecture, architecture, device
-    export convert_to_device, ismatching, compatible_array_types, nonparametric_type
-    export synchronize 
-    
-    """
-        AbstractArchitecture
+import KernelAbstractions
 
-    Abstract supertype for architectures supported by SpeedyWeather.
-    """
-    abstract type AbstractArchitecture end
+export AbstractArchitecture
+export CPU, CPUStatic, GPU
+export CUDAGPU, MetalGPU, ROCGPU
+export array_type, on_architecture, architecture, device
+export convert_to_device, ismatching, compatible_array_types, nonparametric_type
+export synchronize
 
-    """
-        AbstractCPU <: AbstractArchitecture
+"""
+    AbstractArchitecture
 
-    Abstract supertype for CPU architectures supported by SpeedyWeather.
-    """
-    abstract type AbstractCPU <: AbstractArchitecture end
+Abstract supertype for architectures supported by SpeedyWeather.
+"""
+abstract type AbstractArchitecture end
 
-    """
-        CPU <: AbstractCPU
+"""
+    AbstractCPU <: AbstractArchitecture
 
-    Run SpeedyWeather on one CPU node.
-    """
-    struct CPU{D} <: AbstractCPU
-        device::D
-    end
+Abstract supertype for CPU architectures supported by SpeedyWeather.
+"""
+abstract type AbstractCPU <: AbstractArchitecture end
 
-    Base.show(io::IO, a::CPU) = print(io, "CPU")
+"""
+    CPU <: AbstractCPU
 
-    CPU() = CPU(KernelAbstractions.CPU())
-    CPUStatic() = CPU(KernelAbstractions.CPU(; static=true))
+Run SpeedyWeather on one CPU node.
+"""
+struct CPU{D} <: AbstractCPU
+    device::D
+end
 
-    """
-        GPU(device)
+Base.show(io::IO, a::CPU) = print(io, "CPU")
 
-    Return a GPU architecture using `device`.
-    `device` defauls to CUDA.CUDABackend(always_inline=true). 
-    CUDA has to be loaded for this to work. 
-    """
-    struct GPU{D} <: AbstractArchitecture
-        device :: D
-    end
+CPU() = CPU(KernelAbstractions.CPU())
+CPUStatic() = CPU(KernelAbstractions.CPU(; static = true))
 
-    Base.show(io::IO, a::GPU) = print(io, "GPU($(device(a)))")
+"""
+    GPU(device)
 
-    # defined here so that it can be extended
-    function GPU end 
-    function CUDAGPU end
-    function MetalGPU end
+Return a GPU architecture using `device`.
+`device` defauls to CUDA.CUDABackend(always_inline=true). 
+CUDA has to be loaded for this to work. 
+"""
+struct GPU{D} <: AbstractArchitecture
+    device::D
+end
 
-    #####
-    ##### These methods are extended in SpeedyWeatherCUDAExt
-    #####
+Base.show(io::IO, a::GPU) = print(io, "GPU($(device(a)))")
 
-    device(a::CPU) = a.device
-    device(a::GPU) = a.device
+# defined here so that it can be extended
+function GPU end
+function CUDAGPU end
+function MetalGPU end
+function ROCGPU end
 
-    """
-        architecture(x)
+#####
+##### These methods are extended in SpeedyWeatherCUDAExt
+#####
 
-    Return the default architecture that's associated with the input `x`.
-    """
-    architecture() = nothing
-    architecture(::Number) = nothing
-    architecture(::Array) = CPU()
-    architecture(::Type{<:Array}) = CPU()
-    architecture(a::SubArray) = architecture(parent(a))
+device(a::CPU) = a.device
+device(a::GPU) = a.device
 
-    """
-        architecture(a::AbstractArchitecture)
+"""
+    architecture(x)
 
-    Return the architecture of `a`.
-    """
-    architecture(a::AbstractArchitecture) = a
+Return the default architecture that's associated with the input `x`.
+"""
+architecture() = nothing
+architecture(::Number) = nothing
+architecture(::Array) = CPU()
+architecture(::Type{<:Array}) = CPU()
+architecture(a::SubArray) = architecture(parent(a))
 
-    """
-        array_type(arch::AbstractArchitecture)
+"""
+    architecture(a::AbstractArchitecture)
 
-    Return the array type that's used with the architecture `arch`.
-    """
-    array_type(::CPU) = Array
-    array_type(::Type{<:CPU}) = Array
+Return the architecture of `a`.
+"""
+architecture(a::AbstractArchitecture) = a
 
-    """
-        array_type(::AbstractArchitecture, NF::Type, N::Int)
-  
-    Return the concrete array type that's used with the architecture 
-    for a number type `NF` and dimension `N`.
-    """
-    array_type(::CPU, NF::Type, N::Int) = Array{NF, N}
+"""
+    array_type(arch::AbstractArchitecture)
 
-    """
-        compatible_array_types(arch::AbstractArchitecture)
+Return the array type that's used with the architecture `arch`.
+"""
+array_type(::CPU) = Array
+array_type(::Type{<:CPU}) = Array
 
-    Return the array types that are compatible with the architecture `arch`.
-    This includes the regular `array_type(arch)` as well as any other array types
-    that are compatible with the architecture, e.g. device arrays on GPU.
-    """
-    compatible_array_types(arch::Type{<:AbstractArchitecture}) = (array_type(arch),) # fallback to array_type
-    compatible_array_types(arch::AbstractArchitecture) = (array_type(arch),) # fallback to array_type
-    
-    ismatching(arch::Type{<:AbstractArchitecture}, array_T::Type{<:AbstractArray}) = any(arch_array -> array_T <: arch_array, compatible_array_types(arch))
-    ismatching(arch::AbstractArchitecture, array_T::Type{<:AbstractArray}) = ismatching(typeof(arch), array_T)
-    ismatching(arch::AbstractArchitecture, array::AbstractArray) = ismatching(arch, typeof(array))
+"""
+    array_type(::AbstractArchitecture, NF::Type, N::Int)
+
+Return the concrete array type that's used with the architecture 
+for a number type `NF` and dimension `N`.
+"""
+array_type(::CPU, NF::Type, N::Int) = Array{NF, N}
+
+"""
+    compatible_array_types(arch::AbstractArchitecture)
+
+Return the array types that are compatible with the architecture `arch`.
+This includes the regular `array_type(arch)` as well as any other array types
+that are compatible with the architecture, e.g. device arrays on GPU.
+"""
+compatible_array_types(arch::Type{<:AbstractArchitecture}) = (array_type(arch),) # fallback to array_type
+compatible_array_types(arch::AbstractArchitecture) = (array_type(arch),) # fallback to array_type
+
+ismatching(arch::Type{<:AbstractArchitecture}, array_T::Type{<:AbstractArray}) = any(arch_array -> array_T <: arch_array, compatible_array_types(arch))
+ismatching(arch::AbstractArchitecture, array_T::Type{<:AbstractArray}) = ismatching(typeof(arch), array_T)
+ismatching(arch::AbstractArchitecture, array::AbstractArray) = ismatching(arch, typeof(array))
 
 
-    """
-        nonparametric_type(array_T::Type{<:AbstractArray})
+"""
+    nonparametric_type(array_T::Type{<:AbstractArray})
 
-    Strip away all the parameters of `array_T` and return the nonparametric type.
-    """
-    nonparametric_type(::Type{<:Array}) = Array
-    
-    # nonparametric_type for a SubArray is the arraytype it is viewing. Needed to construct new arrays from SubArrays!
-    nonparametric_type(::Type{<:SubArray{T, N, A}}) where {T, N, A} = nonparametric_type(A)
-    nonparametric_type(::Type{<:SubArray}) = SubArray   # if ArrayType A is not specified, return SubArray
+Strip away all the parameters of `array_T` and return the nonparametric type.
+"""
+nonparametric_type(::Type{<:Array}) = Array
 
-    # Fallback
-    """
-        on_architecture(arch::AbstractArchitecture, a)
+# nonparametric_type for a SubArray is the arraytype it is viewing. Needed to construct new arrays from SubArrays!
+nonparametric_type(::Type{<:SubArray{T, N, A}}) where {T, N, A} = nonparametric_type(A)
+nonparametric_type(::Type{<:SubArray}) = SubArray   # if ArrayType A is not specified, return SubArray
 
-    Return `a`, but on the architecture `arch`. 
-    """
-    on_architecture(arch, a) = a
+# Fallback
+"""
+    on_architecture(arch::AbstractArchitecture, a)
 
-    # Tupled implementation
-    on_architecture(arch::AbstractArchitecture, t::Tuple) = Tuple(on_architecture(arch, elem) for elem in t)
-    on_architecture(arch::AbstractArchitecture, nt::NamedTuple) = NamedTuple{keys(nt)}(on_architecture(arch, Tuple(nt)))
+Return `a`, but on the architecture `arch`. 
+"""
+on_architecture(arch, a) = a
 
-    # On architecture for array types
-    on_architecture(::CPU, a::Array) = a
-    on_architecture(::CPU, a::BitArray) = a
-    on_architecture(::CPU, a::SubArray{<:Any, <:Any, <:Array}) = a
-    on_architecture(::CPU, a::StepRangeLen) = a
+# Tupled implementation
+on_architecture(arch::AbstractArchitecture, t::Tuple) = Tuple(on_architecture(arch, elem) for elem in t)
+on_architecture(arch::AbstractArchitecture, nt::NamedTuple) = NamedTuple{keys(nt)}(on_architecture(arch, Tuple(nt)))
 
-    # Convert arguments to GPU-compatible types
-    @inline convert_to_device(arch, args)  = args
-    @inline convert_to_device(::CPU, args) = args
+# On architecture for array types
+on_architecture(::CPU, a::Array) = a
+on_architecture(::CPU, a::BitArray) = a
+on_architecture(::CPU, a::SubArray{<:Any, <:Any, <:Array}) = a
+on_architecture(::CPU, a::StepRangeLen) = a
 
-    KernelAbstractions.synchronize(arch::AbstractArchitecture) = KernelAbstractions.synchronize(arch.device)
-end 
+# Convert arguments to GPU-compatible types
+@inline convert_to_device(arch, args) = args
+@inline convert_to_device(::CPU, args) = args
+
+KernelAbstractions.synchronize(arch::AbstractArchitecture) = KernelAbstractions.synchronize(arch.device)
+end

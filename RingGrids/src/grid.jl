@@ -9,24 +9,24 @@ function Base.show(io::IO, grid::AbstractGrid)
     nlat = get_nlat(grid)
     npoints = get_npoints(grid)
     full_or_reduced = isfull(grid) ? "full" : "reduced"
-    res = sqrt(4π/npoints)*360/2π
-    digits = round(Int, log10(1/res)) + 2
+    res = sqrt(4π / npoints) * 360 / 2π
+    digits = round(Int, log10(1 / res)) + 2
     average_resolution = Printf.@sprintf("%.*f˚", digits, res)
 
     println(io, "$nlat-ring $Grid_")
     println(io, "├ nlat_half=$nlat_half ($npoints points, ~$average_resolution, $full_or_reduced)")
-    print(io,   "└ architecture: $(grid.architecture)")
+    return print(io, "└ architecture: $(grid.architecture)")
 end
 
 ## TYPES
-grid_type(::Type{Grid}) where {Grid<:AbstractGrid} = nonparametric_type(Grid) 
+grid_type(::Type{Grid}) where {Grid <: AbstractGrid} = nonparametric_type(Grid)
 full_grid_type(grid::AbstractGrid) = full_grid_type(typeof(grid))
 
 """$(TYPEDSIGNATURES) For any instance of `AbstractGrid` type its n-dimensional type
 (*Grid{T, N, ...} returns *Array) but without any parameters `{T, N, ArrayType}`"""
 Architectures.nonparametric_type(grid::AbstractGrid) = nonparametric_type(typeof(grid))
 
-"""$(TYPEDSIGNATURES) Resolution paraemeters `nlat_half` of a `grid`.
+"""$(TYPEDSIGNATURES) Resolution parameters `nlat_half` of a `grid`.
 Number of latitude rings on one hemisphere, Equator included."""
 get_nlat_half(grid::AbstractGrid) = grid.nlat_half
 
@@ -35,24 +35,24 @@ latitude rings `nlat` (both hemispheres)."""
 nlat_odd(grid::AbstractGrid) = nlat_odd(typeof(grid))
 
 # get total number of latitude rings, *(nlat_half > 0) to return 0 for nlat_half = 0
-get_nlat(Grid::Type{<:AbstractGrid}, nlat_half::Integer) = 2nlat_half - nlat_odd(Grid)*(nlat_half > 0)
+get_nlat(Grid::Type{<:AbstractGrid}, nlat_half::Integer) = 2nlat_half - nlat_odd(Grid) * (nlat_half > 0)
 
 """$(TYPEDSIGNATURES) Get number of latitude rings, pole to pole."""
 get_nlat(grid::AbstractGrid) = get_nlat(typeof(grid), grid.nlat_half)
 
 """$(TYPEDSIGNATURES) Total number of grid points in all dimensions of `grid`.
 Equivalent to length of the underlying data array."""
-get_npoints(grid::Grid, args...) where {Grid<:AbstractGrid} = get_npoints(Grid, grid.nlat_half, args...)
+get_npoints(grid::Grid, args...) where {Grid <: AbstractGrid} = get_npoints(Grid, grid.nlat_half, args...)
 get_npoints(G::Type{<:AbstractGrid}, nlat_half::Integer, k::Integer...) = prod(k) * get_npoints(G, nlat_half)
 get_quadrature_weights(grid::AbstractGrid) = get_quadrature_weights(typeof(grid), grid.nlat_half)
 
 """$(TYPEDSIGNATURES) Size of the matrix of the horizontal grid if representable as such (not all grids)."""
-matrix_size(grid::Grid) where {Grid<:AbstractGrid} = matrix_size(Grid, get_nlat_half(grid))
+matrix_size(grid::Grid) where {Grid <: AbstractGrid} = matrix_size(Grid, get_nlat_half(grid))
 
 # CONSTRUCTORS
 """$(TYPEDSIGNATURES) Create a new `grid` of type `Grid` with resolution parameter `nlat_half`.
 `architecture` is the device type (CPU/GPU). Precomputes the ring indices `rings`."""
-function (::Type{Grid})(nlat_half::Integer, architecture=DEFAULT_ARCHITECTURE()) where {Grid<:AbstractGrid}
+function (::Type{Grid})(nlat_half::Integer, architecture::AbstractArchitecture = DEFAULT_ARCHITECTURE()) where {Grid <: AbstractGrid}
     Grid_ = nonparametric_type(Grid)                # strip away parameters of type, obtain from arguments
     rings = eachring(Grid, nlat_half)               # precompute indices to access the variable-length rings
     w = whichring(Grid, nlat_half, rings)           # precompute ring indices for each grid point
@@ -60,21 +60,20 @@ function (::Type{Grid})(nlat_half::Integer, architecture=DEFAULT_ARCHITECTURE())
 end
 
 # also allow to construct a field with Grid(data)
-function (::Type{Grid})(data::AbstractArray; input_as=Vector, kwargs...) where {Grid<:AbstractGrid}
+function (::Type{Grid})(data::AbstractArray; input_as = Vector, kwargs...) where {Grid <: AbstractGrid}
     return Grid(data, input_as, kwargs...)          # make input_as a positional argument
 end
 
-# change the architecture of a grid, keep all other fields 
-function (::Type{Grid})(grid::Grid, architecture::AbstractArchitecture) where {Grid<:AbstractGrid}
-    Grid_ = nonparametric_type(Grid)                # strip away parameters of type, obtain from arguments
-    return Grid_(grid.nlat_half, architecture, adapt(array_type(architecture), grid.rings), adapt(array_type(architecture), grid.whichring))
+# change the architecture of a grid, keep all other fields
+function (::Type{Grid})(grid::Grid, architecture::AbstractArchitecture) where {Grid <: AbstractGrid}
+    return on_architecture(architecture, grid)
 end
 
 function (::Type{Grid})(
-    data::AbstractArray,
-    input_as::Type{Vector};
-    architecture=DEFAULT_ARCHITECTURE(),
-) where {Grid<:AbstractGrid}
+        data::AbstractArray,
+        input_as::Type{Vector};
+        architecture = DEFAULT_ARCHITECTURE(),
+    ) where {Grid <: AbstractGrid}
     # create a grid based on the size of data
     npoints = size(data, 1)
     nlat_half = get_nlat_half(Grid, npoints)
@@ -83,11 +82,11 @@ function (::Type{Grid})(
 end
 
 function (::Type{Grid})(
-    data::AbstractArray,
-    input_as::Type{Matrix};
-    architecture=DEFAULT_ARCHITECTURE(),
-) where {Grid<:AbstractGrid}
-    npoints = size(data, 1)*size(data, 2)
+        data::AbstractArray,
+        input_as::Type{Matrix};
+        architecture = DEFAULT_ARCHITECTURE(),
+    ) where {Grid <: AbstractGrid}
+    npoints = size(data, 1) * size(data, 2)
     nlat_half = get_nlat_half(Grid, npoints)
     grid = Grid(nlat_half, architecture)
     data_flat = reshape(data, :, size(data)[3:end]...)
@@ -98,55 +97,55 @@ end
 
 """$(TYPEDSIGNATURES) Longitudes (degrees, 0-360˚E), latitudes (degrees, 90˚N to -90˚N) for
 every (horizontal) grid point in `grid` in ring order (0-360˚E then north to south)."""
-get_londlatds(grid::Grid) where {Grid<:AbstractGrid} = get_londlatds(Grid, grid.nlat_half)
+get_londlatds(grid::Grid) where {Grid <: AbstractGrid} = get_londlatds(Grid, grid.nlat_half)
 
 """$(TYPEDSIGNATURES) Longitudes (radians, 0-2π), latitudes (degrees, π/2 to -π/2) for
 every (horizontal) grid point in `grid` in ring order (0-360˚E then north to south)."""
-get_lonlats(grid::Grid) where {Grid<:AbstractGrid} = get_lonlats(Grid, grid.nlat_half)
+get_lonlats(grid::Grid) where {Grid <: AbstractGrid} = get_lonlats(Grid, grid.nlat_half)
 
 """$(TYPEDSIGNATURES) Longitudes (radians, 0-2π), colatitudes (degrees, 0 to π) for
 every (horizontal) grid point in `grid` in ring order (0-360˚E then north to south)."""
-get_loncolats(grid::Grid) where {Grid<:AbstractGrid} = get_loncolats(Grid, grid.nlat_half)
+get_loncolats(grid::Grid) where {Grid <: AbstractGrid} = get_loncolats(Grid, grid.nlat_half)
 
 # radians
 function get_lonlats(Grid::Type{<:AbstractGrid}, nlat_half::Integer)
     londs, latds = get_londlatds(Grid, nlat_half)  # longitudes, latitudes in degrees
-    return londs * π/180, latds * π/180             # to radians
+    return londs * π / 180, latds * π / 180             # to radians
 end
 
 # radians and colatitudes
 function get_loncolats(Grid::Type{<:AbstractGrid}, nlat_half::Integer)
     lons, lats = get_lonlats(Grid, nlat_half)
-    colats = π/2 .- lats
+    colats = π / 2 .- lats
     return lons, colats
 end
 
 """$(TYPEDSIGNATURES) Latitude (radians) for each ring in `grid`, north to south."""
-get_lat(grid::Grid) where {Grid<:AbstractGrid} = get_lat(Grid, grid.nlat_half)
+get_lat(grid::Grid) where {Grid <: AbstractGrid} = get_lat(Grid, grid.nlat_half)
 
 """$(TYPEDSIGNATURES) Latitude (degrees) for each ring in `grid`, north to south."""
-get_latd(grid::Grid) where {Grid<:AbstractGrid} = get_latd(Grid, grid.nlat_half)
+get_latd(grid::Grid) where {Grid <: AbstractGrid} = get_latd(Grid, grid.nlat_half)
 
 """$(TYPEDSIGNATURES) Colatitudes (radians) for each ring in `grid`, north to south."""
-get_colat(grid::Grid) where {Grid<:AbstractGrid} = get_colat(Grid, grid.nlat_half)
+get_colat(grid::Grid) where {Grid <: AbstractGrid} = get_colat(Grid, grid.nlat_half)
 
 """$(TYPEDSIGNATURES) Longitude (degrees). Full grids only."""
-get_lond(grid::Grid) where {Grid<:AbstractGrid} = get_lond(Grid, grid.nlat_half)
+get_lond(grid::Grid) where {Grid <: AbstractGrid} = get_lond(Grid, grid.nlat_half)
 
 """$(TYPEDSIGNATURES) Longitude (radians). Full grids only."""
-get_lon(grid::Grid) where {Grid<:AbstractGrid} = get_lon(Grid, grid.nlat_half)
+get_lon(grid::Grid) where {Grid <: AbstractGrid} = get_lon(Grid, grid.nlat_half)
 
-get_nlon_max(grid::Grid) where {Grid<:AbstractGrid} = get_nlon_max(Grid, grid.nlat_half)
+get_nlon_max(grid::Grid) where {Grid <: AbstractGrid} = get_nlon_max(Grid, grid.nlat_half)
 get_nlons(grid::AbstractGrid) = get_nlons(typeof(grid), grid.nlat_half)
 
-get_lat(Grid::Type{<:AbstractGrid}, nlat_half::Integer) = get_latd(Grid, nlat_half) * (π/180)
-get_colat(Grid::Type{<:AbstractGrid}, nlat_half::Integer) = π/2 .- get_lat(Grid, nlat_half)
+get_lat(Grid::Type{<:AbstractGrid}, nlat_half::Integer) = get_latd(Grid, nlat_half) * (π / 180)
+get_colat(Grid::Type{<:AbstractGrid}, nlat_half::Integer) = π / 2 .- get_lat(Grid, nlat_half)
 
 """$(TYPEDSIGNATURES)
 Returns a vector `nlons` for the number of longitude points per latitude ring, north to south.
 Provide grid `Grid` and its resolution parameter `nlat_half`. For keyword argument
 `both_hemispheres=false` only the northern hemisphere (incl Equator) is returned."""
-function get_nlons(Grid::Type{<:AbstractGrid}, nlat_half::Integer; both_hemispheres::Bool=true)
+function get_nlons(Grid::Type{<:AbstractGrid}, nlat_half::Integer; both_hemispheres::Bool = true)
     n = both_hemispheres ? get_nlat(Grid, nlat_half) : nlat_half
     return [get_nlon_per_ring(Grid, nlat_half, j) for j in 1:n]
 end
@@ -172,7 +171,6 @@ and then each grid point per ring. To be used like
 
 Accesses precomputed `grid.rings`."""
 @inline eachring(grid::AbstractGrid) = grid.rings
-@inline eachring(grid::AbstractGrid{<:GPU}) = Vector(grid.rings) # on GPU transfer indices back to CPU first 
 
 """$(TYPEDSIGNATURES)
 Computes the ring indices `i0:i1` for start and end of every longitudinal point
@@ -182,7 +180,7 @@ function eachring(Grid::Type{<:AbstractGrid}, nlat_half::Integer)
     nlat = get_nlat(Grid, nlat_half)
     rings = Vector{UnitRange{Int}}(undef, nlat)    # allocate
     each_index_in_ring!(rings, Grid, nlat_half)    # calculate iteratively
-    return rings                                                    
+    return rings
 end
 
 """$(TYPEDSIGNATURES) Same as `eachring(grid)` but performs a bounds check to assess
@@ -245,7 +243,7 @@ end
 
 """$(TYPEDSIGNATURES) Obtain ring index `j` from gridpoint `ij` and `rings`
 describing rind indices as obtained from `eachring(::Grid)`"""
-function whichring(ij::Integer, rings)
+function whichring(ij, rings::AbstractVector)
     @boundscheck 0 < ij <= rings[end][end] || throw(BoundsError)
     j = 1
     @inbounds while ij > rings[j][end]
@@ -254,7 +252,9 @@ function whichring(ij::Integer, rings)
     return j
 end
 
-whichring(ij::Integer, grid::AbstractGrid) = whichring(ij, grid.rings)
+# access precomputed whichring
+whichring(ij, field::AbstractField) = whichring(ij, field.grid)
+whichring(ij, grid::AbstractGrid) = grid.whichring[ij]
 
 """$(TYPEDSIGNATURES) Vector of ring indices for every grid point in `grid`."""
 function whichring(Grid::Type{<:AbstractGrid}, nlat_half, rings)
@@ -265,16 +265,34 @@ function whichring(Grid::Type{<:AbstractGrid}, nlat_half, rings)
     return w
 end
 
-whichring(grid::AbstractGrid) = whichring(typeof(grid), grid.nlat_half, grid.rings)
+whichring(grid::AbstractGrid) = grid.whichring
 whichring(Grid::Type{<:AbstractGrid}, nlat_half::Integer) = whichring(Grid, nlat_half, eachring(Grid, nlat_half))
 
-# for architectures / adapt 
+# for architectures / adapt
 Architectures.ismatching(grid::AbstractGrid, array_type::Type{<:AbstractArray}) = ismatching(grid.architecture, array_type)
 Architectures.ismatching(grid::AbstractGrid, array::AbstractArray) = ismatching(grid.architecture, typeof(array))
 
 Architectures.architecture(grid::AbstractGrid) = grid.architecture
+Architectures.on_architecture(grid::AbstractGrid, x) = on_architecture(architecture(grid), x)
 
-function Architectures.on_architecture(arch::AbstractArchitecture, grid::Grid) where Grid<:AbstractGrid 
+# only transfer the whichring on GPU
+function Architectures.on_architecture(arch::AbstractArchitecture, grid::Grid) where {Grid <: AbstractGrid}
     Grid_ = nonparametric_type(Grid)
-    return Grid_(grid, arch)
-end 
+    return Grid_(
+        grid.nlat_half,
+        arch,
+        grid.rings,
+        on_architecture(arch, grid.whichring)
+    )
+end
+
+# don't adapt the CPU-only rings
+function Adapt.adapt_structure(to, grid::AbstractGrid)
+    Grid_ = nonparametric_type(typeof(grid))
+    return Grid_(
+        grid.nlat_half,
+        Adapt.adapt_structure(to, grid.architecture),
+        nothing,
+        Adapt.adapt_structure(to, grid.whichring)
+    )
+end

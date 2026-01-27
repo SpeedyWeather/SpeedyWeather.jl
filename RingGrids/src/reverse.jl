@@ -4,7 +4,7 @@ function Base._reverse!(field::AbstractField, ::Val{:lat})
 
     rings = eachring(field)
     nrings = length(rings)
-    rings_north = view(rings, 1:nrings ÷ 2)
+    rings_north = view(rings, 1:(nrings ÷ 2))
 
     @inbounds for k in eachlayer(field)
         for (j_north, ring) in enumerate(rings_north)
@@ -37,5 +37,5 @@ function Base._reverse!(field::AbstractField, ::Val{:lon})
 end
 
 # also allow long names longitude, latitude
-Base._reverse!(field::AbstractField, ::Val{:latitude}) =  Base._reverse!(field, Val{:lat}())
+Base._reverse!(field::AbstractField, ::Val{:latitude}) = Base._reverse!(field, Val{:lat}())
 Base._reverse!(field::AbstractField, ::Val{:longitude}) = Base._reverse!(field, Val{:lon}())

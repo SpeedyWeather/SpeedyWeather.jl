@@ -36,21 +36,25 @@ but are only concerned with local freezing, ice growth and melt and the thermody
 The `ThermodynamicSeaIce` model defined here uses only sea ice concentration ``c`` in units of
 ``[\text{m}^2/\text{m}^2]`` as a prognostic variable.
 
-Melting and freezing is dependend on the sea surface temperature ``SST`` at the previous time step ``i-1``
+Melting and freezing is dependent on the sea surface temperature ``SST`` at the previous time step ``i-1``
 and the current ``i`` and air-sea fluxes applied to get from one time step to the other.
 Sea ice may modify the sea surface temperatures SST (particularly in the case of freezing) and so we denote the
 uncorrected SST with ``SST^*`` meaning that the sea ice time step has not been applied yet.
 The time step size is ``\Delta t``.
 
-First determine an insulation factor ``r`` (``r=0`` equals full insulation, ``r=1`` no insulation) linearly
-from sea ice concentration which reduces the air-sea flux ``F`` used as the tendency for the slab ocean SST
+Air-sea fluxes ``F`` of heat and humidity are reduced following a simple sea ice concentration-dependent
+scaling
+
 ```math
-\begin{aligned}
-r &= 1 - c_{i-1} \\
-SST_i^* &= SST_{i-1} + \Delta t~r~F \\
-\end{aligned}
+F \leftarrow \frac{F}{1 + \frac{c_{i-1}}{c_s}} \\
 ```
-This happens inside the [Slab ocean](@ref) model.
+With ``c_s = 0.01`` meaning that at a sea ice concentration of ``c_{i-1} = 1`` at the previous time step only 1% of the
+flux goes through the ice. The albedo ``a`` is chosen linearly with respect to sea ice concentration
+
+```math
+a = a_o + c_{i-1}*(a_i - a_o)
+```
+with ``a_o = 0.06`` the albedo of ocean, and ``a_i = 0.6`` the albedo of ice.
 
 Now determine a tendency in sea ice concentration ``\Delta c`` from the melting and freezing, both proportional to the
 difference of the sea surface temperature to freezing temperature with freeze rate ``f`` in ``[\text{m}^2/\text{m}^2/K]``
@@ -70,7 +74,7 @@ and the uncorrected sea ice concentration ``c_i^*`` in ``[0, 1]`` by
 
 ```math
 \begin{aligned}
-SST_i &= max(SST_i^*, T_f) \\
+SST_i &= \max(SST_i^*, T_f) \\
 c_i &= \max( \min( c_i^*, 1) , 0)
 \end{aligned}
 ```
@@ -86,7 +90,7 @@ sea_ice = ThermodynamicSeaIce(spectral_grid)
 and most often together with an albedo that scales linearly with sea ice concentration
 
 ```@example sea_ice
-albedo = Albedo(ocean=OceanSeaIceAlbedo(spectral_grid), land=AlbedoClimatology(spectral_grid))
+albedo = OceanLandAlbedo(ocean=OceanSeaIceAlbedo(spectral_grid), land=AlbedoClimatology(spectral_grid))
 ```
 
 Using `ocean=GlobalConstantAlbedo(0.06)` instead would disable the effect of sea ice on
@@ -111,10 +115,8 @@ And output is added like
 add!(model, SpeedyWeather.SeaIceConcentrationOutput())
 ```
 
-or as part of `SpeedyWeather.OceanOutput()` which however needs splatting `...`
-to unpack the tuple
+or as part of `SpeedyWeather.OceanOutput()`
 
 ```@example sea_ice
-add!(model, SpeedyWeather.OceanOutput()...)
+add!(model, SpeedyWeather.OceanOutput())
 ```
-

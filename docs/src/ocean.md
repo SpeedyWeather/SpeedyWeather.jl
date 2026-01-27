@@ -54,7 +54,7 @@ where `;` just means that every argument that follows is a keyword argument.
 
 This will use the sea surface temperature climatology from 1 June but
 not change it thereafter. Note that because nothing happens in the ocean time step
-you can use `set!(simulation, sea_surface_temperature=...)` to modify the 
+you can use `set!(simulation, sea_surface_temperature=...)` to modify the
 sea surface temperatures further at any point after `initialize!`.
 
 ## Seasonal ocean climatology
@@ -69,7 +69,7 @@ The `SeasonalOceanClimatology` reads monthly sea surface temperature
 fields from file, and interpolates them in time on every time step
 and writes them to the prognostic variables. Several options
 exist to load another `file` from `path` etc. For a full list of
-options type `?SeasonalOceanClimatology`. 
+options type `?SeasonalOceanClimatology`.
 To be passed on to the model constructor like
 
 ```@example ocean
@@ -103,25 +103,24 @@ is given by
 
 
 ```math
-C_0 \frac{d SST}{dt} = (1-r) \left( R_{sd} - R_{su} - R_{lu} + R_{ld} - L_v*E_v - S \right)
+C_0 \frac{\mathrm{d} SST}{\mathrm{d}t} = \left( R_{sd} - R_{su} - R_{lu} + R_{ld} - L_v H - S \right)
 ```
 
-with ``r \in [0, 1]`` an insulating factor due to sea ice, see [Thermodynamic sea ice model](@ref),
-by default chosen as ``r = c``, i.e proportional to sea ice concentration ``c``, insulating
-the ocean from surface fluxes at full sea ice coverage (``c=1``) and no insulation for
-ice-free ocean (``c=0``). The surface fluxes are ``R_{sd}`` for shortwave (``s``) radiative
+The surface fluxes are ``R_{sd}`` for shortwave (``s``) radiative
 flux downward (positive sign, heating the ocean); ``R_{su}`` reflected upward shortwave flux
 given albedo (negative sign, cooling the ocean); ``R_{lu}`` a longwave upward flux through
 which the ocean loses heat dependent on its sea surface temperature (negative sign);
 ``R_{ld}`` downward longwave flux where the atmosphere warms the ocean due to its own
-tempreature (positive sign); ``E_v`` is the upward evaporative (or surface condensation) flux,
+tempreature (positive sign); ``H`` is the upward surface humidity flux (evaporation or condensation),
 converted to ``W/m^2`` through multiplication with the latent heat of condensation
 ``L_v`` (negative sign as evaporation cools the ocean); and ``S`` the sensible heat flux
 through turbulent transport of heat in the atmospheric boundary layer. All surface flux
 terms have units of ``W/m^2``.
 
-The slab ocean is then passed on to the model constructor as with all other
-ocean models
+Depending on the presence of sea ice, the sensible and latent heat fluxes are subject to
+insulation, see [Thermodynamic sea ice model](@ref). The insulation is applied as a flux reduction
+within the surface flux calculation. The slab ocean is then passed on to the model constructor
+as with all other ocean models
 
 ```@example ocean
 model = PrimitiveWetModel(spectral_grid; ocean)
@@ -139,8 +138,7 @@ add!(model, SpeedyWeather.SeaSurfaceTemperatureOutput())
 or collectively with sea ice concentration
 
 ```@example ocean
-add!(model, SpeedyWeather.OceanOutput()...)
+add!(model, SpeedyWeather.OceanOutput())
 ```
 
-where the splatting operator `...` has to be applied to unpack all output variables in
-the tuple, all output variable groups are defined as tuples.
+All output variable groups are defined as tuples which are implicitly splatted (`...`).

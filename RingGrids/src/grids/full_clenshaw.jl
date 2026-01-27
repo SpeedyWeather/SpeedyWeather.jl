@@ -24,31 +24,29 @@ end
 Architectures.nonparametric_type(::Type{<:FullClenshawGrid}) = FullClenshawGrid
 
 # FIELD
-const FullClenshawField{T, N} = Field{T, N, ArrayType, Grid} where {ArrayType, Grid<:FullClenshawGrid}
+const FullClenshawField{T, N} = Field{T, N, ArrayType, Grid} where {ArrayType, Grid <: FullClenshawGrid}
 
 # define grid_type (i) without T, N, (ii) with T, (iii) with T, N but not with <:?Field
 # to not have precendence over grid_type(::Type{Field{...})
 grid_type(::Type{FullClenshawField}) = FullClenshawGrid
-grid_type(::Type{FullClenshawField{T}}) where T = FullClenshawGrid
+grid_type(::Type{FullClenshawField{T}}) where {T} = FullClenshawGrid
 grid_type(::Type{FullClenshawField{T, N}}) where {T, N} = FullClenshawGrid
 
-function Base.showarg(io::IO, F::Field{T, N, ArrayType, Grid}, toplevel) where {T, N, ArrayType, Grid<:FullClenshawGrid{A}} where A <: AbstractArchitecture
+function Base.showarg(io::IO, F::Field{T, N, ArrayType, Grid}, toplevel) where {T, N, ArrayType, Grid <: FullClenshawGrid{A}} where {A <: AbstractArchitecture}
     print(io, "FullClenshawField{$T, $N}")
     toplevel && print(io, " as ", nonparametric_type(ArrayType))
-    toplevel && print(io, " on ", F.grid.architecture)
+    return toplevel && print(io, " on ", F.grid.architecture)
 end
 
 # SIZE
 nlat_odd(::Type{<:FullClenshawGrid}) = true
 get_npoints(::Type{<:FullClenshawGrid}, nlat_half::Integer) = 8 * nlat_half^2 - 4nlat_half
-get_nlat_half(::Type{<:FullClenshawGrid}, npoints::Integer) = round(Int, 1/4 + sqrt(1/16 + npoints/8))
+get_nlat_half(::Type{<:FullClenshawGrid}, npoints::Integer) = round(Int, 1 / 4 + sqrt(1 / 16 + npoints / 8))
 get_nlon(::Type{<:FullClenshawGrid}, nlat_half::Integer) = 4nlat_half
 
 ## COORDINATES
-get_latd(::Type{<:FullClenshawGrid}, nlat_half::Integer) = [90 - 90j/nlat_half for j in 1:2nlat_half-1]
+get_latd(::Type{<:FullClenshawGrid}, nlat_half::Integer) = [90 - 90j / nlat_half for j in 1:(2nlat_half - 1)]
 get_lond(::Type{<:FullClenshawGrid}, nlat_half::Integer) = get_lond(FullGaussianGrid, nlat_half)
 
 # QUADRATURE
 get_quadrature_weights(::Type{<:FullClenshawGrid}, nlat_half::Integer) = clenshaw_curtis_weights(nlat_half)
-
-Adapt.@adapt_structure FullClenshawGrid

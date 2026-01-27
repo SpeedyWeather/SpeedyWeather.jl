@@ -25,34 +25,37 @@ nonparametric_type(::Type{<:OctaHEALPixGrid}) = OctaHEALPixGrid
 full_grid_type(::Type{<:OctaHEALPixGrid}) = FullOctaHEALPixGrid
 
 # FIELD
-const OctaHEALPixField{T, N} = Field{T, N, ArrayType, Grid} where {ArrayType, Grid<:OctaHEALPixGrid}
+const OctaHEALPixField{T, N} = Field{T, N, ArrayType, Grid} where {ArrayType, Grid <: OctaHEALPixGrid}
 
 # define grid_type (i) without T, N, (ii) with T, (iii) with T, N but not with <:?Field
 # to not have precendence over grid_type(::Type{Field{...})
 grid_type(::Type{OctaHEALPixField}) = OctaHEALPixGrid
-grid_type(::Type{OctaHEALPixField{T}}) where T = OctaHEALPixGrid
+grid_type(::Type{OctaHEALPixField{T}}) where {T} = OctaHEALPixGrid
 grid_type(::Type{OctaHEALPixField{T, N}}) where {T, N} = OctaHEALPixGrid
 
-function Base.showarg(io::IO, F::Field{T, N, ArrayType, Grid}, toplevel) where {T, N, ArrayType, Grid<:OctaHEALPixGrid{A}} where A <: AbstractArchitecture
+function Base.showarg(io::IO, F::Field{T, N, ArrayType, Grid}, toplevel) where {T, N, ArrayType, Grid <: OctaHEALPixGrid{A}} where {A <: AbstractArchitecture}
     print(io, "OctaHEALPixField{$T, $N}")
     toplevel && print(io, " as ", nonparametric_type(ArrayType))
-    toplevel && print(io, " on ", F.grid.architecture)
+    return toplevel && print(io, " on ", F.grid.architecture)
 end
 
 ## SIZE
 nlat_odd(::Type{<:OctaHEALPixGrid}) = true
-get_npoints(::Type{<:OctaHEALPixGrid}, nlat_half::Integer) = 4*nlat_half^2
-get_nlat_half(::Type{<:OctaHEALPixGrid}, npoints::Integer) = round(Int, sqrt(npoints/4))
+get_npoints(::Type{<:OctaHEALPixGrid}, nlat_half::Integer) = 4 * nlat_half^2
+get_nlat_half(::Type{<:OctaHEALPixGrid}, npoints::Integer) = round(Int, sqrt(npoints / 4))
 
-# number of longitude 
+# number of longitude
 function get_nlon_per_ring(Grid::Type{<:OctaHEALPixGrid}, nlat_half::Integer, j::Integer)
     nlat = get_nlat(Grid, nlat_half)
     @assert 0 < j <= nlat "Ring $j is outside P$nlat_half grid."
     # j = j > nlat_half ? nlat - j + 1 : j      # flip north south due to symmetry
-    return min(4j, 8nlat_half-4j)
+    return min(4j, 8nlat_half - 4j)
 end
 
-matrix_size(::Type{OctaHEALPixGrid}, nlat_half::Integer) = (2nlat_half, 2nlat_half)
+matrix_size(::Type{<:OctaHEALPixGrid}, nlat_half::Integer) = (2nlat_half, 2nlat_half)
+
+# convert to a 2D matrix view, should be applied to matrix-ordered field
+Base.Matrix(field::OctaHEALPixField) = reshape(field.data, matrix_size(field)...)
 
 ## COORDINATES
 function get_latd(::Type{<:OctaHEALPixGrid}, nlat_half::Integer)
@@ -60,8 +63,12 @@ function get_latd(::Type{<:OctaHEALPixGrid}, nlat_half::Integer)
     latd = zeros(nlat)
 
     # Górski et al. 2005 eq 4 but without the 1/3 and Nside=nlat_half
-    for j in 1:nlat_half        latd[j] = 90 - acosd(1-(j/nlat_half)^2) end # north + Equator
-    for j in nlat_half+1:nlat   latd[j] = -latd[nlat-j+1]               end # southern hemisphere
+    for j in 1:nlat_half
+        latd[j] = 90 - acosd(1 - (j / nlat_half)^2)
+    end # north + Equator
+    for j in (nlat_half + 1):nlat
+        latd[j] = -latd[nlat - j + 1]
+    end # southern hemisphere
 
     return latd
 end
@@ -70,30 +77,34 @@ function get_lond_per_ring(Grid::Type{<:OctaHEALPixGrid}, nlat_half::Integer, j:
     nlon = get_nlon_per_ring(Grid, nlat_half, j)
     # equidistant longitudes with equal offsets from 0˚ and 360˚,
     # e.g. 45, 135, 225, 315 for nlon=4
-    return collect(180/nlon:360/nlon:360)
+    return collect((180 / nlon):(360 / nlon):360)
 end
 
 ## INDEXING
-function each_index_in_ring(::Type{<:OctaHEALPixGrid},     # function for OctaHEALPix grids
-                            j::Integer,                     # ring index north to south
-                            nlat_half::Integer)             # resolution param
+function each_index_in_ring(
+        ::Type{<:OctaHEALPixGrid},     # function for OctaHEALPix grids
+        j::Integer,                     # ring index north to south
+        nlat_half::Integer
+    )             # resolution param
 
     @boundscheck 0 < j < 2nlat_half || throw(BoundsError)   # ring index valid?
     if j <= nlat_half                                       # northern hemisphere incl Equator
-        index_1st = 2j*(j-1) + 1                            # first in-ring index i
-        index_end = 2j*(j+1)                                # last in-ring index i
-    else                                                    # southern hemisphere 
+        index_1st = 2j * (j - 1) + 1                            # first in-ring index i
+        index_end = 2j * (j + 1)                                # last in-ring index i
+    else                                                    # southern hemisphere
         n = 4nlat_half^2                                    # total number of points
         j = 2nlat_half - j                                  # count ring index from south pole
-        index_1st = n - 2j*(j+1) + 1                        # count backwards
-        index_end = n - 2j*(j-1)
+        index_1st = n - 2j * (j + 1) + 1                        # count backwards
+        index_end = n - 2j * (j - 1)
     end
     return index_1st:index_end                              # range of i's in ring
 end
 
-function each_index_in_ring!(   rings,
-                                Grid::Type{<:OctaHEALPixGrid},
-                                nlat_half::Integer) # resolution param
+function each_index_in_ring!(
+        rings,
+        Grid::Type{<:OctaHEALPixGrid},
+        nlat_half::Integer
+    ) # resolution param
 
     nlat = length(rings)
     @boundscheck nlat == get_nlat(Grid, nlat_half) || throw(BoundsError)
@@ -104,8 +115,10 @@ function each_index_in_ring!(   rings,
         index_end += 4j                             # add number of grid points per ring
         rings[j] = index_1st:index_end              # turn into UnitRange
     end
-    @inbounds for (j, j_rev) in zip(nlat_half+1:nlat,       # South only
-                                    nlat-nlat_half:-1:1)    # reverse index
+    return @inbounds for (j, j_rev) in zip(
+            (nlat_half + 1):nlat,       # South only
+            (nlat - nlat_half):-1:1
+        )    # reverse index
 
         index_1st = index_end + 1                   # 1st index is +1 from prev ring's last index
         index_end += 4j_rev                         # add number of grid points per ring
@@ -115,87 +128,154 @@ end
 
 Adapt.@adapt_structure OctaHEALPixGrid
 
-# ## CONVERSION
-# Base.Matrix(G::OctaHEALPixGrid{T}; kwargs...) where T = Matrix!(zeros(T, matrix_size(G)...), G; kwargs...)
+# quadrant of ij in ring order, TODO needed?
+function quadrant_ring(ij::Integer, grid::OctaHEALPixGrid)
+    j = RingGrids.whichring(grid)[ij]  # ring index j of ij
+    ring = eachring(grid)[j]           # ij indices of ring j
+    nlon = length(ring)                # number of grid points in ring
+    i = ij - ring[1]                   # 0-based index in ring
+    q = mod(4i ÷ nlon, 4)              # quadrant q, either 0, 1, 2, 3
+    iq = i - q * (nlon ÷ 4)                # 0-based index i relative to quadrant
+    return q + 1, iq + 1                   # convert to 1-based
+end
 
-# """
-#     Matrix!(M::AbstractMatrix,
-#             G::OctaHEALPixGrid;
-#             quadrant_rotation=(0, 1, 2, 3),
-#             matrix_quadrant=((2, 2), (1, 2), (1, 1), (2, 1)),
-#             )
+"""$TYPEDSIGNATURES
+Convert ring index ij to matrix indices row, column (r, c) and quadrant q. All 1-based.
+r=1, c=1, is at the north pole, r increases south-eastwards, c increases south-westwards.
+Quadrants are numbered 1 to 4 starting at the prime meridian and increasing eastwards."""
+function ring2rcq(ij::Integer, grid::OctaHEALPixGrid)
+    nside = get_nlat_half(grid)     # resolution param, nside=nlat_half for OctaHEALPix
+    j = whichring(grid)[ij]         # ring index j of ij
+    ring = eachring(grid)[j]        # ij indices of ring j
+    nlon = length(ring)             # number of grid points in ring
+    i = ij - ring[1]                # 0-based index in ring
+    q = mod(4i ÷ nlon, 4)           # quadrant q, either 0, 1, 2, 3
+    iq = i - q * (nlon ÷ 4)             # 0-based index i but relative to quadrant
+    q += 1; iq += 1                 # convert to 1-based
+    r = min(j, nside) - iq + 1      # row in matrix m (1-based)
+    c = iq + max(0, j - nside)        # column in matrix m (1-based)
+    return r, c, q
+end
 
-# Sorts the gridpoints in `G` into the matrix `M` without interpolation.
-# Every quadrant of the grid `G` is rotated as specified in `quadrant_rotation`,
-# 0 is no rotation, 1 is 90˚ clockwise, 2 is 180˚ etc. Grid quadrants are counted
-# eastward starting from 0˚E. The grid quadrants are moved into the matrix quadrant
-# (i, j) as specified. Defaults are equivalent to centered at 0˚E and a rotation
-# such that the North Pole is at M's midpoint."""
-# Matrix!(M::AbstractMatrix, G::OctaHEALPixGrid; kwargs...) = Matrix!((M, G); kwargs...)
+"""$TYPEDSIGNATURES
+Convert matrix indices row, column (r, c) and quadrant q to ring index ij. All 1-based.
+r=1, c=1, is at the north pole, r increases south-eastwards, c increases south-westwards.
+Quadrants are numbered 1 to 4 starting at the prime meridian and increasing eastwards."""
+function rcq2ring(r, c, q, grid::OctaHEALPixGrid)
+    j = r + c - 1                   # 1-based ring index
+    nside = get_nlat_half(grid)     # resolution param, nside=nlat_half for OctaHEALPix
+    ring = eachring(grid)[j]        # ij indices of latitude ring j
+    iq = min(nside - r, c - 1) + 1  # 1-based in-ring index i, relative to quadrant
+    nlon = length(ring)             # number of longitude points in ring
+    i = iq + (q - 1) * (nlon ÷ 4)    # in-ring index i (1-based)
+    ij = ring[i]                    # convert to running index ij
+    return ij
+end
 
-# """
-#     Matrix!(MGs::Tuple{AbstractMatrix{T}, OctaHEALPixGrid}...; kwargs...)
+# unpack nlat_half from grid
+rcq2nest(r, c, q, grid::OctaHEALPixGrid) = rcq2nest(r, c, q, get_nlat_half(grid))
 
-# Like `Matrix!(::AbstractMatrix, ::OctaHEALPixGrid)` but for simultaneous
-# processing of tuples `((M1, G1), (M2, G2), ...)` with matrices `Mi` and grids `Gi`.
-# All matrices and grids have to be of the same size respectively."""
-# function Matrix!(   MGs::Tuple{AbstractMatrix{T}, OctaHEALPixGrid}...;
-#                     quadrant_rotation::NTuple{4, Integer}=(0, 1, 2, 3),     # = 0˚, 90˚, 180˚, 270˚ anti-clockwise
-#                     matrix_quadrant::NTuple{4, Tuple{Integer, Integer}}=((2, 2), (1, 2), (1, 1), (2, 1)),
-#                     ) where T
-                    
-#     ntuples = length(MGs)
 
-#     # check that the first (matrix, grid) tuple has corresponding sizes
-#     M, G = MGs[1]
-#     m, n = size(M)
-#     @boundscheck m == n || throw(BoundsError)
-#     @boundscheck m == 2*G.nlat_half || throw(BoundsError)
+"""$TYPEDSIGNATURES
+Convert matrix indices row, column (r, c) and quadrant q to nested index ij. All 1-based.
+r=1, c=1, is at the north pole, r increases south-eastwards, c increases south-westwards.
+Quadrants are numbered 1 to 4 starting at the prime meridian and increasing eastwards."""
+function rcq2nest(r, c, q, nside::Integer)
+    # @assert ispow2(nside)                   # nside must be power of 2
+    # TODO UInt32 restricts nside to 2^16, ~150m resolution, remove for higher resolution but slower
+    br = interleave_with_zeros(UInt32(r - 1))         # bit representation of row (0-based) occupies odd bits
+    bc = interleave_with_zeros(UInt32(c - 1)) << 1    # bit representation of column (0-based) occupies even bits
+    bq = (q - 1) << 2trailing_zeros(nside)    # the 2 quadrant bits occupy highest bits
+    b = bq | bc | br                        # combine bits
+    return b + 1                            # convert to 1-based nested index
+end
 
-#     for MG in MGs   # check that all matrices and all grids are of same size
-#         Mi, Gi = MG
-#         @boundscheck size(Mi) == size(M) || throw(BoundsError)
-#         @boundscheck size(Gi) == size(G) || throw(BoundsError)
-#     end
+# unpack nlat_half from grid
+nest2rcq(ij, grid::OctaHEALPixGrid) = nest2rcq(ij, get_nlat_half(grid))
 
-#     for q in matrix_quadrant    # check always in 2x2
-#         sr, sc = q
-#         @boundscheck ((sr in (1, 2)) && (sc in (1, 2))) || throw(BoundsError)
-#     end
+"""$TYPEDSIGNATURES
+Convert nested index ij to matrix indices row, column (r, c) and quadrant q. All 1-based.
+r=1, c=1, is at the north pole, r increases south-eastwards, c increases south-westwards.
+Quadrants are numbered 1 to 4 starting at the prime meridian and increasing eastwards."""
+function nest2rcq(ij, nside)
+    # @assert ispow2(nside)           # nside must be power of 2
+    ij -= 1                         # convert to 0-based ij
+    shift = 2trailing_zeros(nside)  # number of bits occupied for row and column
+    q = ij >> shift                 # 0-based quadrant is encoded in first 2 bits
+    bcr = ij - (q << shift)         # bits for column, row, quadrant bits removed
+    bcr %= UInt32                   # TODO this restricts to nside = 2^16, ~150m
+    # remove for higher resolution but also much slower
+    r = deinterleave(bcr) + 1       # 1-based row index by deinterleaving the odd bits
+    c = deinterleave(bcr >> 1) + 1  # 1-based column index by deinterleaving the even bits
+    q += 1                          # 1-based quadrant
+    return r, c, q
+end
 
-#     rings = eachring(G)         # index ranges for all rings
-#     nlat_half = G.nlat_half     # number of latitude rings on one hemisphere incl Equator
-#     nside = nlat_half           # side length of a basepixel matrix
+"""$TYPEDSIGNATURES
+Interleave an integer's bits with zeros, e.g.
 
-#     # sort grid indices from G into matrix M
-#     # 1) loop over each grid point per ring
-#     # 2) determine quadrant (0, 1, 2, 3) via modulo
-#     # 3) get longitude index iq within quadrant
-#     # 4) determine corresponding indices r, c in matrix M
+    00000000 00000000 00000000 00000111
 
-#     @inbounds for (j, ring) in enumerate(rings)
-#         nlon = length(ring)                         # number of grid points in ring
-#         for ij in ring                              # continuous index in grid
-#             i = ij-ring[1]                          # 0-based index in ring
-#             grid_quadrant = floor(Int, mod(4*i/nlon, 4))  # either 0, 1, 2, 3
-#             iq = i - grid_quadrant*(nlon÷4)             # 0-based index i relative to quadrant
-#             r = min(j, nlat_half) - iq               # row in matrix m (1-based)
-#             c = (iq+1) + max(0, j-nlat_half)         # column in matrix m (1-based)
+becomes
 
-#             # rotate indices in quadrant
-#             r, c = rotate_matrix_indices(r, c, nside, quadrant_rotation[grid_quadrant+1])
+    00000000 00000000 00000000 00010101
 
-#             # shift grid quadrant to matrix quadrant
-#             sr, sc = matrix_quadrant[grid_quadrant+1]
-#             r += (sr-1)*nside                       # shift row into matrix quadrant
-#             c += (sc-1)*nside                       # shift column into matrix quadrant
+The highest half of the bits are zeros will be discarded."""
+function interleave_with_zeros(ui::Integer)
+    r = zero(ui)
+    nbits = 4 * sizeof(ui)
+    for s in 0:(nbits - 1)  # TODO is there a more efficient way?
+        r |= (ui & (one(ui) << s)) << s
+    end
+    return r
+end
 
-#             for (Mi, Gi) in MGs                      # for every (matrix, grid) tuple
-#                 Mi[r, c] = convert(T, Gi[ij])         # convert data and copy over
-#             end
-#         end
-#     end
+"""$TYPEDSIGNATURES
+Deinterleave an integer's bits, e.g.
 
-#     ntuples == 1 && return M
-#     return Tuple(Mi for (Mi, Gi) in MGs)
-# end
+    00000000 00000000 00000000 00010101
+
+becomes
+
+    00000000 00000000 00000000 00000111."""
+function deinterleave(ui::Integer)
+    r = zero(ui)
+    nbits = 4 * sizeof(ui)
+    for s in 0:(nbits - 1)  # TODO is there a more efficient way?
+        r |= (ui & (one(ui) << 2s)) >> s
+    end
+    return r
+end
+
+"""$TYPEDSIGNATURES
+Convert ring index ij to nested index ij of grid. All 1-based."""
+ring2nest(ij::Integer, grid::OctaHEALPixGrid) = rcq2nest(ring2rcq(ij, grid)..., grid)
+
+"""$TYPEDSIGNATURES
+Convert nested index ij to ring index ij of grid. All 1-based."""
+nest2ring(ij::Integer, grid::OctaHEALPixGrid) = rcq2ring(nest2rcq(ij, grid)..., grid)
+
+rcq2xy(r, c, q, grid::OctaHEALPixGrid; kwargs...) = rcq2xy(r, c, q, get_nlat_half(grid); kwargs...)
+
+function rcq2xy(
+        r, c, q, nside;
+        quadrant_rotation = (0, 1, 2, 3),                    # = 0˚, 90˚, 180˚, 270˚ anti-clockwise
+        matrix_quadrant = ((2, 2), (1, 2), (1, 1), (2, 1)),  # north polar-centric view
+    )
+    # rotate indices in quadrant
+    x, y = rotate_matrix_indices(r, c, nside, quadrant_rotation[q])
+
+    # shift grid quadrant to matrix quadrant
+    sr, sc = matrix_quadrant[q]
+    x += (sr - 1) * nside           # shift row into matrix quadrant
+    y += (sc - 1) * nside           # shift column into matrix quadrant
+    xy = (y - 1) * 2nside + x       # to single running index xy that can be reshaped into matrix
+    return xy
+end
+
+"""$TYPEDSIGNATURES
+Convert ring index ij to matrix index xy of grid. All 1-based.
+xy is a running index in a 2D matrix of size (`2*nlat_half`, `2*nlat_half`),
+with a polar-centric view on the north pole in the middle of that matrix,
+the South Pole divided into 4 in the corners. Like a stereographic projection."""
+ring2xy(ij::Integer, grid::OctaHEALPixGrid; kwargs...) = rcq2xy(ring2rcq(ij, grid)..., grid; kwargs...)

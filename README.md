@@ -1,31 +1,32 @@
 # SpeedyWeather.jl <img src="docs/src/assets/logo.png" width="100" />
 
-
 [![CI](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI.yml) 
 [![status](https://joss.theoj.org/papers/515c81a4d6a69e31cc71ded65ac9c36a/status.svg)](https://joss.theoj.org/papers/515c81a4d6a69e31cc71ded65ac9c36a)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.6510139.svg)](https://doi.org/10.5281/zenodo.6510139)  
 [![docs](https://img.shields.io/badge/documentation-latest_release-blue.svg)](https://speedyweather.github.io/SpeedyWeatherDocumentation/stable/)
 [![docs](https://img.shields.io/badge/documentation-main-blue.svg)](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/)
+[![code style: runic](https://img.shields.io/badge/code_style-%E1%9A%B1%E1%9A%A2%E1%9A%BE%E1%9B%81%E1%9A%B2-black)](https://github.com/fredrikekre/Runic.jl)
 
-SpeedyWeather.jl is a global atmospheric model with simple physics developed as a research playground
-with an everything-flexible attitude as long as it is speedy. It is easy to use and easy to extend, making 
+SpeedyWeather.jl is a global atmospheric model developed as a research playground
+with an everything-flexible attitude as long as it is speedy. Technically it is a climate model with simple,
+yet interactive representations of ocean, land and sea-ice. It is easy to use and easy to extend, making 
 atmospheric modelling an interactive experience -- in the terminal, in a notebook or conventionally through scripts.
-With minimal code redundancies it supports
+With minimal code redundancies, it supports
 
 **Dynamics and physics**
 - Different physical equations (barotropic vorticity, shallow water, primitive equations, with and without humidity)
 - Particle advection in 2D for all equations
 - Tracer advection in 2D/3D that can be added, deleted, (de)activated anytime
-- Physics parameterizations for convection, precipitation, boundary layer, etc.
+- Physics parameterizations for convection, precipitation, boundary layer, radiation, etc.
 - Various more or less realistic planets and what-if scenarios by easily modifying initial and boundary conditions
 - A slab ocean and thermodynamic sea ice model
-- A 2-layer land bucket model with soil temperature, moisture and vegetation
+- A 2-layer land bucket model with soil temperature, moisture, vegetation and snow
 
 **Numerics and computing**
 - Different spatial grids (full and octahedral, Gaussian and Clenshaw-Curtis, HEALPix, OctaHEALPix)
 - Different resolutions (T31 to T1023 and higher, i.e. 400km to 10km using linear, quadratic or cubic truncation)
 - Different arithmetics: Float32 (default), Float64, and (experimental) BFloat16, stochastic rounding
-- a very fast and flexible spherical harmonics transform library SpeedyTransforms
+- A very fast and flexible spherical harmonics transform library SpeedyTransforms
 
 **User interface**
 - Data visualisation: 2D, 3D, interactive (you can zoom and rotate!) powered by Makie
@@ -52,29 +53,30 @@ individual terms of the equations, and analyse and visualise output on the fly.
 
 We do not necessarily aim to make SpeedyWeather an atmospheric model for the purpose of production-ready
 weather forecasting, at least not at the cost of our current level of interactivity and ease of
-use or extensibility. If someone wants to implement a parameterization that is very complicated
-and expensive to run then they are more than encouraged to do so. We are happy to provide a general interface
-to do so and support you to move this to its own repository, leveraging modularity. This may note become
-the default to not oppose the "easy and fast by default"-philosophy but that does not mean we don't
-appreciate your efforts or reject your contributions. In fact, we would love to show case more how
-easy to complex, laptop to HPC can work seamlessly within the same model.
-But SpeedyWeather's defaults should be balanced: Physically accurate yet general; as independently as possible
-from other components and parameter choices; not too complicated to implement and understand; and computationally cheap.
-Finding a good balance is difficult but we try our best. 
+use or extensibility. It is more build with a climate application scope in mind.
+If someone wants to implement a parameterization that is very complicated and computationally expensive,
+then they are more than encouraged to do so. We are happy to provide a general interface
+to enable and support such extensions, which can even be developed as their own independent projects in separate repositories
+thanks to the modular structure of SpeedyWeather. Since SpeedyWeather follows an "easy and fast by default" philosophy, these
+complex extensions likely will not be used by default. We would nevertheless appreciate such efforts since we aim for SpeedyWeather
+to enable a "hierarchy of models" spanning multiple levels process and computational complexity and runnable on hardware ranging from
+a single laptop to a large HPC cluster. It is important, however, that SpeedyWeather's defaults be balanced: physically accurate yet
+fast enough to run on a laptop; comprehensive enough to simulate realistic weather yet understandable for newcomers; holistic enough
+to provide an easy-to-use interface yet modular enough to allow for extensive customization.
 
-This means in practice, that while SpeedyWeather is currently developed, many more physical processes
-and other features will be implemented. On our TODO is
+Finding a good balance is difficult, but we try our best.
 
-- A more realistic radiation scheme depending on clouds and humidity
-- Longwave radiation that depends on (globally averaged) greenhouse gas concentrations to represent climate change
-- Snow affecting surface fluxes including albedo
+Despite our commitment to simplicity and ease-of-use, many more physical processes and other features are continuing to be developed.
+On our TODO list are
+
+- Radiation depending on greenhouse gas concentrations to represent climate change
 - Exoplanet support with more flexibility on the atmospheric composition
 - 3D particle advection
 
 Currently in development are
 
-- single GPU and CPU multi-threading support via KernelAbstractions
-- differentiability with Enzyme
+- Single GPU and CPU multi-threading support via KernelAbstractions
+- Differentiability with Enzyme
 
 ## Contributing
 
