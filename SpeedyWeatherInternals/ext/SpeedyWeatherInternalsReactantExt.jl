@@ -24,7 +24,7 @@ Architectures.compatible_array_types(::Type{<:ReactantDevice}) = (ConcreteRArray
 
 Architectures.nonparametric_type(::Type{<:ConcreteRArray}) = ConcreteRArray
 
-device(::ReactantDevice) = ReactantBackend()
+device(dev::ReactantDevice) = dev.device
 
 architecture(::AnyConcreteReactantArray) = ReactantDevice()
 architecture(::Reactant.AnyTracedRArray) = ReactantDevice()
@@ -39,7 +39,7 @@ on_architecture(::CPU, a::SubArray{<:Any, <:Any, <:AnyConcreteReactantArray}) = 
 const ArraysToRArray = Union{
     Array,
     Reactant.AnyConcretePJRTArray,
-    # Reactant.AnyConcreteIFRTArray, # needed?
+    Reactant.AnyConcreteIFRTArray,
     BitArray,
     SubArray{<:Any, <:Any, <:Array},
 }
