@@ -124,6 +124,8 @@ ismatching(arch::Type{<:AbstractArchitecture}, array_T::Type{<:AbstractArray}) =
 ismatching(arch::AbstractArchitecture, array_T::Type{<:AbstractArray}) = ismatching(typeof(arch), array_T)
 ismatching(arch::AbstractArchitecture, array::AbstractArray) = ismatching(arch, typeof(array))
 
+# TODO: currently we just chech matching array types, sufficient?
+ismatching(arch_1::AbstractArchitecture, arch_2::AbstractArchitecture) = array_type(arch_1) == array_type(arch_2)
 
 """
     nonparametric_type(array_T::Type{<:AbstractArray})

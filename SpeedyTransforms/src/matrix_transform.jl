@@ -70,7 +70,7 @@ function MatrixSpectralTransform(
     # Create another SpectralTransform to calculate the transform matrices from (do this on the CPU)
     spectrum_cpu = on_architecture(CPU(), spectrum)
     grid_cpu = on_architecture(CPU(), grid)
-    S = SpectralTransform(spectrum_cpu, grid_cpu; NF, ArrayType = Array, nlayers, LegendreShortcut, architecture = CPU())
+    S = SpectralTransform(spectrum_cpu, grid_cpu; NF, nlayers, LegendreShortcut)
 
     npoints = get_npoints(grid)
     nharmonics = LowerTriangularArrays.nonzeros(spectrum)

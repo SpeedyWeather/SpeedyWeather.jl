@@ -66,17 +66,15 @@ $(TYPEDSIGNATURES)
 Create a `Spectrum` from another `Spectrum` but with a new architecture.
 """
 Spectrum(spectrum::Spectrum; architecture::AbstractArchitecture = DEFAULT_ARCHITECTURE()) =
-    adapt(
-    array_type(architecture), Spectrum(
+    Spectrum(
         spectrum.lmax,
         spectrum.mmax,
         architecture,
-        spectrum.orders,
-        spectrum.l_indices,
-        spectrum.m_indices,
-        spectrum.lm_orders
+        on_architecture(architecture, spectrum.orders),
+        on_architecture(architecture, spectrum.l_indices),
+        on_architecture(architecture, spectrum.m_indices),
+        on_architecture(architecture, spectrum.lm_orders)
     )
-)
 
 triangle_number(m::Integer) = m * (m + 1) ÷ 2
 nonzeros(l::Integer, m::Integer) = l * m - triangle_number(m - 1)

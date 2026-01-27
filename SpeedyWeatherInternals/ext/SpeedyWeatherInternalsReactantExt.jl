@@ -28,6 +28,8 @@ device(::ReactantDevice) = ReactantBackend()
 
 architecture(::AnyConcreteReactantArray) = ReactantDevice()
 architecture(::Reactant.AnyTracedRArray) = ReactantDevice()
+architecture(::Type{<:AnyConcreteReactantArray}) = ReactantDevice()
+architecture(::Type{<:Reactant.AnyTracedRArray}) = ReactantDevice()
 
 on_architecture(::ReactantDevice, a::Reactant.AnyTracedRArray) = a
 on_architecture(::CPU, a::AnyConcreteReactantArray) = Array(a)
@@ -45,10 +47,16 @@ const ArraysToRArray = Union{
 on_architecture(::ReactantDevice, a::ArraysToRArray) = Reactant.to_rarray(a)
 
 # defined for automatic conversion during struct construction
-# could also generalize those, but currently we are very conservative here
+# could also generalize those, but currently we are very conservative here to only define exactly those we need
 Base.convert(::Type{ConcretePJRTArray{T, 1, 1}}, a::AbstractVector{T}) where {T <: Number} = Reactant.to_rarray(a)
 Base.convert(::Type{ConcretePJRTArray{T, 1, 1}}, a::AbstractVector{S}) where {T <: Number, S <: Number} = Reactant.to_rarray(T.(a))
-Base.convert(::Type{ConcretePJRTArray{T, 3, 1}}, a::AbstractArray{T, 3}) where {T} = Reactant.to_rarray(a)
+Base.convert(::Type{ConcretePJRTArray{T, 2}}, a::AbstractMatrix{T}) where {T <: Number} = Reactant.to_rarray(a)
+Base.convert(::Type{ConcretePJRTArray{T, 2}}, a::AbstractMatrix{S}) where {T <: Number, S <: Number} = Reactant.to_rarray(T.(a))
+Base.convert(::Type{ConcretePJRTArray{T, 2, 1}}, a::AbstractMatrix{T}) where {T <: Number} = Reactant.to_rarray(a)
+Base.convert(::Type{ConcretePJRTArray{T, 2, 1}}, a::AbstractMatrix{S}) where {T <: Number, S <: Number} = Reactant.to_rarray(T.(a))
+Base.convert(::Type{ConcretePJRTArray{T, 3, 1}}, a::AbstractArray{T, 3}) where {T <: Number} = Reactant.to_rarray(a)
+Base.convert(::Type{ConcretePJRTArray{T, 3, 1}}, a::AbstractArray{S, 3}) where {T <: Number, S <: Number} = Reactant.to_rarray(T.(a))
 
+Reactant.ConcretePJRTArray{T, N, D}(a::AbstractArray{T, N}) where {T, N, D} = Reactant.to_rarray(a)
 
 end

@@ -260,9 +260,8 @@ function SpectralTransform(
     )
     (; grid) = field
     NF = eltype(field)                          # number format of the spectral coefficients
-    ArrayType = RingGrids.array_type(field)
     nlayers = size(field, 2)
-    return SpectralTransform(grid; NF, ArrayType, nlayers, kwargs...)
+    return SpectralTransform(grid; NF, nlayers, kwargs...)
 end
 
 """$(TYPEDSIGNATURES)
@@ -272,18 +271,17 @@ function SpectralTransform(
         coeffs::LowerTriangularArray;
         kwargs...
     )
+    @assert ismatching(architecture(field), architecture(coeffs)) "Architectures of field and coeffs do not match."
+    
     # infer types for SpectralTransform
     NF = promote_type(real(eltype(field)), real(eltype(coeffs)))
-    ArrayType = nonparametric_type(array_type(field))
-    ArrayType2 = nonparametric_type(array_type(coeffs))
-    @assert ArrayType == ArrayType2 "ArrayTypes of field ($_ArrayType1) and coeffs ($_ArrayType2) do not match."
-
+    
     # get resolution
     (; spectrum) = coeffs
     (; grid) = field
     nlayers = size(field, 2)
     @assert nlayers == size(coeffs, 2) "Number of layers in field ($nlayers) and coeffs ($(size(coeffs, 2))) do not match."
-    return SpectralTransform(spectrum, grid; NF, ArrayType, nlayers, kwargs...)
+    return SpectralTransform(spectrum, grid; NF, nlayers, kwargs...)
 end
 
 # make commutative
