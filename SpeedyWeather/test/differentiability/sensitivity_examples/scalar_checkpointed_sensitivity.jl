@@ -4,7 +4,7 @@ Pkg.activate("test/differentiability/sensitivity_examples")
 using SpeedyWeather, Enzyme, JLD2, Checkpointing
 
 # Parse command line argument for N (number of timesteps)
-const N = length(ARGS) >= 1 ? parse(Int, ARGS[1]) : 1
+const N = length(ARGS) >= 1 ? parse(Int, ARGS[1]) : 5
 
 println("Running Sensitivity Analyis with N = $N")
 savename_base = "new-sensitivity-$N"
@@ -14,7 +14,9 @@ model = PrimitiveWetModel(; spectral_grid)                 # construct model
 simulation = initialize!(model)  
 initialize!(simulation)
 run!(simulation, period=Day(20))
-        
+
+# do the scaling again because we need it for the timestepping when calling it manually 
+initialize!(simulation, steps=N)
 (; prognostic_variables, diagnostic_variables, model) = simulation
 (; Δt, Δt_millisec) = model.time_stepping
 dt = 2Δt
@@ -23,9 +25,6 @@ const i_point = 443 # pick this kind of random point (it's ≈ Copenhagen)
 
 progn = prognostic_variables
 diagn = diagnostic_variables
-
-# do the scaling again because we need it for the timestepping when calling it manually 
-SpeedyWeather.scale!(progn, diagn, model.planet.radius)
 
 function checkpointed_timesteps!(progn::PrognosticVariables, diagn, model, N_steps, checkpoint_scheme::Scheme, lf1=2, lf2=2)
     

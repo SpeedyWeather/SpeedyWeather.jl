@@ -1,5 +1,5 @@
 import Pkg 
-Pkg.activate("test/differentiability/sensitivity_examples")
+Pkg.activate("SpeedyWeather/test/differentiability/sensitivity_examples")
 
 using SpeedyWeather, Enzyme, JLD2, Checkpointing
 
@@ -14,6 +14,9 @@ model = PrimitiveWetModel(; spectral_grid)                 # construct model
 simulation = initialize!(model)  
 initialize!(simulation)
 run!(simulation, period=Day(20))
+
+# do the scaling and init again because we need it for the timestepping when calling it manually 
+initialize!(simulation, steps=N)
         
 (; prognostic_variables, diagnostic_variables, model) = simulation
 (; Δt, Δt_millisec) = model.time_stepping
@@ -21,9 +24,6 @@ dt = 2Δt
 
 progn = prognostic_variables
 diagn = diagnostic_variables
-
-# do the scaling again because we need it for the timestepping when calling it manually 
-SpeedyWeather.scale!(progn, diagn, model.planet.radius)
 
 function checkpointed_timesteps!(progn::PrognosticVariables, diagn, model, N_steps, checkpoint_scheme::Scheme, lf1=2, lf2=2)
     
