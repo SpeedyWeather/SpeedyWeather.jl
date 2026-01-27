@@ -91,15 +91,15 @@ function SpectralTransform(
         spectrum::AbstractSpectrum,                     # Spectral truncation
         grid::AbstractGrid;                             # grid used and resolution, e.g. FullGaussianGrid
         NF::Type{<:Real} = DEFAULT_NF,                                                  # Number format NF
-        ArrayType::Type{<:AbstractArray} = DEFAULT_ARRAYTYPE,                           # Array type used for spectral coefficients (can be parametric)
         nlayers::Integer = DEFAULT_NLAYERS,                                             # number of layers in the vertical (for scratch memory size)
         LegendreShortcut::Type{<:AbstractLegendreShortcut} = LegendreShortcutLinear,    # shorten Legendre loop over order m
-        architecture::AbstractArchitecture = architecture(ArrayType),                   # architecture that kernels are launched on
     )
+    (; lmax, mmax, architecture) = spectrum                       # 1-based spectral truncation order and degree
+
+    ArrayType = array_type(architecture)
+    ArrayType_ = nonparametric_type(ArrayType)      # drop parameters of ArrayType
 
     (; nlat_half) = grid                            # number of latitude rings on one hemisphere incl equator
-    ArrayType_ = nonparametric_type(ArrayType)      # drop parameters of ArrayType
-    (; lmax, mmax) = spectrum                       # 1-based spectral truncation order and degree
 
     # RESOLUTION PARAMETERS
     nlat = get_nlat(grid)           # 2nlat_half but one less if grid has odd # of lat rings
@@ -191,7 +191,7 @@ function SpectralTransform(
         array_type(architecture, Complex{NF}, 2),
         LowerTriangularArray{NF, 2, array_type(architecture, NF, 2), typeof(spectrum)},
         typeof(scratch_memory),
-        typeof(gradients)
+        typeof(gradients),
     }(
         architecture,
         spectrum, nfreq_max,

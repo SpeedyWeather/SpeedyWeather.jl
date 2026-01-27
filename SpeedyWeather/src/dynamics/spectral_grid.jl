@@ -275,10 +275,10 @@ function (::Type{S})(
         one_more_degree::Bool = true,
         kwargs...
     ) where {S <: SpeedyTransforms.AbstractSpectralTransform}
-    (; NF, spectrum, grid, nlayers, ArrayType) = spectral_grid
+    (; NF, spectrum, grid, nlayers) = spectral_grid
     (; lmax, mmax, architecture) = spectrum
     spectrum = one_more_degree == false ? Spectrum(lmax - 1, mmax; architecture) : spectrum
-    return S(spectrum, grid; NF, ArrayType, nlayers, kwargs...)
+    return S(spectrum, grid; NF, nlayers, kwargs...)
 end
 
 # because model components can be `nothing`, their constructor being `Nothing()`

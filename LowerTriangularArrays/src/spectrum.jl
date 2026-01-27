@@ -29,10 +29,10 @@ function Spectrum(
         architecture = DEFAULT_ARCHITECTURE(),
     )
 
-    orders = adapt(array_type(architecture), [m:lmax for m in 1:mmax])
-    ls = adapt(array_type(architecture), l_indices(lmax, mmax))
-    ms = adapt(array_type(architecture), m_indices(lmax, mmax))
-    lm_orders_tuple = adapt(array_type(architecture), lm_orders(lmax, mmax))
+    orders = on_architecture(architecture, [m:lmax for m in 1:mmax])
+    ls = on_architecture(architecture, l_indices(lmax, mmax))
+    ms = on_architecture(architecture, m_indices(lmax, mmax))
+    lm_orders_tuple = on_architecture(architecture, lm_orders(lmax, mmax))
 
     return Spectrum{
         typeof(architecture),

@@ -1,8 +1,8 @@
-module SpeedyWeatherInternalsReactantExt 
+module SpeedyWeatherInternalsReactantExt
 
 using KernelAbstractions
 using SpeedyWeatherInternals
-using Reactant 
+using Reactant
 
 import SpeedyWeatherInternals.Architectures: Architectures, ReactantDevice, array_type, architecture, on_architecture, compatible_array_types, nonparametric_type
 
@@ -11,7 +11,7 @@ const ReactantKernelAbstractionsExt = Base.get_extension(
     Reactant, :ReactantKernelAbstractionsExt
 )
 const ReactantBackend = ReactantKernelAbstractionsExt.ReactantBackend
-const AnyConcreteReactantArray = Union{Reactant.AnyConcretePJRTArray,Reactant.AnyConcreteIFRTArray}
+const AnyConcreteReactantArray = Union{Reactant.AnyConcretePJRTArray, Reactant.AnyConcreteIFRTArray}
 
 Architectures.ReactantDevice() = ReactantDevice(ReactantBackend())
 
@@ -31,15 +31,24 @@ architecture(::Reactant.AnyTracedRArray) = ReactantDevice()
 
 on_architecture(::ReactantDevice, a::Reactant.AnyTracedRArray) = a
 on_architecture(::CPU, a::AnyConcreteReactantArray) = Array(a)
-on_architecture(::CPU, a::SubArray{<:Any,<:Any,<:AnyConcreteReactantArray}) = Array(a)
+on_architecture(::CPU, a::SubArray{<:Any, <:Any, <:AnyConcreteReactantArray}) = Array(a)
 
-# which arrays should converted? 
-const ArraysToRArray = Union{Array,
+# which arrays should converted?
+const ArraysToRArray = Union{
+    Array,
     Reactant.AnyConcretePJRTArray,
     # Reactant.AnyConcreteIFRTArray, # needed?
     BitArray,
-    SubArray{<:Any,<:Any,<:Array}}
+    SubArray{<:Any, <:Any, <:Array},
+}
 
 on_architecture(::ReactantDevice, a::ArraysToRArray) = Reactant.to_rarray(a)
+
+# defined for automatic conversion during struct construction
+# could also generalize those, but currently we are very conservative here
+Base.convert(::Type{ConcretePJRTArray{T, 1, 1}}, a::AbstractVector{T}) where {T <: Number} = Reactant.to_rarray(a)
+Base.convert(::Type{ConcretePJRTArray{T, 1, 1}}, a::AbstractVector{S}) where {T <: Number, S <: Number} = Reactant.to_rarray(T.(a))
+Base.convert(::Type{ConcretePJRTArray{T, 3, 1}}, a::AbstractArray{T, 3}) where {T} = Reactant.to_rarray(a)
+
 
 end
