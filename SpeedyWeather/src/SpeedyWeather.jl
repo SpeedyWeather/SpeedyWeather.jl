@@ -131,10 +131,9 @@ include("variables/variables.jl")
 include("dynamics/tracers.jl")
 include("dynamics/particles.jl")
 include("dynamics/clock.jl")
-include("variables/prognostic_variables.jl")
+# include("variables/prognostic_variables.jl")
 include("variables/set.jl")
-include("physics/define_column.jl")
-include("variables/diagnostic_variables.jl")
+# include("variables/diagnostic_variables.jl")
 
 # MODEL COMPONENTS
 include("dynamics/time_integration.jl")

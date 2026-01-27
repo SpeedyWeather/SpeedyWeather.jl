@@ -6,6 +6,11 @@ abstract type AbstractVariables end
 abstract type AbstractPrognosticVariables <: AbstractVariables end
 abstract type AbstractDiagnosticVariables <: AbstractVariables end
 
+# TODO remove. Define here to pass parsing while testing
+struct PrognosticVariables end
+struct DiagnosticVariables end
+struct Tendencies end
+
 """
     $TYPEDEF
 

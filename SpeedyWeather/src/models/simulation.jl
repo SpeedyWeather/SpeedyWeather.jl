@@ -1,29 +1,24 @@
 export Simulation
 
-"""
-$(TYPEDSIGNATURES)
-Simulation is a container struct to be used with `run!(::Simulation)`.
-It contains
-$(TYPEDFIELDS)"""
-struct Simulation{Model <: AbstractModel, Progn, Diagn} <: AbstractSimulation{Model}
-    "define the current state of the model"
-    prognostic_variables::Progn
+"""$(TYPEDSIGNATURES)
+Simulation is a container struct simply wrapping the variables (prognostic and diagnostic)
+and the model. It contains $(TYPEDFIELDS)"""
+struct Simulation{M <: AbstractModel, V} <: AbstractSimulation{M}
+    "All variables"
+    variables::V
 
-    "contain the tendencies and auxiliary arrays to compute them"
-    diagnostic_variables::Diagn
-
-    "all parameters, constant at runtime"
-    model::Model
+    "All model components, containing parameters, constant at runtime"
+    model::M
 end
 
 function Base.show(io::IO, S::AbstractSimulation)
     println(io, "Simulation{$(model_type(S.model))}")
-    println(io, "├ prognostic_variables::PrognosticVariables{...}")
-    println(io, "├ diagnostic_variables::DiagnosticVariables{...}")
-    return print(io, "└ model::$(model_type(S.model)){...}")
+    println(io, "├ variables::Variables{...}")
+    print(io, "└ model::$(model_type(S.model)){...}")
+    return nothing
 end
 
-unpack(sim::AbstractSimulation) = (sim.prognostic_variables, sim.diagnostic_variables, sim.model)
+unpack(sim::AbstractSimulation) = (sim.variables, sim.model)
 
 const DEFAULT_PERIOD = Day(10)
 const DEFAULT_TIMESTEPS = -1    # -1 means unspecified = use the period kwarg
@@ -45,7 +40,7 @@ function run!(
     return unicodeplot(simulation)
 end
 
-# fallback to be extended when plotting library extension are loaded
+# fallback to be extended when UnicodePlots extension are loaded
 unicodeplot(x) = nothing
 
 """$(TYPEDSIGNATURES)
@@ -91,7 +86,8 @@ function initialize!(
     transform!(diagn, progn, lf, model, initialize = true)
     initialize!(diagn, progn.particles, progn, model)
     initialize!(model.output, model.feedback, progn, diagn, model)
-    return initialize!(model.callbacks, progn, diagn, model)
+    initialize!(model.callbacks, progn, diagn, model)
+    return simulation
 end
 
 """$(TYPEDSIGNATURES)
@@ -104,5 +100,6 @@ function finalize!(simulation::AbstractSimulation)
     unscale!(progn)                                 # undo radius-scaling for vor, div from the dynamical core
     unscale!(diagn)                                 # undo radius-scaling for vor, div from the dynamical core
     finalize!(model.output, simulation)             # possibly post-process output, then close netCDF file
-    return finalize!(model.callbacks, progn, diagn, model) # any callbacks to finalize?
+    finalize!(model.callbacks, progn, diagn, model) # any callbacks to finalize?
+    return simulation
 end

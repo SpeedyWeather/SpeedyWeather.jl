@@ -1,96 +1,102 @@
-export Grid2D, Grid3D, Spectral2D, Spectral3D, PrognosticVariable, DiagnosticVariable
+abstract type AbstractVariables end
+abstract type AbstractVariableDims end
+abstract type AbstractVariable{D <: AbstractVariableDims} end
 
-"""
-    $TYPEDEF
+@kwdef struct Variables{P, G, T, D, Ph, S} <: AbstractVariables
+    prognostic::P = NamedTuple()
+    grid::G = NamedTuple()
+    tendencies::T = NamedTuple()
+    dynamics::D = NamedTuple()
+    physics::Ph = NamedTuple()
+    scratch::S = NamedTuple()
+end
 
-Indicator type for 2D variables on the spatial grid (x, y).
-"""
+# runic: off
+function Variables(model::AbstractModel)
+    progn      = initialize_variables(get_prognostic_variables(model), model)
+    grid       = initialize_variables(      get_grid_variables(model), model)
+    tendencies = initialize_variables(  get_tendency_variables(model), model)
+    dynamics   = initialize_variables(  get_dynamics_variables(model), model)
+    physics    = initialize_variables(   get_physics_variables(model), model)
+    scratch    = initialize_variables(   get_scratch_variables(model), model)
+    return Variables(progn, grid, tendencies, dynamics, physics, scratch)
+end
+# runic: on
+
 struct Grid2D <: AbstractVariableDims end
-
-"""
-    $TYPEDEF
-
-Indicator type for 3D variables on the spatial grid (x, y, z).
-"""
 struct Grid3D <: AbstractVariableDims end
-
-"""
-    $TYPEDEF
-
-Indicator type for spectral 2D variables (l, m).
-"""
+struct Land3D <: AbstractVariableDims end       # TODO redundant given Grid3D exists?
+struct Ocean3D <: AbstractVariableDims end
 struct Spectral2D <: AbstractVariableDims end
-
-"""
-    $TYPEDEF
-
-Indicator type for spectral 3D variables (l, m, k).
-"""
 struct Spectral3D <: AbstractVariableDims end
+struct Vertical1D <: AbstractVariableDims end
 
-# intialize variables
-Base.zero(::AbstractVariable{Grid2D}, SG::SpectralGrid, nlayers::Int) = zeros(SG.GridVariable2D, SG.grid)
-Base.zero(::AbstractVariable{Grid3D}, SG::SpectralGrid, nlayers::Int) = zeros(SG.GridVariable3D, SG.grid, nlayers)
+struct Grid4D <: AbstractVariableDims end
+struct Spectral4D <: AbstractVariableDims end
+
+zeeros(::Type{T}, k...) where {T} = fill!(T(undef, k...), 0)
+
+# runic: off
+Base.zero(::AbstractVariable{Grid2D},     SG::SpectralGrid, nlayers::Int) = zeros(SG.GridVariable2D, SG.grid)
+Base.zero(::AbstractVariable{Grid3D},     SG::SpectralGrid, nlayers::Int) = zeros(SG.GridVariable3D, SG.grid, nlayers)
+Base.zero(::AbstractVariable{Land3D},     SG::SpectralGrid, nlayers::Int) = zeros(SG.GridVariable3D, SG.grid, nlayers)
+Base.zero(::AbstractVariable{Ocean3D},    SG::SpectralGrid, nlayers::Int) = zeros(SG.GridVariable3D, SG.grid, nlayers)
 Base.zero(::AbstractVariable{Spectral2D}, SG::SpectralGrid, nlayers::Int) = zeros(SG.SpectralVariable2D, SG.spectrum)
 Base.zero(::AbstractVariable{Spectral3D}, SG::SpectralGrid, nlayers::Int) = zeros(SG.SpectralVariable3D, SG.spectrum, nlayers)
+Base.zero(::AbstractVariable{Vertical1D}, SG::SpectralGrid, nlayers::Int) = zeeros(SG.VectorType, nlayers)
 
-"""
-    $TYPEDEF
+Base.zero(::AbstractVariable{Grid4D},     SG::SpectralGrid, k::Int...) = zeros(SG.GridVariable3D, SG.grid, k...)
+Base.zero(::AbstractVariable{Spectral4D}, SG::SpectralGrid, k::Int...) = zeros(SG.GridVariable3D, SG.grid, k...)
+# runic: on
 
-Represents a prognostic variable with the given `name` and `dims`.
-"""
-@kwdef struct PrognosticVariable{
-        VD, # <:VarDims
-        UT, # <:Units
-    } <: AbstractVariable{VD}
-    "Name of the prognostic variable"
-    name::Symbol
+for Var in (
+        :PrognosticVariable,
+        :GridVariable,
+        :TendencyVariable,
+        :DynamicsVariable,
+        :PhysicsVariable,
+        :ScratchVariable,
+    )
 
-    "Grid dimensions on which the variable is defined"
-    dims::VD
+    @eval begin
+        @kwdef struct $Var{D, U} <: AbstractVariable{D}
+            name::Symbol
+            dims::D
+            units::U = ""
+            desc::String = ""
+            namespace::Symbol = Symbol()
+        end
 
-    "Physical untis associated with this state variable"
-    units::UT = nothing
-
-    "Human-readable description of this state variable"
-    desc::String = ""
-
-    "Namespace of the variable, :land, :ocean or :atmosphere (default)"
-    namespace::Symbol = :atmosphere
+        nonparametric_type(v::$Var) = nonparametric_type(typeof(v))
+        nonparametric_type(::Type{<:$Var}) = $Var
+        $Var(name, dims; kwargs...) = $Var(; name, dims, kwargs...)
+        $Var(name, dims, units; kwargs...) = $Var(; name, dims, units, kwargs...)
+        $Var(name, dims, units, desc; kwargs...) = $Var(; name, dims, units, desc, kwargs...)
+        $Var(name, dims, units, desc, namespace) = $Var(; name, dims, units, desc, namespace)
+    end
 end
 
-"""
-    $TYPEDEF
+identifier(v::AbstractVariable) = Symbol(nonparametric_type(v), "_", v.namespace, v.namespace == Symbol() ? "" : "_", v.name)
+get_namespaces(variables::Tuple) = get_namespaces(variables...)
+get_namespaces(variables::AbstractVariable...) = unique([v.namespace for v in variables])
 
-Represents a diagnostic variable with the given `name` and `dims`.
-"""
-@kwdef struct DiagnosticVariable{
-        VD, # <:VarDims
-        UT, # <:Units
-    } <: AbstractVariable{VD}
-    "Name of the diagnostic variable"
-    name::Symbol
+function named_tuple(::Type{V}, variables::AbstractVariable...) where {V <: AbstractVariable}
+    all_vars = filter(v -> v isa V, variables)
+    unique_vars = remove_duplicate_variables(all_vars...)
+    namespaces = get_namespaces(unique_vars)
 
-    "Grid dimensions on which the variable is defined"
-    dims::VD
+    namespace_dict = Dict{Symbol, Vector{V}}()
+    for ns in namespaces
+        namespace_dict[ns] = [v for v in unique_vars if v.namespace == ns]
+    end
 
-    "Physical untis associated with this state variable"
-    units::UT = nothing
-
-    "Human-readable description of this state variable"
-    desc::String = ""
-
-    "Namespace of the variable, :land, :ocean or :atmosphere (default)"
-    namespace::Symbol = :atmosphere
+    return NamedTuple{Tuple(namespaces)}(Tuple(Tuple(namespace_dict[ns]) for ns in namespaces))
 end
 
-"""
-    remove_duplicate_variables(variables::AbstractVariable...) 
+Base.unique(variables::AbstractVariable...) = unique(v -> identifier(v), variables)
 
-Remove duplicate variables based on their `name` and `namespace`.
-Only the first occurrence of each unique combination is kept.
-"""
-function remove_duplicate_variables(variables::AbstractVariable...)
+remove_duplicates(variables::Tuple) = remove_duplicates(variables...)
+function remove_duplicates(variables::AbstractVariable...)
     seen = Set{Tuple{Symbol, Symbol}}()
     unique_vars = []
     for v in variables
@@ -103,48 +109,10 @@ function remove_duplicate_variables(variables::AbstractVariable...)
     return unique_vars
 end
 
-"""
-    $TYPEDSIGNATURES
-
-Takes a tuple of `AbstractVariable`s, filters only the `DiagnosticVariable`s,
-and splits them into a `NamedTuple` organized by their `namespace` field.
-
-Returns a `NamedTuple` with keys corresponding to the namespaces found
-(e.g., `:atmosphere`, `:land`, `:ocean`), where each value is a tuple
-of `DiagnosticVariable`s belonging to that namespace.
-
-# Example
-```julia
-vars = (
-    DiagnosticVariables(name=:temp, dims=Grid3D(), namespace=:atmosphere),
-    PrognosticVariable(name=:u, dims=Grid3D(), namespace=:atmosphere),
-    DiagnosticVariables(name=:soil_temp, dims=Grid3D(), namespace=:land),
-    DiagnosticVariables(name=:pressure, dims=Grid3D(), namespace=:atmosphere),
-)
-
-result = get_diagnostic_variables(vars)
-# Returns: (atmosphere = (...), land = (...))
-```
-"""
-function get_diagnostic_variables(variables::AbstractVariable...)
-    # Filter only DiagnosticVariables
-    diag_vars = filter(v -> v isa DiagnosticVariable, variables)
-
-    # Remove duplicates
-    unique_vars = remove_duplicate_variables(diag_vars...)
-
-    # Currently hardcoded (might change in the future)
-    namespaces = (:atmosphere, :land, :ocean)
-
-    # Split by namespace
-    namespace_dict = Dict{Symbol, Vector{DiagnosticVariable}}()
-    for ns in namespaces
-        namespace_dict[ns] = [v for v in unique_vars if v.namespace == ns]
-    end
-
-    # Convert to NamedTuple with tuples instead of vectors
-    return NamedTuple{Tuple(namespaces)}(Tuple(Tuple(namespace_dict[ns]) for ns in namespaces))
+function initialize_variables(SG::SpectralGrid, nlayers::Integer, variables...)
+    return NamedTuple{Tuple(map(v -> v.name, variables))}(Tuple(map(var -> zero(var, SG, nlayers), variables)))
 end
+
 
 """
     $TYPEDSIGNATURES
@@ -159,8 +127,8 @@ of `PrognosticVariable`s belonging to that namespace.
 # Example
 ```julia
 vars = (
-    PrognosticVariable(name=:u, dims=Grid3D(), namespace=:atmosphere),
-    DiagnosticVariables(name=:temp, dims=Grid3D(), namespace=:atmosphere),
+    PrognosticVariable(name=:u, dims=Grid3D(), namespace=:atmosphere),``
+    DiagnosticVariable(name=:temp, dims=Grid3D(), namespace=:atmosphere),
     PrognosticVariable(name=:soil_moisture, dims=Grid3D(), namespace=:land),
     PrognosticVariable(name=:v, dims=Grid3D(), namespace=:atmosphere),
 )
@@ -174,7 +142,7 @@ function get_prognostic_variables(variables::AbstractVariable...)
     prog_vars = filter(v -> v isa PrognosticVariable, variables)
 
     # Remove duplicates
-    unique_vars = remove_duplicate_variables(prog_vars...)
+    unique_vars = remove_duplicates(prog_vars...)
 
     # Currently hardcoded (might change in the future)
     namespaces = (:atmosphere, :land, :ocean)
@@ -190,10 +158,3 @@ function get_prognostic_variables(variables::AbstractVariable...)
 end
 
 get_prognostic_variables(model::AbstractModel) = get_prognostic_variables(variables(model)...)
-get_diagnostic_variables(model::AbstractModel) = get_diagnostic_variables(variables(model)...)
-
-# TODO: not quite sure yet about the nlayers or where it'll go
-# initialize a NamedTuple from variables
-function initialize_variables(SG::SpectralGrid, nlayers::Integer, variables...)
-    return NamedTuple{Tuple(map(v -> v.name, variables))}(Tuple(map(var -> zero(var, SG, nlayers), variables)))
-end

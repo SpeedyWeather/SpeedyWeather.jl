@@ -90,17 +90,14 @@ function initialize!(model::Barotropic; time::DateTime = DEFAULT_DATE)
     initialize!(model.random_process, model)
     initialize!(model.particle_advection, model)
 
-    # allocate prognostic and diagnostic variables
-    prognostic_variables = PrognosticVariables(model)
-    diagnostic_variables = DiagnosticVariables(model)
-    # initialize particles (or other non-atmosphere prognostic variables)
-    initialize!(prognostic_variables.particles, prognostic_variables, diagnostic_variables, model)
+    # allocate all variables and set initial conditions
+    variables = Variables(model)
+    # initialize!(variables.prognostic, model.initial_conditions, model)
 
-    # set the initial conditions
-    initialize!(prognostic_variables, model.initial_conditions, model)
-    (; clock) = prognostic_variables
+    # set the time
+    (; clock) = variables.prognostic
     clock.time = time       # set the current time
     clock.start = time      # and store the start time
 
-    return Simulation(prognostic_variables, diagnostic_variables, model)
+    return Simulation(variables, model)
 end
