@@ -312,10 +312,17 @@ end
 """$(TYPEDSIGNATURES)
 Generator function."""
 function ParticleVariables(SG::SpectralGrid)
-    (; architecture, nparticles, NF, ArrayType) = SG
-    (; ParticleVector) = SG
-    VectorNF = array_type(architecture, NF, 1)
-    locator = RingGrids.AnvilLocator(NF, nparticles; architecture)
+    (; architecture, nparticles, NF, ParticleVector) = SG
+
+    # TODO: CPU Fallback needed for Reactant 
+    if typeof(architecture) <: ReactantDevice
+        VectorNF = array_type(CPU(), NF, 1)
+        locator = RingGrids.AnvilLocator(NF, nparticles; architecture = CPU())
+    else
+        VectorNF = array_type(architecture, NF, 1)
+        locator = RingGrids.AnvilLocator(NF, nparticles; architecture)
+    end
+
     return ParticleVariables{ParticleVector, VectorNF, typeof(locator)}(;
         nparticles, locator
     )
@@ -336,11 +343,10 @@ struct DiagnosticVariables{
         GridVariable3D,         # <: AbstractField
         SpectralTracerTuple,    # <: NamedTuple{Symbol, SpectralVariable3D}
         GridTracerTuple,        # <: NamedTuple{Symbol, GridVariable3D}
-        ParticleVector,         # <: AbstractField
+        ParticleVariable,       # <: AbstractField
         VectorType,             # <: AbstractVector
         PhysicsTuple,           # <: NamedTyple{Symbol, ...}
         ScratchMemoryType,      # <: ArrayType{Complex{NF}, 3}
-        LocatorType,            # <: AbstractLocator
         RefValueNF,             # <: Base.RefValue{NF}
     } <: AbstractDiagnosticVariables
 
@@ -371,7 +377,7 @@ struct DiagnosticVariables{
     physics::PhysicsTuple
 
     "Intermediate variables for the particle advection"
-    particles::ParticleVariables{ParticleVector, VectorType, LocatorType}
+    particles::ParticleVariable
 
     "Average temperature of every horizontal layer [K]"
     temp_average::VectorType
@@ -389,7 +395,7 @@ struct DiagnosticVariables{
             grid_variables::GridVariables{GridType, GridVariable2D, GridVariable3D, GridTracerTuple},
             dynamics::DynamicsVariables{SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, ScratchMemoryType},
             physics::PhysicsTuple,
-            particles::ParticleVariables{ParticleVector, VectorType, LocatorType},
+            particles::ParticleVariable,
             temp_average::VectorType,
             scale::RefValueNF,
         ) where {
@@ -401,18 +407,17 @@ struct DiagnosticVariables{
             GridVariable3D,         # <: AbstractField
             SpectralTracerTuple,    # <: NamedTuple{Symbol, SpectralVariable3D}
             GridTracerTuple,        # <: NamedTuple{Symbol, GridVariable3D}
-            ParticleVector,         # <: AbstractField
+            ParticleVariable,       # 
             VectorType,             # <: AbstractVector
             PhysicsTuple,
             ScratchMemoryType,      # <: ArrayType{Complex{NF}, 3}
-            LocatorType,            # <: AbstractLocator
             RefValueNF,             # <: Base.RefValue{NF}
         }
         return new{
             typeof(spectrum), typeof(grid), SpectralVariable2D, SpectralVariable3D,
             GridVariable2D, GridVariable3D, SpectralTracerTuple, GridTracerTuple,
-            ParticleVector, VectorType, typeof(physics),
-            typeof(dynamics.scratch_memory), typeof(particles.locator),
+            ParticleVariable, VectorType, typeof(physics),
+            typeof(dynamics.scratch_memory),
             typeof(scale),
         }(
             spectrum, grid, nlayers, nparticles,
@@ -425,8 +430,8 @@ struct DiagnosticVariables{
     function DiagnosticVariables{
             SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D,
             GridVariable2D, GridVariable3D, SpectralTracerTuple, GridTracerTuple,
-            ParticleVector, VectorType, PhysicsTuple,
-            ScratchMemoryType, LocatorType, RefValueNF,
+            ParticleVariable, VectorType, PhysicsTuple,
+            ScratchMemoryType, RefValueNF,
         }(
             spectrum, grid, nlayers, nparticles,
             tendencies, grid_variables, dynamics, physics, particles,
@@ -440,18 +445,17 @@ struct DiagnosticVariables{
             GridVariable3D,         # <: AbstractField
             SpectralTracerTuple,    # <: NamedTuple{Symbol, SpectralVariable3D}
             GridTracerTuple,        # <: NamedTuple{Symbol, GridVariable3D}
-            ParticleVector,         # <: AbstractField
+            ParticleVariable,       # <: AbstractField
             VectorType,             # <: AbstractVector
             PhysicsTuple,
             ScratchMemoryType,      # <: ArrayType{Complex{NF}, 3}
-            LocatorType,            # <: AbstractLocator
             RefValueNF,             # <: Base.RefValue{NF}
         }
         return new{
             SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D,
             GridVariable2D, GridVariable3D, SpectralTracerTuple, GridTracerTuple,
-            ParticleVector, VectorType, typeof(physics),
-            ScratchMemoryType, LocatorType, RefValueNF,
+            ParticleVariable, VectorType, typeof(physics),
+            ScratchMemoryType, RefValueNF,
         }(
             spectrum, grid, nlayers, nparticles,
             tendencies, grid_variables, dynamics, physics, particles,
@@ -474,7 +478,7 @@ function DiagnosticVariables(model::AbstractModel)
     (; spectrum, grid, nparticles, NF, nlayers) = SG
     (; SpectralVariable2D, SpectralVariable3D) = SG
     (; GridVariable2D, GridVariable3D) = SG
-    (; VectorType, ParticleVector) = SG
+    (; VectorType) = SG
     nlayers_soil = get_soil_layers(model)
 
     tendencies = Tendencies(SG; tracers)
@@ -500,8 +504,8 @@ function DiagnosticVariables(model::AbstractModel)
     return DiagnosticVariables{
         typeof(spectrum), typeof(grid), SpectralVariable2D, SpectralVariable3D,
         GridVariable2D, GridVariable3D, SpectralTracerTuple, GridTracerTuple,
-        ParticleVector, VectorType, typeof(physics),
-        typeof(dynamics.scratch_memory), typeof(particles.locator), typeof(scale),
+        typeof(particles), VectorType, typeof(physics),
+        typeof(dynamics.scratch_memory), typeof(scale),
     }(
         spectrum, grid, nlayers, nparticles,
         tendencies, grid_variables, dynamics, physics, particles,

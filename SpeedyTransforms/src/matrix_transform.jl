@@ -54,12 +54,12 @@ function MatrixSpectralTransform(
         spectrum::AbstractSpectrum,                                                     # Spectral truncation
         grid::AbstractGrid;                                                             # grid used and resolution, e.g. FullGaussianGrid
         NF::Type{<:Real} = DEFAULT_NF,                                                  # Number format NF
-        ArrayType::Type{<:AbstractArray} = DEFAULT_ARRAYTYPE,                           # Array type used for spectral coefficients (can be parametric)
         nlayers::Integer = DEFAULT_NLAYERS,                                             # number of layers in the vertical (for scratch memory size)
         LegendreShortcut::Type{<:AbstractLegendreShortcut} = LegendreShortcutLinear,    # shorten Legendre loop over order m
-        architecture::AbstractArchitecture = architecture(ArrayType),                   # architecture that kernels are launched on
     )
+    (; architecture) = spectrum                       # 1-based spectral truncation order and degree
 
+    ArrayType = array_type(architecture)
     ArrayType_ = nonparametric_type(ArrayType)      # drop parameters of ArrayType
 
     # LATITUDE VECTORS (based on Gaussian, equi-angle or HEALPix latitudes)

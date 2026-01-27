@@ -27,6 +27,7 @@ Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 AMDGPU = "21141c5a-9bdb-4563-92ae-f87d6854732e"
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
+Reactant = "3c362404-f566-11ee-1572-e11a4b42c853"
 
 [sources]
 LowerTriangularArrays = {path = "../LowerTriangularArrays"}
@@ -37,6 +38,7 @@ SpeedyWeatherInternals = {path = "../SpeedyWeatherInternals"}
 SpeedyTransformsAMDGPUExt = "AMDGPU"
 SpeedyTransformsCUDAExt = "CUDA"
 SpeedyTransformsEnzymeExt = "Enzyme"
+SpeedyTransformsReactantExt = "Reactant"
 
 [compat]
 AMDGPU = "2.1.2"
@@ -57,6 +59,7 @@ LowerTriangularArrays = "0.1"
 Primes = "0.5.7"
 Printf = "1.10"
 ProgressMeter = "1.11.0"
+Reactant = "0.2.209"
 RingGrids = "0.1"
 SpeedyWeatherInternals = "0.1"
 Statistics = "1.10"
