@@ -1,5 +1,5 @@
 import Pkg 
-Pkg.activate("test/differentiability/sensitivity_examples")
+Pkg.activate("SpeedyWeather/test/differentiability/sensitivity_examples")
 
 using SpeedyWeather, Enzyme, JLD2, Checkpointing
 
