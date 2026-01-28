@@ -248,9 +248,8 @@ function SpectralTransform(
     )
     (; spectrum) = coeffs
     NF = real(eltype(coeffs))
-    ArrayType = LowerTriangularArrays.array_type(coeffs)
     nlayers = size(coeffs, 2)
-    return SpectralTransform(spectrum; NF, ArrayType, nlayers, kwargs...)
+    return SpectralTransform(spectrum; NF, nlayers, kwargs...)
 end
 
 # use grid, NF, and ArrayType from field
