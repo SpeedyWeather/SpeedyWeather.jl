@@ -12,7 +12,6 @@ $(TYPEDFIELDS)"""
 struct SpectralTransform{
         NF,
         AR,                         # <: AbstractArchitecture
-        ArrayType,                  # non-parametric array type
         SpectrumType,               # <: AbstractSpectrum
         GridType,                   # <: AbstractGrid
         VectorType,                 # <: ArrayType{NF, 1},
@@ -183,7 +182,6 @@ function SpectralTransform(
     return SpectralTransform{
         NF,
         typeof(architecture),
-        ArrayType_,
         typeof(spectrum),
         typeof(grid),
         array_type(architecture, NF, 1),

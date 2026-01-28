@@ -4,7 +4,6 @@ $(TYPEDFIELDS)"""
 struct MatrixSpectralTransform{
         NF,
         AR,                         # <: AbstractArchitecture
-        ArrayType,                  # non-parametric array type
         SpectrumType,               # <: AbstractSpectrum
         GridType,                   # <: AbstractGrid
         VectorType,                 # <: ArrayType{NF, 1},
@@ -100,7 +99,6 @@ function MatrixSpectralTransform(
     return MatrixSpectralTransform{
         NF,
         typeof(architecture),
-        ArrayType_,
         typeof(spectrum),
         typeof(grid),
         typeof(coslat),
