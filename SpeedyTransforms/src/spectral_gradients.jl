@@ -296,6 +296,7 @@ end
     end
 end
 
+#=
 """
 $(TYPEDSIGNATURES)
 Get U, V (=(u, v)*coslat) from vorticity ζ and divergence D in spectral space.
@@ -388,6 +389,7 @@ function UV_from_vordiv!(
 
     return U, V
 end
+=#
 
 #TODO: This version is for GPU only, currently this version has a bug that stops Enzyme differentiability
 """
@@ -404,7 +406,7 @@ function UV_from_vordiv!(
         V::LowerTriangularArray,
         vor::LowerTriangularArray,
         div::LowerTriangularArray,
-        S::SpectralTransform{NF, <:GPU};
+        S::SpectralTransform{NF};
         radius = DEFAULT_RADIUS,
     ) where {NF}
     (; vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2) = S
