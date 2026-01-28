@@ -3,7 +3,7 @@ const DEFAULT_GRID = FullGaussianGrid
 const DEFAULT_NF = Float32
 const DEFAULT_ARRAYTYPE = Array
 
-abstract type AbstractSpectralTransform{NF, AR, AT} end
+abstract type AbstractSpectralTransform{NF, AR} end
 Architectures.nonparametric_type(S::AbstractSpectralTransform) = nonparametric_type(typeof(S))
 
 """SpectralTransform struct that contains all parameters and precomputed arrays
@@ -12,7 +12,6 @@ $(TYPEDFIELDS)"""
 struct SpectralTransform{
         NF,
         AR,                         # <: AbstractArchitecture
-        ArrayType,                  # non-parametric array type
         SpectrumType,               # <: AbstractSpectrum
         GridType,                   # <: AbstractGrid
         VectorType,                 # <: ArrayType{NF, 1},
@@ -21,7 +20,7 @@ struct SpectralTransform{
         LowerTriangularArrayType,   # <: LowerTriangularArray{NF, 2, ArrayType{NF}},
         ScratchType,                # <: ScratchMemory{ArrayComplexType, VectorComplexType},
         GradientType,               # <: NamedTuple for gradients
-    } <: AbstractSpectralTransform{NF, AR, ArrayType}
+    } <: AbstractSpectralTransform{NF, AR}
 
     # Architecture
     architecture::AR
@@ -78,7 +77,7 @@ end
 
 # eltype of a transform is the number format used within
 Base.eltype(S::AbstractSpectralTransform{NF}) where {NF} = NF
-Architectures.array_type(S::AbstractSpectralTransform{NF, AR, AT}) where {NF, AR, AT} = AT
+Architectures.array_type(S::AbstractSpectralTransform{NF, AR}) where {NF, AR} = array_type(AR)
 Architectures.nonparametric_type(::Type{<:SpectralTransform}) = SpectralTransform
 
 """
@@ -91,15 +90,15 @@ function SpectralTransform(
         spectrum::AbstractSpectrum,                     # Spectral truncation
         grid::AbstractGrid;                             # grid used and resolution, e.g. FullGaussianGrid
         NF::Type{<:Real} = DEFAULT_NF,                                                  # Number format NF
-        ArrayType::Type{<:AbstractArray} = DEFAULT_ARRAYTYPE,                           # Array type used for spectral coefficients (can be parametric)
         nlayers::Integer = DEFAULT_NLAYERS,                                             # number of layers in the vertical (for scratch memory size)
         LegendreShortcut::Type{<:AbstractLegendreShortcut} = LegendreShortcutLinear,    # shorten Legendre loop over order m
-        architecture::AbstractArchitecture = architecture(ArrayType),                   # architecture that kernels are launched on
     )
+    (; lmax, mmax, architecture) = spectrum                       # 1-based spectral truncation order and degree
+
+    ArrayType = array_type(architecture)
+    ArrayType_ = nonparametric_type(ArrayType)      # drop parameters of ArrayType
 
     (; nlat_half) = grid                            # number of latitude rings on one hemisphere incl equator
-    ArrayType_ = nonparametric_type(ArrayType)      # drop parameters of ArrayType
-    (; lmax, mmax) = spectrum                       # 1-based spectral truncation order and degree
 
     # RESOLUTION PARAMETERS
     nlat = get_nlat(grid)           # 2nlat_half but one less if grid has odd # of lat rings
@@ -183,7 +182,6 @@ function SpectralTransform(
     return SpectralTransform{
         NF,
         typeof(architecture),
-        ArrayType_,
         typeof(spectrum),
         typeof(grid),
         array_type(architecture, NF, 1),
@@ -191,7 +189,7 @@ function SpectralTransform(
         array_type(architecture, Complex{NF}, 2),
         LowerTriangularArray{NF, 2, array_type(architecture, NF, 2), typeof(spectrum)},
         typeof(scratch_memory),
-        typeof(gradients)
+        typeof(gradients),
     }(
         architecture,
         spectrum, nfreq_max,
@@ -248,9 +246,8 @@ function SpectralTransform(
     )
     (; spectrum) = coeffs
     NF = real(eltype(coeffs))
-    ArrayType = LowerTriangularArrays.array_type(coeffs)
     nlayers = size(coeffs, 2)
-    return SpectralTransform(spectrum; NF, ArrayType, nlayers, kwargs...)
+    return SpectralTransform(spectrum; NF, nlayers, kwargs...)
 end
 
 # use grid, NF, and ArrayType from field
@@ -260,9 +257,8 @@ function SpectralTransform(
     )
     (; grid) = field
     NF = eltype(field)                          # number format of the spectral coefficients
-    ArrayType = RingGrids.array_type(field)
     nlayers = size(field, 2)
-    return SpectralTransform(grid; NF, ArrayType, nlayers, kwargs...)
+    return SpectralTransform(grid; NF, nlayers, kwargs...)
 end
 
 """$(TYPEDSIGNATURES)
@@ -272,18 +268,17 @@ function SpectralTransform(
         coeffs::LowerTriangularArray;
         kwargs...
     )
+    @assert ismatching(architecture(field), architecture(coeffs)) "Architectures of field and coeffs do not match."
+    
     # infer types for SpectralTransform
     NF = promote_type(real(eltype(field)), real(eltype(coeffs)))
-    ArrayType = nonparametric_type(array_type(field))
-    ArrayType2 = nonparametric_type(array_type(coeffs))
-    @assert ArrayType == ArrayType2 "ArrayTypes of field ($_ArrayType1) and coeffs ($_ArrayType2) do not match."
-
+    
     # get resolution
     (; spectrum) = coeffs
     (; grid) = field
     nlayers = size(field, 2)
     @assert nlayers == size(coeffs, 2) "Number of layers in field ($nlayers) and coeffs ($(size(coeffs, 2))) do not match."
-    return SpectralTransform(spectrum, grid; NF, ArrayType, nlayers, kwargs...)
+    return SpectralTransform(spectrum, grid; NF, nlayers, kwargs...)
 end
 
 # make commutative

@@ -232,7 +232,12 @@ function SpectralGrid(
     GridVariable4D = Field{NF, 3, array_type(architecture, NF, 3), typeof(grid)}
 
     # Particle vector type
-    ParticleVector = array_type(architecture, Particle{NF}, 1)
+    # TODO: For Reactant CPU fallback for particles, we need something else in the long run 
+    if typeof(architecture) <: ReactantDevice
+        ParticleVector = array_type(CPU(), Particle{NF}, 1)
+    else
+        ParticleVector = array_type(architecture, Particle{NF}, 1)
+    end
 
     # Create the SpectralGrid with all fields
     return SpectralGrid{typeof(architecture), typeof(spectrum), typeof(grid)}(
@@ -275,10 +280,10 @@ function (::Type{S})(
         one_more_degree::Bool = true,
         kwargs...
     ) where {S <: SpeedyTransforms.AbstractSpectralTransform}
-    (; NF, spectrum, grid, nlayers, ArrayType) = spectral_grid
+    (; NF, spectrum, grid, nlayers) = spectral_grid
     (; lmax, mmax, architecture) = spectrum
     spectrum = one_more_degree == false ? Spectrum(lmax - 1, mmax; architecture) : spectrum
-    return S(spectrum, grid; NF, ArrayType, nlayers, kwargs...)
+    return S(spectrum, grid; NF, nlayers, kwargs...)
 end
 
 # because model components can be `nothing`, their constructor being `Nothing()`

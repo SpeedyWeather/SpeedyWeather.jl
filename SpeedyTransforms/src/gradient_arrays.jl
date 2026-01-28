@@ -64,10 +64,12 @@ function meridional_gradient_factors(
     end
 
     # move to architecture of spectrum
-    return (on_architecture(spectrum, grad_y1), 
-            on_architecture(spectrum, grad_y2),
-            on_architecture(spectrum, grad_y_vordiv1),
-            on_architecture(spectrum, grad_y_vordiv2))
+    return (
+        on_architecture(spectrum, grad_y1),
+        on_architecture(spectrum, grad_y2),
+        on_architecture(spectrum, grad_y_vordiv1),
+        on_architecture(spectrum, grad_y_vordiv2),
+    )
 end
 
 # if number format not provided use default

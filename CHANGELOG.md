@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Reactant support [#970](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/970)
 - MatrixSpectralTransform implemented [#952](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/952)
 - The number of soil layers is now solely defined by the land model and not in the `SpectralGrid` anymore [#898](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/898)   
 - Revised GPU benchmarks to include full GPU models [#946](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/946) and the dynamical core [#967](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/967)

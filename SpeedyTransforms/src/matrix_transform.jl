@@ -4,14 +4,13 @@ $(TYPEDFIELDS)"""
 struct MatrixSpectralTransform{
         NF,
         AR,                         # <: AbstractArchitecture
-        ArrayType,                  # non-parametric array type
         SpectrumType,               # <: AbstractSpectrum
         GridType,                   # <: AbstractGrid
         VectorType,                 # <: ArrayType{NF, 1},
         MatrixType,                 # <: ArrayType{NF, 2},
         MatrixComplexType,          # <: ArrayType{Complex{NF}, 2},
         GradientType,               # <: NamedTuple for gradients
-    } <: AbstractSpectralTransform{NF, AR, ArrayType}
+    } <: AbstractSpectralTransform{NF, AR}
 
     # Architecture
     architecture::AR
@@ -54,12 +53,12 @@ function MatrixSpectralTransform(
         spectrum::AbstractSpectrum,                                                     # Spectral truncation
         grid::AbstractGrid;                                                             # grid used and resolution, e.g. FullGaussianGrid
         NF::Type{<:Real} = DEFAULT_NF,                                                  # Number format NF
-        ArrayType::Type{<:AbstractArray} = DEFAULT_ARRAYTYPE,                           # Array type used for spectral coefficients (can be parametric)
         nlayers::Integer = DEFAULT_NLAYERS,                                             # number of layers in the vertical (for scratch memory size)
         LegendreShortcut::Type{<:AbstractLegendreShortcut} = LegendreShortcutLinear,    # shorten Legendre loop over order m
-        architecture::AbstractArchitecture = architecture(ArrayType),                   # architecture that kernels are launched on
     )
+    (; architecture) = spectrum                       # 1-based spectral truncation order and degree
 
+    ArrayType = array_type(architecture)
     ArrayType_ = nonparametric_type(ArrayType)      # drop parameters of ArrayType
 
     # LATITUDE VECTORS (based on Gaussian, equi-angle or HEALPix latitudes)
@@ -70,7 +69,7 @@ function MatrixSpectralTransform(
     # Create another SpectralTransform to calculate the transform matrices from (do this on the CPU)
     spectrum_cpu = on_architecture(CPU(), spectrum)
     grid_cpu = on_architecture(CPU(), grid)
-    S = SpectralTransform(spectrum_cpu, grid_cpu; NF, ArrayType = Array, nlayers, LegendreShortcut, architecture = CPU())
+    S = SpectralTransform(spectrum_cpu, grid_cpu; NF, nlayers, LegendreShortcut)
 
     npoints = get_npoints(grid)
     nharmonics = LowerTriangularArrays.nonzeros(spectrum)
@@ -100,7 +99,6 @@ function MatrixSpectralTransform(
     return MatrixSpectralTransform{
         NF,
         typeof(architecture),
-        ArrayType_,
         typeof(spectrum),
         typeof(grid),
         typeof(coslat),
@@ -223,7 +221,7 @@ function transform!(                        # SPECTRAL TO GRID
     nlayers = size(coeffs, 2)
     scratch = ndims(coeffs) == 1 ? view(scratch_memory, :, 1) : nlayers < size(scratch_memory, 2) ? view(scratch_memory, :, 1:nlayers) : scratch_memory
 
-    # the result is real-valued, therefore we can split the complex multiplication 
+    # the result is real-valued, therefore we can split the complex multiplication
     # into two real-valued multiplications
     scratch .= real.(coeffs.data)
     LinearAlgebra.mul!(field.data, M.backward_real, scratch)
