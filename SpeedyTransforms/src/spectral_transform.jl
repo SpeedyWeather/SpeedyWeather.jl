@@ -3,7 +3,7 @@ const DEFAULT_GRID = FullGaussianGrid
 const DEFAULT_NF = Float32
 const DEFAULT_ARRAYTYPE = Array
 
-abstract type AbstractSpectralTransform{NF, AR, AT} end
+abstract type AbstractSpectralTransform{NF, AR} end
 Architectures.nonparametric_type(S::AbstractSpectralTransform) = nonparametric_type(typeof(S))
 
 """SpectralTransform struct that contains all parameters and precomputed arrays
@@ -20,7 +20,7 @@ struct SpectralTransform{
         LowerTriangularArrayType,   # <: LowerTriangularArray{NF, 2, ArrayType{NF}},
         ScratchType,                # <: ScratchMemory{ArrayComplexType, VectorComplexType},
         GradientType,               # <: NamedTuple for gradients
-    } <: AbstractSpectralTransform{NF, AR, ArrayType}
+    } <: AbstractSpectralTransform{NF, AR}
 
     # Architecture
     architecture::AR
@@ -77,7 +77,7 @@ end
 
 # eltype of a transform is the number format used within
 Base.eltype(S::AbstractSpectralTransform{NF}) where {NF} = NF
-Architectures.array_type(S::AbstractSpectralTransform{NF, AR, AT}) where {NF, AR, AT} = AT
+Architectures.array_type(S::AbstractSpectralTransform{NF, AR}) where {NF, AR} = array_type(AR)
 Architectures.nonparametric_type(::Type{<:SpectralTransform}) = SpectralTransform
 
 """

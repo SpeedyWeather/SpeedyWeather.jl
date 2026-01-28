@@ -10,7 +10,7 @@ struct MatrixSpectralTransform{
         MatrixType,                 # <: ArrayType{NF, 2},
         MatrixComplexType,          # <: ArrayType{Complex{NF}, 2},
         GradientType,               # <: NamedTuple for gradients
-    } <: AbstractSpectralTransform{NF, AR, ArrayType}
+    } <: AbstractSpectralTransform{NF, AR}
 
     # Architecture
     architecture::AR
