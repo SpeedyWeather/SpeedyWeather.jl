@@ -49,7 +49,7 @@ Our implementation of the model using KernelAbstractions.jl, also enables an eas
 !!! warning "Work in progress"
     The Reactant support of SpeedyWeather.jl is still work in progress, incomplete and considered experimental.
 
-We are currently working on making SpeedyWeather.jl compatible with the MLIR/XLA optimizer Reactant.jl. If you want to try it out, use the `ReactantDevice` architecture and the set your backend within Reatant with `Reactant.set_default_backend`. 
+We are currently working on making SpeedyWeather.jl compatible with the MLIR/XLA optimizer Reactant.jl. If you want to try it out, use the `ReactantDevice` architecture and set your device within Reactant with `Reactant.set_default_backend`. 
 
 ## Benchmarks 
 
