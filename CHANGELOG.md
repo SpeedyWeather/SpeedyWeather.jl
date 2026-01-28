@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- GitHub Actions: Cache updated [#945](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/945)
+- The number of soil layers is now solely defined by the land model and not in the `SpectralGrid` anymore [#898](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/898)   
+- Revised GPU benchmarks to include full GPU models [#946](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/946) and the dynamical core [#967](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/967)
 - Label-based modular skip CI mechanism for github and buildkite [#957](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/957)
 - Monorepo structure and separate tests [#957](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/957)
 - Changed OneBandShortwave to ij logic [#955](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/955)
@@ -9,7 +12,7 @@
 - Fix bug in parameter subsetting [#960](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/960)
 - Follow-up to #783: finalize @param/@component markers [#935](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/935)
 - Adjust fill!(::PrognosticVariables, x) to new variable system [#949](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/949)
-- Code formatting with Runic applied [#950](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/950)
+- Code formatting with Runic applied [#950](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/950) [#964](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/964)
 - Implicit correction kernelized and GPU-ready [#891](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/891)
 - The dynamical core of the primitive equations is now GPU-ready with kernelized implementations [#934](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/934)
 - EarthDryAtmosphere to dispatch like PrimitiveDryModel inside kernels [#944](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/944)

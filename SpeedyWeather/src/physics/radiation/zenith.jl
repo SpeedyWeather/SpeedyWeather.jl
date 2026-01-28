@@ -130,7 +130,7 @@ export SolarZenith
 
 """Solar zenith angle varying with daily and seasonal cycle.
 $(TYPEDFIELDS)"""
-@parameterized @kwdef struct SolarZenith{NF <: AbstractFloat, SD<:AbstractSolarDeclination} <: AbstractZenith
+@parameterized @kwdef struct SolarZenith{NF <: AbstractFloat, SD <: AbstractSolarDeclination} <: AbstractZenith
     # OPTIONS
     length_of_day::Second = Hour(24)
     length_of_year::Second = Day(365.25)
@@ -138,8 +138,8 @@ $(TYPEDFIELDS)"""
     seasonal_cycle::Bool = true
 
     # COEFFICIENTS
-    @param solar_declination::SD = SinSolarDeclination(Earth{NF}()) (group=:solar_declination,)
-    @param time_correction::SolarTimeCorrection{NF} = SolarTimeCorrection{NF}() (group=:time_correction,)
+    @param solar_declination::SD = SinSolarDeclination(Earth{NF}()) (group = :solar_declination,)
+    @param time_correction::SolarTimeCorrection{NF} = SolarTimeCorrection{NF}() (group = :time_correction,)
 
     initial_time::Base.RefValue{DateTime} = Ref(DEFAULT_DATE)
 end
@@ -241,14 +241,14 @@ export SolarZenithSeason
 
 """Solar zenith angle varying with seasonal cycle only.
 $(TYPEDFIELDS)"""
-@parameterized @kwdef struct SolarZenithSeason{NF <: AbstractFloat, SD<:AbstractSolarDeclination} <: AbstractZenith
+@parameterized @kwdef struct SolarZenithSeason{NF <: AbstractFloat, SD <: AbstractSolarDeclination} <: AbstractZenith
     # OPTIONS
     length_of_day::Second = Hour(24)
     length_of_year::Second = Day(365.25)
     seasonal_cycle::Bool = true
 
     # COEFFICIENTS
-    @param solar_declination::SD = SinSolarDeclination(Earth{NF}()) (group=:solar_declination,)
+    @param solar_declination::SD = SinSolarDeclination(Earth{NF}()) (group = :solar_declination,)
 
     initial_time::Base.RefValue{DateTime} = Ref(DEFAULT_DATE)
 end

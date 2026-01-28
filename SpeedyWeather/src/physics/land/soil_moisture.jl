@@ -34,11 +34,12 @@ end
 # Adapt.adapt_structure(to, soil::SeasonalSoilMoisture) = adapt(to, ManualSeasonalSoilMoisture(soil.monthly_soil_moisture))
 
 # generator function
-function SeasonalSoilMoisture(SG::SpectralGrid; kwargs...)
-    (; NF, GridVariable4D, grid, nlayers_soil) = SG
-    monthly_soil_moisture = zeros(GridVariable4D, grid, nlayers_soil, 12)
+function SeasonalSoilMoisture(SG::SpectralGrid, nlayers::Int = DEFAULT_NLAYERS_SOIL; kwargs...)
+    (; NF, GridVariable4D, grid) = SG
+    monthly_soil_moisture = zeros(GridVariable4D, grid, nlayers, 12)
     return SeasonalSoilMoisture{NF, GridVariable4D}(; monthly_soil_moisture, kwargs...)
 end
+SeasonalSoilMoisture(SG::SpectralGrid, geometry::LandGeometry; kwargs...) = SeasonalSoilMoisture(SG, geometry.nlayers; kwargs...)
 
 function variables(::SeasonalSoilMoisture)
     return (
@@ -156,21 +157,21 @@ $(TYPEDFIELDS)"""
     time_scale::Second = Day(2)
 
     "[OPTION] Infiltration fraction, that is, fraction of top layer runoff that is put into layer below [1]"
-    @param infiltration_fraction::NF = 0.25 (bounds=0..1,)
+    @param infiltration_fraction::NF = 0.25 (bounds = 0 .. 1,)
 
     "[OPTION] Apply land-sea mask to set ocean-only points?"
     mask::Bool = true
 
     "[OPTION] Initial soil moisture over ocean, volume fraction [1]"
-    @param ocean_moisture::NF = 0 (bounds=0..1,)
+    @param ocean_moisture::NF = 0 (bounds = 0 .. 1,)
 end
 
 Adapt.@adapt_structure LandBucketMoisture
-LandBucketMoisture(SG::SpectralGrid; kwargs...) = LandBucketMoisture{SG.NF}(; kwargs...)
+LandBucketMoisture(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothing; kwargs...) = LandBucketMoisture{SG.NF}(; kwargs...)
 function initialize!(soil::LandBucketMoisture, model::PrimitiveEquation)
-    (; nlayers_soil) = model.spectral_grid
-    @assert nlayers_soil == 2 "LandBucketMoisture only works with 2 soil layers " *
-        "but spectral_grid.nlayers_soil = $nlayers_soil given. Ignoring additional layers."
+    nlayers = get_soil_layers(model)
+    @assert nlayers == 2 "LandBucketMoisture only works with 2 soil layers " *
+        "but geometry.nlayers = $nlayers given. Ignoring additional layers."
 
     return nothing
 end
@@ -191,7 +192,7 @@ function initialize!(
         model::PrimitiveEquation,
     )
     # create a seasonal model, initialize it and the variables
-    seasonal_model = SeasonalSoilMoisture(model.spectral_grid)
+    seasonal_model = SeasonalSoilMoisture(model.spectral_grid, model.land.geometry)
     initialize!(seasonal_model, model)
     initialize!(progn, diagn, seasonal_model, model)
     # (seasonal model will be garbage collected hereafter)

@@ -3,6 +3,8 @@ abstract type AbstractLandComponent <: AbstractModelComponent end
 abstract type AbstractWetLand <: AbstractLand end
 abstract type AbstractDryLand <: AbstractLand end
 
+const DEFAULT_NLAYERS_SOIL = 2
+
 # model class is the abstract supertype
 model_class(::Type{<:AbstractWetLand}) = AbstractWetLand
 model_class(::Type{<:AbstractDryLand}) = AbstractDryLand
@@ -12,6 +14,9 @@ model_class(model::AbstractLand) = model_class(typeof(model))
 model_type(::Type{<:AbstractWetLand}) = LandModel
 model_type(::Type{<:AbstractDryLand}) = DryLandModel
 model_type(model::AbstractLand) = model_type(typeof(model))
+
+@inline get_soil_layers(model::AbstractLand) = model.geometry.nlayers
+@inline get_soil_layers(::Nothing) = 0 # fallback
 
 function Base.show(io::IO, M::AbstractLand)
     println(io, "$(model_type(M)) <: $(model_class(M))")
@@ -30,17 +35,17 @@ end
 export LandModel
 @parameterized @kwdef mutable struct LandModel{G, TD, T, SM, SN, V, R} <: AbstractWetLand
     spectral_grid::SpectralGrid
-    @component geometry::G = LandGeometry(spectral_grid)
-    @component thermodynamics::TD = LandThermodynamics(spectral_grid)
-    @component temperature::T = LandBucketTemperature(spectral_grid)
-    @component soil_moisture::SM = LandBucketMoisture(spectral_grid)
-    @component snow::SN = SnowModel(spectral_grid)
-    @component vegetation::V = VegetationClimatology(spectral_grid)
+    @component geometry::G = LandGeometry(spectral_grid, nlayers = DEFAULT_NLAYERS_SOIL)
+    @component thermodynamics::TD = LandThermodynamics(spectral_grid, geometry)
+    @component temperature::T = LandBucketTemperature(spectral_grid, geometry)
+    @component soil_moisture::SM = LandBucketMoisture(spectral_grid, geometry)
+    @component snow::SN = SnowModel(spectral_grid, geometry)
+    @component vegetation::V = VegetationClimatology(spectral_grid, geometry)
     @component rivers::R = nothing
 end
 
-# also allow spectral grid to be passed on as first an only positional argument to model constructors
-(L::Type{<:AbstractLand})(SG::SpectralGrid; kwargs...) = L(spectral_grid = SG; kwargs...)
+# also allow spectral grid to be passed on as first an only positional argument to model constructors and nlayers to be passed as keyword argument directly to the constructor
+(L::Type{<:AbstractLand})(SG::SpectralGrid; nlayers = DEFAULT_NLAYERS_SOIL, kwargs...) = L(spectral_grid = SG, geometry = LandGeometry(SG, nlayers = nlayers); kwargs...)
 
 # initializing the land model initializes its components
 function initialize!(
@@ -68,9 +73,9 @@ variables(land::LandModel) = (
 export DryLandModel
 @parameterized @kwdef struct DryLandModel{G, TD, T} <: AbstractDryLand
     spectral_grid::SpectralGrid
-    @component geometry::G = LandGeometry(spectral_grid)
-    @component thermodynamics::TD = LandThermodynamics(spectral_grid)
-    @component temperature::T = LandBucketTemperature(spectral_grid)
+    @component geometry::G = LandGeometry(spectral_grid, nlayers = DEFAULT_NLAYERS_SOIL)
+    @component thermodynamics::TD = LandThermodynamics(spectral_grid, geometry)
+    @component temperature::T = LandBucketTemperature(spectral_grid, geometry)
 end
 
 function initialize!(land::DryLandModel, model::PrimitiveEquation)

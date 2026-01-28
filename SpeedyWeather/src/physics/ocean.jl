@@ -272,10 +272,10 @@ Fields and options are
 $(TYPEDFIELDS)"""
 @parameterized @kwdef struct AquaPlanet{NF} <: AbstractOcean
     "[OPTION] Temperature on the Equator [K]"
-    @param temp_equator::NF = 302 (bounds=Positive,)
+    @param temp_equator::NF = 302 (bounds = Positive,)
 
     "[OPTION] Temperature at the poles [K]"
-    @param temp_poles::NF = 273 (bounds=Positive,)
+    @param temp_poles::NF = 273 (bounds = Positive,)
 
     "[OPTION] Mask the sea surface temperature according to model.land_sea_mask?"
     mask::Bool = true
@@ -319,7 +319,7 @@ export SlabOcean
     specific_heat_capacity::NF = 4184
 
     "[OPTION] Average mixed-layer depth [m]"
-    @param mixed_layer_depth::NF = 50 (bounds=Positive,)
+    @param mixed_layer_depth::NF = 50 (bounds = Positive,)
 
     "[OPTION] Density of water [kg/m³]"
     density::NF = 1000

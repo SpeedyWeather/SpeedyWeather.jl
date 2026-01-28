@@ -21,7 +21,7 @@ The life of every SpeedyWeather.jl simulation starts with a `SpectralGrid` objec
 A `SpectralGrid` defines the physical domain of the simulation and its discretization.
 This domain has to be a sphere because of the spherical harmonics, but it can have a different radius.
 The discretization is for spectral, grid-point space and the vertical as this determines the size of many
-arrays for preallocation, for which als the number format is essential to know.
+arrays for preallocation, for which also the number format is essential to know.
 That's why `SpectralGrid` is the beginning of every SpeedyWeather.jl simulation and that is why
 it has to be passed on to (most) model components.
 

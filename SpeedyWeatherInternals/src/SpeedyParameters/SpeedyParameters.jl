@@ -29,4 +29,4 @@ export @parameterized, parameters, parameterof, reconstruct, stripparams, attrib
 
 include("parameters.jl")
 
-end 
+end

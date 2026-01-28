@@ -1,7 +1,7 @@
 function init_shortwave_state!(diagn, model)
     diagn.grid.temp_grid_prev .= 280
-    diagn.grid.humid_grid_prev .= 1e-3
-    diagn.grid.pres_grid_prev .= 1e5
+    diagn.grid.humid_grid_prev .= 1.0e-3
+    diagn.grid.pres_grid_prev .= 1.0e5
     diagn.physics.cloud_top .= model.spectral_grid.nlayers + 1
     diagn.physics.rain_rate .= 0
     diagn.physics.ocean.albedo .= 0.5

@@ -16,13 +16,13 @@ prognostic variable, also modifies sea surface temperature as
 cooling below freezing grows sea ice. Fields are $(TYPEDFIELDS)"""
 @parameterized @kwdef mutable struct ThermodynamicSeaIce{NF} <: AbstractSeaIce
     "[OPTION] Freezing temperature of sea water [K]"
-    @param temp_freeze::NF = 273.15 - 1.8 (bounds=Positive,)
+    @param temp_freeze::NF = 273.15 - 1.8 (bounds = Positive,)
 
     "[OPTION] Melting rate of sea ice [m²/m²/s/K]"
-    @param melt_rate::NF = 1.0e-6 (bounds=Nonnegative,)
+    @param melt_rate::NF = 1.0e-6 (bounds = Nonnegative,)
 
     "[OPTION] Freezing rate of sea ice [m²/m²/K]"
-    @param freeze_rate::NF = 0.1 (bounds=Nonnegative,)
+    @param freeze_rate::NF = 0.1 (bounds = Nonnegative,)
 end
 
 ThermodynamicSeaIce(SG::SpectralGrid; kwargs...) = ThermodynamicSeaIce{SG.NF}(; kwargs...)

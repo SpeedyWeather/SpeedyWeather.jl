@@ -8,7 +8,7 @@
             L = randn(complex(NF), spectrum, nlayers)
 
             # one more degree that shouldbe ignored
-            spectrum2 = Spectrum(trunc, one_degree_more=true)
+            spectrum2 = Spectrum(trunc, one_degree_more = true)
             L2 = randn(complex(NF), spectrum2, nlayers)
 
             # make trunc x trunc identical random numbers

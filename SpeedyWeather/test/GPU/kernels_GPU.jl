@@ -38,4 +38,4 @@ import KernelAbstractions: KernelAbstractions, @kernel
         # Verify results
         @test A ≈ expected
     end
-end 
+end

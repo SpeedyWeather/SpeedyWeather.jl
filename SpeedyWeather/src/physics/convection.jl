@@ -389,16 +389,16 @@ $(TYPEDFIELDS)"""
     time_scale::Second = Hour(12)
 
     "[OPTION] Pressure of maximum heating [hPa]"
-    @param p₀::NF = 525 (bounds=Positive,)
+    @param p₀::NF = 525 (bounds = Positive,)
 
     "[OPTION] Vertical extent of heating [hPa]"
-    @param σₚ::NF = 200 (bounds=Positive,)
+    @param σₚ::NF = 200 (bounds = Positive,)
 
     "[OPTION] Latitude of heating [˚N]"
-    @param θ₀::NF = 0 (bounds=-90..90,)
+    @param θ₀::NF = 0 (bounds = -90 .. 90,)
 
     "[OPTION] Latitudinal width of heating [˚]"
-    @param σθ::NF = 20 (bounds=Positive,)
+    @param σθ::NF = 20 (bounds = Positive,)
 
     "[DERIVED] Latitudinal mask"
     lat_mask::VectorType

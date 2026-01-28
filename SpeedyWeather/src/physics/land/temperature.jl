@@ -36,7 +36,7 @@ end
 # Adapt.adapt_structure(to, temp::SeasonalLandTemperature) = adapt(to, ManualSeasonalLandTemperature(temp.monthly_temperature))
 
 # generator function
-function SeasonalLandTemperature(SG::SpectralGrid; kwargs...)
+function SeasonalLandTemperature(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothing; kwargs...)
     (; NF, GridVariable3D, grid) = SG
     monthly_temperature = zeros(GridVariable3D, grid, 12)  # 12 months
     return SeasonalLandTemperature{NF, GridVariable3D}(; monthly_temperature, kwargs...)
@@ -137,14 +137,14 @@ end
 export ConstantLandTemperature
 @parameterized @kwdef struct ConstantLandTemperature{NF} <: AbstractLandTemperature
     "[OPTION] Globally constant temperature"
-    @param temperature::NF = 285 (bounds=Positive,)
+    @param temperature::NF = 285 (bounds = Positive,)
 
     "[OPTION] Apply land-sea mask to NaN ocean-only points?"
     mask::Bool = true
 end
 
 # generator function
-ConstantLandTemperature(SG::SpectralGrid; kwargs...) = ConstantLandTemperature{SG.NF}(; kwargs...)
+ConstantLandTemperature(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothing; kwargs...) = ConstantLandTemperature{SG.NF}(; kwargs...)
 
 initialize!(land::ConstantLandTemperature, model::PrimitiveEquation) = nothing
 function initialize!(
@@ -181,11 +181,11 @@ end
 Adapt.@adapt_structure LandBucketTemperature
 
 # generator function
-LandBucketTemperature(SG::SpectralGrid; kwargs...) = LandBucketTemperature{SG.NF}(; kwargs...)
+LandBucketTemperature(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothing; kwargs...) = LandBucketTemperature{SG.NF}(; kwargs...)
 function initialize!(land::LandBucketTemperature, model::PrimitiveEquation)
-    (; nlayers_soil) = model.spectral_grid
-    @assert nlayers_soil == 2 "LandBucketTemperature only works with 2 soil layers " *
-        "but spectral_grid.nlayers_soil = $nlayers_soil given. Ignoring additional layers."
+    nlayers = get_soil_layers(model)
+    @assert nlayers == 2 "LandBucketTemperature only works with 2 soil layers " *
+        "but geometry.nlayers = $nlayers given. Ignoring additional layers."
     return nothing
 end
 
@@ -196,7 +196,7 @@ function initialize!(
         model::PrimitiveEquation,
     )
     # create a seasonal model, initialize it and the variables
-    seasonal_model = SeasonalLandTemperature(model.spectral_grid)
+    seasonal_model = SeasonalLandTemperature(model.spectral_grid, model.land.geometry)
     initialize!(seasonal_model, model)
     initialize!(progn, diagn, seasonal_model, model)
     # (seasonal model will be garbage collected hereafter)
