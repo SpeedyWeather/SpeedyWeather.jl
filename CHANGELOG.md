@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Particle advection GPU ready [#897](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/897)
 - Enzyme compat relaxed as Enzyme bug was fixed and uv_from_vordiv! kernel version used on CPU as well [#971](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/971)
 - GitHub Actions: Cache updated [#945](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/945)
 - The number of soil layers is now solely defined by the land model and not in the `SpectralGrid` anymore [#898](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/898)   
