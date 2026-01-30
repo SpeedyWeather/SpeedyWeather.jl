@@ -62,7 +62,7 @@ benchmarks[:benchmark203] = BenchmarkSuiteModel(
 )
 
 
-benchmarks[:benchmark300] = BenchmarkSuiteDynamics(
+benchmarks[:benchmark300] = BenchmarkSuiteDynamicsGPU(
     title = "PrimitiveWet dynamical core benchmarks, matrix transform CPU",
     nruns = 2,
     trunc = [63, 127],
@@ -72,7 +72,7 @@ benchmarks[:benchmark300] = BenchmarkSuiteDynamics(
     model = fill(CPU(), 5),
 )
 
-benchmarks[:benchmark301] = BenchmarkSuiteDynamics(
+benchmarks[:benchmark301] = BenchmarkSuiteDynamicsGPU(
     title = "PrimitiveWet dynamical core benchmarks, matrix transform GPU",
     nruns = 2,
     trunc = [63, 127],
@@ -82,7 +82,7 @@ benchmarks[:benchmark301] = BenchmarkSuiteDynamics(
     model = fill(GPU(), 5),
 )
 
-benchmarks[:benchmark302] = BenchmarkSuiteDynamics(
+benchmarks[:benchmark302] = BenchmarkSuiteDynamicsGPU(
     title = "PrimitiveWet dynamical core benchmarks, FFT+LT transform CPU",
     nruns = 2,
     trunc = [63, 127],
@@ -92,7 +92,7 @@ benchmarks[:benchmark302] = BenchmarkSuiteDynamics(
     model = fill(CPU(), 5),
 )
 
-benchmarks[:benchmark303] = BenchmarkSuiteDynamics(
+benchmarks[:benchmark303] = BenchmarkSuiteDynamicsGPU(
     title = "PrimitiveWet dynamical core benchmarks, FFT+LT transform GPU",
     nruns = 2,
     trunc = [63, 127],

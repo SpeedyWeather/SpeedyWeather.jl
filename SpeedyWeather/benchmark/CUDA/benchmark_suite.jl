@@ -123,7 +123,7 @@ function run_benchmark_suite!(suite::BenchmarkSuiteModel)
     return suite
 end
 
-@kwdef mutable struct BenchmarkSuiteDynamics <: AbstractBenchmarkSuiteTimed
+@kwdef mutable struct BenchmarkSuiteDynamicsGPU <: AbstractBenchmarkSuiteTimed
     title::String
     nruns::Int = 1
     model::Vector = fill(SpeedyWeather.CPU, nruns)
@@ -139,7 +139,7 @@ end
     allocs::Vector{Vector{Int}} = [fill(0, length(function_names)) for i in 1:nruns]
 end
 
-function run_benchmark_suite!(suite::BenchmarkSuiteDynamics)
+function run_benchmark_suite!(suite::BenchmarkSuiteDynamicsGPU)
 
     for i in 1:suite.nruns
         NF = suite.NF[i]
