@@ -269,10 +269,10 @@ function SpectralTransform(
         kwargs...
     )
     @assert ismatching(architecture(field), architecture(coeffs)) "Architectures of field and coeffs do not match."
-    
+
     # infer types for SpectralTransform
     NF = promote_type(real(eltype(field)), real(eltype(coeffs)))
-    
+
     # get resolution
     (; spectrum) = coeffs
     (; grid) = field

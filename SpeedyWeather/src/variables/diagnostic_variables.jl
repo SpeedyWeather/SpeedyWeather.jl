@@ -314,7 +314,7 @@ Generator function."""
 function ParticleVariables(SG::SpectralGrid)
     (; architecture, nparticles, NF, ParticleVector) = SG
 
-    # TODO: CPU Fallback needed for Reactant 
+    # TODO: CPU Fallback needed for Reactant
     if typeof(architecture) <: ReactantDevice
         VectorNF = array_type(CPU(), NF, 1)
         locator = RingGrids.AnvilLocator(NF, nparticles; architecture = CPU())
@@ -407,7 +407,7 @@ struct DiagnosticVariables{
             GridVariable3D,         # <: AbstractField
             SpectralTracerTuple,    # <: NamedTuple{Symbol, SpectralVariable3D}
             GridTracerTuple,        # <: NamedTuple{Symbol, GridVariable3D}
-            ParticleVariable,       # 
+            ParticleVariable,       #
             VectorType,             # <: AbstractVector
             PhysicsTuple,
             ScratchMemoryType,      # <: ArrayType{Complex{NF}, 3}

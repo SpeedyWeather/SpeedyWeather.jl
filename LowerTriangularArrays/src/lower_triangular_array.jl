@@ -787,7 +787,7 @@ function KernelAbstractions.get_backend(
     return KernelAbstractions.get_backend(a.data)
 end
 
-Adapt.parent_type(::Type{<:LowerTriangularArray{T,N,ArrayType}}) where {T,N,ArrayType} = ArrayType
+Adapt.parent_type(::Type{<:LowerTriangularArray{T, N, ArrayType}}) where {T, N, ArrayType} = ArrayType
 Adapt.adapt_structure(to, L::LowerTriangularArray) = Adapt.adapt(to, L.data)
 
 Architectures.architecture(L::LowerTriangularArray) = architecture(L.spectrum)

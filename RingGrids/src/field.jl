@@ -526,7 +526,7 @@ function KernelAbstractions.get_backend(
     return KernelAbstractions.get_backend(field.data)
 end
 
-Adapt.parent_type(::Type{<:Field{T,N,ArrayType}}) where {T,N,ArrayType} = ArrayType
+Adapt.parent_type(::Type{<:Field{T, N, ArrayType}}) where {T, N, ArrayType} = ArrayType
 Adapt.adapt_structure(to, field::AbstractField) = Adapt.adapt(to, field.data)
 
 Architectures.architecture(field::AbstractField) = architecture(field.grid)
