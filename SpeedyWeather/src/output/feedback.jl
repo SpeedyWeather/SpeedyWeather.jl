@@ -57,6 +57,9 @@ function initialize!(feedback::Feedback, clock::Clock, model::AbstractModel)
     return feedback.progress_meter = ProgressMeter.Progress(clock.n_timesteps - 1; enabled = verbose, showspeed, desc)
 end
 
+# fallback if feedback is set to nothing 
+initialize!(::Nothing, clock::Clock, model::AbstractModel) = nothing
+
 progress!(feedback::Feedback) = ProgressMeter.next!(feedback.progress_meter)
 
 function progress!(feedback::Feedback, progn::PrognosticVariables)
