@@ -289,10 +289,10 @@ function initialize!(
 
     # DEFINE NETCDF DIMENSIONS SPACE
     # explictly move to CPU to avoid issues with Reactant and on GPU
-    lond = on_architecture(CPU(), get_lond(output.field2D))
-    latd = on_architecture(CPU(), get_latd(output.field2D))
+    lond = get_lond(output.field2D)
+    latd = get_latd(output.field2D)
     σ = on_architecture(CPU(), model.geometry.σ_levels_full)
-    soil_indices = on_architecture(CPU(), collect(1:get_soil_layers(model)))
+    soil_indices = collect(1:get_soil_layers(model))
 
     defVar(dataset, "lon", lond, ("lon",), attrib = Dict("units" => "degrees_east", "long_name" => "longitude"))
     defVar(dataset, "lat", latd, ("lat",), attrib = Dict("units" => "degrees_north", "long_name" => "latitude"))

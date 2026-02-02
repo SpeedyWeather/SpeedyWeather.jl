@@ -4,7 +4,7 @@ using KernelAbstractions
 using SpeedyWeatherInternals
 using Reactant
 
-import SpeedyWeatherInternals.Architectures: Architectures, ReactantDevice, array_type, architecture, on_architecture, compatible_array_types, nonparametric_type, device
+import SpeedyWeatherInternals.Architectures: Architectures, CPU, ReactantDevice, array_type, architecture, on_architecture, compatible_array_types, nonparametric_type, device
 
 # grab the proper KernelAbstractions backend for Reactant
 const ReactantKernelAbstractionsExt = Base.get_extension(

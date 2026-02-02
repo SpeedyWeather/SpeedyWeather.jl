@@ -138,19 +138,16 @@ nonparametric_type(::Type{<:Array}) = Array
 nonparametric_type(::Type{<:SubArray{T, N, A}}) where {T, N, A} = nonparametric_type(A)
 nonparametric_type(::Type{<:SubArray}) = SubArray   # if ArrayType A is not specified, return SubArray
 
-# Fallback
-"""
-    on_architecture(arch::AbstractArchitecture, a)
-
-Return `a`, but on the architecture `arch`. 
-"""
-on_architecture(arch, a) = a
-
 # Tupled implementation
 on_architecture(arch::AbstractArchitecture, t::Tuple) = Tuple(on_architecture(arch, elem) for elem in t)
 on_architecture(arch::AbstractArchitecture, nt::NamedTuple) = NamedTuple{keys(nt)}(on_architecture(arch, Tuple(nt)))
 
 # On architecture for array types
+"""
+    on_architecture(arch::AbstractArchitecture, a)
+
+Return `a`, but on the architecture `arch`. 
+"""
 on_architecture(::CPU, a::Array) = a
 on_architecture(::CPU, a::BitArray) = a
 on_architecture(::CPU, a::SubArray{<:Any, <:Any, <:Array}) = a
