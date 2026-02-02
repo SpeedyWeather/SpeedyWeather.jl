@@ -239,7 +239,7 @@ Initialize NetCDF `output` by creating a netCDF file and storing the initial con
 of `diagn` (and `progn`). To be called just before the first timesteps."""
 function initialize!(
         output::NetCDFOutput,
-        feedback::AbstractFeedback,
+        feedback::Union{AbstractFeedback, Nothing},
         progn::PrognosticVariables,
         diagn::DiagnosticVariables,
         model::AbstractModel,
