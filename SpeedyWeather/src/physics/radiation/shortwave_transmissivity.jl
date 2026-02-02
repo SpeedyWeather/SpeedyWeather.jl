@@ -44,12 +44,14 @@ $(TYPEDFIELDS)."""
     # Weighted visible + near-IR: 0.95*0.033 + 0.05*0.0 = 0.03135 (SPEEDY absaer, fband weights)
     @param absorptivity_aerosol::NF = 0.03135 (bounds = 0 .. 1,)
 
-    "[OPTION] Absorptivity of water vapor [per kg/kg per 10^5 Pa]"
     # Weighted visible + near-IR: 0.95*0.022 + 0.05*15.0*0.2 = 0.171 per g/kg → 1.7e-4 per kg/kg (SPEEDY abswv1, abswv2)
+    # Value chosen following PR #974 for a ~75W/m^2 shortwave absorption target
+    "[OPTION] Absorptivity of water vapor [per kg/kg per 10^5 Pa]"
     @param absorptivity_water_vapor::NF = 75 (bounds = 0 .. 1,)
-    "[OPTION] Base cloud absorptivity [per kg/kg per 10^5 Pa]"
+    
     # Weighted visible band: 0.95*0.015 = 0.014 per g/kg → 1.4e-5 per kg/kg (SPEEDY abscl1)
-    @param absorptivity_cloud_base::NF = 15.0 (bounds = 0 .. 1,)
+    "[OPTION] Base cloud absorptivity [per kg/kg per 10^5 Pa]"
+    @param absorptivity_cloud_base::NF = 15 (bounds = 0 .. 1,)
 
     "[OPTION] Maximum cloud absorptivity [per 10^5 Pa]"
     # Weighted one-band scaling: 0.95*0.15 = 0.1425 → rounded to 0.14 (SPEEDY abscl2)
