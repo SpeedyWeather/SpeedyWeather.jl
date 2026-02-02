@@ -46,10 +46,10 @@ $(TYPEDFIELDS)."""
 
     "[OPTION] Absorptivity of water vapor [per kg/kg per 10^5 Pa]"
     # Weighted visible + near-IR: 0.95*0.022 + 0.05*15.0*0.2 = 0.171 per g/kg → 1.7e-4 per kg/kg (SPEEDY abswv1, abswv2)
-    @param absorptivity_water_vapor::NF = 0.00017 (bounds = 0 .. 1,)
+    @param absorptivity_water_vapor::NF = 75 (bounds = 0 .. 1,)
     "[OPTION] Base cloud absorptivity [per kg/kg per 10^5 Pa]"
     # Weighted visible band: 0.95*0.015 = 0.014 per g/kg → 1.4e-5 per kg/kg (SPEEDY abscl1)
-    @param absorptivity_cloud_base::NF = 0.000014 (bounds = 0 .. 1,)
+    @param absorptivity_cloud_base::NF = 15.0 (bounds = 0 .. 1,)
 
     "[OPTION] Maximum cloud absorptivity [per 10^5 Pa]"
     # Weighted one-band scaling: 0.95*0.15 = 0.1425 → rounded to 0.14 (SPEEDY abscl2)
