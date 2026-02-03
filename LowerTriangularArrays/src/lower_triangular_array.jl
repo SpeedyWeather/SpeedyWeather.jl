@@ -778,7 +778,7 @@ function Base.similar(
         ::Type{T},
     ) where {N, ArrayType, S, T}
     L = find_L(bc)
-    return LowerTriangularArray{T, N, ArrayType{T, N}, S}(similar(L.data, T), L.spectrum)
+    return LowerTriangularArray{T, N, array_type(GPU(), T, N), S}(similar(L.data, T), L.spectrum)
 end
 
 function KernelAbstractions.get_backend(
