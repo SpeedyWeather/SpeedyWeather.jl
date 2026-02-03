@@ -1,3 +1,39 @@
+## ENTRAINMENT PROFILES
+abstract type AbstractEntrainment <: AbstractParameterization end
+
+export LinearEntrainment, ConstantEntrainment
+
+"""Linear entrainment profile: entrainment rate decreases linearly from surface to a given sigma level.
+At surface (σ=1), entrainment equals `surface_entrainment`. At `σ_entrainment`, entrainment becomes zero.
+Above (σ < σ_entrainment), entrainment is zero. Fields are $(TYPEDFIELDS)"""
+@kwdef struct LinearEntrainment{NF} <: AbstractEntrainment
+    "[OPTION] Sigma level at which entrainment becomes zero [1]"
+    σ_entrainment::NF = 0.5
+
+    "[OPTION] Entrainment rate at surface [1]"
+    surface_entrainment::NF = 0.5
+end
+
+Adapt.@adapt_structure LinearEntrainment
+LinearEntrainment(SG::SpectralGrid; kwargs...) = LinearEntrainment{SG.NF}(; kwargs...)
+
+"""$(TYPEDSIGNATURES) Entrainment rate at sigma level σ for linear profile."""
+@inline (E::LinearEntrainment)(σ) = E.surface_entrainment * max(0, σ - E.σ_entrainment) / (1 - E.σ_entrainment)
+
+"""Constant entrainment profile: entrainment rate is constant at all levels.
+Fields are $(TYPEDFIELDS)"""
+@kwdef struct ConstantEntrainment{NF} <: AbstractEntrainment
+    "[OPTION] Constant entrainment rate [1]"
+    entrainment_rate::NF = 0.2
+end
+
+Adapt.@adapt_structure ConstantEntrainment
+ConstantEntrainment(SG::SpectralGrid; kwargs...) = ConstantEntrainment{SG.NF}(; kwargs...)
+
+"""$(TYPEDSIGNATURES) Entrainment rate at sigma level σ for constant profile."""
+@inline (E::ConstantEntrainment)(σ) = E.entrainment_rate
+
+## CONVECTION SCHEMES
 abstract type AbstractConvection <: AbstractParameterization end
 
 export BettsMillerConvection
@@ -5,18 +41,22 @@ export BettsMillerConvection
 """The simplified Betts-Miller convection scheme from Frierson, 2007,
 https://doi.org/10.1175/JAS3935.1. This implements the qref-formulation
 in their paper. Fields and options are $(TYPEDFIELDS)"""
-@parameterized @kwdef struct BettsMillerConvection{NF} <: AbstractConvection
+@parameterized @kwdef struct BettsMillerConvection{NF, Entrainment <: AbstractEntrainment} <: AbstractConvection
     "[OPTION] Relaxation time for profile adjustment"
     time_scale::Second = Hour(4)
 
     "[OPTION] Relative humidity for reference profile [1]"
     @param relative_humidity::NF = 0.7
+
+    "[OPTION] Entrainment profile for mixing environmental air into the rising parcel"
+    @component entrainment::Entrainment = LinearEntrainment{NF}()
 end
 
 Adapt.@adapt_structure BettsMillerConvection
 
 # generator function
-BettsMillerConvection(SG::SpectralGrid; kwargs...) = BettsMillerConvection{SG.NF}(; kwargs...)
+BettsMillerConvection(SG::SpectralGrid; entrainment = LinearEntrainment(SG), kwargs...) =
+    BettsMillerConvection{SG.NF, typeof(entrainment)}(; entrainment, kwargs...)
 initialize!(::BettsMillerConvection, ::PrimitiveEquation) = nothing
 
 # function barrier
@@ -59,7 +99,8 @@ and relaxes current vertical profiles to the adjusted references."""
     humid_ref_profile = diagn.dynamics.b_grid   # specific humidity [kg/kg] profile to adjust to
 
     # CONVECTIVE CRITERIA AND FIRST GUESS RELAXATION
-    level_zero_buoyancy = pseudo_adiabat!(ij, temp_ref_profile, temp, humid, geopotential, pₛ, σ, atmosphere)
+    entrainment = convection.entrainment
+    level_zero_buoyancy = pseudo_adiabat!(ij, temp_ref_profile, temp, humid, geopotential, pₛ, σ, atmosphere, entrainment)
 
     for k in level_zero_buoyancy:nlayers
         qsat = saturation_humidity(temp_ref_profile[ij, k], pₛ * σ[k], atmosphere)
@@ -179,7 +220,8 @@ set to NaN instead and should be skipped in the relaxation."""
         geopotential,
         pres,
         σ,
-        atmosphere
+        atmosphere,
+        entrainment::AbstractEntrainment,
     )
     NF = eltype(temp_ref_profile)             # number format
     nlayers = length(σ)                       # number of vertical layers
@@ -228,6 +270,12 @@ set to NaN instead and should be skipped in the relaxation."""
             # at new (lower) temperature condensation occurs immediately
             # new humidity equals to that saturation humidity
             humid_parcel = saturation_humidity(temp_parcel, σ[k] * pres, atmosphere)
+
+            # Entrainment: mix rising parcel with environmental air
+            # This dilutes the parcel, reducing buoyancy and limiting convection depth
+            ε = entrainment(σ[k])
+            temp_parcel = (1 - ε) * temp_parcel + ε * temp_environment[ij, k]
+            humid_parcel = (1 - ε) * humid_parcel + ε * humid_environment[ij, k]
         else
             temp_parcel = temp_parcel_dry       # else parcel temperature following dry adiabat
         end
@@ -389,16 +437,16 @@ $(TYPEDFIELDS)"""
     time_scale::Second = Hour(12)
 
     "[OPTION] Pressure of maximum heating [hPa]"
-    @param p₀::NF = 525 (bounds = Positive,)
+    @param p₀::NF = 525 (bounds=Positive,)
 
     "[OPTION] Vertical extent of heating [hPa]"
-    @param σₚ::NF = 200 (bounds = Positive,)
+    @param σₚ::NF = 200 (bounds=Positive,)
 
     "[OPTION] Latitude of heating [˚N]"
-    @param θ₀::NF = 0 (bounds = -90 .. 90,)
+    @param θ₀::NF = 0 (bounds=-90..90,)
 
     "[OPTION] Latitudinal width of heating [˚]"
-    @param σθ::NF = 20 (bounds = Positive,)
+    @param σθ::NF = 20 (bounds=Positive,)
 
     "[DERIVED] Latitudinal mask"
     lat_mask::VectorType
