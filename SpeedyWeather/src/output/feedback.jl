@@ -72,6 +72,9 @@ $(TYPEDSIGNATURES)
 Finalises the progress meter and the progress txt file."""
 finalize!(F::Feedback) = ProgressMeter.finish!(F.progress_meter)
 
+# fallback if feedback is set to nothing 
+finalize!(::Nothing) = nothing
+
 """$(TYPEDSIGNATURES)
 Detect NaN (Not-a-Number, or Inf) in the prognostic variables."""
 function nan_detection!(feedback::Feedback, progn::PrognosticVariables)

@@ -315,7 +315,7 @@ function timestep!(
         lf1::Integer = 2,               # leapfrog index 1 (dis/enables Robert+Williams filter)
         lf2::Integer = 2,               # leapfrog index 2 (time step used for tendencies)
     )
-    model.feedback.nans_detected && return nothing  # exit immediately if NaNs/Infs already present
+    (!isnothing(model.feedback) && model.feedback.nans_detected) && return nothing  # exit immediately if NaNs/Infs already present
 
     # set the tendencies back to zero for accumulation
     fill!(diagn.tendencies, 0, Barotropic)
