@@ -41,8 +41,8 @@ export LearnedSurfaceRoughness
     # Ocean normalisation parameters
     ocean_input_means::Vector{NF} = Float32[0.19490805, 0.11980359, 7.7569385]
     ocean_input_stds::Vector{NF} = Float32[6.6221075, 5.4018555, 3.5962458]
-    ocean_output_mean::NF = -9.1571865
-    ocean_output_std::NF = 1.0090618
+    ocean_output_mean::NF = -9.1571865f0
+    ocean_output_std::NF = 1.0090618f0
 
     # Land normalisation parameters
     land_input_means::Vector{NF} = Float32[
@@ -57,8 +57,8 @@ export LearnedSurfaceRoughness
         8.05910187e+1, 1.13503149e+3, 3.34448814e+1, 1.26479045e-1,
         9.95290726e-2,
     ]
-    land_output_mean::NF = -5.031811
-    land_output_std::NF = 2.4447718
+    land_output_mean::NF = -5.031811f0
+    land_output_std::NF = 2.4447718f0
 
     land_input_buffer::Vector{Float32} = zeros(Float32, 13)
 
