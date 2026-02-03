@@ -474,7 +474,7 @@ find_field(::Any, rest) = find_field(rest)
 # allocation for broadcasting via similar, reusing grid from the first field of the broadcast arguments
 # e.g. field1 + field2 creates a new field that share the grid of field1
 # 2 .+ field1 creates a new field that share the grid of field1
-function Base.similar(bc::Broadcasted{FieldStyle{N}}, ::Type{T}) where {N, T}
+function Base.similar(bc::Broadcasted{FieldStyle{N, Grid}}, ::Type{T}) where {N, Grid, T}
     field = find_field(bc)
     return similar(field, T)
 end
@@ -499,7 +499,7 @@ function Base.BroadcastStyle(
     return FieldGPUStyle{N, Grid}()
 end
 
-function Base.similar(bc::Broadcasted{FieldGPUStyle{N}}, ::Type{T}) where {N, T}
+function Base.similar(bc::Broadcasted{FieldGPUStyle{N, Grid}}, ::Type{T}) where {N, Grid, T}
     field = find_field(bc)
     return similar(field, T)
 end
@@ -507,12 +507,12 @@ end
 # ::Val{0} for broadcasting with 0-dimensional, ::Val{1} for broadcasting with vectors, etc
 # when there's a dimension mismatch always choose the larger dimension
 FieldGPUStyle{N, Grid}(::Val{N}) where {N, Grid} = FieldGPUStyle{N, Grid}()
-FieldGPUStyle{1, Grid}(::Val{2}) where Grid = FieldGPUStyle{2, Grid}()
-FieldGPUStyle{1, Grid}(::Val{0}) where Grid = FieldGPUStyle{1, Grid}()
-FieldGPUStyle{2, Grid}(::Val{3}) where Grid = FieldGPUStyle{3, Grid}()
-FieldGPUStyle{2, Grid}(::Val{1}) where Grid = FieldGPUStyle{2, Grid}()
-FieldGPUStyle{3, Grid}(::Val{4}) where Grid = FieldGPUStyle{4, Grid}()
-FieldGPUStyle{3, Grid}(::Val{2}) where Grid = FieldGPUStyle{2, Grid}()
+FieldGPUStyle{1, Grid}(::Val{2}) where {Grid} = FieldGPUStyle{2, Grid}()
+FieldGPUStyle{1, Grid}(::Val{0}) where {Grid} = FieldGPUStyle{1, Grid}()
+FieldGPUStyle{2, Grid}(::Val{3}) where {Grid} = FieldGPUStyle{3, Grid}()
+FieldGPUStyle{2, Grid}(::Val{1}) where {Grid} = FieldGPUStyle{2, Grid}()
+FieldGPUStyle{3, Grid}(::Val{4}) where {Grid} = FieldGPUStyle{4, Grid}()
+FieldGPUStyle{3, Grid}(::Val{2}) where {Grid} = FieldGPUStyle{2, Grid}()
 
 function KernelAbstractions.get_backend(
         field::F
