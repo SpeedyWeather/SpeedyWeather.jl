@@ -116,8 +116,8 @@ function MatrixSpectralTransform(
         backward,
         backward_real,
         backward_imag,
-        scratch_memory,
         scratch_memory_old,
+        scratch_memory,
         gradients,
     )
 end
