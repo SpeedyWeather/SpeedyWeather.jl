@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fixed an issue with LowerTriangularArray broadcast on GPU [#975](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/975)
 - Particle advection GPU ready [#897](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/897)
 - Enzyme compat relaxed as Enzyme bug was fixed and uv_from_vordiv! kernel version used on CPU as well [#971](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/971)
 - GitHub Actions: Cache updated [#945](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/945)
