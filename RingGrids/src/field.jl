@@ -460,8 +460,8 @@ import Base.Broadcast: BroadcastStyle, Broadcasted, DefaultArrayStyle
 struct FieldStyle{N, Grid} <: Broadcast.AbstractArrayStyle{N} end
 
 # define broadcast style for Field from its parameters
-Base.BroadcastStyle(::Type{F}) where {F <: AbstractField{T, N, AT, Grid}} where {T, N, AT, Grid} =
-    FieldStyle{N, Grid}()
+Base.BroadcastStyle(::Type{F}) where {F <: AbstractField{T, N, ArrayType, Grid}} where {T, N, ArrayType, Grid} =
+    FieldStyle{N, nonparametric_type(Grid)}()
 
 # find a field within Broadcasted to reuse its grid
 find_field(bc::Base.Broadcast.Broadcasted) = find_field(bc.args)
@@ -476,18 +476,16 @@ find_field(::Any, rest) = find_field(rest)
 # 2 .+ field1 creates a new field that share the grid of field1
 function Base.similar(bc::Broadcasted{FieldStyle{N, Grid}}, ::Type{T}) where {N, Grid, T}
     field = find_field(bc)
-    return similar(field, T)
+    return nonparametric_type(typeof(field))(similar(field.data, T, axes(bc)), field.grid)
 end
 
 # ::Val{0} for broadcasting with 0-dimensional, ::Val{1} for broadcasting with vectors, etc
-# when there's a dimension mismatch always choose the larger dimension
+# when there's a dimension mismatch always choose the smaller dimension
 FieldStyle{N, Grid}(::Val{N}) where {N, Grid} = FieldStyle{N, Grid}()
 FieldStyle{1, Grid}(::Val{2}) where {Grid} = FieldStyle{2, Grid}()
 FieldStyle{1, Grid}(::Val{0}) where {Grid} = FieldStyle{1, Grid}()
 FieldStyle{2, Grid}(::Val{3}) where {Grid} = FieldStyle{3, Grid}()
-FieldStyle{2, Grid}(::Val{1}) where {Grid} = FieldStyle{2, Grid}()
 FieldStyle{3, Grid}(::Val{4}) where {Grid} = FieldStyle{4, Grid}()
-FieldStyle{3, Grid}(::Val{2}) where {Grid} = FieldStyle{2, Grid}()
 
 ## GPU (same but <: GPUArrays.AbstractGPUArrayStyle)
 struct FieldGPUStyle{N, Grid} <: GPUArrays.AbstractGPUArrayStyle{N} end
@@ -496,23 +494,21 @@ struct FieldGPUStyle{N, Grid} <: GPUArrays.AbstractGPUArrayStyle{N} end
 function Base.BroadcastStyle(
         ::Type{F}
     ) where {F <: AbstractField{T, N, ArrayType, Grid}} where {T, N, ArrayType <: GPUArrays.AbstractGPUArray, Grid}
-    return FieldGPUStyle{N, Grid}()
+    return FieldGPUStyle{N, nonparametric_type(Grid)}()
 end
 
 function Base.similar(bc::Broadcasted{FieldGPUStyle{N, Grid}}, ::Type{T}) where {N, Grid, T}
     field = find_field(bc)
-    return similar(field, T)
+    return nonparametric_type(typeof(field))(similar(field.data, T, axes(bc)), field.grid)
 end
 
 # ::Val{0} for broadcasting with 0-dimensional, ::Val{1} for broadcasting with vectors, etc
 # when there's a dimension mismatch always choose the larger dimension
 FieldGPUStyle{N, Grid}(::Val{N}) where {N, Grid} = FieldGPUStyle{N, Grid}()
 FieldGPUStyle{1, Grid}(::Val{2}) where {Grid} = FieldGPUStyle{2, Grid}()
-FieldGPUStyle{1, Grid}(::Val{0}) where {Grid} = FieldGPUStyle{1, Grid}()
+FieldGPUStyle{1, Grid}(::Val{0}) where {Grid} = FieldGPUStyle{2, Grid}()
 FieldGPUStyle{2, Grid}(::Val{3}) where {Grid} = FieldGPUStyle{3, Grid}()
-FieldGPUStyle{2, Grid}(::Val{1}) where {Grid} = FieldGPUStyle{2, Grid}()
 FieldGPUStyle{3, Grid}(::Val{4}) where {Grid} = FieldGPUStyle{4, Grid}()
-FieldGPUStyle{3, Grid}(::Val{2}) where {Grid} = FieldGPUStyle{2, Grid}()
 
 function KernelAbstractions.get_backend(
         field::F
