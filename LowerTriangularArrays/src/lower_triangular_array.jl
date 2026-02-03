@@ -726,8 +726,7 @@ lta_view(L::LowerTriangularMatrix, c::Colon) = LowerTriangularArray(view(L.data,
 lta_view(L::LowerTriangularArray, args...) = view(L, args...)   # fallback to normal view
 
 # Broadcast CPU/GPU
-import Base.Broadcast: BroadcastStyle, Broadcasted, DefaultArrayStyle
-import LinearAlgebra: isstructurepreserving, fzeropreserving
+import Base.Broadcast: BroadcastStyle, Broadcasted
 
 # CPU with scalar indexing
 struct LowerTriangularStyle{N} <: Broadcast.AbstractArrayStyle{N} end
@@ -735,7 +734,7 @@ struct LowerTriangularStyle{N} <: Broadcast.AbstractArrayStyle{N} end
 # GPU without scalar indexing
 struct LowerTriangularGPUStyle{N} <: GPUArrays.AbstractGPUArrayStyle{N} end
 
-function BroadcastStyle(::Type{LowerTriangularArray{T, N}}) where {T, N}
+function BroadcastStyle(::Type{LowerTriangularArray{T, N, ArrayType, S}}) where {T, N, ArrayType <: AbstractArray, S}
     return LowerTriangularStyle{N}()
 end
 
