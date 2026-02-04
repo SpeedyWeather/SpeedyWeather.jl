@@ -759,13 +759,16 @@ find_L(::Tuple{}) = nothing
 find_L(a::LowerTriangularArray, rest) = a
 find_L(::Any, rest) = find_L(rest)
 
+parent_or_not(x::Union{SubArray, Transpose}) = parent(x)
+parent_or_not(x) = x
+
 function Base.similar(
         bc::Broadcasted{LowerTriangularStyle{N}},
         ::Type{T},
     ) where {N, T}
     L = find_L(bc)
     # parent of broadcasted arrays is used because we don't want e.g. a view or transpose as a result
-    return nonparametric_type(typeof(L))(similar(parent(L.data), T, axes(bc)), L.spectrum)
+    return nonparametric_type(typeof(L))(similar(parent_or_not(L.data), T, axes(bc)), L.spectrum)
 end
 
 # same function as above, but needs to be defined for both CPU and GPU style
@@ -775,7 +778,7 @@ function Base.similar(
     ) where {N, T}
     L = find_L(bc)
     # parent of broadcasted arrays is used because we don't want e.g. a view or transpose as a result
-    return nonparametric_type(typeof(L))(similar(parent(L.data), T, axes(bc)), L.spectrum)
+    return nonparametric_type(typeof(L))(similar(parent_or_not(L.data), T, axes(bc)), L.spectrum)
 end
 
 function KernelAbstractions.get_backend(
