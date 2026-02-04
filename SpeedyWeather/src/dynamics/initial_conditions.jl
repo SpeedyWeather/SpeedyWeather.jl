@@ -161,7 +161,7 @@ export RandomVelocity
 
 """Start with random velocity as initial conditions
 $(TYPEDFIELDS)"""
-@kwdef mutable struct RandomVelocity{NF} <: AbstractInitialConditions
+@kwdef mutable struct RandomVelocity{NF, S, RNG} <: AbstractInitialConditions
     "[OPTION] maximum speed [ms⁻¹]"
     max_speed::NF = 60
 
@@ -169,13 +169,17 @@ $(TYPEDFIELDS)"""
     truncation::Int = 15
 
     "[OPTION] Random number generator seed, 0=randomly seed from Julia's GLOBAL_RNG"
-    seed::Int = 0
+    seed::S = 0
 
     "Independent random number generator for this random process"
-    random_number_generator::Random.Xoshiro = Random.Xoshiro(seed)
+    random_number_generator::RNG = Random.Xoshiro(seed)
 end
 
-RandomVelocity(SG::SpectralGrid; kwargs...) = RandomVelocity{SG.NF}(; kwargs...)
+function RandomVelocity(SG::SpectralGrid; kwargs...)
+    RNG = haskey(kwargs, :random_number_generator) ? typeof(kwargs[:random_number_generator]) : typeof(Random.Xoshiro())
+    SeedType = haskey(kwargs, :seed) ? typeof(kwargs[:seed]) : Int
+    return RandomVelocity{SG.NF, SeedType, RNG}(; kwargs...)
+end
 
 """$(TYPEDSIGNATURES)
 Start with random vorticity as initial conditions"""
