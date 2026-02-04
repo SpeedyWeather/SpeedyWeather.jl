@@ -6,12 +6,14 @@ using Dates, DocStringExtensions
 
 using SpeedyWeather: ReactantDevice, scale!, get_step, unpack, timestep!, first_timesteps!, later_timestep!
 
-const ReactantSimulation = Union{Simulation{<:BarotropicModel{SG,<:ReactantDevice}}, 
-Simulation{<:ShallowWaterModel{SG,<:ReactantDevice}}, Simulation{<:PrimitiveDryModel{SG,<:ReactantDevice}}, Simulation{<:PrimitiveWetModel{SG,<:ReactantDevice}}} where SG
+const ReactantSimulation = Union{
+    Simulation{<:BarotropicModel{SG, <:ReactantDevice}},
+    Simulation{<:ShallowWaterModel{SG, <:ReactantDevice}}, Simulation{<:PrimitiveDryModel{SG, <:ReactantDevice}}, Simulation{<:PrimitiveWetModel{SG, <:ReactantDevice}},
+} where {SG}
 
-# initialize a BarotropicModel with ReactantDevice, only use @jit on some parts 
+# initialize a BarotropicModel with ReactantDevice, only use @jit on some parts
 # TODO: might define a custom @jit_or_not macro for this to use in main code
-function SpeedyWeather.initialize!(model::BarotropicModel{SG,<:ReactantDevice}; time::DateTime = SpeedyWeather.DEFAULT_DATE) where {SG <: SpectralGrid}
+function SpeedyWeather.initialize!(model::BarotropicModel{SG, <:ReactantDevice}; time::DateTime = SpeedyWeather.DEFAULT_DATE) where {SG <: SpectralGrid}
     (; spectral_grid) = model
 
     spectral_grid.nlayers > 1 && @error "Only nlayers=1 supported for BarotropicModel, \
@@ -89,13 +91,13 @@ function SpeedyWeather.time_stepping!(simulation::ReactantSimulation, r_first_ti
         timestep!(simulation, r_first_timesteps!, r_later_timestep!)
     end
     return
-end   
+end
 
 function SpeedyWeather.timestep!(simulation::ReactantSimulation, r_first_timesteps! = nothing, r_later_timestep! = nothing)
     if isnothing(r_first_timesteps!)
         @info "Reactant compiling first_timesteps!"
         r_first_timesteps! = @compile first_timesteps!(simulation)
-    end 
+    end
 
     if isnothing(r_later_timestep!)
         @info "Reactant compiling later_timestep!"
@@ -107,6 +109,6 @@ function SpeedyWeather.timestep!(simulation::ReactantSimulation, r_first_timeste
     else
         r_later_timestep!(simulation)
     end
-end 
-    
-end 
+end
+
+end

@@ -98,6 +98,8 @@ Base.size(L::LowerTriangularArray, i::Integer, base::Type{OneBased}, as::Type{Ve
 # sizeof the underlying data vector
 Base.sizeof(L::LowerTriangularArray) = sizeof(L.data)
 
+Architectures.nonparametric_type(::Type{<:LowerTriangularArray}) = LowerTriangularArray
+
 function Base.show(io::IO, ::MIME"text/plain", L::LowerTriangularMatrix)
     Base.array_summary(io, L, axes(L))
     L_print = on_architecture(CPU(), L)
@@ -726,34 +728,27 @@ lta_view(L::LowerTriangularMatrix, c::Colon) = LowerTriangularArray(view(L.data,
 lta_view(L::LowerTriangularArray, args...) = view(L, args...)   # fallback to normal view
 
 # Broadcast CPU/GPU
-import Base.Broadcast: BroadcastStyle, Broadcasted, DefaultArrayStyle
-import LinearAlgebra: isstructurepreserving, fzeropreserving
+import Base.Broadcast: BroadcastStyle, Broadcasted
 
 # CPU with scalar indexing
-struct LowerTriangularStyle{N, ArrayType, S} <: Broadcast.AbstractArrayStyle{N} end
+struct LowerTriangularStyle{N} <: Broadcast.AbstractArrayStyle{N} end
 
 # GPU without scalar indexing
-struct LowerTriangularGPUStyle{N, ArrayType, S} <: GPUArrays.AbstractGPUArrayStyle{N} end
+struct LowerTriangularGPUStyle{N} <: GPUArrays.AbstractGPUArrayStyle{N} end
 
-function BroadcastStyle(::Type{LowerTriangularArray{T, N, ArrayType, S}}) where {T, N, ArrayType, S}
-    # remove number format parameter for broadcasting with type promotion
-    ArrayType_ = nonparametric_type(ArrayType)
-    return LowerTriangularStyle{N, ArrayType_, S}()
+function BroadcastStyle(::Type{LowerTriangularArray{T, N, ArrayType, S}}) where {T, N, ArrayType <: AbstractArray, S}
+    return LowerTriangularStyle{N}()
 end
 
 function BroadcastStyle(
         ::Type{LowerTriangularArray{T, N, ArrayType, S}},
     ) where {T, N, ArrayType <: GPUArrays.AbstractGPUArray, S}
-    # remove number format parameter for broadcasting with type promotion
-    ArrayType_ = nonparametric_type(ArrayType)
-    return LowerTriangularGPUStyle{N, ArrayType_, S}()
+    return LowerTriangularGPUStyle{N}()
 end
 
 # ::Val{0} for broadcasting with 0-dimensional, ::Val{1} for broadcasting with vectors, etc
-LowerTriangularStyle{N, ArrayType, S}(::Val{M}) where {N, ArrayType, S, M} =
-    LowerTriangularStyle{N, ArrayType, S}()
-LowerTriangularGPUStyle{N, ArrayType, S}(::Val{M}) where {N, ArrayType, S, M} =
-    LowerTriangularGPUStyle{N, ArrayType, S}()
+LowerTriangularStyle{N}(::Val{M}) where {N, M} = LowerTriangularStyle{N}()
+LowerTriangularGPUStyle{N}(::Val{M}) where {N, M} = LowerTriangularGPUStyle{N}()
 
 "`L = find_L(Ls)` returns the first LowerTriangularArray among the arguments.
 Adapted from Julia documentation of Broadcast interface"
@@ -765,25 +760,27 @@ find_L(a::LowerTriangularArray, rest) = a
 find_L(::Any, rest) = find_L(rest)
 
 function Base.similar(
-        bc::Broadcasted{LowerTriangularStyle{N, ArrayType, S}},
+        bc::Broadcasted{LowerTriangularStyle{N}},
         ::Type{T},
-    ) where {N, ArrayType, S, T}
+    ) where {N, T}
     L = find_L(bc)
-    return LowerTriangularArray{T, N, ArrayType{T, N}, S}(similar(L.data, T), L.spectrum)
+    # parent of broadcasted arrays is used because we don't want e.g. a view or transpose as a result
+    return nonparametric_type(typeof(L))(similar(parent(L.data), T, axes(bc)), L.spectrum)
 end
 
 # same function as above, but needs to be defined for both CPU and GPU style
 function Base.similar(
-        bc::Broadcasted{LowerTriangularGPUStyle{N, ArrayType, S}},
+        bc::Broadcasted{LowerTriangularGPUStyle{N}},
         ::Type{T},
-    ) where {N, ArrayType, S, T}
+    ) where {N, T}
     L = find_L(bc)
-    return LowerTriangularArray{T, N, ArrayType{T, N}, S}(similar(L.data, T), L.spectrum)
+    # parent of broadcasted arrays is used because we don't want e.g. a view or transpose as a result
+    return nonparametric_type(typeof(L))(similar(parent(L.data), T, axes(bc)), L.spectrum)
 end
 
 function KernelAbstractions.get_backend(
-        a::LowerTriangularArray{T, N, ArrayType, S}
-    ) where {T, N, ArrayType, S}
+        a::LowerTriangularArray{T, N}
+    ) where {T, N}
     return KernelAbstractions.get_backend(a.data)
 end
 
