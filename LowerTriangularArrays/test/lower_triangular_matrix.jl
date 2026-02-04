@@ -913,3 +913,69 @@ end
         end
     end
 end
+
+@testset "truncate!" begin
+    @testset for NF in (Float32, ComplexF32)
+        @testset for lmax in (8, 16, 32)
+            mmax = lmax
+            nlayers = 3
+
+            # Test LowerTriangularMatrix (2D)
+            L = rand(LowerTriangularMatrix{NF}, lmax, mmax)
+            L_original = deepcopy(L)
+
+            # Truncate to half the resolution (0-based)
+            ltrunc = lmax ÷ 2 - 1
+            mtrunc = mmax ÷ 2 - 1
+            LowerTriangularArrays.truncate!(L, ltrunc, mtrunc)
+
+            # Check that coefficients beyond truncation are zero
+            for m in 1:mmax
+                for l in m:lmax
+                    if l > ltrunc + 1 || m > mtrunc + 1  # +1 for 1-based indexing
+                        @test L[l, m] == 0
+                    else
+                        # Check that coefficients within truncation are unchanged
+                        @test L[l, m] == L_original[l, m]
+                    end
+                end
+            end
+
+            # Test LowerTriangularArray (3D)
+            L3D = rand(LowerTriangularArray{NF}, lmax, mmax, nlayers)
+            L3D_original = deepcopy(L3D)
+
+            LowerTriangularArrays.truncate!(L3D, ltrunc, mtrunc)
+
+            for k in 1:nlayers
+                for m in 1:mmax
+                    for l in m:lmax
+                        if l > ltrunc + 1 || m > mtrunc + 1
+                            @test L3D[l, m, k] == 0
+                        else
+                            @test L3D[l, m, k] == L3D_original[l, m, k]
+                        end
+                    end
+                end
+            end
+
+            # Test asymmetric truncation (ltrunc != mtrunc)
+            L_asym = rand(LowerTriangularMatrix{NF}, lmax, mmax)
+            L_asym_original = deepcopy(L_asym)
+
+            ltrunc_asym = lmax - 2  # truncate only last degree
+            mtrunc_asym = mmax ÷ 2 - 1  # truncate half the orders
+            LowerTriangularArrays.truncate!(L_asym, ltrunc_asym, mtrunc_asym)
+
+            for m in 1:mmax
+                for l in m:lmax
+                    if l > ltrunc_asym + 1 || m > mtrunc_asym + 1
+                        @test L_asym[l, m] == 0
+                    else
+                        @test L_asym[l, m] == L_asym_original[l, m]
+                    end
+                end
+            end
+        end
+    end
+end 

@@ -14,32 +14,25 @@ function truncate!(
     ltrunc += 1     # 0-based to 1-based
     mtrunc += 1
 
-    # TODO: there's currently a bug that prevents this from working on GPU without the .data
-    # that's mostly related to the custom broadcasting
-    alms.data[(l_indices .> ltrunc) .|| (m_indices .> mtrunc), :] .= 0
+    # Launch kernel for GPU/Reactant compatibility
+    arch = architecture(alms)
+    launch!(arch, SpectralWorkOrder, size(alms), _truncate_kernel!,
+        alms.data, l_indices, m_indices, ltrunc, mtrunc)
 
     return alms
 end
 
-# version just for matrices with the colon in the indexing
-function truncate!(
-        alms::LowerTriangularMatrix,    # spectral field to be truncated
-        ltrunc::Integer,                # truncate to max degree ltrunc (0-based)
-        mtrunc::Integer,                # truncate to max order mtrunc (0-based)
-    )
-    (; l_indices, m_indices) = alms.spectrum
+@kernel inbounds = true function _truncate_kernel!(data, @Const(l_indices), @Const(m_indices), ltrunc, mtrunc)
+    I = @index(Global, NTuple)
+    lm = I[1]
 
-    # Convert to 1-based indexing
-    ltrunc += 1     # 0-based to 1-based
-    mtrunc += 1
+    l = l_indices[lm]
+    m = m_indices[lm]
 
-    # TODO: there's currently a bug that prevents this from working on GPU without the .data
-    # that's mostly related to the custom broadcasting
-    alms.data[(l_indices .> ltrunc) .|| (m_indices .> mtrunc)] .= 0
-
-    return alms
+    if l > ltrunc || m > mtrunc
+        data[I...] = 0
+    end
 end
-
 
 """
 $(TYPEDSIGNATURES)
