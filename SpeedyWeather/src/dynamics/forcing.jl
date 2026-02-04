@@ -258,7 +258,7 @@ end
     layer = I[2]
     lat = latds[ij]
 
-    Fu[ij, layer] += s * sin(k * lat * π / 180)
+    Fu[ij, layer] += s * sin(deg2rad(k * lat))
 end
 
 export HeldSuarez
