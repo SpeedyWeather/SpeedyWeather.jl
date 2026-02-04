@@ -64,6 +64,14 @@ export LearnedSurfaceRoughness
     land_states::LS
 end
 
+function Base.show(io::IO, scheme::LearnedSurfaceRoughness)
+    print(io, "LearnedSurfaceRoughness{$(eltype(scheme.ocean_output_mean))}")
+    println(io)
+    println(io, "├ Ocean: Empirically derived analytical model")
+    n_layers = length(keys(scheme.land_params))
+    println(io, "└ Land:  Neural network ($n_layers layers)")
+end
+
 Adapt.@adapt_structure ConstantSurfaceRoughness
 ConstantSurfaceRoughness(SG::SpectralGrid, kwargs...) = ConstantSurfaceRoughness{SG.NF}(; kwargs...)
 initialize!(::ConstantSurfaceRoughness, ::PrimitiveEquation) = nothing
@@ -92,6 +100,30 @@ $(TYPEDFIELDS)"""
     drag_min::NF = 1.0e-5
 
     surface_roughness::SR
+end
+
+function Base.show(io::IO, B::BulkRichardsonDrag)
+    println(io, "BulkRichardsonDrag{$(typeof(B.von_Karman))}")
+    println(io, "├ von_Karman: $(B.von_Karman)")
+    println(io, "├ critical_Richardson: $(B.critical_Richardson)")
+    println(io, "├ drag_min: $(B.drag_min)")
+    print(io,   "└┐surface_roughness: ")
+    
+    buf = IOBuffer()
+    show(buf, B.surface_roughness)
+    s = String(take!(buf))
+    lines = split(s, '\n')
+    
+    if !isempty(lines)
+        println(io, lines[1])
+    end
+
+    prefix = " " 
+    for line in lines[2:end]
+        if !isempty(line)
+            println(io, prefix, line)
+        end
+    end
 end
 
 Adapt.@adapt_structure BulkRichardsonDrag
