@@ -252,7 +252,7 @@ function forcing!(
     )
 end
 
-@kernel inbounds=true function kolmogorov_flow_kernel!(Fu, s, k, latds)
+@kernel inbounds = true function kolmogorov_flow_kernel!(Fu, s, k, latds)
     I = @index(Global, NTuple)
     ij = I[1]
     layer = I[2]

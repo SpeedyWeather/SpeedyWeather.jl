@@ -16,8 +16,10 @@ function truncate!(
 
     # Launch kernel for GPU/Reactant compatibility
     arch = architecture(alms)
-    launch!(arch, SpectralWorkOrder, size(alms), _truncate_kernel!,
-        alms.data, l_indices, m_indices, ltrunc, mtrunc)
+    launch!(
+        arch, SpectralWorkOrder, size(alms), _truncate_kernel!,
+        alms.data, l_indices, m_indices, ltrunc, mtrunc
+    )
 
     return alms
 end
