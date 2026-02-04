@@ -89,20 +89,19 @@ $(TYPEDSIGNATURES)
 Scale the variable `var` with scalar `scale`.
 """
 @propagate_inbounds function scale!(
-    variable::Union{LowerTriangularArray, Field}, 
-    scale::Real 
-)
-    return variable.data .*= scale 
-end 
+        variable::Union{LowerTriangularArray, Field},
+        scale::Real
+    )
+    return variable.data .*= scale
+end
 
 """
 $(TYPEDSIGNATURES)
 Undo the scaling of the variable `var` with scalar `scale`.
 """
 @propagate_inbounds function unscale!(
-    variable::Union{LowerTriangularArray, Field}, 
-    scale::Real 
-)
-    return variable.data ./= scale 
-end 
-
+        variable::Union{LowerTriangularArray, Field},
+        scale::Real
+    )
+    return variable.data ./= scale
+end
