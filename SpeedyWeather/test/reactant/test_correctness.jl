@@ -5,7 +5,6 @@ Verifies that the Reactant implementation yields the same results as the CPU ver
 
 import Pkg
 Pkg.activate(@__DIR__)
-Pkg.develop(path = joinpath(@__DIR__, "..", ".."))
 
 using SpeedyWeather
 using Reactant
@@ -38,7 +37,6 @@ model_cpu = BarotropicModel(
 )
 
 simulation_cpu = initialize!(model_cpu)
-initialize!(simulation_cpu; steps = NSTEPS, output = false)
 
 println("  ✓ CPU model initialized")
 println("  Resolution: T$(TRUNC), $(spectral_grid_cpu.nlat) latitudes")
@@ -62,7 +60,6 @@ model_reactant = BarotropicModel(
 )
 
 simulation_reactant = initialize!(model_reactant)
-initialize!(simulation_reactant; steps = NSTEPS, output = false)
 
 println("  ✓ Reactant model initialized")
 
@@ -75,18 +72,15 @@ progn_cpu, diagn_cpu, _ = SpeedyWeather.unpack(simulation_cpu)
 progn_reactant, diagn_reactant, _ = SpeedyWeather.unpack(simulation_reactant)
 
 # Copy vorticity from CPU to Reactant (both leapfrog steps)
-vor_cpu_1 = Array(progn_cpu.vor[:, :, 1])
-vor_cpu_2 = Array(progn_cpu.vor[:, :, 2])
+vor_cpu = Array(progn_cpu.vor)
 
 # Use Reactant.to_rarray to transfer data
-progn_reactant.vor[:, :, 1] .= Reactant.to_rarray(vor_cpu_1)
-progn_reactant.vor[:, :, 2] .= Reactant.to_rarray(vor_cpu_2)
-
+progn_reactant.vor .= Reactant.to_rarray(vor_cpu)
 println("  ✓ Initial vorticity synchronized")
 
 # Verify initial state matches
-vor_reactant_check = Array(progn_reactant.vor[:, :, 1])
-@assert isapprox(vor_cpu_1, vor_reactant_check, rtol = 1e-10) "Initial state mismatch!"
+vor_reactant_check = Array(progn_reactant.vor)
+@assert isapprox(vor_cpu, vor_reactant_check, rtol = 1e-10) "Initial state mismatch!"
 println("  ✓ Initial state verified")
 
 # ============================================================================
@@ -99,11 +93,11 @@ vor_initial = copy(vor_cpu_1)
 
 # Run CPU model
 println("  Running CPU model for $NSTEPS steps...")
-SpeedyWeather.time_stepping!(simulation_cpu)
+SpeedyWeather.run!(simulation_cpu, steps=NSTEPS)
 
 # Run Reactant model
 println("  Running Reactant model for $NSTEPS steps...")
-SpeedyWeather.time_stepping!(simulation_reactant)
+SpeedyWeather.run!(simulation_reactant, steps=NSTEPS)
 
 # ============================================================================
 # Compare Results
