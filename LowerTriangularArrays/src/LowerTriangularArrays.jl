@@ -15,7 +15,7 @@ import SpeedyWeatherInternals.Architectures: Architectures, AbstractArchitecture
 import SpeedyWeatherInternals.Utils: launch!, SpectralWorkOrder
 
 # NUMERICS
-import LinearAlgebra: tril!
+import LinearAlgebra: Transpose, tril!
 
 export AbstractSpectrum, Spectrum, resolution, truncation
 
