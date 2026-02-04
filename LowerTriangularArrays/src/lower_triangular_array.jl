@@ -98,6 +98,8 @@ Base.size(L::LowerTriangularArray, i::Integer, base::Type{OneBased}, as::Type{Ve
 # sizeof the underlying data vector
 Base.sizeof(L::LowerTriangularArray) = sizeof(L.data)
 
+Architectures.nonparametric_type(::Type{<:LowerTriangularArray}) = LowerTriangularArray
+
 function Base.show(io::IO, ::MIME"text/plain", L::LowerTriangularMatrix)
     Base.array_summary(io, L, axes(L))
     L_print = on_architecture(CPU(), L)
@@ -762,7 +764,8 @@ function Base.similar(
         ::Type{T},
     ) where {N, T}
     L = find_L(bc)
-    return similar(L, T)
+    # parent of broadcasted arrays is used because we don't want e.g. a view or transpose as a result
+    return nonparametric_type(typeof(L))(similar(parent(L.data), T, axes(bc)), L.spectrum)
 end
 
 # same function as above, but needs to be defined for both CPU and GPU style
@@ -771,7 +774,8 @@ function Base.similar(
         ::Type{T},
     ) where {N, T}
     L = find_L(bc)
-    return similar(L, T)
+    # parent of broadcasted arrays is used because we don't want e.g. a view or transpose as a result
+    return nonparametric_type(typeof(L))(similar(parent(L.data), T, axes(bc)), L.spectrum)
 end
 
 function KernelAbstractions.get_backend(

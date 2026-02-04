@@ -476,7 +476,8 @@ find_field(::Any, rest) = find_field(rest)
 # 2 .+ field1 creates a new field that share the grid of field1
 function Base.similar(bc::Broadcasted{FieldStyle{N, Grid}}, ::Type{T}) where {N, Grid, T}
     field = find_field(bc)
-    return nonparametric_type(typeof(field))(similar(field.data, T, axes(bc)), field.grid)
+    # parent of broadcasted arrays is used because we don't want e.g. a view or transpose as a result
+    return nonparametric_type(typeof(field))(similar(parent(field.data), T, axes(bc)), field.grid)
 end
 
 # ::Val{0} for broadcasting with 0-dimensional, ::Val{1} for broadcasting with vectors, etc
@@ -499,7 +500,8 @@ end
 
 function Base.similar(bc::Broadcasted{FieldGPUStyle{N, Grid}}, ::Type{T}) where {N, Grid, T}
     field = find_field(bc)
-    return nonparametric_type(typeof(field))(similar(field.data, T, axes(bc)), field.grid)
+    # parent of broadcasted arrays is used because we don't want e.g. a view or transpose as a result
+    return nonparametric_type(typeof(field))(similar(parent(field.data), T, axes(bc)), field.grid)
 end
 
 # ::Val{0} for broadcasting with 0-dimensional, ::Val{1} for broadcasting with vectors, etc
