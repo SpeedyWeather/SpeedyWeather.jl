@@ -252,6 +252,7 @@ Finalizes the ProgressTxt callback by writing the total time taken to the progre
 function finalize!(progress_txt::ProgressTxt, progn, diagn, model)
     # escape in case of no output
     progress_txt.write_only_with_output && (model.output.active || return nothing)
+    isnothing(model.feedback) && return nothing
 
     (; file) = progress_txt
     (; progress_meter) = model.feedback
