@@ -11,6 +11,7 @@ using SpeedyWeather
 using Reactant
 using Test
 using LinearAlgebra
+using Statistics: mean
 
 # Configuration
 const TRUNC = 31            # spectral truncation
@@ -29,11 +30,11 @@ println("=" ^ 60)
 println("\n[1/4] Setting up CPU model...")
 
 spectral_grid_cpu = SpectralGrid(; nlayers = NLAYERS, trunc = TRUNC)
-initial_conditions_cpu = InitialConditions(; vordiv = RandomVorticity(spectral_grid_cpu))
 
+# Use ZonalJet for deterministic initial conditions
 model_cpu = BarotropicModel(
     spectral_grid_cpu;
-    initial_conditions = initial_conditions_cpu,
+    initial_conditions = InitialConditions(; vordiv = ZonalJet()),
 )
 
 simulation_cpu = initialize!(model_cpu)
@@ -53,14 +54,11 @@ spectral_grid_reactant = SpectralGrid(; architecture = arch_reactant, nlayers = 
 # Use MatrixSpectralTransform for Reactant compatibility
 M = MatrixSpectralTransform(spectral_grid_reactant)
 
-# Use same initial conditions type
-initial_conditions_reactant = InitialConditions(; vordiv = RandomVorticity(spectral_grid_reactant))
-
 model_reactant = BarotropicModel(
     spectral_grid_reactant;
     spectral_transform = M,
     feedback = nothing,  # disable feedback for Reactant
-    initial_conditions = initial_conditions_reactant,
+    initial_conditions = InitialConditions(; vordiv = ZonalJet()),
 )
 
 simulation_reactant = initialize!(model_reactant)
