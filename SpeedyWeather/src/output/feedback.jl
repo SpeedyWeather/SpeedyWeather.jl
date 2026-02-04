@@ -67,6 +67,8 @@ function progress!(feedback::Feedback, progn::PrognosticVariables)
     return feedback.debug && nan_detection!(feedback, progn)
 end
 
+progress!(::Nothing, progn::PrognosticVariables) = nothing
+
 """
 $(TYPEDSIGNATURES)
 Finalises the progress meter and the progress txt file."""
@@ -224,6 +226,7 @@ Writes the time stepping progress to the progress.txt file every `every_n_percen
 function callback!(progress_txt::ProgressTxt, progn, diagn, model)
     # escape in case of no output
     progress_txt.write_only_with_output && (model.output.active || return nothing)
+    isnothing(model.feedback) && return nothing
 
     (; progress_meter, nans_detected) = model.feedback
     (; counter, n) = progress_meter
