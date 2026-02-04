@@ -1,7 +1,7 @@
 # Changelog
 
 ## Unreleased
-
+- Fix absorptivity_water_vapor and absorptivity_cloud_base default values [#974](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/974)
 - Particle advection GPU ready [#897](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/897)
 - Enzyme compat relaxed as Enzyme bug was fixed and uv_from_vordiv! kernel version used on CPU as well [#971](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/971)
 - GitHub Actions: Cache updated [#945](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/945)
