@@ -32,8 +32,6 @@ import JLD2: jldopen, jldsave, JLDFile
 import CodecZlib
 import BitInformation: round, round!
 import ProgressMeter
-import Lux
-import NPZ
 
 # UTILITIES
 using DomainSets.IntervalSets
