@@ -97,10 +97,9 @@ end
 Kernel version of initialize! for RandomVorticity initial conditions."""
 function initialize!(
         progn::PrognosticVariables,
-        initial_conditions::RandomVorticity,
+        initial_conditions::RandomVorticity{NF},
         model::Barotropic
-    )
-    NF = eltype(progn)  #
+    ) where NF
 
     # reseed the random number generator, for seed=0 randomly seed from Julia's global RNG
     seed = initial_conditions.seed == 0 ? rand(UInt) : initial_conditions.seed
@@ -115,10 +114,13 @@ function initialize!(
 
     # Pre-generate random values on CPU, then transfer to device
     nlm = LowerTriangularArrays.nonzeros(spectrum)
-    random_values_cpu = 2 .* rand(RNG, Complex{NF}, nlm, nlayers) .- (1 + 1im)
+    # re and imag seperately as Reactant has no rng for complex
+    random_values_cpu_real = 2f0 .* rand(RNG, NF, nlm, nlayers) .- 1f0
+    random_values_cpu_imag = 2f0 .* rand(RNG, NF, nlm, nlayers) .- 1f0im
+    random_values_cpu = random_values_cpu_real .+ random_values_cpu_imag
 
     # Transfer to device architecture
-    ξ = zeros(LowerTriangularArray{Complex{NF}}, spectrum, nlayers)
+    ξ = zeros(Complex{NF}, spectrum, nlayers)
     random_values = on_architecture(architecture(ξ), random_values_cpu)
 
     # Get l indices for each harmonic
@@ -129,7 +131,6 @@ function initialize!(
         architecture(ξ), SpectralWorkOrder, size(ξ),
         random_vorticity_kernel!, ξ, random_values, A, power, l_indices, lmax
     )
-
     # Apply spectral truncation
     SpeedyTransforms.spectral_truncation!(ξ, initial_conditions.max_wavenumber)
 
@@ -137,19 +138,16 @@ function initialize!(
     return set!(progn, model; vor = ξ, lf = 1)
 end
 
-@kernel inbounds = true function random_vorticity_kernel!(
+@kernel function random_vorticity_kernel!(
         ξ,
-        @Const(random_values),
+        random_values,
         A,
         power,
-        @Const(l_indices),
+        l_indices,
         lmax
     )
     I = @index(Global, Cartesian)
     lm = I[1]  # spectral coefficient index
-    k = I[2]   # layer index
-
-    # Get the degree l for this harmonic
     l = l_indices[lm]
 
     # Skip zonal modes (m=0, which are the first lmax harmonics)
@@ -210,8 +208,8 @@ function initialize!(
     u = 2A * Field(u_data, grid) .- A
     v = 2A * Field(v_data, grid) .- A
 
-    u_spectral = @inbounds transform(u, model.spectral_transform)
-    v_spectral = @inbounds transform(v, model.spectral_transform)
+    u_spectral = transform(u, model.spectral_transform)
+    v_spectral = transform(v, model.spectral_transform)
 
     SpeedyTransforms.spectral_truncation!(u_spectral, initial_conditions.truncation)
     SpeedyTransforms.spectral_truncation!(v_spectral, initial_conditions.truncation)
