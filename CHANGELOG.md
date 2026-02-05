@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+## v0.18
+
+- Installation main instructions in docs + schedule tests [#979](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/979)
 - Bug fix: Cloud reflectivity on half level above not below [#978](https://github.dev/SpeedyWeather/SpeedyWeather.jl/pull/978)
 - Fix absorptivity_water_vapor and absorptivity_cloud_base default values [#974](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/974)
 - Particle advection GPU ready [#897](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/897)
