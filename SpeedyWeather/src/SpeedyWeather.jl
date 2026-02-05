@@ -32,6 +32,8 @@ import JLD2: jldopen, jldsave, JLDFile
 import CodecZlib
 import BitInformation: round, round!
 import ProgressMeter
+import Artifacts
+import Pkg.Artifacts as PkgA
 
 # UTILITIES
 using DomainSets.IntervalSets
@@ -182,6 +184,9 @@ include("physics/land/soil_moisture.jl")
 include("physics/land/snow.jl")
 include("physics/land/vegetation.jl")
 include("physics/land/rivers.jl")
+
+# INPUT
+include("input/get_asset.jl")
 
 # OUTPUT
 include("output/schedule.jl")

@@ -67,9 +67,6 @@ export VegetationClimatology
     "[OPTION] Combine high and low vegetation factor, a in high + a*low [1]"
     low_veg_factor::NF = 0.8
 
-    "[OPTION] path to the folder containing the soil moisture file, pkg path default"
-    path::String = "SpeedyWeather.jl/input_data"
-
     "[OPTION] filename of soil moisture"
     file::String = "vegetation.nc"
 
@@ -107,11 +104,7 @@ end
 function initialize!(vegetation::VegetationClimatology, model::PrimitiveEquation)
 
     # LOAD NETCDF FILE
-    if vegetation.path == "SpeedyWeather.jl/input_data"
-        path = joinpath(@__DIR__, "../../../input_data", vegetation.file)
-    else
-        path = joinpath(vegetation.path, vegetation.file)
-    end
+    path = get_speedy_asset("data", vegetation.file)
     ncfile = NCDataset(path)
 
     # high and low vegetation cover

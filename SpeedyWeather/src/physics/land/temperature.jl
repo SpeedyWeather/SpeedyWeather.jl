@@ -6,9 +6,6 @@ export SeasonalLandTemperature
 The temperature is linearly interpolated between months based on the model time.
 $(TYPEDFIELDS)"""
 @kwdef struct SeasonalLandTemperature{NF, GridVariable3D} <: AbstractLandTemperature
-    "[OPTION] path to the folder containing the land temperature file, pkg path default"
-    path::String = "SpeedyWeather.jl/input_data"
-
     "[OPTION] filename of land surface temperatures"
     file::String = "land_surface_temperature.nc"
 
@@ -52,11 +49,7 @@ function initialize!(land::SeasonalLandTemperature, model::PrimitiveEquation)
     (; monthly_temperature) = land
 
     # LOAD NETCDF FILE
-    if land.path == "SpeedyWeather.jl/input_data"
-        path = joinpath(@__DIR__, "../../../input_data", land.file)
-    else
-        path = joinpath(land.path, land.file)
-    end
+    path = get_speedy_asset("data", land.file)
     ncfile = NCDataset(path)
 
     # read out netCDF data

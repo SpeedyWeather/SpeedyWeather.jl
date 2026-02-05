@@ -125,9 +125,6 @@ $(TYPEDFIELDS)"""
 @kwdef struct EarthOrography{NF, GridVariable2D, SpectralVariable2D} <: AbstractOrography
 
     # OPTIONS
-    "path to the folder containing the orography file, pkg path default"
-    path::String = "SpeedyWeather.jl/input_data"
-
     "filename of orography"
     file::String = "orography.nc"
 
@@ -189,12 +186,7 @@ function initialize!(
     (; orography, surface_geopotential, scale) = orog
     (; gravity) = P
 
-    # LOAD NETCDF FILE
-    if orog.path == "SpeedyWeather.jl/input_data"
-        path = joinpath(@__DIR__, "../../input_data", orog.file)
-    else
-        path = joinpath(orog.path, orog.file)
-    end
+    path = get_speedy_asset("data", orog.file)
     ncfile = NCDataset(path)
 
     # height [m], wrap matrix into a grid

@@ -7,9 +7,6 @@ The soil moisture is linearly interpolated between months based on the model tim
 $(TYPEDFIELDS)"""
 @kwdef struct SeasonalSoilMoisture{NF, GridVariable4D} <: AbstractSoilMoisture
     # READ CLIMATOLOGY FROM FILE
-    "[OPTION] path to the folder containing the soil moisture file, pkg path default"
-    path::String = "SpeedyWeather.jl/input_data"
-
     "[OPTION] filename of soil moisture"
     file::String = "soil_moisture.nc"
 
@@ -54,11 +51,7 @@ function initialize!(soil::SeasonalSoilMoisture, model::PrimitiveEquation)
     (; monthly_soil_moisture) = soil
 
     # LOAD NETCDF FILE
-    if soil.path == "SpeedyWeather.jl/input_data"
-        path = joinpath(@__DIR__, "../../../input_data", soil.file)
-    else
-        path = joinpath(soil.path, soil.file)
-    end
+    path = get_speedy_asset("data", soil.file)
     ncfile = NCDataset(path)
 
     # read out netCDF data

@@ -91,12 +91,8 @@ and writes them to the prognostic variables.
 Fields and options are
 $(TYPEDFIELDS)"""
 @kwdef struct SeasonalOceanClimatology{NF, Grid, GridVariable3D} <: AbstractOcean
-
     "Grid used for the model"
     grid::Grid
-
-    "[OPTION] Path to the folder containing the sea surface temperatures, pkg path default"
-    path::String = "SpeedyWeather.jl/input_data"
 
     "[OPTION] Filename of sea surface temperatures"
     file::String = "sea_surface_temperature.nc"
@@ -124,12 +120,7 @@ end
 function initialize!(ocean::SeasonalOceanClimatology, model::PrimitiveEquation)
     (; monthly_temperature) = ocean
 
-    # LOAD NETCDF FILE
-    if ocean.path == "SpeedyWeather.jl/input_data"
-        path = joinpath(@__DIR__, "../../input_data", ocean.file)
-    else
-        path = joinpath(ocean.path, ocean.file)
-    end
+    path = get_speedy_asset("data", ocean.file)
     ncfile = NCDataset(path)
 
     # create interpolator from grid in file to grid used in model
@@ -209,9 +200,6 @@ and the ocean time is set with `initialize!(model, time=time)`.
 Fields and options are
 $(TYPEDFIELDS)"""
 @kwdef struct ConstantOceanClimatology <: AbstractOcean
-    "[OPTION] path to the folder containing the land-sea mask file, pkg path default"
-    path::String = "SpeedyWeather.jl/input_data"
-
     "[OPTION] filename of sea surface temperatures"
     file::String = "sea_surface_temperature.nc"
 

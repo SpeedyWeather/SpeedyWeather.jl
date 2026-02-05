@@ -117,9 +117,6 @@ export AlbedoClimatology
 
 """Albedo climatology loaded from netcdf file. Fields are $(TYPEDFIELDS)"""
 @kwdef struct AlbedoClimatology{GridVariable2D} <: AbstractAlbedo
-    "[OPTION] path to the folder containing the albedo file, pkg path default"
-    path::String = "SpeedyWeather.jl/input_data"
-
     "[OPTION] filename of albedo"
     file::String = "albedo.nc"
 
@@ -148,11 +145,7 @@ set!(albedo::AbstractAlbedo, args...; kwargs...) = set!(albedo.albedo, args...; 
 function initialize!(albedo::AlbedoClimatology, model::PrimitiveEquation)
 
     # LOAD NETCDF FILE
-    if albedo.path == "SpeedyWeather.jl/input_data"
-        path = joinpath(@__DIR__, "../../input_data", albedo.file)
-    else
-        path = joinpath(albedo.path, albedo.file)
-    end
+    path = get_speedy_asset("data", albedo.file)
     ncfile = NCDataset(path)
 
     a = on_architecture(model.architecture, albedo.file_Grid(ncfile[albedo.varname].var[:, :], input_as = Matrix))

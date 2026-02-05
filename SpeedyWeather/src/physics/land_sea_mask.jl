@@ -74,9 +74,6 @@ $(TYPEDFIELDS)"""
 @kwdef struct EarthLandSeaMask{NF, GridVariable2D} <: AbstractLandSeaMask
 
     # OPTIONS
-    "path to the folder containing the land-sea mask file, pkg path default"
-    path::String = "SpeedyWeather.jl/input_data"
-
     "filename of land sea mask"
     file::String = "land-sea_mask.nc"
 
@@ -121,11 +118,7 @@ function initialize!(land_sea_mask::EarthLandSeaMask, model::PrimitiveEquation)
     (; file_Grid) = land_sea_mask
 
     # LOAD NETCDF FILE
-    if land_sea_mask.path == "SpeedyWeather.jl/input_data"
-        path = joinpath(@__DIR__, "../../input_data", land_sea_mask.file)
-    else
-        path = joinpath(land_sea_mask.path, land_sea_mask.file)
-    end
+    path = get_speedy_asset("data", land_sea_mask.file)
     ncfile = NCDataset(path)
 
     # high resolution land-sea mask
