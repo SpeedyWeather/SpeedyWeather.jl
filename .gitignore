@@ -28,6 +28,10 @@ docs/.CondaPkg
 # environment.
 Manifest.toml
 
+# Artifacts toml file, which should be filled locally but not pushed
+# back to SpeedyWeather
+SpeedyWeather/Artifacts.toml
+
 # no jupyter notebook checkpoints
 .ipynb_*
 
