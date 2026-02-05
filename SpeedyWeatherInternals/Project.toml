@@ -1,7 +1,7 @@
 name = "SpeedyWeatherInternals"
 uuid = "34489162-d270-4603-8b96-37b04f830d73"
 authors = ["SpeedyWeatherInternals contributors"]
-version = "0.1.2"
+version = "0.1.3"
 
 [deps]
 ComponentArrays = "b0b7db55-cfe3-40fc-9ded-d10e2dbeff66"
