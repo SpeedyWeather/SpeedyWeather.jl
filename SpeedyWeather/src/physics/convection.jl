@@ -6,12 +6,12 @@ export LinearEntrainment, ConstantEntrainment
 """Linear entrainment profile: entrainment rate decreases linearly from surface to a given sigma level.
 At surface (σ=1), entrainment equals `surface_entrainment`. At `σ_entrainment`, entrainment becomes zero.
 Above (σ < σ_entrainment), entrainment is zero. Fields are $(TYPEDFIELDS)"""
-@kwdef struct LinearEntrainment{NF} <: AbstractEntrainment
+@parameterized @kwdef struct LinearEntrainment{NF} <: AbstractEntrainment
     "[OPTION] Sigma level at which entrainment becomes zero [1]"
-    σ_entrainment::NF = 0.5
+    @param σ_entrainment::NF = 0.5
 
     "[OPTION] Entrainment rate at surface [1]"
-    surface_entrainment::NF = 0.5
+    @param surface_entrainment::NF = 0.5
 end
 
 Adapt.@adapt_structure LinearEntrainment
@@ -22,9 +22,9 @@ LinearEntrainment(SG::SpectralGrid; kwargs...) = LinearEntrainment{SG.NF}(; kwar
 
 """Constant entrainment profile: entrainment rate is constant at all levels.
 Fields are $(TYPEDFIELDS)"""
-@kwdef struct ConstantEntrainment{NF} <: AbstractEntrainment
+@parameterized @kwdef struct ConstantEntrainment{NF} <: AbstractEntrainment
     "[OPTION] Constant entrainment rate [1]"
-    entrainment_rate::NF = 0.2
+    @param entrainment_rate::NF = 0.2
 end
 
 Adapt.@adapt_structure ConstantEntrainment
@@ -304,15 +304,19 @@ The simplified Betts-Miller convection scheme from Frierson, 2007,
 https://doi.org/10.1175/JAS3935.1 but with humidity set to zero.
 Fields and options are
 $(TYPEDFIELDS)"""
-@kwdef struct BettsMillerDryConvection{NF} <: AbstractConvection
+@kwdef struct BettsMillerDryConvection{NF, Entrainment <: AbstractEntrainment} <: AbstractConvection
     "[OPTION] Relaxation time for profile adjustment"
     time_scale::Second = Hour(4)
+
+    "[OPTION] Entrainment profile for mixing environmental air into the rising parcel"
+    @component entrainment::Entrainment = LinearEntrainment{NF}()
 end
 
-Adapt.adapt_structure(to, bmdc::BettsMillerDryConvection{NF}) where {NF} = BettsMillerDryConvection{NF}(adapt_structure(to, bmdc.time_scale))
+Adapt.@adapt_structure BettsMillerDryConvection
 
 # generator function
-BettsMillerDryConvection(SG::SpectralGrid; kwargs...) = BettsMillerDryConvection{SG.NF}(; kwargs...)
+BettsMillerDryConvection(SG::SpectralGrid; entrainment = LinearEntrainment(SG), kwargs...) =
+    BettsMillerDryConvection{SG.NF, typeof(entrainment)}(; entrainment, kwargs...)
 initialize!(::BettsMillerDryConvection, ::PrimitiveEquation) = nothing
 
 # function barrier
@@ -344,6 +348,7 @@ and relaxes current vertical profiles to the adjusted references."""
     temp_ref_profile = diagn.dynamics.a_grid     # temperature [K] reference profile to adjust to
 
     # CONVECTIVE CRITERIA AND FIRST GUESS RELAXATION
+    entrainment = DBM.entrainment
     # Use surface temperature directly (simplified for now)
     temp_parcel = temp[ij, nlayers]
     level_zero_buoyancy = dry_adiabat!(
@@ -351,7 +356,8 @@ and relaxes current vertical profiles to the adjusted references."""
         temp,
         temp_parcel,
         σ,
-        atmosphere
+        atmosphere,
+        entrainment
     )
 
     local PT::NF = 0        # precipitation due to cooling
@@ -394,7 +400,9 @@ set to NaN instead and should be skipped in the relaxation."""
         temp_parcel,
         σ,
         atmosphere,
+        entrainment::AbstractEntrainment,
     )
+
     NF = eltype(temp_ref_profile)
     (; κ) = atmosphere
 
@@ -413,6 +421,12 @@ set to NaN instead and should be skipped in the relaxation."""
 
         # dry adiabatic ascent
         temp_parcel = temp_parcel * (σ[k] / σ[k + 1])^κ
+
+        # Entrainment: mix rising parcel with environmental air
+        # This dilutes the parcel, reducing buoyancy and limiting convection depth
+        ε = entrainment(σ[k])
+        temp_parcel = (1 - ε) * temp_parcel + ε * temp_environment[ij, k]
+
         temp_ref_profile[ij, k] = temp_parcel
 
         # check whether parcel is still buoyant wrt to environment
@@ -437,16 +451,16 @@ $(TYPEDFIELDS)"""
     time_scale::Second = Hour(12)
 
     "[OPTION] Pressure of maximum heating [hPa]"
-    @param p₀::NF = 525 (bounds=Positive,)
+    @param p₀::NF = 525 (bounds = Positive,)
 
     "[OPTION] Vertical extent of heating [hPa]"
-    @param σₚ::NF = 200 (bounds=Positive,)
+    @param σₚ::NF = 200 (bounds = Positive,)
 
     "[OPTION] Latitude of heating [˚N]"
-    @param θ₀::NF = 0 (bounds=-90..90,)
+    @param θ₀::NF = 0 (bounds = -90 .. 90,)
 
     "[OPTION] Latitudinal width of heating [˚]"
-    @param σθ::NF = 20 (bounds=Positive,)
+    @param σθ::NF = 20 (bounds = Positive,)
 
     "[DERIVED] Latitudinal mask"
     lat_mask::VectorType
