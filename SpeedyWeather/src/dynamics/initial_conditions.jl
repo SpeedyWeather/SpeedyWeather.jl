@@ -70,7 +70,7 @@ export RandomVorticity
 
 """Start with random vorticity as initial conditions
 $(TYPEDFIELDS)"""
-@kwdef mutable struct RandomVorticity{NF} <: AbstractInitialConditions
+@kwdef mutable struct RandomVorticity{NF, S, RNG} <: AbstractInitialConditions
     "[OPTION] Power of the spectral distribution k^power"
     power::NF = -3
 
@@ -81,13 +81,17 @@ $(TYPEDFIELDS)"""
     max_wavenumber::Int = 20
 
     "[OPTION] Random number generator seed, 0=randomly seed from Julia's GLOBAL_RNG"
-    seed::Int = 123
+    seed::S = 123
 
     "Independent random number generator for this random process"
-    random_number_generator::Random.Xoshiro = Random.Xoshiro(seed)
+    random_number_generator::RNG = Random.Xoshiro(seed)
 end
 
-RandomVorticity(SG::SpectralGrid; kwargs...) = RandomVorticity{SG.NF}(; kwargs...)
+function RandomVorticity(SG::SpectralGrid; kwargs...)
+    RNG = haskey(kwargs, :random_number_generator) ? typeof(kwargs[:random_number_generator]) : typeof(Random.Xoshiro())
+    SeedType = haskey(kwargs, :seed) ? typeof(kwargs[:seed]) : Int
+    return RandomVorticity{SG.NF, SeedType, RNG}(; kwargs...)
+end
 
 """$(TYPEDSIGNATURES)
 Kernel version of initialize! for RandomVorticity initial conditions."""
@@ -185,14 +189,12 @@ end
 Start with random vorticity as initial conditions"""
 function initialize!(
         progn::PrognosticVariables,
-        initial_conditions::RandomVelocity,
+        initial_conditions::RandomVelocity{NF},
         model::Barotropic
-    )
-
-    NF = eltype(progn)
+    ) where NF
 
     # reseed the random number generator, for seed=0 randomly seed from Julia's global RNG
-    seed = initial_conditions.seed == 0 ? rand(UInt) : initial_conditions.seed
+    seed = initial_conditions.seed # == 0 ? rand(UInt) : initial_conditions.seed
     RNG = initial_conditions.random_number_generator
     Random.seed!(RNG, seed)
 
@@ -202,14 +204,14 @@ function initialize!(
 
     # sample vector to use RNG (not implemented for RingGrids)
     npoints = RingGrids.get_npoints(grid)
-    u_data = on_architecture(grid.architecture, rand(RNG, NF, npoints))
-    v_data = on_architecture(grid.architecture, rand(RNG, NF, npoints))
+    u_data = on_architecture(architecture(grid), rand(RNG, NF, npoints))
+    v_data = on_architecture(architecture(grid), rand(RNG, NF, npoints))
 
     u = 2A * Field(u_data, grid) .- A
     v = 2A * Field(v_data, grid) .- A
 
-    u_spectral = transform(u, model.spectral_transform)
-    v_spectral = transform(v, model.spectral_transform)
+    u_spectral = @inbounds transform(u, model.spectral_transform)
+    v_spectral = @inbounds transform(v, model.spectral_transform)
 
     SpeedyTransforms.spectral_truncation!(u_spectral, initial_conditions.truncation)
     SpeedyTransforms.spectral_truncation!(v_spectral, initial_conditions.truncation)
