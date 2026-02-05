@@ -304,7 +304,7 @@ The simplified Betts-Miller convection scheme from Frierson, 2007,
 https://doi.org/10.1175/JAS3935.1 but with humidity set to zero.
 Fields and options are
 $(TYPEDFIELDS)"""
-@kwdef struct BettsMillerDryConvection{NF, Entrainment <: AbstractEntrainment} <: AbstractConvection
+@parameterized @kwdef struct BettsMillerDryConvection{NF, Entrainment <: AbstractEntrainment} <: AbstractConvection
     "[OPTION] Relaxation time for profile adjustment"
     time_scale::Second = Hour(4)
 
