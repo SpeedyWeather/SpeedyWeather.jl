@@ -30,7 +30,7 @@ end
 with g the angular fraction of the year in radians. Following Spencer 1971,
 Fourier series representation of the position of the sun. Search 2(5):172.
 $(TYPEDFIELDS)"""
-@parameterized Base.@kwdef struct SolarDeclination{NF <: AbstractFloat} <: AbstractSolarDeclination
+@parameterized @kwdef struct SolarDeclination{NF <: AbstractFloat} <: AbstractSolarDeclination
     @param a::NF = 0.006918      # the offset +
     @param s1::NF = 0.070257     # s1*sin(g) +
     @param c1::NF = -0.399912    # c1*cos(g) +
@@ -113,14 +113,16 @@ function WhichZenith(SG::SpectralGrid, P::AbstractPlanet; kwargs...)
     end
 end
 
-# function barrier
-function cos_zenith!(diagn::DiagnosticVariables, time::DateTime, model::PrimitiveEquation)
+# function barrier to dispatch over model.solar_zenith
+function cos_zenith!(diagn::DiagnosticVariables, rotation_time::DateTime, orbit_time::DateTime, model::PrimitiveEquation)
     (; solar_zenith, geometry) = model
     (; cos_zenith) = diagn.physics
-    rotation_time = time
-    orbit_time = time
     return cos_zenith!(cos_zenith, solar_zenith, rotation_time, orbit_time, geometry)
 end
+
+# convenience fallback if only one time is given
+# e.g. for diagnostics that only have access to the model time, but not the separate rotation and orbit time for solar zenith calculations
+cos_zenith!(diagn::DiagnosticVariables, time::DateTime, model::PrimitiveEquation) = cos_zenith!(diagn, time, time, model)
 
 function Base.show(io::IO, L::AbstractZenith)
     println(io, "$(typeof(L)) <: AbstractZenith")
@@ -220,10 +222,11 @@ function cos_zenith!(
     sinδ, cosδ = sincos(δ)
 
     # Launch kernel for solar zenith calculation
-    return launch!(
+    launch!(
         architecture(cos_zenith), LinearWorkOrder, size(cos_zenith), solar_zenith_kernel!,
         cos_zenith, solar_hour_angle_0E, sinδ, cosδ, sinlat, coslat, lons, cos_zenith.grid.whichring
     )
+    return cos_zenith
 end
 
 # Kernel for solar zenith calculation with daily cycle
@@ -268,7 +271,7 @@ depending on parameters in SolarZenithSeason."""
 function cos_zenith!(
         cos_zenith::AbstractField,
         S::SolarZenithSeason,
-        rotation_time::DateTime,
+        rotation_time::DateTime,        # not used, but to keep the same function barrier as SolarZenith
         orbit_time::DateTime,
         geometry::AbstractGeometry,
     )
@@ -288,10 +291,11 @@ function cos_zenith!(
     sinδ, cosδ = sincos(δ)
 
     # Launch kernel for seasonal solar zenith calculation
-    return launch!(
+    launch!(
         architecture(cos_zenith), LinearWorkOrder, size(cos_zenith), solar_zenith_season_kernel!,
         cos_zenith, δ, sinδ, cosδ, sinlat, coslat, lat, cos_zenith.grid.whichring
     )
+    return cos_zenith
 end
 
 # Kernel for seasonal solar zenith calculation (daily average)

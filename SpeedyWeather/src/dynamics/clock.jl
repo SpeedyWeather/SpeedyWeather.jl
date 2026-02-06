@@ -25,6 +25,18 @@ $(TYPEDFIELDS)"""
 
     "Time step"
     Δt::Millisecond = Millisecond(0)
+
+    "Rotation time for daily cycle"
+    rotation_time::DateTime = time
+
+    "Orbit time for seasonal cycle"
+    orbit_time::DateTime = time
+
+    "Dilation (relative speed wrt time) of rotation time for daily cycle, used for solar zenith calculations"
+    rotation_dilation::Float32 = 1
+
+    "Dilation (relative speed wrt time) of orbit time for seasonal cycle, used for solar zenith calculations"
+    orbit_dilation::Float32 = 1
 end
 
 # we don't want to adapt the clock, it has to stay mutable,
@@ -33,17 +45,22 @@ Adapt.adapt_structure(to, ::Clock) = nothing
 
 function timestep!(clock::Clock, Δt; increase_counter::Bool = true)
     clock.time += Δt
+
+    # step the rotation and orbit time separately for solar zenith calculations
+    # using the dilation factors to speed up or slow down the rotation and orbit time relative to the model time
+    clock.rotation_time += Millisecond(round(Int, Δt.value * clock.rotation_dilation))
+    clock.orbit_time += Millisecond(round(Int, Δt.value * clock.orbit_dilation))
+    
+    # increase the counter after the first step, as the first step is a half-step and doesn't count
     # the first timestep is a half-step and doesn't count
-    clock.timestep_counter += increase_counter
-    return nothing
+    return clock.timestep_counter += increase_counter
 end
 
 # pretty printing
 function Base.show(io::IO, C::Clock)
     println(io, "$(typeof(C))")
     keys = propertynames(C)
-    print_fields(io, C, keys)
-    return nothing
+    return print_fields(io, C, keys)
 end
 
 # copy!
@@ -55,12 +72,19 @@ function Base.copy!(clock::Clock, clock_old::Clock)
     clock.n_timesteps = clock_old.n_timesteps
     clock.Δt = clock_old.Δt
 
+    # for solar zenith calculations
+    # we need to keep track of the rotation and orbit time separately, so we copy those as well
+    clock.rotation_time = clock_old.rotation_time
+    clock.orbit_time = clock_old.orbit_time
+    clock.rotation_dilation = clock_old.rotation_dilation
+    clock.orbit_dilation = clock_old.orbit_dilation
+
     return nothing
 end
 
 """$(TYPEDSIGNATURES)
 Initialize the clock with the time step `Δt` from `time_stepping`."""
-initialize!(clock::Clock, time_stepping::AbstractTimeStepper, args...) =
+initialize!(clock::Clock, time_stepping::AbstractTimeStepper, args...) = 
     initialize!(clock, time_stepping.Δt_millisec, args...)
 
 """$(TYPEDSIGNATURES)
