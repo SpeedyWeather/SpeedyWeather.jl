@@ -60,6 +60,7 @@ function initialize!(
         output::Bool = false,
     )
     progn, diagn, model = unpack(simulation)
+    arch = model.architecture
 
     # SET THE CLOCK
     (; clock) = progn
@@ -77,7 +78,7 @@ function initialize!(
     set!(simulation.model.output, active = output, reset_path = true)
 
     # SCALING: we use vorticity*radius, divergence*radius in the dynamical core
-    scale!(progn, diagn, model.planet.radius)
+    @maybe_jit arch scale!(progn, diagn, model.planet.radius)
 
     # OUTPUT INITIALISATION AND STORING INITIAL CONDITIONS + FEEDBACK
     # propagate spectral state to grid variables for initial condition output
@@ -88,10 +89,10 @@ function initialize!(
     lf == 2 && all(vor .== 0) && @warn "Vorticity is zero on 2nd leapfrog index though you use it to calculate tendencies." *
         " You may wanted to continue with a leapfrog step without data for it in the 2nd step."
 
-    transform!(diagn, progn, lf, model, initialize = true)
+    @maybe_jit arch transform!(diagn, progn, lf, model, initialize = true)
     initialize!(diagn, progn.particles, progn, model)
     initialize!(model.output, model.feedback, progn, diagn, model)
-    return initialize!(model.callbacks, progn, diagn, model)
+    return @maybe_jit arch initialize!(model.callbacks, progn, diagn, model)
 end
 
 """$(TYPEDSIGNATURES)

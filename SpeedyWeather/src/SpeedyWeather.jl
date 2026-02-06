@@ -46,6 +46,7 @@ export initialize!, finalize!
 # import utilities
 export Utils
 using SpeedyWeatherInternals.Utils
+import SpeedyWeatherInternals.Utils: @maybe_jit
 
 # parameter handling
 using SpeedyWeatherInternals.SpeedyParameters

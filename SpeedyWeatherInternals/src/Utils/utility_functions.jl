@@ -119,3 +119,27 @@ function readable_secs(secs::Real)
     end
     return Dates.canonicalize(round(millisecs, Dates.Millisecond(10)))
 end
+
+"""
+$(TYPEDSIGNATURES)
+Fallback for `@maybe_jit` when Reactant is not available. Just calls `f(args...; kwargs...)`."""
+_jit(::AbstractArchitecture, f, args...; kwargs...) = f(args...; kwargs...)
+
+"""
+    @maybe_jit arch expr
+
+Macro that conditionally applies `Reactant.@jit` based on the architecture.
+For `ReactantDevice`, the extension overloads `_jit` to use `@jit`.
+For other architectures, just executes the expression directly.
+
+Usage: `@maybe_jit model.architecture initialize!(model.geometry, model)`
+"""
+macro maybe_jit(arch, expr)
+    if expr.head == :call
+        f = expr.args[1]
+        args = expr.args[2:end]
+        return esc(:(_jit($arch, $f, $(args...))))
+    else
+        return esc(expr)
+    end
+end

@@ -5,6 +5,7 @@ using SpeedyWeatherInternals
 using Reactant
 
 import SpeedyWeatherInternals.Architectures: Architectures, CPU, ReactantDevice, array_type, architecture, on_architecture, compatible_array_types, nonparametric_type, device
+import SpeedyWeatherInternals.Utils: _jit
 
 # grab the proper KernelAbstractions backend for Reactant
 const ReactantKernelAbstractionsExt = Base.get_extension(
@@ -58,5 +59,8 @@ Base.convert(::Type{ConcretePJRTArray{T, 3, 1}}, a::AbstractArray{T, 3}) where {
 Base.convert(::Type{ConcretePJRTArray{T, 3, 1}}, a::AbstractArray{S, 3}) where {T <: Number, S <: Number} = Reactant.to_rarray(T.(a))
 
 Reactant.ConcretePJRTArray{T, N, D}(a::AbstractArray{T, N}) where {T, N, D} = Reactant.to_rarray(a)
+
+# For @maybe_jit macro - extend _jit for ReactantDevice
+_jit(::ReactantDevice, f, args...; kwargs...) = Reactant.@jit f(args...; kwargs...)
 
 end
