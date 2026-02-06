@@ -120,7 +120,7 @@ function initialize!(
     random_values_cpu = random_values_cpu_real .+ random_values_cpu_imag
 
     # Transfer to device architecture
-    ξ = zeros(Complex{NF}, spectrum, nlayers)
+    ξ = similar(progn.vor)[:,:,1]
     random_values = on_architecture(architecture(ξ), random_values_cpu)
 
     # Get l indices for each harmonic
