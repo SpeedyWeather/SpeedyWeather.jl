@@ -1,13 +1,14 @@
+const assets_url = "https://github.com/SpeedyWeather/SpeedyWeatherAssets/raw/refs/heads/main"
+
 """
-    get_speedy_asset(subfolder, filename)
+    get_asset(subfolder, filename)
 
 Downloads a file from the SpeedyWeatherAssets repo, adds it to 
 Artifacts.toml in the project root, and returns the file path.
 """
-function get_speedy_asset(subfolder::String, filename::String)
-    # SpeedyAssets base url
-    repo_base = "https://github.com/SpeedyWeather/SpeedyWeatherAssets/raw/refs/heads/main"
-    url = "$repo_base/$subfolder/$filename"
+function get_asset(path::String...)
+    filename = path[end]
+    url = joinpath(assets_url, path...)
 
     project_root = pkgdir(SpeedyWeather)
     artifact_toml = joinpath(project_root, "Artifacts.toml")

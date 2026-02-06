@@ -49,7 +49,7 @@ function initialize!(land::SeasonalLandTemperature, model::PrimitiveEquation)
     (; monthly_temperature) = land
 
     # LOAD NETCDF FILE
-    path = get_speedy_asset("data", land.file)
+    path = get_asset("data", land.file)
     ncfile = NCDataset(path)
 
     # read out netCDF data

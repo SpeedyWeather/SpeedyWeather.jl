@@ -104,7 +104,7 @@ end
 function initialize!(vegetation::VegetationClimatology, model::PrimitiveEquation)
 
     # LOAD NETCDF FILE
-    path = get_speedy_asset("data", vegetation.file)
+    path = get_asset("data", vegetation.file)
     ncfile = NCDataset(path)
 
     # high and low vegetation cover

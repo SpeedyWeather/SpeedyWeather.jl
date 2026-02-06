@@ -51,7 +51,7 @@ function initialize!(soil::SeasonalSoilMoisture, model::PrimitiveEquation)
     (; monthly_soil_moisture) = soil
 
     # LOAD NETCDF FILE
-    path = get_speedy_asset("data", soil.file)
+    path = get_asset("data", soil.file)
     ncfile = NCDataset(path)
 
     # read out netCDF data

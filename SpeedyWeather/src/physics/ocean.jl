@@ -120,7 +120,7 @@ end
 function initialize!(ocean::SeasonalOceanClimatology, model::PrimitiveEquation)
     (; monthly_temperature) = ocean
 
-    path = get_speedy_asset("data", ocean.file)
+    path = get_asset("data", ocean.file)
     ncfile = NCDataset(path)
 
     # create interpolator from grid in file to grid used in model

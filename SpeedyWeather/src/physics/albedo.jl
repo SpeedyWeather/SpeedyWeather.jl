@@ -145,7 +145,7 @@ set!(albedo::AbstractAlbedo, args...; kwargs...) = set!(albedo.albedo, args...; 
 function initialize!(albedo::AlbedoClimatology, model::PrimitiveEquation)
 
     # LOAD NETCDF FILE
-    path = get_speedy_asset("data", albedo.file)
+    path = get_asset("data", albedo.file)
     ncfile = NCDataset(path)
 
     a = on_architecture(model.architecture, albedo.file_Grid(ncfile[albedo.varname].var[:, :], input_as = Matrix))

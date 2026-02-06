@@ -118,7 +118,7 @@ function initialize!(land_sea_mask::EarthLandSeaMask, model::PrimitiveEquation)
     (; file_Grid) = land_sea_mask
 
     # LOAD NETCDF FILE
-    path = get_speedy_asset("data", land_sea_mask.file)
+    path = get_asset("data", land_sea_mask.file)
     ncfile = NCDataset(path)
 
     # high resolution land-sea mask

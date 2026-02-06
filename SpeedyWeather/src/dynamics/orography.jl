@@ -186,7 +186,7 @@ function initialize!(
     (; orography, surface_geopotential, scale) = orog
     (; gravity) = P
 
-    path = get_speedy_asset("data", orog.file)
+    path = get_asset("data", orog.file)
     ncfile = NCDataset(path)
 
     # height [m], wrap matrix into a grid
