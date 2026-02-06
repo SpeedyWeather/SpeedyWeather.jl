@@ -240,7 +240,7 @@ function first_timesteps!(simulation::AbstractSimulation)
     (; Δt) = time_stepping
 
     # decide whether to start with 1x Euler then 1x Leapfrog at Δt
-    if time_stepping.first_step_euler
+    @trace if time_stepping.first_step_euler
         first_timesteps!(progn, diagn, model)
         time_stepping.first_step_euler = !time_stepping.continue_with_leapfrog   # after first run! continue with leapfrog
 

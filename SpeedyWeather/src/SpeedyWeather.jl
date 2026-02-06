@@ -14,6 +14,7 @@ import KernelAbstractions: KernelAbstractions, @kernel, @index, @Const, synchron
 import GPUArrays: GPUArrays, @allowscalar
 import Adapt: Adapt, adapt, adapt_structure
 import GPUArrays: @allowscalar
+import ReactantCore: @trace
 
 using SpeedyWeatherInternals
 using SpeedyWeatherInternals.Architectures

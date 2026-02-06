@@ -12,7 +12,7 @@ using Test
 using LinearAlgebra
 using CUDA
 using Statistics: mean
-import SpeedyWeather: ReactantDevice
+import SpeedyWeather: ReactantDevice, first_timesteps!, later_timestep!
 
 # ============================================================================
 # Configuration
@@ -67,14 +67,15 @@ function create_reactant_model(ModelType::Type; trunc = TRUNC)
     return ModelType(spectral_grid; spectral_transform = M, feedback = nothing, initial_conditions)
 end
 
-"""Synchronize prognostic variables from Reactant to CPU simulation."""
-function sync_prognostic_variables!(sim_cpu, sim_reactant)
+"""Synchronize variables from Reactant to CPU simulation."""
+function sync_variables!(sim_cpu, sim_reactant)
     progn_cpu, _, _ = SpeedyWeather.unpack(sim_cpu)
     progn_reactant, _, _ = SpeedyWeather.unpack(sim_reactant)
 
     # Sync vorticity from Reactant to CPU (copy underlying data)
     copyto!(progn_cpu.vor.data, Array(progn_reactant.vor.data))
 
+    #TODO: for the other models add more varibles
     return nothing
 end
 
@@ -123,54 +124,79 @@ function compare_grid_variables(sim_cpu, sim_reactant; rtol = RTOL, atol = ATOL)
     return results
 end
 
-"""Run the full correctness test for a given model type."""
-function test_model_correctness(ModelType::Type; trunc = TRUNC, nsteps = NSTEPS, rtol = RTOL, atol = ATOL)
-    model_name = string(ModelType)
+"""Compare tendencies between CPU and Reactant simulations after a single timestep."""
+function compare_tendencies(sim_cpu, sim_reactant; rtol = RTOL, atol = ATOL)
+    _, diagn_cpu, _ = SpeedyWeather.unpack(sim_cpu)
+    _, diagn_reactant, _ = SpeedyWeather.unpack(sim_reactant)
 
-    println("="^60)
-    println("$model_name: CPU vs Reactant Comparison Test")
-    println("="^60)
+    results = Dict{Symbol, NamedTuple}()
 
-    # Setup CPU model
-    println("\n[1/4] Setting up CPU model...")
-    model_cpu = create_cpu_model(ModelType; trunc)
-    simulation_cpu = initialize!(model_cpu)
-    println("  ✓ CPU model initialized")
-    println("  Resolution: T$trunc")
+    # Compare vorticity tendency
+    vor_tend_cpu = Array(diagn_cpu.tendencies.vor_tend)
+    vor_tend_reactant = Array(diagn_reactant.tendencies.vor_tend)
+    abs_diff = abs.(vor_tend_cpu .- vor_tend_reactant)
+    results[:vor_tend] = (
+        max_abs_diff = maximum(abs_diff),
+        mean_abs_diff = mean(abs_diff),
+        matches = isapprox(vor_tend_cpu, vor_tend_reactant, rtol = rtol, atol = atol),
+    )
 
-    # Setup Reactant model
-    println("\n[2/4] Setting up Reactant model...")
-    model_reactant = create_reactant_model(ModelType; trunc)
-    simulation_reactant = initialize!(model_reactant)
-    println("  ✓ Reactant model initialized")
+    return results
+end
 
-    # Synchronize initial conditions (copy from Reactant to CPU)
-    println("\n[3/4] Synchronizing initial conditions...")
-    sync_prognostic_variables!(simulation_cpu, simulation_reactant)
-    println("  ✓ Prognostic variables synchronized (Reactant → CPU)")
+"""Test tendencies after a single timestep on already-initialized simulations."""
+function test_tendencies!(sim_cpu, sim_reactant, model_name; rtol = RTOL, atol = ATOL)
+    println("\n" * "-"^60)
+    println("Testing tendencies (single timestep)")
+    println("-"^60)
+
+    # Run a single timestep to compute tendencies
+    r_first_timesteps! = @compile first_timesteps!(sim_reactant)
+    r_later_timestep! = @compile later_timestep!(sim_reactant)
+
+    println("  Running CPU model...")
+    SpeedyWeather.timestep!(sim_cpu)
+    println("  Running Reactant model...")
+    SpeedyWeather.timestep!(sim_reactant, r_first_timesteps!, r_later_timestep!)
+    println("  ✓ Tendencies computed")
+
+    # Compare tendencies
+    tend_results = compare_tendencies(sim_cpu, sim_reactant; rtol, atol)
+
+    println("\nVorticity tendency comparison:")
+    println("  Max absolute difference:  $(tend_results[:vor_tend].max_abs_diff)")
+    println("  Mean absolute difference: $(tend_results[:vor_tend].mean_abs_diff)")
+
+    @testset "$model_name Tendency Comparison" begin
+        @test tend_results[:vor_tend].matches
+    end
+
+    return tend_results
+end
+
+"""Test prognostic and grid variables after running for nsteps on already-initialized simulations."""
+function test_time_stepping!(sim_cpu, sim_reactant, r_first_timesteps!, r_later_timestep!, model_name; nsteps = NSTEPS, rtol = RTOL, atol = ATOL)
+    println("\n" * "-"^60)
+    println("Testing time stepping ($nsteps steps)")
+    println("-"^60)
 
     # Run time stepping
-    println("\n[4/4] Running time stepping comparison...")
-    println("  Running CPU model for $nsteps steps...")
-    SpeedyWeather.run!(simulation_cpu; steps = nsteps)
+    println("  Running CPU model...")
+    SpeedyWeather.run!(sim_cpu; steps = nsteps)
 
-    println("  Running Reactant model for $nsteps steps...")
-    SpeedyWeather.run!(simulation_reactant; steps = nsteps)
+    println("  Running Reactant model...")
+    SpeedyWeather.run!(sim_reactant; steps = nsteps)
+    println("  ✓ Time stepping completed")
 
     # Compare results
-    println("\n" * "="^60)
-    println("RESULTS")
-    println("="^60)
-
-    progn_results = compare_prognostic_variables(simulation_cpu, simulation_reactant; rtol, atol)
-    grid_results = compare_grid_variables(simulation_cpu, simulation_reactant; rtol, atol)
+    progn_results = compare_prognostic_variables(sim_cpu, sim_reactant; rtol, atol)
+    grid_results = compare_grid_variables(sim_cpu, sim_reactant; rtol, atol)
 
     println("\nVorticity comparison after $nsteps steps:")
     println("  Max absolute difference:  $(progn_results[:vor].max_abs_diff)")
     println("  Mean absolute difference: $(progn_results[:vor].mean_abs_diff)")
 
-    # Run tests
-    @testset "$model_name CPU vs Reactant" begin
+    @testset "$model_name Time Stepping" begin
         @testset "Prognostic variables" begin
             @test progn_results[:vor].matches
         end
@@ -182,16 +208,57 @@ function test_model_correctness(ModelType::Type; trunc = TRUNC, nsteps = NSTEPS,
         end
     end
 
-    println("\n" * "="^60)
-    println("Test completed!")
+    return (progn_results, grid_results)
+end
+
+"""Run all correctness tests for a given model type."""
+function test_model(ModelType::Type; trunc = TRUNC, nsteps = NSTEPS, rtol = RTOL, atol = ATOL)
+    model_name = string(ModelType)
+
+    println("="^60)
+    println("$model_name: CPU vs Reactant Correctness Tests")
     println("="^60)
 
-    return (progn_results, grid_results)
+    # Setup CPU model
+    println("\n[1/4] Setting up CPU model...")
+    model_cpu = create_cpu_model(ModelType; trunc)
+    simulation_cpu = initialize!(model_cpu)
+    println("  ✓ CPU model initialized (T$trunc)")
+
+    # Setup Reactant model
+    println("\n[2/4] Setting up Reactant model...")
+    model_reactant = create_reactant_model(ModelType; trunc)
+    simulation_reactant = initialize!(model_reactant)
+    r_first_timesteps! = @compile first_timesteps!(simulation_reactant)
+    r_later_timestep! = @compile later_timestep!(simulation_reactant)
+    println("  ✓ Reactant model initialized")
+
+    # spin up models a bit 
+    println("\n[3/4] Spinning up models...")
+    run!(simulation_cpu; period = Day(20))
+    run!(simulation_reactant, r_first_timesteps!, r_later_timestep!; period = Day(20))
+    println("  ✓ Models spun up")
+
+    # Synchronize initial conditions (copy from Reactant to CPU)
+    println("\n[4/4] Synchronizing initial conditions...")
+    sync_variables!(simulation_cpu, simulation_reactant)
+    println("  ✓ Variables synchronized (Reactant → CPU)")
+
+    # Run tests
+    @testset "$model_name CPU vs Reactant" begin
+        tend_results = test_tendencies!(simulation_cpu, simulation_reactant, r_first_timesteps!, r_later_timestep!, model_name; rtol, atol)
+        stepping_results = test_time_stepping!(simulation_cpu, simulation_reactant, r_first_timesteps!, r_later_timestep!, model_name; nsteps, rtol, atol)
+    end
+
+    println("\n" * "="^60)
+    println("$model_name tests completed!")
+    println("="^60)
+
+    return nothing
 end
 
 # ============================================================================
 # Run tests
 # ============================================================================
 
-# Test BarotropicModel
-test_model_correctness(BarotropicModel)
+test_model(BarotropicModel)
