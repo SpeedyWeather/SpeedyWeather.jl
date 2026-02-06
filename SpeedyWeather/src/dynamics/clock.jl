@@ -63,7 +63,6 @@ function Base.show(io::IO, C::Clock)
     return print_fields(io, C, keys)
 end
 
-# copy!
 function Base.copy!(clock::Clock, clock_old::Clock)
     clock.time = clock_old.time
     clock.start = clock_old.start
@@ -86,6 +85,19 @@ end
 Initialize the clock with the time step `Δt` from `time_stepping`."""
 initialize!(clock::Clock, time_stepping::AbstractTimeStepper, args...) = 
     initialize!(clock, time_stepping.Δt_millisec, args...)
+
+"""$(TYPEDSIGNATURES)
+Initialize the clock with the time step `Δt` from `time_stepping` and
+computes the time dilation given a `planet` with `length_of_day` and `length_of_year`."""
+function initialize!(clock::Clock, time_stepping::AbstractTimeStepper, planet::AbstractPlanet, args...)
+
+    # given a planet's length of day and year, we can compute the dilation factors for the rotation and orbit time
+    clock.rotation_dilation = Second(EARTH_DAY).value / Second(planet.length_of_day).value
+    clock.orbit_dilation = Second(EARTH_YEAR).value / Second(planet.length_of_year).value
+
+    # now initialize rest of the clock as normal
+    return initialize!(clock, time_stepping, args...)
+end
 
 """$(TYPEDSIGNATURES)
 Initialize the clock with the time step `Δt` and `period` to integrate for."""
@@ -185,6 +197,11 @@ Dates.Month(x::AbstractFloat) = Day(30x)  # approximate
 Dates.Year(x::AbstractFloat) = Day(365x) # approximate
 Century(x::AbstractFloat) = Year(100x)
 Millenium(x::AbstractFloat) = Century(10x)
+
+Dates.Second(c::Dates.CompoundPeriod) = sum(Dates.Second.(c.periods))
+Dates.Minute(c::Dates.CompoundPeriod) = sum(Dates.Minute.(c.periods))
+Dates.Hour(c::Dates.CompoundPeriod) = sum(Dates.Hour.(c.periods))
+Dates.Day(c::Dates.CompoundPeriod) = sum(Dates.Day.(c.periods))
 
 # use Dates.second to round to integer seconds
 Dates.second(x::Dates.Nanosecond) = round(Int, x.value * 1.0e-9)

@@ -4,6 +4,9 @@ const DEFAULT_RADIUS = 6.371e6
 const DEFAULT_ROTATION = 7.29e-5    # default angular frequency of Earth's rotation [1/s]
 const DEFAULT_GRAVITY = 9.81        # default gravitational acceleration on Earth [m/s²]
 
+const EARTH_DAY = Hour(24)
+const EARTH_YEAR = Day(365) + Hour(6)
+
 export Earth
 
 """
@@ -28,13 +31,13 @@ $(TYPEDFIELDS)
     daily_cycle::Bool = true
 
     "Seconds in a daily rotation"
-    length_of_day::Second = Hour(24)
+    length_of_day::Second = EARTH_DAY
 
     "switch on/off seasonal cycle"
     seasonal_cycle::Bool = true
 
     "Seconds in an orbit around the sun"
-    length_of_year::Second = Day(365.25)
+    length_of_year::Second = EARTH_YEAR
 
     "time of spring equinox (year irrelevant)"
     equinox::DateTime = DateTime(2000, 3, 20)
