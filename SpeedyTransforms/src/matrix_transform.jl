@@ -160,7 +160,7 @@ function transform!(                        # GRID TO SPECTRAL
     # catch incorrect sizes early
     @boundscheck ismatching(M, field, horizontal_only = true) || throw(DimensionMismatch(M, field))
     @boundscheck ismatching(M, coeffs, horizontal_only = true) || throw(DimensionMismatch(M, coeffs))
-    # TODO: deactivated temporarily because of Reactant issue 
+    # TODO: deactivated temporarily because of Reactant issue
     #@boundscheck size(coeffs, 2) == size(field, 2) || throw(DimensionMismatch(field.data, coeffs.data))
     LinearAlgebra.mul!(coeffs.data, M.forward, field.data)
     return coeffs

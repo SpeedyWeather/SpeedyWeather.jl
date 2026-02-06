@@ -99,7 +99,7 @@ function initialize!(
         progn::PrognosticVariables,
         initial_conditions::RandomVorticity{NF},
         model::Barotropic
-    ) where NF
+    ) where {NF}
 
     # reseed the random number generator, for seed=0 randomly seed from Julia's global RNG
     seed = initial_conditions.seed == 0 ? rand(UInt) : initial_conditions.seed
@@ -115,12 +115,12 @@ function initialize!(
     # Pre-generate random values on CPU, then transfer to device
     nlm = LowerTriangularArrays.nonzeros(spectrum)
     # re and imag seperately as Reactant has no rng for complex
-    random_values_cpu_real = 2f0 .* rand(RNG, NF, nlm, nlayers) .- 1f0
-    random_values_cpu_imag = 2f0 .* rand(RNG, NF, nlm, nlayers) .- 1f0im
+    random_values_cpu_real = 2.0f0 .* rand(RNG, NF, nlm, nlayers) .- 1.0f0
+    random_values_cpu_imag = 2.0f0 .* rand(RNG, NF, nlm, nlayers) .- 1.0f0im
     random_values_cpu = random_values_cpu_real .+ random_values_cpu_imag
 
     # Transfer to device architecture
-    ξ = similar(progn.vor)[:,:,1]
+    ξ = similar(progn.vor)[:, :, 1]
     random_values = on_architecture(architecture(ξ), random_values_cpu)
 
     # Get l indices for each harmonic
@@ -189,7 +189,7 @@ function initialize!(
         progn::PrognosticVariables,
         initial_conditions::RandomVelocity{NF},
         model::Barotropic
-    ) where NF
+    ) where {NF}
 
     # reseed the random number generator, for seed=0 randomly seed from Julia's global RNG
     seed = initial_conditions.seed # == 0 ? rand(UInt) : initial_conditions.seed

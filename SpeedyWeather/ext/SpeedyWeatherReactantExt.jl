@@ -11,6 +11,8 @@ const ReactantSimulation = Union{
     Simulation{<:ShallowWaterModel{SG, <:ReactantDevice}}, Simulation{<:PrimitiveDryModel{SG, <:ReactantDevice}}, Simulation{<:PrimitiveWetModel{SG, <:ReactantDevice}},
 } where {SG}
 
+# time stepping functions with Reactant, take compiled functions as optional arguments
+# in case they are not provided, they are compiled on the fly
 function SpeedyWeather.time_stepping!(simulation::ReactantSimulation, r_first_timesteps! = nothing, r_later_timestep! = nothing)
     if isnothing(r_first_timesteps!)
         @info "Reactant compiling first_timesteps!"
@@ -30,8 +32,8 @@ function SpeedyWeather.time_stepping!(simulation::ReactantSimulation, r_first_ti
 end
 
 function SpeedyWeather.timestep!(simulation::ReactantSimulation, r_first_timesteps!, r_later_timestep!)
-    
     (; clock) = simulation.prognostic_variables
+
     return if clock.timestep_counter == 0
         r_first_timesteps!(simulation)
     else
@@ -39,9 +41,14 @@ function SpeedyWeather.timestep!(simulation::ReactantSimulation, r_first_timeste
     end
 end
 
+"""
+$(TYPEDSIGNATURES)
+Run a simulation with Reactant, take compiled functions as optional arguments.
+In case they are not provided, they are compiled on the fly.
+"""
 function SpeedyWeather.run!(
-        simulation::ReactantSimulation, 
-        r_first_timesteps! = nothing, 
+        simulation::ReactantSimulation,
+        r_first_timesteps! = nothing,
         r_later_timestep! = nothing;
         period::Period = SpeedyWeather.DEFAULT_PERIOD,
         steps::Int = SpeedyWeather.DEFAULT_TIMESTEPS,

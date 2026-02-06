@@ -19,8 +19,8 @@ import SpeedyWeather: ReactantDevice
 # ============================================================================
 const TRUNC = 31            # spectral truncation
 const NSTEPS = 10           # number of time steps to compare
-const RTOL = 1e-3           # relative tolerance for comparison
-const ATOL = 1e-8          # absolute tolerance for comparison
+const RTOL = 1.0e-3           # relative tolerance for comparison
+const ATOL = 1.0e-8          # absolute tolerance for comparison
 
 # ============================================================================
 # Helper functions
@@ -71,10 +71,10 @@ end
 function sync_prognostic_variables!(sim_cpu, sim_reactant)
     progn_cpu, _, _ = SpeedyWeather.unpack(sim_cpu)
     progn_reactant, _, _ = SpeedyWeather.unpack(sim_reactant)
-    
+
     # Sync vorticity from Reactant to CPU (copy underlying data)
     copyto!(progn_cpu.vor.data, Array(progn_reactant.vor.data))
-    
+
     return nothing
 end
 
@@ -82,9 +82,9 @@ end
 function compare_prognostic_variables(sim_cpu, sim_reactant; rtol = RTOL, atol = ATOL)
     progn_cpu, _, _ = SpeedyWeather.unpack(sim_cpu)
     progn_reactant, _, _ = SpeedyWeather.unpack(sim_reactant)
-    
+
     results = Dict{Symbol, NamedTuple}()
-    
+
     # Compare vorticity
     vor_cpu = Array(progn_cpu.vor[:, :, 2])
     vor_reactant = Array(progn_reactant.vor[:, :, 2])
@@ -92,9 +92,9 @@ function compare_prognostic_variables(sim_cpu, sim_reactant; rtol = RTOL, atol =
     results[:vor] = (
         max_abs_diff = maximum(abs_diff),
         mean_abs_diff = mean(abs_diff),
-        matches = isapprox(vor_cpu, vor_reactant, rtol = rtol, atol = atol)
+        matches = isapprox(vor_cpu, vor_reactant, rtol = rtol, atol = atol),
     )
-    
+
     return results
 end
 
@@ -102,90 +102,90 @@ end
 function compare_grid_variables(sim_cpu, sim_reactant; rtol = RTOL, atol = ATOL)
     _, diagn_cpu, _ = SpeedyWeather.unpack(sim_cpu)
     _, diagn_reactant, _ = SpeedyWeather.unpack(sim_reactant)
-    
+
     results = Dict{Symbol, Bool}()
-    
+
     # Compare u_grid
     u_cpu = Array(diagn_cpu.grid.u_grid)
     u_reactant = Array(diagn_reactant.grid.u_grid)
     results[:u_grid] = isapprox(u_cpu, u_reactant, rtol = rtol, atol = atol)
-    
+
     # Compare v_grid
     v_cpu = Array(diagn_cpu.grid.v_grid)
     v_reactant = Array(diagn_reactant.grid.v_grid)
     results[:v_grid] = isapprox(v_cpu, v_reactant, rtol = rtol, atol = atol)
-    
+
     # Compare vor_grid
     vor_cpu = Array(diagn_cpu.grid.vor_grid)
     vor_reactant = Array(diagn_reactant.grid.vor_grid)
     results[:vor_grid] = isapprox(vor_cpu, vor_reactant, rtol = rtol, atol = atol)
-    
+
     return results
 end
 
 """Run the full correctness test for a given model type."""
 function test_model_correctness(ModelType::Type; trunc = TRUNC, nsteps = NSTEPS, rtol = RTOL, atol = ATOL)
     model_name = string(ModelType)
-    
-    println("=" ^ 60)
+
+    println("="^60)
     println("$model_name: CPU vs Reactant Comparison Test")
-    println("=" ^ 60)
-    
+    println("="^60)
+
     # Setup CPU model
     println("\n[1/4] Setting up CPU model...")
     model_cpu = create_cpu_model(ModelType; trunc)
     simulation_cpu = initialize!(model_cpu)
     println("  ✓ CPU model initialized")
     println("  Resolution: T$trunc")
-    
+
     # Setup Reactant model
     println("\n[2/4] Setting up Reactant model...")
     model_reactant = create_reactant_model(ModelType; trunc)
     simulation_reactant = initialize!(model_reactant)
     println("  ✓ Reactant model initialized")
-    
+
     # Synchronize initial conditions (copy from Reactant to CPU)
     println("\n[3/4] Synchronizing initial conditions...")
     sync_prognostic_variables!(simulation_cpu, simulation_reactant)
     println("  ✓ Prognostic variables synchronized (Reactant → CPU)")
-    
+
     # Run time stepping
     println("\n[4/4] Running time stepping comparison...")
     println("  Running CPU model for $nsteps steps...")
     SpeedyWeather.run!(simulation_cpu; steps = nsteps)
-    
+
     println("  Running Reactant model for $nsteps steps...")
     SpeedyWeather.run!(simulation_reactant; steps = nsteps)
-    
+
     # Compare results
-    println("\n" * "=" ^ 60)
+    println("\n" * "="^60)
     println("RESULTS")
-    println("=" ^ 60)
-    
+    println("="^60)
+
     progn_results = compare_prognostic_variables(simulation_cpu, simulation_reactant; rtol, atol)
     grid_results = compare_grid_variables(simulation_cpu, simulation_reactant; rtol, atol)
-    
+
     println("\nVorticity comparison after $nsteps steps:")
     println("  Max absolute difference:  $(progn_results[:vor].max_abs_diff)")
     println("  Mean absolute difference: $(progn_results[:vor].mean_abs_diff)")
-    
+
     # Run tests
     @testset "$model_name CPU vs Reactant" begin
         @testset "Prognostic variables" begin
             @test progn_results[:vor].matches
         end
-        
+
         @testset "Grid variables" begin
             @test grid_results[:u_grid]
             @test grid_results[:v_grid]
             @test grid_results[:vor_grid]
         end
     end
-    
-    println("\n" * "=" ^ 60)
+
+    println("\n" * "="^60)
     println("Test completed!")
-    println("=" ^ 60)
-    
+    println("="^60)
+
     return (progn_results, grid_results)
 end
 
