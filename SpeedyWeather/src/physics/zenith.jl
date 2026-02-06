@@ -117,7 +117,9 @@ end
 function cos_zenith!(diagn::DiagnosticVariables, time::DateTime, model::PrimitiveEquation)
     (; solar_zenith, geometry) = model
     (; cos_zenith) = diagn.physics
-    return cos_zenith!(cos_zenith, solar_zenith, time, geometry)
+    rotation_time = time
+    orbit_time = time
+    return cos_zenith!(cos_zenith, solar_zenith, rotation_time, orbit_time, geometry)
 end
 
 function Base.show(io::IO, L::AbstractZenith)
@@ -185,12 +187,14 @@ end
 """
 $(TYPEDSIGNATURES)
 Calculate cos of solar zenith angle with a daily cycle
-at time `time`. Seasonal cycle or time correction may be disabled,
+at rotation_time `rotation_time` and orbit_time `orbit_time`.
+Seasonal cycle or time correction may be disabled,
 depending on parameters in SolarZenith."""
 function cos_zenith!(
         cos_zenith::AbstractField,
         S::SolarZenith,
-        time::DateTime,
+        rotation_time::DateTime,
+        orbit_time::DateTime,
         geometry::AbstractGeometry,
     )
     NF = eltype(cos_zenith)
@@ -200,7 +204,7 @@ function cos_zenith!(
         throw(DimensionMismatch(geometry.spectral_grid.grid, cos_zenith.grid))
 
     # g: angular fraction of year [0...2π] for Jan-01 to Dec-31
-    time_of_year = S.seasonal_cycle ? time : S.initial_time[]
+    time_of_year = S.seasonal_cycle ? orbit_time : S.initial_time[]
     g = year_angle(NF, time_of_year, length_of_day, length_of_year)
 
     # time correction [radians] due to the equation of time (sunrise/set oscillation)
@@ -208,7 +212,7 @@ function cos_zenith!(
 
     # solar hour angle at 0˚E (longtiude offset added later)
     λ = 0
-    solar_hour_angle_0E = solar_hour_angle(NF, time, λ, length_of_day) + tc
+    solar_hour_angle_0E = solar_hour_angle(NF, rotation_time, λ, length_of_day) + tc
 
     # solar declination angle [radians] changing from tropic of cancer to capricorn
     # throughout the year measured by g [radians]
@@ -258,12 +262,14 @@ SolarZenithSeason(SG::SpectralGrid; kwargs...) = SolarZenithSeason{SG.NF, SinSol
 """
 $(TYPEDSIGNATURES)
 Calculate cos of solar zenith angle as daily average
-at time `time`. Seasonal cycle or time correction may be disabled,
+at rotation_time `rotation_time` and orbit_time `orbit_time`.
+Seasonal cycle or time correction may be disabled,
 depending on parameters in SolarZenithSeason."""
 function cos_zenith!(
         cos_zenith::AbstractField,
         S::SolarZenithSeason,
-        time::DateTime,
+        rotation_time::DateTime,
+        orbit_time::DateTime,
         geometry::AbstractGeometry,
     )
     NF = eltype(cos_zenith)
@@ -273,7 +279,7 @@ function cos_zenith!(
         throw(DimensionMismatch(geometry.spectral_grid.grid, cos_zenith.grid))
 
     # g: angular fraction of year [0...2π] for Jan-01 to Dec-31
-    time_of_year = S.seasonal_cycle ? time : S.initial_time[]
+    time_of_year = S.seasonal_cycle ? orbit_time : S.initial_time[]
     g = year_angle(NF, time_of_year, length_of_day, length_of_year)
 
     # solar declination angle [radians] changing from tropic of cancer to capricorn
