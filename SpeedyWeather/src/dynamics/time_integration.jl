@@ -240,10 +240,9 @@ function first_timesteps!(simulation::AbstractSimulation)
     (; Δt) = time_stepping
 
     # decide whether to start with 1x Euler then 1x Leapfrog at Δt
-    @trace if time_stepping.first_step_euler
+    if time_stepping.first_step_euler
         first_timesteps!(progn, diagn, model)
         time_stepping.first_step_euler = !time_stepping.continue_with_leapfrog   # after first run! continue with leapfrog
-
     else    # or continue with leaprog steps at 2Δt (e.g. restart)
         # but make sure that implicit solver is initialized in that situation
         initialize!(model.implicit, 2Δt, diagn, model)
