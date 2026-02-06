@@ -150,14 +150,16 @@ function test_tendencies!(sim_cpu, sim_reactant, model_name; rtol = RTOL, atol =
     println("Testing tendencies (single timestep)")
     println("-"^60)
 
-    # Run a single timestep to compute tendencies
-    r_first_timesteps! = @compile first_timesteps!(sim_reactant)
-    r_later_timestep! = @compile later_timestep!(sim_reactant)
+    initialize!(sim_cpu, steps=1)
+    initialize!(sim_reactant, steps=1)
 
+    sync_variables!(sim_cpu, sim_reactant)
+
+    # Run a single timestep to compute tendencies
     println("  Running CPU model...")
     SpeedyWeather.timestep!(sim_cpu)
     println("  Running Reactant model...")
-    SpeedyWeather.timestep!(sim_reactant, r_first_timesteps!, r_later_timestep!)
+    @jit SpeedyWeather.timestep!(sim_reactant)
     println("  ✓ Tendencies computed")
 
     # Compare tendencies
@@ -175,10 +177,12 @@ function test_tendencies!(sim_cpu, sim_reactant, model_name; rtol = RTOL, atol =
 end
 
 """Test prognostic and grid variables after running for nsteps on already-initialized simulations."""
-function test_time_stepping!(sim_cpu, sim_reactant, r_first_timesteps!, r_later_timestep!, model_name; nsteps = NSTEPS, rtol = RTOL, atol = ATOL)
+function test_time_stepping!(sim_cpu, sim_reactant, model_name; nsteps = NSTEPS, rtol = RTOL, atol = ATOL)
     println("\n" * "-"^60)
     println("Testing time stepping ($nsteps steps)")
     println("-"^60)
+    
+    sync_variables!(sim_cpu, sim_reactant)
 
     # Run time stepping
     println("  Running CPU model...")
@@ -220,34 +224,27 @@ function test_model(ModelType::Type; trunc = TRUNC, nsteps = NSTEPS, rtol = RTOL
     println("="^60)
 
     # Setup CPU model
-    println("\n[1/4] Setting up CPU model...")
+    println("\n[1/3] Setting up CPU model...")
     model_cpu = create_cpu_model(ModelType; trunc)
     simulation_cpu = initialize!(model_cpu)
     println("  ✓ CPU model initialized (T$trunc)")
 
     # Setup Reactant model
-    println("\n[2/4] Setting up Reactant model...")
+    println("\n[2/3] Setting up Reactant model...")
     model_reactant = create_reactant_model(ModelType; trunc)
     simulation_reactant = initialize!(model_reactant)
-    r_first_timesteps! = @compile first_timesteps!(simulation_reactant)
-    r_later_timestep! = @compile later_timestep!(simulation_reactant)
     println("  ✓ Reactant model initialized")
 
     # spin up models a bit 
-    println("\n[3/4] Spinning up models...")
+    println("\n[3/3] Spinning up models...")
     run!(simulation_cpu; period = Day(20))
-    run!(simulation_reactant, r_first_timesteps!, r_later_timestep!; period = Day(20))
+    run!(simulation_reactant; period = Day(20))
     println("  ✓ Models spun up")
-
-    # Synchronize initial conditions (copy from Reactant to CPU)
-    println("\n[4/4] Synchronizing initial conditions...")
-    sync_variables!(simulation_cpu, simulation_reactant)
-    println("  ✓ Variables synchronized (Reactant → CPU)")
 
     # Run tests
     @testset "$model_name CPU vs Reactant" begin
-        tend_results = test_tendencies!(simulation_cpu, simulation_reactant, r_first_timesteps!, r_later_timestep!, model_name; rtol, atol)
-        stepping_results = test_time_stepping!(simulation_cpu, simulation_reactant, r_first_timesteps!, r_later_timestep!, model_name; nsteps, rtol, atol)
+        tend_results = test_tendencies!(simulation_cpu, simulation_reactant,     model_name; rtol, atol)
+        stepping_results = test_time_stepping!(simulation_cpu, simulation_reactant, model_name; nsteps, rtol, atol)
     end
 
     println("\n" * "="^60)
