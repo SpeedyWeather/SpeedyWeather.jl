@@ -225,8 +225,8 @@ One-band shortwave radiative transfer with cloud reflection and ozone absorption
     U = U_surface_albedo + U_stratocumulus
     for k in nlayers:-1:1
         U_out = U * t[ij, k]
-        U_out += k == cloud_top ? U_reflected : zero(U)
         dTdt[ij, k] += flux_to_tendency((U - U_out) / cₚ, pₛ, k, model)
+        U_out += k == cloud_top ? U_reflected : zero(U)
         U = U_out
     end
 
