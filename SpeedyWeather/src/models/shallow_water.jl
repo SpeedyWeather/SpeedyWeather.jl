@@ -61,10 +61,20 @@ $(TYPEDFIELDS)"""
     feedback::FB = Feedback()
 end
 
-prognostic_variables(::Type{<:ShallowWater}) = (:vor, :div, :pres)
-default_concrete_model(::Type{ShallowWater}) = ShallowWaterModel
+function variables(::Type{<:ShallowWater})
+    return (variables(BarotropicModel)...,
+        PrognosticVariable(:div, Spectral3D(), desc = "Divergence", units = "1/s"),
+        PrognosticVariable(:pres, Spectral2D(), desc = "Interface displacement", units = "m"),
+        GridVariable(:div, Grid3D(), desc = "Divergence", units = "1/s"),
+        GridVariable(:pres, Grid2D(), desc = "Interface displacement", units = "m"),
+        TendencyVariable(:div, Spectral3D(), desc = "Tendency of divergence", units = "1/s²"),
+        TendencyVariable(:pres, Spectral2D(), desc = "Tendency of interface displacement", units = "m/s"),
+        TendencyVariable(:div, Grid3D(), namespace = :grid, desc = "Tendency of divergence on the grid", units = "1/s²"),
+        TendencyVariable(:pres, Grid2D(), namespace = :grid, desc = "Tendency of interface displacement on the grid", units = "m/s"),
+    )
+end
 
-"""
+""" 
 $(TYPEDSIGNATURES)
 Calls all `initialize!` functions for most components (=fields) of `model`,
 except for `model.output` and `model.feedback` which are always initialized
@@ -87,15 +97,12 @@ function initialize!(model::ShallowWater; time::DateTime = DEFAULT_DATE)
     initialize!(model.random_process, model)
     initialize!(model.particle_advection, model)
 
-    # allocate variables
-    prognostic_variables = PrognosticVariables(model)
-    diagnostic_variables = DiagnosticVariables(model)
+    # allocate all variables and set initial conditions
+    variables = Variables(model)
+    # initialize!(variables.prognostic, model.initial_conditions, model)
 
-    # initialize non-atmosphere prognostic variables
-    initialize!(prognostic_variables.particles, prognostic_variables, diagnostic_variables, model)
-
-    initialize!(prognostic_variables, model.initial_conditions, model)
-    (; clock) = prognostic_variables
+    # set the time
+    (; clock) = variables.prognostic
     clock.time = time       # set the current time
     clock.start = time      # and store the start time
 

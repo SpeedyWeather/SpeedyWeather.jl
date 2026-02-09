@@ -106,5 +106,7 @@ end
 @inline get_parameterizations(model::ShallowWater) = NamedTuple()
 @inline get_extra_parameterizations(model::ShallowWater) = NamedTuple()
 
-# default to 0 soil layers / no land model
-@inline get_soil_layers(model::AbstractModel) = 0
+"""$(TYPEDSIGNATURES)
+Extract the number of soil layers from the model. The fallback is 0 soil layers, i.e. no land model."""
+@inline get_soil_layers(model::AbstractModel) = (haskey(model, :land) && !isnothing(model.land)) ? get_nlayers(model.land) : 0
+@inline get_nlayers(model::AbstractModel) = model.spectral_grid.nlayers

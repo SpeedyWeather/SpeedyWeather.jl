@@ -248,7 +248,7 @@ function initialize!(
 
     # only checked for models that have a land component
     if hasfield(typeof(model), :land) && !isnothing(model.land)
-        @assert get_soil_layers(model) == size(output.field3Dland, 2) "$(size(output.field3Dland, 2)) soil layers initialized for output, but $(get_soil_layers(model)) soil layers initialized for model. Please construct NetCDFOutput with the same LandGeometry as the model."
+        @assert get_nlayers(model.land) == size(output.field3Dland, 2) "$(size(output.field3Dland, 2)) soil layers initialized for output, but $(get_nlayers(model.land)) soil layers initialized for model. Please construct NetCDFOutput with the same LandGeometry as the model."
     end
 
     # GET RUN ID, CREATE FOLDER

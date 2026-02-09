@@ -10,7 +10,7 @@ function forcing!(
     return forcing!(diagn, progn, model.forcing, lf, model)
 end
 
-## NO FORCING
+# NO FORCING
 forcing!(diagn, progn, forcing::Nothing, args...) = nothing
 
 # JET STREAM FORCING

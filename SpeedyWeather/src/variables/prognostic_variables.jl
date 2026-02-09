@@ -119,7 +119,7 @@ function PrognosticVariables(model::AbstractModel)
 
     (; NF, spectrum, grid, nlayers, nparticles) = SG
     (; SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, ParticleVector) = SG
-    nlayers_soil = get_soil_layers(model)
+    nlayers_soil = get_nlayers(model.land)
 
     # allocate parameterization variables
     variable_names = get_prognostic_variables(model)

@@ -59,15 +59,21 @@ $(TYPEDFIELDS)"""
     feedback::FB = Feedback()
 end
 
-prognostic_variables(::Type{<:Barotropic}) = (:vor,)
-default_concrete_model(::Type{Barotropic}) = BarotropicModel
-
-parameters(model::Barotropic; kwargs...) = SpeedyParams(
-    planet = parameters(model.planet; component = :planet, kwargs...),
-    atmosphere = parameters(model.atmosphere; component = :atmosphere, kwargs...),
-    forcing = parameters(model.forcing; component = :forcing, kwargs...),
-    drag = parameters(model.drag; component = :drag, kwargs...),
-)
+function variables(::Type{<:Barotropic})
+    return (
+        PrognosticVariable(:clock, ClockVar(), desc = "Clock", units = "s"),
+        PrognosticVariable(:vor, Spectral3D(), desc = "Relative vorticity", units = "1/s"),
+        GridVariable(:vor, Grid3D(), desc = "Relative vorticity", units = "1/s"),
+        GridVariable(:u, Grid3D(), desc = "Zonal wind", units = "m/s"),
+        GridVariable(:v, Grid3D(), desc = "Meridional wind", units = "m/s"),
+        TendencyVariable(:vor, Spectral3D(), desc = "Tendency of relative vorticity", units = "1/s²"),
+        TendencyVariable(:vor, Grid3D(), namespace = :grid, desc = "Tendency of relative vorticity on the grid", units = "1/s²"),
+        TendencyVariable(:u, Grid3D(), namespace = :grid, desc = "Tendency of zonal wind on the grid", units = "m/s²"),
+        TendencyVariable(:v, Grid3D(), namespace = :grid, desc = "Tendency of meridional wind on the grid", units = "m/s²"),
+        ScratchVariable(:a, Spectral3D(), desc = "Spectral3D scratch memory", units = "?"),
+        ScratchVariable(:b, Spectral3D(), desc = "Spectral3D scratch memory", units = "?"),
+    )
+end
 
 """
 $(TYPEDSIGNATURES)

@@ -53,3 +53,17 @@ deactivate!(dict::TRACER_DICT, tracers::Tracer...) = _activate!(dict, tracers...
 
 # delete from tracer dictionary, identified by its `name::Symbol`
 Base.delete!(model::AbstractModel, tracer::Tracer) = delete!(model.tracers, tracer.name)
+
+function variables(T::Tracer)
+    return (
+        PrognosticVariable(T.name, Spectral3D(), desc = "$(T.name)", namespace = :tracers),
+        GridVariable(T.name, Grid3D(), desc = "$(T.name)", namespace = :tracers),
+        GridVariable(Symbol(T.name, :_prev), Grid3D(), desc = "$(T.name)", namespace = :tracers),
+        TendencyVariable(T.name, Spectral3D(), desc = "Tendency of $(T.name)", namespace = :tracers),
+        TendencyVariable(Symbol(T.name, :_grid), Grid3D(), desc = "Tendency of $(T.name)", namespace = :tracers),
+    )
+end
+
+function variables(D::TRACER_DICT)
+    return (variables(tracer) for tracer in values(D)) |> Iterators.flatten |> Tuple
+end
