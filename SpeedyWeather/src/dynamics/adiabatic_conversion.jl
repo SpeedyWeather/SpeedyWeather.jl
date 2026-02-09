@@ -26,28 +26,27 @@ function initialize!(
     )
     (; σ_lnp_A, σ_lnp_B) = adiabatic
 
-    # Transfer arrays to CPU for computation
-    σ_lnp_A_cpu = on_architecture(CPU(), σ_lnp_A)
-    σ_lnp_B_cpu = on_architecture(CPU(), σ_lnp_B)
-
     # ADIABATIC TERM, Simmons and Burridge, 1981, eq. 3.12
-    (; σ_levels_half, σ_levels_full, σ_levels_thick) = model.geometry
-    σ_levels_half_cpu = on_architecture(CPU(), σ_levels_half)
-    σ_levels_thick_cpu = on_architecture(CPU(), σ_levels_thick)
+    (; σ_levels_half, σ_levels_thick) = model.geometry
+    nlayers = length(σ_levels_thick)
+
+    σ_half_lower = @view σ_levels_half[1:nlayers]       # σ_k-1/2
+    σ_half_upper = @view σ_levels_half[2:(nlayers + 1)]  # σ_k+1/2
+    ks = 1:nlayers
+
+    # clamp σ_half_lower to avoid log(0) at k=1 where σ_levels_half[1] = 0
+    NF = eltype(σ_lnp_A)
+    σ_half_lower_safe = max.(σ_half_lower, eps(NF))
 
     # precompute ln(σ_k+1/2) - ln(σ_k-1/2) but swap sign, include 1/Δσₖ
-    σ_lnp_A_cpu .= log.(σ_levels_half_cpu[1:(end - 1)] ./ σ_levels_half_cpu[2:end]) ./ σ_levels_thick_cpu
-    σ_lnp_A_cpu[1] = 0  # the corresponding sum is 1:k-1 so 0 to replace log(0) from above
+    # set k=1 to 0 (the corresponding sum is 1:k-1 so 0 to replace log(0))
+    σ_lnp_A .= log.(σ_half_lower_safe ./ σ_half_upper) ./ σ_levels_thick .* (ks .> 1)
 
     # precompute the αₖ = 1 - p_k-1/2/Δpₖ*log(p_k+1/2/p_k-1/2) term in σ coordinates
-    σ_lnp_B_cpu .= 1 .- σ_levels_half_cpu[1:(end - 1)] ./ σ_levels_thick_cpu .*
-        log.(σ_levels_half_cpu[2:end] ./ σ_levels_half_cpu[1:(end - 1)])
-    σ_lnp_B_cpu[1] = σ_levels_half_cpu[1] <= 0 ? log(2) : σ_lnp_B_cpu[1]    # set α₁ = log(2), eq. 3.19
-    σ_lnp_B_cpu .*= -1  # absorb sign from -1/Δσₖ only, eq. 3.12
-
-    # Transfer results back to device
-    σ_lnp_A .= on_architecture(architecture(σ_lnp_A), σ_lnp_A_cpu)
-    σ_lnp_B .= on_architecture(architecture(σ_lnp_B), σ_lnp_B_cpu)
+    # set α₁ = log(2) when σ_levels_half[1] <= 0, eq. 3.19
+    # absorb sign from -1/Δσₖ only, eq. 3.12
+    σ_lnp_B .= .-(1 .- σ_half_lower_safe ./ σ_levels_thick .* log.(σ_half_upper ./ σ_half_lower_safe)) .* (ks .> 1) .-
+        log(NF(2)) .* (ks .== 1)
 
     return nothing
 end
