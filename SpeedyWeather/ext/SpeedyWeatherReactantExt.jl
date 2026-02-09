@@ -13,6 +13,24 @@ const ReactantSimulation = Union{
 
 # time stepping functions with Reactant, take compiled functions as optional arguments
 # in case they are not provided, they are compiled on the fly
+
+"""
+$(TYPEDSIGNATURES)
+
+Time-stepping function for a simulation with Reactant, take compiled functions as optional arguments.
+In case they are not provided, they are compiled on the fly.
+
+Example usage:
+
+```julia
+simulation = initialize!(model) 
+initialize!(simulation; steps=10) # don't forget this! 
+r_first! = @compile SpeedyWeather.first_timesteps!(simulation)
+r_later! = @compile SpeedyWeather.later_timestep!(simulation)
+SpeedyWeather.time_stepping!(simulation, r_first!, r_later!)
+SpeedyWeather.finalize!(simulation)
+```
+"""
 function SpeedyWeather.time_stepping!(simulation::ReactantSimulation, r_first_timesteps! = nothing, r_later_timestep! = nothing)
     if isnothing(r_first_timesteps!)
         @info "Reactant compiling first_timesteps!"
@@ -39,25 +57,6 @@ function SpeedyWeather.timestep!(simulation::ReactantSimulation, r_first_timeste
     else
         r_later_timestep!(simulation)
     end
-end
-
-"""
-$(TYPEDSIGNATURES)
-Run a simulation with Reactant, take compiled functions as optional arguments.
-In case they are not provided, they are compiled on the fly.
-"""
-function SpeedyWeather.run!(
-        simulation::ReactantSimulation,
-        r_first_timesteps! = nothing,
-        r_later_timestep! = nothing;
-        period::Period = SpeedyWeather.DEFAULT_PERIOD,
-        steps::Int = SpeedyWeather.DEFAULT_TIMESTEPS,
-        output::Bool = false,
-    )
-    SpeedyWeather.initialize!(simulation; period, steps, output)                      # scaling, initialize output, store initial conditions
-    SpeedyWeather.time_stepping!(simulation, r_first_timesteps!, r_later_timestep!)   # run it, yeah!
-    SpeedyWeather.finalize!(simulation)                                               # unscale, finalize output, write restart file, finalize callbacks
-    return SpeedyWeather.unicodeplot(simulation)
 end
 
 end
