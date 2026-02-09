@@ -123,10 +123,15 @@ export EarthOrography
 """Earth's orography read from file, with smoothing.
 $(TYPEDFIELDS)"""
 @kwdef struct EarthOrography{NF, GridVariable2D, SpectralVariable2D} <: AbstractOrography
-
     # OPTIONS
     "filename of orography"
     file::String = "orography.nc"
+    
+    "path to the folder containing the orography"
+    path::String = joinpath(pkgdir(SpeedyWeather), "src/input/custom_inputs", file)
+
+    "NCDataset variable name"
+    varname::String = "orog"
 
     "Grid the orography file comes on"
     file_Grid::Type{<:AbstractGrid} = FullGaussianGrid
@@ -185,14 +190,17 @@ function initialize!(
 
     (; orography, surface_geopotential, scale) = orog
     (; gravity) = P
-
-    path = get_asset("data", orog.file)
-    ncfile = NCDataset(path)
+    if isfile(orog.path)
+        ncdataset = get_asset(orog.path, orog.file; orog.varname, type=FullGaussianField, format=NCDataset)
+    else
+        print("artifact")
+        ncdataset = get_asset("data", orog.file; name=orog.varname, type=FullGaussianField, format=NCDataset)
+    end
 
     # height [m], wrap matrix into a grid
     # TODO also read lat, lon from file and flip array in case it's not as expected
     # F = RingGrids.field_type(orog.file_Grid)  # TODO this isn't working, hardcode instead
-    orography_highres = on_architecture(S.architecture, FullGaussianField(ncfile["orog"].var[:, :], input_as = Matrix))
+    orography_highres = on_architecture(S.architecture, ncdataset)
 
     # Interpolate/coarsen to desired resolution
     interpolate!(orography, orography_highres)
