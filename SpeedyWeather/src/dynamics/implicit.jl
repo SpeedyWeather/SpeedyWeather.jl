@@ -210,7 +210,6 @@ function initialize!(
         atmosphere::AbstractAtmosphere,
         adiabatic_conversion::AbstractAdiabaticConversion,
     )
-    NF = eltype(diagn)
     # option to skip reinitialization at restart
     (implicit.initialized && !implicit.reinitialize) && return nothing
 
@@ -220,34 +219,7 @@ function initialize!(
     (; Δp_geopot_half, Δp_geopot_full) = geopotential
     (; σ_lnp_A, σ_lnp_B) = adiabatic_conversion
 
-    # Get the architecture to transfer back at the end
-    arch = architecture(implicit.S)
-
-    # Transfer all arrays that need to be computed to CPU
-    # These are small (nlayers × nlayers) matrices, so CPU computation is more efficient
-    temp_profile_cpu, S_cpu, S⁻¹_cpu, L_cpu, R_cpu, U_cpu, W_cpu, L0_cpu, L1_cpu, L2_cpu, L3_cpu, L4_cpu =
-        on_architecture(
-        CPU(), (
-            implicit.temp_profile, implicit.S, implicit.S⁻¹, implicit.L,
-            implicit.R, implicit.U, implicit.W, implicit.L0, implicit.L1,
-            implicit.L2, implicit.L3, implicit.L4,
-        )
-    )
-
-    # Also transfer geometry and other arrays to CPU
-    σ_levels_full_cpu, σ_levels_thick_cpu, Δp_geopot_half_cpu, Δp_geopot_full_cpu, σ_lnp_A_cpu, σ_lnp_B_cpu, temp_average_cpu =
-        on_architecture(
-        CPU(), (
-            σ_levels_full, σ_levels_thick, Δp_geopot_half, Δp_geopot_full,
-            σ_lnp_A, σ_lnp_B, diagn.temp_average,
-        )
-    )
-
-    # use current vertical temperature profile
-    temp_profile_cpu .= temp_average_cpu
-
-    # return immediately if temp_profile contains NaRs, model blew up in that case
-    all(isfinite.(temp_profile_cpu)) || return nothing
+    arch = architecture(implicit.S⁻¹)
 
     # set up R, U, L, W operators from
     # δD = G_D + ξ(RδT + Uδlnps)        divergence D correction
@@ -262,77 +234,121 @@ function initialize!(
     # R, U, L, W are linear operators that are therefore defined here and inverted
     # to obtain δD first, and then δT and δlnps through substitution
 
+    (; temp_profile, S⁻¹, L, R, U, W, L0, L1, L2, L3, L4) = implicit
+
+    # use current vertical temperature profile
+    temp_profile .= diagn.temp_average
+
+    # return immediately if temp_profile contains NaRs, model blew up in that case
+    all(isfinite.(temp_profile)) || return nothing
+
     ξ = α * dt                        # dt = 2Δt for leapfrog, but = Δt, Δ/2 in first_timesteps!
     implicit.ξ[] = ξ                # also store in Implicit struct
 
+    # index vectors for broadcasting: rows = 1:nlayers (column), cols = (1:nlayers)' (row)
+    rows = (1:nlayers)
+    cols = (1:nlayers)'
+
     # DIVERGENCE OPERATORS (called g in Hoskins and Simmons 1975, eq 11 and Appendix 1)
-    @inbounds for k in 1:nlayers                # vertical geopotential integration as matrix operator
-        R_cpu[1:k, k] .= -Δp_geopot_full_cpu[k]         # otherwise equivalent to geopotential! with zero orography
-        R_cpu[1:(k - 1), k] .+= -Δp_geopot_half_cpu[k]      # incl the minus but excluding the eigenvalues as with U
-    end
-    U_cpu .= -R_dry * temp_profile_cpu        # the R_d*Tₖ∇² term excl the eigenvalues from ∇² for divergence
+    # R[row, k] = -Δp_geopot_full[k] for row <= k, additionally -Δp_geopot_half[k] for row < k
+    R .= .-Δp_geopot_full[cols] .* (rows .<= cols) .- Δp_geopot_half[cols] .* (rows .< cols)
+
+    # U = -R_dry * temp_profile (the R_d*Tₖ∇² term excl eigenvalues from ∇² for divergence)
+    U .= .-R_dry .* temp_profile
 
     # TEMPERATURE OPERATOR (called τ in Hoskins and Simmons 1975, eq 9 and Appendix 1)
-    L0_cpu .= 1 ./ 2σ_levels_thick_cpu
-    L2_cpu .= κ * temp_profile_cpu .* σ_lnp_A_cpu    # factor in front of the div_sum_above term
-    L4_cpu .= κ * temp_profile_cpu .* σ_lnp_B_cpu    # factor in front of div term in Dlnps/Dt
+    L0 .= inv.(2 .* σ_levels_thick)
+    L2 .= κ .* temp_profile .* σ_lnp_A
+    L4 .= κ .* temp_profile .* σ_lnp_B
 
-    @inbounds for k in 1:nlayers
-        Tₖ = temp_profile_cpu[k]                    # average temperature at k
-        k_above = max(1, k - 1)                       # layer index above
-        k_below = min(k + 1, nlayers)                 # layer index below
-        ΔT_above = Tₖ - temp_profile_cpu[k_above]   # temperature difference to layer above
-        ΔT_below = temp_profile_cpu[k_below] - Tₖ   # and to layer below
-        σₖ = σ_levels_full_cpu[k]                   # should be Σ_r=1^k Δσᵣ for model top at >0hPa
-        σₖ_above = σ_levels_full_cpu[k_above]
+    # L1[k, r]: vertical advection operator
+    # k indices for below/above neighbours, clamped to 1:nlayers
+    k_above = max.(1, rows .- 1)
+    k_below = min.(rows .+ 1, nlayers)
+    ΔT_below = temp_profile[k_below] .- temp_profile[rows]
+    ΔT_above = temp_profile[rows] .- temp_profile[k_above]
+    σₖ = σ_levels_full[rows]
+    σₖ_above = σ_levels_full[k_above]
+    Δσᵣ = σ_levels_thick[cols]
 
-        for r in 1:nlayers
-            L1_cpu[k, r] = ΔT_below * σ_levels_thick_cpu[r] * σₖ         # vert advection operator below
-            L1_cpu[k, r] -= k >= r ? σ_levels_thick_cpu[r] : zero(NF)
+    L1 .= ΔT_below .* Δσᵣ .* σₖ .- Δσᵣ .* (rows .>= cols) .+
+           ΔT_above .* Δσᵣ .* σₖ_above .- Δσᵣ .* ((rows .- 1) .>= cols)
 
-            L1_cpu[k, r] += ΔT_above * σ_levels_thick_cpu[r] * σₖ_above   # vert advection operator above
-            L1_cpu[k, r] -= (k - 1) >= r ? σ_levels_thick_cpu[r] : zero(NF)
-        end
+    # L3[r, k]: sum_above operator — lower triangle gets σ_levels_thick[k]
+    L3 .= σ_levels_thick[cols] .* (rows .> cols)
 
-        # _sum_above operator itself
-        L3_cpu[1:k, k] .= 0                              # fill upper triangle + diagonal with zeros
-        L3_cpu[(k + 1):end, k] .= σ_levels_thick_cpu[k]      # vert integration top to k-1
-    end
-
-    L_cpu .= Diagonal(L0_cpu) * L1_cpu .+ Diagonal(L2_cpu) * L3_cpu .+ Diagonal(L4_cpu)  # combine all operators into L
+    # Combine all operators into L = Diagonal(L0)*L1 + Diagonal(L2)*L3 + Diagonal(L4)
+    L .= L0 .* L1 .+ L2 .* L3 .+ L4 .* (rows .== cols)
 
     # PRESSURE OPERATOR (called πᵣ in Hoskins and Simmons, 1975 Appendix 1)
-    W_cpu .= -σ_levels_thick_cpu                # the -D̄ term in the log surface pres equation
+    W .= .-σ_levels_thick
 
     # solving the equations above for δD yields
     # δD = SG, with G = G_D + ξRG_T + ξUG_lnps and the operator S
     # S = 1 - ξ²(RL + UW) that has to be inverted to obtain δD from the Gs
-    I = LinearAlgebra.I(nlayers)
-    @inbounds for l in 1:(trunc + 1)
-        eigenvalue = -l * (l - 1)           # 1-based, -l*(l+1) → -l*(l-1)
-        S_cpu .= I .- ξ^2 * eigenvalue * (R_cpu * L_cpu .+ U_cpu * W_cpu')
+    # Compute S⁻¹ for every l via Gauss-Jordan elimination
+    S_scratch = similar(S⁻¹)
+    launch!(arch, LinearWorkOrder, (trunc + 1,), _implicit_invert_S_kernel!,
+        S⁻¹, S_scratch, R, L, U, W, ξ, nlayers)
 
-        # inv(S) but saving memory:
-        luS = LinearAlgebra.lu!(S_cpu)      # in-place LU decomposition (overwriting S)
-        Sinv = L1_cpu                       # reuse L1 matrix to store inv(S)
-        Sinv .= I                           # use ldiv! so last arg needs to be unity matrix
-        LinearAlgebra.ldiv!(luS, Sinv)      # now do S\I = S⁻¹ via LU decomposition
-        S⁻¹_cpu[l, :, :] .= Sinv            # store in array
+    return nothing
+end
+
+# Compute S⁻¹ for each spectral degree l via Gauss-Jordan elimination
+# S = I - ξ²*eigenvalue*(R*L + U*Wᵀ), then invert S per l
+# S_scratch[l,:,:] stores the S matrix during elimination,
+# while S⁻¹[l,:,:] tracks the identity → inverse transformation
+@kernel inbounds = true function _implicit_invert_S_kernel!(
+        S⁻¹,                           # Output: (trunc+2) × nlayers × nlayers tensor
+        S_scratch,                     # Scratch: same shape as S⁻¹, stores S per l
+        @Const(R),                      # Input: divergence operator matrix
+        @Const(L),                      # Input: temperature operator matrix
+        @Const(U),                      # Input: divergence vector
+        @Const(W),                      # Input: pressure vector
+        @Const(ξ),                      # Input: semi-implicit time step coefficient
+        @Const(nlayers),                # Input: number of layers
+    )
+    l = @index(Global, Linear)      # spectral degree (1-based)
+
+    NF = eltype(S⁻¹)
+    eigenvalue = -l * (l - 1)       # 1-based, -l*(l+1) → -l*(l-1)
+    ξ²λ = ξ^2 * eigenvalue
+
+    # Compute S = I - ξ²λ*(R*L + U*Wᵀ) into S_scratch[l,:,:]
+    # and initialize S⁻¹[l,:,:] as identity
+    for k in 1:nlayers
+        for r in 1:nlayers
+            RL_kr = zero(NF)
+            for j in 1:nlayers
+                RL_kr += R[k, j] * L[j, r]
+            end
+            S_scratch[l, k, r] = (k == r ? one(NF) : zero(NF)) - ξ²λ * (RL_kr + U[k] * W[r])
+            S⁻¹[l, k, r] = k == r ? one(NF) : zero(NF)
+        end
     end
 
-    # Transfer computed results back to the original architecture
-    implicit.temp_profile .= on_architecture(arch, temp_profile_cpu)
-    implicit.S .= on_architecture(arch, S_cpu)
-    implicit.S⁻¹ .= on_architecture(arch, S⁻¹_cpu)
-    implicit.L .= on_architecture(arch, L_cpu)
-    implicit.R .= on_architecture(arch, R_cpu)
-    implicit.U .= on_architecture(arch, U_cpu)
-    implicit.W .= on_architecture(arch, W_cpu)
-    implicit.L0 .= on_architecture(arch, L0_cpu)
-    implicit.L1 .= on_architecture(arch, L1_cpu)
-    implicit.L2 .= on_architecture(arch, L2_cpu)
-    implicit.L3 .= on_architecture(arch, L3_cpu)
-    return implicit.L4 .= on_architecture(arch, L4_cpu)
+    # Gauss-Jordan elimination: reduce S_scratch[l,:,:] (S) to I,
+    # applying the same row operations to S⁻¹[l,:,:] (I → S⁻¹)
+    for pivot in 1:nlayers
+        inv_pivot = inv(S_scratch[l, pivot, pivot])
+
+        # Scale pivot row
+        for r in 1:nlayers
+            S_scratch[l, pivot, r] *= inv_pivot
+            S⁻¹[l, pivot, r] *= inv_pivot
+        end
+
+        # Eliminate all other rows
+        for k in 1:nlayers
+            if k != pivot
+                factor = S_scratch[l, k, pivot]
+                for r in 1:nlayers
+                    S_scratch[l, k, r] -= factor * S_scratch[l, pivot, r]
+                    S⁻¹[l, k, r] -= factor * S⁻¹[l, pivot, r]
+                end
+            end
+        end
+    end
 end
 
 set_initialized!(implicit::ImplicitPrimitiveEquation) = (implicit.initialized = true)
