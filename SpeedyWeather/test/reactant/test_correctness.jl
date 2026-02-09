@@ -90,9 +90,12 @@ function compare_prognostic_variables(sim_cpu, sim_reactant; rtol = RTOL, atol =
     vor_cpu = Array(progn_cpu.vor[:, :, 2])
     vor_reactant = Array(progn_reactant.vor[:, :, 2])
     abs_diff = abs.(vor_cpu .- vor_reactant)
+    rel_diff = abs_diff ./ max.(abs.(vor_cpu), abs.(vor_reactant), eps(eltype(real(vor_cpu))))
     results[:vor] = (
         max_abs_diff = maximum(abs_diff),
         mean_abs_diff = mean(abs_diff),
+        max_rel_diff = maximum(rel_diff),
+        mean_rel_diff = mean(rel_diff),
         matches = isapprox(vor_cpu, vor_reactant, rtol = rtol, atol = atol),
     )
 
@@ -104,22 +107,46 @@ function compare_grid_variables(sim_cpu, sim_reactant; rtol = RTOL, atol = ATOL)
     _, diagn_cpu, _ = SpeedyWeather.unpack(sim_cpu)
     _, diagn_reactant, _ = SpeedyWeather.unpack(sim_reactant)
 
-    results = Dict{Symbol, Bool}()
+    results = Dict{Symbol, NamedTuple}()
 
     # Compare u_grid
     u_cpu = Array(diagn_cpu.grid.u_grid)
     u_reactant = Array(diagn_reactant.grid.u_grid)
-    results[:u_grid] = isapprox(u_cpu, u_reactant, rtol = rtol, atol = atol)
+    abs_diff = abs.(u_cpu .- u_reactant)
+    rel_diff = abs_diff ./ max.(abs.(u_cpu), abs.(u_reactant), eps(eltype(u_cpu)))
+    results[:u_grid] = (
+        max_abs_diff = maximum(abs_diff),
+        mean_abs_diff = mean(abs_diff),
+        max_rel_diff = maximum(rel_diff),
+        mean_rel_diff = mean(rel_diff),
+        matches = isapprox(u_cpu, u_reactant, rtol = rtol, atol = atol),
+    )
 
     # Compare v_grid
     v_cpu = Array(diagn_cpu.grid.v_grid)
     v_reactant = Array(diagn_reactant.grid.v_grid)
-    results[:v_grid] = isapprox(v_cpu, v_reactant, rtol = rtol, atol = atol)
+    abs_diff = abs.(v_cpu .- v_reactant)
+    rel_diff = abs_diff ./ max.(abs.(v_cpu), abs.(v_reactant), eps(eltype(v_cpu)))
+    results[:v_grid] = (
+        max_abs_diff = maximum(abs_diff),
+        mean_abs_diff = mean(abs_diff),
+        max_rel_diff = maximum(rel_diff),
+        mean_rel_diff = mean(rel_diff),
+        matches = isapprox(v_cpu, v_reactant, rtol = rtol, atol = atol),
+    )
 
     # Compare vor_grid
     vor_cpu = Array(diagn_cpu.grid.vor_grid)
     vor_reactant = Array(diagn_reactant.grid.vor_grid)
-    results[:vor_grid] = isapprox(vor_cpu, vor_reactant, rtol = rtol, atol = atol)
+    abs_diff = abs.(vor_cpu .- vor_reactant)
+    rel_diff = abs_diff ./ max.(abs.(vor_cpu), abs.(vor_reactant), eps(eltype(vor_cpu)))
+    results[:vor_grid] = (
+        max_abs_diff = maximum(abs_diff),
+        mean_abs_diff = mean(abs_diff),
+        max_rel_diff = maximum(rel_diff),
+        mean_rel_diff = mean(rel_diff),
+        matches = isapprox(vor_cpu, vor_reactant, rtol = rtol, atol = atol),
+    )
 
     return results
 end
@@ -135,9 +162,12 @@ function compare_tendencies(sim_cpu, sim_reactant; rtol = RTOL, atol = ATOL)
     vor_tend_cpu = Array(diagn_cpu.tendencies.vor_tend)
     vor_tend_reactant = Array(diagn_reactant.tendencies.vor_tend)
     abs_diff = abs.(vor_tend_cpu .- vor_tend_reactant)
+    rel_diff = abs_diff ./ max.(abs.(vor_tend_cpu), abs.(vor_tend_reactant), eps(eltype(real(vor_tend_cpu))))
     results[:vor_tend] = (
         max_abs_diff = maximum(abs_diff),
         mean_abs_diff = mean(abs_diff),
+        max_rel_diff = maximum(rel_diff),
+        mean_rel_diff = mean(rel_diff),
         matches = isapprox(vor_tend_cpu, vor_tend_reactant, rtol = rtol, atol = atol),
     )
 
@@ -150,8 +180,8 @@ function test_tendencies!(sim_cpu, sim_reactant, model_name; rtol = RTOL, atol =
     println("Testing tendencies (single timestep)")
     println("-"^60)
 
-    initialize!(sim_cpu, steps=1)
-    initialize!(sim_reactant, steps=1)
+    initialize!(sim_cpu)
+    initialize!(sim_reactant)
 
     sync_variables!(sim_cpu, sim_reactant)
 
@@ -168,6 +198,8 @@ function test_tendencies!(sim_cpu, sim_reactant, model_name; rtol = RTOL, atol =
     println("\nVorticity tendency comparison:")
     println("  Max absolute difference:  $(tend_results[:vor_tend].max_abs_diff)")
     println("  Mean absolute difference: $(tend_results[:vor_tend].mean_abs_diff)")
+    println("  Max relative difference:  $(tend_results[:vor_tend].max_rel_diff)")
+    println("  Mean relative difference: $(tend_results[:vor_tend].mean_rel_diff)")
 
     @testset "$model_name Tendency Comparison" begin
         @test tend_results[:vor_tend].matches
@@ -199,6 +231,17 @@ function test_time_stepping!(sim_cpu, sim_reactant, model_name; nsteps = NSTEPS,
     println("\nVorticity comparison after $nsteps steps:")
     println("  Max absolute difference:  $(progn_results[:vor].max_abs_diff)")
     println("  Mean absolute difference: $(progn_results[:vor].mean_abs_diff)")
+    println("  Max relative difference:  $(progn_results[:vor].max_rel_diff)")
+    println("  Mean relative difference: $(progn_results[:vor].mean_rel_diff)")
+
+    println("\nGrid variable comparison after $nsteps steps:")
+    for name in (:u_grid, :v_grid, :vor_grid)
+        println("  $name:")
+        println("    Max absolute difference:  $(grid_results[name].max_abs_diff)")
+        println("    Mean absolute difference: $(grid_results[name].mean_abs_diff)")
+        println("    Max relative difference:  $(grid_results[name].max_rel_diff)")
+        println("    Mean relative difference: $(grid_results[name].mean_rel_diff)")
+    end
 
     @testset "$model_name Time Stepping" begin
         @testset "Prognostic variables" begin
@@ -206,9 +249,9 @@ function test_time_stepping!(sim_cpu, sim_reactant, model_name; nsteps = NSTEPS,
         end
 
         @testset "Grid variables" begin
-            @test grid_results[:u_grid]
-            @test grid_results[:v_grid]
-            @test grid_results[:vor_grid]
+            @test grid_results[:u_grid].matches
+            @test grid_results[:v_grid].matches
+            @test grid_results[:vor_grid].matches
         end
     end
 
