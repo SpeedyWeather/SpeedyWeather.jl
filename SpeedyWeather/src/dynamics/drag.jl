@@ -2,16 +2,15 @@ abstract type AbstractDrag <: AbstractModelComponent end
 
 # function barrier for all drags to unpack model.drag
 function drag!(
-        diagn::DiagnosticVariables,
-        progn::PrognosticVariables,
+        vars::Variables,
         lf::Integer,
         model::AbstractModel,
     )
-    return drag!(diagn, progn, model.drag, lf, model)
+    return drag!(vars, model.drag, lf, model)
 end
 
 # NO DRAG
-drag!(diagn, progn, drag::Nothing, args...) = nothing
+drag!(vars, drag::Nothing, args...) = nothing
 
 export LinearDrag
 
@@ -51,20 +50,17 @@ end
 $(TYPEDSIGNATURES)
 Compute tendency for boundary layer drag of a `column` and add to its tendencies fields"""
 function drag!(
-        diagn::DiagnosticVariables,
-        progn::PrognosticVariables,
+        vars::Variables,
         drag::LinearDrag,
         lf::Integer,
         model::AbstractModel,
     )
-    u = diagn.grid.u_grid
-    v = diagn.grid.v_grid
-
-    Fu = diagn.tendencies.u_tend_grid
-    Fv = diagn.tendencies.v_tend_grid
+    (; u, v) = vars.grid
+    Fu = vars.tendencies.grid.u
+    Fv = vars.tendencies.grid.v
 
     # include radius scaling
-    c = diagn.scale[]
+    c = vars.prognostic.scale[]
     @. Fu -= c * drag.drag_coefs' .* u
     @. Fv -= c * drag.drag_coefs' .* v
 
@@ -92,22 +88,21 @@ with `c_D` the non-dimensional drag coefficient as defined in `drag::QuadraticDr
 `c_D` and layer thickness `H` are precomputed in `initialize!(::QuadraticDrag, ::AbstractModel)`
 and scaled by the radius as are the momentum equations."""
 function drag!(
-        diagn::DiagnosticVariables,
-        progn::PrognosticVariables,
+        vars::Variables,
         drag::QuadraticDrag,
         lf::Integer,
         model::AbstractModel,
     )
-    k = diagn.nlayers   # only apply to surface layer
-    u = field_view(diagn.grid.u_grid, :, k)
-    v = field_view(diagn.grid.v_grid, :, k)
+    k = size(vars.grid.u, 2)            # drag only on surface layer
+    u = field_view(vars.grid.u, :, k)
+    v = field_view(vars.grid.v, :, k)
 
-    Fu = field_view(diagn.tendencies.u_tend_grid, :, k)
-    Fv = field_view(diagn.tendencies.v_tend_grid, :, k)
+    Fu = field_view(vars.tendencies.grid.u, :, k)
+    Fv = field_view(vars.tendencies.grid.v, :, k)
 
     # total drag coefficient with radius scaling
     c = drag.c_D / model.atmosphere.layer_thickness
-    c *= diagn.scale[]^2
+    c *= vars.prognostic.scale[]^2
 
     return launch!(
         architecture(Fu), LinearWorkOrder, size(Fu), quadratic_drag_kernel!,
@@ -143,18 +138,17 @@ $(TYPEDSIGNATURES)
 Linear drag for the vorticity equations of the form F = -cξ
 with c drag coefficient [1/s]."""
 function drag!(
-        diagn::DiagnosticVariables,
-        progn::PrognosticVariables,
+        vars::Variables,
         drag::LinearVorticityDrag,
         lf::Integer,
         model::AbstractModel,
     )
-    (; vor_tend) = diagn.tendencies
-    vor = get_step(progn.vor, lf)
+    vor_tend = vars.tendencies.vor
+    vor = get_step(vars.prognostic.vor, lf)
 
     # scale by radius (but only once, the second radius is in vor)
-    c = drag.c * diagn.scale[]
-    vor_tend .-= c * vor
+    c = drag.c * vars.prognostic.scale[]
+    vor_tend.data .-= c * vor.data      # use .data to bypass conflicting broadcasting
 
     return nothing
 end
@@ -201,24 +195,23 @@ function initialize!(drag::JetDrag, model::AbstractModel)
 end
 
 function drag!(
-        diagn::DiagnosticVariables,
-        progn::PrognosticVariables,
+        vars::Variables,
         drag::JetDrag,
         lf::Integer,
         model::AbstractModel,
     )
-    vor = get_step(progn.vor, lf)
-    (; vor_tend) = diagn.tendencies
+    vor = get_step(vars.prognostic.vor, lf)
+    vor_tend = vars.tendencies.vor
     (; ζ₀) = drag
 
     # scale by radius as is vorticity
-    s = diagn.scale[]
+    s = vars.prognostic.scale[]
     r = s / drag.time_scale.value
 
-    k = diagn.nlayers   # drag only on surface layer
+    k = size(vor, 2)   # drag only on surface layer
 
     # GPU kernel launch
-    arch = architecture(diagn.grid.u_grid)
+    arch = architecture(vars.grid.u)
     return launch!(
         arch, LinearWorkOrder, (size(vor_tend, 1),), jet_drag_kernel!,
         vor_tend, vor, ζ₀, r, k

@@ -147,6 +147,12 @@ function StochasticStirring(SG::SpectralGrid; kwargs...)
     return StochasticStirring{SG.NF, SG.VectorType}(; lat_mask, kwargs...)
 end
 
+function variables(::StochasticStirring)
+    return (
+        ScratchVariable(:a_2D, Spectral2D(), desc = "2D spectral scratch space", units = "?"),
+    )
+end
+
 function initialize!(
         forcing::StochasticStirring,
         model::AbstractModel
