@@ -36,8 +36,8 @@ struct MatrixSpectralTransform{
     backward_imag::MatrixType           # imag part of backward transform matrix
 
     # SCRATCH MEMORY
-    scratch_memory::MatrixType
-    scratch_memory_old::MatrixComplexType   # state is undetermined, only read after writing to it
+    scratch_memory::MatrixComplexType
+    scratch_memory_split::MatrixType   # state is undetermined, only read after writing to it
 
     gradients::GradientType             # precomputed gradient and integration matrices
 end
