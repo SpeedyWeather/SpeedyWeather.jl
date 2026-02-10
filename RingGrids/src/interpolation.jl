@@ -634,7 +634,7 @@ function find_grid_indices!(
 
     # Convert λs to the same type as lon_offsets if needed
     λs_converted = convert.(eltype(lon_offsets), λs)
-    Main.@infiltrate
+
     return launch!(
         architecture,
         LinearWorkOrder,
