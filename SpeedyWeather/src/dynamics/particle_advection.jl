@@ -28,6 +28,9 @@ export ParticleAdvection2D
         NF,
         GeometryType, # <: AbstractGridGeometry
     } <: AbstractParticleAdvection
+    "[OPTION] Number of particles"
+    nparticles::Int = 10
+
     "[OPTION] Execute particle advection every n timesteps"
     every_n_timesteps::Int = 6
 
@@ -42,9 +45,14 @@ export ParticleAdvection2D
 end
 
 function ParticleAdvection2D(SG::SpectralGrid; kwargs...)
-    SG.nparticles == 0 && @warn "ParticleAdvection2D created but nparticles = 0 in spectral grid."
     geometry = GridGeometry(SG.grid; NF = SG.NF)
     return ParticleAdvection2D{SG.NF, typeof(geometry)}(; geometry, kwargs...)
+end
+
+function variables(P::ParticleAdvection2D)
+    return (
+        PrognosticVariable(:particles, ParticleVectorDim(P.nparticles), desc = "Particle locations", units = "˚/1"),
+    )
 end
 
 function initialize!(

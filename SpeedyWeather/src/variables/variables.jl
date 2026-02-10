@@ -105,7 +105,7 @@ their own namespaces to distinguish between e.g. ocean, land, or tracer variable
 All non-prognostic groups are considered to be diagnostic with no memory between time steps."""
 @kwdef struct Variables{Po, G, T, D, Pm, Pt, S} <: AbstractVariables
     "Prognostic variables subject to time stepping."
-    prognostic::P = NamedTuple()
+    prognostic::Po = NamedTuple()
 
     "Variables defined on the grid, mostly copies of spectral prognostic variables."
     grid::G = NamedTuple()

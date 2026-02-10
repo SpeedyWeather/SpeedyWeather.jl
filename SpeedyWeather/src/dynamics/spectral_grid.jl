@@ -96,9 +96,6 @@ struct SpectralGrid{
     GridVariable4D::Type{<:AbstractArray}
 
     # PARTICLES
-    "[OPTION] number of particles for particle advection [1]"
-    nparticles::Int
-
     "[DERIVED] ArrayType of particle vector"
     ParticleVector::Type{<:AbstractArray}
 
@@ -110,7 +107,6 @@ end
 function Base.show(io::IO, SG::SpectralGrid)
     (; NF, trunc, grid, nlat, npoints, nlayers) = SG
     (; architecture, ArrayType) = SG
-    (; nparticles) = SG
     Grid = nonparametric_type(grid)
 
     # resolution information
@@ -125,8 +121,6 @@ function Base.show(io::IO, SG::SpectralGrid)
     println(io, "├ Spectral:      T$trunc LowerTriangularMatrix")
     println(io, "├ Grid:          $nlat-ring $Grid, $npoints grid points")
     println(io, "├ Resolution:    $(s(average_degrees))°, $(s(average_resolution))km (at $(radius_str)km radius)")
-    nparticles > 0 &&
-        println(io, "├ Particles:     $nparticles")
     println(io, "├ Vertical:      $nlayers-layer atmosphere")
     return print(io, "└ Architecture:  $architecture using $ArrayType")
 end
@@ -141,7 +135,6 @@ function SpectralGrid(;
         trunc::Int = DEFAULT_TRUNC,
         Grid::Type{<:AbstractGrid} = DEFAULT_GRID,
         dealiasing::Real = 2,
-        nparticles::Int = 0,
         nlayers::Int = DEFAULT_NLAYERS,
     )
 
@@ -161,7 +154,7 @@ function SpectralGrid(;
     spectrum = Spectrum(trunc + 2, trunc + 1, architecture = architecture)
 
     # Create the SpectralGrid with all fields
-    return SpectralGrid(NF, spectrum, grid, dealiasing, nparticles, nlayers)
+    return SpectralGrid(NF, spectrum, grid, dealiasing, nlayers)
 end
 
 """
@@ -172,19 +165,12 @@ function SpectralGrid(
         grid::AbstractGrid;
         NF::Type{<:AbstractFloat} = DEFAULT_NF,
         dealiasing::Real = 2,
-        nparticles::Int = 0,
         nlayers::Int = DEFAULT_NLAYERS,
     )
     architecture = grid.architecture
-
     trunc = SpeedyTransforms.get_truncation(grid, dealiasing)
-    nlat_half = SpeedyTransforms.get_nlat_half(grid)
-    nlat = RingGrids.get_nlat(grid)
-    npoints = RingGrids.get_npoints(grid)
-
     spectrum = Spectrum(trunc + 2, trunc + 1, architecture = architecture)
-
-    return SpectralGrid(NF, spectrum, grid, dealiasing, nparticles, nlayers)
+    return SpectralGrid(NF, spectrum, grid, dealiasing, nlayers)
 end
 
 # low level constructor, not intended to be used directly by users
@@ -193,7 +179,6 @@ function SpectralGrid(
         spectrum::Spectrum,
         grid::AbstractGrid,
         dealiasing,
-        nparticles,
         nlayers::Int,
     )
     @assert spectrum.architecture == grid.architecture "Architecture of grid and spectrum must match"
@@ -256,7 +241,6 @@ function SpectralGrid(
         GridVariable2D,
         GridVariable3D,
         GridVariable4D,
-        nparticles,
         ParticleVector,
         nlayers,
     )
