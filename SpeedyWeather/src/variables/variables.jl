@@ -73,24 +73,29 @@ end
 Adapt.@adapt_structure Variables
 
 function Base.show(io::IO, V::Variables)
-    print(io, "Variables{@NamedTuple{...}, ...}")
+    Vsize = prettymemory(Base.summarysize(V))
+    print(io, styled"{warning:Variables}", "{@NamedTuple{...}, ...} ", styled"{note:($Vsize)}")
     for (i, p) in enumerate(propertynames(V))
-        lasti = i == length(propertynames(V))   # check if last property to choose ending └
-        s = lasti ? "└" : "├"                   # choose ending
-        print(io, "\n$s $p")
+        lasti = i == length(propertynames(V))           # check if last property to choose ending └
+        s = lasti ? "└" : "├"                           # choose ending
+        psize = prettymemory(Base.summarysize(getfield(V, p)))
+        print(io, "\n$s", styled"{info: $p }", styled"{note:($psize)}")
         for (j, k) in enumerate(keys(getfield(V, p)))
             lastj = j == length(keys(getfield(V, p)))   # check if last variable in namespace to choose ending └
             s2 = lastj ? "└" : "├"                      # choose ending └ for last variable
             maybe_bar1 = lasti ? " " : "│"              # if last variable in namespace, no vertical bar needed
-            print(io, "\n$maybe_bar1 $s2 $k")
+            print(io, "\n$maybe_bar1 $s2 ")
             nt = getfield(getfield(V, p), k)
             if nt isa NamedTuple
+                print(io, styled"{success:$k}")
                 for (l, m) in enumerate(keys(nt))
                     s3 = l == length(keys(nt)) ? "└" : "├"  # choose ending └ for last variable
                     maybe_bar2 = lastj ? " " : "│"          # if last variable in namespace, no vertical bar needed
-                    print(io, "\n$maybe_bar1 $maybe_bar2 $s3 $m: ", Base.summary(getfield(nt, m)))
+                    smry = Base.summary(getfield(nt, m))
+                    print(io, "\n$maybe_bar1 $maybe_bar2 $s3 ", styled"{magenta:$m}: $smry")
                 end
             else
+                print(io, styled"{magenta:$k}")
                 print(io, ": ", Base.summary(nt))
             end
         end

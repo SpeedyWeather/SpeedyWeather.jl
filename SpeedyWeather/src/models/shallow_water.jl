@@ -63,14 +63,14 @@ end
 
 function variables(::Type{<:ShallowWater})
     return (variables(BarotropicModel)...,
-        PrognosticVariable(:div, Spectral3D(), desc = "Divergence", units = "1/s"),
-        PrognosticVariable(:pres, Spectral2D(), desc = "Interface displacement", units = "m"),
+        PrognosticVariable(:div, Spectral4D(2), desc = "Divergence", units = "1/s"),                # 2 for 2 leapfrog steps
+        PrognosticVariable(:η, Spectral3D(2), desc = "Interface displacement", units = "m"),
         GridVariable(:div, Grid3D(), desc = "Divergence", units = "1/s"),
-        GridVariable(:pres, Grid2D(), desc = "Interface displacement", units = "m"),
+        GridVariable(:η, Grid2D(), desc = "Interface displacement", units = "m"),
         TendencyVariable(:div, Spectral3D(), desc = "Tendency of divergence", units = "1/s²"),
-        TendencyVariable(:pres, Spectral2D(), desc = "Tendency of interface displacement", units = "m/s"),
+        TendencyVariable(:η, Spectral2D(), desc = "Tendency of interface displacement", units = "m/s"),
         TendencyVariable(:div, Grid3D(), namespace = :grid, desc = "Tendency of divergence on the grid", units = "1/s²"),
-        TendencyVariable(:pres, Grid2D(), namespace = :grid, desc = "Tendency of interface displacement on the grid", units = "m/s"),
+        TendencyVariable(:η, Grid2D(), namespace = :grid, desc = "Tendency of interface displacement on the grid", units = "m/s"),
     )
 end
 

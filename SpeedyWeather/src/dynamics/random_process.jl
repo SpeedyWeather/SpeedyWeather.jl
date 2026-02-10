@@ -116,11 +116,11 @@ function initialize!(
 end
 
 function random_process!(
-        progn::PrognosticVariables,
+        vars::Variables,
         process::SpectralAR1Process{NF},
     ) where {NF}
 
-    (; random_pattern) = progn
+    (; random_pattern) = vars.prognostic
     lmax, mmax = size(random_pattern, OneBased, as = Matrix)  # max degree l, order m of harmonics (1-based)
 
     a = process.autoregressive_factor[]

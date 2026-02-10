@@ -63,7 +63,7 @@ function variables(::Type{<:Barotropic})
     return (
         PrognosticVariable(:clock, ClockDim(), desc = "Clock", units = "s"),
         PrognosticVariable(:scale, ScalarDim(1), desc = "Scaling of vor and div in the dynamical core", units = "m"),
-        PrognosticVariable(:vor, Spectral3D(), desc = "Relative vorticity", units = "1/s"),
+        PrognosticVariable(:vor, Spectral4D(2), desc = "Relative vorticity", units = "1/s"),        # 2 for 2 leapfrog steps
         GridVariable(:vor, Grid3D(), desc = "Relative vorticity", units = "1/s"),
         GridVariable(:u, Grid3D(), desc = "Zonal wind", units = "m/s"),
         GridVariable(:v, Grid3D(), desc = "Meridional wind", units = "m/s"),

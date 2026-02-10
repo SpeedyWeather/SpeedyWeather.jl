@@ -56,11 +56,13 @@ Base.delete!(model::AbstractModel, tracer::Tracer) = delete!(model.tracers, trac
 
 function variables(T::Tracer)
     return (
-        PrognosticVariable(T.name, Spectral3D(), desc = "$(T.name)", namespace = :tracers),
+        PrognosticVariable(T.name, Spectral4D(2), desc = "$(T.name)", namespace = :tracers),    # 2 for 2 leapfrog steps
         GridVariable(T.name, Grid3D(), desc = "$(T.name)", namespace = :tracers),
         GridVariable(Symbol(T.name, :_prev), Grid3D(), desc = "$(T.name)", namespace = :tracers),
         TendencyVariable(T.name, Spectral3D(), desc = "Tendency of $(T.name)", namespace = :tracers),
         TendencyVariable(Symbol(T.name, :_grid), Grid3D(), desc = "Tendency of $(T.name)", namespace = :tracers),
+        ScratchVariable(:a_grid, Grid3D(), desc = "Work array for tracer advection"),
+        ScratchVariable(:b_grid, Grid3D(), desc = "Work array for tracer advection"),
     )
 end
 

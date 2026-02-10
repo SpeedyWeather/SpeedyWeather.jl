@@ -614,21 +614,22 @@ end
 humidity_tendency!(::DiagnosticVariables, ::PrimitiveDry) = nothing
 
 function tracer_advection!(
-        diagn::DiagnosticVariables,
+        vars::Variables,
         model::AbstractModel,
     )
     G = model.geometry
     S = model.spectral_transform
 
     for (name, tracer) in model.tracers
-        tracer_tend = diagn.tendencies.tracers_tend[name]
-        tracer_tend_grid = diagn.tendencies.tracers_tend_grid[name]
-        tracer_grid = diagn.grid.tracers_grid[name]
+        name_grid = Symbol(name, "_grid")
+        tracer_tend = vars.tendencies.tracers[name]
+        tracer_tend_grid = vars.tendencies.tracers[name_grid]
+        tracer_grid = vars.grid.tracers[name]
 
         # add horizontal advection to parameterization + vertical advection + forcing/drag tendencies
-        tracer.active && horizontal_advection!(tracer_tend, tracer_tend_grid, tracer_grid, diagn, G, S, add = true)
+        tracer.active && horizontal_advection!(tracer_tend, tracer_tend_grid, tracer_grid, vars, G, S, add = true)
     end
-    return
+    return nothing
 end
 
 """$(TYPEDSIGNATURES)
@@ -637,35 +638,38 @@ function horizontal_advection!(
         A_tend::LowerTriangularArray,       # Output: tendency to write into
         A_tend_grid::AbstractField,         # Input: tendency incl prev terms
         A_grid::AbstractField,              # Input: grid field to be advected
-        diagn::DiagnosticVariables,
+        vars::Variables,
         G::Geometry,
         S::SpectralTransform;
-        add::Bool = true,                     # add/overwrite A_tend_grid?
+        add::Bool = true,                   # add/overwrite A_tend_grid?
     )
 
-    (; div_grid) = diagn.grid
-    (; scratch_memory) = diagn.dynamics
+    # barotropic model doesn't have divergence, the +A*div term is then zero
+    if haskey(vars.grid, :div)              
+        div_grid = vars.grid.div
 
-    kernel_func = add ? muladd : @inline (a, b, c) -> a * b
+        kernel_func = add ? muladd : @inline (a, b, c) -> a * b
 
-    # Launch kernel to compute +A*div term of the advection operator
-    arch = architecture(A_tend_grid)
-    launch!(
-        arch, RingGridWorkOrder, size(A_tend_grid), _horizontal_advection_kernel!,
-        A_tend_grid, A_grid, div_grid, kernel_func
-    )
+        # Launch kernel to compute +A*div term of the advection operator
+        arch = architecture(A_tend_grid)
+        launch!(
+            arch, RingGridWorkOrder, size(A_tend_grid), _horizontal_advection_kernel!,
+            A_tend_grid, A_grid, div_grid, kernel_func
+        )
+    end
 
+    scratch_memory = vars.scratch.transform_memory
     transform!(A_tend, A_tend_grid, scratch_memory, S)  # for +A*div in spectral space
 
     # now add the -∇⋅((u, v)*A) term
-    flux_divergence!(A_tend, A_grid, diagn, G, S, add = true, flipsign = true)
+    flux_divergence!(A_tend, A_grid, vars, G, S, add = true, flipsign = true)
 
     return nothing
 end
 
 @kernel inbounds = true function _horizontal_advection_kernel!(
-        A_tend_grid,            # Input/Output: tendency grid
-        A_grid,                 # Input: field to be advected
+        A_tend_grid,    # Input/Output: tendency grid
+        A_grid,         # Input: field to be advected
         div_grid,       # Input: divergence field
         kernel_func,    # Input: kernel function (muladd or multiply)
     )
@@ -687,28 +691,28 @@ Computes `∇⋅((u, v)*A)` with the option to add/overwrite `A_tend` and to
 function flux_divergence!(
         A_tend::LowerTriangularArray,   # Output: tendency to write into
         A_grid::AbstractField,          # Input: grid field to be advected
-        diagn::DiagnosticVariables,     # for u_grid, v_grid
+        vars::Variables,                # for u,v on grid and scratch memory
         G::Geometry,
         S::SpectralTransform;
-        add::Bool = true,                 # add result to A_tend or overwrite for false
-        flipsign::Bool = true,            # compute -∇⋅((u, v)*A) (true) or ∇⋅((u, v)*A)?
+        add::Bool = true,               # add result to A_tend or overwrite for false
+        flipsign::Bool = true,          # compute -∇⋅((u, v)*A) (true) or ∇⋅((u, v)*A)?
     )
-    (; u_grid, v_grid) = diagn.grid
-    (; scratch_memory) = diagn.dynamics
+    (; u, v) = vars.grid
+    scratch_memory = vars.scratch.transform_memory
     (; coslat⁻¹) = G
 
     # reuse general work arrays a, b, a_grid, b_grid
-    uA = diagn.dynamics.a           # = u*A in spectral
-    vA = diagn.dynamics.b           # = v*A in spectral
-    uA_grid = diagn.dynamics.a_grid # = u*A on grid
-    vA_grid = diagn.dynamics.b_grid # = v*A on grid
+    uA = vars.scratch.a                 # = u*A in spectral
+    vA = vars.scratch.b                 # = v*A in spectral
+    uA_grid = vars.scratch.a_grid       # = u*A on grid
+    vA_grid = vars.scratch.b_grid       # = v*A on grid
 
     # Launch kernel to compute u*A and v*A with coslat scaling
-    (; whichring) = A_grid.grid     # precomputed ring indices
+    (; whichring) = A_grid.grid         # precomputed ring indices
     arch = architecture(A_grid)
     launch!(
         arch, RingGridWorkOrder, size(A_grid), _flux_divergence_kernel!,
-        uA_grid, vA_grid, A_grid, u_grid, v_grid, coslat⁻¹, whichring
+        uA_grid, vA_grid, A_grid, u, v, coslat⁻¹, whichring
     )
 
     transform!(uA, uA_grid, scratch_memory, S)
@@ -752,7 +756,7 @@ with `Fᵤ, Fᵥ` from `u_tend_grid`/`v_tend_grid` that are assumed to be alread
 set in `forcing!`. Set `div=false` for the BarotropicModel which doesn't
 require the divergence tendency."""
 function vorticity_flux_curldiv!(
-        diagn::DiagnosticVariables,
+        vars::Variables,
         coriolis::AbstractCoriolis,
         geometry::Geometry,
         S::SpectralTransform;
@@ -763,12 +767,11 @@ function vorticity_flux_curldiv!(
     (; f) = coriolis
     (; coslat⁻¹) = geometry
 
-    (; u_tend_grid, v_tend_grid) = diagn.tendencies     # already contains forcing
-    u = diagn.grid.u_grid                               # velocity
-    v = diagn.grid.v_grid                               # velocity
-    vor = diagn.grid.vor_grid                           # relative vorticity
+    u_tend_grid = vars.tendencies.grid.u                # already contains forcing
+    v_tend_grid = vars.tendencies.grid.v                # already contains forcing
+    (; u, v, vor) = vars.grid                           # velocities and vorticity on grid
     (; whichring) = u.grid                              # precomputed ring indices
-    scratch_memory = diagn.dynamics.scratch_memory      # scratch memory for transforms
+    scratch_memory = vars.scratch.transform_memory      # scratch memory for transforms
 
     # Launch the kernel for vorticity flux calculation
     arch = S.architecture
@@ -779,15 +782,19 @@ function vorticity_flux_curldiv!(
     )
 
     # divergence and curl of that u, v_tend vector for vor, div tendencies
-    (; vor_tend, div_tend) = diagn.tendencies
-    u_tend = diagn.dynamics.a
-    v_tend = diagn.dynamics.b
+    vor_tend = vars.tendencies.vor
+    u_tend = vars.scratch.a
+    v_tend = vars.scratch.b
 
     transform!(u_tend, u_tend_grid, scratch_memory, S)
     transform!(v_tend, v_tend_grid, scratch_memory, S)
 
     curl!(vor_tend, u_tend, v_tend, S; add)                 # ∂ζ/∂t = ∇×(u_tend, v_tend)
-    div && divergence!(div_tend, u_tend, v_tend, S; add)    # ∂D/∂t = ∇⋅(u_tend, v_tend)
+
+    if div                                                  # not needed/availbel in barotropic model
+        div_tend = vars.tendencies.div
+        divergence!(div_tend, u_tend, v_tend, S; add)       # ∂D/∂t = ∇⋅(u_tend, v_tend)
+    end
     return nothing
 end
 
@@ -966,12 +973,12 @@ function SpeedyTransforms.transform!(
     u_grid = vars.grid.u
     v_grid = vars.grid.v
     vor_grid = vars.grid.vor
-    
+
     # U = u*coslat, V=v*coslat
     U = vars.scratch.a                          # reuse work arrays for velocities in spectral
     V = vars.scratch.b                          # reuse work arrays for velocities in spectral
     vor = get_step(vars.prognostic.vor, lf)     # relative vorticity at leapfrog step lf
-    
+
     scratch_memory = vars.scratch.transform_memory
     S = model.spectral_transform
     transform!(vor_grid, vor, scratch_memory, S)    # get vorticity on grid from spectral vor
@@ -987,7 +994,7 @@ function SpeedyTransforms.transform!(
 
     for (name, tracer) in model.tracers
         tracer_var = get_step(vars.prognostic.tracers[name], lf)  # tracer at leapfrog step lf
-        tracer.active && transform!(diagn.grid.tracers[name], tracer_var, scratch_memory, S)
+        tracer.active && transform!(vars.grid.tracers[name], tracer_var, scratch_memory, S)
     end
 
     # transform random pattern for random process unless random_process=nothing
@@ -1185,10 +1192,10 @@ function linear_pressure_gradient!(
     return nothing
 end
 
-function reset_tendencies!(vars::Variables; value=0)
+function reset_tendencies!(vars::Variables; value = 0)
     for tendency in vars.tendencies
         # tendencies can contain namespaces, unpack those then
-        if tendency isa NamedTuple      
+        if tendency isa NamedTuple
             for t in tendency
                 fill!(t, value)
             end

@@ -211,26 +211,30 @@ function leapfrog!(
         model::AbstractModel,
     )
     (; prognostic, tendencies) = vars
-    for (varname, tendname) in zip(prognostic_variables(model), tendency_names(model))
-        var = getfield(prognostic, varname)
-        var_old, var_new = get_steps(var)
-        var_tend = getfield(tendencies, tendname)
-        SpeedyTransforms.spectral_truncation!(var_tend)
-        leapfrog!(var_old, var_new, var_tend, dt, lf, model.time_stepping)
+
+
+    for varname in keys(tendencies)
+        if !(tendencies[varname] isa NamedTuple)
+            var = getfield(prognostic, varname)
+            var_old, var_new = get_steps(var)
+            var_tend = getfield(tendencies, varname)
+            SpeedyTransforms.spectral_truncation!(var_tend)
+            leapfrog!(var_old, var_new, var_tend, dt, lf, model.time_stepping)
+        end
     end
 
     # and time stepping for tracers if active
     for (name, tracer) in model.tracers
         if tracer.active
             var_old, var_new = get_steps(prognostic.tracers[name])
-            var_tend = tendencies.tracers_tend[name]
+            var_tend = tendencies.tracers[name]
             SpeedyTransforms.spectral_truncation!(var_tend)
             leapfrog!(var_old, var_new, var_tend, dt, lf, model.time_stepping)
         end
     end
 
     # evolve the random pattern in time
-    random_process!(prognostic, model.random_process)
+    random_process!(vars, model.random_process)
     return nothing
 end
 
@@ -427,7 +431,7 @@ function later_timestep!(simulation::AbstractSimulation)
     timestep!(variables, 2Δt, model)                # calculate tendencies and leapfrog forward
     timestep!(clock, Δt_millisec)                   # time of lf=2 and variables after timestep!
 
-    progress!(feedback, variables.prognostic)       # updates the progress meter bar
+    progress!(feedback, variables)                  # updates the progress meter bar
     output!(output, simulation)                     # do output?
     callback!(model.callbacks, variables, model)    # any callbacks?
     return nothing
