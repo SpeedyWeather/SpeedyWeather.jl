@@ -9,10 +9,10 @@ function get_nc_variable_name(ncfile::NCDataset, name::String)
         candidates = filter(k -> k ∉ keys(ncfile.dim), keys(ncfile))
 
         if isempty(candidates)
-            error("No suitable variable found in asset (all variables matched dimension names).")
+            error("No suitable variable found in asset (all variables matched dimension names)")
         elseif length(candidates) > 1
             msg = join(candidates, ", ")
-            error("Ambiguous asset: found $(length(candidates)) variables ($msg). Please specify a `varname` kwarg.")
+            error("Ambiguous asset: found $(length(candidates)) variables ($msg). Please specify a `varname` kwarg")
         end
 
         target_name = candidates[1]
@@ -27,10 +27,17 @@ end
 Downloads a file from the SpeedyWeatherAssets repo, adds it to 
 Artifacts.toml in the project root, and returns the file path.
 """
-function get_asset(path::String...; name::String = "", type = NCDataset, format = NCDataset)
+function get_asset(path::String; name::String = "", type = NCDataset, format = NCDataset)
     if isfile(path) # check if path is local (custom input)
-        return _get_asset(path, name, type, format)
+        try
+            asset = _get_asset(path, name, type, format)
+            return asset
+        catch e
+            @warn "Custom asset loading failed with: $e"
+            @warn "Attempting to load default asset"
+        end
     end
+
 
     filename = path[end]
     url = joinpath(assets_url, path...)
