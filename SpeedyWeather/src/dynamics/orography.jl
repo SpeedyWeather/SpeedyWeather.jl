@@ -191,9 +191,8 @@ function initialize!(
     (; orography, surface_geopotential, scale) = orog
     (; gravity) = P
     if isfile(orog.path)
-        ncdataset = get_asset(orog.path, orog.file; orog.varname, type=FullGaussianField, format=NCDataset)
+        ncdataset = get_asset(orog.path, orog.file; name=orog.varname, type=FullGaussianField, format=NCDataset)
     else
-        print("artifact")
         ncdataset = get_asset("data", orog.file; name=orog.varname, type=FullGaussianField, format=NCDataset)
     end
 

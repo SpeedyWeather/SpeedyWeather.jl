@@ -28,6 +28,10 @@ Downloads a file from the SpeedyWeatherAssets repo, adds it to
 Artifacts.toml in the project root, and returns the file path.
 """
 function get_asset(path::String...; name::String = "", type = NCDataset, format = NCDataset)
+    if isfile(path) # check if path is local (custom input)
+        return _get_asset(path, name, type, format)
+    end
+
     filename = path[end]
     url = joinpath(assets_url, path...)
     project_root = pkgdir(SpeedyWeather)
