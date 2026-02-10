@@ -106,5 +106,5 @@ function initialize!(model::ShallowWater; time::DateTime = DEFAULT_DATE)
     clock.time = time       # set the current time
     clock.start = time      # and store the start time
 
-    return Simulation(prognostic_variables, diagnostic_variables, model)
+    return Simulation(variables, model)
 end

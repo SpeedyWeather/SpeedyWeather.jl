@@ -10,7 +10,7 @@ function drag!(
     return drag!(diagn, progn, model.drag, lf, model)
 end
 
-## NO DRAG
+# NO DRAG
 drag!(diagn, progn, drag::Nothing, args...) = nothing
 
 export LinearDrag

@@ -5,27 +5,27 @@ General transform for `random processes <: AbstractRandomProcess`.
 Takes the spectral `random_pattern` in the prognostic variables
 and transforms it to spectral space in `diagn.grid.random_pattern`."""
 function SpeedyTransforms.transform!(
-        diagn::DiagnosticVariables,
-        progn::PrognosticVariables,
+        vars::Variables,
         lf::Integer,
         random_process::AbstractRandomProcess,
         spectral_transform::SpectralTransform,
     )
-    grid = diagn.grid.random_pattern
-    spec = progn.random_pattern
-    transform!(grid, spec, diagn.dynamics.scratch_memory, spectral_transform)
+    pattern = vars.prognostic.random_pattern
+    pattern_grid = vars.grid.random_pattern
+    scratch_memory = vars.scratch.transform_memory
+    transform!(pattern_grid, pattern, scratch_memory, spectral_transform)
 
-    return if :clamp in fieldnames(typeof(random_process))
-        clamp!(grid, random_process.clamp...)
+    if :clamp in fieldnames(typeof(random_process))
+        clamp!(pattern_grid, random_process.clamp...)
     end
+    return nothing
 end
 
 """$(TYPEDSIGNATURES)
 `random_process=nothing` does not need to transform any random pattern from
 spectral to grid space."""
 function SpeedyTransforms.transform!(
-        diagn::DiagnosticVariables,
-        progn::PrognosticVariables,
+        vars::Variables,
         lf::Integer,
         random_process::Nothing,
         spectral_transform::SpectralTransform,
@@ -33,7 +33,7 @@ function SpeedyTransforms.transform!(
     return nothing
 end
 
-random_process!(progn::PrognosticVariables, process::Nothing) = nothing
+random_process!(::Variables, process::Nothing) = nothing
 
 export SpectralAR1Process
 
@@ -73,6 +73,13 @@ end
 
 # generator function
 SpectralAR1Process(SG::SpectralGrid; kwargs...) = SpectralAR1Process{SG.NF, SG.VectorType}(trunc = SG.trunc; kwargs...)
+
+function variables(::SpectralAR1Process)
+    return (
+        PrognosticVariable(:random_pattern, Spectral2D(), desc = "Random pattern for the random process", units = "1"),
+        GridVariable(:random_pattern, Grid2D(), desc = "Random pattern for the random process", units = "1"),
+    )
+end
 
 function initialize!(
         process::SpectralAR1Process,
@@ -121,7 +128,7 @@ function random_process!(
     s = convert(NF, 2 / sqrt(2))              # to scale: std(real(randn(Complex))) = √2/2 to 1
 
     lm = 0
-    return @inbounds for m in 1:mmax
+    @inbounds for m in 1:mmax
         for l in m:lmax
             lm += 1
 
@@ -134,4 +141,5 @@ function random_process!(
             random_pattern[lm] += ξ * r       # noise term
         end
     end
+    return nothing
 end

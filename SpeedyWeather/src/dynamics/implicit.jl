@@ -1,8 +1,8 @@
 abstract type AbstractImplicit <: AbstractModelComponent end
 
 # model.implicit=nothing (for BarotropicModel)
-initialize!(::Nothing, dt::Real, ::DiagnosticVariables, ::AbstractModel) = nothing
-implicit_correction!(::DiagnosticVariables, ::PrognosticVariables, ::Nothing, ::AbstractModel) = nothing
+initialize!(::Nothing, dt::Real, ::Variables, ::AbstractModel) = nothing
+implicit_correction!(::Variables, ::Nothing, ::AbstractModel) = nothing
 
 # SHALLOW WATER MODEL
 export ImplicitShallowWater
@@ -37,7 +37,8 @@ ImplicitShallowWater(SG::SpectralGrid; kwargs...) = ImplicitShallowWater{SG.NF}(
 $(TYPEDSIGNATURES)
 Update the implicit terms in `implicit` for the shallow water model as they depend on the time step `dt`."""
 function initialize!(implicit::ImplicitShallowWater, dt::Real, args...)
-    return implicit.time_step = implicit.α * dt  # new implicit timestep ξ = α*dt = 2αΔt (for leapfrog) from input dt
+    implicit.time_step = implicit.α * dt  # new implicit timestep ξ = α*dt = 2αΔt (for leapfrog) from input dt
+    return implicit
 end
 
 # implicit shallow water has no precomputed arrays, so implicit.initialized is not defined

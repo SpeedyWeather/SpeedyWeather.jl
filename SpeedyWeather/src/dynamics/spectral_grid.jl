@@ -278,6 +278,12 @@ function SpeedyTransforms.SpectralTransform(
     return SpectralTransform(spectrum, grid; NF, ArrayType, nlayers, kwargs...)
 end
 
+function variables(::SpectralTransform)
+    return (
+        ScratchVariable(:transform_memory, TransformScratchMemory(), desc = "Scratch memory for spectral transform"),
+    )
+end
+
 # because model components can be `nothing`, their constructor being `Nothing()`
 # we also allow `::SpectralGrid` as the first argument
 Base.Nothing(::SpectralGrid) = Nothing()

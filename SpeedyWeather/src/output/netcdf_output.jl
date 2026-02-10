@@ -145,7 +145,7 @@ function Base.show(io::IO, output::NetCDFOutput{F}) where {F}
     for (i, (key, var)) in enumerate(output.variables)
         print(io, "\n $(i == nvars ? "└" : "├") $key: $(var.long_name) [$(var.unit)]")
     end
-    return
+    return nothing
 end
 
 """
@@ -236,19 +236,20 @@ end
 
 """$(TYPEDSIGNATURES)
 Initialize NetCDF `output` by creating a netCDF file and storing the initial conditions
-of `diagn` (and `progn`). To be called just before the first timesteps."""
+of `vars`. To be called just before the first timesteps."""
 function initialize!(
         output::NetCDFOutput,
         feedback::AbstractFeedback,
-        progn::PrognosticVariables,
-        diagn::DiagnosticVariables,
+        vars::Variables,
         model::AbstractModel,
     )
     output.active || return nothing             # exit immediately for no output
 
     # only checked for models that have a land component
     if hasfield(typeof(model), :land) && !isnothing(model.land)
-        @assert get_nlayers(model.land) == size(output.field3Dland, 2) "$(size(output.field3Dland, 2)) soil layers initialized for output, but $(get_nlayers(model.land)) soil layers initialized for model. Please construct NetCDFOutput with the same LandGeometry as the model."
+        @assert get_nlayers(model.land) == size(output.field3Dland, 2) "$(size(output.field3Dland, 2))" *
+            " soil layers initialized for output, but $(get_nlayers(model.land)) soil layers initialized for model." * 
+            " Please construct NetCDFOutput with the same LandGeometry as the model."
     end
 
     # GET RUN ID, CREATE FOLDER
@@ -257,12 +258,8 @@ function initialize!(
     create_run_folder!(output)
 
     # OUTPUT FREQUENCY
-    output.output_every_n_steps = max(
-        1, round(
-            Int,
-            Millisecond(output.output_dt).value / model.time_stepping.Δt_millisec.value
-        )
-    )
+    rate = Millisecond(output.output_dt).value / model.time_stepping.Δt_millisec.value
+    output.output_every_n_steps = max(1, round(Int, rate))
     output.output_dt = Second(round(Int, output.output_every_n_steps * model.time_stepping.Δt_sec))
 
     # RESET COUNTERS
@@ -285,7 +282,7 @@ function initialize!(
             "standard_name" => "time", "calendar" => "proleptic_gregorian"
         )
     )
-    output!(output, progn.clock.time)   # write initial time
+    output!(output, vars.prognostic.clock.time)   # write initial time
 
     # DEFINE NETCDF DIMENSIONS SPACE
     lond = get_lond(output.field2D)
@@ -301,7 +298,7 @@ function initialize!(
     # VARIABLES, define every output variable in the netCDF file and write initial conditions
     for (key, var) in output.variables
         define_variable!(dataset, var, eltype(output.field2D))
-        output!(output, var, Simulation(progn, diagn, model))
+        output!(output, var, Simulation(vars, model))
     end
 
     # CALLBACKS
@@ -340,7 +337,7 @@ end
 
 """
 $(TYPEDSIGNATURES)
-Writes the variables from `progn` or `diagn` of time step `i` at time `time` into `output.netcdf_file`.
+Writes the variables from `vars` of time step `i` at time `time` into `output.netcdf_file`.
 Simply escapes for no netcdf output or if output shouldn't be written on this time step.
 Interpolates onto output grid and resolution as specified in `output`, converts to output
 number format, truncates the mantissa for higher compression and applies lossless compression."""
@@ -350,9 +347,10 @@ function output!(output::AbstractOutput, simulation::AbstractSimulation)
     active || return nothing                                            # escape immediately for no netcdf output
     timestep_counter % output_every_n_steps == 0 || return nothing      # escape if output not written on this step
 
-    (; clock) = simulation.prognostic_variables
+    (; clock) = simulation.variables.prognostic
     output!(output, clock.time)                                         # increase counter write time
-    return output!(output, output.variables, simulation)                       # write variables
+    output!(output, output.variables, simulation)                       # write variables
+    return output
 end
 
 get_indices(i, variable::AbstractOutputVariable) = get_indices(i, Val.(variable.dims_xyzt)...)
@@ -392,7 +390,7 @@ function output!(
     # unscale if variable.unscale == true and exists
     if hasproperty(variable, :unscale)
         if variable.unscale
-            unscale!(var, simulation.diagnostic_variables.scale[])
+            scale!(var, inv(simulation.variables.prognostic.scale[]))
         end
     end
 

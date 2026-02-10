@@ -137,7 +137,8 @@ function initialize!(
     diffusion.expl = on_architecture(arch, ∇²ⁿ)
     diffusion.impl = on_architecture(arch, ∇²ⁿ_implicit)
     diffusion.expl_div = on_architecture(arch, ∇²ⁿ_div)
-    return diffusion.impl_div = on_architecture(arch, ∇²ⁿ_div_implicit)
+    diffusion.impl_div = on_architecture(arch, ∇²ⁿ_div_implicit)
+    return nothing
 end
 
 """$(TYPEDSIGNATURES)
@@ -158,11 +159,11 @@ function horizontal_diffusion!(
     @boundscheck lmax <= size(expl, 1) == size(impl, 1) || throw(BoundsError)
     @boundscheck nlayers <= size(expl, 2) == size(impl, 2) || throw(BoundsError)
 
-    return launch!(
+    launch!(
         architecture(tendency), SpectralWorkOrder, size(tendency), _horizontal_diffusion_kernel!,
         tendency, var, expl, impl, var.spectrum.l_indices
     )
-
+    return nothing
 end
 
 @kernel inbounds = true function _horizontal_diffusion_kernel!(
@@ -201,7 +202,7 @@ function horizontal_diffusion!(
         tracer_tend = diagn.tendencies.tracers_tend[name]
         tracer.active && horizontal_diffusion!(tracer_tend, tracer_var, expl, impl)
     end
-    return
+    return nothing
 end
 
 """$(TYPEDSIGNATURES)

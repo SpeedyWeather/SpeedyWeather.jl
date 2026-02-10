@@ -10,7 +10,6 @@ function dynamics_tendencies!(
     drag!(diagn, progn, lf, model)      # drag term for u, v
     vorticity_flux!(diagn, model)       # = ∇×(v(ζ+f) + Fᵤ, -u(ζ+f) + Fᵥ)
     tracer_advection!(diagn, model)
-
     return nothing
 end
 
@@ -964,21 +963,22 @@ Propagate the spectral state of the prognostic variables `progn` to the
 diagnostic variables in `diagn` for the barotropic vorticity model.
 Updates grid vorticity, spectral stream function and spectral and grid velocities u, v."""
 function SpeedyTransforms.transform!(
-        diagn::DiagnosticVariables,
-        progn::PrognosticVariables,
+        vars::Variables,
         lf::Integer,
         model::Barotropic;
         kwargs...
     )
-    (; vor_grid, u_grid, v_grid) = diagn.grid
-    (; scratch_memory) = diagn.dynamics
-
-    vor = get_step(progn.vor, lf)   # relative vorticity at leapfrog step lf
-    U = diagn.dynamics.a            # reuse work arrays for velocities in spectral
-    V = diagn.dynamics.b            # reuse work arrays for velocities in spectral
+    u_grid = vars.grid.u
+    v_grid = vars.grid.v
+    vor_grid = vars.grid.vor
+    
     # U = u*coslat, V=v*coslat
+    U = vars.scratch.a                          # reuse work arrays for velocities in spectral
+    V = vars.scratch.b                          # reuse work arrays for velocities in spectral
+    vor = get_step(vars.prognostic.vor, lf)     # relative vorticity at leapfrog step lf
+    
+    scratch_memory = vars.scratch.transform_memory
     S = model.spectral_transform
-
     transform!(vor_grid, vor, scratch_memory, S)    # get vorticity on grid from spectral vor
 
     # get spectral U, V from spectral vorticity via stream function Ψ
@@ -991,12 +991,12 @@ function SpeedyTransforms.transform!(
     transform!(v_grid, V, scratch_memory, S, unscale_coslat = true)
 
     for (name, tracer) in model.tracers
-        tracer_var = get_step(progn.tracers[name], lf)  # tracer at leapfrog step lf
-        tracer.active && transform!(diagn.grid.tracers_grid[name], tracer_var, scratch_memory, S)
+        tracer_var = get_step(vars.prognostic.tracers[name], lf)  # tracer at leapfrog step lf
+        tracer.active && transform!(diagn.grid.tracers[name], tracer_var, scratch_memory, S)
     end
 
     # transform random pattern for random process unless random_process=nothing
-    transform!(diagn, progn, lf, model.random_process, S)
+    transform!(vars, lf, model.random_process, S)
 
     return nothing
 end
@@ -1188,4 +1188,18 @@ function linear_pressure_gradient!(
     geopot.data .+= R_dry .* temp_profile' .* pres.data
 
     return nothing
+end
+
+function reset_tendencies!(vars::Variables; value=0)
+    for tendency in vars.tendencies
+        # tendencies can contain namespaces, unpack those then
+        if tendency isa NamedTuple      
+            for t in tendency
+                fill!(t, value)
+            end
+        else    # it's not a namespace, fill directly
+            fill!(tendency, value)
+        end
+    end
+    return vars
 end

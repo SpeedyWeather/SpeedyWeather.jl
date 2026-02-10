@@ -61,7 +61,8 @@ end
 
 function variables(::Type{<:Barotropic})
     return (
-        PrognosticVariable(:clock, ClockVar(), desc = "Clock", units = "s"),
+        PrognosticVariable(:clock, ClockDim(), desc = "Clock", units = "s"),
+        PrognosticVariable(:scale, ScalarDim(1), desc = "Scaling of vor and div in the dynamical core", units = "m"),
         PrognosticVariable(:vor, Spectral3D(), desc = "Relative vorticity", units = "1/s"),
         GridVariable(:vor, Grid3D(), desc = "Relative vorticity", units = "1/s"),
         GridVariable(:u, Grid3D(), desc = "Zonal wind", units = "m/s"),

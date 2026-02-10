@@ -5,28 +5,28 @@ export Grid2D, Grid3D, Spectral2D, Spectral3D, PrognosticVariable, DiagnosticVar
 
 Indicator type for 2D variables on the spatial grid (x, y).
 """
-struct Grid2D <: AbstractVariableDims end
+struct Grid2D <: AbstractVariableDim end
 
 """
     $TYPEDEF
 
 Indicator type for 3D variables on the spatial grid (x, y, z).
 """
-struct Grid3D <: AbstractVariableDims end
+struct Grid3D <: AbstractVariableDim end
 
 """
     $TYPEDEF
 
 Indicator type for spectral 2D variables (l, m).
 """
-struct Spectral2D <: AbstractVariableDims end
+struct Spectral2D <: AbstractVariableDim end
 
 """
     $TYPEDEF
 
 Indicator type for spectral 3D variables (l, m, k).
 """
-struct Spectral3D <: AbstractVariableDims end
+struct Spectral3D <: AbstractVariableDim end
 
 # intialize variables
 Base.zero(::AbstractVariable{Grid2D}, SG::SpectralGrid, nlayers::Int) = zeros(SG.GridVariable2D, SG.grid)

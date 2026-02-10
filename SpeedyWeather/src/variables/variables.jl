@@ -1,36 +1,43 @@
-abstract type AbstractVariableDims end                          # Dimensions of variables
-abstract type AbstractVariable{D <: AbstractVariableDims} end   # Variable type with dimensions D
+abstract type AbstractVariableDim end                           # Dimensions of variables
+abstract type AbstractVariable{D <: AbstractVariableDim} end    # Variable type with dimensions D
 abstract type AbstractVariables end                             # Container for all variable arrays in the model
 
 # DIMENSIONS --------------------------
 # define a a bunch of variable dimensions used to allocate variables of the right size and type
-struct ClockVar <: AbstractVariableDims end
-struct Grid2D <: AbstractVariableDims end
-struct Grid3D <: AbstractVariableDims end
-struct Land3D <: AbstractVariableDims end
-struct Ocean3D <: AbstractVariableDims end
-struct Spectral2D <: AbstractVariableDims end
-struct Spectral3D <: AbstractVariableDims end
-struct Latitude1D <: AbstractVariableDims end
-struct Vertical1D <: AbstractVariableDims end
-@kwdef struct Grid4D <: AbstractVariableDims
+struct ClockDim <: AbstractVariableDim end
+@kwdef struct ScalarDim{T} <: AbstractVariableDim
+    value::T = zero(DEFAULT_NF)                                 # default value via ScalarDim(1)
+end
+struct Grid2D <: AbstractVariableDim end
+struct Grid3D <: AbstractVariableDim end
+struct Land3D <: AbstractVariableDim end
+struct Ocean3D <: AbstractVariableDim end
+struct Spectral2D <: AbstractVariableDim end
+struct Spectral3D <: AbstractVariableDim end
+struct Latitude1D <: AbstractVariableDim end
+struct Vertical1D <: AbstractVariableDim end
+@kwdef struct Grid4D <: AbstractVariableDim
     n::Int = 1                                                  # length of 4th dimension
 end
-@kwdef struct Spectral4D <: AbstractVariableDims
+@kwdef struct Spectral4D <: AbstractVariableDim
     n::Int = 1
 end
-@kwdef struct Array1D <: AbstractVariableDims
+@kwdef struct VectorDim <: AbstractVariableDim
     n::Int = 1
 end
-@kwdef struct Array2D <: AbstractVariableDims
-    m::Int = 1; n::Int = 1
+@kwdef struct MatrixDim <: AbstractVariableDim
+    m::Int = 1
+    n::Int = 1
 end
+struct TransformScratchMemory <: AbstractVariableDim end
 
 # zero constructor for arrays but matching the grid/spectrum syntax
 zeeros(::Type{T}, k...) where {T} = fill!(T(undef, k...), 0)
 
+# Zero constructors for variables, except for ScalarDim which takes the default from its field .value
 # runic: off
-Base.zero(::AbstractVariable{ClockVar},     model::AbstractModel) = Clock()
+Base.zero(v::AbstractVariable{<:ScalarDim}, model::AbstractModel) = Ref(convert(model.spectral_grid.NF, v.dims.value))
+Base.zero(::AbstractVariable{ClockDim},     model::AbstractModel) = Clock()
 Base.zero(::AbstractVariable{Grid2D},       model::AbstractModel) = zeros( model.spectral_grid.GridVariable2D, model.spectral_grid.grid)
 Base.zero(::AbstractVariable{Grid3D},       model::AbstractModel) = zeros( model.spectral_grid.GridVariable3D, model.spectral_grid.grid, get_nlayers(model))
 Base.zero(::AbstractVariable{Land3D},       model::AbstractModel) = zeros( model.spectral_grid.GridVariable3D, model.spectral_grid.grid, get_nlayers(model.land))
@@ -39,10 +46,11 @@ Base.zero(::AbstractVariable{Spectral2D},   model::AbstractModel) = zeros( model
 Base.zero(::AbstractVariable{Spectral3D},   model::AbstractModel) = zeros( model.spectral_grid.SpectralVariable3D, model.spectral_grid.spectrum, get_nlayers(model))
 Base.zero(::AbstractVariable{Latitude1D},   model::AbstractModel) = zeeros(model.spectral_grid.VectorType, model.spectral_grid.nlat)
 Base.zero(::AbstractVariable{Vertical1D},   model::AbstractModel) = zeeros(model.spectral_grid.VectorType, get_nlayers(model))
-Base.zero(v::AbstractVariable{Array1D},     model::AbstractModel) = zeeros(model.spectral_grid.VectorType, v.dims.n)
-Base.zero(v::AbstractVariable{Array2D},     model::AbstractModel) = zeeros(model.spectral_grid.MatrixType, v.dims.m, v.dims.n)
+Base.zero(v::AbstractVariable{VectorDim},   model::AbstractModel) = zeeros(model.spectral_grid.VectorType, v.dims.n)
+Base.zero(v::AbstractVariable{MatrixDim},   model::AbstractModel) = zeeros(model.spectral_grid.MatrixType, v.dims.m, v.dims.n)
 Base.zero(v::AbstractVariable{Grid4D},      model::AbstractModel) = zeros( model.spectral_grid.GridVariable3D, model.spectral_grid.grid, v.dims.n)
 Base.zero(v::AbstractVariable{Spectral4D},  model::AbstractModel) = zeros( model.spectral_grid.SpectralVariable3D, model.spectral_grid.spectrum, v.dims.n)
+Base.zero(::AbstractVariable{TransformScratchMemory}, model::AbstractModel) = model.spectral_transform.scratch_memory
 # runic: on
 
 # VARIABLE TYPES --------------------------
@@ -52,6 +60,7 @@ for Var in (
         :TendencyVariable,
         :DynamicsVariable,
         :ParameterizationVariable,
+        :ParticleVariable,
         :ScratchVariable,
     )
 
@@ -90,14 +99,34 @@ identifier(v::AbstractVariable) =
 
 Base.unique(variables::AbstractVariable...) = unique(v -> identifier(v), variables)
 
-@kwdef struct Variables{P, G, T, D, Pa, S} <: AbstractVariables
+"""Struct that holds all variables of a simulation. Variables are split into 
+groups corresponding in the fields here $(TYPEDFIELDS) Each group can have
+their own namespaces to distinguish between e.g. ocean, land, or tracer variables.
+All non-prognostic groups are considered to be diagnostic with no memory between time steps."""
+@kwdef struct Variables{Po, G, T, D, Pm, Pt, S} <: AbstractVariables
+    "Prognostic variables subject to time stepping."
     prognostic::P = NamedTuple()
+
+    "Variables defined on the grid, mostly copies of spectral prognostic variables."
     grid::G = NamedTuple()
+
+    "Tendencies of the prognostic variables"
     tendencies::T = NamedTuple()
+
+    "Variables used in the dynamical core"
     dynamics::D = NamedTuple()
-    parameterizations::Pa = NamedTuple()
+
+    "Variables used in the parameterizations"
+    parameterizations::Pm = NamedTuple()
+
+    "Variables used for particle advection"
+    particles::Pt = NamedTuple()
+
+    "Scratch variables for temporary storage during calculations with undetermined state (write before read)."
     scratch::S = NamedTuple()
 end
+
+Adapt.@adapt_structure Variables
 
 function Base.show(io::IO, V::Variables)
     print(io, "Variables{@NamedTuple{...}, ...}")
@@ -108,13 +137,13 @@ function Base.show(io::IO, V::Variables)
         for (j, k) in enumerate(keys(getfield(V, p)))
             lastj = j == length(keys(getfield(V, p)))   # check if last variable in namespace to choose ending └
             s2 = lastj ? "└" : "├"                      # choose ending └ for last variable
-            maybe_bar1 = lasti ? " " : "│"               # if last variable in namespace, no vertical bar needed
+            maybe_bar1 = lasti ? " " : "│"              # if last variable in namespace, no vertical bar needed
             print(io, "\n$maybe_bar1 $s2 $k")
             nt = getfield(getfield(V, p), k)
             if nt isa NamedTuple
                 for (l, m) in enumerate(keys(nt))
                     s3 = l == length(keys(nt)) ? "└" : "├"  # choose ending └ for last variable
-                    maybe_bar2 = lastj ? " " : "│"           # if last variable in namespace, no vertical bar needed
+                    maybe_bar2 = lastj ? " " : "│"          # if last variable in namespace, no vertical bar needed
                     print(io, "\n$maybe_bar1 $maybe_bar2 $s3 $m: ", Base.summary(getfield(nt, m)))
                 end
             else
@@ -133,8 +162,9 @@ function Variables(model::AbstractModel)
     tendencies        = initialize_variables(filter_variables(all_vars,         TendencyVariable), model)
     dynamics          = initialize_variables(filter_variables(all_vars,         DynamicsVariable), model)
     parameterizations = initialize_variables(filter_variables(all_vars, ParameterizationVariable), model)
+    particles         = initialize_variables(filter_variables(all_vars,         ParticleVariable), model)
     scratch           = initialize_variables(filter_variables(all_vars,          ScratchVariable), model)
-    return Variables(; prognostic, grid, tendencies, dynamics, parameterizations, scratch)
+    return Variables(; prognostic, grid, tendencies, dynamics, parameterizations, particles, scratch)
 end
 # runic: on
 
@@ -199,3 +229,29 @@ function filter_variables(variables, VariableType)
     # Convert to NamedTuple with tuples instead of vectors
     return NamedTuple{Tuple(namespaces)}(Tuple(namespace_dict[ns] for ns in namespaces))
 end
+
+# TODO move get_step, get_steps to LowerTriangularArrays?
+
+function get_steps(coeffs::LowerTriangularArray{T, 2}) where {T}
+    nsteps = size(coeffs, 2)
+    return ntuple(i -> lta_view(coeffs, :, i), nsteps)
+end
+
+function get_steps(coeffs::LowerTriangularArray{T, 3}) where {T}
+    nsteps = size(coeffs, 3)
+    return ntuple(i -> lta_view(coeffs, :, :, i), nsteps)
+end
+
+export get_step
+
+"""$(TYPEDSIGNATURES)
+Get the i-th step of a LowerTriangularArray as a view (wrapped into a LowerTriangularArray).
+"step" refers to the last dimension, for prognostic variables used for the leapfrog time step.
+This method is for a 2D spectral variable (horizontal only) with steps in the 3rd dimension."""
+get_step(coeffs::LowerTriangularArray{T, 2}, i) where {T} = lta_view(coeffs, :, i)
+
+"""$(TYPEDSIGNATURES)
+Get the i-th step of a LowerTriangularArray as a view (wrapped into a LowerTriangularArray).
+"step" refers to the last dimension, for prognostic variables used for the leapfrog time step.
+This method is for a 3D spectral variable (horizontal+vertical) with steps in the 4rd dimension."""
+get_step(coeffs::LowerTriangularArray{T, 3}, i) where {T} = lta_view(coeffs, :, :, i)

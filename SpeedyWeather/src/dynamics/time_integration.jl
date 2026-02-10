@@ -115,7 +115,8 @@ function initialize!(L::Leapfrog, model::AbstractModel)
     n = round(Int, Millisecond(output_dt).value / L.Δt_millisec.value)
     nΔt = n * L.Δt_millisec
     if nΔt != output_dt
-        @warn "$n steps of Δt = $(L.Δt_millisec.value)ms yield output every $(nΔt.value)ms (=$(nΔt.value / 1000)s), but output_dt = $(output_dt.value)s"
+        @warn "$n steps of Δt = $(L.Δt_millisec.value)ms yield output every " *
+            "$(nΔt.value)ms (=$(nΔt.value / 1000)s), but output_dt = $(output_dt.value)s"
     end
     if L.start_with_euler
         L.first_step_euler = true
@@ -176,9 +177,12 @@ function leapfrog!(
     # for lf == 1 (initial time step) no filter applied (w1=w2=0)
     # for lf == 2 (later steps) Robert+Williams filter is applied
     w1 = lf == 1 ? zero(NF) : robert_filter * williams_filter / 2       # = ν*α/2 in Williams (2009, Eq. 8)
-    w2 = lf == 1 ? zero(NF) : robert_filter * (1 - williams_filter) / 2   # = ν(1-α)/2 in Williams (2009, Eq. 9)
+    w2 = lf == 1 ? zero(NF) : robert_filter * (1 - williams_filter) / 2 # = ν(1-α)/2 in Williams (2009, Eq. 9)
 
-    launch!(architecture(tendency), SpectralWorkOrder, size(tendency), leapfrog_kernel!, A_old, A_new, A_lf, tendency, dt_NF, w1, w2)
+    launch!(
+        architecture(tendency), SpectralWorkOrder, size(tendency), leapfrog_kernel!,
+        A_old, A_new, A_lf, tendency, dt_NF, w1, w2
+    )
 
     return nothing
 end
@@ -235,24 +239,24 @@ First 1 or 2 time steps of `simulation`. If `model.time_stepping.start_with_eule
 then start with one Euler step with dt/2, followed by one Leapfrog step with dt.
 If false, continue with leapfrog steps at 2Δt (e.g. restart)."""
 function first_timesteps!(simulation::AbstractSimulation)
-    progn, diagn, model = unpack(simulation)
+    (; variables, model) = simulation
     (; time_stepping) = model
     (; Δt) = time_stepping
 
     # decide whether to start with 1x Euler then 1x Leapfrog at Δt
     if time_stepping.first_step_euler
-        first_timesteps!(progn, diagn, model)
+        first_timesteps!(variables, model)
         time_stepping.first_step_euler = !time_stepping.continue_with_leapfrog   # after first run! continue with leapfrog
 
     else    # or continue with leaprog steps at 2Δt (e.g. restart)
         # but make sure that implicit solver is initialized in that situation
-        initialize!(model.implicit, 2Δt, diagn, model)
+        initialize!(model.implicit, 2Δt, variables, model)
         set_initialized!(model.implicit)            # mark implicit as initialized
         later_timestep!(simulation)
     end
 
     # only now initialise feedback for benchmark accuracy
-    (; clock) = progn
+    (; clock) = variables.prognostic
     initialize!(model.feedback, clock, model)
     return nothing
 end
@@ -262,11 +266,10 @@ $(TYPEDSIGNATURES)
 Performs the first two initial time steps (Euler forward, unfiltered leapfrog) to populate the
 prognostic variables with two time steps (t=0, Δt) that can then be used in the normal leap frogging."""
 function first_timesteps!(
-        progn::PrognosticVariables,         # all prognostic variables
-        diagn::DiagnosticVariables,         # all pre-allocated diagnostic variables
-        model::AbstractModel,               # everything that is constant at runtime
+        vars::Variables,        # all variables
+        model::AbstractModel,   # everything that is constant at runtime
     )
-    (; clock) = progn
+    (; clock) = vars.prognostic
     clock.n_timesteps == 0 && return nothing    # exit immediately for no time steps
 
     (; implicit) = model
@@ -277,29 +280,29 @@ function first_timesteps!(
     lf1 = 1                             # without Robert+Williams filter
     lf2 = 1                             # evaluates all tendencies at t=0,
     # the first leapfrog index (=>Euler forward)
-    initialize!(implicit, Δt / 2, diagn, model)       # update precomputed implicit terms with time step Δt/2
-    timestep!(progn, diagn, Δt / 2, model, lf1, lf2)  # update time by half the leapfrog time step Δt used here
+    initialize!(implicit, Δt / 2, vars, model)      # update precomputed implicit terms with time step Δt/2
+    timestep!(vars, Δt / 2, model, lf1, lf2)        # update time by half the leapfrog time step Δt used here
     timestep!(clock, Δt_millisec_half, increase_counter = false)
 
     # output, callbacks not called after the first Euler step as it's a half-step (i=0 to i=1/2)
     # populating the second leapfrog index to perform the second time step
 
     # SECOND TIME STEP (UNFILTERED LEAPFROG with dt=Δt, leapfrogging from t=0 over t=Δt/2 to t=Δt)
-    initialize!(implicit, Δt, diagn, model)    # update precomputed implicit terms with time step Δt
-    lf1 = 1                             # without Robert+Williams filter
-    lf2 = 2                             # evaluate all tendencies at t=dt/2,
+    initialize!(implicit, Δt, vars, model)  # update precomputed implicit terms with time step Δt
+    lf1 = 1                                 # without Robert+Williams filter
+    lf2 = 2                                 # evaluate all tendencies at t=dt/2,
     # the 2nd leapfrog index (=>Leapfrog)
-    timestep!(progn, diagn, Δt, model, lf1, lf2)
+    timestep!(vars, Δt, model, lf1, lf2)
     # remove prev Δt/2 in case not even milliseconds, otherwise time is off by 1ms
     timestep!(clock, -Δt_millisec_half, increase_counter = false)
     timestep!(clock, Δt_millisec)
 
     # do output and callbacks after the first proper (from i=0 to i=1) time step
-    callback!(model.callbacks, progn, diagn, model)
-    output!(model.output, Simulation(progn, diagn, model))
+    callback!(model.callbacks, vars, model)
+    output!(model.output, Simulation(vars, model))
 
     # from now on precomputed implicit terms with 2Δt
-    initialize!(implicit, 2Δt, diagn, model)
+    initialize!(implicit, 2Δt, vars, model)
     set_initialized!(implicit)      # mark implicit as initialized
 
     return nothing
@@ -412,13 +415,13 @@ end
 Perform one single time step of `simulation` including
 possibly output and callbacks."""
 function timestep!(simulation::AbstractSimulation)
-    (; clock) = simulation.prognostic_variables
-
-    return if clock.timestep_counter == 0
+    (; clock) = simulation.variables.prognostic
+    if clock.timestep_counter == 0
         first_timesteps!(simulation)
     else
         later_timestep!(simulation)
     end
+    return simulation
 end
 
 """$(TYPEDSIGNATURES)
@@ -441,9 +444,9 @@ end
 """$(TYPEDSIGNATURES)
 Main time loop that loops over all time steps."""
 function time_stepping!(simulation::AbstractSimulation)
-    (; clock) = simulation.prognostic_variables
+    (; clock) = simulation.variables.prognostic
     for _ in 1:clock.n_timesteps        # MAIN LOOP
         timestep!(simulation)
     end
-    return
+    return simulation
 end

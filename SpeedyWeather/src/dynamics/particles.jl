@@ -22,6 +22,8 @@ struct Particle{
     σ::NF
 end
 
+Adapt.@adapt_structure Particle
+
 # keyword constructors
 Particle{NF}(; lon, lat, σ = 0) where {NF} = Particle{NF}(true, lon, lat, σ)
 Particle(; lon, lat, σ = 0) = Particle(lon, lat, σ)
@@ -160,5 +162,3 @@ function set(p::P; lon = nothing, lat = nothing, σ = nothing) where {P <: Parti
     pσ = isnothing(σ) ? p.σ : σ
     return P(p.active, plon, plat, pσ)
 end
-
-Adapt.@adapt_structure Particle
