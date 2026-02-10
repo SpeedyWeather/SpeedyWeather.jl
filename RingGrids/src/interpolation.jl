@@ -60,7 +60,9 @@ function GridGeometry(
     # vector type
     VectorType = array_type(architecture, NF, 1)
     VectorIntType = array_type(architecture, Int, 1)
-    device_rings = on_architecture(architecture, grid.rings)
+    
+    # Tuple{UnitRange} is with Reactant compatible, otherwise copy to architecture
+    device_rings = typeof(architecture) <: ReactantDevice ? Tuple(grid.rings) : on_architecture(architecture, grid.rings)
 
     return GridGeometry{typeof(grid), VectorType, VectorIntType, typeof(device_rings)}(
         grid, nlat_half, nlat, npoints, londs, latd_poles, nlons, lon_offsets, device_rings
@@ -78,8 +80,8 @@ abstract type AbstractLocator end
 and their weights. This Locator is a 4-point average in an anvil-shaped grid-point arrangement
 between two latitude rings."""
 @kwdef struct AnvilLocator{
-        VectorType,
-        VectorIntType,
+        VectorType,         # <: AbstractArray{NF, 1} 
+        VectorIntType,      # <: AbstractArray{Int, 1}
     } <: AbstractLocator
 
     npoints_output::Int            # number of points to interpolate onto (length of following vectors)
@@ -92,9 +94,9 @@ between two latitude rings."""
     ij_ds::VectorIntType = zeros(Int, npoints_output)   # pixel index ij for bottom right point d on ring j+1
 
     # distances to adjacent grid points (i.e. the averaging weights)
-    Δys::VectorType = zero(VectorType(undef, npoints_output))    # distance fractions between rings
-    Δabs::VectorType = zero(VectorType(undef, npoints_output))    # distance fractions between a, b
-    Δcds::VectorType = zero(VectorType(undef, npoints_output))    # distance fractions between c, d
+    Δys::VectorType = zeros(npoints_output)    # distance fractions between rings
+    Δabs::VectorType = zeros(npoints_output)    # distance fractions between a, b
+    Δcds::VectorType = zeros(npoints_output)   # distance fractions between c, d
 end
 
 Adapt.@adapt_structure AnvilLocator
@@ -470,7 +472,10 @@ function find_rings!(
     )
 
     if ~unsafe
-        θmin, θmax = extrema(θs)
+        # TODO: return to `extrema` when Reactant fixed 
+        # https://github.com/EnzymeAD/Reactant.jl/issues/2387
+        #θmin, θmax = extrema(θs)
+        θmin, θmax = (minimum(θs), maximum(θs))
         @assert θmin >= -90 "Latitudes θs are expected to be within [-90˚, 90˚]; θ=$(θmin)˚ given."
         @assert θmax <= 90 "Latitudes θs are expected to be within [-90˚, 90˚]; θ=$(θmax)˚ given."
 
@@ -567,15 +572,15 @@ function find_rings(θs::AbstractVector, latd::AbstractVector{NF}) where {NF}
 end
 
 @kernel inbounds = true function find_grid_indices_kernel!(
-        @Const(js),            # ring indices j
+        js,            # ring indices j
         ij_as, ij_bs,          # northern point indices
         ij_cs, ij_ds,          # southern point indices
         Δabs, Δcds,            # distance fractions
-        @Const(λs),            # longitudes to interpolate onto
-        @Const(lon_offsets),   # longitude offsets for each ring
-        @Const(nlons),         # number of longitude points per ring
-        @Const(nlat),          # number of latitude rings
-        @Const(rings)          # ring indices
+        λs,            # longitudes to interpolate onto
+        lon_offsets,   # longitude offsets for each ring
+        nlons,         # number of longitude points per ring
+        nlat,          # number of latitude rings
+        rings          # ring indices
     )
     k = @index(Global, Linear)
 
@@ -629,7 +634,7 @@ function find_grid_indices!(
 
     # Convert λs to the same type as lon_offsets if needed
     λs_converted = convert.(eltype(lon_offsets), λs)
-
+    Main.@infiltrate
     return launch!(
         architecture,
         LinearWorkOrder,
