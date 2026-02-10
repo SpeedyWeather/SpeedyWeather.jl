@@ -10,6 +10,12 @@ $(TYPEDFIELDS)"""
     "[OPTION] filename of soil moisture"
     file::String = "soil_moisture.nc"
 
+    "[OPTION] path to the folder containing the soil moisture"
+    path::String = joinpath("data", file)
+
+    "[OPTION] flag to check for soil moisture in SWA or locally"
+    from_assets::Bool = true
+
     "[OPTION] variable name in netcdf file for layer 1"
     varname_layer1::String = "swl1"
 
@@ -51,8 +57,13 @@ function initialize!(soil::SeasonalSoilMoisture, model::PrimitiveEquation)
     (; monthly_soil_moisture) = soil
 
     # LOAD NETCDF FILE
-    path = get_asset("data", soil.file)
-    ncfile = NCDataset(path)
+    ncfile = get_asset(
+        soil.path;
+        from_assets = soil.from_assets,
+        name = "sm",
+        type = NCDataset,
+        format = NCDataset
+    )
 
     # read out netCDF data
     nx, ny, nt = ncfile.dim["lon"], ncfile.dim["lat"], ncfile.dim["time"]

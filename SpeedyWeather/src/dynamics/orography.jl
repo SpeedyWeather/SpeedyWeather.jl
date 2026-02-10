@@ -130,6 +130,9 @@ $(TYPEDFIELDS)"""
     "path to the folder containing the orography"
     path::String = joinpath("data", file)
 
+    "flag to check for orography in SWA or locally"
+    from_assets::Bool = true
+
     "NCDataset variable name"
     varname::String = "orog"
 
@@ -164,13 +167,6 @@ function EarthOrography(spectral_grid::SpectralGrid; kwargs...)
     (; architecture, NF, GridVariable2D, SpectralVariable2D, grid, spectrum) = spectral_grid
     orography = on_architecture(architecture, zeros(GridVariable2D, grid))
     surface_geopotential = on_architecture(architecture, zeros(SpectralVariable2D, spectrum))
-
-    if haskey(kwargs, :path)
-        if !isfile(kwargs[:path])
-            @error "Could not find the asset path provided, will attempt to load default asset"
-        end
-    end
-
     return EarthOrography{NF, GridVariable2D, SpectralVariable2D}(;
         orography, surface_geopotential, kwargs...
     )
@@ -197,11 +193,14 @@ function initialize!(
 
     (; orography, surface_geopotential, scale) = orog
     (; gravity) = P
+
     ncdataset = get_asset(
         orog.path;
-        name = orog.varname, 
-        type = FullGaussianField, 
-        format = NCDataset)
+        from_assets = orog.from_assets,
+        name = orog.varname,
+        type = FullGaussianField,
+        format = NCDataset
+    )
 
     # height [m], wrap matrix into a grid
     # TODO also read lat, lon from file and flip array in case it's not as expected

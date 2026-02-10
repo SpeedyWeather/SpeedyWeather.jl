@@ -77,6 +77,15 @@ $(TYPEDFIELDS)"""
     "filename of land sea mask"
     file::String = "land-sea_mask.nc"
 
+    "path to the folder containing the orography"
+    path::String = joinpath("data", file)
+
+    "flag to check for land-sea mask in SWA or locally"
+    from_assets::Bool = true
+
+    "NCDataset variable name"
+    varname::String = "lsm"
+
     "Grid the land-sea mask file comes on"
     file_Grid::Type{<:AbstractGrid} = FullClenshawGrid
 
@@ -115,14 +124,14 @@ Reads a high-resolution land-sea mask from file and interpolates (grid-cell aver
 onto the model grid for a fractional sea mask."""
 function initialize!(land_sea_mask::EarthLandSeaMask, model::PrimitiveEquation)
 
-    (; file_Grid) = land_sea_mask
-
     # LOAD NETCDF FILE
-    path = get_asset("data", land_sea_mask.file)
-    ncfile = NCDataset(path)
-
-    # high resolution land-sea mask
-    lsm_highres = land_sea_mask.file_Grid(ncfile["lsm"].var[:, :], input_as = Matrix)
+    lsm_highres, _ = get_asset(
+        land_sea_mask.path;
+        from_assets = land_sea_mask.from_assets,
+        name = land_sea_mask.varname,
+        type = land_sea_mask.file_Grid,
+        format = NCDataset
+    )
 
     # average onto grid cells of the model
     cpu_mask = on_architecture(CPU(), land_sea_mask.mask)

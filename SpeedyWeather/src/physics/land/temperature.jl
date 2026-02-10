@@ -9,6 +9,12 @@ $(TYPEDFIELDS)"""
     "[OPTION] filename of land surface temperatures"
     file::String = "land_surface_temperature.nc"
 
+    "[OPTION] path to the folder containing the lst"
+    path::String = joinpath("data", file)
+
+    "[OPTION] flag to check for lst in SWA or locally"
+    from_assets::Bool = true
+
     "[OPTION] variable name in netcdf file"
     varname::String = "lst"
 
@@ -16,7 +22,7 @@ $(TYPEDFIELDS)"""
     file_Grid::Type{<:AbstractGrid} = FullGaussianGrid
 
     "[OPTION] The missing value in the data respresenting ocean"
-    missing_value::NF = NaN
+    missing_value::NF = NF(NaN)
 
     "[OPTION] Apply land-sea mask to use fallback ocean temperature for ocean-only points?"
     mask::Bool = true
@@ -49,12 +55,14 @@ function initialize!(land::SeasonalLandTemperature, model::PrimitiveEquation)
     (; monthly_temperature) = land
 
     # LOAD NETCDF FILE
-    path = get_asset("data", land.file)
-    ncfile = NCDataset(path)
+    lst, fill_value = get_asset(
+        land.path;
+        from_assets = land.from_assets,
+        name = land.varname,
+        type = land.file_Grid,
+        format = NCDataset
+    )
 
-    # read out netCDF data
-    fill_value = ncfile[land.varname].attrib["_FillValue"]
-    lst = land.file_Grid(ncfile[land.varname].var[:, :, :], input_as = Matrix)
     lst[lst .=== fill_value] .= land.missing_value      # === to include NaN
     lst = on_architecture(model.architecture, lst)
 

@@ -97,6 +97,12 @@ $(TYPEDFIELDS)"""
     "[OPTION] Filename of sea surface temperatures"
     file::String = "sea_surface_temperature.nc"
 
+    "[OPTION] path to the folder containing the sst"
+    path::String = joinpath("data", file)
+
+    "[OPTION] flag to check for sst in SWA or locally"
+    from_assets::Bool = true
+
     "[OPTION] Variable name in netcdf file"
     varname::String = "sst"
 
@@ -104,7 +110,7 @@ $(TYPEDFIELDS)"""
     file_Grid::Type{<:AbstractGrid} = FullGaussianGrid
 
     "[OPTION] The missing value in the data respresenting land"
-    missing_value::NF = NaN
+    missing_value::NF = NF(NaN)
 
     # to be filled from file
     "Monthly sea surface temperatures [K], interpolated onto Grid"
@@ -120,12 +126,15 @@ end
 function initialize!(ocean::SeasonalOceanClimatology, model::PrimitiveEquation)
     (; monthly_temperature) = ocean
 
-    path = get_asset("data", ocean.file)
-    ncfile = NCDataset(path)
+    sst, fill_value = get_asset(
+        ocean.path;
+        from_assets = ocean.from_assets,
+        name = ocean.varname,
+        type = ocean.file_Grid,
+        format = NCDataset
+    )
 
     # create interpolator from grid in file to grid used in model
-    fill_value = ncfile[ocean.varname].attrib["_FillValue"]
-    sst = ocean.file_Grid(ncfile[ocean.varname].var[:, :, :], input_as = Matrix)
     sst[sst .=== fill_value] .= ocean.missing_value      # === to include NaN
 
     # transfer to architecture of model if needed

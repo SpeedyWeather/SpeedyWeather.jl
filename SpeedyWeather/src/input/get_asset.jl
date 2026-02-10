@@ -27,20 +27,21 @@ end
 Downloads a file from the SpeedyWeatherAssets repo, adds it to 
 Artifacts.toml in the project root, and returns the file path.
 """
-function get_asset(path::String; name::String = "", type = NCDataset, format = NCDataset)
-    if isfile(path) # check if path is local (custom input)
-        try
-            asset = _get_asset(path, name, type, format)
-            return asset
-        catch e
-            @warn "Custom asset loading failed with: $e"
-            @warn "Attempting to load default asset"
+function get_asset(path::String; from_assets::Bool = true, name::String = "", type = NCDataset, format = NCDataset)
+    if !from_assets
+        if isfile(path) # check if path is local (custom input)
+            try
+                return _get_asset(path, name, type, format)
+            catch e
+                throw("Local asset loading failed with: $e")
+            end
+        else
+            throw("Local $name file doesn't exist on this path")
         end
     end
 
-
-    filename = path[end]
-    url = joinpath(assets_url, path...)
+    filename = basename(path)
+    url = joinpath(assets_url, path)
     project_root = pkgdir(SpeedyWeather)
     artifact_toml = joinpath(project_root, "Artifacts.toml")
 
@@ -50,11 +51,15 @@ function get_asset(path::String; name::String = "", type = NCDataset, format = N
     # If not found or file not installed create and bind it
     if hash === nothing || !Artifacts.artifact_exists(hash)
         hash = PkgA.create_artifact() do artifact_dir
-            Artifacts.download(url, joinpath(artifact_dir, filename))
+            dest_path = joinpath(artifact_dir, filename)
+            try
+                Artifacts.download(url, dest_path)
+            catch e
+                @error "Download failed for URL: $url" exception = (e)
+                throw("Could not download asset '$filename'. Check your internet connection or if the URL asset path exists.")
+            end
         end
-
-        # Also creates the Artifact.toml if it's missing
-        PkgA.bind_artifact!(artifact_toml, filename, hash)
+        PkgA.bind_artifact!(artifact_toml, filename, hash, force = true)
     end
 
     asset_path = joinpath(Artifacts.artifact_path(hash), filename)
@@ -72,4 +77,20 @@ function _get_asset(path::String, name::String, type::Type{FullGaussianField}, f
     data = ncfile[target_name].var[:, :]
     close(ncfile)
     return type(data, input_as = Matrix)
+end
+
+function _get_asset(path::String, name::String, type::Type{<:AbstractGrid}, format::Type{NCDataset})
+    ncfile = NCDataset(path)
+    target_name = get_nc_variable_name(ncfile, name)
+    v = ncfile[target_name]
+
+    # Handle files with different dims
+    if length(size(v)) == 2
+        data = v.var[:, :]
+    elseif length(size(v)) == 3
+        data = v.var[:, :, :]
+    end
+    fill_value = get(v.attrib, "_FillValue", NaN)
+    close(ncfile)
+    return type(data, input_as = Matrix), fill_value
 end
