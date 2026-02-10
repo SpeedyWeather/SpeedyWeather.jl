@@ -127,6 +127,7 @@ include("dynamics/orography.jl")
 include("parameterizations/land_sea_mask.jl")
 
 # VARIABLES
+include("variables/dimensions.jl")
 include("variables/variables.jl")
 include("dynamics/tracers.jl")
 include("dynamics/particles.jl")

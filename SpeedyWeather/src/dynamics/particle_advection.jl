@@ -50,8 +50,14 @@ function ParticleAdvection2D(SG::SpectralGrid; kwargs...)
 end
 
 function variables(P::ParticleAdvection2D)
+    (; nparticles) = P
     return (
-        PrognosticVariable(:particles, ParticleVectorDim(P.nparticles), desc = "Particle locations", units = "˚/1"),
+        PrognosticVariable(:particles, ParticleVectorDim(nparticles), desc = "Particle locations", units = "˚/1"),
+        ParticleVariable(:locations, ParticleVectorDim(nparticles), desc = "Particle locations", units = "˚/1"),
+        ParticleVariable(:u, VectorDim(nparticles), desc = "Zonal velocity at particle location", units = "m/s"),
+        ParticleVariable(:v, VectorDim(nparticles), desc = "Meridional velocity at particle location", units = "m/s"),
+        ParticleVariable(:w, VectorDim(nparticles), desc = "Vertical velocity in σ coordinate at particle location", units = "1"),
+        ParticleVariable(:locator, LocatorDim(nparticles), desc = "Vertical σ coordinate of particle location", units = "1"),
     )
 end
 
@@ -100,14 +106,14 @@ function initialize!(
     length(particles) == 0 && return nothing
 
     k = particle_advection.layer
-    u_grid = field_view(diagn.grid.u_grid, :, k)
-    v_grid = field_view(diagn.grid.v_grid, :, k)
-    (; locator) = diagn.particles
+    u_grid = field_view(vars.grid.u, :, k)
+    v_grid = field_view(vars.grid.v, :, k)
+    (; locator) = vars.particles
     (; geometry) = particle_advection
 
     # interpolate initial velocity on initial locations
-    lats = diagn.particles.u    # reuse u,v arrays as only used for u, v
-    lons = diagn.particles.v    # after update_locator!
+    lats = vars.particles.u    # reuse u,v arrays as only used for u, v
+    lons = vars.particles.v    # after update_locator!
     σ = Vector(model.geometry.σ_levels_full)[k] # explicitly on CPU
 
     # modulo particles and extract their coordinates
@@ -117,8 +123,8 @@ function initialize!(
     )
 
     RingGrids.update_locator!(locator, geometry, lons, lats)
-    u0 = diagn.particles.u      # now reused arrays are actually u, v
-    v0 = diagn.particles.v
+    u0 = vars.particles.u      # now reused arrays are actually u, v
+    v0 = vars.particles.v
     interpolate!(u0, u_grid, locator, geometry)
     interpolate!(v0, v_grid, locator, geometry)
     return nothing
@@ -139,12 +145,12 @@ end
 
 # function barrier, unpack what's needed
 function particle_advection!(vars, adv::ParticleAdvection2D, model::AbstractModel)
-    return particle_advection!(vars.prognostic.particles, diagn, progn.clock, adv)
+    return particle_advection!(vars.prognostic.particles, vars, vars.prognostic.clock, adv)
 end
 
 function particle_advection!(
         particles::AbstractVector{P},
-        diagn::AbstractVariables,
+        vars::Variables,
         clock::Clock,
         particle_advection::ParticleAdvection2D,
     ) where {P <: Particle}
@@ -152,7 +158,7 @@ function particle_advection!(
     # escape immediately for no particles
     length(particles) == 0 && return nothing
 
-    (; locator) = diagn.particles
+    (; locator) = vars.particles
     (; geometry) = particle_advection
 
     # decide whether to execute on this time step:
@@ -172,31 +178,31 @@ function particle_advection!(
     Δt = particle_advection.Δt[]        # time step [s*˚/m]
     Δt_half = Δt / 2                      # /2 because Heun is average of Euler+corrected step
 
-    u_old = diagn.particles.u           # from previous time step and location
-    v_old = diagn.particles.v           # from previous time step and location
+    u_old = vars.particles.u           # from previous time step and location
+    v_old = vars.particles.v           # from previous time step and location
 
     # HACK: reuse u, v arrays (old velocity) on the fly for interpolation
     # as they're not needed anymore after new (predicted) location is found
     # same is true for the corrector step, interpolating velocities for the
     # next time step of the particle advection
-    lons = diagn.particles.u
-    lats = diagn.particles.v
+    lons = vars.particles.u
+    lats = vars.particles.v
 
     # Launch predictor step kernel
     launch!(
         architecture(u_old), LinearWorkOrder, (length(particles),),
-        predictor_step_kernel!, particles, diagn.particles.locations, u_old, v_old, lons, lats, Δt_half
+        predictor_step_kernel!, particles, vars.particles.locations, u_old, v_old, lons, lats, Δt_half
     )
 
     # CORRECTOR STEP, use u, v at new location and new time step
     k = particle_advection.layer
-    u_grid = field_view(diagn.grid.u_grid, :, k)
-    v_grid = field_view(diagn.grid.v_grid, :, k)
+    u_grid = field_view(vars.grid.u, :, k)
+    v_grid = field_view(vars.grid.v, :, k)
     RingGrids.update_locator!(locator, geometry, lons, lats)
 
     # interpolate new velocity on predicted new locations
-    u_new = diagn.particles.u
-    v_new = diagn.particles.v
+    u_new = vars.particles.u
+    v_new = vars.particles.v
     interpolate!(u_new, u_grid, locator, geometry)
     interpolate!(v_new, v_grid, locator, geometry)
 

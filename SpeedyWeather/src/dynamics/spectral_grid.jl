@@ -97,7 +97,7 @@ struct SpectralGrid{
 
     # PARTICLES
     "[DERIVED] ArrayType of particle vector"
-    ParticleVector::Type{<:AbstractArray}
+    ParticleVectorType::Type{<:AbstractArray}
 
     # VERTICAL
     "[OPTION] number of vertical layers in the atmosphere"
@@ -214,7 +214,7 @@ function SpectralGrid(
     GridVariable4D = Field{NF, 3, array_type(architecture, NF, 3), typeof(grid)}
 
     # Particle vector type
-    ParticleVector = array_type(architecture, Particle{NF}, 1)
+    ParticleVectorType = array_type(architecture, Particle{NF}, 1)
 
     # Create the SpectralGrid with all fields
     return SpectralGrid{typeof(architecture), typeof(spectrum), typeof(grid)}(
@@ -241,7 +241,7 @@ function SpectralGrid(
         GridVariable2D,
         GridVariable3D,
         GridVariable4D,
-        ParticleVector,
+        ParticleVectorType,
         nlayers,
     )
 end
