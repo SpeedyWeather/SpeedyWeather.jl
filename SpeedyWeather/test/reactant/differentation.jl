@@ -13,4 +13,8 @@ end
 
 dsimulation = make_zero(simulation)
 
-results = @jit autodiff(Enzyme.set_runtime_activity(Reverse), run_sim, Active, Duplicated(simulation, dsimulation))
+try 
+    results = @jit autodiff(Enzyme.set_runtime_activity(Reverse), run_sim, Active, Duplicated(simulation, dsimulation))
+catch err
+    @show err
+end

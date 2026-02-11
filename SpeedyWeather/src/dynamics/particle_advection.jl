@@ -16,6 +16,9 @@ function initialize!(
     return initialize!(diagn, particles, progn, model.particle_advection, model)
 end
 
+# TODO: remove fallback for reactant when it's compatible with particle advection   
+initialize!(::DiagnosticVariables, ::Nothing, ::PrognosticVariables, ::AbstractModel) = nothing
+
 # 3. the repeated call to actually advect particles
 particle_advection!(progn, diagn, model) = particle_advection!(progn, diagn, model.particle_advection, model)
 
@@ -85,6 +88,10 @@ function initialize!(
     end
     return
 end
+
+# Fallback for no particle advection
+initialize!(::Nothing, ::PrognosticVariables, ::DiagnosticVariables, ::AbstractModel) = nothing
+
 
 """$(TYPEDSIGNATURES)
 Initialize particle advection time integration: Store u,v interpolated initial conditions

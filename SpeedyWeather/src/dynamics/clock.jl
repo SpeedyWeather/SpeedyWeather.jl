@@ -7,24 +7,24 @@ export Clock
 Clock struct keeps track of the model time, how many days to integrate for
 and how many time steps this takes.
 $(TYPEDFIELDS)"""
-@kwdef mutable struct Clock <: AbstractClock
+@kwdef mutable struct Clock{DT, S, I, MS} <: AbstractClock
     "current model time"
-    time::DateTime = DEFAULT_DATE
+    time::DT = DEFAULT_DATE
 
     "start time of simulation"
-    start::DateTime = DEFAULT_DATE
+    start::DT = DEFAULT_DATE
 
     "period to integrate for"
-    period::Second = Second(0)
+    period::S = Second(0)
 
     "Counting all time steps during simulation"
-    timestep_counter::Int = 0
+    timestep_counter::I = 0
 
     "number of time steps to integrate for, set in `initialize!(::Clock, ::AbstractTimeStepper)`"
-    n_timesteps::Int = 0
+    n_timesteps::I = 0
 
     "Time step"
-    Δt::Millisecond = Millisecond(0)
+    Δt::MS = Millisecond(0)
 end
 
 # we don't want to adapt the clock, it has to stay mutable,
