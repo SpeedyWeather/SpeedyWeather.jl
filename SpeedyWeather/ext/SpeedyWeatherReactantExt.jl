@@ -31,7 +31,7 @@ SpeedyWeather.time_stepping!(simulation, r_first!, r_later!)
 SpeedyWeather.finalize!(simulation)
 ```
 """
-function SpeedyWeather.time_stepping!(simulation::ReactantSimulation, r_first_timesteps! = nothing, r_later_timestep! = nothing)
+function SpeedyWeather.time_stepping!(simulation::ReactantSimulation, r_first_timesteps! = nothing, r_later_timestep! = nothing, enable_checkpointing = true)
     if isnothing(r_first_timesteps!)
         @info "Reactant compiling first_timesteps!"
         r_first_timesteps! = @compile first_timesteps!(simulation)
@@ -43,7 +43,7 @@ function SpeedyWeather.time_stepping!(simulation::ReactantSimulation, r_first_ti
     end
 
     (; clock) = simulation.prognostic_variables
-    for _ in 1:clock.n_timesteps        # MAIN LOOP
+    @trace checkpointing=enable_checkpointing for _ in 1:clock.n_timesteps
         timestep!(simulation, r_first_timesteps!, r_later_timestep!)
     end
     return

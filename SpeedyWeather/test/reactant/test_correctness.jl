@@ -1,72 +1,4 @@
-"""
-Test script comparing SpeedyWeather models on CPU vs Reactant.
-Verifies that the Reactant implementation yields the same results as the CPU version.
-"""
-
-import Pkg
-Pkg.activate(@__DIR__)
-
-using SpeedyWeather
-using Reactant
-using Test
-using LinearAlgebra
-using CUDA
-using Statistics: mean
-import SpeedyWeather: ReactantDevice, first_timesteps!, later_timestep!
-
-# ============================================================================
-# Configuration
-# ============================================================================
-const TRUNC = 31            # spectral truncation
-const NSTEPS = 10           # number of time steps to compare
-const RTOL = 1.0e-3           # relative tolerance for comparison
-const ATOL = 1.0e-8          # absolute tolerance for comparison
-
-# ============================================================================
 # Helper functions
-# ============================================================================
-
-"""Get nlayers for a given model type."""
-nlayers_for_model(::Type{BarotropicModel}) = 1
-nlayers_for_model(::Type{ShallowWaterModel}) = 1
-nlayers_for_model(::Type{PrimitiveDryModel}) = 8
-nlayers_for_model(::Type{PrimitiveWetModel}) = 8
-
-"""Get default initial conditions for a given model type."""
-function default_initial_conditions(::Type{BarotropicModel})
-    return InitialConditions(; vordiv = ZeroInitially())
-end
-
-function default_initial_conditions(::Type{ShallowWaterModel})
-    return InitialConditions(; vordiv = ZonalJet())
-end
-
-function default_initial_conditions(::Type{PrimitiveDryModel})
-    return InitialConditions(; vordiv = ZonalWind())
-end
-
-function default_initial_conditions(::Type{PrimitiveWetModel})
-    return InitialConditions(; vordiv = ZonalWind())
-end
-
-"""Create a CPU model of the given type."""
-function create_cpu_model(ModelType::Type; trunc = TRUNC)
-    nlayers = nlayers_for_model(ModelType)
-    spectral_grid = SpectralGrid(; nlayers, trunc)
-    M = MatrixSpectralTransform(spectral_grid)
-    initial_conditions = default_initial_conditions(ModelType)
-    return ModelType(spectral_grid; spectral_transform = M, initial_conditions)
-end
-
-"""Create a Reactant model of the given type."""
-function create_reactant_model(ModelType::Type; trunc = TRUNC)
-    nlayers = nlayers_for_model(ModelType)
-    arch = SpeedyWeather.ReactantDevice()
-    spectral_grid = SpectralGrid(; architecture = arch, nlayers, trunc)
-    M = MatrixSpectralTransform(spectral_grid)
-    initial_conditions = default_initial_conditions(ModelType)
-    return ModelType(spectral_grid; spectral_transform = M, feedback = nothing, initial_conditions)
-end
 
 """Synchronize variables from Reactant to CPU simulation."""
 function sync_variables!(sim_cpu, sim_reactant)
@@ -298,8 +230,6 @@ function test_model(ModelType::Type; trunc = TRUNC, nsteps = NSTEPS, rtol = RTOL
     return nothing
 end
 
-# ============================================================================
 # Run tests
-# ============================================================================
 
 test_model(BarotropicModel)
