@@ -1,9 +1,9 @@
 abstract type AbstractLandGeometry <: AbstractModelComponent end
 
 export LandGeometry
-struct LandGeometry{VectorType} <: AbstractLandGeometry
+struct LandGeometry{VectorType, IntType} <: AbstractLandGeometry
     "[OPTION] Number of soil layers"
-    nlayers::Int
+    nlayers::IntType
 
     "[OPTION] thickness of each soil layer [m]"
     layer_thickness::VectorType
@@ -25,7 +25,7 @@ function LandGeometry(SG::SpectralGrid; nlayers = DEFAULT_NLAYERS_SOIL, layer_th
         end
     end
 
-    return LandGeometry(nlayers, layer_thickness)
+    return LandGeometry{typeof(layer_thickness), typeof(nlayers)}(nlayers, layer_thickness)
 end
 
 initialize!(::LandGeometry, model::PrimitiveEquation) = nothing

@@ -42,11 +42,12 @@ $(TYPEDFIELDS)"""
         GridVariable3D,         # <: AbstractField
         SpectralTracerTuple,    # <: NamedTuple{Tuple{Symbol}, Tuple{SpectralVariable3D}}
         GridTracerTuple,        # <: NamedTuple{Tuple{Symbol}, Tuple{GridVariable3D}}
+        IntType,                # <: Integer
     } <: AbstractDiagnosticVariables
 
     spectrum::SpectrumType            # spectral resolution: maximum degree and order of spherical harmonics
     grid::GridType                    # grid resolution: number of latitude rings on one hemisphere (Eq. incl.)
-    nlayers::Int                      # number of vertical layers
+    nlayers::IntType                  # number of vertical layers
 
     # SPECTRAL TENDENCIES
     "Vorticity of horizontal wind field [1/s]"
@@ -96,6 +97,7 @@ function Tendencies(SG::SpectralGrid; tracers::TRACER_DICT = TRACER_DICT())
         SpectralVariable2D, SpectralVariable3D,
         GridVariable2D, GridVariable3D,
         typeof(tracers_tend), typeof(tracers_tend_grid),
+        typeof(nlayers),
     }(;
         spectrum, grid, nlayers,
         tracers_tend, tracers_tend_grid
@@ -113,10 +115,11 @@ $TYPEDFIELDS."""
         GridVariable2D,         # <: AbstractField
         GridVariable3D,         # <: AbstractField
         GridTracerTuple,        # <: NamedTuple{Tuple{Symbol}, Tuple{GridVariable3D}}
+        IntType,                # <: Integer
     } <: AbstractDiagnosticVariables
 
     grid::GridType          # grid resolution: number of latitude rings on one hemisphere (Eq. incl.)
-    nlayers::Int            # number of vertical layers
+    nlayers::IntType        # number of vertical layers
 
     "Relative vorticity of the horizontal wind [1/s]"
     vor_grid::GridVariable3D = zeros(GridVariable3D, grid, nlayers)
@@ -164,7 +167,7 @@ function GridVariables(SG::SpectralGrid; tracers::TRACER_DICT = TRACER_DICT())
 
     tracers_grid_prev = (; [key => zeros(GridVariable3D, grid, nlayers) for key in keys(tracers)]...)
 
-    return GridVariables{typeof(grid), GridVariable2D, GridVariable3D, typeof(tracers_grid)}(;
+    return GridVariables{typeof(grid), GridVariable2D, GridVariable3D, typeof(tracers_grid), typeof(nlayers)}(;
         grid, nlayers,
         tracers_grid, tracers_grid_prev
     )
@@ -184,11 +187,12 @@ $(TYPEDFIELDS)"""
         GridVariable2D,         # <: AbstractField
         GridVariable3D,         # <: AbstractField
         ScratchMemoryType,      # <: ScratchMemory{ArrayType{Complex{NF},3}}
+        IntType,                # <: Integer
     } <: AbstractDiagnosticVariables
 
     spectrum::SpectrumType  # spectral resolution: maximum degree and order of spherical harmonics
     grid::GridType          # grid resolution: number of latitude rings on one hemisphere (Eq. incl.)
-    nlayers::Int            # number of vertical layers
+    nlayers::IntType        # number of vertical layers
 
     "Multi-purpose a, 3D work array to be reused in various places"
     a::SpectralVariable3D = zeros(SpectralVariable3D, spectrum, nlayers)
@@ -274,6 +278,7 @@ function DynamicsVariables(
         typeof(spectrum), typeof(grid),
         SpectralVariable2D, SpectralVariable3D,
         GridVariable2D, GridVariable3D, typeof(scratch_memory),
+        typeof(nlayers),
     }(;
         spectrum, grid, nlayers, scratch_memory
     )
@@ -289,9 +294,10 @@ $(TYPEDFIELDS)"""
         ParticleVector,         # <: AbstractField
         VectorNF,               # Vector{NF} or CuVector{NF}
         LocatorType,           # <:AbstractLocator
+        IntType,                # <: Integer
     } <: AbstractDiagnosticVariables
     "Number of particles"
-    nparticles::Int
+    nparticles::IntType
 
     "Work array: particle locations"
     locations::ParticleVector = zeros(ParticleVector, nparticles)
@@ -323,7 +329,7 @@ function ParticleVariables(SG::SpectralGrid)
         locator = RingGrids.AnvilLocator(NF, nparticles; architecture)
     end
 
-    return ParticleVariables{ParticleVector, VectorNF, typeof(locator)}(;
+    return ParticleVariables{ParticleVector, VectorNF, typeof(locator), typeof(nparticles)}(;
         nparticles, locator
     )
 end
@@ -348,6 +354,7 @@ struct DiagnosticVariables{
         PhysicsTuple,           # <: NamedTyple{Symbol, ...}
         ScratchMemoryType,      # <: ArrayType{Complex{NF}, 3}
         RefValueNF,             # <: Base.RefValue{NF}
+        IntType,                # <: Integer
     } <: AbstractDiagnosticVariables
 
     # DIMENSIONS
@@ -358,10 +365,10 @@ struct DiagnosticVariables{
     grid_used::GridType          # TODO cannot be named `grid` because of `GridVariables` ...
 
     "Number of vertical layers"
-    nlayers::Int
+    nlayers::IntType
 
     "Number of particles for particle advection"
-    nparticles::Int
+    nparticles::IntType
 
     "Tendencies (spectral and grid) of the prognostic variables"
     tendencies::Tendencies{SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, SpectralTracerTuple, GridTracerTuple}
@@ -389,8 +396,8 @@ struct DiagnosticVariables{
     function DiagnosticVariables(
             spectrum::SpectrumType,
             grid::GridType,
-            nlayers::Int,
-            nparticles::Int,
+            nlayers::IntType,
+            nparticles::IntType,
             tendencies::Tendencies{SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, SpectralTracerTuple, GridTracerTuple},
             grid_variables::GridVariables{GridType, GridVariable2D, GridVariable3D, GridTracerTuple},
             dynamics::DynamicsVariables{SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, ScratchMemoryType},
@@ -412,6 +419,7 @@ struct DiagnosticVariables{
             PhysicsTuple,
             ScratchMemoryType,      # <: ArrayType{Complex{NF}, 3}
             RefValueNF,             # <: Base.RefValue{NF}
+            IntType,                # <: Integer
         }
         return new{
             typeof(spectrum), typeof(grid), SpectralVariable2D, SpectralVariable3D,
@@ -419,6 +427,7 @@ struct DiagnosticVariables{
             ParticleVariable, VectorType, typeof(physics),
             typeof(dynamics.scratch_memory),
             typeof(scale),
+            IntType,
         }(
             spectrum, grid, nlayers, nparticles,
             tendencies, grid_variables, dynamics, physics, particles,
@@ -431,7 +440,7 @@ struct DiagnosticVariables{
             SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D,
             GridVariable2D, GridVariable3D, SpectralTracerTuple, GridTracerTuple,
             ParticleVariable, VectorType, PhysicsTuple,
-            ScratchMemoryType, RefValueNF,
+            ScratchMemoryType, RefValueNF, IntType,
         }(
             spectrum, grid, nlayers, nparticles,
             tendencies, grid_variables, dynamics, physics, particles,
@@ -450,12 +459,13 @@ struct DiagnosticVariables{
             PhysicsTuple,
             ScratchMemoryType,      # <: ArrayType{Complex{NF}, 3}
             RefValueNF,             # <: Base.RefValue{NF}
+            IntType,                # <: Integer
         }
         return new{
             SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D,
             GridVariable2D, GridVariable3D, SpectralTracerTuple, GridTracerTuple,
             ParticleVariable, VectorType, typeof(physics),
-            ScratchMemoryType, RefValueNF,
+            ScratchMemoryType, RefValueNF, IntType,
         }(
             spectrum, grid, nlayers, nparticles,
             tendencies, grid_variables, dynamics, physics, particles,
@@ -505,7 +515,7 @@ function DiagnosticVariables(model::AbstractModel)
         typeof(spectrum), typeof(grid), SpectralVariable2D, SpectralVariable3D,
         GridVariable2D, GridVariable3D, SpectralTracerTuple, GridTracerTuple,
         typeof(particles), VectorType, typeof(physics),
-        typeof(dynamics.scratch_memory), typeof(scale),
+        typeof(dynamics.scratch_memory), typeof(scale), typeof(nlayers),
     }(
         spectrum, grid, nlayers, nparticles,
         tendencies, grid_variables, dynamics, physics, particles,

@@ -10,6 +10,7 @@ struct MatrixSpectralTransform{
         MatrixType,                 # <: ArrayType{NF, 2},
         MatrixComplexType,          # <: ArrayType{Complex{NF}, 2},
         GradientType,               # <: NamedTuple for gradients
+        IntType,                    # <: Integer
     } <: AbstractSpectralTransform{NF, AR}
 
     # Architecture
@@ -18,7 +19,7 @@ struct MatrixSpectralTransform{
     # SPECTRAL AND GRID RESOLUTION
     spectrum::SpectrumType              # spectral truncation
     grid::GridType                      # grid used, including nlat_half for resolution, indices for rings, etc.
-    nlayers::Int                        # number of layers in vertical
+    nlayers::IntType                    # number of layers in vertical
 
     # CORRESPONDING GRID VECTORS
     coslat::VectorType                  # Cosine of latitudes, north to south
@@ -105,6 +106,7 @@ function MatrixSpectralTransform(
         typeof(backward_real),
         typeof(forward),
         typeof(gradients),
+        typeof(nlayers),
     }(
         architecture,
         spectrum, grid, nlayers,

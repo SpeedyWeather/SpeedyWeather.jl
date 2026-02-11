@@ -23,6 +23,7 @@ struct SpectralGrid{
         ArchitectureType,      # <: AbstractArchitecture
         SpectrumType,          # <: AbstractSpectrum
         GridType,              # <: AbstractGrid
+        IntType,               # <: Integer
     } <: AbstractSpectralGrid
 
     "[OPTION] number format used throughout the model"
@@ -53,7 +54,7 @@ struct SpectralGrid{
     TensorIntType::Type{<:AbstractArray}
     # HORIZONTAL SPECTRAL
     "[OPTION] horizontal resolution as the maximum degree of spherical harmonics"
-    trunc::Int
+    trunc::IntType
 
     "[DERIVED] spectral space"
     spectrum::SpectrumType
@@ -72,13 +73,13 @@ struct SpectralGrid{
     dealiasing::Float64
 
     "[DERIVED] number of latitude rings on one hemisphere (Equator incl)"
-    nlat_half::Int
+    nlat_half::IntType
 
     "[DERIVED] number of latitude rings on both hemispheres"
-    nlat::Int
+    nlat::IntType
 
     "[DERIVED] total number of grid points in the horizontal"
-    npoints::Int
+    npoints::IntType
 
     "[DERIVED] instance of horizontal grid used for calculations in grid-point space"
     grid::GridType
@@ -97,14 +98,14 @@ struct SpectralGrid{
 
     # PARTICLES
     "[OPTION] number of particles for particle advection [1]"
-    nparticles::Int
+    nparticles::IntType
 
     "[DERIVED] ArrayType of particle vector"
     ParticleVector::Type{<:AbstractArray}
 
     # VERTICAL
     "[OPTION] number of vertical layers in the atmosphere"
-    nlayers::Int
+    nlayers::IntType
 end
 
 function Base.show(io::IO, SG::SpectralGrid)
@@ -240,7 +241,7 @@ function SpectralGrid(
     end
 
     # Create the SpectralGrid with all fields
-    return SpectralGrid{typeof(architecture), typeof(spectrum), typeof(grid)}(
+    return SpectralGrid{typeof(architecture), typeof(spectrum), typeof(grid), typeof(nlat_half)}(
         NF,
         architecture,
         ArrayType,

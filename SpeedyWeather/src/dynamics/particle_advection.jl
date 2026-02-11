@@ -28,12 +28,13 @@ export ParticleAdvection2D
 @kwdef struct ParticleAdvection2D{
         NF,
         GeometryType, # <: AbstractGridGeometry
+        IntType,
     } <: AbstractParticleAdvection
     "[OPTION] Execute particle advection every n timesteps"
-    every_n_timesteps::Int = 6
+    every_n_timesteps::IntType = 6
 
     "[OPTION] Advect with velocities from this vertical layer index"
-    layer::Int = 1
+    layer::IntType = 1
 
     "[DERIVED] Time step used for particle advection (scaled by radius, converted to degrees) [s*˚/m]"
     Δt::Base.RefValue{NF} = Ref(zero(NF))
@@ -45,7 +46,7 @@ end
 function ParticleAdvection2D(SG::SpectralGrid; kwargs...)
     SG.nparticles == 0 && @warn "ParticleAdvection2D created but nparticles = 0 in spectral grid."
     geometry = GridGeometry(SG.grid; NF = SG.NF)
-    return ParticleAdvection2D{SG.NF, typeof(geometry)}(;
+    return ParticleAdvection2D{SG.NF, typeof(geometry), typeof(SG.trunc)}(;
         geometry,
         kwargs...
     )

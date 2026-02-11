@@ -3,12 +3,12 @@ export Leapfrog
 
 """Leapfrog time stepping defined by the following fields
 $(TYPEDFIELDS)"""
-@kwdef mutable struct Leapfrog{NF <: AbstractFloat} <: AbstractTimeStepper
+@kwdef mutable struct Leapfrog{NF <: AbstractFloat, IntType} <: AbstractTimeStepper
     "[DERIVED] Spectral resolution (max degree of spherical harmonics)"
-    trunc::Int
+    trunc::IntType
 
     "[CONST] Number of time steps stored simultaneously in prognostic variables"
-    nsteps::Int = 2
+    nsteps::IntType = 2
 
     "[OPTION] Time step in minutes for T31, scale linearly to `trunc`"
     Δt_at_T31::Second = Minute(40)
@@ -94,7 +94,7 @@ Generator function for a Leapfrog struct using `spectral_grid`
 for the resolution information."""
 function Leapfrog(spectral_grid::SpectralGrid; kwargs...)
     (; NF, trunc) = spectral_grid
-    return Leapfrog{NF}(; trunc, kwargs...)
+    return Leapfrog{NF, typeof(trunc)}(; trunc, kwargs...)
 end
 
 """$(TYPEDSIGNATURES)

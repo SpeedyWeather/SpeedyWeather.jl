@@ -16,14 +16,15 @@ $(TYPEDFIELDS)"""
 @kwdef mutable struct HyperDiffusion{
         NF,
         MatrixType,
+        IntType,
     } <: AbstractHorizontalDiffusion
 
     # DIMENSIONS
     "spectral resolution"
-    trunc::Int
+    trunc::IntType
 
     "number of vertical levels"
-    nlayers::Int
+    nlayers::IntType
 
     # PARAMETERS
     "[OPTION] power of Laplacian"
@@ -60,7 +61,7 @@ Passes on keyword arguments."""
 function HyperDiffusion(spectral_grid::SpectralGrid; kwargs...)
     (; NF, trunc, nlayers, ArrayType) = spectral_grid        # take resolution parameters from spectral_grid
     MatrixType = ArrayType{NF, 2}
-    return HyperDiffusion{NF, MatrixType}(; trunc, nlayers, kwargs...)
+    return HyperDiffusion{NF, MatrixType, typeof(trunc)}(; trunc, nlayers, kwargs...)
 end
 
 """$(TYPEDSIGNATURES)
@@ -295,14 +296,15 @@ export SpectralFilter
 @kwdef mutable struct SpectralFilter{
         NF,
         MatrixType,
+        IntType,
     } <: AbstractHorizontalDiffusion
 
     # DIMENSIONS
     "spectral resolution"
-    trunc::Int
+    trunc::IntType
 
     "number of vertical levels"
-    nlayers::Int
+    nlayers::IntType
 
     # PARAMETERS
     "[OPTION] shift diffusion to higher (positive shift) or lower (neg) wavenumbers, relative to trunc"
@@ -341,7 +343,7 @@ Passes on keyword arguments."""
 function SpectralFilter(spectral_grid::SpectralGrid; kwargs...)
     (; NF, trunc, nlayers, ArrayType) = spectral_grid        # take resolution parameters from spectral_grid
     MatrixType = ArrayType{NF, 2}
-    return SpectralFilter{NF, MatrixType}(; trunc, nlayers, kwargs...)
+    return SpectralFilter{NF, MatrixType, typeof(trunc)}(; trunc, nlayers, kwargs...)
 end
 
 function initialize!(diffusion::SpectralFilter, model::AbstractModel)

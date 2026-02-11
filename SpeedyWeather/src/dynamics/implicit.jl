@@ -118,14 +118,15 @@ $(TYPEDFIELDS)"""
         VectorType,
         MatrixType,
         TensorType,
+        IntType,
     } <: AbstractImplicit
 
     # DIMENSIONS
     "Spectral resolution"
-    trunc::Int
+    trunc::IntType
 
     "Number of vertical layers"
-    nlayers::Int
+    nlayers::IntType
 
     # PARAMETERS
     "Time-step coefficient: 0=explicit, 0.5=centred implicit, 1=backward implicit"
@@ -182,7 +183,7 @@ end
 Generator using the resolution from SpectralGrid."""
 function ImplicitPrimitiveEquation(spectral_grid::SpectralGrid; kwargs...)
     (; NF, VectorType, MatrixType, TensorType, trunc, nlayers) = spectral_grid
-    return ImplicitPrimitiveEquation{NF, VectorType, MatrixType, TensorType}(;
+    return ImplicitPrimitiveEquation{NF, VectorType, MatrixType, TensorType, typeof(trunc)}(;
         trunc, nlayers, kwargs...
     )
 end
