@@ -313,7 +313,7 @@ function UV_from_vordiv!(
         S::SpectralTransform;
         radius = DEFAULT_RADIUS,
     )
-    (; vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2) = S
+    (; vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2) = S.gradients
     @boundscheck ismatching(S, U) || throw(DimensionMismatch(S, U))
 
     launch!(architecture(U), SpectralWorkOrder, size(U), _UV_from_vordiv_kernel!, U, V, vor, div, vor.spectrum.l_indices, vor.spectrum.lmax, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)
