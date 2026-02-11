@@ -85,29 +85,7 @@ Adapt.@adapt_structure PrognosticVariables
 Base.eltype(::PrognosticVariables{SpectrumType, GridType, SpectralVariable2D}) where {SpectrumType, GridType, SpectralVariable2D <: LowerTriangularArray{Complex{NF}}} where {NF} = NF
 Architectures.array_type(::PrognosticVariables{SpectrumType, GridType, SpectralVariable2D}) where {SpectrumType, GridType, SpectralVariable2D <: LowerTriangularArray{NF, N, ArrayType}} where {NF, N, ArrayType <: AbstractArray} = nonparametric_type(ArrayType)
 
-function get_steps(coeffs::LowerTriangularArray{T, 2}) where {T}
-    nsteps = size(coeffs, 2)
-    return ntuple(i -> lta_view(coeffs, :, i), nsteps)
-end
 
-function get_steps(coeffs::LowerTriangularArray{T, 3}) where {T}
-    nsteps = size(coeffs, 3)
-    return ntuple(i -> lta_view(coeffs, :, :, i), nsteps)
-end
-
-export get_step
-
-"""$(TYPEDSIGNATURES)
-Get the i-th step of a LowerTriangularArray as a view (wrapped into a LowerTriangularArray).
-"step" refers to the last dimension, for prognostic variables used for the leapfrog time step.
-This method is for a 2D spectral variable (horizontal only) with steps in the 3rd dimension."""
-get_step(coeffs::LowerTriangularArray{T, 2}, i) where {T} = lta_view(coeffs, :, i)
-
-"""$(TYPEDSIGNATURES)
-Get the i-th step of a LowerTriangularArray as a view (wrapped into a LowerTriangularArray).
-"step" refers to the last dimension, for prognostic variables used for the leapfrog time step.
-This method is for a 3D spectral variable (horizontal+vertical) with steps in the 4rd dimension."""
-get_step(coeffs::LowerTriangularArray{T, 3}, i) where {T} = lta_view(coeffs, :, :, i)
 
 """$(TYPEDSIGNATURES)
 Generator function."""
@@ -119,7 +97,7 @@ function PrognosticVariables(model::AbstractModel)
 
     (; NF, spectrum, grid, nlayers, nparticles) = SG
     (; SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, ParticleVector) = SG
-    nlayers_soil = get_soil_layers(model)
+    nlayers_soil = get_nlayers(model.land)
 
     # allocate parameterization variables
     variable_names = get_prognostic_variables(model)

@@ -1,8 +1,8 @@
 abstract type AbstractImplicit <: AbstractModelComponent end
 
 # model.implicit=nothing (for BarotropicModel)
-initialize!(::Nothing, dt::Real, ::DiagnosticVariables, ::AbstractModel) = nothing
-implicit_correction!(::DiagnosticVariables, ::PrognosticVariables, ::Nothing, ::AbstractModel) = nothing
+initialize!(::Nothing, dt::Real, ::Variables, ::AbstractModel) = nothing
+implicit_correction!(::Variables, ::Nothing, ::AbstractModel) = nothing
 
 # SHALLOW WATER MODEL
 export ImplicitShallowWater
@@ -37,7 +37,8 @@ ImplicitShallowWater(SG::SpectralGrid; kwargs...) = ImplicitShallowWater{SG.NF}(
 $(TYPEDSIGNATURES)
 Update the implicit terms in `implicit` for the shallow water model as they depend on the time step `dt`."""
 function initialize!(implicit::ImplicitShallowWater, dt::Real, args...)
-    return implicit.time_step = implicit.α * dt  # new implicit timestep ξ = α*dt = 2αΔt (for leapfrog) from input dt
+    implicit.time_step = implicit.α * dt  # new implicit timestep ξ = α*dt = 2αΔt (for leapfrog) from input dt
+    return implicit
 end
 
 # implicit shallow water has no precomputed arrays, so implicit.initialized is not defined
@@ -50,17 +51,16 @@ Apply correction to the tendencies in `diagn` to prevent the gravity waves from 
 The correction is implicitly evaluated using the parameter `implicit.α` to switch between
 forward, centered implicit or backward evaluation of the gravity wave terms."""
 function implicit_correction!(
-        diagn::DiagnosticVariables,
-        progn::PrognosticVariables,
+        vars::Variables,
         implicit::ImplicitShallowWater,
         model::ShallowWater
     )
 
-    (; div_tend, pres_tend) = diagn.tendencies  # tendency of divergence and pressure/η
-    div_old, div_new = get_steps(progn.div)   # divergence at t, t+dt
-    pres_old, pres_new = get_steps(progn.pres)  # pressure/η at t, t+dt
+    div_tend = vars.tendencies.div                      # tendency of divergence and interface displacement η
+    η_tend = vars.tendencies.η                          # tendency of divergence and interface displacement η
+    div_old, div_new = get_steps(vars.prognostic.div)   # divergence at t, t+dt
+    η_old, η_new = get_steps(vars.prognostic.η)         # η at t, t+dt
 
-    # unpack with [] as stored in a RefValue for mutation during initialization
     H = model.atmosphere.layer_thickness        # layer thickness [m], undisturbed, no mountains
     g = model.planet.gravity                    # gravitational acceleration [m/s²]
     ξ = implicit.time_step                      # new implicit timestep ξ = α*dt = 2αΔt (for leapfrog)
@@ -72,16 +72,16 @@ function implicit_correction!(
     arch = architecture(div_tend)
     launch!(
         arch, SpectralWorkOrder, size(div_tend), implicit_shallow_water_kernel!,
-        div_tend, pres_tend, div_old, div_new, pres_old, pres_new, l_indices, H, g, ξ
+        div_tend, η_tend, div_old, div_new, η_old, η_new, l_indices, H, g, ξ
     )
 
     zero_last_degree!(div_tend)
-    zero_last_degree!(pres_tend)
+    zero_last_degree!(η_tend)
     return nothing
 end
 
 @kernel inbounds = true function implicit_shallow_water_kernel!(
-        div_tend, pres_tend, div_old, div_new, pres_old, pres_new, l_indices,
+        div_tend, η_tend, div_old, div_new, η_old, η_new, l_indices,
         @Const(H), @Const(g), @Const(ξ)
     )
     I = @index(Global, Cartesian)
@@ -98,13 +98,13 @@ end
     # Vⁱ is a prognostic variable at time step i
     # N is the right hand side of ∂V\∂t = N(V)
     # NI is the part of N that's calculated semi-implicitily: N = NE + NI
-    G_div = div_tend[lm, k] - g * ∇² * (pres_old[lm] - pres_new[lm])
-    G_η = pres_tend[lm] - H * (div_old[lm, k] - div_new[lm, k])
+    G_div = div_tend[lm, k] - g * ∇² * (η_old[lm, k] - η_new[lm, k])
+    G_η = η_tend[lm] - H * (div_old[lm, k] - div_new[lm, k])
 
     # Using the Gs correct the tendencies for semi-implicit time stepping
     S⁻¹ = inv(1 - ξ^2 * H * g * ∇²)  # operator to invert
     div_tend[lm, k] = S⁻¹ * (G_div - ξ * g * ∇² * G_η)
-    pres_tend[lm] = G_η - ξ * H * div_tend[lm, k]
+    η_tend[lm] = G_η - ξ * H * div_tend[lm, k]
 end
 
 export ImplicitPrimitiveEquation

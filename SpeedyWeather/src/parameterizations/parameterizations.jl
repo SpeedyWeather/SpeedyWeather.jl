@@ -29,23 +29,6 @@ Initialize an `AbstractParameterization`. This is called once at when calling in
 The default behaviour is to return `nothing`."""
 initialize!(parameterization::AbstractParameterization, model::AbstractModel) = nothing
 
-"""
-    $(TYPEDSIGNATURES)
-
-Function that defines which variables a `AbstractParameterization` needs to use and allocate,
-returns a tuple of [`AbstractVariable`](@ref).
-"""
-variables(parameterization::AbstractParameterization) = () # fallback for parameterizations that don't need variables
-
-# variables of nothing are nothing
-variables(::Nothing) = ()
-
-function variables(model::AbstractModel)
-    # Collect all variables from all parameterizations and flatten into a single tuple
-    all_vars = Tuple(vcat([collect(SpeedyWeather.variables(component)) for component in SpeedyWeather.get_all_parameterizations(model)]...))
-    return all_vars
-end
-
 """$(TYPEDSIGNATURES)
 Extract the parameterizations from the model including land and ocean, to infer variables."""
 function get_all_parameterizations(model::AbstractModel)

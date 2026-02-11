@@ -2,6 +2,7 @@ module SpeedyWeather
 
 # STRUCTURE
 using DocStringExtensions
+using StyledStrings
 
 # NUMERICS
 import Primes
@@ -113,7 +114,7 @@ function animate end
 # abstract types
 include("models/abstract_models.jl")
 include("variables/abstract_types.jl")
-include("models/parameterizations.jl")
+include("parameterizations/parameterizations.jl")
 
 # GEOMETRY CONSTANTS ETC
 include("dynamics/vertical_coordinates.jl")
@@ -124,17 +125,17 @@ include("dynamics/planet.jl")
 include("dynamics/atmosphere.jl")
 include("dynamics/adiabatic_conversion.jl")
 include("dynamics/orography.jl")
-include("physics/land_sea_mask.jl")
+include("parameterizations/land_sea_mask.jl")
 
 # VARIABLES
+include("variables/dimensions.jl")
 include("variables/variables.jl")
 include("dynamics/tracers.jl")
 include("dynamics/particles.jl")
 include("dynamics/clock.jl")
-include("variables/prognostic_variables.jl")
+# include("variables/prognostic_variables.jl")
 include("variables/set.jl")
-include("physics/define_column.jl")
-include("variables/diagnostic_variables.jl")
+# include("variables/diagnostic_variables.jl")
 
 # MODEL COMPONENTS
 include("dynamics/time_integration.jl")
@@ -153,35 +154,35 @@ include("dynamics/particle_advection.jl")
 include("dynamics/random_process.jl")
 
 # PARAMETERIZATIONS
-include("physics/albedo.jl")
-include("physics/tendencies.jl")
-include("physics/vertical_diffusion.jl")
-include("physics/large_scale_condensation.jl")
-include("physics/surface_fluxes/boundary_layer.jl")
-include("physics/surface_fluxes/surface_condition.jl")
-include("physics/surface_fluxes/momentum.jl")
-include("physics/surface_fluxes/heat.jl")
-include("physics/surface_fluxes/humidity.jl")
-include("physics/convection.jl")
-include("physics/radiation/zenith.jl")
-include("physics/radiation/shortwave_radiation.jl")
-include("physics/radiation/shortwave_transmissivity.jl")
-include("physics/radiation/clouds.jl")
-include("physics/radiation/longwave_radiation.jl")
-include("physics/radiation/longwave_transmissivity.jl")
-include("physics/stochastic_physics.jl")
+include("parameterizations/albedo.jl")
+include("parameterizations/tendencies.jl")
+include("parameterizations/vertical_diffusion.jl")
+include("parameterizations/large_scale_condensation.jl")
+include("parameterizations/surface_fluxes/boundary_layer.jl")
+include("parameterizations/surface_fluxes/surface_condition.jl")
+include("parameterizations/surface_fluxes/momentum.jl")
+include("parameterizations/surface_fluxes/heat.jl")
+include("parameterizations/surface_fluxes/humidity.jl")
+include("parameterizations/convection.jl")
+include("parameterizations/radiation/zenith.jl")
+include("parameterizations/radiation/shortwave_radiation.jl")
+include("parameterizations/radiation/shortwave_transmissivity.jl")
+include("parameterizations/radiation/clouds.jl")
+include("parameterizations/radiation/longwave_radiation.jl")
+include("parameterizations/radiation/longwave_transmissivity.jl")
+include("parameterizations/stochastic_physics.jl")
 
 # OCEAN AND LAND
-include("physics/ocean.jl")
-include("physics/sea_ice.jl")
-include("physics/land/land.jl")
-include("physics/land/geometry.jl")
-include("physics/land/thermodynamics.jl")
-include("physics/land/temperature.jl")
-include("physics/land/soil_moisture.jl")
-include("physics/land/snow.jl")
-include("physics/land/vegetation.jl")
-include("physics/land/rivers.jl")
+include("parameterizations/ocean.jl")
+include("parameterizations/sea_ice.jl")
+include("parameterizations/land/land.jl")
+include("parameterizations/land/geometry.jl")
+include("parameterizations/land/thermodynamics.jl")
+include("parameterizations/land/temperature.jl")
+include("parameterizations/land/soil_moisture.jl")
+include("parameterizations/land/snow.jl")
+include("parameterizations/land/vegetation.jl")
+include("parameterizations/land/rivers.jl")
 
 # OUTPUT
 include("output/schedule.jl")

@@ -41,3 +41,9 @@ function Base.show(io::IO, S::SpectralTransform{NF, ArrayType}) where {NF, Array
     print(io, "└ Memory:       for $nlayers layers ($memorysize_str)")
     return nothing
 end
+
+function Base.summary(io::IO, M::ScratchMemory)
+    AT = nonparametric_type(typeof(M.north))
+    NF = eltype(M.north)
+    print(io, Base.dims2string((size(M.north)..., 2)), " ScratchMemory{$AT{$NF,...}, ...}")
+end

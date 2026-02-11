@@ -208,10 +208,6 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
 end
 
 """$(TYPEDSIGNATURES)
-Extract the number of soil layers from the model."""
-@inline get_soil_layers(model::PrimitiveWetModel) = get_soil_layers(model.land)
-
-"""$(TYPEDSIGNATURES)
 A `model` is adapted to the GPU or CPU by wrapping some (but not all!)
 of its fields (determined by `model.model_parameters`) into a NamedTuple.
 Importantly, while accessing fields `model.field` still works as usual,

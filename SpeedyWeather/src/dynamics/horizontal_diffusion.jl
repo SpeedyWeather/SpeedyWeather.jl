@@ -137,7 +137,8 @@ function initialize!(
     diffusion.expl = on_architecture(arch, ∇²ⁿ)
     diffusion.impl = on_architecture(arch, ∇²ⁿ_implicit)
     diffusion.expl_div = on_architecture(arch, ∇²ⁿ_div)
-    return diffusion.impl_div = on_architecture(arch, ∇²ⁿ_div_implicit)
+    diffusion.impl_div = on_architecture(arch, ∇²ⁿ_div_implicit)
+    return nothing
 end
 
 """$(TYPEDSIGNATURES)
@@ -154,15 +155,15 @@ function horizontal_diffusion!(
     lmax, mmax = size(tendency, OneBased, as = Matrix)
     nlayers = size(var, 2)
 
-    @boundscheck size(tendency) == size(var) || throw(BoundsError)
-    @boundscheck lmax <= size(expl, 1) == size(impl, 1) || throw(BoundsError)
-    @boundscheck nlayers <= size(expl, 2) == size(impl, 2) || throw(BoundsError)
+    @boundscheck size(tendency) == size(var) || throw(BoundsError(tendency))
+    @boundscheck lmax <= size(expl, 1) == size(impl, 1) || throw(BoundsError(expl, lmax))
+    @boundscheck nlayers <= size(expl, 2) == size(impl, 2) || throw(BoundsError(expl, nlayers))
 
-    return launch!(
+    launch!(
         architecture(tendency), SpectralWorkOrder, size(tendency), _horizontal_diffusion_kernel!,
         tendency, var, expl, impl, var.spectrum.l_indices
     )
-
+    return nothing
 end
 
 @kernel inbounds = true function _horizontal_diffusion_kernel!(
@@ -183,8 +184,7 @@ end
 """$(TYPEDSIGNATURES)
 Apply horizontal diffusion to vorticity in the BarotropicModel."""
 function horizontal_diffusion!(
-        diagn::DiagnosticVariables,
-        progn::PrognosticVariables,
+        vars::Variables,
         diffusion::AbstractHorizontalDiffusion,
         model::Barotropic,
         lf::Integer = 1,    # leapfrog index used (2 is unstable)
@@ -192,23 +192,22 @@ function horizontal_diffusion!(
     (; expl, impl) = diffusion
 
     # Barotropic model diffuses vorticity (only variable)
-    vor = get_step(progn.vor, lf)                               # lta_view for leapfrog index
-    (; vor_tend) = diagn.tendencies
+    vor = get_step(vars.prognostic.vor, lf)                               # lta_view for leapfrog index
+    vor_tend = vars.tendencies.vor
     horizontal_diffusion!(vor_tend, vor, expl, impl)
 
     for (name, tracer) in model.tracers
-        tracer_var = get_step(progn.tracers[name], lf)          # lta_view for leapfrog index
-        tracer_tend = diagn.tendencies.tracers_tend[name]
+        tracer_var = get_step(vars.prognostic.tracers[name], lf)          # lta_view for leapfrog index
+        tracer_tend = vars.tendencies.tracers[name]
         tracer.active && horizontal_diffusion!(tracer_tend, tracer_var, expl, impl)
     end
-    return
+    return nothing
 end
 
 """$(TYPEDSIGNATURES)
 Apply horizontal diffusion to vorticity and divergence in the ShallowWaterModel."""
 function horizontal_diffusion!(
-        diagn::DiagnosticVariables,
-        progn::PrognosticVariables,
+        vars::Variables,
         diffusion::AbstractHorizontalDiffusion,
         model::ShallowWater,
         lf::Integer = 1,    # leapfrog index used (2 is unstable)
@@ -216,26 +215,26 @@ function horizontal_diffusion!(
     (; expl, impl, expl_div, impl_div) = diffusion
 
     # ShallowWater model diffuses vorticity and divergence
-    vor = get_step(progn.vor, lf)
-    div = get_step(progn.div, lf)
-    (; vor_tend, div_tend) = diagn.tendencies
+    vor = get_step(vars.prognostic.vor, lf)
+    div = get_step(vars.prognostic.div, lf)
+    vor_tend = vars.tendencies.vor
+    div_tend = vars.tendencies.div
     horizontal_diffusion!(vor_tend, vor, expl, impl)
     horizontal_diffusion!(div_tend, div, expl_div, impl_div)
 
     for (name, tracer) in model.tracers
-        tracer_var = get_step(progn.tracers[name], lf)      # lta_view for leapfrog index
-        tracer_tend = diagn.tendencies.tracers_tend[name]
+        tracer_var = get_step(vars.prognostic.tracers[name], lf)      # lta_view for leapfrog index
+        tracer_tend = vars.tendencies.tracers[name]
         tracer.active && horizontal_diffusion!(tracer_tend, tracer_var, expl, impl)
     end
-    return
+    return nothing
 end
 
 """$(TYPEDSIGNATURES)
 Apply horizontal diffusion applied to vorticity, divergence, temperature, and
 humidity (PrimitiveWet only) in the PrimitiveEquation models."""
 function horizontal_diffusion!(
-        diagn::DiagnosticVariables,
-        progn::PrognosticVariables,
+        vars::Variables,
         diffusion::AbstractHorizontalDiffusion,
         model::PrimitiveEquation,
         lf::Integer = 1,    # leapfrog index used (2 is unstable)
@@ -247,22 +246,25 @@ function horizontal_diffusion!(
     (; expl, impl) = diffusion
 
     # Primitive equation models diffuse vor, divergence, temp (and humidity for wet core)
-    vor = get_step(progn.vor, lf)
-    div = get_step(progn.div, lf)
-    temp = get_step(progn.temp, lf)
-    humid = get_step(progn.humid, lf)
-    (; vor_tend, div_tend, temp_tend, humid_tend) = diagn.tendencies
+    vor = get_step(vars.prognostic.vor, lf)
+    div = get_step(vars.prognostic.div, lf)
+    temp = get_step(vars.prognostic.temp, lf)
+    humid = get_step(vars.prognostic.humid, lf)
+    vor_tend = vars.tendencies.vor
+    div_tend = vars.tendencies.div
+    temp_tend = vars.tendencies.temp
+    humid_tend = vars.tendencies.humid
     horizontal_diffusion!(vor_tend, vor, expl, impl)
     horizontal_diffusion!(div_tend, div, expl_div, impl_div)
     horizontal_diffusion!(temp_tend, temp, expl, impl)
     model isa PrimitiveWet && horizontal_diffusion!(humid_tend, humid, expl, impl)
 
     for (name, tracer) in model.tracers
-        tracer_var = get_step(progn.tracers[name], lf)      # lta_view for leapfrog index
-        tracer_tend = diagn.tendencies.tracers_tend[name]
+        tracer_var = get_step(vars.prognostic.tracers[name], lf)      # lta_view for leapfrog index
+        tracer_tend = vars.tendencies.tracers[name]
         tracer.active && horizontal_diffusion!(tracer_tend, tracer_var, expl, impl)
     end
-    return
+    return nothing
 end
 
 export SpectralFilter

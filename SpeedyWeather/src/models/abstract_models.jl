@@ -58,17 +58,19 @@ initialize!(model::AbstractModel, ps::Union{ComponentVector, SpeedyParams}; kwar
 function Base.show(io::IO, M::AbstractModel)
     properties = propertynames(M)
     n = length(properties)
-    s = "$(model_type(M)) <: $(model_class(M))"
+    Msize = prettymemory(Base.summarysize(M))
+    s = styled"{warning:$(model_type(M))}"*" <: $(model_class(M)) " * styled"{note:($Msize)}"
     n == 0 ? print(io, s) : println(io, s)
     for (i, key) in enumerate(properties)
         val = getfield(M, key)
         s = i == n ? "└" : "├"  # choose ending └ for last property
         p = i == n ? print : println
-        a = "$s $key: $(typeof(val))"
-        a = textwidth(a) > 100 ? string(a[1:97], "...") : a  # truncate long strings
+        t = "$(typeof(val))"
+        t = textwidth(t) > 60 ? string(t[1:57], "...") : t  # truncate long strings
+        a = "$s " * styled"{info:$key}"*": $t"
         p(io, a)
     end
-    return
+    return nothing
 end
 
 # Functions to get parameters and parameterization to
@@ -106,5 +108,7 @@ end
 @inline get_parameterizations(model::ShallowWater) = NamedTuple()
 @inline get_extra_parameterizations(model::ShallowWater) = NamedTuple()
 
-# default to 0 soil layers / no land model
-@inline get_soil_layers(model::AbstractModel) = 0
+"""$(TYPEDSIGNATURES)
+Extract the number of soil layers from the model. The fallback is 0 soil layers, i.e. no land model."""
+@inline get_soil_layers(model::AbstractModel) = (haskey(model, :land) && !isnothing(model.land)) ? get_nlayers(model.land) : 0
+@inline get_nlayers(model::AbstractModel) = model.spectral_grid.nlayers

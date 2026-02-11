@@ -1,7 +1,7 @@
 name = "SpeedyWeather"
 uuid = "9e226e20-d153-4fed-8a5b-493def4f21a9"
+version = "0.18.0"
 authors = ["SpeedyWeather contributors"]
-version = "0.18"
 
 [deps]
 AbstractFFTs = "621f4979-c628-5d54-868e-fcf4e3e8185c"
@@ -32,12 +32,19 @@ RingGrids = "d1845624-ad4f-453b-8ff4-a8db365bf3a7"
 SpeedyTransforms = "ed023a3f-7a3c-42dd-bab6-68c21c8c3105"
 SpeedyWeatherInternals = "34489162-d270-4603-8b96-37b04f830d73"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
+StyledStrings = "f489334b-da3d-4c2e-b8f0-e476e12c162b"
 TOML = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
 
 [weakdeps]
 FiniteDifferences = "26cc04aa-876d-5657-8c51-4c34ba976000"
 GeoMakie = "db073c08-6b98-4ee5-b6a4-5efafb3259c6"
 UnicodePlots = "b8865327-cd53-5732-bb35-84acbb429228"
+
+[sources]
+LowerTriangularArrays = {path = "../LowerTriangularArrays"}
+RingGrids = {path = "../RingGrids"}
+SpeedyTransforms = {path = "../SpeedyTransforms"}
+SpeedyWeatherInternals = {path = "../SpeedyWeatherInternals"}
 
 [extensions]
 SpeedyWeatherEnzymeExt = "Enzyme"
@@ -76,18 +83,7 @@ RingGrids = "0.1"
 SpeedyTransforms = "0.1"
 SpeedyWeatherInternals = "0.1"
 Statistics = "1.10"
+StyledStrings = "1.11.0"
 TOML = "1"
 UnicodePlots = "3.3"
 julia = "1.10"
-
-[sources.LowerTriangularArrays]
-path = "../LowerTriangularArrays"
-
-[sources.RingGrids]
-path = "../RingGrids"
-
-[sources.SpeedyTransforms]
-path = "../SpeedyTransforms"
-
-[sources.SpeedyWeatherInternals]
-path = "../SpeedyWeatherInternals"

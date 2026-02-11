@@ -157,14 +157,10 @@ end
 $(TYPEDSIGNATURES)
 calculates the geopotential in the ShallowWaterModel as g*η,
 i.e. gravity times the interface displacement (field `pres`)"""
-function geopotential!(
-        diagn::DiagnosticVariables,
-        planet::AbstractPlanet
-    )
-
+function geopotential!(vars::Variables, planet::AbstractPlanet)
     # note this only works in 2D models with nlayers=1 otherwise gepotential is actually 3D and not just 2D x 1
     # one would need to use lta/field_view(gepotential, :, nlayers) to make it 2D again
-    (; geopotential, pres_grid) = diagn.grid
-    geopotential .= planet.gravity .* pres_grid
-    return nothing
+    (; geopotential, η) = vars.grid
+    geopotential .= planet.gravity .* η
+    return geopotential
 end

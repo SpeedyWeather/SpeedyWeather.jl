@@ -115,7 +115,8 @@ function initialize!(L::Leapfrog, model::AbstractModel)
     n = round(Int, Millisecond(output_dt).value / L.Δt_millisec.value)
     nΔt = n * L.Δt_millisec
     if nΔt != output_dt
-        @warn "$n steps of Δt = $(L.Δt_millisec.value)ms yield output every $(nΔt.value)ms (=$(nΔt.value / 1000)s), but output_dt = $(output_dt.value)s"
+        @warn "$n steps of Δt = $(L.Δt_millisec.value)ms yield output every " *
+            "$(nΔt.value)ms (=$(nΔt.value / 1000)s), but output_dt = $(output_dt.value)s"
     end
     if L.start_with_euler
         L.first_step_euler = true
@@ -176,9 +177,12 @@ function leapfrog!(
     # for lf == 1 (initial time step) no filter applied (w1=w2=0)
     # for lf == 2 (later steps) Robert+Williams filter is applied
     w1 = lf == 1 ? zero(NF) : robert_filter * williams_filter / 2       # = ν*α/2 in Williams (2009, Eq. 8)
-    w2 = lf == 1 ? zero(NF) : robert_filter * (1 - williams_filter) / 2   # = ν(1-α)/2 in Williams (2009, Eq. 9)
+    w2 = lf == 1 ? zero(NF) : robert_filter * (1 - williams_filter) / 2 # = ν(1-α)/2 in Williams (2009, Eq. 9)
 
-    launch!(architecture(tendency), SpectralWorkOrder, size(tendency), leapfrog_kernel!, A_old, A_new, A_lf, tendency, dt_NF, w1, w2)
+    launch!(
+        architecture(tendency), SpectralWorkOrder, size(tendency), leapfrog_kernel!,
+        A_old, A_new, A_lf, tendency, dt_NF, w1, w2
+    )
 
     return nothing
 end
@@ -198,35 +202,39 @@ end
 tendency_names(model::AbstractModel) = tuple((Symbol(var, :_tend) for var in prognostic_variables(model))...)
 
 """$(TYPEDSIGNATURES)
-Leapfrog time stepping for all prognostic variables in `progn` using their tendencies in `tend`.
+Leapfrog time stepping for all prognostic variables in `vars` using their tendencies.
 Depending on `model` decides which variables to time step."""
 function leapfrog!(
-        progn::PrognosticVariables,
-        tend::Tendencies,
+        vars::Variables,
         dt::Real,               # time step (mostly =2Δt, but for init steps =Δt, Δt/2)
         lf::Int,                # leapfrog index to dis/enable Williams filter
         model::AbstractModel,
     )
-    for (varname, tendname) in zip(prognostic_variables(model), tendency_names(model))
-        var = getfield(progn, varname)
-        var_old, var_new = get_steps(var)
-        var_tend = getfield(tend, tendname)
-        SpeedyTransforms.spectral_truncation!(var_tend)
-        leapfrog!(var_old, var_new, var_tend, dt, lf, model.time_stepping)
+    (; prognostic, tendencies) = vars
+
+
+    for varname in keys(tendencies)
+        if !(tendencies[varname] isa NamedTuple)
+            var = getfield(prognostic, varname)
+            var_old, var_new = get_steps(var)
+            var_tend = getfield(tendencies, varname)
+            SpeedyTransforms.spectral_truncation!(var_tend)
+            leapfrog!(var_old, var_new, var_tend, dt, lf, model.time_stepping)
+        end
     end
 
     # and time stepping for tracers if active
     for (name, tracer) in model.tracers
         if tracer.active
-            var_old, var_new = get_steps(progn.tracers[name])
-            var_tend = tend.tracers_tend[name]
+            var_old, var_new = get_steps(prognostic.tracers[name])
+            var_tend = tendencies.tracers[name]
             SpeedyTransforms.spectral_truncation!(var_tend)
             leapfrog!(var_old, var_new, var_tend, dt, lf, model.time_stepping)
         end
     end
 
     # evolve the random pattern in time
-    random_process!(progn, model.random_process)
+    random_process!(vars, model.random_process)
     return nothing
 end
 
@@ -235,24 +243,25 @@ First 1 or 2 time steps of `simulation`. If `model.time_stepping.start_with_eule
 then start with one Euler step with dt/2, followed by one Leapfrog step with dt.
 If false, continue with leapfrog steps at 2Δt (e.g. restart)."""
 function first_timesteps!(simulation::AbstractSimulation)
-    progn, diagn, model = unpack(simulation)
+    (; variables, model) = simulation
     (; time_stepping) = model
     (; Δt) = time_stepping
 
     # decide whether to start with 1x Euler then 1x Leapfrog at Δt
     if time_stepping.first_step_euler
-        first_timesteps!(progn, diagn, model)
-        time_stepping.first_step_euler = !time_stepping.continue_with_leapfrog   # after first run! continue with leapfrog
-
-    else    # or continue with leaprog steps at 2Δt (e.g. restart)
+        first_timesteps!(variables, model)
+        # after first run! continue with leapfrog
+        time_stepping.first_step_euler = !time_stepping.continue_with_leapfrog   
+    else 
+        # or continue with leaprog steps at 2Δt (e.g. restart)
         # but make sure that implicit solver is initialized in that situation
-        initialize!(model.implicit, 2Δt, diagn, model)
+        initialize!(model.implicit, 2Δt, variables, model)
         set_initialized!(model.implicit)            # mark implicit as initialized
         later_timestep!(simulation)
     end
 
     # only now initialise feedback for benchmark accuracy
-    (; clock) = progn
+    (; clock) = variables.prognostic
     initialize!(model.feedback, clock, model)
     return nothing
 end
@@ -262,11 +271,10 @@ $(TYPEDSIGNATURES)
 Performs the first two initial time steps (Euler forward, unfiltered leapfrog) to populate the
 prognostic variables with two time steps (t=0, Δt) that can then be used in the normal leap frogging."""
 function first_timesteps!(
-        progn::PrognosticVariables,         # all prognostic variables
-        diagn::DiagnosticVariables,         # all pre-allocated diagnostic variables
-        model::AbstractModel,               # everything that is constant at runtime
+        vars::Variables,        # all variables
+        model::AbstractModel,   # everything that is constant at runtime
     )
-    (; clock) = progn
+    (; clock) = vars.prognostic
     clock.n_timesteps == 0 && return nothing    # exit immediately for no time steps
 
     (; implicit) = model
@@ -277,29 +285,29 @@ function first_timesteps!(
     lf1 = 1                             # without Robert+Williams filter
     lf2 = 1                             # evaluates all tendencies at t=0,
     # the first leapfrog index (=>Euler forward)
-    initialize!(implicit, Δt / 2, diagn, model)       # update precomputed implicit terms with time step Δt/2
-    timestep!(progn, diagn, Δt / 2, model, lf1, lf2)  # update time by half the leapfrog time step Δt used here
+    initialize!(implicit, Δt / 2, vars, model)      # update precomputed implicit terms with time step Δt/2
+    timestep!(vars, Δt / 2, model, lf1, lf2)        # update time by half the leapfrog time step Δt used here
     timestep!(clock, Δt_millisec_half, increase_counter = false)
 
     # output, callbacks not called after the first Euler step as it's a half-step (i=0 to i=1/2)
     # populating the second leapfrog index to perform the second time step
 
     # SECOND TIME STEP (UNFILTERED LEAPFROG with dt=Δt, leapfrogging from t=0 over t=Δt/2 to t=Δt)
-    initialize!(implicit, Δt, diagn, model)    # update precomputed implicit terms with time step Δt
-    lf1 = 1                             # without Robert+Williams filter
-    lf2 = 2                             # evaluate all tendencies at t=dt/2,
+    initialize!(implicit, Δt, vars, model)  # update precomputed implicit terms with time step Δt
+    lf1 = 1                                 # without Robert+Williams filter
+    lf2 = 2                                 # evaluate all tendencies at t=dt/2,
     # the 2nd leapfrog index (=>Leapfrog)
-    timestep!(progn, diagn, Δt, model, lf1, lf2)
+    timestep!(vars, Δt, model, lf1, lf2)
     # remove prev Δt/2 in case not even milliseconds, otherwise time is off by 1ms
     timestep!(clock, -Δt_millisec_half, increase_counter = false)
     timestep!(clock, Δt_millisec)
 
     # do output and callbacks after the first proper (from i=0 to i=1) time step
-    callback!(model.callbacks, progn, diagn, model)
-    output!(model.output, Simulation(progn, diagn, model))
+    callback!(model.callbacks, vars, model)
+    output!(model.output, Simulation(vars, model))
 
     # from now on precomputed implicit terms with 2Δt
-    initialize!(implicit, 2Δt, diagn, model)
+    initialize!(implicit, 2Δt, vars, model)
     set_initialized!(implicit)      # mark implicit as initialized
 
     return nothing
@@ -308,27 +316,24 @@ end
 """$(TYPEDSIGNATURES)
 Calculate a single time step for the barotropic model."""
 function timestep!(
-        progn::PrognosticVariables,     # all prognostic variables
-        diagn::DiagnosticVariables,     # all pre-allocated diagnostic variables
+        vars::Variables,                # all variables
         dt::Real,                       # time step (mostly =2Δt, but for first_timesteps! =Δt, Δt/2)
         model::Barotropic,              # everything that's constant at runtime
         lf1::Integer = 2,               # leapfrog index 1 (dis/enables Robert+Williams filter)
         lf2::Integer = 2,               # leapfrog index 2 (time step used for tendencies)
     )
     model.feedback.nans_detected && return nothing  # exit immediately if NaNs/Infs already present
-
-    # set the tendencies back to zero for accumulation
-    fill!(diagn.tendencies, 0, Barotropic)
+    reset_tendencies!(vars)             # set the tendencies back to zero for accumulation
 
     # TENDENCIES, DIFFUSION, LEAPFROGGING AND TRANSFORM SPECTRAL STATE TO GRID
-    dynamics_tendencies!(diagn, progn, lf2, model)
-    horizontal_diffusion!(diagn, progn, model.horizontal_diffusion, model)
-    leapfrog!(progn, diagn.tendencies, dt, lf1, model)
-    transform!(diagn, progn, lf2, model)
+    dynamics_tendencies!(vars, lf2, model)
+    horizontal_diffusion!(vars, model.horizontal_diffusion, model)
+    leapfrog!(vars, dt, lf1, model)
+    transform!(vars, lf2, model)
 
     # PARTICLE ADVECTION (always skip 1st step of first_timesteps!)
     not_first_timestep = lf2 == 2
-    not_first_timestep && particle_advection!(progn, diagn, model)
+    not_first_timestep && particle_advection!(vars, model)
 
     return nothing
 end
@@ -337,30 +342,27 @@ end
 $(TYPEDSIGNATURES)
 Calculate a single time step for the `model <: ShallowWater`."""
 function timestep!(
-        progn::PrognosticVariables,     # all prognostic variables
-        diagn::DiagnosticVariables,     # all pre-allocated diagnostic variables
+        vars::Variables,                # all variables
         dt::Real,                       # time step (mostly =2Δt, but for first_timesteps! =Δt, Δt/2)
         model::ShallowWater,            # everything that's constant at runtime
         lf1::Integer = 2,               # leapfrog index 1 (dis/enables Robert+Williams filter)
         lf2::Integer = 2,               # leapfrog index 2 (time step used for tendencies)
     )
     model.feedback.nans_detected && return nothing  # exit immediately if NaRs already present
-
-    # set the tendencies back to zero for accumulation
-    fill!(diagn.tendencies, 0, ShallowWater)
+    reset_tendencies!(vars)             # set the tendencies back to zero for accumulation
 
     # GET TENDENCIES, CORRECT THEM FOR SEMI-IMPLICIT INTEGRATION
-    dynamics_tendencies!(diagn, progn, lf2, model)
-    implicit_correction!(diagn, progn, model.implicit, model)
+    dynamics_tendencies!(vars, lf2, model)
+    implicit_correction!(vars, model.implicit, model)
 
     # APPLY DIFFUSION, STEP FORWARD IN TIME, AND TRANSFORM NEW TIME STEP TO GRID
-    horizontal_diffusion!(diagn, progn, model.horizontal_diffusion, model)
-    leapfrog!(progn, diagn.tendencies, dt, lf1, model)
-    transform!(diagn, progn, lf2, model)
+    horizontal_diffusion!(vars, model.horizontal_diffusion, model)
+    leapfrog!(vars, dt, lf1, model)
+    transform!(vars, lf2, model)
 
     # PARTICLE ADVECTION (always skip 1st step of first_timesteps!)
     not_first_timestep = lf2 == 2
-    not_first_timestep && particle_advection!(progn, diagn, model)
+    not_first_timestep && particle_advection!(vars, model)
 
     return nothing
 end
@@ -369,41 +371,38 @@ end
 $(TYPEDSIGNATURES)
 Calculate a single time step for the `model<:PrimitiveEquation`"""
 function timestep!(
-        progn::PrognosticVariables,     # all prognostic variables
-        diagn::DiagnosticVariables,     # all pre-allocated diagnostic variables
+        vars::Variables,                # all variables
         dt::Real,                       # time step (mostly =2Δt, but for first_timesteps! =Δt, Δt/2)
         model::PrimitiveEquation,       # everything that's constant at runtime
         lf1::Integer = 2,               # leapfrog index 1 (dis/enables Robert+Williams filter)
         lf2::Integer = 2,               # leapfrog index 2 (time step used for tendencies)
     )
     model.feedback.nans_detected && return nothing  # exit immediately if NaRs already present
-
-    # set the tendencies back to zero for accumulation
-    fill!(diagn.tendencies, 0, typeof(model))
+    reset_tendencies!(vars)             # set the tendencies back to zero for accumulation
 
     if model.physics                            # switch on/off all physics parameterizations
         # calculate all parameterizations
-        parameterization_tendencies!(diagn, progn, model)
-        ocean_timestep!(progn, diagn, model)    # sea surface temperature and maybe in the future sea ice
-        sea_ice_timestep!(progn, diagn, model)  # sea ice
-        land_timestep!(progn, diagn, model)     # soil moisture and temperature, vegetation, maybe rivers
+        parameterization_tendencies!(vars, model)
+        ocean_timestep!(vars, model)    # sea surface temperature and maybe in the future sea ice
+        sea_ice_timestep!(vars, model)  # sea ice
+        land_timestep!(vars, model)     # soil moisture and temperature, vegetation, maybe rivers
     end
 
     if model.dynamics                                               # switch on/off all dynamics
-        dynamics_tendencies!(diagn, progn, lf2, model)              # dynamical core
-        implicit_correction!(diagn, progn, model.implicit, model)   # semi-implicit time stepping corrections
+        dynamics_tendencies!(vars, lf2, model)              # dynamical core
+        implicit_correction!(vars, model.implicit, model)   # semi-implicit time stepping corrections
     else    # just transform physics tendencies to spectral space
-        physics_tendencies_only!(diagn, model)
+        physics_tendencies_only!(vars, model)
     end
 
-    # # APPLY DIFFUSION, STEP FORWARD IN TIME, AND TRANSFORM NEW TIME STEP TO GRID
-    horizontal_diffusion!(diagn, progn, model.horizontal_diffusion, model)
-    leapfrog!(progn, diagn.tendencies, dt, lf1, model)
-    transform!(diagn, progn, lf2, model)
+    # APPLY DIFFUSION, STEP FORWARD IN TIME, AND TRANSFORM NEW TIME STEP TO GRID
+    horizontal_diffusion!(vars, model.horizontal_diffusion, model)
+    leapfrog!(vars, dt, lf1, model)
+    transform!(vars, lf2, model)
 
     # PARTICLE ADVECTION (always skip 1st step of first_timesteps!)
     not_first_timestep = lf2 == 2
-    not_first_timestep && particle_advection!(progn, diagn, model)
+    not_first_timestep && particle_advection!(vars, model)
 
     return nothing
 end
@@ -412,38 +411,38 @@ end
 Perform one single time step of `simulation` including
 possibly output and callbacks."""
 function timestep!(simulation::AbstractSimulation)
-    (; clock) = simulation.prognostic_variables
-
-    return if clock.timestep_counter == 0
+    (; clock) = simulation.variables.prognostic
+    if clock.timestep_counter == 0
         first_timesteps!(simulation)
     else
         later_timestep!(simulation)
     end
+    return simulation
 end
 
 """$(TYPEDSIGNATURES)
 Perform one single "normal" time step of `simulation`, after `first_timesteps!`."""
 function later_timestep!(simulation::AbstractSimulation)
-    progn, diagn, model = unpack(simulation)
+    (; variables, model) = simulation
     (; feedback, output) = model
     (; Δt, Δt_millisec) = model.time_stepping
-    (; clock) = progn
+    (; clock) = variables.prognostic
 
-    timestep!(progn, diagn, 2Δt, model)             # calculate tendencies and leapfrog forward
-    timestep!(clock, Δt_millisec)                   # time of lf=2 and diagn after timestep!
+    timestep!(variables, 2Δt, model)                # calculate tendencies and leapfrog forward
+    timestep!(clock, Δt_millisec)                   # time of lf=2 and variables after timestep!
 
-    progress!(feedback, progn)                      # updates the progress meter bar
+    progress!(feedback, variables)                  # updates the progress meter bar
     output!(output, simulation)                     # do output?
-    callback!(model.callbacks, progn, diagn, model) # any callbacks?
+    callback!(model.callbacks, variables, model)    # any callbacks?
     return nothing
 end
 
 """$(TYPEDSIGNATURES)
 Main time loop that loops over all time steps."""
 function time_stepping!(simulation::AbstractSimulation)
-    (; clock) = simulation.prognostic_variables
+    (; clock) = simulation.variables.prognostic
     for _ in 1:clock.n_timesteps        # MAIN LOOP
         timestep!(simulation)
     end
-    return
+    return simulation
 end

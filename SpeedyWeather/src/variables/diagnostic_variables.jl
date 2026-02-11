@@ -475,7 +475,7 @@ function DiagnosticVariables(model::AbstractModel)
     (; SpectralVariable2D, SpectralVariable3D) = SG
     (; GridVariable2D, GridVariable3D) = SG
     (; VectorType, ParticleVector) = SG
-    nlayers_soil = get_soil_layers(model)
+    nlayers_soil = get_nlayers(model.land)
 
     tendencies = Tendencies(SG; tracers)
     grid_variables = GridVariables(SG; tracers)
