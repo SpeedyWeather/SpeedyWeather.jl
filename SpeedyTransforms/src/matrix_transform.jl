@@ -235,3 +235,63 @@ function transform!(                        # SPECTRAL TO GRID
     unscale_coslat && RingGrids._scale_lat!(field, M.coslat⁻¹)
     return field
 end
+
+# KERNEL-BASED INVERSE TRANSFORM (spectral to grid) for MatrixSpectralTransform
+# This is an alternative to the LinearAlgebra.mul!-based transform! above,
+# expressing the same operation as a KernelAbstractions @kernel so that
+# Reactant can trace and potentially accelerate it.
+
+@kernel inbounds = true function _inverse_matrix_transform_kernel!(
+        field_data,             # output: grid point data, (npoints, nlayers)
+        backward_real,          # real part of backward matrix, (npoints, nharmonics)
+        backward_imag,          # imag part of backward matrix, (npoints, nharmonics)
+        coeffs_data,            # input: spectral coefficients, (nharmonics, nlayers)
+        nharmonics,             # number of spectral harmonics (first dim of coeffs_data)
+    )
+    ij, k = @index(Global, NTuple)
+
+    # dot product: field[ij, k] = Σ_lm B_re[ij, lm] * re(c[lm, k]) - B_im[ij, lm] * im(c[lm, k])
+    acc = zero(eltype(field_data))
+    for lm in 1:nharmonics
+        c = coeffs_data[lm, k]
+        acc += backward_real[ij, lm] * real(c) - backward_imag[ij, lm] * imag(c)
+    end
+    field_data[ij, k] = acc
+end
+
+"""$(TYPEDSIGNATURES)
+Kernel-based spectral-to-grid transform using `MatrixSpectralTransform`.
+Expresses the backward transform as a KernelAbstractions `@kernel` over
+`(ij, k)` grid point and layer indices, computing the matrix-vector product
+without scratch memory. This is an alternative to the `LinearAlgebra.mul!`-based
+`transform!` intended for Reactant compatibility testing."""
+function transform_kernel!(                     # SPECTRAL TO GRID (kernel version)
+        field::AbstractField,                   # gridded output
+        coeffs::LowerTriangularArray,           # spectral coefficients input
+        M::MatrixSpectralTransform;             # precomputed transform
+        unscale_coslat::Bool = false,           # unscale with cos(lat) on the fly?
+    )
+
+    # catch incorrect sizes early
+    @boundscheck ismatching(M, field) || throw(DimensionMismatch(M, field))
+    @boundscheck ismatching(M, coeffs) || throw(DimensionMismatch(M, coeffs))
+
+    npoints = size(M.backward_real, 1)
+    nharmonics = size(M.backward_real, 2)
+    nlayers = size(coeffs, 2)
+
+    launch!(
+        M.architecture,
+        RingGridWorkOrder,
+        (npoints, nlayers),
+        _inverse_matrix_transform_kernel!,
+        field.data,
+        M.backward_real,
+        M.backward_imag,
+        coeffs.data,
+        nharmonics,
+    )
+
+    unscale_coslat && RingGrids._scale_lat!(field, M.coslat⁻¹)
+    return field
+end
