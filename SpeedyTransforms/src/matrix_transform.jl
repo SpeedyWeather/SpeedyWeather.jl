@@ -36,8 +36,7 @@ struct MatrixSpectralTransform{
     backward_imag::MatrixType           # imag part of backward transform matrix
 
     # SCRATCH MEMORY
-    scratch_memory::MatrixComplexType
-    scratch_memory_split::MatrixType   # state is undetermined, only read after writing to it
+    scratch_memory::MatrixType
 
     gradients::GradientType             # precomputed gradient and integration matrices
 end
@@ -92,7 +91,7 @@ function MatrixSpectralTransform(
 
     # SCRATCH MEMORY FOR FOURIER NOT YET LEGENDRE TRANSFORMED AND VICE VERSA
     scratch_memory = on_architecture(architecture, zeros(NF, spectrum, nlayers).data)
-    scratch_memory_old = on_architecture(architecture, zeros(Complex{NF}, grid, nlayers).data)
+    #scratch_memory = on_architecture(architecture, zeros(Complex{NF}, grid, nlayers).data)
 
     # PRECOMPUTE GRADIENT AND INTEGRATION MATRICES
     gradients = gradient_arrays(NF, spectrum)
@@ -116,7 +115,6 @@ function MatrixSpectralTransform(
         backward,
         backward_real,
         backward_imag,
-        scratch_memory_old,
         scratch_memory,
         gradients,
     )
@@ -173,7 +171,7 @@ coefficients to an n-dimensional array `field`. Uses precomputed dense transform
 the transformation. The spectral transform is number format-flexible but `field` and the spectral
 transform `M` have to have the same number format. The spectral transform is grid-flexible as long
 as `field.grid` and `M.grid` match."""
-function transform!(                        # SPECTRAL TO GRID
+function transform_old!(                        # SPECTRAL TO GRID
         field::AbstractField,               # gridded output
         coeffs::LowerTriangularArray,       # spectral coefficients input
         scratch_memory,                     # explicit scratch memory to use
@@ -187,23 +185,30 @@ function transform!(                        # SPECTRAL TO GRID
 
     nlayers = size(coeffs, 2)
 
-    # use first n layers of scratch memory if nlayers is less than the number of layers in scratch_memory
-    scratch = ndims(coeffs) == 1 ? view(scratch_memory, :, 1) : nlayers < size(scratch_memory, 2) ? view(scratch_memory, :, 1:nlayers) : scratch_memory
+    nlayers = size(coeffs, 2)
+    if nlayers < size(scratch_memory, 2)
+        # use first n layers of scratch memory
+        scratch = view(scratch_memory, :, 1:nlayers)
 
-    # multiply into scratch which is complex typed and then take real part into field
-    # imaginary part should be zero but destination is used to store intermediate results
-    # explicitly convert to real also for NaN + NaN*im results
-    # TODO if multiplication yields all real then one could write directly into field.data
-    # which would be much faster but if the imaginary part is non-zero this throws an error
-    # so for now use the scratch memory as intermediate storage and then copy real part
-    LinearAlgebra.mul!(scratch, M.backward, coeffs.data)
-    field.data .= real.(scratch)
+        # multiply into scratch which is complex typed and then take real part into field
+        # imaginary part should be zero but destination is used to store intermediate results
+        # explicitly convert to real also for NaN + NaN*im results
+        LinearAlgebra.mul!(scratch, M.backward, coeffs.data)
+        field.data .= real.(scratch)
+
+    else    # don't use view for 3D transforms with all layers
+        # TODO if multiplication yields all real then one could write directly into field.data
+        # which would be much faster but if the imaginary part is non-zero this throws an error
+        # so for now use the scratch memory as intermediate storage and then copy real part
+        LinearAlgebra.mul!(scratch_memory, M.backward, coeffs.data)
+        field.data .= real.(scratch_memory)
+    end
 
     unscale_coslat && RingGrids._scale_lat!(field, M.coslat⁻¹)
     return field
 end
 
-function transform_split!(                        # SPECTRAL TO GRID
+function transform!(                        # SPECTRAL TO GRID
         field::AbstractField,               # gridded output
         coeffs::LowerTriangularArray,       # spectral coefficients input
         scratch_memory,                     # explicit scratch memory to use
