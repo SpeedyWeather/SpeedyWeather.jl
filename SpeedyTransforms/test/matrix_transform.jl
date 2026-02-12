@@ -23,21 +23,22 @@
                 @test size(M.backward_real) == size(M.backward)
                 @test size(M.backward_imag) == size(M.backward)
 
-                tol = NF == Float32 ? 1.0e-3 : 1.0e-7
+                rtol = NF == Float32 ? 1.0e-3 : 1.0e-7
+                atol = NF == Float32 ? 1.0e-3 : 1.0e-7
 
                 # 2D roundtrip: start in spectral space to avoid aliasing issues
                 spec = randn(Complex{NF}, spectrum)
                 field = transform(spec, M)
                 spec_roundtrip = transform(field, M)
                 field_roundtrip = transform(spec_roundtrip, M)
-                @test field_roundtrip ≈ field atol = tol rtol = tol
+                @test field_roundtrip ≈ field atol = atol rtol = rtol
 
                 # 2D roundtrip: start in grid space
                 field2 = randn(NF, grid)
                 spec2 = transform(field2, M)
                 field2_roundtrip = transform(spec2, M)
                 spec2_roundtrip = transform(field2_roundtrip, M)
-                @test spec2_roundtrip ≈ spec2 atol = tol rtol = tol
+                @test spec2_roundtrip ≈ spec2 atol = atol rtol = rtol
 
                 # 3D roundtrip: start in spectral space
                 nlayers = 8
@@ -47,14 +48,14 @@
                 field3D = transform(spec3D, M3D)
                 spec3D_roundtrip = transform(field3D, M3D)
                 field3D_roundtrip = transform(spec3D_roundtrip, M3D)
-                @test field3D_roundtrip ≈ field3D atol = tol rtol = tol
+                @test field3D_roundtrip ≈ field3D atol = atol rtol = rtol
 
                 # 3D roundtrip: start in grid space
                 field3D_2 = randn(NF, grid, nlayers)
                 spec3D_2 = transform(field3D_2, M3D)
                 field3D_2_roundtrip = transform(spec3D_2, M3D)
                 spec3D_2_roundtrip = transform(field3D_2_roundtrip, M3D)
-                @test spec3D_2_roundtrip ≈ spec3D_2 atol = tol rtol = tol
+                @test spec3D_2_roundtrip ≈ spec3D_2 atol = atol rtol = rtol
             end
         end
     end
@@ -67,38 +68,39 @@ end
                     FullGaussianGrid,
                     OctahedralGaussianGrid,
                 )
-
+                
                 nlayers = 8
                 spectrum = Spectrum(trunc)
                 grid = Grid(SpeedyTransforms.get_nlat_half(trunc))
                 S = SpectralTransform(spectrum, grid; NF, nlayers)
                 M = MatrixSpectralTransform(spectrum, grid; NF, nlayers)
 
-                tol = NF == Float32 ? 1.0e-3 : 1.0e-7
+                rtol = NF == Float32 ? 1.0e-3 : 1.0e-7
+                atol = NF == Float32 ? 1.0e-3 : 1.0e-7
 
                 # 2D spectral -> grid
                 spec = randn(Complex{NF}, spectrum)
                 field_S = transform(spec, S)
                 field_M = transform(spec, M)
-                @test field_M ≈ field_S atol = tol rtol = tol
+                @test field_M ≈ field_S atol = atol rtol = rtol
 
                 # 2D grid -> spectral
                 field = randn(NF, grid)
                 spec_S = transform(field, S)
                 spec_M = transform(field, M)
-                @test spec_M ≈ spec_S atol = tol rtol = tol
+                @test spec_M ≈ spec_S atol = atol rtol = rtol
 
                 # 3D spectral -> grid
                 spec3D = randn(Complex{NF}, spectrum, nlayers)
                 field3D_S = transform(spec3D, S)
                 field3D_M = transform(spec3D, M)
-                @test field3D_M ≈ field3D_S atol = tol rtol = tol
+                @test field3D_M ≈ field3D_S atol = atol rtol = rtol
 
                 # 3D grid -> spectral
                 field3D = randn(NF, grid, nlayers)
                 spec3D_S = transform(field3D, S)
                 spec3D_M = transform(field3D, M)
-                @test spec3D_M ≈ spec3D_S atol = tol rtol = tol
+                @test spec3D_M ≈ spec3D_S atol = atol rtol = rtol
             end
         end
     end
