@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Bug fix: Ozone absorption now deposited into stratospheric layers (1 and 2) rather than removed from the beam at TOA. Previously ozone energy was silently lost from the system without contributing a temperature tendency. Fix also adds symmetric ozone attenuation on the upward SW beam for energy conservation.
+- Bug fix: Ozone absorption now deposited into stratospheric layers (1 and 2) rather than removed from the beam at TOA. Previously ozone energy was silently lost from the system without contributing a temperature tendency. Fix also adds symmetric ozone attenuation on the upward SW beam for energy conservation. [#986](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/986)
 
 ## v0.18
 
