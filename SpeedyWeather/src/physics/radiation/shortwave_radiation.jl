@@ -2,7 +2,6 @@ abstract type AbstractRadiation <: AbstractParameterization end
 abstract type AbstractShortwave <: AbstractRadiation end
 abstract type AbstractShortwaveRadiativeTransfer <: AbstractShortwave end
 
-## SHORTWAVE RADIATION FOR A FULLY TRANSPARENT ATMOSPHERE
 export TransparentShortwave
 struct TransparentShortwave <: AbstractShortwave end
 Adapt.@adapt_structure TransparentShortwave
@@ -149,11 +148,11 @@ export OneBandShortwaveRadiativeTransfer
 
 $(TYPEDFIELDS)."""
 @parameterized @kwdef struct OneBandShortwaveRadiativeTransfer{NF} <: AbstractShortwaveRadiativeTransfer
-    "[OPTION] Ozone absorption in upper stratosphere (W/m^2)"
-    @param ozone_absorp_upper::NF = 0 (bounds = Nonnegative,)
+    "[OPTION] Ozone absorption in upper stratosphere (layer 1) in fraction of incoming solar radiation (1)"
+    @param ozone_absorption_upper::NF = 0.01 (bounds = 0..1,)
 
-    "[OPTION] Ozone absorption in lower stratosphere (W/m^2)"
-    @param ozone_absorp_lower::NF = 0 (bounds = Nonnegative,)
+    "[OPTION] Ozone absorption in lower stratosphere (layer 2) in fraction of incoming solar radiation (1)"
+    @param ozone_absorption_lower::NF = 0.008 (bounds = 0..1,)
 end
 Adapt.@adapt_structure OneBandShortwaveRadiativeTransfer
 
@@ -171,7 +170,7 @@ One-band shortwave radiative transfer with cloud reflection and ozone absorption
         radiation::OneBandShortwaveRadiativeTransfer,
         model,
     )
-    (; ozone_absorp_upper, ozone_absorp_lower) = radiation
+    (; ozone_absorption_upper, ozone_absorption_lower) = radiation
     (; cloud_cover, cloud_top, stratocumulus_cover, cloud_albedo, stratocumulus_albedo) = clouds
 
     dTdt = diagn.tendencies.temp_tend_grid
@@ -196,20 +195,25 @@ One-band shortwave radiative transfer with cloud reflection and ozone absorption
     #   Layer 1: ozone_absorp_upper  (upper stratosphere, ~25-50 km)
     #   Layer 2: ozone_absorp_lower  (lower stratosphere, ~12-25 km)
     U_reflected = zero(D)
+    ozone_absorption = zero(D)
+    
     for k in 1:nlayers
+        # D is before cloud  
         if k == cloud_top
             R = cloud_albedo * cloud_cover
             U_reflected = D * R
             D *= (1 - R)
         end
 
-        D_out = D * t[ij, k]
-        # Ozone absorbs from the post-transmissivity beam in the stratospheric layers
         if k == 1
-            D_out = max(0, D_out - ozone_absorp_upper)
+            ozone_absorption = ozone_absorption_upper * D_toa * (3 - 2cos_zenith)
         elseif k == 2
-            D_out = max(0, D_out - ozone_absorp_lower)
+            ozone_absorption = ozone_absorption_lower * D_toa * (4 - 4cos_zenith)
+        else
+            ozone_absorption = zero(D)
         end
+
+        D_out = (D - ozone_absorption) * t[ij, k]
         # Update temperature tendency due to absorbed shortwave radiation
         dTdt[ij, k] += flux_to_tendency((D - D_out) / cₚ, pₛ, k, model)
         D = D_out
@@ -240,9 +244,9 @@ One-band shortwave radiative transfer with cloud reflection and ozone absorption
     for k in nlayers:-1:1
         U_out = U * t[ij, k]
         if k == 1
-            U_out = max(zero(U_out), U_out - ozone_absorp_upper)
+            U_out = max(0, U_out - ozone_absorp_upper)
         elseif k == 2
-            U_out = max(zero(U_out), U_out - ozone_absorp_lower)
+            U_out = max(0, U_out - ozone_absorp_lower)
         end
         dTdt[ij, k] += flux_to_tendency((U - U_out) / cₚ, pₛ, k, model)
         U_out += k == cloud_top ? U_reflected : zero(U)
