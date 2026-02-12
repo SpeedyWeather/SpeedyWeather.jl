@@ -187,27 +187,26 @@ One-band shortwave radiative transfer with cloud reflection and ozone absorption
     D_toa = model.planet.solar_constant * cos_zenith
     D = D_toa
 
-    # Downward beam.
-    # Ozone is an additional absorber in the top two model layers (stratosphere),
-    # folded into the same (D - D_out) term used for transmissivity absorption so
-    # that the tendency is computed consistently with the rest of the SW scheme.
-    # At night D_toa = 0, so ozone cannot create spurious heating.
-    #   Layer 1: ozone_absorp_upper  (upper stratosphere, ~25-50 km)
-    #   Layer 2: ozone_absorp_lower  (lower stratosphere, ~12-25 km)
+    # DOWNWARD BEAM
     U_reflected = zero(D)
     ozone_absorption = zero(D)
-    
+
     for k in 1:nlayers
-        # D is before cloud  
+        # 1. cloud reflection?
         if k == cloud_top
             R = cloud_albedo * cloud_cover
             U_reflected = D * R
             D *= (1 - R)
         end
 
+        # 2. ozone absorption in stratosphere layers
         if k == 1
+            # ozone absorption is a fraction of incoming solar radiation at TOA, scaled by zenith angle
+            # Fortran SPEEDY uses a much more complicated year and latitude dependent ozone absorption
+            # which we simplify here to a simple formula 
             ozone_absorption = ozone_absorption_upper * D_toa * (3 - 2cos_zenith)
         elseif k == 2
+            # similar here but lower stratosphere absorption is typically weaker
             ozone_absorption = ozone_absorption_lower * D_toa * (4 - 4cos_zenith)
         else
             ozone_absorption = zero(D)
@@ -237,17 +236,9 @@ One-band shortwave radiative transfer with cloud reflection and ozone absorption
     diagn.physics.surface_shortwave_up[ij] = U_surface_albedo
     diagn.physics.albedo[ij] = albedo
 
-    # Upward beam.
-    # Ozone attenuates the reflected beam in layers 1 and 2 symmetrically with
-    # the downward pass, ensuring energy conservation in the SW budget.
     U = U_surface_albedo + U_stratocumulus
     for k in nlayers:-1:1
         U_out = U * t[ij, k]
-        if k == 1
-            U_out = max(0, U_out - ozone_absorp_upper)
-        elseif k == 2
-            U_out = max(0, U_out - ozone_absorp_lower)
-        end
         dTdt[ij, k] += flux_to_tendency((U - U_out) / cₚ, pₛ, k, model)
         U_out += k == cloud_top ? U_reflected : zero(U)
         U = U_out
