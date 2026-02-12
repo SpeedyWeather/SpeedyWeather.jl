@@ -149,10 +149,10 @@ export OneBandShortwaveRadiativeTransfer
 $(TYPEDFIELDS)."""
 @parameterized @kwdef struct OneBandShortwaveRadiativeTransfer{NF} <: AbstractShortwaveRadiativeTransfer
     "[OPTION] Ozone absorption in upper stratosphere (layer 1) in fraction of incoming solar radiation (1)"
-    @param ozone_absorption_upper::NF = 0.01 (bounds = 0..1,)
+    @param ozone_absorption_upper::NF = 0.03 (bounds = 0..1,)
 
     "[OPTION] Ozone absorption in lower stratosphere (layer 2) in fraction of incoming solar radiation (1)"
-    @param ozone_absorption_lower::NF = 0.008 (bounds = 0..1,)
+    @param ozone_absorption_lower::NF = 0.024 (bounds = 0..1,)
 end
 Adapt.@adapt_structure OneBandShortwaveRadiativeTransfer
 
@@ -202,13 +202,12 @@ One-band shortwave radiative transfer with cloud reflection and ozone absorption
         # 2. ozone absorption in stratosphere layers
         # TODO make this vertical coordinate and not layer index dependent
         if k == 1
-            # ozone absorption is a fraction of incoming solar radiation at TOA, scaled by zenith angle
-            # Fortran SPEEDY uses a much more complicated year and latitude dependent ozone absorption
-            # which we simplify here to a simple formula 
-            ozone_absorption = ozone_absorption_upper * D_toa * (3 - 2cos_zenith)
+            # ozone absorption is a fraction of incoming solar radiation at TOA
+            # not dependent on latitude or year as done in Fortran SPEEDY
+            ozone_absorption = ozone_absorption_upper * D_toa
         elseif k == 2
             # similar here but lower stratosphere absorption is typically weaker
-            ozone_absorption = ozone_absorption_lower * D_toa * (4 - 4cos_zenith)
+            ozone_absorption = ozone_absorption_lower * D_toa
         else
             # no ozone absorption in troposphere layers
             ozone_absorption = zero(D)
