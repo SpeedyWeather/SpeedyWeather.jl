@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- MatrixSpectralTransform implemented [#952](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/952)
+
 ## v0.18
 
 - Installation main instructions in docs + schedule tests [#979](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/979)
@@ -59,7 +61,6 @@
 - Seasonal ocean and land climatology models GPU-ready [#892](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/892)
 - Zenith constructors [#889](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/889)
 - More general forcing of pressure, vorticity and divergence [#855](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/855)
-
 
 ## v0.17.3
 
