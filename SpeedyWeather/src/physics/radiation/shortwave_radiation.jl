@@ -200,6 +200,7 @@ One-band shortwave radiative transfer with cloud reflection and ozone absorption
         end
 
         # 2. ozone absorption in stratosphere layers
+        # TODO make this vertical coordinate and not layer index dependent
         if k == 1
             # ozone absorption is a fraction of incoming solar radiation at TOA, scaled by zenith angle
             # Fortran SPEEDY uses a much more complicated year and latitude dependent ozone absorption
@@ -209,11 +210,14 @@ One-band shortwave radiative transfer with cloud reflection and ozone absorption
             # similar here but lower stratosphere absorption is typically weaker
             ozone_absorption = ozone_absorption_lower * D_toa * (4 - 4cos_zenith)
         else
+            # no ozone absorption in troposphere layers
             ozone_absorption = zero(D)
         end
 
+        # 3. transmissivity of the layer
         D_out = (D - ozone_absorption) * t[ij, k]
         # Update temperature tendency due to absorbed shortwave radiation
+        # from flux convergence D = D in from the top, D_out at the bottom of a layer
         dTdt[ij, k] += flux_to_tendency((D - D_out) / cₚ, pₛ, k, model)
         D = D_out
     end
