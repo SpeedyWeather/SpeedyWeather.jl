@@ -16,4 +16,11 @@ export AbstractWorkOrder, SpectralWorkOrder, RingGridWorkOrder, SpectralInnerWor
 export DiagonalWorkOrder, Array3DWorkOrder, LinearWorkOrder
 include("kernel_launching.jl")
 
+# custom dates with parametric value types for Reactant compatibility
+export SpeedyPeriod, SpeedyFixedPeriod
+export SpeedyMillisecond, SpeedySecond, SpeedyMinute, SpeedyHour, SpeedyDay, SpeedyWeek, SpeedyMonth, SpeedyYear
+export SpeedyUTInstant, SpeedyDateTime
+export secondofday
+include("custom_dates.jl")
+
 end
