@@ -24,6 +24,7 @@ struct SpectralGrid{
         SpectrumType,          # <: AbstractSpectrum
         GridType,              # <: AbstractGrid
         IntType,               # <: Integer
+        NFDealiasing,          # <: Float64
     } <: AbstractSpectralGrid
 
     "[OPTION] number format used throughout the model"
@@ -70,7 +71,7 @@ struct SpectralGrid{
 
     # SIZE OF GRID from trunc, Grid, dealiasing:
     "[OPTION] how to match spectral with grid resolution: dealiasing factor, 1=linear, 2=quadratic, 3=cubic grid"
-    dealiasing::Float64
+    dealiasing::NFDealiasing
 
     "[DERIVED] number of latitude rings on one hemisphere (Equator incl)"
     nlat_half::IntType
@@ -241,7 +242,7 @@ function SpectralGrid(
     end
 
     # Create the SpectralGrid with all fields
-    return SpectralGrid{typeof(architecture), typeof(spectrum), typeof(grid), typeof(nlat_half)}(
+    return SpectralGrid{typeof(architecture), typeof(spectrum), typeof(grid), typeof(nlat_half), Float64}(
         NF,
         architecture,
         ArrayType,
