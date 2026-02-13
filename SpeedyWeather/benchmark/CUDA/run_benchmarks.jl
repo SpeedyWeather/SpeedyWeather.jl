@@ -1,7 +1,7 @@
 import Pkg
 Pkg.activate("benchmark/CUDA")
 
-using CUDA, SpeedyWeather, Dates
+using CUDA, SpeedyWeather
 using Adapt
 using BenchmarkTools
 
@@ -19,7 +19,7 @@ md = open("README.md", "w")
 write(md, "# Benchmarks\n")
 
 version = SpeedyWeather.pkgversion(SpeedyWeather)
-write(md, "\ncreated for SpeedyWeather.jl v$version on $(Dates.format(Dates.now(), Dates.RFC1123Format)). \n\n")
+write(md, "\ncreated for SpeedyWeather.jl v$version on $(Libc.strftime("%a, %d %b %Y %H:%M:%S", time())). \n\n")
 
 write(md, "### Machine details\n\n")
 write(md, "All benchmark simulatons were run on a server with access to an NVIDIA A100 GPU.\n")

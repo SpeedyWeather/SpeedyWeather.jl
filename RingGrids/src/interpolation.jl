@@ -7,12 +7,13 @@ struct GridGeometry{
         VectorType,
         VectorIntType,
         VectorRange,
+        IntType
     } <: AbstractGridGeometry
     grid::Grid                  # grid, e.g. FullGaussianGrid
 
-    nlat_half::Int              # number of latitude rings on one hemisphere (Eq. incl)
-    nlat::Int                   # total number of latitude rings
-    npoints::Int                # total number of grid points
+    nlat_half::IntType          # number of latitude rings on one hemisphere (Eq. incl)
+    nlat::IntType               # total number of latitude rings
+    npoints::IntType            # total number of grid points
     londs::VectorType           # longitudes of every grid point 0˚ to 360˚E
     latd::VectorType            # latitude of each ring, incl north pole 90˚N, ..., south pole -90˚N
 
@@ -64,7 +65,7 @@ function GridGeometry(
     # Tuple{UnitRange} is with Reactant compatible, otherwise copy to architecture
     device_rings = typeof(architecture) <: ReactantDevice ? Tuple(grid.rings) : on_architecture(architecture, grid.rings)
 
-    return GridGeometry{typeof(grid), VectorType, VectorIntType, typeof(device_rings)}(
+    return GridGeometry{typeof(grid), VectorType, VectorIntType, typeof(device_rings), typeof(nlat_half)}(
         grid, nlat_half, nlat, npoints, londs, latd_poles, nlons, lon_offsets, device_rings
     )
 end
@@ -80,11 +81,12 @@ abstract type AbstractLocator end
 and their weights. This Locator is a 4-point average in an anvil-shaped grid-point arrangement
 between two latitude rings."""
 @kwdef struct AnvilLocator{
-        VectorType,         # <: AbstractArray{NF, 1} 
-        VectorIntType,      # <: AbstractArray{Int, 1}
+        VectorType,
+        VectorIntType,
+        IntType,
     } <: AbstractLocator
 
-    npoints_output::Int            # number of points to interpolate onto (length of following vectors)
+    npoints_output::IntType            # number of points to interpolate onto (length of following vectors)
 
     # to the coordinates respective indices
     js::VectorIntType = zeros(Int, npoints_output)   # ring indices j such that [j, j+1) contains the point
@@ -116,7 +118,7 @@ function (::Type{L})(
     VectorType = array_type(architecture, NF, 1)
     VectorIntType = array_type(architecture, Int, 1)
 
-    return L{VectorType, VectorIntType}(; npoints_output = npoints)
+    return L{VectorType, VectorIntType, typeof(npoints)}(; npoints_output = npoints)
 end
 
 # use Float32 as default for weights

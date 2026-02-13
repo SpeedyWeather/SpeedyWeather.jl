@@ -21,37 +21,83 @@ benchmarks[:benchmark101] = BenchmarkSuiteTransform(
 )=#
 
 benchmarks[:benchmark200] = BenchmarkSuiteModel(
-    title = "PrimitiveWet benchmarks, CPU",
-    nruns = 3,
-    trunc = [31, 63, 127, 255, 511],
+    title = "PrimitiveWet benchmarks, matrix transform CPU",
+    nruns = 2,
+    trunc = [63, 127],
     nlayers = fill(16, 5),
     Grid = fill(SpeedyWeather.DEFAULT_GRID, 5),
+    transform_type = fill(:matrix, 5),
     model = fill(CPU(), 5),
 )
 
 benchmarks[:benchmark201] = BenchmarkSuiteModel(
-    title = "PrimitiveWet benchmarks, GPU",
-    nruns = 3,
-    trunc = [31, 63, 127, 255, 511],
+    title = "PrimitiveWet benchmarks, matrix transform GPU",
+    nruns = 2,
+    trunc = [63, 127],
     nlayers = fill(16, 5),
     Grid = fill(SpeedyWeather.DEFAULT_GRID, 5),
+    transform_type = fill(:matrix, 5),
     model = fill(GPU(), 5),
 )
 
-benchmarks[:benchmark300] = BenchmarkSuiteDynamics(
-    title = "PrimitiveWet dynamical core benchmarks, CPU",
-    nruns = 4,
-    trunc = [31, 63, 127, 255],
+
+benchmarks[:benchmark202] = BenchmarkSuiteModel(
+    title = "PrimitiveWet benchmarks, FFT+LT transform CPU",
+    nruns = 2,
+    trunc = [63, 127],
     nlayers = fill(16, 5),
     Grid = fill(SpeedyWeather.DEFAULT_GRID, 5),
+    transform_type = fill(:fft, 5),
     model = fill(CPU(), 5),
 )
 
-benchmarks[:benchmark301] = BenchmarkSuiteDynamics(
-    title = "PrimitiveWet dynamical core benchmarks, GPU",
-    nruns = 4,
-    trunc = [31, 63, 127, 255],
+benchmarks[:benchmark203] = BenchmarkSuiteModel(
+    title = "PrimitiveWet benchmarks, FFT+LT transform GPU",
+    nruns = 2,
+    trunc = [63, 127],
     nlayers = fill(16, 5),
     Grid = fill(SpeedyWeather.DEFAULT_GRID, 5),
+    transform_type = fill(:fft, 5),
+    model = fill(GPU(), 5),
+)
+
+
+benchmarks[:benchmark300] = BenchmarkSuiteDynamicsGPU(
+    title = "PrimitiveWet dynamical core benchmarks, matrix transform CPU",
+    nruns = 2,
+    trunc = [63, 127],
+    nlayers = fill(16, 5),
+    Grid = fill(SpeedyWeather.DEFAULT_GRID, 5),
+    transform_type = fill(:matrix, 5),
+    model = fill(CPU(), 5),
+)
+
+benchmarks[:benchmark301] = BenchmarkSuiteDynamicsGPU(
+    title = "PrimitiveWet dynamical core benchmarks, matrix transform GPU",
+    nruns = 2,
+    trunc = [63, 127],
+    nlayers = fill(16, 5),
+    Grid = fill(SpeedyWeather.DEFAULT_GRID, 5),
+    transform_type = fill(:matrix, 5),
+    model = fill(GPU(), 5),
+)
+
+benchmarks[:benchmark302] = BenchmarkSuiteDynamicsGPU(
+    title = "PrimitiveWet dynamical core benchmarks, FFT+LT transform CPU",
+    nruns = 2,
+    trunc = [63, 127],
+    nlayers = fill(16, 5),
+    Grid = fill(SpeedyWeather.DEFAULT_GRID, 5),
+    transform_type = fill(:fft, 5),
+    model = fill(CPU(), 5),
+)
+
+benchmarks[:benchmark303] = BenchmarkSuiteDynamicsGPU(
+    title = "PrimitiveWet dynamical core benchmarks, FFT+LT transform GPU",
+    nruns = 2,
+    trunc = [63, 127],
+    nlayers = fill(16, 5),
+    Grid = fill(SpeedyWeather.DEFAULT_GRID, 5),
+    transform_type = fill(:fft, 5),
     model = fill(GPU(), 5),
 )

@@ -113,7 +113,7 @@ function timestep!(
     (; monthly_temperature) = land
     (; soil_temperature) = progn.land
     NF = eltype(soil_temperature)
-    weight = convert(NF, Dates.days(time - Dates.firstdayofmonth(time)) / Dates.daysinmonth(time))
+    weight = convert(NF, Dates.days(time - Dates.firstdayofmonth(time)) / Dates.daysinmonth(year(time), Dates.month(time)))
 
     launch!(
         architecture(soil_temperature), RingGridWorkOrder, size(soil_temperature),

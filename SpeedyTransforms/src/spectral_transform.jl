@@ -20,6 +20,7 @@ struct SpectralTransform{
         LowerTriangularArrayType,   # <: LowerTriangularArray{NF, 2, ArrayType{NF}},
         ScratchType,                # <: ScratchMemory{ArrayComplexType, VectorComplexType},
         GradientType,               # <: NamedTuple for gradients
+        IntType,                    # <: Integer
     } <: AbstractSpectralTransform{NF, AR}
 
     # Architecture
@@ -27,18 +28,18 @@ struct SpectralTransform{
 
     # SPECTRAL RESOLUTION
     spectrum::SpectrumType          # spectral truncation
-    nfreq_max::Int                  # Maximum (at Equator) number of Fourier frequencies (real FFT)
+    nfreq_max::IntType              # Maximum (at Equator) number of Fourier frequencies (real FFT)
     LegendreShortcut::Type{<:AbstractLegendreShortcut} # Legendre shortcut for truncation of m loop
     mmax_truncation::Vector{Int}    # Maximum order m to retain per latitude ring
 
     # GRID
     grid::GridType                  # grid used, including nlat_half for resolution, indices for rings, etc.
-    nlayers::Int                    # number of layers in the vertical (for scratch memory size)
+    nlayers::IntType                # number of layers in the vertical (for scratch memory size)
 
     # CORRESPONDING GRID SIZE
-    nlon_max::Int                   # Maximum number of longitude points (at Equator)
+    nlon_max::IntType               # Maximum number of longitude points (at Equator)
     nlons::Vector{Int}              # Number of longitude points per ring
-    nlat::Int                       # Number of latitude rings
+    nlat::IntType                   # Number of latitude rings
     rings::Vector{UnitRange{Int}}   # precomputed ring indices
 
     # CORRESPONDING GRID VECTORS
@@ -64,7 +65,7 @@ struct SpectralTransform{
     # state is undetermined, only read after writing to it
     scratch_memory::ScratchType
 
-    jm_index_size::Int                          # number of indices per layer in kjm_indices
+    jm_index_size::IntType                      # number of indices per layer in kjm_indices
     kjm_indices::ArrayTypeIntMatrix             # precomputed kjm loop indices map for legendre transform
 
     # SOLID ANGLES ΔΩ FOR QUADRATURE
@@ -190,6 +191,7 @@ function SpectralTransform(
         LowerTriangularArray{NF, 2, array_type(architecture, NF, 2), typeof(spectrum)},
         typeof(scratch_memory),
         typeof(gradients),
+        typeof(nlayers),
     }(
         architecture,
         spectrum, nfreq_max,

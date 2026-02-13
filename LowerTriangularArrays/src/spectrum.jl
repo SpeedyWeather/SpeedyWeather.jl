@@ -7,9 +7,9 @@ Encodes the spectral trunction, orders and degrees of the spherical harmonics.
 Is used by every `LowerTriangularArray` and also defines the architecture on which the 
 data of the `LowerTriangularArray` is stored.
 """
-struct Spectrum{A, O, L} <: AbstractSpectrum
-    lmax::Int
-    mmax::Int
+struct Spectrum{A, O, L, IntType} <: AbstractSpectrum
+    lmax::IntType
+    mmax::IntType
     architecture::A
     orders::O
     l_indices::L    # used by GPU kernels
@@ -38,6 +38,7 @@ function Spectrum(
         typeof(architecture),
         typeof(orders),
         typeof(ls),
+        typeof(lmax),
     }(
         lmax,
         mmax,

@@ -10,6 +10,7 @@ struct MatrixSpectralTransform{
         MatrixType,                 # <: ArrayType{NF, 2},
         MatrixComplexType,          # <: ArrayType{Complex{NF}, 2},
         GradientType,               # <: NamedTuple for gradients
+        IntType,                    # <: Integer
     } <: AbstractSpectralTransform{NF, AR}
 
     # Architecture
@@ -18,7 +19,7 @@ struct MatrixSpectralTransform{
     # SPECTRAL AND GRID RESOLUTION
     spectrum::SpectrumType              # spectral truncation
     grid::GridType                      # grid used, including nlat_half for resolution, indices for rings, etc.
-    nlayers::Int                        # number of layers in vertical
+    nlayers::IntType                    # number of layers in vertical
 
     # CORRESPONDING GRID VECTORS
     coslat::VectorType                  # Cosine of latitudes, north to south
@@ -36,7 +37,6 @@ struct MatrixSpectralTransform{
 
     # SCRATCH MEMORY
     scratch_memory::MatrixType
-    scratch_memory_old::MatrixComplexType   # state is undetermined, only read after writing to it
 
     gradients::GradientType             # precomputed gradient and integration matrices
 end
@@ -91,7 +91,7 @@ function MatrixSpectralTransform(
 
     # SCRATCH MEMORY FOR FOURIER NOT YET LEGENDRE TRANSFORMED AND VICE VERSA
     scratch_memory = on_architecture(architecture, zeros(NF, spectrum, nlayers).data)
-    scratch_memory_old = on_architecture(architecture, zeros(Complex{NF}, grid, nlayers).data)
+    #scratch_memory = on_architecture(architecture, zeros(Complex{NF}, grid, nlayers).data)
 
     # PRECOMPUTE GRADIENT AND INTEGRATION MATRICES
     gradients = gradient_arrays(NF, spectrum)
@@ -105,6 +105,7 @@ function MatrixSpectralTransform(
         typeof(backward_real),
         typeof(forward),
         typeof(gradients),
+        typeof(nlayers),
     }(
         architecture,
         spectrum, grid, nlayers,
@@ -115,7 +116,6 @@ function MatrixSpectralTransform(
         backward_real,
         backward_imag,
         scratch_memory,
-        scratch_memory_old,
         gradients,
     )
 end
@@ -185,6 +185,8 @@ function transform_old!(                        # SPECTRAL TO GRID
     @boundscheck ismatching(M, coeffs) || throw(DimensionMismatch(M, coeffs))
 
     nlayers = size(coeffs, 2)
+
+    nlayers = size(coeffs, 2)
     if nlayers < size(scratch_memory, 2)
         # use first n layers of scratch memory
         scratch = view(scratch_memory, :, 1:nlayers)
@@ -229,6 +231,66 @@ function transform!(                        # SPECTRAL TO GRID
 
     scratch .= imag.(coeffs.data)
     LinearAlgebra.mul!(field.data, M.backward_imag, scratch, -1, 1)
+
+    unscale_coslat && RingGrids._scale_lat!(field, M.coslat⁻¹)
+    return field
+end
+
+# KERNEL-BASED INVERSE TRANSFORM (spectral to grid) for MatrixSpectralTransform
+# This is an alternative to the LinearAlgebra.mul!-based transform! above,
+# expressing the same operation as a KernelAbstractions @kernel so that
+# Reactant can trace and potentially accelerate it.
+
+@kernel inbounds = true function _inverse_matrix_transform_kernel!(
+        field_data,             # output: grid point data, (npoints, nlayers)
+        backward_real,          # real part of backward matrix, (npoints, nharmonics)
+        backward_imag,          # imag part of backward matrix, (npoints, nharmonics)
+        coeffs_data,            # input: spectral coefficients, (nharmonics, nlayers)
+        nharmonics,             # number of spectral harmonics (first dim of coeffs_data)
+    )
+    ij, k = @index(Global, NTuple)
+
+    # dot product: field[ij, k] = Σ_lm B_re[ij, lm] * re(c[lm, k]) - B_im[ij, lm] * im(c[lm, k])
+    acc = zero(eltype(field_data))
+    for lm in 1:nharmonics
+        c = coeffs_data[lm, k]
+        acc += backward_real[ij, lm] * real(c) - backward_imag[ij, lm] * imag(c)
+    end
+    field_data[ij, k] = acc
+end
+
+"""$(TYPEDSIGNATURES)
+Kernel-based spectral-to-grid transform using `MatrixSpectralTransform`.
+Expresses the backward transform as a KernelAbstractions `@kernel` over
+`(ij, k)` grid point and layer indices, computing the matrix-vector product
+without scratch memory. This is an alternative to the `LinearAlgebra.mul!`-based
+`transform!` intended for Reactant compatibility testing."""
+function transform_kernel!(                     # SPECTRAL TO GRID (kernel version)
+        field::AbstractField,                   # gridded output
+        coeffs::LowerTriangularArray,           # spectral coefficients input
+        M::MatrixSpectralTransform;             # precomputed transform
+        unscale_coslat::Bool = false,           # unscale with cos(lat) on the fly?
+    )
+
+    # catch incorrect sizes early
+    @boundscheck ismatching(M, field) || throw(DimensionMismatch(M, field))
+    @boundscheck ismatching(M, coeffs) || throw(DimensionMismatch(M, coeffs))
+
+    npoints = size(M.backward_real, 1)
+    nharmonics = size(M.backward_real, 2)
+    nlayers = size(coeffs, 2)
+
+    launch!(
+        M.architecture,
+        RingGridWorkOrder,
+        (npoints, nlayers),
+        _inverse_matrix_transform_kernel!,
+        field.data,
+        M.backward_real,
+        M.backward_imag,
+        coeffs.data,
+        nharmonics,
+    )
 
     unscale_coslat && RingGrids._scale_lat!(field, M.coslat⁻¹)
     return field

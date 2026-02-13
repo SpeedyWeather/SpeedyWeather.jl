@@ -1,4 +1,4 @@
-using NCDatasets, Dates
+using NCDatasets
 
 @testset "Output for BarotropicModel" begin
     tmp_output_path = mktempdir(pwd(), prefix = "tmp_testruns_")  # Cleaned up when the process exits
@@ -219,6 +219,16 @@ end
 
 @testset "Time axis" begin
 
+    # NCDatasets returns Dates.DateTime from stdlib; convert to our DateTime
+    import Dates as StdDates
+    to_dt(d::StdDates.DateTime) = DateTime(
+        StdDates.year(d), StdDates.month(d), StdDates.day(d),
+        StdDates.hour(d), StdDates.minute(d), StdDates.second(d), StdDates.millisecond(d)
+    )
+    to_dt(d::DateTime) = d
+    to_ms(d::StdDates.Millisecond) = Millisecond(StdDates.value(d))
+    to_ms(d::Millisecond) = d
+
     function manual_time_axis(startdate, dt, n_timesteps)
         time_axis = zeros(typeof(startdate), n_timesteps + 1)
         for i in 0:n_timesteps
@@ -237,7 +247,7 @@ end
 
     progn = simulation.prognostic_variables
     tmp_read_path = joinpath(model.output.run_path, model.output.filename)
-    t = NCDataset(tmp_read_path)["time"][:]
+    t = to_dt.(NCDataset(tmp_read_path)["time"][:])
     @test t == manual_time_axis(model.output.startdate, model.time_stepping.Δt_millisec, progn.clock.n_timesteps)
 
     # do a simulation with the adjust_Δt_with_output turned on
@@ -246,9 +256,9 @@ end
     model = PrimitiveDryModel(spectral_grid; output, time_stepping)
     simulation = initialize!(model)
     run!(simulation, output = true; period = Day(1))
-    t = SpeedyWeather.load_trajectory("time", model)
+    t = to_dt.(SpeedyWeather.load_trajectory("time", model))
     @test all(y -> y == diff(t)[1], diff(t)) # all elements equal
-    @test diff(t)[1] == Minute(70)
+    @test diff(t)[1] == Millisecond(Minute(70))
 
     # this is a nonsense simulation with way too large timesteps, but it's here to test the time axis output
     # for future tests: This simulation blows up because of too large time steps but only a warning is thrown
@@ -265,7 +275,7 @@ end
 
     progn = simulation.prognostic_variables
     tmp_read_path = joinpath(model.output.run_path, model.output.filename)
-    t = NCDataset(tmp_read_path)["time"][:]
+    t = to_dt.(NCDataset(tmp_read_path)["time"][:])
     @test t == manual_time_axis(model.output.startdate, model.time_stepping.Δt_millisec, progn.clock.n_timesteps)
-    @test t == SpeedyWeather.load_trajectory("time", model)
+    @test t == to_dt.(SpeedyWeather.load_trajectory("time", model))
 end
