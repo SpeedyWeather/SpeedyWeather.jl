@@ -34,8 +34,7 @@ as (following Seeley and Wordsworth [^SW23], eq. 1)
 \frac{dF}{dT} = α (T_t - T)
 ```
 
-The flux ``F`` (in ``W/m^2/K``) is a vertical upward flux between two layers (vertically adjacent)
-of temperature difference ``dT``. The change of this flux across layers depends on the temperature
+The flux ``F`` (in ``W/m^2/K``) is a vertical upward flux between two layers (vertically adjacent) of temperature difference ``dT``. The change of this flux across layers depends on the temperature
 ``T`` and is a relaxation term towards a prescribed stratospheric temperature ``T_t = 200~K`` with
 a radiative forcing constant ``\alpha = 0.025 W/m^2/K^2``. Two layers of identical temperatures
 ``T_1 = T_2`` would have no net flux between them, but a layer below at higher temperature would
@@ -184,27 +183,25 @@ Over land, the stratocumulus cover $\mathrm{CLS}$ is further modified to be prop
 where $\mathrm{RH}_N$ is the surface (lowest model layer) relative humidity.
 
 **Radiative transfer:**
-The full TOA incoming flux enters the top of the atmosphere and is propagated downward through each layer
-using a transmissivity $\tau_{k}^{SR}$, which depends on zenith angle, layer depth, humidity, and cloud properties:
+The incoming solar flux at the top of the atmosphere is computed from astronomical formulae. Shortwave radiation is propagated downward through each layer using a transmissivity $\tau_{k}^{SR}$, which depends on zenith angle, layer depth, humidity, and cloud properties:
 
 ```math
 F_{k+h}^{\downarrow, SR} = F_{k-h}^{\downarrow, SR} \, \tau_k^{SR}
 ```
 
-In the cloud-top layer, cloud reflection removes a fraction of the downward beam and stores it as
-$F^{\uparrow, cloud}$ to be re-added to the upward beam at that level:
+In the cloud-top layer, cloud reflection is included:
 
 ```math
 F_{k+h}^{\downarrow, SR} = F_{k-h}^{\downarrow, SR} (1 - A_{cl} \, \mathrm{CLC}) \, \tau_{k}^{SR}
 ```
 
-Ozone absorption in the upper ($k=1$) and lower ($k=2$) stratosphere is applied as an additional
-attenuation **inside** the layer loop, so that the absorbed energy is correctly deposited as a
-temperature tendency in those layers:
+Ozone absorption in the upper ($k=1$) and lower ($k=2$) stratosphere is applied inside the layer loop, depositing the absorbed energy as a temperature tendency in those layers:
 
 ```math
-F_{k+h}^{\downarrow, SR} = \max\!\left(0,\ F_{k+h}^{\downarrow, SR} - \Delta F_k^{ozone}\right), \quad k \in \{1, 2\}
+F_{k+h}^{\downarrow, SR} = (F_{k-h}^{\downarrow, SR} - \Delta F_k^{ozone}) \, \tau_{k}^{SR}, \quad k \in \{1, 2\}
 ```
+
+where $\Delta F_k^{ozone}$ is a prescribed fraction of the TOA solar flux $F_0^{\downarrow, sol}$.
 
 At the surface, stratocumulus reflection and surface albedo are applied:
 
@@ -218,32 +215,13 @@ The upward flux at the surface is
 F_{s}^{\uparrow, SR} = F_{s}^{\downarrow, SR} \, A_s
 ```
 
-and is propagated upward through each layer with the same transmissivity. Ozone attenuation is
-applied symmetrically on the upward beam at layers 1 and 2, ensuring SW energy conservation:
+and is propagated upward as
 
 ```math
-F_{k-h}^{\uparrow, SR} = \max\!\left(0,\ F_{k+h}^{\uparrow, SR} \, \tau_{k}^{SR} - \Delta F_k^{ozone}\right), \quad k \in \{1, 2\}
+F_{k-h}^{\uparrow, SR} =  F_{k+h}^{\uparrow, SR} \, \tau_{k}^{SR}
 ```
 
-Cloud reflection $F^{\uparrow, cloud}$ is re-added to the upward beam at the cloud-top layer. The final
-upward flux leaving the atmosphere is stored as `outgoing_shortwave` (OSR) and represents the **total**
-TOA-outgoing SW: cloud reflection + stratocumulus reflection + surface albedo reflection, all after
-partial attenuation by water vapor and ozone on the return path.
-
-**Energy budget:**
-Because `outgoing_shortwave` (OSR) is the total TOA-upgoing SW (including surface reflection that
-made it back through the atmosphere), the correct formula to diagnose the SW energy absorbed by the
-atmosphere alone from model diagnostics is:
-
-```math
-\text{SW}_{\text{atm}} = \underbrace{(F_0^{\downarrow} - \text{OSR})}_{\text{total absorbed}} -
-\underbrace{(F_s^{\downarrow} - F_s^{\uparrow})}_{\text{surface absorbed}} =
-F_0^{\downarrow} - \text{OSR} - \text{SRD} + \text{SRU}
-```
-
-where SRD = `surface_shortwave_down` and SRU = `surface_shortwave_up`. Omitting the `+SRU` term
-would implicitly assume the surface reflects nothing (SRU = 0) and underestimate atmospheric
-absorption by exactly SRU (~15–20 W/m² in a typical run).
+Cloud reflection $F^{\uparrow, cloud}$ is re-added to the upward beam at the cloud-top layer. The final upward flux leaving the atmosphere is stored as `outgoing_shortwave` (OSR) and represents the **total** TOA-outgoing SW: cloud reflection + stratocumulus reflection + surface albedo reflection, all after partial attenuation by water vapor on the return path.
 
 **Key features:**
 
