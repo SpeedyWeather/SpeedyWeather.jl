@@ -175,7 +175,7 @@ function drag!(
 end
 
 @kernel inbounds = true function speed_limit_drag_kernel!(
-        Fu, Fv, u, v, @Const(c), @Const(speed_limit)
+        Fu, Fv, u, v, c, speed_limit
     )
     ij, k = @index(Global, NTuple)
 
