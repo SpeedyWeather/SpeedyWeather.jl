@@ -10,7 +10,7 @@ function drag!(
     return drag!(diagn, progn, model.drag, lf, model)
 end
 
-## NO DRAG
+# NO DRAG
 drag!(diagn, progn, drag::Nothing, args...) = nothing
 
 export LinearDrag
@@ -71,11 +71,10 @@ function drag!(
     return nothing
 end
 
-# Quadratic drag
 export QuadraticDrag
-@parameterized @kwdef mutable struct QuadraticDrag{NF} <: AbstractDrag
+@parameterized @kwdef struct QuadraticDrag{NF} <: AbstractDrag
     "[OPTION] drag coefficient [1]"
-    @param c_D::NF = 1.0e-12 (bounds = Nonnegative,)    # TODO is this a good default?
+    @param drag::NF = 1e-5 (bounds = Nonnegative,)    # TODO is this a good default?
 end
 
 QuadraticDrag(SG::SpectralGrid; kwargs...) = QuadraticDrag{SG.NF}(; kwargs...)
@@ -94,7 +93,7 @@ and scaled by the radius as are the momentum equations."""
 function drag!(
         diagn::DiagnosticVariables,
         progn::PrognosticVariables,
-        drag::QuadraticDrag,
+        scheme::QuadraticDrag,
         lf::Integer,
         model::AbstractModel,
     )
@@ -106,8 +105,10 @@ function drag!(
     Fv = field_view(diagn.tendencies.v_tend_grid, :, k)
 
     # total drag coefficient with radius scaling
-    c = drag.c_D / model.atmosphere.layer_thickness
-    c *= diagn.scale[]^2
+    # note that while the equations (with prognostic variable vorticity) are scaled
+    # with radius R squared, one R will go into the curl operator applied to forcing of u, v
+    # to yield a tendency for vorticity, so only one R is needed here in the drag coefficient scaling
+    c = scheme.drag / model.atmosphere.layer_thickness * diagn.scale[]
 
     return launch!(
         architecture(Fu), LinearWorkOrder, size(Fu), quadratic_drag_kernel!,
@@ -128,66 +129,63 @@ end
     Fv[ij] -= c * speed * v[ij]
 end
 
-## Tropospheric drag
-export TroposphericDrag
-@parameterized @kwdef mutable struct TroposphericDrag{NF} <: AbstractDrag
-    "[OPTION] drag coefficient [1]"
-    @param c_D::NF = 1.0e-8 (bounds = Nonnegative,)    # TODO is this a good default?
-    @param U::NF = 80 (bounds = Nonnegative,) 
+export SpeedLimitDrag
+@parameterized @kwdef struct SpeedLimitDrag{NF} <: AbstractDrag
+    "[OPTION] drag coefficient [1/m]"
+    @param drag::NF = 4e-7 (bounds = Nonnegative,)
+
+    "[OPTION] Speed limit above which drag kicks in [m/s]"
+    @param speed_limit::NF = 80 (bounds = Nonnegative,) 
 end
 
-TroposphericDrag(SG::SpectralGrid; kwargs...) = TroposphericDrag{SG.NF}(; kwargs...)
-initialize!(::TroposphericDrag, ::AbstractModel) = nothing
+SpeedLimitDrag(SG::SpectralGrid; kwargs...) = SpeedLimitDrag{SG.NF}(; kwargs...)
+initialize!(::SpeedLimitDrag, ::AbstractModel) = nothing
 
 """
 $(TYPEDSIGNATURES)
-Tropospheric drag for the momentum equations.
+Speed limit drag for the momentum equations.
 
-    Fu = -c_D/H*(|(u, v)|- U)^2*u
+    Fu = -c*max(0, |(u, v)| - speed_limit)^2 * sign(u)
 
-with `c_D` the non-dimensional drag coefficient as defined in `drag::TroposphericDrag`.
-`c_D` and layer thickness `H` are precomputed in `initialize!(::TroposphericDrag, ::AbstractModel)`
-and scaled by the radius as are the momentum equations."""
-
+with `c` the drag coefficient [1/m] as defined in `drag::SpeedLimitDrag` and
+kicking in only above a certain speed limit. The drag is quadratic in the excess
+speed above the limit and acts to slow down the flow, hence the `sign(u)` term."""
 function drag!(
         diagn::DiagnosticVariables,
         progn::PrognosticVariables,
-        drag::TroposphericDrag,
+        scheme::SpeedLimitDrag,
         lf::Integer,
         model::AbstractModel,
     )
-    k = 0   # only apply to top layer
-    u = field_view(diagn.grid.u_grid, :, k)
-    v = field_view(diagn.grid.v_grid, :, k)
+    u = diagn.grid.u_grid
+    v = diagn.grid.v_grid
 
-    Fu = field_view(diagn.tendencies.u_tend_grid, :, k)
-    Fv = field_view(diagn.tendencies.v_tend_grid, :, k)
+    Fu = diagn.tendencies.u_tend_grid
+    Fv = diagn.tendencies.v_tend_grid
 
     # total drag coefficient with radius scaling
-    c = drag.c_D / model.atmosphere.layer_thickness
-    c *= diagn.scale[]^2
-    U = drag.U
+    c = scheme.drag * diagn.scale[]
+    (; speed_limit) = scheme
 
-    return launch!(
-        architecture(Fu), LinearWorkOrder, size(Fu), tropospheric_drag_kernel!,
-        Fu, Fv, u, v, c, U
+    launch!(
+        architecture(Fu), RingGridWorkOrder, size(Fu), speed_limit_drag_kernel!,
+        Fu, Fv, u, v, c, speed_limit
     )
+    return nothing
 end
 
-@kernel inbounds = true function tropospheric_drag_kernel!(
-        Fu, Fv, u, v, @Const(c), @Const(U)
+@kernel inbounds = true function speed_limit_drag_kernel!(
+        Fu, Fv, u, v, @Const(c), @Const(speed_limit)
     )
-    ij = @index(Global, Linear)
+    ij, k = @index(Global, NTuple)
 
-    # Calculate speed at layer k
-    speed = sqrt(u[ij]^2 + v[ij]^2)
+    # Calculate speed
+    speed = sqrt(u[ij, k]^2 + v[ij, k]^2)
 
-    # Apply tropospheric drag, -= as the tendencies already contain forcing
-    delta = speed - U
-    if delta > 0.0
-        Fu[ij] -= c * delta^2 * u[ij]
-        Fv[ij] -= c * delta^2 * v[ij]
-    end
+    # Apply speed limit drag, -= as the tendencies already contain forcing
+    U² = max(0, speed - speed_limit)^2
+    Fu[ij, k] -= c * U² * sign(u[ij, k])
+    Fv[ij, k] -= c * U² * sign(v[ij, k])
 end
 
 export LinearVorticityDrag
