@@ -234,6 +234,11 @@ function set!(output::AbstractOutput; active, reset_path = true)
     return nothing
 end
 
+# fallback for nothing output
+function set!(::Nothing; active, reset_path = true)
+    return nothing
+end
+
 """$(TYPEDSIGNATURES)
 Initialize NetCDF `output` by creating a netCDF file and storing the initial conditions
 of `diagn` (and `progn`). To be called just before the first timesteps."""
@@ -317,6 +322,11 @@ function initialize!(
     return nothing
 end
 
+# fallback for nothing output 
+function initialize!(::Nothing, ::Union{AbstractFeedback, Nothing}, ::PrognosticVariables, ::DiagnosticVariables, ::AbstractModel)
+    return nothing
+end
+
 Base.close(output::NetCDFOutput) = NCDatasets.close(output.netcdf_file)
 Base.close(::Nothing) = nothing     # in case of no netCDF output nothing to close
 
@@ -354,6 +364,11 @@ function output!(output::AbstractOutput, simulation::AbstractSimulation)
     (; clock) = simulation.prognostic_variables
     output!(output, clock.time)                                         # increase counter write time
     return output!(output, output.variables, simulation)                       # write variables
+end
+
+# fallback for nothing output 
+function output!(::Nothing, ::AbstractSimulation)
+    return nothing
 end
 
 get_indices(i, variable::AbstractOutputVariable) = get_indices(i, Val.(variable.dims_xyzt)...)
@@ -465,6 +480,8 @@ function finalize!(
     return close(output)
 end
 
+finalize!(::Nothing, ::AbstractSimulation) = nothing
+
 # default finalize method for output variables
 function finalize!(
         output::AbstractOutput,
@@ -535,3 +552,13 @@ function load_trajectory(var_name::Union{Symbol, String}, model::AbstractModel)
     @assert model.output.active "Output is turned off"
     return Array(NCDataset(get_full_output_file_path(model.output))[string(var_name)])
 end
+
+"""
+$(TYPEDSIGNATURES)
+Returns the output time step of the model `M`."""
+function get_output_dt(output::AbstractOutput)
+    return output.output_dt
+end 
+
+# Fallback for when output is nothing
+get_output_dt(::Nothing) = Millisecond(0)

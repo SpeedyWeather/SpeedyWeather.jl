@@ -103,8 +103,8 @@ Initialize leapfrogging `L` by recalculating the time step given the output time
 be a divisor such that an integer number of time steps matches exactly with the output
 time step."""
 function initialize!(L::Leapfrog, model::AbstractModel)
-    (; output_dt) = model.output
     (; radius) = model.planet
+    output_dt = get_output_dt(model.output)
 
     # take radius from planet and recalculate time step and possibly adjust with output dt
     L.Δt_millisec = get_Δt_millisec(L.Δt_at_T31, L.trunc, radius, L.adjust_with_output, output_dt)
@@ -240,15 +240,19 @@ function first_timesteps!(simulation::AbstractSimulation)
     (; Δt) = time_stepping
 
     # decide whether to start with 1x Euler then 1x Leapfrog at Δt
-    if time_stepping.first_step_euler
-        first_timesteps!(progn, diagn, model)
-        time_stepping.first_step_euler = !time_stepping.continue_with_leapfrog   # after first run! continue with leapfrog
-    else    # or continue with leaprog steps at 2Δt (e.g. restart)
-        # but make sure that implicit solver is initialized in that situation
-        initialize!(model.implicit, 2Δt, diagn, model)
-        set_initialized!(model.implicit)            # mark implicit as initialized
-        later_timestep!(simulation)
-    end
+    # TODO: this causes problems with Reactant when traced / or when not traced as a regular if loop in reverse mode
+    ifelse(time_stepping.first_step_euler, 
+        begin 
+            first_timesteps!(progn, diagn, model)
+            time_stepping.first_step_euler = !time_stepping.continue_with_leapfrog   # after first run! continue with leapfrog
+        end, 
+        begin # or continue with leaprog steps at 2Δt (e.g. restart)
+            # but make sure that implicit solver is initialized in that situation
+            initialize!(model.implicit, 2Δt, diagn, model)
+            set_initialized!(model.implicit)            # mark implicit as initialized
+            later_timestep!(simulation)
+        end
+    )
 
     # only now initialise feedback for benchmark accuracy
     (; clock) = progn
@@ -266,7 +270,7 @@ function first_timesteps!(
         model::AbstractModel,               # everything that is constant at runtime
     )
     (; clock) = progn
-    clock.n_timesteps == 0 && return nothing    # exit immediately for no time steps
+    if clock.n_timesteps == 0 && return nothing    # exit immediately for no time steps
 
     (; implicit) = model
     (; Δt, Δt_millisec) = model.time_stepping
