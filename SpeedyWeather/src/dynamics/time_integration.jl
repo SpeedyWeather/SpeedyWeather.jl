@@ -3,7 +3,7 @@ export Leapfrog
 
 """Leapfrog time stepping defined by the following fields
 $(TYPEDFIELDS)"""
-@kwdef mutable struct Leapfrog{NF <: AbstractFloat, IntType} <: AbstractTimeStepper
+@kwdef mutable struct Leapfrog{NF, IntType, B} <: AbstractTimeStepper
     "[DERIVED] Spectral resolution (max degree of spherical harmonics)"
     trunc::IntType
 
@@ -14,16 +14,16 @@ $(TYPEDFIELDS)"""
     Δt_at_T31::Second = Minute(40)
 
     "[OPTION] Adjust `Δt_at_T31` with the `output_dt` to reach `output_dt` exactly in integer time steps"
-    adjust_with_output::Bool = true
+    adjust_with_output::B = true
 
     "[OPTION] Start integration with (1) Euler step with dt/2, (2) Leapfrog step with dt"
-    start_with_euler::Bool = true
+    start_with_euler::B = true
 
     "[OPTION] Sets `first_step_euler=false` after first step to continue with leapfrog after 1st `run!` call"
-    continue_with_leapfrog::Bool = true
+    continue_with_leapfrog::B = true
 
     "[DERIVED] Use Euler on first time step? (controlled by `start_with_euler` and `continue_with_leapfrog`)"
-    first_step_euler::Bool = start_with_euler
+    first_step_euler::B = start_with_euler
 
     "[OPTION] Robert (1966) time filter coefficient to suppress the computational mode"
     robert_filter::NF = 0.1
@@ -94,7 +94,7 @@ Generator function for a Leapfrog struct using `spectral_grid`
 for the resolution information."""
 function Leapfrog(spectral_grid::SpectralGrid; kwargs...)
     (; NF, trunc) = spectral_grid
-    return Leapfrog{NF, typeof(trunc)}(; trunc, kwargs...)
+    return Leapfrog{NF, typeof(trunc), Bool}(; trunc, kwargs...)
 end
 
 """$(TYPEDSIGNATURES)
