@@ -149,15 +149,24 @@ export OneBandShortwaveRadiativeTransfer
 $(TYPEDFIELDS)."""
 @parameterized @kwdef struct OneBandShortwaveRadiativeTransfer{NF, F} <: AbstractShortwaveRadiativeTransfer
     "[OPTION] Total ozone absorption as fraction of incoming solar radiation (1)"
-    @param ozone_absorption::NF = 0.01 (bounds = 0..1,)
+    @param ozone_absorption::NF = 0.01 (bounds = 0 .. 1,)
 
     "[OPTION] Ozone distribution above σ₀, has to be explicitly normalized to ∫dσ = 1 (1)"
-    ozone_distribution::F = (σ) -> 50*max(0, 0.2f0 - σ)
+    ozone_distribution::F
 end
 Adapt.@adapt_structure OneBandShortwaveRadiativeTransfer
 
 # generator function
-OneBandShortwaveRadiativeTransfer(SG::SpectralGrid; kwargs...) = OneBandShortwaveRadiativeTransfer{SG.NF}(; kwargs...)
+function OneBandShortwaveRadiativeTransfer(
+        SG::SpectralGrid;
+        ozone_distribution = (σ) -> 50 * max(0, 0.2f0 - σ),     # default distribution here
+        kwargs...
+    )
+    return OneBandShortwaveRadiativeTransfer{SG.NF, typeof(ozone_distribution)}(;
+        ozone_distribution = ozone_distribution, kwargs...
+    )
+end
+
 initialize!(::OneBandShortwaveRadiativeTransfer, ::PrimitiveEquation) = nothing
 
 """$(TYPEDSIGNATURES)
@@ -171,7 +180,7 @@ One-band shortwave radiative transfer with cloud reflection and ozone absorption
         model,
     )
 
-    (; ozone_absorption) = radiation.ozone_absorption
+    O₃_absorption = radiation.ozone_absorption
     (; cloud_cover, cloud_top, stratocumulus_cover, cloud_albedo, stratocumulus_albedo) = clouds
 
     dTdt = diagn.tendencies.temp_tend_grid
@@ -203,10 +212,10 @@ One-band shortwave radiative transfer with cloud reflection and ozone absorption
         end
 
         # 2. ozone absorption in stratosphere layers above σ₀, distribution scaled by layer thickness
-        ozone = ozone_absorption * radiation.ozone_distribution(σ[k]) * Δσ[k]
+        O₃ = O₃_absorption * radiation.ozone_distribution(σ[k]) * Δσ[k]
 
         # 3. transmissivity of the layer
-        D_out = (D - ozone*D_toa) * t[ij, k]
+        D_out = (D - O₃ * D_toa) * t[ij, k]
         # Update temperature tendency due to absorbed shortwave radiation
         # from flux convergence D = D in from the top, D_out at the bottom of a layer
         dTdt[ij, k] += flux_to_tendency((D - D_out) / cₚ, pₛ, k, model)
