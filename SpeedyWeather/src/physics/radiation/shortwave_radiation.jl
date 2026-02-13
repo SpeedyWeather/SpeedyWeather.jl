@@ -147,12 +147,12 @@ export OneBandShortwaveRadiativeTransfer
     OneBandShortwaveRadiativeTransfer <: AbstractShortwaveRadiativeTransfer
 
 $(TYPEDFIELDS)."""
-@parameterized @kwdef struct OneBandShortwaveRadiativeTransfer{NF} <: AbstractShortwaveRadiativeTransfer
-    "[OPTION] Ozone absorption in upper stratosphere (layer 1) in fraction of incoming solar radiation (1)"
-    @param ozone_absorption_upper::NF = 0.009 (bounds = 0..1,)
+@parameterized @kwdef struct OneBandShortwaveRadiativeTransfer{NF, F} <: AbstractShortwaveRadiativeTransfer
+    "[OPTION] Total ozone absorption as fraction of incoming solar radiation (1)"
+    @param ozone_absorption::NF = 0.01 (bounds = 0..1,)
 
-    "[OPTION] Ozone absorption in lower stratosphere (layer 2) in fraction of incoming solar radiation (1)"
-    @param ozone_absorption_lower::NF = 0.001 (bounds = 0..1,)
+    "[OPTION] Ozone distribution above σ₀, has to be explicitly normalized to ∫dσ = 1 (1)"
+    ozone_distribution::F = (σ) -> 50*max(0, 0.2f0 - σ)
 end
 Adapt.@adapt_structure OneBandShortwaveRadiativeTransfer
 
@@ -170,12 +170,15 @@ One-band shortwave radiative transfer with cloud reflection and ozone absorption
         radiation::OneBandShortwaveRadiativeTransfer,
         model,
     )
-    (; ozone_absorption_upper, ozone_absorption_lower) = radiation
+
+    (; ozone_absorption) = radiation.ozone_absorption
     (; cloud_cover, cloud_top, stratocumulus_cover, cloud_albedo, stratocumulus_albedo) = clouds
 
     dTdt = diagn.tendencies.temp_tend_grid
     pₛ = diagn.grid.pres_grid_prev[ij]
     nlayers = size(dTdt, 2)
+    σ = model.geometry.σ_levels_full
+    Δσ = model.geometry.σ_levels_thick
 
     cos_zenith = diagn.physics.cos_zenith[ij]
     albedo_ocean = diagn.physics.ocean.albedo[ij]
@@ -199,22 +202,11 @@ One-band shortwave radiative transfer with cloud reflection and ozone absorption
             D *= (1 - R)
         end
 
-        # 2. ozone absorption in stratosphere layers
-        # TODO make this vertical coordinate and not layer index dependent
-        if k == 1
-            # ozone absorption is a fraction of incoming solar radiation at TOA
-            # not dependent on latitude or year as done in Fortran SPEEDY
-            ozone_absorption = ozone_absorption_upper * D_toa
-        elseif k == 2
-            # similar here but lower stratosphere absorption is typically weaker
-            ozone_absorption = ozone_absorption_lower * D_toa
-        else
-            # no ozone absorption in troposphere layers
-            ozone_absorption = zero(D)
-        end
+        # 2. ozone absorption in stratosphere layers above σ₀, distribution scaled by layer thickness
+        ozone = ozone_absorption * radiation.ozone_distribution(σ[k]) * Δσ[k]
 
         # 3. transmissivity of the layer
-        D_out = (D - ozone_absorption) * t[ij, k]
+        D_out = (D - ozone*D_toa) * t[ij, k]
         # Update temperature tendency due to absorbed shortwave radiation
         # from flux convergence D = D in from the top, D_out at the bottom of a layer
         dTdt[ij, k] += flux_to_tendency((D - D_out) / cₚ, pₛ, k, model)
