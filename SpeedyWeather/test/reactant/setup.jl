@@ -24,20 +24,20 @@ function default_initial_conditions(::Type{PrimitiveWetModel})
 end
 
 """Create a CPU model of the given type."""
-function create_cpu_model(ModelType::Type; trunc = TRUNC)
+function create_cpu_model(ModelType::Type; trunc = TRUNC, kwargs...)
     nlayers = nlayers_for_model(ModelType)
     spectral_grid = SpectralGrid(; nlayers, trunc)
     M = MatrixSpectralTransform(spectral_grid)
     initial_conditions = default_initial_conditions(ModelType)
-    return ModelType(spectral_grid; spectral_transform = M, initial_conditions)
+    return ModelType(spectral_grid; spectral_transform = M, initial_conditions, kwargs...)
 end
 
 """Create a Reactant model of the given type."""
-function create_reactant_model(ModelType::Type; trunc = TRUNC)
+function create_reactant_model(ModelType::Type; trunc = TRUNC, kwargs...)
     nlayers = nlayers_for_model(ModelType)
     arch = SpeedyWeather.ReactantDevice()
     spectral_grid = SpectralGrid(; architecture = arch, nlayers, trunc)
     M = MatrixSpectralTransform(spectral_grid)
     initial_conditions = default_initial_conditions(ModelType)
-    return ModelType(spectral_grid; spectral_transform = M, feedback = nothing, initial_conditions)
+    return ModelType(spectral_grid; spectral_transform = M, feedback = nothing, initial_conditions, kwargs...)
 end

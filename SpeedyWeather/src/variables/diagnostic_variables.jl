@@ -320,10 +320,12 @@ Generator function."""
 function ParticleVariables(SG::SpectralGrid)
     (; architecture, nparticles, NF, ParticleVector) = SG
 
-    # TODO: CPU Fallback needed for Reactant
+    # TODO: Particle advection for Reactant nonworking
     if typeof(architecture) <: ReactantDevice
-        VectorNF = array_type(CPU(), NF, 1)
-        locator = RingGrids.AnvilLocator(NF, nparticles; architecture = CPU())
+        locator = nothing 
+        return ParticleVariables{ParticleVector, Nothing, Nothing, typeof(nparticles)}(;
+            nparticles, locator = nothing, u = nothing, v = nothing, σ_tend = nothing
+        )
     else
         VectorNF = array_type(architecture, NF, 1)
         locator = RingGrids.AnvilLocator(NF, nparticles; architecture)

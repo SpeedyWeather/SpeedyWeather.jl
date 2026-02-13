@@ -4,12 +4,7 @@ module TracableDates
 # Standalone replacement for Julia's Dates module with `value::IntType` instead of `value::Int64`
 # so that Reactant can trace through the integer operations.
 # This code is mostly LLM generated, instructed to copy the Julia.Base implementation
-# I really dislike that we have to do this here.
-# Alternatively, we would just abandon having a Date like type anywhere in the model
-# If we decide to keep this implementation, we could try to minimize it a bit further
-# and really only keep the bits we use in anything that's traced by Reactant, so in a run!
-# and convert between regular Dates and SpeedyDates when needed
-# Type names mirror Dates directly: Second, Millisecond, DateTime, etc.
+# This code or something similar will likely become a part of Reactant very soon 
 
 # types (matching Dates exports)
 export Period, DatePeriod, TimePeriod

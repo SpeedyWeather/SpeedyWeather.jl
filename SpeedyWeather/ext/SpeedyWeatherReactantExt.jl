@@ -52,7 +52,7 @@ end
 function SpeedyWeather.timestep!(simulation::ReactantSimulation, r_first_timesteps!, r_later_timestep!)
     (; clock) = simulation.prognostic_variables
 
-    return if clock.timestep_counter == 0
+    return @trace if clock.timestep_counter == 0
         r_first_timesteps!(simulation)
     else
         r_later_timestep!(simulation)

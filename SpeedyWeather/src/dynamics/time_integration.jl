@@ -3,7 +3,7 @@ export Leapfrog
 
 """Leapfrog time stepping defined by the following fields
 $(TYPEDFIELDS)"""
-@kwdef mutable struct Leapfrog{NF <: AbstractFloat, IntType} <: AbstractTimeStepper
+@kwdef mutable struct Leapfrog{NF, IntType, B} <: AbstractTimeStepper
     "[DERIVED] Spectral resolution (max degree of spherical harmonics)"
     trunc::IntType
 
@@ -14,16 +14,16 @@ $(TYPEDFIELDS)"""
     Δt_at_T31::Second = Minute(40)
 
     "[OPTION] Adjust `Δt_at_T31` with the `output_dt` to reach `output_dt` exactly in integer time steps"
-    adjust_with_output::Bool = true
+    adjust_with_output::B = true
 
     "[OPTION] Start integration with (1) Euler step with dt/2, (2) Leapfrog step with dt"
-    start_with_euler::Bool = true
+    start_with_euler::B = true
 
     "[OPTION] Sets `first_step_euler=false` after first step to continue with leapfrog after 1st `run!` call"
-    continue_with_leapfrog::Bool = true
+    continue_with_leapfrog::B = true
 
     "[DERIVED] Use Euler on first time step? (controlled by `start_with_euler` and `continue_with_leapfrog`)"
-    first_step_euler::Bool = start_with_euler
+    first_step_euler::B = start_with_euler
 
     "[OPTION] Robert (1966) time filter coefficient to suppress the computational mode"
     robert_filter::NF = 0.1
@@ -94,7 +94,7 @@ Generator function for a Leapfrog struct using `spectral_grid`
 for the resolution information."""
 function Leapfrog(spectral_grid::SpectralGrid; kwargs...)
     (; NF, trunc) = spectral_grid
-    return Leapfrog{NF, typeof(trunc)}(; trunc, kwargs...)
+    return Leapfrog{NF, typeof(trunc), Bool}(; trunc, kwargs...)
 end
 
 """$(TYPEDSIGNATURES)
@@ -103,8 +103,8 @@ Initialize leapfrogging `L` by recalculating the time step given the output time
 be a divisor such that an integer number of time steps matches exactly with the output
 time step."""
 function initialize!(L::Leapfrog, model::AbstractModel)
-    (; output_dt) = model.output
     (; radius) = model.planet
+    output_dt = get_output_dt(model.output)
 
     # take radius from planet and recalculate time step and possibly adjust with output dt
     L.Δt_millisec = get_Δt_millisec(L.Δt_at_T31, L.trunc, radius, L.adjust_with_output, output_dt)
@@ -240,15 +240,19 @@ function first_timesteps!(simulation::AbstractSimulation)
     (; Δt) = time_stepping
 
     # decide whether to start with 1x Euler then 1x Leapfrog at Δt
-    if time_stepping.first_step_euler
-        first_timesteps!(progn, diagn, model)
-        time_stepping.first_step_euler = !time_stepping.continue_with_leapfrog   # after first run! continue with leapfrog
-    else    # or continue with leaprog steps at 2Δt (e.g. restart)
-        # but make sure that implicit solver is initialized in that situation
-        initialize!(model.implicit, 2Δt, diagn, model)
-        set_initialized!(model.implicit)            # mark implicit as initialized
-        later_timestep!(simulation)
-    end
+    # TODO: this causes problems with Reactant when traced / or when not traced as a regular if loop in reverse mode
+    ifelse(time_stepping.first_step_euler, 
+        begin 
+            first_timesteps!(progn, diagn, model)
+            time_stepping.first_step_euler = !time_stepping.continue_with_leapfrog   # after first run! continue with leapfrog
+        end, 
+        begin # or continue with leaprog steps at 2Δt (e.g. restart)
+            # but make sure that implicit solver is initialized in that situation
+            initialize!(model.implicit, 2Δt, diagn, model)
+            set_initialized!(model.implicit)            # mark implicit as initialized
+            later_timestep!(simulation)
+        end
+    )
 
     # only now initialise feedback for benchmark accuracy
     (; clock) = progn
@@ -266,7 +270,7 @@ function first_timesteps!(
         model::AbstractModel,               # everything that is constant at runtime
     )
     (; clock) = progn
-    clock.n_timesteps == 0 && return nothing    # exit immediately for no time steps
+    if clock.n_timesteps == 0 && return nothing    # exit immediately for no time steps
 
     (; implicit) = model
     (; Δt, Δt_millisec) = model.time_stepping

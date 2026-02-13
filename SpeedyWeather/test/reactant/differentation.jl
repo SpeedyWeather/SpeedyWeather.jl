@@ -3,8 +3,9 @@
 const N_steps = 10
 const i_grid = 100
 
-model = create_reactant_model(BarotropicModel)
+model = create_reactant_model(BarotropicModel, output=nothing)
 simulation = initialize!(model)
+run!(simulation; steps= 10)
 
 function run_sim(simulation)
     run!(simulation; steps = N_steps)
