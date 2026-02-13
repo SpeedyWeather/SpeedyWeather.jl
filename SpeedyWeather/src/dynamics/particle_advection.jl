@@ -82,11 +82,8 @@ function initialize!(
         particle_advection::ParticleAdvection2D,
         model::AbstractModel,
     ) where {P <: Particle}
-    for i in eachindex(particles)
-        # uniform random in lon (360*rand), lat (cos-distribution), σ (rand)
-        particles[i] = rand(P)
-    end
-    return
+
+    return particles .= on_architecture(architecture(particles), rand(P, length(particles)))
 end
 
 # Fallback for no particle advection
@@ -117,22 +114,29 @@ function initialize!(
     # interpolate initial velocity on initial locations
     lats = diagn.particles.u    # reuse u,v arrays as only used for u, v
     lons = diagn.particles.v    # after update_locator!
-    σ = model.geometry.σ_levels_full[k]
+    σ = Vector(model.geometry.σ_levels_full)[k] # explicitly on CPU
 
-    for i in eachindex(particles)
-        # modulo all particles here
-        # i.e. one can start with a particle at -120˚E which moduloed to 240˚E here
-        # also given this is 2D advection on a given layer set that vertical coordinate σ here
-        particles[i] = mod(set(particles[i]; σ = σ))
-        lons[i] = particles[i].lon
-        lats[i] = particles[i].lat
-    end
+    # modulo particles and extract their coordinates
+    launch!(architecture(particles), LinearWorkOrder, (length(particles),), _initialize_particles_kernel!, particles, lons, lats, σ)
 
     RingGrids.update_locator!(locator, geometry, lons, lats)
     u0 = diagn.particles.u      # now reused arrays are actually u, v
     v0 = diagn.particles.v
     interpolate!(u0, u_grid, locator, geometry)
     return interpolate!(v0, v_grid, locator, geometry)
+end
+
+# Kernel to modulo particles and extract their coordinates
+@kernel inbounds = true function _initialize_particles_kernel!(
+        particles, lons, lats, σ
+    )
+    i = @index(Global, Linear)
+
+    # modulo all particles here
+    # i.e. one can start with a particle at -120˚E which moduloed to 240˚E here
+    particles[i] = mod(set(particles[i]; σ = σ))
+    lons[i] = particles[i].lon
+    lats[i] = particles[i].lat
 end
 
 # function barrier, unpack what's needed
@@ -180,20 +184,11 @@ function particle_advection!(
     lons = diagn.particles.u
     lats = diagn.particles.v
 
-    for i in eachindex(particles, u_old, v_old)
-        isactive(particles[i]) || continue
-        # sum up Heun's first term in 1/2*Δt*(uv_old + uv_new) on the fly
-        # use only Δt/2
-        particles[i] = advect_2D(particles[i], u_old[i], v_old[i], Δt_half)
-
-        # predictor step, used to evaluate u_new, v_new
-        # now again with Δt/2 to have an Euler timestep with Δt together with prev line
-        diagn.particles.locations[i] = advect_2D(particles[i], u_old[i], v_old[i], Δt_half)
-
-        # reuse work arrays on the fly for new (predicted) locations
-        lons[i] = diagn.particles.locations[i].lon
-        lats[i] = diagn.particles.locations[i].lat
-    end
+    # Launch predictor step kernel
+    launch!(
+        architecture(u_old), LinearWorkOrder, (length(particles),),
+        predictor_step_kernel!, particles, diagn.particles.locations, u_old, v_old, lons, lats, Δt_half
+    )
 
     # CORRECTOR STEP, use u, v at new location and new time step
     k = particle_advection.layer
@@ -207,16 +202,11 @@ function particle_advection!(
     interpolate!(u_new, u_grid, locator, geometry)
     interpolate!(v_new, v_grid, locator, geometry)
 
-    for i in eachindex(particles, u_new, v_new)
-        isactive(particles[i]) || continue
-
-        # sum up Heun's 2nd term in 1/2*Δt*(uv_old + uv_new) on the fly
-        particles[i] = advect_2D(particles[i], u_new[i], v_new[i], Δt_half)
-
-        # reuse work arrays on the fly for new (correct) locations
-        lons[i] = particles[i].lon
-        lats[i] = particles[i].lat
-    end
+    # Launch corrector step kernel
+    launch!(
+        architecture(u_new), LinearWorkOrder, (length(particles),),
+        corrector_step_kernel!, particles, u_new, v_new, lons, lats, Δt_half
+    )
 
     # store new velocities at new (corrected locations) to be used on
     # next particle advection time step
@@ -226,7 +216,7 @@ function particle_advection!(
     return nothing
 end
 
-function advect_2D(
+@inline function advect_2D(
         particle::Particle{NF},         # particle to advect
         u::NF,                          # zonal velocity [m/s]
         v::NF,                          # meridional velocity [m/s]
@@ -237,4 +227,41 @@ function advect_2D(
     coslat = max(cosd(particle.lat), eps(NF))   # prevents division by zero
     dlon = u * dt / coslat                        # increment in longitude [˚E]
     return mod(move(particle, dlon, dlat))      # move, mod back to [0, 360˚E], [-90, 90˚N]
+end
+
+# Kernel for predictor step in Heun's method
+@kernel inbounds = true function predictor_step_kernel!(
+        particles, locations, u_old, v_old, lons, lats, @Const(Δt_half)
+    )
+    i = @index(Global, Linear)
+
+    if isactive(particles[i])
+        # sum up Heun's first term in 1/2*Δt*(uv_old + uv_new) on the fly
+        # use only Δt/2
+        particles[i] = advect_2D(particles[i], u_old[i], v_old[i], Δt_half)
+
+        # predictor step, used to evaluate u_new, v_new
+        # now again with Δt/2 to have an Euler timestep with Δt together with prev line
+        locations[i] = advect_2D(particles[i], u_old[i], v_old[i], Δt_half)
+
+        # reuse work arrays on the fly for new (predicted) locations
+        lons[i] = locations[i].lon
+        lats[i] = locations[i].lat
+    end
+end
+
+# Kernel for corrector step in Heun's method
+@kernel inbounds = true function corrector_step_kernel!(
+        particles, u_new, v_new, lons, lats, @Const(Δt_half)
+    )
+    i = @index(Global, Linear)
+
+    if isactive(particles[i])
+        # sum up Heun's 2nd term in 1/2*Δt*(uv_old + uv_new) on the fly
+        particles[i] = advect_2D(particles[i], u_new[i], v_new[i], Δt_half)
+
+        # reuse work arrays on the fly for new (correct) locations
+        lons[i] = particles[i].lon
+        lats[i] = particles[i].lat
+    end
 end

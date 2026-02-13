@@ -1,7 +1,7 @@
 name = "SpeedyTransforms"
 uuid = "ed023a3f-7a3c-42dd-bab6-68c21c8c3105"
 authors = ["SpeedyTransforms contributors"]
-version = "0.1.1"
+version = "0.1.2"
 
 [deps]
 AbstractFFTs = "621f4979-c628-5d54-868e-fcf4e3e8185c"

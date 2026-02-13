@@ -4,6 +4,7 @@ using JLArrays
 import SpeedyWeatherInternals.Architectures: Architectures, ismatching, CPU, GPU, architecture, array_type, compatible_array_types, nonparametric_type
 
 const JLGPU = GPU{JLBackend}
+
 # make JLArrays compatible with standard GPU Architecture
 Architectures.ismatching(arch::GPU, array_type::Type{<:JLArray}) = true
 Architectures.ismatching(arch::Type{<:GPU}, array_type::Type{<:JLArray}) = true

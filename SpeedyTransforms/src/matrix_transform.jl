@@ -37,7 +37,6 @@ struct MatrixSpectralTransform{
 
     # SCRATCH MEMORY
     scratch_memory::MatrixType
-    scratch_memory_old::MatrixComplexType   # state is undetermined, only read after writing to it
 
     gradients::GradientType             # precomputed gradient and integration matrices
 end
@@ -92,7 +91,7 @@ function MatrixSpectralTransform(
 
     # SCRATCH MEMORY FOR FOURIER NOT YET LEGENDRE TRANSFORMED AND VICE VERSA
     scratch_memory = on_architecture(architecture, zeros(NF, spectrum, nlayers).data)
-    scratch_memory_old = on_architecture(architecture, zeros(Complex{NF}, grid, nlayers).data)
+    #scratch_memory = on_architecture(architecture, zeros(Complex{NF}, grid, nlayers).data)
 
     # PRECOMPUTE GRADIENT AND INTEGRATION MATRICES
     gradients = gradient_arrays(NF, spectrum)
@@ -117,7 +116,6 @@ function MatrixSpectralTransform(
         backward_real,
         backward_imag,
         scratch_memory,
-        scratch_memory_old,
         gradients,
     )
 end
@@ -185,6 +183,8 @@ function transform_old!(                        # SPECTRAL TO GRID
     # catch incorrect sizes early
     @boundscheck ismatching(M, field) || throw(DimensionMismatch(M, field))
     @boundscheck ismatching(M, coeffs) || throw(DimensionMismatch(M, coeffs))
+
+    nlayers = size(coeffs, 2)
 
     nlayers = size(coeffs, 2)
     if nlayers < size(scratch_memory, 2)
