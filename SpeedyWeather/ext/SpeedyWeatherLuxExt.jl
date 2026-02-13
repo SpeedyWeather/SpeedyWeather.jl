@@ -1,6 +1,6 @@
 module SpeedyWeatherLuxExt
 
-using SpeedyWeather, Lux, NPZ
+using SpeedyWeather, Lux, NPZ, StaticArrays
 import Random, Adapt
 
 function SpeedyWeather.LearnedSurfaceRoughness(
@@ -30,10 +30,8 @@ function SpeedyWeather.LearnedSurfaceRoughness(
     load_land_parameters!(land_params, land_weights)
 
     land_states = Lux.testmode(rand_states)
-    land_model = (u, p, s) -> first(Lux.apply(land_nn, u, p, s))
 
-    return LearnedSurfaceRoughness{SG.NF, typeof(land_model), typeof(land_nn), typeof(land_params), typeof(land_states)}(;
-        land_model = land_model,
+    return LearnedSurfaceRoughness{SG.NF, typeof(land_nn), typeof(land_params), typeof(land_states)}(;
         land_nn = land_nn,
         land_params = land_params,
         land_states = land_states,
@@ -65,6 +63,19 @@ end
 Adapt.@adapt_structure SpeedyWeather.LearnedSurfaceRoughness
 SpeedyWeather.initialize!(::LearnedSurfaceRoughness, ::PrimitiveEquation) = nothing
 
+# Symbolic regression-derived expression for ice-free ocean surface roughness
+@inline function ice_free_roughness(x1, x2, x3)
+    return (x3 * ((((((-0.096541196 * x3) - 0.30319092) / exp(x3)) - -0.7495353) / exp(x3)) - -0.7495353)) - (-0.040766064 * (((-0.6404533 + x2) * x2) - (x1 - 0.69219255)))
+end
+
+@inline function sea_ice_roughness(ℵ)
+    return max(1.0f-3, 0.93f-3 * (1.0f0 - ℵ) + (6.05f-3 * exp(-17.0f0 * (ℵ - 0.5f0)^2)))
+end
+
+@inline function normalise(a, m, s)
+    return (a - m) / s
+end
+
 Base.@propagate_inbounds function SpeedyWeather.surface_roughness_land(ij, scheme::LearnedSurfaceRoughness, diagn, progn)
     vₕ = diagn.physics.land.vegetation_high[ij]
     vₗ = diagn.physics.land.vegetation_low[ij]
@@ -83,7 +94,6 @@ Base.@propagate_inbounds function SpeedyWeather.surface_roughness_land(ij, schem
     i₆ = soil_temperature * vᵦ
 
     # Normalise inputs
-    normalise(a, m, s) = (a - m) / s
     vₕ = normalise(vₕ, scheme.land_input_means[2], scheme.land_input_stds[2])
     vₗ = normalise(vₗ, scheme.land_input_means[3], scheme.land_input_stds[3])
     vᵦ = normalise(vᵦ, scheme.land_input_means[1], scheme.land_input_stds[1])
@@ -102,7 +112,7 @@ Base.@propagate_inbounds function SpeedyWeather.surface_roughness_land(ij, schem
 
     scheme.land_input_buffer[:] .= (vᵦ, vₕ, vₗ, g, sd, i₅, soil_temperature, i₆, i₃, i₂, i₁, soil_moisture, i₄)
 
-    prediction = scheme.land_model(scheme.land_input_buffer, scheme.land_params, scheme.land_states)
+    prediction, _ = Lux.apply(scheme.land_nn, scheme.land_input_buffer, scheme.land_params, scheme.land_states)
     log_surface_roughness = (prediction[1] * scheme.land_output_std) + scheme.land_output_mean
     surface_roughness = exp(log_surface_roughness)
     return surface_roughness
@@ -115,18 +125,15 @@ Base.@propagate_inbounds function SpeedyWeather.surface_roughness_ocean(ij, sche
     Vₛ = diagn.grid.v_grid[ij, surface]
     UVₛ = diagn.physics.surface_wind_speed[ij]
 
-    normalise(a, m, s) = (a - m) / s
     Uₛ = normalise(Uₛ, scheme.ocean_input_means[1], scheme.ocean_input_stds[1])
     Vₛ = normalise(Vₛ, scheme.ocean_input_means[2], scheme.ocean_input_stds[2])
     UVₛ = normalise(UVₛ, scheme.ocean_input_means[3], scheme.ocean_input_stds[3])
 
-    # Symbolic regression-derived expression for ice-free ocean surface roughness
-    ice_free_roughness(x1, x2, x3) = (x3 * ((((((-0.096541196 * x3) - 0.30319092) / exp(x3)) - -0.7495353) / exp(x3)) - -0.7495353)) - (-0.040766064 * (((-0.6404533 + x2) * x2) - (x1 - 0.69219255)))
     log_ocean_roughness = ice_free_roughness(Uₛ, Vₛ, UVₛ) * scheme.ocean_output_std + scheme.ocean_output_mean
     ocean_roughness = exp(log_ocean_roughness)
-    sea_ice_roughness = max(1.0f-3, 0.93f-3 * (1.0f0 - ℵ) + (6.05f-3 * exp(-17.0f0 * (ℵ - 0.5f0)^2)))  # From IFS documentation, CY49R1
+    ℵ_roughness = sea_ice_roughness(ℵ)  # From IFS documentation, CY49R1
 
-    surface_roughness = ℵ * sea_ice_roughness + (1 - ℵ) * ocean_roughness
+    surface_roughness = ℵ * ℵ_roughness + (1 - ℵ) * ocean_roughness
     return surface_roughness
 end
 
