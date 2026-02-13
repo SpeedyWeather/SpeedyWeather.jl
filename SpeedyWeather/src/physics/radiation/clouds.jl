@@ -43,7 +43,7 @@ export DiagnosticClouds
     @param precipitation_max::NF = 10 (bounds = Positive,)
 
     "[OPTION] Cloud albedo for visible band at CLC=1 [1]"
-    @param cloud_albedo::NF = 0.43 (bounds = 0 .. 1,)
+    @param cloud_albedo::NF = 0.6 (bounds = 0 .. 1,)
 
     "[OPTION] Stratocumulus cloud albedo (surface reflection/absorption) [1]"
     @param stratocumulus_albedo::NF = 0.5 (bounds = 0 .. 1,)

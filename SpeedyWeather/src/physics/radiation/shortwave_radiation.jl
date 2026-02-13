@@ -149,10 +149,10 @@ export OneBandShortwaveRadiativeTransfer
 $(TYPEDFIELDS)."""
 @parameterized @kwdef struct OneBandShortwaveRadiativeTransfer{NF} <: AbstractShortwaveRadiativeTransfer
     "[OPTION] Ozone absorption in upper stratosphere (layer 1) in fraction of incoming solar radiation (1)"
-    @param ozone_absorption_upper::NF = 0.03 (bounds = 0..1,)
+    @param ozone_absorption_upper::NF = 0.009 (bounds = 0..1,)
 
     "[OPTION] Ozone absorption in lower stratosphere (layer 2) in fraction of incoming solar radiation (1)"
-    @param ozone_absorption_lower::NF = 0.024 (bounds = 0..1,)
+    @param ozone_absorption_lower::NF = 0.001 (bounds = 0..1,)
 end
 Adapt.@adapt_structure OneBandShortwaveRadiativeTransfer
 
