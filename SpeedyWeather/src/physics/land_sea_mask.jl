@@ -78,11 +78,14 @@ $(TYPEDFIELDS)"""
     file::String = "land-sea_mask.nc"
 
     "path to the folder containing the orography"
-    path::String = joinpath("data", file)
+    path::String = joinpath("data", "boundary_conditions", file)
 
     "flag to check for land-sea mask in SWA or locally"
     from_assets::Bool = true
 
+    "[OPTION] SpeedyWeatherAssets version number"
+    version::VersionNumber = DEFAULT_ASSETS_VERSION
+    
     "NCDataset variable name"
     varname::String = "lsm"
 
@@ -130,7 +133,8 @@ function initialize!(land_sea_mask::EarthLandSeaMask, model::PrimitiveEquation)
         from_assets = land_sea_mask.from_assets,
         name = land_sea_mask.varname,
         type = land_sea_mask.file_Grid,
-        format = NCDataset
+        format = NCDataset,
+        version = land_sea_mask.version
     )
 
     # average onto grid cells of the model

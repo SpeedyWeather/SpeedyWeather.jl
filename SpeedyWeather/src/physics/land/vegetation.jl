@@ -71,10 +71,13 @@ export VegetationClimatology
     file::String = "vegetation.nc"
 
     "[OPTION] path to the folder containing the vegetation"
-    path::String = joinpath("data", file)
+    path::String = joinpath("data", "boundary_conditions", file)
 
     "[OPTION] flag to check for vegetation in SWA or locally"
     from_assets::Bool = true
+
+    "[OPTION] SpeedyWeatherAssets version number"
+    version::VersionNumber = DEFAULT_ASSETS_VERSION
 
     "[OPTION] variable name in netcdf file for high vegetation"
     varname_vegh::String = "vegh"
@@ -115,14 +118,16 @@ function initialize!(vegetation::VegetationClimatology, model::PrimitiveEquation
         from_assets = vegetation.from_assets,
         name = vegetation.varname_vegh,
         type = vegetation.file_Grid,
-        format = NCDataset
+        format = NCDataset,
+        version = vegetation.version
     )
     vegl, _ = get_asset(
         vegetation.path;
         from_assets = vegetation.from_assets,
         name = vegetation.varname_vegl,
         type = vegetation.file_Grid,
-        format = NCDataset
+        format = NCDataset,
+        version = vegetation.version
     )
 
     vegh = on_architecture(model.architecture, vegh)

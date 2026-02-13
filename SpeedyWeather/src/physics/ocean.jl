@@ -98,10 +98,13 @@ $(TYPEDFIELDS)"""
     file::String = "sea_surface_temperature.nc"
 
     "[OPTION] path to the folder containing the sst"
-    path::String = joinpath("data", file)
+    path::String = joinpath("data", "boundary_conditions", file)
 
     "[OPTION] flag to check for sst in SWA or locally"
     from_assets::Bool = true
+
+    "[OPTION] SpeedyWeatherAssets version number"
+    version::VersionNumber = DEFAULT_ASSETS_VERSION
 
     "[OPTION] Variable name in netcdf file"
     varname::String = "sst"
@@ -131,7 +134,8 @@ function initialize!(ocean::SeasonalOceanClimatology, model::PrimitiveEquation)
         from_assets = ocean.from_assets,
         name = ocean.varname,
         type = ocean.file_Grid,
-        format = NCDataset
+        format = NCDataset,
+        version = ocean.version
     )
 
     # create interpolator from grid in file to grid used in model

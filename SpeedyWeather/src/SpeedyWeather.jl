@@ -117,6 +117,9 @@ include("models/abstract_models.jl")
 include("variables/abstract_types.jl")
 include("models/parameterizations.jl")
 
+# INPUT
+include("input/get_asset.jl")
+
 # GEOMETRY CONSTANTS ETC
 include("dynamics/vertical_coordinates.jl")
 include("dynamics/spectral_grid.jl")
@@ -184,9 +187,6 @@ include("physics/land/soil_moisture.jl")
 include("physics/land/snow.jl")
 include("physics/land/vegetation.jl")
 include("physics/land/rivers.jl")
-
-# INPUT
-include("input/get_asset.jl")
 
 # OUTPUT
 include("output/schedule.jl")

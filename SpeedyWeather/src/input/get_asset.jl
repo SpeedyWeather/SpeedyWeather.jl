@@ -1,4 +1,6 @@
-const assets_url = "https://github.com/SpeedyWeather/SpeedyWeatherAssets/raw/refs/heads/main"
+const ASSETS_URL = "https://github.com/SpeedyWeather/SpeedyWeatherAssets/raw/refs"
+const DEFAULT_ASSETS_VERSION = v"1"
+const ASSETS_VERSIONS_AVAILABLE = (v"1",)
 
 function get_nc_variable_name(ncfile::NCDataset, name::String)
     if !haskey(ncfile, name) && name != ""
@@ -27,7 +29,15 @@ end
 Downloads a file from the SpeedyWeatherAssets repo, adds it to 
 Artifacts.toml in the project root, and returns the file path.
 """
-function get_asset(path::String; from_assets::Bool = true, name::String = "", type = NCDataset, format = NCDataset)
+function get_asset(
+        path::String;
+        from_assets::Bool = true,
+        name::String = "",
+        type::Any = NCDataset,
+        format::Any = NCDataset,
+        version::VersionNumber = DEFAULT_ASSETS_VERSION
+    )
+
     if !from_assets
         if isfile(path) # check if path is local (custom input)
             try
@@ -40,8 +50,22 @@ function get_asset(path::String; from_assets::Bool = true, name::String = "", ty
         end
     end
 
+    if !isempty(version.build)
+        branch = version.build[1]
+        target_url = joinpath(ASSETS_URL, "heads/$branch")
+    else
+        if version in ASSETS_VERSIONS_AVAILABLE
+            target_url = joinpath(ASSETS_URL, "tags/$version")
+        else
+            available_str = join(ASSETS_VERSIONS_AVAILABLE, ", ")
+            msg = "SpeedyWeatherAssets version $version not available. " *
+                "Please select from: $available_str, or the 'main' build"
+            throw(ArgumentError(msg))
+        end
+    end
+
     filename = basename(path)
-    url = joinpath(assets_url, path)
+    url = joinpath(target_url, path)
     project_root = pkgdir(SpeedyWeather)
     artifact_toml = joinpath(project_root, "Artifacts.toml")
 

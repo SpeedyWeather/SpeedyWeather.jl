@@ -10,10 +10,13 @@ $(TYPEDFIELDS)"""
     file::String = "land_surface_temperature.nc"
 
     "[OPTION] path to the folder containing the lst"
-    path::String = joinpath("data", file)
+    path::String = joinpath("data", "boundary_conditions", file)
 
     "[OPTION] flag to check for lst in SWA or locally"
     from_assets::Bool = true
+
+    "[OPTION] SpeedyWeatherAssets version number"
+    version::VersionNumber = DEFAULT_ASSETS_VERSION
 
     "[OPTION] variable name in netcdf file"
     varname::String = "lst"
@@ -60,7 +63,8 @@ function initialize!(land::SeasonalLandTemperature, model::PrimitiveEquation)
         from_assets = land.from_assets,
         name = land.varname,
         type = land.file_Grid,
-        format = NCDataset
+        format = NCDataset,
+        version = land.version
     )
 
     lst[lst .=== fill_value] .= land.missing_value      # === to include NaN

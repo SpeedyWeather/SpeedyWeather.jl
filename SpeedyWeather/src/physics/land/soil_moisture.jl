@@ -11,10 +11,13 @@ $(TYPEDFIELDS)"""
     file::String = "soil_moisture.nc"
 
     "[OPTION] path to the folder containing the soil moisture"
-    path::String = joinpath("data", file)
+    path::String = joinpath("data", "boundary_conditions", file)
 
     "[OPTION] flag to check for soil moisture in SWA or locally"
     from_assets::Bool = true
+
+    "[OPTION] SpeedyWeatherAssets version number"
+    version::VersionNumber = DEFAULT_ASSETS_VERSION
 
     "[OPTION] variable name in netcdf file for layer 1"
     varname_layer1::String = "swl1"
@@ -62,7 +65,8 @@ function initialize!(soil::SeasonalSoilMoisture, model::PrimitiveEquation)
         from_assets = soil.from_assets,
         name = "sm",
         type = NCDataset,
-        format = NCDataset
+        format = NCDataset,
+        version = soil.version
     )
 
     # read out netCDF data

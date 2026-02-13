@@ -128,10 +128,13 @@ $(TYPEDFIELDS)"""
     file::String = "orography.nc"
 
     "path to the folder containing the orography"
-    path::String = joinpath("data", file)
+    path::String = joinpath("data", "boundary_conditions", file)
 
     "flag to check for orography in SWA or locally"
     from_assets::Bool = true
+
+    "[OPTION] SpeedyWeatherAssets version number"
+    version::VersionNumber = DEFAULT_ASSETS_VERSION
 
     "NCDataset variable name"
     varname::String = "orog"
@@ -199,7 +202,8 @@ function initialize!(
         from_assets = orog.from_assets,
         name = orog.varname,
         type = FullGaussianField,
-        format = NCDataset
+        format = NCDataset,
+        version = orog.version
     )
 
     # height [m], wrap matrix into a grid
