@@ -71,6 +71,9 @@ $(TYPEDFIELDS)"""
 
     "[OPTION] Reference dry-adiabatic temperature lapse rate [K/m]"
     @param dry_lapse_rate::NF = 9.8 / 1000
+
+    "[OPTION] Layer thickness for the shallow water model [m]"
+    @param layer_thickness::NF = 8500 (bounds = Positive,)
 end
 
 Adapt.@adapt_structure EarthAtmosphere

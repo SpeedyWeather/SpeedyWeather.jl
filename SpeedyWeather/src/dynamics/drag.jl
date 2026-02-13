@@ -128,6 +128,68 @@ end
     Fv[ij] -= c * speed * v[ij]
 end
 
+## Tropospheric drag
+export TroposphericDrag
+@parameterized @kwdef mutable struct TroposphericDrag{NF} <: AbstractDrag
+    "[OPTION] drag coefficient [1]"
+    @param c_D::NF = 1.0e-8 (bounds = Nonnegative,)    # TODO is this a good default?
+    @param U::NF = 80 (bounds = Nonnegative,) 
+end
+
+TroposphericDrag(SG::SpectralGrid; kwargs...) = TroposphericDrag{SG.NF}(; kwargs...)
+initialize!(::TroposphericDrag, ::AbstractModel) = nothing
+
+"""
+$(TYPEDSIGNATURES)
+Tropospheric drag for the momentum equations.
+
+    Fu = -c_D/H*(|(u, v)|- U)^2*u
+
+with `c_D` the non-dimensional drag coefficient as defined in `drag::TroposphericDrag`.
+`c_D` and layer thickness `H` are precomputed in `initialize!(::TroposphericDrag, ::AbstractModel)`
+and scaled by the radius as are the momentum equations."""
+
+function drag!(
+        diagn::DiagnosticVariables,
+        progn::PrognosticVariables,
+        drag::TroposphericDrag,
+        lf::Integer,
+        model::AbstractModel,
+    )
+    k = 0   # only apply to top layer
+    u = field_view(diagn.grid.u_grid, :, k)
+    v = field_view(diagn.grid.v_grid, :, k)
+
+    Fu = field_view(diagn.tendencies.u_tend_grid, :, k)
+    Fv = field_view(diagn.tendencies.v_tend_grid, :, k)
+
+    # total drag coefficient with radius scaling
+    c = drag.c_D / model.atmosphere.layer_thickness
+    c *= diagn.scale[]^2
+    U = drag.U
+
+    return launch!(
+        architecture(Fu), LinearWorkOrder, size(Fu), tropospheric_drag_kernel!,
+        Fu, Fv, u, v, c, U
+    )
+end
+
+@kernel inbounds = true function tropospheric_drag_kernel!(
+        Fu, Fv, u, v, @Const(c), @Const(U)
+    )
+    ij = @index(Global, Linear)
+
+    # Calculate speed at layer k
+    speed = sqrt(u[ij]^2 + v[ij]^2)
+
+    # Apply tropospheric drag, -= as the tendencies already contain forcing
+    delta = speed - U
+    if delta > 0.0
+        Fu[ij] -= c * delta^2 * u[ij]
+        Fv[ij] -= c * delta^2 * v[ij]
+    end
+end
+
 export LinearVorticityDrag
 @parameterized @kwdef mutable struct LinearVorticityDrag{NF} <: AbstractDrag
     "[OPTION] drag coefficient [1/s]"
