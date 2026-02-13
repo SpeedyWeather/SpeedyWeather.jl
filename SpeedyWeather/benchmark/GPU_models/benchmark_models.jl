@@ -4,7 +4,6 @@ using Printf
 using CUDA
 using SpeedyWeather
 using Plots
-using Dates
 
 """
     run_benchmark(simulation)
@@ -118,7 +117,7 @@ function plot_results(truncations, cpu_times, gpu_times; filename = "cpu_vs_gpu_
     p = plot(p1, p2, layout = (2, 1), size = (800, 800))
 
     # Add timestamp
-    timestamp = Dates.format(now(), "yyyy-mm-dd HH:MM:SS")
+    timestamp = Libc.strftime("%Y-%m-%d %H:%M:%S", time())
     annotate!(p[2], [(truncations[1], minimum(speedups), ("Generated: $timestamp", 8, :left, :bottom))])
 
     # Save to PDF

@@ -146,7 +146,7 @@ function test_time_stepping!(sim_cpu, sim_reactant, model_name; nsteps = NSTEPS,
     println("\n" * "-"^60)
     println("Testing time stepping ($nsteps steps)")
     println("-"^60)
-    
+
     sync_variables!(sim_cpu, sim_reactant)
 
     # Run time stepping
@@ -211,7 +211,7 @@ function test_model(ModelType::Type; trunc = TRUNC, nsteps = NSTEPS, rtol = RTOL
     simulation_reactant = initialize!(model_reactant)
     println("  ✓ Reactant model initialized")
 
-    # spin up models a bit 
+    # spin up models a bit
     println("\n[3/3] Spinning up models...")
     run!(simulation_cpu; period = Day(20))
     run!(simulation_reactant; period = Day(20))
@@ -219,7 +219,7 @@ function test_model(ModelType::Type; trunc = TRUNC, nsteps = NSTEPS, rtol = RTOL
 
     # Run tests
     @testset "$model_name CPU vs Reactant" begin
-        tend_results = test_tendencies!(simulation_cpu, simulation_reactant,     model_name; rtol, atol)
+        tend_results = test_tendencies!(simulation_cpu, simulation_reactant, model_name; rtol, atol)
         stepping_results = test_time_stepping!(simulation_cpu, simulation_reactant, model_name; nsteps, rtol, atol)
     end
 

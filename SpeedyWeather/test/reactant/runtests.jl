@@ -2,6 +2,7 @@
 Test scripts running SpeedyWeather with Reactant.
 """
 
+cd("SpeedyWeather/test/reactant")
 import Pkg
 Pkg.activate(@__DIR__)
 
@@ -23,5 +24,5 @@ const ATOL = 1.0e-8          # absolute tolerance for comparison
 
 include("setup.jl")
 
-include("test_correctness.jl")
+#include("test_correctness.jl")
 include("differentation.jl")

@@ -17,7 +17,7 @@ SinSolarDeclination struct."""
 function (S::SinSolarDeclination)(g::NF) where {NF}
     planet = S.planet
     axial_tilt = deg2rad(planet.axial_tilt)
-    equinox = planet.length_of_day.value * Dates.dayofyear(planet.equinox) / planet.length_of_year.value
+    equinox = planet.length_of_day.value * dayofyear(planet.equinox) / planet.length_of_year.value
     return axial_tilt * sin(g - 2 * (π * convert(NF, equinox)))
 end
 
@@ -141,7 +141,7 @@ $(TYPEDFIELDS)"""
     @param solar_declination::SD = SinSolarDeclination(Earth{NF}()) (group = :solar_declination,)
     @param time_correction::SolarTimeCorrection{NF} = SolarTimeCorrection{NF}() (group = :time_correction,)
 
-    initial_time::Base.RefValue{DateTime} = Ref(DEFAULT_DATE)
+    initial_time::Base.RefValue{<:DateTime} = Ref(DEFAULT_DATE)
 end
 
 SolarZenith(SG::SpectralGrid; kwargs...) = SolarZenith{SG.NF, SinSolarDeclination{Earth{SG.NF}}}(; kwargs...)
@@ -157,18 +157,18 @@ end
 """
 $(TYPEDSIGNATURES)
 Fraction of year as angle in radians [0...2π].
-TODO: Takes length of day/year as argument, but calls to Dates.Time(), Dates.dayofyear()
+TODO: Takes length of day/year as argument, but calls to secondofday(), dayofyear()
 currently have these hardcoded."""
 function year_angle(::Type{T}, time::DateTime, length_of_day::Second, length_of_year::Second) where {T}
     year2rad = convert(T, 2π / length_of_year.value)
-    sec_of_day = Dates.second(Dates.Time(time).instant)
-    return year2rad * (Dates.dayofyear(time) * length_of_day.value + sec_of_day)
+    sec_of_day = Dates.secondofday(time)
+    return year2rad * (dayofyear(time) * length_of_day.value + sec_of_day)
 end
 
 """
 $(TYPEDSIGNATURES)
 Fraction of day as angle in radians [0...2π].
-TODO: Takes length of day as argument, but a call to Dates.Time()
+TODO: Takes length of day as argument, but a call to secondofday()
 currently have this hardcoded anyway."""
 function solar_hour_angle(
         ::Type{T},
@@ -178,7 +178,7 @@ function solar_hour_angle(
     ) where {T}
     day2rad = convert(T, 2π / length_of_day.value)
     noon_in_sec = length_of_day.value ÷ 2
-    sec_of_day = Dates.second(Dates.Time(time).instant)
+    sec_of_day = Dates.secondofday(time)
     return (sec_of_day - noon_in_sec) * day2rad + convert(T, λ)
 end
 
@@ -250,7 +250,7 @@ $(TYPEDFIELDS)"""
     # COEFFICIENTS
     @param solar_declination::SD = SinSolarDeclination(Earth{NF}()) (group = :solar_declination,)
 
-    initial_time::Base.RefValue{DateTime} = Ref(DEFAULT_DATE)
+    initial_time::Base.RefValue{<:DateTime} = Ref(DEFAULT_DATE)
 end
 
 SolarZenithSeason(SG::SpectralGrid; kwargs...) = SolarZenithSeason{SG.NF, SinSolarDeclination{Earth{SG.NF}}}(; kwargs...)

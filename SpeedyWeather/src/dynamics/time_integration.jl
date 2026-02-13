@@ -50,11 +50,11 @@ of the model. In case `adjust_Δt_with_output` is true, the `Δt_at_T31` is addi
 adjusted to the closest divisor of `output_dt` so that the output time axis is keeping
 `output_dt` exactly."""
 function get_Δt_millisec(
-        Δt_at_T31::Dates.TimePeriod,
+        Δt_at_T31::TimePeriod,
         trunc,
         radius,
         adjust_with_output::Bool,
-        output_dt::Dates.TimePeriod = DEFAULT_OUTPUT_DT,
+        output_dt::TimePeriod = DEFAULT_OUTPUT_DT,
     )
     # linearly scale Δt with trunc+1 (which are often powers of two)
     resolution_factor = (DEFAULT_TRUNC + 1) / (trunc + 1)
@@ -270,7 +270,7 @@ function first_timesteps!(
 
     (; implicit) = model
     (; Δt, Δt_millisec) = model.time_stepping
-    Δt_millisec_half = Dates.Millisecond(Δt_millisec.value ÷ 2)   # this might be 1ms off
+    Δt_millisec_half = Millisecond(Δt_millisec.value ÷ 2)   # this might be 1ms off
 
     # FIRST TIME STEP (EULER FORWARD with dt=Δt/2)
     lf1 = 1                             # without Robert+Williams filter

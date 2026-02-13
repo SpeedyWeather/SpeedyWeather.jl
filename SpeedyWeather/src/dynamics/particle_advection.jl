@@ -16,7 +16,7 @@ function initialize!(
     return initialize!(diagn, particles, progn, model.particle_advection, model)
 end
 
-# TODO: remove fallback for reactant when it's compatible with particle advection   
+# TODO: remove fallback for reactant when it's compatible with particle advection
 initialize!(::DiagnosticVariables, ::Nothing, ::PrognosticVariables, ::AbstractModel) = nothing
 
 # 3. the repeated call to actually advect particles

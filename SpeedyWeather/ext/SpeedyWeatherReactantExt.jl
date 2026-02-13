@@ -2,7 +2,7 @@ module SpeedyWeatherReactantExt
 
 using SpeedyWeather
 using Reactant
-using Dates, DocStringExtensions
+using DocStringExtensions
 
 using SpeedyWeather: ReactantDevice, scale!, get_step, unpack, timestep!, first_timesteps!, later_timestep!
 
@@ -43,7 +43,7 @@ function SpeedyWeather.time_stepping!(simulation::ReactantSimulation, r_first_ti
     end
 
     (; clock) = simulation.prognostic_variables
-    @trace checkpointing=enable_checkpointing for _ in 1:clock.n_timesteps
+    @trace checkpointing = enable_checkpointing for _ in 1:clock.n_timesteps
         timestep!(simulation, r_first_timesteps!, r_later_timestep!)
     end
     return

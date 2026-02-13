@@ -1,4 +1,4 @@
-# Setup function 
+# Setup function
 
 """Get nlayers for a given model type."""
 nlayers_for_model(::Type{BarotropicModel}) = 1

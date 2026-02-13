@@ -1,4 +1,4 @@
-using SpeedyWeather, Dates, Printf
+using SpeedyWeather, Printf
 import SpeedyWeather.SpeedyTransforms: prettymemory
 
 include("benchmark_suite.jl")
@@ -15,7 +15,7 @@ md = open("README.md", "w")
 write(md, "# Benchmarks\n")
 
 version = SpeedyWeather.pkgversion(SpeedyWeather)
-write(md, "\ncreated for SpeedyWeather.jl v$version on $(Dates.format(Dates.now(), Dates.RFC1123Format)). \n\n")
+write(md, "\ncreated for SpeedyWeather.jl v$version on $(Libc.strftime("%a, %d %b %Y %H:%M:%S", time())). \n\n")
 write(md, "All simulations have been benchmarked over several seconds (wallclock time) without output. ")
 write(md, "Benchmarking excludes initialization and is started just before the main time loop and finishes right after. ")
 write(md, "The benchmarking results here are not very robust, timings that change with +-50% are not uncommon. ")
