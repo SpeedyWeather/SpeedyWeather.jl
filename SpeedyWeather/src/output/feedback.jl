@@ -14,7 +14,7 @@ $(TYPEDFIELDS)"""
     debug::Bool = true
 
     "[OPTION] Progress description"
-    description::String = "Weather is speedy:"
+    description::String = ""
 
     "[OPTION] show speed in progress meter?"
     showspeed::Bool = true
@@ -54,14 +54,24 @@ function initialize!(feedback::Feedback, clock::Clock, model::AbstractModel)
     # only do now for benchmark accuracy
     (; showspeed, description, verbose) = feedback
     desc = description * (model.output.active ? " $(model.output.run_folder) " : " ")
-    return feedback.progress_meter = ProgressMeter.Progress(clock.n_timesteps - 1; enabled = verbose, showspeed, desc)
+    feedback.progress_meter = ProgressMeter.Progress(clock.n_timesteps - 1; 
+        enabled = verbose,
+        showspeed,
+        desc,
+        color = :blue,
+        barlen = 10,
+        barglyphs = ProgressMeter.BarGlyphs(" ━━  "),
+        )
+    return nothing
 end
 
 progress!(feedback::Feedback) = ProgressMeter.next!(feedback.progress_meter)
 
-function progress!(feedback::Feedback, progn::PrognosticVariables)
+function progress!(feedback::Feedback, progn::PrognosticVariables, diagn::DiagnosticVariables)
+    mod(feedback.progress_meter.core.counter, 100) == 0 && max_speed(diagn)
     progress!(feedback)
-    return feedback.debug && nan_detection!(feedback, progn)
+    feedback.debug && nan_detection!(feedback, progn)
+    return nothing
 end
 
 """
@@ -72,7 +82,6 @@ finalize!(F::Feedback) = ProgressMeter.finish!(F.progress_meter)
 """$(TYPEDSIGNATURES)
 Detect NaN (Not-a-Number, or Inf) in the prognostic variables."""
 function nan_detection!(feedback::Feedback, progn::PrognosticVariables)
-
     feedback.nans_detected && return nothing            # escape immediately if nans already detected
     i = feedback.progress_meter.counter                 # time step
     GPUArrays.@allowscalar vor0 = progn.vor[2, end, 2]  # only check 1-0 mode of surface vorticity
@@ -111,12 +120,25 @@ end
 # used to pass on the time step to ProgressMeter.speedstring via calling this
 # constant from the ProgressMeter module
 const DT_IN_SEC = Ref(1.0)
+const FEEDBACK_UMAX = Ref(0f0)
 
 # "extend" the speedstring function from ProgressMeter by defining it for ::AbstractFloat
 # not just ::Any to effectively overwrite it
 function ProgressMeter.speedstring(sec_per_iter::AbstractFloat)
     dt_in_sec = SpeedyWeather.DT_IN_SEC[]   # pull global "constant"
-    return speedstring(sec_per_iter, dt_in_sec)
+    U = SpeedyWeather.FEEDBACK_UMAX[]
+    return progress_string(sec_per_iter, dt_in_sec, U)
+end
+
+function progress_string(sec_per_iter, dt_in_sec, U)
+    speed = speedstring(sec_per_iter, dt_in_sec)
+    umax = @sprintf "U = %2i m/s" U
+    return speed * ", " * umax
+end
+
+function max_speed(diagn::DiagnosticVariables)
+    umin, umax = extrema(diagn.grid.u_grid)
+    FEEDBACK_UMAX[] = max(abs(umin), abs(umax))
 end
 
 export ParametersTxt
