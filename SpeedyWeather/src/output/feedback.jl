@@ -68,7 +68,8 @@ end
 progress!(feedback::Feedback) = ProgressMeter.next!(feedback.progress_meter)
 
 function progress!(feedback::Feedback, progn::PrognosticVariables, diagn::DiagnosticVariables)
-    mod(feedback.progress_meter.core.counter, 100) == 0 && max_speed(diagn)
+    mod(feedback.progress_meter.core.counter, 10) == 0 && max_speed(diagn)
+    mod(feedback.progress_meter.core.counter, 10) == 0 && temperature_range(diagn)
     progress!(feedback)
     feedback.debug && nan_detection!(feedback, progn)
     return nothing
@@ -121,24 +122,35 @@ end
 # constant from the ProgressMeter module
 const DT_IN_SEC = Ref(1.0)
 const FEEDBACK_UMAX = Ref(0f0)
+const FEEDBACK_TMIN = Ref(0f0)
+const FEEDBACK_TMAX = Ref(0f0)
 
 # "extend" the speedstring function from ProgressMeter by defining it for ::AbstractFloat
 # not just ::Any to effectively overwrite it
 function ProgressMeter.speedstring(sec_per_iter::AbstractFloat)
     dt_in_sec = SpeedyWeather.DT_IN_SEC[]   # pull global "constant"
     U = SpeedyWeather.FEEDBACK_UMAX[]
-    return progress_string(sec_per_iter, dt_in_sec, U)
+    Tmin = SpeedyWeather.FEEDBACK_TMIN[]
+    Tmax = SpeedyWeather.FEEDBACK_TMAX[]
+    return progress_string(sec_per_iter, dt_in_sec, U, Tmin, Tmax)
 end
 
-function progress_string(sec_per_iter, dt_in_sec, U)
+function progress_string(sec_per_iter, dt_in_sec, U, Tmin, Tmax)
     speed = speedstring(sec_per_iter, dt_in_sec)
     umax = @sprintf "U = %2i m/s" U
-    return speed * ", " * umax
+    Trange = @sprintf "T = [%3i, %2i] ˚C" Tmin Tmax
+    return speed * ", " * umax * ", " * Trange
 end
 
 function max_speed(diagn::DiagnosticVariables)
     umin, umax = extrema(diagn.grid.u_grid)
     FEEDBACK_UMAX[] = max(abs(umin), abs(umax))
+end
+
+function temperature_range(diagn::DiagnosticVariables)
+    tmin, tmax = extrema(diagn.grid.temp_grid)
+    FEEDBACK_TMIN[] = tmin - 273.15f0
+    FEEDBACK_TMAX[] = tmax - 273.15f0
 end
 
 export ParametersTxt
