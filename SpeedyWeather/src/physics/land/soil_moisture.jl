@@ -164,6 +164,24 @@ $(TYPEDFIELDS)"""
 
     "[OPTION] Initial soil moisture over ocean, volume fraction [1]"
     @param ocean_moisture::NF = 0 (bounds = 0 .. 1,)
+
+    "[OPTION] path to the folder containing the soil type file, pkg path default"
+    path::String = "SpeedyWeather.jl/input_data"
+
+    "[OPTION] filename of soil type"
+    file::String = "soil_type.nc"
+
+    "[OPTION] variable name in netcdf file"
+    varname::String = "slt"
+
+    "[OPTION] Grid the soil type file comes on"
+    file_Grid::Type{<:AbstractGrid} = FullGaussianGrid
+
+    "[OPTION] The missing value in the data respresenting ocean"
+    missing_value::NF = NF(NaN)
+
+    "[OPTION] Field capacities relating to soil textural types"
+    field_capacities::NTuple{7, NF} = (0.244f0, 0.347f0, 0.383f0, 0.448f0, 0.541f0, 0.663f0, 0.347f0)
 end
 
 Adapt.@adapt_structure LandBucketMoisture
@@ -195,7 +213,36 @@ function initialize!(
     seasonal_model = SeasonalSoilMoisture(model.spectral_grid, model.land.geometry)
     initialize!(seasonal_model, model)
     initialize!(progn, diagn, seasonal_model, model)
-    # (seasonal model will be garbage collected hereafter)
+
+    # LOAD NETCDF FILE
+    if soil.path == "SpeedyWeather.jl/input_data"
+        path = joinpath(@__DIR__, "../../../input_data", soil.file)
+    else
+        path = joinpath(soil.path, soil.file)
+    end
+    ncfile = NCDataset(path)
+
+    # read out netCDF data
+    nx, ny = ncfile.dim["longitude"], ncfile.dim["latitude"]
+    nlat_half = RingGrids.get_nlat_half(soil.file_Grid, nx * ny)
+    grid = soil.file_Grid(nlat_half)
+
+    # the soil type from file but wrapped into a grid
+    NF = eltype(soil.missing_value)
+    soil_type_file = zeros(NF, grid)
+
+    fill_value = NF(ncfile[soil.varname].attrib["_FillValue"])
+    soil_type_file[soil_type_file .=== fill_value] .= soil.missing_value      # === to include NaN
+    soil_type_file = on_architecture(model.architecture, soil_type_file)
+    soil_type_model_grid = similar(progn.land.soil_field_capacity)
+
+    interp = RingGrids.interpolator(soil_type_model_grid, soil_type_file, NF = Float32)
+    interpolate!(soil_type_model_grid, soil_type_file, interp)
+
+    field_capacity = progn.land.soil_field_capacity
+    type_indices = Int.(round.(soil_type_model_grid))
+    safe_indices = max.(type_indices, 1)
+    field_capacity.data .= soil.field_capacities[safe_indices]
 
     # set ocean "soil" moisture points (100% ocean only)
     masked_value = soil.ocean_moisture
@@ -204,6 +251,10 @@ function initialize!(
         sm = progn.land.soil_moisture.data
         sm[isnan.(sm)] .= masked_value
         mask!(progn.land.soil_moisture, model.land_sea_mask, :ocean; masked_value)
+
+        sfc = progn.land.soil_field_capacity.data
+        sfc[isnan.(sfc)] .= masked_value
+        mask!(progn.land.soil_field_capacity, model.land_sea_mask, :ocean; masked_value)
     end
 end
 
@@ -237,32 +288,36 @@ function timestep!(
     @boundscheck size(soil_moisture, 2) >= 2 || throw(DimensionMismatch)
 
     # Water at field capacity [m], top and lower layer γ*z₁ and γ*z₂
-    γ = model.land.thermodynamics.field_capacity
-    f₁ = γ * model.land.geometry.layer_thickness[1]
-    f₂ = γ * model.land.geometry.layer_thickness[2]
+    field_capacity = progn.land.soil_field_capacity
+    z₁ = model.land.geometry.layer_thickness[1]
+    z₂ = model.land.geometry.layer_thickness[2]
 
     p = soil.infiltration_fraction      # Infiltration fraction: fraction of top layer runoff put into lower layer
     τ⁻¹ = inv(convert(eltype(soil_moisture), Second(soil.time_scale).value))
 
-    params = (; ρ, Δt, f₁, f₂, p, τ⁻¹)  # pack into NamedTuple for kernel
+    params = (; ρ, Δt, z₁, z₂, p, τ⁻¹)  # pack into NamedTuple for kernel
 
     return launch!(
         architecture(soil_moisture), LinearWorkOrder, (size(soil_moisture, 1),),
-        land_bucket_soil_moisture_kernel!, soil_moisture, mask, P, S, H, R, params
+        land_bucket_soil_moisture_kernel!, soil_moisture, field_capacity, mask, P, S, H, R, params
     )
 end
 
 @kernel inbounds = true function land_bucket_soil_moisture_kernel!(
-        soil_moisture, mask, P, S, H, R, params
+        soil_moisture, field_capacity, mask, P, S, H, R, params
     )
 
     ij = @index(Global, Linear)             # every grid point ij
 
     if mask[ij] > 0                         # at least partially land
-        (; ρ, Δt, f₁, f₂, p, τ⁻¹) = params
+        (; ρ, Δt, z₁, z₂, p, τ⁻¹) = params
         # precipitation (rain only, convection + large-scale) minus evaporation (or condensation, = humidity flux)
         # river runoff via drain excess water below (that's just gone)
         # convert to [m/s] by dividing by density
+
+        # Apply field capacity
+        f₁ = field_capacity[ij] * z₁
+        f₂ = field_capacity[ij] * z₂
 
         # Soil top sources and sinks
         # note: rain water can increase soil moisture regardless of snow cover
@@ -291,6 +346,7 @@ end
 function variables(::LandBucketMoisture)
     return (
         # Prognostic variables
+        PrognosticVariable(name = :soil_field_capacity, dims=Grid2D(), desc = "Field capacity of local soil type", units = "m³m⁻³", namespace = :land),
         PrognosticVariable(name = :soil_moisture, dims = Grid3D(), desc = "Soil moisture content (fraction of capacity)", units = "1", namespace = :land),
         # Diagnostic variables written to diagn.physics
         DiagnosticVariable(name = :river_runoff, dims = Grid2D(), desc = "River runoff from soil moisture", units = "m/s", namespace = :land),

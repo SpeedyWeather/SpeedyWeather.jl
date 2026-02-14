@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add soil type map for soil-specific field capacities [#981](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/981)
+
 ## v0.18
 
 - Adds a drag term to winds above a certain speed limit [#987](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/987/commits)
