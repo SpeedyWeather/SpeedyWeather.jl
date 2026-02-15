@@ -16,6 +16,9 @@ $(TYPEDFIELDS)"""
     "[OPTION] Progress description"
     description::String = ""
 
+    "[OPTION] Progress bar length, nothing = full window width"
+    progress_bar_length::Int = 20
+
     "[OPTION] show speed (e.g. in simulated years per day) in progress meter?"
     showspeed::Bool = true
 
@@ -62,9 +65,11 @@ function initialize!(feedback::Feedback, clock::Clock, model::AbstractModel)
     # used to pass on the time step to ProgressMeter.speedstring
     FEEDBACK_DT_IN_SEC[] = model.time_stepping.Δt_sec
     FEEDBACK_TIME[] = clock.time
-    FEEDBACK_UMAX[] = -1    # reset those to default = skip by default
-    FEEDBACK_TMIN[] = -1    # only with show_* true they'll be evaluated and shown again
-    FEEDBACK_TMAX[] = -1
+    
+    # reset those to default (-1 not shown, 0 shown)
+    FEEDBACK_UMAX[] = feedback.show_umax ? 0 : -1
+    FEEDBACK_TMIN[] = feedback.show_temperature_range ? 0 : -1
+    FEEDBACK_TMAX[] = feedback.show_temperature_range ? 0 : -1
 
     # reinitalize progress meter, minus one to exclude first_timesteps! which contain compilation
     # only do now for benchmark accuracy
@@ -76,10 +81,11 @@ function initialize!(feedback::Feedback, clock::Clock, model::AbstractModel)
         showspeed,
         desc,
         color = :blue,
-        barlen = 20,
+        barlen = feedback.progress_bar_length,
         barglyphs = ProgressMeter.BarGlyphs(" ━━  "),
         dt = feedback_dt,
     )
+
     return nothing
 end
 
@@ -88,7 +94,7 @@ progress!(feedback::Feedback) = ProgressMeter.next!(feedback.progress_meter)
 function progress!(feedback::Feedback, progn::PrognosticVariables, diagn::DiagnosticVariables)
     every_nsteps = feedback.progress_meter.core.check_iterations
     (; counter) = feedback.progress_meter.core
-    mod(counter, every_nsteps) == 0 && (FEEDBACK_TIME[] = progn.clock.time)
+    FEEDBACK_TIME[] = progn.clock.time
     feedback.show_umax && mod(counter, every_nsteps) == 0 && max_speed(diagn)
     feedback.show_temperature_range && mod(counter, every_nsteps) == 0 && temperature_range(diagn)
     progress!(feedback)

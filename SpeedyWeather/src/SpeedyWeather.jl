@@ -2,7 +2,6 @@ module SpeedyWeather
 
 # STRUCTURE
 using DocStringExtensions
-using StyledStrings
 
 # NUMERICS
 import Primes
