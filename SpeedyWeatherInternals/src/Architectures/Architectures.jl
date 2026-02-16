@@ -3,7 +3,7 @@ module Architectures
 import KernelAbstractions
 
 export AbstractArchitecture
-export CPU, CPUStatic, GPU
+export CPU, CPUStatic, GPU, ReactantDevice
 export CUDAGPU, MetalGPU, ROCGPU
 export array_type, on_architecture, architecture, device
 export convert_to_device, ismatching, compatible_array_types, nonparametric_type
@@ -50,11 +50,24 @@ end
 
 Base.show(io::IO, a::GPU) = print(io, "GPU($(device(a)))")
 
+"""
+    ReactantDevice(device)
+
+Return a Reactant architecture to run SpeedyWeather using Reactant.
+The actual device it's running on depends on the Reactant settings.
+"""
+struct ReactantDevice{D} <: AbstractArchitecture
+    device::D
+end
+
+Base.show(io::IO, a::ReactantDevice) = print(io, "ReactantDevice")
+
 # defined here so that it can be extended
 function GPU end
 function CUDAGPU end
 function MetalGPU end
 function ROCGPU end
+function ReactantDevice end
 
 #####
 ##### These methods are extended in SpeedyWeatherCUDAExt
@@ -111,6 +124,8 @@ ismatching(arch::Type{<:AbstractArchitecture}, array_T::Type{<:AbstractArray}) =
 ismatching(arch::AbstractArchitecture, array_T::Type{<:AbstractArray}) = ismatching(typeof(arch), array_T)
 ismatching(arch::AbstractArchitecture, array::AbstractArray) = ismatching(arch, typeof(array))
 
+# TODO: currently we just chech matching array types, sufficient?
+ismatching(arch_1::AbstractArchitecture, arch_2::AbstractArchitecture) = array_type(arch_1) == array_type(arch_2)
 
 """
     nonparametric_type(array_T::Type{<:AbstractArray})
@@ -123,19 +138,16 @@ nonparametric_type(::Type{<:Array}) = Array
 nonparametric_type(::Type{<:SubArray{T, N, A}}) where {T, N, A} = nonparametric_type(A)
 nonparametric_type(::Type{<:SubArray}) = SubArray   # if ArrayType A is not specified, return SubArray
 
-# Fallback
-"""
-    on_architecture(arch::AbstractArchitecture, a)
-
-Return `a`, but on the architecture `arch`. 
-"""
-on_architecture(arch, a) = a
-
 # Tupled implementation
 on_architecture(arch::AbstractArchitecture, t::Tuple) = Tuple(on_architecture(arch, elem) for elem in t)
 on_architecture(arch::AbstractArchitecture, nt::NamedTuple) = NamedTuple{keys(nt)}(on_architecture(arch, Tuple(nt)))
 
 # On architecture for array types
+"""
+    on_architecture(arch::AbstractArchitecture, a)
+
+Return `a`, but on the architecture `arch`. 
+"""
 on_architecture(::CPU, a::Array) = a
 on_architecture(::CPU, a::BitArray) = a
 on_architecture(::CPU, a::SubArray{<:Any, <:Any, <:Array}) = a

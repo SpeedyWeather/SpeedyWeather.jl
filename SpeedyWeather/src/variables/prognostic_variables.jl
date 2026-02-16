@@ -18,6 +18,7 @@ export PrognosticVariables
         ParticleVector,         # <: AbstractVector{Particle{NF}}
         RefValueNF,             # <: Base.RefValue{NF}
         ClockType,              # <: Union{Clock, Nothing}
+        IntType,                # <: Integer
     } <: AbstractPrognosticVariables
 
     # DIMENSIONS
@@ -28,16 +29,16 @@ export PrognosticVariables
     grid::GridType
 
     "number of vertical layers in the atmosphere"
-    nlayers::Int
+    nlayers::IntType
 
     "number of vertical layers in the soil"
-    nlayers_soil::Int
+    nlayers_soil::IntType
 
     "Number of particles for particle advection"
-    nparticles::Int
+    nparticles::IntType
 
     "Number of time steps simultaneously stored in prognostic variables, 2 for 2-step leapfrog scheme"
-    nsteps::Int
+    nsteps::IntType
 
     # LAYERED VARIABLES
     "Vorticity of horizontal wind field [1/s], but scaled by scale (=radius during simulation)"
@@ -134,7 +135,7 @@ function PrognosticVariables(model::AbstractModel)
     return PrognosticVariables{
         typeof(spectrum), typeof(grid),
         SpectralVariable2D, SpectralVariable3D, SpectralVariable4D,
-        typeof(ocean), typeof(land), typeof(physics), typeof(tracer_tuple), ParticleVector, Base.RefValue{NF}, typeof(clock),
+        typeof(ocean), typeof(land), typeof(physics), typeof(tracer_tuple), ParticleVector, Base.RefValue{NF}, typeof(clock), typeof(nlayers),
     }(;
         spectrum, grid, nlayers, nlayers_soil, nparticles, nsteps, ocean, land, physics, tracers = tracer_tuple, clock
     )
@@ -235,12 +236,12 @@ function Base.zero(
         progn::PrognosticVariables{
             SpectrumType, GridType,
             SpectralVariable2D, SpectralVariable3D, SpectralVariable4D,
-            OceanType, LandType, PhysicsType, TracerTuple, ParticleVector, RefValueNF, ClockType,
+            OceanType, LandType, PhysicsType, TracerTuple, ParticleVector, RefValueNF, ClockType, IntType,
         }
     ) where {
         SpectrumType, GridType,
         SpectralVariable2D, SpectralVariable3D, SpectralVariable4D,
-        OceanType, LandType, PhysicsType, TracerTuple, ParticleVector, RefValueNF, ClockType,
+        OceanType, LandType, PhysicsType, TracerTuple, ParticleVector, RefValueNF, ClockType, IntType,
     }
 
     (; spectrum, grid, nlayers, nlayers_soil, nparticles, nsteps) = progn
@@ -254,7 +255,7 @@ function Base.zero(
     return PrognosticVariables{
         SpectrumType, GridType,
         SpectralVariable2D, SpectralVariable3D, SpectralVariable4D,
-        OceanType, LandType, PhysicsType, TracerTuple, ParticleVector, RefValueNF, ClockType,
+        OceanType, LandType, PhysicsType, TracerTuple, ParticleVector, RefValueNF, ClockType, IntType,
     }(;
         spectrum, grid, nlayers, nlayers_soil, nparticles, nsteps,
         ocean, land, physics,

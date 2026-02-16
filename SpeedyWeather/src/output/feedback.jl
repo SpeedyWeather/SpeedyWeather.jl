@@ -57,6 +57,9 @@ function initialize!(feedback::Feedback, clock::Clock, model::AbstractModel)
     return feedback.progress_meter = ProgressMeter.Progress(clock.n_timesteps - 1; enabled = verbose, showspeed, desc)
 end
 
+# fallback if feedback is set to nothing
+initialize!(::Nothing, clock::Clock, model::AbstractModel) = nothing
+
 progress!(feedback::Feedback) = ProgressMeter.next!(feedback.progress_meter)
 
 function progress!(feedback::Feedback, progn::PrognosticVariables)
@@ -64,10 +67,15 @@ function progress!(feedback::Feedback, progn::PrognosticVariables)
     return feedback.debug && nan_detection!(feedback, progn)
 end
 
+progress!(::Nothing, progn::PrognosticVariables) = nothing
+
 """
 $(TYPEDSIGNATURES)
 Finalises the progress meter and the progress txt file."""
 finalize!(F::Feedback) = ProgressMeter.finish!(F.progress_meter)
+
+# fallback if feedback is set to nothing
+finalize!(::Nothing) = nothing
 
 """$(TYPEDSIGNATURES)
 Detect NaN (Not-a-Number, or Inf) in the prognostic variables."""
@@ -200,7 +208,7 @@ function initialize!(progress_txt::ProgressTxt, progn, diagn, model)
     # create progress.txt file in run_????/
     file = open(joinpath(path, filename), "w")
     s = "Starting SpeedyWeather.jl $run_folder on " *
-        Dates.format(Dates.now(), Dates.RFC1123Format)
+        Libc.strftime("%a, %d %b %Y %H:%M:%S", time())
     write(file, s * "\n")
     write(file, "Integrating:\n")
     write(file, "$SG\n")
@@ -218,6 +226,7 @@ Writes the time stepping progress to the progress.txt file every `every_n_percen
 function callback!(progress_txt::ProgressTxt, progn, diagn, model)
     # escape in case of no output
     progress_txt.write_only_with_output && (model.output.active || return nothing)
+    isnothing(model.feedback) && return nothing
 
     (; progress_meter, nans_detected) = model.feedback
     (; counter, n) = progress_meter
@@ -246,6 +255,7 @@ Finalizes the ProgressTxt callback by writing the total time taken to the progre
 function finalize!(progress_txt::ProgressTxt, progn, diagn, model)
     # escape in case of no output
     progress_txt.write_only_with_output && (model.output.active || return nothing)
+    isnothing(model.feedback) && return nothing
 
     (; file) = progress_txt
     (; progress_meter) = model.feedback

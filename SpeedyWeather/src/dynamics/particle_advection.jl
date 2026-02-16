@@ -16,6 +16,9 @@ function initialize!(
     return initialize!(diagn, particles, progn, model.particle_advection, model)
 end
 
+# TODO: remove fallback for reactant when it's compatible with particle advection
+initialize!(::DiagnosticVariables, ::Nothing, ::PrognosticVariables, ::AbstractModel) = nothing
+
 # 3. the repeated call to actually advect particles
 particle_advection!(progn, diagn, model) = particle_advection!(progn, diagn, model.particle_advection, model)
 
@@ -28,12 +31,13 @@ export ParticleAdvection2D
 @kwdef struct ParticleAdvection2D{
         NF,
         GeometryType, # <: AbstractGridGeometry
+        IntType,
     } <: AbstractParticleAdvection
     "[OPTION] Execute particle advection every n timesteps"
-    every_n_timesteps::Int = 6
+    every_n_timesteps::IntType = 6
 
     "[OPTION] Advect with velocities from this vertical layer index"
-    layer::Int = 1
+    layer::IntType = 1
 
     "[DERIVED] Time step used for particle advection (scaled by radius, converted to degrees) [s*˚/m]"
     Δt::Base.RefValue{NF} = Ref(zero(NF))
@@ -45,7 +49,7 @@ end
 function ParticleAdvection2D(SG::SpectralGrid; kwargs...)
     SG.nparticles == 0 && @warn "ParticleAdvection2D created but nparticles = 0 in spectral grid."
     geometry = GridGeometry(SG.grid; NF = SG.NF)
-    return ParticleAdvection2D{SG.NF, typeof(geometry)}(;
+    return ParticleAdvection2D{SG.NF, typeof(geometry), typeof(SG.trunc)}(;
         geometry,
         kwargs...
     )
@@ -81,6 +85,10 @@ function initialize!(
 
     return particles .= on_architecture(architecture(particles), rand(P, length(particles)))
 end
+
+# Fallback for no particle advection
+initialize!(::Nothing, ::PrognosticVariables, ::DiagnosticVariables, ::AbstractModel) = nothing
+
 
 """$(TYPEDSIGNATURES)
 Initialize particle advection time integration: Store u,v interpolated initial conditions

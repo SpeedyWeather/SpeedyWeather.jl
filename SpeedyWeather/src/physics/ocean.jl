@@ -175,7 +175,7 @@ function timestep!(
     (; monthly_temperature) = ocean
     (; sea_surface_temperature) = progn.ocean
     NF = eltype(sea_surface_temperature)
-    weight = convert(NF, Dates.days(time - Dates.firstdayofmonth(time)) / Dates.daysinmonth(time))
+    weight = convert(NF, Dates.days(time - Dates.firstdayofmonth(time)) / Dates.daysinmonth(year(time), Dates.month(time)))
 
     return launch!(
         architecture(sea_surface_temperature), LinearWorkOrder, size(sea_surface_temperature),

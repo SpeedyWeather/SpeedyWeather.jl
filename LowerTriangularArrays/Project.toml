@@ -23,9 +23,11 @@ julia = "1.10"
 
 [extensions]
 LowerTriangularArraysFiniteDifferencesExt = "FiniteDifferences"
+LowerTriangularArraysReactantExt = "Reactant"
 
 [sources.SpeedyWeatherInternals]
 path = "../SpeedyWeatherInternals"
 
 [weakdeps]
 FiniteDifferences = "26cc04aa-876d-5657-8c51-4c34ba976000"
+Reactant = "3c362404-f566-11ee-1572-e11a4b42c853"

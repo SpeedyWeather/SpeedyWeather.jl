@@ -44,6 +44,13 @@ Be aware that directly calling e.g. `CuArray`, `ROCArray` or `adapt` on the data
 
 Our implementation of the model using KernelAbstractions.jl, also enables an easy multithreading of the model on CPU. As soon as you start Julia with more than one thread (e.g. `julia --threads 4`) SpeedyWeather will make use of all threads available. 
 
+## Reactant Support 
+
+!!! warning "Work in progress"
+    The Reactant support of SpeedyWeather.jl is still work in progress, incomplete and considered experimental.
+
+We are currently working on making SpeedyWeather.jl compatible with the MLIR/XLA optimizer Reactant.jl. If you want to try it out, use the `ReactantDevice` architecture and set your device within Reactant with `Reactant.set_default_backend`. 
+
 ## Benchmarks 
 
 More to follow...

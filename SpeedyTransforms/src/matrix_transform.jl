@@ -4,14 +4,14 @@ $(TYPEDFIELDS)"""
 struct MatrixSpectralTransform{
         NF,
         AR,                         # <: AbstractArchitecture
-        ArrayType,                  # non-parametric array type
         SpectrumType,               # <: AbstractSpectrum
         GridType,                   # <: AbstractGrid
         VectorType,                 # <: ArrayType{NF, 1},
         MatrixType,                 # <: ArrayType{NF, 2},
         MatrixComplexType,          # <: ArrayType{Complex{NF}, 2},
         GradientType,               # <: NamedTuple for gradients
-    } <: AbstractSpectralTransform{NF, AR, ArrayType}
+        IntType,                    # <: Integer
+    } <: AbstractSpectralTransform{NF, AR}
 
     # Architecture
     architecture::AR
@@ -19,7 +19,7 @@ struct MatrixSpectralTransform{
     # SPECTRAL AND GRID RESOLUTION
     spectrum::SpectrumType              # spectral truncation
     grid::GridType                      # grid used, including nlat_half for resolution, indices for rings, etc.
-    nlayers::Int                        # number of layers in vertical
+    nlayers::IntType                    # number of layers in vertical
 
     # CORRESPONDING GRID VECTORS
     coslat::VectorType                  # Cosine of latitudes, north to south
@@ -53,12 +53,12 @@ function MatrixSpectralTransform(
         spectrum::AbstractSpectrum,                                                     # Spectral truncation
         grid::AbstractGrid;                                                             # grid used and resolution, e.g. FullGaussianGrid
         NF::Type{<:Real} = DEFAULT_NF,                                                  # Number format NF
-        ArrayType::Type{<:AbstractArray} = DEFAULT_ARRAYTYPE,                           # Array type used for spectral coefficients (can be parametric)
         nlayers::Integer = DEFAULT_NLAYERS,                                             # number of layers in the vertical (for scratch memory size)
         LegendreShortcut::Type{<:AbstractLegendreShortcut} = LegendreShortcutLinear,    # shorten Legendre loop over order m
-        architecture::AbstractArchitecture = architecture(ArrayType),                   # architecture that kernels are launched on
     )
+    (; architecture) = spectrum                       # 1-based spectral truncation order and degree
 
+    ArrayType = array_type(architecture)
     ArrayType_ = nonparametric_type(ArrayType)      # drop parameters of ArrayType
 
     # LATITUDE VECTORS (based on Gaussian, equi-angle or HEALPix latitudes)
@@ -69,7 +69,7 @@ function MatrixSpectralTransform(
     # Create another SpectralTransform to calculate the transform matrices from (do this on the CPU)
     spectrum_cpu = on_architecture(CPU(), spectrum)
     grid_cpu = on_architecture(CPU(), grid)
-    S = SpectralTransform(spectrum_cpu, grid_cpu; NF, ArrayType = Array, nlayers, LegendreShortcut, architecture = CPU())
+    S = SpectralTransform(spectrum_cpu, grid_cpu; NF, nlayers, LegendreShortcut)
 
     npoints = get_npoints(grid)
     nharmonics = LowerTriangularArrays.nonzeros(spectrum)
@@ -99,13 +99,13 @@ function MatrixSpectralTransform(
     return MatrixSpectralTransform{
         NF,
         typeof(architecture),
-        ArrayType_,
         typeof(spectrum),
         typeof(grid),
         typeof(coslat),
         typeof(backward_real),
         typeof(forward),
         typeof(gradients),
+        typeof(nlayers),
     }(
         architecture,
         spectrum, grid, nlayers,
@@ -160,7 +160,8 @@ function transform!(                        # GRID TO SPECTRAL
     # catch incorrect sizes early
     @boundscheck ismatching(M, field, horizontal_only = true) || throw(DimensionMismatch(M, field))
     @boundscheck ismatching(M, coeffs, horizontal_only = true) || throw(DimensionMismatch(M, coeffs))
-    @boundscheck size(coeffs, 2) == size(field, 2) || throw(DimensionMismatch(field.data, coeffs.data))
+    # TODO: deactivated temporarily because of Reactant issue
+    #@boundscheck size(coeffs, 2) == size(field, 2) || throw(DimensionMismatch(field.data, coeffs.data))
     LinearAlgebra.mul!(coeffs.data, M.forward, field.data)
     return coeffs
 end
@@ -223,13 +224,73 @@ function transform!(                        # SPECTRAL TO GRID
     nlayers = size(coeffs, 2)
     scratch = ndims(coeffs) == 1 ? view(scratch_memory, :, 1) : nlayers < size(scratch_memory, 2) ? view(scratch_memory, :, 1:nlayers) : scratch_memory
 
-    # the result is real-valued, therefore we can split the complex multiplication 
+    # the result is real-valued, therefore we can split the complex multiplication
     # into two real-valued multiplications
     scratch .= real.(coeffs.data)
     LinearAlgebra.mul!(field.data, M.backward_real, scratch)
 
     scratch .= imag.(coeffs.data)
     LinearAlgebra.mul!(field.data, M.backward_imag, scratch, -1, 1)
+
+    unscale_coslat && RingGrids._scale_lat!(field, M.coslat⁻¹)
+    return field
+end
+
+# KERNEL-BASED INVERSE TRANSFORM (spectral to grid) for MatrixSpectralTransform
+# This is an alternative to the LinearAlgebra.mul!-based transform! above,
+# expressing the same operation as a KernelAbstractions @kernel so that
+# Reactant can trace and potentially accelerate it.
+
+@kernel inbounds = true function _inverse_matrix_transform_kernel!(
+        field_data,             # output: grid point data, (npoints, nlayers)
+        backward_real,          # real part of backward matrix, (npoints, nharmonics)
+        backward_imag,          # imag part of backward matrix, (npoints, nharmonics)
+        coeffs_data,            # input: spectral coefficients, (nharmonics, nlayers)
+        nharmonics,             # number of spectral harmonics (first dim of coeffs_data)
+    )
+    ij, k = @index(Global, NTuple)
+
+    # dot product: field[ij, k] = Σ_lm B_re[ij, lm] * re(c[lm, k]) - B_im[ij, lm] * im(c[lm, k])
+    acc = zero(eltype(field_data))
+    for lm in 1:nharmonics
+        c = coeffs_data[lm, k]
+        acc += backward_real[ij, lm] * real(c) - backward_imag[ij, lm] * imag(c)
+    end
+    field_data[ij, k] = acc
+end
+
+"""$(TYPEDSIGNATURES)
+Kernel-based spectral-to-grid transform using `MatrixSpectralTransform`.
+Expresses the backward transform as a KernelAbstractions `@kernel` over
+`(ij, k)` grid point and layer indices, computing the matrix-vector product
+without scratch memory. This is an alternative to the `LinearAlgebra.mul!`-based
+`transform!` intended for Reactant compatibility testing."""
+function transform_kernel!(                     # SPECTRAL TO GRID (kernel version)
+        field::AbstractField,                   # gridded output
+        coeffs::LowerTriangularArray,           # spectral coefficients input
+        M::MatrixSpectralTransform;             # precomputed transform
+        unscale_coslat::Bool = false,           # unscale with cos(lat) on the fly?
+    )
+
+    # catch incorrect sizes early
+    @boundscheck ismatching(M, field) || throw(DimensionMismatch(M, field))
+    @boundscheck ismatching(M, coeffs) || throw(DimensionMismatch(M, coeffs))
+
+    npoints = size(M.backward_real, 1)
+    nharmonics = size(M.backward_real, 2)
+    nlayers = size(coeffs, 2)
+
+    launch!(
+        M.architecture,
+        RingGridWorkOrder,
+        (npoints, nlayers),
+        _inverse_matrix_transform_kernel!,
+        field.data,
+        M.backward_real,
+        M.backward_imag,
+        coeffs.data,
+        nharmonics,
+    )
 
     unscale_coslat && RingGrids._scale_lat!(field, M.coslat⁻¹)
     return field

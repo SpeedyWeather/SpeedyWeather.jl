@@ -16,14 +16,15 @@ $(TYPEDFIELDS)"""
 @kwdef mutable struct HyperDiffusion{
         NF,
         MatrixType,
+        IntType,
     } <: AbstractHorizontalDiffusion
 
     # DIMENSIONS
     "spectral resolution"
-    trunc::Int
+    trunc::IntType
 
     "number of vertical levels"
-    nlayers::Int
+    nlayers::IntType
 
     # PARAMETERS
     "[OPTION] power of Laplacian"
@@ -60,7 +61,7 @@ Passes on keyword arguments."""
 function HyperDiffusion(spectral_grid::SpectralGrid; kwargs...)
     (; NF, trunc, nlayers, ArrayType) = spectral_grid        # take resolution parameters from spectral_grid
     MatrixType = ArrayType{NF, 2}
-    return HyperDiffusion{NF, MatrixType}(; trunc, nlayers, kwargs...)
+    return HyperDiffusion{NF, MatrixType, typeof(trunc)}(; trunc, nlayers, kwargs...)
 end
 
 """$(TYPEDSIGNATURES)
@@ -82,18 +83,9 @@ function initialize!(
         G::AbstractGeometry,
         L::AbstractTimeStepper,
     )
-    arch = architecture(diffusion.expl)
     (; trunc, nlayers, resolution_scaling) = diffusion
-    ∇²ⁿ = on_architecture(CPU(), diffusion.expl)
-    ∇²ⁿ_implicit = on_architecture(CPU(), diffusion.impl)
-    ∇²ⁿ_div = on_architecture(CPU(), diffusion.expl_div)
-    ∇²ⁿ_div_implicit = on_architecture(CPU(), diffusion.impl_div)
-    σ_levels_full = on_architecture(CPU(), G.σ_levels_full)
     (; power, power_stratosphere, tapering_σ) = diffusion
     (; Δt, radius) = L
-
-    # arrays are relatively small (Nlayers x trunc) -> precompute explicitly on CPU
-
 
     # Reduce diffusion time scale (=increase diffusion, always in seconds) with resolution
     # times 1/radius because time step Δt is scaled with 1/radius
@@ -107,37 +99,70 @@ function initialize!(
     # (=more scale-selective for smaller wavenumbers)
     largest_eigenvalue = -trunc * (trunc + 1)
 
-    for k in 1:nlayers
+    # Get architecture and arrays
+    ∇²ⁿ = diffusion.expl
+    ∇²ⁿ_implicit = diffusion.impl
+    ∇²ⁿ_div = diffusion.expl_div
+    ∇²ⁿ_div_implicit = diffusion.impl_div
+    σ_levels_full = G.σ_levels_full
+
+    # Launch kernel
+    arch = architecture(∇²ⁿ)
+    worksize = (trunc + 2, nlayers)
+    launch!(
+        arch, Array3DWorkOrder, worksize, _initialize_hyperdiffusion_kernel!,
+        ∇²ⁿ, ∇²ⁿ_implicit, ∇²ⁿ_div, ∇²ⁿ_div_implicit, σ_levels_full,
+        trunc, power, power_stratosphere, tapering_σ,
+        time_scale, time_scale_div, Δt, largest_eigenvalue
+    )
+
+    return nothing
+end
+
+@kernel inbounds = true function _initialize_hyperdiffusion_kernel!(
+        ∇²ⁿ,
+        ∇²ⁿ_implicit,
+        ∇²ⁿ_div,
+        ∇²ⁿ_div_implicit,
+        @Const(σ_levels_full),
+        trunc,
+        power,
+        power_stratosphere,
+        tapering_σ,
+        time_scale,
+        time_scale_div,
+        Δt,
+        largest_eigenvalue
+    )
+    l_plus_1, k = @index(Global, NTuple)  # l+1 index (1-based), layer index
+
+    l = l_plus_1 - 1  # actual degree l (0-based)
+
+    # last degree is only used by vector quantities; set to zero for implicit and explicit
+    # to set any tendency at lmax+1,1:mmax to zero (what it should be anyway)
+    if l_plus_1 == trunc + 2
+        ∇²ⁿ[l_plus_1, k] = 0
+        ∇²ⁿ_implicit[l_plus_1, k] = 0
+        ∇²ⁿ_div[l_plus_1, k] = 0
+        ∇²ⁿ_div_implicit[l_plus_1, k] = 0
+    else
         # VERTICAL TAPERING for the stratosphere
         # go from 1 to 0 between σ=0 and tapering_σ
         σ = σ_levels_full[k]
-        tapering = max(0, (tapering_σ - σ) / tapering_σ)         # ∈ [0, 1]
+        tapering = max(0, (tapering_σ - σ) / tapering_σ)  # ∈ [0, 1]
         p = power + tapering * (power_stratosphere - power)
 
-        for l in 0:trunc    # diffusion for every degree l, but indendent of order m
-            eigenvalue_norm = -l * (l + 1) / largest_eigenvalue   # normalised diffusion ∇², power=1
+        # Normalized eigenvalue
+        eigenvalue_norm = -l * (l + 1) / largest_eigenvalue
 
-            # Explicit part (=-ν∇²ⁿ), time scales to damping frequencies [1/s] times norm. eigenvalue
-            ∇²ⁿ[l + 1, k] = -eigenvalue_norm^power / time_scale
-            ∇²ⁿ_div[l + 1, k] = -eigenvalue_norm^p / time_scale_div
+        # Explicit part (=-ν∇²ⁿ), time scales to damping frequencies [1/s] times norm. eigenvalue
+        ∇²ⁿ[l_plus_1, k] = -eigenvalue_norm^power / time_scale
+        ∇²ⁿ_div[l_plus_1, k] = -eigenvalue_norm^p / time_scale_div
 
-            # and implicit part of the diffusion (= 1/(1-2Δtν∇²ⁿ))
-            ∇²ⁿ_implicit[l + 1, k] = 1 / (1 - 2Δt * ∇²ⁿ[l + 1, k])
-            ∇²ⁿ_div_implicit[l + 1, k] = 1 / (1 - 2Δt * ∇²ⁿ_div[l + 1, k])
-        end
-
-        # last degree is only used by vector quantities; set to zero for implicit and explicit
-        # to set any tendency at lmax+1,1:mmax to zero (what it should be anyway)
-        ∇²ⁿ[trunc + 2, k] = 0
-        ∇²ⁿ_implicit[trunc + 2, k] = 0
-        ∇²ⁿ_div[trunc + 2, k] = 0
-        ∇²ⁿ_div_implicit[trunc + 2, k] = 0
+        # and implicit part of the diffusion (= 1/(1-2Δtν∇²ⁿ))
+        ∇²ⁿ_implicit[l_plus_1, k] = 1 / (1 - 2Δt * ∇²ⁿ[l_plus_1, k])
+        ∇²ⁿ_div_implicit[l_plus_1, k] = 1 / (1 - 2Δt * ∇²ⁿ_div[l_plus_1, k])
     end
-
-    diffusion.expl = on_architecture(arch, ∇²ⁿ)
-    diffusion.impl = on_architecture(arch, ∇²ⁿ_implicit)
-    diffusion.expl_div = on_architecture(arch, ∇²ⁿ_div)
-    return diffusion.impl_div = on_architecture(arch, ∇²ⁿ_div_implicit)
 end
 
 """$(TYPEDSIGNATURES)
@@ -271,14 +296,15 @@ export SpectralFilter
 @kwdef mutable struct SpectralFilter{
         NF,
         MatrixType,
+        IntType,
     } <: AbstractHorizontalDiffusion
 
     # DIMENSIONS
     "spectral resolution"
-    trunc::Int
+    trunc::IntType
 
     "number of vertical levels"
-    nlayers::Int
+    nlayers::IntType
 
     # PARAMETERS
     "[OPTION] shift diffusion to higher (positive shift) or lower (neg) wavenumbers, relative to trunc"
@@ -317,7 +343,7 @@ Passes on keyword arguments."""
 function SpectralFilter(spectral_grid::SpectralGrid; kwargs...)
     (; NF, trunc, nlayers, ArrayType) = spectral_grid        # take resolution parameters from spectral_grid
     MatrixType = ArrayType{NF, 2}
-    return SpectralFilter{NF, MatrixType}(; trunc, nlayers, kwargs...)
+    return SpectralFilter{NF, MatrixType, typeof(trunc)}(; trunc, nlayers, kwargs...)
 end
 
 function initialize!(diffusion::SpectralFilter, model::AbstractModel)

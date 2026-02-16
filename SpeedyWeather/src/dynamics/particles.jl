@@ -45,6 +45,10 @@ function Base.zeros(ArrayType::Type{<:AbstractArray{P}}, n::Int...) where {P <: 
     return fill!(z, zero(P))
 end
 
+# TODO: this is here for Reactant compat, so that `ParticleVector` can be initialized to `nothing`
+# remove it once Reactant particle advection is implemented
+Base.zeros(::Type{Nothing}, n::Int...) = nothing
+
 Base.eltype(::Type{Particle{NF}}) where {NF} = NF
 Base.eltype(::Particle{NF}) where {NF} = NF
 
