@@ -157,7 +157,7 @@ function initialize!(albedo::AlbedoClimatology, model::PrimitiveEquation)
     a = get_asset(
         albedo.path;
         from_assets = albedo.from_assets,
-        name = "sm",
+        name = albedo.varname,
         type = albedo.file_Grid,
         format = NCDataset,
         version = albedo.version
