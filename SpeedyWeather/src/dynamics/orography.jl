@@ -203,7 +203,8 @@ function initialize!(
     orography_highres = on_architecture(S.architecture, FullGaussianField(ncfile["orog"].var[:, :], input_as = Matrix))
 
     # Interpolate/coarsen to desired resolution
-    interpolate!(orography, orography_highres)
+    # TODO REACTANT: for reactant we explicitly deactivate the boundschecks here:
+    @inbounds interpolate!(orography, orography_highres)
     orography .*= scale                     # scale orography (default 1)
     transform!(surface_geopotential, orography, S)   # no *gravity yet
 

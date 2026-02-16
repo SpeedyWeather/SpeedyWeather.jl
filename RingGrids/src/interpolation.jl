@@ -7,7 +7,7 @@ struct GridGeometry{
         VectorType,
         VectorIntType,
         VectorRange,
-        IntType
+        IntType,
     } <: AbstractGridGeometry
     grid::Grid                  # grid, e.g. FullGaussianGrid
 
@@ -61,7 +61,7 @@ function GridGeometry(
     # vector type
     VectorType = array_type(architecture, NF, 1)
     VectorIntType = array_type(architecture, Int, 1)
-    
+
     # Tuple{UnitRange} is with Reactant compatible, otherwise copy to architecture
     device_rings = typeof(architecture) <: ReactantDevice ? Tuple(grid.rings) : on_architecture(architecture, grid.rings)
 
@@ -227,7 +227,8 @@ function interpolator(
     londs = on_architecture(architecture(grid_out), londs)
     latds = on_architecture(architecture(grid_out), latds)
 
-    update_locator!(I, londs, latds, unsafe = false)
+    # TODO REACTANT: for reactant we explicitly deactivate the boundschecks here:
+    @inbounds update_locator!(I, londs, latds, unsafe = true)
     return I
 end
 
@@ -474,7 +475,7 @@ function find_rings!(
     )
 
     if ~unsafe
-        # TODO: return to `extrema` when Reactant fixed 
+        # TODO: return to `extrema` when Reactant fixed
         # https://github.com/EnzymeAD/Reactant.jl/issues/2387
         #θmin, θmax = extrema(θs)
         θmin, θmax = (minimum(θs), maximum(θs))
