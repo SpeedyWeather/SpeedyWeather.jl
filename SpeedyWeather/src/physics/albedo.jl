@@ -154,7 +154,7 @@ set!(albedo::AbstractAlbedo, args...; kwargs...) = set!(albedo.albedo, args...; 
 function initialize!(albedo::AlbedoClimatology, model::PrimitiveEquation)
 
     # LOAD NETCDF FILE
-    a = get_asset(
+    a, _ = get_asset(
         albedo.path;
         from_assets = albedo.from_assets,
         name = albedo.varname,
