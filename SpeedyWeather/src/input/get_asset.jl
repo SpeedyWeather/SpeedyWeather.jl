@@ -55,7 +55,7 @@ function get_asset(
         target_url = joinpath(ASSETS_URL, "heads/$branch")
     else
         if version in ASSETS_VERSIONS_AVAILABLE
-            target_url = joinpath(ASSETS_URL, "tags/$version")
+            target_url = joinpath(ASSETS_URL, "tags/v$version")
         else
             available_str = join(ASSETS_VERSIONS_AVAILABLE, ", ")
             msg = "SpeedyWeatherAssets version $version not available. " *
