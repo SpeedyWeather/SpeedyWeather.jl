@@ -547,7 +547,7 @@ function find_rings_unsafe!(
         js::AbstractArray,             # Out: vector of ring indices
         Δys::AbstractArray,            # distance fractions to ring further south
         θs::AbstractArray,             # latitudes of points to interpolate onto
-        latd::AbstractArray,       # latitudes of rings (90˚ to -90˚, strictly decreasing)
+        latd::AbstractArray,           # latitudes of rings (90˚ to -90˚, strictly decreasing)
         architecture::AbstractArchitecture
     )
 
