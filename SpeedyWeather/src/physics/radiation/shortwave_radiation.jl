@@ -2,7 +2,6 @@ abstract type AbstractRadiation <: AbstractParameterization end
 abstract type AbstractShortwave <: AbstractRadiation end
 abstract type AbstractShortwaveRadiativeTransfer <: AbstractShortwave end
 
-## SHORTWAVE RADIATION FOR A FULLY TRANSPARENT ATMOSPHERE
 export TransparentShortwave
 struct TransparentShortwave <: AbstractShortwave end
 Adapt.@adapt_structure TransparentShortwave
@@ -148,17 +147,26 @@ export OneBandShortwaveRadiativeTransfer
     OneBandShortwaveRadiativeTransfer <: AbstractShortwaveRadiativeTransfer
 
 $(TYPEDFIELDS)."""
-@parameterized @kwdef struct OneBandShortwaveRadiativeTransfer{NF} <: AbstractShortwaveRadiativeTransfer
-    "[OPTION] Ozone absorption in upper stratosphere (W/m^2)"
-    @param ozone_absorp_upper::NF = 0 (bounds = Nonnegative,)
+@parameterized @kwdef struct OneBandShortwaveRadiativeTransfer{NF, F} <: AbstractShortwaveRadiativeTransfer
+    "[OPTION] Total ozone absorption as fraction of incoming solar radiation (1)"
+    @param ozone_absorption::NF = 0.01 (bounds = 0 .. 1,)
 
-    "[OPTION] Ozone absorption in lower stratosphere (W/m^2)"
-    @param ozone_absorp_lower::NF = 0 (bounds = Nonnegative,)
+    "[OPTION] Ozone distribution above σ₀, has to be explicitly normalized to ∫dσ = 1 (1)"
+    ozone_distribution::F
 end
 Adapt.@adapt_structure OneBandShortwaveRadiativeTransfer
 
 # generator function
-OneBandShortwaveRadiativeTransfer(SG::SpectralGrid; kwargs...) = OneBandShortwaveRadiativeTransfer{SG.NF}(; kwargs...)
+function OneBandShortwaveRadiativeTransfer(
+        SG::SpectralGrid;
+        ozone_distribution = (σ) -> 50 * max(0, 0.2f0 - σ),     # default distribution here
+        kwargs...
+    )
+    return OneBandShortwaveRadiativeTransfer{SG.NF, typeof(ozone_distribution)}(;
+        ozone_distribution = ozone_distribution, kwargs...
+    )
+end
+
 initialize!(::OneBandShortwaveRadiativeTransfer, ::PrimitiveEquation) = nothing
 
 """$(TYPEDSIGNATURES)
@@ -171,12 +179,15 @@ One-band shortwave radiative transfer with cloud reflection and ozone absorption
         radiation::OneBandShortwaveRadiativeTransfer,
         model,
     )
-    (; ozone_absorp_upper, ozone_absorp_lower) = radiation
+
+    O₃_absorption = radiation.ozone_absorption
     (; cloud_cover, cloud_top, stratocumulus_cover, cloud_albedo, stratocumulus_albedo) = clouds
 
     dTdt = diagn.tendencies.temp_tend_grid
     pₛ = diagn.grid.pres_grid_prev[ij]
     nlayers = size(dTdt, 2)
+    σ = model.geometry.σ_levels_full
+    Δσ = model.geometry.σ_levels_thick
 
     cos_zenith = diagn.physics.cos_zenith[ij]
     albedo_ocean = diagn.physics.ocean.albedo[ij]
@@ -184,21 +195,29 @@ One-band shortwave radiative transfer with cloud reflection and ozone absorption
     land_fraction = model.land_sea_mask.mask[ij]
     cₚ = model.atmosphere.heat_capacity
 
-    # Apply ozone absorption at top of atmosphere (TOA)
+    # Full TOA downward flux; ozone absorption is handled inside the layer loop below.
     D_toa = model.planet.solar_constant * cos_zenith
-    D = max(0, D_toa - ozone_absorp_upper - ozone_absorp_lower)
+    D = D_toa
 
-    # Downward beam
+    # DOWNWARD BEAM
     U_reflected = zero(D)
+    ozone_absorption = zero(D)
+
     for k in 1:nlayers
+        # 1. cloud reflection?
         if k == cloud_top
             R = cloud_albedo * cloud_cover
             U_reflected = D * R
             D *= (1 - R)
         end
 
-        D_out = D * t[ij, k]
+        # 2. ozone absorption in stratosphere layers above σ₀, distribution scaled by layer thickness
+        O₃ = O₃_absorption * radiation.ozone_distribution(σ[k]) * Δσ[k]
+
+        # 3. transmissivity of the layer
+        D_out = (D - O₃ * D_toa) * t[ij, k]
         # Update temperature tendency due to absorbed shortwave radiation
+        # from flux convergence D = D in from the top, D_out at the bottom of a layer
         dTdt[ij, k] += flux_to_tendency((D - D_out) / cₚ, pₛ, k, model)
         D = D_out
     end
@@ -221,7 +240,6 @@ One-band shortwave radiative transfer with cloud reflection and ozone absorption
     diagn.physics.surface_shortwave_up[ij] = U_surface_albedo
     diagn.physics.albedo[ij] = albedo
 
-    # Upward beam
     U = U_surface_albedo + U_stratocumulus
     for k in nlayers:-1:1
         U_out = U * t[ij, k]

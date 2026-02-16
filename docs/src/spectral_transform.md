@@ -26,7 +26,7 @@ Justin described his work in a Blog series [^Willmert2020].
 ## Spherical harmonics
 
 The [spherical harmonics](https://en.wikipedia.org/wiki/Spherical_harmonics) ``Y_{lm}`` of degree ``l`` and order ``m``
-over the longitude ``\phi = (0, 2\pi)`` and colatitudes ``\theta = (-\pi/2, \pi/2)``, are
+over the longitude ``\phi = (0, 2\pi)`` and latitudes ``\theta = (-\pi/2, \pi/2)``, are
 
 ```math
 Y_{lm}(\phi, \theta) = \lambda_l^m(\sin\theta) e^{im\phi}
