@@ -216,6 +216,15 @@ $(TYPEDFIELDS)"""
     "[OPTION] filename of sea surface temperatures"
     file::String = "sea_surface_temperature.nc"
 
+    "[OPTION] path to the folder containing the sst"
+    path::String = joinpath("data", "boundary_conditions", file)
+
+    "[OPTION] flag to check for sst in SWA or locally"
+    from_assets::Bool = true
+
+    "[OPTION] SpeedyWeatherAssets version number"
+    version::VersionNumber = DEFAULT_ASSETS_VERSION
+
     "[OPTION] Variable name in netcdf file"
     varname::String = "sst"
 
