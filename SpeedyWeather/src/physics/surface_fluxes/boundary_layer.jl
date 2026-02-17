@@ -75,12 +75,37 @@ Adapt.@adapt_structure ConstantSurfaceRoughness
 ConstantSurfaceRoughness(SG::SpectralGrid, kwargs...) = ConstantSurfaceRoughness{SG.NF}(; kwargs...)
 initialize!(::ConstantSurfaceRoughness, ::PrimitiveEquation) = nothing
 
-@propagate_inbounds function surface_roughness_land(ij, scheme::ConstantSurfaceRoughness, diagn, progn)
-    return scheme.roughness_length_land
+@propagate_inbounds function parameterization!(ij, diagn, progn, scheme::AbstractSurfaceRoughness, model)
+    surface_roughness!(ij, diagn, progn, scheme, model.land_sea_mask)
+    return surface_roughness!(ij, diagn, progn, scheme, model.land_sea_mask)
 end
 
-@propagate_inbounds function surface_roughness_ocean(ij, scheme::ConstantSurfaceRoughness, diagn, progn)
-    return scheme.roughness_length_ocean
+variables(::AbstractSurfaceRoughness) = (
+    DiagnosticVariable(name = :surface_roughness, dims = Grid2D(), desc = "Surface roughness length", units = "m"),
+    DiagnosticVariable(name = :surface_roughness, dims = Grid2D(), desc = "Land surface roughness length", units = "m", namespace = :land),
+    DiagnosticVariable(name = :surface_roughness, dims = Grid2D(), desc = "Ocean surface roughness length", units = "m", namespace = :ocean),
+)
+
+@propagate_inbounds function surface_roughness!(ij, diagn, progn, scheme::ConstantSurfaceRoughness, land_sea_mask)
+    land_fraction = land_sea_mask.mask[ij]
+    z₀_land = scheme.roughness_length_land
+    z₀_ocean = scheme.roughness_length_ocean
+
+    if land_fraction > 0
+        diagn.physics.land.surface_roughness[ij] = z₀_land
+    else
+        diagn.physics.land.surface_roughness[ij] = zero(land_fraction)
+    end
+
+    if land_fraction < 1
+        diagn.physics.ocean.surface_roughness[ij] = z₀_ocean
+    else
+        diagn.physics.ocean.surface_roughness[ij] = zero(land_fraction)
+    end
+
+    diagn.physics.surface_roughness[ij] = land_fraction * z₀_land + (1 - land_fraction) * z₀_ocean
+
+    return nothing
 end
 
 export BulkRichardsonDrag
@@ -142,8 +167,8 @@ end
 
 # function barrier
 @propagate_inbounds function parameterization!(ij, diagn, progn, drag::BulkRichardsonDrag, model)
-    boundary_layer_drag!(ij, diagn, progn, drag, model.land_sea_mask, model.atmosphere, model.planet, model.orography)
-    return boundary_layer_drag!(ij, diagn, progn, drag, model.land_sea_mask, model.atmosphere, model.planet, model.orography)
+    boundary_layer_drag!(ij, diagn, progn, drag, model.atmosphere, model.planet, model.orography)
+    return boundary_layer_drag!(ij, diagn, progn, drag, model.atmosphere, model.planet, model.orography)
 end
 
 @propagate_inbounds function boundary_layer_drag!(
@@ -151,13 +176,10 @@ end
         diagn,
         progn,
         drag::BulkRichardsonDrag,
-        land_sea_mask,
         atmosphere,
         planet,
         orography,
     )
-    land_fraction = land_sea_mask.mask[ij]
-
     # Height z [m] of lowermost layer above ground
     surface = diagn.nlayers
     (; gravity) = planet
@@ -167,13 +189,8 @@ end
     # Frierson 2006, eq (12)
     κ = drag.von_Karman
 
-    # Calculate land and ocean roughness lengths
-    z₀_land = zero(land_fraction)
-    z₀_ocean = zero(land_fraction)
-    z₀_land = land_fraction > 0 ? surface_roughness_land(ij, drag.surface_roughness, diagn, progn) : zero(land_fraction)
-    z₀_ocean = land_fraction < 1 ? surface_roughness_ocean(ij, drag.surface_roughness, diagn, progn) : zero(land_fraction)
-
-    z₀ = land_fraction * z₀_land + (1 - land_fraction) * z₀_ocean
+    # Get surface roughness length
+    z₀ = diagn.physics.surface_roughness[ij]
 
     # should be z > z₀, z=z₀ means an infinitely high drag
     # 0 < z < z₀ doesn't make sense so cap here
