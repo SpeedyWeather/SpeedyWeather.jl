@@ -1,6 +1,6 @@
 module SpeedyWeatherLuxExt
 
-using SpeedyWeather, Lux, NPZ, StaticArrays
+using SpeedyWeather, Lux, NPZ
 import Random, Adapt
 
 function SpeedyWeather.LearnedSurfaceRoughness(
