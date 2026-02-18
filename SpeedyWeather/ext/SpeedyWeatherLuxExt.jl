@@ -123,7 +123,7 @@ Base.@propagate_inbounds function surface_roughness_ocean(ij, diagn, progn, sche
     ℵ = progn.ocean.sea_ice_concentration[ij]
     Uₛ = diagn.grid.u_grid[ij, surface]
     Vₛ = diagn.grid.v_grid[ij, surface]
-    UVₛ = diagn.physics.surface_wind_speed[ij]
+    UVₛ = sqrt(Uₛ^2 + Vₛ^2)
 
     Uₛ = normalise(Uₛ, scheme.ocean_input_means[1], scheme.ocean_input_stds[1])
     Vₛ = normalise(Vₛ, scheme.ocean_input_means[2], scheme.ocean_input_stds[2])
