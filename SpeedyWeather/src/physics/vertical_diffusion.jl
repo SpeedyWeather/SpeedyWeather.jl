@@ -45,7 +45,7 @@ variables(::BulkRichardsonDiffusion) = (
     DiagnosticVariable(name = :boundary_layer_height, dims = Grid2D(), desc = "Boundary layer height", units = "1"),
 )
 
-function initialize!(diffusion::BulkRichardsonDiffusion, model::PrimitiveEquation)
+function initialize!(diffusion::BulkRichardsonDiffusion{NF}, model::PrimitiveEquation) where {NF}
 
     (; nlayers) = model.geometry
     nlayers == 1 && return nothing     # no diffusion for 1-layer model
@@ -54,21 +54,19 @@ function initialize!(diffusion::BulkRichardsonDiffusion, model::PrimitiveEquatio
     # also includes a 1/2 so that the diffusion coefficients on full levels can be added
     # which is equivalent to interpolating them on half levels for a ∂σ (K ∂σ) formulation
     # with σ-dependent diffusion coefficient K
-    σ = on_architecture(CPU(), model.geometry.σ_levels_full)
-    σ_half = on_architecture(CPU(), model.geometry.σ_levels_half)
-    ∇²_above = on_architecture(CPU(), diffusion.∇²_above)
-    ∇²_below = on_architecture(CPU(), diffusion.∇²_below)
+    σ = model.geometry.σ_levels_full
+    σ_half = model.geometry.σ_levels_half
 
-    for k in 1:nlayers
-        σ₋ = k <= 1 ? -Inf : σ[k - 1]   # sets the gradient across surface and top to 0
-        σ₊ = k >= nlayers ? Inf : σ[k + 1]   # = no flux boundary conditions
-        ∇²_above[k] = inv(2 * (σ[k] - σ₋) * (σ_half[k + 1] - σ_half[k]))
-        ∇²_below[k] = inv(2 * (σ₊ - σ[k]) * (σ_half[k + 1] - σ_half[k]))
-    end
+    # σ shifted by one level: σ₋[k] = σ[k-1], σ₊[k] = σ[k+1]
+    # boundary: -Inf at top, Inf at bottom → gradient = 0 = no flux BCs
+    σ₋ = vcat(NF(-Inf), σ[1:(end - 1)])    # σ[k-1], with -Inf for k=1
+    σ₊ = vcat(σ[2:end], NF(Inf))           # σ[k+1], with Inf for k=nlayers
 
-    arch = model.architecture
-    diffusion.∇²_above .= on_architecture(arch, ∇²_above)
-    diffusion.∇²_below .= on_architecture(arch, ∇²_below)
+    # Δσ_half[k] = σ_half[k+1] - σ_half[k], length nlayers
+    Δσ_half = σ_half[2:end] .- σ_half[1:(end - 1)]
+
+    diffusion.∇²_above .= inv.(2 .* (σ .- σ₋) .* Δσ_half)
+    diffusion.∇²_below .= inv.(2 .* (σ₊ .- σ) .* Δσ_half)
     return nothing
 end
 
