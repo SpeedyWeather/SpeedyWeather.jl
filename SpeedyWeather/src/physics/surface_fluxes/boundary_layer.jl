@@ -113,7 +113,7 @@ export BulkRichardsonDrag
 """Boundary layer drag coefficient from the bulk Richardson number,
 following Frierson, 2006, Journal of the Atmospheric Sciences.
 $(TYPEDFIELDS)"""
-@kwdef struct BulkRichardsonDrag{NF, SR} <: AbstractBoundaryLayer
+@kwdef struct BulkRichardsonDrag{NF} <: AbstractBoundaryLayer
     "[OPTION] von Kármán constant [1]"
     von_Karman::NF = 0.4
 
@@ -122,48 +122,11 @@ $(TYPEDFIELDS)"""
 
     "[OPTION] Drag minimum to avoid zero surface fluxes in stable conditions [1]"
     drag_min::NF = 1.0e-5
-
-    surface_roughness::SR
-end
-
-function Base.show(io::IO, B::BulkRichardsonDrag)
-    println(io, "BulkRichardsonDrag{$(typeof(B.von_Karman))}")
-    println(io, "├ von_Karman: $(B.von_Karman)")
-    println(io, "├ critical_Richardson: $(B.critical_Richardson)")
-    println(io, "├ drag_min: $(B.drag_min)")
-    print(io, "└┐surface_roughness: ")
-
-    buf = IOBuffer()
-    show(buf, B.surface_roughness)
-    s = String(take!(buf))
-    lines = split(s, '\n')
-
-    if !isempty(lines)
-        println(io, lines[1])
-    end
-
-    prefix = " "
-    for line in lines[2:end]
-        if !isempty(line)
-            println(io, prefix, line)
-        end
-    end
-    return
 end
 
 Adapt.@adapt_structure BulkRichardsonDrag
-function BulkRichardsonDrag(
-        SG::SpectralGrid;
-        surface_roughness = ConstantSurfaceRoughness(SG),
-        kwargs...
-    )
-    SR = typeof(surface_roughness)
-    return BulkRichardsonDrag{SG.NF, SR}(; surface_roughness, kwargs...)
-end
-function initialize!(drag::BulkRichardsonDrag, model::PrimitiveEquation)
-    initialize!(drag.surface_roughness, model)
-    return nothing
-end
+BulkRichardsonDrag(SG::SpectralGrid, kwargs...) = BulkRichardsonDrag{SG.NF}(; kwargs...)
+initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
 
 # function barrier
 @propagate_inbounds function parameterization!(ij, diagn, progn, drag::BulkRichardsonDrag, model)
