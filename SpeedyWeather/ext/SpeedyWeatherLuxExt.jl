@@ -130,7 +130,9 @@ Base.@propagate_inbounds function surface_roughness_ocean(ij, diagn, progn, sche
     UVₛ = normalise(UVₛ, scheme.ocean_input_means[3], scheme.ocean_input_stds[3])
 
     log_ocean_roughness = ice_free_roughness(Uₛ, Vₛ, UVₛ) * scheme.ocean_output_std + scheme.ocean_output_mean
-    ocean_roughness = exp(log_ocean_roughness)
+
+    ocean_roughness_limit = 3.92f-3 # observed roughness saturation, from Curcic (2020)
+    ocean_roughness = min(ocean_roughness_limit, exp(log_ocean_roughness))
     ℵ_roughness = sea_ice_roughness(ℵ)  # From IFS documentation, CY49R1
 
     surface_roughness = ℵ * ℵ_roughness + (1 - ℵ) * ocean_roughness
