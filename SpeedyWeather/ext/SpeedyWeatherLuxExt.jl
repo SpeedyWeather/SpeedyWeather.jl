@@ -139,22 +139,13 @@ end
 
 Base.@propagate_inbounds function SpeedyWeather.surface_roughness!(ij, diagn, progn, scheme::LearnedSurfaceRoughness, land_sea_mask)
     land_fraction = land_sea_mask.mask[ij]
-    z₀_land = surface_roughness_land(ij, diagn, progn, scheme)
-    z₀_ocean = surface_roughness_ocean(ij, diagn, progn, scheme)
 
-    if land_fraction > 0
-        diagn.physics.land.surface_roughness[ij] = z₀_land
-    else
-        diagn.physics.land.surface_roughness[ij] = zero(land_fraction)
-    end
+    # Compute separate ocean and land surface roughness
+    diagn.physics.land.surface_roughness[ij] = land_fraction > 0 ? surface_roughness_land(ij, diagn, progn, scheme) : zero(land_fraction)
+    diagn.physics.ocean.surface_roughness[ij] = land_fraction < 1 ? surface_roughness_ocean(ij, diagn, progn, scheme) : zero(land_fraction)
 
-    if land_fraction < 1
-        diagn.physics.ocean.surface_roughness[ij] = z₀_ocean
-    else
-        diagn.physics.ocean.surface_roughness[ij] = zero(land_fraction)
-    end
-
-    diagn.physics.surface_roughness[ij] = land_fraction * z₀_land + (1 - land_fraction) * z₀_ocean
+    # Blend the two via arithmetic average
+    diagn.physics.surface_roughness[ij] = land_fraction * diagn.physics.land.surface_roughness[ij] + (1 - land_fraction) * diagn.physics.ocean.surface_roughness[ij]
     return nothing
 end
 

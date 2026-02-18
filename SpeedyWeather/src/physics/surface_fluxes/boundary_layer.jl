@@ -88,23 +88,11 @@ variables(::AbstractSurfaceRoughness) = (
 
 @propagate_inbounds function surface_roughness!(ij, diagn, progn, scheme::ConstantSurfaceRoughness, land_sea_mask)
     land_fraction = land_sea_mask.mask[ij]
-    z₀_land = scheme.roughness_length_land
-    z₀_ocean = scheme.roughness_length_ocean
 
-    if land_fraction > 0
-        diagn.physics.land.surface_roughness[ij] = z₀_land
-    else
-        diagn.physics.land.surface_roughness[ij] = zero(land_fraction)
-    end
+    diagn.physics.land.surface_roughness[ij] = land_fraction > 0 ? scheme.roughness_length_land : zero(land_fraction)
+    diagn.physics.ocean.surface_roughness[ij] = land_fraction < 1 ? scheme.roughness_length_ocean : zero(land_fraction)
 
-    if land_fraction < 1
-        diagn.physics.ocean.surface_roughness[ij] = z₀_ocean
-    else
-        diagn.physics.ocean.surface_roughness[ij] = zero(land_fraction)
-    end
-
-    diagn.physics.surface_roughness[ij] = land_fraction * z₀_land + (1 - land_fraction) * z₀_ocean
-
+    diagn.physics.surface_roughness[ij] = land_fraction * diagn.physics.land.surface_roughness[ij] + (1 - land_fraction) * diagn.physics.ocean.surface_roughness[ij]
     return nothing
 end
 
