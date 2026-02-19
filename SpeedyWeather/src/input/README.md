@@ -1,1 +1,1 @@
-The data available for download through these scripts are climatological averages and other data derived from ECMWF's ERA5 project licensed under CC BY 4.0
+The data available for download through these scripts are climatological averages and other data derived from ECMWF's [ERA5 project](https://www.ecmwf.int/en/forecasts/dataset/ecmwf-reanalysis-v5) licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
