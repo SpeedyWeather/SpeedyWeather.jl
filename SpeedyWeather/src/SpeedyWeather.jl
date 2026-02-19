@@ -122,6 +122,10 @@ import SpeedyTransforms: AbstractSpectralTransform, prettymemory
 export animate, globe
 function animate end
 
+# input data loading utility
+include("input_data.jl")
+export load_from_netcdf!, input_data_path
+
 # abstract types
 include("models/abstract_models.jl")
 include("variables/abstract_types.jl")

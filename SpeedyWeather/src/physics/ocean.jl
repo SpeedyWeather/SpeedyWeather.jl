@@ -122,30 +122,11 @@ function SeasonalOceanClimatology(SG::SpectralGrid; kwargs...)
 end
 
 function initialize!(ocean::SeasonalOceanClimatology, model::PrimitiveEquation)
-    (; monthly_temperature) = ocean
-
-    # LOAD NETCDF FILE
-    if ocean.path == "SpeedyWeather.jl/input_data"
-        path = joinpath(@__DIR__, "../../input_data", ocean.file)
-    else
-        path = joinpath(ocean.path, ocean.file)
-    end
-    ncfile = NCDataset(path)
-
-    # create interpolator from grid in file to grid used in model
-    fill_value = ncfile[ocean.varname].attrib["_FillValue"]
-    sst = ocean.file_Grid(ncfile[ocean.varname].var[:, :, :], input_as = Matrix)
-    sst[sst .=== fill_value] .= ocean.missing_value      # === to include NaN
-
-    # transfer to architecture of model if needed
-    sst = on_architecture(model.architecture, sst)
-
-    @boundscheck fields_match(monthly_temperature, sst, vertical_only = true) ||
-        throw(DimensionMismatch(monthly_temperature, sst))
-
-    # create interpolator from grid in file to grid used in model
-    interp = RingGrids.interpolator(monthly_temperature, sst, NF = Float32)
-    interpolate!(monthly_temperature, sst, interp)
+    load_from_netcdf!(
+        ocean.monthly_temperature, ocean.path, ocean.file, ocean.varname;
+        file_Grid = ocean.file_Grid, missing_value = ocean.missing_value,
+        architecture = model.architecture
+    )
     return nothing
 end
 

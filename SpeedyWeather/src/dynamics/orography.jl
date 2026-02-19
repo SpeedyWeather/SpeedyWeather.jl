@@ -188,25 +188,14 @@ function initialize!(
 
     (; orography, surface_geopotential, scale) = orog
     (; gravity) = P
+    (; architecture) = S
 
-    # LOAD NETCDF FILE
-    if orog.path == "SpeedyWeather.jl/input_data"
-        path = joinpath(@__DIR__, "../../input_data", orog.file)
-    else
-        path = joinpath(orog.path, orog.file)
-    end
-    ncfile = NCDataset(path)
-
-    # height [m], wrap matrix into a grid
-    # TODO also read lat, lon from file and flip array in case it's not as expected
-    # F = RingGrids.field_type(orog.file_Grid)  # TODO this isn't working, hardcode instead
-    orography_highres = on_architecture(S.architecture, FullGaussianField(ncfile["orog"].var[:, :], input_as = Matrix))
-
-    # Interpolate/coarsen to desired resolution
-    # TODO REACTANT: for reactant we explicitly deactivate the boundschecks here:
-    @inbounds interpolate!(orography, orography_highres)
-    orography .*= scale                     # scale orography (default 1)
-    transform!(surface_geopotential, orography, S)   # no *gravity yet
+    # load orography from file, interpolate onto model grid, and scale
+    load_from_netcdf!(
+        orography, orog.path, orog.file, "orog";
+        file_Grid = FullGaussianGrid, scale, architecture
+    )
+    @maybe_jit architecture transform!(surface_geopotential, orography, S)   # no *gravity yet
 
     if orog.smoothing                       # smooth orography in spectral space?
         # get trunc=lmax from size of surface_geopotential
@@ -215,11 +204,14 @@ function initialize!(
         truncation = round(Int, trunc * (1 - orog.smoothing_fraction))
         c = orog.smoothing_strength
         power = orog.smoothing_power
-        SpeedyTransforms.spectral_smoothing!(surface_geopotential, c; power, truncation)
+        @maybe_jit architecture SpeedyTransforms.spectral_smoothing!(surface_geopotential, c; power, truncation)
     end
 
-    transform!(orography, surface_geopotential, S)                  # to grid-point space
+    # For
+    inbounds_transform!(orography, surface_geopotential, S) = @inbounds transform!(orography, surface_geopotential, S)
+    @maybe_jit architecture inbounds_transform!(orography, surface_geopotential, S)
+
     surface_geopotential .*= gravity                                # turn orography into surface geopotential
-    SpeedyTransforms.spectral_truncation!(surface_geopotential)     # set the lmax+1 harmonics to zero
+    @maybe_jit architecture SpeedyTransforms.spectral_truncation!(surface_geopotential)     # set the lmax+1 harmonics to zero
     return nothing
 end

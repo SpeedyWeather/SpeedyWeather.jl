@@ -51,26 +51,11 @@ end
 function initialize!(land::SeasonalLandTemperature, model::PrimitiveEquation)
     (; monthly_temperature) = land
 
-    # LOAD NETCDF FILE
-    if land.path == "SpeedyWeather.jl/input_data"
-        path = joinpath(@__DIR__, "../../../input_data", land.file)
-    else
-        path = joinpath(land.path, land.file)
-    end
-    ncfile = NCDataset(path)
-
-    # read out netCDF data
-    fill_value = ncfile[land.varname].attrib["_FillValue"]
-    lst = land.file_Grid(ncfile[land.varname].var[:, :, :], input_as = Matrix)
-    lst[lst .=== fill_value] .= land.missing_value      # === to include NaN
-    lst = on_architecture(model.architecture, lst)
-
-    @boundscheck fields_match(monthly_temperature, lst, vertical_only = true) ||
-        throw(DimensionMismatch(monthly_temperature, lst))
-
-    # create interpolator from grid in file to grid used in model
-    interp = RingGrids.interpolator(monthly_temperature, lst, NF = Float32)
-    interpolate!(monthly_temperature, lst, interp)
+    load_from_netcdf!(
+        monthly_temperature, land.path, land.file, land.varname;
+        file_Grid = land.file_Grid, missing_value = land.missing_value,
+        architecture = model.architecture
+    )
 
     # mask ocean points to fallback ocean temperature
     # set ocean "land" temperature points (100% ocean only)

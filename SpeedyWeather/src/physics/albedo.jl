@@ -146,17 +146,10 @@ end
 set!(albedo::AbstractAlbedo, args...; kwargs...) = set!(albedo.albedo, args...; kwargs...)
 
 function initialize!(albedo::AlbedoClimatology, model::PrimitiveEquation)
-
-    # LOAD NETCDF FILE
-    if albedo.path == "SpeedyWeather.jl/input_data"
-        path = joinpath(@__DIR__, "../../input_data", albedo.file)
-    else
-        path = joinpath(albedo.path, albedo.file)
-    end
-    ncfile = NCDataset(path)
-
-    a = on_architecture(model.architecture, albedo.file_Grid(ncfile[albedo.varname].var[:, :], input_as = Matrix))
-    return interpolate!(albedo.albedo, a)
+    return load_from_netcdf!(
+        albedo.albedo, albedo.path, albedo.file, albedo.varname;
+        file_Grid = albedo.file_Grid, architecture = model.architecture
+    )
 end
 
 @propagate_inbounds albedo!(ij, diagn, progn, albedo::AlbedoClimatology, model) =
