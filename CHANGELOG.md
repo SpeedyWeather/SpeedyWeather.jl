@@ -3,7 +3,12 @@
 ## Unreleased
 
 - Get SpeedyWeatherAssets on the fly [#983](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/983)
-- Ozone absorption now deposited into stratospheric layers [#986](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/986)
+
+## v0.18.1
+
+- Fix docs colatitude -> latitude terminology [#990](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/990)
+- Progress bar with additional information [#989](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/989)
+- Bug fix: Ozone absorption now deposited into stratospheric layers [#986](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/986)
 - Adds a drag term to winds above a certain speed limit [#987](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/987)
 
 ## v0.18
