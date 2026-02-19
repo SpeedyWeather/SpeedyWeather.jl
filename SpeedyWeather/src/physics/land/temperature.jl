@@ -6,11 +6,17 @@ export SeasonalLandTemperature
 The temperature is linearly interpolated between months based on the model time.
 $(TYPEDFIELDS)"""
 @kwdef struct SeasonalLandTemperature{NF, GridVariable3D} <: AbstractLandTemperature
-    "[OPTION] path to the folder containing the land temperature file, pkg path default"
-    path::String = "SpeedyWeather.jl/input_data"
-
     "[OPTION] filename of land surface temperatures"
     file::String = "land_surface_temperature.nc"
+
+    "[OPTION] path to the folder containing the lst"
+    path::String = joinpath("data", "boundary_conditions", file)
+
+    "[OPTION] flag to check for lst in SWA or locally"
+    from_assets::Bool = true
+
+    "[OPTION] SpeedyWeatherAssets version number"
+    version::VersionNumber = DEFAULT_ASSETS_VERSION
 
     "[OPTION] variable name in netcdf file"
     varname::String = "lst"
@@ -19,7 +25,7 @@ $(TYPEDFIELDS)"""
     file_Grid::Type{<:AbstractGrid} = FullGaussianGrid
 
     "[OPTION] The missing value in the data respresenting ocean"
-    missing_value::NF = NaN
+    missing_value::NF = NF(NaN)
 
     "[OPTION] Apply land-sea mask to use fallback ocean temperature for ocean-only points?"
     mask::Bool = true
@@ -52,16 +58,15 @@ function initialize!(land::SeasonalLandTemperature, model::PrimitiveEquation)
     (; monthly_temperature) = land
 
     # LOAD NETCDF FILE
-    if land.path == "SpeedyWeather.jl/input_data"
-        path = joinpath(@__DIR__, "../../../input_data", land.file)
-    else
-        path = joinpath(land.path, land.file)
-    end
-    ncfile = NCDataset(path)
+    lst, fill_value = get_asset(
+        land.path;
+        from_assets = land.from_assets,
+        name = land.varname,
+        type = land.file_Grid,
+        format = NCDataset,
+        version = land.version
+    )
 
-    # read out netCDF data
-    fill_value = ncfile[land.varname].attrib["_FillValue"]
-    lst = land.file_Grid(ncfile[land.varname].var[:, :, :], input_as = Matrix)
     lst[lst .=== fill_value] .= land.missing_value      # === to include NaN
     lst = on_architecture(model.architecture, lst)
 

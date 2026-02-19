@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Get SpeedyWeatherAssets on the fly [#983](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/983)
+
 ## v0.18.1
 
 - Fix docs colatitude -> latitude terminology [#990](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/990)

@@ -91,15 +91,20 @@ and writes them to the prognostic variables.
 Fields and options are
 $(TYPEDFIELDS)"""
 @kwdef struct SeasonalOceanClimatology{NF, Grid, GridVariable3D} <: AbstractOcean
-
     "Grid used for the model"
     grid::Grid
 
-    "[OPTION] Path to the folder containing the sea surface temperatures, pkg path default"
-    path::String = "SpeedyWeather.jl/input_data"
-
     "[OPTION] Filename of sea surface temperatures"
     file::String = "sea_surface_temperature.nc"
+
+    "[OPTION] path to the folder containing the sst"
+    path::String = joinpath("data", "boundary_conditions", file)
+
+    "[OPTION] flag to check for sst in SWA or locally"
+    from_assets::Bool = true
+
+    "[OPTION] SpeedyWeatherAssets version number"
+    version::VersionNumber = DEFAULT_ASSETS_VERSION
 
     "[OPTION] Variable name in netcdf file"
     varname::String = "sst"
@@ -108,7 +113,7 @@ $(TYPEDFIELDS)"""
     file_Grid::Type{<:AbstractGrid} = FullGaussianGrid
 
     "[OPTION] The missing value in the data respresenting land"
-    missing_value::NF = NaN
+    missing_value::NF = NF(NaN)
 
     # to be filled from file
     "Monthly sea surface temperatures [K], interpolated onto Grid"
@@ -124,17 +129,16 @@ end
 function initialize!(ocean::SeasonalOceanClimatology, model::PrimitiveEquation)
     (; monthly_temperature) = ocean
 
-    # LOAD NETCDF FILE
-    if ocean.path == "SpeedyWeather.jl/input_data"
-        path = joinpath(@__DIR__, "../../input_data", ocean.file)
-    else
-        path = joinpath(ocean.path, ocean.file)
-    end
-    ncfile = NCDataset(path)
+    sst, fill_value = get_asset(
+        ocean.path;
+        from_assets = ocean.from_assets,
+        name = ocean.varname,
+        type = ocean.file_Grid,
+        format = NCDataset,
+        version = ocean.version
+    )
 
     # create interpolator from grid in file to grid used in model
-    fill_value = ncfile[ocean.varname].attrib["_FillValue"]
-    sst = ocean.file_Grid(ncfile[ocean.varname].var[:, :, :], input_as = Matrix)
     sst[sst .=== fill_value] .= ocean.missing_value      # === to include NaN
 
     # transfer to architecture of model if needed
@@ -209,11 +213,17 @@ and the ocean time is set with `initialize!(model, time=time)`.
 Fields and options are
 $(TYPEDFIELDS)"""
 @kwdef struct ConstantOceanClimatology <: AbstractOcean
-    "[OPTION] path to the folder containing the land-sea mask file, pkg path default"
-    path::String = "SpeedyWeather.jl/input_data"
-
     "[OPTION] filename of sea surface temperatures"
     file::String = "sea_surface_temperature.nc"
+
+    "[OPTION] path to the folder containing the sst"
+    path::String = joinpath("data", "boundary_conditions", file)
+
+    "[OPTION] flag to check for sst in SWA or locally"
+    from_assets::Bool = true
+
+    "[OPTION] SpeedyWeatherAssets version number"
+    version::VersionNumber = DEFAULT_ASSETS_VERSION
 
     "[OPTION] Variable name in netcdf file"
     varname::String = "sst"

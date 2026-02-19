@@ -123,13 +123,21 @@ export EarthOrography
 """Earth's orography read from file, with smoothing.
 $(TYPEDFIELDS)"""
 @kwdef struct EarthOrography{NF, GridVariable2D, SpectralVariable2D} <: AbstractOrography
-
     # OPTIONS
-    "path to the folder containing the orography file, pkg path default"
-    path::String = "SpeedyWeather.jl/input_data"
-
     "filename of orography"
     file::String = "orography.nc"
+
+    "path to the folder containing the orography"
+    path::String = joinpath("data", "boundary_conditions", file)
+
+    "flag to check for orography in SWA or locally"
+    from_assets::Bool = true
+
+    "[OPTION] SpeedyWeatherAssets version number"
+    version::VersionNumber = DEFAULT_ASSETS_VERSION
+
+    "NCDataset variable name"
+    varname::String = "orog"
 
     "Grid the orography file comes on"
     file_Grid::Type{<:AbstractGrid} = FullGaussianGrid
@@ -189,18 +197,19 @@ function initialize!(
     (; orography, surface_geopotential, scale) = orog
     (; gravity) = P
 
-    # LOAD NETCDF FILE
-    if orog.path == "SpeedyWeather.jl/input_data"
-        path = joinpath(@__DIR__, "../../input_data", orog.file)
-    else
-        path = joinpath(orog.path, orog.file)
-    end
-    ncfile = NCDataset(path)
+    ncdataset = get_asset(
+        orog.path;
+        from_assets = orog.from_assets,
+        name = orog.varname,
+        type = FullGaussianField,
+        format = NCDataset,
+        version = orog.version
+    )
 
     # height [m], wrap matrix into a grid
     # TODO also read lat, lon from file and flip array in case it's not as expected
     # F = RingGrids.field_type(orog.file_Grid)  # TODO this isn't working, hardcode instead
-    orography_highres = on_architecture(S.architecture, FullGaussianField(ncfile["orog"].var[:, :], input_as = Matrix))
+    orography_highres = on_architecture(S.architecture, ncdataset)
 
     # Interpolate/coarsen to desired resolution
     interpolate!(orography, orography_highres)

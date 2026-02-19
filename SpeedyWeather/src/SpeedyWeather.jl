@@ -32,6 +32,8 @@ import JLD2: jldopen, jldsave, JLDFile
 import CodecZlib
 import BitInformation: round, round!
 import ProgressMeter
+import Artifacts
+import Pkg.Artifacts as PkgA
 
 # UTILITIES
 using DomainSets.IntervalSets
@@ -114,6 +116,9 @@ function animate end
 include("models/abstract_models.jl")
 include("variables/abstract_types.jl")
 include("models/parameterizations.jl")
+
+# INPUT
+include("input/get_asset.jl")
 
 # GEOMETRY CONSTANTS ETC
 include("dynamics/vertical_coordinates.jl")

@@ -67,11 +67,17 @@ export VegetationClimatology
     "[OPTION] Combine high and low vegetation factor, a in high + a*low [1]"
     low_veg_factor::NF = 0.8
 
-    "[OPTION] path to the folder containing the soil moisture file, pkg path default"
-    path::String = "SpeedyWeather.jl/input_data"
-
     "[OPTION] filename of soil moisture"
     file::String = "vegetation.nc"
+
+    "[OPTION] path to the folder containing the vegetation"
+    path::String = joinpath("data", "boundary_conditions", file)
+
+    "[OPTION] flag to check for vegetation in SWA or locally"
+    from_assets::Bool = true
+
+    "[OPTION] SpeedyWeatherAssets version number"
+    version::VersionNumber = DEFAULT_ASSETS_VERSION
 
     "[OPTION] variable name in netcdf file for high vegetation"
     varname_vegh::String = "vegh"
@@ -83,7 +89,7 @@ export VegetationClimatology
     file_Grid::Type{<:AbstractGrid} = FullGaussianGrid
 
     "[OPTION] The missing value in the data respresenting ocean"
-    missing_value::NF = NaN
+    missing_value::NF = NF(NaN)
     # to be filled from file
     "High vegetation cover [1], interpolated onto Grid"
     high_cover::GridVariable2D
@@ -107,16 +113,23 @@ end
 function initialize!(vegetation::VegetationClimatology, model::PrimitiveEquation)
 
     # LOAD NETCDF FILE
-    if vegetation.path == "SpeedyWeather.jl/input_data"
-        path = joinpath(@__DIR__, "../../../input_data", vegetation.file)
-    else
-        path = joinpath(vegetation.path, vegetation.file)
-    end
-    ncfile = NCDataset(path)
+    vegh, _ = get_asset(
+        vegetation.path;
+        from_assets = vegetation.from_assets,
+        name = vegetation.varname_vegh,
+        type = vegetation.file_Grid,
+        format = NCDataset,
+        version = vegetation.version
+    )
+    vegl, _ = get_asset(
+        vegetation.path;
+        from_assets = vegetation.from_assets,
+        name = vegetation.varname_vegl,
+        type = vegetation.file_Grid,
+        format = NCDataset,
+        version = vegetation.version
+    )
 
-    # high and low vegetation cover
-    vegh = vegetation.file_Grid(ncfile[vegetation.varname_vegh].var[:, :], input_as = Matrix)
-    vegl = vegetation.file_Grid(ncfile[vegetation.varname_vegl].var[:, :], input_as = Matrix)
     vegh = on_architecture(model.architecture, vegh)
     vegl = on_architecture(model.architecture, vegl)
 
