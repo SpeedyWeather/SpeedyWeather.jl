@@ -57,16 +57,19 @@ function initialize!(diffusion::BulkRichardsonDiffusion{NF}, model::PrimitiveEqu
     σ = model.geometry.σ_levels_full
     σ_half = model.geometry.σ_levels_half
 
-    # σ shifted by one level: σ₋[k] = σ[k-1], σ₊[k] = σ[k+1]
-    # boundary: -Inf at top, Inf at bottom → gradient = 0 = no flux BCs
-    σ₋ = vcat(NF(-Inf), σ[1:(end - 1)])    # σ[k-1], with -Inf for k=1
-    σ₊ = vcat(σ[2:end], NF(Inf))           # σ[k+1], with Inf for k=nlayers
-
     # Δσ_half[k] = σ_half[k+1] - σ_half[k], length nlayers
     Δσ_half = σ_half[2:end] .- σ_half[1:(end - 1)]
 
-    diffusion.∇²_above .= inv.(2 .* (σ .- σ₋) .* Δσ_half)
-    diffusion.∇²_below .= inv.(2 .* (σ₊ .- σ) .* Δσ_half)
+    # interior levels k=2:nlayers-1 (avoid vcat with scalars for Reactant compatibility)
+    # ∇²_above[k] = 1 / (2*(σ[k] - σ[k-1]) * Δσ_half[k])
+    # ∇²_below[k] = 1 / (2*(σ[k+1] - σ[k]) * Δσ_half[k])
+    n = nlayers
+    diffusion.∇²_above[2:n] .= inv.(2 .* (σ[2:n] .- σ[1:(n - 1)]) .* Δσ_half[2:n])
+    diffusion.∇²_below[1:(n - 1)] .= inv.(2 .* (σ[2:n] .- σ[1:(n - 1)]) .* Δσ_half[1:(n - 1)])
+
+    # boundary: no flux at top and bottom (σ₋[1] = -Inf, σ₊[end] = Inf → inv = 0)
+    @allowscalar diffusion.∇²_above[1] = zero(NF)
+    @allowscalar diffusion.∇²_below[n] = zero(NF)
     return nothing
 end
 
