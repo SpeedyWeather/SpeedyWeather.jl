@@ -141,7 +141,8 @@ function initialize!(land_sea_mask::EarthLandSeaMask, model::PrimitiveEquation)
         land_sea_mask.mask .= round.(land_sea_mask.mask ./ q) .* q
     end
 
-    lo, hi = extrema(land_sea_mask.mask)
+    # TODO: do it again with extrema, once reactant bug resolved
+    lo, hi = minimum(land_sea_mask.mask), maximum(land_sea_mask.mask)
     if (lo < 0 || hi > 1)
         # @warn "Land-sea mask has values in [$lo, $hi], clamping to [0, 1]."
         land_sea_mask.mask .= clamp.(land_sea_mask.mask, 0, 1)

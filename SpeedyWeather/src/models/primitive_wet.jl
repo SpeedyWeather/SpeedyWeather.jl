@@ -167,13 +167,13 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
     @maybe_jit arch initialize!(model.drag, model)
 
     # boundary conditions
-    @maybe_jit arch initialize!(model.orography, model)
-    @maybe_jit arch initialize!(model.land_sea_mask, model)
-    @maybe_jit arch initialize!(model.ocean, model)
-    @maybe_jit arch initialize!(model.sea_ice, model)
-    @maybe_jit arch initialize!(model.land, model)
-    @maybe_jit arch initialize!(model.solar_zenith, time, model)
-    @maybe_jit arch initialize!(model.albedo, model)
+    initialize!(model.orography, model)
+    initialize!(model.land_sea_mask, model)
+    initialize!(model.ocean, model)
+    initialize!(model.sea_ice, model)
+    initialize!(model.land, model)
+    initialize!(model.solar_zenith, time, model)
+    initialize!(model.albedo, model)
 
     # parameterizations
     @maybe_jit arch initialize!(model.boundary_layer_drag, model)
