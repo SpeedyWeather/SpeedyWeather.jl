@@ -151,18 +151,20 @@ Calls all `initialize!` functions for components of `model`,
 except for `model.output` and `model.feedback` which are always called
 at in `time_stepping!` and `model.implicit` which is done in `first_timesteps!`."""
 function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
+    arch = model.architecture
+
     # NUMERICS (implicit is initialized later)
-    initialize!(model.geometry, model)
-    initialize!(model.time_stepping, model)
-    initialize!(model.horizontal_diffusion, model)
+    @maybe_jit arch initialize!(model.geometry, model)
+    @maybe_jit arch initialize!(model.time_stepping, model)
+    @maybe_jit arch initialize!(model.horizontal_diffusion, model)
 
     # DYNAMICS
-    initialize!(model.coriolis, model)
-    initialize!(model.geopotential, model)
-    initialize!(model.adiabatic_conversion, model)
-    initialize!(model.random_process, model)
-    initialize!(model.forcing, model)
-    initialize!(model.drag, model)
+    @maybe_jit arch initialize!(model.coriolis, model)
+    @maybe_jit arch initialize!(model.geopotential, model)
+    @maybe_jit arch initialize!(model.adiabatic_conversion, model)
+    @maybe_jit arch initialize!(model.random_process, model)
+    @maybe_jit arch initialize!(model.forcing, model)
+    @maybe_jit arch initialize!(model.drag, model)
 
     # boundary conditions
     initialize!(model.orography, model)
@@ -174,18 +176,18 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
     initialize!(model.albedo, model)
 
     # parameterizations
-    initialize!(model.boundary_layer_drag, model)
-    initialize!(model.vertical_diffusion, model)
-    initialize!(model.large_scale_condensation, model)
-    initialize!(model.convection, model)
-    initialize!(model.shortwave_radiation, model)
-    initialize!(model.longwave_radiation, model)
-    initialize!(model.surface_condition, model)
-    initialize!(model.surface_momentum_flux, model)
-    initialize!(model.surface_heat_flux, model)
-    initialize!(model.surface_humidity_flux, model)
-    initialize!(model.stochastic_physics, model)
-    initialize!(model.particle_advection, model)
+    @maybe_jit arch initialize!(model.boundary_layer_drag, model)
+    @maybe_jit arch initialize!(model.vertical_diffusion, model)
+    @maybe_jit arch initialize!(model.large_scale_condensation, model)
+    @maybe_jit arch initialize!(model.convection, model)
+    @maybe_jit arch initialize!(model.shortwave_radiation, model)
+    @maybe_jit arch initialize!(model.longwave_radiation, model)
+    @maybe_jit arch initialize!(model.surface_condition, model)
+    @maybe_jit arch initialize!(model.surface_momentum_flux, model)
+    @maybe_jit arch initialize!(model.surface_heat_flux, model)
+    @maybe_jit arch initialize!(model.surface_humidity_flux, model)
+    @maybe_jit arch initialize!(model.stochastic_physics, model)
+    @maybe_jit arch initialize!(model.particle_advection, model)
 
     # allocate prognostic and diagnostic variables
     prognostic_variables = PrognosticVariables(model)
@@ -194,11 +196,11 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
     # initialize non-atmosphere prognostic variables
     (; particles, ocean, land) = prognostic_variables
     initialize!(particles, prognostic_variables, diagnostic_variables, model.particle_advection, model)
-    initialize!(ocean, prognostic_variables, diagnostic_variables, model.ocean, model)
-    initialize!(land, prognostic_variables, diagnostic_variables, model.land, model)
+    @maybe_jit arch initialize!(ocean, prognostic_variables, diagnostic_variables, model.ocean, model)
+    @maybe_jit arch initialize!(land, prognostic_variables, diagnostic_variables, model.land, model)
 
     # set the initial conditions (may overwrite variables set in initialize! ocean/land)
-    initialize!(prognostic_variables, model.initial_conditions, model)
+    @maybe_jit arch initialize!(prognostic_variables, model.initial_conditions, model)
     (; clock) = prognostic_variables
     clock.time = time       # set the current time
     clock.start = time      # and store the start time

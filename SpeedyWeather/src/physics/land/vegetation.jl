@@ -105,27 +105,14 @@ function VegetationClimatology(SG::SpectralGrid, geometry::LandGeometryOrNothing
 end
 
 function initialize!(vegetation::VegetationClimatology, model::PrimitiveEquation)
-
-    # LOAD NETCDF FILE
-    if vegetation.path == "SpeedyWeather.jl/input_data"
-        path = joinpath(@__DIR__, "../../../input_data", vegetation.file)
-    else
-        path = joinpath(vegetation.path, vegetation.file)
-    end
-    ncfile = NCDataset(path)
-
-    # high and low vegetation cover
-    vegh = vegetation.file_Grid(ncfile[vegetation.varname_vegh].var[:, :], input_as = Matrix)
-    vegl = vegetation.file_Grid(ncfile[vegetation.varname_vegl].var[:, :], input_as = Matrix)
-    vegh = on_architecture(model.architecture, vegh)
-    vegl = on_architecture(model.architecture, vegl)
-
-    # interpolate onto grid
-    high_vegetation_cover = vegetation.high_cover
-    low_vegetation_cover = vegetation.low_cover
-    interpolator = RingGrids.interpolator(high_vegetation_cover, vegh, NF = Float32)
-    interpolate!(high_vegetation_cover, vegh, interpolator)
-    return interpolate!(low_vegetation_cover, vegl, interpolator)
+    load_from_netcdf!(
+        vegetation.high_cover, vegetation.path, vegetation.file, vegetation.varname_vegh;
+        file_Grid = vegetation.file_Grid, architecture = model.architecture
+    )
+    return load_from_netcdf!(
+        vegetation.low_cover, vegetation.path, vegetation.file, vegetation.varname_vegl;
+        file_Grid = vegetation.file_Grid, architecture = model.architecture
+    )
 end
 
 function initialize!(

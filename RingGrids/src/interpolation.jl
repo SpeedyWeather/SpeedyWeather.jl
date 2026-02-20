@@ -7,7 +7,7 @@ struct GridGeometry{
         VectorType,
         VectorIntType,
         VectorRange,
-        IntType
+        IntType,
     } <: AbstractGridGeometry
     grid::Grid                  # grid, e.g. FullGaussianGrid
 
@@ -61,7 +61,9 @@ function GridGeometry(
     # vector type
     VectorType = array_type(architecture, NF, 1)
     VectorIntType = array_type(architecture, Int, 1)
-    device_rings = on_architecture(architecture, grid.rings)
+
+    # Tuple{UnitRange} is with Reactant compatible, otherwise copy to architecture
+    device_rings = typeof(architecture) <: ReactantDevice ? Tuple(grid.rings) : on_architecture(architecture, grid.rings)
 
     return GridGeometry{typeof(grid), VectorType, VectorIntType, typeof(device_rings), typeof(nlat_half)}(
         grid, nlat_half, nlat, npoints, londs, latd_poles, nlons, lon_offsets, device_rings
@@ -94,9 +96,9 @@ between two latitude rings."""
     ij_ds::VectorIntType = zeros(Int, npoints_output)   # pixel index ij for bottom right point d on ring j+1
 
     # distances to adjacent grid points (i.e. the averaging weights)
-    Δys::VectorType = zero(VectorType(undef, npoints_output))    # distance fractions between rings
-    Δabs::VectorType = zero(VectorType(undef, npoints_output))    # distance fractions between a, b
-    Δcds::VectorType = zero(VectorType(undef, npoints_output))    # distance fractions between c, d
+    Δys::VectorType = zeros(npoints_output)    # distance fractions between rings
+    Δabs::VectorType = zeros(npoints_output)    # distance fractions between a, b
+    Δcds::VectorType = zeros(npoints_output)   # distance fractions between c, d
 end
 
 Adapt.@adapt_structure AnvilLocator
@@ -225,7 +227,8 @@ function interpolator(
     londs = on_architecture(architecture(grid_out), londs)
     latds = on_architecture(architecture(grid_out), latds)
 
-    update_locator!(I, londs, latds, unsafe = false)
+    # TODO REACTANT: for reactant we explicitly deactivate the boundschecks here:
+    @inbounds update_locator!(I, londs, latds, unsafe = true)
     return I
 end
 
@@ -268,7 +271,7 @@ function interpolate(
 end
 
 # the actual interpolation function
-function _interpolate!(
+Base.@propagate_inbounds function _interpolate!(
         Aout,                               # Out: interpolated values
         A,                                  # gridded values to interpolate from
         locator::AnvilLocator,
@@ -337,31 +340,31 @@ end
 end
 
 # version for 2D fields
-interpolate!(
+Base.@propagate_inbounds interpolate!(
     Aout::Field,
     A::Field2D,
     interpolator::AbstractInterpolator,
 ) = interpolate!(Aout, A, interpolator.locator, interpolator.geometry)
 
-function interpolate!(
+Base.@propagate_inbounds function interpolate!(
         Aout::Field,
         A::Field2D,
         locator::AbstractLocator,
         geometry::AbstractGridGeometry,
     )
     fields_match(Aout, A) && return copyto!(Aout.data, A.data)
-    @assert ismatching(architecture(A), Aout) "Interpolation is only supported between fields on the same architecture, got $(architecture(A)) and $(architecture(Aout))"
+    @assert ismatching(architecture(A), architecture(Aout)) "Interpolation is only supported between fields on the same architecture, got $(architecture(A)) and $(architecture(Aout))"
     return _interpolate!(Aout.data, A.data, locator, geometry, architecture(A))
 end
 
 # version for 2D field and vector
-interpolate!(
+Base.@propagate_inbounds interpolate!(
     Aout::AbstractVector,       # Out: points to interpolate onto
     A::Field2D,                 # In: field to interpolate from
     interpolator::AbstractInterpolator,
 ) = interpolate!(Aout, A, interpolator.locator, interpolator.geometry)
 
-function interpolate!(
+Base.@propagate_inbounds function interpolate!(
         Aout::AbstractVector,       # Out: points to interpolate onto
         A::Field2D,                 # In: field to interpolate from
         locator::AbstractLocator,
@@ -371,13 +374,13 @@ function interpolate!(
 end
 
 # version for 3D+ fields
-interpolate!(
+Base.@propagate_inbounds interpolate!(
     Aout::Field,        # Out: grid to interpolate onto
     A::Field,           # In: gridded data to interpolate from
     interpolator::AbstractInterpolator,
 ) = interpolate!(Aout, A, interpolator.locator, interpolator.geometry)
 
-function interpolate!(
+Base.@propagate_inbounds function interpolate!(
         Aout::Field,        # Out: grid to interpolate onto
         A::Field,           # In: gridded data to interpolate from
         locator::AbstractLocator,
@@ -394,7 +397,7 @@ function interpolate!(
 end
 
 # interpolate while creating an interpolator on the fly
-function interpolate!(
+Base.@propagate_inbounds function interpolate!(
         Aout::Field,
         A::Field;
         kwargs...
@@ -463,16 +466,19 @@ function update_locator!(
 end
 
 function find_rings!(
-        js::AbstractVector{<:Integer},  # Out: ring indices j
+        js::AbstractVector,             # Out: ring indices j
         Δys::AbstractVector,            # Out: distance fractions to ring further south
         θs::AbstractVector,             # latitudes to interpolate onto
         latd::AbstractVector;           # latitudes of the rings on the original grid
-        unsafe::Bool = false,             # skip safety checks when true
+        unsafe::Bool = false,           # skip safety checks when true
         architecture::AbstractArchitecture = architecture(js)
     )
 
     if ~unsafe
-        θmin, θmax = extrema(θs)
+        # TODO: return to `extrema` when Reactant fixed
+        # https://github.com/EnzymeAD/Reactant.jl/issues/2387
+        #θmin, θmax = extrema(θs)
+        θmin, θmax = (minimum(θs), maximum(θs))
         @assert θmin >= -90 "Latitudes θs are expected to be within [-90˚, 90˚]; θ=$(θmin)˚ given."
         @assert θmax <= 90 "Latitudes θs are expected to be within [-90˚, 90˚]; θ=$(θmax)˚ given."
 
@@ -538,12 +544,12 @@ DimensionMismatchArray(a::AbstractArray, bs::AbstractArray...) =
 end
 
 function find_rings_unsafe!(
-        js::AbstractArray{<:Integer},  # Out: vector of ring indices
+        js::AbstractArray,             # Out: vector of ring indices
         Δys::AbstractArray,            # distance fractions to ring further south
         θs::AbstractArray,             # latitudes of points to interpolate onto
-        latd::AbstractArray{NF},       # latitudes of rings (90˚ to -90˚, strictly decreasing)
+        latd::AbstractArray,           # latitudes of rings (90˚ to -90˚, strictly decreasing)
         architecture::AbstractArchitecture
-    ) where {NF <: AbstractFloat}
+    )
 
     @boundscheck length(js) == length(θs) || throw(DimensionMismatchArray(js, θs))
     @boundscheck length(js) == length(Δys) || throw(DimensionMismatchArray(js, Δys))
@@ -569,15 +575,15 @@ function find_rings(θs::AbstractVector, latd::AbstractVector{NF}) where {NF}
 end
 
 @kernel inbounds = true function find_grid_indices_kernel!(
-        @Const(js),            # ring indices j
+        js,            # ring indices j
         ij_as, ij_bs,          # northern point indices
         ij_cs, ij_ds,          # southern point indices
         Δabs, Δcds,            # distance fractions
-        @Const(λs),            # longitudes to interpolate onto
-        @Const(lon_offsets),   # longitude offsets for each ring
-        @Const(nlons),         # number of longitude points per ring
-        @Const(nlat),          # number of latitude rings
-        @Const(rings)          # ring indices
+        λs,            # longitudes to interpolate onto
+        lon_offsets,   # longitude offsets for each ring
+        nlons,         # number of longitude points per ring
+        nlat,          # number of latitude rings
+        rings          # ring indices
     )
     k = @index(Global, Linear)
 
@@ -671,7 +677,7 @@ $(TYPEDSIGNATURES)
 Computes the average at the North and South pole from a given grid `A` and it's precomputed
 ring indices `rings`. The North pole average is an equally weighted average of all grid points
 on the northern-most ring. Similar for the South pole."""
-@inline function average_on_poles(A::AbstractVector{NF}, rings) where {NF <: AbstractFloat}
+@inline function average_on_poles(A::AbstractVector, rings)
     # TODO: doing the computation below causes allocations, doing it with views causes scalarindexing on GPU
     A_northpole = mean(A[rings[1]])     # average of all grid points around the north pole
     A_southpole = mean(A[rings[end]])   # same for south pole
