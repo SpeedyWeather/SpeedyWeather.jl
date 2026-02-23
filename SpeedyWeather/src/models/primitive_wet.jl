@@ -196,8 +196,8 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
     # initialize non-atmosphere prognostic variables
     (; particles, ocean, land) = prognostic_variables
     initialize!(particles, prognostic_variables, diagnostic_variables, model.particle_advection, model)
-    @maybe_jit arch initialize!(ocean, prognostic_variables, diagnostic_variables, model.ocean, model)
-    @maybe_jit arch initialize!(land, prognostic_variables, diagnostic_variables, model.land, model)
+    initialize!(ocean, prognostic_variables, diagnostic_variables, model.ocean, model)
+    initialize!(land, prognostic_variables, diagnostic_variables, model.land, model)
 
     # set the initial conditions (may overwrite variables set in initialize! ocean/land)
     @maybe_jit arch initialize!(prognostic_variables, model.initial_conditions, model)

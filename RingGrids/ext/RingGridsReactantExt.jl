@@ -18,22 +18,23 @@ Base.Broadcast.BroadcastStyle(::Type{AbstractField{T, N, ArrayType, Grid}}) wher
 @kernel inbounds = true function find_rings_kernel_branchless!(
         js,                # Out: ring indices j
         Δys,               # Out: distance fractions to ring further south
-        @Const(θs),        # latitudes to interpolate onto
-        @Const(latd)       # latitudes of the rings on the original grid
+        θs,        # latitudes to interpolate onto
+        latd,      # latitudes of the rings on the original grid
+        n::Int     # length(latd), passed explicitly to avoid dynamic dispatch
     )
     k = @index(Global, Linear)
     θ = θs[k]
 
     # latd is strictly decreasing, count how many entries satisfy latd[i] >= θ
     # this gives j such that latd[j] >= θ > latd[j+1]
-    n = length(latd)
     j = 0
     for i in 1:n
-        j += (latd[i] >= θ)
+        j += ifelse(latd[i] >= θ, 1, 0)
     end
 
     # clamp to valid range [1, n-1] to avoid out-of-bounds on latd[j+1]
-    j = clamp(j, 1, n - 1)
+    j = max(j, 1)
+    j = min(j, n - 1)
 
     # Store results
     js[k] = j - 1  # 0 = north pole, nlat = south pole
@@ -65,10 +66,7 @@ function RingGrids.find_rings_unsafe!(
         latd::AbstractArray,
         architecture::ReactantDevice
     )
-
-    @boundscheck length(js) == length(θs) || throw(RingGrids.DimensionMismatchArray(js, θs))
-    @boundscheck length(js) == length(Δys) || throw(RingGrids.DimensionMismatchArray(js, Δys))
-
+    # TODO: include boundschecks again when issue with Reactant resolved
     return launch!(
         architecture,
         LinearWorkOrder,
@@ -77,7 +75,8 @@ function RingGrids.find_rings_unsafe!(
         js,
         Δys,
         θs,
-        latd
+        latd,
+        length(latd)
     )
 end
 

@@ -62,9 +62,7 @@ function initialize!(land::SeasonalLandTemperature, model::PrimitiveEquation)
     masked_value = land.ocean_temperature
     return if land.mask
         # Replace NaN values in soil temperature with a fallback ocean temperature
-        # unpack via .data due to broadcasting issues
-        mtd = monthly_temperature.data
-        mtd[isnan.(mtd)] .= masked_value
+        mask!(monthly_temperature, isnan.(monthly_temperature), :land; masked_value)
 
         # but land-sea mask may not align so also set those 100% ocean points to
         # the same fallback ocean temperature
@@ -189,9 +187,8 @@ function initialize!(
     # set ocean "land" temperature points (100% ocean only)
     return if land.mask
         masked_value = land.ocean_temperature
-        # TODO currently requries .data because of broadcasting issues
-        lst = progn.land.soil_temperature.data
-        lst[isnan.(lst)] .= masked_value
+
+        mask!(progn.land.soil_temperature, isnan.(progn.land.soil_temperature), :land; masked_value) # land because 1 in isnan.(x) is set to masked_value
         mask!(progn.land.soil_temperature, model.land_sea_mask, :ocean; masked_value)
     end
 end

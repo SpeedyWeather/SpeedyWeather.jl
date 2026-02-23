@@ -43,7 +43,6 @@ function mask!(
     masked_val = convert(eltype(field), masked_value)
 
     @boundscheck fields_match(field, mask, horizontal_only = true) || throw(DimensionMismatch(field, mask))
-    @boundscheck ndims(mask) == 1 || throw(DimensionMismatch(field, mask))
 
     arch = architecture(field)
     launch!(arch, RingGridWorkOrder, size(field), mask_kernel!, field, mask, val, masked_val)
@@ -51,9 +50,16 @@ function mask!(
 end
 
 # 2D, 3D or ND variant via Cartesian indexing
-@kernel inbounds = true function mask_kernel!(field, mask, val, masked_val)
+@kernel inbounds = true function mask_kernel!(field::AbstractArray{T, N}, mask::AbstractVector{R}, val, masked_val) where {T, R, N}
     ijk = @index(Global, Cartesian)
     if mask[ijk[1]] == val
+        field[ijk] = masked_val
+    end
+end
+
+@kernel inbounds = true function mask_kernel!(field::AbstractArray{T, N}, mask::AbstractArray{R, N}, val, masked_val) where {T, R, N}
+    ijk = @index(Global, Cartesian)
+    if mask[ijk] == val
         field[ijk] = masked_val
     end
 end
