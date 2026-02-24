@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add entrainment profiles to Betts-Miller convection, wet and dry [#976](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/976)
+
 ## v0.18.1
 
 - Fix docs colatitude -> latitude terminology [#990](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/990)
