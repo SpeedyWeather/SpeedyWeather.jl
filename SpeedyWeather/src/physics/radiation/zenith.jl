@@ -163,10 +163,10 @@ $(TYPEDSIGNATURES)
 Fraction of year as angle in radians [0...2π].
 TODO: Takes length of day/year as argument, but calls to Dates.Time(), Dates.dayofyear()
 currently have these hardcoded."""
-function year_angle(::Type{T}, time::DateTime, length_of_day::Second, length_of_year::Second) where {T}
-    year2rad = convert(T, 2π / length_of_year.value)
+function year_angle(::Type{T}, time::DateTime, length_of_day::Period, length_of_year::Period) where {T}
+    year2rad = T(2π) / Second(length_of_year).value
     sec_of_day = Dates.second(Dates.Time(time).instant)
-    return year2rad * (Dates.dayofyear(time) * length_of_day.value + sec_of_day)
+    return year2rad * (Dates.dayofyear(time) * Second(length_of_day).value + sec_of_day)
 end
 
 """
@@ -174,14 +174,13 @@ $(TYPEDSIGNATURES)
 Fraction of day as angle in radians [0...2π].
 TODO: Takes length of day as argument, but a call to Dates.Time()
 currently have this hardcoded anyway."""
-function solar_hour_angle(
-        ::Type{T},
+function solar_hour_angle(::Type{T},
         time::DateTime,
         λ,                      # longitude in radians
-        length_of_day::Second
+        length_of_day::Period
     ) where {T}
-    day2rad = convert(T, 2π / length_of_day.value)
-    noon_in_sec = length_of_day.value ÷ 2
+    day2rad = T(2π) / Second(length_of_day).value
+    noon_in_sec = Second(length_of_day).value ÷ 2
     sec_of_day = Dates.second(Dates.Time(time).instant)
     return (sec_of_day - noon_in_sec) * day2rad + convert(T, λ)
 end
@@ -237,7 +236,7 @@ end
 
     ij = @index(Global, Linear)
     j = whichring[ij]
-
+    
     sinδsinϕ = sinδ * sinlat[j]
     cosδcosϕ = cosδ * coslat[j]
     h = solar_hour_angle_0E + lons[ij]      # solar hour angle at longitude λ in radians
@@ -306,21 +305,16 @@ end
 
     ij = @index(Global, Linear)
     j = whichring[ij]
-
-    NF = eltype(cos_zenith)         # force type stability
-    local h₀::NF                    # hour angle sunrise to sunset
-    local cos_zenith_j::NF          # at latitude j
+    NF = eltype(cos_zenith)
 
     ϕ = lat[j]
-    h₀ = abs(δ) + abs(ϕ) < π / 2 ?    # polar day/night?
-        acos(-tan(ϕ) * tan(δ)) :   # if not: calculate length of day
-        ϕ * δ > 0 ? π : 0            # polar day if signs are equal, otherwise polar night
+    h₀ = NF(ifelse(2*(abs(δ) + abs(ϕ)) < π,     # polar day/night?
+        acos(-tan(ϕ) * tan(δ)),                 # if not: length of day
+        ifelse(ϕ * δ > 0, π, 0)))               # polar day if signs are equal, otherwise polar night
 
     sinϕ, cosϕ = sinlat[j], coslat[j]
     cos_zenith_j = h₀ * sinδ * sinϕ + cosδ * cosϕ * sin(h₀)
-    cos_zenith_j /= π
-
-    cos_zenith[ij] = cos_zenith_j
+    cos_zenith[ij] = cos_zenith_j / π
 end
 
 function variables(::AbstractZenith)

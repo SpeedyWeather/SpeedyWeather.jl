@@ -92,6 +92,10 @@ computes the time dilation given a `planet` with `length_of_day` and `length_of_
 function initialize!(clock::Clock, time_stepping::AbstractTimeStepper, planet::AbstractPlanet, args...)
 
     # given a planet's length of day and year, we can compute the dilation factors for the rotation and orbit time
+    @assert planet.length_of_day.value != 0 "planet.length_of_day is 0 (rotating infinitely fast)," *
+        " choose Second(typemax(Int)) for a tidally locked planet." 
+    @assert planet.length_of_year.value != 0 "planet.length_of_year is 0 (orbiting infinitely fast)," *
+        " choose Second(typemax(Int)) or seasonal_cycle=false to remove seasons." 
     clock.rotation_dilation = Second(EARTH_DAY).value / Second(planet.length_of_day).value
     clock.orbit_dilation = Second(EARTH_YEAR).value / Second(planet.length_of_year).value
 
