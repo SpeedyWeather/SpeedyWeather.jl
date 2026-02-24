@@ -33,7 +33,7 @@ ConstantEntrainment(SG::SpectralGrid; kwargs...) = ConstantEntrainment{SG.NF}(; 
 """$(TYPEDSIGNATURES) Entrainment rate at sigma level σ for constant profile."""
 @inline (E::ConstantEntrainment)(σ) = E.entrainment_rate
 
-## CONVECTION SCHEMES
+# CONVECTION SCHEMES
 abstract type AbstractConvection <: AbstractParameterization end
 
 export BettsMillerConvection

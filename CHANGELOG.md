@@ -4,9 +4,15 @@
 
 - Add entrainment profiles to Betts-Miller convection, wet and dry [#976](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/976)
 
+## v0.18.1
+
+- Fix docs colatitude -> latitude terminology [#990](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/990)
+- Progress bar with additional information [#989](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/989)
+- Bug fix: Ozone absorption now deposited into stratospheric layers [#986](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/986)
+- Adds a drag term to winds above a certain speed limit [#987](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/987)
+
 ## v0.18
 
-- Adds a drag term to winds above a certain speed limit [#987](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/987/commits)
 - Installation main instructions in docs + schedule tests [#979](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/979)
 - Bug fix: Cloud reflectivity on half level above not below [#978](https://github.dev/SpeedyWeather/SpeedyWeather.jl/pull/978)
 - Fix absorptivity_water_vapor and absorptivity_cloud_base default values [#974](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/974)
