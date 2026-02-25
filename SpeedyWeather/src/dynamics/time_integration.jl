@@ -270,7 +270,7 @@ function first_timesteps!(
         model::AbstractModel,               # everything that is constant at runtime
     )
     (; clock) = progn
-    if clock.n_timesteps == 0 && return nothing    # exit immediately for no time steps
+    clock.n_timesteps == 0 && return nothing    # exit immediately for no time steps
 
     (; implicit) = model
     (; Δt, Δt_millisec) = model.time_stepping
