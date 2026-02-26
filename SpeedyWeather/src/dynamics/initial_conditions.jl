@@ -394,7 +394,7 @@ $(TYPEDSIGNATURES)
 Create a struct that contains all parameters for the Jablonowski and Williamson, 2006
 intitial conditions for the primitive equation model. Default values as in Jablonowski.
 $(TYPEDFIELDS)"""
-@kwdef struct ZonalWind{NF} <: AbstractInitialConditions
+@kwdef struct ZonalWind{NF, F} <: AbstractInitialConditions
     "conversion from σ to Jablonowski's ηᵥ-coordinates"
     η₀::NF = 0.252
 
@@ -413,9 +413,12 @@ $(TYPEDFIELDS)"""
 
     "[OPTION] radius of Gaussian perturbation in units of Earth's radius [1]"
     perturb_radius::NF = 1 / 10
+
+    # TODO: remove that again once we have the new variable system and access to diagnostic variables here as well to use those as a scratch
+    scratch_field::F
 end
 
-ZonalWind(SG::SpectralGrid; kwargs...) = ZonalWind{SG.NF}(; kwargs...)
+ZonalWind(SG::SpectralGrid; kwargs...) = ZonalWind{SG.NF, SG.GridVariable3D}(; scratch_field = zeros(SG.NF, SG.grid, SG.nlayers), kwargs...)
 
 """
 $(TYPEDSIGNATURES)
@@ -426,7 +429,7 @@ function initialize!(
         model::PrimitiveEquation
     )
 
-    (; u₀, η₀) = initial_conditions
+    (; u₀, η₀, scratch_field) = initial_conditions
     (; perturb_uₚ, perturb_radius) = initial_conditions
     λc = initial_conditions.perturb_lon
     sinφc, cosφc = sind(initial_conditions.perturb_lat), cosd(initial_conditions.perturb_lat)
@@ -437,7 +440,7 @@ function initialize!(
     div_ic = JablonowskiDivergence(sinφc, cosφc, λc, radius, u₀, η₀, perturb_uₚ, R)
 
     # apply those to set the initial conditions for vor, div
-    set!(progn, model; vor = vor_ic, div = div_ic, lf = 1, static_func = true)
+    set!(progn, model; vor = vor_ic, div = div_ic, lf = 1, static_func = true, scratch_field)
     return nothing
 end
 
@@ -585,11 +588,10 @@ $(TYPEDSIGNATURES)
 Initial conditions from Jablonowski and Williamson, 2006, QJR Meteorol. Soc"""
 function initialize!(
         progn::PrognosticVariables,
-        initial_conditions::JablonowskiTemperature,
+        initial_conditions::JablonowskiTemperature{NF},
         model::PrimitiveEquation
-    )
+    ) where {NF}
 
-    NF = eltype(progn)
     (; u₀, η₀, ΔT, Tmin) = initial_conditions
     (; σ_tropopause) = initial_conditions
 
@@ -600,22 +602,17 @@ function initialize!(
     (; radius, rotation, gravity) = model.planet
 
     (; σ_levels_full) = model.geometry
-    σ_levels_full_cpu = on_architecture(CPU(), σ_levels_full)
     φ = model.geometry.latds
 
     # vertical profile
-    Tη = similar(σ_levels_full_cpu)
-    for k in 1:nlayers
-        σ = σ_levels_full_cpu[k]
-        Tη[k] = T₀ * σ^(R_dry * Γ / gravity)      # Jablonowski and Williamson eq. 4
-
-        if σ < σ_tropopause
-            Tη[k] += ΔT * (σ_tropopause - σ)^5          # Jablonowski and Williamson eq. 5
-        end
-    end
-
-    Tη .= max.(Tη, Tmin)
-    Tη = on_architecture(model.architecture, Tη)
+    exponent = R_dry * Γ / gravity
+    Tη = T₀ .* σ_levels_full .^ exponent .+
+        ifelse.(
+        σ_levels_full .< σ_tropopause,
+        ΔT .* (σ_tropopause .- σ_levels_full) .^ 5,
+        zero(NF)
+    )
+    Tη = max.(Tη, Tmin)
 
     # temperature
     temp_grid = zeros(NF, grid, nlayers)
@@ -812,10 +809,11 @@ function initialize!(
 
     lnp₀ = log(p₀)                      # logarithm of reference surface pressure [log(Pa)]
     lnp_grid = similar(orography)       # allocate log surface pressure on grid
-
+    @info lnp_grid
     RΓg⁻¹ = R_dry * Γ / gravity         # for convenience
     ΓT₀⁻¹ = Γ / T₀
     @. lnp_grid = lnp₀ + log(1 - ΓT₀⁻¹ * orography) / RΓg⁻¹
+    @info lnp_grid
     set!(progn, model; pres = lnp_grid, lf = 1)
     return nothing
 end
