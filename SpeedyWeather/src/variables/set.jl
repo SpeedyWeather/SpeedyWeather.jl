@@ -108,17 +108,12 @@ function set!(
     if isnothing(S)
         specs = transform(field)
     else
-        # convert to number format in S, needed for FFTW
-        @info "eltype(field): $(eltype(field)), eltype(S): $(eltype(S))"
-        @info eltype(field) <: eltype(S)
-        if !(eltype(field) <: eltype(S))
-            field = convert.(eltype(S), field)
-        end
+        # TODO: NF convert removed becaue of problems with Reactant, reimplement it
 
         # only allocate temporary array if we need to transform to a different truncation
         if var.spectrum == S.spectrum
-            @info "reusing spectral transform"
-            return transform!(var, field, S)
+            transform!(var, field, S)
+            return nothing
         else
             specs = transform(field, S)
         end
