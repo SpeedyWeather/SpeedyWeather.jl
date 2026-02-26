@@ -615,7 +615,7 @@ function initialize!(
     Tη = max.(Tη, Tmin)
 
     # temperature
-    temp_grid = similar(progn.temp, grid, NF)
+    temp_grid = similar(progn.temp[:, :, 2], grid, NF)
     aΩ = radius * rotation
 
     # Launch kernel
