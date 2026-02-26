@@ -809,11 +809,9 @@ function initialize!(
 
     lnp₀ = log(p₀)                      # logarithm of reference surface pressure [log(Pa)]
     lnp_grid = similar(orography)       # allocate log surface pressure on grid
-    @info lnp_grid
     RΓg⁻¹ = R_dry * Γ / gravity         # for convenience
     ΓT₀⁻¹ = Γ / T₀
     @. lnp_grid = lnp₀ + log(1 - ΓT₀⁻¹ * orography) / RΓg⁻¹
-    @info lnp_grid
     set!(progn, model; pres = lnp_grid, lf = 1)
     return nothing
 end
