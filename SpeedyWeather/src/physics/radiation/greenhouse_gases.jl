@@ -2,6 +2,12 @@ abstract type AbstractGreenhouseGas <: AbstractModelComponent end
 abstract type AbstractCO2 <: AbstractGreenhouseGas end
 # variables(::AbstractCO2) = PrognosticVariable(:co2, ...)
 
+"""$(TYPEDSIGNATURES) CO2 uses unit of ppm, so *1e-6 to convert to kg/kg."""
+@inline unit(::AbstractCO2) = 1f-6
+
+"""$(TYPEDSIGNATURES) The molar mass ratio CO2 / molar mass of dry air"""
+@inline molar_mass_ratio(::AbstractCO2) = 44f0 / 29f0
+
 const DEFAULT_CO2 = 280     # preindustrial CO2 [ppm]
 
 export CO2
@@ -16,8 +22,8 @@ end
 CO2(SG::SpectralGrid, concentration::Real = DEFAULT_CO2) = CO2{SG.NF}(concentration)
 CO2(SG::SpectralGrid, concentration::Function) = CO2(concentration)
 
-(C::CO2)(::DateTime) = C.concentration
-(C::CO2{<:Function})(t::DateTime) = C.concentration(t)
+@inline (C::CO2)(::DateTime) = C.concentration
+@inline (C::CO2{<:Function})(t::DateTime) = C.concentration(t)
 
 export TwoTimesCO2, FourTimesCO2
 "$(TYPEDSIGNATURES) 2xCO2 scenario: Doubles preindustrial `DEFAULT_CO2` in the year 2000."
@@ -41,17 +47,17 @@ to the Keeling curve, ignoring seasonal variation."""
     a::NF = 3.85
 
     "[OPTION] e-folding frequency b in `c + a*exp((t-t0)*b)` [1/year]"
-    b::NF = 1/48
+    b::NF = 1 / 48
 end
 
 ExponentialCO2(SG::SpectralGrid; kwargs...) = ExponentialCO2{SG.NF}(; kwargs...)
-function (C::ExponentialCO2{NF})(t::DateTime) where NF
+function (C::ExponentialCO2{NF})(t::DateTime) where {NF}
 
     # time since start in seconds, convert from Float64 to NF
     Δt = convert(NF, Dates.datetime2unix(t) - Dates.datetime2unix(C.start))
     Δt /= (365.25f0 * 24 * 3600)    # time in years
     Δt = convert(NF, Δt)            # to compute the exponential in NF
-    
+
     return C.base_concentration + C.a * exp(C.b * Δt)
 end
 
