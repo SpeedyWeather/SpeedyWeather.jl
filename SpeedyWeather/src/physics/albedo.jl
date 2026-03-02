@@ -133,7 +133,7 @@ export AlbedoClimatology
     version::VersionNumber = DEFAULT_ASSETS_VERSION
 
     "[OPTION] Grid the albedo file comes on"
-    file_Grid::Type{<:AbstractGrid} = FullGaussianGrid
+    FieldType::Type{<:AbstractField} = FullGaussianField
 
     "Albedo climatology"
     albedo::GridVariable2D
@@ -154,14 +154,15 @@ set!(albedo::AbstractAlbedo, args...; kwargs...) = set!(albedo.albedo, args...; 
 function initialize!(albedo::AlbedoClimatology, model::PrimitiveEquation)
 
     # LOAD NETCDF FILE
-    a, _ = get_asset(
+    a = get_asset(
         albedo.path;
         from_assets = albedo.from_assets,
         name = albedo.varname,
-        type = albedo.file_Grid,
-        format = NCDataset,
+        ArrayType = albedo.FieldType,
+        FileFormat = NCDataset,
         version = albedo.version
     )
+    
     return interpolate!(albedo.albedo, a)
 end
 

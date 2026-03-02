@@ -86,10 +86,8 @@ export VegetationClimatology
     varname_vegl::String = "vegl"
 
     "[OPTION] Grid the soil moisture file comes on"
-    file_Grid::Type{<:AbstractGrid} = FullGaussianGrid
+    FieldType::Type{<:AbstractField} = FullGaussianField
 
-    "[OPTION] The missing value in the data respresenting ocean"
-    missing_value::NF = NF(NaN)
     # to be filled from file
     "High vegetation cover [1], interpolated onto Grid"
     high_cover::GridVariable2D
@@ -113,20 +111,21 @@ end
 function initialize!(vegetation::VegetationClimatology, model::PrimitiveEquation)
 
     # LOAD NETCDF FILE
-    vegh, _ = get_asset(
+    vegh = get_asset(
         vegetation.path;
         from_assets = vegetation.from_assets,
         name = vegetation.varname_vegh,
-        type = vegetation.file_Grid,
-        format = NCDataset,
+        ArrayType = vegetation.FieldType,
+        FileFormat = NCDataset,
         version = vegetation.version
     )
-    vegl, _ = get_asset(
+
+    vegl = get_asset(
         vegetation.path;
         from_assets = vegetation.from_assets,
         name = vegetation.varname_vegl,
-        type = vegetation.file_Grid,
-        format = NCDataset,
+        ArrayType = vegetation.FieldType,
+        FileFormat = NCDataset,
         version = vegetation.version
     )
 

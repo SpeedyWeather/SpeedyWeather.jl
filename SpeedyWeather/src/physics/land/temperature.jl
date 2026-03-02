@@ -22,10 +22,7 @@ $(TYPEDFIELDS)"""
     varname::String = "lst"
 
     "[OPTION] Grid the land surface temperature file comes on"
-    file_Grid::Type{<:AbstractGrid} = FullGaussianGrid
-
-    "[OPTION] The missing value in the data respresenting ocean"
-    missing_value::NF = NF(NaN)
+    FieldType::Type{<:AbstractField} = FullGaussianField
 
     "[OPTION] Apply land-sea mask to use fallback ocean temperature for ocean-only points?"
     mask::Bool = true
@@ -58,16 +55,15 @@ function initialize!(land::SeasonalLandTemperature, model::PrimitiveEquation)
     (; monthly_temperature) = land
 
     # LOAD NETCDF FILE
-    lst, fill_value = get_asset(
+    lst = get_asset(
         land.path;
         from_assets = land.from_assets,
         name = land.varname,
-        type = land.file_Grid,
-        format = NCDataset,
+        ArrayType = land.FieldType,
+        FileFormat = NCDataset,
         version = land.version
     )
-
-    lst[lst .=== fill_value] .= land.missing_value      # === to include NaN
+    
     lst = on_architecture(model.architecture, lst)
 
     @boundscheck fields_match(monthly_temperature, lst, vertical_only = true) ||

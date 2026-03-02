@@ -26,7 +26,7 @@ $(TYPEDFIELDS)"""
     varname_layer2::String = "swl2"
 
     "[OPTION] Grid the soil moisture file comes on"
-    file_Grid::Type{<:AbstractGrid} = FullGaussianGrid
+    FieldType::Type{<:AbstractField} = FullGaussianField
 
     "[OPTION] The missing value in the data respresenting ocean"
     missing_value::NF = NF(NaN)
@@ -60,35 +60,29 @@ function initialize!(soil::SeasonalSoilMoisture, model::PrimitiveEquation)
     (; monthly_soil_moisture) = soil
 
     # LOAD NETCDF FILE
-    ncfile = get_asset(
+    field_layer1 = get_asset(
         soil.path;
         from_assets = soil.from_assets,
-        name = "sm",
-        type = NCDataset,
-        format = NCDataset,
+        name = soil.varname_layer1,
+        ArrayType = soil.FieldType,
+        FileFormat = NCDataset,
         version = soil.version
     )
 
-    # read out netCDF data
-    nx, ny, nt = ncfile.dim["lon"], ncfile.dim["lat"], ncfile.dim["time"]
-    nlat_half = RingGrids.get_nlat_half(soil.file_Grid, nx * ny)
-    grid = soil.file_Grid(nlat_half)
+    field_layer2 = get_asset(
+        soil.path;
+        from_assets = soil.from_assets,
+        name = soil.varname_layer2,
+        ArrayType = soil.FieldType,
+        FileFormat = NCDataset,
+        version = soil.version
+    )
 
-    # the soil moisture from file but wrapped into a grid
-    NF = eltype(monthly_soil_moisture)
-    nlayers = size(monthly_soil_moisture, 2)
-    soil_moisture_file = zeros(NF, grid, nlayers, nt)
-
-    for l in 1:nt   # read out monthly to swap dimensions to horizontal - vertical - time
-        soil_moisture_file[:, 1, l] .= vec(ncfile[soil.varname_layer1].var[:, :, l])
-        soil_moisture_file[:, 2, l] .= vec(ncfile[soil.varname_layer2].var[:, :, l])
-    end
-
-    fill_value1 = NF(ncfile[soil.varname_layer1].attrib["_FillValue"])
-    fill_value2 = NF(ncfile[soil.varname_layer2].attrib["_FillValue"])
-    fill_value1 === fill_value2 || @warn "Fill values are different for the two soil layers, use only from layer 1"
-    soil_moisture_file[soil_moisture_file .=== fill_value1] .= soil.missing_value      # === to include NaN
-    soil_moisture_file = on_architecture(model.architecture, soil_moisture_file)
+    # 2 layers, 12 months
+    field = zeros(field_layer1.grid, 2, 12)
+    field[:, 1, :] .= field_layer1
+    field[:, 2, :] .= field_layer2
+    soil_moisture_file = on_architecture(model.architecture, field)
 
     @boundscheck fields_match(monthly_soil_moisture, soil_moisture_file, vertical_only = true) ||
         throw(DimensionMismatch(monthly_soil_moisture, soil_moisture_file))

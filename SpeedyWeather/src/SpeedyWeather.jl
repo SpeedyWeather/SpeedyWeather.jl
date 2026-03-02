@@ -33,7 +33,7 @@ import CodecZlib
 import BitInformation: round, round!
 import ProgressMeter
 import Artifacts
-import Pkg.Artifacts as PkgA
+import Pkg
 
 # UTILITIES
 using DomainSets.IntervalSets

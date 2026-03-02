@@ -110,10 +110,7 @@ $(TYPEDFIELDS)"""
     varname::String = "sst"
 
     "[OPTION] Grid the sea surface temperature file comes on"
-    file_Grid::Type{<:AbstractGrid} = FullGaussianGrid
-
-    "[OPTION] The missing value in the data respresenting land"
-    missing_value::NF = NF(NaN)
+    FieldType::Type{<:AbstractField} = FullGaussianField
 
     # to be filled from file
     "Monthly sea surface temperatures [K], interpolated onto Grid"
@@ -129,17 +126,14 @@ end
 function initialize!(ocean::SeasonalOceanClimatology, model::PrimitiveEquation)
     (; monthly_temperature) = ocean
 
-    sst, fill_value = get_asset(
+    sst = get_asset(
         ocean.path;
         from_assets = ocean.from_assets,
         name = ocean.varname,
-        type = ocean.file_Grid,
-        format = NCDataset,
+        ArrayType = ocean.FieldType,
+        FileFormat = NCDataset,
         version = ocean.version
     )
-
-    # create interpolator from grid in file to grid used in model
-    sst[sst .=== fill_value] .= ocean.missing_value      # === to include NaN
 
     # transfer to architecture of model if needed
     sst = on_architecture(model.architecture, sst)
@@ -229,7 +223,7 @@ $(TYPEDFIELDS)"""
     varname::String = "sst"
 
     "[OPTION] Grid the sea surface temperature file comes on"
-    file_Grid::Type{<:AbstractGrid} = FullGaussianGrid
+    FieldType::Type{<:AbstractField} = FullGaussianField
 
     "[OPTION] The missing value in the data respresenting land"
     missing_value::Float64 = NaN
@@ -250,14 +244,15 @@ function initialize!(
         model::PrimitiveEquation,
     ) where {PrognosticVariablesOcean}
     # create a seasonal model, initialize it and the variables
-    (; path, file, varname, file_Grid, missing_value) = ocean_model
+    (; path, file, varname, FieldType) = ocean_model
     (; NF, GridVariable3D, grid) = model.spectral_grid
     seasonal_model = SeasonalOceanClimatology{NF, typeof(grid), GridVariable3D}(;
-        grid, path, file, varname, file_Grid, missing_value
+        grid, path, file, varname, FieldType
     )
     initialize!(seasonal_model, model)
-    return initialize!(ocean, progn, diagn, seasonal_model, model)
+    initialize!(ocean, progn, diagn, seasonal_model, model)
     # (seasonal model will be garbage collected hereafter)
+    return nothing
 end
 
 function timestep!(

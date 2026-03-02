@@ -90,7 +90,7 @@ $(TYPEDFIELDS)"""
     varname::String = "lsm"
 
     "Grid the land-sea mask file comes on"
-    file_Grid::Type{<:AbstractGrid} = FullClenshawGrid
+    FieldType::Type{<:AbstractField} = FullClenshawField
 
     "[OPTION] Quantization to fraction?"
     quantization::Float64 = 0.01
@@ -128,12 +128,12 @@ onto the model grid for a fractional sea mask."""
 function initialize!(land_sea_mask::EarthLandSeaMask, model::PrimitiveEquation)
 
     # LOAD NETCDF FILE
-    lsm_highres, _ = get_asset(
+    lsm_highres = get_asset(
         land_sea_mask.path;
         from_assets = land_sea_mask.from_assets,
         name = land_sea_mask.varname,
-        type = land_sea_mask.file_Grid,
-        format = NCDataset,
+        ArrayType = land_sea_mask.FieldType,
+        FileFormat = NCDataset,
         version = land_sea_mask.version
     )
 
