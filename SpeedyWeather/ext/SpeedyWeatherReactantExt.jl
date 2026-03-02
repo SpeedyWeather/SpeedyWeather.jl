@@ -3,8 +3,13 @@ module SpeedyWeatherReactantExt
 using SpeedyWeather
 using Reactant
 using DocStringExtensions
+using Dates
 
 using SpeedyWeather: ReactantDevice, scale!, get_step, unpack, timestep!, first_timesteps!, later_timestep!
+
+const ReactantDatesExt = Base.get_extension(
+    Reactant, :ReactantDatesExt
+)
 
 const ReactantSimulation = Union{
     Simulation{<:BarotropicModel{SG, <:ReactantDevice}},
@@ -58,5 +63,8 @@ function SpeedyWeather.timestep!(simulation::ReactantSimulation, r_first_timeste
         r_later_timestep!(simulation)
     end
 end
+
+# that's for Reactant TracableDateTime
+SpeedyWeather.secondofday(dt::ReactantDatesExt.TraceableRDateTime) = Dates.second(ReactantDatesExt.TraceableRTime(dt).instant)
 
 end
