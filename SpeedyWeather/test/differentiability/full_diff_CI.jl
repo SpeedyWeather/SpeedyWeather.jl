@@ -17,6 +17,8 @@ if VERSION <= v"1.11.0"
         (; prognostic_variables, diagnostic_variables, model) = simulation
         (; Δt, Δt_millisec) = model.time_stepping
         dt = 2Δt
+        lf1 = 1
+        lf2 = 2
 
         progn = prognostic_variables
         diagn = diagnostic_variables
