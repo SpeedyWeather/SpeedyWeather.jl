@@ -1,5 +1,4 @@
-"""
-$(TYPEDSIGNATURES)
+"""$(TYPEDSIGNATURES)
 Check whether elements of a vector `v` are strictly increasing."""
 function isincreasing(v::AbstractVector)
     is_increasing = true
@@ -9,9 +8,7 @@ function isincreasing(v::AbstractVector)
     return is_increasing
 end
 
-"""
-$(TYPEDSIGNATURES)
-
+"""$(TYPEDSIGNATURES)
 Check whether elements of a vector `v` are strictly decreasing."""
 function isdecreasing(v::AbstractVector)
     is_decreasing = true
@@ -21,9 +18,7 @@ function isdecreasing(v::AbstractVector)
     return is_decreasing
 end
 
-"""
-    clip_negatives!(A::AbstractArray)
-
+"""$(TYPEDSIGNATURES)
 Set all negative entries `a` in `A` to zero."""
 function clip_negatives!(A::AbstractArray{T}) where {T}
     return @inbounds for i in eachindex(A)
@@ -31,9 +26,7 @@ function clip_negatives!(A::AbstractArray{T}) where {T}
     end
 end
 
-"""
-    underflow!(A::AbstractArray, ϵ::Real)
-
+"""$(TYPEDSIGNATURES)
 Underflows element `a` in `A` to zero if `abs(a) < ϵ`."""
 function underflow!(A::AbstractArray{T}, ϵ::Real) where {T}
     ϵT = convert(T, abs(ϵ))
@@ -42,9 +35,7 @@ function underflow!(A::AbstractArray{T}, ϵ::Real) where {T}
     end
 end
 
-"""
-    flipgsign!(A::AbstractArray)
-
+"""$(TYPEDSIGNATURES)
 Like `-A` but in-place."""
 function flipsign!(A::AbstractArray)
     @inbounds for i in eachindex(A)
@@ -52,20 +43,6 @@ function flipsign!(A::AbstractArray)
     end
     return A
 end
-
-"""
-    A = nans(T, dims...)
-
-Allocate array A with NaNs of type T. Similar to `zeros(T, dims...)`."""
-function nans(::Type{T}, dims...) where {T}
-    return fill(convert(T, NaN), dims...)
-end
-
-"""
-    A = nans(dims...)
-
-Allocate `A::Array{Float64}` with NaNs."""
-nans(dims...) = nans(Float64, dims...)
 
 """
 $(TYPEDSIGNATURES)
@@ -79,14 +56,14 @@ function print_fields(io::IO, A, keys; arrays::Bool = false)
         last = (i == n) & ~filtered
         key = keys_filtered[i]
         val = getfield(A, key)
-        ~last ? println(io, "├ $key::$(typeof(val)) = $val") :
-            print(io, "└ $key::$(typeof(val)) = $val")
+        s = "├ " * styled"{info:$key}{note:::$(typeof(val))} = $val"
+        ~last ? println(io, s) : print(io, s)
     end
-    return if filtered                 # add the names of arrays
-        s = "└── arrays: "
+    if filtered                 # add the names of arrays
+        s = styled"└── arrays: "
         for key in keys
             if ~(key in keys_filtered)
-                s *= "$key, "
+                s *= styled"{info:$key}, "
             end
         end
 
@@ -94,6 +71,7 @@ function print_fields(io::IO, A, keys; arrays::Bool = false)
         s_without_comma = s[1:prevind(s, findlast(==(','), s))]
         print(io, s_without_comma)
     end
+    return nothing
 end
 
 """$(TYPEDSIGNATURES)

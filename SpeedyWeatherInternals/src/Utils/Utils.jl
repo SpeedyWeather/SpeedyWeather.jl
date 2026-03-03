@@ -1,6 +1,7 @@
 module Utils
 
 using DocStringExtensions
+using StyledStrings
 using Dates
 using ..Architectures
 

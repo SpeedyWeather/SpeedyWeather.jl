@@ -134,22 +134,30 @@ function NetCDFOutput(
 end
 
 function Base.show(io::IO, output::NetCDFOutput{F}) where {F}
-    println(io, "NetCDFOutput{$F}")
-    println(io, "├ status: $(output.active ? "active" : "inactive/uninitialized")")
-    println(io, "├ write restart file: $(output.write_restart) (if active)")
-    println(io, "├ interpolator: $(typeof(output.interpolator))")
-    println(io, "├ path: $(joinpath(output.run_path, output.filename)) (overwrite=$(output.overwrite))")
-    println(io, "├ frequency: $(output.output_dt)")
-    print(io, "└┐ variables:")
+
+    F_str = string("{", F, "}")
+    type_param_str = length(F_str) > 30 ? string(first(F_str, 30), "...}") : F_str
+    active = output.active ? "active" : "inactive/uninitialized"
+
+    println(io, styled"{warning:NetCDFOutput}{note:$type_param_str}")
+    println(io, styled"├ {info:status}: $active")
+    println(io, styled"├ {info:write restart file}: $(output.write_restart) (if active)")
+
+    interp_type_str = string(typeof(output.interpolator))
+    interp_type_str_short = length(interp_type_str) > 70 ? string(first(interp_type_str, 70), "...}") : interp_type_str
+
+    println(io, styled"├ {info:interpolator}: $interp_type_str_short")
+    println(io, styled"├ {info:path}: $(joinpath(output.run_path, output.filename)) (overwrite=$(output.overwrite))")
+    println(io, styled"├ {info:frequency}: $(output.output_dt)")
+    print(io, styled"└┐ {info:variables}:")
     nvars = length(output.variables)
     for (i, (key, var)) in enumerate(output.variables)
-        print(io, "\n $(i == nvars ? "└" : "├") $key: $(var.long_name) [$(var.unit)]")
+        print(io, "\n $(i == nvars ? "└" : "├") ", styled"{info:$key}: $(var.long_name) ", styled"{note:[$(var.unit)]}")
     end
     return nothing
 end
 
-"""
-$(TYPEDSIGNATURES)
+"""$(TYPEDSIGNATURES)
 Add `outputvariables` to a dictionary defining the variables subject to NetCDF output."""
 function add!(D::OUTPUT_VARIABLES_DICT, outputvariables::AbstractOutputVariable...)
     for outputvariable in outputvariables   # loop over all variables in arguments

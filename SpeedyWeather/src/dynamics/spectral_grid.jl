@@ -116,13 +116,15 @@ function Base.show(io::IO, SG::SpectralGrid)
     radius_str = @sprintf("%.0f", radius / 1000)
     average_degrees = 360 / sqrt(npoints * π)
 
-    println(io, "SpectralGrid{Spectrum{...}, $Grid{...}}")
-    println(io, "├ Number format: $NF")
-    println(io, "├ Spectral:      T$trunc LowerTriangularMatrix")
-    println(io, "├ Grid:          $nlat-ring $Grid, $npoints grid points")
-    println(io, "├ Resolution:    $(s(average_degrees))°, $(s(average_resolution))km (at $(radius_str)km radius)")
-    println(io, "├ Vertical:      $nlayers-layer atmosphere")
-    return print(io, "└ Architecture:  $architecture using $ArrayType")
+    params = "{Spectrum{...}, $Grid{...}}"
+    println(io, styled"{warning:SpectralGrid}{note:$params}")
+    println(io, styled"├ {info:Number format}: $NF")
+    println(io, styled"├ {info:Spectral}:      T$trunc LowerTriangularMatrix")
+    println(io, styled"├ {info:Grid}:          $nlat-ring $Grid, $npoints grid points")
+    println(io, styled"├ {info:Resolution}:    $(s(average_degrees))°, $(s(average_resolution))km (at $(radius_str)km radius)")
+    println(io, styled"├ {info:Vertical}:      $nlayers-layer atmosphere")
+    print(io, styled"└ {info:Architecture}:  $architecture using $ArrayType")
+    return nothing
 end
 
 # Constructor that takes all [OPTION] parameters as keyword arguments

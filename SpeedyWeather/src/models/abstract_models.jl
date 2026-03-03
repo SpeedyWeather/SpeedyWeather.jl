@@ -26,9 +26,14 @@ finalize!(::AbstractModelComponent, ::AbstractModel) = nothing
 
 # print all fields with type <: Number
 function Base.show(io::IO, P::AbstractModelComponent)
-    println(io, "$(typeof(P)) <: $(supertype(typeof(P)))")
+    type_str = split("$(typeof(P))", "{", limit = 2)
+    type_itself = type_str[1]
+    type_params = length(type_str) == 2 ? ("{" * type_str[2]) : ""
+    type_params_short = length(type_params) > 30 ? first(type_params, 30) * "...}" : type_params
+    println(io, styled"{warning:$type_itself}{note:$type_params_short}" * " <: $(supertype(typeof(P)))")
     keys = propertynames(P)
-    return print_fields(io, P, keys)
+    print_fields(io, P, keys)
+    return nothing
 end
 
 """$(TYPEDSIGNATURES)
@@ -59,7 +64,7 @@ function Base.show(io::IO, M::AbstractModel)
     properties = propertynames(M)
     n = length(properties)
     Msize = prettymemory(Base.summarysize(M))
-    s = styled"{warning:$(model_type(M))}"*" <: $(model_class(M)) " * styled"{note:($Msize)}"
+    s = styled"{warning:$(model_type(M))}"*"{...} <: $(model_class(M)) " * styled"{note:($Msize)}"
     n == 0 ? print(io, s) : println(io, s)
     for (i, key) in enumerate(properties)
         val = getfield(M, key)
@@ -67,7 +72,7 @@ function Base.show(io::IO, M::AbstractModel)
         p = i == n ? print : println
         t = "$(typeof(val))"
         t = textwidth(t) > 60 ? string(t[1:57], "...") : t  # truncate long strings
-        a = "$s " * styled"{info:$key}"*": $t"
+        a = "$s " * styled"{info:$key}"*"::$t"
         p(io, a)
     end
     return nothing

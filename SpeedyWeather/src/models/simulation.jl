@@ -15,9 +15,9 @@ function Base.show(io::IO, S::AbstractSimulation)
     vsize = prettymemory(Base.summarysize(S.variables))
     Msize = prettymemory(Base.summarysize(S.model))
     Ssize = prettymemory(Base.summarysize(S))
-    println(io, styled"{warning:Simulation}", "{Variables{...}, $(model_type(S.model)){...}} ", styled"({note:$Ssize})")
-    println(io, "├ ", styled"{info:variables}" * ": Variables{...} " * styled"{note:($vsize)}")
-    print(io, "└ ", styled"{info:model}" * ": $(model_type(S.model)){...} " * styled"{note:($Msize)}")
+    println(io, styled"{warning:Simulation}", "{...} ", styled"{note:($Ssize)}")
+    println(io, "├ ", styled"{info:variables}" * "::Variables{...} " * styled"{note:($vsize)}")
+    print(io, "└ ", styled"{info:model}" * "::$(model_type(S.model)){...} " * styled"{note:($Msize)}")
     return nothing
 end
 

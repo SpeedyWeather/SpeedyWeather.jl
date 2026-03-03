@@ -25,23 +25,6 @@ end
     end
 end
 
-@testset "nans" begin
-    for s in ((3,), (3, 4), (3, 4, 5))
-        for T in (Float16, Float32, Float64)
-            A = nans(T, s...)
-            for a in A
-                @test isnan(a)
-            end
-            @test size(A) == s
-        end
-
-        A = nans(s...)
-        for a in A
-            @test isnan(a)
-        end
-    end
-end
-
 using Dates: CompoundPeriod, Day, Hour, Minute, Second, Millisecond, coarserperiod
 
 @testset "readable secs feedback" begin
