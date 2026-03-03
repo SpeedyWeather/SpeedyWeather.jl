@@ -35,7 +35,7 @@ with `from_assets = true` will look into that repository to find the
 corresponding file under `path`, note that the base path starts with
 `"data"` and then can have any subfolder(s). 
 
-```
+```julia
 joinpath("data", "subfolder", file)
 ```
 
@@ -83,15 +83,12 @@ SpeedyWeather.DEFAULT_ASSETS_VERSION
 For new released versions one should (manually) add that version to
 
 ```@example assets
-using SpeedyWeather
 SpeedyWeather.AVAILABLE_ASSETS_VERSIONS
 ```
 
 only those versions can be used in `version = v"1.1"` for example.
 Branches of SpeedyWeatherAssets, e.g. `version = "main"` do not have
 to be added to the available versions.
-
-
 
 
 
