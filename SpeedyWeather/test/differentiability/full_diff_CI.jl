@@ -37,7 +37,16 @@ if VERSION <= v"1.11.0"
             return nothing
         end
 
+        # force the GC, then disable it
+        GC.gc()
+        GC.enable(false)
+
         autodiff(Reverse, timestep_oop!, Const, Duplicated(progn_new, dprogn_new), Duplicated(progn, d_progn), Duplicated(diagn, d_diag), Const(dt), Duplicated(model, d_model))
+
+        # turn GC on again
+        GC.enable(true)
+        GC.gc()
+
         @test sum(to_vec(d_progn)[1]) != 0
 
         # with Const(model)
