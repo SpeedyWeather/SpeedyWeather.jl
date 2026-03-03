@@ -31,7 +31,7 @@ if VERSION <= v"1.11.0"
 
         autodiff(Reverse, SpeedyWeather.timestep!, Const, Duplicated(progn_new, dprogn_new), Duplicated(diagn, d_diag), Const(dt), Duplicated(model, d_model), Const(lf1), Const(lf2))
 
-        @test sum(to_vec(d_progn_new)[1]) != 0
+        @test sum(to_vec(dprogn_new)[1]) != 0
 
         # with Const(model)
         # currently not activated to keep the CI fast
