@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Enzyme CI runs without GC [#995](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/995)
 - Change from MIT to EUPL license [#992](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/992)
 
 ## v0.18.1
