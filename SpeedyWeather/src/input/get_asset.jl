@@ -1,6 +1,6 @@
 #= These 3 const are conceptually the Project.toml for assets.
 
-1. When releasing a new version of SpeedyWeatherAssets extend the ASSETS_VERSIONS_AVAILABLE tuple, e.g. (v"1", v"1.1").
+1. When releasing a new version of SpeedyWeatherAssets extend the AVAILABLE_ASSETS_VERSIONS tuple, e.g. (v"1", v"1.1").
 Do this manually as we can't automatically detect new versions from the repo.
 This allows a user to use a newer version even if not the default yet.
 
@@ -9,15 +9,18 @@ SpeedyWeatherAssets should use semantic versioning, so v"1.1" should only add ne
 =#
 const ASSETS_URL = "https://github.com/SpeedyWeather/SpeedyWeatherAssets/raw/refs"
 const DEFAULT_ASSETS_VERSION = v"1"
-const ASSETS_VERSIONS_AVAILABLE = (v"1", )
+const AVAILABLE_ASSETS_VERSIONS = (v"1", )
 
 # end SpeedyWeatherAssets "Project.toml"
 
 """$(TYPEDSIGNATURES)
-Downloads a file from the SpeedyWeatherAssets repo, adds it to 
-Artifacts.toml in the project root, and returns the file path.
+Downloads a file under `path` from the SpeedyWeatherAssets repo (if `from_assets=true`,
+otherwise locally), adds it to Artifacts.toml in the project root, and returns the file path.
 Use `version = v"1+branch"` to retrieve data from a branch,
 e.g. `version = v"1+main"` for the latest on the main branch.
+`name` is used to find a variable inside the file, `ArrayType` to determine how to wrap
+the loaded data into (in most cases) a `Field`, e.g. `FullGaussianField`, therefore determininig
+the grid the data comes on. `FileFormat` determines how to read the file, e.g. `NCDataset` for NetCDF files.
 """
 function get_asset(
         path::String;
@@ -25,7 +28,7 @@ function get_asset(
         name::String = "",
         ArrayType = Array,
         FileFormat = NCDataset,
-        version::VersionNumber = DEFAULT_ASSETS_VERSION
+        version = DEFAULT_ASSETS_VERSION
     )
 
     if !from_assets     # try to load locally
@@ -40,16 +43,16 @@ function get_asset(
         end
     end
 
-    if !isempty(version.build)
-        branch = version.build[1]
-        target_url = joinpath(ASSETS_URL, "heads/$branch")
+    if version isa String
+        # interpret as branch name
+        target_url = joinpath(ASSETS_URL, "heads/$version")
     else
-        if version in ASSETS_VERSIONS_AVAILABLE
+        if version in AVAILABLE_ASSETS_VERSIONS
             target_url = joinpath(ASSETS_URL, "tags/v$version")
         else
-            available_str = join(ASSETS_VERSIONS_AVAILABLE, ", ")
+            available_str = join(AVAILABLE_ASSETS_VERSIONS, ", ")
             msg = "SpeedyWeatherAssets version $version not available. " *
-                "Please select from: $available_str, or the 'main' build"
+                "Please select from: $available_str, or use `version = \"branch\"` to specify a branch."
             throw(ArgumentError(msg))
         end
     end
@@ -57,7 +60,8 @@ function get_asset(
     filename = basename(path)
     url = joinpath(target_url, path)
     project_root = pkgdir(SpeedyWeather)
-    project_root = isnothing(project_root) ? (@__DIR__) : project_root   # fallback to @__DIR__ if pkgdir fails (e.g. in dev mode)
+    # fallback to @__DIR__ if pkgdir fails (e.g. in dev mode)
+    project_root = isnothing(project_root) ? (@__DIR__) : project_root
     artifact_toml = joinpath(project_root, "Artifacts.toml")
 
     # Check if the artifact already exists in the TOML
@@ -125,7 +129,7 @@ end
 function _get_asset(path::String, name::String, ArrayType::Type{<:Array}, FileFormat::Type{<:NCDataset})
     v, ds = _get_asset(path, name, NCDataset, FileFormat)
     data = load_shape_preserving(v, Val(ndims(v)))
-    if eltype(data) <: AbstractFloat
+    if eltype(data) <: AbstractFloat    # exclude case of loading integer data, e.g. land-sea mask
         fill_value = get(v.attrib, "_FillValue", NaN)
         # use === to include NaNs but also excpect fill value to have same type as data
         data[data .=== fill_value] .= NaN
