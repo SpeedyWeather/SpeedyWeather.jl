@@ -3,6 +3,8 @@
 ## Unreleased
 
 - Data-driven surface roughness scheme [#959](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/959)
+- Get SpeedyWeatherAssets on the fly [#983](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/983)
+- Change from MIT to EUPL license [#992](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/992)
 
 ## v0.18.1
 
