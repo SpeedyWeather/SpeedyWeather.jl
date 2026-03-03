@@ -27,7 +27,7 @@ The interface to load data from
 [SpeedyWeatherAssets](https://github.com/SpeedyWeather/SpeedyWeatherAssets)
 is via the `get_asset` function
 
-```@docs
+```@docs; canonical=false
 get_asset
 ```
 
