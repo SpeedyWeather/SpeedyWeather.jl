@@ -6,8 +6,8 @@ using Dates
 using ..Architectures
 
 # miscellaneous utility functions
-export isincreasing, isdecreasing, clip_negatives!, underflow!
-export flipsign!, nans, print_fields, readable_secs
+export isincreasing, isdecreasing
+export print_fields, readable_secs
 include("utility_functions.jl")
 
 # kernel

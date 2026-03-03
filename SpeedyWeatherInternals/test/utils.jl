@@ -7,24 +7,6 @@ using SpeedyWeatherInternals.Utils
     @test ~isincreasing(randn(10))
 end
 
-@testset "clip negatives" begin
-    for T in (Float16, Float32, Float64)
-        A = randn(T, 30, 50)
-        clip_negatives!(A)
-        @test all(A .>= 0)
-    end
-end
-
-@testset "flip sign" begin
-    for T in (Float16, Float32, Float64)
-        A = randn(T, 30, 50)
-        A2 = copy(A)
-        flipsign!(A)
-        flipsign!(A)
-        @test all(A .== A2)
-    end
-end
-
 using Dates: CompoundPeriod, Day, Hour, Minute, Second, Millisecond, coarserperiod
 
 @testset "readable secs feedback" begin

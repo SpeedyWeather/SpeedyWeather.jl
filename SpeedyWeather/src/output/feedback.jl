@@ -95,10 +95,10 @@ function progress!(feedback::Feedback, vars::Variables)
     every_nsteps = feedback.progress_meter.core.check_iterations
     (; counter) = feedback.progress_meter.core
     FEEDBACK_TIME[] = vars.prognostic.clock.time
-    feedback.show_umax && mod(counter, every_nsteps) == 0 && max_speed(vars.diagnostic)
-    feedback.show_temperature_range && mod(counter, every_nsteps) == 0 && temperature_range(vars.diagnostic)
+    feedback.show_umax && mod(counter, every_nsteps) == 0 && max_speed(vars)
+    feedback.show_temperature_range && mod(counter, every_nsteps) == 0 && temperature_range(vars)
     progress!(feedback)
-    feedback.debug && nan_detection!(feedback, progn)
+    feedback.debug && nan_detection!(feedback, vars)
     return nothing
 end
 

@@ -18,32 +18,6 @@ function isdecreasing(v::AbstractVector)
     return is_decreasing
 end
 
-"""$(TYPEDSIGNATURES)
-Set all negative entries `a` in `A` to zero."""
-function clip_negatives!(A::AbstractArray{T}) where {T}
-    return @inbounds for i in eachindex(A)
-        A[i] = max(A[i], zero(T))
-    end
-end
-
-"""$(TYPEDSIGNATURES)
-Underflows element `a` in `A` to zero if `abs(a) < ϵ`."""
-function underflow!(A::AbstractArray{T}, ϵ::Real) where {T}
-    ϵT = convert(T, abs(ϵ))
-    return @inbounds for i in eachindex(A)
-        A[i] = abs(A[i]) < ϵT ? zero(T) : A[i]
-    end
-end
-
-"""$(TYPEDSIGNATURES)
-Like `-A` but in-place."""
-function flipsign!(A::AbstractArray)
-    @inbounds for i in eachindex(A)
-        A[i] = -A[i]
-    end
-    return A
-end
-
 """
 $(TYPEDSIGNATURES)
 Prints to `io` all fields of a struct `A` identified by their
