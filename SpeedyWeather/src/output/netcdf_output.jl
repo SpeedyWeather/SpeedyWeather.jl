@@ -141,18 +141,18 @@ function Base.show(io::IO, output::NetCDFOutput{F}) where {F}
 
     println(io, styled"{warning:NetCDFOutput}{note:$type_param_str}")
     println(io, styled"├ {info:status}: $active")
-    println(io, styled"├ {info:write restart file}: $(output.write_restart) (if active)")
+    println(io, styled"├ {info:write restart file} = $(output.write_restart) (if active)")
 
     interp_type_str = string(typeof(output.interpolator))
     interp_type_str_short = length(interp_type_str) > 70 ? string(first(interp_type_str, 70), "...}") : interp_type_str
 
-    println(io, styled"├ {info:interpolator}: $interp_type_str_short")
-    println(io, styled"├ {info:path}: $(joinpath(output.run_path, output.filename)) (overwrite=$(output.overwrite))")
-    println(io, styled"├ {info:frequency}: $(output.output_dt)")
-    print(io, styled"└┐ {info:variables}:")
+    println(io, styled"├ {info:interpolator}::$interp_type_str_short")
+    println(io, styled"├ {info:path} = $(joinpath(output.run_path, output.filename)) (overwrite=$(output.overwrite))")
+    println(io, styled"├ {info:frequency} = $(output.output_dt)")
+    print(io, styled"└ {info:variables}")
     nvars = length(output.variables)
     for (i, (key, var)) in enumerate(output.variables)
-        print(io, "\n $(i == nvars ? "└" : "├") ", styled"{info:$key}: $(var.long_name) ", styled"{note:[$(var.unit)]}")
+        print(io, "\n  $(i == nvars ? "└" : "├") ", styled"{magenta:$key}: $(var.long_name) ", styled"{note:[$(var.unit)]}")
     end
     return nothing
 end
