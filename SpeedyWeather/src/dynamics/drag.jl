@@ -67,11 +67,10 @@ function drag!(
     return nothing
 end
 
-# Quadratic drag
 export QuadraticDrag
-@parameterized @kwdef mutable struct QuadraticDrag{NF} <: AbstractDrag
+@parameterized @kwdef struct QuadraticDrag{NF} <: AbstractDrag
     "[OPTION] drag coefficient [1]"
-    @param c_D::NF = 1.0e-12 (bounds = Nonnegative,)    # TODO is this a good default?
+    @param drag::NF = 1e-5 (bounds = Nonnegative,)    # TODO is this a good default?
 end
 
 QuadraticDrag(SG::SpectralGrid; kwargs...) = QuadraticDrag{SG.NF}(; kwargs...)
@@ -89,7 +88,7 @@ with `c_D` the non-dimensional drag coefficient as defined in `drag::QuadraticDr
 and scaled by the radius as are the momentum equations."""
 function drag!(
         vars::Variables,
-        drag::QuadraticDrag,
+        scheme::QuadraticDrag,
         lf::Integer,
         model::AbstractModel,
     )
@@ -101,8 +100,10 @@ function drag!(
     Fv = field_view(vars.tendencies.grid.v, :, k)
 
     # total drag coefficient with radius scaling
-    c = drag.c_D / model.atmosphere.layer_thickness
-    c *= vars.prognostic.scale[]^2
+    # note that while the equations (with prognostic variable vorticity) are scaled
+    # with radius R squared, one R will go into the curl operator applied to forcing of u, v
+    # to yield a tendency for vorticity, so only one R is needed here in the drag coefficient scaling
+    c = scheme.drag / model.atmosphere.layer_thickness * diagn.scale[]
 
     return launch!(
         architecture(Fu), LinearWorkOrder, size(Fu), quadratic_drag_kernel!,
@@ -121,6 +122,64 @@ end
     # Apply quadratic drag, -= as the tendencies already contain forcing
     Fu[ij] -= c * speed * u[ij]
     Fv[ij] -= c * speed * v[ij]
+end
+
+export SpeedLimitDrag
+@parameterized @kwdef struct SpeedLimitDrag{NF} <: AbstractDrag
+    "[OPTION] drag coefficient [1/m]"
+    @param drag::NF = 4e-7 (bounds = Nonnegative,)
+
+    "[OPTION] Speed limit above which drag kicks in [m/s]"
+    @param speed_limit::NF = 80 (bounds = Nonnegative,) 
+end
+
+SpeedLimitDrag(SG::SpectralGrid; kwargs...) = SpeedLimitDrag{SG.NF}(; kwargs...)
+initialize!(::SpeedLimitDrag, ::AbstractModel) = nothing
+
+"""
+$(TYPEDSIGNATURES)
+Speed limit drag for the momentum equations.
+
+    Fu = -c*max(0, |(u, v)| - speed_limit)^2 * sign(u)
+
+with `c` the drag coefficient [1/m] as defined in `drag::SpeedLimitDrag` and
+kicking in only above a certain speed limit. The drag is quadratic in the excess
+speed above the limit and acts to slow down the flow, hence the `sign(u)` term."""
+function drag!(
+        vars::Variables,
+        scheme::SpeedLimitDrag,
+        lf::Integer,
+        model::AbstractModel,
+    )
+    u = vars.grid.u
+    v = vars.grid.v
+
+    Fu = vars.tendencies.grid.u
+    Fv = vars.tendencies.grid.v
+
+    # total drag coefficient with radius scaling
+    c = scheme.drag * vars.prognostic.scale[]
+    (; speed_limit) = scheme
+
+    launch!(
+        architecture(Fu), RingGridWorkOrder, size(Fu), speed_limit_drag_kernel!,
+        Fu, Fv, u, v, c, speed_limit
+    )
+    return nothing
+end
+
+@kernel inbounds = true function speed_limit_drag_kernel!(
+        Fu, Fv, u, v, c, speed_limit
+    )
+    ij, k = @index(Global, NTuple)
+
+    # Calculate speed
+    speed = sqrt(u[ij, k]^2 + v[ij, k]^2)
+
+    # Apply speed limit drag, -= as the tendencies already contain forcing
+    U² = max(0, speed - speed_limit)^2
+    Fu[ij, k] -= c * U² * sign(u[ij, k])
+    Fv[ij, k] -= c * U² * sign(v[ij, k])
 end
 
 export LinearVorticityDrag

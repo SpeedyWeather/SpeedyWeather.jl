@@ -50,10 +50,10 @@ export ZonalRidge
 $(TYPEDFIELDS)"""
 @kwdef struct ZonalRidge{NF, GridVariable2D, SpectralVariable2D} <: AbstractOrography
 
-    "conversion from σ to Jablonowski's ηᵥ-coordinates"
+    "[OPTION] conversion from σ to Jablonowski's ηᵥ-coordinates"
     η₀::NF = 0.252
 
-    "max amplitude of zonal wind [m/s] that scales orography height"
+    "[OPTION] max amplitude of zonal wind [m/s] that scales orography height"
     u₀::NF = 35
 
     # FIELDS (to be initialized in initialize!)
@@ -123,37 +123,44 @@ export EarthOrography
 """Earth's orography read from file, with smoothing.
 $(TYPEDFIELDS)"""
 @kwdef struct EarthOrography{NF, GridVariable2D, SpectralVariable2D} <: AbstractOrography
-
-    # OPTIONS
-    "path to the folder containing the orography file, pkg path default"
-    path::String = "SpeedyWeather.jl/input_data"
-
-    "filename of orography"
+    "[OPTION] filename of orography"
     file::String = "orography.nc"
 
-    "Grid the orography file comes on"
-    file_Grid::Type{<:AbstractGrid} = FullGaussianGrid
+    "[OPTION] path to the folder containing the orography"
+    path::String = joinpath("data", "boundary_conditions", file)
 
-    "scale orography by a factor"
+    "[OPTION] flag to check for orography in SpeedyWeatherAssets or locally"
+    from_assets::Bool = true
+
+    "[OPTION] SpeedyWeatherAssets version number"
+    version::VersionNumber = DEFAULT_ASSETS_VERSION
+
+    "[OPTION] NCDataset variable name"
+    varname::String = "orog"
+
+    "[OPTION] Grid the orography file comes on"
+    FieldType::Type{<:AbstractField} = FullGaussianField
+
+    "[OPTION] scale orography by a factor"
     scale::NF = 1.0
 
-    "smooth the orography field?"
+    "[OPTION] smooth the orography field?"
     smoothing::Bool = true
 
-    "power of Laplacian for smoothing"
+    "[OPTION] ower of Laplacian for smoothing"
     smoothing_power::NF = 1.0
 
-    "highest degree l is multiplied by"
+    "[OPTION] highest degree l is multiplied by"
     smoothing_strength::NF = 0.1
 
-    "fraction of highest wavenumbers to smooth"
+    "[OPTION] fraction of highest wavenumbers to smooth"
     smoothing_fraction::NF = 0.05
 
     # FIELDS (to be initialized in initialize!)
-    "height [m] on grid-point space."
+    "[DERIVED] height [m] on grid-point space."
     orography::GridVariable2D
 
-    "surface geopotential, height*gravity [m²/s²]"
+    "[DERIVED] surface geopotential, height*gravity [m²/s²]"
     surface_geopotential::SpectralVariable2D
 end
 
@@ -189,18 +196,17 @@ function initialize!(
     (; orography, surface_geopotential, scale) = orog
     (; gravity) = P
 
-    # LOAD NETCDF FILE
-    if orog.path == "SpeedyWeather.jl/input_data"
-        path = joinpath(@__DIR__, "../../input_data", orog.file)
-    else
-        path = joinpath(orog.path, orog.file)
-    end
-    ncfile = NCDataset(path)
+    # load orography from file
+    field = get_asset(
+        orog.path;
+        from_assets = orog.from_assets,
+        name = orog.varname,
+        ArrayType = orog.FieldType,
+        FileFormat = NCDataset,
+        version = orog.version
+    )
 
-    # height [m], wrap matrix into a grid
-    # TODO also read lat, lon from file and flip array in case it's not as expected
-    # F = RingGrids.field_type(orog.file_Grid)  # TODO this isn't working, hardcode instead
-    orography_highres = on_architecture(S.architecture, FullGaussianField(ncfile["orog"].var[:, :], input_as = Matrix))
+    orography_highres = on_architecture(S.architecture, field)
 
     # Interpolate/coarsen to desired resolution
     interpolate!(orography, orography_highres)

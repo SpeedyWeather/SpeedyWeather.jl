@@ -68,7 +68,7 @@ $(TYPEDFIELDS)"""
     @component particle_advection::PA = nothing
     @component initial_conditions::IC = InitialConditions(spectral_grid, PrimitiveDry)
     @component forcing::FR = nothing
-    @component drag::DR = nothing
+    @component drag::DR = SpeedLimitDrag(spectral_grid)
 
     # VARIABLES
     random_process::RP = nothing
