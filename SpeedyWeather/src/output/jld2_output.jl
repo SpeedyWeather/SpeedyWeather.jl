@@ -141,24 +141,26 @@ function output_jld2!(output::JLD2Output, simulation::AbstractSimulation)
     output.output_counter += 1                                      # output counter increases when writing time
     i = output.output_counter
 
-    return if output_diagnostic & output_prognostic
+    if output_diagnostic & output_prognostic
         jld2_file["$i"] = (simulation.prognostic_variables, simulation.diagnostic_variables)
     elseif output_prognostic
         jld2_file["$i"] = simulation.prognostic_variables
     elseif output_diagnostic
         jld2_file["$i"] = simulation.diagnostic_variables
     end
+    return nothing
 end
 
 function finalize!(
         output::JLD2Output,
         simulation::AbstractSimulation,
     )
-    return if output.merge_output && output.output_counter > 0
+    if output.merge_output && output.output_counter > 0
         merge_output(output)
     else
         close(output)
     end
+    return nothing
 end
 
 """

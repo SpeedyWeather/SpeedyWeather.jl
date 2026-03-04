@@ -159,7 +159,7 @@ Adapt.@adapt_structure OneBandShortwaveRadiativeTransfer
 # generator function
 function OneBandShortwaveRadiativeTransfer(
         SG::SpectralGrid;
-        ozone_distribution = (σ) -> 50 * max(0, 0.2f0 - σ),     # default distribution here
+        ozone_distribution = (σ) -> 50 * max(0, 1//5 - σ),     # default distribution here
         kwargs...
     )
     return OneBandShortwaveRadiativeTransfer{SG.NF, typeof(ozone_distribution)}(;

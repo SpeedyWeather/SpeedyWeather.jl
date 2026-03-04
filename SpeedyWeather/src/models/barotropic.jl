@@ -99,7 +99,7 @@ function initialize!(model::Barotropic; time::DateTime = DEFAULT_DATE)
 
     # allocate all variables and set initial conditions
     variables = Variables(model)
-    # initialize!(variables.prognostic, model.initial_conditions, model)
+    initialize!(variables, model)
 
     # set the time
     (; clock) = variables.prognostic

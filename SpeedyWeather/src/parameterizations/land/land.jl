@@ -117,10 +117,11 @@ function initialize!(
     initialize!(progn, diagn, land_model.temperature, model)
 
     # only initialize soil moisture, vegetation, rivers if atmosphere and land are wet
-    return if model isa PrimitiveWet && land_model isa AbstractWetLand
+    if model isa PrimitiveWet && land_model isa AbstractWetLand
         initialize!(progn, diagn, land_model.soil_moisture, model)
         initialize!(progn, diagn, land_model.snow, model)
         initialize!(progn, diagn, land_model.vegetation, model)
         initialize!(progn, diagn, land_model.rivers, model)
     end
+    return nothing
 end

@@ -162,9 +162,10 @@ end
 
 function copy_if_key_exists!(to, from, key)
     # use hasproperty here as a union for haskey (works with NamedTuples) and hasfield (works with structs)
-    return if hasproperty(to, key) && hasproperty(from, key)
+    if hasproperty(to, key) && hasproperty(from, key)
         getfield(to, key) .= getfield(from, key)
     end
+    return nothing
 end
 
 """$(TYPEDSIGNATURES)

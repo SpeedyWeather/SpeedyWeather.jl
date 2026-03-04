@@ -258,7 +258,7 @@ initialize!(albedo::LandSnowAlbedo, model::PrimitiveEquation) = nothing
     end
 
     # 2. Add snow cover
-    return if haskey(progn.land, :snow_depth)
+    if haskey(progn.land, :snow_depth)
         (; snow_depth) = progn.land
         (; albedo_snow, snow_depth_scale) = albedo_scheme
 
@@ -271,4 +271,5 @@ initialize!(albedo::LandSnowAlbedo, model::PrimitiveEquation) = nothing
         # set land albedo linearly between bare land and snow depending on snow cover [0, 1]
         diagn.albedo[ij] += snow_cover * albedo_snow
     end
+    return nothing
 end

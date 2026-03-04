@@ -201,12 +201,13 @@ function initialize!(
 
     # set ocean "soil" moisture points (100% ocean only)
     masked_value = soil.ocean_moisture
-    return if soil.mask
+    if soil.mask
         # TODO: broadcasting over views of Fields of GPUArrays doesn't work
         sm = progn.land.soil_moisture.data
         sm[isnan.(sm)] .= masked_value
         mask!(progn.land.soil_moisture, model.land_sea_mask, :ocean; masked_value)
     end
+    return nothing
 end
 
 function timestep!(

@@ -101,8 +101,9 @@ function reset_variables!(diagn::DiagnosticVariables)
 end
 
 function reset_variable!(vars, var::Symbol, reset_value)
-    return if haskey(vars, var)
+    if haskey(vars, var)
         field = getfield(vars, var)
         field .= reset_value
     end
+    return nothing
 end

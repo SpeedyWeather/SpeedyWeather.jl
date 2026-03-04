@@ -291,8 +291,8 @@ function callback!(progress_txt::ProgressTxt, vars, model)
     (; file, every_n_percent) = progress_txt
 
     # occasionally write progress to txt file
-    return if (counter / n * 100 % 1) > ((counter + 1) / n * 100 % 1)
-        percent = round(Int, (counter + 1) / n * 100)             # % of time steps completed
+    if (counter / n * 100 % 1) > ((counter + 1) / n * 100 % 1)
+        percent = round(Int, (counter + 1) / n * 100)       # % of time steps completed
         if (percent % every_n_percent == 0)                 # write every p% step in txt
             write(file, @sprintf("\n%3d%%", percent))
             r = remaining_time(progress_meter)
@@ -306,6 +306,7 @@ function callback!(progress_txt::ProgressTxt, vars, model)
             flush(file)
         end
     end
+    return nothing
 end
 
 """$(TYPEDSIGNATURES)

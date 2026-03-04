@@ -76,7 +76,7 @@ function initialize!(land::SeasonalLandTemperature, model::PrimitiveEquation)
     # mask ocean points to fallback ocean temperature
     # set ocean "land" temperature points (100% ocean only)
     masked_value = land.ocean_temperature
-    return if land.mask
+    if land.mask
         # Replace NaN values in soil temperature with a fallback ocean temperature
         # unpack via .data due to broadcasting issues
         mtd = monthly_temperature.data
@@ -86,6 +86,7 @@ function initialize!(land::SeasonalLandTemperature, model::PrimitiveEquation)
         # the same fallback ocean temperature
         mask!(monthly_temperature, model.land_sea_mask, :ocean; masked_value)
     end
+    return nothing
 end
 
 function initialize!(
@@ -203,13 +204,14 @@ function initialize!(
     # (seasonal model will be garbage collected hereafter)
 
     # set ocean "land" temperature points (100% ocean only)
-    return if land.mask
+    if land.mask
         masked_value = land.ocean_temperature
         # TODO currently requries .data because of broadcasting issues
         lst = progn.land.soil_temperature.data
         lst[isnan.(lst)] .= masked_value
         mask!(progn.land.soil_temperature, model.land_sea_mask, :ocean; masked_value)
     end
+    return nothing
 end
 
 function timestep!(
