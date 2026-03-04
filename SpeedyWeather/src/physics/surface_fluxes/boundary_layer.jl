@@ -34,6 +34,18 @@ end
 
 export LearnedSurfaceRoughness
 @kwdef struct LearnedSurfaceRoughness{NF, LNN, LP, LS} <: AbstractSurfaceRoughness
+    "[OPTION] filename of land weights"
+    file::String = "z0_land.npz"
+
+    "[OPTION] path to the folder containing the neural network weights"
+    path::String = joinpath("data", "weights", file)
+
+    "[OPTION] flag to check for weights in SWA or locally"
+    from_assets::Bool = true
+
+    "[OPTION] SpeedyWeatherAssets version number"
+    version::VersionNumber = DEFAULT_ASSETS_VERSION
+
     # Ocean normalisation parameters
     ocean_input_means::Vector{NF} = Float32[0.19490805, 0.11980359, 7.7569385]
     ocean_input_stds::Vector{NF} = Float32[6.6221075, 5.4018555, 3.5962458]

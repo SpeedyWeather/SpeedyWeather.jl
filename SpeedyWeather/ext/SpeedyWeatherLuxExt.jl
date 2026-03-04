@@ -5,17 +5,15 @@ import Random, Adapt
 
 const z₀_SATURATION_LIMIT = 3.92f-3 # observed roughness saturation, from Curcic (2020)
 
+function SpeedyWeather._get_asset(path::String, name::String, ArrayType::Type{<:Array}, FileFormat::Type{<:Dict})
+    data = NPZ.npzread(path)
+    return data
+end
+
 function SpeedyWeather.LearnedSurfaceRoughness(
         SG::SpectralGrid;
-        land_path::String = "z0_land_model_weights.npz",
         kwargs...
     )
-    full_land_path = joinpath(@__DIR__, "../input_data/nn_weights", land_path)
-
-    if !isfile(full_land_path)
-        @warn "Model weights not found. Ensure paths are correct."
-    end
-
     # Set up Lux NN
     land_nn = Lux.Chain(
         Lux.Dense(13 => 32, Lux.leakyrelu),
@@ -26,11 +24,9 @@ function SpeedyWeather.LearnedSurfaceRoughness(
         Lux.Dense(64 => 32, Lux.leakyrelu),
         Lux.Dense(32 => 1)
     )
+
     rng = Random.default_rng()
     land_params, rand_states = Lux.setup(rng, land_nn)
-    land_weights = NPZ.npzread(full_land_path)
-    load_land_parameters!(land_params, land_weights)
-
     land_states = Lux.testmode(rand_states)
 
     return LearnedSurfaceRoughness{SG.NF, typeof(land_nn), typeof(land_params), typeof(land_states)}(;
@@ -63,7 +59,18 @@ function load_land_parameters!(params, weights::Dict{String, Array{Float32}})
 end
 
 Adapt.@adapt_structure SpeedyWeather.LearnedSurfaceRoughness
-SpeedyWeather.initialize!(::LearnedSurfaceRoughness, ::PrimitiveEquation) = nothing
+function SpeedyWeather.initialize!(surface_roughness::LearnedSurfaceRoughness, ::PrimitiveEquation)
+    weights = SpeedyWeather.get_asset(
+        surface_roughness.path,
+        from_assets = surface_roughness.from_assets,
+        name = "land_weights",
+        ArrayType = Array,
+        FileFormat = Dict,
+        version = surface_roughness.version
+    )
+    load_land_parameters!(surface_roughness.land_params, weights)
+    return nothing
+end
 
 # Symbolic regression-derived expression for ice-free ocean surface roughness
 @inline function ice_free_roughness(x1, x2, x3)
