@@ -32,3 +32,4 @@ jobs:
           ssh: ${{ secrets.DOCUMENTER_KEY }}
           # ssh: ${{ secrets.NAME_OF_MY_SSH_PRIVATE_KEY_SECRET }}
           subdir: SpeedyWeather
+          tag_prefix: NO_PREFIX
