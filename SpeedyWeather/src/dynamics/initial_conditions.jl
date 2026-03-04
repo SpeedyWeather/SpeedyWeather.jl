@@ -848,17 +848,16 @@ function initialize!(
         model::PrimitiveEquation,
     )
     (; relhumid_ref) = IC
-    (; nlayers, σ_levels_full) = model.geometry
+    (; σ_levels_full) = model.geometry
     (; atmosphere) = model
 
     # get pressure [Pa] on grid
     lnpₛ = get_step(progn.pres, 1)  # 1 = first leapfrog timestep
-    pres_grid = transform(lnpₛ, model.spectral_transform)
-    pres_grid .= exp.(pres_grid)
+    pres_grid = exp.(transform(lnpₛ, model.spectral_transform))
 
     temp = get_step(progn.temp, 1)  #  1 = first leapfrog timestep
     temp_grid = transform(temp, model.spectral_transform)
-    humid_grid = zero(temp_grid)
+    humid_grid = similar(temp_grid)
 
     # Launch kernel
     launch!(
