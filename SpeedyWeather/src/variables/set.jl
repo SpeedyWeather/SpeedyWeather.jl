@@ -33,18 +33,20 @@ function set!(
     if :u in keys(kwargs) && :v in keys(kwargs)
         (; vor, div) = vars
         set_vordiv!(get_step(vor, lf), get_step(div, lf), kwargs[:u], kwargs[:v], geometry, spectral_transform; add, coslat_scaling_included, static_func)
+    elseif :u in keys(kwargs) || :v in keys(kwargs)
+        @warn "Only one of `u` and `v` provided, but both are needed to set `vor` and `div`. Skipping."
     end
 
     # normal case, search for varname in prognostic variables
     for varname in keys(kwargs)
-        if varname in keys(vars)
+        if varname in (:u, :v)  # already handled in special case above
+            nothing
+        elseif varname in keys(vars)
             var = get_step(vars[varname], lf)
             set!(var, kwargs[varname], geometry, spectral_transform; add, static_func)
-        elseif varname in (:u, :v)
-            nothing
         else
-            # throw error if vanname can't be found
-            throw(UndefVarError(varname))
+            # throw error if vanname can't be found and print existing variables
+            @warn "`$varname` not defined in variables NamedTuple with keys = $(keys(vars)). Skipping."
         end
     end
     return nothing
@@ -333,7 +335,22 @@ function set_vordiv!(
         curl!(vor, u_, v_, S; add, radius)
         divergence!(div, u_, v_, S; add, radius)
     end
-    return nothing
+    return vor, div
+end
+
+# if number provided for u, v then vor = div = 0
+function set_vordiv!(
+        vor::LowerTriangularArray,
+        div::LowerTriangularArray,
+        u::Number,  # this is a constant field, curl and div are zero
+        v::Number,  # this is a constant field, curl and div are zero
+        geometry::Geometry,
+        S::Union{Nothing, SpectralTransform} = nothing;
+        kwargs...
+)
+    vor .= 0    # curl of a constant is zero
+    div .= 0    # divergence of a constant is zero
+    return vor, div
 end
 
 """$(TYPEDSIGNATURES)
