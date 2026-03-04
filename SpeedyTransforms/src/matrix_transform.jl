@@ -216,7 +216,6 @@ function transform!(                        # SPECTRAL TO GRID
         M::MatrixSpectralTransform;         # precomputed transform
         unscale_coslat::Bool = false,       # unscale with cos(lat) on the fly?
     )
-
     # catch incorrect sizes early
     @boundscheck ismatching(M, field) || throw(DimensionMismatch(M, field))
     @boundscheck ismatching(M, coeffs) || throw(DimensionMismatch(M, coeffs))
