@@ -92,7 +92,7 @@ function compare_clock(sim_cpu, sim_reactant)
     @test clock_cpu.n_timesteps == clock_reactant.n_timesteps
     @test clock_cpu.timestep_counter == clock_reactant.timestep_counter
     # convert to DateTime to compare because Reactant TracedRDatetime might be used
-    return @test DateTime(clock_cpu.time) == DateTime(clock_reactant.time)
+    return @test clock_cpu.time == clock_reactant.time
 end
 
 """Compare tendencies between CPU and Reactant simulations after a single timestep."""
