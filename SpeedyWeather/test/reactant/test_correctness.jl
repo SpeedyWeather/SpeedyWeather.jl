@@ -84,6 +84,17 @@ function compare_grid_variables(sim_cpu, sim_reactant; rtol = RTOL, atol = ATOL)
     return results
 end
 
+"""Compare that the clock is running in the same way. (Not as trivial as you might think as we needed specific patches to Reactant for that)"""
+function compare_clock(sim_cpu, sim_reactant)
+    clock_cpu = sim_cpu.prognostic_variables.clock
+    clock_reactant = sim_reactant.prognostic_variables.clock
+
+    @test clock_cpu.n_timesteps == clock_reactant.n_timesteps
+    @test clock_cpu.timestep_counter == clock_reactant.timestep_counter
+    # convert to DateTime to compare because Reactant TracedRDatetime might be used
+    return @test DateTime(clock_cpu.time) == DateTime(clock_reactant.time)
+end
+
 """Compare tendencies between CPU and Reactant simulations after a single timestep."""
 function compare_tendencies(sim_cpu, sim_reactant; rtol = RTOL, atol = ATOL)
     _, diagn_cpu, _ = SpeedyWeather.unpack(sim_cpu)
@@ -160,6 +171,7 @@ function test_time_stepping!(sim_cpu, sim_reactant, model_name; nsteps = NSTEPS,
     # Compare results
     progn_results = compare_prognostic_variables(sim_cpu, sim_reactant; rtol, atol)
     grid_results = compare_grid_variables(sim_cpu, sim_reactant; rtol, atol)
+    clock_results = compare_clock(sim_cpu, sim_reactant)
 
     println("\nVorticity comparison after $nsteps steps:")
     println("  Max absolute difference:  $(progn_results[:vor].max_abs_diff)")
