@@ -79,7 +79,7 @@ function initialize!(
         model::AbstractModel,
     )
 
-    haskey(vars.prognostic, :vor) || return nothing
+    haskey(vars.prognostic, :vor) || warn_undefvar(vars, :vor) && return nothing
     (; vor) = vars.prognostic
     NF = real(eltype(vor))
 
@@ -162,7 +162,7 @@ function initialize!(
         model::AbstractModel,
     )
 
-    haskey(vars.prognostic, :vor) || return nothing
+    haskey(vars.prognostic, :vor) || warn_undefvar(vars, :vor) && return nothing
     (; vor) = vars.prognostic
     NF = real(eltype(vor))
 
@@ -243,7 +243,8 @@ function initialize!(
         model::AbstractModel
     )
 
-    haskey(vars.prognostic, :vor) && haskey(vars.prognostic, :div) || return nothing
+    haskey(vars.prognostic, :vor) || warn_undefvar(vars, :vor) && return nothing
+    haskey(vars.prognostic, :div) || warn_undefvar(vars, :div) && return nothing
 
     model.spectral_grid.nlayers == 1 ||
         throw(ArgumentError("ZonalJet initial conditions can only be used with ShallowWaterModel (1 layer)"))
@@ -396,6 +397,9 @@ function initialize!(
         model::PrimitiveEquation
     )
 
+    haskey(vars.prognostic, :vor) || warn_undefvar(vars, :vor) && return nothing
+    haskey(vars.prognostic, :div) || warn_undefvar(vars, :div) && return nothing
+
     (; u₀, η₀) = initial_conditions
     (; perturb_uₚ, perturb_radius) = initial_conditions
     λc = initial_conditions.perturb_lon
@@ -490,6 +494,9 @@ function initialize!(
         initial_conditions::RossbyHaurwitzWave,
         model::AbstractModel,
     )
+    # make vor esential but div, eta optional
+    haskey(vars.prognostic, :vor) || warn_undefvar(vars, :vor) && return nothing
+
     (; m, ω, K, c) = initial_conditions
     (; geometry) = model
     Ω = model.planet.rotation
@@ -507,8 +514,8 @@ function initialize!(
     η(λ, θ) = R^2 / g * (A(λ, θ) + B(λ, θ) * cosd(m * λ) + C(λ, θ) * cosd(2m * λ))
 
     set!(vars, geometry, vor = ζ, static_func = false)
-    set!(vars, geometry, η = η, static_func = false)
-    set!(vars, geometry, div = 0)  # technically not needed, but set to zero for completeness
+    haskey(vars.prognostic, :div) && set!(vars, geometry, div = 0)  # technically not needed, but set to zero for completeness
+    haskey(vars.prognostic, :η) && set!(vars, geometry, η = η, static_func = false)
 
     # filter low values below cutoff amplitude c
     vor = get_step(vars.prognostic.vor, 1)    # 1 = first leapfrog timestep
@@ -558,7 +565,7 @@ function initialize!(
         model::PrimitiveEquation
     )
 
-    haskey(vars.prognostic, :temp) || return nothing
+    haskey(vars.prognostic, :temp) || warn_undefvar(vars, :temp) && return nothing
     (; temp) = vars.prognostic
     NF = real(eltype(temp))
 
@@ -713,6 +720,8 @@ function initialize!(
         model::PrimitiveEquation
     )
 
+    haskey(vars.prognostic, :pres) || warn_undefvar(vars, :pres) && return nothing
+
     # T₀:       Reference absolute T [K] at surface z = 0
     # Γ:        Reference temperature lapse rate (dry or moist) -dT/dz [K/m]
     # gravity:  Gravitational acceleration [m/s^2]
@@ -746,6 +755,7 @@ function initialize!(
         ::ConstantPressure,
         model::PrimitiveEquation
     )
+    haskey(vars.prognostic, :pres) || warn_undefvar(vars, :pres) && return nothing
 
     # logarithm of reference surface pressure [log(Pa)]
     set!(vars, model; pres = log(model.atmosphere.pressure_reference))
@@ -765,7 +775,7 @@ function initialize!(
         IC::ConstantRelativeHumidity,
         model::PrimitiveEquation,
     )
-    haskey(vars.prognostic, :humid) || return nothing
+    haskey(vars.prognostic, :humid) || warn_undefvar(vars, :humid) && return nothing
 
     (; relhumid_ref) = IC
     (; σ_levels_full) = model.geometry
@@ -837,7 +847,7 @@ function initialize!(
         initial_conditions::RandomWaves,
         model::AbstractModel
     )
-    haskey(vars.prognostic, :η) || return nothing
+    haskey(vars.prognostic, :η) || warn_undefvar(vars, :η) && return nothing
     (; η) = vars.prognostic
 
     NF = eltype(η)

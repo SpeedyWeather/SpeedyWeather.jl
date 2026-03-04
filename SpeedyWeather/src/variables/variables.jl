@@ -179,6 +179,17 @@ function filter_variables(variables, VariableType)
     return NamedTuple{Tuple(namespaces)}(Tuple(namespace_dict[ns] for ns in namespaces))
 end
 
+"""$(TYPEDSIGNATURES)
+Helper function to warn when a variable is not defined in the Variables. Reports on
+group (prognostic etc.) and namespace therein (e.g. ocean, land, etc.) and lists the defined variables in that group and namespace.
+Returns true to allow for short-circuiting with `&& return nothing` to exit a function early."""
+function warn_undefvar(vars::Variables, key::Symbol, group::Symbol = :prognostic, namespace::Symbol = Symbol())
+    path = namespace == Symbol() ? "$group" : "$group.$namespace"
+    defined_vars = namespace == Symbol() ? keys(getfield(vars, group)) : keys(getfield(getfield(vars, group), namespace))
+    @warn "Variable $key not defined in variables.$path. Defined are: $defined_vars"
+    return true # return true to allow for short-circuiting with && return nothing to skip exit the following code early
+end
+
 # TODO move get_step, get_steps to LowerTriangularArrays?
 
 function get_steps(coeffs::LowerTriangularArray{T, 2}) where {T}

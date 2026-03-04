@@ -66,10 +66,10 @@ function initialize!(feedback::Feedback, clock::Clock, model::AbstractModel)
     FEEDBACK_DT_IN_SEC[] = model.time_stepping.Δt_sec
     FEEDBACK_TIME[] = clock.time
     
-    # reset those to default (-1 not shown, 0 shown)
-    FEEDBACK_UMAX[] = feedback.show_umax ? 0 : -1
-    FEEDBACK_TMIN[] = feedback.show_temperature_range ? 0 : -1
-    FEEDBACK_TMAX[] = feedback.show_temperature_range ? 0 : -1
+    # reset those to default (-1 not shown)
+    FEEDBACK_UMAX[] = -1
+    FEEDBACK_TMIN[] = -1
+    FEEDBACK_TMAX[] = -1
 
     # reinitalize progress meter, minus one to exclude first_timesteps! which contain compilation
     # only do now for benchmark accuracy
