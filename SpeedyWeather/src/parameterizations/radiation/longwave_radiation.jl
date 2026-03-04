@@ -148,11 +148,11 @@ end
 
 function variables(::AbstractLongwave)
     return (
-        DiagnosticVariable(name = :surface_longwave_down, dims = Grid2D(), desc = "Surface longwave radiation down", units = "W/m^2"),
-        DiagnosticVariable(name = :surface_longwave_up, dims = Grid2D(), desc = "Surface longwave radiation up over ocean", units = "W/m^2", namespace = :ocean),
-        DiagnosticVariable(name = :surface_longwave_up, dims = Grid2D(), desc = "Surface longwave radiation up over land", units = "W/m^2", namespace = :land),
-        DiagnosticVariable(name = :surface_longwave_up, dims = Grid2D(), desc = "Surface longwave radiation up", units = "W/m^2"),
-        DiagnosticVariable(name = :outgoing_longwave, dims = Grid2D(), desc = "TOA Longwave radiation up", units = "W/m^2"),
+        ParameterizationVariable(:surface_longwave_down, Grid2D(), desc = "Surface longwave radiation down", units = "W/m^2"),
+        ParameterizationVariable(:surface_longwave_up, Grid2D(), desc = "Surface longwave radiation up over ocean", units = "W/m^2", namespace = :ocean),
+        ParameterizationVariable(:surface_longwave_up, Grid2D(), desc = "Surface longwave radiation up over land", units = "W/m^2", namespace = :land),
+        ParameterizationVariable(:surface_longwave_up, Grid2D(), desc = "Surface longwave radiation up", units = "W/m^2"),
+        ParameterizationVariable(:outgoing_longwave, Grid2D(), desc = "TOA Longwave radiation up", units = "W/m^2"),
     )
 end
 

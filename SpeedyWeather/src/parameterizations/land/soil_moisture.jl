@@ -293,13 +293,10 @@ end
 
 function variables(::LandBucketMoisture)
     return (
-        # Prognostic variables
-        PrognosticVariable(name = :soil_moisture, dims = Grid3D(), desc = "Soil moisture content (fraction of capacity)", units = "1", namespace = :land),
-        # Diagnostic variables written to diagn.physics
-        DiagnosticVariable(name = :river_runoff, dims = Grid2D(), desc = "River runoff from soil moisture", units = "m/s", namespace = :land),
-        # Diagnostic variables read from diagn.physics
-        DiagnosticVariable(name = :rain_rate, dims = Grid2D(), desc = "Convective precipitation rate", units = "m/s"),
-        DiagnosticVariable(name = :surface_humidity_flux, dims = Grid2D(), desc = "Surface humidity flux", units = "kg/s/m²", namespace = :land),
-        DiagnosticVariable(name = :snow_melt_rate, dims = Grid2D(), desc = "Snow melt rate + snow runoff", units = "m/s", namespace = :land),
+        PrognosticVariable(:soil_moisture, Grid3D(), desc = "Soil moisture content (fraction of capacity)", units = "1", namespace = :land),
+        ParameterizationVariable(:river_runoff, Grid2D(), desc = "River runoff from soil moisture", units = "m/s", namespace = :land),
+        ParameterizationVariable(:rain_rate, Grid2D(), desc = "Convective precipitation rate", units = "m/s"),
+        ParameterizationVariable(:surface_humidity_flux, Grid2D(), desc = "Surface humidity flux", units = "kg/s/m²", namespace = :land),
+        ParameterizationVariable(:snow_melt_rate, Grid2D(), desc = "Snow melt rate + snow runoff", units = "m/s", namespace = :land),
     )
 end

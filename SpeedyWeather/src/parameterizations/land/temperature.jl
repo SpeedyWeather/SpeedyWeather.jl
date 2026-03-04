@@ -297,14 +297,12 @@ end
 
 function variables(::LandBucketTemperature)
     return (
-        # Prognostic variables
-        PrognosticVariable(name = :soil_temperature, dims = Grid3D(), desc = "Soil temperature", units = "K", namespace = :land),
-        PrognosticVariable(name = :soil_moisture, dims = Grid3D(), desc = "Soil moisture content (fraction of capacity)", units = "1", namespace = :land),
-        # Diagnostic variables read from diagn.physics
-        DiagnosticVariable(name = :surface_shortwave_down, dims = Grid2D(), desc = "Surface shortwave radiation down", units = "W/m²"),
-        DiagnosticVariable(name = :surface_shortwave_up, dims = Grid2D(), desc = "Surface shortwave radiation up", units = "W/m²", namespace = :land),
-        DiagnosticVariable(name = :surface_longwave_down, dims = Grid2D(), desc = "Surface longwave radiation down", units = "W/m²"),
-        DiagnosticVariable(name = :surface_longwave_up, dims = Grid2D(), desc = "Surface longwave radiation up", units = "W/m²", namespace = :land),
-        DiagnosticVariable(name = :sensible_heat_flux, dims = Grid2D(), desc = "Sensible heat flux", units = "W/m²", namespace = :land),
+        PrognosticVariable(:soil_temperature, Grid3D(), desc = "Soil temperature", units = "K", namespace = :land),
+        PrognosticVariable(:soil_moisture, Grid3D(), desc = "Soil moisture content (fraction of capacity)", units = "1", namespace = :land),
+        ParameterizationVariable(:surface_shortwave_down, Grid2D(), desc = "Surface shortwave radiation down", units = "W/m²"),
+        ParameterizationVariable(:surface_shortwave_up, Grid2D(), desc = "Surface shortwave radiation up", units = "W/m²", namespace = :land),
+        ParameterizationVariable(:surface_longwave_down, Grid2D(), desc = "Surface longwave radiation down", units = "W/m²"),
+        ParameterizationVariable(:surface_longwave_up, Grid2D(), desc = "Surface longwave radiation up", units = "W/m²", namespace = :land),
+        ParameterizationVariable(:sensible_heat_flux, Grid2D(), desc = "Sensible heat flux", units = "W/m²", namespace = :land),
     )
 end

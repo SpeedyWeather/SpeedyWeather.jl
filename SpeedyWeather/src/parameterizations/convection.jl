@@ -158,10 +158,10 @@ end
 
 function variables(::BettsMillerConvection)
     return (
-        DiagnosticVariable(name = :rain_convection, dims = Grid2D(), desc = "Convective precipitation (accumulated)", units = "m"),
-        DiagnosticVariable(name = :rain_rate_convection, dims = Grid2D(), desc = "Convective precipitation rate", units = "m/s"),
-        DiagnosticVariable(name = :rain_rate, dims = Grid2D(), desc = "Rain rate (large-scale + convection)", units = "m/s"),
-        DiagnosticVariable(name = :cloud_top, dims = Grid2D(), desc = "Cloud top layer index", units = "1"),
+        ParameterizationVariable(:rain_convection, Grid2D(), desc = "Convective precipitation (accumulated)", units = "m"),
+        ParameterizationVariable(:rain_rate_convection, Grid2D(), desc = "Convective precipitation rate", units = "m/s"),
+        ParameterizationVariable(:rain_rate, Grid2D(), desc = "Rain rate (large-scale + convection)", units = "m/s"),
+        ParameterizationVariable(:cloud_top, Grid2D(), desc = "Cloud top layer index", units = "1"),
     )
 end
 

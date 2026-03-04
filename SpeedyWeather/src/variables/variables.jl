@@ -41,8 +41,6 @@ Used to remove duplicates when extracting variables from the model. E.g. `:Varia
 identifier(v::AbstractVariable) =
     Symbol(nonparametric_type(v), "_", v.namespace, v.namespace == Symbol() ? "" : "_", v.name)
 
-Base.unique(variables::AbstractVariable...) = unique(v -> identifier(v), variables)
-
 """Struct that holds all variables of a simulation. Variables are split into 
 groups corresponding in the fields here $(TYPEDFIELDS) Each group can have
 their own namespaces to distinguish between e.g. ocean, land, or tracer variables.
@@ -164,9 +162,9 @@ end
 
 get_namespaces(variables::AbstractVariable...) = unique([v.namespace for v in variables])
 
-function filter_variables(variables, VariableType)
-    # filter by variable type, remove duplicates
-    vars = unique(filter(v -> v isa VariableType, variables))
+function filter_variables(vars, VariableType)
+    vars = filter(v -> v isa VariableType, vars)    # filter by variable type
+    vars = unique(v -> identifier(v), vars)         # remove duplicates by identifier (group+namespace+name)
 
     # Split by namespace
     namespaces = get_namespaces(vars...)

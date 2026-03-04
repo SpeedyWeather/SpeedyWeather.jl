@@ -315,6 +315,6 @@ end
 
 function variables(::AbstractZenith)
     return (
-        DiagnosticVariable(name = :cos_zenith, dims = Grid2D(), desc = "Cosine of solar zenith angle", units = "1"),
+        ParameterizationVariable(:cos_zenith, Grid2D(), desc = "Cosine of solar zenith angle", units = "1"),
     )
 end

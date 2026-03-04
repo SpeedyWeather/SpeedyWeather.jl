@@ -64,9 +64,9 @@ end
 # all albedos need to define albedo for ocean/land separately and combined
 function variables(::AbstractAlbedo)
     return (
-        DiagnosticVariable(name = :albedo, dims = Grid2D(), desc = "Albedo", units = "1"),
-        DiagnosticVariable(name = :albedo, dims = Grid2D(), desc = "Albedo over the ocean", units = "1", namespace = :ocean),
-        DiagnosticVariable(name = :albedo, dims = Grid2D(), desc = "Albedo over the land", units = "1", namespace = :land),
+        ParameterizationVariable(:albedo, Grid2D(), desc = "Albedo", units = "1"),
+        ParameterizationVariable(:albedo, Grid2D(), desc = "Albedo over the ocean", units = "1", namespace = :ocean),
+        ParameterizationVariable(:albedo, Grid2D(), desc = "Albedo over the land", units = "1", namespace = :land),
     )
 end
 

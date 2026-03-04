@@ -214,10 +214,10 @@ end
 
 function variables(::AbstractSurfaceHumidityFlux)
     return (
-        DiagnosticVariable(name = :surface_humidity_flux, dims = Grid2D(), desc = "Total surface humidity flux", units = "kg/m²/s"),
-        DiagnosticVariable(name = :surface_humidity_flux, dims = Grid2D(), desc = "Ocean surface humidity flux", units = "kg/m²/s", namespace = :ocean),
-        DiagnosticVariable(name = :surface_humidity_flux, dims = Grid2D(), desc = "Land surface humidity flux", units = "kg/m²/s", namespace = :land),
-        PrognosticVariable(name = :surface_humidity_flux, dims = Grid2D(), desc = "Prescribed Ocean surface humidity flux", units = "kg/m²/s", namespace = :ocean),
-        PrognosticVariable(name = :surface_humidity_flux, dims = Grid2D(), desc = "Prescribed Land surface humidity flux", units = "kg/m²/s", namespace = :land),
+        PrognosticVariable(:surface_humidity_flux, Grid2D(), desc = "Prescribed Ocean surface humidity flux", units = "kg/m²/s", namespace = :ocean),
+        PrognosticVariable(:surface_humidity_flux, Grid2D(), desc = "Prescribed Land surface humidity flux", units = "kg/m²/s", namespace = :land),
+        ParameterizationVariable(:surface_humidity_flux, Grid2D(), desc = "Total surface humidity flux", units = "kg/m²/s"),
+        ParameterizationVariable(:surface_humidity_flux, Grid2D(), desc = "Ocean surface humidity flux", units = "kg/m²/s", namespace = :ocean),
+        ParameterizationVariable(:surface_humidity_flux, Grid2D(), desc = "Land surface humidity flux", units = "kg/m²/s", namespace = :land),
     )
 end

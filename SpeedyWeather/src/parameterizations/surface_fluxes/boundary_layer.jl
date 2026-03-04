@@ -1,7 +1,7 @@
 abstract type AbstractBoundaryLayer <: AbstractParameterization end
 
 variables(::AbstractBoundaryLayer) = (
-    DiagnosticVariable(name = :boundary_layer_drag, dims = Grid2D(), desc = "Boundary layer drag coefficient", units = "1"),
+    ParameterizationVariable(:boundary_layer_drag, Grid2D(), desc = "Boundary layer drag coefficient", units = "1"),
 )
 
 export ConstantDrag

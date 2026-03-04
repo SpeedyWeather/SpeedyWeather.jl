@@ -42,7 +42,7 @@ end
 
 variables(::BulkRichardsonDiffusion) = (
     # TODO change to height in meters or index?
-    DiagnosticVariable(name = :boundary_layer_height, dims = Grid2D(), desc = "Boundary layer height", units = "1"),
+    ParameterizationVariable(:boundary_layer_height, Grid2D(), desc = "Boundary layer height", units = "1"),
 )
 
 function initialize!(diffusion::BulkRichardsonDiffusion, model::PrimitiveEquation)

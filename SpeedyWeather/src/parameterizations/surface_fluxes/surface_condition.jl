@@ -21,9 +21,9 @@ SurfaceCondition(SG::SpectralGrid; kwargs...) = SurfaceCondition{SG.NF}(; kwargs
 
 function variables(::AbstractSurfaceCondition)
     return (
-        DiagnosticVariable(name = :surface_wind_speed, dims = Grid2D(), desc = "Surface wind speed", units = "m/s"),
-        DiagnosticVariable(name = :surface_air_density, dims = Grid2D(), desc = "Surface air density", units = "kg/m³"),
-        DiagnosticVariable(name = :surface_air_temperature, dims = Grid2D(), desc = "Surface air temperature", units = "K"),
+        ParameterizationVariable(:surface_wind_speed, Grid2D(), desc = "Surface wind speed", units = "m/s"),
+        ParameterizationVariable(:surface_air_density, Grid2D(), desc = "Surface air density", units = "kg/m³"),
+        ParameterizationVariable(:surface_air_temperature, Grid2D(), desc = "Surface air temperature", units = "K"),
     )
 end
 

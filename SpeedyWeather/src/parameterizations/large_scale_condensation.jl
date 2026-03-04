@@ -165,12 +165,12 @@ end
 
 function variables(::ImplicitCondensation)
     return (
-        DiagnosticVariable(name = :rain_large_scale, dims = Grid2D(), desc = "Large-scale precipitation (rain, accumulated)", units = "m"),
-        DiagnosticVariable(name = :snow_large_scale, dims = Grid2D(), desc = "Large-scale precipitation (snow, accumulated)", units = "m"),
-        DiagnosticVariable(name = :rain_rate_large_scale, dims = Grid2D(), desc = "Large-scale precipitation (rain)", units = "m/s"),
-        DiagnosticVariable(name = :snow_rate_large_scale, dims = Grid2D(), desc = "Large-scale precipitation (snow)", units = "m/s"),
-        DiagnosticVariable(name = :rain_rate, dims = Grid2D(), desc = "Rain rate (large-scale + convection)", units = "m/s"),
-        DiagnosticVariable(name = :snow_rate, dims = Grid2D(), desc = "Snow rate (large-scale + convection)", units = "m/s"),
-        DiagnosticVariable(name = :cloud_top, dims = Grid2D(), desc = "Cloud top layer index", units = "1"),
+        ParameterizationVariable(:rain_large_scale, Grid2D(), desc = "Large-scale precipitation (rain, accumulated)", units = "m"),
+        ParameterizationVariable(:snow_large_scale, Grid2D(), desc = "Large-scale precipitation (snow, accumulated)", units = "m"),
+        ParameterizationVariable(:rain_rate_large_scale, Grid2D(), desc = "Large-scale precipitation (rain)", units = "m/s"),
+        ParameterizationVariable(:snow_rate_large_scale, Grid2D(), desc = "Large-scale precipitation (snow)", units = "m/s"),
+        ParameterizationVariable(:rain_rate, Grid2D(), desc = "Rain rate (large-scale + convection)", units = "m/s"),
+        ParameterizationVariable(:snow_rate, Grid2D(), desc = "Snow rate (large-scale + convection)", units = "m/s"),
+        ParameterizationVariable(:cloud_top, Grid2D(), desc = "Cloud top layer index", units = "1"),
     )
 end

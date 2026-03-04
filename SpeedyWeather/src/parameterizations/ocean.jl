@@ -344,15 +344,15 @@ SlabOcean(SG::SpectralGrid; kwargs...) = SlabOcean{SG.NF}(; kwargs...)
 
 function variables(::SlabOcean)
     return (
-        PrognosticVariable(name = :sea_surface_temperature, dims = Grid2D(), namespace = :ocean, desc = "Sea surface temperature", units = "K"),
+        PrognosticVariable(:sea_surface_temperature, Grid2D(), namespace = :ocean, desc = "Sea surface temperature", units = "K"),
 
-        DiagnosticVariable(name = :surface_shortwave_down, dims = Grid2D(), desc = "Surface shortwave radiation down", units = "W/m^2"),
-        DiagnosticVariable(name = :surface_shortwave_up, dims = Grid2D(), desc = "Surface shortwave radiation up over ocean", units = "W/m^2", namespace = :ocean),
-        DiagnosticVariable(name = :surface_longwave_down, dims = Grid2D(), desc = "Surface longwave radiation down", units = "W/m^2"),
-        DiagnosticVariable(name = :surface_longwave_up, dims = Grid2D(), desc = "Surface longwave radiation up over ocean", units = "W/m^2", namespace = :ocean),
+        ParameterizationVariable(:surface_shortwave_down, Grid2D(), desc = "Surface shortwave radiation down", units = "W/m^2"),
+        ParameterizationVariable(:surface_shortwave_up, Grid2D(), desc = "Surface shortwave radiation up over ocean", units = "W/m^2", namespace = :ocean),
+        ParameterizationVariable(:surface_longwave_down, Grid2D(), desc = "Surface longwave radiation down", units = "W/m^2"),
+        ParameterizationVariable(:surface_longwave_up, Grid2D(), desc = "Surface longwave radiation up over ocean", units = "W/m^2", namespace = :ocean),
 
-        DiagnosticVariable(name = :surface_humidity_flux, dims = Grid2D(), desc = "Surface humidity flux", units = "kg/s/m^2", namespace = :ocean),
-        DiagnosticVariable(name = :surface_sensible_heat_flux, dims = Grid2D(), desc = "Surface sensible heat flux", units = "kg/s/m^2", namespace = :ocean),
+        ParameterizationVariable(:surface_humidity_flux, Grid2D(), desc = "Surface humidity flux", units = "kg/s/m^2", namespace = :ocean),
+        ParameterizationVariable(:surface_sensible_heat_flux, Grid2D(), desc = "Surface sensible heat flux", units = "kg/s/m^2", namespace = :ocean),
     )
 end
 
