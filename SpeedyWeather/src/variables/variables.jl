@@ -38,8 +38,7 @@ end
 """$(TYPEDSIGNATURES)
 Symbol representing a unique identifier for a variable, combining its type, namespace and name and namespace. 
 Used to remove duplicates when extracting variables from the model. E.g. `:Variable_ocean_sea_surface_temperature`."""
-identifier(v::AbstractVariable) =
-    Symbol(nonparametric_type(v), "_", v.namespace, v.namespace == Symbol() ? "" : "_", v.name)
+identifier(v::AbstractVariable) = Symbol(v.namespace, :_, v.name)
 
 """Struct that holds all variables of a simulation. Variables are split into 
 groups corresponding in the fields here $(TYPEDFIELDS) Each group can have
