@@ -115,5 +115,5 @@ end
 
 """$(TYPEDSIGNATURES)
 Extract the number of soil layers from the model. The fallback is 0 soil layers, i.e. no land model."""
-@inline get_soil_layers(model::AbstractModel) = (haskey(model, :land) && !isnothing(model.land)) ? get_nlayers(model.land) : 0
+@inline get_soil_layers(model::AbstractModel) = (hasproperty(model, :land) && !isnothing(model.land)) ? get_nlayers(model.land) : 0
 @inline get_nlayers(model::AbstractModel) = model.spectral_grid.nlayers

@@ -42,7 +42,7 @@ end
 
 """$TYPEDSIGNATURES To be extended for every output variable to define
 the path where in `simulation` to find that output variable `::AbstractField`."""
-path(::VorticityOutput, simulation) = simulation.diagnostic_variables.grid.vor_grid
+path(::VorticityOutput, simulation) = simulation.variables.grid.vor
 
 """Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
@@ -57,7 +57,7 @@ Fields are: $(TYPEDFIELDS)"""
     keepbits::Int = 7
 end
 
-path(::ZonalVelocityOutput, simulation) = simulation.diagnostic_variables.grid.u_grid
+path(::ZonalVelocityOutput, simulation) = simulation.variables.grid.u
 
 """Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
@@ -72,7 +72,7 @@ Fields are: $(TYPEDFIELDS)"""
     keepbits::Int = 7
 end
 
-path(::MeridionalVelocityOutput, simulation) = simulation.diagnostic_variables.grid.v_grid
+path(::MeridionalVelocityOutput, simulation) = simulation.variables.grid.v
 
 """Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
@@ -88,7 +88,7 @@ Fields are: $(TYPEDFIELDS)"""
     unscale::Bool = true
 end
 
-path(::DivergenceOutput, simulation) = simulation.diagnostic_variables.grid.div_grid
+path(::DivergenceOutput, simulation) = simulation.variables.grid.div
 
 """Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
@@ -103,7 +103,7 @@ Fields are: $(TYPEDFIELDS)"""
     keepbits::Int = 7
 end
 
-path(::InterfaceDisplacementOutput, simulation) = simulation.diagnostic_variables.grid.pres_grid
+path(::InterfaceDisplacementOutput, simulation) = simulation.variables.grid.η
 
 """Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
@@ -119,7 +119,7 @@ Fields are: $(TYPEDFIELDS)"""
     transform::F = (x) -> exp(x) / 100     # log(Pa) to hPa
 end
 
-path(::SurfacePressureOutput, simulation) = simulation.diagnostic_variables.grid.pres_grid
+path(::SurfacePressureOutput, simulation) = simulation.variables.grid.pres
 
 """Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
@@ -136,7 +136,7 @@ Fields are: $(TYPEDFIELDS)"""
 end
 
 # points to surface not mean sea level pressure but core variable to read in
-path(::MeanSeaLevelPressureOutput, simulation) = simulation.diagnostic_variables.grid.pres_grid
+path(::MeanSeaLevelPressureOutput, simulation) = simulation.variables.grid.pres
 
 function output!(
         output::NetCDFOutput,
@@ -153,27 +153,27 @@ function output!(
     g = simulation.model.planet.gravity
 
     # compute virtual temperature on the fly
-    (; nlayers) = simulation.diagnostic_variables
-    T = simulation.diagnostic_variables.physics.surface_air_temperature
+    nlayers = size(simulation.variables.grid.temp, 2)
+    T = simulation.variables.parameterizations.surface_air_temperature
 
     if !simulation.model.physics    # otherwise this has been computed already
         # calculate the surface air temperature from lowest model level temperature
         # via dry adiabatic lapse rate
-        T .= field_view(simulation.diagnostic_variables.grid.temp_grid, :, nlayers)
+        T .= field_view(simulation.variables.grid.temp, :, nlayers)
         # σ vertical coordinate at lowest model level
         GPUArrays.@allowscalar σ = simulation.model.geometry.σ_levels_full[nlayers]
         σ⁻ᵏ = σ^(-κ)    # precalculate adiabatic descent factor
         T .*= σ⁻ᵏ       # lower to surface assuming dry adiabatic lapse rate
     end
 
-    q = field_view(simulation.diagnostic_variables.grid.humid_grid, :, nlayers)
-    Tᵥ = simulation.diagnostic_variables.dynamics.a_2D_grid
+    q = field_view(simulation.variables.grid.humid, :, nlayers)
+    Tᵥ = simulation.variables.scratch.a_2D_grid
 
     (; atmosphere) = simulation.model
     Tᵥ .= virtual_temperature.(T, q, atmosphere)
 
     # calculate mean sea-level pressure on model grid
-    mslp = simulation.diagnostic_variables.dynamics.b_2D_grid
+    mslp = simulation.variables.scratch.b_2D_grid
     (; transform) = variable                    # to change units from log(Pa) to hPa
     @. mslp = transform(g * h / R_dry / Tᵥ + lnpₛ)    # Pa to hPa
 
@@ -206,7 +206,7 @@ Fields are: $(TYPEDFIELDS)"""
     transform::F = (x) -> x - 273.15     # K to ˚C
 end
 
-path(::TemperatureOutput, simulation) = simulation.diagnostic_variables.grid.temp_grid
+path(::TemperatureOutput, simulation) = simulation.variables.grid.temp
 
 """Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
@@ -221,7 +221,7 @@ Fields are: $(TYPEDFIELDS)"""
     keepbits::Int = 7
 end
 
-path(::HumidityOutput, simulation) = simulation.diagnostic_variables.grid.humid_grid
+path(::HumidityOutput, simulation) = simulation.variables.grid.humid
 
 # collect all in one for convenience
 DynamicsOutput() = (
