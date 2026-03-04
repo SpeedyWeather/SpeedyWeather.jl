@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Add soil type map for soil-specific field capacities [#981](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/981)
 - Get SpeedyWeatherAssets on the fly [#983](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/983)
 - Change from MIT to EUPL license [#992](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/992)
 

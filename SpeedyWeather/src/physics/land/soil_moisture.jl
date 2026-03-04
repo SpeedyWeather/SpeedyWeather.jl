@@ -154,7 +154,7 @@ export LandBucketMoisture
 """LandBucketMoisture model with two soil layers exchanging moisture via vertical diffusion.
 Forced by precipitation, evaporation, surface condensation, snow melt and river runoff drainage.
 $(TYPEDFIELDS)"""
-@parameterized @kwdef struct LandBucketMoisture{NF} <: AbstractSoilMoisture
+@parameterized @kwdef struct LandBucketMoisture{NF, GridVariable2D} <: AbstractSoilMoisture
     "[OPTION] Time scale of vertical diffusion [s]"
     time_scale::Second = Day(2)
 
@@ -166,10 +166,43 @@ $(TYPEDFIELDS)"""
 
     "[OPTION] Initial soil moisture over ocean, volume fraction [1]"
     @param ocean_moisture::NF = 0 (bounds = 0 .. 1,)
+
+    "[OPTION] filename of soil type"
+    file::String = "soil_type.nc"
+
+    "[OPTION] path to the folder containing the soil moisture"
+    path::String = joinpath("data", "boundary_conditions", file)
+
+    "[OPTION] flag to check for soil moisture in SWA or locally"
+    from_assets::Bool = true
+
+    "[OPTION] variable name in netcdf file"
+    varname::String = "slt"
+
+    "[OPTION] SpeedyWeatherAssets version number"
+    version::VersionNumber = DEFAULT_ASSETS_VERSION
+
+    "[OPTION] Grid the soil moisture file comes on"
+    FieldType::Type{<:AbstractField} = FullClenshawField
+
+    "[OPTION] The missing value in the data respresenting ocean"
+    missing_value::NF = NF(NaN)
+
+    "[OPTION] Field capacities relating to soil textural types"
+    field_capacities::NTuple{7, NF} = (0.244f0, 0.347f0, 0.383f0, 0.448f0, 0.541f0, 0.663f0, 0.347f0)
+
+    # to be filled from file
+    "Soil types, interpolated onto a grid"
+    soil_types::GridVariable2D
 end
 
 Adapt.@adapt_structure LandBucketMoisture
-LandBucketMoisture(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothing; kwargs...) = LandBucketMoisture{SG.NF}(; kwargs...)
+function LandBucketMoisture(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothing; kwargs...)
+    (; NF, GridVariable2D, grid) = SG
+    soil_types = zeros(GridVariable2D, grid)
+    return LandBucketMoisture{NF, GridVariable2D}(; soil_types, kwargs...)
+end
+
 function initialize!(soil::LandBucketMoisture, model::PrimitiveEquation)
     nlayers = get_soil_layers(model)
     @assert nlayers == 2 "LandBucketMoisture only works with 2 soil layers " *
@@ -193,11 +226,29 @@ function initialize!(
         soil::LandBucketMoisture,
         model::PrimitiveEquation,
     )
+    (; soil_types) = soil
     # create a seasonal model, initialize it and the variables
     seasonal_model = SeasonalSoilMoisture(model.spectral_grid, model.land.geometry)
     initialize!(seasonal_model, model)
     initialize!(progn, diagn, seasonal_model, model)
-    # (seasonal model will be garbage collected hereafter)
+
+    field = get_asset(
+        soil.path;
+        from_assets = soil.from_assets,
+        name = soil.varname,
+        ArrayType = soil.FieldType,
+        FileFormat = NCDataset,
+        version = soil.version
+    )
+
+    soil_type_file = on_architecture(model.architecture, field)
+    interp = RingGrids.interpolator(soil_types, soil_type_file, NF = Float32)
+    interpolate!(soil_types, soil_type_file, interp)
+
+    field_capacity = progn.land.soil_field_capacity
+    type_indices = (isnan(x) ? 0 : round(Int, x) for x in soil_types)
+    safe_indices = max.(type_indices, 1)
+    field_capacity.data .= soil.field_capacities[safe_indices]
 
     # set ocean "soil" moisture points (100% ocean only)
     masked_value = soil.ocean_moisture
@@ -206,6 +257,10 @@ function initialize!(
         sm = progn.land.soil_moisture.data
         sm[isnan.(sm)] .= masked_value
         mask!(progn.land.soil_moisture, model.land_sea_mask, :ocean; masked_value)
+
+        sfc = progn.land.soil_field_capacity.data
+        sfc[isnan.(sfc)] .= masked_value
+        mask!(progn.land.soil_field_capacity, model.land_sea_mask, :ocean; masked_value)
     end
 end
 
@@ -239,32 +294,36 @@ function timestep!(
     @boundscheck size(soil_moisture, 2) >= 2 || throw(DimensionMismatch)
 
     # Water at field capacity [m], top and lower layer γ*z₁ and γ*z₂
-    γ = model.land.thermodynamics.field_capacity
-    f₁ = γ * model.land.geometry.layer_thickness[1]
-    f₂ = γ * model.land.geometry.layer_thickness[2]
+    field_capacity = progn.land.soil_field_capacity
+    z₁ = model.land.geometry.layer_thickness[1]
+    z₂ = model.land.geometry.layer_thickness[2]
 
     p = soil.infiltration_fraction      # Infiltration fraction: fraction of top layer runoff put into lower layer
     τ⁻¹ = inv(convert(eltype(soil_moisture), Second(soil.time_scale).value))
 
-    params = (; ρ, Δt, f₁, f₂, p, τ⁻¹)  # pack into NamedTuple for kernel
+    params = (; ρ, Δt, z₁, z₂, p, τ⁻¹)  # pack into NamedTuple for kernel
 
     return launch!(
         architecture(soil_moisture), LinearWorkOrder, (size(soil_moisture, 1),),
-        land_bucket_soil_moisture_kernel!, soil_moisture, mask, P, S, H, R, params
+        land_bucket_soil_moisture_kernel!, soil_moisture, field_capacity, mask, P, S, H, R, params
     )
 end
 
 @kernel inbounds = true function land_bucket_soil_moisture_kernel!(
-        soil_moisture, mask, P, S, H, R, params
+        soil_moisture, field_capacity, mask, P, S, H, R, params
     )
 
     ij = @index(Global, Linear)             # every grid point ij
 
     if mask[ij] > 0                         # at least partially land
-        (; ρ, Δt, f₁, f₂, p, τ⁻¹) = params
+        (; ρ, Δt, z₁, z₂, p, τ⁻¹) = params
         # precipitation (rain only, convection + large-scale) minus evaporation (or condensation, = humidity flux)
         # river runoff via drain excess water below (that's just gone)
         # convert to [m/s] by dividing by density
+
+        # Apply field capacity
+        f₁ = field_capacity[ij] * z₁
+        f₂ = field_capacity[ij] * z₂
 
         # Soil top sources and sinks
         # note: rain water can increase soil moisture regardless of snow cover
@@ -293,6 +352,7 @@ end
 function variables(::LandBucketMoisture)
     return (
         # Prognostic variables
+        PrognosticVariable(name = :soil_field_capacity, dims=Grid2D(), desc = "Field capacity of local soil type", units = "m³m⁻³", namespace = :land),
         PrognosticVariable(name = :soil_moisture, dims = Grid3D(), desc = "Soil moisture content (fraction of capacity)", units = "1", namespace = :land),
         # Diagnostic variables written to diagn.physics
         DiagnosticVariable(name = :river_runoff, dims = Grid2D(), desc = "River runoff from soil moisture", units = "m/s", namespace = :land),
