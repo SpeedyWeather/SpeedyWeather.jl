@@ -154,7 +154,7 @@ export LandBucketMoisture
 """LandBucketMoisture model with two soil layers exchanging moisture via vertical diffusion.
 Forced by precipitation, evaporation, surface condensation, snow melt and river runoff drainage.
 $(TYPEDFIELDS)"""
-@parameterized @kwdef struct LandBucketMoisture{NF} <: AbstractSoilMoisture
+@parameterized @kwdef struct LandBucketMoisture{NF, GridVariable2D} <: AbstractSoilMoisture
     "[OPTION] Time scale of vertical diffusion [s]"
     time_scale::Second = Day(2)
 
@@ -167,27 +167,42 @@ $(TYPEDFIELDS)"""
     "[OPTION] Initial soil moisture over ocean, volume fraction [1]"
     @param ocean_moisture::NF = 0 (bounds = 0 .. 1,)
 
-    "[OPTION] path to the folder containing the soil type file, pkg path default"
-    path::String = "SpeedyWeather.jl/input_data"
-
     "[OPTION] filename of soil type"
     file::String = "soil_type.nc"
+
+    "[OPTION] path to the folder containing the soil moisture"
+    path::String = joinpath("data", "boundary_conditions", file)
+
+    "[OPTION] flag to check for soil moisture in SWA or locally"
+    from_assets::Bool = true
 
     "[OPTION] variable name in netcdf file"
     varname::String = "slt"
 
-    "[OPTION] Grid the soil type file comes on"
-    file_Grid::Type{<:AbstractGrid} = FullGaussianGrid
+    "[OPTION] SpeedyWeatherAssets version number"
+    version::VersionNumber = DEFAULT_ASSETS_VERSION
+
+    "[OPTION] Grid the soil moisture file comes on"
+    FieldType::Type{<:AbstractField} = FullClenshawField
 
     "[OPTION] The missing value in the data respresenting ocean"
     missing_value::NF = NF(NaN)
 
     "[OPTION] Field capacities relating to soil textural types"
     field_capacities::NTuple{7, NF} = (0.244f0, 0.347f0, 0.383f0, 0.448f0, 0.541f0, 0.663f0, 0.347f0)
+
+    # to be filled from file
+    "Soil types, interpolated onto a grid"
+    soil_types::GridVariable2D
 end
 
 Adapt.@adapt_structure LandBucketMoisture
-LandBucketMoisture(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothing; kwargs...) = LandBucketMoisture{SG.NF}(; kwargs...)
+function LandBucketMoisture(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothing; kwargs...)
+    (; NF, GridVariable2D, grid) = SG
+    soil_types = zeros(GridVariable2D, grid)
+    return LandBucketMoisture{NF, GridVariable2D}(; soil_types, kwargs...)
+end
+
 function initialize!(soil::LandBucketMoisture, model::PrimitiveEquation)
     nlayers = get_soil_layers(model)
     @assert nlayers == 2 "LandBucketMoisture only works with 2 soil layers " *
@@ -211,38 +226,27 @@ function initialize!(
         soil::LandBucketMoisture,
         model::PrimitiveEquation,
     )
+    (; soil_types) = soil
     # create a seasonal model, initialize it and the variables
     seasonal_model = SeasonalSoilMoisture(model.spectral_grid, model.land.geometry)
     initialize!(seasonal_model, model)
     initialize!(progn, diagn, seasonal_model, model)
 
-    # LOAD NETCDF FILE
-    if soil.path == "SpeedyWeather.jl/input_data"
-        path = joinpath(@__DIR__, "../../../input_data", soil.file)
-    else
-        path = joinpath(soil.path, soil.file)
-    end
-    ncfile = NCDataset(path)
+    field = get_asset(
+        soil.path;
+        from_assets = soil.from_assets,
+        name = soil.varname,
+        ArrayType = soil.FieldType,
+        FileFormat = NCDataset,
+        version = soil.version
+    )
 
-    # read out netCDF data
-    nx, ny = ncfile.dim["longitude"], ncfile.dim["latitude"]
-    nlat_half = RingGrids.get_nlat_half(soil.file_Grid, nx * ny)
-    grid = soil.file_Grid(nlat_half)
-
-    # the soil type from file but wrapped into a grid
-    NF = eltype(soil.missing_value)
-    soil_type_file = zeros(NF, grid)
-
-    fill_value = NF(ncfile[soil.varname].attrib["_FillValue"])
-    soil_type_file[soil_type_file .=== fill_value] .= soil.missing_value      # === to include NaN
-    soil_type_file = on_architecture(model.architecture, soil_type_file)
-    soil_type_model_grid = similar(progn.land.soil_field_capacity)
-
-    interp = RingGrids.interpolator(soil_type_model_grid, soil_type_file, NF = Float32)
-    interpolate!(soil_type_model_grid, soil_type_file, interp)
+    soil_type_file = on_architecture(model.architecture, field)
+    interp = RingGrids.interpolator(soil_types, soil_type_file, NF = Float32)
+    interpolate!(soil_types, soil_type_file, interp)
 
     field_capacity = progn.land.soil_field_capacity
-    type_indices = Int.(round.(soil_type_model_grid))
+    type_indices = (isnan(x) ? 0 : round(Int, x) for x in soil_types)
     safe_indices = max.(type_indices, 1)
     field_capacity.data .= soil.field_capacities[safe_indices]
 
