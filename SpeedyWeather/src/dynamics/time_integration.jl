@@ -3,7 +3,7 @@ export Leapfrog
 
 """Leapfrog time stepping defined by the following fields
 $(TYPEDFIELDS)"""
-@kwdef mutable struct Leapfrog{NF, IntType, B} <: AbstractTimeStepper
+@kwdef mutable struct Leapfrog{NF, IntType, S, MS, B} <: AbstractTimeStepper
     "[DERIVED] Spectral resolution (max degree of spherical harmonics)"
     trunc::IntType
 
@@ -11,7 +11,7 @@ $(TYPEDFIELDS)"""
     nsteps::IntType = 2
 
     "[OPTION] Time step in minutes for T31, scale linearly to `trunc`"
-    Δt_at_T31::Second = Minute(40)
+    Δt_at_T31::S = Minute(40)
 
     "[OPTION] Adjust `Δt_at_T31` with the `output_dt` to reach `output_dt` exactly in integer time steps"
     adjust_with_output::B = true
@@ -35,7 +35,7 @@ $(TYPEDFIELDS)"""
     radius::NF = DEFAULT_RADIUS
 
     "[DERIVED] Time step Δt in milliseconds at specified resolution"
-    Δt_millisec::Millisecond = get_Δt_millisec(Second(Δt_at_T31), trunc, radius, adjust_with_output)
+    Δt_millisec::MS = get_Δt_millisec(Second(Δt_at_T31), trunc, radius, adjust_with_output)
 
     "[DERIVED] Time step Δt [s] at specified resolution"
     Δt_sec::NF = Δt_millisec.value / 1000
@@ -94,7 +94,7 @@ Generator function for a Leapfrog struct using `spectral_grid`
 for the resolution information."""
 function Leapfrog(spectral_grid::SpectralGrid; kwargs...)
     (; NF, trunc) = spectral_grid
-    return Leapfrog{NF, typeof(trunc), Bool}(; trunc, kwargs...)
+    return Leapfrog{NF, typeof(trunc), Dates.Second, Dates.Millisecond, Bool}(; trunc, kwargs...)
 end
 
 """$(TYPEDSIGNATURES)
@@ -241,11 +241,12 @@ function first_timesteps!(simulation::AbstractSimulation)
 
     # decide whether to start with 1x Euler then 1x Leapfrog at Δt
     # TODO: this causes problems with Reactant when traced / or when not traced as a regular if loop in reverse mode
-    ifelse(time_stepping.first_step_euler, 
-        begin 
+    ifelse(
+        time_stepping.first_step_euler,
+        begin
             first_timesteps!(progn, diagn, model)
             time_stepping.first_step_euler = !time_stepping.continue_with_leapfrog   # after first run! continue with leapfrog
-        end, 
+        end,
         begin # or continue with leaprog steps at 2Δt (e.g. restart)
             # but make sure that implicit solver is initialized in that situation
             initialize!(model.implicit, 2Δt, diagn, model)
