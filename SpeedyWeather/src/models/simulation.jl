@@ -64,13 +64,14 @@ function initialize!(
     # SET THE CLOCK
     (; clock) = progn
     (; time_stepping) = model
+    (; planet) = model  # pass on planet to calculate time dilation for solar zenith calculations
     if steps != DEFAULT_TIMESTEPS
         # sets the steps, calculate period from it, store the start date, reset counter
         @assert period == DEFAULT_PERIOD "Period and steps cannot be set simultaneously"
-        initialize!(clock, time_stepping, steps)
+        initialize!(clock, time_stepping, planet, steps)
     else
         # set period = how long to integrate for, tore the start date, reset counter
-        initialize!(clock, time_stepping, period)
+        initialize!(clock, time_stepping, planet, period)
     end
 
     # OUTPUT, enable/disable output
