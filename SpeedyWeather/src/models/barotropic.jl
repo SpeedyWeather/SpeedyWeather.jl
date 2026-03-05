@@ -83,7 +83,7 @@ function initialize!(model::Barotropic; time::DateTime = DEFAULT_DATE)
     # initialize components
     arch = model.architecture
     @maybe_jit arch initialize!(model.geometry, model)
-    @maybe_jit arch initialize!(model.time_stepping, model)
+    initialize!(model.time_stepping, model)
     @maybe_jit arch initialize!(model.coriolis, model)
     @maybe_jit arch initialize!(model.forcing, model)
     @maybe_jit arch initialize!(model.drag, model)
