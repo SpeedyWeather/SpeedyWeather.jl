@@ -27,6 +27,9 @@ $(TYPEDFIELDS)"""
     Δt::MS = Millisecond(0)
 end
 
+# default constructor (extended e.g. by ReactantExt)
+Clock(architecture::AbstractArchitecture) = Clock()
+
 # we don't want to adapt the clock, it has to stay mutable,
 # we just explicitly transfer nothing to the kernels
 Adapt.adapt_structure(to, ::Clock) = nothing
@@ -86,6 +89,12 @@ Initialize the clock with setting the start time and resetting the timestep coun
 function initialize!(clock::Clock)
     clock.start = clock.time    # store the start time
     clock.timestep_counter = 0  # reset counter
+    return clock
+end
+
+function set!(clock::Clock; time::DateTime, start::DateTime)
+    clock.time = time
+    clock.start = start
     return clock
 end
 

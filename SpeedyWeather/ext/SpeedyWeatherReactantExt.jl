@@ -67,4 +67,6 @@ end
 # that's for Reactant TracableDateTime
 SpeedyWeather.secondofday(dt::ReactantDatesExt.TracedRDateTime) = Dates.second(ReactantDatesExt.TracedRTime(dt).instant)
 
+SpeedyWeather.Clock(architecture::ReactantDevice) = Reactant.to_rarray(SpeedyWeather.Clock(), track_numbers = true)
+
 end

@@ -100,8 +100,7 @@ function initialize!(model::Barotropic; time::DateTime = DEFAULT_DATE)
     # set the initial conditions
     @maybe_jit arch initialize!(prognostic_variables, model.initial_conditions, model)
     (; clock) = prognostic_variables
-    clock.time = time       # set the current time
-    clock.start = time      # and store the start time
+    @maybe_jit arch set!(clock, time = time, start = time)
 
     return Simulation(prognostic_variables, diagnostic_variables, model)
 end
