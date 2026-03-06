@@ -22,13 +22,23 @@ Geopotential(SG::SpectralGrid) = Geopotential(
     on_architecture(SG.architecture, zeros(SG.NF, SG.nlayers))
 )
 
+function variables(::Geopotential)
+    return (
+        GridVariable(:geopotential, Grid3D(), desc = "Geopotential", units = "m^2/s^2"),
+        # TODO only the grid should be necessary, remove this when adapting the geopotential calculation
+        # in the dynamical core to only need grid geopotential
+        DynamicsVariable(:geopotential, Spectral3D(), desc = "Geopotential", units = "m^2/s^2"),
+    )
+end
+
 # function barrier to unpack only model components needed
 function initialize!(
         geopotential::Geopotential,
         model::PrimitiveEquation
     )
     model_parameters = (atmosphere = model.atmosphere, geometry = model.geometry)
-    return initialize!(geopotential, model_parameters)
+    initialize!(geopotential, model_parameters)
+    return nothing
 end
 
 """
@@ -57,41 +67,53 @@ end
 
 # calculate geopotential in grid-point space for parameterizations
 function geopotential!(
-        diagn::DiagnosticVariables,
+        vars::Variables,
         model::PrimitiveEquation,
     )
-    temp = diagn.grid.temp_grid
-    humid = diagn.grid.humid_grid
+    T = vars.grid.temp
+    Φ = vars.grid.geopotential
+
+    # use zero scratch for humidity in dry models to not distinguish in kernels below
+    vars.scratch.a_grid .= 0
+    q = haskey(vars.grid, :humid) ? vars.grid.humid : vars.scratch.a_grid
+
+    (; orography) = model.orography
     g = model.planet.gravity
     G = model.geopotential
-    (; geopotential) = diagn.grid
     (; orography) = model.orography
     (; atmosphere) = model
 
-    arch = architecture(temp)
+    arch = architecture(T)
     if typeof(arch) <: GPU
-        launch!(arch, LinearWorkOrder, (size(temp, 1),), geopotential_kernel!, geopotential, temp, humid, orography, g, G, atmosphere)
+        launch!(arch, LinearWorkOrder, (size(T, 1),), geopotential_kernel!, Φ, T, q, orography, g, G, atmosphere)
     else
-        geopotential_cpu!(geopotential, temp, humid, orography, g, G, atmosphere)
+        geopotential_cpu!(Φ, T, q, orography, g, G, atmosphere)
     end
     return nothing
 end
 
-function geopotential_cpu!(geopotential, temp, humid, orography, gravity, Geopotential, atmosphere)
-    nlayers = size(temp, 2)
-    return @inbounds for ij in eachgridpoint(geopotential)
-        geopotential_compute!(ij, geopotential, temp, humid, orography, gravity, Geopotential.Δp_geopot_half, Geopotential.Δp_geopot_full, nlayers, atmosphere)
+function geopotential_cpu!(Φ, T, q, orography, g, G, atmosphere)
+    nlayers = size(T, 2)
+    @inbounds for ij in eachgridpoint(Φ)
+        geopotential_compute!(
+            ij, Φ, T, q, orography, g, G.Δp_geopot_half, G.Δp_geopot_full, nlayers, atmosphere
+        )
     end
+    return nothing
 end
 
-@kernel function geopotential_kernel!(geopotential, temp, humid, orography, gravity, Geopotential, atmosphere)
+@kernel function geopotential_kernel!(Φ, T, q, orography, g, G, atmosphere)
     ij = @index(Global, Linear)
-    nlayers = size(temp, 2)
-
-    @inbounds geopotential_compute!(ij, geopotential, temp, humid, orography, gravity, Geopotential.Δp_geopot_half, Geopotential.Δp_geopot_full, nlayers, atmosphere)
+    nlayers = size(T, 2)
+    @inbounds geopotential_compute!(
+        ij, Φ, T, q, orography, g, G.Δp_geopot_half, G.Δp_geopot_full, nlayers, atmosphere
+    )
 end
 
-@propagate_inbounds function geopotential_compute!(ij, geopotential, temp, humid, orography, gravity, Δp_geopot_half, Δp_geopot_full, nlayers, atmosphere)
+@propagate_inbounds function geopotential_compute!(
+        ij, geopotential, temp, humid, orography,
+        gravity, Δp_geopot_half, Δp_geopot_full, nlayers, atmosphere
+    )
     # bottom layer
     Tᵥ = virtual_temperature(temp[ij, nlayers], humid[ij, nlayers], atmosphere)
     geopotential[ij, nlayers] = gravity * orography[ij] + Tᵥ * Δp_geopot_full[nlayers]
@@ -102,9 +124,8 @@ end
         Tᵥ = virtual_temperature(temp[ij, k], humid[ij, k], atmosphere)
         geopotential[ij, k] = geopotential[ij, k + 1] + Tᵥ_below * Δp_geopot_half[k + 1] + Tᵥ * Δp_geopot_full[k]
     end
-    return
+    return nothing
 end
-
 
 """
 $(TYPEDSIGNATURES)
@@ -132,10 +153,11 @@ function geopotential!(
 
     # OTHER FULL LAYERS, integrate two half-layers from bottom to top
     arch = architecture(geopot)
-    return launch!(
+    launch!(
         arch, SpectralWorkOrder, (size(geopot, 1),), geopotential_spectral_kernel!,
         geopot, temp_virt, Δp_geopot_half, Δp_geopot_full, nlayers
     )
+    return nothing
 end
 
 @kernel inbounds = true function geopotential_spectral_kernel!(

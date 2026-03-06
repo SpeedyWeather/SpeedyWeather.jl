@@ -626,7 +626,7 @@ end
 
     # Jablonowski and Williamson use η for σ coordinates
     η = σ_levels_full[k]
-    ηᵥ = (η - η₀) * π / 2  # auxiliary variable for vertical coordinate
+    ηᵥ = (η - η₀) * π * 1 // 2  # auxiliary variable for vertical coordinate
 
     # Amplitudes with height
     A1 = 3 // 4 * η * π * u₀ / R_dry * sin(ηᵥ) * sqrt(cos(ηᵥ))
@@ -637,10 +637,12 @@ end
     sinφ = sind(φij)
     cosφ = cosd(φij)
 
+    NF = eltype(temp_grid)
+
     # Jablonowski and Williamson, eq. (6)
     temp_grid[ij, k] = Tη[k] + A1 * (
         (-2sinφ^6 * (cosφ^2 + 1 // 3) + 10 // 63) * A2 +
-            (8 // 5 * cosφ^3 * (sinφ^2 + 2 // 3) - π // 4) * aΩ
+            (8 // 5 * cosφ^3 * (sinφ^2 + 2 // 3) - convert(NF, π) * 1 // 4) * aΩ
     )
 end
 
@@ -715,7 +717,7 @@ $(TYPEDSIGNATURES)
 Initialize surface pressure on orography by integrating the
 hydrostatic equation with the reference temperature lapse rate."""
 function initialize!(
-        ::Variables,
+        vars::Variables,
         ::PressureOnOrography,
         model::PrimitiveEquation
     )

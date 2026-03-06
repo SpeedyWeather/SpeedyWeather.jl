@@ -70,10 +70,12 @@ function Base.show(io::IO, M::AbstractModel)
         val = getfield(M, key)
         s = i == n ? "└" : "├"  # choose ending └ for last property
         p = i == n ? print : println
-        t = "$(typeof(val))"
-        t = textwidth(t) > 60 ? string(t[1:57], "...") : t  # truncate long strings
-        a = "$s " * styled"{info:$key}"*"::$t"
-        p(io, a)
+        t = split("$(typeof(val))", "{", limit = 2)
+        t1 = t[1]
+        t2 = length(t) == 2 ? ("{" * t[2]) : ""
+        a = "$s " * styled"{info:$key}"*"::$t1" * styled"{note:$t2}"
+        a_short = textwidth(a) > 75 ? first(a, 75) * "..." : a
+        p(io, a_short)
     end
     return nothing
 end

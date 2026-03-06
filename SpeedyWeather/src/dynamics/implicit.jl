@@ -187,6 +187,12 @@ function ImplicitPrimitiveEquation(spectral_grid::SpectralGrid; kwargs...)
     )
 end
 
+function variables(implicit::ImplicitPrimitiveEquation)
+    return (
+        GridVariable(:temp_average, VectorDim(implicit.nlayers), desc = "Average vertical temperature profile", units = "K"),
+    )
+end
+
 # function barrier to unpack the constants struct for primitive eq models
 function initialize!(
         I::ImplicitPrimitiveEquation,
