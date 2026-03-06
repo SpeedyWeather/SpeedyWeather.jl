@@ -197,27 +197,16 @@ function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
     initialize!(model.stochastic_physics, model)
     initialize!(model.particle_advection, model)
 
-    # # allocate prognostic and diagnostic variables
-    # prognostic_variables = PrognosticVariables(model)
-    # diagnostic_variables = DiagnosticVariables(model)
-
-    # # initialize non-atmosphere prognostic variables
-    # (; particles, ocean, land) = prognostic_variables
-    # initialize!(particles, prognostic_variables, diagnostic_variables, model.particle_advection, model)
-    # initialize!(ocean, prognostic_variables, diagnostic_variables, model.ocean, model)
-    # initialize!(land, prognostic_variables, diagnostic_variables, model.land, model)
-
-    # # set the initial conditions (may overwrite variables set in initialize! ocean/land)
-    # initialize!(prognostic_variables, model.initial_conditions, model)
-
-    # allocate all variables and set initial conditions
+    # allocate all variables
     variables = Variables(model)
-    initialize!(variables, model)
-
-    # set the time
+    
+    # set the time first
     (; clock) = variables.prognostic
     clock.time = time       # set the current time
     clock.start = time      # and store the start time
+    
+    # set all initial conditions for the ocean, seaice, land then atmosphere
+    initialize!(variables, model)
 
     return Simulation(variables, model)
 end

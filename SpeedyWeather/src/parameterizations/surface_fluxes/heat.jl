@@ -12,6 +12,9 @@ end
 
 Adapt.@adapt_structure SurfaceHeatFlux
 
+# abbreviate show for SurfaceHeatFlux to avoid printing all fields of ocean and land albedo in the main show
+Base.show(io::IO, SHF::SurfaceHeatFlux) = show(io, SHF, values = false)
+
 # generator function
 function SurfaceHeatFlux(
         SG::SpectralGrid;

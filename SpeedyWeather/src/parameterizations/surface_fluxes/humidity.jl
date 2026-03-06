@@ -15,6 +15,9 @@ end
 
 Adapt.@adapt_structure SurfaceHumidityFlux
 
+# abbreviate show for SurfaceHumidityFlux to avoid printing all fields of ocean and land albedo in the main show
+Base.show(io::IO, SHF::SurfaceHumidityFlux) = show(io, SHF, values = false)
+
 function SurfaceHumidityFlux(
         SG::SpectralGrid;
         ocean = SurfaceOceanHumidityFlux(SG),
@@ -168,8 +171,6 @@ variables(::SurfaceLandHumidityFlux) = (
     return nothing
 end
 
-## ----
-
 export PrescribedOceanHumidityFlux
 """Prescribed humidity flux over ocean surfaces. Applies surface humidity flux from
 `progn.ocean.surface_humidity_flux`. $(TYPEDFIELDS)"""
@@ -203,9 +204,6 @@ variables(::PrescribedOceanHumidityFlux) = (
     vars.tendencies.grid.humid[ij, surface] += surface_flux_to_tendency(flux_ocean, pₛ, model)
     return nothing
 end
-
-
-## ----
 
 export PrescribedLandHumidityFlux
 """Prescribed humidity flux over land surfaces. Applies surface humidity flux from

@@ -32,7 +32,7 @@ end
     _call_parameterizations!(ij, vars, parameterizations, model)
 
     # tendencies have to be scaled by the radius for the dynamical core
-    scale!(ij, vars.tendencies, model.planet.radius)
+    scale!(ij, vars.tendencies.grid, model.planet.radius)
 end
 
 # CPU without kernel, just a loop, change loop order compared to GPU though:
@@ -44,7 +44,7 @@ function parameterization_tendencies_cpu!(vars, model)
     radius = model.planet.radius
     return @inbounds for ij in 1:model.geometry.npoints
         # tendencies have to be scaled by the radius for the dynamical core
-        scale!(ij, vars.tendencies, radius)
+        scale!(ij, vars.tendencies.grid, radius)
     end
 end
 

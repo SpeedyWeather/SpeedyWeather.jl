@@ -25,26 +25,14 @@ initialize!(::ThermodynamicSeaIce, ::AbstractModel) = nothing
 
 function variables(::ThermodynamicSeaIce)
     return (
-        PrognosticVariable(name = :sea_ice_concentration, dims = Grid2D(), namespace = :ocean, desc = "Sea ice concentration", units = "1"),
+        PrognosticVariable(:sea_ice_concentration, Grid2D(), namespace = :ocean, desc = "Sea ice concentration", units = "1"),
     )
 end
 
-# don't affect concentration (may be set with set!)
-function initialize!(
-        ocean::PrognosticVariablesOcean,
-        vars::Variables,
-        sea_ice_model::ThermodynamicSeaIce,
-        model::PrimitiveEquation,
-    ) where {PrognosticVariablesOcean}
-    return nothing
-end
+# start with zero concentration
+initialize!(vars::Variables, sea_ice_model::ThermodynamicSeaIce, model::PrimitiveEquation) = nothing
 
-function timestep!(
-        vars::Variables,
-        sea_ice_model::ThermodynamicSeaIce,
-        model::PrimitiveEquation
-    )
-
+function timestep!(vars::Variables, sea_ice_model::ThermodynamicSeaIce, model::PrimitiveEquation)
     sst = vars.prognostic.ocean.sea_surface_temperature
     ℵ = vars.prognostic.ocean.sea_ice_concentration   # sea ice concentration [0, 1] as \aleph yay!
 

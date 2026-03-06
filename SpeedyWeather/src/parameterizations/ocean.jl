@@ -13,25 +13,14 @@ the following functions
         # you can use other fields from model, e.g. model.geometry
     end
 
-    function initialize!(
-        ocean,
-        progn::PrognosticVariables,
-        diagn::DiagnosticVariables,
-        ocean_model::CustomOceanModel,
-        model::PrimitiveEquation,
-    )
+    function initialize!(vars::Variables, ocean_model::CustomOceanModel, model::PrimitiveEquation)
         # your code here to initialize the prognostic variables for the ocean
-        # namely, ocean.sea_surface_temperature, ocean.sea_ice_concentration, e.g.
-        # ocean.sea_surface_temperature .= 300      # 300K everywhere
+        # namely, vars.prognostic.ocean.sea_surface_temperature, e.g.
+        # vars.prognostic.ocean.sea_surface_temperature .= 300      # 300K everywhere
     end
 
-    function timestep!(
-        progn::PrognosticVariables,
-        diagn::DiagnosticVariables,
-        ocean_model::CustomOceanModel,
-        model::PrimitiveEquation,
-    )
-        # your code here to change the progn.ocean.sea_surface_temperature
+    function timestep!(vars::Variables, ocean_model::CustomOceanModel, model::PrimitiveEquation)
+        # your code here to change the vars.prognostic.ocean.sea_surface_temperature
     end
 
 Temperatures in ocean.sea_surface_temperature have units of Kelvin,
@@ -44,12 +33,6 @@ but not masked by the land-sea mask, its value is always ignored.
 """
 abstract type AbstractOcean <: AbstractModelComponent end
 
-function Base.show(io::IO, O::AbstractOcean)
-    println(io, "$(typeof(O)) <: AbstractOcean")
-    keys = propertynames(O)
-    return print_fields(io, O, keys)
-end
-
 # variable that AbstractOcean requires
 function variables(::AbstractOcean)
     return (
@@ -58,26 +41,11 @@ function variables(::AbstractOcean)
 end
 
 # function barrier for all oceans
-function initialize!(
-        ocean::PrognosticVariablesOcean,
-        vars::Variables,
-        ocean_model::AbstractOcean,
-        model::PrimitiveEquation
-    ) where {PrognosticVariablesOcean}
-    initialize!(ocean, vars, ocean_model, model)
-    return initialize!(ocean, vars, model.sea_ice, model)
-end
+ocean_timestep!(vars::Variables, model::PrimitiveEquation) = timestep!(vars, model.ocean, model)
+initialize!(vars::Variables, ocean::AbstractOcean, model) =
+    @warn "`$(typeof(ocean))` does not have an `initialize!(::Variables, ::$(typeof(ocean)), model)` method " *
+    "to set the initial conditions for the ocean prognostic variables."
 
-# function barrier for all oceans
-function ocean_timestep!(
-        vars::Variables,
-        model::PrimitiveEquation
-    )
-    return timestep!(vars, model.ocean, model)
-end
-
-
-## SEASONAL OCEAN CLIMATOLOGY
 export SeasonalOceanClimatology
 
 """
@@ -143,14 +111,8 @@ function initialize!(ocean::SeasonalOceanClimatology, model::PrimitiveEquation)
     return nothing
 end
 
-function initialize!(
-        ocean::PrognosticVariablesOcean,
-        vars::Variables,
-        ocean_model::SeasonalOceanClimatology,
-        model::PrimitiveEquation,
-    ) where {PrognosticVariablesOcean}
-    return timestep!(vars, ocean_model, model)
-end
+# initial conditions for the ocean are just a "timestep" of the climatology
+initialize!(vars::Variables, ocean::SeasonalOceanClimatology, model) = timestep!(vars, ocean, model)
 
 function timestep!(
         vars::Variables,
@@ -169,23 +131,22 @@ function timestep!(
     NF = eltype(sea_surface_temperature)
     weight = convert(NF, Dates.days(time - Dates.firstdayofmonth(time)) / Dates.daysinmonth(time))
 
-    return launch!(
+    launch!(
         architecture(sea_surface_temperature), LinearWorkOrder, size(sea_surface_temperature),
-        seasonal_ocean_kernel!,
+        interpolate_monthly_climatology_kernel!,
         sea_surface_temperature, monthly_temperature, weight, this_month, next_month
     )
+    return nothing
 end
 
-@kernel inbounds = true function seasonal_ocean_kernel!(
-        sst, monthly_temp, weight, this_month, next_month
+@kernel inbounds = true function interpolate_monthly_climatology_kernel!(
+        var, monthly, weight, this_month, next_month
     )
-
     ij = @index(Global, Linear)
-
-    sst[ij] = (1 - weight) * monthly_temp[ij, this_month] + weight * monthly_temp[ij, next_month]
+    var[ij] = (1 - weight) * monthly[ij, this_month] + weight * monthly[ij, next_month]
 end
 
-## CONSTANT OCEAN CLIMATOLOGY
+# CONSTANT OCEAN CLIMATOLOGY
 export ConstantOceanClimatology
 
 """
@@ -229,13 +190,9 @@ ConstantOceanClimatology(SG::SpectralGrid; kwargs...) = ConstantOceanClimatology
 # nothing to initialize for model.ocean
 initialize!(::ConstantOceanClimatology, ::PrimitiveEquation) = nothing
 
-# initialize
-function initialize!(
-        ocean::PrognosticVariablesOcean,
-        vars::Variables,
-        ocean_model::ConstantOceanClimatology,
-        model::PrimitiveEquation,
-    ) where {PrognosticVariablesOcean}
+# initial conditions for the ocean are just a "timestep" of the climatology
+function initialize!(vars::Variables, ocean_model::ConstantOceanClimatology, model)
+
     # create a seasonal model, initialize it and the variables
     (; path, file, varname, FieldType) = ocean_model
     (; NF, GridVariable3D, grid) = model.spectral_grid
@@ -243,20 +200,18 @@ function initialize!(
         grid, path, file, varname, FieldType
     )
     initialize!(seasonal_model, model)
-    initialize!(ocean, vars, seasonal_model, model)
+
+    # now set the initial conditions for the ocean prognostic variables with the seasonal model
     # (seasonal model will be garbage collected hereafter)
+    initialize!(vars, seasonal_model, model)
+
     return nothing
 end
 
-function timestep!(
-        vars::Variables,
-        ocean_model::ConstantOceanClimatology,
-        model::PrimitiveEquation,
-    )
-    return nothing
-end
+# constant climatology does not change in time, so timestep! is a no-op
+timestep!(vars::Variables, ocean_model::ConstantOceanClimatology, model) = nothing
 
-## CONSTANT OCEAN CLIMATOLOGY
+# AQUAPLANET
 export AquaPlanet
 
 """
@@ -281,30 +236,21 @@ end
 # generator function
 AquaPlanet(SG::SpectralGrid; kwargs...) = AquaPlanet{SG.NF}(; kwargs...)
 
-# nothing to initialize for AquaPlanet
+# nothing to initialize for AquaPlanet model itself
 initialize!(::AquaPlanet, ::PrimitiveEquation) = nothing
 
-# initialize
-function initialize!(
-        ocean::PrognosticVariablesOcean,
-        vars::Variables,
-        ocean_model::AquaPlanet,
-        model::PrimitiveEquation,
-    ) where {PrognosticVariablesOcean}
-    (; sea_surface_temperature) = ocean
+# set initial conditions: cos²(lat) SST profile
+function initialize!(vars::Variables, ocean_model::AquaPlanet, model::PrimitiveEquation)
+    (; sea_surface_temperature) = vars.prognostic.ocean
     Te, Tp = ocean_model.temp_equator, ocean_model.temp_poles
     sst(λ, φ) = (Te - Tp) * cosd(φ)^2 + Tp
     set!(sea_surface_temperature, sst, model.geometry)
-    return ocean_model.mask && mask!(sea_surface_temperature, model.land_sea_mask, :land)
-end
-
-function timestep!(
-        vars::Variables,
-        ocean_model::AquaPlanet,
-        model::PrimitiveEquation,
-    )
+    ocean_model.mask && mask!(sea_surface_temperature, model.land_sea_mask, :land)
     return nothing
 end
+
+# SST is constant in time, so timestep! is a no-op
+timestep!(vars::Variables, ocean_model::AquaPlanet, model::PrimitiveEquation) = nothing
 
 
 export SlabOcean
@@ -346,41 +292,30 @@ function variables(::SlabOcean)
     )
 end
 
-# nothing to initialize for SlabOcean
+# nothing to initialize for SlabOcean model itself
 initialize!(ocean_model::SlabOcean, model::PrimitiveEquation) = nothing
 
-# initialize
-function initialize!(
-        ocean::PrognosticVariablesOcean,
-        progn::PrognosticVariables,
-        diagn::DiagnosticVariables,
-        ocean_model::SlabOcean,
-        model::PrimitiveEquation,
-    ) where {PrognosticVariablesOcean}
+# set initial conditions from seasonal climatology, then fill land points
+function initialize!(vars::Variables, ocean_model::SlabOcean, model::PrimitiveEquation)
     # create a seasonal model, initialize it and the variables
     seasonal_model = SeasonalOceanClimatology(model.spectral_grid)
     initialize!(seasonal_model, model)
-    initialize!(ocean, progn, diagn, seasonal_model, model)
+    initialize!(vars, seasonal_model, model)
     # (seasonal model will be garbage collected hereafter)
 
     # set land "sst" points (100% land only)
     if ocean_model.mask
         masked_value = ocean_model.land_temperature
-        sst = progn.ocean.sea_surface_temperature.data
+        sst = vars.prognostic.ocean.sea_surface_temperature.data
         # TODO: broadcasting over views of Fields of GPUArrays doesn't work
         sst[isnan.(sst)] .= masked_value
-        mask!(progn.ocean.sea_surface_temperature, model.land_sea_mask, :land; masked_value)
+        mask!(vars.prognostic.ocean.sea_surface_temperature, model.land_sea_mask, :land; masked_value)
     end
     return nothing
 end
 
-function timestep!(
-        progn::PrognosticVariables,
-        diagn::DiagnosticVariables,
-        ocean_model::SlabOcean,
-        model::PrimitiveEquation,
-    )
-    sst = progn.ocean.sea_surface_temperature
+function timestep!(vars::Variables, ocean_model::SlabOcean, model::PrimitiveEquation)
+    sst = vars.prognostic.ocean.sea_surface_temperature
 
     Lᵥ = latent_heat_condensation(model.atmosphere)
     C₀ = ocean_model.heat_capacity_mixed_layer
@@ -390,12 +325,12 @@ function timestep!(
     (; mask) = model.land_sea_mask
 
     # Frierson et al. 2006, eq (1), all W/m² except humidity flux in kg/m²/s
-    Rsd = diagn.physics.surface_shortwave_down          # before albedo
-    Rsu = diagn.physics.ocean.surface_shortwave_up      # reflected from albedo
-    Rld = diagn.physics.surface_longwave_down
-    Rlu = diagn.physics.ocean.surface_longwave_up
-    S = diagn.physics.ocean.sensible_heat_flux
-    H = diagn.physics.ocean.surface_humidity_flux       # [kg/m²/s]
+    Rsd = vars.parameterizations.surface_shortwave_down         # before albedo
+    Rsu = vars.parameterizations.ocean.surface_shortwave_up     # reflected from albedo
+    Rld = vars.parameterizations.surface_longwave_down
+    Rlu = vars.parameterizations.ocean.surface_longwave_up
+    S = vars.parameterizations.ocean.sensible_heat_flux
+    H = vars.parameterizations.ocean.surface_humidity_flux      # [kg/m²/s]
 
     params = (; Δt_C₀, Lᵥ)                              # pack into NamedTuple for kernel
 

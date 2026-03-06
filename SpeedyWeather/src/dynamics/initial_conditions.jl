@@ -32,6 +32,14 @@ end
 """$(TYPEDSIGNATURES)
 Loops over all initial conditions in `model.initial_conditions` and applies one after another."""
 function initialize!(vars::Variables, model::AbstractModel)
+
+    # first initialize ocean, sea ice and land
+    hasproperty(model, :ocean) && initialize!(vars, model.ocean, model)
+    hasproperty(model, :sea_ice) && initialize!(vars, model.sea_ice, model)
+    hasproperty(model, :land) && initialize!(vars, model.land, model)
+
+    # then atmosphere as this may include initial conditoins like StartFromFile
+    # which would contain ocean/land initial conditions that should overwrite the above if they are included
     for IC in model.initial_conditions
         initialize!(vars, IC, model)
     end

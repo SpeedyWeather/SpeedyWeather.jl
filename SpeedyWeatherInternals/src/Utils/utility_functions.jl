@@ -32,11 +32,11 @@ function print_fields(io::IO, A, keys; arrays::Bool = false, values::Bool = true
         val = getfield(A, key)
         val_str = values ? val : ""
         equal_sign = values ? " = " : ""
-        s = "├ " * styled"{info:$key}{note:::$(typeof(val))}$equal_sign$val_str"
-        ~last ? println(io, s) : print(io, s)
+        s = styled"{info:$key}{note:::$(typeof(val))}$equal_sign$val_str"
+        ~last ? println(io, "├ " * s) : print(io, "└ " *  s)
     end
     if filtered                 # add the names of arrays
-        s = styled"└── arrays: "
+        s = styled"└ arrays: "
         for key in keys
             if ~(key in keys_filtered)
                 s *= styled"{info:$key}, "
