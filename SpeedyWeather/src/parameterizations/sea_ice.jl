@@ -1,13 +1,8 @@
 abstract type AbstractSeaIce <: AbstractModelComponent end
 
 # function barrier for all sea ice
-@propagate_inbounds function sea_ice_timestep!(
-        progn::PrognosticVariables,
-        diagn::DiagnosticVariables,
-        model::PrimitiveEquation
-    )
-    return timestep!(progn, diagn, model.sea_ice, model)
-end
+@propagate_inbounds sea_ice_timestep!(vars::Variables, model::PrimitiveEquation) =
+    timestep!(vars, model.sea_ice, model)
 
 export ThermodynamicSeaIce
 
@@ -37,8 +32,7 @@ end
 # don't affect concentration (may be set with set!)
 function initialize!(
         ocean::PrognosticVariablesOcean,
-        progn::PrognosticVariables,
-        diagn::DiagnosticVariables,
+        vars::Variables,
         sea_ice_model::ThermodynamicSeaIce,
         model::PrimitiveEquation,
     ) where {PrognosticVariablesOcean}
@@ -46,14 +40,13 @@ function initialize!(
 end
 
 function timestep!(
-        progn::PrognosticVariables,
-        diagn::DiagnosticVariables,
+        vars::Variables,
         sea_ice_model::ThermodynamicSeaIce,
         model::PrimitiveEquation
     )
 
-    sst = progn.ocean.sea_surface_temperature
-    ℵ = progn.ocean.sea_ice_concentration   # sea ice concentration [0, 1] as \aleph yay!
+    sst = vars.prognostic.ocean.sea_surface_temperature
+    ℵ = vars.prognostic.ocean.sea_ice_concentration   # sea ice concentration [0, 1] as \aleph yay!
 
     Δt = model.time_stepping.Δt_sec
     (; mask) = model.land_sea_mask

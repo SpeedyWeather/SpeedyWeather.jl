@@ -5,9 +5,9 @@ struct TransparentLongwaveTransmissivity <: AbstractLongwaveTransmissivity end
 Adapt.@adapt_structure TransparentLongwaveTransmissivity
 TransparentLongwaveTransmissivity(SG::SpectralGrid) = TransparentLongwaveTransmissivity()
 initialize!(::TransparentLongwaveTransmissivity, ::AbstractModel) = nothing
-@propagate_inbounds function transmissivity!(ij, diagn, progn, transmissivity::TransparentLongwaveTransmissivity, model)
+@propagate_inbounds function transmissivity!(ij, vars, transmissivity::TransparentLongwaveTransmissivity, model)
     # transmissivity is 1 everywhere (no absorption)
-    t = diagn.dynamics.a_grid   # use scratch array
+    t = vars.scratch.a_grid   # use scratch array
     nlayers = size(t, 2)
     for k in 1:nlayers
         t[ij, k] = one(eltype(t))
@@ -31,10 +31,10 @@ Adapt.@adapt_structure FriersonLongwaveTransmissivity
 FriersonLongwaveTransmissivity(SG::SpectralGrid; kwargs...) = FriersonLongwaveTransmissivity{SG.NF}(; kwargs...)
 initialize!(::FriersonLongwaveTransmissivity, ::AbstractModel) = nothing
 
-@propagate_inbounds function transmissivity!(ij, diagn, progn, transmissivity::FriersonLongwaveTransmissivity, model)
+@propagate_inbounds function transmissivity!(ij, vars, transmissivity::FriersonLongwaveTransmissivity, model)
 
     # use scratch array to compute transmissivity t
-    t = diagn.dynamics.a_grid
+    t = vars.scratch.a_grid
     nlayers = size(t, 2)
     NF = eltype(t)
 

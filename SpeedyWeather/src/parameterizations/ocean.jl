@@ -51,33 +51,29 @@ function Base.show(io::IO, O::AbstractOcean)
 end
 
 # variable that AbstractOcean requires
-variables(::AbstractOcean) =
-    (
-    PrognosticVariable(
-        name = :sea_surface_temperature, dims = Grid2D(),
-        namespace = :ocean, units = "K", desc = "Sea surface temperature"
-    ),
-)
+function variables(::AbstractOcean)
+    return (
+        PrognosticVariable(:sea_surface_temperature, Grid2D(), namespace = :ocean, units = "K", desc = "Sea surface temperature"),
+    )
+end
 
 # function barrier for all oceans
 function initialize!(
         ocean::PrognosticVariablesOcean,
-        progn::PrognosticVariables,
-        diagn::DiagnosticVariables,
+        vars::Variables,
         ocean_model::AbstractOcean,
         model::PrimitiveEquation
     ) where {PrognosticVariablesOcean}
-    initialize!(ocean, progn, diagn, ocean_model, model)
-    return initialize!(ocean, progn, diagn, model.sea_ice, model)
+    initialize!(ocean, vars, ocean_model, model)
+    return initialize!(ocean, vars, model.sea_ice, model)
 end
 
 # function barrier for all oceans
 function ocean_timestep!(
-        progn::PrognosticVariables,
-        diagn::DiagnosticVariables,
+        vars::Variables,
         model::PrimitiveEquation
     )
-    return timestep!(progn, diagn, model.ocean, model)
+    return timestep!(vars, model.ocean, model)
 end
 
 
@@ -100,7 +96,7 @@ $(TYPEDFIELDS)"""
     "[OPTION] path to the folder containing the sst"
     path::String = joinpath("data", "boundary_conditions", file)
 
-    "[OPTION] flag to check for sst in SWA or locally"
+    "[OPTION] flag to check for sst in SpeedyWeatherAssets or locally"
     from_assets::Bool = true
 
     "[OPTION] SpeedyWeatherAssets version number"
@@ -149,21 +145,19 @@ end
 
 function initialize!(
         ocean::PrognosticVariablesOcean,
-        progn::PrognosticVariables,
-        diagn::DiagnosticVariables,
+        vars::Variables,
         ocean_model::SeasonalOceanClimatology,
         model::PrimitiveEquation,
     ) where {PrognosticVariablesOcean}
-    return timestep!(progn, diagn, ocean_model, model)
+    return timestep!(vars, ocean_model, model)
 end
 
 function timestep!(
-        progn::PrognosticVariables,
-        diagn::DiagnosticVariables,
+        vars::Variables,
         ocean::SeasonalOceanClimatology,
         model::PrimitiveEquation,
     )
-    (; time) = progn.clock
+    (; time) = vars.prognostic.clock
 
     this_month = Dates.month(time)
     next_month = (this_month % 12) + 1      # mod for dec 12 -> jan 1
@@ -171,7 +165,7 @@ function timestep!(
     # linear interpolation weight between the two months
     # TODO check whether this shifts the climatology by 1/2 a month
     (; monthly_temperature) = ocean
-    (; sea_surface_temperature) = progn.ocean
+    (; sea_surface_temperature) = vars.prognostic.ocean
     NF = eltype(sea_surface_temperature)
     weight = convert(NF, Dates.days(time - Dates.firstdayofmonth(time)) / Dates.daysinmonth(time))
 
@@ -213,7 +207,7 @@ $(TYPEDFIELDS)"""
     "[OPTION] path to the folder containing the sst"
     path::String = joinpath("data", "boundary_conditions", file)
 
-    "[OPTION] flag to check for sst in SWA or locally"
+    "[OPTION] flag to check for sst in SpeedyWeatherAssets or locally"
     from_assets::Bool = true
 
     "[OPTION] SpeedyWeatherAssets version number"
@@ -238,8 +232,7 @@ initialize!(::ConstantOceanClimatology, ::PrimitiveEquation) = nothing
 # initialize
 function initialize!(
         ocean::PrognosticVariablesOcean,
-        progn::PrognosticVariables,
-        diagn::DiagnosticVariables,
+        vars::Variables,
         ocean_model::ConstantOceanClimatology,
         model::PrimitiveEquation,
     ) where {PrognosticVariablesOcean}
@@ -250,14 +243,13 @@ function initialize!(
         grid, path, file, varname, FieldType
     )
     initialize!(seasonal_model, model)
-    initialize!(ocean, progn, diagn, seasonal_model, model)
+    initialize!(ocean, vars, seasonal_model, model)
     # (seasonal model will be garbage collected hereafter)
     return nothing
 end
 
 function timestep!(
-        progn::PrognosticVariables,
-        diagn::DiagnosticVariables,
+        vars::Variables,
         ocean_model::ConstantOceanClimatology,
         model::PrimitiveEquation,
     )
@@ -295,8 +287,7 @@ initialize!(::AquaPlanet, ::PrimitiveEquation) = nothing
 # initialize
 function initialize!(
         ocean::PrognosticVariablesOcean,
-        progn::PrognosticVariables,
-        diagn::DiagnosticVariables,
+        vars::Variables,
         ocean_model::AquaPlanet,
         model::PrimitiveEquation,
     ) where {PrognosticVariablesOcean}
@@ -308,8 +299,7 @@ function initialize!(
 end
 
 function timestep!(
-        progn::PrognosticVariables,
-        diagn::DiagnosticVariables,
+        vars::Variables,
         ocean_model::AquaPlanet,
         model::PrimitiveEquation,
     )

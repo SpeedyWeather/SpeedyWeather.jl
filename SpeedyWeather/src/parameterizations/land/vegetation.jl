@@ -6,28 +6,27 @@ NoVegetation(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothing) = NoVe
 initialize!(vegetation::NoVegetation, model::PrimitiveEquation) = nothing
 
 function initialize!(
-        progn::PrognosticVariables,
-        diagn::DiagnosticVariables,
+        vars::Variables,
         vegetation::NoVegetation,
         model::PrimitiveEquation
     )
     # initialize by running a "timestep"
-    return timestep!(progn, diagn, vegetation, model)
+    timestep!(vars, vegetation, model)
+    return nothing 
 end
 
 function timestep!(
-        progn::PrognosticVariables,
-        diagn::DiagnosticVariables,
+        vars::Variables,
         vegetation::NoVegetation,
         model::PrimitiveEquation
     )
     # a "timestep" of no vegetation is just to calculate the soil moisture availability
-    return soil_moisture_availability!(diagn, progn, vegetation, model)
+    soil_moisture_availability!(vars, vegetation, model)
+    return nothing 
 end
 
 function soil_moisture_availability!(
-        diagn::DiagnosticVariables,
-        progn::PrognosticVariables,
+        vars::Variables,
         vegetation::AbstractVegetation,
         model::PrimitiveDry,
     )
@@ -35,14 +34,13 @@ function soil_moisture_availability!(
 end
 
 function soil_moisture_availability!(
-        diagn::DiagnosticVariables,
-        progn::PrognosticVariables,
+        vars::Variables,
         vegetation::NoVegetation,
         model::PrimitiveWet,
     )
     # view on the top layer of soil moisture
-    soil_moisture_top = field_view(progn.land.soil_moisture, :, 1)
-    (; soil_moisture_availability) = diagn.physics.land
+    soil_moisture_top = field_view(vars.prognostic.land.soil_moisture, :, 1)
+    (; soil_moisture_availability) = vars.parameterizations.land
 
     # Fortran SPEEDY documentation eq. 51 with vegetation = 0
     W_cap = model.land.thermodynamics.field_capacity
@@ -73,7 +71,7 @@ export VegetationClimatology
     "[OPTION] path to the folder containing the vegetation"
     path::String = joinpath("data", "boundary_conditions", file)
 
-    "[OPTION] flag to check for vegetation in SWA or locally"
+    "[OPTION] flag to check for vegetation in SpeedyWeatherAssets or locally"
     from_assets::Bool = true
 
     "[OPTION] SpeedyWeatherAssets version number"
@@ -141,30 +139,27 @@ function initialize!(vegetation::VegetationClimatology, model::PrimitiveEquation
 end
 
 function initialize!(
-        progn::PrognosticVariables,
-        diagn::DiagnosticVariables,
+        vars::Variables,
         veg::VegetationClimatology,
         model::PrimitiveEquation,
     )
     # initialize land temperature by "running" the step at the current time
-    return timestep!(progn, diagn, veg, model)
+    return timestep!(vars, veg, model)
 end
 
 # function barrier
 function timestep!(
-        progn::PrognosticVariables,
-        diagn::DiagnosticVariables,
+        vars::Variables,
         vegetation::VegetationClimatology,
         model::PrimitiveEquation
     )
 
     # a "timestep" of vegetation climatology is just to calculate the soil moisture availability
-    return soil_moisture_availability!(diagn, progn, vegetation, model)
+    return soil_moisture_availability!(vars, vegetation, model)
 end
 
 function soil_moisture_availability!(
-        diagn::DiagnosticVariables,
-        progn::PrognosticVariables,
+        vars::Variables,
         vegetation::VegetationClimatology,
         model::PrimitiveDry,
     )
@@ -172,13 +167,12 @@ function soil_moisture_availability!(
 end
 
 function soil_moisture_availability!(
-        diagn::DiagnosticVariables,
-        progn::PrognosticVariables,
+        vars::Variables,
         vegetation::VegetationClimatology,
         model::PrimitiveWet,
     )
-    (; vegetation_high, vegetation_low, soil_moisture_availability) = diagn.physics.land
-    (; soil_moisture) = progn.land
+    (; vegetation_high, vegetation_low, soil_moisture_availability) = vars.parameterizations.land
+    (; soil_moisture) = vars.prognostic.land
     (; low_veg_factor) = vegetation
 
     # copy over vegetation fields into diagnostic variables

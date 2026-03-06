@@ -29,32 +29,32 @@ function variables(::SurfaceMomentumFlux)
     return (
         ParameterizationVariable(:boundary_layer_drag, Grid2D(), desc = "Boundary layer drag coefficient", units = "1"),
         ParameterizationVariable(:surface_wind_speed, Grid2D(), desc = "Surface wind speed", units = "m/s"),
-        ParameterizationVariable(:surface_air_density, Grid2D(), desc = "Surface air density", units = "kg/m³"),
+        ParameterizationVariable(:surface_air_density, Grid2D(), desc = "Surface air density", units = "kg/m^2"),
         ParameterizationVariable(:surface_air_temperature, Grid2D(), desc = "Surface air temperature", units = "K"),
     )
 end
 
 # function barrier
-@propagate_inbounds function parameterization!(ij, diagn, progn, momentum_flux::SurfaceMomentumFlux, model)
-    return surface_wind_stress!(ij, diagn, momentum_flux, model)
+@propagate_inbounds function parameterization!(ij, vars, momentum_flux::SurfaceMomentumFlux, model)
+    surface_wind_stress!(ij, vars, momentum_flux, model)
+    return nothing
 end
 
-@propagate_inbounds function surface_wind_stress!(ij, diagn, momentum_flux::SurfaceMomentumFlux, model)
+@propagate_inbounds function surface_wind_stress!(ij, vars, momentum_flux::SurfaceMomentumFlux, model)
 
     (; drag_land, drag_ocean) = momentum_flux
     land_fraction = model.land_sea_mask.mask[ij]
     surface = model.geometry.nlayers
 
     # drag coefficient either from SurfaceMomentumFlux or from a central drag coefficient
-    d = diagn.physics.boundary_layer_drag[ij]
-    drag = momentum_flux.use_boundary_layer_drag ?
-        d : land_fraction * drag_land + (1 - land_fraction) * drag_ocean
+    d = vars.parameterizations.boundary_layer_drag[ij]
+    drag = ifelse(momentum_flux.use_boundary_layer_drag, d, land_fraction * drag_land + (1 - land_fraction) * drag_ocean)
 
     # Fortran SPEEDY documentation eq. 52, 53, accumulate fluxes with +=
-    V₀ = diagn.physics.surface_wind_speed[ij]
-    ρ = diagn.physics.surface_air_density[ij]
-    u = diagn.grid.u_grid_prev[ij, surface]
-    v = diagn.grid.v_grid_prev[ij, surface]
+    V₀ = vars.parameterizations.surface_wind_speed[ij]
+    ρ = vars.parameterizations.surface_air_density[ij]
+    u = vars.grid.u_prev[ij, surface]
+    v = vars.grid.v_prev[ij, surface]
 
     # fraction to slow down the lowermost layer wind u,v to surface wind
     f = momentum_flux.wind_slowdown
@@ -64,8 +64,8 @@ end
     flux_v_upward = -ρ * drag * V₀ * f * v
 
     # convert fluxes to tendencies
-    pₛ = diagn.grid.pres_grid_prev[ij]          # surface pressure [Pa]
-    diagn.tendencies.u_tend_grid[ij, surface] += surface_flux_to_tendency(flux_u_upward, pₛ, model)
-    diagn.tendencies.v_tend_grid[ij, surface] += surface_flux_to_tendency(flux_v_upward, pₛ, model)
+    pₛ = vars.grid.pres_prev[ij]          # surface pressure [Pa]
+    vars.tendencies.grid.u[ij, surface] += surface_flux_to_tendency(flux_u_upward, pₛ, model)
+    vars.tendencies.grid.v[ij, surface] += surface_flux_to_tendency(flux_v_upward, pₛ, model)
     return nothing
 end

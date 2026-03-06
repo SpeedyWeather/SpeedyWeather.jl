@@ -22,7 +22,7 @@ end
 $(TYPEDSIGNATURES)
 Prints to `io` all fields of a struct `A` identified by their
 `keys`."""
-function print_fields(io::IO, A, keys; arrays::Bool = false)
+function print_fields(io::IO, A, keys; arrays::Bool = false, values::Bool = true)
     keys_filtered = arrays ? keys : filter(key -> ~(getfield(A, key) isa AbstractArray), keys)
     n = length(keys_filtered)
     filtered = n < length(keys)
@@ -30,7 +30,9 @@ function print_fields(io::IO, A, keys; arrays::Bool = false)
         last = (i == n) & ~filtered
         key = keys_filtered[i]
         val = getfield(A, key)
-        s = "├ " * styled"{info:$key}{note:::$(typeof(val))} = $val"
+        val_str = values ? val : ""
+        equal_sign = values ? " = " : ""
+        s = "├ " * styled"{info:$key}{note:::$(typeof(val))}$equal_sign$val_str"
         ~last ? println(io, s) : print(io, s)
     end
     if filtered                 # add the names of arrays

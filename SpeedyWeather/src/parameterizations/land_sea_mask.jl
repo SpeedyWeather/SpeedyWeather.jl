@@ -80,7 +80,7 @@ $(TYPEDFIELDS)"""
     "path to the folder containing the orography"
     path::String = joinpath("data", "boundary_conditions", file)
 
-    "flag to check for land-sea mask in SWA or locally"
+    "flag to check for land-sea mask in SpeedyWeatherAssets or locally"
     from_assets::Bool = true
 
     "[OPTION] SpeedyWeatherAssets version number"

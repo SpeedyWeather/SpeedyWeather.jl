@@ -27,10 +27,23 @@ Adapt.@adapt_structure ImplicitCondensation
 ImplicitCondensation(SG::SpectralGrid; kwargs...) = ImplicitCondensation{SG.NF}(; kwargs...)
 initialize!(::ImplicitCondensation, ::PrimitiveEquation) = nothing
 
+function variables(::ImplicitCondensation)
+    return (
+        ParameterizationVariable(:rain_large_scale, Grid2D(), desc = "Large-scale precipitation (rain, accumulated)", units = "m"),
+        ParameterizationVariable(:snow_large_scale, Grid2D(), desc = "Large-scale precipitation (snow, accumulated)", units = "m"),
+        ParameterizationVariable(:rain_rate_large_scale, Grid2D(), desc = "Large-scale precipitation (rain)", units = "m/s"),
+        ParameterizationVariable(:snow_rate_large_scale, Grid2D(), desc = "Large-scale precipitation (snow)", units = "m/s"),
+        ParameterizationVariable(:rain_rate, Grid2D(), desc = "Rain rate (large-scale + convection)", units = "m/s"),
+        ParameterizationVariable(:snow_rate, Grid2D(), desc = "Snow rate (large-scale + convection)", units = "m/s"),
+        ParameterizationVariable(:cloud_top, Grid2D(), desc = "Cloud top layer index", units = "1"),
+    )
+end
+
 # function barrier
-@propagate_inbounds function parameterization!(ij, diagn, progn, lsc::ImplicitCondensation, model)
+@propagate_inbounds function parameterization!(ij, vars, lsc::ImplicitCondensation, model)
     (; geometry, planet, atmosphere, time_stepping) = model
-    return large_scale_condensation!(ij, diagn, lsc, geometry, planet, atmosphere, time_stepping)
+    large_scale_condensation!(ij, vars, lsc, geometry, planet, atmosphere, time_stepping)
+    return nothing
 end
 
 """
@@ -41,7 +54,7 @@ and temperature from latent heat release and integrates the
 large-scale precipitation vertically for output."""
 @propagate_inbounds function large_scale_condensation!(
         ij,
-        diagn::DiagnosticVariables,
+        vars,
         condensation::ImplicitCondensation,
         geometry::Geometry,
         planet::AbstractPlanet,
@@ -49,14 +62,14 @@ large-scale precipitation vertically for output."""
         time_stepping,
     )
     # use previous time step for more stable Euler forward step of the parameterizations
-    temp = diagn.grid.temp_grid_prev                # temperature [K]
-    humid = diagn.grid.humid_grid_prev              # specific humidity [kg/kg]
-    temp_tend = diagn.tendencies.temp_tend_grid     # temperature tendency [K/s]
-    humid_tend = diagn.tendencies.humid_tend_grid   # specific humidity tendency [kg/kg/s]
+    temp = vars.grid.temp_prev                  # temperature [K]
+    humid = vars.grid.humid_prev                # specific humidity [kg/kg]
+    temp_tend = vars.tendencies.grid.temp       # temperature tendency [K/s]
+    humid_tend = vars.tendencies.grid.humid     # specific humidity tendency [kg/kg/s]
     nlayers = size(temp, 2)
 
     # precompute scaling constants to minimize divisions (used to convert between humidity [kg/kg] and precipitation [m])
-    pₛ = diagn.grid.pres_grid_prev[ij]              # surface pressure [Pa]
+    pₛ = vars.grid.pres_prev[ij]               # surface pressure [Pa]
     (; Δt_sec) = time_stepping                      # time step [s]
     σ = geometry.σ_levels_full                      # vertical sigma coordinate [1]
     Δσ = geometry.σ_levels_thick                    # layer thickness in sigma coordinates
@@ -123,7 +136,7 @@ large-scale precipitation vertically for output."""
             # If there is large-scale condensation at a level higher (i.e. smaller k) than
             # the cloud-top previously diagnosed due to convection, then increase the cloud-top
             # Fortran SPEEDY documentation Page 7 (last sentence)
-            diagn.physics.cloud_top[ij] = min(diagn.physics.cloud_top[ij], k)
+            vars.parameterizations.cloud_top[ij] = min(vars.parameterizations.cloud_top[ij], k)
 
             # 2. Precipitation (rain) due to large-scale condensation [kg/m²/s] /ρ for [m/s]
             δq_rain = min(0, δq)                # precipitation only for negative humidity tendency
@@ -149,28 +162,16 @@ large-scale precipitation vertically for output."""
     snow_flux_down = max(snow_flux_down, 0)
 
     # precipitation from rain/snow [m] during time step whatever is fluxed out
-    diagn.physics.rain_large_scale[ij] += Δt_sec * rain_flux_down
-    diagn.physics.snow_large_scale[ij] += Δt_sec * snow_flux_down
+    vars.parameterizations.rain_large_scale[ij] += Δt_sec * rain_flux_down
+    vars.parameterizations.snow_large_scale[ij] += Δt_sec * snow_flux_down
 
     # and the rain/snow fall rate [m/s]
-    diagn.physics.rain_rate_large_scale[ij] = rain_flux_down
-    diagn.physics.snow_rate_large_scale[ij] = snow_flux_down
+    vars.parameterizations.rain_rate_large_scale[ij] = rain_flux_down
+    vars.parameterizations.snow_rate_large_scale[ij] = snow_flux_down
 
     # accumulate into total rain/snow rate including convection [m/s]
-    diagn.physics.rain_rate[ij] += rain_flux_down
-    diagn.physics.snow_rate[ij] += snow_flux_down
+    vars.parameterizations.rain_rate[ij] += rain_flux_down
+    vars.parameterizations.snow_rate[ij] += snow_flux_down
 
     return nothing
-end
-
-function variables(::ImplicitCondensation)
-    return (
-        ParameterizationVariable(:rain_large_scale, Grid2D(), desc = "Large-scale precipitation (rain, accumulated)", units = "m"),
-        ParameterizationVariable(:snow_large_scale, Grid2D(), desc = "Large-scale precipitation (snow, accumulated)", units = "m"),
-        ParameterizationVariable(:rain_rate_large_scale, Grid2D(), desc = "Large-scale precipitation (rain)", units = "m/s"),
-        ParameterizationVariable(:snow_rate_large_scale, Grid2D(), desc = "Large-scale precipitation (snow)", units = "m/s"),
-        ParameterizationVariable(:rain_rate, Grid2D(), desc = "Rain rate (large-scale + convection)", units = "m/s"),
-        ParameterizationVariable(:snow_rate, Grid2D(), desc = "Snow rate (large-scale + convection)", units = "m/s"),
-        ParameterizationVariable(:cloud_top, Grid2D(), desc = "Cloud top layer index", units = "1"),
-    )
 end

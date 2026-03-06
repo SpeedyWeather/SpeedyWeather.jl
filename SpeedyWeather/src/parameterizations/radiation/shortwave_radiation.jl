@@ -26,39 +26,33 @@ end
 initialize!(::TransparentShortwave, ::PrimitiveEquation) = nothing
 
 # function barrier
-@propagate_inbounds function parameterization!(ij, diagn, progn, ::TransparentShortwave, model)
+@propagate_inbounds function parameterization!(ij, vars, ::TransparentShortwave, model)
 
     planet = model.planet
     land_sea_mask = model.land_sea_mask.mask
 
-    (; surface_shortwave_down, surface_shortwave_up) = diagn.physics
-    ssrd_ocean = diagn.physics.ocean.surface_shortwave_down
-    ssrd_land = diagn.physics.land.surface_shortwave_down
-    ssru_ocean = diagn.physics.ocean.surface_shortwave_up
-    ssru_land = diagn.physics.land.surface_shortwave_up
-
-    cos_zenith = diagn.physics.cos_zenith[ij]
+    cos_zenith = vars.parameterizations.cos_zenith[ij]
     land_fraction = land_sea_mask[ij]
-    albedo_ocean = diagn.physics.ocean.albedo[ij]
-    albedo_land = diagn.physics.land.albedo[ij]
+    albedo_ocean = vars.parameterizations.ocean.albedo[ij]
+    albedo_land = vars.parameterizations.land.albedo[ij]
 
     S₀ = planet.solar_constant
     D = S₀ * cos_zenith             # top of atmosphere downward radiation
-    surface_shortwave_down[ij] = D  # transparent atmosphere so same at surface (before albedo)
-    ssrd_ocean[ij] = D
-    ssrd_land[ij] = D
+    vars.parameterizations.surface_shortwave_down[ij] = D  # transparent atmosphere so same at surface (before albedo)
+    vars.parameterizations.ocean.surface_shortwave_down[ij] = D
+    vars.parameterizations.land.surface_shortwave_down[ij] = D
 
     # shortwave up is after albedo reflection, separated by ocean/land
-    ssru_ocean[ij] = albedo_ocean * D
-    ssru_land[ij] = albedo_land * D
+    vars.parameterizations.ocean.surface_shortwave_up[ij] = albedo_ocean * D
+    vars.parameterizations.land.surface_shortwave_up[ij] = albedo_land * D
 
     # land-sea mask-weighted
     albedo = (1 - land_fraction) * albedo_ocean + land_fraction * albedo_land
-    surface_shortwave_up[ij] = albedo * D
-    diagn.physics.albedo[ij] = albedo   # store weighted albedo
+    vars.parameterizations.surface_shortwave_up[ij] = albedo * D
+    vars.parameterizations.albedo[ij] = albedo   # store weighted albedo
 
     # transparent also for reflected shortwave radiation travelling up
-    diagn.physics.outgoing_shortwave[ij] = surface_shortwave_up[ij]
+    vars.parameterizations.outgoing_shortwave[ij] = vars.parameterizations.surface_shortwave_up[ij]
     return nothing
 end
 
@@ -131,14 +125,13 @@ Computes cloud cover fraction from relative humidity and precipitation, then
 integrates downward and upward radiative fluxes accounting for cloud albedo effects."""
 @propagate_inbounds function parameterization!(
         ij,
-        diagn,
-        progn,
+        vars,
         radiation::OneBandShortwave,
         model,
     )
-    clouds = clouds!(ij, diagn, progn, radiation.clouds, model)
-    t = transmissivity!(ij, diagn, progn, clouds, radiation.transmissivity, model)
-    shortwave_radiative_transfer!(ij, diagn, t, clouds, radiation.radiative_transfer, model)
+    clouds = clouds!(ij, vars, radiation.clouds, model)
+    t = transmissivity!(ij, vars, clouds, radiation.transmissivity, model)
+    shortwave_radiative_transfer!(ij, vars, t, clouds, radiation.radiative_transfer, model)
     return nothing
 end
 
@@ -173,7 +166,7 @@ initialize!(::OneBandShortwaveRadiativeTransfer, ::PrimitiveEquation) = nothing
 One-band shortwave radiative transfer with cloud reflection and ozone absorption."""
 @propagate_inbounds function shortwave_radiative_transfer!(
         ij,
-        diagn,
+        vars,
         t,          # Transmissivity array
         clouds,     # NamedTuple from clouds!
         radiation::OneBandShortwaveRadiativeTransfer,
@@ -183,15 +176,15 @@ One-band shortwave radiative transfer with cloud reflection and ozone absorption
     O₃_absorption = radiation.ozone_absorption
     (; cloud_cover, cloud_top, stratocumulus_cover, cloud_albedo, stratocumulus_albedo) = clouds
 
-    dTdt = diagn.tendencies.temp_tend_grid
-    pₛ = diagn.grid.pres_grid_prev[ij]
+    dTdt = vars.tendencies.grid.temp
+    pₛ = vars.grid.pres_prev[ij]
     nlayers = size(dTdt, 2)
     σ = model.geometry.σ_levels_full
     Δσ = model.geometry.σ_levels_thick
 
-    cos_zenith = diagn.physics.cos_zenith[ij]
-    albedo_ocean = diagn.physics.ocean.albedo[ij]
-    albedo_land = diagn.physics.land.albedo[ij]
+    cos_zenith = vars.parameterizations.cos_zenith[ij]
+    albedo_ocean = vars.parameterizations.ocean.albedo[ij]
+    albedo_land = vars.parameterizations.land.albedo[ij]
     land_fraction = model.land_sea_mask.mask[ij]
     cₚ = model.atmosphere.heat_capacity
 
@@ -225,29 +218,29 @@ One-band shortwave radiative transfer with cloud reflection and ozone absorption
     # Surface stratocumulus reflection
     U_stratocumulus = D * stratocumulus_albedo * stratocumulus_cover
     D_surface = D - U_stratocumulus
-    diagn.physics.surface_shortwave_down[ij] = D_surface
-    diagn.physics.ocean.surface_shortwave_down[ij] = D_surface
-    diagn.physics.land.surface_shortwave_down[ij] = D_surface
+    vars.parameterizations.surface_shortwave_down[ij] = D_surface
+    vars.parameterizations.ocean.surface_shortwave_down[ij] = D_surface
+    vars.parameterizations.land.surface_shortwave_down[ij] = D_surface
 
     # Surface albedo reflections
     up_ocean = albedo_ocean * D_surface
     up_land = albedo_land * D_surface
-    diagn.physics.ocean.surface_shortwave_up[ij] = up_ocean
-    diagn.physics.land.surface_shortwave_up[ij] = up_land
+    vars.parameterizations.ocean.surface_shortwave_up[ij] = up_ocean
+    vars.parameterizations.land.surface_shortwave_up[ij] = up_land
 
     albedo = (1 - land_fraction) * albedo_ocean + land_fraction * albedo_land
     U_surface_albedo = albedo * D_surface
-    diagn.physics.surface_shortwave_up[ij] = U_surface_albedo
-    diagn.physics.albedo[ij] = albedo
+    vars.parameterizations.surface_shortwave_up[ij] = U_surface_albedo
+    vars.parameterizations.albedo[ij] = albedo
 
     U = U_surface_albedo + U_stratocumulus
     for k in nlayers:-1:1
         U_out = U * t[ij, k]
         dTdt[ij, k] += flux_to_tendency((U - U_out) / cₚ, pₛ, k, model)
-        U_out += k == cloud_top ? U_reflected : zero(U)
+        U_out += ifelse(k == cloud_top, U_reflected, zero(U))
         U = U_out
     end
 
-    diagn.physics.outgoing_shortwave[ij] = U
+    vars.parameterizations.outgoing_shortwave[ij] = U
     return nothing
 end

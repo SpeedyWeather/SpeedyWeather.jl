@@ -25,14 +25,14 @@ initialize!(::AbstractModelComponent, ::AbstractModel) = nothing
 finalize!(::AbstractModelComponent, ::AbstractModel) = nothing
 
 # print all fields with type <: Number
-function Base.show(io::IO, P::AbstractModelComponent)
+function Base.show(io::IO, P::AbstractModelComponent; values=true)
     type_str = split("$(typeof(P))", "{", limit = 2)
     type_itself = type_str[1]
     type_params = length(type_str) == 2 ? ("{" * type_str[2]) : ""
     type_params_short = length(type_params) > 30 ? first(type_params, 30) * "...}" : type_params
     println(io, styled"{warning:$type_itself}{note:$type_params_short}" * " <: $(supertype(typeof(P)))")
     keys = propertynames(P)
-    print_fields(io, P, keys)
+    print_fields(io, P, keys; values)
     return nothing
 end
 

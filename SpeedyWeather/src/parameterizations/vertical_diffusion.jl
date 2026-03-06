@@ -41,8 +41,7 @@ function BulkRichardsonDiffusion(SG::SpectralGrid; kwargs...)
 end
 
 variables(::BulkRichardsonDiffusion) = (
-    # TODO change to height in meters or index?
-    ParameterizationVariable(:boundary_layer_height, Grid2D(), desc = "Boundary layer height", units = "1"),
+    ParameterizationVariable(:boundary_layer_height, Grid2D(), desc = "Boundary layer height index", units = "1"),
 )
 
 function initialize!(diffusion::BulkRichardsonDiffusion, model::PrimitiveEquation)
@@ -73,12 +72,12 @@ function initialize!(diffusion::BulkRichardsonDiffusion, model::PrimitiveEquatio
 end
 
 # function barrier
-@propagate_inbounds parameterization!(ij, diagn, progn, diffusion::BulkRichardsonDiffusion, model) =
-    vertical_diffusion!(ij, diagn, diffusion, model.atmosphere, model.planet, model.orography, model.geopotential)
+@propagate_inbounds parameterization!(ij, vars, diffusion::BulkRichardsonDiffusion, model) =
+    vertical_diffusion!(ij, vars, diffusion, model.atmosphere, model.planet, model.orography, model.geopotential)
 
 @propagate_inbounds function vertical_diffusion!(
         ij,
-        diagn,
+        vars,
         diffusion::BulkRichardsonDiffusion,
         atmosphere,
         planet,
@@ -91,28 +90,31 @@ end
     # escape immediately if all diffusions disabled
     any((diffuse_momentum, diffuse_static_energy, diffuse_humidity)) || return nothing
 
-    K, kₕ = get_diffusion_coefficients!(ij, diagn, diffusion, atmosphere, planet, orography, geopot)
+    K, kₕ = get_diffusion_coefficients!(ij, vars, diffusion, atmosphere, planet, orography, geopot)
 
-    u_tend = diagn.tendencies.u_tend_grid
-    v_tend = diagn.tendencies.v_tend_grid
-    temp_tend = diagn.tendencies.temp_tend_grid
-    humid_tend = diagn.tendencies.humid_tend_grid
-
+    u_tend = vars.tendencies.grid.u
+    v_tend = vars.tendencies.grid.v
+    temp_tend = vars.tendencies.grid.temp
+    
     # TODO previous time step?
-    u = diagn.grid.u_grid
-    v = diagn.grid.v_grid
-    humid = diagn.grid.humid_grid
-
+    u = vars.grid.u
+    v = vars.grid.v
+    
     diffuse_momentum && _vertical_diffusion!(ij, u_tend, u, K, kₕ, diffusion)
     diffuse_momentum && _vertical_diffusion!(ij, v_tend, v, K, kₕ, diffusion)
-    atmosphere isa AbstractWetAtmosphere && diffuse_humidity    && _vertical_diffusion!(ij, humid_tend, humid, K, kₕ, diffusion)
+    
+    if atmosphere isa AbstractWetAtmosphere && diffuse_humidity
+        humid_tend = vars.tendencies.grid.humid
+        humid = vars.grid.humid
+        _vertical_diffusion!(ij, humid_tend, humid, K, kₕ, diffusion)
+    end
 
     if diffuse_static_energy
         # compute dry static energy on the fly
-        dry_static_energy = diagn.dynamics.a_grid
+        dry_static_energy = vars.scratch.a_grid
         cₚ = atmosphere.heat_capacity
-        T = diagn.grid.temp_grid
-        Φ = diagn.grid.geopotential
+        T = vars.grid.temp
+        Φ = vars.grid.geopotential
 
         for k in 1:size(T, 2)
             dry_static_energy[ij, k] = cₚ * T[ij, k] + Φ[ij, k]
@@ -126,16 +128,14 @@ end
 
 @propagate_inbounds function get_diffusion_coefficients!(
         ij,
-        diagn,
+        vars,
         diffusion::BulkRichardsonDiffusion,
         atmosphere::AbstractAtmosphere,
         planet::AbstractPlanet,
         orog,
         geopot::AbstractGeopotential,
     )
-    # reuse scratch array for diffusion coefficients
-    K = diagn.dynamics.b_grid
-    nlayers = size(K, 2)
+    nlayers = length(diffusion.∇²_above)
 
     # parameters
     Ri_c = diffusion.critical_Richardson
@@ -154,14 +154,14 @@ end
     Z = T₀ * Δp_geopot_full[nlayers] / gravity
     logZ_z₀ = log(Z / z₀)
 
-    u = diagn.grid.u_grid
-    v = diagn.grid.v_grid
-    geopotential = diagn.grid.geopotential
+    u = vars.grid.u
+    v = vars.grid.v
+    geopotential = vars.grid.geopotential
     (; orography) = orog
 
     # Boundary layer depth is highest layer for which Ri < Ri_c (the "critical" threshold)
     # as well as all layers below
-    Ri = bulk_richardson!(ij, diagn, atmosphere)
+    Ri = bulk_richardson!(ij, vars, atmosphere)
     kₕ::Int = nlayers
     while kₕ > 0 && Ri[ij, kₕ] < Ri_c
         kₕ -= 1
@@ -169,10 +169,13 @@ end
     kₕ += 1  # uppermost layer where Ri < Ri_c
 
     # for output, TODO as layer index or height?
-    diagn.physics.boundary_layer_height[ij] = kₕ
+    vars.parameterizations.boundary_layer_height[ij] = kₕ
+
+    # reuse scratch array for diffusion coefficients
+    K = vars.scratch.b_grid
 
     # diffusion above boundary layer is 0
-    for k in 1:nlayers  # set for all layers
+    for k in 1:nlayers  # reset for all layers
         K[ij, k] = 0
     end
 
@@ -254,20 +257,23 @@ Calculate the bulk Richardson number following Frierson, 2007.
 For vertical stability in the boundary layer."""
 @propagate_inbounds function bulk_richardson!(
         ij,
-        diagn,
+        vars,
         atmosphere::AbstractAtmosphere,
     )
     # reuse work array
-    Ri = diagn.dynamics.a_grid
+    Ri = vars.scratch.a_grid
     nlayers = size(Ri, 2)
     surface = nlayers       # surface index
     cₚ = atmosphere.heat_capacity
 
-    u = diagn.grid.u_grid_prev
-    v = diagn.grid.v_grid_prev
-    Φ = diagn.grid.geopotential
-    T = diagn.grid.temp_grid_prev
-    q = diagn.grid.humid_grid_prev
+    u = vars.grid.u_prev
+    v = vars.grid.v_prev
+    Φ = vars.grid.geopotential
+    T = vars.grid.temp_prev
+    
+    # for dry models, use scratch array to bypass access to non-existing humidity variable
+    for k in 1:nlayers vars.scratch.b_grid[ij, k] = 0 end   # reset to zero humidity
+    q = haskey(vars.grid, :humid_prev) ? vars.grid.humid_prev : vars.scratch.b_grid 
 
     # surface layer
     V² = u[ij, surface]^2 + v[ij, surface]^2

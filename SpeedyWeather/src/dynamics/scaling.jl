@@ -18,12 +18,11 @@ scale!(var::AbstractField, scale::Real) = (var .*= scale)
 Scale the tendencies inside `diagn` with scalar `scale`.
 Intended use to scale the tendencies of the parameterizations
 by the radius for the dynamical core."""
-@propagate_inbounds function scale!(ij, diagn::Tendencies, scale::Real)
-    @inbounds for k in eachlayer(diagn.u_tend_grid)
-        diagn.u_tend_grid[ij, k] *= scale
-        diagn.v_tend_grid[ij, k] *= scale
-        diagn.temp_tend_grid[ij, k] *= scale
-        diagn.humid_tend_grid[ij, k] *= scale
+@propagate_inbounds function scale!(ij, vars::NamedTuple, scale::Real)
+    for var in vars
+        for k in eachlayer(var)
+            var[ij, k] *= scale
+        end
     end
     return nothing
 end

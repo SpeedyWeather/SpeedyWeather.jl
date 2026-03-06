@@ -30,38 +30,39 @@ end
 initialize!(::SurfaceCondition, ::PrimitiveEquation) = nothing
 
 # function barrier
-@propagate_inbounds function parameterization!(ij, diagn, progn, sc::SurfaceCondition, model)
-    return surface_condition!(ij, diagn, sc, model)
+@propagate_inbounds function parameterization!(ij, vars, sc::SurfaceCondition, model)
+    return surface_condition!(ij, vars, sc, model)
 end
 
-@propagate_inbounds function surface_condition!(ij, diagn, surface_condition::SurfaceCondition, model)
+@propagate_inbounds function surface_condition!(ij, vars, surface_condition::SurfaceCondition, model)
 
     (; wind_slowdown, gust_speed) = surface_condition
     nlayers = model.geometry.nlayers
     (; atmosphere) = model
 
     # Fortran SPEEDY documentation eq. 49 but use previous time step for numerical stability
-    uₛ = wind_slowdown * diagn.grid.u_grid_prev[ij, nlayers]
-    vₛ = wind_slowdown * diagn.grid.v_grid_prev[ij, nlayers]
+    uₛ = wind_slowdown * vars.grid.u_prev[ij, nlayers]
+    vₛ = wind_slowdown * vars.grid.v_prev[ij, nlayers]
 
     # Fortran SPEEDY documentation eq. 50, sqrt(u² + v² + gust_speed²)
     surface_wind_speed = sqrt(muladd(uₛ, uₛ, muladd(vₛ, vₛ, gust_speed^2)))
-    diagn.physics.surface_wind_speed[ij] = surface_wind_speed
+    vars.parameterizations.surface_wind_speed[ij] = surface_wind_speed
 
     # Surface air density
     (; R_dry, κ) = model.atmosphere
     σ = model.geometry.σ_levels_full[nlayers]       # σ vertical coordinate at lowest model level
-    pₛ = diagn.grid.pres_grid_prev[ij]              # surface pressure [Pa]
-    T = diagn.grid.temp_grid_prev[ij, nlayers]      # virtual temperature at lowest model level [K]
-    q = diagn.grid.humid_grid_prev[ij, nlayers]     # specific humidity at lowest model level [kg/kg]
+    pₛ = vars.grid.pres_prev[ij]                    # surface pressure [Pa]
+    T = vars.grid.temp_prev[ij, nlayers]            # virtual temperature at lowest model level [K]
+    q = haskey(vars.grid, :humid_prev) ?
+        vars.grid.humid_prev[ij, nlayers] : zero(T) # specific humidity at lowest model level [kg/kg]
     Tᵥ = virtual_temperature(T, q, atmosphere)      # virtual temperature at lowest model level [K]
     σ⁻ᵏ = σ^(-κ)                                    # precalculate
     Tᵥ *= σ⁻ᵏ                                       # lower to surface assuming dry adiabatic lapse rate
     ρ = pₛ / (R_dry * Tᵥ)                               # surface air density [kg/m³] from ideal gas law
-    diagn.physics.surface_air_density[ij] = ρ       # store for surface temp/humidity fluxes
+    vars.parameterizations.surface_air_density[ij] = ρ       # store for surface temp/humidity fluxes
 
     # Surface air temperature
     T *= σ⁻ᵏ                                        # lower to surface assuming dry adiabatic lapse rate
-    diagn.physics.surface_air_temperature[ij] = T   # store for surface temp/humidity fluxes
+    vars.parameterizations.surface_air_temperature[ij] = T   # store for surface temp/humidity fluxes
     return nothing
 end

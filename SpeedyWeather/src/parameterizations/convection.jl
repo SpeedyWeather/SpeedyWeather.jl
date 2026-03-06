@@ -20,8 +20,8 @@ BettsMillerConvection(SG::SpectralGrid; kwargs...) = BettsMillerConvection{SG.NF
 initialize!(::BettsMillerConvection, ::PrimitiveEquation) = nothing
 
 # function barrier
-@propagate_inbounds parameterization!(ij, diagn, progn, convection_scheme::BettsMillerConvection, model) =
-    convection!(ij, diagn, convection_scheme, model)
+@propagate_inbounds parameterization!(ij, vars, convection_scheme::BettsMillerConvection, model) =
+    convection!(ij, vars, convection_scheme, model)
 
 """
 $(TYPEDSIGNATURES)
@@ -30,7 +30,7 @@ simplified Betts-Miller convection. Starts with a first-guess relaxation to dete
 the convective criteria (none, dry/shallow or deep), then adjusts reference profiles
 for thermodynamic consistency (e.g. in dry convection the humidity profile is non-precipitating),
 and relaxes current vertical profiles to the adjusted references."""
-@propagate_inbounds function convection!(ij, diagn, convection::BettsMillerConvection, model)
+@propagate_inbounds function convection!(ij, vars, convection::BettsMillerConvection, model)
 
     (; geometry, planet, atmosphere, time_stepping) = model
     σ = geometry.σ_levels_full
@@ -40,12 +40,12 @@ and relaxes current vertical profiles to the adjusted references."""
     Δt = time_stepping.Δt_sec
 
     # use previous time step for more stable calculations
-    temp = diagn.grid.temp_grid_prev
-    humid = diagn.grid.humid_grid_prev
-    geopotential = diagn.grid.geopotential
-    temp_tend = diagn.tendencies.temp_tend_grid
-    humid_tend = diagn.tendencies.humid_tend_grid
-    pₛ = diagn.grid.pres_grid_prev[ij]          # surface pressure [Pa]
+    temp = vars.grid.temp_grid_prev
+    humid = vars.grid.humid_grid_prev
+    geopotential = vars.grid.geopotential
+    temp_tend = vars.tendencies.grid.temp
+    humid_tend = vars.tendencies.grid.humid
+    pₛ = vars.grid.pres_prev[ij]          # surface pressure [Pa]
     NF = eltype(temp)
 
     # thermodynamics
@@ -55,8 +55,8 @@ and relaxes current vertical profiles to the adjusted references."""
     cₚ = atmosphere.heat_capacity               # heat capacity
 
     # use scratch arrays for temp_ref_profile, humid_ref_profile
-    temp_ref_profile = diagn.dynamics.a_grid   # temperature [K] reference profile to adjust to
-    humid_ref_profile = diagn.dynamics.b_grid   # specific humidity [kg/kg] profile to adjust to
+    temp_ref_profile = vars.dynamics.a_grid   # temperature [K] reference profile to adjust to
+    humid_ref_profile = vars.dynamics.b_grid   # specific humidity [kg/kg] profile to adjust to
 
     # CONVECTIVE CRITERIA AND FIRST GUESS RELAXATION
     level_zero_buoyancy = pseudo_adiabat!(ij, temp_ref_profile, temp, humid, geopotential, pₛ, σ, atmosphere)
@@ -144,15 +144,15 @@ and relaxes current vertical profiles to the adjusted references."""
     rain_convection = max(rain_convection, 0)   # ensure non-negative precipitation, rounding errors
 
     # Store precipitation in diagnostic arrays
-    diagn.physics.rain_convection[ij] += rain_convection            # accumulated rain [m] for output
+    vars.parameterizations.rain_convection[ij] += rain_convection            # accumulated rain [m] for output
     rain_rate_convection = rain_convection / Δt                     # instantaneous rate [m/s] for coupling
-    diagn.physics.rain_rate_convection[ij] = rain_rate_convection   # instantaneous rate [m/s] for coupling
+    vars.parameterizations.rain_rate_convection[ij] = rain_rate_convection   # instantaneous rate [m/s] for coupling
 
     # accumulate into total rain rate including large-scale condensation [m/s]
-    diagn.physics.rain_rate[ij] += rain_rate_convection             # instantaneous rate [m/s] for coupling
+    vars.parameterizations.rain_rate[ij] += rain_rate_convection             # instantaneous rate [m/s] for coupling
 
     # clouds reach to top of convection
-    diagn.physics.cloud_top[ij] = min(diagn.physics.cloud_top[ij], level_zero_buoyancy)
+    vars.parameterizations.cloud_top[ij] = min(vars.parameterizations.cloud_top[ij], level_zero_buoyancy)
     return nothing
 end
 
@@ -268,8 +268,8 @@ BettsMillerDryConvection(SG::SpectralGrid; kwargs...) = BettsMillerDryConvection
 initialize!(::BettsMillerDryConvection, ::PrimitiveEquation) = nothing
 
 # function barrier
-@propagate_inbounds parameterization!(ij, diagn, progn, convection_scheme::BettsMillerDryConvection, model) =
-    convection!(ij, diagn, convection_scheme, model)
+@propagate_inbounds parameterization!(ij, vars, convection_scheme::BettsMillerDryConvection, model) =
+    convection!(ij, vars, convection_scheme, model)
 
 """
 $(TYPEDSIGNATURES)
@@ -279,21 +279,21 @@ Starts with a first-guess relaxation to determine the convective criterion,
 then adjusts the reference profiles
 for thermodynamic consistency (e.g. in dry convection the humidity profile is non-precipitating),
 and relaxes current vertical profiles to the adjusted references."""
-@propagate_inbounds function convection!(ij, diagn, DBM::BettsMillerDryConvection, model)
+@propagate_inbounds function convection!(ij, vars, DBM::BettsMillerDryConvection, model)
 
     (; geometry, atmosphere) = model
-    NF = eltype(diagn.grid.temp_grid_prev)
+    NF = eltype(vars.grid.temp_prev)
     σ = geometry.σ_levels_full
     σ_half = geometry.σ_levels_half
     Δσ = geometry.σ_levels_thick
     nlayers = length(σ)
 
     # use previous time step for more stable calculations
-    temp = diagn.grid.temp_grid_prev
-    temp_tend = diagn.tendencies.temp_tend_grid
+    temp = vars.grid.temp_prev
+    temp_tend = vars.tendencies.grid.temp
 
     # use work arrays for temp_ref_profile
-    temp_ref_profile = diagn.dynamics.a_grid     # temperature [K] reference profile to adjust to
+    temp_ref_profile = vars.scratch.a_grid     # temperature [K] reference profile to adjust to
 
     # CONVECTIVE CRITERIA AND FIRST GUESS RELAXATION
     # Use surface temperature directly (simplified for now)
@@ -306,8 +306,8 @@ and relaxes current vertical profiles to the adjusted references."""
         atmosphere
     )
 
-    local PT::NF = 0        # precipitation due to cooling
-    local ΔT::NF = 0        # vertically uniform temperature profile adjustment
+    PT::NF = 0        # precipitation due to cooling
+    ΔT::NF = 0        # vertically uniform temperature profile adjustment
 
     # skip constants compared to Frierson 2007, i.e. no /τ, /gravity, *cₚ/Lᵥ
     for k in level_zero_buoyancy:nlayers
@@ -357,8 +357,8 @@ set to NaN instead and should be skipped in the relaxation."""
     end
     temp_ref_profile[ij, nlayers] = temp_parcel    # start profile at surface with parcel temperature
 
-    local buoyant::Bool = true              # is the parcel still buoyant?
-    local k::Int = nlayers                  # layer index top to surface
+    buoyant::Bool = true                    # is the parcel still buoyant?
+    k::Int = nlayers                        # layer index top to surface
 
     while buoyant && k > 1                  # calculate moist adiabat while buoyant till top
         k -= 1                              # one level up
@@ -419,17 +419,17 @@ function initialize!(C::ConvectiveHeating, model::PrimitiveEquation)
 end
 
 # function barrier
-@propagate_inbounds parameterization!(ij, diagn, progn, convection_scheme::ConvectiveHeating, model) =
-    convection!(ij, diagn, convection_scheme, model)
+@propagate_inbounds parameterization!(ij, vars, convection_scheme::ConvectiveHeating, model) =
+    convection!(ij, vars, convection_scheme, model)
 
 @propagate_inbounds function convection!(
         ij,
-        diagn::DiagnosticVariables,
+        vars,
         scheme::ConvectiveHeating,
         model,
     )
-    pₛ = diagn.grid.pres_grid_prev
-    temp_tend = diagn.tendencies.temp_tend_grid
+    pₛ = vars.grid.pres_prev
+    temp_tend = vars.tendencies.grid.temp
     nlayers = size(temp_tend, 2)
     NF = eltype(temp_tend)
 
@@ -438,13 +438,10 @@ end
     latd = model.geometry.latd[j]
     σ = model.geometry.σ_levels_full
 
-    # escape immediately if not in the tropics
-    abs(latd) >= scheme.σθ && return nothing
-
+    Qmax = ifelse(abs(latd) < scheme.σθ, inv(convert(NF, Second(scheme.time_scale).value)), NF(0))
     p₀ = scheme.p₀ * 100     # hPa -> Pa
     σₚ = scheme.σₚ * 100     # hPa -> Pa
     cos²θ_term = scheme.lat_mask[j]
-    Qmax = inv(convert(NF, Second(scheme.time_scale).value))
 
     for k in 1:nlayers
         p = pₛ[ij] * σ[k]      # Pressure in Pa on layer k

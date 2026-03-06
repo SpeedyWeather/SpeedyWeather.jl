@@ -13,7 +13,7 @@ $(TYPEDFIELDS)"""
     "[OPTION] path to the folder containing the soil moisture"
     path::String = joinpath("data", "boundary_conditions", file)
 
-    "[OPTION] flag to check for soil moisture in SWA or locally"
+    "[OPTION] flag to check for soil moisture in SpeedyWeatherAssets or locally"
     from_assets::Bool = true
 
     "[OPTION] SpeedyWeatherAssets version number"
@@ -94,18 +94,17 @@ function initialize!(soil::SeasonalSoilMoisture, model::PrimitiveEquation)
 end
 
 function initialize!(
-        progn::PrognosticVariables,
-        diagn::DiagnosticVariables,
+        vars::Variables,
         soil::SeasonalSoilMoisture,
         model::PrimitiveEquation,
     )
     # initialize soil_moisture by "running" the step at the current time
-    return timestep!(progn, diagn, soil, model)
+    timestep!(vars, soil, model)
+    return nothing
 end
 
 function timestep!(
-        progn::PrognosticVariables,
-        diagn::DiagnosticVariables,
+        vars::Variables,
         soil::SeasonalSoilMoisture,
         model::PrimitiveDry,
     )
@@ -113,23 +112,22 @@ function timestep!(
 end
 
 function timestep!(
-        progn::PrognosticVariables,
-        diagn::DiagnosticVariables,
+        vars::Variables,
         soil::SeasonalSoilMoisture,
         model::PrimitiveEquation,
     )
-    (; time) = progn.clock
+    (; time) = vars.prognostic.clock
 
     this_month = Dates.month(time)
     next_month = (this_month % 12) + 1      # mod for dec 12 -> jan 1
 
     # linear interpolation weight between the two months
     # TODO check whether this shifts the climatology by 1/2 a month
-    NF = eltype(progn.land.soil_moisture)
+    NF = eltype(vars.prognostic.land.soil_moisture)
     weight = convert(NF, Dates.days(time - Dates.firstdayofmonth(time)) / Dates.daysinmonth(time))
 
     (; monthly_soil_moisture) = soil
-    (; soil_moisture) = progn.land
+    (; soil_moisture) = vars.prognostic.land
 
     launch!(
         architecture(soil_moisture), RingGridWorkOrder, size(soil_moisture),
@@ -179,8 +177,7 @@ function initialize!(soil::LandBucketMoisture, model::PrimitiveEquation)
 end
 
 function initialize!(
-        progn::PrognosticVariables,
-        diagn::DiagnosticVariables,
+        vars::Variables,
         soil::LandBucketMoisture,
         model::PrimitiveDry,
     )
@@ -188,31 +185,29 @@ function initialize!(
 end
 
 function initialize!(
-        progn::PrognosticVariables,
-        diagn::DiagnosticVariables,
+        vars::Variables,
         soil::LandBucketMoisture,
         model::PrimitiveEquation,
     )
     # create a seasonal model, initialize it and the variables
     seasonal_model = SeasonalSoilMoisture(model.spectral_grid, model.land.geometry)
     initialize!(seasonal_model, model)
-    initialize!(progn, diagn, seasonal_model, model)
+    initialize!(vars, seasonal_model, model)
     # (seasonal model will be garbage collected hereafter)
 
     # set ocean "soil" moisture points (100% ocean only)
     masked_value = soil.ocean_moisture
     if soil.mask
         # TODO: broadcasting over views of Fields of GPUArrays doesn't work
-        sm = progn.land.soil_moisture.data
+        sm = vars.prognostic.land.soil_moisture.data
         sm[isnan.(sm)] .= masked_value
-        mask!(progn.land.soil_moisture, model.land_sea_mask, :ocean; masked_value)
+        mask!(vars.prognostic.land.soil_moisture, model.land_sea_mask, :ocean; masked_value)
     end
     return nothing
 end
 
 function timestep!(
-        progn::PrognosticVariables,
-        diagn::DiagnosticVariables,
+        vars::Variables,
         soil::LandBucketMoisture,
         model::PrimitiveDry,
     )
@@ -220,20 +215,19 @@ function timestep!(
 end
 
 function timestep!(
-        progn::PrognosticVariables,
-        diagn::DiagnosticVariables,
+        vars::Variables,
         soil::LandBucketMoisture,
         model::PrimitiveEquation,
     )
-    (; soil_moisture) = progn.land
+    (; soil_moisture) = vars.prognostic.land
     Δt = model.time_stepping.Δt_sec
     ρ = model.atmosphere.water_density
     (; mask) = model.land_sea_mask
 
-    P = diagn.physics.rain_rate                     # precipitation (rain only) in [m/s]
-    S = diagn.physics.land.snow_melt_rate           # [kg/m²/s] includes snow runoff leakage water
-    H = diagn.physics.land.surface_humidity_flux    # [kg/m²/s], divide by density for [m/s], positive up
-    R = diagn.physics.land.river_runoff             # diagnosed here, accumulated [m]
+    P = vars.parameterizations.rain_rate                    # precipitation (rain only) in [m/s]
+    S = vars.parameterizations.land.snow_melt_rate          # [kg/m²/s] includes snow runoff leakage water
+    H = vars.parameterizations.land.surface_humidity_flux   # [kg/m²/s], divide by density for [m/s], positive up
+    R = vars.parameterizations.land.river_runoff            # diagnosed here, accumulated [m]
 
     @boundscheck fields_match(soil_moisture, P, S, H, R, horizontal_only = true) ||
         throw(DimensionMismatch(soil_moisture, P))

@@ -29,23 +29,21 @@ initialize!(snow::SnowModel, model::PrimitiveEquation) = nothing
 
 # set initial conditions for snow depth in initial conditions
 function initialize!(
-        progn::PrognosticVariables,
-        diagn::DiagnosticVariables,
+        vars::Variables,
         snow::SnowModel,
         model::PrimitiveEquation,
     )
-    return set!(progn, model.geometry, snow_depth = 0)
+    return set!(vars.prognostic, model.geometry, snow_depth = 0)
 end
 
 function timestep!(
-        progn::PrognosticVariables,
-        diagn::DiagnosticVariables,
+        vars::Variables,
         snow::SnowModel,
         model::PrimitiveEquation,
     )
     Δt = model.time_stepping.Δt_sec
-    (; snow_depth) = progn.land                             # in equivalent liquid water height [m]
-    (; soil_temperature) = progn.land
+    (; snow_depth) = vars.prognostic.land                   # in equivalent liquid water height [m]
+    (; soil_temperature) = vars.prognostic.land
     (; mask) = model.land_sea_mask
 
     # Some thermodynamics needed by snow
@@ -56,8 +54,8 @@ function timestep!(
     (; melting_threshold) = snow
     r⁻¹ = inv(convert(eltype(snow_depth), Second(snow.runoff_time_scale).value))
 
-    snow_fall_rate = diagn.physics.snow_rate                # from precipitation schemes [m/s]
-    snow_melt_rate = diagn.physics.land.snow_melt_rate      # for soil moisture model
+    snow_fall_rate = vars.parameterizations.snow_rate               # from precipitation schemes [m/s]
+    snow_melt_rate = vars.parameterizations.land.snow_melt_rate     # for soil moisture model
 
     params = (; melting_threshold, cₛ, z₁, Δt, ρ_water, Lᵢ, r⁻¹)
 

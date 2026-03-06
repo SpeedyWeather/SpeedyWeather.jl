@@ -88,40 +88,38 @@ end
 variables(land::DryLandModel) = (variables(land.temperature)...,)
 
 # unpack land model and call general timestep! function
-land_timestep!(progn::PrognosticVariables, diagn::DiagnosticVariables, model::PrimitiveEquation) =
-    timestep!(progn, diagn, model.land, model)
+land_timestep!(vars::Variables, model::PrimitiveEquation) =
+    timestep!(vars, model.land, model)
 
 function timestep!(
-        progn::PrognosticVariables,
-        diagn::DiagnosticVariables,
+        vars::Variables,
         land::AbstractLand,
         model::PrimitiveEquation,
     )
     if model isa PrimitiveWet && land isa AbstractWetLand
         # TODO think about the order of these
-        timestep!(progn, diagn, land.snow, model)
-        timestep!(progn, diagn, land.soil_moisture, model)
-        timestep!(progn, diagn, land.rivers, model)
-        timestep!(progn, diagn, land.vegetation, model)
+        timestep!(vars, land.snow, model)
+        timestep!(vars, land.soil_moisture, model)
+        timestep!(vars, land.rivers, model)
+        timestep!(vars, land.vegetation, model)
     end
-    return timestep!(progn, diagn, land.temperature, model)
+    return timestep!(vars, land.temperature, model)
 end
 
 function initialize!(
         land::PrognosticVariablesLand,  # for dispatch
-        progn::PrognosticVariables,
-        diagn::DiagnosticVariables,
+        vars::Variables,
         land_model::AbstractLand,
         model::PrimitiveEquation,
     ) where {PrognosticVariablesLand}
-    initialize!(progn, diagn, land_model.temperature, model)
+    initialize!(vars, land_model.temperature, model)
 
     # only initialize soil moisture, vegetation, rivers if atmosphere and land are wet
     if model isa PrimitiveWet && land_model isa AbstractWetLand
-        initialize!(progn, diagn, land_model.soil_moisture, model)
-        initialize!(progn, diagn, land_model.snow, model)
-        initialize!(progn, diagn, land_model.vegetation, model)
-        initialize!(progn, diagn, land_model.rivers, model)
+        initialize!(vars, land_model.soil_moisture, model)
+        initialize!(vars, land_model.snow, model)
+        initialize!(vars, land_model.vegetation, model)
+        initialize!(vars, land_model.rivers, model)
     end
     return nothing
 end

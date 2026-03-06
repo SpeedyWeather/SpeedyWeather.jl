@@ -31,10 +31,10 @@ UniformCooling(SG::SpectralGrid; kwargs...) = UniformCooling{SG.NF}(; kwargs...)
 initialize!(radiation::UniformCooling, model::PrimitiveEquation) = nothing
 
 # function barrier
-@propagate_inbounds function parameterization!(ij, diagn, progn, longwave::UniformCooling, model)
+@propagate_inbounds function parameterization!(ij, vars, longwave::UniformCooling, model)
 
-    T = diagn.grid.temp_grid_prev
-    dTdt = diagn.tendencies.temp_tend_grid
+    T = vars.grid.temp_prev
+    dTdt = vars.tendencies.grid.temp
     (; temp_min, temp_stratosphere) = longwave
     nlayers = size(T, 2)
 
@@ -44,9 +44,9 @@ initialize!(radiation::UniformCooling, model::PrimitiveEquation) = nothing
 
     for k in 1:nlayers
         # Paulius and Garner, 2006, eq (1) and (2)
-        dTdt[ij, k] += T[ij, k] > temp_min ? cooling : (temp_stratosphere - T[ij, k]) * τ⁻¹
+        dTdt[ij, k] += ifelse(T[ij, k] > temp_min, cooling, (temp_stratosphere - T[ij, k]) * τ⁻¹)
     end
-    return
+    return nothing
 end
 
 ## JEEVANJEE TEMPERATURE FLUX
@@ -91,11 +91,11 @@ JeevanjeeRadiation(SG::SpectralGrid; kwargs...) = JeevanjeeRadiation{SG.NF}(; kw
 initialize!(::JeevanjeeRadiation, ::PrimitiveEquation) = nothing
 
 # function barrier
-@propagate_inbounds function parameterization!(ij, diagn, progn, longwave::JeevanjeeRadiation, model)
+@propagate_inbounds function parameterization!(ij, vars, longwave::JeevanjeeRadiation, model)
 
-    T = diagn.grid.temp_grid                            # to match Seeley, 2023 notation
-    dTdt = diagn.tendencies.temp_tend_grid
-    pₛ = diagn.grid.pres_grid_prev[ij]                  # surface pressure [Pa]
+    T = vars.grid.temp                                  # to match Seeley, 2023 notation
+    dTdt = vars.tendencies.grid.temp
+    pₛ = vars.grid.pres_prev[ij]                        # surface pressure [Pa]
     nlayers = size(T, 2)
 
     (; α) = longwave
@@ -108,34 +108,34 @@ initialize!(::JeevanjeeRadiation, ::PrimitiveEquation) = nothing
     Tₜ = longwave.temp_tropopause
 
     land_fraction = model.land_sea_mask.mask[ij]
-    sst = progn.ocean.sea_surface_temperature[ij]
-    lst = progn.land.soil_temperature[ij, 1]            # TODO use skin temperature?
+    sst = vars.prognostic.ocean.sea_surface_temperature[ij]
+    lst = vars.prognostic.land.soil_temperature[ij, 1]  # TODO use skin temperature?
 
     # extension to Jeevanjee: Include temperature flux (Stefan-Boltzmann)
     # between surface and lowermost air temperature
     # but zero flux if land/sea not available
-    Fₖ_ocean = isfinite(sst) ? ϵ_ocean * σ * sst^4 : zero(sst)      # [W/m²]
-    diagn.physics.ocean.surface_longwave_up[ij] = Fₖ_ocean      # for ocean model forcing
+    Fₖ_ocean = isfinite(sst) ? ϵ_ocean * σ * sst^4 : zero(sst)          # [W/m²]
+    vars.parameterizations.ocean.surface_longwave_up[ij] = Fₖ_ocean     # for ocean model forcing
 
-    Fₖ_land = isfinite(lst) ? ϵ_land * σ * lst^4 : zero(lst)        # [W/m²]
-    diagn.physics.land.surface_longwave_up[ij] = Fₖ_land        # for land model forcing
+    Fₖ_land = isfinite(lst) ? ϵ_land * σ * lst^4 : zero(lst)            # [W/m²]
+    vars.parameterizations.land.surface_longwave_up[ij] = Fₖ_land       # for land model forcing
 
     Fₖ_down = ϵ * σ * T[ij, nlayers]^4
-    diagn.physics.surface_longwave_down[ij] = Fₖ_down          # for surface energy budget
+    vars.parameterizations.surface_longwave_down[ij] = Fₖ_down          # for surface energy budget
     dTdt[ij, nlayers] -= surface_flux_to_tendency(Fₖ_down / cₚ, pₛ, model)   # out of layer k
 
     # land-sea mask weighted combined flux from land and ocean
-    local Fₖ::eltype(T)
+    Fₖ::eltype(T)
     Fₖ = (1 - land_fraction) * Fₖ_ocean + land_fraction * Fₖ_land
-    dTdt[ij, nlayers] += surface_flux_to_tendency(Fₖ / cₚ, pₛ, model) # convert [W/m²] / cₚ to K·Pa/s
-    diagn.physics.surface_longwave_up[ij] = Fₖ                      # [W/m²] store for output/diagnostics
+    dTdt[ij, nlayers] += surface_flux_to_tendency(Fₖ / cₚ, pₛ, model)   # convert [W/m²] / cₚ to K·Pa/s
+    vars.parameterizations.surface_longwave_up[ij] = Fₖ                 # [W/m²] store for output/diagnostics
 
     # integrate from surface up
     for k in nlayers:-1:2
         # Seeley and Wordsworth, 2023 eq (1)
-        Fₖ += (T[ij, k - 1] - T[ij, k]) * α * (Tₜ - T[ij, k])         # upward flux from layer k into k-1
-        dTdt[ij, k] -= flux_to_tendency(Fₖ / cₚ, pₛ, k, model)    # out of layer k
-        dTdt[ij, k - 1] += flux_to_tendency(Fₖ / cₚ, pₛ, k - 1, model)    # into layer k-1
+        Fₖ += (T[ij, k - 1] - T[ij, k]) * α * (Tₜ - T[ij, k])           # upward flux from layer k into k-1
+        dTdt[ij, k] -= flux_to_tendency(Fₖ / cₚ, pₛ, k, model)          # out of layer k
+        dTdt[ij, k - 1] += flux_to_tendency(Fₖ / cₚ, pₛ, k - 1, model)  # into layer k-1
     end
 
     # Relax the uppermost level towards prescribed "tropopause temperature"
@@ -143,7 +143,7 @@ initialize!(::JeevanjeeRadiation, ::PrimitiveEquation) = nothing
 
     # for diagnostic, use Fₖ as the outgoing longwave radiation although it's technically into the
     # uppermost layer from below (not out of it)
-    return diagn.physics.outgoing_longwave[ij] = Fₖ
+    return vars.parameterizations.outgoing_longwave[ij] = Fₖ
 end
 
 function variables(::AbstractLongwave)
@@ -152,7 +152,7 @@ function variables(::AbstractLongwave)
         ParameterizationVariable(:surface_longwave_up, Grid2D(), desc = "Surface longwave radiation up over ocean", units = "W/m^2", namespace = :ocean),
         ParameterizationVariable(:surface_longwave_up, Grid2D(), desc = "Surface longwave radiation up over land", units = "W/m^2", namespace = :land),
         ParameterizationVariable(:surface_longwave_up, Grid2D(), desc = "Surface longwave radiation up", units = "W/m^2"),
-        ParameterizationVariable(:outgoing_longwave, Grid2D(), desc = "TOA Longwave radiation up", units = "W/m^2"),
+        ParameterizationVariable(:outgoing_longwave, Grid2D(), desc = "Top-of-atmosphere longwave radiation up", units = "W/m^2"),
     )
 end
 
@@ -204,10 +204,10 @@ function initialize!(radiation::OneBandLongwave, model::PrimitiveEquation)
     return initialize!(radiation.radiative_transfer, model)
 end
 
-@propagate_inbounds function parameterization!(ij, diagn, progn, radiation::OneBandLongwave, model)
+@propagate_inbounds function parameterization!(ij, vars, radiation::OneBandLongwave, model)
     # pass on array that was used to compute transmissivity (scratch array)
-    t = transmissivity!(ij, diagn, progn, radiation.transmissivity, model)
-    return longwave_radiative_transfer!(ij, diagn, t, progn, radiation.radiative_transfer, model)
+    t = transmissivity!(ij, vars, radiation.transmissivity, model)
+    return longwave_radiative_transfer!(ij, vars, t, radiation.radiative_transfer, model)
 end
 
 export OneBandLongwaveRadiativeTransfer
@@ -231,16 +231,15 @@ initialize!(::OneBandLongwaveRadiativeTransfer, ::PrimitiveEquation) = nothing
 
 @propagate_inbounds function longwave_radiative_transfer!(
         ij,
-        diagn,
+        vars,
         transmissivity,
-        progn,
         longwave::OneBandLongwaveRadiativeTransfer,
         model,
     )
-    T = diagn.grid.temp_grid_prev
+    T = vars.grid.temp_prev
     NF = eltype(T)
-    dTdt = diagn.tendencies.temp_tend_grid
-    pₛ = diagn.grid.pres_grid_prev[ij]                  # surface pressure [Pa]
+    dTdt = vars.tendencies.grid.temp
+    pₛ = vars.grid.pres_prev[ij]                        # surface pressure [Pa]
     nlayers = size(T, 2)
 
     ϵ_ocean = longwave.emissivity_ocean
@@ -249,19 +248,19 @@ initialize!(::OneBandLongwaveRadiativeTransfer, ::PrimitiveEquation) = nothing
     cₚ = model.atmosphere.heat_capacity
 
     land_fraction = model.land_sea_mask.mask[ij]
-    sst = progn.ocean.sea_surface_temperature[ij]
-    lst = progn.land.soil_temperature[ij, 1]            # TODO use skin temperature?
+    sst = vars.prognostic.ocean.sea_surface_temperature[ij]
+    lst = vars.prognostic.land.soil_temperature[ij, 1]  # TODO use skin temperature?
 
-    U_ocean = isfinite(sst) ? ϵ_ocean * σ * sst^4 : zero(sst)       # [W/m²]
-    diagn.physics.ocean.surface_longwave_up[ij] = U_ocean           # for ocean model forcing
+    U_ocean = ifelse(isfinite(sst), ϵ_ocean * σ * sst^4, zero(sst))  # [W/m²]
+    vars.parameterizations.ocean.surface_longwave_up[ij] = U_ocean    # for ocean model forcing
 
-    U_land = isfinite(lst) ? ϵ_land * σ * lst^4 : zero(lst)         # [W/m²]
-    diagn.physics.land.surface_longwave_up[ij] = U_land             # for land model forcing
+    U_land = ifelse(isfinite(lst), ϵ_land * σ * lst^4, zero(lst))     # [W/m²]
+    vars.parameterizations.land.surface_longwave_up[ij] = U_land      # for land model forcing
 
     # land-sea mask weighted combined flux from land and ocean (surface boundary condition)
     U::NF = (1 - land_fraction) * U_ocean + land_fraction * U_land
     dTdt[ij, nlayers] += surface_flux_to_tendency(U / cₚ, pₛ, model)     # convert [W/m²] / cₚ to K·Pa/s
-    diagn.physics.surface_longwave_up[ij] = U                           # [W/m²] store for output/diagnostics
+    vars.parameterizations.surface_longwave_up[ij] = U                  # [W/m²] store for output/diagnostics
 
     # UPWARD BEAM
     for k in nlayers:-1:2
@@ -275,7 +274,7 @@ initialize!(::OneBandLongwaveRadiativeTransfer, ::PrimitiveEquation) = nothing
     t = transmissivity[ij, 1]
     U = U * t + (1 - t) * σ * T[ij, 1]^4
     dTdt[ij, 1] -= flux_to_tendency(U / cₚ, pₛ, 1, model)               # out of layer 1
-    diagn.physics.outgoing_longwave[ij] = U
+    vars.parameterizations.outgoing_longwave[ij] = U
 
     # DOWNWARD BEAM
     D::NF = 0               # top boundary condition (no longwave coming from space)
@@ -289,7 +288,7 @@ initialize!(::OneBandLongwaveRadiativeTransfer, ::PrimitiveEquation) = nothing
     # Surface downward longwave radiation
     t = transmissivity[ij, nlayers]
     D = D * t + (1 - t) * σ * T[ij, nlayers]^4
-    diagn.physics.surface_longwave_down[ij] = D
+    vars.parameterizations.surface_longwave_down[ij] = D
     dTdt[ij, nlayers] -= surface_flux_to_tendency(D / cₚ, pₛ, model)    # out of layer k
 
     return nothing

@@ -12,7 +12,7 @@ $(TYPEDFIELDS)"""
     "[OPTION] path to the folder containing the lst"
     path::String = joinpath("data", "boundary_conditions", file)
 
-    "[OPTION] flag to check for lst in SWA or locally"
+    "[OPTION] flag to check for lst in SpeedyWeatherAssets or locally"
     from_assets::Bool = true
 
     "[OPTION] SpeedyWeatherAssets version number"
@@ -90,22 +90,20 @@ function initialize!(land::SeasonalLandTemperature, model::PrimitiveEquation)
 end
 
 function initialize!(
-        progn::PrognosticVariables,
-        diagn::DiagnosticVariables,
+        vars::Variables,
         land::SeasonalLandTemperature,
         model::PrimitiveEquation,
     )
     # initialize land temperature by "running" the step at the current time
-    return timestep!(progn, diagn, land, model)
+    return timestep!(vars, land, model)
 end
 
 function timestep!(
-        progn::PrognosticVariables,
-        diagn::DiagnosticVariables,
+        vars::Variables,
         land::SeasonalLandTemperature,
         model::PrimitiveEquation,
     )
-    (; time) = progn.clock
+    (; time) = vars.prognostic.clock
 
     this_month = Dates.month(time)
     next_month = (this_month % 12) + 1      # mod for dec 12 -> jan 1
@@ -113,7 +111,7 @@ function timestep!(
     # linear interpolation weight between the two months
     # TODO check whether this shifts the climatology by 1/2 a month
     (; monthly_temperature) = land
-    (; soil_temperature) = progn.land
+    (; soil_temperature) = vars.prognostic.land
     NF = eltype(soil_temperature)
     weight = convert(NF, Dates.days(time - Dates.firstdayofmonth(time)) / Dates.daysinmonth(time))
 
@@ -150,17 +148,17 @@ ConstantLandTemperature(SG::SpectralGrid, geometry::LandGeometryOrNothing = noth
 
 initialize!(land::ConstantLandTemperature, model::PrimitiveEquation) = nothing
 function initialize!(
-        progn::PrognosticVariables,
-        diagn::DiagnosticVariables,
+        vars::Variables,
         land::ConstantLandTemperature,
         model::PrimitiveEquation,
     )
-    set!(progn.land.soil_temperature, land.temperature)
-    return land.mask && mask!(progn.land.soil_temperature, model.land_sea_mask, :ocean)
+    set!(vars.prognostic.land.soil_temperature, land.temperature)
+    land.mask && mask!(vars.prognostic.land.soil_temperature, model.land_sea_mask, :ocean)
+    return nothing 
 end
 
 # temperature is constant so do nothing during land timestep
-timestep!(progn::PrognosticVariables, diagn::DiagnosticVariables, land::ConstantLandTemperature, args...) = nothing
+timestep!(vars::Variables, land::ConstantLandTemperature, args...) = nothing
 
 function variables(::ConstantLandTemperature)
     return (
@@ -192,35 +190,33 @@ function initialize!(land::LandBucketTemperature, model::PrimitiveEquation)
 end
 
 function initialize!(
-        progn::PrognosticVariables,
-        diagn::DiagnosticVariables,
+        vars::Variables,
         land::LandBucketTemperature,
         model::PrimitiveEquation,
     )
     # create a seasonal model, initialize it and the variables
     seasonal_model = SeasonalLandTemperature(model.spectral_grid, model.land.geometry)
     initialize!(seasonal_model, model)
-    initialize!(progn, diagn, seasonal_model, model)
+    initialize!(vars, seasonal_model, model)
     # (seasonal model will be garbage collected hereafter)
 
     # set ocean "land" temperature points (100% ocean only)
     if land.mask
         masked_value = land.ocean_temperature
         # TODO currently requries .data because of broadcasting issues
-        lst = progn.land.soil_temperature.data
+        lst = vars.prognostic.land.soil_temperature.data
         lst[isnan.(lst)] .= masked_value
-        mask!(progn.land.soil_temperature, model.land_sea_mask, :ocean; masked_value)
+        mask!(vars.prognostic.land.soil_temperature, model.land_sea_mask, :ocean; masked_value)
     end
     return nothing
 end
 
 function timestep!(
-        progn::PrognosticVariables,
-        diagn::DiagnosticVariables,
+        vars::Variables,
         land::LandBucketTemperature,
         model::PrimitiveEquation,
     )
-    (; soil_temperature, soil_moisture) = progn.land
+    (; soil_temperature, soil_moisture) = vars.prognostic.land
     Lᵥ = latent_heat_condensation(model.atmosphere)
     Lᵢ = latent_heat_sublimation(model.atmosphere)
     Δt = model.time_stepping.Δt_sec
@@ -230,15 +226,15 @@ function timestep!(
 
     # Sum up flux F following Frierson et al. 2006, eq (1)
     # use separate land fluxes (not ocean)
-    Rsd = diagn.physics.surface_shortwave_down          # before albedo reflection
-    Rsu = diagn.physics.land.surface_shortwave_up       # only albedo reflection
-    Rld = diagn.physics.surface_longwave_down           # all in [W/m²]
-    Rlu = diagn.physics.land.surface_longwave_up
-    S = diagn.physics.land.sensible_heat_flux
+    Rsd = vars.parameterizations.surface_shortwave_down         # before albedo reflection
+    Rsu = vars.parameterizations.land.surface_shortwave_up      # only albedo reflection
+    Rld = vars.parameterizations.surface_longwave_down          # all in [W/m²]
+    Rlu = vars.parameterizations.land.surface_longwave_up
+    S = vars.parameterizations.land.sensible_heat_flux
 
     # except these in [kg/s/m²]
-    H = haskey(diagn.physics.land, :surface_humidity_flux) ? diagn.physics.land.surface_humidity_flux : nothing
-    M = haskey(diagn.physics.land, :snow_melt_rate) ? diagn.physics.land.snow_melt_rate : nothing
+    H = haskey(vars.parameterizations.land, :surface_humidity_flux) ? vars.parameterizations.land.surface_humidity_flux : nothing
+    M = haskey(vars.parameterizations.land, :snow_melt_rate) ? vars.parameterizations.land.snow_melt_rate : nothing
 
     @boundscheck fields_match(soil_temperature, Rsd, Rsu, Rld, Rlu, S, horizontal_only = true) ||
         throw(DimensionMismatch(soil_temperature, Rs))

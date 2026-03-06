@@ -7,14 +7,13 @@ NoClouds(SG::SpectralGrid) = NoClouds()
 initialize!(clouds::NoClouds, ::AbstractModel) = nothing
 @propagate_inbounds function clouds!(
         ij,
-        diagn,
-        progn,
+        vars,
         ::NoClouds,
         model,
     )
-    NF = eltype(diagn.grid.temp_grid_prev)
+    NF = eltype(vars.grid.temp_prev)
     cloud_cover = zero(NF)           # no cloud cover
-    cloud_top = diagn.nlayers + 1    # below surface
+    cloud_top = size(vars.grid.temp_prev, 2) + 1    # below surface
 
     return (    # NamedTuple
         cloud_cover = cloud_cover,
@@ -69,13 +68,12 @@ DiagnosticClouds(SG::SpectralGrid; kwargs...) = DiagnosticClouds{SG.NF}(; kwargs
 initialize!(clouds::DiagnosticClouds, model::AbstractModel) = nothing
 @propagate_inbounds function clouds!(
         ij,
-        diagn,
-        progn,
+        vars,
         clouds::DiagnosticClouds,
         model,
     )
     # Diagnose cloud cover and cloud top.
-    (; cloud_cover, cloud_top, stratocumulus_cover) = diagnose_cloud_properties(ij, diagn, clouds, model)
+    (; cloud_cover, cloud_top, stratocumulus_cover) = diagnose_cloud_properties(ij, vars, clouds, model)
 
     return (    # NamedTuple
         cloud_cover = cloud_cover,
@@ -89,15 +87,15 @@ end
 """$(TYPEDSIGNATURES)
 Core cloud diagnosis algorithm shared by DiagnosticClouds and SpectralDiagnosticClouds.
 Returns (cloud_cover, cloud_top, stratocumulus_cover) tuple."""
-@propagate_inbounds function diagnose_cloud_properties(ij, diagn, clouds::DiagnosticClouds, model)
+@propagate_inbounds function diagnose_cloud_properties(ij, vars, clouds::DiagnosticClouds, model)
 
-    temp = diagn.grid.temp_grid_prev
-    humid = diagn.grid.humid_grid_prev
-    geopotential = diagn.grid.geopotential
+    temp = vars.grid.temp_prev
+    humid = vars.grid.humid_prev
+    geopotential = vars.grid.geopotential
     NF = eltype(temp)
     nlayers = size(temp, 2)
 
-    pₛ = diagn.grid.pres_grid_prev[ij]
+    pₛ = vars.grid.pres_prev[ij]
     sigma_levels = model.geometry.σ_levels_full
     land_fraction = model.land_sea_mask.mask[ij]
     cₚ = model.atmosphere.heat_capacity
@@ -114,11 +112,11 @@ Returns (cloud_cover, cloud_top, stratocumulus_cover) tuple."""
     cloud_factor = clouds.stratocumulus_cloud_factor
 
     # Precipitation contribution (rain rate is in m/s)
-    rain_rate = diagn.physics.rain_rate[ij]
+    rain_rate = vars.parameterizations.rain_rate[ij]
     precip_term = min(precip_max, (86400 * rain_rate) / 1000)   # convert to mm/day
     P = precip_weight * sqrt(precip_term)
 
-    cloud_top_precipitation = diagn.physics.cloud_top[ij]       # from convection or large-scale condensation
+    cloud_top_precipitation = vars.parameterizations.cloud_top[ij]       # from convection or large-scale condensation
     humidity_term_cloud_top::NF = 0
     cloud_top_humidity = nlayers + 1
 
@@ -140,7 +138,7 @@ Returns (cloud_cover, cloud_top, stratocumulus_cover) tuple."""
     # Combined cloud cover
     cloud_cover = min(1, P + humidity_term_cloud_top)
     cloud_top = min(cloud_top_humidity, cloud_top_precipitation)
-    diagn.physics.cloud_top[ij] = cloud_top
+    vars.parameterizations.cloud_top[ij] = cloud_top
 
     # Stratocumulus parameterization
     stratocumulus_cover::NF = 0         # fallback for no stratocumulus

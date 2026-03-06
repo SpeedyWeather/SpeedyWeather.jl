@@ -8,13 +8,12 @@ initialize!(::TransparentShortwaveTransmissivity, ::AbstractModel) = nothing
 
 @propagate_inbounds function transmissivity!(
         ij,
-        diagn,
-        progn,
+        vars,
         clouds,
         ::TransparentShortwaveTransmissivity,
         model,
     )
-    t = diagn.dynamics.a_grid
+    t = vars.scratch.a_grid
     nlayers = size(t, 2)
     for k in 1:nlayers
         t[ij, k] = one(eltype(t))
@@ -64,15 +63,14 @@ initialize!(::BackgroundShortwaveTransmissivity, ::AbstractModel) = nothing
 
 @propagate_inbounds function transmissivity!(
         ij,
-        diagn,
-        progn,
+        vars,
         clouds,    # NamedTuple from clouds!
         transmissivity::BackgroundShortwaveTransmissivity,
         model,
     )
 
     # use scratch array for transmissivity t
-    t = diagn.dynamics.a_grid
+    t = vars.scratch.a_grid
     NF = eltype(t)
 
     (;
@@ -81,13 +79,13 @@ initialize!(::BackgroundShortwaveTransmissivity, ::AbstractModel) = nothing
     ) = transmissivity
     (; cloud_top, cloud_cover) = clouds
 
-    humid = diagn.grid.humid_grid_prev
-    cos_zenith = diagn.physics.cos_zenith[ij]
+    humid = vars.grid.humid_prev
+    cos_zenith = vars.parameterizations.cos_zenith[ij]
     nlayers = size(t, 2)
 
     sigma_levels = model.geometry.σ_levels_half
     sigma_levels_full = model.geometry.σ_levels_full
-    normalized_surface_pressure = diagn.grid.pres_grid_prev[ij] / 100000
+    normalized_surface_pressure = vars.grid.pres_prev[ij] / 100000
 
     # Zenith angle correction factor
     azen = transmissivity.zenith_amplitude

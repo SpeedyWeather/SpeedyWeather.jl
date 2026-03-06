@@ -34,23 +34,30 @@ function initialize!(sppt::StochasticallyPerturbedParameterizationTendencies, mo
 end
 
 # function barrier
-@propagate_inbounds parameterization!(ij, diagn, progn, sppt::StochasticallyPerturbedParameterizationTendencies, model) =
-    sppt!(ij, diagn, sppt)
+@propagate_inbounds parameterization!(ij, vars, sppt::StochasticallyPerturbedParameterizationTendencies, model) =
+    sppt!(ij, vars, sppt)
 
 """$(TYPEDSIGNATURES)
 Apply stochastically perturbed parameterization tendencies (SPPT) to
 u, v, temperature and humidity in column ij."""
-@propagate_inbounds function sppt!(ij, diagn, sppt)
+@propagate_inbounds function sppt!(ij, vars, sppt)
 
-    r = diagn.grid.random_pattern[ij]
+    r = vars.grid.random_pattern[ij]
     (; taper) = sppt
-    (; u_tend_grid, v_tend_grid, temp_tend_grid, humid_tend_grid) = diagn.tendencies
+    u_tend = vars.tendencies.grid.u
+    v_tend = vars.tendencies.grid.v
+    temp_tend = vars.tendencies.grid.temp
 
-    return @inbounds for k in eachlayer(u_tend_grid, v_tend_grid, temp_tend_grid, humid_tend_grid)
-        R = 1 + r * taper[k]          # r in [-1, 1], R in [0, 2] (don't change sign of tendency)
-        u_tend_grid[ij, k] *= R     # perturb all prognostic variables in the same way
-        v_tend_grid[ij, k] *= R
-        temp_tend_grid[ij, k] *= R
-        humid_tend_grid[ij, k] *= R
+    # dry models don't have humidity just perturb a dummy array to avoid branching in the loop below
+    humid_tend = haskey(vars.tendencies.grid, :humid) ? vars.tendencies.grid.humid : vars.scratch.a_grid
+
+
+    @inbounds for k in eachlayer(u_tend, v_tend, temp_tend, humid_tend)
+        R = 1 + r * taper[k]        # r in [-1, 1], R in [0, 2] (don't change sign of tendency)
+        u_tend[ij, k] *= R          # perturb all prognostic variables in the same way
+        v_tend[ij, k] *= R
+        temp_tend[ij, k] *= R
+        humid_tend[ij, k] *= R
     end
+    return nothing
 end

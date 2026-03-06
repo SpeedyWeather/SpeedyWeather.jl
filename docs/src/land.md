@@ -325,7 +325,6 @@ so snow depth from the snow bucket immediately brightens land grid cells.
 The total albedo is higher over already brighter areas (low vegetation cover)
 and lower over darker areas. This somewhat reflects that in forests the
 snow cover is broken up and snow lies in between trees.
-`DefaultAlbedo` uses `LandSnowAlbedo`; there is currently no time-evolving snow albedo.
 
 ## Albedo
 
@@ -358,7 +357,7 @@ land but being treated with an albedo that comes from 90% ocean.
 Not very realistic. The default albedo can be created with
 
 ```@example land
-albedo = DefaultAlbedo(spectral_grid)
+albedo = OceanLandAlbedo(spectral_grid)
 ```
 
 and inspected with

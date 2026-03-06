@@ -81,7 +81,7 @@ $(TYPEDFIELDS)"""
     sea_ice::SI = ThermodynamicSeaIce(spectral_grid)
     land::LA = DryLandModel(spectral_grid)
     solar_zenith::ZE = WhichZenith(spectral_grid, planet)
-    albedo::AL = DefaultAlbedo(spectral_grid)
+    albedo::AL = OceanLandAlbedo(spectral_grid)
 
     # PHYSICS/PARAMETERIZATIONS
     physics::Bool = true
