@@ -114,10 +114,11 @@ function WhichZenith(SG::SpectralGrid, P::AbstractPlanet; kwargs...)
 end
 
 # function barrier
-function cos_zenith!(diagn::DiagnosticVariables, time::DateTime, model::PrimitiveEquation)
+function cos_zenith!(vars::Variables, time::DateTime, model::PrimitiveEquation)
     (; solar_zenith, geometry) = model
-    (; cos_zenith) = diagn.physics
-    return cos_zenith!(cos_zenith, solar_zenith, time, geometry)
+    (; cos_zenith) = vars.parameterizations
+    cos_zenith!(cos_zenith, solar_zenith, time, geometry)
+    return nothing
 end
 
 function Base.show(io::IO, L::AbstractZenith)
@@ -297,14 +298,14 @@ end
     ij = @index(Global, Linear)
     j = whichring[ij]
 
-    NF = eltype(cos_zenith)         # force type stability
-    local h₀::NF                    # hour angle sunrise to sunset
-    local cos_zenith_j::NF          # at latitude j
+    NF = eltype(cos_zenith)     # force type stability
+    h₀::NF                      # hour angle sunrise to sunset
+    cos_zenith_j::NF            # at latitude j
 
     ϕ = lat[j]
-    h₀ = abs(δ) + abs(ϕ) < π / 2 ?    # polar day/night?
-        acos(-tan(ϕ) * tan(δ)) :   # if not: calculate length of day
-        ϕ * δ > 0 ? π : 0            # polar day if signs are equal, otherwise polar night
+    h₀ = ifelse(2*(abs(δ) + abs(ϕ)) < π,    # polar day/night?
+        acos(-tan(ϕ) * tan(δ)),             # if not: calculate length of day
+        ifelse(ϕ * δ > 0, π, 0))            # polar day if signs are equal, otherwise polar night
 
     sinϕ, cosϕ = sinlat[j], coslat[j]
     cos_zenith_j = h₀ * sinδ * sinϕ + cosδ * cosϕ * sin(h₀)
