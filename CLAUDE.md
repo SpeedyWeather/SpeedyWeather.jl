@@ -140,3 +140,13 @@ Test subdirectories: `dynamics/`, `physics/`, `output/`, `GPU/`, `differentiabil
 ## Code Style
 
 The project uses [Runic.jl](https://github.com/fredrikekre/Runic.jl) for formatting.
+
+## Pull Request Convention
+
+Every PR **must** add a line to `CHANGELOG.md` under the `## Unreleased` section:
+
+```
+- Brief description of change [#NNN](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/NNN)
+```
+
+Add it as the first bullet under `## Unreleased`.
