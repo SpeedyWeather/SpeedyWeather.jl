@@ -271,8 +271,6 @@ function first_timesteps!(
         model::AbstractModel,               # everything that is constant at runtime
     )
     (; clock) = progn
-    clock.n_timesteps == 0 && return nothing    # exit immediately for no time steps
-
     (; implicit) = model
     (; Δt, Δt_millisec) = model.time_stepping
     Δt_millisec_half = Millisecond(Δt_millisec.value ÷ 2)   # this might be 1ms off
@@ -418,11 +416,13 @@ possibly output and callbacks."""
 function timestep!(simulation::AbstractSimulation)
     (; clock) = simulation.prognostic_variables
 
-    return if clock.timestep_counter == 0
+    @trace if clock.timestep_counter == 0
         first_timesteps!(simulation)
     else
         later_timestep!(simulation)
     end
+
+    return nothing
 end
 
 """$(TYPEDSIGNATURES)
