@@ -352,8 +352,7 @@ set_initialized!(implicit::ImplicitPrimitiveEquation) = (implicit.initialized = 
 """$(TYPEDSIGNATURES)
 Apply the implicit corrections to dampen gravity waves in the primitive equation models."""
 function implicit_correction!(
-        diagn::DiagnosticVariables,
-        progn::PrognosticVariables,
+        vars::Variables,
         implicit::ImplicitPrimitiveEquation,
         model::PrimitiveEquation,
     )
@@ -361,14 +360,15 @@ function implicit_correction!(
     # escape immediately if explicit
     implicit.α == 0 && return nothing
 
-    (; nlayers, trunc) = implicit
-    (; S⁻¹, R, U, L, W) = implicit
+    (; S⁻¹, R, U, L, W, nlayers) = implicit
     ξ = implicit.ξ[]
 
-    (; temp_tend, pres_tend, div_tend) = diagn.tendencies
-    div_old, div_new = get_steps(progn.div)
-    G = diagn.dynamics.a              # reuse work arrays, used for combined tendency G
-    geopotential = diagn.dynamics.b   # used for geopotential
+    temp_tend = vars.tendencies.temp
+    pres_tend = vars.tendencies.pres
+    div_tend = vars.tendencies.div
+    div_old, div_new = get_steps(vars.prognostic.div)
+    G = vars.scratch.a                  # reuse work arrays, used for combined tendency G
+    geopotential = vars.scratch.b       # used for geopotential
     geopotential .= 0
 
     # Get precomputed l_indices from the spectrum
@@ -377,9 +377,8 @@ function implicit_correction!(
     arch = architecture(temp_tend)
 
     # Single kernel: All implicit correction steps for each spectral mode
-    lm_size = size(pres_tend, 1)
     launch!(
-        arch, LinearWorkOrder, (lm_size,),
+        arch, LinearWorkOrder, (size(pres_tend, 1),),
         implicit_primitive_single_kernel!,
         temp_tend, pres_tend, div_tend, G, geopotential,
         div_old, div_new, S⁻¹, R, U, L, W, l_indices, ξ, nlayers

@@ -249,21 +249,25 @@ function horizontal_diffusion!(
     vor = get_step(vars.prognostic.vor, lf)
     div = get_step(vars.prognostic.div, lf)
     temp = get_step(vars.prognostic.temp, lf)
-    humid = get_step(vars.prognostic.humid, lf)
     vor_tend = vars.tendencies.vor
     div_tend = vars.tendencies.div
     temp_tend = vars.tendencies.temp
-    humid_tend = vars.tendencies.humid
     horizontal_diffusion!(vor_tend, vor, expl, impl)
     horizontal_diffusion!(div_tend, div, expl_div, impl_div)
     horizontal_diffusion!(temp_tend, temp, expl, impl)
-    model isa PrimitiveWet && horizontal_diffusion!(humid_tend, humid, expl, impl)
+
+    if haskey(vars.tendencies, :humid)
+        humid = get_step(vars.prognostic.humid, lf)
+        humid_tend = vars.tendencies.humid
+        horizontal_diffusion!(humid_tend, humid, expl, impl)
+    end
 
     for (name, tracer) in model.tracers
         tracer_var = get_step(vars.prognostic.tracers[name], lf)      # lta_view for leapfrog index
         tracer_tend = vars.tendencies.tracers[name]
         tracer.active && horizontal_diffusion!(tracer_tend, tracer_var, expl, impl)
     end
+    
     return nothing
 end
 
