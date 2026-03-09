@@ -151,9 +151,9 @@ CPUStatic()  # wraps KernelAbstractions.CPU(; static = true)
 GPU()        # wraps backend-specific GPU (CUDA default; Metal/AMDGPU via extensions)
 ```
 
-Backend-specific array types (`CuArray`, `ROCArray`, `MtlArray`) and
-`convert_to_device` are registered in the extension modules under
-`SpeedyWeatherInternals/ext/`.
+Backend-specific array types (`CuArray`, `ROCArray`, `MtlArray`) are registered
+in the extension modules under `SpeedyWeatherInternals/ext/`.
+Use `on_architecture(device, data)` to transfer data between devices.
 
 ### Work order types
 
