@@ -64,7 +64,8 @@ and `finalize!`.
 ## Typical Usage
 
 ```julia
-spectral_grid = SpectralGrid(trunc=31, nlayers=8)
+arch = SpeedyWeather.CPU()
+spectral_grid = SpectralGrid(trunc=31, nlayers=8, architecture=arch)
 model = PrimitiveWetModel(spectral_grid)
 simulation = initialize!(model)
 run!(simulation, period=Day(10), output=true)
@@ -185,14 +186,13 @@ loop!(args...)
 ### Defining a kernel
 
 ```julia
-@kernel inbounds = true function my_kernel!(A, B, @Const(c))
+@kernel inbounds = true function my_kernel!(A, B, c)
     I = @index(Global, Linear)      # or NTuple / Cartesian for multi-dim
     A[I] = B[I] * c
 end
 ```
 
 - `inbounds = true` — standard on all performance kernels (28+ files)
-- `@Const(x)` — marks read-only arguments for compiler optimisation (23+ files)
 - Use `@index(Global, Linear)` for 1D / flattened access,
   `@index(Global, NTuple)` for `ij, k` style,
   `@index(Global, Cartesian)` for `I[1], I[2]` style
