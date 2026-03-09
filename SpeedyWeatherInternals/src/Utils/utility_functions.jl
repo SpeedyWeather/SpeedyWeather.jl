@@ -33,7 +33,8 @@ function print_fields(io::IO, A, keys; arrays::Bool = false, values::Bool = true
         val_str = values ? val : ""
         equal_sign = values ? " = " : ""
         s = styled"{info:$key}{note:::$(typeof(val))}$equal_sign$val_str"
-        ~last ? println(io, "├ " * s) : print(io, "└ " *  s)
+        s_short = textwidth(s) > 75 ? first(s, 75) * "..." : s
+        ~last ? println(io, "├ " * s_short) : print(io, "└ " *  s_short)
     end
     if filtered                 # add the names of arrays
         s = styled"└ arrays: "

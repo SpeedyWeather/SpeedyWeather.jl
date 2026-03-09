@@ -7,7 +7,7 @@ TransparentLongwaveTransmissivity(SG::SpectralGrid) = TransparentLongwaveTransmi
 initialize!(::TransparentLongwaveTransmissivity, ::AbstractModel) = nothing
 @propagate_inbounds function transmissivity!(ij, vars, transmissivity::TransparentLongwaveTransmissivity, model)
     # transmissivity is 1 everywhere (no absorption)
-    t = vars.scratch.a_grid   # use scratch array
+    t = vars.scratch.grid.a   # use scratch array
     nlayers = size(t, 2)
     for k in 1:nlayers
         t[ij, k] = one(eltype(t))
@@ -34,7 +34,7 @@ initialize!(::FriersonLongwaveTransmissivity, ::AbstractModel) = nothing
 @propagate_inbounds function transmissivity!(ij, vars, transmissivity::FriersonLongwaveTransmissivity, model)
 
     # use scratch array to compute transmissivity t
-    t = vars.scratch.a_grid
+    t = vars.scratch.grid.a
     nlayers = size(t, 2)
     NF = eltype(t)
 

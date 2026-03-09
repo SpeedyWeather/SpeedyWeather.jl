@@ -149,7 +149,8 @@ function SpeedyTransforms.transform!(
 
         for (name, tracer) in model.tracers
             if tracer.active
-                vars.grid.tracers_prev[name] .= vars.grid.tracers[name]
+                name_prev = Symbol(name, :_prev)
+                vars.grid.tracers[name_prev] .= vars.grid.tracers[name]
             end
         end
     end
@@ -189,7 +190,8 @@ function SpeedyTransforms.transform!(
 
         for (name, tracer) in model.tracers
             if tracer.active
-                vars.grid.tracers_prev[name] .= vars.grid.tracers[name]
+                name_prev = Symbol(name, :_prev)
+                vars.grid.tracers[name_prev] .= vars.grid.tracers[name]
             end
         end
     end

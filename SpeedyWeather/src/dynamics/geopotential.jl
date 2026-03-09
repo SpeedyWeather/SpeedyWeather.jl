@@ -74,8 +74,8 @@ function geopotential!(
     Φ = vars.grid.geopotential
 
     # use zero scratch for humidity in dry models to not distinguish in kernels below
-    vars.scratch.a_grid .= 0
-    q = haskey(vars.grid, :humid) ? vars.grid.humid : vars.scratch.a_grid
+    vars.scratch.grid.a .= 0
+    q = haskey(vars.grid, :humid) ? vars.grid.humid : vars.scratch.grid.a
 
     (; orography) = model.orography
     g = model.planet.gravity
@@ -132,15 +132,15 @@ $(TYPEDSIGNATURES)
 Compute spectral geopotential `geopot` from spectral temperature `temp`
 and spectral surface geopotential `geopot_surf` (orography*gravity)."""
 function geopotential!(
-        diagn::DiagnosticVariables,
+        vars::Variables,
         G::Geopotential,
         orography::AbstractOrography,
     )
-    (; temp_virt) = diagn.dynamics
-    geopot = diagn.dynamics.geopotential                # spectral geopotential to fill
-    geopot_surf = orography.surface_geopotential        # = orography*gravity
-    (; Δp_geopot_half, Δp_geopot_full) = G              # = R*Δlnp either on half or full levels
-    (; nlayers) = diagn                                 # number of vertical levels
+    Tᵥ = vars.dynamics.virtual_temperature
+    Φ = vars.dynamics.geopotential              # spectral geopotential to fill
+    Φₛ = orography.surface_geopotential         # = orography*gravity
+    (; Δp_geopot_half, Δp_geopot_full) = G      # = R*Δlnp either on half or full levels
+    nlayers = size(Φ, 2)                        # number of vertical levels
 
     @boundscheck nlayers == length(Δp_geopot_full) || throw(BoundsError)
 
@@ -149,30 +149,33 @@ function geopotential!(
 
     # BOTTOM FULL LAYER
     # TODO: broadcasting with LTA issue here
-    geopot.data[:, nlayers] .= geopot_surf.data .+ temp_virt.data[:, nlayers] .* Δp_geopot_full[nlayers:nlayers]
+    Φ.data[:, nlayers] .= Φₛ.data .+ Tᵥ.data[:, nlayers] .* Δp_geopot_full[nlayers:nlayers]
 
     # OTHER FULL LAYERS, integrate two half-layers from bottom to top
-    arch = architecture(geopot)
+    arch = architecture(Φ)
     launch!(
-        arch, SpectralWorkOrder, (size(geopot, 1),), geopotential_spectral_kernel!,
-        geopot, temp_virt, Δp_geopot_half, Δp_geopot_full, nlayers
+        arch, SpectralWorkOrder, (size(Φ, 1),), geopotential_spectral_kernel!,
+        Φ, Tᵥ, Δp_geopot_half, Δp_geopot_full, nlayers
     )
     return nothing
 end
 
 @kernel inbounds = true function geopotential_spectral_kernel!(
-        geopot,                     # Output: spectral geopotential
-        temp_virt,                  # Input: spectral virtual temperature
-        @Const(Δp_geopot_half),     # Input: integration constant for half levels
-        @Const(Δp_geopot_full),     # Input: integration constant for full levels
-        @Const(nlayers),            # Input: number of vertical layers
+        geopotential,               # Output: spectral geopotential
+        virtual_temperature,        # Input: spectral virtual temperature
+        Δp_geopot_half,             # Input: integration constant for half levels
+        Δp_geopot_full,             # Input: integration constant for full levels
+        nlayers,                    # Input: number of vertical layers
     )
-    lm = @index(Global, Linear)  # global index: harmonic lm
+    lm = @index(Global, Linear)     # global index: harmonic lm
+
+    Φ = geopotential                # for brevity
+    Tᵥ = virtual_temperature
 
     # Integrate from bottom to top over all layers except bottom (already computed)
     for k in (nlayers - 1):-1:1
-        geopot_k½ = geopot[lm, k + 1] + temp_virt[lm, k + 1] * Δp_geopot_half[k + 1]  # 1st half layer integration
-        geopot[lm, k] = geopot_k½ + temp_virt[lm, k] * Δp_geopot_full[k]        # 2nd onto full layer
+        Φ_k½ = Φ[lm, k + 1] + Tᵥ[lm, k + 1] * Δp_geopot_half[k + 1]     # 1st half layer integration
+        Φ[lm, k] = Φ_k½ + Tᵥ[lm, k] * Δp_geopot_full[k]                 # 2nd onto full layer
     end
 end
 

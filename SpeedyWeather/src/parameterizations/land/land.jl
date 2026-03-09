@@ -18,18 +18,7 @@ model_type(model::AbstractLand) = model_type(typeof(model))
 @inline get_nlayers(model::AbstractLand) = model.geometry.nlayers
 @inline get_nlayers(::Nothing) = 0 # fallback
 
-function Base.show(io::IO, M::AbstractLand)
-    println(io, "$(model_type(M)) <: $(model_class(M))")
-    properties = propertynames(M)
-    n = length(properties)
-    for (i, key) in enumerate(properties)
-        val = getfield(M, key)
-        s = i == n ? "└" : "├"  # choose ending └ for last property
-        p = i == n ? print : println
-        p(io, "$s $key: $(typeof(val))")
-    end
-    return
-end
+Base.show(io::IO, M::AbstractLand) = Base.show(io, M, values=false)
 
 # LandModel defined through its components
 export LandModel
@@ -48,17 +37,15 @@ end
 (L::Type{<:AbstractLand})(SG::SpectralGrid; nlayers = DEFAULT_NLAYERS_SOIL, kwargs...) = L(spectral_grid = SG, geometry = LandGeometry(SG, nlayers = nlayers); kwargs...)
 
 # initializing the land model initializes its components
-function initialize!(
-        land::LandModel,
-        model::PrimitiveEquation
-    )
+function initialize!(land::LandModel, model::AbstractModel)
     initialize!(model.land.geometry, model)
     initialize!(model.land.thermodynamics, model)
     initialize!(model.land.temperature, model)
     initialize!(model.land.soil_moisture, model)
     initialize!(model.land.snow, model)
     initialize!(model.land.vegetation, model)
-    return initialize!(model.land.rivers, model)
+    initialize!(model.land.rivers, model)
+    return nothing
 end
 
 # allocate variables as defined by land components
@@ -78,10 +65,11 @@ export DryLandModel
     @component temperature::T = LandBucketTemperature(spectral_grid, geometry)
 end
 
-function initialize!(land::DryLandModel, model::PrimitiveEquation)
+function initialize!(land::DryLandModel, model::AbstractModel)
     initialize!(model.land.geometry, model)
     initialize!(model.land.thermodynamics, model)
-    return initialize!(model.land.temperature, model)
+    initialize!(model.land.temperature, model)
+    return nothing
 end
 
 # initializing the land model initializes its components
@@ -103,15 +91,11 @@ function timestep!(
         timestep!(vars, land.rivers, model)
         timestep!(vars, land.vegetation, model)
     end
-    return timestep!(vars, land.temperature, model)
+    timestep!(vars, land.temperature, model)
+    return nothing
 end
 
-function initialize!(
-        land::PrognosticVariablesLand,  # for dispatch
-        vars::Variables,
-        land_model::AbstractLand,
-        model::PrimitiveEquation,
-    ) where {PrognosticVariablesLand}
+function initialize!(vars::Variables, land_model::AbstractLand, model)
     initialize!(vars, land_model.temperature, model)
 
     # only initialize soil moisture, vegetation, rivers if atmosphere and land are wet

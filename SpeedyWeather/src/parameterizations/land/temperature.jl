@@ -47,7 +47,7 @@ end
 
 function variables(::SeasonalLandTemperature)
     return (
-        PrognosticVariable(name = :soil_temperature, dims = Grid3D(), namespace = :land),
+        PrognosticVariable(:soil_temperature, Land3D(), namespace = :land),
     )
 end
 
@@ -101,7 +101,7 @@ end
 function timestep!(
         vars::Variables,
         land::SeasonalLandTemperature,
-        model::PrimitiveEquation,
+        model,
     )
     (; time) = vars.prognostic.clock
 
@@ -117,23 +117,14 @@ function timestep!(
 
     launch!(
         architecture(soil_temperature), RingGridWorkOrder, size(soil_temperature),
-        seasonal_land_temperature_kernel!,
+        interpolate_monthly_climatology_kernel!,
         soil_temperature, monthly_temperature, weight, this_month, next_month
     )
 
     return nothing
 end
 
-@kernel inbounds = true function seasonal_land_temperature_kernel!(
-        soil_temperature, monthly_temperature, weight, this_month, next_month
-    )
-    ij, k = @index(Global, NTuple)
-
-    soil_temperature[ij, k] = (1 - weight) * monthly_temperature[ij, this_month] +
-        weight * monthly_temperature[ij, next_month]
-end
-
-## CONSTANT LAND CLIMATOLOGY
+# CONSTANT LAND CLIMATOLOGY
 export ConstantLandTemperature
 @parameterized @kwdef struct ConstantLandTemperature{NF} <: AbstractLandTemperature
     "[OPTION] Globally constant temperature"
@@ -162,7 +153,7 @@ timestep!(vars::Variables, land::ConstantLandTemperature, args...) = nothing
 
 function variables(::ConstantLandTemperature)
     return (
-        PrognosticVariable(name = :soil_temperature, dims = Grid3D(), namespace = :land),
+        PrognosticVariable(:soil_temperature, Land3D(), namespace = :land),
     )
 end
 
@@ -182,6 +173,19 @@ Adapt.@adapt_structure LandBucketTemperature
 
 # generator function
 LandBucketTemperature(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothing; kwargs...) = LandBucketTemperature{SG.NF}(; kwargs...)
+
+function variables(::LandBucketTemperature)
+    return (
+        PrognosticVariable(:soil_temperature, Land3D(), desc = "Soil temperature", units = "K", namespace = :land),
+        PrognosticVariable(:soil_moisture, Land3D(), desc = "Soil moisture content (fraction of capacity)", units = "1", namespace = :land),
+        ParameterizationVariable(:surface_shortwave_down, Grid2D(), desc = "Surface shortwave radiation down", units = "W/m²"),
+        ParameterizationVariable(:surface_shortwave_up, Grid2D(), desc = "Surface shortwave radiation up", units = "W/m²", namespace = :land),
+        ParameterizationVariable(:surface_longwave_down, Grid2D(), desc = "Surface longwave radiation down", units = "W/m²"),
+        ParameterizationVariable(:surface_longwave_up, Grid2D(), desc = "Surface longwave radiation up", units = "W/m²", namespace = :land),
+        ParameterizationVariable(:sensible_heat_flux, Grid2D(), desc = "Sensible heat flux", units = "W/m²", namespace = :land),
+    )
+end
+
 function initialize!(land::LandBucketTemperature, model::PrimitiveEquation)
     nlayers = get_nlayers(model.land)
     @assert nlayers == 2 "LandBucketTemperature only works with 2 soil layers " *
@@ -192,7 +196,7 @@ end
 function initialize!(
         vars::Variables,
         land::LandBucketTemperature,
-        model::PrimitiveEquation,
+        model,
     )
     # create a seasonal model, initialize it and the variables
     seasonal_model = SeasonalLandTemperature(model.spectral_grid, model.land.geometry)
@@ -289,16 +293,4 @@ end
         soil_temperature[ij, 1] += Δt / (z₁ * C₁) * (F - D)
         soil_temperature[ij, 2] += Δt / (z₂ * C₂) * D
     end
-end
-
-function variables(::LandBucketTemperature)
-    return (
-        PrognosticVariable(:soil_temperature, Grid3D(), desc = "Soil temperature", units = "K", namespace = :land),
-        PrognosticVariable(:soil_moisture, Grid3D(), desc = "Soil moisture content (fraction of capacity)", units = "1", namespace = :land),
-        ParameterizationVariable(:surface_shortwave_down, Grid2D(), desc = "Surface shortwave radiation down", units = "W/m²"),
-        ParameterizationVariable(:surface_shortwave_up, Grid2D(), desc = "Surface shortwave radiation up", units = "W/m²", namespace = :land),
-        ParameterizationVariable(:surface_longwave_down, Grid2D(), desc = "Surface longwave radiation down", units = "W/m²"),
-        ParameterizationVariable(:surface_longwave_up, Grid2D(), desc = "Surface longwave radiation up", units = "W/m²", namespace = :land),
-        ParameterizationVariable(:sensible_heat_flux, Grid2D(), desc = "Sensible heat flux", units = "W/m²", namespace = :land),
-    )
 end

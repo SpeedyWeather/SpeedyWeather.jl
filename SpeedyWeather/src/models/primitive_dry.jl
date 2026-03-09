@@ -134,10 +134,12 @@ $(TYPEDFIELDS)"""
 end
 
 function variables(::Type{<:PrimitiveDry})
-    return (variables(BarotropicModel)...,
+    return (
+        variables(BarotropicModel)...,
         PrognosticVariable(:div, Spectral4D(2), desc = "Divergence", units = "1/s"),                # 2 for 2 leapfrog steps
         PrognosticVariable(:temp, Spectral4D(2), desc = "Temperature", units = "K"),                # 2 for 2 leapfrog steps
         PrognosticVariable(:pres, Spectral3D(2), desc = "Logarithm of surface pressure", units = "log(Pa)"),
+
         GridVariable(:div, Grid3D(), desc = "Divergence", units = "1/s"),
         GridVariable(:temp, Grid3D(), desc = "Temperature", units = "K"),
         GridVariable(:pres, Grid2D(), desc = "Logarithm of surface pressure", units = ""),
@@ -146,14 +148,32 @@ function variables(::Type{<:PrimitiveDry})
         GridVariable(:pres_prev, Grid2D(), desc = "Logarithm of surface pressure at previous time step", units = ""),
         GridVariable(:u_prev, Grid3D(), desc = "Zonal wind at previous time step", units = "m/s"),
         GridVariable(:v_prev, Grid3D(), desc = "Meridional wind at previous time step", units = "m/s"),
+
         TendencyVariable(:div, Spectral3D(), desc = "Tendency of divergence", units = "1/s²"),
         TendencyVariable(:temp, Spectral3D(), desc = "Tendency of temperature", units = "K/s"),
         TendencyVariable(:pres, Spectral2D(), desc = "Tendency of surface pressure", units = "log(Pa)/s"),
         TendencyVariable(:div, Grid3D(), namespace = :grid, desc = "Tendency of divergence on the grid", units = "1/s²"),
         TendencyVariable(:temp, Grid3D(), namespace = :grid, desc = "Tendency of temperature on the grid", units = "K/s"),
         TendencyVariable(:pres, Grid2D(), namespace = :grid, desc = "Tendency of surface pressure on the grid", units = "log(Pa)/s"),
-        ScratchVariable(:a_grid, Grid3D(), desc = "Work array for dynamics"),
-        ScratchVariable(:b_grid, Grid3D(), desc = "Work array for dynamics"),
+
+        DynamicsVariable(:dpres_dx, Grid2D(), desc = "Zonal gradient of the logarithm of surface pressure"),
+        DynamicsVariable(:dpres_dy, Grid2D(), desc = "Meridional gradient of the logarithm of surface pressure"),
+        DynamicsVariable(:pres_flux, Grid3D(), desc = "Pressure gradient flux, (u, v) ⋅ ∇lnp_s"),
+        DynamicsVariable(:virtual_temperature, Spectral3D(), desc = "Virtual temperature", units = "K"),
+        DynamicsVariable(:u_mean_grid, Grid2D(), desc = "Vertically integrated zonal velocity", units = "m/s"),
+        DynamicsVariable(:v_mean_grid, Grid2D(), desc = "Vertically integrated meridional velocity", units = "m/s"),
+        DynamicsVariable(:div_mean_grid, Grid2D(), desc = "Vertically integrated divergence", units = "1/s"),
+        DynamicsVariable(:div_mean, Spectral2D(), desc = "Vertically integrated divergence", units = "1/s"),
+        DynamicsVariable(:div_sum_above, Grid3D(), desc = "Partially vertically integrated divergence, top to layer above", units = "1/s"),
+        DynamicsVariable(:pres_flux_sum_above, Grid3D(), desc = "Partially vertically integrated pressure gradient flux, top to layer above"),
+        DynamicsVariable(:w, Grid3D(), desc = "Vertical velocity, dσ/dt.", units = "1/s"),
+
+        ScratchVariable(:a, Grid3D(), desc = "Work array for dynamics", namespace = :grid),
+        ScratchVariable(:b, Grid3D(), desc = "Work array for dynamics", namespace = :grid),
+        ScratchVariable(:a_2D, Spectral2D(), desc = "Work array for dynamics"),
+        ScratchVariable(:b_2D, Spectral2D(), desc = "Work array for dynamics"),
+        ScratchVariable(:a_2D, Grid2D(), desc = "Work array for dynamics", namespace = :grid),
+        ScratchVariable(:b_2D, Grid2D(), desc = "Work array for dynamics", namespace = :grid),
     )
 end
 
@@ -199,12 +219,12 @@ function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
 
     # allocate all variables
     variables = Variables(model)
-    
+
     # set the time first
     (; clock) = variables.prognostic
     clock.time = time       # set the current time
     clock.start = time      # and store the start time
-    
+
     # set all initial conditions for the ocean, seaice, land then atmosphere
     initialize!(variables, model)
 

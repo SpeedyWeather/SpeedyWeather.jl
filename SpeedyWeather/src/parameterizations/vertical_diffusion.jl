@@ -111,7 +111,7 @@ end
 
     if diffuse_static_energy
         # compute dry static energy on the fly
-        dry_static_energy = vars.scratch.a_grid
+        dry_static_energy = vars.scratch.grid.a
         cₚ = atmosphere.heat_capacity
         T = vars.grid.temp
         Φ = vars.grid.geopotential
@@ -172,12 +172,10 @@ end
     vars.parameterizations.boundary_layer_height[ij] = kₕ
 
     # reuse scratch array for diffusion coefficients
-    K = vars.scratch.b_grid
+    K = vars.scratch.grid.b
 
-    # diffusion above boundary layer is 0
-    for k in 1:nlayers  # reset for all layers
-        K[ij, k] = 0
-    end
+    # diffusion above boundary layer is 0, reset for all layers
+    for k in 1:nlayers K[ij, k] = 0 end
 
     if kₕ <= nlayers    # boundary layer depth is at least 1 layer thick (calculate diffusion)
 
@@ -261,7 +259,7 @@ For vertical stability in the boundary layer."""
         atmosphere::AbstractAtmosphere,
     )
     # reuse work array
-    Ri = vars.scratch.a_grid
+    Ri = vars.scratch.grid.a
     nlayers = size(Ri, 2)
     surface = nlayers       # surface index
     cₚ = atmosphere.heat_capacity
@@ -272,8 +270,8 @@ For vertical stability in the boundary layer."""
     T = vars.grid.temp_prev
     
     # for dry models, use scratch array to bypass access to non-existing humidity variable
-    for k in 1:nlayers vars.scratch.b_grid[ij, k] = 0 end   # reset to zero humidity
-    q = haskey(vars.grid, :humid_prev) ? vars.grid.humid_prev : vars.scratch.b_grid 
+    for k in 1:nlayers vars.scratch.grid.b[ij, k] = 0 end   # reset to zero humidity
+    q = haskey(vars.grid, :humid_prev) ? vars.grid.humid_prev : vars.scratch.grid.b 
 
     # surface layer
     V² = u[ij, surface]^2 + v[ij, surface]^2
