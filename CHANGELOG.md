@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Remove `@Const` from kernels [#NNN](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/NNN)
 - Get SpeedyWeatherAssets on the fly [#983](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/983)
 - Change from MIT to EUPL license [#992](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/992)
 

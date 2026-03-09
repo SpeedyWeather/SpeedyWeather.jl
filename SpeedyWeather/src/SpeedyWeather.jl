@@ -10,7 +10,7 @@ import LinearAlgebra: LinearAlgebra, Diagonal
 export rotate, rotate!
 
 # GPU, PARALLEL
-import KernelAbstractions: KernelAbstractions, @kernel, @index, @Const, synchronize
+import KernelAbstractions: KernelAbstractions, @kernel, @index, synchronize
 import GPUArrays: GPUArrays, @allowscalar
 import Adapt: Adapt, adapt, adapt_structure
 import GPUArrays: @allowscalar
