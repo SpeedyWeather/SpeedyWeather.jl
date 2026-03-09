@@ -137,6 +137,83 @@ Test subdirectories: `dynamics/`, `physics/`, `output/`, `GPU/`, `differentiabil
 - Dev docs:    https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/
 - Build: `julia --project=docs docs/make.jl`
 
+## Kernel Launching
+
+Kernel infrastructure lives in `SpeedyWeatherInternals/src/Utils/kernel_launching.jl`
+and `SpeedyWeatherInternals/src/Architectures/`.
+
+### Architecture abstraction
+
+```julia
+CPU()        # wraps KernelAbstractions.CPU()
+CPUStatic()  # wraps KernelAbstractions.CPU(; static = true)
+GPU()        # wraps backend-specific GPU (CUDA default; Metal/AMDGPU via extensions)
+```
+
+Backend-specific array types (`CuArray`, `ROCArray`, `MtlArray`) and
+`convert_to_device` are registered in the extension modules under
+`SpeedyWeatherInternals/ext/`.
+
+### Work order types
+
+Six types encode what iteration space a kernel covers:
+
+| Type | Iteration space |
+|------|----------------|
+| `SpectralWorkOrder` | all `lm` harmonics × vertical layers |
+| `SpectralInnerWorkOrder` | as above, but skip `lm=1` |
+| `DiagonalWorkOrder` | diagonal elements of a `LowerTriangularArray` |
+| `RingGridWorkOrder` | all grid points `ij` × vertical layers |
+| `Array3DWorkOrder` | regular 3D arrays |
+| `LinearWorkOrder` | flattened 1D (eachindex) |
+
+### Launching a kernel
+
+```julia
+launch!(arch, WorkOrderType, worksize, kernel!, args...)
+```
+
+Internally this calls `work_layout` to compute a sensible `workgroup` size
+(capped at 256 threads, heuristic aspect ratios for 2D/3D), then dispatches
+via the KernelAbstractions API:
+
+```julia
+loop! = kernel!(device(arch), workgroup, worksize)
+loop!(args...)
+```
+
+### Defining a kernel
+
+```julia
+@kernel inbounds = true function my_kernel!(A, B, @Const(c))
+    I = @index(Global, Linear)      # or NTuple / Cartesian for multi-dim
+    A[I] = B[I] * c
+end
+```
+
+- `inbounds = true` — standard on all performance kernels (28+ files)
+- `@Const(x)` — marks read-only arguments for compiler optimisation (23+ files)
+- Use `@index(Global, Linear)` for 1D / flattened access,
+  `@index(Global, NTuple)` for `ij, k` style,
+  `@index(Global, Cartesian)` for `I[1], I[2]` style
+
+### CPU vs GPU dispatch
+
+Many functions branch on architecture type:
+
+```julia
+arch = architecture(field)
+if arch isa GPU
+    launch!(arch, LinearWorkOrder, (n,), my_kernel!, ...)
+else
+    my_cpu_loop!(...)   # plain Julia loops
+end
+```
+
+Kernels are spread across ~36 files in `SpeedyWeather/src/dynamics/`,
+`physics/`, `SpeedyTransforms/src/`, `RingGrids/src/`, and
+`LowerTriangularArrays/src/`.
+
 ## Code Style
 
 The project uses [Runic.jl](https://github.com/fredrikekre/Runic.jl) for formatting.
