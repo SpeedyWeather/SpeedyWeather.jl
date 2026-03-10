@@ -11,7 +11,7 @@ Fields are: $(TYPEDFIELDS)"""
     keepbits::Int = 12
 end
 
-path(::ZonalVelocity10mOutput, simulation) = simulation.diagnostic_variables.grid.u_grid
+path(::ZonalVelocity10mOutput, simulation) = simulation.variables.grid.u
 
 """Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
@@ -26,7 +26,7 @@ Fields are: $(TYPEDFIELDS)"""
     keepbits::Int = 12
 end
 
-path(::MeridionalVelocity10mOutput, simulation) = simulation.diagnostic_variables.grid.v_grid
+path(::MeridionalVelocity10mOutput, simulation) = simulation.variables.grid.v
 
 """$(TYPEDSIGNATURES)
 10m wind is defined using a logarithmic profile from the lowermost model layer.
@@ -50,12 +50,12 @@ function output!(
     nlayers = size(u_or_v_grid, 2)
     u_or_v_bottom = field_view(u_or_v_grid, :, nlayers)
 
-    z_bottom = simulation.diagnostic_variables.dynamics.a_2D_grid
-    u_or_v10 = simulation.diagnostic_variables.dynamics.b_2D_grid
+    z_bottom = simulation.variables.scratch.a_2D_grid
+    u_or_v10 = simulation.variables.scratch.b_2D_grid
 
     # Compute z_bottom as z_surf + T_bottom * Δp_geopot / g, start with z_surf
     z_bottom .= max.(simulation.model.orography.orography, 0)   # [m] set negative values to zero
-    T_bottom = field_view(simulation.diagnostic_variables.grid.temp_grid, :, nlayers)
+    T_bottom = field_view(simulation.variables.grid.temp, :, nlayers)
     Δp_geopot = simulation.model.geopotential.Δp_geopot_full[end]
 
     # accumulate the second term in
@@ -95,7 +95,7 @@ Fields are: $(TYPEDFIELDS)"""
 end
 
 # not the actual surface temperature but the core variable to read in
-path(::SurfaceTemperatureOutput, simulation) = simulation.diagnostic_variables.grid.temp_grid
+path(::SurfaceTemperatureOutput, simulation) = simulation.variables.grid.temp
 
 function output!(
         output::NetCDFOutput,
@@ -106,7 +106,7 @@ function output!(
     ~hastime(variable) && output.output_counter > 1 && return nothing
 
     # reuse scratch array to avoid allocations
-    Ts = simulation.diagnostic_variables.dynamics.a_2D_grid
+    Ts = simulation.variables.scratch.a_2D_grid
 
     # Retrieve T_bottom
     T_grid = path(variable, simulation)
@@ -151,7 +151,7 @@ Fields are: $(TYPEDFIELDS)"""
 end
 
 path(::BoundaryLayerDragOutput, simulation) =
-    simulation.diagnostic_variables.physics.boundary_layer_drag
+    simulation.variables.parameterizations.boundary_layer_drag
 
 # collect all in one for convenience
 BoundaryLayerOutput() = (

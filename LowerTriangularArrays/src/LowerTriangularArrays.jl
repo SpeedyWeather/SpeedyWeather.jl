@@ -2,6 +2,7 @@ module LowerTriangularArrays
 
 # STRUCTURE
 using DocStringExtensions
+using StyledStrings
 
 # GPU
 import Adapt: Adapt, adapt

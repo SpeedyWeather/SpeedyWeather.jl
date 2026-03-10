@@ -36,11 +36,12 @@ function _apply_batched_fft!(
     nlayers = size(field, 2)        # number of vertical layers
 
     # Perform the FFT
-    return if not_equator # skip FFT, redundant when north already did that latitude
+    if not_equator # skip FFT, redundant when north already did that latitude
         view(f_out, 1:nfreq, 1:nlayers, j) .= rfft_plan * view_only_on_cpu(field.data, ilons, :)
     else
         f_out[1:nfreq, 1:nlayers, j] .= 0
     end
+    return nothing
 end
 
 # CPU version with view
@@ -66,9 +67,10 @@ function _apply_batched_fft!(
     nlayers = size(field, 2)        # number of vertical layers
     nfreq = nlon ÷ 2 + 1
 
-    return if not_equator  # skip FFT, redundant when north already did that latitude
+    if not_equator  # skip FFT, redundant when north already did that latitude
         view(field.data, ilons, :) .= brfft_plan * view_only_on_cpu(g_in, 1:nfreq, 1:nlayers, j)
     end
+    return nothing
 end
 
 # Forward FFT Application Function for serial FFT
@@ -86,11 +88,12 @@ function _apply_serial_fft!(
     rfft_plan = rfft_plans_1D[j]    # FFT planned wrt nlon on ring
     k_grid = eachlayer(field)[k]    # Precomputed ring index (as a Cartesian index)
 
-    return if not_equator
+    if not_equator
         view(f_out, 1:nfreq, k, j) .= rfft_plan * view(field.data, ilons, k_grid)
     else
         fill!(view(f_out, 1:nfreq, k, j), 0)
     end
+    return nothing
 end
 
 # Inverse FFT Application Function for serial FFT
@@ -108,9 +111,10 @@ function _apply_serial_fft!(
     brfft_plan = brfft_plans_1D[j]      # FFT planned wrt nlon on ring
     k_grid = eachlayer(field)[k]        # Precomputed ring index (as a Cartesian index)
 
-    return if not_equator
+    if not_equator
         view(field.data, ilons, k_grid) .= brfft_plan * view(g_in, 1:nfreq, k, j)
     end
+    return nothing
 end
 
 """$(TYPEDSIGNATURES)

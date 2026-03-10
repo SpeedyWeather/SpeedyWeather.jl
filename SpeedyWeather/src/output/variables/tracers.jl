@@ -11,4 +11,4 @@
 end
 
 path(tracer::TracerOutput, simulation) =
-    simulation.diagnostic_variables.grid.tracers_grid[Symbol(tracer.name)]
+    simulation.variables.grid.tracers[Symbol(tracer.name)]

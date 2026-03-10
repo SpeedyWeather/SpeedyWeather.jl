@@ -66,10 +66,10 @@ function initialize!(feedback::Feedback, clock::Clock, model::AbstractModel)
     FEEDBACK_DT_IN_SEC[] = model.time_stepping.Δt_sec
     FEEDBACK_TIME[] = clock.time
     
-    # reset those to default (-1 not shown, 0 shown)
-    FEEDBACK_UMAX[] = feedback.show_umax ? 0 : -1
-    FEEDBACK_TMIN[] = feedback.show_temperature_range ? 0 : -1
-    FEEDBACK_TMAX[] = feedback.show_temperature_range ? 0 : -1
+    # reset those to default (-1 not shown)
+    FEEDBACK_UMAX[] = -1
+    FEEDBACK_TMIN[] = -1
+    FEEDBACK_TMAX[] = -1
 
     # reinitalize progress meter, minus one to exclude first_timesteps! which contain compilation
     # only do now for benchmark accuracy
@@ -91,14 +91,14 @@ end
 
 progress!(feedback::Feedback) = ProgressMeter.next!(feedback.progress_meter)
 
-function progress!(feedback::Feedback, progn::PrognosticVariables, diagn::DiagnosticVariables)
+function progress!(feedback::Feedback, vars::Variables)
     every_nsteps = feedback.progress_meter.core.check_iterations
     (; counter) = feedback.progress_meter.core
-    FEEDBACK_TIME[] = progn.clock.time
-    feedback.show_umax && mod(counter, every_nsteps) == 0 && max_speed(diagn)
-    feedback.show_temperature_range && mod(counter, every_nsteps) == 0 && temperature_range(diagn)
+    FEEDBACK_TIME[] = vars.prognostic.clock.time
+    feedback.show_umax && mod(counter, every_nsteps) == 0 && max_speed(vars)
+    feedback.show_temperature_range && mod(counter, every_nsteps) == 0 && temperature_range(vars)
     progress!(feedback)
-    feedback.debug && nan_detection!(feedback, progn)
+    feedback.debug && nan_detection!(feedback, vars)
     return nothing
 end
 
@@ -109,14 +109,15 @@ finalize!(F::Feedback) = ProgressMeter.finish!(F.progress_meter)
 
 """$(TYPEDSIGNATURES)
 Detect NaN (Not-a-Number, or Inf) in the prognostic variables."""
-function nan_detection!(feedback::Feedback, progn::PrognosticVariables)
-    feedback.nans_detected && return nothing            # escape immediately if nans already detected
-    i = feedback.progress_meter.counter                 # time step
-    GPUArrays.@allowscalar vor0 = progn.vor[2, end, 2]  # only check 1-0 mode of surface vorticity
-
+function nan_detection!(feedback::Feedback, vars::Variables)
+    feedback.nans_detected && return nothing                        # escape immediately if nans already detected
+    i = feedback.progress_meter.counter                             # time step
+    GPUArrays.@allowscalar vor0 = vars.prognostic.vor[2, end, 2]    # only check 1-0 mode of surface vorticity
+    
     # just check first harmonic, spectral transform propagates NaNs globally anyway
+    (; time) = vars.prognostic.clock                                # current time for feedback
     nans_detected_here = ~isfinite(vor0)
-    nans_detected_here && @warn "NaN or Inf detected at time step $i"
+    nans_detected_here && @warn "NaN or Inf detected at time step $i ($time)"
     return feedback.nans_detected = nans_detected_here
 end
 
@@ -172,15 +173,15 @@ function progress_string(t, sec_per_iter, dt_in_sec, U, Tmin, Tmax)
     return time * speed * umax * Trange
 end
 
-function max_speed(diagn::DiagnosticVariables)
-    hasproperty(diagn.grid, :u_grid) || return nothing
-    umin, umax = extrema(diagn.grid.u_grid)
+function max_speed(vars::Variables)
+    hasproperty(vars.grid, :u) || return nothing
+    umin, umax = extrema(vars.grid.u)
     return FEEDBACK_UMAX[] = max(abs(umin), abs(umax))
 end
 
-function temperature_range(diagn::DiagnosticVariables)
-    hasproperty(diagn.grid, :u_grid) || return nothing
-    tmin, tmax = extrema(diagn.grid.temp_grid)
+function temperature_range(vars::Variables)
+    hasproperty(vars.grid, :temp) || return nothing
+    tmin, tmax = extrema(vars.grid.temp)
     FEEDBACK_TMIN[] = tmin - 273.15f0
     return FEEDBACK_TMAX[] = tmax - 273.15f0
 end
@@ -202,7 +203,7 @@ end
 
 """$(TYPEDSIGNATURES)
 Initialize ParametersTxt by writing the model parameters (via defined show of model components) into a text file."""
-function initialize!(parameters_txt::ParametersTxt, progn, diagn, model)
+function initialize!(parameters_txt::ParametersTxt, vars, model)
 
     # escape in case of no output
     parameters_txt.write_only_with_output && (model.output.active || return nothing)
@@ -250,7 +251,7 @@ end
 
 """$(TYPEDSIGNATURES)
 Initializes the ProgressTxt callback by creating a progress.txt file and writing some initial information to it."""
-function initialize!(progress_txt::ProgressTxt, progn, diagn, model)
+function initialize!(progress_txt::ProgressTxt, vars, model)
     # escape in case of no output
     progress_txt.write_only_with_output && (model.output.active || return nothing)
 
@@ -261,7 +262,7 @@ function initialize!(progress_txt::ProgressTxt, progn, diagn, model)
     (; run_folder, run_path) = model.output
     SG = model.spectral_grid
     L = model.time_stepping
-    days = Second(progn.clock.period).value / (3600 * 24)
+    days = Second(vars.prognostic.clock.period).value / (3600 * 24)
 
     # create progress.txt file in run_????/
     file = open(joinpath(path, filename), "w")
@@ -281,7 +282,7 @@ end
 
 """$(TYPEDSIGNATURES)
 Writes the time stepping progress to the progress.txt file every `every_n_percent` % of time steps."""
-function callback!(progress_txt::ProgressTxt, progn, diagn, model)
+function callback!(progress_txt::ProgressTxt, vars, model)
     # escape in case of no output
     progress_txt.write_only_with_output && (model.output.active || return nothing)
 
@@ -290,8 +291,8 @@ function callback!(progress_txt::ProgressTxt, progn, diagn, model)
     (; file, every_n_percent) = progress_txt
 
     # occasionally write progress to txt file
-    return if (counter / n * 100 % 1) > ((counter + 1) / n * 100 % 1)
-        percent = round(Int, (counter + 1) / n * 100)             # % of time steps completed
+    if (counter / n * 100 % 1) > ((counter + 1) / n * 100 % 1)
+        percent = round(Int, (counter + 1) / n * 100)       # % of time steps completed
         if (percent % every_n_percent == 0)                 # write every p% step in txt
             write(file, @sprintf("\n%3d%%", percent))
             r = remaining_time(progress_meter)
@@ -305,11 +306,12 @@ function callback!(progress_txt::ProgressTxt, progn, diagn, model)
             flush(file)
         end
     end
+    return nothing
 end
 
 """$(TYPEDSIGNATURES)
 Finalizes the ProgressTxt callback by writing the total time taken to the progress.txt file and closing it."""
-function finalize!(progress_txt::ProgressTxt, progn, diagn, model)
+function finalize!(progress_txt::ProgressTxt, vars, model)
     # escape in case of no output
     progress_txt.write_only_with_output && (model.output.active || return nothing)
 

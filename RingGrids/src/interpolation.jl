@@ -162,8 +162,10 @@ Base.eltype(::AnvilInterpolator{NF}) where {NF} = NF
 grid_type(I::AnvilInterpolator) = typeof(I.geometry.grid)
 
 function Base.show(io::IO, L::AnvilInterpolator{NF}) where {NF}
-    println(io, "AnvilInterpolator{$NF} for $(L.geometry.grid)")
-    return print(io, "└ onto: $(L.locator.npoints_output) points")
+    NF_str = "{$NF}"
+    println(io, styled"{warning:AnvilInterpolator}{note:$NF_str} for $(L.geometry.grid)")
+    print(io, styled"└ {info:onto}: $(L.locator.npoints_output) points")
+    return nothing
 end
 
 # define to a <:AbstractInterpolator the corresponding Locator

@@ -14,8 +14,8 @@ CenteredVerticalAdvection(spectral_grid; order = 2) = CenteredVerticalAdvection{
 UpwindVerticalAdvection(spectral_grid; order = 5) = UpwindVerticalAdvection{spectral_grid.NF, (order + 1) ÷ 2}()
 WENOVerticalAdvection(spectral_grid) = WENOVerticalAdvection{spectral_grid.NF}()
 
-@inline retrieve_previous_time_step(variables, var) = getproperty(variables, Symbol(var, :_grid_prev))
-@inline retrieve_current_time_step(variables, var) = getproperty(variables, Symbol(var, :_grid))
+@inline retrieve_previous_time_step(variables, var) = getproperty(variables, Symbol(var, :_prev))
+@inline retrieve_current_time_step(variables, var) = getproperty(variables, var)
 
 @inline retrieve_time_step(::DiffusiveVerticalAdvection, variables, var) = retrieve_previous_time_step(variables, var)
 @inline retrieve_time_step(::DispersiveVerticalAdvection, variables, var) = retrieve_current_time_step(variables, var)
@@ -26,57 +26,52 @@ WENOVerticalAdvection(spectral_grid) = WENOVerticalAdvection{spectral_grid.NF}()
     return ntuple(i -> clamp(i + k - B - 1, 1, nlayers), 2B + 1)
 end
 
-function vertical_advection!(
-        diagn::DiagnosticVariables,
-        model::PrimitiveEquation,
-    )
+function vertical_advection!(vars::Variables, model)
+
     Δσ = model.geometry.σ_levels_thick
     advection_scheme = model.vertical_advection
-    (; σ_tend) = diagn.dynamics
+    (; w) = vars.dynamics
 
-    for var in (:u, :v, :temp)
-        ξ_tend = getproperty(diagn.tendencies, Symbol(var, :_tend_grid))
-        ξ = retrieve_time_step(advection_scheme, diagn.grid, var)
-        _vertical_advection!(ξ_tend, σ_tend, ξ, Δσ, advection_scheme)
-    end
-
-    if model isa PrimitiveWet   # advect humidity only with primitive wet core
-        ξ_tend = getproperty(diagn.tendencies, :humid_tend_grid)
-        ξ = retrieve_time_step(advection_scheme, diagn.grid, :humid)
-        _vertical_advection!(ξ_tend, σ_tend, ξ, Δσ, advection_scheme)
-    end
-
-    for tracer in values(model.tracers)
-        if tracer.active
-            ξ_tend = diagn.tendencies.tracers_tend_grid[tracer.name]
-            ξ = retrieve_time_step(advection_scheme, diagn.grid, :tracers)[tracer.name]
-            _vertical_advection!(ξ_tend, σ_tend, ξ, Δσ, advection_scheme)
+    for var in (:u, :v, :temp, :humid)
+        if haskey(vars.tendencies.grid, var)
+            ξ_tend = vars.tendencies.grid[var]
+            ξ = retrieve_time_step(advection_scheme, vars.grid, var)
+            _vertical_advection!(ξ_tend, w, ξ, Δσ, advection_scheme)
         end
     end
-    return
+
+    for (name, tracer) in model.tracers
+        if tracer.active
+            ξ_tend = vars.tendencies.tracers[Symbol(name, :_grid)]
+            ξ = retrieve_time_step(advection_scheme, vars.grid.tracers, name)
+            _vertical_advection!(ξ_tend, w, ξ, Δσ, advection_scheme)
+        end
+    end
+    return nothing
 end
 
 function _vertical_advection!(
         ξ_tend::AbstractField,      # tendency of quantity ξ
-        σ_tend::AbstractField,      # vertical velocity at k+1/2
+        w::AbstractField,           # vertical velocity at k+1/2
         ξ::AbstractField,           # ξ
         Δσ,                         # layer thickness on σ levels
         adv::VerticalAdvection      # vertical advection scheme of order B
     )
-    grids_match(ξ_tend, σ_tend, ξ) || throw(DimensionMismatch(ξ_tend, σ_tend, ξ))
+    grids_match(ξ_tend, w, ξ) || throw(DimensionMismatch(ξ_tend, w, ξ))
 
     nlayers = size(ξ, 2)
     arch = architecture(ξ_tend)
 
-    return launch!(
+    launch!(
         arch, RingGridWorkOrder, size(ξ_tend),
         vertical_advection_kernel!,
-        ξ_tend, σ_tend, ξ, Δσ, nlayers, adv
+        ξ_tend, w, ξ, Δσ, nlayers, adv
     )
+    return nothing
 end
 
 @kernel inbounds = true function vertical_advection_kernel!(
-        ξ_tend, σ_tend, ξ, @Const(Δσ), @Const(nlayers), adv
+        ξ_tend, w, ξ, @Const(Δσ), @Const(nlayers), adv
     )
     ij, k = @index(Global, NTuple)
 
@@ -88,14 +83,14 @@ end
 
     k_stencil = retrieve_stencil(k, nlayers, adv)
 
-    σ̇⁻ = σ_tend[ij, k⁻]
-    σ̇⁺ = σ_tend[ij, k⁺]
+    w⁻ = w[ij, k⁻]
+    w⁺ = w[ij, k⁺]
 
-    ξᶠ⁺ = reconstructed_at_face(ξ, ij, k_stencil[2:end], σ̇⁺, adv)
-    ξᶠ⁻ = reconstructed_at_face(ξ, ij, k_stencil[1:(end - 1)], σ̇⁻, adv)
+    ξᶠ⁺ = reconstructed_at_face(ξ, ij, k_stencil[2:end], w⁺, adv)
+    ξᶠ⁻ = reconstructed_at_face(ξ, ij, k_stencil[1:(end - 1)], w⁻, adv)
 
     # -= as the tendencies already contain the parameterizations
-    ξ_tend[ij, k] -= Δσₖ⁻¹ * (σ̇⁺ * ξᶠ⁺ - σ̇⁻ * ξᶠ⁻ - ξ[ij, k] * (σ̇⁺ - σ̇⁻))
+    ξ_tend[ij, k] -= Δσₖ⁻¹ * (w⁺ * ξᶠ⁺ - w⁻ * ξᶠ⁻ - ξ[ij, k] * (w⁺ - w⁻))
 end
 
 # 1st order upwind
@@ -108,55 +103,55 @@ end
 # 3rd order upwind
 @inline reconstructed_at_face(ξ, ij, k, u, ::UpwindVerticalAdvection{NF, 2}) where {NF} =
     ifelse(
-    u > 0, (2ξ[ij, k[1]] + 5ξ[ij, k[2]] - ξ[ij, k[3]]) / 6,
-    (2ξ[ij, k[4]] + 5ξ[ij, k[3]] - ξ[ij, k[2]]) / 6
+    u > 0, (2ξ[ij, k[1]] + 5ξ[ij, k[2]] - ξ[ij, k[3]]) * 1 // 6,
+    (2ξ[ij, k[4]] + 5ξ[ij, k[3]] - ξ[ij, k[2]]) * 1 // 6
 )
 
 # 5th order upwind
 @inline reconstructed_at_face(ξ, ij, k, u, ::UpwindVerticalAdvection{NF, 3}) where {NF} =
     ifelse(
-    u > 0, (2ξ[ij, k[1]] - 13ξ[ij, k[2]] + 47ξ[ij, k[3]] + 27ξ[ij, k[4]] - 3ξ[ij, k[5]]) / 60,
-    (2ξ[ij, k[6]] - 13ξ[ij, k[5]] + 47ξ[ij, k[4]] + 27ξ[ij, k[3]] - 3ξ[ij, k[2]]) / 60
+    u > 0, (2ξ[ij, k[1]] - 13ξ[ij, k[2]] + 47ξ[ij, k[3]] + 27ξ[ij, k[4]] - 3ξ[ij, k[5]]) * 1 // 60,
+    (2ξ[ij, k[6]] - 13ξ[ij, k[5]] + 47ξ[ij, k[4]] + 27ξ[ij, k[3]] - 3ξ[ij, k[2]]) * 1 // 60
 )
 
 # 2nd order centered
 @inline reconstructed_at_face(ξ, ij, k, u, ::CenteredVerticalAdvection{NF, 1}) where {NF} =
-    (ξ[ij, k[1]] + ξ[ij, k[2]]) / 2
+    (ξ[ij, k[1]] + ξ[ij, k[2]]) * 1 // 2
 
 # 4th order centered
 @inline reconstructed_at_face(ξ, ij, k, u, ::CenteredVerticalAdvection{NF, 2}) where {NF} =
-    (-ξ[ij, k[1]] + 7ξ[ij, k[2]] + 7ξ[ij, k[3]] - ξ[ij, k[4]]) / 12
+    (-ξ[ij, k[1]] + 7ξ[ij, k[2]] + 7ξ[ij, k[3]] - ξ[ij, k[4]]) * 1 // 12
 
-const ε = 1.0e-6
-const d₀ = 3 / 10
-const d₁ = 3 / 5
-const d₂ = 1 / 10
+const ε = 1 // 1_000_000    # = 1e-6 but number format flexible
+const d₀ = 3 // 10
+const d₁ = 3 // 5
+const d₂ = 1 // 10
 
-@inline weight_β₀(S, NF) = NF(13 / 12) * (S[1] - 2S[2] + S[3])^2 + NF(1 / 4) * (3S[1] - 4S[2] + S[3])^2
-@inline weight_β₁(S, NF) = NF(13 / 12) * (S[1] - 2S[2] + S[3])^2 + NF(1 / 4) * (S[1] - S[3])^2
-@inline weight_β₂(S, NF) = NF(13 / 12) * (S[1] - 2S[2] + S[3])^2 + NF(1 / 4) * (S[1] - 4S[2] + 3S[3])^2
+@inline weight_β₀(S) = 13 // 12 * (S[1] - 2S[2] + S[3])^2 + 1 // 4 * (3S[1] - 4S[2] + S[3])^2
+@inline weight_β₁(S) = 13 // 12 * (S[1] - 2S[2] + S[3])^2 + 1 // 4 * (S[1] - S[3])^2
+@inline weight_β₂(S) = 13 // 12 * (S[1] - 2S[2] + S[3])^2 + 1 // 4 * (S[1] - 4S[2] + 3S[3])^2
 
-@inline p₀(S) = (2S[1] + 5S[2] - S[3]) / 6 # downind stencil
-@inline p₁(S) = (-S[1] + 5S[2] + 2S[3]) / 6 # upwind stencil
-@inline p₂(S) = (2S[1] - 7S[2] + 11S[3]) / 6 # extrapolating stencil
+@inline p₀(S) = (2S[1] + 5S[2] - S[3]) * 1 // 6 # downind stencil
+@inline p₁(S) = (-S[1] + 5S[2] + 2S[3]) * 1 // 6 # upwind stencil
+@inline p₂(S) = (2S[1] - 7S[2] + 11S[3]) * 1 // 6 # extrapolating stencil
 
 @inline τ₅(β₀, β₁, β₂) = abs(β₂ - β₀)
 
-@inline function weno_reconstruction(S₀, S₁, S₂, NF)
-    β₀ = weight_β₀(S₀, NF)
-    β₁ = weight_β₁(S₁, NF)
-    β₂ = weight_β₂(S₂, NF)
+@inline function weno_reconstruction(S₀, S₁, S₂)
+    β₀ = weight_β₀(S₀)
+    β₁ = weight_β₁(S₁)
+    β₂ = weight_β₂(S₂)
 
-    w₀ = NF(d₀) * (1 + (τ₅(β₀, β₁, β₂) / (β₀ + NF(ε)))^2)
-    w₁ = NF(d₁) * (1 + (τ₅(β₀, β₁, β₂) / (β₁ + NF(ε)))^2)
-    w₂ = NF(d₂) * (1 + (τ₅(β₀, β₁, β₂) / (β₂ + NF(ε)))^2)
+    w₀ = d₀ * (1 + (τ₅(β₀, β₁, β₂) / (β₀ + ε))^2)
+    w₁ = d₁ * (1 + (τ₅(β₀, β₁, β₂) / (β₁ + ε))^2)
+    w₂ = d₂ * (1 + (τ₅(β₀, β₁, β₂) / (β₂ + ε))^2)
 
     w₀, w₁, w₂ = (w₀, w₁, w₂) ./ (w₀ + w₁ + w₂)
 
     return p₀(S₀) * w₀ + p₁(S₁) * w₁ + p₂(S₂) * w₂
 end
 
-@inline function reconstructed_at_face(ξ, ij, k, u, ::WENOVerticalAdvection{NF}) where {NF}
+@inline function reconstructed_at_face(ξ, ij, k, u, ::WENOVerticalAdvection)
     if u > 0
         S₀ = (ξ[ij, k[3]], ξ[ij, k[4]], ξ[ij, k[5]])
         S₁ = (ξ[ij, k[2]], ξ[ij, k[3]], ξ[ij, k[4]])
@@ -166,5 +161,5 @@ end
         S₁ = (ξ[ij, k[5]], ξ[ij, k[4]], ξ[ij, k[3]])
         S₂ = (ξ[ij, k[6]], ξ[ij, k[5]], ξ[ij, k[4]])
     end
-    return weno_reconstruction(S₀, S₁, S₂, NF)
+    return weno_reconstruction(S₀, S₁, S₂)
 end

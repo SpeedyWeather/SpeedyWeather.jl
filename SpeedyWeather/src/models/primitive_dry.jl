@@ -81,7 +81,7 @@ $(TYPEDFIELDS)"""
     sea_ice::SI = ThermodynamicSeaIce(spectral_grid)
     land::LA = DryLandModel(spectral_grid)
     solar_zenith::ZE = WhichZenith(spectral_grid, planet)
-    albedo::AL = DefaultAlbedo(spectral_grid)
+    albedo::AL = OceanLandAlbedo(spectral_grid)
 
     # PHYSICS/PARAMETERIZATIONS
     physics::Bool = true
@@ -133,8 +133,49 @@ $(TYPEDFIELDS)"""
     params::PV = Val(parameterizations)
 end
 
-prognostic_variables(::Type{<:PrimitiveDry}) = (:vor, :div, :temp, :pres)
-default_concrete_model(::Type{PrimitiveDry}) = PrimitiveDryModel
+function variables(::Type{<:PrimitiveDry})
+    return (
+        variables(BarotropicModel)...,
+        PrognosticVariable(:div, Spectral4D(2), desc = "Divergence", units = "1/s"),                # 2 for 2 leapfrog steps
+        PrognosticVariable(:temp, Spectral4D(2), desc = "Temperature", units = "K"),                # 2 for 2 leapfrog steps
+        PrognosticVariable(:pres, Spectral3D(2), desc = "Logarithm of surface pressure", units = "log(Pa)"),
+
+        GridVariable(:div, Grid3D(), desc = "Divergence", units = "1/s"),
+        GridVariable(:temp, Grid3D(), desc = "Temperature", units = "K"),
+        GridVariable(:pres, Grid2D(), desc = "Logarithm of surface pressure", units = ""),
+        GridVariable(:div_prev, Grid3D(), desc = "Divergence at previous time step", units = "1/s"),
+        GridVariable(:temp_prev, Grid3D(), desc = "Temperature at previous time step", units = "K"),
+        GridVariable(:pres_prev, Grid2D(), desc = "Logarithm of surface pressure at previous time step", units = ""),
+        GridVariable(:u_prev, Grid3D(), desc = "Zonal wind at previous time step", units = "m/s"),
+        GridVariable(:v_prev, Grid3D(), desc = "Meridional wind at previous time step", units = "m/s"),
+
+        TendencyVariable(:div, Spectral3D(), desc = "Tendency of divergence", units = "1/s²"),
+        TendencyVariable(:temp, Spectral3D(), desc = "Tendency of temperature", units = "K/s"),
+        TendencyVariable(:pres, Spectral2D(), desc = "Tendency of surface pressure", units = "log(Pa)/s"),
+        TendencyVariable(:div, Grid3D(), namespace = :grid, desc = "Tendency of divergence on the grid", units = "1/s²"),
+        TendencyVariable(:temp, Grid3D(), namespace = :grid, desc = "Tendency of temperature on the grid", units = "K/s"),
+        TendencyVariable(:pres, Grid2D(), namespace = :grid, desc = "Tendency of surface pressure on the grid", units = "log(Pa)/s"),
+
+        DynamicsVariable(:dpres_dx, Grid2D(), desc = "Zonal gradient of the logarithm of surface pressure"),
+        DynamicsVariable(:dpres_dy, Grid2D(), desc = "Meridional gradient of the logarithm of surface pressure"),
+        DynamicsVariable(:pres_flux, Grid3D(), desc = "Pressure gradient flux, (u, v) ⋅ ∇lnp_s"),
+        DynamicsVariable(:virtual_temperature, Spectral3D(), desc = "Virtual temperature", units = "K"),
+        DynamicsVariable(:u_mean_grid, Grid2D(), desc = "Vertically integrated zonal velocity", units = "m/s"),
+        DynamicsVariable(:v_mean_grid, Grid2D(), desc = "Vertically integrated meridional velocity", units = "m/s"),
+        DynamicsVariable(:div_mean_grid, Grid2D(), desc = "Vertically integrated divergence", units = "1/s"),
+        DynamicsVariable(:div_mean, Spectral2D(), desc = "Vertically integrated divergence", units = "1/s"),
+        DynamicsVariable(:div_sum_above, Grid3D(), desc = "Partially vertically integrated divergence, top to layer above", units = "1/s"),
+        DynamicsVariable(:pres_flux_sum_above, Grid3D(), desc = "Partially vertically integrated pressure gradient flux, top to layer above"),
+        DynamicsVariable(:w, Grid3D(), desc = "Vertical velocity, dσ/dt.", units = "1/s"),
+
+        ScratchVariable(:a, Grid3D(), desc = "Work array for dynamics", namespace = :grid),
+        ScratchVariable(:b, Grid3D(), desc = "Work array for dynamics", namespace = :grid),
+        ScratchVariable(:a_2D, Spectral2D(), desc = "Work array for dynamics"),
+        ScratchVariable(:b_2D, Spectral2D(), desc = "Work array for dynamics"),
+        ScratchVariable(:a_2D, Grid2D(), desc = "Work array for dynamics", namespace = :grid),
+        ScratchVariable(:b_2D, Grid2D(), desc = "Work array for dynamics", namespace = :grid),
+    )
+end
 
 """
 $(TYPEDSIGNATURES)
@@ -176,29 +217,19 @@ function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
     initialize!(model.stochastic_physics, model)
     initialize!(model.particle_advection, model)
 
-    # allocate prognostic and diagnostic variables
-    prognostic_variables = PrognosticVariables(model)
-    diagnostic_variables = DiagnosticVariables(model)
+    # allocate all variables
+    variables = Variables(model)
 
-    # initialize non-atmosphere prognostic variables
-    (; particles, ocean, land) = prognostic_variables
-    initialize!(particles, prognostic_variables, diagnostic_variables, model.particle_advection, model)
-    initialize!(ocean, prognostic_variables, diagnostic_variables, model.ocean, model)
-    initialize!(land, prognostic_variables, diagnostic_variables, model.land, model)
-
-    # set the initial conditions (may overwrite variables set in initialize! ocean/land)
-    initialize!(prognostic_variables, model.initial_conditions, model)
-    (; clock) = prognostic_variables
+    # set the time first
+    (; clock) = variables.prognostic
     clock.time = time       # set the current time
     clock.start = time      # and store the start time
 
-    # pack prognostic, diagnostic variables and model into a simulation
-    return Simulation(prognostic_variables, diagnostic_variables, model)
-end
+    # set all initial conditions for the ocean, seaice, land then atmosphere
+    initialize!(variables, model)
 
-"""$(TYPEDSIGNATURES)
-Extract the number of soil layers from the model."""
-@inline get_soil_layers(model::PrimitiveDryModel) = get_soil_layers(model.land)
+    return Simulation(variables, model)
+end
 
 """$(TYPEDSIGNATURES)
 A `model` is adapted to the GPU or CPU by wrapping some (but not all!)

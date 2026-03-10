@@ -20,20 +20,8 @@ The input may be:
 * A scalar `<: Number` (interpreted as a constant field in grid space)
 """
 function set!(
-        progn::PrognosticVariables,
+        vars::NamedTuple,
         geometry::Geometry;
-        u = nothing,
-        v = nothing,
-        vor = nothing,
-        div = nothing,
-        temp = nothing,
-        humid = nothing,
-        pres = nothing,
-        sea_surface_temperature = nothing,
-        sea_ice_concentration = nothing,
-        soil_temperature = nothing,
-        snow_depth = nothing,
-        soil_moisture = nothing,
         lf::Integer = 1,
         add::Bool = false,
         spectral_transform::Union{Nothing, SpectralTransform} = nothing,
@@ -41,37 +29,30 @@ function set!(
         static_func::Bool = true,
         kwargs...
     )
-    # ATMOSPHERE
-    isnothing(vor)   || set!(get_step(progn.vor, lf), vor, geometry, spectral_transform; add, static_func)
-    isnothing(div)   || set!(get_step(progn.div, lf), div, geometry, spectral_transform; add, static_func)
-    isnothing(temp)  || set!(get_step(progn.temp, lf), temp, geometry, spectral_transform; add, static_func)
-    isnothing(humid) || set!(get_step(progn.humid, lf), humid, geometry, spectral_transform; add, static_func)
-    isnothing(pres)  || set!(get_step(progn.pres, lf), pres, geometry, spectral_transform; add, static_func)
+    # special case for u,v setting vor, div
+    if :u in keys(kwargs) && :v in keys(kwargs)
+        (; vor, div) = vars
+        set_vordiv!(get_step(vor, lf), get_step(div, lf), kwargs[:u], kwargs[:v], geometry, spectral_transform; add, coslat_scaling_included, static_func)
+    elseif :u in keys(kwargs) || :v in keys(kwargs)
+        @warn "Only one of `u` and `v` provided, but both are needed to set `vor` and `div`. Skipping."
+    end
 
-    # or provide u, v instead of vor, div
-    isnothing(u) | isnothing(v) || set_vordiv!(get_step(progn.vor, lf), get_step(progn.div, lf), u, v, geometry, spectral_transform; add, coslat_scaling_included, static_func)
-
-    # OCEAN
-    isnothing(sea_surface_temperature)  || set!(progn.ocean.sea_surface_temperature, sea_surface_temperature, geometry, spectral_transform; add, static_func)
-    isnothing(sea_ice_concentration)    || set!(progn.ocean.sea_ice_concentration, sea_ice_concentration, geometry, spectral_transform; add, static_func)
-
-    # LAND
-    isnothing(soil_temperature)         || set!(progn.land.soil_temperature, soil_temperature, geometry, spectral_transform; add, static_func)
-    isnothing(snow_depth)               || set!(progn.land.snow_depth, snow_depth, geometry, spectral_transform; add, static_func)
-    isnothing(soil_moisture)            || set!(progn.land.soil_moisture, soil_moisture, geometry, spectral_transform; add, static_func)
-
-    # TRACERS
+    # normal case, search for varname in prognostic variables
     for varname in keys(kwargs)
-        if varname in keys(progn.tracers)
-            tracer_var = get_step(progn.tracers[varname], lf)
-            set!(tracer_var, kwargs[varname], geometry, spectral_transform; add, static_func)
+        if varname in (:u, :v)  # already handled in special case above
+            nothing
+        elseif varname in keys(vars)
+            var = vars[varname] isa LowerTriangularArray ? get_step(vars[varname], lf) : vars[varname]
+            set!(var, kwargs[varname], geometry, spectral_transform; add, static_func)
         else
-            throw(UndefVarError(varname))
+            # throw error if vanname can't be found and print existing variables
+            @warn "`$varname` not defined in variables NamedTuple with keys = $(keys(vars)). Skipping."
         end
     end
-    return
+    return nothing
 end
 
+set!(vars::Variables, args...; kwargs...) = set!(vars.prognostic, args...; kwargs...)
 
 # set LTA <- LTA
 function set!(
@@ -341,7 +322,7 @@ function set_vordiv!(
     v_ = coslat_scaling_included ? v : transform(RingGrids.scale_coslat⁻¹(transform(u, S)), S)
     radius = geometry.radius[]
 
-    return if size(vor) != size(u_) != size(v_)
+    if size(vor) != size(u_) != size(v_)
         u_new = zero(vor)
         copyto!(u_new, u_)
 
@@ -354,20 +335,33 @@ function set_vordiv!(
         curl!(vor, u_, v_, S; add, radius)
         divergence!(div, u_, v_, S; add, radius)
     end
+    return vor, div
 end
 
-"""
-$(TYPEDSIGNATURES)
+# if number provided for u, v then vor = div = 0
+function set_vordiv!(
+        vor::LowerTriangularArray,
+        div::LowerTriangularArray,
+        u::Number,  # this is a constant field, curl and div are zero
+        v::Number,  # this is a constant field, curl and div are zero
+        geometry::Geometry,
+        S::Union{Nothing, SpectralTransform} = nothing;
+        kwargs...
+)
+    vor .= 0    # curl of a constant is zero
+    div .= 0    # divergence of a constant is zero
+    return vor, div
+end
 
+"""$(TYPEDSIGNATURES)
 Sets properties of the simuluation `S`. Convenience wrapper to call the other concrete 
 `set!` methods. All `kwargs` are forwarded to these methods, which are documented 
-seperately. See their documentation for possible `kwargs`. 
-"""
+seperately. See their documentation for possible `kwargs`. """
 function set!(S::AbstractSimulation; kwargs...)
-    return set!(S.prognostic_variables, S.model.geometry; spectral_transform = S.model.spectral_transform, kwargs...)
+    return set!(S.variables, S.model.geometry; spectral_transform = S.model.spectral_transform, kwargs...)
 end
 
-function set!(progn::PrognosticVariables, model::AbstractModel; kwargs...)
-    progn.scale[] != 1 && @warn "Prognostic variables are scaled with $(progn.scale[]), but `set!` assumes unscaled variables."
-    return set!(progn, model.geometry; spectral_transform = model.spectral_transform, kwargs...)
+function set!(vars::Variables, model::AbstractModel; kwargs...)
+    vars.prognostic.scale[] != 1 && @warn "Prognostic variables are scaled with $(vars.prognostic.scale[]), but `set!` assumes unscaled variables."
+    return set!(vars, model.geometry; spectral_transform = model.spectral_transform, kwargs...)
 end

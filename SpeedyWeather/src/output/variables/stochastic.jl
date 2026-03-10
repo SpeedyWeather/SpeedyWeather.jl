@@ -12,4 +12,4 @@ Fields are: $(TYPEDFIELDS)"""
 end
 
 path(::RandomPatternOutput, simulation) =
-    simulation.diagnostic_variables.grid.random_pattern
+    simulation.variables.grid.random_pattern

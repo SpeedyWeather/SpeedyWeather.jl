@@ -25,10 +25,15 @@ initialize!(::AbstractModelComponent, ::AbstractModel) = nothing
 finalize!(::AbstractModelComponent, ::AbstractModel) = nothing
 
 # print all fields with type <: Number
-function Base.show(io::IO, P::AbstractModelComponent)
-    println(io, "$(typeof(P)) <: $(supertype(typeof(P)))")
+function Base.show(io::IO, P::AbstractModelComponent; values=true)
+    type_str = split("$(typeof(P))", "{", limit = 2)
+    type_itself = type_str[1]
+    type_params = length(type_str) == 2 ? ("{" * type_str[2]) : ""
+    type_params_short = length(type_params) > 30 ? first(type_params, 30) * "...}" : type_params
+    println(io, styled"{warning:$type_itself}{note:$type_params_short}" * " <: $(supertype(typeof(P)))")
     keys = propertynames(P)
-    return print_fields(io, P, keys)
+    print_fields(io, P, keys; values)
+    return nothing
 end
 
 """$(TYPEDSIGNATURES)
@@ -58,17 +63,21 @@ initialize!(model::AbstractModel, ps::Union{ComponentVector, SpeedyParams}; kwar
 function Base.show(io::IO, M::AbstractModel)
     properties = propertynames(M)
     n = length(properties)
-    s = "$(model_type(M)) <: $(model_class(M))"
+    Msize = prettymemory(Base.summarysize(M))
+    s = styled"{warning:$(model_type(M))}"*"{...} <: $(model_class(M)) " * styled"{note:($Msize)}"
     n == 0 ? print(io, s) : println(io, s)
     for (i, key) in enumerate(properties)
         val = getfield(M, key)
         s = i == n ? "└" : "├"  # choose ending └ for last property
         p = i == n ? print : println
-        a = "$s $key: $(typeof(val))"
-        a = textwidth(a) > 100 ? string(a[1:97], "...") : a  # truncate long strings
-        p(io, a)
+        t = split("$(typeof(val))", "{", limit = 2)
+        t1 = t[1]
+        t2 = length(t) == 2 ? ("{" * t[2]) : ""
+        a = "$s " * styled"{info:$key}"*"::$t1" * styled"{note:$t2}"
+        a_short = textwidth(a) > 75 ? first(a, 75) * "..." : a
+        p(io, a_short)
     end
-    return
+    return nothing
 end
 
 # Functions to get parameters and parameterization to
@@ -106,5 +115,7 @@ end
 @inline get_parameterizations(model::ShallowWater) = NamedTuple()
 @inline get_extra_parameterizations(model::ShallowWater) = NamedTuple()
 
-# default to 0 soil layers / no land model
-@inline get_soil_layers(model::AbstractModel) = 0
+"""$(TYPEDSIGNATURES)
+Extract the number of soil layers from the model. The fallback is 0 soil layers, i.e. no land model."""
+@inline get_soil_layers(model::AbstractModel) = (hasproperty(model, :land) && !isnothing(model.land)) ? get_nlayers(model.land) : 0
+@inline get_nlayers(model::AbstractModel) = model.spectral_grid.nlayers

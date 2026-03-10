@@ -13,9 +13,10 @@ function Base.show(io::IO, grid::AbstractGrid)
     digits = round(Int, log10(1 / res)) + 2
     average_resolution = Printf.@sprintf("%.*f˚", digits, res)
 
-    println(io, "$nlat-ring $Grid_")
-    println(io, "├ nlat_half=$nlat_half ($npoints points, ~$average_resolution, $full_or_reduced)")
-    return print(io, "└ architecture: $(grid.architecture)")
+    println(io, styled"$nlat-ring {warning:$Grid_}\{...\}")
+    println(io, styled"├ {info:nlat_half} = $nlat_half {note:($npoints points, ~$average_resolution, $full_or_reduced)}")
+    print(io, styled"└ {info:architecture} = $(grid.architecture)")
+    return nothing
 end
 
 ## TYPES
