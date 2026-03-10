@@ -3,6 +3,10 @@
 ## Unreleased
 
 - Move `get_asset` to RingGrids with NCDatasets extension; make `assets_url` and `version` kwargs [#996](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/996)
+- Small fixes to improve Enzyme CI [#995](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/995)
+- JuliaActions Cache upgraded to v3 [#1001](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1001)
+- Remove `@Const` from kernels [#1000](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1000)
+- Add CLAUDE.md with codebase summary for AI-assisted development [#999](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/999)
 - Get SpeedyWeatherAssets on the fly [#983](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/983)
 - Change from MIT to EUPL license [#992](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/992)
 
