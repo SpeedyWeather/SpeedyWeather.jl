@@ -83,7 +83,7 @@ variables(::SurfaceOceanHumidityFlux) = (
     ρ = vars.parameterizations.surface_air_density[ij]
     V₀ = vars.parameterizations.surface_wind_speed[ij]
     land_fraction = model.land_sea_mask.mask[ij]
-    surface_humid = vars.grid.humid_grid_prev[ij, surface]
+    surface_humid = vars.grid.humid_prev[ij, surface]
     sea_ice_concentration = haskey(vars.prognostic.ocean, :sea_ice_concentration) ?
         vars.prognostic.ocean.sea_ice_concentration[ij] : zero(SST)
 
@@ -146,7 +146,7 @@ variables(::SurfaceLandHumidityFlux) = (
     V₀ = vars.parameterizations.surface_wind_speed[ij]
     land_fraction = model.land_sea_mask.mask[ij]
     surface = model.geometry.nlayers            # indexing top to bottom
-    surface_humid = vars.grid.humid_grid_prev[ij, surface]
+    surface_humid = vars.grid.humid_prev[ij, surface]
 
     # drag coefficient either from SurfaceLandHumidityFlux or from a central drag coefficient
     d = vars.parameterizations.boundary_layer_drag[ij]

@@ -30,10 +30,7 @@ end
 
 initialize!(::LandGeometry, model::PrimitiveEquation) = nothing
 
-function Base.show(io::IO, geom::LandGeometry{V}) where {V}
-    println(io, "$(geom.nlayers)-layer LandGeometry{$V}")
-    return print(io, "└ layer_thickness: $(geom.layer_thickness)")
-end
+# Base.show(io::IO, geom::LandGeometry) =
 
 # because model components can be `nothing`, their constructor being `Nothing()`
 Base.Nothing(::SpectralGrid, ::LandGeometry) = Nothing()

@@ -142,8 +142,18 @@ $(TYPEDFIELDS)"""
     params::PV = Val(parameterizations)
 end
 
-prognostic_variables(::Type{<:PrimitiveWet}) = (:vor, :div, :temp, :humid, :pres)
-default_concrete_model(::Type{PrimitiveWet}) = PrimitiveWetModel
+function variables(::Type{<:PrimitiveWet})
+    return (
+        variables(PrimitiveDry)...,
+
+        # Add humidity
+        PrognosticVariable(:humid, Spectral4D(2), desc = "Specific humidity", units = "kg/kg"), # 2 for 2 leapfrog steps
+        GridVariable(:humid, Grid3D(), desc = "Humidity", units = "kg/kg"),
+        GridVariable(:humid_prev, Grid3D(), desc = "Specific humidity at previous time step", units = "kg/kg"),
+        TendencyVariable(:humid, Spectral3D(), desc = "Tendency of specific humidity", units = "kg/kg/s"),
+        TendencyVariable(:humid, Grid3D(), namespace = :grid, desc = "Tendency of specific humidity on the grid", units = "kg/kg/s"),
+    )
+end
 
 """
 $(TYPEDSIGNATURES)
@@ -187,24 +197,18 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
     initialize!(model.stochastic_physics, model)
     initialize!(model.particle_advection, model)
 
-    # allocate prognostic and diagnostic variables
-    prognostic_variables = PrognosticVariables(model)
-    diagnostic_variables = DiagnosticVariables(model)
+    # allocate all variables
+    variables = Variables(model)
 
-    # initialize non-atmosphere prognostic variables
-    (; particles, ocean, land) = prognostic_variables
-    initialize!(particles, prognostic_variables, diagnostic_variables, model.particle_advection, model)
-    initialize!(ocean, prognostic_variables, diagnostic_variables, model.ocean, model)
-    initialize!(land, prognostic_variables, diagnostic_variables, model.land, model)
-
-    # set the initial conditions (may overwrite variables set in initialize! ocean/land)
-    initialize!(prognostic_variables, model.initial_conditions, model)
-    (; clock) = prognostic_variables
+    # set the time first
+    (; clock) = variables.prognostic
     clock.time = time       # set the current time
     clock.start = time      # and store the start time
 
-    # pack prognostic, diagnostic variables and model into a simulation
-    return Simulation(prognostic_variables, diagnostic_variables, model)
+    # set all initial conditions for the ocean, seaice, land then atmosphere
+    initialize!(variables, model)
+
+    return Simulation(variables, model)
 end
 
 """$(TYPEDSIGNATURES)

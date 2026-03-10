@@ -24,23 +24,27 @@ Adapt.@adapt_structure SnowModel
 # generator function
 SnowModel(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothing; kwargs...) = SnowModel{SG.NF}(; kwargs...)
 
+function variables(::SnowModel)
+    return (
+        PrognosticVariable(:snow_depth, Grid2D(), namespace = :land, units = "m", desc = "Snow depth in equivalent liquid water height"),
+        PrognosticVariable(:soil_temperature, Land3D(), namespace = :land, units = "K", desc = "Soil temperature"),
+        ParameterizationVariable(:snow_melt_rate, Grid2D(), namespace = :land, units = "kg/m²/s", desc = "Snow melt rate"),
+    )
+end
+
 # initialize component
 initialize!(snow::SnowModel, model::PrimitiveEquation) = nothing
 
 # set initial conditions for snow depth in initial conditions
-function initialize!(
-        vars::Variables,
-        snow::SnowModel,
-        model::PrimitiveEquation,
-    )
-    return set!(vars.prognostic, model.geometry, snow_depth = 0)
-end
+initialize!(vars::Variables, snow::SnowModel, model::PrimitiveEquation) =
+    set!(vars.prognostic.land, model.geometry, snow_depth = 0)
 
 function timestep!(
         vars::Variables,
         snow::SnowModel,
         model::PrimitiveEquation,
     )
+
     Δt = model.time_stepping.Δt_sec
     (; snow_depth) = vars.prognostic.land                   # in equivalent liquid water height [m]
     (; soil_temperature) = vars.prognostic.land
@@ -59,11 +63,12 @@ function timestep!(
 
     params = (; melting_threshold, cₛ, z₁, Δt, ρ_water, Lᵢ, r⁻¹)
 
-    return launch!(
+    launch!(
         architecture(snow_depth), LinearWorkOrder, size(snow_depth), land_snow_kernel!,
         snow_depth, soil_temperature, snow_melt_rate, snow_fall_rate, mask,
         params,
     )
+    return nothing
 end
 
 @kernel inbounds = true function land_snow_kernel!(
@@ -114,12 +119,4 @@ end
         # Euler forward time step but cap at 0 depth to not melt more snow than available
         snow_depth[ij] = max(snow_depth[ij] + Δt * dsnow, 0)
     end
-end
-
-function variables(::SnowModel)
-    return (
-        PrognosticVariable(:snow_depth, Grid2D(), namespace = :land, units = "m", desc = "Snow depth in equivalent liquid water height"),
-        PrognosticVariable(:soil_temperature, Grid3D(), namespace = :land, units = "K", desc = "Soil temperature"),
-        ParameterizationVariable(:snow_melt_rate, Grid2D(), namespace = :land, units = "kg/m²/s", desc = "Snow melt rate"),
-    )
 end

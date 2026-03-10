@@ -40,8 +40,8 @@ and relaxes current vertical profiles to the adjusted references."""
     Δt = time_stepping.Δt_sec
 
     # use previous time step for more stable calculations
-    temp = vars.grid.temp_grid_prev
-    humid = vars.grid.humid_grid_prev
+    temp = vars.grid.temp_prev
+    humid = vars.grid.humid_prev
     geopotential = vars.grid.geopotential
     temp_tend = vars.tendencies.grid.temp
     humid_tend = vars.tendencies.grid.humid
@@ -55,8 +55,8 @@ and relaxes current vertical profiles to the adjusted references."""
     cₚ = atmosphere.heat_capacity               # heat capacity
 
     # use scratch arrays for temp_ref_profile, humid_ref_profile
-    temp_ref_profile = vars.dynamics.grid.a     # temperature [K] reference profile to adjust to
-    humid_ref_profile = vars.dynamics.grid.b    # specific humidity [kg/kg] profile to adjust to
+    temp_ref_profile = vars.scratch.grid.a      # temperature [K] reference profile to adjust to
+    humid_ref_profile = vars.scratch.grid.b     # specific humidity [kg/kg] profile to adjust to
 
     # CONVECTIVE CRITERIA AND FIRST GUESS RELAXATION
     level_zero_buoyancy = pseudo_adiabat!(ij, temp_ref_profile, temp, humid, geopotential, pₛ, σ, atmosphere)

@@ -13,7 +13,7 @@ initialize!(::TransparentShortwaveTransmissivity, ::AbstractModel) = nothing
         ::TransparentShortwaveTransmissivity,
         model,
     )
-    t = vars.scratch.a_grid
+    t = vars.scratch.grid.a
     nlayers = size(t, 2)
     for k in 1:nlayers
         t[ij, k] = one(eltype(t))
@@ -70,7 +70,7 @@ initialize!(::BackgroundShortwaveTransmissivity, ::AbstractModel) = nothing
     )
 
     # use scratch array for transmissivity t
-    t = vars.scratch.a_grid
+    t = vars.scratch.grid.a
     NF = eltype(t)
 
     (;

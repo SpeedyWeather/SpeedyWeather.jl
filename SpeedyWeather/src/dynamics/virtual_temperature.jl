@@ -30,19 +30,20 @@ function linear_virtual_temperature!(
         lf::Integer,
         model::PrimitiveEquation,
     )
-    Tᵥ = diagn.dynamics.virtual_temperature
+    Tᵥ = vars.dynamics.virtual_temperature
     μ = model.atmosphere.μ_virt_temp
-    (; temp_average) = vars.diagn
-    temp = get_step(vars.prognostic.temp, lf)
-    humid = get_step(vars.prognostic.humid, lf)
+    Tₖ = vars.grid.temp_average
+    T = get_step(vars.prognostic.temp, lf)
+    q = get_step(vars.prognostic.humid, lf)
 
     # TODO check that doing a non-linear virtual temperature in grid-point space
     # but a linear virtual temperature in spectral space to avoid another transform
     # does not cause any problems. Alternative do the transform or have a linear
     # virtual temperature in both grid and spectral space
     
-    # TODO: broadcast with LTA doesn't work here becasue of a broadcast conflict (Tₖ and humid are different dimensions and array types)
-    return @. temp_virt.data = temp.data + (temp_average' * μ) * humid.data
+    # TODO: broadcast with LTA doesn't work here becasue of a broadcast conflict
+    # (Tₖ and q are different dimensions and array types)
+    return @. Tᵥ.data = T.data + (Tₖ' * μ) * q.data
 end
 
 @inline virtual_temperature(T, q, A::AbstractWetAtmosphere) = virtual_temperature(T, q, A.μ_virt_temp)

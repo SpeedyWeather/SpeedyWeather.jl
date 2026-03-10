@@ -1,5 +1,5 @@
 for Var in (
-        :PrognosticVariable,
+        :PrognosticVariable,            # variable groups to define
         :GridVariable,
         :TendencyVariable,
         :DynamicsVariable,
@@ -9,6 +9,11 @@ for Var in (
     )
 
     @eval begin
+        """$(TYPEDSIGNATURES) A variable defined through its `name`, dimensions `dims` and optionally
+        its `units`, description `desc` and the `namespace` it's sorted under within a
+        variable group. This definition is only used to return an object to define that a given
+        model component wants to define a variable -- allocation and being sorted into the
+        `Variables` tree happens elsewhere."""
         @kwdef struct $Var{D, U} <: AbstractVariable{D}
             name::Symbol
             dims::D
@@ -101,20 +106,25 @@ function Base.show(io::IO, V::Variables)
 end
 
 # runic: off
+"""$(TYPEDSIGNATURES) Allocate all variables for a `model` as defined by its components.
+Filters out duplicates and sorts the variables into groups and namespaces."""
 function Variables(model::AbstractModel)
     all_vars = all_variables(model)     # one long tuple for all required variables of model and its components
-    prognostic        = initialize_variables(filter_variables(all_vars,       PrognosticVariable), model)
-    grid              = initialize_variables(filter_variables(all_vars,             GridVariable), model)
-    tendencies        = initialize_variables(filter_variables(all_vars,         TendencyVariable), model)
-    dynamics          = initialize_variables(filter_variables(all_vars,         DynamicsVariable), model)
-    parameterizations = initialize_variables(filter_variables(all_vars, ParameterizationVariable), model)
-    particles         = initialize_variables(filter_variables(all_vars,         ParticleVariable), model)
-    scratch           = initialize_variables(filter_variables(all_vars,          ScratchVariable), model)
+    prognostic        = allocate(filter_variables(all_vars,       PrognosticVariable), model)
+    grid              = allocate(filter_variables(all_vars,             GridVariable), model)
+    tendencies        = allocate(filter_variables(all_vars,         TendencyVariable), model)
+    dynamics          = allocate(filter_variables(all_vars,         DynamicsVariable), model)
+    parameterizations = allocate(filter_variables(all_vars, ParameterizationVariable), model)
+    particles         = allocate(filter_variables(all_vars,         ParticleVariable), model)
+    scratch           = allocate(filter_variables(all_vars,          ScratchVariable), model)
     return Variables(; prognostic, grid, tendencies, dynamics, parameterizations, particles, scratch)
 end
 # runic: on
 
-function initialize_variables(variables, model)
+"""$(TYPEDSIGNATURES) Allocates all variables within a group given a tuple of variables
+expected to be `<: AbstractVariable` definitions. Determines the namespaces,
+allocates the arrays with zeros and collects them into NamedTuples."""
+function allocate(variables, model)
     length(variables) == 0 && return NamedTuple()  # return empty NamedTuple if no variables to initialize
     namespaces = filter(k -> k != Symbol(), keys(variables))
     return merge(
@@ -140,6 +150,10 @@ variables(::Nothing) = ()                                   # to allow for model
 variables(::Any) = ()                                       # fallback for any component
 variables(model::AbstractModel) = variables(typeof(model))
 
+# fallbacks in case model components are Nothing
+initialize!(::Variables, ::Nothing, ::Any) = nothing
+timestep!(::Variables, ::Nothing, ::Any) = nothing
+
 """$(TYPEDSIGNATURES)
 Define variables needed by a model component. This is used to extract all variables from the model and to initialize them.
 The default is to return an empty tuple, but components can define their variables by extending this function for their type."""
@@ -161,6 +175,9 @@ end
 
 get_namespaces(variables::AbstractVariable...) = unique([v.namespace for v in variables])
 
+"""$(TYPEDSIGNATURES) Filters a tuple of variables `vars` by `VariableTyple`,
+removes duplicates such that the variable path remains unique. Returns a
+NamedTuple of the variable definitions (but the arrays aren't allocated here but in `allocate`)"""
 function filter_variables(vars, VariableType)
     vars = filter(v -> v isa VariableType, vars)    # filter by variable type
     vars = unique(v -> identifier(v), vars)         # remove duplicates by identifier (group+namespace+name)

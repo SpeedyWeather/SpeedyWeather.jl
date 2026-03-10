@@ -42,7 +42,7 @@ function set!(
         if varname in (:u, :v)  # already handled in special case above
             nothing
         elseif varname in keys(vars)
-            var = get_step(vars[varname], lf)
+            var = vars[varname] isa LowerTriangularArray ? get_step(vars[varname], lf) : vars[varname]
             set!(var, kwargs[varname], geometry, spectral_transform; add, static_func)
         else
             # throw error if vanname can't be found and print existing variables
