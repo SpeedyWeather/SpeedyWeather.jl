@@ -29,11 +29,7 @@ if VERSION <= v"1.11.0"
         progn_new = zero(progn)
         dprogn_new = one(progn) # seed
 
-        GC.gc()
-
         autodiff(Reverse, SpeedyWeather.timestep!, Const, Duplicated(progn_new, dprogn_new), Duplicated(diagn, d_diag), Const(dt), Duplicated(model, d_model), Const(lf1), Const(lf2))
-
-        GC.gc()
 
         @test sum(to_vec(dprogn_new)[1]) != 0
 
