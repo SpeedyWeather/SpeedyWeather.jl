@@ -166,7 +166,7 @@ function horizontal_diffusion!(
 end
 
 @kernel inbounds = true function _horizontal_diffusion_kernel!(
-        tendency, var, @Const(expl), @Const(impl), @Const(l_indices)
+        tendency, var, expl, impl, l_indices
     )
 
     I = @index(Global, Cartesian)

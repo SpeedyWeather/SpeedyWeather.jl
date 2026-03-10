@@ -117,7 +117,7 @@ function drag!(
 end
 
 @kernel inbounds = true function quadratic_drag_kernel!(
-        Fu, Fv, u, v, @Const(c)
+        Fu, Fv, u, v, c
     )
     ij = @index(Global, Linear)
 
@@ -286,7 +286,7 @@ function drag!(
 end
 
 @kernel inbounds = true function jet_drag_kernel!(
-        vor_tend, vor, ζ₀, @Const(r), @Const(k)
+        vor_tend, vor, ζ₀, r, k
     )
     lm = @index(Global, Linear)
     vor_tend[lm, k] -= r * (vor[lm, k] - ζ₀[lm])
