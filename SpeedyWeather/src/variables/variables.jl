@@ -124,26 +124,27 @@ end
 """$(TYPEDSIGNATURES) Allocates all variables within a group given a tuple of variables
 expected to be `<: AbstractVariable` definitions. Determines the namespaces,
 allocates the arrays with zeros and collects them into NamedTuples."""
-function allocate(variables, model)
-    length(variables) == 0 && return NamedTuple()  # return empty NamedTuple if no variables to initialize
-    namespaces = filter(k -> k != Symbol(), keys(variables))
-    return merge(
-        # variables without namespace identified by empty symbol Symbol() go directly into the main NamedTuple
-        # that way we have variables.prognostic.vor skipping the namespace between prognostic and vor
-        NamedTuple{Tuple(map(v -> v.name, variables[Symbol()]))}(Tuple(map(var -> zero(var, model), variables[Symbol()]))),
+function allocate(group, model)
+    length(group) == 0 && return NamedTuple()  # return empty NamedTuple if no variables to initialize
+    namespaces = filter(k -> k != Symbol(), tuple(keys(group)...))
 
-        # other variables grouped by namespace
-        # e.g. variables.prognostic.ocean.sea_surface_temperature, variables.prognostic.land.soil_moisture, etc.
-        NamedTuple{namespaces}(
-            Tuple(
-                map(
-                    ns ->
-                    NamedTuple{Tuple(map(v -> v.name, variables[ns]))}(Tuple(map(var -> zero(var, model), variables[ns])))
-                    , namespaces
-                )
+    # variables without namespace identified by empty symbol Symbol() go directly into the main NamedTuple
+    # that way we have variables.prognostic.vor skipping the namespace between prognostic and vor
+    nt1 = NamedTuple{Tuple(map(v -> v.name, group[Symbol()]))}(Tuple(map(var -> zero(var, model), group[Symbol()])))
+
+    # other variables grouped by namespace
+    # e.g. variables.prognostic.ocean.sea_surface_temperature, variables.prognostic.land.soil_moisture, etc.
+    nt2 = NamedTuple{namespaces}(
+        Tuple(
+            map(
+                ns ->
+                NamedTuple{Tuple(map(v -> v.name, group[ns]))}(Tuple(map(var -> zero(var, model), group[ns])))
+                , namespaces
             )
         )
     )
+
+    return merge(nt1, nt2)
 end
 
 variables(::Nothing) = ()                                   # to allow for model.component = nothing
@@ -177,20 +178,18 @@ get_namespaces(variables::AbstractVariable...) = unique([v.namespace for v in va
 
 """$(TYPEDSIGNATURES) Filters a tuple of variables `vars` by `VariableTyple`,
 removes duplicates such that the variable path remains unique. Returns a
-NamedTuple of the variable definitions (but the arrays aren't allocated here but in `allocate`)"""
+dictionary of the variable definitions (but the arrays aren't allocated here but in `allocate`)"""
 function filter_variables(vars, VariableType)
     vars = filter(v -> v isa VariableType, vars)    # filter by variable type
     vars = unique(v -> identifier(v), vars)         # remove duplicates by identifier (group+namespace+name)
 
-    # Split by namespace
-    namespaces = get_namespaces(vars...)
-    namespace_dict = Dict{Symbol, Tuple}()
+    namespaces = get_namespaces(vars...)            # Split by namespace
+    group = Dict{Symbol, Tuple}()                   # assemble the variable group
     for ns in namespaces
-        namespace_dict[ns] = Tuple([v for v in vars if v.namespace == ns])
+        group[ns] = Tuple([v for v in vars if v.namespace == ns])
     end
-
-    # Convert to NamedTuple with tuples instead of vectors
-    return NamedTuple{Tuple(namespaces)}(Tuple(namespace_dict[ns] for ns in namespaces))
+    
+    return group
 end
 
 """$(TYPEDSIGNATURES)
