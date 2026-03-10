@@ -1,11 +1,8 @@
-"""
-    $TYPEDEF
-
+"""$TYPEDEF
 Abstract type for all column-based parmaetrizations. Custom parametrizations are expected to 
 subtype this and implement the [`variables`](@ref), [`initialize!`](@ref), and [`parameterization!`](@ref) for it. In
 order to use the parameterization in a model, add it to the `parameterizations` of the model 
-at definition.
-"""
+at definition."""
 abstract type AbstractParameterization <: AbstractModelComponent end
 
 """Function that defines the actual parameterization of an `AbstractParameterization`.
@@ -22,9 +19,7 @@ parameterization!
 """$(TYPEDSIGNATURES) Fallback when setting `parameterization=nothing` in the model constructor."""
 parameterization!(ij, vars, parameterization::Nothing, model) = nothing
 
-"""
-    $(TYPEDSIGNATURES)
-
+"""$(TYPEDSIGNATURES)
 Initialize an `AbstractParameterization`. This is called once at when calling initialize!(model). 
 The default behaviour is to return `nothing`."""
 initialize!(parameterization::AbstractParameterization, model::AbstractModel) = nothing

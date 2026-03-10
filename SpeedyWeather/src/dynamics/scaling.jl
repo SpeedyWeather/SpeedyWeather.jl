@@ -15,15 +15,22 @@ end
 scale!(var::AbstractField, scale::Real) = (var .*= scale)
 
 """$(TYPEDSIGNATURES)
-Scale the tendencies inside `diagn` with scalar `scale`.
+Scale the tendencies of u, v, temp, humid with scalar `scale`.
 Intended use to scale the tendencies of the parameterizations
 by the radius for the dynamical core."""
-@propagate_inbounds function scale!(ij, vars::NamedTuple, scale::Real)
-    for var in vars
-        for k in eachlayer(var)
-            var[ij, k] *= scale
-        end
-    end
+@propagate_inbounds function scale_tendencies!(vars::NamedTuple, scale::Real)
+    haskey(vars, :u) && (vars.u .*= scale)
+    haskey(vars, :v) && (vars.v .*= scale)
+    haskey(vars, :temp) && (vars.temp .*= scale)
+    haskey(vars, :humid) && (vars.humid .*= scale)
+    return nothing
+end
+
+@propagate_inbounds function scale_tendencies!(ij, vars::NamedTuple, scale::Real)
+    haskey(vars, :u) && (for k in eachlayer(vars.u) vars.u[ij, k] *= scale end)
+    haskey(vars, :v) && (for k in eachlayer(vars.u) vars.u[ij, k] *= scale end)
+    haskey(vars, :temp) && (for k in eachlayer(vars.u) vars.u[ij, k] *= scale end)
+    haskey(vars, :humid) && (for k in eachlayer(vars.u) vars.u[ij, k] *= scale end)
     return nothing
 end
 

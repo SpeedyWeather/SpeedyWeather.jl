@@ -6,8 +6,8 @@ function parameterization_tendencies!(
     )
     # parameterizations with their own kernel
     (; time) = vars.prognostic.clock
-    cos_zenith!(vars, time, model)
-    reset_variables!(vars)
+    # cos_zenith!(vars, time, model)
+    # reset_variables!(vars)
 
     (; architecture, npoints) = model.spectral_grid
     if architecture isa Architectures.AbstractCPU
@@ -32,7 +32,7 @@ end
     _call_parameterizations!(ij, vars, parameterizations, model)
 
     # tendencies have to be scaled by the radius for the dynamical core
-    scale!(ij, vars.tendencies.grid, model.planet.radius)
+    scale_tendencies!(ij, vars.tendencies.grid, model.planet.radius)
 end
 
 # CPU without kernel, just a loop, change loop order compared to GPU though:
@@ -41,11 +41,9 @@ end
 function parameterization_tendencies_cpu!(vars, model)
     @inbounds _call_parameterizations_cpu!(vars, get_parameterizations(model), model)
 
-    radius = model.planet.radius
-    return @inbounds for ij in 1:model.geometry.npoints
-        # tendencies have to be scaled by the radius for the dynamical core
-        scale!(ij, vars.tendencies.grid, radius)
-    end
+    # tendencies have to be scaled by the radius for the dynamical core
+    @inbounds scale_tendencies!(vars.tendencies.grid, model.planet.radius)
+    return nothing
 end
 
 # Use @generated to unroll NamedTuple iteration at compile time for GPU compatibility

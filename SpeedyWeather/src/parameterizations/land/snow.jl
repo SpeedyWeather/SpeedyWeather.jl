@@ -58,7 +58,14 @@ function timestep!(
     (; melting_threshold) = snow
     r⁻¹ = inv(convert(eltype(snow_depth), Second(snow.runoff_time_scale).value))
 
-    snow_fall_rate = vars.parameterizations.snow_rate               # from precipitation schemes [m/s]
+    # reset in any case
+    vars.scratch.grid.a_2D .= 0
+    
+    # from precipitation schemes [m/s]
+    snow_fall_rate = haskey(vars.parameterizations, :snow_rate) ?
+        vars.parameterizations.snow_rate :
+        vars.scratch.grid.a_2D               
+    
     snow_melt_rate = vars.parameterizations.land.snow_melt_rate     # for soil moisture model
 
     params = (; melting_threshold, cₛ, z₁, Δt, ρ_water, Lᵢ, r⁻¹)
