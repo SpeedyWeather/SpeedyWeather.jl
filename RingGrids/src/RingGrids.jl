@@ -12,7 +12,7 @@ import LinearAlgebra
 # GPU
 import Adapt: Adapt, adapt, adapt_structure
 import GPUArrays
-import KernelAbstractions: KernelAbstractions, @kernel, @index, @Const, synchronize
+import KernelAbstractions: KernelAbstractions, @kernel, @index, synchronize
 
 # SPEEDYWEATHER SUBMODULES
 import SpeedyWeatherInternals.Architectures: Architectures, AbstractArchitecture, CPU, GPU,
