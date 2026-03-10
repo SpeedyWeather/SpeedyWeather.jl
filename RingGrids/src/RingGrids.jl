@@ -132,14 +132,6 @@ const DEFAULT_ARCHITECTURE = CPU
 export globe
 function globe end
 
-# ASSET DOWNLOADING
-export get_asset, ASSETS_URL, DEFAULT_ASSETS_VERSION
-
-# stubs extended by RingGridsNCDatasetsExt
-function _get_asset end
-function get_nc_variable_name end
-
-include("get_asset.jl")
 include("utility_functions.jl")
 
 # GENERAL
@@ -173,5 +165,14 @@ include("quadrature_weights.jl")
 include("interpolation.jl")
 include("vertices.jl")
 include("statistics.jl")
+
+# ASSET DOWNLOADING
+export get_asset, ASSETS_URL, DEFAULT_ASSETS_VERSION
+
+# stubs extended by RingGridsNCDatasetsExt
+function _get_asset end
+function get_nc_variable_name end
+
+include("get_asset.jl")
 
 end

@@ -3,9 +3,6 @@ module RingGridsNCDatasetsExt
 using RingGrids
 using NCDatasets
 
-"""$(TYPEDSIGNATURES)
-Search for a variable name `name` in `ncfile`. If `name` is empty, try to find a single variable
-that is not a dimension. If multiple candidates are found, throw an error."""
 function RingGrids.get_nc_variable_name(ncfile::NCDataset, name::String)
 
     if !haskey(ncfile, name) && name != ""
