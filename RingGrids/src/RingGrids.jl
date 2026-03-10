@@ -9,6 +9,10 @@ import Statistics: Statistics, mean
 import FastGaussQuadrature
 import LinearAlgebra
 
+# ASSET DOWNLOADING
+import Artifacts
+import Pkg
+
 # GPU
 import Adapt: Adapt, adapt, adapt_structure
 import GPUArrays
@@ -128,6 +132,14 @@ const DEFAULT_ARCHITECTURE = CPU
 export globe
 function globe end
 
+# ASSET DOWNLOADING
+export get_asset, ASSETS_URL, DEFAULT_ASSETS_VERSION
+
+# stubs extended by RingGridsNCDatasetsExt
+function _get_asset end
+function get_nc_variable_name end
+
+include("get_asset.jl")
 include("utility_functions.jl")
 
 # GENERAL
