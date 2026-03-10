@@ -174,6 +174,7 @@ include("physics/radiation/shortwave_transmissivity.jl")
 include("physics/radiation/clouds.jl")
 include("physics/radiation/longwave_radiation.jl")
 include("physics/radiation/longwave_transmissivity.jl")
+include("physics/radiation/greenhouse_gases.jl")
 include("physics/stochastic_physics.jl")
 
 # OCEAN AND LAND

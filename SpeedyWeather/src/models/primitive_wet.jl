@@ -41,6 +41,7 @@ $(TYPEDFIELDS)"""
         CV,     # <:AbstractConvection,
         SW,     # <:AbstractShortwave,
         LW,     # <:AbstractLongwave,
+        GHG,    # NamedTuple of <:AbstractGreenhouseGas,
         SP,     # <:AbstractStochasticPhysics,
         CP,     # <:AbstractParameterization
         TS,     # <:AbstractTimeStepper,
@@ -98,6 +99,7 @@ $(TYPEDFIELDS)"""
     @component convection::CV = BettsMillerConvection(spectral_grid)
     @component shortwave_radiation::SW = OneBandShortwave(spectral_grid)
     @component longwave_radiation::LW = OneBandLongwave(spectral_grid)
+    @component greenhouse_gases::GHG = (; co2 = ExponentialCO2(spectral_grid))
     @component stochastic_physics::SP = nothing
     @component custom_parameterization::CP = nothing
 
