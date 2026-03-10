@@ -167,13 +167,13 @@ function output!(
     end
 
     q = field_view(simulation.variables.grid.humid, :, nlayers)
-    Tᵥ = simulation.variables.scratch.a_2D_grid
+    Tᵥ = simulation.variables.scratch.grid.a_2D
 
     (; atmosphere) = simulation.model
     Tᵥ .= virtual_temperature.(T, q, atmosphere)
 
     # calculate mean sea-level pressure on model grid
-    mslp = simulation.variables.scratch.b_2D_grid
+    mslp = simulation.variables.scratch.grid.b_2D
     (; transform) = variable                    # to change units from log(Pa) to hPa
     @. mslp = transform(g * h / R_dry / Tᵥ + lnpₛ)    # Pa to hPa
 

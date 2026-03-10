@@ -24,13 +24,7 @@ with 0 (=sea) and 1 (=land). The surface fluxes will weight proportionally the f
 from sea and land surface temperatures. Note however, that the land-sea mask can declare
 grid points being (at least partially) ocean even though the sea surface temperatures
 aren't defined (=NaN) in that grid point. In that case, not flux is applied."""
-abstract type AbstractLandSeaMask end
-
-function Base.show(io::IO, L::AbstractLandSeaMask)
-    println(io, "$(typeof(L)) <: AbstractLandSeaMask")
-    keys = propertynames(L)
-    return print_fields(io, L, keys)
-end
+abstract type AbstractLandSeaMask <: AbstractModelComponent end
 
 function mask!(
         field::AbstractField,

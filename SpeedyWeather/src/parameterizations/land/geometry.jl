@@ -30,7 +30,5 @@ end
 
 initialize!(::LandGeometry, model::PrimitiveEquation) = nothing
 
-# Base.show(io::IO, geom::LandGeometry) =
-
 # because model components can be `nothing`, their constructor being `Nothing()`
 Base.Nothing(::SpectralGrid, ::LandGeometry) = Nothing()

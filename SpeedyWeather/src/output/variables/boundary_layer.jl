@@ -50,8 +50,8 @@ function output!(
     nlayers = size(u_or_v_grid, 2)
     u_or_v_bottom = field_view(u_or_v_grid, :, nlayers)
 
-    z_bottom = simulation.variables.scratch.a_2D_grid
-    u_or_v10 = simulation.variables.scratch.b_2D_grid
+    z_bottom = simulation.variables.scratch.grid.a_2D
+    u_or_v10 = simulation.variables.scratch.grid.b_2D
 
     # Compute z_bottom as z_surf + T_bottom * Δp_geopot / g, start with z_surf
     z_bottom .= max.(simulation.model.orography.orography, 0)   # [m] set negative values to zero
@@ -106,7 +106,7 @@ function output!(
     ~hastime(variable) && output.output_counter > 1 && return nothing
 
     # reuse scratch array to avoid allocations
-    Ts = simulation.variables.scratch.a_2D_grid
+    Ts = simulation.variables.scratch.grid.a_2D
 
     # Retrieve T_bottom
     T_grid = path(variable, simulation)

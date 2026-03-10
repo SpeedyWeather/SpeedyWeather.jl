@@ -1,6 +1,6 @@
-abstract type AbstractSolarDeclination end
-abstract type AbstractSolarTimeCorrection end
-abstract type AbstractZenith end
+abstract type AbstractSolarDeclination <:AbstractModelComponent end
+abstract type AbstractSolarTimeCorrection <: AbstractModelComponent end
+abstract type AbstractZenith <: AbstractModelComponent end
 
 """Coefficients to calculate the solar declination angle δ [radians] based on a simple
 sine function, with Earth's axial tilt as amplitude, equinox as phase shift.
@@ -8,6 +8,8 @@ $(TYPEDFIELDS)"""
 struct SinSolarDeclination{P} <: AbstractSolarDeclination
     planet::P
 end
+
+Base.show(io::IO, S::SinSolarDeclination) = show(io, S, values=false)
 
 """
 $(TYPEDSIGNATURES)
@@ -56,12 +58,6 @@ function (SD::SolarDeclination)(g)
     return a + s1 * sin1g + c1 * cos1g + s2 * sin2g + c2 * cos2g + s3 * sin3g + c3 * cos3g
 end
 
-function Base.show(io::IO, L::AbstractSolarDeclination)
-    println(io, "$(typeof(L)) <: AbstractSolarDeclination")
-    keys = propertynames(L)
-    return print_fields(io, L, keys)
-end
-
 """Coefficients for the solar time correction (also called
 Equation of time) which adjusts the solar hour to an oscillation
 of sunrise/set by about +-16min throughout the year."""
@@ -82,12 +78,6 @@ function (STC::SolarTimeCorrection)(g)
     sin1g, cos1g = sincos(g)
     sin2g, cos2g = sincos(2g)
     return deg2rad(a + s1 * sin1g + c1 * cos1g + s2 * sin2g + c2 * cos2g)
-end
-
-function Base.show(io::IO, L::AbstractSolarTimeCorrection)
-    println(io, "$(typeof(L)) <: AbstractSolarTimeCorrection")
-    keys = propertynames(L)
-    return print_fields(io, L, keys)
 end
 
 """
@@ -119,12 +109,6 @@ function cos_zenith!(vars::Variables, time::DateTime, model::PrimitiveEquation)
     (; cos_zenith) = vars.parameterizations
     cos_zenith!(cos_zenith, solar_zenith, time, geometry)
     return nothing
-end
-
-function Base.show(io::IO, L::AbstractZenith)
-    println(io, "$(typeof(L)) <: AbstractZenith")
-    keys = propertynames(L)
-    return print_fields(io, L, keys)
 end
 
 export SolarZenith

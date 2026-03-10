@@ -185,18 +185,7 @@ function OneBandGreyLongwave(
     return OneBandLongwave(transmissivity, radiative_transfer)
 end
 
-function Base.show(io::IO, M::OneBandLongwave)
-    println(io, "OneBandLongwave <: AbstractLongwave")
-    properties = propertynames(M)
-    n = length(properties)
-    for (i, key) in enumerate(properties)
-        val = getfield(M, key)
-        s = i == n ? "└" : "├"  # choose ending └ for last property
-        p = i == n ? print : println
-        p(io, "$s $key: $(typeof(val))")
-    end
-    return
-end
+Base.show(io::IO, M::OneBandLongwave) = Base.show(io, M, values=false)
 
 # initialize one after another
 function initialize!(radiation::OneBandLongwave, model::PrimitiveEquation)

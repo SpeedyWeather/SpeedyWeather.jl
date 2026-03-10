@@ -1,5 +1,5 @@
 abstract type AbstractOutput <: AbstractModelComponent end
-abstract type AbstractOutputVariable end
+abstract type AbstractOutputVariable <: AbstractModelComponent end
 
 # default number format for output
 const DEFAULT_OUTPUT_NF = Float32
@@ -444,15 +444,6 @@ function output!(
     )
     for var in values(output_variables)
         output!(output, var, simulation)
-    end
-    return
-end
-
-function Base.show(io::IO, outputvariable::AbstractOutputVariable)
-    print(io, "$(typeof(outputvariable)) <: SpeedyWeather.AbstractOutputVariable")
-    for field in propertynames(outputvariable)
-        value = getfield(outputvariable, field)
-        print(io, "\n├ $field::$(typeof(value)) = $value")
     end
     return
 end

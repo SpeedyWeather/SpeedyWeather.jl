@@ -1,4 +1,4 @@
-abstract type AbstractFeedback end
+abstract type AbstractFeedback <: AbstractModelComponent end
 
 export Feedback
 
@@ -40,12 +40,6 @@ $(TYPEDFIELDS)"""
 
     "[DERIVED] did NaNs occur in the simulation?"
     nans_detected::Bool = false
-end
-
-function Base.show(io::IO, F::AbstractFeedback)
-    println(io, "$(typeof(F)) <: AbstractFeedback")
-    keys = propertynames(F)
-    return print_fields(io, F, keys)
 end
 
 function Base.show(io::IO, P::ProgressMeter.Progress)

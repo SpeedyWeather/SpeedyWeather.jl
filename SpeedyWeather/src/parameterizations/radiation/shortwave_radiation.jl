@@ -98,18 +98,7 @@ function OneBandGreyShortwave(
     return OneBandShortwave(clouds, transmissivity, radiative_transfer)
 end
 
-function Base.show(io::IO, M::OneBandShortwave)
-    println(io, "OneBandShortwave <: AbstractShortwave")
-    properties = propertynames(M)
-    n = length(properties)
-    for (i, key) in enumerate(properties)
-        val = getfield(M, key)
-        s = i == n ? "└" : "├"  # choose ending └ for last property
-        p = i == n ? print : println
-        p(io, "$s $key: $(typeof(val))")
-    end
-    return
-end
+Base.show(io::IO, M::OneBandShortwave) = show(io, M, values=false)
 
 # initialize one after another
 function initialize!(radiation::OneBandShortwave, model::PrimitiveEquation)

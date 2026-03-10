@@ -1,4 +1,4 @@
-abstract type AbstractCallback end
+abstract type AbstractCallback <: AbstractModelComponent end
 const CALLBACK_DICT = Dict{Symbol, AbstractCallback}
 const RANDSTRING_LENGTH = 4
 
@@ -18,12 +18,6 @@ CallbackDict() = CALLBACK_DICT()
 """$(TYPEDSIGNATURES)
 Create Callback dictionary like normal dictionaries."""
 CallbackDict(pairs::Pair{Symbol, <:AbstractCallback}...) = CALLBACK_DICT(pairs...)
-
-function Base.show(io::IO, C::AbstractCallback)
-    println(io, "$(typeof(C)) <: AbstractCallback")
-    keys = propertynames(C)
-    return print_fields(io, C, keys)
-end
 
 # dummy callback
 export NoCallback
