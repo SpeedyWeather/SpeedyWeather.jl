@@ -29,7 +29,7 @@ function get_nc_variable_name(ncfile::NCDataset, name::String)
 end
 
 # lazy load from NCDataset into netCDF variable (actually CommonDataModel.CFVariable)
-function RingGrids._get_asset(path::String, name::String, ArrayType::Type{<:NCDataset}, FileFormat::Type{<:NCDataset}, fill_value)
+function RingGrids.load_asset(path::String, name::String, ArrayType::Type{<:NCDataset}, FileFormat::Type{<:NCDataset}, fill_value)
     ds = NCDataset(path)
     # TODO also read lat, lon from file and flip array in case it's not as expected
     target_name = get_nc_variable_name(ds, name)
@@ -37,8 +37,8 @@ function RingGrids._get_asset(path::String, name::String, ArrayType::Type{<:NCDa
 end
 
 # load from NetCDF into Array
-function RingGrids._get_asset(path::String, name::String, ArrayType::Type{<:Array}, FileFormat::Type{<:NCDataset}, fill_value)
-    v, ds = RingGrids._get_asset(path, name, NCDataset, FileFormat, fill_value)
+function RingGrids.load_asset(path::String, name::String, ArrayType::Type{<:Array}, FileFormat::Type{<:NCDataset}, fill_value)
+    v, ds = RingGrids.load_asset(path, name, NCDataset, FileFormat, fill_value)
     data = RingGrids.load_shape_preserving(v, Val(ndims(v)))
     if eltype(data) <: AbstractFloat    # exclude case of loading integer data, e.g. land-sea mask
         nc_fill = get(v.attrib, "_FillValue", fill_value)

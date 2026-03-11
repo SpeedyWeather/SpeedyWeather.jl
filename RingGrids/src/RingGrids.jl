@@ -167,10 +167,10 @@ include("vertices.jl")
 include("statistics.jl")
 
 # ASSET DOWNLOADING
-export get_asset, ASSETS_URL, DEFAULT_ASSETS_VERSION
+export get_asset, load_asset, ASSETS_URL, DEFAULT_ASSETS_VERSION
 
-# stub extended by RingGridsNCDatasetsExt
-function _get_asset end
+# load_asset: extension dispatch point implemented by RingGridsNCDatasetsExt (and future format extensions)
+function load_asset end
 
 include("get_asset.jl")
 

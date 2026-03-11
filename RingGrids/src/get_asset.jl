@@ -40,7 +40,7 @@ function get_asset(
     if !from_assets     # try to load locally
         if isfile(path) # check if path is local (custom input)
             try
-                return _get_asset(path, name, ArrayType, FileFormat, fill_value)
+                return load_asset(path, name, ArrayType, FileFormat, fill_value)
             catch e
                 throw("Local asset loading failed with: $e")
             end
@@ -83,12 +83,12 @@ function get_asset(
 
     asset_path = joinpath(Artifacts.artifact_path(hash), filename)
 
-    return _get_asset(asset_path, name, ArrayType, FileFormat, fill_value)
+    return load_asset(asset_path, name, ArrayType, FileFormat, fill_value)
 end
 
 # load from array into a RingGrid Field
-function _get_asset(path::String, name::String, ArrayType::Type{<:AbstractFullField}, FileFormat, fill_value)
-    data = _get_asset(path, name, Array, FileFormat, fill_value)        # first load as Array
+function load_asset(path::String, name::String, ArrayType::Type{<:AbstractFullField}, FileFormat, fill_value)
+    data = load_asset(path, name, Array, FileFormat, fill_value)        # first load as Array
     return ArrayType(data, input_as = Matrix)
 end
 
