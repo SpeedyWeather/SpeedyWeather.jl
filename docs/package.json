@@ -10,6 +10,7 @@
     "markdown-it-footnote": "^4.0.0",
     "markdown-it-mathjax3": "^4.3.2",
     "@mdit/plugin-mathjax": "^0.25.0",
-    "@mdit/plugin-tex": "^0.23.1"
+    "@mdit/plugin-tex": "^0.23.1",
+    "@nolebase/vitepress-plugin-enhanced-readabilities": "^2.0.0"
   }
 }
