@@ -1,4 +1,7 @@
 import { defineConfig } from 'vitepress'
+import { mathjaxPlugin } from './mathjax-plugin'
+
+const mathjax = mathjaxPlugin()
 
 const baseTemp = {
   base: 'REPLACE_ME_DOCUMENTER_VITEPRESS',
@@ -33,10 +36,19 @@ export default defineConfig({
   ignoreDeadLinks: true,
 
   markdown: {
+    config(md) {
+      mathjax.markdownConfig(md)
+    },
     theme: {
       light: 'github-light',
       dark: 'github-dark',
     },
+  },
+
+  vite: {
+    plugins: [
+      mathjax.vitePlugin,
+    ],
   },
 
   themeConfig: {
