@@ -3,7 +3,7 @@ module RingGridsNCDatasetsExt
 using RingGrids
 using NCDatasets
 
-function RingGrids.get_nc_variable_name(ncfile::NCDataset, name::String)
+function get_nc_variable_name(ncfile::NCDataset, name::String)
 
     if !haskey(ncfile, name) && name != ""
         # Helper to show user available var names
@@ -29,21 +29,21 @@ function RingGrids.get_nc_variable_name(ncfile::NCDataset, name::String)
 end
 
 # lazy load from NCDataset into netCDF variable (actually CommonDataModel.CFVariable)
-function RingGrids._get_asset(path::String, name::String, ArrayType::Type{<:NCDataset}, FileFormat::Type{<:NCDataset})
+function RingGrids._get_asset(path::String, name::String, ArrayType::Type{<:NCDataset}, FileFormat::Type{<:NCDataset}, fill_value)
     ds = NCDataset(path)
     # TODO also read lat, lon from file and flip array in case it's not as expected
-    target_name = RingGrids.get_nc_variable_name(ds, name)
+    target_name = get_nc_variable_name(ds, name)
     return ds[target_name], ds
 end
 
 # load from NetCDF into Array
-function RingGrids._get_asset(path::String, name::String, ArrayType::Type{<:Array}, FileFormat::Type{<:NCDataset})
-    v, ds = RingGrids._get_asset(path, name, NCDataset, FileFormat)
+function RingGrids._get_asset(path::String, name::String, ArrayType::Type{<:Array}, FileFormat::Type{<:NCDataset}, fill_value)
+    v, ds = RingGrids._get_asset(path, name, NCDataset, FileFormat, fill_value)
     data = RingGrids.load_shape_preserving(v, Val(ndims(v)))
     if eltype(data) <: AbstractFloat    # exclude case of loading integer data, e.g. land-sea mask
-        fill_value = get(v.attrib, "_FillValue", NaN)
+        nc_fill = get(v.attrib, "_FillValue", fill_value)
         # use === to include NaNs but also expect fill value to have same type as data
-        data[data .=== fill_value] .= NaN
+        data[data .=== nc_fill] .= fill_value
     end
     close(ds)
     return data

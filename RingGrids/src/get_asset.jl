@@ -23,6 +23,8 @@ the loaded data (in most cases into a `Field` subtype, determining the grid).
 `FileFormat` determines how to read the file; load NCDatasets.jl to enable reading NetCDF files.
 `assets_url` can be set to a custom URL for alternative asset repositories (e.g. for Terrarium).
 `version` is the version tag (a `VersionNumber`) or branch name (a `String`) to download from.
+`fill_value` is the value used to replace missing data (identified by the file's `_FillValue`
+attribute) in the loaded array; defaults to `NaN`.
 """
 function get_asset(
         path::String;
@@ -32,12 +34,13 @@ function get_asset(
         FileFormat = nothing,
         assets_url::String = ASSETS_URL,
         version = DEFAULT_ASSETS_VERSION,
+        fill_value = NaN,
     )
 
     if !from_assets     # try to load locally
         if isfile(path) # check if path is local (custom input)
             try
-                return _get_asset(path, name, ArrayType, FileFormat)
+                return _get_asset(path, name, ArrayType, FileFormat, fill_value)
             catch e
                 throw("Local asset loading failed with: $e")
             end
@@ -80,12 +83,12 @@ function get_asset(
 
     asset_path = joinpath(Artifacts.artifact_path(hash), filename)
 
-    return _get_asset(asset_path, name, ArrayType, FileFormat)
+    return _get_asset(asset_path, name, ArrayType, FileFormat, fill_value)
 end
 
 # load from array into a RingGrid Field
-function _get_asset(path::String, name::String, ArrayType::Type{<:AbstractFullField}, FileFormat)
-    data = _get_asset(path, name, Array, FileFormat)        # first load as Array
+function _get_asset(path::String, name::String, ArrayType::Type{<:AbstractFullField}, FileFormat, fill_value)
+    data = _get_asset(path, name, Array, FileFormat, fill_value)        # first load as Array
     return ArrayType(data, input_as = Matrix)
 end
 

@@ -169,9 +169,8 @@ include("statistics.jl")
 # ASSET DOWNLOADING
 export get_asset, ASSETS_URL, DEFAULT_ASSETS_VERSION
 
-# stubs extended by RingGridsNCDatasetsExt
+# stub extended by RingGridsNCDatasetsExt
 function _get_asset end
-function get_nc_variable_name end
 
 include("get_asset.jl")
 
