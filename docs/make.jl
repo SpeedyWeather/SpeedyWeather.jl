@@ -98,5 +98,4 @@ DocumenterVitepress.deploydocs(
     deploy_repo = "github.com/SpeedyWeather/SpeedyWeatherDocumentation",
     devbranch = "main",
     push_preview = true,
-    versions = ["stable" => "v^", "v#.#.#", "dev" => "dev"],
 )
