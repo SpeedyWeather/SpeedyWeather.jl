@@ -1,0 +1,150 @@
+/* SpeedyWeather.jl VitePress theme */
+
+/* =========================
+   Fonts
+   ========================= */
+
+@font-face {
+  font-family: JuliaMono-Regular;
+  src: url("https://cdn.jsdelivr.net/gh/cormullion/juliamono/webfonts/JuliaMono-Regular.woff2");
+}
+
+:root {
+  --vp-font-family-mono: JuliaMono-Regular, monospace;
+}
+
+pre,
+code {
+  font-family: "JuliaMono-Regular", monospace;
+  font-feature-settings: "calt" off;
+}
+
+/* =========================
+   Colors — SpeedyWeather teal/sky brand
+   ========================= */
+
+:root {
+  --vp-c-brand:   #0891b2;
+  --vp-c-brand-1: #06b6d4;
+  --vp-c-brand-2: #22d3ee;
+  --vp-c-brand-3: #0e7490;
+
+  --vp-home-hero-name-color: transparent;
+  --vp-home-hero-name-background: -webkit-linear-gradient(
+    120deg,
+    #0891b2 15%,
+    #06b6d4 50%,
+    #67e8f9 85%
+  );
+
+  --vp-home-hero-image-background-image: linear-gradient(
+    -145deg,
+    #06b6d440 20%,
+    #22d3ee70 55%,
+    #a5f3fc90 85%
+  );
+  --vp-home-hero-image-filter: blur(44px);
+}
+
+/* =========================
+   Brand buttons
+   ========================= */
+
+:root {
+  --vp-button-brand-border: #06b6d4;
+  --vp-button-brand-bg: #0891b2;
+  --vp-button-brand-text: #ffffff;
+  --vp-button-brand-hover-border: #22d3ee;
+  --vp-button-brand-hover-bg: #06b6d4;
+  --vp-button-brand-hover-text: #ffffff;
+  --vp-button-brand-active-border: #0e7490;
+  --vp-button-brand-active-bg: #0e7490;
+}
+
+/* =========================
+   Dark mode
+   ========================= */
+
+:root.dark {
+  --vp-c-brand: #22d3ee;
+  --vp-c-brand-1: #67e8f9;
+  --vp-c-brand-2: #22d3ee;
+  --vp-c-brand-3: #06b6d4;
+
+  --vp-home-hero-name-background: -webkit-linear-gradient(
+    120deg,
+    #22d3ee 10%,
+    #67e8f9 45%,
+    #a5f3fc 80%
+  );
+
+  --vp-home-hero-image-background-image: linear-gradient(
+    -45deg,
+    #0c1a1c 20%,
+    #06b6d4 50%,
+    #0c1014 80%
+  );
+  --vp-home-hero-image-filter: blur(56px);
+}
+
+:root.dark {
+  --vp-button-brand-border: #22d3ee;
+  --vp-button-brand-bg: #06b6d4;
+  --vp-button-brand-text: #ffffff;
+  --vp-button-brand-hover-border: #67e8f9;
+  --vp-button-brand-hover-bg: #22d3ee;
+  --vp-button-brand-hover-text: #042a33;
+}
+
+/* =========================
+   Code blocks
+   ========================= */
+
+:root {
+  --vp-code-bg: #f0fdff;
+  --vp-code-block-bg: #ecfeff;
+}
+
+:root.dark {
+  --vp-code-bg: #0c1a20;
+  --vp-code-block-bg: #0c1a20;
+}
+
+/* =========================
+   MathJax
+   ========================= */
+
+.mjx-scroll-wrapper {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  text-align: center;
+}
+
+mjx-container {
+  display: inline-block;
+  padding: 0.5rem 0;
+  margin: auto 2px -2px;
+  overflow: visible !important;
+  text-align: left;
+}
+
+mjx-container > svg {
+  display: inline-block;
+  height: auto;
+}
+
+mjx-container svg path {
+  fill: currentColor !important;
+  stroke: currentColor !important;
+}
+
+/* =========================
+   Accessibility
+   ========================= */
+
+:focus-visible {
+  outline: 2px solid var(--vp-c-brand);
+  outline-offset: 2px;
+}

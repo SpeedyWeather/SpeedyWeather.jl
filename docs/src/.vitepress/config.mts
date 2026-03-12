@@ -1,5 +1,7 @@
 import { defineConfig } from 'vitepress'
+import { tabsMarkdownPlugin } from 'vitepress-plugin-tabs'
 import { mathjaxPlugin } from './mathjax-plugin'
+import path from 'path'
 
 const mathjax = mathjaxPlugin()
 
@@ -37,7 +39,8 @@ export default defineConfig({
 
   markdown: {
     config(md) {
-      mathjax.markdownConfig(md)
+      md.use(tabsMarkdownPlugin);
+      mathjax.markdownConfig(md);
     },
     theme: {
       light: 'github-light',
@@ -49,6 +52,30 @@ export default defineConfig({
     plugins: [
       mathjax.vitePlugin,
     ],
+    define: {
+      __DEPLOY_ABSPATH__: JSON.stringify('REPLACE_ME_DOCUMENTER_VITEPRESS_DEPLOY_ABSPATH'),
+    },
+    resolve: {
+      alias: {
+        '@': path.resolve(__dirname, '../components'),
+      },
+    },
+    build: {
+      assetsInlineLimit: 0,
+    },
+    optimizeDeps: {
+      exclude: [
+        '@nolebase/vitepress-plugin-enhanced-readabilities/client',
+        'vitepress',
+        '@nolebase/ui',
+      ],
+    },
+    ssr: {
+      noExternal: [
+        '@nolebase/vitepress-plugin-enhanced-readabilities',
+        '@nolebase/ui',
+      ],
+    },
   },
 
   themeConfig: {
