@@ -183,7 +183,7 @@ function Base.show(
     return print(io, "└ clock: $(progn.clock.time)")
 end
 
-function copy_if_key_exists!(to, from, key)
+@inline function copy_if_key_exists!(to, from, key)
     # use hasproperty here as a union for haskey (works with NamedTuples) and hasfield (works with structs)
     return if hasproperty(to, key) && hasproperty(from, key)
         getfield(to, key) .= getfield(from, key)
@@ -192,7 +192,7 @@ end
 
 """$(TYPEDSIGNATURES)
 Copies entries of `progn_old` into `progn_new`."""
-function Base.copy!(progn_new::PrognosticVariables, progn_old::PrognosticVariables)
+@inline function Base.copy!(progn_new::PrognosticVariables, progn_old::PrognosticVariables)
 
     # Atmospheric variables
     copy_if_key_exists!(progn_new, progn_old, :vor)
