@@ -3,6 +3,19 @@
 ## Unreleased
 
 - MatrixSpectralTransform implemented [#952](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/952)
+- Small fixes to improve Enzyme CI [#995](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/995)
+- JuliaActions Cache upgraded to v3 [#1001](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1001)
+- Remove `@Const` from kernels [#1000](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1000)
+- Add CLAUDE.md with codebase summary for AI-assisted development [#999](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/999)
+- Get SpeedyWeatherAssets on the fly [#983](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/983)
+- Change from MIT to EUPL license [#992](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/992)
+
+## v0.18.1
+
+- Fix docs colatitude -> latitude terminology [#990](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/990)
+- Progress bar with additional information [#989](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/989)
+- Bug fix: Ozone absorption now deposited into stratospheric layers [#986](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/986)
+- Adds a drag term to winds above a certain speed limit [#987](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/987)
 
 ## v0.18
 

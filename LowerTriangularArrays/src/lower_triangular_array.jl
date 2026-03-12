@@ -699,7 +699,7 @@ function zero_last_degree!(L::LowerTriangularArray)
     return nothing
 end
 
-@kernel inbounds = true function zero_last_degree_kernel!(data, @Const(l_indices), lmax)
+@kernel inbounds = true function zero_last_degree_kernel!(data, l_indices, lmax)
     I = @index(Global, Cartesian)
 
     l = l_indices[I[1]]
