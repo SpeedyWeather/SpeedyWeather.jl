@@ -26,7 +26,7 @@ function _scale_lat!(field::AbstractField, v::AbstractVector)
     return field
 end
 
-@kernel inbounds = true function scale_lat_kernel!(field, v, @Const(whichring))
+@kernel inbounds = true function scale_lat_kernel!(field, v, whichring)
     ij, k = @index(Global, NTuple)
     j = whichring[ij]   # get ring index for grid point ij
     field[ij, k] *= v[j]

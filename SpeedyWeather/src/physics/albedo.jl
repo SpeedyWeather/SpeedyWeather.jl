@@ -117,17 +117,23 @@ export AlbedoClimatology
 
 """Albedo climatology loaded from netcdf file. Fields are $(TYPEDFIELDS)"""
 @kwdef struct AlbedoClimatology{GridVariable2D} <: AbstractAlbedo
-    "[OPTION] path to the folder containing the albedo file, pkg path default"
-    path::String = "SpeedyWeather.jl/input_data"
-
     "[OPTION] filename of albedo"
     file::String = "albedo.nc"
+
+    "[OPTION] path to the folder containing the soil moisture"
+    path::String = joinpath("data", "boundary_conditions", file)
+
+    "[OPTION] flag to check for soil moisture in SWA or locally"
+    from_assets::Bool = true
 
     "[OPTION] variable name in netcdf file"
     varname::String = "alb"
 
+    "[OPTION] SpeedyWeatherAssets version number"
+    version::VersionNumber = DEFAULT_ASSETS_VERSION
+
     "[OPTION] Grid the albedo file comes on"
-    file_Grid::Type{<:AbstractGrid} = FullGaussianGrid
+    FieldType::Type{<:AbstractField} = FullGaussianField
 
     "Albedo climatology"
     albedo::GridVariable2D
@@ -148,14 +154,15 @@ set!(albedo::AbstractAlbedo, args...; kwargs...) = set!(albedo.albedo, args...; 
 function initialize!(albedo::AlbedoClimatology, model::PrimitiveEquation)
 
     # LOAD NETCDF FILE
-    if albedo.path == "SpeedyWeather.jl/input_data"
-        path = joinpath(@__DIR__, "../../input_data", albedo.file)
-    else
-        path = joinpath(albedo.path, albedo.file)
-    end
-    ncfile = NCDataset(path)
-
-    a = on_architecture(model.architecture, albedo.file_Grid(ncfile[albedo.varname].var[:, :], input_as = Matrix))
+    a = get_asset(
+        albedo.path;
+        from_assets = albedo.from_assets,
+        name = albedo.varname,
+        ArrayType = albedo.FieldType,
+        FileFormat = NCDataset,
+        version = albedo.version
+    )
+    
     return interpolate!(albedo.albedo, a)
 end
 

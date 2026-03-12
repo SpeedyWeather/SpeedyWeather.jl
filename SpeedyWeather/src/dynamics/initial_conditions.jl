@@ -350,10 +350,10 @@ end
 @kernel inbounds = true function zonal_jet_kernel!(
         u_grid,
         η_perturb_grid,
-        @Const(lat),
-        @Const(lons),
-        @Const(coslat⁻¹),
-        @Const(whichring),
+        lat,
+        lons,
+        coslat⁻¹,
+        whichring,
         θ₀,
         θ₁,
         umax,
@@ -635,9 +635,9 @@ end
 
 @kernel inbounds = true function jablonowski_temperature_kernel!(
         temp_grid,
-        @Const(Tη),
-        @Const(φ),
-        @Const(σ_levels_full),
+        Tη,
+        φ,
+        σ_levels_full,
         η₀,
         u₀,
         R_dry,
@@ -767,7 +767,7 @@ end
 @kernel inbounds = true function homogeneous_temperature_kernel!(
         temp,
         temp_surf,
-        @Const(σ_levels_full),
+        σ_levels_full,
         R_dry,
         Γg⁻¹
     )
@@ -879,7 +879,7 @@ end
         humid_grid,
         temp_grid,
         pres_grid,
-        @Const(σ_levels_full),
+        σ_levels_full,
         relhumid_ref,
         atmosphere,
     )
