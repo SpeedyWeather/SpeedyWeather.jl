@@ -162,8 +162,8 @@ function initialize!(albedo::AlbedoClimatology, model::PrimitiveEquation)
         FileFormat = NCDataset,
         version = albedo.version
     )
-    
-    return interpolate!(albedo.albedo, on_architecture(model.architecture, a)
+
+    return interpolate!(albedo.albedo, on_architecture(model.architecture, a))
 end
 
 @propagate_inbounds albedo!(ij, diagn, progn, albedo::AlbedoClimatology, model) =

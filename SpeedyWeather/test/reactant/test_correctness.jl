@@ -243,5 +243,5 @@ function test_model(ModelType::Type; trunc = TRUNC, nsteps = NSTEPS, rtol = RTOL
 end
 
 # Run tests
-
+test_model(PrimitiveWetModel)
 test_model(BarotropicModel)
