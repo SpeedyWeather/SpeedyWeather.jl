@@ -470,6 +470,7 @@ find_field(x) = x
 find_field(::Tuple{}) = nothing
 find_field(a::AbstractField, rest) = a
 find_field(::Any, rest) = find_field(rest)
+find_field(ex::Base.Broadcast.Extruded) = find_field(ex.x)
 
 # allocation for broadcasting via similar, reusing grid from the first field of the broadcast arguments
 # e.g. field1 + field2 creates a new field that share the grid of field1

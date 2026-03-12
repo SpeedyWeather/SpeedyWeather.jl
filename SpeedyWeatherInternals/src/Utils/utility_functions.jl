@@ -137,8 +137,16 @@ Usage: `@maybe_jit model.architecture initialize!(model.geometry, model)`
 macro maybe_jit(arch, expr)
     if expr.head == :call
         f = expr.args[1]
-        args = expr.args[2:end]
-        return esc(:(_jit($arch, $f, $(args...))))
+        remaining = expr.args[2:end]
+        # when kwargs are present (f(a; k=v)), Julia puts a Expr(:parameters, ...) as the first remaining arg
+        if !isempty(remaining) && remaining[1] isa Expr && remaining[1].head == :parameters
+            kwargs = remaining[1].args
+            args = remaining[2:end]
+            kw_exprs = [k isa Expr ? Expr(:kw, k.args[1], k.args[2]) : Expr(:kw, k, k) for k in kwargs]
+            return esc(:(_jit($arch, $f, $(args...); $(kw_exprs...))))
+        else
+            return esc(:(_jit($arch, $f, $(remaining...))))
+        end
     else
         return esc(expr)
     end

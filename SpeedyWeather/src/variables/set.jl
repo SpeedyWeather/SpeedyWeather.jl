@@ -39,14 +39,15 @@ function set!(
         spectral_transform::Union{Nothing, AbstractSpectralTransform} = nothing,
         coslat_scaling_included::Bool = false,
         static_func::Bool = true,
+        scratch_field::Union{Nothing, AbstractField} = nothing,
         kwargs...
     )
     # ATMOSPHERE
-    isnothing(vor)   || set!(get_step(progn.vor, lf), vor, geometry, spectral_transform; add, static_func)
-    isnothing(div)   || set!(get_step(progn.div, lf), div, geometry, spectral_transform; add, static_func)
-    isnothing(temp)  || set!(get_step(progn.temp, lf), temp, geometry, spectral_transform; add, static_func)
-    isnothing(humid) || set!(get_step(progn.humid, lf), humid, geometry, spectral_transform; add, static_func)
-    isnothing(pres)  || set!(get_step(progn.pres, lf), pres, geometry, spectral_transform; add, static_func)
+    isnothing(vor)   || set!(get_step(progn.vor, lf), vor, geometry, spectral_transform; add, static_func, scratch_field)
+    isnothing(div)   || set!(get_step(progn.div, lf), div, geometry, spectral_transform; add, static_func, scratch_field)
+    isnothing(temp)  || set!(get_step(progn.temp, lf), temp, geometry, spectral_transform; add, static_func, scratch_field)
+    isnothing(humid) || set!(get_step(progn.humid, lf), humid, geometry, spectral_transform; add, static_func, scratch_field)
+    isnothing(pres)  || set!(get_step(progn.pres, lf), pres, geometry, spectral_transform; add, static_func, scratch_field)
 
     # or provide u, v instead of vor, div
     isnothing(u) | isnothing(v) || set_vordiv!(get_step(progn.vor, lf), get_step(progn.div, lf), u, v, geometry, spectral_transform; add, coslat_scaling_included, static_func)
@@ -107,9 +108,15 @@ function set!(
     if isnothing(S)
         specs = transform(field)
     else
-        # convert to number format in S, needed for FFTW
-        field = convert.(eltype(S), field)
-        specs = transform(field, S)
+        # TODO: NF convert removed becaue of problems with Reactant, reimplement it
+
+        # only allocate temporary array if we need to transform to a different truncation
+        if var.spectrum == S.spectrum
+            transform!(var, field, S)
+            return nothing
+        else
+            specs = transform(field, S)
+        end
     end
     return set!(var, specs; add, kwargs...)
 end
@@ -121,10 +128,11 @@ function set!(
         geometry::Geometry,
         S::Union{AbstractSpectralTransform, Nothing} = nothing;
         add::Bool = false,
+        scratch_field::Union{AbstractField, Nothing} = nothing,
         kwargs...,
     )
     (; grid, nlayers, NF) = geometry.spectral_grid
-    field = ndims(var) == 1 ? zeros(NF, grid) : zeros(NF, grid, nlayers)
+    field = isnothing(scratch_field) ? (ndims(var) == 1 ? zeros(NF, grid) : zeros(NF, grid, nlayers)) : scratch_field
     set!(field, f, geometry, S; add = false, kwargs...)
     return set!(var, field, geometry, S; add, kwargs...)
 end
@@ -193,11 +201,15 @@ function set!(
         S::Union{Nothing, AbstractSpectralTransform} = nothing;
         add::Bool = false,
         static_func = true,
+        kwargs...
     )
     (; londs, latds, σ_levels_full) = geometry
 
-    # on GPU no dynamically generated function are allowd in kernels, transfer them to CPU and back
-    if typeof(architecture(var)) <: GPU && static_func == false
+    # Reactant: use broadcasting (no KA kernel, no scalar indexing)
+    if typeof(architecture(var)) <: ReactantDevice
+        _set_function_3d_broadcast!(var, f, londs, latds, σ_levels_full; add)
+        # on GPU no dynamically generated function are allowd in kernels, transfer them to CPU and back
+    elseif typeof(architecture(var)) <: GPU && static_func == false
         arch_cpu = CPU()
 
         var_cpu = on_architecture(arch_cpu, var)
@@ -223,6 +235,23 @@ end
 @kernel function set_field_3d_kernel!(var, londs, latds, σ_levels_full, f, kernel_func)
     ij, k = @index(Global, NTuple)
     var[ij, k] = kernel_func(var[ij, k], f(londs[ij], latds[ij], σ_levels_full[k]))
+end
+
+# Reactant-compatible broadcasting version: no KA kernel, no scalar indexing
+function _set_function_3d_broadcast!(
+        var::AbstractField, f::Function,
+        londs::AbstractVector, latds::AbstractVector, σ_levels_full::AbstractVector;
+        add::Bool = false,
+    )
+    # reshape σ for broadcasting: londs/latds are (npoints,), σ_row is (1, nlayers)
+    σ_row = reshape(σ_levels_full, 1, :)
+    val = f.(londs, latds, σ_row)
+    if add
+        var.data .= var.data .+ val
+    else
+        var.data .= val
+    end
+    return var
 end
 
 # if geometry available

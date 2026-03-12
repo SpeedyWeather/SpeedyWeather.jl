@@ -337,7 +337,7 @@ and a Legendre Transform in the meridional direction exploiting symmetries. The 
 number format-flexible but `field` and the spectral transform `S` have to have the same number format.
 Uses the precalculated arrays, FFT plans and other constants in the SpectralTransform struct `S`.
 The spectral transform is grid-flexible as long as `field.grid` and `S.grid` match."""
-transform!(                                 # SPECTRAL TO GRID
+Base.@propagate_inbounds transform!(                                 # SPECTRAL TO GRID
     field::AbstractField,                   # gridded output
     coeffs::LowerTriangularArray,           # spectral coefficients input
     S::AbstractSpectralTransform;           # precomputed transform

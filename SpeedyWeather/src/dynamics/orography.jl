@@ -195,6 +195,7 @@ function initialize!(
 
     (; orography, surface_geopotential, scale) = orog
     (; gravity) = P
+    (; architecture) = S
 
     # load orography from file
     field = get_asset(
@@ -220,11 +221,14 @@ function initialize!(
         truncation = round(Int, trunc * (1 - orog.smoothing_fraction))
         c = orog.smoothing_strength
         power = orog.smoothing_power
-        SpeedyTransforms.spectral_smoothing!(surface_geopotential, c; power, truncation)
+        @maybe_jit architecture SpeedyTransforms.spectral_smoothing!(surface_geopotential, c; power, truncation)
     end
 
-    transform!(orography, surface_geopotential, S)                  # to grid-point space
+    # For
+    inbounds_transform!(orography, surface_geopotential, S) = @inbounds transform!(orography, surface_geopotential, S)
+    @maybe_jit architecture inbounds_transform!(orography, surface_geopotential, S)
+
     surface_geopotential .*= gravity                                # turn orography into surface geopotential
-    SpeedyTransforms.spectral_truncation!(surface_geopotential)     # set the lmax+1 harmonics to zero
+    @maybe_jit architecture SpeedyTransforms.spectral_truncation!(surface_geopotential)     # set the lmax+1 harmonics to zero
     return nothing
 end

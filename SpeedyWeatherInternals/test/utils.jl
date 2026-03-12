@@ -53,3 +53,15 @@ end
     @test readable_secs(1.23) == CompoundPeriod(Second(1), Millisecond(230))
     @test readable_secs(0.123) == CompoundPeriod(Millisecond(120))
 end
+
+@testset "@maybe_jit without Reactant" begin
+    # just test that it works without error, even with kwargs
+    A = rand(10, 10)
+    arch = SpeedyWeather.CPU()
+
+    res = @maybe_jit arch sum(A)
+    @test res == sum(A)
+
+    res2 = @maybe_jit arch sum(A; dims = 1)
+    @test res2 == sum(A; dims = 1)
+end

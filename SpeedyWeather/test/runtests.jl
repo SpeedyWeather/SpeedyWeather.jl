@@ -20,6 +20,7 @@ if !FLAG_EXTENDED_TESTS && !FLAG_ENZYME_TESTS
     # GENERAL
     include("spectral_grid.jl")
     include("parameters.jl")
+    include("input_data.jl")
 
     # GPU/KERNELABSTRACTIONS
     include("GPU/kernelabstractions.jl")
