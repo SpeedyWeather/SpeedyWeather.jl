@@ -91,24 +91,26 @@ and writes them to the prognostic variables.
 Fields and options are
 $(TYPEDFIELDS)"""
 @kwdef struct SeasonalOceanClimatology{NF, Grid, GridVariable3D} <: AbstractOcean
-
     "Grid used for the model"
     grid::Grid
 
-    "[OPTION] Path to the folder containing the sea surface temperatures, pkg path default"
-    path::String = "SpeedyWeather.jl/input_data"
-
     "[OPTION] Filename of sea surface temperatures"
     file::String = "sea_surface_temperature.nc"
+
+    "[OPTION] path to the folder containing the sst"
+    path::String = joinpath("data", "boundary_conditions", file)
+
+    "[OPTION] flag to check for sst in SWA or locally"
+    from_assets::Bool = true
+
+    "[OPTION] SpeedyWeatherAssets version number"
+    version::VersionNumber = DEFAULT_ASSETS_VERSION
 
     "[OPTION] Variable name in netcdf file"
     varname::String = "sst"
 
     "[OPTION] Grid the sea surface temperature file comes on"
-    file_Grid::Type{<:AbstractGrid} = FullGaussianGrid
-
-    "[OPTION] The missing value in the data respresenting land"
-    missing_value::NF = NaN
+    FieldType::Type{<:AbstractField} = FullGaussianField
 
     # to be filled from file
     "Monthly sea surface temperatures [K], interpolated onto Grid"
@@ -122,11 +124,26 @@ function SeasonalOceanClimatology(SG::SpectralGrid; kwargs...)
 end
 
 function initialize!(ocean::SeasonalOceanClimatology, model::PrimitiveEquation)
-    load_from_netcdf!(
-        ocean.monthly_temperature, ocean.path, ocean.file, ocean.varname;
-        file_Grid = ocean.file_Grid, missing_value = ocean.missing_value,
-        architecture = model.architecture
+    (; monthly_temperature) = ocean
+
+    sst = get_asset(
+        ocean.path;
+        from_assets = ocean.from_assets,
+        name = ocean.varname,
+        ArrayType = ocean.FieldType,
+        FileFormat = NCDataset,
+        version = ocean.version
     )
+
+    # transfer to architecture of model if needed
+    sst = on_architecture(model.architecture, sst)
+
+    @boundscheck fields_match(monthly_temperature, sst, vertical_only = true) ||
+        throw(DimensionMismatch(monthly_temperature, sst))
+
+    # create interpolator from grid in file to grid used in model
+    interp = RingGrids.interpolator(monthly_temperature, sst, NF = Float32)
+    interpolate!(monthly_temperature, sst, interp)
     return nothing
 end
 
@@ -190,17 +207,23 @@ and the ocean time is set with `initialize!(model, time=time)`.
 Fields and options are
 $(TYPEDFIELDS)"""
 @kwdef struct ConstantOceanClimatology <: AbstractOcean
-    "[OPTION] path to the folder containing the land-sea mask file, pkg path default"
-    path::String = "SpeedyWeather.jl/input_data"
-
     "[OPTION] filename of sea surface temperatures"
     file::String = "sea_surface_temperature.nc"
+
+    "[OPTION] path to the folder containing the sst"
+    path::String = joinpath("data", "boundary_conditions", file)
+
+    "[OPTION] flag to check for sst in SWA or locally"
+    from_assets::Bool = true
+
+    "[OPTION] SpeedyWeatherAssets version number"
+    version::VersionNumber = DEFAULT_ASSETS_VERSION
 
     "[OPTION] Variable name in netcdf file"
     varname::String = "sst"
 
     "[OPTION] Grid the sea surface temperature file comes on"
-    file_Grid::Type{<:AbstractGrid} = FullGaussianGrid
+    FieldType::Type{<:AbstractField} = FullGaussianField
 
     "[OPTION] The missing value in the data respresenting land"
     missing_value::Float64 = NaN
@@ -221,14 +244,15 @@ function initialize!(
         model::PrimitiveEquation,
     ) where {PrognosticVariablesOcean}
     # create a seasonal model, initialize it and the variables
-    (; path, file, varname, file_Grid, missing_value) = ocean_model
+    (; path, file, varname, FieldType) = ocean_model
     (; NF, GridVariable3D, grid) = model.spectral_grid
     seasonal_model = SeasonalOceanClimatology{NF, typeof(grid), GridVariable3D}(;
-        grid, path, file, varname, file_Grid, missing_value
+        grid, path, file, varname, FieldType
     )
     initialize!(seasonal_model, model)
-    return initialize!(ocean, progn, diagn, seasonal_model, model)
+    initialize!(ocean, progn, diagn, seasonal_model, model)
     # (seasonal model will be garbage collected hereafter)
+    return nothing
 end
 
 function timestep!(

@@ -225,7 +225,7 @@ end
 # Kernel for solar zenith calculation with daily cycle
 @kernel inbounds = true function solar_zenith_kernel!(
         cos_zenith,
-        @Const(solar_hour_angle_0E), @Const(sinδ), @Const(cosδ), @Const(sinlat), @Const(coslat), @Const(lons), @Const(whichring)
+        solar_hour_angle_0E, sinδ, cosδ, sinlat, coslat, lons, whichring
     )
 
     ij = @index(Global, Linear)
@@ -291,7 +291,7 @@ end
 # Kernel for seasonal solar zenith calculation (daily average)
 @kernel inbounds = true function solar_zenith_season_kernel!(
         cos_zenith,
-        @Const(δ), @Const(sinδ), @Const(cosδ), @Const(sinlat), @Const(coslat), @Const(lat), @Const(whichring)
+        δ, sinδ, cosδ, sinlat, coslat, lat, whichring
     )
 
     ij = @index(Global, Linear)

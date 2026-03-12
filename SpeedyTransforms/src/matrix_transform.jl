@@ -79,9 +79,10 @@ function MatrixSpectralTransform(
     field2D = zeros(NF, grid_cpu)
     coeffs2D = zeros(Complex{NF}, spectrum_cpu)
 
-    progress = ProgressMeter.Progress(length(field2D); dt = 2, desc = "Precalculate matrices:")
-    forward_matrix!(forward, S, field2D, coeffs2D, progress)
-    backward_matrix!(backward, forward)
+    progress_fwd = ProgressMeter.Progress(length(field2D); dt = 2, desc = "Precalculate forward matrix:")
+    forward_matrix!(forward, S, field2D, coeffs2D, progress_fwd)
+    progress_bwd = ProgressMeter.Progress(2 * nharmonics; dt = 2, desc = "Precalculate backward matrix:")
+    backward_matrix!(backward, S, field2D, coeffs2D, progress_bwd)
 
     forward = on_architecture(architecture, forward)
     backward = on_architecture(architecture, backward)
@@ -137,11 +138,29 @@ end
 
 """$(TYPEDSIGNATURES)
 Compute the backward transform matrix `B` from spectral to grid space using the precomputed
-spectral transform `S`. The matrix is computed such that multiplying it by spectral
-coefficients yields flattened grid data. This function is not yet implemented."""
-function backward_matrix!(B, F)
-    B .= LinearAlgebra.pinv(F)              # Moore Penrose pseudo-inverse
-    return B
+spectral transform `S`. The inverse transform maps complex spectral coefficients to real grid
+values via `field = Re(B * coeffs)`, so `B` is complex. Each column is determined by probing
+with a real unit vector (`coeffs[lm] = 1` gives `Re(B)[:, lm]`) and an imaginary unit vector
+(`coeffs[lm] = im` gives `-Im(B)[:, lm]`)."""
+function backward_matrix!(B, S::AbstractSpectralTransform, field::AbstractField2D, coeffs::LowerTriangularMatrix, progress = nothing)
+    for lm in axes(coeffs.data, 1)
+        # real part of column: set coeffs[lm] = 1 (real unit vector)
+        coeffs.data .= 0
+        GPUArrays.@allowscalar coeffs.data[lm] = 1
+        transform!(field, coeffs, S)
+        real_response = copy(field.data)
+
+        # imaginary part of column: set coeffs[lm] = im (imaginary unit vector)
+        # field = Re(B * c) = Re(B)*Re(c) - Im(B)*Im(c), with c[lm]=im: field = -Im(B)[:, lm]
+        coeffs.data .= 0
+        GPUArrays.@allowscalar coeffs.data[lm] = im
+        transform!(field, coeffs, S)
+
+        B[:, lm] .= real_response .+ im .* (.-field.data)
+
+        isnothing(progress) || ProgressMeter.next!(progress)
+    end
+    return nothing
 end
 
 """$(TYPEDSIGNATURES)

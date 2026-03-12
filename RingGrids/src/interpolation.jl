@@ -320,15 +320,15 @@ end
 @kernel inbounds = true function _interpolate_kernel!(
         Aout,               # Out: interpolated values
         A,                  # gridded values to interpolate from
-        @Const(ij_as),      # indices of A to interpolate from
-        @Const(ij_bs),      # indices of A to interpolate from
-        @Const(ij_cs),      # indices of A to interpolate from
-        @Const(ij_ds),      # indices of A to interpolate from
-        @Const(Δabs),       # weights of A to interpolate from
-        @Const(Δcds),       # weights of A to interpolate from
-        @Const(Δys),        # weights of A to interpolate from
-        @Const(A_northpole),
-        @Const(A_southpole),
+        ij_as,      # indices of A to interpolate from
+        ij_bs,      # indices of A to interpolate from
+        ij_cs,      # indices of A to interpolate from
+        ij_ds,      # indices of A to interpolate from
+        Δabs,       # weights of A to interpolate from
+        Δcds,       # weights of A to interpolate from
+        Δys,        # weights of A to interpolate from
+        A_northpole,
+        A_southpole,
     )
 
     k = @index(Global, Linear)
@@ -507,8 +507,8 @@ DimensionMismatchArray(a::AbstractArray, bs::AbstractArray...) =
 @kernel inbounds = true function find_rings_kernel!(
         js,                # Out: ring indices j
         Δys,               # Out: distance fractions to ring further south
-        @Const(θs),        # latitudes to interpolate onto
-        @Const(latd)       # latitudes of the rings on the original grid
+        θs,        # latitudes to interpolate onto
+        latd       # latitudes of the rings on the original grid
     )
     k = @index(Global, Linear)
 

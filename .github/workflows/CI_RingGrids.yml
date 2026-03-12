@@ -41,7 +41,7 @@ jobs:
         with:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
-      - uses: julia-actions/cache@v2
+      - uses: julia-actions/cache@v3
       - name: Julia 1.10, add local packages as sources not supported yet
         shell: julia --color=yes --project=. {0}
         run: |

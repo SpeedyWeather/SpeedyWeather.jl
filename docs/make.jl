@@ -39,6 +39,7 @@ makedocs(
             "Extensions" => "extensions.md",
             "Forcing and drag" => "forcing_drag.md",
             "Parameterizations" => "parameterizations.md",
+            "Input data" => "input_data.md",
             "Orography" => "orography.md",
             "Land-Sea Mask" => "land_sea_mask.md",
             "Ocean" => "custom_ocean.md",

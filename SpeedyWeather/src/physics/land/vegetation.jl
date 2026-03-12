@@ -67,11 +67,17 @@ export VegetationClimatology
     "[OPTION] Combine high and low vegetation factor, a in high + a*low [1]"
     low_veg_factor::NF = 0.8
 
-    "[OPTION] path to the folder containing the soil moisture file, pkg path default"
-    path::String = "SpeedyWeather.jl/input_data"
-
     "[OPTION] filename of soil moisture"
     file::String = "vegetation.nc"
+
+    "[OPTION] path to the folder containing the vegetation"
+    path::String = joinpath("data", "boundary_conditions", file)
+
+    "[OPTION] flag to check for vegetation in SWA or locally"
+    from_assets::Bool = true
+
+    "[OPTION] SpeedyWeatherAssets version number"
+    version::VersionNumber = DEFAULT_ASSETS_VERSION
 
     "[OPTION] variable name in netcdf file for high vegetation"
     varname_vegh::String = "vegh"
@@ -80,10 +86,8 @@ export VegetationClimatology
     varname_vegl::String = "vegl"
 
     "[OPTION] Grid the soil moisture file comes on"
-    file_Grid::Type{<:AbstractGrid} = FullGaussianGrid
+    FieldType::Type{<:AbstractField} = FullGaussianField
 
-    "[OPTION] The missing value in the data respresenting ocean"
-    missing_value::NF = NaN
     # to be filled from file
     "High vegetation cover [1], interpolated onto Grid"
     high_cover::GridVariable2D
@@ -105,14 +109,35 @@ function VegetationClimatology(SG::SpectralGrid, geometry::LandGeometryOrNothing
 end
 
 function initialize!(vegetation::VegetationClimatology, model::PrimitiveEquation)
-    load_from_netcdf!(
-        vegetation.high_cover, vegetation.path, vegetation.file, vegetation.varname_vegh;
-        file_Grid = vegetation.file_Grid, architecture = model.architecture
+
+    # LOAD NETCDF FILE
+    vegh = get_asset(
+        vegetation.path;
+        from_assets = vegetation.from_assets,
+        name = vegetation.varname_vegh,
+        ArrayType = vegetation.FieldType,
+        FileFormat = NCDataset,
+        version = vegetation.version
     )
-    return load_from_netcdf!(
-        vegetation.low_cover, vegetation.path, vegetation.file, vegetation.varname_vegl;
-        file_Grid = vegetation.file_Grid, architecture = model.architecture
+
+    vegl = get_asset(
+        vegetation.path;
+        from_assets = vegetation.from_assets,
+        name = vegetation.varname_vegl,
+        ArrayType = vegetation.FieldType,
+        FileFormat = NCDataset,
+        version = vegetation.version
     )
+
+    vegh = on_architecture(model.architecture, vegh)
+    vegl = on_architecture(model.architecture, vegl)
+
+    # interpolate onto grid
+    high_vegetation_cover = vegetation.high_cover
+    low_vegetation_cover = vegetation.low_cover
+    interpolator = RingGrids.interpolator(high_vegetation_cover, vegh, NF = Float32)
+    interpolate!(high_vegetation_cover, vegh, interpolator)
+    return interpolate!(low_vegetation_cover, vegl, interpolator)
 end
 
 function initialize!(

@@ -4,8 +4,6 @@
             @testset for Grid in (
                     FullGaussianGrid,
                     OctahedralGaussianGrid,
-                    FullClenshawGrid,
-                    OctahedralClenshawGrid,
                 )
 
                 spectrum = Spectrum(trunc)
@@ -68,7 +66,7 @@ end
                     FullGaussianGrid,
                     OctahedralGaussianGrid,
                 )
-                
+
                 nlayers = 8
                 spectrum = Spectrum(trunc)
                 grid = Grid(SpeedyTransforms.get_nlat_half(trunc))

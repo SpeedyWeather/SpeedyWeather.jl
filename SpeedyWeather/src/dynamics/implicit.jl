@@ -82,7 +82,7 @@ end
 
 @kernel inbounds = true function implicit_shallow_water_kernel!(
         div_tend, pres_tend, div_old, div_new, pres_old, pres_new, l_indices,
-        @Const(H), @Const(g), @Const(ξ)
+        H, g, ξ
     )
     I = @index(Global, Cartesian)
     lm = I[1]  # single index lm corresponding to harmonic l, m
@@ -402,8 +402,8 @@ end
 # Single kernel that does all steps for one spectral mode
 @kernel inbounds = true function implicit_primitive_single_kernel!(
         temp_tend, pres_tend, div_tend, G, geopotential,
-        div_old, div_new, @Const(S⁻¹), @Const(R), @Const(U), @Const(L), @Const(W), @Const(l_indices),
-        @Const(ξ), @Const(nlayers)
+        div_old, div_new, S⁻¹, R, U, L, W, l_indices,
+        ξ, nlayers
     )
     lm = @index(Global, Linear)
 

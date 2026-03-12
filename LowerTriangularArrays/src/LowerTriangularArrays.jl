@@ -7,7 +7,7 @@ using DocStringExtensions
 import Adapt: Adapt, adapt
 import GPUArrays
 import KernelAbstractions
-import KernelAbstractions: @kernel, @index, @Const
+import KernelAbstractions: @kernel, @index
 
 import SpeedyWeatherInternals.Architectures: Architectures, AbstractArchitecture, on_architecture,
     array_type, ismatching, CPU, GPU, architecture, nonparametric_type
