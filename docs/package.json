@@ -1,16 +1,20 @@
 {
+  "devDependencies": {
+    "@types/node": "^25.3.5",
+    "@types/markdown-it-footnote": "^3.0.4"
+  },
   "scripts": {
     "docs:dev": "vitepress dev build/.documenter",
     "docs:build": "vitepress build build/.documenter",
     "docs:preview": "vitepress preview build/.documenter"
   },
   "dependencies": {
-    "vitepress": "^1.6.3",
-    "markdown-it": "^14.1.0",
+    "@nolebase/vitepress-plugin-enhanced-readabilities": "^2.18.2",
+    "@mdit/plugin-mathjax": "^0.26.1",
+    "@mdit/plugin-tex": "^0.24.1",
     "markdown-it-footnote": "^4.0.0",
-    "markdown-it-mathjax3": "^4.3.2",
-    "@mdit/plugin-mathjax": "^0.25.0",
-    "@mdit/plugin-tex": "^0.23.1",
-    "@nolebase/vitepress-plugin-enhanced-readabilities": "^2.0.0"
+    "markdown-it": "^14.1.0",
+    "vitepress": "^1.6.4",
+    "vitepress-plugin-tabs": "^0.8.0"
   }
 }
