@@ -91,7 +91,7 @@ function compare_clock(sim_cpu, sim_reactant)
 
     @test clock_cpu.n_timesteps == clock_reactant.n_timesteps
     @test clock_cpu.timestep_counter == clock_reactant.timestep_counter
-    # convert to DateTime to compare because Reactant TracedRDatetime might be used
+    # convert to DateTime to compare because Reactant ReactantDatetime might be used
     return @test clock_cpu.time == clock_reactant.time
 end
 

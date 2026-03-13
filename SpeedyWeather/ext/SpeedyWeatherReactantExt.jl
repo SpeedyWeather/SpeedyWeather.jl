@@ -65,7 +65,7 @@ function SpeedyWeather.timestep!(simulation::ReactantSimulation, r_first_timeste
 end
 
 # that's for Reactant TracableDateTime
-SpeedyWeather.secondofday(dt::ReactantDatesExt.TracedRDateTime) = Dates.second(ReactantDatesExt.TracedRTime(dt).instant)
+SpeedyWeather.secondofday(dt::ReactantDatesExt.ReactantDateTime) = Dates.second(ReactantDatesExt.ReactantTime(dt).instant)
 
 SpeedyWeather.Clock(architecture::ReactantDevice) = Reactant.to_rarray(SpeedyWeather.Clock(), track_numbers = true)
 
