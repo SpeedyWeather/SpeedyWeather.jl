@@ -370,6 +370,108 @@ This avoids to loop over these additional dimensions, but the result would be th
 power_spectrum(alms[:, 1])
 ```
 
+## MatrixSpectralTransform
+
+SpeedyTransforms also provides a `MatrixSpectralTransform`, an alternative spectral transform
+that replaces the ring-by-ring FFT + Legendre recursion of `SpectralTransform` with a single
+dense matrix–matrix multiply. Concretely, the forward (grid → spectral) transform becomes
+
+```math
+\text{coeffs} = F \cdot \text{field}
+```
+
+and the backward (spectral → grid) transform is split into two real-valued multiplications
+
+```math
+\text{field} = B_{\Re} \cdot \Re(\text{coeffs}) - B_{\Im} \cdot \Im(\text{coeffs})
+```
+
+where ``F``, ``B_{\Re}``, ``B_{\Im}`` are dense real/complex matrices precomputed at construction
+time by probing the existing `SpectralTransform` with unit vectors.
+
+### When to use it
+
+The `MatrixSpectralTransform` is worth considering when:
+
+- **GPU performance is critical.** On modern GPUs, a single large `GEMM` is highly optimised
+  (via cuBLAS / rocBLAS / MPS), often outperforming many small FFTs and Legendre recursions.
+- **Differentiability is required.** A pure matrix multiply is trivially differentiable by
+  automatic differentiation frameworks such as Enzyme or Reactant, unlike the mixed
+  FFT + recursion path.
+- **The same resolution is used many times.** The upfront precomputation cost is amortised
+  over all subsequent transforms.
+
+### Construction
+
+The constructor mirrors `SpectralTransform` in its keyword arguments:
+
+```@example speedytransforms4
+using RingGrids, LowerTriangularArrays, SpeedyTransforms
+
+spectrum = Spectrum(31)
+grid = FullGaussianGrid(SpeedyTransforms.get_nlat_half(31))
+M = MatrixSpectralTransform(spectrum, grid; NF = Float32)
+```
+
+The constructor prints progress while precomputing the forward and backward matrices.
+The `show` output summarises the resolution and memory footprint of the matrices.
+
+### Usage: drop-in replacement for `SpectralTransform`
+
+`MatrixSpectralTransform` implements the same `transform` interface as `SpectralTransform`,
+so it can be used as a drop-in replacement:
+
+```@example speedytransforms4
+# spectral → grid
+alms = randn(LowerTriangularMatrix{ComplexF32}, 32, 32)
+field = transform(alms, M)
+```
+
+```@example speedytransforms4
+# grid → spectral
+alms2 = transform(field, M)
+alms ≈ alms2
+```
+
+3D (multi-layer) transforms work the same way — just pass a `nlayers` keyword at construction:
+
+```@example speedytransforms4
+nlayers = 8
+M3D = MatrixSpectralTransform(spectrum, grid; NF = Float32, nlayers)
+
+alms3D = randn(LowerTriangularArray{ComplexF32}, 32, 32, nlayers)
+field3D = transform(alms3D, M3D)
+alms3D_rt = transform(field3D, M3D)
+field3D ≈ transform(alms3D_rt, M3D)
+```
+
+### Agreement with `SpectralTransform`
+
+The matrix-based and the FFT/Legendre-based transforms agree to within floating-point
+rounding error:
+
+```@example speedytransforms4
+S = SpectralTransform(spectrum, grid; NF = Float32)
+
+field_S = transform(alms, S)
+field_M = transform(alms, M)
+field_S ≈ field_M
+```
+
+### Memory considerations
+
+The forward matrix ``F`` is of size `(nharmonics × npoints)` and the backward matrices
+``B_{\Re}, B_{\Im}`` are of size `(npoints × nharmonics)`, all in `NF`.
+At T127 resolution on a `FullGaussianGrid` this amounts to several hundred MB,
+compared to the Legendre polynomials of `SpectralTransform` which only store one latitude
+ring at a time. The `show` output prints the total matrix memory:
+
+```@example speedytransforms4
+using SpeedyWeather
+spectral_grid = SpectralGrid(trunc=63, nlayers=8)
+MatrixSpectralTransform(spectral_grid)
+```
+
 ## Functions and type index
 
 ```@autodocs
