@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- MatrixSpectralTransform implemented [#952](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/952)
 - `get_asset` now supports optional `output_grid` [#1004](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1004)
 - Switch documentation to DocumenterVitepress for a modern VitePress-based theme [#1002](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1002)
 - Move `get_asset` to RingGrids with NCDatasets extension; make `assets_url` and `version` kwargs [#996](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/996)
@@ -76,7 +77,6 @@
 - Seasonal ocean and land climatology models GPU-ready [#892](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/892)
 - Zenith constructors [#889](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/889)
 - More general forcing of pressure, vorticity and divergence [#855](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/855)
-
 
 ## v0.17.3
 
