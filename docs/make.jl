@@ -7,6 +7,7 @@ makedocs(
         repo = "github.com/SpeedyWeather/SpeedyWeather.jl",
         devbranch = "main",
         devurl = "dev",
+        deploy_url = "./SpeedyWeatherDocumentation/" # adjust if cross-repo deployment to ./repo_name/
     ),
     sitename = "SpeedyWeather.jl",
     authors = "M Klöwer and SpeedyWeather contributors",
@@ -91,7 +92,6 @@ for pattern in [r"\.jld2", r"\.nc"]
         rm(filename)
     end
 end
-
 
 DocumenterVitepress.deploydocs(
     repo = "github.com/SpeedyWeather/SpeedyWeather.jl",
