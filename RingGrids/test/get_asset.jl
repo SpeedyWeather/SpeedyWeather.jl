@@ -1,3 +1,4 @@
+import Pkg
 using NCDatasets
 
 # path to a known asset file in SpeedyWeatherAssets
