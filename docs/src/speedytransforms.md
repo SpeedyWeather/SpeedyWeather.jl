@@ -403,25 +403,24 @@ The `MatrixSpectralTransform` is worth considering when:
 
 ### Construction
 
-You can construct a `MatrixSpectralTransform` directly from a `SpectralGrid` — the
-same convenience constructor that `SpectralTransform` uses:
-
-```@example speedytransforms4
-using SpeedyWeather
-
-spectral_grid = SpectralGrid(trunc=31, nlayers=8)
-M = MatrixSpectralTransform(spectral_grid)
-```
-
-Or equivalently from a `Spectrum` and `AbstractGrid` when working with SpeedyTransforms
-standalone:
+When working with SpeedyTransforms standalone, construct from a `Spectrum` and grid:
 
 ```@example speedytransforms4
 using RingGrids, LowerTriangularArrays, SpeedyTransforms
 
 spectrum = Spectrum(31)
 grid = FullGaussianGrid(SpeedyTransforms.get_nlat_half(31))
-M2 = MatrixSpectralTransform(spectrum, grid; NF = Float32)
+M = MatrixSpectralTransform(spectrum, grid; NF = Float32)
+```
+
+When working at the SpeedyWeather level, pass a `SpectralGrid` directly — the same
+convenience constructor that `SpectralTransform` uses:
+
+```@example speedytransforms5
+using SpeedyWeather
+
+spectral_grid = SpectralGrid(trunc=31, nlayers=8)
+M_sg = MatrixSpectralTransform(spectral_grid)
 ```
 
 The constructor prints a progress bar while precomputing the forward and backward matrices.
@@ -474,10 +473,9 @@ field_S ≈ field_M
 Pass a `MatrixSpectralTransform` to any model constructor via the `spectral_transform`
 keyword to use it in place of the default `SpectralTransform`:
 
-```@example speedytransforms4
-spectral_grid = SpectralGrid(trunc=31, nlayers=8)
-M = MatrixSpectralTransform(spectral_grid)
-model = PrimitiveWetModel(spectral_grid; spectral_transform = M)
+```@example speedytransforms5
+M_sg = MatrixSpectralTransform(spectral_grid)
+model = PrimitiveWetModel(spectral_grid; spectral_transform = M_sg)
 simulation = initialize!(model)
 ```
 
@@ -493,8 +491,7 @@ At T127 resolution on a `FullGaussianGrid` this amounts to several hundred MB,
 compared to the Legendre polynomials of `SpectralTransform` which only store one latitude
 ring at a time. The `show` output prints the total matrix memory:
 
-```@example speedytransforms4
-using SpeedyWeather
+```@example speedytransforms5
 spectral_grid = SpectralGrid(trunc=63, nlayers=8)
 MatrixSpectralTransform(spectral_grid)
 ```
