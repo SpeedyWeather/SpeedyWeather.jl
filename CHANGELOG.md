@@ -4,7 +4,7 @@
 
 - MatrixSpectralTransform implemented [#952](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/952)
 - `get_asset` now supports optional `output_grid` [#1004](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1004)
-- Switch documentation to DocumenterVitepress for a modern VitePress-based theme [#1002](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1002)
+- Switch documentation to DocumenterVitepress for a modern VitePress-based theme [#1002](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1002) [#1008](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1008)
 - Move `get_asset` to RingGrids with NCDatasets extension; make `assets_url` and `version` kwargs [#996](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/996)
 - Small fixes to improve Enzyme CI [#995](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/995)
 - JuliaActions Cache upgraded to v3 [#1001](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1001)
