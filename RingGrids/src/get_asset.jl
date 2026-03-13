@@ -25,6 +25,7 @@ the loaded data (in most cases into a `Field` subtype, determining the grid).
 `version` is the version tag (a `VersionNumber`) or branch name (a `String`) to download from.
 `fill_value` is the value used to replace missing data (identified by the file's `_FillValue`
 attribute) in the loaded array; defaults to `NaN`.
+`output_grid` is the grid to interpolate the loaded data to; defaults to `nothing` (no interpolation). `ArrayType` must be a `AbstractFullField` type for interpolation to work.
 """
 function get_asset(
         path::String;
@@ -35,6 +36,7 @@ function get_asset(
         assets_url::String = ASSETS_URL,
         version = DEFAULT_ASSETS_VERSION,
         fill_value = NaN,
+        output_grid::Union{Nothing, AbstractGrid} = nothing,
     )
 
     if !from_assets     # try to load locally
@@ -83,7 +85,17 @@ function get_asset(
 
     asset_path = joinpath(Artifacts.artifact_path(hash), filename)
 
-    return load_asset(asset_path, name, ArrayType, FileFormat, fill_value)
+    data = load_asset(asset_path, name, ArrayType, FileFormat, fill_value)
+
+    if !isnothing(output_grid)
+        @assert ArrayType <: AbstractFullField "output_grid can only be used with AbstractFullField types as ArrayType, got $ArrayType"
+        # interpolate to output_grid
+        out_field = zeros(eltype(data), output_grid, size(data)[2:end]...)
+        interpolate!(out_field, data)
+        return out_field
+    end
+
+    return data
 end
 
 # load from array into a RingGrid Field
