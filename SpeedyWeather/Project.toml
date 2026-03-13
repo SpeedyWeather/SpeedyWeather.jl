@@ -11,6 +11,7 @@ Atomix = "a9b6321e-bd34-4604-b9c9-b65b8de01458"
 BitInformation = "de688a37-743e-4ac2-a6f0-bd62414d1aa7"
 CodecZlib = "944b1d66-785c-5afd-91f1-9de20f533193"
 ComponentArrays = "b0b7db55-cfe3-40fc-9ded-d10e2dbeff66"
+Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
 DocStringExtensions = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
 DomainSets = "5b8099bc-c8ec-5219-889f-1d9e522a28bf"
 Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
@@ -50,7 +51,7 @@ SpeedyWeatherInternals = {path = "../SpeedyWeatherInternals"}
 SpeedyWeatherEnzymeExt = "Enzyme"
 SpeedyWeatherFiniteDifferencesExt = "FiniteDifferences"
 SpeedyWeatherGeoMakieExt = "GeoMakie"
-SpeedyWeatherReactantExt = "Reactant"
+SpeedyWeatherReactantExt = ["Reactant", "Dates"]
 SpeedyWeatherUnicodePlotsExt = "UnicodePlots"
 
 [compat]

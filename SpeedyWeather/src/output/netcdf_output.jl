@@ -21,6 +21,8 @@ $(TYPEDFIELDS)"""
         Field2D,
         Field3D,
         Interpolator,
+        DT,
+        S,
     } <: AbstractOutput
 
     # FILE OPTIONS
@@ -64,10 +66,10 @@ $(TYPEDFIELDS)"""
 
     # WHAT/WHEN OPTIONS
     "[DERIVD] start date of the simulation, used for time dimension in netcdf file"
-    startdate::DateTime = DateTime(2000, 1, 1)
+    startdate::DT = DateTime(2000, 1, 1)
 
     "[OPTION] output frequency, time step"
-    output_dt::Second = Second(DEFAULT_OUTPUT_DT)
+    output_dt::S = Second(DEFAULT_OUTPUT_DT)
 
     "[OPTION] dictionary of variables to output, e.g. u, v, vor, div, pres, temp, humid"
     variables::OUTPUT_VARIABLES_DICT = OutputVariablesDict()
@@ -322,7 +324,7 @@ function initialize!(
     return nothing
 end
 
-# fallback for nothing output 
+# fallback for nothing output
 function initialize!(::Nothing, ::Union{AbstractFeedback, Nothing}, ::PrognosticVariables, ::DiagnosticVariables, ::AbstractModel)
     return nothing
 end
@@ -366,7 +368,7 @@ function output!(output::AbstractOutput, simulation::AbstractSimulation)
     return output!(output, output.variables, simulation)                       # write variables
 end
 
-# fallback for nothing output 
+# fallback for nothing output
 function output!(::Nothing, ::AbstractSimulation)
     return nothing
 end
@@ -558,7 +560,7 @@ $(TYPEDSIGNATURES)
 Returns the output time step of the model `M`."""
 function get_output_dt(output::AbstractOutput)
     return output.output_dt
-end 
+end
 
 # Fallback for when output is nothing
 get_output_dt(::Nothing) = Millisecond(0)

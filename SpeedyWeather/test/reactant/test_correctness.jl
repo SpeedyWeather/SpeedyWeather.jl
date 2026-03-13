@@ -91,7 +91,7 @@ function compare_clock(sim_cpu, sim_reactant)
 
     @test clock_cpu.n_timesteps == clock_reactant.n_timesteps
     @test clock_cpu.timestep_counter == clock_reactant.timestep_counter
-    # convert to DateTime to compare because Reactant TracedRDatetime might be used
+    # convert to DateTime to compare because Reactant ReactantDatetime might be used
     return @test clock_cpu.time == clock_reactant.time
 end
 
@@ -124,16 +124,16 @@ function test_tendencies!(sim_cpu, sim_reactant, model_name; rtol = RTOL, atol =
     println("Testing tendencies (single timestep)")
     println("-"^60)
 
-    initialize!(sim_cpu)
-    initialize!(sim_reactant)
+    initialize!(sim_cpu, steps = 1)
+    initialize!(sim_reactant, steps = 1)
 
     sync_variables!(sim_cpu, sim_reactant)
 
     # Run a single timestep to compute tendencies
     println("  Running CPU model...")
-    SpeedyWeather.timestep!(sim_cpu)
+    SpeedyWeather.time_stepping!(sim_cpu)
     println("  Running Reactant model...")
-    @jit SpeedyWeather.timestep!(sim_reactant)
+    @jit SpeedyWeather.time_stepping!(sim_reactant)
     println("  ✓ Tendencies computed")
 
     # Compare tendencies
