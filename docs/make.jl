@@ -1,13 +1,12 @@
 using Documenter
+using DocumenterVitepress
 using SpeedyWeatherInternals, LowerTriangularArrays, RingGrids, SpeedyTransforms, SpeedyWeather
 
 makedocs(
-    format = Documenter.HTML(
-        prettyurls = get(ENV, "CI", nothing) == "true",
-        ansicolor = true,
-        collapselevel = 1,
-        canonical = "https://speedyweather.github.io/SpeedyWeatherDocumentation/stable/",
-        size_threshold = 600_000        # in bytes
+    format = DocumenterVitepress.MarkdownVitepress(
+        repo = "github.com/SpeedyWeather/SpeedyWeather.jl",
+        devbranch = "main",
+        devurl = "dev",
     ),
     sitename = "SpeedyWeather.jl",
     authors = "M Klöwer and SpeedyWeather contributors",
@@ -94,10 +93,9 @@ for pattern in [r"\.jld2", r"\.nc"]
 end
 
 
-deploydocs(
+DocumenterVitepress.deploydocs(
     repo = "github.com/SpeedyWeather/SpeedyWeather.jl",
     deploy_repo = "github.com/SpeedyWeather/SpeedyWeatherDocumentation",
     devbranch = "main",
     push_preview = true,
-    versions = ["stable" => "v^", "v#.#.#", "dev" => "dev"],
 )

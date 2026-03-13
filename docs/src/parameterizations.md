@@ -172,7 +172,7 @@ Our existing parameterizations also define further abstract subtypes of `Abstrac
 that can also be used to used to reuse some of the functionality of existing parameterizations.
 These include:
 
-```@exaple parameterization
+```@example parameterization
 using InteractiveUtils # hide
 subtypes(SpeedyWeather.AbstractParameterization)
 ```
