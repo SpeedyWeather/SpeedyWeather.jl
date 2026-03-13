@@ -393,27 +393,38 @@ time by probing the existing `SpectralTransform` with unit vectors.
 
 The `MatrixSpectralTransform` is worth considering when:
 
-- **GPU performance is critical.** On modern GPUs, a single large `GEMM` is highly optimised
-  (via cuBLAS / rocBLAS / MPS), often outperforming many small FFTs and Legendre recursions.
-- **Differentiability is required.** A pure matrix multiply is trivially differentiable by
-  automatic differentiation frameworks such as Enzyme or Reactant, unlike the mixed
-  FFT + recursion path.
-- **The same resolution is used many times.** The upfront precomputation cost is amortised
-  over all subsequent transforms.
+- **Working at low to mid resolution.** The dense matrices scale as
+  ``O(N_{\text{grid}} \times N_{\text{harmonics}})``, so at high resolutions they
+  can require many GB of memory and become impractical.
+- **Using Reactant.** The current Reactant/XLA-based model execution in SpeedyWeather
+  is limited to `MatrixSpectralTransform`, since XLA can compile a `GEMM` directly.
+- **GPU performance is critical.** On modern GPUs a single large matrix multiply
+  (cuBLAS / rocBLAS / MPS) is often faster than many smaller FFTs and Legendre loops.
 
 ### Construction
 
-The constructor mirrors `SpectralTransform` in its keyword arguments:
+You can construct a `MatrixSpectralTransform` directly from a `SpectralGrid` — the
+same convenience constructor that `SpectralTransform` uses:
+
+```@example speedytransforms4
+using SpeedyWeather
+
+spectral_grid = SpectralGrid(trunc=31, nlayers=8)
+M = MatrixSpectralTransform(spectral_grid)
+```
+
+Or equivalently from a `Spectrum` and `AbstractGrid` when working with SpeedyTransforms
+standalone:
 
 ```@example speedytransforms4
 using RingGrids, LowerTriangularArrays, SpeedyTransforms
 
 spectrum = Spectrum(31)
 grid = FullGaussianGrid(SpeedyTransforms.get_nlat_half(31))
-M = MatrixSpectralTransform(spectrum, grid; NF = Float32)
+M2 = MatrixSpectralTransform(spectrum, grid; NF = Float32)
 ```
 
-The constructor prints progress while precomputing the forward and backward matrices.
+The constructor prints a progress bar while precomputing the forward and backward matrices.
 The `show` output summarises the resolution and memory footprint of the matrices.
 
 ### Usage: drop-in replacement for `SpectralTransform`
@@ -457,6 +468,22 @@ field_S = transform(alms, S)
 field_M = transform(alms, M)
 field_S ≈ field_M
 ```
+
+### Using within a model
+
+Pass a `MatrixSpectralTransform` to any model constructor via the `spectral_transform`
+keyword to use it in place of the default `SpectralTransform`:
+
+```@example speedytransforms4
+spectral_grid = SpectralGrid(trunc=31, nlayers=8)
+M = MatrixSpectralTransform(spectral_grid)
+model = PrimitiveWetModel(spectral_grid; spectral_transform = M)
+simulation = initialize!(model)
+```
+
+The model then uses dense matrix multiplications for every grid ↔ spectral transform
+during the time integration. This is otherwise identical to the default setup —
+the same `run!` interface applies.
 
 ### Memory considerations
 
