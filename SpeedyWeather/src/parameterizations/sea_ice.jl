@@ -33,8 +33,11 @@ end
 initialize!(vars::Variables, sea_ice_model::ThermodynamicSeaIce, model::PrimitiveEquation) = nothing
 
 function timestep!(vars::Variables, sea_ice_model::ThermodynamicSeaIce, model::PrimitiveEquation)
-    sst = vars.prognostic.ocean.sea_surface_temperature
     ℵ = vars.prognostic.ocean.sea_ice_concentration   # sea ice concentration [0, 1] as \aleph yay!
+    
+    # escape immediately if there is no sea surface temperature
+    haskey(vars.prognostic.ocean, :sea_surface_temperature) || return nothing
+    sst = vars.prognostic.ocean.sea_surface_temperature
 
     Δt = model.time_stepping.Δt_sec
     (; mask) = model.land_sea_mask

@@ -380,7 +380,7 @@ function timestep!(
     model.feedback.nans_detected && return nothing  # exit immediately if NaRs already present
     reset_tendencies!(vars)             # set the tendencies back to zero for accumulation
 
-    if model.physics                            # switch on/off all physics parameterizations
+    if model.physics                    # switch on/off all physics parameterizations
         # calculate all parameterizations
         parameterization_tendencies!(vars, model)
         ocean_timestep!(vars, model)    # sea surface temperature and maybe in the future sea ice

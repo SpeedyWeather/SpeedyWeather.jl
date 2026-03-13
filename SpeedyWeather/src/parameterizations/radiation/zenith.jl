@@ -104,10 +104,11 @@ function WhichZenith(SG::SpectralGrid, P::AbstractPlanet; kwargs...)
 end
 
 # function barrier
-function cos_zenith!(vars::Variables, time::DateTime, model::PrimitiveEquation)
-    (; solar_zenith, geometry) = model
+function parameterization!(vars::Variables, zenith::AbstractZenith, model::PrimitiveEquation)
+    (; time) = vars.prognostic.clock
+    (; geometry) = model
     (; cos_zenith) = vars.parameterizations
-    cos_zenith!(cos_zenith, solar_zenith, time, geometry)
+    cos_zenith!(cos_zenith, zenith, time, geometry)
     return nothing
 end
 
@@ -130,6 +131,12 @@ $(TYPEDFIELDS)"""
 end
 
 SolarZenith(SG::SpectralGrid; kwargs...) = SolarZenith{SG.NF, SinSolarDeclination{Earth{SG.NF}}}(; kwargs...)
+
+function variables(::AbstractZenith)
+    return (
+        ParameterizationVariable(:cos_zenith, Grid2D(), desc = "Cosine of solar zenith angle", units = "1"),
+    )
+end
 
 function initialize!(
         S::AbstractZenith,
@@ -296,10 +303,4 @@ end
     cos_zenith_j /= π
 
     cos_zenith[ij] = cos_zenith_j
-end
-
-function variables(::AbstractZenith)
-    return (
-        ParameterizationVariable(:cos_zenith, Grid2D(), desc = "Cosine of solar zenith angle", units = "1"),
-    )
 end

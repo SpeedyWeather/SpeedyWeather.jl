@@ -50,7 +50,6 @@ $(TYPEDFIELDS)"""
         FB,     # <:AbstractFeedback,
         TS1,    # <:Tuple{Symbol}
         TS2,    # <:Tuple{Symbol}
-        TS3,    # <:Tuple{Symbol}
         PV,     # <:Val
     } <: PrimitiveDry
 
@@ -80,11 +79,11 @@ $(TYPEDFIELDS)"""
     ocean::OC = SlabOcean(spectral_grid)
     sea_ice::SI = ThermodynamicSeaIce(spectral_grid)
     land::LA = DryLandModel(spectral_grid)
-    solar_zenith::ZE = WhichZenith(spectral_grid, planet)
-    albedo::AL = OceanLandAlbedo(spectral_grid)
-
+    
     # PHYSICS/PARAMETERIZATIONS
     physics::Bool = true
+    solar_zenith::ZE = WhichZenith(spectral_grid, planet)
+    @component albedo::AL = OceanLandAlbedo(spectral_grid)
     @component boundary_layer_drag::BL = BulkRichardsonDrag(spectral_grid)
     @component vertical_diffusion::VD = BulkRichardsonDiffusion(spectral_grid)
     @component surface_condition::SC = SurfaceCondition(spectral_grid)
@@ -108,13 +107,18 @@ $(TYPEDFIELDS)"""
     callbacks::Dict{Symbol, AbstractCallback} = Dict{Symbol, AbstractCallback}()
     feedback::FB = Feedback()
 
-    # Tuples with symbols or instances of all parameterizations and parameter functions
-    # Used to initiliaze variables and for the column-based parameterizations
-    model_parameters::TS1 = (
+    # Tuples with symbols pointing at the core components needed to be adapted
+    # for availability within the parameterizations
+    core_components::TS1 = (
         :architecture, :time_stepping, :orography, :geopotential, :atmosphere,
         :planet, :geometry, :land_sea_mask,
     )
-    parameterizations::TS2 = (  # mixing
+
+    parameterizations::TS2 = (  
+        # orbit or external forcing
+        :solar_zenith,
+    
+        # mixing
         :vertical_diffusion, :convection,
 
         # radiation
@@ -126,7 +130,6 @@ $(TYPEDFIELDS)"""
         # perturbations
         :stochastic_physics,
     )
-    extra_parameterizations::TS3 = (:solar_zenith, :land, :ocean, :sea_ice)
 
     # DERIVED
     # used to infer parameterizations at compile-time
@@ -233,12 +236,12 @@ end
 
 """$(TYPEDSIGNATURES)
 A `model` is adapted to the GPU or CPU by wrapping some (but not all!)
-of its fields (determined by `model.model_parameters`) into a NamedTuple.
+of its fields (determined by `model.core_components`) into a NamedTuple.
 Importantly, while accessing fields `model.field` still works as usual,
 one cannot use multiple dispatch on the model as a whole, e.g. `::PrimitiveDry`
 will not work on GPU-adapted models."""
 function Adapt.adapt_structure(to, model::PrimitiveDryModel)
-    adapt_fields = model.model_parameters
+    adapt_fields = model.core_components
     return NamedTuple{adapt_fields}(
         adapt_structure(to, getfield(model, field)) for field in adapt_fields
     )

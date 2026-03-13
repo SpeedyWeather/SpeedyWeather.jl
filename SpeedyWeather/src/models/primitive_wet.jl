@@ -53,7 +53,6 @@ $(TYPEDFIELDS)"""
         FB,     # <:AbstractFeedback,
         TS1,    # <:Tuple{Symbol}
         TS2,    # <:Tuple{Symbol}
-        TS3,    # <:Tuple{Symbol}
         PV,     # <:Val
     } <: PrimitiveWet
 
@@ -118,11 +117,15 @@ $(TYPEDFIELDS)"""
     # Tuples with symbols or instances of all parameterizations and parameter functions
     # Used to initiliaze variables and for the column-based parameterizations
     # also determine order in which parameterizations are called
-    model_parameters::TS1 = (
+    core_components::TS1 = (
         :architecture, :time_stepping, :orography, :geopotential, :atmosphere,
         :planet, :geometry, :land_sea_mask,
     )
-    parameterizations::TS2 = (  # mixing and precipitation
+    parameterizations::TS2 = (  
+        # external forcing
+        :solar_zenith,
+    
+        # mixing and precipitation
         :vertical_diffusion, :large_scale_condensation, :convection,
 
         # radiation
@@ -135,7 +138,6 @@ $(TYPEDFIELDS)"""
         # perturbations
         :stochastic_physics,
     )
-    extra_parameterizations::TS3 = (:solar_zenith, :land, :ocean, :sea_ice)
 
     # DERIVED
     # used to infer parameterizations at compile-time
@@ -205,7 +207,7 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
     clock.time = time       # set the current time
     clock.start = time      # and store the start time
 
-    # set all initial conditions for the ocean, seaice, land then atmosphere
+    # set all initial conditions for the ocean, sea ice, land then atmosphere
     initialize!(variables, model)
 
     return Simulation(variables, model)
@@ -213,12 +215,12 @@ end
 
 """$(TYPEDSIGNATURES)
 A `model` is adapted to the GPU or CPU by wrapping some (but not all!)
-of its fields (determined by `model.model_parameters`) into a NamedTuple.
+of its fields (determined by `model.core_components`) into a NamedTuple.
 Importantly, while accessing fields `model.field` still works as usual,
 one cannot use multiple dispatch on the model as a whole, e.g. `::PrimitiveDry`
 will not work on GPU-adapted models."""
 function Adapt.adapt_structure(to, model::PrimitiveWetModel)
-    adapt_fields = model.model_parameters
+    adapt_fields = model.core_components
     return NamedTuple{adapt_fields}(
         adapt_structure(to, getfield(model, field)) for field in adapt_fields
     )

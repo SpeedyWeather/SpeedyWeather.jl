@@ -73,12 +73,12 @@ indexing and ideally no allocations. For more details see
 The signature of the function is
 
 ```julia
-parameterization!(ij, diagn::DiagnosticVariables, progn::PrognosticVariables, parameterization::MyParameterization, model_parameters)
+parameterization!(ij, diagn::DiagnosticVariables, progn::PrognosticVariables, parameterization::MyParameterization, model_core)
 ```
 
 Note that
 - albedos should extend `albedo!(ij, ...)` instead, see [Example: Albedo](@ref) below
-- `model_parameters` is a subset of `model` adapted to GPU and passed on as `NamedTuple` instead
+- `model_core` is a subset of `model` adapted to GPU and passed on as `NamedTuple` instead
 
 ## Accumulate do not overwrite
 
@@ -235,9 +235,9 @@ Base.@propagate_inbounds function SpeedyWeather.albedo!(
     diagn,                          # not ::DiagnosticVariables as called with `diagn.physics.ocean` then `diagn.physics.land`
     progn::PrognosticVariables,
     albedo::SimpleAlbedo,
-    model_parameters,               # model unpacked into a NamedTuple
+    model,                          # model subset unpacked into a NamedTuple
 )
-    (; land_sea_mask) = model_parameters
+    (; land_sea_mask) = model
     (; sea_ice_concentration) = progn.ocean
     (; land_albedo, seaice_albedo, ocean_albedo) = albedo
 

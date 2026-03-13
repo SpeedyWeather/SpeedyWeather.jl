@@ -4,11 +4,26 @@ function parameterization_tendencies!(
         vars::Variables,
         model::PrimitiveEquation,
     )
-    # parameterizations with their own kernel
-    (; time) = vars.prognostic.clock
-    # cos_zenith!(vars, time, model)
-    # reset_variables!(vars)
+    reset_variables!(vars)
 
+    # parameterizations with their own kernel
+    global_parameterizations!(vars, model)
+
+    # parameterizations fused into a single kernel over ij
+    column_parameterizations!(vars, model)
+
+    return nothing
+end
+
+function global_parameterizations!(vars::Variables, model::PrimitiveEquation)
+    for parameterization in get_parameterizations(model)
+        parameterization!(vars, parameterization, model)
+    end
+    return nothing
+end
+
+# COLUMN-BASED PARAMETERIZATIONS
+function column_parameterizations!(vars, model)
     (; architecture, npoints) = model.spectral_grid
     if architecture isa Architectures.AbstractCPU
         # bypass kernel launch on CPU
@@ -48,15 +63,12 @@ end
 
 # Use @generated to unroll NamedTuple iteration at compile time for GPU compatibility
 @generated function _call_parameterizations!(ij, vars, parameterizations::NamedTuple{names}, model) where {names}
-    calls = [
-        :(
-                parameterization!(ij, vars, parameterizations.$name, model)
-            ) for name in names
-    ]
-    return quote
+    calls = [:(parameterization!(ij, vars, parameterizations.$name, model)) for name in names]
+    quote
         Base.@_propagate_inbounds_meta
         $(Expr(:block, calls...))
     end
+    return nothing
 end
 
 # Use @generated to unroll NamedTuple iteration at compile time also on CPU for performance
@@ -68,10 +80,11 @@ end
             end
             end for name in names
     ]                    # parameterizations outer loop
-    return quote
+    quote
         Base.@_propagate_inbounds_meta
         $(Expr(:block, calls...))
     end
+    return nothing
 end
 
 """$(TYPEDSIGNATURES)

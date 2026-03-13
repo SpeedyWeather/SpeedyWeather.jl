@@ -12,12 +12,12 @@
         DiagnosticVariable(name = :my_albedo, dims = Grid2D(), desc = "Albedo", units = "1"),
     )
 
-    # note that for albedos should actually define `albedo!(ij, diagn, progn, albedo, model_parameters)`
+    # note that for albedos should actually define `albedo!(ij, diagn, progn, albedo, model)`
     # as they are applied to ocean/land separately but ignore this here and implement this like any other parameterization
     # in practice this conflicts with the shortwave radiation scheme that also doesn't know about the `my_albedo` variable
-    function SpeedyWeather.parameterization!(ij, diagn::DiagnosticVariables, progn, albedo::SimpleAlbedo, model_parameters)
+    function SpeedyWeather.parameterization!(ij, diagn::DiagnosticVariables, progn, albedo::SimpleAlbedo, model)
 
-        (; land_sea_mask) = model_parameters
+        (; land_sea_mask) = model
         (; sea_ice_concentration) = progn.ocean
         (; land_albedo, seaice_albedo, ocean_albedo) = albedo
 

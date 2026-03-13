@@ -19,13 +19,25 @@ parameterization!
 """$(TYPEDSIGNATURES) Fallback when setting `parameterization=nothing` in the model constructor."""
 parameterization!(ij, vars, parameterization::Nothing, model) = nothing
 
+"""$(TYPEDSIGNATURES) Fallback for parameterizations that don't have a global kernel."""
+parameterization!(vars, parameterization::Any, model) = nothing
+
 """$(TYPEDSIGNATURES)
 Initialize an `AbstractParameterization`. This is called once at when calling initialize!(model). 
 The default behaviour is to return `nothing`."""
 initialize!(parameterization::AbstractParameterization, model::AbstractModel) = nothing
 
 """$(TYPEDSIGNATURES)
-Extract the parameterizations from the model including land and ocean, to infer variables."""
-function get_all_parameterizations(model::AbstractModel)
-    return merge(get_parameterizations(model), get_extra_parameterizations(model))
+Extract the parameterizations from the model as NamedTuple.
+These are the GPU-compatible components of the model."""
+@generated function get_parameterizations(model::ModelType) where {ModelType <: PrimitiveEquation}
+    # Extract parameterization symbols from the type
+    params_type = fieldtype(ModelType, :params)
+    param_names = params_type.parameters[1]  # Extract tuple from Val{tuple}
+
+    # Generate literal field accesses for type stability
+    return :(NamedTuple{$param_names}(tuple($([:(model.$name) for name in param_names]...))))
 end
+
+@inline get_parameterizations(model::Barotropic) = NamedTuple()
+@inline get_parameterizations(model::ShallowWater) = NamedTuple()

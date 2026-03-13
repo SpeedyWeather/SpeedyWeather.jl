@@ -184,7 +184,6 @@ variables(::PrescribedOceanHumidityFlux) = (
     ParameterizationVariable(:surface_humidity_flux, Grid2D(), desc = "Ocean surface humidity flux", units = "kg/m²/s", namespace = :ocean),
 )
 
-
 @propagate_inbounds function surface_humidity_flux!(ij, vars, ::PrescribedOceanHumidityFlux, model)
     land_fraction = model.land_sea_mask.mask[ij]
     pₛ = vars.grid.pres_prev[ij]          # surface pressure [Pa]
