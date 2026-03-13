@@ -3,27 +3,27 @@ export Leapfrog
 
 """Leapfrog time stepping defined by the following fields
 $(TYPEDFIELDS)"""
-@kwdef mutable struct Leapfrog{NF <: AbstractFloat} <: AbstractTimeStepper
+@kwdef mutable struct Leapfrog{NF, IntType, B} <: AbstractTimeStepper
     "[DERIVED] Spectral resolution (max degree of spherical harmonics)"
-    trunc::Int
+    trunc::IntType
 
     "[CONST] Number of time steps stored simultaneously in prognostic variables"
-    nsteps::Int = 2
+    nsteps::IntType = 2
 
     "[OPTION] Time step in minutes for T31, scale linearly to `trunc`"
     Δt_at_T31::Second = Minute(40)
 
     "[OPTION] Adjust `Δt_at_T31` with the `output_dt` to reach `output_dt` exactly in integer time steps"
-    adjust_with_output::Bool = true
+    adjust_with_output::B = true
 
     "[OPTION] Start integration with (1) Euler step with dt/2, (2) Leapfrog step with dt"
-    start_with_euler::Bool = true
+    start_with_euler::B = true
 
     "[OPTION] Sets `first_step_euler=false` after first step to continue with leapfrog after 1st `run!` call"
-    continue_with_leapfrog::Bool = true
+    continue_with_leapfrog::B = true
 
     "[DERIVED] Use Euler on first time step? (controlled by `start_with_euler` and `continue_with_leapfrog`)"
-    first_step_euler::Bool = start_with_euler
+    first_step_euler::B = start_with_euler
 
     "[OPTION] Robert (1966) time filter coefficient to suppress the computational mode"
     robert_filter::NF = 0.1
@@ -50,11 +50,11 @@ of the model. In case `adjust_Δt_with_output` is true, the `Δt_at_T31` is addi
 adjusted to the closest divisor of `output_dt` so that the output time axis is keeping
 `output_dt` exactly."""
 function get_Δt_millisec(
-        Δt_at_T31::Dates.TimePeriod,
+        Δt_at_T31::TimePeriod,
         trunc,
         radius,
         adjust_with_output::Bool,
-        output_dt::Dates.TimePeriod = DEFAULT_OUTPUT_DT,
+        output_dt::TimePeriod = DEFAULT_OUTPUT_DT,
     )
     # linearly scale Δt with trunc+1 (which are often powers of two)
     resolution_factor = (DEFAULT_TRUNC + 1) / (trunc + 1)
@@ -94,7 +94,7 @@ Generator function for a Leapfrog struct using `spectral_grid`
 for the resolution information."""
 function Leapfrog(spectral_grid::SpectralGrid; kwargs...)
     (; NF, trunc) = spectral_grid
-    return Leapfrog{NF}(; trunc, kwargs...)
+    return Leapfrog{NF, typeof(trunc), Bool}(; trunc, kwargs...)
 end
 
 """$(TYPEDSIGNATURES)
@@ -103,8 +103,8 @@ Initialize leapfrogging `L` by recalculating the time step given the output time
 be a divisor such that an integer number of time steps matches exactly with the output
 time step."""
 function initialize!(L::Leapfrog, model::AbstractModel)
-    (; output_dt) = model.output
     (; radius) = model.planet
+    output_dt = get_output_dt(model.output)
 
     # take radius from planet and recalculate time step and possibly adjust with output dt
     L.Δt_millisec = get_Δt_millisec(L.Δt_at_T31, L.trunc, radius, L.adjust_with_output, output_dt)
@@ -240,16 +240,19 @@ function first_timesteps!(simulation::AbstractSimulation)
     (; Δt) = time_stepping
 
     # decide whether to start with 1x Euler then 1x Leapfrog at Δt
-    if time_stepping.first_step_euler
-        first_timesteps!(progn, diagn, model)
-        time_stepping.first_step_euler = !time_stepping.continue_with_leapfrog   # after first run! continue with leapfrog
-
-    else    # or continue with leaprog steps at 2Δt (e.g. restart)
-        # but make sure that implicit solver is initialized in that situation
-        initialize!(model.implicit, 2Δt, diagn, model)
-        set_initialized!(model.implicit)            # mark implicit as initialized
-        later_timestep!(simulation)
-    end
+    # TODO: this causes problems with Reactant when traced / or when not traced as a regular if loop in reverse mode
+    ifelse(time_stepping.first_step_euler, 
+        begin 
+            first_timesteps!(progn, diagn, model)
+            time_stepping.first_step_euler = !time_stepping.continue_with_leapfrog   # after first run! continue with leapfrog
+        end, 
+        begin # or continue with leaprog steps at 2Δt (e.g. restart)
+            # but make sure that implicit solver is initialized in that situation
+            initialize!(model.implicit, 2Δt, diagn, model)
+            set_initialized!(model.implicit)            # mark implicit as initialized
+            later_timestep!(simulation)
+        end
+    )
 
     # only now initialise feedback for benchmark accuracy
     (; clock) = progn
@@ -271,7 +274,7 @@ function first_timesteps!(
 
     (; implicit) = model
     (; Δt, Δt_millisec) = model.time_stepping
-    Δt_millisec_half = Dates.Millisecond(Δt_millisec.value ÷ 2)   # this might be 1ms off
+    Δt_millisec_half = Millisecond(Δt_millisec.value ÷ 2)   # this might be 1ms off
 
     # FIRST TIME STEP (EULER FORWARD with dt=Δt/2)
     lf1 = 1                             # without Robert+Williams filter
@@ -315,7 +318,7 @@ function timestep!(
         lf1::Integer = 2,               # leapfrog index 1 (dis/enables Robert+Williams filter)
         lf2::Integer = 2,               # leapfrog index 2 (time step used for tendencies)
     )
-    model.feedback.nans_detected && return nothing  # exit immediately if NaNs/Infs already present
+    (!isnothing(model.feedback) && model.feedback.nans_detected) && return nothing  # exit immediately if NaNs/Infs already present
 
     # set the tendencies back to zero for accumulation
     fill!(diagn.tendencies, 0, Barotropic)

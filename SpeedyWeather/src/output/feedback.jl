@@ -65,7 +65,7 @@ function initialize!(feedback::Feedback, clock::Clock, model::AbstractModel)
     # used to pass on the time step to ProgressMeter.speedstring
     FEEDBACK_DT_IN_SEC[] = model.time_stepping.Δt_sec
     FEEDBACK_TIME[] = clock.time
-    
+
     # reset those to default (-1 not shown, 0 shown)
     FEEDBACK_UMAX[] = feedback.show_umax ? 0 : -1
     FEEDBACK_TMIN[] = feedback.show_temperature_range ? 0 : -1
@@ -89,6 +89,9 @@ function initialize!(feedback::Feedback, clock::Clock, model::AbstractModel)
     return nothing
 end
 
+# fallback if feedback is set to nothing
+initialize!(::Nothing, clock::Clock, model::AbstractModel) = nothing
+
 progress!(feedback::Feedback) = ProgressMeter.next!(feedback.progress_meter)
 
 function progress!(feedback::Feedback, progn::PrognosticVariables, diagn::DiagnosticVariables)
@@ -102,10 +105,15 @@ function progress!(feedback::Feedback, progn::PrognosticVariables, diagn::Diagno
     return nothing
 end
 
+progress!(::Nothing, progn::PrognosticVariables, diagn::DiagnosticVariables) = nothing
+
 """
 $(TYPEDSIGNATURES)
 Finalises the progress meter and the progress txt file."""
 finalize!(F::Feedback) = ProgressMeter.finish!(F.progress_meter)
+
+# fallback if feedback is set to nothing
+finalize!(::Nothing) = nothing
 
 """$(TYPEDSIGNATURES)
 Detect NaN (Not-a-Number, or Inf) in the prognostic variables."""
@@ -149,9 +157,9 @@ end
 # constant from the ProgressMeter module
 const FEEDBACK_DT_IN_SEC = Ref(1.0)
 const FEEDBACK_TIME = Ref(DEFAULT_DATE)
-const FEEDBACK_UMAX = Ref(-1f0)     # default negative = skip show
-const FEEDBACK_TMIN = Ref(-1f0)
-const FEEDBACK_TMAX = Ref(-1f0)
+const FEEDBACK_UMAX = Ref(-1.0f0)     # default negative = skip show
+const FEEDBACK_TMIN = Ref(-1.0f0)
+const FEEDBACK_TMAX = Ref(-1.0f0)
 
 # "extend" the speedstring function from ProgressMeter by defining it for ::AbstractFloat
 # not just ::Any to effectively overwrite it
@@ -266,7 +274,7 @@ function initialize!(progress_txt::ProgressTxt, progn, diagn, model)
     # create progress.txt file in run_????/
     file = open(joinpath(path, filename), "w")
     s = "Starting SpeedyWeather.jl $run_folder on " *
-        Dates.format(Dates.now(), Dates.RFC1123Format)
+        Libc.strftime("%a, %d %b %Y %H:%M:%S", time())
     write(file, s * "\n")
     write(file, "Integrating:\n")
     write(file, "$SG\n")
@@ -284,6 +292,7 @@ Writes the time stepping progress to the progress.txt file every `every_n_percen
 function callback!(progress_txt::ProgressTxt, progn, diagn, model)
     # escape in case of no output
     progress_txt.write_only_with_output && (model.output.active || return nothing)
+    isnothing(model.feedback) && return nothing
 
     (; progress_meter, nans_detected) = model.feedback
     (; counter, n) = progress_meter
@@ -312,6 +321,7 @@ Finalizes the ProgressTxt callback by writing the total time taken to the progre
 function finalize!(progress_txt::ProgressTxt, progn, diagn, model)
     # escape in case of no output
     progress_txt.write_only_with_output && (model.output.active || return nothing)
+    isnothing(model.feedback) && return nothing
 
     (; file) = progress_txt
     (; progress_meter) = model.feedback

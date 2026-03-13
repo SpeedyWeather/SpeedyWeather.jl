@@ -1,0 +1,60 @@
+name: Reactant Correctness
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  correctness-test:
+    name: Reactant Correctness - Julia v${{ matrix.version }}, ${{ matrix.os }}
+    # don't run if any of these labels are present
+    if: >
+      !( 
+      contains(github.event.pull_request.labels.*.name, 'skip-ci') ||
+      contains(github.event.pull_request.labels.*.name, 'skip-speedyweather-ci') ||
+      contains(github.event.pull_request.labels.*.name, 'skip-reactant-ci')
+      )
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    permissions:
+      actions: write
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        version:
+          - '1.11'
+        os:
+          - ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: ${{ matrix.version }}
+      
+      - uses: julia-actions/cache@v2
+      
+      - name: Develop local packages
+        run: |
+          julia --color=yes --project=SpeedyWeather/test/reactant -e '
+            using Pkg
+            Pkg.develop([
+              PackageSpec(path="SpeedyWeatherInternals"),
+              PackageSpec(path="LowerTriangularArrays"),
+              PackageSpec(path="RingGrids"),
+              PackageSpec(path="SpeedyTransforms"),
+              PackageSpec(path="SpeedyWeather")
+            ])
+            Pkg.instantiate()
+          '
+      
+      - name: Run Reactant correctness tests
+        run: |
+          julia --color=yes --project=SpeedyWeather/test/reactant SpeedyWeather/test/reactant/test_correctness.jl
+        env:
+          GITHUB_AUTH: ${{ secrets.GITHUB_TOKEN }}

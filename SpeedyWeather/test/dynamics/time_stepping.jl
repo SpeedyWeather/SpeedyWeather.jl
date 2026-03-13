@@ -133,7 +133,7 @@ end
     leapfrog = Leapfrog(spectral_grid; start_with_euler = true, continue_with_leapfrog = true)
     planet = Earth(spectral_grid, radius = 2^22)  # use radius that is power of 2 to avoid rounding errors in scaling
 
-    ic = RandomVelocity(seed = 1234)
+    ic = RandomVelocity(spectral_grid, seed = 1234)
     model = BarotropicModel(spectral_grid, time_stepping = leapfrog, initial_conditions = ic)
 
     simulation = initialize!(model)

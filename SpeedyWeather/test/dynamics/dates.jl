@@ -67,15 +67,13 @@ end
     @test_throws AssertionError run!(simulation, steps = 1, period = Day(1))
 end
 
-import Dates
-
 @testset "time conversions" begin
-    # Priated conversions from integer/float types
+    # Conversions from integer/float types
     @test convert(Second, 1) == Second(1)
     @test convert(Second, 1.4) == Second(1)
     @test convert(Second, 1.5) == Second(2)
 
-    # Pirated conversions for month and year
+    # Conversions for month and year
     @test Second(Year(1)) == Second(365 * 24 * 60 * 60)
     @test Day(Year(1)) == Day(365)
     @test Hour(Year(1)) == Hour(Second(Year(1)))
@@ -92,7 +90,6 @@ import Dates
     @test Century(1) == Year(100)
     @test Second(Century(1)) == Second(100 * 365 * 24 * 60 * 60)
     @test Millisecond(Century(1)) == Millisecond(Second(Century(1)))
-    @test Dates.coarserperiod(Year) == (Century, 100)
     @test_throws MethodError Week(Century(1))
 
     # Millenium
@@ -102,7 +99,6 @@ import Dates
     @test Millenium(1) == Century(10)
     @test Second(Millenium(1)) == Second(1000 * 365 * 24 * 60 * 60)
     @test Millisecond(Millenium(1)) == Millisecond(Second(Millenium(1)))
-    @test Dates.coarserperiod(Century) == (Millenium, 10)
     @test_throws MethodError Week(Millenium(1))
 
     # Type promotion rules

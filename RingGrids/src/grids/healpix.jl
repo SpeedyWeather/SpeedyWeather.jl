@@ -12,8 +12,8 @@ Equator. For more details see Górski et al. 2005, DOI:10.1086/427976.
 `whichring` is a precomputed vector of ring indices for each grid point ij, i.e. `whichring[ij]`
 gives the ring index j of grid point ij. Fields are
 $(TYPEDFIELDS)"""
-struct HEALPixGrid{A, V, W} <: AbstractReducedGrid{A}
-    nlat_half::Int                  # number of latitudes on one hemisphere
+struct HEALPixGrid{A, V, W, IntType} <: AbstractReducedGrid{A}
+    nlat_half::IntType              # number of latitudes on one hemisphere
     architecture::A                 # information about device, CPU/GPU
     rings::V                        # precomputed ring indices
     whichring::W                    # precomputed ring index for each grid point ij

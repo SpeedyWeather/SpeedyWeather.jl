@@ -11,6 +11,9 @@ import MacroTools
 import ModelParameters: ModelParameters, AbstractParam
 import ConstructionBase: constructorof, getproperties, setproperties
 
+# extend value from TracableDates so there's one unified function
+import ..Utils.TracableDates: value
+
 # DOMAINS
 import DomainSets: Domain, RealLine, NonnegativeRealLine, PositiveRealLine, NegativeRealLine, UnitInterval
 using DomainSets.IntervalSets

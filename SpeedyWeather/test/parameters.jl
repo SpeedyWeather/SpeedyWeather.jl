@@ -7,7 +7,7 @@ import ModelParameters: ModelParameters, Model, Param, params, update
 @testset "SpeedyParam" begin
     # Test basic construction and getter functions
     p = SpeedyParam(42.0, bounds = RealLine(), desc = "Test parameter", unit = "m", category = "generic")
-    @test value(p) == p.val == 42.0
+    @test SpeedyWeather.value(p) == p.val == 42.0
     @test bounds(p) == p.bounds == RealLine()
     @test description(p) == p.desc == "Test parameter"
     @test attributes(p) == (unit = "m", category = "generic")
@@ -15,7 +15,7 @@ import ModelParameters: ModelParameters, Model, Param, params, update
     # Test ModelParameters interface
     @test params(p) == (p,)
     @test Model(p)[:val] == (42.0,)
-    @test value(update(p, (1.0,))) == 1.0
+    @test SpeedyWeather.value(update(p, (1.0,))) == 1.0
     @test stripparams(p) == 42.0
 end
 

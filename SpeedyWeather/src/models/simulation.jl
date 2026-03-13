@@ -60,6 +60,7 @@ function initialize!(
         output::Bool = false,
     )
     progn, diagn, model = unpack(simulation)
+    arch = model.architecture
 
     # SET THE CLOCK
     (; clock) = progn
@@ -85,13 +86,19 @@ function initialize!(
 
     # raise a warning if starting with leapfrog but there's zero vorticity
     vor = get_step(progn.vor, lf)
-    lf == 2 && all(vor .== 0) && @warn "Vorticity is zero on 2nd leapfrog index though you use it to calculate tendencies." *
-        " You may wanted to continue with a leapfrog step without data for it in the 2nd step."
 
-    transform!(diagn, progn, lf, model, initialize = true)
+    #TODO: figure out what Reactant's problem with the simple statement below is:
+    #lf == 2 && all(vor .== 0) && @warn "Vorticity is zero on 2nd leapfrog index though you use it to calculate tendencies." *
+    #    " You may wanted to continue with a leapfrog step without data for it in the 2nd step."
+    #@trace if lf == 2 && all(vor .== 0)
+    #    @warn "Vorticity is zero on 2nd leapfrog index though you use it to calculate tendencies." *
+    #        " You may wanted to continue with a leapfrog step without data for it in the 2nd step."
+    #end
+
+    @maybe_jit arch transform!(diagn, progn, lf, model, initialize = true)
     initialize!(diagn, progn.particles, progn, model)
     initialize!(model.output, model.feedback, progn, diagn, model)
-    return initialize!(model.callbacks, progn, diagn, model)
+    return @maybe_jit arch initialize!(model.callbacks, progn, diagn, model)
 end
 
 """$(TYPEDSIGNATURES)

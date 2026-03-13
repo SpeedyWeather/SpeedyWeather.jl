@@ -4,8 +4,8 @@ HEALPixGrid to a full grid. A `FullHEALPixGrid` has none of the equal-area prope
 It only shares the latitudes with the `HEALPixGrid` but uses the longitudes from the `FullGaussianGrid`
 without offset, i.e. the first longitude point on every ring is at 0˚E.
 $(TYPEDFIELDS)"""
-struct FullHEALPixGrid{A, V, W} <: AbstractFullGrid{A}
-    nlat_half::Int      # number of latitudes on one hemisphere
+struct FullHEALPixGrid{A, V, W, IntType} <: AbstractFullGrid{A}
+    nlat_half::IntType  # number of latitudes on one hemisphere
     architecture::A     # information about device, CPU/GPU
     rings::V            # precomputed ring indices
     whichring::W        # precomputed ring index for each grid point ij

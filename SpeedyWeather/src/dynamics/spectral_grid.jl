@@ -23,6 +23,8 @@ struct SpectralGrid{
         ArchitectureType,      # <: AbstractArchitecture
         SpectrumType,          # <: AbstractSpectrum
         GridType,              # <: AbstractGrid
+        IntType,               # <: Integer
+        NFDealiasing,          # <: Float64
     } <: AbstractSpectralGrid
 
     "[OPTION] number format used throughout the model"
@@ -53,7 +55,7 @@ struct SpectralGrid{
     TensorIntType::Type{<:AbstractArray}
     # HORIZONTAL SPECTRAL
     "[OPTION] horizontal resolution as the maximum degree of spherical harmonics"
-    trunc::Int
+    trunc::IntType
 
     "[DERIVED] spectral space"
     spectrum::SpectrumType
@@ -69,16 +71,16 @@ struct SpectralGrid{
 
     # SIZE OF GRID from trunc, Grid, dealiasing:
     "[OPTION] how to match spectral with grid resolution: dealiasing factor, 1=linear, 2=quadratic, 3=cubic grid"
-    dealiasing::Float64
+    dealiasing::NFDealiasing
 
     "[DERIVED] number of latitude rings on one hemisphere (Equator incl)"
-    nlat_half::Int
+    nlat_half::IntType
 
     "[DERIVED] number of latitude rings on both hemispheres"
-    nlat::Int
+    nlat::IntType
 
     "[DERIVED] total number of grid points in the horizontal"
-    npoints::Int
+    npoints::IntType
 
     "[DERIVED] instance of horizontal grid used for calculations in grid-point space"
     grid::GridType
@@ -97,14 +99,14 @@ struct SpectralGrid{
 
     # PARTICLES
     "[OPTION] number of particles for particle advection [1]"
-    nparticles::Int
+    nparticles::IntType
 
     "[DERIVED] ArrayType of particle vector"
-    ParticleVector::Type{<:AbstractArray}
+    ParticleVector::Type
 
     # VERTICAL
     "[OPTION] number of vertical layers in the atmosphere"
-    nlayers::Int
+    nlayers::IntType
 end
 
 function Base.show(io::IO, SG::SpectralGrid)
@@ -232,10 +234,15 @@ function SpectralGrid(
     GridVariable4D = Field{NF, 3, array_type(architecture, NF, 3), typeof(grid)}
 
     # Particle vector type
-    ParticleVector = array_type(architecture, Particle{NF}, 1)
+    # TODO: For Reactant we need something else in the long run
+    if typeof(architecture) <: ReactantDevice
+        ParticleVector = typeof(nothing) # this is just a dummy type, it's actually nonworking
+    else
+        ParticleVector = array_type(architecture, Particle{NF}, 1)
+    end
 
     # Create the SpectralGrid with all fields
-    return SpectralGrid{typeof(architecture), typeof(spectrum), typeof(grid)}(
+    return SpectralGrid{typeof(architecture), typeof(spectrum), typeof(grid), typeof(nlat_half), Float64}(
         NF,
         architecture,
         ArrayType,
@@ -275,10 +282,10 @@ function (::Type{S})(
         one_more_degree::Bool = true,
         kwargs...
     ) where {S <: SpeedyTransforms.AbstractSpectralTransform}
-    (; NF, spectrum, grid, nlayers, ArrayType) = spectral_grid
+    (; NF, spectrum, grid, nlayers) = spectral_grid
     (; lmax, mmax, architecture) = spectrum
     spectrum = one_more_degree == false ? Spectrum(lmax - 1, mmax; architecture) : spectrum
-    return S(spectrum, grid; NF, ArrayType, nlayers, kwargs...)
+    return S(spectrum, grid; NF, nlayers, kwargs...)
 end
 
 # because model components can be `nothing`, their constructor being `Nothing()`

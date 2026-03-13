@@ -11,7 +11,7 @@ $(TYPEDSIGNATURES)
 Create a struct `EarthAtmosphere <: AbstractAtmosphere`, with the following physical/chemical
 characteristics. Keyword arguments are
 $(TYPEDFIELDS)"""
-@parameterized @kwdef struct EarthAtmosphere{NF <: AbstractFloat} <: AbstractWetAtmosphere
+@parameterized @kwdef struct EarthAtmosphere{NF} <: AbstractWetAtmosphere
     "[OPTION] Molar mass of dry air [g/mol]"
     @param mol_mass_dry_air::NF = 28.9649 (bounds = Positive,)
 
@@ -79,7 +79,7 @@ EarthAtmosphere(::Type{NF}; kwargs...) where {NF} = EarthAtmosphere{NF}(; kwargs
 Base.eltype(::EarthAtmosphere{NF}) where {NF} = NF
 
 export EarthDryAtmosphere
-@parameterized @kwdef struct EarthDryAtmosphere{NF <: AbstractFloat} <: AbstractDryAtmosphere
+@parameterized @kwdef struct EarthDryAtmosphere{NF} <: AbstractDryAtmosphere
     "[OPTION] Molar mass of dry air [g/mol]"
     @param mol_mass_dry_air::NF = 28.9649 (bounds = Positive,)
 
