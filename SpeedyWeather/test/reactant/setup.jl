@@ -29,7 +29,7 @@ function create_cpu_model(ModelType::Type; trunc = TRUNC, kwargs...)
     spectral_grid = SpectralGrid(; nlayers, trunc)
     M = MatrixSpectralTransform(spectral_grid)
     initial_conditions = default_initial_conditions(ModelType)
-    return ModelType(spectral_grid; spectral_transform = M, initial_conditions, kwargs...)
+    return ModelType(spectral_grid; spectral_transform = M, feedback = nothing, initial_conditions, kwargs...)
 end
 
 """Create a Reactant model of the given type."""
