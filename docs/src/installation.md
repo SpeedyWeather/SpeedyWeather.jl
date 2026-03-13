@@ -63,17 +63,19 @@ section in the Pkg documentation to learn more about the differences between `ad
 
 ## Compatibility with Julia versions
 
-SpeedyWeather.jl requires Julia v1.10 or later. The package is tested on Julia 1.10, and 1.11.
+SpeedyWeather.jl requires Julia v1.10 or later.
+The package is tested on Julia 1.10, 1.11 and 1.12.
 
 ## Extensions
 
-SpeedyWeather.jl has a weak dependency on
+SpeedyWeather.jl and its submodules have several weak dependencies for visualisation (Makie, GeoMakie),
+differentiability (Enzyme, FiniteDifferences) or GPU computing (CUDA, AMDGPU, Metal).
+These are all
+[extensions](https://pkgdocs.julialang.org/v1.10/creating-packages/#Conditional-loading-of-code-in-packages-(Extensions)),
+meaning that this functionality is only loaded from SpeedyWeather (or its submodules)
+when `using Makie` etc. Hence, if you want to make use of this extension
+(some [Examples](@ref Examples) show this) you need to install Makie.jl etc. manually.
 
-- [Makie.jl](https://github.com/MakieOrg/Makie.jl) to extend `Makie.heatmap`
-
-This is an
-[extension](https://pkgdocs.julialang.org/v1.10/creating-packages/#Conditional-loading-of-code-in-packages-(Extensions)),
-meaning that this functionality is only loaded from SpeedyWeather when `using Makie`
-(or its backends CairoMakie.jl, GLMakie.jl, ...). Hence, if you want to make use of this
-extension (some [Examples](@ref Examples) show this) you need to install Makie.jl manually.
+You can see the extensions in the respective `ext` folders within the submodule folders
+of the monorepo.
 

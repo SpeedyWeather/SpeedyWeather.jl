@@ -86,10 +86,12 @@ where both `:abc` and `:xyz` are listed. Tracers in SpeedyWeather are
 based on dictionaries so the order of the tracers is arbitrary,
 they are always defined by their `key` instead.
 
-Note that a tracer can be added to or deleted from a simulation at _any time_.
-So you can run a simulation, add a tracer, continue the simulation,
-or delete a tracer and continue. You can also just activate them or
-deactivate them, see below.
+All tracers have to be added to the `model` before it is initialized to
+return the `simulation`. This is because that initialization determines
+all required variables and allocates them, after that `simulation.variables`
+is an immutable collection of (mutable) arrays. If you do want to start or
+pause a tracer advection at any time you have to activate or deactivate them,
+see below.
 
 ## (De)activate tracers
 
