@@ -124,16 +124,16 @@ function test_tendencies!(sim_cpu, sim_reactant, model_name; rtol = RTOL, atol =
     println("Testing tendencies (single timestep)")
     println("-"^60)
 
-    initialize!(sim_cpu)
-    initialize!(sim_reactant)
+    initialize!(sim_cpu, steps = 1)
+    initialize!(sim_reactant, steps = 1)
 
     sync_variables!(sim_cpu, sim_reactant)
 
     # Run a single timestep to compute tendencies
     println("  Running CPU model...")
-    SpeedyWeather.timestep!(sim_cpu)
+    SpeedyWeather.time_stepping!(sim_cpu)
     println("  Running Reactant model...")
-    @jit SpeedyWeather.timestep!(sim_reactant)
+    @jit SpeedyWeather.time_stepping!(sim_reactant)
     println("  ✓ Tendencies computed")
 
     # Compare tendencies

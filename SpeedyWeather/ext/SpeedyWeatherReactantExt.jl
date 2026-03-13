@@ -48,20 +48,13 @@ function SpeedyWeather.time_stepping!(simulation::ReactantSimulation, r_first_ti
     end
 
     (; clock) = simulation.prognostic_variables
-    @trace checkpointing = enable_checkpointing for _ in 1:clock.n_timesteps
-        timestep!(simulation, r_first_timesteps!, r_later_timestep!)
-    end
-    return
-end
 
-function SpeedyWeather.timestep!(simulation::ReactantSimulation, r_first_timesteps!, r_later_timestep!)
-    (; clock) = simulation.prognostic_variables
+    r_first_timesteps!(simulation)
 
-    return @trace if clock.timestep_counter == 0
-        r_first_timesteps!(simulation)
-    else
+    @trace checkpointing = enable_checkpointing for _ in clock.timestep_counter:clock.n_timesteps
         r_later_timestep!(simulation)
     end
+    return
 end
 
 # that's for Reactant TracableDateTime
