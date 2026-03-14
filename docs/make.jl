@@ -7,6 +7,7 @@ makedocs(
         repo = "github.com/SpeedyWeather/SpeedyWeather.jl",
         devbranch = "main",
         devurl = "dev",
+        deploy_url = "./SpeedyWeatherDocumentation/" # adjust if cross-repo deployment to ./repo_name/
     ),
     sitename = "SpeedyWeather.jl",
     authors = "M Klöwer and SpeedyWeather contributors",
@@ -14,8 +15,8 @@ makedocs(
     checkdocs = :exports,
     pages = [
         "Home" => "index.md",
-        "Installation" => "installation.md",
-        "Running SpeedyWeather" => [
+        "Usage" => [
+            "Installation" => "installation.md",
             "How to run SpeedyWeather" => "how_to_run_speedy.md",
             "Examples 2D" => "examples_2D.md",
             "Examples 3D" => "examples_3D.md",
@@ -34,7 +35,7 @@ makedocs(
             "Other output" => "other_output.md",
             "GPU and Architectures" => "architectures_gpu.md",
         ],
-        "Extending SpeedyWeather" => [
+        "Advanced" => [
             "Extensions" => "extensions.md",
             "Forcing and drag" => "forcing_drag.md",
             "Parameterizations" => "parameterizations.md",
@@ -45,29 +46,25 @@ makedocs(
             "NetCDF output variables" => "custom_netcdf_output.md",
             "Callbacks" => "callbacks.md",
         ],
-        "Dynamics" => [
+        "Physics" => [
             "Barotropic model" => "barotropic.md",
             "Shallow water model" => "shallowwater.md",
             "Primitive equation model" => "primitiveequation.md",
-        ],
-        "Physics" => [
             "Large-scale condensation" => "large_scale_condensation.md",
             "Convection" => "convection.md",
             "Radiation" => "radiation.md",
             "Vertical diffusion" => "vertical_diffusion.md",
             "Surface fluxes" => "surface_fluxes.md",
         ],
-        "Discretization" => [
-            "Spherical Harmonic Transform" => "spectral_transform.md",
+        "Numerics" => [
             "Grids" => "grids.md",
-        ],
-        "RingGrids" => "ringgrids.md",
-        "LowerTriangularArrays" => "lowertriangularmatrices.md",
-        "SpeedyTransforms" => [
-            "Spectral transforms" => "speedytransforms.md",
+            "RingGrids" => "ringgrids.md",
+            "LowerTriangularArrays" => "lowertriangularmatrices.md",
+            "Spherical Harmonic Transform" => "spectral_transform.md",
+            "SpeedyTransforms" => "speedytransforms.md",
             "Gradient operators" => "gradients.md",
         ],
-        "Function and type index" => "functions.md",
+        "API" => "functions.md",
     ]
 )
 
@@ -91,7 +88,6 @@ for pattern in [r"\.jld2", r"\.nc"]
         rm(filename)
     end
 end
-
 
 DocumenterVitepress.deploydocs(
     repo = "github.com/SpeedyWeather/SpeedyWeather.jl",
