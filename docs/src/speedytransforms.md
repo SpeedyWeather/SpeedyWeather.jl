@@ -481,7 +481,8 @@ simulation = initialize!(model)
 
 The model then uses dense matrix multiplications for every grid ↔ spectral transform
 during the time integration. This is otherwise identical to the default setup —
-the same `run!` interface applies.
+the same `run!` interface applies. Currently the regular `SpectralTransform` is always 
+used as the default in model construction. However, that may change in the future. 
 
 ### Memory considerations
 
