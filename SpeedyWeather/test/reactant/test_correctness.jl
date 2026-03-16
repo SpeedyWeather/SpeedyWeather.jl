@@ -9,7 +9,7 @@ function sync_variables!(sim_cpu, sim_reactant)
     copyto!(progn_cpu.vor.data, Array(progn_reactant.vor.data))
 
     #TODO: for the other models add more varibles
-    return nothing
+    return
 end
 
 """Compare prognostic variables between CPU and Reactant simulations."""
@@ -92,7 +92,7 @@ function compare_clock(sim_cpu, sim_reactant)
     @test clock_cpu.n_timesteps == clock_reactant.n_timesteps
     @test clock_cpu.timestep_counter == clock_reactant.timestep_counter
     # convert to DateTime to compare because Reactant ReactantDatetime might be used
-    return @test clock_cpu.time == clock_reactant.time
+    return @test DateTime(clock_cpu.time) == DateTime(clock_reactant.time)
 end
 
 """Compare tendencies between CPU and Reactant simulations after a single timestep."""
@@ -119,7 +119,7 @@ function compare_tendencies(sim_cpu, sim_reactant; rtol = RTOL, atol = ATOL)
 end
 
 """Test tendencies after a single timestep on already-initialized simulations."""
-function test_tendencies!(sim_cpu, sim_reactant, model_name; rtol = RTOL, atol = ATOL)
+function test_tendencies!(sim_cpu, sim_reactant, model_name, r_first!, r_later!; rtol = RTOL, atol = ATOL)
     println("\n" * "-"^60)
     println("Testing tendencies (single timestep)")
     println("-"^60)
@@ -133,7 +133,7 @@ function test_tendencies!(sim_cpu, sim_reactant, model_name; rtol = RTOL, atol =
     println("  Running CPU model...")
     SpeedyWeather.time_stepping!(sim_cpu)
     println("  Running Reactant model...")
-    @jit SpeedyWeather.time_stepping!(sim_reactant)
+    SpeedyWeather.time_stepping!(sim_reactant, r_first!, r_later!)
     println("  ✓ Tendencies computed")
 
     # Compare tendencies
@@ -153,7 +153,7 @@ function test_tendencies!(sim_cpu, sim_reactant, model_name; rtol = RTOL, atol =
 end
 
 """Test prognostic and grid variables after running for nsteps on already-initialized simulations."""
-function test_time_stepping!(sim_cpu, sim_reactant, model_name; nsteps = NSTEPS, rtol = RTOL, atol = ATOL)
+function test_time_stepping!(sim_cpu, sim_reactant, model_name, r_first!, r_later!; nsteps = NSTEPS, rtol = RTOL, atol = ATOL)
     println("\n" * "-"^60)
     println("Testing time stepping ($nsteps steps)")
     println("-"^60)
@@ -165,7 +165,9 @@ function test_time_stepping!(sim_cpu, sim_reactant, model_name; nsteps = NSTEPS,
     SpeedyWeather.run!(sim_cpu; steps = nsteps)
 
     println("  Running Reactant model...")
-    SpeedyWeather.run!(sim_reactant; steps = nsteps)
+    initialize!(sim_reactant; steps = nsteps)
+    SpeedyWeather.time_stepping!(sim_reactant, r_first!, r_later!)
+    SpeedyWeather.finalize!(sim_reactant)
     println("  ✓ Time stepping completed")
 
     # Compare results
@@ -230,9 +232,15 @@ function test_model(ModelType::Type; trunc = TRUNC, nsteps = NSTEPS, rtol = RTOL
     println("  ✓ Models spun up")
 
     # Run tests
+    # Pre-compile Reactant functions once
+    println("\n[4/4] Pre-compiling Reactant functions...")
+    r_first! = @compile first_timesteps!(simulation_reactant)
+    r_later! = @compile later_timestep!(simulation_reactant)
+    println("  ✓ Reactant functions compiled")
+
     @testset "$model_name CPU vs Reactant" begin
-        tend_results = test_tendencies!(simulation_cpu, simulation_reactant, model_name; rtol, atol)
-        stepping_results = test_time_stepping!(simulation_cpu, simulation_reactant, model_name; nsteps, rtol, atol)
+        tend_results = test_tendencies!(simulation_cpu, simulation_reactant, model_name, r_first!, r_later!; rtol, atol)
+        stepping_results = test_time_stepping!(simulation_cpu, simulation_reactant, model_name, r_first!, r_later!; nsteps, rtol, atol)
     end
 
     println("\n" * "="^60)
