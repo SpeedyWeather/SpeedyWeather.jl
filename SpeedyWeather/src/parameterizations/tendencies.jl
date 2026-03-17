@@ -15,6 +15,7 @@ function parameterization_tendencies!(
     return nothing
 end
 
+# TODO also @generated for compile time loop?
 function global_parameterizations!(vars::Variables, model::PrimitiveEquation)
     for parameterization in get_parameterizations(model)
         parameterization!(vars, parameterization, model)
@@ -27,11 +28,11 @@ function column_parameterizations!(vars, model)
     (; architecture, npoints) = model.spectral_grid
     if architecture isa Architectures.AbstractCPU
         # bypass kernel launch on CPU
-        parameterization_tendencies_cpu!(vars, model)
+        column_parameterizations_cpu!(vars, model)
     else
         # GPU: all other parameterizations are fused into a single kernel over horizontal grid point index ij
         launch!(
-            architecture, LinearWorkOrder, (npoints,), parameterization_tendencies_kernel!,
+            architecture, LinearWorkOrder, (npoints,), column_parameterizations_kernel!,
             vars, get_parameterizations(model), model
         )
     end
@@ -39,52 +40,52 @@ function column_parameterizations!(vars, model)
 end
 
 # GPU kernel, unrolling NamedTuple iteration at compile time, fuses all parameterizations
-@kernel inbounds = true function parameterization_tendencies_kernel!(vars, parameterizations, model)
+@kernel inbounds = true function column_parameterizations_kernel!(vars, parameterizations, model)
 
     ij = @index(Global, Linear)     # every horizontal grid point ij
 
     # manually unroll loop over all parameterizations (NamedTuple iteration not GPU-compatible)
-    _call_parameterizations!(ij, vars, parameterizations, model)
+    column_parameterizations!(ij, vars, parameterizations, model)
 
     # tendencies have to be scaled by the radius for the dynamical core
     scale_tendencies!(ij, vars.tendencies.grid, model.planet.radius)
 end
 
+# Use @generated to unroll NamedTuple iteration at compile time for GPU compatibility
+@generated function column_parameterizations!(ij, vars, parameterizations::NamedTuple{names}, model) where {names}
+    calls = [:(parameterization!(ij, vars, parameterizations.$name, model)) for name in names]
+    return quote
+        Base.@_propagate_inbounds_meta
+        $(Expr(:block, calls...))
+    end
+end
+
 # CPU without kernel, just a loop, change loop order compared to GPU though:
 # outer loop over parameterizations, inner loop over horizontal grid points
 # this yields a more contiguous memory access pattern on CPU
-function parameterization_tendencies_cpu!(vars, model)
-    @inbounds _call_parameterizations_cpu!(vars, get_parameterizations(model), model)
+function column_parameterizations_cpu!(vars, model)
+    _column_parameterizations_cpu!(vars, get_parameterizations(model), model)
 
     # tendencies have to be scaled by the radius for the dynamical core
     @inbounds scale_tendencies!(vars.tendencies.grid, model.planet.radius)
     return nothing
 end
 
-# Use @generated to unroll NamedTuple iteration at compile time for GPU compatibility
-@generated function _call_parameterizations!(ij, vars, parameterizations::NamedTuple{names}, model) where {names}
-    calls = [:(parameterization!(ij, vars, parameterizations.$name, model)) for name in names]
-    quote
-        Base.@_propagate_inbounds_meta
-        $(Expr(:block, calls...))
-    end
-    return nothing
-end
-
 # Use @generated to unroll NamedTuple iteration at compile time also on CPU for performance
-@generated function _call_parameterizations_cpu!(vars, parameterizations::NamedTuple{names}, model) where {names}
+@generated function _column_parameterizations_cpu!(vars, parameterizations::NamedTuple{names}, model) where {names}
+    # runic: off
     calls = [
         quote
-                for ij in 1:model.geometry.npoints      # horizontal grid points inner loop
-                    parameterization!(ij, vars, parameterizations.$name, model)
+            for ij in 1:model.geometry.npoints      # horizontal grid points inner loop
+                parameterization!(ij, vars, parameterizations.$name, model)
             end
-            end for name in names
-    ]                    # parameterizations outer loop
-    quote
+        end for name in names                       # parameterizations outer loop
+    ]
+    # runic: on
+    return quote
         Base.@_propagate_inbounds_meta
         $(Expr(:block, calls...))
     end
-    return nothing
 end
 
 """$(TYPEDSIGNATURES)

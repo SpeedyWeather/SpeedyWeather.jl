@@ -17,7 +17,7 @@ $(TYPEDFIELDS)"""
     description::String = ""
 
     "[OPTION] Progress bar length, nothing = full window width"
-    progress_bar_length::Int = 20
+    progress_bar_length::Int = 0
 
     "[OPTION] show speed (e.g. in simulated years per day) in progress meter?"
     showspeed::Bool = true

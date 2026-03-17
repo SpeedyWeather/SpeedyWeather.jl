@@ -112,6 +112,9 @@ function parameterization!(vars::Variables, zenith::AbstractZenith, model::Primi
     return nothing
 end
 
+# as a global parameterization define the column parameterization as doing nothing
+parameterization!(ij, vars::Variables, zenith::AbstractZenith, model::PrimitiveEquation) = nothing
+
 export SolarZenith
 
 """Solar zenith angle varying with daily and seasonal cycle.

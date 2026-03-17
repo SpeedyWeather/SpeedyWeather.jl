@@ -380,7 +380,7 @@ function timestep!(
     model.feedback.nans_detected && return nothing  # exit immediately if NaRs already present
     reset_tendencies!(vars)             # set the tendencies back to zero for accumulation
 
-    if model.physics                    # switch on/off all physics parameterizations
+    if ~model.dynamics_only             # switch on/off all physics parameterizations
         # calculate all parameterizations
         parameterization_tendencies!(vars, model)
         ocean_timestep!(vars, model)    # sea surface temperature and maybe in the future sea ice
@@ -388,7 +388,7 @@ function timestep!(
         land_timestep!(vars, model)     # soil moisture and temperature, vegetation, maybe rivers
     end
 
-    if model.dynamics                                               # switch on/off all dynamics
+    if model.dynamics                                       # switch on/off all dynamics
         dynamics_tendencies!(vars, lf2, model)              # dynamical core
         implicit_correction!(vars, model.implicit, model)   # semi-implicit time stepping corrections
     else    # just transform physics tendencies to spectral space

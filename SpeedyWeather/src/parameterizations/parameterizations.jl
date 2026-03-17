@@ -17,10 +17,10 @@ indexing of arrays."""
 parameterization!
 
 """$(TYPEDSIGNATURES) Fallback when setting `parameterization=nothing` in the model constructor."""
-parameterization!(ij, vars, parameterization::Nothing, model) = nothing
+parameterization!(ij, vars::AbstractVariables, parameterization::Nothing, model) = nothing
 
 """$(TYPEDSIGNATURES) Fallback for parameterizations that don't have a global kernel."""
-parameterization!(vars, parameterization::Any, model) = nothing
+parameterization!(vars::AbstractVariables, parameterization::Any, model) = nothing
 
 """$(TYPEDSIGNATURES)
 Initialize an `AbstractParameterization`. This is called once at when calling initialize!(model). 

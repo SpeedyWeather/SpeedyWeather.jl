@@ -156,7 +156,7 @@ function output!(
     nlayers = size(simulation.variables.grid.temp, 2)
     T = simulation.variables.parameterizations.surface_air_temperature
 
-    if !simulation.model.physics    # otherwise this has been computed already
+    if simulation.model.dynamics_only    # otherwise this has been computed already
         # calculate the surface air temperature from lowest model level temperature
         # via dry adiabatic lapse rate
         T .= field_view(simulation.variables.grid.temp, :, nlayers)

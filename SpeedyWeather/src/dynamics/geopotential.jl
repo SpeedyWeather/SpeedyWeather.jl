@@ -31,16 +31,6 @@ function variables(::Geopotential)
     )
 end
 
-# function barrier to unpack only model components needed
-function initialize!(
-        geopotential::Geopotential,
-        model::PrimitiveEquation
-    )
-    model_parameters = (atmosphere = model.atmosphere, geometry = model.geometry)
-    initialize!(geopotential, model_parameters)
-    return nothing
-end
-
 """
 $(TYPEDSIGNATURES)
 Precomputes constants for the vertical integration of the geopotential, defined as
@@ -49,7 +39,7 @@ Precomputes constants for the vertical integration of the geopotential, defined 
 `Φ_k = Φ_{k+1/2} + R*T_k*(ln(p_{k+1/2}) - ln(p_k))` (full levels)
 
 Same formula but `k → k-1/2`."""
-function initialize!(G::Geopotential, model)
+function initialize!(G::Geopotential, model::PrimitiveEquation)
     (; Δp_geopot_half, Δp_geopot_full) = G
     (; R_dry) = model.atmosphere
     (; σ_levels_full, σ_levels_half) = model.geometry

@@ -74,15 +74,15 @@ $(TYPEDFIELDS)"""
     tracers::TRACER_DICT = TRACER_DICT()
 
     # BOUNDARY CONDITIONS
-    orography::OR = EarthOrography(spectral_grid)
-    land_sea_mask::LS = EarthLandSeaMask(spectral_grid)
-    ocean::OC = SlabOcean(spectral_grid)
-    sea_ice::SI = ThermodynamicSeaIce(spectral_grid)
-    land::LA = DryLandModel(spectral_grid)
+    dynamics_only::Bool = false
+    @component orography::OR = EarthOrography(spectral_grid)
+    @component land_sea_mask::LS = EarthLandSeaMask(spectral_grid)
+    @component ocean::OC = SlabOcean(spectral_grid)
+    @component sea_ice::SI = ThermodynamicSeaIce(spectral_grid)
+    @component land::LA = DryLandModel(spectral_grid)
     
     # PHYSICS/PARAMETERIZATIONS
-    physics::Bool = true
-    solar_zenith::ZE = WhichZenith(spectral_grid, planet)
+    @component solar_zenith::ZE = WhichZenith(spectral_grid, planet)
     @component albedo::AL = OceanLandAlbedo(spectral_grid)
     @component boundary_layer_drag::BL = BulkRichardsonDrag(spectral_grid)
     @component vertical_diffusion::VD = BulkRichardsonDiffusion(spectral_grid)
@@ -92,8 +92,8 @@ $(TYPEDFIELDS)"""
     @component convection::CV = BettsMillerDryConvection(spectral_grid)
     @component shortwave_radiation::SW = TransparentShortwave(spectral_grid)
     @component longwave_radiation::LW = OneBandGreyLongwave(spectral_grid)
-    stochastic_physics::SP = nothing
-    custom_parameterization::CP = nothing
+    @component stochastic_physics::SP = nothing
+    @component custom_parameterization::CP = nothing
 
     # NUMERICS
     time_stepping::TS = Leapfrog(spectral_grid)

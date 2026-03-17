@@ -77,16 +77,16 @@ $(TYPEDFIELDS)"""
     tracers::TRACER_DICT = TRACER_DICT()
 
     # BOUNDARY CONDITIONS
+    dynamics_only::Bool = false
     @component orography::OR = EarthOrography(spectral_grid)
     @component land_sea_mask::LS = EarthLandSeaMask(spectral_grid)
     @component ocean::OC = SlabOcean(spectral_grid)
     @component sea_ice::SI = ThermodynamicSeaIce(spectral_grid)
     @component land::LA = LandModel(spectral_grid)
+    
+    # PHYSICS/PARAMETERIZATIONS
     @component solar_zenith::ZE = WhichZenith(spectral_grid, planet)
     @component albedo::AL = OceanLandAlbedo(spectral_grid)
-
-    # PHYSICS/PARAMETERIZATIONS
-    physics::Bool = true
     @component boundary_layer_drag::BL = BulkRichardsonDrag(spectral_grid)
     @component vertical_diffusion::VD = BulkRichardsonDiffusion(spectral_grid)
     @component surface_condition::SC = SurfaceCondition(spectral_grid)
