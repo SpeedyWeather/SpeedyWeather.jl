@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- GitHub `actions/setup-node` updated to v6 [#1009](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1009)
 - Documentation for `MatrixSpectralTransform` added to SpeedyTransforms docs [#1006](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/1006)
 - MatrixSpectralTransform implemented [#952](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/952)
 - `get_asset` now supports optional `output_grid` [#1004](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1004)
