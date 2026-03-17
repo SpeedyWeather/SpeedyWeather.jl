@@ -10,25 +10,21 @@
 
         initialize!(model.stochastic_physics, model)
 
-        progn = PrognosticVariables(model)
-        diagn = DiagnosticVariables(model)
+        vars = Variables(model)
 
-        SpeedyWeather.random_process!(progn, model.random_process)
-        r_grid = diagn.grid.random_pattern
-        r_spec = progn.random_pattern
-        transform!(r_grid, r_spec, diagn.dynamics.scratch_memory, model.spectral_transform)
+        SpeedyWeather.random_process!(vars, model.random_process)
 
         # execute only one parameterization
-        ij = rand(1:model.spectral_grid.npoints)
-        SpeedyWeather.parameterization!(ij, diagn, progn, model.longwave_radiation, model)
+        ij = rand(1:model.geometry.npoints)
+        SpeedyWeather.parameterization!(ij, vars, model.longwave_radiation, model)
 
-        dTdt = diagn.tendencies.temp_tend_grid[ij, end]
+        dTdt = vars.tendencies.grid.temp[ij, end]
         @test dTdt != 0
 
         # now stochastic perturbation and check it's not the same
-        SpeedyWeather.parameterization!(ij, diagn, progn, model.stochastic_physics, model)
+        SpeedyWeather.parameterization!(ij, vars, model.stochastic_physics, model)
 
-        dTdt2 = diagn.tendencies.temp_tend_grid[ij, end]
+        dTdt2 = vars.tendencies.grid.temp[ij, end]
         @test dTdt2 != dTdt != 0
     end
 end

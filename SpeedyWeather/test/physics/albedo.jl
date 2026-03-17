@@ -12,12 +12,11 @@ import Statistics: mean
             model = Model(spectral_grid; albedo)
 
             initialize!(albedo, model)
-            progn = PrognosticVariables(model)
-            diagn = DiagnosticVariables(model)
-            SpeedyWeather.parameterization_tendencies!(diagn, progn, model)
+            vars = Variables(model)
+            SpeedyWeather.parameterization_tendencies!(vars, model)
 
-            a, b = extrema(diagn.physics.albedo)
-            m = mean(diagn.physics.albedo)
+            a, b = extrema(vars.parameterizations.albedo)
+            m = mean(vars.parameterizations.albedo)
             @test a >= 0
             @test b <= 1
             @test 0 < m < 1
@@ -43,18 +42,17 @@ end
                 model = Model(spectral_grid; albedo)
 
                 initialize!(albedo, model)
-                progn = PrognosticVariables(model)
-                diagn = DiagnosticVariables(model)
-                SpeedyWeather.parameterization_tendencies!(diagn, progn, model)
+                vars = Variables(model)
+                SpeedyWeather.parameterization_tendencies!(vars, model)
 
-                a, b = extrema(diagn.physics.land.albedo)
-                m = mean(diagn.physics.land.albedo)
+                a, b = extrema(vars.parameterizations.land.albedo)
+                m = mean(vars.parameterizations.land.albedo)
                 @test a >= 0
                 @test b <= 1
                 @test 0 < m < 1
 
-                a, b = extrema(diagn.physics.ocean.albedo)
-                m = mean(diagn.physics.ocean.albedo)
+                a, b = extrema(vars.parameterizations.ocean.albedo)
+                m = mean(vars.parameterizations.ocean.albedo)
                 @test a >= 0
                 @test b <= 1
                 @test 0 < m < 1

@@ -12,19 +12,19 @@
         DiagnosticVariable(name = :my_albedo, dims = Grid2D(), desc = "Albedo", units = "1"),
     )
 
-    # note that for albedos should actually define `albedo!(ij, diagn, progn, albedo, model)`
+    # note that for albedos should actually define `albedo!(ij, vars, albedo, model)`
     # as they are applied to ocean/land separately but ignore this here and implement this like any other parameterization
     # in practice this conflicts with the shortwave radiation scheme that also doesn't know about the `my_albedo` variable
-    function SpeedyWeather.parameterization!(ij, diagn::DiagnosticVariables, progn, albedo::SimpleAlbedo, model)
+    function SpeedyWeather.parameterization!(ij, vars::Variables, albedo::SimpleAlbedo, model)
 
         (; land_sea_mask) = model
-        (; sea_ice_concentration) = progn.ocean
+        (; sea_ice_concentration) = vars.prognostic.ocean
         (; land_albedo, seaice_albedo, ocean_albedo) = albedo
 
         if land_sea_mask.mask[ij] > 0.95 # if mostly land
-            diagn.physics.my_albedo[ij] = land_albedo
+            vars.parameterizations.my_albedo[ij] = land_albedo
         else # if ocean
-            diagn.physics.my_albedo[ij] = ocean_albedo + sea_ice_concentration[ij] * (seaice_albedo - ocean_albedo)
+            vars.parameterizations.my_albedo[ij] = ocean_albedo + sea_ice_concentration[ij] * (seaice_albedo - ocean_albedo)
         end
     end
 
@@ -34,13 +34,13 @@
     model = PrimitiveWetModel(spectral_grid; albedo = albedo)
     simulation = initialize!(model)
 
-    # check if albedo in diagn
-    @test haskey(simulation.diagnostic_variables.physics, :my_albedo)
+    # check if albedo in vars.parameterizations
+    @test haskey(simulation.variables.parameterizations, :my_albedo)
 
     run!(simulation, steps = 3)       # run only a few time steps
-    progn, diagn, model = SpeedyWeather.unpack(simulation)
+    vars, model = SpeedyWeather.unpack(simulation)
 
-    (; my_albedo) = diagn.physics
+    (; my_albedo) = vars.parameterizations
     (; mask) = model.land_sea_mask
 
     for ij in eachindex(my_albedo, mask)
@@ -65,9 +65,9 @@
 
     simulation = initialize!(model)
     run!(simulation, steps = 3)    # run only a few time steps
-    progn, diagn, model = SpeedyWeather.unpack(simulation)
+    vars, model = SpeedyWeather.unpack(simulation)
 
-    (; my_albedo) = diagn.physics
+    (; my_albedo) = vars.parameterizations
     (; mask) = model.land_sea_mask
 
     for ij in eachindex(my_albedo, mask)

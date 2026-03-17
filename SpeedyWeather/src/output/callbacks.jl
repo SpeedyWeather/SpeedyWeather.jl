@@ -128,12 +128,12 @@ Allocates vector of correct length (number of elements = total time steps plus o
 global surface temperature of the initial conditions"""
 function initialize!(
         callback::GlobalSurfaceTemperatureCallback{NF},
-        progn::PrognosticVariables,
-        diagn::DiagnosticVariables,
+        vars::Variables,
         model::AbstractModel,
     ) where {NF}
-    callback.temp = Vector{NF}(undef, progn.clock.n_timesteps + 1)    # replace with vector of correct length
-    callback.temp[1] = diagn.temp_average[diagn.nlayers]            # set initial conditions
+    callback.temp = Vector{NF}(undef, vars.prognostic.clock.n_timesteps + 1)    # replace with vector of correct length
+    nlayers = model.geometry.nlayers
+    callback.temp[1] = vars.grid.temp_average[nlayers]            # set initial conditions
     return callback.timestep_counter = 1                                   # (re)set counter to 1
 end
 
@@ -143,13 +143,13 @@ Pulls the average temperature from the lowermost layer and stores it in the next
 element of the callback.temp vector."""
 function callback!(
         callback::GlobalSurfaceTemperatureCallback,
-        progn::PrognosticVariables,
-        diagn::DiagnosticVariables,
+        vars::Variables,
         model::AbstractModel,
     )
     callback.timestep_counter += 1
     i = callback.timestep_counter
-    return callback.temp[i] = diagn.temp_average[diagn.nlayers]
+    nlayers = model.geometry.nlayers
+    return callback.temp[i] = vars.grid.temp_average[nlayers]
 end
 
 # nothing to finalize

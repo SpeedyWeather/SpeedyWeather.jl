@@ -155,9 +155,9 @@ So at the current state of our simulation we have a total energy
 
 ```@example analysis
 # flat copies for convenience
-u = simulation.diagnostic_variables.grid.u_grid[:, 1]
-v = simulation.diagnostic_variables.grid.v_grid[:, 1]
-η = simulation.diagnostic_variables.grid.pres_grid
+u = simulation.variables.grid.u[:, 1]
+v = simulation.variables.grid.v[:, 1]
+η = simulation.variables.grid.η
 
 TE = total_energy(u, v, η, model)
 ```
@@ -209,11 +209,11 @@ as
 
 ```@example analysis
 # vorticity
-ζ = simulation.diagnostic_variables.grid.vor_grid[:,1]
+ζ = simulation.variables.grid.vor[:,1]
 f = coriolis(ζ)     # create f on that grid
 
 # layer thickness
-η = simulation.diagnostic_variables.grid.pres_grid
+η = simulation.variables.grid.η
 H = model.atmosphere.layer_thickness
 Hb = model.orography.orography
 h = @. η + H - Hb
@@ -428,14 +428,14 @@ function global_diagnostics(u, v, ζ, η, model)
 end
 
 # unpack diagnostic variables and call global_diagnostics from above
-function global_diagnostics(diagn::DiagnosticVariables, model::AbstractModel)
-    u = diagn.grid.u_grid[:, 1]
-    v = diagn.grid.v_grid[:, 1]
-    ζR = diagn.grid.vor_grid[:, 1]
-    η = diagn.grid.pres_grid
+function global_diagnostics(vars::Variables, model::AbstractModel)
+    u = vars.grid.u[:, 1]
+    v = vars.grid.v[:, 1]
+    ζR = vars.grid.vor[:, 1]
+    η = vars.grid.η
 
     # vorticity during simulation is scaled by radius R, unscale here
-    ζ = ζR ./ diagn.scale[]
+    ζ = ζR ./ vars.prognostic.scale[]
 
     return global_diagnostics(u, v, ζ, η, model)
 end
@@ -449,7 +449,7 @@ end
     before the time integration and is undone directly after it. However, because
     now we are accessing the vorticity _during_ the simulation we need to unscale
     the vorticity (and divergence) manually. General recommendation is to divide
-    by `diagn.scale[]` (and not `radius`) as `diagn.scale[]` always reflects whether
+    by `vars.prognostic.scale[]` (and not `radius`) as `vars.prognostic.scale[]` always reflects whether
     a vorticity and divergence are currently scaled (scale = radius) or not (scale = 1).
 
 Then we define a new callback `GlobalDiagnostics` subtype of SpeedyWeather's
@@ -474,12 +474,11 @@ end
 # define how to initialize a GlobalDiagnostics callback
 function SpeedyWeather.initialize!(
     callback::GlobalDiagnostics,
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
+    vars::Variables,
     model::AbstractModel,
 )
     # replace with vector of correct length
-    n = progn.clock.n_timesteps + 1    # +1 for initial conditions
+    n = vars.prognostic.clock.n_timesteps + 1    # +1 for initial conditions
     callback.time = zeros(DateTime, n)
     callback.M = zeros(n)
     callback.C = zeros(n)
@@ -488,9 +487,9 @@ function SpeedyWeather.initialize!(
     callback.P = zeros(n)
     callback.Q = zeros(n)
 
-    M, C, Λ, K, P, Q = global_diagnostics(diagn, model)
+    M, C, Λ, K, P, Q = global_diagnostics(vars, model)
 
-    callback.time[1] = progn.clock.time
+    callback.time[1] = vars.prognostic.clock.time
     callback.M[1] = M  # set initial conditions
     callback.C[1] = C  # set initial conditions
     callback.Λ[1] = Λ  # set initial conditions
@@ -506,17 +505,16 @@ end
 # define what a GlobalDiagnostics callback does on every time step
 function SpeedyWeather.callback!(
     callback::GlobalDiagnostics,
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
+    vars::Variables,
     model::AbstractModel,
 )
     callback.timestep_counter += 1
     i = callback.timestep_counter
 
-    M, C, Λ, K, P, Q = global_diagnostics(diagn, model)
+    M, C, Λ, K, P, Q = global_diagnostics(vars, model)
 
     # store current time and diagnostics for timestep i
-    callback.time[i] = progn.clock.time
+    callback.time[i] = vars.prognostic.clock.time
     callback.M[i] = M
     callback.C[i] = C
     callback.Λ[i] = Λ
@@ -528,12 +526,7 @@ end
 using NCDatasets
 
 # define how to finalize a GlobalDiagnostics callback after simulation finished
-function SpeedyWeather.finalize!(
-    callback::GlobalDiagnostics,
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
-    model::AbstractModel,
-)
+function SpeedyWeather.finalize!(callback::GlobalDiagnostics, args...)
     n_timesteps = callback.timestep_counter
 
     # create a netCDF file in current path

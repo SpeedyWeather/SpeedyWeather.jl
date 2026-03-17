@@ -11,9 +11,8 @@
             model = Model(spectral_grid; land)
             initialize!(model.land, model)
 
-            progn = PrognosticVariables(model)
-            diagn = DiagnosticVariables(model)
-            SpeedyWeather.land_timestep!(progn, diagn, model)
+            vars = Variables(model)
+            SpeedyWeather.land_timestep!(vars, model)
         end
     end
 end
@@ -41,9 +40,8 @@ end
 
                     # just test that no errors are thrown
                     initialize!(land, model)
-                    progn = PrognosticVariables(model)
-                    diagn = DiagnosticVariables(model)
-                    SpeedyWeather.land_timestep!(progn, diagn, model)
+                    vars = Variables(model)
+                    SpeedyWeather.land_timestep!(vars, model)
                 end
             end
         end
@@ -64,14 +62,13 @@ end
 
             # just test that no errors are thrown
             initialize!(land, model)
-            progn = PrognosticVariables(model)
-            diagn = DiagnosticVariables(model)
-            SpeedyWeather.land_timestep!(progn, diagn, model)
+            vars = Variables(model)
+            SpeedyWeather.land_timestep!(vars, model)
 
             if snow isa SnowModel
-                @test all(isfinite.(progn.land.snow_depth))
+                @test all(isfinite.(vars.prognostic.land.snow_depth))
             else
-                @test !haskey(progn.land, :snow_depth)
+                @test !haskey(vars.prognostic.land, :snow_depth)
             end
         end
     end

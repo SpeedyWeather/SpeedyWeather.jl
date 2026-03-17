@@ -1,4 +1,4 @@
-@testset "PrognosticVariables initialize, zero, fill!, one" begin
+@testset "Variables initialize, zero, fill!, one" begin
 
     NF = Float32
     nlayers = 2
@@ -11,7 +11,7 @@
     run!(simulation, period = Day(1), output = false)
 
     # zero test
-    progn = simulation.prognostic_variables
+    progn = simulation.variables.prognostic
 
     progn_new = zero(progn)
 

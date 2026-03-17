@@ -68,16 +68,16 @@ And we'll go through them one by one.
 ```@example callbacks
 function SpeedyWeather.initialize!(
     callback::StormChaser,
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
+    vars::Variables,
     model::AbstractModel,
 )
     # allocate recorder: number of time steps (incl initial conditions) in simulation
-    callback.maximum_surface_wind_speed = zeros(progn.clock.n_timesteps + 1)
+    callback.maximum_surface_wind_speed = zeros(vars.prognostic.clock.n_timesteps + 1)
 
     # where surface (=lowermost model layer) u, v on the grid are stored
-    u_grid = diagn.grid.u_grid[:, diagn.nlayers]
-    v_grid = diagn.grid.u_grid[:, diagn.nlayers]
+    nlayers = model.geometry.nlayers
+    u_grid = vars.grid.u[:, nlayers]
+    v_grid = vars.grid.v[:, nlayers]
 
     # maximum wind speed of initial conditions
     callback.maximum_surface_wind_speed[1] = max_2norm(u_grid, v_grid)
@@ -87,7 +87,7 @@ function SpeedyWeather.initialize!(
 end
 ```
 The `initialize!` function has to be extended for the new callback `::StormChaser` as first
-argument, then followed by prognostic and diagnostic variables and model. For correct
+argument, then followed by `vars::Variables` (all model variables) and `model`. For correct
 multiple dispatch it is important to restrict the first argument to the new `StormChaser` type
 (to not call another callback instead), but the other type declarations are for clarity only.
 `initialize!(::AbstractCallback, args...)` is called once just before the main time loop,
@@ -117,8 +117,7 @@ Then we need to extend the `callback!` function as follows
 ```@example callbacks
 function SpeedyWeather.callback!(
     callback::StormChaser,
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
+    vars::Variables,
     model::AbstractModel,
 )
 
@@ -127,15 +126,16 @@ function SpeedyWeather.callback!(
     i = callback.timestep_counter
 
     # where surface (=lowermost model layer) u, v on the grid are stored
-    u_grid = diagn.grid.u_grid[:, diagn.nlayers]
-    v_grid = diagn.grid.u_grid[:, diagn.nlayers]
+    nlayers = model.geometry.nlayers
+    u_grid = vars.grid.u[:, nlayers]
+    v_grid = vars.grid.v[:, nlayers]
 
     # maximum wind speed at current time step
     callback.maximum_surface_wind_speed[i] = max_2norm(u_grid, v_grid)
 end
 ```
 The function signature for `callback!` is the same as for `initialize!`. You may
-access anything from `progn`, `diagn` or `model`, although for a purely diagnostic
+access anything from `vars` or `model`, although for a purely diagnostic
 callback this should be read-only. While you could change other model components like the
 land sea mask in `model.land_sea_mask` or orography etc. then you interfere with the
 simulation which is more advanced and will be discussed in Intrusive callbacks below.
@@ -308,24 +308,23 @@ end
 
 function SpeedyWeather.initialize!(
     callback::MyScheduledCallback,
-    progn::PrognosticVariables,
+    vars::Variables,
     args...
 )
     # when initializing a scheduled callback also initialize its schedule!
-    initialize!(callback.schedule, progn.clock)
+    initialize!(callback.schedule, vars.prognostic.clock)
 
     # initialize other things in your callback here
 end
 
 function SpeedyWeather.callback!(
     callback::MyScheduledCallback,
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
+    vars::Variables,
     model::AbstractModel,
 )
     # scheduled callbacks start with this line to execute only when scheduled!
     # else escape immediately
-    isscheduled(callback.schedule, progn.clock) || return nothing
+    isscheduled(callback.schedule, vars.prognostic.clock) || return nothing
 
     # Just print the North Pole surface temperature to screen
     (;time) = progn.clock
