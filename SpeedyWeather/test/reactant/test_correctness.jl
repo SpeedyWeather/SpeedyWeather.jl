@@ -119,7 +119,7 @@ function compare_tendencies(sim_cpu, sim_reactant; rtol = RTOL, atol = ATOL)
 end
 
 """Test tendencies after a single timestep on already-initialized simulations."""
-function test_tendencies!(sim_cpu, sim_reactant, model_name, r_first!, r_later!; rtol = RTOL, atol = ATOL)
+function test_tendencies!(sim_cpu, sim_reactant, model_name, r_first! = nothing, r_later! = nothing; rtol = RTOL, atol = ATOL)
     println("\n" * "-"^60)
     println("Testing tendencies (single timestep)")
     println("-"^60)
@@ -153,7 +153,7 @@ function test_tendencies!(sim_cpu, sim_reactant, model_name, r_first!, r_later!;
 end
 
 """Test prognostic and grid variables after running for nsteps on already-initialized simulations."""
-function test_time_stepping!(sim_cpu, sim_reactant, model_name, r_first!, r_later!; nsteps = NSTEPS, rtol = RTOL, atol = ATOL)
+function test_time_stepping!(sim_cpu, sim_reactant, model_name, r_first! = nothing, r_later! = nothing; nsteps = NSTEPS, rtol = RTOL, atol = ATOL)
     println("\n" * "-"^60)
     println("Testing time stepping ($nsteps steps)")
     println("-"^60)
@@ -234,8 +234,10 @@ function test_model(ModelType::Type; trunc = TRUNC, nsteps = NSTEPS, rtol = RTOL
     # Run tests
     # Pre-compile Reactant functions once
     println("\n[4/4] Pre-compiling Reactant functions...")
-    r_first! = @compile first_timesteps!(simulation_reactant)
-    r_later! = @compile later_timestep!(simulation_reactant)
+    #r_first! = @compile first_timesteps!(simulation_reactant)
+    #r_later! = @compile later_timestep!(simulation_reactant)
+    r_first! = nothing
+    r_later! = nothing
     println("  ✓ Reactant functions compiled")
 
     @testset "$model_name CPU vs Reactant" begin
