@@ -15,12 +15,17 @@ function parameterization_tendencies!(
     return nothing
 end
 
-# TODO also @generated for compile time loop?
 function global_parameterizations!(vars::Variables, model::PrimitiveEquation)
-    for parameterization in get_parameterizations(model)
-        parameterization!(vars, parameterization, model)
-    end
+    _global_parameterizations!(vars, get_parameterizations(model), model)
     return nothing
+end
+
+# Use @generated to unroll NamedTuple iteration at compile time
+@generated function _global_parameterizations!(vars, parameterizations::NamedTuple{names}, model) where {names}
+    calls = [:(parameterization!(vars, parameterizations.$name, model)) for name in names]
+    return quote
+        $(Expr(:block, calls...))
+    end
 end
 
 # COLUMN-BASED PARAMETERIZATIONS
