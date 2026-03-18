@@ -54,9 +54,7 @@ function SpeedyWeather.time_stepping!(simulation::ReactantSimulation, r_first_ti
     #    r_later_timestep!(simulation)
     #end
 
-    if clock.timestep_counter == 0
-        r_first_timesteps!(simulation)
-    end
+    r_first_timesteps!(simulation)
 
     for _ in clock.timestep_counter:clock.n_timesteps
         r_later_timestep!(simulation)
