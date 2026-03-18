@@ -8,6 +8,14 @@ function sync_variables!(sim_cpu, sim_reactant)
     # Sync vorticity from Reactant to CPU (copy underlying data)
     copyto!(progn_cpu.vor.data, Array(progn_reactant.vor.data))
 
+    # Sync clock from Reactant to CPU
+    clock_cpu = progn_cpu.clock
+    clock_reactant = progn_reactant.clock
+    clock_cpu.time = DateTime(clock_reactant.time)
+    clock_cpu.start = DateTime(clock_reactant.start)
+    clock_cpu.timestep_counter = Int(clock_reactant.timestep_counter)
+    clock_cpu.n_timesteps = Int(clock_reactant.n_timesteps)
+
     #TODO: for the other models add more varibles
     return
 end
@@ -182,7 +190,7 @@ function test_time_stepping!(sim_cpu, sim_reactant, model_name, r_first! = nothi
     println("  Mean relative difference: $(progn_results[:vor].mean_rel_diff)")
 
     println("\nGrid variable comparison after $nsteps steps:")
-    for name in (:u_grid, :vor_grid) # add :v_grid again later
+    for name in (:u_grid, :v_grid, :vor_grid)
         println("  $name:")
         println("    Max absolute difference:  $(grid_results[name].max_abs_diff)")
         println("    Mean absolute difference: $(grid_results[name].mean_abs_diff)")
@@ -227,8 +235,8 @@ function test_model(ModelType::Type; trunc = TRUNC, nsteps = NSTEPS, rtol = RTOL
 
     # spin up models a bit
     println("\n[3/3] Spinning up models...")
-    run!(simulation_cpu; period = Day(20))
-    run!(simulation_reactant; period = Day(20))
+    #run!(simulation_cpu; period = Day(5))
+    run!(simulation_reactant; period = Day(100)) # we copy from Reactant to cpu later so only there we need a spin up, we need a long spin up, because with some ICs we get mostly zonal flow otherwise
     println("  ✓ Models spun up")
 
     # Run tests
