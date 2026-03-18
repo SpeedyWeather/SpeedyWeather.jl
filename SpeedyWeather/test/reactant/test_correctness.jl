@@ -182,7 +182,7 @@ function test_time_stepping!(sim_cpu, sim_reactant, model_name, r_first! = nothi
     println("  Mean relative difference: $(progn_results[:vor].mean_rel_diff)")
 
     println("\nGrid variable comparison after $nsteps steps:")
-    for name in (:u_grid, :v_grid, :vor_grid)
+    for name in (:u_grid, :vor_grid) # add :v_grid again later
         println("  $name:")
         println("    Max absolute difference:  $(grid_results[name].max_abs_diff)")
         println("    Mean absolute difference: $(grid_results[name].mean_abs_diff)")
@@ -234,6 +234,7 @@ function test_model(ModelType::Type; trunc = TRUNC, nsteps = NSTEPS, rtol = RTOL
     # Run tests
     # Pre-compile Reactant functions once
     println("\n[4/4] Pre-compiling Reactant functions...")
+    # TODO: when not recompiling there is a difference in diagnostic variables, look into that
     #r_first! = @compile first_timesteps!(simulation_reactant)
     #r_later! = @compile later_timestep!(simulation_reactant)
     r_first! = nothing

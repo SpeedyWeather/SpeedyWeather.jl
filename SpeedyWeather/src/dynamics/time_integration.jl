@@ -241,7 +241,7 @@ function first_timesteps!(simulation::AbstractSimulation)
 
     # decide whether to start with 1x Euler then 1x Leapfrog at Δt
     # TODO: this causes problems with Reactant when traced / or when not traced as a regular if loop in reverse mode
-    ifelse(
+    @trace ifelse(
         time_stepping.first_step_euler,
         begin
             first_timesteps!(progn, diagn, model)
