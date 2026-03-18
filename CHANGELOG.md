@@ -4,7 +4,12 @@
 
 - Broadcasting for LTA and RingGrids revised [#977](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/977)
 - Reactant support [#970](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/970)
+- GitHub `actions/setup-node` updated to v6 [#1009](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1009)
+- Documentation for `MatrixSpectralTransform` added to SpeedyTransforms docs [#1006](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/1006)
 - MatrixSpectralTransform implemented [#952](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/952)
+- `get_asset` now supports optional `output_grid` [#1004](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1004)
+- Switch documentation to DocumenterVitepress for a modern VitePress-based theme [#1002](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1002) [#1008](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1008)
+- Move `get_asset` to RingGrids with NCDatasets extension; make `assets_url` and `version` kwargs [#996](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/996)
 - Small fixes to improve Enzyme CI [#995](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/995)
 - JuliaActions Cache upgraded to v3 [#1001](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1001)
 - Remove `@Const` from kernels [#1000](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1000)

@@ -65,6 +65,11 @@ end
             @testset for Grid in (
                     FullGaussianGrid,
                     OctahedralGaussianGrid,
+                    FullClenshawGrid,
+                    OctahedralClenshawGrid,
+                    HEALPixGrid,
+                    OctaminimalGaussianGrid,
+                    OctaHEALPixGrid,
                 )
 
                 nlayers = 8

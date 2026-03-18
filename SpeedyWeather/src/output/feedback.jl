@@ -65,7 +65,7 @@ function initialize!(feedback::Feedback, clock::Clock, model::AbstractModel)
     # used to pass on the time step to ProgressMeter.speedstring
     FEEDBACK_DT_IN_SEC[] = model.time_stepping.Δt_sec
     FEEDBACK_TIME[] = clock.time
-    
+
     # reset those to default (-1 not shown, 0 shown)
     FEEDBACK_UMAX[] = feedback.show_umax ? 0 : -1
     FEEDBACK_TMIN[] = feedback.show_temperature_range ? 0 : -1
@@ -105,7 +105,7 @@ function progress!(feedback::Feedback, progn::PrognosticVariables, diagn::Diagno
     return nothing
 end
 
-progress!(::Nothing, progn::PrognosticVariables) = nothing
+progress!(::Nothing, progn::PrognosticVariables, diagn::DiagnosticVariables) = nothing
 
 """
 $(TYPEDSIGNATURES)
@@ -157,9 +157,9 @@ end
 # constant from the ProgressMeter module
 const FEEDBACK_DT_IN_SEC = Ref(1.0)
 const FEEDBACK_TIME = Ref(DEFAULT_DATE)
-const FEEDBACK_UMAX = Ref(-1f0)     # default negative = skip show
-const FEEDBACK_TMIN = Ref(-1f0)
-const FEEDBACK_TMAX = Ref(-1f0)
+const FEEDBACK_UMAX = Ref(-1.0f0)     # default negative = skip show
+const FEEDBACK_TMIN = Ref(-1.0f0)
+const FEEDBACK_TMAX = Ref(-1.0f0)
 
 # "extend" the speedstring function from ProgressMeter by defining it for ::AbstractFloat
 # not just ::Any to effectively overwrite it

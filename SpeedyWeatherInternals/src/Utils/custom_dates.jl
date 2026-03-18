@@ -4,12 +4,12 @@ module TracableDates
 # Standalone replacement for Julia's Dates module with `value::IntType` instead of `value::Int64`
 # so that Reactant can trace through the integer operations.
 # This code is mostly LLM generated, instructed to copy the Julia.Base implementation
-# This code or something similar will likely become a part of Reactant very soon 
+# This code or something similar will likely become a part of Reactant very soon
 
 # types (matching Dates exports)
 export Period, DatePeriod, TimePeriod
 export Millisecond, Second, Minute, Hour, Day, Week, Month, Year
-export DateTime
+export DateTime, Date
 export CompoundPeriod
 # additional types not in Dates
 export Century, Millenium
@@ -17,7 +17,7 @@ export Century, Millenium
 export year, month, day, hour, minute, second, millisecond, yearmonthday
 export dayofyear, daysinmonth, isleapyear, firstdayofmonth
 # functions (matching Dates exports)
-export canonicalize, now
+export canonicalize, now, format
 
 # ============================================================================
 # ABSTRACT TYPES
@@ -410,6 +410,131 @@ function DateTime(
 end
 
 # ============================================================================
+# DATE — parametric (stores day count, like Dates.Date)
+# ============================================================================
+"""
+    Date{IntType}
+
+A parametric Date type where the underlying day counter is of type `IntType`.
+Mirrors `Dates.Date` but allows non-Int64 integer types for Reactant compatibility."""
+struct Date{IntType} <: AbstractDateTime
+    instant::UTInstant{Day{IntType}}
+    Date{IntType}(instant::UTInstant{Day{IntType}}) where {IntType} = new{IntType}(instant)
+end
+
+# Convenience: infer IntType from instant
+Date(instant::UTInstant{Day{IntType}}) where {IntType} = Date{IntType}(instant)
+
+# UTD helper
+_UTD(x) = UTInstant(Day(x))
+
+# value accessor for Date (returns days since epoch)
+value(dt::Date) = value(dt.instant.periods)
+
+# Core constructor from parts
+function Date(y::Int64, m::Int64 = 1, d::Int64 = 1)
+    return Date(_UTD(_totaldays(y, m, d)))
+end
+
+# Fallback constructor from any integers
+Date(y, m = 1, d = 1) = Date(Int64(y), Int64(m), Int64(d))
+
+# Convenience constructors from Period types
+function Date(y::Year, m::Month = Month(1), d::Day = Day(1))
+    return Date(value(y), value(m), value(d))
+end
+
+# ============================================================================
+# DATE ACCESSORS
+# ============================================================================
+year(dt::Date) = _year(value(dt))
+month(dt::Date) = _month(value(dt))
+day(dt::Date) = _day(value(dt))
+yearmonthday(dt::Date) = _yearmonthday(value(dt))
+dayofyear(dt::Date) = _dayofyear(value(dt))
+
+# ============================================================================
+# DATE PRINTING
+# ============================================================================
+function Base.show(io::IO, dt::Date)
+    y, m, d = yearmonthday(dt)
+    return print(io, _pad4(y), '-', _pad2(m), '-', _pad2(d))
+end
+
+Base.show(io::IO, ::MIME"text/plain", dt::Date) = show(io, dt)
+
+# ============================================================================
+# DATE EQUALITY AND COMPARISON
+# ============================================================================
+Base.:(==)(x::Date, y::Date) = value(x) == value(y)
+Base.isless(x::Date, y::Date) = isless(value(x), value(y))
+Base.isfinite(::Union{Type{<:Date}, Date}) = true
+Base.zero(::Type{Date}) = Date(_UTD(0))
+Base.zero(::Type{Date{I}}) where {I} = Date{I}(UTInstant(Day{I}(zero(I))))
+Base.zero(::Date{I}) where {I} = Date{I}(UTInstant(Day{I}(zero(I))))
+
+# ============================================================================
+# DATE ARITHMETIC
+# ============================================================================
+# Date - Date -> Day
+Base.:(-)(x::Date, y::Date) = Day(value(x) - value(y))
+
+# Date +/- Day
+Base.:(+)(x::Date, y::Day) = Date(_UTD(value(x) + value(y)))
+Base.:(-)(x::Date, y::Day) = Date(_UTD(value(x) - value(y)))
+Base.:(+)(y::Day, x::Date) = x + y
+
+# Date +/- Week
+Base.:(+)(x::Date, y::Week) = x + Day(value(y) * 7)
+Base.:(-)(x::Date, y::Week) = x - Day(value(y) * 7)
+Base.:(+)(y::Week, x::Date) = x + y
+
+# Date + Year
+function Base.:(+)(dt::Date, y::Year)
+    oy, m, d = yearmonthday(dt)
+    ny = oy + value(y)
+    ld = daysinmonth(ny, m)
+    return Date(ny, m, d <= ld ? d : ld)
+end
+
+function Base.:(-)(dt::Date, y::Year)
+    oy, m, d = yearmonthday(dt)
+    ny = oy - value(y)
+    ld = daysinmonth(ny, m)
+    return Date(ny, m, d <= ld ? d : ld)
+end
+
+# Date + Month
+function Base.:(+)(dt::Date, z::Month)
+    y, m, d = yearmonthday(dt)
+    ny = _yearwrap(y, m, value(z))
+    mm = _monthwrap(m, value(z))
+    ld = daysinmonth(ny, mm)
+    return Date(ny, mm, d <= ld ? d : ld)
+end
+
+function Base.:(-)(dt::Date, z::Month)
+    y, m, d = yearmonthday(dt)
+    ny = _yearwrap(y, m, -value(z))
+    mm = _monthwrap(m, -value(z))
+    ld = daysinmonth(ny, mm)
+    return Date(ny, mm, d <= ld ? d : ld)
+end
+
+Base.:(+)(y::Year, x::Date) = x + y
+Base.:(+)(y::Month, x::Date) = x + y
+
+# Multiple periods
+Base.:(+)(a::Date, b::Period, c::Period) = a + b + c
+Base.:(+)(a::Date, b::Period, c::Period, d::Period...) = (+)((a + b + c), d...)
+
+# ============================================================================
+# DATE <-> DATETIME CONVERSION
+# ============================================================================
+Date(dt::DateTime) = Date(_UTD(fld(value(dt), 86400000)))
+DateTime(dt::Date) = DateTime(_UTM(value(dt) * 86400000))
+
+# ============================================================================
 # DATETIME ACCESSORS
 # ============================================================================
 function year(dt::DateTime)
@@ -559,6 +684,12 @@ function firstdayofmonth(dt::DateTime)
     return DateTime(y, m, 1)
 end
 
+# first day of the month for a given Date
+function firstdayofmonth(dt::Date)
+    y, m, _ = yearmonthday(dt)
+    return Date(y, m, 1)
+end
+
 # second accessor for Millisecond (used in schedule.jl: Dates.second(every_n_timesteps * clock.Δt))
 second(ms::Millisecond) = div(value(ms), 1000)
 
@@ -579,6 +710,14 @@ function format(dt::DateTime, fmt::String = "yyyy-mm-ddTHH:MM:SS")
     return result
 end
 
+function format(dt::Date, fmt::String = "yyyy-mm-dd")
+    y, m, d = yearmonthday(dt)
+    result = replace(fmt, "yyyy" => _pad4(y))
+    result = replace(result, "mm" => _pad2(m))
+    result = replace(result, "dd" => _pad2(d))
+    return result
+end
+
 # RFC1123-like format for now() replacement
 function now()
     # Return a fixed "now" — in practice this is only used for logging
@@ -589,7 +728,7 @@ end
 # ============================================================================
 # BROADCASTING SUPPORT
 # ============================================================================
-Base.Broadcast.broadcastable(x::Union{Period, UTInstant, DateTime}) = Ref(x)
+Base.Broadcast.broadcastable(x::Union{Period, UTInstant, DateTime, Date}) = Ref(x)
 
 # ============================================================================
 # COMPOUND PERIOD AND CANONICALIZE
