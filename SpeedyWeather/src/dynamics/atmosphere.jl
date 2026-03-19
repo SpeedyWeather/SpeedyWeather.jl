@@ -61,7 +61,7 @@ $(TYPEDFIELDS)"""
     @param saturation_vapor_pressure::NF = 610.78 (bounds = Positive,)
 
     "[OPTION] Surface reference temperature [K]"
-    @param temperature_reference::NF = 288.0 (bounds = Nonnegative,)
+    @param reference_temperature::NF = 288.0 (bounds = Nonnegative,)
 
     "[OPTION] Temperature of freezing point of water [K]"
     @param temperature_freezing::NF = 273.15 (bounds = Nonnegative,)
@@ -102,7 +102,7 @@ export EarthDryAtmosphere
     @param pressure_reference::NF = 1.0e5 (bounds = Positive,)
 
     "[OPTION] Surface reference temperature [K]"
-    @param temperature_reference::NF = 288.0 (bounds = Nonnegative,)
+    @param reference_temperature::NF = 288.0 (bounds = Nonnegative,)
 
     "[OPTION] Reference dry-adiabatic temperature lapse rate [K/m]"
     @param dry_lapse_rate::NF = 9.8 / 1000

@@ -591,7 +591,7 @@ function initialize!(
 
     Γ = lapse_rate(model.atmosphere)
     (; R_dry) = model.atmosphere
-    T₀ = model.atmosphere.temperature_reference
+    T₀ = model.atmosphere.reference_temperature
     (; grid, nlayers) = model.spectral_grid
     (; radius, rotation, gravity) = model.planet
 
@@ -735,7 +735,7 @@ function homogeneous_temperature!(
     # R_dry:        Specific gas constant for dry air [J/kg/K]
 
     (; R_dry) = model.atmosphere
-    T₀ = model.atmosphere.temperature_reference
+    T₀ = model.atmosphere.reference_temperature
     (; gravity) = model.planet
     (; nlayers, σ_levels_full) = model.geometry
     (; norm_sphere) = model.spectral_transform          # normalization of the l=m=0 spherical harmonic
@@ -800,7 +800,7 @@ function initialize!(
 
     Γ = lapse_rate(model.atmosphere)
     (; R_dry) = model.atmosphere
-    T₀ = model.atmosphere.temperature_reference
+    T₀ = model.atmosphere.reference_temperature
     p₀ = model.atmosphere.pressure_reference
 
     (; gravity) = model.planet

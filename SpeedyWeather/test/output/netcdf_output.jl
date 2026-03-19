@@ -166,7 +166,7 @@ end
     @test maximum(abs.(ds["v10"].var[:, :, end])) < maximum(abs.(ds["u"].var[:, :, end, end]))
 
     ## surface temperature should be within 60-130% of
-    T₀ = model.atmosphere.temperature_reference     # in K
+    T₀ = model.atmosphere.reference_temperature     # in K
     Tsurf = ds["tsurf"].var[:, :, end] .+ 273.15    # last timestep from ˚C to K
     @test all(0.6 .< (Tsurf ./ T₀) .< 1.3)
 end
