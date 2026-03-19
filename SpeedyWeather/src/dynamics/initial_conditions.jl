@@ -801,7 +801,7 @@ function initialize!(
     Γ = lapse_rate(model.atmosphere)
     (; R_dry) = model.atmosphere
     T₀ = model.atmosphere.reference_temperature
-    p₀ = model.atmosphere.pressure_reference
+    p₀ = model.atmosphere.reference_pressure
 
     (; gravity) = model.planet
     (; orography) = model.orography     # orography on the grid
@@ -828,7 +828,7 @@ function initialize!(
     )
 
     # logarithm of reference surface pressure [log(Pa)]
-    set!(progn, model; pres = log(model.atmosphere.pressure_reference))
+    set!(progn, model; pres = log(model.atmosphere.reference_pressure))
     return nothing
 end
 

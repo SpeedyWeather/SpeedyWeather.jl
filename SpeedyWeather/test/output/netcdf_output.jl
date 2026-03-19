@@ -149,7 +149,7 @@ end
     @test haskey(ds, "mslp")    # but this variable
 
     # Test reasonable scale for mean
-    p₀ = model.atmosphere.pressure_reference / 100      # Pa -> hPa
+    p₀ = model.atmosphere.reference_pressure / 100      # Pa -> hPa
     mslp = ds["mslp"].var[:, :, end]    # variable at last time step `.var` to read the raw data ignoring any mask
 
     # should be within ~800 to ~1200hPa

@@ -55,7 +55,7 @@ $(TYPEDFIELDS)"""
     stefan_boltzmann::NF = 5.67e-8
 
     "[OPTION] Surface reference pressure [Pa]"
-    @param pressure_reference::NF = 1.0e5 (bounds = Positive,)
+    @param reference_pressure::NF = 1.0e5 (bounds = Positive,)
 
     "[OPTION] Saturation vapor pressure at freezing point (0°C) [Pa]"
     @param saturation_vapor_pressure::NF = 610.78 (bounds = Positive,)
@@ -99,7 +99,7 @@ export EarthDryAtmosphere
     stefan_boltzmann::NF = 5.67e-8
 
     "[OPTION] Surface reference pressure [Pa]"
-    @param pressure_reference::NF = 1.0e5 (bounds = Positive,)
+    @param reference_pressure::NF = 1.0e5 (bounds = Positive,)
 
     "[OPTION] Surface reference temperature [K]"
     @param reference_temperature::NF = 288.0 (bounds = Nonnegative,)
