@@ -183,7 +183,7 @@ function leapfrog!(
     return nothing
 end
 
-@kernel inbounds = true function leapfrog_kernel!(A_old, A_new, A_lf, tendency, @Const(dt), @Const(w1), @Const(w2))
+@kernel inbounds = true function leapfrog_kernel!(A_old, A_new, A_lf, tendency, dt, w1, w2)
 
     lmk = @index(Global, Linear)    # every harmonic lm, every vertical layer k
 
@@ -432,7 +432,7 @@ function later_timestep!(simulation::AbstractSimulation)
     timestep!(progn, diagn, 2Δt, model)             # calculate tendencies and leapfrog forward
     timestep!(clock, Δt_millisec)                   # time of lf=2 and diagn after timestep!
 
-    progress!(feedback, progn)                      # updates the progress meter bar
+    progress!(feedback, progn, diagn)               # updates the progress meter bar
     output!(output, simulation)                     # do output?
     callback!(model.callbacks, progn, diagn, model) # any callbacks?
     return nothing

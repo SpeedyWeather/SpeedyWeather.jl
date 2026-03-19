@@ -34,8 +34,7 @@ as (following Seeley and Wordsworth [^SW23], eq. 1)
 \frac{dF}{dT} = α (T_t - T)
 ```
 
-The flux ``F`` (in ``W/m^2/K``) is a vertical upward flux between two layers (vertically adjacent)
-of temperature difference ``dT``. The change of this flux across layers depends on the temperature
+The flux ``F`` (in ``W/m^2/K``) is a vertical upward flux between two layers (vertically adjacent) of temperature difference ``dT``. The change of this flux across layers depends on the temperature
 ``T`` and is a relaxation term towards a prescribed stratospheric temperature ``T_t = 200~K`` with
 a radiative forcing constant ``\alpha = 0.025 W/m^2/K^2``. Two layers of identical temperatures
 ``T_1 = T_2`` would have no net flux between them, but a layer below at higher temperature would
@@ -184,15 +183,7 @@ Over land, the stratocumulus cover $\mathrm{CLS}$ is further modified to be prop
 where $\mathrm{RH}_N$ is the surface (lowest model layer) relative humidity.
 
 **Radiative transfer:**
-The incoming solar flux at the top of the atmosphere is computed from astronomical formulae. Ozone absorption in the
-lower and upper stratosphere is subtracted, yielding the downward flux into the first model layer:
-
-```math
-F_{h}^{\downarrow, SR} = F_{0}^{\downarrow, sol} - \Delta F_{ust}^{ozone} - \Delta F_{lst}^{ozone}
-```
-
-Shortwave radiation is then propagated downward through each layer using a transmissivity $\tau_{k}^{SR}$,
-which depends on zenith angle, layer depth, humidity, and cloud properties:
+The incoming solar flux at the top of the atmosphere is computed from astronomical formulae. Shortwave radiation is propagated downward through each layer using a transmissivity $\tau_{k}^{SR}$, which depends on zenith angle, layer depth, humidity, and cloud properties:
 
 ```math
 F_{k+h}^{\downarrow, SR} = F_{k-h}^{\downarrow, SR} \, \tau_k^{SR}
@@ -203,6 +194,14 @@ In the cloud-top layer, cloud reflection is included:
 ```math
 F_{k+h}^{\downarrow, SR} = F_{k-h}^{\downarrow, SR} (1 - A_{cl} \, \mathrm{CLC}) \, \tau_{k}^{SR}
 ```
+
+Ozone absorption in the upper ($k=1$) and lower ($k=2$) stratosphere is applied inside the layer loop, depositing the absorbed energy as a temperature tendency in those layers:
+
+```math
+F_{k+h}^{\downarrow, SR} = (F_{k-h}^{\downarrow, SR} - \Delta F_k^{ozone}) \, \tau_{k}^{SR}, \quad k \in \{1, 2\}
+```
+
+where $\Delta F_k^{ozone}$ is a prescribed fraction of the TOA solar flux $F_0^{\downarrow, sol}$.
 
 At the surface, stratocumulus reflection and surface albedo are applied:
 
@@ -222,8 +221,7 @@ and is propagated upward as
 F_{k-h}^{\uparrow, SR} =  F_{k+h}^{\uparrow, SR} \, \tau_{k}^{SR}
 ```
 
-with cloud reflection added at the cloud-top layer. The upward part is only modeled for the visible band,
-as near-infrared is mostly absorbed downward.
+Cloud reflection $F^{\uparrow, cloud}$ is re-added to the upward beam at the cloud-top layer. The final upward flux leaving the atmosphere is stored as `outgoing_shortwave` (OSR) and represents the **total** TOA-outgoing SW: cloud reflection + stratocumulus reflection + surface albedo reflection, all after partial attenuation by water vapor on the return path.
 
 **Key features:**
 

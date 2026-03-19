@@ -17,28 +17,21 @@ if VERSION <= v"1.11.0"
         (; prognostic_variables, diagnostic_variables, model) = simulation
         (; Δt, Δt_millisec) = model.time_stepping
         dt = 2Δt
+        lf1 = 1
+        lf2 = 2
 
         progn = prognostic_variables
         diagn = diagnostic_variables
 
-        diagn_copy = deepcopy(diagn)
-        progn_copy = deepcopy(progn)
-
-        d_progn = zero(progn)
         d_diag = make_zero(diagn)
         d_model = make_zero(model)
 
         progn_new = zero(progn)
         dprogn_new = one(progn) # seed
 
-        function timestep_oop!(progn_new::PrognosticVariables, progn_old::PrognosticVariables, diagn, dt, model, lf1 = 2, lf2 = 2)
-            copy!(progn_new, progn_old)
-            SpeedyWeather.timestep!(progn_new, diagn, dt, model, lf1, lf2)
-            return nothing
-        end
+        autodiff(Reverse, SpeedyWeather.timestep!, Const, Duplicated(progn_new, dprogn_new), Duplicated(diagn, d_diag), Const(dt), Duplicated(model, d_model), Const(lf1), Const(lf2))
 
-        autodiff(Reverse, timestep_oop!, Const, Duplicated(progn_new, dprogn_new), Duplicated(progn, d_progn), Duplicated(diagn, d_diag), Const(dt), Duplicated(model, d_model))
-        @test sum(to_vec(d_progn)[1]) != 0
+        @test sum(to_vec(dprogn_new)[1]) != 0
 
         # with Const(model)
         # currently not activated to keep the CI fast

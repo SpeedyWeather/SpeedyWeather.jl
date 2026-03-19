@@ -120,7 +120,7 @@ function pressure_gradient_flux!(
         diagn::DiagnosticVariables,
         progn::PrognosticVariables,
         lf::Integer,                   # leapfrog index
-        S::SpectralTransform,
+        S::AbstractSpectralTransform,
     )
 
     (; scratch_memory) = diagn.dynamics
@@ -293,8 +293,8 @@ end
 @kernel inbounds = true function _vertical_integration_spectral_kernel!(
         div_mean,               # Output: vertically averaged divergence (spectral)
         div,                    # Input: divergence (spectral)
-        @Const(σ_levels_thick), # Input: layer thicknesses
-        @Const(nlayers),       # Input: number of layers
+        σ_levels_thick, # Input: layer thicknesses
+        nlayers,       # Input: number of layers
     )
     lm = @index(Global, Linear)  # global index: harmonic lm
 
@@ -329,7 +329,7 @@ of the logarithm of surface pressure ln(pₛ) and D̄ the vertically averaged di
 4. Set tendency of the l=m=0 mode to 0 for better mass conservation."""
 function surface_pressure_tendency!(
         diagn::DiagnosticVariables,
-        S::SpectralTransform,
+        S::AbstractSpectralTransform,
     )
     (; pres_tend, pres_tend_grid) = diagn.tendencies
     (; ∇lnp_x, ∇lnp_y, u_mean_grid, v_mean_grid, div_mean, scratch_memory) = diagn.dynamics
@@ -420,7 +420,7 @@ function vordiv_tendencies!(
         atmosphere::AbstractAtmosphere,
         geometry::AbstractGeometry,
         implicit::ImplicitPrimitiveEquation,
-        S::SpectralTransform,
+        S::AbstractSpectralTransform,
     )
     (; f) = coriolis                            # coriolis parameter
     Tₖ = implicit.temp_profile                  # reference temperature profile
@@ -463,9 +463,9 @@ end
         ∇lnp_x,                 # Input: zonal gradient of log surface pressure
         ∇lnp_y,                 # Input: meridional gradient of log surface pressure
         Tₖ,                     # Input: reference temperature profile
-        @Const(f),              # Input: coriolis parameter
-        @Const(coslat⁻¹),       # Input: 1/cos(latitude) for scaling
-        @Const(whichring),      # Input: mapping from grid point to latitude ring
+        f,              # Input: coriolis parameter
+        coslat⁻¹,       # Input: 1/cos(latitude) for scaling
+        whichring,      # Input: mapping from grid point to latitude ring
         atmosphere,             # Input: atmosphere for R_dry and μ_virt_temp
     )
     ij, k = @index(Global, NTuple)
@@ -541,7 +541,7 @@ function temperature_tendency!(
         atmosphere::AbstractAtmosphere,
         implicit::ImplicitPrimitiveEquation,
         G::Geometry,
-        S::SpectralTransform,
+        S::AbstractSpectralTransform,
     )
     (; temp_tend, temp_tend_grid) = diagn.tendencies
     (; div_grid, temp_grid, humid_grid) = diagn.grid
@@ -575,9 +575,9 @@ end
         div_sum_above,          # Input: sum of div from layers above
         uv∇lnp_sum_above,       # Input: sum of uv∇lnp from layers above
         uv∇lnp,                 # Input: (u,v)⋅∇lnp term
-        @Const(temp_profile),   # Input: reference temperature profile
-        @Const(σ_lnp_A),        # Input: adiabatic conversion coefficient A
-        @Const(σ_lnp_B),        # Input: adiabatic conversion coefficient B
+        temp_profile,   # Input: reference temperature profile
+        σ_lnp_A,        # Input: adiabatic conversion coefficient A
+        σ_lnp_B,        # Input: adiabatic conversion coefficient B
         atmosphere,             # Input: atmosphere for κ and μ_virt_temp
     )
 
@@ -647,7 +647,7 @@ function horizontal_advection!(
         A_grid::AbstractField,              # Input: grid field to be advected
         diagn::DiagnosticVariables,
         G::Geometry,
-        S::SpectralTransform;
+        S::AbstractSpectralTransform;
         add::Bool = true,                     # add/overwrite A_tend_grid?
     )
 
@@ -697,7 +697,7 @@ function flux_divergence!(
         A_grid::AbstractField,          # Input: grid field to be advected
         diagn::DiagnosticVariables,     # for u_grid, v_grid
         G::Geometry,
-        S::SpectralTransform;
+        S::AbstractSpectralTransform;
         add::Bool = true,                 # add result to A_tend or overwrite for false
         flipsign::Bool = true,            # compute -∇⋅((u, v)*A) (true) or ∇⋅((u, v)*A)?
     )
@@ -732,8 +732,8 @@ end
         A_grid,                 # Input: field to be advected
         u_grid,                 # Input: zonal velocity
         v_grid,                 # Input: meridional velocity
-        @Const(coslat⁻¹),       # Input: 1/cos(latitude) for scaling
-        @Const(whichring),      # Input: mapping from grid point to latitude ring
+        coslat⁻¹,       # Input: 1/cos(latitude) for scaling
+        whichring,      # Input: mapping from grid point to latitude ring
     )
     I = @index(Global, Cartesian)
 
@@ -763,7 +763,7 @@ function vorticity_flux_curldiv!(
         diagn::DiagnosticVariables,
         coriolis::AbstractCoriolis,
         geometry::Geometry,
-        S::SpectralTransform;
+        S::AbstractSpectralTransform;
         div::Bool = true,     # also calculate div of vor flux?
         add::Bool = false
     )    # accumulate in vor/div tendencies?
@@ -800,7 +800,7 @@ function vorticity_flux_curldiv!(
 end
 
 @kernel inbounds = true function _vorticity_flux_kernel!(
-        u_tend_grid, v_tend_grid, u, v, vor, @Const(f), @Const(coslat⁻¹), @Const(whichring)
+        u_tend_grid, v_tend_grid, u, v, vor, f, coslat⁻¹, whichring
     )
     # Get indices
     ij, k = @index(Global, NTuple)
@@ -912,7 +912,7 @@ This version is used for both ShallowWater and PrimitiveEquation, only the geopo
 calculation in geopotential! differs."""
 function bernoulli_potential!(
         diagn::DiagnosticVariables,
-        S::SpectralTransform,
+        S::AbstractSpectralTransform,
     )
     (; u_grid, v_grid) = diagn.grid
     (; scratch_memory) = diagn.dynamics
@@ -937,7 +937,7 @@ function volume_flux_divergence!(
         orog::AbstractOrography,
         atmosphere::AbstractAtmosphere,
         G::AbstractGeometry,
-        S::SpectralTransform
+        S::AbstractSpectralTransform
     )
 
     (; pres_grid) = diagn.grid
@@ -1150,7 +1150,7 @@ and stores the result in `diagn.temp_average`"""
 function temperature_average!(
         diagn::DiagnosticVariables,
         temp::LowerTriangularArray,
-        S::SpectralTransform,
+        S::AbstractSpectralTransform,
     )
     # average from l=m=0 harmonic divided by norm of the sphere
     @. diagn.temp_average = real(temp[1, :]) / S.norm_sphere

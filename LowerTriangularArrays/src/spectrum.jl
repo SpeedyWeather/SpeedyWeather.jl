@@ -139,3 +139,4 @@ Adapt.@adapt_structure Spectrum
 
 Architectures.architecture(s::Spectrum) = s.architecture
 Architectures.on_architecture(architecture::AbstractArchitecture, s::Spectrum) = Spectrum(s; architecture)
+Architectures.on_architecture(s::Spectrum, x) = on_architecture(architecture(s), x)

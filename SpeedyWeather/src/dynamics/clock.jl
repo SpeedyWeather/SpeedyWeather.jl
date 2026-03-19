@@ -34,14 +34,16 @@ Adapt.adapt_structure(to, ::Clock) = nothing
 function timestep!(clock::Clock, Δt; increase_counter::Bool = true)
     clock.time += Δt
     # the first timestep is a half-step and doesn't count
-    return clock.timestep_counter += increase_counter
+    clock.timestep_counter += increase_counter
+    return nothing
 end
 
 # pretty printing
 function Base.show(io::IO, C::Clock)
     println(io, "$(typeof(C))")
     keys = propertynames(C)
-    return print_fields(io, C, keys)
+    print_fields(io, C, keys)
+    return nothing
 end
 
 # copy!

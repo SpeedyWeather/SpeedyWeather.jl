@@ -11,16 +11,16 @@ start+p, but p is rounded to match the multiple of the model timestep.
 Periodic schedules and event schedules can be combined, executing at both.
 A Schedule is supposed to be added into callbacks as fields
 
-    Base.@kwdef struct MyCallback
+    @kwdef struct MyCallback
         schedule::Schedule = Schedule(every=Day(1))
         other_fields
     end
 
-see also `initialize!(::Schedule,::Clock)` and `isscheduled(::Schedule,::Clock)`.
+see also `initialize!(::Schedule, ::Clock)` and `isscheduled(::Schedule, ::Clock)`.
 
 Fields
 $(TYPEDFIELDS)"""
-Base.@kwdef mutable struct Schedule <: AbstractSchedule
+@kwdef mutable struct Schedule <: AbstractSchedule
     "[OPTION] Execute every time period, first timestep excluded. Default=never."
     every::Second = Second(typemax(Int))
 
@@ -37,19 +37,18 @@ Base.@kwdef mutable struct Schedule <: AbstractSchedule
     counter::Int = 0
 end
 
-"""
-$(TYPEDSIGNATURES)
+"""$(TYPEDSIGNATURES)
 A Schedule based on DateTime arguments, For two consecutive time steps i, i+1, an event is
 scheduled at i+1 when it occurs in (i,i+1]."""
 Schedule(times::DateTime...) = Schedule(times = DateTime[times...])
 
-"""
-$(TYPEDSIGNATURES)
+"""$(TYPEDSIGNATURES)
 Initialize a Schedule with a Clock (which is assumed to have been initialized).
 Takes both scheduler.every and scheduler.times into account, such that
 both periodic and events can be scheduled simultaneously. But execution will
 happen only once if they coincide on a given time step."""
 function initialize!(scheduler::Schedule, clock::Clock)
+    clock.Δt == Millisecond(0) && error("Clock needs to be initialized with a non-zero time step before initializing schedule.")
     schedule = falses(clock.n_timesteps)    # initialize schedule as BitVector
 
     # PERIODIC SCHEDULE, always AFTER scheduler.every time period has passed

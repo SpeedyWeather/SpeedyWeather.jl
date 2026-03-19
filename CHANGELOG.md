@@ -2,6 +2,33 @@
 
 ## Unreleased
 
+- GitHub `actions/setup-node` updated to v6 [#1009](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1009)
+- Documentation for `MatrixSpectralTransform` added to SpeedyTransforms docs [#1006](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/1006)
+- MatrixSpectralTransform implemented [#952](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/952)
+- `get_asset` now supports optional `output_grid` [#1004](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1004)
+- Switch documentation to DocumenterVitepress for a modern VitePress-based theme [#1002](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1002) [#1008](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1008)
+- Move `get_asset` to RingGrids with NCDatasets extension; make `assets_url` and `version` kwargs [#996](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/996)
+- Small fixes to improve Enzyme CI [#995](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/995)
+- JuliaActions Cache upgraded to v3 [#1001](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1001)
+- Remove `@Const` from kernels [#1000](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1000)
+- Add CLAUDE.md with codebase summary for AI-assisted development [#999](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/999)
+- Get SpeedyWeatherAssets on the fly [#983](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/983)
+- Change from MIT to EUPL license [#992](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/992)
+
+## v0.18.1
+
+- Fix docs colatitude -> latitude terminology [#990](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/990)
+- Progress bar with additional information [#989](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/989)
+- Bug fix: Ozone absorption now deposited into stratospheric layers [#986](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/986)
+- Adds a drag term to winds above a certain speed limit [#987](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/987)
+
+## v0.18
+
+- Installation main instructions in docs + schedule tests [#979](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/979)
+- Bug fix: Cloud reflectivity on half level above not below [#978](https://github.dev/SpeedyWeather/SpeedyWeather.jl/pull/978)
+- Fix absorptivity_water_vapor and absorptivity_cloud_base default values [#974](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/974)
+- Particle advection GPU ready [#897](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/897)
+- Enzyme compat relaxed as Enzyme bug was fixed and uv_from_vordiv! kernel version used on CPU as well [#971](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/971)
 - GitHub Actions: Cache updated [#945](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/945)
 - The number of soil layers is now solely defined by the land model and not in the `SpectralGrid` anymore [#898](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/898)   
 - Revised GPU benchmarks to include full GPU models [#946](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/946) and the dynamical core [#967](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/967)
@@ -52,7 +79,6 @@
 - Seasonal ocean and land climatology models GPU-ready [#892](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/892)
 - Zenith constructors [#889](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/889)
 - More general forcing of pressure, vorticity and divergence [#855](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/855)
-
 
 ## v0.17.3
 

@@ -699,7 +699,7 @@ function zero_last_degree!(L::LowerTriangularArray)
     return nothing
 end
 
-@kernel inbounds = true function zero_last_degree_kernel!(data, @Const(l_indices), lmax)
+@kernel inbounds = true function zero_last_degree_kernel!(data, l_indices, lmax)
     I = @index(Global, Cartesian)
 
     l = l_indices[I[1]]
@@ -791,7 +791,7 @@ Adapt.adapt_structure(to, L::LowerTriangularArray) = Adapt.adapt(to, L.data)
 
 Architectures.architecture(L::LowerTriangularArray) = architecture(L.spectrum)
 
-function Architectures.on_architecture(arch, L::LowerTriangularArray)
+function Architectures.on_architecture(arch::AbstractArchitecture, L::LowerTriangularArray)
     adapted_data = on_architecture(arch, L.data)
     if ismatching(L.spectrum, typeof(adapted_data)) # if matching, use the same spectrum
         return LowerTriangularArray(adapted_data, on_architecture(arch, L.spectrum))

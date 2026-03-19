@@ -1,6 +1,7 @@
 module SpeedyTransforms
 
 using DocStringExtensions, Printf
+import ProgressMeter
 
 # NUMERICS
 import AssociatedLegendrePolynomials as Legendre
@@ -13,7 +14,7 @@ import Primes
 # GPU
 import GPUArrays: GPUArrays, AbstractGPUArray
 import Adapt: Adapt, adapt, adapt_structure
-import KernelAbstractions: @kernel, @index, @Const, synchronize
+import KernelAbstractions: @kernel, @index, synchronize
 import Atomix
 
 # SPEEDYWEATHER MODULES
@@ -26,6 +27,8 @@ using LowerTriangularArrays
 export SpectralTransform,
     transform!,
     transform
+
+export MatrixSpectralTransform
 
 # ALIASING
 export get_nlat_half
@@ -51,7 +54,9 @@ export power_spectrum
 include("aliasing.jl")
 include("legendre_shortcuts.jl")
 include("scratch_memory.jl")
+include("gradient_arrays.jl")
 include("spectral_transform.jl")
+include("matrix_transform.jl")
 include("fourier.jl")
 include("legendre.jl")
 include("legendre_ka.jl")

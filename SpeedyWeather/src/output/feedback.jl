@@ -14,10 +14,25 @@ $(TYPEDFIELDS)"""
     debug::Bool = true
 
     "[OPTION] Progress description"
-    description::String = "Weather is speedy:"
+    description::String = ""
 
-    "[OPTION] show speed in progress meter?"
+    "[OPTION] Progress bar length, nothing = full window width"
+    progress_bar_length::Int = 20
+
+    "[OPTION] show speed (e.g. in simulated years per day) in progress meter?"
     showspeed::Bool = true
+
+    "[OPTION] Minimum wallclock time between feedback updates"
+    feedback_dt::Float32 = 0.1
+
+    "[OPTION] Show simulation time?"
+    show_time::Bool = true
+
+    "[OPTION] Show maximum speed of the simulated flow [m/s]"
+    show_umax::Bool = true
+
+    "[OPTION] Show temperature range of simulation [˚C]"
+    show_temperature_range::Bool = true
 
     "[DERIVED] struct containing everything progress related"
     progress_meter::ProgressMeter.Progress =
@@ -48,20 +63,43 @@ function initialize!(feedback::Feedback, clock::Clock, model::AbstractModel)
 
     # hack: redefine element in global constant dt_in_sec
     # used to pass on the time step to ProgressMeter.speedstring
-    DT_IN_SEC[] = model.time_stepping.Δt_sec
+    FEEDBACK_DT_IN_SEC[] = model.time_stepping.Δt_sec
+    FEEDBACK_TIME[] = clock.time
+    
+    # reset those to default (-1 not shown, 0 shown)
+    FEEDBACK_UMAX[] = feedback.show_umax ? 0 : -1
+    FEEDBACK_TMIN[] = feedback.show_temperature_range ? 0 : -1
+    FEEDBACK_TMAX[] = feedback.show_temperature_range ? 0 : -1
 
     # reinitalize progress meter, minus one to exclude first_timesteps! which contain compilation
     # only do now for benchmark accuracy
-    (; showspeed, description, verbose) = feedback
+    (; showspeed, description, verbose, feedback_dt) = feedback
     desc = description * (model.output.active ? " $(model.output.run_folder) " : " ")
-    return feedback.progress_meter = ProgressMeter.Progress(clock.n_timesteps - 1; enabled = verbose, showspeed, desc)
+    feedback.progress_meter = ProgressMeter.Progress(
+        clock.n_timesteps - 1;
+        enabled = verbose,
+        showspeed,
+        desc,
+        color = :blue,
+        barlen = feedback.progress_bar_length,
+        barglyphs = ProgressMeter.BarGlyphs(" ━━  "),
+        dt = feedback_dt,
+    )
+
+    return nothing
 end
 
 progress!(feedback::Feedback) = ProgressMeter.next!(feedback.progress_meter)
 
-function progress!(feedback::Feedback, progn::PrognosticVariables)
+function progress!(feedback::Feedback, progn::PrognosticVariables, diagn::DiagnosticVariables)
+    every_nsteps = feedback.progress_meter.core.check_iterations
+    (; counter) = feedback.progress_meter.core
+    FEEDBACK_TIME[] = progn.clock.time
+    feedback.show_umax && mod(counter, every_nsteps) == 0 && max_speed(diagn)
+    feedback.show_temperature_range && mod(counter, every_nsteps) == 0 && temperature_range(diagn)
     progress!(feedback)
-    return feedback.debug && nan_detection!(feedback, progn)
+    feedback.debug && nan_detection!(feedback, progn)
+    return nothing
 end
 
 """
@@ -72,7 +110,6 @@ finalize!(F::Feedback) = ProgressMeter.finish!(F.progress_meter)
 """$(TYPEDSIGNATURES)
 Detect NaN (Not-a-Number, or Inf) in the prognostic variables."""
 function nan_detection!(feedback::Feedback, progn::PrognosticVariables)
-
     feedback.nans_detected && return nothing            # escape immediately if nans already detected
     i = feedback.progress_meter.counter                 # time step
     GPUArrays.@allowscalar vor0 = progn.vor[2, end, 2]  # only check 1-0 mode of surface vorticity
@@ -89,7 +126,7 @@ Define a ProgressMeter.speedstring method that also takes a time step
 `dt_in_sec` to translate sec/iteration to days/days-like speeds."""
 function speedstring(sec_per_iter, dt_in_sec)
     if sec_per_iter == Inf
-        return "  N/A  days/day"
+        return ", N/A  days/day"
     end
 
     sim_time_per_time = dt_in_sec / sec_per_iter
@@ -101,22 +138,51 @@ function speedstring(sec_per_iter, dt_in_sec)
             (1 / 24, "hours"),
         )
         if (sim_time_per_time / divideby) > 2
-            return @sprintf "%5.2f %2s/day" (sim_time_per_time / divideby) unit
+            return @sprintf ", %5.2f %2s/day" (sim_time_per_time / divideby) unit
         end
     end
-    return " <2 hours/days"
+    return ", <2 hours/days"
 end
 
 # hack: define global constant whose element will be changed in initialize_feedback
 # used to pass on the time step to ProgressMeter.speedstring via calling this
 # constant from the ProgressMeter module
-const DT_IN_SEC = Ref(1.0)
+const FEEDBACK_DT_IN_SEC = Ref(1.0)
+const FEEDBACK_TIME = Ref(DEFAULT_DATE)
+const FEEDBACK_UMAX = Ref(-1f0)     # default negative = skip show
+const FEEDBACK_TMIN = Ref(-1f0)
+const FEEDBACK_TMAX = Ref(-1f0)
 
 # "extend" the speedstring function from ProgressMeter by defining it for ::AbstractFloat
 # not just ::Any to effectively overwrite it
 function ProgressMeter.speedstring(sec_per_iter::AbstractFloat)
-    dt_in_sec = SpeedyWeather.DT_IN_SEC[]   # pull global "constant"
-    return speedstring(sec_per_iter, dt_in_sec)
+    t = SpeedyWeather.FEEDBACK_TIME[]
+    dt_in_sec = SpeedyWeather.FEEDBACK_DT_IN_SEC[]   # pull global "constant"
+    U = SpeedyWeather.FEEDBACK_UMAX[]
+    Tmin = SpeedyWeather.FEEDBACK_TMIN[]
+    Tmax = SpeedyWeather.FEEDBACK_TMAX[]
+    return progress_string(t, sec_per_iter, dt_in_sec, U, Tmin, Tmax)
+end
+
+function progress_string(t, sec_per_iter, dt_in_sec, U, Tmin, Tmax)
+    time = string(Dates.Date(t))
+    speed = speedstring(sec_per_iter, dt_in_sec)
+    umax = U < 0 ? "" : @sprintf ", %i m/s" U
+    Trange = Tmax < 0 ? "" : @sprintf ", [%i, %i] ˚C" Tmin Tmax
+    return time * speed * umax * Trange
+end
+
+function max_speed(diagn::DiagnosticVariables)
+    hasproperty(diagn.grid, :u_grid) || return nothing
+    umin, umax = extrema(diagn.grid.u_grid)
+    return FEEDBACK_UMAX[] = max(abs(umin), abs(umax))
+end
+
+function temperature_range(diagn::DiagnosticVariables)
+    hasproperty(diagn.grid, :u_grid) || return nothing
+    tmin, tmax = extrema(diagn.grid.temp_grid)
+    FEEDBACK_TMIN[] = tmin - 273.15f0
+    return FEEDBACK_TMAX[] = tmax - 273.15f0
 end
 
 export ParametersTxt
@@ -232,7 +298,7 @@ function callback!(progress_txt::ProgressTxt, progn, diagn, model)
             write(file, ", ETA: $r")
 
             time_elapsed = progress_meter.tlast - progress_meter.tinit
-            s = speedstring(time_elapsed / counter, DT_IN_SEC[])
+            s = speedstring(time_elapsed / counter, FEEDBACK_DT_IN_SEC[])
             write(file, ", $s")
 
             nans_detected && write(file, ", NaN/Inf detected.")
