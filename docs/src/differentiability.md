@@ -57,7 +57,7 @@ dmodel.planet.gravity
 
 ## Differentiating longer trajectories and checkpointing 
 
-In a very similar fashing as for the single timestep, we can also differentiate longer trajectories. For this, we need to use checkpointing to avoid storing all intermediate states in memory. This will also at the same time keep the compile time of the gradient still manageable. For a full example on how to do this for a sensitivity analysis, see the [sensitivity example](https://github.com/SpeedyWeather/SpeedyWeather.jl/blob/main/SpeedyWeather/test/differentiatibility/sensitivity_examples/).
+In a very similar fashion as for the single timestep, we can also differentiate longer trajectories. For this, we need to use checkpointing to avoid storing all intermediate states in memory. This will also at the same time keep the compile time of the gradient still manageable. For a full example on how to do this for a sensitivity analysis, see the [sensitivity example](https://github.com/SpeedyWeather/SpeedyWeather.jl/blob/main/SpeedyWeather/test/differentiatibility/sensitivity_examples/).
 
 
 ## Parameter handling
