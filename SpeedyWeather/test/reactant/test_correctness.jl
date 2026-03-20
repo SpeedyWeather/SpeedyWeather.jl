@@ -114,7 +114,9 @@ function compare_tendencies(sim_cpu, sim_reactant; rtol = RTOL, atol = ATOL)
     vor_tend_cpu = Array(diagn_cpu.tendencies.vor_tend)
     vor_tend_reactant = Array(diagn_reactant.tendencies.vor_tend)
     abs_diff = abs.(vor_tend_cpu .- vor_tend_reactant)
-    rel_diff = abs_diff ./ max.(abs.(vor_tend_cpu), abs.(vor_tend_reactant), eps(eltype(real(vor_tend_cpu))))
+    # Normalize by array-wide scale to avoid inflation from near-zero elements
+    vor_scale = max(maximum(abs.(vor_tend_cpu)), maximum(abs.(vor_tend_reactant)), atol)
+    rel_diff = abs_diff ./ vor_scale
     results[:vor_tend] = (
         max_abs_diff = maximum(abs_diff),
         mean_abs_diff = mean(abs_diff),
