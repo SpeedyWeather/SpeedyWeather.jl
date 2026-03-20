@@ -183,7 +183,7 @@ function leapfrog!(
     return nothing
 end
 
-@kernel inbounds = true function leapfrog_kernel!(A_old, A_new, A_lf, tendency, @Const(dt), @Const(w1), @Const(w2))
+@kernel inbounds = true function leapfrog_kernel!(A_old, A_new, A_lf, tendency, dt, w1, w2)
 
     lmk = @index(Global, Linear)    # every harmonic lm, every vertical layer k
 

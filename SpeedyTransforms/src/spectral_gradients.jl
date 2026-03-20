@@ -265,7 +265,7 @@ function UV_from_vor!(
     return U, V
 end
 
-@kernel inbounds = true function _UV_from_vor_kernel!(U, V, vor, @Const(l_indices), lmax, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)
+@kernel inbounds = true function _UV_from_vor_kernel!(U, V, vor, l_indices, lmax, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)
     I = @index(Global, Cartesian)
     lm = I[1]
     k = ndims(vor) == 1 ? CartesianIndex() : I[2]
@@ -327,7 +327,7 @@ function UV_from_vordiv!(
     return U, V
 end
 
-@kernel inbounds = true function _UV_from_vordiv_kernel!(U, V, vor, div, @Const(l_indices), lmax, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)
+@kernel inbounds = true function _UV_from_vordiv_kernel!(U, V, vor, div, l_indices, lmax, vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2)
     I = @index(Global, Cartesian)
     lm = I[1]
     k = ndims(vor) == 1 ? CartesianIndex() : I[2]
@@ -410,7 +410,7 @@ function ∇²!(
     return ∇²alms
 end
 
-@kernel function ∇²_kernel!(∇²alms, alms, @Const(eigenvalues), kernel_func, @Const(l_indices))
+@kernel function ∇²_kernel!(∇²alms, alms, eigenvalues, kernel_func, l_indices)
 
     I = @index(Global, Cartesian) # I[1] == lm, I[2] == k
     # we use cartesian index instead of NTuple here

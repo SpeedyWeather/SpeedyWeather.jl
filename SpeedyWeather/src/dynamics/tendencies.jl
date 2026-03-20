@@ -293,8 +293,8 @@ end
 @kernel inbounds = true function _vertical_integration_spectral_kernel!(
         div_mean,               # Output: vertically averaged divergence (spectral)
         div,                    # Input: divergence (spectral)
-        @Const(σ_levels_thick), # Input: layer thicknesses
-        @Const(nlayers),       # Input: number of layers
+        σ_levels_thick, # Input: layer thicknesses
+        nlayers,       # Input: number of layers
     )
     lm = @index(Global, Linear)  # global index: harmonic lm
 
@@ -463,9 +463,9 @@ end
         ∇lnp_x,                 # Input: zonal gradient of log surface pressure
         ∇lnp_y,                 # Input: meridional gradient of log surface pressure
         Tₖ,                     # Input: reference temperature profile
-        @Const(f),              # Input: coriolis parameter
-        @Const(coslat⁻¹),       # Input: 1/cos(latitude) for scaling
-        @Const(whichring),      # Input: mapping from grid point to latitude ring
+        f,              # Input: coriolis parameter
+        coslat⁻¹,       # Input: 1/cos(latitude) for scaling
+        whichring,      # Input: mapping from grid point to latitude ring
         atmosphere,             # Input: atmosphere for R_dry and μ_virt_temp
     )
     ij, k = @index(Global, NTuple)
@@ -575,9 +575,9 @@ end
         div_sum_above,          # Input: sum of div from layers above
         uv∇lnp_sum_above,       # Input: sum of uv∇lnp from layers above
         uv∇lnp,                 # Input: (u,v)⋅∇lnp term
-        @Const(temp_profile),   # Input: reference temperature profile
-        @Const(σ_lnp_A),        # Input: adiabatic conversion coefficient A
-        @Const(σ_lnp_B),        # Input: adiabatic conversion coefficient B
+        temp_profile,   # Input: reference temperature profile
+        σ_lnp_A,        # Input: adiabatic conversion coefficient A
+        σ_lnp_B,        # Input: adiabatic conversion coefficient B
         atmosphere,             # Input: atmosphere for κ and μ_virt_temp
     )
 
@@ -732,8 +732,8 @@ end
         A_grid,                 # Input: field to be advected
         u_grid,                 # Input: zonal velocity
         v_grid,                 # Input: meridional velocity
-        @Const(coslat⁻¹),       # Input: 1/cos(latitude) for scaling
-        @Const(whichring),      # Input: mapping from grid point to latitude ring
+        coslat⁻¹,       # Input: 1/cos(latitude) for scaling
+        whichring,      # Input: mapping from grid point to latitude ring
     )
     I = @index(Global, Cartesian)
 
@@ -800,7 +800,7 @@ function vorticity_flux_curldiv!(
 end
 
 @kernel inbounds = true function _vorticity_flux_kernel!(
-        u_tend_grid, v_tend_grid, u, v, vor, @Const(f), @Const(coslat⁻¹), @Const(whichring)
+        u_tend_grid, v_tend_grid, u, v, vor, f, coslat⁻¹, whichring
     )
     # Get indices
     ij, k = @index(Global, NTuple)
