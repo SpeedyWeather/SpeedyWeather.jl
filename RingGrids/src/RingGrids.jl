@@ -9,6 +9,10 @@ import Statistics: Statistics, mean
 import FastGaussQuadrature
 import LinearAlgebra
 
+# ASSET DOWNLOADING
+import Artifacts
+import Pkg
+
 # GPU
 import Adapt: Adapt, adapt, adapt_structure
 import GPUArrays
@@ -161,5 +165,13 @@ include("quadrature_weights.jl")
 include("interpolation.jl")
 include("vertices.jl")
 include("statistics.jl")
+
+# ASSET DOWNLOADING
+export get_asset, load_asset, ASSETS_URL, DEFAULT_ASSETS_VERSION
+
+# load_asset: extension dispatch point implemented by RingGridsNCDatasetsExt (and future format extensions)
+function load_asset end
+
+include("get_asset.jl")
 
 end

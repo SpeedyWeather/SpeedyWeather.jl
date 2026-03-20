@@ -32,8 +32,6 @@ import JLD2: jldopen, jldsave, JLDFile
 import CodecZlib
 import BitInformation: round, round!
 import ProgressMeter
-import Artifacts
-import Pkg
 
 # UTILITIES
 using DomainSets.IntervalSets
@@ -101,12 +99,13 @@ export zonal_mean
 using SpeedyTransforms
 
 export SpeedyTransforms, SpectralTransform
+export MatrixSpectralTransform
 export transform, transform!
 export curl, divergence, curl!, divergence!
 export ∇, ∇², ∇⁻², ∇!, ∇²!, ∇⁻²!
 export power_spectrum
 
-import SpeedyTransforms: prettymemory
+import SpeedyTransforms: AbstractSpectralTransform, prettymemory
 
 # to be defined in GeoMakie extension
 export animate, globe
@@ -116,9 +115,6 @@ function animate end
 include("models/abstract_models.jl")
 include("variables/abstract_types.jl")
 include("models/parameterizations.jl")
-
-# INPUT
-include("input/get_asset.jl")
 
 # GEOMETRY CONSTANTS ETC
 include("dynamics/vertical_coordinates.jl")
