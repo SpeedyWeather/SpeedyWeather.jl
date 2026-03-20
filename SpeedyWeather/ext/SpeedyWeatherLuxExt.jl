@@ -5,7 +5,7 @@ import Random, Adapt
 
 const z₀_SATURATION_LIMIT = 3.92f-3 # observed roughness saturation, from Curcic (2020)
 
-function SpeedyWeather._get_asset(path::String, name::String, ArrayType::Type{<:Array}, FileFormat::Type{<:Dict})
+function RingGrids.load_asset(path::String, name::String, ArrayType::Type{<:Array}, FileFormat::Type{<:Dict}, FillValue::Float64)
     data = NPZ.npzread(path)
     return data
 end
@@ -60,7 +60,7 @@ end
 
 Adapt.@adapt_structure SpeedyWeather.LearnedSurfaceRoughness
 function SpeedyWeather.initialize!(surface_roughness::LearnedSurfaceRoughness, ::PrimitiveEquation)
-    weights = SpeedyWeather.get_asset(
+    weights = RingGrids.get_asset(
         surface_roughness.path,
         from_assets = surface_roughness.from_assets,
         name = "land_weights",
