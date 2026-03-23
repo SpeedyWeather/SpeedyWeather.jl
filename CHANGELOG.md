@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-## v0.18.2
+## v0.19.0
 
 - Rename `temperature_reference` and `pressure_reference` to `reference_temperature` and `reference_pressure` respectively [#1010](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1010)
 - Revised variable system based on NamedTuples [#969](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/969)
