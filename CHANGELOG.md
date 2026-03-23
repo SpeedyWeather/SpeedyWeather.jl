@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Data-driven surface roughness scheme [#959](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/959)
 - GitHub `actions/setup-node` updated to v6 [#1009](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1009)
 - Documentation for `MatrixSpectralTransform` added to SpeedyTransforms docs [#1006](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/1006)
 - MatrixSpectralTransform implemented [#952](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/952)
