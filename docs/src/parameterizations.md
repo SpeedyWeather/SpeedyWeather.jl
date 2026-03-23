@@ -55,9 +55,9 @@ In this example we allocate a new diagnostic variable `flux_variable` and a new 
 for our parameterization. The flux variable is defined as a two-dimensional variable on our grid, and the prognostic variable
 is defined as a spectral variable. Three-dimensional variables are also possible by using `Grid3D` and `Spectral3D` as `dims`.
 
-These variables are then passed to the `parameterization!` function inside of the regular `PrognosticVariables` and
-`DiagnosticVariables` objects. Additionally, `DiagnosticVariables` has several work
-arrays that you canreuse `diagn.grid.a` and `.b`, `.c`, `.d`. These work arrays have
+These variables are then passed to the `parameterization!` function inside the `Variables` object.
+Additionally, `Variables` has several scratch
+arrays that you can reuse `vars.scratch.grid.a` and `.b`, `.c`, `.d`. These work arrays have
 an unknown state so you should overwrite every entry and you also should not use them
 to retain information after that parameterization has been executed.
 
@@ -73,12 +73,12 @@ indexing and ideally no allocations. For more details see
 The signature of the function is
 
 ```julia
-parameterization!(ij, diagn::DiagnosticVariables, progn::PrognosticVariables, parameterization::MyParameterization, model_parameters)
+parameterization!(ij, vars::Variables, parameterization::MyParameterization, model_core)
 ```
 
 Note that
 - albedos should extend `albedo!(ij, ...)` instead, see [Example: Albedo](@ref) below
-- `model_parameters` is a subset of `model` adapted to GPU and passed on as `NamedTuple` instead
+- `model_core` is a subset of `model` adapted to GPU and passed on as `NamedTuple` instead (as defined by `model.core_components`)
 
 ## Accumulate do not overwrite
 
@@ -89,10 +89,10 @@ arrays in which *every* parameterization writes into, meaning they should be
 beforehand is effectively disabled. Hence, do
 
 ```julia
-diagn.tendendies.temp_tend[k] += something_you_calculated
+vars.tendencies.grid.temp[ij, k] += something_you_calculated
 ```
 
-not `diagn.tendendies.temp_tend[k] = something_you_calculated` which would overwrite
+not `vars.tendencies.grid.temp[ij, k] = something_you_calculated` which would overwrite
 any previous tendency.
 
 ## Define the generator function
@@ -165,7 +165,7 @@ A parameterization is expected to implement the following functions:
 
 1. Define a generator function `MyParameterization(spectral_grid; kwargs...)`
 2. A `initialize!(::MyParameterization, ::PrimitiveEquation)` function
-3. A `parameterization!(ij, diagn::DiagnosticVariables, progn::PrognosticVariables, ::MyParameterization, ::PrimitiveEquation)` function
+3. A `parameterization!(ij, vars::Variables, ::MyParameterization, ::PrimitiveEquation)` function
 4. A `variables(::MyParameterization)` function
 
 Our existing parameterizations also define further abstract subtypes of `AbstractParameterization`
@@ -232,19 +232,18 @@ SpeedyWeather.variables(::SimpleAlbedo) = (
 
 Base.@propagate_inbounds function SpeedyWeather.albedo!(
     ij,                             # horizontal grid index ij
-    diagn,                          # not ::DiagnosticVariables as called with `diagn.physics.ocean` then `diagn.physics.land`
-    progn::PrognosticVariables,
+    vars::Variables,
     albedo::SimpleAlbedo,
-    model_parameters,               # model unpacked into a NamedTuple
+    model,                          # model subset unpacked into a NamedTuple
 )
-    (; land_sea_mask) = model_parameters
-    (; sea_ice_concentration) = progn.ocean
+    (; land_sea_mask) = model
+    (; sea_ice_concentration) = vars.prognostic.ocean
     (; land_albedo, seaice_albedo, ocean_albedo) = albedo
 
     if land_sea_mask.mask[ij] > 0.95 # if mostly land
-        diagn.albedo[ij] = land_albedo
+        vars.parameterizations.albedo[ij] = land_albedo
     else # if ocean
-        diagn.albedo[ij] = ocean_albedo + sea_ice_concentration[ij] * (seaice_albedo - ocean_albedo)
+        vars.parameterizations.albedo[ij] = ocean_albedo + sea_ice_concentration[ij] * (seaice_albedo - ocean_albedo)
     end
 end
 ```

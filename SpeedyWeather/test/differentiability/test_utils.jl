@@ -6,38 +6,32 @@ using SpeedyWeather: AbstractSimulation
 # this type could potentially also implement the `AbstractSimulation` interface?
 struct ADSimulation{
         ModelType <: AbstractModel,
-        PrognosticType,
-        DiagnosticType,
+        VarsType,
     }
     model::ModelType
-    progvars::PrognosticType
-    diagvars::DiagnosticType
-    dprogvars::PrognosticType
-    ddiagvars::DiagnosticType
+    vars::VarsType
+    dvars::VarsType
 end
 
 function ADSimulation(sim::AbstractSimulation)
-    (; prognostic_variables, diagnostic_variables, model) = simulation
-    progn = deepcopy(prognostic_variables)
-    diagn = deepcopy(diagnostic_variables)
+    (; variables, model) = sim
+    vars = deepcopy(variables)
     return ADSimulation(
         deepcopy(model),
-        progn,
-        diagn,
-        zero(progn),
-        make_zero(diagn),
+        vars,
+        make_zero(vars),
     )
 end
 
-prognosticseed(adsim::ADSimulation) = deepcopy(adsim.progvars), one(adsim.progvars)
+# expose compat accessors so existing callers still work
+progvars(adsim::ADSimulation) = adsim.vars
+diagvars(adsim::ADSimulation) = adsim.vars
+dprogvars(adsim::ADSimulation) = adsim.dvars
+ddiagvars(adsim::ADSimulation) = adsim.dvars
 
-diagnosticseed(adsim::ADSimulation) = deepcopy(adsim.diagvars), one(adsim.diagvars)
+prognosticseed(adsim::ADSimulation) = deepcopy(adsim.vars), make_zero(adsim.vars)
 
-function Base.one(diag::DiagnosticVariables{NF}) where {NF}
-    vec, re = to_vec(diag)
-    vec .= NF(1)
-    return re(vec)
-end
+diagnosticseed(adsim::ADSimulation) = deepcopy(adsim.vars), make_zero(adsim.vars)
 
 function initialize_with_spinup!(model::AbstractModel, spinup_period = Day(5), init_period = Day(1))
     simulation = initialize!(model)

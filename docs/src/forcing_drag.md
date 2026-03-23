@@ -194,26 +194,23 @@ then this will be called automatically with multiple dispatch.
 
 ```@example extend
 function SpeedyWeather.forcing!(
-    diagn::DiagnosticVariables,
-    progn::PrognosticVariables,
+    vars::Variables,
     forcing::StochasticStirring,
     lf::Integer,
     model::AbstractModel,
 )
     # function barrier only
-    forcing!(diagn, forcing, model.spectral_transform)
+    forcing!(vars, forcing, model.spectral_transform)
 end
 ```
 
 The function signature (types and number of its arguments) has to be as outlined above.
-The first argument has to be of type `DiagnosticVariables` as the diagnostic variables,
-are the ones you want to change (likely the tendencies within) to apply a forcing.
-But technically you can change anything else too, although the results may be unexpected.
-The diagnostic variables contain the current model state in grid-point space and the
-tendencies (in grid and spectral space). The second argument has to be of type
-`PrognosticVariables` because, in general, the forcing may use (information from)
-the prognostic variables in spectral space, which includes in `progn.clock.time` the current
-time for time-dependent forcing. But all prognostic variables should be considered read-only.
+The first argument has to be of type `Variables` as it contains the tendencies you will
+want to change as well as the current model state. But all state fields should be
+considered read-only when applying a forcing.
+`vars.tendencies` contains the tendencies (in grid and spectral space) and
+`vars.prognostic` contains the prognostic variables in spectral space, including
+`vars.prognostic.clock.time` the current time for time-dependent forcing.
 The third argument has to be of the type of our new custom forcing, here `StochasticStirring`,
 so that multiple dispatch calls the correct method of `forcing!`. The forth argument is of type
 `AbstractModel`, so that the forcing can also make use of anything inside `model`, e.g.
@@ -238,7 +235,7 @@ So we define the actual `forcing!` function that's then called as follows
 
 ```@example extend
 function forcing!(
-    diagn::DiagnosticVariables,
+    vars::Variables,
     forcing::StochasticStirring{NF},
     spectral_transform::SpectralTransform
 ) where NF
@@ -255,14 +252,14 @@ function forcing!(
     end
 
     # to grid-point space
-    S_grid = diagn.dynamics.a_grid  # use scratch array "a"
+    S_grid = vars.scratch.grid.a    # allocate a work array matching vor grid
     transform!(S_grid, S, spectral_transform)
 
     # mask everything but mid-latitudes
     RingGrids._scale_lat!(S_grid, forcing.lat_mask)
 
     # back to spectral space
-    (; vor_tend) = diagn.tendencies
+    vor_tend = vars.tendencies.vor
     transform!(vor_tend, S_grid, spectral_transform)
 
     return nothing
@@ -360,17 +357,17 @@ Note that this conflict would be avoided if the forcing writes into
 
 In general, these are the fields you can write into for new terms
 
-- `u_tend_grid` in grid space
-- `v_tend_grid` in grid space
-- `vor_tend` in spectral space
-- `div_tend` in spectral space
-- `pres_tend` in spectral space
-- `pres_tend_grid` in grid space
-- `temp_tend_grid` in grid space
-- `humid_tend_gri` in grid space
+- `tendencies.grid.u` in grid space
+- `tendencies.grid.v` in grid space
+- `tendencies.vor` in spectral space
+- `tendencies.div` in spectral space
+- `tendencies.pres` in spectral space
+- `tendencies.grid.pres` in grid space
+- `tendencies.grid.temp` in grid space
+- `tendencies.grid.humid` in grid space
 
 One currently cannot force vorticity or divergence in grid space
-but you would need to force u,v instead. In contrast, u and v cannot
+but you would need to force u, v instead. In contrast, u and v cannot
 be forced in spectral space only in grid space.
 These restrictions exist because of the way how SpeedyWeather transforms
 between spaces to obtain tendencies. Pressure (or interface displacement
@@ -378,4 +375,4 @@ in the shallow water) can be forced both in spectral or grid space.
 Note that if you write into the pressure tendency for the primitive equation model
 these need to correspond to ``\partial_t \ln p_s`` so not in units of Pa/s but
 including the logarithm! In the shallow water model, this should have
-the normal units of m/s instead.
+the normal units of m/s instead and the pressure-equivalent variables is called `η` instead as it's the interface displacement in meters (and not actually pressure).

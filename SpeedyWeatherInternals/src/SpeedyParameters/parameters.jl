@@ -102,21 +102,22 @@ Base.getindex(ps::SpeedyParams, param_label::String) = getindex(ps, [param_label
     return SpeedyParams(param_subset)
 end
 
-## selecting columns
+# selecting columns
 Base.getindex(ps::SpeedyParams, nm::Symbol) = getindex(ps, :, nm)
 @inline function Base.getindex(ps::SpeedyParams, ::Colon, nm::Symbol)
     # include fieldname only (no component)
-    return if nm == :idx
+    if nm == :idx
         1:length(ps)
     elseif nm == :fieldname
         ModelParameters.paramfieldnames(ps)
     else
         map(p -> getindex(p, nm), ModelParameters.params(ps))
     end
+    return nothing
 end
 
-## non-mutating setindex!
-## consider using a method instead of setindex! to avoid confusion?
+# non-mutating setindex!
+# consider using a method instead of setindex! to avoid confusion?
 Base.setindex!(ps::SpeedyParams, x, nm::Symbol) = setindex!(ps, x, :, nm)
 @inline function Base.setindex!(ps::SpeedyParams, x, ::Colon, nm::Symbol)
     # include fieldname only (no component)

@@ -1,6 +1,7 @@
 module RingGrids
 
 # DOCUMENTATION
+using StyledStrings
 using DocStringExtensions
 import Printf
 

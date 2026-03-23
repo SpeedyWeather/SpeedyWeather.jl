@@ -6,11 +6,10 @@
 
         initialize!(model.longwave_radiation, model)
 
-        progn = PrognosticVariables(model)
-        diagn = DiagnosticVariables(model)
+        vars = Variables(model)
 
         ij = rand(1:model.spectral_grid.npoints)
-        SpeedyWeather.parameterization!(ij, diagn, progn, model.longwave_radiation, model)
+        SpeedyWeather.parameterization!(ij, vars, model.longwave_radiation, model)
     end
 end
 
@@ -23,12 +22,11 @@ end
         model = PrimitiveWetModel(spectral_grid; longwave_radiation)
         initialize!(model.longwave_radiation, model)
 
-        progn = PrognosticVariables(model)
-        diagn = DiagnosticVariables(model)
+        vars = Variables(model)
 
         for ij in 1:model.spectral_grid.npoints
-            SpeedyWeather.parameterization!(ij, diagn, progn, model.longwave_radiation, model)
-            t = SpeedyWeather.transmissivity!(ij, diagn, progn, model.longwave_radiation.transmissivity, model)
+            SpeedyWeather.parameterization!(ij, vars, model.longwave_radiation, model)
+            t = SpeedyWeather.transmissivity!(ij, vars, model.longwave_radiation.transmissivity, model)
             @test all(0 .<= t[ij, :] .<= 1)
         end
     end

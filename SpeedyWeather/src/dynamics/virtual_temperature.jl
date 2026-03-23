@@ -4,14 +4,13 @@ Linear virtual temperature for `model::PrimitiveDry`: Just copy over
 arrays from `temp` to `temp_virt` at timestep `lf` in spectral space
 as humidity is zero in this `model`."""
 function linear_virtual_temperature!(
-        diagn::DiagnosticVariables,
-        progn::PrognosticVariables,
+        vars::Variables,
         lf::Integer,
         model::PrimitiveDry,
     )
-    (; temp_virt) = diagn.dynamics
-    temp = get_step(progn.temp, lf)
-    return copyto!(temp_virt, temp)
+    Tᵥ = vars.dynamics.virtual_temperature
+    T = get_step(vars.prognostic.temp, lf)
+    return copyto!(Tᵥ, T)
 end
 
 """
@@ -27,25 +26,24 @@ specific humidity q and
 
 in spectral space."""
 function linear_virtual_temperature!(
-        diagn::DiagnosticVariables,
-        progn::PrognosticVariables,
+        vars::Variables,
         lf::Integer,
         model::PrimitiveEquation,
     )
-    (; temp_virt) = diagn.dynamics
+    Tᵥ = vars.dynamics.virtual_temperature
     μ = model.atmosphere.μ_virt_temp
-    (; temp_average) = diagn
-    temp = get_step(progn.temp, lf)
-    humid = get_step(progn.humid, lf)
+    Tₖ = vars.grid.temp_average
+    T = get_step(vars.prognostic.temp, lf)
+    q = get_step(vars.prognostic.humid, lf)
 
     # TODO check that doing a non-linear virtual temperature in grid-point space
     # but a linear virtual temperature in spectral space to avoid another transform
     # does not cause any problems. Alternative do the transform or have a linear
     # virtual temperature in both grid and spectral space
-    # transform!(temp_virt, temp_virt_grid, diagn.dynamics.scratch_memory, S)
-
-    # TODO: broadcast with LTA doesn't work here becasue of a broadcast conflict (Tₖ and humid are different dimensions and array types)
-    return @. temp_virt.data = temp.data + (temp_average' * μ) * humid.data
+    
+    # TODO: broadcast with LTA doesn't work here becasue of a broadcast conflict
+    # (Tₖ and q are different dimensions and array types)
+    return @. Tᵥ.data = T.data + (Tₖ' * μ) * q.data
 end
 
 @inline virtual_temperature(T, q, A::AbstractWetAtmosphere) = virtual_temperature(T, q, A.μ_virt_temp)

@@ -1,6 +1,8 @@
 module SpeedyTransforms
 
-using DocStringExtensions, Printf
+using DocStringExtensions
+using StyledStrings
+using Printf
 import ProgressMeter
 
 # NUMERICS

@@ -135,25 +135,23 @@ end
 # initialize the schedule
 function SpeedyWeather.initialize!(
     callback::MilleniumFlood,
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
+    vars::Variables,
     model::AbstractModel,
 )
-    initialize!(callback.schedule, progn.clock)
+    initialize!(callback.schedule, vars.prognostic.clock)
 end
 
 function SpeedyWeather.callback!(
     callback::MilleniumFlood,
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
+    vars::Variables,
     model::AbstractModel,
 )
     # escape immediately if not scheduled yet
-    isscheduled(callback.schedule, progn.clock) || return nothing
+    isscheduled(callback.schedule, vars.prognostic.clock) || return nothing
 
     # otherwise set the entire land-sea mask to ocean
     model.land_sea_mask.mask .= 0
-    @info "Everything flooded on $(progn.clock.time)"
+    @info "Everything flooded on $(vars.prognostic.clock.time)"
 end
 
 # nothing needs to be done after simulation is finished

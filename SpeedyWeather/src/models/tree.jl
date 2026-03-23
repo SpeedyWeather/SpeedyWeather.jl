@@ -109,11 +109,12 @@ function print_branch(
     s = ~with_size ? s : s * " ($(prettymemory(Base.summarysize(property))))"
     println(s)
 
-    return if continue_branching
+    if continue_branching
         for (i, branch) in enumerate(property_names)
             last = i == n_properties
             prevs[level + 2] = ~last
             print_branch(branch, property, level + 1, max_level, last, prevs, with_types, with_size, modules...)
         end
     end
+    return nothing
 end

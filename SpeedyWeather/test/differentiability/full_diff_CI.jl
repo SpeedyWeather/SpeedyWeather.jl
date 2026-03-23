@@ -14,33 +14,35 @@ if VERSION <= v"1.11.0"
         initialize!(simulation)
         run!(simulation, period = Hour(6))
 
-        (; prognostic_variables, diagnostic_variables, model) = simulation
+        (; variables, model) = simulation
         (; Δt, Δt_millisec) = model.time_stepping
         dt = 2Δt
         lf1 = 1
         lf2 = 2
 
-        progn = prognostic_variables
-        diagn = diagnostic_variables
+        vars = variables
+        vars_copy = deepcopy(vars)
 
-        d_diag = make_zero(diagn)
+        d_vars = make_zero(vars)
         d_model = make_zero(model)
 
-        progn_new = zero(progn)
-        dprogn_new = one(progn) # seed
+        vars_new = make_zero(vars)
+        dvars_new = make_zero(vars)
 
-        autodiff(Reverse, SpeedyWeather.timestep!, Const, Duplicated(progn_new, dprogn_new), Duplicated(diagn, d_diag), Const(dt), Duplicated(model, d_model), Const(lf1), Const(lf2))
+        # seed dvars_new with ones (output seed)
+        for k in keys(dvars_new.prognostic)
+            field = getfield(dvars_new.prognostic, k)
+            if field isa AbstractArray
+                field .= one(eltype(field))
+            end
+        end
 
-        @test sum(to_vec(dprogn_new)[1]) != 0
+        autodiff(Reverse, timestep_oop!, Const, Duplicated(vars_new, dvars_new), Duplicated(vars, d_vars), Const(dt), Duplicated(model, d_model))
+        @test sum(to_vec(d_vars)[1]) != 0
 
-        # with Const(model)
-        # currently not activated to keep the CI fast
-        #autodiff(set_runtime_activity(Reverse), timestep_oop!, Const, Duplicated(progn_new, dprogn_new), Duplicated(progn, d_progn), Duplicated(diagn, d_diag), Const(dt), Const(model))
-        #@test sum(to_vec(d_progn)[1]) != 0
-        #@test progn != d_progn
     end
 else
     @testset "Complete Differentiability" begin
-        @test_broken false # we report a broken test here on v1.11, just to indicate that this (properly) doesn't work yet
+        @test_broken false
     end
 end

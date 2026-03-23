@@ -1,4 +1,4 @@
-@testset "Test PrognosticVariables set!" begin
+@testset "Test Variables set!" begin
 
     nlayers = 8
     nlayers_soil = 2
@@ -27,7 +27,7 @@
 
     f(lon, lat, sig) = sind(lon) * cosd(lat) * (1 - sig)
 
-    prog_new = simulation.prognostic_variables
+    prog_new = simulation.variables.prognostic
     prog_old = deepcopy(prog_new)
 
     # set things ...

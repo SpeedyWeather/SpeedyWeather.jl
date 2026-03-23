@@ -67,15 +67,16 @@ function _legendre!(
         S::SpectralTransform{NF, <:Architectures.GPU};             # precomputed transform
         unscale_coslat::Bool = false,               # unscale by cosine of latitude on the fly?
     ) where {NF}
+
     (; nlat_half) = S.grid              # dimensions
-    (; lmax) = S.spectrum              # 1-based max degree l, order m of spherical harmonics
+    (; lmax) = S.spectrum               # 1-based max degree l, order m of spherical harmonics
     (; legendre_polynomials) = S        # precomputed Legendre polynomials
-    (; kjm_indices) = S                # kjm loop indices precomputed for threads
+    (; kjm_indices) = S                 # kjm loop indices precomputed for threads
     (; coslat⁻¹, lon_offsets) = S
     # NOTE: this comes out as a range, not an integer
     nlayers = size(specs, 2)            # get number of layers of specs for fewer layers than precomputed in S
 
-    lmax = lmax - 1                       # 0-based max degree l of spherical harmonics
+    lmax = lmax - 1                     # 0-based max degree l of spherical harmonics
 
     @boundscheck SpeedyTransforms.ismatching(S, specs) || throw(DimensionMismatch(S, specs))
     @boundscheck size(g_north) == size(g_south) == (S.nfreq_max, S.nlayers, nlat_half) || throw(DimensionMismatch(S, specs))
@@ -100,10 +101,10 @@ function _legendre!(
     )
 
     # unscale by cosine of latitude on the fly if requested
-    return if unscale_coslat
+    if unscale_coslat
         unscale_coslat!(g_north, g_south, coslat⁻¹, architecture = S.architecture)
     end
-
+    return nothing
 end
 
 
