@@ -57,7 +57,7 @@ end
 
 """$(TYPEDSIGNATURES) Composite OceanLandAlbedo: Call albedo.ocean over ocean and albedo.land over land."""
 @propagate_inbounds function parameterization!(ij, diagn::DiagnosticVariables, progn, albedo::OceanLandAlbedo, model)
-    albedo!(ij, diagn.physics.ocean, progn, albedo.ocean, model)
+    albedo!(ij, diagn, progn, albedo.ocean, model)
     return albedo!(ij, diagn.physics.land, progn, albedo.land, model)
 end
 
@@ -162,7 +162,7 @@ function initialize!(albedo::AlbedoClimatology, model::PrimitiveEquation)
         FileFormat = NCDataset,
         version = albedo.version
     )
-    
+
     return interpolate!(albedo.albedo, a)
 end
 
@@ -302,53 +302,48 @@ OceanAlbedo(SG::SpectralGrid; kwargs...) = OceanAlbedo{SG.NF}(; kwargs...)
 initialize!(::OceanAlbedo, ::PrimitiveEquation) = nothing
 
 """$(TYPEDSIGNATURES) Compute unpolarized Fresnel reflectance."""
-@inline function fresnel_reflectance(n::NF, mu::NF) where NF
-    # Ensure mu is strictly bounded to prevent domain errors
-    mu = clamp(mu, NF(1e-5), one(NF))
+@inline function fresnel_reflectance(n::NF, mu::NF) where {NF}
+    # Mu is bounded to prevent domain errors
+    mu = clamp(mu, NF(1.0e-5), one(NF))
     theta_i = acos(mu)
-    
+
     sin_theta_t = sin(theta_i) / n
     theta_t = asin(sin_theta_t)
-    
+
     # Perpendicular and parallel polarizations
     r_s = ((cos(theta_i) - n * cos(theta_t)) / (cos(theta_i) + n * cos(theta_t)))^2
     r_p = ((n * cos(theta_i) - cos(theta_t)) / (n * cos(theta_i) + cos(theta_t)))^2
-    
+
     return NF(0.5) * (r_s + r_p)
 end
 
 """$(TYPEDSIGNATURES) Polynomial regression function f(mu, sigma) from Jin et al. (2011)."""
-@inline function f_mu_sigma(mu::NF, sigma::NF) where NF
+@inline function f_mu_sigma(mu::NF, sigma::NF) where {NF}
     p1, p2, p3 = NF(0.0152), NF(-1.7873), NF(6.8972)
     p4, p5, p6 = NF(-8.5778), NF(4.071), NF(-7.6446)
     p7, p8, p9 = NF(0.1643), NF(-7.8409), NF(-3.5639)
     p10, p11 = NF(-2.3588), NF(10.0538)
-    
-    poly_pre = p1 + p2*mu + p3*mu^2 + p4*mu^3 + p5*sigma + p6*mu*sigma
-    poly_exp = exp(p7 + p8*mu + p9*mu^2 + p10*sigma + p11*mu*sigma)
-    
+
+    poly_pre = p1 + p2 * mu + p3 * mu^2 + p4 * mu^3 + p5 * sigma + p6 * mu * sigma
+    poly_exp = exp(p7 + p8 * mu + p9 * mu^2 + p10 * sigma + p11 * mu * sigma)
+
     return poly_pre * poly_exp
 end
 
-@propagate_inbounds function albedo!(ij, diagn, progn, albedo_scheme::OceanAlbedo{NF}, model) where NF
+@propagate_inbounds function albedo!(ij, diagn, progn, albedo_scheme::OceanAlbedo{NF}, model) where {NF}
     (; refractive_index, foam_reflectance, volume_scattering, cloudy_sky) = albedo_scheme
 
-    # Extract required local variables. 
-    # NOTE: You may need to adjust the symbols (:surface_wind_speed, etc.) 
-    # to match the exact field names in your specific DiagnosticVariables struct.
-    wind_speed = haskey(diagn, :surface_wind_speed) ? diagn.surface_wind_speed[ij] : zero(NF)
-    mu         = haskey(diagn, :cos_zenith) ? diagn.cos_zenith[ij] : one(NF)
-    f_dir      = haskey(diagn, :fraction_direct) ? diagn.fraction_direct[ij] : NF(0.5)
-    f_dif      = haskey(diagn, :fraction_diffuse) ? diagn.fraction_diffuse[ij] : NF(0.5)
+    wind_speed = diagn.physics.surface_wind_speed[ij]
+    mu = diagn.physics.cos_zenith[ij]
+    f_dir = diagn.physics.rad_fraction_direct[ij]
+    f_dif = diagn.physics.rad_fraction_diffuse[ij]
+    sigma = diagn.physics.ocean.surface_roughness[ij]
 
     # Enforce night/horizon boundary
     if mu <= zero(NF)
-        diagn.albedo[ij] = one(NF)
+        diagn.physics.ocean.albedo[ij] = one(NF)
         return
     end
-
-    # Calculate surface roughness using Cox-Munk if not explicitly provided in the diagnostics
-    sigma = haskey(diagn, :surface_roughness) ? diagn.surface_roughness[ij] : sqrt(max(NF(0.003) + NF(0.00512) * wind_speed, zero(NF)))
 
     n0 = refractive_index
 
@@ -356,24 +351,24 @@ end
     r_f = fresnel_reflectance(n0, mu)
     alpha_dir_s = r_f - f_mu_sigma(mu, sigma)
 
-    # 2. Diffuse Surface Albedo 
+    # 2. Diffuse Surface Albedo
     if cloudy_sky
         # Eq 5b (Cloudy sky)
         alpha_dif_s = NF(-0.1479) + NF(0.1502) * n0 - NF(0.0176) * n0 * sigma
     else
         # Eq 5a (Isotropic clear sky)
-        alpha_dif_s = NF(-0.1482) - NF(0.0120) * n0 + NF(0.1608) * n0^2 - NF(0.0244) * n0 * sigma
+        alpha_dif_s = NF(-0.1482) - NF(0.012) * n0 + NF(0.1608) * n0^2 - NF(0.0244) * n0 * sigma
     end
 
     # 3. Assemble Broadband Albedo (Eq 15)
     alpha_b = f_dir * alpha_dir_s + f_dif * alpha_dif_s + volume_scattering
 
     # 4. Foam Adjustment (Eqs 16 & 17)
-    f_wc = NF(2.95e-6) * (wind_speed ^ NF(3.52))
+    f_wc = NF(2.95e-6) * (wind_speed^NF(3.52))
     f_wc = clamp(f_wc, zero(NF), one(NF))
 
     alpha_final = f_wc * foam_reflectance + (one(NF) - f_wc) * alpha_b
 
-    diagn.albedo[ij] = clamp(alpha_final, zero(NF), one(NF))
+    diagn.physics.ocean.albedo[ij] = clamp(alpha_final, zero(NF), one(NF))
     return
 end

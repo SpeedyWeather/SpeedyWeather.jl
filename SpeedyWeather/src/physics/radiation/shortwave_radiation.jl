@@ -17,6 +17,8 @@ function variables(::AbstractShortwave)
         DiagnosticVariable(name = :surface_shortwave_up, dims = Grid2D(), desc = "Surface shortwave radiation up over land", units = "W/m^2", namespace = :land),
         DiagnosticVariable(name = :outgoing_shortwave, dims = Grid2D(), desc = "TOA Shortwave radiation up", units = "W/m^2"),
         DiagnosticVariable(name = :cos_zenith, dims = Grid2D(), desc = "Cos zenith angle", units = "1"),
+        DiagnosticVariable(name = :rad_fraction_direct, dims = Grid2D(), desc = "Fraction of direct radiation at surface", units = "1"),
+        DiagnosticVariable(name = :rad_fraction_diffuse, dims = Grid2D(), desc = "Fraction of diffuse radiation at surface", units = "1"),
         DiagnosticVariable(name = :albedo, dims = Grid2D(), desc = "Albedo", units = "1"),
         DiagnosticVariable(name = :albedo, dims = Grid2D(), desc = "Albedo over ocean", units = "1", namespace = :ocean),
         DiagnosticVariable(name = :albedo, dims = Grid2D(), desc = "Albedo over land", units = "1", namespace = :land),
@@ -56,6 +58,10 @@ initialize!(::TransparentShortwave, ::PrimitiveEquation) = nothing
     albedo = (1 - land_fraction) * albedo_ocean + land_fraction * albedo_land
     surface_shortwave_up[ij] = albedo * D
     diagn.physics.albedo[ij] = albedo   # store weighted albedo
+
+    # Transparent atmosphere == 100% direct beam
+    diagn.physics.rad_fraction_direct[ij] = 1.0
+    diagn.physics.rad_fraction_diffuse[ij] = 0.0
 
     # transparent also for reflected shortwave radiation travelling up
     diagn.physics.outgoing_shortwave[ij] = surface_shortwave_up[ij]
@@ -228,6 +234,19 @@ One-band shortwave radiative transfer with cloud reflection and ozone absorption
     diagn.physics.surface_shortwave_down[ij] = D_surface
     diagn.physics.ocean.surface_shortwave_down[ij] = D_surface
     diagn.physics.land.surface_shortwave_down[ij] = D_surface
+
+    # Calculate direct/diffuse radiation fractions at the surface
+    mu = max(cos_zenith, 0.05)
+    
+    # Baseline Rayleigh scattering increases at lower solar angles (longer path)
+    clear_sky_diffuse = clamp(0.15 + 0.1 / mu, 0.0, 1.0)
+    
+    # Linearly scale between clear sky diffuse and 100% diffuse based on cloud cover
+    fraction_diffuse = clear_sky_diffuse * (1 - cloud_cover) + 1.0 * cloud_cover
+    fraction_direct = 1.0 - fraction_diffuse
+
+    diagn.physics.rad_fraction_direct[ij] = fraction_direct
+    diagn.physics.rad_fraction_diffuse[ij] = fraction_diffuse
 
     # Surface albedo reflections
     up_ocean = albedo_ocean * D_surface
