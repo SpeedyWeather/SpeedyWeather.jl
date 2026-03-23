@@ -2,6 +2,7 @@
 Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+DocumenterVitepress = "4710194d-e776-4893-9690-8d956a29c365"
 GeoMakie = "db073c08-6b98-4ee5-b6a4-5efafb3259c6"
 LowerTriangularArrays = "ed20b33f-a660-45d0-a353-9c8c20bb5814"
 NCDatasets = "85f8d34a-cbdd-5861-8df4-14fed0d494ab"
@@ -20,7 +21,8 @@ SpeedyWeatherInternals = {path = "../SpeedyWeatherInternals"}
 
 [compat]
 CairoMakie = "0.12, 0.13, 0.14, 0.15"
-Documenter = "0.26, 0.27, 1"
+Documenter = "1.11"
+DocumenterVitepress = "0.3"
 GeoMakie = "0.7.6"
 NCDatasets = "0.12, 0.13, 0.14"
 UnicodePlots = "3"

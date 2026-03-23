@@ -200,7 +200,7 @@ end
 @kernel inbounds = true function unscale_coslat_kernel!(
         g_north,
         g_south,
-        @Const(coslat⁻¹),
+        coslat⁻¹,
     )
     i, k, j = @index(Global, NTuple)
     g_north[i, k, j] *= coslat⁻¹[j]

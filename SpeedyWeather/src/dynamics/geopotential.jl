@@ -140,9 +140,9 @@ end
 @kernel inbounds = true function geopotential_spectral_kernel!(
         geopot,                     # Output: spectral geopotential
         temp_virt,                  # Input: spectral virtual temperature
-        @Const(Δp_geopot_half),     # Input: integration constant for half levels
-        @Const(Δp_geopot_full),     # Input: integration constant for full levels
-        @Const(nlayers),            # Input: number of vertical layers
+        Δp_geopot_half,     # Input: integration constant for half levels
+        Δp_geopot_full,     # Input: integration constant for full levels
+        nlayers,            # Input: number of vertical layers
     )
     lm = @index(Global, Linear)  # global index: harmonic lm
 
