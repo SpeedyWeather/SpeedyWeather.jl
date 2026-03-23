@@ -24,7 +24,7 @@ function reorder!(
     return out
 end
 
-@kernel inbounds = true function reorder_kernel!(out, field, @Const(order), @Const(grid))
+@kernel inbounds = true function reorder_kernel!(out, field, order, grid)
     ij, k = @index(Global, NTuple)
     # TODO the recomputes the reordering for every layer k, maybe distribute only over ij?
     out_indices = reorder(order, ij, grid)

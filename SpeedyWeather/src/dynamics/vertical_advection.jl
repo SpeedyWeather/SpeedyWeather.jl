@@ -71,7 +71,7 @@ function _vertical_advection!(
 end
 
 @kernel inbounds = true function vertical_advection_kernel!(
-        ξ_tend, w, ξ, @Const(Δσ), @Const(nlayers), adv
+        ξ_tend, w, ξ, Δσ, nlayers, adv
     )
     ij, k = @index(Global, NTuple)
 

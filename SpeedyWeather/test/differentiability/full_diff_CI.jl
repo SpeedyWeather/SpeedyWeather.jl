@@ -17,6 +17,8 @@ if VERSION <= v"1.11.0"
         (; variables, model) = simulation
         (; Δt, Δt_millisec) = model.time_stepping
         dt = 2Δt
+        lf1 = 1
+        lf2 = 2
 
         vars = variables
         vars_copy = deepcopy(vars)

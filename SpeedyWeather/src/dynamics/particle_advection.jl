@@ -235,7 +235,7 @@ end
 
 # Kernel for predictor step in Heun's method
 @kernel inbounds = true function predictor_step_kernel!(
-        particles, locations, u_old, v_old, lons, lats, @Const(Δt_half)
+        particles, locations, u_old, v_old, lons, lats, Δt_half
     )
     i = @index(Global, Linear)
 
@@ -256,7 +256,7 @@ end
 
 # Kernel for corrector step in Heun's method
 @kernel inbounds = true function corrector_step_kernel!(
-        particles, u_new, v_new, lons, lats, @Const(Δt_half)
+        particles, u_new, v_new, lons, lats, Δt_half
     )
     i = @index(Global, Linear)
 

@@ -54,6 +54,12 @@ The derivatives are accumulated in the `dmodel` shadow. So, if we e.g. want to k
 ```julia
 dmodel.planet.gravity
 ```
+
+## Differentiating longer trajectories and checkpointing 
+
+In a very similar fashion as for the single timestep, we can also differentiate longer trajectories. For this, we need to use checkpointing to avoid storing all intermediate states in memory. This will also at the same time keep the compile time of the gradient still manageable. For a full example on how to do this for a sensitivity analysis, see the [sensitivity example](https://github.com/SpeedyWeather/SpeedyWeather.jl/blob/main/SpeedyWeather/test/differentiatibility/sensitivity_examples/).
+
+
 ## Parameter handling
 
 SpeedyWeather also provides automated parameter handling for all models and subcomponents via an extension of [ModelParameters.jl](https://github.com/rafaqz/ModelParameters.jl). Parameters can be automatically collected via the `parameters` method:

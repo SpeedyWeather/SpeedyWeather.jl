@@ -362,14 +362,14 @@ end
         temp_tend,
         temp,
         pres,
-        @Const(temp_relax_freq),
-        @Const(temp_equil_a),
-        @Const(temp_equil_b),
-        @Const(logσ),
-        @Const(Tmin),
-        @Const(κ),
-        @Const(σ),
-        @Const(whichring),
+        temp_relax_freq,
+        temp_equil_a,
+        temp_equil_b,
+        logσ,
+        Tmin,
+        κ,
+        σ,
+        whichring,
     )
     ij, k = @index(Global, NTuple)
     j = whichring[ij]                   # latitude ring index

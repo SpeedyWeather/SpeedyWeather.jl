@@ -15,11 +15,11 @@ never have to download orography or a land-sea mask.
 
 The following explains how we set up
 [SpeedyWeatherAssets](https://github.com/SpeedyWeather/SpeedyWeatherAssets)
-to work with `SpeedyWeather.get_asset` using different versions of
+to work with `SpeedyWeather.get_asset` or `RingGrids.get_asset` using different versions of
 input data or from experimental branches. The primary intended use case
 is to support different data-driven parameterizations with specific
 neural network weights that all come in different files that need to be
-loaded in.
+loaded in. The asset handling is part of `RingGrids`, but exported so that you can use them with `SpeedyWeather` directly as well.
 
 ## SpeedyWeatherAssets
 
@@ -28,7 +28,7 @@ The interface to load data from
 is via the `get_asset` function
 
 ```@docs; canonical=false
-SpeedyWeather.get_asset
+RingGrids.get_asset
 ```
 
 with `from_assets = true` will look into that repository to find the
@@ -76,14 +76,14 @@ delete individiual ones.
 The current default version of SpeedyWeatherAssets used is
 
 ```@example assets
-using SpeedyWeather
-SpeedyWeather.DEFAULT_ASSETS_VERSION
+using RingGrids
+RingGrids.DEFAULT_ASSETS_VERSION
 ```
 
 For new released versions one should (manually) add that version to
 
 ```@example assets
-SpeedyWeather.AVAILABLE_ASSETS_VERSIONS
+RingGrids.AVAILABLE_ASSETS_VERSIONS
 ```
 
 only those versions can be used in `version = v"1.1"` for example.

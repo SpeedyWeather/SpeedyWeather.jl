@@ -116,10 +116,13 @@ function Base.show(io::IO, SG::SpectralGrid)
     radius_str = @sprintf("%.0f", radius / 1000)
     average_degrees = 360 / sqrt(npoints * π)
 
+    # number of spherical harmonics
+    nharmonics = LowerTriangularArrays.nonzeros(SG.spectrum)
+
     params = "{Spectrum{...}, $Grid{...}}"
     println(io, styled"{warning:SpectralGrid}{note:$params}")
     println(io, styled"├ {info:Number format}: $NF")
-    println(io, styled"├ {info:Spectral}:      T$trunc LowerTriangularMatrix")
+    println(io, styled"├ {info:Spectral}:      T$trunc LowerTriangularMatrix, $nharmonics harmonics")
     println(io, styled"├ {info:Grid}:          $nlat-ring $Grid, $npoints grid points")
     println(io, styled"├ {info:Resolution}:    $(s(average_degrees))°, $(s(average_resolution))km (at $(radius_str)km radius)")
     println(io, styled"├ {info:Vertical}:      $nlayers-layer atmosphere")
@@ -253,15 +256,15 @@ end
 
 """$(TYPEDSIGNATURES)
 Generator function for a SpectralTransform struct pulling in parameters from a SpectralGrid struct."""
-function SpeedyTransforms.SpectralTransform(
+function (::Type{S})(
         spectral_grid::SpectralGrid;
         one_more_degree::Bool = true,
         kwargs...
-    )
+    ) where {S <: SpeedyTransforms.AbstractSpectralTransform}
     (; NF, spectrum, grid, nlayers, ArrayType) = spectral_grid
     (; lmax, mmax, architecture) = spectrum
     spectrum = one_more_degree == false ? Spectrum(lmax - 1, mmax; architecture) : spectrum
-    return SpectralTransform(spectrum, grid; NF, ArrayType, nlayers, kwargs...)
+    return S(spectrum, grid; NF, ArrayType, nlayers, kwargs...)
 end
 
 function variables(::SpectralTransform)

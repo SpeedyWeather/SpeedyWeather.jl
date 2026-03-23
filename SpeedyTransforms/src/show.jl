@@ -12,7 +12,7 @@ function prettymemory(b)
     return string(@sprintf("%.2f", value), " ", units)
 end
 
-function Base.show(io::IO, S::SpectralTransform{NF, ArrayType}) where {NF, ArrayType}
+function Base.show(io::IO, S::SpectralTransform{NF, AR, AT}) where {NF, AR, AT}
     (; spectrum, grid, nlayers, architecture) = S
     (; lmax, mmax) = spectrum   # 1-based max degree/order of harmonics
     (; nlat_half) = grid
@@ -21,10 +21,10 @@ function Base.show(io::IO, S::SpectralTransform{NF, ArrayType}) where {NF, Array
     # add information about size of Legendre polynomials and scratch memory
     polysize_str = prettymemory(Base.summarysize(S.legendre_polynomials))
     memorysize_str = prettymemory(
-        Base.summarysize(S.scratch_memory.north) +      # add all scratch_memories
-            Base.summarysize(S.scratch_memory.south) +
-            Base.summarysize(S.scratch_memory.column.north) +
-            Base.summarysize(S.scratch_memory.column.south)
+        sizeof(S.scratch_memory.north) +      # add all scratch_memories
+        sizeof(S.scratch_memory.south) +
+        sizeof(S.scratch_memory.column.north) +
+        sizeof(S.scratch_memory.column.south)
     )
 
     dealias = get_dealiasing(mmax - 1, nlat_half) # -1 for zero-based
@@ -47,4 +47,28 @@ function Base.summary(io::IO, M::ScratchMemory)
     AT = nonparametric_type(typeof(M.north))
     NF = eltype(M.north)
     print(io, Base.dims2string((size(M.north)..., 2)), " ScratchMemory{$AT{$NF,...}, ...}")
+end
+
+function Base.show(io::IO, S::MatrixSpectralTransform{NF, AR, AT}) where {NF, AR, AT}
+    (; spectrum, grid, nlayers, architecture) = S
+    (; lmax, mmax) = spectrum   # 1-based max degree/order of harmonics
+    (; nlat_half) = grid
+    Grid = nonparametric_type(grid)
+
+    # add information about size of Legendre polynomials and scratch memory
+    matrixsize_str = prettymemory(2*Base.sizeof(S.forward))
+    scratchsize_str = prettymemory(Base.sizeof(S.scratch_memory))
+
+    dealias = get_dealiasing(mmax - 1, nlat_half) # -1 for zero-based
+    truncations = ["<linear", "linear", "quadratic", "cubic", ">cubic"]
+    truncation = truncations[clamp(floor(Int, dealias) + 1, 1, 5)]
+    dealiasing = @sprintf("%.3g", dealias)
+
+    println(io, "MatrixSpectralTransform{$NF, $architecture{...}, $AT, ...}:")
+    println(io, "├ Spectral:     T$(mmax - 1), $(lmax)x$(mmax) LowerTriangularMatrix{Complex{$NF}}")
+    println(io, "├ Grid:         Field{$NF}, $(RingGrids.get_nlat(grid))-ring $Grid")
+    println(io, "├ Truncation:   dealiasing = $dealiasing ($truncation)")
+    println(io, "├ Architecture: $architecture")
+    print(io, "└ Memory:       $matrixsize_str matrices, $scratchsize_str scratch ($nlayers layers)")
+    return nothing
 end
