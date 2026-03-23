@@ -768,11 +768,7 @@ function initialize!(
     haskey(vars.prognostic, :pres) || warn_undefvar(vars, :pres) && return nothing
 
     # logarithm of reference surface pressure [log(Pa)]
-<<<<<<< HEAD
-    set!(progn, model; pres = log(model.atmosphere.reference_pressure))
-=======
-    set!(vars, model; pres = log(model.atmosphere.pressure_reference))
->>>>>>> mk/newvars
+    set!(vars, model; pres = log(model.atmosphere.reference_pressure))
     return nothing
 end
 
