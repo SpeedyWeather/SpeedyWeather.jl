@@ -238,6 +238,12 @@ $(TYPEDFIELDS)"""
     "Meridional gradient of log surf pressure"
     ∇lnp_y::GridVariable2D = zeros(GridVariable2D, grid)
 
+    "Gradient of log surf pressure, spectral, both components batched: layer 1 = zonal, layer 2 = meridional"
+    ∇lnp_spec::SpectralVariable3D = zeros(SpectralVariable3D, spectrum, 2)
+
+    "Gradient of log surf pressure, grid, both components batched: layer 1 = zonal, layer 2 = meridional"
+    ∇lnp_grid::GridVariable3D = zeros(GridVariable3D, grid, 2)
+
     "Vertical average of zonal velocity [m/s]"
     u_mean_grid::GridVariable2D = zeros(GridVariable2D, grid)
 

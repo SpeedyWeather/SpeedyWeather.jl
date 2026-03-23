@@ -125,15 +125,17 @@ function pressure_gradient_flux!(
 
     (; scratch_memory) = diagn.dynamics
 
-    # PRESSURE GRADIENT
-    pres = get_step(progn.pres, lf)         # log of surface pressure at leapfrog step lf
-    ∇lnp_x_spec = diagn.dynamics.a_2D       # reuse 2D work arrays for gradients
-    ∇lnp_y_spec = diagn.dynamics.b_2D       # in spectral space
-    (; ∇lnp_x, ∇lnp_y) = diagn.dynamics     # but store in grid space
+    # PRESSURE GRADIENT: batched spectral gradient + single 3D transform (GPU-friendly)
+    pres = get_step(progn.pres, lf)                  # log of surface pressure at leapfrog step lf
+    (; ∇lnp_spec, ∇lnp_grid) = diagn.dynamics        # 2-layer arrays: layer 1 = zonal, layer 2 = meridional
+    (; ∇lnp_x, ∇lnp_y) = diagn.dynamics              # 2D grid arrays (read by other tendency functions)
 
-    ∇!(∇lnp_x_spec, ∇lnp_y_spec, pres, S)                   # CALCULATE ∇ln(pₛ)
-    transform!(∇lnp_x, ∇lnp_x_spec, scratch_memory, S, unscale_coslat = true) # transform to grid: zonal gradient
-    transform!(∇lnp_y, ∇lnp_y_spec, scratch_memory, S, unscale_coslat = true) # meridional gradient
+    ∇!(∇lnp_spec, pres, S)                           # CALCULATE ∇ln(pₛ): layer 1 = zonal, layer 2 = meridional
+    transform!(∇lnp_grid, ∇lnp_spec, scratch_memory, S, unscale_coslat = true)  # single 3D transform
+
+    # copy 2-layer result into the 2D ∇lnp_x, ∇lnp_y fields used throughout the dynamical core
+    ∇lnp_x.data .= view(∇lnp_grid.data, :, 1)
+    ∇lnp_y.data .= view(∇lnp_grid.data, :, 2)
 
     (; u_grid, v_grid) = diagn.grid
     (; uv∇lnp) = diagn.dynamics
@@ -339,6 +341,14 @@ function surface_pressure_tendency!(
     @. pres_tend_grid += u_mean_grid * ∇lnp_x + v_mean_grid * ∇lnp_y
 
     ūv̄∇lnpₛ = diagn.dynamics.a_2D           # reuse 2D work array
+
+    # TODO (issue #947): This grid→spectral transform is the 3rd single-level transform
+    # that could be batched for GPU efficiency. A possible approach: combine `pres_tend_grid`
+    # and another 2D field into a 2-layer array and perform one 3D transform. However,
+    # `pres_tend_grid` accumulates forcing contributions before this point and `div_mean`
+    # is accumulated in spectral space in `vertical_integration!` at the semi-implicit lf=1
+    # step. Batching would require restructuring the forcing accumulation and the semi-implicit
+    # splitting. Do not implement without further design and agreement.
     transform!(ūv̄∇lnpₛ, pres_tend_grid, scratch_memory, S)
 
     # for semi-implicit div_mean is calc at time step i-1 in vertical_integration!

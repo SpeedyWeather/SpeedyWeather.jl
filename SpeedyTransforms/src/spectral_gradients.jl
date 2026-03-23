@@ -526,6 +526,59 @@ end
     end
 end
 
+"""$(TYPEDSIGNATURES)
+Applies the gradient operator ∇ to the 2D input `p` and stores the zonal derivative
+in layer 1 and the meridional derivative in layer 2 of the 3D output array `dpdxy`.
+The gradient operator acts on the unit sphere and therefore omits the 1/radius scaling
+unless `radius` keyword argument is provided.
+This batched form avoids two separate spectral→grid transforms by computing both
+gradient components into a single 3D array that can be transformed in one call."""
+function ∇!(
+        dpdxy::LowerTriangularArray,            # Output: 3D, layer 1 = zonal, layer 2 = meridional gradient
+        p::LowerTriangularArray,                # Input: 2D spectral coefficients
+        S::AbstractSpectralTransform;           # includes precomputed arrays
+        radius = DEFAULT_RADIUS,                # scale with radius if provided, otherwise unit sphere
+    )
+    @boundscheck ismatching(S, p) || throw(DimensionMismatch(S, p))
+    @boundscheck size(dpdxy, 2) >= 2 || throw(DimensionMismatch("dpdxy must have at least 2 layers"))
+
+    (; grad_y1, grad_y2) = S.gradients
+    (; m_indices) = p.spectrum
+
+    launch!(architecture(dpdxy), SpectralWorkOrder, size(dpdxy), ∇_kernel!, dpdxy, p.data, m_indices, grad_y1, grad_y2)
+
+    # 1/radius factor if not unit sphere
+    if radius != 1
+        dpdxy .*= inv(radius)
+    end
+
+    return dpdxy
+end
+
+@kernel inbounds = true function ∇_kernel!(dpdxy, p, m_indices, grad_y1, grad_y2)
+    I = @index(Global, Cartesian)
+    lm = I[1]
+    k = I[2]
+    lmmax = size(dpdxy, 1)
+
+    # only compute for layer 1 (x) and layer 2 (y); ignore higher layers if present
+    if k == 1
+        # zonal gradient: dpdx = im*(m-1)*p
+        dpdxy[lm, 1] = complex(0, m_indices[lm] - 1) * p[lm]
+    elseif k == 2
+        # meridional gradient using grad_y precomputed coefficients
+        gy1 = grad_y1[lm]
+        gy2 = grad_y2[lm]
+        if lm == 1
+            dpdxy[lm, 2] = gy2 * p[lm + 1]
+        elseif lm == lmmax
+            dpdxy[lm, 2] = gy1 * p[lm - 1]
+        else
+            dpdxy[lm, 2] = gy1 * p[lm - 1] + gy2 * p[lm + 1]
+        end
+    end
+end
+
 """$(TYPEDSIGNATURES) The zonal and meridional gradient of `p`
 using an existing `SpectralTransform` `S`. Acts on the unit sphere,
 i.e. it omits 1/radius scaling unless `radius` keyword argument is provided."""

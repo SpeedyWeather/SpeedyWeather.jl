@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Batch two 2D spectral→grid transforms in `pressure_gradient_flux!` into one 3D transform for GPU efficiency [#1012](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1012)
 - GitHub `actions/setup-node` updated to v6 [#1009](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1009)
 - Documentation for `MatrixSpectralTransform` added to SpeedyTransforms docs [#1006](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/1006)
 - MatrixSpectralTransform implemented [#952](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/952)
