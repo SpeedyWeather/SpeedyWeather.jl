@@ -58,7 +58,7 @@ end
 """$(TYPEDSIGNATURES) Composite OceanLandAlbedo: Call albedo.ocean over ocean and albedo.land over land."""
 @propagate_inbounds function parameterization!(ij, diagn::DiagnosticVariables, progn, albedo::OceanLandAlbedo, model)
     albedo!(ij, diagn, progn, albedo.ocean, model)
-    return albedo!(ij, diagn.physics.land, progn, albedo.land, model)
+    return albedo!(ij, diagn, progn, albedo.land, model)
 end
 
 # all albedos need to define albedo for ocean/land separately and combined
@@ -247,7 +247,7 @@ initialize!(albedo::LandSnowAlbedo, model::PrimitiveEquation) = nothing
     (; albedo_land, albedo_high_vegetation, albedo_low_vegetation) = albedo_scheme
 
     if haskey(diagn, :vegetation_high) && haskey(diagn, :vegetation_low)
-        (; vegetation_high, vegetation_low) = diagn
+        (; vegetation_high, vegetation_low) = diagn.physics.land
 
         # linear combination of high and low vegetation and bare soil
         diagn.albedo[ij] = vegetation_high[ij] * albedo_high_vegetation +
@@ -331,6 +331,14 @@ end
 end
 
 @propagate_inbounds function albedo!(ij, diagn, progn, albedo_scheme::OceanAlbedo{NF}, model) where {NF}
+    land_fraction = model.land_sea_mask.mask[ij]
+    
+    # Exit if the point is land
+    if land_fraction == 1
+        diagn.physics.ocean.albedo[ij] = zero(land_fraction)
+        return
+    end
+
     (; refractive_index, foam_reflectance, volume_scattering, cloudy_sky) = albedo_scheme
 
     wind_speed = diagn.physics.surface_wind_speed[ij]
@@ -369,6 +377,69 @@ end
 
     alpha_final = f_wc * foam_reflectance + (one(NF) - f_wc) * alpha_b
 
-    diagn.physics.ocean.albedo[ij] = clamp(alpha_final, zero(NF), one(NF))
+    # Also account for sea ice if sea ice concentration is available
+    if haskey(progn.ocean, :sea_ice_concentration)
+        sea_ice_conc = progn.ocean.sea_ice_concentration[ij]
+        alpha_ice = NF(0.6)  # Typical sea ice albedo
+        diagn.physics.ocean.albedo[ij] = clamp((one(NF) - sea_ice_conc) * alpha_final + sea_ice_conc * alpha_ice, zero(NF), one(NF))
+    else
+        diagn.physics.ocean.albedo[ij] = clamp(alpha_final, zero(NF), one(NF))
+    end
+
     return
+end
+
+export LearnedBRDF
+@parameterized @kwdef struct LearnedBRDF{NF, LNN, LP, LS, Scheme <: AbstractSnowCover} <: AbstractAlbedo
+    "[OPTION] filename of land weights"
+    file::String = "brdf.npz"
+
+    "[OPTION] path to the folder containing the neural network weights"
+    path::String = joinpath("data", "weights", file)
+
+    "[OPTION] flag to check for weights in SWA or locally"
+    from_assets::Bool = true
+
+    "[OPTION] SpeedyWeatherAssets version number"
+    version::VersionNumber = DEFAULT_ASSETS_VERSION
+
+    "Conversion from snow depth to snow cover [m]"
+    @param snow_depth_scale::NF = 0.05 (bounds = Positive,)
+
+    "Snow cover-albedo scheme"
+    @param snow_cover::Scheme = SaturatingSnowCover() (group = :snow_cover,)
+
+    # Ocean normalisation parameters
+    input_means::Vector{NF} = Float32[
+        1.8544014e-1, 4.8125926e-1, 1.8360449e-1,
+        2.6629507e+2, 6.8946009e+0, 8.4837744e+3,
+        9.8664957e-1, 8.8243204e-1,
+    ]
+    input_stds::Vector{NF} = Float32[
+        3.3605048e-1, 4.4779891e-1, 1.372516e-1, 2.9311209e+1,
+        2.4076269e+1, 8.7741064e+3, 1.4606022e+0, 8.4775335e-1,
+    ]
+    output_means::Vector{NF} = Float32[
+        0.19499032, 0.05033005, 0.01945734,
+        0.36265752, 0.12071748, 0.04039559,
+        0.2922392, 0.08076486, 0.02871396,
+    ]
+    output_stds::Vector{NF} = Float32[
+        0.21011186, 0.02822702, 0.01345009,
+        0.13475, 0.05032686, 0.02287926,
+        0.16457707, 0.03171282, 0.01661654,
+    ]
+
+    input_buffer::Vector{Float32} = zeros(Float32, 8)
+
+    brdf_nn::LNN
+    brdf_params::LP
+    brdf_states::LS
+end
+
+function Base.show(io::IO, scheme::LearnedBRDF)
+    print(io, "LearnedBRDF{$(eltype(scheme.output_mean))}")
+    println(io)
+    n_layers = length(keys(scheme.brdf_params))
+    return println(io, "└ BRDF: Neural network ($n_layers layers)")
 end

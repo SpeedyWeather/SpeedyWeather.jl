@@ -85,6 +85,12 @@ export VegetationClimatology
     "[OPTION] variable name in netcdf file for low vegetation"
     varname_vegl::String = "vegl"
 
+    "[OPTION] variable name in netcdf file for high vegetation LAI"
+    varname_lai_hv::String = "lai_hv"
+
+    "[OPTION] variable name in netcdf file for low vegetation LAI"
+    varname_lai_lv::String = "lai_lv"
+
     "[OPTION] Grid the soil moisture file comes on"
     FieldType::Type{<:AbstractField} = FullGaussianField
 
@@ -94,6 +100,12 @@ export VegetationClimatology
 
     "Low vegetation cover [1], interpolated onto Grid"
     low_cover::GridVariable2D
+
+    "High vegetation LAI [1], interpolated onto Grid"
+    high_lai::GridVariable2D
+
+    "Low vegetation LAI [1], interpolated onto Grid"
+    low_lai::GridVariable2D
 end
 
 # TODO to adapt create a ManualVegetationClimatology component like AlbedoClimatology is adapted to ManualAlbedo
@@ -105,7 +117,9 @@ function VegetationClimatology(SG::SpectralGrid, geometry::LandGeometryOrNothing
     (; NF, GridVariable2D, grid) = SG
     high_cover = zeros(GridVariable2D, grid)
     low_cover = zeros(GridVariable2D, grid)
-    return VegetationClimatology{NF, GridVariable2D}(; high_cover, low_cover, kwargs...)
+    high_lai = zeros(GridVariable2D, grid)
+    low_lai = zeros(GridVariable2D, grid)
+    return VegetationClimatology{NF, GridVariable2D}(; high_cover, low_cover, high_lai, low_lai, kwargs...)
 end
 
 function initialize!(vegetation::VegetationClimatology, model::PrimitiveEquation)
@@ -119,7 +133,6 @@ function initialize!(vegetation::VegetationClimatology, model::PrimitiveEquation
         FileFormat = NCDataset,
         version = vegetation.version
     )
-
     vegl = get_asset(
         vegetation.path;
         from_assets = vegetation.from_assets,
@@ -128,16 +141,39 @@ function initialize!(vegetation::VegetationClimatology, model::PrimitiveEquation
         FileFormat = NCDataset,
         version = vegetation.version
     )
+    lai_hv = get_asset(
+        vegetation.path;
+        from_assets = vegetation.from_assets,
+        name = vegetation.varname_lai_hv,
+        ArrayType = vegetation.FieldType,
+        FileFormat = NCDataset,
+        version = vegetation.version
+    )
+    lai_lv = get_asset(
+        vegetation.path;
+        from_assets = vegetation.from_assets,
+        name = vegetation.varname_lai_lv,
+        ArrayType = vegetation.FieldType,
+        FileFormat = NCDataset,
+        version = vegetation.version
+    )
 
     vegh = on_architecture(model.architecture, vegh)
     vegl = on_architecture(model.architecture, vegl)
+    lai_hv = on_architecture(model.architecture, lai_hv)
+    lai_lv = on_architecture(model.architecture, lai_lv)
 
     # interpolate onto grid
     high_vegetation_cover = vegetation.high_cover
     low_vegetation_cover = vegetation.low_cover
+    high_lai = vegetation.high_lai
+    low_lai = vegetation.low_lai
     interpolator = RingGrids.interpolator(high_vegetation_cover, vegh, NF = Float32)
     interpolate!(high_vegetation_cover, vegh, interpolator)
-    return interpolate!(low_vegetation_cover, vegl, interpolator)
+    interpolate!(high_lai, lai_hv, interpolator)
+    interpolate!(low_vegetation_cover, vegl, interpolator)
+    interpolate!(low_lai, lai_lv, interpolator)
+    return nothing
 end
 
 function initialize!(
@@ -236,6 +272,8 @@ function variables(::VegetationClimatology)
     return (
         DiagnosticVariable(name = :vegetation_high, dims = Grid2D(), desc = "Vegetation high cover", units = "1", namespace = :land),
         DiagnosticVariable(name = :vegetation_low, dims = Grid2D(), desc = "Vegetation low cover", units = "1", namespace = :land),
+        DiagnosticVariable(name = :lai_hv, dims = Grid2D(), desc = "Leaf Area Index of high vegetation", units = "1", namespace = :land),
+        DiagnosticVariable(name = :lai_lv, dims = Grid2D(), desc = "Leaf Area Index of low vegetation", units = "1", namespace = :land),
         DiagnosticVariable(name = :soil_moisture_availability, dims = Grid2D(), desc = "Soil moisture availability for evaporation", units = "1", namespace = :land),
         PrognosticVariable(name = :soil_moisture, dims = Grid3D(), desc = "Soil moisture content (fraction of capacity)", units = "1", namespace = :land),
     )

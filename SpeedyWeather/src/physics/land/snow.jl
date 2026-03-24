@@ -11,18 +11,46 @@ from the diagnosed precipitation, melts once the top soil layer exceeds
 unrealistic snow buildup as in reality the snow would turn into ice and a glacier / 
 ice sheet would form instead.
 $(TYPEDFIELDS)"""
-@parameterized @kwdef struct SnowModel{NF} <: AbstractSnow
+@parameterized @kwdef struct SnowModel{NF, GridVariable2D} <: AbstractSnow
+    "[OPTION] filename of 'permanent' glacier mask"
+    file::String = "glacier_mask.nc"
+
+    "[OPTION] path to the folder containing the glacier mask"
+    path::String = joinpath("data", "boundary_conditions", file)
+
+    "[OPTION] flag to check for glacier mask in SWA or locally"
+    from_assets::Bool = true
+
+    "[OPTION] variable name in netcdf file"
+    varname::String = "glm"
+
+    "[OPTION] SpeedyWeatherAssets version number"
+    version::VersionNumber = DEFAULT_ASSETS_VERSION
+
+    "[OPTION] Grid the albedo file comes on"
+    FieldType::Type{<:AbstractField} = FullGaussianField
+
     "[OPTION] Temperature threshold for snow melting [K]"
     @param melting_threshold::NF = 275 (bounds = Positive,)
 
     "[OPTION] Time scale for snow runoff/leakage into soil moisture [s]"
     @param runoff_time_scale::Second = Year(4) (bounds = Positive,)
+
+    "'Permanent' glacier mask"
+    snow_depth::GridVariable2D
 end
 
 Adapt.@adapt_structure SnowModel
 
 # generator function
-SnowModel(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothing; kwargs...) = SnowModel{SG.NF}(; kwargs...)
+# SnowModel(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothing; kwargs...) = SnowModel{SG.NF, SG.GridVariable2D}(; kwargs...)
+
+function SnowModel(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothing; kwargs...)
+    (; NF, GridVariable2D, grid) = SG
+    snow_depth = zeros(GridVariable2D, grid)  # initialize snow depth to zero
+    return SnowModel{NF, GridVariable2D}(; snow_depth, kwargs...)
+end
+
 
 # initialize component
 initialize!(snow::SnowModel, model::PrimitiveEquation) = nothing
@@ -34,7 +62,24 @@ function initialize!(
         snow::SnowModel,
         model::PrimitiveEquation,
     )
-    return set!(progn, model.geometry, snow_depth = 0)
+    glm = get_asset(
+        snow.path,
+        from_assets = snow.from_assets,
+        name = snow.varname,
+        ArrayType = snow.FieldType,
+        FileFormat = NCDataset,
+        version = snow.version,
+    )
+
+    glm = on_architecture(model.architecture, glm)
+    glm *= 10  # Convert from binary mask to snow depth (permanent glaciers are 10m)
+
+    # Interpolate onto the grid
+    snow_depth = snow.snow_depth
+    interpolator = RingGrids.interpolator(snow_depth, glm, NF = Float32)
+    interpolate!(snow_depth, glm, interpolator)
+
+    return set!(progn, model.geometry, snow_depth = glm)
 end
 
 function timestep!(
