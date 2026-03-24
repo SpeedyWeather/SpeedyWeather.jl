@@ -98,9 +98,9 @@ function initialize!(model::Barotropic; time::DateTime = DEFAULT_DATE)
     initialize!(prognostic_variables.particles, prognostic_variables, diagnostic_variables, model)
 
     # set the initial conditions
-    @maybe_jit arch initialize!(prognostic_variables, model.initial_conditions, model)
+    initialize!(prognostic_variables, model.initial_conditions, model)
     (; clock) = prognostic_variables
-    @maybe_jit arch set!(clock, time = time, start = time)
+    set!(clock, time = time, start = time)
 
     return Simulation(prognostic_variables, diagnostic_variables, model)
 end
