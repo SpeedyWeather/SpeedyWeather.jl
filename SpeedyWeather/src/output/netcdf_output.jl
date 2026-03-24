@@ -528,6 +528,14 @@ Returns the full path of the output file after it was created."""
 get_full_output_file_path(output::AbstractOutput) = joinpath(output.run_path, output.filename)
 
 """$(TYPEDSIGNATURES)
+Returns the full path of the output file for a `simulation`. Throws an error if output is not active."""
+function get_output_path(simulation::AbstractSimulation)
+    output = simulation.model.output
+    output.active || error("Output is not active")
+    return joinpath(output.run_path, output.filename)
+end
+
+"""$(TYPEDSIGNATURES)
 Loads a `var_name` trajectory of the model `M` that has been saved in
 a netCDF file during the time stepping."""
 function load_trajectory(var_name::Union{Symbol, String}, model::AbstractModel)
