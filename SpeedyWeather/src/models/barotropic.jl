@@ -82,14 +82,14 @@ function initialize!(model::Barotropic; time::DateTime = DEFAULT_DATE)
 
     # initialize components
     arch = model.architecture
-    @maybe_jit arch initialize!(model.geometry, model)
+    initialize!(model.geometry, model)
     initialize!(model.time_stepping, model)
-    @maybe_jit arch initialize!(model.coriolis, model)
-    @maybe_jit arch initialize!(model.forcing, model)
-    @maybe_jit arch initialize!(model.drag, model)
-    @maybe_jit arch initialize!(model.horizontal_diffusion, model)
-    @maybe_jit arch initialize!(model.random_process, model)
-    @maybe_jit arch initialize!(model.particle_advection, model)
+    initialize!(model.coriolis, model)
+    initialize!(model.forcing, model)
+    initialize!(model.drag, model)
+    initialize!(model.horizontal_diffusion, model)
+    initialize!(model.random_process, model)
+    initialize!(model.particle_advection, model)
 
     # allocate prognostic and diagnostic variables
     prognostic_variables = PrognosticVariables(model)
