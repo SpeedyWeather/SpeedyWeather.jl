@@ -13,7 +13,7 @@ using LinearAlgebra
 using CUDA
 using Statistics: mean
 using Enzyme
-import SpeedyWeather: ReactantDevice, first_timesteps!, later_timestep!
+import SpeedyWeather: ReactantDevice, first_timesteps!, later_timestep!, @maybe_jit
 
 # Configuration
 
@@ -22,7 +22,8 @@ const NSTEPS = 10           # number of time steps to compare
 const RTOL = 1.0e-3         # relative tolerance for comparison
 const ATOL = 1.0e-8         # absolute tolerance for comparison
 
+include("test_maybe_jit.jl")
 include("setup.jl")
-
 include("test_correctness.jl")
+
 #include("differentation.jl")
