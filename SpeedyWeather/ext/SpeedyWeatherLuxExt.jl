@@ -396,7 +396,7 @@ Base.@propagate_inbounds function SpeedyWeather.albedo!(ij, diagn, progn, scheme
         return nothing
     end
 
-    diagn.physics.land.albedo[ij] = brdf(ij, diagn, progn, scheme)
+    diagn.physics.land.albedo[ij] = clamp(brdf(ij, diagn, progn, scheme), 0, 1)
     return nothing
 end
 
