@@ -138,7 +138,7 @@ macro maybe_jit(arch, expr)
     if expr.head == :call
         f = expr.args[1]
         args = expr.args[2:end]
-        return esc(:(_jit($arch, $f, $(args...))))
+        return :(_jit($(esc(arch)), $(esc(f)), $(esc.(args)...)))
     else
         return esc(expr)
     end
