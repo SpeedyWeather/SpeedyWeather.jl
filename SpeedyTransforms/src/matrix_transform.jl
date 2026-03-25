@@ -191,43 +191,6 @@ coefficients to an n-dimensional array `field`. Uses precomputed dense transform
 the transformation. The spectral transform is number format-flexible but `field` and the spectral
 transform `M` have to have the same number format. The spectral transform is grid-flexible as long
 as `field.grid` and `M.grid` match."""
-function transform_old!(                        # SPECTRAL TO GRID
-        field::AbstractField,               # gridded output
-        coeffs::LowerTriangularArray,       # spectral coefficients input
-        scratch_memory,                     # explicit scratch memory to use
-        M::MatrixSpectralTransform;         # precomputed transform
-        unscale_coslat::Bool = false,       # unscale with cos(lat) on the fly?
-    )
-
-    # catch incorrect sizes early
-    @boundscheck ismatching(M, field) || throw(DimensionMismatch(M, field))
-    @boundscheck ismatching(M, coeffs) || throw(DimensionMismatch(M, coeffs))
-
-    nlayers = size(coeffs, 2)
-
-    nlayers = size(coeffs, 2)
-    if nlayers < size(scratch_memory, 2)
-        # use first n layers of scratch memory
-        scratch = view(scratch_memory, :, 1:nlayers)
-
-        # multiply into scratch which is complex typed and then take real part into field
-        # imaginary part should be zero but destination is used to store intermediate results
-        # explicitly convert to real also for NaN + NaN*im results
-        LinearAlgebra.mul!(scratch, M.backward, coeffs.data)
-        field.data .= real.(scratch)
-
-    else    # don't use view for 3D transforms with all layers
-        # TODO if multiplication yields all real then one could write directly into field.data
-        # which would be much faster but if the imaginary part is non-zero this throws an error
-        # so for now use the scratch memory as intermediate storage and then copy real part
-        LinearAlgebra.mul!(scratch_memory, M.backward, coeffs.data)
-        field.data .= real.(scratch_memory)
-    end
-
-    unscale_coslat && RingGrids._scale_lat!(field, M.coslat⁻¹)
-    return field
-end
-
 function transform!(                        # SPECTRAL TO GRID
         field::AbstractField,               # gridded output
         coeffs::LowerTriangularArray,       # spectral coefficients input

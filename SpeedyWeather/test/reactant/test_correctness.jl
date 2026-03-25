@@ -8,6 +8,9 @@ function sync_variables!(sim_cpu, sim_reactant)
     # Sync vorticity from Reactant to CPU (copy underlying data)
     copyto!(progn_cpu.vor.data, Array(progn_reactant.vor.data))
 
+    # Sync scale factor so that initialize! → scale! applies the correct scaling
+    progn_cpu.scale[] = progn_reactant.scale[]
+
     # Sync clock from Reactant to CPU
     clock_cpu = progn_cpu.clock
     clock_reactant = progn_reactant.clock
@@ -128,22 +131,33 @@ function compare_tendencies(sim_cpu, sim_reactant; rtol = RTOL, atol = ATOL)
     return results
 end
 
-"""Test tendencies after a single timestep on already-initialized simulations."""
-function test_tendencies!(sim_cpu, sim_reactant, model_name, r_first! = nothing, r_later! = nothing; rtol = RTOL, atol = ATOL)
+"""Test tendencies after running both simulations identically.
+
+Tendencies are computed from grid-point variables which are produced by
+`transform!` (spectral → grid). Because the CPU and Reactant backends
+execute transform! slightly differently (identical matrices but different
+numerical paths through @jit), the resulting grid variables — and therefore
+the tendencies — can differ at the level of the spectral transform
+discrepancy. We therefore compare tendencies after running both models in
+the same self-consistent way, mirroring `test_time_stepping!`."""
+function test_tendencies!(sim_cpu, sim_reactant, model_name, r_first! = nothing, r_later! = nothing; nsteps = 1, rtol = RTOL, atol = ATOL)
     println("\n" * "-"^60)
-    println("Testing tendencies (single timestep)")
+    println("Testing tendencies ($nsteps steps)")
     println("-"^60)
 
-    initialize!(sim_cpu, steps = 1)
-    initialize!(sim_reactant, steps = 1)
-
+    sync_variables!(sim_cpu, sim_reactant)
+    initialize!(sim_cpu; steps = nsteps)
+    initialize!(sim_reactant; steps = nsteps)
     sync_variables!(sim_cpu, sim_reactant)
 
-    # Run a single timestep to compute tendencies
-    println("  Running CPU model...")
+    # Run one step to compute tendencies
     SpeedyWeather.time_stepping!(sim_cpu)
-    println("  Running Reactant model...")
+
+    # Run another step to ensure all variables are updated
     SpeedyWeather.time_stepping!(sim_reactant, r_first!, r_later!)
+
+    SpeedyWeather.finalize!(sim_reactant)
+    SpeedyWeather.finalize!(sim_cpu)
     println("  ✓ Tendencies computed")
 
     # Compare tendencies
