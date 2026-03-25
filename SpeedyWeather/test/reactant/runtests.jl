@@ -15,6 +15,8 @@ using Statistics: mean
 using Enzyme
 import SpeedyWeather: ReactantDevice, first_timesteps!, later_timestep!, @maybe_jit
 
+const SpeedyWeatherReactantExt = Base.get_extension(SpeedyWeather, :SpeedyWeatherReactantExt)
+
 # Configuration
 
 const TRUNC = 31            # spectral truncation

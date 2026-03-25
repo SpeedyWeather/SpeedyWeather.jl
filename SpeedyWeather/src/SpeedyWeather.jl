@@ -25,7 +25,7 @@ export SpeedyWeatherInternals, Architectures
 
 # INPUT OUTPUT
 import TOML
-# Dates types are provided by SpeedyWeatherInternals.Utils.custom_dates
+import Dates
 import Printf: Printf, @sprintf
 import Random: randstring
 import NCDatasets: NCDatasets, NCDataset, defDim, defVar
@@ -46,22 +46,22 @@ export Utils
 using SpeedyWeatherInternals.Utils
 import SpeedyWeatherInternals.Utils: @maybe_jit
 
-# TracableDates as drop-in replacement for Dates (export everything Dates does as well)
-import SpeedyWeatherInternals.Utils.TracableDates as Dates
+# Dates from stdlib
 export Dates
-using SpeedyWeatherInternals.Utils.TracableDates
+using Dates
 export Period, DatePeriod, TimePeriod
 export DateTime, Millisecond, Second, Minute, Hour, Day, Week, Month, Year
 export CompoundPeriod, canonicalize
 export dayofyear, daysinmonth, isleapyear, firstdayofmonth
 export year, month, day, hour, minute, second, millisecond, yearmonthday
+# Century and Millenium defined in clock.jl
 export Century, Millenium
 
 # parameter handling
 using SpeedyWeatherInternals.SpeedyParameters
 
 import SpeedyWeatherInternals.SpeedyParameters: parameters
-import SpeedyWeatherInternals.Utils.TracableDates: value
+import Dates: value
 
 # export user-facing parameter handling types and methods
 export SpeedyParam, SpeedyParams, parameters, stripparams

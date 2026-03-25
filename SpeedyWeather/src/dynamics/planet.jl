@@ -13,7 +13,7 @@ characteristics. Note that `radius` is not part of it as this should be chosen
 in `SpectralGrid`. Keyword arguments are
 $(TYPEDFIELDS)
 """
-@parameterized @kwdef struct Earth{NF, B} <: AbstractPlanet
+@parameterized @kwdef struct Earth{NF, S, DT, B} <: AbstractPlanet
 
     "Earth's radius [m]"
     @param radius::NF = DEFAULT_RADIUS
@@ -28,16 +28,16 @@ $(TYPEDFIELDS)
     daily_cycle::B = true
 
     "Seconds in a daily rotation"
-    length_of_day::Second = Hour(24)
+    length_of_day::S = Hour(24)
 
     "switch on/off seasonal cycle"
     seasonal_cycle::B = true
 
     "Seconds in an orbit around the sun"
-    length_of_year::Second = Day(365.25)
+    length_of_year::S = Day(365.25)
 
     "time of spring equinox (year irrelevant)"
-    equinox::DateTime = DateTime(2000, 3, 20)
+    equinox::DT = DateTime(2000, 3, 20)
 
     "angle [˚] rotation axis tilt wrt to orbit"
     @param axial_tilt::NF = 23.4 (bounds = -90 .. 90,)
@@ -48,5 +48,5 @@ end
 
 Adapt.@adapt_structure Earth
 
-Earth(SG::SpectralGrid; kwargs...) = Earth{SG.NF, Bool}(; kwargs...)
-Earth(::Type{NF}; kwargs...) where {NF} = Earth{NF, Bool}(; kwargs...)
+Earth(SG::SpectralGrid; kwargs...) = Earth{SG.NF, Dates.Second, Dates.DateTime, Bool}(; kwargs...)
+Earth(::Type{NF}; kwargs...) where {NF} = Earth{NF, Dates.Second, Dates.DateTime, Bool}(; kwargs...)
