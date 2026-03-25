@@ -43,8 +43,7 @@ end
 end
 
 @testset "readable secs feedback" begin
-    using SpeedyWeatherInternals.Utils.TracableDates:
-        CompoundPeriod, Day, Hour, Minute, Second, Millisecond
+    using Dates: CompoundPeriod, Day, Hour, Minute, Second, Millisecond
     @test readable_secs(123456) == CompoundPeriod(Day(1), Hour(10))
     @test readable_secs(12345) == CompoundPeriod(Hour(3), Minute(26))
     @test readable_secs(1234) == CompoundPeriod(Minute(20), Second(34))

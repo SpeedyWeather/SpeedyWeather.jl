@@ -60,7 +60,15 @@ Base.convert(::Type{ConcretePJRTArray{T, 3, 1}}, a::AbstractArray{S, 3}) where {
 
 Reactant.ConcretePJRTArray{T, N, D}(a::AbstractArray{T, N}) where {T, N, D} = Reactant.to_rarray(a)
 
-# For @maybe_jit macro - extend _jit for ReactantDevice
-_jit(::ReactantDevice, f, args...; kwargs...) = Reactant.@jit f(args...; kwargs...)
+# For @maybe_jit macro - extend _jit for ReactantDevice.
+# If we are already inside a Reactant compile/trace context, call f directly (no nested @jit).
+# Otherwise JIT-compile on the fly.
+function _jit(::ReactantDevice, f, args...; kwargs...)
+    if Reactant.ReactantCore.within_compile()
+        return f(args...; kwargs...)
+    else
+        return Reactant.@jit f(args...; kwargs...)
+    end
+end
 
 end

@@ -118,7 +118,7 @@ function PrognosticVariables(model::AbstractModel)
     tracers = model.tracers
     nsteps = model.time_stepping.nsteps
 
-    (; NF, spectrum, grid, nlayers, nparticles) = SG
+    (; NF, spectrum, grid, nlayers, nparticles, architecture) = SG
     (; SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, ParticleVector) = SG
     nlayers_soil = get_soil_layers(model)
 
@@ -130,7 +130,7 @@ function PrognosticVariables(model::AbstractModel)
     ocean = initialize_variables(SG, 1, variable_names.ocean...)
 
     tracer_tuple = (; [key => zeros(SpectralVariable4D, spectrum, nlayers, nsteps) for key in keys(tracers)]...)
-    clock = Clock()
+    clock = Clock(architecture)
 
     return PrognosticVariables{
         typeof(spectrum), typeof(grid),

@@ -181,7 +181,7 @@ function transform!(                        # GRID TO SPECTRAL
     @boundscheck ismatching(M, coeffs, horizontal_only = true) || throw(DimensionMismatch(M, coeffs))
     # TODO: deactivated temporarily because of Reactant issue
     #@boundscheck size(coeffs, 2) == size(field, 2) || throw(DimensionMismatch(field.data, coeffs.data))
-    LinearAlgebra.mul!(coeffs.data, M.forward, field.data)
+    @maybe_jit M.architecture LinearAlgebra.mul!(coeffs.data, M.forward, field.data)
     return coeffs
 end
 
@@ -245,11 +245,13 @@ function transform!(                        # SPECTRAL TO GRID
     # the result is real-valued, therefore we can split the complex multiplication
     # into two real-valued multiplications
     scratch .= real.(coeffs.data)
-    LinearAlgebra.mul!(field.data, M.backward_real, scratch)
+    @maybe_jit M.architecture LinearAlgebra.mul!(field.data, M.backward_real, scratch)
 
     scratch .= imag.(coeffs.data)
-    LinearAlgebra.mul!(field.data, M.backward_imag, scratch, -1, 1)
+    @maybe_jit M.architecture LinearAlgebra.mul!(field.data, M.backward_imag, scratch, -1, 1)
 
-    unscale_coslat && RingGrids._scale_lat!(field, M.coslat⁻¹)
+    if unscale_coslat
+        @maybe_jit M.architecture RingGrids._scale_lat!(field, M.coslat⁻¹)
+    end
     return field
 end

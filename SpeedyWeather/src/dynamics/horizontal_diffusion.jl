@@ -17,6 +17,7 @@ $(TYPEDFIELDS)"""
         NF,
         MatrixType,
         IntType,
+        S,
     } <: AbstractHorizontalDiffusion
 
     # DIMENSIONS
@@ -31,10 +32,10 @@ $(TYPEDFIELDS)"""
     power::NF = 4
 
     "[OPTION] diffusion time scale"
-    time_scale::Second = Hour(4)
+    time_scale::S = Hour(4)
 
     "[OPTION] diffusion time scale for divergence"
-    time_scale_div::Second = Hour(1)
+    time_scale_div::S = Hour(1)
 
     "[OPTION] stronger diffusion with resolution? 0: constant with trunc, 1: (inverse) linear with trunc, etc"
     resolution_scaling::NF = 1
@@ -61,7 +62,7 @@ Passes on keyword arguments."""
 function HyperDiffusion(spectral_grid::SpectralGrid; kwargs...)
     (; NF, trunc, nlayers, ArrayType) = spectral_grid        # take resolution parameters from spectral_grid
     MatrixType = ArrayType{NF, 2}
-    return HyperDiffusion{NF, MatrixType, typeof(trunc)}(; trunc, nlayers, kwargs...)
+    return HyperDiffusion{NF, MatrixType, typeof(trunc), Dates.Second}(; trunc, nlayers, kwargs...)
 end
 
 """$(TYPEDSIGNATURES)

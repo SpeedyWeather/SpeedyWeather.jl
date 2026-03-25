@@ -4,6 +4,7 @@
 
 - Broadcasting for LTA and RingGrids revised [#977](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/977)
 - Reactant support [#970](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/970)
+- Add `get_output_path(::Simulation)` to retrieve the output file path [#1011](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1011)
 - GitHub `actions/setup-node` updated to v6 [#1009](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1009)
 - Documentation for `MatrixSpectralTransform` added to SpeedyTransforms docs [#1006](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/1006)
 - MatrixSpectralTransform implemented [#952](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/952)

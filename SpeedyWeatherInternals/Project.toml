@@ -5,6 +5,7 @@ version = "0.1.3"
 
 [deps]
 ComponentArrays = "b0b7db55-cfe3-40fc-9ded-d10e2dbeff66"
+Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
 ConstructionBase = "187b0558-2788-49d3-abe0-74a17ed4e7c9"
 DocStringExtensions = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
 DomainSets = "5b8099bc-c8ec-5219-889f-1d9e522a28bf"

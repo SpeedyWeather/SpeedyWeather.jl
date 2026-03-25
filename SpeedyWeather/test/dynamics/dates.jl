@@ -106,3 +106,55 @@ end
     @test promote(Year(1), Millenium(1)) == (Year(1), Year(1000))
     @test promote(Century(1), Millenium(1)) == (Century(1), Century(10))
 end
+
+@testset "Century and Millenium" begin
+
+    @testset "Parametric construction" begin
+        c = Century(1)
+        @test c isa Century{Int64}
+        @test Dates.value(c) == 1
+
+        c32 = Century(Int32(2))
+        @test c32 isa Century{Int32}
+        @test Dates.value(c32) == Int32(2)
+
+        m = Millenium(1)
+        @test m isa Millenium{Int64}
+        @test Dates.value(m) == 1
+
+        m32 = Millenium(Int32(3))
+        @test m32 isa Millenium{Int32}
+        @test Dates.value(m32) == Int32(3)
+    end
+
+    @testset "Promotion rules" begin
+        @test promote_type(Century, Year) == Year
+        @test promote_type(Century, Month) == Month
+        @test promote_type(Century, Day) == Day
+        @test promote_type(Century, Hour) == Hour
+        @test promote_type(Century, Second) == Second
+
+        @test promote_type(Millenium, Century) == Century
+        @test promote_type(Millenium, Year) == Year
+        @test promote_type(Millenium, Month) == Month
+        @test promote_type(Millenium, Day) == Day
+        @test promote_type(Millenium, Hour) == Hour
+        @test promote_type(Millenium, Second) == Second
+    end
+
+    @testset "coarserperiod" begin
+        @test Dates.coarserperiod(Year) == (Century, 100)
+        @test Dates.coarserperiod(Century) == (Millenium, 10)
+    end
+
+    @testset "printing" begin
+        @test Dates._units(Century(1)) == " century"
+        @test Dates._units(Century(2)) == " centuries"
+        @test Dates._units(Millenium(1)) == " millenium"
+        @test Dates._units(Millenium(2)) == " millenia"
+    end
+
+    @testset "Period constructor from Period" begin
+        @test Century(Millenium(1)) == Century(10)
+    end
+end

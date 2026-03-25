@@ -55,6 +55,6 @@ jobs:
       
       - name: Run Reactant correctness tests
         run: |
-          julia --color=yes --project=SpeedyWeather/test/reactant SpeedyWeather/test/reactant/test_correctness.jl
+          julia --color=yes --project=SpeedyWeather/test/reactant SpeedyWeather/test/reactant/runtests.jl
         env:
           GITHUB_AUTH: ${{ secrets.GITHUB_TOKEN }}

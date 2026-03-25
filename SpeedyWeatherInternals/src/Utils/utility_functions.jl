@@ -143,9 +143,9 @@ macro maybe_jit(arch, expr)
             kwargs = remaining[1].args
             args = remaining[2:end]
             kw_exprs = [k isa Expr ? Expr(:kw, k.args[1], k.args[2]) : Expr(:kw, k, k) for k in kwargs]
-            return esc(:(_jit($arch, $f, $(args...); $(kw_exprs...))))
+            return :(_jit($(esc(arch)), $(esc(f)), $(esc.(args...)); $(esc.(kw_exprs)...)))
         else
-            return esc(:(_jit($arch, $f, $(remaining...))))
+            return :(_jit($(esc(arch), $(esc(f)), $(esc.(remaining)...)))
         end
     else
         return esc(expr)
