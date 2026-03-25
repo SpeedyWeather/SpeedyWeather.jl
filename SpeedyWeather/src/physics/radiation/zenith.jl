@@ -188,12 +188,11 @@ Calculate cos of solar zenith angle with a daily cycle
 at time `time`. Seasonal cycle or time correction may be disabled,
 depending on parameters in SolarZenith."""
 function cos_zenith!(
-        cos_zenith::AbstractField,
+        cos_zenith::AbstractField{NF},
         S::SolarZenith,
         time::DateTime,
         geometry::AbstractGeometry,
-    )
-    NF = eltype(cos_zenith)
+    ) where {NF}
     (; sinlat, coslat, lons) = geometry
     (; length_of_day, length_of_year) = S
     @boundscheck geometry.spectral_grid.grid == cos_zenith.grid ||
@@ -261,12 +260,11 @@ Calculate cos of solar zenith angle as daily average
 at time `time`. Seasonal cycle or time correction may be disabled,
 depending on parameters in SolarZenithSeason."""
 function cos_zenith!(
-        cos_zenith::AbstractField,
+        cos_zenith::AbstractField{NF},
         S::SolarZenithSeason,
         time::DateTime,
         geometry::AbstractGeometry,
-    )
-    NF = eltype(cos_zenith)
+    ) where {NF}
     (; sinlat, coslat, lat) = geometry
     (; length_of_day, length_of_year) = S
     @boundscheck geometry.spectral_grid.grid == cos_zenith.grid ||
