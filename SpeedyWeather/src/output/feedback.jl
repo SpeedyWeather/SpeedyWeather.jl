@@ -274,7 +274,7 @@ function initialize!(progress_txt::ProgressTxt, progn, diagn, model)
     # create progress.txt file in run_????/
     file = open(joinpath(path, filename), "w")
     s = "Starting SpeedyWeather.jl $run_folder on " *
-        Libc.strftime("%a, %d %b %Y %H:%M:%S", time())
+        Dates.format(Dates.now(), Dates.RFC1123Format)
     write(file, s * "\n")
     write(file, "Integrating:\n")
     write(file, "$SG\n")
