@@ -131,6 +131,51 @@ function compare_tendencies(sim_cpu, sim_reactant; rtol = RTOL, atol = ATOL)
     return results
 end
 
+"""Test tendencies after running both simulations identically.
+
+Tendencies are computed from grid-point variables which are produced by
+`transform!` (spectral → grid). Because the CPU and Reactant backends
+execute transform! slightly differently (identical matrices but different
+numerical paths through @jit), the resulting grid variables — and therefore
+the tendencies — can differ at the level of the spectral transform
+discrepancy. We therefore compare tendencies after running both models in
+the same self-consistent way, mirroring `test_time_stepping!`."""
+function test_tendencies!(sim_cpu, sim_reactant, model_name, r_first! = nothing, r_later! = nothing; nsteps = 1, rtol = RTOL, atol = ATOL)
+    println("\n" * "-"^60)
+    println("Testing tendencies ($nsteps steps)")
+    println("-"^60)
+
+    sync_variables!(sim_cpu, sim_reactant)
+    initialize!(sim_cpu; steps = nsteps)
+    initialize!(sim_reactant; steps = nsteps)
+    sync_variables!(sim_cpu, sim_reactant)
+
+    # Run one step to compute tendencies
+    SpeedyWeather.time_stepping!(sim_cpu)
+
+    # Run another step to ensure all variables are updated
+    SpeedyWeather.time_stepping!(sim_reactant, r_first!, r_later!)
+
+    SpeedyWeather.finalize!(sim_reactant)
+    SpeedyWeather.finalize!(sim_cpu)
+    println("  ✓ Tendencies computed")
+
+    # Compare tendencies
+    tend_results = compare_tendencies(sim_cpu, sim_reactant; rtol, atol)
+
+    println("\nVorticity tendency comparison:")
+    println("  Max absolute difference:  $(tend_results[:vor_tend].max_abs_diff)")
+    println("  Mean absolute difference: $(tend_results[:vor_tend].mean_abs_diff)")
+    println("  Max relative difference:  $(tend_results[:vor_tend].max_rel_diff)")
+    println("  Mean relative difference: $(tend_results[:vor_tend].mean_rel_diff)")
+
+    @testset "$model_name Tendency Comparison" begin
+        @test tend_results[:vor_tend].matches
+    end
+
+    return tend_results
+end
+
 """Test prognostic and grid variables after running for nsteps on already-initialized simulations."""
 function test_time_stepping!(sim_cpu, sim_reactant, model_name, r_first! = nothing, r_later! = nothing; nsteps = NSTEPS, rtol = RTOL, atol = ATOL)
     println("\n" * "-"^60)
@@ -221,7 +266,8 @@ function test_model(ModelType::Type; trunc = TRUNC, nsteps = NSTEPS, rtol = RTOL
     println("  ✓ Reactant functions compiled")
 
     @testset "$model_name CPU vs Reactant" begin
-        test_time_stepping!(simulation_cpu, simulation_reactant, model_name, r_first!, r_later!; nsteps, rtol, atol)
+        tend_results = test_tendencies!(simulation_cpu, simulation_reactant, model_name, r_first!, r_later!; rtol, atol)
+        stepping_results = test_time_stepping!(simulation_cpu, simulation_reactant, model_name, r_first!, r_later!; nsteps, rtol, atol)
     end
 
     println("\n" * "="^60)

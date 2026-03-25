@@ -126,11 +126,11 @@ Dates._units(m::Century) = abs(m.value) == 1 ? " century" : " centuries"
 Base.convert(::Type{Year}, c::Century) = Year(c.value * 100)
 
 # promotion rules
-Base.promote_rule(::Type{Century}, ::Type{Year}) = Year
-Base.promote_rule(::Type{Century}, ::Type{Month}) = Month
-Base.promote_rule(::Type{Century}, ::Type{Day}) = Day
-Base.promote_rule(::Type{Century}, ::Type{Hour}) = Hour
-Base.promote_rule(::Type{Century}, ::Type{Second}) = Second
+Base.promote_rule(::Type{<:Century}, ::Type{Year}) = Year
+Base.promote_rule(::Type{<:Century}, ::Type{Month}) = Month
+Base.promote_rule(::Type{<:Century}, ::Type{Day}) = Day
+Base.promote_rule(::Type{<:Century}, ::Type{Hour}) = Hour
+Base.promote_rule(::Type{<:Century}, ::Type{Second}) = Second
 
 """
     Millenium{IntType} <: Period
@@ -153,12 +153,12 @@ Base.convert(::Type{Century}, m::Millenium) = Century(m.value * 10)
 Base.convert(::Type{Year}, m::Millenium) = Year(Century(m))
 
 # promotion rules for converting to common types, e.g. in collections
-Base.promote_rule(::Type{Millenium}, ::Type{Century}) = Century
-Base.promote_rule(::Type{Millenium}, ::Type{Year}) = Year
-Base.promote_rule(::Type{Millenium}, ::Type{Month}) = Month
-Base.promote_rule(::Type{Millenium}, ::Type{Day}) = Day
-Base.promote_rule(::Type{Millenium}, ::Type{Hour}) = Hour
-Base.promote_rule(::Type{Millenium}, ::Type{Second}) = Second
+Base.promote_rule(::Type{<:Millenium}, ::Type{<:Century}) = Century
+Base.promote_rule(::Type{<:Millenium}, ::Type{Year}) = Year
+Base.promote_rule(::Type{<:Millenium}, ::Type{Month}) = Month
+Base.promote_rule(::Type{<:Millenium}, ::Type{Day}) = Day
+Base.promote_rule(::Type{<:Millenium}, ::Type{Hour}) = Hour
+Base.promote_rule(::Type{<:Millenium}, ::Type{Second}) = Second
 
 # add coarserperiod dispatches for Century and Millenium
 Dates.coarserperiod(::Type{Year}) = (Century, 100)
