@@ -138,13 +138,13 @@ $(TYPEDFIELDS)"""
     seasonal_cycle::Bool = true
 
     # COEFFICIENTS
-    @param solar_declination::SD = SinSolarDeclination(Earth{NF}()) (group = :solar_declination,)
+    @param solar_declination::SD = SinSolarDeclination(Earth(NF)) (group = :solar_declination,)
     @param time_correction::SolarTimeCorrection{NF} = SolarTimeCorrection{NF}() (group = :time_correction,)
 
     initial_time::Base.RefValue{<:DateTime} = Ref(DEFAULT_DATE)
 end
 
-SolarZenith(SG::SpectralGrid; kwargs...) = SolarZenith{SG.NF, SinSolarDeclination{Earth{SG.NF}}}(; kwargs...)
+SolarZenith(SG::SpectralGrid; kwargs...) = SolarZenith{SG.NF, SinSolarDeclination{typeof(Earth(SG.NF))}}(; kwargs...)
 
 function initialize!(
         S::AbstractZenith,
@@ -248,12 +248,12 @@ $(TYPEDFIELDS)"""
     seasonal_cycle::Bool = true
 
     # COEFFICIENTS
-    @param solar_declination::SD = SinSolarDeclination(Earth{NF}()) (group = :solar_declination,)
+    @param solar_declination::SD = SinSolarDeclination(Earth(NF)) (group = :solar_declination,)
 
     initial_time::Base.RefValue{<:DateTime} = Ref(DEFAULT_DATE)
 end
 
-SolarZenithSeason(SG::SpectralGrid; kwargs...) = SolarZenithSeason{SG.NF, SinSolarDeclination{Earth{SG.NF}}}(; kwargs...)
+SolarZenithSeason(SG::SpectralGrid; kwargs...) = SolarZenithSeason{SG.NF, SinSolarDeclination{typeof(Earth(SG.NF))}}(; kwargs...)
 
 """
 $(TYPEDSIGNATURES)
