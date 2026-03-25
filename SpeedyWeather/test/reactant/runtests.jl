@@ -2,9 +2,9 @@
 Test scripts running SpeedyWeather with Reactant.
 """
 
-#cd("SpeedyWeather/test/reactant")
+cd("SpeedyWeather/test/reactant")
 import Pkg
-#Pkg.activate(@__DIR__)
+Pkg.activate(@__DIR__)
 
 using SpeedyWeather
 using Reactant

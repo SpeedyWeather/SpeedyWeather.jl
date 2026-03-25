@@ -241,19 +241,15 @@ function first_timesteps!(simulation::AbstractSimulation)
 
     # decide whether to start with 1x Euler then 1x Leapfrog at Δt
     # TODO: this causes problems with Reactant when traced / or when not traced as a regular if loop in reverse mode
-    @trace ifelse(
-        time_stepping.first_step_euler,
-        begin
-            first_timesteps!(progn, diagn, model)
-            time_stepping.first_step_euler = !time_stepping.continue_with_leapfrog   # after first run! continue with leapfrog
-        end,
-        begin # or continue with leaprog steps at 2Δt (e.g. restart)
-            # but make sure that implicit solver is initialized in that situation
-            initialize!(model.implicit, 2Δt, diagn, model)
-            set_initialized!(model.implicit)            # mark implicit as initialized
-            later_timestep!(simulation)
-        end
-    )
+    @trace if time_stepping.first_step_euler
+        first_timesteps!(progn, diagn, model)
+        time_stepping.first_step_euler = !time_stepping.continue_with_leapfrog   # after first run! continue with leapfrog
+    else # or continue with leaprog steps at 2Δt (e.g. restart)
+        # but make sure that implicit solver is initialized in that situation
+        initialize!(model.implicit, 2Δt, diagn, model)
+        set_initialized!(model.implicit)            # mark implicit as initialized
+        later_timestep!(simulation)
+    end
 
     # only now initialise feedback for benchmark accuracy
     (; clock) = progn
