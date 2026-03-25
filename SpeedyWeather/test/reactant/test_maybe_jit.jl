@@ -71,4 +71,47 @@
         @test isapprox(Array(field_cpu), Array(field_rea); rtol = RTOL, atol = ATOL)
     end
 
+    # -----------------------------------------------------------------------
+    # 3. Keyword arguments
+    # -----------------------------------------------------------------------
+
+    function _kwarg_func!(x; scale = one(eltype(x)), offset = zero(eltype(x)))
+        x .= x .* scale .+ offset
+        return nothing
+    end
+
+    @testset "kwargs - CPU" begin
+        x = ones(Float32, 4)
+        @maybe_jit CPU() _kwarg_func!(x; scale = 2.0f0, offset = 3.0f0)
+        @test all(x .== 5.0f0)   # 1*2 + 3 = 5
+    end
+
+    @testset "kwargs - Reactant" begin
+        arch = ReactantDevice()
+        x = Reactant.to_rarray(ones(Float32, 4))
+        @maybe_jit arch _kwarg_func!(x; scale = 2.0f0, offset = 3.0f0)
+        @test all(Array(x) .== 5.0f0)
+    end
+
+    @testset "kwargs nested - CPU" begin
+        function _kwarg_outer!(arch, x; scale = one(eltype(x)))
+            @maybe_jit arch _kwarg_func!(x; scale = scale, offset = 10.0f0)
+            return nothing
+        end
+        x = ones(Float32, 4)
+        @maybe_jit CPU() _kwarg_outer!(CPU(), x; scale = 3.0f0)
+        @test all(x .== 13.0f0)   # 1*3 + 10 = 13
+    end
+
+    @testset "kwargs nested - Reactant" begin
+        function _kwarg_outer_r!(arch, x; scale = one(eltype(x)))
+            @maybe_jit arch _kwarg_func!(x; scale = scale, offset = 10.0f0)
+            return nothing
+        end
+        arch = ReactantDevice()
+        x = Reactant.to_rarray(ones(Float32, 4))
+        @maybe_jit arch _kwarg_outer_r!(arch, x; scale = 3.0f0)
+        @test all(Array(x) .== 13.0f0)
+    end
+
 end

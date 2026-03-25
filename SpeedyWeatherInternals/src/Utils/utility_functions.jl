@@ -137,8 +137,15 @@ Usage: `@maybe_jit model.architecture initialize!(model.geometry, model)`
 macro maybe_jit(arch, expr)
     if expr.head == :call
         f = expr.args[1]
-        args = expr.args[2:end]
-        return :(_jit($(esc(arch)), $(esc(f)), $(esc.(args)...)))
+        rest = expr.args[2:end]
+        # keyword arguments appear as Expr(:parameters, ...) at the front of rest
+        if !isempty(rest) && rest[1] isa Expr && rest[1].head == :parameters
+            kwargs = rest[1]
+            args = rest[2:end]
+            return :(_jit($(esc(arch)), $(esc(f)), $(esc.(args)...); $(esc.(kwargs.args)...)))
+        else
+            return :(_jit($(esc(arch)), $(esc(f)), $(esc.(rest)...)))
+        end
     else
         return esc(expr)
     end
