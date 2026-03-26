@@ -67,8 +67,10 @@ SpeedyWeather.secondofday(dt::ReactantDatesExt.ReactantDateTime) = Dates.second(
 
 #TODO: move those the the ReactantDatesExt once I am sure it's all additional functionality I need to add
 #Dates.firstdayofmonth(dt::ReactantDatesExt.ReactantDateTime) = ReactantDatesExt.ReactantDate(dt).date
-Dates.firstdayofmonth(dt::ReactantDatesExt.ReactantDate) = ReactantDatesExt.ReactantDate(Dates.UTInstant(ReactantDatesExt.ReactantDay(Dates.value(dt) - Dates.day(dt) + 1)))
-Dates.firstdayofmonth(dt::ReactantDatesExt.ReactantDateTime) = convert(ReactantDatesExt.ReactantDateTime, Dates.firstdayofmonth(convert(ReactantDatesExt.ReactantDate, dt)))
+Dates.firstdayofmonth(dt::ReactantDatesExt.ReactantDate{I}) where {I} =
+    ReactantDatesExt.ReactantDate{I}(Date(Dates.year(dt), Dates.month(dt)))
+Dates.firstdayofmonth(dt::ReactantDatesExt.ReactantDateTime{I}) where {I} =
+    ReactantDatesExt.ReactantDateTime{I}(DateTime(Dates.year(dt), Dates.month(dt)))
 
 # ReactantDatesExt versions of Base.convert methods (mirrors Dates.jl conversions)
 Base.convert(::Type{ReactantDatesExt.ReactantDateTime}, dt::ReactantDatesExt.ReactantDate) =
@@ -86,6 +88,20 @@ Base.convert(::Type{ReactantDatesExt.ReactantDate}, x::Day) =
     ReactantDatesExt.ReactantDate(Dates.UTInstant(ReactantDatesExt.ReactantDay(Dates.value(x))))
 Base.convert(::Type{Day}, dt::ReactantDatesExt.ReactantDate) =
     Day(Dates.value(dt))
+
+# Typed outer constructors for Reactant period types so that Period arithmetic
+# (e.g. -(x::P, y::P) = P(value(x)-value(y))) preserves the type parameter I
+# when value arithmetic falls back to a plain Int via ConcretePJRTNumber.to_number.
+for T in (
+    :ReactantYear, :ReactantMonth, :ReactantDay,
+    :ReactantHour, :ReactantMinute, :ReactantSecond,
+    :ReactantMillisecond, :ReactantMicrosecond, :ReactantNanosecond,
+)
+    @eval (::Type{ReactantDatesExt.$T{I}})(v::Number) where {I} = ReactantDatesExt.$T(convert(I, v))
+end
+
+# Dates.days for ReactantMillisecond (mirrors days(c::Millisecond) = div(value(c), 86400000))
+Dates.days(rm::ReactantDatesExt.ReactantMillisecond) = div(Dates.value(rm), 86400000)
 
 SpeedyWeather.Clock(architecture::ReactantDevice) = Reactant.to_rarray(SpeedyWeather.Clock(), track_numbers = true)
 
