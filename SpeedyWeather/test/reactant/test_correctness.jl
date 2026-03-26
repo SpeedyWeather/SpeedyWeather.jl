@@ -251,7 +251,7 @@ function test_model(ModelType::Type; trunc = TRUNC, nsteps = NSTEPS, rtol = RTOL
 
     # spin up models a bit
     println("\n[3/3] Spinning up models...")
-    #run!(simulation_cpu; period = Day(5))
+    run!(simulation_cpu; period = Day(1)) # dummy steps so that `simulation_cpu` also conitinues a prior simulation, we could also manually set e.g. `continue_with_leapfrog` arguments instead, but those might change in the future
     run!(simulation_reactant; period = Day(100)) # we copy from Reactant to cpu later so only there we need a spin up, we need a long spin up, because with some ICs we get mostly zonal flow otherwise
     println("  ✓ Models spun up")
 

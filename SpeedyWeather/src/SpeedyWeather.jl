@@ -25,7 +25,7 @@ export SpeedyWeatherInternals, Architectures
 
 # INPUT OUTPUT
 import TOML
-import Dates
+import Dates: Dates, DateTime, TimePeriod, Period, Millisecond, Second, Minute, Hour, Day, Week, Month, Year, value, year, month, day, hour, minute, second
 import Printf: Printf, @sprintf
 import Random: randstring
 import NCDatasets: NCDatasets, NCDataset, defDim, defVar
@@ -38,6 +38,9 @@ import ProgressMeter
 using DomainSets.IntervalSets
 import Base: @propagate_inbounds
 
+# to avoid a `using Dates` to pass on DateTime arguments
+export DateTime, Millisecond, Second, Minute, Hour, Day, Week, Month, Year, Century, Millenium
+
 # export functions that have many cross-component methods
 export initialize!, finalize!
 
@@ -46,22 +49,10 @@ export Utils
 using SpeedyWeatherInternals.Utils
 import SpeedyWeatherInternals.Utils: @maybe_jit
 
-# Dates from stdlib
-export Dates
-using Dates
-export Period, DatePeriod, TimePeriod
-export DateTime, Millisecond, Second, Minute, Hour, Day, Week, Month, Year
-export CompoundPeriod, canonicalize
-export dayofyear, daysinmonth, isleapyear, firstdayofmonth
-export year, month, day, hour, minute, second, millisecond, yearmonthday
-# Century and Millenium defined in clock.jl
-export Century, Millenium
-
 # parameter handling
 using SpeedyWeatherInternals.SpeedyParameters
 
 import SpeedyWeatherInternals.SpeedyParameters: parameters
-import Dates: value
 
 # export user-facing parameter handling types and methods
 export SpeedyParam, SpeedyParams, parameters, stripparams
