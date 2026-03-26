@@ -65,6 +65,28 @@ end
 # that's for Reactant TracableDateTime
 SpeedyWeather.secondofday(dt::ReactantDatesExt.ReactantDateTime) = Dates.second(ReactantDatesExt.ReactantTime(dt).instant)
 
+#TODO: move those the the ReactantDatesExt once I am sure it's all additional functionality I need to add
+#Dates.firstdayofmonth(dt::ReactantDatesExt.ReactantDateTime) = ReactantDatesExt.ReactantDate(dt).date
+Dates.firstdayofmonth(dt::ReactantDatesExt.ReactantDate) = ReactantDatesExt.ReactantDate(Dates.UTD(Dates.value(dt) - Dates.day(dt) + 1))
+Dates.firstdayofmonth(dt::ReactantDatesExt.ReactantDateTime) = ReactantDatesExt.ReactantDateTime(Dates.firstdayofmonth(ReactantDatesExt.ReactantDate(dt)))
+
+# ReactantDatesExt versions of Base.convert methods (mirrors Dates.jl conversions)
+Base.convert(::Type{ReactantDatesExt.ReactantDateTime}, dt::ReactantDatesExt.ReactantDate) =
+    ReactantDatesExt.ReactantDateTime(Dates.UTInstant(ReactantDatesExt.ReactantMillisecond(Dates.value(dt) * 86400000)))
+Base.convert(::Type{ReactantDatesExt.ReactantDate}, dt::ReactantDatesExt.ReactantDateTime) =
+    ReactantDatesExt.ReactantDate(Dates.UTInstant(ReactantDatesExt.ReactantDay(div(Dates.value(dt), 86400000))))
+Base.convert(::Type{ReactantDatesExt.ReactantTime}, dt::ReactantDatesExt.ReactantDateTime) =
+    ReactantDatesExt.ReactantTime(ReactantDatesExt.ReactantNanosecond((Dates.value(dt) % 86400000) * 1000000))
+
+Base.convert(::Type{ReactantDatesExt.ReactantDateTime}, x::Millisecond) =
+    ReactantDatesExt.ReactantDateTime(Dates.UTInstant(ReactantDatesExt.ReactantMillisecond(Dates.value(x))))
+Base.convert(::Type{Millisecond}, dt::ReactantDatesExt.ReactantDateTime) =
+    Millisecond(Dates.value(dt))
+Base.convert(::Type{ReactantDatesExt.ReactantDate}, x::Day) =
+    ReactantDatesExt.ReactantDate(Dates.UTInstant(ReactantDatesExt.ReactantDay(Dates.value(x))))
+Base.convert(::Type{Day}, dt::ReactantDatesExt.ReactantDate) =
+    Day(Dates.value(dt))
+
 SpeedyWeather.Clock(architecture::ReactantDevice) = Reactant.to_rarray(SpeedyWeather.Clock(), track_numbers = true)
 
 end
