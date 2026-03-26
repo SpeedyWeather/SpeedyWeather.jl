@@ -413,7 +413,7 @@ function transform(                         # GRID TO SPECTRAL
         field::AbstractField,               # input field
         S::AbstractSpectralTransform,       # precomputed spectral transform
     )
-    coeffs = similar(field, S.spectrum, Complex{eltype(S)})
+    coeffs = similar(field, S.spectrum, Complex{eltype(field)})
     transform!(coeffs, field, S)
     return coeffs
 end
@@ -426,7 +426,7 @@ function transform(                     # SPECTRAL TO GRID
         S::AbstractSpectralTransform;   # precomputed spectral transform
         kwargs...                       # pass on unscale_coslat=true/false(default)
     )
-    field = similar(coeffs, S.grid, eltype(S))
+    field = similar(coeffs, S.grid, real(eltype(coeffs)))
     transform!(field, coeffs, S; kwargs...)
     return field
 end

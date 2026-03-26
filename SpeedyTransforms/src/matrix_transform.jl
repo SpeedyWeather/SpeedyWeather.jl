@@ -63,8 +63,8 @@ function MatrixSpectralTransform(
 
     # LATITUDE VECTORS (based on Gaussian, equi-angle or HEALPix latitudes)
     latd = RingGrids.get_latd(grid)                         # latitude in degrees (90˚Nto -90˚N)
-    coslat = on_architecture(architecture, cosd.(latd))     # cos(lat)
-    coslat⁻¹ = on_architecture(architecture, inv.(coslat))  # 1/cos(lat)
+    coslat = on_architecture(architecture, NF.(cosd.(latd)))     # cos(lat)
+    coslat⁻¹ = on_architecture(architecture, NF.(inv.(coslat)))  # 1/cos(lat)
 
     # Create another SpectralTransform to calculate the transform matrices from (do this on the CPU)
     spectrum_cpu = on_architecture(CPU(), spectrum)

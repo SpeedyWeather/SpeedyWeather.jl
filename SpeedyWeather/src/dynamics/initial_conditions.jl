@@ -459,7 +459,7 @@ end
 
 Adapt.@adapt_structure JablonowskiVorticity
 
-@inline function (J::JablonowskiVorticity)(λ, φ, η)
+@inline function (J::JablonowskiVorticity)(λ::NF, φ::NF , η::NF) where {NF}
     (; sinφc, cosφc, λc, radius, u₀, η₀, perturb_uₚ, R) = J
 
     # great circle distance to perturbation
@@ -467,7 +467,7 @@ Adapt.@adapt_structure JablonowskiVorticity
     r = radius * acos(X)
 
     # Eq (3), the unperturbed zonal wind
-    ζ = -4 * u₀ / radius * cos((η - η₀) * π / 2)^(3 / 2) * sind(φ) * cosd(φ) * (2 - 5sind(φ)^2)
+    ζ = -4 * u₀ / radius * cos((η - η₀) * π / 2)^(NF(3 // 2)) * sind(φ) * cosd(φ) * (2 - 5sind(φ)^2)
 
     # Eq (12), the perturbation
     perturbation = perturb_uₚ / radius * exp(-(r / R)^2) *
@@ -618,48 +618,37 @@ function initialize!(
     temp_grid = similar(progn.temp[:, :, 2], grid, NF)
     aΩ = radius * rotation
 
-    # Launch kernel
-    launch!(
-        architecture(temp_grid), RingGridWorkOrder, size(temp_grid),
-        jablonowski_temperature_kernel!, temp_grid, Tη, φ, σ_levels_full,
-        η₀, u₀, R_dry, aΩ
-    )
+    _jablonowski_temperature_broadcast!(temp_grid, Tη, φ, σ_levels_full,
+            η₀, u₀, R_dry, aΩ)
 
     set!(progn, model; temp = temp_grid, lf = 1)
 
     return nothing
 end
 
-@kernel inbounds = true function jablonowski_temperature_kernel!(
-        temp_grid,
-        Tη,
-        φ,
-        σ_levels_full,
-        η₀,
-        u₀,
-        R_dry,
-        aΩ
-    )
-    ij, k = @index(Global, NTuple)
+function _jablonowski_temperature_broadcast!(temp_grid, Tη, φ, σ_levels_full,
+        η₀, u₀, R_dry, aΩ)
+    NF = eltype(temp_grid)
 
-    # Jablonowski and Williamson use η for σ coordinates
-    η = σ_levels_full[k]
-    ηᵥ = (η - η₀) * π / 2  # auxiliary variable for vertical coordinate
+    # reshape for broadcasting: φ is (npoints,), σ/Tη are (nlayers,)
+    σ_row = reshape(σ_levels_full, 1, :)    # (1, nlayers)
+    Tη_row = reshape(Tη, 1, :)              # (1, nlayers)
+
+    ηᵥ = (σ_row .- η₀) .* NF(π) ./ 2
 
     # Amplitudes with height
-    A1 = 3 / 4 * η * π * u₀ / R_dry * sin(ηᵥ) * sqrt(cos(ηᵥ))
-    A2 = 2u₀ * cos(ηᵥ)^(3 / 2)
+    A1 = NF(3 / 4) .* σ_row .* NF(π) .* u₀ ./ R_dry .* sin.(ηᵥ) .* sqrt.(cos.(ηᵥ))
+    A2 = 2u₀ .* cos.(ηᵥ) .^ NF(3 / 2)
 
-    # Get latitude
-    φij = φ[ij]
-    sinφ = sind(φij)
-    cosφ = cosd(φij)
+    sinφ = sind.(φ)        # (npoints,)
+    cosφ = cosd.(φ)        # (npoints,)
 
-    # Jablonowski and Williamson, eq. (6)
-    temp_grid[ij, k] = Tη[k] + A1 * (
-        (-2sinφ^6 * (cosφ^2 + 1 / 3) + 10 / 63) * A2 +
-            (8 / 5 * cosφ^3 * (sinφ^2 + 2 / 3) - π / 4) * aΩ
+    # Jablonowski and Williamson, eq. (6) — broadcast over (npoints, nlayers)
+    temp_grid.data .= Tη_row .+ A1 .* (
+        (-2 .* sinφ .^ 6 .* (cosφ .^ 2 .+ NF(1 / 3)) .+ NF(10 / 63)) .* A2 .+
+            (NF(8 / 5) .* cosφ .^ 3 .* (sinφ .^ 2 .+ NF(2 / 3)) .- NF(π / 4)) .* aΩ
     )
+    return nothing
 end
 
 export StartFromFile
