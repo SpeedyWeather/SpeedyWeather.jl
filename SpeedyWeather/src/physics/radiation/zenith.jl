@@ -162,7 +162,7 @@ currently have these hardcoded."""
 function year_angle(::Type{T}, time::DateTime, length_of_day::Second, length_of_year::Second) where {T}
     year2rad = convert(T, 2π / length_of_year.value)
     sec_of_day = secondofday(time)
-    return year2rad * (dayofyear(time) * length_of_day.value + sec_of_day)
+    return year2rad * (Dates.dayofyear(time) * length_of_day.value + sec_of_day)
 end
 
 """
