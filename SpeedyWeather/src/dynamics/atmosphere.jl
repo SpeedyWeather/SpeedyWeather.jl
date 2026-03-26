@@ -142,7 +142,8 @@ function saturation_vapor_pressure(T, A::AbstractWetAtmosphere)
     (; R_vapor) = A
     T₀ = A.temperature_freezing
     T = convert(eltype(T₀), T)      # ensure type of A
-    return e₀ * exp(Lᵥ / R_vapor * (inv(T₀) - inv(T)))
+    # TODO: replace 1/T with inv(T) once Reactant issue fixed https://github.com/EnzymeAD/Reactant.jl/issues/2560
+    return e₀ * exp(Lᵥ / R_vapor * (1/T₀ - 1/T))
 end
 
 saturation_humidity(T, p, A::AbstractDryAtmosphere) = zero(T)
