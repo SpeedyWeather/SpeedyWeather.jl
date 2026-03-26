@@ -46,6 +46,7 @@ model_type(model::AbstractModel) = model_type(typeof(model))
 initialize!(model::AbstractModel, ps::Union{ComponentVector, SpeedyParams}; kwargs...) =
     initialize!(reconstruct(model, ps); kwargs...)
 
+# pretty printing
 function Base.show(io::IO, M::AbstractModel)
     properties = propertynames(M)
     n = length(properties)

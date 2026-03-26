@@ -44,6 +44,9 @@ $(TYPEDFIELDS)"""
     Δt::NF = Δt_sec / radius
 end
 
+get_prognostic_steps(::Leapfrog) = 2
+get_tendency_steps(::Leapfrog) = 1
+
 """$(TYPEDSIGNATURES)
 Computes the time step in [ms]. `Δt_at_T31` is always scaled with the resolution `trunc` 
 of the model. In case `adjust_Δt_with_output` is true, the `Δt_at_T31` is additionally 

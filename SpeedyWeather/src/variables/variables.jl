@@ -46,7 +46,7 @@ Used to remove duplicates when extracting variables from the model. E.g. `:Varia
 identifier(v::AbstractVariable) = Symbol(v.namespace, :_, v.name)
 
 """Struct that holds all variables of a simulation. Variables are split into 
-groups corresponding in the fields here $(TYPEDFIELDS) Each group can have
+groups corresponding to the fields here $(TYPEDFIELDS) Each group can have
 their own namespaces to distinguish between e.g. ocean, land, or tracer variables.
 All non-prognostic groups are considered to be diagnostic with no memory between time steps."""
 @kwdef struct Variables{Po, G, T, D, Pm, Pt, S} <: AbstractVariables
@@ -74,6 +74,7 @@ end
 
 Adapt.@adapt_structure Variables
 
+# pretty printing
 function Base.show(io::IO, V::Variables)
     Vsize = prettymemory(Base.summarysize(V))
     print(io, styled"{warning:Variables}", "{@NamedTuple{...}, ...} ", styled"{note:($Vsize)}")
@@ -149,16 +150,22 @@ end
 
 variables(::Nothing) = ()                                   # to allow for model.component = nothing
 variables(::Any) = ()                                       # fallback for any component
-variables(model::AbstractModel) = variables(typeof(model))
 
 # fallbacks in case model components are Nothing
-initialize!(::Variables, ::Nothing, ::Any) = nothing
+initialize!(::Variables, ::Nothing, ::Any) = nothing        # used to define initial conditions
 timestep!(::Variables, ::Nothing, ::Any) = nothing
 
 """$(TYPEDSIGNATURES)
-Define variables needed by a model component. This is used to extract all variables from the model and to initialize them.
-The default is to return an empty tuple, but components can define their variables by extending this function for their type."""
+Define variables needed by a model component. This is used to identify all required variables
+by a model and initialize them. The default is to return an empty tuple, but components can
+define their variables by extending this function for their type."""
 variables
+
+"""$(TYPEDSIGNATURES)
+Fallback: component can define `variables(::Component, ::Model)` or simply `variables(::Component)`.
+In the former, `model` is available to define required variables based on other model components,
+in the latter only the component itself determines which variables are needed."""
+variables(component, model) = variables(component)
 
 """$(TYPEDSIGNATURES)
 Extracts all variables from the model by iterating over all components and collecting their variables.
@@ -166,7 +173,8 @@ Return a tuple of all variables."""
 function all_variables(model::AbstractModel)
     t = variables(model)                        # variables from the model itself
     for component in propertynames(model)       # iterate over all components of the model
-        vars = variables(getproperty(model, component))
+        # pass on model as well to allow for cross-component information to be used to define required variables
+        vars = variables(getproperty(model, component), model)
         if length(vars) > 0
             t = tuple(t..., vars...)
         end

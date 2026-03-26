@@ -136,12 +136,18 @@ $(TYPEDFIELDS)"""
     params::PV = Val(parameterizations)
 end
 
-function variables(::Type{<:PrimitiveDry})
+function variables(model::PrimitiveDry)
+    nsteps = get_prognostic_steps(model.time_stepping)
+    return variables(typeof(model), nsteps)
+end
+
+"""($TYPEDSIGNATURES) All variables needed for the primitive dry model itself (components excluded)."""
+function variables(::Type{<:PrimitiveDry}, nsteps)
     return (
-        variables(BarotropicModel)...,
-        PrognosticVariable(:div, Spectral4D(2), desc = "Divergence", units = "1/s"),                # 2 for 2 leapfrog steps
-        PrognosticVariable(:temp, Spectral4D(2), desc = "Temperature", units = "K"),                # 2 for 2 leapfrog steps
-        PrognosticVariable(:pres, Spectral3D(2), desc = "Logarithm of surface pressure", units = "log(Pa)"),
+        variables(BarotropicModel, nsteps)...,
+        PrognosticVariable(:div, Spectral4D(nsteps), desc = "Divergence", units = "1/s"),
+        PrognosticVariable(:temp, Spectral4D(nsteps), desc = "Temperature", units = "K"),
+        PrognosticVariable(:pres, Spectral3D(nsteps), desc = "Logarithm of surface pressure", units = "log(Pa)"),
 
         GridVariable(:div, Grid3D(), desc = "Divergence", units = "1/s"),
         GridVariable(:temp, Grid3D(), desc = "Temperature", units = "K"),
@@ -171,12 +177,12 @@ function variables(::Type{<:PrimitiveDry})
         DynamicsVariable(:pres_flux_sum_above, Grid3D(), desc = "Partially vertically integrated pressure gradient flux, top to layer above"),
         DynamicsVariable(:w, Grid3D(), desc = "Vertical velocity, dσ/dt.", units = "1/s"),
 
-        ScratchVariable(:a, Grid3D(), desc = "Work array for dynamics", namespace = :grid),
-        ScratchVariable(:b, Grid3D(), desc = "Work array for dynamics", namespace = :grid),
-        ScratchVariable(:a_2D, Spectral2D(), desc = "Work array for dynamics"),
-        ScratchVariable(:b_2D, Spectral2D(), desc = "Work array for dynamics"),
-        ScratchVariable(:a_2D, Grid2D(), desc = "Work array for dynamics", namespace = :grid),
-        ScratchVariable(:b_2D, Grid2D(), desc = "Work array for dynamics", namespace = :grid),
+        ScratchVariable(:a, Grid3D(), desc = "Scratch array", namespace = :grid),
+        ScratchVariable(:b, Grid3D(), desc = "Scratch array", namespace = :grid),
+        ScratchVariable(:a_2D, Spectral2D(), desc = "Scratch array"),
+        ScratchVariable(:b_2D, Spectral2D(), desc = "Scratch array"),
+        ScratchVariable(:a_2D, Grid2D(), desc = "Scratch array", namespace = :grid),
+        ScratchVariable(:b_2D, Grid2D(), desc = "Scratch array", namespace = :grid),
     )
 end
 

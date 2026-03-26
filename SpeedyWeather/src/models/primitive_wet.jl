@@ -144,12 +144,18 @@ $(TYPEDFIELDS)"""
     params::PV = Val(parameterizations)
 end
 
-function variables(::Type{<:PrimitiveWet})
+function variables(model::PrimitiveWet)
+    nsteps = get_prognostic_steps(model.time_stepping)
+    return variables(typeof(model), nsteps)
+end
+
+"""($TYPEDSIGNATURES) All variables needed for the primitive wet model itself (components excluded)."""
+function variables(::Type{<:PrimitiveWet}, nsteps)
     return (
-        variables(PrimitiveDry)...,
+        variables(PrimitiveDry, nsteps)...,
 
         # Add humidity
-        PrognosticVariable(:humid, Spectral4D(2), desc = "Specific humidity", units = "kg/kg"), # 2 for 2 leapfrog steps
+        PrognosticVariable(:humid, Spectral4D(nsteps), desc = "Specific humidity", units = "kg/kg"),
         GridVariable(:humid, Grid3D(), desc = "Humidity", units = "kg/kg"),
         GridVariable(:humid_prev, Grid3D(), desc = "Specific humidity at previous time step", units = "kg/kg"),
         TendencyVariable(:humid, Spectral3D(), desc = "Tendency of specific humidity", units = "kg/kg/s"),

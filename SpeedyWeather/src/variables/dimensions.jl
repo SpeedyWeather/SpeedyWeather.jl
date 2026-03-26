@@ -29,7 +29,7 @@ Base.zero(::AbstractVariable{Ocean3D}, model::AbstractModel) = zeros(model.spect
 struct Spectral2D <: AbstractVariableDim end
 Base.zero(::AbstractVariable{Spectral2D}, model::AbstractModel) = zeros(model.spectral_grid.SpectralVariable2D, model.spectral_grid.spectrum)
 
-"""Dimension for 3D spectral variables with vertical levels."""
+"""Dimension for 3D spectral variables with e.g. `n` vertical levels."""
 @kwdef struct Spectral3D <: AbstractVariableDim
     n::Int = 0
 end

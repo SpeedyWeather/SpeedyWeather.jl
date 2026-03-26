@@ -73,8 +73,7 @@ To be called just before the first timesteps."""
 function initialize!(
         output::JLD2Output,
         feedback::AbstractFeedback,
-        progn::PrognosticVariables,
-        diagn::DiagnosticVariables,
+        vars::Variables,
         model::AbstractModel,
     )
     output.active || return nothing     # exit immediately for no output
@@ -104,7 +103,7 @@ function initialize!(
     output.jld2_file = jld2_file
 
     # write initial condition
-    output_jld2!(output, Simulation(progn, diagn, model))
+    output_jld2!(output, Simulation(vars, model))
 
     # CALLBACKS
     # add ParametersTxt callback
