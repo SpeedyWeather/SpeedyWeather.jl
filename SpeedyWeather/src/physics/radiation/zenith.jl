@@ -107,7 +107,7 @@ function WhichZenith(SG::SpectralGrid, P::AbstractPlanet; kwargs...)
         )
 
     else
-        return SolarZenithSeason{NF, typeof(solar_declination)}(;
+        return SolarZenithSeason{NF, typeof(solar_declination), Base.RefValue{DateTime}}(;
             length_of_day, length_of_year, solar_declination, seasonal_cycle, kwargs...
         )
     end
