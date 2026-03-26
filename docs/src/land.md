@@ -292,8 +292,9 @@ step). The actual removal is reported as
 in ``kg/m²/s``, where the `excess` term (negative for melting trying to remove more snow than there is)
 only appears when the naive tendency would overdraw the bucket.
 `snow_melt_rate` is zero over ocean points. Snow depth is clipped to zero and stored 
-as equivalent liquid water height, not physical snow thickness. The accumulation is capped at 10m equivalent liquid water height, following how permanent snow area is treated 
-in IFS Cycle 49r1.
+as equivalent liquid water height, not physical snow thickness. The accumulation is 
+capped at 10m equivalent liquid water height, following how permanent snow area is treated 
+in [IFS Cycle 49r1](https://www.ecmwf.int/en/elibrary/81626-ifs-documentation-cy49r1-part-iv-physical-processes).
 
 The snow budget links into other surface schemes:
 

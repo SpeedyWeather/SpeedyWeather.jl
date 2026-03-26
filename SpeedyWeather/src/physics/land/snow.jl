@@ -3,8 +3,7 @@ abstract type AbstractSnow <: AbstractLandComponent end
 export SnowModel    # maybe change for a more concise name later
 
 """
-    SnowModel(; melting_threshold=275, snow_depth_cap=10)
-
+$(TYPEDSIGNATURES)
 Single-column snow bucket model in equivalent liquid water depth. Snow accumulates
 from the diagnosed precipitation, melts once the top soil layer exceeds
 `melting_threshold`, and is capped at `snow_depth_cap` to limit infinite snow/ice accumulation
