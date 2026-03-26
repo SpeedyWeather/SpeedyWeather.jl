@@ -1,3 +1,5 @@
+using Dates
+
 @testset "Sec, min, hrs arguments" begin
     SG = SpectralGrid(trunc = 42, nlayers = 1)
     L1 = Leapfrog(SG, Δt_at_T31 = 30)
