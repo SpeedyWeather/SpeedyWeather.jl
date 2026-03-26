@@ -14,7 +14,7 @@ $(TYPEDFIELDS)"""
     "[OPTION] Temperature threshold for snow melting [K]"
     @param melting_threshold::NF = 275 (bounds = Positive,)
 
-    "[OPTION] Permanent snow/ice depth cap [m]"
+    "[OPTION] Permanent snow/ice depth cap in equivalent liquid water depth [m]"
     snow_depth_cap::NF = 10
 end
 
@@ -105,7 +105,7 @@ end
 
         # store to pass to soil moisture [kg/m²/s], combined runoff with melt rate
         # limited to what's available to melt/runoff
-        snow_melt_rate[ij] = (melt_rate_max + runoff_rate_max + dsnow_excess) * ρ_water
+        snow_melt_rate[ij] = (melt_rate_max + dsnow_excess) * ρ_water
 
         # Euler forward time step but cap at 0 depth to not melt more snow than available
         snow_depth_forward = max(snow_depth[ij] + Δt * dsnow, 0)
