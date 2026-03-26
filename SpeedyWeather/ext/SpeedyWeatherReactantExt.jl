@@ -68,7 +68,7 @@ SpeedyWeather.secondofday(dt::ReactantDatesExt.ReactantDateTime) = Dates.second(
 #TODO: move those the the ReactantDatesExt once I am sure it's all additional functionality I need to add
 #Dates.firstdayofmonth(dt::ReactantDatesExt.ReactantDateTime) = ReactantDatesExt.ReactantDate(dt).date
 Dates.firstdayofmonth(dt::ReactantDatesExt.ReactantDate) = ReactantDatesExt.ReactantDate(Dates.UTD(Dates.value(dt) - Dates.day(dt) + 1))
-Dates.firstdayofmonth(dt::ReactantDatesExt.ReactantDateTime) = ReactantDatesExt.ReactantDateTime(Dates.firstdayofmonth(ReactantDatesExt.ReactantDate(dt)))
+Dates.firstdayofmonth(dt::ReactantDatesExt.ReactantDateTime) = ReactantDatesExt.ReactantDateTime(Dates.firstdayofmonth(convert(ReactantDatesExt.ReactantDate, dt)))
 
 # ReactantDatesExt versions of Base.convert methods (mirrors Dates.jl conversions)
 Base.convert(::Type{ReactantDatesExt.ReactantDateTime}, dt::ReactantDatesExt.ReactantDate) =
