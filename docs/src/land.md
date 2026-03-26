@@ -261,8 +261,7 @@ with precipitation ``P`` and melting ``M``.
 Snow accumulates from the column-integrated large-scale
 (currently not from convection) snow precipitation rate ``P``, `snow_rate` (``kg/m²/s``),
 and melts once the top soil layer exceeds the melt threshold ``T_{melt}`` (default ``275~K``)
-through the term ``M``. The accumulation is capped at 10m, as permanent snow area is treated 
-in IFS Cycle 49r1.
+through the term ``M``.
 
 The available melt energy in the top
 layer of thickness ``z₁`` uses the dry-soil heat capacity ``cₛ``:
@@ -293,7 +292,8 @@ step). The actual removal is reported as
 in ``kg/m²/s``, where the `excess` term (negative for melting trying to remove more snow than there is)
 only appears when the naive tendency would overdraw the bucket.
 `snow_melt_rate` is zero over ocean points. Snow depth is clipped to zero and stored 
-as equivalent liquid water height, not physical snow thickness.
+as equivalent liquid water height, not physical snow thickness. The accumulation is capped at 10m equivalent liquid water height, following how permanent snow area is treated 
+in IFS Cycle 49r1.
 
 The snow budget links into other surface schemes:
 
