@@ -141,7 +141,7 @@ $(TYPEDFIELDS)"""
     @param solar_declination::SD = SinSolarDeclination(Earth(NF)) (group = :solar_declination,)
     @param time_correction::SolarTimeCorrection{NF} = SolarTimeCorrection{NF}() (group = :time_correction,)
 
-    initial_time::Base.RefValue{<:DateTime} = Ref(DEFAULT_DATE)
+    initial_time::Base.RefValue{DateTime} = Ref(DEFAULT_DATE)
 end
 
 SolarZenith(SG::SpectralGrid; kwargs...) = SolarZenith{SG.NF, SinSolarDeclination{typeof(Earth(SG.NF))}}(; kwargs...)
@@ -249,7 +249,7 @@ $(TYPEDFIELDS)"""
     # COEFFICIENTS
     @param solar_declination::SD = SinSolarDeclination(Earth(NF)) (group = :solar_declination,)
 
-    initial_time::Base.RefValue{<:DateTime} = Ref(DEFAULT_DATE)
+    initial_time::Base.RefValue{DateTime} = Ref(DEFAULT_DATE)
 end
 
 SolarZenithSeason(SG::SpectralGrid; kwargs...) = SolarZenithSeason{SG.NF, SinSolarDeclination{typeof(Earth(SG.NF))}}(; kwargs...)
