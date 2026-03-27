@@ -100,7 +100,7 @@ end
         return vars_new
     end
 
-    vars_new, dvars_new = ADSeed(fdsim, :prognostic)
+    vars_new, dvars_new = ADseed(fdsim, :prognostic)
 
     @info "Running finite differences"
     fd_vjp = @time FiniteDifferences.j′vp(central_fdm(5, 1), x -> leapfrog_step(x, dt, lf1, model), dvars_new, vars_new)
@@ -157,13 +157,12 @@ end
         return vars_new
     end
 
-    vars_new, dvars_new = ADSeed(fdsim, :tendencies)
+    vars_new, dvars_new = ADseed(fdsim, :tendencies)
 
     @info "Running finite differences"
     fd_vjp = @time FiniteDifferences.j′vp(central_fdm(5, 1), x -> transform_step(x, lf2, model), dvars_new, vars_new)
 
     @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dvars)[1], rtol = 1.0e-3, atol = 1.0e-3))
-
 end
 
 @testset "Differentiability: timestep! on Barotropic model" begin
@@ -238,7 +237,7 @@ end
     pvec = vec(ps)
     adsim = ADSimulation(simulation)
     dp = zero(pvec)
-    vars_new, dvars_new = ADSeed(adsim, :prognostic)
+    vars_new, dvars_new = ADseed(adsim, :prognostic)
     @time autodiff(
         Reverse,
         timestep_oop!,
