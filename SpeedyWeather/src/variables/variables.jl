@@ -45,6 +45,8 @@ Symbol representing a unique identifier for a variable, combining its type, name
 Used to remove duplicates when extracting variables from the model. E.g. `:Variable_ocean_sea_surface_temperature`."""
 identifier(v::AbstractVariable) = Symbol(v.namespace, :_, v.name)
 
+export Variables
+
 """Struct that holds all variables of a simulation. Variables are split into 
 groups corresponding to the fields here $(TYPEDFIELDS) Each group can have
 their own namespaces to distinguish between e.g. ocean, land, or tracer variables.

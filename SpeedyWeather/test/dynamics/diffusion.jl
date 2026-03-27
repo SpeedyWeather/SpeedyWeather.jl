@@ -7,15 +7,10 @@
             model = PrimitiveWetModel(spectral_grid; horizontal_diffusion)
             simulation = initialize!(model)
 
-            # # run for a day to have non-zero vor, vor_tend
-            # run!(simulation, period=Day(1))
-
-            progn = simulation.prognostic_variables
-            diagn = simulation.diagnostic_variables
-
+            (; variables) = simulation
             (; expl, impl) = model.horizontal_diffusion
-            vor = get_step(progn.vor, 1)
-            (; vor_tend) = diagn.tendencies
+            vor = get_step(variables.prognostic.vor, 1)
+            vor_tend = variables.tendencies.vor
 
             # apply diffusion
             SpeedyWeather.horizontal_diffusion!(vor_tend, vor, expl, impl)
@@ -32,7 +27,7 @@
                 end
             end
 
-            vor2 = get_step(progn.vor, 2)
+            vor2 = get_step(variables.prognostic.vor, 2)
             SpeedyWeather.leapfrog!(vor, vor2, vor_tend, model.time_stepping.Δt, 1, model.time_stepping)
 
             @test any(vor .!= vor2)    # check that at least some coefficients are different

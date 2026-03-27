@@ -2,8 +2,8 @@ export set!
 
 """
 $(TYPEDSIGNATURES)
-Sets new values for the keyword arguments (velocities, vorticity, divergence, etc..) into the
-prognostic variable struct `progn` at timestep index `lf`. If `add==true` they are added to the 
+Sets new values for variables defined through keyword matching the keys in a NamedTuple.
+Spectral variables can be set at timestep index `lf`. If `add==true` they are added to the 
 current value instead. If a `AbstractSpectralTransform` S is provided, it is used when needed to set 
 the variable, otherwise it is recomputed. In case `u` and `v` are provied, actually the divergence
 and vorticity are set and `coslat_scaling_included` specficies whether or not the 1/cos(lat) 
@@ -18,6 +18,10 @@ The input may be:
 * An instance of `AbstractField` 
 * An instance of `LowerTriangularArray` 
 * A scalar `<: Number` (interpreted as a constant field in grid space)
+
+Specify the namespace as a symbol in case the `vars::NamedTuple` contains them, e.g.
+
+    set!(vars, sea_surface_temperature = 1, namespace=:ocean)
 """
 function set!(
         vars::NamedTuple,
@@ -27,12 +31,14 @@ function set!(
         spectral_transform::Union{Nothing, AbstractSpectralTransform} = nothing,
         coslat_scaling_included::Bool = false,
         static_func::Bool = true,
+        namespace::Union{Nothing, Symbol} = nothing,
         kwargs...
     )
     # special case for u,v setting vor, div
     if :u in keys(kwargs) && :v in keys(kwargs)
         (; vor, div) = vars
-        set_vordiv!(get_step(vor, lf), get_step(div, lf), kwargs[:u], kwargs[:v], geometry, spectral_transform; add, coslat_scaling_included, static_func)
+        set_vordiv!(get_step(vor, lf), get_step(div, lf), kwargs[:u], kwargs[:v],
+            geometry, spectral_transform; add, coslat_scaling_included, static_func)
     elseif :u in keys(kwargs) || :v in keys(kwargs)
         @warn "Only one of `u` and `v` provided, but both are needed to set `vor` and `div`. Skipping."
     end
@@ -44,9 +50,18 @@ function set!(
         elseif varname in keys(vars)
             var = vars[varname] isa LowerTriangularArray ? get_step(vars[varname], lf) : vars[varname]
             set!(var, kwargs[varname], geometry, spectral_transform; add, static_func)
+        elseif namespace in keys(vars)
+            if varname in keys(vars[namespace])
+                var = vars[namespace][varname] isa LowerTriangularArray ?
+                    get_step(vars[namespace][varname], lf) : vars[namespace][varname]
+                set!(var, kwargs[varname], geometry, spectral_transform; add, static_func)
+            else
+                # throw error if varname can't be found and print existing variables
+                @warn "`$varname` not defined in NamedTuple with keys = $(keys(vars[namespace])). Skipping."
+            end
         else
-            # throw error if vanname can't be found and print existing variables
-            @warn "`$varname` not defined in variables NamedTuple with keys = $(keys(vars)). Skipping."
+            # throw error if varname can't be found and print existing variables
+            @warn "`$varname` not defined in NamedTuple with keys = $(keys(vars)). Skipping."
         end
     end
     return nothing

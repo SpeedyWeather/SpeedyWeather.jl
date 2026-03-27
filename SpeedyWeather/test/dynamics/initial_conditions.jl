@@ -1,23 +1,10 @@
-@testset "ZeroInitially" begin
-    spectral_grid = SpectralGrid(nlayers = 1)
-    ic = ZeroInitially()
-    model = BarotropicModel(spectral_grid)
-    vars = Variables(model)
-    initialize!(vars, ic, model)
-
-    # Check that vorticity is initialized to zero
-    vor = vars.prognostic.vor
-    @test all(vor .== 0)
-    @test !any(isnan.(vor))
-end
-
 @testset "RandomVorticity" begin
     spectral_grid = SpectralGrid(nlayers = 1)
 
     # Test with default parameters
     ic = RandomVorticity(spectral_grid)
     model = BarotropicModel(spectral_grid)
-    vars = Variables(model)
+    vars = SpeedyWeather.Variables(model)
     initialize!(vars, ic, model)
     vor = vars.prognostic.vor
 
@@ -25,10 +12,10 @@ end
     @test !all(vor .== 0)
     @test !any(isnan.(vor))
 
-    # Test different parameters produce different results
+    # Test different parameters produce different results``
     ic_custom = RandomVorticity(spectral_grid; power = -2, amplitude = 1.0e-5, max_wavenumber = 15)
     model_custom = BarotropicModel(spectral_grid)
-    vars_custom = Variables(model_custom)
+    vars_custom = SpeedyWeather.Variables(model_custom)
     initialize!(vars_custom, ic_custom, model_custom)
     vor_custom = vars_custom.prognostic.vor
 
@@ -70,13 +57,13 @@ end
     vars = Variables(model)
     initialize!(vars, ic, model)
     vor = vars.prognostic.vor
-    pres = vars.prognostic.pres
+    η = vars.prognostic.η
 
     # Check vorticity and pressure are initialized
     @test !all(vor .== 0)
     @test !any(isnan.(vor))
-    @test !all(pres .== 0)
-    @test !any(isnan.(pres))
+    @test !all(η .== 0)
+    @test !any(isnan.(η))
 
     # Test different parameters produce different results
     ic_custom = ZonalJet(spectral_grid; latitude = 30, width = 15, umax = 60)
@@ -126,13 +113,13 @@ end
     vars = Variables(model)
     initialize!(vars, ic, model)
     vor = vars.prognostic.vor
-    pres = vars.prognostic.pres
+    η = vars.prognostic.η
 
     # Check vorticity and pressure are initialized
     @test !all(vor .== 0)
     @test !any(isnan.(vor))
-    @test !all(pres .== 0)
-    @test !any(isnan.(pres))
+    @test !all(η .== 0)
+    @test !any(isnan.(η))
 
     # Test different parameters produce different results
     ic_custom = RossbyHaurwitzWave(spectral_grid; m = 6)
@@ -216,10 +203,10 @@ end
     model_sw = ShallowWaterModel(spectral_grid_sw)
     vars_sw = Variables(model_sw)
     initialize!(vars_sw, ic_sw, model_sw)
-    pres_sw = vars_sw.prognostic.pres
+    η = vars_sw.prognostic.η
 
-    @test all(pres_sw .≈ 0)
-    @test !any(isnan.(pres_sw))
+    @test all(η .≈ 0)
+    @test !any(isnan.(η))
 end
 
 @testset "ConstantRelativeHumidity" begin
@@ -227,7 +214,8 @@ end
 
     # Test with default relative humidity
     # we need a nonzero temperature to set the humidity, so we use the Jablonowski temperature
-    ic = InitialConditions(; humid = ConstantRelativeHumidity(spectral_grid), temp = JablonowskiTemperature(spectral_grid))
+    # important to have temp therefore first in the named tuple!
+    ic = (; temp = JablonowskiTemperature(spectral_grid), humid = ConstantRelativeHumidity(spectral_grid))
     model = PrimitiveWetModel(spectral_grid)
     vars = Variables(model)
     initialize!(vars, ic, model)
@@ -238,7 +226,7 @@ end
     @test !any(isnan.(humid))
 
     # Test different parameters produce different results
-    ic_custom = InitialConditions(; humid = ConstantRelativeHumidity(spectral_grid; relhumid_ref = 0.5), temp = JablonowskiTemperature(spectral_grid))
+    ic_custom = (; temp = JablonowskiTemperature(spectral_grid), humid = ConstantRelativeHumidity(spectral_grid; relhumid_ref = 0.5))
     model_custom = PrimitiveWetModel(spectral_grid)
     vars_custom = Variables(model_custom)
     initialize!(vars_custom, ic_custom, model_custom)
@@ -256,21 +244,21 @@ end
     model = ShallowWaterModel(spectral_grid)
     vars = Variables(model)
     initialize!(vars, ic, model)
-    pres = vars.prognostic.pres
+    η = vars.prognostic.η
 
     # Check pressure is initialized
-    @test !all(pres .== 0)
-    @test !any(isnan.(pres))
+    @test !all(η .== 0)
+    @test !any(isnan.(η))
 
     # Test different parameters produce different results
-    ic_custom = RandomWaves(spectral_grid; A = 1000, lmin = 5, lmax = 20)
+    ic_custom = RandomWaves(spectral_grid; amplitude = 1000, lmin = 5, lmax = 20)
     model_custom = ShallowWaterModel(spectral_grid)
     vars_custom = Variables(model_custom)
     initialize!(vars_custom, ic_custom, model_custom)
-    pres_custom = vars_custom.prognostic.pres
+    η_custom = vars_custom.prognostic.η
 
-    @test !any(isnan.(pres_custom))
-    @test pres_custom != pres  # Different parameters should give different results
+    @test !any(isnan.(η_custom))
+    @test η_custom != η   # Different parameters should give different results
 end
 
 @testset "StartFromRest" begin

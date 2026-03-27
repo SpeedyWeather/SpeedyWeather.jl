@@ -77,8 +77,8 @@ function variables(model::ShallowWater)
         TendencyVariable(:div, Grid3D(), namespace = :grid, desc = "Tendency of divergence on the grid", units = "1/s²"),
         TendencyVariable(:η, Grid2D(), namespace = :grid, desc = "Tendency of interface displacement on the grid", units = "m/s"),
         
-        ScratchVariable(:a_grid, Grid3D(), desc = "Scratch array"),
-        ScratchVariable(:b_grid, Grid3D(), desc = "Scratch array"),
+        ScratchVariable(:a, Grid3D(), desc = "Scratch array", namespace=:grid),
+        ScratchVariable(:b, Grid3D(), desc = "Scratch array", namespace=:grid),
     )
 end
 
