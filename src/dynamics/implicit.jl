@@ -3,6 +3,11 @@ abstract type AbstractImplicit <: AbstractModelComponent end
 # model.implicit = nothing (for BarotropicModel)
 initialize!(::Nothing, dt::Real, ::Any...) = nothing
 lorenz_implicit_correction!(::DiagnosticVariables, ::PrognosticVariables, ::Nothing, ::AbstractModel) = nothing
+_strip_implicit!(::DiagnosticVariables, ::PrognosticVariables, ::Nothing, ::AbstractModel) = nothing
+
+"""$(TYPEDSIGNATURES)
+No-op strip for models without implicit terms (e.g. BarotropicModel)."""
+lorenz_strip_implicit!(::DiagnosticVariables, ::PrognosticVariables, ::Nothing, ::AbstractModel) = nothing
 
 # ============================================================================
 # SHALLOW WATER MODEL
@@ -46,38 +51,69 @@ end
 set_initialized!(implicit::ImplicitShallowWater) = nothing
 set_initialized!(implicit::Nothing) = nothing
 
+# Strip L_I(x) from diagn.tendencies in-place before Lorenz accumulation so that
+# accumulate_tendency! stores only F_E into G (Hotta et al. 2016, Eq. 19 uses F_E).
+# For ShallowWater: L_I_div = -g·∇²·η, L_I_pres = -H·D (both already in diagn.tendencies
+# from bernoulli_potential_swm! and volume_flux_divergence!).
+function _strip_implicit!(
+    diagn::DiagnosticVariables,
+    progn::PrognosticVariables,
+    ::ImplicitShallowWater,
+    model::ShallowWater,
+)
+    div_tend  = diagn.tendencies.div_tend
+    pres_tend = diagn.tendencies.pres_tend
+    div_x     = get_step(progn.div,  1)
+    pres_x    = get_step(progn.pres, 1)
+    H = model.atmosphere.layer_thickness
+    g = model.planet.gravity
+    l_indices = div_tend.spectrum.l_indices
+    arch = architecture(div_tend)
+    launch!(arch, SpectralWorkOrder, size(div_tend),
+            _strip_implicit_swm_kernel!,
+            div_tend, pres_tend, div_x, pres_x, l_indices, H, g)
+    return nothing
+end
+
+# F_E_div  = F_div  - (-g·∇²·η) = F_div  + g·∇²·η  (∇²≤0: removes positive gravity wave term)
+# F_E_pres = F_pres - (-H·D)    = F_pres + H·D
+@kernel inbounds=true function _strip_implicit_swm_kernel!(
+    div_tend, pres_tend,
+    @Const(div_x), @Const(pres_x),
+    l_indices,
+    @Const(H), @Const(g),
+)
+    I  = @index(Global, Cartesian)
+    lm = I[1]
+    k  = I[2]
+    l  = l_indices[lm]
+    ∇² = -l*(l-1)
+    div_tend[lm, k] += g * ∇² * pres_x[lm]
+    pres_tend[lm]   += H * div_x[lm, k]
+end
+
 """$(TYPEDSIGNATURES)
 Apply the semi-implicit correction for the Lorenz N-cycle shallow water model,
 implementing Hotta et al. (2016) Eq. 20:
 
-    dx = (I - α·Δt·L_I)⁻¹ · (G + L_I·x)
+    δx = (I - α·Δt·L_I)⁻¹ · (G_E + L_I·x)
 
-where G is the accumulated weighted tendency (stored in diagn.tendencies, which
-accumulates into progn index 2) and x is the current state (progn index 1).
-
-The shallow water implicit operator L_I acts as:
-    divergence eq:    L_I·x = -g·∇²·η      (gravity wave pressure gradient)
-    free surface eq:  L_I·x = -H·D          (mass divergence)
-
-Note the sign: ∇² has negative eigenvalues (-l(l-1) < 0), so -g·∇²·η is positive
-for positive η, correctly representing the restoring pressure gradient.
-
-Unlike the leapfrog correction which computes (pres_old - pres_new) to shift the
-implicit term from the current to the previous time level, here we evaluate L_I·x
-directly at the single current state x."""
+Reads G_E from progn index 2 (the F_E accumulator, left unchanged) and the current
+state x from progn index 1. Writes the corrected δx into diagn.tendencies.div_tend
+and diagn.tendencies.pres_tend, which were pre-filled with G_E by the caller via a
+G→tend copy before this function is called."""
 function lorenz_implicit_correction!(
     diagn::DiagnosticVariables,
     progn::PrognosticVariables,
     implicit::ImplicitShallowWater,
     model::ShallowWater,
 )
-    # G accumulators live in progn index 2
-    div_G    = get_step(progn.div,  2)   # accumulated G for divergence
-    pres_G   = get_step(progn.pres, 2)   # accumulated G for pressure
-
-    # Current state x at index 1
-    div_current  = get_step(progn.div,  1)
-    pres_current = get_step(progn.pres, 1)
+    div_G    = get_step(progn.div,  2)          # F_E accumulator (read only)
+    pres_G   = get_step(progn.pres, 2)          # F_E accumulator (read only)
+    div_x    = get_step(progn.div,  1)          # current state
+    pres_x   = get_step(progn.pres, 1)          # current state
+    div_δx   = diagn.tendencies.div_tend        # output: corrected δD
+    pres_δx  = diagn.tendencies.pres_tend       # output: corrected δη
 
     H = model.atmosphere.layer_thickness
     g = model.planet.gravity
@@ -88,17 +124,18 @@ function lorenz_implicit_correction!(
 
     launch!(arch, SpectralWorkOrder, size(div_G),
             lorenz_implicit_shallow_water_kernel!,
-            div_G, pres_G, div_current, pres_current, l_indices, H, g, ξ)
+            div_G, pres_G, div_x, pres_x, div_δx, pres_δx, l_indices, H, g, ξ)
 
-    zero_last_degree!(div_G)
-    zero_last_degree!(pres_G)
+    zero_last_degree!(div_δx)
+    zero_last_degree!(pres_δx)
 
     return nothing
 end
 
 @kernel inbounds=true function lorenz_implicit_shallow_water_kernel!(
-    div_tend, pres_tend,
-    div_current, pres_current,
+    @Const(div_G), @Const(pres_G),
+    @Const(div_x), @Const(pres_x),
+    div_δx, pres_δx,
     l_indices,
     @Const(H), @Const(g), @Const(ξ),
 )
@@ -109,24 +146,21 @@ end
     l  = l_indices[lm]
     ∇² = -l*(l-1)   # Laplacian eigenvalue, 1-based, always ≤ 0
 
-    # Form G + L_I·x  (Hotta et al. 2016, Eq. 20 numerator before inversion)
-    #
-    # L_I·x for divergence eq = -g·∇²·η_current
-    #   ∇² is negative, so -g·∇²·η = +g·l(l-1)·η > 0 for positive η
-    #   Written as: -g*∇²*pres_current
-    #
-    # L_I·x for pressure eq = -H·D_current
-    #
-    G_div = div_tend[lm, k]  - g*∇²*pres_current[lm]
-    G_η   = pres_tend[lm]    - H*div_current[lm, k]
+    # Form exact Eq. 20 RHS = G_E + L_I(x_current):
+    #   L_I_div  = -g·∇²·η  (≥0 since ∇²≤0)
+    #   L_I_pres = -H·D
+    G_div = div_G[lm, k] - g*∇²*pres_x[lm]
+    G_η   = pres_G[lm]   - H*div_x[lm, k]
 
-    # Scalar inversion of (I - ξ²·H·g·∇²) for this spectral mode.
-    # ∇² ≤ 0 so -ξ²·H·g·∇² ≥ 0, making S⁻¹ ≤ 1: the correction is always bounded.
+    # Scalar inversion: S⁻¹ = 1/(1 - ξ²·H·g·∇²). Since ∇²≤0, S⁻¹≤1.
     S⁻¹ = inv(1 - ξ^2*H*g*∇²)
 
-    # Solve for corrected divergence tendency, then back-substitute for pressure
-    div_tend[lm, k] = S⁻¹*(G_div - ξ*g*∇²*G_η) # TODO double check this 
-    pres_tend[lm]   = G_η - ξ*H*div_tend[lm, k]
+    # Solve 2×2 system (I - ξ·L_I)·δx = G:
+    #   δD + ξ·g·∇²·δη = G_div  =>  δD = S⁻¹·(G_div - ξ·g·∇²·G_η)
+    #   δη + ξ·H·δD    = G_η    =>  δη = G_η - ξ·H·δD
+    δD = S⁻¹*(G_div - ξ*g*∇²*G_η)
+    div_δx[lm, k] = δD
+    pres_δx[lm]   = G_η - ξ*H*δD
 end
 
 # ============================================================================

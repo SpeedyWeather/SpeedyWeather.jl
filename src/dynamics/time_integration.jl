@@ -27,9 +27,9 @@ struct NCycleLorenzABBA <: NCycleLorenzVariant end
 A semi-implicit Lorenz N-cycle time integration scheme following Hotta et al. (2016).
 
 # Algorithm (per substep)
-1. G = w*F_E(x) + (1-w)*G     (weighted tendency accumulation, Eq. 19)
-2. G = (I - α*Δt*L_I)^(-1) * (G + L_I*x)  (implicit correction, Eq. 20)
-3. x = x + Δt*G               (state update, Eq. 21)
+1. G   ← w*F_E(x) + (1-w)*G              (weighted F_E accumulation, Eq. 19; G preserved)
+2. δx  = (I - α*Δt*L_I)^(-1) * (G + L_I*x)  (implicit correction, Eq. 20; G untouched)
+3. x   ← x + Δt*δx                       (state update, Eq. 21)
 
 # Key differences from Leapfrog
 - Self-starting: no special first steps needed
@@ -174,7 +174,9 @@ end
 # ============================================================================
 
 """$(TYPEDSIGNATURES)
-Accumulate weighted tendency in-place: G ← w*F_E + (1-w)*G  (Hotta et al. 2016, Eq. 19)."""
+Accumulate weighted explicit tendency in-place: G ← w*F_E + (1-w)*G  (Hotta et al. 2016, Eq. 19).
+`_strip_implicit!` must have been called before this to remove the implicit operator L_I(x) from F,
+so that only the explicit part F_E is accumulated here."""
 function accumulate_tendency!(
     G::LowerTriangularArray,
     F_explicit::LowerTriangularArray,
@@ -254,6 +256,10 @@ function lorenz_ncycle_step!(
     end
 
     # STEP 1: Weighted tendency accumulation  G ← w*F_E + (1-w)*G  (Eq. 19)
+    # First strip the implicit operator L_I(x) from the full tendency F = F_E + L_I(x)
+    # so that only the explicit part F_E is accumulated. The implicit correction (STEP 2)
+    # adds L_I(x_current) back once to form the exact Eq. 20 RHS.
+    _strip_implicit!(diagn, progn, model.implicit, model)
     w = weight_coefficient(L, clock)
 
     for (varname, tendname) in zip(prognostic_variables(model), tendency_names(model))
@@ -272,21 +278,34 @@ function lorenz_ncycle_step!(
         accumulate_tendency!(G, F_explicit, w, L)
     end
 
-    # STEP 2: Semi-implicit correction  G ← (I - α*Δt*L_I)⁻¹*(G + L_I*x)  (Eq. 20)
-    # Note: the implicit correction reads x from progn index 1 and writes
-    # the corrected tendency back into diagn.tendencies (which point to G via index 2)
+    # STEP 2: Semi-implicit correction  δx = (I - α*Δt*L_I)⁻¹*(G_E + L_I*x)  (Eq. 20)
+    # First copy G_E → tend so that:
+    #   - explicit variables (e.g. vor) have δx = G_E already in tend
+    #   - G_E in progn index 2 is left unchanged (not overwritten with δx)
+    # Then lorenz_implicit_correction! overwrites only the implicit variables
+    # (div_tend, pres_tend for SWE) with the corrected δx.
+    for (varname, tendname) in zip(prognostic_variables(model), tendency_names(model))
+        G  = get_step(getfield(progn, varname), 2)
+        δx = getfield(tend, tendname)
+        copyto!(δx, G)
+    end
+    for (name, tracer) in model.tracers
+        tracer.active || continue
+        copyto!(tend.tracers_tend[name], get_step(progn.tracers[name], 2))
+    end
     lorenz_implicit_correction!(diagn, progn, model.implicit, model)
 
-    # STEP 3: State update  x ← x + Δt*G  (Eq. 21)
-    for varname in prognostic_variables(model)
+    # STEP 3: State update  x ← x + Δt*δx  (Eq. 21), reading δx from tend
+    for (varname, tendname) in zip(prognostic_variables(model), tendency_names(model))
         var = getfield(progn, varname)
-        update_state!(get_step(var, 1), get_step(var, 2), dt, L)
+        δx  = getfield(tend, tendname)
+        update_state!(get_step(var, 1), δx, dt, L)
     end
 
     for (name, tracer) in model.tracers
         tracer.active || continue
         var = progn.tracers[name]
-        update_state!(get_step(var, 1), get_step(var, 2), dt, L)
+        update_state!(get_step(var, 1), tend.tracers_tend[name], dt, L)
     end
 
     random_process!(progn, model.random_process)
