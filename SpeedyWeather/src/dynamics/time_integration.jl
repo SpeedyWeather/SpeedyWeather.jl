@@ -215,7 +215,6 @@ function leapfrog!(
     )
     (; prognostic, tendencies) = vars
 
-
     for varname in keys(tendencies)
         if !(tendencies[varname] isa NamedTuple)
             var = getfield(prognostic, varname)
