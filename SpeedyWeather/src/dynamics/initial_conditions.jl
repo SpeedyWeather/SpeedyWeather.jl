@@ -205,8 +205,8 @@ function initialize!(
     u_data = on_architecture(architecture(grid), rand(RNG, NF, npoints))
     v_data = on_architecture(architecture(grid), rand(RNG, NF, npoints))
 
-    u = 2A * Field(u_data, grid) .- A
-    v = 2A * Field(v_data, grid) .- A
+    u = 2A .* Field(u_data, grid) .- A
+    v = 2A .* Field(v_data, grid) .- A
 
     u_spectral = transform(u, model.spectral_transform)
     v_spectral = transform(v, model.spectral_transform)

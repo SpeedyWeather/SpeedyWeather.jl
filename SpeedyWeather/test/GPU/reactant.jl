@@ -5,7 +5,7 @@ using Reactant, CUDA # we need CUDA even on other devices for the kernel raising
 Reactant.set_default_backend("gpu")
 
 arch = SpeedyWeather.ReactantDevice()
-spectral_grid = SpectralGrid(architecture=arch)
+spectral_grid = SpectralGrid(architecture=arch, nlayers=1)
 spectral_transform = MatrixSpectralTransform(spectral_grid)
 model = BarotropicModel(spectral_grid=spectral_grid, spectral_transform=spectral_transform)
 simulation = initialize!(model)
