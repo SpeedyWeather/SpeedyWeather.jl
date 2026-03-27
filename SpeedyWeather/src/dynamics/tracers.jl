@@ -61,8 +61,8 @@ function variables(T::Tracer)
         GridVariable(Symbol(T.name, :_prev), Grid3D(), desc = "$(T.name)", namespace = :tracers),
         TendencyVariable(T.name, Spectral3D(), desc = "Tendency of $(T.name)", namespace = :tracers),
         TendencyVariable(Symbol(T.name, :_grid), Grid3D(), desc = "Tendency of $(T.name)", namespace = :tracers),
-        ScratchVariable(:a_grid, Grid3D(), desc = "Work array for tracer advection"),
-        ScratchVariable(:b_grid, Grid3D(), desc = "Work array for tracer advection"),
+        ScratchVariable(:a, Grid3D(), desc = "Scratch array", namespace = :grid),
+        ScratchVariable(:b, Grid3D(), desc = "Scratch array", namespace = :grid),
     )
 end
 

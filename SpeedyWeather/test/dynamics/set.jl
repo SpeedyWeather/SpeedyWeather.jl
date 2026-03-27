@@ -131,6 +131,10 @@
 
     set!(simulation, vor = f; lf)
     @test get_step(prog_new.vor, lf) ≈ A_spec
+
+    # groups
+    set!(simulation, geopotential=1, group=:grid)
+    @test all(simulation.variables.grid.geopotential .== 1)
 end
 
 @testset "Set! grids" begin

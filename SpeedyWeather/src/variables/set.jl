@@ -22,6 +22,7 @@ The input may be:
 Specify the namespace as a symbol in case the `vars::NamedTuple` contains them, e.g.
 
     set!(vars, sea_surface_temperature = 1, namespace=:ocean)
+    
 """
 function set!(
         vars::NamedTuple,
@@ -67,7 +68,9 @@ function set!(
     return nothing
 end
 
-set!(vars::Variables, args...; kwargs...) = set!(vars.prognostic, args...; kwargs...)
+"""$(TYPEDSIGNATURES) set the `variables`, default is in the group `prognostic`."""
+set!(variables::Variables, args...; group::Symbol = :prognostic, kwargs...) =
+    set!(getfield(variables, group), args...; kwargs...)
 
 # set LTA <- LTA
 function set!(
