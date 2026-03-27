@@ -90,7 +90,6 @@ function initialize!(
     end
 
     transform!(variables, lf, model, initialize = true)
-    haskey(progn, :particles) && initialize!(variables, progn.particles, model)
     initialize!(model.output, variables, model)
     initialize!(model.callbacks, variables, model)
     return simulation

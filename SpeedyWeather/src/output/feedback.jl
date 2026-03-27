@@ -99,7 +99,8 @@ function progress!(feedback::Feedback, vars::Variables)
     return nothing
 end
 
-progress!(::Nothing, progn::PrognosticVariables, diagn::DiagnosticVariables) = nothing
+# fallback for feedback = nothing
+progress!(::Nothing, vars::Variables) = nothing
 
 """
 $(TYPEDSIGNATURES)

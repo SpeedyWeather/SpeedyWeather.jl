@@ -351,7 +351,8 @@ function timestep!(
         lf1::Integer = 2,               # leapfrog index 1 (dis/enables Robert+Williams filter)
         lf2::Integer = 2,               # leapfrog index 2 (time step used for tendencies)
     )
-    model.feedback.nans_detected && return nothing  # exit immediately if NaRs already present
+    # exit immediately if NaNs/Infs already present
+    (!isnothing(model.feedback) && model.feedback.nans_detected) && return nothing
     reset_tendencies!(vars)             # set the tendencies back to zero for accumulation
 
     # GET TENDENCIES, CORRECT THEM FOR SEMI-IMPLICIT INTEGRATION
@@ -380,7 +381,8 @@ function timestep!(
         lf1::Integer = 2,               # leapfrog index 1 (dis/enables Robert+Williams filter)
         lf2::Integer = 2,               # leapfrog index 2 (time step used for tendencies)
     )
-    model.feedback.nans_detected && return nothing  # exit immediately if NaRs already present
+    # exit immediately if NaNs/Infs already present
+    (!isnothing(model.feedback) && model.feedback.nans_detected) && return nothing
     reset_tendencies!(vars)             # set the tendencies back to zero for accumulation
 
     if ~model.dynamics_only             # switch on/off all physics parameterizations

@@ -38,6 +38,10 @@ function initialize!(vars::Variables, model::AbstractModel)
     hasproperty(model, :sea_ice) && initialize!(vars, model.sea_ice, model)
     hasproperty(model, :land) && initialize!(vars, model.land, model)
 
+    # then particles
+    progn = vars.prognostic
+    haskey(progn, :particles) && initialize!(variables, progn.particles, model)
+
     # then atmosphere as this may include initial conditions like StartFromFile
     # which would contain ocean/land initial conditions that should overwrite the above if they are included
     initialize!(vars, model.initial_conditions, model)

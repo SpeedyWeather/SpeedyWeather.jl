@@ -1,8 +1,7 @@
 export JLD2Output
 
-"""Output writer for a JLD2 file that saves the PrognosticVariables
-and DiagnosticVariables structs directly to a JLD2 file. All internal
-scalings and units are still applied to these outputs. Fields are 
+"""Output writer for a JLD2 file that saves the Variables struct directly to a JLD2 file.
+All internal scalings and units are still applied to these outputs. Fields are 
 $(TYPEDFIELDS)"""
 @kwdef mutable struct JLD2Output <: AbstractOutput
 
