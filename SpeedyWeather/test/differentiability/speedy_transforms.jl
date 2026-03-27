@@ -289,7 +289,7 @@ end
 
             # test with the eigenvalues saved in S, result should just be seed * eigenvalues
             for i in 1:(vor.spectrum.mmax)
-                @test all(isapprox.(Array(dvor[:, 1])[i, 1:i], S.eigenvalues[i] * (1 + im)))
+                @test all(isapprox.(Array(dvor[:, 1])[i, 1:i], S.gradients.eigenvalues[i] * (1 + im)))
             end
 
             # ∇

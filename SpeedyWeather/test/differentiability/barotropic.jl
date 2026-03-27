@@ -27,7 +27,7 @@
     @test any(abs.(dvec) .> 0)
 
     adsim2 = ADSimulation(simulation)
-    vars2, dvars2 = prognosticseed(adsim2)
+    vars2, dvars2 = ADseed(adsim2, :tendencies)
 
     function dynamics_tendencies(vars, lf, model)
         vars_new = deepcopy(vars)
@@ -87,22 +87,23 @@ end
     lf2 = 2
 
     adsim = ADSimulation(simulation)
+    fdsim = ADSimulation(simulation)
+
     vars, dvars = ADseed(adsim, :prognostic)
 
     @info "Running reverse-mode AD"
     @time autodiff(Reverse, SpeedyWeather.leapfrog!, Const, Duplicated(vars, dvars), Const(dt), Const(lf1), Const(model))
 
-    function leapfrog_step(vars_new::Variables, vars_in::Variables, dt, lf, model)
-        copy!(vars_new, vars_in)
+    function leapfrog_step(vars_in::Variables, dt, lf, model)
+        vars_new = deepcopy(vars_in)
         SpeedyWeather.leapfrog!(vars_new, dt, lf, model)
         return vars_new
     end
 
-    fdsim = ADSimulation(simulation)
-    vars_new = deepcopy(fdsim.vars)
+    vars_new, dvars_new = ADSeed(fdsim, :prognostic)
 
     @info "Running finite differences"
-    fd_vjp = @time FiniteDifferences.j′vp(central_fdm(5, 1), x -> leapfrog_step(vars_new, x, dt, lf1, model), make_zero(dvars), tend_copy)
+    fd_vjp = @time FiniteDifferences.j′vp(central_fdm(5, 1), x -> leapfrog_step(x, dt, lf1, model), dvars_new, vars_new)
 
     @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dvars)[1], rtol = 1.0e-3, atol = 1.0e-3))
 
@@ -144,6 +145,7 @@ end
     lf2 = 2
 
     adsim = ADSimulation(simulation)
+    fdsim = ADSimulation(simulation)
     vars, dvars = ADseed(adsim, :tendencies)
 
     @info "Running reverse-mode AD"
@@ -155,10 +157,10 @@ end
         return vars_new
     end
 
-    fdsim = ADSimulation(simulation)
+    vars_new, dvars_new = ADSeed(fdsim, :tendencies)
 
     @info "Running finite differences"
-    fd_vjp = @time FiniteDifferences.j′vp(central_fdm(5, 1), x -> transform_step(x, lf2, model), make_zero(dvars), fdsim.vars)
+    fd_vjp = @time FiniteDifferences.j′vp(central_fdm(5, 1), x -> transform_step(x, lf2, model), dvars_new, vars_new)
 
     @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dvars)[1], rtol = 1.0e-3, atol = 1.0e-3))
 

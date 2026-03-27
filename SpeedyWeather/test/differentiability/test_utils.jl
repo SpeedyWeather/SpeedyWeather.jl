@@ -31,8 +31,8 @@ function ADseed(adsim::ADSimulation, name::Symbol)
     seed = make_zero(adsim.vars)
 
     # seed dvars_new with ones (output seed)
-    for k in keys(getfield(seed, symbol))
-        field = getfield(getfield(seed,name), k)
+    for k in keys(getfield(seed, name))
+        field = getfield(getfield(seed, name), k)
         if field isa AbstractArray
             field .= one(eltype(field))
         end
