@@ -16,7 +16,7 @@
     lf2 = 2
 
     adsim = ADSimulation(simulation)
-    vars, dvars = diagnosticseed(adsim)
+    vars, dvars = ADseed(adsim, :tendencies)
 
     @info "Running reverse-mode AD"
     @time autodiff(Reverse, SpeedyWeather.dynamics_tendencies!, Const, Duplicated(vars, dvars), Const(lf2), Const(model))
@@ -27,7 +27,7 @@
     @test any(abs.(dvec) .> 0)
 
     adsim2 = ADSimulation(simulation)
-    vars2, dvars2 = prognosticseed(adsim2)
+    vars2, dvars2 = ADseed(adsim2, :tendencies)
 
     function dynamics_tendencies(vars, lf, model)
         vars_new = deepcopy(vars)
@@ -53,7 +53,7 @@ end
 
     lf1 = 1
     adsim = ADSimulation(simulation)
-    vars, dvars = diagnosticseed(adsim)
+    vars, dvars = ADseed(adsim, :tendencies)
 
     @time autodiff(Reverse, SpeedyWeather.horizontal_diffusion!, Const, Duplicated(vars, dvars), Const(model.horizontal_diffusion), Const(model), Const(lf1))
 
@@ -87,26 +87,23 @@ end
     lf2 = 2
 
     adsim = ADSimulation(simulation)
-    vars, dvars = prognosticseed(adsim)
+    fdsim = ADSimulation(simulation)
 
-    tend = adsim.vars.tendencies
-    tend_copy = deepcopy(tend)
-    dtend = make_zero(tend)
+    vars, dvars = ADseed(adsim, :prognostic)
 
     @info "Running reverse-mode AD"
     @time autodiff(Reverse, SpeedyWeather.leapfrog!, Const, Duplicated(vars, dvars), Const(dt), Const(lf1), Const(model))
 
-    function leapfrog_step(vars_new::Variables, vars_in::Variables, dt, lf, model)
-        copy!(vars_new, vars_in)
+    function leapfrog_step(vars_in::Variables, dt, lf, model)
+        vars_new = deepcopy(vars_in)
         SpeedyWeather.leapfrog!(vars_new, dt, lf, model)
         return vars_new
     end
 
-    fdsim = ADSimulation(simulation)
-    vars_new = deepcopy(fdsim.vars)
+    vars_new, dvars_new = ADseed(fdsim, :prognostic)
 
     @info "Running finite differences"
-    fd_vjp = @time FiniteDifferences.j′vp(central_fdm(5, 1), x -> leapfrog_step(vars_new, x, dt, lf1, model), make_zero(dvars), tend_copy)
+    fd_vjp = @time FiniteDifferences.j′vp(central_fdm(5, 1), x -> leapfrog_step(x, dt, lf1, model), dvars_new, vars_new)
 
     @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dvars)[1], rtol = 1.0e-3, atol = 1.0e-3))
 
@@ -137,7 +134,7 @@ end
     # ∂(tend) needs to be: dt* ( 1 + w1 - w2) (for every coefficient)
 end
 
-@testset "Differentiability: transform!(::Diagnostic, ::Prognostic)" begin
+@testset "Differentiability: transform!(::Variables)" begin
     spectral_grid = SpectralGrid(trunc = 9, nlayers = 1)
     model = BarotropicModel(; spectral_grid)
     simulation = initialize_with_spinup!(model)
@@ -148,7 +145,8 @@ end
     lf2 = 2
 
     adsim = ADSimulation(simulation)
-    vars, dvars = prognosticseed(adsim)
+    fdsim = ADSimulation(simulation)
+    vars, dvars = ADseed(adsim, :tendencies)
 
     @info "Running reverse-mode AD"
     @time autodiff(Reverse, SpeedyWeather.transform!, Const, Duplicated(vars, dvars), Const(lf2), Const(model))
@@ -159,13 +157,12 @@ end
         return vars_new
     end
 
-    fdsim = ADSimulation(simulation)
+    vars_new, dvars_new = ADseed(fdsim, :tendencies)
 
     @info "Running finite differences"
-    fd_vjp = @time FiniteDifferences.j′vp(central_fdm(5, 1), x -> transform_step(x, lf2, model), make_zero(dvars), fdsim.vars)
+    fd_vjp = @time FiniteDifferences.j′vp(central_fdm(5, 1), x -> transform_step(x, lf2, model), dvars_new, vars_new)
 
     @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dvars)[1], rtol = 1.0e-3, atol = 1.0e-3))
-
 end
 
 @testset "Differentiability: timestep! on Barotropic model" begin
@@ -187,7 +184,7 @@ end
     )
 
     adsim = ADSimulation(simulation)
-    vars_new, dvars_new = prognosticseed(adsim)
+    vars_new, dvars_new = ADseed(adsim, :prognostic)
 
     @info "Running reverse-mode AD"
     # test that we can differentiate wrt to everything
@@ -211,7 +208,7 @@ end
 
     # test that we can differentiate with Const(Model) only wrt to the state
     adsim2 = ADSimulation(simulation)
-    vars_new, dvars_new = prognosticseed(adsim2)
+    vars_new, dvars_new = ADseed(adsim2, :prognostic)
 
     @time autodiff(
         set_runtime_activity(Reverse),
@@ -240,7 +237,7 @@ end
     pvec = vec(ps)
     adsim = ADSimulation(simulation)
     dp = zero(pvec)
-    vars_new, dvars_new = deepcopy(adsim.vars), make_zero(adsim.dvars)
+    vars_new, dvars_new = ADseed(adsim, :prognostic)
     @time autodiff(
         Reverse,
         timestep_oop!,

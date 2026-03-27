@@ -21,23 +21,10 @@ if VERSION <= v"1.11.0"
         lf2 = 2
 
         vars = variables
-        vars_copy = deepcopy(vars)
-
-        d_vars = make_zero(vars)
+        dvars = make_zero(vars)
         d_model = make_zero(model)
 
-        vars_new = make_zero(vars)
-        dvars_new = make_zero(vars)
-
-        # seed dvars_new with ones (output seed)
-        for k in keys(dvars_new.prognostic)
-            field = getfield(dvars_new.prognostic, k)
-            if field isa AbstractArray
-                field .= one(eltype(field))
-            end
-        end
-
-        autodiff(Reverse, timestep_oop!, Const, Duplicated(vars_new, dvars_new), Duplicated(vars, d_vars), Const(dt), Duplicated(model, d_model))
+        autodiff(Reverse, SpeedyWeather.timestep!, Const, Duplicated(vars, d_vars), Const(dt), Duplicated(model, d_model), Const(lf1), Const(lf2))
         @test sum(to_vec(d_vars)[1]) != 0
 
     end
