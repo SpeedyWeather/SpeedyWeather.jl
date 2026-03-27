@@ -16,7 +16,7 @@
     lf2 = 2
 
     adsim = ADSimulation(simulation)
-    vars, dvars = diagnosticseed(adsim)
+    vars, dvars = ADseed(adsim, :tendencies)
 
     @info "Running reverse-mode AD"
     @time autodiff(Reverse, SpeedyWeather.dynamics_tendencies!, Const, Duplicated(vars, dvars), Const(lf2), Const(model))
@@ -53,7 +53,7 @@ end
 
     lf1 = 1
     adsim = ADSimulation(simulation)
-    vars, dvars = diagnosticseed(adsim)
+    vars, dvars = ADseed(adsim, :tendencies)
 
     @time autodiff(Reverse, SpeedyWeather.horizontal_diffusion!, Const, Duplicated(vars, dvars), Const(model.horizontal_diffusion), Const(model), Const(lf1))
 
@@ -87,11 +87,7 @@ end
     lf2 = 2
 
     adsim = ADSimulation(simulation)
-    vars, dvars = prognosticseed(adsim)
-
-    tend = adsim.vars.tendencies
-    tend_copy = deepcopy(tend)
-    dtend = make_zero(tend)
+    vars, dvars = ADseed(adsim, :prognostic)
 
     @info "Running reverse-mode AD"
     @time autodiff(Reverse, SpeedyWeather.leapfrog!, Const, Duplicated(vars, dvars), Const(dt), Const(lf1), Const(model))
@@ -137,7 +133,7 @@ end
     # ∂(tend) needs to be: dt* ( 1 + w1 - w2) (for every coefficient)
 end
 
-@testset "Differentiability: transform!(::Diagnostic, ::Prognostic)" begin
+@testset "Differentiability: transform!(::Variables)" begin
     spectral_grid = SpectralGrid(trunc = 9, nlayers = 1)
     model = BarotropicModel(; spectral_grid)
     simulation = initialize_with_spinup!(model)
@@ -148,7 +144,7 @@ end
     lf2 = 2
 
     adsim = ADSimulation(simulation)
-    vars, dvars = prognosticseed(adsim)
+    vars, dvars = ADseed(adsim, :tendencies)
 
     @info "Running reverse-mode AD"
     @time autodiff(Reverse, SpeedyWeather.transform!, Const, Duplicated(vars, dvars), Const(lf2), Const(model))
@@ -187,7 +183,7 @@ end
     )
 
     adsim = ADSimulation(simulation)
-    vars_new, dvars_new = prognosticseed(adsim)
+    vars_new, dvars_new = ADseed(adsim, :prognostic)
 
     @info "Running reverse-mode AD"
     # test that we can differentiate wrt to everything
@@ -211,7 +207,7 @@ end
 
     # test that we can differentiate with Const(Model) only wrt to the state
     adsim2 = ADSimulation(simulation)
-    vars_new, dvars_new = prognosticseed(adsim2)
+    vars_new, dvars_new = ADseed(adsim2, :prognostic)
 
     @time autodiff(
         set_runtime_activity(Reverse),
@@ -240,7 +236,7 @@ end
     pvec = vec(ps)
     adsim = ADSimulation(simulation)
     dp = zero(pvec)
-    vars_new, dvars_new = deepcopy(adsim.vars), make_zero(adsim.dvars)
+    vars_new, dvars_new = ADSeed(adsim, :prognostic)
     @time autodiff(
         Reverse,
         timestep_oop!,

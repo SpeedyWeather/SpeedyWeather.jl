@@ -24,14 +24,22 @@ function ADSimulation(sim::AbstractSimulation)
 end
 
 # expose compat accessors so existing callers still work
-progvars(adsim::ADSimulation) = adsim.vars
-diagvars(adsim::ADSimulation) = adsim.vars
-dprogvars(adsim::ADSimulation) = adsim.dvars
-ddiagvars(adsim::ADSimulation) = adsim.dvars
+vars(adsim::ADSimulation) = adsim.vars
+dvars(adsim::ADSimulation) = adsim.dvars
 
-prognosticseed(adsim::ADSimulation) = deepcopy(adsim.vars), make_zero(adsim.vars)
+function ADseed(adsim::ADSimulation, name::Symbol)
+    seed = make_zero(adsim.vars)
 
-diagnosticseed(adsim::ADSimulation) = deepcopy(adsim.vars), make_zero(adsim.vars)
+    # seed dvars_new with ones (output seed)
+    for k in keys(getfield(seed, symbol))
+        field = getfield(getfield(seed,name), k)
+        if field isa AbstractArray
+            field .= one(eltype(field))
+        end
+    end
+
+    return deepcopy(adsim.vars), seed
+end 
 
 function initialize_with_spinup!(model::AbstractModel, spinup_period = Day(5), init_period = Day(1))
     simulation = initialize!(model)
