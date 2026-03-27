@@ -16,17 +16,18 @@
     lf2 = 2
 
     adsim = ADSimulation(simulation)
+    fdsim = ADSimulation(simulation)
+
     vars, dvars = ADseed(adsim, :tendencies)
 
     @info "Running reverse-mode AD"
     @time autodiff(Reverse, SpeedyWeather.dynamics_tendencies!, Const, Duplicated(vars, dvars), Const(lf2), Const(model))
 
-    # basic sanity checks for VJP
-    dvec, _ = to_vec(dvars)
+    # basic sanity checks for VJP, testing prognostic because that's the input
+    dvec, _ = to_vec(dvars.prognostic)
     @test all(isfinite.(dvec))
     @test any(abs.(dvec) .> 0)
 
-    adsim2 = ADSimulation(simulation)
     vars2, dvars2 = ADseed(adsim2, :tendencies)
 
     function dynamics_tendencies(vars, lf, model)
@@ -35,12 +36,11 @@
         return vars_new
     end
 
-    fdsim = ADSimulation(simulation)
     @info "Running finite differences"
-    fd_vjp = @time FiniteDifferences.j′vp(central_fdm(15, 1), x -> dynamics_tendencies(x, lf2, model), make_zero(adsim.dvars), fdsim.vars)
+    fd_vjp = @time FiniteDifferences.j′vp(central_fdm(15, 1), x -> dynamics_tendencies(x, lf2, model), dvars2, vars2)
 
     # this is currently failing, possibly due to problems with finite diff?
-    @test_broken all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dvars)[1], rtol = 1.0e-1, atol = 1.0e-1))
+    @test_broken all(isapprox.(to_vec(fd_vjp[1].prognostic)[1], to_vec(dvars.prognostic)[1], rtol = 1.0e-1, atol = 1.0e-1))
 end
 
 #
@@ -146,7 +146,7 @@ end
 
     adsim = ADSimulation(simulation)
     fdsim = ADSimulation(simulation)
-    vars, dvars = ADseed(adsim, :tendencies)
+    vars, dvars = ADseed(adsim, :grid)
 
     @info "Running reverse-mode AD"
     @time autodiff(Reverse, SpeedyWeather.transform!, Const, Duplicated(vars, dvars), Const(lf2), Const(model))
@@ -157,12 +157,12 @@ end
         return vars_new
     end
 
-    vars_new, dvars_new = ADseed(fdsim, :tendencies)
+    vars_new, dvars_new = ADseed(fdsim, :grid)
 
     @info "Running finite differences"
     fd_vjp = @time FiniteDifferences.j′vp(central_fdm(5, 1), x -> transform_step(x, lf2, model), dvars_new, vars_new)
 
-    @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dvars)[1], rtol = 1.0e-3, atol = 1.0e-3))
+    @test all(isapprox.(to_vec(fd_vjp[1].prognostic)[1], to_vec(dvars.prognostic)[1], rtol = 1.0e-3, atol = 1.0e-3))
 end
 
 @testset "Differentiability: timestep! on Barotropic model" begin
@@ -173,17 +173,20 @@ end
     (; Δt, Δt_millisec) = simulation.model.time_stepping
     dt = 2Δt
 
+    adsim = ADSimulation(simulation)
+
     fdsim = ADSimulation(simulation)
+    vars_fd, dvars_fd = ADseed(fdsim, :prognostic)
+
     @info "Running finite differences"
     # for the full timestep, we need a bit higher precision
     fd_vjp = @time FiniteDifferences.j′vp(
         central_fdm(15, 1),
         x -> timestep_oop(x, dt, deepcopy(fdsim.model)),
-        make_zero(fdsim.vars),
-        deepcopy(fdsim.vars)
+        dvars_fd,
+        vars_fd
     )
 
-    adsim = ADSimulation(simulation)
     vars_new, dvars_new = ADseed(adsim, :prognostic)
 
     @info "Running reverse-mode AD"

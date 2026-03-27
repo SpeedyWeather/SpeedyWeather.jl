@@ -23,18 +23,32 @@ function ADSimulation(sim::AbstractSimulation)
     )
 end
 
-# expose compat accessors so existing callers still work
-vars(adsim::ADSimulation) = adsim.vars
-dvars(adsim::ADSimulation) = adsim.dvars
+"""
+    ADseed(adsim::ADSimulation, name::Symbol)
 
+Return a copy of the `adsim.vars` and a seed for the `name` field of `adsim.dvars`. 
+The seed should be the output of the function it is fed into.
+"""
 function ADseed(adsim::ADSimulation, name::Symbol)
-    seed = make_zero(adsim.vars)
+    seed = make_zero(adsim.dvars)
 
-    # seed dvars_new with ones (output seed)
     for k in keys(getfield(seed, name))
         field = getfield(getfield(seed, name), k)
         if field isa AbstractArray
-            field .= one(eltype(field))
+            if eltype(field) <: Complex
+                field .= one(eltype(real(field))) + im * one(eltype(real(field)))
+            else 
+                field .= one(eltype(field))
+            end 
+        elseif field isa NamedTuple
+            for k2 in keys(field)
+                field2 = getfield(field, k2)
+                if eltype(field2) <: Complex
+                    field2 .= one(eltype(real(field2))) + im * one(eltype(real(field2)))
+                else 
+                    field2 .= one(eltype(field2))
+                end
+            end
         end
     end
 
