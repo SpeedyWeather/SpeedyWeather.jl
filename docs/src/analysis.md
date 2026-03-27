@@ -77,7 +77,7 @@ Now we check ``\eta_{0,0}`` the ``l = m = 0`` coefficent of the inital condition
 of that simulation with
 
 ```@example analysis
-simulation.prognostic_variables.pres[1, 1]
+simulation.variables.pres[1, 1]
 ```
 
 `[1, 1]` the first element of the underlying
@@ -90,7 +90,7 @@ by which you have to divide to get your mean value in the original units
 
 ```@example analysis
 a = model.spectral_transform.norm_sphere    # = 2√π = 3.5449078
-η_mean = real(simulation.prognostic_variables.pres[1, 1]) / a
+η_mean = real(simulation.variables.prognostic.pres[1, 1]) / a
 ```
 
 So the initial conditions in this simulation are such that the global mean interface displacement
@@ -105,7 +105,7 @@ Let's check what happens after the simulation ran for some days
 run!(simulation, period=Day(10))
 
 # now we check η_mean again
-η_mean_later = real(simulation.prognostic_variables.pres[1, 1]) / a
+η_mean_later = real(simulation.variables.prognostic.pres[1, 1]) / a
 ```
 
 which is _exactly_ the same. So mass is conserved, woohoo.

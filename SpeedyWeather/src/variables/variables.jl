@@ -40,6 +40,7 @@ function Base.show(io::IO, var::AbstractVariable)
     return nothing
 end
 
+export Variables
 """$(TYPEDSIGNATURES)
 Symbol representing a unique identifier for a variable, combining its type, namespace and name and namespace. 
 Used to remove duplicates when extracting variables from the model. E.g. `:Variable_ocean_sea_surface_temperature`."""
