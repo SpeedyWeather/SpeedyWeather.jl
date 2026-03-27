@@ -97,6 +97,7 @@ function initialize!(model::Barotropic; time::DateTime = DEFAULT_DATE)
         SpectralGrid with nlayers=$(spectral_grid.nlayers) provided."
 
     # initialize components
+    arch = model.architecture
     initialize!(model.geometry, model)
     initialize!(model.time_stepping, model)
     initialize!(model.coriolis, model)
@@ -106,14 +107,15 @@ function initialize!(model::Barotropic; time::DateTime = DEFAULT_DATE)
     initialize!(model.random_process, model)
     initialize!(model.particle_advection, model)
 
-    # allocate all variables and set initial conditions
+    # allocate all variables
     variables = Variables(model)
-    initialize!(variables, model)
-
-    # set the time
+    
+    # set the time first
     (; clock) = variables.prognostic
-    clock.time = time       # set the current time
-    clock.start = time      # and store the start time
+    set!(clock, time = time, start = time)
+    
+    # now set initial conditions
+    initialize!(variables, model)
 
     return Simulation(variables, model)
 end

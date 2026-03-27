@@ -14,8 +14,8 @@ it is `rings = [1:4, 5:12, 13:24, 25:32, 33:36]`. For efficient looping see `eac
 `whichring` is a precomputed vector of ring indices for each grid point ij, i.e. `whichring[ij]` gives
 the ring index j of grid point ij. Fields are
 $(TYPEDFIELDS)"""
-struct OctaHEALPixGrid{A, V, W} <: AbstractReducedGrid{A}
-    nlat_half::Int      # number of latitudes on one hemisphere
+struct OctaHEALPixGrid{A, V, W, IntType} <: AbstractReducedGrid{A}
+    nlat_half::IntType  # number of latitudes on one hemisphere
     architecture::A     # information about device, CPU/GPU
     rings::V            # precomputed ring indices
     whichring::W        # precomputed ring index for each grid point ij

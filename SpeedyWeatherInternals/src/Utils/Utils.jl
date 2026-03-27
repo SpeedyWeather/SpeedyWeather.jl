@@ -2,12 +2,14 @@ module Utils
 
 using DocStringExtensions
 using StyledStrings
-using Dates
 using ..Architectures
 
-# miscellaneous utility functions
+import Dates
+
+# miscellaneous utility functions (uses Dates for readable_secs)
 export isincreasing, isdecreasing
 export print_fields, readable_secs
+export _jit, @maybe_jit
 include("utility_functions.jl")
 
 # kernel

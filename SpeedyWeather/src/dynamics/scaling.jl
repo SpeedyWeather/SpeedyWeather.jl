@@ -1,7 +1,7 @@
 """$(TYPEDSIGNATURES)
 Scales the prognostic variables vorticity and divergence with
 the Earth's radius which is used in the dynamical core."""
-@propagate_inbounds function scale!(vars::Variables, scale::Real)
+@propagate_inbounds function scale_prognostic!(vars::Variables, scale::Real)
     progn = vars.prognostic             # for convenience
     new_scale = scale / progn.scale[]   # undo previous scale and new scale in one go
     haskey(progn, :vor) && (progn.vor .*= new_scale)
@@ -35,12 +35,34 @@ end
 end
 
 """$(TYPEDSIGNATURES)
-Undo the radius-scaling of vorticity and divergence from `scale!(vars, scale::Real)`."""
-function unscale!(vars::Variables)
+Undo the radius-scaling of vorticity and divergence from `scale_prognostic!(vars, scale::Real)`."""
+function unscale_prognostic!(vars::Variables)
     progn = vars.prognostic             # for convenience
     inv_scale = inv(progn.scale[])
     haskey(progn, :vor) && (progn.vor .*= inv_scale)
     haskey(progn, :div) && (progn.div .*= inv_scale)
     progn.scale[] = 1                   # set scale back to 1=unscaled
     return vars
+end
+
+"""
+$(TYPEDSIGNATURES)
+Scale the variable `var` with scalar `scale`.
+"""
+@propagate_inbounds function scale!(
+        variable::Union{LowerTriangularArray, Field},
+        scale::Real
+    )
+    return variable.data .*= scale
+end
+
+"""
+$(TYPEDSIGNATURES)
+Undo the scaling of the variable `var` with scalar `scale`.
+"""
+@propagate_inbounds function unscale!(
+        variable::Union{LowerTriangularArray, Field},
+        scale::Real
+    )
+    return variable.data ./= scale
 end

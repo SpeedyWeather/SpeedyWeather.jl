@@ -107,12 +107,13 @@ function initialize!(model::ShallowWater; time::DateTime = DEFAULT_DATE)
 
     # allocate all variables and set initial conditions
     variables = Variables(model)
-    initialize!(variables, model)
 
-    # set the time
+    # set the time first
     (; clock) = variables.prognostic
-    clock.time = time       # set the current time
-    clock.start = time      # and store the start time
+    set!(clock, time = time, start = time)
+
+    # now set initial conditions
+    initialize!(variables, model)
 
     return Simulation(variables, model)
 end

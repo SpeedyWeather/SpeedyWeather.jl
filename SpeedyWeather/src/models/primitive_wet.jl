@@ -210,8 +210,7 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
 
     # set the time first
     (; clock) = variables.prognostic
-    clock.time = time       # set the current time
-    clock.start = time      # and store the start time
+    set!(clock, time = time, start = time)
 
     # set all initial conditions for the ocean, sea ice, land then atmosphere
     initialize!(variables, model)

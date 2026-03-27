@@ -67,7 +67,7 @@ export RandomVorticity
 
 """Start with random vorticity as initial conditions
 $(TYPEDFIELDS)"""
-@kwdef mutable struct RandomVorticity{NF} <: AbstractInitialConditions
+@kwdef mutable struct RandomVorticity{NF, S, RNG} <: AbstractInitialConditions
     "[OPTION] Power of the spectral distribution k^power"
     power::NF = -3
 
@@ -78,13 +78,17 @@ $(TYPEDFIELDS)"""
     max_wavenumber::Int = 20
 
     "[OPTION] Random number generator seed, 0=randomly seed from Julia's GLOBAL_RNG"
-    seed::Int = 123
+    seed::S = 123
 
     "Independent random number generator for this random process"
-    random_number_generator::Random.Xoshiro = Random.Xoshiro(seed)
+    random_number_generator::RNG = Random.Xoshiro(seed)
 end
 
-RandomVorticity(SG::SpectralGrid; kwargs...) = RandomVorticity{SG.NF}(; kwargs...)
+function RandomVorticity(SG::SpectralGrid; kwargs...)
+    RNG = haskey(kwargs, :random_number_generator) ? typeof(kwargs[:random_number_generator]) : typeof(Random.Xoshiro())
+    SeedType = haskey(kwargs, :seed) ? typeof(kwargs[:seed]) : Int
+    return RandomVorticity{SG.NF, SeedType, RNG}(; kwargs...)
+end
 
 """$(TYPEDSIGNATURES)
 Kernel version of initialize! for RandomVorticity initial conditions."""
@@ -111,11 +115,15 @@ function initialize!(
 
     # Pre-generate random values on CPU, then transfer to device
     nlm = LowerTriangularArrays.nonzeros(spectrum)
-    random_values_cpu = 2 .* rand(RNG, Complex{NF}, nlm) .- (1 + 1im)
+    
+    # re and imag seperately as Reactant has no rng for complex
+    random_values_cpu_real = 2.0f0 .* rand(RNG, NF, nlm, nlayers) .- 1.0f0
+    random_values_cpu_imag = 2.0f0 .* rand(RNG, NF, nlm, nlayers) .- 1.0f0im
+    random_values_cpu = random_values_cpu_real .+ random_values_cpu_imag
 
     # Transfer to device architecture
-    ξ = zeros(LowerTriangularArray{Complex{NF}}, spectrum, nlayers)
-    random_values = on_architecture(architecture(vor), random_values_cpu)
+    ξ = similar(vor)[:, :, 1]
+    random_values = on_architecture(architecture(ξ), random_values_cpu)
 
     # Get l indices for each harmonic
     (; l_indices) = spectrum
@@ -130,7 +138,7 @@ function initialize!(
     return set!(vars, model; vor = ξ, lf = 1)
 end
 
-@kernel inbounds = true function random_vorticity_kernel!(
+@kernel function random_vorticity_kernel!(
         ξ,
         random_values,
         amplitude,
@@ -153,7 +161,7 @@ export RandomVelocity
 
 """Start with random velocity as initial conditions
 $(TYPEDFIELDS)"""
-@kwdef mutable struct RandomVelocity{NF} <: AbstractInitialConditions
+@kwdef mutable struct RandomVelocity{NF, S, RNG} <: AbstractInitialConditions
     "[OPTION] maximum speed [ms⁻¹]"
     max_speed::NF = 60
 
@@ -161,13 +169,17 @@ $(TYPEDFIELDS)"""
     truncation::Int = 15
 
     "[OPTION] Random number generator seed, 0=randomly seed from Julia's GLOBAL_RNG"
-    seed::Int = 0
+    seed::S = 0
 
     "Independent random number generator for this random process"
-    random_number_generator::Random.Xoshiro = Random.Xoshiro(seed)
+    random_number_generator::RNG = Random.Xoshiro(seed)
 end
 
-RandomVelocity(SG::SpectralGrid; kwargs...) = RandomVelocity{SG.NF}(; kwargs...)
+function RandomVelocity(SG::SpectralGrid; kwargs...)
+    RNG = haskey(kwargs, :random_number_generator) ? typeof(kwargs[:random_number_generator]) : typeof(Random.Xoshiro())
+    SeedType = haskey(kwargs, :seed) ? typeof(kwargs[:seed]) : Int
+    return RandomVelocity{SG.NF, SeedType, RNG}(; kwargs...)
+end
 
 """$(TYPEDSIGNATURES)
 Start with random vorticity as initial conditions"""
@@ -192,12 +204,13 @@ function initialize!(
     A = 2 * initial_conditions.max_speed
 
     # sample vector to use RNG (not implemented for RingGrids)
+    # TODO: Do this below with `similar` on a grid variable instead after Variables PR is merged
     npoints = RingGrids.get_npoints(grid)
-    u_data = on_architecture(grid.architecture, rand(RNG, NF, npoints))
-    v_data = on_architecture(grid.architecture, rand(RNG, NF, npoints))
+    u_data = on_architecture(architecture(grid), rand(RNG, NF, npoints))
+    v_data = on_architecture(architecture(grid), rand(RNG, NF, npoints))
 
-    u = 2A * Field(u_data, grid) .- A
-    v = 2A * Field(v_data, grid) .- A
+    u = 2A .* Field(u_data, grid) .- A
+    v = 2A .* Field(v_data, grid) .- A
 
     u_spectral = transform(u, model.spectral_transform)
     v_spectral = transform(v, model.spectral_transform)

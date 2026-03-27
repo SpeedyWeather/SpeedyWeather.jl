@@ -75,7 +75,7 @@ function initialize!(
     set!(simulation.model.output, active = output, reset_path = true)
 
     # SCALING: we use vorticity*radius, divergence*radius in the dynamical core
-    scale!(variables, model.planet.radius)
+    scale_prognostic!(variables, model.planet.radius)
 
     # OUTPUT INITIALISATION AND STORING INITIAL CONDITIONS + FEEDBACK
     # propagate spectral state to grid variables for initial condition output
@@ -83,12 +83,15 @@ function initialize!(
 
     # raise a warning if starting with leapfrog but there's zero vorticity
     vor = get_step(progn.vor, lf)
-    lf == 2 && all(vor .== 0) && @warn "Vorticity is zero on 2nd leapfrog index though you use it to calculate tendencies." *
-        " You may wanted to continue with a leapfrog step without data for it in the 2nd step."
+
+    @trace if lf == 2 && all(vor .== 0)
+        @warn "Vorticity is zero on 2nd leapfrog index though you use it to calculate tendencies." *
+            " You may wanted to continue with a leapfrog step without data for it in the 2nd step."
+    end
 
     transform!(variables, lf, model, initialize = true)
     haskey(progn, :particles) && initialize!(variables, progn.particles, model)
-    initialize!(model.output, model.feedback, variables, model)
+    initialize!(model.output, variables, model)
     initialize!(model.callbacks, variables, model)
     return simulation
 end
@@ -99,7 +102,7 @@ finalizes the output, writes a restart file and finalizes callbacks."""
 function finalize!(simulation::AbstractSimulation)
     (; variables, model) = simulation
     finalize!(model.feedback)                       # finish the progress meter, do first for benchmark accuracy
-    unscale!(variables)                             # undo radius-scaling for vor, div from the dynamical core
+    unscale_prognostic!(variables)                  # undo radius-scaling for vor, div from the dynamical core
     finalize!(model.output, simulation)             # possibly post-process output, then close netCDF file
     finalize!(model.callbacks, variables, model)    # any callbacks to finalize?
     return simulation

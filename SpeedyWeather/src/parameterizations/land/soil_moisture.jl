@@ -123,8 +123,8 @@ function timestep!(
 
     # linear interpolation weight between the two months
     # TODO check whether this shifts the climatology by 1/2 a month
-    NF = eltype(vars.prognostic.land.soil_moisture)
-    weight = convert(NF, Dates.days(time - Dates.firstdayofmonth(time)) / Dates.daysinmonth(time))
+    NF = eltype(progn.land.soil_moisture)
+    weight = convert(NF, Dates.days(time - Dates.firstdayofmonth(time)) / Dates.daysinmonth(year(time), Dates.month(time)))
 
     (; monthly_soil_moisture) = soil
     (; soil_moisture) = vars.prognostic.land

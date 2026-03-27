@@ -248,7 +248,7 @@ end
     run!(simulation, output = true; period = Day(1))
     t = SpeedyWeather.load_trajectory("time", model)
     @test all(y -> y == diff(t)[1], diff(t)) # all elements equal
-    @test diff(t)[1] == Minute(70)
+    @test diff(t)[1] == Millisecond(Minute(70))
 
     # this is a nonsense simulation with way too large timesteps, but it's here to test the time axis output
     # for future tests: This simulation blows up because of too large time steps but only a warning is thrown

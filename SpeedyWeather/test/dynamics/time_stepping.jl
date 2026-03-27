@@ -133,7 +133,7 @@ end
     leapfrog = Leapfrog(spectral_grid; start_with_euler = true, continue_with_leapfrog = true)
     planet = Earth(spectral_grid, radius = 2^22)  # use radius that is power of 2 to avoid rounding errors in scaling
 
-    ic = RandomVelocity(seed = 1234)
+    ic = RandomVelocity(spectral_grid, seed = 1234)
     model = BarotropicModel(spectral_grid, time_stepping = leapfrog, initial_conditions = ic)
 
     simulation = initialize!(model)
@@ -153,9 +153,9 @@ end
     @test time_restarted == simulation.variables.prognostic.clock.time
 
     # check bit reproducibility of scaling
-    SpeedyWeather.scale!(simulation.variables, planet.radius)
+    SpeedyWeather.scale_prognostic!(simulation.variables, planet.radius)
     @test vor_restarted != simulation.variables.prognostic.vor
-    SpeedyWeather.unscale!(simulation.variables)
+    SpeedyWeather.unscale_prognostic!(simulation.variables)
     @test vor_restarted == simulation.variables.prognostic.vor
 
     # with restart half way
