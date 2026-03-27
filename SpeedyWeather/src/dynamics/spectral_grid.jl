@@ -210,8 +210,8 @@ function SpectralGrid(
     nlat = RingGrids.get_nlat(grid)
     npoints = RingGrids.get_npoints(grid)
 
-    # Convert numeric parameters to Float64
-    dealiasing_f64 = Float64(dealiasing)
+    # Convert numeric parameters to Float32
+    dealiasing_f32 = Float32(dealiasing)
 
     # Calculate derived fields
     ArrayType = array_type(architecture)
@@ -242,7 +242,7 @@ function SpectralGrid(
     end
 
     # Create the SpectralGrid with all fields
-    return SpectralGrid{typeof(architecture), typeof(spectrum), typeof(grid), typeof(nlat_half), Float64}(
+    return SpectralGrid{typeof(architecture), typeof(spectrum), typeof(grid), typeof(nlat_half), Float32}(
         NF,
         architecture,
         ArrayType,
@@ -257,7 +257,7 @@ function SpectralGrid(
         SpectralVariable2D,
         SpectralVariable3D,
         SpectralVariable4D,
-        dealiasing_f64,
+        dealiasing_f32,
         nlat_half,
         nlat,
         npoints,

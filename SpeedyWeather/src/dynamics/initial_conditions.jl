@@ -192,7 +192,7 @@ function initialize!(
     ) where {NF}
 
     # reseed the random number generator, for seed=0 randomly seed from Julia's global RNG
-    seed = initial_conditions.seed # == 0 ? rand(UInt) : initial_conditions.seed
+    seed = initial_conditions.seed == 0 ? rand(UInt) : initial_conditions.seed
     RNG = initial_conditions.random_number_generator
     Random.seed!(RNG, seed)
 
