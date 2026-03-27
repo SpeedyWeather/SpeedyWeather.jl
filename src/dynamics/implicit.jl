@@ -71,25 +71,27 @@ function lorenz_implicit_correction!(
     implicit::ImplicitShallowWater,
     model::ShallowWater,
 )
-    (; div_tend, pres_tend) = diagn.tendencies  # G: accumulated weighted tendencies
+    # G accumulators live in progn index 2
+    div_G    = get_step(progn.div,  2)   # accumulated G for divergence
+    pres_G   = get_step(progn.pres, 2)   # accumulated G for pressure
 
-    # Current state x at index 1 (single time level — no old/new distinction)
+    # Current state x at index 1
     div_current  = get_step(progn.div,  1)
     pres_current = get_step(progn.pres, 1)
 
-    H = model.atmosphere.layer_thickness    # undisturbed layer thickness [m]
-    g = model.planet.gravity                # gravitational acceleration [m/s²]
-    ξ = implicit.time_step                  # ξ = α·Δt
+    H = model.atmosphere.layer_thickness
+    g = model.planet.gravity
+    ξ = implicit.time_step
 
-    l_indices = div_tend.spectrum.l_indices
-    arch = architecture(div_tend)
+    l_indices = div_G.spectrum.l_indices
+    arch = architecture(div_G)
 
-    launch!(arch, SpectralWorkOrder, size(div_tend),
+    launch!(arch, SpectralWorkOrder, size(div_G),
             lorenz_implicit_shallow_water_kernel!,
-            div_tend, pres_tend, div_current, pres_current, l_indices, H, g, ξ)
+            div_G, pres_G, div_current, pres_current, l_indices, H, g, ξ)
 
-    zero_last_degree!(div_tend)
-    zero_last_degree!(pres_tend)
+    zero_last_degree!(div_G)
+    zero_last_degree!(pres_G)
 
     return nothing
 end
@@ -111,7 +113,7 @@ end
     #
     # L_I·x for divergence eq = -g·∇²·η_current
     #   ∇² is negative, so -g·∇²·η = +g·l(l-1)·η > 0 for positive η
-    #   Written as: -g*∇²*pres_current  (do NOT use +g*∇²*pres_current)
+    #   Written as: -g*∇²*pres_current
     #
     # L_I·x for pressure eq = -H·D_current
     #
@@ -123,7 +125,7 @@ end
     S⁻¹ = inv(1 - ξ^2*H*g*∇²)
 
     # Solve for corrected divergence tendency, then back-substitute for pressure
-    div_tend[lm, k] = S⁻¹*(G_div - ξ*g*∇²*G_η)
+    div_tend[lm, k] = S⁻¹*(G_div - ξ*g*∇²*G_η) # TODO double check this 
     pres_tend[lm]   = G_η - ξ*H*div_tend[lm, k]
 end
 
