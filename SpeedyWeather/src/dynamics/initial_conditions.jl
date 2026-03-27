@@ -30,7 +30,7 @@ function InitialConditions(spectral_grid, ::Type{<:PrimitiveWet})
 end
 
 """$(TYPEDSIGNATURES)
-Loops over all initial conditions in `model.initial_conditions` and applies one after another."""
+Apply initial conditions as defined by `model.ocean`, `.sea_ice`, `.land` and `.initial_conditions` in that order."""
 function initialize!(vars::Variables, model::AbstractModel)
 
     # first initialize ocean, sea ice and land
@@ -40,8 +40,15 @@ function initialize!(vars::Variables, model::AbstractModel)
 
     # then atmosphere as this may include initial conditions like StartFromFile
     # which would contain ocean/land initial conditions that should overwrite the above if they are included
-    for IC in model.initial_conditions
-        initialize!(vars, IC, model)
+    initialize!(vars, model.initial_conditions, model)
+    return nothing
+end
+
+"""$(TYPEDSIGNATURES)
+Apply initial conditions as in the `initial_conditions::NamedTuple` one after another."""
+function initialize!(vars::Variables, initial_conditions::NamedTuple, model::AbstractModel)
+    for ic in initial_conditions
+        initialize!(vars, ic, model)
     end
     return nothing
 end
@@ -120,7 +127,7 @@ function initialize!(
     )
 
     # Set the prognostic variable
-    return set!(progn, model; vor = ξ, lf = 1)
+    return set!(vars, model; vor = ξ, lf = 1)
 end
 
 @kernel inbounds = true function random_vorticity_kernel!(
@@ -564,6 +571,9 @@ end
 
 JablonowskiTemperature(SG::SpectralGrid; kwargs...) = JablonowskiTemperature{SG.NF}(; kwargs...)
 
+# fallback for models that don't have temperature
+initialize!(::Variables, ::JablonowskiTemperature, ::AbstractModel) = nothing
+
 """
 $(TYPEDSIGNATURES)
 Initial conditions from Jablonowski and Williamson, 2006, QJR Meteorol. Soc"""
@@ -760,10 +770,14 @@ export ConstantPressure
 struct ConstantPressure <: AbstractInitialConditions end
 ConstantPressure(SG::SpectralGrid) = ConstantPressure()
 
+# fallback for all models
+initialize!(::Variables, ::ConstantPressure, ::AbstractModel) = nothing
+
+# but primitive models should set the pressure correctly
 function initialize!(
         vars::Variables,
         ::ConstantPressure,
-        model::PrimitiveEquation
+        model::PrimitiveEquation,
     )
     haskey(vars.prognostic, :pres) || warn_undefvar(vars, :pres) && return nothing
 
@@ -780,10 +794,13 @@ end
 
 ConstantRelativeHumidity(SG::SpectralGrid; kwargs...) = ConstantRelativeHumidity{SG.NF}(; kwargs...)
 
+# fallback for models that don't have humidity
+initialize!(::Variables, ::ConstantRelativeHumidity, ::AbstractModel) = nothing
+
 function initialize!(
         vars::Variables,
         IC::ConstantRelativeHumidity,
-        model::PrimitiveEquation,
+        model::PrimitiveWet,
     )
     haskey(vars.prognostic, :humid) || warn_undefvar(vars, :humid) && return nothing
 
@@ -836,7 +853,7 @@ in the shallow water equations.
 $(TYPEDFIELDS)"""
 @kwdef struct RandomWaves{NF} <: AbstractInitialConditions
     """[OPTION] amplitude [m]"""
-    A::NF = 2000
+    amplitude::NF = 2000
 
     """[OPTION] minimum wavenumber"""
     lmin::Int = 10
@@ -860,9 +877,11 @@ function initialize!(
     haskey(vars.prognostic, :η) || warn_undefvar(vars, :η) && return nothing
     (; η) = vars.prognostic
 
-    NF = eltype(η)
+    NF = eltype(real(η))
     (; amplitude, lmin, lmax) = initial_conditions
     (; spectrum) = η
+
+    @info spectrum
 
     # start with matrix to have matrix indexing
     ηm = on_architecture(η, randn(Complex{NF}, spectrum.lmax, spectrum.mmax))
@@ -872,7 +891,7 @@ function initialize!(
     ηm[min(lmax + 2, spectrum.lmax):spectrum.lmax, :] .= 0
 
     # convert to LowerTriangularMatrix with vector indexing
-    η = LowerTriangularArray(ηm, spectrum)
+    η = LowerTriangularMatrix(ηm, spectrum)
 
     # scale to amplitude
     η_grid = transform(η, model.spectral_transform)

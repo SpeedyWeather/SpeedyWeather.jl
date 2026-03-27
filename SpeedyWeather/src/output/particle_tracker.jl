@@ -8,7 +8,7 @@ of particles from particle advection. To be added like
 
 Output done via netCDF. Fields and options are
 $(TYPEDFIELDS)"""
-@kwdef mutable struct ParticleTracker{NF} <: AbstractCallback
+@kwdef mutable struct ParticleTracker{V} <: AbstractCallback
     "[OPTION] when to schedule particle tracking"
     schedule::Schedule = Schedule(every = Hour(4))
 
@@ -34,19 +34,22 @@ $(TYPEDFIELDS)"""
     netcdf_file::Union{NCDataset, Nothing} = nothing
 
     # tracking arrays
-    lon::Vector{NF} = zeros(NF, nparticles)
-    lat::Vector{NF} = zeros(NF, nparticles)
-    σ::Vector{NF} = zeros(NF, nparticles)
+    lon::V
+    lat::V
+    σ::V
 end
 
-ParticleTracker(SG::SpectralGrid; kwargs...) =
-    ParticleTracker{SG.NF}(; kwargs...)
+function ParticleTracker(SG::SpectralGrid; kwargs...)
+    # dummy vector
+    v = zeros(SG.NF, 0) 
+    return ParticleTracker{SG.VectorType}(; lon=v, lat=v, σ=v, kwargs...)
+end
 
 function initialize!(
-        particle_tracker::ParticleTracker{NF},
+        particle_tracker::ParticleTracker,
         vars::Variables,
         model::AbstractModel,
-    ) where {NF}
+    )
 
     (; clock) = vars.prognostic
     initialize!(particle_tracker.schedule, clock)
@@ -72,10 +75,17 @@ function initialize!(
         )
     )
 
-    # PARTICLE DIMENSION
+    # allocate tracking arrays now of correct size
+    arch = model.spectral_grid.architecture
+    NF = model.spectral_grid.NF
     (; particles) = vars.prognostic
     nparticles = length(particles)
     particle_tracker.nparticles = nparticles
+    particle_tracker.lon = on_architecture(arch, zeros(NF, nparticles))
+    particle_tracker.lat = on_architecture(arch, zeros(NF, nparticles))
+    particle_tracker.σ = on_architecture(arch, zeros(NF, nparticles))
+
+    # PARTICLE DIMENSION
     defDim(dataset, "particle", nparticles)
     defVar(
         dataset, "particle", Int64, ("particle",),
