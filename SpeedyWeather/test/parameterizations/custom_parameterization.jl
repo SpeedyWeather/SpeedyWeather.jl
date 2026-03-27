@@ -9,7 +9,7 @@
     SimpleAlbedo(SG::SpectralGrid; kwargs...) = SimpleAlbedo{SG.NF}(; kwargs...)
     SpeedyWeather.initialize!(::SimpleAlbedo, model::PrimitiveEquation) = nothing
     SpeedyWeather.variables(::SimpleAlbedo) = (
-        DiagnosticVariable(name = :my_albedo, dims = Grid2D(), desc = "Albedo", units = "1"),
+        SpeedyWeather.ParameterizationVariable(:my_albedo, SpeedyWeather.Grid2D(), desc = "Albedo", units = "1"),
     )
 
     # note that for albedos should actually define `albedo!(ij, vars, albedo, model)`

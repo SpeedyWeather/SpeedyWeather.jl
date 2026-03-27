@@ -35,7 +35,7 @@ Base.zero(::AbstractVariable{Spectral2D}, model::AbstractModel) = zeros(model.sp
 end
 Base.zero(v::AbstractVariable{Spectral3D}, model::AbstractModel) = zeros(model.spectral_grid.SpectralVariable3D, model.spectral_grid.spectrum, v.dims.n == 0 ? get_nlayers(model) : v.dims.n)
 
-"""Dimension for 1D latitude-oriented variables."""
+"""Dimension for 1D variables as a function of latitude only."""
 struct Latitude1D <: AbstractVariableDim end
 Base.zero(::AbstractVariable{Latitude1D}, model::AbstractModel) = fill!(model.spectral_grid.VectorType(undef, model.spectral_grid.nlat), 0)
 

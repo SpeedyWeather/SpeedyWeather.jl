@@ -28,13 +28,11 @@
             run!(simulation, period = Day(3))
 
             @test simulation.model.feedback.nans_detected == false
-
-
-            @test haskey(simulation.prognostic_variables.ocean, :sea_surface_temperature)
+            @test haskey(simulation.variables.prognostic.ocean, :sea_surface_temperature)
 
             # Some SSTs may contain NaNs
-            # @test all(0 .<= simulation.prognostic_variables.ocean.sea_surface_temperature .<= 330)
-            sst = simulation.prognostic_variables.ocean.sea_surface_temperature
+            # @test all(0 .<= simulation.variables.prognostic.ocean.sea_surface_temperature .<= 330)
+            sst = simulation.variables.prognostic.ocean.sea_surface_temperature
             for ij in eachindex(sst)
                 if !isnan(sst[ij])
                     @test 0 <= sst[ij] <= 330
@@ -42,9 +40,9 @@
             end
 
             if sea_ice isa Nothing
-                @test !haskey(simulation.prognostic_variables.ocean, :sea_ice_concentration)
+                @test !haskey(simulation.variables.prognostic.ocean, :sea_ice_concentration)
             else
-                @test all(0 .<= simulation.prognostic_variables.ocean.sea_ice_concentration .<= 1)
+                @test all(0 .<= simulation.variables.prognostic.ocean.sea_ice_concentration .<= 1)
             end
         end
     end

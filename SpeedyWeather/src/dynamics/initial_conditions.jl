@@ -900,8 +900,6 @@ function initialize!(
     (; amplitude, lmin, lmax) = initial_conditions
     (; spectrum) = η
 
-    @info spectrum
-
     # start with matrix to have matrix indexing
     ηm = on_architecture(η, randn(Complex{NF}, spectrum.lmax, spectrum.mmax))
 

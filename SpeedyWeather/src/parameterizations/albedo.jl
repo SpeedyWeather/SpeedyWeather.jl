@@ -156,7 +156,7 @@ function initialize!(albedo::AlbedoClimatology, model::PrimitiveEquation)
     return interpolate!(albedo.albedo, a)
 end
 
-@propagate_inbounds albedo!(ij, albedo, vars, scheme::AlbedoClimatology, model) = (albedo[ij] = albedo.albedo[ij])
+@propagate_inbounds albedo!(ij, albedo, vars, scheme::AlbedoClimatology, model) = (albedo[ij] = scheme.albedo[ij])
 
 # OceanSeaIceAlbedo
 export OceanSeaIceAlbedo
