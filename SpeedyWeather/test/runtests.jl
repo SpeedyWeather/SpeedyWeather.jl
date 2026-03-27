@@ -33,6 +33,7 @@ if !FLAG_EXTENDED_TESTS && !FLAG_ENZYME_TESTS
     include("dynamics/forcing_drag.jl")
     include("dynamics/dates.jl")
     include("dynamics/set.jl")
+    include("dynamics/copy_variables.jl")
     include("dynamics/orography.jl")
     include("dynamics/initial_conditions.jl")
     include("dynamics/run_speedy.jl")

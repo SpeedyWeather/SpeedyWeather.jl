@@ -16,7 +16,7 @@ function initialize!(
 end
 
 # TODO: remove fallback for reactant when it's compatible with particle advection
-initialize!(::DiagnosticVariables, ::Nothing, ::PrognosticVariables, ::AbstractModel) = nothing
+initialize!(::Variables, ::Nothing, ::AbstractModel) = nothing
 
 # 3. the repeated call to actually advect particles
 particle_advection!(vars, model) = particle_advection!(vars, model.particle_advection, model)
@@ -98,7 +98,7 @@ function initialize!(
 end
 
 # Fallback for no particle advection
-initialize!(::Nothing, ::PrognosticVariables, ::DiagnosticVariables, ::AbstractModel) = nothing
+initialize!(::Nothing, ::Variables, ::AbstractModel) = nothing
 
 
 """$(TYPEDSIGNATURES)

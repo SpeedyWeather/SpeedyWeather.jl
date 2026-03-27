@@ -77,6 +77,45 @@ end
 
 Adapt.@adapt_structure Variables
 
+"""$(TYPEDSIGNATURES)
+Copy all entries from `src` to `dest` by recursing over the variable groups
+and namespaces. Uses `copyto!` for arrays, `copy!` for `Clock`,
+and direct assignment for `Ref` values."""
+function Base.copy!(dest::Variables, src::Variables)
+    for group in propertynames(dest)
+        _copy_namedtuple!(getfield(dest, group), getfield(src, group))
+    end
+    return dest
+end
+
+# copy all entries of a NamedTuple, recursing into nested NamedTuples (namespaces)
+function _copy_namedtuple!(dest::NamedTuple, src::NamedTuple)
+    for key in keys(dest)
+        _copy_entry!(getfield(dest, key), getfield(src, key))
+    end
+    return nothing
+end
+
+_copy_entry!(dest::NamedTuple, src::NamedTuple) = _copy_namedtuple!(dest, src)
+_copy_entry!(dest::AbstractArray, src::AbstractArray) = copyto!(dest, src)
+_copy_entry!(dest::Base.RefValue, src::Base.RefValue) = (dest[] = src[])
+
+# fallback for mutable structs (e.g. Clock): copy each field via setfield!
+function _copy_entry!(dest, src)
+    if ismutable(dest)
+        for field in fieldnames(typeof(dest))
+            setfield!(dest, field, getfield(src, field))
+        end
+    else
+        # immutable structs (e.g. ScratchMemory): recurse into array fields
+        for field in fieldnames(typeof(dest))
+            d = getfield(dest, field)
+            d isa AbstractArray && copyto!(d, getfield(src, field))
+        end
+    end
+    return nothing
+end
+
 # pretty printing
 function Base.show(io::IO, V::Variables)
     Vsize = prettymemory(Base.summarysize(V))
