@@ -373,13 +373,13 @@ struct DiagnosticVariables{
     nparticles::IntType
 
     "Tendencies (spectral and grid) of the prognostic variables"
-    tendencies::Tendencies{SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, SpectralTracerTuple, GridTracerTuple}
+    tendencies::Tendencies{SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, SpectralTracerTuple, GridTracerTuple, IntType}
 
     "Gridded prognostic variables"
-    grid::GridVariables{GridType, GridVariable2D, GridVariable3D, GridTracerTuple}
+    grid::GridVariables{GridType, GridVariable2D, GridVariable3D, GridTracerTuple, IntType}
 
     "Intermediate variables for the dynamical core"
-    dynamics::DynamicsVariables{SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, ScratchMemoryType}
+    dynamics::DynamicsVariables{SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, ScratchMemoryType, IntType}
 
     # TODO: different parameteric type here?
     "Global fields returned from physics parameterizations, including land and ocean"
@@ -400,9 +400,9 @@ struct DiagnosticVariables{
             grid::GridType,
             nlayers::IntType,
             nparticles::IntType,
-            tendencies::Tendencies{SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, SpectralTracerTuple, GridTracerTuple},
-            grid_variables::GridVariables{GridType, GridVariable2D, GridVariable3D, GridTracerTuple},
-            dynamics::DynamicsVariables{SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, ScratchMemoryType},
+            tendencies::Tendencies{SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, SpectralTracerTuple, GridTracerTuple, IntType},
+            grid_variables::GridVariables{GridType, GridVariable2D, GridVariable3D, GridTracerTuple, IntType},
+            dynamics::DynamicsVariables{SpectrumType, GridType, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, ScratchMemoryType, IntType},
             physics::PhysicsTuple,
             particles::ParticleVariable,
             temp_average::VectorType,

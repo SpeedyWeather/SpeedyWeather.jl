@@ -201,12 +201,13 @@ function initialize!(
     A = convert(NF, initial_conditions.max_speed) * 2
 
     # sample vector to use RNG (not implemented for RingGrids)
+    # TODO: Do this below with `similar` on a grid variable instead after Variables PR is merged
     npoints = RingGrids.get_npoints(grid)
     u_data = on_architecture(architecture(grid), rand(RNG, NF, npoints))
     v_data = on_architecture(architecture(grid), rand(RNG, NF, npoints))
 
-    u = 2A * Field(u_data, grid) .- A
-    v = 2A * Field(v_data, grid) .- A
+    u = 2A .* Field(u_data, grid) .- A
+    v = 2A .* Field(v_data, grid) .- A
 
     u_spectral = transform(u, model.spectral_transform)
     v_spectral = transform(v, model.spectral_transform)

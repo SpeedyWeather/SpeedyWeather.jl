@@ -764,6 +764,9 @@ find_L(ex::Base.Broadcast.Extruded) = find_L(ex.x)
 parent_or_not(x::Union{SubArray, Transpose}) = parent(x)
 parent_or_not(x) = x
 
+parent_or_not(x::Union{SubArray, Transpose}) = parent(x)
+parent_or_not(x) = x
+
 function Base.similar(
         bc::Broadcasted{LowerTriangularStyle{N}},
         ::Type{T},
