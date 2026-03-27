@@ -77,7 +77,7 @@ model = PrimitiveWetModel(spectral_grid; ocean)
 nothing # hide
 ```
 
-The time of the year is determined by the clock in `prognostic_variables.clock`
+The time of the year is determined by the clock in `variables.prognostic.clock`
 such that `initialize!(model, time=DateTime(2000, 1, 1))` would interpolate
 the seasonal climatology onto the first of January.
 

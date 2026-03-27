@@ -284,13 +284,13 @@ from `RingGrids` which takes every element in the latitude mask `lat_mask`
 and multiplies it with every grid-point on the respective latitude ring.
 
 Now for the last lines we have to know the order in which different terms
-are written into the tendencies for vorticity, `diagn.tendencies.vor_tend`.
+are written into the tendencies for vorticity, `vars.tendencies.vor`.
 In SpeedyWeather, the `forcing!` comes first, then the `drag!` (see [Custom drag](@ref))
 then the curl of the vorticity flux (the vorticity advection).
 This means we can transform `S_grid` directly back into `vor_tend`
 without overwriting other terms which, in fact, will be added to this
 array afterwards. In general, you can also force the momentum equations
-in grid-point space by writing into `u_tend_grid` and `v_tend_grid`.
+in grid-point space by writing into `vars.tendencies.grid.u` and `vars.tendencies.grid.v`.
 
 ## Custom forcing: model construction
 
@@ -316,7 +316,7 @@ run!(simulation)
 
 # visualisation
 using CairoMakie
-vor = simulation.diagnostic_variables.grid.vor_grid[:, 1]
+vor = simulation.variables.grid.vor[:, 1]
 heatmap(vor, title="Stochastically stirred vorticity")
 save("stochastic_stirring.png", ans) # hide
 nothing # hide

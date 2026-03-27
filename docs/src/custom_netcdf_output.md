@@ -17,7 +17,7 @@ is the equivalent of [Vertical velocity](@ref) in the [Sigma coordinates](@ref).
 This variable is calculated and stored at every time step in
 
 ```julia
-simulation.diagnostic_variables.dynamics.σ_tend
+simulation.variables.dynamics.w
 ```
 
 So how do we access it and add it the netCDF output?
@@ -60,7 +60,7 @@ the global scope.
 
 To output a variable one also has to define its path where
 to find the `AbstractField`. For our example we already
-said above that this is `simulation.diagnostic_variables.dynamics.σ_tend`.
+said above that this is `simulation.variables.dynamics.w`.
 For this we need to extend the `path` function. Using multiple
 dispatch we need to constrain the first argument's type to
 `::VerticalVelocityOutput` but the second argument is just
@@ -68,7 +68,7 @@ the simulation object.
 
 ```@example netcdf_custom
 SpeedyWeather.path(::VerticalVelocityOutput, simulation) =
-    simulation.diagnostic_variables.dynamics.σ_tend
+    simulation.variables.dynamics.w
 ```
 
 ## Reading the new variable
@@ -170,15 +170,15 @@ function SpeedyWeather.output!(
     simulation::SpeedyWeather.AbstractSimulation,
 )
     # INTERPOLATION
-    w = output.grid3D               # scratch grid to interpolate into
-    (; σ_tend) = simulation.diagnostic_variables.dynamics     # point to data in diagnostic variables
-    RingGrids.interpolate!(w, σ_tend , output.interpolator)
+    w_out = output.grid3D               # scratch grid to interpolate into
+    w_sigma = simulation.variables.dynamics.w     # point to data in variables
+    RingGrids.interpolate!(w_out, w_sigma, output.interpolator)
 
-    # (do any changes to w here)
+    # (do any changes to w_out here)
 
     # WRITE TO NETCDF
     i = output.output_counter       # output time step to write
-    output.netcdf_file[variable.name][:, :, :, i] = w
+    output.netcdf_file[variable.name][:, :, :, i] = w_out
     return nothing
 end
 ```
@@ -198,7 +198,7 @@ which are of type and size as defined by the `output_Grid` and
 `nlat_half` arguments when creating the `NetCDFOutput`.
 So the three lines for interpolation are essentially those in
 which your definition of a new output variable is linked
-with where to find that variable in `diagnostic_variables`.
+with where to find that variable in `simulation.variables`.
 You can, in principle, also do any kind of computation here,
 for example adding two variables, normalising data and so on.
 In the end it has to be on the `output_Grid` hence you

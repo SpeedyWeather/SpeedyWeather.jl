@@ -180,24 +180,24 @@ First, you create a [`SpectralGrid`](@ref) with the `nparticles` keyword
 ```@example particle
 spectral_grid = SpectralGrid(nparticles = 3)
 ```
-Then the particles live as `AbstractVector{Particle}` inside the prognostic variables
+Then the particles live as `AbstractVector{Particle}` inside the variables
 ```@example particle
 model = BarotropicModel(spectral_grid)
 simulation = initialize!(model)
-simulation.prognostic_variables.particles
+simulation.variables.particles.locations
 ```
 Which are placed in random locations (using `rand`) initially.
 In order to change these (e.g. to set the initial conditions) you do
 ```@example particle
-simulation.prognostic_variables.particles[1] = Particle(lon=-120, lat=45)
-simulation.prognostic_variables.particles
+simulation.variables.particles.locations[1] = Particle(lon=-120, lat=45)
+simulation.variables.particles.locations
 ```
 which sets the first particle (you can think of the index as the particle identification)
 to some specified location, or you could deactivate a particle with
 ```@example particle
-first_particle = simulation.prognostic_variables.particles[1]
-simulation.prognostic_variables.particles[1] = deactivate(first_particle)
-simulation.prognostic_variables.particles
+first_particle = simulation.variables.particles.locations[1]
+simulation.variables.particles.locations[1] = deactivate(first_particle)
+simulation.variables.particles.locations
 ```
 
 To actually advect these particles inside a SpeedyWeather simulation we have to create
@@ -214,7 +214,7 @@ advect our three particles we have defined above
 ```@example particle
 model = BarotropicModel(spectral_grid; particle_advection)
 simulation = initialize!(model)
-simulation.prognostic_variables.particles
+simulation.variables.particles.locations
 ```
 
 Which are the initial conditions for our three particles. After 10 days of simulation
@@ -222,7 +222,7 @@ they have changed
 
 ```@example particle
 run!(simulation, period=Day(10))
-simulation.prognostic_variables.particles
+simulation.variables.particles.locations
 ```
 
 Woohoo! We just advected some particles. This is probably not as exciting as actually

@@ -40,7 +40,7 @@ off a wave propagating eastward. This wave becomes obvious when visualised with
 ```@example jablonowski
 using CairoMakie
 
-vor = simulation.diagnostic_variables.grid.vor_grid[:, end]
+vor = simulation.variables.grid.vor[:, end]
 heatmap(vor, title="Surface relative vorticity")
 save("jablonowski.png", ans) # hide
 nothing # hide
@@ -90,7 +90,7 @@ Visualising surface temperature with
 ```@example heldsuarez
 using CairoMakie
 
-temp = simulation.diagnostic_variables.grid.temp_grid[:, end]
+temp = simulation.variables.grid.temp[:, end]
 heatmap(temp, title="Surface temperature [K]", colormap=:thermal)
 
 save("heldsuarez.png", ans) # hide
@@ -139,7 +139,7 @@ of the convection scheme, causing updrafts and downdrafts in both humidity and t
 ```@example aquaplanet
 using CairoMakie
 
-humid = simulation.diagnostic_variables.grid.humid_grid[:, end]
+humid = simulation.variables.grid.humid[:, end]
 heatmap(humid, title="Surface specific humidity [kg/kg]", colormap=:oslo)
 
 save("aquaplanet.png", ans) # hide
@@ -169,7 +169,7 @@ model = PrimitiveWetModel(spectral_grid; ocean, land_sea_mask, orography, convec
 simulation = initialize!(model)
 run!(simulation, period=Day(20))
 
-humid = simulation.diagnostic_variables.grid.humid_grid[:, end]
+humid = simulation.variables.grid.humid[:, end]
 heatmap(humid, title="No deep convection: Surface specific humidity [kg/kg]", colormap=:oslo)
 save("aquaplanet_nodeepconvection.png", ans) # hide
 nothing # hide
@@ -188,7 +188,7 @@ model = PrimitiveWetModel(spectral_grid; ocean, land_sea_mask, orography, convec
 simulation = initialize!(model)
 run!(simulation, period=Day(20))
 
-humid = simulation.diagnostic_variables.grid.humid_grid[:, end]
+humid = simulation.variables.grid.humid[:, end]
 heatmap(humid, title="No convection: Surface specific humidity [kg/kg]", colormap=:oslo)
 save("aquaplanet_noconvection.png", ans) # hide
 nothing # hide
@@ -230,7 +230,7 @@ We set `snow=false` in `ImplicitCondensation` and therefore deal with rain only.
 ```@example precipitation
 using CairoMakie
 
-(; rain_large_scale, rain_convection) = simulation.diagnostic_variables.physics
+(; rain_large_scale, rain_convection) = simulation.variables.parameterizations
 m2mm = 1000     # convert from [m] to [mm]
 heatmap(m2mm*rain_large_scale, title="Large-scale precipiation (rain) [mm]: Accumulated over 10 days", colormap=:dense)
 save("large-scale_precipitation_acc.png", ans) # hide
@@ -239,7 +239,7 @@ nothing # hide
 ![Large-scale precipitation](large-scale_precipitation_acc.png)
 
 Precipitation (rain, both large-scale and convective) are written into the
-`simulation.diagnostic_variables.physics` which, however, accumulate all precipitation
+`simulation.variables.parameterizations` which, however, accumulate all precipitation
 during simulation. In the NetCDF output, precipitation rate (in mm/hr) is calculated
 from accumulated precipitation as a post-processing step.
 More interactively, you can also reset these accumulators and integrate for another 6 hours
@@ -247,8 +247,8 @@ to get the precipitation only in that period.
 
 ```@example precipitation
 # reset accumulators and simulate 6 hours
-simulation.diagnostic_variables.physics.rain_large_scale .= 0
-simulation.diagnostic_variables.physics.rain_convection .= 0
+simulation.variables.parameterizations.rain_large_scale .= 0
+simulation.variables.parameterizations.rain_convection .= 0
 run!(simulation, period=Hour(6))
 
 # visualise, rain_* arrays are flat copies, no need to read them out again!

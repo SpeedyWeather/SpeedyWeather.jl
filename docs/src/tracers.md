@@ -79,7 +79,7 @@ You can check that the tracers exists in the variables with
 
 ```@example tracers
 simulation = initialize!(model)
-simulation.prognostic_variables
+simulation.variables
 ```
 
 where both `:abc` and `:xyz` are listed. Tracers in SpeedyWeather are
@@ -162,7 +162,7 @@ run!(simulation, period=Day(0))
 
 # visualise the initial conditions for this tracer
 using CairoMakie
-abc0 = simulation.diagnostic_variables.grid.tracers_grid[:abc][:, 1]
+abc0 = simulation.variables.grid.tracers.abc[:, 1]
 
 heatmap(abc0, title="Tracer abc, initial conditions")
 save("tracer_abc.png", ans) # hide
@@ -179,7 +179,7 @@ hemisphere which will advect that tracer, after some days:
 ```@example tracers
 run!(simulation, period=Day(3))
 
-abc1 = simulation.diagnostic_variables.grid.tracers_grid[:abc][:, 1]
+abc1 = simulation.variables.grid.tracers.abc[:, 1]
 heatmap(abc1, title="Tracer abc, after 3 days")
 save("tracer2.png", ans) # hide
 nothing # hide

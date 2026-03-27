@@ -81,7 +81,7 @@ add!(model, :progress_txt => progress_txt)
 
 ## Restart file
 
-`NetCDFOutput` also by default writes a restart file, containing the `simulation.prognostic_variables`
+`NetCDFOutput` also by default writes a restart file, containing the `simulation.variables.prognostic`
 that can be read back in with teh `StartFromFile` initial conditions. Implemented as a callback
 `RestartFile` can also be created independently of `NetCDFOutput`, e.g.
 
