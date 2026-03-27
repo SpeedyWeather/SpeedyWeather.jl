@@ -202,7 +202,7 @@ Below we will demonstrate this in an example.
 Let's implement a very simple albedo parameterization as an example how to define a new parameterization.
 All this parametrization does is to set the albedo to a constant value over land and to linearly interpolate
 between the albedo of the ocean and the sea ice depending on the current sea ice concentration.
-This albedo is written into the diagnostic variable `diagn.physics.albedo` and used later by subsequent parameterizations.
+This albedo is written into `vars.parameterizations.albedo` and used later by subsequent parameterizations.
 
 Let's get started. First we define our albedo parameterization with all the functions we need to implement for our parameterization interface:
 
@@ -252,7 +252,7 @@ end
     In contrast to other parameterizations that are supposed to extend
     `parameterization!(ij, diagn, progn, p::MyParameterization, model)`
     albedos are expected to extend `albedo!` instead. That way they can be
-    used of ocean, land or both. As long as they write into `diagn.albedo[ij]`
+    used of ocean, land or both. As long as they write into `vars.parameterizations.albedo[ij]`
     as shown above, the shortwave radiation scheme will correctly use that
     to compute radiative surface fluxes over both ocean and land.
 
@@ -269,9 +269,8 @@ albedo = SimpleAlbedo(spectral_grid)
 model = PrimitiveWetModel(spectral_grid; albedo=albedo)
 simulation = initialize!(model)
 run!(simulation, period=Day(5)) # spin up the model a little
-progn, diagn, model = SpeedyWeather.unpack(simulation)
 
-heatmap(diagn.physics.albedo)
+heatmap(simulation.variables.parameterizations.albedo)
 ```
 
 As you can see, it worked! The albedo is set to a constant value over land and to linearly interpolate
@@ -290,9 +289,8 @@ model = PrimitiveWetModel(spectral_grid;
 
 simulation = initialize!(model)
 run!(simulation, period=Day(5)) # spin up the model a little
-progn, diagn, model = SpeedyWeather.unpack(simulation)
 
-heatmap(diagn.physics.albedo)
+heatmap(simulation.variables.parameterizations.albedo)
 ```
 
 Again, it worked! Note that it's important here to call the `:shortwave_radiation` after our

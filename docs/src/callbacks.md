@@ -327,8 +327,8 @@ function SpeedyWeather.callback!(
     isscheduled(callback.schedule, vars.prognostic.clock) || return nothing
 
     # Just print the North Pole surface temperature to screen
-    (;time) = progn.clock
-    temp_at_north_pole = diagn.grid.temp_grid[1,end]
+    (;time) = vars.prognostic.clock
+    temp_at_north_pole = vars.grid.temp[1,end]
 
     @info "North pole has a temperature of $temp_at_north_pole on $time."
 end
@@ -339,8 +339,8 @@ SpeedyWeather.finalize!(::MyScheduledCallback, args...) = nothing
 
 So in summary
 - add a field `schedule::Schedule` to your callback
-- add the line `initialize!(callback.schedule, progn.clock)` when initializing your callback
-- start your `callback!` method with `isscheduled(callback.schedule, progn.clock) || return nothing` to execute only when scheduled
+- add the line `initialize!(callback.schedule, vars.prognostic.clock)` when initializing your callback
+- start your `callback!` method with `isscheduled(callback.schedule, vars.prognostic.clock) || return nothing` to execute only when scheduled
 
 A `Schedule` is a field inside a callback as this allows you the set the callbacks
 desired schedule when creating it. In the example above we can create our callback

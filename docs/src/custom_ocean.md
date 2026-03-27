@@ -1,7 +1,7 @@
 # Ocean
 
 The ocean in SpeedyWeather.jl is defined with two horizontal fields in the
-prognostic variables which has a field `ocean`, i.e. `simulation.prognostic_variables.ocean`.
+prognostic variables which has a field `ocean`, i.e. `simulation.variables.prognostic.ocean`.
 
 - `ocean.sea_surface_temperature` with units of Kelvin [K].
 - `ocean.sea_ice_concentration` with units of area fraction [1].

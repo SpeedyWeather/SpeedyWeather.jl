@@ -252,7 +252,7 @@ Greenland and Antarctic ice sheets.
 ### LandSnowModel
 
 `SnowModel` stores a single snow bucket with depth ``S`` in units of equivalent liquid water height
-(`prognostic_variables.land.snow_depth`) and solves the following equation
+(`variables.prognostic.land.snow_depth`) and solves the following equation
 
 ```math
 \frac{dS}{dt} = P - M - R
@@ -409,7 +409,7 @@ simulation = initialize!(model)
 run!(simulation, steps=1)   # run for a step to "diagnose" albedo = ocean/land weighted
 
 using CairoMakie
-(; albedo) = simulation.diagnostic_variables.physics
+(; albedo) = simulation.variables.parameterizations
 heatmap(albedo, title="Custom albedo, separately defined for ocean/land")
 save("ocean_land_albedo.png", ans) # hide
 nothing # hide

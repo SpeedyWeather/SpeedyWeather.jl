@@ -37,34 +37,22 @@ spectral_grid = SpectralGrid(nlayers = 1)
 model = BarotropicModel(spectral_grid)
 simulation = initialize!(model)
 ```
-the `prognostic_variables`, the `diagnostic_variables` and the `model` (that we just
+the `variables` and the `model` (that we just
 initialized). We could now do `tree(simulation)` but that gets very lengthy and
-so will split things into `tree(simulation.prognostic_variables)`,
-`tree(simulation.diagnostic_variables)` and `tree(simulation.model)` for more
+so will split things into `tree(simulation.variables)` and `tree(simulation.model)` for more
 digestible chunks. You can also provide the `with_types=true` keyword to get
 also the types of these fields printed, but we'll skip that here.
 
-## Prognostic variables
+## Variables
 
-The prognostic variables struct is parametric on the model type, `model_type(model)`
-(which strips away its parameters), but this is only to dispatch over it.
-The fields are for all models the same, just the barotropic model would not
-use temperature for example (but you could use nevertheless). 
+All simulation variables (prognostic and diagnostic) are stored in `simulation.variables`,
+a `Variables` struct with named groups as `NamedTuple`s. The variables are model-specific, each model only allocates exactly those variables it needs. The prognostic variables in `variables.prognostic` are generally in spectral coefficients, `variables.grid` hold gridded variables, `variables.tendencies` the tendencies, `variables.dynamics` work arrays that are computed by the dynamical core. A full overview of all variables can be easily printed with:
 
 ```@example structure
-tree(simulation.prognostic_variables)
+show(simulation.variables)
 ```
 
-The prognostic variable struct can be mutated (e.g. to set new initial conditions) with the [`SpeedyWeather.set!`](@ref) function. 
-
-## Diagnostic variables
-
-Similar for the diagnostic variables, regardless the model type, they contain the
-same fields but for the 2D models many will not be used for example.
-
-```@example structure
-tree(simulation.diagnostic_variables)
-```
+The prognostic variables can be mutated (e.g. to set new initial conditions) with the [`SpeedyWeather.set!`](@ref) function.
 
 ## BarotropicModel
 
