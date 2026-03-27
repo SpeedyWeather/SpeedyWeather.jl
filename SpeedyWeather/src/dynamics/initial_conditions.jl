@@ -30,7 +30,8 @@ function InitialConditions(spectral_grid, ::Type{<:PrimitiveWet})
 end
 
 """$(TYPEDSIGNATURES)
-Apply initial conditions as defined by `model.ocean`, `.sea_ice`, `.land` and `.initial_conditions` in that order."""
+Apply initial conditions as defined by `model.ocean`, `.sea_ice`, `.land`,
+`.particle_advection` and `.initial_conditions` in that order."""
 function initialize!(vars::Variables, model::AbstractModel)
 
     # first initialize ocean, sea ice and land
@@ -39,8 +40,9 @@ function initialize!(vars::Variables, model::AbstractModel)
     hasproperty(model, :land) && initialize!(vars, model.land, model)
 
     # then particles
-    progn = vars.prognostic
-    haskey(progn, :particles) && initialize!(variables, progn.particles, model)
+    if haskey(vars.prognostic, :particles)
+        initialize!(vars.prognostic.particles, vars, model)
+    end
 
     # then atmosphere as this may include initial conditions like StartFromFile
     # which would contain ocean/land initial conditions that should overwrite the above if they are included
