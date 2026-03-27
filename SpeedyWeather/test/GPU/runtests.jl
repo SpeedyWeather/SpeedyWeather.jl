@@ -55,7 +55,7 @@ if gpu_backend === :CUDA
 
     include("CUDA/architecture.jl")
     # REACTANT ON GPU (currently only works tested with CUDA)
-    include("reactant.jl")
+    #include("reactant.jl")
 
 elseif gpu_backend === :AMDGPU
 
