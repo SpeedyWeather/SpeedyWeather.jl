@@ -123,7 +123,7 @@ function timestep!(
 
     # linear interpolation weight between the two months
     # TODO check whether this shifts the climatology by 1/2 a month
-    NF = eltype(progn.land.soil_moisture)
+    NF = eltype(vars.prognostic.land.soil_moisture)
     weight = convert(NF, Dates.days(time - Dates.firstdayofmonth(time)) / Dates.daysinmonth(year(time), Dates.month(time)))
 
     (; monthly_soil_moisture) = soil
@@ -131,20 +131,11 @@ function timestep!(
 
     launch!(
         architecture(soil_moisture), RingGridWorkOrder, size(soil_moisture),
-        seasonal_soil_moisture_kernel!,
+        interpolate_monthly_climatology_kernel!,
         soil_moisture, monthly_soil_moisture, weight, this_month, next_month
     )
 
     return nothing
-end
-
-@kernel inbounds = true function seasonal_soil_moisture_kernel!(
-        soil_moisture, monthly_soil_moisture, weight, this_month, next_month
-    )
-    ij, k = @index(Global, NTuple)
-
-    soil_moisture[ij, k] = (1 - weight) * monthly_soil_moisture[ij, k, this_month] +
-        weight * monthly_soil_moisture[ij, k, next_month]
 end
 
 export LandBucketMoisture
