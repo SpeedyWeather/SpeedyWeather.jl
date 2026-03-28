@@ -106,14 +106,13 @@ end
 Base.getindex(ps::SpeedyParams, nm::Symbol) = getindex(ps, :, nm)
 @inline function Base.getindex(ps::SpeedyParams, ::Colon, nm::Symbol)
     # include fieldname only (no component)
-    if nm == :idx
+    return if nm == :idx
         1:length(ps)
     elseif nm == :fieldname
         ModelParameters.paramfieldnames(ps)
     else
         map(p -> getindex(p, nm), ModelParameters.params(ps))
     end
-    return nothing
 end
 
 # non-mutating setindex!
