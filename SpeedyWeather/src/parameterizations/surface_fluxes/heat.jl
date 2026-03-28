@@ -232,21 +232,21 @@ variables(::PrescribedLandHeatFlux) = (
     land_fraction = model.land_sea_mask.mask[ij]
     pₛ = vars.grid.pres_prev[ij]                # surface pressure [Pa]
     cₚ = model.atmosphere.heat_capacity
-    surface = vars.nlayers                     # indexing top to bottom
+    surface = model.geometry.nlayers             # indexing top to bottom
 
     # read in a prescribed flux
     flux_land = vars.prognostic.land.sensible_heat_flux[ij]
 
     # store without weighting by land fraction for coupling
-    vars.physics.land.sensible_heat_flux[ij] = flux_land  # store land flux separately too
+    vars.parameterizations.land.sensible_heat_flux[ij] = flux_land  # store land flux separately too
 
     flux_land *= land_fraction                  # weight by land fraction of land-sea mask
 
     # output/diagnose: ocean sets flux (=), land accumulates (+=)
-    vars.physics.sensible_heat_flux[ij] += flux_land
+    vars.parameterizations.sensible_heat_flux[ij] += flux_land
 
     # accumulate with += into end=lowermost layer total flux
     flux_land /= cₚ                             # [W/m²] -> [K/s]
-    vars.tendencies.temp_tend_grid[ij, surface] += surface_flux_to_tendency(flux_land, pₛ, model)
+    vars.tendencies.grid.temp[ij, surface] += surface_flux_to_tendency(flux_land, pₛ, model)
     return nothing
 end

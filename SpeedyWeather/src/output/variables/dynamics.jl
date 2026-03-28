@@ -166,7 +166,8 @@ function output!(
         T .*= σ⁻ᵏ       # lower to surface assuming dry adiabatic lapse rate
     end
 
-    q = field_view(simulation.variables.grid.humid, :, nlayers)
+    has_humid = haskey(simulation.variables.grid, :humid)
+    q = has_humid ? field_view(simulation.variables.grid.humid, :, nlayers) : zero(T)
     Tᵥ = simulation.variables.scratch.grid.a_2D
 
     (; atmosphere) = simulation.model

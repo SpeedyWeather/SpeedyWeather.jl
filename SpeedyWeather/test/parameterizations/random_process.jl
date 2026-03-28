@@ -16,12 +16,12 @@ using Statistics
                 # instead of running the model, just run the random process
                 nsteps = 100
                 for _ in 1:nsteps
-                    SpeedyWeather.random_process!(simulation.prognostic_variables, random_process)
+                    SpeedyWeather.random_process!(simulation.variables, random_process)
                 end
 
                 # transform to grid space (don't clamp)
-                grid = simulation.diagnostic_variables.grid.random_pattern
-                spec = simulation.prognostic_variables.random_pattern
+                grid = simulation.variables.grid.random_pattern
+                spec = simulation.variables.prognostic.random_pattern
                 transform!(grid, spec, model.spectral_transform)
 
                 @test mean(grid) ≈ 0 atol = 1.0e-2
@@ -43,22 +43,22 @@ end
         # instead of running the model, just run the random process
         nsteps = 100
         for _ in 1:nsteps
-            SpeedyWeather.random_process!(simulation.prognostic_variables, random_process)
+            SpeedyWeather.random_process!(simulation.variables, random_process)
         end
 
-        spec1 = copy(simulation.prognostic_variables.random_pattern)
+        spec1 = copy(simulation.variables.prognostic.random_pattern)
 
         # reinitialize the model with the same seed
         simulation = initialize!(model)
         nsteps = 100
         for _ in 1:nsteps
-            SpeedyWeather.random_process!(simulation.prognostic_variables, random_process)
+            SpeedyWeather.random_process!(simulation.variables, random_process)
         end
 
         if seed != 0    # non-zero seed is actual seed
-            @test spec1 == simulation.prognostic_variables.random_pattern
+            @test spec1 == simulation.variables.prognostic.random_pattern
         else            # but zero seed pulls random seed from global RNG
-            @test spec1 != simulation.prognostic_variables.random_pattern
+            @test spec1 != simulation.variables.prognostic.random_pattern
         end
     end
 end

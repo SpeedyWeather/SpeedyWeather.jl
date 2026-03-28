@@ -184,8 +184,8 @@ end
     model_new = PrimitiveDryModel(spectral_grid; initial_conditions)
     simulation_new = initialize!(model_new)
 
-    progn_old = simulation.prognostic_variables
-    progn_new = simulation_new.prognostic_variables
+    progn_old = simulation.variables.prognostic
+    progn_new = simulation_new.variables.prognostic
 
     for varname in (:vor, :div, :temp, :pres)
         var_old = getfield(progn_old, varname)
@@ -207,8 +207,8 @@ end
     model_new = PrimitiveDryModel(spectral_grid; initial_conditions)
     simulation_new = initialize!(model_new)
 
-    progn_old = simulation.prognostic_variables
-    progn_new = simulation_new.prognostic_variables
+    progn_old = simulation.variables.prognostic
+    progn_new = simulation_new.variables.prognostic
 
     for varname in (:vor, :div, :temp, :pres)
         var_old = getfield(progn_old, varname)
@@ -235,7 +235,7 @@ end
     simulation = initialize!(model)
     run!(simulation, output = true; period = Day(1))
 
-    progn = simulation.prognostic_variables
+    progn = simulation.variables.prognostic
     tmp_read_path = joinpath(model.output.run_path, model.output.filename)
     t = NCDataset(tmp_read_path)["time"][:]
     @test t == manual_time_axis(model.output.startdate, model.time_stepping.Δt_millisec, progn.clock.n_timesteps)
@@ -263,7 +263,7 @@ end
     model.implicit.reinitialize = false
     run!(simulation, output = true, period = Day(365000))
 
-    progn = simulation.prognostic_variables
+    progn = simulation.variables.prognostic
     tmp_read_path = joinpath(model.output.run_path, model.output.filename)
     t = NCDataset(tmp_read_path)["time"][:]
     @test t == manual_time_axis(model.output.startdate, model.time_stepping.Δt_millisec, progn.clock.n_timesteps)
