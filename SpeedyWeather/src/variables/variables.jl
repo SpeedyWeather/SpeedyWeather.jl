@@ -83,20 +83,24 @@ and namespaces. Uses `copyto!` for arrays, `copy!` for `Clock`,
 and direct assignment for `Ref` values."""
 function Base.copy!(dest::Variables, src::Variables)
     for group in propertynames(dest)
-        _copy_namedtuple!(getfield(dest, group), getfield(src, group))
+        copy_variables!(getfield(dest, group), getfield(src, group))
     end
     return dest
 end
 
-# copy all entries of a NamedTuple, recursing into nested NamedTuples (namespaces)
-function _copy_namedtuple!(dest::NamedTuple, src::NamedTuple)
+"""$(TYPEDSIGNATURES)
+Copy variables in `NamedTuples` from `src` into `dest`, only copying keys present in both.
+Recurses into nested NamedTuples (namespaces like ocean, land, tracers).
+Used for restart file loading where `src` may come from a different model version."""
+function copy_variables!(dest::NamedTuple, src::NamedTuple)
     for key in keys(dest)
+        haskey(src, key) || continue
         _copy_entry!(getfield(dest, key), getfield(src, key))
     end
     return nothing
 end
 
-_copy_entry!(dest::NamedTuple, src::NamedTuple) = _copy_namedtuple!(dest, src)
+_copy_entry!(dest::NamedTuple, src::NamedTuple) = copy_variables!(dest, src)
 _copy_entry!(dest::AbstractArray, src::AbstractArray) = copyto!(dest, src)
 _copy_entry!(dest::Base.RefValue, src::Base.RefValue) = (dest[] = src[])
 
@@ -115,23 +119,6 @@ function _copy_entry!(dest, src)
     end
     return nothing
 end
-
-"""$(TYPEDSIGNATURES)
-Copy variables in `NamedTuples` from `src` into `dest`, only copying keys present in both.
-Recurses into nested NamedTuples (namespaces like ocean, land, tracers).
-Used for restart file loading where `src` may come from a different model version."""
-function copy_variables!(dest::NamedTuple, src::NamedTuple)
-    for key in keys(dest)
-        haskey(src, key) || continue
-        _copy_variables_entry!(getfield(dest, key), getfield(src, key))
-    end
-    return nothing
-end
-
-_copy_variables_entry!(dest::NamedTuple, src::NamedTuple) = copy_variables!(dest, src)
-_copy_variables_entry!(dest::AbstractArray, src::AbstractArray) = copyto!(dest, src)
-_copy_variables_entry!(dest::Base.RefValue, src::Base.RefValue) = (dest[] = src[])
-_copy_variables_entry!(dest, src) = _copy_entry!(dest, src)
 
 # pretty printing
 function Base.show(io::IO, V::Variables)
