@@ -20,7 +20,7 @@ end
         vars = Variables(model)
         init_shortwave_state!(vars, model)
 
-        SpeedyWeather.parameterization!(vars, model.zenith, model)
+        SpeedyWeather.parameterization!(vars, model.solar_zenith, model)
 
         for ij in 1:model.spectral_grid.npoints
             SpeedyWeather.parameterization!(ij, vars, model.shortwave_radiation, model)

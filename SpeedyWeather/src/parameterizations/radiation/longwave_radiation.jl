@@ -125,8 +125,7 @@ initialize!(::JeevanjeeRadiation, ::PrimitiveEquation) = nothing
     dTdt[ij, nlayers] -= surface_flux_to_tendency(Fₖ_down / cₚ, pₛ, model)   # out of layer k
 
     # land-sea mask weighted combined flux from land and ocean
-    Fₖ::eltype(T)
-    Fₖ = (1 - land_fraction) * Fₖ_ocean + land_fraction * Fₖ_land
+    Fₖ::eltype(T) = (1 - land_fraction) * Fₖ_ocean + land_fraction * Fₖ_land
     dTdt[ij, nlayers] += surface_flux_to_tendency(Fₖ / cₚ, pₛ, model)   # convert [W/m²] / cₚ to K·Pa/s
     vars.parameterizations.surface_longwave_up[ij] = Fₖ                 # [W/m²] store for output/diagnostics
 

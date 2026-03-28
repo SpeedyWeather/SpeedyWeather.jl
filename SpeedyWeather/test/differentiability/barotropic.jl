@@ -201,9 +201,10 @@ end
         Duplicated(model, make_zero(model))
     )
 
-    # nonzero gradient
+    # nonzero gradient of the prognostic variables
     dvars = adsim.dvars
-    @test sum(to_vec(dvars)[1]) != 0
+    @test sum(to_vec(dvars.prognostic)[1]) != 0
+
 
     @test_broken isapprox(to_vec(fd_vjp[1])[1], to_vec(dvars)[1], rtol = 0.05) # we have to go really quite high with the tolerances here
     @test mean(abs.(to_vec(fd_vjp[1])[1] - to_vec(dvars)[1])) < 0.002 # so we check a few extra statistics
