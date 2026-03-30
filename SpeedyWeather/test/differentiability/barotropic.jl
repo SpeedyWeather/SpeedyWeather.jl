@@ -16,7 +16,6 @@
     lf2 = 2
 
     adsim = ADSimulation(simulation)
-    fdsim = ADSimulation(simulation)
 
     vars, dvars = ADseed(adsim, :tendencies)
 
@@ -28,7 +27,7 @@
     @test all(isfinite.(dvec))
     @test any(abs.(dvec) .> 0)
 
-    vars2, dvars2 = ADseed(adsim2, :tendencies)
+    vars2, dvars2 = ADseed(adsim, :tendencies)
 
     function dynamics_tendencies(vars, lf, model)
         vars_new = deepcopy(vars)
@@ -87,7 +86,6 @@ end
     lf2 = 2
 
     adsim = ADSimulation(simulation)
-    fdsim = ADSimulation(simulation)
 
     vars, dvars = ADseed(adsim, :prognostic)
 
@@ -100,7 +98,7 @@ end
         return vars_new
     end
 
-    vars_new, dvars_new = ADseed(fdsim, :prognostic)
+    vars_new, dvars_new = ADseed(adsim, :prognostic)
 
     @info "Running finite differences"
     fd_vjp = @time FiniteDifferences.j′vp(central_fdm(5, 1), x -> leapfrog_step(x, dt, lf1, model), dvars_new, vars_new)
@@ -145,7 +143,6 @@ end
     lf2 = 2
 
     adsim = ADSimulation(simulation)
-    fdsim = ADSimulation(simulation)
     vars, dvars = ADseed(adsim, :grid)
 
     @info "Running reverse-mode AD"
@@ -153,14 +150,14 @@ end
 
     function transform_step(vars_in::Variables, lf, model)
         vars_new = deepcopy(vars_in)
-        SpeedyWeather.transform!(vars_new, lf, model)
+        SpeedyWeather.transform!(vars_new, lf, deepcopy(model))
         return vars_new
     end
 
-    vars_new, dvars_new = ADseed(fdsim, :grid)
+    vars_new, dvars_new = ADseed(adsim, :grid)
 
     @info "Running finite differences"
-    fd_vjp = @time FiniteDifferences.j′vp(central_fdm(5, 1), x -> transform_step(x, lf2, model), dvars_new, vars_new)
+    fd_vjp = @time FiniteDifferences.j′vp(central_fdm(11, 1), x -> transform_step(x, lf2, model), dvars_new, vars_new)
 
     @test all(isapprox.(to_vec(fd_vjp[1].prognostic)[1], to_vec(dvars.prognostic)[1], rtol = 1.0e-3, atol = 1.0e-3))
 end
@@ -174,15 +171,13 @@ end
     dt = 2Δt
 
     adsim = ADSimulation(simulation)
-
-    fdsim = ADSimulation(simulation)
-    vars_fd, dvars_fd = ADseed(fdsim, :prognostic)
+    vars_fd, dvars_fd = ADseed(adsim, :prognostic)
 
     @info "Running finite differences"
     # for the full timestep, we need a bit higher precision
     fd_vjp = @time FiniteDifferences.j′vp(
-        central_fdm(15, 1),
-        x -> timestep_oop(x, dt, deepcopy(fdsim.model)),
+        central_fdm(21, 1),
+        x -> timestep_oop(x, dt, deepcopy(adsim.model)),
         dvars_fd,
         vars_fd
     )
@@ -211,20 +206,19 @@ end
     @test maximum(to_vec(fd_vjp[1].prognostic.vor)[1] - to_vec(dvars.prognostic.vor)[1]) < 0.05
 
     # test that we can differentiate with Const(Model) only wrt to the state
-    adsim2 = ADSimulation(simulation)
-    vars_new, dvars_new = ADseed(adsim2, :prognostic)
+    vars_new, dvars_new = ADseed(adsim, :prognostic)
 
     @time autodiff(
         set_runtime_activity(Reverse),
         timestep_oop!,
         Const,
         Duplicated(vars_new, dvars_new),
-        Duplicated(adsim2.vars, adsim2.dvars),
+        Duplicated(adsim.vars, adsim.dvars),
         Const(dt),
         Const(model)
     )
 
-    d_vars = adsim2.dvars
+    d_vars = adsim.dvars
     @test_broken isapprox(to_vec(fd_vjp[1])[1], to_vec(d_vars)[1], rtol = 0.05) # we have to go really quite high with the tolerances here
     @test mean(abs.(to_vec(fd_vjp[1])[1] - to_vec(d_vars)[1])) < 0.002 # so we check a few extra statistics
     @test maximum(to_vec(fd_vjp[1].prognostic.vor)[1] - to_vec(d_vars.prognostic.vor)[1]) < 0.05
