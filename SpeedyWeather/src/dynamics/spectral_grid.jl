@@ -272,7 +272,7 @@ function (::Type{S})(
     return S(spectrum, grid; NF, nlayers, kwargs...)
 end
 
-function variables(::SpectralTransform)
+function variables(::SpeedyTransforms.AbstractSpectralTransform)
     return (
         ScratchVariable(:transform_memory, TransformScratchMemory(), desc = "Scratch memory for spectral transform"),
     )

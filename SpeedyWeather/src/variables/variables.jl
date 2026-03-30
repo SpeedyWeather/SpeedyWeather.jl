@@ -91,33 +91,45 @@ end
 """$(TYPEDSIGNATURES)
 Copy variables in `NamedTuples` from `src` into `dest`, only copying keys present in both.
 Recurses into nested NamedTuples (namespaces like ocean, land, tracers).
-Used for restart file loading where `src` may come from a different model version."""
-function copy_variables!(dest::NamedTuple, src::NamedTuple)
-    for key in keys(dest)
-        haskey(src, key) || continue
-        _copy_entry!(getfield(dest, key), getfield(src, key))
+Uses `@generated` to unroll the key iteration at compile time so that Enzyme
+can differentiate through this function without runtime reflection more easily."""
+@generated function copy_variables!(dest::NamedTuple{K1}, src::NamedTuple{K2}) where {K1, K2}
+    exprs = Expr[]
+    for key in K1
+        key in K2 || continue
+        push!(exprs, :(_copy_entry!(getfield(dest, $(QuoteNode(key))), getfield(src, $(QuoteNode(key))))))
     end
-    return nothing
+    return quote
+        $(exprs...)
+        return nothing
+    end
 end
 
-_copy_entry!(dest::NamedTuple, src::NamedTuple) = copy_variables!(dest, src)
 _copy_entry!(dest::AbstractArray, src::AbstractArray) = copyto!(dest, src)
+_copy_entry!(dest::NamedTuple, src::NamedTuple) = copy_variables!(dest, src)
 _copy_entry!(dest::Base.RefValue, src::Base.RefValue) = (dest[] = src[])
 
 # fallback for mutable structs (e.g. Clock): copy each field via setfield!
-function _copy_entry!(dest, src)
-    if ismutable(dest)
-        for field in fieldnames(typeof(dest))
-            setfield!(dest, field, getfield(src, field))
+# and immutable structs with array fields (e.g. ScratchMemory): copyto! on arrays.
+# uses @generated to avoid runtime reflection (ismutable, fieldnames, isa checks)
+# which Enzyme cannot differentiate through.
+@generated function _copy_entry!(dest::T, src::T) where T
+    exprs = Expr[]
+    for (i, fname) in enumerate(fieldnames(T))
+        ft = fieldtype(T, i)
+        if ft <: AbstractArray
+            push!(exprs, :(copyto!(getfield(dest, $(QuoteNode(fname))), getfield(src, $(QuoteNode(fname))))))
+        elseif ft <: NamedTuple
+            push!(exprs, :(copy_variables!(getfield(dest, $(QuoteNode(fname))), getfield(src, $(QuoteNode(fname))))))
+        elseif ismutabletype(T)
+            push!(exprs, :(setfield!(dest, $(QuoteNode(fname)), getfield(src, $(QuoteNode(fname))))))
         end
-    else
-        # immutable structs (e.g. ScratchMemory): recurse into array fields
-        for field in fieldnames(typeof(dest))
-            d = getfield(dest, field)
-            d isa AbstractArray && copyto!(d, getfield(src, field))
-        end
+        # for immutable structs: skip non-array, non-NamedTuple fields (not copyable in place)
     end
-    return nothing
+    return quote
+        $(exprs...)
+        return nothing
+    end
 end
 
 # pretty printing

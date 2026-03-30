@@ -26,4 +26,12 @@
     simulation = initialize!(model)
     run!(simulation, period = Day(10))
     @test simulation.model.feedback.nans_detected == false
+
+    # PrimitiveWet, with MatrixSpectralTransform
+    spectral_grid = SpectralGrid()
+    spectral_transform = MatrixSpectralTransform(spectral_grid)
+    model = PrimitiveWetModel(spectral_grid; spectral_transform)
+    simulation = initialize!(model)
+    run!(simulation, period = Day(10))
+    @test simulation.model.feedback.nans_detected == false
 end
