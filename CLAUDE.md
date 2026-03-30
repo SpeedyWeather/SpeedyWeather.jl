@@ -119,7 +119,7 @@ inside `run!` for spectral efficiency.
 
 ## Array Types 
 
-Mainly two array types are used: `LowerTriangularArray` for spectral coefficients, and `Field` for gridded data. Thesy can be intialized for testing as in the following: 
+Mainly two array types are used: `LowerTriangularArray` for spectral coefficients, and `Field` for gridded data. They can be initialized for testing as in the following: 
 
 ```julia 
 spectrum = Spectrum(trunc=10)
