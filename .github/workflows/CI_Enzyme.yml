@@ -49,8 +49,9 @@ jobs:
         if: ${{ matrix.version == '1.10' }}
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
-        with:
-          test_args: 'enzyme'
-          project: SpeedyWeather
+
+      - name: Run Enzyme differentiability tests
+        run: |
+          julia --color=yes --project=SpeedyWeather/test/differentiability SpeedyWeather/test/differentiability/full
         env:
           GITHUB_AUTH: ${{ secrets.GITHUB_TOKEN }}
