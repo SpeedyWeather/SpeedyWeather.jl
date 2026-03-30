@@ -130,7 +130,7 @@ function timestep!(
     (; soil_moisture) = vars.prognostic.land
 
     launch!(
-        architecture(soil_moisture), RingGridWorkOrder, size(soil_moisture),
+        architecture(soil_moisture), RingGridWorkOrder, (size(soil_moisture, 1),),
         interpolate_monthly_climatology_kernel!,
         soil_moisture, monthly_soil_moisture, weight, this_month, next_month
     )

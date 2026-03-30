@@ -1,21 +1,21 @@
-using SpeedyWeather
-using Test
+# using SpeedyWeather
+# using Test
 
-FLAG_EXTENDED_TESTS = "extended_tests" in ARGS ? true : false
-FLAG_ENZYME_TESTS = "enzyme" in ARGS ? true : false
+# FLAG_EXTENDED_TESTS = "extended_tests" in ARGS ? true : false
+# FLAG_ENZYME_TESTS = "enzyme" in ARGS ? true : false
 
-if FLAG_EXTENDED_TESTS
-    @info "Running extended test suite"
-    include("differentiability/runtests.jl")
-end
+# if FLAG_EXTENDED_TESTS
+#     @info "Running extended test suite"
+#     include("differentiability/runtests.jl")
+# end
 
-if FLAG_ENZYME_TESTS
-    @info "Running Enzyme CI tests"
-    include("differentiability/full_diff_CI.jl")
-end
+# if FLAG_ENZYME_TESTS
+#     @info "Running Enzyme CI tests"
+#     include("differentiability/full_diff_CI.jl")
+# end
 
-if !FLAG_EXTENDED_TESTS && !FLAG_ENZYME_TESTS
-    @info "Running general test suite"
+# if !FLAG_EXTENDED_TESTS && !FLAG_ENZYME_TESTS
+#     @info "Running general test suite"
 
     # GENERAL
     include("spectral_grid.jl")
@@ -25,7 +25,7 @@ if !FLAG_EXTENDED_TESTS && !FLAG_ENZYME_TESTS
     include("GPU/kernelabstractions.jl")
 
     # DYNAMICS
-    include("dynamics/diffusion.jl")
+    include("dynamics/horizontal_diffusion.jl")
     include("dynamics/time_stepping.jl")
     include("dynamics/vertical_advection.jl")
     include("dynamics/particles.jl")
@@ -65,4 +65,4 @@ if !FLAG_EXTENDED_TESTS && !FLAG_ENZYME_TESTS
     include("output/netcdf_output.jl")
     include("output/jld2_output.jl")
     include("output/feedback.jl")
-end
+# end

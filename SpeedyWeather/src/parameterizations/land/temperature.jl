@@ -116,7 +116,7 @@ function timestep!(
     weight = convert(NF, Dates.days(time - Dates.firstdayofmonth(time)) / Dates.daysinmonth(year(time), Dates.month(time)))
 
     launch!(
-        architecture(soil_temperature), RingGridWorkOrder, size(soil_temperature),
+        architecture(soil_temperature), RingGridWorkOrder, (size(soil_temperature, 1),),
         interpolate_monthly_climatology_kernel!,
         soil_temperature, monthly_temperature, weight, this_month, next_month
     )
