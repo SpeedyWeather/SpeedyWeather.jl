@@ -36,11 +36,10 @@ function run_benchmarks(trunc_list, nlayers_list, float_types, device)
                 model = PrimitiveWetModel(spectral_grid)
                 simulation = initialize!(model)
 
-                progn, diagn, model = SpeedyWeather.unpack(simulation)
+                vars, model = SpeedyWeather.unpack(simulation)
                 S = model.spectral_transform
                 specs, grids = generate_random_inputs(spectral_grid)
                 lf = 2
-                # S, specs, grids = generate_random_inputs(N, nlayers, T, device)
 
                 println("Running benchmark for device=$device, trunc=$trunc, nlayers=$nlayers, NF=$NF")
                 println()
@@ -62,11 +61,11 @@ function run_benchmarks(trunc_list, nlayers_list, float_types, device)
                 times_fourier_forward[i, j] = minimum(b).time
 
                 # Time parameterization
-                b = @benchmark CUDA.@sync SpeedyWeather.parameterization_tendencies!($diagn, $progn, $model)
+                b = @benchmark CUDA.@sync SpeedyWeather.parameterization_tendencies!($vars, $model)
                 times_parameterization[i, j] = minimum(b).time
 
                 # Time dynamics
-                b = @benchmark CUDA.@sync SpeedyWeather.dynamics_tendencies!($diagn, $progn, $lf, $model)
+                b = @benchmark CUDA.@sync SpeedyWeather.dynamics_tendencies!($vars, $lf, $model)
                 times_dynamics[i, j] = minimum(b).time
             end
         end

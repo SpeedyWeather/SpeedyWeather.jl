@@ -250,7 +250,7 @@ end
 
 !!! info "Albedos extend albedo!"
     In contrast to other parameterizations that are supposed to extend
-    `parameterization!(ij, diagn, progn, p::MyParameterization, model)`
+    `parameterization!(ij, vars, p::MyParameterization, model)`
     albedos are expected to extend `albedo!` instead. That way they can be
     used of ocean, land or both. As long as they write into `vars.parameterizations.albedo[ij]`
     as shown above, the shortwave radiation scheme will correctly use that
