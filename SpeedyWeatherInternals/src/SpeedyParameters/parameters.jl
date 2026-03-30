@@ -4,7 +4,7 @@
 Specialized implementation of `AbstractParam` for Speedy models that defines a fixed
 set of fields with concrete types.
 """
-Base.@kwdef struct SpeedyParam{NF <: AbstractFloat} <: AbstractParam{NF}
+@kwdef struct SpeedyParam{NF <: AbstractFloat} <: AbstractParam{NF}
     "numeric value of the parameter"
     value::NF = NaN
 
@@ -82,7 +82,7 @@ stripparams(params::SpeedyParams) = stripparams(unpack_params(params))
 
 # Base overrides for SpeedyParams
 
-## parameter subsets
+# parameter subsets
 Base.getindex(ps::SpeedyParams, param_label::String) = getindex(ps, [param_label])
 @inline function Base.getindex(ps::SpeedyParams, param_labels::Vector{String})
     # extract labels from ComponentVector

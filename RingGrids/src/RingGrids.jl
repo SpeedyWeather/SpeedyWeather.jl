@@ -24,7 +24,8 @@ import SpeedyWeatherInternals.Architectures: Architectures, AbstractArchitecture
     on_architecture, architecture, array_type, ismatching, nonparametric_type
 
 using SpeedyWeatherInternals.Architectures
-using SpeedyWeatherInternals.Utils
+using SpeedyWeatherInternals.KernelLaunching
+import SpeedyWeatherInternals: Utils
 
 # ABSTRACT GRIDS
 export AbstractGrid,

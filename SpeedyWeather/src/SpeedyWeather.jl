@@ -16,13 +16,15 @@ import GPUArrays: GPUArrays, @allowscalar
 import Adapt: Adapt, adapt, adapt_structure
 import GPUArrays: @allowscalar
 import ReactantCore: @trace
+import Base: @propagate_inbounds
 
 using SpeedyWeatherInternals
 using SpeedyWeatherInternals.Architectures
+using SpeedyWeatherInternals.KernelLaunching
 import SpeedyWeatherInternals.Architectures: AbstractArchitecture, CPU, GPU,
     on_architecture, architecture, array_type, ismatching, nonparametric_type
 export CPU, GPU, on_architecture, architecture                # export device functions
-export SpeedyWeatherInternals, Architectures
+export SpeedyWeatherInternals, Architectures, KernelLaunching
 
 # INPUT OUTPUT
 import TOML
@@ -36,28 +38,21 @@ import CodecZlib
 import BitInformation: round, round!
 import ProgressMeter
 
-# UTILITIES
-using DomainSets.IntervalSets
-import Base: @propagate_inbounds
-
 # to avoid a `using Dates` to pass on DateTime arguments
 export DateTime, Millisecond, Second, Minute, Hour, Day, Week, Month, Year, Century, Millenium
 
-# export functions that have many cross-component methods
-export initialize!, finalize!
-
-# import utilities
+# UTILITIES
 export Utils
-using SpeedyWeatherInternals.Utils
-import SpeedyWeatherInternals.Utils: @maybe_jit
+import SpeedyWeatherInternals.Utils: Utils, @maybe_jit, _jit, print_fields, readable_secs
 
-# parameter handling
+# PARAMETER HANDLING
+using DomainSets.IntervalSets
 using SpeedyWeatherInternals.SpeedyParameters
-
 import SpeedyWeatherInternals.SpeedyParameters: parameters
+export SpeedyParam, SpeedyParams, parameters, stripparams       # export user-facing parameter handling types and methods
 
-# export user-facing parameter handling types and methods
-export SpeedyParam, SpeedyParams, parameters, stripparams
+# Export heavily methoded functions
+export initialize!, finalize!
 
 # DATA STRUCTURES
 # LowerTriangularArrays for spherical harmonics

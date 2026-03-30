@@ -482,7 +482,7 @@ function find_rings!(
         #TODO: as we only allow instances of Field to be the original grid, the latitudes below
         #TODO: should be okay anyway. Checking it on GPU is a bit more annoying...
 
-        @assert isdecreasing(latd) "Latitudes latd are expected to be strictly decreasing."
+        @assert Utils.isdecreasing(latd) "Latitudes latd are expected to be strictly decreasing."
         #@assert latd[1] == 90 "Latitudes latd are expected to contain 90˚N, the north pole."
 
         # Hack: for intervals between rings to be one-sided open [j, j+1) the last element in
