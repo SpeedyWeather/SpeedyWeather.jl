@@ -1,3 +1,7 @@
+import Pkg
+cd(@__DIR__)
+Pkg.activate(".")
+
 using SpeedyWeather, Dates, Printf
 import SpeedyWeather.SpeedyTransforms: prettymemory
 

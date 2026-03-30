@@ -43,9 +43,10 @@ Abbreviations in the tables below are as follows, omitted columns use defaults.
 
 The benchmark suite here can be reproduced by executing:
 
-```> julia manual_benchmarking.jl```
+```> julia SpeedyWeather/benchmark/manual_benchmarking.jl```
 
-inside `the SpeedyWeather.jl/benchmark` folder. It will create this `README.md` which can be pushed to the repository for updates or comparison.
+It will create this `README.md` which can be pushed to the repository for updates or comparison.
+
 ## Models, default setups
 
 | Model | T | L | Physics | Δt | SYPD | Memory|
