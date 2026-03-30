@@ -30,7 +30,7 @@ SpeedyWeather/src/
 │   ├── radiation/     # Shortwave & longwave
 │   └── surface_fluxes/
 ├── models/            # Model definitions and simulation runner
-├── variables/         # Prognostic & diagnostic variable metadata
+├── variables/         # Unified Variables system (prognostic, grid, tendencies, …)
 ├── output/            # NetCDF, JLD2, callbacks, restart files
 └── input/             # Asset loading
 ```
@@ -40,9 +40,8 @@ SpeedyWeather/src/
 | Type | Purpose |
 |------|---------|
 | `SpectralGrid` | Central config: resolution (`trunc`), grid type, `nlayers`, `NF`, architecture |
-| `PrognosticVariables` | All state variables (vor, div, temp, humid, pres, particles, tracers) |
-| `DiagnosticVariables` | Tendencies and auxiliary grid-space fields |
-| `Simulation{Model,Progn,Diagn}` | Top-level container holding model + variables |
+| `Variables` | Unified container for all simulation variables (prognostic, grid, tendencies, dynamics, parameterizations, particles, scratch) |
+| `Simulation{V,M}` | Top-level container holding model + variables |
 | `Leapfrog` | Time stepper with Robert/Williams filters |
 | `SpectralTransform` | FFT/Legendre transform machinery |
 
@@ -60,6 +59,35 @@ AbstractModel
 All model components (orography, ocean, convection, etc.) inherit from
 `AbstractModelComponent` and implement `initialize!`, optionally `timestep!`
 and `finalize!`.
+
+### Variables Structure
+
+`Variables` is a unified container with 7 groups, each a NamedTuple:
+
+| Group | Purpose |
+|-------|---------|
+| `prognostic` | State variables subject to time stepping (vor, div, temp, pres, tracers, etc.) |
+| `grid` | Grid-point copies of spectral prognostic variables (u, v, temp, etc.) |
+| `tendencies` | Time derivatives; spectral at top level, grid-space under `.grid` namespace |
+| `dynamics` | Working arrays for the dynamical core (pressure gradients, vertical velocity, etc.) |
+| `parameterizations` | Working arrays for parameterizations (fluxes, radiation, cloud properties, etc.) |
+| `particles` | Particle advection variables |
+| `scratch` | Temporary storage (write-before-read) |
+
+Variables can be organized by namespace (e.g. `:ocean`, `:land`, `:tracers`):
+
+```julia
+vars.prognostic.vor                             # Spectral vorticity
+vars.prognostic.ocean.sea_surface_temperature   # Ocean namespace
+vars.tendencies.vor                             # Spectral vorticity tendency
+vars.tendencies.grid.u                          # Grid-space u-wind tendency
+vars.dynamics.w                                 # Vertical velocity
+```
+
+Model components define their variables via variable type categories:
+`PrognosticVariable`, `GridVariable`, `TendencyVariable`, `DynamicsVariable`,
+`ParameterizationVariable`, `ParticleVariable`, `ScratchVariable`.
+These are collected and allocated automatically by the `Variables(model)` constructor.
 
 ## Typical Usage
 
@@ -85,8 +113,24 @@ Spectral Tendencies
 New Spectral State
 ```
 
-Prognostic variables are stored with 2 time levels (`lf=1,2`) for the leapfrog scheme.
-Vorticity and divergence are scaled by `radius` inside `run!` for spectral efficiency.
+Prognostic variables live in `vars.prognostic`, tendencies in `vars.tendencies` (spectral)
+and `vars.tendencies.grid` (grid-space). Vorticity and divergence are scaled by `radius`
+inside `run!` for spectral efficiency.
+
+## Array Types 
+
+Mainly two array types are used: `LowerTriangularArray` for spectral coefficients, and `Field` for gridded data. Thesy can be intialized for testing as in the following: 
+
+```julia 
+spectrum = Spectrum(trunc=10)
+nlayers = 5
+coeffs_zero = zeros(ComplexF32, spectrum, nlayers)
+coeffs_rand = rand(ComplexF32, spectrum, nlayers)
+
+grid = HEALPixGrid(5)
+field_zero = zeros(Float32, grid, nlayers)
+field_rand = rand(Float32, grid, nlayers)
+```
 
 ## Key Source Files
 
@@ -119,15 +163,19 @@ Vorticity and divergence are scaled by `radius` inside `run!` for spectral effic
 
 ## Testing
 
+- Every new method that is implemented has to be tested in the unit tests of its respective submodule
+- Keep the unit tests short and concise, they should finish quickly
+- Call the test with the `--check-bounds=yes` flag activated
+
 ```bash
-# Main model tests
-julia --project=SpeedyWeather SpeedyWeather/test/runtests.jl
+# Main model testsm
+julia --project=SpeedyWeather --check-bounds=yes SpeedyWeather/test/runtests.jl
 
 # Extended tests
 julia --project=SpeedyWeather SpeedyWeather/test/runtests.jl extended_tests
 
 # Individual packages
-julia --project=RingGrids RingGrids/test/runtests.jl
+julia --project=RingGrids --check-bounds=yes RingGrids/test/runtests.jl
 ```
 
 Test subdirectories: `dynamics/`, `physics/`, `output/`, `GPU/`, `differentiability/`.
