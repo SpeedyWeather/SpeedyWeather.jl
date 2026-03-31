@@ -52,6 +52,6 @@ jobs:
 
       - name: Run Enzyme differentiability tests
         run: |
-          julia --color=yes --project=SpeedyWeather/test/differentiability SpeedyWeather/test/differentiability/full
+          julia --color=yes --project=SpeedyWeather/test/differentiability SpeedyWeather/test/differentiability/full_diff_CI.jl
         env:
           GITHUB_AUTH: ${{ secrets.GITHUB_TOKEN }}

@@ -1,6 +1,8 @@
 # Enzyme and Julia 1.11 still has some problems, and the test below is broken
 # in Julia 1.11
-using Enzyme, FiniteDifferences
+import Pkg
+Pkg.activate(@__DIR__)
+using Enzyme, FiniteDifferences, Test
 
 if VERSION <= v"1.11.0"
     @testset "Complete Differentiability" begin

@@ -1,21 +1,13 @@
 """$(TYPEDSIGNATURES)
 Check whether elements of a vector `v` are strictly increasing."""
 function isincreasing(v::AbstractVector)
-    is_increasing = true
-    for i in 2:length(v)
-        is_increasing &= v[i - 1] < v[i] ? true : false
-    end
-    return is_increasing
+    return all(diff(v) .> 0)
 end
 
 """$(TYPEDSIGNATURES)
 Check whether elements of a vector `v` are strictly decreasing."""
 function isdecreasing(v::AbstractVector)
-    is_decreasing = true
-    for i in 2:length(v)
-        is_decreasing &= v[i - 1] > v[i] ? true : false
-    end
-    return is_decreasing
+    return all(diff(v) .< 0)
 end
 
 """

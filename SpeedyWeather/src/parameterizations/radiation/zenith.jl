@@ -69,6 +69,8 @@ of sunrise/set by about +-16min throughout the year."""
     @param c2::NF = -0.837378    # c2*cos(2g)
 end
 
+Adapt.@adapt_structure SolarTimeCorrection
+
 """
 $(TYPEDSIGNATURES)
 Functor that returns the time correction for a angular
@@ -134,6 +136,8 @@ $(TYPEDFIELDS)"""
 end
 
 SolarZenith(SG::SpectralGrid; kwargs...) = SolarZenith{SG.NF, SinSolarDeclination{typeof(Earth(SG.NF))}, Base.RefValue{DateTime}}(; kwargs...)
+
+Adapt.@adapt_structure SolarZenith
 
 function variables(::AbstractZenith)
     return (
@@ -249,6 +253,8 @@ $(TYPEDFIELDS)"""
 end
 
 SolarZenithSeason(SG::SpectralGrid; kwargs...) = SolarZenithSeason{SG.NF, SinSolarDeclination{typeof(Earth(SG.NF))}, Base.RefValue{DateTime}}(; kwargs...)
+
+Adapt.@adapt_structure SolarZenithSeason
 
 """
 $(TYPEDSIGNATURES)

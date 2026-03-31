@@ -8,14 +8,16 @@ on:
       - main
 jobs:
   correctness-test:
-    name: Reactant Correctness - Julia v${{ matrix.version }}, ${{ matrix.os }}
+    name: Extended Differentiablity Correctness - Julia v${{ matrix.version }}, ${{ matrix.os }}
+    # temporarily disabled
+    if: false
     # don't run if any of these labels are present
-    if: >
-      !( 
-      contains(github.event.pull_request.labels.*.name, 'skip-ci') ||
-      contains(github.event.pull_request.labels.*.name, 'skip-speedyweather-ci') ||
-      contains(github.event.pull_request.labels.*.name, 'skip-enzyme-ci')
-      )
+    # if: >
+    #   !(
+    #   contains(github.event.pull_request.labels.*.name, 'skip-ci') ||
+    #   contains(github.event.pull_request.labels.*.name, 'skip-speedyweather-ci') ||
+    #   contains(github.event.pull_request.labels.*.name, 'skip-enzyme-ci')
+    #   )
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90
     permissions:
@@ -25,7 +27,7 @@ jobs:
       fail-fast: false
       matrix:
         version:
-          - '1.11'
+          - '1.10'
         os:
           - ubuntu-latest
     steps:
@@ -39,7 +41,7 @@ jobs:
       
       - name: Develop local packages
         run: |
-          julia --color=yes --project=SpeedyWeather/test/reactant -e '
+          julia --color=yes --project=SpeedyWeather/test/differentiability -e '
             using Pkg
             Pkg.develop([
               PackageSpec(path="SpeedyWeatherInternals"),
@@ -53,6 +55,6 @@ jobs:
       
       - name: Run Extended tests
         run: |
-          julia --color=yes --project=SpeedyWeather/test/differentiability SpeedyWeather/test/differentiability/full_diff_CI.jl")
+          julia --color=yes --project=SpeedyWeather/test/differentiability SpeedyWeather/test/differentiability/runtests.jl")
         env:
           GITHUB_AUTH: ${{ secrets.GITHUB_TOKEN }}

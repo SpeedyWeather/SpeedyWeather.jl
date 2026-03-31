@@ -270,7 +270,7 @@ function SpectralTransform(
         coeffs::LowerTriangularArray;
         kwargs...
     )
-    @assert ismatching(architecture(field), architecture(coeffs)) "Architectures of field and coeffs do not match."
+    @boundscheck ismatching(architecture(field), architecture(coeffs)) || throw(ArgumentError("Architectures of field and coeffs do not match."))
 
     # infer types for SpectralTransform
     NF = promote_type(real(eltype(field)), real(eltype(coeffs)))
@@ -279,7 +279,7 @@ function SpectralTransform(
     (; spectrum) = coeffs
     (; grid) = field
     nlayers = size(field, 2)
-    @assert nlayers == size(coeffs, 2) "Number of layers in field ($nlayers) and coeffs ($(size(coeffs, 2))) do not match."
+    @boundscheck nlayers == size(coeffs, 2) || throw(DimensionMismatch("Number of layers in field ($nlayers) and coeffs ($(size(coeffs, 2))) do not match."))
     return SpectralTransform(spectrum, grid; NF, nlayers, kwargs...)
 end
 

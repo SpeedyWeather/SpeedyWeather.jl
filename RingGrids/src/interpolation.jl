@@ -475,8 +475,8 @@ function find_rings!(
 
     if ~unsafe
         θmin, θmax = extrema(θs)
-        @assert θmin >= -90 "Latitudes θs are expected to be within [-90˚, 90˚]; θ=$(θmin)˚ given."
-        @assert θmax <= 90 "Latitudes θs are expected to be within [-90˚, 90˚]; θ=$(θmax)˚ given."
+        @boundscheck θmin >= -90 || throw(ArgumentError("Latitudes θs are expected to be within [-90˚, 90˚]; θ=$(θmin)˚ given."))
+        @boundscheck θmax <= 90 || throw(ArgumentError("Latitudes θs are expected to be within [-90˚, 90˚]; θ=$(θmax)˚ given."))
 
         #TODO: currently we only check the latitudes of the grid we interpolate onto
         #TODO: as we only allow instances of Field to be the original grid, the latitudes below

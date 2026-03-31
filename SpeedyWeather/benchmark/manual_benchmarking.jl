@@ -2,7 +2,7 @@ import Pkg
 cd(@__DIR__)
 Pkg.activate(".")
 
-using SpeedyWeather, Dates, Printf
+using SpeedyWeather, Dates, Printf, InteractiveUtils
 import SpeedyWeather.SpeedyTransforms: prettymemory
 
 include("benchmark_suite.jl")
