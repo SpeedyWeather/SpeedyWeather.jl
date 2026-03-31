@@ -11,8 +11,8 @@
     spectral_grid_gpu = SpectralGrid(architecture = arch_gpu)
 
     # don't initialize parameterizations
-    model_cpu = PrimitiveWetModel(spectral_grid_cpu, physics = false)
-    model_gpu = PrimitiveWetModel(spectral_grid_gpu, physics = false)
+    model_cpu = PrimitiveWetModel(spectral_grid_cpu, dynamics_only = true)
+    model_gpu = PrimitiveWetModel(spectral_grid_gpu, dynamics_only = true)
 
     simulation_cpu = initialize!(model_cpu)
     simulation_gpu = initialize!(model_gpu)
