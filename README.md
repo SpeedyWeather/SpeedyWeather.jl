@@ -1,11 +1,17 @@
 # SpeedyWeather.jl <img src="docs/src/assets/logo.png" width="100" />
 
-[![CI](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI.yml) 
-[![status](https://joss.theoj.org/papers/515c81a4d6a69e31cc71ded65ac9c36a/status.svg)](https://joss.theoj.org/papers/515c81a4d6a69e31cc71ded65ac9c36a)
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.6510139.svg)](https://doi.org/10.5281/zenodo.6510139)  
 [![docs](https://img.shields.io/badge/documentation-latest_release-blue.svg)](https://speedyweather.github.io/SpeedyWeatherDocumentation/stable/)
 [![docs](https://img.shields.io/badge/documentation-main-blue.svg)](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/)
 [![code style: runic](https://img.shields.io/badge/code_style-%E1%9A%B1%E1%9A%A2%E1%9A%BE%E1%9B%81%E1%9A%B2-black)](https://github.com/fredrikekre/Runic.jl)
+[![status](https://joss.theoj.org/papers/515c81a4d6a69e31cc71ded65ac9c36a/status.svg)](https://joss.theoj.org/papers/515c81a4d6a69e31cc71ded65ac9c36a)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.6510139.svg)](https://doi.org/10.5281/zenodo.6510139)  
+[![CI](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI_SpeedyWeather.yml/badge.svg)](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI_SpeedyWeather.yml) 
+[![CI](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI_SpeedyTransforms.yml/badge.svg)](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI_SpeedyTransforms.yml)
+[![CI](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI_RingGrids.yml/badge.svg)](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI_RingGridsyml) 
+[![CI](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI_LowerTriangularArrays.yml/badge.svg)](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI_LowerTriangularArrays.yml)
+[![CI](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI_SpeedyWeatherInternals.yml/badge.svg)](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI_SpeedyWeatherInternals.yml)
+[![CI](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI_Enzyme.yml/badge.svg)](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI_Enzyme.yml)
+[![CI](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI_Reactant_Correctness.yml/badge.svg)](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI_Reactant_Correctness.yml)
 
 SpeedyWeather.jl is a global atmospheric model developed as a research playground
 with an everything-flexible attitude as long as it is speedy. Technically it is a climate model with simple,
