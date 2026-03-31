@@ -197,7 +197,7 @@ function (::Type{F})(
     return ColumnField(data, grid)
 end
 
-## Some ARITHMETICS with regular Fields
+# Some ARITHMETICS with regular Fields
 add!(field::Field, column_field::ColumnField) = field .+= transpose(column_field)
 add!(column_field::ColumnField, field::Field) = column_field .+= transpose(field)
 

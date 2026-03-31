@@ -191,10 +191,11 @@ function unscale_coslat!(
         architecture::AbstractArchitecture = DEFAULT_ARCHITECTURE
     )
 
-    return launch!(
+    launch!(
         architecture, Array3DWorkOrder, size(g_north), unscale_coslat_kernel!,
         g_north, g_south, coslat⁻¹
     )
+    return nothing
 end
 
 @kernel inbounds = true function unscale_coslat_kernel!(

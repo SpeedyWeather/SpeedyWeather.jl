@@ -191,7 +191,7 @@ function _legendre!(                        # GRID TO SPECTRAL
 
     specs_reinterpret = reinterpret(real(eltype(specs.data)), specs.data)
 
-    return launch!(
+    launch!(
         S.architecture,
         LinearWorkOrder,
         (S.jm_index_size * nlayers,),
@@ -205,5 +205,5 @@ function _legendre!(                        # GRID TO SPECTRAL
         solid_angles,
         kjm_indices
     )
-
+    return nothing
 end

@@ -142,8 +142,9 @@ end
 @kernel inbounds = true function interpolate_monthly_climatology_kernel!(
         var, monthly, weight, this_month, next_month
     )
-    ij = @index(Global, Linear)
-    var[ij] = (1 - weight) * monthly[ij, this_month] + weight * monthly[ij, next_month]
+    I = @index(Global, Cartesian)           # always launch over size(var)
+    ijk = ndims(monthly) == 2 ? I[1] : I    # if monthly is 2D, ignore vertical index
+    var[I] = (1 - weight) * monthly[ijk, this_month] + weight * monthly[ijk, next_month]
 end
 
 # CONSTANT OCEAN CLIMATOLOGY

@@ -550,7 +550,7 @@ function find_rings_unsafe!(
     @boundscheck length(js) == length(θs) || throw(DimensionMismatchArray(js, θs))
     @boundscheck length(js) == length(Δys) || throw(DimensionMismatchArray(js, Δys))
 
-    return launch!(
+    launch!(
         architecture,
         LinearWorkOrder,
         size(js),
@@ -560,6 +560,7 @@ function find_rings_unsafe!(
         θs,
         latd
     )
+    return nothing
 end
 
 # for testing only
@@ -634,7 +635,7 @@ function find_grid_indices!(
     # Convert λs to the same type as lon_offsets if needed
     λs_converted = convert.(eltype(lon_offsets), λs)
 
-    return launch!(
+    launch!(
         architecture,
         LinearWorkOrder,
         size(js),
@@ -649,6 +650,7 @@ function find_grid_indices!(
         nlat,
         rings
     )
+    return nothing
 end
 
 @inline function find_lon_indices(

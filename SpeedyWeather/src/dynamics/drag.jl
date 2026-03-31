@@ -105,10 +105,11 @@ function drag!(
     # to yield a tendency for vorticity, so only one R is needed here in the drag coefficient scaling
     c = scheme.drag / model.atmosphere.layer_thickness * diagn.scale[]
 
-    return launch!(
+    launch!(
         architecture(Fu), LinearWorkOrder, size(Fu), quadratic_drag_kernel!,
         Fu, Fv, u, v, c
     )
+    return nothing
 end
 
 @kernel inbounds = true function quadratic_drag_kernel!(
@@ -183,9 +184,9 @@ end
 end
 
 export LinearVorticityDrag
-@parameterized @kwdef mutable struct LinearVorticityDrag{NF} <: AbstractDrag
-    "[OPTION] drag coefficient [1/s]"
-    @param c::NF = 1.0e-7 (bounds = Nonnegative,)
+@kwdef mutable struct LinearVorticityDrag{NF} <: AbstractDrag
+    "[OPTION] drag coefficient time scale [Second]"
+    time_scale::Second = Day(6)
 end
 
 LinearVorticityDrag(SG::SpectralGrid; kwargs...) = LinearVorticityDrag{SG.NF}(; kwargs...)
@@ -206,8 +207,8 @@ function drag!(
     vor = get_step(vars.prognostic.vor, lf)
 
     # scale by radius (but only once, the second radius is in vor)
-    c = drag.c * vars.prognostic.scale[]
-    vor_tend.data .-= c * vor.data      # use .data to bypass conflicting broadcasting
+    r = vars.prognostic.scale[] / Second(drag.time_scale).value
+    vor_tend.data .-= r * vor.data      # use .data to bypass conflicting broadcasting
 
     return nothing
 end
@@ -271,10 +272,11 @@ function drag!(
 
     # GPU kernel launch
     arch = architecture(vars.grid.u)
-    return launch!(
+    launch!(
         arch, LinearWorkOrder, (size(vor_tend, 1),), jet_drag_kernel!,
         vor_tend, vor, ζ₀, r, k
     )
+    return nothing
 end
 
 @kernel inbounds = true function jet_drag_kernel!(

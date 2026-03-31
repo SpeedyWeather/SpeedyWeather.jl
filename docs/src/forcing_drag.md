@@ -48,7 +48,7 @@ using SpeedyWeather
     latitude::NF = 45
 
     "Stirring width [˚]"
-    width::NF = 24
+    width::NF = 12
 
 
     # TO BE INITIALISED

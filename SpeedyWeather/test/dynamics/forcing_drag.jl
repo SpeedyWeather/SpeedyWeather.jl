@@ -2,11 +2,12 @@
     tmp_output_path = mktempdir(pwd(), prefix = "tmp_testruns_")  # Cleaned up when the process exits
 
     # 2D models
-    spectral_grid = SpectralGrid(trunc = 31, nlayers = 1)
+    spectral_grid = SpectralGrid(trunc = 42, nlayers = 1)
     output = NetCDFOutput(spectral_grid, path = tmp_output_path)
-    drag = JetDrag(spectral_grid, time_scale = Day(6))
-    forcing = StochasticStirring(spectral_grid)
-    random_process = SpectralAR1Process(spectral_grid)
+    add!(output, SpeedyWeather.RandomPatternOutput())
+    drag = LinearVorticityDrag(spectral_grid, time_scale = Day(6))
+    forcing = StochasticStirring(spectral_grid, strength = 5e-10)
+    random_process = SpectralAR1Process(spectral_grid, time_scale = Day(2))
     initial_conditions = StartFromRest(spectral_grid)
 
     @testset for Model in (BarotropicModel, ShallowWaterModel)
@@ -24,9 +25,10 @@ end
     # 3D models
     spectral_grid = SpectralGrid(trunc = 31, nlayers = 8)
     output = NetCDFOutput(spectral_grid, path = tmp_output_path)
-    drag = JetDrag(spectral_grid, time_scale = Day(6))
-    forcing = StochasticStirring(spectral_grid)
-    random_process = SpectralAR1Process(spectral_grid)
+    add!(output, SpeedyWeather.RandomPatternOutput())
+    drag = LinearVorticityDrag(spectral_grid, time_scale = Day(6))
+    forcing = StochasticStirring(spectral_grid, strength = 2e-11)
+    random_process = SpectralAR1Process(spectral_grid, time_scale = Day(2))
     initial_conditions = StartFromRest(spectral_grid)
 
     @testset for Model in (PrimitiveDryModel, PrimitiveWetModel)

@@ -9,6 +9,7 @@ include("parameters.jl")
 include("GPU/kernelabstractions.jl")
 
 # DYNAMICS
+include("dynamics/run_defaults.jl")
 include("dynamics/horizontal_diffusion.jl")
 include("dynamics/time_stepping.jl")
 include("dynamics/vertical_advection.jl")
@@ -20,7 +21,6 @@ include("dynamics/set.jl")
 include("dynamics/copy_variables.jl")
 include("dynamics/orography.jl")
 include("dynamics/initial_conditions.jl")
-include("dynamics/run_speedy.jl")
 
 # VERTICAL LEVELS
 include("dynamics/vertical_coordinates.jl")

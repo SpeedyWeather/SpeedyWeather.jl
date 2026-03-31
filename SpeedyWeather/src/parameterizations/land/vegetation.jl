@@ -55,7 +55,7 @@ end
 
 function variables(::NoVegetation)
     return (
-        PrognosticVariable(:soil_moisture, Grid3D(), desc = "Soil moisture content (fraction of capacity)", units = "1", namespace = :land),
+        PrognosticVariable(:soil_moisture, Land3D(), desc = "Soil moisture content (fraction of capacity)", units = "1", namespace = :land),
         ParameterizationVariable(:soil_moisture_availability, Grid2D(), desc = "Soil moisture availability for evaporation", units = "1", namespace = :land),
     )
 end
@@ -228,7 +228,7 @@ end
 
 function variables(::VegetationClimatology)
     return (
-        PrognosticVariable(:soil_moisture, Grid3D(), desc = "Soil moisture content (fraction of capacity)", units = "1", namespace = :land),
+        PrognosticVariable(:soil_moisture, Land3D(), desc = "Soil moisture content (fraction of capacity)", units = "1", namespace = :land),
         ParameterizationVariable(:vegetation_high, Grid2D(), desc = "Vegetation high cover", units = "1", namespace = :land),
         ParameterizationVariable(:vegetation_low, Grid2D(), desc = "Vegetation low cover", units = "1", namespace = :land),
         ParameterizationVariable(:soil_moisture_availability, Grid2D(), desc = "Soil moisture availability for evaporation", units = "1", namespace = :land),

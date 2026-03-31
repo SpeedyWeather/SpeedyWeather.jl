@@ -109,10 +109,11 @@ function forcing!(
     (; whichring) = Fu.grid
 
     arch = architecture(Fu)
-    return launch!(
+    launch!(
         arch, RingGridWorkOrder, size(Fu), jetstream_forcing_kernel!,
         Fu, amplitude, tapering, whichring
     )
+    return nothing
 end
 
 @kernel inbounds = true function jetstream_forcing_kernel!(
@@ -128,7 +129,6 @@ end
 
 export StochasticStirring
 @parameterized @kwdef struct StochasticStirring{NF, VectorType} <: AbstractForcing
-
     "[OPTION] Stirring strength A [1/s²]"
     @param strength::NF = 2.0e-11
 
@@ -149,7 +149,8 @@ end
 
 function variables(::StochasticStirring)
     return (
-        ScratchVariable(:a_2D, Spectral2D(), desc = "2D spectral scratch space", units = "?"),
+        ScratchVariable(:a_2D, Spectral2D(), desc = "scratch array", units = "?"),
+        ScratchVariable(:a_2D, Grid2D(), desc = "scratch array", units = "?", namespace=:grid),
     )
 end
 
@@ -185,7 +186,8 @@ function forcing!(
         spectral_transform::SpectralTransform
     )
     # get random values from random process
-    S_grid = vars.grid.random_pattern
+    S_grid = vars.scratch.grid.a_2D
+    S_grid .= vars.grid.random_pattern  # copy to leave the random pattern unchanged
 
     # mask everything but mid-latitudes
     RingGrids._scale_lat!(S_grid, forcing.lat_mask)
@@ -200,10 +202,11 @@ function forcing!(
     # force every layer
     vor_tend = vars.tendencies.vor
     arch = architecture(vor_tend)
-    return launch!(
+    launch!(
         arch, SpectralWorkOrder, size(vor_tend), stochastic_stirring_kernel!,
         vor_tend, S_masked
     )
+    return nothing
 end
 
 # GPU kernel for adding 2D spectral field to each layer of 3D field
@@ -364,12 +367,13 @@ function forcing!(
     σ = model.geometry.σ_levels_full
 
     (; whichring) = temp_grid.grid
-    return launch!(
+    launch!(
         architecture(temp_tend), RingGridWorkOrder, size(temp_tend), held_suarez_kernel!,
         temp_tend, temp, pres,
         temp_relax_freq, temp_equil_a, temp_equil_b, logσ,
         Tmin, κ, σ, whichring
     )
+    return nothing
 end
 
 @kernel inbounds = true function held_suarez_kernel!(

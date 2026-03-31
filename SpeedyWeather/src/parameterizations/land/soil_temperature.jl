@@ -116,7 +116,7 @@ function timestep!(
     weight = convert(NF, Dates.days(time - Dates.firstdayofmonth(time)) / Dates.daysinmonth(year(time), Dates.month(time)))
 
     launch!(
-        architecture(soil_temperature), RingGridWorkOrder, (size(soil_temperature, 1),),
+        architecture(soil_temperature), RingGridWorkOrder, size(soil_temperature),
         interpolate_monthly_climatology_kernel!,
         soil_temperature, monthly_temperature, weight, this_month, next_month
     )
@@ -177,7 +177,6 @@ LandBucketTemperature(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothin
 function variables(::LandBucketTemperature)
     return (
         PrognosticVariable(:soil_temperature, Land3D(), desc = "Soil temperature", units = "K", namespace = :land),
-        PrognosticVariable(:soil_moisture, Land3D(), desc = "Soil moisture content (fraction of capacity)", units = "1", namespace = :land),
         ParameterizationVariable(:surface_shortwave_down, Grid2D(), desc = "Surface shortwave radiation down", units = "W/m²"),
         ParameterizationVariable(:surface_shortwave_up, Grid2D(), desc = "Surface shortwave radiation up", units = "W/m²", namespace = :land),
         ParameterizationVariable(:surface_longwave_down, Grid2D(), desc = "Surface longwave radiation down", units = "W/m²"),
@@ -220,7 +219,8 @@ function timestep!(
         land::LandBucketTemperature,
         model::PrimitiveEquation,
     )
-    (; soil_temperature, soil_moisture) = vars.prognostic.land
+    (; soil_temperature) = vars.prognostic.land
+    soil_moisture = haskey(vars.prognostic.land, :soil_moisture) ? vars.prognostic.land.soil_moisture : nothing
     Lᵥ = latent_heat_condensation(model.atmosphere)
     Lᵢ = latent_heat_sublimation(model.atmosphere)
     Δt = model.time_stepping.Δt_sec
@@ -242,7 +242,7 @@ function timestep!(
 
     @boundscheck fields_match(soil_temperature, Rsd, Rsu, Rld, Rlu, S, horizontal_only = true) ||
         throw(DimensionMismatch(soil_temperature, Rs))
-    @boundscheck size(soil_moisture, 2) == size(soil_temperature, 2) == 2 || throw(DimensionMismatch)
+    @boundscheck size(soil_temperature, 2) == 2 || throw(DimensionMismatch)
 
     λ = thermodynamics.heat_conductivity_dry_soil
     γ = thermodynamics.field_capacity
@@ -283,8 +283,8 @@ end
 
         # heat capacity of the (wet) soil layers 1 and 2 [J/(m³ K)]
         # ignore snow here
-        C₁ = Cw * soil_moisture[ij, 1] * γ + Cs
-        C₂ = Cw * soil_moisture[ij, 2] * γ + Cs
+        C₁ = isnothing(soil_moisture) ? Cs : Cw * soil_moisture[ij, 1] * γ + Cs
+        C₂ = isnothing(soil_moisture) ? Cs : Cw * soil_moisture[ij, 2] * γ + Cs
 
         # vertical diffusion term between layers
         D = Δ * (soil_temperature[ij, 1] - soil_temperature[ij, 2])

@@ -213,10 +213,11 @@ function _set_function_3d!(var::AbstractField, f::Function, londs::AbstractVecto
     kernel_func = add ? (a, b) -> a + b : (a, b) -> b
 
     @boundscheck size(var) == (length(londs), length(σ_levels_full)) || throw(DimensionMismatch())
-    return launch!(
+    launch!(
         architecture(var), RingGridWorkOrder, size(var), set_field_3d_kernel!,
         var, londs, latds, σ_levels_full, f, kernel_func
     )
+    return var
 end
 
 @kernel function set_field_3d_kernel!(var, londs, latds, σ_levels_full, f, kernel_func)

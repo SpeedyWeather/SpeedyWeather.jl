@@ -88,22 +88,21 @@ function timestep!(
         # TODO think about the order of these
         timestep!(vars, land.snow, model)
         timestep!(vars, land.soil_moisture, model)
-        timestep!(vars, land.rivers, model)
         timestep!(vars, land.vegetation, model)
+        timestep!(vars, land.rivers, model)
     end
     timestep!(vars, land.temperature, model)
     return nothing
 end
 
 function initialize!(vars::Variables, land_model::AbstractLand, model)
-    initialize!(vars, land_model.temperature, model)
-
     # only initialize soil moisture, vegetation, rivers if atmosphere and land are wet
     if model isa PrimitiveWet && land_model isa AbstractWetLand
-        initialize!(vars, land_model.soil_moisture, model)
         initialize!(vars, land_model.snow, model)
+        initialize!(vars, land_model.soil_moisture, model)
         initialize!(vars, land_model.vegetation, model)
         initialize!(vars, land_model.rivers, model)
     end
+    initialize!(vars, land_model.temperature, model)
     return nothing
 end

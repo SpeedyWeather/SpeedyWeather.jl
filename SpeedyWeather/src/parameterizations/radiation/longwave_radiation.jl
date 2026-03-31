@@ -49,8 +49,7 @@ initialize!(radiation::UniformCooling, model::PrimitiveEquation) = nothing
     return nothing
 end
 
-## JEEVANJEE TEMPERATURE FLUX
-
+# JEEVANJEE TEMPERATURE FLUX
 export JeevanjeeRadiation
 """
 Temperature flux longwave radiation from Jeevanjee and Romps, 2018,
@@ -174,7 +173,7 @@ function OneBandLongwave(
     return OneBandLongwave(transmissivity, radiative_transfer)
 end
 
-# primitive dry model version
+# primitive dry model version (not a type only a function)
 export OneBandGreyLongwave
 function OneBandGreyLongwave(
         SG::SpectralGrid;
@@ -189,13 +188,15 @@ Base.show(io::IO, M::OneBandLongwave) = Base.show(io, M, values=false)
 # initialize one after another
 function initialize!(radiation::OneBandLongwave, model::PrimitiveEquation)
     initialize!(radiation.transmissivity, model)
-    return initialize!(radiation.radiative_transfer, model)
+    initialize!(radiation.radiative_transfer, model)
+    return nothing
 end
 
 @propagate_inbounds function parameterization!(ij, vars, radiation::OneBandLongwave, model)
     # pass on array that was used to compute transmissivity (scratch array)
     t = transmissivity!(ij, vars, radiation.transmissivity, model)
-    return longwave_radiative_transfer!(ij, vars, t, radiation.radiative_transfer, model)
+    longwave_radiative_transfer!(ij, vars, t, radiation.radiative_transfer, model)
+    return nothing
 end
 
 export OneBandLongwaveRadiativeTransfer
@@ -237,13 +238,13 @@ initialize!(::OneBandLongwaveRadiativeTransfer, ::PrimitiveEquation) = nothing
 
     land_fraction = model.land_sea_mask.mask[ij]
     sst = vars.prognostic.ocean.sea_surface_temperature[ij]
-    lst = vars.prognostic.land.soil_temperature[ij, 1]  # TODO use skin temperature?
+    lst = vars.prognostic.land.soil_temperature[ij, 1]                  # TODO use skin temperature?
 
-    U_ocean = ifelse(isfinite(sst), ϵ_ocean * σ * sst^4, zero(sst))  # [W/m²]
-    vars.parameterizations.ocean.surface_longwave_up[ij] = U_ocean    # for ocean model forcing
+    U_ocean = ifelse(isfinite(sst), ϵ_ocean * σ * sst^4, zero(sst))     # [W/m²]
+    vars.parameterizations.ocean.surface_longwave_up[ij] = U_ocean      # for ocean model forcing
 
-    U_land = ifelse(isfinite(lst), ϵ_land * σ * lst^4, zero(lst))     # [W/m²]
-    vars.parameterizations.land.surface_longwave_up[ij] = U_land      # for land model forcing
+    U_land = ifelse(isfinite(lst), ϵ_land * σ * lst^4, zero(lst))       # [W/m²]
+    vars.parameterizations.land.surface_longwave_up[ij] = U_land        # for land model forcing
 
     # land-sea mask weighted combined flux from land and ocean (surface boundary condition)
     U::NF = (1 - land_fraction) * U_ocean + land_fraction * U_land

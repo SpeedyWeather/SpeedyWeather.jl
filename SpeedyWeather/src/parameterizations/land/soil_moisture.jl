@@ -49,7 +49,7 @@ SeasonalSoilMoisture(SG::SpectralGrid, geometry::LandGeometry; kwargs...) = Seas
 
 function variables(::SeasonalSoilMoisture)
     return (
-        PrognosticVariable(name = :soil_moisture, dims = Grid3D(), desc = "Soil moisture content (fraction of capacity)", units = "1", namespace = :land),
+        PrognosticVariable(:soil_moisture, Land3D(), desc = "Soil moisture content (fraction of capacity)", units = "1", namespace = :land),
     )
 end
 
@@ -131,18 +131,11 @@ function timestep!(
 
     launch!(
         architecture(soil_moisture), RingGridWorkOrder, size(soil_moisture),
-        interpolate_monthly_climatology_3d_kernel!,
+        interpolate_monthly_climatology_kernel!,
         soil_moisture, monthly_soil_moisture, weight, this_month, next_month
     )
 
     return nothing
-end
-
-@kernel inbounds = true function interpolate_monthly_climatology_3d_kernel!(
-        var, monthly, weight, this_month, next_month
-    )
-    ij, k = @index(Global, NTuple)
-    var[ij, k] = (1 - weight) * monthly[ij, k, this_month] + weight * monthly[ij, k, next_month]
 end
 
 export LandBucketMoisture
@@ -241,10 +234,11 @@ function timestep!(
 
     params = (; ρ, Δt, f₁, f₂, p, τ⁻¹)  # pack into NamedTuple for kernel
 
-    return launch!(
+    launch!(
         architecture(soil_moisture), LinearWorkOrder, (size(soil_moisture, 1),),
         land_bucket_soil_moisture_kernel!, soil_moisture, mask, P, S, H, R, params
     )
+    return nothing
 end
 
 @kernel inbounds = true function land_bucket_soil_moisture_kernel!(
@@ -275,7 +269,7 @@ end
         W₁ = soil_moisture[ij, 1]           # wrt to field capacity so maximum is 1
         δW₁ = W₁ - min(W₁, 1)               # excess moisture in top layer, cap at field capacity
         soil_moisture[ij, 1] -= δW₁         # remove excess from top layer
-        soil_moisture[ij, 2] += p * δW₁ * f₁ / f₂ # add fraction to lower layer
+        soil_moisture[ij, 2] += p * δW₁ * f₁ / f₂   # add fraction to lower layer
         R[ij] += Δt * (1 - p) * δW₁ * f₁            # accumulate river runoff [m] of top layer
 
         # remove excess water from lower layer (this disappears)
@@ -285,7 +279,7 @@ end
 
 function variables(::LandBucketMoisture)
     return (
-        PrognosticVariable(:soil_moisture, Grid3D(), desc = "Soil moisture content (fraction of capacity)", units = "1", namespace = :land),
+        PrognosticVariable(:soil_moisture, Land3D(), desc = "Soil moisture content (fraction of capacity)", units = "1", namespace = :land),
         ParameterizationVariable(:river_runoff, Grid2D(), desc = "River runoff from soil moisture", units = "m/s", namespace = :land),
         ParameterizationVariable(:rain_rate, Grid2D(), desc = "Convective precipitation rate", units = "m/s"),
         ParameterizationVariable(:surface_humidity_flux, Grid2D(), desc = "Surface humidity flux", units = "kg/s/m²", namespace = :land),
