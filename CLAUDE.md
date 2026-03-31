@@ -168,14 +168,14 @@ field_rand = rand(Float32, grid, nlayers)
 - Call the test with the `--check-bounds=yes` flag activated
 
 ```bash
-# Main model testsm
-julia --project=SpeedyWeather --check-bounds=yes SpeedyWeather/test/runtests.jl
+# Main model tests
+julia --project=SpeedyWeather --check-bounds=yes -e 'using Pkg; Pkg.test("SpeedyWeather")'
 
 # Extended tests
 julia --project=SpeedyWeather SpeedyWeather/test/runtests.jl extended_tests
 
 # Individual packages
-julia --project=RingGrids --check-bounds=yes RingGrids/test/runtests.jl
+julia --project=RingGrids --check-bounds=yes -e 'using Pkg; Pkg.test("RingGrids")'
 ```
 
 Test subdirectories: `dynamics/`, `physics/`, `output/`, `GPU/`, `differentiability/`.
@@ -188,8 +188,9 @@ Test subdirectories: `dynamics/`, `physics/`, `output/`, `GPU/`, `differentiabil
 
 ## Kernel Launching
 
-Kernel infrastructure lives in `SpeedyWeatherInternals/src/Utils/kernel_launching.jl`
-and `SpeedyWeatherInternals/src/Architectures/`.
+Kernel infrastructure lives in `SpeedyWeatherInternals/src/KernelLaunching/KernelLaunching.jl`
+(a standalone submodule of `SpeedyWeatherInternals`) and `SpeedyWeatherInternals/src/Architectures/`.
+Other packages import it via `using SpeedyWeatherInternals.KernelLaunching`.
 
 ### Architecture abstraction
 

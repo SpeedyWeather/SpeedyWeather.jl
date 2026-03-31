@@ -2,7 +2,7 @@ using KernelAbstractions
 
 @testset "KernelAbstractions tests" begin
 
-    import SpeedyWeatherInternals.KernelLaunching: launch!, LinearWorkOrder, SpectralWorkOrder, RingGridWorkOrder
+    import SpeedyWeather.SpeedyWeatherInternals.KernelLaunching: launch!, LinearWorkOrder, SpectralWorkOrder, RingGridWorkOrder
 
     # To-Do write tests for each type of dims_type in the kernel launching util,
     # the tests currently below will be removed when the KA becomes the only one
