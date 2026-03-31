@@ -99,6 +99,31 @@ simulation = initialize!(model)
 run!(simulation, period=Day(10), output=true)
 ```
 
+## Running on GPU
+
+To run a model on GPU, load a GPU backend package (e.g. `CUDA`, `AMDGPU`, or `Metal`)
+before using SpeedyWeather, then pass `GPU()` as the architecture:
+
+```julia
+using CUDA              # or AMDGPU, Metal
+using SpeedyWeather
+
+arch = SpeedyWeather.GPU()
+spectral_grid = SpectralGrid(trunc=31, nlayers=8, architecture=arch)
+model = PrimitiveWetModel(spectral_grid)
+simulation = initialize!(model)
+run!(simulation, period=Day(10))
+```
+
+The GPU backend must be loaded first so that SpeedyWeather's extension modules
+register the correct array types (`CuArray`, `ROCArray`, `MtlArray`).
+
+GPU tests live in `SpeedyWeather/test/GPU/` and can be run with:
+
+```bash
+julia --project=SpeedyWeather SpeedyWeather/test/GPU/runtests.jl
+```
+
 ## Time-Step Information Flow
 
 ```
