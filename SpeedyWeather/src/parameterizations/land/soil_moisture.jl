@@ -130,12 +130,19 @@ function timestep!(
     (; soil_moisture) = vars.prognostic.land
 
     launch!(
-        architecture(soil_moisture), RingGridWorkOrder, (size(soil_moisture, 1),),
-        interpolate_monthly_climatology_kernel!,
+        architecture(soil_moisture), RingGridWorkOrder, size(soil_moisture),
+        interpolate_monthly_climatology_3d_kernel!,
         soil_moisture, monthly_soil_moisture, weight, this_month, next_month
     )
 
     return nothing
+end
+
+@kernel inbounds = true function interpolate_monthly_climatology_3d_kernel!(
+        var, monthly, weight, this_month, next_month
+    )
+    ij, k = @index(Global, NTuple)
+    var[ij, k] = (1 - weight) * monthly[ij, k, this_month] + weight * monthly[ij, k, next_month]
 end
 
 export LandBucketMoisture

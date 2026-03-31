@@ -122,14 +122,24 @@ inside `run!` for spectral efficiency.
 Mainly two array types are used: `LowerTriangularArray` for spectral coefficients, and `Field` for gridded data. They can be initialized for testing as in the following: 
 
 ```julia 
-spectrum = Spectrum(trunc=10)
+arch = SpeedyWeather.CPU()
+spectrum = Spectrum(trunc=10, architecture = arch)
 nlayers = 5
 coeffs_zero = zeros(ComplexF32, spectrum, nlayers)
 coeffs_rand = rand(ComplexF32, spectrum, nlayers)
 
-grid = HEALPixGrid(5)
+grid = HEALPixGrid(6, arch)
 field_zero = zeros(Float32, grid, nlayers)
 field_rand = rand(Float32, grid, nlayers)
+```
+
+In case there's also an initialized `SpectralGrid` use it instead: 
+
+```julia
+arch = SpeedyWeather.CPU()
+spectral_grid = SpectralGrid(trunc=10, architecture=arch)
+coeffs = rand(ComplexF32, spectral_grid.spectrum)
+field = rand(Float32, spectral_grid.grid)
 ```
 
 ## Key Source Files
