@@ -409,28 +409,13 @@ export LearnedBRDF
     "Snow cover-albedo scheme"
     @param snow_cover::Scheme = SaturatingSnowCover() (group = :snow_cover,)
 
-    # Ocean normalisation parameters
-    input_means::Vector{NF} = Float32[
-        1.8544014e-1, 4.8125926e-1, 1.8360449e-1,
-        2.6629507e+2, 6.8946009e+0, 8.4837744e+3,
-        9.8664957e-1, 8.8243204e-1,
-    ]
-    input_stds::Vector{NF} = Float32[
-        3.3605048e-1, 4.4779891e-1, 1.372516e-1, 2.9311209e+1,
-        2.4076269e+1, 8.7741064e+3, 1.4606022e+0, 8.4775335e-1,
-    ]
-    output_means::Vector{NF} = Float32[
-        0.19499032, 0.05033005, 0.01945734,
-        0.36265752, 0.12071748, 0.04039559,
-        0.2922392, 0.08076486, 0.02871396,
-    ]
-    output_stds::Vector{NF} = Float32[
-        0.21011186, 0.02822702, 0.01345009,
-        0.13475, 0.05032686, 0.02287926,
-        0.16457707, 0.03171282, 0.01661654,
-    ]
-
     input_buffer::Vector{Float32} = zeros(Float32, 8)
+
+    # Normalisation parameters
+    norm_means::Vector{Float32} = zeros(Float32, 8)
+    norm_stds::Vector{Float32} = zeros(Float32, 8)
+    unnorm_means::Vector{Float32} = zeros(Float32, 6)
+    unnorm_stds::Vector{Float32} = zeros(Float32, 6)
 
     brdf_nn::LNN
     brdf_params::LP

@@ -162,51 +162,53 @@ Base.@propagate_inbounds function SpeedyWeather.surface_roughness!(ij, diagn, pr
     return nothing
 end
 
-# --- Albedo ---
-function ResidualBlock(dim::Int, dropout_rate::Float64 = 0.1)
-    inner_layers = Lux.Chain(
-        Lux.Dense(dim => dim, Lux.gelu),
-        Lux.LayerNorm((dim,)),
-        Lux.Dropout(dropout_rate),
-        Lux.Dense(dim => dim, Lux.gelu),
-        Lux.LayerNorm((dim,))
-    )
-    # Lux.SkipConnection automatically handles the `out + identity` operation
-    return Lux.SkipConnection(inner_layers, +)
-end
 
-function build_head(in_dim::Int, hidden_dim::Int)
-    return Lux.Chain(
-        Lux.Dense(in_dim => hidden_dim, Lux.gelu),
-        Lux.LayerNorm((hidden_dim,)),
-        Lux.Dense(hidden_dim => 3)
+using Lux, Random
+
+function PreNormResidualBlock(dim::Int, activation_fn, dropout_rate=0.05f0, expansion_factor=2)
+    hidden_dim = dim * expansion_factor
+    
+    return SkipConnection(
+        Chain(;
+            norm1   = BatchNorm(dim),
+            linear1 = Dense(dim => hidden_dim, activation_fn),
+            linear2 = Dense(hidden_dim => dim),
+            dropout = Dropout(dropout_rate)
+        ),
+        +
     )
 end
 
-function BRDFNet(; input_dim::Int = 8, shared_dim::Int = 256, head_dim::Int = 64, dropout_rate::Float64 = 0.1)
-    # 1. Trunk (Embedding + ResBlocks)
-    trunk = Lux.Chain(
-        Lux.Dense(input_dim => shared_dim, Lux.gelu),
-        Lux.LayerNorm((shared_dim,)),
-        ResidualBlock(shared_dim, dropout_rate),
-        ResidualBlock(shared_dim, dropout_rate)
+function BRDFNet(; input_dim=8, shared_dim=64, head_dim=64, activation_fn=gelu, dropout_rate=0.1f0)
+    
+    trunk_embed = Chain(;
+        linear   = Dense(input_dim => shared_dim),
+        norm_act = BatchNorm(shared_dim, activation_fn)
     )
 
-    # 2. Parallel Heads (vis, nir, sw)
-    # BranchLayer passes the same input (from the trunk) to all three sub-chains
-    heads = Lux.BranchLayer(
-        build_head(shared_dim, head_dim),
-        build_head(shared_dim, head_dim),
-        build_head(shared_dim, head_dim)
+    trunk_res_blocks = Chain(;
+        block1 = PreNormResidualBlock(shared_dim, activation_fn, dropout_rate),
+        block2 = PreNormResidualBlock(shared_dim, activation_fn, dropout_rate),
+        block3 = PreNormResidualBlock(shared_dim, activation_fn, dropout_rate)
     )
 
-    # 3. Combiner
-    # In Julia/Lux, the feature dimension is dim=1 (column-major: features x batch_size).
-    # `vcat` correctly mirrors PyTorch's `torch.cat([...], dim=1)`
-    combiner = Lux.WrappedFunction(x -> vcat(x...))
+    build_head(in_dim, hid_dim, out_feat) = Chain(;
+        linear1  = Dense(in_dim => hid_dim),
+        norm_act = BatchNorm(hid_dim, activation_fn),
+        linear2  = Dense(hid_dim => out_feat)
+    )
 
-    # Chain them all together
-    return Lux.Chain(trunk, heads, combiner)
+    heads = Parallel(vcat;
+        iso = build_head(shared_dim, head_dim, 2),
+        vol = build_head(shared_dim, head_dim, 2),
+        geo = build_head(shared_dim, head_dim, 2)
+    )
+
+    return Chain(; 
+        trunk_embed = trunk_embed, 
+        trunk_res_blocks = trunk_res_blocks, 
+        heads = heads
+    )
 end
 
 function SpeedyWeather.LearnedBRDF(
@@ -237,65 +239,9 @@ function SpeedyWeather.LearnedBRDF(
     )
 end
 
-function load_brdf_parameters!(params, weights::Dict{String, Array{Float32}})
-    # Define a mapping from PyTorch keys to the corresponding Lux parameter nested structure.
-    # Format: "pytorch_layer_prefix" => (Lux_layer_reference, is_layernorm)
-
-    mapping = [
-        # 1. Trunk Embed (Maps to params.layer_1)
-        "trunk_embed.0" => (params.layer_1.layer_1, false),
-        "trunk_embed.2" => (params.layer_1.layer_2, true),
-
-        # 2. ResBlock 1 (Maps to params.layer_1.layer_3)
-        "trunk_res_blocks.0.linear1" => (params.layer_1.layer_3.layer_1, false),
-        "trunk_res_blocks.0.norm1" => (params.layer_1.layer_3.layer_2, true),
-        "trunk_res_blocks.0.linear2" => (params.layer_1.layer_3.layer_4, false),
-        "trunk_res_blocks.0.norm2" => (params.layer_1.layer_3.layer_5, true),
-
-        # 3. ResBlock 2 (Maps to params.layer_1.layer_4)
-        "trunk_res_blocks.1.linear1" => (params.layer_1.layer_4.layer_1, false),
-        "trunk_res_blocks.1.norm1" => (params.layer_1.layer_4.layer_2, true),
-        "trunk_res_blocks.1.linear2" => (params.layer_1.layer_4.layer_4, false),
-        "trunk_res_blocks.1.norm2" => (params.layer_1.layer_4.layer_5, true),
-
-        # 4. Heads (Maps to params.layer_2. BranchLayer stores them as layer_1, layer_2, layer_3)
-        "vis_head.0" => (params.layer_2.layer_1.layer_1, false),
-        "vis_head.2" => (params.layer_2.layer_1.layer_2, true),
-        "vis_head.3" => (params.layer_2.layer_1.layer_3, false),
-
-        "nir_head.0" => (params.layer_2.layer_2.layer_1, false),
-        "nir_head.2" => (params.layer_2.layer_2.layer_2, true),
-        "nir_head.3" => (params.layer_2.layer_2.layer_3, false),
-
-        "sw_head.0" => (params.layer_2.layer_3.layer_1, false),
-        "sw_head.2" => (params.layer_2.layer_3.layer_2, true),
-        "sw_head.3" => (params.layer_2.layer_3.layer_3, false),
-    ]
-
-    for (py_prefix, (lux_layer, is_layernorm)) in mapping
-        weight_key = py_prefix * ".weight"
-        bias_key = py_prefix * ".bias"
-
-        if haskey(weights, weight_key) && haskey(weights, bias_key)
-            if is_layernorm
-                # PyTorch LayerNorm uses 'weight', Lux uses 'scale'
-                lux_layer.scale .= weights[weight_key]
-            else
-                # PyTorch and Lux Dense layers both expect (out_features, in_features)
-                lux_layer.weight .= weights[weight_key]
-            end
-            lux_layer.bias .= weights[bias_key]
-        else
-            @warn "Weights or bias for $py_prefix not found in loaded PyTorch dictionary"
-        end
-    end
-
-    return nothing
-end
-
 Adapt.@adapt_structure SpeedyWeather.LearnedBRDF
 function SpeedyWeather.initialize!(brdf::LearnedBRDF, ::PrimitiveEquation)
-    weights = RingGrids.get_asset(
+    params = RingGrids.get_asset(
         brdf.path,
         from_assets = brdf.from_assets,
         name = "brdf", # Adjust this if your asset name differs
@@ -304,8 +250,12 @@ function SpeedyWeather.initialize!(brdf::LearnedBRDF, ::PrimitiveEquation)
         version = brdf.version
     )
 
-    load_brdf_parameters!(brdf.brdf_params, weights)
+    brdf.norm_means .= params["x_mean"]
+    brdf.norm_stds .= params["x_std"]
+    brdf.unnorm_means .= params["y_mean"]
+    brdf.unnorm_stds .= params["y_std"]
 
+    load_brdf_parameters!(brdf.brdf_params, params)
     return nothing
 end
 
@@ -323,76 +273,77 @@ end
 """
 Calculate SAL using the Lucht et al. (2000) polynomial.
 """
-Base.@propagate_inbounds function calculate_black_sky_albedo(f_iso, f_vol, f_geo, mu0)
-    # Computed directly to avoid heap allocations
+Base.@propagate_inbounds function calculate_black_sky_albedo(f_iso, f_vol, f_geo, θ)
     NF = typeof(f_iso)
-    c_iso = NF(1.0) - NF(0.007574) * mu0 - NF(1.284909) * mu0^2
-    c_vol = NF(-0.070987) * mu0 - NF(0.166314) * mu0^2
-    c_geo = NF(0.307588) * mu0 + NF(0.04184) * mu0^2
-
+    c_iso = NF(1.0) + (NF(0.0) * θ^2) + (NF(0.0) * θ^3)
+    c_vol = NF(-0.007574) + (NF(-0.070987) * θ^2) + (NF(0.307588) * θ^3)
+    c_geo = NF(-1.284909) + (NF(-0.166314) * θ^2) + (NF(0.04184) * θ^3)
     return (c_iso * f_iso) + (c_vol * f_vol) + (c_geo * f_geo)
 end
 
 """ Calculate BSA from SAL and WSA using fraction of direct radiation at the surface"""
-Base.@propagate_inbounds function calculate_bsa_from_fraction(f_iso, f_vol, f_geo, mu0, fraction_direct)
+Base.@propagate_inbounds function calculate_bsa_from_fraction(f_iso, f_vol, f_geo, θ, fraction_direct)
     wsa = calculate_white_sky_albedo(f_iso, f_vol, f_geo)
-    bsa = calculate_black_sky_albedo(f_iso, f_vol, f_geo, mu0)
+    bsa = calculate_black_sky_albedo(f_iso, f_vol, f_geo, θ)
     return (fraction_direct * bsa) + ((1 - fraction_direct) * wsa)
 end
+
+const vis_weight, nir_weight = 0.5308, 0.4771
 
 Base.@propagate_inbounds function brdf(ij, diagn, progn, scheme::LearnedBRDF)
     # Calculate snow cover
     snow_depth = progn.land.snow_depth[ij]
-    snow_cover = scheme.snow_cover(snow_depth, scheme.snow_depth_scale)
+    snow_cover = scheme.snow_cover(snow_depth, scheme.snow_depth_scale) * 100
 
     # Normalise inputs
-    vegh = normalise(diagn.physics.land.vegetation_high[ij], scheme.input_means[1], scheme.input_stds[1]) 
-    vegl = normalise(diagn.physics.land.vegetation_low[ij], scheme.input_means[2], scheme.input_stds[2])
-    soil_moisture = normalise(progn.land.soil_moisture[ij, end], scheme.input_means[3], scheme.input_stds[3])
-    soil_temperature = normalise(progn.land.soil_temperature[ij, end], scheme.input_means[4], scheme.input_stds[4])
-    snow_cover = normalise(snow_cover, scheme.input_means[5], scheme.input_stds[5])
-    geopotential = normalise(diagn.grid.geopotential[ij, end], scheme.input_means[6], scheme.input_stds[6])
-    lai_hv = normalise(diagn.physics.land.lai_hv[ij], scheme.input_means[7], scheme.input_stds[7])
-    lai_lv = normalise(diagn.physics.land.lai_lv[ij], scheme.input_means[8], scheme.input_stds[8])
+    vegh = normalise(diagn.physics.land.vegetation_high[ij], scheme.norm_means[1], scheme.norm_stds[1])
+    vegl = normalise(diagn.physics.land.vegetation_low[ij], scheme.norm_means[2], scheme.norm_stds[2])
+    soil_moisture = normalise(progn.land.soil_moisture[ij, end], scheme.norm_means[3], scheme.norm_stds[3])
+    soil_temperature = normalise(progn.land.soil_temperature[ij, end], scheme.norm_means[4], scheme.norm_stds[4])
+    snow_cover = normalise(snow_cover, scheme.norm_means[5], scheme.norm_stds[5])
+    geopotential = normalise(diagn.grid.geopotential[ij, end], scheme.norm_means[6], scheme.norm_stds[6])
+    lai_hv = normalise(diagn.physics.land.lai_hv[ij], scheme.norm_means[7], scheme.norm_stds[7])
+    lai_lv = normalise(diagn.physics.land.lai_lv[ij], scheme.norm_means[8], scheme.norm_stds[8])
 
 
     scheme.input_buffer[:] .= (
-        vegh, vegl, soil_moisture, soil_temperature, snow_cover, geopotential, lai_hv, lai_lv
+        vegh, vegl, soil_moisture, soil_temperature, snow_cover, geopotential, lai_hv, lai_lv,
     )
 
     # TODO: sort out this reshaping stuff. Probably fixed by not using layer norm in the network.
     input_matrix = reshape(scheme.input_buffer, :, 1)
     prediction, _ = Lux.apply(scheme.brdf_nn, input_matrix, scheme.brdf_params, scheme.brdf_states)
-    # vis_pred = prediction[1:3]
-    # nir_pred = prediction[4:6]
-    sw_pred_iso = prediction[7]
-    sw_pred_vol = prediction[8]
-    sw_pred_geo = prediction[9]
+    vis_pred = prediction[1:3]
+    nir_pred = prediction[4:6]
+    
+    sw_pred = vis_weight * vis_pred + nir_weight * nir_pred
+    sw_pred_iso, sw_pred_vol, sw_pred_geo = sw_pred
 
     # Unnorm outputs
-    sw_pred_iso = denormalise(sw_pred_iso, scheme.output_means[7], scheme.output_stds[7])
-    sw_pred_vol = denormalise(sw_pred_vol, scheme.output_means[8], scheme.output_stds[8])
-    sw_pred_geo = denormalise(sw_pred_geo, scheme.output_means[9], scheme.output_stds[9])
+    sw_pred_iso = denormalise(sw_pred_iso, scheme.unnorm_means[7], scheme.unnorm_stds[7])
+    sw_pred_vol = denormalise(sw_pred_vol, scheme.unnorm_means[8], scheme.unnorm_stds[8])
+    sw_pred_geo = denormalise(sw_pred_geo, scheme.unnorm_means[9], scheme.unnorm_stds[9])
 
-    mu0 = diagn.physics.cos_zenith[ij]
+    μ = diagn.physics.cos_zenith[ij]
+    θ = acos(μ)
     fraction_direct = diagn.physics.rad_fraction_direct[ij]
 
-    return calculate_bsa_from_fraction(sw_pred_iso, sw_pred_vol, sw_pred_geo, mu0, fraction_direct)
+    return calculate_bsa_from_fraction(sw_pred_iso, sw_pred_vol, sw_pred_geo, θ, fraction_direct)
 end
 
 Base.@propagate_inbounds function SpeedyWeather.albedo!(ij, diagn, progn, scheme::LearnedBRDF, model)
     land_fraction = model.land_sea_mask.mask[ij]
-    
+
     # Don't run for fully ocean cells
     if land_fraction == 0
         diagn.physics.land.albedo[ij] = zero(land_fraction)
         return nothing
     end
-    
+
     # Don't run for night-time cells
-    mu = diagn.physics.cos_zenith[ij]
-    if mu <= 0
-        diagn.physics.land.albedo[ij] = one(mu) 
+    μ = diagn.physics.cos_zenith[ij]
+    if μ <= 0
+        diagn.physics.land.albedo[ij] = one(μ)
         return nothing
     end
 
