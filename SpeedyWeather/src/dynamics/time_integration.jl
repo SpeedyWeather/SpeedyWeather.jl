@@ -396,7 +396,7 @@ function timestep!(
         dynamics_tendencies!(vars, lf2, model)              # dynamical core
         implicit_correction!(vars, model.implicit, model)   # semi-implicit time stepping corrections
     else    # just transform physics tendencies to spectral space
-        physics_tendencies_only!(vars, model)
+        parameterization_tendencies_only!(vars, model)
     end
 
     # APPLY DIFFUSION, STEP FORWARD IN TIME, AND TRANSFORM NEW TIME STEP TO GRID

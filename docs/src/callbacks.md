@@ -138,7 +138,7 @@ The function signature for `callback!` is the same as for `initialize!`. You may
 access anything from `vars` or `model`, although for a purely diagnostic
 callback this should be read-only. While you could change other model components like the
 land sea mask in `model.land_sea_mask` or orography etc. then you interfere with the
-simulation which is more advanced and will be discussed in Intrusive callbacks below.
+simulation which is more advanced and will be discussed in [Intrusive callbacks](@ref) below.
 
 Lastly, we extend the `finalize!` function which is called once after the last time step.
 This could be used, for example, to save the `maximum_surface_wind_speed` vector to
@@ -229,7 +229,7 @@ global mean surface temperatures in Kelvin on every time step while the model ra
 model.callbacks[:temperature].temp
 ```
 
-## [Intrusive callbacks](@id intrusive_callbacks)
+## Intrusive callbacks
 
 In the sections above, callbacks were introduced as a tool to define custom
 diagnostics or simulation output. This is the simpler and recommended way of using

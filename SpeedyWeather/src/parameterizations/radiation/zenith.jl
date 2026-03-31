@@ -210,10 +210,11 @@ function cos_zenith!(
     sinδ, cosδ = sincos(δ)
 
     # Launch kernel for solar zenith calculation
-    return launch!(
+    launch!(
         architecture(cos_zenith), LinearWorkOrder, size(cos_zenith), solar_zenith_kernel!,
         cos_zenith, solar_hour_angle_0E, sinδ, cosδ, sinlat, coslat, lons, cos_zenith.grid.whichring
     )
+    return nothing
 end
 
 # Kernel for solar zenith calculation with daily cycle
@@ -223,7 +224,7 @@ end
     )
 
     ij = @index(Global, Linear)
-    j = whichring[ij]
+    j = whichring[ij]  
 
     sinδsinϕ = sinδ * sinlat[j]
     cosδcosϕ = cosδ * coslat[j]
@@ -275,10 +276,11 @@ function cos_zenith!(
     sinδ, cosδ = sincos(δ)
 
     # Launch kernel for seasonal solar zenith calculation
-    return launch!(
+    launch!(
         architecture(cos_zenith), LinearWorkOrder, size(cos_zenith), solar_zenith_season_kernel!,
         cos_zenith, δ, sinδ, cosδ, sinlat, coslat, lat, cos_zenith.grid.whichring
     )
+    return nothing
 end
 
 # Kernel for seasonal solar zenith calculation (daily average)

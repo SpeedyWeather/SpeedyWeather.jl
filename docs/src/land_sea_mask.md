@@ -120,7 +120,7 @@ You can for example read something from file, set some values manually, or use c
 
 ## Time-dependent land-sea mask
 
-It is possible to define an [intrusive callback](@ref intrusive_callbacks) to change the
+It is possible to define [Intrusive callbacks](@ref) to change the
 land-sea mask during integration. The grid in `model.land_sea_mask.mask`
 is mutable, meaning you can change the values of grid points in-place but not replace
 the entire mask or change its size. If that mask is changed, this will be reflected

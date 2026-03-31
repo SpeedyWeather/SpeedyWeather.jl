@@ -514,7 +514,7 @@ end
 For `dynamics=false`, after calling `parameterization_tendencies!` call this function
 to transform the physics tendencies from grid-point to spectral space including the
 necessary coslat⁻¹ scaling."""
-function physics_tendencies_only!(
+function parameterization_tendencies_only!(
         vars::Variables,
         model::PrimitiveEquation,
     )
