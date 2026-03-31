@@ -108,7 +108,10 @@ end
 
         # Euler forward time step but cap at 0 depth to not melt more snow than available
         snow_depth_forward = max(snow_depth[ij] + Δt * dsnow, 0)
-        snow_depth[ij] = min(snow_depth_forward, snow_depth_cap)  # cap at permanent snow/ice depth
+
+        # Conservation of mass is violated here by removing excess snow above the depth cap,
+        # but we do it at the end here to avoid that excess adding to the melt rate
+        snow_depth[ij] = min(snow_depth_forward, snow_depth_cap) 
     end
 end
 
