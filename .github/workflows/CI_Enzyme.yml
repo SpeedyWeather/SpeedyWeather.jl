@@ -48,8 +48,6 @@ jobs:
           Pkg.instantiate()
         if: ${{ matrix.version == '1.10' }}
       - uses: julia-actions/julia-buildpkg@v1
-      - uses: julia-actions/julia-runtest@v1
-
       - name: Run Enzyme differentiability tests
         run: |
           julia --color=yes --project=SpeedyWeather/test/differentiability SpeedyWeather/test/differentiability/full_diff_CI.jl
