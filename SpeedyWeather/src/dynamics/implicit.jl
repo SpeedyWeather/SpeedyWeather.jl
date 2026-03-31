@@ -98,7 +98,7 @@ end
     # Vⁱ is a prognostic variable at time step i
     # N is the right hand side of ∂V\∂t = N(V)
     # NI is the part of N that's calculated semi-implicitily: N = NE + NI
-    G_div = div_tend[lm, k] - g * ∇² * (η_old[lm, k] - η_new[lm, k])
+    G_div = div_tend[lm, k] - g * ∇² * (η_old[lm] - η_new[lm])
     G_η = η_tend[lm] - H * (div_old[lm, k] - div_new[lm, k])
 
     # Using the Gs correct the tendencies for semi-implicit time stepping
