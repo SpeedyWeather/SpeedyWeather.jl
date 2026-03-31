@@ -11,6 +11,7 @@ import FastGaussQuadrature
 import LinearAlgebra
 
 # ASSET DOWNLOADING
+import Downloads
 import Artifacts
 import Pkg
 
