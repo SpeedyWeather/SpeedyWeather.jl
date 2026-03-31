@@ -273,6 +273,19 @@ Kernels are spread across ~36 files in `SpeedyWeather/src/dynamics/`,
 `physics/`, `SpeedyTransforms/src/`, `RingGrids/src/`, and
 `LowerTriangularArrays/src/`.
 
+## Benchmarks
+
+Benchmarks live in `SpeedyWeather/benchmark/`. Run the full suite with:
+
+```bash
+julia --project=SpeedyWeather/benchmark SpeedyWeather/benchmark/manual_benchmarking.jl
+```
+
+Results are written to `SpeedyWeather/benchmark/README.md`. Previous benchmark results
+in that file serve as the baseline. When running benchmarks, compare new results against
+the existing README.md values: deviations of +/- 20% are normal and acceptable, but
+larger regressions should be reported to the user.
+
 ## Code Style
 
 The project uses [Runic.jl](https://github.com/fredrikekre/Runic.jl) for formatting.
