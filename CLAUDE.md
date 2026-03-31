@@ -133,7 +133,7 @@ field_zero = zeros(Float32, grid, nlayers)
 field_rand = rand(Float32, grid, nlayers)
 ```
 
-In case there's also an initialized `SpectralGrid` use it instead: 
+In case there's already a `SpectralGrid` use it instead: 
 
 ```julia
 arch = SpeedyWeather.CPU()
