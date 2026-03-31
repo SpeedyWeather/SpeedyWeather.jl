@@ -97,9 +97,9 @@ function print_fields(io::IO, A, keys; arrays::Bool = false)
 end
 
 """$(TYPEDSIGNATURES)
-Returns `Dates.CompoundPeriod` rounding to either (days, hours), (hours, minutes), (minutes,
-seconds), or seconds with 1 decimal place accuracy for >10s and two for less.
-E.g.
+Returns a human-readable string for a duration given in seconds, rounding to
+(days, hours), (hours, minutes), (minutes, seconds), or seconds with
+1-2 decimal places for short durations. E.g.
 ```@example
 julia> using SpeedyWeather: readable_secs
 
@@ -107,7 +107,7 @@ julia> readable_secs(12345)
 ```
 """
 function readable_secs(secs::Real)
-    millisecs = Dates.Millisecond(round(secs * 1000))
+    millisecs = Dates.Millisecond(round(Int, secs * 1000))
     if millisecs >= Dates.Day(1)
         return Dates.canonicalize(round(millisecs, Dates.Hour))
     elseif millisecs >= Dates.Hour(1)
@@ -118,4 +118,35 @@ function readable_secs(secs::Real)
         return Dates.canonicalize(round(millisecs, Dates.Millisecond(100)))
     end
     return Dates.canonicalize(round(millisecs, Dates.Millisecond(10)))
+end
+
+"""
+$(TYPEDSIGNATURES)
+Fallback for `@maybe_jit` when Reactant is not available. Just calls `f(args...; kwargs...)`."""
+_jit(::AbstractArchitecture, f, args...; kwargs...) = f(args...; kwargs...)
+
+"""
+    @maybe_jit arch expr
+
+Macro that conditionally applies `Reactant.@jit` based on the architecture.
+For `ReactantDevice`, the extension overloads `_jit` to use `@jit`.
+For other architectures, just executes the expression directly.
+
+Usage: `@maybe_jit model.architecture initialize!(model.geometry, model)`
+"""
+macro maybe_jit(arch, expr)
+    if expr.head == :call
+        f = expr.args[1]
+        rest = expr.args[2:end]
+        # keyword arguments appear as Expr(:parameters, ...) at the front of rest
+        if !isempty(rest) && rest[1] isa Expr && rest[1].head == :parameters
+            kwargs = rest[1]
+            args = rest[2:end]
+            return :(_jit($(esc(arch)), $(esc(f)), $(esc.(args)...); $(esc.(kwargs.args)...)))
+        else
+            return :(_jit($(esc(arch)), $(esc(f)), $(esc.(rest)...)))
+        end
+    else
+        return esc(expr)
+    end
 end

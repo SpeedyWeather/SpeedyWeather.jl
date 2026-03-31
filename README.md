@@ -73,10 +73,11 @@ On our TODO list are
 - Exoplanet support with more flexibility on the atmospheric composition
 - 3D particle advection
 
-Currently in development are
+Currently in development, but already (partially) available are
 
 - Single GPU and CPU multi-threading support via KernelAbstractions
 - Differentiability with Enzyme
+- MLIR/OpenXLA compilation with Reactant
 
 ## Contributing
 

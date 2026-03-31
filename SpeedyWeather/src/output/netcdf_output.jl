@@ -21,6 +21,8 @@ $(TYPEDFIELDS)"""
         Field2D,
         Field3D,
         Interpolator,
+        DT,
+        S,
     } <: AbstractOutput
 
     # FILE OPTIONS
@@ -64,10 +66,10 @@ $(TYPEDFIELDS)"""
 
     # WHAT/WHEN OPTIONS
     "[DERIVD] start date of the simulation, used for time dimension in netcdf file"
-    startdate::DateTime = DateTime(2000, 1, 1)
+    startdate::DT = DateTime(2000, 1, 1)
 
     "[OPTION] output frequency, time step"
-    output_dt::Second = Second(DEFAULT_OUTPUT_DT)
+    output_dt::S = Second(DEFAULT_OUTPUT_DT)
 
     "[OPTION] dictionary of variables to output, e.g. u, v, vor, div, pres, temp, humid"
     variables::OUTPUT_VARIABLES_DICT = OutputVariablesDict()
@@ -234,12 +236,17 @@ function set!(output::AbstractOutput; active, reset_path = true)
     return nothing
 end
 
+# fallback for nothing output
+function set!(::Nothing; active, reset_path = true)
+    return nothing
+end
+
 """$(TYPEDSIGNATURES)
 Initialize NetCDF `output` by creating a netCDF file and storing the initial conditions
 of `diagn` (and `progn`). To be called just before the first timesteps."""
 function initialize!(
         output::NetCDFOutput,
-        feedback::AbstractFeedback,
+        feedback::Union{AbstractFeedback, Nothing},
         progn::PrognosticVariables,
         diagn::DiagnosticVariables,
         model::AbstractModel,
@@ -288,9 +295,10 @@ function initialize!(
     output!(output, progn.clock.time)   # write initial time
 
     # DEFINE NETCDF DIMENSIONS SPACE
+    # explictly move to CPU to avoid issues with Reactant and on GPU
     lond = get_lond(output.field2D)
     latd = get_latd(output.field2D)
-    σ = model.geometry.σ_levels_full
+    σ = on_architecture(CPU(), model.geometry.σ_levels_full)
     soil_indices = collect(1:get_soil_layers(model))
 
     defVar(dataset, "lon", lond, ("lon",), attrib = Dict("units" => "degrees_east", "long_name" => "longitude"))
@@ -313,6 +321,11 @@ function initialize!(
 
     # add RestartFile callback
     output.write_restart && add!(model.callbacks, :restart_file => RestartFile())
+    return nothing
+end
+
+# fallback for nothing output
+function initialize!(::Nothing, ::Union{AbstractFeedback, Nothing}, ::PrognosticVariables, ::DiagnosticVariables, ::AbstractModel)
     return nothing
 end
 
@@ -353,6 +366,11 @@ function output!(output::AbstractOutput, simulation::AbstractSimulation)
     (; clock) = simulation.prognostic_variables
     output!(output, clock.time)                                         # increase counter write time
     return output!(output, output.variables, simulation)                       # write variables
+end
+
+# fallback for nothing output
+function output!(::Nothing, ::AbstractSimulation)
+    return nothing
 end
 
 get_indices(i, variable::AbstractOutputVariable) = get_indices(i, Val.(variable.dims_xyzt)...)
@@ -464,6 +482,8 @@ function finalize!(
     return close(output)
 end
 
+finalize!(::Nothing, ::AbstractSimulation) = nothing
+
 # default finalize method for output variables
 function finalize!(
         output::AbstractOutput,
@@ -542,3 +562,13 @@ function load_trajectory(var_name::Union{Symbol, String}, model::AbstractModel)
     @assert model.output.active "Output is turned off"
     return Array(NCDataset(get_full_output_file_path(model.output))[string(var_name)])
 end
+
+"""
+$(TYPEDSIGNATURES)
+Returns the output time step of the model `M`."""
+function get_output_dt(output::AbstractOutput)
+    return output.output_dt
+end
+
+# Fallback for when output is nothing
+get_output_dt(::Nothing) = Millisecond(0)

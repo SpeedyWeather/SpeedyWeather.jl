@@ -102,12 +102,12 @@ function WhichZenith(SG::SpectralGrid, P::AbstractPlanet; kwargs...)
     solar_declination = SinSolarDeclination(P)
 
     if daily_cycle
-        return SolarZenith{NF, typeof(solar_declination)}(;
+        return SolarZenith{NF, typeof(solar_declination), Base.RefValue{DateTime}}(;
             length_of_day, length_of_year, solar_declination, seasonal_cycle, kwargs...
         )
 
     else
-        return SolarZenithSeason{NF, typeof(solar_declination)}(;
+        return SolarZenithSeason{NF, typeof(solar_declination), Base.RefValue{DateTime}}(;
             length_of_day, length_of_year, solar_declination, seasonal_cycle, kwargs...
         )
     end
@@ -130,7 +130,7 @@ export SolarZenith
 
 """Solar zenith angle varying with daily and seasonal cycle.
 $(TYPEDFIELDS)"""
-@parameterized @kwdef struct SolarZenith{NF <: AbstractFloat, SD <: AbstractSolarDeclination} <: AbstractZenith
+@parameterized @kwdef struct SolarZenith{NF <: AbstractFloat, SD <: AbstractSolarDeclination, RV} <: AbstractZenith
     # OPTIONS
     length_of_day::Second = Hour(24)
     length_of_year::Second = Day(365.25)
@@ -138,13 +138,13 @@ $(TYPEDFIELDS)"""
     seasonal_cycle::Bool = true
 
     # COEFFICIENTS
-    @param solar_declination::SD = SinSolarDeclination(Earth{NF}()) (group = :solar_declination,)
+    @param solar_declination::SD = SinSolarDeclination(Earth(NF)) (group = :solar_declination,)
     @param time_correction::SolarTimeCorrection{NF} = SolarTimeCorrection{NF}() (group = :time_correction,)
 
-    initial_time::Base.RefValue{DateTime} = Ref(DEFAULT_DATE)
+    initial_time::RV = Ref(DEFAULT_DATE) # <: Base.RefValue{DateTime}
 end
 
-SolarZenith(SG::SpectralGrid; kwargs...) = SolarZenith{SG.NF, SinSolarDeclination{Earth{SG.NF}}}(; kwargs...)
+SolarZenith(SG::SpectralGrid; kwargs...) = SolarZenith{SG.NF, SinSolarDeclination{typeof(Earth(SG.NF))}, Base.RefValue{DateTime}}(; kwargs...)
 
 function initialize!(
         S::AbstractZenith,
@@ -157,18 +157,18 @@ end
 """
 $(TYPEDSIGNATURES)
 Fraction of year as angle in radians [0...2π].
-TODO: Takes length of day/year as argument, but calls to Dates.Time(), Dates.dayofyear()
+TODO: Takes length of day/year as argument, but calls to secondofday(), dayofyear()
 currently have these hardcoded."""
 function year_angle(::Type{T}, time::DateTime, length_of_day::Second, length_of_year::Second) where {T}
     year2rad = convert(T, 2π / length_of_year.value)
-    sec_of_day = Dates.second(Dates.Time(time).instant)
+    sec_of_day = secondofday(time)
     return year2rad * (Dates.dayofyear(time) * length_of_day.value + sec_of_day)
 end
 
 """
 $(TYPEDSIGNATURES)
 Fraction of day as angle in radians [0...2π].
-TODO: Takes length of day as argument, but a call to Dates.Time()
+TODO: Takes length of day as argument, but a call to secondofday()
 currently have this hardcoded anyway."""
 function solar_hour_angle(
         ::Type{T},
@@ -178,7 +178,7 @@ function solar_hour_angle(
     ) where {T}
     day2rad = convert(T, 2π / length_of_day.value)
     noon_in_sec = length_of_day.value ÷ 2
-    sec_of_day = Dates.second(Dates.Time(time).instant)
+    sec_of_day = secondofday(time)
     return (sec_of_day - noon_in_sec) * day2rad + convert(T, λ)
 end
 
@@ -188,12 +188,11 @@ Calculate cos of solar zenith angle with a daily cycle
 at time `time`. Seasonal cycle or time correction may be disabled,
 depending on parameters in SolarZenith."""
 function cos_zenith!(
-        cos_zenith::AbstractField,
+        cos_zenith::AbstractField{NF},
         S::SolarZenith,
         time::DateTime,
         geometry::AbstractGeometry,
-    )
-    NF = eltype(cos_zenith)
+    ) where {NF}
     (; sinlat, coslat, lons) = geometry
     (; length_of_day, length_of_year) = S
     @boundscheck geometry.spectral_grid.grid == cos_zenith.grid ||
@@ -241,19 +240,19 @@ export SolarZenithSeason
 
 """Solar zenith angle varying with seasonal cycle only.
 $(TYPEDFIELDS)"""
-@parameterized @kwdef struct SolarZenithSeason{NF <: AbstractFloat, SD <: AbstractSolarDeclination} <: AbstractZenith
+@parameterized @kwdef struct SolarZenithSeason{NF <: AbstractFloat, SD <: AbstractSolarDeclination, RV} <: AbstractZenith
     # OPTIONS
     length_of_day::Second = Hour(24)
     length_of_year::Second = Day(365.25)
     seasonal_cycle::Bool = true
 
     # COEFFICIENTS
-    @param solar_declination::SD = SinSolarDeclination(Earth{NF}()) (group = :solar_declination,)
+    @param solar_declination::SD = SinSolarDeclination(Earth(NF)) (group = :solar_declination,)
 
-    initial_time::Base.RefValue{DateTime} = Ref(DEFAULT_DATE)
+    initial_time::RV = Ref(DEFAULT_DATE) # <: Base.RefValue{DateTime}
 end
 
-SolarZenithSeason(SG::SpectralGrid; kwargs...) = SolarZenithSeason{SG.NF, SinSolarDeclination{Earth{SG.NF}}}(; kwargs...)
+SolarZenithSeason(SG::SpectralGrid; kwargs...) = SolarZenithSeason{SG.NF, SinSolarDeclination{typeof(Earth(SG.NF))}, Base.RefValue{DateTime}}(; kwargs...)
 
 """
 $(TYPEDSIGNATURES)
@@ -261,12 +260,11 @@ Calculate cos of solar zenith angle as daily average
 at time `time`. Seasonal cycle or time correction may be disabled,
 depending on parameters in SolarZenithSeason."""
 function cos_zenith!(
-        cos_zenith::AbstractField,
+        cos_zenith::AbstractField{NF},
         S::SolarZenithSeason,
         time::DateTime,
         geometry::AbstractGeometry,
-    )
-    NF = eltype(cos_zenith)
+    ) where {NF}
     (; sinlat, coslat, lat) = geometry
     (; length_of_day, length_of_year) = S
     @boundscheck geometry.spectral_grid.grid == cos_zenith.grid ||

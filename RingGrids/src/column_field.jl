@@ -201,38 +201,6 @@ end
 add!(field::Field, column_field::ColumnField) = field .+= transpose(column_field)
 add!(column_field::ColumnField, field::Field) = column_field .+= transpose(field)
 
-## BROADCASTING (main functionality defined in field.jl)
-
-# define broadcast style for ColumnField from its parameters
-Base.BroadcastStyle(::Type{F}) where {F <: ColumnField{T, N, ArrayType, Grid}} where {T, N, ArrayType, Grid} =
-    FieldStyle{N, nonparametric_type(Grid), true}()
-
-# allocation for broadcasting via similar, reusing grid from the first field of the broadcast arguments
-# e.g. field1 + field2 creates a new field that share the grid of field1
-# 2 .+ field1 creates a new field that share the grid of field1
-function Base.similar(bc::Broadcasted{FieldStyle{N, Grid, true}}, ::Type{T}) where {N, Grid, T}
-    field = find_field(bc)
-    ArrayType_ = nonparametric_type(typeof(field.data))
-    new_data = ArrayType_{T}(undef, size(bc))
-    old_grid = field.grid
-    return ColumnField(new_data, old_grid)
-end
-
-# same as for FieldStyle but for constrain to ArrayType<:GPUArrays
-function Base.BroadcastStyle(
-        ::Type{F}
-    ) where {F <: ColumnField{T, N, ArrayType, Grid}} where {T, N, ArrayType <: GPUArrays.AbstractGPUArray, Grid}
-    return FieldGPUStyle{N, Grid, true}()
-end
-
-function Base.similar(bc::Broadcasted{FieldGPUStyle{N, Grid, true}}, ::Type{T}) where {N, Grid, T}
-    field = find_field(bc)
-    ArrayType_ = nonparametric_type(typeof(field.data))
-    new_data = ArrayType_{T}(undef, size(bc))
-    old_grid = field.grid
-    return ColumnField(new_data, old_grid)
-end
-
 function Architectures.on_architecture(arch, field::ColumnField{T, N, ArrayType, Grid}) where {T, N, ArrayType, Grid}
     adapted_data = on_architecture(arch, field.data)
     if ismatching(field.grid, typeof(adapted_data))

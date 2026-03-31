@@ -1,3 +1,5 @@
+using Dates
+
 @testset "Sec, min, hrs arguments" begin
     SG = SpectralGrid(trunc = 42, nlayers = 1)
     L1 = Leapfrog(SG, Δt_at_T31 = 30)
@@ -67,15 +69,13 @@ end
     @test_throws AssertionError run!(simulation, steps = 1, period = Day(1))
 end
 
-import Dates
-
 @testset "time conversions" begin
-    # Priated conversions from integer/float types
+    # Conversions from integer/float types
     @test convert(Second, 1) == Second(1)
     @test convert(Second, 1.4) == Second(1)
     @test convert(Second, 1.5) == Second(2)
 
-    # Pirated conversions for month and year
+    # Conversions for month and year
     @test Second(Year(1)) == Second(365 * 24 * 60 * 60)
     @test Day(Year(1)) == Day(365)
     @test Hour(Year(1)) == Hour(Second(Year(1)))
@@ -92,7 +92,6 @@ import Dates
     @test Century(1) == Year(100)
     @test Second(Century(1)) == Second(100 * 365 * 24 * 60 * 60)
     @test Millisecond(Century(1)) == Millisecond(Second(Century(1)))
-    @test Dates.coarserperiod(Year) == (Century, 100)
     @test_throws MethodError Week(Century(1))
 
     # Millenium
@@ -102,11 +101,62 @@ import Dates
     @test Millenium(1) == Century(10)
     @test Second(Millenium(1)) == Second(1000 * 365 * 24 * 60 * 60)
     @test Millisecond(Millenium(1)) == Millisecond(Second(Millenium(1)))
-    @test Dates.coarserperiod(Century) == (Millenium, 10)
     @test_throws MethodError Week(Millenium(1))
 
     # Type promotion rules
     @test promote(Year(1), Century(1)) == (Year(1), Year(100))
     @test promote(Year(1), Millenium(1)) == (Year(1), Year(1000))
     @test promote(Century(1), Millenium(1)) == (Century(1), Century(10))
+end
+
+@testset "Century and Millenium" begin
+
+    @testset "Parametric construction" begin
+        c = Century(1)
+        @test c isa Century{Int64}
+        @test Dates.value(c) == 1
+
+        c32 = Century(Int32(2))
+        @test c32 isa Century{Int32}
+        @test Dates.value(c32) == Int32(2)
+
+        m = Millenium(1)
+        @test m isa Millenium{Int64}
+        @test Dates.value(m) == 1
+
+        m32 = Millenium(Int32(3))
+        @test m32 isa Millenium{Int32}
+        @test Dates.value(m32) == Int32(3)
+    end
+
+    @testset "Promotion rules" begin
+        @test promote_type(Century, Year) == Year
+        @test promote_type(Century, Month) == Month
+        @test promote_type(Century, Day) == Day
+        @test promote_type(Century, Hour) == Hour
+        @test promote_type(Century, Second) == Second
+
+        @test promote_type(Millenium, Century) == Century
+        @test promote_type(Millenium, Year) == Year
+        @test promote_type(Millenium, Month) == Month
+        @test promote_type(Millenium, Day) == Day
+        @test promote_type(Millenium, Hour) == Hour
+        @test promote_type(Millenium, Second) == Second
+    end
+
+    @testset "coarserperiod" begin
+        @test Dates.coarserperiod(Year) == (Century, 100)
+        @test Dates.coarserperiod(Century) == (Millenium, 10)
+    end
+
+    @testset "printing" begin
+        @test Dates._units(Century(1)) == " century"
+        @test Dates._units(Century(2)) == " centuries"
+        @test Dates._units(Millenium(1)) == " millenium"
+        @test Dates._units(Millenium(2)) == " millenia"
+    end
+
+    @testset "Period constructor from Period" begin
+        @test Century(Millenium(1)) == Century(10)
+    end
 end

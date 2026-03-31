@@ -14,6 +14,7 @@ import KernelAbstractions: KernelAbstractions, @kernel, @index, synchronize
 import GPUArrays: GPUArrays, @allowscalar
 import Adapt: Adapt, adapt, adapt_structure
 import GPUArrays: @allowscalar
+import ReactantCore: @trace
 
 using SpeedyWeatherInternals
 using SpeedyWeatherInternals.Architectures
@@ -24,7 +25,7 @@ export SpeedyWeatherInternals, Architectures
 
 # INPUT OUTPUT
 import TOML
-import Dates: Dates, DateTime, Period, Millisecond, Second, Minute, Hour, Day, Week, Month, Year
+import Dates: Dates, DateTime, TimePeriod, Period, Millisecond, Second, Minute, Hour, Day, Week, Month, Year, value, year, month, day, hour, minute, second
 import Printf: Printf, @sprintf
 import Random: randstring
 import NCDatasets: NCDatasets, NCDataset, defDim, defVar
@@ -46,6 +47,7 @@ export initialize!, finalize!
 # import utilities
 export Utils
 using SpeedyWeatherInternals.Utils
+import SpeedyWeatherInternals.Utils: @maybe_jit
 
 # parameter handling
 using SpeedyWeatherInternals.SpeedyParameters

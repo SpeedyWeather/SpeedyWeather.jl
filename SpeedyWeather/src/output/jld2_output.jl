@@ -78,7 +78,7 @@ Initialize JLD2 `output` by creating a JLD2 file.
 To be called just before the first timesteps."""
 function initialize!(
         output::JLD2Output,
-        feedback::AbstractFeedback,
+        feedback::Union{AbstractFeedback, Nothing},
         progn::PrognosticVariables,
         diagn::DiagnosticVariables,
         model::AbstractModel,

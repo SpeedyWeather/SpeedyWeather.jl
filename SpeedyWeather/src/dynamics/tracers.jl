@@ -6,13 +6,13 @@ export Tracer
 and define it as `active` (=true default). `active=false` will (temporarily)
 disable the time evolution of the tracer. Fields are
 $(TYPEDFIELDS)"""
-@kwdef mutable struct Tracer <: AbstractTracer
+@kwdef mutable struct Tracer{B} <: AbstractTracer
     name::Symbol
-    active::Bool = true
+    active::B = true
 end
 
 # method to create a tracer from a positional symbol
-Tracer(name::Symbol; kwargs...) = Tracer(; name, kwargs...)
+Tracer(name::Symbol; kwargs...) = Tracer{Bool}(; name, kwargs...)
 
 const TRACER_DICT = Dict{Symbol, Tracer}
 

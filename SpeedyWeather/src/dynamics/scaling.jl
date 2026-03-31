@@ -8,7 +8,7 @@ Scale the variable `var` inside `progn` with scalar `scale`.
         scale::Real,
     )
     var = getfield(progn, var)
-    return var .*= scale
+    return scale!(var, scale)
 end
 
 """
@@ -21,7 +21,7 @@ Scale the variable `var` inside `diagn` with scalar `scale`.
         scale::Real,
     )
     variable = getfield(diagn.grid, var)
-    return variable .*= scale
+    return scale!(variable, scale)
 end
 
 """
@@ -82,4 +82,26 @@ function unscale!(
         scale::Real
     )
     return variable ./= scale
+end
+
+"""
+$(TYPEDSIGNATURES)
+Scale the variable `var` with scalar `scale`.
+"""
+@propagate_inbounds function scale!(
+        variable::Union{LowerTriangularArray, Field},
+        scale::Real
+    )
+    return variable.data .*= scale
+end
+
+"""
+$(TYPEDSIGNATURES)
+Undo the scaling of the variable `var` with scalar `scale`.
+"""
+@propagate_inbounds function unscale!(
+        variable::Union{LowerTriangularArray, Field},
+        scale::Real
+    )
+    return variable.data ./= scale
 end

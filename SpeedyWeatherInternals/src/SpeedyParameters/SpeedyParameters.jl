@@ -11,6 +11,9 @@ import MacroTools
 import ModelParameters: ModelParameters, AbstractParam
 import ConstructionBase: constructorof, getproperties, setproperties
 
+# extend value from Dates so there's one unified function
+import Dates: value
+
 # DOMAINS
 import DomainSets: Domain, RealLine, NonnegativeRealLine, PositiveRealLine, NegativeRealLine, UnitInterval
 using DomainSets.IntervalSets

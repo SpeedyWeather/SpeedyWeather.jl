@@ -200,8 +200,7 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
     # set the initial conditions (may overwrite variables set in initialize! ocean/land)
     initialize!(prognostic_variables, model.initial_conditions, model)
     (; clock) = prognostic_variables
-    clock.time = time       # set the current time
-    clock.start = time      # and store the start time
+    set!(clock, time = time, start = time)
 
     # pack prognostic, diagnostic variables and model into a simulation
     return Simulation(prognostic_variables, diagnostic_variables, model)

@@ -240,12 +240,25 @@ function forcing!(
         lf::Integer,
         model::AbstractModel,
     )
+    (; latds) = model.geometry
     # scale by radius as is the vorticity equation
     s = forcing.strength * diagn.scale[]
     k = forcing.wavenumber
 
     Fu = diagn.tendencies.u_tend_grid
-    return set!(Fu, (λ, θ, σ) -> s * sind(k * θ), model.geometry)
+    return launch!(
+        architecture(Fu), RingGridWorkOrder, size(Fu), kolmogorov_flow_kernel!,
+        Fu, s, k, latds
+    )
+end
+
+@kernel inbounds = true function kolmogorov_flow_kernel!(Fu, s, k, latds)
+    I = @index(Global, NTuple)
+    ij = I[1]
+    layer = I[2]
+    lat = latds[ij]
+
+    Fu[ij, layer] += s * sin(deg2rad(k * lat))
 end
 
 export HeldSuarez
