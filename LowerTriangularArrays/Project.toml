@@ -18,9 +18,9 @@ FiniteDifferences = "0.12"
 GPUArrays = "11.2.3"
 KernelAbstractions = "0.9.38"
 LinearAlgebra = "1.10"
+Reactant = "0.2.243"
 SpeedyWeatherInternals = "0.1"
 julia = "1.10"
-
 [extensions]
 LowerTriangularArraysFiniteDifferencesExt = "FiniteDifferences"
 LowerTriangularArraysReactantExt = "Reactant"
