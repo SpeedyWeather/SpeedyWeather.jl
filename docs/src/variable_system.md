@@ -96,7 +96,7 @@ when using it as the 2nd argument
 function SpeedyWeather.variables(A::MyAlbedo, model::AbstractModel) 
     n = model.spectral_grid.nlayers
     return (
-        ParameterizationVariable(:albedo_matrix, SpeedyWeather.MatrixDim(n, n), units="1", desc="What is it?", namespace=:radiation),
+        SpeedyWeather.ParameterizationVariable(:albedo_matrix, SpeedyWeather.MatrixDim(n, n), units="1", desc="What is it?", namespace=:radiation),
     )
 end
 ```

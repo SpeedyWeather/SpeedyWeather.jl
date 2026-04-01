@@ -165,8 +165,8 @@ TE = total_energy(u, v, η, model)
 with units of ``m^3 s^{-2}`` (multiplying by surface area of the sphere
 and density of the fluid would turn it into joule = ``kg \, m^2 s^{-2}``).
 To know in general where to find the respective variables ``u, v, \eta`` inside our
-simulation object see [Prognostic variables](@ref) and [Diagnostic variables](@ref).
-Now let us continue the simulation
+simulation object see [Variables](@ref). Now let us continue the simulation
+
 ```@example analysis
 run!(simulation, period=Day(10))
 
@@ -179,6 +179,7 @@ So the total energy has somewhat changed, it decreased to
 ```@example analysis
 TE_later/TE
 ```
+
 of its previous value over 10 days.
 
 !!! note "Energy conservation"

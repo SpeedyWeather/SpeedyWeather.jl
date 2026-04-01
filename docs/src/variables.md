@@ -25,6 +25,7 @@ are structured within SpeedyWeather.
 Let's start at the top. When creating a `Simulation`, its fields are
 
 ```@example variables
+using SpeedyWeather
 spectral_grid = SpectralGrid(nlayers = 1)
 model = BarotropicModel(spectral_grid)
 simulation = initialize!(model)
@@ -42,7 +43,7 @@ variables are considered read-only after initialization but there is no
 hard restriction on this, e.g. you can use [Intrusive callbacks](@ref) to change
 the model during integration.
 
-## Variables
+## The `Variables` struct
 
 All simulation variables (prognostic and diagnostic) are stored in `simulation.variables`,
 which is a `Variables` struct with 7 (hardcoded) groups `prognostic`, `grid`, `tendencies`,
