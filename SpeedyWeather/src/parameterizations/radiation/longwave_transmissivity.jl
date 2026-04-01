@@ -1,19 +1,7 @@
 abstract type AbstractLongwaveTransmissivity <: AbstractLongwave end
 
 export TransparentLongwaveTransmissivity
-struct TransparentLongwaveTransmissivity <: AbstractLongwaveTransmissivity end
-Adapt.@adapt_structure TransparentLongwaveTransmissivity
-TransparentLongwaveTransmissivity(SG::SpectralGrid) = TransparentLongwaveTransmissivity()
-initialize!(::TransparentLongwaveTransmissivity, ::AbstractModel) = nothing
-@propagate_inbounds function transmissivity!(ij, vars, transmissivity::TransparentLongwaveTransmissivity, model)
-    # transmissivity is 1 everywhere (no absorption)
-    t = vars.scratch.grid.a   # use scratch array
-    nlayers = size(t, 2)
-    for k in 1:nlayers
-        t[ij, k] = one(eltype(t))
-    end
-    return t
-end
+TransparentLongwaveTransmissivity(SG::SpectralGrid) = ConstantLongwaveTransmissivity(SG, transmissivity=1)
 
 export ConstantLongwaveTransmissivity
 @parameterized @kwdef struct ConstantLongwaveTransmissivity{NF} <: AbstractLongwaveTransmissivity

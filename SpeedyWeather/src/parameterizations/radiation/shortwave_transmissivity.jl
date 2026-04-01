@@ -1,25 +1,7 @@
 abstract type AbstractShortwaveTransmissivity <: AbstractShortwave end
 
 export TransparentShortwaveTransmissivity
-struct TransparentShortwaveTransmissivity <: AbstractShortwaveTransmissivity end
-Adapt.@adapt_structure TransparentShortwaveTransmissivity
-TransparentShortwaveTransmissivity(SG::SpectralGrid) = TransparentShortwaveTransmissivity()
-initialize!(::TransparentShortwaveTransmissivity, ::AbstractModel) = nothing
-
-@propagate_inbounds function transmissivity!(
-        ij,
-        vars,
-        clouds,
-        ::TransparentShortwaveTransmissivity,
-        model,
-    )
-    t = vars.scratch.grid.a
-    nlayers = size(t, 2)
-    for k in 1:nlayers
-        t[ij, k] = one(eltype(t))
-    end
-    return t
-end
+TransparentShortwaveTransmissivity(SG::SpectralGrid) = ConstantShortwaveTransmissivity(SG, transmissivity=1)
 
 export ConstantShortwaveTransmissivity
 @parameterized @kwdef struct ConstantShortwaveTransmissivity{NF} <: AbstractShortwaveTransmissivity
