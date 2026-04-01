@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- [BREAKING] model.dyanmics_only instead of .physics [#969](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/969)
+- [BREAKING] Kernel launching now in SpeedyWeatherInternals.KernelLaunching [#969](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/969)
+- Pretty printing with StyledStrings [#969](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/969)
+- [BREAKING] Particle advection determines nparticles [#969](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/969)
+- Global parameterizations [#969](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/969)
+- [BREAKING] set! adapted to variable groups and namespaces [#969](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/969)
+- [BREAKING] Initial conditions modularised [#969](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/969)
 - [BREAKING] New dynamic variable system based on NamedTuples [#969](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/969)
 - GitHub Action Julia chache updated to v3 [#1020](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1020)
 - Broadcasting for LTA and RingGrids revised [#977](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/977)

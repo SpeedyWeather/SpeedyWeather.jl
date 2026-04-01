@@ -24,6 +24,10 @@ and signatures they have to extend.
     For the 2D models `BarotropicModel` and `ShallowWaterModel` additional
     terms have to be defined as a custom forcing or drag, see [Extending SpeedyWeather](@ref).
 
+Note that most parameterization are implemented as _column_ parameterization but SpeedyWeather
+also allows for _global_ parameterization to be implemented, see
+[Global parameterizations](@ref).
+
 ## Define your own parameterizations
 
 When defining a new paramerization it is required to subtype `AbstractParameterization`
@@ -307,3 +311,36 @@ it's best to familiarize yourself with our data structures that we explain in [M
 and therein [PrimitiveDryModel](@ref) and [PrimitiveWetModel](@ref), as well as [Variables](@ref)
 and the underlying [Variable system](@ref). Also most aspects of [Custom forcing and drag](@ref)
 components also applies to parameterizations.
+
+## Global parameterizations
+
+The parameterization described above is a _column_ parameterization, so you only have to
+implement the parameterization acting on the ij-th column with no communication between
+columns and the loop (or kernel launch) across columns being taken care of. However,
+SpeedyWeather allows any parameterization to implement a column or a _global_ parameterization
+or both. The global parameterizations are called first, then the column parameterizations.
+
+While a column parameterization is obtained by implementing
+
+```julia
+parameterization!(ij, ::Variables, ::MyParameterization, model)
+```
+
+a global parameterization is implemented by simply dropping the first argument
+
+```julia
+parameterization!(::Variables, ::MyParameterization, model)
+```
+
+A global parameterization is therefore expected to implement its own kernel launch.
+While the column method `parameterization!(ij, ...)` has to be explicitly implemented
+the global parameterization `parameterization!(...)` has the default fallback to `nothing`.
+This means that if you want to implement a global parameterization only then you need
+to define explicitly that
+
+```julia
+# as a global parameterization define the column parameterization as doing nothing
+parameterization!(ij, vars::Variables, ::MyParameterization, model) = nothing
+```
+
+For a concrete example see the implementation of the solar zenith calculation.
