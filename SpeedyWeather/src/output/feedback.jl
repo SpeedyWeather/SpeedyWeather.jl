@@ -63,7 +63,7 @@ function initialize!(feedback::Feedback, clock::Clock, model::AbstractModel)
     # reset those to default (-1 not shown)
     FEEDBACK_UMAX[] = -1
     FEEDBACK_TMIN[] = -1
-    FEEDBACK_TMAX[] = -1
+    FEEDBACK_TMAX[] = -300  # in °C
 
     # reinitalize progress meter, minus one to exclude first_timesteps! which contain compilation
     # only do now for benchmark accuracy
@@ -155,7 +155,7 @@ const FEEDBACK_DT_IN_SEC = Ref(1.0)
 const FEEDBACK_TIME = Ref(DEFAULT_DATE)
 const FEEDBACK_UMAX = Ref(-1.0f0)     # default negative = skip show
 const FEEDBACK_TMIN = Ref(-1.0f0)
-const FEEDBACK_TMAX = Ref(-1.0f0)
+const FEEDBACK_TMAX = Ref(-300.0f0)
 
 # "extend" the speedstring function from ProgressMeter by defining it for ::AbstractFloat
 # not just ::Any to effectively overwrite it
@@ -171,8 +171,8 @@ end
 function progress_string(t, sec_per_iter, dt_in_sec, U, Tmin, Tmax)
     time = string(Dates.Date(t))
     speed = speedstring(sec_per_iter, dt_in_sec)
-    umax = U < 0 ? "" : @sprintf ", %i m/s" U
-    Trange = Tmax < 0 ? "" : @sprintf ", [%i, %i] ˚C" Tmin Tmax
+    umax = U < 0 ? "" : @sprintf ", %3d m/s" U
+    Trange = Tmax <= -300 ? "" : @sprintf ", [%3d, %3d] ˚C" Tmin Tmax
     return time * speed * umax * Trange
 end
 
