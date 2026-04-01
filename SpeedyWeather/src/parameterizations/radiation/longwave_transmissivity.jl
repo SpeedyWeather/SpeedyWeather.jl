@@ -16,15 +16,15 @@ initialize!(::TransparentLongwaveTransmissivity, ::AbstractModel) = nothing
 end
 
 export FriersonLongwaveTransmissivity
-@kwdef struct FriersonLongwaveTransmissivity{NF} <: AbstractLongwaveTransmissivity
+@parameterized @kwdef struct FriersonLongwaveTransmissivity{NF} <: AbstractLongwaveTransmissivity
     "[OPTION] Optical depth at the equator"
-    τ₀_equator::NF = 6
+    @param τ₀_equator::NF = 6 (bounds = Nonnegative,)
 
     "[OPTION] Optical depth at the poles"
-    τ₀_pole::NF = 1.5
+    @param τ₀_pole::NF = 1.5 (bounds = Nonnegative,)
 
     "[OPTION] Fraction to mix linear and quadratic profile"
-    fₗ::NF = 0.1
+    @param fₗ::NF = 0.1 (bounds = 0 .. 1,)
 end
 
 Adapt.@adapt_structure FriersonLongwaveTransmissivity

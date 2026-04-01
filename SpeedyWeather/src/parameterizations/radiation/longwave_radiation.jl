@@ -70,7 +70,7 @@ $(TYPEDFIELDS)"""
     @param α::NF = 0.025 (bounds = Nonnegative,)
 
     "[OPTION] Emissivity of the atmosphere [1]"
-    emissivity_atmosphere::NF = 0
+    @param emissivity_atmosphere::NF = 0 (bounds = 0 .. 1,)
 
     "[OPTION] Emissivity for surface flux over ocean [1]"
     @param emissivity_ocean::NF = 0.65 (bounds = 0 .. 1,)
@@ -157,9 +157,9 @@ end
 export OneBandLongwave
 """One-band longwave radiation scheme with transmissivity and radiative transfer components.
 Following Frierson, 2006, JAS, https://doi.org/10.1175/JAS3706.1. Fields are $(TYPEDFIELDS)"""
-struct OneBandLongwave{T, R} <: AbstractLongwave
-    transmissivity::T
-    radiative_transfer::R
+@parameterized @kwdef struct OneBandLongwave{T, R} <: AbstractLongwave
+    @component transmissivity::T
+    @component radiative_transfer::R
 end
 
 Adapt.@adapt_structure OneBandLongwave
@@ -204,12 +204,12 @@ export OneBandLongwaveRadiativeTransfer
 """Radiative transfer solver for OneBandLongwave radiation scheme.
 Computes longwave radiative transfer with upward and downward beams including surface fluxes.
 Fields are $(TYPEDFIELDS)"""
-@kwdef struct OneBandLongwaveRadiativeTransfer{NF} <: AbstractLongwaveRadiativeTransfer
+@parameterized @kwdef struct OneBandLongwaveRadiativeTransfer{NF} <: AbstractLongwaveRadiativeTransfer
     "[OPTION] Emissivity for surface flux over ocean [1]"
-    emissivity_ocean::NF = 1
+    @param emissivity_ocean::NF = 1 (bounds = 0 .. 1,)
 
     "[OPTION] Emissivity for surface flux over land [1]"
-    emissivity_land::NF = 1
+    @param emissivity_land::NF = 1 (bounds = 0 .. 1,)
 end
 
 Adapt.@adapt_structure OneBandLongwaveRadiativeTransfer
