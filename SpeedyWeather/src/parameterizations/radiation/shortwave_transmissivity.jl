@@ -4,32 +4,37 @@ export TransparentShortwaveTransmissivity
 TransparentShortwaveTransmissivity(SG::SpectralGrid) = ConstantShortwaveTransmissivity(SG, transmissivity=1)
 
 export ConstantShortwaveTransmissivity
+
+"""Constant transmissivity for the shortwave, weighted by pressure thickness per layer. ($TYPEDFIELDS)"""
 @parameterized @kwdef struct ConstantShortwaveTransmissivity{NF} <: AbstractShortwaveTransmissivity
-    "[OPTION] Transmissivity of the atmosphere (0 .. 1)"
-    @param transmissivity::NF = 0.95 (bounds = 0 .. 1,)
+    "[OPTION] Transmissivity of the whole atmosphere (0 .. 1)"
+    @param transmissivity::NF = 0.85 (bounds = 0 .. 1,)
 end
 Adapt.@adapt_structure ConstantShortwaveTransmissivity
-ConstantShortwaveTransmissivity(SG::SpectralGrid) = ConstantShortwaveTransmissivity()
+ConstantShortwaveTransmissivity(SG::SpectralGrid, kwargs...) = ConstantShortwaveTransmissivity{SG.NF}(; kwargs...)
 initialize!(::ConstantShortwaveTransmissivity, ::AbstractModel) = nothing
 
 @propagate_inbounds function transmissivity!(
         ij,
         vars,
         clouds,
-        T::ConstantShortwaveTransmissivity,
+        CST::ConstantShortwaveTransmissivity,
         model,
     )
     t = vars.scratch.grid.a
     nlayers = size(t, 2)
+
+    τ = -log(CST.transmissivity)            # total optical depth of the atmosphere
+    dσ = model.geometry.σ_levels_thick      # divide optical depth wrt to pressure thickness of each layer
     for k in 1:nlayers
-        t[ij, k] = T.transmissivity
+        t[ij, k] = exp(-τ * dσ[k])          # transmissivity through layer k
     end
     return t
 end
 
 export BackgroundShortwaveTransmissivity
 
-"""    BackgroundShortwaveTransmissivity <: AbstractShortwaveTransmissivity
+"""BackgroundShortwaveTransmissivity <: AbstractShortwaveTransmissivity
 $(TYPEDFIELDS)."""
 @parameterized @kwdef struct BackgroundShortwaveTransmissivity{NF} <: AbstractShortwaveTransmissivity
     "[OPTION] Zenith correction amplitude (SPEEDY azen) [1]"

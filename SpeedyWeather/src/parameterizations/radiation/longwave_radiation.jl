@@ -206,10 +206,10 @@ Computes longwave radiative transfer with upward and downward beams including su
 Fields are $(TYPEDFIELDS)"""
 @parameterized @kwdef struct OneBandLongwaveRadiativeTransfer{NF} <: AbstractLongwaveRadiativeTransfer
     "[OPTION] Emissivity for surface flux over ocean [1]"
-    @param emissivity_ocean::NF = 1 (bounds = 0 .. 1,)
+    @param emissivity_ocean::NF = 0.98 (bounds = 0 .. 1,)
 
     "[OPTION] Emissivity for surface flux over land [1]"
-    @param emissivity_land::NF = 1 (bounds = 0 .. 1,)
+    @param emissivity_land::NF = 0.98 (bounds = 0 .. 1,)
 end
 
 Adapt.@adapt_structure OneBandLongwaveRadiativeTransfer

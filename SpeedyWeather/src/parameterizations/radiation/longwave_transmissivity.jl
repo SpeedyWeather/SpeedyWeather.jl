@@ -5,17 +5,19 @@ TransparentLongwaveTransmissivity(SG::SpectralGrid) = ConstantLongwaveTransmissi
 
 export ConstantLongwaveTransmissivity
 @parameterized @kwdef struct ConstantLongwaveTransmissivity{NF} <: AbstractLongwaveTransmissivity
-    @param transmissivity::NF = 0.95 (bounds = 0 .. 1,)
+    @param transmissivity::NF = 0.6 (bounds = 0 .. 1,)
 end
 Adapt.@adapt_structure ConstantLongwaveTransmissivity
 ConstantLongwaveTransmissivity(SG::SpectralGrid) = ConstantLongwaveTransmissivity()
 initialize!(::ConstantLongwaveTransmissivity, ::AbstractModel) = nothing
-@propagate_inbounds function transmissivity!(ij, vars, T::ConstantLongwaveTransmissivity, model)
-    # transmissivity is 1 everywhere (no absorption)
-    t = vars.scratch.grid.a   # use scratch array
+@propagate_inbounds function transmissivity!(ij, vars, CLT::ConstantLongwaveTransmissivity, model)
+    t = vars.scratch.grid.a
     nlayers = size(t, 2)
+
+    τ = -log(CLT.transmissivity)            # total optical depth of the atmosphere
+    dσ = model.geometry.σ_levels_thick      # divide optical depth wrt to pressure thickness of each layer
     for k in 1:nlayers
-        t[ij, k] = T.transmissivity
+        t[ij, k] = exp(-τ * dσ[k])          # transmissivity through layer k
     end
     return t
 end
