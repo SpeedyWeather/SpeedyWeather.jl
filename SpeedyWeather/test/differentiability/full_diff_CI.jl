@@ -24,9 +24,9 @@ if VERSION <= v"1.11.0"
 
         vars = variables
         dvars = make_zero(vars)
-        d_model = make_zero(model)
+        dmodel = make_zero(model)
 
-        autodiff(Reverse, SpeedyWeather.timestep!, Const, Duplicated(vars, d_vars), Const(dt), Duplicated(model, d_model), Const(lf1), Const(lf2))
+        autodiff(Reverse, SpeedyWeather.timestep!, Const, Duplicated(vars, dvars), Const(dt), Duplicated(model, dmodel), Const(lf1), Const(lf2))
         @test sum(to_vec(d_vars)[1]) != 0
 
     end
