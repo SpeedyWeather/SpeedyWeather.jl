@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- README CI Badges [#1024](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1024)
 - GitHub Action Julia chache updated to v3 [#1020](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1020)
 - Broadcasting for LTA and RingGrids revised [#977](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/977)
 - Reactant support for the BarotropicModel and Reactant architecture basics [#970](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/970)
