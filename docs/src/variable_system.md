@@ -42,7 +42,7 @@ Let's see whether this actually works
 ```@example variable_system
 spectral_grid = SpectralGrid()
 my_albedo = MyAlbedo()
-model = PrimitiveWetModel(spectal_grid, albedo=my_albedo)
+model = PrimitiveWetModel(spectral_grid, albedo=my_albedo)
 simulation = initialize!(model)
 simulation.variables.parameterizations.radiation.my_albedo
 ```
