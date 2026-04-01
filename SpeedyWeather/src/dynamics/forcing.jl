@@ -229,10 +229,10 @@ $(TYPEDFIELDS)
 """
 @parameterized @kwdef mutable struct KolmogorovFlow{NF} <: AbstractForcing
     "[OPTION] Strength of forcing [1/s²]"
-    @param strength::NF = 1.5e-5
+    @param strength::NF = 5e-5 (bounds = Nonnegative,)
 
     "[OPTION] Wavenumber of forcing in meridional direction (pole to pole)"
-    @param wavenumber::NF = 8 (bounds = Positive,)
+    @param wavenumber::NF = 8 (bounds = Nonnegative,)
 end
 
 KolmogorovFlow(SG::SpectralGrid; kwargs...) = KolmogorovFlow{SG.NF}(; kwargs...)

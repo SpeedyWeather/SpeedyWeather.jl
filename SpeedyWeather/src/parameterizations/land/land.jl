@@ -58,7 +58,7 @@ variables(land::LandModel) = (
 )
 
 export DryLandModel
-@parameterized @kwdef struct DryLandModel{G, TD, T} <: AbstractDryLand
+@parameterized @kwdef mutable struct DryLandModel{G, TD, T} <: AbstractDryLand
     spectral_grid::SpectralGrid
     @component geometry::G = LandGeometry(spectral_grid, nlayers = DEFAULT_NLAYERS_SOIL)
     @component thermodynamics::TD = LandThermodynamics(spectral_grid, geometry)
