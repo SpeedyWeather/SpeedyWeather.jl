@@ -63,15 +63,33 @@ function test_tendencies!(sim_cpu, sim_reactant, model_name, r_first! = nothing,
     println("Testing tendencies ($nsteps steps)")
     println("-"^60)
 
+    # Pre-compile Reactant functions if needed (@compile may mutate sim_reactant
+    # as a side effect, so compile first, then finalize + sync to restore clean state)
+    if isnothing(r_first!)
+        initialize!(sim_reactant; steps = nsteps)
+        r_first! = @compile first_timesteps!(sim_reactant)
+        SpeedyWeather.finalize!(sim_reactant)
+    end
+    if isnothing(r_later!)
+        initialize!(sim_reactant; steps = nsteps)
+        r_later! = @compile later_timestep!(sim_reactant)
+        SpeedyWeather.finalize!(sim_reactant)
+    end
+
+    # Sync from Reactant to CPU (both now in unscaled post-finalize state)
     sync_variables!(sim_cpu, sim_reactant)
+
+    # Initialize both (scales prognostic vars, transforms to grid)
     initialize!(sim_cpu; steps = nsteps)
     initialize!(sim_reactant; steps = nsteps)
+
+    # Sync again so CPU has the exact same state as Reactant
     sync_variables!(sim_cpu, sim_reactant)
 
     # Run one step to compute tendencies
     SpeedyWeather.time_stepping!(sim_cpu)
 
-    # Run another step to ensure all variables are updated
+    # Run one step on Reactant with pre-compiled functions
     SpeedyWeather.time_stepping!(sim_reactant, r_first!, r_later!)
 
     SpeedyWeather.finalize!(sim_reactant)
@@ -107,6 +125,17 @@ function test_time_stepping!(sim_cpu, sim_reactant, model_name, r_first! = nothi
     println("Testing time stepping ($nsteps steps)")
     println("-"^60)
 
+    # Pre-compile Reactant functions if needed (this may mutate sim_reactant as a side effect)
+    if isnothing(r_first!)
+        initialize!(sim_reactant; steps = nsteps)
+        r_first! = @compile first_timesteps!(sim_reactant)
+    end
+    if isnothing(r_later!)
+        initialize!(sim_reactant; steps = nsteps)
+        r_later! = @compile later_timestep!(sim_reactant)
+    end
+
+    # Sync after @compile to undo any side effects on sim_reactant
     sync_variables!(sim_cpu, sim_reactant)
 
     # Run time stepping
@@ -144,7 +173,6 @@ function test_time_stepping!(sim_cpu, sim_reactant, model_name, r_first! = nothi
     end
 
     @testset "$model_name Time Stepping" begin
-
         @testset "Clock" begin
             compare_clock(sim_cpu, sim_reactant)
         end
@@ -166,7 +194,7 @@ function test_time_stepping!(sim_cpu, sim_reactant, model_name, r_first! = nothi
 end
 
 """Run all correctness tests for a given model type."""
-function test_model(ModelType::Type; trunc = TRUNC, nsteps = NSTEPS, rtol = RTOL, atol = ATOL)
+function test_model(ModelType::Type; trunc = TRUNC, nsteps = NSTEPS, rtol = RTOL, atol = ATOL, precompile = false)
     model_name = string(ModelType)
 
     println("="^60)
@@ -193,13 +221,16 @@ function test_model(ModelType::Type; trunc = TRUNC, nsteps = NSTEPS, rtol = RTOL
 
     # Run tests
     # Pre-compile Reactant functions once
-    println("\n[4/4] Pre-compiling Reactant functions...")
-    # TODO: when not recompiling there is a difference in diagnostic variables, look into that
-    #r_first! = @compile first_timesteps!(simulation_reactant)
-    #r_later! = @compile later_timestep!(simulation_reactant)
-    r_first! = nothing
-    r_later! = nothing
-    println("  ✓ Reactant functions compiled")
+    if precompile
+        println("\n[4/4] Pre-compiling Reactant functions...")
+        initialize!(simulation_reactant; steps = nsteps)
+        r_first! = @compile first_timesteps!(simulation_reactant)
+        r_later! = @compile later_timestep!(simulation_reactant)
+        println("  ✓ Reactant functions compiled")
+    else 
+        r_first! = nothing
+        r_later! = nothing
+    end 
 
     @testset "$model_name CPU vs Reactant" begin
         tend_results = test_tendencies!(simulation_cpu, simulation_reactant, model_name, r_first!, r_later!; rtol, atol)

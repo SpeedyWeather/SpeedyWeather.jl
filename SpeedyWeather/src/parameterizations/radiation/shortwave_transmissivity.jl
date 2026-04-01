@@ -11,7 +11,7 @@ export ConstantShortwaveTransmissivity
     @param transmissivity::NF = 0.85 (bounds = 0 .. 1,)
 end
 Adapt.@adapt_structure ConstantShortwaveTransmissivity
-ConstantShortwaveTransmissivity(SG::SpectralGrid, kwargs...) = ConstantShortwaveTransmissivity{SG.NF}(; kwargs...)
+ConstantShortwaveTransmissivity(SG::SpectralGrid; kwargs...) = ConstantShortwaveTransmissivity{SG.NF}(; kwargs...)
 initialize!(::ConstantShortwaveTransmissivity, ::AbstractModel) = nothing
 
 @propagate_inbounds function transmissivity!(

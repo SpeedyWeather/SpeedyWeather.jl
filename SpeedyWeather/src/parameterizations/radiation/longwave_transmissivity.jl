@@ -8,7 +8,7 @@ export ConstantLongwaveTransmissivity
     @param transmissivity::NF = 0.6 (bounds = 0 .. 1,)
 end
 Adapt.@adapt_structure ConstantLongwaveTransmissivity
-ConstantLongwaveTransmissivity(SG::SpectralGrid) = ConstantLongwaveTransmissivity()
+ConstantLongwaveTransmissivity(SG::SpectralGrid; kwargs...) = ConstantLongwaveTransmissivity{SG.NF}(; kwargs...)
 initialize!(::ConstantLongwaveTransmissivity, ::AbstractModel) = nothing
 @propagate_inbounds function transmissivity!(ij, vars, CLT::ConstantLongwaveTransmissivity, model)
     t = vars.scratch.grid.a
