@@ -92,7 +92,7 @@ export OneBandGreyShortwave
 function OneBandGreyShortwave(
         SG::SpectralGrid;
         clouds = NoClouds(SG),
-        transmissivity = TransparentShortwaveTransmissivity(SG),
+        transmissivity = ConstantShortwaveTransmissivity(SG),
         radiative_transfer = OneBandShortwaveRadiativeTransfer(SG),
     )
     return OneBandShortwave(clouds, transmissivity, radiative_transfer)

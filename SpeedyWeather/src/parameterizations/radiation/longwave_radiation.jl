@@ -177,7 +177,7 @@ end
 export OneBandGreyLongwave
 function OneBandGreyLongwave(
         SG::SpectralGrid;
-        transmissivity = TransparentLongwaveTransmissivity(SG),
+        transmissivity = ConstantLongwaveTransmissivity(SG),
         radiative_transfer = OneBandLongwaveRadiativeTransfer(SG),
     )
     return OneBandLongwave(transmissivity, radiative_transfer)

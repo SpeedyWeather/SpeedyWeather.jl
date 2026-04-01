@@ -21,6 +21,30 @@ initialize!(::TransparentShortwaveTransmissivity, ::AbstractModel) = nothing
     return t
 end
 
+export ConstantShortwaveTransmissivity
+@parameterized @kwdef struct ConstantShortwaveTransmissivity{NF} <: AbstractShortwaveTransmissivity
+    "[OPTION] Transmissivity of the atmosphere (0 .. 1)"
+    @param transmissivity::NF = 0.95 (bounds = 0 .. 1,)
+end
+Adapt.@adapt_structure ConstantShortwaveTransmissivity
+ConstantShortwaveTransmissivity(SG::SpectralGrid) = ConstantShortwaveTransmissivity()
+initialize!(::ConstantShortwaveTransmissivity, ::AbstractModel) = nothing
+
+@propagate_inbounds function transmissivity!(
+        ij,
+        vars,
+        clouds,
+        T::ConstantShortwaveTransmissivity,
+        model,
+    )
+    t = vars.scratch.grid.a
+    nlayers = size(t, 2)
+    for k in 1:nlayers
+        t[ij, k] = T.transmissivity
+    end
+    return t
+end
+
 export BackgroundShortwaveTransmissivity
 
 """    BackgroundShortwaveTransmissivity <: AbstractShortwaveTransmissivity

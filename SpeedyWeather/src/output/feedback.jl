@@ -172,7 +172,7 @@ function progress_string(t, sec_per_iter, dt_in_sec, U, Tmin, Tmax)
     time = string(Dates.Date(t))
     speed = speedstring(sec_per_iter, dt_in_sec)
     umax = U < 0 ? "" : @sprintf ", %3d m/s" U
-    Trange = Tmax <= -300 ? "" : @sprintf ", [%3d, %3d] ˚C" Tmin Tmax
+    Trange = Tmax <= -300 ? "" : @sprintf ", [%4d, %4d] ˚C" Tmin Tmax
     return time * speed * umax * Trange
 end
 
