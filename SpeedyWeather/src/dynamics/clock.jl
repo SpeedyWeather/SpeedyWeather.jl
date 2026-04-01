@@ -41,17 +41,20 @@ function timestep!(clock::Clock, Δt; increase_counter::Bool = true)
     return nothing
 end
 
-# copy!
-function Base.copy!(clock::Clock, clock_old::Clock)
-    clock.time = clock_old.time
-    clock.start = clock_old.start
-    clock.period = clock_old.period
-    clock.timestep_counter = clock_old.timestep_counter
-    clock.n_timesteps = clock_old.n_timesteps
-    clock.Δt = clock_old.Δt
+# copy! (converts on the fly for Reactant types to work as well)
+function Base.copy!(clock::Clock{DT, S, I, MS}, clock_old::Clock) where {DT, S, I, MS}
+    clock.time = convert(DT, clock_old.time)    # convert to the same type as clock_old.time
+    clock.start = convert(DT, clock_old.start)  # convert to the same type as clock_old.start
+    clock.period = convert(S, clock_old.period) # convert to the same type as clock_old.period, 
+    clock.timestep_counter = convert(I, clock_old.timestep_counter) # convert to the same type as clock_old.timestep_counter
+    clock.n_timesteps = convert(I, clock_old.n_timesteps) # convert to the same type as clock_old.n_timesteps
+    clock.Δt = convert(MS, clock_old.Δt) # convert to the same type as clock_old.Δt
 
     return nothing
 end
+
+# for copy!(::Variables, ::Variables)
+_copy_entry!(dest::AbstractClock, src::AbstractClock) = copy!(dest, src)
 
 """$(TYPEDSIGNATURES)
 Initialize the clock with the time step `Δt` from `time_stepping`."""

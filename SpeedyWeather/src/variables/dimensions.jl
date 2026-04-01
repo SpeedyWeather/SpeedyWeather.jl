@@ -1,6 +1,6 @@
 """Dimension for the simulation clock and time tracking."""
 struct ClockDim <: AbstractVariableDim end
-Base.zero(::AbstractVariable{ClockDim}, model::AbstractModel) = Clock()
+Base.zero(::AbstractVariable{ClockDim}, model::AbstractModel) = Clock(model.architecture)
 
 """Dimension for scalar variables holding single numerical values as RefValue.
 Default value is 0, but can be set via ScalarDim, e.g. ScalarDim(1) for a default value of 1."""

@@ -275,7 +275,8 @@ function first_timesteps!(
         model::AbstractModel,   # everything that is constant at runtime
     )
     (; clock) = vars.prognostic
-    clock.n_timesteps == 0 && return nothing    # exit immediately for no time steps
+    # TODO: deactaved that check for Reactant, but it doesn't seem neccary anyway as the toplevle time_stepping! should take care of this
+    #clock.n_timesteps == 0 && return nothing    # exit immediately for no time steps
 
     (; implicit) = model
     (; Δt, Δt_millisec) = model.time_stepping

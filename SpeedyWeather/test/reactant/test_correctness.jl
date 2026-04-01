@@ -124,7 +124,6 @@ function test_time_stepping!(sim_cpu, sim_reactant, model_name, r_first! = nothi
     vars_reactant, _ = SpeedyWeather.unpack(sim_reactant)
     progn_results = compare_arrays(vars_cpu.prognostic, vars_reactant.prognostic; rtol, atol)
     grid_results = compare_arrays(vars_cpu.grid, vars_reactant.grid; rtol, atol)
-    compare_clock(sim_cpu, sim_reactant)
 
     println("\nPrognostic variable comparison after $nsteps steps:")
     for (name, r) in progn_results
@@ -145,6 +144,11 @@ function test_time_stepping!(sim_cpu, sim_reactant, model_name, r_first! = nothi
     end
 
     @testset "$model_name Time Stepping" begin
+
+        @testset "Clock" begin
+            compare_clock(sim_cpu, sim_reactant)
+        end
+        
         @testset "Prognostic variables" begin
             for (name, r) in progn_results
                 @test r.matches

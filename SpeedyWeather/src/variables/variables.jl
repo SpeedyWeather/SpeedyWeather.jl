@@ -109,7 +109,7 @@ _copy_entry!(dest::AbstractArray, src::AbstractArray) = copyto!(dest, src)
 _copy_entry!(dest::NamedTuple, src::NamedTuple) = copy_variables!(dest, src)
 _copy_entry!(dest::Base.RefValue, src::Base.RefValue) = (dest[] = src[])
 
-# fallback for mutable structs (e.g. Clock): copy each field via setfield!
+# fallback for mutable structs: copy each field via setfield!
 # and immutable structs with array fields (e.g. ScratchMemory): copyto! on arrays.
 # uses @generated to avoid runtime reflection (ismutable, fieldnames, isa checks)
 # which Enzyme cannot differentiate through.
