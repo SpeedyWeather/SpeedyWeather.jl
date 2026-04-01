@@ -234,25 +234,26 @@ SpeedyWeather.initialize!(::SimpleAlbedo, model::PrimitiveEquation) = nothing
 
 # define variables required (composite albedo and ocean/land independently)
 SpeedyWeather.variables(::SimpleAlbedo) = (
-    SpeedyWeather.ParameterizationVariable(:albedo, SpeedyWeather.Grid2D(), desc="Albedo", units="1"),
-    SpeedyWeather.ParameterizationVariable(:albedo, SpeedyWeather.Grid2D(), desc="Albedo", units="1", namespace=:ocean),
-    SpeedyWeather.ParameterizationVariable(:albedo, SpeedyWeather.Grid2D(), desc="Albedo", units="1", namespace=:land),
+    ParameterizationVariable(:albedo, SpeedyWeather.Grid2D(), desc="Albedo", units="1"),
+    ParameterizationVariable(:albedo, SpeedyWeather.Grid2D(), desc="Albedo", units="1", namespace=:ocean),
+    ParameterizationVariable(:albedo, SpeedyWeather.Grid2D(), desc="Albedo", units="1", namespace=:land),
 )
 
 Base.@propagate_inbounds function SpeedyWeather.albedo!(
     ij,                             # horizontal grid index ij
+    albedo,                         # albedo field to write into
     vars::Variables,
-    albedo::SimpleAlbedo,
+    scheme::SimpleAlbedo,
     model,                          # model subset unpacked into a NamedTuple
 )
     (; land_sea_mask) = model
     (; sea_ice_concentration) = vars.prognostic.ocean
-    (; land_albedo, seaice_albedo, ocean_albedo) = albedo
+    (; land_albedo, seaice_albedo, ocean_albedo) = scheme
 
     if land_sea_mask.mask[ij] > 0.95 # if mostly land
-        vars.parameterizations.albedo[ij] = land_albedo
+        albedo[ij] = land_albedo
     else # if ocean
-        vars.parameterizations.albedo[ij] = ocean_albedo + sea_ice_concentration[ij] * (seaice_albedo - ocean_albedo)
+        albedo[ij] = ocean_albedo + sea_ice_concentration[ij] * (seaice_albedo - ocean_albedo)
     end
 end
 ```
@@ -260,8 +261,8 @@ end
 !!! info "Albedos extend albedo!"
     In contrast to other parameterizations that are supposed to extend
     `parameterization!(ij, vars, p::MyParameterization, model)`
-    albedos are expected to extend `albedo!` instead. That way they can be
-    used for ocean, land or both. As long as they write into `vars.parameterizations.albedo[ij]`
+    albedos are expected to extend `albedo!(ij, albedo_field, vars...)` instead. That way they can be
+    used for ocean, land or both. As long as they write into `albedo_field[ij]`
     as shown above, the shortwave radiation scheme will correctly use that
     to compute radiative surface fluxes over both ocean and land.
 

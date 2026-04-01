@@ -285,7 +285,7 @@ which we do by extending the `variables` function
 
 ```@example extend
 SpeedyWeather.variables(::StochasticStirring) = (
-    ScratchVariable(:a, Grid3D(), namespace=:grid),
+    ScratchVariable(:a, SpeedyWeather.Grid3D(), namespace=:grid),
 )
 ```
 

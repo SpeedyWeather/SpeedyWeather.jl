@@ -1,3 +1,11 @@
+export PrognosticVariable,
+    GridVariable,
+    TendencyVariable,
+    DynamicsVariable,
+    ParameterizationVariable,
+    ParticleVariable,
+    ScratchVariable
+
 for Var in (
         :PrognosticVariable,            # variable groups to define
         :GridVariable,

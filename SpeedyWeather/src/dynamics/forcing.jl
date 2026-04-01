@@ -366,7 +366,7 @@ function forcing!(
     (; κ) = model.atmosphere
     σ = model.geometry.σ_levels_full
 
-    (; whichring) = temp_grid.grid
+    (; whichring) = temp.grid
     launch!(
         architecture(temp_tend), RingGridWorkOrder, size(temp_tend), held_suarez_kernel!,
         temp_tend, temp, pres,

@@ -27,7 +27,7 @@ Then we can extend the `variables` function as
 ```@example variable_system
 function SpeedyWeather.variables(::MyAlbedo)
     return (
-        SpeedyWeather.ParameterizationVariable(:my_albedo, SpeedyWeather.Grid2D(), namespace=:radiation),
+        ParameterizationVariable(:my_albedo, SpeedyWeather.Grid2D(), namespace=:radiation),
     )
 end
 ```
@@ -92,16 +92,17 @@ size would be hardcoded to 10x10, you can however adapt this definition to use `
 case this information is in your albedo `A::MyAlbedo` or you can use any information from `model`
 when using it as the 2nd argument
 
-```@example variable_system
+```julia
 function SpeedyWeather.variables(A::MyAlbedo, model::AbstractModel) 
     n = model.spectral_grid.nlayers
     return (
-        SpeedyWeather.ParameterizationVariable(:albedo_matrix, SpeedyWeather.MatrixDim(n, n), units="1", desc="What is it?", namespace=:radiation),
+        ParameterizationVariable(:albedo_matrix, SpeedyWeather.MatrixDim(n, n), units="1", desc="What is it?", namespace=:radiation),
     )
 end
 ```
 
-in which case the `albedo_matrix` is always allocated of size `nlayers`x`nlayers`.
+in which case the `albedo_matrix` is always allocated of size `nlayers`x`nlayers`
+as determined in the spectral grid.
 
 ## Define new variable dimensions
 

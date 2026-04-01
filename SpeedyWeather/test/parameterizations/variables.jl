@@ -5,12 +5,12 @@
     MyParam(::SpectralGrid) = MyParam()
 
     SpeedyWeather.variables(::MyParam) = (
-        SpeedyWeather.ParameterizationVariable(:myvar_grid2d, SpeedyWeather.Grid2D(), desc = "My variable", units = "1"),
-        SpeedyWeather.ParameterizationVariable(:myvar_grid3d, SpeedyWeather.Grid3D(), desc = "My variable", units = "1"),
-        SpeedyWeather.PrognosticVariable(:myvar_spectral2d, SpeedyWeather.Spectral2D(), desc = "My variable", units = "1"),
-        SpeedyWeather.PrognosticVariable(:myvar_spectral3d, SpeedyWeather.Spectral3D(), desc = "My variable", units = "1"),
-        SpeedyWeather.PrognosticVariable(:mylandvar_spectral3d, SpeedyWeather.Spectral3D(), desc = "My variable", units = "1", namespace = :land),
-        SpeedyWeather.PrognosticVariable(:myoceanvar_spectral3d, SpeedyWeather.Spectral3D(), desc = "My variable", units = "1", namespace = :ocean),
+        ParameterizationVariable(:myvar_grid2d, SpeedyWeather.Grid2D(), desc = "My variable", units = "1"),
+        ParameterizationVariable(:myvar_grid3d, SpeedyWeather.Grid3D(), desc = "My variable", units = "1"),
+        PrognosticVariable(:myvar_spectral2d, SpeedyWeather.Spectral2D(), desc = "My variable", units = "1"),
+        PrognosticVariable(:myvar_spectral3d, SpeedyWeather.Spectral3D(), desc = "My variable", units = "1"),
+        PrognosticVariable(:mylandvar_spectral3d, SpeedyWeather.Spectral3D(), desc = "My variable", units = "1", namespace = :land),
+        PrognosticVariable(:myoceanvar_spectral3d, SpeedyWeather.Spectral3D(), desc = "My variable", units = "1", namespace = :ocean),
     )
 
     # init model
