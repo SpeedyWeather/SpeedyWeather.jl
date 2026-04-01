@@ -12,23 +12,23 @@ See also [Examples 2D](@ref Examples) for examples with the
 
 ```@example jablonowski
 using SpeedyWeather
-spectral_grid = SpectralGrid(trunc=31, nlayers=8, Grid=FullGaussianGrid, dealiasing=3)
+spectral_grid = SpectralGrid(trunc = 31, nlayers = 8, Grid=FullGaussianGrid, dealiasing = 3)
 
 orography = ZonalRidge(spectral_grid)
-initial_conditions = InitialConditions(
+initial_conditions = (;                             # collect initial conditions into NamedTuple
     vordiv = ZonalWind(spectral_grid),
     temp = JablonowskiTemperature(spectral_grid),
     pres = ConstantPressure(spectral_grid))
 
-model = PrimitiveDryModel(spectral_grid; orography, initial_conditions, physics=false)
+model = PrimitiveDryModel(spectral_grid; orography, initial_conditions, dynamics_only = true)
 simulation = initialize!(model)
-run!(simulation, period=Day(9))
+run!(simulation, period = Day(9))
 nothing # hide
 ```
 
 The Jablonowski-Williamson baroclinic wave test case[^JW06] using the
 [Primitive equation model](@ref primitive_equation_model) particularly the dry model,
-as we switch off all physics with `physics=false`.
+as we switch off all parameterizations (and ocean, sea_ice and land) with `dynamics_only = true`.
 We want to use 8 vertical levels, and a lower resolution of T31 on a
 [full Gaussian grid](@ref FullGaussianGrid).
 The Jablonowski-Williamson initial conditions are `ZonalWind` for vorticity and divergence
@@ -51,7 +51,7 @@ nothing # hide
 
 ```@example heldsuarez
 using SpeedyWeather
-spectral_grid = SpectralGrid(trunc=31, nlayers=8)
+spectral_grid = SpectralGrid(trunc = 31, nlayers = 8)
 
 # construct model with only Held-Suarez forcing, no other physics
 model = PrimitiveDryModel(
@@ -61,29 +61,27 @@ model = PrimitiveDryModel(
     forcing = HeldSuarez(spectral_grid),
     drag = LinearDrag(spectral_grid),
 
-    # switch off other physics
-    physics = false,
+    # switch off other parameterizations, ocean, sea ice and land
+    dynamics_only = true,
 
     # use Earth's orography
     orography = EarthOrography(spectral_grid)
 )
 
 simulation = initialize!(model)
-run!(simulation, period=Day(20))
+run!(simulation, period = Day(20))
 nothing # hide
 ```
 
 The code above defines the Held-Suarez forcing [^HS94] in terms of temperature relaxation
 and a linear drag term that is applied near the planetary boundary but switches off
-all other physics in the primitive equation model without humidity.
-Switching off the surface wind would also automatically turn off the surface evaporation
-(not relevant in the primitive _dry_ model) and sensible heat flux as that one is proportional
-to the surface wind (which is zero with `nothing`).
-But to also avoid the calculation being run at all we use `nothing` for model components
-passed to the model constructor.
-Some model components use a `NoSomething` but most can just be set to `nothing`.
-`NoSomething`s do not require the spectral grid to be passed on, but as a convention
-we allow every model component to have it for construction even if not required.
+all other parameterizations in the primitive equation model without humidity.
+One could also just switch off the boundary layer scheme which would also automatically turn off
+the surface fluxes (heat and momentum) as they aren't supposed to run with Held-Suarez forcing.
+But to also avoid the calculation being run at all we use `dynamics_only = true`.
+The `forcing` and `drag` are considered to be terms of the dynamical core
+(regardless of which process they represent conceptually).
+Generally, model components can just be set to `nothing` where intuitive.
 
 Visualising surface temperature with
 
@@ -117,7 +115,7 @@ nothing # hide
 ```
 
 Here we have defined an aquaplanet simulation by
-- creating an `ocean::AquaPlanet`. This will use constant sea surface temperatures that only vary with latitude.
+- creating an `ocean::AquaPlanet`. This will use constant sea surface temperatures that only vary with latitude (and not with time).
 - creating a `land_sea_mask::AquaPlanetMask` this will use a land-sea mask with `false`=ocean everywhere.
 - creating an `orography::NoOrography` which will have no orography and zero surface geopotential.
 
@@ -205,14 +203,14 @@ And the comparison looks like
 using SpeedyWeather
 
 # components
-spectral_grid = SpectralGrid(trunc=31, nlayers=8)
-large_scale_condensation = ImplicitCondensation(spectral_grid, snow=false)
+spectral_grid = SpectralGrid(trunc = 31, nlayers = 8)
+large_scale_condensation = ImplicitCondensation(spectral_grid, snow = false)
 convection = BettsMillerConvection(spectral_grid)
 
 # create model, initialize, run
 model = PrimitiveWetModel(spectral_grid; large_scale_condensation, convection)
 simulation = initialize!(model)
-run!(simulation, period=Day(10))
+run!(simulation, period = Day(10))
 nothing # hide
 ```
 
@@ -225,7 +223,7 @@ let it rain at 80% instead of 100% relative humidity. We now want to analyse
 the precipitation that comes from these parameterizations.
 
 Note that the following only considers liquid precipitation for simplicity.
-We set `snow=false` in `ImplicitCondensation` and therefore deal with rain only.
+We set `snow = false` in `ImplicitCondensation` and therefore deal with rain only.
 
 ```@example precipitation
 using CairoMakie

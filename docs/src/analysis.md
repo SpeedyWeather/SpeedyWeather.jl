@@ -459,7 +459,7 @@ details)
 
 ```@example analysis
 # define a GlobalDiagnostics callback and the fields it needs
-Base.@kwdef mutable struct GlobalDiagnostics <: SpeedyWeather.AbstractCallback
+@kwdef mutable struct GlobalDiagnostics <: SpeedyWeather.AbstractCallback
     timestep_counter::Int = 0
 
     time::Vector{DateTime} = []

@@ -265,6 +265,7 @@ function forcing!(
     return nothing
 end
 ```
+
 The function signature can then just match to whatever we need. In our case
 we have a forcing defined in spectral space which, however, is masked in
 grid-point space. So we will need the `model.spectral_transform`.
@@ -274,23 +275,59 @@ but that is inefficient.
 Now this is actually where we implement the equation we started from in
 [Custom forcing and drag](@ref) simply by looping over the spherical
 harmonics in `S` and updating its entries. Then we transform `S` into
-grid-point space using the `a_grid` work array that is in `dynamics_variables`,
-`b_grid` is another one you can use, so are `a, b` in spectral space.
-However, these are really work arrays, meaning you should expect them
-to be overwritten momentarily once the function concludes and no information
-will remain. Equivalently, these arrays may have an undefined state
-prior to the `forcing!` call. We then use the `_scale_lat!` function
-from `RingGrids` which takes every element in the latitude mask `lat_mask`
-and multiplies it with every grid-point on the respective latitude ring.
+grid-point space using a work array that is in `variables.scratch`.
+SpeedyWeather has a dynamic [Variable system](@ref), see also
+[Variables](@ref). That means components can declare the variables they
+need. Here, we may assume that some component already requires
+`variables.scratch.grid.a` to exist, but we should generally be
+explicit by declaring this variables here too for `StochasticStirring`,
+which we do by extending the `variables` function
 
-Now for the last lines we have to know the order in which different terms
-are written into the tendencies for vorticity, `vars.tendencies.vor`.
+```@example extend
+SpeedyWeather.variables(::StochasticStirring) = (
+    ScratchVariable(:a, Grid3D(), namespace=:grid),
+)
+```
+
+For details, please see [Declare variables](@ref).
+
+Scratch arrays have an undefined state as any component is free to use
+them and write data into it. In that sense, they should be treated as
+write-before-read for example to store and intermediate result. You also
+should expect them to be overwritten momentarily once the function concludes
+and no information will remain. The only exception are situations where
+a model component implements two functions that are directly called
+one after another, then you can pass scratch arrays in between them, e.g.
+
+```julia
+a = foo!(...)   # uses a scratch array a and returns it
+bar!(a, ...)    # reads the scratch array a in
+```
+
+Now back to the stochastic stirring. For the last lines in `forcing!` we
+have to know the order in which different terms are written into the tendencies
+for vorticity, `vars.tendencies.vor`.
 In SpeedyWeather, the `forcing!` comes first, then the `drag!` (see [Custom drag](@ref))
 then the curl of the vorticity flux (the vorticity advection).
 This means we can transform `S_grid` directly back into `vor_tend`
 without overwriting other terms which, in fact, will be added to this
 array afterwards. In general, you can also force the momentum equations
 in grid-point space by writing into `vars.tendencies.grid.u` and `vars.tendencies.grid.v`.
+
+As a note of caution for the primitive equation models the parameterizations are executed
+first, the general order is
+
+- parameterizations
+- ocean
+- sea ice
+- land
+- forcing
+- drag
+- dynamics
+
+that means in the primitive models you always want to accumulate into the tendencies
+with `+=` otherwise you would overwrite with a custom forcing the tendencies
+that would have been computed in other model components before the forcing.
 
 ## Custom forcing: model construction
 

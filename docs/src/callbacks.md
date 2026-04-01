@@ -40,7 +40,7 @@ i.e. `struct` or `mutable struct CustomCallback <: SpeedyWeather.AbstractCallbac
 ```@example callbacks
 using SpeedyWeather
 
-Base.@kwdef mutable struct StormChaser{NF} <: SpeedyWeather.AbstractCallback
+@kwdef mutable struct StormChaser{NF} <: SpeedyWeather.AbstractCallback
     timestep_counter::Int = 0
     maximum_surface_wind_speed::Vector{NF} = [0]
 end
@@ -120,7 +120,6 @@ function SpeedyWeather.callback!(
     vars::Variables,
     model::AbstractModel,
 )
-
     # increase counter
     callback.timestep_counter += 1
     i = callback.timestep_counter
@@ -328,7 +327,7 @@ function SpeedyWeather.callback!(
 
     # Just print the North Pole surface temperature to screen
     (;time) = vars.prognostic.clock
-    temp_at_north_pole = vars.grid.temp[1,end]
+    temp_at_north_pole = vars.grid.temp[1, end]
 
     @info "North pole has a temperature of $temp_at_north_pole on $time."
 end

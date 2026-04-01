@@ -34,7 +34,7 @@ Many types and components in SpeedyWeather have
 extended Julia's `show` function with some pretty printing to give you
 a better overview of its contents, e.g. a `clock::Clock` is printed as
 
-```@example structure
+```@example models
 using SpeedyWeather
 clock = Clock()
 ```
@@ -84,6 +84,6 @@ model = PrimitiveDryModel(spectral_grid)
 The `PrimitiveWetModel` is the most complex model we currently have, hence its
 field tree is the longest, defining many components for the physics parameterizations.
 
-```@example structure
+```@example models
 model = PrimitiveWetModel(spectral_grid)
 ```
