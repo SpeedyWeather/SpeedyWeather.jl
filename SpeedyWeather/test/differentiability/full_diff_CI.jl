@@ -2,7 +2,7 @@
 # in Julia 1.11
 import Pkg
 Pkg.activate(@__DIR__)
-using Enzyme, FiniteDifferences, Test
+using SpeedyWeather, Enzyme, Test
 
 if VERSION <= v"1.11.0"
     @testset "Complete Differentiability" begin
