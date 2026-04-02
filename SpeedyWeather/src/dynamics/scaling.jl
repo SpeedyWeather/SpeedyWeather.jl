@@ -52,22 +52,19 @@ end
 
 """$(TYPEDSIGNATURES)
 Undo the radius-scaling of vorticity and divergence from `scale_prognostic!(vars, scale::Real)`."""
-function unscale_prognostic!(vars::Variables)
+function unscale!(vars::Variables)
     progn = vars.prognostic             # for convenience
     inv_scale = inv(progn.scale[])
     haskey(progn, :vor) && (progn.vor .*= inv_scale)
     haskey(progn, :div) && (progn.div .*= inv_scale)
-    progn.scale[] = 1                   # set scale back to 1=unscaled
-    return vars
-end
 
-"""$(TYPEDSIGNATURES)
-Undo the radius-scaling of the scaled variables in variables.grid."""
-function unscale_grid_variables!(vars::Variables)
-    inv_scale = inv(vars.prognostic.scale[])
+    # and the corresponding grid variables if they exist
     haskey(vars.grid, :vor) && (vars.grid.vor .*= inv_scale)
     haskey(vars.grid, :div) && (vars.grid.div .*= inv_scale)
-    vars.prognostic.scale[] = 1         # set scale back to 1=unscaled
+
+    # TODO unscale the tendencies too?
+
+    progn.scale[] = 1                   # set scale back to 1=unscaled
     return vars
 end
 

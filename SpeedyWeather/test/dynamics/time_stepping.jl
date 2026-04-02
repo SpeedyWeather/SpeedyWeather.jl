@@ -155,7 +155,7 @@ end
     # check bit reproducibility of scaling
     SpeedyWeather.scale_prognostic!(simulation.variables, planet.radius)
     @test vor_restarted != simulation.variables.prognostic.vor
-    SpeedyWeather.unscale_prognostic!(simulation.variables)
+    SpeedyWeather.unscale!(simulation.variables)
     @test vor_restarted == simulation.variables.prognostic.vor
 
     # with restart half way
