@@ -24,6 +24,14 @@ if VERSION <= v"1.11.0"
 
         vars = variables
         dvars = make_zero(vars)
+
+        # set a seeed for the prognostic variables
+        dvars.prognostic.vor .= 1 + im
+        dvars.prognostic.div .= 1 + im
+        dvars.prognostic.humid .= 1 + im
+        dvars.prognostic.temp .= 1 + im
+        dvars.prognostic.pres .= 1 + im
+
         dmodel = make_zero(model)
 
         autodiff(Reverse, SpeedyWeather.timestep!, Const, Duplicated(vars, dvars), Const(dt), Duplicated(model, dmodel), Const(lf1), Const(lf2))
