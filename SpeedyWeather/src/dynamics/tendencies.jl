@@ -1002,15 +1002,20 @@ function temperature_average!(
 end
 
 function reset_tendencies!(vars::Variables; value = 0)
-    for tendency in vars.tendencies
-        # tendencies can contain namespaces, unpack those then
-        if tendency isa NamedTuple
-            for t in tendency
-                fill!(t, value)
-            end
-        else    # it's not a namespace, fill directly
-            fill!(tendency, value)
-        end
-    end
+    _reset_tendencies!(vars.tendencies, value)
     return vars
 end
+
+# recursively fill all arrays in a NamedTuple, unpacking nested NamedTuples
+# this avoids Union-typed iteration which Enzyme cannot differentiate
+@inline _reset_tendencies!(nt::NamedTuple, value) = _reset_tendencies_inner!(values(nt), value)
+@inline _reset_tendencies_inner!(::Tuple{}, _) = nothing
+@inline function _reset_tendencies_inner!(t::Tuple, value)
+    _reset_tendency!(first(t), value)
+    _reset_tendencies_inner!(Base.tail(t), value)
+    return nothing
+end
+
+# dispatch on element type: nested NamedTuple vs array
+@inline _reset_tendency!(nt::NamedTuple, value) = _reset_tendencies_inner!(values(nt), value)
+@inline _reset_tendency!(a::AbstractArray, value) = fill!(a, value)
