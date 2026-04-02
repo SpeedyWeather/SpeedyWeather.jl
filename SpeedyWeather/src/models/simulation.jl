@@ -90,7 +90,7 @@ function initialize!(
     end
 
     # transform variables from spectral to grid (= set the diagnostic variables in the correct initial state)
-    transform!(variables, lf, model, initialize = true)          
+    transform!(variables, lf, model, initialize = true)
     haskey(progn, :particles) && initialize!(variables, progn.particles, model)     # initialize particle work arrays
 
     # only initialize output and callbacks just before the simulation starts

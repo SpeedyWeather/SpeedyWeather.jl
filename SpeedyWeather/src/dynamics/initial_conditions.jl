@@ -121,7 +121,7 @@ function initialize!(
 
     # Pre-generate random values on CPU, then transfer to device
     nlm = LowerTriangularArrays.nonzeros(spectrum)
-    
+
     # re and imag seperately as Reactant has no rng for complex
     random_values_cpu_real = 2.0f0 .* rand(RNG, NF, nlm, nlayers) .- 1.0f0
     random_values_cpu_imag = 2.0f0 .* rand(RNG, NF, nlm, nlayers) .- 1.0f0im
@@ -878,7 +878,7 @@ $(TYPEDFIELDS)"""
     lmin::Int = 10
 
     """[OPTION] maximum wavenumber"""
-    lmax::Int = 30        
+    lmax::Int = 30
 end
 
 RandomWaves(SG::SpectralGrid; kwargs...) = RandomWaves{SG.NF}(; kwargs...)

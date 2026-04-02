@@ -7,7 +7,7 @@ struct GridGeometry{
         VectorType,
         VectorIntType,
         VectorRange,
-        IntType
+        IntType,
     } <: AbstractGridGeometry
     grid::Grid                  # grid, e.g. FullGaussianGrid
 

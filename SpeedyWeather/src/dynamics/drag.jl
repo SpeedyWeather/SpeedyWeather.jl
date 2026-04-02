@@ -70,7 +70,7 @@ end
 export QuadraticDrag
 @parameterized @kwdef struct QuadraticDrag{NF} <: AbstractDrag
     "[OPTION] drag coefficient [1]"
-    @param drag::NF = 1e-5 (bounds = Nonnegative,)    # TODO is this a good default?
+    @param drag::NF = 1.0e-5 (bounds = Nonnegative,)    # TODO is this a good default?
 end
 
 QuadraticDrag(SG::SpectralGrid; kwargs...) = QuadraticDrag{SG.NF}(; kwargs...)
@@ -128,10 +128,10 @@ end
 export SpeedLimitDrag
 @parameterized @kwdef struct SpeedLimitDrag{NF} <: AbstractDrag
     "[OPTION] drag coefficient [1/m]"
-    @param drag::NF = 4e-7 (bounds = Nonnegative,)
+    @param drag::NF = 4.0e-7 (bounds = Nonnegative,)
 
     "[OPTION] Speed limit above which drag kicks in [m/s]"
-    @param speed_limit::NF = 80 (bounds = Nonnegative,) 
+    @param speed_limit::NF = 80 (bounds = Nonnegative,)
 end
 
 SpeedLimitDrag(SG::SpectralGrid; kwargs...) = SpeedLimitDrag{SG.NF}(; kwargs...)

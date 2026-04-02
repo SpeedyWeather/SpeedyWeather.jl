@@ -53,7 +53,7 @@ struct SpectralGrid{
 
     "[DERIVED] Type of 3D array of integers"
     TensorIntType::Type{<:AbstractArray}
-    
+
     # HORIZONTAL SPECTRAL
     "[OPTION] horizontal resolution as the maximum degree of spherical harmonics"
     trunc::IntType

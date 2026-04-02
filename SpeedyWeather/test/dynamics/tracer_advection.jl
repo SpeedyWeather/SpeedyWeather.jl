@@ -20,7 +20,7 @@
     ntracers = 2
     @test length(simulation.variables.prognostic.tracers) == ntracers
     @test length(simulation.variables.grid.tracers) == ntracers * SpeedyWeather.get_prognostic_steps(model.time_stepping)
-    @test length(simulation.variables.tendencies.tracers) == 2*ntracers  # 2 for each, one grid one spectral
+    @test length(simulation.variables.tendencies.tracers) == 2 * ntracers  # 2 for each, one grid one spectral
 end
 
 @testset "Tracers: activate!, deactivate!" begin

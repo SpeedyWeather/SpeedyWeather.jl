@@ -12,7 +12,7 @@ function initialize!(
     )
     # initialize by running a "timestep"
     timestep!(vars, vegetation, model)
-    return nothing 
+    return nothing
 end
 
 function timestep!(
@@ -22,7 +22,7 @@ function timestep!(
     )
     # a "timestep" of no vegetation is just to calculate the soil moisture availability
     soil_moisture_availability!(vars, vegetation, model)
-    return nothing 
+    return nothing
 end
 
 function soil_moisture_availability!(

@@ -26,7 +26,7 @@ function FiniteDifferences.to_vec(x::Vector{Particle{NF}}) where {NF}
     end
 end
 
-# TODO: We used to have an adaption here that replaced NaN's as FiniteDifferences can't deal with them, maybe we have to reintroduce it later 
+# TODO: We used to have an adaption here that replaced NaN's as FiniteDifferences can't deal with them, maybe we have to reintroduce it later
 
 #=
 # in the ocean and land variables we have NaNs, FiniteDifferences can't deal with those, so we replace them

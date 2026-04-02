@@ -64,13 +64,13 @@ end
 """$(TYPEDSIGNATURES) Composite OceanLandAlbedo: Call albedo.ocean over ocean and albedo.land over land."""
 @propagate_inbounds function parameterization!(ij, vars::Variables, albedo::OceanLandAlbedo, model)
     albedo!(ij, vars.parameterizations.ocean.albedo, vars, albedo.ocean, model)
-    albedo!(ij, vars.parameterizations.land.albedo, vars, albedo.land, model)
+    return albedo!(ij, vars.parameterizations.land.albedo, vars, albedo.land, model)
 end
 
 """$(TYPEDSIGNATURES) Single Albedo: Call same albedo over ocean and land."""
 @propagate_inbounds function parameterization!(ij, vars::Variables, albedo::AbstractAlbedo, model)
     albedo!(ij, vars.parameterizations.ocean.albedo, vars, albedo, model)
-    albedo!(ij, vars.parameterizations.land.albedo, vars, albedo, model)
+    return albedo!(ij, vars.parameterizations.land.albedo, vars, albedo, model)
 end
 
 export GlobalConstantAlbedo
@@ -152,7 +152,7 @@ function initialize!(albedo::AlbedoClimatology, model::PrimitiveEquation)
         FileFormat = NCDataset,
         version = albedo.version
     )
-    
+
     return interpolate!(albedo.albedo, a)
 end
 

@@ -11,7 +11,7 @@
     run!(simulation, period = Day(5)) # spin-up to get nonzero values for all fields
     initialize!(simulation; period = Day(1))
 
-    
+
     adsim = ADSimulation(simulation)
     (; vars, model) = simulation
     (; Δt, Δt_millisec) = model.time_stepping
@@ -46,8 +46,8 @@
     fd_vjp = FiniteDifferences.j′vp(central_fdm(11, 1), x -> parameterization_tendencies(x, model), dvars_copy, vars_copy)
 
     # TO-DO this test is broken, they gradients don't line up
-    # old test checked dprogn 
-    @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dvars)[1],rtol=1e-4,atol=1e-1))
+    # old test checked dprogn
+    @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dvars)[1], rtol = 1.0e-4, atol = 1.0e-1))
 
     #
     # ocean
@@ -60,7 +60,7 @@
 
     function ocean_timestep(vars, model)
         vars_new = deepcopy(vars)
-        SpeedyWeather.ocean_timestep!(vars_new,deepcopy(model))
+        SpeedyWeather.ocean_timestep!(vars_new, deepcopy(model))
         return progn_new
     end
 

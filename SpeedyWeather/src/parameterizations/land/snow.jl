@@ -60,12 +60,12 @@ function timestep!(
 
     # reset in any case
     vars.scratch.grid.a_2D .= 0
-    
+
     # from precipitation schemes [m/s]
     snow_fall_rate = haskey(vars.parameterizations, :snow_rate) ?
         vars.parameterizations.snow_rate :
-        vars.scratch.grid.a_2D               
-    
+        vars.scratch.grid.a_2D
+
     snow_melt_rate = vars.parameterizations.land.snow_melt_rate     # for soil moisture model
 
     params = (; melting_threshold, cₛ, z₁, Δt, ρ_water, Lᵢ, r⁻¹)

@@ -46,7 +46,7 @@ end
 function Base.summary(io::IO, M::ScratchMemory)
     AT = nonparametric_type(typeof(M.north))
     NF = eltype(M.north)
-    print(io, Base.dims2string((size(M.north)..., 2)), " ScratchMemory{$AT{$NF,...}, ...}")
+    return print(io, Base.dims2string((size(M.north)..., 2)), " ScratchMemory{$AT{$NF,...}, ...}")
 end
 
 function Base.show(io::IO, S::MatrixSpectralTransform{NF, AR, AT}) where {NF, AR, AT}

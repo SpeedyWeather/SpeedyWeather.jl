@@ -183,7 +183,7 @@ function OneBandGreyLongwave(
     return OneBandLongwave(transmissivity, radiative_transfer)
 end
 
-Base.show(io::IO, M::OneBandLongwave) = Base.show(io, M, values=false)
+Base.show(io::IO, M::OneBandLongwave) = Base.show(io, M, values = false)
 
 # initialize one after another
 function initialize!(radiation::OneBandLongwave, model::PrimitiveEquation)

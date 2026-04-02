@@ -162,9 +162,11 @@ end
 end
 
 @testset "copy!(::Clock, ::Clock)" begin
-    clock1 = Clock(time = DateTime(2020, 6, 15), start = DateTime(2020, 6, 1),
+    clock1 = Clock(
+        time = DateTime(2020, 6, 15), start = DateTime(2020, 6, 1),
         period = Day(14), timestep_counter = 5, n_timesteps = 10,
-        Δt = Millisecond(3600_000))
+        Δt = Millisecond(3600_000)
+    )
 
     clock2 = Clock()
 

@@ -1,7 +1,7 @@
 abstract type AbstractShortwaveTransmissivity <: AbstractShortwave end
 
 export TransparentShortwaveTransmissivity
-TransparentShortwaveTransmissivity(SG::SpectralGrid) = ConstantShortwaveTransmissivity(SG, transmissivity=1)
+TransparentShortwaveTransmissivity(SG::SpectralGrid) = ConstantShortwaveTransmissivity(SG, transmissivity = 1)
 
 export ConstantShortwaveTransmissivity
 
@@ -58,7 +58,7 @@ $(TYPEDFIELDS)."""
     # Value chosen following PR #974 for a ~75W/m^2 shortwave absorption target
     "[OPTION] Absorptivity of water vapor [per kg/kg per 10^5 Pa]"
     @param absorptivity_water_vapor::NF = 75 (bounds = Nonnegative,)
-    
+
     # Weighted visible band: 0.95*0.015 = 0.014 per g/kg → 1.4e-5 per kg/kg (SPEEDY abscl1)
     "[OPTION] Base cloud absorptivity [per kg/kg per 10^5 Pa]"
     @param absorptivity_cloud_base::NF = 10 (bounds = Nonnegative,)

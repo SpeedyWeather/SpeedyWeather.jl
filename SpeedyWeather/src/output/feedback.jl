@@ -59,7 +59,7 @@ function initialize!(feedback::Feedback, clock::Clock, model::AbstractModel)
     # used to pass on the time step to ProgressMeter.speedstring
     FEEDBACK_DT_IN_SEC[] = model.time_stepping.Δt_sec
     FEEDBACK_TIME[] = clock.time
-    
+
     # reset those to default (-1 not shown)
     FEEDBACK_UMAX[] = -1
     FEEDBACK_TMIN[] = -1
@@ -116,7 +116,7 @@ function nan_detection!(feedback::Feedback, vars::Variables)
     feedback.nans_detected && return nothing                        # escape immediately if nans already detected
     i = feedback.progress_meter.counter                             # time step
     GPUArrays.@allowscalar vor0 = vars.prognostic.vor[2, end, 2]    # only check 1-0 mode of surface vorticity
-    
+
     # just check first harmonic, spectral transform propagates NaNs globally anyway
     (; time) = vars.prognostic.clock                                # current time for feedback
     nans_detected_here = ~isfinite(vor0)

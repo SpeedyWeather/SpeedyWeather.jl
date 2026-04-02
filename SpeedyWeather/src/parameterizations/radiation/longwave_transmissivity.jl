@@ -1,7 +1,7 @@
 abstract type AbstractLongwaveTransmissivity <: AbstractLongwave end
 
 export TransparentLongwaveTransmissivity
-TransparentLongwaveTransmissivity(SG::SpectralGrid) = ConstantLongwaveTransmissivity(SG, transmissivity=1)
+TransparentLongwaveTransmissivity(SG::SpectralGrid) = ConstantLongwaveTransmissivity(SG, transmissivity = 1)
 
 export ConstantLongwaveTransmissivity
 @parameterized @kwdef struct ConstantLongwaveTransmissivity{NF} <: AbstractLongwaveTransmissivity

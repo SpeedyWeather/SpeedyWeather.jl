@@ -121,7 +121,7 @@ _copy_entry!(dest::Base.RefValue, src::Base.RefValue) = (dest[] = src[])
 # and immutable structs with array fields (e.g. ScratchMemory): copyto! on arrays.
 # uses @generated to avoid runtime reflection (ismutable, fieldnames, isa checks)
 # which Enzyme cannot differentiate through.
-@generated function _copy_entry!(dest::T, src::T) where T
+@generated function _copy_entry!(dest::T, src::T) where {T}
     exprs = Expr[]
     for (i, fname) in enumerate(fieldnames(T))
         ft = fieldtype(T, i)
@@ -262,7 +262,7 @@ function filter_variables(vars, VariableType)
     for ns in namespaces
         group[ns] = Tuple([v for v in vars if v.namespace == ns])
     end
-    
+
     return group
 end
 

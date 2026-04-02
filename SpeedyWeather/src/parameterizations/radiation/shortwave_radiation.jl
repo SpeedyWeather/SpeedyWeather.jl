@@ -98,7 +98,7 @@ function OneBandGreyShortwave(
     return OneBandShortwave(clouds, transmissivity, radiative_transfer)
 end
 
-Base.show(io::IO, M::OneBandShortwave) = show(io, M, values=false)
+Base.show(io::IO, M::OneBandShortwave) = show(io, M, values = false)
 
 # initialize one after another
 function initialize!(radiation::OneBandShortwave, model::PrimitiveEquation)
@@ -141,7 +141,7 @@ Adapt.@adapt_structure OneBandShortwaveRadiativeTransfer
 # generator function
 function OneBandShortwaveRadiativeTransfer(
         SG::SpectralGrid;
-        ozone_distribution = (σ) -> 50 * max(0, 1//5 - σ),     # default distribution here
+        ozone_distribution = (σ) -> 50 * max(0, 1 // 5 - σ),     # default distribution here
         kwargs...
     )
     return OneBandShortwaveRadiativeTransfer{SG.NF, typeof(ozone_distribution)}(;

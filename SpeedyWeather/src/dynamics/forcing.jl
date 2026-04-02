@@ -150,7 +150,7 @@ end
 function variables(::StochasticStirring)
     return (
         ScratchVariable(:a_2D, Spectral2D(), desc = "scratch array", units = "?"),
-        ScratchVariable(:a_2D, Grid2D(), desc = "scratch array", units = "?", namespace=:grid),
+        ScratchVariable(:a_2D, Grid2D(), desc = "scratch array", units = "?", namespace = :grid),
     )
 end
 
@@ -229,7 +229,7 @@ $(TYPEDFIELDS)
 """
 @parameterized @kwdef mutable struct KolmogorovFlow{NF} <: AbstractForcing
     "[OPTION] Strength of forcing [1/s²]"
-    @param strength::NF = 5e-5 (bounds = Nonnegative,)
+    @param strength::NF = 5.0e-5 (bounds = Nonnegative,)
 
     "[OPTION] Wavenumber of forcing in meridional direction (pole to pole)"
     @param wavenumber::NF = 8 (bounds = Nonnegative,)

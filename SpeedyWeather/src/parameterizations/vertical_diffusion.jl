@@ -95,14 +95,14 @@ end
     u_tend = vars.tendencies.grid.u
     v_tend = vars.tendencies.grid.v
     temp_tend = vars.tendencies.grid.temp
-    
+
     # TODO previous time step?
     u = vars.grid.u
     v = vars.grid.v
-    
+
     diffuse_momentum && _vertical_diffusion!(ij, u_tend, u, K, kₕ, diffusion)
     diffuse_momentum && _vertical_diffusion!(ij, v_tend, v, K, kₕ, diffusion)
-    
+
     if atmosphere isa AbstractWetAtmosphere && diffuse_humidity
         humid_tend = vars.tendencies.grid.humid
         humid = vars.grid.humid
@@ -175,7 +175,9 @@ end
     K = vars.scratch.grid.b
 
     # diffusion above boundary layer is 0, reset for all layers
-    for k in 1:nlayers K[ij, k] = 0 end
+    for k in 1:nlayers
+        K[ij, k] = 0
+    end
 
     if kₕ <= nlayers    # boundary layer depth is at least 1 layer thick (calculate diffusion)
 
@@ -268,10 +270,12 @@ For vertical stability in the boundary layer."""
     v = vars.grid.v_prev
     Φ = vars.grid.geopotential
     T = vars.grid.temp_prev
-    
+
     # for dry models, use scratch array to bypass access to non-existing humidity variable
-    for k in 1:nlayers vars.scratch.grid.b[ij, k] = 0 end   # reset to zero humidity
-    q = haskey(vars.grid, :humid_prev) ? vars.grid.humid_prev : vars.scratch.grid.b 
+    for k in 1:nlayers
+        vars.scratch.grid.b[ij, k] = 0
+    end   # reset to zero humidity
+    q = haskey(vars.grid, :humid_prev) ? vars.grid.humid_prev : vars.scratch.grid.b
 
     # surface layer
     V² = u[ij, surface]^2 + v[ij, surface]^2

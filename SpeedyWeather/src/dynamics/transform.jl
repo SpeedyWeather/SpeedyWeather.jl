@@ -53,7 +53,7 @@ function SpeedyTransforms.transform!(
         model::ShallowWater;
         kwargs...
     )
-    
+
     vor_grid = vars.grid.vor
     u_grid = vars.grid.u
     v_grid = vars.grid.v

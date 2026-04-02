@@ -63,7 +63,7 @@ function initialize!(land::SeasonalLandTemperature, model::PrimitiveEquation)
         FileFormat = NCDataset,
         version = land.version
     )
-    
+
     lst = on_architecture(model.architecture, lst)
 
     @boundscheck fields_match(monthly_temperature, lst, vertical_only = true) ||
@@ -145,7 +145,7 @@ function initialize!(
     )
     set!(vars.prognostic.land.soil_temperature, land.temperature)
     land.mask && mask!(vars.prognostic.land.soil_temperature, model.land_sea_mask, :ocean)
-    return nothing 
+    return nothing
 end
 
 # temperature is constant so do nothing during land timestep

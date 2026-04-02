@@ -64,4 +64,3 @@ elseif gpu_backend === :AMDGPU
 elseif gpu_backend === :Metal
     include("MetalGPU/metal.jl")
 end
-

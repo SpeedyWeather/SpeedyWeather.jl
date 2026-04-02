@@ -319,8 +319,8 @@ function surface_pressure_tendency!(
         vars::Variables,
         S::AbstractSpectralTransform,
     )
-    pres_tend =  vars.tendencies.pres
-    pres_tend_grid =  vars.tendencies.grid.pres
+    pres_tend = vars.tendencies.pres
+    pres_tend_grid = vars.tendencies.grid.pres
     (; dpres_dx, dpres_dy, u_mean_grid, v_mean_grid, div_mean) = vars.dynamics
     scratch_memory = vars.scratch.transform_memory
 
@@ -350,7 +350,7 @@ function vertical_velocity!(
     (; div_sum_above, pres_flux, pres_flux_sum_above) = vars.dynamics
     (; div_mean_grid) = vars.dynamics           # vertical avrgd div to be added to ūv̄∇lnp
     div_grid = vars.grid.div
-    
+
     # vertical velocity in sigma coordinates, positive down
     (; w) = vars.dynamics                       # = vertical mass flux M = pₛσ̇ at k+1/2
 
@@ -584,11 +584,11 @@ function temperature_tendency!(
     temp_tend_grid = vars.tendencies.grid.temp
     div_grid = vars.grid.div
     (; temp) = vars.grid
-    
+
     # use scratch array with zeros in case humidity doesn't exist
     vars.scratch.grid.a .= 0
     humid = haskey(vars.grid, :humid) ? vars.grid.humid : vars.scratch.grid.a
-    
+
     (; pres_flux, pres_flux_sum_above, div_sum_above) = vars.dynamics
     scratch_memory = vars.scratch.transform_memory
     (; temp_profile) = implicit
@@ -885,7 +885,7 @@ with
 
 with Fᵤ, Fᵥ the forcing from `forcing!` already in `u_tend_grid`/`v_tend_grid` and
 vorticity ζ, coriolis f."""
-vorticity_flux!(vars::Variables, model::ShallowWater) = 
+vorticity_flux!(vars::Variables, model::ShallowWater) =
     vorticity_flux_curldiv!(vars, model.coriolis, model.geometry, model.spectral_transform, div = true, add = true)
 
 """
@@ -901,7 +901,7 @@ with
 
 with Fᵤ, Fᵥ the forcing from `forcing!` already in `u_tend_grid`/`v_tend_grid` and
 vorticity ζ, coriolis f."""
-vorticity_flux!(vars::Variables, model::Barotropic) = 
+vorticity_flux!(vars::Variables, model::Barotropic) =
     vorticity_flux_curldiv!(vars, model.coriolis, model.geometry, model.spectral_transform, div = false, add = true)
 
 function bernoulli_potential!(vars::Variables, model::ShallowWater)

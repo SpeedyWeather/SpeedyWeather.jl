@@ -37,15 +37,15 @@ function ADseed(adsim::ADSimulation, name::Symbol)
         if field isa AbstractArray
             if eltype(field) <: Complex
                 field .= one(eltype(real(field))) + im * one(eltype(real(field)))
-            else 
+            else
                 field .= one(eltype(field))
-            end 
+            end
         elseif field isa NamedTuple
             for k2 in keys(field)
                 field2 = getfield(field, k2)
                 if eltype(field2) <: Complex
                     field2 .= one(eltype(real(field2))) + im * one(eltype(real(field2)))
-                else 
+                else
                     field2 .= one(eltype(field2))
                 end
             end
@@ -53,7 +53,7 @@ function ADseed(adsim::ADSimulation, name::Symbol)
     end
 
     return deepcopy(adsim.vars), seed
-end 
+end
 
 function initialize_with_spinup!(model::AbstractModel, spinup_period = Day(5), init_period = Day(1))
     simulation = initialize!(model)

@@ -40,7 +40,7 @@ function linear_virtual_temperature!(
     # but a linear virtual temperature in spectral space to avoid another transform
     # does not cause any problems. Alternative do the transform or have a linear
     # virtual temperature in both grid and spectral space
-    
+
     # TODO: broadcast with LTA doesn't work here becasue of a broadcast conflict
     # (Tₖ and q are different dimensions and array types)
     return @. Tᵥ.data = T.data + (Tₖ' * μ) * q.data

@@ -38,8 +38,10 @@ function set!(
     # special case for u,v setting vor, div
     if :u in keys(kwargs) && :v in keys(kwargs)
         (; vor, div) = vars
-        set_vordiv!(get_step(vor, lf), get_step(div, lf), kwargs[:u], kwargs[:v],
-            geometry, spectral_transform; add, coslat_scaling_included, static_func)
+        set_vordiv!(
+            get_step(vor, lf), get_step(div, lf), kwargs[:u], kwargs[:v],
+            geometry, spectral_transform; add, coslat_scaling_included, static_func
+        )
     elseif :u in keys(kwargs) || :v in keys(kwargs)
         @warn "Only one of `u` and `v` provided, but both are needed to set `vor` and `div`. Skipping."
     end
@@ -366,7 +368,7 @@ function set_vordiv!(
         geometry::Geometry,
         S::Union{Nothing, SpectralTransform} = nothing;
         kwargs...
-)
+    )
     vor .= 0    # curl of a constant is zero
     div .= 0    # divergence of a constant is zero
     return vor, div

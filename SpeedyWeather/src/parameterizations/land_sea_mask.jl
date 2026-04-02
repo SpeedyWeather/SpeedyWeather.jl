@@ -79,7 +79,7 @@ $(TYPEDFIELDS)"""
 
     "[OPTION] SpeedyWeatherAssets version number"
     version::VersionNumber = DEFAULT_ASSETS_VERSION
-    
+
     "NCDataset variable name"
     varname::String = "lsm"
 

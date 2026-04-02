@@ -6,7 +6,7 @@ using ..Architectures
 
 import Dates        # Dates for readable_secs
 
-# miscellaneous utility functions 
+# miscellaneous utility functions
 export isincreasing, isdecreasing
 export print_fields, readable_secs
 export _jit, @maybe_jit

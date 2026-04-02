@@ -292,7 +292,7 @@ function horizontal_diffusion!(
         tracer_tend = vars.tendencies.tracers[name]
         tracer.active && horizontal_diffusion!(tracer_tend, tracer_var, expl, impl)
     end
-    
+
     return nothing
 end
 

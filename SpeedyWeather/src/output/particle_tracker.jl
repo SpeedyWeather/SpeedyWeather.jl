@@ -41,8 +41,8 @@ end
 
 function ParticleTracker(SG::SpectralGrid; kwargs...)
     # dummy vector
-    v = zeros(SG.NF, 0) 
-    return ParticleTracker{SG.VectorType}(; lon=v, lat=v, σ=v, kwargs...)
+    v = zeros(SG.NF, 0)
+    return ParticleTracker{SG.VectorType}(; lon = v, lat = v, σ = v, kwargs...)
 end
 
 function initialize!(

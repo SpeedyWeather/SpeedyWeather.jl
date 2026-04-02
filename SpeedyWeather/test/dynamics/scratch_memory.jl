@@ -1,12 +1,12 @@
 @testset "Scratch memory allocation" begin
     SG = SpectralGrid(trunc = 21, nlayers = 3)
-    
+
     # created via transform or directly
     S = SpectralTransform(SG)
     SM = SpeedyTransforms.ScratchMemory(SG.NF, SG.architecture, SG.grid, 3)
 
     # created via model initialization
-    model = PrimitiveDryModel(spectral_grid, spectral_transform=S)
+    model = PrimitiveDryModel(spectral_grid, spectral_transform = S)
     variables = Variables(model)
 
     # change the memory of the transform

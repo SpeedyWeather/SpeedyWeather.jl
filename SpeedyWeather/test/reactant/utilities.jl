@@ -2,9 +2,11 @@
 
 @testset "copy!(::Clock, ::Clock) with Reactant" begin
     # create a standard CPU clock with non-default values
-    clock_cpu = Clock(time = DateTime(2020, 6, 15), start = DateTime(2020, 6, 1),
+    clock_cpu = Clock(
+        time = DateTime(2020, 6, 15), start = DateTime(2020, 6, 1),
         period = Day(14), timestep_counter = 5, n_timesteps = 10,
-        Δt = Millisecond(3600_000))
+        Δt = Millisecond(3600_000)
+    )
 
     # create a Reactant clock (has ConcreteRNumber fields via track_numbers)
     clock_reactant = SpeedyWeather.Clock(ReactantDevice())

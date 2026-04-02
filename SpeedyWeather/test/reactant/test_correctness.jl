@@ -176,7 +176,7 @@ function test_time_stepping!(sim_cpu, sim_reactant, model_name, r_first! = nothi
         @testset "Clock" begin
             compare_clock(sim_cpu, sim_reactant)
         end
-        
+
         @testset "Prognostic variables" begin
             for (name, r) in progn_results
                 @test r.matches
@@ -227,10 +227,10 @@ function test_model(ModelType::Type; trunc = TRUNC, nsteps = NSTEPS, rtol = RTOL
         r_first! = @compile first_timesteps!(simulation_reactant)
         r_later! = @compile later_timestep!(simulation_reactant)
         println("  ✓ Reactant functions compiled")
-    else 
+    else
         r_first! = nothing
         r_later! = nothing
-    end 
+    end
 
     @testset "$model_name CPU vs Reactant" begin
         tend_results = test_tendencies!(simulation_cpu, simulation_reactant, model_name, r_first!, r_later!; rtol, atol)

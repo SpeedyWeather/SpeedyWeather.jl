@@ -80,7 +80,7 @@ $(TYPEDFIELDS)"""
     @component ocean::OC = SlabOcean(spectral_grid)
     @component sea_ice::SI = ThermodynamicSeaIce(spectral_grid)
     @component land::LA = DryLandModel(spectral_grid)
-    
+
     # PHYSICS/PARAMETERIZATIONS
     @component solar_zenith::ZE = WhichZenith(spectral_grid, planet)
     @component albedo::AL = OceanLandAlbedo(spectral_grid)
@@ -114,10 +114,10 @@ $(TYPEDFIELDS)"""
         :planet, :geometry, :land_sea_mask,
     )
 
-    parameterizations::TS2 = (  
+    parameterizations::TS2 = (
         # orbit or external forcing
         :solar_zenith,
-    
+
         # mixing
         :vertical_diffusion, :convection,
 

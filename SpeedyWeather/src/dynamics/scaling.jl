@@ -27,10 +27,26 @@ by the radius for the dynamical core."""
 end
 
 @propagate_inbounds function scale_tendencies!(ij, vars::NamedTuple, scale::Real)
-    haskey(vars, :u) && (for k in eachlayer(vars.u) vars.u[ij, k] *= scale end)
-    haskey(vars, :v) && (for k in eachlayer(vars.v) vars.v[ij, k] *= scale end)
-    haskey(vars, :temp) && (for k in eachlayer(vars.temp) vars.temp[ij, k] *= scale end)
-    haskey(vars, :humid) && (for k in eachlayer(vars.humid) vars.humid[ij, k] *= scale end)
+    haskey(vars, :u) && (
+        for k in eachlayer(vars.u)
+            vars.u[ij, k] *= scale
+        end
+    )
+    haskey(vars, :v) && (
+        for k in eachlayer(vars.v)
+            vars.v[ij, k] *= scale
+        end
+    )
+    haskey(vars, :temp) && (
+        for k in eachlayer(vars.temp)
+            vars.temp[ij, k] *= scale
+        end
+    )
+    haskey(vars, :humid) && (
+        for k in eachlayer(vars.humid)
+            vars.humid[ij, k] *= scale
+        end
+    )
     return nothing
 end
 

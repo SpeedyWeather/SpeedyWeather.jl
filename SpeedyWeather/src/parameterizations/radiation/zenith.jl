@@ -1,4 +1,4 @@
-abstract type AbstractSolarDeclination <:AbstractModelComponent end
+abstract type AbstractSolarDeclination <: AbstractModelComponent end
 abstract type AbstractSolarTimeCorrection <: AbstractModelComponent end
 abstract type AbstractZenith <: AbstractModelComponent end
 
@@ -9,7 +9,7 @@ struct SinSolarDeclination{P} <: AbstractSolarDeclination
     planet::P
 end
 
-Base.show(io::IO, S::SinSolarDeclination) = show(io, S, values=false)
+Base.show(io::IO, S::SinSolarDeclination) = show(io, S, values = false)
 
 """
 $(TYPEDSIGNATURES)
@@ -228,7 +228,7 @@ end
     )
 
     ij = @index(Global, Linear)
-    j = whichring[ij]  
+    j = whichring[ij]
 
     sinδsinϕ = sinδ * sinlat[j]
     cosδcosϕ = cosδ * coslat[j]
@@ -303,9 +303,11 @@ end
     cos_zenith_j::NF            # at latitude j
 
     ϕ = lat[j]
-    h₀ = ifelse(2*(abs(δ) + abs(ϕ)) < π,    # polar day/night?
+    h₀ = ifelse(
+        2 * (abs(δ) + abs(ϕ)) < π,    # polar day/night?
         acos(-tan(ϕ) * tan(δ)),             # if not: calculate length of day
-        ifelse(ϕ * δ > 0, π, 0))            # polar day if signs are equal, otherwise polar night
+        ifelse(ϕ * δ > 0, π, 0)
+    )            # polar day if signs are equal, otherwise polar night
 
     sinϕ, cosϕ = sinlat[j], coslat[j]
     cos_zenith_j = h₀ * sinδ * sinϕ + cosδ * cosϕ * sin(h₀)

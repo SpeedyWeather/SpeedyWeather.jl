@@ -18,7 +18,7 @@ finalize!(::Nothing, ::AbstractModel) = nothing
 initialize!(::AbstractModelComponent, ::AbstractModel) = nothing
 finalize!(::AbstractModelComponent, ::AbstractModel) = nothing
 
-function Base.show(io::IO, P::AbstractModelComponent; values=true)
+function Base.show(io::IO, P::AbstractModelComponent; values = true)
     type_str = split("$(typeof(P))", "{", limit = 2)
     type_itself = type_str[1]
     type_params = length(type_str) == 2 ? ("{" * type_str[2]) : ""
@@ -51,7 +51,7 @@ function Base.show(io::IO, M::AbstractModel)
     properties = propertynames(M)
     n = length(properties)
     Msize = prettymemory(Base.summarysize(M))
-    s = styled"{warning:$(model_type(M))}"*"{...} <: $(model_class(M)) " * styled"{note:($Msize)}"
+    s = styled"{warning:$(model_type(M))}" * "{...} <: $(model_class(M)) " * styled"{note:($Msize)}"
     n == 0 ? print(io, s) : println(io, s)
     for (i, key) in enumerate(properties)
         val = getfield(M, key)
@@ -60,7 +60,7 @@ function Base.show(io::IO, M::AbstractModel)
         t = split("$(typeof(val))", "{", limit = 2)
         t1 = t[1]
         t2 = length(t) == 2 ? ("{" * t[2]) : ""
-        a = "$s " * styled"{info:$key}"*"::$t1" * styled"{note:$t2}"
+        a = "$s " * styled"{info:$key}" * "::$t1" * styled"{note:$t2}"
         a_short = textwidth(a) > 75 ? first(a, 75) * "..." : a
         p(io, a_short)
     end

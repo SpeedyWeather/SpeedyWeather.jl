@@ -99,7 +99,7 @@ function run_benchmark_suite!(suite::BenchmarkSuiteModel)
         else
             M = SpectralTransform(spectral_grid)
         end
-        
+
         model = PrimitiveWetModel(spectral_grid; spectral_transform = M)
         simulation = initialize!(model)
         # spin up
@@ -157,7 +157,7 @@ function run_benchmark_suite!(suite::BenchmarkSuiteDynamicsGPU)
         else
             M = SpectralTransform(spectral_grid)
         end
-        
+
         model = PrimitiveWetModel(spectral_grid; spectral_transform = M)
         simulation = initialize!(model)
         # spin up

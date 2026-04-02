@@ -80,10 +80,10 @@
     set!(simulation, vor = Float32(3.0), lf = lf, add = true)
     @test get_step(prog_new.vor, lf) ≈ (2 .* M3_spec)
 
-    set!(simulation, sea_surface_temperature = Float16(3.0), namespace=:ocean)
+    set!(simulation, sea_surface_temperature = Float16(3.0), namespace = :ocean)
     @test all(prog_new.ocean.sea_surface_temperature .≈ 3.0)
 
-    set!(simulation, sea_surface_temperature = Float16(3.0), add = true, namespace=:ocean)
+    set!(simulation, sea_surface_temperature = Float16(3.0), add = true, namespace = :ocean)
     @test all(prog_new.ocean.sea_surface_temperature .≈ 6.0)
 
     # vor_div, create u,v first in spectral space
@@ -133,7 +133,7 @@
     @test get_step(prog_new.vor, lf) ≈ A_spec
 
     # groups
-    set!(simulation, geopotential=1, group=:grid)
+    set!(simulation, geopotential = 1, group = :grid)
     @test all(simulation.variables.grid.geopotential .== 1)
 end
 
