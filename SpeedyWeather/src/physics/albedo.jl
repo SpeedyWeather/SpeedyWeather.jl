@@ -409,11 +409,11 @@ export LearnedBRDF
     "Snow cover-albedo scheme"
     @param snow_cover::Scheme = SaturatingSnowCover() (group = :snow_cover,)
 
-    input_buffer::Vector{Float32} = zeros(Float32, 8)
+    input_buffer::Vector{Float32} = zeros(Float32, 10)
 
     # Normalisation parameters
-    norm_means::Vector{Float32} = zeros(Float32, 8)
-    norm_stds::Vector{Float32} = zeros(Float32, 8)
+    norm_means::Vector{Float32} = zeros(Float32, 10)
+    norm_stds::Vector{Float32} = zeros(Float32, 10)
     unnorm_means::Vector{Float32} = zeros(Float32, 6)
     unnorm_stds::Vector{Float32} = zeros(Float32, 6)
 

@@ -163,61 +163,136 @@ Base.@propagate_inbounds function SpeedyWeather.surface_roughness!(ij, diagn, pr
 end
 
 
-using Lux, Random
-
-function PreNormResidualBlock(dim::Int, activation_fn, dropout_rate=0.05f0, expansion_factor=2)
+function PreNormResidualBlock(dim::Int, activation::Function, dropout_rate::Float32 = 0.05f0, expansion_factor::Int = 2)
     hidden_dim = dim * expansion_factor
-    
-    return SkipConnection(
-        Chain(;
-            norm1   = BatchNorm(dim),
-            linear1 = Dense(dim => hidden_dim, activation_fn),
-            linear2 = Dense(hidden_dim => dim),
-            dropout = Dropout(dropout_rate)
-        ),
-        +
+
+    inner_path = Lux.Chain(;
+        norm1 = Lux.BatchNorm(dim),
+        linear1 = Lux.Dense(dim => hidden_dim),
+        act1 = Lux.WrappedFunction(activation),
+        linear2 = Lux.Dense(hidden_dim => dim),
+        dropout = Lux.Dropout(dropout_rate)
     )
+    return Lux.SkipConnection(inner_path, +)
 end
 
-function BRDFNet(; input_dim=8, shared_dim=64, head_dim=64, activation_fn=gelu, dropout_rate=0.1f0)
-    
-    trunk_embed = Chain(;
-        linear   = Dense(input_dim => shared_dim),
-        norm_act = BatchNorm(shared_dim, activation_fn)
+# BRDFNet
+function BRDFNet(; input_dim = 10, shared_dim = 32, head_dim = 32, activation = gelu, dropout_rate = 0.1)
+
+    trunk_embed = Lux.Chain(;
+        linear = Lux.Dense(input_dim => shared_dim),
+        norm = Lux.BatchNorm(shared_dim),
+        act = Lux.WrappedFunction(activation)
     )
 
-    trunk_res_blocks = Chain(;
-        block1 = PreNormResidualBlock(shared_dim, activation_fn, dropout_rate),
-        block2 = PreNormResidualBlock(shared_dim, activation_fn, dropout_rate),
-        block3 = PreNormResidualBlock(shared_dim, activation_fn, dropout_rate)
+    trunk_res_blocks = Lux.Chain(;
+        block1 = PreNormResidualBlock(shared_dim, activation, dropout_rate),
+        block2 = PreNormResidualBlock(shared_dim, activation, dropout_rate),
+        block3 = PreNormResidualBlock(shared_dim, activation, dropout_rate)
     )
 
-    build_head(in_dim, hid_dim, out_feat) = Chain(;
-        linear1  = Dense(in_dim => hid_dim),
-        norm_act = BatchNorm(hid_dim, activation_fn),
-        linear2  = Dense(hid_dim => out_feat)
+    build_head(in_dim, hidden_dim, out_features) = Lux.Chain(;
+        linear1 = Lux.Dense(in_dim => hidden_dim),
+        norm = Lux.BatchNorm(hidden_dim),
+        act = Lux.WrappedFunction(activation),
+        linear2 = Lux.Dense(hidden_dim => out_features)
     )
 
-    heads = Parallel(vcat;
-        iso = build_head(shared_dim, head_dim, 2),
-        vol = build_head(shared_dim, head_dim, 2),
-        geo = build_head(shared_dim, head_dim, 2)
+    heads = Lux.Parallel(
+        vcat;
+        iso_head = build_head(shared_dim, head_dim, 2),
+        vol_head = build_head(shared_dim, head_dim, 2),
+        geo_head = build_head(shared_dim, head_dim, 2)
     )
+    return Lux.Chain(; trunk_embed, trunk_res_blocks, heads)
+end
 
-    return Chain(; 
-        trunk_embed = trunk_embed, 
-        trunk_res_blocks = trunk_res_blocks, 
-        heads = heads
-    )
+function load_brdfnet_parameters!(ps, st, weights::Dict{String, Any})
+    # --- Trunk Embed ---
+    ps.trunk_embed.linear.weight .= weights["trunk_embed.0.weight"]
+    ps.trunk_embed.linear.bias .= weights["trunk_embed.0.bias"]
+    ps.trunk_embed.norm.scale .= weights["trunk_embed.1.weight"]
+    ps.trunk_embed.norm.bias .= weights["trunk_embed.1.bias"]
+    st.trunk_embed.norm.running_mean .= weights["trunk_embed.1.running_mean"]
+    st.trunk_embed.norm.running_var .= weights["trunk_embed.1.running_var"]
+
+    # --- Trunk Res Blocks ---
+    b1_ps = ps.trunk_res_blocks.block1
+    b1_st = st.trunk_res_blocks.block1
+    b2_ps = ps.trunk_res_blocks.block2
+    b2_st = st.trunk_res_blocks.block2
+    b3_ps = ps.trunk_res_blocks.block3
+    b3_st = st.trunk_res_blocks.block3
+
+    # Block 1
+    b1_ps.norm1.scale .= weights["trunk_res_blocks.0.norm1.weight"]
+    b1_ps.norm1.bias .= weights["trunk_res_blocks.0.norm1.bias"]
+    b1_st.norm1.running_mean .= weights["trunk_res_blocks.0.norm1.running_mean"]
+    b1_st.norm1.running_var .= weights["trunk_res_blocks.0.norm1.running_var"]
+    b1_ps.linear1.weight .= weights["trunk_res_blocks.0.linear1.weight"]
+    b1_ps.linear1.bias .= weights["trunk_res_blocks.0.linear1.bias"]
+    b1_ps.linear2.weight .= weights["trunk_res_blocks.0.linear2.weight"]
+    b1_ps.linear2.bias .= weights["trunk_res_blocks.0.linear2.bias"]
+
+    # Block 2
+    b2_ps.norm1.scale .= weights["trunk_res_blocks.1.norm1.weight"]
+    b2_ps.norm1.bias .= weights["trunk_res_blocks.1.norm1.bias"]
+    b2_st.norm1.running_mean .= weights["trunk_res_blocks.1.norm1.running_mean"]
+    b2_st.norm1.running_var .= weights["trunk_res_blocks.1.norm1.running_var"]
+    b2_ps.linear1.weight .= weights["trunk_res_blocks.1.linear1.weight"]
+    b2_ps.linear1.bias .= weights["trunk_res_blocks.1.linear1.bias"]
+    b2_ps.linear2.weight .= weights["trunk_res_blocks.1.linear2.weight"]
+    b2_ps.linear2.bias .= weights["trunk_res_blocks.1.linear2.bias"]
+
+    # Block 3
+    b3_ps.norm1.scale .= weights["trunk_res_blocks.2.norm1.weight"]
+    b3_ps.norm1.bias .= weights["trunk_res_blocks.2.norm1.bias"]
+    b3_st.norm1.running_mean .= weights["trunk_res_blocks.2.norm1.running_mean"]
+    b3_st.norm1.running_var .= weights["trunk_res_blocks.2.norm1.running_var"]
+    b3_ps.linear1.weight .= weights["trunk_res_blocks.2.linear1.weight"]
+    b3_ps.linear1.bias .= weights["trunk_res_blocks.2.linear1.bias"]
+    b3_ps.linear2.weight .= weights["trunk_res_blocks.2.linear2.weight"]
+    b3_ps.linear2.bias .= weights["trunk_res_blocks.2.linear2.bias"]
+
+    # Iso head
+    ps.heads.iso_head.linear1.weight .= weights["iso_head.0.weight"]
+    ps.heads.iso_head.linear1.bias .= weights["iso_head.0.bias"]
+    ps.heads.iso_head.norm.scale .= weights["iso_head.1.weight"]
+    ps.heads.iso_head.norm.bias .= weights["iso_head.1.bias"]
+    st.heads.iso_head.norm.running_mean .= weights["iso_head.1.running_mean"]
+    st.heads.iso_head.norm.running_var .= weights["iso_head.1.running_var"]
+    ps.heads.iso_head.linear2.weight .= weights["iso_head.3.weight"]
+    ps.heads.iso_head.linear2.bias .= weights["iso_head.3.bias"]
+
+    # Vol head
+    ps.heads.vol_head.linear1.weight .= weights["vol_head.0.weight"]
+    ps.heads.vol_head.linear1.bias .= weights["vol_head.0.bias"]
+    ps.heads.vol_head.norm.scale .= weights["vol_head.1.weight"]
+    ps.heads.vol_head.norm.bias .= weights["vol_head.1.bias"]
+    st.heads.vol_head.norm.running_mean .= weights["vol_head.1.running_mean"]
+    st.heads.vol_head.norm.running_var .= weights["vol_head.1.running_var"]
+    ps.heads.vol_head.linear2.weight .= weights["vol_head.3.weight"]
+    ps.heads.vol_head.linear2.bias .= weights["vol_head.3.bias"]
+
+    # Geo head
+    ps.heads.geo_head.linear1.weight .= weights["geo_head.0.weight"]
+    ps.heads.geo_head.linear1.bias .= weights["geo_head.0.bias"]
+    ps.heads.geo_head.norm.scale .= weights["geo_head.1.weight"]
+    ps.heads.geo_head.norm.bias .= weights["geo_head.1.bias"]
+    st.heads.geo_head.norm.running_mean .= weights["geo_head.1.running_mean"]
+    st.heads.geo_head.norm.running_var .= weights["geo_head.1.running_var"]
+    ps.heads.geo_head.linear2.weight .= weights["geo_head.3.weight"]
+    ps.heads.geo_head.linear2.bias .= weights["geo_head.3.bias"]
+    return nothing
 end
 
 function SpeedyWeather.LearnedBRDF(
         SG::SpectralGrid;
         snow_cover = SaturatingSnowCover(),
-        input_dim::Int = 8,
-        shared_dim::Int = 256,
-        head_dim::Int = 64,
-        dropout_rate::Float64 = 0.1,
+        input_dim::Int = 10,
+        shared_dim::Int = 32,
+        head_dim::Int = 32,
+        dropout_rate::Float32 = 0.0f0,
         kwargs...
     )
 
@@ -226,8 +301,6 @@ function SpeedyWeather.LearnedBRDF(
 
     rng = Random.default_rng()
     brdf_params, rand_states = Lux.setup(rng, brdf_nn)
-
-    # Freeze dropout for inference by default
     brdf_states = Lux.testmode(rand_states)
 
     return LearnedBRDF{SG.NF, typeof(brdf_nn), typeof(brdf_params), typeof(brdf_states), typeof(snow_cover)}(;
@@ -255,7 +328,7 @@ function SpeedyWeather.initialize!(brdf::LearnedBRDF, ::PrimitiveEquation)
     brdf.unnorm_means .= params["y_mean"]
     brdf.unnorm_stds .= params["y_std"]
 
-    load_brdf_parameters!(brdf.brdf_params, params)
+    load_brdfnet_parameters!(brdf.brdf_params, brdf.brdf_states, params)
     return nothing
 end
 
@@ -298,31 +371,43 @@ Base.@propagate_inbounds function brdf(ij, diagn, progn, scheme::LearnedBRDF)
     # Normalise inputs
     vegh = normalise(diagn.physics.land.vegetation_high[ij], scheme.norm_means[1], scheme.norm_stds[1])
     vegl = normalise(diagn.physics.land.vegetation_low[ij], scheme.norm_means[2], scheme.norm_stds[2])
-    soil_moisture = normalise(progn.land.soil_moisture[ij, end], scheme.norm_means[3], scheme.norm_stds[3])
-    soil_temperature = normalise(progn.land.soil_temperature[ij, end], scheme.norm_means[4], scheme.norm_stds[4])
-    snow_cover = normalise(snow_cover, scheme.norm_means[5], scheme.norm_stds[5])
-    geopotential = normalise(diagn.grid.geopotential[ij, end], scheme.norm_means[6], scheme.norm_stds[6])
-    lai_hv = normalise(diagn.physics.land.lai_hv[ij], scheme.norm_means[7], scheme.norm_stds[7])
-    lai_lv = normalise(diagn.physics.land.lai_lv[ij], scheme.norm_means[8], scheme.norm_stds[8])
-
+    soil_moisture1 = normalise(progn.land.soil_moisture[ij, begin], scheme.norm_means[3], scheme.norm_stds[3])
+    soil_temperature1 = normalise(progn.land.soil_temperature[ij, begin], scheme.norm_means[4], scheme.norm_stds[4])
+    soil_moisture2 = normalise(progn.land.soil_moisture[ij, end], scheme.norm_means[5], scheme.norm_stds[5])
+    soil_temperature2 = normalise(progn.land.soil_temperature[ij, end], scheme.norm_means[6], scheme.norm_stds[6])
+    geopotential = normalise(diagn.grid.geopotential[ij, end], scheme.norm_means[7], scheme.norm_stds[7])
+    lai_hv = normalise(diagn.physics.land.lai_hv[ij], scheme.norm_means[8], scheme.norm_stds[8])
+    lai_lv = normalise(diagn.physics.land.lai_lv[ij], scheme.norm_means[9], scheme.norm_stds[9])
+    snow_cover = normalise(snow_cover, scheme.norm_means[10], scheme.norm_stds[10])
 
     scheme.input_buffer[:] .= (
-        vegh, vegl, soil_moisture, soil_temperature, snow_cover, geopotential, lai_hv, lai_lv,
+        vegh, vegl, soil_moisture1, 
+        soil_temperature1, soil_moisture2, soil_temperature2,
+        geopotential, lai_hv, lai_lv, snow_cover
     )
 
     # TODO: sort out this reshaping stuff. Probably fixed by not using layer norm in the network.
     input_matrix = reshape(scheme.input_buffer, :, 1)
     prediction, _ = Lux.apply(scheme.brdf_nn, input_matrix, scheme.brdf_params, scheme.brdf_states)
-    vis_pred = prediction[1:3]
-    nir_pred = prediction[4:6]
-    
-    sw_pred = vis_weight * vis_pred + nir_weight * nir_pred
-    sw_pred_iso, sw_pred_vol, sw_pred_geo = sw_pred
+
+    vis_iso = prediction[1]
+    vis_vol = prediction[2]
+    vis_geo = prediction[3]
+    nir_iso = prediction[4]
+    nir_vol = prediction[5]
+    nir_geo = prediction[6]
 
     # Unnorm outputs
-    sw_pred_iso = denormalise(sw_pred_iso, scheme.unnorm_means[7], scheme.unnorm_stds[7])
-    sw_pred_vol = denormalise(sw_pred_vol, scheme.unnorm_means[8], scheme.unnorm_stds[8])
-    sw_pred_geo = denormalise(sw_pred_geo, scheme.unnorm_means[9], scheme.unnorm_stds[9])
+    vis_iso = denormalise(vis_iso, scheme.unnorm_means[1], scheme.unnorm_stds[1])
+    vis_vol = denormalise(vis_vol, scheme.unnorm_means[2], scheme.unnorm_stds[2])
+    vis_geo = denormalise(vis_geo, scheme.unnorm_means[3], scheme.unnorm_stds[3])
+    nir_iso = denormalise(nir_iso, scheme.unnorm_means[4], scheme.unnorm_stds[4])
+    nir_vol = denormalise(nir_vol, scheme.unnorm_means[5], scheme.unnorm_stds[5])
+    nir_geo = denormalise(nir_geo, scheme.unnorm_means[6], scheme.unnorm_stds[6])
+
+    sw_pred_iso = (vis_iso * vis_weight) + (nir_iso * nir_weight)
+    sw_pred_vol = (vis_vol * vis_weight) + (nir_vol * nir_weight)
+    sw_pred_geo = (vis_geo * vis_weight) + (nir_geo * nir_weight)
 
     μ = diagn.physics.cos_zenith[ij]
     θ = acos(μ)

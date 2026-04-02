@@ -213,13 +213,15 @@ function soil_moisture_availability!(
         vegetation::VegetationClimatology,
         model::PrimitiveWet,
     )
-    (; vegetation_high, vegetation_low, soil_moisture_availability) = diagn.physics.land
+    (; vegetation_high, vegetation_low, lai_hv, lai_lv, soil_moisture_availability) = diagn.physics.land
     (; soil_moisture) = progn.land
     (; low_veg_factor) = vegetation
 
     # copy over vegetation fields into diagnostic variables
     vegetation_high .= vegetation.high_cover
     vegetation_low .= vegetation.low_cover
+    lai_hv .= vegetation.high_lai
+    lai_lv .= vegetation.low_lai
 
     W_cap = model.land.thermodynamics.field_capacity
     W_wilt = model.land.thermodynamics.wilting_point
@@ -227,6 +229,7 @@ function soil_moisture_availability!(
     D_root = model.land.geometry.layer_thickness[2]
 
     @boundscheck fields_match(vegetation_high, vegetation_low, soil_moisture_availability) || throws(BoundsError)
+    @boundscheck fields_match(lai_hv, lai_lv, soil_moisture_availability) || throws(BoundsError)
     @boundscheck fields_match(soil_moisture, soil_moisture_availability, horizontal_only = true) || throws(BoundsError)
     @boundscheck size(soil_moisture, 2) >= 2                # defined for two layers
     @boundscheck size(soil_moisture_availability, 2) == 1   # 2D only
