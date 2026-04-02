@@ -184,17 +184,15 @@ end
 end
 
 export LinearVorticityDrag
-@kwdef mutable struct LinearVorticityDrag{NF} <: AbstractDrag
-    "[OPTION] drag coefficient time scale [Second]"
-    time_scale::Second = Day(6)
+@parameterized @kwdef struct LinearVorticityDrag{NF} <: AbstractDrag
+    "[OPTION] drag coefficient [1/s]"
+    @param c::NF = 1.0e-7 (bounds = Nonnegative,)
 end
 
 LinearVorticityDrag(SG::SpectralGrid; kwargs...) = LinearVorticityDrag{SG.NF}(; kwargs...)
-
 initialize!(::LinearVorticityDrag, ::AbstractModel) = nothing
 
-"""
-$(TYPEDSIGNATURES)
+"""$(TYPEDSIGNATURES)
 Linear drag for the vorticity equations of the form F = -cξ
 with c drag coefficient [1/s]."""
 function drag!(
@@ -207,8 +205,8 @@ function drag!(
     vor = get_step(vars.prognostic.vor, lf)
 
     # scale by radius (but only once, the second radius is in vor)
-    r = vars.prognostic.scale[] / Second(drag.time_scale).value
-    vor_tend.data .-= r * vor.data      # use .data to bypass conflicting broadcasting
+    c = drag.c * vars.prognostic.scale[]
+    vor_tend .-= c * vor
 
     return nothing
 end

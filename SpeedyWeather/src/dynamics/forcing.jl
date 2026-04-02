@@ -62,13 +62,13 @@ function initialize!(
     (; radius) = model.planet
 
     # Some constants similar to Galewsky 2004
-    θ₀ = (latitude - width) / 360 * 2π        # southern boundary of jet [radians]
-    θ₁ = (latitude + width) / 360 * 2π        # northern boundary of jet
-    eₙ = exp(-4 / (θ₁ - θ₀)^2)              # normalisation, so that speed is at max
-    A₀ = speed / eₙ / time_scale.value      # amplitude [m/s²] without lat dependency
-    A₀ *= radius                        # scale by radius as are the momentum equations
+    θ₀ = (latitude - width) / 360 * 2π          # southern boundary of jet [radians]
+    θ₁ = (latitude + width) / 360 * 2π          # northern boundary of jet
+    eₙ = exp(-4 / (θ₁ - θ₀)^2)                  # normalisation, so that speed is at max
+    A₀ = speed / eₙ / time_scale.value          # amplitude [m/s²] without lat dependency
+    A₀ *= radius                                # scale by radius as are the momentum equations
 
-    (; nlat, colat) = model.geometry
+    (; colat) = model.geometry
     # latitude in radians, abs for north/south symmetry
     θ = @. abs(π / 2 - colat)
 
