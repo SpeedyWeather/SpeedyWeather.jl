@@ -2,7 +2,7 @@
 # in Julia 1.11
 import Pkg
 Pkg.activate(@__DIR__)
-using SpeedyWeather, Enzyme, Test
+using SpeedyWeather, Enzyme, FiniteDifferences, Test
 
 if VERSION <= v"1.11.0"
     @testset "Complete Differentiability" begin
@@ -27,7 +27,7 @@ if VERSION <= v"1.11.0"
         dmodel = make_zero(model)
 
         autodiff(Reverse, SpeedyWeather.timestep!, Const, Duplicated(vars, dvars), Const(dt), Duplicated(model, dmodel), Const(lf1), Const(lf2))
-        @test sum(to_vec(d_vars)[1]) != 0
+        @test sum(to_vec(dvars)[1]) != 0
 
     end
 else
