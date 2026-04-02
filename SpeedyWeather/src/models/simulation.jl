@@ -106,6 +106,7 @@ function finalize!(simulation::AbstractSimulation)
     (; variables, model) = simulation
     finalize!(model.feedback)                       # finish the progress meter, do first for benchmark accuracy
     unscale_prognostic!(variables)                  # undo radius-scaling for vor, div from the dynamical core
+    unscale_grid_variables!(variables)              # undo radius-scaling for grid variables (vor, div)
     finalize!(model.output, simulation)             # possibly post-process output, then close netCDF file
     finalize!(model.callbacks, variables, model)    # any callbacks to finalize?
     return simulation

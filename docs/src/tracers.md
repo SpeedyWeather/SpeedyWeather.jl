@@ -160,7 +160,7 @@ add!(model, Tracer(:abc))
 simulation = initialize!(model)
 
 # add and set tracer and run a 0-day simulation
-set!(simulation, abc = (λ, φ, σ) -> exp(-(λ-180)^2/10^2), namespac e =:tracers)
+set!(simulation, abc = (λ, φ, σ) -> exp(-(λ-180)^2/10^2), namespace =:tracers)
 run!(simulation, period = Day(0))
 
 # visualise the initial conditions for this tracer

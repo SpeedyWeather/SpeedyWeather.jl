@@ -61,6 +61,16 @@ function unscale_prognostic!(vars::Variables)
     return vars
 end
 
+"""$(TYPEDSIGNATURES)
+Undo the radius-scaling of the scaled variables in variables.grid."""
+function unscale_grid_variables!(vars::Variables)
+    inv_scale = inv(vars.prognostic.scale[])
+    haskey(vars.grid, :vor) && (vars.grid.vor .*= inv_scale)
+    haskey(vars.grid, :div) && (vars.grid.div .*= inv_scale)
+    vars.prognostic.scale[] = 1         # set scale back to 1=unscaled
+    return vars
+end
+
 """
 $(TYPEDSIGNATURES)
 Scale the variable `var` with scalar `scale`.
