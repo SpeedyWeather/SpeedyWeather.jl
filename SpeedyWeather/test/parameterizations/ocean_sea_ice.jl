@@ -46,4 +46,17 @@
             end
         end
     end
+
+    @testset "PrescribedOcean + PrescribedSeaIce" begin
+        ocean = PrescribedOcean(spectral_grid)
+        sea_ice = PrescribedSeaIce(spectral_grid)
+        model = PrimitiveWetModel(spectral_grid; ocean, sea_ice)
+        model.feedback.verbose = false
+        simulation = initialize!(model)
+        run!(simulation, steps = 2)
+
+        @test simulation.model.feedback.nans_detected == false
+        @test haskey(simulation.variables.prognostic.ocean, :sea_surface_temperature)
+        @test haskey(simulation.variables.prognostic.ocean, :sea_ice_concentration)
+    end
 end

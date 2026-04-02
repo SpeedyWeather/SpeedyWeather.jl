@@ -46,6 +46,17 @@ initialize!(vars::Variables, ocean::AbstractOcean, model) =
     @warn "`$(typeof(ocean))` does not have an `initialize!(::Variables, ::$(typeof(ocean)), model)` method " *
     "to set the initial conditions for the ocean prognostic variables."
 
+export PrescribedOcean 
+
+"""
+Prescribed ocean that declares the necessary allocations for the sea surface temperature,
+but all dynamics are expected to be externally set. Used for coupling to external ocean models.
+"""
+struct PrescribedOcean <: AbstractOcean end
+PrescribedOcean(::SpectralGrid) = PrescribedOcean() # added constructor, just to be consistent with call signatures
+initialize!(vars::Variables, ::PrescribedOcean, model) = nothing
+timestep!(vars::Variables, ::PrescribedOcean, model) = nothing
+
 export SeasonalOceanClimatology
 
 """

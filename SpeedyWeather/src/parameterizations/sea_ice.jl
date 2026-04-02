@@ -4,6 +4,23 @@ abstract type AbstractSeaIce <: AbstractModelComponent end
 @propagate_inbounds sea_ice_timestep!(vars::Variables, model::PrimitiveEquation) =
     timestep!(vars, model.sea_ice, model)
 
+function variables(::AbstractSeaIce)
+    return (
+        PrognosticVariable(:sea_ice_concentration, Grid2D(), namespace = :ocean, desc = "Sea ice concentration", units = "1"),
+    )
+end
+
+export PrescribedSeaIce
+
+"""
+Prescribed sea ice that declares the necessary allocations for the sea ice concentration,
+but all dynamics are expected to be externally set. Used for coupling to external sea ice models.
+"""
+struct PrescribedSeaIce <: AbstractSeaIce end
+PrescribedSeaIce(::SpectralGrid) = PrescribedSeaIce() # added constructor, just to be consistent with call signatures
+initialize!(vars::Variables, ::PrescribedSeaIce, model) = nothing
+timestep!(vars::Variables, ::PrescribedSeaIce, model) = nothing
+
 export ThermodynamicSeaIce
 
 """Thermodynamic sea ice model using sea ice concentration as
@@ -23,11 +40,7 @@ end
 ThermodynamicSeaIce(SG::SpectralGrid; kwargs...) = ThermodynamicSeaIce{SG.NF}(; kwargs...)
 initialize!(::ThermodynamicSeaIce, ::AbstractModel) = nothing
 
-function variables(::ThermodynamicSeaIce)
-    return (
-        PrognosticVariable(:sea_ice_concentration, Grid2D(), namespace = :ocean, desc = "Sea ice concentration", units = "1"),
-    )
-end
+
 
 # start with zero concentration
 initialize!(vars::Variables, sea_ice_model::ThermodynamicSeaIce, model::PrimitiveEquation) = nothing
