@@ -128,11 +128,11 @@ you have to pass on as a keyword argument (see [Setting variables](@ref))
 e.g.
 
 ```@example tracers
-set!(simulation, abc=1, namespace=:tracer)
+set!(simulation, abc = 1, namespace = :tracers)
 
 (; GridVariable3D, nlat_half, nlayers) = spectral_grid
-set!(simulation, abc=randn(GridVariable3D, nlat_half, nlayers), namespace=:tracer)
-set!(simulation, abc=(λ, φ, σ) -> exp(-(λ-180)^2/10^2), namespace=:tracer)
+set!(simulation, abc=randn(GridVariable3D, nlat_half, nlayers), namespace = :tracers)
+set!(simulation, abc=(λ, φ, σ) -> exp(-(λ-180)^2/10^2), namespace = :tracers)
 ```
 
 The first one sets `abc` to a global constant (not super exciting),
@@ -154,14 +154,14 @@ Let us illustrate some tracer advection in practice
 
 ```@example tracers
 using SpeedyWeather
-spectral_grid = SpectralGrid(trunc=85, nlayers=1)
+spectral_grid = SpectralGrid(trunc = 85, nlayers = 1)
 model = ShallowWaterModel(spectral_grid)
 add!(model, Tracer(:abc))
 simulation = initialize!(model)
 
 # add and set tracer and run a 0-day simulation
-set!(simulation, abc = (λ, φ, σ) -> exp(-(λ-180)^2/10^2), namespace=:tracer)
-run!(simulation, period=Day(0))
+set!(simulation, abc = (λ, φ, σ) -> exp(-(λ-180)^2/10^2), namespac e =:tracers)
+run!(simulation, period = Day(0))
 
 # visualise the initial conditions for this tracer
 using CairoMakie
