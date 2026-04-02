@@ -177,6 +177,4 @@ nothing # hide
 ![Land-sea mask2](land-sea_mask2.png)
 
 And the land-sea mask has successfully been set to ocean everywhere at the start
-of the 21st century. Note that while we added an `@info` line into the
-`callback!` function, this is here not printed because of how the
-Documenter works. If you execute this in the REPL you'll see it.
+of the 21st century.

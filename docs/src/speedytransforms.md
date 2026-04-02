@@ -374,7 +374,7 @@ power_spectrum(alms[:, 1])
 
 SpeedyTransforms also provides a `MatrixSpectralTransform`, an alternative spectral transform
 that replaces the ring-by-ring FFT + Legendre recursion of `SpectralTransform` with a single
-dense matrix–matrix multiply. Concretely, the forward (grid → spectral) transform becomes
+dense matrix-matrix multiply. Concretely, the forward (grid → spectral) transform becomes
 
 ```math
 \text{coeffs} = F \cdot \text{field}

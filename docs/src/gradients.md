@@ -1,4 +1,4 @@
-## Gradient operators
+# Gradient operators
 
 [SpeedyTransforms](@ref) also includes many gradient operators to take derivatives in
 spherical harmonics. These are in particular ``\nabla, \nabla \cdot, \nabla \times,

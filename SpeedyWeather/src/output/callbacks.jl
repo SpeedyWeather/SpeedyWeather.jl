@@ -54,7 +54,7 @@ function add!(D::CALLBACK_DICT, key_callbacks::Pair{Symbol, <:AbstractCallback}.
         callback = key_callback.second
         D[key] = callback
     end
-    return
+    return D
 end
 
 """
@@ -91,7 +91,7 @@ function add!(D::CALLBACK_DICT, callbacks::AbstractCallback...; verbose = true)
         verbose && @info "$(typeof(callback)) callback added with key $key"
         add!(D, key => callback)
     end
-    return
+    return D
 end
 
 """
