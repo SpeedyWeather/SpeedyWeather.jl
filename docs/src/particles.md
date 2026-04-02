@@ -219,7 +219,9 @@ which we will do in the next section
 A [`ParticleTracker`](@ref) is implemented as a callback, see [Callbacks](@ref), outputting
 the particle locations via netCDF. We can create it like
 
-```@example particle
+```@example particle_tracker
+using SpeedyWeather
+spectral_grid = SpectralGrid(nlayers = 1)
 particle_tracker = ParticleTracker(spectral_grid, schedule = Schedule(every = Hour(3)))
 ```
 
