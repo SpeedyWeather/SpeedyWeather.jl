@@ -74,7 +74,9 @@ Tracers are just defined through their `key`, e.g. `:co2`, so while you can do
 the same tracer -- and no two tracers with the same key can exist inside `model`
 (and `simulation`).
 
-What you should not do is add a tracer to the `model` _after_ it has been initialized.
+What you should not do is add a tracer to the `model` _after_ it has been initialized,
+as this would leave it without its required variables that are allocated at
+`initialize!(model)`.
 You can check that the tracers exists in the variables with
 
 ```@example tracers
@@ -82,9 +84,8 @@ simulation = initialize!(model)
 simulation.variables
 ```
 
-where both `:abc` and `:xyz` are listed. Tracers in SpeedyWeather are
-based on dictionaries so the order of the tracers is arbitrary,
-they are always defined by their `key` instead.
+Note that the tracer appear in several arrays, in the prognostic variables,
+a tendency and so on.
 
 All tracers have to be added to the `model` before it is initialized to
 return the `simulation`. This is because that initialization determines
@@ -103,7 +104,7 @@ it also has a field `active` which can be changed any time.
 Do not confuse this with the discussion of active vs passive,
 categorising whether a tracer impacts the flow or not.
 Active versus deactivated here is solely used to describe
-whether its time evolution is temporarily "deactivated.
+whether its time evolution is (temporarily) _deactivated_.
 An activated tracer (the default) is advected,
 a deactivated tracer does not change in time
 (=frozen) but continues to exist and all its variables remain in place.
@@ -121,15 +122,17 @@ i.e. `activate!(simulation, Tracer(:abc))`.
 ## Set tracers
 
 Tracers can be set to values by using the `set!` function, which
-can take scalars, fields (spectral or grid) or functions as arguments,
+can take scalars, fields (spectral or grid) or functions as arguments.
+But note that tracers are placed in the namespace `tracer` which
+you have to pass on as a keyword argument (see [Setting variables](@ref))
 e.g.
 
 ```@example tracers
-set!(simulation, abc=1)
+set!(simulation, abc=1, namespace=:tracer)
 
 (; GridVariable3D, nlat_half, nlayers) = spectral_grid
-set!(simulation, abc=randn(GridVariable3D, nlat_half, nlayers))
-set!(simulation, abc=(λ, φ, σ) -> exp(-(λ-180)^2/10^2))
+set!(simulation, abc=randn(GridVariable3D, nlat_half, nlayers), namespace=:tracer)
+set!(simulation, abc=(λ, φ, σ) -> exp(-(λ-180)^2/10^2), namespace=:tracer)
 ```
 
 The first one sets `abc` to a global constant (not super exciting),
@@ -157,7 +160,7 @@ add!(model, Tracer(:abc))
 simulation = initialize!(model)
 
 # add and set tracer and run a 0-day simulation
-set!(simulation, abc = (λ, φ, σ) -> exp(-(λ-180)^2/10^2))
+set!(simulation, abc = (λ, φ, σ) -> exp(-(λ-180)^2/10^2), namespace=:tracer)
 run!(simulation, period=Day(0))
 
 # visualise the initial conditions for this tracer
@@ -189,4 +192,12 @@ nothing # hide
 
 ## Output tracers
 
-more to come...
+This follows equivalent to other [Output variables](@ref) but the
+tracer name as `Symbol` has to be provided
+
+```@example tracers
+add!(model, SpeedyWeather.TracerOutput(:abc))
+```
+
+and other keyword arguments like `long_name::String` and `units::String`
+can be passed on too. 

@@ -100,3 +100,5 @@ in `set!` to set variables, e.g.
 ```@example variables
 set!(simulation, sea_surface_temperature=300, namespace=:ocean)
 ```
+
+For another example, see [Set tracers](@ref).
