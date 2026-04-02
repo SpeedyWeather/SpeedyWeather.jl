@@ -205,7 +205,7 @@ which are then set during `initialize!(::AbstractModel)`, but you can also
 change them now, before the model runs 
 ```@example howto
 # harmonic x layer x leapfrog steps
-simulation.variables.prognostic.vor[1, 1, 1] = 0
+simulation.variables.prognostic.vorticity[1, 1, 1] = 0
 ```
 So with this we have set the zero mode (first index) of vorticity of the first (and only)
 layer (second index) in the shallow water model to zero. Because the leapfrogging is a 2-step

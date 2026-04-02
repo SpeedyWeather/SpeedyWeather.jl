@@ -104,8 +104,8 @@ function initialize!(
         model::AbstractModel,
     )
 
-    haskey(vars.prognostic, :vor) || warn_undefvar(vars, :vor) && return nothing
-    (; vor) = vars.prognostic
+    haskey(vars.prognostic, :vorticity) || warn_undefvar(vars, :vorticity) && return nothing
+    vor = vars.prognostic.vorticity
     NF = real(eltype(vor))
 
     # reseed the random number generator, for seed=0 randomly seed from Julia's global RNG
@@ -141,7 +141,7 @@ function initialize!(
     )
 
     # Set the prognostic variable
-    return set!(vars, model; vor = ξ, lf = 1)
+    return set!(vars, model; vorticity = ξ, lf = 1)
 end
 
 @kernel function random_vorticity_kernel!(
@@ -195,8 +195,8 @@ function initialize!(
         model::AbstractModel,
     )
 
-    haskey(vars.prognostic, :vor) || warn_undefvar(vars, :vor) && return nothing
-    (; vor) = vars.prognostic
+    haskey(vars.prognostic, :vorticity) || warn_undefvar(vars, :vorticity) && return nothing
+    vor = vars.prognostic.vorticity
     NF = real(eltype(vor))
 
     # reseed the random number generator, for seed=0 randomly seed from Julia's global RNG
@@ -277,8 +277,8 @@ function initialize!(
         model::AbstractModel
     )
 
-    haskey(vars.prognostic, :vor) || warn_undefvar(vars, :vor) && return nothing
-    haskey(vars.prognostic, :div) || warn_undefvar(vars, :div) && return nothing
+    haskey(vars.prognostic, :vorticity) || warn_undefvar(vars, :vorticity) && return nothing
+    haskey(vars.prognostic, :divergenceergenceergenceergenceergenceergenceergence) || warn_undefvar(vars, :divergence) && return nothing
 
     model.spectral_grid.nlayers == 1 ||
         throw(ArgumentError("ZonalJet initial conditions can only be used with ShallowWaterModel (1 layer)"))
@@ -323,7 +323,7 @@ function initialize!(
 
     # get vorticity initial conditions from curl of u, v
     v = zero(u)     # meridional velocity zero for these initial conditions
-    vor = get_step(vars.prognostic.vor, 1)
+    vor = get_step(vars.prognostic.vorticity, 1)
     curl!(vor, u, v, model.spectral_transform)
 
     # compute the div = -∇⋅(0,(ζ+f)*u) = ∇×((ζ+f)*u, 0) term, v=0
@@ -431,8 +431,8 @@ function initialize!(
         model::PrimitiveEquation
     )
 
-    haskey(vars.prognostic, :vor) || warn_undefvar(vars, :vor) && return nothing
-    haskey(vars.prognostic, :div) || warn_undefvar(vars, :div) && return nothing
+    haskey(vars.prognostic, :vorticity) || warn_undefvar(vars, :vorticity) && return nothing
+    haskey(vars.prognostic, :divergence) || warn_undefvar(vars, :divergence) && return nothing
 
     (; u₀, η₀) = initial_conditions
     (; perturb_uₚ, perturb_radius) = initial_conditions
@@ -529,7 +529,7 @@ function initialize!(
         model::AbstractModel,
     )
     # make vor esential but div, eta optional
-    haskey(vars.prognostic, :vor) || warn_undefvar(vars, :vor) && return nothing
+    haskey(vars.prognostic, :vorticity) || warn_undefvar(vars, :vorticity) && return nothing
 
     (; m, ω, K, c) = initial_conditions
     (; geometry) = model
@@ -548,11 +548,11 @@ function initialize!(
     η(λ, θ) = R^2 / g * (A(λ, θ) + B(λ, θ) * cosd(m * λ) + C(λ, θ) * cosd(2m * λ))
 
     set!(vars, geometry, vor = ζ, static_func = false)
-    haskey(vars.prognostic, :div) && set!(vars, geometry, div = 0)  # technically not needed, but set to zero for completeness
+    haskey(vars.prognostic, :divergence) && set!(vars, geometry, div = 0)  # technically not needed, but set to zero for completeness
     haskey(vars.prognostic, :η) && set!(vars, geometry, η = η, static_func = false)
 
     # filter low values below cutoff amplitude c
-    vor = get_step(vars.prognostic.vor, 1)    # 1 = first leapfrog timestep
+    vor = get_step(vars.prognostic.vorticity, 1)    # 1 = first leapfrog timestep
     low_values = abs.(vor) .< c
     vor[low_values] .= 0
     if haskey(vars.prognostic, :η)
@@ -602,8 +602,8 @@ function initialize!(
         model::PrimitiveEquation
     )
 
-    haskey(vars.prognostic, :temp) || warn_undefvar(vars, :temp) && return nothing
-    (; temp) = vars.prognostic
+    haskey(vars.prognostic, :temperature) || warn_undefvar(vars, :temperature) && return nothing
+    (; temperature=temp) = vars.prognostic
     NF = real(eltype(temp))
 
     (; u₀, η₀, ΔT, Tmin) = initial_conditions
@@ -759,7 +759,7 @@ function initialize!(
         model::PrimitiveEquation
     )
 
-    haskey(vars.prognostic, :pres) || warn_undefvar(vars, :pres) && return nothing
+    haskey(vars.prognostic, :pressure) || warn_undefvar(vars, :pressure) && return nothing
 
     # T₀:       Reference absolute T [K] at surface z = 0
     # Γ:        Reference temperature lapse rate (dry or moist) -dT/dz [K/m]
@@ -798,7 +798,7 @@ function initialize!(
         ::ConstantPressure,
         model::PrimitiveEquation,
     )
-    haskey(vars.prognostic, :pres) || warn_undefvar(vars, :pres) && return nothing
+    haskey(vars.prognostic, :pressure) || warn_undefvar(vars, :pressure) && return nothing
 
     # logarithm of reference surface pressure [log(Pa)]
     set!(vars, model; pres = log(model.atmosphere.pressure_reference))
@@ -821,18 +821,18 @@ function initialize!(
         IC::ConstantRelativeHumidity,
         model::PrimitiveWet,
     )
-    haskey(vars.prognostic, :humid) || warn_undefvar(vars, :humid) && return nothing
+    haskey(vars.prognostic, :humidity) || warn_undefvar(vars, :humidity) && return nothing
 
     (; relhumid_ref) = IC
     (; σ_levels_full) = model.geometry
     (; atmosphere) = model
 
     # get pressure [Pa] on grid
-    lnpₛ = get_step(vars.prognostic.pres, 1)  # 1 = first leapfrog timestep
+    lnpₛ = get_step(vars.prognostic.pressure, 1)  # 1 = first leapfrog timestep
     pres_grid = transform(lnpₛ, model.spectral_transform)
     pres_grid .= exp.(pres_grid)
 
-    temp = get_step(vars.prognostic.temp, 1)  #  1 = first leapfrog timestep
+    temp = get_step(vars.prognostic.temperature, 1)  #  1 = first leapfrog timestep
     temp_grid = transform(temp, model.spectral_transform)
     humid_grid = zero(temp_grid)
 

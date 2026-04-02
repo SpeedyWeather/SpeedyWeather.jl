@@ -36,7 +36,7 @@ Next, we will prepare to use Enzyme. Enzyme saves the gradient information in a 
 
 ```julia
 dvars = make_zero(variables) # shadow for the variables
-dvars.prognostic.vor .= 1    # seed the reverse AD
+dvars.prognostic.vorticity .= 1    # seed the reverse AD
 dmodel = make_zero(model) # here, we'll accumulate all parameter derivatives
 ```
 
@@ -138,7 +138,7 @@ ps = parameters(model)
 pvec = vec(ps)
 dp = zero(pvec)
 dvars = make_zero(variables) # shadow for the variables
-dvars.prognostic.vor .= 1    # seed the reverse AD
+dvars.prognostic.vorticity .= 1    # seed the reverse AD
 
 function timestep_with_new_params!(vars, dt, model, p)
     new_model = SpeedyWeather.reconstruct(model, p)

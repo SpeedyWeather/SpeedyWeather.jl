@@ -200,7 +200,7 @@ function forcing!(
     S_masked .*= (vars.prognostic.scale[]^2 * forcing.strength)
 
     # force every layer
-    vor_tend = vars.tendencies.vor
+    vor_tend = vars.tendencies.vorticity
     arch = architecture(vor_tend)
     launch!(
         arch, SpectralWorkOrder, size(vor_tend), stochastic_stirring_kernel!,
@@ -358,9 +358,9 @@ function forcing!(
         lf::Integer,
         model::AbstractModel,
     )
-    temp = vars.grid.temp
-    pres = vars.grid.pres
-    temp_tend = vars.tendencies.grid.temp
+    temp = vars.grid.temperature
+    pres = vars.grid.pressure
+    temp_tend = vars.tendencies.grid.temperature
 
     (; Tmin, logσ, temp_relax_freq, temp_equil_a, temp_equil_b) = forcing
     (; κ) = model.atmosphere

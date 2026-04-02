@@ -46,10 +46,10 @@ u, v, temperature and humidity in column ij."""
     (; taper) = sppt
     u_tend = vars.tendencies.grid.u
     v_tend = vars.tendencies.grid.v
-    temp_tend = vars.tendencies.grid.temp
+    temp_tend = vars.tendencies.grid.temperature
 
     # dry models don't have humidity just perturb a dummy array to avoid branching in the loop below
-    humid_tend = haskey(vars.tendencies.grid, :humid) ? vars.tendencies.grid.humid : vars.scratch.a_grid
+    humid_tend = haskey(vars.tendencies.grid, :humidity) ? vars.tendencies.grid.humidity : vars.scratch.a_grid
 
 
     @inbounds for k in eachlayer(u_tend, v_tend, temp_tend, humid_tend)

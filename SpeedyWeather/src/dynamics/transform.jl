@@ -10,12 +10,12 @@ function SpeedyTransforms.transform!(
     )
     u_grid = vars.grid.u
     v_grid = vars.grid.v
-    vor_grid = vars.grid.vor
+    vor_grid = vars.grid.vorticity
 
     # U = u*coslat, V=v*coslat
     U = vars.scratch.a                          # reuse work arrays for velocities in spectral
     V = vars.scratch.b                          # reuse work arrays for velocities in spectral
-    vor = get_step(vars.prognostic.vor, lf)     # relative vorticity at leapfrog step lf
+    vor = get_step(vars.prognostic.vorticity, lf)     # relative vorticity at leapfrog step lf
 
     scratch_memory = vars.scratch.transform_memory
     S = model.spectral_transform
@@ -54,14 +54,14 @@ function SpeedyTransforms.transform!(
         kwargs...
     )
 
-    vor_grid = vars.grid.vor
+    vor_grid = vars.grid.vorticity
     u_grid = vars.grid.u
     v_grid = vars.grid.v
-    div_grid = vars.grid.div
+    div_grid = vars.grid.divergence
     η_grid = vars.grid.η
 
-    vor = get_step(vars.prognostic.vor, lf)     # relative vorticity at leapfrog step lf
-    div = get_step(vars.prognostic.div, lf)     # divergence at leapfrog step lf
+    vor = get_step(vars.prognostic.vorticity, lf)     # relative vorticity at leapfrog step lf
+    div = get_step(vars.prognostic.divergence, lf)     # divergence at leapfrog step lf
     η = get_step(vars.prognostic.η, lf)         # interface displacement η at leapfrog step lf
 
     # U = u*coslat, V=v*coslat
@@ -107,27 +107,27 @@ function SpeedyTransforms.transform!(
         initialize::Bool = false,
     )
 
-    vor_grid = vars.grid.vor
-    div_grid = vars.grid.div
-    pres_grid = vars.grid.pres
+    vor_grid = vars.grid.vorticity
+    div_grid = vars.grid.divergence
+    pres_grid = vars.grid.pressure
     u_grid = vars.grid.u
     v_grid = vars.grid.v
-    temp_grid = vars.grid.temp
+    temp_grid = vars.grid.temperature
 
-    pres_grid_prev = vars.grid.pres_prev
+    pres_grid_prev = vars.grid.pressure_prev
     u_grid_prev = vars.grid.u_prev
     v_grid_prev = vars.grid.v_prev
-    temp_grid_prev = vars.grid.temp_prev
+    temp_grid_prev = vars.grid.temperature_prev
 
-    vor = get_step(vars.prognostic.vor, lf)         # relative vorticity at leapfrog step lf
-    div = get_step(vars.prognostic.div, lf)         # divergence at leapfrog step lf
-    temp = get_step(vars.prognostic.temp, lf)       # temperature at leapfrog step lf
-    pres = get_step(vars.prognostic.pres, lf)       # logarithm of surface pressure at leapfrog step lf
+    vor = get_step(vars.prognostic.vorticity, lf)         # relative vorticity at leapfrog step lf
+    div = get_step(vars.prognostic.divergence, lf)         # divergence at leapfrog step lf
+    temp = get_step(vars.prognostic.temperature, lf)       # temperature at leapfrog step lf
+    pres = get_step(vars.prognostic.pressure, lf)       # logarithm of surface pressure at leapfrog step lf
 
     if model isa PrimitiveWet                       # dry model don't have humidity variables
-        humid_grid = vars.grid.humid
-        humid_grid_prev = vars.grid.humid_prev
-        humid = get_step(vars.prognostic.humid, lf) # humidity at leapfrog step lf
+        humid_grid = vars.grid.humidity
+        humid_grid_prev = vars.grid.humidity_prev
+        humid = get_step(vars.prognostic.humidity, lf) # humidity at leapfrog step lf
     end
 
     scratch_memory = vars.scratch.transform_memory

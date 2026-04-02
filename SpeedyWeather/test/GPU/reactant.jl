@@ -12,4 +12,4 @@ simulation = initialize!(model)
 run!(simulation, nsteps = 10)
 
 # TODO: fix GPU reactant in follow up when initial conditions are easier to handle
-@test_broken !any(isnan.(simulation.prognostic_variables.vor))
+@test_broken !any(isnan.(simulation.prognostic_variables.vorticity))

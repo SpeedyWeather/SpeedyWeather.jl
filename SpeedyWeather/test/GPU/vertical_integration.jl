@@ -28,7 +28,7 @@
 
     vars_gpu.grid.u .= on_architecture(arch_gpu, vars_cpu.grid.u)
     vars_gpu.grid.v .= on_architecture(arch_gpu, vars_cpu.grid.v)
-    vars_gpu.grid.div .= on_architecture(arch_gpu, vars_cpu.grid.div)
+    vars_gpu.grid.divergence .= on_architecture(arch_gpu, vars_cpu.grid.divergence)
 
     vars_gpu.dynamics.u_mean_grid .= on_architecture(arch_gpu, vars_cpu.dynamics.u_mean_grid)
     vars_gpu.dynamics.v_mean_grid .= on_architecture(arch_gpu, vars_cpu.dynamics.v_mean_grid)
@@ -38,7 +38,7 @@
     vars_gpu.dynamics.div_sum_above .= on_architecture(arch_gpu, vars_cpu.dynamics.div_sum_above)
     vars_gpu.dynamics.pres_flux_sum_above .= on_architecture(arch_gpu, vars_cpu.dynamics.pres_flux_sum_above)
 
-    vars_gpu.prognostic.div .= on_architecture(arch_gpu, vars_cpu.prognostic.div)
+    vars_gpu.prognostic.divergence .= on_architecture(arch_gpu, vars_cpu.prognostic.divergence)
 
     # Run vertical integration on both CPU and GPU
     SpeedyWeather.vertical_integration!(vars_cpu, 1, model_cpu.geometry)

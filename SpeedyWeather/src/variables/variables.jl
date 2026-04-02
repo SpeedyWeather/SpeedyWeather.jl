@@ -196,7 +196,7 @@ function allocate(group, model)
     namespaces = filter(k -> k != Symbol(), tuple(keys(group)...))
 
     # variables without namespace identified by empty symbol Symbol() go directly into the main NamedTuple
-    # that way we have variables.prognostic.vor skipping the namespace between prognostic and vor
+    # that way we have variables.prognostic.vorticity skipping the namespace between prognostic and vor
     nt1 = NamedTuple{Tuple(map(v -> v.name, group[Symbol()]))}(Tuple(map(var -> zero(var, model), group[Symbol()])))
 
     # other variables grouped by namespace

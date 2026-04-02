@@ -66,7 +66,7 @@ and `finalize!`.
 
 | Group | Purpose |
 |-------|---------|
-| `prognostic` | State variables subject to time stepping (vor, div, temp, pres, tracers, etc.) |
+| `prognostic` | State variables subject to time stepping (vorticity, div, temp, pres, tracers, etc.) |
 | `grid` | Grid-point copies of spectral prognostic variables (u, v, temp, etc.) |
 | `tendencies` | Time derivatives; spectral at top level, grid-space under `.grid` namespace |
 | `dynamics` | Working arrays for the dynamical core (pressure gradients, vertical velocity, etc.) |
@@ -77,9 +77,9 @@ and `finalize!`.
 Variables can be organized by namespace (e.g. `:ocean`, `:land`, `:tracers`):
 
 ```julia
-vars.prognostic.vor                             # Spectral vorticity
+vars.prognostic.vorticity                             # Spectral vorticity
 vars.prognostic.ocean.sea_surface_temperature   # Ocean namespace
-vars.tendencies.vor                             # Spectral vorticity tendency
+vars.tendencies.vorticity                             # Spectral vorticity tendency
 vars.tendencies.grid.u                          # Grid-space u-wind tendency
 vars.dynamics.w                                 # Vertical velocity
 ```

@@ -108,7 +108,7 @@ Using surface pressure `pₛ` [Pa] and gravity `g` [m/s^2]."""
 
 # hacky, temporary placement, and also modularize this?
 function reset_variables!(vars::Variables)
-    nlayers = size(vars.prognostic.temp, 2)
+    nlayers = size(vars.prognostic.temperature, 2)
     reset_variable!(vars.parameterizations, :cloud_top, nlayers + 1)   # reset to below top layer
     reset_variable!(vars.parameterizations, :rain_rate, 0)
     reset_variable!(vars.parameterizations, :snow_rate, 0)

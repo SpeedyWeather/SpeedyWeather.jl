@@ -92,7 +92,7 @@ end
             @test haskey(ds, key)
         end
 
-        nx, ny, nz, nt = size(ds[:vor])
+        nx, ny, nz, nt = size(ds[:vorticity])
         @test nx == 2ny
         @test ny == 2nlat_half
     end
@@ -187,7 +187,7 @@ end
     progn_old = simulation.variables.prognostic
     progn_new = simulation_new.variables.prognostic
 
-    for varname in (:vor, :div, :temp, :pres)
+    for varname in (:vorticity, :divergence, :temperature, :pressure)
         var_old = getfield(progn_old, varname)
         var_new = getfield(progn_new, varname)
         @test all(var_old .== var_new)
@@ -210,7 +210,7 @@ end
     progn_old = simulation.variables.prognostic
     progn_new = simulation_new.variables.prognostic
 
-    for varname in (:vor, :div, :temp, :pres)
+    for varname in (:vorticity, :divergence, :temperature, :pressure)
         var_old = getfield(progn_old, varname)
         var_new = getfield(progn_new, varname)
         @test all(var_old .== var_new)

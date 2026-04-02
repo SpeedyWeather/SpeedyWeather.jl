@@ -5,8 +5,8 @@
         model = PrimitiveWetModel(spectral_grid)
         simulation = initialize!(model)
         progn = simulation.variables.prognostic
-        temp = get_step(progn.temp, 1)
-        humid = get_step(progn.humid, 1)
+        temp = get_step(progn.temperature, 1)
+        humid = get_step(progn.humidity, 1)
 
         # give every layer some constant temperature by setting the l=m=0 mode (index 1) for all k
         temp0 = 280      # in Kelvin
@@ -35,8 +35,8 @@ end
         model = PrimitiveWetModel(spectral_grid)
         simulation = initialize!(model)
         vars = simulation.variables
-        temp = get_step(vars.prognostic.temp, 1)
-        humid = get_step(vars.prognostic.humid, 1)
+        temp = get_step(vars.prognostic.temperature, 1)
+        humid = get_step(vars.prognostic.humidity, 1)
 
         # give every layer some constant temperature by setting the l=m=0 mode (index 1) for all k
         temp0 = 280      # in Kelvin
