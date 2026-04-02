@@ -120,3 +120,5 @@ or as part of `SpeedyWeather.OceanOutput()`
 ```@example sea_ice
 add!(model, SpeedyWeather.OceanOutput())
 ```
+
+For more information see [Output variables](@ref).

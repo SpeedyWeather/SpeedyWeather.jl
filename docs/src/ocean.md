@@ -54,7 +54,8 @@ where `;` just means that every argument that follows is a keyword argument.
 
 This will use the sea surface temperature climatology from 1 June but
 not change it thereafter. Note that because nothing happens in the ocean time step
-you can use `set!(simulation, sea_surface_temperature=...)` to modify the
+you can use `set!(simulation, sea_surface_temperature=..., namespace=:ocean)`
+(see [Setting variables](@ref)) to modify the
 sea surface temperatures further at any point after `initialize!`.
 
 ## Seasonal ocean climatology
@@ -142,3 +143,4 @@ add!(model, SpeedyWeather.OceanOutput())
 ```
 
 All output variable groups are defined as tuples which are implicitly splatted (`...`).
+For more information see [Output variables](@ref).

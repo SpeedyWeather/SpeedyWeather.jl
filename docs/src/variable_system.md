@@ -1,6 +1,6 @@
 # Variable system
 
-SpeedyWeahter implements a dynamica variables system. This means there is no central list
+SpeedyWeather implements a dynamical variables system. This means there is no central list
 of all variables being allocated by every model and every model component can declare
 a set of variables as being required which will then be allocated when the
 model is initialized.

@@ -96,7 +96,7 @@ Note that
 - most albedos should extend `albedo!(ij, ...)` instead, see [Example: Albedo](@ref) below
 - `model_core` is a subset of `model` adapted to GPU and passed on as `NamedTuple` instead (as defined by `model.core_components`)
 
-## Accumulate do not overwrite
+## Accumulate not overwrite
 
 Every parameterization either computes tendencies directly or indirectly via
 fluxes (upward or downward, see [Fluxes to tendencies](@ref)). These are
@@ -109,7 +109,7 @@ vars.tendencies.grid.temp[ij, k] += something_you_calculated
 ```
 
 not `vars.tendencies.grid.temp[ij, k] = something_you_calculated` which would overwrite
-any previous tendency.
+any previous tendency. See also [Order of tendencies](@ref).
 
 ## Define the generator function
 

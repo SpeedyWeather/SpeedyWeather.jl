@@ -1,4 +1,4 @@
-## Custom forcing and drag
+# Custom forcing and drag
 
 The following example is a bit more concrete than the previous conceptual example,
 but we try to add a few more details that are important, or you at least should
@@ -177,7 +177,7 @@ describing the geometry of the grid we use and at its given resolution.
 Note that `initialize!` is expected to be read and write on the `forcing` argument
 (hence using Julia's `!`-notation) but read-only on the `model`,
 except for `model.forcing` which points to the same object. You technically can
-initialize or generally alter several model components in one, but that not advised
+initialize or generally alter several model components in one, but that is not advised
 and can easily lead to unexpected behaviour because of multiple dispatch.
 
 As a last note on `initialize!`, you can see that we scale the amplitude/strength `A`
@@ -215,7 +215,7 @@ The third argument has to be of the type of our new custom forcing, here `Stocha
 so that multiple dispatch calls the correct method of `forcing!`. The forth argument is of type
 `AbstractModel`, so that the forcing can also make use of anything inside `model`, e.g.
 `model.geometry` or `model.planet` etc. But you can be more restrictive to define a forcing only
-for the `BarotropicModel` for example, use ``model::Barotropic`` in that case.
+for the `BarotropicModel` for example, use `model::Barotropic` in that case.
 Or you could define two methods, one for `Barotropic` one for all other models with
 `AbstractModel` (not `Barotropic` as a more specific method is prioritised with multiple
 dispatch). The 5th argument is the leapfrog index `lf` which after the first time step will
@@ -314,7 +314,9 @@ without overwriting other terms which, in fact, will be added to this
 array afterwards. In general, you can also force the momentum equations
 in grid-point space by writing into `vars.tendencies.grid.u` and `vars.tendencies.grid.v`.
 
-As a note of caution for the primitive equation models the parameterizations are executed
+## Order of tendencies
+
+As a note of caution for the primitive equation models, the parameterizations are executed
 first, the general order is
 
 - parameterizations
@@ -328,6 +330,7 @@ first, the general order is
 that means in the primitive models you always want to accumulate into the tendencies
 with `+=` otherwise you would overwrite with a custom forcing the tendencies
 that would have been computed in other model components before the forcing.
+See also [Accumulate not overwrite](@ref).
 
 ## Custom forcing: model construction
 

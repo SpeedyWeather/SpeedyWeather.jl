@@ -210,9 +210,10 @@ run!(simulation, period=Day(10))
 simulation.variables.particles.locations
 ```
 
-Woohoo! We just advected some particles. This is probably not as exciting as actually
-tracking the particles over the globe and being able to visualise their trajectory
-which we will do in the next section
+Woohoo! We just advected some particles. Note that the active particles
+have their vertical coordinate set to value of the layer they are being
+advected on given that we defined `ParticleAdvection2D` with `layer = 1`
+as default (which has that coordinate value as default).
 
 ## Tracking particles
 
@@ -248,12 +249,14 @@ simulation = initialize!(model)
 run!(simulation, period = Day(10))
 model.output.run_folder
 ```
-so that you can read the netCDF file with
+
+As we don't have `output = true`, by default, the `particles.nc` file will be written
+the to current working directory. You can read the netCDF file with
 
 ```@example particle_tracker
 using NCDatasets
-run_folder = model.output.run_folder                    # normally the run_???? string with run number
-path = joinpath(run_folder, particle_tracker.filename)  # by default "run_????/particles.nc"
+run_folder = model.output.run_folder                    # if output = true the run_???? string with run number
+path = joinpath(run_folder, particle_tracker.filename)  # "particles.nc" by default if output = false
 ds = NCDataset(path)
 ds["lon"]
 ds["lat"]
