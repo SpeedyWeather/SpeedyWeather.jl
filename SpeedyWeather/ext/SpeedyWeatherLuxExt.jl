@@ -38,13 +38,13 @@ function SpeedyWeather.LearnedSurfaceRoughness(
 end
 
 function load_land_parameters!(params, weights::Dict{String, Array{Float32}})
-    layer_map = [
+    layer_map = (
         "embed_layer" => :layer_1,
         "layer_1" => :layer_2,
         "layer_2" => :layer_4,
         "layer_3" => :layer_6,
         "output_layer" => :layer_7,
-    ]
+    )
     for (py_name, lux_sym) in layer_map
         # Check layer names match
         if hasproperty(params, lux_sym)
@@ -199,10 +199,10 @@ function BRDFNet(; input_dim = 10, shared_dim = 32, head_dim = 32, activation = 
     )
 
     heads = Lux.Parallel(
-        vcat;
-        iso_head = build_head(shared_dim, head_dim, 2),
-        vol_head = build_head(shared_dim, head_dim, 2),
-        geo_head = build_head(shared_dim, head_dim, 2)
+        tuple;
+        head1 = build_head(shared_dim, head_dim, 2),
+        head2 = build_head(shared_dim, head_dim, 2),
+        head3 = build_head(shared_dim, head_dim, 2)
     )
     return Lux.Chain(; trunk_embed, trunk_res_blocks, heads)
 end
@@ -255,38 +255,38 @@ function load_brdfnet_parameters!(ps, st, weights::Dict{String, Any})
     b3_ps.linear2.bias .= weights["trunk_res_blocks.2.linear2.bias"]
 
     # Iso head
-    ps.heads.iso_head.linear1.weight .= weights["iso_head.0.weight"]
-    ps.heads.iso_head.linear1.bias .= weights["iso_head.0.bias"]
-    ps.heads.iso_head.norm.scale .= weights["iso_head.1.weight"]
-    ps.heads.iso_head.norm.bias .= weights["iso_head.1.bias"]
-    st.heads.iso_head.norm.running_mean .= weights["iso_head.1.running_mean"]
-    st.heads.iso_head.norm.running_var .= weights["iso_head.1.running_var"]
-    ps.heads.iso_head.linear2.weight .= weights["iso_head.3.weight"]
-    ps.heads.iso_head.linear2.bias .= weights["iso_head.3.bias"]
+    ps.heads.head1.linear1.weight .= weights["iso_head.0.weight"]
+    ps.heads.head1.linear1.bias .= weights["iso_head.0.bias"]
+    ps.heads.head1.norm.scale .= weights["iso_head.1.weight"]
+    ps.heads.head1.norm.bias .= weights["iso_head.1.bias"]
+    st.heads.head1.norm.running_mean .= weights["iso_head.1.running_mean"]
+    st.heads.head1.norm.running_var .= weights["iso_head.1.running_var"]
+    ps.heads.head1.linear2.weight .= weights["iso_head.3.weight"]
+    ps.heads.head1.linear2.bias .= weights["iso_head.3.bias"]
 
     # Vol head
-    ps.heads.vol_head.linear1.weight .= weights["vol_head.0.weight"]
-    ps.heads.vol_head.linear1.bias .= weights["vol_head.0.bias"]
-    ps.heads.vol_head.norm.scale .= weights["vol_head.1.weight"]
-    ps.heads.vol_head.norm.bias .= weights["vol_head.1.bias"]
-    st.heads.vol_head.norm.running_mean .= weights["vol_head.1.running_mean"]
-    st.heads.vol_head.norm.running_var .= weights["vol_head.1.running_var"]
-    ps.heads.vol_head.linear2.weight .= weights["vol_head.3.weight"]
-    ps.heads.vol_head.linear2.bias .= weights["vol_head.3.bias"]
+    ps.heads.head2.linear1.weight .= weights["vol_head.0.weight"]
+    ps.heads.head2.linear1.bias .= weights["vol_head.0.bias"]
+    ps.heads.head2.norm.scale .= weights["vol_head.1.weight"]
+    ps.heads.head2.norm.bias .= weights["vol_head.1.bias"]
+    st.heads.head2.norm.running_mean .= weights["vol_head.1.running_mean"]
+    st.heads.head2.norm.running_var .= weights["vol_head.1.running_var"]
+    ps.heads.head2.linear2.weight .= weights["vol_head.3.weight"]
+    ps.heads.head2.linear2.bias .= weights["vol_head.3.bias"]
 
     # Geo head
-    ps.heads.geo_head.linear1.weight .= weights["geo_head.0.weight"]
-    ps.heads.geo_head.linear1.bias .= weights["geo_head.0.bias"]
-    ps.heads.geo_head.norm.scale .= weights["geo_head.1.weight"]
-    ps.heads.geo_head.norm.bias .= weights["geo_head.1.bias"]
-    st.heads.geo_head.norm.running_mean .= weights["geo_head.1.running_mean"]
-    st.heads.geo_head.norm.running_var .= weights["geo_head.1.running_var"]
-    ps.heads.geo_head.linear2.weight .= weights["geo_head.3.weight"]
-    ps.heads.geo_head.linear2.bias .= weights["geo_head.3.bias"]
+    ps.heads.head3.linear1.weight .= weights["geo_head.0.weight"]
+    ps.heads.head3.linear1.bias .= weights["geo_head.0.bias"]
+    ps.heads.head3.norm.scale .= weights["geo_head.1.weight"]
+    ps.heads.head3.norm.bias .= weights["geo_head.1.bias"]
+    st.heads.head3.norm.running_mean .= weights["geo_head.1.running_mean"]
+    st.heads.head3.norm.running_var .= weights["geo_head.1.running_var"]
+    ps.heads.head3.linear2.weight .= weights["geo_head.3.weight"]
+    ps.heads.head3.linear2.bias .= weights["geo_head.3.bias"]
     return nothing
 end
 
-function SpeedyWeather.LearnedBRDF(
+function SpeedyWeather.LearnedLandAlbedo(
         SG::SpectralGrid;
         snow_cover = SaturatingSnowCover(),
         input_dim::Int = 10,
@@ -303,7 +303,7 @@ function SpeedyWeather.LearnedBRDF(
     brdf_params, rand_states = Lux.setup(rng, brdf_nn)
     brdf_states = Lux.testmode(rand_states)
 
-    return LearnedBRDF{SG.NF, typeof(brdf_nn), typeof(brdf_params), typeof(brdf_states), typeof(snow_cover)}(;
+    return LearnedLandAlbedo{SG.NF, typeof(brdf_nn), typeof(brdf_params), typeof(brdf_states), typeof(snow_cover)}(;
         brdf_nn = brdf_nn,
         brdf_params = brdf_params,
         brdf_states = brdf_states,
@@ -312,8 +312,8 @@ function SpeedyWeather.LearnedBRDF(
     )
 end
 
-Adapt.@adapt_structure SpeedyWeather.LearnedBRDF
-function SpeedyWeather.initialize!(brdf::LearnedBRDF, ::PrimitiveEquation)
+Adapt.@adapt_structure SpeedyWeather.LearnedLandAlbedo
+function SpeedyWeather.initialize!(brdf::LearnedLandAlbedo, ::PrimitiveEquation)
     params = RingGrids.get_asset(
         brdf.path,
         from_assets = brdf.from_assets,
@@ -348,9 +348,10 @@ Calculate SAL using the Lucht et al. (2000) polynomial.
 """
 Base.@propagate_inbounds function calculate_black_sky_albedo(f_iso, f_vol, f_geo, θ)
     NF = typeof(f_iso)
-    c_iso = NF(1.0) + (NF(0.0) * θ^2) + (NF(0.0) * θ^3)
-    c_vol = NF(-0.007574) + (NF(-0.070987) * θ^2) + (NF(0.307588) * θ^3)
-    c_geo = NF(-1.284909) + (NF(-0.166314) * θ^2) + (NF(0.04184) * θ^3)
+    c_iso = NF(1.0)
+    c_vol = evalpoly(θ, (NF(-0.007574), NF(0.0), NF(-0.070987), NF(0.307588)))
+    c_geo = evalpoly(θ, (NF(-1.284909), NF(0.0), NF(-0.166314), NF(0.04184)))
+    
     return (c_iso * f_iso) + (c_vol * f_vol) + (c_geo * f_geo)
 end
 
@@ -363,7 +364,7 @@ end
 
 const vis_weight, nir_weight = 0.5308, 0.4771
 
-Base.@propagate_inbounds function brdf(ij, diagn, progn, scheme::LearnedBRDF)
+Base.@propagate_inbounds function brdf(ij, diagn, progn, scheme::LearnedLandAlbedo)
     # Calculate snow cover
     snow_depth = progn.land.snow_depth[ij]
     snow_cover = scheme.snow_cover(snow_depth, scheme.snow_depth_scale) * 100
@@ -381,21 +382,21 @@ Base.@propagate_inbounds function brdf(ij, diagn, progn, scheme::LearnedBRDF)
     snow_cover = normalise(snow_cover, scheme.norm_means[10], scheme.norm_stds[10])
 
     scheme.input_buffer[:] .= (
-        vegh, vegl, soil_moisture1, 
+        vegh, vegl, soil_moisture1,
         soil_temperature1, soil_moisture2, soil_temperature2,
-        geopotential, lai_hv, lai_lv, snow_cover
+        geopotential, lai_hv, lai_lv, snow_cover,
     )
 
-    # TODO: sort out this reshaping stuff. Probably fixed by not using layer norm in the network.
     input_matrix = reshape(scheme.input_buffer, :, 1)
-    prediction, _ = Lux.apply(scheme.brdf_nn, input_matrix, scheme.brdf_params, scheme.brdf_states)
+    (out1, out2, out3), _ = Lux.apply(scheme.brdf_nn, input_matrix, scheme.brdf_params, scheme.brdf_states)
 
-    vis_iso = prediction[1]
-    vis_vol = prediction[2]
-    vis_geo = prediction[3]
-    nir_iso = prediction[4]
-    nir_vol = prediction[5]
-    nir_geo = prediction[6]
+    # Unpack predictions
+    vis_iso = out1[1]
+    vis_vol = out1[2]
+    vis_geo = out2[1]
+    nir_iso = out2[2]
+    nir_vol = out3[1]
+    nir_geo = out3[2]
 
     # Unnorm outputs
     vis_iso = denormalise(vis_iso, scheme.unnorm_means[1], scheme.unnorm_stds[1])
@@ -404,6 +405,9 @@ Base.@propagate_inbounds function brdf(ij, diagn, progn, scheme::LearnedBRDF)
     nir_iso = denormalise(nir_iso, scheme.unnorm_means[4], scheme.unnorm_stds[4])
     nir_vol = denormalise(nir_vol, scheme.unnorm_means[5], scheme.unnorm_stds[5])
     nir_geo = denormalise(nir_geo, scheme.unnorm_means[6], scheme.unnorm_stds[6])
+
+    # Do the above but more efficiently
+
 
     sw_pred_iso = (vis_iso * vis_weight) + (nir_iso * nir_weight)
     sw_pred_vol = (vis_vol * vis_weight) + (nir_vol * nir_weight)
@@ -416,7 +420,7 @@ Base.@propagate_inbounds function brdf(ij, diagn, progn, scheme::LearnedBRDF)
     return calculate_bsa_from_fraction(sw_pred_iso, sw_pred_vol, sw_pred_geo, θ, fraction_direct)
 end
 
-Base.@propagate_inbounds function SpeedyWeather.albedo!(ij, diagn, progn, scheme::LearnedBRDF, model)
+Base.@propagate_inbounds function SpeedyWeather.albedo!(ij, diagn, progn, scheme::LearnedLandAlbedo, model)
     land_fraction = model.land_sea_mask.mask[ij]
 
     # Don't run for fully ocean cells
@@ -428,7 +432,6 @@ Base.@propagate_inbounds function SpeedyWeather.albedo!(ij, diagn, progn, scheme
     # Don't run for night-time cells
     μ = diagn.physics.cos_zenith[ij]
     if μ <= 0
-        diagn.physics.land.albedo[ij] = one(μ)
         return nothing
     end
 

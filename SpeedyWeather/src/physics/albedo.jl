@@ -273,8 +273,8 @@ initialize!(albedo::LandSnowAlbedo, model::PrimitiveEquation) = nothing
     end
 end
 
-## OceanAlbedo (Jin et al., 2011)
-export OceanAlbedo
+## JinOceanAlbedo (Jin et al., 2011)
+export JinOceanAlbedo
 
 """
 Ocean surface albedo parameterization based on Jin et al. (2011).
@@ -282,7 +282,7 @@ Calculates broadband albedo as a function of wind speed, surface roughness,
 and solar zenith angle, partitioned into direct and diffuse components.
 Fields are $(TYPEDFIELDS)
 """
-@parameterized @kwdef struct OceanAlbedo{NF} <: AbstractAlbedo
+@parameterized @kwdef struct JinOceanAlbedo{NF} <: AbstractAlbedo
     "[OPTION] Refractive index of water for broadband visible spectrum [1]"
     @param refractive_index::NF = 1.34 (bounds = 1 .. 2,)
 
@@ -292,29 +292,32 @@ Fields are $(TYPEDFIELDS)
     "[OPTION] Volume scattering contribution for Case 1 waters [1]"
     @param volume_scattering::NF = 0.006 (bounds = 0 .. 0.1,)
 
+    "[OPTION] Albedo of sea ice at concentration=1 [1]"
+    @param albedo_ice::NF = 0.6 (bounds = 0 .. 1,)
+
     "[OPTION] Use overcast skies formula for diffuse albedo?"
     cloudy_sky::Bool = false
 end
 
-Adapt.@adapt_structure OceanAlbedo
-OceanAlbedo(SG::SpectralGrid; kwargs...) = OceanAlbedo{SG.NF}(; kwargs...)
+Adapt.@adapt_structure JinOceanAlbedo
+JinOceanAlbedo(SG::SpectralGrid; kwargs...) = JinOceanAlbedo{SG.NF}(; kwargs...)
 
-initialize!(::OceanAlbedo, ::PrimitiveEquation) = nothing
+initialize!(::JinOceanAlbedo, ::PrimitiveEquation) = nothing
 
 """$(TYPEDSIGNATURES) Compute unpolarized Fresnel reflectance."""
 @inline function fresnel_reflectance(n::NF, mu::NF) where {NF}
     # Mu is bounded to prevent domain errors
-    mu = clamp(mu, NF(1.0e-5), one(NF))
-    theta_i = acos(mu)
+    μ = clamp(mu, NF(1.0e-5), one(NF))
+    θᵢ = acos(μ)
 
-    sin_theta_t = sin(theta_i) / n
-    theta_t = asin(sin_theta_t)
+    sin_theta_t = sin(θᵢ) / n
+    θₜ = asin(sin_theta_t)
 
     # Perpendicular and parallel polarizations
-    r_s = ((cos(theta_i) - n * cos(theta_t)) / (cos(theta_i) + n * cos(theta_t)))^2
-    r_p = ((n * cos(theta_i) - cos(theta_t)) / (n * cos(theta_i) + cos(theta_t)))^2
+    rₛ = ((cos(θᵢ) - n * cos(θₜ)) / (cos(θᵢ) + n * cos(θₜ)))^2
+    rₚ = ((n * cos(θᵢ) - cos(θₜ)) / (n * cos(θᵢ) + cos(θₜ)))^2
 
-    return NF(0.5) * (r_s + r_p)
+    return NF(0.5) * (rₛ + rₚ)
 end
 
 """$(TYPEDSIGNATURES) Polynomial regression function f(mu, sigma) from Jin et al. (2011)."""
@@ -330,8 +333,9 @@ end
     return poly_pre * poly_exp
 end
 
-@propagate_inbounds function albedo!(ij, diagn, progn, albedo_scheme::OceanAlbedo{NF}, model) where {NF}
+@propagate_inbounds function albedo!(ij, diagn, progn, albedo_scheme::JinOceanAlbedo{NF}, model) where {NF}
     land_fraction = model.land_sea_mask.mask[ij]
+    μ = diagn.physics.cos_zenith[ij]
     
     # Exit if the point is land
     if land_fraction == 1
@@ -339,49 +343,46 @@ end
         return
     end
 
-    (; refractive_index, foam_reflectance, volume_scattering, cloudy_sky) = albedo_scheme
-
-    wind_speed = diagn.physics.surface_wind_speed[ij]
-    mu = diagn.physics.cos_zenith[ij]
-    f_dir = diagn.physics.rad_fraction_direct[ij]
-    f_dif = diagn.physics.rad_fraction_diffuse[ij]
-    sigma = diagn.physics.ocean.surface_roughness[ij]
-
     # Enforce night/horizon boundary
-    if mu <= zero(NF)
-        diagn.physics.ocean.albedo[ij] = one(NF)
+    if μ <= zero(NF)
         return
     end
 
-    n0 = refractive_index
+    (; refractive_index, foam_reflectance, volume_scattering, cloudy_sky, albedo_ice) = albedo_scheme
+
+    wind_speed = diagn.physics.surface_wind_speed[ij]
+    f_dir = diagn.physics.rad_fraction_direct[ij]
+    f_dif = diagn.physics.rad_fraction_diffuse[ij]
+    σ = diagn.physics.ocean.surface_roughness[ij]
+
+    n₀ = refractive_index
 
     # 1. Direct Surface Albedo
-    r_f = fresnel_reflectance(n0, mu)
-    alpha_dir_s = r_f - f_mu_sigma(mu, sigma)
+    r_f = fresnel_reflectance(n₀, μ)
+    alpha_dir_s = r_f - f_mu_sigma(μ, σ)
 
     # 2. Diffuse Surface Albedo
     if cloudy_sky
         # Eq 5b (Cloudy sky)
-        alpha_dif_s = NF(-0.1479) + NF(0.1502) * n0 - NF(0.0176) * n0 * sigma
+        alpha_dif_s = NF(-0.1479) + NF(0.1502) * n₀ - NF(0.0176) * n₀ * σ
     else
         # Eq 5a (Isotropic clear sky)
-        alpha_dif_s = NF(-0.1482) - NF(0.012) * n0 + NF(0.1608) * n0^2 - NF(0.0244) * n0 * sigma
+        alpha_dif_s = NF(-0.1482) - NF(0.012) * n₀ + NF(0.1608) * n₀^2 - NF(0.0244) * n₀ * σ
     end
 
     # 3. Assemble Broadband Albedo (Eq 15)
-    alpha_b = f_dir * alpha_dir_s + f_dif * alpha_dif_s + volume_scattering
+    αᵦ = f_dir * alpha_dir_s + f_dif * alpha_dif_s + volume_scattering
 
     # 4. Foam Adjustment (Eqs 16 & 17)
     f_wc = NF(2.95e-6) * (wind_speed^NF(3.52))
     f_wc = clamp(f_wc, zero(NF), one(NF))
 
-    alpha_final = f_wc * foam_reflectance + (one(NF) - f_wc) * alpha_b
+    alpha_final = f_wc * foam_reflectance + (one(NF) - f_wc) * αᵦ
 
     # Also account for sea ice if sea ice concentration is available
     if haskey(progn.ocean, :sea_ice_concentration)
         sea_ice_conc = progn.ocean.sea_ice_concentration[ij]
-        alpha_ice = NF(0.6)  # Typical sea ice albedo
-        diagn.physics.ocean.albedo[ij] = clamp((one(NF) - sea_ice_conc) * alpha_final + sea_ice_conc * alpha_ice, zero(NF), one(NF))
+        diagn.physics.ocean.albedo[ij] = clamp((one(NF) - sea_ice_conc) * alpha_final + sea_ice_conc * albedo_ice, zero(NF), one(NF))
     else
         diagn.physics.ocean.albedo[ij] = clamp(alpha_final, zero(NF), one(NF))
     end
@@ -389,8 +390,8 @@ end
     return
 end
 
-export LearnedBRDF
-@parameterized @kwdef struct LearnedBRDF{NF, LNN, LP, LS, Scheme <: AbstractSnowCover} <: AbstractAlbedo
+export LearnedLandAlbedo
+@parameterized @kwdef struct LearnedLandAlbedo{NF, LNN, LP, LS, Scheme <: AbstractSnowCover} <: AbstractAlbedo
     "[OPTION] filename of land weights"
     file::String = "brdf.npz"
 
@@ -422,8 +423,8 @@ export LearnedBRDF
     brdf_states::LS
 end
 
-function Base.show(io::IO, scheme::LearnedBRDF)
-    print(io, "LearnedBRDF{$(eltype(scheme.output_mean))}")
+function Base.show(io::IO, scheme::LearnedLandAlbedo)
+    print(io, "LearnedLandAlbedo{$(eltype(scheme.output_mean))}")
     println(io)
     n_layers = length(keys(scheme.brdf_params))
     return println(io, "└ BRDF: Neural network ($n_layers layers)")
