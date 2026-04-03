@@ -217,14 +217,7 @@ end
 """$(TYPEDSIGNATURES)
 When model components are named tuples themselves then check for
 variables required by the elements of the named tuple and pass those one as key-value pairs."""
-function variables(nt::NamedTuple, model::AbstractModel)
-    t = ()
-    for (key, value) in pairs(nt)
-        t = tuple(t..., variables(Pair(key, value), model)...)
-    end
-    return t
-end
-
+variables(nt::NamedTuple, model::AbstractModel) = (variables(pair, model) for pair in pairs(nt)) |> Iterators.flatten |> Tuple
 variables(::Nothing) = ()                                   # to allow for model.component = nothing
 variables(::Any) = ()                                       # fallback for any component
 
