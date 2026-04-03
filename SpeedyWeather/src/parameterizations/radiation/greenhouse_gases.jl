@@ -20,6 +20,9 @@ function greenhouse_gases_timestep!(vars::Variables, model::PrimitiveEquation)
     end
 end
 
+# for models without greenhouse gases, do nothing
+greenhouse_gases_timestep!(vars::Variables, model::AbstractModel) = nothing   
+
 """$(TYPEDSIGNATURES) CO2 uses unit of ppm, so *1e-6 to convert to kg/kg."""
 @inline unit(::AbstractCO2) = 1f-6
 
