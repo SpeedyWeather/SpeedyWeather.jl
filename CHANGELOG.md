@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `JLD2Output` revised to be able to select groups, additional `ArrayOutput` option to output to RAM [#1026](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1026)
 - [BREAKING] model.dyanmics_only instead of .physics [#969](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/969)
 - [BREAKING] Kernel launching now in SpeedyWeatherInternals.KernelLaunching [#969](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/969)
 - Pretty printing with StyledStrings [#969](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/969)
