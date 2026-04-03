@@ -245,10 +245,11 @@ function initialize!(
     (; temp_profile, S⁻¹, L, R, U, W, L0, L1, L2, L3, L4) = implicit
 
     # use current vertical temperature profile
-    temp_profile .= diagn.temp_average
+    temp_profile .= temp_average
 
     # return immediately if temp_profile contains NaRs, model blew up in that case
-    all(isfinite.(temp_profile)) || return nothing
+    # TODO: reactive when issues with Reactant resolved
+    # all(isfinite.(temp_profile)) || return nothing
 
     ξ = α * dt                          # dt = 2Δt for leapfrog, but = Δt, Δ/2 in first_timesteps!
     implicit.ξ[] = ξ                    # also store in Implicit struct

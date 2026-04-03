@@ -63,7 +63,10 @@ function SpeedyWeather.time_stepping!(simulation::ReactantSimulation, r_first_ti
 end
 
 # that's for Reactant TracableDateTime
-SpeedyWeather.secondofday(dt::ReactantDatesExt.ReactantDateTime) = Dates.second(ReactantDatesExt.ReactantTime(dt).instant)
+SpeedyWeather.secondofday(dt::ReactantDatesExt.ReactantDateTime) = Dates.second(convert(ReactantDatesExt.ReactantTime, dt).instant)
+
+@inline SpeedyWeather.year_angle(::Type{T}, time::Dates.AbstractDateTime, length_of_day::ReactantDatesExt.ReactantSecond, length_of_year::ReactantDatesExt.ReactantSecond) where {T} = SpeedyWeather._year_angle(T, time, length_of_day, length_of_year)
+@inline SpeedyWeather.solar_hour_angle(::Type{T}, time::Dates.AbstractDateTime, λ, length_of_day::ReactantDatesExt.ReactantSecond) where {T} = SpeedyWeather._solar_hour_angle(T, time, λ, length_of_day)
 
 #TODO: move those the the ReactantDatesExt once I am sure it's all additional functionality I need to add
 #Dates.firstdayofmonth(dt::ReactantDatesExt.ReactantDateTime) = ReactantDatesExt.ReactantDate(dt).date
@@ -102,6 +105,12 @@ end
 
 # Dates.days for ReactantMillisecond (mirrors days(c::Millisecond) = div(value(c), 86400000))
 Dates.days(rm::ReactantDatesExt.ReactantMillisecond) = div(Dates.value(rm), 86400000)
+
+# These function extend those defined in SpeedyWeather/src/dynamics/clock.jl
+# They will not move to ReactantDatesExt as they aren't part of stdlib Dates.jl
+Dates.second(x::ReactantDatesExt.ReactantNanosecond) = round(Int, x.value * 1.0e-9)
+Dates.second(x::ReactantDatesExt.ReactantMicrosecond) = round(Int, x.value * 1.0e-6)
+Dates.second(x::ReactantDatesExt.ReactantMillisecond) = round(Int, x.value * 1.0e-3)
 
 SpeedyWeather.Clock(architecture::ReactantDevice) = Reactant.to_rarray(SpeedyWeather.Clock(), track_numbers = true)
 

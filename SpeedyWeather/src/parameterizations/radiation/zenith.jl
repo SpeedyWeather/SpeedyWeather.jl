@@ -158,22 +158,33 @@ $(TYPEDSIGNATURES)
 Fraction of year as angle in radians [0...2π].
 TODO: Takes length of day/year as argument, but calls to secondofday(), dayofyear()
 currently have these hardcoded."""
-function year_angle(::Type{T}, time::DateTime, length_of_day::Second, length_of_year::Second) where {T}
+@inline year_angle(::Type{T}, time::Dates.AbstractDateTime, length_of_day::Second, length_of_year::Second) where {T} = _year_angle(T, time, length_of_day, length_of_year)
+
+# internal version allows to be called by other time formats, e.g. by ReactantSecond in the extension
+function _year_angle(::Type{T}, time::Dates.AbstractDateTime, length_of_day, length_of_year) where {T}
     year2rad = convert(T, 2π / length_of_year.value)
     sec_of_day = secondofday(time)
     return year2rad * (Dates.dayofyear(time) * length_of_day.value + sec_of_day)
-end
+end 
 
 """
 $(TYPEDSIGNATURES)
 Fraction of day as angle in radians [0...2π].
 TODO: Takes length of day as argument, but a call to secondofday()
 currently have this hardcoded anyway."""
-function solar_hour_angle(
+@inline solar_hour_angle(
         ::Type{T},
         time::DateTime,
         λ,                      # longitude in radians
         length_of_day::Second
+    ) where {T} = _solar_hour_angle(T, time, λ, length_of_day)
+    
+# internal version allows to be called by other time formats, e.g. by ReactantSecond in the extension
+function _solar_hour_angle(
+        ::Type{T},
+        time,
+        λ,                      # longitude in radians
+        length_of_day
     ) where {T}
     day2rad = convert(T, 2π / length_of_day.value)
     noon_in_sec = length_of_day.value ÷ 2
@@ -189,9 +200,9 @@ depending on parameters in SolarZenith."""
 function cos_zenith!(
         cos_zenith::AbstractField{NF},
         S::SolarZenith,
-        time::DateTime,
+        time::DT,
         geometry::AbstractGeometry,
-    ) where {NF}
+    ) where {NF, DT<:Dates.AbstractDateTime}
     (; sinlat, coslat, lons) = geometry
     (; length_of_day, length_of_year) = S
     @boundscheck geometry.spectral_grid.grid == cos_zenith.grid ||
@@ -264,9 +275,9 @@ depending on parameters in SolarZenithSeason."""
 function cos_zenith!(
         cos_zenith::AbstractField{NF},
         S::SolarZenithSeason,
-        time::DateTime,
+        time::DT,
         geometry::AbstractGeometry,
-    ) where {NF}
+    ) where {NF, DT<:Dates.AbstractDateTime}
     (; sinlat, coslat, lat) = geometry
     (; length_of_day, length_of_year) = S
     @boundscheck geometry.spectral_grid.grid == cos_zenith.grid ||
