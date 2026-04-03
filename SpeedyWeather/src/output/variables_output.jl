@@ -272,7 +272,7 @@ function Base.show(io::IO, output::ArrayOutput)
 end
 
 """$(TYPEDSIGNATURES)
-Initialize `ArrayOutput` by clearing any previous output and setting up counters."""
+Initialize `ArrayOutput` by pre-allocating the full output array and storing the initial condition."""
 function initialize!(
         output::ArrayOutput,
         vars::Variables,
@@ -280,11 +280,18 @@ function initialize!(
     )
     initialize_variables_output!(output, model) || return nothing
 
-    # clear and store initial condition
-    empty!(getfield(output, :output))
-    output.output_counter += 1
-    snapshot = deepcopy(filter_groups(vars, output))
-    push!(getfield(output, :output), snapshot)
+    # compute total number of output snapshots: IC + one per output_every_n_steps
+    n_timesteps = vars.prognostic.clock.n_timesteps
+    n_outputs = n_timesteps ÷ output.output_every_n_steps + 1   # +1 for the IC
+
+    # pre-allocate the full vector with deep copies
+    ic = deepcopy(filter_groups(vars, output))
+    output_vector = Vector{typeof(ic)}(undef, n_outputs)
+    output_vector[1] = ic
+    setfield!(output, :output, output_vector)
+
+    # counter already at 0 from initialize_variables_output!, set to 1 for IC
+    output.output_counter = 1
     return nothing
 end
 
@@ -293,8 +300,8 @@ Base.close(::ArrayOutput) = nothing
 function output!(output::ArrayOutput, simulation::AbstractSimulation)
     should_output!(output) || return nothing
     output.output_counter += 1
-    snapshot = deepcopy(filter_groups(simulation.variables, output))
-    push!(getfield(output, :output), snapshot)
+    i = output.output_counter
+    getfield(output, :output)[i] = deepcopy(filter_groups(simulation.variables, output))
     return nothing
 end
 
