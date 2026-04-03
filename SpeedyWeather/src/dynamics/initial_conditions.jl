@@ -230,7 +230,7 @@ function initialize!(
 
     # repeat over vertical layers
     ξks = repeat(ξ, 1, nlayers)
-    set!(vars, model; vor = ξks, lf = 1)
+    set!(vars, model; vorticity = ξks, lf = 1)
 
     return nothing
 end
@@ -445,7 +445,7 @@ function initialize!(
     div_ic = JablonowskiDivergence(sinφc, cosφc, λc, radius, u₀, η₀, perturb_uₚ, R)
 
     # apply those to set the initial conditions for vor, div
-    set!(vars, model; vor = vor_ic, div = div_ic, lf = 1, static_func = true)
+    set!(vars, model; vorticity = vor_ic, divergence = div_ic, lf = 1, static_func = true)
     return nothing
 end
 
@@ -547,8 +547,8 @@ function initialize!(
     C(λ, θ) = K^2 / 4 * cosd(θ)^(2m) * ((m + 1) * cosd(θ)^2 - (m + 2))
     η(λ, θ) = R^2 / g * (A(λ, θ) + B(λ, θ) * cosd(m * λ) + C(λ, θ) * cosd(2m * λ))
 
-    set!(vars, geometry, vor = ζ, static_func = false)
-    haskey(vars.prognostic, :divergence) && set!(vars, geometry, div = 0)  # technically not needed, but set to zero for completeness
+    set!(vars, geometry, vorticity = ζ, static_func = false)
+    haskey(vars.prognostic, :divergence) && set!(vars, geometry, divergence = 0)  # technically not needed, but set to zero for completeness
     haskey(vars.prognostic, :η) && set!(vars, geometry, η = η, static_func = false)
 
     # filter low values below cutoff amplitude c
@@ -603,7 +603,7 @@ function initialize!(
     )
 
     haskey(vars.prognostic, :temperature) || warn_undefvar(vars, :temperature) && return nothing
-    (; temperature=temp) = vars.prognostic
+    temp = vars.prognostic.temperature
     NF = real(eltype(temp))
 
     (; u₀, η₀, ΔT, Tmin) = initial_conditions
@@ -644,7 +644,7 @@ function initialize!(
         η₀, u₀, R_dry, aΩ
     )
 
-    set!(vars, model; temp = temp_grid, lf = 1)
+    set!(vars, model; temperature = temp_grid, lf = 1)
 
     return nothing
 end
@@ -781,7 +781,7 @@ function initialize!(
     RΓg⁻¹ = R_dry * Γ / gravity         # for convenience
     ΓT₀⁻¹ = Γ / T₀
     @. lnp_grid = lnp₀ + log(1 - ΓT₀⁻¹ * orography) / RΓg⁻¹
-    set!(vars, model; pres = lnp_grid, lf = 1)
+    set!(vars, model; pressure = lnp_grid, lf = 1)
     return nothing
 end
 
@@ -801,7 +801,7 @@ function initialize!(
     haskey(vars.prognostic, :pressure) || warn_undefvar(vars, :pressure) && return nothing
 
     # logarithm of reference surface pressure [log(Pa)]
-    set!(vars, model; pres = log(model.atmosphere.pressure_reference))
+    set!(vars, model; pressure = log(model.atmosphere.pressure_reference))
     return nothing
 end
 
@@ -842,7 +842,7 @@ function initialize!(
         constant_relative_humidity_kernel!, humid_grid, temp_grid, pres_grid,
         σ_levels_full, relhumid_ref, atmosphere,
     )
-    set!(vars, model; humid = humid_grid, lf = 1)
+    set!(vars, model; humidity = humid_grid, lf = 1)
 
     return nothing
 end

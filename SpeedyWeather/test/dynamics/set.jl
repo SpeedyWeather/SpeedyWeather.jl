@@ -36,16 +36,16 @@
     set!(simulation, vorticity = L, lf = lf)
     @test get_step(prog_new.vorticity, lf) == L
 
-    set!(simulation, div = L, lf = lf; add = true)
+    set!(simulation, divergence = L, lf = lf; add = true)
     @test get_step(prog_new.divergence, lf) == (get_step(prog_old.divergence, lf) .+ L)
 
-    set!(simulation, temp = L2, lf = lf)
+    set!(simulation, temperature = L2, lf = lf)
     @test get_step(prog_new.temperature, lf) ≈ L2_trunc
 
-    set!(simulation, humid = L3, lf = lf)
+    set!(simulation, humidity = L3, lf = lf)
     @test get_step(prog_new.humidity, lf) ≈ L3_trunc
 
-    set!(simulation, pres = L[:, 1], lf = lf)
+    set!(simulation, pressure = L[:, 1], lf = lf)
     @test get_step(prog_new.pressure, lf) == L[:, 1]
 
     set!(simulation, vorticity = A, lf = lf)

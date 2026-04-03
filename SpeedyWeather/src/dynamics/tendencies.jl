@@ -451,7 +451,9 @@ function vordiv_tendencies!(
     # tendencies already contain parameterizations + advection, therefore accumulate
     u_tend_grid = vars.tendencies.grid.u
     v_tend_grid = vars.tendencies.grid.v
-    (; u, v, vorticity=vor, temperature=temp) = vars.grid  # velocities, vorticity, temperature
+    (; u, v) = vars.grid                                    # velocities, vorticity, temperature
+    vor = vars.grid.vorticity
+    temp = vars.grid.temperature
     vars.scratch.grid.a .= 0
     humid = haskey(vars.grid, :humidity) ? vars.grid.humidity : vars.scratch.grid.a
     (; dpres_dx, dpres_dy) = vars.dynamics              # zonal/meridional gradient of logarithm of surface pressure
@@ -583,7 +585,7 @@ function temperature_tendency!(
     temp_tend = vars.tendencies.temperature
     temp_tend_grid = vars.tendencies.grid.temperature
     div_grid = vars.grid.divergence
-    (; temperature=temp) = vars.grid
+    temp = vars.grid.temperature
 
     # use scratch array with zeros in case humidity doesn't exist
     vars.scratch.grid.a .= 0
@@ -656,7 +658,7 @@ function humidity_tendency!(
 
     humid_tend = vars.tendencies.humidity
     humid_tend_grid = vars.tendencies.grid.humidity
-    (; humidity=humid) = vars.grid
+    humid = vars.grid.humidity
 
     # add horizontal advection to parameterization + vertical advection tendencies
     horizontal_advection!(humid_tend, humid_tend_grid, humid, vars, G, S, add = true)
@@ -823,7 +825,8 @@ function vorticity_flux_curldiv!(
 
     u_tend_grid = vars.tendencies.grid.u                # already contains forcing
     v_tend_grid = vars.tendencies.grid.v                # already contains forcing
-    (; u, v, vorticity=vor) = vars.grid                  # velocities and vorticity on grid
+    (; u, v) = vars.grid                                  # velocities and vorticity on grid
+    vor = vars.grid.vorticity
     (; whichring) = u.grid                              # precomputed ring indices
     scratch_memory = vars.scratch.transform_memory      # scratch memory for transforms
 

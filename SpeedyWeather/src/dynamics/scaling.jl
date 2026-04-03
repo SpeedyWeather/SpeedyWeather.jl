@@ -49,7 +49,7 @@ end
     )
     return nothing
 end
-s
+
 """$(TYPEDSIGNATURES)
 Undo the radius-scaling of vorticity and divergence from `scale_prognostic!(vars, scale::Real)`."""
 function unscale!(vars::Variables)
