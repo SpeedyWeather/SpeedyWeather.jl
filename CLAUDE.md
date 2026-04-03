@@ -30,7 +30,7 @@ SpeedyWeather/src/
 │   ├── radiation/     # Shortwave & longwave
 │   └── surface_fluxes/
 ├── models/            # Model definitions and simulation runner
-├── variables/         # Prognostic & diagnostic variable metadata
+├── variables/         # Unified Variables system (prognostic, grid, tendencies, …)
 ├── output/            # NetCDF, JLD2, callbacks, restart files
 └── input/             # Asset loading
 ```
@@ -40,9 +40,8 @@ SpeedyWeather/src/
 | Type | Purpose |
 |------|---------|
 | `SpectralGrid` | Central config: resolution (`trunc`), grid type, `nlayers`, `NF`, architecture |
-| `PrognosticVariables` | All state variables (vor, div, temp, humid, pres, particles, tracers) |
-| `DiagnosticVariables` | Tendencies and auxiliary grid-space fields |
-| `Simulation{Model,Progn,Diagn}` | Top-level container holding model + variables |
+| `Variables` | Unified container for all simulation variables (prognostic, grid, tendencies, dynamics, parameterizations, particles, scratch) |
+| `Simulation{V,M}` | Top-level container holding model + variables |
 | `Leapfrog` | Time stepper with Robert/Williams filters |
 | `SpectralTransform` | FFT/Legendre transform machinery |
 
@@ -61,6 +60,35 @@ All model components (orography, ocean, convection, etc.) inherit from
 `AbstractModelComponent` and implement `initialize!`, optionally `timestep!`
 and `finalize!`.
 
+### Variables Structure
+
+`Variables` is a unified container with 7 groups, each a NamedTuple:
+
+| Group | Purpose |
+|-------|---------|
+| `prognostic` | State variables subject to time stepping (vor, div, temp, pres, tracers, etc.) |
+| `grid` | Grid-point copies of spectral prognostic variables (u, v, temp, etc.) |
+| `tendencies` | Time derivatives; spectral at top level, grid-space under `.grid` namespace |
+| `dynamics` | Working arrays for the dynamical core (pressure gradients, vertical velocity, etc.) |
+| `parameterizations` | Working arrays for parameterizations (fluxes, radiation, cloud properties, etc.) |
+| `particles` | Particle advection variables |
+| `scratch` | Temporary storage (write-before-read) |
+
+Variables can be organized by namespace (e.g. `:ocean`, `:land`, `:tracers`):
+
+```julia
+vars.prognostic.vor                             # Spectral vorticity
+vars.prognostic.ocean.sea_surface_temperature   # Ocean namespace
+vars.tendencies.vor                             # Spectral vorticity tendency
+vars.tendencies.grid.u                          # Grid-space u-wind tendency
+vars.dynamics.w                                 # Vertical velocity
+```
+
+Model components define their variables via variable type categories:
+`PrognosticVariable`, `GridVariable`, `TendencyVariable`, `DynamicsVariable`,
+`ParameterizationVariable`, `ParticleVariable`, `ScratchVariable`.
+These are collected and allocated automatically by the `Variables(model)` constructor.
+
 ## Typical Usage
 
 ```julia
@@ -69,6 +97,31 @@ spectral_grid = SpectralGrid(trunc=31, nlayers=8, architecture=arch)
 model = PrimitiveWetModel(spectral_grid)
 simulation = initialize!(model)
 run!(simulation, period=Day(10), output=true)
+```
+
+## Running on GPU
+
+To run a model on GPU, load a GPU backend package (e.g. `CUDA`, `AMDGPU`, or `Metal`)
+before using SpeedyWeather, then pass `GPU()` as the architecture:
+
+```julia
+using CUDA              # or AMDGPU, Metal
+using SpeedyWeather
+
+arch = SpeedyWeather.GPU()
+spectral_grid = SpectralGrid(trunc=31, nlayers=8, architecture=arch)
+model = PrimitiveWetModel(spectral_grid)
+simulation = initialize!(model)
+run!(simulation, period=Day(10))
+```
+
+The GPU backend must be loaded first so that SpeedyWeather's extension modules
+register the correct array types (`CuArray`, `ROCArray`, `MtlArray`).
+
+GPU tests live in `SpeedyWeather/test/GPU/` and can be run with:
+
+```bash
+julia --project=SpeedyWeather SpeedyWeather/test/GPU/runtests.jl
 ```
 
 ## Time-Step Information Flow
@@ -85,8 +138,34 @@ Spectral Tendencies
 New Spectral State
 ```
 
-Prognostic variables are stored with 2 time levels (`lf=1,2`) for the leapfrog scheme.
-Vorticity and divergence are scaled by `radius` inside `run!` for spectral efficiency.
+Prognostic variables live in `vars.prognostic`, tendencies in `vars.tendencies` (spectral)
+and `vars.tendencies.grid` (grid-space). Vorticity and divergence are scaled by `radius`
+inside `run!` for spectral efficiency.
+
+## Array Types 
+
+Mainly two array types are used: `LowerTriangularArray` for spectral coefficients, and `Field` for gridded data. They can be initialized for testing as in the following: 
+
+```julia 
+arch = SpeedyWeather.CPU()
+spectrum = Spectrum(trunc=10, architecture = arch)
+nlayers = 5
+coeffs_zero = zeros(ComplexF32, spectrum, nlayers)
+coeffs_rand = rand(ComplexF32, spectrum, nlayers)
+
+grid = HEALPixGrid(6, arch)
+field_zero = zeros(Float32, grid, nlayers)
+field_rand = rand(Float32, grid, nlayers)
+```
+
+In case there's already a `SpectralGrid` use it instead: 
+
+```julia
+arch = SpeedyWeather.CPU()
+spectral_grid = SpectralGrid(trunc=10, architecture=arch)
+coeffs = rand(ComplexF32, spectral_grid.spectrum)
+field = rand(Float32, spectral_grid.grid)
+```
 
 ## Key Source Files
 
@@ -119,15 +198,19 @@ Vorticity and divergence are scaled by `radius` inside `run!` for spectral effic
 
 ## Testing
 
+- Every new method that is implemented has to be tested in the unit tests of its respective submodule
+- Keep the unit tests short and concise, they should finish quickly
+- Call the test with the `--check-bounds=yes` flag activated
+
 ```bash
 # Main model tests
-julia --project=SpeedyWeather SpeedyWeather/test/runtests.jl
+julia --project=SpeedyWeather --check-bounds=yes -e 'using Pkg; Pkg.test("SpeedyWeather")'
 
 # Extended tests
 julia --project=SpeedyWeather SpeedyWeather/test/runtests.jl extended_tests
 
 # Individual packages
-julia --project=RingGrids RingGrids/test/runtests.jl
+julia --project=RingGrids --check-bounds=yes -e 'using Pkg; Pkg.test("RingGrids")'
 ```
 
 Test subdirectories: `dynamics/`, `physics/`, `output/`, `GPU/`, `differentiability/`.
@@ -140,8 +223,9 @@ Test subdirectories: `dynamics/`, `physics/`, `output/`, `GPU/`, `differentiabil
 
 ## Kernel Launching
 
-Kernel infrastructure lives in `SpeedyWeatherInternals/src/Utils/kernel_launching.jl`
-and `SpeedyWeatherInternals/src/Architectures/`.
+Kernel infrastructure lives in `SpeedyWeatherInternals/src/KernelLaunching/KernelLaunching.jl`
+(a standalone submodule of `SpeedyWeatherInternals`) and `SpeedyWeatherInternals/src/Architectures/`.
+Other packages import it via `using SpeedyWeatherInternals.KernelLaunching`.
 
 ### Architecture abstraction
 
@@ -213,6 +297,19 @@ end
 Kernels are spread across ~36 files in `SpeedyWeather/src/dynamics/`,
 `physics/`, `SpeedyTransforms/src/`, `RingGrids/src/`, and
 `LowerTriangularArrays/src/`.
+
+## Benchmarks
+
+Benchmarks live in `SpeedyWeather/benchmark/`. Run the full suite with:
+
+```bash
+julia --project=SpeedyWeather/benchmark SpeedyWeather/benchmark/manual_benchmarking.jl
+```
+
+Results are written to `SpeedyWeather/benchmark/README.md`. Previous benchmark results
+in that file serve as the baseline. When running benchmarks, compare new results against
+the existing README.md values: deviations of +/- 20% are normal and acceptable, but
+larger regressions should be reported to the user.
 
 ## Code Style
 

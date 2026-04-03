@@ -1,8 +1,8 @@
 abstract type AbstractImplicit <: AbstractModelComponent end
 
 # model.implicit=nothing (for BarotropicModel)
-initialize!(::Nothing, dt::Real, ::DiagnosticVariables, ::AbstractModel) = nothing
-implicit_correction!(::DiagnosticVariables, ::PrognosticVariables, ::Nothing, ::AbstractModel) = nothing
+initialize!(::Nothing, dt::Real, ::Variables, ::AbstractModel) = nothing
+implicit_correction!(::Variables, ::Nothing, ::AbstractModel) = nothing
 
 # SHALLOW WATER MODEL
 export ImplicitShallowWater
@@ -37,7 +37,8 @@ ImplicitShallowWater(SG::SpectralGrid; kwargs...) = ImplicitShallowWater{SG.NF}(
 $(TYPEDSIGNATURES)
 Update the implicit terms in `implicit` for the shallow water model as they depend on the time step `dt`."""
 function initialize!(implicit::ImplicitShallowWater, dt::Real, args...)
-    return implicit.time_step = implicit.α * dt  # new implicit timestep ξ = α*dt = 2αΔt (for leapfrog) from input dt
+    implicit.time_step = implicit.α * dt  # new implicit timestep ξ = α*dt = 2αΔt (for leapfrog) from input dt
+    return implicit
 end
 
 # implicit shallow water has no precomputed arrays, so implicit.initialized is not defined
@@ -50,17 +51,16 @@ Apply correction to the tendencies in `diagn` to prevent the gravity waves from 
 The correction is implicitly evaluated using the parameter `implicit.α` to switch between
 forward, centered implicit or backward evaluation of the gravity wave terms."""
 function implicit_correction!(
-        diagn::DiagnosticVariables,
-        progn::PrognosticVariables,
+        vars::Variables,
         implicit::ImplicitShallowWater,
         model::ShallowWater
     )
 
-    (; div_tend, pres_tend) = diagn.tendencies  # tendency of divergence and pressure/η
-    div_old, div_new = get_steps(progn.div)   # divergence at t, t+dt
-    pres_old, pres_new = get_steps(progn.pres)  # pressure/η at t, t+dt
+    div_tend = vars.tendencies.div                      # tendency of divergence and interface displacement η
+    η_tend = vars.tendencies.η                          # tendency of divergence and interface displacement η
+    div_old, div_new = get_steps(vars.prognostic.div)   # divergence at t, t+dt
+    η_old, η_new = get_steps(vars.prognostic.η)         # η at t, t+dt
 
-    # unpack with [] as stored in a RefValue for mutation during initialization
     H = model.atmosphere.layer_thickness        # layer thickness [m], undisturbed, no mountains
     g = model.planet.gravity                    # gravitational acceleration [m/s²]
     ξ = implicit.time_step                      # new implicit timestep ξ = α*dt = 2αΔt (for leapfrog)
@@ -72,17 +72,17 @@ function implicit_correction!(
     arch = architecture(div_tend)
     launch!(
         arch, SpectralWorkOrder, size(div_tend), implicit_shallow_water_kernel!,
-        div_tend, pres_tend, div_old, div_new, pres_old, pres_new, l_indices, H, g, ξ
+        div_tend, η_tend, div_old, div_new, η_old, η_new, l_indices, H, g, ξ
     )
 
     zero_last_degree!(div_tend)
-    zero_last_degree!(pres_tend)
+    zero_last_degree!(η_tend)
     return nothing
 end
 
 @kernel inbounds = true function implicit_shallow_water_kernel!(
-        div_tend, pres_tend, div_old, div_new, pres_old, pres_new, l_indices,
-        H, g, ξ
+        div_tend, η_tend, div_old, div_new, η_old, η_new, l_indices,
+        H, g, ξ,
     )
     I = @index(Global, Cartesian)
     lm = I[1]  # single index lm corresponding to harmonic l, m
@@ -98,13 +98,13 @@ end
     # Vⁱ is a prognostic variable at time step i
     # N is the right hand side of ∂V\∂t = N(V)
     # NI is the part of N that's calculated semi-implicitily: N = NE + NI
-    G_div = div_tend[lm, k] - g * ∇² * (pres_old[lm] - pres_new[lm])
-    G_η = pres_tend[lm] - H * (div_old[lm, k] - div_new[lm, k])
+    G_div = div_tend[lm, k] - g * ∇² * (η_old[lm] - η_new[lm])
+    G_η = η_tend[lm] - H * (div_old[lm, k] - div_new[lm, k])
 
     # Using the Gs correct the tendencies for semi-implicit time stepping
     S⁻¹ = inv(1 - ξ^2 * H * g * ∇²)  # operator to invert
     div_tend[lm, k] = S⁻¹ * (G_div - ξ * g * ∇² * G_η)
-    pres_tend[lm] = G_η - ξ * H * div_tend[lm, k]
+    η_tend[lm] = G_η - ξ * H * div_tend[lm, k]
 end
 
 export ImplicitPrimitiveEquation
@@ -188,29 +188,36 @@ function ImplicitPrimitiveEquation(spectral_grid::SpectralGrid; kwargs...)
     )
 end
 
+function variables(implicit::ImplicitPrimitiveEquation)
+    return (
+        GridVariable(:temp_average, VectorDim(implicit.nlayers), desc = "Average vertical temperature profile", units = "K"),
+    )
+end
+
 # function barrier to unpack the constants struct for primitive eq models
 function initialize!(
         I::ImplicitPrimitiveEquation,
         dt::Real,
-        diagn::DiagnosticVariables,
+        vars::Variables,
         model::PrimitiveEquation,
     )
     model.dynamics || return nothing    # escape immediately if no dynamics
     (; geometry, geopotential, atmosphere, adiabatic_conversion) = model
-    return initialize!(I, dt, diagn, geometry, geopotential, atmosphere, adiabatic_conversion)
+    initialize!(I, dt, vars.grid.temp_average, geometry, geopotential, atmosphere, adiabatic_conversion)
+    return nothing
 end
 
 """$(TYPEDSIGNATURES)
 Initialize the implicit terms for the PrimitiveEquation models."""
 function initialize!(
-        implicit::ImplicitPrimitiveEquation,
+        implicit::ImplicitPrimitiveEquation{NF},
         dt::Real,                                           # the scaled time step radius*dt
-        diagn::DiagnosticVariables,
+        temp_average::AbstractVector,                       # average vertical temperature profile to construct the operators
         geometry::AbstractGeometry,
         geopotential::AbstractGeopotential,
         atmosphere::AbstractAtmosphere,
         adiabatic_conversion::AbstractAdiabaticConversion,
-    )
+    ) where {NF}
     # option to skip reinitialization at restart
     (implicit.initialized && !implicit.reinitialize) && return nothing
 
@@ -220,7 +227,7 @@ function initialize!(
     (; Δp_geopot_half, Δp_geopot_full) = geopotential
     (; σ_lnp_A, σ_lnp_B) = adiabatic_conversion
 
-    arch = architecture(implicit.S⁻¹)
+    arch = architecture(implicit.S)
 
     # set up R, U, L, W operators from
     # δD = G_D + ξ(RδT + Uδlnps)        divergence D correction
@@ -243,8 +250,8 @@ function initialize!(
     # return immediately if temp_profile contains NaRs, model blew up in that case
     all(isfinite.(temp_profile)) || return nothing
 
-    ξ = α * dt                        # dt = 2Δt for leapfrog, but = Δt, Δ/2 in first_timesteps!
-    implicit.ξ[] = ξ                # also store in Implicit struct
+    ξ = α * dt                          # dt = 2Δt for leapfrog, but = Δt, Δ/2 in first_timesteps!
+    implicit.ξ[] = ξ                    # also store in Implicit struct
 
     # index vectors for broadcasting: rows = 1:nlayers (column), cols = (1:nlayers)' (row)
     rows = (1:nlayers)
@@ -357,8 +364,7 @@ set_initialized!(implicit::ImplicitPrimitiveEquation) = (implicit.initialized = 
 """$(TYPEDSIGNATURES)
 Apply the implicit corrections to dampen gravity waves in the primitive equation models."""
 function implicit_correction!(
-        diagn::DiagnosticVariables,
-        progn::PrognosticVariables,
+        vars::Variables,
         implicit::ImplicitPrimitiveEquation,
         model::PrimitiveEquation,
     )
@@ -366,14 +372,15 @@ function implicit_correction!(
     # escape immediately if explicit
     implicit.α == 0 && return nothing
 
-    (; nlayers, trunc) = implicit
-    (; S⁻¹, R, U, L, W) = implicit
+    (; S⁻¹, R, U, L, W, nlayers) = implicit
     ξ = implicit.ξ[]
 
-    (; temp_tend, pres_tend, div_tend) = diagn.tendencies
-    div_old, div_new = get_steps(progn.div)
-    G = diagn.dynamics.a              # reuse work arrays, used for combined tendency G
-    geopotential = diagn.dynamics.b   # used for geopotential
+    temp_tend = vars.tendencies.temp
+    pres_tend = vars.tendencies.pres
+    div_tend = vars.tendencies.div
+    div_old, div_new = get_steps(vars.prognostic.div)
+    G = vars.scratch.a                  # reuse work arrays, used for combined tendency G
+    geopotential = vars.scratch.b       # used for geopotential
     geopotential .= 0
 
     # Get precomputed l_indices from the spectrum
@@ -382,9 +389,8 @@ function implicit_correction!(
     arch = architecture(temp_tend)
 
     # Single kernel: All implicit correction steps for each spectral mode
-    lm_size = size(pres_tend, 1)
     launch!(
-        arch, LinearWorkOrder, (lm_size,),
+        arch, LinearWorkOrder, (size(pres_tend, 1),),
         implicit_primitive_single_kernel!,
         temp_tend, pres_tend, div_tend, G, geopotential,
         div_old, div_new, S⁻¹, R, U, L, W, l_indices, ξ, nlayers

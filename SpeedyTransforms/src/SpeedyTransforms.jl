@@ -1,6 +1,8 @@
 module SpeedyTransforms
 
-using DocStringExtensions, Printf
+using DocStringExtensions
+using StyledStrings
+using Printf
 import ProgressMeter
 
 # NUMERICS
@@ -19,7 +21,8 @@ import Atomix
 
 # SPEEDYWEATHER MODULES
 using SpeedyWeatherInternals.Architectures
-using SpeedyWeatherInternals.Utils
+using SpeedyWeatherInternals.KernelLaunching
+import SpeedyWeatherInternals.Utils: Utils, @maybe_jit
 using RingGrids
 using LowerTriangularArrays
 

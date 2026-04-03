@@ -182,11 +182,11 @@ simulation = initialize!(model)
 and we have initialized the `ShallowWaterModel` we have defined earlier.
 As `initialize!(model)` also initializes the prognostic (and diagnostic)
 variables, it also initializes the clock in
-`simulation.prognostic_variables.clock`. To initialize with a specific
+`simulation.variables.prognostic.clock`. To initialize with a specific
 time, do
 ```@example howto
 simulation = initialize!(model, time=DateTime(2020,5,1))
-simulation.prognostic_variables.clock.time
+simulation.variables.prognostic.clock.time
 ```
 to set the time to 1st May, 2020 (but you can also do that manually).
 This time is used by components that depend on time, e.g. the solar
@@ -205,7 +205,7 @@ which are then set during `initialize!(::AbstractModel)`, but you can also
 change them now, before the model runs 
 ```@example howto
 # harmonic x layer x leapfrog steps
-simulation.prognostic_variables.vor[1, 1, 1] = 0
+simulation.variables.prognostic.vor[1, 1, 1] = 0
 ```
 So with this we have set the zero mode (first index) of vorticity of the first (and only)
 layer (second index) in the shallow water model to zero. Because the leapfrogging is a 2-step

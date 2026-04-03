@@ -50,7 +50,6 @@ $(TYPEDFIELDS)"""
         FB,     # <:AbstractFeedback,
         TS1,    # <:Tuple{Symbol}
         TS2,    # <:Tuple{Symbol}
-        TS3,    # <:Tuple{Symbol}
         PV,     # <:Val
     } <: PrimitiveDry
 
@@ -75,26 +74,26 @@ $(TYPEDFIELDS)"""
     tracers::TRACER_DICT = TRACER_DICT()
 
     # BOUNDARY CONDITIONS
-    orography::OR = EarthOrography(spectral_grid)
-    land_sea_mask::LS = EarthLandSeaMask(spectral_grid)
-    ocean::OC = SlabOcean(spectral_grid)
-    sea_ice::SI = ThermodynamicSeaIce(spectral_grid)
-    land::LA = DryLandModel(spectral_grid)
-    solar_zenith::ZE = WhichZenith(spectral_grid, planet)
-    albedo::AL = DefaultAlbedo(spectral_grid)
+    dynamics_only::Bool = false
+    @component orography::OR = EarthOrography(spectral_grid)
+    @component land_sea_mask::LS = EarthLandSeaMask(spectral_grid)
+    @component ocean::OC = SlabOcean(spectral_grid)
+    @component sea_ice::SI = ThermodynamicSeaIce(spectral_grid)
+    @component land::LA = DryLandModel(spectral_grid)
 
     # PHYSICS/PARAMETERIZATIONS
-    physics::Bool = true
+    @component solar_zenith::ZE = WhichZenith(spectral_grid, planet)
+    @component albedo::AL = OceanLandAlbedo(spectral_grid)
     @component boundary_layer_drag::BL = BulkRichardsonDrag(spectral_grid)
     @component vertical_diffusion::VD = BulkRichardsonDiffusion(spectral_grid)
     @component surface_condition::SC = SurfaceCondition(spectral_grid)
     @component surface_momentum_flux::SM = SurfaceMomentumFlux(spectral_grid)
     @component surface_heat_flux::SH = SurfaceHeatFlux(spectral_grid)
     @component convection::CV = BettsMillerDryConvection(spectral_grid)
-    @component shortwave_radiation::SW = TransparentShortwave(spectral_grid)
+    @component shortwave_radiation::SW = OneBandGreyShortwave(spectral_grid)
     @component longwave_radiation::LW = OneBandGreyLongwave(spectral_grid)
-    stochastic_physics::SP = nothing
-    custom_parameterization::CP = nothing
+    @component stochastic_physics::SP = nothing
+    @component custom_parameterization::CP = nothing
 
     # NUMERICS
     time_stepping::TS = Leapfrog(spectral_grid)
@@ -108,13 +107,18 @@ $(TYPEDFIELDS)"""
     callbacks::Dict{Symbol, AbstractCallback} = Dict{Symbol, AbstractCallback}()
     feedback::FB = Feedback()
 
-    # Tuples with symbols or instances of all parameterizations and parameter functions
-    # Used to initiliaze variables and for the column-based parameterizations
-    model_parameters::TS1 = (
+    # Tuples with symbols pointing at the core components needed to be adapted
+    # for availability within the parameterizations
+    core_components::TS1 = (
         :architecture, :time_stepping, :orography, :geopotential, :atmosphere,
         :planet, :geometry, :land_sea_mask,
     )
-    parameterizations::TS2 = (  # mixing
+
+    parameterizations::TS2 = (
+        # orbit or external forcing
+        :solar_zenith,
+
+        # mixing
         :vertical_diffusion, :convection,
 
         # radiation
@@ -126,15 +130,61 @@ $(TYPEDFIELDS)"""
         # perturbations
         :stochastic_physics,
     )
-    extra_parameterizations::TS3 = (:solar_zenith, :land, :ocean, :sea_ice)
 
     # DERIVED
     # used to infer parameterizations at compile-time
     params::PV = Val(parameterizations)
 end
 
-prognostic_variables(::Type{<:PrimitiveDry}) = (:vor, :div, :temp, :pres)
-default_concrete_model(::Type{PrimitiveDry}) = PrimitiveDryModel
+function variables(model::PrimitiveDry)
+    nsteps = get_prognostic_steps(model.time_stepping)
+    return variables(typeof(model), nsteps)
+end
+
+"""($TYPEDSIGNATURES) All variables needed for the primitive dry model itself (components excluded)."""
+function variables(::Type{<:PrimitiveDry}, nsteps)
+    return (
+        variables(BarotropicModel, nsteps)...,
+        PrognosticVariable(:div, Spectral4D(nsteps), desc = "Divergence", units = "1/s"),
+        PrognosticVariable(:temp, Spectral4D(nsteps), desc = "Temperature", units = "K"),
+        PrognosticVariable(:pres, Spectral3D(nsteps), desc = "Logarithm of surface pressure", units = "log(Pa)"),
+
+        GridVariable(:div, Grid3D(), desc = "Divergence", units = "1/s"),
+        GridVariable(:temp, Grid3D(), desc = "Temperature", units = "K"),
+        GridVariable(:pres, Grid2D(), desc = "Logarithm of surface pressure", units = ""),
+        GridVariable(:div_prev, Grid3D(), desc = "Divergence at previous time step", units = "1/s"),
+        GridVariable(:temp_prev, Grid3D(), desc = "Temperature at previous time step", units = "K"),
+        GridVariable(:pres_prev, Grid2D(), desc = "Logarithm of surface pressure at previous time step", units = ""),
+        GridVariable(:u_prev, Grid3D(), desc = "Zonal wind at previous time step", units = "m/s"),
+        GridVariable(:v_prev, Grid3D(), desc = "Meridional wind at previous time step", units = "m/s"),
+
+        TendencyVariable(:div, Spectral3D(), desc = "Tendency of divergence", units = "1/s²"),
+        TendencyVariable(:temp, Spectral3D(), desc = "Tendency of temperature", units = "K/s"),
+        TendencyVariable(:pres, Spectral2D(), desc = "Tendency of surface pressure", units = "log(Pa)/s"),
+        TendencyVariable(:div, Grid3D(), namespace = :grid, desc = "Tendency of divergence on the grid", units = "1/s²"),
+        TendencyVariable(:temp, Grid3D(), namespace = :grid, desc = "Tendency of temperature on the grid", units = "K/s"),
+        TendencyVariable(:pres, Grid2D(), namespace = :grid, desc = "Tendency of surface pressure on the grid", units = "log(Pa)/s"),
+
+        DynamicsVariable(:dpres_dx, Grid2D(), desc = "Zonal gradient of the logarithm of surface pressure"),
+        DynamicsVariable(:dpres_dy, Grid2D(), desc = "Meridional gradient of the logarithm of surface pressure"),
+        DynamicsVariable(:pres_flux, Grid3D(), desc = "Pressure gradient flux, (u, v) ⋅ ∇lnp_s"),
+        DynamicsVariable(:virtual_temperature, Spectral3D(), desc = "Virtual temperature", units = "K"),
+        DynamicsVariable(:u_mean_grid, Grid2D(), desc = "Vertically integrated zonal velocity", units = "m/s"),
+        DynamicsVariable(:v_mean_grid, Grid2D(), desc = "Vertically integrated meridional velocity", units = "m/s"),
+        DynamicsVariable(:div_mean_grid, Grid2D(), desc = "Vertically integrated divergence", units = "1/s"),
+        DynamicsVariable(:div_mean, Spectral2D(), desc = "Vertically integrated divergence", units = "1/s"),
+        DynamicsVariable(:div_sum_above, Grid3D(), desc = "Partially vertically integrated divergence, top to layer above", units = "1/s"),
+        DynamicsVariable(:pres_flux_sum_above, Grid3D(), desc = "Partially vertically integrated pressure gradient flux, top to layer above"),
+        DynamicsVariable(:w, Grid3D(), desc = "Vertical velocity, dσ/dt.", units = "1/s"),
+
+        ScratchVariable(:a, Grid3D(), desc = "Scratch array", namespace = :grid),
+        ScratchVariable(:b, Grid3D(), desc = "Scratch array", namespace = :grid),
+        ScratchVariable(:a_2D, Spectral2D(), desc = "Scratch array"),
+        ScratchVariable(:b_2D, Spectral2D(), desc = "Scratch array"),
+        ScratchVariable(:a_2D, Grid2D(), desc = "Scratch array", namespace = :grid),
+        ScratchVariable(:b_2D, Grid2D(), desc = "Scratch array", namespace = :grid),
+    )
+end
 
 """
 $(TYPEDSIGNATURES)
@@ -176,37 +226,27 @@ function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
     initialize!(model.stochastic_physics, model)
     initialize!(model.particle_advection, model)
 
-    # allocate prognostic and diagnostic variables
-    prognostic_variables = PrognosticVariables(model)
-    diagnostic_variables = DiagnosticVariables(model)
+    # allocate all variables
+    variables = Variables(model)
 
-    # initialize non-atmosphere prognostic variables
-    (; particles, ocean, land) = prognostic_variables
-    initialize!(particles, prognostic_variables, diagnostic_variables, model.particle_advection, model)
-    initialize!(ocean, prognostic_variables, diagnostic_variables, model.ocean, model)
-    initialize!(land, prognostic_variables, diagnostic_variables, model.land, model)
-
-    # set the initial conditions (may overwrite variables set in initialize! ocean/land)
-    initialize!(prognostic_variables, model.initial_conditions, model)
-    (; clock) = prognostic_variables
+    # set the time first
+    (; clock) = variables.prognostic
     set!(clock, time = time, start = time)
 
-    # pack prognostic, diagnostic variables and model into a simulation
-    return Simulation(prognostic_variables, diagnostic_variables, model)
+    # set all initial conditions for the ocean, seaice, land then atmosphere
+    initialize!(variables, model)
+
+    return Simulation(variables, model)
 end
 
 """$(TYPEDSIGNATURES)
-Extract the number of soil layers from the model."""
-@inline get_soil_layers(model::PrimitiveDryModel) = get_soil_layers(model.land)
-
-"""$(TYPEDSIGNATURES)
 A `model` is adapted to the GPU or CPU by wrapping some (but not all!)
-of its fields (determined by `model.model_parameters`) into a NamedTuple.
+of its fields (determined by `model.core_components`) into a NamedTuple.
 Importantly, while accessing fields `model.field` still works as usual,
 one cannot use multiple dispatch on the model as a whole, e.g. `::PrimitiveDry`
 will not work on GPU-adapted models."""
 function Adapt.adapt_structure(to, model::PrimitiveDryModel)
-    adapt_fields = model.model_parameters
+    adapt_fields = model.core_components
     return NamedTuple{adapt_fields}(
         adapt_structure(to, getfield(model, field)) for field in adapt_fields
     )

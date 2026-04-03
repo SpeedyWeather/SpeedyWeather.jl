@@ -160,3 +160,31 @@ end
         @test Century(Millenium(1)) == Century(10)
     end
 end
+
+@testset "copy!(::Clock, ::Clock)" begin
+    clock1 = Clock(
+        time = DateTime(2020, 6, 15), start = DateTime(2020, 6, 1),
+        period = Day(14), timestep_counter = 5, n_timesteps = 10,
+        Δt = Millisecond(3600_000)
+    )
+
+    clock2 = Clock()
+
+    # before copy, clock2 has default values
+    @test clock2.time == SpeedyWeather.DEFAULT_DATE
+    @test clock2.timestep_counter == 0
+    @test clock2.n_timesteps == 0
+
+    copy!(clock2, clock1)
+
+    @test clock2.time == clock1.time
+    @test clock2.start == clock1.start
+    @test clock2.period == clock1.period
+    @test clock2.timestep_counter == clock1.timestep_counter
+    @test clock2.n_timesteps == clock1.n_timesteps
+    @test clock2.Δt == clock1.Δt
+
+    # mutating clock1 after copy should not affect clock2
+    clock1.timestep_counter = 99
+    @test clock2.timestep_counter == 5
+end

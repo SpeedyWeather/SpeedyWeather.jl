@@ -1,0 +1,68 @@
+abstract type AbstractSurfaceCondition <: AbstractParameterization end
+
+export SurfaceCondition
+
+"""Surface condition parameterization that calculates near-surface atmospheric
+variables needed for surface flux calculations. Computes surface wind speed
+including sub-grid scale gusts, surface air density, and surface air temperature
+by extrapolating from the lowest model level to the surface using standard
+atmospheric relationships. Fields are $(TYPEDFIELDS)"""
+@kwdef struct SurfaceCondition{NF} <: AbstractSurfaceCondition
+    "[OPTION] Ratio of near-surface wind to lowest-level wind [1]"
+    wind_slowdown::NF = 0.95
+
+    "[OPTION] Wind speed of sub-grid scale gusts [m/s]"
+    gust_speed::NF = 5
+end
+
+Adapt.@adapt_structure SurfaceCondition
+
+SurfaceCondition(SG::SpectralGrid; kwargs...) = SurfaceCondition{SG.NF}(; kwargs...)
+
+function variables(::AbstractSurfaceCondition)
+    return (
+        ParameterizationVariable(:surface_wind_speed, Grid2D(), desc = "Surface wind speed", units = "m/s"),
+        ParameterizationVariable(:surface_air_density, Grid2D(), desc = "Surface air density", units = "kg/m³"),
+        ParameterizationVariable(:surface_air_temperature, Grid2D(), desc = "Surface air temperature", units = "K"),
+    )
+end
+
+initialize!(::SurfaceCondition, ::PrimitiveEquation) = nothing
+
+# function barrier
+@propagate_inbounds function parameterization!(ij, vars, sc::SurfaceCondition, model)
+    return surface_condition!(ij, vars, sc, model)
+end
+
+@propagate_inbounds function surface_condition!(ij, vars, surface_condition::SurfaceCondition, model)
+
+    (; wind_slowdown, gust_speed) = surface_condition
+    nlayers = model.geometry.nlayers
+    (; atmosphere) = model
+
+    # Fortran SPEEDY documentation eq. 49 but use previous time step for numerical stability
+    uₛ = wind_slowdown * vars.grid.u_prev[ij, nlayers]
+    vₛ = wind_slowdown * vars.grid.v_prev[ij, nlayers]
+
+    # Fortran SPEEDY documentation eq. 50, sqrt(u² + v² + gust_speed²)
+    surface_wind_speed = sqrt(muladd(uₛ, uₛ, muladd(vₛ, vₛ, gust_speed^2)))
+    vars.parameterizations.surface_wind_speed[ij] = surface_wind_speed
+
+    # Surface air density
+    (; R_dry, κ) = model.atmosphere
+    σ = model.geometry.σ_levels_full[nlayers]       # σ vertical coordinate at lowest model level
+    pₛ = vars.grid.pres_prev[ij]                    # surface pressure [Pa]
+    T = vars.grid.temp_prev[ij, nlayers]            # virtual temperature at lowest model level [K]
+    q = haskey(vars.grid, :humid_prev) ?
+        vars.grid.humid_prev[ij, nlayers] : zero(T) # specific humidity at lowest model level [kg/kg]
+    Tᵥ = virtual_temperature(T, q, atmosphere)      # virtual temperature at lowest model level [K]
+    σ⁻ᵏ = σ^(-κ)                                    # precalculate
+    Tᵥ *= σ⁻ᵏ                                       # lower to surface assuming dry adiabatic lapse rate
+    ρ = pₛ / (R_dry * Tᵥ)                               # surface air density [kg/m³] from ideal gas law
+    vars.parameterizations.surface_air_density[ij] = ρ       # store for surface temp/humidity fluxes
+
+    # Surface air temperature
+    T *= σ⁻ᵏ                                        # lower to surface assuming dry adiabatic lapse rate
+    vars.parameterizations.surface_air_temperature[ij] = T   # store for surface temp/humidity fluxes
+    return nothing
+end

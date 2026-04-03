@@ -17,11 +17,10 @@
 
     simulation = initialize!(model)
 
-    @test length(simulation.prognostic_variables.tracers) == 2
-    @test length(simulation.diagnostic_variables.grid.tracers_grid) == 2
-    @test length(simulation.diagnostic_variables.grid.tracers_grid_prev) == 2
-    @test length(simulation.diagnostic_variables.tendencies.tracers_tend) == 2
-    @test length(simulation.diagnostic_variables.tendencies.tracers_tend_grid) == 2
+    ntracers = 2
+    @test length(simulation.variables.prognostic.tracers) == ntracers
+    @test length(simulation.variables.grid.tracers) == ntracers * SpeedyWeather.get_prognostic_steps(model.time_stepping)
+    @test length(simulation.variables.tendencies.tracers) == 2 * ntracers  # 2 for each, one grid one spectral
 end
 
 @testset "Tracers: activate!, deactivate!" begin
@@ -42,12 +41,12 @@ end
     activate!(simulation, Tracer(:abc))
     @test model.tracers[:abc].active
 
-    set!(simulation, abc = (λ, φ, σ) -> exp(-(λ - 180)^2 / 10^2))
+    set!(simulation, abc = (λ, φ, σ) -> exp(-(λ - 180)^2 / 10^2), namespace = :tracers)
     run!(simulation, period = Day(0))
 
     # initial conditions
-    abc0_spec = get_step(simulation.prognostic_variables.tracers[:abc], 1)
-    abc0 = deepcopy(simulation.diagnostic_variables.grid.tracers_grid[:abc])
+    abc0_spec = get_step(simulation.variables.prognostic.tracers.abc, 1)
+    abc0 = deepcopy(simulation.variables.grid.tracers.abc)
 
     # set some grid in the same way and check that the tracer abc is correctly set
     # but compare in spectral space due to transform errors
@@ -57,7 +56,7 @@ end
 
     # check that everything is different after 10 days
     run!(simulation, period = Day(10))
-    abc1 = simulation.diagnostic_variables.grid.tracers_grid[:abc]
+    abc1 = simulation.variables.grid.tracers.abc
 
     for ij in eachindex(abc0, abc1)
         @test abc0[ij] != abc1[ij]
@@ -66,7 +65,7 @@ end
     # check that everything is the same if tracer deactivated
     deactivate!(simulation, Tracer(:abc))
     run!(simulation, period = Day(10))
-    abc2 = simulation.diagnostic_variables.grid.tracers_grid[:abc]
+    abc2 = simulation.variables.grid.tracers.abc
 
     for ij in eachindex(abc1, abc2)
         @test abc1[ij] == abc2[ij]
@@ -80,13 +79,13 @@ end
 
         add!(model, Tracer(:abc))
         simulation = initialize!(model)
-        set!(simulation, abc = (λ, φ, σ) -> σ * exp(-(λ - 180)^2 / 10^2))
+        set!(simulation, abc = (λ, φ, σ) -> σ * exp(-(λ - 180)^2 / 10^2), namespace = :tracers)
         run!(simulation, period = Day(0))
-        abc0 = simulation.diagnostic_variables.grid.tracers_grid[:abc][:, :]
+        abc0 = simulation.variables.grid.tracers.abc[:, :]
 
         # check that everything is different after simulation
         run!(simulation, period = Day(1))
-        abc1 = simulation.diagnostic_variables.grid.tracers_grid[:abc][:, :]
+        abc1 = simulation.variables.grid.tracers.abc[:, :]
 
         for ij in eachindex(abc0, abc1)
             @test abc0[ij] != abc1[ij]

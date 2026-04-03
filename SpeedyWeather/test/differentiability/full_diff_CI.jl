@@ -1,6 +1,8 @@
 # Enzyme and Julia 1.11 still has some problems, and the test below is broken
 # in Julia 1.11
-using Enzyme, FiniteDifferences
+import Pkg
+Pkg.activate(@__DIR__)
+using SpeedyWeather, Enzyme, FiniteDifferences, Test
 
 if VERSION <= v"1.11.0"
     @testset "Complete Differentiability" begin
@@ -14,33 +16,30 @@ if VERSION <= v"1.11.0"
         initialize!(simulation)
         run!(simulation, period = Hour(6))
 
-        (; prognostic_variables, diagnostic_variables, model) = simulation
+        (; variables, model) = simulation
         (; Δt, Δt_millisec) = model.time_stepping
         dt = 2Δt
         lf1 = 1
         lf2 = 2
 
-        progn = prognostic_variables
-        diagn = diagnostic_variables
+        vars = variables
+        dvars = make_zero(vars)
 
-        d_diag = make_zero(diagn)
-        d_model = make_zero(model)
+        # set a seeed for the prognostic variables
+        dvars.prognostic.vor .= 1 + im
+        dvars.prognostic.div .= 1 + im
+        dvars.prognostic.humid .= 1 + im
+        dvars.prognostic.temp .= 1 + im
+        dvars.prognostic.pres .= 1 + im
 
-        progn_new = zero(progn)
-        dprogn_new = one(progn) # seed
+        dmodel = make_zero(model)
 
-        autodiff(Reverse, SpeedyWeather.timestep!, Const, Duplicated(progn_new, dprogn_new), Duplicated(diagn, d_diag), Const(dt), Duplicated(model, d_model), Const(lf1), Const(lf2))
+        autodiff(Reverse, SpeedyWeather.timestep!, Const, Duplicated(vars, dvars), Const(dt), Duplicated(model, dmodel), Const(lf1), Const(lf2))
+        @test sum(to_vec(dvars)[1]) != 0
 
-        @test sum(to_vec(dprogn_new)[1]) != 0
-
-        # with Const(model)
-        # currently not activated to keep the CI fast
-        #autodiff(set_runtime_activity(Reverse), timestep_oop!, Const, Duplicated(progn_new, dprogn_new), Duplicated(progn, d_progn), Duplicated(diagn, d_diag), Const(dt), Const(model))
-        #@test sum(to_vec(d_progn)[1]) != 0
-        #@test progn != d_progn
     end
 else
     @testset "Complete Differentiability" begin
-        @test_broken false # we report a broken test here on v1.11, just to indicate that this (properly) doesn't work yet
+        @test_broken false
     end
 end

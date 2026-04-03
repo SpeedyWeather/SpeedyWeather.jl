@@ -74,7 +74,7 @@ function get_asset(
         hash = Pkg.Artifacts.create_artifact() do artifact_dir
             dest_path = joinpath(artifact_dir, filename)
             try
-                Artifacts.download(url, dest_path)
+                Downloads.download(url, dest_path)
             catch e
                 @error "Download failed for URL: $url" exception = (e)
                 throw("Could not download asset '$filename'. Check your internet connection or if the URL asset path exists.")

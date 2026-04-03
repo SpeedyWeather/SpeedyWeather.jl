@@ -1,4 +1,4 @@
-@testset "Test PrognosticVariables set!" begin
+@testset "Test Variables set!" begin
 
     nlayers = 8
     nlayers_soil = 2
@@ -27,7 +27,7 @@
 
     f(lon, lat, sig) = sind(lon) * cosd(lat) * (1 - sig)
 
-    prog_new = simulation.prognostic_variables
+    prog_new = simulation.variables.prognostic
     prog_old = deepcopy(prog_new)
 
     # set things ...
@@ -55,20 +55,20 @@
     @test get_step(prog_new.vor, lf) == (2 .* A_spec)
 
     # grids
-    set!(simulation, sea_surface_temperature = A[:, 1], lf = lf)
+    set!(simulation, sea_surface_temperature = A[:, 1], namespace = :ocean)
     @test prog_new.ocean.sea_surface_temperature == A[:, 1]
 
-    set!(simulation, sea_ice_concentration = B[:, 1], lf = lf, add = true)
+    set!(simulation, sea_ice_concentration = B[:, 1], namespace = :ocean, add = true)
     C = similar(A[:, 1])
     RingGrids.interpolate!(C, B[:, 1]; NF)
     @test all(isapprox(prog_new.ocean.sea_ice_concentration, prog_old.ocean.sea_ice_concentration .+ C, atol = 1.0e-6))
 
     Di = deepcopy(prog_new.land.soil_temperature)
     RingGrids.interpolate!(Di, D; NF)
-    set!(simulation, soil_temperature = D, lf = lf)
+    set!(simulation, soil_temperature = D, namespace = :land)
     @test prog_new.land.soil_temperature == Di
 
-    set!(simulation, soil_moisture = D, lf = lf)
+    set!(simulation, soil_moisture = D, lf = lf, namespace = :land)
     @test prog_new.land.soil_moisture == Di
 
     # numbers
@@ -80,10 +80,10 @@
     set!(simulation, vor = Float32(3.0), lf = lf, add = true)
     @test get_step(prog_new.vor, lf) ≈ (2 .* M3_spec)
 
-    set!(simulation, sea_surface_temperature = Float16(3.0))
+    set!(simulation, sea_surface_temperature = Float16(3.0), namespace = :ocean)
     @test all(prog_new.ocean.sea_surface_temperature .≈ 3.0)
 
-    set!(simulation, sea_surface_temperature = Float16(3.0), add = true)
+    set!(simulation, sea_surface_temperature = Float16(3.0), add = true, namespace = :ocean)
     @test all(prog_new.ocean.sea_surface_temperature .≈ 6.0)
 
     # vor_div, create u,v first in spectral space
@@ -131,6 +131,10 @@
 
     set!(simulation, vor = f; lf)
     @test get_step(prog_new.vor, lf) ≈ A_spec
+
+    # groups
+    set!(simulation, geopotential = 1, group = :grid)
+    @test all(simulation.variables.grid.geopotential .== 1)
 end
 
 @testset "Set! grids" begin

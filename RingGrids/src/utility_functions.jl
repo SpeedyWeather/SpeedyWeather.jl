@@ -1,18 +1,3 @@
-"""
-$(TYPEDSIGNATURES)
-Check whether elements of a vector `v` are strictly increasing."""
-function isincreasing(v::AbstractVector)
-    return all(diff(v) .> 0)
-end
-
-"""
-$(TYPEDSIGNATURES)
-
-Check whether elements of a vector `v` are strictly decreasing."""
-function isdecreasing(v::AbstractVector)
-    return all(diff(v) .< 0)
-end
-
 """$(TYPEDSIGNATURES)
 For every element vᵢ in v does a<=vi<=b hold?"""
 function extrema_in(v::AbstractVector, a::Real, b::Real)

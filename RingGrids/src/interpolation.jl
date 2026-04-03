@@ -166,8 +166,10 @@ Base.eltype(::AnvilInterpolator{NF}) where {NF} = NF
 grid_type(I::AnvilInterpolator) = typeof(I.geometry.grid)
 
 function Base.show(io::IO, L::AnvilInterpolator{NF}) where {NF}
-    println(io, "AnvilInterpolator{$NF} for $(L.geometry.grid)")
-    return print(io, "└ onto: $(L.locator.npoints_output) points")
+    NF_str = "{$NF}"
+    println(io, styled"{warning:AnvilInterpolator}{note:$NF_str} for $(L.geometry.grid)")
+    print(io, styled"└ {info:onto}: $(L.locator.npoints_output) points")
+    return nothing
 end
 
 # define to a <:AbstractInterpolator the corresponding Locator
@@ -475,18 +477,15 @@ function find_rings!(
     )
 
     if ~unsafe
-        # TODO: return to `extrema` when Reactant fixed
-        # https://github.com/EnzymeAD/Reactant.jl/issues/2387
-        #θmin, θmax = extrema(θs)
-        θmin, θmax = (minimum(θs), maximum(θs))
-        @assert θmin >= -90 "Latitudes θs are expected to be within [-90˚, 90˚]; θ=$(θmin)˚ given."
-        @assert θmax <= 90 "Latitudes θs are expected to be within [-90˚, 90˚]; θ=$(θmax)˚ given."
+        θmin, θmax = extrema(θs)
+        @boundscheck θmin >= -90 || throw(ArgumentError("Latitudes θs are expected to be within [-90˚, 90˚]; θ=$(θmin)˚ given."))
+        @boundscheck θmax <= 90 || throw(ArgumentError("Latitudes θs are expected to be within [-90˚, 90˚]; θ=$(θmax)˚ given."))
 
         #TODO: currently we only check the latitudes of the grid we interpolate onto
         #TODO: as we only allow instances of Field to be the original grid, the latitudes below
         #TODO: should be okay anyway. Checking it on GPU is a bit more annoying...
 
-        @assert isdecreasing(latd) "Latitudes latd are expected to be strictly decreasing."
+        @assert Utils.isdecreasing(latd) "Latitudes latd are expected to be strictly decreasing."
         #@assert latd[1] == 90 "Latitudes latd are expected to contain 90˚N, the north pole."
 
         # Hack: for intervals between rings to be one-sided open [j, j+1) the last element in
@@ -554,7 +553,7 @@ function find_rings_unsafe!(
     @boundscheck length(js) == length(θs) || throw(DimensionMismatchArray(js, θs))
     @boundscheck length(js) == length(Δys) || throw(DimensionMismatchArray(js, Δys))
 
-    return launch!(
+    launch!(
         architecture,
         LinearWorkOrder,
         size(js),
@@ -564,6 +563,7 @@ function find_rings_unsafe!(
         θs,
         latd
     )
+    return nothing
 end
 
 # for testing only
@@ -638,7 +638,7 @@ function find_grid_indices!(
     # Convert λs to the same type as lon_offsets if needed
     λs_converted = convert.(eltype(lon_offsets), λs)
 
-    return launch!(
+    launch!(
         architecture,
         LinearWorkOrder,
         size(js),
@@ -653,6 +653,7 @@ function find_grid_indices!(
         nlat,
         rings
     )
+    return nothing
 end
 
 @inline function find_lon_indices(

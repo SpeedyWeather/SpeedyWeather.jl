@@ -61,10 +61,29 @@ $(TYPEDFIELDS)"""
     feedback::FB = Feedback()
 end
 
-prognostic_variables(::Type{<:ShallowWater}) = (:vor, :div, :pres)
-default_concrete_model(::Type{ShallowWater}) = ShallowWaterModel
+"""($TYPEDSIGNATURES) All variables needed for the shallow water model itself (components excluded)."""
+function variables(model::ShallowWater)
+    nsteps = get_prognostic_steps(model.time_stepping)
+    return (
+        variables(BarotropicModel, nsteps)...,
+        PrognosticVariable(:div, Spectral4D(nsteps), desc = "Divergence", units = "1/s"),
+        PrognosticVariable(:η, Spectral3D(nsteps), desc = "Interface displacement", units = "m"),
 
-"""
+        GridVariable(:div, Grid3D(), desc = "Divergence", units = "1/s"),
+        GridVariable(:η, Grid2D(), desc = "Interface displacement", units = "m"),
+        GridVariable(:geopotential, Grid2D(), desc = "Geopotential", units = "m²/s²"),
+
+        TendencyVariable(:div, Spectral3D(), desc = "Tendency of divergence", units = "1/s²"),
+        TendencyVariable(:η, Spectral2D(), desc = "Tendency of interface displacement", units = "m/s"),
+        TendencyVariable(:div, Grid3D(), namespace = :grid, desc = "Tendency of divergence on the grid", units = "1/s²"),
+        TendencyVariable(:η, Grid2D(), namespace = :grid, desc = "Tendency of interface displacement on the grid", units = "m/s"),
+
+        ScratchVariable(:a, Grid3D(), desc = "Scratch array", namespace = :grid),
+        ScratchVariable(:b, Grid3D(), desc = "Scratch array", namespace = :grid),
+    )
+end
+
+""" 
 $(TYPEDSIGNATURES)
 Calls all `initialize!` functions for most components (=fields) of `model`,
 except for `model.output` and `model.feedback` which are always initialized
@@ -87,16 +106,15 @@ function initialize!(model::ShallowWater; time::DateTime = DEFAULT_DATE)
     initialize!(model.random_process, model)
     initialize!(model.particle_advection, model)
 
-    # allocate variables
-    prognostic_variables = PrognosticVariables(model)
-    diagnostic_variables = DiagnosticVariables(model)
+    # allocate all variables and set initial conditions
+    variables = Variables(model)
 
-    # initialize non-atmosphere prognostic variables
-    initialize!(prognostic_variables.particles, prognostic_variables, diagnostic_variables, model)
-
-    initialize!(prognostic_variables, model.initial_conditions, model)
-    (; clock) = prognostic_variables
+    # set the time first
+    (; clock) = variables.prognostic
     set!(clock, time = time, start = time)
 
-    return Simulation(prognostic_variables, diagnostic_variables, model)
+    # now set initial conditions
+    initialize!(variables, model)
+
+    return Simulation(variables, model)
 end

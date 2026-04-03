@@ -32,14 +32,21 @@ function Base.show(io::IO, S::SpectralTransform{NF, AR, AT}) where {NF, AR, AT}
     truncation = truncations[clamp(floor(Int, dealias) + 1, 1, 5)]
     dealiasing = @sprintf("%.3g", dealias)
 
-    println(io, "SpectralTransform{$NF, $architecture{...}, $AT, ...}:")
-    println(io, "├ Spectral:     T$(mmax - 1), $(lmax)x$(mmax) LowerTriangularMatrix{Complex{$NF}}")
-    println(io, "├ Grid:         Field{$NF}, $(RingGrids.get_nlat(grid))-ring $Grid")
-    println(io, "├ Truncation:   dealiasing = $dealiasing ($truncation)")
-    println(io, "├ Legendre:     Polynomials $polysize_str, shortcut: $(short_name(S.LegendreShortcut))")
-    println(io, "├ Architecture: $architecture")
-    print(io, "└ Memory:       for $nlayers layers ($memorysize_str)")
+    param_str = "{$NF, $AT}"
+    println(io, styled"{warning:SpectralTransform}{note:$param_str}")
+    println(io, styled"├ {info:Spectral}:     T$(mmax - 1), $(lmax)x$(mmax) LowerTriangularMatrix{note:\{Complex\{$NF\}\}}")
+    println(io, styled"├ {info:Grid}:         Field{note:\{$NF\}}, $(RingGrids.get_nlat(grid))-ring $Grid")
+    println(io, styled"├ {info:Truncation}:   dealiasing = $dealiasing {note:($truncation)}")
+    println(io, styled"├ {info:Legendre}:     Polynomials $polysize_str, shortcut: $(short_name(S.LegendreShortcut))")
+    println(io, styled"├ {info:Architecture}: $architecture")
+    print(io, styled"└ {info:Memory}:       for $nlayers layers {note:($memorysize_str)}")
     return nothing
+end
+
+function Base.summary(io::IO, M::ScratchMemory)
+    AT = nonparametric_type(typeof(M.north))
+    NF = eltype(M.north)
+    return print(io, Base.dims2string((size(M.north)..., 2)), " ScratchMemory{$AT{$NF,...}, ...}")
 end
 
 function Base.show(io::IO, S::MatrixSpectralTransform{NF, AR, AT}) where {NF, AR, AT}
@@ -57,11 +64,12 @@ function Base.show(io::IO, S::MatrixSpectralTransform{NF, AR, AT}) where {NF, AR
     truncation = truncations[clamp(floor(Int, dealias) + 1, 1, 5)]
     dealiasing = @sprintf("%.3g", dealias)
 
-    println(io, "MatrixSpectralTransform{$NF, $architecture{...}, $AT, ...}:")
-    println(io, "├ Spectral:     T$(mmax - 1), $(lmax)x$(mmax) LowerTriangularMatrix{Complex{$NF}}")
-    println(io, "├ Grid:         Field{$NF}, $(RingGrids.get_nlat(grid))-ring $Grid")
-    println(io, "├ Truncation:   dealiasing = $dealiasing ($truncation)")
-    println(io, "├ Architecture: $architecture")
-    print(io, "└ Memory:       $matrixsize_str matrices, $scratchsize_str scratch ($nlayers layers)")
+    param_str = "{$NF, $AT}"
+    println(io, styled"{warning:MatrixSpectralTransform}{note:$param_str}")
+    println(io, styled"├ {info:Spectral}:     T$(mmax - 1), $(lmax)x$(mmax) LowerTriangularMatrix{note:\{Complex\{$NF\}\}}")
+    println(io, styled"├ {info:Grid}:         Field{note:\{$NF\}}, $(RingGrids.get_nlat(grid))-ring $Grid")
+    println(io, styled"├ {info:Truncation}:   dealiasing = $dealiasing {note:($truncation)}")
+    println(io, styled"├ {info:Architecture}: $architecture")
+    print(io, styled"└ {info:Memory}:       $matrixsize_str matrices, $scratchsize_str scratch ($nlayers layers)")
     return nothing
 end

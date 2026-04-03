@@ -12,9 +12,9 @@ const ReactantDatesExt = Base.get_extension(
 )
 
 const ReactantSimulation = Union{
-    Simulation{<:BarotropicModel{SG, <:ReactantDevice}},
-    Simulation{<:ShallowWaterModel{SG, <:ReactantDevice}}, Simulation{<:PrimitiveDryModel{SG, <:ReactantDevice}}, Simulation{<:PrimitiveWetModel{SG, <:ReactantDevice}},
-} where {SG}
+    Simulation{V, <:BarotropicModel{SG, <:ReactantDevice}},
+    Simulation{V, <:ShallowWaterModel{SG, <:ReactantDevice}}, Simulation{V, <:PrimitiveDryModel{SG, <:ReactantDevice}}, Simulation{V, <:PrimitiveWetModel{SG, <:ReactantDevice}},
+} where {V, SG}
 
 # time stepping functions with Reactant, take compiled functions as optional arguments
 # in case they are not provided, they are compiled on the fly
@@ -47,7 +47,7 @@ function SpeedyWeather.time_stepping!(simulation::ReactantSimulation, r_first_ti
         r_later_timestep! = @compile later_timestep!(simulation)
     end
 
-    (; clock) = simulation.prognostic_variables
+    clock = simulation.variables.prognostic.clock
 
     #TODO: reenable @trace once Reactant issues fixed
     #@trace checkpointing = enable_checkpointing for _ in clock.timestep_counter:clock.n_timesteps

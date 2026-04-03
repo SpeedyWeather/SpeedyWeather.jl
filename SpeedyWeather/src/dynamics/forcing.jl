@@ -2,16 +2,15 @@ abstract type AbstractForcing <: AbstractModelComponent end
 
 # function barrier for all forcings to unpack model.forcing
 function forcing!(
-        diagn::DiagnosticVariables,
-        progn::PrognosticVariables,
+        vars::Variables,
         lf::Integer,
         model::AbstractModel,
     )
-    return forcing!(diagn, progn, model.forcing, lf, model)
+    return forcing!(vars, model.forcing, lf, model)
 end
 
-## NO FORCING
-forcing!(diagn, progn, forcing::Nothing, args...) = nothing
+# NO FORCING
+forcing!(vars, forcing::Nothing, args...) = nothing
 
 # JET STREAM FORCING
 export JetStreamForcing
@@ -63,13 +62,13 @@ function initialize!(
     (; radius) = model.planet
 
     # Some constants similar to Galewsky 2004
-    θ₀ = (latitude - width) / 360 * 2π        # southern boundary of jet [radians]
-    θ₁ = (latitude + width) / 360 * 2π        # northern boundary of jet
-    eₙ = exp(-4 / (θ₁ - θ₀)^2)              # normalisation, so that speed is at max
-    A₀ = speed / eₙ / time_scale.value      # amplitude [m/s²] without lat dependency
-    A₀ *= radius                        # scale by radius as are the momentum equations
+    θ₀ = (latitude - width) / 360 * 2π          # southern boundary of jet [radians]
+    θ₁ = (latitude + width) / 360 * 2π          # northern boundary of jet
+    eₙ = exp(-4 / (θ₁ - θ₀)^2)                  # normalisation, so that speed is at max
+    A₀ = speed / eₙ / time_scale.value          # amplitude [m/s²] without lat dependency
+    A₀ *= radius                                # scale by radius as are the momentum equations
 
-    (; nlat, colat) = model.geometry
+    (; colat) = model.geometry
     # latitude in radians, abs for north/south symmetry
     θ = @. abs(π / 2 - colat)
 
@@ -87,13 +86,12 @@ end
 
 # function barrier
 function forcing!(
-        diagn::DiagnosticVariables,
-        progn::PrognosticVariables,
+        vars::Variables,
         forcing::JetStreamForcing,
         lf::Integer,
         model::AbstractModel,
     )
-    return forcing!(diagn, forcing)
+    return forcing!(vars, forcing)
 end
 
 """$(TYPEDSIGNATURES)
@@ -101,20 +99,21 @@ Set for every latitude ring the tendency to the precomputed forcing
 in the momentum equations following the JetStreamForcing.
 The forcing is precomputed in `initialize!(::JetStreamForcing, ::AbstractModel)`."""
 function forcing!(
-        diagn::DiagnosticVariables,
+        vars::Variables,
         forcing::JetStreamForcing
     )
 
-    Fu = diagn.tendencies.u_tend_grid
+    Fu = vars.tendencies.grid.u
 
     (; amplitude, tapering) = forcing
     (; whichring) = Fu.grid
 
     arch = architecture(Fu)
-    return launch!(
+    launch!(
         arch, RingGridWorkOrder, size(Fu), jetstream_forcing_kernel!,
         Fu, amplitude, tapering, whichring
     )
+    return nothing
 end
 
 @kernel inbounds = true function jetstream_forcing_kernel!(
@@ -130,7 +129,6 @@ end
 
 export StochasticStirring
 @parameterized @kwdef struct StochasticStirring{NF, VectorType} <: AbstractForcing
-
     "[OPTION] Stirring strength A [1/s²]"
     @param strength::NF = 2.0e-11
 
@@ -147,6 +145,13 @@ end
 function StochasticStirring(SG::SpectralGrid; kwargs...)
     lat_mask = on_architecture(SG.architecture, zeros(SG.NF, SG.nlat))
     return StochasticStirring{SG.NF, SG.VectorType}(; lat_mask, kwargs...)
+end
+
+function variables(::StochasticStirring)
+    return (
+        ScratchVariable(:a_2D, Spectral2D(), desc = "scratch array", units = "?"),
+        ScratchVariable(:a_2D, Grid2D(), desc = "scratch array", units = "?", namespace = :grid),
+    )
 end
 
 function initialize!(
@@ -166,41 +171,42 @@ function initialize!(
 end
 
 function forcing!(
-        diagn::DiagnosticVariables,
-        progn::PrognosticVariables,
+        vars::Variables,
         forcing::StochasticStirring,
         lf::Integer,
         model::AbstractModel,
     )
-    return forcing!(diagn, forcing, model.spectral_transform)
+    return forcing!(vars, forcing, model.spectral_transform)
 end
 
 
 function forcing!(
-        diagn::DiagnosticVariables,
+        vars::Variables,
         forcing::StochasticStirring,
         spectral_transform::SpectralTransform
     )
     # get random values from random process
-    S_grid = diagn.grid.random_pattern
+    S_grid = vars.scratch.grid.a_2D
+    S_grid .= vars.grid.random_pattern  # copy to leave the random pattern unchanged
 
     # mask everything but mid-latitudes
     RingGrids._scale_lat!(S_grid, forcing.lat_mask)
 
     # back to spectral space
-    S_masked = diagn.dynamics.a_2D
-    transform!(S_masked, S_grid, diagn.dynamics.scratch_memory, spectral_transform)
+    S_masked = vars.scratch.a_2D
+    transform!(S_masked, S_grid, vars.scratch.transform_memory, spectral_transform)
 
     # scale by radius^2 as is the vorticity equation, and scale to forcing strength
-    S_masked .*= (diagn.scale[]^2 * forcing.strength)
+    S_masked .*= (vars.prognostic.scale[]^2 * forcing.strength)
 
     # force every layer
-    (; vor_tend) = diagn.tendencies
+    vor_tend = vars.tendencies.vor
     arch = architecture(vor_tend)
-    return launch!(
+    launch!(
         arch, SpectralWorkOrder, size(vor_tend), stochastic_stirring_kernel!,
         vor_tend, S_masked
     )
+    return nothing
 end
 
 # GPU kernel for adding 2D spectral field to each layer of 3D field
@@ -223,10 +229,10 @@ $(TYPEDFIELDS)
 """
 @parameterized @kwdef mutable struct KolmogorovFlow{NF} <: AbstractForcing
     "[OPTION] Strength of forcing [1/s²]"
-    @param strength::NF = 1.5e-5
+    @param strength::NF = 5.0e-5 (bounds = Nonnegative,)
 
     "[OPTION] Wavenumber of forcing in meridional direction (pole to pole)"
-    @param wavenumber::NF = 8 (bounds = Positive,)
+    @param wavenumber::NF = 8 (bounds = Nonnegative,)
 end
 
 KolmogorovFlow(SG::SpectralGrid; kwargs...) = KolmogorovFlow{SG.NF}(; kwargs...)
@@ -234,22 +240,22 @@ KolmogorovFlow(SG::SpectralGrid; kwargs...) = KolmogorovFlow{SG.NF}(; kwargs...)
 initialize!(::KolmogorovFlow, ::AbstractModel) = nothing
 
 function forcing!(
-        diagn::DiagnosticVariables,
-        progn::PrognosticVariables,
+        vars::Variables,
         forcing::KolmogorovFlow,
         lf::Integer,
         model::AbstractModel,
     )
     (; latds) = model.geometry
     # scale by radius as is the vorticity equation
-    s = forcing.strength * diagn.scale[]
+    s = forcing.strength * vars.prognostic.scale[]
     k = forcing.wavenumber
 
-    Fu = diagn.tendencies.u_tend_grid
-    return launch!(
+    Fu = vars.tendencies.grid.u
+    launch!(
         architecture(Fu), RingGridWorkOrder, size(Fu), kolmogorov_flow_kernel!,
         Fu, s, k, latds
     )
+    return nothing
 end
 
 @kernel inbounds = true function kolmogorov_flow_kernel!(Fu, s, k, latds)
@@ -347,33 +353,33 @@ end
 """$(TYPEDSIGNATURES)
 Apply temperature relaxation following Held and Suarez 1996, BAMS."""
 function forcing!(
-        diagn::DiagnosticVariables,
-        progn::PrognosticVariables,
+        vars::Variables,
         forcing::HeldSuarez,
         lf::Integer,
         model::AbstractModel,
     )
-    temp_grid = diagn.grid.temp_grid
-    pres_grid = diagn.grid.pres_grid
-    temp_tend_grid = diagn.tendencies.temp_tend_grid
+    temp = vars.grid.temp
+    pres = vars.grid.pres
+    temp_tend = vars.tendencies.grid.temp
 
     (; Tmin, logσ, temp_relax_freq, temp_equil_a, temp_equil_b) = forcing
     (; κ) = model.atmosphere
     σ = model.geometry.σ_levels_full
 
-    (; whichring) = temp_grid.grid
-    return launch!(
-        architecture(temp_tend_grid), RingGridWorkOrder, size(temp_tend_grid), held_suarez_kernel!,
-        temp_tend_grid, temp_grid, pres_grid,
+    (; whichring) = temp.grid
+    launch!(
+        architecture(temp_tend), RingGridWorkOrder, size(temp_tend), held_suarez_kernel!,
+        temp_tend, temp, pres,
         temp_relax_freq, temp_equil_a, temp_equil_b, logσ,
         Tmin, κ, σ, whichring
     )
+    return nothing
 end
 
 @kernel inbounds = true function held_suarez_kernel!(
-        temp_tend_grid,
-        temp_grid,
-        pres_grid,
+        temp_tend,
+        temp,
+        pres,
         temp_relax_freq,
         temp_equil_a,
         temp_equil_b,
@@ -389,5 +395,5 @@ end
 
     # Held and Suarez 1996, equation 3 with precomputed a, b during initialization
     Teq = max(Tmin, (temp_equil_a[j] + temp_equil_b[j] * logσ[k]) * σ[k]^κ)
-    temp_tend_grid[ij, k] -= kₜ * (temp_grid[ij, k] - Teq)  # Held and Suarez 1996, equation 2
+    temp_tend[ij, k] -= kₜ * (temp[ij, k] - Teq)  # Held and Suarez 1996, equation 2
 end

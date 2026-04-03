@@ -25,6 +25,7 @@ const RTOL = 1.0e-3         # relative tolerance for comparison
 const ATOL = 1.0e-8         # absolute tolerance for comparison
 
 include("test_maybe_jit.jl")
+include("utilities.jl")
 include("setup.jl")
 include("test_correctness.jl")
 

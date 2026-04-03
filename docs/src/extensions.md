@@ -86,21 +86,20 @@ that is called on _every_ step of the time integration. This new method
 for `forcing!` needs to have the following function signature
 ```@example extending
 function forcing!(
-    diagn::DiagnosticVariables,
-    progn::PrognosticVariables,
+    vars::Variables,
     forcing::MyForcing,
     model::AbstractModel,
     lf::Integer,
 )
     # whatever the forcing is supposed to do, in the end you want
     # to write into the tendency fields
-    diagn.tendencies.u_tend_grid = forcing.a
-    diagn.tendencies.v_tend_grid = forcing.a
-    diagn.tendencies.vor_tend = forcing.a
+    vars.tendencies.grid.u .= forcing.a
+    vars.tendencies.grid.v .= forcing.a
+    vars.tendencies.vor .= forcing.a
 end
 ```
-`DiagnosticVariables` is the type of the first argument, because it contains
-the tendencies you will want to change, so this is supposed to be read and write.
+`Variables` is the type of the first argument, because it contains
+both the tendencies you will want to change and the current state to read from.
 The other arguments should be treated read-only. You can make use of anything else
 in `model`, but often we unpack the model in a function barrier (which can help with
 type inference and therefore performance). But let's skip that detail for now.

@@ -41,10 +41,10 @@ function run_benchmark_suite!(suite::BenchmarkSuite)
         spectral_grid = SpectralGrid(; NF, trunc, Grid, nlayers)
         suite.nlat[i] = spectral_grid.nlat
 
-        model = Model(spectral_grid)
+        model = Model(spectral_grid; feedback = Feedback(verbose = true))
         if Model <: PrimitiveEquation
-            model.physics = physics
             model.dynamics = dynamics
+            model.dynamics_only = !physics
         else
             suite.dynamics[i] = true
             suite.physics[i] = false
@@ -160,46 +160,45 @@ function run_benchmark_suite!(suite::BenchmarkSuiteDynamics)
 
         simulation = initialize!(model)
 
-        diagn = simulation.diagnostic_variables
-        progn = simulation.prognostic_variables
+        vars, model = SpeedyWeather.unpack(simulation)
         lf = 2
         (; orography, geometry, spectral_transform, geopotential, atmosphere, implicit) = model
         lf_implicit = implicit.α == 0 ? lf : 1
 
-        b = @benchmark SpeedyWeather.pressure_gradient_flux!($diagn, $progn, $lf, $spectral_transform)
+        b = @benchmark SpeedyWeather.pressure_gradient_flux!($vars, $lf, $spectral_transform)
         add_results!(suite, b, i, 1)
 
-        b = @benchmark SpeedyWeather.linear_virtual_temperature!($diagn, $progn, $lf_implicit, $model)
+        b = @benchmark SpeedyWeather.linear_virtual_temperature!($vars, $lf_implicit, $model)
         add_results!(suite, b, i, 2)
 
-        b = @benchmark SpeedyWeather.geopotential!($diagn, $geopotential, $orography)
+        b = @benchmark SpeedyWeather.geopotential!($vars, $geopotential, $orography)
         add_results!(suite, b, i, 3)
 
-        b = @benchmark SpeedyWeather.vertical_integration!($diagn, $progn, $lf_implicit, $geometry)
+        b = @benchmark SpeedyWeather.vertical_integration!($vars, $lf_implicit, $geometry)
         add_results!(suite, b, i, 4)
 
-        b = @benchmark SpeedyWeather.surface_pressure_tendency!($diagn, $spectral_transform)
+        b = @benchmark SpeedyWeather.surface_pressure_tendency!($vars, $spectral_transform)
         add_results!(suite, b, i, 5)
 
-        b = @benchmark SpeedyWeather.vertical_velocity!($diagn, $geometry)
+        b = @benchmark SpeedyWeather.vertical_velocity!($vars, $geometry)
         add_results!(suite, b, i, 6)
 
-        b = @benchmark SpeedyWeather.linear_pressure_gradient!($diagn, $progn, $lf_implicit, $atmosphere, $implicit)
+        b = @benchmark SpeedyWeather.linear_pressure_gradient!($vars, $lf_implicit, $atmosphere, $implicit)
         add_results!(suite, b, i, 7)
 
-        b = @benchmark SpeedyWeather.vertical_advection!($diagn, $model)
+        b = @benchmark SpeedyWeather.vertical_advection!($vars, $model)
         add_results!(suite, b, i, 8)
 
-        b = @benchmark SpeedyWeather.vordiv_tendencies!($diagn, $model)
+        b = @benchmark SpeedyWeather.vordiv_tendencies!($vars, $model)
         add_results!(suite, b, i, 9)
 
-        b = @benchmark SpeedyWeather.temperature_tendency!($diagn, $model)
+        b = @benchmark SpeedyWeather.temperature_tendency!($vars, $model)
         add_results!(suite, b, i, 10)
 
-        b = @benchmark SpeedyWeather.humidity_tendency!($diagn, $model)
+        b = @benchmark SpeedyWeather.humidity_tendency!($vars, $model)
         add_results!(suite, b, i, 11)
 
-        b = @benchmark SpeedyWeather.bernoulli_potential!($diagn, $spectral_transform)
+        b = @benchmark SpeedyWeather.bernoulli_potential!($vars, $spectral_transform)
         add_results!(suite, b, i, 12)
     end
 

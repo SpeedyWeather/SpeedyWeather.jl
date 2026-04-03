@@ -176,58 +176,44 @@ Note that the default initial state of particles is active. In SpeedyWeather all
 particles can be activated or deactivated at any time using the [`activate`](@ref)
 and [`deactivate`](@ref) functions.
 
-First, you create a [`SpectralGrid`](@ref) with the `nparticles` keyword
+We create a `ParticleAdvection2D` with the `nparticles` keyword to determine
+the number of particles (use the `layer` keyword for 3D models)
 ```@example particle
-spectral_grid = SpectralGrid(nparticles = 3)
-```
-Then the particles live as `AbstractVector{Particle}` inside the prognostic variables
-```@example particle
-model = BarotropicModel(spectral_grid)
+spectral_grid = SpectralGrid(nlayers = 1)
+particle_advection = ParticleAdvection2D(spectral_grid, nparticles = 3)
+model = BarotropicModel(spectral_grid; particle_advection)
 simulation = initialize!(model)
-simulation.prognostic_variables.particles
+```
+Then the particles live as `AbstractVector{Particle}` inside the variables
+```@example particle
+vars = simulation.variables     # for brevity
+vars.prognostic.particles
 ```
 Which are placed in random locations (using `rand`) initially.
-In order to change these (e.g. to set the initial conditions) you do
+In order to change these (e.g. to set the initial conditions) you can do
 ```@example particle
-simulation.prognostic_variables.particles[1] = Particle(lon=-120, lat=45)
-simulation.prognostic_variables.particles
+vars.prognostic.particles[1] = Particle(lon=-120, lat=45)
+vars.prognostic.particles
 ```
 which sets the first particle (you can think of the index as the particle identification)
 to some specified location, or you could deactivate a particle with
-```@example particle
-first_particle = simulation.prognostic_variables.particles[1]
-simulation.prognostic_variables.particles[1] = deactivate(first_particle)
-simulation.prognostic_variables.particles
-```
-
-To actually advect these particles inside a SpeedyWeather simulation we have to create
-a `ParticalAdvection2D` instance that lets you control the time step used
-for particle advection and which vertical layer to use in the 3D models.
 
 ```@example particle
-particle_advection = ParticleAdvection2D(spectral_grid, layer = 1)
+first_particle = vars.prognostic.particles[1]
+vars.prognostic.particles[1] = deactivate(first_particle)
+vars.prognostic.particles
 ```
-
-we choose the first (=top-most) layer although this is the default anyway. Now we can
-advect our three particles we have defined above
-
-```@example particle
-model = BarotropicModel(spectral_grid; particle_advection)
-simulation = initialize!(model)
-simulation.prognostic_variables.particles
-```
-
-Which are the initial conditions for our three particles. After 10 days of simulation
-they have changed
+After 10 days of simulation the particle locations have changed
 
 ```@example particle
 run!(simulation, period=Day(10))
-simulation.prognostic_variables.particles
+simulation.variables.particles.locations
 ```
 
-Woohoo! We just advected some particles. This is probably not as exciting as actually
-tracking the particles over the globe and being able to visualise their trajectory
-which we will do in the next section
+Woohoo! We just advected some particles. Note that the active particles
+have their vertical coordinate set to value of the layer they are being
+advected on given that we defined `ParticleAdvection2D` with `layer = 1`
+as default (which has that coordinate value as default).
 
 ## Tracking particles
 
@@ -236,8 +222,8 @@ the particle locations via netCDF. We can create it like
 
 ```@example particle_tracker
 using SpeedyWeather
-spectral_grid = SpectralGrid(nparticles = 100, nlayers=1)
-particle_tracker = ParticleTracker(spectral_grid, schedule=Schedule(every=Hour(3)))
+spectral_grid = SpectralGrid(nlayers = 1)
+particle_tracker = ParticleTracker(spectral_grid, schedule = Schedule(every = Hour(3)))
 ```
 
 which would output every 3 hours (the default). This output frequency might be slightly adjusted
@@ -247,7 +233,7 @@ as keyword arguments `ParticleTracker(spectral_grid, keepbits=15)` for example.
 The callback is then added after the model is created
 
 ```@example particle_tracker
-particle_advection = ParticleAdvection2D(spectral_grid)
+particle_advection = ParticleAdvection2D(spectral_grid, nparticles = 100)
 model = ShallowWaterModel(spectral_grid; particle_advection)
 add!(model.callbacks, particle_tracker)
 ```
@@ -260,15 +246,17 @@ the run folder can be obtained after the simulation by `model.output.run_folder`
 
 ```@example particle_tracker
 simulation = initialize!(model)
-run!(simulation, period=Day(10))
+run!(simulation, period = Day(10))
 model.output.run_folder
 ```
-so that you can read the netCDF file with
+
+As we don't have `output = true`, by default, the `particles.nc` file will be written
+the to current working directory. You can read the netCDF file with
 
 ```@example particle_tracker
 using NCDatasets
-run_folder = model.output.run_folder                    # normally the run_???? string with run number
-path = joinpath(run_folder, particle_tracker.filename)  # by default "run_????/particles.nc"
+run_folder = model.output.run_folder                    # if output = true the run_???? string with run number
+path = joinpath(run_folder, particle_tracker.filename)  # "particles.nc" by default if output = false
 ds = NCDataset(path)
 ds["lon"]
 ds["lat"]
@@ -315,3 +303,6 @@ save("particles_geomakie.png", fig) # hide
 nothing # hide
 ```
 ![Particle advection](particles_geomakie.png)
+
+For more advanced visualisations of the particle tracker see the
+[TravellingSailorProblem.jl](https://github.com/SpeedyWeather/TravellingSailorProblem.jl).

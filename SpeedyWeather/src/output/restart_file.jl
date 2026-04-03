@@ -30,8 +30,7 @@ to the output folder (or current path) that can be used to restart the model.
 Variables in restart file are not scaled."""
 function finalize!(
         restart::RestartFile,
-        progn::PrognosticVariables,
-        diagn::DiagnosticVariables,
+        vars::Variables,
         model::AbstractModel,
     )
     # escape in case of no output
@@ -44,7 +43,7 @@ function finalize!(
     mkpath(path)
 
     jldopen(joinpath(path, filename), "w"; compress) do f
-        f["prognostic_variables"] = progn
+        f["variables.prognostic"] = vars.prognostic
         f["version"] = restart.pkg_version
         f["description"] = "Restart file created by SpeedyWeather.jl"
     end

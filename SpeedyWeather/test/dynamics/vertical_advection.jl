@@ -28,7 +28,7 @@ end
         model = PrimitiveWetModel(
             spectral_grid;
             vertical_advection = VerticalAdvection(spectral_grid),
-            physics = false
+            dynamics_only = true
         )
         simulation = initialize!(model)
         run!(simulation, period = Day(1))

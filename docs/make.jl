@@ -29,7 +29,7 @@ makedocs(
             "Sea ice models" => "sea_ice.md",
             "Land surface models" => "land.md",
             "Analysis" => "analysis.md",
-            "Tree structure" => "structure.md",
+            "Variables" => "variables.md",
             "Differentiability and Adjoint Model" => "differentiability.md",
             "NetCDF output" => "output.md",
             "Other output" => "other_output.md",
@@ -37,6 +37,7 @@ makedocs(
         ],
         "Advanced" => [
             "Extensions" => "extensions.md",
+            "Variable system" => "variable_system.md",
             "Forcing and drag" => "forcing_drag.md",
             "Parameterizations" => "parameterizations.md",
             "Input data" => "input_data.md",
