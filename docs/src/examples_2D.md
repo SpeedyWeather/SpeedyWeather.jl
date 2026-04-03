@@ -185,7 +185,7 @@ is stored in the diagnostic variables and can be visualised with
 only vertical layer)
 
 ```@example galewsky_setup
-vor = simulation.diagnostic_variables.grid.vor_grid[:, 1]
+vor = simulation.variables.grid.vor[:, 1]
 heatmap(vor, title="Relative vorticity [1/s]")
 save("galewsky2.png", ans) # hide
 nothing # hide
@@ -261,7 +261,7 @@ the Makie extension
 
 ```@example galewsky_setup2
 using CairoMakie
-vor = simulation.diagnostic_variables.grid.vor_grid[:, 1]   # 1 to index surface
+vor = simulation.variables.grid.vor[:, 1]   # 1 to index surface
 heatmap(vor, title="Relative vorticity [1/s]")
 save("galewsky3.png", ans) # hide
 nothing # hide
@@ -298,7 +298,7 @@ a `LinearVorticityDrag` and use the default drag coefficient. Then visualize zon
 ```@example jet_stream_setup
 using CairoMakie
 
-u = simulation.diagnostic_variables.grid.u_grid[:, 1]
+u = simulation.variables.grid.u[:, 1]
 heatmap(u, title="Zonal wind [m/s]")
 save("polar_jets.png", ans) # hide
 nothing # hide
@@ -358,7 +358,7 @@ using CairoMakie
 
 H = model.atmosphere.layer_thickness
 Hb = model.orography.orography
-η = simulation.diagnostic_variables.grid.pres_grid
+η = simulation.variables.grid.η
 h = @. η + H - Hb   # @. to broadcast grid + scalar - grid
 
 heatmap(h, title="Dynamic layer thickness h", colormap=:oslo)

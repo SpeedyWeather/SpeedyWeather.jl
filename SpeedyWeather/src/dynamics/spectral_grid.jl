@@ -23,6 +23,8 @@ struct SpectralGrid{
         ArchitectureType,      # <: AbstractArchitecture
         SpectrumType,          # <: AbstractSpectrum
         GridType,              # <: AbstractGrid
+        IntType,               # <: Integer
+        NFDealiasing,          # <: Float64
     } <: AbstractSpectralGrid
 
     "[OPTION] number format used throughout the model"
@@ -51,9 +53,10 @@ struct SpectralGrid{
 
     "[DERIVED] Type of 3D array of integers"
     TensorIntType::Type{<:AbstractArray}
+
     # HORIZONTAL SPECTRAL
     "[OPTION] horizontal resolution as the maximum degree of spherical harmonics"
-    trunc::Int
+    trunc::IntType
 
     "[DERIVED] spectral space"
     spectrum::SpectrumType
@@ -69,16 +72,16 @@ struct SpectralGrid{
 
     # SIZE OF GRID from trunc, Grid, dealiasing:
     "[OPTION] how to match spectral with grid resolution: dealiasing factor, 1=linear, 2=quadratic, 3=cubic grid"
-    dealiasing::Float64
+    dealiasing::NFDealiasing
 
     "[DERIVED] number of latitude rings on one hemisphere (Equator incl)"
-    nlat_half::Int
+    nlat_half::IntType
 
     "[DERIVED] number of latitude rings on both hemispheres"
-    nlat::Int
+    nlat::IntType
 
     "[DERIVED] total number of grid points in the horizontal"
-    npoints::Int
+    npoints::IntType
 
     "[DERIVED] instance of horizontal grid used for calculations in grid-point space"
     grid::GridType
@@ -96,21 +99,17 @@ struct SpectralGrid{
     GridVariable4D::Type{<:AbstractArray}
 
     # PARTICLES
-    "[OPTION] number of particles for particle advection [1]"
-    nparticles::Int
-
     "[DERIVED] ArrayType of particle vector"
-    ParticleVector::Type{<:AbstractArray}
+    ParticleVectorType::Type
 
     # VERTICAL
     "[OPTION] number of vertical layers in the atmosphere"
-    nlayers::Int
+    nlayers::IntType
 end
 
 function Base.show(io::IO, SG::SpectralGrid)
     (; NF, trunc, grid, nlat, npoints, nlayers) = SG
     (; architecture, ArrayType) = SG
-    (; nparticles) = SG
     Grid = nonparametric_type(grid)
 
     # resolution information
@@ -120,15 +119,18 @@ function Base.show(io::IO, SG::SpectralGrid)
     radius_str = @sprintf("%.0f", radius / 1000)
     average_degrees = 360 / sqrt(npoints * π)
 
-    println(io, "SpectralGrid{Spectrum{...}, $Grid{...}}")
-    println(io, "├ Number format: $NF")
-    println(io, "├ Spectral:      T$trunc LowerTriangularMatrix")
-    println(io, "├ Grid:          $nlat-ring $Grid, $npoints grid points")
-    println(io, "├ Resolution:    $(s(average_degrees))°, $(s(average_resolution))km (at $(radius_str)km radius)")
-    nparticles > 0 &&
-        println(io, "├ Particles:     $nparticles")
-    println(io, "├ Vertical:      $nlayers-layer atmosphere")
-    return print(io, "└ Architecture:  $architecture using $ArrayType")
+    # number of spherical harmonics
+    nharmonics = LowerTriangularArrays.nonzeros(SG.spectrum)
+
+    params = "{Spectrum{...}, $Grid{...}}"
+    println(io, styled"{warning:SpectralGrid}{note:$params}")
+    println(io, styled"├ {info:Number format}: $NF")
+    println(io, styled"├ {info:Spectral}:      T$trunc LowerTriangularMatrix, $nharmonics harmonics")
+    println(io, styled"├ {info:Grid}:          $nlat-ring $Grid, $npoints grid points")
+    println(io, styled"├ {info:Resolution}:    $(s(average_degrees))°, $(s(average_resolution))km (at $(radius_str)km radius)")
+    println(io, styled"├ {info:Vertical}:      $nlayers-layer atmosphere")
+    print(io, styled"└ {info:Architecture}:  $architecture using $ArrayType")
+    return nothing
 end
 
 # Constructor that takes all [OPTION] parameters as keyword arguments
@@ -141,7 +143,6 @@ function SpectralGrid(;
         trunc::Int = DEFAULT_TRUNC,
         Grid::Type{<:AbstractGrid} = DEFAULT_GRID,
         dealiasing::Real = 2,
-        nparticles::Int = 0,
         nlayers::Int = DEFAULT_NLAYERS,
     )
 
@@ -161,7 +162,7 @@ function SpectralGrid(;
     spectrum = Spectrum(trunc + 2, trunc + 1, architecture = architecture)
 
     # Create the SpectralGrid with all fields
-    return SpectralGrid(NF, spectrum, grid, dealiasing, nparticles, nlayers)
+    return SpectralGrid(NF, spectrum, grid, dealiasing, nlayers)
 end
 
 """
@@ -172,19 +173,12 @@ function SpectralGrid(
         grid::AbstractGrid;
         NF::Type{<:AbstractFloat} = DEFAULT_NF,
         dealiasing::Real = 2,
-        nparticles::Int = 0,
         nlayers::Int = DEFAULT_NLAYERS,
     )
     architecture = grid.architecture
-
     trunc = SpeedyTransforms.get_truncation(grid, dealiasing)
-    nlat_half = SpeedyTransforms.get_nlat_half(grid)
-    nlat = RingGrids.get_nlat(grid)
-    npoints = RingGrids.get_npoints(grid)
-
     spectrum = Spectrum(trunc + 2, trunc + 1, architecture = architecture)
-
-    return SpectralGrid(NF, spectrum, grid, dealiasing, nparticles, nlayers)
+    return SpectralGrid(NF, spectrum, grid, dealiasing, nlayers)
 end
 
 # low level constructor, not intended to be used directly by users
@@ -193,7 +187,6 @@ function SpectralGrid(
         spectrum::Spectrum,
         grid::AbstractGrid,
         dealiasing,
-        nparticles,
         nlayers::Int,
     )
     @assert spectrum.architecture == grid.architecture "Architecture of grid and spectrum must match"
@@ -205,8 +198,8 @@ function SpectralGrid(
     nlat = RingGrids.get_nlat(grid)
     npoints = RingGrids.get_npoints(grid)
 
-    # Convert numeric parameters to Float64
-    dealiasing_f64 = Float64(dealiasing)
+    # Convert numeric parameters to Float32
+    dealiasing_f32 = Float32(dealiasing)
 
     # Calculate derived fields
     ArrayType = array_type(architecture)
@@ -229,10 +222,12 @@ function SpectralGrid(
     GridVariable4D = Field{NF, 3, array_type(architecture, NF, 3), typeof(grid)}
 
     # Particle vector type
-    ParticleVector = array_type(architecture, Particle{NF}, 1)
+    # TODO: For Reactant we need something else in the long run
+    # use Nothing as a dummy type, it's not actually working
+    ParticleVectorType = typeof(architecture) <: ReactantDevice ? Nothing : array_type(architecture, Particle{NF}, 1)
 
     # Create the SpectralGrid with all fields
-    return SpectralGrid{typeof(architecture), typeof(spectrum), typeof(grid)}(
+    return SpectralGrid{typeof(architecture), typeof(spectrum), typeof(grid), typeof(nlat_half), Float32}(
         NF,
         architecture,
         ArrayType,
@@ -247,7 +242,7 @@ function SpectralGrid(
         SpectralVariable2D,
         SpectralVariable3D,
         SpectralVariable4D,
-        dealiasing_f64,
+        dealiasing_f32,
         nlat_half,
         nlat,
         npoints,
@@ -256,8 +251,7 @@ function SpectralGrid(
         GridVariable2D,
         GridVariable3D,
         GridVariable4D,
-        nparticles,
-        ParticleVector,
+        ParticleVectorType,
         nlayers,
     )
 end
@@ -267,15 +261,21 @@ end
 
 """$(TYPEDSIGNATURES)
 Generator function for a SpectralTransform struct pulling in parameters from a SpectralGrid struct."""
-function SpeedyTransforms.SpectralTransform(
+function (::Type{S})(
         spectral_grid::SpectralGrid;
         one_more_degree::Bool = true,
         kwargs...
-    )
-    (; NF, spectrum, grid, nlayers, ArrayType) = spectral_grid
+    ) where {S <: SpeedyTransforms.AbstractSpectralTransform}
+    (; NF, spectrum, grid, nlayers) = spectral_grid
     (; lmax, mmax, architecture) = spectrum
     spectrum = one_more_degree == false ? Spectrum(lmax - 1, mmax; architecture) : spectrum
-    return SpectralTransform(spectrum, grid; NF, ArrayType, nlayers, kwargs...)
+    return S(spectrum, grid; NF, nlayers, kwargs...)
+end
+
+function variables(::SpeedyTransforms.AbstractSpectralTransform)
+    return (
+        ScratchVariable(:transform_memory, TransformScratchMemory(), desc = "Scratch memory for spectral transform"),
+    )
 end
 
 # because model components can be `nothing`, their constructor being `Nothing()`

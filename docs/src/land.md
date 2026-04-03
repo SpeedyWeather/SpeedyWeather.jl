@@ -252,7 +252,7 @@ Greenland and Antarctic ice sheets.
 ### LandSnowModel
 
 `SnowModel` stores a single snow bucket with depth ``S`` in units of equivalent liquid water height
-(`prognostic_variables.land.snow_depth`) and solves the following equation
+(`variables.prognostic.land.snow_depth`) and solves the following equation
 
 ```math
 \frac{dS}{dt} = P - M - R
@@ -325,7 +325,6 @@ so snow depth from the snow bucket immediately brightens land grid cells.
 The total albedo is higher over already brighter areas (low vegetation cover)
 and lower over darker areas. This somewhat reflects that in forests the
 snow cover is broken up and snow lies in between trees.
-`DefaultAlbedo` uses `LandSnowAlbedo`; there is currently no time-evolving snow albedo.
 
 ## Albedo
 
@@ -358,7 +357,7 @@ land but being treated with an albedo that comes from 90% ocean.
 Not very realistic. The default albedo can be created with
 
 ```@example land
-albedo = DefaultAlbedo(spectral_grid)
+albedo = OceanLandAlbedo(spectral_grid)
 ```
 
 and inspected with
@@ -410,7 +409,7 @@ simulation = initialize!(model)
 run!(simulation, steps=1)   # run for a step to "diagnose" albedo = ocean/land weighted
 
 using CairoMakie
-(; albedo) = simulation.diagnostic_variables.physics
+(; albedo) = simulation.variables.parameterizations
 heatmap(albedo, title="Custom albedo, separately defined for ocean/land")
 save("ocean_land_albedo.png", ans) # hide
 nothing # hide

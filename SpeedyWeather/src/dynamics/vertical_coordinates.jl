@@ -60,6 +60,6 @@ function sigma_okay(nlayers::Integer, σ_half::AbstractVector)
     @assert σ_half[1] >= 0 "First manually specified σ_half has to be >0"
     @assert σ_half[end] == 1 "Last manually specified σ_half has to be 1."
     @assert nlayers == (length(σ_half) - 1) "nlayers has to be length of σ_half - 1"
-    @assert isincreasing(σ_half) "Vertical sigma coordinates are not increasing."
+    @assert Utils.isincreasing(σ_half) "Vertical sigma coordinates are not increasing."
     return true
 end

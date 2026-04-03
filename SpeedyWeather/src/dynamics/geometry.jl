@@ -12,25 +12,26 @@ $(TYPEDFIELDS)
         RefValueNF,         # <:Union{Base.RefValue{NF}, CUDA.RefValue{NF}}
         VectorIntType,
         VectorType,
+        IntType,            # <: Integer
     } <: AbstractGeometry
 
     "SpectralGrid that defines spectral and grid resolution"
     spectral_grid::SpectralGridType
 
     "Resolution parameter nlat_half of Grid, # of latitudes on one hemisphere (incl Equator)"
-    nlat_half::Int = spectral_grid.nlat_half
+    nlat_half::IntType = spectral_grid.nlat_half
 
     "Maximum number of longitudes (at/around Equator)"
-    nlon_max::Int = get_nlon_max(spectral_grid.Grid, nlat_half)
+    nlon_max::IntType = get_nlon_max(spectral_grid.Grid, nlat_half)
 
     "Number of latitude rings"
-    nlat::Int = spectral_grid.nlat
+    nlat::IntType = spectral_grid.nlat
 
     "Number of vertical levels"
-    nlayers::Int = spectral_grid.nlayers
+    nlayers::IntType = spectral_grid.nlayers
 
     "Total number of horizontal grid points"
-    npoints::Int = spectral_grid.npoints
+    npoints::IntType = spectral_grid.npoints
 
     "Planet's radius [m], set from model.planet during initialize!"
     radius::RefValueNF = RefValueNF(DEFAULT_RADIUS)
@@ -110,7 +111,7 @@ function Geometry(SG::SpectralGrid; vertical_coordinates = SigmaCoordinates(SG.n
 
     (; NF, VectorIntType, VectorType) = SG
     (; σ_half) = vertical_coordinates
-    return Geometry{typeof(SG), Base.RefValue{NF}, VectorIntType, VectorType}(; spectral_grid = SG, σ_levels_half = σ_half)
+    return Geometry{typeof(SG), Base.RefValue{NF}, VectorIntType, VectorType, typeof(nlayers)}(; spectral_grid = SG, σ_levels_half = σ_half)
 end
 
 function Base.show(io::IO, G::Geometry)

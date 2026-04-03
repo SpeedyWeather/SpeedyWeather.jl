@@ -2,6 +2,35 @@
 
 ## Unreleased
 
+- RossbyHaurwitz initial condition example corrected [#1027](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1027)
+- [BREAKING] model.dyanmics_only instead of .physics [#969](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/969)
+- [BREAKING] Kernel launching now in SpeedyWeatherInternals.KernelLaunching [#969](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/969)
+- Pretty printing with StyledStrings [#969](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/969)
+- [BREAKING] Particle advection determines nparticles [#969](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/969)
+- Global parameterizations [#969](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/969)
+- [BREAKING] set! adapted to variable groups and namespaces [#969](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/969)
+- [BREAKING] Initial conditions modularised [#969](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/969)
+- [BREAKING] New dynamic variable system based on NamedTuples [#969](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/969)
+- README CI Badges [#1024](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1024)
+- GitHub Action Julia chache updated to v3 [#1020](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1020)
+- Broadcasting for LTA and RingGrids revised [#977](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/977)
+- Reactant support for the BarotropicModel and Reactant architecture basics [#970](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/970)
+- Minor fixes for Metal GPUs [#1019](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1019)
+- Delete unused/moved zenith.jl file [#1016](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1016)
+- Add `get_output_path(::Simulation)` to retrieve the output file path [#1011](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1011)
+- GitHub `actions/setup-node` updated to v6 [#1009](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1009)
+- Documentation for `MatrixSpectralTransform` added to SpeedyTransforms docs [#1006](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/1006)
+- MatrixSpectralTransform implemented [#952](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/952)
+- `get_asset` now supports optional `output_grid` [#1004](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1004)
+- Switch documentation to DocumenterVitepress for a modern VitePress-based theme [#1002](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1002) [#1008](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1008)
+- Move `get_asset` to RingGrids with NCDatasets extension; make `assets_url` and `version` kwargs [#996](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/996)
+- Small fixes to improve Enzyme CI [#995](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/995)
+- JuliaActions Cache upgraded to v3 [#1001](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1001)
+- Remove `@Const` from kernels [#1000](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1000)
+- Add CLAUDE.md with codebase summary for AI-assisted development [#999](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/999)
+- Get SpeedyWeatherAssets on the fly [#983](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/983)
+- Change from MIT to EUPL license [#992](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/992)
+
 ## v0.18.1
 
 - Fix docs colatitude -> latitude terminology [#990](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/990)
@@ -66,7 +95,6 @@
 - Seasonal ocean and land climatology models GPU-ready [#892](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/892)
 - Zenith constructors [#889](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/889)
 - More general forcing of pressure, vorticity and divergence [#855](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/855)
-
 
 ## v0.17.3
 

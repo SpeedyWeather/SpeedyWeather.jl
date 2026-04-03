@@ -1,11 +1,10 @@
 # SpeedyWeather.jl documentation
 
-Welcome to the documentation for [SpeedyWeather.jl](https://github.com/milankl/SpeedyWeather.jl) a global
-atmospheric circulation model with simple parametrizations to represent physical processes such as clouds,
-precipitation and radiation. SpeedyWeather in general is more a library than just a model as it exposes
-most of its internal functions to the user such that simulations and analysis can be interactively
-combined. Its user interface is built in a very modular way such that new components can be easily
-defined and integrated into SpeedyWeather.
+Welcome to the documentation for [SpeedyWeather.jl](https://github.com/milankl/SpeedyWeather.jl)!
+SpeedyWeather.jl is a global atmospheric model developed as a research playground
+with an everything-flexible attitude as long as it is speedy. Technically it is a climate model with simple,
+yet interactive representations of ocean, land and sea-ice. It is easy to use and easy to extend, making 
+atmospheric modelling an interactive experience -- in the terminal, in a notebook or conventionally through scripts.
 
 ## Overview
 
@@ -78,5 +77,9 @@ The bibtex entry for the paper is:
 
 MK received funding by the European Research Council under Horizon 2020 within the ITHACA project,
 grant agreement number 741112 from 2021-2022. From 2022-2024 this project was also funded by the
-National Science Foundation NSF. Since 2024, the main funding is from Schmidt Sciences LLC through
-MK's Eric & Wendy Schmidt AI in Science Fellowship.
+National Science Foundation NSF. From 2024-2025, the funding is from Schmidt Sciences LLC through
+MK's Eric & Wendy Schmidt AI in Science Fellowship. Since 2025, MK's funding is provided through
+a NERC Independent Research Fellowship under grant number UKRI191.
+
+All other contributors bring in their own funding from various national and international
+grants which is highly acknowledged.

@@ -2,20 +2,21 @@ module LowerTriangularArrays
 
 # STRUCTURE
 using DocStringExtensions
+using StyledStrings
 
 # GPU
 import Adapt: Adapt, adapt
 import GPUArrays
 import KernelAbstractions
-import KernelAbstractions: @kernel, @index, @Const
+import KernelAbstractions: @kernel, @index
 
 import SpeedyWeatherInternals.Architectures: Architectures, AbstractArchitecture, on_architecture,
     array_type, ismatching, CPU, GPU, architecture, nonparametric_type
 
-import SpeedyWeatherInternals.Utils: launch!, SpectralWorkOrder
+import SpeedyWeatherInternals.KernelLaunching: launch!, SpectralWorkOrder
 
 # NUMERICS
-import LinearAlgebra: tril!
+import LinearAlgebra: Transpose, tril!
 
 export AbstractSpectrum, Spectrum, resolution, truncation
 

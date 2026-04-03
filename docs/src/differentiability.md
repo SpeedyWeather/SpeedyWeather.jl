@@ -27,26 +27,23 @@ run!(simulation, period=Day(10)) # spin-up the model a bit
 Then, we get all variables we need from our `simulation`
 
 ```julia
-(; prognostic_variables, diagnostic_variables, model) = simulation
+(; variables, model) = simulation
 (; Δt, Δt_millisec) = model.time_stepping
 dt = 2Δt
-
-progn = prognostic_variables
-diagn = diagnostic_variables
 ```
 
 Next, we will prepare to use Enzyme. Enzyme saves the gradient information in a shadow of the original input. For the inputs this shadow is initialized zero, whereas for the output the shadow is used as the seed of the AD. In other words, as we are doing reverse-mode AD, the shadow of the output is the value that is backpropageted by the reverse-mode AD. Ok, let's initialize everything:
 
 ```julia
-dprogn = one(progn) # shadow for the progn values
-ddiagn = make_zero(diagn) # shadow for the diagn values
+dvars = make_zero(variables) # shadow for the variables
+dvars.prognostic.vor .= 1    # seed the reverse AD
 dmodel = make_zero(model) # here, we'll accumulate all parameter derivatives
 ```
 
 Then, we can already do the differentiation with Enzyme
 
 ```julia
-autodiff(Reverse, SpeedyWeather.timestep!, Const, Duplicated(progn, dprogn), Duplicated(diagn, ddiagn), Const(dt), Duplicated(model, dmodel))
+autodiff(Reverse, SpeedyWeather.timestep!, Const, Duplicated(variables, dvars), Const(dt), Duplicated(model, dmodel))
 ```
 
 The derivatives are accumulated in the `dmodel` shadow. So, if we e.g. want to know the derivative with respect to the gravity constant, we just have to inspect:
@@ -54,6 +51,12 @@ The derivatives are accumulated in the `dmodel` shadow. So, if we e.g. want to k
 ```julia
 dmodel.planet.gravity
 ```
+
+## Differentiating longer trajectories and checkpointing 
+
+In a very similar fashion as for the single timestep, we can also differentiate longer trajectories. For this, we need to use checkpointing to avoid storing all intermediate states in memory. This will also at the same time keep the compile time of the gradient still manageable. For a full example on how to do this for a sensitivity analysis, see the [sensitivity example](https://github.com/SpeedyWeather/SpeedyWeather.jl/blob/main/SpeedyWeather/test/differentiatibility/sensitivity_examples/).
+
+
 ## Parameter handling
 
 SpeedyWeather also provides automated parameter handling for all models and subcomponents via an extension of [ModelParameters.jl](https://github.com/rafaqz/ModelParameters.jl). Parameters can be automatically collected via the `parameters` method:
@@ -134,16 +137,16 @@ run!(simulation, period=Day(10))
 ps = parameters(model)
 pvec = vec(ps)
 dp = zero(pvec)
-dprogn = one(progn) # shadow for the prognostic variabels
-ddiagn = make_zero(diagn) # shadow for the diagnostic variables
+dvars = make_zero(variables) # shadow for the variables
+dvars.prognostic.vor .= 1    # seed the reverse AD
 
-function timestep_with_new_params!(progn, diagn, dt, model, p)
+function timestep_with_new_params!(vars, dt, model, p)
     new_model = SpeedyWeather.reconstruct(model, p)
-    SpeedyWeather.timestep!(progn, diagn, dt, new_model)
+    SpeedyWeather.timestep!(vars, dt, new_model)
     return nothing
 end
 
-autodiff(Reverse, timestep_with_new_params!, Const, Duplicated(progn, dprogn), Duplicated(diagn, ddiagn), Const(dt), Duplicated(model, make_zero(model)))
+autodiff(Reverse, timestep_with_new_params!, Const, Duplicated(variables, dvars), Const(dt), Duplicated(model, make_zero(model)))
 ```
 
 Note, however, that a full sensitivity analysis over long integration periods is computationally much more demanding, and is something that we are currently working on.

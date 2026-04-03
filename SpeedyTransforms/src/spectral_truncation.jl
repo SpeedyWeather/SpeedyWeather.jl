@@ -51,10 +51,10 @@ end
 
 @kernel function spectral_smoothing_kernel!(
         L,
-        @Const(c),
-        @Const(power),
-        @Const(eigenvalue_norm),
-        @Const(l_indices)
+        c,
+        power,
+        eigenvalue_norm,
+        l_indices
     )
     I = @index(Global, Cartesian)  # I[1] == lm, I[2] == k
 

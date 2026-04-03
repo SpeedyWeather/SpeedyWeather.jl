@@ -245,7 +245,7 @@ simulation = initialize!(model)
 run!(simulation, period=Week(1))
 
 # get surface shortwave radiation down
-ssrd = simulation.diagnostic_variables.physics.surface_shortwave_down
+ssrd = simulation.variables.parameterizations.surface_shortwave_down
 heatmap(ssrd,title="Surface shortwave radiation down [W/m^2]")
 save("ssrd.png", ans) # hide
 nothing # hide
@@ -254,7 +254,7 @@ nothing # hide
 ![Surface shortwave radiation down](ssrd.png)
 
 ```@example radiation
-osr = simulation.diagnostic_variables.physics.outgoing_shortwave
+osr = simulation.variables.parameterizations.outgoing_shortwave
 heatmap(osr,title="Outgoing shortwave radiation [W/m^2]")
 save("osr.png", ans) # hide
 nothing # hide
@@ -274,7 +274,7 @@ simulation = initialize!(model)
 run!(simulation, period=Week(1))
 
 # The shortwave fluxes can be visualised
-ssrd = simulation.diagnostic_variables.physics.surface_shortwave_down
+ssrd = simulation.variables.parameterizations.surface_shortwave_down
 heatmap(ssrd, title="Surface shortwave radiation (dry model) [W/m^2]")
 save("ssrd_dry.png", ans) # hide
 nothing # hide
@@ -337,7 +337,7 @@ sw_no_sc = OneBandShortwave(spectral_grid, clouds = DiagnosticClouds(spectral_gr
 model = PrimitiveWetModel(spectral_grid; shortwave_radiation=sw_no_sc)
 sim = initialize!(model)
 run!(sim, period=Day(5))
-ssrd = sim.diagnostic_variables.physics.surface_shortwave_down
+ssrd = sim.variables.parameterizations.surface_shortwave_down
 heatmap(ssrd, title="No stratocumulus clouds [W/m^2]")
 save("oneband_no_stratocumulus.png", ans) # hide
 nothing # hide

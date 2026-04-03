@@ -12,8 +12,8 @@
             nlayers = 1
         end
 
-        spectral_grid = SpectralGrid(trunc = 31, nlayers = nlayers, nparticles = 100)
-        particle_advection = ParticleAdvection2D(spectral_grid, layer = 1)
+        spectral_grid = SpectralGrid(trunc = 31, nlayers = nlayers)
+        particle_advection = ParticleAdvection2D(spectral_grid, layer = 1, nparticles = 100)
 
         model = Model(spectral_grid; particle_advection)
 
@@ -23,7 +23,7 @@
         simulation = initialize!(model)
         run!(simulation, period = Day(1))
 
-        for particle in simulation.prognostic_variables.particles
+        for particle in simulation.variables.prognostic.particles
             @test SpeedyWeather.ismod(particle)
             @test particle.σ == model.geometry.σ_levels_full[1]
         end

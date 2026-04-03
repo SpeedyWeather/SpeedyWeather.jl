@@ -2,9 +2,9 @@ export set!
 
 """
 $(TYPEDSIGNATURES)
-Sets new values for the keyword arguments (velocities, vorticity, divergence, etc..) into the
-prognostic variable struct `progn` at timestep index `lf`. If `add==true` they are added to the 
-current value instead. If a `SpectralTransform` S is provided, it is used when needed to set 
+Sets new values for variables defined through keyword matching the keys in a NamedTuple.
+Spectral variables can be set at timestep index `lf`. If `add==true` they are added to the 
+current value instead. If a `AbstractSpectralTransform` S is provided, it is used when needed to set 
 the variable, otherwise it is recomputed. In case `u` and `v` are provied, actually the divergence
 and vorticity are set and `coslat_scaling_included` specficies whether or not the 1/cos(lat) 
 scaling is already included in the arrays or not (default: `false`). If a function or callable 
@@ -18,60 +18,61 @@ The input may be:
 * An instance of `AbstractField` 
 * An instance of `LowerTriangularArray` 
 * A scalar `<: Number` (interpreted as a constant field in grid space)
+
+Specify the namespace as a symbol in case the `vars::NamedTuple` contains them, e.g.
+
+    set!(vars, sea_surface_temperature = 1, namespace=:ocean)
+    
 """
 function set!(
-        progn::PrognosticVariables,
+        vars::NamedTuple,
         geometry::Geometry;
-        u = nothing,
-        v = nothing,
-        vor = nothing,
-        div = nothing,
-        temp = nothing,
-        humid = nothing,
-        pres = nothing,
-        sea_surface_temperature = nothing,
-        sea_ice_concentration = nothing,
-        soil_temperature = nothing,
-        snow_depth = nothing,
-        soil_moisture = nothing,
         lf::Integer = 1,
         add::Bool = false,
-        spectral_transform::Union{Nothing, SpectralTransform} = nothing,
+        spectral_transform::Union{Nothing, AbstractSpectralTransform} = nothing,
         coslat_scaling_included::Bool = false,
         static_func::Bool = true,
+        namespace::Union{Nothing, Symbol} = nothing,
         kwargs...
     )
-    # ATMOSPHERE
-    isnothing(vor)   || set!(get_step(progn.vor, lf), vor, geometry, spectral_transform; add, static_func)
-    isnothing(div)   || set!(get_step(progn.div, lf), div, geometry, spectral_transform; add, static_func)
-    isnothing(temp)  || set!(get_step(progn.temp, lf), temp, geometry, spectral_transform; add, static_func)
-    isnothing(humid) || set!(get_step(progn.humid, lf), humid, geometry, spectral_transform; add, static_func)
-    isnothing(pres)  || set!(get_step(progn.pres, lf), pres, geometry, spectral_transform; add, static_func)
+    # special case for u,v setting vor, div
+    if :u in keys(kwargs) && :v in keys(kwargs)
+        (; vor, div) = vars
+        set_vordiv!(
+            get_step(vor, lf), get_step(div, lf), kwargs[:u], kwargs[:v],
+            geometry, spectral_transform; add, coslat_scaling_included, static_func
+        )
+    elseif :u in keys(kwargs) || :v in keys(kwargs)
+        @warn "Only one of `u` and `v` provided, but both are needed to set `vor` and `div`. Skipping."
+    end
 
-    # or provide u, v instead of vor, div
-    isnothing(u) | isnothing(v) || set_vordiv!(get_step(progn.vor, lf), get_step(progn.div, lf), u, v, geometry, spectral_transform; add, coslat_scaling_included, static_func)
-
-    # OCEAN
-    isnothing(sea_surface_temperature)  || set!(progn.ocean.sea_surface_temperature, sea_surface_temperature, geometry, spectral_transform; add, static_func)
-    isnothing(sea_ice_concentration)    || set!(progn.ocean.sea_ice_concentration, sea_ice_concentration, geometry, spectral_transform; add, static_func)
-
-    # LAND
-    isnothing(soil_temperature)         || set!(progn.land.soil_temperature, soil_temperature, geometry, spectral_transform; add, static_func)
-    isnothing(snow_depth)               || set!(progn.land.snow_depth, snow_depth, geometry, spectral_transform; add, static_func)
-    isnothing(soil_moisture)            || set!(progn.land.soil_moisture, soil_moisture, geometry, spectral_transform; add, static_func)
-
-    # TRACERS
+    # normal case, search for varname in prognostic variables
     for varname in keys(kwargs)
-        if varname in keys(progn.tracers)
-            tracer_var = get_step(progn.tracers[varname], lf)
-            set!(tracer_var, kwargs[varname], geometry, spectral_transform; add, static_func)
+        if varname in (:u, :v)  # already handled in special case above
+            nothing
+        elseif varname in keys(vars)
+            var = vars[varname] isa LowerTriangularArray ? get_step(vars[varname], lf) : vars[varname]
+            set!(var, kwargs[varname], geometry, spectral_transform; add, static_func)
+        elseif namespace in keys(vars)
+            if varname in keys(vars[namespace])
+                var = vars[namespace][varname] isa LowerTriangularArray ?
+                    get_step(vars[namespace][varname], lf) : vars[namespace][varname]
+                set!(var, kwargs[varname], geometry, spectral_transform; add, static_func)
+            else
+                # throw error if varname can't be found and print existing variables
+                @warn "`$varname` not defined in NamedTuple with keys = $(keys(vars[namespace])). Skipping."
+            end
         else
-            throw(UndefVarError(varname))
+            # throw error if varname can't be found and print existing variables
+            @warn "`$varname` not defined in NamedTuple with keys = $(keys(vars)). Skipping."
         end
     end
-    return
+    return nothing
 end
 
+"""$(TYPEDSIGNATURES) set the `variables`, default is in the group `prognostic`."""
+set!(variables::Variables, args...; group::Symbol = :prognostic, kwargs...) =
+    set!(getfield(variables, group), args...; kwargs...)
 
 # set LTA <- LTA
 function set!(
@@ -100,7 +101,7 @@ function set!(
         var::LowerTriangularArray,
         field::AbstractField,
         geometry::Union{Geometry, Nothing} = nothing,
-        S::Union{Nothing, SpectralTransform} = nothing;
+        S::Union{Nothing, AbstractSpectralTransform} = nothing;
         add::Bool = false,
         kwargs...,
     )
@@ -119,7 +120,7 @@ function set!(
         var::LowerTriangularArray,
         f::Function,
         geometry::Geometry,
-        S::Union{SpectralTransform, Nothing} = nothing;
+        S::Union{AbstractSpectralTransform, Nothing} = nothing;
         add::Bool = false,
         kwargs...,
     )
@@ -134,7 +135,7 @@ function set!(
         var::LowerTriangularArray,
         s::Number,
         geometry::Geometry,
-        S::Union{SpectralTransform, Nothing} = nothing;
+        S::Union{AbstractSpectralTransform, Nothing} = nothing;
         add::Bool = false,
         kwargs...,
     )
@@ -156,7 +157,7 @@ function set!(
         var::AbstractField,
         field::AbstractField,
         geometry::Geometry,
-        S::Union{Nothing, SpectralTransform} = nothing;
+        S::Union{Nothing, AbstractSpectralTransform} = nothing;
         add::Bool = false,
         kwargs...,
     )
@@ -177,7 +178,7 @@ function set!(
         var::AbstractField,
         specs::LowerTriangularArray,
         geometry::Geometry,
-        S::Union{Nothing, SpectralTransform} = nothing;
+        S::Union{Nothing, AbstractSpectralTransform} = nothing;
         add::Bool = false,
         kwargs...,
     )
@@ -190,7 +191,7 @@ function set!(
         var::AbstractField3D,
         f::Function,
         geometry::Geometry,
-        S::Union{Nothing, SpectralTransform} = nothing;
+        S::Union{Nothing, AbstractSpectralTransform} = nothing;
         add::Bool = false,
         static_func = true,
     )
@@ -214,10 +215,11 @@ function _set_function_3d!(var::AbstractField, f::Function, londs::AbstractVecto
     kernel_func = add ? (a, b) -> a + b : (a, b) -> b
 
     @boundscheck size(var) == (length(londs), length(σ_levels_full)) || throw(DimensionMismatch())
-    return launch!(
+    launch!(
         architecture(var), RingGridWorkOrder, size(var), set_field_3d_kernel!,
         var, londs, latds, σ_levels_full, f, kernel_func
     )
+    return var
 end
 
 @kernel function set_field_3d_kernel!(var, londs, latds, σ_levels_full, f, kernel_func)
@@ -230,7 +232,7 @@ function set!(
         var::AbstractField2D,
         f::Function,
         geometry::Geometry,
-        S::Union{Nothing, SpectralTransform} = nothing;
+        S::Union{Nothing, AbstractSpectralTransform} = nothing;
         kwargs...
     )
 
@@ -242,7 +244,7 @@ end
 function set!(
         var::AbstractField2D,
         f::Function,
-        S::Union{Nothing, SpectralTransform} = nothing;
+        S::Union{Nothing, AbstractSpectralTransform} = nothing;
         kwargs...
     )
     # otherwise recompute longitude, latitude vectors
@@ -271,7 +273,7 @@ function set!(
         var::AbstractField,
         s::Number,
         geometry::Union{Geometry, Nothing} = nothing,
-        S::Union{Nothing, SpectralTransform} = nothing;
+        S::Union{Nothing, AbstractSpectralTransform} = nothing;
         add::Bool = false,
         kwargs...,
     )
@@ -287,7 +289,7 @@ function set_vordiv!(
         u_func,
         v_func,
         geometry::Geometry,
-        S::Union{Nothing, SpectralTransform} = nothing;
+        S::Union{Nothing, AbstractSpectralTransform} = nothing;
         add::Bool = false,
         coslat_scaling_included::Bool = false,
         kwargs...,
@@ -307,7 +309,7 @@ function set_vordiv!(
         u::AbstractField,
         v::AbstractField,
         geometry::Geometry,
-        S::SpectralTransform = SpectralTransform(geometry.spectral_grid);
+        S::AbstractSpectralTransform = SpectralTransform(geometry.spectral_grid);
         add::Bool = false,
         coslat_scaling_included::Bool = false,
         kwargs...,
@@ -332,7 +334,7 @@ function set_vordiv!(
         u::LowerTriangularArray,
         v::LowerTriangularArray,
         geometry::Geometry,
-        S::SpectralTransform = SpectralTransform(geometry.spectral_grid);
+        S::AbstractSpectralTransform = SpectralTransform(geometry.spectral_grid);
         add::Bool = false,
         coslat_scaling_included::Bool = false,
         kwargs...,
@@ -341,7 +343,7 @@ function set_vordiv!(
     v_ = coslat_scaling_included ? v : transform(RingGrids.scale_coslat⁻¹(transform(u, S)), S)
     radius = geometry.radius[]
 
-    return if size(vor) != size(u_) != size(v_)
+    if size(vor) != size(u_) != size(v_)
         u_new = zero(vor)
         copyto!(u_new, u_)
 
@@ -354,20 +356,33 @@ function set_vordiv!(
         curl!(vor, u_, v_, S; add, radius)
         divergence!(div, u_, v_, S; add, radius)
     end
+    return vor, div
 end
 
-"""
-$(TYPEDSIGNATURES)
+# if number provided for u, v then vor = div = 0
+function set_vordiv!(
+        vor::LowerTriangularArray,
+        div::LowerTriangularArray,
+        u::Number,  # this is a constant field, curl and div are zero
+        v::Number,  # this is a constant field, curl and div are zero
+        geometry::Geometry,
+        S::Union{Nothing, SpectralTransform} = nothing;
+        kwargs...
+    )
+    vor .= 0    # curl of a constant is zero
+    div .= 0    # divergence of a constant is zero
+    return vor, div
+end
 
+"""$(TYPEDSIGNATURES)
 Sets properties of the simuluation `S`. Convenience wrapper to call the other concrete 
 `set!` methods. All `kwargs` are forwarded to these methods, which are documented 
-seperately. See their documentation for possible `kwargs`. 
-"""
+seperately. See their documentation for possible `kwargs`. """
 function set!(S::AbstractSimulation; kwargs...)
-    return set!(S.prognostic_variables, S.model.geometry; spectral_transform = S.model.spectral_transform, kwargs...)
+    return set!(S.variables, S.model.geometry; spectral_transform = S.model.spectral_transform, kwargs...)
 end
 
-function set!(progn::PrognosticVariables, model::AbstractModel; kwargs...)
-    progn.scale[] != 1 && @warn "Prognostic variables are scaled with $(progn.scale[]), but `set!` assumes unscaled variables."
-    return set!(progn, model.geometry; spectral_transform = model.spectral_transform, kwargs...)
+function set!(vars::Variables, model::AbstractModel; kwargs...)
+    vars.prognostic.scale[] != 1 && @warn "Prognostic variables are scaled with $(vars.prognostic.scale[]), but `set!` assumes unscaled variables."
+    return set!(vars, model.geometry; spectral_transform = model.spectral_transform, kwargs...)
 end

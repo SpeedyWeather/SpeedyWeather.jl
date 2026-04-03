@@ -1,4 +1,4 @@
-## Gradient operators
+# Gradient operators
 
 [SpeedyTransforms](@ref) also includes many gradient operators to take derivatives in
 spherical harmonics. These are in particular ``\nabla, \nabla \cdot, \nabla \times,
@@ -113,7 +113,7 @@ spectral_grid = SpectralGrid(trunc=31, nlayers=1)
 forcing = SpeedyWeather.JetStreamForcing(spectral_grid)
 drag = LinearVorticityDrag(spectral_grid)
 model = ShallowWaterModel(spectral_grid; forcing, drag)
-simulation = initialize!(model);
+simulation = initialize!(model)
 run!(simulation, period=Day(30))
 nothing # hide
 ```
@@ -121,8 +121,8 @@ nothing # hide
 Now pretend you only have `u, v` to get vorticity (which is actually the prognostic variable in the model,
 so calculated anyway...).
 ```@example gradient
-u = simulation.diagnostic_variables.grid.u_grid[:, 1]   # [:, 1] for 1st layer
-v = simulation.diagnostic_variables.grid.v_grid[:, 1]
+u = simulation.variables.grid.u[:, 1]   # [:, 1] for 1st layer
+v = simulation.variables.grid.v[:, 1]
 vor = curl(u, v, radius = model.planet.radius)
 nothing # hide
 ```
@@ -206,7 +206,7 @@ nothing # hide
 Which is the interface displacement assuming geostrophy.
 The actual interface displacement contains also ageostrophy
 ```@example gradient
-η_grid2 = simulation.diagnostic_variables.grid.pres_grid
+η_grid2 = simulation.variables.grid.η
 heatmap(η_grid2, title="Interface displacement η [m] with ageostrophy")
 save("eta_ageostrophic.png", ans) # hide
 nothing # hide

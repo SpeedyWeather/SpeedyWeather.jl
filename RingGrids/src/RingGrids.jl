@@ -1,6 +1,7 @@
 module RingGrids
 
 # DOCUMENTATION
+using StyledStrings
 using DocStringExtensions
 import Printf
 
@@ -9,17 +10,23 @@ import Statistics: Statistics, mean
 import FastGaussQuadrature
 import LinearAlgebra
 
+# ASSET DOWNLOADING
+import Downloads
+import Artifacts
+import Pkg
+
 # GPU
 import Adapt: Adapt, adapt, adapt_structure
 import GPUArrays
-import KernelAbstractions: KernelAbstractions, @kernel, @index, @Const, synchronize
+import KernelAbstractions: KernelAbstractions, @kernel, @index, synchronize
 
 # SPEEDYWEATHER SUBMODULES
 import SpeedyWeatherInternals.Architectures: Architectures, AbstractArchitecture, CPU, GPU,
     on_architecture, architecture, array_type, ismatching, nonparametric_type
 
 using SpeedyWeatherInternals.Architectures
-using SpeedyWeatherInternals.Utils
+using SpeedyWeatherInternals.KernelLaunching
+import SpeedyWeatherInternals: Utils
 
 # ABSTRACT GRIDS
 export AbstractGrid,
@@ -161,5 +168,13 @@ include("quadrature_weights.jl")
 include("interpolation.jl")
 include("vertices.jl")
 include("statistics.jl")
+
+# ASSET DOWNLOADING
+export get_asset, load_asset, ASSETS_URL, DEFAULT_ASSETS_VERSION
+
+# load_asset: extension dispatch point implemented by RingGridsNCDatasetsExt (and future format extensions)
+function load_asset end
+
+include("get_asset.jl")
 
 end

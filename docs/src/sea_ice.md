@@ -11,7 +11,7 @@ subtypes(SpeedyWeather.AbstractSeaIce)
 ## No sea ice
 
 You can set `sea_ice = nothing` which will not touch the initial
-`prognostic_variables.sea_ice_concentration` (which when allocated is zero),
+`variables.prognostic.ocean.sea_ice_concentration` (which when allocated is zero),
 nor advance it. But you may use `set!(simulation, sea_ice_concentration=...)` to set the
 sea ice concentration manually. No sea ice does not do anything on every time step
 so your manual modifications will prevail after `initialize!`.
@@ -120,3 +120,5 @@ or as part of `SpeedyWeather.OceanOutput()`
 ```@example sea_ice
 add!(model, SpeedyWeather.OceanOutput())
 ```
+
+For more information see [Output variables](@ref).
