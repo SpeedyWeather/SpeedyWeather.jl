@@ -44,6 +44,9 @@ function initialize!(vars::Variables, model::AbstractModel)
         initialize!(vars.prognostic.particles, vars, model)
     end
 
+    # green house gases are function of time only, just do one "timestep"
+    greenhouse_gases_timestep!(vars, model)
+
     # then atmosphere as this may include initial conditions like StartFromFile
     # which would contain ocean/land initial conditions that should overwrite the above if they are included
     initialize!(vars, model.initial_conditions, model)

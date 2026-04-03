@@ -1,6 +1,24 @@
 abstract type AbstractGreenhouseGas <: AbstractModelComponent end
 abstract type AbstractCO2 <: AbstractGreenhouseGas end
-# variables(::AbstractCO2) = PrognosticVariable(:co2, ...)
+
+# greenhouse gases are implemented as named tuple so to identify them by symbol
+# also pass on the name as the key of the named tuple element
+variables(name_ghg::Pair{<:Symbol, <:AbstractGreenhouseGas}, model::AbstractModel) =
+    variables(name_ghg.second, name_ghg.first, model)
+
+variables(::AbstractCO2, name::Symbol, args...) = (
+    PrognosticVariable(name, ScalarDim(), units="ppm", desc="Carbon dioxide", namespace=:greenhouse_gases),
+)
+
+"""$(TYPEDSIGNATURES)
+Time step greenhouse gas concentration as function of time only."""
+function greenhouse_gases_timestep!(vars::Variables, model::PrimitiveEquation)
+    isnothing(model.greenhouse_gases) && return nothing     # if greenhouse_gases is nothing, then skip this step
+    t = vars.prognostic.clock.time
+    for gas in keys(model.greenhouse_gases)
+        vars.prognostic.greenhouse_gases[gas][] = model.greenhouse_gases[gas](t)
+    end
+end
 
 """$(TYPEDSIGNATURES) CO2 uses unit of ppm, so *1e-6 to convert to kg/kg."""
 @inline unit(::AbstractCO2) = 1f-6
@@ -55,12 +73,6 @@ function (C::ExponentialCO2{NF})(t::DateTime) where {NF}
 
     # time since start in seconds, convert from Float64 to NF
     Δt = convert(NF, Dates.datetime2unix(t) - Dates.datetime2unix(C.start))
-    Δt /= (365.25f0 * 24 * 3600)    # time in years
-    Δt = convert(NF, Δt)            # to compute the exponential in NF
-
+    Δt *= convert(NF, 1 / (365.25f0 * 24 * 3600))    # time in years
     return C.base_concentration + C.a * exp(C.b * Δt)
 end
-
-# for gas in keys(model.greenhouse_gases)
-#     simulation.variables[gas][] = model.greenhouse_gases[gas](time)
-# end
