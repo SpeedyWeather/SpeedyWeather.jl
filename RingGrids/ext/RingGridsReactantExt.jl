@@ -4,7 +4,7 @@ using RingGrids
 using Reactant
 using KernelAbstractions
 using SpeedyWeatherInternals.Architectures: ReactantDevice
-using SpeedyWeatherInternals.Utils: launch!, LinearWorkOrder
+using SpeedyWeatherInternals.KernelLaunching: launch!, LinearWorkOrder
 
 const AnyReactantArray = Union{Reactant.AnyConcretePJRTArray, Reactant.AnyConcreteIFRTArray, Reactant.AnyTracedRArray}
 

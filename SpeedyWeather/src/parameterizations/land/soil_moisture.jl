@@ -189,7 +189,7 @@ function initialize!(
     # set ocean "soil" moisture points (100% ocean only)
     masked_value = soil.ocean_moisture
     if soil.mask
-        mask!(vars.prognostic.land.soil_moisture, isnan.(progn.land.soil_moisture), :land; masked_value) # land because isnan.(x) == 1 is set to masked_value
+        mask!(vars.prognostic.land.soil_moisture, isnan.(vars.prognostic.land.soil_moisture), :land; masked_value) # land because isnan.(x) == 1 is set to masked_value
         mask!(vars.prognostic.land.soil_moisture, model.land_sea_mask, :ocean; masked_value)
     end
 end

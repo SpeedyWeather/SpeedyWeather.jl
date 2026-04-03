@@ -760,10 +760,6 @@ find_L(a::LowerTriangularArray, rest) = a
 find_L(::Any, rest) = find_L(rest)
 find_L(ex::Base.Broadcast.Extruded) = find_L(ex.x)
 
-
-parent_or_not(x::Union{SubArray, Transpose}) = parent(x)
-parent_or_not(x) = x
-
 parent_or_not(x::Union{SubArray, Transpose}) = parent(x)
 parent_or_not(x) = x
 

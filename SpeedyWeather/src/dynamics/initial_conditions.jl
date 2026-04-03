@@ -626,7 +626,7 @@ function initialize!(
     Tη = max.(Tη, Tmin)
 
     # temperature
-    temp_grid = similar(progn.temp[:, :, 2], grid, NF)
+    temp_grid = similar(vars.prognostic.temp[:, :, 2], grid, NF)
     aΩ = radius * rotation
 
     _jablonowski_temperature_broadcast!(temp_grid, Tη, φ, σ_levels_full,
@@ -642,19 +642,18 @@ function _jablonowski_temperature_broadcast!(temp_grid, Tη, φ, σ_levels_full,
     NF = eltype(temp_grid)
 
     # reshape for broadcasting: φ is (npoints,), σ/Tη are (nlayers,)
-    σ_row = reshape(σ_levels_full, 1, :)    # (1, nlayers)
+    η_row = reshape(σ_levels_full, 1, :)    # (1, nlayers), Jablonowski uses η for σ
     Tη_row = reshape(Tη, 1, :)              # (1, nlayers)
 
-    ηᵥ = (σ_row .- η₀) .* NF(π) ./ 2
+    ηᵥ = (η_row .- η₀) .* NF(π) ./ 2
 
     # Amplitudes with height
-    A1 = 3 // 4 .* η .* π .* u₀ ./ R_dry .* sin.(ηᵥ) * sqrt.(cos.(ηᵥ))
-    A2 = 2u₀ .* cos.(ηᵥ)^(3 // 2)
+    A1 = 3 // 4 .* η_row .* NF(π) .* u₀ ./ R_dry .* sin.(ηᵥ) .* sqrt.(cos.(ηᵥ))
+    A2 = 2u₀ .* cos.(ηᵥ) .^ (3 // 2)
 
-    # Get latitude
-    φij = φ[ij]
-    sinφ = sind(φij)
-    cosφ = cosd(φij)
+    # Latitude arrays for broadcasting: (npoints,) broadcasts against (1, nlayers)
+    sinφ = sind.(φ)
+    cosφ = cosd.(φ)
 
     # Jablonowski and Williamson, eq. (6) — broadcast over (npoints, nlayers)
     temp_grid.data .= Tη_row .+ A1 .* (
