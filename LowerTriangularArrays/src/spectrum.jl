@@ -125,10 +125,11 @@ Base.:(==)(s1::Spectrum, s2::Spectrum) =
     s1.lmax == s2.lmax && s1.mmax == s2.mmax
 
 function Base.show(io::IO, S::Spectrum)
-    println(io, "T$(S.mmax - 1) Spectrum")
-    println(io, "├ lmax=$(S.lmax) (degrees)")
-    println(io, "├ mmax=$(S.mmax) (orders)")
-    return print(io, "└ architecture: $(typeof(S.architecture))")
+    println(io, styled"T$(S.mmax - 1) {warning:Spectrum}\{...\}")
+    println(io, styled"├ {info:lmax} = $(S.lmax) {note:(degrees)}")
+    println(io, styled"├ {info:mmax} = $(S.mmax) {note:(orders)}")
+    print(io, styled"└ {info:architecture} = $(typeof(S.architecture))")
+    return nothing
 end
 
 Architectures.ismatching(s::Spectrum, array_type::Type{<:AbstractArray}) = ismatching(s.architecture, array_type)

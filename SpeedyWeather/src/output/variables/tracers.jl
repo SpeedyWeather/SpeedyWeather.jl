@@ -10,5 +10,9 @@
     transform::F = (x) -> x
 end
 
+# as tracers are identified by their name::Symbol, allow this too
+TracerOutput(name::Symbol; kwargs...) =
+    TracerOutput(; name = string(name), long_name = string(name), kwargs...)
+
 path(tracer::TracerOutput, simulation) =
-    simulation.diagnostic_variables.grid.tracers_grid[Symbol(tracer.name)]
+    simulation.variables.grid.tracers[Symbol(tracer.name)]

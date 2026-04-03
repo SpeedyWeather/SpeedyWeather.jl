@@ -4,7 +4,7 @@
 Specialized implementation of `AbstractParam` for Speedy models that defines a fixed
 set of fields with concrete types.
 """
-Base.@kwdef struct SpeedyParam{NF <: AbstractFloat} <: AbstractParam{NF}
+@kwdef struct SpeedyParam{NF <: AbstractFloat} <: AbstractParam{NF}
     "numeric value of the parameter"
     value::NF = NaN
 
@@ -82,7 +82,7 @@ stripparams(params::SpeedyParams) = stripparams(unpack_params(params))
 
 # Base overrides for SpeedyParams
 
-## parameter subsets
+# parameter subsets
 Base.getindex(ps::SpeedyParams, param_label::String) = getindex(ps, [param_label])
 @inline function Base.getindex(ps::SpeedyParams, param_labels::Vector{String})
     # extract labels from ComponentVector
@@ -102,7 +102,7 @@ Base.getindex(ps::SpeedyParams, param_label::String) = getindex(ps, [param_label
     return SpeedyParams(param_subset)
 end
 
-## selecting columns
+# selecting columns
 Base.getindex(ps::SpeedyParams, nm::Symbol) = getindex(ps, :, nm)
 @inline function Base.getindex(ps::SpeedyParams, ::Colon, nm::Symbol)
     # include fieldname only (no component)
@@ -115,8 +115,8 @@ Base.getindex(ps::SpeedyParams, nm::Symbol) = getindex(ps, :, nm)
     end
 end
 
-## non-mutating setindex!
-## consider using a method instead of setindex! to avoid confusion?
+# non-mutating setindex!
+# consider using a method instead of setindex! to avoid confusion?
 Base.setindex!(ps::SpeedyParams, x, nm::Symbol) = setindex!(ps, x, :, nm)
 @inline function Base.setindex!(ps::SpeedyParams, x, ::Colon, nm::Symbol)
     # include fieldname only (no component)

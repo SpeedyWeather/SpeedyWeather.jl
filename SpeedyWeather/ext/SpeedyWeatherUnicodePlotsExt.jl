@@ -93,7 +93,7 @@ end
 
 # add a method for Simulation when the extension is loaded to trigger a unicodeplot after run!(simulation)
 function SpeedyWeather.unicodeplot(simulation::SpeedyWeather.AbstractSimulation)
-    vor = on_architecture(CPU(), simulation.diagnostic_variables.grid.vor_grid[:, end])
+    vor = on_architecture(CPU(), simulation.variables.grid.vor[:, end])
     return UnicodePlots.heatmap(vor, title = "Surface vorticity [1/s]")
 end
 

@@ -1,8 +1,7 @@
 export JLD2Output
 
-"""Output writer for a JLD2 file that saves the PrognosticVariables
-and DiagnosticVariables structs directly to a JLD2 file. All internal
-scalings and units are still applied to these outputs. Fields are 
+"""Output writer for a JLD2 file that saves the Variables struct directly to a JLD2 file.
+All internal scalings and units are still applied to these outputs. Fields are 
 $(TYPEDFIELDS)"""
 @kwdef mutable struct JLD2Output <: AbstractOutput
 
@@ -51,12 +50,6 @@ $(TYPEDFIELDS)"""
     "[OPTION] will reopen and resave the file to merge everything in one big vector. Turn off if the file is too large for memory."
     merge_output::Bool = true
 
-    "[OPTION] output the PrognosticVariables"
-    output_prognostic::Bool = true
-
-    "[OPTION] output the DiagnosticVariables as well"
-    output_diagnostic::Bool = true
-
     # TIME STEPS AND COUNTERS (initialize later)
     output_every_n_steps::Int = 0           # output frequency
     timestep_counter::Int = 0               # time step counter
@@ -78,9 +71,7 @@ Initialize JLD2 `output` by creating a JLD2 file.
 To be called just before the first timesteps."""
 function initialize!(
         output::JLD2Output,
-        feedback::Union{AbstractFeedback, Nothing},
-        progn::PrognosticVariables,
-        diagn::DiagnosticVariables,
+        vars::Variables,
         model::AbstractModel,
     )
     output.active || return nothing     # exit immediately for no output
@@ -110,7 +101,7 @@ function initialize!(
     output.jld2_file = jld2_file
 
     # write initial condition
-    output_jld2!(output, Simulation(progn, diagn, model))
+    output_jld2!(output, Simulation(vars, model))
 
     # CALLBACKS
     # add ParametersTxt callback
@@ -120,7 +111,8 @@ function initialize!(
     output.write_progress_txt && add!(model.callbacks, :progress_txt => ProgressTxt())
 
     # add RestartFile callback
-    return output.write_restart && add!(model.callbacks, :restart_file => RestartFile())
+    output.write_restart && add!(model.callbacks, :restart_file => RestartFile())
+    return nothing
 end
 
 Base.close(output::JLD2Output) = close(output.jld2_file)
@@ -136,29 +128,22 @@ function output!(output::JLD2Output, simulation::AbstractSimulation)
 end
 
 function output_jld2!(output::JLD2Output, simulation::AbstractSimulation)
-    (; jld2_file, output_diagnostic, output_prognostic) = output
-
     output.output_counter += 1                                      # output counter increases when writing time
     i = output.output_counter
-
-    return if output_diagnostic & output_prognostic
-        jld2_file["$i"] = (simulation.prognostic_variables, simulation.diagnostic_variables)
-    elseif output_prognostic
-        jld2_file["$i"] = simulation.prognostic_variables
-    elseif output_diagnostic
-        jld2_file["$i"] = simulation.diagnostic_variables
-    end
+    output.jld2_file["$i"] = simulation.variables
+    return nothing
 end
 
 function finalize!(
         output::JLD2Output,
         simulation::AbstractSimulation,
     )
-    return if output.merge_output && output.output_counter > 0
+    if output.merge_output && output.output_counter > 0
         merge_output(output)
     else
         close(output)
     end
+    return nothing
 end
 
 """

@@ -310,7 +310,7 @@ function UV_from_vordiv!(
         V::LowerTriangularArray,
         vor::LowerTriangularArray,
         div::LowerTriangularArray,
-        S::SpectralTransform;
+        S::AbstractSpectralTransform;
         radius = DEFAULT_RADIUS,
     )
     (; vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2) = S.gradients

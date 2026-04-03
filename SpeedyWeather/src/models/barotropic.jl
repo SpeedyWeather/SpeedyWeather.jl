@@ -59,15 +59,31 @@ $(TYPEDFIELDS)"""
     feedback::FB = Feedback()
 end
 
-prognostic_variables(::Type{<:Barotropic}) = (:vor,)
-default_concrete_model(::Type{Barotropic}) = BarotropicModel
+function variables(model::Barotropic)
+    nsteps = get_prognostic_steps(model.time_stepping)
+    return variables(typeof(model), nsteps)
+end
 
-parameters(model::Barotropic; kwargs...) = SpeedyParams(
-    planet = parameters(model.planet; component = :planet, kwargs...),
-    atmosphere = parameters(model.atmosphere; component = :atmosphere, kwargs...),
-    forcing = parameters(model.forcing; component = :forcing, kwargs...),
-    drag = parameters(model.drag; component = :drag, kwargs...),
-)
+"""($TYPEDSIGNATURES) All variables needed for the barotropic model itself (components excluded)."""
+function variables(::Type{<:Barotropic}, nsteps)
+    return (
+        PrognosticVariable(:clock, ClockDim(), desc = "Clock", units = "s"),
+        PrognosticVariable(:scale, ScalarDim(1), desc = "Scaling of vor and div in the dynamical core", units = "m"),
+        PrognosticVariable(:vor, Spectral4D(nsteps), desc = "Relative vorticity", units = "1/s"),
+
+        TendencyVariable(:vor, Spectral3D(), desc = "Tendency of relative vorticity", units = "1/s²"),
+        TendencyVariable(:vor, Grid3D(), namespace = :grid, desc = "Tendency of relative vorticity on the grid", units = "1/s²"),
+        TendencyVariable(:u, Grid3D(), namespace = :grid, desc = "Tendency of zonal wind on the grid", units = "m/s²"),
+        TendencyVariable(:v, Grid3D(), namespace = :grid, desc = "Tendency of meridional wind on the grid", units = "m/s²"),
+
+        GridVariable(:vor, Grid3D(), desc = "Relative vorticity", units = "1/s"),
+        GridVariable(:u, Grid3D(), desc = "Zonal wind", units = "m/s"),
+        GridVariable(:v, Grid3D(), desc = "Meridional wind", units = "m/s"),
+
+        ScratchVariable(:a, Spectral3D(), desc = "Scratch array", units = "?"),
+        ScratchVariable(:b, Spectral3D(), desc = "Scratch array", units = "?"),
+    )
+end
 
 """
 $(TYPEDSIGNATURES)
@@ -91,16 +107,15 @@ function initialize!(model::Barotropic; time::DateTime = DEFAULT_DATE)
     initialize!(model.random_process, model)
     initialize!(model.particle_advection, model)
 
-    # allocate prognostic and diagnostic variables
-    prognostic_variables = PrognosticVariables(model)
-    diagnostic_variables = DiagnosticVariables(model)
-    # initialize particles (or other non-atmosphere prognostic variables)
-    initialize!(prognostic_variables.particles, prognostic_variables, diagnostic_variables, model)
+    # allocate all variables
+    variables = Variables(model)
 
-    # set the initial conditions
-    initialize!(prognostic_variables, model.initial_conditions, model)
-    (; clock) = prognostic_variables
+    # set the time first
+    (; clock) = variables.prognostic
     set!(clock, time = time, start = time)
 
-    return Simulation(prognostic_variables, diagnostic_variables, model)
+    # now set initial conditions
+    initialize!(variables, model)
+
+    return Simulation(variables, model)
 end

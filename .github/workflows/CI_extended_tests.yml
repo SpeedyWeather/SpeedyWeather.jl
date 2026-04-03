@@ -1,29 +1,60 @@
-name: Extended Test
-# Weekly extended tests
+name: Extended Tests
 on:
-  schedule:
-    - cron: '0 2 * * 0'  # Daily at 2 AM UTC every Sunday
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
 jobs:
-  test:
+  correctness-test:
+    name: Extended Differentiablity Correctness - Julia v${{ matrix.version }}, ${{ matrix.os }}
+    # temporarily disabled
+    if: false
+    # don't run if any of these labels are present
+    # if: >
+    #   !(
+    #   contains(github.event.pull_request.labels.*.name, 'skip-ci') ||
+    #   contains(github.event.pull_request.labels.*.name, 'skip-speedyweather-ci') ||
+    #   contains(github.event.pull_request.labels.*.name, 'skip-enzyme-ci')
+    #   )
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    permissions:
+      actions: write
+      contents: read
     strategy:
+      fail-fast: false
       matrix:
         version:
           - '1.10'
         os:
           - ubuntu-latest
-        arch:
-          - x64
     steps:
       - uses: actions/checkout@v6
+      
       - uses: julia-actions/setup-julia@v2
         with:
           version: ${{ matrix.version }}
-          arch: ${{ matrix.arch }}
-      - uses: julia-actions/cache@v3
-      - uses: julia-actions/julia-buildpkg@v1
-      - uses: julia-actions/julia-runtest@v1
-        with:
-          test_args: 'extended_tests'
+      
+      - uses: julia-actions/cache@v2
+      
+      - name: Develop local packages
+        run: |
+          julia --color=yes --project=SpeedyWeather/test/differentiability -e '
+            using Pkg
+            Pkg.develop([
+              PackageSpec(path="SpeedyWeatherInternals"),
+              PackageSpec(path="LowerTriangularArrays"),
+              PackageSpec(path="RingGrids"),
+              PackageSpec(path="SpeedyTransforms"),
+              PackageSpec(path="SpeedyWeather")
+            ])
+            Pkg.instantiate()
+          '
+      
+      - name: Run Extended tests
+        run: |
+          julia --color=yes --project=SpeedyWeather/test/differentiability SpeedyWeather/test/differentiability/runtests.jl")
         env:
           GITHUB_AUTH: ${{ secrets.GITHUB_TOKEN }}

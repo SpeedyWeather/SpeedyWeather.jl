@@ -26,60 +26,9 @@ function FiniteDifferences.to_vec(x::Vector{Particle{NF}}) where {NF}
     end
 end
 
-# A version of the generic fallback from FiniteDifferences that excludes some of the fields
-# that we don't want to be varied for our big data structures
-# also replaces NaNs that are expected in land and ocean variables
-function FiniteDifferences.to_vec(x::T) where {T <: Union{PrognosticVariables, DiagnosticVariables, Tendencies, GridVariables, DynamicsVariables, ParticleVariables}}
+# TODO: We used to have an adaption here that replaced NaN's as FiniteDifferences can't deal with them, maybe we have to reintroduce it later
 
-    excluded_fields_pre, included_fields, excluded_fields_post = determine_included_fields(T)
-
-    val_vecs_and_backs = map(name -> to_vec(getfield(x, name)), included_fields)
-    vals = first.(val_vecs_and_backs)
-    backs = last.(val_vecs_and_backs)
-
-    vals_excluded_pre = map(name -> getfield(x, name), excluded_fields_pre)
-    vals_excluded_post = map(name -> getfield(x, name), excluded_fields_post)
-
-    v, vals_from_vec = to_vec(vals)
-    v = replace_NaN(x, v)
-
-    function structtype_from_vec(v::Vector{<:Real})
-        val_vecs = vals_from_vec(v)
-        values = map((b, v) -> b(v), backs, val_vecs)
-
-        return T(vals_excluded_pre..., values..., vals_excluded_post...)
-    end
-    return v, structtype_from_vec
-end
-
-function determine_included_fields(T::Type)
-    names = fieldnames(T)
-
-    included_field_types = Union{
-        SpeedyWeather.AbstractDiagnosticVariables,
-        SpeedyWeather.AbstractPrognosticVariables,
-        NTuple, Dict{Symbol, <:Tuple}, Dict{Symbol, <:AbstractArray}, AbstractArray,
-    }
-
-    excluded_fields_pre = []
-    included_fields = []
-    excluded_fields_post = []
-
-    for name in names
-        if fieldtype(T, name) <: included_field_types
-            push!(included_fields, name)
-        else
-            if isempty(included_fields)
-                push!(excluded_fields_pre, name)
-            else
-                push!(excluded_fields_post, name)
-            end
-        end
-    end
-
-    return excluded_fields_pre, included_fields, excluded_fields_post
-end
-
+#=
 # in the ocean and land variables we have NaNs, FiniteDifferences can't deal with those, so we replace them
 function replace_NaN(x_type::T, vec) where {T <: NamedTuple}
     nan_indices = isnan.(vec)
@@ -89,6 +38,7 @@ end
 
 # fallback, we really only want to replace the NaNs in ocean and land variables
 replace_NaN(type, vec) = vec
+=#
 
 # By default FiniteDifferences doesn't include this, even though Integers can't be varied.
 # there's an old GitHub issue and PR about this

@@ -4,8 +4,7 @@
         spectral_grid = SpectralGrid(; NF, nlayers, Grid = FullGaussianGrid)
         model = PrimitiveWetModel(spectral_grid)
         simulation = initialize!(model)
-        progn = simulation.prognostic_variables
-        diagn = simulation.diagnostic_variables
+        progn = simulation.variables.prognostic
         temp = get_step(progn.temp, 1)
         humid = get_step(progn.humid, 1)
 
@@ -15,10 +14,10 @@
         humid .= 0
 
         lf = 1      # leapfrog time step
-        SpeedyWeather.transform!(diagn, progn, lf, model)
-        SpeedyWeather.linear_virtual_temperature!(diagn, progn, lf, model)
-        SpeedyWeather.geopotential!(diagn, model.geopotential, model.orography)
-        geopot_grid = transform(diagn.dynamics.geopotential, model.spectral_transform)
+        SpeedyWeather.transform!(simulation.variables, lf, model)
+        SpeedyWeather.linear_virtual_temperature!(simulation.variables, lf, model)
+        SpeedyWeather.geopotential!(simulation.variables, model.geopotential, model.orography)
+        geopot_grid = transform(simulation.variables.dynamics.geopotential, model.spectral_transform)
 
         # approximate heights [m] for this setup
         heights = [27000, 18000, 13000, 9000, 6000, 3700, 1800, 700]
@@ -35,10 +34,9 @@ end
         spectral_grid = SpectralGrid(; NF, nlayers = 8, Grid = FullGaussianGrid)
         model = PrimitiveWetModel(spectral_grid)
         simulation = initialize!(model)
-        progn = simulation.prognostic_variables
-        diagn = simulation.diagnostic_variables
-        temp = get_step(progn.temp, 1)
-        humid = get_step(progn.humid, 1)
+        vars = simulation.variables
+        temp = get_step(vars.prognostic.temp, 1)
+        humid = get_step(vars.prognostic.humid, 1)
 
         # give every layer some constant temperature by setting the l=m=0 mode (index 1) for all k
         temp0 = 280      # in Kelvin
@@ -46,10 +44,10 @@ end
         humid .= 0
 
         lf = 1      # leapfrog time step
-        SpeedyWeather.transform!(diagn, progn, lf, model)
-        SpeedyWeather.linear_virtual_temperature!(diagn, progn, lf, model)
-        SpeedyWeather.geopotential!(diagn, model.geopotential, model.orography)
-        SpeedyWeather.bernoulli_potential!(diagn, model.spectral_transform)
+        SpeedyWeather.transform!(vars, lf, model)
+        SpeedyWeather.linear_virtual_temperature!(vars, lf, model)
+        SpeedyWeather.geopotential!(vars, model.geopotential, model.orography)
+        SpeedyWeather.bernoulli_potential!(vars, model.spectral_transform)
     end
 end
 

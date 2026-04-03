@@ -99,24 +99,23 @@ function run_benchmark_suite!(suite::BenchmarkSuiteModel)
         else
             M = SpectralTransform(spectral_grid)
         end
-        
+
         model = PrimitiveWetModel(spectral_grid; spectral_transform = M)
         simulation = initialize!(model)
         # spin up
         run!(simulation; steps = 10)
         initialize!(simulation)
-        progn, diagn, model = SpeedyWeather.unpack(simulation)
-        fill!(diagn.tendencies, 0, typeof(model))
+        vars, model = SpeedyWeather.unpack(simulation)
 
         println("Running BenchmarkSuiteModel for architecture=$architecture, trunc=$trunc, nlayers=$nlayers, NF=$NF \n")
 
-        b = @benchmark CUDA.@sync SpeedyWeather.parameterization_tendencies!($diagn, $progn, $model)
+        b = @benchmark CUDA.@sync SpeedyWeather.parameterization_tendencies!($vars, $model)
         add_results!(suite, b, i, 1)
 
-        b = @benchmark CUDA.@sync SpeedyWeather.dynamics_tendencies!($diagn, $progn, $lf, $model)
+        b = @benchmark CUDA.@sync SpeedyWeather.dynamics_tendencies!($vars, $lf, $model)
         add_results!(suite, b, i, 2)
 
-        b = @benchmark CUDA.@sync SpeedyWeather.implicit_correction!($diagn, $progn, $model.implicit, $model)
+        b = @benchmark CUDA.@sync SpeedyWeather.implicit_correction!($vars, $model.implicit, $model)
         add_results!(suite, b, i, 3)
     end
 
@@ -158,76 +157,75 @@ function run_benchmark_suite!(suite::BenchmarkSuiteDynamicsGPU)
         else
             M = SpectralTransform(spectral_grid)
         end
-        
+
         model = PrimitiveWetModel(spectral_grid; spectral_transform = M)
         simulation = initialize!(model)
         # spin up
         run!(simulation; steps = 10)
         initialize!(simulation)
-        progn, diagn, model = SpeedyWeather.unpack(simulation)
-        fill!(diagn.tendencies, 0, typeof(model))
+        vars, model = SpeedyWeather.unpack(simulation)
         (; orography, geometry, spectral_transform, geopotential, atmosphere, implicit) = model
 
         println("Running BenchmarkSuiteDynamics for architecture=$architecture, trunc=$trunc, nlayers=$nlayers, NF=$NF \n")
 
-        b = @benchmark CUDA.@sync SpeedyWeather.forcing!($diagn, $progn, $lf, $model)
+        b = @benchmark CUDA.@sync SpeedyWeather.forcing!($vars, $lf, $model)
         add_results!(suite, b, i, 1)
 
-        b = @benchmark CUDA.@sync SpeedyWeather.drag!($diagn, $progn, $lf, $model)
+        b = @benchmark CUDA.@sync SpeedyWeather.drag!($vars, $lf, $model)
         add_results!(suite, b, i, 2)
 
         lf_implicit = implicit.α == 0 ? lf : 1
 
-        b = @benchmark CUDA.@sync SpeedyWeather.pressure_gradient_flux!($diagn, $progn, $lf, $spectral_transform)
+        b = @benchmark CUDA.@sync SpeedyWeather.pressure_gradient_flux!($vars, $lf, $spectral_transform)
         add_results!(suite, b, i, 3)
 
-        b = @benchmark CUDA.@sync SpeedyWeather.linear_virtual_temperature!($diagn, $progn, $lf_implicit, $model)
+        b = @benchmark CUDA.@sync SpeedyWeather.linear_virtual_temperature!($vars, $lf_implicit, $model)
         add_results!(suite, b, i, 4)
 
-        diagn.grid.temp_grid.data .-= implicit.temp_profile'
+        vars.grid.temp.data .-= implicit.temp_profile'
 
-        b = @benchmark CUDA.@sync SpeedyWeather.geopotential!($diagn, $geopotential, $orography)
+        b = @benchmark CUDA.@sync SpeedyWeather.geopotential!($vars, $geopotential, $orography)
         add_results!(suite, b, i, 5)
 
-        b = @benchmark CUDA.@sync SpeedyWeather.vertical_integration!($diagn, $progn, $lf_implicit, $geometry)
+        b = @benchmark CUDA.@sync SpeedyWeather.vertical_integration!($vars, $lf_implicit, $geometry)
         add_results!(suite, b, i, 6)
 
-        b = @benchmark CUDA.@sync SpeedyWeather.surface_pressure_tendency!($diagn, $spectral_transform)
+        b = @benchmark CUDA.@sync SpeedyWeather.surface_pressure_tendency!($vars, $spectral_transform)
         add_results!(suite, b, i, 7)
 
-        b = @benchmark CUDA.@sync SpeedyWeather.vertical_velocity!($diagn, $geometry)
+        b = @benchmark CUDA.@sync SpeedyWeather.vertical_velocity!($vars, $geometry)
         add_results!(suite, b, i, 8)
 
-        b = @benchmark CUDA.@sync SpeedyWeather.linear_pressure_gradient!($diagn, $progn, $lf_implicit, $atmosphere, $implicit)
+        b = @benchmark CUDA.@sync SpeedyWeather.linear_pressure_gradient!($vars, $lf_implicit, $atmosphere, $implicit)
         add_results!(suite, b, i, 9)
 
-        b = @benchmark CUDA.@sync SpeedyWeather.vertical_advection!($diagn, $model)
+        b = @benchmark CUDA.@sync SpeedyWeather.vertical_advection!($vars, $model)
         add_results!(suite, b, i, 10)
 
-        b = @benchmark CUDA.@sync SpeedyWeather.vordiv_tendencies!($diagn, $model)
+        b = @benchmark CUDA.@sync SpeedyWeather.vordiv_tendencies!($vars, $model)
         add_results!(suite, b, i, 11)
 
-        b = @benchmark CUDA.@sync SpeedyWeather.temperature_tendency!($diagn, $model)
+        b = @benchmark CUDA.@sync SpeedyWeather.temperature_tendency!($vars, $model)
         add_results!(suite, b, i, 12)
 
-        b = @benchmark CUDA.@sync SpeedyWeather.humidity_tendency!($diagn, $model)
+        b = @benchmark CUDA.@sync SpeedyWeather.humidity_tendency!($vars, $model)
         add_results!(suite, b, i, 13)
 
-        b = @benchmark CUDA.@sync SpeedyWeather.bernoulli_potential!($diagn, $spectral_transform)
+        b = @benchmark CUDA.@sync SpeedyWeather.bernoulli_potential!($vars, $spectral_transform)
         add_results!(suite, b, i, 14)
 
-        b = @benchmark CUDA.@sync SpeedyWeather.tracer_advection!($diagn, $model)
+        b = @benchmark CUDA.@sync SpeedyWeather.tracer_advection!($vars, $model)
         add_results!(suite, b, i, 15)
 
-        diagn.grid.temp_grid.data .+= implicit.temp_profile'
+        vars.grid.temp.data .+= implicit.temp_profile'
 
-        # now just transforms as comparisions
-        vor = progn.vor[:, :, lf]
-        b = @benchmark CUDA.@sync SpeedyWeather.transform!($diagn.grid.vor_grid, $vor, $spectral_transform)
+        # now just transforms as comparisons
+        vor = SpeedyWeather.get_step(vars.prognostic.vor, lf)
+        b = @benchmark CUDA.@sync SpeedyWeather.transform!($vars.grid.vor, $vor, $spectral_transform)
         add_results!(suite, b, i, 16)
 
         # and inverse
-        b = @benchmark CUDA.@sync SpeedyWeather.transform!($vor, $diagn.grid.vor_grid, $spectral_transform)
+        b = @benchmark CUDA.@sync SpeedyWeather.transform!($vor, $vars.grid.vor, $spectral_transform)
         add_results!(suite, b, i, 17)
     end
 

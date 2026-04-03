@@ -6,7 +6,7 @@ the model, these are described below.
 ## JLD2 Output 
 
 As an alternative to the [NetCDF output](@ref), it is also possible to directly
-output the `PrognosticVariables` and `DiagnosticVariables` to a JLD2 file.
+output the `Variables` (all prognostic and diagnostic variables) to a JLD2 file.
 This might be interesting if you are really interested in the model internals,
 or also for some machine learning tasks. However, this option doesn't feature
 any possibilites to regrid or select variables, and it comes with the usual limitations
@@ -81,7 +81,7 @@ add!(model, :progress_txt => progress_txt)
 
 ## Restart file
 
-`NetCDFOutput` also by default writes a restart file, containing the `simulation.prognostic_variables`
+`NetCDFOutput` also by default writes a restart file, containing the `simulation.variables.prognostic`
 that can be read back in with teh `StartFromFile` initial conditions. Implemented as a callback
 `RestartFile` can also be created independently of `NetCDFOutput`, e.g.
 
