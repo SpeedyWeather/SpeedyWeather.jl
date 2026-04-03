@@ -21,13 +21,12 @@ methods simply as 1, 2, 3.
 
 ## Rossby-Haurwitz wave in a BarotropicModel
 
-We define a `BarotropicModel` of some resolution but keep all its components
-as default
+We define a `BarotropicModel` of some resolution without forcing and drag
 
 ```@example haurwitz
 using SpeedyWeather
 spectral_grid = SpectralGrid(trunc=63, nlayers=1)
-model = BarotropicModel(spectral_grid)
+model = BarotropicModel(spectral_grid, forcing=nothing, drag=nothing)
 simulation = initialize!(model)
 ```
 
@@ -162,7 +161,9 @@ Rossby-Haurwitz wave in the shallow water model without any influences from orog
 spectral_grid = SpectralGrid(trunc=63, nlayers=1)
 initial_conditions = RossbyHaurwitzWave(spectral_grid)
 orography = NoOrography(spectral_grid)
-model = ShallowWaterModel(; spectral_grid, initial_conditions, orography)
+forcing = nothing
+drag = nothing
+model = ShallowWaterModel(spectral_grid; forcing, drag, initial_conditions, orography)
 simulation = initialize!(model)
 run!(simulation, period=Day(8))
 
@@ -204,7 +205,10 @@ initial_conditions = (;
 orography = NoOrography(spectral_grid)
 time_stepping = Leapfrog(spectral_grid, Δt_at_T31=Minute(30))   # 30min timestep scaled linearly
 
-model = PrimitiveDryModel(spectral_grid; time_stepping, initial_conditions, orography, dynamics_only=false)
+forcing = nothing
+drag = nothing
+
+model = PrimitiveDryModel(spectral_grid; time_stepping, initial_conditions, orography, forcing, drag, dynamics_only=false)
 simulation = initialize!(model)
 run!(simulation, period=Day(5))
 nothing # hide
