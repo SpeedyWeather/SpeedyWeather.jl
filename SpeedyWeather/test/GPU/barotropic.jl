@@ -41,9 +41,9 @@ end
 
     # check IC snapshot (transfer to CPU first to avoid scalar indexing on GPU)
     ic = output.output[1].prognostic
-    @test all(isfinite, on_architecture(CPU(), ic.vor))
+    @test all(isfinite, on_architecture(SpeedyWeather.CPU(), ic.vor))
 
     # check final snapshot
     final_snapshot = output.output[end].prognostic
-    @test all(isfinite, on_architecture(CPU(), final_snapshot.vor))
+    @test all(isfinite, on_architecture(SpeedyWeather.CPU(), final_snapshot.vor))
 end
