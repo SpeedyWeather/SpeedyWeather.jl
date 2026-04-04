@@ -136,3 +136,4 @@ end
     # prognostic data is valid
     @test all(isfinite, snapshot.prognostic.vor)
 end
+

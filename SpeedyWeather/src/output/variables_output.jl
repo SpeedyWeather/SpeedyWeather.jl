@@ -173,7 +173,8 @@ end
 function output_jld2!(output::JLD2Output, simulation::AbstractSimulation)
     output.output_counter += 1
     i = output.output_counter
-    output.jld2_file["$i"] = filter_groups(simulation.variables, output)
+    snapshot = filter_groups(simulation.variables, output)
+    output.jld2_file["$i"] = on_architecture(CPU(), snapshot)
     return nothing
 end
 
