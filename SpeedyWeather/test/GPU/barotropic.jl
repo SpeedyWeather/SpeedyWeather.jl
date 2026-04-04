@@ -39,11 +39,11 @@ end
 
     @test simulation.model.feedback.nans_detected == false
 
-    # check IC snapshot (convert to CPU first to avoid scalar indexing on GPU)
+    # check IC snapshot (transfer to CPU first to avoid scalar indexing on GPU)
     ic = output.output[1].prognostic
-    @test all(isfinite, Array(ic.vor))
+    @test all(isfinite, on_architecture(CPU(), ic.vor))
 
     # check final snapshot
     final_snapshot = output.output[end].prognostic
-    @test all(isfinite, Array(final_snapshot.vor))
+    @test all(isfinite, on_architecture(CPU(), final_snapshot.vor))
 end
