@@ -4,6 +4,7 @@ using Test
 # GENERAL
 include("spectral_grid.jl")
 include("parameters.jl")
+include("prognostic_variables.jl")
 
 # GPU/KERNELABSTRACTIONS
 include("GPU/kernelabstractions.jl")
