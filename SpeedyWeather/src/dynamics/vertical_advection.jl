@@ -75,7 +75,7 @@ end
     )
     ij, k = @index(Global, NTuple)
 
-    Δσₖ⁻¹ = inv(Δσ[k])
+    Δσₖ⁻¹ = 1/Δσ[k]   #TODO: `inv` isn't compatible with Reactant yet, add it back once that's done
 
     # for k=1 "above" term (at k-1/2) is 0, for k==nlayers "below" term (at k+1/2) is zero
     k⁻ = max(1, k - 1)

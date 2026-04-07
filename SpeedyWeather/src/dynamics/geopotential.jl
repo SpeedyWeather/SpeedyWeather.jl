@@ -74,10 +74,10 @@ function geopotential!(
     (; atmosphere) = model
 
     arch = architecture(T)
-    if typeof(arch) <: GPU
-        launch!(arch, LinearWorkOrder, (size(T, 1),), geopotential_kernel!, Φ, T, q, orography, g, G, atmosphere)
-    else
+    if typeof(arch) <: AbstractCPU
         geopotential_cpu!(Φ, T, q, orography, g, G, atmosphere)
+    else
+        launch!(arch, LinearWorkOrder, (size(T, 1),), geopotential_kernel!, Φ, T, q, orography, g, G, atmosphere)
     end
     return nothing
 end

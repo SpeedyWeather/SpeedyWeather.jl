@@ -143,7 +143,7 @@ end
     fb = diffusion.surface_layer_fraction
     κ = diffusion.von_Karman
     z₀ = diffusion.roughness_length
-    gravity⁻¹ = inv(planet.gravity)
+    gravity⁻¹ = 1/planet.gravity   #TODO: `inv` isn't compatible with Reactant yet, add it back once that's done
 
     # Typical height Z of lowermost layer from geopotential of reference surface temperature
     # minus surface geopotential (orography * gravity), simplification compared to
@@ -217,14 +217,14 @@ end
 # Ri-dependent factor in Frierson, 2006 eq (20)
 @inline function Rifac(Ri, Ri_c, z, z₀)
     Ri_Ri_c = Ri / Ri_c
-    return inv(1 + Ri_Ri_c * log(z / z₀) / (1 - Ri_Ri_c))
+    return 1/(1 + Ri_Ri_c * log(z / z₀) / (1 - Ri_Ri_c))   #TODO: `inv` isn't compatible with Reactant yet, add it back once that's done
 end
 
 # Approximate: Ri-dependent factor in Frierson, 2006 eq (20)
 # because 1 / (1 + log(z/z₀)) is so weakly dependent on z for 10-10000m
 @inline function Rifac(Ri, Ri_c, logz_z₀)
     Ri_Ri_c = Ri / Ri_c
-    return inv(1 + Ri_Ri_c * logz_z₀ / (1 - Ri_Ri_c))
+    return 1/(1 + Ri_Ri_c * logz_z₀ / (1 - Ri_Ri_c))   #TODO: `inv` isn't compatible with Reactant yet, add it back once that's done
 end
 
 @propagate_inbounds function _vertical_diffusion!(

@@ -103,7 +103,7 @@ large-scale precipitation vertically for output."""
             # 0. convert between humidity tendency [kg/kg/s] and precipitation amount [m] or rate [m/s]
             Δp_gρ = Δσ[k] * pₛ_gρ                           # pressure thickness of layer Δp times 1/g/ρ [m]
             Δp_Δtgρ = Δp_gρ / Δt_sec                          # pressure thickness of layer Δp times 1/Δt/g/ρ [m/s]
-            Δtgρ_Δp = inv(Δp_Δtgρ)                          # [s/m]
+            Δtgρ_Δp = 1/Δp_Δtgρ                             # [s/m] #TODO: `inv` isn't compatible with Reactant yet, add it back once that's done
 
             # 1. Melting of snow from layer above
             δT_melt = max(temp[ij, k] - melting_threshold, 0)   # only if temperature above melting threshold

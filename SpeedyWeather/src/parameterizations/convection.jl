@@ -126,7 +126,7 @@ and relaxes current vertical profiles to the adjusted references."""
     rain_convection::NF = 0
 
     # GET TENDENCIES FROM ADJUSTED PROFILES
-    τ⁻¹ = inv(convert(NF, Second(convection.time_scale).value))
+    τ⁻¹ = 1/convert(NF, Second(convection.time_scale).value)   #TODO: `inv` isn't compatible with Reactant yet, add it back once that's done
     for k in level_zero_buoyancy:nlayers
         temp_tend[ij, k] -= (temp[ij, k] - temp_ref_profile[ij, k]) * τ⁻¹
         δq = (humid[ij, k] - humid_ref_profile[ij, k]) * τ⁻¹
@@ -438,7 +438,7 @@ end
     latd = model.geometry.latd[j]
     σ = model.geometry.σ_levels_full
 
-    Qmax = ifelse(abs(latd) < scheme.σθ, inv(convert(NF, Second(scheme.time_scale).value)), NF(0))
+    Qmax = ifelse(abs(latd) < scheme.σθ, 1/convert(NF, Second(scheme.time_scale).value), NF(0))   #TODO: `inv` isn't compatible with Reactant yet, add it back once that's done
     p₀ = scheme.p₀ * 100     # hPa -> Pa
     σₚ = scheme.σₚ * 100     # hPa -> Pa
     cos²θ_term = scheme.lat_mask[j]

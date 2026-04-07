@@ -102,7 +102,8 @@ end
     G_η = η_tend[lm] - H * (div_old[lm, k] - div_new[lm, k])
 
     # Using the Gs correct the tendencies for semi-implicit time stepping
-    S⁻¹ = inv(1 - ξ^2 * H * g * ∇²)  # operator to invert
+    # TODO: Reactant doesn't support inv(.) yet, set back to inv once that's done
+    S⁻¹ = 1/(1 - ξ^2 * H * g * ∇²)  # operator to invert
     div_tend[lm, k] = S⁻¹ * (G_div - ξ * g * ∇² * G_η)
     η_tend[lm] = G_η - ξ * H * div_tend[lm, k]
 end
@@ -339,7 +340,7 @@ end
     # Gauss-Jordan elimination: reduce S_scratch[l,:,:] (S) to I,
     # applying the same row operations to S⁻¹[l,:,:] (I → S⁻¹)
     for pivot in 1:nlayers
-        inv_pivot = inv(S_scratch[l, pivot, pivot])
+        inv_pivot = 1/S_scratch[l, pivot, pivot]   #TODO: `inv` isn't compatible with Reactant yet, add it back once that's done
 
         # Scale pivot row
         for r in 1:nlayers
