@@ -7,9 +7,6 @@ at regular intervals. Subtypes must have fields: `active`, `path`, `run_prefix`,
 abstract type AbstractVariablesOutput <: AbstractOutput end
 
 # GROUPS FILTERING
-
-const ALL_VARIABLE_GROUPS = (:prognostic, :grid, :tendencies, :dynamics, :parameterizations, :particles, :scratch)
-
 """$(TYPEDSIGNATURES)
 Filter `vars::Variables` to only include the groups specified in `output.groups`.
 Returns the `Variables` struct directly when `groups` contains `:all`,

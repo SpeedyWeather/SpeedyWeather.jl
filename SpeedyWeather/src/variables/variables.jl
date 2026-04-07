@@ -82,6 +82,9 @@ All non-prognostic groups are considered to be diagnostic with no memory between
     scratch::S = NamedTuple()
 end
 
+# defined e.g. for output filters, as fieldnames(Variables) isn't fully type stable
+const ALL_VARIABLE_GROUPS = (:prognostic, :grid, :tendencies, :dynamics, :parameterizations, :particles, :scratch)
+
 Adapt.@adapt_structure Variables
 
 """$(TYPEDSIGNATURES)
