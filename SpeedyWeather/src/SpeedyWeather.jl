@@ -21,7 +21,7 @@ import Base: @propagate_inbounds
 using SpeedyWeatherInternals
 using SpeedyWeatherInternals.Architectures
 using SpeedyWeatherInternals.KernelLaunching
-import SpeedyWeatherInternals.Architectures: AbstractArchitecture, CPU, GPU,
+import SpeedyWeatherInternals.Architectures: AbstractArchitecture, AbstractCPU, CPU, GPU,
     on_architecture, architecture, array_type, ismatching, nonparametric_type
 export CPU, GPU, on_architecture, architecture                # export device functions
 export SpeedyWeatherInternals, Architectures, KernelLaunching

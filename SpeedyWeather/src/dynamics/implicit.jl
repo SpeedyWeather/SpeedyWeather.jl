@@ -401,8 +401,8 @@ function implicit_correction!(
     zero_last_degree!(pres_tend)
     zero_last_degree!(temp_tend)
 
-    pres_tend.data[1:1] .= 0    # mass conservation
-
+    #pres_tend.data[1:1] .= 0    # mass conservation
+    @allowscalar pres_tend.data[1] = 0    # mass conservation
     return nothing
 end
 
