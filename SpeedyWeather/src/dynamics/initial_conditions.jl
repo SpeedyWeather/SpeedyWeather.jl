@@ -611,7 +611,7 @@ function initialize!(
 
     Γ = lapse_rate(model.atmosphere)
     (; R_dry) = model.atmosphere
-    T₀ = model.atmosphere.temperature_reference
+    T₀ = model.atmosphere.reference_temperature
     (; grid, nlayers) = model.spectral_grid
     (; radius, rotation, gravity) = model.planet
 
@@ -769,8 +769,8 @@ function initialize!(
 
     Γ = lapse_rate(model.atmosphere)
     (; R_dry) = model.atmosphere
-    T₀ = model.atmosphere.temperature_reference
-    p₀ = model.atmosphere.pressure_reference
+    T₀ = model.atmosphere.reference_temperature
+    p₀ = model.atmosphere.reference_pressure
 
     (; gravity) = model.planet
     (; orography) = model.orography     # orography on the grid
@@ -800,8 +800,8 @@ function initialize!(
     )
     haskey(vars.prognostic, :pressure) || warn_undefvar(vars, :pressure) && return nothing
 
-    # logarithm of reference surface pressure [log(Pa)]
-    set!(vars, model; pressure = log(model.atmosphere.pressure_reference))
+    # prognostic variable is logarithm of reference surface pressure [log(Pa)]
+    set!(vars, model; pressure = log(model.atmosphere.reference_pressure))
     return nothing
 end
 
