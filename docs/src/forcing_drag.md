@@ -400,11 +400,13 @@ In general, these are the fields you can write into for new terms
 - `tendencies.grid.u` in grid space
 - `tendencies.grid.v` in grid space
 - `tendencies.vorticity` in spectral space
-- `tendencies.div` in spectral space
-- `tendencies.pres` in spectral space
-- `tendencies.grid.pres` in grid space
-- `tendencies.grid.temp` in grid space
-- `tendencies.grid.humid` in grid space
+- `tendencies.divergence` in spectral space
+- `tendencies.pressure` in spectral space (primitive equation only)
+- `tendencies.grid.pressure` in grid space (primitive equation only)
+- `tendencies.η` in spectral space (shallow water only)
+- `tendencies.grid.η` in grid space (shallow water only)
+- `tendencies.grid.temperature` in grid space (primitive equation only)
+- `tendencies.grid.humidity` in grid space (primitive wet model only)
 
 One currently cannot force vorticity or divergence in grid space
 but you would need to force u, v instead. In contrast, u and v cannot
@@ -414,5 +416,6 @@ between spaces to obtain tendencies. Pressure (or interface displacement
 in the shallow water) can be forced both in spectral or grid space.
 Note that if you write into the pressure tendency for the primitive equation model
 these need to correspond to ``\partial_t \ln p_s`` so not in units of Pa/s but
-including the logarithm! In the shallow water model, this should have
-the normal units of m/s instead and the pressure-equivalent variables is called `η` instead as it's the interface displacement in meters (and not actually pressure).
+including the logarithm! In the shallow water model, the pressure-equivalent variable
+is called `η` instead as it's the interface displacement in meters (and not actually pressure),
+so this should have the normal units of m/s instead.
