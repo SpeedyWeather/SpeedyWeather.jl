@@ -11,8 +11,12 @@ $(TYPEDFIELDS)
         SpectralGridType,   # <:Union{SpectralGrid, Nothing}, the latter only matter inside GPU kernels
         RefValueNF,         # <:Union{Base.RefValue{NF}, CUDA.RefValue{NF}}
         VectorIntType,
-        VectorType,
         IntType,            # <: Integer
+        VT1,                # These seemingly redundant extra VectorTypes are needed for Reactant compat 
+        VTLat,              # which needs different types for different sizes of the array
+        VTGrid,
+        VTVert1,
+        VTVert2,
     } <: AbstractGeometry
 
     "SpectralGrid that defines spectral and grid resolution"
@@ -42,59 +46,59 @@ $(TYPEDFIELDS)
 
     # ARRAYS OF LANGITUDES/LONGITUDES
     "Array of longitudes in degrees (0...360˚), empty for non-full grids"
-    lond::VectorType = get_lond(spectral_grid.Grid, nlat_half)
+    lond::VT1 = get_lond(spectral_grid.Grid, nlat_half)
 
     "Array of latitudes in degrees (90˚...-90˚)"
-    latd::VectorType = get_latd(spectral_grid.Grid, nlat_half)
+    latd::VTLat = get_latd(spectral_grid.Grid, nlat_half)
 
     "Array of latitudes in radians (π...-π)"
-    lat::VectorType = get_lat(spectral_grid.Grid, nlat_half)
+    lat::VTLat = get_lat(spectral_grid.Grid, nlat_half)
 
     "Array of colatitudes in radians (0...π)"
-    colat::VectorType = get_colat(spectral_grid.Grid, nlat_half)
+    colat::VTLat = get_colat(spectral_grid.Grid, nlat_half)
 
     "Longitude (0˚...360˚) for each grid point in ring order"
-    londs::VectorType = get_londlatds(spectral_grid.Grid, nlat_half)[1]
+    londs::VTGrid = get_londlatds(spectral_grid.Grid, nlat_half)[1]
 
     "Latitude (-90˚...˚90) for each grid point in ring order"
-    latds::VectorType = get_londlatds(spectral_grid.Grid, nlat_half)[2]
+    latds::VTGrid = get_londlatds(spectral_grid.Grid, nlat_half)[2]
 
     "Longitude (0...2π) for each grid point in ring order"
-    lons::VectorType = RingGrids.get_lonlats(spectral_grid.Grid, nlat_half)[1]
+    lons::VTGrid = RingGrids.get_lonlats(spectral_grid.Grid, nlat_half)[1]
 
     "Latitude (-π/2...π/2) for each grid point in ring order"
-    lats::VectorType = RingGrids.get_lonlats(spectral_grid.Grid, nlat_half)[2]
+    lats::VTGrid = RingGrids.get_lonlats(spectral_grid.Grid, nlat_half)[2]
 
     "sin of latitudes"
-    sinlat::VectorType = sind.(latd)
+    sinlat::VTLat = sind.(latd)
 
     "cos of latitudes"
-    coslat::VectorType = cosd.(latd)
+    coslat::VTLat = cosd.(latd)
 
     "= 1/cos(lat)"
-    coslat⁻¹::VectorType = 1 ./ coslat
+    coslat⁻¹::VTLat = 1 ./ coslat
 
     "= cos²(lat)"
-    coslat²::VectorType = coslat .^ 2
+    coslat²::VTLat = coslat .^ 2
 
     "= 1/cos²(lat)"
-    coslat⁻²::VectorType = 1 ./ coslat²
+    coslat⁻²::VTLat = 1 ./ coslat²
 
     # VERTICAL SIGMA COORDINATE σ = p/p0 (fraction of surface pressure)
     "σ at half levels, σ_k+1/2"
-    σ_levels_half::VectorType = default_sigma_coordinates(nlayers)
+    σ_levels_half::VTVert1 = default_sigma_coordinates(nlayers)
 
     "σ at full levels, σₖ"
-    σ_levels_full::VectorType = 0.5 * (σ_levels_half[2:end] + σ_levels_half[1:(end - 1)])
+    σ_levels_full::VTVert2 = 0.5 * (σ_levels_half[2:end] + σ_levels_half[1:(end - 1)])
 
     "σ level thicknesses, σₖ₊₁ - σₖ"
-    σ_levels_thick::VectorType = σ_levels_half[2:end] - σ_levels_half[1:(end - 1)]
+    σ_levels_thick::VTVert2 = σ_levels_half[2:end] - σ_levels_half[1:(end - 1)]
 
     "log of σ at full levels, include surface (σ=1) as last element"
-    ln_σ_levels_full::VectorType = log.(vcat(σ_levels_full, 1))
+    ln_σ_levels_full::VTVert1 = log.(vcat(σ_levels_full, 1))
 
     "Full to half levels interpolation"
-    full_to_half_interpolation::VectorType = σ_interpolation_weights(σ_levels_full, σ_levels_half)
+    full_to_half_interpolation::VTVert2 = σ_interpolation_weights(σ_levels_full, σ_levels_half)
 end
 
 Adapt.@adapt_structure Geometry
@@ -111,7 +115,7 @@ function Geometry(SG::SpectralGrid; vertical_coordinates = SigmaCoordinates(SG.n
 
     (; NF, VectorIntType, VectorType) = SG
     (; σ_half) = vertical_coordinates
-    return Geometry{typeof(SG), Base.RefValue{NF}, VectorIntType, VectorType, typeof(nlayers)}(; spectral_grid = SG, σ_levels_half = σ_half)
+    return Geometry{typeof(SG), Base.RefValue{NF}, VectorIntType, typeof(nlayers), VectorType, VectorType, VectorType, VectorType, VectorType}(; spectral_grid = SG, σ_levels_half = σ_half)
 end
 
 function Base.show(io::IO, G::Geometry)
