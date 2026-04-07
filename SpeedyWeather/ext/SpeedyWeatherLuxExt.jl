@@ -415,7 +415,7 @@ Base.@propagate_inbounds function brdf(ij, diagn, progn, scheme::LearnedLandAlbe
 
     μ = diagn.physics.cos_zenith[ij]
     θ = acos(μ)
-    fraction_direct = diagn.physics.rad_fraction_direct[ij]
+    fraction_direct = diagn.physics.direct_radiation_fraction[ij]
 
     return calculate_bsa_from_fraction(sw_pred_iso, sw_pred_vol, sw_pred_geo, θ, fraction_direct)
 end

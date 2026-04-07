@@ -351,8 +351,8 @@ end
     (; refractive_index, foam_reflectance, volume_scattering, cloudy_sky, albedo_ice) = albedo_scheme
 
     wind_speed = diagn.physics.surface_wind_speed[ij]
-    f_dir = diagn.physics.rad_fraction_direct[ij]
-    f_dif = diagn.physics.rad_fraction_diffuse[ij]
+    f_dir = diagn.physics.direct_radiation_fraction[ij]
+    f_dif = diagn.physics.diffuse_radiation_fraction[ij]
     σ = diagn.physics.ocean.surface_roughness[ij]
 
     n₀ = refractive_index
