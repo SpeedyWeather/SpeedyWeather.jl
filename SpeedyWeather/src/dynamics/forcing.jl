@@ -333,7 +333,7 @@ function initialize!(
     σ = model.geometry.σ_levels_full
     (; σb, ΔTy, Δθz, relax_time_slow, relax_time_fast, Tmax) = forcing
     (; logσ, temp_relax_freq, temp_equil_a, temp_equil_b) = forcing
-    p₀ = model.atmosphere.pressure_reference
+    p₀ = model.atmosphere.reference_pressure
 
     # slow relaxation everywhere, fast in the tropics
     kₐ = 1 / relax_time_slow.value
