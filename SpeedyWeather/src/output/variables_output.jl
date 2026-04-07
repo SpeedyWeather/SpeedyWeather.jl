@@ -2,9 +2,8 @@ export JLD2Output, ArrayOutput
 
 """Abstract supertype for output writers that save `Variables` (or subsets thereof)
 at regular intervals. Subtypes must have fields: `active`, `path`, `run_prefix`, `id`,
-`run_number`, `run_digits`, `run_folder`, `run_path`, `overwrite`, `write_restart`,
-`write_parameters_txt`, `write_progress_txt`, `output_dt`, `output_every_n_steps`,
-`timestep_counter`, `output_counter`, `groups`."""
+`run_number`, `run_digits`, `overwrite`, `write_restart`, `write_parameters_txt`,
+`write_progress_txt`, `output_dt`, `groups`, and `core::OutputWriterCore`."""
 abstract type AbstractVariablesOutput <: AbstractOutput end
 
 # GROUPS FILTERING
@@ -20,57 +19,6 @@ function filter_groups(vars::Variables, output::AbstractVariablesOutput)
     :all in groups && return vars
     selected = Tuple(g for g in ALL_VARIABLE_GROUPS if g in groups)
     return NamedTuple{selected}(Tuple(getfield(vars, g) for g in selected))
-end
-
-# SHARED INITIALIZE
-
-"""$(TYPEDSIGNATURES)
-Shared initialization for `AbstractVariablesOutput` subtypes: determine run folder,
-compute output frequency, reset counters, add standard callbacks."""
-function initialize_variables_output!(
-        output::AbstractVariablesOutput,
-        model::AbstractModel,
-    )
-    output.active || return false
-
-    # GET RUN ID, CREATE FOLDER (only for outputs that write to disk)
-    if hasproperty(output, :filename)
-        determine_run_folder!(output)
-        create_run_folder!(output)
-    end
-
-    # OUTPUT FREQUENCY
-    output.output_every_n_steps = max(
-        1, round(
-            Int,
-            Millisecond(output.output_dt).value / model.time_stepping.Δt_millisec.value
-        )
-    )
-    output.output_dt = Second(round(Int, output.output_every_n_steps * model.time_stepping.Δt_sec))
-
-    # RESET COUNTERS
-    output.timestep_counter = 0
-    output.output_counter = 0
-
-    # CALLBACKS
-    output.write_parameters_txt && add!(model.callbacks, :parameters_txt => ParametersTxt())
-    output.write_progress_txt && add!(model.callbacks, :progress_txt => ProgressTxt())
-    output.write_restart && add!(model.callbacks, :restart_file => RestartFile())
-
-    return true
-end
-
-# SHARED OUTPUT STEPPING
-
-"""$(TYPEDSIGNATURES)
-Shared output stepping logic: increment timestep counter and check whether output
-should be written on this step. Returns `true` if output should proceed."""
-function should_output!(output::AbstractVariablesOutput)
-    output.timestep_counter += 1
-    (; active, output_every_n_steps, timestep_counter) = output
-    active || return false
-    timestep_counter % output_every_n_steps == 0 || return false
-    return true
 end
 
 """Output writer for a JLD2 file that saves the Variables struct directly to a JLD2 file.
@@ -96,12 +44,6 @@ $(TYPEDFIELDS)"""
     "[OPTION] run numbers digits"
     run_digits::Int = 4
 
-    "[DERIVED] folder name where data is stored, determined at initialize!"
-    run_folder::String = ""
-
-    "[DERIVED] full path to folder where data is stored, determined at initialize!"
-    run_path::String = ""
-
     "[OPTION] Overwrite an existing run folder?"
     overwrite::Bool = false
 
@@ -126,10 +68,8 @@ $(TYPEDFIELDS)"""
     "[OPTION] which variable groups to save, e.g. (:prognostic,) or (:prognostic, :grid). Use (:all,) for all groups."
     groups::Tuple{Vararg{Symbol}} = (:all,)
 
-    # TIME STEPS AND COUNTERS (initialize later)
-    output_every_n_steps::Int = 0           # output frequency
-    timestep_counter::Int = 0               # time step counter
-    output_counter::Int = 0                 # output step counter
+    "[DERIVED] shared output writer state (run folder, counters, output frequency)"
+    core::OutputWriterCore = OutputWriterCore()
 
     jld2_file::Union{JLDFile, Nothing} = nothing
 end
@@ -151,7 +91,7 @@ function initialize!(
         vars::Variables,
         model::AbstractModel,
     )
-    initialize_variables_output!(output, model) || return nothing
+    initialize!(output.core, output, model) || return nothing
 
     # CREATE JLD2 FILE
     (; run_path, filename) = output
@@ -166,7 +106,7 @@ end
 Base.close(output::JLD2Output) = close(output.jld2_file)
 
 function output!(output::JLD2Output, simulation::AbstractSimulation)
-    should_output!(output) || return nothing
+    output!(output.core, output) || return nothing
     return output_jld2!(output, simulation)
 end
 
@@ -234,32 +174,29 @@ Otherwise follows the same logic as [`JLD2Output`](@ref). Fields are $(TYPEDFIEL
     "[OPTION] which variable groups to save, e.g. (:prognostic,) or (:prognostic, :grid). Use (:all,) for all groups."
     groups::Tuple{Vararg{Symbol}} = (:all,)
 
-    # TIME STEPS AND COUNTERS (initialize later)
-    output_every_n_steps::Int = 0           # output frequency
-    timestep_counter::Int = 0               # time step counter
-    output_counter::Int = 0                 # output step counter
+    "[DERIVED] shared output writer state (run folder, counters, output frequency)"
+    core::OutputWriterCore = OutputWriterCore()
 
     "[DERIVED] vector of stored variable snapshots, populated during the simulation"
     output::Vector = []
 end
 
-# ArrayOutput has no run folder or file, but AbstractOutput methods
-# like set! need these fields. Provide stubs.
+# ArrayOutput has no run folder or file — stub out path-related option fields
+# that AbstractOutput methods like set! may try to assign.
 Base.getproperty(output::ArrayOutput, s::Symbol) = begin
-    if s === :run_folder
-        return ""
-    elseif s === :run_path
-        return ""
-    elseif s === :path
-        return ""
-    else
-        return getfield(output, s)
-    end
+    s in (:path, :run_prefix, :id, :run_number, :run_digits, :overwrite) && return _arrayoutput_default(s)
+    s === :core && return getfield(output, :core)
+    s in OUTPUT_WRITER_CORE_FIELDS && return getproperty(getfield(output, :core), s)
+    return getfield(output, s)
 end
 
+_arrayoutput_default(s::Symbol) = s === :run_number ? 1 : s === :run_digits ? 4 : s === :overwrite ? false : ""
+
 function Base.setproperty!(output::ArrayOutput, s::Symbol, v)
-    # silently ignore path-related assignments from set!
-    s in (:run_folder, :run_path, :path) && return v
+    # silently ignore path-related option fields that ArrayOutput doesn't use
+    s in (:path, :run_prefix, :id, :run_number, :run_digits, :overwrite) && return v
+    s === :core && return setfield!(output, :core, v)
+    s in OUTPUT_WRITER_CORE_FIELDS && return setproperty!(getfield(output, :core), s, v)
     return setfield!(output, s, v)
 end
 
@@ -279,7 +216,7 @@ function initialize!(
         vars::Variables,
         model::AbstractModel,
     )
-    initialize_variables_output!(output, model) || return nothing
+    initialize!(getfield(output, :core), output, model; create_folder = false) || return nothing
 
     # compute total number of output snapshots: IC + one per output_every_n_steps
     n_timesteps = vars.prognostic.clock.n_timesteps
@@ -291,7 +228,7 @@ function initialize!(
     output_vector[1] = ic
     setfield!(output, :output, output_vector)
 
-    # counter already at 0 from initialize_variables_output!, set to 1 for IC
+    # counter already reset to 0 by initialize!, set to 1 for IC
     output.output_counter = 1
     return nothing
 end
@@ -299,7 +236,7 @@ end
 Base.close(::ArrayOutput) = nothing
 
 function output!(output::ArrayOutput, simulation::AbstractSimulation)
-    should_output!(output) || return nothing
+    output!(output.core, output) || return nothing
     output.output_counter += 1
     i = output.output_counter
     getfield(output, :output)[i] = deepcopy(filter_groups(simulation.variables, output))
