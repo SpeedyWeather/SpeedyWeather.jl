@@ -316,7 +316,7 @@ end
     ϕ = lat[j]
     h₀ = ifelse(
         2 * (abs(δ) + abs(ϕ)) < π,    # polar day/night?
-        acos(-tan(ϕ) * tan(δ)),             # if not: calculate length of day
+        NF(acos(-tan(ϕ) * tan(δ))),        # if not: calculate length of day
         ifelse(ϕ * δ > 0, NF(π), zero(NF))
     )            # polar day if signs are equal, otherwise polar night
 
