@@ -116,14 +116,14 @@ Callback that records the global mean surface temperature on every time step.
 $(TYPEDFIELDS)"""
 Base.@kwdef mutable struct GlobalSurfaceTemperatureCallback{NF} <: AbstractCallback
     timestep_counter::Int = 0
-    temp::Vector{NF} = zeros(DEFAULT_NF, 0)
+    temperature::Vector{NF} = zeros(DEFAULT_NF, 0)
 end
 
 GlobalSurfaceTemperatureCallback(SG::SpectralGrid) = GlobalSurfaceTemperatureCallback{SG.NF}()
 
 """
 $(TYPEDSIGNATURES)
-Initializes callback.temp vector that records the global mean surface temperature on every time step.
+Initializes callback.temperature vector that records the global mean surface temperature on every time step.
 Allocates vector of correct length (number of elements = total time steps plus one) and stores the
 global surface temperature of the initial conditions"""
 function initialize!(
@@ -131,16 +131,17 @@ function initialize!(
         vars::Variables,
         model::AbstractModel,
     ) where {NF}
-    callback.temp = Vector{NF}(undef, vars.prognostic.clock.n_timesteps + 1)    # replace with vector of correct length
+    callback.temperature = Vector{NF}(undef, vars.prognostic.clock.n_timesteps + 1)    # replace with vector of correct length
     nlayers = model.geometry.nlayers
-    callback.temp[1] = vars.grid.temp_average[nlayers]            # set initial conditions
-    return callback.timestep_counter = 1                                   # (re)set counter to 1
+    callback.temperature[1] = vars.grid.temp_average[nlayers]       # set initial conditions
+    callback.timestep_counter = 1                                   # (re)set counter to 1
+    return nothing 
 end
 
 """
 $(TYPEDSIGNATURES)
 Pulls the average temperature from the lowermost layer and stores it in the next
-element of the callback.temp vector."""
+element of the callback.temperature vector."""
 function callback!(
         callback::GlobalSurfaceTemperatureCallback,
         vars::Variables,
@@ -149,7 +150,8 @@ function callback!(
     callback.timestep_counter += 1
     i = callback.timestep_counter
     nlayers = model.geometry.nlayers
-    return callback.temp[i] = vars.grid.temp_average[nlayers]
+    callback.temperature[i] = vars.grid.temp_average[nlayers]
+    return nothing
 end
 
 # nothing to finalize

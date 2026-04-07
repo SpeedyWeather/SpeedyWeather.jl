@@ -141,7 +141,7 @@ end
     run!(simulation, steps = 10)
     @test leapfrog.first_step_euler == false
 
-    vor_restarted = deepcopy(simulation.variables.prognostic.vor)
+    vor_restarted = deepcopy(simulation.variables.prognostic.vorticity)
     time_restarted = simulation.variables.prognostic.clock.time
 
     # do a new simulation from same model
@@ -149,14 +149,14 @@ end
     @test leapfrog.first_step_euler == true
     run!(simulation, steps = 10)
     @test leapfrog.first_step_euler == false
-    @test vor_restarted == simulation.variables.prognostic.vor
+    @test vor_restarted == simulation.variables.prognostic.vorticity
     @test time_restarted == simulation.variables.prognostic.clock.time
 
     # check bit reproducibility of scaling
     SpeedyWeather.scale_prognostic!(simulation.variables, planet.radius)
-    @test vor_restarted != simulation.variables.prognostic.vor
+    @test vor_restarted != simulation.variables.prognostic.vorticity
     SpeedyWeather.unscale!(simulation.variables)
-    @test vor_restarted == simulation.variables.prognostic.vor
+    @test vor_restarted == simulation.variables.prognostic.vorticity
 
     # with restart half way
     simulation = initialize!(model)
@@ -167,6 +167,6 @@ end
 
     # this test is flagged as "broken" as bit reproducibility is close but not perfect
     # not sure exactly why, needs further investigation if deemed important
-    @test_broken vor_restarted == simulation.variables.prognostic.vor
+    @test_broken vor_restarted == simulation.variables.prognostic.vorticity
     @test time_restarted == simulation.variables.prognostic.clock.time
 end

@@ -55,7 +55,7 @@ function output!(
 
     # Compute z_bottom as z_surf + T_bottom * Δp_geopot / g, start with z_surf
     z_bottom .= max.(simulation.model.orography.orography, 0)   # [m] set negative values to zero
-    T_bottom = field_view(simulation.variables.grid.temp, :, nlayers)
+    T_bottom = field_view(simulation.variables.grid.temperature, :, nlayers)
     Δp_geopot = simulation.model.geopotential.Δp_geopot_full[end]
 
     # accumulate the second term in
@@ -95,7 +95,7 @@ Fields are: $(TYPEDFIELDS)"""
 end
 
 # not the actual surface temperature but the core variable to read in
-path(::SurfaceTemperatureOutput, simulation) = simulation.variables.grid.temp
+path(::SurfaceTemperatureOutput, simulation) = simulation.variables.grid.temperature
 
 function output!(
         output::NetCDFOutput,

@@ -210,7 +210,7 @@ as
 
 ```@example analysis
 # vorticity
-ζ = simulation.variables.grid.vor[:,1]
+ζ = simulation.variables.grid.vorticity[:,1]
 f = coriolis(ζ)     # create f on that grid
 
 # layer thickness
@@ -432,7 +432,7 @@ end
 function global_diagnostics(vars::Variables, model::AbstractModel)
     u = vars.grid.u[:, 1]
     v = vars.grid.v[:, 1]
-    ζR = vars.grid.vor[:, 1]
+    ζR = vars.grid.vorticity[:, 1]
     η = vars.grid.η
 
     # vorticity during simulation is scaled by radius R, unscale here

@@ -255,14 +255,13 @@ Greenland and Antarctic ice sheets.
 (`variables.prognostic.land.snow_depth`) and solves the following equation
 
 ```math
-\frac{dS}{dt} = P - M - R
+\frac{dS}{dt} = P - M
 ```
-with precipitation ``P``, melting ``M`` and runoff ``R``.
+with precipitation ``P`` and melting ``M``.
 Snow accumulates from the column-integrated large-scale
 (currently not from convection) snow precipitation rate ``P``, `snow_rate` (``kg/m²/s``),
 and melts once the top soil layer exceeds the melt threshold ``T_{melt}`` (default ``275~K``)
-through the term ``M`` and the runoff is implemented as a weak relaxation term
-back to 0 with a multi-year time scale.
+through the term ``M``.
 
 The available melt energy in the top
 layer of thickness ``z₁`` uses the dry-soil heat capacity ``cₛ``:
@@ -282,24 +281,20 @@ this formulation allows to melt more snow than there actually is, so we need
 to cap the amount to not end up with negative snow. We implement this constrain
 not for terms individually but for the sum of all terms, see below.
 
-A slow runoff/relaxation term prevents perennial snow packs from growing without bound,
+Snowfall and melt form a raw tendency ``\text{d}S_{max}`` that is further limited 
+so we never remove more snow than is present (including what falls during the current 
+step). The actual removal is reported as
 
 ```math
-\text{runoff}_{rate_{max}} = \frac{S}{\tau_{runoff}},
+\text{snow\_melt\_rate} = \text{melt}_{rate_{max}} + \text{excess},
 ```
 
-controlled by `runoff_time_scale` (default ``4`` years). Snowfall, melt and runoff form a raw
-tendency ``\text{d}S_{max}`` that is further limited so we never remove more snow than is present
-(including what falls during the current step). The actual removal is reported as
-
-```math
-\text{snow\_melt\_rate} = \text{melt}_{rate_{max}} + \text{runoff}_{rate_{max}} + \text{excess},
-```
-
-in ``kg/m²/s``, where the `excess` term (negative for melting/runoff trying to remove more snow than there is)
+in ``kg/m²/s``, where the `excess` term (negative for melting trying to remove more snow than there is)
 only appears when the naive tendency would overdraw the bucket.
-`snow_melt_rate` therefore combines true melt with the runoff leak and is zero over ocean points.
-Snow depth is clipped to zero and stored as equivalent liquid water height, not physical snow thickness.
+`snow_melt_rate` is zero over ocean points. Negative snow depth is clamped to zero (technically redundant given the conserving excess term above) and stored 
+as equivalent liquid water height, not physical snow thickness. The accumulation is 
+capped at 10m equivalent liquid water height, following how permanent snow area is treated 
+in [IFS Cycle 49r1](https://www.ecmwf.int/en/elibrary/81626-ifs-documentation-cy49r1-part-iv-physical-processes). In reality very large accumulation of snow would form glaciers and eventually ice sheets that we do not simulate here.
 
 The snow budget links into other surface schemes:
 

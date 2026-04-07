@@ -25,7 +25,7 @@ Run tests with `julia --project=<PackageName> <PackageName>/test/runtests.jl`.
 ```
 SpeedyWeather/src/
 ├── dynamics/          # Core dynamics (tendencies, time stepping, diffusion, …)
-├── physics/           # Parameterisations (convection, radiation, land, ocean, …)
+├── parameterizations/ # Parameterisations (convection, radiation, land, ocean, …)
 │   ├── land/          # 2-layer soil bucket model
 │   ├── radiation/     # Shortwave & longwave
 │   └── surface_fluxes/
@@ -66,8 +66,8 @@ and `finalize!`.
 
 | Group | Purpose |
 |-------|---------|
-| `prognostic` | State variables subject to time stepping (vor, div, temp, pres, tracers, etc.) |
-| `grid` | Grid-point copies of spectral prognostic variables (u, v, temp, etc.) |
+| `prognostic` | State variables subject to time stepping (vorticity, divergence, temperature, pressure, tracers, etc.) |
+| `grid` | Grid-point copies of spectral prognostic variables (u, v, temperature, etc.) |
 | `tendencies` | Time derivatives; spectral at top level, grid-space under `.grid` namespace |
 | `dynamics` | Working arrays for the dynamical core (pressure gradients, vertical velocity, etc.) |
 | `parameterizations` | Working arrays for parameterizations (fluxes, radiation, cloud properties, etc.) |
@@ -77,9 +77,9 @@ and `finalize!`.
 Variables can be organized by namespace (e.g. `:ocean`, `:land`, `:tracers`):
 
 ```julia
-vars.prognostic.vor                             # Spectral vorticity
+vars.prognostic.vorticity                             # Spectral vorticity
 vars.prognostic.ocean.sea_surface_temperature   # Ocean namespace
-vars.tendencies.vor                             # Spectral vorticity tendency
+vars.tendencies.vorticity                             # Spectral vorticity tendency
 vars.tendencies.grid.u                          # Grid-space u-wind tendency
 vars.dynamics.w                                 # Vertical velocity
 ```
@@ -175,8 +175,8 @@ field = rand(Float32, spectral_grid.grid)
 | `dynamics/time_integration.jl` (~450 lines) | Main time loop (`time_stepping!`) |
 | `dynamics/implicit.jl` | Semi-implicit gravity-wave treatment (allows CFL > 1) |
 | `models/simulation.jl` | `run!`, `initialize!`, `finalize!` for `Simulation` |
-| `physics/convection.jl` | Betts-Miller convection |
-| `physics/large_scale_condensation.jl` | Implicit condensation |
+| `parameterizations/convection.jl` | Betts-Miller convection |
+| `parameterizations/large_scale_condensation.jl` | Implicit condensation |
 | `output/netcdf_output.jl` (~540 lines) | NetCDF writing with interpolation |
 | `output/callbacks.jl` | Hook system for runtime code injection |
 
@@ -213,7 +213,7 @@ julia --project=SpeedyWeather SpeedyWeather/test/runtests.jl extended_tests
 julia --project=RingGrids --check-bounds=yes -e 'using Pkg; Pkg.test("RingGrids")'
 ```
 
-Test subdirectories: `dynamics/`, `physics/`, `output/`, `GPU/`, `differentiability/`.
+Test subdirectories: `dynamics/`, `parameterizations/`, `output/`, `GPU/`, `differentiability/`.
 
 ## Documentation
 
@@ -295,7 +295,7 @@ end
 ```
 
 Kernels are spread across ~36 files in `SpeedyWeather/src/dynamics/`,
-`physics/`, `SpeedyTransforms/src/`, `RingGrids/src/`, and
+`parameterizations/`, `SpeedyTransforms/src/`, `RingGrids/src/`, and
 `LowerTriangularArrays/src/`.
 
 ## Benchmarks

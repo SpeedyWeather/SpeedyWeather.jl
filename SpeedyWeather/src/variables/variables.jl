@@ -153,19 +153,22 @@ function Base.show(io::IO, V::Variables)
             lastj = j == length(keys(getfield(V, p)))   # check if last variable in namespace to choose ending └
             s2 = lastj ? "└" : "├"                      # choose ending └ for last variable
             maybe_bar1 = lasti ? " " : "│"              # if last variable in namespace, no vertical bar needed
-            print(io, "\n$maybe_bar1 $s2 ")
             nt = getfield(getfield(V, p), k)
             if nt isa NamedTuple
-                print(io, styled"{success:$k}")
+                print(io, "\n$maybe_bar1 $s2 ", styled"{success:$k}")
                 for (l, m) in enumerate(keys(nt))
                     s3 = l == length(keys(nt)) ? "└" : "├"  # choose ending └ for last variable
                     maybe_bar2 = lastj ? " " : "│"          # if last variable in namespace, no vertical bar needed
                     smry = Base.summary(getfield(nt, m))
-                    print(io, "\n$maybe_bar1 $maybe_bar2 $s3 ", styled"{magenta:$m}: $smry")
+                    line = "$maybe_bar1 $maybe_bar2 $s3 " * styled"{magenta:$m}: $smry"
+                    line_short = textwidth(line) > 75 ? first(line, 75) * "..." : line
+                    print(io, "\n", line_short)
                 end
             else
-                print(io, styled"{magenta:$k}")
-                print(io, ": ", Base.summary(nt))
+                smry = Base.summary(nt)
+                line = "$maybe_bar1 $s2 " * styled"{magenta:$k}: $smry"
+                line_short = textwidth(line) > 75 ? first(line, 75) * "..." : line
+                print(io, "\n", line_short)
             end
         end
     end
@@ -196,7 +199,7 @@ function allocate(group, model)
     namespaces = filter(k -> k != Symbol(), tuple(keys(group)...))
 
     # variables without namespace identified by empty symbol Symbol() go directly into the main NamedTuple
-    # that way we have variables.prognostic.vor skipping the namespace between prognostic and vor
+    # that way we have variables.prognostic.vorticity skipping the namespace between prognostic and vor
     nt1 = NamedTuple{Tuple(map(v -> v.name, group[Symbol()]))}(Tuple(map(var -> zero(var, model), group[Symbol()])))
 
     # other variables grouped by namespace

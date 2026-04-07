@@ -40,12 +40,12 @@ and relaxes current vertical profiles to the adjusted references."""
     Δt = time_stepping.Δt_sec
 
     # use previous time step for more stable calculations
-    temp = vars.grid.temp_prev
-    humid = vars.grid.humid_prev
+    temp = vars.grid.temperature_prev
+    humid = vars.grid.humidity_prev
     geopotential = vars.grid.geopotential
-    temp_tend = vars.tendencies.grid.temp
-    humid_tend = vars.tendencies.grid.humid
-    pₛ = vars.grid.pres_prev[ij]          # surface pressure [Pa]
+    temp_tend = vars.tendencies.grid.temperature
+    humid_tend = vars.tendencies.grid.humidity
+    pₛ = vars.grid.pressure_prev[ij]          # surface pressure [Pa]
     NF = eltype(temp)
 
     # thermodynamics
@@ -282,15 +282,15 @@ and relaxes current vertical profiles to the adjusted references."""
 @propagate_inbounds function convection!(ij, vars, DBM::BettsMillerDryConvection, model)
 
     (; geometry, atmosphere) = model
-    NF = eltype(vars.grid.temp_prev)
+    NF = eltype(vars.grid.temperature_prev)
     σ = geometry.σ_levels_full
     σ_half = geometry.σ_levels_half
     Δσ = geometry.σ_levels_thick
     nlayers = length(σ)
 
     # use previous time step for more stable calculations
-    temp = vars.grid.temp_prev
-    temp_tend = vars.tendencies.grid.temp
+    temp = vars.grid.temperature_prev
+    temp_tend = vars.tendencies.grid.temperature
 
     # use work arrays for temp_ref_profile
     temp_ref_profile = vars.scratch.grid.a     # temperature [K] reference profile to adjust to
@@ -428,8 +428,8 @@ end
         scheme::ConvectiveHeating,
         model,
     )
-    pₛ = vars.grid.pres_prev
-    temp_tend = vars.tendencies.grid.temp
+    pₛ = vars.grid.pressure_prev
+    temp_tend = vars.tendencies.grid.temperature
     nlayers = size(temp_tend, 2)
     NF = eltype(temp_tend)
 

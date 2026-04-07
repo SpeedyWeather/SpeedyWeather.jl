@@ -18,13 +18,13 @@
         ij = rand(1:model.geometry.npoints)
         SpeedyWeather.parameterization!(ij, vars, model.longwave_radiation, model)
 
-        dTdt = vars.tendencies.grid.temp[ij, end]
+        dTdt = vars.tendencies.grid.temperature[ij, end]
         @test dTdt != 0
 
         # now stochastic perturbation and check it's not the same
         SpeedyWeather.parameterization!(ij, vars, model.stochastic_physics, model)
 
-        dTdt2 = vars.tendencies.grid.temp[ij, end]
+        dTdt2 = vars.tendencies.grid.temperature[ij, end]
         @test dTdt2 != dTdt != 0
     end
 end
