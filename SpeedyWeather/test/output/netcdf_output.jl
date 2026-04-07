@@ -92,7 +92,7 @@ end
             @test haskey(ds, key)
         end
 
-        nx, ny, nz, nt = size(ds[:vorticity])
+        nx, ny, nz, nt = size(ds[:vor])
         @test nx == 2ny
         @test ny == 2nlat_half
     end
