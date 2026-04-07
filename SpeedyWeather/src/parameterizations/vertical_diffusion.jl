@@ -148,7 +148,7 @@ end
     # minus surface geopotential (orography * gravity), simplification compared to
     # Frierson to reduce the number of expensive log calls given that z ≈ Z for most
     # surface temperature variations
-    T₀ = atmosphere.temperature_reference
+    T₀ = atmosphere.reference_temperature
     gravity = planet.gravity
     Δp_geopot_full = geopot.Δp_geopot_full
     Z = T₀ * Δp_geopot_full[nlayers] / gravity
