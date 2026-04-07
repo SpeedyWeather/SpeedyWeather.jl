@@ -6,7 +6,7 @@ the model, these are described below.
 ## JLD2 Output 
 
 As an alternative to the [NetCDF output](@ref), it is also possible to directly
-output the `Variables` (all prognostic and diagnostic variables) to a JLD2 file.
+output the `Variables` (or one subgroup of it) to a JLD2 file.
 This might be interesting if you are really interested in the model internals,
 or also for some machine learning tasks. However, this option doesn't feature
 any possibilites to regrid or select variables, and it comes with the usual limitations
@@ -28,6 +28,20 @@ With all options shown below
 ```@example output2
 @doc JLD2Output
 ```
+
+## Array Output (to RAM)
+
+It's also possible to output the `Variables` (or a subgroup of it) directly into an array that is kept in the memory. This might be useful e.g. for low-resolution simulations you want to work with and visualize quickly, or also for simulations within ML training loops. `ArrayOutput` follows the exact same logic as `JLD2Output` except that the actual output is kept in an array `output`. So, save e.g. all prognostic variables to memory, you can run: 
+
+```@example output3
+using SpeedyWeather
+spectral_grid = SpectralGrid(trunc=31, nlayers=1)
+output = ArrayOutput(output_dt=Hour(1), groups=(:prognostic,))
+model = ShallowWaterModel(spectral_grid, output=output)
+model.output
+```
+
+After a succesfull `run!` the result is stored in `output.output`. 
 
 ## Parameter summary
 
