@@ -160,7 +160,7 @@ end
     l = l_indices[lm]
 
     # Skip zonal modes (m=0, which are the first lmax harmonics)
-    ξ[I] = ifelse(lm > lmax & l <= max_wavenumber, amplitude * l^power * random_values[I], 0)
+    ξ[I] = ifelse(lm > lmax & l <= max_wavenumber, amplitude * l^power * random_values[I], zero(amplitude))
 end
 
 export RandomVelocity
@@ -381,7 +381,7 @@ end
     θ = lat[j]  # latitude in radians
 
     # Compute velocity per latitude, u as in Galewsky, 2004
-    u_θ = ifelse(θ₀ < θ < θ₁, umax / eₙ * exp(1 / (θ - θ₀) / (θ - θ₁)), 0)
+    u_θ = ifelse(θ₀ < θ < θ₁, umax / eₙ * exp(1 / (θ - θ₀) / (θ - θ₁)), zero(umax))
 
     # Store velocity with scaling for curl!
     u_grid[ij] = u_θ / radius * coslat⁻¹[j]
