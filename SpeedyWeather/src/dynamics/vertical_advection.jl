@@ -32,7 +32,7 @@ function vertical_advection!(vars::Variables, model)
     advection_scheme = model.vertical_advection
     (; w) = vars.dynamics
 
-    for var in (:u, :v, :temp, :humid)
+    for var in (:u, :v, :temperature, :humidity)
         if haskey(vars.tendencies.grid, var)
             ξ_tend = vars.tendencies.grid[var]
             ξ = retrieve_time_step(advection_scheme, vars.grid, var)

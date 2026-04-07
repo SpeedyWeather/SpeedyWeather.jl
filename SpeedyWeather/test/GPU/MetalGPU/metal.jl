@@ -11,7 +11,7 @@ using Metal
     # allocate variables with Metal arrays
     model = PrimitiveWetModel(spectral_grid)
     vars = Variables(model)
-    @test vars.prognostic.vor.data isa MtlArray
+    @test vars.prognostic.vorticity.data isa MtlArray
     @test vars.prognostic.ocean.sea_surface_temperature.data isa MtlArray
-    @test vars.grid.vor.data isa MtlArray
+    @test vars.grid.vorticity.data isa MtlArray
 end

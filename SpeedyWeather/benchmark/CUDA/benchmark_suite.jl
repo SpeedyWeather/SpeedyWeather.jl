@@ -220,7 +220,7 @@ function run_benchmark_suite!(suite::BenchmarkSuiteDynamicsGPU)
         vars.grid.temp.data .+= implicit.temp_profile'
 
         # now just transforms as comparisons
-        vor = SpeedyWeather.get_step(vars.prognostic.vor, lf)
+        vor = SpeedyWeather.get_step(vars.prognostic.vorticity, lf)
         b = @benchmark CUDA.@sync SpeedyWeather.transform!($vars.grid.vor, $vor, $spectral_transform)
         add_results!(suite, b, i, 16)
 

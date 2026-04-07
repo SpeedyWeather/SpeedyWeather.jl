@@ -6,7 +6,7 @@
     model = BarotropicModel(spectral_grid)
     vars = SpeedyWeather.Variables(model)
     initialize!(vars, ic, model)
-    vor = vars.prognostic.vor
+    vor = vars.prognostic.vorticity
 
     # Check vorticity is non-zero and has no NaNs
     @test !all(vor .== 0)
@@ -17,7 +17,7 @@
     model_custom = BarotropicModel(spectral_grid)
     vars_custom = SpeedyWeather.Variables(model_custom)
     initialize!(vars_custom, ic_custom, model_custom)
-    vor_custom = vars_custom.prognostic.vor
+    vor_custom = vars_custom.prognostic.vorticity
 
     @test !any(isnan.(vor_custom))
     @test vor_custom != vor  # Different parameters should give different results
@@ -31,7 +31,7 @@ end
     model = BarotropicModel(spectral_grid)
     vars = Variables(model)
     initialize!(vars, ic, model)
-    vor = vars.prognostic.vor
+    vor = vars.prognostic.vorticity
 
     # Check vorticity is non-zero and has no NaNs
     @test !all(vor .== 0)
@@ -42,7 +42,7 @@ end
     model_custom = BarotropicModel(spectral_grid)
     vars_custom = Variables(model_custom)
     initialize!(vars_custom, ic_custom, model_custom)
-    vor_custom = vars_custom.prognostic.vor
+    vor_custom = vars_custom.prognostic.vorticity
 
     @test !any(isnan.(vor_custom))
     @test vor_custom != vor  # Different parameters should give different results
@@ -56,7 +56,7 @@ end
     model = ShallowWaterModel(spectral_grid)
     vars = Variables(model)
     initialize!(vars, ic, model)
-    vor = vars.prognostic.vor
+    vor = vars.prognostic.vorticity
     η = vars.prognostic.η
 
     # Check vorticity and pressure are initialized
@@ -70,7 +70,7 @@ end
     model_custom = ShallowWaterModel(spectral_grid)
     vars_custom = Variables(model_custom)
     initialize!(vars_custom, ic_custom, model_custom)
-    vor_custom = vars_custom.prognostic.vor
+    vor_custom = vars_custom.prognostic.vorticity
 
     @test !any(isnan.(vor_custom))
     @test vor_custom != vor  # Different parameters should give different results
@@ -84,8 +84,8 @@ end
     model = PrimitiveDryModel(spectral_grid)
     vars = Variables(model)
     initialize!(vars, ic, model)
-    vor = vars.prognostic.vor
-    div = vars.prognostic.div
+    vor = vars.prognostic.vorticity
+    div = vars.prognostic.divergence
 
     # Check vorticity and divergence are initialized
     @test !all(vor .== 0)
@@ -98,7 +98,7 @@ end
     model_custom = PrimitiveDryModel(spectral_grid)
     vars_custom = Variables(model_custom)
     initialize!(vars_custom, ic_custom, model_custom)
-    vor_custom = vars_custom.prognostic.vor
+    vor_custom = vars_custom.prognostic.vorticity
 
     @test !any(isnan.(vor_custom))
     @test vor_custom != vor  # Different parameters should give different results
@@ -112,7 +112,7 @@ end
     model = ShallowWaterModel(spectral_grid)
     vars = Variables(model)
     initialize!(vars, ic, model)
-    vor = vars.prognostic.vor
+    vor = vars.prognostic.vorticity
     η = vars.prognostic.η
 
     # Check vorticity and pressure are initialized
@@ -126,7 +126,7 @@ end
     model_custom = ShallowWaterModel(spectral_grid)
     vars_custom = Variables(model_custom)
     initialize!(vars_custom, ic_custom, model_custom)
-    vor_custom = vars_custom.prognostic.vor
+    vor_custom = vars_custom.prognostic.vorticity
 
     @test !any(isnan.(vor_custom))
     @test vor_custom != vor  # Different wavenumber should give different results
@@ -140,7 +140,7 @@ end
     model = PrimitiveWetModel(spectral_grid)
     vars = Variables(model)
     initialize!(vars, ic, model)
-    temp = vars.prognostic.temp
+    temp = vars.prognostic.temperature
 
     # Check temperature is initialized
     @test !all(temp .== 0)
@@ -151,7 +151,7 @@ end
     model_custom = PrimitiveWetModel(spectral_grid)
     vars_custom = Variables(model_custom)
     initialize!(vars_custom, ic_custom, model_custom)
-    temp_custom = vars_custom.prognostic.temp
+    temp_custom = vars_custom.prognostic.temperature
 
     @test !any(isnan.(temp_custom))
     @test temp_custom != temp  # Different parameters should give different results
@@ -165,7 +165,7 @@ end
     model = PrimitiveDryModel(spectral_grid)
     vars = Variables(model)
     initialize!(vars, ic, model)
-    pres = vars.prognostic.pres
+    pres = vars.prognostic.pressure
 
     # Check pressure is initialized
     @test !all(pres .== 0)
@@ -175,7 +175,7 @@ end
     model_wet = PrimitiveWetModel(spectral_grid)
     vars_wet = Variables(model_wet)
     initialize!(vars_wet, ic, model_wet)
-    pres_wet = vars_wet.prognostic.pres
+    pres_wet = vars_wet.prognostic.pressure
 
     @test !all(pres_wet .== 0)
     @test !any(isnan.(pres_wet))
@@ -192,7 +192,7 @@ end
     model = PrimitiveDryModel(spectral_grid)
     vars = Variables(model)
     initialize!(vars, ic, model)
-    pres = vars.prognostic.pres
+    pres = vars.prognostic.pressure
 
     # Check pressure is initialized to constant value
     @test !any(isnan.(pres))
@@ -219,7 +219,7 @@ end
     model = PrimitiveWetModel(spectral_grid)
     vars = Variables(model)
     initialize!(vars, ic, model)
-    humid = vars.prognostic.humid
+    humid = vars.prognostic.humidity
 
     # Check humidity is initialized
     @test !all(humid .== 0)
@@ -230,7 +230,7 @@ end
     model_custom = PrimitiveWetModel(spectral_grid)
     vars_custom = Variables(model_custom)
     initialize!(vars_custom, ic_custom, model_custom)
-    humid_custom = vars_custom.prognostic.humid
+    humid_custom = vars_custom.prognostic.humidity
 
     @test !any(isnan.(humid_custom))
     @test humid_custom != humid  # Different relative humidity should give different results
@@ -269,8 +269,8 @@ end
     model = PrimitiveDryModel(spectral_grid)
     vars = Variables(model)
     initialize!(vars, ic, model)
-    pres = vars.prognostic.pres
-    temp = vars.prognostic.temp
+    pres = vars.prognostic.pressure
+    temp = vars.prognostic.temperature
 
     # Check pressure and temperature are initialized
     @test !all(iszero.(pres))
@@ -280,7 +280,7 @@ end
     model_wet = PrimitiveWetModel(spectral_grid)
     vars_wet = Variables(model_wet)
     initialize!(vars_wet, ic, model_wet)
-    humid = vars_wet.prognostic.humid
+    humid = vars_wet.prognostic.humidity
 
     @test !all(iszero.(humid))
 end

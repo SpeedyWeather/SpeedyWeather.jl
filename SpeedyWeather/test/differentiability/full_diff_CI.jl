@@ -26,11 +26,11 @@ if VERSION <= v"1.11.0"
         dvars = make_zero(vars)
 
         # set a seeed for the prognostic variables
-        dvars.prognostic.vor .= 1 + im
-        dvars.prognostic.div .= 1 + im
-        dvars.prognostic.humid .= 1 + im
-        dvars.prognostic.temp .= 1 + im
-        dvars.prognostic.pres .= 1 + im
+        dvars.prognostic.vorticity .= 1 + im
+        dvars.prognostic.divergence .= 1 + im
+        dvars.prognostic.humidity .= 1 + im
+        dvars.prognostic.temperature .= 1 + im
+        dvars.prognostic.pressure .= 1 + im
 
         dmodel = make_zero(model)
 

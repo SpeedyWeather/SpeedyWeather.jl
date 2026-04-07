@@ -1,5 +1,4 @@
 @testset "run defaults for a year, no blow up" begin
-
     @testset "BarotropicModel" begin
         spectral_grid = SpectralGrid(nlayers = 1)
         model = BarotropicModel(spectral_grid)

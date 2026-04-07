@@ -62,13 +62,13 @@ end
     diff_coefficient = model.horizontal_diffusion.impl .* model.horizontal_diffusion.expl
     l_indices = [(1:l) for l in 1:spectral_grid.spectrum.mmax]
     for (i, il) in enumerate(l_indices)
-        @test all(real.(Matrix(dvars.prognostic.vor[:, 1, lf1])[i, il]) .≈ diff_coefficient[i])
+        @test all(real.(Matrix(dvars.prognostic.vorticity[:, 1, lf1])[i, il]) .≈ diff_coefficient[i])
     end
 
     # ∂(tend_old)
     # should be row-wise `model.horizontal_diffusion.impl`
     for (i, il) in enumerate(l_indices)
-        @test all(real.(Matrix(dvars.tendencies.vor[:, 1])[i, il]) .≈ model.horizontal_diffusion.impl[i])
+        @test all(real.(Matrix(dvars.tendencies.vorticity[:, 1])[i, il]) .≈ model.horizontal_diffusion.impl[i])
     end
 end
 
@@ -109,15 +109,15 @@ end
     # single variable leapfrog step
     #
 
-    A_old = vars.prognostic.vor[:, :, 1]
+    A_old = vars.prognostic.vorticity[:, :, 1]
     A_old_copy = deepcopy(A_old)
     dA_old = one(A_old)
 
-    A_new = vars.prognostic.vor[:, :, 2]
+    A_new = vars.prognostic.vorticity[:, :, 2]
     A_new_copy = deepcopy(A_new)
     dA_new = one(A_new)
 
-    tendency = adsim.vars.tendencies.vor
+    tendency = adsim.vars.tendencies.vorticity
     tendency_copy = deepcopy(tendency)
     dtendency = make_zero(tendency)
 
@@ -203,7 +203,7 @@ end
 
     @test_broken isapprox(to_vec(fd_vjp[1])[1], to_vec(dvars)[1], rtol = 0.05) # we have to go really quite high with the tolerances here
     @test mean(abs.(to_vec(fd_vjp[1])[1] - to_vec(dvars)[1])) < 0.002 # so we check a few extra statistics
-    @test maximum(to_vec(fd_vjp[1].prognostic.vor)[1] - to_vec(dvars.prognostic.vor)[1]) < 0.05
+    @test maximum(to_vec(fd_vjp[1].prognostic.vorticity)[1] - to_vec(dvars.prognostic.vorticity)[1]) < 0.05
 
     # test that we can differentiate with Const(Model) only wrt to the state
     vars_new, dvars_new = ADseed(adsim, :prognostic)
@@ -221,7 +221,7 @@ end
     d_vars = adsim.dvars
     @test_broken isapprox(to_vec(fd_vjp[1])[1], to_vec(d_vars)[1], rtol = 0.05) # we have to go really quite high with the tolerances here
     @test mean(abs.(to_vec(fd_vjp[1])[1] - to_vec(d_vars)[1])) < 0.002 # so we check a few extra statistics
-    @test maximum(to_vec(fd_vjp[1].prognostic.vor)[1] - to_vec(d_vars.prognostic.vor)[1]) < 0.05
+    @test maximum(to_vec(fd_vjp[1].prognostic.vorticity)[1] - to_vec(d_vars.prognostic.vorticity)[1]) < 0.05
 end
 
 @testset "Differentiability: Barotropic model parameters" begin

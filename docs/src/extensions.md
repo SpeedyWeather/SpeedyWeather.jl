@@ -95,7 +95,7 @@ function forcing!(
     # to write into the tendency fields
     vars.tendencies.grid.u .= forcing.a
     vars.tendencies.grid.v .= forcing.a
-    vars.tendencies.vor .= forcing.a
+    vars.tendencies.vorticity .= forcing.a
 end
 ```
 `Variables` is the type of the first argument, because it contains
@@ -105,7 +105,7 @@ in `model`, but often we unpack the model in a function barrier (which can help 
 type inference and therefore performance). But let's skip that detail for now.
 Generally, try to precompute what you can in
 `initialize!`. For the forcing you will need to force the velocities `u, v` in
-grid-point space or the vorticity `vor`, divergence `div` in spectral space.
+grid-point space or the vorticity `vorticity`, divergence `div` in spectral space.
 This is not a constrain in most applications we came across, but in case it
 is in yours please reach out.
 

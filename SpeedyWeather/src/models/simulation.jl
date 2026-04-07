@@ -82,7 +82,7 @@ function initialize!(
     lf = model.time_stepping.first_step_euler ? 1 : 2       # use 2nd leapfrog index when restarting
 
     # raise a warning if starting with leapfrog but there's zero vorticity
-    vor = get_step(progn.vor, lf)
+    vor = get_step(progn.vorticity, lf)
 
     @trace if lf == 2 && all(vor .== 0)
         @warn "Vorticity is zero on 2nd leapfrog index though you use it to calculate tendencies." *

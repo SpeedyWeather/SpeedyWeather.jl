@@ -241,8 +241,8 @@ function run_benchmarks_gpu(; trunc = 31, nlayers = 8, check_correctness = false
         "transform!",
         SpeedyWeather.transform!,
         SpeedyWeather.transform!,
-        [diagn_cpu.grid.vor_grid, progn_cpu.vor, model_cpu.spectral_transform],
-        [diagn_gpu.grid.vor_grid, progn_gpu.vor, model_gpu.spectral_transform]
+        [diagn_cpu.grid.vor_grid, progn_cpu.vorticity, model_cpu.spectral_transform],
+        [diagn_gpu.grid.vor_grid, progn_gpu.vorticity, model_gpu.spectral_transform]
     )
 
     # Test 1: vertical_integration!

@@ -36,7 +36,7 @@ Next, we will prepare to use Enzyme. Enzyme saves the gradient information in a 
 
 ```julia
 dvars = make_zero(variables) # shadow for the variables
-dvars.prognostic.vor .= 1    # seed the reverse AD
+dvars.prognostic.vorticity .= 1    # seed the reverse AD
 dmodel = make_zero(model) # here, we'll accumulate all parameter derivatives
 ```
 
@@ -86,8 +86,8 @@ Parameters:
 │    12 │            water_density │   1000.0 │ atmosphere │     EarthAtmosphere{Float32} │        0.0 .. Inf (open) (HalfLine) │                                                                    water density [kg/m³] │
 │    13 │ latent_heat_condensation │  2.501e6 │ atmosphere │     EarthAtmosphere{Float32} │ 0.0 .. Inf (closed-open) (HalfLine) │                                                       latent heat of condensation [J/kg] │
 │    14 │  latent_heat_sublimation │  2.801e6 │ atmosphere │     EarthAtmosphere{Float32} │ 0.0 .. Inf (closed-open) (HalfLine) │                                                        latent heat of sublimation [J/kg] │
-│    15 │       pressure_reference │ 100000.0 │ atmosphere │     EarthAtmosphere{Float32} │        0.0 .. Inf (open) (HalfLine) │                                                          surface reference pressure [Pa] │
-│    16 │    temperature_reference │    288.0 │ atmosphere │     EarthAtmosphere{Float32} │ 0.0 .. Inf (closed-open) (HalfLine) │                                                        surface reference temperature [K] │
+│    15 │       reference_pressure │ 100000.0 │ atmosphere │     EarthAtmosphere{Float32} │        0.0 .. Inf (open) (HalfLine) │                                                          surface reference pressure [Pa] │
+│    16 │    reference_temperature │    288.0 │ atmosphere │     EarthAtmosphere{Float32} │ 0.0 .. Inf (closed-open) (HalfLine) │                                                        surface reference temperature [K] │
 │    17 │         moist_lapse_rate │    0.005 │ atmosphere │     EarthAtmosphere{Float32} │       -Inf .. Inf (open) (RealLine) │                                   reference moist-adiabatic temperature lapse rate [K/m] │
 │    18 │           dry_lapse_rate │   0.0098 │ atmosphere │     EarthAtmosphere{Float32} │       -Inf .. Inf (open) (RealLine) │                                     reference dry-adiabatic temperature lapse rate [K/m] │
 │    19 │          layer_thickness │   8500.0 │ atmosphere │     EarthAtmosphere{Float32} │        0.0 .. Inf (open) (HalfLine) │                                          layer thickness for the shallow water model [m] │
@@ -123,7 +123,7 @@ param_vec = vec(params)
 
 # output
 
-ComponentVector{Float32}(planet = (rotation = 7.29f-5, gravity = 9.81f0, axial_tilt = 23.4f0, solar_constant = 1365.0f0), atmosphere = (mol_mass_dry_air = 28.9649f0, mol_mass_vapor = 18.0153f0, heat_capacity = 1004.0f0, R_vapor = 461.52438f0, mol_ratio = 0.62197006f0, μ_virt_temp = 0.60779446f0, κ = 0.2859107f0, water_density = 1000.0f0, latent_heat_condensation = 2.501f6, latent_heat_sublimation = 2.801f6, pressure_reference = 100000.0f0, temperature_reference = 288.0f0, moist_lapse_rate = 0.005f0, dry_lapse_rate = 0.0098f0, layer_thickness = 8500.0f0), forcing = (strength = 3.0f-12, wavenumber = 8.0f0), drag = (c = 1.0f-7))
+ComponentVector{Float32}(planet = (rotation = 7.29f-5, gravity = 9.81f0, axial_tilt = 23.4f0, solar_constant = 1365.0f0), atmosphere = (mol_mass_dry_air = 28.9649f0, mol_mass_vapor = 18.0153f0, heat_capacity = 1004.0f0, R_vapor = 461.52438f0, mol_ratio = 0.62197006f0, μ_virt_temp = 0.60779446f0, κ = 0.2859107f0, water_density = 1000.0f0, latent_heat_condensation = 2.501f6, latent_heat_sublimation = 2.801f6, reference_pressure = 100000.0f0, reference_temperature = 288.0f0, moist_lapse_rate = 0.005f0, dry_lapse_rate = 0.0098f0, layer_thickness = 8500.0f0), forcing = (strength = 3.0f-12, wavenumber = 8.0f0), drag = (c = 1.0f-7))
 ```
 
 `ComponentVector`s behave like normal `Array`s but additionally allow you to access the components following the original nested structure in the model, e.g. `param_vec.planet.solar_constant` will extract the solar constant parameter from the `Earth` component.
@@ -138,7 +138,7 @@ ps = parameters(model)
 pvec = vec(ps)
 dp = zero(pvec)
 dvars = make_zero(variables) # shadow for the variables
-dvars.prognostic.vor .= 1    # seed the reverse AD
+dvars.prognostic.vorticity .= 1    # seed the reverse AD
 
 function timestep_with_new_params!(vars, dt, model, p)
     new_model = SpeedyWeather.reconstruct(model, p)

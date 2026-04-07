@@ -17,17 +17,17 @@ using JLD2
 
     # check that IC output contains finite values for all prognostic variables
     ic = f["output_vector"][1].prognostic
-    @test all(isfinite, ic.vor)
-    @test all(isfinite, ic.div)
-    @test all(isfinite, ic.humid)
-    @test all(isfinite, ic.pres)
-    @test all(isfinite, ic.temp)
+    @test all(isfinite, ic.vorticity)
+    @test all(isfinite, ic.divergence)
+    @test all(isfinite, ic.humidity)
+    @test all(isfinite, ic.pressure)
+    @test all(isfinite, ic.temperature)
 
     # check last output also contains finite values
     final_output = f["output_vector"][end].prognostic
-    @test all(isfinite, final_output.vor)
-    @test all(isfinite, final_output.div)
-    @test all(isfinite, final_output.humid)
-    @test all(isfinite, final_output.pres)
-    @test all(isfinite, final_output.temp)
+    @test all(isfinite, final_output.vorticity)
+    @test all(isfinite, final_output.divergence)
+    @test all(isfinite, final_output.humidity)
+    @test all(isfinite, final_output.pressure)
+    @test all(isfinite, final_output.temperature)
 end
