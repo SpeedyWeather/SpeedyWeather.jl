@@ -390,7 +390,7 @@ function linear_pressure_gradient!(
         vars::Variables,
         lf::Int,                # leapfrog index to evaluate tendencies on
         atmosphere::AbstractAtmosphere,
-        implicit::ImplicitPrimitiveEquation,
+        implicit::AbstractImplicit,
     )
     (; R_dry) = atmosphere                      # dry gas constant
     Tₖ = implicit.temp_profile                  # reference profile at layer k
@@ -441,7 +441,7 @@ function vordiv_tendencies!(
         coriolis::AbstractCoriolis,
         atmosphere::AbstractAtmosphere,
         geometry::AbstractGeometry,
-        implicit::ImplicitPrimitiveEquation,
+        implicit::AbstractImplicit,
         S::AbstractSpectralTransform,
     )
     (; f) = coriolis                            # coriolis parameter
@@ -578,7 +578,7 @@ function temperature_tendency!(
         vars::Variables,
         adiabatic_conversion::AbstractAdiabaticConversion,
         atmosphere::AbstractAtmosphere,
-        implicit::ImplicitPrimitiveEquation,
+        implicit::AbstractImplicit,
         G::Geometry,
         S::AbstractSpectralTransform,
     )
