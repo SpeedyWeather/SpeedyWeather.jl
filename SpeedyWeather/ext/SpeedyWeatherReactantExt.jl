@@ -37,26 +37,31 @@ SpeedyWeather.finalize!(simulation)
 ```
 """
 function SpeedyWeather.time_stepping!(simulation::ReactantSimulation, r_first_timesteps! = nothing, r_later_timestep! = nothing, enable_checkpointing = true)
+    
+    clock = simulation.variables.prognostic.clock
+
     if isnothing(r_first_timesteps!)
         @info "Reactant compiling first_timesteps!"
         r_first_timesteps! = @compile first_timesteps!(simulation)
     end
+
+    #TODO: reenable @trace once Reactant issues fixed
+    #@trace checkpointing = enable_checkpointing for _ in clock.timestep_counter:clock.n_timesteps
+    #    r_later_timestep!(simulation)
+    #end
+    @info "Doing the first timesteps"
+
+    r_first_timesteps!(simulation)
+
+    @info "Further timestep loop"
 
     if isnothing(r_later_timestep!)
         @info "Reactant compiling later_timestep!"
         r_later_timestep! = @compile later_timestep!(simulation)
     end
 
-    clock = simulation.variables.prognostic.clock
-
-    #TODO: reenable @trace once Reactant issues fixed
-    #@trace checkpointing = enable_checkpointing for _ in clock.timestep_counter:clock.n_timesteps
-    #    r_later_timestep!(simulation)
-    #end
-
-    r_first_timesteps!(simulation)
-
-    for _ in (Int(clock.timestep_counter) + 1):Int(clock.n_timesteps)
+    for i in (Int(clock.timestep_counter) + 1):Int(clock.n_timesteps)
+        @info "Reactant timestep! $i"
         r_later_timestep!(simulation)
     end
     return
