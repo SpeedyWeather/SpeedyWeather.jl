@@ -277,7 +277,7 @@ function horizontal_diffusion!(
     vor_tend = vars.tendencies.vorticity
     div_tend = vars.tendencies.divergence
     temp_tend = vars.tendencies.temperature
-    horizontal_diffusion!(vor_tend, vorticity, expl, impl)
+    horizontal_diffusion!(vor_tend, vor, expl, impl)
     horizontal_diffusion!(div_tend, div, expl_div, impl_div)
     horizontal_diffusion!(temp_tend, temp, expl, impl)
 

@@ -278,7 +278,7 @@ function initialize!(
     )
 
     haskey(vars.prognostic, :vorticity) || warn_undefvar(vars, :vorticity) && return nothing
-    haskey(vars.prognostic, :divergenceergenceergenceergenceergenceergenceergence) || warn_undefvar(vars, :divergence) && return nothing
+    haskey(vars.prognostic, :divergence) || warn_undefvar(vars, :divergence) && return nothing
 
     model.spectral_grid.nlayers == 1 ||
         throw(ArgumentError("ZonalJet initial conditions can only be used with ShallowWaterModel (1 layer)"))
