@@ -2,12 +2,10 @@
 
 ## Unreleased
 
-<<<<<<< gm/perm-ice-cap
+- ParallelTestRunner for SpeedyWeather CI [#1033](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1033)
 - Remove snow runoff, add snow depth cap [#1017](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1017)
-=======
 - [BREAKING] Rename `temperature_reference`->`reference_temperature`, `pressure_reference`->`reference_pressure` [#1025](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1025)
 - [BREAKING] Prognostic variables renamed [#1025](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1025)
->>>>>>> main
 - Make default KolmogorovFlow weaker [#1030](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1030)
 - GitHub Action Cache updated to v3 [#1029](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1029)
 - RossbyHaurwitz initial condition example corrected [#1027](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1027)
