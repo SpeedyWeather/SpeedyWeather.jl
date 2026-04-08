@@ -1,47 +1,37 @@
-const DEFAULT_NSTEPS = 2
 export Leapfrog
 
 """Leapfrog time stepping defined by the following fields
 $(TYPEDFIELDS)"""
-@kwdef mutable struct Leapfrog{NF, IntType, S, MS, B} <: AbstractTimeStepper
-    "[DERIVED] Spectral resolution (max degree of spherical harmonics)"
-    trunc::IntType
-
-    "[CONST] Number of time steps stored simultaneously in prognostic variables"
-    nsteps::IntType = 2
-
+mutable struct Leapfrog{NF, S, B, MS} <: AbstractTimeStepper
     "[OPTION] Time step in minutes for T31, scale linearly to `trunc`"
-    Δt_at_T31::S = Minute(40)
+    Δt_at_T31::S
 
     "[OPTION] Adjust `Δt_at_T31` with the `output_dt` to reach `output_dt` exactly in integer time steps"
-    adjust_with_output::B = true
+    adjust_with_output::B
 
     "[OPTION] Start integration with (1) Euler step with dt/2, (2) Leapfrog step with dt"
-    start_with_euler::B = true
+    start_with_euler::B
 
     "[OPTION] Sets `first_step_euler=false` after first step to continue with leapfrog after 1st `run!` call"
-    continue_with_leapfrog::B = true
+    continue_with_leapfrog::B
 
     "[DERIVED] Use Euler on first time step? (controlled by `start_with_euler` and `continue_with_leapfrog`)"
-    first_step_euler::B = start_with_euler
+    first_step_euler::B
 
     "[OPTION] Robert (1966) time filter coefficient to suppress the computational mode"
-    robert_filter::NF = 0.1
+    robert_filter::NF
 
     "[OPTION] Williams time filter (Amezcua 2011) coefficient for 3rd order acc"
-    williams_filter::NF = 0.53
-
-    "[DERIVED] Radius of sphere [m], used for scaling, set in `initialize!` to `planet.radius`"
-    radius::NF = DEFAULT_RADIUS
+    williams_filter::NF
 
     "[DERIVED] Time step Δt in milliseconds at specified resolution"
-    Δt_millisec::MS = get_Δt_millisec(Second(Δt_at_T31), trunc, radius, adjust_with_output)
+    Δt_millisec::MS
 
     "[DERIVED] Time step Δt [s] at specified resolution"
-    Δt_sec::NF = Δt_millisec.value / 1000
+    Δt_sec::NF
 
     "[DERIVED] Time step Δt [s/m] at specified resolution, scaled by 1/radius"
-    Δt::NF = Δt_sec / radius
+    Δt::NF
 end
 
 function Adapt.adapt_structure(to, L::Leapfrog)
@@ -49,15 +39,34 @@ function Adapt.adapt_structure(to, L::Leapfrog)
 end
 
 get_prognostic_steps(::Leapfrog) = 2
-get_tendency_steps(::Leapfrog) = 1
-
 
 """$(TYPEDSIGNATURES)
 Generator function for a Leapfrog struct using `spectral_grid`
 for the resolution information."""
-function Leapfrog(spectral_grid::SpectralGrid; kwargs...)
+function Leapfrog(
+        spectral_grid::SpectralGrid;
+        Δt_at_T31 = Minute(40),
+        adjust_with_output = true,
+        start_with_euler = true,
+        continue_with_leapfrog = true,
+        robert_filter = 0.1,
+        williams_filter = 0.53,
+        radius = DEFAULT_RADIUS,
+    )
     (; NF, trunc) = spectral_grid
-    return Leapfrog{NF, typeof(trunc), Dates.Second, Dates.Millisecond, Bool}(; trunc, kwargs...)
+
+    # compute time step
+    Δt_millisec::Millisecond = get_Δt_millisec(Second(Δt_at_T31), trunc, DEFAULT_RADIUS, adjust_with_output)
+    Δt_sec::NF = Δt_millisec.value / 1000
+    Δt::NF = Δt_sec / radius
+
+    # derived and mutated, controlled by start_with_euler and continue_with_leapfrog
+    first_step_euler = start_with_euler
+
+    return Leapfrog(
+        Second(Δt_at_T31), adjust_with_output, start_with_euler, continue_with_leapfrog, first_step_euler,
+        NF(robert_filter), NF(williams_filter), Δt_millisec, Δt_sec, Δt,
+    )
 end
 
 """$(TYPEDSIGNATURES)
@@ -66,11 +75,20 @@ Initialize leapfrogging `L` by recalculating the time step given the output time
 be a divisor such that an integer number of time steps matches exactly with the output
 time step."""
 function initialize!(L::Leapfrog, model::AbstractModel)
+    calculate_timestep!(L, model)  # common among several time steppers
+    if L.start_with_euler
+        L.first_step_euler = true
+    end
+    return nothing
+end
+
+function calculate_timestep!(L::AbstractTimeStepper, model::AbstractModel)
+    (; trunc) = model.spectral_grid
     (; radius) = model.planet
     output_dt = get_output_dt(model.output)
 
     # take radius from planet and recalculate time step and possibly adjust with output dt
-    L.Δt_millisec = get_Δt_millisec(L.Δt_at_T31, L.trunc, radius, L.adjust_with_output, output_dt)
+    L.Δt_millisec = get_Δt_millisec(L.Δt_at_T31, trunc, radius, L.adjust_with_output, output_dt)
     L.Δt_sec = L.Δt_millisec.value / 1000
     L.Δt = L.Δt_sec / radius
 
@@ -81,10 +99,6 @@ function initialize!(L::Leapfrog, model::AbstractModel)
         @warn "$n steps of Δt = $(L.Δt_millisec.value)ms yield output every " *
             "$(nΔt.value)ms (=$(nΔt.value / 1000)s), but output_dt = $(output_dt.value)s"
     end
-    if L.start_with_euler
-        L.first_step_euler = true
-    end
-
     return nothing
 end
 
@@ -133,9 +147,6 @@ end
     A_old[lmk] = A_lf[lmk] + w1 * a_update
     A_new[lmk] = a_new - w2 * a_update
 end
-
-# variables that are leapfrogged in the respective models, e.g. :vor_tend, :div_tend, etc...
-tendency_names(model::AbstractModel) = tuple((Symbol(var, :_tend) for var in prognostic_variables(model))...)
 
 """$(TYPEDSIGNATURES)
 Leapfrog time stepping for all prognostic variables in `vars` using their tendencies.

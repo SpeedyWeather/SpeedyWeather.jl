@@ -26,49 +26,54 @@ A semi-implicit Lorenz N-cycle time integration scheme following Hotta et al. (2
 3. x = x + Δt*dx              (state update)
 $(TYPEDFIELDS)
 """
-@kwdef mutable struct NCycleLorenz{NF<:AbstractFloat, V<:NCycleLorenzVariant} <: AbstractTimeStepper
-    "[DERIVED] Spectral resolution (max degree of spherical harmonics)"
-    trunc::Int
-
-    "[CONST] Number of time steps stored (2: current state + tendency accumulator)"
-    nsteps::Int = 2
-    
+mutable struct NCycleLorenz{NF, V, IntType, S, MS, B} <: AbstractTimeStepper
     "[OPTION] Number of cycles N (3 or 4 recommended, 4 is more stable)"
-    cycles::Int = 4
+    cycles::IntType
     
     "[OPTION] Variant: NCycleLorenzA() (default), B, AB, or ABBA"
-    variant::V = NCycleLorenzA()
+    variant::V
     
-    "[OPTION] Centering parameter: 0.5=Crank-Nicolson (2nd order), 1.0=Backward Euler (1st order)"
-    α::NF = 0.5
-
-    "[OPTION] Time step in minutes for T31, scale linearly to `trunc`"
-    Δt_at_T31::Second = Minute(30)
+    "[OPTION] Time step for T31, scale linearly with resolution"
+    Δt_at_T31::S
 
     "[OPTION] Adjust `Δt_at_T31` with the `output_dt` to reach `output_dt` exactly"
-    adjust_with_output::Bool = true
-
-    "[OPTION] No Euler first step needed"
-    first_step_euler::Bool = false           # Not used for Lorenz, but needed for compatibility
-
-    "[DERIVED] Radius of sphere [m], set in `initialize!` to `planet.radius`"
-    radius::NF = DEFAULT_RADIUS
+    adjust_with_output::B
 
     "[DERIVED] Time step Δt in milliseconds at specified resolution"
-    Δt_millisec::Millisecond = get_Δt_millisec(Second(Δt_at_T31), trunc, radius, adjust_with_output)
+    Δt_millisec::MS
 
     "[DERIVED] Time step Δt [s] at specified resolution"
-    Δt_sec::NF = Δt_millisec.value/1000
+    Δt_sec::NF
 
     "[DERIVED] Time step Δt [s/m] at specified resolution, scaled by 1/radius"
-    Δt::NF = Δt_sec/radius
+    Δt::NF
 end
+
+function Adapt.adapt_structure(to, L::NCycleLorenz)
+    return (; Δt = L.Δt, Δt_sec = L.Δt_sec, Δt_millisec = L.Δt_millisec)
+end
+
+# first for prognostic variables, 2nd for "prognostic" tendency from previous time step
+get_prognostic_steps(::NCycleLorenz) = 2
 
 """$(TYPEDSIGNATURES)
 Generator function for NCycleLorenz struct using `spectral_grid` for resolution."""
-function NCycleLorenz(spectral_grid::SpectralGrid; kwargs...)
+function NCycleLorenz(
+    spectral_grid::SpectralGrid;
+    cycles = 4,
+    variant = NCycleLorenzA(),
+    Δt_at_T31 = Minute(30),
+    adjust_with_output = true,
+    radius = DEFAULT_RADIUS,
+)
     (; NF, trunc) = spectral_grid
-    return NCycleLorenz{NF, NCycleLorenzA}(; trunc, kwargs...)
+    
+    # compute time step
+    Δt_millisec::Millisecond = get_Δt_millisec(Second(Δt_at_T31), trunc, DEFAULT_RADIUS, adjust_with_output)
+    Δt_sec::NF = Δt_millisec.value/1000
+    Δt::NF = Δt_sec/radius
+
+    return NCycleLorenz(cycles, variant, Second(Δt_at_T31), adjust_with_output, Δt_millisec, Δt_sec, Δt)
 end
 
 """$(TYPEDSIGNATURES)
@@ -78,24 +83,11 @@ current_substep(L::NCycleLorenz, clock) = mod(clock.timestep_counter, L.cycles)
 """$(TYPEDSIGNATURES)
 Initialize NCycleLorenz time stepper."""
 function initialize!(L::NCycleLorenz, model::AbstractModel)
-    (; output_dt) = model.output
-    (; radius) = model.planet
-
-    # Validate compatibility - runs ONCE, not every timestep
-    if L.variant isa NCycleLorenzABBA && L.cycles != 4
-        @warn "ABBA variant designed for N=4 (4th order accurate), but N=$(L.cycles). Consider cycles=4 or variant A/B/AB."
+    if L.variant isa NCycleLorenzABBA && L.cycles != 4          # Validate compatibility
+        @warn "N-Cycle Lorenz with ABBA variant is for N=4 (4th order accurate), but N=$(L.cycles). Consider cycles=4 or variant A/B/AB."
     end
 
-    L.Δt_millisec = get_Δt_millisec(L.Δt_at_T31, L.trunc, radius, L.adjust_with_output, output_dt)
-    L.Δt_sec = L.Δt_millisec.value/1000
-    L.Δt = L.Δt_sec/radius
-
-    n = round(Int, Millisecond(output_dt).value/L.Δt_millisec.value)
-    nΔt = n*L.Δt_millisec
-    if nΔt != output_dt
-        @warn "$n steps of Δt = $(L.Δt_millisec.value)ms yield output every $(nΔt.value)ms, but output_dt = $(output_dt.value)ms"
-    end
-
+    calculate_timestep!(L, model)
     return nothing
 end
 
@@ -119,9 +111,7 @@ end
 # Fallback for when NF is not specified (uses DEFAULT_NF)
 @inline weight_coefficient(V::NCycleLorenzVariant, k::Int, N::Int) = 
     weight_coefficient(DEFAULT_NF, V, k, N)
-# ============================================================================
-# LORENZ N-CYCLE HELPER KERNELS
-# ============================================================================
+
 """$(TYPEDSIGNATURES)
 Accumulate weighted tendency: G = w*F_E + (1-w)*G (Hotta et al. 2016, Eq. 19)"""
 function accumulate_tendency!(

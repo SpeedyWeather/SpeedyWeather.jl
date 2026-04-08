@@ -60,8 +60,7 @@ end
 Generator function based on the resolutin in `spectral_grid`.
 Passes on keyword arguments."""
 function HyperDiffusion(spectral_grid::SpectralGrid; kwargs...)
-    (; NF, trunc, nlayers, ArrayType) = spectral_grid        # take resolution parameters from spectral_grid
-    MatrixType = ArrayType{NF, 2}
+    (; NF, trunc, nlayers, MatrixType) = spectral_grid        # take resolution parameters from spectral_grid
     return HyperDiffusion{NF, MatrixType, typeof(trunc), Dates.Second}(; trunc, nlayers, kwargs...)
 end
 
@@ -71,22 +70,12 @@ model time step, and possibly with a changing strength/power in
 the vertical."""
 function initialize!(
         diffusion::HyperDiffusion,
-        model::AbstractModel
+        model::AbstractModel,
     )
-    return initialize!(diffusion, model.geometry, model.time_stepping)
-end
-
-"""$(TYPEDSIGNATURES)
-Precomputes the hyper diffusion terms for all layers based on the
-model time step in `L`, the vertical level sigma level in `G`."""
-function initialize!(
-        diffusion::HyperDiffusion,
-        G::AbstractGeometry,
-        L::AbstractTimeStepper,
-    )
-    (; trunc, nlayers, resolution_scaling) = diffusion
-    (; power, power_stratosphere, tapering_σ) = diffusion
-    (; Δt, radius) = L
+    (; trunc, nlayers) = diffusion
+    (; resolution_scaling, power, power_stratosphere, tapering_σ) = diffusion
+    (; Δt) = model.time_stepping
+    (; radius) = model.planet
 
     # Reduce diffusion time scale (=increase diffusion, always in seconds) with resolution
     # times 1/radius because time step Δt is scaled with 1/radius
@@ -105,7 +94,7 @@ function initialize!(
     ∇²ⁿ_implicit = diffusion.impl
     ∇²ⁿ_div = diffusion.expl_div
     ∇²ⁿ_div_implicit = diffusion.impl_div
-    σ_levels_full = G.σ_levels_full
+    σ_levels_full = model.geometry.σ_levels_full
 
     # Launch kernel
     arch = architecture(∇²ⁿ)
