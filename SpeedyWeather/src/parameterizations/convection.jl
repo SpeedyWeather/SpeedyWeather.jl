@@ -61,7 +61,7 @@ and relaxes current vertical profiles to the adjusted references."""
     # CONVECTIVE CRITERIA AND FIRST GUESS RELAXATION
     level_zero_buoyancy = pseudo_adiabat!(ij, temp_ref_profile, temp, humid, geopotential, pₛ, σ, atmosphere)
 
-    for k in level_zero_buoyancy:nlayers
+    @trace for k in level_zero_buoyancy:nlayers
         qsat = saturation_humidity(temp_ref_profile[ij, k], pₛ * σ[k], atmosphere)
         humid_ref_profile[ij, k] = qsat * convection.relative_humidity
     end
@@ -72,7 +72,7 @@ and relaxes current vertical profiles to the adjusted references."""
     Qref::NF = 0      # = ∫_pₛ^p_LZB -humid_ref_profile dp
 
     # skip constants compared to Frierson 2007, i.e. no /τ, /gravity, *cₚ/Lᵥ
-    for k in level_zero_buoyancy:nlayers
+    @trace for k in level_zero_buoyancy:nlayers
         # Frierson's equation (1)
         # δq = -(humid[ij, k] - humid_ref_profile[ij, k])/SBM.time_scale.value
         # Pq -= δq*Δσ[k]/gravity
@@ -96,7 +96,7 @@ and relaxes current vertical profiles to the adjusted references."""
     # height of zero buoyancy level in σ coordinates
     Δσ_lzb = σ_half[nlayers + 1] - σ_half[level_zero_buoyancy]
 
-    if deep_convection
+    @trace if deep_convection
 
         ΔT = (PT - Pq * Lᵥ / cₚ) / Δσ_lzb         # eq (5) but reusing PT, Pq, and /cₚ already included
 
@@ -127,7 +127,7 @@ and relaxes current vertical profiles to the adjusted references."""
 
     # GET TENDENCIES FROM ADJUSTED PROFILES
     τ⁻¹ = 1/convert(NF, Second(convection.time_scale).value)   #TODO: `inv` isn't compatible with Reactant yet, add it back once that's done
-    for k in level_zero_buoyancy:nlayers
+    @trace for k in level_zero_buoyancy:nlayers
         temp_tend[ij, k] -= (temp[ij, k] - temp_ref_profile[ij, k]) * τ⁻¹
         δq = (humid[ij, k] - humid_ref_profile[ij, k]) * τ⁻¹
         humid_tend[ij, k] -= δq
