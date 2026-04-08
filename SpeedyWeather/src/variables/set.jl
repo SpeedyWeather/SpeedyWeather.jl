@@ -37,9 +37,9 @@ function set!(
     )
     # special case for u,v setting vor, div
     if :u in keys(kwargs) && :v in keys(kwargs)
-        (; vor, div) = vars
+        (; vorticity, divergence) = vars
         set_vordiv!(
-            get_step(vor, lf), get_step(div, lf), kwargs[:u], kwargs[:v],
+            get_step(vorticity, lf), get_step(divergence, lf), kwargs[:u], kwargs[:v],
             geometry, spectral_transform; add, coslat_scaling_included, static_func
         )
     elseif :u in keys(kwargs) || :v in keys(kwargs)

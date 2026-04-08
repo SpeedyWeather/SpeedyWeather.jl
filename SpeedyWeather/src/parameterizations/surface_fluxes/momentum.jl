@@ -64,7 +64,7 @@ end
     flux_v_upward = -ρ * drag * V₀ * f * v
 
     # convert fluxes to tendencies
-    pₛ = vars.grid.pres_prev[ij]          # surface pressure [Pa]
+    pₛ = vars.grid.pressure_prev[ij]          # surface pressure [Pa]
     vars.tendencies.grid.u[ij, surface] += surface_flux_to_tendency(flux_u_upward, pₛ, model)
     vars.tendencies.grid.v[ij, surface] += surface_flux_to_tendency(flux_v_upward, pₛ, model)
     return nothing

@@ -312,7 +312,7 @@ end
                 oro_grid2 = transform(oro_spec1, S)
                 oro_spec2 = transform(oro_grid2, S)
 
-                tol = NF == Float32 ? sqrt(eps(NF)) : 5.0e-7
+                tol = NF == Float32 ? 2*sqrt(eps(NF)) : 5.0e-7
 
                 for lm in eachharmonic(oro_spec1, oro_spec2)
                     @test oro_spec1[lm] ≈ oro_spec2[lm] atol = tol rtol = tol

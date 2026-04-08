@@ -94,7 +94,7 @@ end
 
     u_tend = vars.tendencies.grid.u
     v_tend = vars.tendencies.grid.v
-    temp_tend = vars.tendencies.grid.temp
+    temp_tend = vars.tendencies.grid.temperature
 
     # TODO previous time step?
     u = vars.grid.u
@@ -104,8 +104,8 @@ end
     diffuse_momentum && _vertical_diffusion!(ij, v_tend, v, K, kₕ, diffusion)
 
     if atmosphere isa AbstractWetAtmosphere && diffuse_humidity
-        humid_tend = vars.tendencies.grid.humid
-        humid = vars.grid.humid
+        humid_tend = vars.tendencies.grid.humidity
+        humid = vars.grid.humidity
         _vertical_diffusion!(ij, humid_tend, humid, K, kₕ, diffusion)
     end
 
@@ -113,7 +113,7 @@ end
         # compute dry static energy on the fly
         dry_static_energy = vars.scratch.grid.a
         cₚ = atmosphere.heat_capacity
-        T = vars.grid.temp
+        T = vars.grid.temperature
         Φ = vars.grid.geopotential
 
         for k in 1:size(T, 2)
@@ -148,7 +148,7 @@ end
     # minus surface geopotential (orography * gravity), simplification compared to
     # Frierson to reduce the number of expensive log calls given that z ≈ Z for most
     # surface temperature variations
-    T₀ = atmosphere.temperature_reference
+    T₀ = atmosphere.reference_temperature
     gravity = planet.gravity
     Δp_geopot_full = geopot.Δp_geopot_full
     Z = T₀ * Δp_geopot_full[nlayers] / gravity
@@ -269,13 +269,13 @@ For vertical stability in the boundary layer."""
     u = vars.grid.u_prev
     v = vars.grid.v_prev
     Φ = vars.grid.geopotential
-    T = vars.grid.temp_prev
+    T = vars.grid.temperature_prev
 
     # for dry models, use scratch array to bypass access to non-existing humidity variable
     for k in 1:nlayers
         vars.scratch.grid.b[ij, k] = 0
     end   # reset to zero humidity
-    q = haskey(vars.grid, :humid_prev) ? vars.grid.humid_prev : vars.scratch.grid.b
+    q = haskey(vars.grid, :humidity_prev) ? vars.grid.humidity_prev : vars.scratch.grid.b
 
     # surface layer
     V² = u[ij, surface]^2 + v[ij, surface]^2

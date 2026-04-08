@@ -77,13 +77,13 @@ variables(::SurfaceOceanHumidityFlux) = (
     SST = vars.prognostic.ocean.sea_surface_temperature[ij]
 
     # SATURATION HUMIDITY OVER OCEAN
-    pₛ = vars.grid.pres_prev[ij]          # surface pressure [Pa]
+    pₛ = vars.grid.pressure_prev[ij]          # surface pressure [Pa]
     sat_humid_ocean = saturation_humidity(SST, pₛ, model.atmosphere)
 
     ρ = vars.parameterizations.surface_air_density[ij]
     V₀ = vars.parameterizations.surface_wind_speed[ij]
     land_fraction = model.land_sea_mask.mask[ij]
-    surface_humid = vars.grid.humid_prev[ij, surface]
+    surface_humid = vars.grid.humidity_prev[ij, surface]
     sea_ice_concentration = haskey(vars.prognostic.ocean, :sea_ice_concentration) ?
         vars.prognostic.ocean.sea_ice_concentration[ij] : zero(SST)
 
@@ -106,7 +106,7 @@ variables(::SurfaceOceanHumidityFlux) = (
     vars.parameterizations.surface_humidity_flux[ij] = flux_ocean
 
     # accumulate with += into end=lowermost layer total flux
-    vars.tendencies.grid.humid[ij, surface] += surface_flux_to_tendency(flux_ocean, pₛ, model)
+    vars.tendencies.grid.humidity[ij, surface] += surface_flux_to_tendency(flux_ocean, pₛ, model)
     return nothing
 end
 
@@ -139,14 +139,14 @@ variables(::SurfaceLandHumidityFlux) = (
     α = vars.parameterizations.land.soil_moisture_availability[ij]
 
     # SATURATION HUMIDITY OVER LAND
-    pₛ = vars.grid.pres_prev[ij]          # surface pressure [Pa]
+    pₛ = vars.grid.pressure_prev[ij]          # surface pressure [Pa]
     sat_humid_land = saturation_humidity(T, pₛ, model.atmosphere)
 
     ρ = vars.parameterizations.surface_air_density[ij]
     V₀ = vars.parameterizations.surface_wind_speed[ij]
     land_fraction = model.land_sea_mask.mask[ij]
     surface = model.geometry.nlayers            # indexing top to bottom
-    surface_humid = vars.grid.humid_prev[ij, surface]
+    surface_humid = vars.grid.humidity_prev[ij, surface]
 
     # drag coefficient either from SurfaceLandHumidityFlux or from a central drag coefficient
     d = vars.parameterizations.boundary_layer_drag[ij]
@@ -167,7 +167,7 @@ variables(::SurfaceLandHumidityFlux) = (
     vars.parameterizations.surface_humidity_flux[ij] += flux_land
 
     # accumulate with += into end=lowermost layer total flux
-    vars.tendencies.grid.humid[ij, surface] += surface_flux_to_tendency(flux_land, pₛ, model)
+    vars.tendencies.grid.humidity[ij, surface] += surface_flux_to_tendency(flux_land, pₛ, model)
     return nothing
 end
 
@@ -186,7 +186,7 @@ variables(::PrescribedOceanHumidityFlux) = (
 
 @propagate_inbounds function surface_humidity_flux!(ij, vars, ::PrescribedOceanHumidityFlux, model)
     land_fraction = model.land_sea_mask.mask[ij]
-    pₛ = vars.grid.pres_prev[ij]          # surface pressure [Pa]
+    pₛ = vars.grid.pressure_prev[ij]          # surface pressure [Pa]
     surface = model.geometry.nlayers
 
     # read in a prescribed flux
@@ -200,7 +200,7 @@ variables(::PrescribedOceanHumidityFlux) = (
     vars.parameterizations.surface_humidity_flux[ij] = flux_ocean
 
     # accumulate with += into end=lowermost layer total flux
-    vars.tendencies.grid.humid[ij, surface] += surface_flux_to_tendency(flux_ocean, pₛ, model)
+    vars.tendencies.grid.humidity[ij, surface] += surface_flux_to_tendency(flux_ocean, pₛ, model)
     return nothing
 end
 
@@ -219,7 +219,7 @@ variables(::PrescribedLandHumidityFlux) = (
 
 @propagate_inbounds function surface_humidity_flux!(ij, vars, ::PrescribedLandHumidityFlux, model)
     land_fraction = model.land_sea_mask.mask[ij]
-    pₛ = vars.grid.pres_prev[ij]          # surface pressure [Pa]
+    pₛ = vars.grid.pressure_prev[ij]          # surface pressure [Pa]
     surface = model.geometry.nlayers
 
     # read in a prescribed flux
@@ -233,6 +233,6 @@ variables(::PrescribedLandHumidityFlux) = (
     vars.parameterizations.surface_humidity_flux[ij] += flux_land
 
     # accumulate with += into end=lowermost layer total flux
-    vars.tendencies.grid.humid[ij, surface] += surface_flux_to_tendency(flux_land, pₛ, model)
+    vars.tendencies.grid.humidity[ij, surface] += surface_flux_to_tendency(flux_land, pₛ, model)
     return nothing
 end

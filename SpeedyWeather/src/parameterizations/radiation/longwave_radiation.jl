@@ -33,8 +33,8 @@ initialize!(radiation::UniformCooling, model::PrimitiveEquation) = nothing
 # function barrier
 @propagate_inbounds function parameterization!(ij, vars, longwave::UniformCooling, model)
 
-    T = vars.grid.temp_prev
-    dTdt = vars.tendencies.grid.temp
+    T = vars.grid.temperature_prev
+    dTdt = vars.tendencies.grid.temperature
     (; temp_min, temp_stratosphere) = longwave
     nlayers = size(T, 2)
 
@@ -92,9 +92,9 @@ initialize!(::JeevanjeeRadiation, ::PrimitiveEquation) = nothing
 # function barrier
 @propagate_inbounds function parameterization!(ij, vars, longwave::JeevanjeeRadiation, model)
 
-    T = vars.grid.temp                                  # to match Seeley, 2023 notation
-    dTdt = vars.tendencies.grid.temp
-    pₛ = vars.grid.pres_prev[ij]                        # surface pressure [Pa]
+    T = vars.grid.temperature                                  # to match Seeley, 2023 notation
+    dTdt = vars.tendencies.grid.temperature
+    pₛ = vars.grid.pressure_prev[ij]                        # surface pressure [Pa]
     nlayers = size(T, 2)
 
     (; α) = longwave
@@ -225,10 +225,10 @@ initialize!(::OneBandLongwaveRadiativeTransfer, ::PrimitiveEquation) = nothing
         longwave::OneBandLongwaveRadiativeTransfer,
         model,
     )
-    T = vars.grid.temp_prev
+    T = vars.grid.temperature_prev
     NF = eltype(T)
-    dTdt = vars.tendencies.grid.temp
-    pₛ = vars.grid.pres_prev[ij]                        # surface pressure [Pa]
+    dTdt = vars.tendencies.grid.temperature
+    pₛ = vars.grid.pressure_prev[ij]                        # surface pressure [Pa]
     nlayers = size(T, 2)
 
     ϵ_ocean = longwave.emissivity_ocean

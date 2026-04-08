@@ -17,16 +17,16 @@ using JLD2
 
     # check that IC output contains finite values for the prognostic vorticity
     ic = f["output_vector"][1].prognostic
-    @test all(isfinite, ic.vor)
+    @test all(isfinite, ic.vorticity)
 
     # check last output also contains finite values
     final_output = f["output_vector"][end].prognostic
-    @test all(isfinite, final_output.vor)
+    @test all(isfinite, final_output.vorticity)
 
-    # the final snapshot was saved before unscale!, so vor is scaled by radius;
-    # after run! the simulation's vor has been unscaled
+    # the final snapshot was saved before unscale!, so vorticity is scaled by radius;
+    # after run! the simulation's vorticity has been unscaled
     radius = simulation.model.planet.radius
-    @test Array(final_output.vor) ≈ Array(simulation.variables.prognostic.vor) * radius
+    @test Array(final_output.vorticity) ≈ Array(simulation.variables.prognostic.vorticity) * radius
 
     # default groups = (:all,) outputs the full Variables struct
     snapshot = f["output_vector"][1]
@@ -69,7 +69,7 @@ end
     @test !haskey(snapshot, :parameterizations)
 
     # prognostic data is still valid
-    @test all(isfinite, snapshot.prognostic.vor)
+    @test all(isfinite, snapshot.prognostic.vorticity)
     close(f)
 end
 
@@ -85,16 +85,16 @@ end
 
     # check IC snapshot
     ic = output.output[1].prognostic
-    @test all(isfinite, ic.vor)
+    @test all(isfinite, ic.vorticity)
 
     # check final snapshot
     final_snapshot = output.output[end].prognostic
-    @test all(isfinite, final_snapshot.vor)
+    @test all(isfinite, final_snapshot.vorticity)
 
-    # the final snapshot was saved before unscale!, so vor is scaled by radius;
-    # after run! the simulation's vor has been unscaled
+    # the final snapshot was saved before unscale!, so vorticity is scaled by radius;
+    # after run! the simulation's vorticity has been unscaled
     radius = simulation.model.planet.radius
-    @test Array(final_snapshot.vor) ≈ Array(simulation.variables.prognostic.vor) * radius
+    @test Array(final_snapshot.vorticity) ≈ Array(simulation.variables.prognostic.vorticity) * radius
 
     # default groups = (:all,) outputs the full Variables struct
     @test output.output[1] isa Variables
@@ -107,7 +107,7 @@ end
     @test hasproperty(output.output[1], :scratch)
 
     # snapshots should be independent copies (deepcopy), not aliased
-    @test output.output[1].prognostic.vor !== output.output[end].prognostic.vor
+    @test output.output[1].prognostic.vorticity !== output.output[end].prognostic.vorticity
 end
 
 @testset "ArrayOutput with group selection" begin
@@ -128,5 +128,5 @@ end
     @test !haskey(snapshot, :dynamics)
 
     # prognostic data is valid
-    @test all(isfinite, snapshot.prognostic.vor)
+    @test all(isfinite, snapshot.prognostic.vorticity)
 end

@@ -51,10 +51,10 @@ end
     # Surface air density
     (; R_dry, κ) = model.atmosphere
     σ = model.geometry.σ_levels_full[nlayers]       # σ vertical coordinate at lowest model level
-    pₛ = vars.grid.pres_prev[ij]                    # surface pressure [Pa]
-    T = vars.grid.temp_prev[ij, nlayers]            # virtual temperature at lowest model level [K]
-    q = haskey(vars.grid, :humid_prev) ?
-        vars.grid.humid_prev[ij, nlayers] : zero(T) # specific humidity at lowest model level [kg/kg]
+    pₛ = vars.grid.pressure_prev[ij]                    # surface pressure [Pa]
+    T = vars.grid.temperature_prev[ij, nlayers]            # virtual temperature at lowest model level [K]
+    q = haskey(vars.grid, :humidity_prev) ?
+        vars.grid.humidity_prev[ij, nlayers] : zero(T) # specific humidity at lowest model level [kg/kg]
     Tᵥ = virtual_temperature(T, q, atmosphere)      # virtual temperature at lowest model level [K]
     σ⁻ᵏ = σ^(-κ)                                    # precalculate
     Tᵥ *= σ⁻ᵏ                                       # lower to surface assuming dry adiabatic lapse rate

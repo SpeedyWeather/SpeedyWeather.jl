@@ -60,12 +60,12 @@ function geopotential!(
         vars::Variables,
         model::PrimitiveEquation,
     )
-    T = vars.grid.temp
+    T = vars.grid.temperature
     Φ = vars.grid.geopotential
 
     # use zero scratch for humidity in dry models to not distinguish in kernels below
     vars.scratch.grid.a .= 0
-    q = haskey(vars.grid, :humid) ? vars.grid.humid : vars.scratch.grid.a
+    q = haskey(vars.grid, :humidity) ? vars.grid.humidity : vars.scratch.grid.a
 
     (; orography) = model.orography
     g = model.planet.gravity

@@ -3,7 +3,7 @@ abstract type AbstractHorizontalDiffusion <: AbstractModelComponent end
 export HyperDiffusion
 
 """
-Horizontal hyper diffusion of vor, div, temp, humid; implicitly in spectral space
+Horizontal hyper diffusion of vorticity, div, temp, humid; implicitly in spectral space
 with a `power` of the Laplacian (default = 4) and the strength controlled by
 `time_scale` (default = 1 hour). For vorticity and divergence, by default,
 the `time_scale` (=1/strength of diffusion) is reduced with increasing resolution
@@ -217,8 +217,8 @@ function horizontal_diffusion!(
     (; expl, impl) = diffusion
 
     # Barotropic model diffuses vorticity (only variable)
-    vor = get_step(vars.prognostic.vor, lf)                               # lta_view for leapfrog index
-    vor_tend = vars.tendencies.vor
+    vor = get_step(vars.prognostic.vorticity, lf)                               # lta_view for leapfrog index
+    vor_tend = vars.tendencies.vorticity
     horizontal_diffusion!(vor_tend, vor, expl, impl)
 
     for (name, tracer) in model.tracers
@@ -240,10 +240,10 @@ function horizontal_diffusion!(
     (; expl, impl, expl_div, impl_div) = diffusion
 
     # ShallowWater model diffuses vorticity and divergence
-    vor = get_step(vars.prognostic.vor, lf)
-    div = get_step(vars.prognostic.div, lf)
-    vor_tend = vars.tendencies.vor
-    div_tend = vars.tendencies.div
+    vor = get_step(vars.prognostic.vorticity, lf)
+    div = get_step(vars.prognostic.divergence, lf)
+    vor_tend = vars.tendencies.vorticity
+    div_tend = vars.tendencies.divergence
     horizontal_diffusion!(vor_tend, vor, expl, impl)
     horizontal_diffusion!(div_tend, div, expl_div, impl_div)
 
@@ -270,20 +270,20 @@ function horizontal_diffusion!(
     # and those for all other variables
     (; expl, impl) = diffusion
 
-    # Primitive equation models diffuse vor, divergence, temp (and humidity for wet core)
-    vor = get_step(vars.prognostic.vor, lf)
-    div = get_step(vars.prognostic.div, lf)
-    temp = get_step(vars.prognostic.temp, lf)
-    vor_tend = vars.tendencies.vor
-    div_tend = vars.tendencies.div
-    temp_tend = vars.tendencies.temp
+    # Primitive equation models diffuse vorticity, divergence, temp (and humidity for wet core)
+    vor = get_step(vars.prognostic.vorticity, lf)
+    div = get_step(vars.prognostic.divergence, lf)
+    temp = get_step(vars.prognostic.temperature, lf)
+    vor_tend = vars.tendencies.vorticity
+    div_tend = vars.tendencies.divergence
+    temp_tend = vars.tendencies.temperature
     horizontal_diffusion!(vor_tend, vor, expl, impl)
     horizontal_diffusion!(div_tend, div, expl_div, impl_div)
     horizontal_diffusion!(temp_tend, temp, expl, impl)
 
-    if haskey(vars.tendencies, :humid)
-        humid = get_step(vars.prognostic.humid, lf)
-        humid_tend = vars.tendencies.humid
+    if haskey(vars.tendencies, :humidity)
+        humid = get_step(vars.prognostic.humidity, lf)
+        humid_tend = vars.tendencies.humidity
         horizontal_diffusion!(humid_tend, humid, expl, impl)
     end
 

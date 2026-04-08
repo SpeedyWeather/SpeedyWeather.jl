@@ -185,7 +185,7 @@ is stored in the diagnostic variables and can be visualised with
 only vertical layer)
 
 ```@example galewsky_setup
-vor = simulation.variables.grid.vor[:, 1]
+vor = simulation.variables.grid.vorticity[:, 1]
 heatmap(vor, title="Relative vorticity [1/s]")
 save("galewsky2.png", ans) # hide
 nothing # hide
@@ -261,7 +261,7 @@ the Makie extension
 
 ```@example galewsky_setup2
 using CairoMakie
-vor = simulation.variables.grid.vor[:, 1]   # 1 to index surface
+vor = simulation.variables.grid.vorticity[:, 1]   # 1 to index surface
 heatmap(vor, title="Relative vorticity [1/s]")
 save("galewsky3.png", ans) # hide
 nothing # hide

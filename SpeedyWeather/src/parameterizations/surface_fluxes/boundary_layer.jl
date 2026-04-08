@@ -99,12 +99,12 @@ Calculate the bulk Richardson number following Frierson, 2006.
 For vertical stability in the boundary layer."""
 @propagate_inbounds function bulk_richardson_surface(ij, ΔΦ₀, vars, atmosphere)
     cₚ = atmosphere.heat_capacity
-    NF = eltype(vars.grid.temp_prev)
-    surface = size(vars.grid.temp_prev, 2)     # surface index = nlayers
+    NF = eltype(vars.grid.temperature_prev)
+    surface = size(vars.grid.temperature_prev, 2)     # surface index = nlayers
 
     Vₛ = vars.parameterizations.surface_wind_speed[ij]
-    T = vars.grid.temp_prev[ij, surface]
-    q = haskey(vars.grid, :humid_prev) ? vars.grid.humid_prev[ij, surface] : zero(NF)
+    T = vars.grid.temperature_prev[ij, surface]
+    q = haskey(vars.grid, :humidity_prev) ? vars.grid.humidity_prev[ij, surface] : zero(NF)
     Tᵥ = virtual_temperature(T, q, atmosphere)
 
     # bulk Richardson number at lowermost layer N from Frierson, 2006, eq. (15)

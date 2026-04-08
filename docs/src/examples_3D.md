@@ -15,10 +15,10 @@ using SpeedyWeather
 spectral_grid = SpectralGrid(trunc = 31, nlayers = 8, Grid=FullGaussianGrid, dealiasing = 3)
 
 orography = ZonalRidge(spectral_grid)
-initial_conditions = (;                             # collect initial conditions into NamedTuple
+initial_conditions = (;                             # collect initial conditions into NamedTuple (keys don't matter)
     vordiv = ZonalWind(spectral_grid),
-    temp = JablonowskiTemperature(spectral_grid),
-    pres = ConstantPressure(spectral_grid))
+    temperature = JablonowskiTemperature(spectral_grid),
+    pressure = ConstantPressure(spectral_grid))
 
 model = PrimitiveDryModel(spectral_grid; orography, initial_conditions, dynamics_only = true)
 simulation = initialize!(model)
@@ -40,7 +40,7 @@ off a wave propagating eastward. This wave becomes obvious when visualised with
 ```@example jablonowski
 using CairoMakie
 
-vor = simulation.variables.grid.vor[:, end]
+vor = simulation.variables.grid.vorticity[:, end]
 heatmap(vor, title="Surface relative vorticity")
 save("jablonowski.png", ans) # hide
 nothing # hide
@@ -88,7 +88,7 @@ Visualising surface temperature with
 ```@example heldsuarez
 using CairoMakie
 
-temp = simulation.variables.grid.temp[:, end]
+temp = simulation.variables.grid.temperature[:, end]
 heatmap(temp, title="Surface temperature [K]", colormap=:thermal)
 
 save("heldsuarez.png", ans) # hide
@@ -137,7 +137,7 @@ of the convection scheme, causing updrafts and downdrafts in both humidity and t
 ```@example aquaplanet
 using CairoMakie
 
-humid = simulation.variables.grid.humid[:, end]
+humid = simulation.variables.grid.humidity[:, end]
 heatmap(humid, title="Surface specific humidity [kg/kg]", colormap=:oslo)
 
 save("aquaplanet.png", ans) # hide
@@ -167,7 +167,7 @@ model = PrimitiveWetModel(spectral_grid; ocean, land_sea_mask, orography, convec
 simulation = initialize!(model)
 run!(simulation, period=Day(20))
 
-humid = simulation.variables.grid.humid[:, end]
+humid = simulation.variables.grid.humidity[:, end]
 heatmap(humid, title="No deep convection: Surface specific humidity [kg/kg]", colormap=:oslo)
 save("aquaplanet_nodeepconvection.png", ans) # hide
 nothing # hide
@@ -186,7 +186,7 @@ model = PrimitiveWetModel(spectral_grid; ocean, land_sea_mask, orography, convec
 simulation = initialize!(model)
 run!(simulation, period=Day(20))
 
-humid = simulation.variables.grid.humid[:, end]
+humid = simulation.variables.grid.humidity[:, end]
 heatmap(humid, title="No convection: Surface specific humidity [kg/kg]", colormap=:oslo)
 save("aquaplanet_noconvection.png", ans) # hide
 nothing # hide

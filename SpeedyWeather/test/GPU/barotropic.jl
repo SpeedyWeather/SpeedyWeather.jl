@@ -24,8 +24,8 @@ end
     @test length(f["output_vector"]) > 0
 
     snapshot = f["output_vector"][1]
-    @test parent(snapshot.prognostic.vor) isa Array
-    @test all(isfinite, snapshot.prognostic.vor)
+    @test parent(snapshot.prognostic.vorticity) isa Array
+    @test all(isfinite, snapshot.prognostic.vorticity)
     close(f)
 end
 
@@ -41,9 +41,9 @@ end
 
     # check IC snapshot (transfer to CPU first to avoid scalar indexing on GPU)
     ic = output.output[1].prognostic
-    @test all(isfinite, on_architecture(SpeedyWeather.CPU(), ic.vor))
+    @test all(isfinite, on_architecture(SpeedyWeather.CPU(), ic.vorticity))
 
     # check final snapshot
     final_snapshot = output.output[end].prognostic
-    @test all(isfinite, on_architecture(SpeedyWeather.CPU(), final_snapshot.vor))
+    @test all(isfinite, on_architecture(SpeedyWeather.CPU(), final_snapshot.vorticity))
 end

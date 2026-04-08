@@ -13,7 +13,7 @@ run!(simulation; steps = 10)
 
 function run_sim(simulation)
     run!(simulation; steps = N_steps)
-    return simulation.prognostic_variables.vor[i_grid, 1, 2]
+    return simulation.prognostic_variables.vorticity[i_grid, 1, 2]
 end
 
 dsimulation = make_zero(simulation)
@@ -31,7 +31,7 @@ end
 
 function run_sim_lowlevel(simulation)
     SpeedyWeather.later_timestep!(simulation)
-    return simulation.prognostic_variables.vor[i_grid, 1, 2]
+    return simulation.prognostic_variables.vorticity[i_grid, 1, 2]
 end
 
 dsimulation = make_zero(simulation)

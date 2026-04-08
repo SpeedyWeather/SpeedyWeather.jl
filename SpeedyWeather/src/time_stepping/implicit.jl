@@ -1,5 +1,3 @@
-abstract type AbstractImplicit <: AbstractModelComponent end
-
 # model.implicit=nothing (for BarotropicModel)
 initialize!(::Nothing, dt::Real, ::Variables, ::AbstractModel) = nothing
 implicit_correction!(::Variables, ::Nothing, ::AbstractModel) = nothing
@@ -56,9 +54,9 @@ function implicit_correction!(
         model::ShallowWater
     )
 
-    div_tend = vars.tendencies.div                      # tendency of divergence and interface displacement η
+    div_tend = vars.tendencies.divergence                      # tendency of divergence and interface displacement η
     η_tend = vars.tendencies.η                          # tendency of divergence and interface displacement η
-    div_old, div_new = get_steps(vars.prognostic.div)   # divergence at t, t+dt
+    div_old, div_new = get_steps(vars.prognostic.divergence)   # divergence at t, t+dt
     η_old, η_new = get_steps(vars.prognostic.η)         # η at t, t+dt
 
     H = model.atmosphere.layer_thickness        # layer thickness [m], undisturbed, no mountains
@@ -364,10 +362,10 @@ function implicit_correction!(
     (; S⁻¹, R, U, L, W, nlayers) = implicit
     ξ = implicit.ξ[]
 
-    temp_tend = vars.tendencies.temp
-    pres_tend = vars.tendencies.pres
-    div_tend = vars.tendencies.div
-    div_old, div_new = get_steps(vars.prognostic.div)
+    temp_tend = vars.tendencies.temperature
+    pres_tend = vars.tendencies.pressure
+    div_tend = vars.tendencies.divergence
+    div_old, div_new = get_steps(vars.prognostic.divergence)
     G = vars.scratch.a                  # reuse work arrays, used for combined tendency G
     geopotential = vars.scratch.b       # used for geopotential
     geopotential .= 0

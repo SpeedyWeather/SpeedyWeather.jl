@@ -66,16 +66,16 @@ function variables(model::ShallowWater)
     nsteps = get_prognostic_steps(model.time_stepping)
     return (
         variables(BarotropicModel, nsteps)...,
-        PrognosticVariable(:div, Spectral4D(nsteps), desc = "Divergence", units = "1/s"),
+        PrognosticVariable(:divergence, Spectral4D(nsteps), desc = "Divergence", units = "1/s"),
         PrognosticVariable(:η, Spectral3D(nsteps), desc = "Interface displacement", units = "m"),
 
-        GridVariable(:div, Grid3D(), desc = "Divergence", units = "1/s"),
+        GridVariable(:divergence, Grid3D(), desc = "Divergence", units = "1/s"),
         GridVariable(:η, Grid2D(), desc = "Interface displacement", units = "m"),
         GridVariable(:geopotential, Grid2D(), desc = "Geopotential", units = "m²/s²"),
 
-        TendencyVariable(:div, Spectral3D(), desc = "Tendency of divergence", units = "1/s²"),
+        TendencyVariable(:divergence, Spectral3D(), desc = "Tendency of divergence", units = "1/s²"),
         TendencyVariable(:η, Spectral2D(), desc = "Tendency of interface displacement", units = "m/s"),
-        TendencyVariable(:div, Grid3D(), namespace = :grid, desc = "Tendency of divergence on the grid", units = "1/s²"),
+        TendencyVariable(:divergence, Grid3D(), namespace = :grid, desc = "Tendency of divergence on the grid", units = "1/s²"),
         TendencyVariable(:η, Grid2D(), namespace = :grid, desc = "Tendency of interface displacement on the grid", units = "m/s"),
 
         ScratchVariable(:a, Grid3D(), desc = "Scratch array", namespace = :grid),
