@@ -143,9 +143,9 @@ export LandBucketMoisture
 """LandBucketMoisture model with two soil layers exchanging moisture via vertical diffusion.
 Forced by precipitation, evaporation, surface condensation, snow melt and river runoff drainage.
 $(TYPEDFIELDS)"""
-@parameterized @kwdef struct LandBucketMoisture{NF, B} <: AbstractSoilMoisture
+@parameterized @kwdef struct LandBucketMoisture{NF, B, S} <: AbstractSoilMoisture
     "[OPTION] Time scale of vertical diffusion [s]"
-    time_scale::Second = Day(2)
+    time_scale::S = Day(2)
 
     "[OPTION] Infiltration fraction, that is, fraction of top layer runoff that is put into layer below [1]"
     @param infiltration_fraction::NF = 0.25 (bounds = 0 .. 1,)
@@ -158,7 +158,7 @@ $(TYPEDFIELDS)"""
 end
 
 Adapt.@adapt_structure LandBucketMoisture
-LandBucketMoisture(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothing; kwargs...) = LandBucketMoisture{SG.NF, Bool}(; kwargs...)
+LandBucketMoisture(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothing; kwargs...) = LandBucketMoisture{SG.NF, Bool, Dates.Second}(; kwargs...)
 function initialize!(soil::LandBucketMoisture, model::PrimitiveEquation)
     nlayers = get_nlayers(model.land)
     @assert nlayers == 2 "LandBucketMoisture only works with 2 soil layers " *

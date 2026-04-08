@@ -121,6 +121,7 @@ $(TYPEDFIELDS)"""
         TensorType,
         IntType,
         B,              # Bool
+        RefV,           # Base.RefValue{NF}
     } <: AbstractImplicit
 
     # DIMENSIONS
@@ -145,7 +146,7 @@ $(TYPEDFIELDS)"""
     temp_profile::VectorType = zeros(NF, nlayers)
 
     "time step 2α*Δt packed in RefValue for mutability"
-    ξ::Base.RefValue{NF} = Ref{NF}(0)
+    ξ::RefV = Ref{NF}(0)
 
     "divergence: operator for the geopotential calculation"
     R::MatrixType = zeros(NF, nlayers, nlayers)
@@ -185,7 +186,7 @@ end
 Generator using the resolution from SpectralGrid."""
 function ImplicitPrimitiveEquation(spectral_grid::SpectralGrid; kwargs...)
     (; NF, VectorType, MatrixType, TensorType, trunc, nlayers) = spectral_grid
-    return ImplicitPrimitiveEquation{NF, VectorType, MatrixType, TensorType, typeof(trunc), Bool}(;
+    return ImplicitPrimitiveEquation{NF, VectorType, MatrixType, TensorType, typeof(trunc), Bool, Base.RefValue{NF}}(;
         trunc, nlayers, kwargs...
     )
 end

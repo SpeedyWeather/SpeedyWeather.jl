@@ -12,9 +12,9 @@ relaxation term with `time_scale_stratosphere` towards `temp_stratosphere` is ap
     dT/dt = -1.5K/day for T > 207.5K else (200K-T) / 5 days
 
 Fields are $(TYPEDFIELDS)"""
-@parameterized @kwdef struct UniformCooling{NF} <: AbstractLongwave
+@parameterized @kwdef struct UniformCooling{NF, S} <: AbstractLongwave
     "[OPTION] time scale of cooling, default = -1.5K/day = -1K/16hrs"
-    time_scale::Second = Hour(16)
+    time_scale::S = Hour(16)
 
     "[OPTION] temperature [K] below which stratospheric relaxation is applied"
     @param temp_min::NF = 207.5 (bounds = Positive,)
@@ -23,11 +23,11 @@ Fields are $(TYPEDFIELDS)"""
     @param temp_stratosphere::NF = 200 (bounds = Positive,)
 
     "[OPTION] time scale of stratospheric relaxation"
-    time_scale_stratosphere::Second = Day(5)
+    time_scale_stratosphere::S = Day(5)
 end
 
 Adapt.@adapt_structure UniformCooling
-UniformCooling(SG::SpectralGrid; kwargs...) = UniformCooling{SG.NF}(; kwargs...)
+UniformCooling(SG::SpectralGrid; kwargs...) = UniformCooling{SG.NF, Dates.Second}(; kwargs...)
 initialize!(radiation::UniformCooling, model::PrimitiveEquation) = nothing
 
 # function barrier
@@ -65,7 +65,7 @@ layer towards the tropopause temperature `T_t` with time scale `τ = 24h`
 (Seeley and Wordsworth, 2023 use 6h, which is unstable a low resolutions here).
 Fields are
 $(TYPEDFIELDS)"""
-@parameterized @kwdef struct JeevanjeeRadiation{NF} <: AbstractLongwave
+@parameterized @kwdef struct JeevanjeeRadiation{NF, S} <: AbstractLongwave
     "[OPTION] Radiative forcing constant (W/m²/K²)"
     @param α::NF = 0.025 (bounds = Nonnegative,)
 
@@ -82,11 +82,11 @@ $(TYPEDFIELDS)"""
     @param temp_tropopause::NF = 200 (bounds = Positive,)
 
     "[OPTION] Tropopause relaxation time scale to temp_tropopause"
-    time_scale::Second = Hour(24)
+    time_scale::S = Hour(24)
 end
 
 Adapt.@adapt_structure JeevanjeeRadiation
-JeevanjeeRadiation(SG::SpectralGrid; kwargs...) = JeevanjeeRadiation{SG.NF}(; kwargs...)
+JeevanjeeRadiation(SG::SpectralGrid; kwargs...) = JeevanjeeRadiation{SG.NF, Dates.Second}(; kwargs...)
 initialize!(::JeevanjeeRadiation, ::PrimitiveEquation) = nothing
 
 # function barrier
