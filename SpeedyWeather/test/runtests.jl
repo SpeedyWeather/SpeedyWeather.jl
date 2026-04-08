@@ -1,6 +1,12 @@
 using ParallelTestRunner
 using SpeedyWeather
 
+# code that's run for every worker before running the tests
+const init_code = quote
+    using SpeedyWeather
+end
+
+# test suites, manual or automatic file discovery
 testsuite_GPU = Dict(
     "kernelabstractions" => quote
         include("GPU/kernelabstractions.jl")
@@ -19,4 +25,4 @@ testsuite = merge(
 )
 
 # run tests in parallel
-runtests(SpeedyWeather, ARGS; testsuite)
+runtests(SpeedyWeather, ARGS; testsuite, init_code)
