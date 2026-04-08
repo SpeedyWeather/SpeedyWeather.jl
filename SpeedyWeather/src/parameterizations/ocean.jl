@@ -42,6 +42,7 @@ end
 
 # function barrier for all oceans
 ocean_timestep!(vars::Variables, model::PrimitiveEquation) = timestep!(vars, model.ocean, model)
+
 initialize!(vars::Variables, ocean::AbstractOcean, model) =
     @warn "`$(typeof(ocean))` does not have an `initialize!(::Variables, ::$(typeof(ocean)), model)` method " *
     "to set the initial conditions for the ocean prognostic variables."
@@ -65,7 +66,7 @@ fields from file, and interpolates them in time on every time step
 and writes them to the prognostic variables.
 Fields and options are
 $(TYPEDFIELDS)"""
-@kwdef struct SeasonalOceanClimatology{NF, Grid, GridVariable3D} <: AbstractOcean
+@kwdef struct SeasonalOceanClimatology{NF, Grid, GridVariable3D, B} <: AbstractOcean
     "Grid used for the model"
     grid::Grid
 
@@ -76,7 +77,7 @@ $(TYPEDFIELDS)"""
     path::String = joinpath("data", "boundary_conditions", file)
 
     "[OPTION] flag to check for sst in SpeedyWeatherAssets or locally"
-    from_assets::Bool = true
+    from_assets::B = true
 
     "[OPTION] SpeedyWeatherAssets version number"
     version::VersionNumber = DEFAULT_ASSETS_VERSION
@@ -95,7 +96,7 @@ end
 # generator function
 function SeasonalOceanClimatology(SG::SpectralGrid; kwargs...)
     (; NF, GridVariable3D, grid) = SG
-    return SeasonalOceanClimatology{NF, typeof(grid), GridVariable3D}(; grid, kwargs...)
+    return SeasonalOceanClimatology{NF, typeof(grid), GridVariable3D, Bool}(; grid, kwargs...)
 end
 
 function initialize!(ocean::SeasonalOceanClimatology, model::PrimitiveEquation)
@@ -173,7 +174,7 @@ To be created like
 and the ocean time is set with `initialize!(model, time=time)`.
 Fields and options are
 $(TYPEDFIELDS)"""
-@kwdef struct ConstantOceanClimatology <: AbstractOcean
+@kwdef struct ConstantOceanClimatology{B, MV} <: AbstractOcean
     "[OPTION] filename of sea surface temperatures"
     file::String = "sea_surface_temperature.nc"
 
@@ -181,7 +182,7 @@ $(TYPEDFIELDS)"""
     path::String = joinpath("data", "boundary_conditions", file)
 
     "[OPTION] flag to check for sst in SpeedyWeatherAssets or locally"
-    from_assets::Bool = true
+    from_assets::B = true
 
     "[OPTION] SpeedyWeatherAssets version number"
     version::VersionNumber = DEFAULT_ASSETS_VERSION
@@ -193,11 +194,11 @@ $(TYPEDFIELDS)"""
     FieldType::Type{<:AbstractField} = FullGaussianField
 
     "[OPTION] The missing value in the data respresenting land"
-    missing_value::Float64 = NaN
+    missing_value::MV = NaN
 end
 
 # generator
-ConstantOceanClimatology(SG::SpectralGrid; kwargs...) = ConstantOceanClimatology(; kwargs...)
+ConstantOceanClimatology(SG::SpectralGrid; kwargs...) = ConstantOceanClimatology{Bool, Float64}(; kwargs...)
 
 # nothing to initialize for model.ocean
 initialize!(::ConstantOceanClimatology, ::PrimitiveEquation) = nothing
@@ -208,7 +209,7 @@ function initialize!(vars::Variables, ocean_model::ConstantOceanClimatology, mod
     # create a seasonal model, initialize it and the variables
     (; path, file, varname, FieldType) = ocean_model
     (; NF, GridVariable3D, grid) = model.spectral_grid
-    seasonal_model = SeasonalOceanClimatology{NF, typeof(grid), GridVariable3D}(;
+    seasonal_model = SeasonalOceanClimatology{NF, typeof(grid), GridVariable3D, Bool}(;
         grid, path, file, varname, FieldType
     )
     initialize!(seasonal_model, model)
@@ -234,7 +235,7 @@ but vary in latitude following a coslat². To be created like
 
 Fields and options are
 $(TYPEDFIELDS)"""
-@parameterized @kwdef struct AquaPlanet{NF} <: AbstractOcean
+@parameterized @kwdef struct AquaPlanet{NF, B} <: AbstractOcean
     "[OPTION] Temperature on the Equator [K]"
     @param temp_equator::NF = 302 (bounds = Positive,)
 
@@ -242,11 +243,11 @@ $(TYPEDFIELDS)"""
     @param temp_poles::NF = 273 (bounds = Positive,)
 
     "[OPTION] Mask the sea surface temperature according to model.land_sea_mask?"
-    mask::Bool = true
+    mask::B = true
 end
 
 # generator function
-AquaPlanet(SG::SpectralGrid; kwargs...) = AquaPlanet{SG.NF}(; kwargs...)
+AquaPlanet(SG::SpectralGrid; kwargs...) = AquaPlanet{SG.NF, Bool}(; kwargs...)
 
 # nothing to initialize for AquaPlanet model itself
 initialize!(::AquaPlanet, ::PrimitiveEquation) = nothing
@@ -267,7 +268,7 @@ timestep!(vars::Variables, ocean_model::AquaPlanet, model::PrimitiveEquation) = 
 
 export SlabOcean
 
-@parameterized @kwdef mutable struct SlabOcean{NF} <: AbstractOcean
+@parameterized @kwdef mutable struct SlabOcean{NF, B} <: AbstractOcean
     "[OPTION] Specific heat capacity of water [J/kg/K]"
     specific_heat_capacity::NF = 4184
 
@@ -278,7 +279,7 @@ export SlabOcean
     density::NF = 1000
 
     "[OPTION] Mask initial sea surface temperature with land-sea mask?"
-    mask::Bool = true
+    mask::B = true
 
     "[OPTION] SST over land [K]"
     land_temperature::NF = 283
@@ -288,7 +289,7 @@ export SlabOcean
 end
 
 # generator function
-SlabOcean(SG::SpectralGrid; kwargs...) = SlabOcean{SG.NF}(; kwargs...)
+SlabOcean(SG::SpectralGrid; kwargs...) = SlabOcean{SG.NF, Bool}(; kwargs...)
 
 function variables(::SlabOcean)
     return (

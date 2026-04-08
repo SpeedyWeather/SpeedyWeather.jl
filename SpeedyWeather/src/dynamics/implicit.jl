@@ -120,6 +120,7 @@ $(TYPEDFIELDS)"""
         MatrixType,
         TensorType,
         IntType,
+        B,              # Bool
     } <: AbstractImplicit
 
     # DIMENSIONS
@@ -134,10 +135,10 @@ $(TYPEDFIELDS)"""
     α::NF = 1
 
     "Reinitialize at restart when initialized=true"
-    reinitialize::Bool = true
+    reinitialize::B = true
 
     "Flag automatically set to true when initialize! has been called"
-    initialized::Bool = false
+    initialized::B = false
 
     # PRECOMPUTED ARRAYS, to be initialized with initialize!
     "vertical temperature profile, obtained from diagn on first time step"
@@ -184,7 +185,7 @@ end
 Generator using the resolution from SpectralGrid."""
 function ImplicitPrimitiveEquation(spectral_grid::SpectralGrid; kwargs...)
     (; NF, VectorType, MatrixType, TensorType, trunc, nlayers) = spectral_grid
-    return ImplicitPrimitiveEquation{NF, VectorType, MatrixType, TensorType, typeof(trunc)}(;
+    return ImplicitPrimitiveEquation{NF, VectorType, MatrixType, TensorType, typeof(trunc), Bool}(;
         trunc, nlayers, kwargs...
     )
 end

@@ -71,7 +71,7 @@ export EarthLandSeaMask
 
 """Land-sea mask, fractional, read from file.
 $(TYPEDFIELDS)"""
-@kwdef struct EarthLandSeaMask{NF, GridVariable2D} <: AbstractLandSeaMask
+@kwdef struct EarthLandSeaMask{NF, GridVariable2D, B, Q} <: AbstractLandSeaMask
 
     # OPTIONS
     "filename of land sea mask"
@@ -81,7 +81,7 @@ $(TYPEDFIELDS)"""
     path::String = joinpath("data", "boundary_conditions", file)
 
     "flag to check for land-sea mask in SpeedyWeatherAssets or locally"
-    from_assets::Bool = true
+    from_assets::B = true
 
     "[OPTION] SpeedyWeatherAssets version number"
     version::VersionNumber = DEFAULT_ASSETS_VERSION
@@ -93,7 +93,7 @@ $(TYPEDFIELDS)"""
     FieldType::Type{<:AbstractField} = FullClenshawField
 
     "[OPTION] Quantization to fraction?"
-    quantization::Float64 = 0.01
+    quantization::Q = 0.01
 
     # FIELDS (to be initialized in initialize!)
     "Land-sea mask [1] on grid-point space. Land=1, sea=0, land-area fraction in between."
@@ -110,6 +110,12 @@ function (L::Type{<:AbstractLandSeaMask})(spectral_grid::SpectralGrid; kwargs...
     (; NF, GridVariable2D, grid) = spectral_grid
     mask = zeros(GridVariable2D, grid)
     return L{NF, GridVariable2D}(; mask, kwargs...)
+end
+
+function EarthLandSeaMask(spectral_grid::SpectralGrid; kwargs...)
+    (; NF, GridVariable2D, grid) = spectral_grid
+    mask = zeros(GridVariable2D, grid)
+    return EarthLandSeaMask{NF, GridVariable2D, Bool, Float64}(; mask, kwargs...)
 end
 
 # set mask with grid, scalar, function; just define path `mask.mask` to grid here

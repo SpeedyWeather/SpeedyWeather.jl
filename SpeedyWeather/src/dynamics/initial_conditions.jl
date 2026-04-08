@@ -73,7 +73,7 @@ export RandomVorticity
 
 """Start with random vorticity as initial conditions
 $(TYPEDFIELDS)"""
-@kwdef mutable struct RandomVorticity{NF, S, RNG} <: AbstractInitialConditions
+@kwdef mutable struct RandomVorticity{NF, S, RNG, I} <: AbstractInitialConditions
     "[OPTION] Power of the spectral distribution k^power"
     power::NF = -3
 
@@ -81,7 +81,7 @@ $(TYPEDFIELDS)"""
     amplitude::NF = 1.0e-4
 
     "[OPTION] Maximum wavenumber"
-    max_wavenumber::Int = 20
+    max_wavenumber::I = 20
 
     "[OPTION] Random number generator seed, 0=randomly seed from Julia's GLOBAL_RNG"
     seed::S = 123
@@ -93,7 +93,7 @@ end
 function RandomVorticity(SG::SpectralGrid; kwargs...)
     RNG = haskey(kwargs, :random_number_generator) ? typeof(kwargs[:random_number_generator]) : typeof(Random.Xoshiro())
     SeedType = haskey(kwargs, :seed) ? typeof(kwargs[:seed]) : Int
-    return RandomVorticity{SG.NF, SeedType, RNG}(; kwargs...)
+    return RandomVorticity{SG.NF, SeedType, RNG, Int}(; kwargs...)
 end
 
 """$(TYPEDSIGNATURES)
@@ -167,12 +167,12 @@ export RandomVelocity
 
 """Start with random velocity as initial conditions
 $(TYPEDFIELDS)"""
-@kwdef mutable struct RandomVelocity{NF, S, RNG} <: AbstractInitialConditions
+@kwdef mutable struct RandomVelocity{NF, S, RNG, I} <: AbstractInitialConditions
     "[OPTION] maximum speed [ms⁻¹]"
     max_speed::NF = 60
 
     "[OPTION] Maximum wavenumber after truncation"
-    truncation::Int = 15
+    truncation::I = 15
 
     "[OPTION] Random number generator seed, 0=randomly seed from Julia's GLOBAL_RNG"
     seed::S = 0
@@ -184,7 +184,7 @@ end
 function RandomVelocity(SG::SpectralGrid; kwargs...)
     RNG = haskey(kwargs, :random_number_generator) ? typeof(kwargs[:random_number_generator]) : typeof(Random.Xoshiro())
     SeedType = haskey(kwargs, :seed) ? typeof(kwargs[:seed]) : Int
-    return RandomVelocity{SG.NF, SeedType, RNG}(; kwargs...)
+    return RandomVelocity{SG.NF, SeedType, RNG, Int}(; kwargs...)
 end
 
 """$(TYPEDSIGNATURES)
@@ -512,14 +512,14 @@ export RossbyHaurwitzWave
 """Rossby-Haurwitz wave initial conditions as in Williamson et al. 1992, J Computational Physics
 with an additional cut-off amplitude `c` to filter out tiny harmonics in the vorticity field.
 Parameters are $(TYPEDFIELDS)"""
-@kwdef struct RossbyHaurwitzWave{NF} <: AbstractInitialConditions
-    m::Int = 4
+@kwdef struct RossbyHaurwitzWave{NF, I} <: AbstractInitialConditions
+    m::I = 4
     ω::NF = 7.848e-6
     K::NF = 7.848e-6
     c::NF = 1.0e-10
 end
 
-RossbyHaurwitzWave(SG::SpectralGrid; kwargs...) = RossbyHaurwitzWave{SG.NF}(; kwargs...)
+RossbyHaurwitzWave(SG::SpectralGrid; kwargs...) = RossbyHaurwitzWave{SG.NF, Int}(; kwargs...)
 
 """$(TYPEDSIGNATURES)
 Rossby-Haurwitz wave initial conditions as in Williamson et al. 1992, J Computational Physics
@@ -670,7 +670,7 @@ Restart from a previous SpeedyWeather.jl simulation via the restart file restart
 Applies interpolation in the horizontal but not in the vertical. restart.jld2 is
 identified by
 $(TYPEDFIELDS)"""
-@kwdef mutable struct StartFromFile <: AbstractInitialConditions
+@kwdef mutable struct StartFromFile{I} <: AbstractInitialConditions
     "path for restart file"
     path::String = pwd()
 
@@ -681,10 +681,10 @@ $(TYPEDFIELDS)"""
     id::String = ""
 
     "run number, e.g. 1 in `run_set1_0001/restart.jld2`"
-    run_number::Int = 1
+    run_number::I = 1
 
     "run digits, e.g. 4 in `run_set1_0001/restart.jld2` for run_number=1"
-    run_digits::Int = 4
+    run_digits::I = 4
 
     "directly specify the run folder, e.q. `run_0001`"
     run_folder::String = ""
@@ -693,7 +693,7 @@ $(TYPEDFIELDS)"""
     filename::String = "restart.jld2"
 end
 
-StartFromFile(SG::SpectralGrid; kwargs...) = StartFromFile(; kwargs...)
+StartFromFile(SG::SpectralGrid; kwargs...) = StartFromFile{Int}(; kwargs...)
 
 """
 $(TYPEDSIGNATURES)
@@ -848,18 +848,18 @@ export RandomWaves
 """Parameters for random initial conditions for the interface displacement η
 in the shallow water equations.
 $(TYPEDFIELDS)"""
-@kwdef struct RandomWaves{NF} <: AbstractInitialConditions
+@kwdef struct RandomWaves{NF, I} <: AbstractInitialConditions
     """[OPTION] amplitude [m]"""
     amplitude::NF = 2000
 
     """[OPTION] minimum wavenumber"""
-    lmin::Int = 10
+    lmin::I = 10
 
     """[OPTION] maximum wavenumber"""
-    lmax::Int = 30
+    lmax::I = 30
 end
 
-RandomWaves(SG::SpectralGrid; kwargs...) = RandomWaves{SG.NF}(; kwargs...)
+RandomWaves(SG::SpectralGrid; kwargs...) = RandomWaves{SG.NF, Int}(; kwargs...)
 
 """
 $(TYPEDSIGNATURES)

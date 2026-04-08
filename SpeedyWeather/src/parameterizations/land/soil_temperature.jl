@@ -5,7 +5,7 @@ export SeasonalLandTemperature
 """SeasonalLandTemperature model that prescribes land surface temperature from a monthly climatology file.
 The temperature is linearly interpolated between months based on the model time.
 $(TYPEDFIELDS)"""
-@kwdef struct SeasonalLandTemperature{NF, GridVariable3D} <: AbstractLandTemperature
+@kwdef struct SeasonalLandTemperature{NF, GridVariable3D, B} <: AbstractLandTemperature
     "[OPTION] filename of land surface temperatures"
     file::String = "land_surface_temperature.nc"
 
@@ -13,7 +13,7 @@ $(TYPEDFIELDS)"""
     path::String = joinpath("data", "boundary_conditions", file)
 
     "[OPTION] flag to check for lst in SpeedyWeatherAssets or locally"
-    from_assets::Bool = true
+    from_assets::B = true
 
     "[OPTION] SpeedyWeatherAssets version number"
     version::VersionNumber = DEFAULT_ASSETS_VERSION
@@ -25,7 +25,7 @@ $(TYPEDFIELDS)"""
     FieldType::Type{<:AbstractField} = FullGaussianField
 
     "[OPTION] Apply land-sea mask to use fallback ocean temperature for ocean-only points?"
-    mask::Bool = true
+    mask::B = true
 
     "[OPTION] Fallback ocean temperature when mask=true [K]"
     ocean_temperature::NF = 285
@@ -42,7 +42,7 @@ end
 function SeasonalLandTemperature(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothing; kwargs...)
     (; NF, GridVariable3D, grid) = SG
     monthly_temperature = zeros(GridVariable3D, grid, 12)  # 12 months
-    return SeasonalLandTemperature{NF, GridVariable3D}(; monthly_temperature, kwargs...)
+    return SeasonalLandTemperature{NF, GridVariable3D, Bool}(; monthly_temperature, kwargs...)
 end
 
 function variables(::SeasonalLandTemperature)
@@ -124,16 +124,16 @@ end
 
 # CONSTANT LAND CLIMATOLOGY
 export ConstantLandTemperature
-@parameterized @kwdef struct ConstantLandTemperature{NF} <: AbstractLandTemperature
+@parameterized @kwdef struct ConstantLandTemperature{NF, B} <: AbstractLandTemperature
     "[OPTION] Globally constant temperature"
     @param temperature::NF = 285 (bounds = Positive,)
 
     "[OPTION] Apply land-sea mask to NaN ocean-only points?"
-    mask::Bool = true
+    mask::B = true
 end
 
 # generator function
-ConstantLandTemperature(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothing; kwargs...) = ConstantLandTemperature{SG.NF}(; kwargs...)
+ConstantLandTemperature(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothing; kwargs...) = ConstantLandTemperature{SG.NF, Bool}(; kwargs...)
 
 initialize!(land::ConstantLandTemperature, model::PrimitiveEquation) = nothing
 function initialize!(
@@ -159,9 +159,9 @@ export LandBucketTemperature
 
 """MITgcm's two-layer soil model (https://mitgcm.readthedocs.io/en/latest/phys_pkgs/land.html).
 Fields are $(TYPEDFIELDS)"""
-@kwdef struct LandBucketTemperature{NF} <: AbstractLandTemperature
+@kwdef struct LandBucketTemperature{NF, B} <: AbstractLandTemperature
     "[OPTION] Apply land-sea mask to set ocean-only points?"
-    mask::Bool = true
+    mask::B = true
 
     "[OPTION] Initial soil temperature over ocean [K]"
     ocean_temperature::NF = 285
@@ -170,7 +170,7 @@ end
 Adapt.@adapt_structure LandBucketTemperature
 
 # generator function
-LandBucketTemperature(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothing; kwargs...) = LandBucketTemperature{SG.NF}(; kwargs...)
+LandBucketTemperature(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothing; kwargs...) = LandBucketTemperature{SG.NF, Bool}(; kwargs...)
 
 function variables(::LandBucketTemperature)
     return (

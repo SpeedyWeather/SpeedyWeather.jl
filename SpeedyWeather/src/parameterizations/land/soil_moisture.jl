@@ -5,7 +5,7 @@ export SeasonalSoilMoisture
 """SeasonalSoilMoisture model that prescribes soil moisture from a monthly climatology file.
 The soil moisture is linearly interpolated between months based on the model time.
 $(TYPEDFIELDS)"""
-@kwdef struct SeasonalSoilMoisture{NF, GridVariable4D} <: AbstractSoilMoisture
+@kwdef struct SeasonalSoilMoisture{NF, GridVariable4D, B} <: AbstractSoilMoisture
     # READ CLIMATOLOGY FROM FILE
     "[OPTION] filename of soil moisture"
     file::String = "soil_moisture.nc"
@@ -14,7 +14,7 @@ $(TYPEDFIELDS)"""
     path::String = joinpath("data", "boundary_conditions", file)
 
     "[OPTION] flag to check for soil moisture in SpeedyWeatherAssets or locally"
-    from_assets::Bool = true
+    from_assets::B = true
 
     "[OPTION] SpeedyWeatherAssets version number"
     version::VersionNumber = DEFAULT_ASSETS_VERSION
@@ -43,7 +43,7 @@ end
 function SeasonalSoilMoisture(SG::SpectralGrid, nlayers::Int = DEFAULT_NLAYERS_SOIL; kwargs...)
     (; NF, GridVariable4D, grid) = SG
     monthly_soil_moisture = zeros(GridVariable4D, grid, nlayers, 12)
-    return SeasonalSoilMoisture{NF, GridVariable4D}(; monthly_soil_moisture, kwargs...)
+    return SeasonalSoilMoisture{NF, GridVariable4D, Bool}(; monthly_soil_moisture, kwargs...)
 end
 SeasonalSoilMoisture(SG::SpectralGrid, geometry::LandGeometry; kwargs...) = SeasonalSoilMoisture(SG, geometry.nlayers; kwargs...)
 
@@ -143,7 +143,7 @@ export LandBucketMoisture
 """LandBucketMoisture model with two soil layers exchanging moisture via vertical diffusion.
 Forced by precipitation, evaporation, surface condensation, snow melt and river runoff drainage.
 $(TYPEDFIELDS)"""
-@parameterized @kwdef struct LandBucketMoisture{NF} <: AbstractSoilMoisture
+@parameterized @kwdef struct LandBucketMoisture{NF, B} <: AbstractSoilMoisture
     "[OPTION] Time scale of vertical diffusion [s]"
     time_scale::Second = Day(2)
 
@@ -151,14 +151,14 @@ $(TYPEDFIELDS)"""
     @param infiltration_fraction::NF = 0.25 (bounds = 0 .. 1,)
 
     "[OPTION] Apply land-sea mask to set ocean-only points?"
-    mask::Bool = true
+    mask::B = true
 
     "[OPTION] Initial soil moisture over ocean, volume fraction [1]"
     @param ocean_moisture::NF = 0 (bounds = 0 .. 1,)
 end
 
 Adapt.@adapt_structure LandBucketMoisture
-LandBucketMoisture(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothing; kwargs...) = LandBucketMoisture{SG.NF}(; kwargs...)
+LandBucketMoisture(SG::SpectralGrid, geometry::LandGeometryOrNothing = nothing; kwargs...) = LandBucketMoisture{SG.NF, Bool}(; kwargs...)
 function initialize!(soil::LandBucketMoisture, model::PrimitiveEquation)
     nlayers = get_nlayers(model.land)
     @assert nlayers == 2 "LandBucketMoisture only works with 2 soil layers " *
