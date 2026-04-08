@@ -1,65 +1,38 @@
-# ============================================================================
-# LORENZ N-CYCLE TIME STEPPING
-# Based on Hotta et al. (2016), Monthly Weather Review
-# ============================================================================
+const DEFAULT_NSTEPS = 2
+export LorenzNCycle
 
-export NCycleLorenz, NCycleLorenzA, NCycleLorenzB, NCycleLorenzAB, NCycleLorenzABBA
+"""Lorenz N-cycle semi-implicit time stepping (Lorenz 1971, Hotta et al. 2016 MWR).
+Two arrays are stored per variable: step 1 = current state x, step 2 = accumulated
+explicit tendency G. One tendency evaluation per step; self-starting.
 
-"""Abstract type for Lorenz N-cycle variants following Hotta et al. (2016)."""
-abstract type NCycleLorenzVariant end
+Versions A and B differ in their blending weights w^k:
+  Version A: w^0 = 1, w^k = N/(N-k) for k = 1..N-1
+  Version B: w^0 = 1, w^k = N/k     for k = 1..N-1
 
-"""Version A: weights w_k = N/(N-k) for k=1,...,N-1; w_0 = 1"""
-struct NCycleLorenzA <: NCycleLorenzVariant end
+At each step: G ← w·F^E(x) + (1-w)·G, then solve implicitly for δx, then x ← x + Δt·δx.
+N = 4 is recommended (Hotta et al. 2016).
 
-"""Version B: weights w_k = N/k for k=1,...,N-1; w_0 = 1"""
-struct NCycleLorenzB <: NCycleLorenzVariant end
-
-"""Version AB: alternates A and B every N steps"""
-struct NCycleLorenzAB <: NCycleLorenzVariant end
-
-"""Version ABBA: uses A-B-B-A sequence every 2N steps (N=4 only, 4th-order accurate for
-nonlinear systems per Hotta et al. 2016 section 5c)"""
-struct NCycleLorenzABBA <: NCycleLorenzVariant end
-
-"""
-    NCycleLorenz{NF, V} <: AbstractTimeStepper
-
-A semi-implicit Lorenz N-cycle time integration scheme following Hotta et al. (2016).
-
-# Algorithm (per substep)
-1. G   ← w*F_E(x) + (1-w)*G              (weighted F_E accumulation, Eq. 19; G preserved)
-2. δx  = (I - α*Δt*L_I)^(-1) * (G + L_I*x)  (implicit correction, Eq. 20; G untouched)
-3. x   ← x + Δt*δx                       (state update, Eq. 21)
-
-# Key differences from Leapfrog
-- Self-starting: no special first steps needed
-- Two time levels only: current state (index 1) + tendency accumulator (index 2)
-- No computational mode: no Robert-Asselin filtering needed
-- Stable for dissipative systems: physics and diffusion can be treated uniformly
-- ξ = α*Δt (not α*2Δt as in leapfrog)
-
-$(TYPEDFIELDS)
-"""
-@kwdef mutable struct NCycleLorenz{NF<:AbstractFloat, V<:NCycleLorenzVariant} <: AbstractTimeStepper
+$(TYPEDFIELDS)"""
+@kwdef mutable struct LorenzNCycle{NF<:AbstractFloat} <: AbstractTimeStepper
     "[DERIVED] Spectral resolution (max degree of spherical harmonics)"
     trunc::Int
 
-    "[CONST] Number of time steps stored (2: current state + tendency accumulator)"
+    "[CONST] Number of time levels stored: 1 = current state x, 2 = accumulated G"
     nsteps::Int = 2
 
-    "[OPTION] Number of substeps per cycle N (3 or 4 recommended; 4 is more stable)"
-    cycles::Int = 4
+    "[OPTION] Lorenz N-cycle order (N=4 recommended)"
+    N::Int = 4
 
-    "[OPTION] Variant: NCycleLorenzA() (default), NCycleLorenzB(), NCycleLorenzAB(), NCycleLorenzABBA()"
-    variant::V = NCycleLorenzA()
+    "[OPTION] Version A (1) or Version B (2) weights"
+    version::Int = 2
 
-    "[OPTION] Centering parameter: 0.5=Crank-Nicolson (2nd order), 1.0=Backward Euler (1st order)"
-    α::NF = 0.5
+    "[DERIVED] Current position in the N-cycle, 0-indexed, increments mod N each step"
+    k::Int = 0
 
     "[OPTION] Time step in minutes for T31, scaled linearly to `trunc`"
-    Δt_at_T31::Second = Minute(30)
+    Δt_at_T31::Second = Minute(40)
 
-    "[OPTION] Adjust `Δt_at_T31` with `output_dt` to reach `output_dt` exactly"
+    "[OPTION] Adjust `Δt_at_T31` with `output_dt` to reach it exactly in integer steps"
     adjust_with_output::Bool = true
 
     "[DERIVED] Radius of sphere [m], set in `initialize!` from `planet.radius`"
@@ -75,302 +48,247 @@ $(TYPEDFIELDS)
     Δt::NF = Δt_sec/radius
 end
 
-# ============================================================================
-# CONSTRUCTOR AND INITIALIZATION
-# ============================================================================
-
 """$(TYPEDSIGNATURES)
-Generator function for NCycleLorenz struct using `spectral_grid` for resolution."""
-function NCycleLorenz(spectral_grid::SpectralGrid; kwargs...)
-    (; NF, trunc) = spectral_grid
-    return NCycleLorenz{NF, NCycleLorenzA}(; trunc, kwargs...)
+The Lorenz N-cycle blending weight w for the current cycle position k."""
+function lorenz_weight(L::LorenzNCycle{NF}) where NF
+    (; k, N, version) = L
+    k == 0 && return one(NF)
+    return version == 1 ? NF(N) / NF(N - k) : NF(N) / NF(k)
 end
 
 """$(TYPEDSIGNATURES)
-Initialize NCycleLorenz time stepper: calculate final Δt based on resolution and
-output frequency. Unlike Leapfrog, no special first-step handling is needed."""
-function initialize!(L::NCycleLorenz, model::AbstractModel)
+Computes the time step in [ms]. `Δt_at_T31` is always scaled with the resolution `trunc` 
+of the model. In case `adjust_Δt_with_output` is true, the `Δt_at_T31` is additionally 
+adjusted to the closest divisor of `output_dt` so that the output time axis is keeping
+`output_dt` exactly."""
+function get_Δt_millisec(
+    Δt_at_T31::Dates.TimePeriod,
+    trunc,
+    radius,
+    adjust_with_output::Bool,
+    output_dt::Dates.TimePeriod = DEFAULT_OUTPUT_DT,
+)
+    # linearly scale Δt with trunc+1 (which are often powers of two)
+    resolution_factor = (DEFAULT_TRUNC+1)/(trunc+1)
+
+    # radius also affects grid spacing, scale proportionally
+    radius_factor = radius/DEFAULT_RADIUS
+
+    # maybe rename to _at_trunc_and_radius?
+    Δt_at_trunc = Second(Δt_at_T31).value * resolution_factor * radius_factor
+
+    if adjust_with_output && (output_dt > Millisecond(0))
+        k = round(Int, Second(output_dt).value / Δt_at_trunc)
+        divisors = Primes.divisors(Millisecond(output_dt).value)
+        sort!(divisors)
+        i = findfirst(x -> x>=k, divisors)
+        k_new = isnothing(i) ? k : divisors[i]
+        Δt_millisec = Millisecond(round(Int, Millisecond(output_dt).value/k_new))
+
+        # provide info when time step is significantly shortened or lengthened
+        Δt_millisec_unadjusted = round(Int, 1000*Δt_at_trunc)
+        Δt_ratio = Δt_millisec.value/Δt_millisec_unadjusted
+
+        if abs(Δt_ratio - 1) > 0.05     # print info only when +-5% changes
+            p = round(Int, (Δt_ratio - 1)*100)
+            ps = p > 0 ? "+" : ""
+            @info "Time step changed from $Δt_millisec_unadjusted to $Δt_millisec ($ps$p%) to match output frequency."
+        end
+    else 
+        Δt_millisec = Millisecond(round(Int, 1000*Δt_at_trunc))
+    end
+
+    return Δt_millisec
+end 
+
+"""$(TYPEDSIGNATURES)
+Generator using `spectral_grid` for resolution information."""
+function LorenzNCycle(spectral_grid::SpectralGrid; kwargs...)
+    (; NF, trunc) = spectral_grid
+    return LorenzNCycle{NF}(; trunc, kwargs...)
+end
+
+"""$(TYPEDSIGNATURES)
+Initialize `LorenzNCycle`: recalculate the time step from the model's output frequency
+and planet radius, and reset the N-cycle counter k to 0."""
+function initialize!(L::LorenzNCycle, model::AbstractModel)
     (; output_dt) = model.output
     (; radius) = model.planet
 
-    if L.variant isa NCycleLorenzABBA && L.cycles != 4
-        @warn "ABBA variant is designed for N=4 (Hotta et al. 2016, section 5c), but N=$(L.cycles). Consider cycles=4."
-    end
-
+    L.radius = radius
     L.Δt_millisec = get_Δt_millisec(L.Δt_at_T31, L.trunc, radius, L.adjust_with_output, output_dt)
     L.Δt_sec = L.Δt_millisec.value/1000
     L.Δt = L.Δt_sec/radius
+    L.k = 0
 
     n = round(Int, Millisecond(output_dt).value/L.Δt_millisec.value)
     nΔt = n*L.Δt_millisec
     if nΔt != output_dt
-        @warn "$n steps of Δt=$(L.Δt_millisec.value)ms yield output every $(nΔt.value)ms, but output_dt=$(output_dt.value)ms"
+        @warn "$n steps of Δt = $(L.Δt_millisec.value)ms yield output every $(nΔt.value)ms, but output_dt = $(Millisecond(output_dt).value/1000)s"
     end
-
     return nothing
 end
 
-# ============================================================================
-# WEIGHT COEFFICIENTS (Hotta et al. 2016, Eqs 2-3, 7-8)
-# ============================================================================
-
 """$(TYPEDSIGNATURES)
-Get the current substep index k within a single N-cycle (0 to N-1)."""
-current_substep(L::NCycleLorenz, clock) = mod(clock.timestep_counter, L.cycles)
-
-"""$(TYPEDSIGNATURES)
-For alternating variants (AB, ABBA), determine which base variant (A or B) to use
-at the current timestep_counter.
-
-- AB:   repeats [A, B, A, B, ...] where each letter is a full N-cycle
-- ABBA: repeats [A, B, B, A, A, B, B, A, ...] where each letter is a full N-cycle
-        (only meaningful for N=4, Hotta et al. 2016 section 5c)
-"""
-function current_base_variant(L::NCycleLorenz{NF, NCycleLorenzAB}, clock) where NF
-    # Which N-cycle are we in? (integer division)
-    cycle_index = div(clock.timestep_counter, L.cycles)
-    return iseven(cycle_index) ? NCycleLorenzA() : NCycleLorenzB()
+Manually set the time step of `L` to `Δt` and disable adjustment to output frequency."""
+function set!(L::AbstractTimeStepper, Δt::Period)
+    L.Δt_millisec = Millisecond(Δt)
+    L.Δt_sec = L.Δt_millisec.value/1000
+    L.Δt = L.Δt_sec/L.radius
+    resolution_factor = (L.trunc+1)/(DEFAULT_TRUNC+1)
+    L.Δt_at_T31 = Second(round(Int, L.Δt_sec*resolution_factor))
+    L.adjust_with_output = false
+    return L
 end
 
-function current_base_variant(L::NCycleLorenz{NF, NCycleLorenzABBA}, clock) where NF
-    # ABBA repeats with period 4N: cycle indices 0,3 → A; 1,2 → B
-    cycle_index = mod(div(clock.timestep_counter, L.cycles), 4)
-    return (cycle_index == 0 || cycle_index == 3) ? NCycleLorenzA() : NCycleLorenzB()
+set!(L::AbstractTimeStepper; Δt::Period) = set!(L, Δt)
+
+function Adapt.adapt_structure(to, L::LorenzNCycle)
+    return (; Δt=L.Δt, Δt_sec=L.Δt_sec, Δt_millisec=L.Δt_millisec)
 end
 
-"""$(TYPEDSIGNATURES)
-Compute weight coefficient w for the current substep."""
-function weight_coefficient(L::NCycleLorenz{NF}, clock) where NF
-    k = current_substep(L, clock)
-    return weight_coefficient(NF, L.variant, k, L.cycles, clock)
-end
+# ---------------------------------------------------------------------------
+# Kernels
+# ---------------------------------------------------------------------------
 
-# Version A: w_0 = 1, w_k = N/(N-k)  (Hotta et al. 2016, Eqs 2-3)
-@inline function weight_coefficient(::Type{NF}, ::NCycleLorenzA, k::Int, N::Int, clock) where NF
-    return k == 0 ? one(NF) : convert(NF, N) / convert(NF, N - k)
-end
-
-# Version B: w_0 = 1, w_k = N/k  (Hotta et al. 2016, Eqs 7-8)
-@inline function weight_coefficient(::Type{NF}, ::NCycleLorenzB, k::Int, N::Int, clock) where NF
-    return k == 0 ? one(NF) : convert(NF, N) / convert(NF, k)
-end
-
-# AB and ABBA: delegate to the appropriate base variant for this cycle
-@inline function weight_coefficient(::Type{NF}, ::NCycleLorenzAB, k::Int, N::Int, clock) where NF
-    # Determine which base variant we're using for this N-cycle
-    cycle_index = div(clock.timestep_counter, N)
-    base = iseven(cycle_index) ? NCycleLorenzA() : NCycleLorenzB()
-    return weight_coefficient(NF, base, k, N, clock)
-end
-
-@inline function weight_coefficient(::Type{NF}, ::NCycleLorenzABBA, k::Int, N::Int, clock) where NF
-    cycle_index = mod(div(clock.timestep_counter, N), 4)
-    base = (cycle_index == 0 || cycle_index == 3) ? NCycleLorenzA() : NCycleLorenzB()
-    return weight_coefficient(NF, base, k, N, clock)
-end
-
-# ============================================================================
-# HELPER KERNELS FOR STATE UPDATES
-# ============================================================================
-
-"""$(TYPEDSIGNATURES)
-Accumulate weighted explicit tendency in-place: G ← w*F_E + (1-w)*G  (Hotta et al. 2016, Eq. 19).
-`_strip_implicit!` must have been called before this to remove the implicit operator L_I(x) from F,
-so that only the explicit part F_E is accumulated here."""
-function accumulate_tendency!(
-    G::LowerTriangularArray,
-    F_explicit::LowerTriangularArray,
-    w::Real,
-    L::NCycleLorenz{NF},
-) where NF
-    @boundscheck size(G) == size(F_explicit) || throw(BoundsError())
-    w_NF = convert(NF, w)
-    launch!(architecture(G), SpectralWorkOrder, size(G),
-            accumulate_tendency_kernel!, G, F_explicit, w_NF)
-    return nothing
-end
-
-@kernel inbounds=true function accumulate_tendency_kernel!(G, F_explicit, @Const(w))
+"""Kernel for purely explicit variables (vor, humid, tracers).
+Blends the current explicit tendency with stored G, updates state x, stores new G:
+  G_new = w·F^E + (1-w)·G_old
+  x    += Δt·G_new"""
+@kernel inbounds=true function lorenz_step_kernel!(x, G, tendency, @Const(dt), @Const(w))
     lmk = @index(Global, Linear)
-    G[lmk] = w * F_explicit[lmk] + (1 - w) * G[lmk]
+    g_new = w * tendency[lmk] + (1 - w) * G[lmk]
+    x[lmk] = x[lmk] + dt * g_new
+    G[lmk] = g_new
 end
 
-"""$(TYPEDSIGNATURES)
-Update state in-place: x ← x + Δt*G  (Hotta et al. 2016, Eq. 21)."""
-function update_state!(
-    x::LowerTriangularArray,
-    G::LowerTriangularArray,
-    dt::Real,
-    L::NCycleLorenz{NF},
-) where NF
-    @boundscheck size(x) == size(G) || throw(BoundsError())
-    dt_NF = convert(NF, dt)
-    launch!(architecture(x), SpectralWorkOrder, size(x),
-            update_state_kernel!, x, G, dt_NF)
-    return nothing
-end
-
-@kernel inbounds=true function update_state_kernel!(x, G, @Const(dt))
+"""Kernel for implicitly corrected variables (div, pres, temp for PrimitiveEquation).
+`implicit_correction!` performs the G accumulation and implicit solve, writing δx into
+`tendency`. This kernel only does: x ← x + Δt·δx."""
+@kernel inbounds=true function lorenz_update_kernel!(x, tendency, @Const(dt))
     lmk = @index(Global, Linear)
-    x[lmk] = x[lmk] + dt * G[lmk]
+    x[lmk] = x[lmk] + dt * tendency[lmk]
 end
 
-# ============================================================================
-# CORE LORENZ N-CYCLE SUBSTEP
-# ============================================================================
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+tendency_names(model::AbstractModel) =
+    tuple((Symbol(var, :_tend) for var in prognostic_variables(model))...)
+
+"""Variables handled by `implicit_correction!`.
+For these, the G blend is done inside that function, not in `lorenz_step!`."""
+implicit_variables(::AbstractModel)     = ()
+implicit_variables(::ShallowWater)      = (:div, :pres)
+implicit_variables(::PrimitiveEquation) = (:div, :temp, :pres)
+
+# ---------------------------------------------------------------------------
+# lorenz_step!  —  advance all prognostic variables one Lorenz step
+# ---------------------------------------------------------------------------
 
 """$(TYPEDSIGNATURES)
-Perform ONE substep of the Lorenz N-cycle for all prognostic variables,
-following Hotta et al. (2016). The clock tracks which substep we are on within
-the current N-cycle.
+Advance all prognostic variables of `progn` by one Lorenz N-cycle step.
 
-Steps per substep:
-1. Reset G to zero at the start of each new N-cycle (k=0)
-2. Accumulate: G ← w*F_E + (1-w)*G                     (Eq. 19)
-3. Implicit correction: G ← (I - α*Δt*L_I)⁻¹*(G + L_I*x) (Eq. 20)
-4. State update: x ← x + Δt*G                           (Eq. 21)
-
-Storage convention:
-  progn variable index 1 → current state x
-  progn variable index 2 → tendency accumulator G
-"""
-function lorenz_ncycle_step!(
+Explicit variables (vor, humid, tracers): G blend + state update in `lorenz_step_kernel!`.
+Implicit variables (div, pres, temp): `implicit_correction!` already did the G blend
+and wrote δx into `tend`; here just x ← x + Δt·δx via `lorenz_update_kernel!`."""
+function lorenz_step!(
     progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
     tend::Tendencies,
     dt::Real,
+    w::Real,
     model::AbstractModel,
 )
-    L = model.time_stepping::NCycleLorenz
-    clock = progn.clock
+    impl_vars = implicit_variables(model)
 
-    # STEP 0: Reset tendency accumulator G at the start of each new N-cycle
-    if current_substep(L, clock) == 0
-        for varname in prognostic_variables(model)
-            fill!(get_step(getfield(progn, varname), 2), 0)
+    for (varname, tendname) in zip(prognostic_variables(model), tendency_names(model))
+        var      = getfield(progn, varname)
+        x        = get_step(var, 1)
+        var_tend = getfield(tend, tendname)
+        SpeedyTransforms.spectral_truncation!(var_tend)
+
+        if varname ∈ impl_vars
+            launch!(architecture(x), SpectralWorkOrder, size(x),
+                    lorenz_update_kernel!, x, var_tend, dt)
+        else
+            G = get_step(var, 2)
+            launch!(architecture(x), SpectralWorkOrder, size(x),
+                    lorenz_step_kernel!, x, G, var_tend, dt, w)
         end
-        for (name, tracer) in model.tracers
-            tracer.active || continue
-            fill!(get_step(progn.tracers[name], 2), 0)
-        end
     end
 
-    # STEP 1: Weighted tendency accumulation  G ← w*F_E + (1-w)*G  (Eq. 19)
-    # First strip the implicit operator L_I(x) from the full tendency F = F_E + L_I(x)
-    # so that only the explicit part F_E is accumulated. The implicit correction (STEP 2)
-    # adds L_I(x_current) back once to form the exact Eq. 20 RHS.
-    _strip_implicit!(diagn, progn, model.implicit, model)
-    w = weight_coefficient(L, clock)
-
-    for (varname, tendname) in zip(prognostic_variables(model), tendency_names(model))
-        var = getfield(progn, varname)
-        G   = get_step(var, 2)
-        F_explicit = getfield(tend, tendname)
-        spectral_truncation!(F_explicit)
-        accumulate_tendency!(G, F_explicit, w, L)
-    end
-
+    # Tracers are always explicit
     for (name, tracer) in model.tracers
         tracer.active || continue
-        G          = get_step(progn.tracers[name], 2)
-        F_explicit = tend.tracers_tend[name]
-        spectral_truncation!(F_explicit)
-        accumulate_tendency!(G, F_explicit, w, L)
-    end
-
-    # STEP 2: Semi-implicit correction  δx = (I - α*Δt*L_I)⁻¹*(G_E + L_I*x)  (Eq. 20)
-    # First copy G_E → tend so that:
-    #   - explicit variables (e.g. vor) have δx = G_E already in tend
-    #   - G_E in progn index 2 is left unchanged (not overwritten with δx)
-    # Then lorenz_implicit_correction! overwrites only the implicit variables
-    # (div_tend, pres_tend for SWE) with the corrected δx.
-    for (varname, tendname) in zip(prognostic_variables(model), tendency_names(model))
-        G  = get_step(getfield(progn, varname), 2)
-        δx = getfield(tend, tendname)
-        copyto!(δx, G)
-    end
-    for (name, tracer) in model.tracers
-        tracer.active || continue
-        copyto!(tend.tracers_tend[name], get_step(progn.tracers[name], 2))
-    end
-    lorenz_implicit_correction!(diagn, progn, model.implicit, model)
-
-    # STEP 3: State update  x ← x + Δt*δx  (Eq. 21), reading δx from tend
-    for (varname, tendname) in zip(prognostic_variables(model), tendency_names(model))
-        var = getfield(progn, varname)
-        δx  = getfield(tend, tendname)
-        update_state!(get_step(var, 1), δx, dt, L)
-    end
-
-    for (name, tracer) in model.tracers
-        tracer.active || continue
-        var = progn.tracers[name]
-        update_state!(get_step(var, 1), tend.tracers_tend[name], dt, L)
+        var      = progn.tracers[name]
+        x        = get_step(var, 1)
+        G        = get_step(var, 2)
+        var_tend = tend.tracers_tend[name]
+        SpeedyTransforms.spectral_truncation!(var_tend)
+        launch!(architecture(x), SpectralWorkOrder, size(x),
+                lorenz_step_kernel!, x, G, var_tend, dt, w)
     end
 
     random_process!(progn, model.random_process)
     return nothing
 end
 
-# ============================================================================
-# MODEL-SPECIFIC TIMESTEP! METHODS
-# ============================================================================
+# ---------------------------------------------------------------------------
+# timestep!  —  one complete model time step
+# ---------------------------------------------------------------------------
 
 """$(TYPEDSIGNATURES)
-Returns the tendency field names corresponding to each prognostic variable."""
-tendency_names(model::AbstractModel) =
-    tuple((Symbol(var, :_tend) for var in prognostic_variables(model))...)
-
-"""$(TYPEDSIGNATURES)
-One substep for the barotropic model."""
+Single Lorenz N-cycle step for the `Barotropic` model."""
 function timestep!(
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
     dt::Real,
+    w::Real,
     model::Barotropic,
 )
     model.feedback.nans_detected && return nothing
-
     fill!(diagn.tendencies, 0, Barotropic)
+
     dynamics_tendencies!(diagn, progn, 1, model)
     horizontal_diffusion!(diagn, progn, model.horizontal_diffusion, model)
-    lorenz_ncycle_step!(progn, diagn, diagn.tendencies, dt, model)
+    lorenz_step!(progn, diagn.tendencies, dt, w, model)
     transform!(diagn, progn, 1, model)
-    progn.clock.timestep_counter > 0 && particle_advection!(progn, diagn, model)
-
+    particle_advection!(progn, diagn, model)
     return nothing
 end
 
 """$(TYPEDSIGNATURES)
-One substep for the shallow water model."""
+Single Lorenz N-cycle step for the `ShallowWater` model."""
 function timestep!(
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
     dt::Real,
+    w::Real,
     model::ShallowWater,
 )
     model.feedback.nans_detected && return nothing
-
     fill!(diagn.tendencies, 0, ShallowWater)
-    dynamics_tendencies!(diagn, progn, 1, model)
-    horizontal_diffusion!(diagn, progn, model.horizontal_diffusion, model)
-    lorenz_ncycle_step!(progn, diagn, diagn.tendencies, dt, model)
-    transform!(diagn, progn, 1, model)
-    progn.clock.timestep_counter > 0 && particle_advection!(progn, diagn, model)
 
+    dynamics_tendencies!(diagn, progn, 1, model)
+    implicit_correction!(diagn, progn, model.implicit, model, w)
+    horizontal_diffusion!(diagn, progn, model.horizontal_diffusion, model)
+    lorenz_step!(progn, diagn.tendencies, dt, w, model)
+    transform!(diagn, progn, 1, model)
+    particle_advection!(progn, diagn, model)
     return nothing
 end
 
 """$(TYPEDSIGNATURES)
-One substep for the primitive equation model."""
+Single Lorenz N-cycle step for `PrimitiveEquation` models."""
 function timestep!(
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
     dt::Real,
+    w::Real,
     model::PrimitiveEquation,
 )
     model.feedback.nans_detected && return nothing
-
     fill!(diagn.tendencies, 0, typeof(model))
 
     if model.physics
@@ -381,120 +299,83 @@ function timestep!(
     end
 
     if model.dynamics
-        forcing!(diagn, progn, 1, model)
-        drag!(diagn, progn, 1, model)
         dynamics_tendencies!(diagn, progn, 1, model)
+        implicit_correction!(diagn, progn, model.implicit, model, w)
     else
         physics_tendencies_only!(diagn, model)
     end
 
     horizontal_diffusion!(diagn, progn, model.horizontal_diffusion, model)
-    lorenz_ncycle_step!(progn, diagn, diagn.tendencies, dt, model)
+    lorenz_step!(progn, diagn.tendencies, dt, w, model)
     transform!(diagn, progn, 1, model)
-    progn.clock.timestep_counter > 0 && particle_advection!(progn, diagn, model)
-
+    particle_advection!(progn, diagn, model)
     return nothing
 end
 
-# ============================================================================
-# SIMULATION-LEVEL TIMESTEP AND MAIN LOOP
-# ============================================================================
+# ---------------------------------------------------------------------------
+# Simulation-level stepping
+# ---------------------------------------------------------------------------
 
 """$(TYPEDSIGNATURES)
-Perform one substep of `simulation`, handling first-step initialization,
-model integration, output, and callbacks."""
+Dispatch to `first_timesteps!` on the first call, `later_timestep!` thereafter."""
 function timestep!(simulation::AbstractSimulation)
+    (; clock) = simulation.prognostic_variables
+    if clock.timestep_counter == 0
+        first_timesteps!(simulation)
+    else
+        later_timestep!(simulation)
+    end
+end
+
+"""$(TYPEDSIGNATURES)
+Initialise the implicit solver and run the first Lorenz N-cycle step.
+
+The Lorenz N-cycle is self-starting: at k=0 the weight w=1, so the first step
+is a forward-Euler step with semi-implicit correction — no special initialisation
+(Euler half-step, etc.) is required."""
+function first_timesteps!(simulation::AbstractSimulation)
+    progn, diagn, model = unpack(simulation)
+    (; clock) = progn
+    clock.n_timesteps == 0 && return nothing
+
+    (; implicit, time_stepping) = model
+    (; Δt) = time_stepping
+
+    # Lorenz uses ξ = α·Δt (not 2Δt as in leapfrog)
+    initialize!(implicit, Δt, diagn, model)
+    set_initialized!(implicit)
+
+    later_timestep!(simulation)
+    initialize!(model.feedback, clock, model)
+    return nothing
+end
+
+"""$(TYPEDSIGNATURES)
+One normal Lorenz N-cycle step: compute w from the current cycle position k,
+call `timestep!`, increment k mod N, advance the clock, and handle output/callbacks."""
+function later_timestep!(simulation::AbstractSimulation)
     progn, diagn, model = unpack(simulation)
     (; feedback, output) = model
+    (; Δt, Δt_millisec) = model.time_stepping
     (; time_stepping) = model
     (; clock) = progn
 
-    # On the very first call: initialize feedback and the implicit solver.
-    # The implicit solver is initialized here (not in model initialize!) because
-    # it needs diagn.temp_average which is only available after the first transform.
-    if clock.timestep_counter == 0
-        initialize!(feedback, clock, model)
-
-        if !isnothing(model.implicit)
-            # Pass Δt (not 2Δt): the Lorenz N-cycle uses a single time level.
-            # α is read from model.implicit itself inside initialize!.
-            initialize!(model.implicit, time_stepping.Δt, diagn, model)
-            set_initialized!(model.implicit)
-        end
-    end
-
-    (; Δt, Δt_millisec) = time_stepping
-    timestep!(progn, diagn, Δt, model)
+    w = lorenz_weight(time_stepping)
+    timestep!(progn, diagn, Δt, w, model)
+    time_stepping.k = mod(time_stepping.k + 1, time_stepping.N)
     timestep!(clock, Δt_millisec)
 
     progress!(feedback, progn)
     output!(output, simulation)
     callback!(model.callbacks, progn, diagn, model)
-
     return nothing
 end
 
 """$(TYPEDSIGNATURES)
-Main time loop: advance `simulation` for all scheduled timesteps."""
+Main time loop over all time steps."""
 function time_stepping!(simulation::AbstractSimulation)
     (; clock) = simulation.prognostic_variables
     for _ in 1:clock.n_timesteps
         timestep!(simulation)
     end
 end
-
-# ============================================================================
-# UTILITY FUNCTIONS
-# ============================================================================
-
-"""$(TYPEDSIGNATURES)
-Compute the time step in milliseconds. `Δt_at_T31` is scaled linearly with
-spectral resolution `trunc`. If `adjust_with_output` is true, it is additionally
-snapped to the nearest divisor of `output_dt` so the output axis is exact."""
-function get_Δt_millisec(
-    Δt_at_T31::Dates.TimePeriod,
-    trunc::Int,
-    radius::Real,
-    adjust_with_output::Bool,
-    output_dt::Dates.TimePeriod = DEFAULT_OUTPUT_DT,
-)
-    resolution_factor = (DEFAULT_TRUNC + 1) / (trunc + 1)
-    radius_factor     = radius / DEFAULT_RADIUS
-    Δt_at_trunc       = Second(Δt_at_T31).value * resolution_factor * radius_factor
-
-    if adjust_with_output && (output_dt > Millisecond(0))
-        k        = round(Int, Second(output_dt).value / Δt_at_trunc)
-        divisors = Primes.divisors(Millisecond(output_dt).value)
-        sort!(divisors)
-        i        = findfirst(x -> x >= k, divisors)
-        k_new    = isnothing(i) ? k : divisors[i]
-        Δt_millisec = Millisecond(round(Int, Millisecond(output_dt).value / k_new))
-
-        Δt_millisec_unadjusted = round(Int, 1000*Δt_at_trunc)
-        Δt_ratio = Δt_millisec.value / Δt_millisec_unadjusted
-        if abs(Δt_ratio - 1) > 0.05
-            p  = round(Int, (Δt_ratio - 1)*100)
-            ps = p > 0 ? "+" : ""
-            @info "Time step changed from $(Δt_millisec_unadjusted)ms to $(Δt_millisec.value)ms ($ps$p%) to match output frequency."
-        end
-    else
-        Δt_millisec = Millisecond(round(Int, 1000*Δt_at_trunc))
-    end
-
-    return Δt_millisec
-end
-
-"""$(TYPEDSIGNATURES)
-Manually set the time step of `L` to `Δt` and disable output-frequency adjustment."""
-function set!(L::NCycleLorenz, Δt::Period)
-    L.Δt_millisec = Millisecond(Δt)
-    L.Δt_sec      = L.Δt_millisec.value / 1000
-    L.Δt          = L.Δt_sec / L.radius
-
-    resolution_factor = (L.trunc + 1) / (DEFAULT_TRUNC + 1)
-    L.Δt_at_T31       = Second(round(Int, L.Δt_sec * resolution_factor))
-    L.adjust_with_output = false
-    return L
-end
-
-set!(L::NCycleLorenz; Δt::Period) = set!(L, Δt)
