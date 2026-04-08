@@ -19,4 +19,4 @@ testsuite = merge(
 )
 
 # run tests in parallel
-runtests(SpeedyWeather; testsuite)
+runtests(SpeedyWeather, ARGS; testsuite)
