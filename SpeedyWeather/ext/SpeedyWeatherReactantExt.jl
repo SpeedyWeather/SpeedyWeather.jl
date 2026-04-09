@@ -49,11 +49,8 @@ function SpeedyWeather.time_stepping!(simulation::ReactantSimulation, r_first_ti
     #@trace checkpointing = enable_checkpointing for _ in clock.timestep_counter:clock.n_timesteps
     #    r_later_timestep!(simulation)
     #end
-    @info "Doing the first timesteps"
-
+    
     r_first_timesteps!(simulation)
-
-    @info "Further timestep loop"
 
     if isnothing(r_later_timestep!)
         @info "Reactant compiling later_timestep!"
@@ -61,7 +58,6 @@ function SpeedyWeather.time_stepping!(simulation::ReactantSimulation, r_first_ti
     end
 
     for i in (Int(clock.timestep_counter) + 1):Int(clock.n_timesteps)
-        @info "Reactant timestep! $i"
         r_later_timestep!(simulation)
     end
     return
