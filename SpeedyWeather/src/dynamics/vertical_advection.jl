@@ -95,21 +95,21 @@ end
 
 # 1st order upwind
 @inline reconstructed_at_face(ξ, ij, k, u, ::UpwindVerticalAdvection{NF, 1}) where {NF} =
-    ifelse(
+    @trace ifelse(
     u > 0, ξ[ij, k[1]],
     ξ[ij, k[2]]
 )
 
 # 3rd order upwind
 @inline reconstructed_at_face(ξ, ij, k, u, ::UpwindVerticalAdvection{NF, 2}) where {NF} =
-    ifelse(
+    @trace ifelse(
     u > 0, (2ξ[ij, k[1]] + 5ξ[ij, k[2]] - ξ[ij, k[3]]) * 1 // 6,
     (2ξ[ij, k[4]] + 5ξ[ij, k[3]] - ξ[ij, k[2]]) * 1 // 6
 )
 
 # 5th order upwind
 @inline reconstructed_at_face(ξ, ij, k, u, ::UpwindVerticalAdvection{NF, 3}) where {NF} =
-    ifelse(
+    @trace ifelse(
     u > 0, (2ξ[ij, k[1]] - 13ξ[ij, k[2]] + 47ξ[ij, k[3]] + 27ξ[ij, k[4]] - 3ξ[ij, k[5]]) * 1 // 60,
     (2ξ[ij, k[6]] - 13ξ[ij, k[5]] + 47ξ[ij, k[4]] + 27ξ[ij, k[3]] - 3ξ[ij, k[2]]) * 1 // 60
 )
@@ -152,7 +152,7 @@ const d₂ = 1 // 10
 end
 
 @inline function reconstructed_at_face(ξ, ij, k, u, ::WENOVerticalAdvection)
-    if u > 0
+    @trace if u > 0
         S₀ = (ξ[ij, k[3]], ξ[ij, k[4]], ξ[ij, k[5]])
         S₁ = (ξ[ij, k[2]], ξ[ij, k[3]], ξ[ij, k[4]])
         S₂ = (ξ[ij, k[1]], ξ[ij, k[2]], ξ[ij, k[3]])
