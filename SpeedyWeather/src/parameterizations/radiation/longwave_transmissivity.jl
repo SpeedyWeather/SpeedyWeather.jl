@@ -50,7 +50,8 @@ initialize!(::FriersonLongwaveTransmissivity, ::AbstractModel) = nothing
 
     # coordinates
     σ = model.geometry.σ_levels_half
-    θ = model.geometry.latds[ij]
+    j = model.geometry.whichring[ij]
+    sinlat = model.geometry.sinlat[j]   # sin(latitude), avoids calling sind() on traced scalars
 
     # Frierson 2006, eq. (4), (5) but in a differential form, computing dτ between half levels below and above
     # --- τ(k=1/2)                  # half level above
@@ -58,7 +59,7 @@ initialize!(::FriersonLongwaveTransmissivity, ::AbstractModel) = nothing
     # --- τ(k=1+1/2)                # half level below
 
     τ_above::NF = 0
-    τ₀ = τ₀_equator + (τ₀_pole - τ₀_equator) * sind(θ)^2
+    τ₀ = τ₀_equator + (τ₀_pole - τ₀_equator) * sinlat^2
     for k in 2:(nlayers + 1)        # loop over half levels below
         τ_below = τ₀ * (fₗ * σ[k] + (1 - fₗ) * σ[k]^4)
         t[ij, k - 1] = exp(-(τ_below - τ_above))
