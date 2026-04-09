@@ -98,7 +98,8 @@ initialize!(::JeevanjeeRadiation, ::PrimitiveEquation) = nothing
     nlayers = size(T, 2)
 
     (; α) = longwave
-    τ⁻¹ = 1/convert(eltype(T), Second(longwave.time_scale).value)   #TODO: `inv` isn't compatible with Reactant yet, add it back once that's done
+    #TODO: Reintroduce the `Second` here but in a way that's agnostic to the Second type
+    τ⁻¹ = 1/convert(eltype(T), longwave.time_scale.value)   #TODO: `inv` isn't compatible with Reactant yet, add it back once that's done
     ϵ_ocean = longwave.emissivity_ocean
     ϵ_land = longwave.emissivity_land
     ϵ = longwave.emissivity_atmosphere
@@ -113,10 +114,10 @@ initialize!(::JeevanjeeRadiation, ::PrimitiveEquation) = nothing
     # extension to Jeevanjee: Include temperature flux (Stefan-Boltzmann)
     # between surface and lowermost air temperature
     # but zero flux if land/sea not available
-    Fₖ_ocean = isfinite(sst) ? ϵ_ocean * σ * sst^4 : zero(sst)          # [W/m²]
+    Fₖ_ocean = ifelse(isfinite(sst), ϵ_ocean * σ * sst^4, zero(sst))          # [W/m²]
     vars.parameterizations.ocean.surface_longwave_up[ij] = Fₖ_ocean     # for ocean model forcing
 
-    Fₖ_land = isfinite(lst) ? ϵ_land * σ * lst^4 : zero(lst)            # [W/m²]
+    Fₖ_land = ifelse(isfinite(lst), ϵ_land * σ * lst^4, zero(lst))            # [W/m²]
     vars.parameterizations.land.surface_longwave_up[ij] = Fₖ_land       # for land model forcing
 
     Fₖ_down = ϵ * σ * T[ij, nlayers]^4
