@@ -34,7 +34,7 @@ Clock(architecture::AbstractArchitecture) = Clock()
 # we just explicitly transfer nothing to the kernels
 Adapt.adapt_structure(to, ::Clock) = nothing
 
-function timestep!(clock::Clock, Δt; increase_counter::Bool = true)
+function time_step!(clock::Clock, Δt; increase_counter::Bool = true)
     clock.time += Δt
     # the first timestep is a half-step and doesn't count
     clock.timestep_counter += increase_counter
@@ -196,7 +196,7 @@ Base.convert(::Type{Day}, m::Month) = Day(Hour(m))
 Base.convert(::Type{Hour}, m::Month) = Hour(Second(m))
 Base.convert(::Type{Minute}, m::Month) = Minute(Second(m))
 function Base.convert(::Type{Second}, m::Month)
-    return Second(m.value * 30 * 24 * 60 * 60) # approximate
+    return Second(m.value * 30 * 24 * 60 * 60)  # approximate
 end
 Base.convert(::Type{Millisecond}, m::Month) = Millisecond(Second(m))
 

@@ -110,7 +110,7 @@ function leapfrog!(
         A_new::LowerTriangularArray,        # prognostic variable at t+dt
         tendency::LowerTriangularArray,     # tendency (dynamics+physics) of A
         dt::Real,                           # time step (=2Δt, but for init steps =Δt, Δt/2)
-        lf::Int,                            # leapfrog index to dis/enable Williams filter
+        lf::Integer,                        # leapfrog index to dis/enable Williams filter
         L::Leapfrog{NF},                    # struct with constants
     ) where {NF}                              # number format NF
 
@@ -138,9 +138,7 @@ function leapfrog!(
 end
 
 @kernel inbounds = true function leapfrog_kernel!(A_old, A_new, A_lf, tendency, dt, w1, w2)
-
     lmk = @index(Global, Linear)    # every harmonic lm, every vertical layer k
-
     a_old = A_old[lmk]
     a_new = a_old + dt * tendency[lmk]
     a_update = a_old - 2A_lf[lmk] + a_new
@@ -149,38 +147,16 @@ end
 end
 
 """$(TYPEDSIGNATURES)
-Leapfrog time stepping for all prognostic variables in `vars` using their tendencies.
-Depending on `model` decides which variables to time step."""
-function leapfrog!(
-        vars::Variables,
-        dt::Real,               # time step (mostly =2Δt, but for init steps =Δt, Δt/2)
-        lf::Int,                # leapfrog index to dis/enable Williams filter
-        model::AbstractModel,
-    )
-    (; prognostic, tendencies) = vars
-
-    for varname in keys(tendencies)
-        if !(tendencies[varname] isa NamedTuple)
-            var = getfield(prognostic, varname)
-            var_old, var_new = get_steps(var)
-            var_tend = getfield(tendencies, varname)
-            SpeedyTransforms.spectral_truncation!(var_tend)
-            leapfrog!(var_old, var_new, var_tend, dt, lf, model.time_stepping)
-        end
+Perform one single time step of `simulation` including
+possibly output and callbacks."""
+function timestep!(simulation::AbstractSimulation, ::Leapfrog)
+    (; clock) = simulation.variables.prognostic
+    @trace if clock.timestep_counter == 0
+        leapfrog_first_timesteps!(simulation)
+    else
+        later_timestep!(simulation)
     end
 
-    # and time stepping for tracers if active
-    for (name, tracer) in model.tracers
-        if tracer.active
-            var_old, var_new = get_steps(prognostic.tracers[name])
-            var_tend = tendencies.tracers[name]
-            SpeedyTransforms.spectral_truncation!(var_tend)
-            leapfrog!(var_old, var_new, var_tend, dt, lf, model.time_stepping)
-        end
-    end
-
-    # evolve the random pattern in time
-    random_process!(vars, model.random_process)
     return nothing
 end
 
@@ -188,20 +164,20 @@ end
 First 1 or 2 time steps of `simulation`. If `model.time_stepping.start_with_euler` is true,
 then start with one Euler step with dt/2, followed by one Leapfrog step with dt.
 If false, continue with leapfrog steps at 2Δt (e.g. restart)."""
-function first_timesteps!(simulation::AbstractSimulation)
+function leapfrog_first_timesteps!(simulation::AbstractSimulation)
     (; variables, model) = simulation
     (; time_stepping) = model
     (; Δt) = time_stepping
 
     # decide whether to start with 1x Euler then 1x Leapfrog at Δt
     @trace if time_stepping.first_step_euler
-        first_timesteps!(variables, model)
+        leapfrog_first_timesteps!(variables, model)
         time_stepping.first_step_euler = !time_stepping.continue_with_leapfrog   # after first run! continue with leapfrog
     else # or continue with leaprog steps at 2Δt (e.g. restart)
         # but make sure that implicit solver is initialized in that situation
         initialize!(model.implicit, 2Δt, variables, model)
         set_initialized!(model.implicit)            # mark implicit as initialized
-        later_timestep!(simulation)
+        leapfrog_later_timestep!(simulation)
     end
 
     # only now initialise feedback for benchmark accuracy
@@ -257,3 +233,27 @@ function first_timesteps!(
 
     return nothing
 end
+
+function get_steps(coeffs::LowerTriangularArray{T, 2}) where {T}
+    nsteps = size(coeffs, 2)
+    return ntuple(i -> lta_view(coeffs, :, i), nsteps)
+end
+
+function get_steps(coeffs::LowerTriangularArray{T, 3}) where {T}
+    nsteps = size(coeffs, 3)
+    return ntuple(i -> lta_view(coeffs, :, :, i), nsteps)
+end
+
+export get_step
+
+"""$(TYPEDSIGNATURES)
+Get the i-th step of a LowerTriangularArray as a view (wrapped into a LowerTriangularArray).
+"step" refers to the last dimension, for prognostic variables used for the leapfrog time step.
+This method is for a 2D spectral variable (horizontal only) with steps in the 3rd dimension."""
+get_step(coeffs::LowerTriangularArray{T, 2}, i) where {T} = lta_view(coeffs, :, i)
+
+"""$(TYPEDSIGNATURES)
+Get the i-th step of a LowerTriangularArray as a view (wrapped into a LowerTriangularArray).
+"step" refers to the last dimension, for prognostic variables used for the leapfrog time step.
+This method is for a 3D spectral variable (horizontal+vertical) with steps in the 4rd dimension."""
+get_step(coeffs::LowerTriangularArray{T, 3}, i) where {T} = lta_view(coeffs, :, :, i)

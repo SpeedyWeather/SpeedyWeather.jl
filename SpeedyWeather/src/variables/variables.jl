@@ -48,7 +48,6 @@ function Base.show(io::IO, var::AbstractVariable)
     return nothing
 end
 
-export Variables
 """$(TYPEDSIGNATURES)
 Symbol representing a unique identifier for a variable, combining its type, namespace and name and namespace. 
 Used to remove duplicates when extracting variables from the model. E.g. `:Variable_ocean_sea_surface_temperature`."""
@@ -279,29 +278,3 @@ function warn_undefvar(vars::Variables, key::Symbol, group::Symbol = :prognostic
     @warn "Variable $key not defined in variables.$path. Defined are: $defined_vars"
     return true # return true to allow for short-circuiting with && return nothing to skip exit the following code early
 end
-
-# TODO move get_step, get_steps to LowerTriangularArrays?
-
-function get_steps(coeffs::LowerTriangularArray{T, 2}) where {T}
-    nsteps = size(coeffs, 2)
-    return ntuple(i -> lta_view(coeffs, :, i), nsteps)
-end
-
-function get_steps(coeffs::LowerTriangularArray{T, 3}) where {T}
-    nsteps = size(coeffs, 3)
-    return ntuple(i -> lta_view(coeffs, :, :, i), nsteps)
-end
-
-export get_step
-
-"""$(TYPEDSIGNATURES)
-Get the i-th step of a LowerTriangularArray as a view (wrapped into a LowerTriangularArray).
-"step" refers to the last dimension, for prognostic variables used for the leapfrog time step.
-This method is for a 2D spectral variable (horizontal only) with steps in the 3rd dimension."""
-get_step(coeffs::LowerTriangularArray{T, 2}, i) where {T} = lta_view(coeffs, :, i)
-
-"""$(TYPEDSIGNATURES)
-Get the i-th step of a LowerTriangularArray as a view (wrapped into a LowerTriangularArray).
-"step" refers to the last dimension, for prognostic variables used for the leapfrog time step.
-This method is for a 3D spectral variable (horizontal+vertical) with steps in the 4rd dimension."""
-get_step(coeffs::LowerTriangularArray{T, 3}, i) where {T} = lta_view(coeffs, :, :, i)

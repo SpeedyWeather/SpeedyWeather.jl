@@ -1,5 +1,9 @@
 abstract type AbstractHorizontalDiffusion <: AbstractModelComponent end
 
+# dispatch via diffusion type
+horizontal_diffusion!(vars::Variables, model::AbstractModel) =
+    horizontal_diffusion!(vars, model.horizontal_diffusion, model)
+
 export HyperDiffusion
 
 """

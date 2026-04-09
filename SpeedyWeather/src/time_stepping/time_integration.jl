@@ -1,3 +1,31 @@
+"""$(TYPEDSIGNATURES) Main time loop that loops over all time steps."""
+function time_stepping!(simulation::AbstractSimulation)
+    (; clock) = simulation.variables.prognostic
+    for _ in 1:clock.n_timesteps                    # MAIN LOOP
+        time_step!(simulation)
+    end
+    return simulation
+end
+
+# dispatch over time stepper
+time_step!(simulation::AbstractSimulation) = time_step!(simulation, simulation.model.time_stepping)
+
+"""$(TYPEDSIGNATURES) Perform one time step of `simulation`."""
+function time_step!(simulation::AbstractSimulation, time_stepping::AbstractTimeStepper)
+    (; variables, model) = simulation
+    (; feedback, output) = model
+    (; Δt_millisec) = time_stepping
+    (; clock) = variables.prognostic
+
+    time_step!(variables, time_stepping, model)     # calculate tendencies and step forward
+    time_step!(clock, Δt_millisec)                  # then step the clock forward
+
+    progress!(feedback, variables)                  # updates the progress meter bar
+    output!(output, simulation)                     # do output?
+    callback!(model.callbacks, variables, model)    # any callbacks?
+    return nothing
+end
+
 """$(TYPEDSIGNATURES)
 Computes the time step in [ms]. `Δt_at_T31` is always scaled with the resolution `trunc` 
 of the model. In case `adjust_Δt_with_output` is true, the `Δt_at_T31` is additionally 
@@ -48,7 +76,7 @@ Change time step of timestepper `L` to `Δt` (unscaled)
 and disables adjustment to output frequency."""
 function set!(
         L::AbstractTimeStepper,
-        Δt::Period,                 # unscaled time step in Second, Minute, ...
+        Δt::Period,                         # unscaled time step in Second, Minute, ...
     )
     L.Δt_millisec = Millisecond(Δt)         # recalculate all Δt fields
     L.Δt_sec = L.Δt_millisec.value / 1000
@@ -68,35 +96,27 @@ set!(L::AbstractTimeStepper; Δt::Period) = set!(L, Δt)
 
 """$(TYPEDSIGNATURES)
 Calculate a single time step for the barotropic model."""
-function timestep!(
-        vars::Variables,                # all variables
-        dt::Real,                       # time step (mostly =2Δt, but for first_timesteps! =Δt, Δt/2)
-        model::Barotropic,              # everything that's constant at runtime
-        lf1::Integer = 2,               # leapfrog index 1 (dis/enables Robert+Williams filter)
-        lf2::Integer = 2,               # leapfrog index 2 (time step used for tendencies)
+function time_step!(
+        vars::Variables,                        # all variables
+        time_stepping::AbstractTimeStepper,     # time stepping parameters
+        model::Barotropic,                      # everything that's constant at runtime
     )
     # exit immediately if NaNs/Infs already present
     (!isnothing(model.feedback) && model.feedback.nans_detected) && return nothing
+    reset_tendencies!(vars)                     # set the tendencies back to zero for accumulation
 
-    reset_tendencies!(vars)             # set the tendencies back to zero for accumulation
-
-    # TENDENCIES, DIFFUSION, LEAPFROGGING AND TRANSFORM SPECTRAL STATE TO GRID
-    dynamics_tendencies!(vars, lf2, model)
-    horizontal_diffusion!(vars, model.horizontal_diffusion, model)
-    leapfrog!(vars, dt, lf1, model)
-    transform!(vars, lf2, model)
-
-    # PARTICLE ADVECTION (always skip 1st step of first_timesteps!)
-    not_first_timestep = lf2 == 2
-    not_first_timestep && particle_advection!(vars, model)
+    dynamics_tendencies!(vars, model)
+    horizontal_diffusion!(vars, model)
+    update_prognostic!(vars, time_stepping, model)  # step prognostic variables forward
+    transform!(vars, model)                         # new spectral state to grid
+    particle_advection!(vars, model)                # TODO move up?
 
     return nothing
 end
 
-"""
-$(TYPEDSIGNATURES)
-Calculate a single time step for the `model <: ShallowWater`."""
-function timestep!(
+"""$(TYPEDSIGNATURES)
+Calculate a single time step for the shallow water model."""
+function time_step!(
         vars::Variables,                # all variables
         dt::Real,                       # time step (mostly =2Δt, but for first_timesteps! =Δt, Δt/2)
         model::ShallowWater,            # everything that's constant at runtime
@@ -112,7 +132,7 @@ function timestep!(
     implicit_correction!(vars, model.implicit, model)
 
     # APPLY DIFFUSION, STEP FORWARD IN TIME, AND TRANSFORM NEW TIME STEP TO GRID
-    horizontal_diffusion!(vars, model.horizontal_diffusion, model)
+    horizontal_diffusion!(vars, model)
     leapfrog!(vars, dt, lf1, model)
     transform!(vars, lf2, model)
 
@@ -125,8 +145,8 @@ end
 
 """
 $(TYPEDSIGNATURES)
-Calculate a single time step for the `model<:PrimitiveEquation`"""
-function timestep!(
+Calculate a single time step for the primitive equation model."""
+function time_step!(
         vars::Variables,                # all variables
         dt::Real,                       # time step (mostly =2Δt, but for first_timesteps! =Δt, Δt/2)
         model::PrimitiveEquation,       # everything that's constant at runtime
@@ -153,7 +173,7 @@ function timestep!(
     end
 
     # APPLY DIFFUSION, STEP FORWARD IN TIME, AND TRANSFORM NEW TIME STEP TO GRID
-    horizontal_diffusion!(vars, model.horizontal_diffusion, model)
+    horizontal_diffusion!(vars, model)
     leapfrog!(vars, dt, lf1, model)
     transform!(vars, lf2, model)
 
@@ -165,42 +185,39 @@ function timestep!(
 end
 
 """$(TYPEDSIGNATURES)
-Perform one single time step of `simulation` including
-possibly output and callbacks."""
-function timestep!(simulation::AbstractSimulation)
-    (; clock) = simulation.variables.prognostic
-    @trace if clock.timestep_counter == 0
-        first_timesteps!(simulation)
-    else
-        later_timestep!(simulation)
+Leapfrog time stepping for all prognostic variables in `vars` using their tendencies.
+Depending on `model` decides which variables to time step."""
+function update_prognostic!(
+        vars::Variables,
+        time_stepping::AbstractTimeStepper,
+        model::AbstractModel,
+    )
+    (; prognostic, tendencies) = vars
+
+    # atmospheric variables
+    for varname in keys(tendencies)
+        if !(tendencies[varname] isa NamedTuple)
+            var = getfield(prognostic, varname)
+            tendency = getfield(tendencies, varname)
+            update_prognostic!(var, tendency, time_stepping)
+        end
     end
 
-    return nothing
-end
-
-"""$(TYPEDSIGNATURES)
-Perform one single "normal" time step of `simulation`, after `first_timesteps!`."""
-function later_timestep!(simulation::AbstractSimulation)
-    (; variables, model) = simulation
-    (; feedback, output) = model
-    (; Δt, Δt_millisec) = model.time_stepping
-    (; clock) = variables.prognostic
-
-    timestep!(variables, 2Δt, model)                # calculate tendencies and leapfrog forward
-    timestep!(clock, Δt_millisec)                   # time of lf=2 and variables after timestep!
-
-    progress!(feedback, variables)                  # updates the progress meter bar
-    output!(output, simulation)                     # do output?
-    callback!(model.callbacks, variables, model)    # any callbacks?
-    return nothing
-end
-
-"""$(TYPEDSIGNATURES)
-Main time loop that loops over all time steps."""
-function time_stepping!(simulation::AbstractSimulation)
-    (; clock) = simulation.variables.prognostic
-    for _ in 1:clock.n_timesteps        # MAIN LOOP
-        timestep!(simulation)
+    # and time stepping for tracers if active
+    for (name, tracer) in model.tracers
+        if tracer.active
+            var = prognostic.tracers[name]
+            tendency = tendencies.tracers[name]
+            update_prognostic!(var, tendency, time_stepping)
+        end
     end
-    return simulation
+
+    # these might decide to do the timestepping themselves
+    update_ocean!(vars, model, time_stepping)
+    update_seaice!(vars, model, time_stepping)
+    update_land!(vars, model, time_stepping)
+
+    # evolve the random pattern in time
+    random_process!(vars, model.random_process)
+    return nothing
 end
