@@ -88,19 +88,19 @@ initialize!(::Nothing, clock::Clock, model::AbstractModel) = nothing
 
 progress!(feedback::Feedback) = ProgressMeter.next!(feedback.progress_meter)
 
-function progress!(feedback::Feedback, vars::Variables)
+function progress!(feedback::Feedback, vars::Variables, model::AbstractModel)
     every_nsteps = feedback.progress_meter.core.check_iterations
     (; counter) = feedback.progress_meter.core
     FEEDBACK_TIME[] = vars.prognostic.clock.time
     feedback.show_umax && mod(counter, every_nsteps) == 0 && max_speed(vars)
     feedback.show_temperature_range && mod(counter, every_nsteps) == 0 && temperature_range(vars)
     progress!(feedback)
-    feedback.debug && nan_detection!(feedback, vars)
+    feedback.debug && nan_detection!(feedback, vars, model)
     return nothing
 end
 
 # fallback for feedback = nothing
-progress!(::Nothing, vars::Variables) = nothing
+progress!(::Nothing, vars::Variables, model::AbstractModel) = nothing
 
 """
 $(TYPEDSIGNATURES)
@@ -112,10 +112,11 @@ finalize!(::Nothing) = nothing
 
 """$(TYPEDSIGNATURES)
 Detect NaN (Not-a-Number, or Inf) in the prognostic variables."""
-function nan_detection!(feedback::Feedback, vars::Variables)
-    feedback.nans_detected && return nothing                        # escape immediately if nans already detected
-    i = feedback.progress_meter.counter                             # time step
-    GPUArrays.@allowscalar vor0 = vars.prognostic.vorticity[2, end, 2]    # only check 1-0 mode of surface vorticity
+function nan_detection!(feedback::Feedback, vars::Variables, model::AbstractModel)
+    feedback.nans_detected && return nothing        # escape immediately if nans already detected
+    i = feedback.progress_meter.counter             # time step
+    vor = get_prognostic_step(vars.prognostic.vorticity, model.time_stepping, feedback)
+    GPUArrays.@allowscalar vor0 = vor[2, end]       # only check 1-0 mode of surface vorticity
 
     # just check first harmonic, spectral transform propagates NaNs globally anyway
     (; time) = vars.prognostic.clock                                # current time for feedback

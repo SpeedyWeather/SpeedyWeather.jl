@@ -2,11 +2,10 @@
 Calculate all tendencies for the BarotropicModel."""
 function dynamics_tendencies!(
         vars::Variables,
-        lf::Integer,                    # leapfrog index to evaluate tendencies at
         model::Barotropic,
     )
-    forcing!(vars, lf, model)           # = (Fᵤ, Fᵥ) forcing for u, v
-    drag!(vars, lf, model)              # drag term for u, v
+    forcing!(vars, model)               # = (Fᵤ, Fᵥ) forcing for u, v
+    drag!(vars, model)                  # drag term for u, v
     vorticity_flux!(vars, model)        # = ∇×(v(ζ+f) + Fᵤ, -u(ζ+f) + Fᵥ)
     tracer_advection!(vars, model)
     return nothing
@@ -840,6 +839,7 @@ function vorticity_flux_curldiv!(
     u_tend = vars.scratch.a
     v_tend = vars.scratch.b
 
+    S = model.spectral_transform
     transform!(u_tend, u_tend_grid, scratch_memory, S)
     transform!(v_tend, v_tend_grid, scratch_memory, S)
 
@@ -1001,21 +1001,23 @@ function temperature_average!(
     return nothing
 end
 
-function reset_tendencies!(vars::Variables; value = 0)
-    _reset_tendencies!(vars.tendencies, value)
+function reset_tendencies!(vars::Variables, time_stepping::AbstractTimeStepper; value = 0)
+    _reset_tendencies!(vars.tendencies, time_stepping, value)
     return vars
 end
 
 # recursively fill all arrays in a NamedTuple, unpacking nested NamedTuples
 # this avoids Union-typed iteration which Enzyme cannot differentiate
-@inline _reset_tendencies!(nt::NamedTuple, value) = _reset_tendencies_inner!(values(nt), value)
-@inline _reset_tendencies_inner!(::Tuple{}, _) = nothing
-@inline function _reset_tendencies_inner!(t::Tuple, value)
-    _reset_tendency!(first(t), value)
-    _reset_tendencies_inner!(Base.tail(t), value)
+@inline _reset_tendencies!(nt::NamedTuple, ts, value) = _reset_tendencies_inner!(values(nt), ts, value)
+@inline _reset_tendencies_inner!(::Tuple{}, _, _) = nothing
+@inline function _reset_tendencies_inner!(t::Tuple, ts, value)
+    _reset_tendency!(first(t), ts, value)
+    _reset_tendencies_inner!(Base.tail(t), ts, value)
     return nothing
 end
 
 # dispatch on element type: nested NamedTuple vs array
-@inline _reset_tendency!(nt::NamedTuple, value) = _reset_tendencies_inner!(values(nt), value)
-@inline _reset_tendency!(a::AbstractArray, value) = fill!(a, value)
+@inline _reset_tendency!(nt::NamedTuple, ts, value) = _reset_tendencies_inner!(values(nt), ts, value)
+@inline function _reset_tendency!(a::AbstractArray, time_stepping, value)
+    fill!(get_step(a, 1), value)
+end

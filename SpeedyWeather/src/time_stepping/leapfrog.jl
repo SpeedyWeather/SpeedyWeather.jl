@@ -37,7 +37,13 @@ mutable struct Leapfrog{NF, S, B, MS} <: AbstractLeapfrog
 end
 
 Adapt.adapt_structure(to, L::Leapfrog) = LeapfrogCore(L.Δt_millisec, L.Δt_sec, L.Δt)
-prognostic_steps(::Leapfrog) = 2    # for both spectral and grid (those because parameterizations are evaluated at previous time step)
+# leapfrogging always needs 2 steps in spectral
+prognostic_spectral_steps(::Leapfrog) = 2                                       
+# but in 2D only 1 step in grid space
+prognostic_grid_steps(::Leapfrog, ::Union{<:Barotropic, <:ShallowWater}) = 1    
+# but the parameterizations are evaluated at the previous step so 2
+prognostic_grid_steps(::Leapfrog, ::PrimitiveEquation) = 2                      
+# always only one step for tendencies
 tendency_steps(::Leapfrog) = 1
 
 """($TYPEDSIGNATURES)

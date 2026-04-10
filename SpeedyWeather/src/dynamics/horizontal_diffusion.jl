@@ -205,18 +205,17 @@ function horizontal_diffusion!(
         vars::Variables,
         diffusion::AbstractHorizontalDiffusion,
         model::Barotropic,
-        lf::Integer = 1,    # leapfrog index used (2 is unstable)
     )
     (; expl, impl) = diffusion
 
     # Barotropic model diffuses vorticity (only variable)
-    vor = get_step(vars.prognostic.vorticity, lf)                               # lta_view for leapfrog index
-    vor_tend = vars.tendencies.vorticity
+    vor = get_prognostic_step(vars.prognostic.vorticity, model.time_stepping, diffusion)
+    vor_tend = get_tendency_step(vars.tendencies.vorticity, model.time_stepping, diffusion)
     horizontal_diffusion!(vor_tend, vor, expl, impl)
 
     for (name, tracer) in model.tracers
-        tracer_var = get_step(vars.prognostic.tracers[name], lf)          # lta_view for leapfrog index
-        tracer_tend = vars.tendencies.tracers[name]
+        tracer_var = get_prognostic_step(vars.prognostic.tracers[name], model.time_stepping, diffusion)
+        tracer_tend = get_tendency_step(vars.tendencies.tracers[name], model.time_stepping, diffusion)
         tracer.active && horizontal_diffusion!(tracer_tend, tracer_var, expl, impl)
     end
     return nothing

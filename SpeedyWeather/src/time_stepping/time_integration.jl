@@ -20,7 +20,7 @@ function time_step!(simulation::AbstractSimulation, time_stepping::AbstractTimeS
     time_step!(variables, time_stepping, model)     # calculate tendencies and step forward
     time_step!(clock, Δt_millisec)                  # then step the clock forward
 
-    progress!(feedback, variables)                  # updates the progress meter bar
+    progress!(feedback, variables, model)           # updates the progress meter bar
     output!(output, simulation)                     # do output?
     callback!(model.callbacks, variables, model)    # any callbacks?
     return nothing
@@ -98,12 +98,12 @@ set!(L::AbstractTimeStepper; Δt::Period) = set!(L, Δt)
 Calculate a single time step for the barotropic model."""
 function time_step!(
         vars::Variables,                        # all variables
-        ::AbstractTimeStepper,                  # time stepping parameters
+        TS::AbstractTimeStepper,                # time stepping parameters
         model::Barotropic,                      # everything that's constant at runtime
     )
     # exit immediately if NaNs/Infs already present
     (!isnothing(model.feedback) && model.feedback.nans_detected) && return nothing
-    reset_tendencies!(vars)                     # set the tendencies back to zero for accumulation
+    reset_tendencies!(vars, TS)                 # set the tendencies back to zero for accumulation
 
     dynamics_tendencies!(vars, model)
     horizontal_diffusion!(vars, model)
@@ -202,7 +202,7 @@ function update_prognostic!(
         if !(tendencies[varname] isa NamedTuple)
             var = getfield(prognostic, varname)
             tendency = getfield(tendencies, varname)
-            update_prognostic!(var, tendency, time_stepping)
+            update_prognostic!(var, tendency, vars, model.time_stepping, model)
         end
     end
 
@@ -211,14 +211,14 @@ function update_prognostic!(
         if tracer.active
             var = prognostic.tracers[name]
             tendency = tendencies.tracers[name]
-            update_prognostic!(var, tendency, time_stepping)
+            update_prognostic!(var, tendency, vars, model.time_stepping, model)
         end
     end
 
     # these might decide to do the timestepping themselves
-    update_ocean!(vars, model, time_stepping)
-    update_seaice!(vars, model, time_stepping)
-    update_land!(vars, model, time_stepping)
+    # update_ocean!(vars, model, time_stepping)
+    # update_seaice!(vars, model, time_stepping)
+    # update_land!(vars, model, time_stepping)
 
     # evolve the random pattern in time
     random_process!(vars, model.random_process)

@@ -1,13 +1,7 @@
 abstract type AbstractForcing <: AbstractModelComponent end
 
 # function barrier for all forcings to unpack model.forcing
-function forcing!(
-        vars::Variables,
-        lf::Integer,
-        model::AbstractModel,
-    )
-    return forcing!(vars, model.forcing, lf, model)
-end
+forcing!(vars::Variables, model::AbstractModel) = forcing!(vars, model.forcing, model)
 
 # NO FORCING
 forcing!(vars, forcing::Nothing, args...) = nothing
@@ -95,7 +89,8 @@ in the momentum equations following the JetStreamForcing.
 The forcing is precomputed in `initialize!(::JetStreamForcing, ::AbstractModel)`."""
 function forcing!(
         vars::Variables,
-        forcing::JetStreamForcing
+        forcing::JetStreamForcing,
+        time_stepping::AbstractTimeStepper,
     )
 
     Fu = get_tendency_step(vars.tendencies.grid.u, time_stepping, forcing)
