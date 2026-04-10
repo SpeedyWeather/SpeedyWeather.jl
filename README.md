@@ -108,7 +108,7 @@ run!(simulation, period=Day(10), output=true)       # aaaand action!
 ```
 showing
 ```
-Weather is speedy: run 0001 100%|█████████| Time: 0:00:02 (1000.22 years/day)
+ run_0001 100% Time: 0:00:02 (2000-01-11, 1000.22 years/day,  71 m/s, [ -81,   39] ˚C)
 ```
 
 Hurray🥳 In a few seconds seconds we just simulated 10 days of the Earth's atmosphere at a speed of 1000 years per day.
