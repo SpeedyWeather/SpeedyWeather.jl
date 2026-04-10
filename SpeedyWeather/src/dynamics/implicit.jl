@@ -114,14 +114,14 @@ export ImplicitPrimitiveEquation
 Struct that holds various precomputed arrays for the semi-implicit correction to
 prevent gravity waves from amplifying in the primitive equation model.
 $(TYPEDFIELDS)"""
-@kwdef mutable struct ImplicitPrimitiveEquation{
+@kwdef struct ImplicitPrimitiveEquation{
         NF,             # number format
         VectorType,
         MatrixType,
         TensorType,
         IntType,
-        B,              # Bool
-        RefV,           # Base.RefValue{NF}
+        RefValBool,              # Bool
+        RefValNF,           # Base.RefValue{NF}
     } <: AbstractImplicit
 
     # DIMENSIONS
@@ -136,17 +136,17 @@ $(TYPEDFIELDS)"""
     α::NF = 1
 
     "Reinitialize at restart when initialized=true"
-    reinitialize::B = true
+    reinitialize::RefValBool = Ref(true)
 
     "Flag automatically set to true when initialize! has been called"
-    initialized::B = false
+    initialized::RefValBool = Ref(false)
 
     # PRECOMPUTED ARRAYS, to be initialized with initialize!
     "vertical temperature profile, obtained from diagn on first time step"
     temp_profile::VectorType = zeros(NF, nlayers)
 
     "time step 2α*Δt packed in RefValue for mutability"
-    ξ::RefV = Ref{NF}(0)
+    ξ::RefValNF = Ref{NF}(0)
 
     "divergence: operator for the geopotential calculation"
     R::MatrixType = zeros(NF, nlayers, nlayers)
@@ -186,7 +186,7 @@ end
 Generator using the resolution from SpectralGrid."""
 function ImplicitPrimitiveEquation(spectral_grid::SpectralGrid; kwargs...)
     (; NF, VectorType, MatrixType, TensorType, trunc, nlayers) = spectral_grid
-    return ImplicitPrimitiveEquation{NF, VectorType, MatrixType, TensorType, typeof(trunc), Bool, Base.RefValue{NF}}(;
+    return ImplicitPrimitiveEquation{NF, VectorType, MatrixType, TensorType, typeof(trunc), Base.RefValue{Bool}, Base.RefValue{NF}}(;
         trunc, nlayers, kwargs...
     )
 end
@@ -222,86 +222,87 @@ function initialize!(
         adiabatic_conversion::AbstractAdiabaticConversion,
     ) where {NF}
     # option to skip reinitialization at restart
-    (implicit.initialized && !implicit.reinitialize) && return nothing
+    @trace if !(implicit.initialized[]) && implicit.reinitialize[] 
+        
+        (; trunc, nlayers, α) = implicit
+        (; σ_levels_full, σ_levels_thick) = geometry
+        (; R_dry, κ) = atmosphere
+        (; Δp_geopot_half, Δp_geopot_full) = geopotential
+        (; σ_lnp_A, σ_lnp_B) = adiabatic_conversion
 
-    (; trunc, nlayers, α) = implicit
-    (; σ_levels_full, σ_levels_thick) = geometry
-    (; R_dry, κ) = atmosphere
-    (; Δp_geopot_half, Δp_geopot_full) = geopotential
-    (; σ_lnp_A, σ_lnp_B) = adiabatic_conversion
+        arch = architecture(implicit.S)
 
-    arch = architecture(implicit.S)
+        # set up R, U, L, W operators from
+        # δD = G_D + ξ(RδT + Uδlnps)        divergence D correction
+        # δT = G_T + ξLδD                   temperature T correction
+        # δlnps = G_lnps + ξWδD             log surface pressure lnps correction
+        #
+        # G_X is the uncorrected explicit tendency calculated as RHS_expl(Xⁱ) + RHS_impl(Xⁱ⁻¹)
+        # with RHS_expl being the nonlinear terms calculated from the centered time step i
+        # and RHS_impl are the linear terms that are supposed to be calcualted semi-implicitly
+        # however, they have sofar only been evaluated explicitly at time step i-1
+        # and are subject to be corrected to δX following the equations above
+        # R, U, L, W are linear operators that are therefore defined here and inverted
+        # to obtain δD first, and then δT and δlnps through substitution
 
-    # set up R, U, L, W operators from
-    # δD = G_D + ξ(RδT + Uδlnps)        divergence D correction
-    # δT = G_T + ξLδD                   temperature T correction
-    # δlnps = G_lnps + ξWδD             log surface pressure lnps correction
-    #
-    # G_X is the uncorrected explicit tendency calculated as RHS_expl(Xⁱ) + RHS_impl(Xⁱ⁻¹)
-    # with RHS_expl being the nonlinear terms calculated from the centered time step i
-    # and RHS_impl are the linear terms that are supposed to be calcualted semi-implicitly
-    # however, they have sofar only been evaluated explicitly at time step i-1
-    # and are subject to be corrected to δX following the equations above
-    # R, U, L, W are linear operators that are therefore defined here and inverted
-    # to obtain δD first, and then δT and δlnps through substitution
+        (; temp_profile, S⁻¹, L, R, U, W, L0, L1, L2, L3, L4) = implicit
 
-    (; temp_profile, S⁻¹, L, R, U, W, L0, L1, L2, L3, L4) = implicit
+        # use current vertical temperature profile
+        temp_profile .= temp_average
 
-    # use current vertical temperature profile
-    temp_profile .= temp_average
+        # return immediately if temp_profile contains NaRs, model blew up in that case
+        # TODO: reactive when issues with Reactant resolved
+        # all(isfinite.(temp_profile)) || return nothing
 
-    # return immediately if temp_profile contains NaRs, model blew up in that case
-    # TODO: reactive when issues with Reactant resolved
-    # all(isfinite.(temp_profile)) || return nothing
+        ξ = α * dt                          # dt = 2Δt for leapfrog, but = Δt, Δ/2 in first_timesteps!
+        implicit.ξ[] = ξ                    # also store in Implicit struct
 
-    ξ = α * dt                          # dt = 2Δt for leapfrog, but = Δt, Δ/2 in first_timesteps!
-    implicit.ξ[] = ξ                    # also store in Implicit struct
+        # index vectors for broadcasting: rows = 1:nlayers (column), cols = (1:nlayers)' (row)
+        rows = (1:nlayers)
+        cols = (1:nlayers)'
 
-    # index vectors for broadcasting: rows = 1:nlayers (column), cols = (1:nlayers)' (row)
-    rows = (1:nlayers)
-    cols = (1:nlayers)'
+        # DIVERGENCE OPERATORS (called g in Hoskins and Simmons 1975, eq 11 and Appendix 1)
+        # R[row, k] = -Δp_geopot_full[k] for row <= k, additionally -Δp_geopot_half[k] for row < k
+        R .= .-Δp_geopot_full[cols] .* (rows .<= cols) .- Δp_geopot_half[cols] .* (rows .< cols)
 
-    # DIVERGENCE OPERATORS (called g in Hoskins and Simmons 1975, eq 11 and Appendix 1)
-    # R[row, k] = -Δp_geopot_full[k] for row <= k, additionally -Δp_geopot_half[k] for row < k
-    R .= .-Δp_geopot_full[cols] .* (rows .<= cols) .- Δp_geopot_half[cols] .* (rows .< cols)
+        # U = -R_dry * temp_profile (the R_d*Tₖ∇² term excl eigenvalues from ∇² for divergence)
+        U .= .-R_dry .* temp_profile
 
-    # U = -R_dry * temp_profile (the R_d*Tₖ∇² term excl eigenvalues from ∇² for divergence)
-    U .= .-R_dry .* temp_profile
+        # TEMPERATURE OPERATOR (called τ in Hoskins and Simmons 1975, eq 9 and Appendix 1)
+        L0 .= 1 ./ (2 .* σ_levels_thick)
+        L2 .= κ .* temp_profile .* σ_lnp_A
+        L4 .= κ .* temp_profile .* σ_lnp_B
 
-    # TEMPERATURE OPERATOR (called τ in Hoskins and Simmons 1975, eq 9 and Appendix 1)
-    L0 .= 1 ./ (2 .* σ_levels_thick)
-    L2 .= κ .* temp_profile .* σ_lnp_A
-    L4 .= κ .* temp_profile .* σ_lnp_B
+        # L1[k, r]: vertical advection operator
+        # k indices for below/above neighbours, clamped to 1:nlayers
+        k_above = max.(1, rows .- 1)
+        k_below = min.(rows .+ 1, nlayers)
+        ΔT_below = temp_profile[k_below] .- temp_profile[rows]
+        ΔT_above = temp_profile[rows] .- temp_profile[k_above]
+        σₖ = σ_levels_full[rows]
+        σₖ_above = σ_levels_full[k_above]
+        Δσᵣ = σ_levels_thick[cols]
 
-    # L1[k, r]: vertical advection operator
-    # k indices for below/above neighbours, clamped to 1:nlayers
-    k_above = max.(1, rows .- 1)
-    k_below = min.(rows .+ 1, nlayers)
-    ΔT_below = temp_profile[k_below] .- temp_profile[rows]
-    ΔT_above = temp_profile[rows] .- temp_profile[k_above]
-    σₖ = σ_levels_full[rows]
-    σₖ_above = σ_levels_full[k_above]
-    Δσᵣ = σ_levels_thick[cols]
+        L1 .= ΔT_below .* Δσᵣ .* σₖ .- Δσᵣ .* (rows .>= cols) .+
+            ΔT_above .* Δσᵣ .* σₖ_above .- Δσᵣ .* ((rows .- 1) .>= cols)
 
-    L1 .= ΔT_below .* Δσᵣ .* σₖ .- Δσᵣ .* (rows .>= cols) .+
-           ΔT_above .* Δσᵣ .* σₖ_above .- Δσᵣ .* ((rows .- 1) .>= cols)
+        # L3[r, k]: sum_above operator — lower triangle gets σ_levels_thick[k]
+        L3 .= σ_levels_thick[cols] .* (rows .> cols)
 
-    # L3[r, k]: sum_above operator — lower triangle gets σ_levels_thick[k]
-    L3 .= σ_levels_thick[cols] .* (rows .> cols)
+        # Combine all operators into L = Diagonal(L0)*L1 + Diagonal(L2)*L3 + Diagonal(L4)
+        L .= L0 .* L1 .+ L2 .* L3 .+ L4 .* (rows .== cols)
 
-    # Combine all operators into L = Diagonal(L0)*L1 + Diagonal(L2)*L3 + Diagonal(L4)
-    L .= L0 .* L1 .+ L2 .* L3 .+ L4 .* (rows .== cols)
+        # PRESSURE OPERATOR (called πᵣ in Hoskins and Simmons, 1975 Appendix 1)
+        W .= .-σ_levels_thick
 
-    # PRESSURE OPERATOR (called πᵣ in Hoskins and Simmons, 1975 Appendix 1)
-    W .= .-σ_levels_thick
-
-    # solving the equations above for δD yields
-    # δD = SG, with G = G_D + ξRG_T + ξUG_lnps and the operator S
-    # S = 1 - ξ²(RL + UW) that has to be inverted to obtain δD from the Gs
-    # Compute S⁻¹ for every l via Gauss-Jordan elimination
-    S_scratch = similar(S⁻¹)
-    launch!(arch, LinearWorkOrder, (trunc + 1,), _implicit_invert_S_kernel!,
-        S⁻¹, S_scratch, R, L, U, W, ξ, nlayers)
+        # solving the equations above for δD yields
+        # δD = SG, with G = G_D + ξRG_T + ξUG_lnps and the operator S
+        # S = 1 - ξ²(RL + UW) that has to be inverted to obtain δD from the Gs
+        # Compute S⁻¹ for every l via Gauss-Jordan elimination
+        S_scratch = similar(S⁻¹)
+        launch!(arch, LinearWorkOrder, (trunc + 1,), _implicit_invert_S_kernel!,
+            S⁻¹, S_scratch, R, L, U, W, ξ, nlayers)
+    end
 
     return nothing
 end
