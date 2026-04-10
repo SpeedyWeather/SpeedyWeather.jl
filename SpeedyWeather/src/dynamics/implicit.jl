@@ -269,7 +269,7 @@ function initialize!(
     U .= .-R_dry .* temp_profile
 
     # TEMPERATURE OPERATOR (called τ in Hoskins and Simmons 1975, eq 9 and Appendix 1)
-    L0 .= inv.(2 .* σ_levels_thick)
+    L0 .= 1 ./ (2 .* σ_levels_thick)
     L2 .= κ .* temp_profile .* σ_lnp_A
     L4 .= κ .* temp_profile .* σ_lnp_B
 
@@ -404,7 +404,6 @@ function implicit_correction!(
     zero_last_degree!(pres_tend)
     zero_last_degree!(temp_tend)
 
-    #pres_tend.data[1:1] .= 0    # mass conservation
     @allowscalar pres_tend.data[1] = 0    # mass conservation
     return nothing
 end
