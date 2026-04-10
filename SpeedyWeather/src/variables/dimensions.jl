@@ -47,13 +47,13 @@ Base.zero(::AbstractVariable{Vertical1D}, model::AbstractModel) = fill!(model.sp
 @kwdef struct Grid4D <: AbstractVariableDim
     n::Int = 1                                                  # length of 4th dimension
 end
-Base.zero(v::AbstractVariable{Grid4D}, model::AbstractModel) = zeros(model.spectral_grid.GridVariable3D, model.spectral_grid.grid, get_nlayers(model), v.dims.n)
+Base.zero(v::AbstractVariable{Grid4D}, model::AbstractModel) = zeros(model.spectral_grid.GridVariable4D, model.spectral_grid.grid, get_nlayers(model), v.dims.n)
 
 """Dimension for 4D spectral variables with customizable extra dimension."""
 @kwdef struct Spectral4D <: AbstractVariableDim
-    n::Int = 1
+    n::Int = 1                                                  # length of 4th dimension
 end
-Base.zero(v::AbstractVariable{Spectral4D}, model::AbstractModel) = zeros(model.spectral_grid.SpectralVariable3D, model.spectral_grid.spectrum, get_nlayers(model), v.dims.n)
+Base.zero(v::AbstractVariable{Spectral4D}, model::AbstractModel) = zeros(model.spectral_grid.SpectralVariable4D, model.spectral_grid.spectrum, get_nlayers(model), v.dims.n)
 
 """Dimension for generic vector data of arbitrary length."""
 @kwdef struct VectorDim <: AbstractVariableDim

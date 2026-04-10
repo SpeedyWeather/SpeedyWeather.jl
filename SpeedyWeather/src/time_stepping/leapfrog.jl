@@ -1,8 +1,10 @@
 export Leapfrog
 
+abstract type AbstractLeapfrog <: AbstractTimeStepper end
+
 """Leapfrog time stepping defined by the following fields
 $(TYPEDFIELDS)"""
-mutable struct Leapfrog{NF, S, B, MS} <: AbstractTimeStepper
+mutable struct Leapfrog{NF, S, B, MS} <: AbstractLeapfrog
     "[OPTION] Time step in minutes for T31, scale linearly to `trunc`"
     Δt_at_T31::S
 
@@ -34,11 +36,24 @@ mutable struct Leapfrog{NF, S, B, MS} <: AbstractTimeStepper
     Δt::NF
 end
 
-function Adapt.adapt_structure(to, L::Leapfrog)
-    return (; Δt = L.Δt, Δt_sec = L.Δt_sec, Δt_millisec = L.Δt_millisec)
+Adapt.adapt_structure(to, L::Leapfrog) = LeapfrogCore(L.Δt_millisec, L.Δt_sec, L.Δt)
+prognostic_steps(::Leapfrog) = 2    # for both spectral and grid (those because parameterizations are evaluated at previous time step)
+tendency_steps(::Leapfrog) = 1
+
+"""($TYPEDSIGNATURES)
+Immutable core struct used to adapt only the time step fields for use in kernels"""
+struct LeapfrogCore{NF, MS} <: AbstractLeapfrog
+    "[DERIVED] Time step Δt in milliseconds at specified resolution"
+    Δt_millisec::MS
+
+    "[DERIVED] Time step Δt [s] at specified resolution"
+    Δt_sec::NF
+
+    "[DERIVED] Time step Δt [s/m] at specified resolution, scaled by 1/radius"
+    Δt::NF
 end
 
-get_prognostic_steps(::Leapfrog) = 2
+Adapt.@adapt_structure LeapfrogCore
 
 """$(TYPEDSIGNATURES)
 Generator function for a Leapfrog struct using `spectral_grid`
@@ -75,14 +90,14 @@ Initialize leapfrogging `L` by recalculating the time step given the output time
 be a divisor such that an integer number of time steps matches exactly with the output
 time step."""
 function initialize!(L::Leapfrog, model::AbstractModel)
-    calculate_timestep!(L, model)  # common among several time steppers
+    calculate_Δt!(L, model)  # common among several time steppers
     if L.start_with_euler
         L.first_step_euler = true
     end
     return nothing
 end
 
-function calculate_timestep!(L::AbstractTimeStepper, model::AbstractModel)
+function calculate_Δt!(L::AbstractTimeStepper, model::AbstractModel)
     (; trunc) = model.spectral_grid
     (; radius) = model.planet
     output_dt = get_output_dt(model.output)
@@ -233,27 +248,3 @@ function first_timesteps!(
 
     return nothing
 end
-
-function get_steps(coeffs::LowerTriangularArray{T, 2}) where {T}
-    nsteps = size(coeffs, 2)
-    return ntuple(i -> lta_view(coeffs, :, i), nsteps)
-end
-
-function get_steps(coeffs::LowerTriangularArray{T, 3}) where {T}
-    nsteps = size(coeffs, 3)
-    return ntuple(i -> lta_view(coeffs, :, :, i), nsteps)
-end
-
-export get_step
-
-"""$(TYPEDSIGNATURES)
-Get the i-th step of a LowerTriangularArray as a view (wrapped into a LowerTriangularArray).
-"step" refers to the last dimension, for prognostic variables used for the leapfrog time step.
-This method is for a 2D spectral variable (horizontal only) with steps in the 3rd dimension."""
-get_step(coeffs::LowerTriangularArray{T, 2}, i) where {T} = lta_view(coeffs, :, i)
-
-"""$(TYPEDSIGNATURES)
-Get the i-th step of a LowerTriangularArray as a view (wrapped into a LowerTriangularArray).
-"step" refers to the last dimension, for prognostic variables used for the leapfrog time step.
-This method is for a 3D spectral variable (horizontal+vertical) with steps in the 4rd dimension."""
-get_step(coeffs::LowerTriangularArray{T, 3}, i) where {T} = lta_view(coeffs, :, :, i)

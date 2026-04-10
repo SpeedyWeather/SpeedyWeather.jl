@@ -98,7 +98,7 @@ set!(L::AbstractTimeStepper; Δt::Period) = set!(L, Δt)
 Calculate a single time step for the barotropic model."""
 function time_step!(
         vars::Variables,                        # all variables
-        time_stepping::AbstractTimeStepper,     # time stepping parameters
+        ::AbstractTimeStepper,                  # time stepping parameters
         model::Barotropic,                      # everything that's constant at runtime
     )
     # exit immediately if NaNs/Infs already present
@@ -107,9 +107,9 @@ function time_step!(
 
     dynamics_tendencies!(vars, model)
     horizontal_diffusion!(vars, model)
-    update_prognostic!(vars, time_stepping, model)  # step prognostic variables forward
-    transform!(vars, model)                         # new spectral state to grid
-    particle_advection!(vars, model)                # TODO move up?
+    update_prognostic!(vars, model)             # step prognostic variables forward
+    transform!(vars, model)                     # new spectral state to grid
+    particle_advection!(vars, model)            # TODO move up?
 
     return nothing
 end
@@ -183,6 +183,9 @@ function time_step!(
 
     return nothing
 end
+
+# dispatch via time stepping
+update_prognostic!(var::Variables, model::AbstractModel) = update_prognostic!(var, model.time_stepping, model)
 
 """$(TYPEDSIGNATURES)
 Leapfrog time stepping for all prognostic variables in `vars` using their tendencies.

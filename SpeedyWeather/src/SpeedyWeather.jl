@@ -151,8 +151,9 @@ include("dynamics/random_process.jl")
 
 # TIME STEPPING
 include("time_stepping/time_integration.jl")
+include("time_stepping/steps.jl")
 include("time_stepping/leapfrog.jl")
-include("time_stepping/lorenz_ncycle.jl")
+include("time_stepping/ncycle_lorenz.jl")
 include("time_stepping/transform.jl")
 include("time_stepping/implicit.jl")
 

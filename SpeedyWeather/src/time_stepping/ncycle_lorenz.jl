@@ -15,6 +15,9 @@ struct NCycleLorenzAB <: NCycleLorenzVariant end
 """Version ABBA: uses A-B-B-A sequence (only for N=4, provides 4th order accuracy)"""
 struct NCycleLorenzABBA <: NCycleLorenzVariant end
 
+
+abstract type AbstractNCycleLorenz <: AbstractTimeStepper end
+
 """
     NCycleLorenz{NF, V} <: AbstractTimeStepper
 
@@ -26,7 +29,7 @@ A semi-implicit Lorenz N-cycle time integration scheme following Hotta et al. (2
 3. x = x + Δt*dx              (state update)
 $(TYPEDFIELDS)
 """
-mutable struct NCycleLorenz{NF, V, IntType, S, MS, B} <: AbstractTimeStepper
+mutable struct NCycleLorenz{NF, V, IntType, S, MS, B} <: AbstractNCycleLorenz
     "[OPTION] Number of cycles N (3 or 4 recommended, 4 is more stable)"
     cycles::IntType
     
@@ -49,12 +52,19 @@ mutable struct NCycleLorenz{NF, V, IntType, S, MS, B} <: AbstractTimeStepper
     Δt::NF
 end
 
-function Adapt.adapt_structure(to, L::NCycleLorenz)
-    return (; Δt = L.Δt, Δt_sec = L.Δt_sec, Δt_millisec = L.Δt_millisec)
+Adapt.adapt_structure(to, L::NCycleLorenz) = NCycleLorenzCore(L.Δt_millisec, L.Δt_sec, L.Δt)
+
+prognostic_steps(::NCycleLorenz) = 1
+tendency_grid_steps(::NCycleLorenz) = 1     # the grid tendencies are only for F though, the G term only needs storing in spectral space
+tendency_spectral_steps(::NCycleLorenz) = 2 # to store F, G in Hotta et al. 2016, Eqs 5 & 6
+
+struct NCycleLorenzCore{NF, MS} <: AbstractNCycleLorenz
+    Δt_millisec::MS
+    Δt_sec::NF
+    Δt::NF
 end
 
-# first for prognostic variables, 2nd for "prognostic" tendency from previous time step
-get_prognostic_steps(::NCycleLorenz) = 2
+Adapt.@adapt_structure NCycleLorenzCore
 
 """$(TYPEDSIGNATURES)
 Generator function for NCycleLorenz struct using `spectral_grid` for resolution."""
@@ -87,7 +97,7 @@ function initialize!(L::NCycleLorenz, model::AbstractModel)
         @warn "N-Cycle Lorenz with ABBA variant is for N=4 (4th order accurate), but N=$(L.cycles). Consider cycles=4 or variant A/B/AB."
     end
 
-    calculate_timestep!(L, model)
+    calculate_Δt!(L, model)
     return nothing
 end
 

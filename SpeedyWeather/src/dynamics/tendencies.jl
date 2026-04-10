@@ -813,33 +813,30 @@ set in `forcing!`. Set `div=false` for the BarotropicModel which doesn't
 require the divergence tendency."""
 function vorticity_flux_curldiv!(
         vars::Variables,
-        coriolis::AbstractCoriolis,
-        geometry::Geometry,
-        S::AbstractSpectralTransform;
-        div::Bool = true,     # also calculate div of vor flux?
-        add::Bool = false
-    )    # accumulate in vor/div tendencies?
+        model::AbstractModel;
+        div::Bool = true,       # also calculate div of vor flux?
+        add::Bool = false,      # accumulate in vor/div tendencies?
+    )
 
-    (; f) = coriolis
-    (; coslat⁻¹) = geometry
+    (; f) = model.coriolis
+    (; coslat⁻¹) = model.geometry
 
-    u_tend_grid = vars.tendencies.grid.u                # already contains forcing
-    v_tend_grid = vars.tendencies.grid.v                # already contains forcing
-    (; u, v) = vars.grid                                  # velocities and vorticity on grid
-    vor = vars.grid.vorticity
+    u_tend_grid = get_tendency_step(vars.tendencies.grid.u, model.time_stepping, DynamicalCore())
+    v_tend_grid = get_tendency_step(vars.tendencies.grid.v, model.time_stepping, DynamicalCore())
+    u = get_prognostic_step(vars.grid.u, model.time_stepping, DynamicalCore())
+    v = get_prognostic_step(vars.grid.v, model.time_stepping, DynamicalCore())
+    vor = get_prognostic_step(vars.grid.vorticity, model.time_stepping, DynamicalCore())
+
     (; whichring) = u.grid                              # precomputed ring indices
     scratch_memory = vars.scratch.transform_memory      # scratch memory for transforms
 
-    # Launch the kernel for vorticity flux calculation
-    arch = S.architecture
-
     launch!(
-        arch, RingGridWorkOrder, size(u), _vorticity_flux_kernel!,
+        architecture(u), RingGridWorkOrder, size(u), _vorticity_flux_kernel!,
         u_tend_grid, v_tend_grid, u, v, vor, f, coslat⁻¹, whichring
     )
 
     # divergence and curl of that u, v_tend vector for vor, div tendencies
-    vor_tend = vars.tendencies.vorticity
+    vor_tend = get_tendency_step(vars.tendencies.vorticity, model.time_stepping, DynamicalCore())
     u_tend = vars.scratch.a
     v_tend = vars.scratch.b
 
@@ -889,7 +886,7 @@ with
 with Fᵤ, Fᵥ the forcing from `forcing!` already in `u_tend_grid`/`v_tend_grid` and
 vorticity ζ, coriolis f."""
 vorticity_flux!(vars::Variables, model::ShallowWater) =
-    vorticity_flux_curldiv!(vars, model.coriolis, model.geometry, model.spectral_transform, div = true, add = true)
+    vorticity_flux_curldiv!(vars, model, div = true, add = true)
 
 """
 $(TYPEDSIGNATURES)
@@ -905,7 +902,7 @@ with
 with Fᵤ, Fᵥ the forcing from `forcing!` already in `u_tend_grid`/`v_tend_grid` and
 vorticity ζ, coriolis f."""
 vorticity_flux!(vars::Variables, model::Barotropic) =
-    vorticity_flux_curldiv!(vars, model.coriolis, model.geometry, model.spectral_transform, div = false, add = true)
+    vorticity_flux_curldiv!(vars, model, div = false, add = true)
 
 function bernoulli_potential!(vars::Variables, model::ShallowWater)
     S = model.spectral_transform
@@ -957,7 +954,7 @@ function bernoulli_potential!(
     # pₛ = diagn.grid.pres_grid_prev                  # 2D not prev is in Pa
     # RdTlnpₛ .= R_dry * Tₖ' .* log.(pₛ)
 
-    bernoulli_grid .= 1 // 2 .* (u.^2 + v.^2)                    # = ½(u² + v²) on grid
+    bernoulli_grid .= 1 // 2 .* (u .^ 2 + v .^ 2)                    # = ½(u² + v²) on grid
     transform!(bernoulli, bernoulli_grid, scratch_memory, S)    # to spectral space
     bernoulli .+= geopot                                        # add geopotential Φ
     ∇²!(div_tend, bernoulli, S, add = true, flipsign = true)    # add -∇²(½(u² + v²) + ϕ)
