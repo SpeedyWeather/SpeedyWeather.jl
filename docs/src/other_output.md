@@ -128,3 +128,13 @@ my_orography = SpeedyWeather.load_model_component(orography_for_restart)
 new_model = ShallowWaterModel(spectral_grid, orography = my_orography)
 all(new_model.orography.orography .== 123)  # check that the new orography is indeed as customized
 ```
+
+While we do not really want to encourage it, but `WriteModelComponentFile` can be hijacked to write out the entire `model`.
+While this easily saves everything of `model` into one file, it always writes many precomputed arrays to file
+whereas they can just be recomputed when constructing a new model. For example, the Legendre polynomials in
+`model.spectral_transform` can easily be GBs at higher resolution, see also 
+[Precomputed polynomials and allocated memory](@ref). Nevertheless, you can write out the entire model with
+
+```@example output2
+add!(model, :model_writer => WriteModelComponentFile(component=model, filename="model.jld2"))
+```
