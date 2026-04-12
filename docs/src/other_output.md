@@ -106,7 +106,7 @@ to write out specific model components and store them in a file see
 If you modified a model component (say by applying a custom orography) you can save this to file too.
 
 ```@example output2
-orography = CustomOrography(spectral_grid)  # an orography that is untouched at initialize!
+orography = ManualOrography(spectral_grid)  # an orography that is untouched at initialize!
 model = ShallowWaterModel(spectral_grid; orography)
 set!(model, orography=123)                  # set as you like
 orography_for_restart = WriteModelComponentFile(component=model.orography, filename="my_orography.jld2")

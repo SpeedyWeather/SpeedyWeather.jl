@@ -30,11 +30,11 @@ function initialize!(O::NoOrography, ::AbstractModel)
     return nothing
 end
 
-export CustomOrography
+export ManualOrography
 
 """Orography with zero height in `orography` and zero surface geopotential `surface_geopotential`.
 $(TYPEDFIELDS)"""
-@kwdef struct CustomOrography{G, S} <: AbstractOrography
+@kwdef struct ManualOrography{G, S} <: AbstractOrography
     "[OPTION] height [m] on grid-point space."
     orography::G
 
@@ -43,7 +43,7 @@ $(TYPEDFIELDS)"""
 end
 
 # deliberate don't touch the arrays in initialize, as they will be set by the user with set! before the model is run
-initialize!(orog::CustomOrography, model::AbstractModel) = nothing
+initialize!(orog::ManualOrography, model::AbstractModel) = nothing
 
 # set orography with grid, scalar, function
 function set!(

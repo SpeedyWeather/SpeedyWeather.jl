@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- WriteModelComponentFile and CustomOrography [#1040](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1040)
+- WriteModelComponentFile and ManualOrography [#1040](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1040)
 - ParallelTestRunner for SpeedyWeather CI [#1033](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1033)
 - Remove snow runoff, add snow depth cap [#1017](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1017)
 - [BREAKING] Rename `temperature_reference`->`reference_temperature`, `pressure_reference`->`reference_pressure` [#1025](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1025)
