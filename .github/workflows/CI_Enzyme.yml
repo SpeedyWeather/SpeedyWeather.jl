@@ -21,7 +21,7 @@ jobs:
       run:
         shell: bash
         working-directory: ./SpeedyWeather
-    timeout-minutes: 60
+    timeout-minutes: 90
     permissions: # needed to allow julia-actions/cache to proactively delete old caches that it has created
       actions: write
       contents: read
