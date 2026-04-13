@@ -114,8 +114,8 @@ add!(model, :my_orography => orography_for_restart)
 ```
 
 Once the simulation ran you can then load this model component from file and use it to construct
-new model with it, or use its information in some other form, e.g. by writing its arrays to
-other arrays
+a new model with it, or use its information in some other form, e.g. by writing its arrays to
+other arrays:
 
 ```@example output2
 simulation = initialize!(model)
@@ -129,12 +129,18 @@ new_model = ShallowWaterModel(spectral_grid, orography = my_orography)
 all(new_model.orography.orography .== 123)  # check that the new orography is indeed as customized
 ```
 
-While we do not really want to encourage it, but `WriteModelComponentFile` can be hijacked to write out the entire `model`.
-While this easily saves everything of `model` into one file, it always writes many precomputed arrays to file
-whereas they can just be recomputed when constructing a new model. For example, the Legendre polynomials in
+We do not really want to encourage it, but `WriteModelComponentFile` can be hijacked to write out the entire `model`.
+While this easily saves everything of `model` into one file, it always writes many large precomputed arrays to file
+whereas they could just be recomputed when constructing a new model. For example, the Legendre polynomials in
 `model.spectral_transform` can easily be GBs at higher resolution, see also 
 [Precomputed polynomials and allocated memory](@ref). Nevertheless, you can write out the entire model with
 
 ```@example output2
 add!(model, :model_writer => WriteModelComponentFile(component=model, filename="model.jld2"))
 ```
+
+Note that this callback contains a `model` that also contains this callback.
+This self recursion is not particularly problematic as `model` is just a lazy reference.
+However, when you do load in this `model` from file and use it again, note that it again
+contains this callback which would write out its model again. You can `delete!` the callback
+though, see [Adding a callback](@ref).

@@ -5,9 +5,9 @@ Adapt.adapt_structure(to, orog::AbstractOrography) = (orography = adapt_structur
 
 # general constructor with empty arrays (will be initialized in initialize!)
 function (O::Type{<:AbstractOrography})(spectral_grid::SpectralGrid; kwargs...)
-    (; architecture, GridVariable2D, SpectralVariable2D, grid, spectrum) = spectral_grid
-    orography = on_architecture(architecture, zeros(GridVariable2D, grid))
-    surface_geopotential = on_architecture(architecture, zeros(SpectralVariable2D, spectrum))
+    (; GridVariable2D, SpectralVariable2D, grid, spectrum) = spectral_grid
+    orography = zeros(GridVariable2D, grid)
+    surface_geopotential = zeros(SpectralVariable2D, spectrum)
     return O(; orography, surface_geopotential, kwargs...)
 end
 
@@ -85,8 +85,8 @@ end
 
 function ZonalRidge(spectral_grid::SpectralGrid; kwargs...)
     (; architecture, NF, GridVariable2D, SpectralVariable2D, grid, spectrum) = spectral_grid
-    orography = on_architecture(architecture, zeros(GridVariable2D, grid))
-    surface_geopotential = on_architecture(architecture, zeros(SpectralVariable2D, spectrum))
+    orography = zeros(GridVariable2D, grid)
+    surface_geopotential = zeros(SpectralVariable2D, spectrum)
     return ZonalRidge{NF, GridVariable2D, SpectralVariable2D}(; orography, surface_geopotential, kwargs...)
 end
 
@@ -181,9 +181,9 @@ $(TYPEDFIELDS)"""
 end
 
 function EarthOrography(spectral_grid::SpectralGrid; kwargs...)
-    (; architecture, NF, GridVariable2D, SpectralVariable2D, grid, spectrum) = spectral_grid
-    orography = on_architecture(architecture, zeros(GridVariable2D, grid))
-    surface_geopotential = on_architecture(architecture, zeros(SpectralVariable2D, spectrum))
+    (; NF, GridVariable2D, SpectralVariable2D, grid, spectrum) = spectral_grid
+    orography = zeros(GridVariable2D, grid)
+    surface_geopotential = zeros(SpectralVariable2D, spectrum)
     return EarthOrography{NF, GridVariable2D, SpectralVariable2D}(; orography, surface_geopotential, kwargs...)
 end
 
