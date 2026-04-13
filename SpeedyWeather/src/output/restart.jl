@@ -1,8 +1,8 @@
-export RestartFile
+export WriteVariablesRestartFile
 
-"""RestartFile callback. Writes a restart file as .jld2.
-Options are $(TYPEDFIELDS)"""
-@kwdef mutable struct RestartFile <: AbstractCallback
+"""WriteVariablesRestartFile callback. Writes a restart file for the prognostic variables
+on the last time step as jld2 file. Options are $(TYPEDFIELDS)"""
+@kwdef mutable struct WriteVariablesRestartFile <: AbstractCallback
     "[OPTION] File name for restart file, should end with .jld2"
     filename::String = "restart.jld2"
 
@@ -19,8 +19,8 @@ Options are $(TYPEDFIELDS)"""
     pkg_version::VersionNumber = isnothing(pkgversion(SpeedyWeather)) ? v"0.0.0" : pkgversion(SpeedyWeather)
 end
 
-initialize!(::RestartFile, args...) = nothing
-callback!(::RestartFile, args...) = nothing
+initialize!(::WriteVariablesRestartFile, args...) = nothing
+callback!(::WriteVariablesRestartFile, args...) = nothing
 
 """
 $(TYPEDSIGNATURES)
@@ -29,7 +29,7 @@ to the output folder (or current path) that can be used to restart the model.
 `restart.jld2` will then be used as initial conditions.
 Variables in restart file are not scaled."""
 function finalize!(
-        restart::RestartFile,
+        restart::WriteVariablesRestartFile,
         vars::Variables,
         model::AbstractModel,
     )

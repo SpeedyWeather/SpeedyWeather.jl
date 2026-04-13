@@ -110,8 +110,8 @@ function initialize!(
     # add ProgressTxt callback
     output.write_progress_txt && add!(model.callbacks, :progress_txt => ProgressTxt())
 
-    # add RestartFile callback
-    output.write_restart && add!(model.callbacks, :restart_file => RestartFile())
+    # add WriteVariablesRestartFile callback
+    output.write_restart && add!(model.callbacks, :restart_file => WriteVariablesRestartFile())
     return nothing
 end
 

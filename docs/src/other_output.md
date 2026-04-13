@@ -83,10 +83,10 @@ add!(model, :progress_txt => progress_txt)
 
 `NetCDFOutput` also by default writes a restart file, containing the `simulation.variables.prognostic`
 that can be read back in with the `StartFromFile` initial conditions. Implemented as a callback
-`RestartFile` can also be created independently of `NetCDFOutput`, e.g.
+`WriteVariablesRestartFile` can also be created independently of `NetCDFOutput`, e.g.
 
 ```@example output2
-restart_file = RestartFile(write_only_with_output=false, path="folder1", filename="restart.jld2")
+restart_file = WriteVariablesRestartFile(write_only_with_output=false, path="folder1", filename="restart.jld2")
 ```
 
 and added like
@@ -96,7 +96,7 @@ add!(model, :restart_file => restart_file)
 ```
 
 By default `path=""` will use the folder determined by `NetCDFOutput` but otherwise you can
-also provide your own. Note that `RestartFile` will only write the prognostic variables to file.
+also provide your own. Note that `WriteVariablesRestartFile` will only write the prognostic variables to file.
 This is such that you can simulate a spin up and then change model parameters as you like,
 to write out specific model components and store them in a file see
 [Model component restart file](@ref).
