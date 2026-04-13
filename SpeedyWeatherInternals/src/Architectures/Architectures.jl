@@ -142,6 +142,10 @@ nonparametric_type(::Type{<:SubArray}) = SubArray   # if ArrayType A is not spec
 on_architecture(arch::AbstractArchitecture, t::Tuple) = Tuple(on_architecture(arch, elem) for elem in t)
 on_architecture(arch::AbstractArchitecture, nt::NamedTuple) = NamedTuple{keys(nt)}(on_architecture(arch, Tuple(nt)))
 
+# pass-through for types that don't need architecture transfer
+on_architecture(::AbstractArchitecture, x::Number) = x
+on_architecture(::AbstractArchitecture, x::Base.RefValue) = x
+
 # On architecture for array types
 """
     on_architecture(arch::AbstractArchitecture, a)
