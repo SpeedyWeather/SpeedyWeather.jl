@@ -333,16 +333,18 @@ function initialize!(
     (; σb, ΔTy, Δθz, relax_time_slow, relax_time_fast, Tmax) = forcing
     (; log_σ, temp_relax_freq, temp_equil_a, temp_equil_b) = forcing
     p₀ = model.atmosphere.reference_pressure
+    (; radius) = model.planet
 
     # slow relaxation everywhere, fast in the tropics
-    kₐ = 1 / relax_time_slow.value
-    kₛ = 1 / relax_time_fast.value
+    kₐ = 1 / Second(relax_time_slow).value
+    kₛ = 1 / Second(relax_time_fast).value
 
     # Precompute log(σ) for each layer
     @. log_σ = log(σ)
 
     # Held and Suarez equation 4
     temp_relax_freq .= kₐ .+ (kₛ - kₐ) * max.(0, (σ .- σb) ./ (1 - σb)) .* (coslat') .^ 4
+    temp_relax_freq .*= radius  # scale by radius as is the temperature equation
 
     # Held and Suarez equation 3, split into max(Tmin, (a - b*ln(p))*(p/p₀)^κ)
     # precompute a, b to simplify online calculation
@@ -365,12 +367,13 @@ function forcing!(
 
     (; Tmin, log_σ, temp_relax_freq, temp_equil_a, temp_equil_b) = forcing
     (; κ) = model.atmosphere
+    p₀ = model.atmosphere.reference_pressure
     (; whichring) = temp.grid
     launch!(
         architecture(temp_tend), RingGridWorkOrder, size(temp_tend), held_suarez_kernel!,
         temp_tend, temp, log_pₛ,
         temp_relax_freq, temp_equil_a, temp_equil_b,
-        Tmin, κ, log_σ, whichring
+        Tmin, κ, p₀, log_σ, whichring
     )
     return nothing
 end
@@ -384,6 +387,7 @@ end
         temp_equil_b,
         Tmin,
         κ,
+        p₀,
         log_σ,
         whichring,
     )
