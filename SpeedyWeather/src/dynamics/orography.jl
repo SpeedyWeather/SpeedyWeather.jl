@@ -122,7 +122,7 @@ export EarthOrography
 
 """Earth's orography read from file, with smoothing.
 $(TYPEDFIELDS)"""
-@kwdef struct EarthOrography{NF, GridVariable2D, SpectralVariable2D} <: AbstractOrography
+@kwdef struct EarthOrography{NF, GridVariable2D, SpectralVariable2D, B} <: AbstractOrography
     "[OPTION] filename of orography"
     file::String = "orography.nc"
 
@@ -130,7 +130,7 @@ $(TYPEDFIELDS)"""
     path::String = joinpath("data", "boundary_conditions", file)
 
     "[OPTION] flag to check for orography in SpeedyWeatherAssets or locally"
-    from_assets::Bool = true
+    from_assets::B = true
 
     "[OPTION] SpeedyWeatherAssets version number"
     version::VersionNumber = DEFAULT_ASSETS_VERSION
@@ -145,7 +145,7 @@ $(TYPEDFIELDS)"""
     scale::NF = 1.0
 
     "[OPTION] smooth the orography field?"
-    smoothing::Bool = true
+    smoothing::B = true
 
     "[OPTION] ower of Laplacian for smoothing"
     smoothing_power::NF = 1.0
@@ -169,7 +169,7 @@ function EarthOrography(spectral_grid::SpectralGrid; kwargs...)
     (; architecture, NF, GridVariable2D, SpectralVariable2D, grid, spectrum) = spectral_grid
     orography = on_architecture(architecture, zeros(GridVariable2D, grid))
     surface_geopotential = on_architecture(architecture, zeros(SpectralVariable2D, spectrum))
-    return EarthOrography{NF, GridVariable2D, SpectralVariable2D}(;
+    return EarthOrography{NF, GridVariable2D, SpectralVariable2D, Bool}(;
         orography, surface_geopotential, kwargs...
     )
 end

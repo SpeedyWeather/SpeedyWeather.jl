@@ -131,8 +131,11 @@ _copy_entry!(dest::Base.RefValue, src::Base.RefValue) = (dest[] = src[])
             push!(exprs, :(copy_variables!(getfield(dest, $(QuoteNode(fname))), getfield(src, $(QuoteNode(fname))))))
         elseif ismutabletype(T)
             push!(exprs, :(setfield!(dest, $(QuoteNode(fname)), getfield(src, $(QuoteNode(fname))))))
+        elseif !isbitstype(ft)
+            # immutable struct with heap-allocated fields (e.g. ColumnScratchMemory inside ScratchMemory):
+            # recurse so its array fields get copied too
+            push!(exprs, :(_copy_entry!(getfield(dest, $(QuoteNode(fname))), getfield(src, $(QuoteNode(fname))))))
         end
-        # for immutable structs: skip non-array, non-NamedTuple fields (not copyable in place)
     end
     return quote
         $(exprs...)

@@ -120,6 +120,8 @@ $(TYPEDFIELDS)"""
         MatrixType,
         TensorType,
         IntType,
+        B,              # Bool
+        RefV,           # Base.RefValue{NF}
     } <: AbstractImplicit
 
     # DIMENSIONS
@@ -134,17 +136,17 @@ $(TYPEDFIELDS)"""
     α::NF = 1
 
     "Reinitialize at restart when initialized=true"
-    reinitialize::Bool = true
+    reinitialize::B = true
 
     "Flag automatically set to true when initialize! has been called"
-    initialized::Bool = false
+    initialized::B = false
 
     # PRECOMPUTED ARRAYS, to be initialized with initialize!
     "vertical temperature profile, obtained from diagn on first time step"
     temp_profile::VectorType = zeros(NF, nlayers)
 
     "time step 2α*Δt packed in RefValue for mutability"
-    ξ::Base.RefValue{NF} = Ref{NF}(0)
+    ξ::RefV = Ref{NF}(0)
 
     "divergence: operator for the geopotential calculation"
     R::MatrixType = zeros(NF, nlayers, nlayers)
@@ -184,7 +186,7 @@ end
 Generator using the resolution from SpectralGrid."""
 function ImplicitPrimitiveEquation(spectral_grid::SpectralGrid; kwargs...)
     (; NF, VectorType, MatrixType, TensorType, trunc, nlayers) = spectral_grid
-    return ImplicitPrimitiveEquation{NF, VectorType, MatrixType, TensorType, typeof(trunc)}(;
+    return ImplicitPrimitiveEquation{NF, VectorType, MatrixType, TensorType, typeof(trunc), Bool, Base.RefValue{NF}}(;
         trunc, nlayers, kwargs...
     )
 end
@@ -267,7 +269,7 @@ function initialize!(
     U .= .-R_dry .* temp_profile
 
     # TEMPERATURE OPERATOR (called τ in Hoskins and Simmons 1975, eq 9 and Appendix 1)
-    L0 .= inv.(2 .* σ_levels_thick)
+    L0 .= 1 ./ (2 .* σ_levels_thick)
     L2 .= κ .* temp_profile .* σ_lnp_A
     L4 .= κ .* temp_profile .* σ_lnp_B
 
@@ -402,7 +404,6 @@ function implicit_correction!(
     zero_last_degree!(pres_tend)
     zero_last_degree!(temp_tend)
 
-    #pres_tend.data[1:1] .= 0    # mass conservation
     @allowscalar pres_tend.data[1] = 0    # mass conservation
     return nothing
 end

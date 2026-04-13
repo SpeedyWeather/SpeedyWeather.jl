@@ -50,9 +50,9 @@ end
 
 export SurfaceOceanHumidityFlux
 """Humidity flux parameterization over ocean surfaces. Fields are $(TYPEDFIELDS)"""
-@parameterized @kwdef struct SurfaceOceanHumidityFlux{NF} <: AbstractSurfaceHumidityFlux
+@parameterized @kwdef struct SurfaceOceanHumidityFlux{NF, B} <: AbstractSurfaceHumidityFlux
     "[OPTION] Use drag coefficient from calculated following model.boundary_layer_drag"
-    use_boundary_layer_drag::Bool = true
+    use_boundary_layer_drag::B = true
 
     "[OPTION] Or fixed drag coefficient for humidity flux over ocean"
     @param drag::NF = 0.9e-3 (bounds = 0 .. 1,)
@@ -62,7 +62,7 @@ export SurfaceOceanHumidityFlux
 end
 
 Adapt.@adapt_structure SurfaceOceanHumidityFlux
-SurfaceOceanHumidityFlux(SG::SpectralGrid; kwargs...) = SurfaceOceanHumidityFlux{SG.NF}(; kwargs...)
+SurfaceOceanHumidityFlux(SG::SpectralGrid; kwargs...) = SurfaceOceanHumidityFlux{SG.NF, Bool}(; kwargs...)
 initialize!(::SurfaceOceanHumidityFlux, ::PrimitiveWet) = nothing
 
 variables(::SurfaceOceanHumidityFlux) = (
@@ -112,9 +112,9 @@ end
 
 export SurfaceLandHumidityFlux
 """Humidity flux parameterization over land surfaces. Fields are $(TYPEDFIELDS)"""
-@parameterized @kwdef struct SurfaceLandHumidityFlux{NF} <: AbstractSurfaceHumidityFlux
+@parameterized @kwdef struct SurfaceLandHumidityFlux{NF, B} <: AbstractSurfaceHumidityFlux
     "[OPTION] Use column.boundary_layer_drag coefficient"
-    use_boundary_layer_drag::Bool = true
+    use_boundary_layer_drag::B = true
 
     "[OPTION] Or fixed drag coefficient for humidity flux over land"
     @param drag::NF = 1.2e-3 (bounds = 0 .. 1,)
@@ -124,7 +124,7 @@ export SurfaceLandHumidityFlux
 end
 
 Adapt.@adapt_structure SurfaceLandHumidityFlux
-SurfaceLandHumidityFlux(SG::SpectralGrid; kwargs...) = SurfaceLandHumidityFlux{SG.NF}(; kwargs...)
+SurfaceLandHumidityFlux(SG::SpectralGrid; kwargs...) = SurfaceLandHumidityFlux{SG.NF, Bool}(; kwargs...)
 initialize!(::SurfaceLandHumidityFlux, ::PrimitiveWet) = nothing
 
 variables(::SurfaceLandHumidityFlux) = (

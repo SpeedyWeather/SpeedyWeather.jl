@@ -3,7 +3,7 @@ abstract type AbstractCondensation <: AbstractParameterization end
 export ImplicitCondensation
 """Large-scale condensation with implicit latent heat release.
 $(TYPEDFIELDS)"""
-@parameterized @kwdef struct ImplicitCondensation{NF} <: AbstractCondensation
+@parameterized @kwdef struct ImplicitCondensation{NF, B} <: AbstractCondensation
     "[OPTION] Relative humidity threshold [1 = 100%] to trigger condensation"
     @param relative_humidity_threshold::NF = 0.95 (bounds = 0 .. 1,)
 
@@ -11,7 +11,7 @@ $(TYPEDFIELDS)"""
     @param reevaporation::NF = 30 (bounds = Nonnegative,)
 
     "[OPTION] Convert rain below freezing to snow?"
-    snow::Bool = true
+    snow::B = true
 
     "[OPTION] Freezing temperature for snow fall [K]"
     @param freezing_threshold::NF = 263 (bounds = Positive,)
@@ -24,7 +24,7 @@ $(TYPEDFIELDS)"""
 end
 
 Adapt.@adapt_structure ImplicitCondensation
-ImplicitCondensation(SG::SpectralGrid; kwargs...) = ImplicitCondensation{SG.NF}(; kwargs...)
+ImplicitCondensation(SG::SpectralGrid; kwargs...) = ImplicitCondensation{SG.NF, Bool}(; kwargs...)
 initialize!(::ImplicitCondensation, ::PrimitiveEquation) = nothing
 
 function variables(::ImplicitCondensation)

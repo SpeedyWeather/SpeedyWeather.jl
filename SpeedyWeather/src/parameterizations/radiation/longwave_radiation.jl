@@ -12,9 +12,9 @@ relaxation term with `time_scale_stratosphere` towards `temp_stratosphere` is ap
     dT/dt = -1.5K/day for T > 207.5K else (200K-T) / 5 days
 
 Fields are $(TYPEDFIELDS)"""
-@parameterized @kwdef struct UniformCooling{NF} <: AbstractLongwave
+@parameterized @kwdef struct UniformCooling{NF, S} <: AbstractLongwave
     "[OPTION] time scale of cooling, default = -1.5K/day = -1K/16hrs"
-    time_scale::Second = Hour(16)
+    time_scale::S = Hour(16)
 
     "[OPTION] temperature [K] below which stratospheric relaxation is applied"
     @param temp_min::NF = 207.5 (bounds = Positive,)
@@ -23,11 +23,11 @@ Fields are $(TYPEDFIELDS)"""
     @param temp_stratosphere::NF = 200 (bounds = Positive,)
 
     "[OPTION] time scale of stratospheric relaxation"
-    time_scale_stratosphere::Second = Day(5)
+    time_scale_stratosphere::S = Day(5)
 end
 
 Adapt.@adapt_structure UniformCooling
-UniformCooling(SG::SpectralGrid; kwargs...) = UniformCooling{SG.NF}(; kwargs...)
+UniformCooling(SG::SpectralGrid; kwargs...) = UniformCooling{SG.NF, Dates.Second}(; kwargs...)
 initialize!(radiation::UniformCooling, model::PrimitiveEquation) = nothing
 
 # function barrier
@@ -65,7 +65,7 @@ layer towards the tropopause temperature `T_t` with time scale `τ = 24h`
 (Seeley and Wordsworth, 2023 use 6h, which is unstable a low resolutions here).
 Fields are
 $(TYPEDFIELDS)"""
-@parameterized @kwdef struct JeevanjeeRadiation{NF} <: AbstractLongwave
+@parameterized @kwdef struct JeevanjeeRadiation{NF, S} <: AbstractLongwave
     "[OPTION] Radiative forcing constant (W/m²/K²)"
     @param α::NF = 0.025 (bounds = Nonnegative,)
 
@@ -82,11 +82,11 @@ $(TYPEDFIELDS)"""
     @param temp_tropopause::NF = 200 (bounds = Positive,)
 
     "[OPTION] Tropopause relaxation time scale to temp_tropopause"
-    time_scale::Second = Hour(24)
+    time_scale::S = Hour(24)
 end
 
 Adapt.@adapt_structure JeevanjeeRadiation
-JeevanjeeRadiation(SG::SpectralGrid; kwargs...) = JeevanjeeRadiation{SG.NF}(; kwargs...)
+JeevanjeeRadiation(SG::SpectralGrid; kwargs...) = JeevanjeeRadiation{SG.NF, Dates.Second}(; kwargs...)
 initialize!(::JeevanjeeRadiation, ::PrimitiveEquation) = nothing
 
 # function barrier
@@ -98,7 +98,8 @@ initialize!(::JeevanjeeRadiation, ::PrimitiveEquation) = nothing
     nlayers = size(T, 2)
 
     (; α) = longwave
-    τ⁻¹ = 1/convert(eltype(T), Second(longwave.time_scale).value)   #TODO: `inv` isn't compatible with Reactant yet, add it back once that's done
+    #TODO: Reintroduce the `Second` here but in a way that's agnostic to the Second type
+    τ⁻¹ = 1/convert(eltype(T), longwave.time_scale.value)   #TODO: `inv` isn't compatible with Reactant yet, add it back once that's done
     ϵ_ocean = longwave.emissivity_ocean
     ϵ_land = longwave.emissivity_land
     ϵ = longwave.emissivity_atmosphere
@@ -113,10 +114,10 @@ initialize!(::JeevanjeeRadiation, ::PrimitiveEquation) = nothing
     # extension to Jeevanjee: Include temperature flux (Stefan-Boltzmann)
     # between surface and lowermost air temperature
     # but zero flux if land/sea not available
-    Fₖ_ocean = isfinite(sst) ? ϵ_ocean * σ * sst^4 : zero(sst)          # [W/m²]
+    Fₖ_ocean = ifelse(isfinite(sst), ϵ_ocean * σ * sst^4, zero(sst))          # [W/m²]
     vars.parameterizations.ocean.surface_longwave_up[ij] = Fₖ_ocean     # for ocean model forcing
 
-    Fₖ_land = isfinite(lst) ? ϵ_land * σ * lst^4 : zero(lst)            # [W/m²]
+    Fₖ_land = ifelse(isfinite(lst), ϵ_land * σ * lst^4, zero(lst))            # [W/m²]
     vars.parameterizations.land.surface_longwave_up[ij] = Fₖ_land       # for land model forcing
 
     Fₖ_down = ϵ * σ * T[ij, nlayers]^4

@@ -61,7 +61,7 @@ function variables(::NoVegetation)
 end
 
 export VegetationClimatology
-@kwdef struct VegetationClimatology{NF, GridVariable2D} <: AbstractVegetation
+@kwdef struct VegetationClimatology{NF, GridVariable2D, B} <: AbstractVegetation
     "[OPTION] Combine high and low vegetation factor, a in high + a*low [1]"
     low_veg_factor::NF = 0.8
 
@@ -72,7 +72,7 @@ export VegetationClimatology
     path::String = joinpath("data", "boundary_conditions", file)
 
     "[OPTION] flag to check for vegetation in SpeedyWeatherAssets or locally"
-    from_assets::Bool = true
+    from_assets::B = true
 
     "[OPTION] SpeedyWeatherAssets version number"
     version::VersionNumber = DEFAULT_ASSETS_VERSION
@@ -103,7 +103,7 @@ function VegetationClimatology(SG::SpectralGrid, geometry::LandGeometryOrNothing
     (; NF, GridVariable2D, grid) = SG
     high_cover = zeros(GridVariable2D, grid)
     low_cover = zeros(GridVariable2D, grid)
-    return VegetationClimatology{NF, GridVariable2D}(; high_cover, low_cover, kwargs...)
+    return VegetationClimatology{NF, GridVariable2D, Bool}(; high_cover, low_cover, kwargs...)
 end
 
 function initialize!(vegetation::VegetationClimatology, model::PrimitiveEquation)
