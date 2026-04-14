@@ -164,7 +164,7 @@ end
     # as well as all layers below
     Ri = bulk_richardson!(ij, vars, atmosphere)
     kₕ::Int = nlayers
-    while kₕ > 0 && Ri[ij, kₕ] < Ri_c
+    @trace while (kₕ > 0) & (Ri[ij, kₕ] < Ri_c)
         kₕ -= 1
     end
     kₕ += 1  # uppermost layer where Ri < Ri_c
@@ -180,35 +180,44 @@ end
         K[ij, k] = 0
     end
 
-    if kₕ <= nlayers    # boundary layer depth is at least 1 layer thick (calculate diffusion)
-
-        # Calculate diffusion coefficients following Frierson 2006, eq. 16-20
-        # h always non-negative to avoid error in log
-        h = max(geopotential[ij, kₕ] * gravity⁻¹ - orography[ij], 0)
-        Ri_N = Ri[ij, nlayers]                      # surface bulk Richardson number
-        Ri_N = clamp(Ri_N, 0, Ri_c)                 # cases of eq. 12-14
-        sqrtC = (κ / logZ_z₀) * (1 - Ri_N / Ri_c)           # sqrt of eq. 12-14
-        surface_speed = sqrt(u[ij, nlayers]^2 + v[ij, nlayers]^2)
-        K0 = κ * surface_speed * sqrtC              # height-independent K eq. 19, 20
-
-        for k in kₕ:nlayers
-            # height [m] above surface
-            z = max(geopotential[ij, k] * gravity⁻¹ - orography[ij], z₀)
-            zmin = min(z, fb * h)         # height [m] to evaluate Kb(z) at
-            K_k = K0 * zmin             # = κ*u_N*√Cz in eq. (19, 20)
-
-            # multiply with z-dependent factor in eq. (18) ?
-            K_k *= z < fb * h ? one(K0) : zfac(z, h, fb)
-
-            # multiply with Ri-dependent factor in eq. (20) ?
-            # TODO use Ri[kₕ] or Ri_N here?
-            K_k *= Ri[ij, kₕ] <= 0 ? one(K0) : Rifac(Ri[ij, kₕ], Ri_c, logZ_z₀)
-            K[ij, k] = K_k              # write diffusion coefficient into array
-        end
+    @trace if kₕ <= nlayers    # boundary layer depth is at least 1 layer thick (calculate diffusion)
+        _fill_diffusion_coeffs!(ij, K, Ri, geopotential, orography, u, v,
+            kₕ, nlayers, Ri_c, κ, logZ_z₀, fb, gravity⁻¹, z₀)
     end
 
     # return diffusion coefficients and height index of boundary layer
     return K, kₕ
+end
+
+# Extracted to avoid nested @trace (for inside if). Fills K[ij, kₕ:nlayers].
+@propagate_inbounds function _fill_diffusion_coeffs!(
+        ij, K, Ri, geopotential, orography, u, v,
+        kₕ, nlayers, Ri_c, κ, logZ_z₀, fb, gravity⁻¹, z₀
+    )
+    # Calculate diffusion coefficients following Frierson 2006, eq. 16-20
+    # h always non-negative to avoid error in log
+    h = max(geopotential[ij, kₕ] * gravity⁻¹ - orography[ij], 0)
+    Ri_N = Ri[ij, nlayers]                      # surface bulk Richardson number
+    Ri_N = clamp(Ri_N, 0, Ri_c)                 # cases of eq. 12-14
+    sqrtC = (κ / logZ_z₀) * (1 - Ri_N / Ri_c)           # sqrt of eq. 12-14
+    surface_speed = sqrt(u[ij, nlayers]^2 + v[ij, nlayers]^2)
+    K0 = κ * surface_speed * sqrtC              # height-independent K eq. 19, 20
+
+    for k in 1:nlayers
+        # height [m] above surface
+        z = max(geopotential[ij, k] * gravity⁻¹ - orography[ij], z₀)
+        zmin = min(z, fb * h)         # height [m] to evaluate Kb(z) at
+        K_k = K0 * zmin             # = κ*u_N*√Cz in eq. (19, 20)
+
+        # multiply with z-dependent factor in eq. (18) ?
+        K_k *= ifelse(z < fb * h, one(K0), zfac(z, h, fb))
+
+        # multiply with Ri-dependent factor in eq. (20) ?
+        # TODO use Ri[kₕ] or Ri_N here?
+        K_k *= ifelse(Ri[ij, kₕ] <= 0, one(K0), Rifac(Ri[ij, kₕ], Ri_c, logZ_z₀))
+        K[ij, k] = ifelse(k >= kₕ, K_k, zero(K0))   # write diffusion coefficient only within boundary layer
+    end
+    return nothing
 end
 
 # z-dependent factor in Frierson, 2006 eq (18)
@@ -238,7 +247,8 @@ end
     (; ∇²_above, ∇²_below) = diffusion
     nlayers = size(tend, 2)
 
-    for k in kₕ:nlayers         # diffusion only in surface boundary layer of thickness h
+    NF = eltype(tend)
+    for k in 1:nlayers    # diffusion only in surface boundary layer of thickness h
 
         # sets the gradient across surface and top to 0 = no flux boundary conditions
         k₋ = max(k, 1)          # index above (- in σ direction which is 0 at top and 1 at surface)
@@ -247,7 +257,7 @@ end
         K_∂var_below = (var[ij, k₊] - var[ij, k]) * (K[ij, k₊] + K[ij, k])  # average diffusion coefficient K here
         K_∂var_above = (var[ij, k] - var[ij, k₋]) * (K[ij, k] + K[ij, k₋])  # but 1/2 is already baked into the ∇² operators
 
-        tend[ij, k] += ∇²_below[k] * K_∂var_below - ∇²_above[k] * K_∂var_above
+        tend[ij, k] += ifelse(k >= kₕ, ∇²_below[k] * K_∂var_below - ∇²_above[k] * K_∂var_above, zero(NF))
     end
     return
 end

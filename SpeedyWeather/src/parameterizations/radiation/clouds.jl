@@ -124,14 +124,12 @@ Returns (cloud_cover, cloud_top, stratocumulus_cover) tuple."""
     for k in 1:(nlayers - 1)
         humidity_k = humid[ij, k]
         qsat = saturation_humidity(temp[ij, k], sigma_levels[k] * pₛ, model.atmosphere)
-        if humidity_k > q_min && qsat > 0
+        @trace if (humidity_k > q_min) & (qsat > 0)
             relative_humidity_k = humidity_k / qsat
-
-            if relative_humidity_k >= rh_min
-                rh_norm = max(0, (relative_humidity_k - rh_min) / (rh_max - rh_min))
-                humidity_term_cloud_top = min(1, rh_norm)^2
-                cloud_top_humidity = min(k, cloud_top_humidity)
-            end
+            rh_above_min = relative_humidity_k >= rh_min
+            rh_norm = max(0, (relative_humidity_k - rh_min) / (rh_max - rh_min))
+            humidity_term_cloud_top = ifelse(rh_above_min, min(1, rh_norm)^2, humidity_term_cloud_top)
+            cloud_top_humidity = ifelse(rh_above_min, min(k, cloud_top_humidity), cloud_top_humidity)
         end
     end
 

@@ -125,7 +125,7 @@ initialize!(::BackgroundShortwaveTransmissivity, ::AbstractModel) = nothing
         )
 
         # Add cloud absorption below the final cloud top
-        if k >= cloud_top
+        @trace if k >= cloud_top
             layer_absorptivity += cloud_absorptivity_term * cloud_cover
         end
 

@@ -93,7 +93,7 @@ variables(::SurfaceOceanHumidityFlux) = (
 
     # SPEEDY documentation eq. 55/57, zero flux if sea surface temperature not available
     # but remove the max( ,0) to allow for surface condensation
-    flux_ocean = isfinite(SST) ? ρ * drag_ocean * V₀ * (sat_humid_ocean - surface_humid) : zero(SST)
+    flux_ocean = ifelse(isfinite(SST), ρ * drag_ocean * V₀ * (sat_humid_ocean - surface_humid), zero(SST))
 
     # sea ice insulation: more sea ice ⇒ smaller flux (ℵ / ℵ₀ scaling)
     flux_ocean /= 1 + sea_ice_concentration / humidity_flux.sea_ice_insulation
@@ -154,7 +154,7 @@ variables(::SurfaceLandHumidityFlux) = (
 
     # SPEEDY documentation eq. 55/57, zero flux if land / soil moisture availability not available (=ocean)
     # but remove the max( ,0) to allow for surface condensation
-    flux_land = ifelse(isfinite(T) && isfinite(α), ρ * drag_land * V₀ * (α * sat_humid_land - surface_humid), zero(T))
+    flux_land = ifelse(isfinite(T) & isfinite(α), ρ * drag_land * V₀ * (α * sat_humid_land - surface_humid), zero(T))
 
     # snow insulation: deeper snow ⇒ smaller flux (S / S₀ depth scaling)
     flux_land /= 1 + snow_depth / humidity_flux.snow_insulation_depth

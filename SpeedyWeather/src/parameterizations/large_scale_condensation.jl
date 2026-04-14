@@ -98,7 +98,7 @@ large-scale precipitation vertically for output."""
         δq_cond = sat_humid_k * relative_humidity_threshold - humid[ij, k]
 
         # skip if no condensation has occurred yet in this layer or above
-        if δq_cond < 0 || snow_flux_down > 0 || rain_flux_down > 0
+        @trace if (δq_cond < 0) | (snow_flux_down > 0) | (rain_flux_down > 0)
 
             # 0. convert between humidity tendency [kg/kg/s] and precipitation amount [m] or rate [m/s]
             Δp_gρ = Δσ[k] * pₛ_gρ                           # pressure thickness of layer Δp times 1/g/ρ [m]
@@ -144,7 +144,8 @@ large-scale precipitation vertically for output."""
             snow = zero(rain)                   # start with zero snow but potentially swap below
 
             # decide whether to turn precip into snow (all rain freezes to snow)
-            rain, snow = let_it_snow && temp[ij, k] < freezing_threshold ? (snow, rain) : (rain, snow)
+            freeze = let_it_snow & (temp[ij, k] < freezing_threshold)
+            rain, snow = ifelse(freeze, snow, rain), ifelse(freeze, rain, snow)
             rain_flux_down += rain              # accumulate into downward fluxes [m/s] (used in layer below)
             snow_flux_down += snow              # accumulate into downward fluxes [m/s] (used in layer below)
 
