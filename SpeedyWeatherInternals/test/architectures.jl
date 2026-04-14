@@ -1,8 +1,8 @@
 using JLArrays
 using SpeedyWeatherInternals.Architectures
-import SpeedyWeatherInternals.Architectures: AbstractCPU
+import SpeedyWeatherInternals.Architectures: AbstractCPU, CPU, GPU
 
-const JLGPU = SpeedyWeather.GPU{JLArrays.JLBackend}
+const JLGPU = GPU{JLArrays.JLBackend}
 
 @testset "CPU architecture" begin
     arch = CPU()
