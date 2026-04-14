@@ -302,11 +302,14 @@ function SpeedyWeather.LearnedLandAlbedo(
     brdf_params, rand_states = Lux.setup(rng, brdf_nn)
     brdf_states = Lux.testmode(rand_states)
 
+    input_buffer = zeros(SG.NF, 10, SG.npoints)
+
     return LearnedLandAlbedo{SG.NF, typeof(brdf_nn), typeof(brdf_params), typeof(brdf_states), typeof(snow_cover)}(;
         brdf_nn = brdf_nn,
         brdf_params = brdf_params,
         brdf_states = brdf_states,
         snow_cover = snow_cover,
+        input_buffer = input_buffer,
         kwargs...
     )
 end
@@ -361,7 +364,7 @@ Base.@propagate_inbounds function calculate_bsa_from_fraction(f_iso, f_vol, f_ge
     return (fraction_direct * bsa) + ((1 - fraction_direct) * wsa)
 end
 
-const vis_weight, nir_weight = 0.5308, 0.4771
+const vis_weight, nir_weight = 0.5308f0, 0.4771f0
 
 Base.@propagate_inbounds function brdf(ij, vars, scheme::LearnedLandAlbedo)
     # Calculate snow cover
@@ -419,22 +422,119 @@ Base.@propagate_inbounds function brdf(ij, vars, scheme::LearnedLandAlbedo)
     return calculate_bsa_from_fraction(sw_pred_iso, sw_pred_vol, sw_pred_geo, θ, fraction_direct)
 end
 
-Base.@propagate_inbounds function SpeedyWeather.albedo!(ij, vars, scheme::LearnedLandAlbedo, model)
-    land_fraction = model.land_sea_mask.mask[ij]
+# Base.@propagate_inbounds function SpeedyWeather.albedo!(ij, vars, scheme::LearnedLandAlbedo, model)
+#     land_fraction = model.land_sea_mask.mask[ij]
 
-    # Don't run for fully ocean cells
-    if land_fraction == 0
-        vars.parameterizations.land.albedo[ij] = zero(land_fraction)
-        return nothing
+#     # Don't run for fully ocean cells
+#     if land_fraction == 0
+#         vars.parameterizations.land.albedo[ij] = zero(land_fraction)
+#         return nothing
+#     end
+
+#     # Don't run for night-time cells
+#     μ = vars.parameterizations.cos_zenith[ij]
+#     if μ <= 0
+#         return nothing
+#     end
+
+#     vars.parameterizations.land.albedo[ij] = clamp(brdf(ij, vars, scheme), 0, 1)
+#     return nothing
+# end
+
+# The global, ij independent albedo!
+Base.@propagate_inbounds function SpeedyWeather.albedo!(vars::Variables, scheme::LearnedLandAlbedo, model)
+    NF = model.spectral_grid.NF
+
+    vegh = vars.parameterizations.land.vegetation_high
+    vegl = vars.parameterizations.land.vegetation_low
+    sm1 = vars.prognostic.land.soil_moisture[:, begin]
+    st1 = vars.prognostic.land.soil_temperature[:, begin]
+    sm2 = vars.prognostic.land.soil_moisture[:, end]
+    st2 = vars.prognostic.land.soil_temperature[:, end]
+    geopotential = vars.grid.geopotential[:, end]
+    lai_hv = vars.parameterizations.land.lai_vegetation_high
+    lai_lv = vars.parameterizations.land.lai_vegetation_low
+    snow_depth = vars.prognostic.land.snow_depth
+
+    snow_cover = scheme.snow_cover.(snow_depth, scheme.snow_depth_scale) * 100
+
+    X = scheme.input_buffer
+
+    @views @. X[1, :] = normalise(vegh, scheme.norm_means[1], scheme.norm_stds[1])
+    @views @. X[2, :] = normalise(vegl, scheme.norm_means[2], scheme.norm_stds[2])
+    @views @. X[3, :] = normalise(sm1, scheme.norm_means[3], scheme.norm_stds[3])
+    @views @. X[4, :] = normalise(st1, scheme.norm_means[4], scheme.norm_stds[4])
+    @views @. X[5, :] = normalise(sm2, scheme.norm_means[5], scheme.norm_stds[5])
+    @views @. X[6, :] = normalise(st2, scheme.norm_means[6], scheme.norm_stds[6])
+    @views @. X[7, :] = normalise(geopotential, scheme.norm_means[7], scheme.norm_stds[7])
+    @views @. X[8, :] = normalise(lai_hv, scheme.norm_means[8], scheme.norm_stds[8])
+    @views @. X[9, :] = normalise(lai_lv, scheme.norm_means[9], scheme.norm_stds[9])
+    @views @. X[10, :] = normalise(snow_cover, scheme.norm_means[10], scheme.norm_stds[10])
+
+    (out1, out2, out3), _ = Lux.apply(scheme.brdf_nn, X, scheme.brdf_params, scheme.brdf_states)
+
+    v_iso, v_vol = @view(out1[1, :]), @view(out1[2, :])
+    n_iso, n_vol = @view(out2[2, :]), @view(out3[1, :])
+    v_geo, n_geo = @view(out2[1, :]), @view(out3[2, :])
+
+    μ = vars.parameterizations.cos_zenith
+    fraction_direct = vars.parameterizations.direct_radiation_fraction
+    albedo_out = vars.parameterizations.land.albedo
+
+    # Pre-allocate arrays
+    sw_pred_iso = similar(albedo_out)
+    sw_pred_vol = similar(albedo_out)
+    sw_pred_geo = similar(albedo_out)
+    θ = similar(μ)
+    α = similar(albedo_out)
+
+    @. albedo_out = begin
+        v_iso = denormalise(v_iso, scheme.unnorm_means[1], scheme.unnorm_stds[1])
+        v_vol = denormalise(v_vol, scheme.unnorm_means[2], scheme.unnorm_stds[2])
+        v_geo = denormalise(v_geo, scheme.unnorm_means[3], scheme.unnorm_stds[3])
+        n_iso = denormalise(n_iso, scheme.unnorm_means[4], scheme.unnorm_stds[4])
+        n_vol = denormalise(n_vol, scheme.unnorm_means[5], scheme.unnorm_stds[5])
+        n_geo = denormalise(n_geo, scheme.unnorm_means[6], scheme.unnorm_stds[6])
+
+        sw_pred_iso = (v_iso * vis_weight) + (n_iso * nir_weight)
+        sw_pred_vol = (v_vol * vis_weight) + (n_vol * nir_weight)
+        sw_pred_geo = (v_geo * vis_weight) + (n_geo * nir_weight)
+
+        θ = acos(μ)
+
+        α = calculate_bsa_from_fraction(sw_pred_iso, sw_pred_vol, sw_pred_geo, θ, fraction_direct)
+        clamp(α, zero(NF), one(NF))
     end
 
-    # Don't run for night-time cells
-    μ = vars.parameterizations.cos_zenith[ij]
-    if μ <= 0
-        return nothing
+    return nothing
+end
+
+Base.@propagate_inbounds function SpeedyWeather.parameterization!(
+    vars::SpeedyWeather.Variables, 
+    albedo::OceanLandAlbedo{Ocean, <:LearnedLandAlbedo}, 
+    model::SpeedyWeather.PrimitiveEquation
+) where {Ocean}
+    
+    for ij in eachindex(model.land_sea_mask.mask) 
+        SpeedyWeather.albedo!(ij, vars, albedo.ocean, model)
     end
 
-    vars.parameterizations.land.albedo[ij] = clamp(brdf(ij, vars, scheme), 0, 1)
+    SpeedyWeather.albedo!(vars, albedo.land, model)
+
+    # Blend ocean and land albedo
+    mask = model.land_sea_mask.mask
+    @. vars.parameterizations.albedo = mask * vars.parameterizations.land.albedo + 
+                                       (1 - mask) * vars.parameterizations.ocean.albedo
+
+    return nothing
+end
+
+Base.@propagate_inbounds function SpeedyWeather.albedo!(
+    ij::Int, 
+    vars::SpeedyWeather.Variables, 
+    scheme::LearnedLandAlbedo, 
+    model::SpeedyWeather.PrimitiveEquation
+)
     return nothing
 end
 

@@ -400,12 +400,6 @@ end
     return
 end
 
-"""$(TYPEDSIGNATURES) JinOceanAlbedo: Call JinOceanAlbedo over ocean."""
-@propagate_inbounds function parameterization!(ij, vars, albedo::JinOceanAlbedo, model) 
-    albedo!(ij, vars, albedo, model)
-    return nothing
-end
-
 export LearnedLandAlbedo
 @parameterized @kwdef struct LearnedLandAlbedo{NF, LNN, LP, LS, Scheme <: AbstractSnowCover} <: AbstractAlbedo
     "[OPTION] filename of land weights"
@@ -426,7 +420,7 @@ export LearnedLandAlbedo
     "Snow cover-albedo scheme"
     @param snow_cover::Scheme = SaturatingSnowCover() (group = :snow_cover,)
 
-    input_buffer::Vector{Float32} = zeros(Float32, 10)
+    input_buffer::Matrix{NF}
 
     # Normalisation parameters
     norm_means::Vector{Float32} = zeros(Float32, 10)
@@ -440,7 +434,7 @@ export LearnedLandAlbedo
 end
 
 function Base.show(io::IO, scheme::LearnedLandAlbedo)
-    print(io, "LearnedLandAlbedo{$(eltype(scheme.output_mean))}")
+    print(io, "LearnedLandAlbedo{$(eltype(scheme.input_buffer))}")
     println(io)
     n_layers = length(keys(scheme.brdf_params))
     return println(io, "└ BRDF: Neural network ($n_layers layers)")
