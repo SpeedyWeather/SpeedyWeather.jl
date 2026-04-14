@@ -20,7 +20,6 @@ jobs:
     defaults:
       run:
         shell: bash
-        working-directory: ./SpeedyWeather
     timeout-minutes: 90
     permissions: # needed to allow julia-actions/cache to proactively delete old caches that it has created
       actions: write
@@ -56,6 +55,6 @@ jobs:
           '
       - name: Run Enzyme differentiability tests
         run: |
-          julia --color=yes --project=test/differentiability test/differentiability/full_diff_CI.jl
+          julia --color=yes --project=SpeedyWeather/test/differentiability SpeedyWeather/test/differentiability/full_diff_CI.jl
         env:
           GITHUB_AUTH: ${{ secrets.GITHUB_TOKEN }}
