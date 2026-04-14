@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fixed a bug for `SubArrays` not working with `Architectures.ismatching` [#1049
+](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1049)
 - Dependency for DomainSets updated to v0.7 and v0.8 [#1045](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1045) [#1047](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1047)
 - [BREAKING] WriteModelComponentFile and ManualOrography [#1040](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1040)
 - `JLD2Output` revised to be able to select groups, additional `ArrayOutput` option to output to RAM [#1026](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1026)
