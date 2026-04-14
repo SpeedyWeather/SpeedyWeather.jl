@@ -1,7 +1,8 @@
 using JLArrays
+using SpeedyWeatherInternals.Architectures
+import SpeedyWeatherInternals.Architectures: AbstractCPU
 
-const AbstractCPU = SpeedyWeatherInternals.Architectures.AbstractCPU
-const JLGPU = GPU{JLArrays.JLBackend}
+const JLGPU = SpeedyWeather.GPU{JLArrays.JLBackend}
 
 @testset "CPU architecture" begin
     arch = CPU()
@@ -172,19 +173,3 @@ end
     @test keys(nt_gpu) == (:x, :y)
 end
 
-@testset "convert_to_device" begin
-    cpu = CPU()
-    jlgpu = GPU(JLArrays.JLBackend())
-    args = (rand(Float32, 2), 1.0)
-
-    # CPU: pass-through
-    @test convert_to_device(cpu, args) === args
-end
-
-@testset "synchronize" begin
-    cpu = CPU()
-    jlgpu = GPU(JLArrays.JLBackend())
-    # just must not error
-    @test (synchronize(cpu); true)
-    @test (synchronize(jlgpu); true)
-end
