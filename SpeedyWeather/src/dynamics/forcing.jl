@@ -346,7 +346,7 @@ function initialize!(
     temp_relax_freq .= kₐ .+ (kₛ - kₐ) * max.(0, (σ .- σb) ./ (1 - σb)) .* (coslat') .^ 4
     temp_relax_freq .*= radius  # scale by radius as is the temperature equation
 
-    # Held and Suarez equation 3, split into max(Tmin, (a - b*ln(p))*(p/p₀)^κ)
+    # Held and Suarez equation 3, split into max(Tmin, (a + b*ln(p))*(p/p₀)^κ)
     # precompute a, b to simplify online calculation
     @. temp_equil_a = Tmax - ΔTy * sinlat^2 + Δθz * log(p₀) * coslat^2
     @. temp_equil_b = -Δθz * coslat^2
@@ -393,10 +393,10 @@ end
     )
     ij, k = @index(Global, NTuple)
     j = whichring[ij]                   # latitude ring index
-    kₜ = temp_relax_freq[k, j]          # (inverse) relaxation time scale
+    kₜ = temp_relax_freq[k, j]          # (inverse) relaxation time scale (scaled)
 
     log_p = log_pₛ[ij] + log_σ[k]        # p/pₛ = σ but in log space
-    p = exp(log_p[ij])                  # pressure [Pa]
+    p = exp(log_p)                      # pressure [Pa]
 
     # Held and Suarez 1996, equation 3 with precomputed a, b during initialization
     Teq = max(Tmin, (temp_equil_a[j] + temp_equil_b[j] * log_p[ij]) * (p/p₀)^κ)
