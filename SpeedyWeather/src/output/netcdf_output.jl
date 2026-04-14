@@ -401,8 +401,15 @@ function output!(
     var = is3D(variable) ? (is_land(variable) ? output.field3Dland : output.field3D) : output.field2D
 
     try
-        raw = on_architecture(CPU(), path(variable, simulation))
-        RingGrids.interpolate!(var, raw, output.interpolator)
+        v = path(variable, simulation)
+        ts = simulation.model.time_stepping
+        has_step = (is3D(variable) && ndims(v) == 3) ||
+                    (is2D(variable) && ndims(v) == 2)
+        v = has_step ? get_prognostic_step(v, ts, output) : v
+
+        # TODO somehow this throws an error with a view
+        # raw = on_architecture(CPU(), v)
+        RingGrids.interpolate!(var, v, output.interpolator)
     catch FieldError
         var .= variable.missing_value
     end

@@ -954,7 +954,7 @@ function bernoulli_potential!(
     # pₛ = diagn.grid.pres_grid_prev                  # 2D not prev is in Pa
     # RdTlnpₛ .= R_dry * Tₖ' .* log.(pₛ)
 
-    bernoulli_grid .= 1 // 2 .* (u .^ 2 + v .^ 2)                    # = ½(u² + v²) on grid
+    bernoulli_grid .= 1 // 2 .* (u .^ 2 + v .^ 2)               # = ½(u² + v²) on grid
     transform!(bernoulli, bernoulli_grid, scratch_memory, S)    # to spectral space
     bernoulli .+= geopot                                        # add geopotential Φ
     ∇²!(div_tend, bernoulli, S, add = true, flipsign = true)    # add -∇²(½(u² + v²) + ϕ)
@@ -1019,5 +1019,6 @@ end
 # dispatch on element type: nested NamedTuple vs array
 @inline _reset_tendency!(nt::NamedTuple, ts, value) = _reset_tendencies_inner!(values(nt), ts, value)
 @inline function _reset_tendency!(a::AbstractArray, time_stepping, value)
-    fill!(get_step(a, 1), value)
+    a_step = get_tendency_step(a, time_stepping, ResetTendencies())
+    fill!(a_step, value)
 end

@@ -23,15 +23,15 @@ abstract type AbstractNCycleLorenz <: AbstractTimeStepper end
 
 A semi-implicit Lorenz N-cycle time integration scheme following Hotta et al. (2016).
 
-# Algorithm (per substep)
+# Algorithm (per substep of a cycle)
 1. G = w*F_E(x) + (1-w)*G     (weighted tendency accumulation)
 2. dx = (I - α*Δt*L_I)^(-1) * (G + L_I*x)  (implicit solve)
 3. x = x + Δt*dx              (state update)
 $(TYPEDFIELDS)
 """
 mutable struct NCycleLorenz{NF, V, IntType, S, MS, B} <: AbstractNCycleLorenz
-    "[OPTION] Number of cycles N (3 or 4 recommended, 4 is more stable)"
-    cycles::IntType
+    "[OPTION] Number of steps N in a cycles (3 or 4 recommended, 4 is more stable)"
+    steps::IntType
 
     "[OPTION] Variant: NCycleLorenzA() (default), B, AB, or ABBA"
     variant::V
@@ -70,7 +70,7 @@ Adapt.@adapt_structure NCycleLorenzCore
 Generator function for NCycleLorenz struct using `spectral_grid` for resolution."""
 function NCycleLorenz(
         spectral_grid::SpectralGrid;
-        cycles = 4,
+        steps = 4,
         variant = NCycleLorenzA(),
         Δt_at_T31 = Minute(40),
         adjust_with_output = true,
@@ -83,18 +83,18 @@ function NCycleLorenz(
     Δt_sec::NF = Δt_millisec.value / 1000
     Δt::NF = Δt_sec / radius
 
-    return NCycleLorenz(cycles, variant, Second(Δt_at_T31), adjust_with_output, Δt_millisec, Δt_sec, Δt)
+    return NCycleLorenz(steps, variant, Second(Δt_at_T31), adjust_with_output, Δt_millisec, Δt_sec, Δt)
 end
 
 """$(TYPEDSIGNATURES)
 Get current substep within N-cycle (0 to N-1) from the clock."""
-@inline current_substep(L::NCycleLorenz, clock) = mod(clock.timestep_counter, L.cycles)
+@inline current_substep(L::NCycleLorenz, clock) = mod(clock.timestep_counter, L.steps)
 
 """$(TYPEDSIGNATURES)
 Initialize NCycleLorenz time stepper."""
 function initialize!(L::NCycleLorenz, model::AbstractModel)
-    if L.variant isa NCycleLorenzABBA && L.cycles != 4          # Validate compatibility
-        @warn "N-Cycle Lorenz with ABBA variant is for N=4 (4th order accurate), but N=$(L.cycles). Consider cycles=4 or variant A/B/AB."
+    if L.variant isa NCycleLorenzABBA && L.steps != 4          # Validate compatibility
+        @warn "N-Cycle Lorenz with ABBA variant is for N=4 (4th order accurate), but N=$(L.steps). Consider steps=4 or variant A/B/AB."
     end
 
     calculate_Δt!(L, model)
@@ -104,17 +104,18 @@ end
 # Weight coefficient functions (Hotta et al. 2016, Eqs 2-3, 7-8)
 """$(TYPEDSIGNATURES)
 Compute weight coefficient w for current substep."""
-function weight_coefficient(L::NCycleLorenz{NF}, clock) where {NF}
-    k = current_substep(L, clock)
-    return weight_coefficient(NF, L.variant, k, L.cycles)
+function weight_coefficient(L::NCycleLorenz{NF}, clock::Clock) where {NF}
+    return weight_coefficient(NF, L.variant, clock.timestep_counter, L.steps)
 end
 
 # Type-stable versions with explicit NF
-@inline function weight_coefficient(::Type{NF}, ::NCycleLorenzA, k::Int, N::Int) where {NF}
+@inline function weight_coefficient(::Type{NF}, ::NCycleLorenzA, i::Integer, N::Integer) where {NF}
+    k = mod(i, N)   # current substep
     return k == 0 ? one(NF) : convert(NF, N) / convert(NF, N - k)
 end
 
-@inline function weight_coefficient(::Type{NF}, ::NCycleLorenzB, k::Int, N::Int) where {NF}
+@inline function weight_coefficient(::Type{NF}, ::NCycleLorenzB, i::Integer, N::Integer) where {NF}
+    k = mod(i, N)   # current substep
     return k == 0 ? one(NF) : convert(NF, N) / convert(NF, k)
 end
 
@@ -143,17 +144,4 @@ end
     lmk = @index(Global, Linear)
     G[lmk] = w * F[lmk] + (1 - w) * G[lmk]
     var[lmk] = var[lmk] + Δt * G[lmk]
-end
-
-function reset_tendencies!(vars::Variables, time_stepping::NCycleLorenz)
-    (; tendencies) = vars
-    for varname in keys(tendencies)
-        if !(tendencies[varname] isa NamedTuple)
-            tendency = getfield(tendencies, varname)
-            for step in 1:tendency_spectral_steps(time_stepping)
-                fill!(get_step(tendency, step), 0)
-            end
-        end
-    end
-    return nothing
 end
