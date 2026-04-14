@@ -119,6 +119,12 @@ end
     return k == 0 ? one(NF) : convert(NF, N) / convert(NF, k)
 end
 
+@inline function weight_coefficient(::Type{NF}, ::NCycleLorenzAB, i::Integer, N::Integer) where {NF}
+    k = mod(i, 2N)   # current substep
+    variant = k < N ? NCycleLorenzA() : NCycleLorenzB()
+    return weight_coefficient(NF, variant, i, N)
+end
+
 function update_prognostic!(
         var::AbstractArray,
         tendency::AbstractArray,
@@ -142,6 +148,6 @@ end
         var, G, F, w, Δt,
     )
     lmk = @index(Global, Linear)
-    G[lmk] = w * F[lmk] + (1 - w) * G[lmk]
-    var[lmk] = var[lmk] + Δt * G[lmk]
+    G[lmk] = w * F[lmk] + (1 - w) * G[lmk]  # Hotta et al. 2016 eq (5)
+    var[lmk] = var[lmk] + Δt * G[lmk]       # and equation (6)
 end
