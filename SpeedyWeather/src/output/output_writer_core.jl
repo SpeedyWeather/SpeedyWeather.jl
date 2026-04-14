@@ -84,7 +84,7 @@ function initialize!(
     # CALLBACKS
     output.write_parameters_txt && add!(model.callbacks, :parameters_txt => ParametersTxt())
     output.write_progress_txt && add!(model.callbacks, :progress_txt => ProgressTxt())
-    output.write_restart && add!(model.callbacks, :restart_file => RestartFile())
+    output.write_restart && add!(model.callbacks, :variables_restart_file => WriteVariablesRestartFile())
 
     return true
 end

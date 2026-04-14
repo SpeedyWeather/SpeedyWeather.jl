@@ -193,7 +193,7 @@ include("output/callbacks.jl")
 include("output/feedback.jl")
 include("output/output_writer_core.jl")
 include("output/netcdf_output.jl")
-include("output/restart_file.jl")
+include("output/restart.jl")
 include("output/particle_tracker.jl")
 include("output/variables_output.jl")
 

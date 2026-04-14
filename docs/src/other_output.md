@@ -93,14 +93,14 @@ and added like
 add!(model, :progress_txt => progress_txt)
 ```
 
-## Restart file
+## Restart files for variables
 
 `NetCDFOutput` also by default writes a restart file, containing the `simulation.variables.prognostic`
-that can be read back in with teh `StartFromFile` initial conditions. Implemented as a callback
-`RestartFile` can also be created independently of `NetCDFOutput`, e.g.
+that can be read back in with the `StartFromFile` initial conditions. Implemented as a callback
+`WriteVariablesRestartFile` can also be created independently of `NetCDFOutput`, e.g.
 
 ```@example output2
-restart_file = RestartFile(write_only_with_output=false, path="folder1", filename="restart.jld2")
+restart_file = WriteVariablesRestartFile(write_only_with_output=false, path="folder1", filename="restart.jld2")
 ```
 
 and added like
@@ -110,4 +110,51 @@ add!(model, :restart_file => restart_file)
 ```
 
 By default `path=""` will use the folder determined by `NetCDFOutput` but otherwise you can
-also provide your own.
+also provide your own. Note that `WriteVariablesRestartFile` will only write the prognostic variables to file.
+This is such that you can simulate a spin up and then change model parameters as you like,
+to write out specific model components and store them in a file see
+[Model component restart file](@ref).
+
+## Model component restart file
+
+If you modified a model component (say by applying a custom orography) you can save this to file too.
+
+```@example output2
+orography = ManualOrography(spectral_grid)  # an orography that is untouched at initialize!
+model = ShallowWaterModel(spectral_grid; orography)
+set!(model, orography=123)                  # set as you like
+orography_for_restart = WriteModelComponentFile(component=model.orography, filename="my_orography.jld2")
+add!(model, :my_orography => orography_for_restart)
+```
+
+Once the simulation ran you can then load this model component from file and use it to construct
+a new model with it, or use its information in some other form, e.g. by writing its arrays to
+other arrays:
+
+```@example output2
+simulation = initialize!(model)
+run!(simulation, steps=0, output=true)
+
+# either pass on that same callback (which will read out the path) or provide path directly
+my_orography = SpeedyWeather.load_model_component(orography_for_restart)
+
+# construct a new model with that orography
+new_model = ShallowWaterModel(spectral_grid, orography = my_orography)
+all(new_model.orography.orography .== 123)  # check that the new orography is indeed as customized
+```
+
+We do not really want to encourage it, but `WriteModelComponentFile` can be hijacked to write out the entire `model`.
+While this easily saves everything of `model` into one file, it always writes many large precomputed arrays to file
+whereas they could just be recomputed when constructing a new model. For example, the Legendre polynomials in
+`model.spectral_transform` can easily be GBs at higher resolution, see also 
+[Precomputed polynomials and allocated memory](@ref). Nevertheless, you can write out the entire model with
+
+```@example output2
+add!(model, :model_writer => WriteModelComponentFile(component=model, filename="model.jld2"))
+```
+
+Note that this callback contains a `model` that also contains this callback.
+This self recursion is not particularly problematic as `model` is just a lazy reference.
+However, when you do load in this `model` from file and use it again, note that it again
+contains this callback which would write out its model again. You can `delete!` the callback
+though, see [Adding a callback](@ref).

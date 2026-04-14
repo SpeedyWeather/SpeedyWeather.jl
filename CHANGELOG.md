@@ -2,7 +2,11 @@
 
 ## Unreleased
 
-- Held-Suarez reworked, temperatures were not stable [#1042](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1042)
+- Held-Suarez missed scaling, temperatures were not stable [#1042](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1042)
+- Update docs sidebar [#1048](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1048)
+- Fixed a bug for `SubArrays` not working with `Architectures.ismatching` [#1049](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1049)
+- Dependency for DomainSets updated to v0.7 and v0.8 [#1045](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1045) [#1047](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1047)
+- [BREAKING] WriteModelComponentFile and ManualOrography [#1040](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1040)
 - `JLD2Output` revised to be able to select groups, additional `ArrayOutput` option to output to RAM [#1026](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1026)
 - ParallelTestRunner for SpeedyWeather CI [#1033](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1033)
 - Remove snow runoff, add snow depth cap [#1017](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1017)

@@ -3,28 +3,47 @@ abstract type AbstractOrography <: AbstractModelComponent end
 # adapt to GPU only the fields themselves
 Adapt.adapt_structure(to, orog::AbstractOrography) = (orography = adapt_structure(to, orog.orography), surface_geopotential = adapt_structure(to, orog.surface_geopotential))
 
+# general constructor with empty arrays (will be initialized in initialize!)
+function (O::Type{<:AbstractOrography})(spectral_grid::SpectralGrid; kwargs...)
+    (; GridVariable2D, SpectralVariable2D, grid, spectrum) = spectral_grid
+    orography = zeros(GridVariable2D, grid)
+    surface_geopotential = zeros(SpectralVariable2D, spectrum)
+    return O(; orography, surface_geopotential, kwargs...)
+end
+
 export NoOrography
 
 """Orography with zero height in `orography` and zero surface geopotential `surface_geopotential`.
 $(TYPEDFIELDS)"""
-@kwdef struct NoOrography{NF, GridVariable2D, SpectralVariable2D} <: AbstractOrography
-    "height [m] on grid-point space."
-    orography::GridVariable2D
+@kwdef struct NoOrography{G, S} <: AbstractOrography
+    "[OPTION] height [m] on grid-point space."
+    orography::G
 
-    "surface geopotential, height*gravity [m²/s²]"
-    surface_geopotential::SpectralVariable2D
+    "[OPTION] surface geopotential, height*gravity [m²/s²]"
+    surface_geopotential::S
 end
 
-# constructor
-function NoOrography(spectral_grid::SpectralGrid)
-    (; NF, GridVariable2D, SpectralVariable2D, nlat_half, trunc) = spectral_grid
-    orography = zeros(GridVariable2D, nlat_half)
-    surface_geopotential = zeros(SpectralVariable2D, trunc + 2, trunc + 1)
-    return NoOrography{NF, GridVariable2D, SpectralVariable2D}(; orography, surface_geopotential)
+# set arrays to zero when initialized
+function initialize!(O::NoOrography, ::AbstractModel)
+    O.orography .= 0
+    O.surface_geopotential .= 0
+    return nothing
 end
 
-# no further initialization needed
-initialize!(::NoOrography, ::AbstractModel) = nothing
+export ManualOrography
+
+"""Orography with zero height in `orography` and zero surface geopotential `surface_geopotential`.
+$(TYPEDFIELDS)"""
+@kwdef struct ManualOrography{G, S} <: AbstractOrography
+    "[OPTION] height [m] on grid-point space."
+    orography::G
+
+    "[OPTION] surface geopotential, height*gravity [m²/s²]"
+    surface_geopotential::S
+end
+
+# deliberate don't touch the arrays in initialize, as they will be set by the user with set! before the model is run
+initialize!(orog::ManualOrography, model::AbstractModel) = nothing
 
 # set orography with grid, scalar, function
 function set!(
@@ -64,14 +83,11 @@ $(TYPEDFIELDS)"""
     surface_geopotential::SpectralVariable2D
 end
 
-# constructor
 function ZonalRidge(spectral_grid::SpectralGrid; kwargs...)
-    (; NF, GridVariable2D, SpectralVariable2D, nlat_half, trunc) = spectral_grid
-    orography = zeros(GridVariable2D, nlat_half)
-    surface_geopotential = zeros(SpectralVariable2D, trunc + 2, trunc + 1)
-    return ZonalRidge{NF, GridVariable2D, SpectralVariable2D}(;
-        orography, surface_geopotential, kwargs...
-    )
+    (; architecture, NF, GridVariable2D, SpectralVariable2D, grid, spectrum) = spectral_grid
+    orography = zeros(GridVariable2D, grid)
+    surface_geopotential = zeros(SpectralVariable2D, spectrum)
+    return ZonalRidge{NF, GridVariable2D, SpectralVariable2D}(; orography, surface_geopotential, kwargs...)
 end
 
 # function barrier
@@ -164,14 +180,11 @@ $(TYPEDFIELDS)"""
     surface_geopotential::SpectralVariable2D
 end
 
-# constructor
 function EarthOrography(spectral_grid::SpectralGrid; kwargs...)
-    (; architecture, NF, GridVariable2D, SpectralVariable2D, grid, spectrum) = spectral_grid
-    orography = on_architecture(architecture, zeros(GridVariable2D, grid))
-    surface_geopotential = on_architecture(architecture, zeros(SpectralVariable2D, spectrum))
-    return EarthOrography{NF, GridVariable2D, SpectralVariable2D}(;
-        orography, surface_geopotential, kwargs...
-    )
+    (; NF, GridVariable2D, SpectralVariable2D, grid, spectrum) = spectral_grid
+    orography = zeros(GridVariable2D, grid)
+    surface_geopotential = zeros(SpectralVariable2D, spectrum)
+    return EarthOrography{NF, GridVariable2D, SpectralVariable2D}(; orography, surface_geopotential, kwargs...)
 end
 
 # function barrier
