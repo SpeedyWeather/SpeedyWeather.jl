@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Held-Suarez missed scaling, temperatures were not stable [#1042](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1042)
 - Update docs sidebar [#1048](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1048)
 - Fixed a bug for `SubArrays` not working with `Architectures.ismatching` [#1049](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1049)
 - Dependency for DomainSets updated to v0.7 and v0.8 [#1045](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1045) [#1047](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1047)
