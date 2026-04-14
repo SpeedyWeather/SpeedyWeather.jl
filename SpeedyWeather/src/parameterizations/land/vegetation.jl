@@ -207,15 +207,15 @@ function soil_moisture_availability!(
         vegetation::VegetationClimatology,
         model::PrimitiveWet,
     )
-    (; vegetation_high, vegetation_low, soil_moisture_availability) = vars.parameterizations.land
+    (; vegetation_high, vegetation_low, lai_vegetation_high, lai_vegetation_low, soil_moisture_availability) = vars.parameterizations.land
     (; soil_moisture) = vars.prognostic.land
     (; low_veg_factor) = vegetation
 
     # copy over vegetation fields into diagnostic variables
     vegetation_high .= vegetation.high_cover
     vegetation_low .= vegetation.low_cover
-    lai_hv .= vegetation.high_lai
-    lai_lv .= vegetation.low_lai
+    lai_vegetation_high .= vegetation.high_lai
+    lai_vegetation_low .= vegetation.low_lai
 
     W_cap = model.land.thermodynamics.field_capacity
     W_wilt = model.land.thermodynamics.wilting_point
@@ -223,7 +223,7 @@ function soil_moisture_availability!(
     D_root = model.land.geometry.layer_thickness[2]
 
     @boundscheck fields_match(vegetation_high, vegetation_low, soil_moisture_availability) || throws(BoundsError)
-    @boundscheck fields_match(lai_hv, lai_lv, soil_moisture_availability) || throws(BoundsError)
+    @boundscheck fields_match(lai_vegetation_high, lai_vegetation_low, soil_moisture_availability) || throws(BoundsError)
     @boundscheck fields_match(soil_moisture, soil_moisture_availability, horizontal_only = true) || throws(BoundsError)
     @boundscheck size(soil_moisture, 2) >= 2                # defined for two layers
     @boundscheck size(soil_moisture_availability, 2) == 1   # 2D only
@@ -270,8 +270,8 @@ function variables(::VegetationClimatology)
         PrognosticVariable(:soil_moisture, Land3D(), desc = "Soil moisture content (fraction of capacity)", units = "1", namespace = :land),
         ParameterizationVariable(:vegetation_high, Grid2D(), desc = "Vegetation high cover", units = "1", namespace = :land),
         ParameterizationVariable(:vegetation_low, Grid2D(), desc = "Vegetation low cover", units = "1", namespace = :land),
-        ParameterizationVariable(:lai_vegetation_high, dims = Grid2D(), desc = "Leaf Area Index of high vegetation", units = "1", namespace = :land),
-        ParameterizationVariable(:lai_vegetation_low, dims = Grid2D(), desc = "Leaf Area Index of low vegetation", units = "1", namespace = :land),
+        ParameterizationVariable(:lai_vegetation_high, Grid2D(), desc = "Leaf Area Index of high vegetation", units = "1", namespace = :land),
+        ParameterizationVariable(:lai_vegetation_low, Grid2D(), desc = "Leaf Area Index of low vegetation", units = "1", namespace = :land),
         ParameterizationVariable(:soil_moisture_availability, Grid2D(), desc = "Soil moisture availability for evaporation", units = "1", namespace = :land),
     )
 end

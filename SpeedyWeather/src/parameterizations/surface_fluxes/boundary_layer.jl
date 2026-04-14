@@ -89,7 +89,7 @@ initialize!(::ConstantSurfaceRoughness, ::PrimitiveEquation) = nothing
 
 @propagate_inbounds function parameterization!(ij, vars, scheme::AbstractSurfaceRoughness, model)
     surface_roughness!(ij, vars, scheme, model.land_sea_mask)
-    return surface_roughness!(ij, vars, scheme, model.land_sea_mask)
+    return nothing
 end
 
 variables(::AbstractSurfaceRoughness) = (

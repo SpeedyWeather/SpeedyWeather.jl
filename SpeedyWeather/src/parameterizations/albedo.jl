@@ -59,17 +59,6 @@ export DefaultAlbedo
 """$(TYPEDSIGNATURES) Default albedo parameterization."""
 DefaultAlbedo(SG::SpectralGrid; kwargs...) = OceanLandAlbedo(SG; kwargs...)
 
-function initialize!(albedo::OceanLandAlbedo, model::PrimitiveEquation)
-    initialize!(albedo.ocean, model)
-    return initialize!(albedo.land, model)
-end
-
-"""$(TYPEDSIGNATURES) Composite OceanLandAlbedo: Call albedo.ocean over ocean and albedo.land over land."""
-@propagate_inbounds function parameterization!(ij, vars, albedo::OceanLandAlbedo, model)
-    albedo!(ij, vars, albedo.ocean, model)
-    return albedo!(ij, vars, albedo.land, model)
-end
-
 # composite albedos need to define albedo for ocean/land separately and combined
 # plus any custom variables of the ocean and land albedo parameterizations (if specific method is implemented)
 function variables(albedo::OceanLandAlbedo)
@@ -82,25 +71,22 @@ function variables(albedo::OceanLandAlbedo)
     )
 end
 
-# abbreviate show for OceanLandAlbedo to avoid printing all fields of ocean and land albedo in the main show
-Base.show(io::IO, A::OceanLandAlbedo) = show(io, A, values = false)
-
 function initialize!(albedo::OceanLandAlbedo, model::PrimitiveEquation)
     initialize!(albedo.ocean, model)
     initialize!(albedo.land, model)
     return nothing
 end
 
-"""$(TYPEDSIGNATURES) Composite OceanLandAlbedo: Call albedo.ocean over ocean and albedo.land over land."""
+"""$(TYPEDSIGNATURES) OceanLandAlbedo: Call ocean and land albedo parameterizations separately."""
 @propagate_inbounds function parameterization!(ij, vars::Variables, albedo::OceanLandAlbedo, model)
-    albedo!(ij, vars.parameterizations.ocean.albedo, vars, albedo.ocean, model)
-    return albedo!(ij, vars.parameterizations.land.albedo, vars, albedo.land, model)
+    albedo!(ij, vars, albedo.ocean, model)
+    return albedo!(ij, vars, albedo.land, model)
 end
 
 """$(TYPEDSIGNATURES) Single Albedo: Call same albedo over ocean and land."""
 @propagate_inbounds function parameterization!(ij, vars::Variables, albedo::AbstractAlbedo, model)
-    albedo!(ij, vars.parameterizations.ocean.albedo, vars, albedo, model)
-    return albedo!(ij, vars.parameterizations.land.albedo, vars, albedo, model)
+    albedo!(ij, vars, albedo.ocean, model)
+    return albedo!(ij, vars, albedo.land, model)
 end
 
 export GlobalConstantAlbedo
@@ -115,7 +101,7 @@ end
 Adapt.@adapt_structure GlobalConstantAlbedo
 GlobalConstantAlbedo(SG::SpectralGrid; kwargs...) = GlobalConstantAlbedo{SG.NF}(; kwargs...)
 initialize!(albedo::GlobalConstantAlbedo, ::PrimitiveEquation) = nothing
-@propagate_inbounds albedo!(ij, albedo, vars, scheme::GlobalConstantAlbedo, model) = (albedo[ij] = scheme.albedo)
+@propagate_inbounds albedo!(ij, vars, scheme::GlobalConstantAlbedo, model) = (vars.parameterizations.albedo[ij] = scheme.albedo)
 
 export ManualAlbedo
 
@@ -131,7 +117,7 @@ end
 Adapt.@adapt_structure ManualAlbedo
 ManualAlbedo(SG::SpectralGrid) = ManualAlbedo{SG.GridVariable2D}(zeros(SG.GridVariable2D, SG.grid))
 initialize!(albedo::ManualAlbedo, model::PrimitiveEquation) = nothing
-@propagate_inbounds albedo!(ij, albedo, vars, scheme::ManualAlbedo, model) = (albedo[ij] = scheme.albedo[ij])
+@propagate_inbounds albedo!(ij, vars, scheme::ManualAlbedo, model) = (vars.parameterizations.albedo[ij] = scheme.albedo[ij])
 
 export AlbedoClimatology
 
@@ -186,7 +172,7 @@ function initialize!(albedo::AlbedoClimatology, model::PrimitiveEquation)
     return interpolate!(albedo.albedo, a)
 end
 
-@propagate_inbounds albedo!(ij, albedo, vars, scheme::AlbedoClimatology, model) = (albedo[ij] = scheme.albedo[ij])
+@propagate_inbounds albedo!(ij, vars, scheme::AlbedoClimatology, model) = (vars.parameterizations.albedo[ij] = scheme.albedo[ij])
 
 # OceanSeaIceAlbedo
 export OceanSeaIceAlbedo
@@ -205,9 +191,9 @@ Adapt.@adapt_structure OceanSeaIceAlbedo
 OceanSeaIceAlbedo(SG::SpectralGrid; kwargs...) = OceanSeaIceAlbedo{SG.NF}(; kwargs...)
 initialize!(::OceanSeaIceAlbedo, ::PrimitiveEquation) = nothing
 
-@propagate_inbounds function albedo!(ij, albedo, vars, scheme::OceanSeaIceAlbedo, model)
+@propagate_inbounds function albedo!(ij, vars, scheme::OceanSeaIceAlbedo, model)
     (; albedo_ocean, albedo_ice) = scheme
-    NF = eltype(albedo)
+    NF = eltype(vars.parameterizations.ocean.albedo)
     ℵ = haskey(vars.prognostic.ocean, :sea_ice_concentration) ? vars.prognostic.ocean.sea_ice_concentration[ij] : zero(NF)
 
     # set ocean albedo linearly between ocean and ice depending on sea ice concentration
@@ -262,10 +248,11 @@ LandSnowAlbedo(SG::SpectralGrid; snow_cover = SaturatingSnowCover(), kwargs...) 
 
 initialize!(albedo::LandSnowAlbedo, model::PrimitiveEquation) = nothing
 
-@propagate_inbounds function albedo!(ij, albedo, vars, scheme::LandSnowAlbedo, model)
+@propagate_inbounds function albedo!(ij, vars, scheme::LandSnowAlbedo, model)
 
     # 1. Albedo of vegetation + bare soil (no snow)
     (; albedo_land, albedo_high_vegetation, albedo_low_vegetation) = scheme
+    (; albedo) = vars.parameterizations.land
 
     if haskey(vars.parameterizations.land, :vegetation_high) && haskey(vars.parameterizations.land, :vegetation_low)
         (; vegetation_high, vegetation_low) = vars.parameterizations.land
@@ -355,7 +342,8 @@ end
     return poly_pre * poly_exp
 end
 
-@propagate_inbounds function albedo!(ij, vars, albedo_scheme::JinOceanAlbedo{NF}, model) where {NF}
+@propagate_inbounds function albedo!(ij, vars, albedo_scheme::JinOceanAlbedo, model)
+    NF = model.spectral_grid.NF
     land_fraction = model.land_sea_mask.mask[ij]
     μ = vars.parameterizations.cos_zenith[ij]
 
@@ -402,14 +390,20 @@ end
     alpha_final = f_wc * foam_reflectance + (one(NF) - f_wc) * αᵦ
 
     # Also account for sea ice if sea ice concentration is available
-    if haskey(progn.ocean, :sea_ice_concentration)
-        sea_ice_conc = progn.ocean.sea_ice_concentration[ij]
+    if haskey(vars.prognostic.ocean, :sea_ice_concentration)
+        sea_ice_conc = vars.prognostic.ocean.sea_ice_concentration[ij]
         vars.parameterizations.ocean.albedo[ij] = clamp((one(NF) - sea_ice_conc) * alpha_final + sea_ice_conc * albedo_ice, zero(NF), one(NF))
     else
         vars.parameterizations.ocean.albedo[ij] = clamp(alpha_final, zero(NF), one(NF))
     end
 
     return
+end
+
+"""$(TYPEDSIGNATURES) JinOceanAlbedo: Call JinOceanAlbedo over ocean."""
+@propagate_inbounds function parameterization!(ij, vars, albedo::JinOceanAlbedo, model) 
+    albedo!(ij, vars, albedo, model)
+    return nothing
 end
 
 export LearnedLandAlbedo

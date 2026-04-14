@@ -84,7 +84,7 @@ function initialize!(
     interpolator = RingGrids.interpolator(snow_depth, glm, NF = Float32)
     interpolate!(snow_depth, glm, interpolator)
 
-    return set!(vars, model.geometry, snow_depth = glm)
+    return set!(vars, model.geometry, snow_depth = glm; namespace = :land)
 end
 
 function timestep!(

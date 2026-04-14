@@ -89,14 +89,14 @@ end
     return (a * s) + m
 end
 
-Base.@propagate_inbounds function surface_roughness_land(ij, diagn, progn, scheme::LearnedSurfaceRoughness)
-    vₕ = diagn.physics.land.vegetation_high[ij]
-    vₗ = diagn.physics.land.vegetation_low[ij]
+Base.@propagate_inbounds function surface_roughness_land(ij, vars, scheme::LearnedSurfaceRoughness)
+    vₕ = vars.parameterizations.land.vegetation_high[ij]
+    vₗ = vars.parameterizations.land.vegetation_low[ij]
     vᵦ = 1 - vₕ - vₗ  # bare soil
-    g = diagn.grid.geopotential[ij, end]
-    sd = progn.land.snow_depth[ij]
-    soil_moisture = progn.land.soil_moisture[ij, begin]  # currently top layer
-    soil_temperature = progn.land.soil_temperature[ij, end]  # currently bottom layer
+    g = vars.grid.geopotential[ij, end]
+    sd = vars.prognostic.land.snow_depth[ij]
+    soil_moisture = vars.prognostic.land.soil_moisture[ij, begin]  # currently top layer
+    soil_temperature = vars.prognostic.land.soil_temperature[ij, end]  # currently bottom layer
 
     # Modelled interactions
     i₁ = soil_temperature * soil_moisture
@@ -131,11 +131,10 @@ Base.@propagate_inbounds function surface_roughness_land(ij, diagn, progn, schem
     return surface_roughness
 end
 
-Base.@propagate_inbounds function surface_roughness_ocean(ij, diagn, progn, scheme::LearnedSurfaceRoughness)
-    surface = diagn.nlayers
-    ℵ = progn.ocean.sea_ice_concentration[ij]
-    Uₛ = diagn.grid.u_grid[ij, surface]
-    Vₛ = diagn.grid.v_grid[ij, surface]
+Base.@propagate_inbounds function surface_roughness_ocean(ij, vars::Variables, scheme::LearnedSurfaceRoughness)
+    ℵ = vars.prognostic.ocean.sea_ice_concentration[ij]
+    Uₛ = vars.grid.u[ij, end]  # surface wind speed
+    Vₛ = vars.grid.v[ij, end]
     UVₛ = sqrt(Uₛ^2 + Vₛ^2)
 
     Uₛ = normalise(Uₛ, scheme.ocean_input_means[1], scheme.ocean_input_stds[1])
@@ -150,15 +149,15 @@ Base.@propagate_inbounds function surface_roughness_ocean(ij, diagn, progn, sche
     return surface_roughness
 end
 
-Base.@propagate_inbounds function SpeedyWeather.surface_roughness!(ij, diagn, progn, scheme::LearnedSurfaceRoughness, land_sea_mask)
+Base.@propagate_inbounds function SpeedyWeather.surface_roughness!(ij, vars::Variables, scheme::LearnedSurfaceRoughness, land_sea_mask::LandSeaMask)
     land_fraction = land_sea_mask.mask[ij]
 
     # Compute separate ocean and land surface roughness
-    diagn.physics.land.surface_roughness[ij] = land_fraction > 0 ? surface_roughness_land(ij, diagn, progn, scheme) : zero(land_fraction)
-    diagn.physics.ocean.surface_roughness[ij] = land_fraction < 1 ? surface_roughness_ocean(ij, diagn, progn, scheme) : zero(land_fraction)
+    vars.parameterizations.land.surface_roughness[ij] = land_fraction > 0 ? surface_roughness_land(ij, vars, scheme) : zero(land_fraction)
+    vars.parameterizations.ocean.surface_roughness[ij] = land_fraction < 1 ? surface_roughness_ocean(ij, vars, scheme) : zero(land_fraction)
 
     # Blend the two via arithmetic average
-    diagn.physics.surface_roughness[ij] = land_fraction * diagn.physics.land.surface_roughness[ij] + (1 - land_fraction) * diagn.physics.ocean.surface_roughness[ij]
+    vars.parameterizations.surface_roughness[ij] = land_fraction * vars.parameterizations.land.surface_roughness[ij] + (1 - land_fraction) * vars.parameterizations.ocean.surface_roughness[ij]
     return nothing
 end
 
@@ -364,21 +363,21 @@ end
 
 const vis_weight, nir_weight = 0.5308, 0.4771
 
-Base.@propagate_inbounds function brdf(ij, diagn, progn, scheme::LearnedLandAlbedo)
+Base.@propagate_inbounds function brdf(ij, vars, scheme::LearnedLandAlbedo)
     # Calculate snow cover
-    snow_depth = progn.land.snow_depth[ij]
+    snow_depth = vars.prognostic.land.snow_depth[ij]
     snow_cover = scheme.snow_cover(snow_depth, scheme.snow_depth_scale) * 100
 
     # Normalise inputs
-    vegh = normalise(diagn.physics.land.vegetation_high[ij], scheme.norm_means[1], scheme.norm_stds[1])
-    vegl = normalise(diagn.physics.land.vegetation_low[ij], scheme.norm_means[2], scheme.norm_stds[2])
-    soil_moisture1 = normalise(progn.land.soil_moisture[ij, begin], scheme.norm_means[3], scheme.norm_stds[3])
-    soil_temperature1 = normalise(progn.land.soil_temperature[ij, begin], scheme.norm_means[4], scheme.norm_stds[4])
-    soil_moisture2 = normalise(progn.land.soil_moisture[ij, end], scheme.norm_means[5], scheme.norm_stds[5])
-    soil_temperature2 = normalise(progn.land.soil_temperature[ij, end], scheme.norm_means[6], scheme.norm_stds[6])
-    geopotential = normalise(diagn.grid.geopotential[ij, end], scheme.norm_means[7], scheme.norm_stds[7])
-    lai_hv = normalise(diagn.physics.land.lai_hv[ij], scheme.norm_means[8], scheme.norm_stds[8])
-    lai_lv = normalise(diagn.physics.land.lai_lv[ij], scheme.norm_means[9], scheme.norm_stds[9])
+    vegh = normalise(vars.parameterizations.land.vegetation_high[ij], scheme.norm_means[1], scheme.norm_stds[1])
+    vegl = normalise(vars.parameterizations.land.vegetation_low[ij], scheme.norm_means[2], scheme.norm_stds[2])
+    soil_moisture1 = normalise(vars.prognostic.land.soil_moisture[ij, begin], scheme.norm_means[3], scheme.norm_stds[3])
+    soil_temperature1 = normalise(vars.prognostic.land.soil_temperature[ij, begin], scheme.norm_means[4], scheme.norm_stds[4])
+    soil_moisture2 = normalise(vars.prognostic.land.soil_moisture[ij, end], scheme.norm_means[5], scheme.norm_stds[5])
+    soil_temperature2 = normalise(vars.prognostic.land.soil_temperature[ij, end], scheme.norm_means[6], scheme.norm_stds[6])
+    geopotential = normalise(vars.grid.geopotential[ij, end], scheme.norm_means[7], scheme.norm_stds[7])
+    lai_hv = normalise(vars.parameterizations.land.lai_vegetation_high[ij], scheme.norm_means[8], scheme.norm_stds[8])
+    lai_lv = normalise(vars.parameterizations.land.lai_vegetation_low[ij], scheme.norm_means[9], scheme.norm_stds[9])
     snow_cover = normalise(snow_cover, scheme.norm_means[10], scheme.norm_stds[10])
 
     scheme.input_buffer[:] .= (
@@ -413,29 +412,29 @@ Base.@propagate_inbounds function brdf(ij, diagn, progn, scheme::LearnedLandAlbe
     sw_pred_vol = (vis_vol * vis_weight) + (nir_vol * nir_weight)
     sw_pred_geo = (vis_geo * vis_weight) + (nir_geo * nir_weight)
 
-    μ = diagn.physics.cos_zenith[ij]
+    μ = vars.parameterizations.cos_zenith[ij]
     θ = acos(μ)
-    fraction_direct = diagn.physics.direct_radiation_fraction[ij]
+    fraction_direct = vars.parameterizations.direct_radiation_fraction[ij]
 
     return calculate_bsa_from_fraction(sw_pred_iso, sw_pred_vol, sw_pred_geo, θ, fraction_direct)
 end
 
-Base.@propagate_inbounds function SpeedyWeather.albedo!(ij, diagn, progn, scheme::LearnedLandAlbedo, model)
+Base.@propagate_inbounds function SpeedyWeather.albedo!(ij, vars, scheme::LearnedLandAlbedo, model)
     land_fraction = model.land_sea_mask.mask[ij]
 
     # Don't run for fully ocean cells
     if land_fraction == 0
-        diagn.physics.land.albedo[ij] = zero(land_fraction)
+        vars.parameterizations.land.albedo[ij] = zero(land_fraction)
         return nothing
     end
 
     # Don't run for night-time cells
-    μ = diagn.physics.cos_zenith[ij]
+    μ = vars.parameterizations.cos_zenith[ij]
     if μ <= 0
         return nothing
     end
 
-    diagn.physics.land.albedo[ij] = clamp(brdf(ij, diagn, progn, scheme), 0, 1)
+    vars.parameterizations.land.albedo[ij] = clamp(brdf(ij, vars, scheme), 0, 1)
     return nothing
 end
 

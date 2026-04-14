@@ -167,7 +167,7 @@ Fields are: $(TYPEDFIELDS)"""
 end
 
 path(::LandSurfaceRoughnessOutput, simulation) =
-    simulation.diagnostic_variables.physics.land.surface_roughness
+    simulation.variables.parameterizations.land.surface_roughness
 
     """Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
@@ -183,7 +183,7 @@ Fields are: $(TYPEDFIELDS)"""
 end
 
 path(::OceanSurfaceRoughnessOutput, simulation) =
-    simulation.diagnostic_variables.physics.ocean.surface_roughness
+    simulation.variables.parameterizations.ocean.surface_roughness
 
         """Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
@@ -199,7 +199,7 @@ Fields are: $(TYPEDFIELDS)"""
 end
 
 path(::SurfaceRoughnessOutput, simulation) =
-    simulation.diagnostic_variables.physics.surface_roughness
+    simulation.variables.parameterizations.surface_roughness
 
 # collect all in one for convenience
 BoundaryLayerOutput() = (
