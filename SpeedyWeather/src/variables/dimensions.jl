@@ -14,16 +14,22 @@ struct Grid2D <: AbstractVariableDim end
 Base.zero(::AbstractVariable{Grid2D}, model::AbstractModel) = zeros(model.spectral_grid.GridVariable2D, model.spectral_grid.grid)
 
 """Dimension for 3D grid variables on the horizontal grid with vertical levels."""
-struct Grid3D <: AbstractVariableDim end
-Base.zero(::AbstractVariable{Grid3D}, model::AbstractModel) = zeros(model.spectral_grid.GridVariable3D, model.spectral_grid.grid, get_nlayers(model))
+@kwdef struct Grid3D <: AbstractVariableDim
+    n::Int = 0                                                  # length of 3rd dimension, use nlayers for 0
+end
+Base.zero(v::AbstractVariable{Grid3D}, model::AbstractModel) = zeros(model.spectral_grid.GridVariable3D, model.spectral_grid.grid, v.dims.n == 0 ? get_nlayers(model) : v.dims.n)
 
 """Dimension for 3D land surface variables."""
-struct Land3D <: AbstractVariableDim end
-Base.zero(::AbstractVariable{Land3D}, model::AbstractModel) = zeros(model.spectral_grid.GridVariable3D, model.spectral_grid.grid, get_nlayers(model.land))
+@kwdef struct Land3D <: AbstractVariableDim
+    n::Int = 0                                                  # length of 3rd dimension, use nlayers for 0
+end
+Base.zero(v::AbstractVariable{Land3D}, model::AbstractModel) = zeros(model.spectral_grid.GridVariable3D, model.spectral_grid.grid, v.dims.n == 0 ? get_nlayers(model.land) : v.dims.n)
 
 """Dimension for 3D ocean variables."""
-struct Ocean3D <: AbstractVariableDim end
-Base.zero(::AbstractVariable{Ocean3D}, model::AbstractModel) = zeros(model.spectral_grid.GridVariable3D, model.spectral_grid.grid, get_nlayers(model.ocean))
+@kwdef struct Ocean3D <: AbstractVariableDim
+    n::Int = 0                                                  # length of 3rd dimension, use nlayers for 0
+end
+Base.zero(v::AbstractVariable{Ocean3D}, model::AbstractModel) = zeros(model.spectral_grid.GridVariable3D, model.spectral_grid.grid, v.dims.n == 0 ? get_nlayers(model.ocean) : v.dims.n)
 
 """Dimension for 2D spectral variables."""
 struct Spectral2D <: AbstractVariableDim end
@@ -31,7 +37,7 @@ Base.zero(::AbstractVariable{Spectral2D}, model::AbstractModel) = zeros(model.sp
 
 """Dimension for 3D spectral variables with e.g. `n` vertical levels."""
 @kwdef struct Spectral3D <: AbstractVariableDim
-    n::Int = 0
+    n::Int = 0                                                  # length of 3rd dimension, use nlayers for 0
 end
 Base.zero(v::AbstractVariable{Spectral3D}, model::AbstractModel) = zeros(model.spectral_grid.SpectralVariable3D, model.spectral_grid.spectrum, v.dims.n == 0 ? get_nlayers(model) : v.dims.n)
 

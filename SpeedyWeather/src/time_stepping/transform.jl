@@ -1,3 +1,4 @@
+# dispatch over time stepping to decide which prognostic steps to transform to grid space
 SpeedyTransforms.transform!(vars::Variables, model::AbstractModel) =
     transform!(vars, model.time_stepping, model)
 
@@ -10,18 +11,18 @@ function SpeedyTransforms.transform!(
         time_stepping::AbstractTimeStepper,
         model::Barotropic,
     )
-    u_grid = get_prognostic_step(vars.grid.u, time_stepping)
-    v_grid = get_prognostic_step(vars.grid.v, time_stepping)
-    vor_grid = get_prognostic_step(vars.grid.vorticity, time_stepping)
+    S = model.spectral_transform
+    u_grid = get_prognostic_step(vars.grid.u, time_stepping, S)
+    v_grid = get_prognostic_step(vars.grid.v, time_stepping, S)
+    vor_grid = get_prognostic_step(vars.grid.vorticity, time_stepping, S)
 
     # U = u*coslat, V=v*coslat
     U = vars.scratch.a      # reuse scratch arrays for velocities in spectral
     V = vars.scratch.b      # reuse scratch arrays for velocities in spectral
-    vor = get_prognostic_step(vars.prognostic.vorticity, time_stepping)
+    vor = get_prognostic_step(vars.prognostic.vorticity, time_stepping, S)
 
     # get vorticity on grid from spectral vor
     scratch_memory = vars.scratch.transform_memory
-    S = model.spectral_transform
     transform!(vor_grid, vor, scratch_memory, S)
 
     # get spectral U, V from spectral vorticity via stream function Ψ
@@ -34,12 +35,12 @@ function SpeedyTransforms.transform!(
     transform!(v_grid, V, scratch_memory, S, unscale_coslat = true)
 
     for (name, tracer) in model.tracers
-        tracer_var = get_prognostic_step(vars.prognostic.tracers[name], time_stepping)
+        tracer_var = get_prognostic_step(vars.prognostic.tracers[name], time_stepping, S)
         tracer.active && transform!(vars.grid.tracers[name], tracer_var, scratch_memory, S)
     end
 
     # transform random pattern for random process unless random_process=nothing
-    # transform!(vars, lf, model.random_process, S)
+    transform!(vars, model.random_process, S)
 
     return nothing
 end
@@ -52,27 +53,26 @@ grid divergence, grid interface displacement (`pres_grid`) and the velocities
 u, v."""
 function SpeedyTransforms.transform!(
         vars::Variables,
-        lf::Integer,
-        model::ShallowWater;
-        kwargs...
+        time_stepping::AbstractTimeStepper,
+        model::ShallowWater,
     )
 
-    vor_grid = vars.grid.vorticity
-    u_grid = vars.grid.u
-    v_grid = vars.grid.v
-    div_grid = vars.grid.divergence
-    η_grid = vars.grid.η
+    S = model.spectral_transform
+    u_grid = get_prognostic_step(vars.grid.u, time_stepping, S)
+    v_grid = get_prognostic_step(vars.grid.v, time_stepping, S)
+    vor_grid = get_prognostic_step(vars.grid.vorticity, time_stepping, S)
+    div_grid = get_prognostic_step(vars.grid.divergence, time_stepping, S)
+    η_grid = get_prognostic_step(vars.grid.η, time_stepping, S)
 
-    vor = get_step(vars.prognostic.vorticity, lf)     # relative vorticity at leapfrog step lf
-    div = get_step(vars.prognostic.divergence, lf)     # divergence at leapfrog step lf
-    η = get_step(vars.prognostic.η, lf)         # interface displacement η at leapfrog step lf
+    vor = get_prognostic_step(vars.prognostic.vorticity, time_stepping, S)
+    div = get_prognostic_step(vars.prognostic.divergence, time_stepping, S)
+    η = get_prognostic_step(vars.prognostic.η, time_stepping, S)
 
     # U = u*coslat, V=v*coslat
     U = vars.scratch.a
     V = vars.scratch.b
 
     scratch_memory = vars.scratch.transform_memory
-    S = model.spectral_transform
 
     transform!(vor_grid, vor, scratch_memory, S)    # get vorticity on grid from spectral vor
     transform!(div_grid, div, scratch_memory, S)    # get divergence on grid from spectral div
@@ -88,12 +88,12 @@ function SpeedyTransforms.transform!(
     transform!(v_grid, V, scratch_memory, S, unscale_coslat = true)
 
     for (name, tracer) in model.tracers
-        tracer_var = get_step(vars.prognostic.tracers[name], lf)  # tracer at leapfrog step lf
+        tracer_var = get_prognostic_step(vars.prognostic.tracers[name], time_stepping, S)
         tracer.active && transform!(vars.grid.tracers[name], tracer_var, scratch_memory, S)
     end
 
     # transform random pattern for random process unless random_process=nothing
-    transform!(vars, lf, model.random_process, S)
+    transform!(vars, model.random_process, S)
 
     return nothing
 end

@@ -80,7 +80,14 @@ This method is for a 3D field (horizontal + vertical) with steps in the 4rd dime
 
 # get_step depending on time stepping method
 @inline get_step(var, ::AbstractTimeStepper) = get_step(var, 1)
+
+"""$(TYPEDSIGNATURES) Method to be extended by time steppers to customize
+for every model component which step to use."""
 @inline get_step(var, ::AbstractTimeStepper, ::AbstractModelComponent) = get_step(var, 1)
+
+"""$(TYPEDSIGNATURES) Method to be extended by time steppers to customize
+for every model component which step to use."""
+@inline get_step(var, ::AbstractTimeStepper, ::SpeedyTransforms.AbstractSpectralTransform) = get_step(var, 1)
 
 @inline get_prognostic_step(var, TS::AbstractTimeStepper, args...) = get_step(var, TS, args...)
 @inline get_tendency_step(var, TS::AbstractTimeStepper, args...) = get_step(var, TS, args...)

@@ -14,6 +14,7 @@ end
 export NoOrography
 
 """Orography with zero height in `orography` and zero surface geopotential `surface_geopotential`.
+Will be initialized (back) to zero at initialize!.
 $(TYPEDFIELDS)"""
 @kwdef struct NoOrography{G, S} <: AbstractOrography
     "[OPTION] height [m] on grid-point space."
@@ -32,7 +33,8 @@ end
 
 export ManualOrography
 
-"""Orography with zero height in `orography` and zero surface geopotential `surface_geopotential`.
+"""Orography with (initially) zero height in `orography` and zero surface geopotential `surface_geopotential`.
+Will not be changed at initialize! so can be changed at any time with set!
 $(TYPEDFIELDS)"""
 @kwdef struct ManualOrography{G, S} <: AbstractOrography
     "[OPTION] height [m] on grid-point space."

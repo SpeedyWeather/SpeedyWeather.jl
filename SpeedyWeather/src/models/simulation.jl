@@ -97,6 +97,7 @@ function initialize!(
     # only initialize output and callbacks just before the simulation starts
     initialize!(model.output, variables, model)
     initialize!(model.callbacks, variables, model)
+    initialize!(model.feedback, variables, model)
     return simulation
 end
 

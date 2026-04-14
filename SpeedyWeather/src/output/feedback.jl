@@ -51,7 +51,9 @@ end
 """
 $(TYPEDSIGNATURES)
 Initializes the a `Feedback` struct."""
-function initialize!(feedback::Feedback, clock::Clock, model::AbstractModel)
+function initialize!(feedback::Feedback, variables::Variables, model::AbstractModel)
+    (; clock) = variables.prognostic
+
     # set to false to recheck for NaNs
     feedback.nans_detected = false
 
@@ -84,7 +86,7 @@ function initialize!(feedback::Feedback, clock::Clock, model::AbstractModel)
 end
 
 # fallback if feedback is set to nothing
-initialize!(::Nothing, clock::Clock, model::AbstractModel) = nothing
+initialize!(::Nothing, ::Variables, model::AbstractModel) = nothing
 
 progress!(feedback::Feedback) = ProgressMeter.next!(feedback.progress_meter)
 
