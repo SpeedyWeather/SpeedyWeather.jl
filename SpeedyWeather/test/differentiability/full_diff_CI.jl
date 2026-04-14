@@ -32,7 +32,7 @@ using SpeedyWeather, Enzyme, FiniteDifferences, Test
     dvars.prognostic.pressure .= 1 + im
 
     # this is currently failing in v1.12
-    autodiff(set_runtime_activity!(Reverse), SpeedyWeather.timestep!, Const, Duplicated(vars, dvars), Const(dt), Duplicated(model, make_zero(model)), Const(lf1), Const(lf2))
+    autodiff(set_runtime_activity(Reverse), SpeedyWeather.timestep!, Const, Duplicated(vars, dvars), Const(dt), Duplicated(model, make_zero(model)), Const(lf1), Const(lf2))
     
     #autodiff(set_runtime_activity(Reverse), SpeedyWeather.timestep!, Const, Duplicated(vars, dvars), Const(dt), Const(model), Const(lf1), Const(lf2))
     @test sum(to_vec(dvars)[1]) != 0
