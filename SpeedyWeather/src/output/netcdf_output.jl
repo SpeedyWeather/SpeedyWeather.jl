@@ -369,13 +369,13 @@ function output!(
     try
         v = path(variable, simulation)
         ts = simulation.model.time_stepping
-        has_step = (is3D(variable) && ndims(v) == 3) ||
-                    (is2D(variable) && ndims(v) == 2)
-        v = has_step ? get_prognostic_step(v, ts, output) : v
 
-        # TODO somehow this throws an error with a view
-        # raw = on_architecture(CPU(), v)
-        RingGrids.interpolate!(var, v, output.interpolator)
+        # decide on existence of step dimension by comparing dimensionality
+        has_step = (is3D(variable) && ndims(v) == 3) ||     # 2D/3D variables have 1/2 array dimensions respectively 
+                    (is2D(variable) && ndims(v) == 2)       # as the horizontal dim is unravelled, then +1 for step
+        v = has_step ? get_prognostic_step(v, ts, output) : v
+        raw = on_architecture(CPU(), v)
+        RingGrids.interpolate!(var, raw, output.interpolator)
     catch FieldError
         var .= variable.missing_value
     end

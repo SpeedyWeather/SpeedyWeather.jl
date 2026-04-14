@@ -5,32 +5,35 @@ abstract type NCycleLorenzVariant end
 
 """Version A: weights w_k = N/(N-k) for k=1,...,N-1; w_0 = 1"""
 struct NCycleLorenzA <: NCycleLorenzVariant end
+@inline subcycles(::NCycleLorenzA) = 1
 
 """Version B: weights w_k = N/k for k=1,...,N-1; w_0 = 1"""
 struct NCycleLorenzB <: NCycleLorenzVariant end
+@inline subcycles(::NCycleLorenzB) = 1
 
 """Version AB: alternates A and B every N steps"""
 struct NCycleLorenzAB <: NCycleLorenzVariant end
+@inline subcycles(::NCycleLorenzAB) = 2         # one cycle of A one of B
 
 """Version ABBA: uses A-B-B-A sequence (only for N=4, provides 4th order accuracy)"""
 struct NCycleLorenzABBA <: NCycleLorenzVariant end
-
+@inline subcycles(::NCycleLorenzABBA) = 4       # 4 cycles, A, B, B, then A again
 
 abstract type AbstractNCycleLorenz <: AbstractTimeStepper end
 
 """
-    NCycleLorenz{NF, V} <: AbstractTimeStepper
+    NCycleLorenz{NF, V, ...} <: AbstractTimeStepper
 
 A semi-implicit Lorenz N-cycle time integration scheme following Hotta et al. (2016).
 
 # Algorithm (per substep of a cycle)
-1. G = w*F_E(x) + (1-w)*G     (weighted tendency accumulation)
-2. dx = (I - α*Δt*L_I)^(-1) * (G + L_I*x)  (implicit solve)
-3. x = x + Δt*dx              (state update)
+1. G = w*F_E(x) + (1-w)*G                   (weighted tendency accumulation)
+2. dx = (I - α*Δt*L_I)^(-1) * (G + L_I*x)   (implicit solve)
+3. x = x + Δt*dx                            (state update)
 $(TYPEDFIELDS)
 """
 mutable struct NCycleLorenz{NF, V, IntType, S, MS, B} <: AbstractNCycleLorenz
-    "[OPTION] Number of steps N in a cycles (3 or 4 recommended, 4 is more stable)"
+    "[OPTION] Number of steps N in a cycle (3 or 4 recommended, 4 is more stable)"
     steps::IntType
 
     "[OPTION] Variant: NCycleLorenzA() (default), B, AB, or ABBA"
@@ -108,20 +111,28 @@ function weight_coefficient(L::NCycleLorenz{NF}, clock::Clock) where {NF}
     return weight_coefficient(NF, L.variant, clock.timestep_counter, L.steps)
 end
 
-# Type-stable versions with explicit NF
-@inline function weight_coefficient(::Type{NF}, ::NCycleLorenzA, i::Integer, N::Integer) where {NF}
-    k = mod(i, N)   # current substep
+"""$(TYPEDSIGNATURES) Weight coefficient of the A-variant of the N-Cycle Lorenz time stepping scheme."""
+@inline function weight_coefficient(::Type{NF}, V::NCycleLorenzA, i::Integer, N::Integer) where {NF}
+    k = mod(i, subcycles(V) * N)   # current substep
     return k == 0 ? one(NF) : convert(NF, N) / convert(NF, N - k)
 end
 
-@inline function weight_coefficient(::Type{NF}, ::NCycleLorenzB, i::Integer, N::Integer) where {NF}
-    k = mod(i, N)   # current substep
+"""$(TYPEDSIGNATURES) Weight coefficient of the A-variant of the N-Cycle Lorenz time stepping scheme."""
+@inline function weight_coefficient(::Type{NF}, V::NCycleLorenzB, i::Integer, N::Integer) where {NF}
+    k = mod(i, subcycles(V) * N)   # current substep
     return k == 0 ? one(NF) : convert(NF, N) / convert(NF, k)
 end
 
-@inline function weight_coefficient(::Type{NF}, ::NCycleLorenzAB, i::Integer, N::Integer) where {NF}
-    k = mod(i, 2N)   # current substep
+"""$(TYPEDSIGNATURES) Weight coefficient of the A-variant of the N-Cycle Lorenz time stepping scheme."""
+@inline function weight_coefficient(::Type{NF}, V::NCycleLorenzAB, i::Integer, N::Integer) where {NF}
+    k = mod(i, subcycles(V) * N)   # current substep
     variant = k < N ? NCycleLorenzA() : NCycleLorenzB()
+    return weight_coefficient(NF, variant, i, N)
+end
+
+@inline function weight_coefficient(::Type{NF}, V::NCycleLorenzABBA, i::Integer, N::Integer) where {NF}
+    k = mod(i, subcycles(V) * N)   # current substep across all subcycles
+    variant = k < N || k >= (subcycles(V) - 1) * N ? NCycleLorenzA() : NCycleLorenzB()
     return weight_coefficient(NF, variant, i, N)
 end
 
