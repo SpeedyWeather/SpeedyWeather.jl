@@ -1,6 +1,8 @@
 using KernelAbstractions
-import SpeedyWeather: on_architecture, CPU, launch!, SpectralWorkOrder, RingGridWorkOrder, LinearWorkOrder
+
 @testset "KernelAbstractions tests" begin
+
+    import SpeedyWeather.SpeedyWeatherInternals.KernelLaunching: launch!, LinearWorkOrder, SpectralWorkOrder, RingGridWorkOrder
 
     # To-Do write tests for each type of dims_type in the kernel launching util,
     # the tests currently below will be removed when the KA becomes the only one
@@ -21,7 +23,7 @@ import SpeedyWeather: on_architecture, CPU, launch!, SpectralWorkOrder, RingGrid
         N = 2   # number of matrices
         NF = Float32
 
-        arch = SpeedyWeather.CPU()
+        arch = Architectures.CPU()
 
         # Create test arrays
         B = on_architecture(arch, rand(LowerTriangularArray{Complex{NF}}, L, M, N))
@@ -51,7 +53,7 @@ import SpeedyWeather: on_architecture, CPU, launch!, SpectralWorkOrder, RingGrid
         nlayers = 5
         NF = Float32
 
-        arch = SpeedyWeather.CPU()
+        arch = Architectures.CPU()
 
         # Create test arrays
         B = on_architecture(arch, rand(Grid{NF}, nlat_half, nlayers))
@@ -80,7 +82,7 @@ import SpeedyWeather: on_architecture, CPU, launch!, SpectralWorkOrder, RingGrid
         npoints = 20
         NF = Float32
 
-        arch = SpeedyWeather.CPU()
+        arch = Architectures.CPU()
 
         # Create test arrays
         B = on_architecture(arch, rand(NF, npoints))

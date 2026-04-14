@@ -149,7 +149,7 @@ end
     @test haskey(ds, "mslp")    # but this variable
 
     # Test reasonable scale for mean
-    p₀ = model.atmosphere.pressure_reference / 100      # Pa -> hPa
+    p₀ = model.atmosphere.reference_pressure / 100      # Pa -> hPa
     mslp = ds["mslp"].var[:, :, end]    # variable at last time step `.var` to read the raw data ignoring any mask
 
     # should be within ~800 to ~1200hPa
@@ -166,7 +166,7 @@ end
     @test maximum(abs.(ds["v10"].var[:, :, end])) < maximum(abs.(ds["u"].var[:, :, end, end]))
 
     ## surface temperature should be within 60-130% of
-    T₀ = model.atmosphere.temperature_reference     # in K
+    T₀ = model.atmosphere.reference_temperature     # in K
     Tsurf = ds["tsurf"].var[:, :, end] .+ 273.15    # last timestep from ˚C to K
     @test all(0.6 .< (Tsurf ./ T₀) .< 1.3)
 end
@@ -184,10 +184,10 @@ end
     model_new = PrimitiveDryModel(spectral_grid; initial_conditions)
     simulation_new = initialize!(model_new)
 
-    progn_old = simulation.prognostic_variables
-    progn_new = simulation_new.prognostic_variables
+    progn_old = simulation.variables.prognostic
+    progn_new = simulation_new.variables.prognostic
 
-    for varname in (:vor, :div, :temp, :pres)
+    for varname in (:vorticity, :divergence, :temperature, :pressure)
         var_old = getfield(progn_old, varname)
         var_new = getfield(progn_new, varname)
         @test all(var_old .== var_new)
@@ -200,17 +200,17 @@ end
     spectral_grid = SpectralGrid()
     model = PrimitiveDryModel(spectral_grid)
     simulation = initialize!(model)
-    add!(model, :restart_file => RestartFile(path = tmp_output_path, write_only_with_output = false, filename = "myrestart.jld2"))
+    add!(model, :restart_file => WriteVariablesRestartFile(path = tmp_output_path, write_only_with_output = false, filename = "myrestart.jld2"))
     run!(simulation, period = Day(1))
 
     initial_conditions = StartFromFile(run_folder = tmp_output_path, filename = "myrestart.jld2")
     model_new = PrimitiveDryModel(spectral_grid; initial_conditions)
     simulation_new = initialize!(model_new)
 
-    progn_old = simulation.prognostic_variables
-    progn_new = simulation_new.prognostic_variables
+    progn_old = simulation.variables.prognostic
+    progn_new = simulation_new.variables.prognostic
 
-    for varname in (:vor, :div, :temp, :pres)
+    for varname in (:vorticity, :divergence, :temperature, :pressure)
         var_old = getfield(progn_old, varname)
         var_new = getfield(progn_new, varname)
         @test all(var_old .== var_new)
@@ -235,7 +235,7 @@ end
     simulation = initialize!(model)
     run!(simulation, output = true; period = Day(1))
 
-    progn = simulation.prognostic_variables
+    progn = simulation.variables.prognostic
     tmp_read_path = joinpath(model.output.run_path, model.output.filename)
     t = NCDataset(tmp_read_path)["time"][:]
     @test t == manual_time_axis(model.output.startdate, model.time_stepping.Δt_millisec, progn.clock.n_timesteps)
@@ -248,7 +248,7 @@ end
     run!(simulation, output = true; period = Day(1))
     t = SpeedyWeather.load_trajectory("time", model)
     @test all(y -> y == diff(t)[1], diff(t)) # all elements equal
-    @test diff(t)[1] == Minute(70)
+    @test diff(t)[1] == Millisecond(Minute(70))
 
     # this is a nonsense simulation with way too large timesteps, but it's here to test the time axis output
     # for future tests: This simulation blows up because of too large time steps but only a warning is thrown
@@ -263,7 +263,7 @@ end
     model.implicit.reinitialize = false
     run!(simulation, output = true, period = Day(365000))
 
-    progn = simulation.prognostic_variables
+    progn = simulation.variables.prognostic
     tmp_read_path = joinpath(model.output.run_path, model.output.filename)
     t = NCDataset(tmp_read_path)["time"][:]
     @test t == manual_time_axis(model.output.startdate, model.time_stepping.Δt_millisec, progn.clock.n_timesteps)

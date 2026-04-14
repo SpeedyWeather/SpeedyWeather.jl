@@ -1,38 +1,34 @@
-function timestep_oop!(progn_new::PrognosticVariables, progn_old::PrognosticVariables, diagn, dt, model, lf1 = 2, lf2 = 2)
-    copy!(progn_new, progn_old)
-    SpeedyWeather.timestep!(progn_new, diagn, dt, model, lf1, lf2)
+function timestep_oop!(vars_new::Variables, vars_old::Variables, dt, model, lf1 = 2, lf2 = 2)
+    copy!(vars_new, vars_old)
+    SpeedyWeather.timestep!(vars_new, dt, model, lf1, lf2)
     return nothing
 end
 
-function timestep_oop!(progn_new::PrognosticVariables, progn_old::PrognosticVariables, diagn, dt, model, p::ComponentVector, lf1 = 2, lf2 = 2)
-    copy!(progn_new, progn_old)
+function timestep_oop!(vars_new::Variables, vars_old::Variables, dt, model, p::ComponentVector, lf1 = 2, lf2 = 2)
+    copy!(vars_new, vars_old)
     new_model = SpeedyWeather.reconstruct(model, p)
-    SpeedyWeather.timestep!(progn_new, diagn, dt, new_model, lf1, lf2)
+    SpeedyWeather.timestep!(vars_new, dt, new_model, lf1, lf2)
     return nothing
 end
 
 # for FiniteDifferences.jl, we need to copy all inputs that are mutated
 # because this function is called many times by FiniteDifferences
-function timestep_oop(progn, diagn, dt, model, lf1 = 2, lf2 = 2)
+function timestep_oop(vars, dt, model, lf1 = 2, lf2 = 2)
 
-    progn_copy = deepcopy(progn)
-    diagn_copy = deepcopy(diagn)
+    vars_copy = deepcopy(vars)
+    model_copy = deepcopy(model) # just to be safe, as we have some temporary memory in there as well
 
-    model_copy = deepcopy(model) # just to be save, as we have some temporary memory in there as well
-
-    SpeedyWeather.timestep!(progn_copy, diagn_copy, dt, model_copy, lf1, lf2)
-    return progn_copy
+    SpeedyWeather.timestep!(vars_copy, dt, model_copy, lf1, lf2)
+    return vars_copy
 end
 
-function timestep_oop(progn, diagn, dt, model, p::ComponentVector, lf1 = 2, lf2 = 2)
+function timestep_oop(vars, dt, model, p::ComponentVector, lf1 = 2, lf2 = 2)
 
-    progn_copy = deepcopy(progn)
-    diagn_copy = deepcopy(diagn)
-
-    model_copy = deepcopy(model) # just to be save, as we have some temporary memory in there as well
+    vars_copy = deepcopy(vars)
+    model_copy = deepcopy(model) # just to be safe, as we have some temporary memory in there as well
 
     new_model = SpeedyWeather.reconstruct(model_copy, p)
 
-    SpeedyWeather.timestep!(progn_copy, diagn_copy, dt, new_model, lf1, lf2)
-    return progn_copy
+    SpeedyWeather.timestep!(vars_copy, dt, new_model, lf1, lf2)
+    return vars_copy
 end

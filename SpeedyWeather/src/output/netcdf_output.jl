@@ -1,6 +1,3 @@
-abstract type AbstractOutput <: AbstractModelComponent end
-abstract type AbstractOutputVariable end
-
 # default number format for output
 const DEFAULT_OUTPUT_NF = Float32
 const DEFAULT_OUTPUT_DT = Hour(6)
@@ -21,6 +18,8 @@ $(TYPEDFIELDS)"""
         Field2D,
         Field3D,
         Interpolator,
+        DT,
+        S,
     } <: AbstractOutput
 
     # FILE OPTIONS
@@ -41,11 +40,8 @@ $(TYPEDFIELDS)"""
     "[OPTION] run numbers digits"
     run_digits::Int = 4
 
-    "[DERIVED] folder name where data is stored, determined at initialize!"
-    run_folder::String = ""
-
-    "[DERIVED] full path to folder where data is stored, determined at initialize!"
-    run_path::String = ""
+    "[DERIVED] shared output writer state (run folder, counters, output frequency)"
+    core::OutputWriterCore = OutputWriterCore()
 
     "[OPTION] Overwrite an existing run folder?"
     overwrite::Bool = false
@@ -64,18 +60,13 @@ $(TYPEDFIELDS)"""
 
     # WHAT/WHEN OPTIONS
     "[DERIVD] start date of the simulation, used for time dimension in netcdf file"
-    startdate::DateTime = DateTime(2000, 1, 1)
+    startdate::DT = DateTime(2000, 1, 1)
 
     "[OPTION] output frequency, time step"
-    output_dt::Second = Second(DEFAULT_OUTPUT_DT)
+    output_dt::S = Second(DEFAULT_OUTPUT_DT)
 
     "[OPTION] dictionary of variables to output, e.g. u, v, vor, div, pres, temp, humid"
     variables::OUTPUT_VARIABLES_DICT = OutputVariablesDict()
-
-    # TIME STEPS AND COUNTERS (initialize later)
-    output_every_n_steps::Int = 0           # output frequency
-    timestep_counter::Int = 0               # time step counter
-    output_counter::Int = 0                 # output step counter
 
     # the netcdf file to be written into, will be created
     netcdf_file::Union{NCDataset, Nothing} = nothing
@@ -92,14 +83,14 @@ end
 $(TYPEDSIGNATURES)
 Constructor for NetCDFOutput based on `S::SpectralGrid` and optionally
 the `Model` type (e.g. `ShallowWater`, `PrimitiveWet`) as second positional argument. In case a 
-non-default number of soil layers is used, it also needs the respective `LandGeometry` to allocate those outputs
+non-default number of soil layers is used, it also needs the respective `nlayers_soil` to allocate those outputs.
 The output grid is optionally determined by keyword arguments `output_Grid` (its type, full grid required),
 `nlat_half` (resolution) and `output_NF` (number format). By default, uses the full grid
 equivalent of the grid and resolution used in `SpectralGrid` `S`."""
 function NetCDFOutput(
         SG::SpectralGrid,
-        Model::Type{<:AbstractModel} = Barotropic,
-        land_geometry::LandGeometry = LandGeometry(SG, nlayers = DEFAULT_NLAYERS_SOIL);
+        Model::Type{<:AbstractModel} = Barotropic;
+        nlayers_soil = DEFAULT_NLAYERS_SOIL,
         output_grid::AbstractFullGrid = on_architecture(CPU(), RingGrids.full_grid_type(SG.grid)(SG.grid.nlat_half)),
         output_NF::DataType = DEFAULT_OUTPUT_NF,
         output_dt::Period = Second(DEFAULT_OUTPUT_DT),  # only needed for dispatch
@@ -114,7 +105,6 @@ function NetCDFOutput(
 
     # CREATE FULL FIELDS TO INTERPOLATE ONTO BEFORE WRITING DATA OUT
     (; nlayers) = SG
-    nlayers_soil = land_geometry.nlayers
 
     field2D = Field(output_NF, output_grid)
     field3D = Field(output_NF, output_grid, nlayers)
@@ -134,22 +124,30 @@ function NetCDFOutput(
 end
 
 function Base.show(io::IO, output::NetCDFOutput{F}) where {F}
-    println(io, "NetCDFOutput{$F}")
-    println(io, "├ status: $(output.active ? "active" : "inactive/uninitialized")")
-    println(io, "├ write restart file: $(output.write_restart) (if active)")
-    println(io, "├ interpolator: $(typeof(output.interpolator))")
-    println(io, "├ path: $(joinpath(output.run_path, output.filename)) (overwrite=$(output.overwrite))")
-    println(io, "├ frequency: $(output.output_dt)")
-    print(io, "└┐ variables:")
+
+    F_str = string("{", F, "}")
+    type_param_str = length(F_str) > 30 ? string(first(F_str, 30), "...}") : F_str
+    active = output.active ? "active" : "inactive/uninitialized"
+
+    println(io, styled"{warning:NetCDFOutput}{note:$type_param_str}")
+    println(io, styled"├ {info:status}: $active")
+    println(io, styled"├ {info:write restart file} = $(output.write_restart) (if active)")
+
+    interp_type_str = string(typeof(output.interpolator))
+    interp_type_str_short = length(interp_type_str) > 70 ? string(first(interp_type_str, 70), "...}") : interp_type_str
+
+    println(io, styled"├ {info:interpolator}::$interp_type_str_short")
+    println(io, styled"├ {info:path} = $(joinpath(output.run_path, output.filename)) (overwrite=$(output.overwrite))")
+    println(io, styled"├ {info:frequency} = $(output.output_dt)")
+    print(io, styled"└ {info:variables}")
     nvars = length(output.variables)
     for (i, (key, var)) in enumerate(output.variables)
-        print(io, "\n $(i == nvars ? "└" : "├") $key: $(var.long_name) [$(var.unit)]")
+        print(io, "\n  $(i == nvars ? "└" : "├") ", styled"{magenta:$key}: $(var.long_name) ", styled"{note:[$(var.unit)]}")
     end
-    return
+    return nothing
 end
 
-"""
-$(TYPEDSIGNATURES)
+"""$(TYPEDSIGNATURES)
 Add `outputvariables` to a dictionary defining the variables subject to NetCDF output."""
 function add!(D::OUTPUT_VARIABLES_DICT, outputvariables::AbstractOutputVariable...)
     for outputvariable in outputvariables   # loop over all variables in arguments
@@ -234,40 +232,28 @@ function set!(output::AbstractOutput; active, reset_path = true)
     return nothing
 end
 
+# fallback for nothing output
+set!(::Nothing; active, reset_path = true) = nothing
+
 """$(TYPEDSIGNATURES)
 Initialize NetCDF `output` by creating a netCDF file and storing the initial conditions
-of `diagn` (and `progn`). To be called just before the first timesteps."""
+of `vars`. To be called just before the first timesteps."""
 function initialize!(
         output::NetCDFOutput,
-        feedback::AbstractFeedback,
-        progn::PrognosticVariables,
-        diagn::DiagnosticVariables,
+        vars::Variables,
         model::AbstractModel,
     )
     output.active || return nothing             # exit immediately for no output
 
     # only checked for models that have a land component
     if hasfield(typeof(model), :land) && !isnothing(model.land)
-        @assert get_soil_layers(model) == size(output.field3Dland, 2) "$(size(output.field3Dland, 2)) soil layers initialized for output, but $(get_soil_layers(model)) soil layers initialized for model. Please construct NetCDFOutput with the same LandGeometry as the model."
+        @assert get_nlayers(model.land) == size(output.field3Dland, 2) "$(size(output.field3Dland, 2))" *
+            " soil layers initialized for output, but $(get_nlayers(model.land)) soil layers initialized for model." *
+            " Please construct NetCDFOutput with the same `nlayers_soil` as the model."
     end
 
-    # GET RUN ID, CREATE FOLDER
-    # get new id only if not already specified
-    determine_run_folder!(output)
-    create_run_folder!(output)
-
-    # OUTPUT FREQUENCY
-    output.output_every_n_steps = max(
-        1, round(
-            Int,
-            Millisecond(output.output_dt).value / model.time_stepping.Δt_millisec.value
-        )
-    )
-    output.output_dt = Second(round(Int, output.output_every_n_steps * model.time_stepping.Δt_sec))
-
-    # RESET COUNTERS
-    output.timestep_counter = 0         # time step counter
-    output.output_counter = 0           # output step counter
+    # SHARED INITIALIZATION (run folder, output frequency, counters, callbacks)
+    initialize!(output.core, output, model)
 
     # CREATE NETCDF FILE, vector of NcVars for output
     (; run_path, filename) = output
@@ -285,12 +271,13 @@ function initialize!(
             "standard_name" => "time", "calendar" => "proleptic_gregorian"
         )
     )
-    output!(output, progn.clock.time)   # write initial time
+    output!(output, vars.prognostic.clock.time)   # write initial time
 
     # DEFINE NETCDF DIMENSIONS SPACE
+    # explictly move to CPU to avoid issues with Reactant and on GPU
     lond = get_lond(output.field2D)
     latd = get_latd(output.field2D)
-    σ = model.geometry.σ_levels_full
+    σ = on_architecture(CPU(), model.geometry.σ_levels_full)
     soil_indices = collect(1:get_soil_layers(model))
 
     defVar(dataset, "lon", lond, ("lon",), attrib = Dict("units" => "degrees_east", "long_name" => "longitude"))
@@ -301,20 +288,14 @@ function initialize!(
     # VARIABLES, define every output variable in the netCDF file and write initial conditions
     for (key, var) in output.variables
         define_variable!(dataset, var, eltype(output.field2D))
-        output!(output, var, Simulation(progn, diagn, model))
+        output!(output, var, Simulation(vars, model))
     end
 
-    # CALLBACKS
-    # add ParametersTxt callback
-    output.write_parameters_txt && add!(model.callbacks, :parameters_txt => ParametersTxt())
-
-    # add ProgressTxt callback
-    output.write_progress_txt && add!(model.callbacks, :progress_txt => ProgressTxt())
-
-    # add RestartFile callback
-    output.write_restart && add!(model.callbacks, :restart_file => RestartFile())
     return nothing
 end
+
+# fallback for nothing output
+initialize!(::Nothing, ::Union{AbstractFeedback, Nothing}, ::Variables, ::AbstractModel) = nothing
 
 Base.close(output::NetCDFOutput) = NCDatasets.close(output.netcdf_file)
 Base.close(::Nothing) = nothing     # in case of no netCDF output nothing to close
@@ -340,19 +321,22 @@ end
 
 """
 $(TYPEDSIGNATURES)
-Writes the variables from `progn` or `diagn` of time step `i` at time `time` into `output.netcdf_file`.
+Writes the variables from `vars` of time step `i` at time `time` into `output.netcdf_file`.
 Simply escapes for no netcdf output or if output shouldn't be written on this time step.
 Interpolates onto output grid and resolution as specified in `output`, converts to output
 number format, truncates the mantissa for higher compression and applies lossless compression."""
 function output!(output::AbstractOutput, simulation::AbstractSimulation)
-    output.timestep_counter += 1                                        # increase counter
-    (; active, output_every_n_steps, timestep_counter) = output
-    active || return nothing                                            # escape immediately for no netcdf output
-    timestep_counter % output_every_n_steps == 0 || return nothing      # escape if output not written on this step
+    output!(output.core, output) || return nothing
 
-    (; clock) = simulation.prognostic_variables
-    output!(output, clock.time)                                         # increase counter write time
-    return output!(output, output.variables, simulation)                       # write variables
+    (; clock) = simulation.variables.prognostic
+    output!(output, clock.time)                                         # increase counter, write time
+    output!(output, output.variables, simulation)                       # write variables
+    return output
+end
+
+# fallback for nothing output
+function output!(::Nothing, ::AbstractSimulation)
+    return nothing
 end
 
 get_indices(i, variable::AbstractOutputVariable) = get_indices(i, Val.(variable.dims_xyzt)...)
@@ -392,7 +376,7 @@ function output!(
     # unscale if variable.unscale == true and exists
     if hasproperty(variable, :unscale)
         if variable.unscale
-            unscale!(var, simulation.diagnostic_variables.scale[])
+            scale!(var, inv(simulation.variables.prognostic.scale[]))
         end
     end
 
@@ -443,15 +427,6 @@ function output!(
     return
 end
 
-function Base.show(io::IO, outputvariable::AbstractOutputVariable)
-    print(io, "$(typeof(outputvariable)) <: SpeedyWeather.AbstractOutputVariable")
-    for field in propertynames(outputvariable)
-        value = getfield(outputvariable, field)
-        print(io, "\n├ $field::$(typeof(value)) = $value")
-    end
-    return
-end
-
 function finalize!(
         output::AbstractOutput,
         simulation::AbstractSimulation,
@@ -463,6 +438,8 @@ function finalize!(
     end
     return close(output)
 end
+
+finalize!(::Nothing, ::AbstractSimulation) = nothing
 
 # default finalize method for output variables
 function finalize!(
@@ -542,3 +519,13 @@ function load_trajectory(var_name::Union{Symbol, String}, model::AbstractModel)
     @assert model.output.active "Output is turned off"
     return Array(NCDataset(get_full_output_file_path(model.output))[string(var_name)])
 end
+
+"""
+$(TYPEDSIGNATURES)
+Returns the output time step of the model `M`."""
+function get_output_dt(output::AbstractOutput)
+    return output.output_dt
+end
+
+# Fallback for when output is nothing
+get_output_dt(::Nothing) = Millisecond(0)

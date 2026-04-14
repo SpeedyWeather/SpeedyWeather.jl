@@ -5,27 +5,27 @@ General transform for `random processes <: AbstractRandomProcess`.
 Takes the spectral `random_pattern` in the prognostic variables
 and transforms it to spectral space in `diagn.grid.random_pattern`."""
 function SpeedyTransforms.transform!(
-        diagn::DiagnosticVariables,
-        progn::PrognosticVariables,
+        vars::Variables,
         lf::Integer,
         random_process::AbstractRandomProcess,
         spectral_transform::AbstractSpectralTransform,
     )
-    grid = diagn.grid.random_pattern
-    spec = progn.random_pattern
-    transform!(grid, spec, diagn.dynamics.scratch_memory, spectral_transform)
+    pattern = vars.prognostic.random_pattern
+    pattern_grid = vars.grid.random_pattern
+    scratch_memory = vars.scratch.transform_memory
+    transform!(pattern_grid, pattern, scratch_memory, spectral_transform)
 
-    return if :clamp in fieldnames(typeof(random_process))
-        clamp!(grid, random_process.clamp...)
+    if :clamp in fieldnames(typeof(random_process))
+        clamp!(pattern_grid, random_process.clamp...)
     end
+    return nothing
 end
 
 """$(TYPEDSIGNATURES)
 `random_process=nothing` does not need to transform any random pattern from
 spectral to grid space."""
 function SpeedyTransforms.transform!(
-        diagn::DiagnosticVariables,
-        progn::PrognosticVariables,
+        vars::Variables,
         lf::Integer,
         random_process::Nothing,
         spectral_transform::AbstractSpectralTransform,
@@ -33,7 +33,7 @@ function SpeedyTransforms.transform!(
     return nothing
 end
 
-random_process!(progn::PrognosticVariables, process::Nothing) = nothing
+random_process!(::Variables, process::Nothing) = nothing
 
 export SpectralAR1Process
 
@@ -43,14 +43,14 @@ independently. Transformed after every time step to grid space with a
 `clamp` applied to limit extrema. For reproducability `seed` can be
 provided and an independent `random_number_generator` is used
 that is reseeded on every `initialize!`. Fields are: $(TYPEDFIELDS)"""
-@kwdef struct SpectralAR1Process{NF, VectorType} <: AbstractRandomProcess
-    trunc::Int
+@kwdef struct SpectralAR1Process{NF, VectorType, S, RNG, IntType} <: AbstractRandomProcess
+    trunc::IntType
 
     "[OPTION] Time scale of the AR1 process"
     time_scale::Second = Hour(6)
 
     "[OPTION] Wavenumber of the AR1 process"
-    wavenumber::Int = 12
+    wavenumber::IntType = 12
 
     "[OPTION] Standard deviation of the AR1 process"
     standard_deviation::NF = 1 / 3
@@ -59,10 +59,10 @@ that is reseeded on every `initialize!`. Fields are: $(TYPEDFIELDS)"""
     clamp::NTuple{2, NF} = (-1, 1)
 
     "[OPTION] Random number generator seed, 0=randomly seed from Julia's GLOBAL_RNG"
-    seed::Int = 0
+    seed::S = 0
 
     "Independent random number generator for this random process"
-    random_number_generator::Random.Xoshiro = Random.Xoshiro(seed)
+    random_number_generator::RNG = Random.Xoshiro(seed)
 
     "Precomputed auto-regressive factor [1], function of time scale and model time step"
     autoregressive_factor::Base.RefValue{NF} = Ref(zero(NF))
@@ -72,7 +72,18 @@ that is reseeded on every `initialize!`. Fields are: $(TYPEDFIELDS)"""
 end
 
 # generator function
-SpectralAR1Process(SG::SpectralGrid; kwargs...) = SpectralAR1Process{SG.NF, SG.VectorType}(trunc = SG.trunc; kwargs...)
+function SpectralAR1Process(SG::SpectralGrid; kwargs...)
+    RNG = haskey(kwargs, :random_number_generator) ? typeof(kwargs[:random_number_generator]) : typeof(Random.Xoshiro())
+    SeedType = haskey(kwargs, :seed) ? typeof(kwargs[:seed]) : Int
+    return SpectralAR1Process{SG.NF, SG.VectorType, SeedType, RNG, typeof(SG.trunc)}(trunc = SG.trunc; kwargs...)
+end
+
+function variables(::SpectralAR1Process)
+    return (
+        PrognosticVariable(:random_pattern, Spectral2D(), desc = "Random pattern for the random process", units = "1"),
+        GridVariable(:random_pattern, Grid2D(), desc = "Random pattern for the random process", units = "1"),
+    )
+end
 
 function initialize!(
         process::SpectralAR1Process,
@@ -109,11 +120,11 @@ function initialize!(
 end
 
 function random_process!(
-        progn::PrognosticVariables,
+        vars::Variables,
         process::SpectralAR1Process{NF},
     ) where {NF}
 
-    (; random_pattern) = progn
+    (; random_pattern) = vars.prognostic
     lmax, mmax = size(random_pattern, OneBased, as = Matrix)  # max degree l, order m of harmonics (1-based)
 
     a = process.autoregressive_factor[]
@@ -121,7 +132,7 @@ function random_process!(
     s = convert(NF, 2 / sqrt(2))              # to scale: std(real(randn(Complex))) = √2/2 to 1
 
     lm = 0
-    return @inbounds for m in 1:mmax
+    @inbounds for m in 1:mmax
         for l in m:lmax
             lm += 1
 
@@ -134,4 +145,5 @@ function random_process!(
             random_pattern[lm] += ξ * r       # noise term
         end
     end
+    return nothing
 end

@@ -17,7 +17,7 @@ CairoMakie or GtkMakie to be loaded at the time of calling this function.
 
 # Arguments
 - `nc_file::NCDataset`: NetCDF dataset containing SpeedyWeather simulation data
-- `variable::String = "temp"`: Variable to animate (e.g., "temp", "pres", "vor", "u", "v", "humid")
+- `variable::String = "temp"`: Variable to animate (e.g., "temp", "pres", "vorticity", "u", "v", "humid")
 - `level::Int = 1`: Vertical level to plot (for 3D variables)
 - `transient_timesteps::Int = 0`: Number of timesteps to skip at the beginning of the animation
 - `output_file::String = "animation.mp4"`: Path to save the animation

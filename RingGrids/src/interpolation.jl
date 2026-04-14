@@ -7,12 +7,13 @@ struct GridGeometry{
         VectorType,
         VectorIntType,
         VectorRange,
+        IntType,
     } <: AbstractGridGeometry
     grid::Grid                  # grid, e.g. FullGaussianGrid
 
-    nlat_half::Int              # number of latitude rings on one hemisphere (Eq. incl)
-    nlat::Int                   # total number of latitude rings
-    npoints::Int                # total number of grid points
+    nlat_half::IntType          # number of latitude rings on one hemisphere (Eq. incl)
+    nlat::IntType               # total number of latitude rings
+    npoints::IntType            # total number of grid points
     londs::VectorType           # longitudes of every grid point 0˚ to 360˚E
     latd::VectorType            # latitude of each ring, incl north pole 90˚N, ..., south pole -90˚N
 
@@ -62,7 +63,7 @@ function GridGeometry(
     VectorIntType = array_type(architecture, Int, 1)
     device_rings = on_architecture(architecture, grid.rings)
 
-    return GridGeometry{typeof(grid), VectorType, VectorIntType, typeof(device_rings)}(
+    return GridGeometry{typeof(grid), VectorType, VectorIntType, typeof(device_rings), typeof(nlat_half)}(
         grid, nlat_half, nlat, npoints, londs, latd_poles, nlons, lon_offsets, device_rings
     )
 end
@@ -80,9 +81,10 @@ between two latitude rings."""
 @kwdef struct AnvilLocator{
         VectorType,
         VectorIntType,
+        IntType,
     } <: AbstractLocator
 
-    npoints_output::Int            # number of points to interpolate onto (length of following vectors)
+    npoints_output::IntType            # number of points to interpolate onto (length of following vectors)
 
     # to the coordinates respective indices
     js::VectorIntType = zeros(Int, npoints_output)   # ring indices j such that [j, j+1) contains the point
@@ -99,6 +101,20 @@ end
 
 Adapt.@adapt_structure AnvilLocator
 
+function Architectures.on_architecture(arch::AbstractArchitecture, loc::AnvilLocator)
+    return AnvilLocator(
+        npoints_output = loc.npoints_output,
+        js = on_architecture(arch, loc.js),
+        ij_as = on_architecture(arch, loc.ij_as),
+        ij_bs = on_architecture(arch, loc.ij_bs),
+        ij_cs = on_architecture(arch, loc.ij_cs),
+        ij_ds = on_architecture(arch, loc.ij_ds),
+        Δys = on_architecture(arch, loc.Δys),
+        Δabs = on_architecture(arch, loc.Δabs),
+        Δcds = on_architecture(arch, loc.Δcds),
+    )
+end
+
 """
 $(TYPEDSIGNATURES)
 Zero generator function for the 4-point average AnvilLocator. Use `update_locator!` to
@@ -114,7 +130,7 @@ function (::Type{L})(
     VectorType = array_type(architecture, NF, 1)
     VectorIntType = array_type(architecture, Int, 1)
 
-    return L{VectorType, VectorIntType}(; npoints_output = npoints)
+    return L{VectorType, VectorIntType, typeof(npoints)}(; npoints_output = npoints)
 end
 
 # use Float32 as default for weights
@@ -162,8 +178,10 @@ Base.eltype(::AnvilInterpolator{NF}) where {NF} = NF
 grid_type(I::AnvilInterpolator) = typeof(I.geometry.grid)
 
 function Base.show(io::IO, L::AnvilInterpolator{NF}) where {NF}
-    println(io, "AnvilInterpolator{$NF} for $(L.geometry.grid)")
-    return print(io, "└ onto: $(L.locator.npoints_output) points")
+    NF_str = "{$NF}"
+    println(io, styled"{warning:AnvilInterpolator}{note:$NF_str} for $(L.geometry.grid)")
+    print(io, styled"└ {info:onto}: $(L.locator.npoints_output) points")
+    return nothing
 end
 
 # define to a <:AbstractInterpolator the corresponding Locator
@@ -471,14 +489,14 @@ function find_rings!(
 
     if ~unsafe
         θmin, θmax = extrema(θs)
-        @assert θmin >= -90 "Latitudes θs are expected to be within [-90˚, 90˚]; θ=$(θmin)˚ given."
-        @assert θmax <= 90 "Latitudes θs are expected to be within [-90˚, 90˚]; θ=$(θmax)˚ given."
+        @boundscheck θmin >= -90 || throw(ArgumentError("Latitudes θs are expected to be within [-90˚, 90˚]; θ=$(θmin)˚ given."))
+        @boundscheck θmax <= 90 || throw(ArgumentError("Latitudes θs are expected to be within [-90˚, 90˚]; θ=$(θmax)˚ given."))
 
         #TODO: currently we only check the latitudes of the grid we interpolate onto
         #TODO: as we only allow instances of Field to be the original grid, the latitudes below
         #TODO: should be okay anyway. Checking it on GPU is a bit more annoying...
 
-        @assert isdecreasing(latd) "Latitudes latd are expected to be strictly decreasing."
+        @assert Utils.isdecreasing(latd) "Latitudes latd are expected to be strictly decreasing."
         #@assert latd[1] == 90 "Latitudes latd are expected to contain 90˚N, the north pole."
 
         # Hack: for intervals between rings to be one-sided open [j, j+1) the last element in
@@ -546,7 +564,7 @@ function find_rings_unsafe!(
     @boundscheck length(js) == length(θs) || throw(DimensionMismatchArray(js, θs))
     @boundscheck length(js) == length(Δys) || throw(DimensionMismatchArray(js, Δys))
 
-    return launch!(
+    launch!(
         architecture,
         LinearWorkOrder,
         size(js),
@@ -556,6 +574,7 @@ function find_rings_unsafe!(
         θs,
         latd
     )
+    return nothing
 end
 
 # for testing only
@@ -630,7 +649,7 @@ function find_grid_indices!(
     # Convert λs to the same type as lon_offsets if needed
     λs_converted = convert.(eltype(lon_offsets), λs)
 
-    return launch!(
+    launch!(
         architecture,
         LinearWorkOrder,
         size(js),
@@ -645,6 +664,7 @@ function find_grid_indices!(
         nlat,
         rings
     )
+    return nothing
 end
 
 @inline function find_lon_indices(

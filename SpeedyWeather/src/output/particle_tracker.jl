@@ -8,7 +8,7 @@ of particles from particle advection. To be added like
 
 Output done via netCDF. Fields and options are
 $(TYPEDFIELDS)"""
-@kwdef mutable struct ParticleTracker{NF} <: AbstractCallback
+@kwdef mutable struct ParticleTracker{V} <: AbstractCallback
     "[OPTION] when to schedule particle tracking"
     schedule::Schedule = Schedule(every = Hour(4))
 
@@ -34,22 +34,25 @@ $(TYPEDFIELDS)"""
     netcdf_file::Union{NCDataset, Nothing} = nothing
 
     # tracking arrays
-    lon::Vector{NF} = zeros(NF, nparticles)
-    lat::Vector{NF} = zeros(NF, nparticles)
-    σ::Vector{NF} = zeros(NF, nparticles)
+    lon::V
+    lat::V
+    σ::V
 end
 
-ParticleTracker(SG::SpectralGrid; kwargs...) =
-    ParticleTracker{SG.NF}(; nparticles = SG.nparticles, kwargs...)
+function ParticleTracker(SG::SpectralGrid; kwargs...)
+    # dummy vector
+    v = zeros(SG.NF, 0)
+    return ParticleTracker{SG.VectorType}(; lon = v, lat = v, σ = v, kwargs...)
+end
 
 function initialize!(
-        particle_tracker::ParticleTracker{NF},
-        progn::PrognosticVariables,
-        diagn::DiagnosticVariables,
+        particle_tracker::ParticleTracker,
+        vars::Variables,
         model::AbstractModel,
-    ) where {NF}
+    )
 
-    initialize!(particle_tracker.schedule, progn.clock)
+    (; clock) = vars.prognostic
+    initialize!(particle_tracker.schedule, clock)
 
     # CREATE NETCDF FILE, vector of NcVars for output
     (; filename) = particle_tracker
@@ -61,7 +64,7 @@ function initialize!(
     particle_tracker.netcdf_file = dataset
 
     # DEFINE NETCDF DIMENSIONS TIME
-    (; time) = progn.clock
+    (; time) = clock
     time_string = "hours since $(Dates.format(time, "yyyy-mm-dd HH:MM:0.0"))"
     defDim(dataset, "time", Inf)       # unlimited time dimension
     defVar(
@@ -72,9 +75,17 @@ function initialize!(
         )
     )
 
-    # PARTICLE DIMENSION
-    nparticles = length(progn.particles)
+    # allocate tracking arrays now of correct size
+    arch = model.spectral_grid.architecture
+    NF = model.spectral_grid.NF
+    (; particles) = vars.prognostic
+    nparticles = length(particles)
     particle_tracker.nparticles = nparticles
+    particle_tracker.lon = on_architecture(arch, zeros(NF, nparticles))
+    particle_tracker.lat = on_architecture(arch, zeros(NF, nparticles))
+    particle_tracker.σ = on_architecture(arch, zeros(NF, nparticles))
+
+    # PARTICLE DIMENSION
     defDim(dataset, "particle", nparticles)
     defVar(
         dataset, "particle", Int64, ("particle",),
@@ -101,7 +112,7 @@ function initialize!(
     )
 
     # pull particle locations into output work arrays
-    for (p, particle) in enumerate(progn.particles)
+    for (p, particle) in enumerate(particles)
         particle_tracker.lon[p] = particle.lon
         particle_tracker.lat[p] = particle.lat
         particle_tracker.σ[p] = particle.σ
@@ -123,15 +134,14 @@ end
 
 function callback!(
         particle_tracker::ParticleTracker,
-        progn::PrognosticVariables,
-        diagn::DiagnosticVariables,
+        vars::Variables,
         model::AbstractModel,
     )
-    isscheduled(particle_tracker.schedule, progn.clock) || return nothing   # else escape immediately
+    isscheduled(particle_tracker.schedule, vars.prognostic.clock) || return nothing   # else escape immediately
     i = particle_tracker.schedule.counter + 1     # +1 for initial conditions (not scheduled)
 
     # pull particle locations into output work arrays
-    for (p, particle) in enumerate(progn.particles)
+    for (p, particle) in enumerate(vars.prognostic.particles)
         particle_tracker.lon[p] = particle.lon
         particle_tracker.lat[p] = particle.lat
         particle_tracker.σ[p] = particle.σ
@@ -144,7 +154,7 @@ function callback!(
     round!(particle_tracker.σ, keepbits)
 
     # write current particle locations to file
-    (; time, start) = progn.clock
+    (; time, start) = vars.prognostic.clock
     time_passed_hrs = Millisecond(time - start).value / 3600_000     # [ms] -> [hrs]
     particle_tracker.netcdf_file["time"][i] = time_passed_hrs
     particle_tracker.netcdf_file["lon"][:, i] = particle_tracker.lon

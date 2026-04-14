@@ -7,9 +7,9 @@ Encodes the spectral trunction, orders and degrees of the spherical harmonics.
 Is used by every `LowerTriangularArray` and also defines the architecture on which the 
 data of the `LowerTriangularArray` is stored.
 """
-struct Spectrum{A, O, L} <: AbstractSpectrum
-    lmax::Int
-    mmax::Int
+struct Spectrum{A, O, L, IntType} <: AbstractSpectrum
+    lmax::IntType
+    mmax::IntType
     architecture::A
     orders::O
     l_indices::L    # used by GPU kernels
@@ -29,15 +29,16 @@ function Spectrum(
         architecture = DEFAULT_ARCHITECTURE(),
     )
 
-    orders = adapt(array_type(architecture), [m:lmax for m in 1:mmax])
-    ls = adapt(array_type(architecture), l_indices(lmax, mmax))
-    ms = adapt(array_type(architecture), m_indices(lmax, mmax))
-    lm_orders_tuple = adapt(array_type(architecture), lm_orders(lmax, mmax))
+    orders = on_architecture(architecture, [m:lmax for m in 1:mmax])
+    ls = on_architecture(architecture, l_indices(lmax, mmax))
+    ms = on_architecture(architecture, m_indices(lmax, mmax))
+    lm_orders_tuple = on_architecture(architecture, lm_orders(lmax, mmax))
 
     return Spectrum{
         typeof(architecture),
         typeof(orders),
         typeof(ls),
+        typeof(lmax),
     }(
         lmax,
         mmax,
@@ -66,16 +67,14 @@ $(TYPEDSIGNATURES)
 Create a `Spectrum` from another `Spectrum` but with a new architecture.
 """
 Spectrum(spectrum::Spectrum; architecture::AbstractArchitecture = DEFAULT_ARCHITECTURE()) =
-    adapt(
-    array_type(architecture), Spectrum(
-        spectrum.lmax,
-        spectrum.mmax,
-        architecture,
-        spectrum.orders,
-        spectrum.l_indices,
-        spectrum.m_indices,
-        spectrum.lm_orders
-    )
+    Spectrum(
+    spectrum.lmax,
+    spectrum.mmax,
+    architecture,
+    on_architecture(architecture, spectrum.orders),
+    on_architecture(architecture, spectrum.l_indices),
+    on_architecture(architecture, spectrum.m_indices),
+    on_architecture(architecture, spectrum.lm_orders)
 )
 
 triangle_number(m::Integer) = m * (m + 1) ÷ 2
@@ -126,10 +125,11 @@ Base.:(==)(s1::Spectrum, s2::Spectrum) =
     s1.lmax == s2.lmax && s1.mmax == s2.mmax
 
 function Base.show(io::IO, S::Spectrum)
-    println(io, "T$(S.mmax - 1) Spectrum")
-    println(io, "├ lmax=$(S.lmax) (degrees)")
-    println(io, "├ mmax=$(S.mmax) (orders)")
-    return print(io, "└ architecture: $(typeof(S.architecture))")
+    println(io, styled"T$(S.mmax - 1) {warning:Spectrum}\{...\}")
+    println(io, styled"├ {info:lmax} = $(S.lmax) {note:(degrees)}")
+    println(io, styled"├ {info:mmax} = $(S.mmax) {note:(orders)}")
+    print(io, styled"└ {info:architecture} = $(typeof(S.architecture))")
+    return nothing
 end
 
 Architectures.ismatching(s::Spectrum, array_type::Type{<:AbstractArray}) = ismatching(s.architecture, array_type)

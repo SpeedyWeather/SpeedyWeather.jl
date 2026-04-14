@@ -11,92 +11,86 @@
     run!(simulation, period = Day(5)) # spin-up to get nonzero values for all fields
     initialize!(simulation; period = Day(1))
 
-    (; prognostic_variables, diagnostic_variables, model) = simulation
+
+    adsim = ADSimulation(simulation)
+    (; vars, model) = simulation
     (; Δt, Δt_millisec) = model.time_stepping
     dt = 2Δt
 
-    progn = prognostic_variables
-    diagn = diagnostic_variables
-
     # TO-DO: The first time we execute this, the gradient is different. Why?
-    timestep_oop!(make_zero(progn), progn, diagn, dt, model)
+    timestep_oop!(make_zero(vars), vars, dt, model)
 
     #
     # We go individually through all components of the time stepping and check
     # correctness
     #
 
-    fill!(diagn.tendencies, 0, PrimitiveWetModel)
+    fill!(vars.tendencies, 0, PrimitiveWetModel)
     (; time) = progn.clock
 
     #
     # model physics
     #
+    vars, dvars = ADseed(adsim, :tendencies)
+    vars_copy = deepcopy(vars)
+    dvars_copy = deepcopy(dvars)
 
-    progn_copy = deepcopy(progn)
-    dprogn = one(progn)
-    ddiagn = one(diagn)
-    ddiagn_copy = deepcopy(ddiagn)
-    diagn_copy = deepcopy(diagn)
+    autodiff(Reverse, SpeedyWeather.parameterization_tendencies!, Const, Duplicated(vars, dvars), Const(model))
 
-    autodiff(Reverse, SpeedyWeather.parameterization_tendencies!, Const, Duplicated(diagn, ddiagn), Duplicated(progn, dprogn), Const(progn.clock.time), Const(model))
-
-    function parameterization_tendencies(diagn, progn, time, model)
-        diagn_new = deepcopy(diagn)
-        SpeedyWeather.parameterization_tendencies!(diagn_new, deepcopy(progn), deepcopy(time), deepcopy(model))
-        return diagn_new
+    function parameterization_tendencies(vars, model)
+        vars_new = deepcopy(vars)
+        SpeedyWeather.parameterization_tendencies!(vars_new, deepcopy(model))
+        return vars_new
     end
 
-    fd_vjp = FiniteDifferences.j′vp(central_fdm(11, 1), x -> parameterization_tendencies(diagn_copy, x, progn.clock.time, model), ddiagn_copy, progn_copy)
+    fd_vjp = FiniteDifferences.j′vp(central_fdm(11, 1), x -> parameterization_tendencies(x, model), dvars_copy, vars_copy)
 
     # TO-DO this test is broken, they gradients don't line up
-    #@test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dprogn)[1],rtol=1e-4,atol=1e-1))
+    # old test checked dprogn
+    @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dvars)[1], rtol = 1.0e-4, atol = 1.0e-1))
 
     #
     # ocean
     #
+    vars, dvars = ADseed(adsim, :prognostic)
+    vars_copy = deepcopy(vars)
+    dvars_copy = deepcopy(dvars)
 
-    progn_copy = deepcopy(progn)
-    dprogn = one(progn)
-    ddiagn = make_zero(diagn)
-    dprogn_copy = deepcopy(dprogn)
-    diagn_copy = deepcopy(diagn)
+    autodiff(Reverse, SpeedyWeather.ocean_timestep!, Const, Duplicated(vars, dvars), Const(model))
 
-    autodiff(Reverse, SpeedyWeather.ocean_timestep!, Const, Duplicated(progn, dprogn), Duplicated(diagn, ddiagn), Const(model))
-
-    function ocean_timestep(progn, diagn, model)
-        progn_new = deepcopy(progn)
-        SpeedyWeather.ocean_timestep!(progn_new, deepcopy(diagn), deepcopy(model))
+    function ocean_timestep(vars, model)
+        vars_new = deepcopy(vars)
+        SpeedyWeather.ocean_timestep!(vars_new, deepcopy(model))
         return progn_new
     end
 
-    fd_vjp = FiniteDifferences.j′vp(central_fdm(5, 1), x -> ocean_timestep(progn_copy, x, model), dprogn_copy, diagn_copy)
+    fd_vjp = FiniteDifferences.j′vp(central_fdm(5, 1), x -> ocean_timestep(x, model), dvars_copy, vars_copy)
 
     # pass
-    @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(ddiagn)[1], rtol = 1.0e-4, atol = 1.0e-2))
+    # old test checked ddiags
+    @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dvars)[1], rtol = 1.0e-4, atol = 1.0e-2))
 
     #
     # land
     #
 
-    progn_copy = deepcopy(progn)
-    dprogn = one(progn)
-    ddiagn = make_zero(diagn)
-    dprogn_copy = deepcopy(dprogn)
-    diagn_copy = deepcopy(diagn)
+    vars, dvars = ADSeed(adsim, :prognostic)
+    vars_copy = deepcopy(vars)
+    dvars_copy = deepcopy(dvars)
 
-    autodiff(Reverse, SpeedyWeather.land_timestep!, Const, Duplicated(progn, dprogn), Duplicated(diagn, ddiagn), Const(model))
+    autodiff(Reverse, SpeedyWeather.land_timestep!, Const, Duplicated(vars, dvars), Const(model))
 
-    function land_timestep(progn, diagn, model)
-        progn_new = deepcopy(progn)
-        SpeedyWeather.ocean_timestep!(progn_new, deepcopy(diagn), deepcopy(model))
-        return progn_new
+    function land_timestep(vars, model)
+        vars_new = deepcopy(vars)
+        SpeedyWeather.ocean_timestep!(vars_new, deepcopy(model))
+        return vars_new
     end
 
-    fd_vjp = FiniteDifferences.j′vp(central_fdm(5, 1), x -> land_timestep(progn_copy, x, model), dprogn_copy, diagn_copy)
+    fd_vjp = FiniteDifferences.j′vp(central_fdm(5, 1), x -> land_timestep(x, model), dvars_copy, vars_copy)
 
     # pass
-    @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(ddiagn)[1], rtol = 1.0e-4, atol = 1.0e-2))
+    # old test checked ddiagn
+    @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dvars)[1], rtol = 1.0e-4, atol = 1.0e-2))
 
     #####
     # DYNAMICS
@@ -106,69 +100,62 @@
     # dynamics_tendencies!
     #
 
-    diagn_copy = deepcopy(diagn)
-    ddiag = one(diagn_copy)
-    ddiag_copy = deepcopy(ddiag)
-    progn_copy = deepcopy(progn)
-    dprogn = make_zero(progn)
+    vars, dvars = ADSeed(adsim, :tendencies)
+    vars_copy = deepcopy(vars)
+    dvars_copy = deepcopy(dvars)
 
-    autodiff(Reverse, SpeedyWeather.dynamics_tendencies!, Const, Duplicated(diagn, ddiag), Duplicated(progn, dprogn), Const(lf2), Const(model))
+    autodiff(Reverse, SpeedyWeather.dynamics_tendencies!, Const, Duplicated(vars, dvars), Const(lf2), Const(model))
 
-    function dynamics_tendencies(diagn, progn, lf, model)
-        diagn_new = deepcopy(diagn)
-        SpeedyWeather.dynamics_tendencies!(diagn_new, deepcopy(progn), lf, deepcopy(model))
-        return diagn_new
+    function dynamics_tendencies(vars, lf, model)
+        vars_new = deepcopy(vars)
+        SpeedyWeather.dynamics_tendencies!(vars_new, lf, deepcopy(model))
+        return vars_new
     end
 
-    fd_vjp = FiniteDifferences.j′vp(central_fdm(5, 1), x -> dynamics_tendencies(diagn_copy, x, lf2, model), ddiag_copy, progn_copy)
+    fd_vjp = FiniteDifferences.j′vp(central_fdm(5, 1), x -> dynamics_tendencies(x, lf2, model), dvars_copy, vars_copy)
 
     # there are some NaNs in the FD, that's why this test is currently broken
-    @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dprogn)[1], rtol = 1.0e-4, atol = 1.0e-1))
+    # old test checked dprogn
+    @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dvars)[1], rtol = 1.0e-4, atol = 1.0e-1))
 
     #
     # Implicit correction
     #
     # continue here
-    diagn_copy = deepcopy(diagn)
-    ddiag = make_zero(diagn_copy)
-    ddiag_copy = deepcopy(ddiag)
-    progn_copy = deepcopy(progn)
-    dprogn = one(progn)
+    vars, dvars = ADSeed(adsim, :tendencies)
+    vars_copy = deepcopy(vars)
+    dvars_copy = deepcopy(dvars)
 
-    autodiff(Reverse, SpeedyWeather.implicit_correction!, Const, Duplicated(diagn, ddiag), Const(model.implicit), Duplicated(progn, dprogn))
+    autodiff(Reverse, SpeedyWeather.implicit_correction!, Const, Duplicated(vars, dvars), Const(model.implicit), Const(model))
 
-    function implicit_correction(diagn, implicit, progn)
-        diagn_new = deepcopy(diagn)
-        SpeedyWeather.implicit_correction!(diagn_new, deepcopy(implicit), deepcopy(progn))
-        return diagn_new
+    function implicit_correction(vars, implicit, model)
+        vars_new = deepcopy(vars)
+        SpeedyWeather.implicit_correction!(vars_new, deepcopy(implicit), deepcopy(model))
+        return vars_new
     end
 
-    fd_vjp = FiniteDifferences.j′vp(central_fdm(9, 1), x -> implicit_correction(diagn_copy, model.implicit, x), ddiag_copy, progn_copy)
+    fd_vjp = FiniteDifferences.j′vp(central_fdm(9, 1), x -> implicit_correction(x, model.implicit, model), dvars_copy, vars_copy)
 
+    # old test checked dprogn
     @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dprogn)[1], rtol = 1.0e-4, atol = 1.0e-1))
 
     #
     # transform!(diagn, progn, lf2, model)
     #
+    vars, dvars = ADSeed(adsim, :tendencies)
+    vars_copy = deepcopy(vars)
+    dvars_copy = deepcopy(dvars)
 
-    diag_copy = deepcopy(diagn)
+    autodiff(Reverse, SpeedyWeather.transform!, Const, Duplicated(vars, dvars), Const(lf2), Duplicated(model, make_zero(model)))
 
-    ddiag = one(diagn)
-    ddiag_copy = deepcopy(ddiag)
-
-    progn_copy = deepcopy(progn)
-    dprogn = make_zero(progn)
-
-    autodiff(Reverse, SpeedyWeather.transform!, Const, Duplicated(diagn, ddiag), Duplicated(progn, dprogn), Const(lf2), Duplicated(model, make_zero(model)))
-    #autodiff(Reverse, SpeedyWeather.transform!, Const, Duplicated(diagn, ddiag), Duplicated(progn, dprogn), Const(lf2), Const(model))
-
-    function transform_diagn(diag, progn, lf2, model)
-        diag_copy = deepcopy(diag)
-        transform!(diag_copy, deepcopy(progn), lf2, deepcopy(model))
-        return diag_copy
+    function transform_diagn(vars, lf2, model)
+        vars_copy = deepcopy(vars)
+        transform!(vars_copy, lf2, deepcopy(model))
+        return vars_copy
     end
 
-    fd_vjp = FiniteDifferences.j′vp(central_fdm(5, 1), x -> transform_diagn(diag_copy, x, lf2, model), ddiag_copy, progn_copy)
+    fd_vjp = FiniteDifferences.j′vp(central_fdm(5, 1), x -> transform_diagn(x, lf2, model), dvars_copy, vars_copy)
 
-    @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dprogn)[1], rtol = 1.0e-3, atol = 1.0e-3))
+    # old test checked dprogn
+    @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dvars)[1], rtol = 1.0e-3, atol = 1.0e-3))
 end

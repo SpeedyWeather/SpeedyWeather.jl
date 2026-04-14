@@ -6,37 +6,53 @@ using SpeedyWeather: AbstractSimulation
 # this type could potentially also implement the `AbstractSimulation` interface?
 struct ADSimulation{
         ModelType <: AbstractModel,
-        PrognosticType,
-        DiagnosticType,
+        VarsType,
     }
     model::ModelType
-    progvars::PrognosticType
-    diagvars::DiagnosticType
-    dprogvars::PrognosticType
-    ddiagvars::DiagnosticType
+    vars::VarsType
+    dvars::VarsType
 end
 
 function ADSimulation(sim::AbstractSimulation)
-    (; prognostic_variables, diagnostic_variables, model) = simulation
-    progn = deepcopy(prognostic_variables)
-    diagn = deepcopy(diagnostic_variables)
+    (; variables, model) = sim
+    vars = deepcopy(variables)
     return ADSimulation(
         deepcopy(model),
-        progn,
-        diagn,
-        zero(progn),
-        make_zero(diagn),
+        vars,
+        make_zero(vars),
     )
 end
 
-prognosticseed(adsim::ADSimulation) = deepcopy(adsim.progvars), one(adsim.progvars)
+"""
+    ADseed(adsim::ADSimulation, name::Symbol)
 
-diagnosticseed(adsim::ADSimulation) = deepcopy(adsim.diagvars), one(adsim.diagvars)
+Return a copy of the `adsim.vars` and a seed for the `name` field of `adsim.dvars`. 
+The seed should be the output of the function it is fed into.
+"""
+function ADseed(adsim::ADSimulation, name::Symbol)
+    seed = make_zero(adsim.dvars)
 
-function Base.one(diag::DiagnosticVariables{NF}) where {NF}
-    vec, re = to_vec(diag)
-    vec .= NF(1)
-    return re(vec)
+    for k in keys(getfield(seed, name))
+        field = getfield(getfield(seed, name), k)
+        if field isa AbstractArray
+            if eltype(field) <: Complex
+                field .= one(eltype(real(field))) + im * one(eltype(real(field)))
+            else
+                field .= one(eltype(field))
+            end
+        elseif field isa NamedTuple
+            for k2 in keys(field)
+                field2 = getfield(field, k2)
+                if eltype(field2) <: Complex
+                    field2 .= one(eltype(real(field2))) + im * one(eltype(real(field2)))
+                else
+                    field2 .= one(eltype(field2))
+                end
+            end
+        end
+    end
+
+    return deepcopy(adsim.vars), seed
 end
 
 function initialize_with_spinup!(model::AbstractModel, spinup_period = Day(5), init_period = Day(1))

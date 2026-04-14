@@ -54,6 +54,8 @@ include("primitive_wet.jl")
 if gpu_backend === :CUDA
 
     include("CUDA/architecture.jl")
+    # REACTANT ON GPU (currently only works tested with CUDA)
+    #include("reactant.jl")
 
 elseif gpu_backend === :AMDGPU
 

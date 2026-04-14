@@ -1,4 +1,4 @@
-abstract type AbstractCallback end
+abstract type AbstractCallback <: AbstractModelComponent end
 const CALLBACK_DICT = Dict{Symbol, AbstractCallback}
 const RANDSTRING_LENGTH = 4
 
@@ -18,12 +18,6 @@ CallbackDict() = CALLBACK_DICT()
 """$(TYPEDSIGNATURES)
 Create Callback dictionary like normal dictionaries."""
 CallbackDict(pairs::Pair{Symbol, <:AbstractCallback}...) = CALLBACK_DICT(pairs...)
-
-function Base.show(io::IO, C::AbstractCallback)
-    println(io, "$(typeof(C)) <: AbstractCallback")
-    keys = propertynames(C)
-    return print_fields(io, C, keys)
-end
 
 # dummy callback
 export NoCallback
@@ -60,7 +54,7 @@ function add!(D::CALLBACK_DICT, key_callbacks::Pair{Symbol, <:AbstractCallback}.
         callback = key_callback.second
         D[key] = callback
     end
-    return
+    return D
 end
 
 """
@@ -97,7 +91,7 @@ function add!(D::CALLBACK_DICT, callbacks::AbstractCallback...; verbose = true)
         verbose && @info "$(typeof(callback)) callback added with key $key"
         add!(D, key => callback)
     end
-    return
+    return D
 end
 
 """
@@ -122,40 +116,42 @@ Callback that records the global mean surface temperature on every time step.
 $(TYPEDFIELDS)"""
 Base.@kwdef mutable struct GlobalSurfaceTemperatureCallback{NF} <: AbstractCallback
     timestep_counter::Int = 0
-    temp::Vector{NF} = zeros(DEFAULT_NF, 0)
+    temperature::Vector{NF} = zeros(DEFAULT_NF, 0)
 end
 
 GlobalSurfaceTemperatureCallback(SG::SpectralGrid) = GlobalSurfaceTemperatureCallback{SG.NF}()
 
 """
 $(TYPEDSIGNATURES)
-Initializes callback.temp vector that records the global mean surface temperature on every time step.
+Initializes callback.temperature vector that records the global mean surface temperature on every time step.
 Allocates vector of correct length (number of elements = total time steps plus one) and stores the
 global surface temperature of the initial conditions"""
 function initialize!(
         callback::GlobalSurfaceTemperatureCallback{NF},
-        progn::PrognosticVariables,
-        diagn::DiagnosticVariables,
+        vars::Variables,
         model::AbstractModel,
     ) where {NF}
-    callback.temp = Vector{NF}(undef, progn.clock.n_timesteps + 1)    # replace with vector of correct length
-    callback.temp[1] = diagn.temp_average[diagn.nlayers]            # set initial conditions
-    return callback.timestep_counter = 1                                   # (re)set counter to 1
+    callback.temperature = Vector{NF}(undef, vars.prognostic.clock.n_timesteps + 1)    # replace with vector of correct length
+    nlayers = model.geometry.nlayers
+    callback.temperature[1] = vars.grid.temp_average[nlayers]       # set initial conditions
+    callback.timestep_counter = 1                                   # (re)set counter to 1
+    return nothing 
 end
 
 """
 $(TYPEDSIGNATURES)
 Pulls the average temperature from the lowermost layer and stores it in the next
-element of the callback.temp vector."""
+element of the callback.temperature vector."""
 function callback!(
         callback::GlobalSurfaceTemperatureCallback,
-        progn::PrognosticVariables,
-        diagn::DiagnosticVariables,
+        vars::Variables,
         model::AbstractModel,
     )
     callback.timestep_counter += 1
     i = callback.timestep_counter
-    return callback.temp[i] = diagn.temp_average[diagn.nlayers]
+    nlayers = model.geometry.nlayers
+    callback.temperature[i] = vars.grid.temp_average[nlayers]
+    return nothing
 end
 
 # nothing to finalize

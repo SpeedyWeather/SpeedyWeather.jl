@@ -1,85 +1,91 @@
-"""
-$(TYPEDSIGNATURES)
-Scale the variable `var` inside `progn` with scalar `scale`.
-"""
-@propagate_inbounds function scale!(
-        progn::PrognosticVariables,
-        var::Symbol,
-        scale::Real,
-    )
-    var = getfield(progn, var)
-    return var .*= scale
-end
-
-"""
-$(TYPEDSIGNATURES)
-Scale the variable `var` inside `diagn` with scalar `scale`.
-"""
-@propagate_inbounds function scale!(
-        diagn::DiagnosticVariables,
-        var::Symbol,
-        scale::Real,
-    )
-    variable = getfield(diagn.grid, var)
-    return variable .*= scale
-end
-
-"""
-$(TYPEDSIGNATURES)
+"""$(TYPEDSIGNATURES)
 Scales the prognostic variables vorticity and divergence with
 the Earth's radius which is used in the dynamical core."""
-@propagate_inbounds function scale!(
-        progn::PrognosticVariables,
-        diagn::DiagnosticVariables,
-        scale::Real
-    )
-
-    new_scale = scale / progn.scale[]     # undo previous scale and new scale in one go
-    scale!(progn, :vor, new_scale)
-    scale!(progn, :div, new_scale)
-    progn.scale[] = scale               # store scaling information
-    return diagn.scale[] = scale               # store scaling information
+@propagate_inbounds function scale_prognostic!(vars::Variables, scale::Real)
+    progn = vars.prognostic             # for convenience
+    new_scale = scale / progn.scale[]   # undo previous scale and new scale in one go
+    haskey(progn, :vorticity) && (progn.vorticity .*= new_scale)
+    haskey(progn, :divergence) && (progn.divergence .*= new_scale)
     # no need to actually scale the diagnostic variables as they will be
     # overwritten by the transform of the prognostic variables anyway
+    progn.scale[] = scale               # store scaling information
+    return vars
 end
 
+scale!(var::AbstractField, scale::Real) = (var .*= scale)
+
 """$(TYPEDSIGNATURES)
-Scale the tendencies inside `diagn` with scalar `scale`.
+Scale the tendencies of u, v, temp, humid with scalar `scale`.
 Intended use to scale the tendencies of the parameterizations
 by the radius for the dynamical core."""
-@propagate_inbounds function scale!(ij, diagn::Tendencies, scale::Real)
-    return @inbounds for k in eachlayer(diagn.u_tend_grid)
-        diagn.u_tend_grid[ij, k] *= scale
-        diagn.v_tend_grid[ij, k] *= scale
-        diagn.temp_tend_grid[ij, k] *= scale
-        diagn.humid_tend_grid[ij, k] *= scale
-    end
+@propagate_inbounds function scale_tendencies!(vars::NamedTuple, scale::Real)
+    haskey(vars, :u) && (vars.u .*= scale)
+    haskey(vars, :v) && (vars.v .*= scale)
+    haskey(vars, :temperature) && (vars.temperature .*= scale)
+    haskey(vars, :humidity) && (vars.humidity .*= scale)
+    return nothing
+end
+
+@propagate_inbounds function scale_tendencies!(ij, vars::NamedTuple, scale::Real)
+    haskey(vars, :u) && (
+        for k in eachlayer(vars.u)
+            vars.u[ij, k] *= scale
+        end
+    )
+    haskey(vars, :v) && (
+        for k in eachlayer(vars.v)
+            vars.v[ij, k] *= scale
+        end
+    )
+    haskey(vars, :temperature) && (
+        for k in eachlayer(vars.temperature)
+            vars.temperature[ij, k] *= scale
+        end
+    )
+    haskey(vars, :humidity) && (
+        for k in eachlayer(vars.humidity)
+            vars.humidity[ij, k] *= scale
+        end
+    )
+    return nothing
 end
 
 """$(TYPEDSIGNATURES)
-Undo the radius-scaling of vorticity and divergence from `scale!(progn, scale::Real)`."""
-function unscale!(progn::PrognosticVariables)
+Undo the radius-scaling of vorticity and divergence from `scale_prognostic!(vars, scale::Real)`."""
+function unscale!(vars::Variables)
+    progn = vars.prognostic             # for convenience
     inv_scale = inv(progn.scale[])
-    scale!(progn, :vor, inv_scale)
-    scale!(progn, :div, inv_scale)
-    return progn.scale[] = 1                   # set scale back to 1=unscaled
-end
+    haskey(progn, :vorticity) && (progn.vorticity .*= inv_scale)
+    haskey(progn, :divergence) && (progn.divergence .*= inv_scale)
 
-"""$(TYPEDSIGNATURES)
-Undo the radius-scaling of vorticity and divergence from `scale!(diagn, scale::Real)`."""
-function unscale!(diagn::DiagnosticVariables)
-    inv_scale = inv(diagn.scale[])
-    scale!(diagn, :vor_grid, inv_scale)
-    scale!(diagn, :div_grid, inv_scale)
-    return diagn.scale[] = 1                   # set scale back to 1=unscaled
+    # and the corresponding grid variables if they exist
+    haskey(vars.grid, :vorticity) && (vars.grid.vorticity .*= inv_scale)
+    haskey(vars.grid, :divergence) && (vars.grid.divergence .*= inv_scale)
+
+    # TODO unscale the tendencies too?
+
+    progn.scale[] = 1                   # set scale back to 1=unscaled
+    return vars
 end
 
 """
 $(TYPEDSIGNATURES)
-Undo the radius-scaling for any variable. Method used for netcdf output."""
-function unscale!(
-        variable::AbstractArray,
+Scale the variable `var` with scalar `scale`.
+"""
+@propagate_inbounds function scale!(
+        variable::Union{LowerTriangularArray, Field},
         scale::Real
     )
-    return variable ./= scale
+    return variable.data .*= scale
+end
+
+"""
+$(TYPEDSIGNATURES)
+Undo the scaling of the variable `var` with scalar `scale`.
+"""
+@propagate_inbounds function unscale!(
+        variable::Union{LowerTriangularArray, Field},
+        scale::Real
+    )
+    return variable.data ./= scale
 end
