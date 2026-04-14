@@ -108,13 +108,14 @@ run!(simulation, period=Day(10), output=true)       # aaaand action!
 ```
 showing
 ```
- run_0001 100% Time: 0:00:02 (2000-01-11, 1000.22 years/day,  71 m/s, [ -81,   39] ˚C)
+ run_0001 100% Time: 0:00:01 (2000-01-11, 1395.22 years/day,  90 m/s, [ -80,   35] ˚C)
 ```
 
-Hurray🥳 In a few seconds seconds we just simulated 10 days of the Earth's atmosphere at a speed of 1000 years per day.
+Hurray🥳 In a second we just simulated 10 days of the Earth's atmosphere at a speed of almost 1400 simulated years
+per wallclock day. Also printed is the model time, the maximum wind speed and the temperature range (on any layer).
 This simulation used a T31 spectral resolution on an
 [octahedral Gaussian grid](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/grids#OctahedralGaussianGrid)
-(~400km resolution) solving the primitive equations on 8 vertical levels,
+(~400km resolution) solving the primitive equations on 8 vertical layers,
 storing [NetCDF output](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/output).
 
 More examples in the [How to run SpeedyWeather](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/how_to_run_speedy)
@@ -131,7 +132,8 @@ humidity
 
 ![speedyweather_pluto](https://github.com/user-attachments/assets/5d485015-8c28-4c44-9c2b-c3acdf335788)
 
-
+(Note that in SpeedyWeather v0.19 the variable paths have changed so the respective line
+now needs to be written as `q = simulation.variables.grid.humidity[:, end]`)
 
 ## Gallery
 
