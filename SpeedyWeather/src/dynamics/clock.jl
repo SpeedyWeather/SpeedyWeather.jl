@@ -34,7 +34,10 @@ Clock(architecture::AbstractArchitecture) = Clock()
 # we just explicitly transfer nothing to the kernels
 Adapt.adapt_structure(to, ::Clock) = nothing
 
-function time_step!(clock::Clock, Δt; increase_counter::Bool = true)
+# Clock has no GPU arrays, pass through unchanged
+on_architecture(::AbstractArchitecture, clock::Clock) = clock
+
+function timestep!(clock::Clock, Δt; increase_counter::Bool = true)
     clock.time += Δt
     # the first timestep is a half-step and doesn't count
     clock.timestep_counter += increase_counter

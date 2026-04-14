@@ -1,51 +1,28 @@
+using ParallelTestRunner
 using SpeedyWeather
-using Test
 
-# GENERAL
-include("spectral_grid.jl")
-include("parameters.jl")
+# code that's run for every worker before running the tests
+const init_code = quote
+    using SpeedyWeather
+end
 
-# GPU/KERNELABSTRACTIONS
-include("GPU/kernelabstractions.jl")
+# test suites, manual or automatic file discovery
+testsuite_GPU = Dict(
+    "kernelabstractions" => quote
+        include("GPU/kernelabstractions.jl")
+    end
+)
+testsuite_dynamics = find_tests(joinpath(pwd(), "dynamics"))
+testsuite_parameterizations = find_tests(joinpath(pwd(), "parameterizations"))
+testsuite_output = find_tests(joinpath(pwd(), "output"))
 
-# DYNAMICS
-include("dynamics/run_defaults.jl")
-include("dynamics/horizontal_diffusion.jl")
-include("dynamics/time_stepping.jl")
-include("dynamics/vertical_advection.jl")
-include("dynamics/particles.jl")
-include("dynamics/particle_advection.jl")
-include("dynamics/forcing_drag.jl")
-include("dynamics/dates.jl")
-include("dynamics/set.jl")
-include("dynamics/copy_variables.jl")
-include("dynamics/orography.jl")
-include("dynamics/initial_conditions.jl")
+# merge all testsuites
+testsuite = merge(
+    testsuite_GPU,
+    testsuite_dynamics,
+    testsuite_parameterizations,
+    testsuite_output
+)
 
-# VERTICAL LEVELS
-include("dynamics/vertical_coordinates.jl")
-include("dynamics/geopotential.jl")
-
-# PARAMETERIZATIONS
-include("parameterizations/variables.jl")
-include("parameterizations/custom_parameterization.jl")
-include("parameterizations/zenith.jl")
-include("parameterizations/land_sea_mask.jl")
-include("parameterizations/ocean_sea_ice.jl")
-include("parameterizations/large_scale_condensation.jl")
-include("parameterizations/convection.jl")
-include("parameterizations/albedo.jl")
-include("parameterizations/land.jl")
-include("parameterizations/longwave_radiation.jl")
-include("parameterizations/shortwave_radiation.jl")
-include("parameterizations/surface_fluxes.jl")
-include("parameterizations/random_process.jl")
-include("parameterizations/stochastic_physics.jl")
-include("parameterizations/all_parametrizations.jl")
-
-# OUTPUT/EXTENSION
-include("output/callbacks.jl")
-include("output/schedule.jl")
-include("output/netcdf_output.jl")
-include("output/jld2_output.jl")
-include("output/feedback.jl")
+# run tests in parallel
+runtests(SpeedyWeather, ARGS; testsuite, init_code)
