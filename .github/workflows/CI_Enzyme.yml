@@ -20,7 +20,6 @@ jobs:
     defaults:
       run:
         shell: bash
-        working-directory: ./SpeedyWeather
     timeout-minutes: 90
     permissions: # needed to allow julia-actions/cache to proactively delete old caches that it has created
       actions: write
@@ -39,16 +38,22 @@ jobs:
         with:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
-      - uses: julia-actions/cache@v3
-      - name: Julia 1.10, add local packages as sources not supported yet
-        shell: julia --color=yes --project=test/differentiability {0}
+      - uses: julia-actions/cache@v3 
+      - name: Develop local packages
         run: |
-          using Pkg
-          Pkg.develop([PackageSpec(; path) for path in ("../SpeedyWeatherInternals", "../LowerTriangularArrays", "../RingGrids", "../SpeedyTransforms", ".")])
-          Pkg.instantiate()
-        if: ${{ matrix.version == '1.10' }}
+          julia --color=yes --project=SpeedyWeather/test/differentiability -e '
+            using Pkg
+            Pkg.develop([
+              PackageSpec(path="SpeedyWeatherInternals"),
+              PackageSpec(path="LowerTriangularArrays"),
+              PackageSpec(path="RingGrids"),
+              PackageSpec(path="SpeedyTransforms"),
+              PackageSpec(path="SpeedyWeather")
+            ])
+            Pkg.instantiate()
+          '
       - name: Run Enzyme differentiability tests
         run: |
-          julia --color=yes --project=test/differentiability test/differentiability/full_diff_CI.jl
+          julia --color=yes --project=SpeedyWeather/test/differentiability SpeedyWeather/test/differentiability/full_diff_CI.jl
         env:
           GITHUB_AUTH: ${{ secrets.GITHUB_TOKEN }}
