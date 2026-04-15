@@ -599,7 +599,7 @@ $(TYPEDSIGNATURES)
 Initial conditions from Jablonowski and Williamson, 2006, QJR Meteorol. Soc"""
 function initialize!(
         vars::Variables,
-        initial_conditions::JablonowskiTemperature{NF},
+        initial_conditions::JablonowskiTemperature,
         model::PrimitiveEquation
     )
 
@@ -630,7 +630,7 @@ function initialize!(
     Tη = max.(Tη, Tmin)
 
     # temperature
-    temp_grid = similar(vars.prognostic.temp[:, :, 2], grid, NF)
+    temp_grid = similar(vars.prognostic.temperature[:, :, 2], grid, NF)
     aΩ = radius * rotation
 
     _jablonowski_temperature_broadcast!(temp_grid, Tη, φ, σ_levels_full,
