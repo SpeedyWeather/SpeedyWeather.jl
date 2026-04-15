@@ -55,13 +55,13 @@ $(TYPEDFIELDS)"""
     stefan_boltzmann::NF = 5.67e-8
 
     "[OPTION] Surface reference pressure [Pa]"
-    @param pressure_reference::NF = 1.0e5 (bounds = Positive,)
+    @param reference_pressure::NF = 1.0e5 (bounds = Positive,)
 
     "[OPTION] Saturation vapor pressure at freezing point (0°C) [Pa]"
     @param saturation_vapor_pressure::NF = 610.78 (bounds = Positive,)
 
     "[OPTION] Surface reference temperature [K]"
-    @param temperature_reference::NF = 288.0 (bounds = Nonnegative,)
+    @param reference_temperature::NF = 288.0 (bounds = Nonnegative,)
 
     "[OPTION] Temperature of freezing point of water [K]"
     @param temperature_freezing::NF = 273.15 (bounds = Nonnegative,)
@@ -99,10 +99,10 @@ export EarthDryAtmosphere
     stefan_boltzmann::NF = 5.67e-8
 
     "[OPTION] Surface reference pressure [Pa]"
-    @param pressure_reference::NF = 1.0e5 (bounds = Positive,)
+    @param reference_pressure::NF = 1.0e5 (bounds = Positive,)
 
     "[OPTION] Surface reference temperature [K]"
-    @param temperature_reference::NF = 288.0 (bounds = Nonnegative,)
+    @param reference_temperature::NF = 288.0 (bounds = Nonnegative,)
 
     "[OPTION] Reference dry-adiabatic temperature lapse rate [K/m]"
     @param dry_lapse_rate::NF = 9.8 / 1000
@@ -116,8 +116,7 @@ EarthDryAtmosphere(SG::SpectralGrid; kwargs...) = EarthDryAtmosphere{SG.NF}(; kw
 EarthDryAtmosphere(::Type{NF}; kwargs...) where {NF} = EarthDryAtmosphere{NF}(; kwargs...)
 Base.eltype(::EarthDryAtmosphere{NF}) where {NF} = NF
 
-## FUNCTIONS WITH ATMOSPHERE AS ARGUMENT
-
+# FUNCTIONS WITH ATMOSPHERE AS ARGUMENT
 lapse_rate(A::AbstractWetAtmosphere) = A.moist_lapse_rate
 lapse_rate(A::AbstractDryAtmosphere) = A.dry_lapse_rate
 

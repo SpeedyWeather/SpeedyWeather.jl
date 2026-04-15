@@ -105,11 +105,11 @@ arrays in which *every* parameterization writes into, meaning they should be
 beforehand is effectively disabled. Hence, do
 
 ```julia
-vars.tendencies.grid.temp[ij, k] += something_you_calculated
+vars.tendencies.grid.temperature[ij, k] += something_you_calculated
 ```
 
-not `vars.tendencies.grid.temp[ij, k] = something_you_calculated` which would overwrite
-any previous tendency. See also [Order of tendencies](@ref).
+not `vars.tendencies.grid.temperature[ij, k] = something_you_calculated` (`+=` instead of `=`)
+which would overwrite any previous tendency. See also [Order of tendencies](@ref).
 
 ## Define the generator function
 

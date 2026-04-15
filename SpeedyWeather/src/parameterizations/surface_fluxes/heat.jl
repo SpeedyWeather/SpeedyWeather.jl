@@ -82,7 +82,7 @@ variables(::SurfaceOceanHeatFlux) = (
     SST = vars.prognostic.ocean.sea_surface_temperature[ij]
     T = vars.parameterizations.surface_air_temperature[ij]
     land_fraction = model.land_sea_mask.mask[ij]
-    pₛ = vars.grid.pres_prev[ij]
+    pₛ = vars.grid.pressure_prev[ij]
 
     # drag coefficient
     d = vars.parameterizations.boundary_layer_drag[ij]
@@ -105,7 +105,7 @@ variables(::SurfaceOceanHeatFlux) = (
     vars.parameterizations.sensible_heat_flux[ij] = flux_ocean * cₚ        # [W/m²]
 
     # accumulate with += into end=lowermost layer total flux
-    vars.tendencies.grid.temp[ij, nlayers] += surface_flux_to_tendency(flux_ocean, pₛ, model)
+    vars.tendencies.grid.temperature[ij, nlayers] += surface_flux_to_tendency(flux_ocean, pₛ, model)
     return nothing
 end
 
@@ -139,7 +139,7 @@ variables(::SurfaceLandHeatFlux) = (
 
     surface = model.geometry.nlayers
     cₚ = model.atmosphere.heat_capacity
-    pₛ = vars.grid.pres_prev[ij]                  # surface pressure [Pa]
+    pₛ = vars.grid.pressure_prev[ij]                  # surface pressure [Pa]
     ρ = vars.parameterizations.surface_air_density[ij]
     V₀ = vars.parameterizations.surface_wind_speed[ij]
 
@@ -169,7 +169,7 @@ variables(::SurfaceLandHeatFlux) = (
     vars.parameterizations.sensible_heat_flux[ij] += flux_land * cₚ    # [W/m²]
 
     # accumulate with += into end=lowermost layer total flux
-    vars.tendencies.grid.temp[ij, surface] += surface_flux_to_tendency(flux_land, pₛ, model)
+    vars.tendencies.grid.temperature[ij, surface] += surface_flux_to_tendency(flux_land, pₛ, model)
     return nothing
 end
 
@@ -191,7 +191,7 @@ variables(::PrescribedOceanHeatFlux) = (
 
 @propagate_inbounds function surface_heat_flux!(ij, vars, ::PrescribedOceanHeatFlux, model)
     land_fraction = model.land_sea_mask.mask[ij]
-    pₛ = vars.grid.pres_prev[ij]          # surface pressure [Pa]
+    pₛ = vars.grid.pressure_prev[ij]          # surface pressure [Pa]
     cₚ = model.atmosphere.heat_capacity
     surface = model.geometry.nlayers
 
@@ -208,7 +208,7 @@ variables(::PrescribedOceanHeatFlux) = (
 
     # accumulate with += into end=lowermost layer total flux
     flux_ocean /= cₚ                            # [W/m²] -> [K/s]
-    vars.tendencies.grid.temp[ij, surface] += surface_flux_to_tendency(flux_ocean, pₛ, model)
+    vars.tendencies.grid.temperature[ij, surface] += surface_flux_to_tendency(flux_ocean, pₛ, model)
     return nothing
 end
 
@@ -230,7 +230,7 @@ variables(::PrescribedLandHeatFlux) = (
 
 @propagate_inbounds function surface_heat_flux!(ij, vars, ::PrescribedLandHeatFlux, model)
     land_fraction = model.land_sea_mask.mask[ij]
-    pₛ = vars.grid.pres_prev[ij]                # surface pressure [Pa]
+    pₛ = vars.grid.pressure_prev[ij]                # surface pressure [Pa]
     cₚ = model.atmosphere.heat_capacity
     surface = model.geometry.nlayers             # indexing top to bottom
 
@@ -247,6 +247,6 @@ variables(::PrescribedLandHeatFlux) = (
 
     # accumulate with += into end=lowermost layer total flux
     flux_land /= cₚ                             # [W/m²] -> [K/s]
-    vars.tendencies.grid.temp[ij, surface] += surface_flux_to_tendency(flux_land, pₛ, model)
+    vars.tendencies.grid.temperature[ij, surface] += surface_flux_to_tendency(flux_land, pₛ, model)
     return nothing
 end

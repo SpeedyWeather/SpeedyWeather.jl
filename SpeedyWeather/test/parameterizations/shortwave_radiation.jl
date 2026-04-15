@@ -1,7 +1,7 @@
 function init_shortwave_state!(vars, model)
-    vars.grid.temp_prev .= 280
-    vars.grid.humid_prev .= 1.0e-3
-    vars.grid.pres_prev .= 1.0e5
+    vars.grid.temperature_prev .= 280
+    vars.grid.humidity_prev .= 1.0e-3
+    vars.grid.pressure_prev .= 1.0e5
     vars.parameterizations.cloud_top .= model.spectral_grid.nlayers + 1
     vars.parameterizations.rain_rate .= 0
     vars.parameterizations.ocean.albedo .= 0.5

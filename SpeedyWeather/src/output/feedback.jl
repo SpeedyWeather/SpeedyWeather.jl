@@ -115,7 +115,7 @@ Detect NaN (Not-a-Number, or Inf) in the prognostic variables."""
 function nan_detection!(feedback::Feedback, vars::Variables)
     feedback.nans_detected && return nothing                        # escape immediately if nans already detected
     i = feedback.progress_meter.counter                             # time step
-    GPUArrays.@allowscalar vor0 = vars.prognostic.vor[2, end, 2]    # only check 1-0 mode of surface vorticity
+    GPUArrays.@allowscalar vor0 = vars.prognostic.vorticity[2, end, 2]    # only check 1-0 mode of surface vorticity
 
     # just check first harmonic, spectral transform propagates NaNs globally anyway
     (; time) = vars.prognostic.clock                                # current time for feedback
@@ -183,8 +183,8 @@ function max_speed(vars::Variables)
 end
 
 function temperature_range(vars::Variables)
-    hasproperty(vars.grid, :temp) || return nothing
-    tmin, tmax = extrema(vars.grid.temp)
+    hasproperty(vars.grid, :temperature) || return nothing
+    tmin, tmax = extrema(vars.grid.temperature)
     FEEDBACK_TMIN[] = tmin - 273.15f0
     return FEEDBACK_TMAX[] = tmax - 273.15f0
 end

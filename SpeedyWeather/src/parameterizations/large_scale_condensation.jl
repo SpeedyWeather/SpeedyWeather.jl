@@ -62,14 +62,14 @@ large-scale precipitation vertically for output."""
         time_stepping,
     )
     # use previous time step for more stable Euler forward step of the parameterizations
-    temp = vars.grid.temp_prev                  # temperature [K]
-    humid = vars.grid.humid_prev                # specific humidity [kg/kg]
-    temp_tend = vars.tendencies.grid.temp       # temperature tendency [K/s]
-    humid_tend = vars.tendencies.grid.humid     # specific humidity tendency [kg/kg/s]
+    temp = vars.grid.temperature_prev                  # temperature [K]
+    humid = vars.grid.humidity_prev                # specific humidity [kg/kg]
+    temp_tend = vars.tendencies.grid.temperature       # temperature tendency [K/s]
+    humid_tend = vars.tendencies.grid.humidity     # specific humidity tendency [kg/kg/s]
     nlayers = size(temp, 2)
 
     # precompute scaling constants to minimize divisions (used to convert between humidity [kg/kg] and precipitation [m])
-    pₛ = vars.grid.pres_prev[ij]               # surface pressure [Pa]
+    pₛ = vars.grid.pressure_prev[ij]               # surface pressure [Pa]
     (; Δt_sec) = time_stepping                      # time step [s]
     σ = geometry.σ_levels_full                      # vertical sigma coordinate [1]
     Δσ = geometry.σ_levels_thick                    # layer thickness in sigma coordinates

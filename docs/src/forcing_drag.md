@@ -252,14 +252,14 @@ function forcing!(
     end
 
     # to grid-point space
-    S_grid = vars.scratch.grid.a    # allocate a work array matching vor grid
+    S_grid = vars.scratch.grid.a    # allocate a work array matching vorticity grid
     transform!(S_grid, S, spectral_transform)
 
     # mask everything but mid-latitudes
     RingGrids._scale_lat!(S_grid, forcing.lat_mask)
 
     # back to spectral space
-    vor_tend = vars.tendencies.vor
+    vor_tend = vars.tendencies.vorticity
     transform!(vor_tend, S_grid, spectral_transform)
 
     return nothing
@@ -306,7 +306,7 @@ bar!(a, ...)    # reads the scratch array a in
 
 Now back to the stochastic stirring. For the last lines in `forcing!` we
 have to know the order in which different terms are written into the tendencies
-for vorticity, `vars.tendencies.vor`.
+for vorticity, `vars.tendencies.vorticity`.
 In SpeedyWeather, the `forcing!` comes first, then the `drag!` (see [Custom drag](@ref))
 then the curl of the vorticity flux (the vorticity advection).
 This means we can transform `S_grid` directly back into `vor_tend`
@@ -356,7 +356,7 @@ run!(simulation)
 
 # visualisation
 using CairoMakie
-vor = simulation.variables.grid.vor[:, 1]
+vor = simulation.variables.grid.vorticity[:, 1]
 heatmap(vor, title="Stochastically stirred vorticity")
 save("stochastic_stirring.png", ans) # hide
 nothing # hide
@@ -399,12 +399,14 @@ In general, these are the fields you can write into for new terms
 
 - `tendencies.grid.u` in grid space
 - `tendencies.grid.v` in grid space
-- `tendencies.vor` in spectral space
-- `tendencies.div` in spectral space
-- `tendencies.pres` in spectral space
-- `tendencies.grid.pres` in grid space
-- `tendencies.grid.temp` in grid space
-- `tendencies.grid.humid` in grid space
+- `tendencies.vorticity` in spectral space
+- `tendencies.divergence` in spectral space
+- `tendencies.pressure` in spectral space (primitive equation only)
+- `tendencies.grid.pressure` in grid space (primitive equation only)
+- `tendencies.η` in spectral space (shallow water only)
+- `tendencies.grid.η` in grid space (shallow water only)
+- `tendencies.grid.temperature` in grid space (primitive equation only)
+- `tendencies.grid.humidity` in grid space (primitive wet model only)
 
 One currently cannot force vorticity or divergence in grid space
 but you would need to force u, v instead. In contrast, u and v cannot
@@ -414,5 +416,6 @@ between spaces to obtain tendencies. Pressure (or interface displacement
 in the shallow water) can be forced both in spectral or grid space.
 Note that if you write into the pressure tendency for the primitive equation model
 these need to correspond to ``\partial_t \ln p_s`` so not in units of Pa/s but
-including the logarithm! In the shallow water model, this should have
-the normal units of m/s instead and the pressure-equivalent variables is called `η` instead as it's the interface displacement in meters (and not actually pressure).
+including the logarithm! In the shallow water model, the pressure-equivalent variable
+is called `η` instead as it's the interface displacement in meters (and not actually pressure),
+so this should have the normal units of m/s instead.

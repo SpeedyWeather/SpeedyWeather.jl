@@ -11,7 +11,7 @@
         copy!(vars_copy, vars)
 
         # prognostic arrays copied
-        @test vars_copy.prognostic.vor == vars.prognostic.vor
+        @test vars_copy.prognostic.vorticity == vars.prognostic.vorticity
         # clock copied
         @test vars_copy.prognostic.clock.time == vars.prognostic.clock.time
         @test vars_copy.prognostic.clock.timestep_counter == vars.prognostic.clock.timestep_counter
@@ -19,16 +19,16 @@
         @test vars_copy.prognostic.scale[] == vars.prognostic.scale[]
 
         # grid variables copied
-        @test vars_copy.grid.vor == vars.grid.vor
+        @test vars_copy.grid.vorticity == vars.grid.vorticity
         @test vars_copy.grid.u == vars.grid.u
         @test vars_copy.grid.v == vars.grid.v
 
         # tendencies copied
-        @test vars_copy.tendencies.vor == vars.tendencies.vor
+        @test vars_copy.tendencies.vorticity == vars.tendencies.vorticity
 
         # verify it's a deep copy, not aliasing
-        vars.prognostic.vor .= 0
-        @test !all(vars_copy.prognostic.vor .== 0)
+        vars.prognostic.vorticity .= 0
+        @test !all(vars_copy.prognostic.vorticity .== 0)
     end
 
     @testset "ShallowWater" begin
@@ -41,15 +41,15 @@
         vars_copy = Variables(model)
         copy!(vars_copy, vars)
 
-        @test vars_copy.prognostic.vor == vars.prognostic.vor
-        @test vars_copy.prognostic.div == vars.prognostic.div
+        @test vars_copy.prognostic.vorticity == vars.prognostic.vorticity
+        @test vars_copy.prognostic.divergence == vars.prognostic.divergence
         @test vars_copy.prognostic.η == vars.prognostic.η
-        @test vars_copy.grid.vor == vars.grid.vor
-        @test vars_copy.grid.div == vars.grid.div
+        @test vars_copy.grid.vorticity == vars.grid.vorticity
+        @test vars_copy.grid.divergence == vars.grid.divergence
 
         # no aliasing
-        vars.prognostic.div .= 0
-        @test !all(vars_copy.prognostic.div .== 0)
+        vars.prognostic.divergence .= 0
+        @test !all(vars_copy.prognostic.divergence .== 0)
     end
 
     @testset "PrimitiveDry" begin
@@ -63,14 +63,14 @@
         copy!(vars_copy, vars)
 
         # prognostic spectral variables
-        @test vars_copy.prognostic.vor == vars.prognostic.vor
-        @test vars_copy.prognostic.div == vars.prognostic.div
-        @test vars_copy.prognostic.temp == vars.prognostic.temp
-        @test vars_copy.prognostic.pres == vars.prognostic.pres
+        @test vars_copy.prognostic.vorticity == vars.prognostic.vorticity
+        @test vars_copy.prognostic.divergence == vars.prognostic.divergence
+        @test vars_copy.prognostic.temperature == vars.prognostic.temperature
+        @test vars_copy.prognostic.pressure == vars.prognostic.pressure
 
         # grid variables
-        @test vars_copy.grid.vor == vars.grid.vor
-        @test vars_copy.grid.temp == vars.grid.temp
+        @test vars_copy.grid.vorticity == vars.grid.vorticity
+        @test vars_copy.grid.temperature == vars.grid.temperature
 
         # namespaced prognostic variables (ocean, land)
         if haskey(vars.prognostic, :ocean)

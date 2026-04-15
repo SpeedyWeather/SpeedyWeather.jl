@@ -225,7 +225,7 @@ surface wind speeds in [m/s]. And the `:temperature` callback a time series of
 global mean surface temperatures in Kelvin on every time step while the model ran for 3 days.
 
 ```@example callbacks
-model.callbacks[:temperature].temp
+model.callbacks[:temperature].temperature
 ```
 
 ## Intrusive callbacks
@@ -327,7 +327,7 @@ function SpeedyWeather.callback!(
 
     # Just print the North Pole surface temperature to screen
     (;time) = vars.prognostic.clock
-    temp_at_north_pole = vars.grid.temp[1, end]
+    temp_at_north_pole = vars.grid.temperature[1, end]
 
     @info "North pole has a temperature of $temp_at_north_pole on $time."
 end

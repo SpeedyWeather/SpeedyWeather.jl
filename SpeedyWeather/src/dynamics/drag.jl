@@ -201,8 +201,8 @@ function drag!(
         lf::Integer,
         model::AbstractModel,
     )
-    vor_tend = vars.tendencies.vor
-    vor = get_step(vars.prognostic.vor, lf)
+    vor_tend = vars.tendencies.vorticity
+    vor = get_step(vars.prognostic.vorticity, lf)
 
     # scale by radius (but only once, the second radius is in vor)
     c = drag.c * vars.prognostic.scale[]
@@ -258,8 +258,8 @@ function drag!(
         lf::Integer,
         model::AbstractModel,
     )
-    vor = get_step(vars.prognostic.vor, lf)
-    vor_tend = vars.tendencies.vor
+    vor = get_step(vars.prognostic.vorticity, lf)
+    vor_tend = vars.tendencies.vorticity
     (; ζ₀) = drag
 
     # scale by radius as is vorticity

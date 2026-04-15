@@ -90,13 +90,13 @@ initialize!(::BackgroundShortwaveTransmissivity, ::AbstractModel) = nothing
     ) = transmissivity
     (; cloud_top, cloud_cover) = clouds
 
-    humid = vars.grid.humid_prev
+    humid = vars.grid.humidity_prev
     cos_zenith = vars.parameterizations.cos_zenith[ij]
     nlayers = size(t, 2)
 
     sigma_levels = model.geometry.σ_levels_half
     sigma_levels_full = model.geometry.σ_levels_full
-    normalized_surface_pressure = vars.grid.pres_prev[ij] / 100000
+    normalized_surface_pressure = vars.grid.pressure_prev[ij] / 100000
 
     # Zenith angle correction factor
     azen = transmissivity.zenith_amplitude

@@ -6,7 +6,7 @@
     SM = SpeedyTransforms.ScratchMemory(SG.NF, SG.architecture, SG.grid, 3)
 
     # created via model initialization
-    model = PrimitiveDryModel(spectral_grid, spectral_transform = S)
+    model = PrimitiveDryModel(SG, spectral_transform = S)
     variables = Variables(model)
 
     # change the memory of the transform
