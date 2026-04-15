@@ -152,30 +152,30 @@ end
 """Output writer that stores Variables snapshots in memory instead of writing
 to a file. Access the stored snapshots via `output.output` after the simulation.
 Otherwise follows the same logic as [`JLD2Output`](@ref). Fields are $(TYPEDFIELDS)"""
-@kwdef mutable struct ArrayOutput <: AbstractVariablesOutput
+@kwdef mutable struct ArrayOutput{B, S, T, Core} <: AbstractVariablesOutput
 
-    active::Bool = false
+    active::B = false
 
     "[OPTION] also write restart file if output=true?"
-    write_restart::Bool = false
+    write_restart::B = false
 
     "[OPTION] also write parameters txt file if output=true?"
-    write_parameters_txt::Bool = false
+    write_parameters_txt::B = false
 
     "[OPTION] also write progress txt file if output=true?"
-    write_progress_txt::Bool = false
+    write_progress_txt::B = false
 
     "[OPTION] output frequency, time step"
-    output_dt::Second = Second(DEFAULT_OUTPUT_DT)
+    output_dt::S = Second(DEFAULT_OUTPUT_DT)
 
     "[OPTION] which variable groups to save, e.g. (:prognostic,) or (:prognostic, :grid). Use (:all,) for all groups."
-    groups::Tuple{Vararg{Symbol}} = (:all,)
+    groups::T= (:all,)
 
     "[DERIVED] shared output writer state (run folder, counters, output frequency)"
-    core::OutputWriterCore = OutputWriterCore()
+    core::Core = OutputWriterCore()
 
     "[DERIVED] vector of stored variable snapshots, populated during the simulation"
-    output::Vector = []
+    output::Vector{Any} = [Vector{Any}()]
 end
 
 # ArrayOutput has no run folder or file — stub out path-related option fields
@@ -183,6 +183,7 @@ end
 Base.getproperty(output::ArrayOutput, s::Symbol) = begin
     s in (:path, :run_prefix, :id, :run_number, :run_digits, :overwrite) && return _arrayoutput_default(s)
     s === :core && return getfield(output, :core)
+    s === :output && return getfield(output, :output)[1]
     s in OUTPUT_WRITER_CORE_FIELDS && return getproperty(getfield(output, :core), s)
     return getfield(output, s)
 end
@@ -223,7 +224,7 @@ function initialize!(
     ic = deepcopy(filter_groups(vars, output))
     output_vector = Vector{typeof(ic)}(undef, n_outputs)
     output_vector[1] = ic
-    setfield!(output, :output, output_vector)
+    getfield(output, :output)[1] = output_vector
 
     # counter already reset to 0 by initialize!, set to 1 for IC
     output.output_counter = 1
@@ -236,7 +237,7 @@ function output!(output::ArrayOutput, simulation::AbstractSimulation)
     output!(output.core, output) || return nothing
     output.output_counter += 1
     i = output.output_counter
-    getfield(output, :output)[i] = deepcopy(filter_groups(simulation.variables, output))
+    getfield(output, :output)[1][i] = deepcopy(filter_groups(simulation.variables, output))
     return nothing
 end
 
