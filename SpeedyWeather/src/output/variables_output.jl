@@ -175,7 +175,7 @@ Otherwise follows the same logic as [`JLD2Output`](@ref). Fields are $(TYPEDFIEL
     core::Core = OutputWriterCore()
 
     "[DERIVED] vector of stored variable snapshots, populated during the simulation"
-    output::Vector{Any} = [Vector{Any}()]
+    output::Vector{Any} = Any[Vector{Any}()]
 end
 
 # ArrayOutput has no run folder or file — stub out path-related option fields
