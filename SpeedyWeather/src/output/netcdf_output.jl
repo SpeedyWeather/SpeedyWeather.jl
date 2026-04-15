@@ -1,6 +1,3 @@
-abstract type AbstractOutput <: AbstractModelComponent end
-abstract type AbstractOutputVariable <: AbstractModelComponent end
-
 # default number format for output
 const DEFAULT_OUTPUT_NF = Float32
 const DEFAULT_OUTPUT_DT = Hour(6)
@@ -43,11 +40,8 @@ $(TYPEDFIELDS)"""
     "[OPTION] run numbers digits"
     run_digits::Int = 4
 
-    "[DERIVED] folder name where data is stored, determined at initialize!"
-    run_folder::String = ""
-
-    "[DERIVED] full path to folder where data is stored, determined at initialize!"
-    run_path::String = ""
+    "[DERIVED] shared output writer state (run folder, counters, output frequency)"
+    core::OutputWriterCore = OutputWriterCore()
 
     "[OPTION] Overwrite an existing run folder?"
     overwrite::Bool = false
@@ -73,11 +67,6 @@ $(TYPEDFIELDS)"""
 
     "[OPTION] dictionary of variables to output, e.g. u, v, vor, div, pres, temp, humid"
     variables::OUTPUT_VARIABLES_DICT = OutputVariablesDict()
-
-    # TIME STEPS AND COUNTERS (initialize later)
-    output_every_n_steps::Int = 0           # output frequency
-    timestep_counter::Int = 0               # time step counter
-    output_counter::Int = 0                 # output step counter
 
     # the netcdf file to be written into, will be created
     netcdf_file::Union{NCDataset, Nothing} = nothing
@@ -263,19 +252,8 @@ function initialize!(
             " Please construct NetCDFOutput with the same `nlayers_soil` as the model."
     end
 
-    # GET RUN ID, CREATE FOLDER
-    # get new id only if not already specified
-    determine_run_folder!(output)
-    create_run_folder!(output)
-
-    # OUTPUT FREQUENCY
-    rate = Millisecond(output.output_dt).value / model.time_stepping.Δt_millisec.value
-    output.output_every_n_steps = max(1, round(Int, rate))
-    output.output_dt = Second(round(Int, output.output_every_n_steps * model.time_stepping.Δt_sec))
-
-    # RESET COUNTERS
-    output.timestep_counter = 0         # time step counter
-    output.output_counter = 0           # output step counter
+    # SHARED INITIALIZATION (run folder, output frequency, counters, callbacks)
+    initialize!(output.core, output, model)
 
     # CREATE NETCDF FILE, vector of NcVars for output
     (; run_path, filename) = output
@@ -313,15 +291,6 @@ function initialize!(
         output!(output, var, Simulation(vars, model))
     end
 
-    # CALLBACKS
-    # add ParametersTxt callback
-    output.write_parameters_txt && add!(model.callbacks, :parameters_txt => ParametersTxt())
-
-    # add ProgressTxt callback
-    output.write_progress_txt && add!(model.callbacks, :progress_txt => ProgressTxt())
-
-    # add RestartFile callback
-    output.write_restart && add!(model.callbacks, :restart_file => RestartFile())
     return nothing
 end
 
@@ -357,13 +326,10 @@ Simply escapes for no netcdf output or if output shouldn't be written on this ti
 Interpolates onto output grid and resolution as specified in `output`, converts to output
 number format, truncates the mantissa for higher compression and applies lossless compression."""
 function output!(output::AbstractOutput, simulation::AbstractSimulation)
-    output.timestep_counter += 1                                        # increase counter
-    (; active, output_every_n_steps, timestep_counter) = output
-    active || return nothing                                            # escape immediately for no netcdf output
-    timestep_counter % output_every_n_steps == 0 || return nothing      # escape if output not written on this step
+    output!(output.core, output) || return nothing
 
     (; clock) = simulation.variables.prognostic
-    output!(output, clock.time)                                         # increase counter write time
+    output!(output, clock.time)                                         # increase counter, write time
     output!(output, output.variables, simulation)                       # write variables
     return output
 end

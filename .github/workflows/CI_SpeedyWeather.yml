@@ -47,9 +47,9 @@ jobs:
           Pkg.develop([PackageSpec(; path) for path in ("../SpeedyWeatherInternals", "../LowerTriangularArrays", "../RingGrids", "../SpeedyTransforms")])
           Pkg.instantiate()
         if: ${{ matrix.version == '1.10' }}
-      - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
         with:
+          test_args: '--verbose'    # this will also print compile time information via ParallelTestRunner.jl
           project: SpeedyWeather
         env:
           GITHUB_AUTH: ${{ secrets.GITHUB_TOKEN }}

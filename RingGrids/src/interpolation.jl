@@ -101,6 +101,20 @@ end
 
 Adapt.@adapt_structure AnvilLocator
 
+function Architectures.on_architecture(arch::AbstractArchitecture, loc::AnvilLocator)
+    return AnvilLocator(
+        npoints_output = loc.npoints_output,
+        js = on_architecture(arch, loc.js),
+        ij_as = on_architecture(arch, loc.ij_as),
+        ij_bs = on_architecture(arch, loc.ij_bs),
+        ij_cs = on_architecture(arch, loc.ij_cs),
+        ij_ds = on_architecture(arch, loc.ij_ds),
+        Δys = on_architecture(arch, loc.Δys),
+        Δabs = on_architecture(arch, loc.Δabs),
+        Δcds = on_architecture(arch, loc.Δcds),
+    )
+end
+
 """
 $(TYPEDSIGNATURES)
 Zero generator function for the 4-point average AnvilLocator. Use `update_locator!` to

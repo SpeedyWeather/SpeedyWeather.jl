@@ -200,7 +200,7 @@ end
     spectral_grid = SpectralGrid()
     model = PrimitiveDryModel(spectral_grid)
     simulation = initialize!(model)
-    add!(model, :restart_file => RestartFile(path = tmp_output_path, write_only_with_output = false, filename = "myrestart.jld2"))
+    add!(model, :restart_file => WriteVariablesRestartFile(path = tmp_output_path, write_only_with_output = false, filename = "myrestart.jld2"))
     run!(simulation, period = Day(1))
 
     initial_conditions = StartFromFile(run_folder = tmp_output_path, filename = "myrestart.jld2")
