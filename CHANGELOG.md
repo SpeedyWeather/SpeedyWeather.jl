@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fixed several typos in the documentation [#1054](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1054)
 - Revised Enzyme tests and workflow [#1050](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1050)
 - Held-Suarez missed scaling, temperatures were not stable [#1042](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1042)
 - Update docs sidebar [#1048](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1048)

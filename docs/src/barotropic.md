@@ -24,7 +24,7 @@ single global layer on the sphere.
 \frac{\partial \zeta}{\partial t} + \nabla \cdot (\mathbf{u}(\zeta + f)) =
 F_\zeta + \nabla \times \mathbf{F}_\mathbf{u} + (-1)^{n+1}\nu\nabla^{2n}\zeta
 ```
-We denote time``t``, velocity vector ``\mathbf{u} = (u, v)``, Coriolis parameter ``f``,
+We denote time ``t``, velocity vector ``\mathbf{u} = (u, v)``, Coriolis parameter ``f``,
 and hyperdiffusion ``(-1)^{n+1} \nu \nabla^{2n} \zeta``
 (``n`` is the hyperdiffusion order,  see [Horizontal diffusion](@ref diffusion)).
 We also include possible forcing terms
