@@ -4,7 +4,7 @@ abstract type AbstractLeapfrog <: AbstractTimeStepper end
 
 """Leapfrog time stepping defined by the following fields
 $(TYPEDFIELDS)"""
-mutable struct Leapfrog{NF, S, B, MS} <: AbstractLeapfrog
+mutable struct Leapfrog{NF, S, B, MS, IntType} <: AbstractLeapfrog
     "[OPTION] Time step in minutes for T31, scale linearly to `trunc`"
     Δt_at_T31::S
 
@@ -34,21 +34,31 @@ mutable struct Leapfrog{NF, S, B, MS} <: AbstractLeapfrog
 
     "[DERIVED] Time step Δt [s/m] at specified resolution, scaled by 1/radius"
     Δt::NF
+
+    "[DERIVED] Step counter to determine shorter Δt in 1st/2nd step"
+    step_counter::IntType
 end
 
-Adapt.adapt_structure(to, L::Leapfrog) = LeapfrogCore(L.Δt_millisec, L.Δt_sec, L.Δt)
+Adapt.adapt_structure(to, L::Leapfrog) = LeapfrogCore(L.Δt_millisec, L.Δt_sec, L.Δt, L.step_counter)
 # leapfrogging always needs 2 steps in spectral
-prognostic_spectral_steps(::Leapfrog) = 2                                       
+prognostic_spectral_steps(::Leapfrog) = 2
 # but in 2D only 1 step in grid space
-prognostic_grid_steps(::Leapfrog, ::Union{<:Barotropic, <:ShallowWater}) = 1    
+prognostic_grid_steps(::Leapfrog, ::Union{<:Barotropic, <:ShallowWater}) = 1
 # but the parameterizations are evaluated at the previous step so 2
-prognostic_grid_steps(::Leapfrog, ::PrimitiveEquation) = 2                      
+prognostic_grid_steps(::Leapfrog, ::PrimitiveEquation) = 2
 # always only one step for tendencies
 tendency_steps(::Leapfrog) = 1
 
+# for leapfrog do first semi-implicit corrections then horizontal diffusion
+function diffusion_and_implicit!(vars, ::AbstractLeapfrog, ::AbstractImplicit, model)
+    implicit_correction!(vars, model)
+    horizontal_diffusion!(vars, model)
+    return nothing
+end
+
 """($TYPEDSIGNATURES)
 Immutable core struct used to adapt only the time step fields for use in kernels"""
-struct LeapfrogCore{NF, MS} <: AbstractLeapfrog
+struct LeapfrogCore{NF, MS, IntType} <: AbstractLeapfrog
     "[DERIVED] Time step Δt in milliseconds at specified resolution"
     Δt_millisec::MS
 
@@ -57,6 +67,9 @@ struct LeapfrogCore{NF, MS} <: AbstractLeapfrog
 
     "[DERIVED] Time step Δt [s/m] at specified resolution, scaled by 1/radius"
     Δt::NF
+
+    "[DERIVED] Step counter to determine shorter Δt in 1st/2nd step"
+    step_counter::IntType
 end
 
 Adapt.@adapt_structure LeapfrogCore
@@ -84,9 +97,12 @@ function Leapfrog(
     # derived and mutated, controlled by start_with_euler and continue_with_leapfrog
     first_step_euler = start_with_euler
 
+    # to distinguish between first, second and later time steps for leapfrog spin up with shorter steps
+    step_counter = 0
+
     return Leapfrog(
         Second(Δt_at_T31), adjust_with_output, start_with_euler, continue_with_leapfrog, first_step_euler,
-        NF(robert_filter), NF(williams_filter), Δt_millisec, Δt_sec, Δt,
+        NF(robert_filter), NF(williams_filter), Δt_millisec, Δt_sec, Δt, step_counter,
     )
 end
 
@@ -99,72 +115,67 @@ function initialize!(L::Leapfrog, model::AbstractModel)
     calculate_Δt!(L, model)  # common among several time steppers
     if L.start_with_euler
         L.first_step_euler = true
+        L.step_counter = 0
     end
     return nothing
 end
 
-function calculate_Δt!(L::AbstractTimeStepper, model::AbstractModel)
-    (; trunc) = model.spectral_grid
-    (; radius) = model.planet
-    output_dt = get_output_dt(model.output)
+count_step!(L::Leapfrog) = (L.step_counter += 1)
 
-    # take radius from planet and recalculate time step and possibly adjust with output dt
-    L.Δt_millisec = get_Δt_millisec(L.Δt_at_T31, trunc, radius, L.adjust_with_output, output_dt)
-    L.Δt_sec = L.Δt_millisec.value / 1000
-    L.Δt = L.Δt_sec / radius
-
-    # check how time steps from time integration and output align
-    n = round(Int, Millisecond(output_dt).value / L.Δt_millisec.value)
-    nΔt = n * L.Δt_millisec
-    if nΔt != output_dt
-        @warn "$n steps of Δt = $(L.Δt_millisec.value)ms yield output every " *
-            "$(nΔt.value)ms (=$(nΔt.value / 1000)s), but output_dt = $(output_dt.value)s"
-    end
-    return nothing
+function time_step(L::Leapfrog)
+    (; Δt) = L
+    L.step_counter == 1 && return Δt/2  # first step Euler with Δt/2
+    L.step_counter == 2 && return Δt    # 2nd step leapfrog with Δt
+    return 2Δt                          # later steps leapfrog with 2Δt
 end
 
-"""$(TYPEDSIGNATURES)
-Performs one leapfrog time step with (`lf=2`) or without (`lf=1`) Robert+Williams filter
-(see Williams (2009), Montly Weather Review, Eq. 7-9)."""
-function leapfrog!(
-        A_old::LowerTriangularArray,        # prognostic variable at t
-        A_new::LowerTriangularArray,        # prognostic variable at t+dt
-        tendency::LowerTriangularArray,     # tendency (dynamics+physics) of A
-        dt::Real,                           # time step (=2Δt, but for init steps =Δt, Δt/2)
-        lf::Integer,                        # leapfrog index to dis/enable Williams filter
-        L::Leapfrog{NF},                    # struct with constants
-    ) where {NF}                              # number format NF
+function prognostic_step(L::Leapfrog)
+    L.step_counter == 1 || L.step_counter == 2 && return 1
+    return 2
+end
 
-    @boundscheck lf == 1 || lf == 2 || throw(BoundsError())         # index lf picks leapfrog dim
-    @boundscheck size(A_old) == size(A_new) == size(tendency) || throw(BoundsError())
+function update_prognostic!(
+        var::AbstractArray,
+        tendency::AbstractArray,
+        vars::Variables,
+        time_stepping::Leapfrog,
+        implicit::Union{Nothing, AbstractImplicit},
+        ::AbstractModel,
+    )
 
-    A_lf = lf == 1 ? A_old : A_new              # view on either t or t+dt to dis/enable Williams filter
-    (; robert_filter, williams_filter) = L      # coefficients for the Robert and Williams filter
-    dt_NF = convert(NF, dt)                     # time step dt in number format NF
+    Δt = time_step(time_stepping)
+    lf = prognostic_step(time_stepping)         # leapfrog prognostic step index
+    var_old, var_new = get_steps(var)
+    var_lf = get_step(var, lf)                  # view on either t or t+dt to dis/enable Williams filter
+    var_tend = get_tendency_step(tendency, time_stepping, time_stepping)
+
+    @boundscheck lf == 1 || lf == 2 || throw(BoundsError())
+    @boundscheck size(var_old) == size(var_new) == size(var_tend) || throw(BoundsError())
+     
+    (; robert_filter, williams_filter) = time_stepping          # coefficients for the Robert and Williams filter
 
     # LEAP FROG time step with or without Robert+Williams filter
     # Robert time filter to compress computational mode, Williams filter for 3rd order accuracy
     # see Williams (2009), Eq. 7-9
-    # for lf == 1 (initial time step) no filter applied (w1=w2=0)
+    # for lf == 1 (time steps 1 or 2) no filter applied (w1=w2=0)
     # for lf == 2 (later steps) Robert+Williams filter is applied
-    w1 = lf == 1 ? zero(NF) : robert_filter * williams_filter / 2       # = ν*α/2 in Williams (2009, Eq. 8)
-    w2 = lf == 1 ? zero(NF) : robert_filter * (1 - williams_filter) / 2 # = ν(1-α)/2 in Williams (2009, Eq. 9)
+    w1 = (lf - 1) * robert_filter * williams_filter / 2       # = ν*α/2 in Williams (2009, Eq. 8)
+    w2 = (lf - 1) * robert_filter * (1 - williams_filter) / 2 # = ν(1-α)/2 in Williams (2009, Eq. 9)
 
     launch!(
         architecture(tendency), SpectralWorkOrder, size(tendency), leapfrog_kernel!,
-        A_old, A_new, A_lf, tendency, dt_NF, w1, w2
+        var_old, var_new, var_lf, tendency, Δt, w1, w2
     )
-
     return nothing
 end
 
-@kernel inbounds = true function leapfrog_kernel!(A_old, A_new, A_lf, tendency, dt, w1, w2)
+@kernel inbounds = true function leapfrog_kernel!(var_old, var_new, var_lf, tendency, Δt, w1, w2)
     lmk = @index(Global, Linear)    # every harmonic lm, every vertical layer k
-    a_old = A_old[lmk]
-    a_new = a_old + dt * tendency[lmk]
-    a_update = a_old - 2A_lf[lmk] + a_new
-    A_old[lmk] = A_lf[lmk] + w1 * a_update
-    A_new[lmk] = a_new - w2 * a_update
+    old = var_old[lmk]
+    new = old + Δt * tendency[lmk]
+    update = old - 2var_lf[lmk] + new
+    var_old[lmk] = var_lf[lmk] + w1 * update
+    var_new[lmk] = new - w2 * update
 end
 
 """$(TYPEDSIGNATURES)
@@ -252,12 +263,5 @@ function first_timesteps!(
     initialize!(implicit, 2Δt, vars, model)
     set_initialized!(implicit)      # mark implicit as initialized
 
-    return nothing
-end
-
-# for leapfrog do first semi-implicit corrections then horizontal diffusion
-function diffusion_and_implicit!(vars, time_stepping::AbstractLeapfrog, ::AbstractImplicit model)
-    implicit_correction!(vars, model)
-    horizontal_diffusion!(vars, model)
     return nothing
 end

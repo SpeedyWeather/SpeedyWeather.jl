@@ -64,7 +64,7 @@ $(TYPEDFIELDS)"""
 end
 
 """$(TYPEDSIGNATURES)
-Generator function based on the resolutin in `spectral_grid`.
+Generator function based on the resolution in `spectral_grid`.
 Passes on keyword arguments."""
 function HyperDiffusion(spectral_grid::SpectralGrid; kwargs...)
     (; NF, trunc, nlayers, MatrixType) = spectral_grid        # take resolution parameters from spectral_grid
@@ -283,8 +283,8 @@ function horizontal_diffusion!(
     horizontal_diffusion!(div_tend, div, expl_div, impl_div)
 
     for (name, tracer) in model.tracers
-        tracer_var = get_step(vars.prognostic.tracers[name], lf)      # lta_view for leapfrog index
-        tracer_tend = vars.tendencies.tracers[name]
+        tracer_var = get_prognostic_step(vars.prognostic.tracers[name], model.time_stepping, diffusion)
+        tracer_tend = get_tendency_step(vars.tendencies.tracers[name], model.time_stepping, diffusion)
         tracer.active && horizontal_diffusion!(tracer_tend, tracer_var, expl, impl)
     end
     return nothing

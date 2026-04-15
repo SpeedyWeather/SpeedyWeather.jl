@@ -67,8 +67,8 @@ tendency_spectral_steps(::NCycleLorenz) = 2 # to store F, G in Hotta et al. 2016
 
 # dispatch over time stepper here so that other time stepper can change the order
 function diffusion_and_implicit!(vars, ::AbstractNCycleLorenz, model)
-    implicit_correction!(vars, model)
     horizontal_diffusion!(vars, model)
+    implicit_correction!(vars, model)
     return nothing
 end
 

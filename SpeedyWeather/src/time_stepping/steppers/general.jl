@@ -1,0 +1,90 @@
+# extend if a time stepper needs to keep track of steps
+count_step!(::AbstractTimeStepper) = nothing
+
+"""$(TYPEDSIGNATURES)
+Computes the time step in [ms]. `Δt_at_T31` is always scaled with the resolution `trunc` 
+of the model. In case `adjust_Δt_with_output` is true, the `Δt_at_T31` is additionally 
+adjusted to the closest divisor of `output_dt` so that the output time axis is keeping
+`output_dt` exactly."""
+function get_Δt_millisec(
+        Δt_at_T31::TimePeriod,
+        trunc,
+        radius,
+        adjust_with_output::Bool,
+        output_dt::TimePeriod = DEFAULT_OUTPUT_DT,
+    )
+    # linearly scale Δt with trunc+1 (which are often powers of two)
+    resolution_factor = (DEFAULT_TRUNC + 1) / (trunc + 1)
+
+    # radius also affects grid spacing, scale proportionally
+    radius_factor = radius / DEFAULT_RADIUS
+
+    # maybe rename to _at_trunc_and_radius?
+    Δt_at_trunc = Second(Δt_at_T31).value * resolution_factor * radius_factor
+
+    if adjust_with_output && (output_dt > Millisecond(0))
+        k = round(Int, Second(output_dt).value / Δt_at_trunc)
+        divisors = Primes.divisors(Millisecond(output_dt).value)
+        sort!(divisors)
+        i = findfirst(x -> x >= k, divisors)
+        k_new = isnothing(i) ? k : divisors[i]
+        Δt_millisec = Millisecond(round(Int, Millisecond(output_dt).value / k_new))
+
+        # provide info when time step is significantly shortened or lengthened
+        Δt_millisec_unadjusted = round(Int, 1000 * Δt_at_trunc)
+        Δt_ratio = Δt_millisec.value / Δt_millisec_unadjusted
+
+        if abs(Δt_ratio - 1) > 0.05     # print info only when +-5% changes
+            p = round(Int, (Δt_ratio - 1) * 100)
+            ps = p > 0 ? "+" : ""
+            @info "Time step changed from $Δt_millisec_unadjusted to $Δt_millisec ($ps$p%) to match output frequency."
+        end
+    else
+        Δt_millisec = Millisecond(round(Int, 1000 * Δt_at_trunc))
+    end
+
+    return Δt_millisec
+end
+
+"""$(TYPEDSIGNATURES)
+Change time step of timestepper `L` to `Δt` (unscaled)
+and disables adjustment to output frequency."""
+function set!(
+        L::AbstractTimeStepper,
+        Δt::Period,                         # unscaled time step in Second, Minute, ...
+    )
+    L.Δt_millisec = Millisecond(Δt)         # recalculate all Δt fields
+    L.Δt_sec = L.Δt_millisec.value / 1000
+    L.Δt = L.Δt_sec / L.radius
+
+    # recalculate the default time step at resolution T31 to be consistent
+    resolution_factor = (L.trunc + 1) / (DEFAULT_TRUNC + 1)
+    L.Δt_at_T31 = Second(round(Int, L.Δt_sec * resolution_factor))
+
+    # given Δt was manually set disallow adjustment to output frequency
+    L.adjust_with_output = false
+    return L
+end
+
+# also allow for keyword arguments
+set!(L::AbstractTimeStepper; Δt::Period) = set!(L, Δt)
+
+function calculate_Δt!(L::AbstractTimeStepper, model::AbstractModel)
+    (; trunc) = model.spectral_grid
+    (; radius) = model.planet
+    output_dt = get_output_dt(model.output)
+
+    # take radius from planet and recalculate time step and possibly adjust with output dt
+    L.Δt_millisec = get_Δt_millisec(L.Δt_at_T31, trunc, radius, L.adjust_with_output, output_dt)
+    L.Δt_sec = L.Δt_millisec.value / 1000
+    L.Δt = L.Δt_sec / radius
+
+    # check how time steps from time integration and output align
+    n = round(Int, Millisecond(output_dt).value / L.Δt_millisec.value)
+    nΔt = n * L.Δt_millisec
+    if nΔt != output_dt
+        @warn "$n steps of Δt = $(L.Δt_millisec.value)ms yield output every " *
+            "$(nΔt.value)ms (=$(nΔt.value / 1000)s), but output_dt = $(output_dt.value)s"
+    end
+    return nothing
+end

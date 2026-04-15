@@ -35,7 +35,8 @@ end
 
 """$(TYPEDSIGNATURES)
 Get all steps of a variable as a tuple of views (wrapped into the same type as the input variable)
-as defined by `get_step`. "Steps" refer to the last dimension, for prognostic variables e.g. used for the leapfrog time step."""
+as defined by `get_step`. "Steps" refer to the last dimension, for prognostic variables
+e.g. used for the leapfrog time step."""
 get_steps
 
 get_steps(var::AbstractArray{T, 1}) where {T} = (var,)
