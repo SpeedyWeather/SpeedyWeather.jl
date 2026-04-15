@@ -4,6 +4,9 @@ abstract type AbstractHorizontalDiffusion <: AbstractModelComponent end
 horizontal_diffusion!(vars::Variables, model::AbstractModel) =
     horizontal_diffusion!(vars, model.horizontal_diffusion, model)
 
+# dispatch to decide between implicit or explicit diffusion
+@inline implicit_diffusion(::AbstractHorizontalDiffusion, ::Union{Nothing, AbstractImplicit}, ::AbstractTimeStepper) = true
+
 export HyperDiffusion
 
 """
@@ -164,7 +167,7 @@ Apply horizontal diffusion to a 2D field `var` in spectral space by updating its
 with an implicitly calculated diffusion term. The implicit diffusion of the next time step is split
 into an explicit part `expl` and an implicit part `impl`, such that both can be calculated
 in a single forward step by using `var` as well as its tendency `tendency`."""
-function horizontal_diffusion!(
+function horizontal_diffusion!(             # implicit version
         tendency::LowerTriangularArray,     # tendency of a
         var::LowerTriangularArray,          # spectral horizontal field to diffuse
         expl::AbstractMatrix,               # explicit spectral damping (lmax x nlayers matrix)
@@ -178,13 +181,13 @@ function horizontal_diffusion!(
     @boundscheck nlayers <= size(expl, 2) == size(impl, 2) || throw(BoundsError(expl, nlayers))
 
     launch!(
-        architecture(tendency), SpectralWorkOrder, size(tendency), _horizontal_diffusion_kernel!,
+        architecture(tendency), SpectralWorkOrder, size(tendency), _implicit_horizontal_diffusion_kernel!,
         tendency, var, expl, impl, var.spectrum.l_indices
     )
     return nothing
 end
 
-@kernel inbounds = true function _horizontal_diffusion_kernel!(
+@kernel inbounds = true function _implicit_horizontal_diffusion_kernel!(
         tendency, var, expl, impl, l_indices
     )
 
@@ -199,6 +202,41 @@ end
     tendency[I] = (tendency[I] + expl[l, k] * var[I]) * impl[l, k]
 end
 
+function horizontal_diffusion!(             # explicit version
+        tendency::LowerTriangularArray,     # tendency of var
+        var::LowerTriangularArray,          # spectral horizontal field to diffuse
+        expl::AbstractMatrix,               # explicit spectral damping (lmax x nlayers matrix)
+        impl::Nothing,                      # pass on nothing to dispatch to explicit diffusion                         
+    )
+    lmax, mmax = size(tendency, OneBased, as = Matrix)
+    nlayers = size(var, 2)
+
+    @boundscheck size(tendency) == size(var) || throw(BoundsError(tendency))
+    @boundscheck lmax <= size(expl, 1) || throw(BoundsError(expl, lmax))
+    @boundscheck nlayers <= size(expl, 2) || throw(BoundsError(expl, nlayers))
+
+    launch!(
+        architecture(tendency), SpectralWorkOrder, size(tendency), _explicit_horizontal_diffusion_kernel!,
+        tendency, var, expl, var.spectrum.l_indices
+    )
+    return nothing
+end
+
+@kernel inbounds = true function _explicit_horizontal_diffusion_kernel!(
+        tendency, var, expl, l_indices
+    )
+
+    I = @index(Global, Cartesian)
+    lm = I[1]
+    k = ndims(var) == 1 ? 1 : I[2]
+
+    # Get the degree l for this coefficient
+    l = l_indices[lm]
+
+    # Apply horizontal diffusion
+    tendency[I] += expl[l, k] * var[I]
+end
+
 """$(TYPEDSIGNATURES)
 Apply horizontal diffusion to vorticity in the BarotropicModel."""
 function horizontal_diffusion!(
@@ -206,7 +244,8 @@ function horizontal_diffusion!(
         diffusion::AbstractHorizontalDiffusion,
         model::Barotropic,
     )
-    (; expl, impl) = diffusion
+    (; expl) = diffusion
+    impl = implicit_diffusion(diffusion, model.implicit, model.time_stepping) ? diffusion.impl : nothing
 
     # Barotropic model diffuses vorticity (only variable)
     vor = get_prognostic_step(vars.prognostic.vorticity, model.time_stepping, diffusion)
@@ -227,15 +266,19 @@ function horizontal_diffusion!(
         vars::Variables,
         diffusion::AbstractHorizontalDiffusion,
         model::ShallowWater,
-        lf::Integer = 1,    # leapfrog index used (2 is unstable)
     )
-    (; expl, impl, expl_div, impl_div) = diffusion
+    (; expl, expl_div) = diffusion
+
+    # apply diffusion explicitly by passing on nothing for the precomputed implicit array
+    do_implicitly = implicit_diffusion(diffusion, model.implicit, model.time_stepping)
+    impl = do_implicitly ? diffusion.impl : nothing
+    impl_div = do_implicitly ? diffusion.impl_div : nothing
 
     # ShallowWater model diffuses vorticity and divergence
-    vor = get_step(vars.prognostic.vorticity, lf)
-    div = get_step(vars.prognostic.divergence, lf)
-    vor_tend = vars.tendencies.vorticity
-    div_tend = vars.tendencies.divergence
+    vor = get_prognostic_step(vars.prognostic.vorticity, model.time_stepping, diffusion)
+    vor_tend = get_tendency_step(vars.tendencies.vorticity, model.time_stepping, diffusion)
+    div = get_prognostic_step(vars.prognostic.divergence, model.time_stepping, diffusion)
+    div_tend = get_tendency_step(vars.tendencies.divergence, model.time_stepping, diffusion)
     horizontal_diffusion!(vor_tend, vor, expl, impl)
     horizontal_diffusion!(div_tend, div, expl_div, impl_div)
 

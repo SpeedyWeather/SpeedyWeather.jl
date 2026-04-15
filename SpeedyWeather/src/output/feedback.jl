@@ -85,9 +85,6 @@ function initialize!(feedback::Feedback, variables::Variables, model::AbstractMo
     return nothing
 end
 
-# fallback if feedback is set to nothing
-initialize!(::Nothing, ::Variables, model::AbstractModel) = nothing
-
 progress!(feedback::Feedback) = ProgressMeter.next!(feedback.progress_meter)
 
 function progress!(feedback::Feedback, vars::Variables, model::AbstractModel)

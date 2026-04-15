@@ -254,3 +254,10 @@ function first_timesteps!(
 
     return nothing
 end
+
+# for leapfrog do first semi-implicit corrections then horizontal diffusion
+function diffusion_and_implicit!(vars, time_stepping::AbstractLeapfrog, ::AbstractImplicit model)
+    implicit_correction!(vars, model)
+    horizontal_diffusion!(vars, model)
+    return nothing
+end

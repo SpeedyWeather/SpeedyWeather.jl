@@ -98,15 +98,15 @@ set!(L::AbstractTimeStepper; Δt::Period) = set!(L, Δt)
 Calculate a single time step for the barotropic model."""
 function time_step!(
         vars::Variables,                        # all variables
-        TS::AbstractTimeStepper,                # time stepping parameters
-        model::Barotropic,                      # everything that's constant at runtime
+        time_stepping::AbstractTimeStepper,     # time stepping parameters
+        model::Union{Barotropic, ShallowWater}, # everything that's constant at runtime
     )
     # exit immediately if NaNs/Infs already present
     (!isnothing(model.feedback) && model.feedback.nans_detected) && return nothing
-    reset_tendencies!(vars, TS)                 # set the tendencies back to zero for accumulation
+    reset_tendencies!(vars, time_stepping)      # set the tendencies back to zero for accumulation
 
     dynamics_tendencies!(vars, model)
-    horizontal_diffusion!(vars, model)
+    diffusion_and_implicit!(vars, model)        # dispatch over time stepper and implicit so that the order can be changed
     update_prognostic!(vars, model)             # step prognostic variables forward
     transform!(vars, model)                     # new spectral state to grid
     particle_advection!(vars, model)            # TODO move up?
@@ -114,32 +114,17 @@ function time_step!(
     return nothing
 end
 
-"""$(TYPEDSIGNATURES)
-Calculate a single time step for the shallow water model."""
-function time_step!(
-        vars::Variables,                # all variables
-        dt::Real,                       # time step (mostly =2Δt, but for first_timesteps! =Δt, Δt/2)
-        model::ShallowWater,            # everything that's constant at runtime
-        lf1::Integer = 2,               # leapfrog index 1 (dis/enables Robert+Williams filter)
-        lf2::Integer = 2,               # leapfrog index 2 (time step used for tendencies)
-    )
-    # exit immediately if NaNs/Infs already present
-    (!isnothing(model.feedback) && model.feedback.nans_detected) && return nothing
-    reset_tendencies!(vars)             # set the tendencies back to zero for accumulation
+# dispatch over time stepper here so that other time stepper can change the order
+diffusion_and_implicit!(vars, model) = 
+    diffusion_and_implicit!(vars, model.time_stepping, model.implicit, model)
 
-    # GET TENDENCIES, CORRECT THEM FOR SEMI-IMPLICIT INTEGRATION
-    dynamics_tendencies!(vars, lf2, model)
-    implicit_correction!(vars, model.implicit, model)
+# implicit = nothing just call diffusion
+diffusion_and_implicit!(vars, ::AbstractTimeStepper, ::Nothing, model) = horizontal_diffusion!(vars, model)
 
-    # APPLY DIFFUSION, STEP FORWARD IN TIME, AND TRANSFORM NEW TIME STEP TO GRID
+# default order is diffusion then implicit
+function diffusion_and_implicit!(vars, ::AbstractTimeStepper, ::AbstractImplicit, model)
     horizontal_diffusion!(vars, model)
-    leapfrog!(vars, dt, lf1, model)
-    transform!(vars, lf2, model)
-
-    # PARTICLE ADVECTION (always skip 1st step of first_timesteps!)
-    not_first_timestep = lf2 == 2
-    not_first_timestep && particle_advection!(vars, model)
-
+    implicit_correction!(vars, model)
     return nothing
 end
 
@@ -202,7 +187,7 @@ function update_prognostic!(
         if !(tendencies[varname] isa NamedTuple)
             var = getfield(prognostic, varname)
             tendency = getfield(tendencies, varname)
-            update_prognostic!(var, tendency, vars, model.time_stepping, model)
+            update_prognostic!(var, tendency, vars, model.time_stepping, model.implicit, model)
         end
     end
 
@@ -211,7 +196,7 @@ function update_prognostic!(
         if tracer.active
             var = prognostic.tracers[name]
             tendency = tendencies.tracers[name]
-            update_prognostic!(var, tendency, vars, model.time_stepping, model)
+            update_prognostic!(var, tendency, vars, model.time_stepping, model.implicit, model)
         end
     end
 

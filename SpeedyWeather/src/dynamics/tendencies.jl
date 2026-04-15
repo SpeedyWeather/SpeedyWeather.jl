@@ -16,25 +16,23 @@ $(TYPEDSIGNATURES)
 Calculate all tendencies for the ShallowWaterModel."""
 function dynamics_tendencies!(
         vars::Variables,
-        lf::Integer,                        # leapfrog index to evaluate tendencies at
         model::ShallowWater,
     )
     (; planet, atmosphere, orography) = model
     (; spectral_transform, geometry) = model
 
-    # for compatibility with other AbstractModels pressure pres = interface displacement η here
-    forcing!(vars, lf, model)   # = (Fᵤ, Fᵥ, Fₙ) forcing for u, v, η
-    drag!(vars, lf, model)      # drag term for u, v
+    forcing!(vars, model)               # = (Fᵤ, Fᵥ, Fₙ) forcing for u, v, η
+    drag!(vars, model)                  # drag term for u, v
 
     # = ∇×(v(ζ+f) + Fᵤ, -u(ζ+f) + Fᵥ), tendency for vorticity
     # = ∇⋅(v(ζ+f) + Fᵤ, -u(ζ+f) + Fᵥ), tendency for divergence
     vorticity_flux!(vars, model)
 
-    geopotential!(vars, planet)             # geopotential Φ = gη in shallow water
-    bernoulli_potential!(vars, model)       # = -∇²(E+Φ), tendency for divergence
+    geopotential!(vars, planet)         # geopotential Φ = gη in shallow water
+    bernoulli_potential!(vars, model)   # = -∇²(E+Φ), tendency for divergence
 
-    # = -∇⋅(uh, vh), tendency for "pressure" η
-    volume_flux_divergence!(vars, orography, atmosphere, geometry, spectral_transform)
+    # = -∇⋅(uh, vh), tendency for interface displacement η
+    volume_flux_divergence!(vars, model)
 
     # advect all tracers
     tracer_advection!(vars, model)
@@ -747,14 +745,16 @@ function flux_divergence!(
         A_tend::LowerTriangularArray,   # Output: tendency to write into
         A_grid::AbstractField,          # Input: grid field to be advected
         vars::Variables,                # for u,v on grid and scratch memory
-        G::Geometry,
+        geometry::Geometry,
+        time_stepping::AbstractTimeStepper,
         S::AbstractSpectralTransform;
         add::Bool = true,               # add result to A_tend or overwrite for false
         flipsign::Bool = true,          # compute -∇⋅((u, v)*A) (true) or ∇⋅((u, v)*A)?
     )
-    (; u, v) = vars.grid
+    u = get_prognostic_step(vars.grid.u, time_stepping, DynamicalCore())
+    v = get_prognostic_step(vars.grid.v, time_stepping, DynamicalCore())
     scratch_memory = vars.scratch.transform_memory
-    (; coslat⁻¹) = G
+    (; coslat⁻¹) = geometry
 
     # reuse general work arrays a, b, a_grid, b_grid
     uA = vars.scratch.a                 # = u*A in spectral
@@ -845,8 +845,8 @@ function vorticity_flux_curldiv!(
 
     curl!(vor_tend, u_tend, v_tend, S; add)                 # ∂ζ/∂t = ∇×(u_tend, v_tend)
 
-    if div                                                  # not needed/availbel in barotropic model
-        div_tend = vars.tendencies.divergence
+    if div                                                  # not needed/availble in barotropic model
+        div_tend = get_tendency_step(vars.tendencies.divergence, model.time_stepping, DynamicalCore())
         divergence!(div_tend, u_tend, v_tend, S; add)       # ∂D/∂t = ∇⋅(u_tend, v_tend)
     end
     return nothing
@@ -907,11 +907,12 @@ vorticity_flux!(vars::Variables, model::Barotropic) =
 function bernoulli_potential!(vars::Variables, model::ShallowWater)
     S = model.spectral_transform
     scratch_memory = vars.scratch.transform_memory
-    (; u, v) = vars.grid
-    Φ = vars.grid.geopotential
+    u = get_prognostic_step(vars.grid.u, model.time_stepping, BernoulliPotential())
+    v = get_prognostic_step(vars.grid.v, model.time_stepping, BernoulliPotential())
+    Φ = get_prognostic_step(vars.grid.geopotential, model.time_stepping, BernoulliPotential())
     bernoulli = vars.scratch.a                                  # reuse work arrays a, a_grid
     bernoulli_grid = vars.scratch.grid.a
-    div_tend = vars.tendencies.divergence
+    div_tend = get_tendency_step(vars.tendencies.divergence, model.time_stepping, BernoulliPotential())
 
     half = convert(eltype(bernoulli_grid), 0.5)
     @. bernoulli_grid = half * (u^2 + v^2) + Φ
@@ -965,16 +966,13 @@ end
 Computes the (negative) divergence of the volume fluxes `uh, vh` for the continuity equation, -∇⋅(uh, vh)."""
 function volume_flux_divergence!(
         vars::Variables,
-        orog::AbstractOrography,
-        atmosphere::AbstractAtmosphere,
-        G::AbstractGeometry,
-        S::AbstractSpectralTransform
+        model::ShallowWater,
     )
 
-    (; η) = vars.grid
-    η_tend = vars.tendencies.η
-    (; orography) = orog
-    H = atmosphere.layer_thickness
+    η = get_prognostic_step(vars.grid.η, model.time_stepping, ContinuityEquation())
+    η_tend = get_tendency_step(vars.tendencies.η, model.time_stepping, ContinuityEquation())
+    (; orography) = model.orography
+    H = model.atmosphere.layer_thickness
 
     # compute dynamic layer thickness h on the grid
     # η is the interface displacement, update to layer thickness h = η + H - Hb
@@ -982,13 +980,16 @@ function volume_flux_divergence!(
     η .+= H .- orography
 
     # now do -∇⋅(uh, vh) and store in η_tend
-    flux_divergence!(η_tend, η, vars, G, S, add = true, flipsign = true)
+    G = model.geometry
+    TS = model.time_stepping
+    S = model.spectral_transform
+
+    flux_divergence!(η_tend, η, vars, G, TS, S, add = true, flipsign = true)
     return nothing
 end
 
 
-"""
-$(TYPEDSIGNATURES)
+"""$(TYPEDSIGNATURES)
 Calculates the average temperature of a layer from the l=m=0 harmonic
 and stores the result in `diagn.temp_average`"""
 function temperature_average!(
@@ -1020,5 +1021,5 @@ end
 @inline _reset_tendency!(nt::NamedTuple, ts, value) = _reset_tendencies_inner!(values(nt), ts, value)
 @inline function _reset_tendency!(a::AbstractArray, time_stepping, value)
     a_step = get_tendency_step(a, time_stepping, ResetTendencies())
-    fill!(a_step, value)
+    return fill!(a_step, value)
 end

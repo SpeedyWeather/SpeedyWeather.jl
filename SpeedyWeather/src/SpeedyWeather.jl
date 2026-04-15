@@ -111,8 +111,8 @@ export animate, globe
 function animate end
 
 # abstract types
-include("models/abstract_models.jl")
 include("variables/abstract_types.jl")
+include("models/abstract_models.jl")
 include("parameterizations/parameterizations.jl")
 include("time_stepping/abstract_types.jl")
 

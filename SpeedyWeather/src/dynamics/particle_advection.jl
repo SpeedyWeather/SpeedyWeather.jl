@@ -97,9 +97,6 @@ function initialize!(
     return particles
 end
 
-# Fallback for no particle advection
-initialize!(::Nothing, ::Variables, ::AbstractModel) = nothing
-
 """$(TYPEDSIGNATURES)
 Initialize particle advection time integration: Store u,v interpolated initial conditions
 in `diagn.particles.u` and `.v`  to be used when particle advection actually executed for first time."""

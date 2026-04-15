@@ -61,6 +61,17 @@ prognostic_steps(::NCycleLorenz) = 1
 tendency_grid_steps(::NCycleLorenz) = 1     # the grid tendencies are only for F though, the G term only needs storing in spectral space
 tendency_spectral_steps(::NCycleLorenz) = 2 # to store F, G in Hotta et al. 2016, Eqs 5 & 6
 
+# dispatch over timestepper to decide between implicit or explicit diffusion
+@inline implicit_diffusion(::AbstractHorizontalDiffusion, ::Nothing, ::AbstractNCycleLorenz) = true
+@inline implicit_diffusion(::AbstractHorizontalDiffusion, ::AbstractImplicit, ::AbstractNCycleLorenz) = false
+
+# dispatch over time stepper here so that other time stepper can change the order
+function diffusion_and_implicit!(vars, ::AbstractNCycleLorenz, model)
+    implicit_correction!(vars, model)
+    horizontal_diffusion!(vars, model)
+    return nothing
+end
+
 struct NCycleLorenzCore{NF, MS} <: AbstractNCycleLorenz
     Δt_millisec::MS
     Δt_sec::NF
@@ -141,24 +152,50 @@ function update_prognostic!(
         tendency::AbstractArray,
         vars::Variables,
         time_stepping::NCycleLorenz,
+        implicit::Union{Nothing, AbstractImplicit},
         ::AbstractModel,
     )
     (; Δt) = time_stepping
     w = weight_coefficient(time_stepping, vars.prognostic.clock)
-    F = get_step(tendency, 1)   # 1st step is for F at current time step
-    G = get_step(tendency, 2)   # 2nd step is for G which accumulates the weighted tendencies
+
+    # with an implicit solver the tendency_average_kernel! has to be computed
+    # before the implicit solver, so the responsibility is left therein
+    # and execute the prognostic update here only, dispatched over the type of G
+    # without an implicit solver we compute both tendency average and update
+    # here in one kernel
+    F = get_step(tendency, 1)                                           # 1st step is for F at current time step
+    G = implicit isa AbstractImplicit ? nothing : get_step(tendency, 2) # 2nd step is for G which accumulates the weighted tendencies
 
     launch!(
         architecture(var), LinearWorkOrder, size(var), ncycle_lorenz_kernel!,
-        var, G, F, w, Δt,
+        var, F, G, w, Δt,
     )
     return nothing
 end
 
+
 @kernel inbounds = true function ncycle_lorenz_kernel!(
-        var, G, F, w, Δt,
+    var, F, G, w, Δt,
     )
     lmk = @index(Global, Linear)
     G[lmk] = w * F[lmk] + (1 - w) * G[lmk]  # Hotta et al. 2016 eq (5)
     var[lmk] = var[lmk] + Δt * G[lmk]       # and equation (6)
 end
+
+@kernel inbounds = true function ncycle_lorenz_kernel!(
+    var, δvar, ::Nothing, w, Δt,
+    )
+    lmk = @index(Global, Linear)
+    # if G is passed on as nothing assume that the tendency average
+    # has already been computed in the implicit scheme
+    # and therefore only do the prognostic update here
+    var[lmk] = var[lmk] + Δt * δvar[lmk]    # Hotta et al. 2016 eq (21)
+end
+
+# to be used 
+# @kernel inbounds = true function tendency_average_kernel!(
+#         F, G, w,
+#     )
+#     lmk = @index(Global, Linear)
+#     G[lmk] = w * F[lmk] + (1 - w) * G[lmk]  # Hotta et al. 2016 eq (5)
+# end

@@ -345,6 +345,7 @@ get_indices(i, x::Val{true}, y::Val{true}, z::Val{true}, t::Val{false}) = (:, :,
 get_indices(i, x::Val{true}, y::Val{true}, z::Val{false}, t::Val{true}) = (:, :, i)     # 2D + time
 get_indices(i, x::Val{true}, y::Val{true}, z::Val{false}, t::Val{false}) = (:, :)       # 2D
 
+is2D(variable::AbstractOutputVariable) = ~variable.dims_xyzt[3]
 is3D(variable::AbstractOutputVariable) = variable.dims_xyzt[3]
 is_land(variable::AbstractOutputVariable) = hasproperty(variable, :is_land) ? variable.is_land : false
 hastime(variable::AbstractOutputVariable) = variable.dims_xyzt[4]
@@ -366,19 +367,15 @@ function output!(
     # interpolate 2D/3D variables
     var = is3D(variable) ? (is_land(variable) ? output.field3Dland : output.field3D) : output.field2D
 
-    try
-        v = path(variable, simulation)
-        ts = simulation.model.time_stepping
+    ori = path(variable, simulation)                    # original array as in simulation
+    ts = simulation.model.time_stepping
 
-        # decide on existence of step dimension by comparing dimensionality
-        has_step = (is3D(variable) && ndims(v) == 3) ||     # 2D/3D variables have 1/2 array dimensions respectively 
-                    (is2D(variable) && ndims(v) == 2)       # as the horizontal dim is unravelled, then +1 for step
-        v = has_step ? get_prognostic_step(v, ts, output) : v
-        raw = on_architecture(CPU(), v)
-        RingGrids.interpolate!(var, raw, output.interpolator)
-    catch FieldError
-        var .= variable.missing_value
-    end
+    # decide on existence of step dimension by comparing dimensionality
+    has_step = (is3D(variable) && ndims(ori) == 3) ||   # 2D/3D variables have 1/2 array dimensions respectively 
+                (is2D(variable) && ndims(ori) == 2)     # as the horizontal dim is unravelled, then +1 for step
+    ori = has_step ? get_prognostic_step(ori, ts, output) : ori
+    raw = on_architecture(CPU(), ori)
+    RingGrids.interpolate!(var, raw, output.interpolator)
 
     # unscale if variable.unscale == true and exists
     if hasproperty(variable, :unscale)

@@ -1,3 +1,7 @@
+# dispatch over model.implicit
+implicit_correction!(vars::Variables, model::AbstractModel) =
+    implicit_correction!(vars, model.implicit, model)
+
 # model.implicit=nothing (for BarotropicModel)
 initialize!(::Nothing, dt::Real, ::Variables, ::AbstractModel) = nothing
 implicit_correction!(::Variables, ::Nothing, ::AbstractModel) = nothing
@@ -54,8 +58,8 @@ function implicit_correction!(
         model::ShallowWater
     )
 
-    div_tend = vars.tendencies.divergence                      # tendency of divergence and interface displacement η
-    η_tend = vars.tendencies.η                          # tendency of divergence and interface displacement η
+    div_tend = get_tendency_step(vars.tendencies.divergence, model.time_stepping, implicit)
+    η_tend = get_tendency_step(vars.tendencies.η, model.time_stepping, implicit)
     div_old, div_new = get_steps(vars.prognostic.divergence)   # divergence at t, t+dt
     η_old, η_new = get_steps(vars.prognostic.η)         # η at t, t+dt
 
@@ -72,9 +76,6 @@ function implicit_correction!(
         arch, SpectralWorkOrder, size(div_tend), implicit_shallow_water_kernel!,
         div_tend, η_tend, div_old, div_new, η_old, η_new, l_indices, H, g, ξ
     )
-
-    zero_last_degree!(div_tend)
-    zero_last_degree!(η_tend)
     return nothing
 end
 

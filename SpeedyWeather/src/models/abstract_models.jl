@@ -14,6 +14,10 @@ abstract type AbstractModelComponent end
 initialize!(::Nothing, ::AbstractModel) = nothing
 finalize!(::Nothing, ::AbstractModel) = nothing
 
+# some model components (like particle advection or feedback) need variables to be passed on too
+# allow them to by nothing as well
+initialize!(::Nothing, ::AbstractVariables, ::AbstractModel) = nothing
+
 # fallback for model components: nothing to initialize
 initialize!(::AbstractModelComponent, ::AbstractModel) = nothing
 finalize!(::AbstractModelComponent, ::AbstractModel) = nothing
