@@ -50,13 +50,13 @@ function SpeedyWeather.time_stepping!(simulation::ReactantSimulation, r_first_ti
     clock = simulation.variables.prognostic.clock
 
     #TODO: reenable @trace once Reactant issues fixed
-    #@trace checkpointing = enable_checkpointing for _ in clock.timestep_counter:clock.n_timesteps
+    #@trace checkpointing = enable_checkpointing for _ in clock.time_step_counter:clock.n_timesteps
     #    r_later_timestep!(simulation)
     #end
 
     r_first_timesteps!(simulation)
 
-    for _ in (Int(clock.timestep_counter) + 1):Int(clock.n_timesteps)
+    for _ in (Int(clock.time_step_counter) + 1):Int(clock.n_time_steps)
         r_later_timestep!(simulation)
     end
     return

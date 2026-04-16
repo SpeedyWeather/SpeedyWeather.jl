@@ -216,8 +216,8 @@ function initialize!(
     initialize!(getfield(output, :core), output, model; create_folder = false) || return nothing
 
     # compute total number of output snapshots: IC + one per output_every_n_steps
-    n_timesteps = vars.prognostic.clock.n_timesteps
-    n_outputs = n_timesteps ÷ output.output_every_n_steps + 1   # +1 for the IC
+    n_time_steps = vars.prognostic.clock.n_time_steps
+    n_outputs = n_time_steps ÷ output.output_every_n_steps + 1   # +1 for the IC
 
     # pre-allocate the full vector with deep copies
     ic = deepcopy(filter_groups(vars, output))

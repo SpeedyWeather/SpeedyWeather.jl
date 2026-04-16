@@ -4,7 +4,7 @@ abstract type AbstractLeapfrog <: AbstractTimeStepper end
 
 """Leapfrog time stepping defined by the following fields
 $(TYPEDFIELDS)"""
-mutable struct Leapfrog{NF, S, B, MS, IntType} <: AbstractLeapfrog
+mutable struct Leapfrog{NF, S, B, MS} <: AbstractLeapfrog
     "[OPTION] Time step in minutes for T31, scale linearly to `trunc`"
     Δt_at_T31::S
 
@@ -34,9 +34,6 @@ mutable struct Leapfrog{NF, S, B, MS, IntType} <: AbstractLeapfrog
 
     "[DERIVED] Time step Δt [s/m] at specified resolution, scaled by 1/radius"
     Δt::NF
-
-    "[DERIVED] Step counter to determine shorter Δt in 1st/2nd step"
-    step_counter::IntType
 end
 
 Adapt.adapt_structure(to, L::Leapfrog) = LeapfrogCore(L.Δt_millisec, L.Δt_sec, L.Δt, L.step_counter)
@@ -58,7 +55,7 @@ end
 
 """($TYPEDSIGNATURES)
 Immutable core struct used to adapt only the time step fields for use in kernels"""
-struct LeapfrogCore{NF, MS, IntType} <: AbstractLeapfrog
+struct LeapfrogCore{NF, MS} <: AbstractLeapfrog
     "[DERIVED] Time step Δt in milliseconds at specified resolution"
     Δt_millisec::MS
 
@@ -67,9 +64,6 @@ struct LeapfrogCore{NF, MS, IntType} <: AbstractLeapfrog
 
     "[DERIVED] Time step Δt [s/m] at specified resolution, scaled by 1/radius"
     Δt::NF
-
-    "[DERIVED] Step counter to determine shorter Δt in 1st/2nd step"
-    step_counter::IntType
 end
 
 Adapt.@adapt_structure LeapfrogCore
@@ -97,12 +91,9 @@ function Leapfrog(
     # derived and mutated, controlled by start_with_euler and continue_with_leapfrog
     first_step_euler = start_with_euler
 
-    # to distinguish between first, second and later time steps for leapfrog spin up with shorter steps
-    step_counter = 0
-
     return Leapfrog(
         Second(Δt_at_T31), adjust_with_output, start_with_euler, continue_with_leapfrog, first_step_euler,
-        NF(robert_filter), NF(williams_filter), Δt_millisec, Δt_sec, Δt, step_counter,
+        NF(robert_filter), NF(williams_filter), Δt_millisec, Δt_sec, Δt,
     )
 end
 
@@ -115,7 +106,6 @@ function initialize!(L::Leapfrog, model::AbstractModel)
     calculate_Δt!(L, model)  # common among several time steppers
     if L.start_with_euler
         L.first_step_euler = true
-        L.step_counter = 0
     end
     return nothing
 end
@@ -125,33 +115,32 @@ spin_up_steps(::Leapfrog) = 1
 
 function time_step!(clock::Clock, time_stepping::Leapfrog)
     Δt = time_stepping.Δt_millisec  # ::Millisecond, integer based hence ÷ not / below
-    i = time_stepping.step_counter     
-    if i == 1
+    i = clock.step_counter          # 0-based as the clock is only stepped below
+    if i == 0                       # first Euler step at Δt/2
         # i counts every time step, for the clock the first Euler step does not count
         # hence after this the time_stepping will be 1 ahead of clock step counter
         time_step!(clock, Δt ÷ 2, increase_counter = false)
-    elseif i == 2
+    elseif i == 1                   # second step: Leapfrog at Δt
         # subtract the Δt/2 again as otherwise the time can be 1ms off due to rounding
-        time_step!(clock, -(Δt ÷ 2), increase_counter = false)
+        clock.time -= Δt ÷ 2
         time_step!(clock, Δt)
-    else
+    else                            # later steps: Leapfrog at 2Δt but increase clock by Δt
         time_step!(clock, Δt)
     end
     return nothing
 end
 
-count_step!(L::Leapfrog) = (L.step_counter += 1)
-
-function time_step(L::Leapfrog)
+function time_step(L::Leapfrog, clock::Clock)
     (; Δt) = L
-    L.step_counter == 1 && return Δt / 2  # first step Euler with Δt/2
-    L.step_counter == 2 && return Δt    # 2nd step leapfrog with Δt
-    return 2Δt                          # later steps leapfrog with 2Δt
+    clock.step_counter == 0 && return Δt / 2    # first step Euler with Δt/2
+    clock.step_counter == 1 && return Δt        # 2nd step leapfrog with Δt
+    return 2Δt                                  # later steps leapfrog with 2Δt
 end
 
-function prognostic_step(L::Leapfrog)
-    L.step_counter == 1 || L.step_counter == 2 && return 1
-    return 2
+function prognostic_step(::Leapfrog, clock::Clock)
+    clock.step_counter == 0 && return 1         # first Euler step disable filters
+    clock.step_counter == 0 && return 1         # 2nd step: Leapfrog also disable filters
+    return 2                                    # later steps: with RAW filters
 end
 
 function update_prognostic!(
@@ -162,9 +151,9 @@ function update_prognostic!(
         implicit::Union{Nothing, AbstractImplicit},
         ::AbstractModel,
     )
-
-    Δt = time_step(time_stepping)
-    lf = prognostic_step(time_stepping)         # leapfrog prognostic step index
+    (; clock) = vars.prognostic
+    Δt = time_step(time_stepping, clock)
+    lf = prognostic_step(time_stepping, clock)  # leapfrog prognostic step index
     var_old, var_new = get_steps(var)
     var_lf = get_step(var, lf)                  # view on either t or t+dt to dis/enable Williams filter
     var_tend = get_tendency_step(tendency, time_stepping, time_stepping)
@@ -203,7 +192,7 @@ Perform one single time step of `simulation` including
 possibly output and callbacks."""
 function timestep!(simulation::AbstractSimulation, ::Leapfrog)
     (; clock) = simulation.variables.prognostic
-    @trace if clock.timestep_counter == 0
+    @trace if clock.step_counter == 0
         leapfrog_first_timesteps!(simulation)
     else
         later_timestep!(simulation)
@@ -248,7 +237,7 @@ function first_timesteps!(
     )
     (; clock) = vars.prognostic
     # TODO: deactaved that check for Reactant, but it doesn't seem neccary anyway as the toplevle time_stepping! should take care of this
-    #clock.n_timesteps == 0 && return nothing    # exit immediately for no time steps
+    # clock.n_time_steps == 0 && return nothing    # exit immediately for no time steps
 
     (; implicit) = model
     (; Δt, Δt_millisec) = model.time_stepping

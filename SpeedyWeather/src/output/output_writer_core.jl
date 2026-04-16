@@ -22,7 +22,7 @@ Fields are $(TYPEDFIELDS)"""
     output_every_n_steps::Int = 0
 
     "[DERIVED] time step counter, incremented every time step"
-    timestep_counter::Int = 0
+    time_step_counter::Int = 0
 
     "[DERIVED] output step counter, incremented every time output is written"
     output_counter::Int = 0
@@ -78,7 +78,7 @@ function initialize!(
     output.output_dt = Second(round(Int, core.output_every_n_steps * model.time_stepping.Δt_sec))
 
     # RESET COUNTERS
-    core.timestep_counter = 0
+    core.time_step_counter = 0
     core.output_counter = 0
 
     # CALLBACKS
@@ -93,8 +93,8 @@ end
 Increment the timestep counter and return `true` if output should be written on
 this step (i.e. `active` is true and the counter is a multiple of `output_every_n_steps`)."""
 function output!(core::OutputWriterCore, output::AbstractOutput)
-    core.timestep_counter += 1
+    core.time_step_counter += 1
     output.active || return false
-    core.timestep_counter % core.output_every_n_steps == 0 || return false
+    core.time_step_counter % core.output_every_n_steps == 0 || return false
     return true
 end

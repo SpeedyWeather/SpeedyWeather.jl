@@ -41,7 +41,7 @@ i.e. `struct` or `mutable struct CustomCallback <: SpeedyWeather.AbstractCallbac
 using SpeedyWeather
 
 @kwdef mutable struct StormChaser{NF} <: SpeedyWeather.AbstractCallback
-    timestep_counter::Int = 0
+    time_step_counter::Int = 0
     maximum_surface_wind_speed::Vector{NF} = [0]
 end
 
@@ -49,7 +49,7 @@ end
 StormChaser(SG::SpectralGrid) = StormChaser{SG.NF}()
 ```
 
-We decide to have a field `timestep_counter` in the callback that allows us to track
+We decide to have a field `time_step_counter` in the callback that allows us to track
 the number of times the callback was called to create a time series of our highest
 surface wind speeds. The actual `maximum_surface_wind_speed` is then a vector
 of a given type `NF` (= number format), which is where we'll write into. Both
@@ -71,8 +71,8 @@ function SpeedyWeather.initialize!(
     vars::Variables,
     model::AbstractModel,
 )
-    # allocate recorder: number of time steps (incl initial conditions) in simulation
-    callback.maximum_surface_wind_speed = zeros(vars.prognostic.clock.n_timesteps + 1)
+    # allocate recorder: number of steps (incl initial conditions) in simulation
+    callback.maximum_surface_wind_speed = zeros(vars.prognostic.clock.n_steps + 1)
 
     # where surface (=lowermost model layer) u, v on the grid are stored
     nlayers = model.geometry.nlayers
@@ -83,7 +83,7 @@ function SpeedyWeather.initialize!(
     callback.maximum_surface_wind_speed[1] = max_2norm(u_grid, v_grid)
 
     # (re)set counter to 1
-    callback.timestep_counter = 1
+    callback.time_step_counter = 1
 end
 ```
 The `initialize!` function has to be extended for the new callback `::StormChaser` as first
@@ -121,8 +121,8 @@ function SpeedyWeather.callback!(
     model::AbstractModel,
 )
     # increase counter
-    callback.timestep_counter += 1
-    i = callback.timestep_counter
+    callback.time_step_counter += 1
+    i = callback.time_step_counter
 
     # where surface (=lowermost model layer) u, v on the grid are stored
     nlayers = model.geometry.nlayers

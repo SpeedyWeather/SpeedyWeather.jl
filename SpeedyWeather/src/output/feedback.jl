@@ -72,7 +72,7 @@ function initialize!(feedback::Feedback, variables::Variables, model::AbstractMo
     (; showspeed, description, verbose, feedback_dt) = feedback
     desc = description * (model.output.active ? " $(model.output.run_folder) " : " ")
     feedback.progress_meter = ProgressMeter.Progress(
-        clock.n_timesteps - 1;
+        clock.n_steps;          # use time stepper steps (regardless Δt) not time steps of size Δt
         enabled = verbose,
         showspeed,
         desc,

@@ -17,7 +17,7 @@
         @test schedule.every.value ≈ Second(hour).value rtol = 2.0e-1
         @test schedule.steps ≈ period / hour rtol = 2.0e-1
 
-        for _ in 1:clock.n_timesteps
+        for _ in 1:clock.n_time_steps
             SpeedyWeather.timestep!(clock, clock.Δt)
             isscheduled(schedule, clock)
         end
@@ -34,7 +34,7 @@
         @test sum(schedule.schedule) == 1
         @test schedule.counter == 0     # no execution of isscheduled yet
 
-        for _ in 1:clock.n_timesteps
+        for _ in 1:clock.n_time_steps
             SpeedyWeather.timestep!(clock, clock.Δt)
             isscheduled(schedule, clock)
         end

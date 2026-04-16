@@ -43,8 +43,8 @@ function compare_clock(sim_cpu, sim_reactant)
     clock_cpu = sim_cpu.variables.prognostic.clock
     clock_reactant = sim_reactant.variables.prognostic.clock
 
-    @test clock_cpu.n_timesteps == clock_reactant.n_timesteps
-    @test clock_cpu.timestep_counter == clock_reactant.timestep_counter
+    @test clock_cpu.n_time_steps == clock_reactant.n_time_steps
+    @test clock_cpu.time_step_counter == clock_reactant.time_step_counter
     # convert to DateTime to compare because Reactant ReactantDatetime might be used
     return @test DateTime(clock_cpu.time) == DateTime(clock_reactant.time)
 end

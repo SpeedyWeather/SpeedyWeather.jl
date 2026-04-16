@@ -22,7 +22,7 @@ end
 @testset "Callbacks interface" begin
 
     Base.@kwdef mutable struct StormChaser{NF} <: SpeedyWeather.AbstractCallback
-        timestep_counter::Int = 0
+        time_step_counter::Int = 0
         maximum_surface_wind_speed::Vector{NF} = Float64[]
     end
 
@@ -35,7 +35,7 @@ end
             model::AbstractModel,
         )
         # allocate recorder: number of time steps (incl initial conditions) in simulation
-        callback.maximum_surface_wind_speed = zeros(vars.prognostic.clock.n_timesteps + 1)
+        callback.maximum_surface_wind_speed = zeros(vars.prognostic.clock.n_time_steps + 1)
 
         # where surface (=lowermost model layer) u, v on the grid are stored
         nlayers = model.geometry.nlayers
@@ -46,7 +46,7 @@ end
         callback.maximum_surface_wind_speed[1] = max_2norm(u_grid, v_grid)
 
         # (re)set counter to 1
-        callback.timestep_counter = 1
+        callback.time_step_counter = 1
     end
 
     function max_2norm(u::AbstractArray{T}, v::AbstractArray{T}) where {T}
@@ -65,8 +65,8 @@ end
         )
 
         # increase counter
-        callback.timestep_counter += 1
-        i = callback.timestep_counter
+        callback.time_step_counter += 1
+        i = callback.time_step_counter
 
         # where surface (=lowermost model layer) u, v on the grid are stored
         nlayers = model.geometry.nlayers

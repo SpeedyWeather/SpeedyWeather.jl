@@ -461,7 +461,7 @@ details)
 ```@example analysis
 # define a GlobalDiagnostics callback and the fields it needs
 @kwdef mutable struct GlobalDiagnostics <: SpeedyWeather.AbstractCallback
-    timestep_counter::Int = 0
+    time_step_counter::Int = 0
 
     time::Vector{DateTime} = []
     M::Vector{Float64} = []  # mean mass per time step
@@ -479,7 +479,7 @@ function SpeedyWeather.initialize!(
     model::AbstractModel,
 )
     # replace with vector of correct length
-    n = vars.prognostic.clock.n_timesteps + 1    # +1 for initial conditions
+    n = vars.prognostic.clock.n_time_steps + 1    # +1 for initial conditions
     callback.time = zeros(DateTime, n)
     callback.M = zeros(n)
     callback.C = zeros(n)
@@ -498,7 +498,7 @@ function SpeedyWeather.initialize!(
     callback.P[1] = P  # set initial conditions
     callback.Q[1] = Q  # set initial conditions
 
-    callback.timestep_counter = 1  # (re)set counter to 1
+    callback.time_step_counter = 1  # (re)set counter to 1
 
     return nothing
 end
@@ -509,8 +509,8 @@ function SpeedyWeather.callback!(
     vars::Variables,
     model::AbstractModel,
 )
-    callback.timestep_counter += 1
-    i = callback.timestep_counter
+    callback.time_step_counter += 1
+    i = callback.time_step_counter
 
     M, C, Λ, K, P, Q = global_diagnostics(vars, model)
 
@@ -528,13 +528,13 @@ using NCDatasets
 
 # define how to finalize a GlobalDiagnostics callback after simulation finished
 function SpeedyWeather.finalize!(callback::GlobalDiagnostics, args...)
-    n_timesteps = callback.timestep_counter
+    n_time_steps = callback.time_step_counter
 
     # create a netCDF file in current path
     ds = NCDataset(joinpath(pwd(), "global_diagnostics.nc"), "c")
 
     # save diagnostics variables within
-    defDim(ds, "time", n_timesteps)
+    defDim(ds, "time", n_time_steps)
     defVar(ds, "time",                  callback.time,  ("time",))
     defVar(ds, "mass",                  callback.M,     ("time",))
     defVar(ds, "circulation",           callback.C,     ("time",))

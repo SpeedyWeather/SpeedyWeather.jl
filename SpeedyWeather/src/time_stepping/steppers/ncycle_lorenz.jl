@@ -102,7 +102,7 @@ end
 
 """$(TYPEDSIGNATURES)
 Get current substep within N-cycle (0 to N-1) from the clock."""
-@inline current_substep(L::NCycleLorenz, clock) = mod(clock.timestep_counter, L.steps)
+@inline current_substep(L::NCycleLorenz, clock) = mod(clock.step_counter, L.steps)
 
 """$(TYPEDSIGNATURES)
 Initialize NCycleLorenz time stepper."""
@@ -119,7 +119,7 @@ end
 """$(TYPEDSIGNATURES)
 Compute weight coefficient w for current substep."""
 function weight_coefficient(L::NCycleLorenz{NF}, clock::Clock) where {NF}
-    return weight_coefficient(NF, L.variant, clock.timestep_counter, L.steps)
+    return weight_coefficient(NF, L.variant, clock.step_counter, L.steps)
 end
 
 """$(TYPEDSIGNATURES) Weight coefficient of the A-variant of the N-Cycle Lorenz time stepping scheme."""

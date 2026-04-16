@@ -37,7 +37,7 @@ export ParticleAdvection2D
     nparticles::IntType = 10
 
     "[OPTION] Execute particle advection every n timesteps"
-    every_n_timesteps::IntType = 6
+    every_n_time_steps::IntType = 6
 
     "[OPTION] Advect with velocities from this vertical layer index"
     layer::IntType = 1
@@ -74,10 +74,10 @@ function initialize!(
     (; layer) = particle_advection
     nlayers < layer && @warn "Particle advection on layer $layer on spectral grid with nlayers=$nlayers."
 
-    (; every_n_timesteps) = particle_advection
+    (; every_n_time_steps) = particle_advection
     # Δt [˚*s/m] is scaled by radius to convert more easily from velocity [m/s]
     # to [˚/s] for particle locations in degree
-    particle_advection.Δt[] = every_n_timesteps * model.time_stepping.Δt
+    particle_advection.Δt[] = every_n_time_steps * model.time_stepping.Δt
     particle_advection.Δt[] *= (360 / 2π)
     return particle_advection
 end
@@ -168,7 +168,7 @@ function particle_advection!(
 
     # decide whether to execute on this time step:
     # execute always on last time step *before* time step is divisible by
-    # `particle_advection.every_n_timesteps`, e.g. 7, 15, 23, ... for n=8 which
+    # `particle_advection.every_n_time_steps`, e.g. 7, 15, 23, ... for n=8 which
     # already contains u, v at i=8, 16, 24, etc as executed after `transform!`
     # even though the clock hasn't be step forward yet, this means time = time + Δt here
 
@@ -176,15 +176,15 @@ function particle_advection!(
     # with a lf2 == 2 check before this function is called
 
     # escape immediately if advection not on this timestep
-    n = particle_advection.every_n_timesteps
-    clock.timestep_counter % n == (n - 1) || return nothing
+    n = particle_advection.every_n_time_steps
+    clock.time_step_counter % n == (n - 1) || return nothing
 
     # HEUN: PREDICTOR STEP, use u, v at previous time step and location
     Δt = particle_advection.Δt[]        # time step [s*˚/m]
-    Δt_half = Δt / 2                      # /2 because Heun is average of Euler+corrected step
+    Δt_half = Δt / 2                    # /2 because Heun is average of Euler+corrected step
 
-    u_old = vars.particles.u           # from previous time step and location
-    v_old = vars.particles.v           # from previous time step and location
+    u_old = vars.particles.u            # from previous time step and location
+    v_old = vars.particles.v            # from previous time step and location
 
     # HACK: reuse u, v arrays (old velocity) on the fly for interpolation
     # as they're not needed anymore after new (predicted) location is found

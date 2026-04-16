@@ -17,11 +17,17 @@ $(TYPEDFIELDS)"""
     "period to integrate for"
     period::S = Second(0)
 
-    "Counting all time steps during simulation"
-    timestep_counter::I = 0
+    "Counting all steps the time stepper takes during simulation"
+    step_counter::I = 0
 
-    "number of time steps to integrate for, set in `initialize!(::Clock, ::AbstractTimeStepper)`"
-    n_timesteps::I = 0
+    "Counting all time steps of size Δt, ignoring spin-up steps"
+    time_step_counter::I = 0
+
+    "Number of time stepper steps, regardless their step size"
+    n_steps::I = 0
+    
+    "Number of time steps of size Δt"
+    n_time_steps::I = 0
 
     "Time step"
     Δt::MS = Millisecond(0)
@@ -42,19 +48,22 @@ time_step!(clock::Clock, time_stepping::AbstractTimeStepper) =
 
 function time_step!(clock::Clock, Δt; increase_counter::Bool = true)
     clock.time += Δt
-    clock.timestep_counter += increase_counter
+    clock.step_counter += 1                     # always increased, counts time stepper steps
+    clock.time_step_counter += increase_counter # spin up steps may not count for clock
     return nothing
 end
 
 # copy! (converts on the fly for Reactant types to work as well)
 function Base.copy!(clock::Clock{DT, S, I, MS}, clock_old::Clock) where {DT, S, I, MS}
-    clock.time = convert(DT, clock_old.time)    # convert to the same type as clock_old.time
-    clock.start = convert(DT, clock_old.start)  # convert to the same type as clock_old.start
-    clock.period = convert(S, clock_old.period) # convert to the same type as clock_old.period,
-    clock.timestep_counter = convert(I, clock_old.timestep_counter) # convert to the same type as clock_old.timestep_counter
-    clock.n_timesteps = convert(I, clock_old.n_timesteps) # convert to the same type as clock_old.n_timesteps
-    clock.Δt = convert(MS, clock_old.Δt) # convert to the same type as clock_old.Δt
-
+    # explicitly convert to the new types too
+    clock.time = convert(DT, clock_old.time)
+    clock.start = convert(DT, clock_old.start)
+    clock.period = convert(S, clock_old.period)
+    clock.step_counter = convert(I, clock_old.step_counter)
+    clock.time_step_counter = convert(I, clock_old.time_step_counter)
+    clock.n_steps = convert(I, clock_old.n_steps)
+    clock.n_time_steps = convert(I, clock_old.n_time_steps)
+    clock.Δt = convert(MS, clock_old.Δt)
     return nothing
 end
 
@@ -62,35 +71,33 @@ end
 _copy_entry!(dest::AbstractClock, src::AbstractClock) = copy!(dest, src)
 
 """$(TYPEDSIGNATURES)
-Initialize the clock with the time step `Δt` from `time_stepping`."""
-initialize!(clock::Clock, time_stepping::AbstractTimeStepper, args...) =
-    initialize!(clock, time_stepping.Δt_millisec, args...)
-
-"""$(TYPEDSIGNATURES)
 Initialize the clock with the time step `Δt` and `period` to integrate for.
-`n_timesteps` is for the clock only, spin up steps (e.g. Leapfrog with 1 Euler to start)
+`n_time_steps` is for the clock only, spin up steps (e.g. Leapfrog with 1 Euler to start)
 are not counted for the clock."""
-function initialize!(clock::Clock, Δt::Period, period::Period)
-    clock.Δt = Δt
+function initialize!(clock::Clock, time_stepping::AbstractTimeStepper, period::Period)
+    clock.Δt = time_stepping.Δt_millisec
     clock.period = period
-    clock.n_timesteps = ceil(Int, Millisecond(period).value / Millisecond(Δt).value)
+    clock.n_time_steps = ceil(Int, Millisecond(period).value / Millisecond(clock.Δt).value)
+    clock.n_steps = clock.n_time_steps + spin_up_steps(time_stepping)
     return initialize!(clock)      # set start time, reset counter
 end
 
 """$(TYPEDSIGNATURES)
-Initialize the clock with the time step `Δt` and the number of time steps `n_timesteps`."""
-function initialize!(clock::Clock, Δt::Period, n_timesteps::Integer)
-    clock.Δt = Δt
-    clock.n_timesteps = n_timesteps
-    clock.period = Δt * n_timesteps
+Initialize the clock with the time step `Δt` and the number of time stepper steps `n_steps`."""
+function initialize!(clock::Clock, time_stepping::AbstractTimeStepper, n_steps::Integer)
+    clock.Δt = time_stepping.Δt_millisec
+    clock.n_steps = n_steps     # number of steps the time stepper should take, regardless step size
+    clock.n_time_steps = max(0, n_steps - spin_up_steps(time_stepping)) # in case there is spin up the clock may not advance
+    clock.period = clock.Δt * clock.n_time_steps    # therefore calculate period from n_time_steps not n_steps
     return initialize!(clock)
 end
 
 """$(TYPEDSIGNATURES)
-Initialize the clock with setting the start time and resetting the timestep counter."""
+Initialize the clock with setting the start time and resetting the (time) step counters."""
 function initialize!(clock::Clock)
-    clock.start = clock.time    # store the start time
-    clock.timestep_counter = 0  # reset counter
+    clock.start = clock.time        # store the start time
+    clock.step_counter = 0          # reset counter for time stepper steps, regardless step size
+    clock.time_step_counter = 0     # reset counter for steps of size Δt
     return clock
 end
 

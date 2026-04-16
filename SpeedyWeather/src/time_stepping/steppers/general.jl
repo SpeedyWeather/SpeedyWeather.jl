@@ -1,6 +1,3 @@
-# extend if a time stepper needs to keep track of steps
-count_step!(::AbstractTimeStepper) = nothing
-
 """($TYPEDSIGNATURES) Extend in case a time stepper requires spin up steps,
 e.g. Leapfrog starts with 1 Euler step that isn't counted for the clock but requires
 one more step in the main time loop."""

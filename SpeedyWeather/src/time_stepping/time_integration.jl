@@ -1,8 +1,7 @@
 """$(TYPEDSIGNATURES) Main time loop that loops over all time steps."""
 function time_stepping!(simulation::AbstractSimulation)
     (; clock) = simulation.variables.prognostic
-    (; time_stepping) = simulation.model
-    for _ in 1:clock.n_timesteps + spin_up_steps(time_stepping)
+    for _ in 1:clock.n_steps
         time_step!(simulation)
     end
     return simulation
@@ -116,8 +115,6 @@ function update_prognostic!(
         model::AbstractModel,
     )
     (; prognostic, tendencies) = vars
-
-    count_step!(time_stepping)
 
     # atmospheric variables
     for varname in keys(tendencies)

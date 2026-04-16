@@ -34,13 +34,13 @@ using Dates
 
     # set period
     SpeedyWeather.initialize!(c1, L6, Hour(10))
-    @test c1.n_timesteps == 10
+    @test c1.n_time_steps == 10
     SpeedyWeather.initialize!(c1, L6, Day(2))
-    @test c1.n_timesteps == 48
+    @test c1.n_time_steps == 48
 
-    # set n_timesteps
+    # set n_time_steps
     SpeedyWeather.initialize!(c1, L6, 10)
-    @test c1.n_timesteps == 10
+    @test c1.n_time_steps == 10
 end
 
 @testset "Set clock" begin
@@ -48,11 +48,11 @@ end
     time_stepping = Leapfrog(spectral_grid)
     Δt = time_stepping.Δt_at_T31
 
-    # set n_timesteps
+    # set n_time_steps
     clock = Clock()
-    n_timesteps = 100
-    initialize!(clock, time_stepping, n_timesteps)
-    @test clock.n_timesteps == 100
+    n_time_steps = 100
+    initialize!(clock, time_stepping, n_time_steps)
+    @test clock.n_time_steps == 100
     @test clock.period == Second(100 * Δt)
 
     # set period
@@ -60,7 +60,7 @@ end
     period = Day(10)
     initialize!(clock, time_stepping, period)
     @test clock.period == period
-    @test clock.n_timesteps == ceil(Int, Millisecond(period).value / time_stepping.Δt_millisec.value)
+    @test clock.n_time_steps == ceil(Int, Millisecond(period).value / time_stepping.Δt_millisec.value)
 
     model = BarotropicModel(spectral_grid)
     simulation = initialize!(model)
@@ -163,28 +163,30 @@ end
 
 @testset "copy!(::Clock, ::Clock)" begin
     clock1 = Clock(
-        time = DateTime(2020, 6, 15), start = DateTime(2020, 6, 1),
-        period = Day(14), timestep_counter = 5, n_timesteps = 10,
-        Δt = Millisecond(3600_000)
+        time = DateTime(2020, 6, 15), start = DateTime(2020, 6, 1), period = Day(14),
+        step_counter = 5, time_step_counter = 5, n_steps = 10,
+        n_time_steps = 10, Δt = Millisecond(3600_000)
     )
 
     clock2 = Clock()
 
     # before copy, clock2 has default values
     @test clock2.time == SpeedyWeather.DEFAULT_DATE
-    @test clock2.timestep_counter == 0
-    @test clock2.n_timesteps == 0
+    @test clock2.time_step_counter == 0
+    @test clock2.n_time_steps == 0
 
     copy!(clock2, clock1)
 
     @test clock2.time == clock1.time
     @test clock2.start == clock1.start
     @test clock2.period == clock1.period
-    @test clock2.timestep_counter == clock1.timestep_counter
-    @test clock2.n_timesteps == clock1.n_timesteps
+    @test clock2.step_counter == clock1.step_counter
+    @test clock2.time_step_counter == clock1.time_step_counter
+    @test clock2.n_time_steps == clock1.n_time_steps
+    @test clock2.n_steps == clock1.n_steps
     @test clock2.Δt == clock1.Δt
 
     # mutating clock1 after copy should not affect clock2
-    clock1.timestep_counter = 99
-    @test clock2.timestep_counter == 5
+    clock1.time_step_counter = 99
+    @test clock2.time_step_counter == 5
 end
