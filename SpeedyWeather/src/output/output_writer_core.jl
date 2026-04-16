@@ -87,7 +87,7 @@ Increment the timestep counter and return `true` if output should be written on
 this step (i.e. `active` is true and the counter is a multiple of `output_every_n_steps`)."""
 function output!(core::OutputWriterCore, output::AbstractOutput, clock::Clock)
     return do_output =
-        output.active &&                                            # output must be active
-        clock.time_step_counter > 0 &&                              # counter must have increased
+        output.active &&                # output must be active
+        clock.time_step_counter > 0 &&  # don't store initial conditions again (leapfrog has spin up step that doesn't count)
         clock.time_step_counter % core.output_every_n_steps == 0    # and multiple of output frequency
 end

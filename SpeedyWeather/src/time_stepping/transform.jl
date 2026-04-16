@@ -1,6 +1,6 @@
 # dispatch over time stepping to decide which prognostic steps to transform to grid space
-SpeedyTransforms.transform!(vars::Variables, model::AbstractModel) =
-    transform!(vars, model.time_stepping, model)
+SpeedyTransforms.transform!(vars::Variables, model::AbstractModel; kwargs...) =
+    transform!(vars, model.time_stepping, model; kwargs...)
 
 """$(TYPEDSIGNATURES)
 Propagate the spectral state of the prognostic variables of `vars` to the
@@ -9,8 +9,11 @@ Updates grid vorticity, spectral stream function and spectral and grid velocitie
 function SpeedyTransforms.transform!(
         vars::Variables,
         time_stepping::AbstractTimeStepper,
-        model::Barotropic,
+        model::Barotropic;
+        initialize::Bool = false,
     )
+    initialize && initialize!(vars, time_stepping, model)
+
     S = model.spectral_transform
     u_grid = get_prognostic_step(vars.grid.u, time_stepping, S)
     v_grid = get_prognostic_step(vars.grid.v, time_stepping, S)

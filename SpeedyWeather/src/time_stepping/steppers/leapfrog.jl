@@ -37,6 +37,8 @@ mutable struct Leapfrog{NF, S, B, MS} <: AbstractLeapfrog
 end
 
 Adapt.adapt_structure(to, L::Leapfrog) = LeapfrogCore(L.Δt_millisec, L.Δt_sec, L.Δt, L.step_counter)
+
+# HOW MANY STEPS DO VARIABLES NEED?
 # leapfrogging always needs 2 steps in spectral
 prognostic_spectral_steps(::Leapfrog) = 2
 # but in 2D only 1 step in grid space
@@ -45,6 +47,23 @@ prognostic_grid_steps(::Leapfrog, ::Union{<:Barotropic, <:ShallowWater}) = 1
 prognostic_grid_steps(::Leapfrog, ::PrimitiveEquation) = 2
 # always only one step for tendencies
 tendency_steps(::Leapfrog) = 1
+
+# WHICH STEP TO READ WHEN
+@inline which_prognostic_step(var::LowerTriangularArray, ::AbstractLeapfrog, ::SpeedyTransforms.AbstractSpectralTransform) = 2
+@inline which_prognostic_step(var::LowerTriangularArray, ::AbstractLeapfrog, ::AbstractForcing) = 2
+@inline which_prognostic_step(var::LowerTriangularArray, ::AbstractLeapfrog, ::AbstractDrag) = 2
+@inline which_prognostic_step(var::LowerTriangularArray, ::AbstractLeapfrog, ::AbstractDynamicalCoreComponent) = 2
+@inline which_prognostic_step(var::LowerTriangularArray, ::AbstractLeapfrog, ::AbstractHorizontalDiffusion) = 1
+
+function initialize!(vars::Variables, time_stepping::AbstractLeapfrog, ::AbstractModel)
+    (; prognostic) = vars
+    for varname in keys(prognostic)
+        if prognostic[varname] isa AbstractArray
+            var_old, var_new = get_steps(getfield(prognostic, varname))
+            var_new .= var_old
+        end
+    end
+end
 
 # for leapfrog do first semi-implicit corrections then horizontal diffusion
 function diffusion_and_implicit!(vars, ::AbstractLeapfrog, ::AbstractImplicit, model)
@@ -139,7 +158,7 @@ end
 
 function prognostic_step(::Leapfrog, clock::Clock)
     clock.step_counter == 0 && return 1         # first Euler step disable filters
-    clock.step_counter == 0 && return 1         # 2nd step: Leapfrog also disable filters
+    clock.step_counter == 1 && return 1         # 2nd step: Leapfrog also disable filters
     return 2                                    # later steps: with RAW filters
 end
 

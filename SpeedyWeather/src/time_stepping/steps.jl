@@ -79,16 +79,14 @@ Get the i-th step of a 4D field as a view (wrapped into the same type as the inp
 This method is for a 3D field (horizontal + vertical) with steps in the 4rd dimension."""
 @inline get_step(var::AbstractField{T, 3}, step::Integer) where {T} = field_view(var, :, :, step)
 
-# get_step depending on time stepping method
-@inline get_step(var, ::AbstractTimeStepper) = get_step(var, 1)
+# anything that can decide which variable step to get
+const STEP_COMPONENT = Union{AbstractModelComponent, SpeedyTransforms.AbstractSpectralTransform}
 
-"""$(TYPEDSIGNATURES) Method to be extended by time steppers to customize
-for every model component which step to use."""
-@inline get_step(var, ::AbstractTimeStepper, ::AbstractModelComponent) = get_step(var, 1)
+@inline get_step(var, TS::AbstractTimeStepper, C::STEP_COMPONENT) = get_step(var, which_step(var, TS, C))
+@inline get_prognostic_step(var, TS::AbstractTimeStepper, C::STEP_COMPONENT) = get_step(var, which_prognostic_step(var, TS, C))
+@inline get_tendency_step(var, TS::AbstractTimeStepper, C::STEP_COMPONENT) = get_step(var, which_tendency_step(var, TS, C))
 
-"""$(TYPEDSIGNATURES) Method to be extended by time steppers to customize
-for every model component which step to use."""
-@inline get_step(var, ::AbstractTimeStepper, ::SpeedyTransforms.AbstractSpectralTransform) = get_step(var, 1)
-
-@inline get_prognostic_step(var, TS::AbstractTimeStepper, args...) = get_step(var, TS, args...)
-@inline get_tendency_step(var, TS::AbstractTimeStepper, args...) = get_step(var, TS, args...)
+# fallbacks to extend by every time stepper and model component
+@inline which_step(var, ::AbstractTimeStepper, ::STEP_COMPONENT) = 1
+@inline which_prognostic_step(var, ::AbstractTimeStepper, ::STEP_COMPONENT) = 1
+@inline which_tendency_step(var, ::AbstractTimeStepper, ::STEP_COMPONENT) = 1
