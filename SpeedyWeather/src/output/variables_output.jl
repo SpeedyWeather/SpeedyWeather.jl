@@ -217,7 +217,7 @@ function initialize!(
 
     # compute total number of output snapshots: IC + one per output_every_n_steps
     n_time_steps = vars.prognostic.clock.n_time_steps
-    n_outputs = n_time_steps ÷ output.output_every_n_steps + 1   # +1 for the IC
+    n_outputs = n_time_steps ÷ output.output_every_n_steps + 1   # + 1 for the IC
 
     # pre-allocate the full vector with deep copies
     ic = deepcopy(filter_groups(vars, output))
@@ -233,7 +233,8 @@ end
 Base.close(::ArrayOutput) = nothing
 
 function output!(output::ArrayOutput, simulation::AbstractSimulation)
-    output!(output.core, output) || return nothing
+    (; clock) = simulation.prognostic
+    output!(output.core, output, clock) || return nothing
     output.output_counter += 1
     i = output.output_counter
     getfield(output, :output)[i] = deepcopy(filter_groups(simulation.variables, output))
