@@ -1,3 +1,5 @@
+using StatsBase
+
 @testset "SimpleSpectralLongwave: spectroscopic helpers" begin
 
     # ---- Planck function -------------------------------------------------
