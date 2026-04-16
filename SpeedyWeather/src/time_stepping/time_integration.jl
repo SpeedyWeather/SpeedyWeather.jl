@@ -1,7 +1,8 @@
 """$(TYPEDSIGNATURES) Main time loop that loops over all time steps."""
 function time_stepping!(simulation::AbstractSimulation)
     (; clock) = simulation.variables.prognostic
-    for _ in 1:clock.n_timesteps                    # MAIN LOOP
+    (; time_stepping) = simulation.model
+    for _ in 1:clock.n_timesteps + spin_up_steps(time_stepping)
         time_step!(simulation)
     end
     return simulation
@@ -14,11 +15,12 @@ time_step!(simulation::AbstractSimulation) = time_step!(simulation, simulation.m
 function time_step!(simulation::AbstractSimulation, time_stepping::AbstractTimeStepper)
     (; variables, model) = simulation
     (; feedback, output) = model
-    (; Δt_millisec) = time_stepping
     (; clock) = variables.prognostic
 
+    # TODO add a possible initialize implicit step here that defaults to nothing
+
     time_step!(variables, time_stepping, model)     # calculate tendencies and step forward
-    time_step!(clock, Δt_millisec)                  # then step the clock forward
+    time_step!(clock, time_stepping)                # then step the clock forward
 
     progress!(feedback, variables, model)           # updates the progress meter bar
     output!(output, simulation)                     # do output?

@@ -37,9 +37,11 @@ Adapt.adapt_structure(to, ::Clock) = nothing
 # Clock has no GPU arrays, pass through unchanged
 on_architecture(::AbstractArchitecture, clock::Clock) = clock
 
+time_step!(clock::Clock, time_stepping::AbstractTimeStepper) =
+    time_step!(clock, time_stepping.Δt_millisec)
+
 function time_step!(clock::Clock, Δt; increase_counter::Bool = true)
     clock.time += Δt
-    # the first timestep is a half-step and doesn't count
     clock.timestep_counter += increase_counter
     return nothing
 end
@@ -65,7 +67,9 @@ initialize!(clock::Clock, time_stepping::AbstractTimeStepper, args...) =
     initialize!(clock, time_stepping.Δt_millisec, args...)
 
 """$(TYPEDSIGNATURES)
-Initialize the clock with the time step `Δt` and `period` to integrate for."""
+Initialize the clock with the time step `Δt` and `period` to integrate for.
+`n_timesteps` is for the clock only, spin up steps (e.g. Leapfrog with 1 Euler to start)
+are not counted for the clock."""
 function initialize!(clock::Clock, Δt::Period, period::Period)
     clock.Δt = Δt
     clock.period = period

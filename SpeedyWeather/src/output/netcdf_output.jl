@@ -335,9 +335,7 @@ function output!(output::AbstractOutput, simulation::AbstractSimulation)
 end
 
 # fallback for nothing output
-function output!(::Nothing, ::AbstractSimulation)
-    return nothing
-end
+output!(::Nothing, ::AbstractSimulation) = nothing
 
 get_indices(i, variable::AbstractOutputVariable) = get_indices(i, Val.(variable.dims_xyzt)...)
 get_indices(i, x::Val{true}, y::Val{true}, z::Val{true}, t::Val{true}) = (:, :, :, i)   # 3D + time

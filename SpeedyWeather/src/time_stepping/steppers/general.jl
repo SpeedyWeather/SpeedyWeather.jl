@@ -1,6 +1,11 @@
 # extend if a time stepper needs to keep track of steps
 count_step!(::AbstractTimeStepper) = nothing
 
+"""($TYPEDSIGNATURES) Extend in case a time stepper requires spin up steps,
+e.g. Leapfrog starts with 1 Euler step that isn't counted for the clock but requires
+one more step in the main time loop."""
+spin_up_steps(::AbstractTimeStepper) = 0
+
 """$(TYPEDSIGNATURES)
 Computes the time step in [ms]. `Δt_at_T31` is always scaled with the resolution `trunc` 
 of the model. In case `adjust_Δt_with_output` is true, the `Δt_at_T31` is additionally 

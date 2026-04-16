@@ -120,11 +120,31 @@ function initialize!(L::Leapfrog, model::AbstractModel)
     return nothing
 end
 
+"""$(TYPEDSIGNATURES) Leapfrog is spun up with 1 Euler forward step that doesn't count for clock + output"""
+spin_up_steps(::Leapfrog) = 1
+
+function time_step!(clock::Clock, time_stepping::Leapfrog)
+    Δt = time_stepping.Δt_millisec  # ::Millisecond, integer based hence ÷ not / below
+    i = time_stepping.step_counter     
+    if i == 1
+        # i counts every time step, for the clock the first Euler step does not count
+        # hence after this the time_stepping will be 1 ahead of clock step counter
+        time_step!(clock, Δt ÷ 2, increase_counter = false)
+    elseif i == 2
+        # subtract the Δt/2 again as otherwise the time can be 1ms off due to rounding
+        time_step!(clock, -(Δt ÷ 2), increase_counter = false)
+        time_step!(clock, Δt)
+    else
+        time_step!(clock, Δt)
+    end
+    return nothing
+end
+
 count_step!(L::Leapfrog) = (L.step_counter += 1)
 
 function time_step(L::Leapfrog)
     (; Δt) = L
-    L.step_counter == 1 && return Δt/2  # first step Euler with Δt/2
+    L.step_counter == 1 && return Δt / 2  # first step Euler with Δt/2
     L.step_counter == 2 && return Δt    # 2nd step leapfrog with Δt
     return 2Δt                          # later steps leapfrog with 2Δt
 end
@@ -151,16 +171,16 @@ function update_prognostic!(
 
     @boundscheck lf == 1 || lf == 2 || throw(BoundsError())
     @boundscheck size(var_old) == size(var_new) == size(var_tend) || throw(BoundsError())
-     
-    (; robert_filter, williams_filter) = time_stepping          # coefficients for the Robert and Williams filter
+
+    (; robert_filter, williams_filter) = time_stepping          # coefficients for filters
 
     # LEAP FROG time step with or without Robert+Williams filter
     # Robert time filter to compress computational mode, Williams filter for 3rd order accuracy
     # see Williams (2009), Eq. 7-9
-    # for lf == 1 (time steps 1 or 2) no filter applied (w1=w2=0)
+    # for lf == 1 (time steps 1 or 2) no filters applied (w1=w2=0)
     # for lf == 2 (later steps) Robert+Williams filter is applied
-    w1 = (lf - 1) * robert_filter * williams_filter / 2       # = ν*α/2 in Williams (2009, Eq. 8)
-    w2 = (lf - 1) * robert_filter * (1 - williams_filter) / 2 # = ν(1-α)/2 in Williams (2009, Eq. 9)
+    w1 = (lf - 1) * robert_filter * williams_filter / 2         # = ν*α/2 in Williams (2009, Eq. 8)
+    w2 = (lf - 1) * robert_filter * (1 - williams_filter) / 2   # = ν(1-α)/2 in Williams (2009, Eq. 9)
 
     launch!(
         architecture(tendency), SpectralWorkOrder, size(tendency), leapfrog_kernel!,

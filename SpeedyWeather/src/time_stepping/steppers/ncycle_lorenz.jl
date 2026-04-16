@@ -160,22 +160,21 @@ function update_prognostic!(
 
     # with an implicit solver the tendency_average_kernel! has to be computed
     # before the implicit solver, so the responsibility is left therein
-    # and execute the prognostic update here only, dispatched over the type of G
+    # and execute the prognostic update here only, dispatched over the type of implicit
     # without an implicit solver we compute both tendency average and update
-    # here in one kernel
-    F = get_step(tendency, 1)                                           # 1st step is for F at current time step
-    G = implicit isa AbstractImplicit ? nothing : get_step(tendency, 2) # 2nd step is for G which accumulates the weighted tendencies
+    # here in one kernel, notation following largely Hotta et al. 2016
+    F = get_step(tendency, 1)   # tendency of current time step (or weighted + implicitly corrected tendency)
+    G = get_step(tendency, 2)   # accumulated weighted tendencies
 
     launch!(
         architecture(var), LinearWorkOrder, size(var), ncycle_lorenz_kernel!,
-        var, F, G, w, Δt,
+        var, F, G, w, Δt, implicit
     )
     return nothing
 end
 
-
 @kernel inbounds = true function ncycle_lorenz_kernel!(
-    var, F, G, w, Δt,
+    var, F, G, w, Δt, implicit::Nothing,
     )
     lmk = @index(Global, Linear)
     G[lmk] = w * F[lmk] + (1 - w) * G[lmk]  # Hotta et al. 2016 eq (5)
@@ -183,19 +182,11 @@ end
 end
 
 @kernel inbounds = true function ncycle_lorenz_kernel!(
-    var, δvar, ::Nothing, w, Δt,
+    var, δvar, G, w, Δt, implicit::AbstractImplicit
     )
     lmk = @index(Global, Linear)
-    # if G is passed on as nothing assume that the tendency average
-    # has already been computed in the implicit scheme
-    # and therefore only do the prognostic update here
+    # with an implicit solver assume that the tendency average has already been computed
+    # in there and therefore only dothe prognostic update here, the tendency with
+    # implicit corrections, called δvar is then stored in what's F otherwise
     var[lmk] = var[lmk] + Δt * δvar[lmk]    # Hotta et al. 2016 eq (21)
 end
-
-# to be used 
-# @kernel inbounds = true function tendency_average_kernel!(
-#         F, G, w,
-#     )
-#     lmk = @index(Global, Linear)
-#     G[lmk] = w * F[lmk] + (1 - w) * G[lmk]  # Hotta et al. 2016 eq (5)
-# end
