@@ -92,7 +92,7 @@ Another symmetry arises from the fact that the spherical harmonics are either sy
 around the Equator. There is an even/odd combination of degrees and orders so that the sign flips like a
 checkerboard
 ```math
-Y_{l, m}(\phi, \pi-\theta) = (-1)^{l+m}Y_{lm}(\phi, \phi)
+Y_{l, m}(\phi, \pi-\theta) = (-1)^{l+m}Y_{lm}(\phi, \theta)
 ```
 This means that one only has to compute the Legendre polynomials for one hemisphere and the other one
 follows with this equality.
