@@ -95,7 +95,7 @@ Fields are $(TYPEDFIELDS)"""
 
     # ---- CO₂ (Table 1, Williams 2026) ------------------------------------
     "[OPTION] Include CO₂ longwave absorption"
-    do_co2::Bool = false
+    do_co2::Bool = true
 
     "[OPTION] CO₂ concentration [ppmv]"
     @param co2_ppmv::NF = 280 (bounds = Positive,)
