@@ -48,12 +48,13 @@ scalar, so no per-column storage proportional to `nwavenumber` is required.
 ## Usage
 
 ```julia
+using SpeedyWeather
 spectral_grid = SpectralGrid(trunc = 31, nlayers = 8)
 longwave = SimpleSpectralLongwave(spectral_grid)          # defaults from paper
-longwave_co2 = SimpleSpectralLongwave(spectral_grid; co2_ppmv = 300)  # with 300 ppm CO₂
+longwave_co2 = SimpleSpectralLongwave(spectral_grid;  do_co2 = true, co2_ppmv = 280)  # with 280 ppm CO₂
 model = PrimitiveWetModel(spectral_grid; longwave_radiation = longwave)
 simulation = initialize!(model)
-run!(simulation, period = Day(10))
+run!(simulation, period = Day(20))
 ```
 
 Fields are $(TYPEDFIELDS)"""
