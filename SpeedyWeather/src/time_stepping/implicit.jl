@@ -1,9 +1,9 @@
-# dispatch over model.implicit
+# dispatch over model.implicit and time stepping
 implicit_correction!(vars::Variables, model::AbstractModel) =
-    implicit_correction!(vars, model.implicit, model)
+    implicit_correction!(vars, model.implicit, model.time_stepping, model)
 
 # model.implicit=nothing (for BarotropicModel)
-initialize!(::Nothing, dt::Real, ::Variables, ::AbstractModel) = nothing
+initialize!(::Nothing, ::Variables, ::AbstractModel) = nothing
 implicit_correction!(::Variables, ::Nothing, ::AbstractModel) = nothing
 
 # SHALLOW WATER MODEL
@@ -22,30 +22,20 @@ between i-1 and i+1 is controlled by the parameter `α` in the range [0, 1]
 
 Fields are
 $(TYPEDFIELDS)"""
-@kwdef mutable struct ImplicitShallowWater{NF} <: AbstractImplicit
-    "[OPTION] coefficient for semi-implicit computations to filter gravity waves, 0.5 <= α <= 1"
-    α::NF = 1
-
-    "Time step [s], = αdt = 2αΔt (for leapfrog)"
-    time_step::NF = 0
+@kwdef struct ImplicitShallowWater{NF} <: AbstractImplicit
+    "[OPTION] Centering coefficient for semi-implicit, 0.5 = Crank-Nicolson, 1 = Backwards Euler"
+    centering::NF = 0.5
 end
 
 """
 $(TYPEDSIGNATURES)
 Generator using the resolution from `spectral_grid`."""
 ImplicitShallowWater(SG::SpectralGrid; kwargs...) = ImplicitShallowWater{SG.NF}(; kwargs...)
-
-"""
-$(TYPEDSIGNATURES)
-Update the implicit terms in `implicit` for the shallow water model as they depend on the time step `dt`."""
-function initialize!(implicit::ImplicitShallowWater, dt::Real, args...)
-    implicit.time_step = implicit.α * dt  # new implicit timestep ξ = α*dt = 2αΔt (for leapfrog) from input dt
-    return implicit
-end
+initialize!(::ImplicitShallowWater, ::Variables, ::AbstractModel) = nothing
 
 # implicit shallow water has no precomputed arrays, so implicit.initialized is not defined
-set_initialized!(implicit::ImplicitShallowWater) = nothing
-set_initialized!(implicit::Nothing) = nothing
+# set_initialized!(implicit::ImplicitShallowWater) = nothing
+# set_initialized!(implicit::Nothing) = nothing
 
 """
 $(TYPEDSIGNATURES)
@@ -55,31 +45,35 @@ forward, centered implicit or backward evaluation of the gravity wave terms."""
 function implicit_correction!(
         vars::Variables,
         implicit::ImplicitShallowWater,
-        model::ShallowWater
+        time_stepping::AbstractLeapfrog,
+        model::ShallowWater,
     )
 
-    div_tend = get_tendency_step(vars.tendencies.divergence, model.time_stepping, implicit)
-    η_tend = get_tendency_step(vars.tendencies.η, model.time_stepping, implicit)
-    div_old, div_new = get_steps(vars.prognostic.divergence)   # divergence at t, t+dt
-    η_old, η_new = get_steps(vars.prognostic.η)         # η at t, t+dt
+    div_tend = get_tendency_step(vars.tendencies.divergence, time_stepping, implicit)
+    η_tend = get_tendency_step(vars.tendencies.η, time_stepping, implicit)
+    div_old, div_new = get_steps(vars.prognostic.divergence)    # divergence at t, t+dt
+    η_old, η_new = get_steps(vars.prognostic.η)                 # η at t, t+dt
 
     H = model.atmosphere.layer_thickness        # layer thickness [m], undisturbed, no mountains
     g = model.planet.gravity                    # gravitational acceleration [m/s²]
-    ξ = implicit.time_step                      # new implicit timestep ξ = α*dt = 2αΔt (for leapfrog)
-
+    
+    # new implicit timestep ξ = α*dt = 2αΔt (for leapfrog)
+    Δt = time_step(time_stepping, vars.prognostic.clock)       
+    ξ = implicit.centering * Δt
+    
     # Get precomputed l_indices from the spectrum
     l_indices = div_tend.spectrum.l_indices
 
     # GPU kernel launch
     arch = architecture(div_tend)
     launch!(
-        arch, SpectralWorkOrder, size(div_tend), implicit_shallow_water_kernel!,
+        arch, SpectralWorkOrder, size(div_tend), implicit_leapfrog_shallow_water_kernel!,
         div_tend, η_tend, div_old, div_new, η_old, η_new, l_indices, H, g, ξ
     )
     return nothing
 end
 
-@kernel inbounds = true function implicit_shallow_water_kernel!(
+@kernel inbounds = true function implicit_leapfrog_shallow_water_kernel!(
         div_tend, η_tend, div_old, div_new, η_old, η_new, l_indices,
         H, g, ξ,
     )
@@ -104,6 +98,68 @@ end
     S⁻¹ = inv(1 - ξ^2 * H * g * ∇²)  # operator to invert
     div_tend[lm, k] = S⁻¹ * (G_div - ξ * g * ∇² * G_η)
     η_tend[lm] = G_η - ξ * H * div_tend[lm, k]
+end
+
+"""
+$(TYPEDSIGNATURES)
+Apply correction to the tendencies in `diagn` to prevent the gravity waves from amplifying.
+The correction is implicitly evaluated using the parameter `implicit.α` to switch between
+forward, centered implicit or backward evaluation of the gravity wave terms."""
+function implicit_correction!(
+        vars::Variables,
+        implicit::ImplicitShallowWater,
+        time_stepping::AbstractNCycleLorenz,
+        model::ShallowWater
+    )
+    # implicit timestep ξ = α*Δt, depending on centering (0.5 Crank Nicolson, 1 backward Euler)
+    (; Δt) = time_stepping    
+    ξ = implicit.centering * Δt
+    w = weight_coefficient(time_stepping, vars.prognostic.clock)
+
+    # use Hotta et al. 2016 notation for current tendency F and previous (averaged) tendency G
+    F_vor, G_vor = get_steps(vars.tendencies.divergence)
+    F_div, G_div = get_steps(vars.tendencies.divergence)
+    F_η, G_η = get_steps(vars.tendencies.η)
+
+    H = model.atmosphere.layer_thickness        # layer thickness [m], undisturbed, no mountains
+    g = model.planet.gravity                    # gravitational acceleration [m/s²]
+        
+    # Get precomputed l_indices from the spectrum
+    (; l_indices) = F_div.spectrum
+
+    # GPU kernel launch
+    arch = architecture(F_div)
+    launch!(
+        arch, SpectralWorkOrder, size(F_div), implicit_ncycle_lorenz_shallow_water_kernel!,
+        F_vor, G_vor, F_div, G_div, F_η, G_η, l_indices, H, g, ξ, w
+    )
+    return nothing
+end
+
+@kernel inbounds = true function implicit_ncycle_lorenz_shallow_water_kernel!(
+        F_vor, G_vor, F_div, G_div, F_η, G_η, l_indices, H, g, ξ, w
+    )
+    I = @index(Global, Cartesian)
+    lm = I[1]  # single index lm corresponding to harmonic l, m
+    k = I[2]   # layer index
+
+    # do the N-Cycle Lorenz tendency average here to free the F tendencies
+    G_vor[lm, k] = w*F_vor[lm, k] + (1 - w)*G_vor[lm, k]
+    F_vor[lm, k] = G_vor[lm, k]
+    G_div[lm, k] = w*F_div[lm, k] + (1 - w)*G_div[lm, k]
+    G_η[lm] = w*F_η[lm] + (1 - w)*G_η[lm]
+
+    # Use precomputed l index from spectrum
+    l = l_indices[lm]
+
+    # eigenvalue, with without 1/radius², 1-based -l*(l+1) → -l*(l-1)
+    ∇² = -l * (l - 1)
+
+    # Using the Gs correct the tendencies for semi-implicit time stepping
+    # store them in the Fs as they aren't used anymore after the G <- wF + (1-w)*G update
+    S⁻¹ = inv(1 - ξ^2 * H * g * ∇²)  # operator to invert
+    F_div[lm, k] = S⁻¹ * (G_div[lm, k] - ξ * g * ∇² * G_η[lm])
+    F_η[lm] = G_η[lm] - ξ * H * F_div[lm, k]
 end
 
 export ImplicitPrimitiveEquation

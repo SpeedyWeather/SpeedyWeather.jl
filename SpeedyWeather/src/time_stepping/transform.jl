@@ -57,8 +57,10 @@ u, v."""
 function SpeedyTransforms.transform!(
         vars::Variables,
         time_stepping::AbstractTimeStepper,
-        model::ShallowWater,
+        model::ShallowWater,;
+        initialize::Bool = false,
     )
+    initialize && initialize!(vars, time_stepping, model)
 
     S = model.spectral_transform
     u_grid = get_prognostic_step(vars.grid.u, time_stepping, S)

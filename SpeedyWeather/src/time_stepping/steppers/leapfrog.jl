@@ -40,13 +40,13 @@ Adapt.adapt_structure(to, L::Leapfrog) = LeapfrogCore(L.Δt_millisec, L.Δt_sec,
 
 # HOW MANY STEPS DO VARIABLES NEED?
 # leapfrogging always needs 2 steps in spectral
-prognostic_spectral_steps(::Leapfrog) = 2
+prognostic_spectral_steps(::AbstractLeapfrog) = 2
 # but in 2D only 1 step in grid space
-prognostic_grid_steps(::Leapfrog, ::Union{<:Barotropic, <:ShallowWater}) = 1
+prognostic_grid_steps(::AbstractLeapfrog, ::Union{<:Barotropic, <:ShallowWater}) = 1
 # but the parameterizations are evaluated at the previous step so 2
-prognostic_grid_steps(::Leapfrog, ::PrimitiveEquation) = 2
+prognostic_grid_steps(::AbstractLeapfrog, ::PrimitiveEquation) = 2
 # always only one step for tendencies
-tendency_steps(::Leapfrog) = 1
+tendency_steps(::AbstractLeapfrog) = 1
 
 # WHICH STEP TO READ WHEN
 @inline which_prognostic_step(var::LowerTriangularArray, ::AbstractLeapfrog, ::SpeedyTransforms.AbstractSpectralTransform) = 2
@@ -55,7 +55,8 @@ tendency_steps(::Leapfrog) = 1
 @inline which_prognostic_step(var::LowerTriangularArray, ::AbstractLeapfrog, ::AbstractDynamicalCoreComponent) = 2
 @inline which_prognostic_step(var::LowerTriangularArray, ::AbstractLeapfrog, ::AbstractHorizontalDiffusion) = 1
 
-function initialize!(vars::Variables, time_stepping::AbstractLeapfrog, ::AbstractModel)
+# copy prognostic variables' 1st step to 2nd, that way which_prognostic_step can always be 2
+function initialize!(vars::Variables, ::AbstractLeapfrog, ::AbstractModel)
     (; prognostic) = vars
     for varname in keys(prognostic)
         if prognostic[varname] isa AbstractArray
@@ -206,90 +207,90 @@ end
     var_new[lmk] = new - w2 * update
 end
 
-"""$(TYPEDSIGNATURES)
-Perform one single time step of `simulation` including
-possibly output and callbacks."""
-function timestep!(simulation::AbstractSimulation, ::Leapfrog)
-    (; clock) = simulation.variables.prognostic
-    @trace if clock.step_counter == 0
-        leapfrog_first_timesteps!(simulation)
-    else
-        later_timestep!(simulation)
-    end
+# """$(TYPEDSIGNATURES)
+# Perform one single time step of `simulation` including
+# possibly output and callbacks."""
+# function timestep!(simulation::AbstractSimulation, ::Leapfrog)
+#     (; clock) = simulation.variables.prognostic
+#     @trace if clock.step_counter == 0
+#         leapfrog_first_timesteps!(simulation)
+#     else
+#         later_timestep!(simulation)
+#     end
 
-    return nothing
-end
+#     return nothing
+# end
 
-"""$(TYPEDSIGNATURES)
-First 1 or 2 time steps of `simulation`. If `model.time_stepping.start_with_euler` is true,
-then start with one Euler step with dt/2, followed by one Leapfrog step with dt.
-If false, continue with leapfrog steps at 2Δt (e.g. restart)."""
-function leapfrog_first_timesteps!(simulation::AbstractSimulation)
-    (; variables, model) = simulation
-    (; time_stepping) = model
-    (; Δt) = time_stepping
+# """$(TYPEDSIGNATURES)
+# First 1 or 2 time steps of `simulation`. If `model.time_stepping.start_with_euler` is true,
+# then start with one Euler step with dt/2, followed by one Leapfrog step with dt.
+# If false, continue with leapfrog steps at 2Δt (e.g. restart)."""
+# function leapfrog_first_timesteps!(simulation::AbstractSimulation)
+#     (; variables, model) = simulation
+#     (; time_stepping) = model
+#     (; Δt) = time_stepping
 
-    # decide whether to start with 1x Euler then 1x Leapfrog at Δt
-    @trace if time_stepping.first_step_euler
-        leapfrog_first_timesteps!(variables, model)
-        time_stepping.first_step_euler = !time_stepping.continue_with_leapfrog   # after first run! continue with leapfrog
-    else # or continue with leaprog steps at 2Δt (e.g. restart)
-        # but make sure that implicit solver is initialized in that situation
-        initialize!(model.implicit, 2Δt, variables, model)
-        set_initialized!(model.implicit)            # mark implicit as initialized
-        leapfrog_later_timestep!(simulation)
-    end
+#     # decide whether to start with 1x Euler then 1x Leapfrog at Δt
+#     @trace if time_stepping.first_step_euler
+#         leapfrog_first_timesteps!(variables, model)
+#         time_stepping.first_step_euler = !time_stepping.continue_with_leapfrog   # after first run! continue with leapfrog
+#     else # or continue with leaprog steps at 2Δt (e.g. restart)
+#         # but make sure that implicit solver is initialized in that situation
+#         initialize!(model.implicit, 2Δt, variables, model)
+#         set_initialized!(model.implicit)            # mark implicit as initialized
+#         leapfrog_later_timestep!(simulation)
+#     end
 
-    # only now initialise feedback for benchmark accuracy
-    (; clock) = variables.prognostic
-    initialize!(model.feedback, clock, model)
-    return nothing
-end
+#     # only now initialise feedback for benchmark accuracy
+#     (; clock) = variables.prognostic
+#     initialize!(model.feedback, clock, model)
+#     return nothing
+# end
 
-"""
-$(TYPEDSIGNATURES)
-Performs the first two initial time steps (Euler forward, unfiltered leapfrog) to populate the
-prognostic variables with two time steps (t=0, Δt) that can then be used in the normal leap frogging."""
-function first_timesteps!(
-        vars::Variables,        # all variables
-        model::AbstractModel,   # everything that is constant at runtime
-    )
-    (; clock) = vars.prognostic
-    # TODO: deactaved that check for Reactant, but it doesn't seem neccary anyway as the toplevle time_stepping! should take care of this
-    # clock.n_time_steps == 0 && return nothing    # exit immediately for no time steps
+# """
+# $(TYPEDSIGNATURES)
+# Performs the first two initial time steps (Euler forward, unfiltered leapfrog) to populate the
+# prognostic variables with two time steps (t=0, Δt) that can then be used in the normal leap frogging."""
+# function first_timesteps!(
+#         vars::Variables,        # all variables
+#         model::AbstractModel,   # everything that is constant at runtime
+#     )
+#     (; clock) = vars.prognostic
+#     # TODO: deactaved that check for Reactant, but it doesn't seem neccary anyway as the toplevle time_stepping! should take care of this
+#     # clock.n_time_steps == 0 && return nothing    # exit immediately for no time steps
 
-    (; implicit) = model
-    (; Δt, Δt_millisec) = model.time_stepping
-    Δt_millisec_half = Millisecond(Δt_millisec.value ÷ 2)   # this might be 1ms off
+#     (; implicit) = model
+#     (; Δt, Δt_millisec) = model.time_stepping
+#     Δt_millisec_half = Millisecond(Δt_millisec.value ÷ 2)   # this might be 1ms off
 
-    # FIRST TIME STEP (EULER FORWARD with dt=Δt/2)
-    lf1 = 1                             # without Robert+Williams filter
-    lf2 = 1                             # evaluates all tendencies at t=0,
-    # the first leapfrog index (=>Euler forward)
-    initialize!(implicit, Δt / 2, vars, model)      # update precomputed implicit terms with time step Δt/2
-    timestep!(vars, Δt / 2, model, lf1, lf2)        # update time by half the leapfrog time step Δt used here
-    timestep!(clock, Δt_millisec_half, increase_counter = false)
+#     # FIRST TIME STEP (EULER FORWARD with dt=Δt/2)
+#     lf1 = 1                             # without Robert+Williams filter
+#     lf2 = 1                             # evaluates all tendencies at t=0,
+#     # the first leapfrog index (=>Euler forward)
+#     initialize!(implicit, Δt / 2, vars, model)      # update precomputed implicit terms with time step Δt/2
+#     timestep!(vars, Δt / 2, model, lf1, lf2)        # update time by half the leapfrog time step Δt used here
+#     timestep!(clock, Δt_millisec_half, increase_counter = false)
 
-    # output, callbacks not called after the first Euler step as it's a half-step (i=0 to i=1/2)
-    # populating the second leapfrog index to perform the second time step
+#     # output, callbacks not called after the first Euler step as it's a half-step (i=0 to i=1/2)
+#     # populating the second leapfrog index to perform the second time step
 
-    # SECOND TIME STEP (UNFILTERED LEAPFROG with dt=Δt, leapfrogging from t=0 over t=Δt/2 to t=Δt)
-    initialize!(implicit, Δt, vars, model)  # update precomputed implicit terms with time step Δt
-    lf1 = 1                                 # without Robert+Williams filter
-    lf2 = 2                                 # evaluate all tendencies at t=dt/2,
-    # the 2nd leapfrog index (=>Leapfrog)
-    timestep!(vars, Δt, model, lf1, lf2)
-    # remove prev Δt/2 in case not even milliseconds, otherwise time is off by 1ms
-    timestep!(clock, -Δt_millisec_half, increase_counter = false)
-    timestep!(clock, Δt_millisec)
+#     # SECOND TIME STEP (UNFILTERED LEAPFROG with dt=Δt, leapfrogging from t=0 over t=Δt/2 to t=Δt)
+#     initialize!(implicit, Δt, vars, model)  # update precomputed implicit terms with time step Δt
+#     lf1 = 1                                 # without Robert+Williams filter
+#     lf2 = 2                                 # evaluate all tendencies at t=dt/2,
+#     # the 2nd leapfrog index (=>Leapfrog)
+#     timestep!(vars, Δt, model, lf1, lf2)
+#     # remove prev Δt/2 in case not even milliseconds, otherwise time is off by 1ms
+#     timestep!(clock, -Δt_millisec_half, increase_counter = false)
+#     timestep!(clock, Δt_millisec)
 
-    # do output and callbacks after the first proper (from i=0 to i=1) time step
-    callback!(model.callbacks, vars, model)
-    output!(model.output, Simulation(vars, model))
+#     # do output and callbacks after the first proper (from i=0 to i=1) time step
+#     callback!(model.callbacks, vars, model)
+#     output!(model.output, Simulation(vars, model))
 
-    # from now on precomputed implicit terms with 2Δt
-    initialize!(implicit, 2Δt, vars, model)
-    set_initialized!(implicit)      # mark implicit as initialized
+#     # from now on precomputed implicit terms with 2Δt
+#     initialize!(implicit, 2Δt, vars, model)
+#     set_initialized!(implicit)      # mark implicit as initialized
 
-    return nothing
-end
+#     return nothing
+# end

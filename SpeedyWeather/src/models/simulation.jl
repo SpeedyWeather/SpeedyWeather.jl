@@ -78,6 +78,9 @@ function initialize!(
     transform!(variables, model, initialize = true)
     haskey(progn, :particles) && initialize!(variables, progn.particles, model)     # initialize particle work arrays
     
+    # IMPLICIT initialization now in case that depends on the variables (e.g. a background temperature profile)
+    initialize!(model.implicit, variables, model)
+
     # OUTPUT, CALLBACKS, FEEDBACK only initialize output and callbacks now, just before the simulation starts
     set!(simulation.model.output, active = output, reset_path = true)
     initialize!(model.output, variables, model)

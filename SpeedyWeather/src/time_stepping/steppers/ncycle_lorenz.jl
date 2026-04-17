@@ -166,27 +166,35 @@ function update_prognostic!(
     F = get_step(tendency, 1)   # tendency of current time step (or weighted + implicitly corrected tendency)
     G = get_step(tendency, 2)   # accumulated weighted tendencies
 
-    launch!(
-        architecture(var), LinearWorkOrder, size(var), ncycle_lorenz_kernel!,
-        var, F, G, w, Δt, implicit
-    )
+    if isnothing(implicit)
+        launch!(
+            architecture(var), LinearWorkOrder, size(var), ncycle_lorenz_kernel!,
+            var, G, F, w, Δt
+        )
+    else
+        euler_forward!(var, F, Δt)
+    end
     return nothing
 end
 
 @kernel inbounds = true function ncycle_lorenz_kernel!(
-    var, F, G, w, Δt, implicit::Nothing,
+        var, G, F, w, Δt,
     )
     lmk = @index(Global, Linear)
     G[lmk] = w * F[lmk] + (1 - w) * G[lmk]  # Hotta et al. 2016 eq (5)
     var[lmk] = var[lmk] + Δt * G[lmk]       # and equation (6)
 end
 
-@kernel inbounds = true function ncycle_lorenz_kernel!(
-    var, δvar, G, w, Δt, implicit::AbstractImplicit
-    )
-    lmk = @index(Global, Linear)
-    # with an implicit solver assume that the tendency average has already been computed
-    # in there and therefore only dothe prognostic update here, the tendency with
-    # implicit corrections, called δvar is then stored in what's F otherwise
-    var[lmk] = var[lmk] + Δt * δvar[lmk]    # Hotta et al. 2016 eq (21)
+function ncycle_lorenz_tendency_average!(G::AbstractArray, F::AbstractArray, w)
+    G .= ncycle_lorenz_tendency_average.(G.data, F.data, w)
+    return nothing
 end
+
+ncycle_lorenz_tendency_average(G, F, w) = w * F + (1 - w) * G
+
+function euler_forward!(x::AbstractArray, δx::AbstractArray, Δt)
+    x .= euler_forward.(x.data, δx.data, Δt)
+    return nothing
+end
+
+euler_forward(x, δx, Δt) = x + Δt * δx
