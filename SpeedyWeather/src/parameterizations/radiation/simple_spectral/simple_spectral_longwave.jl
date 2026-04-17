@@ -50,8 +50,7 @@ scalar, so no per-column storage proportional to `nwavenumber` is required.
 ```julia
 using SpeedyWeather
 spectral_grid = SpectralGrid(trunc = 31, nlayers = 8)
-longwave = SimpleSpectralLongwave(spectral_grid)          # defaults from paper
-longwave_co2 = SimpleSpectralLongwave(spectral_grid;  do_co2 = true, co2_ppmv = 280)  # with 280 ppm CO₂
+longwave = SimpleSpectralLongwave(spectral_grid)          
 model = PrimitiveWetModel(spectral_grid; longwave_radiation = longwave)
 simulation = initialize!(model)
 run!(simulation, period = Day(20))
@@ -140,10 +139,6 @@ Generator: construct `SimpleSpectralLongwave` from a `SpectralGrid`."""
 SimpleSpectralLongwave(SG::SpectralGrid; kwargs...) = SimpleSpectralLongwave{SG.NF}(; kwargs...)
 
 initialize!(::SimpleSpectralLongwave, ::PrimitiveEquation) = nothing
-
-# =============================================================================
-# Spectroscopic helper functions
-# =============================================================================
 
 """
     h2o_line_kappa_ref(ν̃, rad) -> κ  [m² kg⁻¹]
@@ -268,10 +263,6 @@ exponential temperature dependence exp(σ_cont (T_ref − T)).
 
     return rad.diffusivity * (Δτ_h2o_line + Δτ_h2o_cont + Δτ_co2)
 end
-
-# =============================================================================
-# Main parameterization
-# =============================================================================
 
 """$(TYPEDSIGNATURES)
 Column longwave radiative transfer for the Simple Spectral Model.

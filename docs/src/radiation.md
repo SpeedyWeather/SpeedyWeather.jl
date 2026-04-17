@@ -123,6 +123,79 @@ as
 
 For details see Frierson et al. 2006 [^FH06].
 
+## SimpleSpectralLongwave
+
+A spectrally-resolved clear-sky longwave scheme following Williams [^W26]. Where
+`OneBandLongwave` treats the entire longwave spectrum as a single gray band,
+`SimpleSpectralLongwave` integrates the Schwarzschild two-stream equations at each
+of ``N_\nu = 41`` discrete wavenumber bins from 10 to 2510 cm⁻¹, resolving the
+H₂O rotation band, the H₂O vibration–rotation band, the atmospheric window, and
+optionally the CO₂ 15 μm bending mode. The per-wavenumber equations are comparable
+to those of `OneBandLongwave`,
+
+```math
+\frac{dU}{d\tau} = U - \pi B(T, \tilde{\nu}), \qquad \frac{dD}{d\tau} = \pi B(T, \tilde{\nu}) - D,
+```
+
+with the layer-by-layer solution
+
+```math
+U_{k-1} = e^{-\Delta\tau_k}\, U_k + (1 - e^{-\Delta\tau_k})\, \pi B(T_k, \tilde{\nu}).
+```
+
+The optical depth increment ``\Delta\tau_k`` through layer ``k`` combines three absorbers
+(Eqs. 7–9 of [^W26]):
+
+```math
+\Delta\tau_k = \frac{D\,\Delta p_k}{g} \left[
+  \kappa_\text{line}(\tilde{\nu})\,\frac{p_k}{p_\text{ref}}\,q_k
+  + \kappa_\text{cont}(\tilde{\nu})\,\frac{p_{v,k}}{p_{v,\text{ref}}}\,e^{\sigma_c(T_\text{ref}-T_k)}\,q_k
+  + \kappa_{\text{CO}_2}(\tilde{\nu})\,\frac{p_{k+1}^2 - p_k^2}{2\,p_\text{ref}}\,q_{\text{CO}_2}
+\right]
+```
+
+with diffusivity factor ``D = 1.5`` (Armstrong 1968). The mass absorption coefficients
+``\kappa`` are analytic piecewise-exponential fits: H₂O line absorption is a double
+exponential across the rotation and vibration–rotation bands, H₂O continuum absorption
+is a two-band gray value separated at 1700 cm⁻¹, and CO₂ absorption is a Lorentzian
+centred at 667 cm⁻¹. All ten reference parameters are from Table 1 of [^W26]. The mass absorption coefficients can be plotted with our implementation like so: 
+
+```@example radiation
+using CairoMakie
+rad = SimpleSpectralLongwave{Float32}()
+νs = range(Float32(10), Float32(2510), length=500)
+nan0(v) = replace(x -> iszero(x) ? NaN32 : x, v)
+κ_line = nan0([SpeedyWeather.h2o_line_kappa_ref(ν, rad) for ν in νs])
+κ_cont =      [SpeedyWeather.h2o_cont_kappa_ref(ν, rad) for ν in νs]
+κ_co2  = nan0([SpeedyWeather.co2_kappa_ref(ν, rad)      for ν in νs])
+fig = Figure(size=(700, 350))
+ax = Axis(fig[1, 1]; xlabel="Wavenumber [cm⁻¹]", ylabel="κ [m² kg⁻¹]",
+          yscale=log10,
+          title="SSM reference mass absorption coefficients (T_ref = 260 K, p_ref = 500 hPa)")
+lines!(ax, νs, κ_line; label="H₂O line")
+lines!(ax, νs, κ_cont; label="H₂O continuum")
+lines!(ax, νs, κ_co2;  label="CO₂", linestyle=:dash)
+axislegend(ax, position=:rt)
+save("ssm_kappa_spectrum.png", fig)
+nothing # hide
+```
+
+![SSM mass absorption coefficients](ssm_kappa_spectrum.png)
+
+Usage of the scheme as in the following:
+
+```@example radiation
+spectral_grid = SpectralGrid(trunc=31, nlayers=8)
+longwave_radiation = SimpleSpectralLongwave(spectral_grid; do_co2=true, co2_ppmv=400)
+model = PrimitiveWetModel(spectral_grid; longwave_radiation)
+model.longwave_radiation
+```
+
+Because CO₂ absorption is resolved spectrally, doubling CO₂ from 280 to 560 ppmv
+reduces OLR by ~3 W/m² without any tuning for that purpose. For stable long
+simulations with the default `OneBandShortwave`, `do_co2=true` must be set — without
+CO₂ the H₂O greenhouse effect alone leaves a ~40 W/m² energy imbalance.
+
 ## Shortwave radiation
 
 Currently implemented schemes:
@@ -356,3 +429,5 @@ nothing # hide
 [^KMB06]: Kucharski, F., Molteni, F., & Bracco, A. SPEEDY: A simplified atmospheric general circulation model. ICTP, Trieste, Italy. Appendix A: Model Equations and Parameters (2006). [PDF](https://users.ictp.it/~kucharsk/speedy_description/km_ver41_appendixA.pdf)
 
 [^FH06]: Frierson DMW, IM Held, P Zurita-Gotor. A Gray-Radiation Aquaplanet Moist GCM. Part I: Static Stability and Eddy Scale (2006). Journal of the Atmospheric Sciences 63:10. DOI: [10.1175/JAS3753.1](https://doi.org/10.1175/JAS3753.1)
+
+[^W26]: Williams, A.I.L. Bridging clarity and accuracy: A simple spectral longwave radiation scheme for idealized climate modeling. Journal of Advances in Modeling Earth Systems, 18, e2025MS005405 (2026). DOI: [10.1029/2025MS005405](https://doi.org/10.1029/2025MS005405)
