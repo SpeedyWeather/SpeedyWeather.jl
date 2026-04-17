@@ -207,4 +207,21 @@ Dates.second(x::ReactantDatesExt.ReactantMillisecond) = round(Int, x.value * 1.0
 
 SpeedyWeather.Clock(architecture::ReactantDevice) = Reactant.to_rarray(SpeedyWeather.Clock(), track_numbers = true)
 
+# _units is defined per concrete Period type in Dates with singular/plural logic.
+# For Reactant period types the value is a traced number so we can't branch on it;
+# always return the plural form which is the common case.
+for (T, unit) in (
+    (:ReactantYear, "years"),
+    (:ReactantMonth, "months"),
+    (:ReactantDay, "days"),
+    (:ReactantHour, "hours"),
+    (:ReactantMinute, "minutes"),
+    (:ReactantSecond, "seconds"),
+    (:ReactantMillisecond, "milliseconds"),
+    (:ReactantMicrosecond, "microseconds"),
+    (:ReactantNanosecond, "nanoseconds"),
+)
+    @eval Dates._units(::ReactantDatesExt.$T) = " " * $unit
+end
+
 end

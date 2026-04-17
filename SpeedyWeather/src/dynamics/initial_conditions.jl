@@ -810,41 +810,20 @@ function initialize!(
     (; σ_levels_full) = model.geometry
     (; atmosphere) = model
 
-    # get pressure [Pa] on grid
     lnpₛ = get_step(vars.prognostic.pressure, 1)  # 1 = first leapfrog timestep
-    pres_grid = exp.(transform(lnpₛ, model.spectral_transform))
+    lnpₛ_grid = transform(lnpₛ, model.spectral_transform)
 
-    temp = get_step(vars.prognostic.temperature, 1)  #  1 = first leapfrog timestep
+    temp = get_step(vars.prognostic.temperature, 1)  # 1 = first leapfrog timestep
     temp_grid = transform(temp, model.spectral_transform)
     humid_grid = similar(temp_grid)
 
-    # Launch kernel
-    launch!(
-        architecture(humid_grid), RingGridWorkOrder, size(humid_grid),
-        constant_relative_humidity_kernel!, humid_grid, temp_grid, pres_grid,
-        σ_levels_full, relhumid_ref, atmosphere,
-    )
+    # pressure at each level: σ[k] * exp(lnpₛ[ij]), shape (npoints, nlayers)
+    pres_levels = reshape(exp.(lnpₛ_grid.data), :, 1) .* reshape(σ_levels_full, 1, :)
+
+    humid_grid.data .= relhumid_ref .* saturation_humidity.(temp_grid.data, pres_levels, atmosphere)
+
     set!(vars, model; humidity = humid_grid, lf = 1)
-
     return nothing
-end
-
-@kernel inbounds = true function constant_relative_humidity_kernel!(
-        humid_grid,
-        temp_grid,
-        pres_grid,
-        σ_levels_full,
-        relhumid_ref,
-        atmosphere,
-    )
-    ij, k = @index(Global, NTuple)
-
-    # Compute pressure at this level
-    pₖ = σ_levels_full[k] * pres_grid[ij]
-    T = temp_grid[ij, k]
-
-    # Set humidity as fraction of saturation
-    humid_grid[ij, k] = relhumid_ref * saturation_humidity(T, pₖ, atmosphere)
 end
 
 export RandomWaves

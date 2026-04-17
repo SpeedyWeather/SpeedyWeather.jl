@@ -206,15 +206,21 @@ function transform!(                        # SPECTRAL TO GRID
     scratch = ndims(coeffs) == 1 ? view(scratch_memory, :, 1) : nlayers < size(scratch_memory, 2) ? view(scratch_memory, :, 1:nlayers) : scratch_memory
 
     # the result is real-valued, therefore we can split the complex multiplication
-    # into two real-valued multiplications
-    scratch .= real.(coeffs.data)
-    @maybe_jit M.architecture LinearAlgebra.mul!(field.data, M.backward_real, scratch)
-
-    scratch .= imag.(coeffs.data)
-    @maybe_jit M.architecture LinearAlgebra.mul!(field.data, M.backward_imag, scratch, -1, 1)
+    # into two real-valued multiplications; both must run in a single @maybe_jit call
+    # so that the accumulation (β=1) in the second mul! sees the result of the first
+    # within the same compiled context (avoids Reactant first-call NaN)
+    @maybe_jit M.architecture _backward_mul!(field.data, coeffs.data, scratch, M.backward_real, M.backward_imag)
 
     if unscale_coslat
         @maybe_jit M.architecture RingGrids._scale_lat!(field, M.coslat⁻¹)
     end
     return field
+end
+
+@inline function _backward_mul!(field_data, coeffs_data, scratch, backward_real, backward_imag)
+    scratch .= real.(coeffs_data)
+    LinearAlgebra.mul!(field_data, backward_real, scratch)
+    scratch .= imag.(coeffs_data)
+    LinearAlgebra.mul!(field_data, backward_imag, scratch, -1, 1)
+    return nothing
 end
