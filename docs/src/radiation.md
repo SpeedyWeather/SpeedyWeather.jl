@@ -191,11 +191,6 @@ model = PrimitiveWetModel(spectral_grid; longwave_radiation)
 model.longwave_radiation
 ```
 
-Because CO₂ absorption is resolved spectrally, doubling CO₂ from 280 to 560 ppmv
-reduces OLR by ~3 W/m² without any tuning for that purpose. For stable long
-simulations with the default `OneBandShortwave`, `do_co2=true` must be set — without
-CO₂ the H₂O greenhouse effect alone leaves a ~40 W/m² energy imbalance.
-
 ## Shortwave radiation
 
 Currently implemented schemes:
