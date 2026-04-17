@@ -92,6 +92,9 @@ end
     @test ismatching(cpu, CPU())
     @test ismatching(jlgpu, GPU(JLArrays.JLBackend()))
     @test !ismatching(cpu, jlgpu)
+
+    # with a view / subarray 
+    @test ismatching(cpu, view(a_cpu, 1:2))
 end
 
 @testset "nonparametric_type" begin
