@@ -21,6 +21,8 @@ function Base.show(io::IO, S::AbstractSimulation)
     return nothing
 end
 
+Base.show(io::IO, ::Type{<:Simulation{V,M}}) where {V,M} = print(io, "Simulation{Variables, $(nameof(M)){…}}")
+
 unpack(sim::AbstractSimulation) = (sim.variables, sim.model)
 
 const DEFAULT_PERIOD = Day(10)
