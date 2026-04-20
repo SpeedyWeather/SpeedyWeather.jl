@@ -151,7 +151,7 @@ variables(::SurfaceLandHeatFlux) = (
 
     # drag coefficient
     d = vars.parameterizations.boundary_layer_drag[ij]
-    drag_land = ifelse(heat_flux.use_boundary_layer_drag, d, heat_flux.drag)
+    drag_land = ifelse(heat_flux.use_boundary_layer_drag, d, convert(typeof(d), heat_flux.drag))
 
     # SPEEDY documentation Eq. 54/56, land/sea fraction included
     # Only flux from land if available (not NaN) otherwise zero flux

@@ -89,7 +89,7 @@ variables(::SurfaceOceanHumidityFlux) = (
 
     # drag coefficient either from SurfaceHumidityFlux or from a central drag coefficient
     d = vars.parameterizations.boundary_layer_drag[ij]
-    drag_ocean = humidity_flux.use_boundary_layer_drag ? d : humidity_flux.drag
+    drag_ocean = ifelse(humidity_flux.use_boundary_layer_drag, d, humidity_flux.drag)
 
     # SPEEDY documentation eq. 55/57, zero flux if sea surface temperature not available
     # but remove the max( ,0) to allow for surface condensation
@@ -150,7 +150,7 @@ variables(::SurfaceLandHumidityFlux) = (
 
     # drag coefficient either from SurfaceLandHumidityFlux or from a central drag coefficient
     d = vars.parameterizations.boundary_layer_drag[ij]
-    drag_land = humidity_flux.use_boundary_layer_drag ? d : humidity_flux.drag
+    drag_land = ifelse(humidity_flux.use_boundary_layer_drag, d, convert(typeof(d), humidity_flux.drag))
 
     # SPEEDY documentation eq. 55/57, zero flux if land / soil moisture availability not available (=ocean)
     # but remove the max( ,0) to allow for surface condensation

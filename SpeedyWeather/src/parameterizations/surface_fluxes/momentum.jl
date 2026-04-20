@@ -48,7 +48,7 @@ end
 
     # drag coefficient either from SurfaceMomentumFlux or from a central drag coefficient
     d = vars.parameterizations.boundary_layer_drag[ij]
-    drag = ifelse(momentum_flux.use_boundary_layer_drag, d, land_fraction * drag_land + (1 - land_fraction) * drag_ocean)
+    drag = ifelse(momentum_flux.use_boundary_layer_drag, d, convert(typeof(d), land_fraction * drag_land + (1 - land_fraction) * drag_ocean))
 
     # Fortran SPEEDY documentation eq. 52, 53, accumulate fluxes with +=
     V₀ = vars.parameterizations.surface_wind_speed[ij]
