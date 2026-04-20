@@ -234,14 +234,13 @@ function initialize!(
         truncation = round(Int, trunc * (1 - orog.smoothing_fraction))
         c = orog.smoothing_strength
         power = orog.smoothing_power
-        @maybe_jit architecture SpeedyTransforms.spectral_smoothing!(surface_geopotential, c; power, truncation)
+        SpeedyTransforms.spectral_smoothing!(surface_geopotential, c; power, truncation)
     end
 
     # For
-    inbounds_transform!(orography, surface_geopotential, S) = @inbounds transform!(orography, surface_geopotential, S)
-    @maybe_jit architecture inbounds_transform!(orography, surface_geopotential, S)
+    transform!(orography, surface_geopotential, S)
 
     surface_geopotential .*= gravity                                # turn orography into surface geopotential
-    @maybe_jit architecture SpeedyTransforms.spectral_truncation!(surface_geopotential)     # set the lmax+1 harmonics to zero
+    SpeedyTransforms.spectral_truncation!(surface_geopotential)     # set the lmax+1 harmonics to zero
     return nothing
 end
