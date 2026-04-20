@@ -205,7 +205,6 @@ Dates.second(x::ReactantDatesExt.ReactantNanosecond) = round(Int, x.value * 1.0e
 Dates.second(x::ReactantDatesExt.ReactantMicrosecond) = round(Int, x.value * 1.0e-6)
 Dates.second(x::ReactantDatesExt.ReactantMillisecond) = round(Int, x.value * 1.0e-3)
 
-SpeedyWeather.Clock(architecture::ReactantDevice) = Reactant.to_rarray(SpeedyWeather.Clock(), track_numbers = true)
 
 # _units is defined per concrete Period type in Dates with singular/plural logic.
 # For Reactant period types the value is a traced number so we can't branch on it;
@@ -223,5 +222,31 @@ for (T, unit) in (
 )
     @eval Dates._units(::ReactantDatesExt.$T) = " " * $unit
 end
+
+# construct components with ReactantDates types
+SpeedyWeather.Clock(architecture::ReactantDevice) = Reactant.to_rarray(SpeedyWeather.Clock(), track_numbers = true)
+
+SpeedyWeather.SolarZenith(SG::SpectralGrid{<:ReactantDevice}; kwargs...) = SolarZenith{SG.NF, SinSolarDeclination{typeof(Earth(SG))}, Base.RefValue{ReactantDatesExt.ReactantDateTime}, Bool, ReactantDatesExt.ReactantSecond}(; kwargs...)
+SpeedyWeather.SolarZenithSeason(SG::SpectralGrid{<:ReactantDevice}; kwargs...) = SolarZenithSeason{SG.NF, SinSolarDeclination{typeof(Earth(SG))}, Base.RefValue{ReactantDatesExt.ReactantDateTime}, Bool,  ReactantDatesExt.ReactantSecond}(; kwargs...)
+SpeedyWeather.Earth(SG::SpectralGrid{<:ReactantDevice}; kwargs...) = Earth{SG.NF, ReactantDatesExt.ReactantSecond, ReactantDatesExt.ReactantDateTime, Bool}(kwargs...)
+
+function SpeedyWeather.WhichZenith(SG::SpectralGrid{<:ReactantDevice}, P::SpeedyWeather.AbstractPlanet; kwargs...)
+    (; NF) = SG
+    (; daily_cycle, seasonal_cycle, length_of_day, length_of_year) = P
+    solar_declination = SpeedyWeather.SinSolarDeclination(P)
+
+    if daily_cycle
+        return SolarZenith{NF, typeof(solar_declination), Base.RefValue{ReactantDatesExt.ReactantDateTime}, Bool, ReactantDatesExt.ReactantSecond}(;
+            length_of_day, length_of_year, solar_declination, seasonal_cycle, kwargs...
+        )
+
+    else
+        return SolarZenithSeason{NF, typeof(solar_declination), Base.RefValue{ReactantDatesExt.ReactantDateTime}, Bool,  ReactantDatesExt.ReactantSecond}(;
+            length_of_day, length_of_year, solar_declination, seasonal_cycle, kwargs...
+        )
+    end
+end
+
+Base.convert(::Type{Base.RefValue{ReactantDatesExt.ReactantDateTime}}, dt::Base.RefValue{DateTime}) = Base.RefValue{ReactantDatesExt.ReactantDateTime}(ReactantDatesExt.ReactantDateTime(dt[]))
 
 end
