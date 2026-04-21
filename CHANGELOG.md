@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Disable Julia v1.11 CI for all submodules [#1062](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1062)
 - Updated CUDA compat to include CUDA.jl v0.6 [#1046](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1046) [#1044](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1044)
 - Updated Julia Actions setup workflow [#1061](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1061)
 - Revised Enzyme tests and workflow [#1050](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1050)
