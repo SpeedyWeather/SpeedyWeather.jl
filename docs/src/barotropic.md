@@ -24,7 +24,7 @@ single global layer on the sphere.
 \frac{\partial \zeta}{\partial t} + \nabla \cdot (\mathbf{u}(\zeta + f)) =
 F_\zeta + \nabla \times \mathbf{F}_\mathbf{u} + (-1)^{n+1}\nu\nabla^{2n}\zeta
 ```
-We denote time``t``, velocity vector ``\mathbf{u} = (u, v)``, Coriolis parameter ``f``,
+We denote time ``t``, velocity vector ``\mathbf{u} = (u, v)``, Coriolis parameter ``f``,
 and hyperdiffusion ``(-1)^{n+1} \nu \nabla^{2n} \zeta``
 (``n`` is the hyperdiffusion order,  see [Horizontal diffusion](@ref diffusion)).
 We also include possible forcing terms
@@ -55,7 +55,7 @@ advect the absolute vorticity ``\zeta + f``. In order to avoid to calculate both
 divergence of a flux we rewrite the barotropic vorticity equation as
 ```math
 \frac{\partial \zeta}{\partial t} = F_\zeta +
-\nabla \times (\mathbf{F} + \mathbf{u}_\perp(\zeta + f)) + (-1)^{n+1}\nu\nabla^{2n}\zeta
+\nabla \times (\mathbf{F}_\mathbf{u} + \mathbf{u}_\perp(\zeta + f)) + (-1)^{n+1}\nu\nabla^{2n}\zeta
 ```
 with ``\mathbf{u}_\perp = (v, -u)`` the rotated velocity vector, because
 ``-\nabla\cdot\mathbf{u} = \nabla \times \mathbf{u}_\perp``. This is the form that is solved

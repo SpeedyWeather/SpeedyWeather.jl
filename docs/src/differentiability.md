@@ -97,7 +97,7 @@ Parameters:
 └───────┴──────────────────────────┴──────────┴────────────┴──────────────────────────────┴─────────────────────────────────────┴──────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-The returned `SpeedyParams` object implements the `Model` interface from ModelParmaeters.jl which allows you to interact with the parameter metadata in tablar form. For example, we could extract the values of the parameters with `params[:,:val]` or the bounds with `params[:,:bounds]`. Subsets of parameters can also be extracted by indexing `params` with one or more `String` variable names (or prefxes), e.g:
+The returned `SpeedyParams` object implements the `Model` interface from ModelParmaeters.jl which allows you to interact with the parameter metadata in tabular form. For example, we could extract the values of the parameters with `params[:,:val]` or the bounds with `params[:,:bounds]`. Subsets of parameters can also be extracted by indexing `params` with one or more `String` variable names (or prefxes), e.g:
 
 ```julia
 param_subset = params[["planet.gravity", "atmosphere.heat_capacity"]]
