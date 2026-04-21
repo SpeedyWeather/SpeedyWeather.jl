@@ -243,8 +243,7 @@ function interpolator(
     londs = on_architecture(architecture(grid_out), londs)
     latds = on_architecture(architecture(grid_out), latds)
 
-    # TODO REACTANT: for reactant we explicitly deactivate the boundschecks here:
-    @inbounds update_locator!(I, londs, latds, unsafe = true)
+    @inbounds update_locator!(I, londs, latds, unsafe = false)
     return I
 end
 
