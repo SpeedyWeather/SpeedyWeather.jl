@@ -252,43 +252,6 @@ function test_model(ModelType::Type; trunc = TRUNC, nsteps = NSTEPS, rtol = RTOL
     return nothing
 end
 
-function test_model_gpu(PrimitiveWetModel; trunc = TRUNC, nsteps = NSTEPS, rtol = RTOL, atol = ATOL)
-    model_name = string(ModelType)
-
-    println("="^60)
-    println("$model_name: CPU vs GPU Correctness Tests")
-    println("="^60)
-
-    # Setup CPU model
-    println("\n[1/3] Setting up CPU model...")
-    model_cpu = create_cpu_model(ModelType; trunc)
-    simulation_cpu = initialize!(model_cpu)
-    println("  ✓ CPU model initialized (T$trunc)")
-
-    # Setup Reactant model
-    println("\n[2/3] Setting up GPU model...")
-    model_reactant = create_gpu_model(ModelType; trunc)
-    simulation_reactant = initialize!(model_reactant)
-    println("  ✓ GPU model initialized")
-
-    # spin up models a bit
-    println("\n[3/3] Spinning up models...")
-    run!(simulation_cpu; period = Day(10)) 
-    run!(simulation_reactant; period = Day(10)) 
-    println("  ✓ Models spun up")
-
-    @testset "$model_name CPU vs GPU" begin
-        tend_results = test_tendencies!(simulation_cpu, simulation_reactant, model_name; rtol, atol)
-        stepping_results = test_time_stepping!(simulation_cpu, simulation_reactant, model_name; nsteps, rtol, atol)
-    end
-
-    println("\n" * "="^60)
-    println("$model_name tests completed!")
-    println("="^60)
-
-    return nothing
-end 
-
 # Run tests
 test_model(PrimitiveWetModel)
 #test_model(BarotropicModel)
