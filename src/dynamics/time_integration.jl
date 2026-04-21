@@ -279,38 +279,6 @@ function timestep!(
     return nothing
 end
 
-"""$(TYPEDSIGNATURES)
-Single Lorenz N-cycle step for `PrimitiveEquation` models."""
-function timestep!(
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
-    dt::Real,
-    w::Real,
-    model::PrimitiveEquation,
-)
-    model.feedback.nans_detected && return nothing
-    fill!(diagn.tendencies, 0, typeof(model))
-
-    if model.physics
-        parameterization_tendencies!(diagn, progn, model)
-        ocean_timestep!(progn, diagn, model)
-        sea_ice_timestep!(progn, diagn, model)
-        land_timestep!(progn, diagn, model)
-    end
-
-    if model.dynamics
-        dynamics_tendencies!(diagn, progn, 1, model)
-        horizontal_diffusion!(diagn, progn, model.horizontal_diffusion, model)
-        implicit_correction!(diagn, progn, model.implicit, model, w)
-    else
-        physics_tendencies_only!(diagn, model)
-        horizontal_diffusion!(diagn, progn, model.horizontal_diffusion, model)
-    end
-    lorenz_step!(progn, diagn.tendencies, dt, w, model)
-    transform!(diagn, progn, 1, model)
-    particle_advection!(progn, diagn, model)
-    return nothing
-end
 
 # ---------------------------------------------------------------------------
 # Simulation-level stepping
