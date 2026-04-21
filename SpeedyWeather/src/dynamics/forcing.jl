@@ -292,9 +292,8 @@ $(TYPEDFIELDS)"""
 
     "[OPTION] vertical temperature gradient [K]"
     Δθz::NF = 10
-
     "[DERIVED] log of sigma level per layer"
-    logσ::VectorType
+    log_σ::VectorType
 
     "[DERIVED] relaxation time scale per layer and latitude (inverse, 1/s)"
     temp_relax_freq::MatrixType
@@ -313,12 +312,12 @@ function HeldSuarez(SG::SpectralGrid; kwargs...)
     (; NF, VectorType, MatrixType, nlat, nlayers) = SG
 
     # allocate
-    logσ = on_architecture(SG.architecture, zeros(SG.NF, nlayers))
+    log_σ = on_architecture(SG.architecture, zeros(SG.NF, nlayers))
     temp_relax_freq = on_architecture(SG.architecture, zeros(SG.NF, nlayers, nlat))
     temp_equil_a = on_architecture(SG.architecture, zeros(SG.NF, nlat))
     temp_equil_b = on_architecture(SG.architecture, zeros(SG.NF, nlat))
 
-    return HeldSuarez{NF, VectorType, MatrixType}(; logσ, temp_relax_freq, temp_equil_a, temp_equil_b, kwargs...)
+    return HeldSuarez{NF, VectorType, MatrixType}(; log_σ, temp_relax_freq, temp_equil_a, temp_equil_b, kwargs...)
 end
 
 """$(TYPEDSIGNATURES)
@@ -332,22 +331,26 @@ function initialize!(
     (; coslat, sinlat) = model.geometry
     σ = model.geometry.σ_levels_full
     (; σb, ΔTy, Δθz, relax_time_slow, relax_time_fast, Tmax) = forcing
-    (; logσ, temp_relax_freq, temp_equil_a, temp_equil_b) = forcing
+    (; log_σ, temp_relax_freq, temp_equil_a, temp_equil_b) = forcing
     p₀ = model.atmosphere.reference_pressure
+    (; radius) = model.planet
 
     # slow relaxation everywhere, fast in the tropics
-    kₐ = 1 / relax_time_slow.value
-    kₛ = 1 / relax_time_fast.value
+    kₐ = 1 / Second(relax_time_slow).value
+    kₛ = 1 / Second(relax_time_fast).value
 
-    logσ .= log.(σ)               # precompute log(σ) for equilibrium temperature calculation
+    # Precompute log(σ) for each layer
+    @. log_σ = log(σ)
 
     # Held and Suarez equation 4
     temp_relax_freq .= kₐ .+ (kₛ - kₐ) * max.(0, (σ .- σb) ./ (1 - σb)) .* (coslat') .^ 4
+    temp_relax_freq .*= radius  # scale by radius as is the temperature equation
 
-    # Held and Suarez equation 3, split into max(Tmin, (a - b*ln(p))*(p/p₀)^κ)
+    # Held and Suarez equation 3, split into max(Tmin, (a + b*ln(p))*(p/p₀)^κ)
     # precompute a, b to simplify online calculation
     @. temp_equil_a = Tmax - ΔTy * sinlat^2 + Δθz * log(p₀) * coslat^2
-    return @. temp_equil_b = -Δθz * coslat^2
+    @. temp_equil_b = -Δθz * coslat^2
+    return nothing
 end
 
 """$(TYPEDSIGNATURES)
@@ -359,19 +362,18 @@ function forcing!(
         model::AbstractModel,
     )
     temp = vars.grid.temperature
-    pres = vars.grid.pressure
+    log_pₛ = vars.grid.pressure     # logarithm of surface pressure, precomputed in geopotential module as log(pₛ/p₀) to save memory and time in the kernel
     temp_tend = vars.tendencies.grid.temperature
 
-    (; Tmin, logσ, temp_relax_freq, temp_equil_a, temp_equil_b) = forcing
+    (; Tmin, log_σ, temp_relax_freq, temp_equil_a, temp_equil_b) = forcing
     (; κ) = model.atmosphere
-    σ = model.geometry.σ_levels_full
-
+    p₀ = model.atmosphere.reference_pressure
     (; whichring) = temp.grid
     launch!(
         architecture(temp_tend), RingGridWorkOrder, size(temp_tend), held_suarez_kernel!,
-        temp_tend, temp, pres,
-        temp_relax_freq, temp_equil_a, temp_equil_b, logσ,
-        Tmin, κ, σ, whichring
+        temp_tend, temp, log_pₛ,
+        temp_relax_freq, temp_equil_a, temp_equil_b,
+        Tmin, κ, p₀, log_σ, whichring
     )
     return nothing
 end
@@ -379,21 +381,24 @@ end
 @kernel inbounds = true function held_suarez_kernel!(
         temp_tend,
         temp,
-        pres,
+        log_pₛ,
         temp_relax_freq,
         temp_equil_a,
         temp_equil_b,
-        logσ,
         Tmin,
         κ,
-        σ,
+        p₀,
+        log_σ,
         whichring,
     )
     ij, k = @index(Global, NTuple)
     j = whichring[ij]                   # latitude ring index
-    kₜ = temp_relax_freq[k, j]           # (inverse) relaxation time scale
+    kₜ = temp_relax_freq[k, j]          # (inverse) relaxation time scale (scaled)
+
+    log_p = log_pₛ[ij] + log_σ[k]        # p/pₛ = σ but in log space
+    p = exp(log_p)                      # pressure [Pa]
 
     # Held and Suarez 1996, equation 3 with precomputed a, b during initialization
-    Teq = max(Tmin, (temp_equil_a[j] + temp_equil_b[j] * logσ[k]) * σ[k]^κ)
+    Teq = max(Tmin, (temp_equil_a[j] + temp_equil_b[j] * log_p[ij]) * (p/p₀)^κ)
     temp_tend[ij, k] -= kₜ * (temp[ij, k] - Teq)  # Held and Suarez 1996, equation 2
 end
