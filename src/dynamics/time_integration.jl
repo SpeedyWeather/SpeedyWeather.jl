@@ -271,8 +271,8 @@ function timestep!(
     fill!(diagn.tendencies, 0, ShallowWater)
 
     dynamics_tendencies!(diagn, progn, 1, model)
-    implicit_correction!(diagn, progn, model.implicit, model, w)
     horizontal_diffusion!(diagn, progn, model.horizontal_diffusion, model)
+    implicit_correction!(diagn, progn, model.implicit, model, w)
     lorenz_step!(progn, diagn.tendencies, dt, w, model)
     transform!(diagn, progn, 1, model)
     particle_advection!(progn, diagn, model)
@@ -300,12 +300,12 @@ function timestep!(
 
     if model.dynamics
         dynamics_tendencies!(diagn, progn, 1, model)
+        horizontal_diffusion!(diagn, progn, model.horizontal_diffusion, model)
         implicit_correction!(diagn, progn, model.implicit, model, w)
     else
         physics_tendencies_only!(diagn, model)
+        horizontal_diffusion!(diagn, progn, model.horizontal_diffusion, model)
     end
-
-    horizontal_diffusion!(diagn, progn, model.horizontal_diffusion, model)
     lorenz_step!(progn, diagn.tendencies, dt, w, model)
     transform!(diagn, progn, 1, model)
     particle_advection!(progn, diagn, model)
