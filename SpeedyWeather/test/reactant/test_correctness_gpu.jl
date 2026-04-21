@@ -6,7 +6,7 @@ and mutable structs (Clock) recursively."""
 function sync_variables!(sim_cpu, sim_gpu)
     vars_cpu, _ = SpeedyWeather.unpack(sim_cpu)
     vars_gpu, _ = SpeedyWeather.unpack(sim_gpu)
-    SpeedyWeather.copy!(vars_cpu, vars_gpu)
+    SpeedyWeather.copy!(vars_cpu, on_architecture(sim_cpu.model.architecture, vars_gpu))
     return
 end
 
