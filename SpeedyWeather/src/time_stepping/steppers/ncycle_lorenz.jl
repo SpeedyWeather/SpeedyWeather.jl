@@ -169,7 +169,7 @@ function update_prognostic!(
     if isnothing(implicit)
         launch!(
             architecture(var), LinearWorkOrder, size(var), ncycle_lorenz_kernel!,
-            var, G, F, w, Δt
+            var, F, G, w, Δt
         )
     else
         euler_forward!(var, F, Δt)
@@ -178,7 +178,7 @@ function update_prognostic!(
 end
 
 @kernel inbounds = true function ncycle_lorenz_kernel!(
-        var, G, F, w, Δt,
+        var, F, G, w, Δt,
     )
     lmk = @index(Global, Linear)
     G[lmk] = w * F[lmk] + (1 - w) * G[lmk]  # Hotta et al. 2016 eq (5)

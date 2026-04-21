@@ -55,6 +55,10 @@ tendency_steps(::AbstractLeapfrog) = 1
 @inline which_prognostic_step(var::LowerTriangularArray, ::AbstractLeapfrog, ::AbstractDynamicalCoreComponent) = 2
 @inline which_prognostic_step(var::LowerTriangularArray, ::AbstractLeapfrog, ::AbstractHorizontalDiffusion) = 1
 
+# dispatch over timestepper to decide between implicit or explicit diffusion
+@inline implicit_diffusion(::AbstractHorizontalDiffusion, ::Nothing, ::AbstractLeapfrog) = true
+@inline implicit_diffusion(::AbstractHorizontalDiffusion, ::AbstractImplicit, ::AbstractLeapfrog) = true
+
 # copy prognostic variables' 1st step to 2nd, that way which_prognostic_step can always be 2
 function initialize!(vars::Variables, ::AbstractLeapfrog, ::AbstractModel)
     (; prognostic) = vars

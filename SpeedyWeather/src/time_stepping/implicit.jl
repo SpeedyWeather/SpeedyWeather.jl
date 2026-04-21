@@ -113,11 +113,16 @@ function implicit_correction!(
     )
     # implicit timestep ξ = α*Δt, depending on centering (0.5 Crank Nicolson, 1 backward Euler)
     (; Δt) = time_stepping    
-    ξ = implicit.centering * Δt
     w = weight_coefficient(time_stepping, vars.prognostic.clock)
+    ξ = implicit.centering * Δt
+
+    # do vorticity tendency average now for Euler forward step later only
+    F_vor, G_vor = get_steps(vars.tendencies.vorticity)
+    ncycle_lorenz_tendency_average!(G_vor, F_vor, w)
 
     # use Hotta et al. 2016 notation for current tendency F and previous (averaged) tendency G
-    F_vor, G_vor = get_steps(vars.tendencies.divergence)
+    η = get_prognostic_step(vars.prognostic.η, time_stepping, implicit)
+    div = get_prognostic_step(vars.prognostic.divergence, time_stepping, implicit)
     F_div, G_div = get_steps(vars.tendencies.divergence)
     F_η, G_η = get_steps(vars.tendencies.η)
 
@@ -131,23 +136,17 @@ function implicit_correction!(
     arch = architecture(F_div)
     launch!(
         arch, SpectralWorkOrder, size(F_div), implicit_ncycle_lorenz_shallow_water_kernel!,
-        F_vor, G_vor, F_div, G_div, F_η, G_η, l_indices, H, g, ξ, w
+        F_div, G_div, div, F_η, G_η, η, l_indices, H, g, ξ, w
     )
     return nothing
 end
 
 @kernel inbounds = true function implicit_ncycle_lorenz_shallow_water_kernel!(
-        F_vor, G_vor, F_div, G_div, F_η, G_η, l_indices, H, g, ξ, w
+        F_div, G_div, div, F_η, G_η, η, l_indices, H, g, ξ, w
     )
     I = @index(Global, Cartesian)
     lm = I[1]  # single index lm corresponding to harmonic l, m
     k = I[2]   # layer index
-
-    # do the N-Cycle Lorenz tendency average here to free the F tendencies
-    G_vor[lm, k] = w*F_vor[lm, k] + (1 - w)*G_vor[lm, k]
-    F_vor[lm, k] = G_vor[lm, k]
-    G_div[lm, k] = w*F_div[lm, k] + (1 - w)*G_div[lm, k]
-    G_η[lm] = w*F_η[lm] + (1 - w)*G_η[lm]
 
     # Use precomputed l index from spectrum
     l = l_indices[lm]
@@ -155,11 +154,23 @@ end
     # eigenvalue, with without 1/radius², 1-based -l*(l+1) → -l*(l-1)
     ∇² = -l * (l - 1)
 
+    # explicit tendencies only by subtracting the implicit terms F_E = F - L
+    F_explicit_div = F_div[lm, k] + g*∇²*η[lm]
+    F_explicit_η = F_η[lm] + H*div[lm, k]
+
+    # N-Cycle Lorenz tendency average
+    G_div[lm, k] = w*F_explicit_div + (1 - w)*G_div[lm, k]
+    G_η[lm] = w*F_explicit_η + (1 - w)*G_η[lm]
+
+    # Add the implicit term to form the RHS of the solve
+    RHS_div = G_div[lm, k] - g * ∇²*η[lm]
+    RHS_η = G_η[lm] - H * div[lm, k]
+
     # Using the Gs correct the tendencies for semi-implicit time stepping
     # store them in the Fs as they aren't used anymore after the G <- wF + (1-w)*G update
     S⁻¹ = inv(1 - ξ^2 * H * g * ∇²)  # operator to invert
-    F_div[lm, k] = S⁻¹ * (G_div[lm, k] - ξ * g * ∇² * G_η[lm])
-    F_η[lm] = G_η[lm] - ξ * H * F_div[lm, k]
+    F_div[lm, k] = S⁻¹ * (RHS_div - ξ * g * ∇² * RHS_η)
+    F_η[lm] = RHS_η - ξ * H * F_div[lm, k]
 end
 
 export ImplicitPrimitiveEquation
