@@ -3,6 +3,11 @@
 ## Unreleased
 
 - Updated CUDA compat to include CUDA.jl v0.6 [#1046](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1046)
+- Updated Julia Actions setup workflow [#1061](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1061)
+- Revised Enzyme tests and workflow [#1050](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1050)
+- Held-Suarez missed scaling, temperatures were not stable [#1042](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1042)
+- Update docs sidebar [#1048](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1048)
+- Fixed a bug for `SubArrays` not working with `Architectures.ismatching` [#1049](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1049) [#1056](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1056)
 - Dependency for DomainSets updated to v0.7 and v0.8 [#1045](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1045) [#1047](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1047)
 - [BREAKING] WriteModelComponentFile and ManualOrography [#1040](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1040)
 - `JLD2Output` revised to be able to select groups, additional `ArrayOutput` option to output to RAM [#1026](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1026)
