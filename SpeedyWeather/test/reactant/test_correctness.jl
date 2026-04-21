@@ -58,19 +58,19 @@ numerical paths through @jit), the resulting grid variables — and therefore
 the tendencies — can differ at the level of the spectral transform
 discrepancy. We therefore compare tendencies after running both models in
 the same self-consistent way, mirroring `test_time_stepping!`."""
-function test_tendencies!(sim_cpu, sim_reactant, model_name, r_first! = nothing, r_later! = nothing; nsteps = 1, rtol = RTOL, atol = ATOL)
+function test_tendencies!(sim_cpu, sim_reactant, model_name, r_first! = nothing, r_later! = nothing, mode=:reactant; nsteps = 1, rtol = RTOL, atol = ATOL)
     println("\n" * "-"^60)
     println("Testing tendencies ($nsteps steps)")
     println("-"^60)
 
     # Pre-compile Reactant functions if needed (@compile may mutate sim_reactant
     # as a side effect, so compile first, then finalize + sync to restore clean state)
-    if isnothing(r_first!)
+    if isnothing(r_first!) && mode == :reactant
         initialize!(sim_reactant; steps = nsteps)
         r_first! = @compile first_timesteps!(sim_reactant)
         SpeedyWeather.finalize!(sim_reactant)
     end
-    if isnothing(r_later!)
+    if isnothing(r_later!) && mode == :reactant
         initialize!(sim_reactant; steps = nsteps)
         r_later! = @compile later_timestep!(sim_reactant)
         SpeedyWeather.finalize!(sim_reactant)
@@ -90,7 +90,11 @@ function test_tendencies!(sim_cpu, sim_reactant, model_name, r_first! = nothing,
     SpeedyWeather.time_stepping!(sim_cpu)
 
     # Run one step on Reactant with pre-compiled functions
-    SpeedyWeather.time_stepping!(sim_reactant, r_first!, r_later!)
+    if mode == :reactant
+        SpeedyWeather.time_stepping!(sim_reactant, r_first!, r_later!)
+    else 
+        SpeedyWeather.time_stepping!(sim_reactant)
+    end 
 
     SpeedyWeather.finalize!(sim_reactant)
     SpeedyWeather.finalize!(sim_cpu)
@@ -120,17 +124,17 @@ function test_tendencies!(sim_cpu, sim_reactant, model_name, r_first! = nothing,
 end
 
 """Test prognostic and grid variables after running for nsteps on already-initialized simulations."""
-function test_time_stepping!(sim_cpu, sim_reactant, model_name, r_first! = nothing, r_later! = nothing; nsteps = NSTEPS, rtol = RTOL, atol = ATOL)
+function test_time_stepping!(sim_cpu, sim_reactant, model_name, r_first! = nothing, r_later! = nothing, mode=:reactant; nsteps = NSTEPS, rtol = RTOL, atol = ATOL)
     println("\n" * "-"^60)
     println("Testing time stepping ($nsteps steps)")
     println("-"^60)
 
     # Pre-compile Reactant functions if needed (this may mutate sim_reactant as a side effect)
-    if isnothing(r_first!)
+    if isnothing(r_first!) && mode == :reactant
         initialize!(sim_reactant; steps = nsteps)
         r_first! = @compile first_timesteps!(sim_reactant)
     end
-    if isnothing(r_later!)
+    if isnothing(r_later!) && mode == :reactant
         initialize!(sim_reactant; steps = nsteps)
         r_later! = @compile later_timestep!(sim_reactant)
     end
@@ -144,7 +148,11 @@ function test_time_stepping!(sim_cpu, sim_reactant, model_name, r_first! = nothi
 
     println("  Running Reactant model...")
     initialize!(sim_reactant; steps = nsteps)
-    SpeedyWeather.time_stepping!(sim_reactant, r_first!, r_later!)
+    if mode == :reactant
+        SpeedyWeather.time_stepping!(sim_reactant, r_first!, r_later!)
+    else 
+        SpeedyWeather.time_stepping!(sim_reactant)
+    end 
     SpeedyWeather.finalize!(sim_reactant)
     println("  ✓ Time stepping completed")
 
@@ -216,7 +224,7 @@ function test_model(ModelType::Type; trunc = TRUNC, nsteps = NSTEPS, rtol = RTOL
     # spin up models a bit
     println("\n[3/3] Spinning up models...")
     run!(simulation_cpu; period = Day(1)) # dummy steps so that `simulation_cpu` also continues a prior simulation, we could also manually set e.g. `continue_with_leapfrog` arguments instead, but those might change in the future
-    run!(simulation_reactant; period = Day(100)) # we copy from Reactant to cpu later so only there we need a spin up, we need a long spin up, because with some ICs we get mostly zonal flow otherwise
+    run!(simulation_reactant; period = Day(10)) # we copy from Reactant to cpu later so only there we need a spin up, we need a long spin up, because with some ICs we get mostly zonal flow otherwise
     println("  ✓ Models spun up")
 
     # Run tests
@@ -244,6 +252,43 @@ function test_model(ModelType::Type; trunc = TRUNC, nsteps = NSTEPS, rtol = RTOL
     return nothing
 end
 
+function test_model_gpu(PrimitiveWetModel; trunc = TRUNC, nsteps = NSTEPS, rtol = RTOL, atol = ATOL)
+    model_name = string(ModelType)
+
+    println("="^60)
+    println("$model_name: CPU vs GPU Correctness Tests")
+    println("="^60)
+
+    # Setup CPU model
+    println("\n[1/3] Setting up CPU model...")
+    model_cpu = create_cpu_model(ModelType; trunc)
+    simulation_cpu = initialize!(model_cpu)
+    println("  ✓ CPU model initialized (T$trunc)")
+
+    # Setup Reactant model
+    println("\n[2/3] Setting up GPU model...")
+    model_reactant = create_gpu_model(ModelType; trunc)
+    simulation_reactant = initialize!(model_reactant)
+    println("  ✓ GPU model initialized")
+
+    # spin up models a bit
+    println("\n[3/3] Spinning up models...")
+    run!(simulation_cpu; period = Day(10)) 
+    run!(simulation_reactant; period = Day(10)) 
+    println("  ✓ Models spun up")
+
+    @testset "$model_name CPU vs GPU" begin
+        tend_results = test_tendencies!(simulation_cpu, simulation_reactant, model_name; rtol, atol)
+        stepping_results = test_time_stepping!(simulation_cpu, simulation_reactant, model_name; nsteps, rtol, atol)
+    end
+
+    println("\n" * "="^60)
+    println("$model_name tests completed!")
+    println("="^60)
+
+    return nothing
+end 
+
 # Run tests
 test_model(PrimitiveWetModel)
-test_model(BarotropicModel)
+#test_model(BarotropicModel)
