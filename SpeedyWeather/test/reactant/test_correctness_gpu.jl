@@ -21,7 +21,7 @@ function compare_arrays(nt_cpu::NamedTuple, nt_gpu::NamedTuple; rtol = RTOL, ato
         haskey(nt_gpu, key) || continue
 
         arr_cpu = Array(getfield(nt_cpu, key))
-        arr_gpu = Array(getfield(nt_gpu, key))
+        arr_gpu = Array(on_architecture(architecture(arr_cpu), getfield(nt_gpu, key)))
         abs_diff = abs.(arr_cpu .- arr_gpu)
         rel_diff = abs_diff ./ max.(abs.(arr_cpu), abs.(arr_gpu), eps(eltype(real(arr_cpu))))
         results[key] = (
