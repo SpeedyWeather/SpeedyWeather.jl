@@ -163,6 +163,4 @@ subtypes that define conceptual classes of parameterizations, namely
 subtypes(SpeedyWeather.AbstractParameterization)
 ```
 
-but these are discussed in more detail in [Parameterizations](@ref).
-For a more concrete example of how to define a new forcing for the 2D models,
-see [Custom forcing and drag](@ref).
+but these are discussed in more detail in [Parameterizations](@ref) where we also explain how custom parametrizations can be implemented. For a more concrete example of how to define a new forcing for the 2D models, see [Custom forcing and drag](@ref).
