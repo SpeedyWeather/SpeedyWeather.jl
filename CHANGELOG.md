@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Most of the PrimitiveWetModel is now Reactant compatible, this includes a revision to make most structs fully parametric [#985](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/985)
 - Revised Enzyme tests and workflow [#1050](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1050)
 - Held-Suarez missed scaling, temperatures were not stable [#1042](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1042)
 - Update docs sidebar [#1048](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1048)
