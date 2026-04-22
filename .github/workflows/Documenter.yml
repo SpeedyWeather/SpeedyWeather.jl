@@ -18,18 +18,13 @@ jobs:
       )
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: julia-actions/setup-julia@latest
-        with:
-          version: '1.12'
-      - uses: actions/setup-node@v6
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: docs/package.json
-      - name: Install Node.js dependencies
-        run: npm install
-        working-directory: docs
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Setup Julia
+        uses: julia-actions/setup-julia@v2
+      - name: Load Julia packages from cache
+        id: julia-cache
+        uses: julia-actions/cache@v2
       - name: Install Julia dependencies
         run: julia --color=yes --project=docs/ -e 'using Pkg; Pkg.develop(PackageSpec(path = "SpeedyWeather")); Pkg.instantiate()'
       - name: Build and deploy
