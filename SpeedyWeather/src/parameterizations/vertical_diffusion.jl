@@ -164,7 +164,7 @@ end
     # as well as all layers below
     Ri = bulk_richardson!(ij, vars, atmosphere)
     kₕ::Int = nlayers
-    @trace while (kₕ > 0) && (Ri[ij, kₕ] < Ri_c)
+    @trace while (kₕ > 0) & (Ri[ij, max(1, kₕ)] < Ri_c)
         kₕ -= 1
     end
     kₕ += 1  # uppermost layer where Ri < Ri_c
