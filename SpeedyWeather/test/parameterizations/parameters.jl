@@ -1,12 +1,13 @@
 using ComponentArrays: ComponentVector
 using DomainSets: Domain, RealLine, UnitInterval
-using SpeedyWeather.SpeedyWeatherInternals.SpeedyParameters
+using SpeedyWeather.SpeedyWeatherInternals.ParameterEditing
+using SpeedyWeather.SpeedyWeatherInternals.ParameterEditing: NumberParam
 
 import ModelParameters: ModelParameters, Model, Param, params, update
 
-@testset "SpeedyParam" begin
+@testset "NumberParam" begin
     # Test basic construction and getter functions
-    p = SpeedyParam(42.0, bounds = RealLine(), desc = "Test parameter", unit = "m", category = "generic")
+    p = NumberParam(42.0, bounds = RealLine(), desc = "Test parameter", unit = "m", category = "generic")
     @test SpeedyWeather.value(p) == p.val == 42.0
     @test bounds(p) == p.bounds == RealLine()
     @test description(p) == p.desc == "Test parameter"
@@ -21,14 +22,14 @@ end
 
 @testset "parameters" begin
     # check basic function of parameters method
-    @test parameters(1.0) == SpeedyParam(1.0)
+    @test parameters(1.0) == NumberParam(1.0)
     @test parameters(Param, 1.0) == Param(1.0)
-    @test parameters(SpeedyParam, 1.0, bounds = UnitInterval()) == SpeedyParam(1.0, bounds = UnitInterval())
+    @test parameters(NumberParam, 1.0, bounds = UnitInterval()) == NumberParam(1.0, bounds = UnitInterval())
     # test for non-nested type
     earth = Earth(Float32)
     ps = parameters(earth, category = "planet")
     pvals = (earth.radius, earth.rotation, earth.gravity, earth.axial_tilt, earth.solar_constant)
-    @test isa(ps, SpeedyParams) && SpeedyParams <: ModelParameters.AbstractModel
+    @test isa(ps, ParameterTable) && ParameterTable <: ModelParameters.AbstractModel
     @test values(stripparams(ps)) == pvals
     @test ps[:val] == pvals
     # this fails with an indexing error... looks like a bug in ModelParameters.jl;
@@ -44,11 +45,11 @@ end
     @test all(vec(new_model_ps) .== 2 * vec(model_ps))
     # test parameter subsets
     planet_ps = model_ps["planet"]
-    @test isa(planet_ps, SpeedyParams)
+    @test isa(planet_ps, ParameterTable)
     @test length(planet_ps) == length(parameters(earth))
     @test vec(planet_ps).planet == vec(parameters(earth))
     planet_hc_ps = model_ps[["planet", "atmosphere.heat_capacity"]]
-    @test isa(planet_hc_ps, SpeedyParams)
+    @test isa(planet_hc_ps, ParameterTable)
     @test length(planet_hc_ps) == length(parameters(earth)) + 1
     @test haskey(vec(planet_hc_ps), :planet) && haskey(vec(planet_hc_ps), :atmosphere)
     # test reconstruction from subset
@@ -74,7 +75,7 @@ end
 
 @testset "@parameterized" begin
     # test single parameter, no kwdef
-    SpeedyParameters.@parameterized struct TestType1{T}
+    ParameterEditing.@parameterized struct TestType1{T}
         "non parameter"
         x::T
         "parameter"
@@ -86,7 +87,7 @@ end
     @test ps[:desc] == ("parameter",)
 
     # test two parameters, no kwdef
-    SpeedyParameters.@parameterized struct TestType2{TX, TY, TZ}
+    ParameterEditing.@parameterized struct TestType2{TX, TY, TZ}
         "parameter"
         @param x::TX
         "non-parameter"
@@ -99,7 +100,7 @@ end
     @test ps[:desc] == ("parameter", "")
 
     # test one parameter, with kwdef
-    SpeedyParameters.@parameterized @kwdef struct TestType3{T}
+    ParameterEditing.@parameterized @kwdef struct TestType3{T}
         "parameter"
         @param x::T = 1.0
         "non-parameter"
@@ -111,7 +112,7 @@ end
     @test ps[:desc] == ("parameter",)
 
     # test multiple parameters, with kwdef
-    SpeedyParameters.@parameterized @kwdef struct TestType4{T1, T2}
+    ParameterEditing.@parameterized @kwdef struct TestType4{T1, T2}
         "parameter 1"
         @param x::T1 = 1.0
         "parameter 2"
@@ -125,7 +126,7 @@ end
     @test ps[:desc] == ("parameter 1", "parameter 2", "")
 
     # test parameters for nested type
-    SpeedyParameters.@parameterized @kwdef struct MyModel{T}
+    ParameterEditing.@parameterized @kwdef struct MyModel{T}
         @param component::T = TestType4() (group = :group1,)
     end
     ps = parameters(MyModel())

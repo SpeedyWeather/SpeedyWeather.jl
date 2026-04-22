@@ -1,4 +1,4 @@
-module SpeedyParameters
+module ParameterEditing
 
 # STRUCTURE
 using DocStringExtensions
@@ -27,9 +27,11 @@ const Nonnegative = NonnegativeRealLine()
 const Negative = NegativeRealLine()
 
 # Parameter utilities
-export SpeedyParam, SpeedyParams
+export ParameterTable
 export @parameterized, parameters, parameterof, reconstruct, stripparams, attributes, bounds, description, value
 
+include("parameter_table.jl")
 include("parameters.jl")
+include("parameterized.jl")
 
 end
