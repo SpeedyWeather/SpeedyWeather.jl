@@ -81,7 +81,7 @@ function initialize!(
     )
     (; trunc, nlayers) = diffusion
     (; resolution_scaling, power, power_stratosphere, tapering_σ) = diffusion
-    (; Δt) = model.time_stepping
+    Δt = default_time_step(model.time_stepping)
     (; radius) = model.planet
 
     # Reduce diffusion time scale (=increase diffusion, always in seconds) with resolution
@@ -156,9 +156,9 @@ end
         ∇²ⁿ[l_plus_1, k] = -eigenvalue_norm^power / time_scale
         ∇²ⁿ_div[l_plus_1, k] = -eigenvalue_norm^p / time_scale_div
 
-        # and implicit part of the diffusion (= 1/(1-2Δtν∇²ⁿ))
-        ∇²ⁿ_implicit[l_plus_1, k] = 1 / (1 - 2Δt * ∇²ⁿ[l_plus_1, k])
-        ∇²ⁿ_div_implicit[l_plus_1, k] = 1 / (1 - 2Δt * ∇²ⁿ_div[l_plus_1, k])
+        # and implicit part of the diffusion (= 1/(1-Δtν∇²ⁿ))
+        ∇²ⁿ_implicit[l_plus_1, k] = 1 / (1 - Δt * ∇²ⁿ[l_plus_1, k])
+        ∇²ⁿ_div_implicit[l_plus_1, k] = 1 / (1 - Δt * ∇²ⁿ_div[l_plus_1, k])
     end
 end
 

@@ -2,6 +2,7 @@
 e.g. Leapfrog starts with 1 Euler step that isn't counted for the clock but requires
 one more step in the main time loop."""
 spin_up_steps(::AbstractTimeStepper) = 0
+default_time_step(L::AbstractTimeStepper) = L.Δt
 
 """$(TYPEDSIGNATURES)
 Computes the time step in [ms]. `Δt_at_T31` is always scaled with the resolution `trunc` 

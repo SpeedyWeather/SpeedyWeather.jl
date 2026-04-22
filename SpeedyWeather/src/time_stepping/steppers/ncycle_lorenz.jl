@@ -63,12 +63,12 @@ tendency_spectral_steps(::NCycleLorenz) = 2 # to store F, G in Hotta et al. 2016
 
 # dispatch over timestepper to decide between implicit or explicit diffusion
 @inline implicit_diffusion(::AbstractHorizontalDiffusion, ::Nothing, ::AbstractNCycleLorenz) = true
-@inline implicit_diffusion(::AbstractHorizontalDiffusion, ::AbstractImplicit, ::AbstractNCycleLorenz) = false
+@inline implicit_diffusion(::AbstractHorizontalDiffusion, ::AbstractImplicit, ::AbstractNCycleLorenz) = true
 
 # dispatch over time stepper here so that other time stepper can change the order
 function diffusion_and_implicit!(vars, ::AbstractNCycleLorenz, model)
-    horizontal_diffusion!(vars, model)
     implicit_correction!(vars, model)
+    horizontal_diffusion!(vars, model)
     return nothing
 end
 
@@ -166,14 +166,10 @@ function update_prognostic!(
     F = get_step(tendency, 1)   # tendency of current time step (or weighted + implicitly corrected tendency)
     G = get_step(tendency, 2)   # accumulated weighted tendencies
 
-    if isnothing(implicit)
-        launch!(
-            architecture(var), LinearWorkOrder, size(var), ncycle_lorenz_kernel!,
-            var, F, G, w, Δt
-        )
-    else
-        euler_forward!(var, F, Δt)
-    end
+    launch!(
+        architecture(var), LinearWorkOrder, size(var), ncycle_lorenz_kernel!,
+        var, F, G, w, Δt
+    )
     return nothing
 end
 
@@ -184,17 +180,3 @@ end
     G[lmk] = w * F[lmk] + (1 - w) * G[lmk]  # Hotta et al. 2016 eq (5)
     var[lmk] = var[lmk] + Δt * G[lmk]       # and equation (6)
 end
-
-function ncycle_lorenz_tendency_average!(G::AbstractArray, F::AbstractArray, w)
-    G .= ncycle_lorenz_tendency_average.(G.data, F.data, w)
-    return nothing
-end
-
-ncycle_lorenz_tendency_average(G, F, w) = w * F + (1 - w) * G
-
-function euler_forward!(x::AbstractArray, δx::AbstractArray, Δt)
-    x .= euler_forward.(x.data, δx.data, Δt)
-    return nothing
-end
-
-euler_forward(x, δx, Δt) = x + Δt * δx

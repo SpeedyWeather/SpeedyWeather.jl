@@ -156,7 +156,8 @@ include("time_stepping/steppers/general.jl")
 include("time_stepping/steppers/leapfrog.jl")
 include("time_stepping/steppers/ncycle_lorenz.jl")
 include("time_stepping/transform.jl")
-include("time_stepping/implicit.jl")
+include("time_stepping/implicit/implicit_shallow_water.jl")
+include("time_stepping/implicit/implicit_primitive_equations.jl")
 
 # PARAMETERIZATIONS
 include("parameterizations/albedo.jl")

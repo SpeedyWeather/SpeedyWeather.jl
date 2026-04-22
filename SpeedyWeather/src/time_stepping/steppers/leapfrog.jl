@@ -154,11 +154,12 @@ function time_step!(clock::Clock, time_stepping::Leapfrog)
     return nothing
 end
 
+default_time_step(L::Leapfrog) = 2*L.Δt
 function time_step(L::Leapfrog, clock::Clock)
     (; Δt) = L
     clock.step_counter == 0 && return Δt / 2    # first step Euler with Δt/2
     clock.step_counter == 1 && return Δt        # 2nd step leapfrog with Δt
-    return 2Δt                                  # later steps leapfrog with 2Δt
+    return default_time_step(L)                 # later steps leapfrog with 2Δt
 end
 
 function prognostic_step(::Leapfrog, clock::Clock)
