@@ -226,7 +226,7 @@ function initialize!(
 
     ξ = curl(u_spectral, v_spectral, model.spectral_transform; radius)
 
-    @allowscalar ξ[1] = 0  # remove mean
+    set_scalar!(ξ, 1, zero(eltype(ξ)))  # remove mean
 
     # repeat over vertical layers
     ξks = repeat(ξ, 1, nlayers)

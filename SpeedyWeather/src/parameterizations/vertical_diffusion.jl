@@ -67,8 +67,8 @@ function initialize!(diffusion::BulkRichardsonDiffusion{NF}, model::PrimitiveEqu
     diffusion.∇²_below[1:(n - 1)] .= inv.(2 .* (σ[2:n] .- σ[1:(n - 1)]) .* Δσ_half[1:(n - 1)])
 
     # boundary: no flux at top and bottom (σ₋[1] = -Inf, σ₊[end] = Inf → inv = 0)
-    @allowscalar diffusion.∇²_above[1] = zero(NF)
-    @allowscalar diffusion.∇²_below[n] = zero(NF)
+    set_scalar!(diffusion.∇²_above, 1, zero(NF))
+    set_scalar!(diffusion.∇²_below, n, zero(NF))
     return nothing
 end
 

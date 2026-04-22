@@ -335,7 +335,7 @@ function surface_pressure_tendency!(
     @. pres_tend -= ūv̄∇lnpₛ + div_mean      # add the -div_mean term in spectral, swap sign
 
     #pres_tend.data[1:1] .= 0
-    @allowscalar pres_tend.data[1] = 0  # for mass conservation
+    set_scalar!(pres_tend.data, 1, zero(eltype(pres_tend.data)))  # for mass conservation
     return nothing
 end
 

@@ -68,6 +68,16 @@ function readable_secs(secs::Real)
 end
 
 """
+    set_scalar!(x::AbstractArray, i, v) 
+
+Sets the value of `x[i]` to `v` in a GPU compatible way. This uses `@allowscalar` with 
+Reactant and `x[i:i] .= v` as a workaround for Enzyme compability otherwise. 
+"""
+set_scalar!(x::AbstractArray, i, v) = _set_scalar!(architecture(x), x, i, v)
+
+_set_scalar!(arch::AbstractArchitecture, x::AbstractArray, i, v) = x[i:i] .= v
+
+"""
 $(TYPEDSIGNATURES)
 Fallback for `@maybe_jit` when Reactant is not available. Just calls `f(args...; kwargs...)`."""
 _jit(::AbstractArchitecture, f, args...; kwargs...) = f(args...; kwargs...)

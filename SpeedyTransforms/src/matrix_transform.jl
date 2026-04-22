@@ -128,7 +128,7 @@ data yields spectral coefficients. This function is not yet implemented."""
 function forward_matrix!(F, S::AbstractSpectralTransform, field::AbstractField2D, coeffs::LowerTriangularMatrix, progress = nothing)
     for ij in eachindex(field)
         field .= 0                              # unit vector of input
-        GPUArrays.@allowscalar field[ij] = 1
+        set_scalar!(field, ij, one(eltype(field)))
         transform!(coeffs, field, S)            # forward transforms of unit vectors
         F[:, ij] .= coeffs.data                 # are the columns of the transformation matrix F
         isnothing(progress) || ProgressMeter.next!(progress)
@@ -146,14 +146,14 @@ function backward_matrix!(B, S::AbstractSpectralTransform, field::AbstractField2
     for lm in axes(coeffs.data, 1)
         # real part of column: set coeffs[lm] = 1 (real unit vector)
         coeffs.data .= 0
-        GPUArrays.@allowscalar coeffs.data[lm] = 1
+        set_scalar!(coeffs.data, lm, one(eltype(coeffs.data)))
         transform!(field, coeffs, S)
         real_response = copy(field.data)
 
         # imaginary part of column: set coeffs[lm] = im (imaginary unit vector)
         # field = Re(B * c) = Re(B)*Re(c) - Im(B)*Im(c), with c[lm]=im: field = -Im(B)[:, lm]
         coeffs.data .= 0
-        GPUArrays.@allowscalar coeffs.data[lm] = im
+        set_scalar!(coeffs.data, lm, im * one(eltype(coeffs.data)))
         transform!(field, coeffs, S)
 
         B[:, lm] .= real_response .+ im .* (.-field.data)

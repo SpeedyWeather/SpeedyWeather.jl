@@ -402,7 +402,7 @@ function implicit_correction!(
     zero_last_degree!(pres_tend)
     zero_last_degree!(temp_tend)
 
-    @allowscalar pres_tend.data[1] = 0    # mass conservation
+    set_scalar!(pres_tend.data, 1, zero(eltype(pres_tend.data)))    # mass conservation
     return nothing
 end
 
