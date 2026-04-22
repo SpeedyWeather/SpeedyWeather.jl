@@ -75,7 +75,7 @@ function initialize!(
             Millisecond(output.output_dt).value / model.time_stepping.Δt_millisec.value
         )
     )
-    output.output_dt = Second(round(Int, core.output_every_n_steps * model.time_stepping.Δt_sec))
+    output.output_dt = convert(typeof(output.output_dt), Second(round(Int, core.output_every_n_steps * model.time_stepping.Δt_sec)))
 
     # RESET COUNTERS
     core.timestep_counter = 0

@@ -25,6 +25,9 @@ end
 
 Adapt.@adapt_structure Particle
 
+# positional constructor with explicit active flag
+Particle{NF}(active, lon, lat, σ) where {NF} = Particle{NF, Bool}(active, NF(lon), NF(lat), NF(σ))
+
 # keyword constructors
 Particle{NF}(; lon, lat, σ = 0) where {NF} = Particle{NF, Bool}(true, lon, lat, σ)
 Particle(; lon, lat, σ = 0) = Particle(lon, lat, σ)
