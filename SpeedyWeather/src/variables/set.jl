@@ -112,7 +112,7 @@ function set!(
         # TODO: NF convert removed becaue of problems with Reactant, reimplement it
 
         # only allocate temporary array if we need to transform to a different truncation
-        if var.spectrum == S.spectrum
+        if var.spectrum == S.spectrum && !add
             transform!(var, field, S)
             return nothing
         else
