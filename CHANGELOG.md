@@ -1,7 +1,18 @@
 # Changelog
 
-## Unreleased
+## Unreleased 
 
+## v0.19.0
+
+- [BREAKING] WriteModelComponentFile and ManualOrography [#1040](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1040)
+- [BREAKING] Rename `temperature_reference`->`reference_temperature`, `pressure_reference`->`reference_pressure` [#1025](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1025)
+- [BREAKING] Prognostic variables renamed [#1025](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1025)
+- [BREAKING] model.dyanmics_only instead of .physics [#969](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/969)
+- [BREAKING] Kernel launching now in SpeedyWeatherInternals.KernelLaunching [#969](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/969)
+- [BREAKING] Particle advection determines nparticles [#969](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/969)
+- [BREAKING] set! adapted to variable groups and namespaces [#969](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/969)
+- [BREAKING] Initial conditions modularised [#969](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/969)
+- [BREAKING] New dynamic variable system based on NamedTuples [#969](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/969)
 - Rename `SpeedyParameters` submodule to `ParameterEditing`, `SpeedyParam` to `NumberParam`, and `SpeedyParams` to `ParameterTable` [#1066](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1066)
 - Fixed several typos in the documentation [#1054](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1054)
 - Disable Julia v1.11 CI for all submodules [#1062](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1062)
@@ -12,23 +23,14 @@
 - Update docs sidebar [#1048](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1048)
 - Fixed a bug for `SubArrays` not working with `Architectures.ismatching` [#1049](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1049) [#1056](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1056)
 - Dependency for DomainSets updated to v0.7 and v0.8 [#1045](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1045) [#1047](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1047)
-- [BREAKING] WriteModelComponentFile and ManualOrography [#1040](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1040)
 - `JLD2Output` revised to be able to select groups, additional `ArrayOutput` option to output to RAM [#1026](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1026)
 - ParallelTestRunner for SpeedyWeather CI [#1033](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1033)
 - Remove snow runoff, add snow depth cap [#1017](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1017)
-- [BREAKING] Rename `temperature_reference`->`reference_temperature`, `pressure_reference`->`reference_pressure` [#1025](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1025)
-- [BREAKING] Prognostic variables renamed [#1025](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1025)
 - Make default KolmogorovFlow weaker [#1030](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1030)
 - GitHub Action Cache updated to v3 [#1029](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1029)
 - RossbyHaurwitz initial condition example corrected [#1027](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1027)
-- [BREAKING] model.dyanmics_only instead of .physics [#969](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/969)
-- [BREAKING] Kernel launching now in SpeedyWeatherInternals.KernelLaunching [#969](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/969)
 - Pretty printing with StyledStrings [#969](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/969)
-- [BREAKING] Particle advection determines nparticles [#969](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/969)
 - Global parameterizations [#969](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/969)
-- [BREAKING] set! adapted to variable groups and namespaces [#969](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/969)
-- [BREAKING] Initial conditions modularised [#969](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/969)
-- [BREAKING] New dynamic variable system based on NamedTuples [#969](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/969)
 - README CI Badges [#1024](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1024)
 - GitHub Action Julia chache updated to v3 [#1020](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1020)
 - Broadcasting for LTA and RingGrids revised [#977](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/977)
