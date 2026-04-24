@@ -60,6 +60,7 @@ Base.eltype(::Type{Particle{NF}}) where {NF} = NF
 Base.eltype(::Particle{NF}) where {NF} = NF
 
 Base.rand(rng::Random.AbstractRNG, ::Random.Sampler{Particle}) = rand(rng, Particle{DEFAULT_NF})
+Base.rand(rng::Random.AbstractRNG, ::Random.Sampler{Particle{NF, Bool}}) where {NF} = rand(rng, Particle{NF})
 
 # rand uniformly distributed over the globe with cos-distribution for poles
 function Base.rand(rng::Random.AbstractRNG, ::Random.Sampler{Particle{NF}}) where {NF}
