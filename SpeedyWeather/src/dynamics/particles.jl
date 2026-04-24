@@ -45,6 +45,7 @@ Particle(lon::Integer, lat::Integer, σ::Integer) = Particle{DEFAULT_NF, Bool}(t
 # zero generators
 Base.zero(::Type{Particle}) = Particle{DEFAULT_NF, Bool}(true, 0, 0, 0)
 Base.zero(::Type{Particle{NF}}) where {NF} = Particle{NF, Bool}(true, 0, 0, 0)
+Base.zero(::Type{Particle{NF, Bool}}) where {NF} = Particle{NF, Bool}(true, 0, 0, 0)
 Base.zero(::P) where {P <: Particle} = zero(P)
 function Base.zeros(ArrayType::Type{<:AbstractArray{P}}, n::Int...) where {P <: Particle}
     z = ArrayType(undef, n...)
