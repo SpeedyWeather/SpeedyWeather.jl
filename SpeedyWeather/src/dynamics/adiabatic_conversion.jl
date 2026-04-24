@@ -30,8 +30,8 @@ function initialize!(
     (; σ_levels_half, σ_levels_thick) = model.geometry
     nlayers = length(σ_levels_thick)
 
-    σ_half_lower = @view σ_levels_half[1:nlayers]       # σ_k-1/2
-    σ_half_upper = @view σ_levels_half[2:(nlayers + 1)]  # σ_k+1/2
+    σ_half_lower = σ_levels_half[1:nlayers]       # σ_k-1/2
+    σ_half_upper = σ_levels_half[2:(nlayers + 1)]  # σ_k+1/2
     ks = 1:nlayers
 
     # clamp σ_half_lower to avoid log(0) at k=1 where σ_levels_half[1] = 0
