@@ -136,34 +136,30 @@ $(TYPEDFIELDS)"""
     params::PV = Val(parameterizations)
 end
 
-function variables(model::PrimitiveDry)
-    nsteps = get_prognostic_steps(model.time_stepping)
-    return variables(typeof(model), nsteps)
-end
+variables(model::PrimitiveDry) = variables(typeof(model), get_nsteps(model.time_stepping, model))
 
 """($TYPEDSIGNATURES) All variables needed for the primitive dry model itself (components excluded)."""
-function variables(::Type{<:PrimitiveDry}, nsteps)
+function variables(::Type{<:PrimitiveDry}, nsteps = DEFAULT_NSTEPS)
+    pg = nsteps.prognostic_grid
+    ps = nsteps.prognostic_spectral
+    tg = nsteps.tendency_grid
+    ts = nsteps.tendency_spectral
     return (
         variables(BarotropicModel, nsteps)...,
-        PrognosticVariable(:divergence, Spectral4D(nsteps), desc = "Divergence", units = "1/s"),
-        PrognosticVariable(:temperature, Spectral4D(nsteps), desc = "Temperature", units = "K"),
-        PrognosticVariable(:pressure, Spectral3D(nsteps), desc = "Logarithm of surface pressure", units = "log(Pa)"),
+        PrognosticVariable(:divergence, Spectral4D(ps), desc = "Divergence", units = "1/s"),
+        PrognosticVariable(:temperature, Spectral4D(ps), desc = "Temperature", units = "K"),
+        PrognosticVariable(:pressure, Spectral3D(ps), desc = "Logarithm of surface pressure", units = "log(Pa)"),
 
-        GridVariable(:divergence, Grid3D(), desc = "Divergence", units = "1/s"),
-        GridVariable(:temperature, Grid3D(), desc = "Temperature", units = "K"),
-        GridVariable(:pressure, Grid2D(), desc = "Logarithm of surface pressure", units = ""),
-        GridVariable(:divergence_prev, Grid3D(), desc = "Divergence at previous time step", units = "1/s"),
-        GridVariable(:temperature_prev, Grid3D(), desc = "Temperature at previous time step", units = "K"),
-        GridVariable(:pressure_prev, Grid2D(), desc = "Logarithm of surface pressure at previous time step", units = ""),
-        GridVariable(:u_prev, Grid3D(), desc = "Zonal wind at previous time step", units = "m/s"),
-        GridVariable(:v_prev, Grid3D(), desc = "Meridional wind at previous time step", units = "m/s"),
-
-        TendencyVariable(:divergence, Spectral3D(), desc = "Tendency of divergence", units = "1/s²"),
-        TendencyVariable(:temperature, Spectral3D(), desc = "Tendency of temperature", units = "K/s"),
-        TendencyVariable(:pressure, Spectral2D(), desc = "Tendency of surface pressure", units = "log(Pa)/s"),
-        TendencyVariable(:divergence, Grid3D(), namespace = :grid, desc = "Tendency of divergence on the grid", units = "1/s²"),
-        TendencyVariable(:temperature, Grid3D(), namespace = :grid, desc = "Tendency of temperature on the grid", units = "K/s"),
-        TendencyVariable(:pressure, Grid2D(), namespace = :grid, desc = "Tendency of surface pressure on the grid", units = "log(Pa)/s"),
+        TendencyVariable(:divergence, Spectral4D(ts), desc = "Tendency of divergence", units = "1/s²"),
+        TendencyVariable(:temperature, Spectral4D(ts), desc = "Tendency of temperature", units = "K/s"),
+        TendencyVariable(:pressure, Spectral3D(ts), desc = "Tendency of surface pressure", units = "log(Pa)/s"),
+        TendencyVariable(:divergence, Grid4D(tg), namespace = :grid, desc = "Tendency of divergence on the grid", units = "1/s²"),
+        TendencyVariable(:temperature, Grid4D(tg), namespace = :grid, desc = "Tendency of temperature on the grid", units = "K/s"),
+        TendencyVariable(:pressure, Grid4D(tg), namespace = :grid, desc = "Tendency of surface pressure on the grid", units = "log(Pa)/s"),
+        
+        GridVariable(:divergence, Grid4D(pg), desc = "Divergence", units = "1/s"),
+        GridVariable(:temperature, Grid4D(pg), desc = "Temperature", units = "K"),
+        GridVariable(:pressure, Grid3D(pg), desc = "Logarithm of surface pressure", units = ""),
 
         DynamicsVariable(:dpres_dx, Grid2D(), desc = "Zonal gradient of the logarithm of surface pressure"),
         DynamicsVariable(:dpres_dy, Grid2D(), desc = "Meridional gradient of the logarithm of surface pressure"),

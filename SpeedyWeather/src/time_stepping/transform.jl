@@ -57,7 +57,7 @@ u, v."""
 function SpeedyTransforms.transform!(
         vars::Variables,
         time_stepping::AbstractTimeStepper,
-        model::ShallowWater,;
+        model::ShallowWater;
         initialize::Bool = false,
     )
     initialize && initialize!(vars, time_stepping, model)
@@ -110,58 +110,34 @@ grid divergence, grid temperature, pressure (`pres_grid`) and the velocities
 u, v."""
 function SpeedyTransforms.transform!(
         vars::Variables,
-        lf::Integer,
+        time_stepping::AbstractTimeStepper,
         model::PrimitiveEquation;
         initialize::Bool = false,
     )
+    # used to copy 1st step to 2nd step for leapfrog to always transform
+    # the 2nd step to grid
+    initialize && initialize!(vars, time_stepping, model)
 
-    vor_grid = vars.grid.vorticity
-    div_grid = vars.grid.divergence
-    pres_grid = vars.grid.pressure
-    u_grid = vars.grid.u
-    v_grid = vars.grid.v
-    temp_grid = vars.grid.temperature
+    S = model.spectral_transform
+    u_grid = get_prognostic_step(vars.grid.u, time_stepping, S)
+    v_grid = get_prognostic_step(vars.grid.v, time_stepping, S)
+    vor_grid = get_prognostic_step(vars.grid.vorticity, time_stepping, S)
+    div_grid = get_prognostic_step(vars.grid.divergence, time_stepping, S)
+    pres_grid = get_prognostic_step(vars.grid.pressure, time_stepping, S)
+    temp_grid = get_prognostic_step(vars.grid.temperature, time_stepping, S)
 
-    pres_grid_prev = vars.grid.pressure_prev
-    u_grid_prev = vars.grid.u_prev
-    v_grid_prev = vars.grid.v_prev
-    temp_grid_prev = vars.grid.temperature_prev
-
-    vor = get_step(vars.prognostic.vorticity, lf)         # relative vorticity at leapfrog step lf
-    div = get_step(vars.prognostic.divergence, lf)         # divergence at leapfrog step lf
-    temp = get_step(vars.prognostic.temperature, lf)       # temperature at leapfrog step lf
-    pres = get_step(vars.prognostic.pressure, lf)       # logarithm of surface pressure at leapfrog step lf
-
-    if model isa PrimitiveWet                       # dry model don't have humidity variables
-        humid_grid = vars.grid.humidity
-        humid_grid_prev = vars.grid.humidity_prev
-        humid = get_step(vars.prognostic.humidity, lf) # humidity at leapfrog step lf
-    end
+    vor = get_prognostic_step(vars.prognostic.vorticity, time_stepping, S)
+    div = get_prognostic_step(vars.prognostic.divergence, time_stepping, S)
+    pres = get_prognostic_step(vars.prognostic.pressure, time_stepping, S)
+    temp = get_prognostic_step(vars.prognostic.temperature, time_stepping, S)
 
     scratch_memory = vars.scratch.transform_memory
-
     U = vars.scratch.a                              # reuse work arrays
     V = vars.scratch.b                              # U = u*coslat, V=v*coslat
-    S = model.spectral_transform
 
     # retain previous time step for vertical advection and parameterizations
-    if initialize == false                          # only store prev after initial step
-        @. u_grid_prev = u_grid
-        @. v_grid_prev = v_grid
-        @. temp_grid_prev = temp_grid
-        @. pres_grid_prev = exp(pres_grid)
-
-        if model isa PrimitiveWet
-            @. humid_grid_prev = humid_grid
-        end
-
-        for (name, tracer) in model.tracers
-            if tracer.active
-                name_prev = Symbol(name, :_prev)
-                vars.grid.tracers[name_prev] .= vars.grid.tracers[name]
-            end
-        end
-    end
+    # if not initial step do before transforms i.e before that step is overwritten
+    initialize || move_prognostic_grid_variables_back!(vars, time_stepping, model)
 
     transform!(vor_grid, vor, scratch_memory, S)    # get vorticity on grid from spectral vor
     transform!(div_grid, div, scratch_memory, S)    # get divergence on grid from spectral div
@@ -169,8 +145,10 @@ function SpeedyTransforms.transform!(
     transform!(pres_grid, pres, scratch_memory, S)  # -- pressure --
 
     if model isa PrimitiveWet
+        humid = get_prognostic_step(vars.prognostic.temperature, time_stepping, S)
+        humid_grid = get_prognostic_step(vars.grid.temperature, time_stepping, S)
         transform!(humid_grid, humid, scratch_memory, S)
-        hole_filling!(humid_grid, model.hole_filling, model)  # remove negative humidity
+        hole_filling!(humid_grid, model.hole_filling, model)  # clamp negative humidity to zero
     end
 
     # get spectral U, V from vorticity and divergence via stream function Ψ and vel potential ϕ
@@ -186,31 +164,14 @@ function SpeedyTransforms.transform!(
     temperature_average!(vars, temp, S)
     geopotential!(vars, model)                  # calculate geopotential
 
-    if initialize   # at initial step store prev <- current
-        @. u_grid_prev = u_grid
-        @. v_grid_prev = v_grid
-        @. temp_grid_prev = temp_grid
-        @. pres_grid_prev = exp(pres_grid)      # store pressure in Pa not log(Pa) for parameterizations
-
-        if model isa PrimitiveWet
-            @. humid_grid_prev = humid_grid
-        end
-
-        for (name, tracer) in model.tracers
-            if tracer.active
-                name_prev = Symbol(name, :_prev)
-                vars.grid.tracers[name_prev] .= vars.grid.tracers[name]
-            end
-        end
-    end
-
-    for (name, tracer) in model.tracers
-        tracer_var = get_step(vars.prognostic.tracers[name], lf)  # tracer at leapfrog step lf
-        tracer.active && transform!(vars.grid.tracers[name], tracer_var, scratch_memory, S)
-    end
+    # at initial step copy 2nd step (current) to 1st (prev) to retain those fields
+    # only do after transforms to avoid copying 
+    initialize && move_prognostic_grid_variables_back!(vars, time_stepping, model)
 
     # transform random pattern for random process unless random_process=nothing
-    transform!(vars, lf, model.random_process, S)
+    transform!(vars, model.random_process, S)
 
     return nothing
 end
+
+move_prognostic_grid_variables_back!(::Variables, ::AbstractTimeStepper, ::AbstractModel) = nothing

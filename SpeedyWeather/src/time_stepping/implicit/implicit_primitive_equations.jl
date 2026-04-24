@@ -5,7 +5,7 @@ export ImplicitPrimitiveEquation
 Struct that holds various precomputed arrays for the semi-implicit correction to
 prevent gravity waves from amplifying in the primitive equation model.
 $(TYPEDFIELDS)"""
-@kwdef mutable struct ImplicitPrimitiveEquation{
+@kwdef struct ImplicitPrimitiveEquation{
         NF,             # number format
         VectorType,
         MatrixType,
@@ -14,60 +14,57 @@ $(TYPEDFIELDS)"""
     } <: AbstractImplicit
 
     # DIMENSIONS
-    "Spectral resolution"
+    "[DERIVED] Spectral resolution"
     trunc::IntType
 
-    "Number of vertical layers"
+    "[DERIVED] Number of vertical layers"
     nlayers::IntType
 
     # PARAMETERS
-    "Time-step coefficient: 0=explicit, 0.5=centred implicit, 1=backward implicit"
-    α::NF = 1
+    "[OPTION] Time-step coefficient: 0=explicit, 0.5=centred implicit, 1=backward implicit"
+    centering::NF = 0.5
 
-    "Reinitialize at restart when initialized=true"
+    "[OPTION] Reinitialize at restart when initialized=true"
     reinitialize::Bool = true
 
-    "Flag automatically set to true when initialize! has been called"
+    "[DERIVED] Flag automatically set to true when initialize! has been called"
     initialized::Bool = false
 
     # PRECOMPUTED ARRAYS, to be initialized with initialize!
-    "vertical temperature profile, obtained from diagn on first time step"
+    "[DERIVED] vertical temperature profile, obtained from diagn on first time step"
     temp_profile::VectorType = zeros(NF, nlayers)
 
-    "time step 2α*Δt packed in RefValue for mutability"
-    ξ::Base.RefValue{NF} = Ref{NF}(0)
-
-    "divergence: operator for the geopotential calculation"
+    "[DERIVED] divergence: operator for the geopotential calculation"
     R::MatrixType = zeros(NF, nlayers, nlayers)
 
-    "divergence: the -RdTₖ∇² term excl the eigenvalues from ∇² for divergence"
+    "[DERIVED] divergence: the -RdTₖ∇² term excl the eigenvalues from ∇² for divergence"
     U::VectorType = zeros(NF, nlayers)
 
-    "temperature: operator for the TₖD + κTₖD(ln pₛ)/Dt term"
+    "[DERIVED] temperature: operator for the TₖD + κTₖD(ln pₛ)/Dt term"
     L::MatrixType = zeros(NF, nlayers, nlayers)
 
-    "pressure: vertical averaging of the -D̄ term in the log surface pres equation"
+    "[DERIVED] pressure: vertical averaging of the -D̄ term in the log surface pres equation"
     W::VectorType = zeros(NF, nlayers)
 
-    "components to construct L, 1/ 2Δσ"
+    "[DERIVED] components to construct L, 1/ 2Δσ"
     L0::VectorType = zeros(NF, nlayers)
 
-    "vert advection term in the temperature equation (below+above)"
+    "[DERIVED] vert advection term in the temperature equation (below+above)"
     L1::MatrixType = zeros(NF, nlayers, nlayers)
 
-    "factor in front of the `div_sum_above` term"
+    "[DERIVED] factor in front of the `div_sum_above` term"
     L2::VectorType = zeros(NF, nlayers)
 
-    "`_sum_above` operator itself"
+    "[DERIVED] `_sum_above` operator itself"
     L3::MatrixType = zeros(NF, nlayers, nlayers)
 
-    "factor in front of div term in Dlnpₛ/Dt"
+    "[DERIVED] factor in front of div term in Dlnpₛ/Dt"
     L4::VectorType = zeros(NF, nlayers)
 
-    "for every l the matrix to be inverted"
+    "[DERIVED] for every l the matrix to be inverted"
     S::MatrixType = zeros(NF, nlayers, nlayers)
 
-    "combined inverted operator: S = 1 - ξ²(RL + UW)"
+    "[DERIVED] combined inverted operator: S = 1 - ξ²(RL + UW)"
     S⁻¹::TensorType = zeros(NF, trunc + 2, nlayers, nlayers)
 end
 
@@ -82,20 +79,21 @@ end
 
 function variables(implicit::ImplicitPrimitiveEquation)
     return (
-        GridVariable(:temp_average, VectorDim(implicit.nlayers), desc = "Average vertical temperature profile", units = "K"),
+        DynamicsVariable(:average_temperature_profile, VectorDim(implicit.nlayers), desc = "Average vertical temperature profile", units = "K"),
     )
 end
 
 # function barrier to unpack the constants struct for primitive eq models
 function initialize!(
         I::ImplicitPrimitiveEquation,
-        dt::Real,
         vars::Variables,
         model::PrimitiveEquation,
     )
     model.dynamics || return nothing    # escape immediately if no dynamics
-    (; geometry, geopotential, atmosphere, adiabatic_conversion) = model
-    initialize!(I, dt, vars.grid.temp_average, geometry, geopotential, atmosphere, adiabatic_conversion)
+    (; geometry, time_stepping, geopotential, atmosphere, adiabatic_conversion) = model
+    Δt = time_step(time_stepping, vars.prognostic.clock) 
+    Tₖ = vars.dynamics.average_temperature_profile
+    initialize!(I, Δt, Tₖ, geometry, geopotential, atmosphere, adiabatic_conversion)
     return nothing
 end
 
@@ -103,7 +101,7 @@ end
 Initialize the implicit terms for the PrimitiveEquation models."""
 function initialize!(
         implicit::ImplicitPrimitiveEquation,
-        dt::Real,                                           # the scaled time step radius*dt
+        Δt::Real,                                           # the scaled time step radius*dt
         temp_average::AbstractVector,                       # average vertical temperature profile to construct the operators
         geometry::AbstractGeometry,
         geopotential::AbstractGeopotential,
@@ -116,7 +114,7 @@ function initialize!(
     # option to skip reinitialization at restart
     (implicit.initialized && !implicit.reinitialize) && return nothing
 
-    (; trunc, nlayers, α) = implicit
+    (; trunc, nlayers) = implicit
     (; σ_levels_full, σ_levels_thick) = geometry
     (; R_dry, κ) = atmosphere
     (; Δp_geopot_half, Δp_geopot_full) = geopotential
@@ -164,8 +162,7 @@ function initialize!(
     # R, U, L, W are linear operators that are therefore defined here and inverted
     # to obtain δD first, and then δT and δlnps through substitution
 
-    ξ = α * dt                          # dt = 2Δt for leapfrog, but = Δt, Δ/2 in first_timesteps!
-    implicit.ξ[] = ξ                    # also store in Implicit struct
+    ξ = implicit.centering * Δt                 # 2Δt for leapfrog, but = Δt, Δ/2 in first_timesteps!
 
     # DIVERGENCE OPERATORS (called g in Hoskins and Simmons 1975, eq 11 and Appendix 1)
     @inbounds for k in 1:nlayers                # vertical geopotential integration as matrix operator
@@ -251,10 +248,13 @@ function implicit_correction!(
     )
 
     # escape immediately if explicit
-    implicit.α == 0 && return nothing
+    implicit.centering == 0 && return nothing
 
     (; S⁻¹, R, U, L, W, nlayers) = implicit
-    ξ = implicit.ξ[]
+    
+    # new implicit timestep ξ = α*dt = 2αΔt (for leapfrog)
+    Δt = time_step(time_stepping, vars.prognostic.clock)       
+    ξ = implicit.centering * Δt
 
     temp_tend = vars.tendencies.temperature
     pres_tend = vars.tendencies.pressure
@@ -276,10 +276,6 @@ function implicit_correction!(
         temp_tend, pres_tend, div_tend, G, geopotential,
         div_old, div_new, S⁻¹, R, U, L, W, l_indices, ξ, nlayers
     )
-
-    zero_last_degree!(div_tend)
-    zero_last_degree!(pres_tend)
-    zero_last_degree!(temp_tend)
 
     pres_tend.data[1:1] .= 0    # mass conservation
 

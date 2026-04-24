@@ -977,6 +977,8 @@ function volume_flux_divergence!(
     # compute dynamic layer thickness h on the grid
     # η is the interface displacement, update to layer thickness h = η + H - Hb
     # H is the layer thickness at rest without mountains, Hb the orography
+    # TODO this leaves η <- h between here and the transforms after the time stepping
+    # change to h = η + H - Hb here using a scratch array for h?
     η .+= H .- orography
 
     # now do -∇⋅(uh, vh) and store in η_tend
@@ -998,7 +1000,7 @@ function temperature_average!(
         S::AbstractSpectralTransform,
     )
     # average from l=m=0 harmonic divided by norm of the sphere
-    @. vars.grid.temp_average = real(temp[1, :]) / S.norm_sphere
+    @. vars.dynamics.average_temperature_profile = real(temp[1, :]) / S.norm_sphere
     return nothing
 end
 

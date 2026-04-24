@@ -49,11 +49,11 @@ prognostic_grid_steps(::AbstractLeapfrog, ::PrimitiveEquation) = 2
 tendency_steps(::AbstractLeapfrog) = 1
 
 # WHICH STEP TO READ WHEN
-@inline which_prognostic_step(var::LowerTriangularArray, ::AbstractLeapfrog, ::SpeedyTransforms.AbstractSpectralTransform) = 2
-@inline which_prognostic_step(var::LowerTriangularArray, ::AbstractLeapfrog, ::AbstractForcing) = 2
-@inline which_prognostic_step(var::LowerTriangularArray, ::AbstractLeapfrog, ::AbstractDrag) = 2
-@inline which_prognostic_step(var::LowerTriangularArray, ::AbstractLeapfrog, ::AbstractDynamicalCoreComponent) = 2
-@inline which_prognostic_step(var::LowerTriangularArray, ::AbstractLeapfrog, ::AbstractHorizontalDiffusion) = 1
+@inline which_prognostic_step(var, ::AbstractLeapfrog, ::SpeedyTransforms.AbstractSpectralTransform) = 2
+@inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractForcing) = 2
+@inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractDrag) = 2
+@inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractDynamicalCoreComponent) = 2
+@inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractHorizontalDiffusion) = 1
 
 # dispatch over timestepper to decide between implicit or explicit diffusion
 @inline implicit_diffusion(::AbstractHorizontalDiffusion, ::Nothing, ::AbstractLeapfrog) = true
@@ -66,6 +66,38 @@ function initialize!(vars::Variables, ::AbstractLeapfrog, ::AbstractModel)
         if prognostic[varname] isa AbstractArray
             var_old, var_new = get_steps(getfield(prognostic, varname))
             var_new .= var_old
+        # TODO this requires also all land and ocean variables to be set up with the steps
+        # elseif prognostic[varname] isa NamedTuple
+        #     namespace = prognostic[varname]
+        #     for varname2 in keys(namespace)
+        #         if getfield(namespace, varname2) isa AbstractArray
+        #             var_old, var_new = get_steps(getfield(namespace, varname2))
+        #             var_new .= var_old
+        #         end
+        #     end
+        end
+    end
+end
+
+# copy grid prognostics from 2nd to 1st step to retain these fields for the previous time step
+function move_prognostic_grid_variables_back!(
+    vars::Variables,
+    time_stepping::AbstractLeapfrog,
+    model::AbstractModel,
+)
+    (; grid) = vars
+    for varname in keys(grid)
+        if grid[varname] isa AbstractField
+            var_old, var_new = get_steps(getfield(grid, varname))
+            var_new .= var_old
+        elseif grid[varname] isa NamedTuple
+            nt = grid[varname]
+            for varname2 in keys(nt)
+                if getfield(nt, varname2) isa AbstractField
+                    var_old, var_new = get_steps(getfield(nt, varname2))
+                    var_new .= var_old
+                end
+            end
         end
     end
 end

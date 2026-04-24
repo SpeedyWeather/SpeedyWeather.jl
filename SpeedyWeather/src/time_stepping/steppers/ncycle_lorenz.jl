@@ -66,9 +66,9 @@ tendency_spectral_steps(::NCycleLorenz) = 2 # to store F, G in Hotta et al. 2016
 @inline implicit_diffusion(::AbstractHorizontalDiffusion, ::AbstractImplicit, ::AbstractNCycleLorenz) = true
 
 # dispatch over time stepper here so that other time stepper can change the order
-function diffusion_and_implicit!(vars, ::AbstractNCycleLorenz, model)
-    implicit_correction!(vars, model)
+@noinline function diffusion_and_implicit!(vars, ::AbstractNCycleLorenz, ::AbstractImplicit, model)
     horizontal_diffusion!(vars, model)
+    implicit_correction!(vars, model)
     return nothing
 end
 
@@ -84,7 +84,7 @@ Adapt.@adapt_structure NCycleLorenzCore
 Generator function for NCycleLorenz struct using `spectral_grid` for resolution."""
 function NCycleLorenz(
         spectral_grid::SpectralGrid;
-        steps = 4,
+        steps = 3,
         variant = NCycleLorenzA(),
         Δt_at_T31 = Minute(40),
         adjust_with_output = true,
