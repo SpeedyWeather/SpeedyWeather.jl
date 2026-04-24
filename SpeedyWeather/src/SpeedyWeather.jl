@@ -47,9 +47,9 @@ import SpeedyWeatherInternals.Utils: Utils, @maybe_jit, _jit, print_fields, read
 
 # PARAMETER HANDLING
 using DomainSets.IntervalSets
-using SpeedyWeatherInternals.SpeedyParameters
-import SpeedyWeatherInternals.SpeedyParameters: parameters
-export SpeedyParam, SpeedyParams, parameters, stripparams       # export user-facing parameter handling types and methods
+using SpeedyWeatherInternals.ParameterEditing
+import SpeedyWeatherInternals.ParameterEditing: parameters
+export ParameterTable, parameters, stripparams       # export user-facing parameter handling types and methods
 
 # Export heavily methoded functions
 export initialize!, finalize!

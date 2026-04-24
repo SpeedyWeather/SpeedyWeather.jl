@@ -2,7 +2,7 @@
 
 Generally, SpeedyWeather is built in a very modular, extensible way.
 While that sounds fantastic in general, it does not save you from understanding
-its [modular logic](@ref logic) before you can extend SpeedyWeather.jl easily yourself.
+its [modular logic](@ref logic) before you can extend SpeedyWeather easily yourself.
 We highly recommend you to read the following sections if you would like to
 extend SpeedyWeather in some way, but it also gives you a good understanding
 of how we build SpeedyWeather in the first place. Because in the end there

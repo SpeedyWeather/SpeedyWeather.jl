@@ -125,11 +125,12 @@ total volume (times ``h=\eta+H-H_b`` for the vertical then integrated over the s
 
 ```math
 \begin{align}
-E & = \iint \left[ \int_{H_b}^{\eta}\frac{1}{2}\left(u^2 + v^2 + gz\right)dz \right]dA \\
-  & = \iint \frac{1}{2}\left(u^2 + v^2 + gh\right)h dA
+E & = \iint \left[ \int_{H_b}^{H_b+h}\frac{1}{2}\left(u^2 + v^2 + 2gz\right)dz \right]dA \\
+  & = E_0 + \iint \frac{1}{2}\left(u^2 + v^2 + gh\right)h dA
 \end{align}
 ```
 
+where ``E_0`` is a constant energy shift that does not play a role when considering energy differences.
 In contrast to the [Mass conservation](@ref) which, with respect to the
 spectral transform, is a linear calculation, here we need to multiply
 variables, which has to be done in grid-point space. Then we can transform to spectral
@@ -143,7 +144,7 @@ function total_energy(u, v, η, model)
     g = model.planet.gravity
 
     h = @. η + H - Hb               # layer thickness between the bottom and free surface
-    E = @. h/2*(u^2 + v^2) + g*h^2  # vertically-integrated mechanical energy
+    E = @. h/2*(u^2 + v^2) + (1/2)*g*h^2  # vertically-integrated mechanical energy
 
     # transform to spectral, take l=m=0 mode at [1] and normalize for mean
     return E_mean = real(transform(E)[1]) / model.spectral_transform.norm_sphere

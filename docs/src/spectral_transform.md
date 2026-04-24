@@ -92,7 +92,7 @@ Another symmetry arises from the fact that the spherical harmonics are either sy
 around the Equator. There is an even/odd combination of degrees and orders so that the sign flips like a
 checkerboard
 ```math
-Y_{l, m}(\phi, \pi-\theta) = (-1)^{l+m}Y_{lm}(\phi, \phi)
+Y_{l, m}(\phi, \pi-\theta) = (-1)^{l+m}Y_{lm}(\phi, \theta)
 ```
 This means that one only has to compute the Legendre polynomials for one hemisphere and the other one
 follows with this equality.
@@ -221,7 +221,7 @@ They are as follows with more details below
 | 511           | 1536 | 768  | 29 km        |
 | 682           | 2048 | 1024 | 22 km        |
 | 1024          | 3072 | 1536 | 14 km        |
-| 1365          | 4092 | 2048 | 11 km        |
+| 1365          | 4096 | 2048 | 11 km        |
 
 Some remarks on this table
 - This assumes the default quadratic truncation, you can always adapt the grid resolution via the `dealiasing` option, see [Matching spectral and grid resolution](@ref)

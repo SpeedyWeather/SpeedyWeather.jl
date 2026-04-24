@@ -254,13 +254,13 @@ which can be thought of as a vertical integration of the pressure thickness-weig
 In ``\sigma``-coordinates with ``\Delta p_k = \Delta \sigma_k p_s`` (see [Vertical coordinates](@ref))
 this becomes
 ```math
-\frac{\partial p_s}{\partial t} = - \sum_{k=1}^N \sigma_k \nabla \cdot (\mathbf{u}_k p_s)
-= -\sum_{k=1}^N \sigma_k (\mathbf{u}_k \cdot \nabla p_s + p_s \nabla \cdot \mathbf{u}_k)
+\frac{\partial p_s}{\partial t} = - \sum_{k=1}^N \Delta \sigma_k \nabla \cdot (\mathbf{u}_k p_s)
+= -\sum_{k=1}^N \Delta \sigma_k (\mathbf{u}_k \cdot \nabla p_s + p_s \nabla \cdot \mathbf{u}_k)
 ```
 Using the logarithm of pressure ``\ln p`` as the vertical coordinate this becomes
 ```math
 \frac{\partial \ln p_s}{\partial t} =
--\sum_{k=1}^N \sigma_k (\mathbf{u}_k \cdot \nabla \ln p_s + \nabla \cdot \mathbf{u}_k)
+-\sum_{k=1}^N \Delta \sigma_k (\mathbf{u}_k \cdot \nabla \ln p_s + \nabla \cdot \mathbf{u}_k)
 ```
 The second term is the divergence ``\mathcal{D}_k`` at layer ``k``.
 We introduce ``\bar{a} = \sum_k \Delta \sigma_k a_k``, the ``\sigma``-weighted vertical integration operator

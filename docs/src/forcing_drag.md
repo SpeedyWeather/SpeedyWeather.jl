@@ -9,7 +9,7 @@ as defined in [Vallis et al., 2004](https://doi.org/10.1175/1520-0469(2004)061%3
 \begin{aligned}
 \frac{\partial \zeta}{\partial t} &+ \nabla \cdot (\mathbf{u}(\zeta + f)) =
 S - r\zeta - \nu\nabla^{4}\zeta \\
-S_{l, m}^i &= A(1-\exp(-2\tfrac{\Delta t}{\tau}))Q^i_{l, m} + \exp(-\tfrac{dt}{\tau})S_{l, m}^{i-1} \\
+S_{l, m}^i &= A(1-\exp(-2\tfrac{\Delta t}{\tau}))Q^i_{l, m} + \exp(-\tfrac{\Delta t}{\tau})S_{l, m}^{i-1} \\
 \end{aligned}
 ```
 
@@ -66,7 +66,7 @@ using SpeedyWeather
 end
 ```
 
-So, first the scalar parameters, are added as fields of type `NF` (you could harcode `Float64` too)
+So, first the scalar parameters, are added as fields of type `NF` (you could hardcode `Float64` too)
 with some default values as suggested in the
 [Vallis et al., 2004](https://doi.org/10.1175/1520-0469(2004)061%3C0264:AMASDM%3E2.0.CO;2) paper.
 In order to be able to define the default values, we add the `@kwdef` macro
@@ -171,7 +171,7 @@ use parameters from other components. For example, the definition of the `S` ter
 includes the time step ``\Delta t``, which should be pulled from the `model.time_stepping`.
 We also pull the `Grid` and its resolution parameter `nlat_half` (see [Grids](@ref))
 to get the latitudes with `get_latd` from the `RingGrids` module. Alternatively,
-we could have used `model.geometry.latd` which is contains a bunch of similar arrays
+we could have used `model.geometry.latd` which contains a bunch of similar arrays
 describing the geometry of the grid we use and at its given resolution.
 
 Note that `initialize!` is expected to be read and write on the `forcing` argument

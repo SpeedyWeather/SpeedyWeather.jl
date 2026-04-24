@@ -8,7 +8,7 @@ atmospheric modelling an interactive experience -- in the terminal, in a noteboo
 
 ## Overview
 
-SpeedyWeather.jl is uses a spherical harmonic transform to simulate
+SpeedyWeather.jl uses a spherical harmonic transform to simulate
 the general circulation of the atmosphere using a vorticity-divergence formulation,
 a semi-implicit time integration and simple parameterizations to represent various
 climate processes: Convection, clouds, precipitation, radiation, surface fluxes, among others.
@@ -40,8 +40,12 @@ Finding a good balance is difficult but we try our best.
 
 ## Developers and contributing
 
-The development of  SpeedyWeather.jl is lead by [Milan Klöwer](https://github.com/milankl) with
-[current and past contributors](https://github.com/SpeedyWeather/SpeedyWeather.jl/graphs/contributors).
+The development of  SpeedyWeather.jl is led by 
+
+- [Milan Klöwer](https://github.com/milankl), Oxford
+- [Maximilian Gelbrecht](https://github.com/maximilian-gelbrecht), PIK Potsdam
+
+with many [current and past contributors](https://github.com/SpeedyWeather/SpeedyWeather.jl/graphs/contributors).
 
 Open-source lives from large teams of (even occasional) contributors. If you are interested to
 fix something, implement something, or just use it and provide feedback you are always welcome.
