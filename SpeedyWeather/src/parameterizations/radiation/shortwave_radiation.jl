@@ -165,8 +165,8 @@ One-band shortwave radiative transfer with cloud reflection and ozone absorption
     O₃_absorption = radiation.ozone_absorption
     (; cloud_cover, cloud_top, stratocumulus_cover, cloud_albedo, stratocumulus_albedo) = clouds
 
-    dTdt = vars.tendencies.grid.temperature
-    pₛ = vars.grid.pressure_prev[ij]
+    dTdt = get_tendency_step(vars.tendencies.grid.temperature, model.time_stepping, radiation)
+    pₛ = get_prognostic_step(vars.grid.pressure, model.time_stepping, radiation)[ij]
     nlayers = size(dTdt, 2)
     σ = model.geometry.σ_levels_full
     Δσ = model.geometry.σ_levels_thick

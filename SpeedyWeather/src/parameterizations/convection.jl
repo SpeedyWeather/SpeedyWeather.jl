@@ -40,12 +40,12 @@ and relaxes current vertical profiles to the adjusted references."""
     Δt = time_stepping.Δt_sec
 
     # use previous time step for more stable calculations
-    temp = vars.grid.temperature_prev
-    humid = vars.grid.humidity_prev
+    temp = get_prognostic_step(vars.grid.temperature, time_stepping, convection)
+    humid = get_prognostic_step(vars.grid.humidity, time_stepping, convection)
     geopotential = vars.grid.geopotential
-    temp_tend = vars.tendencies.grid.temperature
-    humid_tend = vars.tendencies.grid.humidity
-    pₛ = vars.grid.pressure_prev[ij]          # surface pressure [Pa]
+    temp_tend = get_tendency_step(vars.tendencies.grid.temperature, time_stepping, convection)
+    humid_tend = get_tendency_step(vars.tendencies.grid.humidity, time_stepping, convection)
+    pₛ = get_prognostic_step(vars.grid.pressure, time_stepping, convection)[ij]          # surface pressure [Pa]
     NF = eltype(temp)
 
     # thermodynamics
@@ -281,16 +281,16 @@ for thermodynamic consistency (e.g. in dry convection the humidity profile is no
 and relaxes current vertical profiles to the adjusted references."""
 @propagate_inbounds function convection!(ij, vars, DBM::BettsMillerDryConvection, model)
 
-    (; geometry, atmosphere) = model
-    NF = eltype(vars.grid.temperature_prev)
+    (; geometry, atmosphere, time_stepping) = model
     σ = geometry.σ_levels_full
     σ_half = geometry.σ_levels_half
     Δσ = geometry.σ_levels_thick
     nlayers = length(σ)
 
     # use previous time step for more stable calculations
-    temp = vars.grid.temperature_prev
-    temp_tend = vars.tendencies.grid.temperature
+    temp = get_prognostic_step(vars.grid.temperature, time_stepping, DBM)
+    NF = eltype(temp)
+    temp_tend = get_tendency_step(vars.tendencies.grid.temperature, time_stepping, DBM)
 
     # use work arrays for temp_ref_profile
     temp_ref_profile = vars.scratch.grid.a     # temperature [K] reference profile to adjust to
@@ -428,8 +428,9 @@ end
         scheme::ConvectiveHeating,
         model,
     )
-    pₛ = vars.grid.pressure_prev
-    temp_tend = vars.tendencies.grid.temperature
+    time_stepping = model.time_stepping
+    pₛ = get_prognostic_step(vars.grid.pressure, time_stepping, scheme)
+    temp_tend = get_tendency_step(vars.tendencies.grid.temperature, time_stepping, scheme)
     nlayers = size(temp_tend, 2)
     NF = eltype(temp_tend)
 

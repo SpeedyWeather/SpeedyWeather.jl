@@ -62,19 +62,20 @@ large-scale precipitation vertically for output."""
         time_stepping,
     )
     # use previous time step for more stable Euler forward step of the parameterizations
-    temp = vars.grid.temperature_prev                  # temperature [K]
-    humid = vars.grid.humidity_prev                # specific humidity [kg/kg]
-    temp_tend = vars.tendencies.grid.temperature       # temperature tendency [K/s]
-    humid_tend = vars.tendencies.grid.humidity     # specific humidity tendency [kg/kg/s]
+    temp = get_prognostic_step(vars.grid.temperature, time_stepping, condensation)                  # temperature [K]
+    humid = get_prognostic_step(vars.grid.humidity, time_stepping, condensation)                    # specific humidity [kg/kg]
+    temp_tend = get_tendency_step(vars.tendencies.grid.temperature, time_stepping, condensation)    # temperature tendency [K/s]
+    humid_tend = get_tendency_step(vars.tendencies.grid.humidity, time_stepping, condensation)      # specific humidity tendency [kg/kg/s]
     nlayers = size(temp, 2)
 
     # precompute scaling constants to minimize divisions (used to convert between humidity [kg/kg] and precipitation [m])
-    pₛ = vars.grid.pressure_prev[ij]               # surface pressure [Pa]
+    pressure = get_prognostic_step(vars.grid.pressure, time_stepping, condensation)                 
+    pₛ = pressure[ij]                               # surface pressure [Pa]
     (; Δt_sec) = time_stepping                      # time step [s]
     σ = geometry.σ_levels_full                      # vertical sigma coordinate [1]
     Δσ = geometry.σ_levels_thick                    # layer thickness in sigma coordinates
     ρ = atmosphere.water_density                    # air density [kg/m³]
-    pₛ_gρ = pₛ / (planet.gravity * ρ)                 # [Pa / (m/s² * kg/m³)] = [Pa m² * s² / kg] = [m]
+    pₛ_gρ = pₛ / (planet.gravity * ρ)               # [Pa / (m/s² * kg/m³)] = [Pa m² * s² / kg] = [m]
 
     # thermodynamics
     Lᵥ = atmosphere.latent_heat_condensation        # latent heat of vaporization
@@ -102,7 +103,7 @@ large-scale precipitation vertically for output."""
 
             # 0. convert between humidity tendency [kg/kg/s] and precipitation amount [m] or rate [m/s]
             Δp_gρ = Δσ[k] * pₛ_gρ                           # pressure thickness of layer Δp times 1/g/ρ [m]
-            Δp_Δtgρ = Δp_gρ / Δt_sec                          # pressure thickness of layer Δp times 1/Δt/g/ρ [m/s]
+            Δp_Δtgρ = Δp_gρ / Δt_sec                        # pressure thickness of layer Δp times 1/Δt/g/ρ [m/s]
             Δtgρ_Δp = inv(Δp_Δtgρ)                          # [s/m]
 
             # 1. Melting of snow from layer above

@@ -49,7 +49,7 @@ initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
 
 # function barrier
 @propagate_inbounds parameterization!(ij, vars, drag::BulkRichardsonDrag, model) =
-    boundary_layer_drag!(ij, vars, drag, model.land_sea_mask, model.atmosphere, model.planet, model.orography)
+    boundary_layer_drag!(ij, vars, drag, model.land_sea_mask, model.atmosphere, model.planet, model.orography, model.time_stepping)
 
 @propagate_inbounds function boundary_layer_drag!(
         ij,
@@ -59,6 +59,7 @@ initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
         atmosphere,
         planet,
         orography,
+        time_stepping,
     )
     land_fraction = land_sea_mask.mask[ij]
 
@@ -80,7 +81,7 @@ initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
     # bulk Richardson number at lowermost layer from Frierson, 2006, eq. (15)
     # they call it Ri_a = Ri here
     ΔΦ₀ = gravity * z     # geopotential high relative to surface
-    Ri = bulk_richardson_surface(ij, ΔΦ₀, vars, atmosphere)
+    Ri = bulk_richardson_surface(ij, ΔΦ₀, vars, atmosphere, drag, time_stepping)
     Ri_c = drag.critical_Richardson
     (; drag_min) = drag
 
@@ -97,14 +98,15 @@ end
 $(TYPEDSIGNATURES)
 Calculate the bulk Richardson number following Frierson, 2006.
 For vertical stability in the boundary layer."""
-@propagate_inbounds function bulk_richardson_surface(ij, ΔΦ₀, vars, atmosphere)
+@propagate_inbounds function bulk_richardson_surface(ij, ΔΦ₀, vars, atmosphere, drag, time_stepping)
     cₚ = atmosphere.heat_capacity
-    NF = eltype(vars.grid.temperature_prev)
-    surface = size(vars.grid.temperature_prev, 2)     # surface index = nlayers
+    temp = get_prognostic_step(vars.grid.temperature, time_stepping, drag)
+    NF = eltype(temp)
+    surface = size(temp, 2)     # surface index = nlayers
 
     Vₛ = vars.parameterizations.surface_wind_speed[ij]
-    T = vars.grid.temperature_prev[ij, surface]
-    q = haskey(vars.grid, :humidity_prev) ? vars.grid.humidity_prev[ij, surface] : zero(NF)
+    T = temp[ij, surface]
+    q = haskey(vars.grid, :humidity) ? get_prognostic_step(vars.grid.humidity, time_stepping, drag)[ij, surface] : zero(NF)
     Tᵥ = virtual_temperature(T, q, atmosphere)
 
     # bulk Richardson number at lowermost layer N from Frierson, 2006, eq. (15)

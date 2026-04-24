@@ -65,39 +65,33 @@ end
 $(TYPEDSIGNATURES)
 Calculate a single time step for the primitive equation model."""
 function time_step!(
-        vars::Variables,                # all variables
-        dt::Real,                       # time step (mostly =2Δt, but for first_timesteps! =Δt, Δt/2)
-        model::PrimitiveEquation,       # everything that's constant at runtime
-        lf1::Integer = 2,               # leapfrog index 1 (dis/enables Robert+Williams filter)
-        lf2::Integer = 2,               # leapfrog index 2 (time step used for tendencies)
+        vars::Variables,                    # all variables
+        time_stepping::AbstractTimeStepper, # dispatch over time stepper
+        model::PrimitiveEquation,           # everything that's constant at runtime
     )
     # exit immediately if NaNs/Infs already present
     (!isnothing(model.feedback) && model.feedback.nans_detected) && return nothing
-    reset_tendencies!(vars)             # set the tendencies back to zero for accumulation
+    reset_tendencies!(vars, time_stepping)  # set the tendencies back to zero for accumulation
 
-    if ~model.dynamics_only             # switch on/off all physics parameterizations
+    if ~model.dynamics_only                 # switch on/off all physics parameterizations
         # calculate all parameterizations
         parameterization_tendencies!(vars, model)
-        ocean_timestep!(vars, model)    # sea surface temperature and maybe in the future sea ice
-        sea_ice_timestep!(vars, model)  # sea ice
-        land_timestep!(vars, model)     # soil moisture and temperature, vegetation, maybe rivers
+        ocean_timestep!(vars, model)
+        sea_ice_timestep!(vars, model)
+        land_timestep!(vars, model)         # soil moisture and temperature,...
     end
 
-    if model.dynamics                                       # switch on/off all dynamics
-        dynamics_tendencies!(vars, lf2, model)              # dynamical core
-        implicit_correction!(vars, model.implicit, model)   # semi-implicit time stepping corrections
+    if model.dynamics                           # switch on/off all dynamics
+        dynamics_tendencies!(vars, model)       # dynamical core
+        diffusion_and_implicit!(vars, model)    # semi-implicit time stepping corrections
     else    # just transform physics tendencies to spectral space
         parameterization_tendencies_only!(vars, model)
+        horizontal_diffusion!(vars, model)
     end
 
-    # APPLY DIFFUSION, STEP FORWARD IN TIME, AND TRANSFORM NEW TIME STEP TO GRID
-    horizontal_diffusion!(vars, model)
-    leapfrog!(vars, dt, lf1, model)
-    transform!(vars, lf2, model)
-
-    # PARTICLE ADVECTION (always skip 1st step of first_timesteps!)
-    not_first_timestep = lf2 == 2
-    not_first_timestep && particle_advection!(vars, model)
+    update_prognostic!(vars, model)             # the actual time step
+    transform!(vars, model)                     # transform spectral back to grid
+    particle_advection!(vars, model)
 
     return nothing
 end

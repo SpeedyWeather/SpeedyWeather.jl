@@ -33,8 +33,8 @@ initialize!(radiation::UniformCooling, model::PrimitiveEquation) = nothing
 # function barrier
 @propagate_inbounds function parameterization!(ij, vars, longwave::UniformCooling, model)
 
-    T = vars.grid.temperature_prev
-    dTdt = vars.tendencies.grid.temperature
+    T = get_prognostic_step(vars.grid.temperature, model.time_stepping, longwave)
+    dTdt = get_tendency_step(vars.tendencies.grid.temperature, model.time_stepping, longwave)
     (; temp_min, temp_stratosphere) = longwave
     nlayers = size(T, 2)
 
@@ -93,8 +93,8 @@ initialize!(::JeevanjeeRadiation, ::PrimitiveEquation) = nothing
 @propagate_inbounds function parameterization!(ij, vars, longwave::JeevanjeeRadiation, model)
 
     T = vars.grid.temperature                                  # to match Seeley, 2023 notation
-    dTdt = vars.tendencies.grid.temperature
-    pₛ = vars.grid.pressure_prev[ij]                        # surface pressure [Pa]
+    dTdt = get_tendency_step(vars.tendencies.grid.temperature, model.time_stepping, longwave)
+    pₛ = get_prognostic_step(vars.grid.pressure, model.time_stepping, longwave)[ij]          # surface pressure [Pa]
     nlayers = size(T, 2)
 
     (; α) = longwave
@@ -225,10 +225,10 @@ initialize!(::OneBandLongwaveRadiativeTransfer, ::PrimitiveEquation) = nothing
         longwave::OneBandLongwaveRadiativeTransfer,
         model,
     )
-    T = vars.grid.temperature_prev
+    T = get_prognostic_step(vars.grid.temperature, model.time_stepping, longwave)
     NF = eltype(T)
-    dTdt = vars.tendencies.grid.temperature
-    pₛ = vars.grid.pressure_prev[ij]                        # surface pressure [Pa]
+    dTdt = get_tendency_step(vars.tendencies.grid.temperature, model.time_stepping, longwave)
+    pₛ = get_prognostic_step(vars.grid.pressure, model.time_stepping, longwave)[ij]          # surface pressure [Pa]
     nlayers = size(T, 2)
 
     ϵ_ocean = longwave.emissivity_ocean

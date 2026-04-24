@@ -82,7 +82,7 @@ variables(::SurfaceOceanHeatFlux) = (
     SST = vars.prognostic.ocean.sea_surface_temperature[ij]
     T = vars.parameterizations.surface_air_temperature[ij]
     land_fraction = model.land_sea_mask.mask[ij]
-    pₛ = vars.grid.pressure_prev[ij]
+    pₛ = get_prognostic_step(vars.grid.pressure, model.time_stepping, heat_flux)[ij]
 
     # drag coefficient
     d = vars.parameterizations.boundary_layer_drag[ij]
@@ -105,7 +105,8 @@ variables(::SurfaceOceanHeatFlux) = (
     vars.parameterizations.sensible_heat_flux[ij] = flux_ocean * cₚ        # [W/m²]
 
     # accumulate with += into end=lowermost layer total flux
-    vars.tendencies.grid.temperature[ij, nlayers] += surface_flux_to_tendency(flux_ocean, pₛ, model)
+    dTdt = get_tendency_step(vars.tendencies.grid.temperature, model.time_stepping, heat_flux)
+    dTdt[ij, nlayers] += surface_flux_to_tendency(flux_ocean, pₛ, model)
     return nothing
 end
 
@@ -139,7 +140,7 @@ variables(::SurfaceLandHeatFlux) = (
 
     surface = model.geometry.nlayers
     cₚ = model.atmosphere.heat_capacity
-    pₛ = vars.grid.pressure_prev[ij]                  # surface pressure [Pa]
+    pₛ = get_prognostic_step(vars.grid.pressure, model.time_stepping, heat_flux)[ij]   # surface pressure [Pa]
     ρ = vars.parameterizations.surface_air_density[ij]
     V₀ = vars.parameterizations.surface_wind_speed[ij]
 
@@ -169,7 +170,8 @@ variables(::SurfaceLandHeatFlux) = (
     vars.parameterizations.sensible_heat_flux[ij] += flux_land * cₚ    # [W/m²]
 
     # accumulate with += into end=lowermost layer total flux
-    vars.tendencies.grid.temperature[ij, surface] += surface_flux_to_tendency(flux_land, pₛ, model)
+    dTdt = get_tendency_step(vars.tendencies.grid.temperature, model.time_stepping, heat_flux)
+    dTdt[ij, surface] += surface_flux_to_tendency(flux_land, pₛ, model)
     return nothing
 end
 
@@ -189,9 +191,9 @@ variables(::PrescribedOceanHeatFlux) = (
     ParameterizationVariable(:sensible_heat_flux, Grid2D(), desc = "Ocean sensible heat flux", units = "W/m^2", namespace = :ocean),
 )
 
-@propagate_inbounds function surface_heat_flux!(ij, vars, ::PrescribedOceanHeatFlux, model)
+@propagate_inbounds function surface_heat_flux!(ij, vars, heat_flux::PrescribedOceanHeatFlux, model)
     land_fraction = model.land_sea_mask.mask[ij]
-    pₛ = vars.grid.pressure_prev[ij]          # surface pressure [Pa]
+    pₛ = get_prognostic_step(vars.grid.pressure, model.time_stepping, heat_flux)[ij]   # surface pressure [Pa]
     cₚ = model.atmosphere.heat_capacity
     surface = model.geometry.nlayers
 
@@ -208,7 +210,8 @@ variables(::PrescribedOceanHeatFlux) = (
 
     # accumulate with += into end=lowermost layer total flux
     flux_ocean /= cₚ                            # [W/m²] -> [K/s]
-    vars.tendencies.grid.temperature[ij, surface] += surface_flux_to_tendency(flux_ocean, pₛ, model)
+    dTdt = get_tendency_step(vars.tendencies.grid.temperature, model.time_stepping, heat_flux)
+    dTdt[ij, surface] += surface_flux_to_tendency(flux_ocean, pₛ, model)
     return nothing
 end
 
@@ -228,9 +231,9 @@ variables(::PrescribedLandHeatFlux) = (
     ParameterizationVariable(:sensible_heat_flux, Grid2D(), desc = "Land sensible heat flux", units = "W/m^2", namespace = :land),
 )
 
-@propagate_inbounds function surface_heat_flux!(ij, vars, ::PrescribedLandHeatFlux, model)
+@propagate_inbounds function surface_heat_flux!(ij, vars, heat_flux::PrescribedLandHeatFlux, model)
     land_fraction = model.land_sea_mask.mask[ij]
-    pₛ = vars.grid.pressure_prev[ij]                # surface pressure [Pa]
+    pₛ = get_prognostic_step(vars.grid.pressure, model.time_stepping, heat_flux)[ij]   # surface pressure [Pa]
     cₚ = model.atmosphere.heat_capacity
     surface = model.geometry.nlayers             # indexing top to bottom
 
@@ -247,6 +250,7 @@ variables(::PrescribedLandHeatFlux) = (
 
     # accumulate with += into end=lowermost layer total flux
     flux_land /= cₚ                             # [W/m²] -> [K/s]
-    vars.tendencies.grid.temperature[ij, surface] += surface_flux_to_tendency(flux_land, pₛ, model)
+    dTdt = get_tendency_step(vars.tendencies.grid.temperature, model.time_stepping, heat_flux)
+    dTdt[ij, surface] += surface_flux_to_tendency(flux_land, pₛ, model)
     return nothing
 end
