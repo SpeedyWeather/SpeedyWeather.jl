@@ -5,6 +5,8 @@ order to use the parameterization in a model, add it to the `parameterizations` 
 at definition."""
 abstract type AbstractParameterization <: AbstractModelComponent end
 
+struct DummyParameterization <: AbstractParameterization end
+
 """Function that defines the actual parameterization of an `AbstractParameterization`.
 
 Takes in the index of the column `ij`, the `Variables` object `vars`, the

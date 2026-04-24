@@ -54,6 +54,8 @@ tendency_steps(::AbstractLeapfrog) = 1
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractDrag) = 2
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractDynamicalCoreComponent) = 2
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractHorizontalDiffusion) = 1
+@inline which_prognostic_step(var, ::AbstractLeapfrog, ::DiffusiveVerticalAdvection) = 1
+@inline which_prognostic_step(var, ::AbstractLeapfrog, ::DispersiveVerticalAdvection) = 2
 
 # dispatch over timestepper to decide between implicit or explicit diffusion
 @inline implicit_diffusion(::AbstractHorizontalDiffusion, ::Nothing, ::AbstractLeapfrog) = true

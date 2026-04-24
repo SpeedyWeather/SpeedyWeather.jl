@@ -1,4 +1,4 @@
-abstract type AbstractVerticalAdvection end
+abstract type AbstractVerticalAdvection <: AbstractModelComponent end
 abstract type VerticalAdvection{NF, B} <: AbstractVerticalAdvection end
 
 # Dispersive and diffusive advection schemes `NF` is the type, `B` the half-stencil size
@@ -14,12 +14,6 @@ CenteredVerticalAdvection(spectral_grid; order = 2) = CenteredVerticalAdvection{
 UpwindVerticalAdvection(spectral_grid; order = 5) = UpwindVerticalAdvection{spectral_grid.NF, (order + 1) ÷ 2}()
 WENOVerticalAdvection(spectral_grid) = WENOVerticalAdvection{spectral_grid.NF}()
 
-@inline retrieve_previous_time_step(variables, var) = getproperty(variables, Symbol(var, :_prev))
-@inline retrieve_current_time_step(variables, var) = getproperty(variables, var)
-
-@inline retrieve_time_step(::DiffusiveVerticalAdvection, variables, var) = retrieve_previous_time_step(variables, var)
-@inline retrieve_time_step(::DispersiveVerticalAdvection, variables, var) = retrieve_current_time_step(variables, var)
-
 @inline function retrieve_stencil(k, nlayers, ::VerticalAdvection{NF, B}) where {NF, B}
     # creates allocation-free tuples for k-B:k+B but clamped into (1, nlayers)
     # e.g. (1, 1, 2), (1, 2, 3), (2, 3, 4) ... (for k=1, 2, 3; B=1)
@@ -34,16 +28,16 @@ function vertical_advection!(vars::Variables, model)
 
     for var in (:u, :v, :temperature, :humidity)
         if haskey(vars.tendencies.grid, var)
-            ξ_tend = vars.tendencies.grid[var]
-            ξ = retrieve_time_step(advection_scheme, vars.grid, var)
+            ξ_tend = get_tendency_step(vars.tendencies.grid[var], model.time_stepping, advection_scheme)
+            ξ = get_prognostic_step(vars.grid[var], model.time_stepping, advection_scheme)
             _vertical_advection!(ξ_tend, w, ξ, Δσ, advection_scheme)
         end
     end
 
     for (name, tracer) in model.tracers
         if tracer.active
-            ξ_tend = vars.tendencies.tracers[Symbol(name, :_grid)]
-            ξ = retrieve_time_step(advection_scheme, vars.grid.tracers, name)
+            ξ_tend = get_tendency_step(vars.tendencies.tracers[Symbol(name, :_grid)], model.time_stepping, advection_scheme)
+            ξ = get_prognostic_step(vars.grid.tracers[name], model.time_stepping, advection_scheme)
             _vertical_advection!(ξ_tend, w, ξ, Δσ, advection_scheme)
         end
     end
@@ -131,9 +125,9 @@ const d₂ = 1 // 10
 @inline weight_β₁(S) = 13 // 12 * (S[1] - 2S[2] + S[3])^2 + 1 // 4 * (S[1] - S[3])^2
 @inline weight_β₂(S) = 13 // 12 * (S[1] - 2S[2] + S[3])^2 + 1 // 4 * (S[1] - 4S[2] + 3S[3])^2
 
-@inline p₀(S) = (2S[1] + 5S[2] - S[3]) * 1 // 6 # downind stencil
-@inline p₁(S) = (-S[1] + 5S[2] + 2S[3]) * 1 // 6 # upwind stencil
-@inline p₂(S) = (2S[1] - 7S[2] + 11S[3]) * 1 // 6 # extrapolating stencil
+@inline p₀(S) = (2S[1] + 5S[2] - S[3]) * 1 // 6     # downind stencil
+@inline p₁(S) = (-S[1] + 5S[2] + 2S[3]) * 1 // 6    # upwind stencil
+@inline p₂(S) = (2S[1] - 7S[2] + 11S[3]) * 1 // 6   # extrapolating stencil
 
 @inline τ₅(β₀, β₁, β₂) = abs(β₂ - β₀)
 
