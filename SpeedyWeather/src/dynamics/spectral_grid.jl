@@ -224,7 +224,7 @@ function SpectralGrid(
     # Particle vector type
     # TODO: For Reactant we need something else in the long run
     # use Nothing as a dummy type, it's not actually working
-    ParticleVectorType = typeof(architecture) <: ReactantDevice ? Nothing : array_type(architecture, Particle{NF}, 1)
+    ParticleVectorType = typeof(architecture) <: ReactantDevice ? Nothing : array_type(architecture, Particle{NF, Bool}, 1)
 
     # Create the SpectralGrid with all fields
     return SpectralGrid{typeof(architecture), typeof(spectrum), typeof(grid), typeof(nlat_half), Float32}(
