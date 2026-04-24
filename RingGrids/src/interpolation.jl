@@ -675,7 +675,7 @@ end
         nlon::Int   # number of longitude points on ring
     ) where {NF <: AbstractFloat}
 
-    Δλ = convert(NF, 360) / nlon          # longitude spacing
+    Δλ = NF(360) / nlon                     # longitude spacing
     ix = (λ - λ₀) / Δλ                      # grid index i but with fractional part
     i = floor(Int, ix)                  # 0-based grid index to the left
     Δ = ix - i                            # distance fraction from i to i+1
