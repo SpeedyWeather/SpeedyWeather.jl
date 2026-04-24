@@ -73,7 +73,7 @@ function _jit(::ReactantDevice, f, args...; kwargs...)
 end
 
 # In Reactant actually use @allowscalar (in constrast to regular model which needs a workaround for Enzyme)
-function _set_scalar!(::ReactantDevice, x::AbstractArray, i, v)
+function _set_scalar!(::ReactantDevice, x::AbstractArray, i::Integer, v::Number)
     @allowscalar x[i] = v
 end 
 

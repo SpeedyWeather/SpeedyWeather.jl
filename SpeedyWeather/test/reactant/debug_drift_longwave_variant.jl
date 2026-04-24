@@ -114,8 +114,44 @@ q_r = Array(sim_r.variables.grid.humidity)
 T_max = maximum(abs.(T_c .- T_r))
 q_max = maximum(abs.(q_c .- q_r))
 
+# DEBUG: compare transmissivity and flux snapshots (debug_t/U/D) layer by layer
+t_c = Array(sim_c.variables.scratch.grid.debug_t)
+t_r = Array(sim_r.variables.scratch.grid.debug_t)
+U_c = Array(sim_c.variables.scratch.grid.debug_U)
+U_r = Array(sim_r.variables.scratch.grid.debug_U)
+D_c = Array(sim_c.variables.scratch.grid.debug_D)
+D_r = Array(sim_r.variables.scratch.grid.debug_D)
+
+function compare_layer(name, A_c, A_r)
+    diff = abs.(A_c .- A_r)
+    println("\n--- debug_$(name) comparison ---  shape=", size(A_c))
+    println("  global max|Δ|: ", maximum(diff))
+    for k in 1:size(A_c, 2)
+        dk = @view diff[:, k]
+        ij_max = argmax(dk)
+        rel = iszero(A_c[ij_max, k]) ? 0.0 : abs(dk[ij_max] / A_c[ij_max, k])
+        println("  layer k=$k  max|Δ|=", dk[ij_max], "  (rel=", rel, ")  at ij=$ij_max  (CPU=", A_c[ij_max, k], "  Reactant=", A_r[ij_max, k], ")")
+    end
+    return maximum(diff)
+end
+
+t_max = compare_layer("t", t_c, t_r)
+U_max = compare_layer("U", U_c, U_r)
+D_max = compare_layer("D", D_c, D_r)
+
+# Also probe ij=1 (north pole) per-layer
+println("\n--- ij=1 (north pole) per-layer ---")
+for k in 1:size(t_c, 2)
+    println("  k=$k  t_Δ=", t_c[1, k] - t_r[1, k],
+            "  U_Δ=", U_c[1, k] - U_r[1, k],
+            "  D_Δ=", D_c[1, k] - D_r[1, k])
+end
+
 println("\n" * "="^70)
 println("RESULT  longwave_variant=$variant")
 println("  T_max_diff: $T_max")
 println("  q_max_diff: $q_max")
+println("  debug_t max|Δ|: ", t_max)
+println("  debug_U max|Δ|: ", U_max)
+println("  debug_D max|Δ|: ", D_max)
 println("="^70)
