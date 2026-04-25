@@ -1,6 +1,26 @@
-# SpeedyWeather.jl documentation
+```@raw html
+---
+layout: home
 
-Welcome to the documentation for [SpeedyWeather.jl](https://github.com/milankl/SpeedyWeather.jl)!
+hero:
+  name: "SpeedyWeather.jl"
+  tagline: "An atmospheric model built for research: interactive, extensible, and built for speed."
+  image:
+    src: /logo.png
+    alt: SpeedyWeather
+  actions:
+    - theme: brand
+      text: Get Started
+      link: /installation
+    - theme: alt
+      text: View on Github
+      link: https://github.com/SpeedyWeather/SpeedyWeather.jl
+    - theme: alt
+      text: API Reference
+      link: /api
+---
+```
+
 SpeedyWeather.jl is a global atmospheric model developed as a research playground
 with an everything-flexible attitude as long as it is speedy. Technically it is a climate model with simple,
 yet interactive representations of ocean, land and sea-ice. It is easy to use and easy to extend, making 
