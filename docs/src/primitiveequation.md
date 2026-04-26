@@ -9,10 +9,10 @@ logarithm of surface pressure ``\ln p_s``, temperature ``T`` and specific humidi
 
 ```math
 \begin{aligned}
-\frac{\partial \zeta}{\partial t} &= \nabla \times (\mathbf{\mathcal{P}}_\mathbf{u}
-+ (f+\zeta)\mathbf{u}_\perp - W(\mathbf{u}) - R_dT_v\nabla \ln p_s) \\
-\frac{\partial \mathcal{D}}{\partial t} &= \nabla \cdot (\mathcal{P}_\mathbf{u}
-+ (f+\zeta)\mathbf{u}_\perp - W(\mathbf{u}) - R_dT_v\nabla \ln p_s) - \nabla^2(\frac{1}{2}(u^2 + v^2) + \Phi) \\
+\frac{\partial \zeta}{\partial t} &= \nabla \times \left[\mathbf{\mathcal{P}}_\mathbf{u}
++ (f+\zeta)\mathbf{u}_\perp - W(\mathbf{u}) - R_dT_v\nabla \ln p_s\right] \\
+\frac{\partial \mathcal{D}}{\partial t} &= \nabla \cdot \left[\mathcal{P}_\mathbf{u}
++ (f+\zeta)\mathbf{u}_\perp - W(\mathbf{u}) - R_dT_v\nabla \ln p_s\right] - \nabla^2\left[\tfrac{1}{2}(u^2 + v^2) + \Phi\right] \\
 \frac{\partial \ln p_s}{\partial t} &= -\frac{1}{p_s} \nabla \cdot \int_0^{p_s} \mathbf{u}~dp \\
 \frac{\partial T}{\partial t} &= \mathcal{P}_T -\nabla\cdot(\mathbf{u}T) + T\mathcal{D} - W(T) + \kappa T_v \frac{D \ln p}{Dt} \\
 \frac{\partial q}{\partial t} &= \mathcal{P}_q -\nabla\cdot(\mathbf{u}q) + q\mathcal{D} - W(q)\\
@@ -25,12 +25,12 @@ Coriolis parameter ``f``, ``W`` the [Vertical advection](@ref) operator, dry air
 and surface pressure ``p_s``, thermodynamic ``\kappa = R_d/c_p``
 with ``c_p`` the heat capacity at constant pressure. Horizontal hyper diffusion of the
 form ``(-1)^{n+1}\nu\nabla^{2n}`` with coefficient ``\nu`` and power ``n``  is added for
-every variable that is advected, meaning ``\zeta, \mathcal{D}, T, q``, but left out
+every variable that is advected, meaning ``\zeta``, ``\mathcal{D}``, ``T``, ``q``, but left out
 here for clarity, see [Horizontal diffusion](@ref diffusion).
 
-The parameterizations for the tendencies of ``u, v, T, q`` from physical processes are denoted as
-``\mathcal{P}_\mathbf{u} = (\mathcal{P}_u, \mathcal{P}_v), \mathcal{P}_T, \mathcal{P}_q``
-and are further described in the corresponding sections, see [Parameterizations](@ref).
+The parameterizations for the tendencies of ``u``, ``v``, ``T``, ``q`` from physical processes are
+denoted as ``\mathcal{P}_\mathbf{u} = (\mathcal{P}_u, \mathcal{P}_v)``, ``\mathcal{P}_T``, ``\mathcal{P}_q``
+respectively and are further described in the corresponding sections, see [Parameterizations](@ref).
 
 SpeedyWeather.jl implements a `PrimitiveWet` and a `PrimitiveDry` dynamical core.
 For a dry atmosphere, we have ``q = 0`` and the virtual temperature ``T_v = T``
@@ -82,7 +82,7 @@ the ideal gas law as total density ``\rho`` times a gas constant
 times the virtual temperature that is supposed to be a function
 of absolute temperature, humidity and some constants
 ```math
-p  = (\rho R_d + \rho_w (R_w - R_d)) T = \rho R_d (1 +
+p  = \left[\rho R_d + \rho_w (R_w - R_d)\right] T = \rho R_d (1 +
 \frac{1 - \tfrac{R_d}{R_w}}{\tfrac{R_d}{R_w}} \frac{\rho_w}{\rho_w + \rho_d})T
 ```
 Now we identify

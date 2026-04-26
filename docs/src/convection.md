@@ -29,8 +29,8 @@ which are described in the following.
 
 We follow the simplification of the Betts-Miller convection scheme
 [^Betts1986][^BettsMiller1986] as studied by Frierson, 2007 [^Frierson2007].
-The central idea of this scheme is to represent the effect of 
-convection as an adjustment towards a (pseudo-) moist adiabat 
+The central idea of this scheme is to represent the effect of
+convection as an adjustment towards a (pseudo-) moist adiabat
 reference profile and its associated humidity profile. Meaning that
 conceptually for every vertical column in the atmosphere we
 
@@ -63,7 +63,7 @@ with gravity ``g``, heat capacity ``c_p``, the saturation specific humidity of t
 (which is its specific humidity given that it has already reached saturation),
 latent heat of vaporization ``L_v``, dry gas constant ``R_d``, water vapor
 gas constant ``R_v``, and [Virtual temperature](@ref) ``T_v``.
-Starting with a temperature ``T`` and humidity ``q = q^\star`` at the lifting condensation level 
+Starting with a temperature ``T`` and humidity ``q = q^\star`` at the lifting condensation level
 temperature aloft changes with $dT = -\frac{d\Phi}{c_p}(...)$ between two layers separated
 ``d\Phi`` in geopotential ``\Phi`` apart. On that new layer, ``q^\star`` is recalculated
 as well as the virtual temperature ``T_v = T(1 + \mu q^\star)``. ``\mu`` is derived from
@@ -107,7 +107,7 @@ the resulting tendencies from this scheme. Those will be calculated in [Correcte
 
 Note that above the level of zero buoyancy no relaxation takes place ``\delta T = \delta q = 0``,
 or, equivalently ``T = T_{ref}``, ``q = q_{ref}`` there.
-Vertically integration from surface ``p_0`` to level of zero buoyancy in 
+Vertically integration from surface ``p_0`` to level of zero buoyancy in
 pressure coordinates ``p_{LZB}`` yields
 
 ```math
@@ -175,7 +175,7 @@ T_{ref,2} &= T_{ref} - \Delta T
 \end{aligned}
 ```
 
-This scheme is non-precipitating (``P_q = 0``) as derived below. ``P_q`` follows from the vertical integral of the moisture tendency ``\delta q``, which in this scheme is a relaxation towards ``q_{\text{ref,2}}`` (see [Corrected relaxation](@ref)). 
+This scheme is non-precipitating (``P_q = 0``) as derived below. ``P_q`` follows from the vertical integral of the moisture tendency ``\delta q``, which in this scheme is a relaxation towards ``q_{\text{ref,2}}`` (see [Corrected relaxation](@ref)).
 
 ```math
 P_q = -\int_{p_0}^{p_{LZB}} \frac{\delta q}{g} \, dp = \int_{p_0}^{p_{LZB}} \frac{q - q_{\text{ref,2}}}{g \tau_{SBM}} dp
@@ -187,7 +187,7 @@ Inserting from above yields
 P_q = \int_{p_0}^{p_{LZB}} \frac{q - \left(1 - \frac{\Delta q}{Q_{\text{ref}}} \right) q_{\text{ref}} }{g \tau_{SBM}} dp = \frac{1}{g \tau_{SBM}} \int_{p_0}^{p_{LZB}} \left( q - q_{\text{ref}} + \frac{\Delta q}{Q_{\text{ref}}} q_{\text{ref}} \right) dp
 ```
 
-The integral becomes 
+The integral becomes
 ```math
 \Delta q + \frac{\Delta q}{Q_{\text{ref}}} \int_{p_0}^{p_{LZB}}q_{\text{ref}} dp = \Delta q + \frac{\Delta q}{Q_{\text{ref}}} (- Q_{\text{ref}}) = 0
 ```

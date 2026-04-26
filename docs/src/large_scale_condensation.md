@@ -39,7 +39,7 @@ humidity calculated from temperature ``T_i`` is
 ```math
 \begin{aligned}
 q_{i+1} - q_i &= q^\star(T_i) - q_i \\
-T_{i+1} - T_i &= -\frac{L_v}{c_p}( q^\star(T_i) - q_i  )
+T_{i+1} - T_i &= -\frac{L_v}{c_p}[ q^\star(T_i) - q_i ]
 \end{aligned}
 ```
 
@@ -66,7 +66,7 @@ Now we make a linear approximation to the derivative and drop the ``O(\Delta T^2
 Inserting the (explicit) latent heat release yields
 
 ```math
-\Delta q = q^\star(T_i) + -\frac{L_v}{c_p} \Delta q \frac{\partial q^\star}{\partial T} (T_i) - q_i
+\Delta q = q^\star(T_i) - \frac{L_v}{c_p} \Delta q \frac{\partial q^\star}{\partial T} (T_i) - q_i
 ```
 
 And solving for ``\Delta q`` yields
@@ -93,7 +93,7 @@ anymore but over several time steps ``\Delta t`` of the leapfrogging.
 ```math
 \begin{aligned}
 \delta q = \frac{q_{i+1} - q_i}{\Delta t} &= \frac{q^\star(T_i) - q_i}{ \Delta t_c
-\left( 1 + \frac{L_v}{c_p} \frac{\partial q^\star}{\partial T}(T_i) \right)} \\
+\left[ 1 + \frac{L_v}{c_p} \frac{\partial q^\star}{\partial T}(T_i) \right]} \\
 \delta T = \frac{T_{i+1} - T_i}{\Delta t} &= -\frac{L_v}{c_p}( \frac{q_{i+1} - q_i}{\Delta t} )
 \end{aligned}
 ```
@@ -118,7 +118,7 @@ as follows
 
 ```math
 \delta q = \frac{q_{i+1} - q_i}{\Delta t} = \frac{rq^\star(T_i) - q_i}{ \Delta t_c
-\left( 1 + \frac{L_vr}{c_p} \frac{\partial q^\star}{\partial T}(T_i) \right)}
+\left[ 1 + \frac{L_vr}{c_p} \frac{\partial q^\star}{\partial T}(T_i) \right]}
 ```
 ``r`` is a linear scale and therefore can be taken out of the gradient
 ``\frac{\partial q^\star}{\partial T}`` in the denominator.
@@ -160,7 +160,7 @@ implicit time stepping can be used as before if reevaporation is calculated befo
 latent heat release.
 
 The reevaportation in `ImplicitCondensation` is controlled by `reevaporation` (dimensionless),
-the proportionality constant ``c \geq 0`` here. 
+the proportionality constant ``c \geq 0`` here.
 
 ```@example condensation
 spectral_grid = SpectralGrid()
@@ -212,7 +212,7 @@ F_m = \min(F_s, \frac{E_m}{L_i}\frac{\Delta p}{\Delta t g\rho})
 
 We cap this to ``F_s`` so that one cannot melt more snow than there is. This snow melt flux
 is then subtracted from ``F_s`` but added to ``F_r`` to move snow water to rain water.
-The according latent heat required for melting is 
+The according latent heat required for melting is
 
 ```math
 \begin{aligned}
@@ -246,7 +246,7 @@ integrated (top to bottom, the direction of pressure ``p``) to diagnose the
 large-scale precipitation ``P`` in units of meters
 
 ```math
-P = - \int_{top}^{bottom} \frac{\Delta t}{g \rho} \delta q dp 
+P = - \int_{top}^{bottom} \frac{\Delta t}{g \rho} \delta q dp
 ```
 
 with gravity ``g``, water density ``\rho`` and time step ``\Delta t``.
