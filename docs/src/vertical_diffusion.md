@@ -39,7 +39,7 @@ That way the diffusion preserves the integral of the variable ``u`` from
 ``\sigma = 0`` to ``\sigma = 1``.
 
 ```math
-\frac{\partial}{\partial t} \int_0^1 u d\sigma  = \int_0^1 \frac{\partial}{\partial \sigma} K
+\frac{\partial}{\partial t} \int_0^1 u~d\sigma  = \int_0^1 \frac{\partial}{\partial \sigma} K
 \frac{\partial u}{\partial \sigma} d\sigma =
 K\frac{\partial u}{\partial \sigma} \vert_{\sigma = 1} - K\frac{\partial u}{\partial \sigma} \vert_{\sigma = 0}
 = 0
@@ -71,7 +71,7 @@ We calculate the diffusion coefficient ``K`` based on the bulk Richardson number
 [^Frierson2006] which is computed as follows
 
 ```math
-Ri = \frac{gz \left( \Theta_v(z) - \Theta_v(z_N) \right)}{|v(z)|^2 \Theta_v(z_N)}
+Ri = \frac{gz \left[ \Theta_v(z) - \Theta_v(z_N) \right]}{|v(z)|^2 \Theta_v(z_N)}
 ```
 
 (see [Bulk Richardson-based drag coefficient](@ref) in comparison).
@@ -89,7 +89,7 @@ number ``Ri``.
 ```math
 K(z) = \begin{cases}
     K_b(z) \quad &\text{for} \quad z \leq f_b h \\
-    K_b(f_b h) \frac{z}{f_b h} \left( 1 - \frac{z - f_b h}{(1 - f_b)h} \right)^2
+    K_b(f_b h) \frac{z}{f_b h} \left[ 1 - \frac{z - f_b h}{(1 - f_b)h} \right]^2
         \quad &\text{for} \quad f_b h < z \leq h \\
 \end{cases}
 ```
@@ -101,7 +101,7 @@ the second case guarantees a smooth transition in ``K`` to zero at ``z = h``.
 ```math
 Kb(z) = \begin{cases}
     \kappa u_N \sqrt{C}z \quad &\text{for} \quad Ri_N \leq 0 \\
-    \kappa u_N \sqrt{C}z \left( 1 + \frac{Ri}{Ri_c}\frac{\log(z/z_0)}{1 - Ri/Ri_c}\right)^{-1}
+    \kappa u_N \sqrt{C}z \left[ 1 + \frac{Ri}{Ri_c}\frac{\log(z/z_0)}{1 - Ri/Ri_c}\right]^{-1}
         \quad &\text{for} \quad Ri_N > 0 \\
 \end{cases}
 ```
