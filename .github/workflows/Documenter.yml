@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - backport/*
     tags: '*'
   pull_request:
 
