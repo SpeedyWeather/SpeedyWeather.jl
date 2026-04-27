@@ -1,7 +1,7 @@
 name = "SpeedyWeather"
 uuid = "9e226e20-d153-4fed-8a5b-493def4f21a9"
 authors = ["SpeedyWeather contributors"]
-version = "0.17.4"
+version = "0.17.5"
 
 [deps]
 AbstractFFTs = "621f4979-c628-5d54-868e-fcf4e3e8185c"
@@ -74,7 +74,7 @@ ProgressMeter = "1.7"
 Random = "1.10"
 RingGrids = "0.1"
 SpeedyTransforms = "0.1"
-SpeedyWeatherInternals = "0.1"
+SpeedyWeatherInternals = "0.1.2"
 Statistics = "1.10"
 TOML = "1"
 UnicodePlots = "3.3"
