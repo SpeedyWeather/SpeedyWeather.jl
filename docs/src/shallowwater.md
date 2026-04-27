@@ -37,7 +37,7 @@ h = \eta + H - H_b
 ```
 that is, the layer thickness at rest ``H`` plus the interface height ``\eta`` minus orography ``H_b``.
 We also add various possible forcing terms
-``F_\zeta, F_\mathcal{D}, F_\eta, \mathbf{F}_\mathbf{u} = (F_u, F_v)`` which can be defined
+``F_\zeta``, ``F_\mathcal{D}``, ``F_\eta``, ``\mathbf{F}_\mathbf{u} = (F_u, F_v)`` which can be defined
 to force the respective variables, see [Extending SpeedyWeather](@ref).
 
 In the shallow water system the flow can be described through ``u, v`` or ``\zeta, \mathcal{D}`` which
@@ -60,10 +60,10 @@ The divergence/curl of the vorticity flux ``\mathbf{u}(\zeta + f)`` are combined
 divergence/curl of the forcing vector ``\mathbf{F}``, as
 ```math
 \begin{aligned}
-- \nabla \cdot (\mathbf{u}(\zeta + f)) + \nabla \times \mathbf{F} &=
-\nabla \times (\mathbf{F} + \mathbf{u}_\perp(\zeta + f)) \\
-\nabla \times (\mathbf{u}(\zeta + f)) + \nabla \cdot \mathbf{F} &=
-\nabla \cdot (\mathbf{F} + \mathbf{u}_\perp(\zeta + f))
+- \nabla \cdot [\mathbf{u}(\zeta + f)] + \nabla \times \mathbf{F} &=
+\nabla \times [\mathbf{F} + \mathbf{u}_\perp(\zeta + f)] \\
+\nabla \times [\mathbf{u}(\zeta + f)] + \nabla \cdot \mathbf{F} &=
+\nabla \cdot [\mathbf{F} + \mathbf{u}_\perp(\zeta + f)]
 \end{aligned}
 ```
 equivalently to how this is done in the [Barotropic vorticity equation](@ref barotropic_vorticity_model)
