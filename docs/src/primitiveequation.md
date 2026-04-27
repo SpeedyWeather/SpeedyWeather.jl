@@ -28,7 +28,7 @@ form ``(-1)^{n+1}\nu\nabla^{2n}`` with coefficient ``\nu`` and power ``n``  is a
 every variable that is advected, meaning ``\zeta``, ``\mathcal{D}``, ``T``, ``q``, but left out
 here for clarity, see [Horizontal diffusion](@ref diffusion).
 
-The parameterizations for the tendencies of ``u``, ``v``, ``T``, ``q`` from physical processes are
+The parameterizations for the tendencies of ``\mathbf{u}=(u, v)``, ``T``, ``q`` from physical processes are
 denoted as ``\mathcal{P}_\mathbf{u} = (\mathcal{P}_u, \mathcal{P}_v)``, ``\mathcal{P}_T``, ``\mathcal{P}_q``
 respectively and are further described in the corresponding sections, see [Parameterizations](@ref).
 
@@ -751,7 +751,7 @@ via
 ```
 (``\mathbf{UW}`` is a matrix of size ``N \times N``) yields
 ```math
-\delta D = \left( 1 + \xi^2\nabla^2(\mathbf{RL + UW})  \right)^{-1}G = \mathbf{S}^{-1}G
+\delta D = \left[ 1 + \xi^2\nabla^2(\mathbf{RL + UW}) \right]^{-1}G = \mathbf{S}^{-1}G
 ```
 The other tendencies ``\delta T`` and ``\delta \ln p_s`` are then obtained
 through insertion above. We may call the operator to be inverted ``\mathbf{S}``
