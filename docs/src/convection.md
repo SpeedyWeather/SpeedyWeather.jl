@@ -130,8 +130,8 @@ through condensation, but ``P_q`` can also be negative. Consequently similar for
 We now distinguish three cases
 
 1. Deep convection when ``P_T > 0`` and ``P_q > 0``
-2. Shallow convection when ``P_T > 0`` and ``P_q <= 0``
-3. No convection for ``P_T <= 0``.
+2. Shallow convection when ``P_T > 0`` and ``P_q \le 0``
+3. No convection for ``P_T \le 0``.
 
 Note that to evaluate these cases it is not necessary to divide by ``\tau_{SBM}`` in
 the first-guess relaxation, neither are the ``1/g`` and ``\tfrac{c_p}{g L_v}``
