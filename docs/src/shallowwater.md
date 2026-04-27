@@ -238,11 +238,11 @@ a single divergence/curl operation as mentioned in [Shallow water equations](@re
 ```math
 \begin{aligned}
 \frac{\partial \tilde{\zeta}}{\partial \tilde{t}} &=
-\tilde{\nabla} \times (\tilde{\mathbf{F}} + \mathbf{u}_\perp(\tilde{\zeta} + \tilde{f})) +
+\tilde{\nabla} \times \left[\tilde{\mathbf{F}} + \mathbf{u}_\perp(\tilde{\zeta} + \tilde{f})\right] +
 (-1)^{n+1}\tilde{\nu}\tilde{\nabla}^{2n}\tilde{\zeta} \\
 \frac{\partial \tilde{\mathcal{D}}}{\partial \tilde{t}} &=
-\tilde{\nabla} \cdot (\tilde{\mathbf{F}} + \mathbf{u}_\perp(\tilde{\zeta} + \tilde{f})) -
-\tilde{\nabla}^2\left(\tfrac{1}{2}(u^2 + v^2) + g\eta \right) +
+\tilde{\nabla} \cdot \left[\tilde{\mathbf{F}} + \mathbf{u}_\perp(\tilde{\zeta} + \tilde{f})\right] -
+\tilde{\nabla}^2\left[\tfrac{1}{2}(u^2 + v^2) + g\eta \right] +
 (-1)^{n+1}\tilde{\nu}\tilde{\nabla}^{2n}\tilde{\mathcal{D}} \\
 \frac{\partial \eta}{\partial \tilde{t}} &=
 - \tilde{\nabla} \cdot (\mathbf{u}h) + \tilde{F}_\eta.
