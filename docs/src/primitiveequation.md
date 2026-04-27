@@ -82,8 +82,8 @@ the ideal gas law as total density ``\rho`` times a gas constant
 times the virtual temperature that is supposed to be a function
 of absolute temperature, humidity and some constants
 ```math
-p  = \left[\rho R_d + \rho_w (R_w - R_d)\right] T = \rho R_d \left[1 +
-\frac{1 - \tfrac{R_d}{R_w}}{\tfrac{R_d}{R_w}} \frac{\rho_w}{\rho_w + \rho_d}\right]T
+p  = \left[\rho R_d + \rho_w (R_w - R_d)\right] T = \rho R_d \left(1 +
+\frac{1 - \tfrac{R_d}{R_w}}{\tfrac{R_d}{R_w}} \frac{\rho_w}{\rho_w + \rho_d}\right)T
 ```
 Now we identify
 ```math
@@ -182,7 +182,7 @@ p_k = \sigma_kp_s
 The layer thickness in terms of pressure is
 ```math
 \Delta p_k = p_{k+\tfrac{1}{2}} - p_{k-\tfrac{1}{2}} =
-(\sigma_{k+\tfrac{1}{2}} - \sigma_{k-\tfrac{1}{2}}) p_s = \Delta \sigma_k p_s
+\left( \sigma_{k+\tfrac{1}{2}} - \sigma_{k-\tfrac{1}{2}} \right) p_s = \Delta \sigma_k p_s
 ```
 which can also be expressed with the layer thickness in sigma coordinates ``\Delta \sigma_k``
 times the surface pressure. In SpeedyWeather.jl one chooses the half levels
@@ -348,7 +348,7 @@ Rearranging terms, we obtain:
 
 ```math
 \frac{\partial T_k}{\partial t} = - \mathbf{u}_k \cdot \nabla T_k
-- \frac{1}{\Delta \sigma_k}\left[\dot{\sigma}_{k+\tfrac{1}{2}}(T_{k+\tfrac{1}{2}} - T_k) + \dot{\sigma}_{k-\tfrac{1}{2}}(T_k - T_{k-\tfrac{1}{2}})\right]
+- \frac{1}{\Delta \sigma_k}\left[\dot{\sigma}_{k+\tfrac{1}{2}}\left(T_{k+\tfrac{1}{2}} - T_k\right) + \dot{\sigma}_{k-\tfrac{1}{2}}\left(T_k - T_{k-\tfrac{1}{2}}\right)\right]
 ```
 
 With the reconstruction at the faces, ``T_{k+\tfrac{1}{2}}`` and ``T_{k-\tfrac{1}{2}}`` depending on one's choice of the advection scheme. For a second-order centered scheme, we choose ``T_{k+\tfrac{1}{2}} = \tfrac{1}{2}(T_k + T_{k+1})`` and obtain:
@@ -457,7 +457,7 @@ In vorticity-divergence formulation of the momentum equations the ``\nabla_\sigm
 drops out in the vorticity equation (``\nabla \times \nabla \Phi = 0``),
 but becomes a ``-\nabla^2 \Phi`` in the divergence equation,
 which is therefore combined with the kinetic energy term
-``-\nabla^2(\tfrac{1}{2}(u^2 + v^2))`` similar as it is done in the [Shallow water equations](@ref).
+``-\nabla^2[\tfrac{1}{2}(u^2 + v^2)]`` similar as it is done in the [Shallow water equations](@ref).
 You can think of ``\tfrac{1}{2}(u^2 + v^2) + \Phi`` as the Bernoulli potential in
 the primitive equations. However, due to the change into sigma coordinates the surface pressure
 gradient also has to be accounted for. Now highlighting only the pressure gradient force, we
