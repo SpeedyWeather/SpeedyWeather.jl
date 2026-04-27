@@ -43,7 +43,7 @@ conceptually for every vertical column in the atmosphere we
 The dry adiabat is
 
 ```math
-T = T_0 (\frac{p}{p_0})^\frac{R}{c_p}
+T = T_0 \left(\frac{p}{p_0}\right)^\frac{R}{c_p}
 ```
 
 The temperature ``T`` of an air parcel at pressure ``p`` is determined by the
@@ -54,9 +54,9 @@ The pseudo adiabat follows the dry adiabat until saturation is reached
 Then it follows the pseudoadiabatic lapse rate
 
 ```math
-\Gamma = -\frac{dT}{dz} = \frac{g}{c_p}\left(
+\Gamma = -\frac{dT}{dz} = \frac{g}{c_p}\left[
     \frac{  1 + \frac{q^\star L_v  }{(1-q^\star)^2     R_d T_v}}{
-            1 + \frac{q^\star L_v^2}{(1-q^\star)^2 c_p R_v T^2}}\right)
+            1 + \frac{q^\star L_v^2}{(1-q^\star)^2 c_p R_v T^2}}\right]
 ```
 
 with gravity ``g``, heat capacity ``c_p``, the saturation specific humidity of the parcel ``q^\star``
@@ -148,7 +148,7 @@ Following Frierson, 2007 [^Frierson2007] in order to conserve enthalpy we correc
 the reference profile for temperature ``T_{ref} \to T_{ref, 2}`` so that ``P_T = P_q``.
 
 ```math
-T_{ref, 2} = T_{ref} + \frac{1}{\Delta p c_p} \int_{p_0}^{p_{LZB}} c_p (T - T_{ref}) + L_v (q - q_{ref}) dp
+T_{ref, 2} = T_{ref} + \frac{1}{\Delta p c_p} \int_{p_0}^{p_{LZB}} \left[ c_p (T - T_{ref}) + L_v (q - q_{ref}) \right] dp
 ```
 
 ``\Delta p`` is the pressure difference ``p_{LZB} - p_0``.
@@ -166,11 +166,11 @@ determined during the calculation of the [Reference profiles](@ref).
 
 ```math
 \begin{aligned}
-\Delta q &= \int_{p_0}^{p_{LZB}} q - q_{ref} dp \\
-Q_{ref}  &= \int_{p_0}^{p_{LZB}} -q_{ref} dp \\
-f_q      &= 1 - \frac{\Delta q}{Q_ref} \\
+\Delta q &= \int_{p_0}^{p_{LZB}} (q - q_{ref}) dp \\
+Q_{ref}  &= \int_{p_0}^{p_{LZB}} -q_{ref}~dp \\
+f_q      &= 1 - \frac{\Delta q}{Q_{ref}} \\
 q_{ref, 2} &= f_q q_{ref} \\
-\Delta T &= \frac{1}{\Delta p} \int_{p_0}^{p_{LZB}} -(T - T_{ref}) dp \\
+\Delta T &= -\frac{1}{\Delta p} \int_{p_0}^{p_{LZB}} (T - T_{ref}) dp \\
 T_{ref,2} &= T_{ref} - \Delta T
 \end{aligned}
 ```

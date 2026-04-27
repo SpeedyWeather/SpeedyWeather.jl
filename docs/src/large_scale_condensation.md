@@ -207,7 +207,7 @@ in meters per second what we also use for the snow and rain water fluxes ``F_r, 
 the actual snow height as it would have on the ground but if melted to water.
 
 ```math
-F_m = \min(F_s, \frac{E_m}{L_i}\frac{\Delta p}{\Delta t g\rho})
+F_m = \min\left(F_s, \frac{E_m}{L_i}\frac{\Delta p}{\Delta t g\rho}\right)
 ```
 
 We cap this to ``F_s`` so that one cannot melt more snow than there is. This snow melt flux
