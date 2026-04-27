@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+## v0.17.5
+- Update SpeedyWeatherInternals compat [#1070](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1070)
+
 ## v0.17.4
 
 - Show for LowerTriangularArray/Matrix on CPU/GPU [#907](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/907)
