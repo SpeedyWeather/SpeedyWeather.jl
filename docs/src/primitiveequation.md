@@ -82,8 +82,8 @@ the ideal gas law as total density ``\rho`` times a gas constant
 times the virtual temperature that is supposed to be a function
 of absolute temperature, humidity and some constants
 ```math
-p  = \left[\rho R_d + \rho_w (R_w - R_d)\right] T = \rho R_d (1 +
-\frac{1 - \tfrac{R_d}{R_w}}{\tfrac{R_d}{R_w}} \frac{\rho_w}{\rho_w + \rho_d})T
+p  = \left[\rho R_d + \rho_w (R_w - R_d)\right] T = \rho R_d \left[1 +
+\frac{1 - \tfrac{R_d}{R_w}}{\tfrac{R_d}{R_w}} \frac{\rho_w}{\rho_w + \rho_d}\right]T
 ```
 Now we identify
 ```math
@@ -309,7 +309,7 @@ The advection equation ``\tfrac{DT}{Dt} = 0`` for a tracer ``T`` is, in flux for
 for layer ``k``:
 ```math
 \frac{\partial (T_k \Delta p_k)}{\partial t} = - \nabla \cdot (\mathbf{u}_k T_k \Delta p_k)
-- (M_{k+\tfrac{1}{2}}T_{k+\tfrac{1}{2}} - M_{k-\tfrac{1}{2}}T_{k-\tfrac{1}{2}})
+- \left(M_{k+\tfrac{1}{2}}T_{k+\tfrac{1}{2}} - M_{k-\tfrac{1}{2}}T_{k-\tfrac{1}{2}}\right)
 ```
 
 Starting from this equation in pressure layer $k$, we can derive the advective form of the tracer transport. Dividing through by the layer thickness ``\Delta p_k`` gives:
@@ -348,14 +348,14 @@ Rearranging terms, we obtain:
 
 ```math
 \frac{\partial T_k}{\partial t} = - \mathbf{u}_k \cdot \nabla T_k
-- \frac{1}{\Delta \sigma_k}\left(\dot{\sigma}_{k+\tfrac{1}{2}}(T_{k+\tfrac{1}{2}} - T_k) + \dot{\sigma}_{k-\tfrac{1}{2}}(T_k - T_{k-\tfrac{1}{2}})\right)
+- \frac{1}{\Delta \sigma_k}\left[\dot{\sigma}_{k+\tfrac{1}{2}}(T_{k+\tfrac{1}{2}} - T_k) + \dot{\sigma}_{k-\tfrac{1}{2}}(T_k - T_{k-\tfrac{1}{2}})\right]
 ```
 
 With the reconstruction at the faces, ``T_{k+\tfrac{1}{2}}`` and ``T_{k-\tfrac{1}{2}}`` depending on one's choice of the advection scheme. For a second-order centered scheme, we choose ``T_{k+\tfrac{1}{2}} = \tfrac{1}{2}(T_k + T_{k+1})`` and obtain:
 
 ```math
 \frac{\partial T_k}{\partial t} = - \mathbf{u}_k \cdot \nabla T_k
-- \frac{1}{2\Delta \sigma_k}\left(\dot{\sigma}_{k+\tfrac{1}{2}}(T_{k+1} - T_k) + \dot{\sigma}_{k-\tfrac{1}{2}}(T_k - T_{k-1})\right)
+- \frac{1}{2\Delta \sigma_k}\left[\dot{\sigma}_{k+\tfrac{1}{2}}(T_{k+1} - T_k) + \dot{\sigma}_{k-\tfrac{1}{2}}(T_k - T_{k-1})\right]
 ```
 
 However, note that this scheme is dispersive and easily leads to instabilities at higher resolution, where a more advanced vertical advection scheme becomes necessary. For convenience, we may write ``W(T)`` to denote the vertical advection term ``\dot{\sigma}\partial_\sigma T``, without specifying which schemes is used.
@@ -368,7 +368,7 @@ Similarly, the conservation of mass for layer ``k`` can be expressed as
 (setting ``T=1`` in the advection equation in section [Vertical advection](@ref))
 ```math
 \frac{\partial \Delta p_k}{\partial t} = -\nabla \cdot (\mathbf{u}_k \Delta p_k)
-- (M_{k+\tfrac{1}{2}} - M_{k-\tfrac{1}{2}})
+- \left(M_{k+\tfrac{1}{2}} - M_{k-\tfrac{1}{2}}\right)
 ```
 Meaning that the pressure thickness ``\Delta p_k`` of layer ``k`` changes with
 a horizontal divergence ``-\nabla \cdot (\mathbf{u}_k \Delta p_k)`` if not
@@ -679,7 +679,7 @@ So what is ``G`` in the [Primitive equation model](@ref primitive_equation_model
 
 ```math
 \begin{aligned}
-G_\mathcal{D} &= N^E_\mathcal{D} - \nabla^2(\Phi^{i-1} + R_dT_k^v (\ln p_s)^{i-1})
+G_\mathcal{D} &= N^E_\mathcal{D} - \nabla^2[\Phi^{i-1} + R_dT_k^v (\ln p_s)^{i-1}]
 = N^E_\mathcal{D} - \nabla^2( \mathbf{R}T^{i-1} + \mathbf{U}\ln p_s^{i-1}) \\
 G_{\ln p_s} &= N_{\ln p_s}^E - \overline{\mathcal{D}^{i-1}}
 = N_{\ln p_s}^E + \mathbf{W}\mathcal{D}^{i-1} \\
