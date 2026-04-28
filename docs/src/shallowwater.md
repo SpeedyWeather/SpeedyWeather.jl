@@ -18,11 +18,11 @@ divergence ``\mathcal{D} = \nabla \cdot \mathbf{u}``
 
 ```math
 \begin{aligned}
-\frac{\partial \zeta}{\partial t} + \nabla \cdot (\mathbf{u}(\zeta + f)) &=
+\frac{\partial \zeta}{\partial t} + \nabla \cdot \left[\mathbf{u}(\zeta + f)\right] &=
 F_\zeta + \nabla \times \mathbf{F}_\mathbf{u} + (-1)^{n+1}\nu\nabla^{2n}\zeta, \\
-\frac{\partial \mathcal{D}}{\partial t} - \nabla \times (\mathbf{u}(\zeta + f)) &=
+\frac{\partial \mathcal{D}}{\partial t} - \nabla \times \left[\mathbf{u}(\zeta + f)\right] &=
 F_\mathcal{D} + \nabla \cdot \mathbf{F}_\mathbf{u}
--\nabla^2(\tfrac{1}{2}(u^2 + v^2) + g\eta) + (-1)^{n+1}\nu\nabla^{2n}\mathcal{D}, \\
+-\nabla^2\left[\tfrac{1}{2}(u^2 + v^2) + g\eta\right] + (-1)^{n+1}\nu\nabla^{2n}\mathcal{D}, \\
 \frac{\partial \eta}{\partial t} + \nabla \cdot (\mathbf{u}h) &= F_\eta,
 \end{aligned}
 ```
@@ -37,8 +37,8 @@ h = \eta + H - H_b
 ```
 that is, the layer thickness at rest ``H`` plus the interface height ``\eta`` minus orography ``H_b``.
 We also add various possible forcing terms
-``F_\zeta, F_\mathcal{D}, F_\eta, \mathbf{F}_\mathbf{u} = (F_u, F_v)`` which can be defined 
-to force the respective variables, see [Extending SpeedyWeather](@ref). 
+``F_\zeta``, ``F_\mathcal{D}``, ``F_\eta``, ``\mathbf{F}_\mathbf{u} = (F_u, F_v)`` which can be defined
+to force the respective variables, see [Extending SpeedyWeather](@ref).
 
 In the shallow water system the flow can be described through ``u, v`` or ``\zeta, \mathcal{D}`` which
 are related through the stream function ``\Psi`` and the velocity potential ``\Phi`` (which is zero
@@ -60,10 +60,10 @@ The divergence/curl of the vorticity flux ``\mathbf{u}(\zeta + f)`` are combined
 divergence/curl of the forcing vector ``\mathbf{F}``, as
 ```math
 \begin{aligned}
-- \nabla \cdot (\mathbf{u}(\zeta + f)) + \nabla \times \mathbf{F} &=
-\nabla \times (\mathbf{F} + \mathbf{u}_\perp(\zeta + f)) \\
-\nabla \times (\mathbf{u}(\zeta + f)) + \nabla \cdot \mathbf{F} &=
-\nabla \cdot (\mathbf{F} + \mathbf{u}_\perp(\zeta + f))
+- \nabla \cdot [\mathbf{u}(\zeta + f)] + \nabla \times \mathbf{F} &=
+\nabla \times [\mathbf{F} + \mathbf{u}_\perp(\zeta + f)] \\
+\nabla \times [\mathbf{u}(\zeta + f)] + \nabla \cdot \mathbf{F} &=
+\nabla \cdot [\mathbf{F} + \mathbf{u}_\perp(\zeta + f)]
 \end{aligned}
 ```
 equivalently to how this is done in the [Barotropic vorticity equation](@ref barotropic_vorticity_model)
@@ -110,7 +110,7 @@ In spectral space ``\nabla^2`` is a diagonal operator, meaning that there is no 
 harmonics and its inversion is therefore easily done on a mode-by-mode basis of the harmonics.
 
 This can be made use of when facing time stepping constraints with explicit schemes, where
-ridiculously small time steps to resolve fast waves would otherwise result in a horribly slow simulation. 
+ridiculously small time steps to resolve fast waves would otherwise result in a horribly slow simulation.
 In the shallow water system there are gravity waves that propagate at a wave speed of ``\sqrt{gH}``
 (typically 300m/s), which, in order to not violate the
 [CFL criterion](https://en.wikipedia.org/wiki/Courant%E2%80%93Friedrichs%E2%80%93Lewy_condition)
@@ -153,7 +153,7 @@ by inverting ``N_I``, but let us gather the other terms as ``G`` first.
 ```math
 G = N_E(V_i) + N_I(V_{i-1}) = N(V_i) + N_I(V_{i-1} - V_i)
 ```
-For the shallow water equations we will only make use of the last formulation, meaning 
+For the shallow water equations we will only make use of the last formulation, meaning
 we first evaluate the whole right-hand side ``N(V_i)`` at the current time step
 as we would do with fully explicit time stepping but then add the implicit terms
 ``N_I(V_{i-1} - V_i)`` afterwards to move those terms from ``i`` to ``i-1``.
@@ -202,7 +202,7 @@ independently, so the Laplace operator ``\nabla^2 = -l(l+1)`` takes the form of 
 ``-l(l+1)`` (normalized to unit sphere, as are the [scaled shallow water equations](@ref scaled_swm))
 and its inversion is therefore just the inversion of this scalar.
 ```math
-\delta D = \frac{G_\mathcal{D} - \xi g\nabla^2 G_\eta}{1 - \xi^2 H \nabla^2} =: S^{-1}(G_\mathcal{D} - \xi g\nabla^2 G_\eta) 
+\delta D = \frac{G_\mathcal{D} - \xi g\nabla^2 G_\eta}{1 - \xi^2 H \nabla^2} =: S^{-1}(G_\mathcal{D} - \xi g\nabla^2 G_\eta)
 ```
 Where the last formulation just makes it clear that ``S = 1 - \xi^2 H \nabla^2`` is the
 operator to be inverted. ``\delta \eta`` is then obtained via insertion as written above.
@@ -238,11 +238,11 @@ a single divergence/curl operation as mentioned in [Shallow water equations](@re
 ```math
 \begin{aligned}
 \frac{\partial \tilde{\zeta}}{\partial \tilde{t}} &=
-\tilde{\nabla} \times (\tilde{\mathbf{F}} + \mathbf{u}_\perp(\tilde{\zeta} + \tilde{f})) +
+\tilde{\nabla} \times \left[\tilde{\mathbf{F}} + \mathbf{u}_\perp(\tilde{\zeta} + \tilde{f})\right] +
 (-1)^{n+1}\tilde{\nu}\tilde{\nabla}^{2n}\tilde{\zeta} \\
 \frac{\partial \tilde{\mathcal{D}}}{\partial \tilde{t}} &=
-\tilde{\nabla} \cdot (\tilde{\mathbf{F}} + \mathbf{u}_\perp(\tilde{\zeta} + \tilde{f})) -
-\tilde{\nabla}^2\left(\tfrac{1}{2}(u^2 + v^2) + g\eta \right) +
+\tilde{\nabla} \cdot \left[\tilde{\mathbf{F}} + \mathbf{u}_\perp(\tilde{\zeta} + \tilde{f})\right] -
+\tilde{\nabla}^2\left[\tfrac{1}{2}(u^2 + v^2) + g\eta \right] +
 (-1)^{n+1}\tilde{\nu}\tilde{\nabla}^{2n}\tilde{\mathcal{D}} \\
 \frac{\partial \eta}{\partial \tilde{t}} &=
 - \tilde{\nabla} \cdot (\mathbf{u}h) + \tilde{F}_\eta.
@@ -253,7 +253,7 @@ As in the [scaled barotropic vorticity equations](@ref scaling), one needs to sc
 the time step, the Coriolis force, the forcing and the diffusion coefficient, but then
 enjoys the luxury of working with dimensionless gradient operators. As before,
 SpeedyWeather.jl will scale vorticity and divergence just before the model integration
-starts and unscale them upon completion and for output. In the 
+starts and unscale them upon completion and for output. In the
 [semi-implicit time integration](@ref implicit_swm) we solve an equation that also
 has to be scaled. It is with radius squared scaling (because it is the tendency for
 the divergence equation which is also scaled with ``R^2``)
