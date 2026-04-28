@@ -2,9 +2,7 @@
 
 ## Unreleased
 
-- Fix some docs rendering [#1072](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1072)
-
-- Documentation hero landing page [#1071](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1071)
+- Documentation hero page and docs rendering [#1071](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1071) [#1072](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1072)
 
 ## v0.19.0
 
