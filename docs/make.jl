@@ -66,7 +66,7 @@ makedocs(
             "SpeedyTransforms" => "speedytransforms.md",
             "Gradient operators" => "gradients.md",
         ],
-        "API" => "functions.md",
+        "API" => "api.md",
     ]
 )
 
