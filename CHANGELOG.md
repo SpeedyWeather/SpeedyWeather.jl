@@ -2,6 +2,8 @@
 
 ## Unreleased 
 
+- Bump julia-actions/cache and setup-julia v2 to v3 [#1073](ttps://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1073)
+
 ## v0.19.0
 
 - [BREAKING] WriteModelComponentFile and ManualOrography [#1040](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1040)
