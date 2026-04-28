@@ -36,9 +36,9 @@ expect the input velocity fields to be scaled by ``\cos^{-1}(\theta)``, i.e.
 
 ```math
 \begin{aligned}
-\hat{\nabla} \cdot (\cos^{-1}(\theta)\mathbf{u}) &= \frac{\partial u}{\partial \lambda} +
+\hat{\nabla} \cdot [\cos^{-1}(\theta)\mathbf{u}] &= \frac{\partial u}{\partial \lambda} +
 \cos\theta\frac{\partial v}{\partial \theta} = R\nabla \cdot \mathbf{u}, \\
-\hat{\nabla} \times (\cos^{-1}(\theta)\mathbf{u}) &= \frac{\partial v}{\partial \lambda} -
+\hat{\nabla} \times [\cos^{-1}(\theta)\mathbf{u}] &= \frac{\partial v}{\partial \lambda} -
 \cos\theta\frac{\partial u}{\partial \theta} = R\nabla \times \mathbf{u}.
 \end{aligned}
 ```
