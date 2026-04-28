@@ -2,6 +2,8 @@
 
 ## Unreleased 
 
+- Documentation hero landing page [#1071](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1071)
+
 ## v0.19.0
 
 - [BREAKING] WriteModelComponentFile and ManualOrography [#1040](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1040)
