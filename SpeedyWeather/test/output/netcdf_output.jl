@@ -288,3 +288,48 @@ end
     @test SpeedyWeather.get_output_path(simulation) == expected_path
     @test isfile(SpeedyWeather.get_output_path(simulation))
 end
+
+@testset "set!(output, model; output_dt)" begin
+    tmp_output_path = mktempdir(pwd(), prefix = "tmp_testruns_")
+
+    spectral_grid = SpectralGrid(nlayers = 1)
+    output = NetCDFOutput(spectral_grid, path = tmp_output_path, output_dt = Hour(6))
+    model = BarotropicModel(spectral_grid; output)
+    simulation = initialize!(model)
+    run!(simulation, output = true, period = Day(1))
+
+    Δt_ms = model.time_stepping.Δt_millisec.value
+
+    # change output_dt to a clean multiple of the model time step (no rounding)
+    new_output_dt_ms = 4 * Δt_ms
+    new_output_dt = Millisecond(new_output_dt_ms)
+    @test_logs set!(model.output, model; output_dt = new_output_dt)   # no @info log
+    @test model.output.core.output_every_n_steps == 4
+    @test Millisecond(model.output.output_dt).value == new_output_dt_ms
+
+    # counters reset by re-initialization
+    @test model.output.core.timestep_counter == 0
+    @test model.output.core.output_counter == 0
+
+    # change to a different multiple
+    set!(model.output, model; output_dt = Millisecond(2 * Δt_ms))
+    @test model.output.core.output_every_n_steps == 2
+    @test Millisecond(model.output.output_dt).value == 2 * Δt_ms
+
+    # request an output_dt that is NOT a multiple of the model time step:
+    # use Δt + 1ms to force rounding back to a single time step (and an @info)
+    non_multiple = Millisecond(Δt_ms + 1)
+    @test_logs (:info,) set!(model.output, model; output_dt = non_multiple)
+    @test model.output.core.output_every_n_steps == 1
+    @test Millisecond(model.output.output_dt).value == Δt_ms
+
+    # check that run! after set! uses the new output frequency
+    period = Day(1)
+    set!(model.output, model; output_dt = Hour(2))   # = 3 * Δt at default settings
+    expected_n = round(Int, Millisecond(Hour(2)).value / Δt_ms)
+    @test model.output.core.output_every_n_steps == expected_n
+    run!(simulation, output = true; period)
+    ds = NCDataset(joinpath(model.output.run_path, model.output.filename))
+    nt = size(ds["vor"])[end]
+    @test nt == Int(Millisecond(period).value ÷ Millisecond(model.output.output_dt).value) + 1
+end

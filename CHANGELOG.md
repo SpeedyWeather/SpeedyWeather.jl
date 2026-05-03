@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `set!(output, model; output_dt)` to change output frequency after model initialization
 - Documentation hero page and docs rendering [#1071](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1071) [#1072](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1072)
 
 ## v0.19.0

@@ -98,3 +98,22 @@ function output!(core::OutputWriterCore, output::AbstractOutput)
     core.timestep_counter % core.output_every_n_steps == 0 || return false
     return true
 end
+
+"""$(TYPEDSIGNATURES)
+Reset the output frequency `output_dt` of `output` and re-initialize its `OutputWriterCore`
+so that the output frequency is recomputed from the model time step. If the requested 
+`output_dt` is not an integer multiple of the model time step, it is rounded to
+the nearest multiple."""
+function set!(output::AbstractOutput, model::AbstractModel; output_dt::Period)
+    Δt_ms = model.time_stepping.Δt_millisec.value
+    output_dt_ms = Millisecond(output_dt).value
+    n = max(1, round(Int, output_dt_ms / Δt_ms))
+    rounded_ms = n * Δt_ms
+    if rounded_ms != output_dt_ms
+        @info "output_dt = $(output_dt_ms)ms is not a multiple of the model time step " *
+            "Δt = $(Δt_ms)ms, rounding to $(rounded_ms)ms (= $(rounded_ms / 1000)s)."
+    end
+    output.output_dt = Second(round(Int, rounded_ms / 1000))
+    initialize!(output.core, output, model; create_folder = false)
+    return nothing
+end
