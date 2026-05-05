@@ -99,6 +99,44 @@ end
     @test !haskey(output.variables, Symbol(div_output.name))
 end
 
+@testset "ZarrOutput xarray-compatible dimension order" begin
+    # _ARRAY_DIMENSIONS must be in row-major (C) order to match the on-disk
+    # shape that Zarr stores; otherwise xarray will assign dim names to the
+    # wrong axes. Regression test for the original implementation that wrote
+    # them in Julia (column-major) order.
+    tmp_output_path = mktempdir(pwd(), prefix = "tmp_zarrtests_dims_")
+    period = Day(1)
+
+    spectral_grid = SpectralGrid(trunc = 5, nlayers = 1)
+    output = ZarrOutput(
+        spectral_grid, ShallowWater;
+        path = tmp_output_path, write_restart = false,
+    )
+    model = ShallowWaterModel(spectral_grid; output)
+    simulation = initialize!(model)
+    run!(simulation, output = true; period)
+
+    g = Zarr.zopen(joinpath(model.output.run_path, model.output.filename))
+
+    # 4D variable: shape (time, layer, lat, lon) on disk and dims
+    # attribute in matching order
+    z_vor = g["vor"]
+    nlon = length(g["lon"][:])
+    nlat = length(g["lat"][:])
+    nlayer = length(g["layer"][:])
+    @test size(z_vor) == (nlon, nlat, nlayer, Int(period / output.output_dt) + 1)
+    @test z_vor.attrs["_ARRAY_DIMENSIONS"] == ["time", "layer", "lat", "lon"]
+
+    # 3D variable (no layer dim): shape (time, lat, lon)
+    z_eta = g["eta"]
+    @test size(z_eta) == (nlon, nlat, Int(period / output.output_dt) + 1)
+    @test z_eta.attrs["_ARRAY_DIMENSIONS"] == ["time", "lat", "lon"]
+
+    # 1D coordinates: dim attribute matches name
+    @test g["lon"].attrs["_ARRAY_DIMENSIONS"] == ["lon"]
+    @test g["time"].attrs["_ARRAY_DIMENSIONS"] == ["time"]
+end
+
 @testset "ZarrOutput compressor and time_chunk options" begin
     tmp_output_path = mktempdir(pwd(), prefix = "tmp_zarrtests_opt_")
     period = Day(1)

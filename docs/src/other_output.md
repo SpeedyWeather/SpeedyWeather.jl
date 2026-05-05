@@ -101,6 +101,45 @@ g["time"][:]            # all stored hours since startdate
 g["vor"][:, :, 1, :]    # vorticity, top layer, all time steps
 ```
 
+### Reading the store from Python with xarray
+
+`ZarrOutput` writes the conventional `_ARRAY_DIMENSIONS` attribute on every array
+(in row-major / C order, as Zarr stores shapes), and CF-style `units` /
+`calendar` attributes on the `time` axis. That is exactly what
+[xarray](https://docs.xarray.dev) needs to open the store as a fully-named,
+time-decoded `Dataset`:
+
+```python
+import xarray as xr
+ds = xr.open_zarr("run_0001/output.zarr", consolidated=False)
+print(ds)
+# <xarray.Dataset>
+# Dimensions:  (time: 41, layer: 8, lat: 32, lon: 64)
+# Coordinates:
+#   * time     (time) datetime64[ns]  2000-01-01 ... 2000-01-11
+#   * layer    (layer) float32        0.06 0.19 ... 0.94
+#   * lat      (lat) float64          85.76 ... -85.76
+#   * lon      (lon) float64          0.0 ... 354.4
+# Data variables:
+#     vor      (time, layer, lat, lon) float32
+#     u        (time, layer, lat, lon) float32
+#     v        (time, layer, lat, lon) float32
+#     temp     (time, layer, lat, lon) float32
+#     humid    (time, layer, lat, lon) float32
+#     mslp     (time, lat, lon) float32
+
+ds["temp"].isel(time=-1, layer=0).plot()       # last step, top layer
+ds["mslp"].mean(("lat", "lon")).plot.line(x="time")
+```
+
+`xarray` decodes the `time` axis to `datetime64` automatically (from the
+CF-style `hours since <startdate>` units), so resampling and slicing by date
+work without extra work:
+
+```python
+ds.sel(time=slice("2000-01-05", "2000-01-08"))["temp"].mean("time")
+```
+
 Custom output variables work exactly as with `NetCDFOutput`: subtype
 `AbstractOutputVariable`, implement `path(::MyOutputVariable, simulation)` to
 return the `AbstractField` to write, and `add!(output, MyOutputVariable())` it to the

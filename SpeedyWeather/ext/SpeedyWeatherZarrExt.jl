@@ -205,7 +205,12 @@ function define_variable!(
     active = var.dims_xyzt
     shape = Tuple(d for (d, on) in zip(full_shape, active) if on)
     chunks = Tuple(c for (c, on) in zip(full_chunks, active) if on)
+    # Zarr stores shape/chunks in row-major (C order) but Julia arrays are
+    # column-major; Zarr.jl reverses at the metadata boundary. The
+    # `_ARRAY_DIMENSIONS` attribute (read by xarray/Xarray-Zarr) must therefore
+    # also be in row-major order — i.e. the reverse of our Julia-side dims.
     dims = String[string(d) for (d, on) in zip(all_dims, active) if on]
+    reverse!(dims)
 
     compressor = resolve_compressor(output.compressor)
 
