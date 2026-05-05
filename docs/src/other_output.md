@@ -101,13 +101,14 @@ g["time"][:]            # all stored hours since startdate
 g["vor"][:, :, 1, :]    # vorticity, top layer, all time steps
 ```
 
+Custom output variables work exactly as with `NetCDFOutput`: subtype
+`AbstractOutputVariable`, implement `path(::MyOutputVariable, simulation)` to
+return the `AbstractField` to write, and `add!(output, MyOutputVariable())` it to the
+`ZarrOutput`. 
+
 ### Reading the store from Python with xarray
 
-`ZarrOutput` writes the conventional `_ARRAY_DIMENSIONS` attribute on every array
-(in row-major / C order, as Zarr stores shapes), and CF-style `units` /
-`calendar` attributes on the `time` axis. That is exactly what
-[xarray](https://docs.xarray.dev) needs to open the store as a fully-named,
-time-decoded `Dataset`:
+`ZarrOutput` writes the stores according to the conventions of `xarray` to ensure compability with it. Simulations can be easily opened in Python as in the following: 
 
 ```python
 import xarray as xr
@@ -139,11 +140,6 @@ work without extra work:
 ```python
 ds.sel(time=slice("2000-01-05", "2000-01-08"))["temp"].mean("time")
 ```
-
-Custom output variables work exactly as with `NetCDFOutput`: subtype
-`AbstractOutputVariable`, implement `path(::MyOutputVariable, simulation)` to
-return the `AbstractField` to write, and `add!(output, MyOutputVariable())` it to the
-`ZarrOutput`. 
 
 ## Parameter summary
 
