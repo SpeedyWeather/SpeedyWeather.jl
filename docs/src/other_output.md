@@ -65,7 +65,7 @@ run!(simulation, period=Day(10), output=true)
 The constructor and option fields mirror [`NetCDFOutput`](@ref): `path`, `id`, `overwrite`,
 `output_dt`, `variables`, `write_restart`, `write_parameters_txt`, `write_progress_txt` all
 behave the same way, the run folder layout (`run_<id>_NNNN/`) is identical, and the same
-[`AbstractOutputVariable`](@ref) types are used to declare which variables are written.
+`AbstractOutputVariable` types are used to declare which variables are written.
 The on-disk layout differs:
 
 - the Zarr store is a *directory* (`output.zarr/`), not a single file
