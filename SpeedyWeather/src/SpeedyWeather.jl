@@ -196,6 +196,7 @@ include("output/netcdf_output.jl")
 include("output/restart.jl")
 include("output/particle_tracker.jl")
 include("output/variables_output.jl")
+include("output/zarr_output.jl")
 
 # MODELS
 include("models/simulation.jl")

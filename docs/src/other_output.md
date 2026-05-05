@@ -43,6 +43,69 @@ model.output
 
 After a succesfull `run!` the result is stored in `output.output`. 
 
+## Zarr Output
+
+[Zarr](https://zarr.dev) is a chunked, compressed, cloud-friendly format for N-dimensional
+arrays. 
+
+`ZarrOutput` is implemented as an **extension** that is only loaded once
+[Zarr.jl](https://github.com/JuliaIO/Zarr.jl) is imported:
+
+```julia
+using SpeedyWeather
+using Zarr     # this loads SpeedyWeatherZarrExt and enables ZarrOutput
+
+spectral_grid = SpectralGrid(trunc=31, nlayers=8)
+output = ZarrOutput(spectral_grid, PrimitiveWet, output_dt=Hour(6))
+model = PrimitiveWetModel(spectral_grid; output)
+simulation = initialize!(model)
+run!(simulation, period=Day(10), output=true)
+```
+
+The constructor and option fields mirror [`NetCDFOutput`](@ref): `path`, `id`, `overwrite`,
+`output_dt`, `variables`, `write_restart`, `write_parameters_txt`, `write_progress_txt` all
+behave the same way, the run folder layout (`run_<id>_NNNN/`) is identical, and the same
+[`AbstractOutputVariable`](@ref) types are used to declare which variables are written.
+The on-disk layout differs:
+
+- the Zarr store is a *directory* (`output.zarr/`), not a single file
+- per-variable arrays live as subdirectories with `.zarray` and `.zattrs` metadata
+- coordinates `lon`, `lat`, `layer`, `soil_layer`, `time` are stored as 1D arrays in
+  the same group, tagged with the conventional `_ARRAY_DIMENSIONS` attribute so that
+  Xarray-compatible readers can rebuild the dataset
+
+Two extra options are specific to `ZarrOutput`:
+
+| Option | Meaning |
+|--------|---------|
+| `time_chunk::Int` | Number of time steps per chunk along the time axis (default `1`). Larger values give bigger chunks and usually better compression at the cost of higher write latency. |
+| `compressor` | Any `Zarr.Compressor` (e.g. `Zarr.BloscCompressor(clevel=3)`, `Zarr.ZlibCompressor()`); `nothing` (default) uses Blosc with the SpeedyWeather default compression level. |
+
+```julia
+using SpeedyWeather, Zarr
+
+spectral_grid = SpectralGrid(trunc=31, nlayers=8)
+output = ZarrOutput(spectral_grid, PrimitiveWet;
+    output_dt = Hour(1),
+    time_chunk = 24,                        # bundle one day per chunk on the time axis
+    compressor = Zarr.BloscCompressor(clevel=5),
+)
+```
+
+Reading back the data only needs Zarr.jl:
+
+```julia
+using Zarr
+g = Zarr.zopen(joinpath(output.run_path, output.filename))
+g["time"][:]            # all stored hours since startdate
+g["vor"][:, :, 1, :]    # vorticity, top layer, all time steps
+```
+
+Custom output variables work exactly as with `NetCDFOutput`: subtype
+[`AbstractOutputVariable`](@ref), implement `path(::MyOutputVariable, simulation)` to
+return the `AbstractField` to write, and `add!(output, MyOutputVariable())` it to the
+`ZarrOutput`. See [Defining new output variables](@ref) for the details.
+
 ## Parameter summary
 
 With `output=true` as an argument in the `run!(simulation)` call, the [NetCDFOutput](@ref) by default also
