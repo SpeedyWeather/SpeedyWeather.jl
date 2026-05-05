@@ -51,7 +51,7 @@ arrays.
 `ZarrOutput` is implemented as an **extension** that is only loaded once
 [Zarr.jl](https://github.com/JuliaIO/Zarr.jl) is imported:
 
-```julia
+```@example zarr
 using SpeedyWeather
 using Zarr     # this loads SpeedyWeatherZarrExt and enables ZarrOutput
 
@@ -94,7 +94,7 @@ output = ZarrOutput(spectral_grid, PrimitiveWet;
 
 Reading back the data only needs Zarr.jl:
 
-```julia
+```@example zarr
 using Zarr
 g = Zarr.zopen(joinpath(output.run_path, output.filename))
 g["time"][:]            # all stored hours since startdate
