@@ -45,8 +45,7 @@ After a succesfull `run!` the result is stored in `output.output`.
 
 ## Zarr Output
 
-[Zarr](https://zarr.dev) is a chunked, compressed, cloud-friendly format for N-dimensional
-arrays. 
+[Zarr](https://zarr.dev) is a chunked, compressed, cloud-friendly format for N-dimensional arrays. 
 
 `ZarrOutput` is implemented as an **extension** that is only loaded once
 [Zarr.jl](https://github.com/JuliaIO/Zarr.jl) is imported:
@@ -71,8 +70,7 @@ The on-disk layout differs:
 - the Zarr store is a *directory* (`output.zarr/`), not a single file
 - per-variable arrays live as subdirectories with `.zarray` and `.zattrs` metadata
 - coordinates `lon`, `lat`, `layer`, `soil_layer`, `time` are stored as 1D arrays in
-  the same group, tagged with the conventional `_ARRAY_DIMENSIONS` attribute so that
-  Xarray-compatible readers can rebuild the dataset
+  the same group, tagged with the conventional `_ARRAY_DIMENSIONS` attribute so that Xarray-compatible readers can rebuild the dataset
 
 Two extra options are specific to `ZarrOutput`:
 
@@ -97,8 +95,8 @@ Reading back the data only needs Zarr.jl:
 ```@example zarr
 using Zarr
 g = Zarr.zopen(joinpath(output.run_path, output.filename))
-g["time"][:]            # all stored hours since startdate
-g["vor"][:, :, 1, :]    # vorticity, top layer, all time steps
+g["time"][:]             # all stored hours since startdate
+g["vor"][:, :, 1, :];    # vorticity, top layer, all time steps
 ```
 
 Custom output variables work exactly as with `NetCDFOutput`: subtype
