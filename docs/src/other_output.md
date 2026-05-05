@@ -102,9 +102,9 @@ g["vor"][:, :, 1, :]    # vorticity, top layer, all time steps
 ```
 
 Custom output variables work exactly as with `NetCDFOutput`: subtype
-[`AbstractOutputVariable`](@ref), implement `path(::MyOutputVariable, simulation)` to
+`AbstractOutputVariable`, implement `path(::MyOutputVariable, simulation)` to
 return the `AbstractField` to write, and `add!(output, MyOutputVariable())` it to the
-`ZarrOutput`. See [Defining new output variables](@ref) for the details.
+`ZarrOutput`. 
 
 ## Parameter summary
 
