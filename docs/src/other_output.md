@@ -59,6 +59,7 @@ output = ZarrOutput(spectral_grid, PrimitiveWet, output_dt=Hour(6))
 model = PrimitiveWetModel(spectral_grid; output)
 simulation = initialize!(model)
 run!(simulation, period=Day(10), output=true)
+nothing #hide
 ```
 
 The constructor and option fields mirror [`NetCDFOutput`](@ref): `path`, `id`, `overwrite`,
@@ -96,7 +97,8 @@ Reading back the data only needs Zarr.jl:
 using Zarr
 g = Zarr.zopen(joinpath(output.run_path, output.filename))
 g["time"][:]             # all stored hours since startdate
-g["vor"][:, :, 1, :];    # vorticity, top layer, all time steps
+g["vor"][:, :, 1, :]     # vorticity, top layer, all time steps
+nothing #hide
 ```
 
 Custom output variables work exactly as with `NetCDFOutput`: subtype
