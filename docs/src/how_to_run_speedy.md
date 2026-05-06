@@ -195,9 +195,9 @@ zenith angle calculation.
 After this step you can continue to tweak your model setup but note that
 some model components are immutable, or that your changes may not be
 propagated to other model components that rely on it. But you can, for
-example, change the output time step like so
+example, change the output interval like so
 ```@example howto
-simulation.model.output.interval = Second(3600)
+set!(model.output, model, interval=Hour(1))
 ```
 Now, if there's output, it will be every hour. Furthermore the initial
 conditions can be set with the `initial_conditions` model component

@@ -64,9 +64,9 @@ model = ShallowWaterModel(spectral_grid; time_stepping, output)
 simulation = initialize!(model)
 model.time_stepping.Δt_sec
 ```
-The shorter the output time step the more the model time step needs to be adjusted
-to match the desired output time step exactly. This is important so that for daily output at
-noon this does not slowly shift towards night over years of model integration.
+The shorter the output interval the more the model time step needs to be adjusted
+to match the desired interval exactly. This is important so that for daily output at
+noon this does not slowly shift towards night over years of the model integration.
 One can always disable this adjustment with
 ```@example netcdf
 time_stepping = Leapfrog(spectral_grid, adjust_with_output=false)

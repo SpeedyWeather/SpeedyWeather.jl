@@ -61,10 +61,10 @@ function Leapfrog(spectral_grid::SpectralGrid; kwargs...)
 end
 
 """$(TYPEDSIGNATURES)
-Initialize leapfrogging `L` by recalculating the time step given the output time step
+Initialize leapfrogging `L` by recalculating the time step given the output
 `interval` from `model.output`. Recalculating will slightly adjust the time step to
 be a divisor such that an integer number of time steps matches exactly with the output
-time step."""
+interval."""
 function initialize!(L::Leapfrog, model::AbstractModel)
     (; radius) = model.planet
     interval = get_interval(model.output)
