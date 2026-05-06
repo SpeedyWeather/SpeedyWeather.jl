@@ -197,7 +197,7 @@ some model components are immutable, or that your changes may not be
 propagated to other model components that rely on it. But you can, for
 example, change the output time step like so
 ```@example howto
-simulation.model.output.output_dt = Second(3600)
+simulation.model.output.interval = Second(3600)
 ```
 Now, if there's output, it will be every hour. Furthermore the initial
 conditions can be set with the `initial_conditions` model component

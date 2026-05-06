@@ -1,6 +1,6 @@
 # default number format for output
 const DEFAULT_OUTPUT_NF = Float32
-const DEFAULT_OUTPUT_DT = Hour(6)
+const DEFAULT_interval = Hour(6)
 const OUTPUT_VARIABLES_DICT = Dict{Symbol, AbstractOutputVariable}
 OutputVariablesDict() = OUTPUT_VARIABLES_DICT()
 
@@ -63,7 +63,7 @@ $(TYPEDFIELDS)"""
     startdate::DT = DateTime(2000, 1, 1)
 
     "[OPTION] output frequency, time step"
-    output_dt::S = Second(DEFAULT_OUTPUT_DT)
+    interval::S = Second(DEFAULT_interval)
 
     "[OPTION] dictionary of variables to output, e.g. u, v, vor, div, pres, temp, humid"
     variables::OUTPUT_VARIABLES_DICT = OutputVariablesDict()
@@ -93,7 +93,7 @@ function NetCDFOutput(
         nlayers_soil = DEFAULT_NLAYERS_SOIL,
         output_grid::AbstractFullGrid = on_architecture(CPU(), RingGrids.full_grid_type(SG.grid)(SG.grid.nlat_half)),
         output_NF::DataType = DEFAULT_OUTPUT_NF,
-        output_dt::Period = Second(DEFAULT_OUTPUT_DT),  # only needed for dispatch
+        interval::Period = Second(DEFAULT_interval),  # only needed for dispatch
         kwargs...
     )
 
@@ -111,7 +111,7 @@ function NetCDFOutput(
     field3Dland = Field(output_NF, output_grid, nlayers_soil)
 
     output = NetCDFOutput(;
-        output_dt = Second(output_dt),    # convert to seconds for dispatch
+        interval = Second(interval),    # convert to seconds for dispatch
         interpolator,
         field2D,
         field3D,
@@ -138,7 +138,7 @@ function Base.show(io::IO, output::NetCDFOutput{F}) where {F}
 
     println(io, styled"├ {info:interpolator}::$interp_type_str_short")
     println(io, styled"├ {info:path} = $(joinpath(output.run_path, output.filename)) (overwrite=$(output.overwrite))")
-    println(io, styled"├ {info:frequency} = $(output.output_dt)")
+    println(io, styled"├ {info:frequency} = $(output.interval)")
     print(io, styled"└ {info:variables}")
     nvars = length(output.variables)
     for (i, (key, var)) in enumerate(output.variables)
@@ -523,9 +523,9 @@ end
 """
 $(TYPEDSIGNATURES)
 Returns the output time step of the model `M`."""
-function get_output_dt(output::AbstractOutput)
-    return output.output_dt
+function get_interval(output::AbstractOutput)
+    return output.interval
 end
 
 # Fallback for when output is nothing
-get_output_dt(::Nothing) = Millisecond(0)
+get_interval(::Nothing) = Millisecond(0)

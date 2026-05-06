@@ -18,7 +18,7 @@ Its usage is similar to the NetCDF output above:
 ```@example output2
 using SpeedyWeather
 spectral_grid = SpectralGrid(trunc=31, nlayers=1)
-output = JLD2Output(output_dt=Hour(1))
+output = JLD2Output(interval=Hour(1))
 model = ShallowWaterModel(spectral_grid, output=output)
 model.output
 ```
@@ -36,7 +36,7 @@ It's also possible to output the `Variables` (or a subgroup of it) directly into
 ```@example output3
 using SpeedyWeather
 spectral_grid = SpectralGrid(trunc=31, nlayers=1)
-output = ArrayOutput(output_dt=Hour(1), groups=(:prognostic,))
+output = ArrayOutput(interval=Hour(1), groups=(:prognostic,))
 model = ShallowWaterModel(spectral_grid, output=output)
 model.output
 ```
