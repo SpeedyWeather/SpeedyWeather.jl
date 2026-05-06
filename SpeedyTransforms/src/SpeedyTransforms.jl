@@ -44,7 +44,10 @@ export curl,
     UV_from_vor!,
     UV_from_vordiv!,
     ∇²!, ∇⁻²!, ∇!,
-    ∇², ∇⁻², ∇
+    ∇², ∇⁻², ∇,
+    laplace, inverse_laplace,
+    laplace!, inverse_laplace!,
+    gradient, gradient!
 
 # TRUNCATION
 export spectral_truncation,

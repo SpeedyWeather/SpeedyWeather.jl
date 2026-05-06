@@ -564,3 +564,11 @@ function ∇(field::AbstractField; kwargs...)
     S = SpectralTransform(field, one_more_degree = true)
     return ∇(field, S; kwargs...)
 end
+
+# for people that don't have unicode support on their keyboard
+laplace = ∇²
+laplace = ∇²!
+inverse_laplace = ∇⁻²
+inverse_laplace! = ∇⁻²!
+gradient = ∇
+gradient! = ∇!
