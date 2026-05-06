@@ -8,7 +8,7 @@ function get_Δt_millisec(
         trunc,
         radius,
         adjust_with_output::Bool,
-        interval::TimePeriod = DEFAULT_INTERVAL,
+        interval::TimePeriod = DEFAULT_OUTPUT_INTERVAL,
     )
     # linearly scale Δt with trunc+1 (which are often powers of two)
     resolution_factor = (DEFAULT_TRUNC + 1) / (trunc + 1)
