@@ -21,7 +21,7 @@ using NCDatasets, Dates
             nx, ny, nz, nt = size(ds[key])
             @test (nx, ny) == RingGrids.matrix_size(output.field2D)
             @test nz == spectral_grid.nlayers
-            @test nt == Int(period / output.output_dt) + 1
+            @test nt == Int(period / output.interval) + 1
         end
     end
 end
@@ -104,8 +104,8 @@ end
 
     # test also output at various resolutions
     spectral_grid = SpectralGrid(nlayers = 8)
-    for output_dt in (Hour(1), Minute(120), Hour(3), Hour(6), Day(1))
-        output = NetCDFOutput(spectral_grid, PrimitiveWet, path = tmp_output_path; output_dt)
+    for interval in (Hour(1), Minute(120), Hour(3), Hour(6), Day(1))
+        output = NetCDFOutput(spectral_grid, PrimitiveWet, path = tmp_output_path; interval)
         model = PrimitiveWetModel(spectral_grid; output)
         simulation = initialize!(model)
         run!(simulation, output = true; period)
@@ -118,7 +118,7 @@ end
 
             # test time
             nt = size(ds[key])[end]
-            @test nt == Int(period / output.output_dt) + 1
+            @test nt == Int(period / output.interval) + 1
         end
     end
 
@@ -230,7 +230,7 @@ end
     tmp_output_path = mktempdir(pwd(), prefix = "tmp_testruns_")  # Cleaned up when the process exits
 
     spectral_grid = SpectralGrid()
-    output = NetCDFOutput(spectral_grid, PrimitiveDry, path = tmp_output_path, id = "dense-output-test", output_dt = Hour(0))
+    output = NetCDFOutput(spectral_grid, PrimitiveDry, path = tmp_output_path, id = "dense-output-test", interval = Hour(0))
     model = PrimitiveDryModel(spectral_grid; output)
     simulation = initialize!(model)
     run!(simulation, output = true; period = Day(1))
@@ -241,7 +241,7 @@ end
     @test t == manual_time_axis(model.output.startdate, model.time_stepping.Δt_millisec, progn.clock.n_timesteps)
 
     # do a simulation with the adjust_Δt_with_output turned on
-    output = NetCDFOutput(spectral_grid, PrimitiveDry, path = tmp_output_path, id = "adjust_dt_with_output-test", output_dt = Minute(70))
+    output = NetCDFOutput(spectral_grid, PrimitiveDry, path = tmp_output_path, id = "adjust_dt_with_output-test", interval = Minute(70))
     time_stepping = Leapfrog(spectral_grid, adjust_with_output = true)
     model = PrimitiveDryModel(spectral_grid; output, time_stepping)
     simulation = initialize!(model)
@@ -256,7 +256,7 @@ end
     # 1kyrs simulation
     spectral_grid = SpectralGrid()
     time_stepping = Leapfrog(spectral_grid, Δt_at_T31 = Day(3650))
-    output = NetCDFOutput(spectral_grid, PrimitiveDry, path = tmp_output_path, id = "long-output-test", output_dt = Day(3650))
+    output = NetCDFOutput(spectral_grid, PrimitiveDry, path = tmp_output_path, id = "long-output-test", interval = Day(3650))
     model = PrimitiveDryModel(spectral_grid; output, time_stepping)
     simulation = initialize!(model)
     model.implicit.initialized = true     # bypass implicit initialization with this insanely large timestep (threw SingularException)
@@ -287,4 +287,49 @@ end
     expected_path = joinpath(simulation.model.output.run_path, simulation.model.output.filename)
     @test SpeedyWeather.get_output_path(simulation) == expected_path
     @test isfile(SpeedyWeather.get_output_path(simulation))
+end
+
+@testset "set!(output, model; interval)" begin
+    tmp_output_path = mktempdir(pwd(), prefix = "tmp_testruns_")
+
+    spectral_grid = SpectralGrid(nlayers = 1)
+    output = NetCDFOutput(spectral_grid, path = tmp_output_path, interval = Hour(6))
+    model = BarotropicModel(spectral_grid; output)
+    simulation = initialize!(model)
+    run!(simulation, output = true, period = Day(1))
+
+    Δt_ms = model.time_stepping.Δt_millisec.value
+
+    # change interval to a clean multiple of the model time step (no rounding)
+    new_interval_ms = 4 * Δt_ms
+    new_interval = Millisecond(new_interval_ms)
+    @test_logs set!(model.output, model; interval = new_interval)   # no @info log
+    @test model.output.core.output_every_n_steps == 4
+    @test Millisecond(model.output.interval).value == new_interval_ms
+
+    # counters reset by re-initialization
+    @test model.output.core.timestep_counter == 0
+    @test model.output.core.output_counter == 0
+
+    # change to a different multiple
+    set!(model.output, model; interval = Millisecond(2 * Δt_ms))
+    @test model.output.core.output_every_n_steps == 2
+    @test Millisecond(model.output.interval).value == 2 * Δt_ms
+
+    # request an interval that is NOT a multiple of the model time step:
+    # use Δt + 1ms to force rounding back to a single time step (and an @info)
+    non_multiple = Millisecond(Δt_ms + 1)
+    @test_logs (:info,) set!(model.output, model; interval = non_multiple)
+    @test model.output.core.output_every_n_steps == 1
+    @test Millisecond(model.output.interval).value == Δt_ms
+
+    # check that run! after set! uses the new output frequency
+    period = Day(1)
+    set!(model.output, model; interval = Hour(2))   # = 3 * Δt at default settings
+    expected_n = round(Int, Millisecond(Hour(2)).value / Δt_ms)
+    @test model.output.core.output_every_n_steps == expected_n
+    run!(simulation, output = true; period)
+    ds = NCDataset(joinpath(model.output.run_path, model.output.filename))
+    nt = size(ds["vor"])[end]
+    @test nt == Int(Millisecond(period).value ÷ Millisecond(model.output.interval).value) + 1
 end

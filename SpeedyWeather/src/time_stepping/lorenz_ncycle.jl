@@ -45,7 +45,7 @@ $(TYPEDFIELDS)
     "[OPTION] Time step in minutes for T31, scale linearly to `trunc`"
     Δt_at_T31::Second = Minute(30)
 
-    "[OPTION] Adjust `Δt_at_T31` with the `output_dt` to reach `output_dt` exactly"
+    "[OPTION] Adjust `Δt_at_T31` with the `interval` to reach `interval` exactly"
     adjust_with_output::Bool = true
 
     "[OPTION] No Euler first step needed"
@@ -78,7 +78,7 @@ current_substep(L::NCycleLorenz, clock) = mod(clock.timestep_counter, L.cycles)
 """$(TYPEDSIGNATURES)
 Initialize NCycleLorenz time stepper."""
 function initialize!(L::NCycleLorenz, model::AbstractModel)
-    (; output_dt) = model.output
+    (; interval) = model.output
     (; radius) = model.planet
 
     # Validate compatibility - runs ONCE, not every timestep
@@ -86,14 +86,14 @@ function initialize!(L::NCycleLorenz, model::AbstractModel)
         @warn "ABBA variant designed for N=4 (4th order accurate), but N=$(L.cycles). Consider cycles=4 or variant A/B/AB."
     end
 
-    L.Δt_millisec = get_Δt_millisec(L.Δt_at_T31, L.trunc, radius, L.adjust_with_output, output_dt)
+    L.Δt_millisec = get_Δt_millisec(L.Δt_at_T31, L.trunc, radius, L.adjust_with_output, interval)
     L.Δt_sec = L.Δt_millisec.value/1000
     L.Δt = L.Δt_sec/radius
 
-    n = round(Int, Millisecond(output_dt).value/L.Δt_millisec.value)
+    n = round(Int, Millisecond(interval).value/L.Δt_millisec.value)
     nΔt = n*L.Δt_millisec
-    if nΔt != output_dt
-        @warn "$n steps of Δt = $(L.Δt_millisec.value)ms yield output every $(nΔt.value)ms, but output_dt = $(output_dt.value)ms"
+    if nΔt != interval
+        @warn "$n steps of Δt = $(L.Δt_millisec.value)ms yield output every $(nΔt.value)ms, but interval = $(interval.value)ms"
     end
 
     return nothing
