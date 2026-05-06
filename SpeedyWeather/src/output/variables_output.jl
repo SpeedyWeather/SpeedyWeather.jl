@@ -57,7 +57,7 @@ $(TYPEDFIELDS)"""
     write_progress_txt::Bool = true
 
     "[OPTION] output frequency, time step"
-    interval::Second = Second(DEFAULT_interval)
+    interval::Second = Second(DEFAULT_INTERVAL)
 
     "[OPTION] will reopen and resave the file to merge everything in one big vector. Turn off if the file is too large for memory."
     merge_output::Bool = true
@@ -166,7 +166,7 @@ Otherwise follows the same logic as [`JLD2Output`](@ref). Fields are $(TYPEDFIEL
     write_progress_txt::Bool = false
 
     "[OPTION] output frequency, time step"
-    interval::Second = Second(DEFAULT_interval)
+    interval::Second = Second(DEFAULT_INTERVAL)
 
     "[OPTION] which variable groups to save, e.g. (:prognostic,) or (:prognostic, :grid). Use (:all,) for all groups."
     groups::Tuple{Vararg{Symbol}} = (:all,)

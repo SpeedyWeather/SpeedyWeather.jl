@@ -1,6 +1,6 @@
 # default number format for output
 const DEFAULT_OUTPUT_NF = Float32
-const DEFAULT_interval = Hour(6)
+const DEFAULT_INTERVAL = Hour(6)
 const OUTPUT_VARIABLES_DICT = Dict{Symbol, AbstractOutputVariable}
 OutputVariablesDict() = OUTPUT_VARIABLES_DICT()
 
@@ -63,7 +63,7 @@ $(TYPEDFIELDS)"""
     startdate::DT = DateTime(2000, 1, 1)
 
     "[OPTION] output frequency, time step"
-    interval::S = Second(DEFAULT_interval)
+    interval::S = Second(DEFAULT_INTERVAL)
 
     "[OPTION] dictionary of variables to output, e.g. u, v, vor, div, pres, temp, humid"
     variables::OUTPUT_VARIABLES_DICT = OutputVariablesDict()
@@ -93,7 +93,7 @@ function NetCDFOutput(
         nlayers_soil = DEFAULT_NLAYERS_SOIL,
         output_grid::AbstractFullGrid = on_architecture(CPU(), RingGrids.full_grid_type(SG.grid)(SG.grid.nlat_half)),
         output_NF::DataType = DEFAULT_OUTPUT_NF,
-        interval::Period = Second(DEFAULT_interval),  # only needed for dispatch
+        interval::Period = Second(DEFAULT_INTERVAL),  # only needed for dispatch
         kwargs...
     )
 
