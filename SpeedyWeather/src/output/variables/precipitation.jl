@@ -48,7 +48,7 @@ function output!(
 
     # rate is defined as average precip since last output step, so first step is 0
     # convert from accumulated [m] to [mm/hr] rain rate over output time step (e.g. 6hours)
-    s = Hour(1) / output.output_dt
+    s = Hour(1) / output.interval
     nx, ny = size(accumulated)
     rate = cat(zeros(eltype(accumulated), nx, ny), diff(accumulated, dims = 3), dims = 3)
     rate .*= s
