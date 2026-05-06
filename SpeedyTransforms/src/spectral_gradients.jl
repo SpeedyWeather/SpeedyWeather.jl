@@ -567,7 +567,7 @@ end
 
 # for people that don't have unicode support on their keyboard
 laplace = ∇²
-laplace = ∇²!
+laplace! = ∇²!
 inverse_laplace = ∇⁻²
 inverse_laplace! = ∇⁻²!
 gradient = ∇
