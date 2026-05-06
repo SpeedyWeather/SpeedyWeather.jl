@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.20.0
+
 - [BREAKING] `output_dt` renamed to `interval` [#1075](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1075)
 - `set!(output, model; interval)` to change output frequency after model initialization [#1075](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1075)
 - Documentation hero page and docs rendering [#1071](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1071) [#1072](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1072)
