@@ -34,8 +34,8 @@ end
         @test haskey(g.arrays, c)
     end
 
-    # time axis length matches Number of expected outputs (IC + period/output_dt)
-    expected_times = Int(period / output.output_dt) + 1
+    # time axis length matches Number of expected outputs (IC + period/interval)
+    expected_times = Int(period / output.interval) + 1
     @test length(g["time"][:]) == expected_times
     @test g["time"][1] == 0.0
 
@@ -124,12 +124,12 @@ end
     nlon = length(g["lon"][:])
     nlat = length(g["lat"][:])
     nlayer = length(g["layer"][:])
-    @test size(z_vor) == (nlon, nlat, nlayer, Int(period / output.output_dt) + 1)
+    @test size(z_vor) == (nlon, nlat, nlayer, Int(period / output.interval) + 1)
     @test z_vor.attrs["_ARRAY_DIMENSIONS"] == ["time", "layer", "lat", "lon"]
 
     # 3D variable (no layer dim): shape (time, lat, lon)
     z_eta = g["eta"]
-    @test size(z_eta) == (nlon, nlat, Int(period / output.output_dt) + 1)
+    @test size(z_eta) == (nlon, nlat, Int(period / output.interval) + 1)
     @test z_eta.attrs["_ARRAY_DIMENSIONS"] == ["time", "lat", "lon"]
 
     # 1D coordinates: dim attribute matches name

@@ -7,7 +7,7 @@ using DocStringExtensions
 import SpeedyWeather: ZarrOutput, AbstractOutput, AbstractOutputVariable,
     AbstractSimulation, AbstractModel, Barotropic, OutputWriterCore,
     OUTPUT_VARIABLES_DICT, OutputVariablesDict, DEFAULT_NLAYERS_SOIL,
-    DEFAULT_OUTPUT_NF, DEFAULT_OUTPUT_DT, DEFAULT_MISSING_VALUE,
+    DEFAULT_OUTPUT_NF, DEFAULT_OUTPUT_INTERVAL, DEFAULT_MISSING_VALUE,
     DEFAULT_COMPRESSION_LEVEL, DEFAULT_KEEPBITS,
     Variables, Simulation, SpectralGrid, Field,
     initialize!, finalize!, output!, set!, add!, add_default!,
@@ -39,7 +39,7 @@ function ZarrOutput(
             CPU(), RingGrids.full_grid_type(SG.grid)(SG.grid.nlat_half)
         ),
         output_NF::DataType = DEFAULT_OUTPUT_NF,
-        output_dt::Period = Second(DEFAULT_OUTPUT_DT),
+        interval::Period = Second(DEFAULT_OUTPUT_INTERVAL),
         compressor = nothing,
         kwargs...
     )
@@ -63,15 +63,15 @@ function ZarrOutput(
     C = typeof(resolve_compressor(compressor))
     Z = Zarr.ZGroup{Zarr.DirectoryStore}
 
-    output_dt_sec = Second(output_dt)
+    interval_sec = Second(interval)
     DT = DateTime
-    S = typeof(output_dt_sec)
+    S = typeof(interval_sec)
     F2 = typeof(field2D)
     F3 = typeof(field3D)
     Itp = typeof(interpolator)
 
     output = ZarrOutput{F2, F3, Itp, DT, S, C, Z}(;
-        output_dt = output_dt_sec,
+        interval = interval_sec,
         interpolator,
         field2D,
         field3D,
@@ -270,14 +270,17 @@ function output!(
     z = output.zarr_group[variable.name]
     if hastime(variable)
         i = output.output_counter                # current write index
-        # Grow the time axis by one if needed (the time array may already have been
-        # extended for this step by output!(output, time::DateTime) below; if not,
-        # extend it here as well).
-        ensure_size!(z, variable, i, var)
-        write_slice!(z, variable, i, var)
+        # Grow the time axis to length `i` if needed. `Base.append!` would
+        # zero-fill the new slab and then we'd overwrite it — `resize!` only
+        # rewrites the array's metadata (`.zarray`) and leaves chunks
+        # untouched, so a single `setindex!` writes only the data we
+        # actually have for this time step.
+        grow_time_axis!(z, i)
+        indices = get_indices(i, variable)
+        z[indices...] = parent_array(var)
     else
         # static fields are only written once — just dump the array.
-        z[:] = parent_array(var, variable)
+        z[:] = parent_array(var)
     end
     return nothing
 end
@@ -289,10 +292,7 @@ function output!(output::ZarrOutput, time::DateTime)
     i = output.output_counter
 
     z_time = output.zarr_group["time"]
-    # extend the time axis to length `i` if needed
-    if size(z_time, 1) < i
-        append!(z_time, [zero(eltype(z_time)) for _ in 1:(i - size(z_time, 1))])
-    end
+    grow_time_axis!(z_time, i)
 
     (; startdate) = output
     time_passed = Millisecond(time - startdate)
@@ -302,32 +302,19 @@ function output!(output::ZarrOutput, time::DateTime)
 end
 
 """$(TYPEDSIGNATURES)
-Make sure the time axis of the Zarr array `z` for `variable` has at least
-length `i` so that the i-th slice can be written."""
-function ensure_size!(z::Zarr.ZArray, variable::AbstractOutputVariable, i::Int, scratch)
-    # the time axis is the *last* dim of z when the variable has a time dim
+Grow the last (time) axis of the Zarr array `z` to length `i` if it is shorter,
+using `Base.resize!` (which only rewrites the array metadata; the new slab
+remains uninitialized chunks until written into)."""
+function grow_time_axis!(z::Zarr.ZArray, i::Int)
     n = ndims(z)
-    cur = size(z, n)
-    cur >= i && return z
-    nadd = i - cur
-    # build a zero slab matching all but the last dim, then append along last dim
-    other = ntuple(k -> size(z, k), n - 1)
-    Base.append!(z, zeros(eltype(z), other..., nadd); dims = n)
+    size(z, n) >= i && return z
+    new_shape = ntuple(k -> k == n ? i : size(z, k), n)
+    Base.resize!(z, new_shape)
     return z
 end
 
-"""Pull out the parent (Array) of a Field for direct copy into a Zarr array.
-Falls back to `Array(var)` when the underlying storage isn't a plain Array."""
-parent_array(var, variable) = Array(parent(var))
-
-"""$(TYPEDSIGNATURES)
-Write the current scratch field `var` into the i-th slice of Zarr array `z`."""
-function write_slice!(z::Zarr.ZArray, variable::AbstractOutputVariable, i::Int, var)
-    indices = get_indices(i, variable)
-    data = parent_array(var, variable)
-    z[indices...] = data
-    return nothing
-end
+"""Pull out the parent (Array) of a Field for direct copy into a Zarr array."""
+parent_array(var) = Array(parent(var))
 
 Base.close(output::ZarrOutput) = nothing
 

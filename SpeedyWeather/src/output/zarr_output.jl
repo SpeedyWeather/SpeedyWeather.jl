@@ -66,7 +66,7 @@ the Zarr group type once `initialize!` has been called (`Nothing` before)."""
     startdate::DT = DateTime(2000, 1, 1)
 
     "[OPTION] output frequency, time step"
-    output_dt::S = Second(DEFAULT_OUTPUT_DT)
+    interval::S = Second(DEFAULT_OUTPUT_INTERVAL)
 
     "[OPTION] dictionary of variables to output, e.g. u, v, vor, div, pres, temp, humid"
     variables::OUTPUT_VARIABLES_DICT = OutputVariablesDict()
@@ -118,7 +118,7 @@ function Base.show(io::IO, output::ZarrOutput{F}) where {F}
 
     println(io, styled"├ {info:interpolator}::$interp_type_str_short")
     println(io, styled"├ {info:path} = $(joinpath(output.run_path, output.filename)) (overwrite=$(output.overwrite))")
-    println(io, styled"├ {info:frequency} = $(output.output_dt)")
+    println(io, styled"├ {info:frequency} = $(output.interval)")
     println(io, styled"├ {info:time chunk} = $(output.time_chunk)")
     print(io, styled"└ {info:variables}")
     nvars = length(output.variables)
