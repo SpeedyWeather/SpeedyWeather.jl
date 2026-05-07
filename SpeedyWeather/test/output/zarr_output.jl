@@ -205,6 +205,64 @@ end
     @test z_vor.metadata.compressor isa Zarr.BloscCompressor
 end
 
+@testset "ZarrOutput spatial chunking" begin
+    tmp_output_path = mktempdir(pwd(), prefix = "tmp_zarrtests_spatial_")
+    period = Day(1)
+
+    spectral_grid = SpectralGrid(trunc = 5, nlayers = 4)
+    output = ZarrOutput(
+        spectral_grid, PrimitiveDry;
+        path = tmp_output_path, write_restart = false,
+        lon_chunk = 4, lat_chunk = 4, z_chunk = 2,
+    )
+    model = PrimitiveDryModel(spectral_grid; output)
+    simulation = initialize!(model)
+    run!(simulation, output = true; period)
+
+    g = Zarr.zopen(joinpath(model.output.run_path, model.output.filename))
+
+    # 4D variable: chunks come back in Julia (column-major) order: (lon, lat, layer, time)
+    z_temp = g["temp"]
+    nlon, nlat = RingGrids.matrix_size(output.field2D)
+    @test z_temp.metadata.chunks[1] == 4   # lon_chunk
+    @test z_temp.metadata.chunks[2] == 4   # lat_chunk
+    @test z_temp.metadata.chunks[3] == 2   # z_chunk
+    @test z_temp.metadata.chunks[4] == max(output.time_chunk, 1)
+
+    # 3D variable (no layer dim): (lon, lat, time)
+    z_mslp = g["mslp"]
+    @test z_mslp.metadata.chunks[1] == 4
+    @test z_mslp.metadata.chunks[2] == 4
+    @test z_mslp.metadata.chunks[3] == max(output.time_chunk, 1)
+
+    # values still finite (skip t=0; physics buffers not populated at IC for mslp)
+    @test all(isfinite, g["temp"][:, :, :, :])
+end
+
+@testset "ZarrOutput chunk clamping to dim size" begin
+    # Requesting chunk sizes larger than the array must be clamped down rather
+    # than rejected by Zarr (chunk ≤ shape is required by the format).
+    tmp_output_path = mktempdir(pwd(), prefix = "tmp_zarrtests_clamp_")
+    period = Day(1)
+
+    spectral_grid = SpectralGrid(trunc = 5, nlayers = 1)
+    output = ZarrOutput(
+        spectral_grid, ShallowWater;
+        path = tmp_output_path, write_restart = false,
+        lon_chunk = 100_000, lat_chunk = 100_000, z_chunk = 100_000,
+    )
+    model = ShallowWaterModel(spectral_grid; output)
+    simulation = initialize!(model)
+    run!(simulation, output = true; period)
+
+    g = Zarr.zopen(joinpath(model.output.run_path, model.output.filename))
+    z_vor = g["vor"]
+    nlon, nlat = RingGrids.matrix_size(output.field2D)
+    @test z_vor.metadata.chunks[1] == nlon
+    @test z_vor.metadata.chunks[2] == nlat
+    @test z_vor.metadata.chunks[3] == 1     # nlayers=1 ⇒ z clamped to 1
+end
+
 @testset "ZarrOutput second run! creates a new store" begin
     tmp_output_path = mktempdir(pwd(), prefix = "tmp_zarrtests_rerun_")
     period = Day(1)

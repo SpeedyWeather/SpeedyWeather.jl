@@ -74,6 +74,15 @@ the Zarr group type once `initialize!` has been called (`Nothing` before)."""
     "[OPTION] number of time steps per chunk along the time dimension"
     time_chunk::Int = 1
 
+    "[OPTION] chunk size along longitude. 0 (default) means one chunk = full lon extent."
+    lon_chunk::Int = 0
+
+    "[OPTION] chunk size along latitude. 0 (default) means one chunk = full lat extent."
+    lat_chunk::Int = 0
+
+    "[OPTION] chunk size along the vertical (layer / soil_layer). 0 (default) means full extent."
+    vertical_chunk::Int = 0
+
     "[OPTION] Zarr compressor (extension-typed). `nothing` keeps the Zarr default."
     compressor::Union{C, Nothing} = nothing
 
@@ -120,6 +129,7 @@ function Base.show(io::IO, output::ZarrOutput{F}) where {F}
     println(io, styled"├ {info:path} = $(joinpath(output.run_path, output.filename)) (overwrite=$(output.overwrite))")
     println(io, styled"├ {info:interval} = $(output.interval)")
     println(io, styled"├ {info:time chunk} = $(output.time_chunk)")
+    println(io, styled"├ {info:spatial chunks (lon,lat,vertical)} = ($(output.lon_chunk),$(output.lat_chunk),$(output.vertical_chunk)) (0 ⇒ full extent)")
     print(io, styled"└ {info:variables}")
     nvars = length(output.variables)
     for (i, (key, var)) in enumerate(output.variables)

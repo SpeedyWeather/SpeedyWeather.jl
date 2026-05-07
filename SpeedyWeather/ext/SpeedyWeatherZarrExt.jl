@@ -202,7 +202,14 @@ function define_variable!(
     nlat = length(get_latd(output.field2D))
     nz = is_land(var) ? size(output.field3Dland, 2) : size(output.field3D, 2)
     full_shape = (nlon, nlat, nz, n_outputs)
-    full_chunks = (nlon, nlat, nz, max(output.time_chunk, 1))
+
+    # Spatial chunking: 0 (default) or any non-positive value ⇒ full extent.
+    # Otherwise clamp to the dimension size so users can't request chunks
+    # larger than the array (Zarr requires chunk ≤ shape).
+    cx = output.lon_chunk > 0 ? min(output.lon_chunk, nlon) : nlon
+    cy = output.lat_chunk > 0 ? min(output.lat_chunk, nlat) : nlat
+    cz = output.z_chunk   > 0 ? min(output.z_chunk,   nz)   : nz
+    full_chunks = (cx, cy, cz, max(output.time_chunk, 1))
     all_dims = is_land(var) ? ("lon", "lat", "soil_layer", "time") : ("lon", "lat", "layer", "time")
 
     # Pick out the active dims as flagged by var.dims_xyzt.
