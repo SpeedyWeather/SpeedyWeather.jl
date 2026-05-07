@@ -213,7 +213,7 @@ end
     output = ZarrOutput(
         spectral_grid, PrimitiveDry;
         path = tmp_output_path, write_restart = false,
-        lon_chunk = 4, lat_chunk = 4, z_chunk = 2,
+        lon_chunk = 4, lat_chunk = 4, vertical_chunk = 2,
     )
     model = PrimitiveDryModel(spectral_grid; output)
     simulation = initialize!(model)
@@ -226,7 +226,7 @@ end
     nlon, nlat = RingGrids.matrix_size(output.field2D)
     @test z_temp.metadata.chunks[1] == 4   # lon_chunk
     @test z_temp.metadata.chunks[2] == 4   # lat_chunk
-    @test z_temp.metadata.chunks[3] == 2   # z_chunk
+    @test z_temp.metadata.chunks[3] == 2   # vertical_chunk
     @test z_temp.metadata.chunks[4] == max(output.time_chunk, 1)
 
     # 3D variable (no layer dim): (lon, lat, time)
@@ -249,7 +249,7 @@ end
     output = ZarrOutput(
         spectral_grid, ShallowWater;
         path = tmp_output_path, write_restart = false,
-        lon_chunk = 100_000, lat_chunk = 100_000, z_chunk = 100_000,
+        lon_chunk = 100_000, lat_chunk = 100_000, vertical_chunk = 100_000,
     )
     model = ShallowWaterModel(spectral_grid; output)
     simulation = initialize!(model)
