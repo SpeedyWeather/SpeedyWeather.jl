@@ -55,7 +55,7 @@ using SpeedyWeather
 using Zarr     # this loads SpeedyWeatherZarrExt and enables ZarrOutput
 
 spectral_grid = SpectralGrid(trunc=31, nlayers=8)
-output = ZarrOutput(spectral_grid, PrimitiveWet, output_dt=Hour(6))
+output = ZarrOutput(spectral_grid, PrimitiveWet, interval=Hour(6))
 model = PrimitiveWetModel(spectral_grid; output)
 simulation = initialize!(model)
 run!(simulation, period=Day(10), output=true)
