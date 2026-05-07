@@ -331,10 +331,4 @@ end
 
 Base.close(output::ZarrOutput) = nothing
 
-# fallback to do nothing for variables without custom finalize
-finalize!(output::ZarrOutput, var::AbstractOutputVariable, args...) = nothing
-
-# NoOutputVariable behaves the same as for NetCDFOutput
-output!(output::ZarrOutput, ::NoOutputVariable, args...) = nothing
-
 end # module
