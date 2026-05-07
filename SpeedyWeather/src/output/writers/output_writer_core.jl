@@ -1,8 +1,5 @@
 export OutputWriterCore
 
-abstract type AbstractOutput <: AbstractModelComponent end
-abstract type AbstractOutputVariable <: AbstractModelComponent end
-
 """Shared runtime state for output writers: derived file paths, output frequency,
 and step/output counters. Embed as `core::OutputWriterCore` in every output writer.
 Option fields (path, id, overwrite, interval, …) stay as flat fields on the writer itself.

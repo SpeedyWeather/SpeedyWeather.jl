@@ -12,7 +12,7 @@ import SpeedyWeather: ZarrOutput, AbstractOutput, AbstractOutputVariable,
     Variables, Simulation, SpectralGrid, Field,
     initialize!, finalize!, output!, set!, add!, add_default!,
     is3D, is_land, hastime, get_indices, scale!, get_soil_layers,
-    NoOutputVariable, get_lond, get_latd, on_architecture, CPU,
+    get_lond, get_latd, on_architecture, CPU,
     AbstractFullGrid
 
 import SpeedyWeather.RingGrids
