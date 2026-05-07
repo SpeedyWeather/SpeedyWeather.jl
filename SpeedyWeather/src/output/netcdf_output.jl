@@ -350,13 +350,12 @@ is_land(variable::AbstractOutputVariable) = hasproperty(variable, :is_land) ? va
 hastime(variable::AbstractOutputVariable) = variable.dims_xyzt[4]
 
 """$(TYPEDSIGNATURES)
-Output a `variable` into the netCDF file `output.netcdf_file`.
-Interpolates onto the output grid and resolution as specified in `output`.
-Method used for all output variables `<: AbstractOutputVariable`
-with dispatch over the second argument. Interpolates, scales,
-custom transform, bitrounding and writes to file."""
+Output a `variable` into `output`. Interpolates onto the output grid and resolution
+as specified in `output`. Method used for all output variables `<: AbstractOutputVariable`
+with dispatch over the second argument. Interpolates, scales, custom transform,
+bitrounding and writes via the backend-specific [`write_array!`](@ref)."""
 function output!(
-        output::NetCDFOutput,
+        output::AbstractOutput,
         variable::AbstractOutputVariable,
         simulation::AbstractSimulation,
     )
@@ -388,9 +387,21 @@ function output!(
         round!(var, variable.keepbits)
     end
 
-    i = output.output_counter               # output time step i to write
-    indices = get_indices(i, variable)      # returns (:, :, i) for example, depending on dims
-    output.netcdf_file[variable.name][indices...] = var     # actually write to file
+    write_array!(output, variable, var)
+    return nothing
+end
+
+"""$(TYPEDSIGNATURES)
+Backend-specific write of an interpolated, post-processed field `field` for `variable`
+into `output`. Implementations exist for [`NetCDFOutput`](@ref) and `ZarrOutput`."""
+function write_array!(
+        output::NetCDFOutput,
+        variable::AbstractOutputVariable,
+        field,
+    )
+    i = output.output_counter
+    indices = get_indices(i, variable)
+    output.netcdf_file[variable.name][indices...] = field
     return nothing
 end
 

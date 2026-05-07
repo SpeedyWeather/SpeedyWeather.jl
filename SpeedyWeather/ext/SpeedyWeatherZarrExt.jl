@@ -10,7 +10,7 @@ import SpeedyWeather: ZarrOutput, AbstractOutput, AbstractOutputVariable,
     DEFAULT_OUTPUT_NF, DEFAULT_OUTPUT_INTERVAL, DEFAULT_MISSING_VALUE,
     DEFAULT_COMPRESSION_LEVEL, DEFAULT_KEEPBITS,
     Variables, Simulation, SpectralGrid, Field,
-    initialize!, finalize!, output!, set!, add!, add_default!,
+    initialize!, finalize!, output!, write_array!, set!, add!, add_default!,
     is3D, is_land, hastime, get_indices, scale!, get_soil_layers,
     NoOutputVariable, get_lond, get_latd, on_architecture, CPU,
     AbstractFullGrid
@@ -242,43 +242,21 @@ end
 
 """$(TYPEDSIGNATURES)
 Write a single output time step for `variable` to the Zarr store in `output`.
-Mirrors the [`NetCDFOutput`](@ref) version: interpolate, optional unscale,
-optional element-wise transform, mantissa rounding, then write."""
-function output!(
+The generic [`output!`](@ref) handles interpolation, transforms and bitrounding;
+this method just performs the Zarr-specific store-side write."""
+function write_array!(
         output::ZarrOutput,
         variable::AbstractOutputVariable,
-        simulation::AbstractSimulation,
+        field,
     )
-    ~hastime(variable) && output.output_counter > 1 && return nothing
-
-    # interpolate 2D/3D variables
-    var = is3D(variable) ? (is_land(variable) ? output.field3Dland : output.field3D) : output.field2D
-
-    raw = on_architecture(CPU(), SpeedyWeather.path(variable, simulation))
-    RingGrids.interpolate!(var, raw, output.interpolator)
-
-    if hasproperty(variable, :unscale)
-        if variable.unscale
-            scale!(var, inv(simulation.variables.prognostic.scale[]))
-        end
-    end
-
-    if hasproperty(variable, :transform)
-        @. var = variable.transform(var)
-    end
-
-    if hasproperty(variable, :keepbits)
-        round!(var, variable.keepbits)
-    end
-
     z = output.zarr_group[variable.name]
     if hastime(variable)
         i = output.output_counter                # current write index
         indices = get_indices(i, variable)
-        z[indices...] = parent_array(var)
+        z[indices...] = parent_array(field)
     else
         # static fields are only written once — just dump the array.
-        z[:] = parent_array(var)
+        z[:] = parent_array(field)
     end
     return nothing
 end

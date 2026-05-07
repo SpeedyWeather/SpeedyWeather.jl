@@ -70,6 +70,50 @@ end
 
     # 3D atmosphere variable has correct vertical dim
     @test size(g["temp"], 3) == spectral_grid.nlayers
+
+    # MSLP is a 2D variable derived on-the-fly from the 3D temperature/log(p_s)
+    # in a PrimitiveWet default output set. Regression test: an earlier
+    # ZarrOutput tried to interpolate the 3D temperature into a 2D output and
+    # threw a DimensionMismatch. Skip the t=0 snapshot — physics hasn't run yet
+    # so the surface-air temperature buffer is still uninitialized there.
+    @test haskey(g.arrays, "mslp")
+    nx, ny = RingGrids.matrix_size(output.field2D)
+    @test size(g["mslp"]) == (nx, ny, Int(period / output.interval) + 1)
+    @test all(isfinite, g["mslp"][:, :, 2:end])
+end
+
+@testset "ZarrOutput for variables with custom output! (2D-from-3D)" begin
+    # tsurf, u10/v10 each have specialized output! methods that derive a 2D
+    # field from 3D model state on the fly. Make sure they all interpolate
+    # cleanly through the ZarrOutput backend.
+    tmp_output_path = mktempdir(pwd(), prefix = "tmp_zarrtests_2dfrom3d_")
+    period = Day(1)
+
+    spectral_grid = SpectralGrid(trunc = 5, nlayers = 4)
+    output = ZarrOutput(
+        spectral_grid, PrimitiveWet;
+        path = tmp_output_path, write_restart = false,
+    )
+    add!(
+        output,
+        SpeedyWeather.SurfaceTemperatureOutput(),
+        SpeedyWeather.ZonalVelocity10mOutput(),
+        SpeedyWeather.MeridionalVelocity10mOutput(),
+    )
+    model = PrimitiveWetModel(spectral_grid; output)
+    simulation = initialize!(model)
+    run!(simulation, output = true; period)
+    @test simulation.model.feedback.nans_detected == false
+
+    g = Zarr.zopen(joinpath(model.output.run_path, model.output.filename))
+    nx, ny = RingGrids.matrix_size(output.field2D)
+    nt = Int(period / output.interval) + 1
+
+    for name in ("tsurf", "u10", "v10")
+        @test haskey(g.arrays, name)
+        @test size(g[name]) == (nx, ny, nt)
+        @test all(isfinite, g[name][:, :, 2:end])
+    end
 end
 
 @testset "ZarrOutput add!/delete! variables" begin
