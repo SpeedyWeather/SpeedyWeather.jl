@@ -102,6 +102,8 @@ export MatrixSpectralTransform
 export transform, transform!
 export curl, divergence, curl!, divergence!
 export ∇, ∇², ∇⁻², ∇!, ∇²!, ∇⁻²!
+export laplace, inverse_laplace, laplace!, inverse_laplace!
+export gradient, gradient!
 export power_spectrum
 
 import SpeedyTransforms: AbstractSpectralTransform, prettymemory
