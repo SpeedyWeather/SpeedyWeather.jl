@@ -118,7 +118,7 @@ function Base.show(io::IO, output::ZarrOutput{F}) where {F}
 
     println(io, styled"├ {info:interpolator}::$interp_type_str_short")
     println(io, styled"├ {info:path} = $(joinpath(output.run_path, output.filename)) (overwrite=$(output.overwrite))")
-    println(io, styled"├ {info:frequency} = $(output.interval)")
+    println(io, styled"├ {info:interval} = $(output.interval)")
     println(io, styled"├ {info:time chunk} = $(output.time_chunk)")
     print(io, styled"└ {info:variables}")
     nvars = length(output.variables)
@@ -126,20 +126,4 @@ function Base.show(io::IO, output::ZarrOutput{F}) where {F}
         print(io, "\n  $(i == nvars ? "└" : "├") ", styled"{magenta:$key}: $(var.long_name) ", styled"{note:[$(var.unit)]}")
     end
     return nothing
-end
-
-"""$(TYPEDSIGNATURES)
-Add `outputvariables` to the dictionary in `output::ZarrOutput`."""
-function add!(output::ZarrOutput, outputvariables::AbstractOutputVariable...)
-    add!(output.variables, outputvariables...)
-    return output
-end
-
-"""$(TYPEDSIGNATURES)
-Delete output variables from `output` by their (short name) (Symbol or String)."""
-function Base.delete!(output::ZarrOutput, keys::Union{String, Symbol}...)
-    for key in keys
-        delete!(output.variables, Symbol(key))
-    end
-    return output
 end

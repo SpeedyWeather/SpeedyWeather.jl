@@ -138,7 +138,7 @@ function Base.show(io::IO, output::NetCDFOutput{F}) where {F}
 
     println(io, styled"├ {info:interpolator}::$interp_type_str_short")
     println(io, styled"├ {info:path} = $(joinpath(output.run_path, output.filename)) (overwrite=$(output.overwrite))")
-    println(io, styled"├ {info:frequency} = $(output.interval)")
+    println(io, styled"├ {info:interval} = $(output.interval)")
     print(io, styled"└ {info:variables}")
     nvars = length(output.variables)
     for (i, (key, var)) in enumerate(output.variables)
@@ -159,7 +159,7 @@ end
 
 """$(TYPEDSIGNATURES)
 Add `outputvariables` to the dictionary in `output::NetCDFOutput`, i.e. at `output.variables`."""
-function add!(output::NetCDFOutput, outputvariables::AbstractOutputVariable...)
+function add!(output::AbstractOutput, outputvariables::AbstractOutputVariable...)
     add!(output.variables, outputvariables...)
     return output
 end
@@ -174,7 +174,7 @@ end
 """$(TYPEDSIGNATURES)
 Delete output variables from `output` by their (short name) (Symbol or String), corresponding
 to the keys in the dictionary."""
-function Base.delete!(output::NetCDFOutput, keys::Union{String, Symbol}...)
+function Base.delete!(output::AbstractOutput, keys::Union{String, Symbol}...)
     for key in keys
         delete!(output.variables, Symbol(key))
     end
