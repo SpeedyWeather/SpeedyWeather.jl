@@ -250,12 +250,8 @@ function output!(
     # interpolate 2D/3D variables
     var = is3D(variable) ? (is_land(variable) ? output.field3Dland : output.field3D) : output.field2D
 
-    try
-        raw = on_architecture(CPU(), SpeedyWeather.path(variable, simulation))
-        RingGrids.interpolate!(var, raw, output.interpolator)
-    catch FieldError
-        var .= variable.missing_value
-    end
+    raw = on_architecture(CPU(), SpeedyWeather.path(variable, simulation))
+    RingGrids.interpolate!(var, raw, output.interpolator)
 
     if hasproperty(variable, :unscale)
         if variable.unscale
