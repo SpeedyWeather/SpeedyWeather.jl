@@ -270,11 +270,7 @@ function output!(
     z = output.zarr_group[variable.name]
     if hastime(variable)
         i = output.output_counter                # current write index
-        # Grow the time axis to length `i` if needed. `Base.append!` would
-        # zero-fill the new slab and then we'd overwrite it — `resize!` only
-        # rewrites the array's metadata (`.zarray`) and leaves chunks
-        # untouched, so a single `setindex!` writes only the data we
-        # actually have for this time step.
+        # Grow the time axis to length `i` if needed. 
         grow_time_axis!(z, i)
         indices = get_indices(i, variable)
         z[indices...] = parent_array(var)
