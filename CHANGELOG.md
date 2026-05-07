@@ -2,12 +2,13 @@
 
 ## Unreleased
 
+- Add non-unicode function name aliases laplace, inverse_laplace, gradient [#1078](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1078)
+
 ## v0.20.0
 
 - [BREAKING] `output_dt` renamed to `interval` [#1075](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1075)
 - `set!(output, model; interval)` to change output frequency after model initialization [#1075](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1075)
 - Documentation hero page and docs rendering [#1071](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1071) [#1072](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1072)
-
 - Bump julia-actions/cache and setup-julia v2 to v3 [#1073](ttps://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1073)
 
 ## v0.19.0
