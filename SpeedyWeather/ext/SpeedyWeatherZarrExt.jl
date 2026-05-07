@@ -106,6 +106,9 @@ function initialize!(
     # SHARED INITIALIZATION (run folder, output frequency, counters, callbacks)
     initialize!(output.core, output, model)
 
+    # Total number of output snapshots: IC + one per `output_every_n_steps`.
+    n_outputs = vars.prognostic.clock.n_timesteps ÷ output.output_every_n_steps + 1
+
     # CREATE ZARR GROUP (the Zarr store is a *directory*, not a single file)
     (; run_path, filename) = output
     store_path = joinpath(run_path, filename)
@@ -141,11 +144,11 @@ function initialize!(
         attrs = Dict("units" => "1", "long_name" => "soil layer index", "_ARRAY_DIMENSIONS" => ["soil_layer"])
     )
 
-    # TIME: extendable along axis 1, chunked by `output.time_chunk`.
+    # TIME: full-length, chunked by `output.time_chunk`.
     (; startdate) = output
     time_string = "hours since $(Dates.format(startdate, "yyyy-mm-dd HH:MM:0.0"))"
     Zarr.zcreate(
-        Float64, g, "time", 0;
+        Float64, g, "time", n_outputs;
         chunks = (max(output.time_chunk, 1),),
         attrs = Dict(
             "units" => time_string, "long_name" => "time",
@@ -155,9 +158,9 @@ function initialize!(
     )
     output!(output, vars.prognostic.clock.time)   # write initial time
 
-    # VARIABLES
+    # VARIABLES (pre-allocated to full length along the time axis)
     for (key, var) in output.variables
-        define_variable!(g, output, var, eltype(output.field2D))
+        define_variable!(g, output, var, n_outputs, eltype(output.field2D))
         output!(output, var, Simulation(vars, model))
     end
 
@@ -183,12 +186,13 @@ end
 """$(TYPEDSIGNATURES)
 Define a Zarr array for output `var` in the Zarr group `g`. Shape and chunk
 shape are derived from `var.dims_xyzt` and the output grid; the time axis is
-created with length 0 and grows via `Base.append!` as new time steps are
-written."""
+pre-allocated to its final length `n_outputs`. Unwritten chunks read back as
+the array's `fill_value`."""
 function define_variable!(
         g::Zarr.ZGroup,
         output::ZarrOutput,
         var::AbstractOutputVariable,
+        n_outputs::Int,
         output_NF::Type{<:AbstractFloat} = DEFAULT_OUTPUT_NF,
     )
     missing_value = hasfield(typeof(var), :missing_value) ? var.missing_value : DEFAULT_MISSING_VALUE
@@ -197,7 +201,7 @@ function define_variable!(
     nlon = length(get_lond(output.field2D))
     nlat = length(get_latd(output.field2D))
     nz = is_land(var) ? size(output.field3Dland, 2) : size(output.field3D, 2)
-    full_shape = (nlon, nlat, nz, 0)
+    full_shape = (nlon, nlat, nz, n_outputs)
     full_chunks = (nlon, nlat, nz, max(output.time_chunk, 1))
     all_dims = is_land(var) ? ("lon", "lat", "soil_layer", "time") : ("lon", "lat", "layer", "time")
 
@@ -270,8 +274,6 @@ function output!(
     z = output.zarr_group[variable.name]
     if hastime(variable)
         i = output.output_counter                # current write index
-        # Grow the time axis to length `i` if needed. 
-        grow_time_axis!(z, i)
         indices = get_indices(i, variable)
         z[indices...] = parent_array(var)
     else
@@ -287,26 +289,11 @@ function output!(output::ZarrOutput, time::DateTime)
     output.output_counter += 1
     i = output.output_counter
 
-    z_time = output.zarr_group["time"]
-    grow_time_axis!(z_time, i)
-
     (; startdate) = output
     time_passed = Millisecond(time - startdate)
     time_hrs = time_passed.value / 3600_000
-    z_time[i] = time_hrs
+    output.zarr_group["time"][i] = time_hrs
     return nothing
-end
-
-"""$(TYPEDSIGNATURES)
-Grow the last (time) axis of the Zarr array `z` to length `i` if it is shorter,
-using `Base.resize!` (which only rewrites the array metadata; the new slab
-remains uninitialized chunks until written into)."""
-function grow_time_axis!(z::Zarr.ZArray, i::Int)
-    n = ndims(z)
-    size(z, n) >= i && return z
-    new_shape = ntuple(k -> k == n ? i : size(z, k), n)
-    Base.resize!(z, new_shape)
-    return z
 end
 
 """Pull out the parent (Array) of a Field for direct copy into a Zarr array."""

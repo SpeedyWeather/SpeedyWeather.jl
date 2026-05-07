@@ -160,3 +160,30 @@ end
     # compressor was applied
     @test z_vor.metadata.compressor isa Zarr.BloscCompressor
 end
+
+@testset "ZarrOutput second run! creates a new store" begin
+    tmp_output_path = mktempdir(pwd(), prefix = "tmp_zarrtests_rerun_")
+    period = Day(1)
+
+    spectral_grid = SpectralGrid(trunc = 5, nlayers = 1)
+    output = ZarrOutput(
+        spectral_grid, ShallowWater;
+        path = tmp_output_path, write_restart = false, id = "rerun",
+    )
+    model = ShallowWaterModel(spectral_grid; output)
+    simulation = initialize!(model)
+
+    run!(simulation, output = true; period)
+    first_path = model.output.run_path
+    n_first = length(Zarr.zopen(joinpath(first_path, output.filename))["time"][:])
+
+    run!(simulation, output = true; period)
+    second_path = model.output.run_path
+
+    # paths differ (new run folder) and the old store wasn't grown by the
+    # second run
+    @test first_path != second_path
+    @test isdir(joinpath(first_path, output.filename))
+    @test isdir(joinpath(second_path, output.filename))
+    @test length(Zarr.zopen(joinpath(first_path, output.filename))["time"][:]) == n_first
+end
