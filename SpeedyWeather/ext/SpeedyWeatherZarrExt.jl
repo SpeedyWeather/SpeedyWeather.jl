@@ -329,34 +329,7 @@ function write_slice!(z::Zarr.ZArray, variable::AbstractOutputVariable, i::Int, 
     return nothing
 end
 
-"""$(TYPEDSIGNATURES)
-Finalize Zarr `output`: call `finalize!` on each output variable, then close
-the store."""
-function finalize!(output::ZarrOutput, simulation::AbstractSimulation)
-    if output.active
-        for var in values(output.variables)
-            finalize!(output, var, simulation)
-        end
-    end
-    return Base.close(output)
-end
-
-# Zarr stores back onto a directory: there's nothing to flush/close beyond
-# that the data is already on disk, but we drop the reference for symmetry.
-function Base.close(output::ZarrOutput)
-    output.zarr_group = nothing
-    return nothing
-end
-
-# allow set! to dispatch — same behaviour as NetCDFOutput.
-SpeedyWeather.set!(output::ZarrOutput; active, reset_path = true) = begin
-    output.active = active
-    if reset_path
-        output.run_folder = ""
-        output.run_path = ""
-    end
-    return nothing
-end
+Base.close(output::ZarrOutput) = nothing
 
 # fallback to do nothing for variables without custom finalize
 finalize!(output::ZarrOutput, var::AbstractOutputVariable, args...) = nothing
