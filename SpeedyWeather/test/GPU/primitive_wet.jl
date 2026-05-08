@@ -8,7 +8,7 @@
     output = NetCDFOutput(spectral_grid, PrimitiveWet, path = tmp_output_path, id = "gpu-netcdf")
     model = PrimitiveWetModel(spectral_grid; output, particle_advection)
     simulation = initialize!(model)
-    run!(simulation, steps = 3, output=true)
+    run!(simulation, steps = 3, output = true)
 
     @test simulation.model.feedback.nans_detected == false
     @test isfile(joinpath(output.run_path, output.filename))

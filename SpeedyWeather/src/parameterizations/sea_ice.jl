@@ -41,7 +41,6 @@ ThermodynamicSeaIce(SG::SpectralGrid; kwargs...) = ThermodynamicSeaIce{SG.NF}(; 
 initialize!(::ThermodynamicSeaIce, ::AbstractModel) = nothing
 
 
-
 # start with zero concentration
 initialize!(vars::Variables, sea_ice_model::ThermodynamicSeaIce, model::PrimitiveEquation) = nothing
 

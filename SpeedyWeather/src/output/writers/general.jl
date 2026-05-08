@@ -104,7 +104,7 @@ set!(::Nothing; active, reset_path = true) = nothing
 initialize!(::Nothing, ::Union{AbstractFeedback, Nothing}, ::Variables, ::AbstractModel) = nothing
 
 # in case of no output nothing to close
-Base.close(::Nothing) = nothing     
+Base.close(::Nothing) = nothing
 
 """$(TYPEDSIGNATURES)
 Writes the variables from `vars` of time step `i` at time `time` into `output.netcdf_file`.
