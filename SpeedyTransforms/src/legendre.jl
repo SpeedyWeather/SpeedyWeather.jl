@@ -56,6 +56,9 @@ function _legendre!(
     @boundscheck ismatching(S, specs) || throw(DimensionMismatch(S, specs))
     @boundscheck size(g_north) == size(g_south) == (S.nfreq_max, S.nlayers, nlat_half) || throw(DimensionMismatch(S, specs))
 
+    fill!(g_north, 0)   # zero before threaded loop to avoid broadcast_unalias inside @threads
+    fill!(g_south, 0)
+
     # Multithreaded over latitudes using @threads :static, which pins each
     # iteration to a fixed OS thread so Threads.threadid() is stable and safe
     # to use as a buffer index into north_threads/south_threads.
@@ -68,9 +71,6 @@ function _legendre!(
         south = view(south_threads, :, t)
 
         @inbounds begin
-            g_north[:, nlayers, j] .= 0
-            g_south[:, nlayers, j] .= 0
-
             lm = 1
             for m in 1:(mmax_truncation[j] + 1)
                 lm_end = lm + lmax - m + 1
@@ -88,12 +88,11 @@ function _legendre!(
 
                 lm = lm_end + 1
             end
-
-            if unscale_coslat
-                g_north[:, nlayers, j] .*= coslat⁻¹[j]
-                g_south[:, nlayers, j] .*= coslat⁻¹[j]
-            end
         end
+    end
+
+    if unscale_coslat
+        unscale_coslat!(g_north, g_south, coslat⁻¹; architecture = architecture(specs))
     end
     return nothing
 end
