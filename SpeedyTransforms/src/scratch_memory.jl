@@ -111,7 +111,7 @@ function ScratchMemory(
         architecture::AbstractArchitecture,
         grid::AbstractGrid,
         nlayers::Integer,
-        nspec::Integer,
+        nspec::Integer = 0,
     ) where {NF}
 
     grid_type = nonparametric_type(grid)   # always use nonparametric concrete type
