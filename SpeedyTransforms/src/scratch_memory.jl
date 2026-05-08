@@ -60,7 +60,7 @@ end
 # On non-CPU architectures we allocate just one (unused) slice so the struct
 # layout stays uniform across architectures.
 _legendre_nthreads(::AbstractArchitecture) = 1
-_legendre_nthreads(::Architectures.AbstractCPU) = Threads.nthreads()
+_legendre_nthreads(::Architectures.AbstractCPU) = Threads.maxthreadid()
 
 function ScratchMemory(
         ::Type{NF},
