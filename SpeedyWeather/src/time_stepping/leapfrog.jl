@@ -13,7 +13,7 @@ $(TYPEDFIELDS)"""
     "[OPTION] Time step in minutes for T31, scale linearly to `trunc`"
     Δt_at_T31::S = Minute(40)
 
-    "[OPTION] Adjust `Δt_at_T31` with the `output_dt` to reach `output_dt` exactly in integer time steps"
+    "[OPTION] Adjust `Δt_at_T31` with the `interval` to reach `interval` exactly in integer time steps"
     adjust_with_output::B = true
 
     "[OPTION] Start integration with (1) Euler step with dt/2, (2) Leapfrog step with dt"
@@ -61,25 +61,25 @@ function Leapfrog(spectral_grid::SpectralGrid; kwargs...)
 end
 
 """$(TYPEDSIGNATURES)
-Initialize leapfrogging `L` by recalculating the time step given the output time step
-`output_dt` from `model.output`. Recalculating will slightly adjust the time step to
+Initialize leapfrogging `L` by recalculating the time step given the output
+`interval` from `model.output`. Recalculating will slightly adjust the time step to
 be a divisor such that an integer number of time steps matches exactly with the output
-time step."""
+interval."""
 function initialize!(L::Leapfrog, model::AbstractModel)
     (; radius) = model.planet
-    output_dt = get_output_dt(model.output)
+    interval = get_interval(model.output)
 
     # take radius from planet and recalculate time step and possibly adjust with output dt
-    L.Δt_millisec = get_Δt_millisec(L.Δt_at_T31, L.trunc, radius, L.adjust_with_output, output_dt)
+    L.Δt_millisec = get_Δt_millisec(L.Δt_at_T31, L.trunc, radius, L.adjust_with_output, interval)
     L.Δt_sec = L.Δt_millisec.value / 1000
     L.Δt = L.Δt_sec / radius
 
     # check how time steps from time integration and output align
-    n = round(Int, Millisecond(output_dt).value / L.Δt_millisec.value)
+    n = round(Int, Millisecond(interval).value / L.Δt_millisec.value)
     nΔt = n * L.Δt_millisec
-    if nΔt != output_dt
+    if nΔt != interval
         @warn "$n steps of Δt = $(L.Δt_millisec.value)ms yield output every " *
-            "$(nΔt.value)ms (=$(nΔt.value / 1000)s), but output_dt = $(output_dt.value)s"
+            "$(nΔt.value)ms (=$(nΔt.value / 1000)s), but interval = $(interval.value)s"
     end
     if L.start_with_euler
         L.first_step_euler = true

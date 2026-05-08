@@ -38,7 +38,7 @@ end
 @testset "architecture() inference" begin
     # scalars / nothing
     @test architecture(1.0) === nothing
-    @test architecture(1f0) === nothing
+    @test architecture(1.0f0) === nothing
     @test architecture() === nothing
 
     # CPU arrays
@@ -92,6 +92,9 @@ end
     @test ismatching(cpu, CPU())
     @test ismatching(jlgpu, GPU(JLArrays.JLBackend()))
     @test !ismatching(cpu, jlgpu)
+
+    # with a view / subarray
+    @test ismatching(cpu, view(a_cpu, 1:2))
 end
 
 @testset "nonparametric_type" begin
@@ -172,4 +175,3 @@ end
     @test nt_gpu.x isa JLArray
     @test keys(nt_gpu) == (:x, :y)
 end
-

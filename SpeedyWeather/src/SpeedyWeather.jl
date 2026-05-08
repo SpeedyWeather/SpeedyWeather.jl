@@ -47,9 +47,9 @@ import SpeedyWeatherInternals.Utils: Utils, @maybe_jit, _jit, print_fields, read
 
 # PARAMETER HANDLING
 using DomainSets.IntervalSets
-using SpeedyWeatherInternals.SpeedyParameters
-import SpeedyWeatherInternals.SpeedyParameters: parameters
-export SpeedyParam, SpeedyParams, parameters, stripparams       # export user-facing parameter handling types and methods
+using SpeedyWeatherInternals.ParameterEditing
+import SpeedyWeatherInternals.ParameterEditing: parameters
+export ParameterTable, parameters, stripparams       # export user-facing parameter handling types and methods
 
 # Export heavily methoded functions
 export initialize!, finalize!
@@ -102,6 +102,8 @@ export MatrixSpectralTransform
 export transform, transform!
 export curl, divergence, curl!, divergence!
 export ∇, ∇², ∇⁻², ∇!, ∇²!, ∇⁻²!
+export laplace, inverse_laplace, laplace!, inverse_laplace!
+export gradient, gradient!
 export power_spectrum
 
 import SpeedyTransforms: AbstractSpectralTransform, prettymemory
@@ -191,11 +193,14 @@ include("parameterizations/land/rivers.jl")
 include("output/schedule.jl")
 include("output/callbacks.jl")
 include("output/feedback.jl")
-include("output/output_writer_core.jl")
-include("output/netcdf_output.jl")
+include("output/writers/general.jl")
+include("output/writers/output_writer_core.jl")
+include("output/writers/netcdf_output.jl")
+include("output/writers/variables_output.jl")
+include("output/writers/zarr_output.jl")
+include("output/variables/output_variables.jl")
 include("output/restart.jl")
 include("output/particle_tracker.jl")
-include("output/variables_output.jl")
 
 # MODELS
 include("models/simulation.jl")

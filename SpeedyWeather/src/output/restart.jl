@@ -112,7 +112,7 @@ load_model_component(callback::WriteModelComponentFile) =
     load_model_component(callback.path, callback.filename)
 
 function load_model_component(path::String, filename::String = "")
-    jldopen(joinpath(path, filename), "r") do f
+    return jldopen(joinpath(path, filename), "r") do f
         return f["component"]
     end
 end
