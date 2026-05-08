@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Column-based parametrizations are now multithreaded on CPU [#1032](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1032)
 - `ZarrOutput` for writing simulation output to a Zarr store, implemented as a Zarr.jl extension [#1076](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1076)
 - Add non-unicode function name aliases laplace, inverse_laplace, gradient [#1078](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1078)
 
