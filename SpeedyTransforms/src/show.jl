@@ -24,7 +24,10 @@ function Base.show(io::IO, S::SpectralTransform{NF, AR, AT}) where {NF, AR, AT}
         sizeof(S.scratch_memory.north) +      # add all scratch_memories
             sizeof(S.scratch_memory.south) +
             sizeof(S.scratch_memory.column.north) +
-            sizeof(S.scratch_memory.column.south)
+            sizeof(S.scratch_memory.column.south) +
+            sizeof(S.scratch_memory.column.north_threads) +
+            sizeof(S.scratch_memory.column.south_threads) +
+            sizeof(S.scratch_memory.column.specs_threads)
     )
 
     dealias = get_dealiasing(mmax - 1, nlat_half) # -1 for zero-based

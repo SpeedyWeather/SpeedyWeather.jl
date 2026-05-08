@@ -56,42 +56,70 @@ function _legendre!(
     @boundscheck ismatching(S, specs) || throw(DimensionMismatch(S, specs))
     @boundscheck size(g_north) == size(g_south) == (S.nfreq_max, S.nlayers, nlat_half) || throw(DimensionMismatch(S, specs))
 
-    north = scratch_memory.north     # use scratch memory for vertically-batched dot product
-    south = scratch_memory.south
+    # Multithreaded over latitudes. Each task gets its own column-scratch slice
+    # (view(north_threads, :, c) / view(south_threads, :, c)) so that the inner
+    # `_fused_oddeven_matvec!` writes don't race. Latitudes are partitioned into
+    # `nchunks` contiguous ranges so that the chunk index `c` is a stable per-task
+    # buffer index — avoiding the task-migration pitfalls of `Threads.threadid()`.
+    north_threads = scratch_memory.north_threads        # (nlayers, nthreads)
+    south_threads = scratch_memory.south_threads        # (nlayers, nthreads)
+    nchunks = min(size(north_threads, 2), nlat_half)
+    chunks = _chunk_ranges(nlat_half, nchunks)
 
-    return @inbounds for j in 1:nlat_half          # symmetry: loop over northern latitudes only
-        g_north[:, nlayers, j] .= 0       # reset scratch memory
-        g_south[:, nlayers, j] .= 0       # reset scratch memory
+    @sync for c in 1:nchunks
+        Threads.@spawn begin
+            north_c = view(north_threads, :, c)
+            south_c = view(south_threads, :, c)
+            @inbounds for j in chunks[c]    # symmetry: loop over northern latitudes only
+                g_north[:, nlayers, j] .= 0
+                g_south[:, nlayers, j] .= 0
 
-        # INVERSE LEGENDRE TRANSFORM by looping over wavenumbers l, m
-        lm = 1                              # single running index for non-zero l, m indices
-        for m in 1:(mmax_truncation[j] + 1)   # Σ_{m=0}^{mmax}, but 1-based index, shortened to mmax_truncation
-            lm_end = lm + lmax - m + 1          # last index in column
+                # INVERSE LEGENDRE TRANSFORM by looping over wavenumbers l, m
+                lm = 1                          # single running index for non-zero l, m indices
+                for m in 1:(mmax_truncation[j] + 1) # Σ_{m=0}^{mmax}, 1-based, shortened
+                    lm_end = lm + lmax - m + 1  # last index in column
 
-            # view on lower triangular column, but batched in vertical
-            spec_view = view(specs.data, lm:lm_end, :)
-            legendre_view = view(legendre_polynomials.data, lm:lm_end, j)
+                    # view on lower triangular column, but batched in vertical
+                    spec_view = view(specs.data, lm:lm_end, :)
+                    legendre_view = view(legendre_polynomials.data, lm:lm_end, j)
 
-            # dot product but split into even and odd harmonics on the fly for better performance
-            # function is 1-based (odd, even, odd, ...) but here use 0-based indexing to name
-            # the "even" and "odd" harmonics, batched in the vertical so it's a mat vec multiplication
-            north, south = _fused_oddeven_matvec!(north, south, spec_view, legendre_view)
+                    # dot product but split into even and odd harmonics on the fly
+                    _fused_oddeven_matvec!(north_c, south_c, spec_view, legendre_view)
 
-            # CORRECT FOR LONGITUDE OFFSETTS (if grid points don't start at 0°E)
-            o = lon_offsets[m, j]           # rotation through multiplication with complex unit vector
-            for k in nlayers
-                g_north[m, k, j] = muladd(o, north[k], g_north[m, k, j])
-                g_south[m, k, j] = muladd(o, south[k], g_south[m, k, j])
+                    # CORRECT FOR LONGITUDE OFFSETTS (if grid points don't start at 0°E)
+                    o = lon_offsets[m, j]
+                    for k in nlayers
+                        g_north[m, k, j] = muladd(o, north_c[k], g_north[m, k, j])
+                        g_south[m, k, j] = muladd(o, south_c[k], g_south[m, k, j])
+                    end
+
+                    lm = lm_end + 1             # first index of next m column
+                end
+
+                if unscale_coslat
+                    g_north[:, nlayers, j] .*= coslat⁻¹[j]
+                    g_south[:, nlayers, j] .*= coslat⁻¹[j]
+                end
             end
-
-            lm = lm_end + 1                         # first index of next m column
-        end
-
-        if unscale_coslat
-            g_north[:, nlayers, j] .*= coslat⁻¹[j]        # scale in place
-            g_south[:, nlayers, j] .*= coslat⁻¹[j]
         end
     end
+    return nothing
+end
+
+# Partition 1:n into `nchunks` contiguous UnitRanges. Used to give each task a
+# stable index 1..nchunks for indexing per-thread scratch buffers, which avoids
+# the task-migration pitfalls of Threads.threadid().
+function _chunk_ranges(n::Integer, nchunks::Integer)
+    nchunks = max(1, min(nchunks, n))
+    base, rem = divrem(n, nchunks)
+    ranges = Vector{UnitRange{Int}}(undef, nchunks)
+    start = 1
+    for c in 1:nchunks
+        len = base + (c <= rem ? 1 : 0)
+        ranges[c] = start:(start + len - 1)
+        start += len
+    end
+    return ranges
 end
 
 # (forward) Legendre kernel, called from _legendre!
@@ -143,41 +171,70 @@ function _legendre!(                        # GRID TO SPECTRAL
     @boundscheck ismatching(S, specs) || throw(DimensionMismatch(S, specs))
     @boundscheck size(f_north) == size(f_south) == (S.nfreq_max, S.nlayers, nlat_half) || throw(DimensionMismatch(S, specs))
 
-    even = scratch_memory.north      # use scratch memory for outer product
-    odd = scratch_memory.south
-
     fill!(specs, 0)                         # reset as we accumulate into specs
 
-    return @inbounds for j_north in 1:nlat_half    # symmetry: loop over northern latitudes only
-        j = j_north                         # symmetric index / ring-away from pole index
+    # Multithreaded over latitudes. Each task accumulates into its own slice of
+    # specs_threads (`view(specs_threads, :, :, c)`) and uses its own column
+    # scratch slices from north_threads/south_threads (repurposed here as
+    # `even`/`odd`). After all tasks finish we sum each thread-local accumulator
+    # into the output `specs.data` to avoid races. As in the inverse transform
+    # we partition latitudes into `nchunks` contiguous ranges so the chunk
+    # index `c` is a stable per-task buffer index.
+    even_threads = scratch_memory.north_threads         # (nlayers, nthreads), repurposed as `even`
+    odd_threads = scratch_memory.south_threads          # (nlayers, nthreads), repurposed as `odd`
+    specs_threads = scratch_memory.specs_threads        # (nspec, nlayers, nthreads)
+    nchunks = min(size(specs_threads, 3), nlat_half)
+    chunks = _chunk_ranges(nlat_half, nchunks)
+    nlayers_used = length(nlayers)
 
-        # SOLID ANGLES including quadrature weights (sinθ Δθ) and azimuth (Δϕ) on ring j
-        ΔΩ = solid_angles[j]                # = sinθ Δθ Δϕ, solid angle for a grid point
+    @sync for c in 1:nchunks
+        Threads.@spawn begin
+            even = view(even_threads, :, c)
+            odd = view(odd_threads, :, c)
+            specs_local = view(specs_threads, :, :, c)
+            fill!(specs_local, 0)
+            @inbounds for j_north in chunks[c]      # symmetry: only northern latitudes
+                j = j_north                         # symmetric / ring-away-from-pole index
 
-        lm = 1                              # single running index for spherical harmonics
-        for m in 1:(mmax_truncation[j] + 1)   # Σ_{m=0}^{mmax}, but 1-based index, shortened to mmax_truncation
+                # SOLID ANGLES including quadrature weights (sinθ Δθ) and azimuth (Δϕ)
+                ΔΩ = solid_angles[j]
 
-            # SOLID ANGLE QUADRATURE WEIGHTS and LONGITUDE OFFSET
-            o = lon_offsets[m, j]           # longitude offset rotation by multiplication with complex unit vector
-            ΔΩ_rotated = ΔΩ * conj(o)         # complex conjugate for rotation back to prime meridian
+                lm = 1                              # single running index for spherical harmonics
+                for m in 1:(mmax_truncation[j] + 1) # Σ_{m=0}^{mmax}, 1-based, shortened
+                    o = lon_offsets[m, j]
+                    ΔΩ_rotated = ΔΩ * conj(o)
 
-            # LEGENDRE TRANSFORM
-            for k in nlayers
-                fn, fs = f_north[m, k, j], f_south[m, k, j]
-                @fastmath even[k] = ΔΩ_rotated * (fn + fs)
-                @fastmath odd[k] = ΔΩ_rotated * (fn - fs)
+                    for k in nlayers
+                        fn, fs = f_north[m, k, j], f_south[m, k, j]
+                        @fastmath even[k] = ΔΩ_rotated * (fn + fs)
+                        @fastmath odd[k] = ΔΩ_rotated * (fn - fs)
+                    end
+
+                    lm_end = lm + lmax - m + 1
+                    spec_view = view(specs_local, lm:lm_end, :)
+                    legendre_view = view(legendre_polynomials.data, lm:lm_end, j)
+
+                    _fused_oddeven_outer_product_accumulate!(spec_view, legendre_view, even, odd)
+
+                    lm = lm_end + 1
+                end
             end
-
-            # integration over l = m:lmax+1
-            lm_end = lm + lmax - m + 1                      # last index in column m
-            spec_view = view(specs.data, lm:lm_end, :)
-            legendre_view = view(legendre_polynomials.data, lm:lm_end, j)
-
-            _fused_oddeven_outer_product_accumulate!(spec_view, legendre_view, even, odd)
-
-            lm = lm_end + 1                             # first index of next column m+1
         end
     end
+
+    # REDUCE: sum each thread-local accumulator into the output specs.data.
+    # specs.data may be 1D (LowerTriangularMatrix, single layer) or 2D
+    # (LowerTriangularArray, multiple layers); restrict the accumulator to the
+    # active nlayers and reshape if needed.
+    @inbounds for c in 1:nchunks
+        src = view(specs_threads, :, 1:nlayers_used, c)
+        if ndims(specs.data) == 1
+            specs.data .+= vec(src)
+        else
+            specs.data .+= src
+        end
+    end
+    return nothing
 end
 
 """
