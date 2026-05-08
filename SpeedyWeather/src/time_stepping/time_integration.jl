@@ -138,7 +138,7 @@ function timestep!(
     reset_tendencies!(vars)             # set the tendencies back to zero for accumulation
 
     if ~model.dynamics_only             # switch on/off all physics parameterizations
-        # calculate all parameterizations
+        greenhouse_gases_timestep!(vars, model)
         parameterization_tendencies!(vars, model)
         ocean_timestep!(vars, model)    # sea surface temperature and maybe in the future sea ice
         sea_ice_timestep!(vars, model)  # sea ice
