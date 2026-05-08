@@ -1,6 +1,6 @@
 name = "SpeedyWeatherInternals"
 uuid = "34489162-d270-4603-8b96-37b04f830d73"
-version = "0.2"
+version = "0.2.0"
 authors = ["SpeedyWeatherInternals contributors"]
 
 [deps]
@@ -30,11 +30,11 @@ SpeedyWeatherInternalsReactantExt = ["Reactant", "KernelAbstractions"]
 
 [compat]
 AMDGPU = "2.1.2"
-CUDA = "4, 5"
+CUDA = "4, 5, 6.0"
 ComponentArrays = "0.15"
 ConstructionBase = "1"
 DocStringExtensions = "0.9"
-DomainSets = "0.7"
+DomainSets = "0.7, 0.8"
 JLArrays = "0.1, 0.2, 0.3"
 KernelAbstractions = "0.9"
 MacroTools = "0.5"

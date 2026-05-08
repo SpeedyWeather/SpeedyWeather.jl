@@ -48,7 +48,6 @@ function Base.show(io::IO, var::AbstractVariable)
     return nothing
 end
 
-export Variables
 """$(TYPEDSIGNATURES)
 Symbol representing a unique identifier for a variable, combining its type, namespace and name and namespace. 
 Used to remove duplicates when extracting variables from the model. E.g. `:Variable_ocean_sea_surface_temperature`."""
@@ -83,7 +82,18 @@ All non-prognostic groups are considered to be diagnostic with no memory between
     scratch::S = NamedTuple()
 end
 
+# defined e.g. for output filters, as fieldnames(Variables) isn't fully type stable
+const ALL_VARIABLE_GROUPS = (:prognostic, :grid, :tendencies, :dynamics, :parameterizations, :particles, :scratch)
+
 Adapt.@adapt_structure Variables
+
+"""$(TYPEDSIGNATURES)
+Transfer all arrays in `vars` to `arch` using `on_architecture` for each group."""
+function Architectures.on_architecture(arch::AbstractArchitecture, vars::Variables)
+    return Variables(;
+        (k => on_architecture(arch, getfield(vars, k)) for k in fieldnames(Variables))...
+    )
+end
 
 """$(TYPEDSIGNATURES)
 Copy all entries from `src` to `dest` by recursing over the variable groups

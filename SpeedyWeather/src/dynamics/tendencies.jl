@@ -390,7 +390,7 @@ function linear_pressure_gradient!(
         vars::Variables,
         lf::Int,                # leapfrog index to evaluate tendencies on
         atmosphere::AbstractAtmosphere,
-        implicit::ImplicitPrimitiveEquation,
+        implicit::AbstractImplicit,
     )
     (; R_dry) = atmosphere                      # dry gas constant
     Tₖ = implicit.temp_profile                  # reference profile at layer k
@@ -441,7 +441,7 @@ function vordiv_tendencies!(
         coriolis::AbstractCoriolis,
         atmosphere::AbstractAtmosphere,
         geometry::AbstractGeometry,
-        implicit::ImplicitPrimitiveEquation,
+        implicit::AbstractImplicit,
         S::AbstractSpectralTransform,
     )
     (; f) = coriolis                            # coriolis parameter
@@ -578,7 +578,7 @@ function temperature_tendency!(
         vars::Variables,
         adiabatic_conversion::AbstractAdiabaticConversion,
         atmosphere::AbstractAtmosphere,
-        implicit::ImplicitPrimitiveEquation,
+        implicit::AbstractImplicit,
         G::Geometry,
         S::AbstractSpectralTransform,
     )
@@ -957,7 +957,7 @@ function bernoulli_potential!(
     # pₛ = diagn.grid.pres_grid_prev                  # 2D not prev is in Pa
     # RdTlnpₛ .= R_dry * Tₖ' .* log.(pₛ)
 
-    bernoulli_grid .= 1 // 2 .* (u.^2 + v.^2)                    # = ½(u² + v²) on grid
+    bernoulli_grid .= 1 // 2 .* (u .^ 2 + v .^ 2)                    # = ½(u² + v²) on grid
     transform!(bernoulli, bernoulli_grid, scratch_memory, S)    # to spectral space
     bernoulli .+= geopot                                        # add geopotential Φ
     ∇²!(div_tend, bernoulli, S, add = true, flipsign = true)    # add -∇²(½(u² + v²) + ϕ)

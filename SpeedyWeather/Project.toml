@@ -1,7 +1,7 @@
 name = "SpeedyWeather"
 uuid = "9e226e20-d153-4fed-8a5b-493def4f21a9"
-version = "0.19"
 authors = ["SpeedyWeather contributors"]
+version = "0.20.0+DEV"
 
 [deps]
 AbstractFFTs = "621f4979-c628-5d54-868e-fcf4e3e8185c"
@@ -41,6 +41,7 @@ FiniteDifferences = "26cc04aa-876d-5657-8c51-4c34ba976000"
 GeoMakie = "db073c08-6b98-4ee5-b6a4-5efafb3259c6"
 Reactant = "3c362404-f566-11ee-1572-e11a4b42c853"
 UnicodePlots = "b8865327-cd53-5732-bb35-84acbb429228"
+Zarr = "0a941bbe-ad1d-11e8-39d9-ab76183a1d99"
 
 [sources]
 LowerTriangularArrays = {path = "../LowerTriangularArrays"}
@@ -54,6 +55,7 @@ SpeedyWeatherFiniteDifferencesExt = "FiniteDifferences"
 SpeedyWeatherGeoMakieExt = "GeoMakie"
 SpeedyWeatherReactantExt = ["Reactant", "Dates"]
 SpeedyWeatherUnicodePlotsExt = "UnicodePlots"
+SpeedyWeatherZarrExt = "Zarr"
 
 [compat]
 AbstractFFTs = "1"
@@ -64,7 +66,7 @@ BitInformation = "0.6"
 CodecZlib = "0.7"
 ComponentArrays = "0.15"
 DocStringExtensions = "0.9"
-DomainSets = "0.7"
+DomainSets = "0.7, 0.8"
 Enzyme = "0.13"
 FFTW = "1"
 FastGaussQuadrature = "0.4, 0.5, 1"
@@ -90,4 +92,5 @@ Statistics = "1.10"
 StyledStrings = "1"
 TOML = "1"
 UnicodePlots = "3.3"
+Zarr = "0.10"
 julia = "1.10"

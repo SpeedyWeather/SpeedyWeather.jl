@@ -52,7 +52,7 @@ model_type(::Type{<:PrimitiveDry}) = PrimitiveDryModel
 model_type(::Type{<:PrimitiveWet}) = PrimitiveWetModel
 model_type(model::AbstractModel) = model_type(typeof(model))
 
-initialize!(model::AbstractModel, ps::Union{ComponentVector, SpeedyParams}; kwargs...) =
+initialize!(model::AbstractModel, ps::Union{ComponentVector, ParameterTable}; kwargs...) =
     initialize!(reconstruct(model, ps); kwargs...)
 
 # pretty printing

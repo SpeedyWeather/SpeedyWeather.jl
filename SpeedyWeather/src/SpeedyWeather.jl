@@ -47,9 +47,9 @@ import SpeedyWeatherInternals.Utils: Utils, @maybe_jit, _jit, print_fields, read
 
 # PARAMETER HANDLING
 using DomainSets.IntervalSets
-using SpeedyWeatherInternals.SpeedyParameters
-import SpeedyWeatherInternals.SpeedyParameters: parameters
-export SpeedyParam, SpeedyParams, parameters, stripparams       # export user-facing parameter handling types and methods
+using SpeedyWeatherInternals.ParameterEditing
+import SpeedyWeatherInternals.ParameterEditing: parameters
+export ParameterTable, parameters, stripparams       # export user-facing parameter handling types and methods
 
 # Export heavily methoded functions
 export initialize!, finalize!
@@ -102,6 +102,8 @@ export MatrixSpectralTransform
 export transform, transform!
 export curl, divergence, curl!, divergence!
 export ∇, ∇², ∇⁻², ∇!, ∇²!, ∇⁻²!
+export laplace, inverse_laplace, laplace!, inverse_laplace!
+export gradient, gradient!
 export power_spectrum
 
 import SpeedyTransforms: AbstractSpectralTransform, prettymemory
@@ -114,6 +116,7 @@ function animate end
 include("models/abstract_models.jl")
 include("variables/abstract_types.jl")
 include("parameterizations/parameterizations.jl")
+include("time_stepping/abstract_types.jl")
 
 # GEOMETRY CONSTANTS ETC
 include("dynamics/vertical_coordinates.jl")
@@ -135,7 +138,6 @@ include("dynamics/clock.jl")
 include("variables/set.jl")
 
 # MODEL COMPONENTS
-include("dynamics/time_integration.jl")
 include("dynamics/forcing.jl")
 include("dynamics/drag.jl")
 include("dynamics/geopotential.jl")
@@ -143,13 +145,18 @@ include("dynamics/virtual_temperature.jl")
 include("dynamics/initial_conditions.jl")
 include("dynamics/horizontal_diffusion.jl")
 include("dynamics/vertical_advection.jl")
-include("dynamics/implicit.jl")
 include("dynamics/scaling.jl")
 include("dynamics/tendencies.jl")
-include("dynamics/transform.jl")
 include("dynamics/hole_filling.jl")
 include("dynamics/particle_advection.jl")
 include("dynamics/random_process.jl")
+
+# TIME STEPPING
+include("time_stepping/time_integration.jl")
+include("time_stepping/leapfrog.jl")
+include("time_stepping/lorenz_ncycle.jl")
+include("time_stepping/transform.jl")
+include("time_stepping/implicit.jl")
 
 # PARAMETERIZATIONS
 include("parameterizations/albedo.jl")
@@ -187,10 +194,14 @@ include("parameterizations/land/rivers.jl")
 include("output/schedule.jl")
 include("output/callbacks.jl")
 include("output/feedback.jl")
-include("output/netcdf_output.jl")
-include("output/restart_file.jl")
+include("output/writers/general.jl")
+include("output/writers/output_writer_core.jl")
+include("output/writers/netcdf_output.jl")
+include("output/writers/variables_output.jl")
+include("output/writers/zarr_output.jl")
+include("output/variables/output_variables.jl")
+include("output/restart.jl")
 include("output/particle_tracker.jl")
-include("output/jld2_output.jl")
 
 # MODELS
 include("models/simulation.jl")

@@ -108,7 +108,7 @@ We use the same drag coefficient for momentum, heat and moisture fluxes.
 The bulk Richardson number at the lowermost model layer ``k = N`` of height ``z_N`` is
 
 ```math
-Ri_N = \frac{gz_N \left( \Theta_v(z_N) - \Theta_v(0) \right)}{|v(z_N)|^2 \Theta_v(0)}
+Ri_N = \frac{gz_N \left[ \Theta_v(z_N) - \Theta_v(0) \right]}{|v(z_N)|^2 \Theta_v(0)}
 ```
 
 with ``gz_N = \Phi_N`` the [Geopotential](@ref) at ``z = z_N``, ``\Theta =  c_pT_v + gz``
@@ -117,13 +117,13 @@ Then the drag coefficient ``C`` follows as
 
 ```math
 C = \begin{cases}
-        \kappa^2 \left( \log(\frac{z_N}{z_0}) \right)^{-2} \quad &\text{for} \quad Ri_N  \leq 0\\
-        \kappa^2 \left( \log(\frac{z_N}{z_0}) \right)^{-2} \left(1 - \frac{Ri_N}{Ri_c}\right)^2 \quad &\text{for} \quad 0 < Ri_N < Ri_c \\
-        0 \quad &\text{for} \quad Ri_N \geq Ri_c. \\
+        \kappa^2 \left[ \log(\frac{z_N}{z_0}) \right]^{-2} \quad &\text{for} \quad Ri_N  \leq 0\\
+        \kappa^2 \left[ \log(\frac{z_N}{z_0}) \right]^{-2} \left(1 - \frac{Ri_N}{Ri_c}\right)^2 \quad &\text{for} \quad 0 < Ri_N < Ri_c \\
+        0 \quad &\text{for} \quad Ri_N \geq Ri_c, \\
     \end{cases}
 ```
 
-with ``\kappa = 0.4`` the von Kármán constant, ``z_0`` the 
+with ``\kappa = 0.4`` the von Kármán constant, ``z_0`` the
 roughness length (we currently use different values over ocean and land).
 There is a maximum drag ``C`` for negative bulk Richardson numbers ``Ri_N``
 but the drag becomes 0 for bulk Richardson numbers being larger than a critical
@@ -138,13 +138,13 @@ every grid cell as it depends on temperature. The maximum drag coefficient
 then follows as
 
 ```math
-C_{max} = \left(\frac{\kappa}{\log(\frac{z}{z_0})} \right)^2
+C_{max} = \left[\frac{\kappa}{\log(\frac{z}{z_0})} \right]^2
 ```
 
 to simplify the drag coefficient calculation to
 
 ```math
-C = C_{max} \left(1 - \frac{Ri_N^*}{Ri_c}\right)^2
+C = C_{max} \left[1 - \frac{Ri_N^*}{Ri_c}\right]^2
 ```
 with ``Ri_N^* = \max(0, \min(Ri_N, Ri_c))`` the clamped ``Ri_N`` which
 is at least ``0`` and at most ``Ri_c``.
@@ -207,7 +207,7 @@ This assumes that a very thin layer of air just above the ocean is saturated but
 assumption is less well justified as it should be a function of the soil moisture and how much
 of that is available to evaporate given vegetation, hence we include a soil moisture availability.
 We again make the simplification that ``q_s = q_N``, i.e. specific humidity of the surface is the
-same as in the lowermost atmospheric layer above. 
+same as in the lowermost atmospheric layer above.
 
 The surface humidity flux in ``kg/s/m^2``, positive up, is then
 
@@ -270,8 +270,8 @@ For more details see [The land-sea mask](@ref) implementation section.
 
 ## References
 
-[^Frierson2006]: Frierson, D. M. W., I. M. Held, and P. Zurita-Gotor, 2006: A Gray-Radiation Aquaplanet Moist GCM. Part I: Static Stability and Eddy Scale. J. Atmos. Sci., 63, 2548-2566. DOI: [10.1175/JAS3753.1](https://doi.org/10.1175/JAS3753.1). 
+[^Frierson2006]: Frierson, D. M. W., I. M. Held, and P. Zurita-Gotor, 2006: A Gray-Radiation Aquaplanet Moist GCM. Part I: Static Stability and Eddy Scale. J. Atmos. Sci., 63, 2548-2566. DOI: [10.1175/JAS3753.1](https://doi.org/10.1175/JAS3753.1).
 
 [^SPEEDY]: Franco Molteni and Fred Kucharski, 20??. Description of the ICTP AGCM (SPEEDY) Version 41. [https://users.ictp.it/~kucharsk/speedy_description/km_ver41_appendixA.pdf](https://users.ictp.it/~kucharsk/speedy_description/km_ver41_appendixA.pdf)
 
-[^Viterbo95]: Viterbo, P., and A. C. M. Beljaars, 1995: An Improved Land Surface Parameterization Scheme in the ECMWF Model and Its Validation. J. Climate, 8, 2716-2748, DOI:[10.1175/1520-0442(1995)008<2716:AILSPS>2.0.CO;2](https://doi.org/10.1175/1520-0442(1995)008<2716:AILSPS>2.0.CO;2). 
+[^Viterbo95]: Viterbo, P., and A. C. M. Beljaars, 1995: An Improved Land Surface Parameterization Scheme in the ECMWF Model and Its Validation. J. Climate, 8, 2716-2748, DOI:[10.1175/1520-0442(1995)008<2716:AILSPS>2.0.CO;2](https://doi.org/10.1175/1520-0442(1995)008<2716:AILSPS>2.0.CO;2).

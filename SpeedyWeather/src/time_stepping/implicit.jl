@@ -1,5 +1,3 @@
-abstract type AbstractImplicit <: AbstractModelComponent end
-
 # model.implicit=nothing (for BarotropicModel)
 initialize!(::Nothing, dt::Real, ::Variables, ::AbstractModel) = nothing
 implicit_correction!(::Variables, ::Nothing, ::AbstractModel) = nothing

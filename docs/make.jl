@@ -30,6 +30,7 @@ makedocs(
             "Land surface models" => "land.md",
             "Analysis" => "analysis.md",
             "Variables" => "variables.md",
+            "Models" => "models.md",
             "Differentiability and Adjoint Model" => "differentiability.md",
             "NetCDF output" => "output.md",
             "Other output" => "other_output.md",
@@ -65,7 +66,7 @@ makedocs(
             "SpeedyTransforms" => "speedytransforms.md",
             "Gradient operators" => "gradients.md",
         ],
-        "API" => "functions.md",
+        "API" => "api.md",
     ]
 )
 
