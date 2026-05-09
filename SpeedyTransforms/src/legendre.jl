@@ -56,42 +56,73 @@ function _legendre!(
     @boundscheck ismatching(S, specs) || throw(DimensionMismatch(S, specs))
     @boundscheck size(g_north) == size(g_south) == (S.nfreq_max, S.nlayers, nlat_half) || throw(DimensionMismatch(S, specs))
 
-    north = scratch_memory.north     # use scratch memory for vertically-batched dot product
-    south = scratch_memory.south
+    fill!(g_north, 0)
+    fill!(g_south, 0)
 
-    return @inbounds for j in 1:nlat_half          # symmetry: loop over northern latitudes only
-        g_north[:, nlayers, j] .= 0       # reset scratch memory
-        g_south[:, nlayers, j] .= 0       # reset scratch memory
+    north_threads = scratch_memory.north_threads        # (nlayers, nthreads)
+    south_threads = scratch_memory.south_threads        # (nlayers, nthreads)
 
-        # INVERSE LEGENDRE TRANSFORM by looping over wavenumbers l, m
-        lm = 1                              # single running index for non-zero l, m indices
-        for m in 1:(mmax_truncation[j] + 1)   # Σ_{m=0}^{mmax}, but 1-based index, shortened to mmax_truncation
-            lm_end = lm + lmax - m + 1          # last index in column
+    if Threads.nthreads() > 1
+        # Multithreaded over latitudes using @threads :static, which pins each
+        # iteration to a fixed OS thread so Threads.threadid() is stable and
+        # safe to use as a buffer index into north_threads/south_threads.
+        Threads.@threads :static for j in 1:nlat_half
+            t = Threads.threadid()
+            _legendre_inverse_lat!(
+                g_north, g_south, specs,
+                view(north_threads, :, t), view(south_threads, :, t),
+                legendre_polynomials, mmax_truncation, lon_offsets,
+                lmax, nlayers, j,
+            )
+        end
+    else
+        # Skip the @threads runtime entirely on a single thread (it allocates
+        # the threading_run machinery on every call and dominates the runtime
+        # for cheap iterations).
+        north = view(north_threads, :, 1)
+        south = view(south_threads, :, 1)
+        for j in 1:nlat_half
+            _legendre_inverse_lat!(
+                g_north, g_south, specs, north, south,
+                legendre_polynomials, mmax_truncation, lon_offsets,
+                lmax, nlayers, j,
+            )
+        end
+    end
 
-            # view on lower triangular column, but batched in vertical
+    if unscale_coslat
+        unscale_coslat!(g_north, g_south, coslat⁻¹; architecture = architecture(specs))
+    end
+    return nothing
+end
+
+# Per-latitude body of the inverse Legendre transform, shared between the
+# threaded and serial paths.
+@inline function _legendre_inverse_lat!(
+        g_north, g_south, specs, north, south,
+        legendre_polynomials, mmax_truncation, lon_offsets,
+        lmax, nlayers, j::Integer,
+    )
+    @inbounds begin
+        lm = 1
+        for m in 1:(mmax_truncation[j] + 1)
+            lm_end = lm + lmax - m + 1
+
             spec_view = view(specs.data, lm:lm_end, :)
             legendre_view = view(legendre_polynomials.data, lm:lm_end, j)
 
-            # dot product but split into even and odd harmonics on the fly for better performance
-            # function is 1-based (odd, even, odd, ...) but here use 0-based indexing to name
-            # the "even" and "odd" harmonics, batched in the vertical so it's a mat vec multiplication
-            north, south = _fused_oddeven_matvec!(north, south, spec_view, legendre_view)
+            _fused_oddeven_matvec!(north, south, spec_view, legendre_view)
 
-            # CORRECT FOR LONGITUDE OFFSETTS (if grid points don't start at 0°E)
-            o = lon_offsets[m, j]           # rotation through multiplication with complex unit vector
+            o = lon_offsets[m, j]
             for k in nlayers
                 g_north[m, k, j] = muladd(o, north[k], g_north[m, k, j])
                 g_south[m, k, j] = muladd(o, south[k], g_south[m, k, j])
             end
 
-            lm = lm_end + 1                         # first index of next m column
-        end
-
-        if unscale_coslat
-            g_north[:, nlayers, j] .*= coslat⁻¹[j]        # scale in place
-            g_south[:, nlayers, j] .*= coslat⁻¹[j]
+            lm = lm_end + 1
         end
     end
+    return nothing
 end
 
 # (forward) Legendre kernel, called from _legendre!
@@ -143,41 +174,90 @@ function _legendre!(                        # GRID TO SPECTRAL
     @boundscheck ismatching(S, specs) || throw(DimensionMismatch(S, specs))
     @boundscheck size(f_north) == size(f_south) == (S.nfreq_max, S.nlayers, nlat_half) || throw(DimensionMismatch(S, specs))
 
-    even = scratch_memory.north      # use scratch memory for outer product
-    odd = scratch_memory.south
-
     fill!(specs, 0)                         # reset as we accumulate into specs
 
-    return @inbounds for j_north in 1:nlat_half    # symmetry: loop over northern latitudes only
-        j = j_north                         # symmetric index / ring-away from pole index
+    even_threads = scratch_memory.north_threads         # (nlayers, nthreads), repurposed as `even`
+    odd_threads = scratch_memory.south_threads          # (nlayers, nthreads), repurposed as `odd`
 
-        # SOLID ANGLES including quadrature weights (sinθ Δθ) and azimuth (Δϕ) on ring j
-        ΔΩ = solid_angles[j]                # = sinθ Δθ Δϕ, solid angle for a grid point
+    if Threads.nthreads() > 1
+        # Multithreaded: each thread accumulates into its own specs_threads
+        # slice; we then reduce by summing into specs.data. specs_threads
+        # views avoid races on the shared output.
+        specs_threads = scratch_memory.specs_threads    # (nspec, nlayers, nthreads)
+        fill!(specs_threads, 0)
+        nlayers_used = length(nlayers)
 
-        lm = 1                              # single running index for spherical harmonics
-        for m in 1:(mmax_truncation[j] + 1)   # Σ_{m=0}^{mmax}, but 1-based index, shortened to mmax_truncation
+        Threads.@threads :static for j in 1:nlat_half
+            t = Threads.threadid()
+            _legendre_forward_lat!(
+                view(specs_threads, :, :, t), f_north, f_south,
+                view(even_threads, :, t), view(odd_threads, :, t),
+                legendre_polynomials, mmax_truncation, lon_offsets, solid_angles,
+                lmax, nlayers, j,
+            )
+        end
 
-            # SOLID ANGLE QUADRATURE WEIGHTS and LONGITUDE OFFSET
-            o = lon_offsets[m, j]           # longitude offset rotation by multiplication with complex unit vector
-            ΔΩ_rotated = ΔΩ * conj(o)         # complex conjugate for rotation back to prime meridian
+        # REDUCE: sum each thread-local accumulator into specs.data.
+        # specs.data may be 1D (LowerTriangularMatrix, single layer) or 2D.
+        nthreads = size(specs_threads, 3)
+        @inbounds for t in 1:nthreads
+            src = view(specs_threads, :, 1:nlayers_used, t)
+            if ndims(specs.data) == 1
+                specs.data .+= vec(src)
+            else
+                specs.data .+= src
+            end
+        end
+    else
+        # Single-thread fast path: skip the @threads runtime *and* the
+        # per-thread accumulator + reduction. Write straight into specs.data,
+        # which matches what the old (pre-threading) implementation did.
+        even = view(even_threads, :, 1)
+        odd = view(odd_threads, :, 1)
+        specs_data = ndims(specs.data) == 1 ?
+            reshape(specs.data, length(specs.data), 1) : specs.data
+        for j in 1:nlat_half
+            _legendre_forward_lat!(
+                specs_data, f_north, f_south, even, odd,
+                legendre_polynomials, mmax_truncation, lon_offsets, solid_angles,
+                lmax, nlayers, j,
+            )
+        end
+    end
+    return nothing
+end
 
-            # LEGENDRE TRANSFORM
+# Per-latitude body of the forward Legendre transform, accumulating into
+# `specs_local`. Shared between threaded and serial paths.
+@inline function _legendre_forward_lat!(
+        specs_local, f_north, f_south, even, odd,
+        legendre_polynomials, mmax_truncation, lon_offsets, solid_angles,
+        lmax, nlayers, j::Integer,
+    )
+    @inbounds begin
+        ΔΩ = solid_angles[j]
+
+        lm = 1
+        for m in 1:(mmax_truncation[j] + 1)
+            o = lon_offsets[m, j]
+            ΔΩ_rotated = ΔΩ * conj(o)
+
             for k in nlayers
                 fn, fs = f_north[m, k, j], f_south[m, k, j]
                 @fastmath even[k] = ΔΩ_rotated * (fn + fs)
                 @fastmath odd[k] = ΔΩ_rotated * (fn - fs)
             end
 
-            # integration over l = m:lmax+1
-            lm_end = lm + lmax - m + 1                      # last index in column m
-            spec_view = view(specs.data, lm:lm_end, :)
+            lm_end = lm + lmax - m + 1
+            spec_view = view(specs_local, lm:lm_end, :)
             legendre_view = view(legendre_polynomials.data, lm:lm_end, j)
 
             _fused_oddeven_outer_product_accumulate!(spec_view, legendre_view, even, odd)
 
-            lm = lm_end + 1                             # first index of next column m+1
+            lm = lm_end + 1
         end
     end
+    return nothing
 end
 
 """

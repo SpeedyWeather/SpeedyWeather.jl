@@ -138,7 +138,7 @@ function SpectralTransform(
     end
 
     # SCRATCH MEMORY FOR FOURIER NOT YET LEGENDRE TRANSFORMED AND VICE VERSA
-    scratch_memory = ScratchMemory(NF, architecture, grid, nlayers)
+    scratch_memory = ScratchMemory(NF, architecture, grid, nlayers, LowerTriangularArrays.nonzeros(spectrum))
 
     rfft_plans = Vector{AbstractFFTs.Plan}(undef, nlat_half)
     brfft_plans = Vector{AbstractFFTs.Plan}(undef, nlat_half)
