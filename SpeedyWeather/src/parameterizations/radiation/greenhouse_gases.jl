@@ -7,7 +7,7 @@ variables(name_ghg::Pair{<:Symbol, <:AbstractGreenhouseGas}, model::AbstractMode
     variables(name_ghg.second, name_ghg.first, model)
 
 variables(::AbstractCO2, name::Symbol, args...) = (
-    PrognosticVariable(name, ScalarDim(), units="ppm", desc="Carbon dioxide", namespace=:greenhouse_gases),
+    PrognosticVariable(name, ScalarDim(), units = "ppm", desc = "Carbon dioxide", namespace = :greenhouse_gases),
 )
 
 """$(TYPEDSIGNATURES)
@@ -19,16 +19,17 @@ function greenhouse_gases_time_step!(vars::Variables, model::PrimitiveEquation)
         # greenhouse gases are functions of time only, overwrite current value
         vars.prognostic.greenhouse_gases[gas][] = model.greenhouse_gases[gas](t)
     end
+    return
 end
 
 # fallback: for models without greenhouse gases, do nothing
-greenhouse_gases_time_step!(vars::Variables, model::AbstractModel) = nothing   
+greenhouse_gases_time_step!(vars::Variables, model::AbstractModel) = nothing
 
 """$(TYPEDSIGNATURES) CO2 uses unit of ppm, so *1e-6 to convert to kg/kg."""
-@inline unit(::AbstractCO2) = 1f-6
+@inline unit(::AbstractCO2) = 1.0f-6
 
 """$(TYPEDSIGNATURES) The molar mass ratio CO2 / molar mass of dry air"""
-@inline molar_mass_ratio(::AbstractCO2) = 44f0 / 29f0
+@inline molar_mass_ratio(::AbstractCO2) = 44.0f0 / 29.0f0
 
 const DEFAULT_CO2 = 280     # preindustrial CO2 [ppm]
 
