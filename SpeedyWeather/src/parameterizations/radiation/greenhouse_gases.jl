@@ -12,16 +12,17 @@ variables(::AbstractCO2, name::Symbol, args...) = (
 
 """$(TYPEDSIGNATURES)
 Time step greenhouse gas concentration as function of time only."""
-function greenhouse_gases_timestep!(vars::Variables, model::PrimitiveEquation)
+function greenhouse_gases_time_step!(vars::Variables, model::PrimitiveEquation)
     isnothing(model.greenhouse_gases) && return nothing     # if greenhouse_gases is nothing, then skip this step
     t = vars.prognostic.clock.time
     for gas in keys(model.greenhouse_gases)
+        # greenhouse gases are functions of time only, overwrite current value
         vars.prognostic.greenhouse_gases[gas][] = model.greenhouse_gases[gas](t)
     end
 end
 
-# for models without greenhouse gases, do nothing
-greenhouse_gases_timestep!(vars::Variables, model::AbstractModel) = nothing   
+# fallback: for models without greenhouse gases, do nothing
+greenhouse_gases_time_step!(vars::Variables, model::AbstractModel) = nothing   
 
 """$(TYPEDSIGNATURES) CO2 uses unit of ppm, so *1e-6 to convert to kg/kg."""
 @inline unit(::AbstractCO2) = 1f-6
@@ -57,12 +58,12 @@ export ExponentialCO2
 
 """$(TYPEDSIGNATURES) Exponential CO2 concentration with defaults fitted
 to the Keeling curve, ignoring seasonal variation."""
-@kwdef struct ExponentialCO2{NF} <: AbstractCO2
+@kwdef struct ExponentialCO2{NF, DT} <: AbstractCO2
     "[OPTION] preindustrial CO2 concentration [ppm]"
     base_concentration::NF = 280
 
     "[OPTION] time of preindustrial CO2"
-    start::DateTime = DateTime(1850)
+    start::DT = DateTime(1850)
 
     "[OPTION] Scaling `a` in `c + a*exp((t-t0)*b)` [ppm]"
     a::NF = 3.85
@@ -71,8 +72,8 @@ to the Keeling curve, ignoring seasonal variation."""
     b::NF = 1 / 48
 end
 
-ExponentialCO2(SG::SpectralGrid; kwargs...) = ExponentialCO2{SG.NF}(; kwargs...)
-function (C::ExponentialCO2{NF})(t::DateTime) where {NF}
+ExponentialCO2(SG::SpectralGrid; kwargs...) = ExponentialCO2{SG.NF, DateTime}(; kwargs...)
+function (C::ExponentialCO2{NF})(t) where {NF}
 
     # time since start in seconds, convert from Float64 to NF
     Δt = convert(NF, Dates.datetime2unix(t) - Dates.datetime2unix(C.start))

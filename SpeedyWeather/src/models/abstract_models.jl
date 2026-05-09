@@ -21,8 +21,8 @@ finalize!(::AbstractModelComponent, ::AbstractModel) = nothing
 # model components that are named tuples of other components,
 # e.g. `greenhouse_gases`, can just call `initialize!` on the elements of the named tuple
 function initialize!(nt::NamedTuple, model::AbstractModel)
-    for value in values(nt)
-        initialize!(value, model)
+    for key in keys(nt)
+        initialize!(getfield(nt, key), model)
     end
     return nothing
 end
