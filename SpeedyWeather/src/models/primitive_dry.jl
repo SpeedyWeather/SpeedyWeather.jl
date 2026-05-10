@@ -179,8 +179,8 @@ function variables(::Type{<:PrimitiveDry}, nsteps)
         DynamicsVariable(:pres_flux_sum_above, Grid3D(), desc = "Partially vertically integrated pressure gradient flux, top to layer above"),
         DynamicsVariable(:w, Grid3D(), desc = "Vertical velocity, dσ/dt.", units = "1/s"),
 
-        ScratchVariable(:a, Grid3D(), desc = "Scratch array", namespace = :grid),
-        ScratchVariable(:b, Grid3D(), desc = "Scratch array", namespace = :grid),
+        ScratchVariable(:a, Grid3D(), desc = "Scratch array", namespace = :grid, fuse = :tend_grid),
+        ScratchVariable(:b, Grid3D(), desc = "Scratch array", namespace = :grid, fuse = :tend_grid),
         ScratchVariable(:a_2D, Spectral2D(), desc = "Scratch array"),
         ScratchVariable(:b_2D, Spectral2D(), desc = "Scratch array"),
         ScratchVariable(:a_2D, Grid2D(), desc = "Scratch array", namespace = :grid),
