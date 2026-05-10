@@ -1021,4 +1021,13 @@ end
 
 # dispatch on element type: nested NamedTuple vs array
 @inline _reset_tendency!(nt::NamedTuple, value) = _reset_tendencies_inner!(values(nt), value)
-@inline _reset_tendency!(a::AbstractArray, value) = fill!(a, value)
+@inline _reset_tendency!(a::AbstractArray, value) = _maybe_fill!(a, value)
+
+# Skip fill! when the underlying storage is a view of another array — fused parents are
+# zeroed once via the parent entry; the per-variable views would otherwise re-zero the
+# same memory. Concretely: a Field/LTA whose `.data` is a SubArray, or a SubArray itself.
+@inline _maybe_fill!(a::AbstractArray, value) = (parent(a) === a ? fill!(a, value) : nothing)
+@inline _maybe_fill!(a::AbstractField, value) =
+    (parent(a.data) === a.data ? fill!(a, value) : nothing)
+@inline _maybe_fill!(a::LowerTriangularArray, value) =
+    (parent(a.data) === a.data ? fill!(a, value) : nothing)

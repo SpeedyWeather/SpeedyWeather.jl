@@ -19,15 +19,18 @@ for Var in (
     @eval begin
         """$(TYPEDSIGNATURES) A variable defined through its `name`, dimensions `dims` and optionally
         its `units`, description `desc` and the `namespace` it's sorted under within a
-        variable group. This definition is only used to return an object to define that a given
-        model component wants to define a variable -- allocation and being sorted into the
-        `Variables` tree happens elsewhere."""
+        variable group. Variables sharing the same non-empty `fuse` symbol (within the same
+        `namespace`) are allocated as views of a single shared parent buffer, which is exposed
+        in the resulting NamedTuple under the `fuse` symbol. This definition is only used to
+        return an object to define that a given model component wants to define a variable --
+        allocation and being sorted into the `Variables` tree happens elsewhere."""
         @kwdef struct $Var{D, U} <: AbstractVariable{D}
             name::Symbol
             dims::D
             units::U = ""
             desc::String = ""
             namespace::Symbol = Symbol()    # empty symbol is used for atmosphere
+            fuse::Symbol = Symbol()         # empty symbol = no fusion; same value = share parent buffer
         end
 
         nonparametric_type(v::$Var) = nonparametric_type(typeof(v))
@@ -35,7 +38,8 @@ for Var in (
         $Var(name, dims; kwargs...) = $Var(; name, dims, kwargs...)
         $Var(name, dims, units; kwargs...) = $Var(; name, dims, units, kwargs...)
         $Var(name, dims, units, desc; kwargs...) = $Var(; name, dims, units, desc, kwargs...)
-        $Var(name, dims, units, desc, namespace) = $Var(; name, dims, units, desc, namespace)
+        $Var(name, dims, units, desc, namespace; kwargs...) = $Var(; name, dims, units, desc, namespace, kwargs...)
+        $Var(name, dims, units, desc, namespace, fuse) = $Var(; name, dims, units, desc, namespace, fuse)
     end
 end
 
@@ -43,8 +47,10 @@ function Base.show(io::IO, var::AbstractVariable)
     print(
         io, nonparametric_type(var),
         "(:", var.name, ", ", var.dims, ", units = ", var.units,
-        ", desc = ", var.desc, ", namespace = ", var.namespace, ")"
+        ", desc = ", var.desc, ", namespace = ", var.namespace
     )
+    var.fuse === Symbol() || print(io, ", fuse = :", var.fuse)
+    print(io, ")")
     return nothing
 end
 
@@ -187,44 +193,110 @@ end
 
 # runic: off
 """$(TYPEDSIGNATURES) Allocate all variables for a `model` as defined by its components.
-Filters out duplicates and sorts the variables into groups and namespaces."""
+Filters out duplicates and sorts the variables into groups and namespaces. Variables
+sharing a non-empty `fuse` symbol (within the same namespace) share a single parent
+buffer; their per-variable entries are views of that parent."""
 function Variables(model::AbstractModel)
     all_vars = all_variables(model)     # one long tuple for all required variables of model and its components
-    prognostic        = allocate(filter_variables(all_vars,       PrognosticVariable), model)
-    grid              = allocate(filter_variables(all_vars,             GridVariable), model)
-    tendencies        = allocate(filter_variables(all_vars,         TendencyVariable), model)
-    dynamics          = allocate(filter_variables(all_vars,         DynamicsVariable), model)
-    parameterizations = allocate(filter_variables(all_vars, ParameterizationVariable), model)
-    particles         = allocate(filter_variables(all_vars,         ParticleVariable), model)
-    scratch           = allocate(filter_variables(all_vars,          ScratchVariable), model)
+
+    # First pass (cross-type): allocate one parent per (namespace, fuse_symbol) group, spanning
+    # all variable types. Returns a Dict keyed by (namespace, fuse) with values (parent, view-by-identifier).
+    fuse_parents = build_fuse_parents(all_vars, model)
+
+    prognostic        = allocate(filter_variables(all_vars,       PrognosticVariable), model, fuse_parents)
+    grid              = allocate(filter_variables(all_vars,             GridVariable), model, fuse_parents)
+    tendencies        = allocate(filter_variables(all_vars,         TendencyVariable), model, fuse_parents)
+    dynamics          = allocate(filter_variables(all_vars,         DynamicsVariable), model, fuse_parents)
+    parameterizations = allocate(filter_variables(all_vars, ParameterizationVariable), model, fuse_parents)
+    particles         = allocate(filter_variables(all_vars,         ParticleVariable), model, fuse_parents)
+    scratch           = allocate(filter_variables(all_vars,          ScratchVariable), model, fuse_parents)
     return Variables(; prognostic, grid, tendencies, dynamics, parameterizations, particles, scratch)
 end
 # runic: on
 
+"""$(TYPEDSIGNATURES) For every non-empty `fuse` symbol used across `all_vars`, allocate one parent
+buffer covering all members in that (namespace, fuse) group across all variable types.
+Returns a `Dict{Tuple{Symbol,Symbol}, NamedTuple}` keyed by `(namespace, fuse)`. Each entry holds
+the parent and a `Dict{Symbol, AbstractArray}` mapping each member's `identifier(v)` to its view."""
+function build_fuse_parents(all_vars, model)
+    # Group all fused vars by (namespace, fuse), deduped by identifier.
+    seen = Set{Symbol}()
+    groups = Dict{Tuple{Symbol, Symbol}, Vector{AbstractVariable}}()
+    for v in all_vars
+        v.fuse === Symbol() && continue
+        id = identifier(v)
+        id in seen && continue
+        push!(seen, id)
+        push!(get!(groups, (v.namespace, v.fuse), AbstractVariable[]), v)
+    end
+
+    parents = Dict{Tuple{Symbol, Symbol}, NamedTuple}()
+    for ((ns, fuse_sym), vars) in groups
+        # Validate: same dim type within a fuse group (allocate_fused dispatches on it).
+        D = typeof(first(vars).dims)
+        for v in vars
+            typeof(v.dims) === D || error(
+                "Fuse group `$fuse_sym` (namespace `$ns`) mixes dim types: " *
+                "$(typeof(v.dims)) for `$(v.name)` vs $D. All members must share the same dim type."
+            )
+        end
+        # Allocate one parent for this fuse group; views aligned with `vars`.
+        parent, views = allocate_fused(typed_vars(vars, D), model)
+        parents[(ns, fuse_sym)] = (
+            parent = parent,
+            views = Dict{Symbol, Any}(identifier(v) => views[i] for (i, v) in enumerate(vars)),
+        )
+    end
+    return parents
+end
+
+# Narrow the eltype of a variable vector to the concrete dim type so allocate_fused dispatches.
+typed_vars(vars, ::Type{D}) where {D} = AbstractVariable{D}[v for v in vars]
+
 """$(TYPEDSIGNATURES) Allocates all variables within a group given a tuple of variables
 expected to be `<: AbstractVariable` definitions. Determines the namespaces,
-allocates the arrays with zeros and collects them into NamedTuples."""
-function allocate(group, model)
+allocates the arrays with zeros and collects them into NamedTuples. Members of a
+fuse group are returned as views of a shared parent (allocated via `build_fuse_parents`),
+and the parent itself is exposed under the fuse symbol in the same NamedTuple."""
+function allocate(group, model, fuse_parents = Dict{Tuple{Symbol, Symbol}, NamedTuple}())
     length(group) == 0 && return NamedTuple()  # return empty NamedTuple if no variables to initialize
     namespaces = filter(k -> k != Symbol(), tuple(keys(group)...))
 
     # variables without namespace identified by empty symbol Symbol() go directly into the main NamedTuple
     # that way we have variables.prognostic.vorticity skipping the namespace between prognostic and vor
-    nt1 = NamedTuple{Tuple(map(v -> v.name, group[Symbol()]))}(Tuple(map(var -> zero(var, model), group[Symbol()])))
+    nt1 = haskey(group, Symbol()) ? _allocate_namespace(group[Symbol()], model, fuse_parents) : NamedTuple()
 
     # other variables grouped by namespace
     # e.g. variables.prognostic.ocean.sea_surface_temperature, variables.prognostic.land.soil_moisture, etc.
     nt2 = NamedTuple{namespaces}(
-        Tuple(
-            map(
-                ns ->
-                NamedTuple{Tuple(map(v -> v.name, group[ns]))}(Tuple(map(var -> zero(var, model), group[ns])))
-                , namespaces
-            )
-        )
+        Tuple(map(ns -> _allocate_namespace(group[ns], model, fuse_parents), namespaces))
     )
 
     return merge(nt1, nt2)
+end
+
+# Build the NamedTuple for a single namespace: fused members become views, with the parent
+# also installed under the fuse symbol. Standalone members allocate normally via `zero(v, model)`.
+function _allocate_namespace(vars, model, fuse_parents)
+    pairs = Pair{Symbol, Any}[]
+    fuse_syms_seen = Set{Symbol}()
+    for v in vars
+        if v.fuse === Symbol()
+            push!(pairs, v.name => zero(v, model))
+        else
+            entry = fuse_parents[(v.namespace, v.fuse)]
+            push!(pairs, v.name => entry.views[identifier(v)])
+            # install the parent under the fuse symbol once per namespace (per variable group)
+            if !(v.fuse in fuse_syms_seen)
+                push!(fuse_syms_seen, v.fuse)
+                v.fuse === v.name && error(
+                    "Fuse symbol `$(v.fuse)` collides with member name `$(v.name)` in namespace `$(v.namespace)`."
+                )
+                push!(pairs, v.fuse => entry.parent)
+            end
+        end
+    end
+    return (; pairs...)
 end
 
 """$(TYPEDSIGNATURES)
