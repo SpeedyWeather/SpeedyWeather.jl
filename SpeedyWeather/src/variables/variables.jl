@@ -195,7 +195,8 @@ end
 """$(TYPEDSIGNATURES) Allocate all variables for a `model` as defined by its components.
 Filters out duplicates and sorts the variables into groups and namespaces. Variables
 sharing a non-empty `fuse` symbol (within the same namespace) share a single parent
-buffer; their per-variable entries are views of that parent."""
+buffer; their per-variable entries are views of that parent. Fused parents themselves
+live under `vars.scratch.fused.<fuse_symbol>`."""
 function Variables(model::AbstractModel)
     all_vars = all_variables(model)     # one long tuple for all required variables of model and its components
 
@@ -210,9 +211,36 @@ function Variables(model::AbstractModel)
     parameterizations = allocate(filter_variables(all_vars, ParameterizationVariable), model, fuse_parents)
     particles         = allocate(filter_variables(all_vars,         ParticleVariable), model, fuse_parents)
     scratch           = allocate(filter_variables(all_vars,          ScratchVariable), model, fuse_parents)
+
+    # Install fused parents at their canonical home: vars.scratch.fused.<fuse_symbol>.
+    # Validates that fuse symbols are globally unique across namespaces.
+    if !isempty(fuse_parents)
+        fused = build_fused_namespace(fuse_parents)
+        scratch = merge(scratch, (fused = fused,))
+    end
+
     return Variables(; prognostic, grid, tendencies, dynamics, parameterizations, particles, scratch)
 end
 # runic: on
+
+"""$(TYPEDSIGNATURES) Build the `vars.scratch.fused` NamedTuple from the `fuse_parents` Dict.
+Keyed flat by fuse symbol; errors if the same fuse symbol is reused across namespaces."""
+function build_fused_namespace(fuse_parents)
+    seen = Dict{Symbol, Symbol}()  # fuse_symbol => namespace, for collision diagnostics
+    pairs = Pair{Symbol, Any}[]
+    for ((ns, fuse_sym), entry) in fuse_parents
+        if haskey(seen, fuse_sym)
+            error(
+                "Fuse symbol `$fuse_sym` is used in multiple namespaces (`$(seen[fuse_sym])` and `$ns`). " *
+                "Fuse symbols must be globally unique across namespaces so they can live flat under " *
+                "`vars.scratch.fused.<fuse_symbol>`."
+            )
+        end
+        seen[fuse_sym] = ns
+        push!(pairs, fuse_sym => entry.parent)
+    end
+    return (; pairs...)
+end
 
 """$(TYPEDSIGNATURES) For every non-empty `fuse` symbol used across `all_vars`, allocate one parent
 buffer covering all members in that (namespace, fuse) group across all variable types.
@@ -275,25 +303,18 @@ function allocate(group, model, fuse_parents = Dict{Tuple{Symbol, Symbol}, Named
     return merge(nt1, nt2)
 end
 
-# Build the NamedTuple for a single namespace: fused members become views, with the parent
-# also installed under the fuse symbol. Standalone members allocate normally via `zero(v, model)`.
+# Build the NamedTuple for a single namespace: fused members become views into a shared parent;
+# standalone members allocate normally via `zero(v, model)`. The parent itself is NOT installed
+# here — it lives at the canonical location `vars.scratch.fused.<fuse_symbol>` (built once at the
+# end of `Variables(model)`).
 function _allocate_namespace(vars, model, fuse_parents)
     pairs = Pair{Symbol, Any}[]
-    fuse_syms_seen = Set{Symbol}()
     for v in vars
         if v.fuse === Symbol()
             push!(pairs, v.name => zero(v, model))
         else
             entry = fuse_parents[(v.namespace, v.fuse)]
             push!(pairs, v.name => entry.views[identifier(v)])
-            # install the parent under the fuse symbol once per namespace (per variable group)
-            if !(v.fuse in fuse_syms_seen)
-                push!(fuse_syms_seen, v.fuse)
-                v.fuse === v.name && error(
-                    "Fuse symbol `$(v.fuse)` collides with member name `$(v.name)` in namespace `$(v.namespace)`."
-                )
-                push!(pairs, v.fuse => entry.parent)
-            end
         end
     end
     return (; pairs...)
