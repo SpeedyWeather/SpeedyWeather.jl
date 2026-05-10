@@ -717,7 +717,7 @@ Left intentionally **standalone** (not fused):
 
 #### Limitations / known follow-ups
 
-- **GPU smoke-test still pending** — design suggests views work (existing `field_view`/`lta_view` use in `drag.jl`, `particle_advection.jl`, output writers), but verification on CUDA/Metal/AMDGPU is a worthwhile S0' check before S4.
+- ~~**GPU smoke-test still pending**~~ — **VERIFIED on CUDA (§6.17)**. All mechanisms work correctly on GPU.
 - **Cross-architecture transfer** of an existing `Variables` (i.e. `on_architecture(arch, vars)` moving from CPU to GPU) is not fuse-aware — would adapt parent and views independently and break sharing. Not exercised in the typical flow (Variables are constructed once on the target arch), so deferred unless tests trip it.
 - **Mixed dim types in one fuse group** (e.g. Grid2D pressure + Grid3D tendencies) not supported. Could be added by sizing the parent as Grid3D with Grid2D members occupying 1 layer each.
 
