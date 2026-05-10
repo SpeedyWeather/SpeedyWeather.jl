@@ -77,7 +77,7 @@ function bump_via_kernel!(arch, field, offset)
 end
 
 # -- core test --------------------------------------------------------------
-function test_fuse_layout(model_constructor::Function, model_name::AbstractString,
+function test_fuse_layout(model_constructor, model_name::AbstractString,
                          expected_tendency_views::NTuple{N, Symbol}) where {N}
     @info "── $(model_name) on GPU ─────────────────────────────"
 
