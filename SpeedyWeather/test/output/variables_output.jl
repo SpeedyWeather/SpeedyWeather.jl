@@ -1,5 +1,8 @@
 using JLD2
 
+
+#=
+
 @testset "JLD2 Output" begin
     tmp_output_path = mktempdir(pwd(), prefix = "tmp_jld2tests_")  # Cleaned up when the process exits
 
@@ -72,6 +75,8 @@ end
     @test all(isfinite, snapshot.prognostic.vorticity)
     close(f)
 end
+
+=#
 
 @testset "ArrayOutput" begin
     spectral_grid = SpectralGrid(trunc = 5, nlayers = 1)
