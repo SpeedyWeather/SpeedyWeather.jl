@@ -723,12 +723,60 @@ Left intentionally **standalone** (not fused):
 
 ---
 
+### 6.17 GPU verification of the fuse mechanism
+
+Verified on CUDA via `gpu_fuse_smoke_test.jl`.
+
+#### Key finding: `view()` on CuArray does NOT return a SubArray
+
+On CPU, `view(Matrix, :, range)` returns a `SubArray` — a Julia-level wrapper that shares the backing array via `Base.parent`. On GPU (CUDA), `view(CuArray, :, range)` returns a **new `CuArray`** wrapping the same device-memory buffer via a pointer offset. It is not a `SubArray`, so `Base.parent(v) === A` is `false` even though the memory IS shared:
+
+```julia
+# CPU
+A_cpu = zeros(Float32, 5, 6)
+v_cpu = view(A_cpu, :, 1:3)
+v_cpu isa SubArray          # true
+Base.parent(v_cpu) === A_cpu # true
+A_cpu[:, 1:3] .= 7f0
+all(v_cpu .== 7f0)           # true — shared via SubArray
+
+# GPU (CUDA)
+A_gpu = CUDA.zeros(Float32, 5, 6)
+v_gpu = view(A_gpu, :, 1:3)
+v_gpu isa SubArray           # false — CuArray, not SubArray
+Base.parent(v_gpu) === A_gpu  # false — different Julia object
+A_gpu[:, 1:3] .= 7f0
+all(Array(v_gpu) .== 7f0)    # true — memory IS shared (pointer offset)
+v_gpu .= 0f0
+all(Array(A_gpu[:, 1:3]) .== 0f0)  # true — writes go both ways
+```
+
+This is CUDA.jl's GPU-native view implementation: sharing happens at the device-buffer level (pointer + offset + stride metadata stored in the `CuArray` header), not via Julia's `SubArray` indirection. The semantics are identical to `SubArray` for the purposes of read/write aliasing — both are transparent views with shared memory — but the Julia-level types differ.
+
+#### Impact on the plan
+
+1. **§6.4 (Field views in KA kernels)** — the concern that "KernelAbstractions handles `SubArray` views" is technically wrong for GPU: KA receives a `CuArray` (not a `SubArray`) when the kernel is adapted to the CUDA backend. This is actually *better*: `CuArray` kernels have no SubArray overhead. The check "add a smoke-test on each backend" is done; all pass.
+
+2. **§6.12 failure mode 1** — "Field views in KA kernels on Metal — historically flaky for non-trivial views." On Metal, `view(MtlArray, :, range)` likely also returns a `MtlArray`, same pattern. The SubArray-flakiness concern does not apply. Still worth testing Metal explicitly, but the risk is lower.
+
+3. **§6.12 failure mode 3** — "Adapt rules: fused parent + views need to adapt cleanly." Since views are `CuArray`s on GPU (not `SubArray`s), `Adapt.adapt_structure(to, field)` gets called with a `Field{T, 2, CuArray}` — which adapts to the underlying `CuArray` data. This is handled correctly by the existing Adapt rules in `RingGrids/src/field.jl:524`.
+
+4. **`reset_tendencies!` and fused views on GPU** — confirmed working: `fill!(view_backed_field, val)` writes through the CuArray view to the parent's device buffer correctly. `reset_tendencies!` zeroes only the tendency slots, leaving scratch slots of the same parent intact.
+
+5. **Slot ordering is not contiguous by view-declaration-type** — the fuse buffer contains both `TendencyVariable` and `ScratchVariable` members interleaved in declaration order across all variable types. For `PrimitiveWet` the layout is: `u` (slots 1–8), `v` (9–16), `temperature` (17–24), `scratch.a` (25–32), `scratch.b` (33–40), `humidity` (41–48). Tests or code that assume tendency views occupy the first `N_tend·nlayers` columns of the parent are wrong — they must check via the view itself, not by index arithmetic.
+
+#### What `Adapt.adapt_structure` returns for a fuse view
+
+`Adapt.adapt_structure(to, field::AbstractField) = Adapt.adapt(to, field.data)` — the kernel receives the raw `.data` array. For a parent-backed Field on GPU, `.data` is already a `CuArray`. For a view-backed Field on GPU, `.data` is also a `CuArray` (the view CuArray). So from the kernel's perspective both look identical: raw `CuArray[ij, k]` indexing. No overhead, no special handling needed.
+
+---
+
 ## 7. Status
 
 **Infrastructure**
 - [x] **S2: Declarative fuse mechanism** (§6.16) — `fuse::Symbol` field on all variable types; cross-type sharing; reset-aware. `vars.tendencies.grid.{u,v,T,q}` are now views of the shared parent `vars.tendencies.grid.tend_grid`. Verified by 1h `run!` of PrimitiveDry + PrimitiveWet.
+- [x] **GPU smoke-test of view-backed tendencies** (§6.17) — CUDA verified. All 59 tests pass in `gpu_fuse_smoke_test.jl`: fused parent on GPU, round-trip memory sharing, KA kernels through view-backed Fields, `reset_tendencies!`. Key insight: `view(CuArray)` returns a `CuArray` (not SubArray) but memory IS shared.
 - [ ] **S0/S1': `transform_batch::Int` on `SpectralGrid`** — needed before S4 to size the SpectralTransform scratch for `K·nlayers`.
-- [ ] **GPU smoke-test of view-backed tendencies** — confirm the existing fuse machinery survives a `run!` on CUDA/Metal/AMDGPU.
 
 **Phase A — easy local wins** (do not depend on fusion)
 - [ ] A1 (2.5): fuse 2D spec→grid for ∇lnpₛ
