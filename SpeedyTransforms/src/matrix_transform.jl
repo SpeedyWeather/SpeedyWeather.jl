@@ -128,7 +128,7 @@ data yields spectral coefficients. This function is not yet implemented."""
 function forward_matrix!(F, S::AbstractSpectralTransform, field::AbstractField2D, coeffs::LowerTriangularMatrix, progress = nothing)
     for ij in eachindex(field)
         field .= 0                              # unit vector of input
-        set_scalar!(field, ij, one(eltype(field)))
+        set_scalar!(field.data, ij, one(eltype(field)))
         transform!(coeffs, field, S)            # forward transforms of unit vectors
         F[:, ij] .= coeffs.data                 # are the columns of the transformation matrix F
         isnothing(progress) || ProgressMeter.next!(progress)
