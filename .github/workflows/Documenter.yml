@@ -21,10 +21,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
       - name: Setup Julia
-        uses: julia-actions/setup-julia@v2
+        uses: julia-actions/setup-julia@v3
       - name: Load Julia packages from cache
         id: julia-cache
-        uses: julia-actions/cache@v2
+        uses: julia-actions/cache@v3
       - name: Install Julia dependencies
         run: julia --color=yes --project=docs/ -e 'using Pkg; Pkg.develop(PackageSpec(path = "SpeedyWeather")); Pkg.instantiate()'
       - name: Build and deploy

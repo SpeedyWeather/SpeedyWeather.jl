@@ -18,7 +18,7 @@ Its usage is similar to the NetCDF output above:
 ```@example output2
 using SpeedyWeather
 spectral_grid = SpectralGrid(trunc=31, nlayers=1)
-output = JLD2Output(output_dt=Hour(1))
+output = JLD2Output(interval=Hour(1))
 model = ShallowWaterModel(spectral_grid, output=output)
 model.output
 ```
@@ -36,12 +36,110 @@ It's also possible to output the `Variables` (or a subgroup of it) directly into
 ```@example output3
 using SpeedyWeather
 spectral_grid = SpectralGrid(trunc=31, nlayers=1)
-output = ArrayOutput(output_dt=Hour(1), groups=(:prognostic,))
+output = ArrayOutput(interval=Hour(1), groups=(:prognostic,))
 model = ShallowWaterModel(spectral_grid, output=output)
 model.output
 ```
 
 After a succesfull `run!` the result is stored in `output.output`. 
+
+## Zarr Output
+
+[Zarr](https://zarr.dev) is a chunked, compressed, cloud-friendly format for N-dimensional arrays. 
+
+`ZarrOutput` is implemented as an **extension** that is only loaded once
+[Zarr.jl](https://github.com/JuliaIO/Zarr.jl) is imported:
+
+```@example zarr
+using SpeedyWeather
+using Zarr     # this loads SpeedyWeatherZarrExt and enables ZarrOutput
+
+spectral_grid = SpectralGrid(trunc=31, nlayers=8)
+output = ZarrOutput(spectral_grid, PrimitiveWet, interval=Hour(6))
+model = PrimitiveWetModel(spectral_grid; output)
+simulation = initialize!(model)
+run!(simulation, period=Day(10), output=true)
+nothing #hide
+```
+
+The constructor and option fields mirror [`NetCDFOutput`](@ref): `path`, `id`, `overwrite`,
+`output_dt`, `variables`, `write_restart`, `write_parameters_txt`, `write_progress_txt` all
+behave the same way, the run folder layout (`run_<id>_NNNN/`) is identical, and the same
+`AbstractOutputVariable` types are used to declare which variables are written.
+The on-disk layout differs:
+
+- the Zarr store is a *directory* (`output.zarr/`), not a single file
+- per-variable arrays live as subdirectories with `.zarray` and `.zattrs` metadata
+- coordinates `lon`, `lat`, `layer`, `soil_layer`, `time` are stored as 1D arrays in
+  the same group, tagged with the conventional `_ARRAY_DIMENSIONS` attribute so that Xarray-compatible readers can rebuild the dataset
+
+Two extra options are specific to `ZarrOutput`:
+
+| Option | Meaning |
+|--------|---------|
+| `time_chunk::Int` | Number of time steps per chunk along the time axis (default `1`). Larger values give bigger chunks and usually better compression at the cost of higher write latency. |
+| `compressor` | Any `Zarr.Compressor` (e.g. `Zarr.BloscCompressor(clevel=3)`, `Zarr.ZlibCompressor()`); `nothing` (default) uses Blosc with the SpeedyWeather default compression level. |
+
+```julia
+using SpeedyWeather, Zarr
+
+spectral_grid = SpectralGrid(trunc=31, nlayers=8)
+output = ZarrOutput(spectral_grid, PrimitiveWet;
+    output_dt = Hour(1),
+    time_chunk = 24,                        # bundle one day per chunk on the time axis
+    compressor = Zarr.BloscCompressor(clevel=5),
+)
+```
+
+Reading back the data only needs Zarr.jl:
+
+```@example zarr
+using Zarr
+g = Zarr.zopen(joinpath(output.run_path, output.filename))
+g["time"][:]             # all stored hours since startdate
+g["vor"][:, :, 1, :]     # vorticity, top layer, all time steps
+nothing #hide
+```
+
+Custom output variables work exactly as with `NetCDFOutput`: subtype
+`AbstractOutputVariable`, implement `path(::MyOutputVariable, simulation)` to
+return the `AbstractField` to write, and `add!(output, MyOutputVariable())` it to the
+`ZarrOutput`. 
+
+### Reading the store from Python with xarray
+
+`ZarrOutput` writes the stores according to the conventions of `xarray` to ensure compability with it. Simulations can be easily opened in Python as in the following: 
+
+```python
+import xarray as xr
+ds = xr.open_zarr("run_0001/output.zarr", consolidated=False)
+print(ds)
+# <xarray.Dataset>
+# Dimensions:  (time: 41, layer: 8, lat: 32, lon: 64)
+# Coordinates:
+#   * time     (time) datetime64[ns]  2000-01-01 ... 2000-01-11
+#   * layer    (layer) float32        0.06 0.19 ... 0.94
+#   * lat      (lat) float64          85.76 ... -85.76
+#   * lon      (lon) float64          0.0 ... 354.4
+# Data variables:
+#     vor      (time, layer, lat, lon) float32
+#     u        (time, layer, lat, lon) float32
+#     v        (time, layer, lat, lon) float32
+#     temp     (time, layer, lat, lon) float32
+#     humid    (time, layer, lat, lon) float32
+#     mslp     (time, lat, lon) float32
+
+ds["temp"].isel(time=-1, layer=0).plot()       # last step, top layer
+ds["mslp"].mean(("lat", "lon")).plot.line(x="time")
+```
+
+`xarray` decodes the `time` axis to `datetime64` automatically (from the
+CF-style `hours since <startdate>` units), so resampling and slicing by date
+work without extra work:
+
+```python
+ds.sel(time=slice("2000-01-05", "2000-01-08"))["temp"].mean("time")
+```
 
 ## Parameter summary
 

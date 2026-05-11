@@ -29,8 +29,8 @@ which are described in the following.
 
 We follow the simplification of the Betts-Miller convection scheme
 [^Betts1986][^BettsMiller1986] as studied by Frierson, 2007 [^Frierson2007].
-The central idea of this scheme is to represent the effect of 
-convection as an adjustment towards a (pseudo-) moist adiabat 
+The central idea of this scheme is to represent the effect of
+convection as an adjustment towards a (pseudo-) moist adiabat
 reference profile and its associated humidity profile. Meaning that
 conceptually for every vertical column in the atmosphere we
 
@@ -43,7 +43,7 @@ conceptually for every vertical column in the atmosphere we
 The dry adiabat is
 
 ```math
-T = T_0 (\frac{p}{p_0})^\frac{R}{c_p}
+T = T_0 \left(\frac{p}{p_0}\right)^\frac{R}{c_p}
 ```
 
 The temperature ``T`` of an air parcel at pressure ``p`` is determined by the
@@ -54,16 +54,16 @@ The pseudo adiabat follows the dry adiabat until saturation is reached
 Then it follows the pseudoadiabatic lapse rate
 
 ```math
-\Gamma = -\frac{dT}{dz} = \frac{g}{c_p}\left(
+\Gamma = -\frac{dT}{dz} = \frac{g}{c_p}\left[
     \frac{  1 + \frac{q^\star L_v  }{(1-q^\star)^2     R_d T_v}}{
-            1 + \frac{q^\star L_v^2}{(1-q^\star)^2 c_p R_v T^2}}\right)
+            1 + \frac{q^\star L_v^2}{(1-q^\star)^2 c_p R_v T^2}}\right]
 ```
 
 with gravity ``g``, heat capacity ``c_p``, the saturation specific humidity of the parcel ``q^\star``
 (which is its specific humidity given that it has already reached saturation),
 latent heat of vaporization ``L_v``, dry gas constant ``R_d``, water vapor
 gas constant ``R_v``, and [Virtual temperature](@ref) ``T_v``.
-Starting with a temperature ``T`` and humidity ``q = q^\star`` at the lifting condensation level 
+Starting with a temperature ``T`` and humidity ``q = q^\star`` at the lifting condensation level
 temperature aloft changes with $dT = -\frac{d\Phi}{c_p}(...)$ between two layers separated
 ``d\Phi`` in geopotential ``\Phi`` apart. On that new layer, ``q^\star`` is recalculated
 as well as the virtual temperature ``T_v = T(1 + \mu q^\star)``. ``\mu`` is derived from
@@ -107,7 +107,7 @@ the resulting tendencies from this scheme. Those will be calculated in [Correcte
 
 Note that above the level of zero buoyancy no relaxation takes place ``\delta T = \delta q = 0``,
 or, equivalently ``T = T_{ref}``, ``q = q_{ref}`` there.
-Vertically integration from surface ``p_0`` to level of zero buoyancy in 
+Vertically integration from surface ``p_0`` to level of zero buoyancy in
 pressure coordinates ``p_{LZB}`` yields
 
 ```math
@@ -130,8 +130,8 @@ through condensation, but ``P_q`` can also be negative. Consequently similar for
 We now distinguish three cases
 
 1. Deep convection when ``P_T > 0`` and ``P_q > 0``
-2. Shallow convection when ``P_T > 0`` and ``P_q <= 0``
-3. No convection for ``P_T <= 0``.
+2. Shallow convection when ``P_T > 0`` and ``P_q \le 0``
+3. No convection for ``P_T \le 0``.
 
 Note that to evaluate these cases it is not necessary to divide by ``\tau_{SBM}`` in
 the first-guess relaxation, neither are the ``1/g`` and ``\tfrac{c_p}{g L_v}``
@@ -148,7 +148,7 @@ Following Frierson, 2007 [^Frierson2007] in order to conserve enthalpy we correc
 the reference profile for temperature ``T_{ref} \to T_{ref, 2}`` so that ``P_T = P_q``.
 
 ```math
-T_{ref, 2} = T_{ref} + \frac{1}{\Delta p c_p} \int_{p_0}^{p_{LZB}} c_p (T - T_{ref}) + L_v (q - q_{ref}) dp
+T_{ref, 2} = T_{ref} + \frac{1}{\Delta p c_p} \int_{p_0}^{p_{LZB}} \left[ c_p (T - T_{ref}) + L_v (q - q_{ref}) \right] dp
 ```
 
 ``\Delta p`` is the pressure difference ``p_{LZB} - p_0``.
@@ -166,16 +166,16 @@ determined during the calculation of the [Reference profiles](@ref).
 
 ```math
 \begin{aligned}
-\Delta q &= \int_{p_0}^{p_{LZB}} q - q_{ref} dp \\
-Q_{ref}  &= \int_{p_0}^{p_{LZB}} -q_{ref} dp \\
-f_q      &= 1 - \frac{\Delta q}{Q_ref} \\
+\Delta q &= \int_{p_0}^{p_{LZB}} (q - q_{ref}) dp \\
+Q_{ref}  &= \int_{p_0}^{p_{LZB}} -q_{ref}~dp \\
+f_q      &= 1 - \frac{\Delta q}{Q_{ref}} \\
 q_{ref, 2} &= f_q q_{ref} \\
-\Delta T &= \frac{1}{\Delta p} \int_{p_0}^{p_{LZB}} -(T - T_{ref}) dp \\
+\Delta T &= -\frac{1}{\Delta p} \int_{p_0}^{p_{LZB}} (T - T_{ref}) dp \\
 T_{ref,2} &= T_{ref} - \Delta T
 \end{aligned}
 ```
 
-This scheme is non-precipitating (``P_q = 0``) as derived below. ``P_q`` follows from the vertical integral of the moisture tendency ``\delta q``, which in this scheme is a relaxation towards ``q_{\text{ref,2}}`` (see [Corrected relaxation](@ref)). 
+This scheme is non-precipitating (``P_q = 0``) as derived below. ``P_q`` follows from the vertical integral of the moisture tendency ``\delta q``, which in this scheme is a relaxation towards ``q_{\text{ref,2}}`` (see [Corrected relaxation](@ref)).
 
 ```math
 P_q = -\int_{p_0}^{p_{LZB}} \frac{\delta q}{g} \, dp = \int_{p_0}^{p_{LZB}} \frac{q - q_{\text{ref,2}}}{g \tau_{SBM}} dp
@@ -187,7 +187,7 @@ Inserting from above yields
 P_q = \int_{p_0}^{p_{LZB}} \frac{q - \left(1 - \frac{\Delta q}{Q_{\text{ref}}} \right) q_{\text{ref}} }{g \tau_{SBM}} dp = \frac{1}{g \tau_{SBM}} \int_{p_0}^{p_{LZB}} \left( q - q_{\text{ref}} + \frac{\Delta q}{Q_{\text{ref}}} q_{\text{ref}} \right) dp
 ```
 
-The integral becomes 
+The integral becomes
 ```math
 \Delta q + \frac{\Delta q}{Q_{\text{ref}}} \int_{p_0}^{p_{LZB}}q_{\text{ref}} dp = \Delta q + \frac{\Delta q}{Q_{\text{ref}}} (- Q_{\text{ref}}) = 0
 ```

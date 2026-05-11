@@ -18,6 +18,15 @@ finalize!(::Nothing, ::AbstractModel) = nothing
 initialize!(::AbstractModelComponent, ::AbstractModel) = nothing
 finalize!(::AbstractModelComponent, ::AbstractModel) = nothing
 
+# model components that are named tuples of other components,
+# e.g. `greenhouse_gases`, can just call `initialize!` on the elements of the named tuple
+function initialize!(nt::NamedTuple, model::AbstractModel)
+    for key in keys(nt)
+        initialize!(getfield(nt, key), model)
+    end
+    return nothing
+end
+
 function Base.show(io::IO, P::AbstractModelComponent; values = true)
     type_str = split("$(typeof(P))", "{", limit = 2)
     type_itself = type_str[1]

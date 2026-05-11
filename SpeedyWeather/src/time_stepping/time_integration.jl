@@ -1,14 +1,14 @@
 """$(TYPEDSIGNATURES)
 Computes the time step in [ms]. `Δt_at_T31` is always scaled with the resolution `trunc` 
 of the model. In case `adjust_Δt_with_output` is true, the `Δt_at_T31` is additionally 
-adjusted to the closest divisor of `output_dt` so that the output time axis is keeping
-`output_dt` exactly."""
+adjusted to the closest divisor of `interval` so that the output time axis is keeping
+`interval` exactly."""
 function get_Δt_millisec(
         Δt_at_T31::TimePeriod,
         trunc,
         radius,
         adjust_with_output::Bool,
-        output_dt::TimePeriod = DEFAULT_OUTPUT_DT,
+        interval::TimePeriod = DEFAULT_OUTPUT_INTERVAL,
     )
     # linearly scale Δt with trunc+1 (which are often powers of two)
     resolution_factor = (DEFAULT_TRUNC + 1) / (trunc + 1)
@@ -19,13 +19,13 @@ function get_Δt_millisec(
     # maybe rename to _at_trunc_and_radius?
     Δt_at_trunc = Second(Δt_at_T31).value * resolution_factor * radius_factor
 
-    if adjust_with_output && (output_dt > Millisecond(0))
-        k = round(Int, Second(output_dt).value / Δt_at_trunc)
-        divisors = Primes.divisors(Millisecond(output_dt).value)
+    if adjust_with_output && (interval > Millisecond(0))
+        k = round(Int, Second(interval).value / Δt_at_trunc)
+        divisors = Primes.divisors(Millisecond(interval).value)
         sort!(divisors)
         i = findfirst(x -> x >= k, divisors)
         k_new = isnothing(i) ? k : divisors[i]
-        Δt_millisec = Millisecond(round(Int, Millisecond(output_dt).value / k_new))
+        Δt_millisec = Millisecond(round(Int, Millisecond(interval).value / k_new))
 
         # provide info when time step is significantly shortened or lengthened
         Δt_millisec_unadjusted = round(Int, 1000 * Δt_at_trunc)
@@ -138,7 +138,7 @@ function timestep!(
     reset_tendencies!(vars)             # set the tendencies back to zero for accumulation
 
     if ~model.dynamics_only             # switch on/off all physics parameterizations
-        # calculate all parameterizations
+        greenhouse_gases_time_step!(vars, model)
         parameterization_tendencies!(vars, model)
         ocean_timestep!(vars, model)    # sea surface temperature and maybe in the future sea ice
         sea_ice_timestep!(vars, model)  # sea ice

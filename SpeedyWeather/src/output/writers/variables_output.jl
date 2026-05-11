@@ -3,7 +3,7 @@ export JLD2Output, ArrayOutput
 """Abstract supertype for output writers that save `Variables` (or subsets thereof)
 at regular intervals. Subtypes must have fields: `active`, `path`, `run_prefix`, `id`,
 `run_number`, `run_digits`, `overwrite`, `write_restart`, `write_parameters_txt`,
-`write_progress_txt`, `output_dt`, `groups`, and `core::OutputWriterCore`."""
+`write_progress_txt`, `interval`, `groups`, and `core::OutputWriterCore`."""
 abstract type AbstractVariablesOutput <: AbstractOutput end
 
 # GROUPS FILTERING
@@ -57,7 +57,7 @@ $(TYPEDFIELDS)"""
     write_progress_txt::Bool = true
 
     "[OPTION] output frequency, time step"
-    output_dt::Second = Second(DEFAULT_OUTPUT_DT)
+    interval::Second = Second(DEFAULT_OUTPUT_INTERVAL)
 
     "[OPTION] will reopen and resave the file to merge everything in one big vector. Turn off if the file is too large for memory."
     merge_output::Bool = true
@@ -77,7 +77,7 @@ function Base.show(io::IO, output::JLD2Output)
     println(io, "├ write restart file: $(output.write_restart) (if active)")
     println(io, "├ path: $(joinpath(output.run_path, output.filename))")
     println(io, "├ groups: $(output.groups)")
-    return println(io, "└ frequency: $(output.output_dt)")
+    return println(io, "└ interval: $(output.interval)")
 end
 
 """$(TYPEDSIGNATURES)
@@ -166,7 +166,7 @@ Otherwise follows the same logic as [`JLD2Output`](@ref). Fields are $(TYPEDFIEL
     write_progress_txt::B = false
 
     "[OPTION] output frequency, time step"
-    output_dt::S = Second(DEFAULT_OUTPUT_DT)
+    interval::S = Second(DEFAULT_OUTPUT_INTERVAL)
 
     "[OPTION] which variable groups to save, e.g. (:prognostic,) or (:prognostic, :grid). Use (:all,) for all groups."
     groups::T= (:all,)
@@ -204,7 +204,7 @@ function Base.show(io::IO, output::ArrayOutput)
     println(io, "├ status: $(output.active ? "active" : "inactive/uninitialized")")
     println(io, "├ snapshots stored: $n")
     println(io, "├ groups: $(output.groups)")
-    return println(io, "└ frequency: $(output.output_dt)")
+    return println(io, "└ interval: $(output.interval)")
 end
 
 """$(TYPEDSIGNATURES)

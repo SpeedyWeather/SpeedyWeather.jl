@@ -1,6 +1,26 @@
-# SpeedyWeather.jl documentation
+```@raw html
+---
+layout: home
 
-Welcome to the documentation for [SpeedyWeather.jl](https://github.com/milankl/SpeedyWeather.jl)!
+hero:
+  name: "SpeedyWeather.jl"
+  tagline: "An atmospheric model for research: friendly, interactive, extensible, and built for speed."
+  image:
+    src: /logo.png
+    alt: SpeedyWeather
+  actions:
+    - theme: brand
+      text: Get Started
+      link: /installation
+    - theme: alt
+      text: View on Github
+      link: https://github.com/SpeedyWeather/SpeedyWeather.jl
+    - theme: alt
+      text: API Reference
+      link: /api
+---
+```
+
 SpeedyWeather.jl is a global atmospheric model developed as a research playground
 with an everything-flexible attitude as long as it is speedy. Technically it is a climate model with simple,
 yet interactive representations of ocean, land and sea-ice. It is easy to use and easy to extend, making 
@@ -10,8 +30,10 @@ atmospheric modelling an interactive experience -- in the terminal, in a noteboo
 
 SpeedyWeather.jl uses a spherical harmonic transform to simulate
 the general circulation of the atmosphere using a vorticity-divergence formulation,
-a semi-implicit time integration and simple parameterizations to represent various
+a semi-implicit time integration and a wide range of parameterizations to represent various
 climate processes: Convection, clouds, precipitation, radiation, surface fluxes, among others.
+SpeedyWeather includes a slab ocean, a land bucket model, and a thermodynamic sea ice model
+making it a climate model with an atmospheric focus in complexity. 
 
 SpeedyWeather.jl defines 
 - [`BarotropicModel`](@ref barotropic_vorticity_model) for the 2D barotropic vorticity equation
@@ -26,17 +48,17 @@ and solves these equations in spherical coordinates as described in this documen
 Why another model? You may ask. We believe that most currently available are stiff, difficult to use
 and extend, and therefore slow down research whereas a modern code in a modern language wouldn't have to.
 We decided to use Julia because it combines the best of Fortran and Python: Within a single language
-we can interactively run SpeedyWeather but also extend it, inspect its components, evaluate
+we can interactively run SpeedyWeather but also extend it, recombine various components, evaluate
 individual terms of the equations, and analyse and visualise output on the fly.
 
 We do not aim to make SpeedyWeather an atmospheric model similar to the production-ready models used
 in weather forecasting, at least not at the cost of our current level of interactivity and ease of
-use or extensibility. If someone wants to implement a cloud parameterization that is very complicated
-and expensive to run then they are more than encouraged to do so, but it will probably live in
-its own repository and we are happy to provide a general interface to do so. But SpeedyWeather's
-defaults should be balanced: Physically accurate yet general; as independently as possible from other
-components and parameter choices; not too complicated to implement and understand; and computationally cheap.
-Finding a good balance is difficult but we try our best. 
+use or extensibility. If someone wants to implement a parameterization that is very complicated
+and expensive to run then they are more than encouraged to do so and we are more than keen to support you,
+but it will probably live in its own repository and we are happy to provide a general interface to do so.
+But SpeedyWeather's defaults should be balanced: Physically accurate yet general; as independently as possible
+from other components and parameter choices, for the sake of modularity; not too complicated to implement
+and understand; and computationally cheap. Finding a good balance is difficult but we try our best. 
 
 ## Developers and contributing
 
@@ -80,8 +102,8 @@ The bibtex entry for the paper is:
 ## Funding
 
 MK received funding by the European Research Council under Horizon 2020 within the ITHACA project,
-grant agreement number 741112 from 2021-2022. From 2022-2024 this project was also funded by the
-National Science Foundation NSF. From 2024-2025, the funding is from Schmidt Sciences LLC through
+grant agreement number 741112 from 2021-2022. From 2022-2024 this project was funded by the
+National Science Foundation NSF. From 2024-2025, the funding came from Schmidt Sciences LLC through
 MK's Eric & Wendy Schmidt AI in Science Fellowship. Since 2025, MK's funding is provided through
 a NERC Independent Research Fellowship under grant number UKRI191.
 
