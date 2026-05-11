@@ -1020,9 +1020,5 @@ end
 end
 
 # dispatch on element type: nested NamedTuple vs array
-# Note: when a tendency entry is a view of a fused parent (e.g. vars.tendencies.grid.u
-# is a slot view of vars.scratch.fused.tend_grid), `fill!` writes through the view and
-# zeroes only that slot of the parent — leaving non-tendency slots in the same parent
-# (used by other fuse-group members) untouched.
 @inline _reset_tendency!(nt::NamedTuple, value) = _reset_tendencies_inner!(values(nt), value)
 @inline _reset_tendency!(a::AbstractArray, value) = fill!(a, value)
