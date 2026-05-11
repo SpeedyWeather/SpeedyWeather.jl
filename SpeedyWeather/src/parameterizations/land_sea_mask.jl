@@ -28,7 +28,7 @@ abstract type AbstractLandSeaMask <: AbstractModelComponent end
 
 function mask!(
         field::AbstractField,
-        mask::AbstractField,
+        mask::AbstractArray,
         land_or_sea::Symbol;
         masked_value = NaN,
     )
@@ -36,7 +36,7 @@ function mask!(
     val = land_or_sea == :land ? 1 : 0
     masked_val = convert(eltype(field), masked_value)
 
-    @boundscheck fields_match(field, mask, horizontal_only = true) || throw(DimensionMismatch(field, mask))
+    @boundscheck size(field,1) == size(mask,1) || throw(DimensionMismatch(field, mask))
 
     arch = architecture(field)
     launch!(arch, RingGridWorkOrder, size(field), mask_kernel!, field, mask, val, masked_val)
