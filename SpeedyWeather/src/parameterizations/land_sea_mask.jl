@@ -71,7 +71,7 @@ export EarthLandSeaMask
 
 """Land-sea mask, fractional, read from file.
 $(TYPEDFIELDS)"""
-@kwdef struct EarthLandSeaMask{NF, GridVariable2D, B, Q} <: AbstractLandSeaMask
+@kwdef struct EarthLandSeaMask{NF, GridVariable2D, B} <: AbstractLandSeaMask
 
     # OPTIONS
     "filename of land sea mask"
@@ -93,7 +93,7 @@ $(TYPEDFIELDS)"""
     FieldType::Type{<:AbstractField} = FullClenshawField
 
     "[OPTION] Quantization to fraction?"
-    quantization::Q = 0.01
+    quantization::NF = 0.01
 
     # FIELDS (to be initialized in initialize!)
     "Land-sea mask [1] on grid-point space. Land=1, sea=0, land-area fraction in between."
@@ -109,13 +109,13 @@ Generator function pulling the resolution information from `spectral_grid`."""
 function (L::Type{<:AbstractLandSeaMask})(spectral_grid::SpectralGrid; kwargs...)
     (; NF, GridVariable2D, grid) = spectral_grid
     mask = zeros(GridVariable2D, grid)
-    return L{NF, GridVariable2D}(; mask, kwargs...)
+    return L{NF, GridVariable2D, Bool}(; mask, kwargs...)
 end
 
 function EarthLandSeaMask(spectral_grid::SpectralGrid; kwargs...)
     (; NF, GridVariable2D, grid) = spectral_grid
     mask = zeros(GridVariable2D, grid)
-    return EarthLandSeaMask{NF, GridVariable2D, Bool, Float64}(; mask, kwargs...)
+    return EarthLandSeaMask{NF, GridVariable2D, Bool}(; mask, kwargs...)
 end
 
 # set mask with grid, scalar, function; just define path `mask.mask` to grid here
@@ -131,17 +131,17 @@ end
 $(TYPEDSIGNATURES)
 Reads a high-resolution land-sea mask from file and interpolates (grid-cell average)
 onto the model grid for a fractional sea mask."""
-function initialize!(land_sea_mask::EarthLandSeaMask, model::PrimitiveEquation)
+function initialize!(land_sea_mask::EarthLandSeaMask{NF}, model::PrimitiveEquation) where NF
 
     # LOAD NETCDF FILE
-    lsm_highres = get_asset(
+    lsm_highres = NF.(get_asset(
         land_sea_mask.path;
         from_assets = land_sea_mask.from_assets,
         name = land_sea_mask.varname,
         ArrayType = land_sea_mask.FieldType,
         FileFormat = NCDataset,
         version = land_sea_mask.version
-    )
+    ))
 
     # average onto grid cells of the model
     cpu_mask = on_architecture(CPU(), land_sea_mask.mask)
