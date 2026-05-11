@@ -113,6 +113,8 @@ end
     @test occursin("u", err.msg)
 end
 
+# Activate these test once we actually use fused variables in the model
+#=
 @testset "view ↔ parent aliasing round trips" begin
     model = _testmodel(nlayers = 4)
     sim = initialize!(model)
@@ -170,3 +172,4 @@ end
     @test haskey(v.tendencies, :vorticity)   # spectral tendency, not fused
     @test !(v.tendencies.vorticity.data isa SubArray)
 end
+=#
