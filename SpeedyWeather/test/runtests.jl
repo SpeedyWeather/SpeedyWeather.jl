@@ -15,13 +15,15 @@ testsuite_GPU = Dict(
 testsuite_dynamics = find_tests(joinpath(pwd(), "dynamics"))
 testsuite_parameterizations = find_tests(joinpath(pwd(), "parameterizations"))
 testsuite_output = find_tests(joinpath(pwd(), "output"))
+testsuite_variables = find_tests(joinpath(pwd(), "variables"))
 
 # merge all testsuites
 testsuite = merge(
     testsuite_GPU,
     testsuite_dynamics,
     testsuite_parameterizations,
-    testsuite_output
+    testsuite_output,
+    testsuite_variables,
 )
 
 # run tests in parallel

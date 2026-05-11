@@ -273,12 +273,15 @@ function build_fuse_parents(all_vars, model)
 
     parents = Dict{Tuple{Symbol, Symbol}, NamedTuple}()
     for ((ns, fuse_sym), vars) in groups
-        # Validate: same dim type within a fuse group (allocate_fused dispatches on it).
-        D = typeof(first(vars).dims)
+        # Validate: same fuse family within a group. Grid2D + Grid3D may be mixed (parent
+        # is a Grid3D buffer), Spectral2D + Spectral3D may be mixed (parent is a Spectral3D
+        # buffer), but mixing grid with spectral is rejected.
+        family = fuse_family(first(vars).dims)
         for v in vars
-            typeof(v.dims) === D || error(
-                "Fuse group `$fuse_sym` (namespace `$ns`) mixes dim types: " *
-                "$(typeof(v.dims)) for `$(v.name)` vs $D. All members must share the same dim type."
+            fuse_family(v.dims) === family || error(
+                "Fuse group `$fuse_sym` (namespace `$ns`) mixes fuse families: " *
+                "`$(v.name)` has $(typeof(v.dims)) (family `$(fuse_family(v.dims))`) but " *
+                "the group is family `$family`. Grid and spectral variables cannot share a parent buffer."
             )
         end
         # Validate: member names are unique within the group.
@@ -288,7 +291,7 @@ function build_fuse_parents(all_vars, model)
             "Each member of a fuse group must have a unique `name`."
         )
         # Allocate one parent for this fuse group; views & slots aligned with `vars`.
-        parent, views, slots = allocate_fused(typed_vars(vars, D), model)
+        parent, views, slots = allocate_fused(vars, model)
         # Build-time correctness check: every view aliases the parent at its declared slot
         # range, slots are pairwise disjoint, and they tile the parent's fused axis exactly.
         _validate_fuse_layout(fuse_sym, ns, vars, parent, views, slots)
@@ -353,9 +356,6 @@ function _validate_fuse_layout(fuse_sym, ns, vars, parent, views, slots)
     )
     return nothing
 end
-
-# Narrow the eltype of a variable vector to the concrete dim type so allocate_fused dispatches.
-typed_vars(vars, ::Type{D}) where {D} = AbstractVariable{D}[v for v in vars]
 
 """$(TYPEDSIGNATURES) Allocates all variables within a group given a tuple of variables
 expected to be `<: AbstractVariable` definitions. Determines the namespaces,
