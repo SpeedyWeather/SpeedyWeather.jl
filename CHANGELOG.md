@@ -3,6 +3,9 @@
 ## Unreleased
 
 - Allow for variables to be fused together (prelimnary work for GPU optiminization) [#1083](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1083)
+
+## v0.20.1
+
 - Implement CO2 and greenhouse gases [#993](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/993)
 - `ZarrOutput` for writing simulation output to a Zarr store, implemented as a Zarr.jl extension [#1076](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1076)
 - Add non-unicode function name aliases laplace, inverse_laplace, gradient [#1078](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1078)
