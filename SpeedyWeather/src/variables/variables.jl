@@ -245,16 +245,29 @@ end
 """$(TYPEDSIGNATURES) For every non-empty `fuse` symbol used across `all_vars`, allocate one parent
 buffer covering all members in that (namespace, fuse) group across all variable types.
 Returns a `Dict{Tuple{Symbol,Symbol}, NamedTuple}` keyed by `(namespace, fuse)`. Each entry holds
-the parent and a `Dict{Symbol, AbstractArray}` mapping each member's `identifier(v)` to its view."""
+the parent and a `Dict{Symbol, AbstractArray}` mapping each member's `identifier(v)` to its view.
+
+Validates at build time that every constructed view actually aliases the parent at its declared
+slot range, that slot ranges are pairwise non-overlapping, and that together they tile the parent's
+fused axis exactly with no gaps. This catches offset/order bugs in `_split_views_*` and ensures
+the right variable is wired to the right slot."""
 function build_fuse_parents(all_vars, model)
-    # Group all fused vars by (namespace, fuse), deduped by identifier.
-    seen = Set{Symbol}()
+    # Group all fused vars by (namespace, fuse), deduped by (namespace, name) Tuple.
+    seen = Dict{Tuple{Symbol, Symbol}, AbstractVariable}()   # (namespace, name) => first variable seen
     groups = Dict{Tuple{Symbol, Symbol}, Vector{AbstractVariable}}()
     for v in all_vars
         v.fuse === Symbol() && continue
-        id = identifier(v)
-        id in seen && continue
-        push!(seen, id)
+        key = (v.namespace, v.name)
+        if haskey(seen, key)
+            prev = seen[key]
+            nonparametric_type(prev) === nonparametric_type(v) && continue  # same type, same var declared twice — fine
+            error(
+                "Fuse group `$(v.fuse)` (namespace `$(v.namespace)`): variable `$(v.name)` is " *
+                "declared as both $(nonparametric_type(prev)) and $(nonparametric_type(v)). " *
+                "Each (namespace, name) pair may appear at most once across all variable types in a fuse group."
+            )
+        end
+        seen[key] = v
         push!(get!(groups, (v.namespace, v.fuse), AbstractVariable[]), v)
     end
 
@@ -268,14 +281,77 @@ function build_fuse_parents(all_vars, model)
                 "$(typeof(v.dims)) for `$(v.name)` vs $D. All members must share the same dim type."
             )
         end
-        # Allocate one parent for this fuse group; views aligned with `vars`.
-        parent, views = allocate_fused(typed_vars(vars, D), model)
+        # Validate: member names are unique within the group.
+        names = Tuple(v.name for v in vars)
+        length(unique(names)) == length(names) || error(
+            "Fuse group `$fuse_sym` (namespace `$ns`) has duplicate member names: $names. " *
+            "Each member of a fuse group must have a unique `name`."
+        )
+        # Allocate one parent for this fuse group; views & slots aligned with `vars`.
+        parent, views, slots = allocate_fused(typed_vars(vars, D), model)
+        # Build-time correctness check: every view aliases the parent at its declared slot
+        # range, slots are pairwise disjoint, and they tile the parent's fused axis exactly.
+        _validate_fuse_layout(fuse_sym, ns, vars, parent, views, slots)
         parents[(ns, fuse_sym)] = (
             parent = parent,
-            views = Dict{Symbol, Any}(identifier(v) => views[i] for (i, v) in enumerate(vars)),
+            views = Dict{Tuple{Symbol, Symbol}, Any}((v.namespace, v.name) => views[i] for (i, v) in enumerate(vars)),
         )
     end
     return parents
+end
+
+# Verify each view actually points at its declared slot inside the parent, slots don't
+# overlap, and together they cover the parent's fused axis exactly. Discards the slot
+# information after checking — it's a correctness check, not runtime metadata.
+function _validate_fuse_layout(fuse_sym, ns, vars, parent, views, slots)
+    parent_size = size(parent.data, 2)
+    covered = falses(parent_size)
+    for (i, v) in enumerate(vars)
+        view_data = views[i].data
+        slot = slots[i]
+        if view_data isa SubArray
+            Base.parent(view_data) === parent.data || error(
+                "Fuse group `$fuse_sym` (namespace `$ns`): view for `$(v.name)` is not a view " *
+                "of the fused parent buffer (got parent $(typeof(Base.parent(view_data))))."
+            )
+ 
+            p_index_last = parentindices(view_data)[end]
+            # Normalise scalar indices (Grid2D / Spectral2D uses field_view(parent, :, k)
+            # which stores an Int rather than a 1-element range in parentindices).
+            p_index_last_range = p_index_last isa Integer ? (p_index_last:p_index_last) : p_index_last
+            p_index_last_range == slot || error(
+                "Fuse group `$fuse_sym` (namespace `$ns`): view for `$(v.name)` has " *
+                "parentindices $(p_index_last) but slot map declares $(slot)."
+            )
+        else # fallback for GPU array types that are not SubArrays
+            size(view_data, ndims(view_data)) == length(slot) || error(
+                "Fuse group `$fuse_sym` (namespace `$ns`): view for `$(v.name)` is not a " *
+                "SubArray (got $(typeof(view_data))) and its last-axis size " *
+                "$(size(view_data, ndims(view_data))) does not match slot length $(length(slot))."
+            )
+        end
+        for k in slot
+
+            # chck the slot is within the parent
+            (1 <= k <= parent_size) || error(
+                "Fuse group `$fuse_sym` (namespace `$ns`): slot $k for `$(v.name)` " *
+                "is outside the parent buffer's axis 1:$parent_size."
+            )
+
+            # check it's not already claimed
+            covered[k] && error(
+                "Fuse group `$fuse_sym` (namespace `$ns`): slot $k is claimed by " *
+                "multiple members (offending member: `$(v.name)`)."
+            )
+            covered[k] = true
+        end
+    end
+    # check everything is covered
+    all(covered) || error(
+        "Fuse group `$fuse_sym` (namespace `$ns`): slots do not tile the parent's " *
+        "fused axis 1:$parent_size (uncovered slots: $(findall(!, covered)))."
+    )
+    return nothing
 end
 
 # Narrow the eltype of a variable vector to the concrete dim type so allocate_fused dispatches.
@@ -314,7 +390,7 @@ function _allocate_namespace(vars, model, fuse_parents)
             push!(pairs, v.name => zero(v, model))
         else
             entry = fuse_parents[(v.namespace, v.fuse)]
-            push!(pairs, v.name => entry.views[identifier(v)])
+            push!(pairs, v.name => entry.views[(v.namespace, v.name)])
         end
     end
     return (; pairs...)
