@@ -85,81 +85,86 @@ end
 Base.zero(::AbstractVariable{LocatorDim}, model::AbstractModel) = RingGrids.AnvilLocator(model.spectral_grid.NF, model.particle_advection.nparticles; architecture = model.spectral_grid.architecture)
 
 # Variable fusion support
-# We may want to fuse a group of variables into a single parent variable to 
-# optimize performance by batching transforms. 
-# Here we define how many "slots" along the layer axis a variable contributes
-# to a fused parent, and how to allocate the parent + per-member views.
-# Currently supports Grid3D, Grid2D, Spectral3D, Spectral2D. Variables in a
-# fused group must share the same dim *type* (validated in allocate).
+# We may want to fuse a group of variables into a single parent variable to
+# optimize performance by batching transforms.
+#
+# Two fuse families are supported:
+#   :grid     — mix of Grid2D and Grid3D; parent is a Grid3D buffer
+#   :spectral — mix of Spectral2D and Spectral3D; parent is a Spectral3D buffer
+#
+# Within a family, members can mix 2D and 3D freely:
+#   - 3D members contribute `nlayers` slots and get a range-indexed view (keeps the layer dim)
+#   - 2D members contribute 1 slot and get a scalar-indexed view (collapses the layer dim,
+#     preserving the original 2D field/LTA semantics)
+#
+# `fused_slots` says how many parent-axis columns a member needs.
+# `fuse_family` says which parent type the member is compatible with; fusion across families
+# (e.g. mixing a Grid3D with a Spectral2D) is rejected in `build_fuse_parents`.
 
 fused_slots(::Grid3D, model::AbstractModel) = get_nlayers(model)
 fused_slots(::Grid2D, ::AbstractModel) = 1
 fused_slots(::Spectral2D, ::AbstractModel) = 1
 fused_slots(d::Spectral3D, model::AbstractModel) = d.n == 0 ? get_nlayers(model) : d.n
 
-# Allocate the fused parent buffer for a group of variables sharing a dim type.
+fuse_family(::Grid2D) = :grid
+fuse_family(::Grid3D) = :grid
+fuse_family(::Spectral2D) = :spectral
+fuse_family(::Spectral3D) = :spectral
+fuse_family(d::AbstractVariableDim) = error(
+    "Fusion is not supported for dim type $(typeof(d)). " *
+    "Supported dim types: Grid2D, Grid3D, Spectral2D, Spectral3D."
+)
+
+# Allocate the fused parent buffer for a group of variables sharing a fuse family.
 # Variables are passed in declaration order; returns (parent, views, slots) where
 # `views[i]` is the field/lta_view for `vars[i]` and `slots[i]` is its UnitRange{Int}
-# along the fused (layer) axis of the parent.
-# `build_fuse_parents` exposes it as a NamedTuple at `vars.scratch.fuse_slots.<fuse>`.
-function allocate_fused(vars::AbstractVector{<:AbstractVariable{Grid3D}}, model::AbstractModel)
+# along the fused axis of the parent. 2D members get scalar-indexed views (collapsed
+# layer dim); 3D members get range-indexed views.
+function allocate_fused(vars::AbstractVector{<:AbstractVariable}, model::AbstractModel)
+    family = fuse_family(first(vars).dims)
     total = sum(fused_slots(v.dims, model) for v in vars)
-    parent = zeros(model.spectral_grid.GridVariable3D, model.spectral_grid.grid, total)
-    views, slots = _split_views_grid3d(parent, vars, model)
+    if family === :grid
+        parent = zeros(model.spectral_grid.GridVariable3D, model.spectral_grid.grid, total)
+        views, slots = _split_grid_views(parent, vars, model)
+    else # :spectral (already validated upstream)
+        parent = zeros(model.spectral_grid.SpectralVariable3D, model.spectral_grid.spectrum, total)
+        views, slots = _split_spectral_views(parent, vars, model)
+    end
     return parent, views, slots
 end
 
-function allocate_fused(vars::AbstractVector{<:AbstractVariable{Grid2D}}, model::AbstractModel)
-    # each Grid2D contributes 1 layer; parent is a Grid3D with N layers
-    parent = zeros(model.spectral_grid.GridVariable3D, model.spectral_grid.grid, length(vars))
-    views = [field_view(parent, :, k) for k in 1:length(vars)]
-    slots = [k:k for k in 1:length(vars)]
-    return parent, views, slots
-end
-
-function allocate_fused(vars::AbstractVector{<:AbstractVariable{Spectral3D}}, model::AbstractModel)
-    total = sum(fused_slots(v.dims, model) for v in vars)
-    parent = zeros(model.spectral_grid.SpectralVariable3D, model.spectral_grid.spectrum, total)
-    views, slots = _split_views_spectral3d(parent, vars, model)
-    return parent, views, slots
-end
-
-function allocate_fused(vars::AbstractVector{<:AbstractVariable{Spectral2D}}, model::AbstractModel)
-    parent = zeros(model.spectral_grid.SpectralVariable3D, model.spectral_grid.spectrum, length(vars))
-    views = [lta_view(parent, :, k) for k in 1:length(vars)]
-    slots = [k:k for k in 1:length(vars)]
-    return parent, views, slots
-end
-
-# fallback: clear error message for unsupported dim types
-allocate_fused(::AbstractVector{<:AbstractVariable{D}}, ::AbstractModel) where {D} =
-    error("Fusion is not implemented for dim type $D. Supported: Grid2D, Grid3D, Spectral2D, Spectral3D.")
-
-function _split_views_grid3d(parent, vars, model)
+# Build views & slot ranges for a grid-family fuse group. Grid2D members use a scalar
+# layer index so the resulting Field stays 2D (no layer axis); Grid3D members use a range.
+function _split_grid_views(parent, vars, model)
     views = Vector{Any}(undef, length(vars))
     slots = Vector{UnitRange{Int}}(undef, length(vars))
     offset = 0
     for (i, v) in enumerate(vars)
         n = fused_slots(v.dims, model)
         slots[i] = (offset + 1):(offset + n)
-        views[i] = field_view(parent, :, slots[i])
+        views[i] = v.dims isa Grid2D ?
+            field_view(parent, :, offset + 1) :    # scalar → 2D Field (no layer dim)
+            field_view(parent, :, slots[i])        # range  → 3D Field (with layer dim)
         offset += n
     end
-    @assert offset == size(parent.data, 2) "Fused Grid3D parent has $offset slots assigned but parent has $(size(parent.data, 2)) layers"
+    @assert offset == size(parent.data, 2) "Fused grid parent has $offset slots assigned but parent has $(size(parent.data, 2)) layers"
     return views, slots
 end
 
-function _split_views_spectral3d(parent, vars, model)
+# Mirror of `_split_grid_views` for the spectral family.
+function _split_spectral_views(parent, vars, model)
     views = Vector{Any}(undef, length(vars))
     slots = Vector{UnitRange{Int}}(undef, length(vars))
     offset = 0
     for (i, v) in enumerate(vars)
         n = fused_slots(v.dims, model)
         slots[i] = (offset + 1):(offset + n)
-        views[i] = lta_view(parent, :, slots[i])
+        views[i] = v.dims isa Spectral2D ?
+            lta_view(parent, :, offset + 1) :      # scalar → LowerTriangularMatrix
+            lta_view(parent, :, slots[i])          # range  → LowerTriangularArray{T,2}
         offset += n
     end
-    @assert offset == size(parent.data, 2) "Fused Spectral3D parent has $offset slots assigned but parent has $(size(parent.data, 2)) layers"
+    @assert offset == size(parent.data, 2) "Fused spectral parent has $offset slots assigned but parent has $(size(parent.data, 2)) layers"
     return views, slots
 end
 
