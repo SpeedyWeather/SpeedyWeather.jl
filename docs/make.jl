@@ -35,7 +35,7 @@ makedocs(
             "NetCDF output" => "output.md",
             "Other output" => "other_output.md",
             "GPU and Architectures" => "architectures_gpu.md",
-            "CO₂ forcing experiments" => "CO2_forcing.md"
+            "CO₂ forcing experiments" => "co2_forcing.md"
         ],
         "Advanced" => [
             "Extensions" => "extensions.md",

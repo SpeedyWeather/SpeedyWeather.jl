@@ -2,7 +2,7 @@
 
 With our [greenhouse gases](radiation.md#greenhouse-gases) and [radiation interface](@ref radiation-ssm), we can also run idealized climate forcing scenarios. We will perform an experiment in which we let the CO₂ concentration rise exponentially starting from 280 ppmv and compare the globally averaged surface temperature to a control run in which we keep the CO₂ concentration constant at 280 ppmv. 
 
-To track the globally averaged surface temperature, we first set up a callback that computes and saves it. Then we set up the two simulations, both using the Simple Spectral Radiation Model of [`AnalyticBandRadiation.jl`](@ref radiation-ssm). 
+To track the globally averaged surface temperature, we first set up a callback that computes and saves it. Then we set up the two simulations, both using the Simple Spectral Radiation Model of [`AnalyticBandRadiation.jl`](@ref radiation-ssm). This script takes significant compute, so that it is not built live in the documentation. 
 
 ```julia 
 using Statistics
