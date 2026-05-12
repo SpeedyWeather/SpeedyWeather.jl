@@ -8,7 +8,7 @@ import SpeedyWeather: AbstractVariableDim, AbstractVariable, AbstractModel,
     AbstractLand, AbstractWetLand, SpectralGrid, LandGeometry,
     PrognosticVariable, Land3D, Variables,
     PrimitiveEquation, get_nlayers,
-    variables, initialize!, timestep!
+    variables, initialize!, timestep!, allocate
 import SpeedyWeather.RingGrids
 
 import Terrarium: Clock, ColumnRingGrid, ForwardEuler, InputSources,
@@ -23,7 +23,7 @@ container at `vars.prognostic.land.terrarium`. The `model.land` must therefore
 be an [`AbstractTerrariumLandModel`](@ref)."""
 struct TerrariumVars <: AbstractVariableDim end
 
-function Base.zero(::AbstractVariable{TerrariumVars}, model::AbstractModel)
+function SpeedyWeather.allocate(::AbstractVariable{TerrariumVars}, model::AbstractModel)
     land = model.land
     return Terrarium.initialize(
         terrarium_model(land);
