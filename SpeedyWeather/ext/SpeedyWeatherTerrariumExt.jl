@@ -252,8 +252,10 @@ function timestep!(
     set!(inputs.surface_shortwave_down, Rsd)
     set!(inputs.surface_longwave_down, Rld)
 
-    # Wrap the SpeedyWeather-owned state in an integrator and step it forward
-    # for the duration of the SpeedyWeather step using `terrarium_substep`.
+    # Constructing ModelIntegrator is allocation-free: it is an immutable struct
+    # of references so no data is copied.  InputSources() is empty intentionally:
+    # we own the input-update cycle above (via set!) and do not want Terrarium's
+    # update_inputs! to overwrite those values during the substeps.
     integrator = ModelIntegrator(
         state.clock, tmodel, InputSources(),
         state, terrarium_initializers(land), terrarium_timestepper(land),
@@ -407,6 +409,8 @@ function timestep!(
     set!(inputs.air_temperature, Tair)
     set!(inputs.air_temperature, inputs.air_temperature - NF(273.15))
 
+    # Same reasoning as in TerrariumWetLand.timestep!: free to construct, empty
+    # InputSources() so SpeedyWeather owns the input-update cycle.
     integrator = ModelIntegrator(
         state.clock, tmodel, InputSources(),
         state, terrarium_initializers(land), terrarium_timestepper(land),
