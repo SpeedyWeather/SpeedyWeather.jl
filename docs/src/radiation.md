@@ -10,6 +10,8 @@ using SpeedyWeather
 subtypes(SpeedyWeather.AbstractLongwave)
 ```
 
+Additionally [AnalyticBandRadiation.jl](https://github.com/NumericalEarth/AnalyticBandRadiation.jl) provides a spectrally-resolved clear-sky longwave scheme following Williams [^W26].
+
 ## Uniform cooling
 
 Following Paulius and Garner[^PG06], the uniform cooling of the atmosphere
@@ -122,6 +124,22 @@ as
 ```
 
 For details see Frierson et al. 2006 [^FH06].
+
+## William's Simple Spectral Model with `AnalyticBandRadiation.jl` (@id radiation-ssm)
+
+ [`AnalyticBandRadiation.jl`](https://github.com/NumericalEarth/AnalyticBandRadiation.jl) provides another longwave radiation scheme for both SpeedyWeather and Breeze. The simple spectral model is a spectrally-resolved clear-sky longwave scheme following Williams [^W26] that fits analytic functions to the absorption spectra. For more details consult the paper and the[documentation of AnalyticBandRadiation.jl](https://numericalearth.github.io/AnalyticBandRadiation.jl/dev/). It can be used as in the following 
+
+```@example radiation
+using SpeedyWeather, AnalyticBandRadiation
+const SpeedyExt = Base.get_extension(AnalyticBandRadiation,
+                                     :AnalyticBandRadiationSpeedyWeatherExt)
+
+spectral_grid = SpectralGrid(trunc = 31, nlayers = 8)
+longwave      = SpeedyExt.SpeedyAnalyticBandLongwave(spectral_grid)
+model         = PrimitiveWetModel(spectral_grid; longwave_radiation = longwave)
+```
+
+Its usage is also demonstrated in the [CO₂ forcing experiments](co2_forcing.md).
 
 ## Shortwave radiation
 
@@ -372,11 +390,11 @@ quadruple the preindustrial CO2 at a given date (default: year 2000). Any callab
 `f(t::DateTime) -> concentration_in_ppm` can be wrapped in `CO2(f)` for a fully
 custom trajectory.
 
-!!! warning "Radiation schemes not yet CO2-aware"
+!!! warning "Most radiation schemes are not yet CO2-aware"
     The greenhouse gas concentrations are tracked as prognostic variables and evolve
-    correctly in time, but the radiation schemes (`OneBandLongwave`
-    etc.) have not yet been updated to use them. Changing CO2 therefore has no effect
-    on the radiative fluxes or temperature tendencies at this stage. This is work in
+    correctly in time, but most radiation schemes (`OneBandLongwave`
+    etc.) have not yet been updated to use them. Only the `AnalyticBandRadiation` uses it currently. Changing CO2 therefore has no effect
+    on the radiative fluxes or temperature tendencies at this stage for all other radiation schemes. This is work in
     progress.
 
 ## References
@@ -390,3 +408,5 @@ custom trajectory.
 [^KMB06]: Kucharski, F., Molteni, F., & Bracco, A. SPEEDY: A simplified atmospheric general circulation model. ICTP, Trieste, Italy. Appendix A: Model Equations and Parameters (2006). [PDF](https://users.ictp.it/~kucharsk/speedy_description/km_ver41_appendixA.pdf)
 
 [^FH06]: Frierson DMW, IM Held, P Zurita-Gotor. A Gray-Radiation Aquaplanet Moist GCM. Part I: Static Stability and Eddy Scale (2006). Journal of the Atmospheric Sciences 63:10. DOI: [10.1175/JAS3753.1](https://doi.org/10.1175/JAS3753.1)
+
+[^W26]: Williams, A.I.L. Bridging clarity and accuracy: A simple spectral longwave radiation scheme for idealized climate modeling. Journal of Advances in Modeling Earth Systems, 18, e2025MS005405 (2026). DOI: [10.1029/2025MS005405](https://doi.org/10.1029/2025MS005405)

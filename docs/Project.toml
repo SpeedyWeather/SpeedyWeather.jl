@@ -1,5 +1,6 @@
 [deps]
 Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
+AnalyticBandRadiation = "cd8119b0-1744-44d6-9ede-6ad1ad750b26"
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 DocumenterVitepress = "4710194d-e776-4893-9690-8d956a29c365"
@@ -14,6 +15,7 @@ UnicodePlots = "b8865327-cd53-5732-bb35-84acbb429228"
 Zarr = "0a941bbe-ad1d-11e8-39d9-ab76183a1d99"
 
 [sources]
+AnalyticBandRadiation = {url = "https://github.com/NumericalEarth/AnalyticBandRadiation.jl"}
 LowerTriangularArrays = {path = "../LowerTriangularArrays"}
 RingGrids = {path = "../RingGrids"}
 SpeedyTransforms = {path = "../SpeedyTransforms"}
