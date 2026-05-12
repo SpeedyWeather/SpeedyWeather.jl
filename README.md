@@ -1,4 +1,4 @@
-# SpeedyWeather.jl <img src="docs/src/assets/logo.png" width="100" />
+# SpeedyWeather.jl <img src="docs/src/public/logo.png" width="100" />
 
 [![docs](https://img.shields.io/badge/documentation-latest_release-blue.svg)](https://speedyweather.github.io/SpeedyWeatherDocumentation/stable/)
 [![docs](https://img.shields.io/badge/documentation-main-blue.svg)](https://speedyweather.github.io/SpeedyWeatherDocumentation/dev/)
