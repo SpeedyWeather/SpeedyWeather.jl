@@ -70,12 +70,6 @@ implementations forward to fields of the same name on `land`):
 """
 abstract type AbstractTerrariumLandModel <: AbstractLand end
 
-# Show / model-class machinery: Terrarium-coupled lands behave as wet lands
-# for the purposes of `model_class` / `model_type` (used by the show methods
-# of `AbstractModel`).
-model_class(::Type{<:AbstractTerrariumLandModel}) = AbstractWetLand
-model_type(::Type{<:AbstractTerrariumLandModel}) = AbstractTerrariumLandModel
-
 @inline get_nlayers(land::AbstractTerrariumLandModel) = land.geometry.nlayers
 
 """$(TYPEDSIGNATURES) Return the underlying Terrarium `AbstractModel`."""
