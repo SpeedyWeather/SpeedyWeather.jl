@@ -7,11 +7,13 @@ using Dates
 const SWTerrarium = Base.get_extension(SpeedyWeather, :SpeedyWeatherTerrariumExt)
 @assert SWTerrarium !== nothing "SpeedyWeatherTerrariumExt failed to load"
 const TerrariumWetLand = SWTerrarium.TerrariumWetLand
+const TerrariumDryLand = SWTerrarium.TerrariumDryLand
 const AbstractTerrariumLandModel = SWTerrarium.AbstractTerrariumLandModel
 
 @testset "Terrarium coupling: type hierarchy" begin
     @test AbstractTerrariumLandModel <: SpeedyWeather.AbstractLand
     @test TerrariumWetLand <: AbstractTerrariumLandModel
+    @test TerrariumDryLand <: AbstractTerrariumLandModel
 end
 
 @testset "Terrarium coupling: initialize + run + NaN check" begin
@@ -81,4 +83,60 @@ end
     @test all(isfinite, Terrarium.interior(state.temperature))
     @test all(isfinite, Terrarium.interior(state.saturation_water_ice))
     @test all(isfinite, Terrarium.interior(state.skin_temperature))
+end
+
+@testset "Terrarium coupling (dry): initialize + run + NaN check" begin
+    ring_grid = SpeedyWeather.RingGrids.FullGaussianGrid(12)
+    spectral_grid = SpectralGrid(ring_grid)
+
+    Nz = 4
+    Δz_min = 0.05
+    column_grid = Terrarium.ColumnRingGrid(
+        Terrarium.CPU(), Float32,
+        Terrarium.ExponentialSpacing(; N = Nz, Δz_min),
+        ring_grid,
+    )
+
+    soil_initializer = Terrarium.SoilInitializer(eltype(column_grid))
+    soil_model = Terrarium.SoilModel(column_grid; initializer = soil_initializer)
+
+    # InputSource for air temperature — consumed by the dry land boundary condition
+    air_temperature_field = Terrarium.Field(column_grid, Terrarium.XY())
+    Tair_input = Terrarium.InputSource(column_grid, air_temperature_field; name = :air_temperature)
+    bcs = Terrarium.PrescribedSurfaceTemperature(:air_temperature)
+
+    land = TerrariumDryLand(
+        spectral_grid, soil_model;
+        boundary_conditions = bcs,
+        input_variables = Terrarium.variables(Tair_input),
+        Δt = 300.0,
+    )
+    @test land isa AbstractTerrariumLandModel
+    @test land isa SpeedyWeather.AbstractLand
+    @test SpeedyWeather.get_nlayers(land) == 1
+
+    land_sea_mask = RockyPlanetMask(land.spectral_grid)
+    time_stepping = Leapfrog(land.spectral_grid, Δt_at_T31 = Minute(15))
+
+    model = PrimitiveDryModel(
+        land.spectral_grid;
+        land,
+        land_sea_mask,
+        time_stepping,
+    )
+
+    sim = SpeedyWeather.initialize!(model)
+
+    @test haskey(sim.variables.prognostic.land, :terrarium)
+    @test haskey(sim.variables.prognostic.land, :soil_temperature)
+    @test !haskey(sim.variables.prognostic.land, :soil_moisture)
+
+    SpeedyWeather.run!(sim, period = Minute(30))
+
+    @test all(isfinite, sim.variables.prognostic.land.soil_temperature)
+    @test all(isfinite, sim.variables.grid.temperature)
+    @test all(isfinite, sim.variables.grid.pressure)
+
+    state = sim.variables.prognostic.land.terrarium
+    @test all(isfinite, Terrarium.interior(state.temperature))
 end

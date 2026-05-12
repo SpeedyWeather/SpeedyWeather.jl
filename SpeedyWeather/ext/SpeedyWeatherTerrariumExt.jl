@@ -7,7 +7,7 @@ using DocStringExtensions
 import SpeedyWeather: AbstractVariableDim, AbstractVariable, AbstractModel,
     AbstractLand, AbstractWetLand, SpectralGrid, LandGeometry,
     PrognosticVariable, Land3D, Variables,
-    PrimitiveEquation, get_nlayers, model_class, model_type,
+    PrimitiveEquation, get_nlayers,
     variables, initialize!, timestep!
 import SpeedyWeather.RingGrids
 
@@ -65,8 +65,6 @@ implementations forward to fields of the same name on `land`):
 * [`terrarium_initializers`](@ref)`(land)` → `NamedTuple`
 * [`terrarium_fields`](@ref)`(land)` → `NamedTuple`
 * [`terrarium_substep`](@ref)`(land)` → seconds (`Real`)
-* [`set_terrarium_timestepper!`](@ref)`(land, ts)` (only needed if the
-  timestepper requires state-dependent initialization)
 """
 abstract type AbstractTerrariumLandModel <: AbstractLand end
 
@@ -96,19 +94,15 @@ terrarium_fields(land::AbstractTerrariumLandModel) = land.fields
 """$(TYPEDSIGNATURES) Return the Terrarium-internal sub-step in seconds."""
 terrarium_substep(land::AbstractTerrariumLandModel) = land.Δt
 
-"""$(TYPEDSIGNATURES) Store a (possibly state-initialized) Terrarium time stepper on `land`."""
-set_terrarium_timestepper!(land::AbstractTerrariumLandModel, ts) = setfield!(land, :timestepper, ts)
-
 """$(TYPEDEF)
 
-The canonical [`AbstractTerrariumLandModel`](@ref) implementation: a
-SpeedyWeather wet-land component that wraps a Terrarium land model and all
-of the metadata required to construct its initial state. A
-`TerrariumWetLand` is passed as the `land=` keyword argument of a
-`PrimitiveWetModel`.
+The canonical [`AbstractTerrariumLandModel`](@ref) implementation for wet
+atmospheric models: wraps a full Terrarium land model (soil + surface energy
+balance + vegetation) and all the metadata required to construct its initial
+state. Pass as `land=` to `PrimitiveWetModel`.
 
 $(TYPEDFIELDS)"""
-mutable struct TerrariumWetLand{
+struct TerrariumWetLand{
         NF,
         LG <: LandGeometry,
         TM <: Terrarium.AbstractModel{NF},
@@ -218,12 +212,6 @@ function initialize!(
     )
     state = vars.prognostic.land.terrarium
     NF = eltype(vars.prognostic.land.soil_temperature)
-    # Terrarium time steppers may need access to the state (e.g. Heun's
-    # intermediate stage). ForwardEuler.initialize is the identity so this is
-    # a no-op for the common case.
-    ts = Terrarium.initialize(terrarium_timestepper(land), terrarium_model(land), state)
-    set_terrarium_timestepper!(land, ts)
-
     Tsoil = interior(state.temperature)[:, 1, end] .+ NF(273.15)
     sat = interior(state.saturation_water_ice)[:, 1, end]
     vars.prognostic.land.soil_temperature .= Tsoil
@@ -290,6 +278,143 @@ function timestep!(
     if haskey(vars.parameterizations, :surface_shortwave_up)
         vars.parameterizations.surface_shortwave_up .= state.surface_shortwave_up
     end
+    return nothing
+end
+
+"""$(TYPEDEF)
+
+[`AbstractTerrariumLandModel`](@ref) for dry atmospheric models: wraps a
+Terrarium soil model (heat conduction only, no surface energy balance or
+moisture). The only atmospheric forcing passed in is near-surface air
+temperature; soil moisture is not tracked. Pass as `land=` to
+`PrimitiveDryModel`.
+
+$(TYPEDFIELDS)"""
+struct TerrariumDryLand{
+        NF,
+        LG <: LandGeometry,
+        TM <: Terrarium.AbstractModel{NF},
+        TS <: Terrarium.AbstractTimeStepper,
+        CK <: Clock,
+        BC <: NamedTuple,
+        IV <: Tuple,
+        IN <: NamedTuple,
+        FL <: NamedTuple,
+    } <: AbstractTerrariumLandModel
+    "SpeedyWeather spectral grid"
+    spectral_grid::SpectralGrid
+    "SpeedyWeather land geometry (a single effective surface layer)"
+    geometry::LG
+    "Underlying Terrarium soil model"
+    model::TM
+    "Terrarium time stepper used inside each SpeedyWeather step"
+    timestepper::TS
+    "Initial Terrarium clock"
+    clock::CK
+    "Boundary conditions forwarded to `Terrarium.initialize`"
+    boundary_conditions::BC
+    "Additional input variables forwarded to `Terrarium.initialize`"
+    input_variables::IV
+    "Field initializers forwarded to the on-the-fly `ModelIntegrator`"
+    initializers::IN
+    "Preconstructed Terrarium fields forwarded to `Terrarium.initialize`"
+    fields::FL
+    "Terrarium-internal sub-step (seconds) used to integrate within each SpeedyWeather step"
+    Δt::Float64
+end
+
+"""$(TYPEDSIGNATURES)
+
+Construct a [`TerrariumDryLand`](@ref) from a Terrarium soil model and a
+SpeedyWeather spectral grid."""
+function TerrariumDryLand(
+        spectral_grid::SpectralGrid,
+        model::Terrarium.AbstractModel{NF};
+        timestepper::Terrarium.AbstractTimeStepper = ForwardEuler(NF),
+        clock::Clock = Clock(time = zero(NF)),
+        boundary_conditions::NamedTuple = (;),
+        input_variables::Tuple = (),
+        initializers::NamedTuple = (;),
+        fields::NamedTuple = (;),
+        Δt::Real = 300,
+    ) where {NF}
+    field_grid = Terrarium.get_field_grid(model.grid)
+    Δz_arr = on_architecture(Terrarium.CPU(), field_grid.z.Δᵃᵃᶜ)
+    geometry = LandGeometry(1, NF[Δz_arr[end]])
+    return TerrariumDryLand(
+        spectral_grid, geometry, model, timestepper, clock,
+        boundary_conditions, input_variables, initializers, fields, Float64(Δt),
+    )
+end
+
+"""$(TYPEDSIGNATURES)
+
+Construct a [`TerrariumDryLand`](@ref) from a pre-built Terrarium
+`ModelIntegrator`. The SpeedyWeather spectral grid is built from the Terrarium
+ring grid; extra keyword arguments are forwarded to the `SpectralGrid`
+constructor."""
+function TerrariumDryLand(
+        integrator::ModelIntegrator{NF, Arch, Grid};
+        spectral_grid_kwargs...,
+    ) where {NF, Arch, Grid <: ColumnRingGrid}
+    spectral_grid = SpectralGrid(integrator.model.grid.rings; NF, spectral_grid_kwargs...)
+    return TerrariumDryLand(
+        spectral_grid, integrator.model;
+        timestepper = integrator.timestepper,
+        clock = integrator.clock,
+        initializers = integrator.initializers,
+    )
+end
+
+# Dry land: only soil_temperature mirror, no moisture.
+function variables(::TerrariumDryLand)
+    return (
+        PrognosticVariable(
+            name = :terrarium, dims = TerrariumVars(),
+            namespace = :land, desc = "Terrarium land state",
+        ),
+        PrognosticVariable(
+            name = :soil_temperature, dims = Land3D(),
+            units = "K", desc = "Soil temperature mirrored from Terrarium",
+            namespace = :land,
+        ),
+    )
+end
+
+function initialize!(
+        vars::Variables,
+        land::TerrariumDryLand,
+        ::PrimitiveEquation,
+    )
+    state = vars.prognostic.land.terrarium
+    NF = eltype(vars.prognostic.land.soil_temperature)
+    vars.prognostic.land.soil_temperature .= interior(state.temperature)[:, 1, end] .+ NF(273.15)
+    return nothing
+end
+
+function timestep!(
+        vars::Variables,
+        land::TerrariumDryLand,
+        ::PrimitiveEquation,
+    )
+    state = vars.prognostic.land.terrarium
+    tmodel = terrarium_model(land)
+    NF = eltype(state)
+
+    # Only air temperature is needed; convert K -> °C
+    Tair = @view vars.grid.temperature[:, end]
+    inputs = state.inputs
+    set!(inputs.air_temperature, Tair)
+    set!(inputs.air_temperature, inputs.air_temperature - NF(273.15))
+
+    integrator = ModelIntegrator(
+        state.clock, tmodel, InputSources(),
+        state, terrarium_initializers(land), terrarium_timestepper(land),
+    )
+    Terrarium.run!(integrator; period = vars.prognostic.clock.Δt, Δt = terrarium_substep(land))
+
+    # Surface soil temperature from the bottom of the column (last z-index)
+    vars.prognostic.land.soil_temperature .= interior(state.temperature)[:, 1, end] .+ NF(273.15)
     return nothing
 end
 
