@@ -106,6 +106,5 @@ dT_max = maximum(abs.(dT_c .- dT_r))
 
 println("\n" * "="^70)
 println("RESULT  shortwave_variant=$variant")
-println("  T_max_diff: $T_max")
-println("  q_max_diff: $q_max")
+println("  T_max_diff: $dT_max")
 println("="^70)
