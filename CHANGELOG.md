@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Document the usage of `AnalyticBandRadiation` as a new radiation model [#1089](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1089)
+
 ## v0.20.1
 
 - Implement CO2 and greenhouse gases [#993](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/993)
