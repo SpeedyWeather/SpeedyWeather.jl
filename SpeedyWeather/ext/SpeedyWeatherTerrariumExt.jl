@@ -212,6 +212,14 @@ function initialize!(
     )
     state = vars.prognostic.land.terrarium
     NF = eltype(vars.prognostic.land.soil_temperature)
+
+    # initialize the "ModelIntegrator" 
+    integrator = ModelIntegrator(
+        state.clock, terrarium_model(land), InputSources(),
+        state, terrarium_initializers(land), terrarium_timestepper(land),
+    )
+    Terrarium.initialize!(integrator)
+
     Tsoil = interior(state.temperature)[:, 1, end] .+ NF(273.15)
     sat = interior(state.saturation_water_ice)[:, 1, end]
     vars.prognostic.land.soil_temperature .= Tsoil
