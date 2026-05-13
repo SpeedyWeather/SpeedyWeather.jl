@@ -142,7 +142,7 @@ function _split_views(parent, vars, model)
     for (i, v) in enumerate(vars)
         n = fused_slots(v.dims, model)
         slots[i] = (offset + 1):(offset + n)
-        views[i] = v.dims <: Union{Grid2D, Spectral2D} ?
+        views[i] = typeof(v.dims) <: Union{Grid2D, Spectral2D} ?
             wrapped_view(parent, :, offset + 1) :    # scalar → 2D array (no layer dim)
             wrapped_view(parent, :, slots[i])        # range  → 3D array (with layer dim)
         offset += n
