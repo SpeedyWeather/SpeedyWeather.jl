@@ -2,7 +2,11 @@
 
 ## Unreleased
 
+<<<<<<< mg/gpu-rework-test
 - Allow for variables to be fused together (prelimnary work for GPU optiminization) [#1083](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1083)
+=======
+- Variable system: rename function that allocates new variables from `Base.zero` to `allocate` [#1087](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1087)
+>>>>>>> main
 
 ## v0.20.1
 
