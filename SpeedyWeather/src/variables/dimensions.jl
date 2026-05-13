@@ -125,45 +125,28 @@ function allocate_fused(vars::AbstractVector{<:AbstractVariable}, model::Abstrac
     total = sum(fused_slots(v.dims, model) for v in vars)
     if family === :grid
         parent = zeros(model.spectral_grid.GridVariable3D, model.spectral_grid.grid, total)
-        views, slots = _split_grid_views(parent, vars, model)
     else # :spectral (already validated upstream)
         parent = zeros(model.spectral_grid.SpectralVariable3D, model.spectral_grid.spectrum, total)
-        views, slots = _split_spectral_views(parent, vars, model)
     end
+    views, slots = _split_views(parent, vars, model)
+
     return parent, views, slots
 end
 
 # Build views & slot ranges for a grid-family fuse group. Grid2D members use a scalar
 # layer index so the resulting Field stays 2D (no layer axis); Grid3D members use a range.
-function _split_grid_views(parent, vars, model)
+function _split_views(parent, vars, model)
     views = Vector{Any}(undef, length(vars))
     slots = Vector{UnitRange{Int}}(undef, length(vars))
     offset = 0
     for (i, v) in enumerate(vars)
         n = fused_slots(v.dims, model)
         slots[i] = (offset + 1):(offset + n)
-        views[i] = v.dims isa Grid2D ?
-            field_view(parent, :, offset + 1) :    # scalar → 2D Field (no layer dim)
-            field_view(parent, :, slots[i])        # range  → 3D Field (with layer dim)
+        views[i] = v.dims <: Union{Grid2D, Spectral2D} ?
+            wrapped_view(parent, :, offset + 1) :    # scalar → 2D array (no layer dim)
+            wrapped_view(parent, :, slots[i])        # range  → 3D array (with layer dim)
         offset += n
     end
     @assert offset == size(parent.data, 2) "Fused grid parent has $offset slots assigned but parent has $(size(parent.data, 2)) layers"
-    return views, slots
-end
-
-# Mirror of `_split_grid_views` for the spectral family.
-function _split_spectral_views(parent, vars, model)
-    views = Vector{Any}(undef, length(vars))
-    slots = Vector{UnitRange{Int}}(undef, length(vars))
-    offset = 0
-    for (i, v) in enumerate(vars)
-        n = fused_slots(v.dims, model)
-        slots[i] = (offset + 1):(offset + n)
-        views[i] = v.dims isa Spectral2D ?
-            lta_view(parent, :, offset + 1) :      # scalar → LowerTriangularMatrix
-            lta_view(parent, :, slots[i])          # range  → LowerTriangularArray{T,2}
-        offset += n
-    end
-    @assert offset == size(parent.data, 2) "Fused spectral parent has $offset slots assigned but parent has $(size(parent.data, 2)) layers"
     return views, slots
 end
