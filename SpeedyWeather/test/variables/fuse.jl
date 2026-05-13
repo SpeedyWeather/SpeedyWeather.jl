@@ -1,6 +1,7 @@
 using SpeedyWeather
 using SpeedyWeather: AbstractVariable, GridVariable, TendencyVariable, ScratchVariable,
-    DynamicsVariable, Grid2D, Grid3D, Spectral2D, Spectral3D,
+    DynamicsVariable, PrognosticVariable,
+    Grid2D, Grid3D, Grid4D, Spectral2D, Spectral3D, Spectral4D,
     allocate_fused, build_fuse_parents, fuse_family, fused_slots
 
 # Helpers used by all testsets — build a model and unwrap a few useful pieces.
@@ -12,8 +13,10 @@ end
 @testset "fuse_family classification" begin
     @test fuse_family(Grid2D()) === :grid
     @test fuse_family(Grid3D()) === :grid
+    @test fuse_family(Grid4D()) === :grid
     @test fuse_family(Spectral2D()) === :spectral
     @test fuse_family(Spectral3D()) === :spectral
+    @test fuse_family(Spectral4D()) === :spectral
 end
 
 @testset "allocate_fused: pure Grid3D group" begin
@@ -78,6 +81,105 @@ end
         TendencyVariable(:p, Spectral2D(), namespace = :x, fuse = :bad),
     ]
     @test_throws ErrorException build_fuse_parents(bad, model)
+end
+
+@testset "allocate_fused: pure Grid4D group (parent is 4D)" begin
+    model = _testmodel(nlayers = 4)
+    vars = AbstractVariable[
+        PrognosticVariable(:a, Grid4D(n = 2), namespace = :g, fuse = :p4),
+        PrognosticVariable(:b, Grid4D(n = 2), namespace = :g, fuse = :p4),
+    ]
+    parent, views, slots = allocate_fused(vars, model)
+    @test ndims(parent.data) == 3
+    @test size(parent.data) == (size(parent.data, 1), 2 * 4, 2)   # (npoints, 2·nlayers, n=2)
+    @test slots == [1:4, 5:8]
+    for (view, slot) in zip(views, slots)
+        @test Base.parent(view.data) === parent.data
+        @test ndims(view.data) == 3                                # (npoints, nlayers, n)
+        @test size(view.data) == (size(parent.data, 1), 4, 2)
+        @test parentindices(view.data)[2] == slot
+    end
+end
+
+@testset "allocate_fused: mixed Grid3D + Grid4D (parent 4D, Grid3D occupies 1 slot)" begin
+    model = _testmodel(nlayers = 4)
+    vars = AbstractVariable[
+        PrognosticVariable(:a4, Grid4D(n = 3), namespace = :g, fuse = :m4),
+        TendencyVariable(:b3, Grid3D(),       namespace = :g, fuse = :m4),
+        PrognosticVariable(:c4, Grid4D(n = 3), namespace = :g, fuse = :m4),
+    ]
+    parent, views, slots = allocate_fused(vars, model)
+    @test ndims(parent.data) == 3
+    # 4 (Grid4D layer slots) + 1 (Grid3D collapsed) + 4 (Grid4D) = 9 along layer axis;
+    # trailing dim n = 3 shared.
+    @test size(parent.data) == (size(parent.data, 1), 9, 3)
+    @test slots == [1:4, 5:5, 6:9]
+
+    # Grid4D members keep the layer dim → 3D view (npoints, nlayers, n)
+    @test ndims(views[1].data) == 3
+    @test size(views[1].data) == (size(parent.data, 1), 4, 3)
+    @test parentindices(views[1].data)[2] == 1:4
+
+    # Grid3D-in-4D member collapses the layer dim → 2D view (npoints, n)
+    @test ndims(views[2].data) == 2
+    @test size(views[2].data) == (size(parent.data, 1), 3)
+    @test parentindices(views[2].data)[2] == 5   # scalar layer index
+
+    @test ndims(views[3].data) == 3
+    @test parentindices(views[3].data)[2] == 6:9
+end
+
+@testset "allocate_fused: pure Spectral4D + Spectral3D mix" begin
+    model = _testmodel(nlayers = 4)
+    vars = AbstractVariable[
+        PrognosticVariable(:a4, Spectral4D(n = 2), namespace = :s, fuse = :ms4),
+        DynamicsVariable(:b3,   Spectral3D(),      namespace = :s, fuse = :ms4),
+    ]
+    parent, views, slots = allocate_fused(vars, model)
+    @test ndims(parent.data) == 3                       # LowerTriangularArray with 3D data
+    # layer axis: 4 (Spectral4D) + 1 (Spectral3D collapsed) = 5; trailing n = 2
+    @test size(parent.data, 2) == 5
+    @test size(parent.data, 3) == 2
+    @test slots == [1:4, 5:5]
+    @test ndims(views[1].data) == 3                     # Spectral4D view
+    @test ndims(views[2].data) == 2                     # Spectral3D-in-4D collapses layer dim
+    for view in views
+        @test Base.parent(view.data) === parent.data
+    end
+end
+
+@testset "fuse validation: mixed n in 4D group is rejected" begin
+    model = _testmodel(nlayers = 4)
+    bad = AbstractVariable[
+        PrognosticVariable(:a, Grid4D(n = 2), namespace = :x, fuse = :badn),
+        PrognosticVariable(:b, Grid4D(n = 3), namespace = :x, fuse = :badn),
+    ]
+    @test_throws ErrorException build_fuse_parents(bad, model)
+end
+
+@testset "fuse validation: 2D member in 4D group is rejected" begin
+    model = _testmodel(nlayers = 4)
+    bad = AbstractVariable[
+        PrognosticVariable(:a4, Grid4D(n = 2), namespace = :x, fuse = :bad24),
+        GridVariable(:b2,       Grid2D(),      namespace = :x, fuse = :bad24),
+    ]
+    @test_throws ErrorException build_fuse_parents(bad, model)
+end
+
+@testset "view ↔ parent aliasing through layer-axis writes (4D parent)" begin
+    model = _testmodel(nlayers = 4)
+    vars = AbstractVariable[
+        PrognosticVariable(:a4, Grid4D(n = 2), namespace = :g, fuse = :alias4),
+        TendencyVariable(:b3,   Grid3D(),      namespace = :g, fuse = :alias4),
+    ]
+    parent, views, _ = allocate_fused(vars, model)
+    # Writing through the 3D-in-4D view should populate exactly slot 5 of the parent
+    # across all `n` trailing slices (and nothing else).
+    fill!(views[2].data, 1)
+    @test all(parent.data[:, 5, :] .== 1)
+    @test all(parent.data[:, 1:4, :] .== 0)
+    # Per-step slice of the parent is contiguous in memory
+    @test parent.data[:, :, 1] isa AbstractMatrix
 end
 
 @testset "fuse validation: cross-type same name is rejected" begin

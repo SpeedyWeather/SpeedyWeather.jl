@@ -304,8 +304,10 @@ function build_fuse_parents(all_vars, model)
 end
 
 # Verify each view actually points at its declared slot inside the parent, slots don't
-# overlap, and together they cover the parent's fused axis exactly. Discards the slot
-# information after checking — it's a correctness check, not runtime metadata.
+# overlap, and together they cover the parent's layer axis exactly. The layer axis is
+# always axis 2 of `parent.data` whether the parent is 3D `(npoints, slots)` or 4D
+# `(npoints, slots, n)`. View `parentindices` may be scalar (Grid2D/3D-in-4D members) or
+# a range (Grid3D/Grid4D members); we normalise to a range for the comparison.
 function _validate_fuse_layout(fuse_sym, ns, vars, parent, views, slots)
     parent_size = size(parent.data, 2)
     covered = falses(parent_size)
@@ -317,28 +319,35 @@ function _validate_fuse_layout(fuse_sym, ns, vars, parent, views, slots)
                 "Fuse group `$fuse_sym` (namespace `$ns`): view for `$(v.name)` is not a view " *
                 "of the fused parent buffer (got parent $(typeof(Base.parent(view_data))))."
             )
- 
-            p_index_last = parentindices(view_data)[end]
-            # Normalise scalar indices (Grid2D / Spectral2D uses field_view(parent, :, k)
-            # which stores an Int rather than a 1-element range in parentindices).
-            p_index_last_range = p_index_last isa Integer ? (p_index_last:p_index_last) : p_index_last
-            p_index_last_range == slot || error(
+
+            # The layer axis is always parent axis 2. parentindices may be scalar (collapsed
+            # layer dim) or a range; normalise to a range for comparison with `slot`.
+            p_index_layer = parentindices(view_data)[2]
+            p_index_layer_range = p_index_layer isa Integer ? (p_index_layer:p_index_layer) : p_index_layer
+            p_index_layer_range == slot || error(
                 "Fuse group `$fuse_sym` (namespace `$ns`): view for `$(v.name)` has " *
-                "parentindices $(p_index_last) but slot map declares $(slot)."
+                "parentindices(axis 2) $(p_index_layer) but slot map declares $(slot)."
             )
-        else # fallback for GPU array types that are not SubArrays
-            size(view_data, ndims(view_data)) == length(slot) || error(
+        else # fallback for GPU array types that are not SubArrays (e.g. CuArray views)
+            # On non-SubArray backends we can only check the layer-axis size is consistent.
+            view_layer_size = size(view_data, 2)
+            # 4D-in-4D and 3D-in-3D keep the layer dim with `length(slot)` columns;
+            # 2D-in-3D and 3D-in-4D collapse the layer dim (view has fewer dims), in
+            # which case axis 2 of the view is the trailing parent dim, so we skip the
+            # size check and rely on slot bookkeeping below.
+            ndims(view_data) == ndims(parent.data) || (view_layer_size == length(slot) ||
+                error(
                 "Fuse group `$fuse_sym` (namespace `$ns`): view for `$(v.name)` is not a " *
-                "SubArray (got $(typeof(view_data))) and its last-axis size " *
-                "$(size(view_data, ndims(view_data))) does not match slot length $(length(slot))."
-            )
+                "SubArray (got $(typeof(view_data))) and its axis-2 size " *
+                "$(view_layer_size) does not match slot length $(length(slot))."
+            ))
         end
         for k in slot
 
             # chck the slot is within the parent
             (1 <= k <= parent_size) || error(
                 "Fuse group `$fuse_sym` (namespace `$ns`): slot $k for `$(v.name)` " *
-                "is outside the parent buffer's axis 1:$parent_size."
+                "is outside the parent buffer's layer axis 1:$parent_size."
             )
 
             # check it's not already claimed
@@ -352,7 +361,7 @@ function _validate_fuse_layout(fuse_sym, ns, vars, parent, views, slots)
     # check everything is covered
     all(covered) || error(
         "Fuse group `$fuse_sym` (namespace `$ns`): slots do not tile the parent's " *
-        "fused axis 1:$parent_size (uncovered slots: $(findall(!, covered)))."
+        "layer axis 1:$parent_size (uncovered slots: $(findall(!, covered)))."
     )
     return nothing
 end
