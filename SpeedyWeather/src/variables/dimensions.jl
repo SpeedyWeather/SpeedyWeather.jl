@@ -82,8 +82,7 @@ allocate(::AbstractVariable{TransformScratchMemory}, model::AbstractModel) = mod
 @kwdef struct LocatorDim <: AbstractVariableDim
     n::Int = 1                                                  # number of locations to track, e.g. for particle advection
 end
-<<<<<<< mg/gpu-rework-test
-Base.zero(::AbstractVariable{LocatorDim}, model::AbstractModel) = RingGrids.AnvilLocator(model.spectral_grid.NF, model.particle_advection.nparticles; architecture = model.spectral_grid.architecture)
+Base.allocate(::AbstractVariable{LocatorDim}, model::AbstractModel) = RingGrids.AnvilLocator(model.spectral_grid.NF, model.particle_advection.nparticles; architecture = model.spectral_grid.architecture)
 
 # Variable fusion support
 # We may want to fuse a group of variables into a single parent variable to
@@ -168,7 +167,3 @@ function _split_spectral_views(parent, vars, model)
     @assert offset == size(parent.data, 2) "Fused spectral parent has $offset slots assigned but parent has $(size(parent.data, 2)) layers"
     return views, slots
 end
-
-=======
-allocate(::AbstractVariable{LocatorDim}, model::AbstractModel) = RingGrids.AnvilLocator(model.spectral_grid.NF, model.particle_advection.nparticles; architecture = model.spectral_grid.architecture)
->>>>>>> main

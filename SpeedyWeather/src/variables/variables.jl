@@ -368,26 +368,12 @@ function allocate(group, model, fuse_parents = Dict{Tuple{Symbol, Symbol}, Named
 
     # variables without namespace identified by empty symbol Symbol() go directly into the main NamedTuple
     # that way we have variables.prognostic.vorticity skipping the namespace between prognostic and vor
-<<<<<<< mg/gpu-rework-test
     nt1 = haskey(group, Symbol()) ? _allocate_namespace(group[Symbol()], model, fuse_parents) : NamedTuple()
-=======
-    nt1 = NamedTuple{Tuple(map(v -> v.name, group[Symbol()]))}(Tuple(map(var -> allocate(var, model), group[Symbol()])))
->>>>>>> main
 
     # other variables grouped by namespace
     # e.g. variables.prognostic.ocean.sea_surface_temperature, variables.prognostic.land.soil_moisture, etc.
     nt2 = NamedTuple{namespaces}(
-<<<<<<< mg/gpu-rework-test
         Tuple(map(ns -> _allocate_namespace(group[ns], model, fuse_parents), namespaces))
-=======
-        Tuple(
-            map(
-                ns ->
-                NamedTuple{Tuple(map(v -> v.name, group[ns]))}(Tuple(map(var -> allocate(var, model), group[ns])))
-                , namespaces
-            )
-        )
->>>>>>> main
     )
 
     return merge(nt1, nt2)
@@ -401,7 +387,7 @@ function _allocate_namespace(vars, model, fuse_parents)
     pairs = Pair{Symbol, Any}[]
     for v in vars
         if v.fuse === Symbol()
-            push!(pairs, v.name => zero(v, model))
+            push!(pairs, v.name => allocate(v, model))
         else
             entry = fuse_parents[(v.namespace, v.fuse)]
             push!(pairs, v.name => entry.views[(v.namespace, v.name)])
