@@ -49,7 +49,6 @@ LowerTriangularArrays = {path = "../LowerTriangularArrays"}
 RingGrids = {path = "../RingGrids"}
 SpeedyTransforms = {path = "../SpeedyTransforms"}
 SpeedyWeatherInternals = {path = "../SpeedyWeatherInternals"}
-Terrarium = {url = "https://github.com/NumericalEarth/Terrarium.jl.git"}
 
 [extensions]
 SpeedyWeatherEnzymeExt = "Enzyme"

@@ -26,3 +26,6 @@ Zarr = "0a941bbe-ad1d-11e8-39d9-ab76183a1d99"
 
 [compat]
 Terrarium = "0.1"
+
+[sources]
+Terrarium = {url = "https://github.com/NumericalEarth/Terrarium.jl.git", rev="main"}
