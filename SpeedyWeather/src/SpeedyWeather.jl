@@ -175,6 +175,7 @@ include("parameterizations/radiation/shortwave_transmissivity.jl")
 include("parameterizations/radiation/clouds.jl")
 include("parameterizations/radiation/longwave_radiation.jl")
 include("parameterizations/radiation/longwave_transmissivity.jl")
+include("parameterizations/radiation/greenhouse_gases.jl")
 include("parameterizations/stochastic_physics.jl")
 
 # OCEAN AND LAND

@@ -39,6 +39,7 @@ $(TYPEDFIELDS)"""
         CV,     # <:AbstractConvection,
         SW,     # <:AbstractShortwave,
         LW,     # <:AbstractLongwave,
+        GHG,    # NamedTuple of <:AbstractGreenhouseGas,
         SP,     # <:AbstractStochasticPhysics,
         CP,     # <:AbstractParameterization,
         TS,     # <:AbstractTimeStepper,
@@ -92,6 +93,7 @@ $(TYPEDFIELDS)"""
     @component convection::CV = BettsMillerDryConvection(spectral_grid)
     @component shortwave_radiation::SW = OneBandGreyShortwave(spectral_grid)
     @component longwave_radiation::LW = OneBandGreyLongwave(spectral_grid)
+    @component greenhouse_gases::GHG = (;)
     @component stochastic_physics::SP = nothing
     @component custom_parameterization::CP = nothing
 
@@ -220,6 +222,7 @@ function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
     initialize!(model.convection, model)
     initialize!(model.shortwave_radiation, model)
     initialize!(model.longwave_radiation, model)
+    initialize!(model.greenhouse_gases, model)
     initialize!(model.surface_condition, model)
     initialize!(model.surface_momentum_flux, model)
     initialize!(model.surface_heat_flux, model)
