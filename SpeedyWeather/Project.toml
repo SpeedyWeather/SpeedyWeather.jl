@@ -51,7 +51,7 @@ SpeedyTransforms = {path = "../SpeedyTransforms"}
 SpeedyWeatherInternals = {path = "../SpeedyWeatherInternals"}
 
 [extensions]
-SpeedyWetherBrowzarrExt = "Browzarr"
+SpeedyWeatherBrowzarrExt = "Browzarr"
 SpeedyWeatherEnzymeExt = "Enzyme"
 SpeedyWeatherFiniteDifferencesExt = "FiniteDifferences"
 SpeedyWeatherGeoMakieExt = "GeoMakie"
