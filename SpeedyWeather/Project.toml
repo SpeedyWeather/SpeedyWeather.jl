@@ -1,7 +1,7 @@
 name = "SpeedyWeather"
 uuid = "9e226e20-d153-4fed-8a5b-493def4f21a9"
-authors = ["SpeedyWeather contributors"]
 version = "0.20.1+DEV"
+authors = ["SpeedyWeather contributors"]
 
 [deps]
 AbstractFFTs = "621f4979-c628-5d54-868e-fcf4e3e8185c"
@@ -37,6 +37,7 @@ StyledStrings = "f489334b-da3d-4c2e-b8f0-e476e12c162b"
 TOML = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
 
 [weakdeps]
+Browzarr = "d7a009df-479f-4526-be69-544662986fe6"
 FiniteDifferences = "26cc04aa-876d-5657-8c51-4c34ba976000"
 GeoMakie = "db073c08-6b98-4ee5-b6a4-5efafb3259c6"
 Reactant = "3c362404-f566-11ee-1572-e11a4b42c853"
@@ -50,6 +51,7 @@ SpeedyTransforms = {path = "../SpeedyTransforms"}
 SpeedyWeatherInternals = {path = "../SpeedyWeatherInternals"}
 
 [extensions]
+SpeedyWetherBrowzarrExt = "Browzarr"
 SpeedyWeatherEnzymeExt = "Enzyme"
 SpeedyWeatherFiniteDifferencesExt = "FiniteDifferences"
 SpeedyWeatherGeoMakieExt = "GeoMakie"
@@ -63,6 +65,7 @@ Adapt = "3, 4"
 AssociatedLegendrePolynomials = "1"
 Atomix = "1"
 BitInformation = "0.6"
+Browzarr = "0.1.0"
 CodecZlib = "0.7"
 ComponentArrays = "0.15"
 DocStringExtensions = "0.9"
