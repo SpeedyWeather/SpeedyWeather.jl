@@ -146,12 +146,12 @@ function SpeedyWeather.variables(::AbstractTerrariumLandModel)
         # output writers) can read them. They are kept in sync from the
         # Terrarium state inside `initialize!` and `timestep!`.
         SpeedyWeather.PrognosticVariable(
-            name = :soil_temperature, dims = SpeedyWeather.Land2D(),
+            name = :soil_temperature, dims = SpeedyWeather.Grid2D(),
             units = "K", desc = "Soil temperature mirrored from Terrarium",
             namespace = :land,
         ),
         SpeedyWeather.PrognosticVariable(
-            name = :soil_moisture, dims = SpeedyWeather.Land2D(),
+            name = :soil_moisture, dims = SpeedyWeather.Grid2D(),
             units = "1", desc = "Soil moisture (saturation fraction) mirrored from Terrarium",
             namespace = :land,
         ),
@@ -336,7 +336,7 @@ function SpeedyWeather.variables(::TerrariumDryLand)
             namespace = :land, desc = "Terrarium land state",
         ),
         SpeedyWeather.PrognosticVariable(
-            name = :soil_temperature, dims = SpeedyWeather.Land3D(),
+            name = :soil_temperature, dims = SpeedyWeather.Grid2D(),
             units = "K", desc = "Soil temperature mirrored from Terrarium",
             namespace = :land,
         ),
