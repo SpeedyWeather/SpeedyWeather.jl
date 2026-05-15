@@ -70,7 +70,7 @@ end
     @test haskey(sim.variables.prognostic.land, :soil_moisture)
 
     # Run a handful of steps and confirm nothing has gone NaN.
-    SpeedyWeather.run!(sim, period = Minute(30))
+    SpeedyWeather.run!(sim, steps = 3)
 
     @test all(isfinite, sim.variables.prognostic.land.soil_temperature)
     @test all(isfinite, sim.variables.prognostic.land.soil_moisture)
@@ -131,7 +131,7 @@ end
     @test haskey(sim.variables.prognostic.land, :soil_temperature)
     @test !haskey(sim.variables.prognostic.land, :soil_moisture)
 
-    SpeedyWeather.run!(sim, period = Minute(30))
+    SpeedyWeather.run!(sim, steps = 3)
 
     @test all(isfinite, sim.variables.prognostic.land.soil_temperature)
     @test all(isfinite, sim.variables.grid.temperature)
