@@ -190,8 +190,8 @@ end
 # CPU and average there. This runs once during interpolator setup, so the CPU hop
 # is negligible.
 function RingGrids.average_on_poles(A::Reactant.AnyConcretePJRTArray, rings)
-    north = Array(A[rings[1]])
-    south = Array(A[rings[end]])
+    north = @allowscalar A[rings[1]]
+    south = @allowscalar A[rings[end]]
     return sum(north) / length(north), sum(south) / length(south)
 end
 
