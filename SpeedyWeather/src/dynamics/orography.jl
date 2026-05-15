@@ -119,14 +119,11 @@ function initialize!(
     RΩ = radius * rotation                # [m/s]
     g⁻¹ = inv(gravity)                  # inverse gravity [s²/m]
 
-    # TODO use set! to write this
-    for ij in eachindex(φ, orography)
-        sinφ = sind(φ[ij])
-        cosφ = cosd(φ[ij])
-
-        # Jablonowski & Williamson, 2006, eq. (7)
-        orography[ij] = g⁻¹ * A * (A * (-2 * sinφ^6 * (cosφ^2 + 1 / 3) + 10 / 63) + (8 / 5 * cosφ^3 * (sinφ^2 + 2 / 3) - π / 4) * RΩ)
-    end
+    NF = eltype(orography)
+    sinφ = sin.(φ .* NF(π) / 180)
+    cosφ = cos.(φ .* NF(π) / 180)
+    # Jablonowski & Williamson, 2006, eq. (7)
+    orography.data .= g⁻¹ .* A .* (A .* (-2 .* sinφ .^ 6 .* (cosφ .^ 2 .+ 1 / 3) .+ 10 / 63) .+ (8 / 5 .* cosφ .^ 3 .* (sinφ .^ 2 .+ 2 / 3) .- π / 4) .* RΩ)
 
     transform!(surface_geopotential, orography, S)   # to grid-point space
     surface_geopotential .*= gravity                 # turn orography into surface geopotential

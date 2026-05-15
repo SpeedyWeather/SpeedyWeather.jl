@@ -656,8 +656,8 @@ end
     A1 = 3 // 4 * η * NF(π) * u₀ / R_dry * sin(ηᵥ) * sqrt(cos(ηᵥ))
     A2 = 2 * u₀ * cos(ηᵥ)^(3 // 2)
 
-    sinφ = sind(φ[ij])
-    cosφ = cosd(φ[ij])
+    sinφ = sin(φ[ij] * NF(π) / 180)
+    cosφ = cos(φ[ij] * NF(π) / 180)
 
     # Jablonowski and Williamson, eq. (6)
     temp_grid[ij, k] = Tη[k] + A1 * (
