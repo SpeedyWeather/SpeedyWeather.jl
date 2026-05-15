@@ -1795,3 +1795,356 @@ within parameterizations.
 | step 10 frierson | 5.526 | 14× amplification |
 | step 10 uniformcooling | 0.460 | no amplification |
 | step 10 disabled | 0.474 | no amplification |
+
+## Session 7 (planned) — Intra-step bisect plan (2026-05-15)
+
+After Session 6 we know two things:
+1. A small 5.8e-4 K **T-only asymmetric** diff is introduced by
+   `initialize!(sim; steps)` BEFORE the first time step.
+2. A larger ~0.4–0.5 K per-step diff is generated WITHIN a single time
+   step by something downstream of `copy!`.
+
+The asymmetric T-only signal in (1) is suspicious enough that it should be
+investigated FIRST as Phase 0, before the intra-step bisect. Reasons:
+- Asymmetry (T only, humidity/u/v at 1 ulp) points to a discrete operation
+  that touches T differently — NOT generic FP noise.
+- The same operation might also run inside `timestep!`, contributing to
+  the per-step seed.
+- It's much cheaper to investigate (only ~8 operations to bisect inside
+  `initialize!` vs ~12 inside `timestep!`).
+- If we fix it, we eliminate a confounder for the intra-step bisect.
+
+### Phase 0 — Investigate `initialize!(sim; steps)` asymmetric T diff
+
+Source: `SpeedyWeather/src/models/simulation.jl:55-103`.
+
+The sequence inside `initialize!(simulation; period, steps, output)`:
+
+```
+initialize!(simulation; ...)
+  ├── initialize!(clock, time_stepping, steps)          # I0  metadata only
+  ├── set!(simulation.model.output, ...)                # I1  output config
+  ├── scale_prognostic!(variables, model.planet.radius) # I2  scales vor, div (spectral)
+  ├── transform!(variables, lf, model, initialize=true) # I3  spectral → grid, with init flag
+  ├── (particles init if any)                           # I4
+  ├── initialize!(model.output, variables, model)       # I5
+  └── initialize!(model.callbacks, variables, model)    # I6
+```
+
+**Prime suspect: I3** — `transform!(variables, lf, model, initialize=true)`.
+This is a HIGHER-LEVEL transform (different from the isolated `transform!`
+on a single LowerTriangularArray that Test B verified bit-identical). It
+likely:
+- Transforms all prognostic spectral fields → corresponding grid fields
+  (vorticity, divergence, temperature, humidity, surface pressure, tracers)
+- Does derived computations (winds u, v from vor+div via Helmholtz; log
+  pressure or virtual temperature precomputes; geopotential height)
+- May call architecture-local thermodynamic helpers
+
+A T-only divergence after I3 strongly suggests a specific T-related
+derived-quantity computation runs differently on CPU vs XLA. Plausible
+culprits inside `transform!(...; initialize=true)`:
+- `log(pressure)` or `log(p_s)` conversion that feeds into T scaling
+- Virtual temperature `Tv = T*(1 + (1/μ - 1)*q)` if it's stored back to T
+- Geopotential calculation `Φ = R*Tv*log(p)` could affect a `T_prev` mirror
+- `temperature_prev ← temperature` copy timing
+- Anomaly conversion (T vs T - T_ref)
+
+#### Phase-0 execution plan
+
+**Step 0.1** — Find the actual transform path
+
+Read `SpeedyWeather/src/dynamics/scaling.jl` (or wherever `transform!(vars,
+lf, model; initialize=true)` is defined). Trace what it does to
+`grid.temperature` specifically. Identify any T-only branches gated on
+`initialize == true`.
+
+```bash
+grep -rn "transform!.*initialize\|function transform!.*Variables.*Model" \
+    SpeedyWeather/src/
+```
+
+**Step 0.2** — Probe I3 sub-operations
+
+If `transform!(...; initialize=true)` does N sub-operations on T (e.g.,
+log-pressure, then virtual T, then geopotential), probe T after EACH.
+Same scratch-field approach as the main bisect, but scoped to `initialize!`.
+
+Add ScratchVariables:
+- `T_init_probe_0` (before `initialize!(sim; steps)`)
+- `T_init_probe_1` (after `scale_prognostic!`)
+- `T_init_probe_2` (after `transform!(...; initialize=true)`)
+- Sub-probes inside I3 if it does multiple T-touching operations
+
+**Step 0.3** — Compare per-grid-point
+
+Important: dump not just `max|ΔT|` but also the **spatial pattern** of the
+diff. The 5.8e-4 K is asymmetric (only T), but is it also spatially
+concentrated (e.g., only at the poles or surface)? If concentrated, that's
+another clue about the operation. The pattern might match the per-step
+0.4 K pattern, confirming a shared mechanism.
+
+**Step 0.4** — Decision
+
+- If I3 is bit-clean → divergence enters elsewhere in `initialize!` (less
+  likely given the operations are all metadata or transforms). Drill in
+  parallel.
+- If I3 introduces the 5.8e-4 K diff → drill into `transform!(...; initialize=true)`
+  to find which T-touching sub-operation is responsible.
+- If the divergence is in a thermodynamic precompute (virtual T, log-p,
+  geopotential), test Float64 widening just there. Unlike the longwave
+  Float64 test (Session 4 — null result), this is a one-shot init computation
+  not a per-step recurrence; Float64 might actually fix it.
+
+Then proceed to Phase 1 (the intra-step bisect) with the `initialize!`
+asymmetric diff either eliminated or characterized.
+
+### Phase 1 — Intra-step bisect
+
+After Session 6 we know the ~0.4–0.5 K T diff is generated **within a single
+time step**, by something downstream of `copy!` and upstream of (or including)
+the final spectral→grid transform. Transforms in isolation are bit-identical,
+so the source must be in parameterization tendencies, dynamics infrastructure
+(leapfrog, diffusion, implicit), or the orchestration that connects them.
+
+Goal: probe T at every step of `run!` (i.e. of `first_timesteps!` for step 1,
+which uses an Euler forward sub-step followed by an unfiltered leapfrog) and
+identify the FIRST operation where CPU and Reactant diverge.
+
+### The pipeline (PrimitiveEquation, step 1 = Euler sub-step at Δt/2)
+
+From `time_stepping/leapfrog.jl:206` (`first_timesteps!`) and
+`time_stepping/time_integration.jl:129` (`timestep!(::Variables, dt, ::PrimitiveEquation, ...)`):
+
+```
+first_timesteps!(simulation)
+  └── first_timesteps!(variables, model)
+       ├── initialize!(implicit, Δt/2, vars, model)        # P0a
+       ├── timestep!(vars, Δt/2, model, lf1=1, lf2=1)      # Euler sub-step
+       │    ├── reset_tendencies!(vars)                     # P1
+       │    ├── greenhouse_gases_time_step!(vars, model)    # P2
+       │    ├── parameterization_tendencies!(vars, model)   # P3
+       │    │    ├── reset_variables!(vars)                  # P3a
+       │    │    ├── global_parameterizations!(vars, model)  # P3b — unrolled NT loop
+       │    │    └── column_parameterizations!(vars, model)  # P3c — fused kernel over ij
+       │    │         (each ij: solar_zenith → vertical_diffusion → lsc → albedo →
+       │    │          shortwave → longwave → boundary_layer_drag → surface_condition →
+       │    │          surface_momentum_flux → surface_heat_flux → surface_humidity_flux)
+       │    ├── ocean_timestep!(vars, model)                 # P4
+       │    ├── sea_ice_timestep!(vars, model)               # P5
+       │    ├── land_timestep!(vars, model)                  # P6
+       │    │    (with dynamics=false we skip the dynamics branch and take
+       │    │     parameterization_tendencies_only! instead, which transforms
+       │    │     physics tendencies grid→spectral)
+       │    ├── parameterization_tendencies_only!(vars, model) # P7
+       │    ├── horizontal_diffusion!(vars, ...)             # P8
+       │    ├── leapfrog!(vars, Δt/2, lf1=1, model)          # P9
+       │    └── transform!(vars, lf2=1, model)               # P10 — spectral→grid
+       ├── initialize!(implicit, Δt, vars, model)            # P11a
+       └── timestep!(vars, Δt, model, lf1=1, lf2=2)          # Leapfrog sub-step
+            (same structure as the Euler sub-step, but with leapfrog from
+             two-time-level history; we only bisect this if the Euler step
+             is bit-identical and the divergence first appears here)
+```
+
+Probe T (`vars.grid.temperature` and `vars.tendencies.grid.temperature`)
+after each numbered marker. Compare CPU vs Reactant.
+
+### Implementation approach — scratch-field snapshots
+
+Modifying `first_timesteps!` to capture intermediate state is the cleanest
+route. Two options:
+
+**Option A — Scratch field snapshots (preferred)**: Add ScratchVariables
+`T_probe_1`, `T_probe_2`, … `T_probe_10` (Grid3D, namespace=:debug) registered
+in `primitive_dry.jl`/`primitive_wet.jl`. Patch `timestep!(::Variables, ...,
+::PrimitiveEquation, ...)` to `copy!(vars.scratch.debug.T_probe_k,
+vars.grid.temperature)` after each numbered marker. At end of one step,
+pull all probes host-side and compute `maximum(abs(T_probe_k_c - T_probe_k_r))`
+for each k. The first k where this is nonzero localizes the divergence.
+
+For the tendency, also probe `vars.tendencies.grid.temperature` — register
+a parallel set `dT_probe_k` so we see whether the seed is in the tendency or
+in the state.
+
+Pros: one compile, captures all probes in one run, no @compile-state issues.
+Cons: requires source modification; needs careful revert when done.
+
+**Option B — Sequential @compile of prefix functions**: Define
+`timestep_to_marker_k!(vars, ...)` functions that run only operations 1..k.
+Compile each, run on a fresh post-resync simulation. Compare T after each.
+
+Pros: zero source modification of `timestep!` (only need to define wrapper
+functions for the test).
+Cons: N compiles instead of 1; state-reset between runs is fiddly; each
+operation has its own side effects.
+
+**Recommendation**: Option A. Cheap to add scratch fields temporarily; one
+compile suffices; gives the full breakdown in one run.
+
+### Concrete execution plan for tomorrow
+
+#### Step 1 — Register debug ScratchVariables (1 commit, revertable)
+
+In `SpeedyWeather/src/models/primitive_wet.jl` (or `primitive_dry.jl` so
+both wet/dry inherit), add to the variable list:
+
+```julia
+ScratchVariable(:T_probe_1,  Grid3D(), desc = "T after reset_tendencies",          namespace = :debug),
+ScratchVariable(:T_probe_2,  Grid3D(), desc = "T after greenhouse_gases_time_step!", namespace = :debug),
+ScratchVariable(:T_probe_3a, Grid3D(), desc = "T after reset_variables!",          namespace = :debug),
+ScratchVariable(:T_probe_3b, Grid3D(), desc = "T after global_parameterizations!", namespace = :debug),
+ScratchVariable(:T_probe_3c, Grid3D(), desc = "T after column_parameterizations!", namespace = :debug),
+ScratchVariable(:T_probe_4,  Grid3D(), desc = "T after ocean_timestep!",           namespace = :debug),
+ScratchVariable(:T_probe_5,  Grid3D(), desc = "T after sea_ice_timestep!",         namespace = :debug),
+ScratchVariable(:T_probe_6,  Grid3D(), desc = "T after land_timestep!",            namespace = :debug),
+ScratchVariable(:T_probe_7,  Grid3D(), desc = "T after parameterization_tendencies_only!", namespace = :debug),
+ScratchVariable(:T_probe_8,  Grid3D(), desc = "T after horizontal_diffusion!",     namespace = :debug),
+ScratchVariable(:T_probe_9,  Grid3D(), desc = "T after leapfrog!",                 namespace = :debug),
+ScratchVariable(:T_probe_10, Grid3D(), desc = "T after transform!",                namespace = :debug),
+# parallel probes for tendency
+ScratchVariable(:dT_probe_2, Grid3D(), desc = "dT after greenhouse_gases",         namespace = :debug),
+ScratchVariable(:dT_probe_3, Grid3D(), desc = "dT after parameterization_tendencies!", namespace = :debug),
+ScratchVariable(:dT_probe_7, Grid3D(), desc = "dT after parameterization_tendencies_only!", namespace = :debug),
+ScratchVariable(:dT_probe_8, Grid3D(), desc = "dT after horizontal_diffusion!",    namespace = :debug),
+```
+
+#### Step 2 — Snapshot insertions
+
+In `SpeedyWeather/src/time_stepping/time_integration.jl`, the `timestep!(vars,
+dt, ::PrimitiveEquation, ...)` body (lines 129–165), insert `copy!` of
+`vars.grid.temperature` into the corresponding scratch field after each
+named operation. Use `copy!(vars.scratch.debug.T_probe_k, vars.grid.temperature)`.
+
+Same for the tendency probes via `vars.tendencies.grid.temperature`.
+
+Be careful: scratch slots are write-before-read, so reading them after a
+fused kernel may give stale values; use `copy!` from the canonical state
+field at each marker, not from another scratch.
+
+#### Step 3 — Write the bisect script
+
+`debug_intra_step_bisect.jl` — same skeleton as `debug_drift_step1.jl`, but
+after the step has run, dumps:
+
+```julia
+for probe in (:T_probe_1, :T_probe_2, :T_probe_3a, :T_probe_3b, :T_probe_3c,
+              :T_probe_4, :T_probe_5, :T_probe_6, :T_probe_7, :T_probe_8,
+              :T_probe_9, :T_probe_10)
+    a = Array(getproperty(sim_c.variables.scratch.debug, probe))
+    b = Array(getproperty(sim_r.variables.scratch.debug, probe))
+    d = maximum(abs.(a .- b))
+    println("  $probe  max|ΔT| = $d")
+end
+```
+
+Same loop for the `dT_probe_*` parallel set.
+
+Run with the default Frierson configuration (default has the largest
+amplification, so the first non-zero probe will be cleanest to spot).
+
+#### Step 4 — Interpret
+
+The first probe k where `max|ΔT| > 0` (or grows substantially beyond the
+upstream baseline) localizes the divergence to one of the 10 operations.
+Possible outcomes:
+
+| First diverging probe | Implication |
+|---|---|
+| P1 (reset_tendencies!) | tendencies array allocation/zeroing differs. Extremely unlikely; would suggest a fundamental allocation bug. |
+| P2 (greenhouse_gases) | Greenhouse-gas time stepping itself. Inspect that function. |
+| P3a (reset_variables!) | Like P1, very unlikely. |
+| P3b (global_parameterizations!) | One of the non-column parameterizations (cloud, etc.) differs. Drill into the `@generated` unroll: bisect by which parameterization is included. |
+| **P3c (column_parameterizations!)** | **The fused per-column kernel. Drill into the unroll order: bisect by k=1..11 prefix (like Session 1 NaN bisect).** Likely culprit given the surface concentration of the diff. |
+| P4 / P5 / P6 (ocean/sea_ice/land) | Surface model itself. |
+| P7 (parameterization_tendencies_only!) | The grid→spectral transform of tendencies. Even though `transform!` in isolation is bit-identical (Test B), perhaps the per-variable grid→spectral path used here differs (different matrix, different layer ordering, etc.). |
+| P8 (horizontal_diffusion!) | Spectral hyperdiffusion. Pure spectral math. |
+| P9 (leapfrog!) | Leapfrog filter. Pure spectral math with Robert+Williams. |
+| P10 (transform!) | Spectral→grid for the new state. We already verified this is bit-identical in isolation (Test B), so divergence here would mean state ENTERING the transform differs (i.e., earlier-detected divergence carried forward). |
+
+#### Step 5 — If P3c is the answer (most likely)
+
+Once we've narrowed to `column_parameterizations!`, do a sub-bisect by
+truncating the `@generated` unroll. Use the same approach as Session 1's
+NaN bisect:
+
+```julia
+# in column_parameterizations_kernel! @generated, temporarily restrict to first k
+calls = [:(parameterization!(ij, vars, parameterizations.$name, model)) for name in names[1:k]]
+```
+
+Run for k=1..N and see at which k the first non-zero T diff appears. With
+longwave_radiation = nothing (since that's where step-1 diff is largest in
+Test A), this drills directly into which non-LW parameterization is the
+generator. Strong candidates:
+- shortwave_radiation (T^4-amplifies any T perturbation, like longwave)
+- surface_heat_flux (writes to dTdt[ij, nlayers] at surface)
+- surface_humidity_flux (writes to humidity, indirect via condensation)
+- large_scale_condensation (latent heat → T)
+
+#### Step 6 — Cleanup
+
+Once the source is identified, revert the ScratchVariable additions and
+probe insertions. Keep `debug_intra_step_bisect.jl` for re-use.
+
+### Pre-bisect predictions
+
+Based on session-6 evidence and surface-layer concentration of the diff:
+
+1. P3c (column_parameterizations) is the most likely first diverging probe.
+2. Within P3c, surface_heat_flux + surface_humidity_flux + shortwave are the
+   prime suspects.
+3. shortwave has the same T^4 structure as longwave → highest a-priori
+   probability of being the per-call seed AND amplifier.
+4. If shortwave is the culprit, the fix recipes from session 4 (Float64
+   widening) might work for shortwave even though they didn't for longwave —
+   shortwave's flux structure is different (no Horner over a layer-varying
+   transmissivity in the same way).
+
+### Files to add tomorrow
+- `SpeedyWeather/src/models/primitive_wet.jl` (or `primitive_dry.jl`) —
+  ScratchVariable registrations for `T_probe_k` and `dT_probe_k`.
+- `SpeedyWeather/src/time_stepping/time_integration.jl` — `copy!` insertions
+  after each operation.
+- `SpeedyWeather/test/reactant/debug_intra_step_bisect.jl` — bisect script.
+
+All three intended to be reverted at end of session 7 except the bisect
+script (kept for re-use).
+
+### What we do NOT need to test
+- Transforms in isolation — already bit-identical (Test B).
+- `copy!` semantics — already verified bit-perfect (Test C).
+- Float64 in the longwave kernel — already shown irrelevant (Session 4).
+- Step-1 with other longwave schemes — already mapped (Test A).
+
+### Status
+
+Plan ready. Begin tomorrow with **Phase 0** (`initialize!(sim; steps)`
+asymmetric T diff) — quickest win and informs the intra-step bisect. Then
+proceed to Phase 1 (intra-step bisect). Total estimated wall time:
+~2 hours including both phases.
+
+### Could Phase 0 already be the whole issue?
+
+Quick sanity check on whether the 5.8e-4 K initialize-time diff explains
+the 5.5 K 10-step drift:
+- 5.8e-4 K input perturbation
+- Frierson amplification factor: 1.34×/step (measured)
+- After 10 steps: 5.8e-4 × 1.34^10 ≈ 5.8e-4 × 17.9 ≈ 1.0e-2 K = 0.01 K
+- Observed 10-step drift: 5.5 K
+- Ratio: ~550× short
+
+So Phase 0 alone CANNOT explain the full 5.5 K drift. But there are two
+possibilities that keep it interesting:
+1. The mechanism that creates the 5.8e-4 K in `initialize!` may ALSO run
+   inside `timestep!` (e.g., a virtual-T recompute called per step), where
+   it would produce a fresh ~5.8e-4 K kick per step. Combined with
+   amplification, that gives ~5.8e-4 × Σ 1.34^k ≈ 5.8e-4 × 50 ≈ 0.03 K —
+   still short by 100× but a real contribution.
+2. The asymmetry is a SYMPTOM of a broader CPU-vs-XLA divergence pattern,
+   and fixing it teaches us about the per-step seed mechanism even if it's
+   not numerically dominant.
+
+So Phase 0 is worth doing first as a diagnostic, but should NOT be expected
+to solve the whole problem. The intra-step bisect (Phase 1) is the main
+event.
