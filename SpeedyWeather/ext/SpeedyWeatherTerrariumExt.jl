@@ -280,7 +280,7 @@ function timestep!(
         vars.prognostic.land.sensible_heat_flux .= state.sensible_heat_flux
     end
     if haskey(vars.prognostic.land, :surface_humidity_flux)
-        vars.prognostic.land.surface_humidity_flux .= state.latent_heat_flux ./ consts.latent_heat_vaporization
+        vars.prognostic.land.surface_humidity_flux .= state.latent_heat_flux ./ consts.thermodynamics.latent_heat_vaporization
     end
     if haskey(vars.parameterizations, :surface_longwave_up)
         vars.parameterizations.surface_longwave_up .= state.surface_longwave_up
