@@ -2,7 +2,8 @@
 
 ## Unreleased
 
-- Browzarr extension [#1093](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1093)
+- Browzarr extension, Zarr.jl compatibilty includes `v0.9` [#1093](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1093) [#1096](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1096)
+- Fixed several typos in the documentation [#1094](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1094)
 - Fixed a wrong reference in the documentation [#1092](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1092)
 - Variable system: rename function that allocates new variables from `Base.zero` to `allocate` [#1087](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1087)
 

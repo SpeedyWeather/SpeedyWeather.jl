@@ -13,8 +13,8 @@ S_{l, m}^i &= A\left[1-\exp\left(-2\tfrac{\Delta t}{\tau}\right)\right]Q^i_{l, m
 \end{aligned}
 ```
 
-So there is a term `S` that is supposed to force the vorticity equation in the
-[Barotropic vorticity model]. However, this term is also stochastically
+So there is a term ``S`` that is supposed to force the vorticity equation in the
+[Barotropic vorticity model](@ref barotropic_vorticity_model). However, this term is also stochastically
 evolving in time, meaning we have to store the previous time steps, ``i-1``,
 in spectral space, because that's where the forcing is defined: for degree
 ``l`` and order ``m`` of the spherical harmonics. ``A`` is a real amplitude.
@@ -211,18 +211,16 @@ considered read-only when applying a forcing.
 `vars.tendencies` contains the tendencies (in grid and spectral space) and
 `vars.prognostic` contains the prognostic variables in spectral space, including
 `vars.prognostic.clock.time` the current time for time-dependent forcing.
-The third argument has to be of the type of our new custom forcing, here `StochasticStirring`,
-so that multiple dispatch calls the correct method of `forcing!`. The forth argument is of type
+The second argument has to be of the type of our new custom forcing, here `StochasticStirring`,
+so that multiple dispatch calls the correct method of `forcing!`. The third argument is the leapfrog index `lf` which after the first time step will
+be `lf=2` to denote that tendencies are evaluated at the current time not at the previous time (how leapfrogging works). Unless you want to read the prognostic variables, for which
+you need to know whether to read `lf=1` or `lf=2`, you can ignore this (but need to include it as argument). The forth argument is of type
 `AbstractModel`, so that the forcing can also make use of anything inside `model`, e.g.
 `model.geometry` or `model.planet` etc. But you can be more restrictive to define a forcing only
 for the `BarotropicModel` for example, use `model::Barotropic` in that case.
 Or you could define two methods, one for `Barotropic` one for all other models with
 `AbstractModel` (not `Barotropic` as a more specific method is prioritised with multiple
-dispatch). The 5th argument is the leapfrog index `lf` which after the first time step will
-be `lf=2` to denote that tendencies are evaluated at the current time not at the previous time
-(how leapfrogging works). Unless you want to read the prognostic variables, for which
-you need to know whether to read `lf=1` or `lf=2`, you can ignore this (but need to include
-it as argument).
+dispatch). 
 
 As you can see, for now not much is actually happening inside this function,
 this is what is often called a function barrier, the only thing we do in here
@@ -293,7 +291,7 @@ For details, please see [Declare variables](@ref).
 
 Scratch arrays have an undefined state as any component is free to use
 them and write data into it. In that sense, they should be treated as
-write-before-read for example to store and intermediate result. You also
+write-before-read for example to store an intermediate result. You also
 should expect them to be overwritten momentarily once the function concludes
 and no information will remain. The only exception are situations where
 a model component implements two functions that are directly called
