@@ -1,6 +1,6 @@
 # [Time integration](@id leapfrog)
 
-SpeedyWeather.jl is based on the [Leapfrog time integration](https://en.wikipedia.org/wiki/Leapfrog_integration]),
+SpeedyWeather.jl is based on the [Leapfrog time integration](https://en.wikipedia.org/wiki/Leapfrog_integration),
 which, for relative vorticity ``\zeta``, is
 in its simplest form
 ```math
