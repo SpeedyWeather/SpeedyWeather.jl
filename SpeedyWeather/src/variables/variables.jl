@@ -104,13 +104,31 @@ end
 """$(TYPEDSIGNATURES)
 Copy all entries from `src` to `dest` by recursing over the variable groups
 and namespaces. Uses `copyto!` for arrays, `copy!` for `Clock`,
-and direct assignment for `Ref` values."""
+and direct assignment for `Ref` values.
+
+View leaves (Fields/LTAs whose `.data` is a `SubArray`, or bare `SubArray`s) are
+skipped: their underlying storage lives in a fuse parent that is itself reachable
+through `vars.scratch.fused.*`, and that parent is copied directly. After the
+parent is updated, every view that aliases it sees the new data automatically.
+Copying through both view and parent is unnecessary work, and on cross-architecture
+copies (CPU ↔ Reactant) the broadcast-aliasing check inside `copyto!` fails.
+Skipping view leaves avoids both problems."""
 function Base.copy!(dest::Variables, src::Variables)
     for group in propertynames(dest)
         copy_variables!(getfield(dest, group), getfield(src, group))
     end
     return dest
 end
+
+"""$(TYPEDSIGNATURES)
+Whether a variable entry is a view onto another buffer (rather than its own backing
+storage). View entries are skipped by `copy!` — see [`Base.copy!(::Variables, ::Variables)`](@ref).
+For `Field` and `LowerTriangularArray` wrappers we check the underlying `.data`;
+a plain `SubArray` leaf is also a view."""
+is_view_entry(a::AbstractField) = a.data isa SubArray
+is_view_entry(a::LowerTriangularArray) = a.data isa SubArray
+is_view_entry(a::SubArray) = true
+is_view_entry(::AbstractArray) = false
 
 """$(TYPEDSIGNATURES)
 Copy variables in `NamedTuples` from `src` into `dest`, only copying keys present in both.
@@ -129,7 +147,10 @@ can differentiate through this function without runtime reflection more easily."
     end
 end
 
-_copy_entry!(dest::AbstractArray, src::AbstractArray) = copyto!(dest, src)
+# Skip view-backed leaves; their data lives in a fuse parent that is itself copied
+# via vars.scratch.fused.<name>. See `is_view_entry` and the `copy!` docstring.
+_copy_entry!(dest::AbstractArray, src::AbstractArray) =
+    is_view_entry(dest) ? dest : copyto!(dest, src)
 _copy_entry!(dest::NamedTuple, src::NamedTuple) = copy_variables!(dest, src)
 _copy_entry!(dest::Base.RefValue, src::Base.RefValue) = (dest[] = src[])
 
@@ -142,7 +163,7 @@ _copy_entry!(dest::Base.RefValue, src::Base.RefValue) = (dest[] = src[])
     for (i, fname) in enumerate(fieldnames(T))
         ft = fieldtype(T, i)
         if ft <: AbstractArray
-            push!(exprs, :(copyto!(getfield(dest, $(QuoteNode(fname))), getfield(src, $(QuoteNode(fname))))))
+            push!(exprs, :(_copy_entry!(getfield(dest, $(QuoteNode(fname))), getfield(src, $(QuoteNode(fname))))))
         elseif ft <: NamedTuple
             push!(exprs, :(copy_variables!(getfield(dest, $(QuoteNode(fname))), getfield(src, $(QuoteNode(fname))))))
         elseif ismutabletype(T)
