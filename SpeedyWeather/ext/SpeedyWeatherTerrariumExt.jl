@@ -232,7 +232,7 @@ function SpeedyWeather.timestep!(
     # `vars.prognostic.land.terrarium`; the soil mirrors are refreshed so
     # SpeedyWeather radiation / surface flux components see current values.
     vars.prognostic.land.soil_temperature .= state.skin_temperature .+ NF(273.15)
-    vars.prognostic.land.soil_moisture .= interior(state.saturation_water_ice)[:, 1, end]
+    vars.prognostic.land.soil_moisture .= @view interior(state.saturation_water_ice)[:, 1, end]
     if haskey(vars.prognostic.land, :sensible_heat_flux)
         vars.prognostic.land.sensible_heat_flux .= state.sensible_heat_flux
     end
