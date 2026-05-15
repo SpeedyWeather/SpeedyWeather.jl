@@ -96,7 +96,7 @@ struct TerrariumWetLand{
     "Preconstructed Terrarium fields forwarded to `Terrarium.initialize`"
     fields::FL
     "Terrarium-internal sub-step (seconds) used to integrate within each SpeedyWeather step"
-    Δt::Float64
+    Δt::NF
 end
 
 """$(TYPEDSIGNATURES)
@@ -294,7 +294,7 @@ struct TerrariumDryLand{
     "Preconstructed Terrarium fields forwarded to `Terrarium.initialize`"
     fields::FL
     "Terrarium-internal sub-step (seconds) used to integrate within each SpeedyWeather step"
-    Δt::Float64
+    Δt::NF
 end
 
 """$(TYPEDSIGNATURES)
@@ -317,7 +317,7 @@ function TerrariumDryLand(
     geometry = LandGeometry(1, NF[Δz_arr[end]])
     return TerrariumDryLand(
         spectral_grid, geometry, model, timestepper, clock,
-        boundary_conditions, input_variables, initializers, fields, Float64(Δt),
+        boundary_conditions, input_variables, initializers, fields, NF(Δt),
     )
 end
 
