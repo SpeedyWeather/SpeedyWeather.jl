@@ -816,13 +816,20 @@ function initialize!(
     temp_grid = transform(temp, model.spectral_transform)
     humid_grid = similar(temp_grid)
 
-    # pressure at each level: σ[k] * exp(lnpₛ[ij]), shape (npoints, nlayers)
-    pres_levels = reshape(exp.(lnpₛ_grid.data), :, 1) .* reshape(σ_levels_full, 1, :)
-
-    humid_grid.data .= relhumid_ref .* saturation_humidity.(temp_grid.data, pres_levels, atmosphere)
+    launch!(architecture(humid_grid), RingGridWorkOrder, size(humid_grid),
+        _constant_relative_humidity_kernel!, humid_grid, temp_grid, lnpₛ_grid, σ_levels_full,
+        relhumid_ref, atmosphere)
 
     set!(vars, model; humidity = humid_grid, lf = 1)
     return nothing
+end
+
+@kernel inbounds = true function _constant_relative_humidity_kernel!(
+        humid_grid, temp_grid, lnpₛ_grid, σ_levels_full, relhumid_ref, atmosphere
+    )
+    ij, k = @index(Global, NTuple)
+    pres = σ_levels_full[k] * exp(lnpₛ_grid[ij])
+    humid_grid[ij, k] = relhumid_ref * saturation_humidity(temp_grid[ij, k], pres, atmosphere)
 end
 
 export RandomWaves
