@@ -4,16 +4,6 @@ using SpeedyWeather
 using Terrarium
 using DocStringExtensions
 
-import SpeedyWeather: AbstractVariableDim, AbstractVariable, AbstractModel,
-    AbstractLand, AbstractWetLand, SpectralGrid, LandGeometry,
-    PrognosticVariable, Land3D, Variables,
-    PrimitiveEquation, get_nlayers, DEFAULT_DATE,
-    variables, initialize!, timestep!, allocate
-import SpeedyWeather.RingGrids
-
-import Terrarium: Clock, ColumnRingGrid, ForwardEuler, InputSources,
-    ModelIntegrator, interior, set!
-
 """$(TYPEDEF)
 
 Variable dimension for the full Terrarium land state. `allocate` for an
@@ -21,9 +11,9 @@ Variable dimension for the full Terrarium land state. `allocate` for an
 so that the entire Terrarium state lives inside SpeedyWeather's `Variables`
 container at `vars.prognostic.land.terrarium`. The `model.land` must therefore
 be an [`AbstractTerrariumLandModel`](@ref)."""
-struct TerrariumVars <: AbstractVariableDim end
+struct TerrariumVars <: SpeedyWeather.AbstractVariableDim end
 
-function SpeedyWeather.allocate(::AbstractVariable{TerrariumVars}, model::AbstractModel)
+function SpeedyWeather.allocate(::SpeedyWeather.AbstractVariable{TerrariumVars}, model::AbstractModel)
     land = model.land
     # Construct a Terrarium clock with a DateTime placeholder so its time type is
     # DateTime; the actual initial datetime is synced from the SpeedyWeather clock
@@ -31,7 +21,7 @@ function SpeedyWeather.allocate(::AbstractVariable{TerrariumVars}, model::Abstra
     # written there.
     return Terrarium.initialize(
         land.model;
-        clock = Clock(time = DEFAULT_DATE),
+        clock = Terrarium.Clock(time = SpeedyWeather.DEFAULT_DATE),
         boundary_conditions = land.boundary_conditions,
         input_variables = land.input_variables,
         fields = land.fields,
@@ -58,9 +48,9 @@ on this abstract type:
   copies soil temperatures, moisture and surface fluxes back into the
   SpeedyWeather variables.
 """
-abstract type AbstractTerrariumLandModel <: AbstractLand end
+abstract type AbstractTerrariumLandModel <: SpeedyWeather.AbstractLand end
 
-@inline get_nlayers(land::AbstractTerrariumLandModel) = land.geometry.nlayers
+@inline SpeedyWeather.get_nlayers(land::AbstractTerrariumLandModel) = land.geometry.nlayers
 
 """$(TYPEDEF)
 
@@ -144,10 +134,10 @@ function TerrariumWetLand(
     )
 end
 
-function variables(::AbstractTerrariumLandModel)
+function SpeedyWeather.variables(::AbstractTerrariumLandModel)
     return (
         # The full Terrarium state, owned by SpeedyWeather's Variables tree.
-        PrognosticVariable(
+        SpeedyWeather.PrognosticVariable(
             name = :terrarium, dims = TerrariumVars(),
             namespace = :land, desc = "Terrarium land state",
         ),
@@ -155,20 +145,20 @@ function variables(::AbstractTerrariumLandModel)
         # rest of SpeedyWeather (longwave/shortwave radiation, surface fluxes,
         # output writers) can read them. They are kept in sync from the
         # Terrarium state inside `initialize!` and `timestep!`.
-        PrognosticVariable(
-            name = :soil_temperature, dims = Land2D(),
+        SpeedyWeather.PrognosticVariable(
+            name = :soil_temperature, dims = SpeedyWeather.Land2D(),
             units = "K", desc = "Soil temperature mirrored from Terrarium",
             namespace = :land,
         ),
-        PrognosticVariable(
-            name = :soil_moisture, dims = Land2D(),
+        SpeedyWeather.PrognosticVariable(
+            name = :soil_moisture, dims = SpeedyWeather.Land2D(),
             units = "1", desc = "Soil moisture (saturation fraction) mirrored from Terrarium",
             namespace = :land,
         ),
     )
 end
 
-function initialize!(
+function SpeedyWeather.initialize!(
         vars::Variables,
         land::AbstractTerrariumLandModel,
         ::PrimitiveEquation,
@@ -194,7 +184,7 @@ function initialize!(
     return nothing
 end
 
-function timestep!(
+function SpeedyWeather.timestep!(
         vars::Variables,
         land::AbstractTerrariumLandModel,
         ::PrimitiveEquation,
@@ -339,21 +329,21 @@ function TerrariumDryLand(
 end
 
 # Dry land: only soil_temperature mirror, no moisture.
-function variables(::TerrariumDryLand)
+function SpeedyWeather.variables(::TerrariumDryLand)
     return (
-        PrognosticVariable(
+        SpeedyWeather.PrognosticVariable(
             name = :terrarium, dims = TerrariumVars(),
             namespace = :land, desc = "Terrarium land state",
         ),
-        PrognosticVariable(
-            name = :soil_temperature, dims = Land3D(),
+        SpeedyWeather.PrognosticVariable(
+            name = :soil_temperature, dims = SpeedyWeather.Land3D(),
             units = "K", desc = "Soil temperature mirrored from Terrarium",
             namespace = :land,
         ),
     )
 end
 
-function initialize!(
+function SpeedyWeather.initialize!(
         vars::Variables,
         land::TerrariumDryLand,
         ::PrimitiveEquation,
@@ -369,7 +359,7 @@ function initialize!(
     return nothing
 end
 
-function timestep!(
+function SpeedyWeather.timestep!(
         vars::Variables,
         land::TerrariumDryLand,
         ::PrimitiveEquation,
