@@ -7,7 +7,7 @@ using DocStringExtensions
 import SpeedyWeather: AbstractVariableDim, AbstractVariable, AbstractModel,
     AbstractLand, AbstractWetLand, SpectralGrid, LandGeometry,
     PrognosticVariable, Land3D, Variables,
-    PrimitiveEquation, get_nlayers,
+    PrimitiveEquation, get_nlayers, DEFAULT_DATE,
     variables, initialize!, timestep!, allocate
 import SpeedyWeather.RingGrids
 
@@ -25,9 +25,13 @@ struct TerrariumVars <: AbstractVariableDim end
 
 function SpeedyWeather.allocate(::AbstractVariable{TerrariumVars}, model::AbstractModel)
     land = model.land
+    # Construct a Terrarium clock with a DateTime placeholder so its time type is
+    # DateTime; the actual initial datetime is synced from the SpeedyWeather clock
+    # in `initialize!(vars, land, model)` once the user-provided `time` has been
+    # written there.
     return Terrarium.initialize(
         land.model;
-        clock = land.clock,
+        clock = Clock(time = DEFAULT_DATE),
         boundary_conditions = land.boundary_conditions,
         input_variables = land.input_variables,
         fields = land.fields,
@@ -71,7 +75,6 @@ struct TerrariumWetLand{
         LG <: LandGeometry,
         TM <: Terrarium.AbstractModel{NF},
         TS <: Terrarium.AbstractTimeStepper,
-        CK <: Clock,
         BC <: NamedTuple,
         IV <: Tuple,
         IN <: NamedTuple,
@@ -85,8 +88,6 @@ struct TerrariumWetLand{
     model::TM
     "Terrarium time stepper used inside each SpeedyWeather step"
     timestepper::TS
-    "Initial Terrarium clock"
-    clock::CK
     "Boundary conditions forwarded to `Terrarium.initialize`"
     boundary_conditions::BC
     "Additional input variables forwarded to `Terrarium.initialize`"
@@ -108,7 +109,6 @@ function TerrariumWetLand(
         spectral_grid::SpectralGrid,
         model::Terrarium.AbstractModel{NF};
         timestepper::Terrarium.AbstractTimeStepper = ForwardEuler(NF),
-        clock::Clock = Clock(time = zero(NF)),
         boundary_conditions::NamedTuple = (;),
         input_variables::Tuple = (),
         initializers::NamedTuple = (;),
@@ -121,8 +121,8 @@ function TerrariumWetLand(
     # as the bottom-most layer thickness for the SpeedyWeather LandGeometry.
     geometry = LandGeometry(1, NF[Δz_arr[end]])
     return TerrariumWetLand(
-        spectral_grid, geometry, model, timestepper, clock,
-        boundary_conditions, input_variables, initializers, fields, Float64(Δt),
+        spectral_grid, geometry, model, timestepper,
+        boundary_conditions, input_variables, initializers, fields, NF(Δt),
     )
 end
 
@@ -140,7 +140,6 @@ function TerrariumWetLand(
     return TerrariumWetLand(
         spectral_grid, integrator.model;
         timestepper = integrator.timestepper,
-        clock = integrator.clock,
         initializers = integrator.initializers,
     )
 end
@@ -176,6 +175,10 @@ function initialize!(
     )
     state = vars.prognostic.land.terrarium
     NF = eltype(vars.prognostic.land.soil_temperature)
+
+    # Sync the Terrarium clock's initial time with the SpeedyWeather clock,
+    # which was set from the `time` kwarg of `initialize!(model; time=...)`.
+    state.clock.time = vars.prognostic.clock.time
 
     # initialize the "ModelIntegrator"
     integrator = ModelIntegrator(
@@ -269,7 +272,6 @@ struct TerrariumDryLand{
         LG <: LandGeometry,
         TM <: Terrarium.AbstractModel{NF},
         TS <: Terrarium.AbstractTimeStepper,
-        CK <: Clock,
         BC <: NamedTuple,
         IV <: Tuple,
         IN <: NamedTuple,
@@ -283,8 +285,6 @@ struct TerrariumDryLand{
     model::TM
     "Terrarium time stepper used inside each SpeedyWeather step"
     timestepper::TS
-    "Initial Terrarium clock"
-    clock::CK
     "Boundary conditions forwarded to `Terrarium.initialize`"
     boundary_conditions::BC
     "Additional input variables forwarded to `Terrarium.initialize`"
@@ -305,7 +305,6 @@ function TerrariumDryLand(
         spectral_grid::SpectralGrid,
         model::Terrarium.AbstractModel{NF};
         timestepper::Terrarium.AbstractTimeStepper = ForwardEuler(NF),
-        clock::Clock = Clock(time = zero(NF)),
         boundary_conditions::NamedTuple = (;),
         input_variables::Tuple = (),
         initializers::NamedTuple = (;),
@@ -316,7 +315,7 @@ function TerrariumDryLand(
     Δz_arr = Terrarium.on_architecture(Terrarium.CPU(), field_grid.z.Δᵃᵃᶜ)
     geometry = LandGeometry(1, NF[Δz_arr[end]])
     return TerrariumDryLand(
-        spectral_grid, geometry, model, timestepper, clock,
+        spectral_grid, geometry, model, timestepper,
         boundary_conditions, input_variables, initializers, fields, NF(Δt),
     )
 end
@@ -335,7 +334,6 @@ function TerrariumDryLand(
     return TerrariumDryLand(
         spectral_grid, integrator.model;
         timestepper = integrator.timestepper,
-        clock = integrator.clock,
         initializers = integrator.initializers,
     )
 end
@@ -362,6 +360,11 @@ function initialize!(
     )
     state = vars.prognostic.land.terrarium
     NF = eltype(vars.prognostic.land.soil_temperature)
+
+    # Sync the Terrarium clock's initial time with the SpeedyWeather clock,
+    # which was set from the `time` kwarg of `initialize!(model; time=...)`.
+    state.clock.time = vars.prognostic.clock.time
+
     vars.prognostic.land.soil_temperature .= interior(state.temperature)[:, 1, end] .+ NF(273.15)
     return nothing
 end
