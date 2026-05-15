@@ -636,38 +636,34 @@ function initialize!(
     temp_grid = similar(vars.prognostic.temperature[:, :, 2], grid, NF)
     aΩ = radius * rotation
 
-    _jablonowski_temperature_broadcast!(temp_grid, Tη, φ, σ_levels_full,
-            η₀, u₀, R_dry, aΩ)
+    launch!(architecture(temp_grid), RingGridWorkOrder, size(temp_grid),
+        _jablonowski_temperature_kernel!, temp_grid, Tη, φ, σ_levels_full, η₀, u₀, R_dry, aΩ)
 
     set!(vars, model; temperature = temp_grid, lf = 1)
 
     return nothing
 end
 
-function _jablonowski_temperature_broadcast!(temp_grid, Tη, φ, σ_levels_full,
-        η₀, u₀, R_dry, aΩ)
+@kernel inbounds = true function _jablonowski_temperature_kernel!(
+        temp_grid, Tη, φ, σ_levels_full, η₀, u₀, R_dry, aΩ
+    )
+    ij, k = @index(Global, NTuple)
     NF = eltype(temp_grid)
 
-    # reshape for broadcasting: φ is (npoints,), σ/Tη are (nlayers,)
-    η_row = reshape(σ_levels_full, 1, :)    # (1, nlayers), Jablonowski uses η for σ
-    Tη_row = reshape(Tη, 1, :)              # (1, nlayers)
+    η = σ_levels_full[k]
+    ηᵥ = (η - η₀) * NF(π) / 2
 
-    ηᵥ = (η_row .- η₀) .* NF(π) ./ 2
+    A1 = 3 // 4 * η * NF(π) * u₀ / R_dry * sin(ηᵥ) * sqrt(cos(ηᵥ))
+    A2 = 2 * u₀ * cos(ηᵥ)^(3 // 2)
 
-    # Amplitudes with height
-    A1 = 3 // 4 .* η_row .* NF(π) .* u₀ ./ R_dry .* sin.(ηᵥ) .* sqrt.(cos.(ηᵥ))
-    A2 = 2u₀ .* cos.(ηᵥ) .^ (3 // 2)
+    sinφ = sind(φ[ij])
+    cosφ = cosd(φ[ij])
 
-    # Latitude arrays for broadcasting: (npoints,) broadcasts against (1, nlayers)
-    sinφ = sind.(φ)
-    cosφ = cosd.(φ)
-
-    # Jablonowski and Williamson, eq. (6) — broadcast over (npoints, nlayers)
-    temp_grid.data .= Tη_row .+ A1 .* (
-        (-2 .* sinφ .^ 6 .* (cosφ .^ 2 .+ 1 // 3) .+ 10 // 63) .* A2 .+
-            (8 // 5 .* cosφ .^ 3 .* (sinφ .^ 2 .+ 2 // 3) .- convert(NF, π) * 1 // 4) .* aΩ
+    # Jablonowski and Williamson, eq. (6)
+    temp_grid[ij, k] = Tη[k] + A1 * (
+        (-2 * sinφ^6 * (cosφ^2 + 1 // 3) + 10 // 63) * A2 +
+            (8 // 5 * cosφ^3 * (sinφ^2 + 2 // 3) - NF(π) / 4) * aΩ
     )
-    return nothing
 end
 
 export StartFromFile
