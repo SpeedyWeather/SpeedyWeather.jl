@@ -213,7 +213,7 @@ function allocate(group, model)
 
     # variables without namespace identified by empty symbol Symbol() go directly into the main NamedTuple
     # that way we have variables.prognostic.vorticity skipping the namespace between prognostic and vor
-    nt1 = NamedTuple{Tuple(map(v -> v.name, group[Symbol()]))}(Tuple(map(var -> zero(var, model), group[Symbol()])))
+    nt1 = NamedTuple{Tuple(map(v -> v.name, group[Symbol()]))}(Tuple(map(var -> allocate(var, model), group[Symbol()])))
 
     # other variables grouped by namespace
     # e.g. variables.prognostic.ocean.sea_surface_temperature, variables.prognostic.land.soil_moisture, etc.
@@ -221,7 +221,7 @@ function allocate(group, model)
         Tuple(
             map(
                 ns ->
-                NamedTuple{Tuple(map(v -> v.name, group[ns]))}(Tuple(map(var -> zero(var, model), group[ns])))
+                NamedTuple{Tuple(map(v -> v.name, group[ns]))}(Tuple(map(var -> allocate(var, model), group[ns])))
                 , namespaces
             )
         )

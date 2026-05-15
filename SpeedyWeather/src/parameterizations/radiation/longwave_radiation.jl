@@ -157,7 +157,7 @@ end
 
 export OneBandLongwave
 """One-band longwave radiation scheme with transmissivity and radiative transfer components.
-Following Frierson, 2006, JAS, https://doi.org/10.1175/JAS3706.1. Fields are $(TYPEDFIELDS)"""
+Following Frierson, 2006, JAS, https://doi.org/10.1175/JAS3753.1. Fields are $(TYPEDFIELDS)"""
 @parameterized @kwdef struct OneBandLongwave{T, R} <: AbstractLongwave
     @component transmissivity::T
     @component radiative_transfer::R
