@@ -86,10 +86,11 @@ function initialize!(
     # raise a warning if starting with leapfrog but there's zero vorticity
     vor = get_step(progn.vorticity, lf)
 
-    @trace if lf == 2 && all(vor .== 0)
-        @warn "Vorticity is zero on 2nd leapfrog index though you use it to calculate tendencies." *
-            " You may wanted to continue with a leapfrog step without data for it in the 2nd step."
-    end
+    # TODO: turn on again
+    #if lf == 2 && all(vor .== 0)
+    #    @warn "Vorticity is zero on 2nd leapfrog index though you use it to calculate tendencies." *
+    #        " You may wanted to continue with a leapfrog step without data for it in the 2nd step."
+    #end
 
     # transform variables from spectral to grid (= set the diagnostic variables in the correct initial state)
     transform!(variables, lf, model, initialize = true)
