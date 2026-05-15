@@ -1534,14 +1534,26 @@ This is the highest-value next test. Cheap to set up — one script edit.
 **Goal**: directly measure the CPU vs Reactant divergence of one spherical
 harmonic transform with bit-identical Float32 spectral input.
 
+**Quick pre-check** (cheap, do FIRST): compare the precomputed matrices
+themselves between CPU and Reactant `MatrixSpectralTransform`. If
+`M_c.forward`, `M_c.backward_real`, `M_c.backward_imag` (see
+`SpeedyTransforms/src/matrix_transform.jl`) don't bit-match their
+Reactant counterparts, transforms CANNOT be bit-identical even with
+identical inputs — the bug is at construction time, not in the
+`mul!` call. If the matrices DO bit-match, divergence (if any) is
+purely from how `LinearAlgebra.mul!` is lowered under XLA.
+
 **Method**: minimal script (no time stepping):
-1. Build CPU and Reactant `SpectralTransform`s with same grid.
-2. Allocate a `LowerTriangularArray{ComplexF32}` (spectrum, nlayers).
-3. Fill with deterministic data (e.g., `rand(MersenneTwister(42), ComplexF32, …)`).
-4. `copy!` the spectral data CPU→Reactant.
-5. `transform!(grid_c, spec_c, transform_c)` on CPU.
-6. `transform!(grid_r, spec_r, transform_r)` under `@compile`.
-7. Compare grid outputs ulp-wise.
+1. Build CPU and Reactant `MatrixSpectralTransform`s with same grid.
+2. **First check the matrices**:
+   `maximum(abs.(Array(M_r.forward) .- M_c.forward))` and same for
+   `backward_real`, `backward_imag`.
+3. Allocate a `LowerTriangularArray{ComplexF32}` (spectrum, nlayers).
+4. Fill with deterministic data (e.g., `rand(MersenneTwister(42), ComplexF32, …)`).
+5. `copy!` the spectral data CPU→Reactant.
+6. `transform!(grid_c, spec_c, transform_c)` on CPU.
+7. `transform!(grid_r, spec_r, transform_r)` under `@compile`.
+8. Compare grid outputs ulp-wise.
 
 **Interpretation**:
 - If max\|Δ\| ≈ 1 ulp Float32 (3e-7 relative): transforms are bit-clean and
@@ -1610,3 +1622,176 @@ Investigation paused. The actionable next step is **Test A** (step-1 with
 UniformCooling and disabled-LW). Cheapest, most diagnostic, and answers the
 "is Frierson the per-step seed or just the amplifier?" question that's
 currently blocking direction.
+
+## Session 6 — Tests A, B, C executed (2026-05-15)
+
+All three planned tests run. Strong, unambiguous results.
+
+### Test A — Step-1 across longwave schemes
+
+Script: `debug_drift_step1_variant.jl <variant>`. Same setup as
+`debug_drift_step1.jl` but takes `frierson | constant | transparent |
+uniformcooling | disabled` as CLI arg.
+
+| Variant | step-1 T_max (K) | step-10 T_max (K) | amplification |
+|---|---|---|---|
+| frierson | 0.386 | 5.526 | **14×** over 9 steps (≈ 1.34×/step) |
+| uniformcooling | 0.454 | 0.460 | **~1×** (no growth) |
+| disabled | 0.505 | 0.474 | **~1×** (slight damping) |
+
+`u_max_diff` at step 1 is ~0.081 m/s for ALL three variants — completely
+independent of longwave scheme, so the non-T variables get their per-step
+seed entirely from upstream.
+
+#### Interpretation — walks back the walk-back
+
+The Session 5 walk-back was wrong. The original Session 5 framing — "seed
+from upstream, Frierson amplifies" — is right after all.
+
+- All three variants produce ~0.4–0.5 K T-diff at step 1 — **this is the seed,
+  generated per step regardless of longwave scheme**.
+- Frierson grows the seed 14× over 10 steps; the others saturate near the
+  step-1 floor.
+- The 12× scheme gap at step 10 is purely amplification, NOT a Frierson-specific
+  per-call divergence.
+- Float64 in longwave (Session 4) failed because the amplifier is physical,
+  not numerical — Float64 doesn't change the operator norm.
+
+### Test B — Isolated transform!
+
+Script: `debug_transform_isolated.jl`. Two-phase:
+
+**Phase 1** — compare precomputed `M.forward`, `M.backward_real`,
+`M.backward_imag` matrices between CPU and Reactant `MatrixSpectralTransform`:
+
+| Matrix | max\|Δ\| |
+|---|---|
+| forward (ComplexF32, 560×3168) | **0.0** |
+| backward_real (Float32, 3168×560) | **0.0** |
+| backward_imag (Float32, 3168×560) | **0.0** |
+
+**Phase 2** — feed bit-identical Float32 spectral input through `transform!`
+on both architectures:
+
+| Output | max\|Δ\| | rel |
+|---|---|---|
+| grid (all 8 layers) | **0.0** | **0.0** (0 ulp) |
+
+**Conclusion**: **TRANSFORMS ARE BIT-IDENTICAL.** Both the precomputed matrices
+AND the live `transform!` operation produce zero divergence between CPU and
+Reactant. Transforms are conclusively ruled out as the seed.
+
+### Test C — copy! round-trip probe
+
+Script: `debug_copy_roundtrip.jl`. Probes at each stage of the resync ritual:
+
+| Stage | T diff (K) | Other vars |
+|---|---|---|
+| pre_copy (CPU spin-up, R fresh) | 322 | huge — sanity |
+| **diff_A** (after copy! c→r) | **0.0** | **0.0** all vars |
+| diff_B (after @compile) | 0.40 | matches one-step advance |
+| **diff_C** (after copy! r→c) | **0.0** | **0.0** all vars |
+| **diff_D** (after initialize!(steps)) | **5.8e-4** | h=1 ulp, u=3.8e-6, v=1 ulp |
+
+**Three findings:**
+
+1. **`copy!` is bit-perfect in both directions** — copies grid vars too, no
+   recomputation, no Float32 cast loss.
+2. **`@compile` advances sim_r by ~1 step** via traced execution. This is
+   normal Reactant behavior. Hence the resync ritual after compile is
+   functionally necessary; the post-compile `copy!(c←r)` brings CPU up to
+   match Reactant's advanced state.
+3. **`initialize!(sim; steps=NSTEPS)` introduces a 5.8e-4 K asymmetric diff**:
+   only T shows it significantly (humidity / v / u all at sub-ulp to few-ulp
+   Float32). Points to a specific operation inside `initialize!` that touches
+   temperature differently — possibly a thermodynamic precompute (virtual T,
+   log T, geopotential init) or a clock-related compute path that runs
+   architecture-locally.
+
+### Combined picture
+
+After Tests A, B, C the seed is **conclusively localized**:
+
+- ❌ NOT transforms (Test B bit-identical)
+- ❌ NOT `copy!` (Test C diff_A = 0)
+- ❌ NOT a single longwave scheme (Test A: ~0.5 K with ALL schemes)
+- ✓ Per-step ~0.4 K T-divergence generated within ONE time step's
+  parameterization + dynamics-infrastructure pipeline
+- ✓ Frierson amplifies that seed 14× over 10 steps via layer-varying-t
+  cross-coupling (Test A confirms)
+- ✓ A separate, smaller 5.8e-4 K T-only diff is introduced by
+  `initialize!(sim; steps)` — asymmetric pattern suggests a specific
+  thermodynamic precompute
+
+### Next steps (continue here)
+
+#### Investigate `initialize!(sim; steps)` asymmetric T diff
+**Why temperature only?** Read `SpeedyWeather/src/models/simulation.jl` for
+the `initialize!(sim; steps)` method. Find any operation that:
+- writes to `grid.temperature` specifically (not other grid vars)
+- could differ CPU vs Reactant (e.g., uses `Float32` constants in a way that
+  XLA lowers differently, or calls a parameterization-init that runs on
+  device).
+Candidates: virtual temperature precompute, geopotential calculation, soil
+temperature spin-up coupling.
+
+This 5.8e-4 K is small compared to the 0.4 K/step generation, but it's an
+easy fix and a clean sub-problem.
+
+#### Bisect parameterizations for the 0.4 K/step seed
+Currently active parameterizations with longwave disabled:
+- solar_zenith
+- albedo
+- shortwave_radiation
+- boundary_layer_drag
+- surface_condition
+- surface_momentum_flux
+- surface_heat_flux
+- surface_humidity_flux
+- vertical_diffusion
+- large_scale_condensation
+
+Some of these had session-2 bisect issues (lsc, surface_heat_flux crashed when
+disabled). Strategy:
+1. Try disabling shortwave alone in `debug_drift_step1_variant.jl` (new
+   variant). If step-1 drops dramatically → shortwave is the dominant seed.
+2. If shortwave is innocent, examine surface flux family (heat, humidity,
+   momentum) — they all run at k=8 surface where the diff concentrates.
+3. The `ifelse` element-type warning from Reactant is a known issue in
+   surface fluxes (session 2). Worth reviewing those `ifelse` sites in
+   `surface_fluxes/{heat,humidity,momentum}.jl` for elem-type fixes that
+   might have been missed.
+
+Note: even bit-clean parameterization kernels can produce different output
+under XLA when FUSED into `column_parameterizations_kernel!`. The fused
+context allows XLA to reorder ops across previously-isolated boundaries.
+If bisect fails to find a clean source, try the per-launch (unfused)
+variant from "Test (4)" of the original plan.
+
+#### HLO inspection (still untried)
+`Reactant.@code_hlo first_timesteps!(sim)` to see what XLA emits for the
+fused column kernel. With transforms confirmed bit-identical, the HLO diff
+between schemes (Frierson vs uniformcooling) would localize the divergence
+within parameterizations.
+
+### Files (session 6)
+- `debug_drift_step1_variant.jl` — step-1 with longwave-scheme CLI arg. Kept.
+- `debug_transform_isolated.jl` — Phase-1 matrix + Phase-2 live transform
+  test. Kept.
+- `debug_copy_roundtrip.jl` — staged probe of copy!/compile/initialize!
+  ritual. Kept.
+
+### Updated key numbers
+| Run | T_max_diff (K) | Notes |
+|---|---|---|
+| copy! c→r | 0.0 | bit-perfect |
+| copy! r→c | 0.0 | bit-perfect |
+| transform! (isolated, 8 layers) | 0.0 | bit-identical |
+| MatrixSpectralTransform matrices | 0.0 | bit-identical |
+| initialize!(sim; steps) introduces | 5.8e-4 | T-only, asymmetric |
+| step 1 frierson | 0.386 | per-step seed dominated by upstream |
+| step 1 uniformcooling | 0.454 | same upstream seed, no LW amplification |
+| step 1 disabled | 0.505 | same upstream seed, no LW at all |
+| step 10 frierson | 5.526 | 14× amplification |
+| step 10 uniformcooling | 0.460 | no amplification |
+| step 10 disabled | 0.474 | no amplification |
