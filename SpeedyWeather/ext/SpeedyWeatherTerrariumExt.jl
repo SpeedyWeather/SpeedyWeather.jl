@@ -16,7 +16,7 @@ import Terrarium: Clock, ColumnRingGrid, ForwardEuler, InputSources,
 
 """$(TYPEDEF)
 
-Variable dimension for the full Terrarium land state. `Base.zero` for an
+Variable dimension for the full Terrarium land state. `allocate` for an
 `AbstractVariable{TerrariumVars}` calls `Terrarium.initialize` on `model.land`
 so that the entire Terrarium state lives inside SpeedyWeather's `Variables`
 container at `vars.prognostic.land.terrarium`. The `model.land` must therefore
@@ -26,11 +26,11 @@ struct TerrariumVars <: AbstractVariableDim end
 function SpeedyWeather.allocate(::AbstractVariable{TerrariumVars}, model::AbstractModel)
     land = model.land
     return Terrarium.initialize(
-        terrarium_model(land);
-        clock = terrarium_clock(land),
-        boundary_conditions = terrarium_boundary_conditions(land),
-        input_variables = terrarium_input_variables(land),
-        fields = terrarium_fields(land),
+        land.model;
+        clock = land.clock,
+        boundary_conditions = land.boundary_conditions,
+        input_variables = land.input_variables,
+        fields = land.fields,
     )
 end
 
@@ -50,49 +50,13 @@ on this abstract type:
   freshly-allocated state and seeds the soil mirrors.
 * [`timestep!`](@ref) pushes SpeedyWeather atmospheric forcings into the
   Terrarium inputs, runs the Terrarium integrator for the duration of the
-  SpeedyWeather step using `terrarium_substep(land)` as the sub-step, and
+  SpeedyWeather step using `land.Δt` as the sub-step, and
   copies soil temperatures, moisture and surface fluxes back into the
   SpeedyWeather variables.
-
-Subtypes are expected to expose the following accessors (default
-implementations forward to fields of the same name on `land`):
-
-* [`terrarium_model`](@ref)`(land)` → `Terrarium.AbstractModel`
-* [`terrarium_timestepper`](@ref)`(land)`
-* [`terrarium_clock`](@ref)`(land)` → `Terrarium.Clock`
-* [`terrarium_boundary_conditions`](@ref)`(land)` → `NamedTuple`
-* [`terrarium_input_variables`](@ref)`(land)` → `Tuple`
-* [`terrarium_initializers`](@ref)`(land)` → `NamedTuple`
-* [`terrarium_fields`](@ref)`(land)` → `NamedTuple`
-* [`terrarium_substep`](@ref)`(land)` → seconds (`Real`)
 """
 abstract type AbstractTerrariumLandModel <: AbstractLand end
 
 @inline get_nlayers(land::AbstractTerrariumLandModel) = land.geometry.nlayers
-
-"""$(TYPEDSIGNATURES) Return the underlying Terrarium `AbstractModel`."""
-terrarium_model(land::AbstractTerrariumLandModel) = land.model
-
-"""$(TYPEDSIGNATURES) Return the Terrarium time stepper."""
-terrarium_timestepper(land::AbstractTerrariumLandModel) = land.timestepper
-
-"""$(TYPEDSIGNATURES) Return the Terrarium [`Clock`](@ref Terrarium.Clock)."""
-terrarium_clock(land::AbstractTerrariumLandModel) = land.clock
-
-"""$(TYPEDSIGNATURES) Return the Terrarium boundary conditions `NamedTuple`."""
-terrarium_boundary_conditions(land::AbstractTerrariumLandModel) = land.boundary_conditions
-
-"""$(TYPEDSIGNATURES) Return the tuple of additional Terrarium input variables."""
-terrarium_input_variables(land::AbstractTerrariumLandModel) = land.input_variables
-
-"""$(TYPEDSIGNATURES) Return the Terrarium field initializers `NamedTuple`."""
-terrarium_initializers(land::AbstractTerrariumLandModel) = land.initializers
-
-"""$(TYPEDSIGNATURES) Return the preconstructed Terrarium fields `NamedTuple`."""
-terrarium_fields(land::AbstractTerrariumLandModel) = land.fields
-
-"""$(TYPEDSIGNATURES) Return the Terrarium-internal sub-step in seconds."""
-terrarium_substep(land::AbstractTerrariumLandModel) = land.Δt
 
 """$(TYPEDEF)
 
@@ -213,10 +177,10 @@ function initialize!(
     state = vars.prognostic.land.terrarium
     NF = eltype(vars.prognostic.land.soil_temperature)
 
-    # initialize the "ModelIntegrator" 
+    # initialize the "ModelIntegrator"
     integrator = ModelIntegrator(
-        state.clock, terrarium_model(land), InputSources(),
-        state, terrarium_initializers(land), terrarium_timestepper(land),
+        state.clock, land.model, InputSources(),
+        state, land.initializers, land.timestepper,
     )
     Terrarium.initialize!(integrator)
 
@@ -233,7 +197,7 @@ function timestep!(
         ::PrimitiveEquation,
     )
     state = vars.prognostic.land.terrarium
-    tmodel = terrarium_model(land)
+    tmodel = land.model
     consts = tmodel.constants
     NF = eltype(state)
 
@@ -266,9 +230,9 @@ function timestep!(
     # update_inputs! to overwrite those values during the substeps.
     integrator = ModelIntegrator(
         state.clock, tmodel, InputSources(),
-        state, terrarium_initializers(land), terrarium_timestepper(land),
+        state, land.initializers, land.timestepper,
     )
-    Terrarium.run!(integrator; period = vars.prognostic.clock.Δt, Δt = terrarium_substep(land))
+    Terrarium.run!(integrator; period = vars.prognostic.clock.Δt, Δt = land.Δt)
 
     # Push Terrarium output back into SpeedyWeather coupling variables.
     # The Terrarium state itself is mutated in place above and remains in
@@ -408,7 +372,7 @@ function timestep!(
         ::PrimitiveEquation,
     )
     state = vars.prognostic.land.terrarium
-    tmodel = terrarium_model(land)
+    tmodel = land.model
     NF = eltype(state)
 
     # Only air temperature is needed; convert K -> °C
@@ -421,9 +385,9 @@ function timestep!(
     # InputSources() so SpeedyWeather owns the input-update cycle.
     integrator = ModelIntegrator(
         state.clock, tmodel, InputSources(),
-        state, terrarium_initializers(land), terrarium_timestepper(land),
+        state, land.initializers, land.timestepper,
     )
-    Terrarium.run!(integrator; period = vars.prognostic.clock.Δt, Δt = terrarium_substep(land))
+    Terrarium.run!(integrator; period = vars.prognostic.clock.Δt, Δt = land.Δt)
 
     # Surface soil temperature from the bottom of the column (last z-index)
     vars.prognostic.land.soil_temperature .= interior(state.temperature)[:, 1, end] .+ NF(273.15)
