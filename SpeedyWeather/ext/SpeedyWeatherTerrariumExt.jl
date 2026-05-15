@@ -206,16 +206,16 @@ function SpeedyWeather.timestep!(
 
     # Push forcings into Terrarium inputs (set! avoids allocating new fields)
     inputs = state.inputs
-    set!(inputs.air_temperature, Tair)
-    set!(inputs.air_temperature, inputs.air_temperature - NF(273.15))   # K -> °C
-    set!(inputs.air_pressure, pres)
-    set!(inputs.air_pressure, exp(inputs.air_pressure))                  # log(Pa) -> Pa
-    set!(inputs.specific_humidity, humid)
-    set!(inputs.rainfall, rain)
-    set!(inputs.snowfall, snow)
-    set!(inputs.windspeed, wind)
-    set!(inputs.surface_shortwave_down, Rsd)
-    set!(inputs.surface_longwave_down, Rld)
+    Terrarium.set!(inputs.air_temperature, Tair)
+    Terrarium.set!(inputs.air_temperature, inputs.air_temperature - NF(273.15))   # K -> °C
+    Terrarium.set!(inputs.air_pressure, pres)
+    Terrarium.set!(inputs.air_pressure, exp(inputs.air_pressure))                  # log(Pa) -> Pa
+    Terrarium.set!(inputs.specific_humidity, humid)
+    Terrarium.set!(inputs.rainfall, rain)
+    Terrarium.set!(inputs.snowfall, snow)
+    Terrarium.set!(inputs.windspeed, wind)
+    Terrarium.set!(inputs.surface_shortwave_down, Rsd)
+    Terrarium.set!(inputs.surface_longwave_down, Rld)
 
     # Constructing ModelIntegrator is allocation-free: it is an immutable struct
     # of references so no data is copied.  InputSources() is empty intentionally:
@@ -371,8 +371,8 @@ function SpeedyWeather.timestep!(
     # Only air temperature is needed; convert K -> °C
     Tair = @view vars.grid.temperature[:, end]
     inputs = state.inputs
-    set!(inputs.air_temperature, Tair)
-    set!(inputs.air_temperature, inputs.air_temperature - NF(273.15))
+    Terrarium.set!(inputs.air_temperature, Tair)
+    Terrarium.set!(inputs.air_temperature, inputs.air_temperature - NF(273.15))
 
     # Same reasoning as in TerrariumWetLand.timestep!: free to construct, empty
     # InputSources() so SpeedyWeather owns the input-update cycle.
