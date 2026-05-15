@@ -1,6 +1,23 @@
 # Changelog
 
-## Unreleased 
+## Unreleased
+
+- Fixed several typos in the documentation [#1094](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1094)
+- Fixed a wrong reference in the documentation [#1092](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1092)
+- Variable system: rename function that allocates new variables from `Base.zero` to `allocate` [#1087](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1087)
+
+## v0.20.1
+
+- Implement CO2 and greenhouse gases [#993](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/993)
+- `ZarrOutput` for writing simulation output to a Zarr store, implemented as a Zarr.jl extension [#1076](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1076)
+- Add non-unicode function name aliases laplace, inverse_laplace, gradient [#1078](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1078)
+
+## v0.20.0
+
+- [BREAKING] `output_dt` renamed to `interval` [#1075](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1075)
+- `set!(output, model; interval)` to change output frequency after model initialization [#1075](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1075)
+- Documentation hero page and docs rendering [#1071](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1071) [#1072](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1072)
+- Bump julia-actions/cache and setup-julia v2 to v3 [#1073](ttps://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1073)
 
 - NCycleLorenz time stepping [#1035](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1035) [#937](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/937)
 
@@ -68,7 +85,7 @@
 - Particle advection GPU ready [#897](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/897)
 - Enzyme compat relaxed as Enzyme bug was fixed and uv_from_vordiv! kernel version used on CPU as well [#971](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/971)
 - GitHub Actions: Cache updated [#945](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/945)
-- The number of soil layers is now solely defined by the land model and not in the `SpectralGrid` anymore [#898](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/898)   
+- The number of soil layers is now solely defined by the land model and not in the `SpectralGrid` anymore [#898](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/898)
 - Revised GPU benchmarks to include full GPU models [#946](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/946) and the dynamical core [#967](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/967)
 - Label-based modular skip CI mechanism for github and buildkite [#957](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/957)
 - Monorepo structure and separate tests [#957](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/957)
@@ -156,7 +173,7 @@
 - Move radius to model.planet [#838](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/838)
 - Soil moisture initial conditions [#830](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/830)
 - Diagnose snow fall from large-scale condensation [#817](https://github.dev/SpeedyWeather/SpeedyWeather.jl/pull/817)
-- Fix output_dt for JLD2Output [#829](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/829)
+- Fix interval for JLD2Output [#829](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/829)
 - Fix some missing scratch memory usage in the transforms [#828](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/828)
 - GitHub actions checkout v5 [#826](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/826)
 - Compatibility for JLD2 v0.6 [#825](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/825)

@@ -6,7 +6,7 @@ abstract type AbstractOutputVariable <: AbstractModelComponent end
 
 """Shared runtime state for output writers: derived file paths, output frequency,
 and step/output counters. Embed as `core::OutputWriterCore` in every output writer.
-Option fields (path, id, overwrite, output_dt, …) stay as flat fields on the writer itself.
+Option fields (path, id, overwrite, interval, …) stay as flat fields on the writer itself.
 
 Call `initialize!(core, output, model)` inside the writer's `initialize!` method to
 populate all derived fields from the writer's option fields and the model time step.
@@ -66,10 +66,10 @@ function initialize!(
         create_run_folder!(output)
     end
 
-    # OUTPUT FREQUENCY, recalculate output_dt after rounding
-    f = round(Int, Millisecond(output.output_dt).value / model.time_stepping.Δt_millisec.value)
+    # OUTPUT FREQUENCY, recalculate interval after rounding
+    f = round(Int, Millisecond(output.interval).value / model.time_stepping.Δt_millisec.value)
     core.output_every_n_steps = max(1, f)
-    output.output_dt = Second(round(Int, core.output_every_n_steps * model.time_stepping.Δt_sec))
+    output.interval = Second(round(Int, core.output_every_n_steps * model.time_stepping.Δt_sec))
 
     # RESET COUNTER
     core.output_counter = 0
@@ -90,4 +90,23 @@ function output!(core::OutputWriterCore, output::AbstractOutput, clock::Clock)
         output.active &&                # output must be active
         clock.time_step_counter > 0 &&  # don't store initial conditions again (leapfrog has spin up step that doesn't count)
         clock.time_step_counter % core.output_every_n_steps == 0    # and multiple of output frequency
+end
+
+"""$(TYPEDSIGNATURES)
+Reset the output frequency `interval` of `output` and re-initialize its `OutputWriterCore`
+so that the output frequency is recomputed from the model time step. If the requested 
+`interval` is not an integer multiple of the model time step, it is rounded to
+the nearest multiple."""
+function set!(output::AbstractOutput, model::AbstractModel; interval::Period)
+    Δt_ms = model.time_stepping.Δt_millisec.value
+    interval_ms = Millisecond(interval).value
+    n = max(1, round(Int, interval_ms / Δt_ms))
+    rounded_ms = n * Δt_ms
+    if rounded_ms != interval_ms
+        @info "interval = $(interval_ms)ms is not a multiple of the model time step " *
+            "Δt = $(Δt_ms)ms, rounding to $(rounded_ms)ms (= $(rounded_ms / 1000)s)."
+    end
+    output.interval = Second(round(Int, rounded_ms / 1000))
+    initialize!(output.core, output, model; create_folder = false)
+    return nothing
 end

@@ -73,8 +73,8 @@ function time_step!(
     (!isnothing(model.feedback) && model.feedback.nans_detected) && return nothing
     reset_tendencies!(vars, time_stepping)  # set the tendencies back to zero for accumulation
 
-    if ~model.dynamics_only                 # switch on/off all physics parameterizations
-        # calculate all parameterizations
+    if ~model.dynamics_only             # switch on/off all physics parameterizations
+        greenhouse_gases_time_step!(vars, model)
         parameterization_tendencies!(vars, model)
         ocean_timestep!(vars, model)
         sea_ice_timestep!(vars, model)

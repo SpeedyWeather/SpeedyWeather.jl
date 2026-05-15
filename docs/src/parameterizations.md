@@ -153,7 +153,7 @@ model = PrimitiveWetModel(spectral_grid, convection=my_convection)
 nothing # hide
 ```
 The following is an overview of what the parameterization fields inside the
-model are called, the are always defined in `model.parameterizations`.
+model are called, they are always defined in `model.parameterizations`.
 See also [Models](@ref), [PrimitiveDryModel](@ref) and [PrimitiveWetModel](@ref).
 
 ```@example parameterization

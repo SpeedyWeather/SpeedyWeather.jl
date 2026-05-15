@@ -8,7 +8,7 @@ mutable struct Leapfrog{NF, S, B, MS} <: AbstractLeapfrog
     "[OPTION] Time step in minutes for T31, scale linearly to `trunc`"
     Δt_at_T31::S
 
-    "[OPTION] Adjust `Δt_at_T31` with the `output_dt` to reach `output_dt` exactly in integer time steps"
+    "[OPTION] Adjust `Δt_at_T31` with the `interval` to reach `interval` exactly in integer time steps"
     adjust_with_output::B
 
     "[OPTION] Start integration with (1) Euler step with dt/2, (2) Leapfrog step with dt"
@@ -157,7 +157,7 @@ end
 
 """$(TYPEDSIGNATURES)
 Initialize leapfrogging `L` by recalculating the time step given the output time step
-`output_dt` from `model.output`. Recalculating will slightly adjust the time step to
+`interval` from `model.output`. Recalculating will slightly adjust the time step to
 be a divisor such that an integer number of time steps matches exactly with the output
 time step."""
 function initialize!(L::Leapfrog, model::AbstractModel)

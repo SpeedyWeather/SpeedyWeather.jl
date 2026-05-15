@@ -46,7 +46,7 @@ initialize!(vars::Variables, ocean::AbstractOcean, model) =
     @warn "`$(typeof(ocean))` does not have an `initialize!(::Variables, ::$(typeof(ocean)), model)` method " *
     "to set the initial conditions for the ocean prognostic variables."
 
-export PrescribedOcean 
+export PrescribedOcean
 
 """
 Prescribed ocean that declares the necessary allocations for the sea surface temperature,

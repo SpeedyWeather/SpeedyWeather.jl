@@ -201,6 +201,11 @@ field = rand(Float32, spectral_grid.grid)
 - Every new method that is implemented has to be tested in the unit tests of its respective submodule
 - Keep the unit tests short and concise, they should finish quickly
 - Call the test with the `--check-bounds=yes` flag activated
+- Test files in `test/<subdir>/` are auto-discovered by `find_tests`; just drop a new `.jl` file
+  there. For features implemented in **extensions** (`ext/SpeedyWeather*Ext.jl`), tests still
+  live in the main package's `test/` tree — add the optional dependency to `test/Project.toml`
+  and `using` it at the top of the test file. Do not consider a feature complete until its
+  unit tests have been added and run successfully.
 
 ```bash
 # Main model tests

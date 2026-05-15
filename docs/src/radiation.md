@@ -345,6 +345,40 @@ nothing # hide
 
 ![No stratocumulus clouds](oneband_no_stratocumulus.png)
 
+## Greenhouse gases
+
+Greenhouse gas concentrations can be prescribed as time-varying scalar quantities and are
+tracked as prognostic variables. For example, an `ExponentialCO2`
+concentration is fitted to the Keeling curve. To customise or add greenhouse gases, pass a
+`NamedTuple` of gas objects to `greenhouse_gases`. The key of the named tuple will be used for the variable name, so `co2 = ..., carbon_dioxide = ...` can co-exist.
+
+```@example radiation
+spectral_grid = SpectralGrid(trunc=31, nlayers=8)
+
+# constant CO2 at 420 ppm
+model = PrimitiveWetModel(spectral_grid; greenhouse_gases = (; co2 = CO2(spectral_grid, 420)))
+simulation = initialize!(model)
+simulation.variables.prognostic.greenhouse_gases.co2[]
+```
+
+A CO2 concentration that increases exponentially over time:
+
+```@example radiation
+co2 = ExponentialCO2(spectral_grid)
+```
+
+Step-change scenarios are also available: `TwoTimesCO2` and `FourTimesCO2` double or
+quadruple the preindustrial CO2 at a given date (default: year 2000). Any callable
+`f(t::DateTime) -> concentration_in_ppm` can be wrapped in `CO2(f)` for a fully
+custom trajectory.
+
+!!! warning "Radiation schemes not yet CO2-aware"
+    The greenhouse gas concentrations are tracked as prognostic variables and evolve
+    correctly in time, but the radiation schemes (`OneBandLongwave`
+    etc.) have not yet been updated to use them. Changing CO2 therefore has no effect
+    on the radiative fluxes or temperature tendencies at this stage. This is work in
+    progress.
+
 ## References
 
 [^PG06]: Paulius and Garner, 2006. JAS. DOI:[10.1175/JAS3705.1](https://doi.org/10.1175/JAS3705.1)

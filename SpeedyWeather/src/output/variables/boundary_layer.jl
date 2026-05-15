@@ -38,7 +38,7 @@ path(::MeridionalVelocity10mOutput, simulation) = simulation.variables.grid.v
     z_bottom = z_surf + T_bottom * Δp_geopot_bottom / g
 """
 function output!(
-        output::NetCDFOutput,
+        output::AbstractOutput,
         variable::Union{ZonalVelocity10mOutput, MeridionalVelocity10mOutput},
         simulation::AbstractSimulation,
     )
@@ -74,9 +74,7 @@ function output!(
         round!(u_or_v10_output, variable.keepbits)
     end
 
-    i = output.output_counter               # output time step i to write
-    indices = get_indices(i, variable)      # returns (:, :, i) for example, depending on dims
-    output.netcdf_file[variable.name][indices...] = u_or_v10_output     # actually write to file
+    write_array!(output, variable, u_or_v10_output)
     return nothing
 end
 
@@ -98,7 +96,7 @@ end
 path(::SurfaceTemperatureOutput, simulation) = simulation.variables.grid.temperature
 
 function output!(
-        output::NetCDFOutput,
+        output::AbstractOutput,
         variable::SurfaceTemperatureOutput,
         simulation::AbstractSimulation,
     )
@@ -130,9 +128,7 @@ function output!(
         round!(Ts_output, variable.keepbits)
     end
 
-    i = output.output_counter               # output time step i to write
-    indices = get_indices(i, variable)      # returns (:, :, i) for example, depending on dims
-    output.netcdf_file[variable.name][indices...] = Ts_output     # actually write to file
+    write_array!(output, variable, Ts_output)
     return nothing
 end
 

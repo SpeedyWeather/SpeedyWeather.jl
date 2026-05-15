@@ -210,7 +210,7 @@ function allocate(group, model)
 
     # variables without namespace identified by empty symbol Symbol() go directly into the main NamedTuple
     # that way we have variables.prognostic.vorticity skipping the namespace between prognostic and vor
-    nt1 = NamedTuple{Tuple(map(v -> v.name, group[Symbol()]))}(Tuple(map(var -> zero(var, model), group[Symbol()])))
+    nt1 = NamedTuple{Tuple(map(v -> v.name, group[Symbol()]))}(Tuple(map(var -> allocate(var, model), group[Symbol()])))
 
     # other variables grouped by namespace
     # e.g. variables.prognostic.ocean.sea_surface_temperature, variables.prognostic.land.soil_moisture, etc.
@@ -218,7 +218,7 @@ function allocate(group, model)
         Tuple(
             map(
                 ns ->
-                NamedTuple{Tuple(map(v -> v.name, group[ns]))}(Tuple(map(var -> zero(var, model), group[ns])))
+                NamedTuple{Tuple(map(v -> v.name, group[ns]))}(Tuple(map(var -> allocate(var, model), group[ns])))
                 , namespaces
             )
         )
@@ -227,6 +227,10 @@ function allocate(group, model)
     return merge(nt1, nt2)
 end
 
+"""$(TYPEDSIGNATURES)
+When model components are named tuples themselves then check for
+variables required by the elements of the named tuple and pass those one as key-value pairs."""
+variables(nt::NamedTuple, model::AbstractModel) = (variables(pair, model) for pair in pairs(nt)) |> Iterators.flatten |> Tuple
 variables(::Nothing) = ()                                   # to allow for model.component = nothing
 variables(::Any) = ()                                       # fallback for any component
 
@@ -244,7 +248,13 @@ variables
 Fallback: component can define `variables(::Component, ::Model)` or simply `variables(::Component)`.
 In the former, `model` is available to define required variables based on other model components,
 in the latter only the component itself determines which variables are needed."""
-variables(component, model) = variables(component)
+variables(component, model::AbstractModel) = variables(component)
+
+"""$(TYPEDSIGNATURES)
+Components can define `variables(pair::Pair{<:Symbol, <:AbstractComponent}, ::Model)` when they are part of a NamedTuple of components,
+e.g. greenhouse gases. The key of the `pair` can then be used to define variables based on the name of the component.
+The fallback defined here just drops the key so that it is optional."""
+variables(name_component::Pair, model::AbstractModel) = variables(name_component.second, model)
 
 """$(TYPEDSIGNATURES)
 Extracts all variables from the model by iterating over all components and collecting their variables.

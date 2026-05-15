@@ -42,7 +42,7 @@ mutable struct NCycleLorenz{NF, V, IntType, S, MS, B} <: AbstractNCycleLorenz
     "[OPTION] Time step for T31, scale linearly with resolution"
     Δt_at_T31::S
 
-    "[OPTION] Adjust `Δt_at_T31` with the `output_dt` to reach `output_dt` exactly"
+    "[OPTION] Adjust `Δt_at_T31` with the `interval` to reach `interval` exactly"
     adjust_with_output::B
 
     "[DERIVED] Time step Δt in milliseconds at specified resolution"
