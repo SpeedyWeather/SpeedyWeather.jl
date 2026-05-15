@@ -12,7 +12,7 @@ import SpeedyWeather: AbstractVariableDim, AbstractVariable, AbstractModel,
 import SpeedyWeather.RingGrids
 
 import Terrarium: Clock, ColumnRingGrid, ForwardEuler, InputSources,
-    ModelIntegrator, interior, on_architecture, set!
+    ModelIntegrator, interior, set!
 
 """$(TYPEDEF)
 
@@ -116,7 +116,7 @@ function TerrariumWetLand(
         Δt::Real = 300,
     ) where {NF}
     field_grid = Terrarium.get_field_grid(model.grid)
-    Δz_arr = on_architecture(Terrarium.CPU(), field_grid.z.Δᵃᵃᶜ)
+    Δz_arr = Terrarium.on_architecture(Terrarium.CPU(), field_grid.z.Δᵃᵃᶜ)
     # The Oceananigans vertical spacing is an OffsetArray; take the last entry
     # as the bottom-most layer thickness for the SpeedyWeather LandGeometry.
     geometry = LandGeometry(1, NF[Δz_arr[end]])
@@ -313,7 +313,7 @@ function TerrariumDryLand(
         Δt::Real = 300,
     ) where {NF}
     field_grid = Terrarium.get_field_grid(model.grid)
-    Δz_arr = on_architecture(Terrarium.CPU(), field_grid.z.Δᵃᵃᶜ)
+    Δz_arr = Terrarium.on_architecture(Terrarium.CPU(), field_grid.z.Δᵃᵃᶜ)
     geometry = LandGeometry(1, NF[Δz_arr[end]])
     return TerrariumDryLand(
         spectral_grid, geometry, model, timestepper, clock,
