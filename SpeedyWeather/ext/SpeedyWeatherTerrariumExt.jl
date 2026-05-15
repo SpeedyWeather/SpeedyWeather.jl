@@ -157,12 +157,12 @@ function variables(::AbstractTerrariumLandModel)
         # output writers) can read them. They are kept in sync from the
         # Terrarium state inside `initialize!` and `timestep!`.
         PrognosticVariable(
-            name = :soil_temperature, dims = Land3D(),
+            name = :soil_temperature, dims = Land2D(),
             units = "K", desc = "Soil temperature mirrored from Terrarium",
             namespace = :land,
         ),
         PrognosticVariable(
-            name = :soil_moisture, dims = Land3D(),
+            name = :soil_moisture, dims = Land2D(),
             units = "1", desc = "Soil moisture (saturation fraction) mirrored from Terrarium",
             namespace = :land,
         ),
