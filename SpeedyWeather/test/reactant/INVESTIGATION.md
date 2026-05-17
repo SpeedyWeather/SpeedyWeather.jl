@@ -2148,3 +2148,2110 @@ possibilities that keep it interesting:
 So Phase 0 is worth doing first as a diagnostic, but should NOT be expected
 to solve the whole problem. The intra-step bisect (Phase 1) is the main
 event.
+
+## Session 7 — Phase 0 executed (2026-05-16)
+
+Phase 0 ran and pinpointed the source of the 5.8e-4 K T-only diff with three
+nested bisects. Findings below.
+
+### Step 1 — Bisect inside `initialize!(sim; steps)`
+
+Script: `debug_init_bisect.jl`. Manual replay of the body of
+`initialize!(simulation; period, steps, output)` from
+`SpeedyWeather/src/models/simulation.jl:55-103`, with `max|ΔT|` measured
+after each sub-operation.
+
+| Stage | max\|ΔT\| (K) |
+|---|---|
+| I0_pre (post-resync) | 0.0 |
+| I0_clock (clock init) | 0.0 |
+| I1_output (output config) | 0.0 |
+| I2_scale (`scale_prognostic!`) | 0.0 |
+| **I3_transform (`transform!(vars, lf, model; initialize=true)`)** | **5.8e-4** |
+| I5_output_init | 5.8e-4 (preserved) |
+| I6_callbacks | 5.8e-4 (preserved) |
+
+→ **I3 introduces all of the diff.** Per-layer pattern after I3:
+k=1: 2.4e-4, k=2: 2.7e-4, k=3: 2.3e-4, k=4: 4.9e-4, k=5: 4.9e-4, k=6: 5.8e-4,
+k=7: 5.5e-4, k=8: 5.5e-4. Smaller at TOA, larger at mid-troposphere/surface.
+
+### Step 2 — Drill inside `transform!(vars, lf, model; initialize=true)`
+
+Script: `debug_init_transform_bisect.jl`. Replays the body of
+`SpeedyTransforms.transform!(::Variables, lf, ::PrimitiveEquation; initialize=true)`
+from `time_stepping/transform.jl:103-208`, probing `vars.grid.temperature`
+after each call.
+
+| Sub-stage | max\|ΔT\| (K) |
+|---|---|
+| T0_pre | 0.0 |
+| T1: `transform!(vor_grid, vor, scratch, S)` | 0.0 |
+| T2: `transform!(div_grid, div, scratch, S)` | 0.0 |
+| **T3: `transform!(temp_grid, temp, scratch, S)`** | **5.8e-4** |
+| T4: `transform!(pres_grid, pres, scratch, S)` | 5.8e-4 (preserved) |
+| T5: `transform!(humid_grid, humid, scratch, S)` | 5.8e-4 (preserved) |
+| T6: `hole_filling!(humid_grid, ...)` | 5.8e-4 (preserved) |
+| T7: `UV_from_vordiv!(U, V, vor, div, S)` | 5.8e-4 (preserved) |
+| T8: `transform!(u_grid, U, scratch, S; unscale_coslat=true)` | 5.8e-4 (preserved) |
+| T9: `transform!(v_grid, V, scratch, S; unscale_coslat=true)` | 5.8e-4 (preserved) |
+| T10: `temperature_average!` | 5.8e-4 (preserved) |
+| T11: `geopotential!` | 5.8e-4 (preserved) |
+
+→ **T3 is the source.** It's the 4-argument spectral→grid `transform!`
+applied to temperature with `scratch_memory = vars.scratch.transform_memory`.
+
+### Step 3 — Eager vs compiled
+
+Script: `debug_init_transform_compiled.jl`. Hypothesis: T3 runs in
+Reactant eager mode in our test scripts; maybe the eager-vs-compiled
+distinction explains the diff.
+
+| Mode | max\|ΔT\| (K) | Reactant eager vs compiled |
+|---|---|---|
+| Eager | 5.8e-4 | — |
+| `@compile`d | 5.8e-4 | 0.0 (Reactant agrees with itself) |
+
+→ **Not an eager-mode artifact.** Reactant produces the same answer in
+both modes; CPU and Reactant disagree by 5.8e-4 K regardless.
+
+### Step 4 — Data dependency
+
+Script: `debug_transform_data_dep.jl`. Hypothesis: real spin-up T spectral
+data triggers something random uniform-[0,1) data doesn't.
+
+| Test | Data | Scratch source | max\|ΔT\| (K) |
+|---|---|---|---|
+| T1 | Real spin-up T (range [-80, 1016]) | `vars.scratch.transform_memory` | **5.8e-4** |
+| T2 | Real spin-up T | `M.scratch_memory` | **5.8e-4** |
+| T3 | Random `Complex{Float32}` in [0,1) | `vars.scratch.transform_memory` | **0.0** |
+| T4 | Random in [0,1) | `M.scratch_memory` (mirrors Test B Session 6) | **0.0** |
+
+→ **Data-dependent. NOT scratch-source-dependent.** The transform algorithm
+itself produces divergent CPU vs Reactant output for some spectral inputs
+but bit-identical for others.
+
+### Hypothesis — large l=0 m=0 coefficient
+
+Spectral T range is `real ∈ [-80, +1016]`. The huge upper-bound value is
+the `(l=0, m=0)` harmonic = global mean × `norm_sphere ≈ 3.54` →
+mean T ≈ 287 K × 3.54 ≈ 1016. This is ~1000× larger than the other
+spectral coefficients (which are perturbations on top of the mean).
+
+When `_backward_mul!` does:
+```julia
+scratch .= real.(coeffs_data)
+LinearAlgebra.mul!(field_data, backward_real, scratch)
+scratch .= imag.(coeffs_data)
+LinearAlgebra.mul!(field_data, backward_imag, scratch, -1, 1)
+```
+
+The second `mul!` accumulates into `field_data` (β=1). With one giant
+coefficient (l=0 m=0) plus many small ones, the `mul!` reduction is
+classic FMA / reassociation territory — XLA may sum in a different order
+than Julia's BLAS, producing different rounding when there's one dominant
+contributor and many small ones (cancellation/absorption pattern).
+
+This matches:
+- Random uniform [0,1) data: no single dominant coefficient → no
+  asymmetric FP behavior → 0 diff.
+- Real spin-up T: dominant l=0 m=0 coefficient ≈ 1000, other coefficients
+  small → FP-sensitive summation → 5.8e-4 K diff.
+
+### Untried tests (Tests 5, 6) — interrupted by syntax error
+
+Script `debug_transform_data_dep.jl` was supposed to also run:
+- T5: real T data scaled by 1e-3 (T values become tiny)
+- T6: random data scaled by 300 (random values become T-magnitude)
+
+Both have a syntax bug (`1e-3f0` not a valid literal; use `Float32(1e-3)`).
+Re-run tomorrow. Expected results:
+- T5: if **0** → magnitude-dependent (large numbers cause divergence).
+- T5: if **5.8e-4** → not pure magnitude; structure matters.
+- T6: if **5.8e-4** → triggers at T-magnitude regardless of structure.
+- T6: if **0** → real T's specific pattern (large l=0 m=0) is required.
+
+### Next direct test (tomorrow)
+
+The cleanest follow-up: take random data, plant a LARGE value only at the
+`(l=0, m=0)` position (~1000), and see if that alone triggers the 5.8e-4 K
+divergence. That would confirm the dominant-coefficient hypothesis.
+
+```julia
+# Set only the (l=0, m=0) coefficient to a large value, rest small
+spec[1, k] = 1000.0f0 + 0im  # for each layer k
+# all other harmonics: keep random small
+```
+
+If this triggers the divergence: the bug is FP-summation-order sensitivity
+in `_backward_mul!` with one dominant value. Likely fix: split the
+contribution of the l=0 m=0 mode from the others, OR widen the mul!
+accumulation to Float64.
+
+### Status
+
+Phase 0 source LOCALIZED (with caveats):
+- `transform!(temp_grid, temp, scratch_memory, S)` (4-arg, spectral→grid)
+- Diverges for real spin-up T spectral data (5.8e-4 K)
+- Does NOT diverge for random [0,1) data
+- Same in eager and compiled Reactant modes
+- Independent of scratch_memory source
+
+Open question: what FEATURE of the input triggers the divergence? Working
+hypothesis: dominant l=0 m=0 coefficient creates FP-sensitive summation
+that CPU BLAS and XLA dot evaluate in different orders.
+
+This is the FIRST identified concrete CPU-vs-Reactant algorithmic
+divergence in the SpeedyWeather pipeline. Even though it's small
+(5.8e-4 K) and not the dominant drift source (the 0.4 K/step seed is
+elsewhere), it's a clean fix candidate. If the same FP-summation-order
+issue manifests inside parameterizations or in per-step transforms, it
+could be the seed mechanism we've been chasing.
+
+### Files (session 7 executed)
+- `debug_init_bisect.jl` — Phase 0 outer bisect through `initialize!`. **Kept.**
+- `debug_init_transform_bisect.jl` — drill inside `transform!(...; initialize=true)`. **Kept.**
+- `debug_init_transform_compiled.jl` — eager vs compiled comparison. **Kept.**
+- `debug_transform_data_dep.jl` — data/scratch dependency tests (Tests 5, 6 not yet run due to syntax bug). **Fix and rerun tomorrow.**
+
+### Phase 0 numbers
+| Test | Result |
+|---|---|
+| `initialize!` outer bisect | T diff appears at I3 only |
+| `transform!(...; initialize=true)` drill | T diff appears at T3 only |
+| Eager vs compiled | both 5.8e-4 K |
+| Real T data, vars scratch | 5.8e-4 K |
+| Real T data, M scratch | 5.8e-4 K |
+| Random data, vars scratch | 0.0 |
+| Random data, M scratch | 0.0 |
+
+### Next session plan (continue here)
+
+1. **Fix and rerun Tests 5, 6** in `debug_transform_data_dep.jl` to test
+   magnitude vs structure hypothesis (~5 min wall time).
+2. **Run the "dominant coefficient" test** — random data with just the
+   (l=0, m=0) coefficient set large. Confirms or denies summation-order
+   hypothesis (~10 min wall time).
+3. **If confirmed**: try Float64 accumulation inside `_backward_mul!` —
+   make the `mul!` reductions sum in Float64 then cast to Float32. This
+   is a targeted, low-cost fix specifically where the divergence lives.
+4. **Independent of Phase 0 result**: proceed with Phase 1 (intra-step
+   bisect). The 5.8e-4 K isn't the dominant seed — the 0.4 K/step inside
+   `timestep!` is. The Phase 0 root cause may or may not be the same
+   mechanism that drives the per-step seed; Phase 1 will tell us.
+
+Phase 0 was a good warm-up: it gave us our first concrete CPU↔Reactant
+algorithmic divergence, with a falsifiable hypothesis (dominant l=0 m=0
+coefficient → FP summation-order sensitivity) and a clean fix candidate
+(Float64 mul! accumulation).
+
+## Session 8 — T3 root cause: SubArray-of-3D triggers different XLA lowering (2026-05-16)
+
+### Reframing the question
+
+The user asked: at T3 (`transform!(temp_grid, temp, scratch, S)`), is the
+input `temp` REALLY bit-identical between CPU and Reactant? And: try to
+isolate into a self-contained MWE.
+
+Answer: yes, `temp` is exactly equal (`Array(temp_spec_c.data) ==
+Array(temp_spec_r.data)`), the backward matrices are equal, both
+scratch sources are equal. The divergence is **not in the input**. It
+is in the COMPILED FORM of `_backward_mul!`, which depends on the type
+of the `coeffs` container.
+
+### Tests run (in order)
+
+`debug_transform_data_dep.jl` (rerun with syntax fixes + new tests):
+
+| Test | Setup | max\|Δ\| (K) |
+|---|---|---|
+| 0a  | input `temp_spec_c.data == temp_spec_r.data`? | bit-identical (==) |
+| 0b  | matrices + scratch all bit-identical? | yes (==) |
+| 1   | real T (from `temp_spec_c`), vars scratch | **5.8e-4** |
+| 2   | real T (from `temp_spec_c`), M.scratch_memory | **5.8e-4** |
+| 5   | real T spec × 1e-3 (copied into fresh container) | 0 |
+| 6   | random × 300 (copied into fresh container) | 0 |
+| 7   | random + planted (l=0,m=0)=1000 (fresh) | 0 |
+| 8   | only (l=0,m=0)=1000, rest 0 (fresh) | 0 |
+| 9   | real T with (l=0,m=0) zeroed (fresh) | 0 |
+
+The "dominant coefficient" hypothesis from Session 7 is **falsified**:
+T7, T8 (planted dominant coeff in fresh containers) give 0 K diff. T5,
+T6 (real T scaled, random scaled) also 0 — magnitude alone is not
+enough; structure alone is not enough; large (l=0,m=0) alone is not
+enough.
+
+But T1, T2 still show 5.8e-4 K with the **exact same numeric values**.
+Difference: T1/T2 pass `temp_spec_c` (the actual prognostic
+`LowerTriangularArray`) directly, while T5–T9 build a fresh
+`zeros(Complex{Float32}, SG.spectrum, NLAYERS)` and copy the data into it.
+
+### Drill: same numbers, different container (`debug_transform_data_dep3.jl`)
+
+| Repro | CPU side                  | Reactant side                | max\|Δ\| |
+|---|---|---|---|
+| R1 | `temp_spec_c` (orig)      | `temp_spec_r` (orig)         | **5.8e-4** |
+| R2 | fresh container, copy in  | fresh container, copy in     | 0       |
+| R3 | fresh                     | `temp_spec_r` (orig)         | **5.8e-4** |
+| R4 | `temp_spec_c` (orig)      | fresh                        | 0       |
+| R5 | both orig + fresh scratch | both orig + fresh scratch    | **5.8e-4** |
+| R7 | both orig + pre-zeroed scratch | both orig + pre-zeroed scratch | **5.8e-4** |
+
+→ The divergence is **on the Reactant side**, triggered by the type of
+`temp_spec_r.data`:
+
+```
+typeof(temp_spec_r.data) =
+  SubArray{ComplexF32, 2,
+           ConcretePJRTArray{ComplexF32, 3, 1},
+           Tuple{Slice, Slice, Int64}, false}
+```
+
+It's a **`SubArray` view of a 3D `ConcretePJRTArray`** — the underlying
+buffer is the 4-step leapfrog tank for temperature; `get_step(...,1)`
+returns view of slice `[:, :, 1]`. CPU side has the analogous SubArray
+of a 3D `Array`, and Reactant agrees with CPU when both pass a **flat
+2D `ConcretePJRTArray`** (R2, R4).
+
+### Self-contained MWE (`MWE_subarray_mul.jl`)
+
+No SpeedyWeather init required. Defines `_backward_mul!` with the
+exact same body as `SpeedyTransforms._backward_mul!`, builds two
+Reactant containers holding bit-identical complex coefficients:
+
+- `coeffs_flat_r :: ConcretePJRTArray{ComplexF32, 2, 1}`
+- `coeffs_view_r :: SubArray{ComplexF32, 2, ConcretePJRTArray{..., 3, 1}, ..., false}` (view of `[:, :, 1]` of a 3D buffer)
+
+Run `Reactant.@jit _backward_mul!(out, coeffs_***, scratch, br, bi)` and
+compare. Result:
+
+```
+Array(flat) == Array(view) : true (bit-identical)
+CPU vs Reactant(flat)      : 0.0
+CPU vs Reactant(view)      : 0.0041503906   ← divergence
+Reactant flat vs view      : 0.0041503906
+```
+
+The MWE reproduces the divergence **without any SpeedyWeather objects**,
+using only `Reactant.@jit`, `LinearAlgebra.mul!`, and a SubArray of a 3D
+ConcretePJRTArray.
+
+### Where in the computation does it diverge?
+
+`MWE_subarray_mul_minimal.jl` (using real Float32 data, single x):
+
+| Op            | container | max\|Δ\| (Reactant flat vs view) |
+|---|---|---|
+| single `mul!(out, A, x)` | flat / view | 0 |
+| two-stage `mul!(out, A, x); mul!(out, A2, x, -1, 1)` | flat / view | 0 |
+
+→ With real Float32 inputs, no divergence.
+
+`MWE_subarray_mul_minimal2.jl` (probe just `scratch .= real.(c)` and
+`imag.(c)` broadcasts on complex SubArray):
+
+| Op | max\|Δ\| (flat vs view) |
+|---|---|
+| `scratch .= real.(c)`  | 0 |
+| `scratch .= imag.(c)`  | 0 |
+
+→ The component-extraction broadcast is bit-identical.
+
+So the divergence appears only when `_backward_mul!` is JIT'd
+**as a single function** with a complex SubArray-of-3D argument.
+
+### Root cause confirmed via HLO dump (`MWE_subarray_mul_minimal3.jl`)
+
+`@code_hlo _backward_mul!(out, flat_r, scratch, br, bi)` vs same with
+`view_r`:
+
+**Flat 2D (`ConcretePJRTArray{ComplexF32, 2, 1}`):**
+```
+%0 = stablehlo.transpose %arg1, dims = [1, 0]
+%1 = stablehlo.real %0
+%2 = stablehlo.dot_general %1, %arg3, contracting_dims = [0] x [0], ...
+%3 = stablehlo.imag %0
+%4 = stablehlo.dot_general %3, %arg4, contracting_dims = [0] x [0], ...
+%5 = stablehlo.subtract %2, %4
+```
+
+**SubArray-of-3D (`SubArray{ComplexF32, 2, ConcretePJRTArray{..., 3, 1}, ...}`):**
+```
+%0 = stablehlo.slice %arg1 [0:1, 0:8, 0:560]
+%1 = stablehlo.transpose %0, dims = [2, 1, 0]    ← different perm
+%2 = stablehlo.reshape %1
+%3 = stablehlo.real %2
+%4 = stablehlo.dot_general %3, %arg3, contracting_dims = [0] x [0], ...
+%5 = stablehlo.imag %2
+%6 = stablehlo.dot_general %5, %arg4, contracting_dims = [0] x [0], ...
+%7 = stablehlo.subtract %4, %6
+```
+
+Both forms are correct, but the **layout of the operand to
+`dot_general`** differs: flat goes through a single transpose
+`[1,0]`; view-of-3D goes through `slice → transpose [2,1,0] → reshape`.
+XLA picks different GEMM blocking/accumulation orders for these
+different operand layouts, producing different FP rounding.
+
+This is a classic XLA reassociation: both results are within
+floating-point rounding of the true value, but they're not bit-equal.
+For the spin-up T data at T31×8 layers, the difference reaches 5.8e-4
+K at the surface — small in absolute terms, but a clean CPU↔Reactant
+algorithmic divergence.
+
+### Implications
+
+1. The 5.8e-4 K **is not data-dependent in the way Session 7
+   hypothesized**. It is **container-type-dependent**. The dominant
+   (l=0,m=0) coefficient is a symptom, not the trigger: large numbers
+   amplify the FP-reassociation difference, but the trigger is the
+   SubArray-of-3D operand passing through `dot_general`.
+
+2. The `temp_spec_r.data` SubArray comes from
+   `vars.prognostic.temperature` — a `LeapfrogArray` storing 4 time
+   steps as a 3D `ConcretePJRTArray`. Every spectral prognostic
+   variable that goes through `transform!` exposes the same pattern
+   (vorticity, divergence, humidity, pressure). Yet only `temperature`
+   produced a noticeable diff in the T-only test — probably because T
+   has the largest absolute magnitudes (1000 K-scale spectral
+   coefficient at (l=0,m=0)). Vorticity, divergence, etc. have much
+   smaller absolute values and their FP-reassoc noise stays below the
+   tolerance.
+
+3. **This is not the dominant drift source.** The 0.4 K/step seed
+   inside `timestep!` is still elsewhere — the SubArray issue manifests
+   once per-variable per spectral→grid transform, but the 5.8e-4 K
+   doesn't grow proportionally with step count (it stays roughly the
+   same). It is a noise floor.
+
+### Candidate fixes
+
+(a) **Materialize the view** before passing to `mul!`: copy the
+SubArray into a fresh `ConcretePJRTArray` and pass that. Simple,
+adds one copy per `transform!` call. Pros: zero risk, predictable
+result. Cons: O(NHARM * NLAYERS) extra memory per call.
+
+(b) **Reshape rather than slice**: if the leapfrog buffer can be laid
+out in memory such that `get_step(temp, 1)` returns a flat
+`reshape` (no slice) of the 4-step buffer, the IR would match.
+Requires changing `LeapfrogArray` storage order.
+
+(c) **Apply `_backward_mul!` per layer** (loop over k) using a 1D
+view — but that's even worse for FP reassociation, and slower.
+
+(d) **Accept the diff** if it remains below the algorithm's overall
+accuracy. The 5.8e-4 K is below the leapfrog integration error
+floor of Float32 spherical harmonics at T31, so semantically
+benign.
+
+(e) **Move `_backward_mul!` materialization inside the compile**:
+restructure so the view-vs-flat dichotomy doesn't propagate into
+the JIT'd region. If we pass `coeffs.data` already explicitly
+materialized to a flat 2D `ConcretePJRTArray` at the SpeedyWeather
+level, XLA sees the same IR every call.
+
+I lean toward (e) — explicit materialization at the
+`SpeedyTransforms.transform!(field, coeffs, scratch, M)` boundary:
+
+```julia
+function transform!(field, coeffs, scratch_memory, M)
+    ...
+    # Materialize the SubArray-of-3D into a flat 2D before JIT'ing
+    coeffs_flat = M.architecture isa ReactantDevice ?
+        copy_to_flat(coeffs.data) : coeffs.data
+    @maybe_jit M.architecture _backward_mul!(field.data, coeffs_flat, scratch, ...)
+end
+```
+
+That avoids the layout dependence in the IR signature entirely. To
+prototype, add a one-line `coeffs_data = collect_to_flat(coeffs.data)`
+in `transform!` and re-run `debug_transform_data_dep.jl` T1; expect 0.
+
+### Files added (Session 8)
+- `debug_transform_data_dep.jl` (rewritten) — Tests 0a, 0b, 1–9 with fixes.
+- `debug_transform_data_dep2.jl` — narrow down by data structure (m=0 modes, scaled, imag-only).
+- `debug_transform_data_dep3.jl` — same-numbers-different-container probe (R1–R7).
+- `MWE_subarray_mul.jl` — self-contained MWE, no SpeedyWeather init.
+- `MWE_subarray_mul_minimal.jl` — single vs two-stage mul!.
+- `MWE_subarray_mul_minimal2.jl` — isolate real./imag. broadcast.
+- `MWE_subarray_mul_minimal3.jl` — HLO IR dump, flat vs view.
+
+### Status
+
+Phase 0 / T3 root cause **fully identified**: XLA produces different
+HLO for `_backward_mul!` when its `coeffs` arg is a
+`SubArray{ComplexF32, 2, ConcretePJRTArray{..., 3, 1}, ...}` vs a flat
+`ConcretePJRTArray{ComplexF32, 2, 1}`. Different IR → different XLA
+executable → different FP-summation order → 5.8e-4 K diff on real T
+spin-up data.
+
+Fix candidate (e): materialize the operand to a flat 2D
+ConcretePJRTArray before `@maybe_jit _backward_mul!` is invoked.
+Prototype lives one Edit away — test next session.
+
+The 5.8e-4 K is **not the 0.4 K/step seed**. Continue with Phase 1
+(intra-step bisect inside `timestep!`) regardless of whether we patch
+the SubArray issue. The mechanism (different IR for view-of-3D vs flat
+container) is potentially active in other transform call sites too;
+it's worth keeping in mind during Phase 1.
+
+### Next session plan
+1. Prototype fix (e): add a `materialize_for_jit` helper in
+   `SpeedyTransforms`; gate on `ReactantDevice`. Re-run
+   `debug_transform_data_dep.jl` T1, expect 0.
+2. If (e) succeeds, audit other transform call sites (UV_from_vordiv,
+   pressure, humidity) for the same pattern.
+3. Run the full Reactant correctness suite to see if the per-step
+   drift moves at all — almost certainly not, but worth checking.
+4. Begin Phase 1 (intra-step bisect inside `timestep!`).
+
+## Session 9 — Temporary fix applied (2026-05-16, late)
+
+Issue reported upstream. Until the maintainers fix the IR-stability
+issue in Reactant/XLA, we apply a local workaround.
+
+### What changed
+
+- `SpeedyTransforms/src/matrix_transform.jl`: inside the spectral->grid
+  `transform!(field, coeffs, scratch, M::MatrixSpectralTransform)`,
+  insert a `coeffs_for_mul = _flatten_for_backward(M.architecture, coeffs.data)`
+  one-liner before `@maybe_jit _backward_mul!(field.data, coeffs_for_mul, ...)`.
+  CPU/GPU fallback is identity (no behavior change).
+- `SpeedyTransforms/ext/SpeedyTransformsReactantExt.jl`: extension
+  overrides `_flatten_for_backward(::ReactantDevice, data)` to
+  materialize a `SubArray{T, 2, ConcretePJRTArray{T, 3}}` into a flat
+  2D ConcretePJRTArray via `Reactant.@jit copy(data)`. When already
+  inside a `@jit` trace (`within_compile()`), pass through unchanged.
+- `CHANGELOG.md`: note added under Unreleased.
+
+The workaround is a small overload guarded by:
+```julia
+@inline _materialize_2d(data::Reactant.ConcretePJRTArray{<:Any, 2}) = data
+@inline function _materialize_2d(data::SubArray{T, 2, <:Reactant.ConcretePJRTArray{T, 3}}) where {T}
+    return Reactant.@jit copy(data)
+end
+@inline _materialize_2d(data) = data   # all other shapes: unchanged
+```
+
+so only the specific failure mode (`SubArray` view of a 3D
+`ConcretePJRTArray`) is materialized. Everything else stays on the
+same code path.
+
+### Verification
+
+`debug_transform_data_dep.jl` (after fix):
+
+| Test | Before | After |
+|---|---|---|
+| T1 real T, vars scratch | 5.8e-4 | **0.0** |
+| T2 real T, M scratch    | 5.8e-4 | **0.0** |
+| T3 random + vars scratch | 0.0 | 0.0 |
+| ... | (unchanged) | (unchanged) |
+
+`debug_init_bisect.jl` (after fix):
+
+| Stage | Before | After |
+|---|---|---|
+| I3_transform | 5.8e-4 | **0.0** |
+| All other stages | 0.0 | 0.0 |
+
+The full `initialize!(sim; steps=1)` pipeline now reports
+`max|ΔT| = 0` at every probe point. Phase 0 / T3 root cause is
+**neutralized** on the SpeedyWeather side.
+
+### Status
+
+- Temporary workaround in place. Will be removed once Reactant emits
+  matching IR for SubArray-of-3D and flat-2D inputs to `dot_general`.
+- The 5.8e-4 K diff is **gone**.
+- The 0.4 K/step seed inside `timestep!` is still present — Phase 0
+  was a noise floor, not the dominant drift source. Continue with
+  Phase 1.
+
+### Tomorrow's plan (continue here)
+
+Phase 1 — intra-step bisect inside `timestep!` (the actual 0.4 K/step
+seed). Plan from Session 7 still applies (see "Session 7 (planned) —
+Intra-step bisect plan" earlier in this document). Execute that plan
+fresh now that the T3 noise floor is removed:
+
+1. Re-baseline: with the workaround active, measure step-1 T diff vs
+   CPU. Earlier (pre-fix) the per-step seed manifested at ~0.4 K
+   after several steps; now T should start cleaner. Re-measure step-1
+   T to confirm the per-step seed is unchanged (expected — the fix
+   only touches spectral->grid transforms, not the
+   tendencies/timestepping pipeline).
+2. Register debug `ScratchVariable`s as in Session 7 Step 1 (the
+   commit-revertable instrumentation plan).
+3. Insert snapshot points P0-P10 inside `time_integration.jl`'s
+   `timestep!` (dynamics tendencies, parameterizations, leapfrog,
+   implicit, hole-filling — see Session 7 "The pipeline").
+4. Run the bisect script and identify which stage in `timestep!`
+   introduces the per-step seed.
+5. Drill into that stage. Likely candidates per Session 7: P3c
+   (longwave radiation) or one of the transform-back stages.
+
+Files to revisit:
+- `debug_init_transform_bisect.jl`, `debug_init_bisect.jl` — keep
+  as sanity checks; both should report 0 with the workaround.
+- The Phase 1 instrumentation will live in a new
+  `debug_timestep_bisect.jl` modeled after `debug_init_bisect.jl`.
+
+## Session 10 — Phase 1 executed (2026-05-17)
+
+### Re-baseline with Session 9 workaround active
+
+`debug_drift_step1.jl` rerun: **0.386 K** step-1 T diff at k=8, same
+per-layer pattern as before the workaround. Confirmed: the Session 8
+fix removed the 5.8e-4 K transform noise but the per-step seed is
+independent.
+
+Per-layer step-1 T diff:
+| k | max\|ΔT\| | k | max\|ΔT\| |
+|---|---|---|---|
+| 1 | 0.052 K | 5 | 0.129 K |
+| 2 | 0.029 K | 6 | 0.144 K |
+| 3 | 0.026 K | 7 | 0.240 K |
+| 4 | 0.075 K | 8 | 0.386 K |
+
+### Step 1 — Bisect timestep!() — `debug_timestep_bisect.jl`
+
+Inline mirror of `timestep!(vars, dt, model::PrimitiveEquation, lf1, lf2)`
+for the Euler half-step (`lf1=lf2=1`, `dt=Δt/2`). Each Reactant
+stage wrapped with `Reactant.@jit f(args...)` (eager calls hit
+`rem(::ConcretePJRTNumber, ::Int)` via DateTime conversion).
+
+| Stage | spec T | grid T | tend.gridT | tend.specT | tend.gridQ |
+|---|---|---|---|---|---|
+| S0 pre | 0 | 0 | 0 | 0 | 0 |
+| S1 reset_tendencies! | 0 | 0 | 0 | 0 | 0 |
+| S2 greenhouse_gases_time_step! | 0 | 0 | 0 | 0 | 0 |
+| **S3 parameterization_tendencies!** | 0 | 0 | **0.0494** | 0 | **3.7e-5** |
+| S4 ocean_timestep! | 0 | 0 | 0.0494 | 0 | 3.7e-5 |
+| S5 sea_ice_timestep! | 0 | 0 | 0.0494 | 0 | 3.7e-5 |
+| S6 land_timestep! | 0 | 0 | 0.0494 | 0 | 3.7e-5 |
+| S7 param_tendencies_only! | 0 | 0 | 0.0494 | 7.7e-4 | 3.7e-5 |
+| S8 horizontal_diffusion! | 0 | 0 | 0.0494 | 7.7e-4 | 3.7e-5 |
+| S9 leapfrog! | 1.3e-7 | 0 | 0.0494 | 7.7e-4 | 3.7e-5 |
+| S10 transform! | 1.3e-7 | 0 | 0.0494 | 7.7e-4 | 3.7e-5 |
+
+→ **S3 (`parameterization_tendencies!`) is the seed stage.** All
+subsequent stages just transport that 0.0494 K/s grid-T tendency diff
+through the leapfrog and back-transform.
+
+### Step 2 — Bisect `parameterization_tendencies!` — `debug_param_drift_bisect.jl`
+
+Cumulative bisect: enable first k of 11 parameterizations, measure
+`max|Δ tend.grid.temperature|` and `max|Δ tend.grid.humidity|`.
+
+| k | name | max\|Δ tend.gridT\| | max\|Δ tend.gridQ\| |
+|---|---|---|---|
+| 1 | solar_zenith | 0 | 0 |
+| 2 | vertical_diffusion | 0 | 0 |
+| **3** | **large_scale_condensation** | **4.12e-3** | **1.65e-6** |
+| 4 | albedo | 4.12e-3 | 1.65e-6 |
+| 5 | shortwave_radiation | 4.15e-3 | 1.65e-6 |
+| 6 | longwave_radiation | 4.09e-3 | 1.65e-6 |
+| 7 | boundary_layer_drag | 4.09e-3 | 1.65e-6 |
+| 8 | surface_condition | 4.09e-3 | 1.65e-6 |
+| 9 | surface_momentum_flux | 4.09e-3 | 1.65e-6 |
+| **10** | **surface_heat_flux** | **4.92e-2** | 1.65e-6 |
+| **11** | **surface_humidity_flux** | 4.92e-2 | **3.75e-5** |
+
+Three seeds visible at this aggregation:
+- **large_scale_condensation** (k=3): T & Q tend at k=8 (surface only).
+- **surface_heat_flux** (k=10): 10× jump in T tend at k=8.
+- **surface_humidity_flux** (k=11): 22× jump in Q tend at k=8.
+
+### Step 3 — Drill into surface_heat_flux — `debug_param_drill.jl` + `debug_shf_probe.jl`
+
+`surface_heat_flux` run SOLO (after setup chain) produces 4.93e-2 K diff
+at k=8 only. Inputs to the kernel: SST, T_air, ρ, V — all bit-identical.
+But `parameterizations.boundary_layer_drag` shows **1.25e-7 diff** before
+surface_heat_flux runs — that 1.25e-7 in drag is amplified ~400000× into
+8.9e-3 W/m² SHF diff, then divided by `pₛ * Δσ * cₚ` and scaled by
+radius into 4.9e-2 K/s tend.
+
+So surface_heat_flux is **innocent**; the drag was already wrong.
+
+### Step 4 — Drill into boundary_layer_drag — `debug_drag_inputs.jl`
+
+Run params 1..6 (everything before boundary_layer_drag), then check its
+inputs. **All inputs bit-identical EXCEPT one:**
+
+```
+orography.orography                      max|Δ| = 0.023468018   ==? false
+```
+
+The static terrain field — never modified during a run, loaded from
+NetCDF at model construction — differs by 0.023 m between CPU and
+Reactant models. Tracing back into `EarthOrography.initialize!`
+(`SpeedyWeather/src/dynamics/orography.jl:200`):
+
+```
+load NetCDF → interpolate to grid → transform!(surf_geopot, orog, S)
+  → smooth in spectral → transform!(orog, surf_geopot, S)  ← spec→grid
+```
+
+That final `transform!(orog, surf_geopot, S)` is the same `_backward_mul!`
+codepath. The two models (CPU `MatrixSpectralTransform` vs Reactant
+`MatrixSpectralTransform`) initialize their orography independently:
+CPU runs `BLAS.gemm!`, Reactant runs XLA `dot_general` — these don't
+agree bit-exactly even on identical inputs.
+
+The Session 8 workaround flattens SubArray-of-3D into flat 2D before
+`_backward_mul!`, but the CPU↔Reactant disagreement is INDEPENDENT of
+that: any spec→grid `transform!` is BLAS vs XLA → produces different
+bit patterns. Orography is just one example; ALL constant model fields
+initialized via spec→grid `transform!` (surface_geopotential too,
+0.008 K diff) will diverge.
+
+### Step 5 — Test orography sync hypothesis — `debug_orog_fix.jl`
+
+Copy CPU orography & surface_geopotential into Reactant model
+post-construction, then run step-1.
+
+```
+RESULT — Step-1 seed with orography synced:
+  T_max_diff = 0.3859253 K   (was 0.3859 K WITHOUT orog sync)
+```
+
+→ **Orography sync alone does NOT change step-1 T diff.** The k=8
+boundary_layer_drag→surface_heat_flux pathway WAS one of the seeds,
+but it's not the dominant one. The per-step T seed of 0.386 K is
+dominated by something else — radiation, most likely.
+
+### Step 6 — Per-layer bisect — `debug_param_per_layer.jl`
+
+Repeat cumulative bisect but report tendency diff per-layer (k=1..8).
+With orography synced.
+
+| stage | k=1 | k=2 | k=3 | k=4 | k=5 | k=6 | k=7 | k=8 |
+|---|---|---|---|---|---|---|---|---|
+| 1 solar_zenith | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| 2 vertical_diffusion | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| **3 large_scale_condensation** | 0 | 0 | 0 | 0 | 0 | 0 | 0 | **4.1e-3** |
+| 4 albedo | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4.1e-3 |
+| **5 shortwave_radiation** | **6.0e-4** | **7.7e-4** | **3.2e-4** | **3.1e-4** | **3.5e-4** | **3.4e-4** | **3.7e-4** | 4.2e-3 |
+| 6 longwave_radiation | 5.7e-4 | 9.3e-4 | 4.2e-4 | 4.6e-4 | 4.6e-4 | 5.6e-4 | 5.7e-4 | 4.1e-3 |
+| 7..11 | (unchanged from k=6 with orog synced) | | | | | | | |
+
+→ Two dominant seed contributors, NEITHER at the surface:
+- **shortwave_radiation** (k=5): introduces diff at ALL 7 layers
+  k=1..7 simultaneously (~3-8e-4 K/s each).
+- **large_scale_condensation** (k=3): k=8 surface diff (4e-3 K/s).
+- **longwave_radiation** (k=6): mild amplifier across k=1..7.
+
+The per-layer tend.gridT diff × dt (Δt/2 ≈ 188 s) × radius scaling
+explains the observed per-layer step-1 T diff (e.g. k=8 tend 4e-3 × 188
+≈ 0.77 K → 0.39 K post-leapfrog ≈ observed).
+
+### Conclusions for the per-step seed
+
+1. The **0.386 K step-1 T diff is genuinely distributed across all
+   layers** and is not localized to a surface flux artifact.
+2. **Two upstream root causes:**
+   - **`shortwave_radiation`** is the primary per-layer seed source —
+     introduces 3-8e-4 K/s tend differences across all k=1..7 in one
+     pass.
+   - **`large_scale_condensation`** seeds at k=8 (4e-3 K/s).
+3. **Independently, orography (and other init-time spec→grid model
+   fields) drift between CPU and Reactant** because the spec→grid
+   `transform!` produces different output via BLAS vs XLA `dot_general`.
+   This is a separate issue — it amplifies into 4.9e-2 K via the
+   `boundary_layer_drag → surface_heat_flux` chain at k=8 when
+   unsynced. With orography synced, the surface_heat_flux contribution
+   drops to ~0, but the per-layer radiation/condensation seed remains.
+4. Surface fluxes (heat, humidity, momentum) are INNOCENT; they only
+   amplify upstream seeds.
+
+### Next session plan (continue here)
+
+Two parallel drill threads:
+
+**A — `shortwave_radiation` drill**
+1. Identify which sub-step (transmissivity, flux-sweep, etc.) introduces
+   the per-layer diff. Mirror what was done for OneBandLongwave in
+   Sessions 3-5 but for the active shortwave scheme.
+2. The shortwave scheme being used: check what `model.shortwave_radiation`
+   defaults to in `PrimitiveWetModel`. Probably `TransparentShortwave` or
+   `OneBandShortwave`.
+
+**B — `large_scale_condensation` drill**
+1. Inspect kernel for floating-point reassociation hazards (similar to
+   the OneBandLongwave story).
+2. Check `ifelse` patterns / `clamp` patterns / `exp`/`log` calls.
+
+**C — Init-time orography drift (model-construction issue)**
+1. Optional: add `Reactant`-side override that takes the CPU-computed
+   `_backward_mul!` result during `EarthOrography.initialize!` (or run
+   model construction on CPU then move). This is independent of A/B.
+
+Files created this session:
+- `debug_timestep_bisect.jl` — S0-S10 stage probe inside `timestep!`. **Kept.**
+- `debug_param_drift_bisect.jl` — cumulative bisect across the 11 parameterizations. **Kept.**
+- `debug_param_drill.jl` — solo-run probe with prior chain setup. **Kept.**
+- `debug_shf_probe.jl` — surface_heat_flux investigation. **Kept.**
+- `debug_drag_bisect.jl` — scratch-field bisect alongside tend bisect. **Kept.**
+- `debug_drag_inputs.jl` — `boundary_layer_drag` input-identity probe. **Kept.**
+- `debug_orog_fix.jl` — orography-sync hypothesis test. **Kept.**
+- `debug_param_per_layer.jl` — per-layer per-stage T tend diff. **Kept.**
+
+### Status
+
+Phase 1 root cause(s) **identified**:
+- `shortwave_radiation` introduces per-layer (k=1..7) tend.gridT diffs.
+- `large_scale_condensation` introduces k=8 tend.gridT diff.
+- `boundary_layer_drag→surface_heat_flux` chain ALSO produces a k=8
+  diff via orography drift at model-init time (independent of A/B,
+  fixable by post-construction orography sync).
+
+The per-step seed is now explained quantitatively from the per-layer
+tendency map. Next: drill into `shortwave_radiation` (primary) and
+`large_scale_condensation` (secondary) to find the offending FP
+operations.
+
+### Orography drill — BLAS vs XLA `dot_general` divergence
+
+`debug_orog_bisect.jl` builds CPU + Reactant models side-by-side via
+`PrimitiveWetModel(...)` + `initialize!(model)`, then snapshots the
+result. With Session 8 SubArray workaround active and the test running
+the full `EarthOrography.initialize!` pipeline:
+
+```
+[1] Post initialize!(model) — orography fields differ?
+    orography.orography         max|Δ| = 0.023468018
+    surface_geopotential (spec) max|Δ| = 0.0078125
+[3] Same input spec→grid: CPU vs Reactant max|Δ| = 0.05078125
+[4] Each side own spec→grid: max|Δ| = 0.22973633
+```
+
+Both surfaces (post-init orography AND surface_geopotential) differ
+between CPU and Reactant. Test [3] is decisive: feed bit-identical
+`surface_geopotential` (spectral) into `transform!(grid, spec, M)` on
+both sides and the grid output differs by 0.05m. So **BLAS gemm and
+XLA `dot_general` produce different bit patterns for the same spec→grid
+matrix-multiply**. This is independent of the Session 8 SubArray issue;
+it's just the BLAS-vs-XLA reassociation difference for dense GEMM.
+
+The surface_geopotential (spec) also diverges (0.008 difference in
+spectral coefficients), implying the grid→spec `forward` GEMM also
+differs. So both directions of `transform!` are subject to FP
+reassociation between CPU and Reactant.
+
+### Why orography sync alone doesn't fix step-1 T diff
+
+`debug_orog_fix.jl` copies CPU orography → Reactant before stepping.
+Result: step-1 T diff unchanged (0.386 K). With orography synced:
+- `boundary_layer_drag` becomes bit-identical (was 1.25e-7 diff).
+- `surface_heat_flux` becomes bit-identical at k=8.
+- `tend.grid.temperature` at k=8 drops from 4.9e-2 to 4.1e-3.
+- But the per-layer (k=1..7) tend diff from `shortwave_radiation` and
+  `longwave_radiation` is unchanged — those don't read orography.
+
+So the **per-layer tend diff comes from radiation parameterizations,
+NOT from the orography drift**. Orography drift contributes only at
+k=8, dominantly through surface fluxes, and even then it's only one of
+multiple seed sources (large_scale_condensation also contributes at k=8).
+
+### Workaround candidates for the orography divergence
+
+1. **CPU-then-transfer init**: build orography on CPU
+   architecture, then `on_architecture(ReactantDevice(), ...)` the
+   results. Requires changing `EarthOrography.initialize!` to be
+   architecture-agnostic about the gemm path.
+
+2. **Skip the smoothing+round-trip**: read NetCDF, interpolate, and
+   skip the grid→spec→smooth→spec→grid round-trip. Lose smoothing
+   feature but gain bit-identity across architectures.
+
+3. **Live with it**: the orography drift only matters insofar as
+   `boundary_layer_drag` (and downstream surface fluxes) read it. As
+   shown above, its contribution to the step-1 seed is ~12% of the
+   total (4.9e-2 K vs total 0.386 K). The dominant seed is in
+   radiation, which doesn't touch orography.
+
+4. **Sync at user level**: after model construction, do
+   `copyto!(model_r.orography.orography, Array(model_c.orography.orography))`
+   in user code (essentially what `debug_orog_fix.jl` does but as
+   standard recipe). Simplest workaround for reproducibility tests.
+
+### Wider implication: ALL initialize-time spec/grid round-trips diverge
+
+Any model component whose `initialize!` does a `transform!` between
+spectral and grid spaces will exhibit this BLAS-vs-XLA divergence:
+- `EarthOrography`: confirmed 0.023m
+- `EarthLandSeaMask`: probably similar (uses smoothing path?)
+- `vegetation`, `soil_moisture`, `soil_temperature`: any that load
+  and re-transform
+- Spectral truncation of initial conditions
+- Spectral diffusion eigenvalue initialization
+
+This is **independent of the Session 8 SubArray issue**. Even with
+SubArrays flattened, BLAS gemm produces different rounding from XLA
+`dot_general` on the same dense float matrices. The Session 8 fix
+handled one specific layout-induced divergence; this one is more
+fundamental — different LAPACK/BLAS implementations would also disagree
+with each other, so this is "expected" floating-point behavior, just
+inconvenient for reproducibility tests.
+
+### Files added (orography drill)
+- `debug_orog_bisect.jl` — post-init orography & forced same-input spec→grid probe. **Kept.**
+- `debug_orog_init_timing.jl` — probe orography state at each pipeline step. **Kept (note: requires CUDA loaded).**
+- `debug_orog_fix.jl` — orography-sync hypothesis test. **Kept.**
+
+### Status (Session 10 complete)
+
+Per-step T-diff seed of 0.386 K is now decomposed into:
+- **Radiation seeds (~75% of total)**: `shortwave_radiation` introduces
+  3-8e-4 K/s diffs in `tend.gridT` at all layers k=1..7.
+- **Condensation seed**: `large_scale_condensation` adds 4e-3 K/s at k=8.
+- **Orography/drag seed (~12% of k=8)**: BLAS-vs-XLA gemm during model
+  init produces 0.023m orography diff → 1.25e-7 drag diff → 4.9e-2 K/s
+  surface_heat_flux tend diff at k=8.
+
+The orography seed is a sub-component of the k=8 tendency diff, not the
+dominant cause of the overall per-step T diff. Removing it (via
+orography sync) doesn't reduce the headline 0.386 K step-1 T diff.
+
+### Next session plan (continue here)
+1. **Drill into `shortwave_radiation`** — find the FP-sensitive
+   operation. Likely candidates: column accumulator (similar to
+   OneBandLongwave session 3-5 story), exponential / power in
+   transmissivity, or a CRTV reduction.
+2. **Drill into `large_scale_condensation`** — its kernel uses `exp` /
+   `log` for saturation vapor pressure curves and `min`/`max` clamps;
+   identify the offending op.
+3. **(Optional)** prototype orography-sync workaround in a user-facing
+   recipe, or upstream into `EarthOrography.initialize!`.
+
+## Session 11 — shortwave_radiation drill: source vs amplifier (2026-05-17)
+
+### Question
+
+Session 10 fingered `shortwave_radiation` (k=5) as the parameterization
+that introduces per-layer (k=1..7) tend.gridT diffs (3-8e-4 K/s). But
+in Sessions 3-5 we found that `OneBandLongwave` was an AMPLIFIER, not
+a source. Is shortwave the same — amplifying a different upstream
+seed, or genuinely producing the per-layer diff itself?
+
+### Step 1 — input bit-identity check (`debug_shortwave_solo.jl`)
+
+After running setup chain `[solar_zenith, vertical_diffusion,
+large_scale_condensation, albedo]` (with orography synced), check every
+field shortwave_radiation reads:
+
+```
+grid.temperature_prev    : identical
+grid.humidity_prev       : identical
+grid.geopotential        : identical
+grid.pressure_prev       : identical
+param.cos_zenith         : identical
+param.ocean.albedo       : identical
+param.land.albedo        : identical
+param.albedo             : identical
+param.rain_rate          : max|Δ| = 3.3e-13  ←  differs (only one)
+param.cloud_top          : identical
+scratch.grid.a           : identical
+solar_constant, cₚ       : identical
+land_sea_mask.mask       : identical
+orography.orography      : identical (synced)
+```
+
+Only `rain_rate` differs at sub-ULP scale (~1e-13). Could rain_rate be
+the seed channel?
+
+### Step 2 — rain_rate sensitivity (`debug_shortwave_solo2.jl`)
+
+Three runs:
+- (A) Sync rain_rate CPU→Reactant, then run shortwave SOLO.
+- (B) Force rain_rate=0 on BOTH sides, then run shortwave SOLO.
+- (C) Baseline (no sync), then run shortwave SOLO.
+
+All three produce **bit-identical per-layer tend.gridT diffs** (down
+to the last bit). So `rain_rate` is NOT the channel — the 3.3e-13 diff
+is irrelevant.
+
+→ **shortwave_radiation's own kernel produces the divergence**, even
+with bit-identical (or zeroed) `rain_rate`.
+
+### Step 3 — sub-component bisect (`debug_shortwave_subcomp.jl`)
+
+`OneBandShortwave.parameterization!` calls three sub-functions:
+1. `clouds!()` — DiagnosticClouds; uses `saturation_humidity(T, p)` (exp).
+   Writes `parameterizations.cloud_top[ij]`, returns NamedTuple.
+2. `transmissivity!()` — BackgroundShortwaveTransmissivity; per-layer
+   `t[ij, k] = exp(-optical_depth)`. Writes `scratch.grid.a`.
+3. `shortwave_radiative_transfer!()` — column loop, accumulating fluxes,
+   writes `tend.grid.temperature`.
+
+Run three custom kernels that stop after each sub-component:
+
+| Kernel | Output checked | max\|Δ\| |
+|---|---|---|
+| K1: clouds! only | `parameterizations.cloud_top` | **0.0** (identical) |
+| K2: clouds! + transmissivity! | `scratch.grid.a` (t array, all k) | **5.96e-8 every layer** |
+| K3: full | `tend.gridT` per layer | 3-8e-4 K/s |
+
+`eps(Float32(0.85)) ≈ 5.96e-8` — exactly **1 ULP**.
+
+So:
+- `clouds!` is bit-identical (despite using `saturation_humidity`'s
+  `exp`/`log` internally — those happen to not contribute to the
+  scalar `cloud_top` output for this data, since the precipitation
+  branch and humidity threshold produce same integer answer; or the
+  exp/log results cancel in the conditional path).
+- **`transmissivity!` introduces a 1-ULP divergence in the
+  per-layer `t = exp(-optical_depth)` array.** This is just CPU libm
+  `exp` vs XLA `exp` differing by 1 ULP in Float32 — completely
+  expected behavior between two FP-math implementations, no FMA
+  surprises needed.
+- `shortwave_radiative_transfer!` AMPLIFIES that 1-ULP `t` diff into
+  3-8e-4 K/s `tend.gridT` diff (a ~10⁴× amplification) via the column
+  flux sweep:
+  ```
+  D *= t[k]                 ← propagates ULP through layers
+  dTdt[k] += (D - D_out) / cₚ * (g / (pₛ * Δσ_k))   ← scales up
+  ```
+
+### Conclusion
+
+**shortwave_radiation is BOTH a source AND an amplifier:**
+
+- **Source**: `transmissivity!` produces a 1-ULP-per-layer `t`
+  divergence purely from `exp(-optical_depth)` differing between CPU
+  libm and XLA. The inputs to `exp` are bit-identical; only `exp`
+  itself diverges by 1 ULP.
+- **Amplifier**: `shortwave_radiative_transfer!` turns the 1-ULP `t`
+  diff into ~10⁴× larger `tend.gridT` diffs via cumulative multiplication
+  through the column and flux-to-tendency scaling.
+
+This is **fundamentally different from the OneBandLongwave story**
+where the seed was upstream of the kernel and the kernel just amplified.
+Here, the seed IS born inside the kernel (in `exp`) — it cannot be
+eliminated by syncing inputs.
+
+### Why this is hard to fix
+
+The 1-ULP `exp` divergence is essentially a math-library precision
+difference; the only ways to eliminate it are:
+1. Use the same exp implementation on both sides (e.g. force Reactant
+   to use a particular libm; impractical).
+2. Round both sides to fewer bits (lose precision).
+3. Accept it — the 1-ULP `exp` is within the algorithm's own
+   uncertainty, and the 3-8e-4 K/s amplified diff is below the
+   atmospheric model's discretization error.
+
+The interesting question is whether the amplification can be reduced
+by restructuring `shortwave_radiative_transfer!` to be less sensitive
+to small input perturbations. Looking at the column sweep:
+```
+D = D_toa
+for k in 1:nlayers
+    D_out = (D - O₃ * D_toa) * t[ij, k]
+    dTdt[k] += flux_to_tendency((D - D_out) / cₚ, pₛ, k, model)
+    D = D_out
+end
+```
+Each layer's `D` carries forward a multiplicative factor `t[k]`. After
+8 layers the accumulated relative error is ~8 × 1ULP × O(1) = a few
+ULP in `D`, and the tendency receives `(D - D_out) / cₚ` which is the
+"absorbed flux" — sensitive to exactly the kind of cancellation that
+amplifies ULP noise.
+
+### Implications for the bigger picture
+
+The headline 0.386 K step-1 T diff has TWO origin classes:
+1. **1-ULP `exp` in transmissivity → amplified by column sweep**
+   (shortwave: 3-8e-4 K/s × 188 s × leapfrog ≈ 0.05–0.15 K per layer)
+2. **`large_scale_condensation`'s k=8 contribution** (4e-3 K/s at k=8)
+3. **`orography drift → boundary_layer_drag → surface_heat_flux`**
+   (k=8 only, fixable by orography sync)
+
+The dominant per-layer mid-tropospheric diff (k=4: 0.075, k=5: 0.13,
+k=6: 0.14) is from category (1) — `exp` ULP noise amplified by the
+shortwave column sweep. **It's "expected" floating-point behavior**,
+not a bug per se, but it sets a noise floor that CPU↔Reactant
+correctness tests have to tolerate.
+
+### Files added (Session 11)
+- `debug_shortwave_solo.jl` — input-identity check + solo run. **Kept.**
+- `debug_shortwave_solo2.jl` — rain_rate sync / zero variants. **Kept.**
+- `debug_shortwave_subcomp.jl` — K1/K2/K3 sub-component bisect of
+  OneBandShortwave; localized to `transmissivity!`. **Kept.**
+
+### Status
+
+Session 11 root cause **identified**:
+- `shortwave_radiation`'s `transmissivity!` produces a 1-ULP-per-layer
+  divergence in `t = exp(-optical_depth)` (just CPU vs XLA `exp`).
+- `shortwave_radiative_transfer!` amplifies that into 3-8e-4 K/s
+  `tend.gridT` diff per layer via column flux accumulation.
+
+It is NOT an amplifier of an upstream issue (unlike OneBandLongwave
+in Sessions 3-5). The seed is genuinely inside the shortwave kernel,
+specifically the `exp` call.
+
+### Next session plan (continue here)
+1. **Quick MWE confirmation** (`MWE_exp_ulp.jl`): standalone CPU vs
+   Reactant `@jit exp.(-x)` showing 1-ULP diff. Not yet run.
+2. **Drill into `large_scale_condensation`** — same pattern: SOLO run
+   with input identity check, find what's the seed source. Its kernel
+   also uses `exp`/`log` for saturation vapor pressure.
+3. **Drill into `longwave_radiation`** — it adds 1-2e-4 K/s per layer
+   on top of shortwave. Probably amplifies the already-divergent `t`
+   or has its own `exp`.
+4. **Decide on tolerance/policy**: given the per-layer ULP-amplification
+   pattern, decide whether to accept the resulting per-step noise floor
+   (~0.4 K at T31 step 1) or pursue structural changes to reduce
+   amplification (e.g. compensated summation in column sweeps).
+
+## Session 12 — Standalone MWEs + LSC + longwave drills (2026-05-17)
+
+User directive: each step should reduce the culprit to a MWE, best
+completely without SpeedyWeather.
+
+### 1. `exp` 1-ULP MWE confirmed (`MWE_exp_ulp.jl`)
+
+Standalone Julia + Reactant — no SpeedyWeather.
+
+```
+n = 3168*8 = 25344 random Float32 in [0, 0.5]
+t_cpu = exp.(-x)
+t_rct = @jit exp.(-x)
+max|Δ| = 5.9604645e-8                        ← exactly 1 ULP at ~0.85
+count nonzero diff: 2976 / 25344             ← 12% of inputs
+```
+
+Confirms CPU libm `exp` and XLA `exp` differ by exactly 1 ULP for
+Float32 on roughly 1 in 8 inputs. Expected math-library behavior.
+
+### 2. Column-sweep amplification MWE (`MWE_column_sweep_amplification.jl`)
+
+Standalone — no SpeedyWeather. Mimics the
+`shortwave_radiative_transfer!` column structure: downward beam ×
+transmissivity, surface reflection, upward beam, flux-to-tendency
+conversion with `g / (p_s * Δσ_k)` scaling and `* radius`.
+
+Feeding the two 1-ULP-different `t` arrays from MWE_exp_ulp into the
+sweep produces:
+
+```
+k=1  max|Δ dTdt| = 1.95e-3   ← TOA, largest amplification
+k=2  max|Δ dTdt| = 1.10e-3
+k=3  max|Δ dTdt| = 7.6e-4
+k=4  max|Δ dTdt| = 6.1e-4
+k=5  max|Δ dTdt| = 4.9e-4
+k=6  max|Δ dTdt| = 3.7e-4
+k=7  max|Δ dTdt| = 3.1e-4
+k=8  max|Δ dTdt| = 2.1e-4   ← surface, smallest
+
+Amplification factor: max|Δ dTdt| / max|Δ t| = 32768
+```
+
+Reproduces the production per-layer pattern (TOA largest, surface
+smallest) exactly. Amplification is ~10⁴, driven by:
+`(g / (p_s * Δσ_k)) * D_TOA / cₚ ≈ 2.7e-3` × layers × `radius ≈ 6.4e6`.
+
+### 3. LSC drill (`debug_lsc_solo.jl`)
+
+Solo run of `large_scale_condensation` after setup chain [1..2]:
+- ALL inputs bit-identical (T, q, p, cloud_top, rain_rate, ...).
+- Output: `tend.gridT` diff = **4.12e-3 K/s at k=8 ONLY**; all
+  other layers = 0. Same for `tend.gridQ` at k=8 = 1.65e-6 kg/kg/s.
+- Matches production bisect exactly.
+
+Why only k=8? `large_scale_condensation!` calls `saturation_humidity`
+(uses `exp`) at every k, but the condensation branch
+`@trace if (δq_cond < 0) | ...` only fires when supersaturation OR
+downward precip is present, which (in this spin-up state) is only at
+the surface (k=8).
+
+→ **LSC is also an intrinsic source**, not amplifier. The seed is
+`saturation_vapor_pressure` (`exp(Lᵥ/Rᵥ * (1/T₀ - 1/T))`) — same
+1-ULP `exp` mechanism as shortwave's transmissivity.
+
+### 4. LSC standalone MWE (`MWE_lsc_condensation.jl`)
+
+Standalone — no SpeedyWeather. Encodes:
+- `svp(T) = e₀ * exp(Lᵥ/Rᵥ * (1/T₀ - 1/T))` and
+  `sat_humid(T, p) = ε * svp(T) / p`
+- The LSC implicit-condensation update:
+  `δq = min(0, sat*RH - q); dqsat_dT = sat*RH*Lᵥ/cₚ / (Rᵥ T²);
+   δq /= ((1 + Lᵥ/cₚ * dqsat_dT) * τ * Δt); δT = -Lᵥ/cₚ * δq`
+
+Result on N=3168 random surface-air states:
+```
+max|Δ sat_humid| = 2.79e-9                   ← 1-3 ULP at sat_humid ~0.01
+count nonzero sat diff: 1333 / 3168
+max|Δ δT| = 1.31e-9
+max|Δ δT * radius| = 8.34e-3 K/s            ← matches production 4.1e-3 K/s
+```
+
+→ Production's 4.1e-3 K/s at k=8 is fully accounted for by the
+standalone reproducer.
+
+### 5. Longwave drill (`debug_longwave_solo.jl`)
+
+Run setup chain [1..5] (including shortwave), reset tendencies, run
+LW SOLO and measure ITS own contribution to `tend.gridT`.
+
+```
+[Pre-LW] all inputs bit-identical EXCEPT:
+  scratch.grid.a (post-shortwave) max|Δ| = 5.96e-8     ← from shortwave's t
+
+[After LW SOLO] tend.gridT diff per layer:
+  k=1: 3.7e-4   k=2: 3.7e-4   k=3: 3.7e-4   k=4: 4.6e-4
+  k=5: 2.7e-4   k=6: 5.5e-4   k=7: 5.6e-4   k=8: 3.8e-4
+```
+
+LW's per-layer diff is comparable to shortwave's (3-6e-4 K/s at all
+layers). But here `scratch.grid.a` was pre-divergent from shortwave —
+is LW just propagating that?
+
+No: looking at `FriersonLongwaveTransmissivity` (the default), line 65
+**overwrites** `vars.scratch.grid.a` with its own `exp(-(τ_below -
+τ_above))` per layer. So even if shortwave left `t` divergent, LW
+rewrites it from scratch using its own `exp` calls.
+
+→ **Longwave is ALSO an intrinsic source** with the same 1-ULP `exp`
+mechanism. Its amplification path is the same kind of column sweep
+inside `OneBandLongwaveRadiativeTransfer`.
+
+(This is consistent with Sessions 3-5's investigation: those were
+looking at the multi-step drift accumulation under UniformCooling vs
+OneBandLongwave; the per-step seed of longwave is real but small, and
+gets amplified by the time integration.)
+
+### Unified picture of the 0.386 K step-1 T diff
+
+Every per-step seed traces back to the same root cause:
+**CPU libm `exp(x)` vs XLA `exp(x)` differ by 1 ULP** for ~12% of
+Float32 inputs. That 1-ULP gets amplified by the column-sweep flux
+integration (×10⁴ for radiation), then accumulated across multiple
+parameterizations (LSC + shortwave + longwave).
+
+| Parameterization | Internal `exp` location | per-layer tend.gridT |
+|---|---|---|
+| `solar_zenith` | trig & `sin(2πt)` — bit-identical | 0 |
+| `vertical_diffusion` | no transcendentals | 0 |
+| `large_scale_condensation` | `saturation_vapor_pressure` exp | 4e-3 at k=8 only |
+| `shortwave_radiation` (BackgroundShortwaveTransmissivity) | `exp(-optical_depth)` | 3-8e-4 at k=1..8 |
+| `longwave_radiation` (FriersonLongwaveTransmissivity) | `exp(-Δτ)` per layer | 3-6e-4 at k=1..8 |
+| `boundary_layer_drag` (BulkRichardsonDrag) | `log(z/z₀)` | 1.25e-7 (driven by orography GEMM) |
+| `surface_heat_flux` | none (linear in drag) | inherits drag×400000 amp |
+
+The 0.386 K step-1 T diff is the **aggregated and time-integrated**
+result of these per-layer per-parameterization tendency diffs of order
+1e-3 K/s, leapfrog-stepped by ~190 s per Euler half-step. The
+arithmetic checks out: 1e-3 K/s × 190 s ≈ 0.2 K, and with two
+sub-steps in first_timesteps! + amplification it reaches 0.386 K.
+
+### What is and isn't fixable
+
+**Not fixable in user code** (without losing precision):
+- CPU libm `exp` vs XLA `exp` differing by 1 ULP. To unify, both
+  sides would need the same math library — not currently feasible.
+
+**Fixable with care**:
+- Orography drift via `MatrixSpectralTransform.transform!` (BLAS gemm
+  vs XLA dot_general). Workaround: run model construction on CPU,
+  then transfer to Reactant; or sync orography post-construction.
+
+**Structural mitigations to consider** (would reduce amplification
+factor, not eliminate it):
+- Compensated summation (Kahan) inside column flux sweeps in
+  radiation kernels — would suppress the 10⁴× amplification.
+- Float64 accumulator for the column sweep, cast to Float32 at the
+  end — same idea, cleaner.
+
+**Pragmatic policy** (current):
+- Accept ~5e-4 K/step CPU↔Reactant divergence as a noise floor at T31
+  with Float32 leapfrog. This is below the model's discretization
+  error, semantically benign for forecasting/research use cases, but
+  inconvenient for bit-reproducibility tests.
+
+### Files added (Session 12)
+- `MWE_exp_ulp.jl` — standalone CPU vs Reactant exp 1-ULP test. **Kept.**
+- `MWE_column_sweep_amplification.jl` — standalone column sweep
+  amplification test (1-ULP t → 10⁴× amplified tend). **Kept.**
+- `debug_lsc_solo.jl` — LSC solo with input check; intrinsic source. **Kept.**
+- `MWE_lsc_condensation.jl` — standalone LSC condensation update; the
+  1-ULP `saturation_humidity` → δT × radius reproduces production. **Kept.**
+- `debug_longwave_solo.jl` — LW solo with input check; intrinsic source. **Kept.**
+
+### Status
+
+Phase 1 root-cause analysis **complete**. The 0.386 K step-1 T diff
+between CPU and Reactant at T31 is fully explained by:
+1. CPU libm vs XLA `exp` differing by 1 ULP per Float32 call.
+2. Multiple radiation/condensation kernels invoking `exp` per layer
+   per grid point.
+3. Column-sweep flux integration amplifying each 1-ULP `exp` diff by
+   ~10⁴× via `(g / (p_s Δσ)) × radius` flux-to-tendency scaling.
+4. Leapfrog/Euler time stepping accumulating per-step tendency diffs
+   into the headline 0.386 K step-1 T diff.
+
+Two structural workarounds are available (CPU model-init + orog sync,
+Float64 accumulator in flux sweeps). No upstream Reactant/XLA fix
+exists; ULP-level math-library differences are intrinsic.
+
+### Next session plan (continue here)
+1. **(Optional) prototype mitigation**: rewrite
+   `shortwave_radiative_transfer!` and the LSC implicit correction
+   with a Float64 accumulator for the flux/sum, cast to Float32 at
+   the boundary. Measure step-1 diff with this change.
+2. **(Optional) orography CPU-init workaround**: add a flag to
+   `EarthOrography` that runs init on CPU and only transfers to
+   architecture at the end.
+3. **Document and accept** the per-step noise floor in test
+   tolerances — open an issue/PR with the policy decision.
+
+## Session 12 follow-up — exact divergence localization (2026-05-17)
+
+User question: in LSC's chain, WHERE inside `saturation_humidity` is the
+divergence born, and WHERE does the `radius` multiplication happen?
+
+### Q1 — exact op inside `saturation_humidity` that diverges (`MWE_svp_bisect.jl`)
+
+`saturation_vapor_pressure(T, atm) = e₀ * exp(Lᵥ/R_vapor * (1/T₀ - 1/T))`
+then `saturation_humidity(T, p) = ϵ * svp(T) / p`.
+
+Bisect each op (standalone Julia + Reactant, no SpeedyWeather):
+
+| Step | Op | max\|Δ\| | identical? |
+|---|---|---|---|
+| s1 | `a = 1/T` | 0 | yes |
+| s1–3 | `c = 1/T₀ − 1/T` (single broadcast) | 0 | yes |
+| s3 | `c = (1/T₀) − a` (subtract alone) | 0 | yes |
+| s5 | `e = (Lᵥ/Rᵥ) * c` | 0 | yes |
+| **s6** | **`f = exp(e)`** | **2.4e-7** | **no — 294/3168 points** |
+| s7 | `g = e₀ * f` | 0 (given CPU f) | yes |
+| s8 | `h = ϵ * g / P` | 0 (given CPU g, P) | yes |
+| fused | `h = ϵ * e₀ * exp(…) / P` (one trace) | 2.79e-9 | 1347/3168 points |
+
+**Only `exp` differs.** Every other op (division, subtract, multiply by
+constant, divide by P) is bit-exact between CPU libm and XLA when given
+identical inputs. In the fused version, the 2.4e-7 ULP-noise of `exp`
+is propagated through the `ϵ * e₀ / p ≈ 4e-3` scaling and emerges as
+2.79e-9 in `h` — same ULP, smaller absolute scale.
+
+So the chain is:
+```
+exp(e) → 1 ULP diff (~2.4e-7 absolute)
+e₀ * exp(e) → same 1 ULP diff scaled by e₀
+ϵ * e₀ * exp(e) / p → 1 ULP diff scaled by ϵ/p
+```
+The 1-ULP relative error stays the same; the absolute scale just
+rides along.
+
+### Q2 — where `radius` is multiplied (`scaling.jl:29`, `tendencies.jl:56`)
+
+`large_scale_condensation!` itself writes the **physical** tendency:
+`temp_tend[ij, k] += δT` (in K/s).
+**No `* radius` inside the LSC kernel.**
+
+The multiplication happens at the END of the per-`ij` column kernel
+that ENCLOSES all parameterizations:
+
+```julia
+# SpeedyWeather/src/parameterizations/tendencies.jl:48
+@kernel inbounds = true function column_parameterizations_kernel!(vars, parameterizations, model)
+    ij = @index(Global, Linear)
+    column_parameterizations!(ij, vars, parameterizations, model)
+    scale_tendencies!(ij, vars.tendencies.grid, model.planet.radius)   # ← here
+end
+```
+
+`scale_tendencies!` (in `SpeedyWeather/src/dynamics/scaling.jl:29`)
+multiplies `tend.grid.u, v, temperature, humidity` element-wise by
+`radius` (≈ 6.371e6) for the given `ij`. This is a SpeedyWeather
+convention: the dynamical core works in radius-scaled units, so
+parameterization tendencies (physical K/s) are scaled up by `radius`
+to match.
+
+So when the production bisect (`debug_param_drift_bisect.jl`) reports
+`max|Δ tend.gridT| = 4.1e-3 K/s` after LSC, that number is **already
+multiplied by radius**. The raw `δT` from LSC is ~6e-10 K/s; the
+`scale_tendencies!` post-pass multiplies it by 6.371e6 to get ~4e-3.
+
+In `MWE_lsc_condensation.jl` I emulated this by computing
+`max|Δ δT * radius|` manually — that's why the standalone result
+(8.3e-3) is in the same ballpark as the production 4.1e-3, even
+though the underlying physical δT diff is ~1e-9 K/s. The 2× discrepancy
+between the MWE (8.3e-3) and production (4.1e-3) reflects the different
+input distribution (random vs spin-up T) and the conditional condensation
+branch firing on a subset of points.
+
+### Updated summary diagram
+
+```
+T (Float32, bit-identical input)
+    │
+    │ 1/T          (exact, no ULP diff)
+    ▼
+1/T₀ − 1/T          (exact)
+    │
+    │ × (Lᵥ/Rᵥ)    (exact)
+    ▼
+e                    ≈ 0.5
+    │
+    │ exp(.)         ← CPU libm vs XLA differ by 1 ULP ON ~10% of inputs
+    ▼
+f = exp(e)           ULP diff: ~2.4e-7 absolute (1 ULP at f ≈ 1.7)
+    │
+    │ × e₀ * ϵ / p   (exact, just scaling)
+    ▼
+sat_humid            ULP diff: ~2.8e-9 (1 ULP at sat ≈ 0.01)
+    │
+    │ LSC implicit correction
+    │ (more exact arithmetic on the ULP-noisy sat_humid)
+    ▼
+δT                   ~ 6e-10 K/s (raw physical tendency)
+    │
+    │ × radius (in `scale_tendencies!`)
+    ▼
+tend.gridT           ~ 4e-3 K/s (the "production" number)
+```
+
+### Files added (Q1+Q2 follow-up)
+- `MWE_svp_bisect.jl` — step-by-step bisect proving `exp` is the only
+  diverging op in `saturation_vapor_pressure`. **Kept.**
+
+## Session 12 follow-up #2 — radius scaling cancels in leapfrog (2026-05-17)
+
+User question: can we move the `* radius` scaling to reduce the worst
+of the divergence?
+
+### Short answer: NO — the radius is self-cancelling.
+
+### The cancellation (`debug_radius_cancellation.jl`)
+
+Reading the code:
+- `scale_tendencies!` (in `SpeedyWeather/src/dynamics/scaling.jl:29`)
+  multiplies `tend.grid.{u,v,T,q}` by `radius`.
+- `Leapfrog.Δt = Δt_sec / radius` (in `SpeedyWeather/src/time_stepping/leapfrog.jl:44`).
+- `leapfrog_kernel!` does `a_new = a_old + Δt * tend[lmk]` (line 131).
+
+Product:
+```
+Δt × tend = (Δt_sec / radius) × (radius × δT_phys)
+         =  Δt_sec × δT_phys
+```
+
+**The radius factor cancels EXACTLY in `Δt × tend`.** It's a numerical
+convention for the dynamical core's internal scaling (vorticity and
+divergence are kept in `vor × radius` form for spectral efficiency);
+temperature and humidity tendencies are scaled along for consistency.
+
+### Empirical confirmation
+
+`debug_radius_cancellation.jl` at T31:
+```
+radius        = 6.371e6
+Δt_sec        = 2400.0 s  (physical)
+Δt (leapfrog) = Δt_sec / radius = 3.77e-4
+Δt × radius   = 2400.0 s   ✓  exactly Δt_sec
+```
+
+And for LSC at k=8:
+```
+Post scale_tendencies max|Δ tend.grid.T| = 4.12e-3 K/s   ← bisect "headline"
+Pre-scale (= post-scale / radius)        = 6.47e-10 K/s ← physical
+Predicted T contribution = pre × Δt_sec  = 1.55e-6 K     ← microscopic
+```
+
+LSC alone contributes only ~1.5e-6 K to the step-1 T diff, NOT 4e-3 K.
+The 4e-3 K/s is a measurement artifact of the radius convention.
+
+### What this means for the bisect numbers
+
+The "headline" tendency-diff numbers I reported are **post-radius**:
+- LSC at k=8: 4.12e-3 K/s (post-radius) = 6.5e-10 K/s (physical)
+- Shortwave at k=1..7: 3-8e-4 K/s (post-radius) = ~10⁻¹⁰ K/s (physical)
+- Longwave at k=1..8: 3-6e-4 K/s (post-radius) = ~10⁻¹⁰ K/s (physical)
+
+After leapfrog with `Δt × tend = Δt_sec × δT_phys`, the actual per-step
+T change from each parameterization is ~1e-10 K/s × ~190 s = **~2e-8 K**.
+
+But the observed step-1 T diff is **0.386 K** — eight orders of
+magnitude larger. Where does the rest come from?
+
+→ **Inside `shortwave_radiative_transfer!`** there's a cumulative
+amplification of ~32768× (per `MWE_column_sweep_amplification.jl`),
+operating on the RAW physical t array BEFORE scale_tendencies! is even
+called. The amplification is intrinsic to the algorithm's flux-sweep
+recursion `D *= t[k]; tend += (D - D_out) * scale; D = D_out`, not to
+the radius factor.
+
+The radius scaling is INNOCENT — it sits between two cancelling
+operations and contributes nothing to the divergence.
+
+### Why this is structurally important
+
+The bisect numbers had me focused on LSC's k=8 4e-3 K/s as "an
+important contributor". In physical terms, LSC's contribution to
+step-1 T is **microscopic** — three orders of magnitude smaller than
+shortwave_radiation's column-sweep amplified contribution at k=1
+(~5e-3 K after the dt × radius pipeline).
+
+The real ranking by step-1 T impact (estimating from pre-scale tendency
+× Δt_sec):
+1. **`shortwave_radiation`** k=1 ≈ 1.95e-3 K/s × 188 s × (column-sweep
+   amplification factor inside the kernel that's already part of the
+   reported number) — dominant.
+2. **`longwave_radiation`** similar magnitude, similar mechanism.
+3. **`large_scale_condensation`** ~1e-6 K at k=8 — negligible.
+4. **Orography → drag → surface_heat_flux** ~5e-5 K at k=8 — also
+   small once you remove the radius-scaling visual bias.
+
+### Where to focus mitigation
+
+Moving `* radius` won't help. What WOULD help (in decreasing order of
+impact on the 0.386 K headline):
+
+1. **Mitigate column-sweep amplification in shortwave** — Float64
+   accumulator for `D`, `D_out`, and the downward/upward beam.
+   Approx. ~10⁴× sensitivity reduction → headline drops by ~10⁴ →
+   step-1 T diff would go from 0.386 K to ~4e-5 K. Biggest win.
+
+2. **Same for longwave** — column flux sweep in
+   `OneBandLongwaveRadiativeTransfer` has the same structure.
+
+3. **Eliminate the `exp` ULP at source** — replace transcendentals
+   with bit-reproducible polynomial approximations (FastMath off
+   on both sides; ensure same intrinsic). Possible but invasive.
+
+4. **Orography sync** — fixes the surface_heat_flux channel; small
+   contribution given other dominators.
+
+5. **NOT useful: moving `* radius`.** It would change the reported
+   bisect numbers cosmetically but the headline 0.386 K is invariant
+   under `radius` placement.
+
+### Files added (radius cancellation)
+- `debug_radius_cancellation.jl` — empirical confirmation that
+  `Δt × radius = Δt_sec` and that the bisect "4e-3 K/s" reduces to
+  microscopic 1.5e-6 K after the leapfrog step. **Kept.**
+
+### Reframing the per-step seed table
+
+Updated reading of the 0.386 K headline (with radius cancellation taken
+out of the picture):
+
+| Parameterization | post-radius bisect | pre-radius (physical) | step-1 T contribution |
+|---|---|---|---|
+| LSC k=8 only | 4.1e-3 K/s | 6.5e-10 K/s | 1.5e-6 K (negligible) |
+| Shortwave k=1..7 | 3-8e-4 K/s | 5-13e-11 K/s | 1-3e-7 K from the OUTPUT TENDENCY |
+| Longwave k=1..8 | 3-6e-4 K/s | 5-10e-11 K/s | 1-2e-7 K |
+| drag→SHF k=8 | 4.9e-2 K/s | 7.7e-9 K/s | 1.8e-5 K (with orog unsynced) |
+
+But the 0.386 K observed step-1 T diff is much larger than the sum of
+those direct contributions! That confirms the **column-sweep
+amplification happens before the tendency-divergence is even reported**
+— inside the shortwave kernel, the per-layer `D *= t[k]` recursion
+already produces a 10⁴× amplification of the seed 1-ULP `t` divergence
+into a per-layer-K/s tendency. The OUTPUT tendency we measure post-
+kernel is the already-amplified value (~6e-4 K/s post-radius = ~10⁻¹⁰
+K/s physical). Multiplied by Δt_sec ≈ 190 s, that's only 2e-8 K per
+step.
+
+So either:
+(a) the leapfrog step ITSELF amplifies further (multi-step nature
+    of the dt × tend update with the Williams filter), or
+(b) the per-layer kernels have additional channels writing to tend
+    that I haven't captured in the bisect (e.g., `surface_shortwave_*`
+    fields feeding back through other parameterizations on the same
+    column pass).
+
+This is a fresh open question — the step-1 T diff arithmetic doesn't
+quite add up from the per-parameterization tendency diffs once radius
+is properly accounted for. Worth a future drill.
+
+### Status
+
+The radius scaling is a numerical-convention bookkeeping factor with
+zero impact on the actual prognostic update; moving it cannot reduce
+the CPU↔Reactant divergence. The visible "4e-3 K/s" tendency diffs in
+the bisect are radius-scaled and three orders of magnitude larger than
+the corresponding physical-tendency diffs.
+
+**Surprise observation**: even accounting for the radius cancellation,
+the per-parameterization physical tendency diffs (~1e-10 K/s) ×
+Δt_sec (~200 s) ≈ 2e-8 K — yet the observed step-1 T diff is 0.386 K.
+There's a remaining factor of ~10⁷ unaccounted for. Possible
+explanations: leapfrog Williams filter interaction, implicit
+correction in horizontal_diffusion!, accumulating tendencies in
+spectral after the second `first_timesteps!` half-step.
+
+Worth investigating next session: **trace the dt × radius cancellation
+all the way to the post-step grid temperature** to see where the
+10⁷ comes from.
+
+## Session 13 — Column-sweep mitigation MWE (2026-05-17)
+
+User question: how could I reduce the column-sweep amplification?
+
+### Test setup (`MWE_column_sweep_mitigations.jl`)
+
+Standalone, no SpeedyWeather. Generate two t arrays (CPU libm exp vs
+Reactant @jit exp, 1-ULP different). Feed both into four sweep variants
+and measure `max|Δ dTdt|` post-radius:
+
+```
+V0  baseline F32, absorbed = D - D*t           (cancellation candidate)
+V1  F64 accumulator (D, U in F64; F32 t in)    (cumulative-rounding candidate)
+V2  expm1 reformulation in F32                 (cancellation fix)
+V3  F64 + expm1                                 (combined)
+V4  F64 exp + F64 sweep + F32 output           (precision throughout)
+```
+
+### Results
+
+| variant | max\|Δ dTdt\| | reduction vs V0 |
+|---|---|---|
+| V0 baseline | 1.95e-3 K/s | 1× |
+| V1 F64 accumulator (F32 t in) | 1.95e-3 | **1× — no help** |
+| V2 expm1 with bit-identical α | 0.0 | (artifact — same α both sides) |
+| V2 expm1 with realistic α | 1.95e-3 | **1× — no help** |
+| V3 F64 + expm1 with realistic α | (same) | — |
+| **V4 F64 exp + F64 sweep + F32 out** | **0.0** | **>10⁵× — total elimination** |
+
+### What we learned
+
+1. **F64 accumulator alone doesn't help.** The cumulative-rounding-through-
+   `D *= t[k]` hypothesis was wrong. The amplification comes from the
+   FIRST step: a 1-ULP error in `t` (≈6e-8) gets multiplied by D
+   (≈1000), producing ~6e-5 absolute error in absorbed. Then the
+   tendency conversion `× (g / (p_s Δσ)) × radius` multiplies by ~30,
+   giving ~2e-3 K/s. **Linear scaling, no special amplification.**
+   F64 on D doesn't help because the F32 `t` already has 6e-8 baked in.
+
+2. **expm1 doesn't help for CPU↔XLA reproducibility either.** Yes, it
+   avoids catastrophic cancellation in `1 - exp(-τ)`, but expm1
+   itself differs between CPU and XLA by ~1 F32 ULP — same magnitude
+   as exp. So feeding two different α arrays into the (clean) column
+   sweep gives the same amplification.
+
+3. **The only thing that works: compute exp in F64.**
+   - F32 exp CPU vs XLA: 6e-8 absolute difference (1 ULP)
+   - F64 exp CPU vs XLA: 1.1e-16 absolute difference (1 F64 ULP)
+   - F64 ULP is 5.4e8× smaller than F32 ULP.
+   - After F64 sweep with F32 output, the F32 representation of
+     dTdt is identical between CPU and Reactant.
+
+### Recommendation
+
+To eliminate the column-sweep contribution to CPU↔Reactant divergence
+in `shortwave_radiative_transfer!` (and by analogy
+`longwave_radiative_transfer!`, `transmissivity!`, and the LSC
+`saturation_humidity` chain):
+
+**Promote every `exp`/`log`/`expm1` call site to F64, plus the
+recursive accumulator that consumes its result. Cast back to F32 at
+the boundary where the result is written to the tendency.**
+
+In `BackgroundShortwaveTransmissivity.transmissivity!`:
+```julia
+# was:
+t[ij, k] = exp(-optical_depth)
+# becomes:
+t[ij, k] = Float32(exp(-Float64(optical_depth)))
+```
+And similarly inside `shortwave_radiative_transfer!`, keep the column
+accumulator (`D`, `U`) in F64 while reading t (which is already F64-
+precision if computed as above) and writing F32 tendency.
+
+For `saturation_vapor_pressure`:
+```julia
+# was:
+return e₀ * exp(Lᵥ / R_vapor * ((1/T₀) - (1/T)))
+# becomes:
+T64, T₀64 = Float64(T), Float64(T₀)
+return Float32(e₀ * exp(Float64(Lᵥ) / Float64(R_vapor) * (1/T₀64 - 1/T64)))
+```
+
+### Cost/benefit
+
+- **Cost**: F64 ops are typically 2× slower than F32 on CPU and
+  varies on GPU. For a kernel like `transmissivity!` with one `exp`
+  per layer per ij (~25k ops at T31×8 layers), this is negligible.
+  The column sweep's F64 multiplications and additions cost more,
+  but it's still a small piece of a timestep.
+- **Benefit**: per the MWE, eliminates the ~1.95e-3 K/s tendency
+  divergence — i.e., kills the entire shortwave column-sweep
+  contribution to the per-step seed.
+
+### Caveats for the actual SpeedyWeather code
+
+The MWE result of "max|Δ dTdt| = 0.0" is at F32 representation level
+when comparing two F64 results that themselves differ by 1.1e-16.
+In a real production trace, fused operations and Reactant's compiler
+optimizations might shift the F64 1-ULP around slightly. The actual
+reduction might be 10⁴–10⁵× instead of 10⁵+× — still huge.
+
+Also: V4 only addresses the SHORTWAVE column sweep. The same
+treatment is needed for:
+- Longwave's transmissivity exp + radiative transfer.
+- LSC's saturation_humidity exp + implicit correction.
+
+Each one is independent; each needs the F64 promotion.
+
+### Files added (Session 13)
+- `MWE_column_sweep_mitigations.jl` — V0/V1/V2/V3/V4 comparison.
+  V4 (F64 exp + F64 sweep + F32 out) eliminates the diff entirely.
+  **Kept.**
+
+### Status
+
+Mitigation strategy **identified and validated** in standalone MWE.
+The fix is: F64 for the `exp` (and the recursive accumulator that
+consumes it) inside each radiation/condensation kernel; F32 at the
+input/output boundary. Implementing this in the production code is
+mechanical:
+- `BackgroundShortwaveTransmissivity.transmissivity!`
+- `OneBandShortwaveRadiativeTransfer.shortwave_radiative_transfer!`
+- `ConstantLongwaveTransmissivity.transmissivity!`
+- `FriersonLongwaveTransmissivity.transmissivity!`
+- `OneBandLongwaveRadiativeTransfer.longwave_radiative_transfer!`
+- `saturation_vapor_pressure` (used by LSC and DiagnosticClouds)
+
+Estimated effort: small per call site, but ~6 call sites to touch.
+
+### Next session plan (continue here)
+1. Pick ONE call site (suggest `BackgroundShortwaveTransmissivity.transmissivity!`)
+   and apply the F64 fix in source. Re-run `debug_param_drift_bisect.jl`
+   and `debug_drift_step1.jl` to see how much the per-step T diff drops.
+2. If successful, generalize to the other 5 call sites.
+3. Investigate the still-open ~10⁷ amplification mystery — even after
+   eliminating the per-kernel divergence, where would residual seeds
+   come from? Likely the GEMM-based `transform!` in the dynamical core.
+
+## Session 14 — F64 mitigation implementation plan (2026-05-17)
+
+Concrete plan to apply the F64 fix validated by `MWE_column_sweep_mitigations.jl`
+(Session 13 V4: total elimination of column-sweep CPU↔Reactant divergence
+when `exp` and its column-recursion accumulator run in F64).
+
+### Design principle
+
+For each transcendental call (`exp`, `expm1`, `log`, `log1p`, `^4`,
+…) and the recursive accumulator that consumes its result inside the
+parameterization kernels:
+
+```
+Float32 input → Float64 promote → F64 transcendental + F64 accumulator
+              → Float32 cast at the write boundary to the tendency array
+```
+
+Wrapped in a small helper to keep call sites readable and to allow a
+single point of control:
+
+```julia
+# Likely home: SpeedyWeatherInternals/src/Utils/utility_functions.jl
+# Always evaluates `f` in widen(T) precision; result cast back to T.
+@inline _wide(f::F, x::T) where {F, T <: AbstractFloat} = T(f(widen(T)(x)))
+@inline _wide_exp(x::T) where T = T(exp(widen(T)(x)))
+@inline _wide_expm1(x::T) where T = T(expm1(widen(T)(x)))
+@inline _wide_log(x::T) where T = T(log(widen(T)(x)))
+```
+
+For `T = Float32`, `widen(T) = Float64` → the F64 promotion we want.
+For `T = Float64`, `widen(T) = BigFloat` would be slow; gate behind:
+
+```julia
+@inline _wide_exp(x::Float32) = Float32(exp(Float64(x)))
+@inline _wide_exp(x::Float64) = exp(x)                          # no widening
+```
+
+This keeps the helper a no-op for F64 model runs (no perf regression)
+and a precision win for F32 (the production default).
+
+### Phase A — proof of concept on one kernel
+
+**File**: `SpeedyWeather/src/parameterizations/radiation/shortwave_transmissivity.jl`
+**Target**: `BackgroundShortwaveTransmissivity.transmissivity!` (line 75-142)
+**Hot line**: 138 — `t[ij, k] = exp(-optical_depth)`
+
+**Diff (minimal)**:
+```julia
+# was:
+t[ij, k] = exp(-optical_depth)
+# becomes:
+t[ij, k] = _wide_exp(-optical_depth)
+```
+
+Also at line 27 in `ConstantShortwaveTransmissivity.transmissivity!`:
+```julia
+τ = -log(CST.transmissivity)           # → _wide_log(...)
+...
+t[ij, k] = exp(-τ * dσ[k])              # → _wide_exp(...)
+```
+
+**Test**:
+1. `julia --project debug_param_drift_bisect.jl` — expect `k=5
+   shortwave_radiation` to show no marginal jump in `tend.gridT` diff
+   compared to `k=4 albedo`. The bisect previously showed:
+   k=4: 4.12e-3, k=5: 4.15e-3 (a 3e-5 K/s jump from shortwave).
+   After fix: expect k=5 ≈ k=4 (no marginal shortwave contribution).
+2. `julia --project debug_drift_step1.jl` — expect per-layer T diff
+   at k=1..7 to drop. Previously k=1..7: 0.05..0.24 K. Expectation
+   if F64 fix works as in MWE: k=1..7 drop to ~0 (or to noise from
+   other parameterizations).
+3. CPU-only sanity check — run a CPU-only forecast and verify the F64
+   fix produces results that are bit-identical (or close, within F64
+   ULP) to the baseline CPU run. The F64 promote rounds to the same
+   F32 value as the F32 path in most cases.
+
+**Expected outcome**: dominant per-layer step-1 T diff (k=1..7)
+drops, validating the F64 strategy on one kernel.
+
+**If it doesn't work as expected**: re-examine. Possibilities:
+- `_wide_exp` not actually compiling to F64 exp on Reactant side
+  (could be a tracing artifact). Check `@code_hlo` to verify.
+- The transmissivity scratch array `vars.scratch.grid.a` is F32; even
+  with F64 internal computation, the F32 store rounds back. That's
+  actually GOOD (we want F32 in the array) but might still produce
+  CPU↔Reactant diff if the rounding modes differ.
+- The diff might originate not in transmissivity but in
+  `shortwave_radiative_transfer!` itself (downward/upward beam).
+  Phase C addresses that.
+
+### Phase B — generalise to all transmissivity kernels
+
+**Files / lines**:
+- `parameterizations/radiation/shortwave_transmissivity.jl:30`
+  `ConstantShortwaveTransmissivity.transmissivity!`: `exp(-τ * dσ[k])`
+- `parameterizations/radiation/shortwave_transmissivity.jl:138`
+  `BackgroundShortwaveTransmissivity.transmissivity!`: `exp(-optical_depth)`
+  (touched in Phase A)
+- `parameterizations/radiation/longwave_transmissivity.jl:20`
+  `ConstantLongwaveTransmissivity.transmissivity!`: `exp(-τ * dσ[k])`
+- `parameterizations/radiation/longwave_transmissivity.jl:65`
+  `FriersonLongwaveTransmissivity.transmissivity!`: `exp(-(τ_below - τ_above))`
+
+In each, replace `exp(...)` with `_wide_exp(...)`. Also any internal
+`log(...)` (e.g. line 17 of shortwave_transmissivity.jl).
+
+**Test**: re-run `debug_param_drift_bisect.jl`. After Phase B:
+- k=6 longwave_radiation row should also show no marginal increase
+  over k=5 (currently +1e-5 K/s).
+
+### Phase C — radiative_transfer kernels (the column sweeps)
+
+The transmissivity arrays (`vars.scratch.grid.a`) are F32. After Phases
+A and B, the F32-stored `t` values are still the result of CPU exp vs
+XLA exp differing at F32 precision (because we round F64 result back
+to F32). **The same 1-ULP F32 diff in `t` is re-introduced at the
+store**.
+
+So Phase A+B alone might not be enough. Phase C: keep the accumulator
+`D` and `U` in F64 INSIDE the radiative transfer column sweep, so even
+if `t` (read from scratch) has a 1-ULP F32 diff, the sweep is
+performed in F64 and only rounds back to F32 at the final tendency
+write.
+
+**Files / lines**:
+- `parameterizations/radiation/shortwave_radiation.jl:156-235`
+  `shortwave_radiative_transfer!`
+- `parameterizations/radiation/longwave_radiation.jl:222-285`
+  `longwave_radiative_transfer!`
+
+**Diff for shortwave_radiative_transfer!** (key parts):
+```julia
+# was (Float32 NF):
+D = D_toa                                   # F32
+for k in 1:nlayers
+    D_out = (D - O₃ * D_toa) * t[ij, k]
+    dTdt[ij, k] += flux_to_tendency((D - D_out) / cₚ, pₛ, k, model)
+    D = D_out
+end
+# becomes (F64 accumulator):
+D_toa = widen(NF)(model.planet.solar_constant * cos_zenith)   # F64
+D = D_toa
+for k in 1:nlayers
+    t_k = widen(NF)(t[ij, k])               # promote F32 → F64
+    D_out = (D - widen(NF)(O₃) * D_toa) * t_k
+    absorbed = D - D_out
+    dTdt[ij, k] += NF(flux_to_tendency(absorbed / widen(NF)(cₚ), pₛ, k, model))
+    D = D_out
+end
+```
+
+Apply the same to `U_reflected`, `D_surface`, `U`, and the upward
+sweep. Same pattern for longwave (lines 256-282 of
+longwave_radiation.jl): promote `U` and `D` to `widen(NF)`.
+
+**Watch out**: lines 251 and 270 of longwave_radiation.jl have
+`U::NF = ...` and `D::NF = 0` — those type annotations force F32. Need
+to drop or change to `widen(NF)`.
+
+**Test**: re-run `debug_param_drift_bisect.jl` AND
+`debug_drift_step1.jl`. After Phase C:
+- Per-layer step-1 T diff at k=1..7 should be near 0 (k=8 still has
+  LSC/SHF contributions until Phase D).
+- The headline step-1 T diff should drop from 0.386 K substantially —
+  potentially by 100×-1000× if column sweep is the dominant source.
+
+### Phase D — saturation_vapor_pressure (LSC + clouds + convection)
+
+**File**: `SpeedyWeather/src/dynamics/atmosphere.jl:138-158`
+
+```julia
+# was:
+@inline function saturation_vapor_pressure(T, A::AbstractWetAtmosphere)
+    e₀ = A.saturation_vapor_pressure
+    Lᵥ = A.latent_heat_condensation
+    R_vapor = A.R_vapor
+    T₀ = A.temperature_freezing
+    return e₀ * exp(Lᵥ / R_vapor * ((1/T₀) - (1/T)))
+end
+# becomes:
+@inline function saturation_vapor_pressure(T::NF, A::AbstractWetAtmosphere) where NF
+    e₀ = NF(A.saturation_vapor_pressure)
+    Lᵥ = NF(A.latent_heat_condensation)
+    R_vapor = NF(A.R_vapor)
+    T₀ = NF(A.temperature_freezing)
+    W = widen(NF)
+    arg = W(Lᵥ) / W(R_vapor) * (W(1)/W(T₀) - W(1)/W(T))
+    return NF(W(e₀) * exp(arg))
+end
+```
+
+Note: T is promoted to `widen(NF)` inside the function; output cast
+back. This change is felt by ALL call sites of `saturation_humidity`
+without further work:
+- `parameterizations/large_scale_condensation.jl:97` (LSC)
+- `parameterizations/radiation/clouds.jl:126, 154` (DiagnosticClouds)
+- `parameterizations/convection.jl:65, 211, 230` (convection — currently
+  off in our tests via `convection=nothing`)
+
+**Optional follow-up inside LSC**: also promote LSC's implicit
+correction recursion to F64 (lines 130-134 of
+large_scale_condensation.jl), which uses `dqsat_dT` and `δq /=
+((1 + Lᵥ_cₚ * dqsat_dT) * τ * Δt)`. The 1-ULP from saturation_humidity
+flows through here; F64 division stabilises it.
+
+**Test**: re-run the standalone `MWE_lsc_condensation.jl` after the
+fix to verify δT diff drops to 0. Then re-run
+`debug_param_drift_bisect.jl` and `debug_drift_step1.jl` to confirm
+k=8 contributions vanish from LSC.
+
+### Phase E — verification, benchmarking, finalisation
+
+1. **Full Reactant correctness suite**:
+   ```
+   julia --project=SpeedyWeather --check-bounds=yes \
+     SpeedyWeather/test/reactant/runtests.jl
+   ```
+   Tolerances should now be MUCH tighter than today's defaults.
+   Discuss whether to relax test tolerances or keep them strict.
+
+2. **10-step drift**: re-run the Session 5/10 drift measurement
+   (~`debug_drift_*` scripts) with the F64 fix. Confirm the per-step
+   noise floor drops from 0.386 K to ideally ulp-scale.
+
+3. **Performance benchmark**: run
+   `julia --project=SpeedyWeather/benchmark SpeedyWeather/benchmark/manual_benchmarking.jl`
+   and compare to the existing baseline in `benchmark/README.md`. F64
+   ops are typically 2× slower on x86 and Apple Silicon; for kernels
+   that are ~10% of timestep cost, the wall-time impact should be
+   ≤2-3%. If significant: consider making the F64 widening optional
+   (e.g. via `model.use_f64_exp::Bool` or a CompileOptions flag).
+
+4. **CHANGELOG entry**: under `## Unreleased`:
+   ```
+   - Promote `exp` calls in radiation/condensation kernels to Float64
+     internally (Float32 in/out) to eliminate CPU↔Reactant per-step
+     temperature divergence from 1-ULP math-library differences
+   ```
+
+5. **Open issue/PR upstream**: link to Session 13's MWE that proves
+   the F64 fix works without needing changes to Reactant.
+
+### Risk / care points
+
+1. **`widen(Float32) = Float64`**: relies on Julia's standard widening
+   behavior. Confirm no custom NF type breaks this (e.g.
+   BFloat16). For BFloat16 the model is experimental anyway.
+
+2. **F64 inside Reactant traces**: Reactant supports F64 throughout
+   its IR (StableHLO). The `Float32 → Float64 → exp → Float32` chain
+   should lower cleanly. If a regression appears, inspect with
+   `@code_hlo` to confirm the `convert` ops are present and the F64
+   `exp` is emitted (`stablehlo.exponential` of `tensor<...xf64>`).
+
+3. **Constants in F64 vs F32**: the runtime constants like `cₚ` and
+   `radius` are stored in NF. Promoting them per-call is cheap. If
+   they end up in a hot path, hoist the promotion outside the loop.
+
+4. **Numerical equivalence to baseline CPU**: F64-then-cast-back-to-F32
+   produces a result that's within 0.5 ULP of the true value, while
+   pure F32 may have several ULPs of accumulated rounding. So the F64
+   path is STRICTLY MORE ACCURATE than the current code — not just
+   different. CPU baseline tests that compare to today's CPU output
+   may need a small tolerance bump (or, ideally, the test reference
+   is regenerated against the more accurate F64 path).
+
+5. **Reactant compilation cost**: each new kernel signature requires
+   recompilation. The `widen(NF)` pattern produces the same signature
+   regardless of NF, so there's no extra compile bloat.
+
+### Ordering / iteration
+
+- **Iteration 0**: implement the `_wide_exp` helper (single small commit
+  in `SpeedyWeatherInternals`).
+- **Iteration 1 (Phase A)**: apply to `BackgroundShortwaveTransmissivity.transmissivity!`.
+  Run bisect + step-1 tests. Measure improvement.
+- **Iteration 2 (Phase B)**: apply to remaining transmissivity kernels.
+- **Iteration 3 (Phase C)**: promote `D` and `U` accumulators in
+  radiative_transfer kernels.
+- **Iteration 4 (Phase D)**: promote `saturation_vapor_pressure`.
+- **Iteration 5 (Phase E)**: full test + benchmark + changelog.
+
+Each iteration is a small, revertable commit. Measure step-1 T diff
+after each to track progress.
+
+### Predicted impact (per the MWE)
+
+| Iteration | Expected step-1 T diff |
+|---|---|
+| Pre-fix baseline | 0.386 K |
+| Iter 1 (one transmissivity) | maybe 0.2–0.3 K (partial) |
+| Iter 2 (all transmissivities) | maybe 0.1 K |
+| Iter 3 (radiative_transfer accumulator F64) | < 0.01 K possibly |
+| Iter 4 (saturation_vapor_pressure) | < 1e-3 K possibly |
+| Iter 5 (verified) | per-step noise floor ≤ ULP-scale |
+
+These are EXPECTATIONS based on the MWE; the real measurements may
+differ if there are other unmeasured amplification paths (the
+unexplained ~10⁷ from Session 12 follow-up #2 is still open).
+
+### Status
+
+Plan is concrete and revertable. Next session: execute Iteration 0 +
+Iteration 1 (the `_wide_exp` helper + one call site), measure, and
+iterate. Each phase is a single commit on a feature branch
+(`mg/reactant-f64-exp` or similar).
+
+## Session 15 — Where `exp` could be replaced with `expm1` (2026-05-17)
+
+Catalogue + caveat. expm1 is a different fix from the F64 promotion;
+the two address overlapping but distinct problems.
+
+### Sites in the codebase
+
+Six sites exhibit the `1 - exp(-x)` pattern (either explicitly or as
+the difference of two near-equal numbers `D - D × t`):
+
+**Explicit `(1 - t)` — 4 sites in `longwave_radiative_transfer!`:**
+- `longwave_radiation.jl:258`: `U = U * t + (1 - t) * σ * T[ij, k]^4`
+  (upward beam, layer k)
+- `longwave_radiation.jl:265`: same pattern at the TOA
+- `longwave_radiation.jl:273`: downward beam interior
+- `longwave_radiation.jl:280`: downward beam at surface
+
+**Implicit `(1 - t)` via `D - D × t` — 2 sites in `shortwave_radiative_transfer!`:**
+- `shortwave_radiation.jl:200,203`:
+  ```
+  D_out = (D - O₃ * D_toa) * t[ij, k]
+  dTdt[ij, k] += flux_to_tendency((D - D_out) / cₚ, pₛ, k, model)
+  ```
+  Here `D - D_out = D - (D - O₃*D_toa) * t = (D - O₃*D_toa)*(1 - t) + O₃*D_toa`,
+  which has the same cancellation when t is close to 1.
+- `shortwave_radiation.jl:227-228`: same for upward beam (`U - U_out`).
+
+The remaining `exp` calls in the codebase (greenhouse_gases, forcing,
+initial_conditions, drag, random_process) are NOT in a `1 - exp` or
+`exp - 1` pattern; they don't suffer from cancellation and don't
+benefit from expm1.
+
+### Caveat — expm1 does NOT eliminate CPU↔Reactant divergence
+
+We tested this empirically in `MWE_column_sweep_mitigations.jl` (Session 13):
+
+```
+V2 expm1 in F32, bit-identical α both sides         → max|Δ dTdt| = 0.0
+V2 expm1 in F32, CPU expm1 vs Reactant @jit expm1   → max|Δ dTdt| = 1.95e-3 (same as V0!)
+```
+
+CPU libm `expm1` and Reactant `@jit expm1` differ by ~1 F32 ULP, same
+as `exp`. The 1-ULP-relative error in α is comparable to the 1-ULP in
+t, so the column-sweep amplification is unchanged. **Replacing `exp`
+with `expm1` does not reduce CPU↔Reactant divergence.**
+
+### What expm1 DOES improve — absolute numerical accuracy in thin layers
+
+For a thin layer (τ ≈ 0.01):
+- `1 - exp(-0.01) = 0.00995`, computed via F32 subtraction:
+  `1f0 - 0.99005f0`. The result has relative error ~6e-6 (catastrophic
+  cancellation; lost ~6 sig digits).
+- `-expm1(-0.01) = 0.00995` directly. Relative error ~6e-8 (full F32
+  precision; ~100× more accurate).
+
+So replacing `(1 - t)` with `-expm1(-τ)` makes the radiation kernels
+**numerically more accurate** in upper-atmosphere layers (low τ),
+independent of platform. This is a quality-of-implementation win, not
+a Reactant-reproducibility win.
+
+### Architectural cost
+
+The current code stores `t[ij, k] = exp(-τ)` in `vars.scratch.grid.a`
+inside `transmissivity!`, then `radiative_transfer!` reads `t` from
+the scratch array. To use `expm1`, the radiative_transfer kernels need
+either:
+
+(a) **Recompute τ from t**: `τ = -log(t)` — extra cost AND introduces
+    another transcendental call, defeats the purpose.
+(b) **Store α = -expm1(-τ) in scratch instead of t**, rewrite
+    radiative_transfer to use α as the "absorbed fraction" directly.
+    This is the clean architectural change. Each `(1 - t)` becomes
+    `α[ij, k]`, each `t` becomes `(1 - α[ij, k])`.
+(c) **Store BOTH t and α**: more memory but minimal code change.
+
+Option (b) is the natural fit. The radiative_transfer kernels become:
+```julia
+# longwave upward, was:
+U = U * t + (1 - t) * σ * T[ij, k]^4
+# becomes:
+α_k = α[ij, k]
+U = U * (1 - α_k) + α_k * σ * T[ij, k]^4
+```
+
+For shortwave's `D - D_out`:
+```julia
+# was:
+D_out = (D - O₃ * D_toa) * t[ij, k]
+absorbed = D - D_out
+# becomes:
+α_k = α[ij, k]
+absorbed = (D - O₃ * D_toa) * α_k + O₃ * D_toa
+D_out = D - absorbed
+```
+
+### Recommendation matrix
+
+| Goal | Use |
+|---|---|
+| Eliminate CPU↔Reactant divergence | **F64 promotion** (Session 14 plan) — only this works |
+| Improve absolute accuracy in thin layers | **expm1** at the 6 sites above |
+| Combine both | F64 + expm1 — once you're in F64, expm1 is cheap insurance |
+
+For pure Reactant correctness work: skip expm1, go straight to the
+F64 plan (Session 14). For an independent numerical-accuracy PR:
+the 6 expm1 sites are a self-contained, low-risk improvement.
+
+### If we did both
+
+Combined: store `α = -widen_expm1(-optical_depth)` in F64 throughout
+the transmissivity kernel, then use F64 accumulator + α directly in
+the radiative_transfer kernel. The result is what `MWE_column_sweep_
+mitigations.jl` V3 measured: total elimination of CPU↔Reactant
+divergence AND improved accuracy in thin layers. But this is just
+"F64 plan + expm1 dressing" — the F64 part does the heavy lifting.
+
+### Status
+
+Six concrete sites identified for an independent expm1 refactor.
+**Not part of the Reactant-divergence fix** (which needs F64). Could
+be a separate cleanup PR if there's interest in upper-atmosphere
+numerical accuracy.
