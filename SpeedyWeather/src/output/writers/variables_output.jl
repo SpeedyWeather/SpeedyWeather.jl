@@ -113,7 +113,7 @@ end
 # array into an independent copy before handing the snapshot to JLD2.
 materialize_views(x) = x
 materialize_views(nt::NamedTuple) = NamedTuple{keys(nt)}(map(materialize_views, values(nt)))
-materialize_views(vars::Variables) = isempty(vars.fused)Variables(;
+materialize_views(vars::Variables) = isempty(vars.fused) ? vars : Variables(;
     (k => materialize_views(getfield(vars, k)) for k in fieldnames(Variables))...
 )
 materialize_views(f::Field) = f.data isa SubArray ? Field(Array(f.data), f.grid) : f

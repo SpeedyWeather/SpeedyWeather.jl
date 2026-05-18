@@ -150,10 +150,10 @@ can differentiate through this function without runtime reflection more easily."
     end
 end
 
-# Skip view-backed leaves; their data lives in a fuse parent that is itself copied
-# via vars.fused.<name>. See `is_view_entry` and the `copy!` docstring.
+# Skip view-backed leaves when both dest and src are views; their data lives in a fuse parent 
+# that is itself copied via vars.fused.<name>. See `is_view_entry` and the `copy!` docstring.
 _copy_entry!(dest::AbstractArray, src::AbstractArray) =
-    is_view_entry(dest) ? dest : copyto!(dest, src)
+    is_view_entry(dest) && is_view_entry(src) ? dest : copyto!(dest, src)
 _copy_entry!(dest::NamedTuple, src::NamedTuple) = copy_variables!(dest, src)
 _copy_entry!(dest::Base.RefValue, src::Base.RefValue) = (dest[] = src[])
 
