@@ -25,9 +25,9 @@ model.output
 
 With all options shown below 
 
-```@example output2
-@doc JLD2Output
-```
+````@docs; canonical=false
+JLD2Output
+````
 
 ## Array Output (to RAM)
 
