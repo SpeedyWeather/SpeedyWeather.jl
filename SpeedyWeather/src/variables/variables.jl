@@ -276,16 +276,8 @@ axis (axis 2 of `parent.data`). E.g. for a `:prognostic` fuse group on `Primitiv
 slot_map = (vorticity = 1:8, divergence = 9:16, temperature = 17:24, humidity = 25:32, pressure = 33:33)
 ```
 
-For Grid2D / 3D-in-4D members the slot range has `length == 1` (e.g. `pressure = 33:33`).
-The user-facing per-variable views (`vars.prognostic.pressure`, etc.) keep their original
-2D/3D rank via the existing `_split_views` logic — the slot map is metadata used by
-`get_step` to slice the parent directly and by `_assert_fuse_alignment` to check that two
-fuse parents agree on member order.
-
-The wrapper forwards `Base.parent`, `Base.size`, `Base.eltype`, `architecture`, `Adapt`,
-`on_architecture`, `is_view_entry`, `_pretty_size`, and `copyto!` to the wrapped buffer
-so existing code that consumes a fused parent (kernels, broadcasts, the copy/print walks)
-keeps working without changes.
+The slot map is used `get_step` to slice the parent directly and by `_assert_fuse_alignment` to check 
+that two fuse parents agree on member order.
 """
 struct FusedParent{P, S <: NamedTuple}
     parent::P
