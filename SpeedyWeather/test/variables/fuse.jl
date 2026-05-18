@@ -221,7 +221,7 @@ end
     model = _testmodel(nlayers = 4)
     sim = initialize!(model)
     v = sim.variables
-    buf = v.scratch.fused.tend_grid
+    buf = v.fused.tend_grid
     nlayers = model.spectral_grid.nlayers
 
     # Write through parent, read through views
@@ -242,7 +242,7 @@ end
     model = _testmodel(nlayers = 4)
     sim = initialize!(model)
     v = sim.variables
-    buf = v.scratch.fused.tend_grid
+    buf = v.fused.tend_grid
     nlayers = model.spectral_grid.nlayers
 
     fill!(buf, eltype(buf)(99))
@@ -259,16 +259,16 @@ end
     @test all(buf.data[:, (3 * nlayers + 1):end] .== 99)
 end
 
-@testset "fused parent lives at vars.scratch.fused.<sym>; standalone variables unaffected" begin
+@testset "fused parent lives at vars.fused.<sym>; standalone variables unaffected" begin
     model = _testmodel(nlayers = 4)
     sim = initialize!(model)
     v = sim.variables
 
-    @test haskey(v.scratch, :fused)
-    @test haskey(v.scratch.fused, :tend_grid)
+    @test haskey(v.fused, :tend_grid)
     # Parent is not duplicated under other groups
     @test !haskey(v.tendencies.grid, :tend_grid)
     @test !haskey(v.scratch.grid, :tend_grid)
+    @test !haskey(v.scratch, :fused)
 
     # Standalone (non-fused) tendency variables still work normally
     @test haskey(v.tendencies, :vorticity)   # spectral tendency, not fused

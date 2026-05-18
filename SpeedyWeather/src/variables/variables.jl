@@ -65,7 +65,7 @@ export Variables
 groups corresponding to the fields here $(TYPEDFIELDS) Each group can have
 their own namespaces to distinguish between e.g. ocean, land, or tracer variables.
 All non-prognostic groups are considered to be diagnostic with no memory between time steps."""
-@kwdef struct Variables{Po, G, T, D, Pm, Pt, S} <: AbstractVariables
+@kwdef struct Variables{Po, G, T, D, Pm, Pt, S, F} <: AbstractVariables
     "Prognostic variables subject to time stepping."
     prognostic::Po = NamedTuple()
 
@@ -86,10 +86,13 @@ All non-prognostic groups are considered to be diagnostic with no memory between
 
     "Scratch variables for temporary storage during calculations with undetermined state (write before read)."
     scratch::S = NamedTuple()
+
+    "Fused variables, contigous allocations of e.g. spectral prognostic variables for batching transforms and other optimizations."
+    fused::F = NamedTuple()
 end
 
 # defined e.g. for output filters, as fieldnames(Variables) isn't fully type stable
-const ALL_VARIABLE_GROUPS = (:prognostic, :grid, :tendencies, :dynamics, :parameterizations, :particles, :scratch)
+const ALL_VARIABLE_GROUPS = (:prognostic, :grid, :tendencies, :dynamics, :parameterizations, :particles, :scratch, :fused)
 
 Adapt.@adapt_structure Variables
 
@@ -108,8 +111,8 @@ and direct assignment for `Ref` values.
 
 View leaves (Fields/LTAs whose `.data` is a `SubArray`, or bare `SubArray`s) are
 skipped: their underlying storage lives in a fuse parent that is itself reachable
-through `vars.scratch.fused.*`, and that parent is copied directly. After the
-parent is updated, every view that aliases it sees the new data automatically.
+through `vars.fused.*`, and that parent is copied directly. After the parent is
+updated, every view that aliases it sees the new data automatically.
 Copying through both view and parent is unnecessary work, and on cross-architecture
 copies (CPU ↔ Reactant) the broadcast-aliasing check inside `copyto!` fails.
 Skipping view leaves avoids both problems."""
@@ -148,7 +151,7 @@ can differentiate through this function without runtime reflection more easily."
 end
 
 # Skip view-backed leaves; their data lives in a fuse parent that is itself copied
-# via vars.scratch.fused.<name>. See `is_view_entry` and the `copy!` docstring.
+# via vars.fused.<name>. See `is_view_entry` and the `copy!` docstring.
 _copy_entry!(dest::AbstractArray, src::AbstractArray) =
     is_view_entry(dest) ? dest : copyto!(dest, src)
 _copy_entry!(dest::NamedTuple, src::NamedTuple) = copy_variables!(dest, src)
@@ -217,7 +220,7 @@ end
 Filters out duplicates and sorts the variables into groups and namespaces. Variables
 sharing a non-empty `fuse` symbol (within the same namespace) share a single parent
 buffer; their per-variable entries are views of that parent. Fused parents themselves
-live under `vars.scratch.fused.<fuse_symbol>`."""
+live under `vars.fused.<fuse_symbol>`."""
 function Variables(model::AbstractModel)
     all_vars = all_variables(model)     # one long tuple for all required variables of model and its components
 
@@ -233,20 +236,18 @@ function Variables(model::AbstractModel)
     particles         = allocate(filter_variables(all_vars,         ParticleVariable), model, fuse_parents)
     scratch           = allocate(filter_variables(all_vars,          ScratchVariable), model, fuse_parents)
 
-    # Install fused parents at their canonical home: vars.scratch.fused.<fuse_symbol>.
+    # Install fused parents at their canonical home: vars.fused.<fuse_symbol>.
     # Validates that fuse symbols are globally unique across namespaces.
-    if !isempty(fuse_parents)
-        fused = build_fused_namespace(fuse_parents)
-        scratch = merge(scratch, (fused = fused,))
-    end
+    fused = build_fused_namespace(fuse_parents)
 
-    return Variables(; prognostic, grid, tendencies, dynamics, parameterizations, particles, scratch)
+    return Variables(; prognostic, grid, tendencies, dynamics, parameterizations, particles, scratch, fused)
 end
 # runic: on
 
-"""$(TYPEDSIGNATURES) Build the `vars.scratch.fused` NamedTuple from the `fuse_parents` Dict.
+"""$(TYPEDSIGNATURES) Build the `vars.fused` NamedTuple from the `fuse_parents` Dict.
 Keyed flat by fuse symbol; errors if the same fuse symbol is reused across namespaces."""
 function build_fused_namespace(fuse_parents)
+    isempty(fuse_parents) && return NamedTuple()
     seen = Dict{Symbol, Symbol}()  # fuse_symbol => namespace, for collision diagnostics
     pairs = Pair{Symbol, Any}[]
     for ((ns, fuse_sym), entry) in fuse_parents
@@ -254,7 +255,7 @@ function build_fused_namespace(fuse_parents)
             error(
                 "Fuse symbol `$fuse_sym` is used in multiple namespaces (`$(seen[fuse_sym])` and `$ns`). " *
                 "Fuse symbols must be globally unique across namespaces so they can live flat under " *
-                "`vars.scratch.fused.<fuse_symbol>`."
+                "`vars.fused.<fuse_symbol>`."
             )
         end
         seen[fuse_sym] = ns
@@ -411,7 +412,7 @@ end
 
 # Build the NamedTuple for a single namespace: fused members become views into a shared parent;
 # standalone members allocate normally via `zero(v, model)`. The parent itself is NOT installed
-# here — it lives at the canonical location `vars.scratch.fused.<fuse_symbol>` (built once at the
+# here — it lives at the canonical location `vars.fused.<fuse_symbol>` (built once at the
 # end of `Variables(model)`).
 function _allocate_namespace(vars, model, fuse_parents)
     pairs = Pair{Symbol, Any}[]
