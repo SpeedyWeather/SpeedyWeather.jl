@@ -252,10 +252,10 @@ function Variables(model::AbstractModel)
 
     # If both the spectral prognostic parent and its grid-snapshot parent exist, they
     # must declare members in matching order so a mega-batched spec→grid transform can
-    # map slot k of `prog_spec` to slot k of `grid`.
+    # map slot k of `prognostic` to slot k of `grid`.
     # TODO: Maybe just move this to unit tests? Do we need to test this every time? 
     if haskey(fused, :prognostic) && haskey(fused, :grid)
-        _assert_fuse_alignment(fused.prog_spec, fused.grid;
+        _assert_fuse_alignment(fused.prognostic, fused.grid;
                                name_a = :prognostic, name_b = :grid)
     end
 
