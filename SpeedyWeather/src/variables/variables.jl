@@ -87,7 +87,7 @@ All non-prognostic groups are considered to be diagnostic with no memory between
     "Scratch variables for temporary storage during calculations with undetermined state (write before read)."
     scratch::S = NamedTuple()
 
-    "Fused variables, contigous allocations of e.g. spectral prognostic variables for batching transforms and other optimizations."
+    "Fused variables, contiguous allocations of e.g. spectral prognostic variables for batching transforms and other optimizations."
     fused::F = NamedTuple()
 end
 
