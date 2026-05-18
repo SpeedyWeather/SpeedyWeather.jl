@@ -6,14 +6,12 @@ using Dates
 # loaded. Pull the public names out of the extension module.
 const SWTerrarium = Base.get_extension(SpeedyWeather, :SpeedyWeatherTerrariumExt)
 @assert SWTerrarium !== nothing "SpeedyWeatherTerrariumExt failed to load"
-const TerrariumWetLand = SWTerrarium.TerrariumWetLand
-const TerrariumDryLand = SWTerrarium.TerrariumDryLand
+const TerrariumLand = SWTerrarium.TerrariumLand
 const AbstractTerrariumLandModel = SWTerrarium.AbstractTerrariumLandModel
 
 @testset "Terrarium coupling: type hierarchy" begin
     @test AbstractTerrariumLandModel <: SpeedyWeather.AbstractLand
-    @test TerrariumWetLand <: AbstractTerrariumLandModel
-    @test TerrariumDryLand <: AbstractTerrariumLandModel
+    @test TerrariumLand <: AbstractTerrariumLandModel
 end
 
 @testset "Terrarium coupling: initialize + run + NaN check" begin
@@ -42,7 +40,7 @@ end
         soil,
     )
 
-    land = TerrariumWetLand(spectral_grid, terrarium_model; Δt = 300.0)
+    land = SpeedyWeather.LandModel(spectral_grid, terrarium_model; Δt = 300.0)
     @test land isa AbstractTerrariumLandModel
     @test land isa SpeedyWeather.AbstractLand
     @test SpeedyWeather.get_nlayers(land) == 1
@@ -105,7 +103,7 @@ end
     Tair_input = Terrarium.InputSource(column_grid, air_temperature_field; name = :air_temperature)
     bcs = Terrarium.PrescribedSurfaceTemperature(:air_temperature)
 
-    land = TerrariumDryLand(
+    land = SpeedyWeather.LandModel(
         spectral_grid, soil_model;
         boundary_conditions = bcs,
         input_variables = Terrarium.variables(Tair_input),
@@ -129,7 +127,6 @@ end
 
     @test haskey(sim.variables.prognostic.land, :terrarium)
     @test haskey(sim.variables.prognostic.land, :soil_temperature)
-    @test !haskey(sim.variables.prognostic.land, :soil_moisture)
 
     SpeedyWeather.run!(sim, steps = 3)
 
