@@ -276,8 +276,8 @@ axis (axis 2 of `parent.data`). E.g. for a `:prognostic` fuse group on `Primitiv
 slot_map = (vorticity = 1:8, divergence = 9:16, temperature = 17:24, humidity = 25:32, pressure = 33:33)
 ```
 
-The slot map is used `get_step` to slice the parent directly and by `_assert_fuse_alignment` to check 
-that two fuse parents agree on member order.
+The slot map is used `get_prognostic_step` and `get_tendency_step` to slice the parent directly and 
+by `_assert_fuse_alignment` to check that two fuse parents agree on member order.
 """
 struct FusedParent{P, S <: NamedTuple}
     parent::P
