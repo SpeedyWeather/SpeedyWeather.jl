@@ -78,8 +78,9 @@ function SpeedyWeather.animate(
     time = ds["time"][:]
 
     # Sort latitudes
-    lat_sort_idx = sortperm(raw_lat)
-    lat = raw_lat[lat_sort_idx]
+    lat_ascending = issorted(raw_lat)
+    lat = lat_ascending ? raw_lat : reverse(raw_lat)
+    @assert issorted(lat) "Latitudes need to be provided in either ascending or descending order."
 
     # Get time units for proper labeling
     time_units = ds["time"].attrib["units"]
