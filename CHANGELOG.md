@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Allow for variables to be fused together (prelimnary work for GPU optiminization) [#1083](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1083)
 - Fixed docs broken layout due to `NetCDFOutput` by using @docs instead of @doc [#1098](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1098)
 - Enzyme is a weakdep again instead of dep (this was a mistake) [#1097](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1097)
 - Fixed several typos in the documentation [#1094](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1094)
