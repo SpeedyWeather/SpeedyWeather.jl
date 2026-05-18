@@ -147,9 +147,9 @@ end
 function variables(::Type{<:PrimitiveDry}, nsteps)
     return (
         variables(BarotropicModel, nsteps)...,
-        PrognosticVariable(:divergence, Spectral4D(nsteps), desc = "Divergence", units = "1/s"),
-        PrognosticVariable(:temperature, Spectral4D(nsteps), desc = "Temperature", units = "K"),
-        PrognosticVariable(:pressure, Spectral3D(nsteps), desc = "Logarithm of surface pressure", units = "log(Pa)"),
+        PrognosticVariable(:divergence, Spectral4D(nsteps), desc = "Divergence", units = "1/s", fuse = :prog_spec),
+        PrognosticVariable(:temperature, Spectral4D(nsteps), desc = "Temperature", units = "K", fuse = :prog_spec),
+        PrognosticVariable(:pressure, Spectral3D(nsteps), desc = "Logarithm of surface pressure", units = "log(Pa)", fuse = :prog_spec),
 
         GridVariable(:divergence, Grid3D(), desc = "Divergence", units = "1/s"),
         GridVariable(:temperature, Grid3D(), desc = "Temperature", units = "K"),
