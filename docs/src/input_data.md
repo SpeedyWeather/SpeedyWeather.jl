@@ -27,9 +27,9 @@ The interface to load data from
 [SpeedyWeatherAssets](https://github.com/SpeedyWeather/SpeedyWeatherAssets)
 is via the `get_asset` function
 
-```@docs; canonical=false
+````@docs; canonical=false
 RingGrids.get_asset
-```
+````
 
 with `from_assets = true` will look into that repository to find the
 corresponding file under `path`, note that the base path starts with
