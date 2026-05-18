@@ -69,7 +69,7 @@ function variables(::Type{<:Barotropic}, nsteps)
     return (
         PrognosticVariable(:clock, ClockDim(), desc = "Clock", units = "s"),
         PrognosticVariable(:scale, ScalarDim(1), desc = "Scaling of vor and div in the dynamical core", units = "m"),
-        PrognosticVariable(:vorticity, Spectral4D(nsteps), desc = "Relative vorticity", units = "1/s", fuse=:prog),
+        PrognosticVariable(:vorticity, Spectral4D(nsteps), desc = "Relative vorticity", units = "1/s"),
 
         TendencyVariable(:vorticity, Spectral3D(), desc = "Tendency of relative vorticity", units = "1/s²"),
         TendencyVariable(:vorticity, Grid3D(), namespace = :grid, desc = "Tendency of relative vorticity on the grid", units = "1/s²"),

@@ -157,7 +157,7 @@ function variables(::Type{<:PrimitiveWet}, nsteps)
         variables(PrimitiveDry, nsteps)...,
 
         # Add humidity
-        PrognosticVariable(:humidity, Spectral4D(nsteps), desc = "Specific humidity", units = "kg/kg", fuse=:prog),
+        PrognosticVariable(:humidity, Spectral4D(nsteps), desc = "Specific humidity", units = "kg/kg"),
         GridVariable(:humidity, Grid3D(), desc = "Humidity", units = "kg/kg"),
         GridVariable(:humidity_prev, Grid3D(), desc = "Specific humidity at previous time step", units = "kg/kg"),
         TendencyVariable(:humidity, Spectral3D(), desc = "Tendency of specific humidity", units = "kg/kg/s"),
