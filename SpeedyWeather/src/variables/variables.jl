@@ -180,14 +180,24 @@ _copy_entry!(dest::Base.RefValue, src::Base.RefValue) = (dest[] = src[])
     end
 end
 
+# Exclude SubArray-backed memory from the pretty-print size: a fused parent's bytes are
+# already counted on `vars.fused.<sym>`, so charging them again on every view that aliases
+# it (e.g. `vars.tendencies.grid.u.data::SubArray`) would inflate the reported size.
+_pretty_size(x) = Base.summarysize(x)                # generic leaves (Clock, Ref, plain arrays, ...)
+_pretty_size(x::AbstractField) = is_view_entry(x) ? 0 : Base.summarysize(x)
+_pretty_size(x::LowerTriangularArray) = is_view_entry(x) ? 0 : Base.summarysize(x)
+_pretty_size(x::SubArray) = 0
+_pretty_size(nt::NamedTuple) = isempty(nt) ? Base.summarysize(nt) : sum(_pretty_size, values(nt))
+_pretty_size(v::Variables) = sum(_pretty_size, (getfield(v, k) for k in propertynames(v)))
+
 # pretty printing
 function Base.show(io::IO, V::Variables)
-    Vsize = prettymemory(Base.summarysize(V))
+    Vsize = prettymemory(_pretty_size(V))
     print(io, styled"{warning:Variables}", "{@NamedTuple{...}, ...} ", styled"{note:($Vsize)}")
     for (i, p) in enumerate(propertynames(V))
         lasti = i == length(propertynames(V))           # check if last property to choose ending └
         s = lasti ? "└" : "├"                           # choose ending
-        psize = prettymemory(Base.summarysize(getfield(V, p)))
+        psize = prettymemory(_pretty_size(getfield(V, p)))
         print(io, "\n$s", styled"{info: $p }", styled"{note:($psize)}")
         for (j, k) in enumerate(keys(getfield(V, p)))
             lastj = j == length(keys(getfield(V, p)))   # check if last variable in namespace to choose ending └
