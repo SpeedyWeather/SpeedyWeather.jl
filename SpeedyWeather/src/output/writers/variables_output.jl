@@ -111,13 +111,13 @@ end
 # round-trip a Field/LTA whose data is a SubArray (the on-disk schema captures
 # the view's parent indirectly, which is brittle). Materialize any view-backed
 # array into an independent copy before handing the snapshot to JLD2.
-_materialize_views(x) = x
-_materialize_views(nt::NamedTuple) = NamedTuple{keys(nt)}(map(_materialize_views, values(nt)))
-_materialize_views(vars::Variables) = Variables(;
-    (k => _materialize_views(getfield(vars, k)) for k in fieldnames(Variables))...
+materialize_views(x) = x
+materialize_views(nt::NamedTuple) = NamedTuple{keys(nt)}(map(materialize_views, values(nt)))
+materialize_views(vars::Variables) = isempty(vars.fused)Variables(;
+    (k => materialize_views(getfield(vars, k)) for k in fieldnames(Variables))...
 )
-_materialize_views(f::Field) = f.data isa SubArray ? Field(Array(f.data), f.grid) : f
-function _materialize_views(L::LowerTriangularArray)
+materialize_views(f::Field) = f.data isa SubArray ? Field(Array(f.data), f.grid) : f
+function materialize_views(L::LowerTriangularArray)
     return L.data isa SubArray ? LowerTriangularArray(Array(L.data), L.spectrum) : L
 end
 
@@ -125,7 +125,7 @@ function output_jld2!(output::JLD2Output, simulation::AbstractSimulation)
     output.output_counter += 1
     i = output.output_counter
     snapshot = filter_groups(simulation.variables, output)
-    output.jld2_file["$i"] = on_architecture(CPU(), snapshot)
+    output.jld2_file["$i"] = materialize_views(on_architecture(CPU(), snapshot))
     return nothing
 end
 
