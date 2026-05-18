@@ -131,7 +131,7 @@ function SpeedyWeather.animate(
 
         # Apply same transformations as the lat/lons
         rolled = circshift(standardized, (shift_amt, 0))
-        transf_data = rolled[:, lat_sort_idx]
+        transf_data = lat_ascending ? rolled : reverse(rolled, dims=2)
 
         return coalesce.(transf_data, NaN32)  # handle missing data for GeoMakie
     end
