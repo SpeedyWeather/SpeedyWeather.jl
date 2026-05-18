@@ -147,13 +147,13 @@ end
 function variables(::Type{<:PrimitiveDry}, nsteps)
     return (
         variables(BarotropicModel, nsteps)...,
-        PrognosticVariable(:divergence, Spectral4D(nsteps), desc = "Divergence", units = "1/s", fuse = :prog_spec),
-        PrognosticVariable(:temperature, Spectral4D(nsteps), desc = "Temperature", units = "K", fuse = :prog_spec),
-        PrognosticVariable(:pressure, Spectral3D(nsteps), desc = "Logarithm of surface pressure", units = "log(Pa)", fuse = :prog_spec),
+        PrognosticVariable(:divergence, Spectral4D(nsteps), desc = "Divergence", units = "1/s", fuse = :prognostic),
+        PrognosticVariable(:temperature, Spectral4D(nsteps), desc = "Temperature", units = "K", fuse = :prognostic),
+        PrognosticVariable(:pressure, Spectral3D(nsteps), desc = "Logarithm of surface pressure", units = "log(Pa)", fuse = :prognostic),
 
-        GridVariable(:divergence, Grid3D(), desc = "Divergence", units = "1/s"),
-        GridVariable(:temperature, Grid3D(), desc = "Temperature", units = "K"),
-        GridVariable(:pressure, Grid2D(), desc = "Logarithm of surface pressure", units = ""),
+        GridVariable(:divergence, Grid3D(), desc = "Divergence", units = "1/s", fuse = :grid),
+        GridVariable(:temperature, Grid3D(), desc = "Temperature", units = "K", fuse = :grid),
+        GridVariable(:pressure, Grid2D(), desc = "Logarithm of surface pressure", units = "", fuse = :grid),
         GridVariable(:divergence_prev, Grid3D(), desc = "Divergence at previous time step", units = "1/s"),
         GridVariable(:temperature_prev, Grid3D(), desc = "Temperature at previous time step", units = "K"),
         GridVariable(:pressure_prev, Grid2D(), desc = "Logarithm of surface pressure at previous time step", units = ""),

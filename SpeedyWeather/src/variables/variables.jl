@@ -250,6 +250,15 @@ function Variables(model::AbstractModel)
     # Validates that fuse symbols are globally unique across namespaces.
     fused = build_fused_namespace(fuse_parents)
 
+    # If both the spectral prognostic parent and its grid-snapshot parent exist, they
+    # must declare members in matching order so a mega-batched spec→grid transform can
+    # map slot k of `prog_spec` to slot k of `grid`.
+    # TODO: Maybe just move this to unit tests? Do we need to test this every time? 
+    if haskey(fused, :prognostic) && haskey(fused, :grid)
+        _assert_fuse_alignment(fused.prog_spec, fused.grid;
+                               name_a = :prognostic, name_b = :grid)
+    end
+
     return Variables(; prognostic, grid, tendencies, dynamics, parameterizations, particles, scratch, fused)
 end
 # runic: on
@@ -260,7 +269,7 @@ Wraps a fused parent buffer with the per-member slot map computed at constructio
 
 `parent` is the underlying `LowerTriangularArray` or `Field`. `slot_map` is a `NamedTuple`
 mapping each fuse member's `name::Symbol` to its `UnitRange{Int}` along the parent's layer
-axis (axis 2 of `parent.data`). E.g. for a `:prog_spec` fuse group on `PrimitiveWet` with
+axis (axis 2 of `parent.data`). E.g. for a `:prognostic` fuse group on `PrimitiveWet` with
 `nlayers = 8`:
 
 ```
@@ -311,7 +320,7 @@ _copy_entry!(dest::FusedParent, src::FusedParent) = _copy_entry!(dest.parent, sr
 Assert that two fuse parents `a` and `b` declare members in matching order — i.e. they
 agree both on which member names exist and on each member's layer-axis slot range. This
 is what lets a mega-batched `transform!` map slot k of one parent to slot k of the other
-(e.g. `:prog_spec` ↔ `:prog_grid`).
+(e.g. `:prognostic` ↔ `:prog_grid`).
 
 `name_a` / `name_b` are used purely for the error message."""
 function _assert_fuse_alignment(a::FusedParent, b::FusedParent; name_a = :a, name_b = :b)
@@ -360,19 +369,23 @@ slot range, that slot ranges are pairwise non-overlapping, and that together the
 fused axis exactly with no gaps. This catches offset/order bugs in `_split_views_*` and ensures
 the right variable is wired to the right slot."""
 function build_fuse_parents(all_vars, model)
-    # Group all fused vars by (namespace, fuse), deduped by (namespace, name) Tuple.
-    seen = Dict{Tuple{Symbol, Symbol}, AbstractVariable}()   # (namespace, name) => first variable seen
+    # Group all fused vars by (namespace, fuse), deduped by (namespace, fuse, name) Tuple.
+    # NOTE: the dedup key includes the fuse symbol so that the same variable `name` may
+    # appear in different fuse groups (e.g. `:vorticity` as a PrognosticVariable in
+    # `:prognostic` AND as a GridVariable in `:grid` — those are legitimate cross-group
+    # uses, not the cross-type-within-one-group collision we want to reject).
+    seen = Dict{Tuple{Symbol, Symbol, Symbol}, AbstractVariable}()   # (namespace, fuse, name) => first variable seen
     groups = Dict{Tuple{Symbol, Symbol}, Vector{AbstractVariable}}()
     for v in all_vars
         v.fuse === Symbol() && continue
-        key = (v.namespace, v.name)
+        key = (v.namespace, v.fuse, v.name)
         if haskey(seen, key)
             prev = seen[key]
             nonparametric_type(prev) === nonparametric_type(v) && continue  # same type, same var declared twice — fine
             error(
                 "Fuse group `$(v.fuse)` (namespace `$(v.namespace)`): variable `$(v.name)` is " *
                 "declared as both $(nonparametric_type(prev)) and $(nonparametric_type(v)). " *
-                "Each (namespace, name) pair may appear at most once across all variable types in a fuse group."
+                "Each (namespace, name) pair may appear at most once across all variable types in a single fuse group."
             )
         end
         seen[key] = v

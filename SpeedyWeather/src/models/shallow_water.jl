@@ -66,11 +66,11 @@ function variables(model::ShallowWater)
     nsteps = get_prognostic_steps(model.time_stepping)
     return (
         variables(BarotropicModel, nsteps)...,
-        PrognosticVariable(:divergence, Spectral4D(nsteps), desc = "Divergence", units = "1/s", fuse = :prog_spec),
-        PrognosticVariable(:η, Spectral3D(nsteps), desc = "Interface displacement", units = "m", fuse = :prog_spec),
+        PrognosticVariable(:divergence, Spectral4D(nsteps), desc = "Divergence", units = "1/s", fuse = :prognostic),
+        PrognosticVariable(:η, Spectral3D(nsteps), desc = "Interface displacement", units = "m", fuse = :prognostic),
 
-        GridVariable(:divergence, Grid3D(), desc = "Divergence", units = "1/s"),
-        GridVariable(:η, Grid2D(), desc = "Interface displacement", units = "m"),
+        GridVariable(:divergence, Grid3D(), desc = "Divergence", units = "1/s", fuse = :grid),
+        GridVariable(:η, Grid2D(), desc = "Interface displacement", units = "m", fuse = :grid),
         GridVariable(:geopotential, Grid2D(), desc = "Geopotential", units = "m²/s²"),
 
         TendencyVariable(:divergence, Spectral3D(), desc = "Tendency of divergence", units = "1/s²"),
