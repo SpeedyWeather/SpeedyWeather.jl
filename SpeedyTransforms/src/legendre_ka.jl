@@ -18,7 +18,7 @@
     m = kjm_indices[tid, 3]
 
     # are m, lmax 0-based here or 1-based?
-    lm_range = get_lm_range(m, lmax)    # assumes 1-based
+    lm_range = LowerTriangularArrays.get_lm_range(m, lmax)    # assumes 1-based
 
     # view on lower triangular column, but batched in vertical
     spec_view = view(specs_data, lm_range, :)
@@ -67,15 +67,16 @@ function _legendre!(
         S::SpectralTransform{NF, <:Architectures.GPU};             # precomputed transform
         unscale_coslat::Bool = false,               # unscale by cosine of latitude on the fly?
     ) where {NF}
+
     (; nlat_half) = S.grid              # dimensions
-    (; lmax) = S.spectrum              # 1-based max degree l, order m of spherical harmonics
+    (; lmax) = S.spectrum               # 1-based max degree l, order m of spherical harmonics
     (; legendre_polynomials) = S        # precomputed Legendre polynomials
-    (; kjm_indices) = S                # kjm loop indices precomputed for threads
+    (; kjm_indices) = S                 # kjm loop indices precomputed for threads
     (; coslat⁻¹, lon_offsets) = S
     # NOTE: this comes out as a range, not an integer
     nlayers = size(specs, 2)            # get number of layers of specs for fewer layers than precomputed in S
 
-    lmax = lmax - 1                       # 0-based max degree l of spherical harmonics
+    lmax = lmax - 1                     # 0-based max degree l of spherical harmonics
 
     @boundscheck SpeedyTransforms.ismatching(S, specs) || throw(DimensionMismatch(S, specs))
     @boundscheck size(g_north) == size(g_south) == (S.nfreq_max, S.nlayers, nlat_half) || throw(DimensionMismatch(S, specs))
@@ -100,10 +101,10 @@ function _legendre!(
     )
 
     # unscale by cosine of latitude on the fly if requested
-    return if unscale_coslat
+    if unscale_coslat
         unscale_coslat!(g_north, g_south, coslat⁻¹, architecture = S.architecture)
     end
-
+    return nothing
 end
 
 
@@ -124,8 +125,8 @@ end
     j = kjm_indices[tid, 2]
     m = kjm_indices[tid, 3]
 
-    lm_range = get_lm_range(m, lmax)
-    lm2_range = get_2lm_range(m, lmax)
+    lm_range = LowerTriangularArrays.get_lm_range(m, lmax)
+    lm2_range = LowerTriangularArrays.get_2lm_range(m, lmax)
 
     ΔΩ = solid_angles[j]                # Solid angle for a grid point
     o = lon_offsets[m, j]               # Longitude offset rotation
@@ -190,7 +191,7 @@ function _legendre!(                        # GRID TO SPECTRAL
 
     specs_reinterpret = reinterpret(real(eltype(specs.data)), specs.data)
 
-    return launch!(
+    launch!(
         S.architecture,
         LinearWorkOrder,
         (S.jm_index_size * nlayers,),
@@ -204,5 +205,5 @@ function _legendre!(                        # GRID TO SPECTRAL
         solid_angles,
         kjm_indices
     )
-
+    return nothing
 end

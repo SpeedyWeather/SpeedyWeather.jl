@@ -1,7 +1,7 @@
 """
 $(TYPEDSIGNATURES)
 A lower triangular array implementation that only stores the non-zero entries explicitly.
-`L<:AbstractArray{T,N-1}` although we do allow both "flat" `N-1`-dimensional indexing and 
+`L<:AbstractArray{T,N-1}` although we do allow both "flat" `N-1`-dimensional indexing and
 additional `N`-dimensional or "matrix-style" indexing.
 
 Supports n-dimensional lower triangular arrays, so that for all trailing dimensions `L[:, :, ..]`
@@ -79,7 +79,7 @@ end
 
 """$(TYPEDSIGNATURES)
 Size of a `LowerTriangularArray` defined as size of the flattened array if `as <: AbstractVector`
-and as if it were a full matrix when `as <: AbstractMatrix`` ."""
+and as if it were a full matrix when `as <: AbstractMatrix`."""
 Base.size(L::LowerTriangularArray, base::Type{<:IndexBasis} = OneBased; as = Vector) = size(L, base, as)
 Base.size(L::LowerTriangularArray, i::Integer, base::Type{<:IndexBasis} = OneBased; as = Vector) = size(L, i, base, as)
 
@@ -97,6 +97,8 @@ Base.size(L::LowerTriangularArray, i::Integer, base::Type{OneBased}, as::Type{Ve
 
 # sizeof the underlying data vector
 Base.sizeof(L::LowerTriangularArray) = sizeof(L.data)
+
+Architectures.nonparametric_type(::Type{<:LowerTriangularArray}) = LowerTriangularArray
 
 function Base.show(io::IO, ::MIME"text/plain", L::LowerTriangularMatrix)
     Base.array_summary(io, L, axes(L))
@@ -284,21 +286,21 @@ only the lower triangle (the non-zero entries) of `L`."""
 """
 $(TYPEDSIGNATURES)
 range of the running indices lm in a l-column (degrees of spherical harmonics)
-given the column index m (order of harmonics) 
+given the column index m (order of harmonics)
 """
 get_lm_range(m, lmax) = lm2i(2 * m - 1, m, lmax):lm2i(lmax + m, m, lmax)
 
 """
 $(TYPEDSIGNATURES)
 range of the doubled running indices 2lm in a l-column (degrees of spherical harmonics)
-given the column index m (order of harmonics) 
+given the column index m (order of harmonics)
 """
 get_2lm_range(m, lmax) = (2 * lm2i(2 * m - 1, m, lmax) - 1):(2 * lm2i(lmax + m, m, lmax))
 
 """
 $(TYPEDSIGNATURES)
-Converts the linear index `i` in the lower triangle into a pair `(l, m)` of indices 
-of the matrix in column-major form. (Formula taken from 
+Converts the linear index `i` in the lower triangle into a pair `(l, m)` of indices
+of the matrix in column-major form. (Formula taken from
 Angeletti et al, 2019, https://hal.science/hal-02047514/document)
 """
 @inline function i2lm(k::Integer, mmax::Integer)
@@ -403,7 +405,7 @@ LowerTriangularArrays. To be used like
 
     for k in eachmatrix(L)
         L[1, k]
-    
+
 to loop over every non-horizontal dimension of L."""
 eachmatrix(L::LowerTriangularArray) = CartesianIndices(size(L)[2:end])
 
@@ -415,15 +417,15 @@ function eachmatrix(L1::LowerTriangularArray, Ls::LowerTriangularArray...)
     return eachmatrix(L1)
 end
 
-"""$(TYPEDSIGNATURES) Iterator for the order m, for each m return all ls, 
+"""$(TYPEDSIGNATURES) Iterator for the order m, for each m return all ls,
 therefore the columns in the lower triangular matrix.
 
     for lms in eachorder(L)
         for lm in lms
-            L[lm] 
+            L[lm]
         end
     end
-    
+
 to loop over every order of L."""
 eachorder(L1::LowerTriangularArray) = eachorder(L1.spectrum)
 
@@ -463,7 +465,7 @@ function Base.DimensionMismatch(L1::LowerTriangularArray, Ls::LowerTriangularArr
 end
 
 # CONVERSIONS
-""" 
+"""
 $(TYPEDSIGNATURES)
 Create a LowerTriangularArray `L` from Matrix `M` by copying over the non-zero elements in `M`."""
 function LowerTriangularMatrix(M::Matrix{T}, spectrum::AbstractSpectrum) where {T} # CPU version
@@ -480,7 +482,7 @@ function LowerTriangularMatrix(M::Matrix{T}, spectrum::AbstractSpectrum) where {
     return L
 end
 
-""" 
+"""
 $(TYPEDSIGNATURES)
 Create a LowerTriangularArray `L` from Matrix `M` by copying over the non-zero elements in `M`."""
 function LowerTriangularMatrix(M::Matrix{T}) where {T} # GPU version
@@ -554,7 +556,11 @@ function Base.copyto!(
     arch = architecture(L1)
     spectrum = L1.spectrum
 
-    launch!(arch, SpectralWorkOrder, size(L1), _copyto_kernel!, L1.data, L2.data, minimum(ls), maximum(ls), minimum(ms), maximum(ms), spectrum.l_indices, spectrum.m_indices, lmax)
+    launch!(
+        arch, SpectralWorkOrder, size(L1), _copyto_kernel!,
+        L1.data, L2.data, minimum(ls), maximum(ls), minimum(ms), maximum(ms),
+        spectrum.l_indices, spectrum.m_indices, lmax,
+    )
 
     return L1
 end
@@ -670,7 +676,7 @@ Base.prod(L::LowerTriangularArray{NF}) where {NF} = zero(NF)
 
 """
 $(TYPEDSIGNATURES)
-Fills the elements of `L` with `x`. Faster than fill!(::AbstractArray, x)
+Fills the elements of `L` with `x`. Faster than `fill!(::AbstractArray, x)`
 as only the non-zero elements in `L` are assigned with x."""
 function Base.fill!(L::LowerTriangularArray, x)
     fill!(L.data, x)
@@ -695,7 +701,7 @@ function zero_last_degree!(L::LowerTriangularArray)
     return nothing
 end
 
-@kernel inbounds = true function zero_last_degree_kernel!(data, @Const(l_indices), lmax)
+@kernel inbounds = true function zero_last_degree_kernel!(data, l_indices, lmax)
     I = @index(Global, Cartesian)
 
     l = l_indices[I[1]]
@@ -722,36 +728,29 @@ lta_view(L::LowerTriangularMatrix, c::Colon) = LowerTriangularArray(view(L.data,
 lta_view(L::LowerTriangularArray, args...) = view(L, args...)   # fallback to normal view
 
 # Broadcast CPU/GPU
-import Base.Broadcast: BroadcastStyle, Broadcasted, DefaultArrayStyle
-import LinearAlgebra: isstructurepreserving, fzeropreserving
+import Base.Broadcast: BroadcastStyle, Broadcasted
 
 # CPU with scalar indexing
-struct LowerTriangularStyle{N, ArrayType, S} <: Broadcast.AbstractArrayStyle{N} end
+struct LowerTriangularStyle{N} <: Broadcast.AbstractArrayStyle{N} end
 
 # GPU without scalar indexing
-struct LowerTriangularGPUStyle{N, ArrayType, S} <: GPUArrays.AbstractGPUArrayStyle{N} end
+struct LowerTriangularGPUStyle{N} <: GPUArrays.AbstractGPUArrayStyle{N} end
 
-function BroadcastStyle(::Type{LowerTriangularArray{T, N, ArrayType, S}}) where {T, N, ArrayType, S}
-    # remove number format parameter for broadcasting with type promotion
-    ArrayType_ = nonparametric_type(ArrayType)
-    return LowerTriangularStyle{N, ArrayType_, S}()
+function BroadcastStyle(::Type{LowerTriangularArray{T, N, ArrayType, S}}) where {T, N, ArrayType <: AbstractArray, S}
+    return LowerTriangularStyle{N}()
 end
 
 function BroadcastStyle(
         ::Type{LowerTriangularArray{T, N, ArrayType, S}},
     ) where {T, N, ArrayType <: GPUArrays.AbstractGPUArray, S}
-    # remove number format parameter for broadcasting with type promotion
-    ArrayType_ = nonparametric_type(ArrayType)
-    return LowerTriangularGPUStyle{N, ArrayType_, S}()
+    return LowerTriangularGPUStyle{N}()
 end
 
 # ::Val{0} for broadcasting with 0-dimensional, ::Val{1} for broadcasting with vectors, etc
-LowerTriangularStyle{N, ArrayType, S}(::Val{M}) where {N, ArrayType, S, M} =
-    LowerTriangularStyle{N, ArrayType, S}()
-LowerTriangularGPUStyle{N, ArrayType, S}(::Val{M}) where {N, ArrayType, S, M} =
-    LowerTriangularGPUStyle{N, ArrayType, S}()
+LowerTriangularStyle{N}(::Val{M}) where {N, M} = LowerTriangularStyle{N}()
+LowerTriangularGPUStyle{N}(::Val{M}) where {N, M} = LowerTriangularGPUStyle{N}()
 
-"`L = find_L(Ls)` returns the first LowerTriangularArray among the arguments. 
+"`L = find_L(Ls)` returns the first LowerTriangularArray among the arguments.
 Adapted from Julia documentation of Broadcast interface"
 find_L(bc::Base.Broadcast.Broadcasted) = find_L(bc.args)
 find_L(args::Tuple) = find_L(find_L(args[1]), Base.tail(args))
@@ -760,34 +759,43 @@ find_L(::Tuple{}) = nothing
 find_L(a::LowerTriangularArray, rest) = a
 find_L(::Any, rest) = find_L(rest)
 
+parent_or_not(x::Union{SubArray, Transpose}) = parent(x)
+parent_or_not(x) = x
+
 function Base.similar(
-        bc::Broadcasted{LowerTriangularStyle{N, ArrayType, S}},
+        bc::Broadcasted{LowerTriangularStyle{N}},
         ::Type{T},
-    ) where {N, ArrayType, S, T}
+    ) where {N, T}
     L = find_L(bc)
-    return LowerTriangularArray{T, N, ArrayType{T, N}, S}(similar(L.data, T), L.spectrum)
+    # parent of broadcasted arrays is used because we don't want e.g. a view or transpose as a result
+    return nonparametric_type(typeof(L))(similar(parent_or_not(L.data), T, axes(bc)), L.spectrum)
 end
 
 # same function as above, but needs to be defined for both CPU and GPU style
 function Base.similar(
-        bc::Broadcasted{LowerTriangularGPUStyle{N, ArrayType, S}},
+        bc::Broadcasted{LowerTriangularGPUStyle{N}},
         ::Type{T},
-    ) where {N, ArrayType, S, T}
+    ) where {N, T}
     L = find_L(bc)
-    return LowerTriangularArray{T, N, ArrayType{T, N}, S}(similar(L.data, T), L.spectrum)
+    # parent of broadcasted arrays is used because we don't want e.g. a view or transpose as a result
+    return nonparametric_type(typeof(L))(similar(parent_or_not(L.data), T, axes(bc)), L.spectrum)
 end
 
 function KernelAbstractions.get_backend(
-        a::LowerTriangularArray{T, N, ArrayType, S}
-    ) where {T, N, ArrayType, S}
+        a::LowerTriangularArray{T, N}
+    ) where {T, N}
     return KernelAbstractions.get_backend(a.data)
 end
+
+Adapt.parent_type(::Type{<:LowerTriangularArray{T, N, ArrayType}}) where {T, N, ArrayType} = ArrayType
+Base.parent(L::LowerTriangularArray) = L.data
 
 Adapt.adapt_structure(to, L::LowerTriangularArray) = Adapt.adapt(to, L.data)
 
 Architectures.architecture(L::LowerTriangularArray) = architecture(L.spectrum)
 
-function Architectures.on_architecture(arch, L::LowerTriangularArray)
+Architectures.on_architecture(L1::LowerTriangularArray, L2) = on_architecture(L1.spectrum, L2)
+function Architectures.on_architecture(arch::AbstractArchitecture, L::LowerTriangularArray)
     adapted_data = on_architecture(arch, L.data)
     if ismatching(L.spectrum, typeof(adapted_data)) # if matching, use the same spectrum
         return LowerTriangularArray(adapted_data, on_architecture(arch, L.spectrum))

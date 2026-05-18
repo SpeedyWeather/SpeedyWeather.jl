@@ -13,9 +13,10 @@ function Base.show(io::IO, grid::AbstractGrid)
     digits = round(Int, log10(1 / res)) + 2
     average_resolution = Printf.@sprintf("%.*f˚", digits, res)
 
-    println(io, "$nlat-ring $Grid_")
-    println(io, "├ nlat_half=$nlat_half ($npoints points, ~$average_resolution, $full_or_reduced)")
-    return print(io, "└ architecture: $(grid.architecture)")
+    println(io, styled"$nlat-ring {warning:$Grid_}\{...\}")
+    println(io, styled"├ {info:nlat_half} = $nlat_half {note:($npoints points, ~$average_resolution, $full_or_reduced)}")
+    print(io, styled"└ {info:architecture} = $(grid.architecture)")
+    return nothing
 end
 
 ## TYPES
@@ -26,7 +27,7 @@ full_grid_type(grid::AbstractGrid) = full_grid_type(typeof(grid))
 (*Grid{T, N, ...} returns *Array) but without any parameters `{T, N, ArrayType}`"""
 Architectures.nonparametric_type(grid::AbstractGrid) = nonparametric_type(typeof(grid))
 
-"""$(TYPEDSIGNATURES) Resolution paraemeters `nlat_half` of a `grid`.
+"""$(TYPEDSIGNATURES) Resolution parameters `nlat_half` of a `grid`.
 Number of latitude rings on one hemisphere, Equator included."""
 get_nlat_half(grid::AbstractGrid) = grid.nlat_half
 
@@ -52,7 +53,7 @@ matrix_size(grid::Grid) where {Grid <: AbstractGrid} = matrix_size(Grid, get_nla
 # CONSTRUCTORS
 """$(TYPEDSIGNATURES) Create a new `grid` of type `Grid` with resolution parameter `nlat_half`.
 `architecture` is the device type (CPU/GPU). Precomputes the ring indices `rings`."""
-function (::Type{Grid})(nlat_half::Integer, architecture = DEFAULT_ARCHITECTURE()) where {Grid <: AbstractGrid}
+function (::Type{Grid})(nlat_half::Integer, architecture::AbstractArchitecture = DEFAULT_ARCHITECTURE()) where {Grid <: AbstractGrid}
     Grid_ = nonparametric_type(Grid)                # strip away parameters of type, obtain from arguments
     rings = eachring(Grid, nlat_half)               # precompute indices to access the variable-length rings
     w = whichring(Grid, nlat_half, rings)           # precompute ring indices for each grid point

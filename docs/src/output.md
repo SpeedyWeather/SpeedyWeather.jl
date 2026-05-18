@@ -40,15 +40,15 @@ trigger it as `output=false` is the default here.
 
 ## Output frequency
 
-If we want to increase the frequency of the output we can choose `output_dt` (default `=Hour(6)`) like so
+If we want to increase the frequency of the output we can choose `interval` (default `=Hour(6)`) like so
 ```@example netcdf
-output = NetCDFOutput(spectral_grid, ShallowWater, output_dt=Hour(1))
+output = NetCDFOutput(spectral_grid, ShallowWater, interval=Hour(1))
 model = ShallowWaterModel(spectral_grid, output=output)
 model.output
 ```
 which will now output every hour. It is important to pass on the new output writer `output` to the
 model constructor, otherwise it will not be part of your model and the default is used instead.
-Note that the choice of `output_dt` can affect the actual time step that is used for the model
+Note that the choice of `interval` can affect the actual time step that is used for the model
 integration, which is explained in the following.
 Example, we run the model at a resolution of T42 and the time step is going to be
 ```@example netcdf
@@ -56,24 +56,24 @@ spectral_grid = SpectralGrid(trunc=42, nlayers=1)
 time_stepping = Leapfrog(spectral_grid)
 time_stepping.Δt_sec
 ```
-seconds. Depending on the output frequency (we chose `output_dt = Hour(1)` above)
+seconds. Depending on the output frequency (we chose `interval = Hour(1)` above)
 this will be slightly adjusted during model initialization:
 ```@example netcdf
-output = NetCDFOutput(spectral_grid, ShallowWater, output_dt=Hour(1))
+output = NetCDFOutput(spectral_grid, ShallowWater, interval=Hour(1))
 model = ShallowWaterModel(spectral_grid; time_stepping, output)
 simulation = initialize!(model)
 model.time_stepping.Δt_sec
 ```
-The shorter the output time step the more the model time step needs to be adjusted
-to match the desired output time step exactly. This is important so that for daily output at
-noon this does not slowly shift towards night over years of model integration.
+The shorter the output interval the more the model time step needs to be adjusted
+to match the desired interval exactly. This is important so that for daily output at
+noon this does not slowly shift towards night over years of the model integration.
 One can always disable this adjustment with
 ```@example netcdf
 time_stepping = Leapfrog(spectral_grid, adjust_with_output=false)
 time_stepping.Δt_sec
 ```
 and a little info will be printed to explain that even though you wanted
-`output_dt = Hour(1)` you will not actually get this upon initialization:
+`interval = Hour(1)` you will not actually get this upon initialization:
 ```@example netcdf
 model = ShallowWaterModel(spectral_grid; time_stepping, output)
 simulation = initialize!(model)
@@ -90,7 +90,7 @@ ds["time"][:]
 which is a bit ugly, that's why `adjust_with_output=true` is the default. In that case we would have
 ```@example netcdf
 time_stepping = Leapfrog(spectral_grid, adjust_with_output=true)
-output = NetCDFOutput(spectral_grid, ShallowWater, output_dt=Hour(1))
+output = NetCDFOutput(spectral_grid, ShallowWater, interval=Hour(1))
 model = ShallowWaterModel(spectral_grid; time_stepping, output)
 simulation = initialize!(model)
 run!(simulation, period=Day(1), output=true)
@@ -157,7 +157,7 @@ You can choose name and unit as you like, e.g. `SpeedyWeather.HumidityOutput(uni
 the compression options, e.g. `SpeedyWeather.HumidityOutput(keepbits = 5)` but more customisation
 is discussed in [Customizing netCDF output](@ref).
 
-We can add new output variables with `add!` 
+We can add new output variables with `add!`
 
 ```@example netcdf
 output = NetCDFOutput(spectral_grid)            # default variables
@@ -185,7 +185,7 @@ the key would change accordingly to `:divergence`.
 Mean sea-Level pressure (`mslp`), surface temperature (`tsurf`) and 10m winds (`u10`, `v10`) are computed
 specifically for the output. If these output variables are not requested then they will not be computed.
 
-**Mean sea-level pressure** is computed as 
+**Mean sea-level pressure** is computed as
 
 ```math
 p_{surf} \exp\left(\frac{g h}{R_d T_v}\right)
@@ -284,15 +284,15 @@ Note that some fields are actual options, but others are derived from the option
 arrays/objects the output writer needs, but shouldn't be passed on by the user.
 The actual options are declared as `[OPTION]` in the following
 
-```@example netcdf
-@doc NetCDFOutput
-```
+````@docs; canonical=false
+NetCDFOutput
+````
 
 ## Visualizing output
 
 The saved NetCDF files can be visualized with a wide range of tools, both in Julia, but also in other languages. In order to get a quick view into a NetCDF file, you can use command line tools like `ncview`. For actual visualizations in Julia, it's easy to use [NCDatasets.jl](https://github.com/JuliaGeo/NCDatasets.jl) for accessing the data and [GeoMakie.jl](https://github.com/JuliaGeo/GeoMakie.jl) for plotting it. For a standard animation we already provide the `animate` function within SpeedyWeather.jl's GeoMakie extension that makes it easy to animate a variable from a NetCDF output file or a `Simulation` object, as seen below:
 
-```@example netcdf 
+```@example netcdf
 using SpeedyWeather, GeoMakie, CairoMakie
 spectral_grid = SpectralGrid()
 model = PrimitiveWetModel(spectral_grid)
@@ -305,15 +305,16 @@ run!(simulation, period=Day(3), output=false) # some spin-up
 run!(simulation, period=Day(5), output=true)
 
 # animate mean sea-level pressure
-animate(simulation, output_file="test_mslp_animation.mp4", variable="mslp") 
+animate(simulation, output_file="test_mslp_animation.mp4", variable="mslp")
+nothing # hide
 ```
 ![test_mslp_animation](test_mslp_animation.mp4)
 
 
 For 3D variables you can provide e.g. `level=1` as keyword argumen to `animate`
-to specify the vertical level to visualise. For more options for `animate`, see below: 
+to specify the vertical level to visualise. For more options for `animate`, see below:
 
-```@example netcdf 
+```@example netcdf
 @doc SpeedyWeather.animate
 ```
 

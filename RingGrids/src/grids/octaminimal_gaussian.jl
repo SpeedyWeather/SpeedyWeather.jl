@@ -8,8 +8,8 @@ of total number of grid points over the `OctahedralGaussianGrid`, hence the name
 
 Fields are
 $(TYPEDFIELDS)"""
-struct OctaminimalGaussianGrid{A, V, W} <: AbstractReducedGrid{A}
-    nlat_half::Int                  # number of latitudes on one hemisphere
+struct OctaminimalGaussianGrid{A, V, W, IntType} <: AbstractReducedGrid{A}
+    nlat_half::IntType              # number of latitudes on one hemisphere
     architecture::A                 # information about device, CPU/GPU
     rings::V                        # precomputed ring indices
     whichring::W                    # precomputed ring index for each grid point ij

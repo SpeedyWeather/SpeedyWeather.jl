@@ -2,12 +2,12 @@
 
 SpeedyWeather.jl is written with differentiability in mind. This means that our model is differentiable by automatic differentiation (AD). If you are interested in machine learning (ML), this means that you can integrate our model directly into your ML models without the need to first train your neural networks offline. For atmospheric modellers this means that you get an adjoint model for free which is always generated automatically, so that we don't need to maintain it separately. This allows you to calibrate SpeedyWeather.jl in a fully automatic and data-driven way.
 
-!!! warning Work in progress
+!!! warning "Work in progress"
     The differentiability of SpeedyWeather.jl is still work in progress and some parts of this documentation might be not be always updated to the latest state. We will extend this documentation over time. Don't hesitate to contact us via GitHub issues or mail when you have questions or want to collaborate.
 
 For the differentiability of our model we rely on [Enzyme.jl](https://github.com/EnzymeAD/Enzyme.jl). If you've used Enzyme before, just go ahead and try to differentiate the model! It should work. We have checked the correctness of the gradients extensively against a finite differences differentiation with [FiniteDifferences.jl](https://github.com/JuliaDiff/FiniteDifferences.jl/). In the following we present a simple example how we can take the gradient of a single timestep of the primitive equation model with respect to one of the model parameter.
 
-!!! warning Enzyme with Julia 1.11
+!!! warning "Enzyme with Julia 1.11"
     Currently there are still some issues with Enzyme in Julia 1.11, we recommend to use Julia 1.10 for the following
 
 ## Differentiating through a single timestep
@@ -27,26 +27,23 @@ run!(simulation, period=Day(10)) # spin-up the model a bit
 Then, we get all variables we need from our `simulation`
 
 ```julia
-(; prognostic_variables, diagnostic_variables, model) = simulation
+(; variables, model) = simulation
 (; Δt, Δt_millisec) = model.time_stepping
 dt = 2Δt
-
-progn = prognostic_variables
-diagn = diagnostic_variables
 ```
 
 Next, we will prepare to use Enzyme. Enzyme saves the gradient information in a shadow of the original input. For the inputs this shadow is initialized zero, whereas for the output the shadow is used as the seed of the AD. In other words, as we are doing reverse-mode AD, the shadow of the output is the value that is backpropageted by the reverse-mode AD. Ok, let's initialize everything:
 
 ```julia
-dprogn = one(progn) # shadow for the progn values
-ddiagn = make_zero(diagn) # shadow for the diagn values
+dvars = make_zero(variables) # shadow for the variables
+dvars.prognostic.vorticity .= 1    # seed the reverse AD
 dmodel = make_zero(model) # here, we'll accumulate all parameter derivatives
 ```
 
 Then, we can already do the differentiation with Enzyme
 
 ```julia
-autodiff(Reverse, SpeedyWeather.timestep!, Const, Duplicated(progn, dprogn), Duplicated(diagn, ddiagn), Const(dt), Duplicated(model, dmodel))
+autodiff(Reverse, SpeedyWeather.timestep!, Const, Duplicated(variables, dvars), Const(dt), Duplicated(model, dmodel))
 ```
 
 The derivatives are accumulated in the `dmodel` shadow. So, if we e.g. want to know the derivative with respect to the gravity constant, we just have to inspect:
@@ -54,6 +51,12 @@ The derivatives are accumulated in the `dmodel` shadow. So, if we e.g. want to k
 ```julia
 dmodel.planet.gravity
 ```
+
+## Differentiating longer trajectories and checkpointing 
+
+In a very similar fashion as for the single timestep, we can also differentiate longer trajectories. For this, we need to use checkpointing to avoid storing all intermediate states in memory. This will also at the same time keep the compile time of the gradient still manageable. For a full example on how to do this for a sensitivity analysis, see the [sensitivity example](https://github.com/SpeedyWeather/SpeedyWeather.jl/tree/main/SpeedyWeather/test/differentiability/sensitivity_examples/).
+
+
 ## Parameter handling
 
 SpeedyWeather also provides automated parameter handling for all models and subcomponents via an extension of [ModelParameters.jl](https://github.com/rafaqz/ModelParameters.jl). Parameters can be automatically collected via the `parameters` method:
@@ -83,8 +86,8 @@ Parameters:
 │    12 │            water_density │   1000.0 │ atmosphere │     EarthAtmosphere{Float32} │        0.0 .. Inf (open) (HalfLine) │                                                                    water density [kg/m³] │
 │    13 │ latent_heat_condensation │  2.501e6 │ atmosphere │     EarthAtmosphere{Float32} │ 0.0 .. Inf (closed-open) (HalfLine) │                                                       latent heat of condensation [J/kg] │
 │    14 │  latent_heat_sublimation │  2.801e6 │ atmosphere │     EarthAtmosphere{Float32} │ 0.0 .. Inf (closed-open) (HalfLine) │                                                        latent heat of sublimation [J/kg] │
-│    15 │       pressure_reference │ 100000.0 │ atmosphere │     EarthAtmosphere{Float32} │        0.0 .. Inf (open) (HalfLine) │                                                          surface reference pressure [Pa] │
-│    16 │    temperature_reference │    288.0 │ atmosphere │     EarthAtmosphere{Float32} │ 0.0 .. Inf (closed-open) (HalfLine) │                                                        surface reference temperature [K] │
+│    15 │       reference_pressure │ 100000.0 │ atmosphere │     EarthAtmosphere{Float32} │        0.0 .. Inf (open) (HalfLine) │                                                          surface reference pressure [Pa] │
+│    16 │    reference_temperature │    288.0 │ atmosphere │     EarthAtmosphere{Float32} │ 0.0 .. Inf (closed-open) (HalfLine) │                                                        surface reference temperature [K] │
 │    17 │         moist_lapse_rate │    0.005 │ atmosphere │     EarthAtmosphere{Float32} │       -Inf .. Inf (open) (RealLine) │                                   reference moist-adiabatic temperature lapse rate [K/m] │
 │    18 │           dry_lapse_rate │   0.0098 │ atmosphere │     EarthAtmosphere{Float32} │       -Inf .. Inf (open) (RealLine) │                                     reference dry-adiabatic temperature lapse rate [K/m] │
 │    19 │          layer_thickness │   8500.0 │ atmosphere │     EarthAtmosphere{Float32} │        0.0 .. Inf (open) (HalfLine) │                                          layer thickness for the shallow water model [m] │
@@ -94,7 +97,7 @@ Parameters:
 └───────┴──────────────────────────┴──────────┴────────────┴──────────────────────────────┴─────────────────────────────────────┴──────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-The returned `SpeedyParams` object implements the `Model` interface from ModelParmaeters.jl which allows you to interact with the parameter metadata in tablar form. For example, we could extract the values of the parameters with `params[:,:val]` or the bounds with `params[:,:bounds]`. Subsets of parameters can also be extracted by indexing `params` with one or more `String` variable names (or prefxes), e.g:
+The returned `ParameterTable` object implements the `Model` interface from ModelParmaeters.jl which allows you to interact with the parameter metadata in tabular form. For example, we could extract the values of the parameters with `params[:,:val]` or the bounds with `params[:,:bounds]`. Subsets of parameters can also be extracted by indexing `params` with one or more `String` variable names (or prefxes), e.g:
 
 ```julia
 param_subset = params[["planet.gravity", "atmosphere.heat_capacity"]]
@@ -113,14 +116,14 @@ Parameters:
 
 ## Vectorizing parameters
 
-Many sensitivity analysis, optimization, or uncertainty quantification algorithms require the parameters to be supplied as one or more vectors of values. `SpeedyParams` provides a dispatch for `Base.vec` that flattens the model parameters into a [ComponentVector](https://docs.sciml.ai/ComponentArrays/stable/quickstart/):
+Many sensitivity analysis, optimization, or uncertainty quantification algorithms require the parameters to be supplied as one or more vectors of values. `ParameterTable` provides a dispatch for `Base.vec` that flattens the model parameters into a [ComponentVector](https://docs.sciml.ai/ComponentArrays/stable/quickstart/):
 
 ```julia
 param_vec = vec(params)
 
 # output
 
-ComponentVector{Float32}(planet = (rotation = 7.29f-5, gravity = 9.81f0, axial_tilt = 23.4f0, solar_constant = 1365.0f0), atmosphere = (mol_mass_dry_air = 28.9649f0, mol_mass_vapor = 18.0153f0, heat_capacity = 1004.0f0, R_vapor = 461.52438f0, mol_ratio = 0.62197006f0, μ_virt_temp = 0.60779446f0, κ = 0.2859107f0, water_density = 1000.0f0, latent_heat_condensation = 2.501f6, latent_heat_sublimation = 2.801f6, pressure_reference = 100000.0f0, temperature_reference = 288.0f0, moist_lapse_rate = 0.005f0, dry_lapse_rate = 0.0098f0, layer_thickness = 8500.0f0), forcing = (strength = 3.0f-12, wavenumber = 8.0f0), drag = (c = 1.0f-7))
+ComponentVector{Float32}(planet = (rotation = 7.29f-5, gravity = 9.81f0, axial_tilt = 23.4f0, solar_constant = 1365.0f0), atmosphere = (mol_mass_dry_air = 28.9649f0, mol_mass_vapor = 18.0153f0, heat_capacity = 1004.0f0, R_vapor = 461.52438f0, mol_ratio = 0.62197006f0, μ_virt_temp = 0.60779446f0, κ = 0.2859107f0, water_density = 1000.0f0, latent_heat_condensation = 2.501f6, latent_heat_sublimation = 2.801f6, reference_pressure = 100000.0f0, reference_temperature = 288.0f0, moist_lapse_rate = 0.005f0, dry_lapse_rate = 0.0098f0, layer_thickness = 8500.0f0), forcing = (strength = 3.0f-12, wavenumber = 8.0f0), drag = (c = 1.0f-7))
 ```
 
 `ComponentVector`s behave like normal `Array`s but additionally allow you to access the components following the original nested structure in the model, e.g. `param_vec.planet.solar_constant` will extract the solar constant parameter from the `Earth` component.
@@ -134,16 +137,16 @@ run!(simulation, period=Day(10))
 ps = parameters(model)
 pvec = vec(ps)
 dp = zero(pvec)
-dprogn = one(progn) # shadow for the prognostic variabels
-ddiagn = make_zero(diagn) # shadow for the diagnostic variables
+dvars = make_zero(variables) # shadow for the variables
+dvars.prognostic.vorticity .= 1    # seed the reverse AD
 
-function timestep_with_new_params!(progn, diagn, dt, model, p)
+function timestep_with_new_params!(vars, dt, model, p)
     new_model = SpeedyWeather.reconstruct(model, p)
-    SpeedyWeather.timestep!(progn, diagn, dt, new_model)
+    SpeedyWeather.timestep!(vars, dt, new_model)
     return nothing
 end
 
-autodiff(Reverse, timestep_with_new_params!, Const, Duplicated(progn, dprogn), Duplicated(diagn, ddiagn), Const(dt), Duplicated(model, make_zero(model)))
+autodiff(Reverse, timestep_with_new_params!, Const, Duplicated(variables, dvars), Const(dt), Duplicated(model, make_zero(model)))
 ```
 
 Note, however, that a full sensitivity analysis over long integration periods is computationally much more demanding, and is something that we are currently working on.

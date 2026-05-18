@@ -1,0 +1,923 @@
+""" Initial conditions for SpeedyWeather.jl models, i.e. the state of the atmosphere,
+ocean, land at the start of a simulation. Implemented as a NamedTuple of elements that are
+each <: AbstractInitialCondition, which are applied one after another to the model
+variables via `initialize!`. Each initial condition `MyIC` needs to implement the
+`initialize!(::Variables, ::MyIC, ::AbstractModel)` function."""
+abstract type AbstractInitialConditions <: AbstractModelComponent end
+
+export InitialConditions
+"""$(TYPEDSIGNATURES) Default initial conditions for the BarotropicModel."""
+InitialConditions(spectral_grid, ::Type{<:Barotropic}) = (; vordiv = RandomVelocity(spectral_grid))
+
+"""$(TYPEDSIGNATURES) Default initial conditions for the ShallowWaterModel."""
+InitialConditions(spectral_grid, ::Type{<:ShallowWater}) = (; vordiv = ZonalJet(spectral_grid))
+
+"""$(TYPEDSIGNATURES) Default initial conditions for the PrimitiveDryModel."""
+function InitialConditions(spectral_grid, ::Type{<:PrimitiveDry})
+    vordiv = ZonalWind(spectral_grid)
+    pres = PressureOnOrography(spectral_grid)
+    temp = JablonowskiTemperature(spectral_grid)
+    return (; vordiv, pres, temp)
+end
+
+"""$(TYPEDSIGNATURES) Default initial conditions for the PrimitiveWetModel."""
+function InitialConditions(spectral_grid, ::Type{<:PrimitiveWet})
+    vordiv = ZonalWind(spectral_grid)
+    pres = PressureOnOrography(spectral_grid)
+    temp = JablonowskiTemperature(spectral_grid)
+    humid = ConstantRelativeHumidity(spectral_grid)
+    return (; vordiv, pres, temp, humid)
+end
+
+"""$(TYPEDSIGNATURES)
+Apply initial conditions as defined by `model.ocean`, `.sea_ice`, `.land`,
+`.particle_advection` and `.initial_conditions` in that order."""
+function initialize!(vars::Variables, model::AbstractModel)
+
+    # first initialize ocean, sea ice and land
+    hasproperty(model, :ocean) && initialize!(vars, model.ocean, model)
+    hasproperty(model, :sea_ice) && initialize!(vars, model.sea_ice, model)
+    hasproperty(model, :land) && initialize!(vars, model.land, model)
+
+    # then particles
+    if haskey(vars.prognostic, :particles)
+        initialize!(vars.prognostic.particles, vars, model)
+    end
+
+    # green house gases are function of time only, just do one "timestep"
+    greenhouse_gases_time_step!(vars, model)
+
+    # then atmosphere as this may include initial conditions like StartFromFile
+    # which would contain ocean/land initial conditions that should overwrite the above if they are included
+    initialize!(vars, model.initial_conditions, model)
+    return nothing
+end
+
+"""$(TYPEDSIGNATURES)
+Apply initial conditions as in the `initial_conditions::NamedTuple` one after another."""
+function initialize!(vars::Variables, initial_conditions::NamedTuple, model::AbstractModel)
+    for ic in initial_conditions
+        initialize!(vars, ic, model)
+    end
+    return nothing
+end
+
+export StartFromRest
+function StartFromRest(
+        SG::SpectralGrid;
+        pres = ConstantPressure(SG),
+        temp = JablonowskiTemperature(SG),
+        humid = ConstantRelativeHumidity(SG)
+    )
+    return (; pres, temp, humid)
+end
+
+export RandomVorticity
+
+"""Start with random vorticity as initial conditions
+$(TYPEDFIELDS)"""
+@kwdef mutable struct RandomVorticity{NF, S, RNG} <: AbstractInitialConditions
+    "[OPTION] Power of the spectral distribution k^power"
+    power::NF = -3
+
+    "[OPTION] the (approximate) amplitude in [1/s], used as standard deviation of spherical harmonic coefficients"
+    amplitude::NF = 1.0e-4
+
+    "[OPTION] Maximum wavenumber"
+    max_wavenumber::Int = 20
+
+    "[OPTION] Random number generator seed, 0=randomly seed from Julia's GLOBAL_RNG"
+    seed::S = 123
+
+    "Independent random number generator for this random process"
+    random_number_generator::RNG = Random.Xoshiro(seed)
+end
+
+function RandomVorticity(SG::SpectralGrid; kwargs...)
+    RNG = haskey(kwargs, :random_number_generator) ? typeof(kwargs[:random_number_generator]) : typeof(Random.Xoshiro())
+    SeedType = haskey(kwargs, :seed) ? typeof(kwargs[:seed]) : Int
+    return RandomVorticity{SG.NF, SeedType, RNG}(; kwargs...)
+end
+
+"""$(TYPEDSIGNATURES)
+Kernel version of initialize! for RandomVorticity initial conditions."""
+function initialize!(
+        vars::Variables,
+        initial_conditions::RandomVorticity,
+        model::AbstractModel,
+    )
+
+    haskey(vars.prognostic, :vorticity) || warn_undefvar(vars, :vorticity) && return nothing
+    vor = vars.prognostic.vorticity
+    NF = real(eltype(vor))
+
+    # reseed the random number generator, for seed=0 randomly seed from Julia's global RNG
+    seed = initial_conditions.seed == 0 ? rand(UInt) : initial_conditions.seed
+    RNG = initial_conditions.random_number_generator
+    Random.seed!(RNG, seed)
+
+    (; spectrum) = vor
+    lmax = spectrum.lmax + 1
+    nlayers = size(vor, 2)
+    power = initial_conditions.power + 1    # +1 as power is summed of orders m
+    (; amplitude, max_wavenumber) = initial_conditions
+
+    # Pre-generate random values on CPU, then transfer to device
+    nlm = LowerTriangularArrays.nonzeros(spectrum)
+
+    # re and imag seperately as Reactant has no rng for complex
+    random_values_cpu_real = 2.0f0 .* rand(RNG, NF, nlm, nlayers) .- 1.0f0
+    random_values_cpu_imag = 2.0f0 .* rand(RNG, NF, nlm, nlayers) .- 1.0f0im
+    random_values_cpu = random_values_cpu_real .+ random_values_cpu_imag
+
+    # Transfer to device architecture
+    ξ = similar(vor)[:, :, 1]
+    random_values = on_architecture(architecture(ξ), random_values_cpu)
+
+    # Get l indices for each harmonic
+    (; l_indices) = spectrum
+
+    # Launch kernel to fill vorticity field
+    launch!(
+        architecture(ξ), SpectralWorkOrder, size(ξ),
+        random_vorticity_kernel!, ξ, random_values, amplitude, power, l_indices, lmax, max_wavenumber
+    )
+
+    # Set the prognostic variable
+    return set!(vars, model; vorticity = ξ, lf = 1)
+end
+
+@kernel function random_vorticity_kernel!(
+        ξ,
+        random_values,
+        amplitude,
+        power,
+        l_indices,
+        lmax,
+        max_wavenumber,
+    )
+    I = @index(Global, Cartesian)
+    lm = I[1]  # spectral coefficient index
+
+    # Get the degree l for this harmonic
+    l = l_indices[lm]
+
+    # Skip zonal modes (m=0, which are the first lmax harmonics)
+    ξ[I] = ifelse(lm > lmax & l <= max_wavenumber, amplitude * l^power * random_values[I], 0)
+end
+
+export RandomVelocity
+
+"""Start with random velocity as initial conditions
+$(TYPEDFIELDS)"""
+@kwdef mutable struct RandomVelocity{NF, S, RNG} <: AbstractInitialConditions
+    "[OPTION] maximum speed [ms⁻¹]"
+    max_speed::NF = 60
+
+    "[OPTION] Maximum wavenumber after truncation"
+    truncation::Int = 15
+
+    "[OPTION] Random number generator seed, 0=randomly seed from Julia's GLOBAL_RNG"
+    seed::S = 0
+
+    "Independent random number generator for this random process"
+    random_number_generator::RNG = Random.Xoshiro(seed)
+end
+
+function RandomVelocity(SG::SpectralGrid; kwargs...)
+    RNG = haskey(kwargs, :random_number_generator) ? typeof(kwargs[:random_number_generator]) : typeof(Random.Xoshiro())
+    SeedType = haskey(kwargs, :seed) ? typeof(kwargs[:seed]) : Int
+    return RandomVelocity{SG.NF, SeedType, RNG}(; kwargs...)
+end
+
+"""$(TYPEDSIGNATURES)
+Start with random vorticity as initial conditions"""
+function initialize!(
+        vars::Variables,
+        initial_conditions::RandomVelocity,
+        model::AbstractModel,
+    )
+
+    haskey(vars.prognostic, :vorticity) || warn_undefvar(vars, :vorticity) && return nothing
+    vor = vars.prognostic.vorticity
+    NF = real(eltype(vor))
+
+    # reseed the random number generator, for seed=0 randomly seed from Julia's global RNG
+    seed = initial_conditions.seed == 0 ? rand(UInt) : initial_conditions.seed
+    RNG = initial_conditions.random_number_generator
+    Random.seed!(RNG, seed)
+
+    (; grid) = model.spectral_grid
+    nlayers = size(vor, 2)
+    (; radius) = model.planet
+    A = 2 * initial_conditions.max_speed
+
+    # sample vector to use RNG (not implemented for RingGrids)
+    # TODO: Do this below with `similar` on a grid variable instead after Variables PR is merged
+    npoints = RingGrids.get_npoints(grid)
+    u_data = on_architecture(architecture(grid), rand(RNG, NF, npoints))
+    v_data = on_architecture(architecture(grid), rand(RNG, NF, npoints))
+
+    u = 2A .* Field(u_data, grid) .- A
+    v = 2A .* Field(v_data, grid) .- A
+
+    u_spectral = transform(u, model.spectral_transform)
+    v_spectral = transform(v, model.spectral_transform)
+
+    SpeedyTransforms.spectral_truncation!(u_spectral, initial_conditions.truncation)
+    SpeedyTransforms.spectral_truncation!(v_spectral, initial_conditions.truncation)
+
+    ξ = curl(u_spectral, v_spectral, model.spectral_transform; radius)
+
+    @allowscalar ξ[1] = 0  # remove mean
+
+    # repeat over vertical layers
+    ξks = repeat(ξ, 1, nlayers)
+    set!(vars, model; vorticity = ξks, lf = 1)
+
+    return nothing
+end
+
+export ZonalJet
+
+"""A struct that contains all parameters for the Galewsky et al, 2004 zonal jet
+intitial conditions for the ShallowWaterModel. Default values as in Galewsky.
+$(TYPEDFIELDS)"""
+@kwdef mutable struct ZonalJet{NF} <: AbstractInitialConditions
+    "jet latitude [˚N]"
+    latitude::NF = 45
+
+    "jet width [˚], default ≈ 19.29˚"
+    width::NF = (1 / 4 - 1 / 7) * 180
+
+    "jet maximum velocity [m/s]"
+    umax::NF = 80
+
+    "perturbation latitude [˚N], position in jet by default"
+    perturb_lat::NF = latitude
+
+    "perturbation longitude [˚E]"
+    perturb_lon::NF = 270
+
+    "perturbation zonal extent [˚], default ≈ 19.1˚"
+    perturb_xwidth::NF = 1 / 3 * 360 / 2π
+
+    "perturbation meridinoal extent [˚], default ≈ 3.8˚"
+    perturb_ywidth::NF = 1 / 15 * 360 / 2π
+
+    "perturbation amplitude [m]"
+    perturb_height::NF = 120
+end
+
+ZonalJet(SG::SpectralGrid; kwargs...) = ZonalJet{SG.NF}(; kwargs...)
+
+"""
+$(TYPEDSIGNATURES)
+Initial conditions from Galewsky, 2004, Tellus"""
+function initialize!(
+        vars::Variables,
+        initial_conditions::ZonalJet,
+        model::AbstractModel
+    )
+
+    haskey(vars.prognostic, :vorticity) || warn_undefvar(vars, :vorticity) && return nothing
+    haskey(vars.prognostic, :divergence) || warn_undefvar(vars, :divergence) && return nothing
+
+    model.spectral_grid.nlayers == 1 ||
+        throw(ArgumentError("ZonalJet initial conditions can only be used with ShallowWaterModel (1 layer)"))
+
+    (; latitude, width, umax) = initial_conditions
+    θ₀ = deg2rad(latitude - width)                  # southern boundary of jet [radians]
+    θ₁ = deg2rad(latitude + width)                  # northern boundary of jet
+    eₙ = exp(-4 / (θ₁ - θ₀)^2)                      # normalisation
+
+    θ₂ = deg2rad(initial_conditions.perturb_lat)    # perturbation latitude [radians]
+    α = deg2rad(initial_conditions.perturb_xwidth)  # zonal extent of interface perturbation [radians]
+    β = deg2rad(initial_conditions.perturb_ywidth)  # meridional extent of interface perturbation [radians]
+    λ = deg2rad(initial_conditions.perturb_lon)     # perturbation longitude [radians]
+
+    (; radius, rotation, gravity) = model.planet
+    (; grid, NF) = model.spectral_grid
+    (; coslat⁻¹) = model.geometry
+
+    u_grid = zeros(NF, grid, 1)
+    η_perturb_grid = zeros(NF, grid)
+    lat = RingGrids.get_lat(grid)
+    lons, _ = RingGrids.get_lonlats(grid)
+
+    # Transfer parameters to device
+    lat_device = on_architecture(architecture(u_grid), lat)
+    lons_device = on_architecture(architecture(u_grid), lons)
+    whichring = u_grid.grid.whichring
+
+    # Launch kernel
+    launch!(
+        architecture(u_grid), RingGridWorkOrder, size(u_grid), zonal_jet_kernel!,
+        u_grid, η_perturb_grid, lat_device, lons_device,
+        coslat⁻¹, whichring, θ₀, θ₁, umax, eₙ, θ₂, α, β, λ,
+        radius, initial_conditions.perturb_height
+    )
+
+    # the following obtain initial conditions for η from u, v=0 via
+    # 0 = -∇⋅((ζ+f)*(-v, u)) - ∇²((u^2 + v^2)/2), i.e.
+    # invert the Laplacian for
+    # ∇²(gη) = -∇⋅(0, (ζ+f)*u) - ∇²(u^2/2)
+    u = transform(u_grid, model.spectral_transform)
+
+    # get vorticity initial conditions from curl of u, v
+    v = zero(u)     # meridional velocity zero for these initial conditions
+    vor = get_step(vars.prognostic.vorticity, 1)
+    curl!(vor, u, v, model.spectral_transform)
+
+    # compute the div = -∇⋅(0,(ζ+f)*u) = ∇×((ζ+f)*u, 0) term, v=0
+    vor_grid = transform(vor, model.spectral_transform)
+    f = coriolis(vor_grid; rotation)
+
+    # includes 1/coslat/radius from above for curl!
+    # but *radius^2 for the ∇⁻²! operation below!
+    vor_flux_grid = @. (vor_grid + f) * u_grid * radius^2
+    vor_flux = transform(vor_flux_grid, model.spectral_transform)
+    div = curl(vor_flux, v, model.spectral_transform)
+
+    # compute the -∇²(u^2/2) term, add to div, divide by gravity
+    RingGrids.scale_coslat!(u_grid)     # remove coslat scaling
+    u_grid .*= radius                   # no radius scaling as we'll apply ∇⁻²(∇²) (would cancel)
+    @. u_grid = 1 // 2 * u_grid^2
+    u²_half = transform!(u, u_grid, model.spectral_transform)
+    ∇²!(div, u²_half, model.spectral_transform, flipsign = true, add = true)
+    div .*= inv(gravity)
+
+    # invert Laplacian to obtain η
+    haskey(vars.prognostic, :η) || return nothing
+    η = get_step(vars.prognostic.η, 1)  # 1 = first leapfrog timestep
+    ∇⁻²!(η, div, model.spectral_transform)
+
+    # add perturbation (reuse u array)
+    η_perturb = transform(η_perturb_grid, model.spectral_transform)
+    η .+= η_perturb
+    SpeedyTransforms.spectral_truncation!(η)
+    return nothing
+end
+
+@kernel inbounds = true function zonal_jet_kernel!(
+        u_grid,
+        η_perturb_grid,
+        lat,
+        lons,
+        coslat⁻¹,
+        whichring,
+        θ₀,
+        θ₁,
+        umax,
+        eₙ,
+        θ₂,
+        α,
+        β,
+        λ,
+        radius,
+        perturb_height
+    )
+    ij = @index(Global, Linear)
+
+    # Get latitude ring index for this grid point
+    j = whichring[ij]
+    θ = lat[j]  # latitude in radians
+
+    # Compute velocity per latitude, u as in Galewsky, 2004
+    u_θ = ifelse(θ₀ < θ < θ₁, umax / eₙ * exp(1 / (θ - θ₀) / (θ - θ₁)), 0)
+
+    # Store velocity with scaling for curl!
+    u_grid[ij] = u_θ / radius * coslat⁻¹[j]
+
+    # Compute perturbation
+    ηθ = perturb_height * cos(θ) * exp(-((θ₂ - θ) / β)^2)
+    ϕ = lons[ij] - λ
+    η_perturb_grid[ij] = exp(-(ϕ / α)^2) * ηθ
+end
+
+export ZonalWind
+
+"""
+$(TYPEDSIGNATURES)
+Create a struct that contains all parameters for the Jablonowski and Williamson, 2006
+intitial conditions for the primitive equation model. Default values as in Jablonowski.
+$(TYPEDFIELDS)"""
+@kwdef struct ZonalWind{NF} <: AbstractInitialConditions
+    "conversion from σ to Jablonowski's ηᵥ-coordinates"
+    η₀::NF = 0.252
+
+    "[OPTION] max amplitude of zonal wind [m/s]"
+    u₀::NF = 35
+
+    # PERTURBATION
+    "[OPTION] perturbation centred at [˚N]"
+    perturb_lat::NF = 40
+
+    "[OPTION] perturbation centred at [˚E]"
+    perturb_lon::NF = 20
+
+    "[OPTION] perturbation strength [m/s]"
+    perturb_uₚ::NF = 1
+
+    "[OPTION] radius of Gaussian perturbation in units of Earth's radius [1]"
+    perturb_radius::NF = 1 / 10
+end
+
+ZonalWind(SG::SpectralGrid; kwargs...) = ZonalWind{SG.NF}(; kwargs...)
+
+"""
+$(TYPEDSIGNATURES)
+Initial conditions from Jablonowski and Williamson, 2006, QJR Meteorol. Soc"""
+function initialize!(
+        vars::Variables,
+        initial_conditions::ZonalWind,
+        model::PrimitiveEquation
+    )
+
+    haskey(vars.prognostic, :vorticity) || warn_undefvar(vars, :vorticity) && return nothing
+    haskey(vars.prognostic, :divergence) || warn_undefvar(vars, :divergence) && return nothing
+
+    (; u₀, η₀) = initial_conditions
+    (; perturb_uₚ, perturb_radius) = initial_conditions
+    λc = initial_conditions.perturb_lon
+    sinφc, cosφc = sind(initial_conditions.perturb_lat), cosd(initial_conditions.perturb_lat)
+    (; radius) = model.planet
+    R = radius * perturb_radius         # spatial extent of perturbation
+
+    vor_ic = JablonowskiVorticity(sinφc, cosφc, λc, radius, u₀, η₀, perturb_uₚ, R)
+    div_ic = JablonowskiDivergence(sinφc, cosφc, λc, radius, u₀, η₀, perturb_uₚ, R)
+
+    # apply those to set the initial conditions for vor, div
+    set!(vars, model; vorticity = vor_ic, divergence = div_ic, lf = 1, static_func = true)
+    return nothing
+end
+
+
+# <: Function so that it works with our `set!`
+struct JablonowskiVorticity{NF} <: Function
+    sinφc::NF
+    cosφc::NF
+    λc::NF
+    radius::NF
+    u₀::NF
+    η₀::NF
+    perturb_uₚ::NF
+    R::NF
+end
+
+Adapt.@adapt_structure JablonowskiVorticity
+
+@inline function (J::JablonowskiVorticity)(λ, φ, η)
+    (; sinφc, cosφc, λc, radius, u₀, η₀, perturb_uₚ, R) = J
+
+    # great circle distance to perturbation
+    X = clamp(sinφc * sind(φ) + cosφc * cosd(φ) * cosd(λ - λc), 0, 1)
+    r = radius * acos(X)
+
+    # Eq (3), the unperturbed zonal wind
+    ζ = -4 * u₀ / radius * cos((η - η₀) * π / 2)^(3 / 2) * sind(φ) * cosd(φ) * (2 - 5sind(φ)^2)
+
+    # Eq (12), the perturbation
+    perturbation = perturb_uₚ / radius * exp(-(r / R)^2) *
+        (tand(φ) - 2 * (radius / R)^2 * acos(X) * (sinφc * cosd(φ) - cosφc * sind(φ) * cosd(λ - λc)) / sqrt(1 - X^2))
+
+    return ζ + perturbation
+end
+
+# <: Function so that it works with our `set!`
+struct JablonowskiDivergence{NF} <: Function
+    sinφc::NF
+    cosφc::NF
+    λc::NF
+    radius::NF
+    u₀::NF
+    η₀::NF
+    perturb_uₚ::NF
+    R::NF
+end
+
+Adapt.@adapt_structure JablonowskiDivergence
+
+@inline function (J::JablonowskiDivergence)(λ, φ, η)
+    (; sinφc, cosφc, λc, radius, u₀, η₀, perturb_uₚ, R) = J
+
+    # great circle distance to perturbation
+    X = clamp(sinφc * sind(φ) + cosφc * cosd(φ) * cosd(λ - λc), 0, 1)
+    r = radius * acos(X)
+
+    # Eq (13)
+    return -2 * perturb_uₚ * radius / R^2 * exp(-(r / R)^2) * acos(X) / sqrt(1 - X^2) * cosφc * sind(λ - λc)
+end
+
+export RossbyHaurwitzWave
+
+"""Rossby-Haurwitz wave initial conditions as in Williamson et al. 1992, J Computational Physics
+with an additional cut-off amplitude `c` to filter out tiny harmonics in the vorticity field.
+Parameters are $(TYPEDFIELDS)"""
+@kwdef struct RossbyHaurwitzWave{NF} <: AbstractInitialConditions
+    m::Int = 4
+    ω::NF = 7.848e-6
+    K::NF = 7.848e-6
+    c::NF = 1.0e-10
+end
+
+RossbyHaurwitzWave(SG::SpectralGrid; kwargs...) = RossbyHaurwitzWave{SG.NF}(; kwargs...)
+
+"""$(TYPEDSIGNATURES)
+Rossby-Haurwitz wave initial conditions as in Williamson et al. 1992, J Computational Physics
+with an additional cut-off amplitude `c` to filter out tiny harmonics in the vorticity field."""
+function initialize!(
+        vars::Variables,
+        initial_conditions::RossbyHaurwitzWave,
+        model::AbstractModel,
+    )
+    # make vor esential but div, eta optional
+    haskey(vars.prognostic, :vorticity) || warn_undefvar(vars, :vorticity) && return nothing
+
+    (; m, ω, K, c) = initial_conditions
+    (; geometry) = model
+    Ω = model.planet.rotation
+    R = model.planet.radius
+    g = model.planet.gravity
+
+    # Rossby-Haurwitz wave defined through vorticity ζ as a function of
+    # longitude λ, latitude θ (in degrees), sigma level σ (vertically constant though)
+    # see Williamson et al. 1992, J Computational Physics, eq 145
+    ζ(λ, θ, σ) = 2ω * sind(θ) - K * sind(θ) * cosd(θ)^m * (m^2 + 3m + 2) * cosd(m * λ)
+    # see Williamson et al. 1992, J Computational Physics, eq 147 - 149, 146
+    A(λ, θ) = ω / 2 * (2Ω + ω) * cosd(θ)^2 + K^2 / 4 * cosd(θ)^(2m) * ((m + 1) * cosd(θ)^2 + (2m^2 - m - 2) - 2m^2 / (cosd(θ)^2))
+    B(λ, θ) = (2(Ω + ω) * K) / ((m + 1) * (m + 2)) * cosd(θ)^m * ((m^2 + 2m + 2) - (m + 1)^2 * cosd(θ)^2)
+    C(λ, θ) = K^2 / 4 * cosd(θ)^(2m) * ((m + 1) * cosd(θ)^2 - (m + 2))
+    η(λ, θ) = R^2 / g * (A(λ, θ) + B(λ, θ) * cosd(m * λ) + C(λ, θ) * cosd(2m * λ))
+
+    set!(vars, geometry, vorticity = ζ, static_func = false)
+    haskey(vars.prognostic, :divergence) && set!(vars, geometry, divergence = 0)  # technically not needed, but set to zero for completeness
+    haskey(vars.prognostic, :η) && set!(vars, geometry, η = η, static_func = false)
+
+    # filter low values below cutoff amplitude c
+    vor = get_step(vars.prognostic.vorticity, 1)    # 1 = first leapfrog timestep
+    low_values = abs.(vor) .< c
+    vor[low_values] .= 0
+    if haskey(vars.prognostic, :η)
+        η = get_step(vars.prognostic.η, 1)
+        low_value = abs.(η) .< c
+        η[low_value] .= 0
+    end
+
+    return nothing
+end
+
+export JablonowskiTemperature
+
+"""
+$(TYPEDSIGNATURES)
+Create a struct that contains all parameters for the Jablonowski and Williamson, 2006
+intitial conditions for the primitive equation model. Default values as in Jablonowski.
+$(TYPEDFIELDS)"""
+@kwdef struct JablonowskiTemperature{NF} <: AbstractInitialConditions
+    "conversion from σ to Jablonowski's ηᵥ-coordinates"
+    η₀::NF = 0.252
+
+    "Sigma coordinates of the tropopause [1]"
+    σ_tropopause::NF = 0.2
+
+    "max amplitude of zonal wind [m/s]"
+    u₀::NF = 35
+
+    "temperature difference used for stratospheric lapse rate [K], Jablonowski uses ΔT = 4.8e5 [K]"
+    ΔT::NF = 0
+
+    "minimum temperature [K] of profile"
+    Tmin::NF = 200
+end
+
+JablonowskiTemperature(SG::SpectralGrid; kwargs...) = JablonowskiTemperature{SG.NF}(; kwargs...)
+
+# fallback for models that don't have temperature
+initialize!(::Variables, ::JablonowskiTemperature, ::AbstractModel) = nothing
+
+"""
+$(TYPEDSIGNATURES)
+Initial conditions from Jablonowski and Williamson, 2006, QJR Meteorol. Soc"""
+function initialize!(
+        vars::Variables,
+        initial_conditions::JablonowskiTemperature,
+        model::PrimitiveEquation
+    )
+
+    haskey(vars.prognostic, :temperature) || warn_undefvar(vars, :temperature) && return nothing
+    temp = vars.prognostic.temperature
+    NF = real(eltype(temp))
+
+    (; u₀, η₀, ΔT, Tmin) = initial_conditions
+    (; σ_tropopause) = initial_conditions
+
+    Γ = lapse_rate(model.atmosphere)
+    (; R_dry) = model.atmosphere
+    T₀ = model.atmosphere.reference_temperature
+    (; grid, nlayers) = model.spectral_grid
+    (; radius, rotation, gravity) = model.planet
+
+    (; σ_levels_full) = model.geometry
+    σ_levels_full_cpu = on_architecture(CPU(), σ_levels_full)
+    φ = model.geometry.latds
+
+    # vertical profile
+    Tη = similar(σ_levels_full_cpu)
+    for k in 1:nlayers
+        σ = σ_levels_full_cpu[k]
+        Tη[k] = T₀ * σ^(R_dry * Γ / gravity)        # Jablonowski and Williamson eq. 4
+
+        if σ < σ_tropopause
+            Tη[k] += ΔT * (σ_tropopause - σ)^5      # Jablonowski and Williamson eq. 5
+        end
+    end
+
+    Tη .= max.(Tη, Tmin)
+    Tη = on_architecture(model.architecture, Tη)
+
+    # temperature
+    temp_grid = zeros(NF, grid, nlayers)
+    aΩ = radius * rotation
+
+    # Launch kernel
+    launch!(
+        architecture(temp_grid), RingGridWorkOrder, size(temp_grid),
+        jablonowski_temperature_kernel!, temp_grid, Tη, φ, σ_levels_full,
+        η₀, u₀, R_dry, aΩ
+    )
+
+    set!(vars, model; temperature = temp_grid, lf = 1)
+
+    return nothing
+end
+
+@kernel inbounds = true function jablonowski_temperature_kernel!(
+        temp_grid,
+        Tη,
+        φ,
+        σ_levels_full,
+        η₀,
+        u₀,
+        R_dry,
+        aΩ
+    )
+    ij, k = @index(Global, NTuple)
+
+    # Jablonowski and Williamson use η for σ coordinates
+    η = σ_levels_full[k]
+    ηᵥ = (η - η₀) * π * 1 // 2  # auxiliary variable for vertical coordinate
+
+    # Amplitudes with height
+    A1 = 3 // 4 * η * π * u₀ / R_dry * sin(ηᵥ) * sqrt(cos(ηᵥ))
+    A2 = 2u₀ * cos(ηᵥ)^(3 // 2)
+
+    # Get latitude
+    φij = φ[ij]
+    sinφ = sind(φij)
+    cosφ = cosd(φij)
+
+    NF = eltype(temp_grid)
+
+    # Jablonowski and Williamson, eq. (6)
+    temp_grid[ij, k] = Tη[k] + A1 * (
+        (-2sinφ^6 * (cosφ^2 + 1 // 3) + 10 // 63) * A2 +
+            (8 // 5 * cosφ^3 * (sinφ^2 + 2 // 3) - convert(NF, π) * 1 // 4) * aΩ
+    )
+end
+
+export StartFromFile
+
+"""
+Restart from a previous SpeedyWeather.jl simulation via the restart file restart.jld2
+Applies interpolation in the horizontal but not in the vertical. restart.jld2 is
+identified by
+$(TYPEDFIELDS)"""
+@kwdef mutable struct StartFromFile <: AbstractInitialConditions
+    "path for restart file"
+    path::String = pwd()
+
+    "run prefix, e.g. 'run' in `run_0001/restart.jld2`"
+    run_prefix::String = "run"
+
+    "identification of run folder, e.g. 'set1' in `run_set1_0001/restart.jld2`"
+    id::String = ""
+
+    "run number, e.g. 1 in `run_set1_0001/restart.jld2`"
+    run_number::Int = 1
+
+    "run digits, e.g. 4 in `run_set1_0001/restart.jld2` for run_number=1"
+    run_digits::Int = 4
+
+    "directly specify the run folder, e.q. `run_0001`"
+    run_folder::String = ""
+
+    "File name of restart file, default `restart.jld2`"
+    filename::String = "restart.jld2"
+end
+
+StartFromFile(SG::SpectralGrid; kwargs...) = StartFromFile(; kwargs...)
+
+"""
+$(TYPEDSIGNATURES)
+Restart from a previous SpeedyWeather.jl simulation via the restart file `restart.jld2`.
+Applies interpolation in the horizontal but not in the vertical."""
+function initialize!(
+        vars::Variables,
+        initial_conditions::StartFromFile,
+        model::AbstractModel
+    )
+
+    (; path, run_prefix, id, run_number, run_digits, filename) = initial_conditions
+
+    if length(initial_conditions.run_folder) == 0
+        # run_folder not specified, determine from run_prefix, id, run_number
+        fmt = Printf.Format("%0$(run_digits)d")
+        run_folder = run_folder_name(run_prefix, id, run_number; fmt)
+    else    # use as specified
+        run_folder = initial_conditions.run_folder
+    end
+    restart_file = jldopen(joinpath(path, run_folder, filename))
+    progn_old = restart_file["variables.prognostic"]
+    version = restart_file["version"]
+    if version != pkgversion(SpeedyWeather)
+        @warn "Restart file created with SpeedyWeather $version loaded " *
+            "but currently used is $(pkgversion(SpeedyWeather))"
+    end
+    copy_variables!(vars.prognostic, progn_old)
+    return nothing
+end
+
+export PressureOnOrography
+struct PressureOnOrography <: AbstractInitialConditions end
+PressureOnOrography(SG::SpectralGrid) = PressureOnOrography()
+
+"""
+$(TYPEDSIGNATURES)
+Initialize surface pressure on orography by integrating the
+hydrostatic equation with the reference temperature lapse rate."""
+function initialize!(
+        vars::Variables,
+        ::PressureOnOrography,
+        model::PrimitiveEquation
+    )
+
+    haskey(vars.prognostic, :pressure) || warn_undefvar(vars, :pressure) && return nothing
+
+    # T₀:       Reference absolute T [K] at surface z = 0
+    # Γ:        Reference temperature lapse rate (dry or moist) -dT/dz [K/m]
+    # gravity:  Gravitational acceleration [m/s^2]
+    # R_dry:    Specific gas constant for dry air [J/kg/K]
+    # p₀:       Reference surface pressure [hPa]
+
+    Γ = lapse_rate(model.atmosphere)
+    (; R_dry) = model.atmosphere
+    T₀ = model.atmosphere.reference_temperature
+    p₀ = model.atmosphere.reference_pressure
+
+    (; gravity) = model.planet
+    (; orography) = model.orography     # orography on the grid
+
+    lnp₀ = log(p₀)                      # logarithm of reference surface pressure [log(Pa)]
+    lnp_grid = similar(orography)       # allocate log surface pressure on grid
+
+    RΓg⁻¹ = R_dry * Γ / gravity         # for convenience
+    ΓT₀⁻¹ = Γ / T₀
+    @. lnp_grid = lnp₀ + log(1 - ΓT₀⁻¹ * orography) / RΓg⁻¹
+    set!(vars, model; pressure = lnp_grid, lf = 1)
+    return nothing
+end
+
+export ConstantPressure
+struct ConstantPressure <: AbstractInitialConditions end
+ConstantPressure(SG::SpectralGrid) = ConstantPressure()
+
+# fallback for all models
+initialize!(::Variables, ::ConstantPressure, ::AbstractModel) = nothing
+
+# but primitive models should set the pressure correctly
+function initialize!(
+        vars::Variables,
+        ::ConstantPressure,
+        model::PrimitiveEquation,
+    )
+    haskey(vars.prognostic, :pressure) || warn_undefvar(vars, :pressure) && return nothing
+
+    # prognostic variable is logarithm of reference surface pressure [log(Pa)]
+    set!(vars, model; pressure = log(model.atmosphere.reference_pressure))
+    return nothing
+end
+
+export ConstantRelativeHumidity
+@kwdef struct ConstantRelativeHumidity{NF} <: AbstractInitialConditions
+    """[OPTION] Relative humidity as fraction of saturation [1]"""
+    relhumid_ref::NF = 0.7
+end
+
+ConstantRelativeHumidity(SG::SpectralGrid; kwargs...) = ConstantRelativeHumidity{SG.NF}(; kwargs...)
+
+# fallback for models that don't have humidity
+initialize!(::Variables, ::ConstantRelativeHumidity, ::AbstractModel) = nothing
+
+function initialize!(
+        vars::Variables,
+        IC::ConstantRelativeHumidity,
+        model::PrimitiveWet,
+    )
+    haskey(vars.prognostic, :humidity) || warn_undefvar(vars, :humidity) && return nothing
+
+    (; relhumid_ref) = IC
+    (; σ_levels_full) = model.geometry
+    (; atmosphere) = model
+
+    # get pressure [Pa] on grid
+    lnpₛ = get_step(vars.prognostic.pressure, 1)  # 1 = first leapfrog timestep
+    pres_grid = transform(lnpₛ, model.spectral_transform)
+    pres_grid .= exp.(pres_grid)
+
+    temp = get_step(vars.prognostic.temperature, 1)  #  1 = first leapfrog timestep
+    temp_grid = transform(temp, model.spectral_transform)
+    humid_grid = zero(temp_grid)
+
+    # Launch kernel
+    launch!(
+        architecture(humid_grid), RingGridWorkOrder, size(humid_grid),
+        constant_relative_humidity_kernel!, humid_grid, temp_grid, pres_grid,
+        σ_levels_full, relhumid_ref, atmosphere,
+    )
+    set!(vars, model; humidity = humid_grid, lf = 1)
+
+    return nothing
+end
+
+@kernel inbounds = true function constant_relative_humidity_kernel!(
+        humid_grid,
+        temp_grid,
+        pres_grid,
+        σ_levels_full,
+        relhumid_ref,
+        atmosphere,
+    )
+    ij, k = @index(Global, NTuple)
+
+    # Compute pressure at this level
+    pₖ = σ_levels_full[k] * pres_grid[ij]
+    T = temp_grid[ij, k]
+
+    # Set humidity as fraction of saturation
+    humid_grid[ij, k] = relhumid_ref * saturation_humidity(T, pₖ, atmosphere)
+end
+
+export RandomWaves
+
+"""Parameters for random initial conditions for the interface displacement η
+in the shallow water equations.
+$(TYPEDFIELDS)"""
+@kwdef struct RandomWaves{NF} <: AbstractInitialConditions
+    """[OPTION] amplitude [m]"""
+    amplitude::NF = 2000
+
+    """[OPTION] minimum wavenumber"""
+    lmin::Int = 10
+
+    """[OPTION] maximum wavenumber"""
+    lmax::Int = 30
+end
+
+RandomWaves(SG::SpectralGrid; kwargs...) = RandomWaves{SG.NF}(; kwargs...)
+
+"""
+$(TYPEDSIGNATURES)
+Random initial conditions for the interface displacement η
+in the shallow water equations. The flow (u, v) is zero initially.
+This kicks off gravity waves that will interact with orography."""
+function initialize!(
+        vars::Variables,
+        initial_conditions::RandomWaves,
+        model::AbstractModel
+    )
+    haskey(vars.prognostic, :η) || warn_undefvar(vars, :η) && return nothing
+    (; η) = vars.prognostic
+
+    NF = eltype(real(η))
+    (; amplitude, lmin, lmax) = initial_conditions
+    (; spectrum) = η
+
+    # start with matrix to have matrix indexing
+    ηm = on_architecture(η, randn(Complex{NF}, spectrum.lmax, spectrum.mmax))
+
+    # zero out other wavenumbers
+    ηm[1:min(lmin, spectrum.lmax), :] .= 0
+    ηm[min(lmax + 2, spectrum.lmax):spectrum.lmax, :] .= 0
+
+    # convert to LowerTriangularMatrix with vector indexing
+    η = LowerTriangularMatrix(ηm, spectrum)
+
+    # scale to amplitude
+    η_grid = transform(η, model.spectral_transform)
+    η_min, η_max = extrema(η_grid)
+    η .*= (amplitude / max(abs(η_min), abs(η_max)))
+    set!(vars, model; η = η)
+
+    return nothing
+end

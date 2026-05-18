@@ -53,7 +53,7 @@ changes) you could manually change the land-sea mask with the `set!` function
 which can take scalars as global constants or functions of two arguments
 longitude ``\lambda`` and ``\varphi``. You can use an anonymous function
 `(λ, φ) -> ...` but you do not have to, defining `function f(λ, φ)` and
-then using `land_sea_mask = f` works too. 
+then using `land_sea_mask = f` works too.
 
 ```@example landseamask
 set!(model, land_sea_mask=0)                    # aqua planet
@@ -81,7 +81,7 @@ And now you can run the simulation as usual with `run!(simulation)`.
 The [`EarthLandSeaMask`](@ref) has itself the option to load another
 land-sea mask from file, but you also have to specify the grid that mask
 from files comes on. It will then attempt to read it via `NCDatasets`
-and interpolate onto the model grid. 
+and interpolate onto the model grid.
 
 ## AquaPlanetMask
 
@@ -120,7 +120,7 @@ You can for example read something from file, set some values manually, or use c
 
 ## Time-dependent land-sea mask
 
-It is possible to define an [intrusive callback](@ref intrusive_callbacks) to change the
+It is possible to define [Intrusive callbacks](@ref) to change the
 land-sea mask during integration. The grid in `model.land_sea_mask.mask`
 is mutable, meaning you can change the values of grid points in-place but not replace
 the entire mask or change its size. If that mask is changed, this will be reflected
@@ -135,25 +135,23 @@ end
 # initialize the schedule
 function SpeedyWeather.initialize!(
     callback::MilleniumFlood,
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
+    vars::Variables,
     model::AbstractModel,
 )
-    initialize!(callback.schedule, progn.clock)
+    initialize!(callback.schedule, vars.prognostic.clock)
 end
 
 function SpeedyWeather.callback!(
     callback::MilleniumFlood,
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
+    vars::Variables,
     model::AbstractModel,
 )
     # escape immediately if not scheduled yet
-    isscheduled(callback.schedule, progn.clock) || return nothing
+    isscheduled(callback.schedule, vars.prognostic.clock) || return nothing
 
     # otherwise set the entire land-sea mask to ocean
     model.land_sea_mask.mask .= 0
-    @info "Everything flooded on $(progn.clock.time)"
+    @info "Everything flooded on $(vars.prognostic.clock.time)"
 end
 
 # nothing needs to be done after simulation is finished
@@ -179,6 +177,4 @@ nothing # hide
 ![Land-sea mask2](land-sea_mask2.png)
 
 And the land-sea mask has successfully been set to ocean everywhere at the start
-of the 21st century. Note that while we added an `@info` line into the
-`callback!` function, this is here not printed because of how the
-Documenter works. If you execute this in the REPL you'll see it.
+of the 21st century.

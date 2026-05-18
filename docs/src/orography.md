@@ -1,7 +1,7 @@
 # Orography
 
 Orography (in height above the surface) forms the surface boundary of the
-lowermost layer in SpeedyWeather. 
+lowermost layer in SpeedyWeather.
 
 In the [shallow-water equations](@ref shallow_water_model) the orography
 ``H_b`` enters the equations when computing the layer thickness ``h = \eta + H_0 - H_b``
@@ -33,7 +33,7 @@ using InteractiveUtils # hide
 using SpeedyWeather
 subtypes(SpeedyWeather.AbstractOrography)
 ```
-which are 
+which are
 
 - ``\Phi_s = z_s = H_b = 0`` for `NoOrography`
 - For `ZonalRidge` the zonal ridge from the Jablonowski and Williamson initial conditions, see [Jablonowski-Williamson baroclinic wave](@ref)
@@ -89,14 +89,14 @@ The easiest to load another orography from a netCDF file is to reuse the
 `EarthOrography`, e.g.
 
 ```julia
-mars_orography = EarthOrography(spectal_grid, 
-                                path="path/to/my/orography",
-                                file="mars_orography.nc",
-                                file_Grid=FullClenshawGrid)
+mars_orography = EarthOrography(spectal_grid,
+                                path = "path/to/my/orography",
+                                file = "mars_orography.nc",
+                                FieldType = FullClenshawField)
 ```
 the orography itself need to come on one of the full grids
-SpeedyWeather defines, i.e. `FullGaussianGrid` or `FullClenshawGrid`
-(a regular lat-lon grid, see [FullClenshawGrid](@ref FullClenshawGrid)),
+SpeedyWeather defines, i.e. the array itself would be `FullGaussianField` or `FullClenshawField`
+(which is on a regular lat-lon grid, see [FullClenshawGrid](@ref FullClenshawGrid)),
 which you can specify. Best to inspect the correct orientation with
 `heatmap(mars_orography.orography)` (after `using CairoMakie`;
 the scope `mars_orography.` is whatever name you chose here).

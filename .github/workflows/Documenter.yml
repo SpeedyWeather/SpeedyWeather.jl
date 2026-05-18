@@ -6,19 +6,32 @@ on:
       - main
     tags: '*'
   pull_request:
+  
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
 
 jobs:
   build:
+    name: build
+    # don't run if any of these labels are present
+    if: >
+      !(  
+      contains(github.event.pull_request.labels.*.name, 'skip-ci') ||
+      contains(github.event.pull_request.labels.*.name, 'skip-docs')
+      )
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: julia-actions/setup-julia@latest
-        with:
-          version: '1.11'
-      - name: Install dependencies
-        run: julia --color=yes --project=docs/ -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate()'
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Setup Julia
+        uses: julia-actions/setup-julia@v3
+      - name: Load Julia packages from cache
+        id: julia-cache
+        uses: julia-actions/cache@v3
+      - name: Install Julia dependencies
+        run: julia --color=yes --project=docs/ -e 'using Pkg; Pkg.develop(PackageSpec(path = "SpeedyWeather")); Pkg.instantiate()'
       - name: Build and deploy
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # For authentication with GitHub Actions token
-          DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY2 }} # For authentication with SSH deploy key
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}       # For authentication with GitHub Actions token
+          DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY2 }}  # For authentication with SSH deploy key
         run: JULIA_DEBUG=Documenter julia --color=yes --project=docs/ docs/make.jl

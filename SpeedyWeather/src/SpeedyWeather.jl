@@ -1,0 +1,213 @@
+module SpeedyWeather
+
+# STRUCTURE
+using DocStringExtensions
+using StyledStrings
+
+# NUMERICS
+import Primes
+import Random
+import LinearAlgebra: LinearAlgebra, Diagonal
+export rotate, rotate!
+
+# GPU, PARALLEL
+import KernelAbstractions: KernelAbstractions, @kernel, @index, synchronize
+import GPUArrays: GPUArrays, @allowscalar
+import Adapt: Adapt, adapt, adapt_structure
+import GPUArrays: @allowscalar
+import ReactantCore: @trace
+import Base: @propagate_inbounds
+
+using SpeedyWeatherInternals
+using SpeedyWeatherInternals.Architectures
+using SpeedyWeatherInternals.KernelLaunching
+import SpeedyWeatherInternals.Architectures: AbstractArchitecture, CPU, GPU,
+    on_architecture, architecture, array_type, ismatching, nonparametric_type
+export CPU, GPU, on_architecture, architecture                # export device functions
+export SpeedyWeatherInternals, Architectures, KernelLaunching
+
+# INPUT OUTPUT
+import TOML
+import Dates: Dates, DateTime, TimePeriod, Period, Millisecond, Second, Minute, Hour, Day,
+    Week, Month, Year, value, year, month, day, hour, minute, second
+import Printf: Printf, @sprintf
+import Random: randstring
+import NCDatasets: NCDatasets, NCDataset, defDim, defVar
+import JLD2: jldopen, jldsave, JLDFile
+import CodecZlib
+import BitInformation: round, round!
+import ProgressMeter
+
+# to avoid a `using Dates` to pass on DateTime arguments
+export DateTime, Millisecond, Second, Minute, Hour, Day, Week, Month, Year, Century, Millenium
+
+# UTILITIES
+export Utils
+import SpeedyWeatherInternals.Utils: Utils, @maybe_jit, _jit, print_fields, readable_secs
+
+# PARAMETER HANDLING
+using DomainSets.IntervalSets
+using SpeedyWeatherInternals.ParameterEditing
+import SpeedyWeatherInternals.ParameterEditing: parameters
+export ParameterTable, parameters, stripparams       # export user-facing parameter handling types and methods
+
+# Export heavily methoded functions
+export initialize!, finalize!
+
+# DATA STRUCTURES
+# LowerTriangularArrays for spherical harmonics
+using LowerTriangularArrays
+export LowerTriangularArrays,
+    LowerTriangularArray,
+    LowerTriangularMatrix
+
+export Spectrum
+
+# indexing styles for LowerTriangularArray/Matrix
+export OneBased, ZeroBased
+export eachmatrix, eachharmonic, eachorder
+
+# RingGrids
+using RingGrids
+
+export RingGrids
+export AbstractGrid, AbstractFullGrid, AbstractReducedGrid
+export AbstractField, AbstractField2D, AbstractField3D
+export Field, Field2D, Field3D,
+    FullClenshawField, FullGaussianField,
+    FullHEALPixField, FullOctaHEALPixField,
+    OctahedralGaussianField, OctahedralClenshawField,
+    HEALPixField, OctaHEALPixField,
+    OctaminimalGaussianField
+
+export ColumnField, ColumnField2D, ColumnField3D, ColumnField4D,
+    FullColumnField, ReducedColumnField, transpose!
+
+export FullClenshawGrid, FullGaussianGrid,
+    FullHEALPixGrid, FullOctaHEALPixGrid,
+    OctahedralGaussianGrid, OctahedralClenshawGrid,
+    HEALPixGrid, OctaHEALPixGrid,
+    OctaminimalGaussianGrid
+
+export eachring, eachlayer, eachgridpoint
+export AnvilInterpolator
+export spherical_distance
+export zonal_mean
+
+# SpeedyTransforms
+using SpeedyTransforms
+
+export SpeedyTransforms, SpectralTransform
+export MatrixSpectralTransform
+export transform, transform!
+export curl, divergence, curl!, divergence!
+export ∇, ∇², ∇⁻², ∇!, ∇²!, ∇⁻²!
+export laplace, inverse_laplace, laplace!, inverse_laplace!
+export gradient, gradient!
+export power_spectrum
+
+import SpeedyTransforms: AbstractSpectralTransform, prettymemory
+
+# to be defined in GeoMakie extension
+export animate, globe
+function animate end
+
+# abstract types
+include("models/abstract_models.jl")
+include("variables/abstract_types.jl")
+include("parameterizations/parameterizations.jl")
+include("time_stepping/abstract_types.jl")
+
+# GEOMETRY CONSTANTS ETC
+include("dynamics/vertical_coordinates.jl")
+include("dynamics/spectral_grid.jl")
+include("dynamics/geometry.jl")
+include("dynamics/coriolis.jl")
+include("dynamics/planet.jl")
+include("dynamics/atmosphere.jl")
+include("dynamics/adiabatic_conversion.jl")
+include("dynamics/orography.jl")
+include("parameterizations/land_sea_mask.jl")
+
+# VARIABLES
+include("variables/dimensions.jl")
+include("variables/variables.jl")
+include("dynamics/tracers.jl")
+include("dynamics/particles.jl")
+include("dynamics/clock.jl")
+include("variables/set.jl")
+
+# MODEL COMPONENTS
+include("dynamics/forcing.jl")
+include("dynamics/drag.jl")
+include("dynamics/geopotential.jl")
+include("dynamics/virtual_temperature.jl")
+include("dynamics/initial_conditions.jl")
+include("dynamics/horizontal_diffusion.jl")
+include("dynamics/vertical_advection.jl")
+include("dynamics/scaling.jl")
+include("dynamics/tendencies.jl")
+include("dynamics/hole_filling.jl")
+include("dynamics/particle_advection.jl")
+include("dynamics/random_process.jl")
+
+# TIME STEPPING
+include("time_stepping/time_integration.jl")
+include("time_stepping/leapfrog.jl")
+include("time_stepping/lorenz_ncycle.jl")
+include("time_stepping/transform.jl")
+include("time_stepping/implicit.jl")
+
+# PARAMETERIZATIONS
+include("parameterizations/albedo.jl")
+include("parameterizations/tendencies.jl")
+include("parameterizations/vertical_diffusion.jl")
+include("parameterizations/large_scale_condensation.jl")
+include("parameterizations/surface_fluxes/boundary_layer.jl")
+include("parameterizations/surface_fluxes/surface_condition.jl")
+include("parameterizations/surface_fluxes/momentum.jl")
+include("parameterizations/surface_fluxes/heat.jl")
+include("parameterizations/surface_fluxes/humidity.jl")
+include("parameterizations/convection.jl")
+include("parameterizations/radiation/zenith.jl")
+include("parameterizations/radiation/shortwave_radiation.jl")
+include("parameterizations/radiation/shortwave_transmissivity.jl")
+include("parameterizations/radiation/clouds.jl")
+include("parameterizations/radiation/longwave_radiation.jl")
+include("parameterizations/radiation/longwave_transmissivity.jl")
+include("parameterizations/radiation/greenhouse_gases.jl")
+include("parameterizations/stochastic_physics.jl")
+
+# OCEAN AND LAND
+include("parameterizations/ocean.jl")
+include("parameterizations/sea_ice.jl")
+include("parameterizations/land/land.jl")
+include("parameterizations/land/geometry.jl")
+include("parameterizations/land/thermodynamics.jl")
+include("parameterizations/land/soil_temperature.jl")
+include("parameterizations/land/soil_moisture.jl")
+include("parameterizations/land/snow.jl")
+include("parameterizations/land/vegetation.jl")
+include("parameterizations/land/rivers.jl")
+
+# OUTPUT
+include("output/schedule.jl")
+include("output/callbacks.jl")
+include("output/feedback.jl")
+include("output/writers/general.jl")
+include("output/writers/output_writer_core.jl")
+include("output/writers/netcdf_output.jl")
+include("output/writers/variables_output.jl")
+include("output/writers/zarr_output.jl")
+include("output/variables/output_variables.jl")
+include("output/restart.jl")
+include("output/particle_tracker.jl")
+
+# MODELS
+include("models/simulation.jl")
+include("models/barotropic.jl")
+include("models/shallow_water.jl")
+include("models/primitive_dry.jl")
+include("models/primitive_wet.jl")
+include("models/set.jl")
+end

@@ -27,6 +27,17 @@ end
 
 Adapt.@adapt_structure ScratchMemory
 
+function Architectures.on_architecture(arch::AbstractArchitecture, s::ScratchMemory)
+    return ScratchMemory(
+        on_architecture(arch, s.north),
+        on_architecture(arch, s.south),
+        ColumnScratchMemory(
+            on_architecture(arch, s.column.north),
+            on_architecture(arch, s.column.south),
+        ),
+    )
+end
+
 function ScratchMemory(
         ::Type{NF},
         architecture::AbstractArchitecture,

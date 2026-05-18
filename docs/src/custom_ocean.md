@@ -1,7 +1,7 @@
 # Ocean
 
 The ocean in SpeedyWeather.jl is defined with two horizontal fields in the
-prognostic variables which has a field `ocean`, i.e. `simulation.prognostic_variables.ocean`.
+prognostic variables which has a field `ocean`, i.e. `simulation.variables.prognostic.ocean`.
 
 - `ocean.sea_surface_temperature` with units of Kelvin [K].
 - `ocean.sea_ice_concentration` with units of area fraction [1].
@@ -46,15 +46,13 @@ function initialize!(
 end
 
 function initialize!(
-    ocean,
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
+    vars::Variables,
     ocean_model::CustomOceanModel,
     model::PrimitiveEquation,
 )
     # your code here to initialize the prognostic variables for the ocean
     # namely, ocean.sea_surface_temperature, ocean.sea_ice_concentration, e.g.
-    # ocean.sea_surface_temperature .= 300      # 300K everywhere
+    # vars.prognostic.ocean.sea_surface_temperature .= 300      # 300K everywhere
 end
 ```
 
@@ -69,12 +67,11 @@ except to define a new method for `CustomOceanModel` or whichever name you chose
 Then you have to extend the `timestep!` function which has a signature like
 ```julia
 function timestep!(
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
+    vars::Variables,
     ocean_model::CustomOceanModel,
     model::PrimitiveEquation,
 )
-    # your code here to change the progn.ocean.sea_surface_temperature
+    # your code here to change the vars.prognostic.ocean.sea_surface_temperature
 end
 ```
 which is called on every time step before the land and before the parameterization

@@ -21,7 +21,7 @@ The life of every SpeedyWeather.jl simulation starts with a `SpectralGrid` objec
 A `SpectralGrid` defines the physical domain of the simulation and its discretization.
 This domain has to be a sphere because of the spherical harmonics, but it can have a different radius.
 The discretization is for spectral, grid-point space and the vertical as this determines the size of many
-arrays for preallocation, for which als the number format is essential to know.
+arrays for preallocation, for which also the number format is essential to know.
 That's why `SpectralGrid` is the beginning of every SpeedyWeather.jl simulation and that is why
 it has to be passed on to (most) model components.
 
@@ -182,11 +182,11 @@ simulation = initialize!(model)
 and we have initialized the `ShallowWaterModel` we have defined earlier.
 As `initialize!(model)` also initializes the prognostic (and diagnostic)
 variables, it also initializes the clock in
-`simulation.prognostic_variables.clock`. To initialize with a specific
+`simulation.variables.prognostic.clock`. To initialize with a specific
 time, do
 ```@example howto
 simulation = initialize!(model, time=DateTime(2020,5,1))
-simulation.prognostic_variables.clock.time
+simulation.variables.prognostic.clock.time
 ```
 to set the time to 1st May, 2020 (but you can also do that manually).
 This time is used by components that depend on time, e.g. the solar
@@ -195,9 +195,9 @@ zenith angle calculation.
 After this step you can continue to tweak your model setup but note that
 some model components are immutable, or that your changes may not be
 propagated to other model components that rely on it. But you can, for
-example, change the output time step like so
+example, change the output interval like so
 ```@example howto
-simulation.model.output.output_dt = Second(3600)
+set!(model.output, model, interval=Hour(1))
 ```
 Now, if there's output, it will be every hour. Furthermore the initial
 conditions can be set with the `initial_conditions` model component
@@ -205,7 +205,7 @@ which are then set during `initialize!(::AbstractModel)`, but you can also
 change them now, before the model runs 
 ```@example howto
 # harmonic x layer x leapfrog steps
-simulation.prognostic_variables.vor[1, 1, 1] = 0
+simulation.variables.prognostic.vorticity[1, 1, 1] = 0
 ```
 So with this we have set the zero mode (first index) of vorticity of the first (and only)
 layer (second index) in the shallow water model to zero. Because the leapfrogging is a 2-step

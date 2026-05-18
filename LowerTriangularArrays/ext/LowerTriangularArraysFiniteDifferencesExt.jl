@@ -13,4 +13,4 @@ function FiniteDifferences.to_vec(x::LTA) where {LTA <: LowerTriangularArray}
     return x_vec, LowerTriangularArray_from_vec
 end
 
-end 
+end

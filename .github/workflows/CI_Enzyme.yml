@@ -1,0 +1,59 @@
+name: Enzyme differentiability
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+jobs:
+  test:
+    name: Julia v${{ matrix.version }}, ${{ matrix.os }}, ${{ matrix.arch }}
+    # don't run if any of these labels are present
+    if: >
+      !( 
+      contains(github.event.pull_request.labels.*.name, 'skip-ci') ||
+      contains(github.event.pull_request.labels.*.name, 'skip-speedyweather-ci') ||
+      contains(github.event.pull_request.labels.*.name, 'skip-enzyme-ci')
+      )
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    timeout-minutes: 90
+    permissions: # needed to allow julia-actions/cache to proactively delete old caches that it has created
+      actions: write
+      contents: read
+    strategy:
+      matrix:
+        version:
+          - '1.10'
+        os:
+          - ubuntu-latest
+        arch:
+          - x64
+    steps:
+      - uses: actions/checkout@v6
+      - uses: julia-actions/setup-julia@v3
+        with:
+          version: ${{ matrix.version }}
+          arch: ${{ matrix.arch }}
+      - uses: julia-actions/cache@v3 
+      - name: Develop local packages
+        run: |
+          julia --color=yes --project=SpeedyWeather/test/differentiability -e '
+            using Pkg
+            Pkg.develop([
+              PackageSpec(path="SpeedyWeatherInternals"),
+              PackageSpec(path="LowerTriangularArrays"),
+              PackageSpec(path="RingGrids"),
+              PackageSpec(path="SpeedyTransforms"),
+              PackageSpec(path="SpeedyWeather")
+            ])
+            Pkg.instantiate()
+          '
+      - name: Run Enzyme differentiability tests
+        run: |
+          julia --color=yes --project=SpeedyWeather/test/differentiability SpeedyWeather/test/differentiability/full_diff_CI.jl
+        env:
+          GITHUB_AUTH: ${{ secrets.GITHUB_TOKEN }}

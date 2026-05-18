@@ -21,10 +21,10 @@ relative vorticity ``\zeta`` with advection, Coriolis force, forcing and diffusi
 single global layer on the sphere.
 
 ```math
-\frac{\partial \zeta}{\partial t} + \nabla \cdot (\mathbf{u}(\zeta + f)) =
+\frac{\partial \zeta}{\partial t} + \nabla \cdot [\mathbf{u}(\zeta + f)] =
 F_\zeta + \nabla \times \mathbf{F}_\mathbf{u} + (-1)^{n+1}\nu\nabla^{2n}\zeta
 ```
-We denote time``t``, velocity vector ``\mathbf{u} = (u, v)``, Coriolis parameter ``f``,
+We denote time ``t``, velocity vector ``\mathbf{u} = (u, v)``, Coriolis parameter ``f``,
 and hyperdiffusion ``(-1)^{n+1} \nu \nabla^{2n} \zeta``
 (``n`` is the hyperdiffusion order,  see [Horizontal diffusion](@ref diffusion)).
 We also include possible forcing terms
@@ -55,7 +55,7 @@ advect the absolute vorticity ``\zeta + f``. In order to avoid to calculate both
 divergence of a flux we rewrite the barotropic vorticity equation as
 ```math
 \frac{\partial \zeta}{\partial t} = F_\zeta +
-\nabla \times (\mathbf{F} + \mathbf{u}_\perp(\zeta + f)) + (-1)^{n+1}\nu\nabla^{2n}\zeta
+\nabla \times [\mathbf{F}_\mathbf{u} + \mathbf{u}_\perp(\zeta + f)] + (-1)^{n+1}\nu\nabla^{2n}\zeta
 ```
 with ``\mathbf{u}_\perp = (v, -u)`` the rotated velocity vector, because
 ``-\nabla\cdot\mathbf{u} = \nabla \times \mathbf{u}_\perp``. This is the form that is solved
@@ -93,8 +93,8 @@ Now loop over
 In SpeedyWeather.jl we use hyperdiffusion through an ``n``-th power Laplacian ``(-1)^{n+1}\nabla^{2n}``
 (hyper when ``n>1``) which
 can be implemented as a multiplication of the spectral coefficients ``\Psi_{lm}`` with
-``(-l(l+1))^nR^{-2n}`` (see spectral [Laplacian](@ref)). It is therefore computationally not more
-expensive to apply hyperdiffusion over diffusion as the ``(-l(l+1))^nR^{-2n}`` can be precomputed.
+``[-l(l+1)]^n R^{-2n}`` (see spectral [Laplacian](@ref)). It is therefore computationally not more
+expensive to apply hyperdiffusion over diffusion as the ``[-l(l+1)]^n R^{-2n}`` can be precomputed.
 Note the sign change ``(-1)^{n+1}`` here is such that the dissipative nature of the diffusion operator
 is retained for ``n`` odd and even.
 
@@ -109,7 +109,7 @@ with ``d\zeta`` being some tendency evaluated from ``\zeta_i``. Now we want to a
 with coefficient ``\nu``, which however, is implicitly calculated from ``\zeta_{i+1}``, then
 
 ```math
-\zeta_{i+1} = \zeta_{i-1} + 2\Delta t (d\zeta + (-1)^{n+1} \nu\nabla^{2n}\zeta_{i+1})
+\zeta_{i+1} = \zeta_{i-1} + 2\Delta t [d\zeta + (-1)^{n+1} \nu\nabla^{2n}\zeta_{i+1}
 ```
 As the application of ``(-1)^{n+1}\nu\nabla^{2n}`` is, for every spectral mode, equivalent to a multiplication of
 a constant, we can rewrite this to
@@ -129,7 +129,7 @@ which only depends on ``\zeta_{i-1}``. Now let ``D_\text{explicit} = (-1)^{n+1}\
 ``D_\text{implicit} = 1 - 2\Delta t \nu\nabla^{2n}`` the implicit part. Both parts can be precomputed and are
 only an element-wise multiplication in spectral space. For every spectral harmonic ``l, m`` we do
 ```math
-d\zeta \to D_\text{implicit}^{-1}(d\zeta + D_\text{explicit}\zeta_{i-1}).
+d\zeta \to D_\text{implicit}^{-1}[d\zeta + D_\text{explicit}\zeta_{i-1}].
 ```
 Hence 2 multiplications and 1 subtraction with precomputed constants.
 However, we will normalize the (hyper-)Laplacians as described in the following. This also will take care of
@@ -148,13 +148,13 @@ all entries in the discrete spectral Laplace operator are in ``[0, 1]``. This al
 alternating sign drops out, such that higher wavenumbers are always dampened and not amplified.
 The normalized coefficient ``\nu^* = l_\text{max}(l_\text{max}+1)\nu`` (always positive) is
 therefore reinterpreted as the (inverse) time scale at which the highest wavenumber is dampened
-to zero due to diffusion. Together we have 
+to zero due to diffusion. Together we have
 ```math
 D^\text{explicit}_{l, m} = -\nu^* \frac{l(l+1)}{l_\text{max}(l_\text{max}+1)}
 ```
 and the hyper-Laplacian of power ``n`` follows as
 ```math
-D^\text{explicit, n}_{l, m} = -\nu^* \left(\frac{l(l+1)}{l_\text{max}(l_\text{max}+1)}\right)^n
+D^\text{explicit, n}_{l, m} = -\nu^* \left[\frac{l(l+1)}{l_\text{max}(l_\text{max}+1)}\right]^n
 ```
 and the implicit part is accordingly ``D^\text{implicit, n}_{l, m} = 1 - 2\Delta t D^\text{explicit, n}_{l, m}``.
 Note that the diffusion time scale ``\nu^*`` is then also scaled by the radius, see next section.
@@ -177,7 +177,7 @@ The inversion of the Laplacians in order to obtain ``\Psi`` from ``\zeta`` there
 where the dimensionless gradients simply omit the scaling with ``1/R``, ``\tilde{\nabla} = R\nabla``.
 The [Barotropic vorticity equation](@ref) scaled with ``R^2`` is
 ```math
-\partial_{\tilde{t}}\tilde{\zeta} + \tilde{\nabla} \cdot (\mathbf{u}(\tilde{\zeta} + \tilde{f})) =
+\partial_{\tilde{t}}\tilde{\zeta} + \tilde{\nabla} \cdot [\mathbf{u}(\tilde{\zeta} + \tilde{f})] =
 \nabla \times \tilde{\mathbf{F}} + (-1)^{n+1}\tilde{\nu}\tilde{\nabla}^{2n}\tilde{\zeta}
 ```
 with

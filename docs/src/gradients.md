@@ -1,4 +1,4 @@
-## Gradient operators
+# Gradient operators
 
 [SpeedyTransforms](@ref) also includes many gradient operators to take derivatives in
 spherical harmonics. These are in particular ``\nabla, \nabla \cdot, \nabla \times,
@@ -14,7 +14,7 @@ under the hood.
     The gradient operators in SpeedyTransforms generally assume a sphere of radius ``R=1``.
     For the transforms themselves that does not make a difference, but the gradient operators
     `divergence`, `curl`, `∇`, `∇²`, `∇⁻²` omit the radius scaling unless you provide the optional
-    keyword `radius` (or you can do `./= radius` manually). 
+    keyword `radius` (or you can do `./= radius` manually).
     Also note that meridional derivates in spectral space expect a ``\cos^{-1}(\theta)`` scaling.
     Details are always outlined in the respective docstrings, `?∇` for example.
 
@@ -36,9 +36,9 @@ expect the input velocity fields to be scaled by ``\cos^{-1}(\theta)``, i.e.
 
 ```math
 \begin{aligned}
-\hat{\nabla} \cdot (\cos^{-1}(\theta)\mathbf{u}) &= \frac{\partial u}{\partial \lambda} +
+\hat{\nabla} \cdot [\cos^{-1}(\theta)\mathbf{u}] &= \frac{\partial u}{\partial \lambda} +
 \cos\theta\frac{\partial v}{\partial \theta} = R\nabla \cdot \mathbf{u}, \\
-\hat{\nabla} \times (\cos^{-1}(\theta)\mathbf{u}) &= \frac{\partial v}{\partial \lambda} -
+\hat{\nabla} \times [\cos^{-1}(\theta)\mathbf{u}] &= \frac{\partial v}{\partial \lambda} -
 \cos\theta\frac{\partial u}{\partial \theta} = R\nabla \times \mathbf{u}.
 \end{aligned}
 ```
@@ -51,7 +51,7 @@ And the Laplace operators omit a ``R^2`` (radius ``R``) scaling, i.e.
 ## Gradient `∇`
 
 We illustrate the usage of the gradient function `∇`. Let us create some fake
-data `G` on the grid first 
+data `G` on the grid first
 
 ```@example gradient
 using SpeedyWeather, CairoMakie
@@ -105,7 +105,7 @@ which becomes, if you take the divergence of these two equations
 Meaning that if we start with ``u, v`` we can obtain the relative vorticity
 ``\zeta`` and, using Coriolis parameter ``f`` and gravity ``g``, invert
 the Laplace operator to obtain displacement ``\eta``. How to do this with
-SpeedyTransforms? 
+SpeedyTransforms?
 
 Let us start by generating some data
 ```@example gradient
@@ -113,7 +113,7 @@ spectral_grid = SpectralGrid(trunc=31, nlayers=1)
 forcing = SpeedyWeather.JetStreamForcing(spectral_grid)
 drag = LinearVorticityDrag(spectral_grid)
 model = ShallowWaterModel(spectral_grid; forcing, drag)
-simulation = initialize!(model);
+simulation = initialize!(model)
 run!(simulation, period=Day(30))
 nothing # hide
 ```
@@ -121,8 +121,8 @@ nothing # hide
 Now pretend you only have `u, v` to get vorticity (which is actually the prognostic variable in the model,
 so calculated anyway...).
 ```@example gradient
-u = simulation.diagnostic_variables.grid.u_grid[:, 1]   # [:, 1] for 1st layer
-v = simulation.diagnostic_variables.grid.v_grid[:, 1]
+u = simulation.variables.grid.u[:, 1]   # [:, 1] for 1st layer
+v = simulation.variables.grid.v[:, 1]
 vor = curl(u, v, radius = model.planet.radius)
 nothing # hide
 ```
@@ -206,7 +206,7 @@ nothing # hide
 Which is the interface displacement assuming geostrophy.
 The actual interface displacement contains also ageostrophy
 ```@example gradient
-η_grid2 = simulation.diagnostic_variables.grid.pres_grid
+η_grid2 = simulation.variables.grid.η
 heatmap(η_grid2, title="Interface displacement η [m] with ageostrophy")
 save("eta_ageostrophic.png", ans) # hide
 nothing # hide

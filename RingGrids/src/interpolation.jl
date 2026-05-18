@@ -7,12 +7,13 @@ struct GridGeometry{
         VectorType,
         VectorIntType,
         VectorRange,
+        IntType,
     } <: AbstractGridGeometry
     grid::Grid                  # grid, e.g. FullGaussianGrid
 
-    nlat_half::Int              # number of latitude rings on one hemisphere (Eq. incl)
-    nlat::Int                   # total number of latitude rings
-    npoints::Int                # total number of grid points
+    nlat_half::IntType          # number of latitude rings on one hemisphere (Eq. incl)
+    nlat::IntType               # total number of latitude rings
+    npoints::IntType            # total number of grid points
     londs::VectorType           # longitudes of every grid point 0˚ to 360˚E
     latd::VectorType            # latitude of each ring, incl north pole 90˚N, ..., south pole -90˚N
 
@@ -28,8 +29,8 @@ GridGeometry(field::AbstractField; kwargs...) = GridGeometry(field.grid; NF = el
 Adapt.@adapt_structure GridGeometry
 
 """
-$(TYPEDSIGNATURES)          
-Precomputed arrays describing the geometry of the Grid with resolution nlat_half.
+$(TYPEDSIGNATURES)
+Precomputed arrays describing the geometry of the Grid with resolution `nlat_half`.
 Contains longitudes, latitudes of grid points, their ring index j and their
 unravelled indices ij."""
 function GridGeometry(
@@ -62,7 +63,7 @@ function GridGeometry(
     VectorIntType = array_type(architecture, Int, 1)
     device_rings = on_architecture(architecture, grid.rings)
 
-    return GridGeometry{typeof(grid), VectorType, VectorIntType, typeof(device_rings)}(
+    return GridGeometry{typeof(grid), VectorType, VectorIntType, typeof(device_rings), typeof(nlat_half)}(
         grid, nlat_half, nlat, npoints, londs, latd_poles, nlons, lon_offsets, device_rings
     )
 end
@@ -80,9 +81,10 @@ between two latitude rings."""
 @kwdef struct AnvilLocator{
         VectorType,
         VectorIntType,
+        IntType,
     } <: AbstractLocator
 
-    npoints_output::Int            # number of points to interpolate onto (length of following vectors)
+    npoints_output::IntType            # number of points to interpolate onto (length of following vectors)
 
     # to the coordinates respective indices
     js::VectorIntType = zeros(Int, npoints_output)   # ring indices j such that [j, j+1) contains the point
@@ -99,9 +101,23 @@ end
 
 Adapt.@adapt_structure AnvilLocator
 
+function Architectures.on_architecture(arch::AbstractArchitecture, loc::AnvilLocator)
+    return AnvilLocator(
+        npoints_output = loc.npoints_output,
+        js = on_architecture(arch, loc.js),
+        ij_as = on_architecture(arch, loc.ij_as),
+        ij_bs = on_architecture(arch, loc.ij_bs),
+        ij_cs = on_architecture(arch, loc.ij_cs),
+        ij_ds = on_architecture(arch, loc.ij_ds),
+        Δys = on_architecture(arch, loc.Δys),
+        Δabs = on_architecture(arch, loc.Δabs),
+        Δcds = on_architecture(arch, loc.Δcds),
+    )
+end
+
 """
 $(TYPEDSIGNATURES)
-Zero generator function for the 4-point average AnvilLocator. Use update_locator! to
+Zero generator function for the 4-point average AnvilLocator. Use `update_locator!` to
 update the grid indices used for interpolation and their weights. The number format
 NF is the format used for the calculations within the interpolation, the input data
 and/or output data formats may differ."""
@@ -114,7 +130,7 @@ function (::Type{L})(
     VectorType = array_type(architecture, NF, 1)
     VectorIntType = array_type(architecture, Int, 1)
 
-    return L{VectorType, VectorIntType}(; npoints_output = npoints)
+    return L{VectorType, VectorIntType, typeof(npoints)}(; npoints_output = npoints)
 end
 
 # use Float32 as default for weights
@@ -134,14 +150,14 @@ expected to have two fields,
  - geometry, which describes the grid G to interpolate from
  - locator, which locates the indices on G and their weights to interpolate
     onto a new grid.
-    
+
 NF is the number format used to calculate the interpolation, which can be
 different from the input data and/or the interpolated data on the new grid."""
 abstract type AbstractInterpolator end
 
 """
 $(TYPEDSIGNATURES)
-Interpolator type for `anvil_anverage`[@ref]. 
+Interpolator type for [`anvil_average`](@ref).
 
 NF is the number format used to calculate the interpolation, which can be
 different from the input data and/or the interpolated data on the new grid.
@@ -162,8 +178,10 @@ Base.eltype(::AnvilInterpolator{NF}) where {NF} = NF
 grid_type(I::AnvilInterpolator) = typeof(I.geometry.grid)
 
 function Base.show(io::IO, L::AnvilInterpolator{NF}) where {NF}
-    println(io, "AnvilInterpolator{$NF} for $(L.geometry.grid)")
-    return print(io, "└ onto: $(L.locator.npoints_output) points")
+    NF_str = "{$NF}"
+    println(io, styled"{warning:AnvilInterpolator}{note:$NF_str} for $(L.geometry.grid)")
+    print(io, styled"└ {info:onto}: $(L.locator.npoints_output) points")
+    return nothing
 end
 
 # define to a <:AbstractInterpolator the corresponding Locator
@@ -315,15 +333,15 @@ end
 @kernel inbounds = true function _interpolate_kernel!(
         Aout,               # Out: interpolated values
         A,                  # gridded values to interpolate from
-        @Const(ij_as),      # indices of A to interpolate from
-        @Const(ij_bs),      # indices of A to interpolate from
-        @Const(ij_cs),      # indices of A to interpolate from
-        @Const(ij_ds),      # indices of A to interpolate from
-        @Const(Δabs),       # weights of A to interpolate from
-        @Const(Δcds),       # weights of A to interpolate from
-        @Const(Δys),        # weights of A to interpolate from
-        @Const(A_northpole),
-        @Const(A_southpole),
+        ij_as,      # indices of A to interpolate from
+        ij_bs,      # indices of A to interpolate from
+        ij_cs,      # indices of A to interpolate from
+        ij_ds,      # indices of A to interpolate from
+        Δabs,       # weights of A to interpolate from
+        Δcds,       # weights of A to interpolate from
+        Δys,        # weights of A to interpolate from
+        A_northpole,
+        A_southpole,
     )
 
     k = @index(Global, Linear)
@@ -471,14 +489,14 @@ function find_rings!(
 
     if ~unsafe
         θmin, θmax = extrema(θs)
-        @assert θmin >= -90 "Latitudes θs are expected to be within [-90˚, 90˚]; θ=$(θmin)˚ given."
-        @assert θmax <= 90 "Latitudes θs are expected to be within [-90˚, 90˚]; θ=$(θmax)˚ given."
+        @boundscheck θmin >= -90 || throw(ArgumentError("Latitudes θs are expected to be within [-90˚, 90˚]; θ=$(θmin)˚ given."))
+        @boundscheck θmax <= 90 || throw(ArgumentError("Latitudes θs are expected to be within [-90˚, 90˚]; θ=$(θmax)˚ given."))
 
         #TODO: currently we only check the latitudes of the grid we interpolate onto
         #TODO: as we only allow instances of Field to be the original grid, the latitudes below
         #TODO: should be okay anyway. Checking it on GPU is a bit more annoying...
 
-        @assert isdecreasing(latd) "Latitudes latd are expected to be strictly decreasing."
+        @assert Utils.isdecreasing(latd) "Latitudes latd are expected to be strictly decreasing."
         #@assert latd[1] == 90 "Latitudes latd are expected to contain 90˚N, the north pole."
 
         # Hack: for intervals between rings to be one-sided open [j, j+1) the last element in
@@ -499,8 +517,8 @@ DimensionMismatchArray(a::AbstractArray, bs::AbstractArray...) =
 @kernel inbounds = true function find_rings_kernel!(
         js,                # Out: ring indices j
         Δys,               # Out: distance fractions to ring further south
-        @Const(θs),        # latitudes to interpolate onto
-        @Const(latd)       # latitudes of the rings on the original grid
+        θs,        # latitudes to interpolate onto
+        latd       # latitudes of the rings on the original grid
     )
     k = @index(Global, Linear)
 
@@ -546,7 +564,7 @@ function find_rings_unsafe!(
     @boundscheck length(js) == length(θs) || throw(DimensionMismatchArray(js, θs))
     @boundscheck length(js) == length(Δys) || throw(DimensionMismatchArray(js, Δys))
 
-    return launch!(
+    launch!(
         architecture,
         LinearWorkOrder,
         size(js),
@@ -556,6 +574,7 @@ function find_rings_unsafe!(
         θs,
         latd
     )
+    return nothing
 end
 
 # for testing only
@@ -567,15 +586,15 @@ function find_rings(θs::AbstractVector, latd::AbstractVector{NF}) where {NF}
 end
 
 @kernel inbounds = true function find_grid_indices_kernel!(
-        @Const(js),            # ring indices j
+        js,            # ring indices j
         ij_as, ij_bs,          # northern point indices
         ij_cs, ij_ds,          # southern point indices
         Δabs, Δcds,            # distance fractions
-        @Const(λs),            # longitudes to interpolate onto
-        @Const(lon_offsets),   # longitude offsets for each ring
-        @Const(nlons),         # number of longitude points per ring
-        @Const(nlat),          # number of latitude rings
-        @Const(rings)          # ring indices
+        λs,            # longitudes to interpolate onto
+        lon_offsets,   # longitude offsets for each ring
+        nlons,         # number of longitude points per ring
+        nlat,          # number of latitude rings
+        rings          # ring indices
     )
     k = @index(Global, Linear)
 
@@ -630,7 +649,7 @@ function find_grid_indices!(
     # Convert λs to the same type as lon_offsets if needed
     λs_converted = convert.(eltype(lon_offsets), λs)
 
-    return launch!(
+    launch!(
         architecture,
         LinearWorkOrder,
         size(js),
@@ -645,6 +664,7 @@ function find_grid_indices!(
         nlat,
         rings
     )
+    return nothing
 end
 
 @inline function find_lon_indices(
@@ -701,7 +721,7 @@ longitude/x-coordinate. See schematic:
     0^      a -------- o - b    # anvil-shaped average of a, b, c, d at location x
     .Δy                |
     .                  |
-    .v                 x 
+    .v                 x
     .                  |
     1         c ------ o ---- d
 
@@ -730,7 +750,7 @@ end
 """
 $TYPEDSIGNATURES
 Averages all grid points in `input` that are within one grid cell of
-`output` with coslat-weighting. The output grid cell boundaries 
+`output` with coslat-weighting. The output grid cell boundaries
 are assumed to be rectangles spanning half way to adjacent longitude
 and latitude points."""
 function grid_cell_average!(
@@ -758,24 +778,24 @@ function grid_cell_average!(
         Δϕ = 2π / length(ring)        # longitude spacing on this ring
 
         # indices for lat_out are shifted as north and south pole are included
-        θ0 = (colat_out[j] + colat_out[j + 1]) / 2    # northern edge
-        θ1 = (colat_out[j + 1] + colat_out[j + 2]) / 2    # southern edge
+        θ0 = (colat_out[j] + colat_out[j + 1]) / 2      # northern edge
+        θ1 = (colat_out[j + 1] + colat_out[j + 2]) / 2  # southern edge
 
         # matrix indices for input grid that lie in output grid cell
         j0 = findfirst(θ -> θ >= θ0, colat_in)
         j1 = findlast(θ -> θ < θ1, colat_in)
 
         for ij in ring
-            ϕ0 = mod(lons_out[ij] - Δϕ / 2, 2π)       # western edge
-            ϕ1 = ϕ0 + Δϕ                            # eastern edge
+            ϕ0 = mod(lons_out[ij] - Δϕ / 2, 2π)         # western edge
+            ϕ1 = ϕ0 + Δϕ                                # eastern edge
             # the last line does not require a mod and in fact throws
             # an error if, as long as the offset from prime meridian
             # is at most Δϕ/2 (true for HEALPixGrids, offset 0 for
             # Gaussian and Clenshaw grids)
 
             # matrix indices for input grid that lie in output grid cell
-            a = findlast(ϕ -> ϕ < ϕ0, lon_in)     # western edge
-            b = findfirst(ϕ -> ϕ >= ϕ1, lon_in)     # eastern edge
+            a = findlast(ϕ -> ϕ < ϕ0, lon_in)           # western edge
+            b = findfirst(ϕ -> ϕ >= ϕ1, lon_in)         # eastern edge
 
             # map around prime meridian if coordinates outside of range
             a = isnothing(a) ? nlon_in : a
@@ -812,7 +832,7 @@ end
 """
 $TYPEDSIGNATURES
 Averages all grid points in `input` that are within one grid cell of
-`output` with coslat-weighting. The output grid cell boundaries 
+`output` with coslat-weighting. The output grid cell boundaries
 are assumed to be rectangles spanning half way to adjacent longitude
 and latitude points."""
 function grid_cell_average(Grid::Type{<:AbstractGrid}, nlat_half::Integer, input::AbstractFullGrid)

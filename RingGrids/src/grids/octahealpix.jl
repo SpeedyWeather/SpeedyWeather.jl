@@ -14,8 +14,8 @@ it is `rings = [1:4, 5:12, 13:24, 25:32, 33:36]`. For efficient looping see `eac
 `whichring` is a precomputed vector of ring indices for each grid point ij, i.e. `whichring[ij]` gives
 the ring index j of grid point ij. Fields are
 $(TYPEDFIELDS)"""
-struct OctaHEALPixGrid{A, V, W} <: AbstractReducedGrid{A}
-    nlat_half::Int      # number of latitudes on one hemisphere
+struct OctaHEALPixGrid{A, V, W, IntType} <: AbstractReducedGrid{A}
+    nlat_half::IntType  # number of latitudes on one hemisphere
     architecture::A     # information about device, CPU/GPU
     rings::V            # precomputed ring indices
     whichring::W        # precomputed ring index for each grid point ij
@@ -217,7 +217,7 @@ Interleave an integer's bits with zeros, e.g.
     00000000 00000000 00000000 00000111
 
 becomes
-    
+
     00000000 00000000 00000000 00010101
 
 The highest half of the bits are zeros will be discarded."""
@@ -231,7 +231,7 @@ function interleave_with_zeros(ui::Integer)
 end
 
 """$TYPEDSIGNATURES
-Deinterleave an integer's bits, e.g.    
+Deinterleave an integer's bits, e.g.
 
     00000000 00000000 00000000 00010101
 
@@ -275,7 +275,7 @@ end
 
 """$TYPEDSIGNATURES
 Convert ring index ij to matrix index xy of grid. All 1-based.
-xy is a running index in a 2D matrix of size (2*nlat_half, 2*nlat_half),
+xy is a running index in a 2D matrix of size (`2*nlat_half`, `2*nlat_half`),
 with a polar-centric view on the north pole in the middle of that matrix,
 the South Pole divided into 4 in the corners. Like a stereographic projection."""
 ring2xy(ij::Integer, grid::OctaHEALPixGrid; kwargs...) = rcq2xy(ring2rcq(ij, grid)..., grid; kwargs...)

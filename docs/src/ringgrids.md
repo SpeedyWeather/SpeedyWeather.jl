@@ -58,7 +58,7 @@ would be a 2D field (though represented as a vector), temperature on several ver
 the atmosphere would be 3D (data represented as a matrix, horizontal x vertical), including
 time would make it 4D. Several fields can share the same grid. Given that the grid is always
 two-dimensional, a 2D and 3D field can also share the same grid, leaving the 3rd dimension
-not further specified for flexibility. 
+not further specified for flexibility.
 
 ## Creating a grid
 
@@ -71,7 +71,7 @@ grid = FullGaussianGrid(24)
 ```
 
 As a second argument `architecture` can be provided which helps to share information on the
-computing architecture (CPU/GPU) but this will not be further explained here. 
+computing architecture (CPU/GPU) but this will not be further explained here.
 
 ## Accessing coordinates
 
@@ -375,7 +375,7 @@ Note that a, c and b, d do not necessarily share the same longitude/x-coordinate
 0^      a -------- o - b    # anvil-shaped average of a, b, c, d at location x
 .Δy                |
 .                  |
-.v                 x 
+.v                 x
 .                  |
 1         c ------ o ---- d
 
@@ -387,13 +387,13 @@ Note that a, c and b, d do not necessarily share the same longitude/x-coordinate
 This interpolation is chosen as by definition of the ring grids, a and b share the same latitude, so do c and d,
 but the longitudes can be different for all four, a, b, c, d.
 
-## ColumnField 
+## ColumnField
 
 Additionally to `Field` there is also a `ColumnField` type. `ColumnField` store the data in a column-major format, which is more efficient for column-based computations. As such, when indexing `ColumnField` the first dimension is the vertical dimension, while the second dimension is the horizontal dimension. Otherwise it behaves just like `Field`. To create a `ColumnField` from a `Field` one can use the `transpose` function, which will transpose the data in place and return a `ColumnField`:
 
 ```@example ringgrids
 grid = OctahedralClenshawGrid(5)    # define a grid
-field = randn(grid, 5)  
+field = randn(grid, 5)
 column_field = transpose(field)
 field == transpose(column_field)    # transposing again returns the original Field
 ```
@@ -429,7 +429,7 @@ ring order etc. Converting this back
 field_ring = RingGrids.ring_order(field_nested)
 ```
 
-Note that currently we do not store the information about the order inside the 
+Note that currently we do not store the information about the order inside the
 On the nested order, changing the resolution is trivial as consecutive elements in chunks
 of 4 have to be averaged (reducing resolution) or every element has to be repeated 4 times
 (increasing resolution). But we don't have this functionality implemented yet.
@@ -455,8 +455,8 @@ meshimage!(ax2, -180..180, -90..90, rotr90(GeoMakie.earth()); npoints = 100)
 londs, latds = RingGrids.get_londlatds(grid)
 
 for ij in 1:N
-    text!(ax1, londs[ij], latds[ij], text=string(field[ij]), color=:black, align=(:center, :center))    
-    text!(ax2, londs[ij], latds[ij], text=string(field_nested[ij]), color=:black, align=(:center, :center))    
+    text!(ax1, londs[ij], latds[ij], text=string(field[ij]), color=:black, align=(:center, :center))
+    text!(ax2, londs[ij], latds[ij], text=string(field_nested[ij]), color=:black, align=(:center, :center))
 end
 
 faces = RingGrids.get_gridcell_polygons(typeof(grid), grid.nlat_half, add_nan=true)

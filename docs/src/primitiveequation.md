@@ -9,10 +9,10 @@ logarithm of surface pressure ``\ln p_s``, temperature ``T`` and specific humidi
 
 ```math
 \begin{aligned}
-\frac{\partial \zeta}{\partial t} &= \nabla \times (\mathbf{\mathcal{P}}_\mathbf{u}
-+ (f+\zeta)\mathbf{u}_\perp - W(\mathbf{u}) - R_dT_v\nabla \ln p_s) \\
-\frac{\partial \mathcal{D}}{\partial t} &= \nabla \cdot (\mathcal{P}_\mathbf{u}
-+ (f+\zeta)\mathbf{u}_\perp - W(\mathbf{u}) - R_dT_v\nabla \ln p_s) - \nabla^2(\frac{1}{2}(u^2 + v^2) + \Phi) \\
+\frac{\partial \zeta}{\partial t} &= \nabla \times \left[\mathbf{\mathcal{P}}_\mathbf{u}
++ (f+\zeta)\mathbf{u}_\perp - W(\mathbf{u}) - R_dT_v\nabla \ln p_s\right] \\
+\frac{\partial \mathcal{D}}{\partial t} &= \nabla \cdot \left[\mathcal{P}_\mathbf{u}
++ (f+\zeta)\mathbf{u}_\perp - W(\mathbf{u}) - R_dT_v\nabla \ln p_s\right] - \nabla^2\left[\tfrac{1}{2}(u^2 + v^2) + \Phi\right] \\
 \frac{\partial \ln p_s}{\partial t} &= -\frac{1}{p_s} \nabla \cdot \int_0^{p_s} \mathbf{u}~dp \\
 \frac{\partial T}{\partial t} &= \mathcal{P}_T -\nabla\cdot(\mathbf{u}T) + T\mathcal{D} - W(T) + \kappa T_v \frac{D \ln p}{Dt} \\
 \frac{\partial q}{\partial t} &= \mathcal{P}_q -\nabla\cdot(\mathbf{u}q) + q\mathcal{D} - W(q)\\
@@ -25,12 +25,12 @@ Coriolis parameter ``f``, ``W`` the [Vertical advection](@ref) operator, dry air
 and surface pressure ``p_s``, thermodynamic ``\kappa = R_d/c_p``
 with ``c_p`` the heat capacity at constant pressure. Horizontal hyper diffusion of the
 form ``(-1)^{n+1}\nu\nabla^{2n}`` with coefficient ``\nu`` and power ``n``  is added for
-every variable that is advected, meaning ``\zeta, \mathcal{D}, T, q``, but left out
+every variable that is advected, meaning ``\zeta``, ``\mathcal{D}``, ``T``, ``q``, but left out
 here for clarity, see [Horizontal diffusion](@ref diffusion).
 
-The parameterizations for the tendencies of ``u, v, T, q`` from physical processes are denoted as
-``\mathcal{P}_\mathbf{u} = (\mathcal{P}_u, \mathcal{P}_v), \mathcal{P}_T, \mathcal{P}_q``
-and are further described in the corresponding sections, see [Parameterizations](@ref).
+The parameterizations for the tendencies of ``\mathbf{u}=(u, v)``, ``T``, ``q`` from physical processes are
+denoted as ``\mathcal{P}_\mathbf{u} = (\mathcal{P}_u, \mathcal{P}_v)``, ``\mathcal{P}_T``, ``\mathcal{P}_q``
+respectively and are further described in the corresponding sections, see [Parameterizations](@ref).
 
 SpeedyWeather.jl implements a `PrimitiveWet` and a `PrimitiveDry` dynamical core.
 For a dry atmosphere, we have ``q = 0`` and the virtual temperature ``T_v = T``
@@ -82,8 +82,8 @@ the ideal gas law as total density ``\rho`` times a gas constant
 times the virtual temperature that is supposed to be a function
 of absolute temperature, humidity and some constants
 ```math
-p  = (\rho R_d + \rho_w (R_w - R_d)) T = \rho R_d (1 +
-\frac{1 - \tfrac{R_d}{R_w}}{\tfrac{R_d}{R_w}} \frac{\rho_w}{\rho_w + \rho_d})T
+p  = \left[\rho R_d + \rho_w (R_w - R_d)\right] T = \rho R_d \left(1 +
+\frac{1 - \tfrac{R_d}{R_w}}{\tfrac{R_d}{R_w}} \frac{\rho_w}{\rho_w + \rho_d}\right)T
 ```
 Now we identify
 ```math
@@ -182,7 +182,7 @@ p_k = \sigma_kp_s
 The layer thickness in terms of pressure is
 ```math
 \Delta p_k = p_{k+\tfrac{1}{2}} - p_{k-\tfrac{1}{2}} =
-(\sigma_{k+\tfrac{1}{2}} - \sigma_{k-\tfrac{1}{2}}) p_s = \Delta \sigma_k p_s
+\left( \sigma_{k+\tfrac{1}{2}} - \sigma_{k-\tfrac{1}{2}} \right) p_s = \Delta \sigma_k p_s
 ```
 which can also be expressed with the layer thickness in sigma coordinates ``\Delta \sigma_k``
 times the surface pressure. In SpeedyWeather.jl one chooses the half levels
@@ -254,13 +254,13 @@ which can be thought of as a vertical integration of the pressure thickness-weig
 In ``\sigma``-coordinates with ``\Delta p_k = \Delta \sigma_k p_s`` (see [Vertical coordinates](@ref))
 this becomes
 ```math
-\frac{\partial p_s}{\partial t} = - \sum_{k=1}^N \sigma_k \nabla \cdot (\mathbf{u}_k p_s)
-= -\sum_{k=1}^N \sigma_k (\mathbf{u}_k \cdot \nabla p_s + p_s \nabla \cdot \mathbf{u}_k)
+\frac{\partial p_s}{\partial t} = - \sum_{k=1}^N \Delta \sigma_k \nabla \cdot (\mathbf{u}_k p_s)
+= -\sum_{k=1}^N \Delta \sigma_k (\mathbf{u}_k \cdot \nabla p_s + p_s \nabla \cdot \mathbf{u}_k)
 ```
 Using the logarithm of pressure ``\ln p`` as the vertical coordinate this becomes
 ```math
 \frac{\partial \ln p_s}{\partial t} =
--\sum_{k=1}^N \sigma_k (\mathbf{u}_k \cdot \nabla \ln p_s + \nabla \cdot \mathbf{u}_k)
+-\sum_{k=1}^N \Delta \sigma_k (\mathbf{u}_k \cdot \nabla \ln p_s + \nabla \cdot \mathbf{u}_k)
 ```
 The second term is the divergence ``\mathcal{D}_k`` at layer ``k``.
 We introduce ``\bar{a} = \sum_k \Delta \sigma_k a_k``, the ``\sigma``-weighted vertical integration operator
@@ -309,7 +309,7 @@ The advection equation ``\tfrac{DT}{Dt} = 0`` for a tracer ``T`` is, in flux for
 for layer ``k``:
 ```math
 \frac{\partial (T_k \Delta p_k)}{\partial t} = - \nabla \cdot (\mathbf{u}_k T_k \Delta p_k)
-- (M_{k+\tfrac{1}{2}}T_{k+\tfrac{1}{2}} - M_{k-\tfrac{1}{2}}T_{k-\tfrac{1}{2}})
+- \left(M_{k+\tfrac{1}{2}}T_{k+\tfrac{1}{2}} - M_{k-\tfrac{1}{2}}T_{k-\tfrac{1}{2}}\right)
 ```
 
 Starting from this equation in pressure layer $k$, we can derive the advective form of the tracer transport. Dividing through by the layer thickness ``\Delta p_k`` gives:
@@ -348,14 +348,14 @@ Rearranging terms, we obtain:
 
 ```math
 \frac{\partial T_k}{\partial t} = - \mathbf{u}_k \cdot \nabla T_k
-- \frac{1}{\Delta \sigma_k}\left(\dot{\sigma}_{k+\tfrac{1}{2}}(T_{k+\tfrac{1}{2}} - T_k) + \dot{\sigma}_{k-\tfrac{1}{2}}(T_k - T_{k-\tfrac{1}{2}})\right)
+- \frac{1}{\Delta \sigma_k}\left[\dot{\sigma}_{k+\tfrac{1}{2}}\left(T_{k+\tfrac{1}{2}} - T_k\right) + \dot{\sigma}_{k-\tfrac{1}{2}}\left(T_k - T_{k-\tfrac{1}{2}}\right)\right]
 ```
 
 With the reconstruction at the faces, ``T_{k+\tfrac{1}{2}}`` and ``T_{k-\tfrac{1}{2}}`` depending on one's choice of the advection scheme. For a second-order centered scheme, we choose ``T_{k+\tfrac{1}{2}} = \tfrac{1}{2}(T_k + T_{k+1})`` and obtain:
 
 ```math
 \frac{\partial T_k}{\partial t} = - \mathbf{u}_k \cdot \nabla T_k
-- \frac{1}{2\Delta \sigma_k}\left(\dot{\sigma}_{k+\tfrac{1}{2}}(T_{k+1} - T_k) + \dot{\sigma}_{k-\tfrac{1}{2}}(T_k - T_{k-1})\right)
+- \frac{1}{2\Delta \sigma_k}\left[\dot{\sigma}_{k+\tfrac{1}{2}}(T_{k+1} - T_k) + \dot{\sigma}_{k-\tfrac{1}{2}}(T_k - T_{k-1})\right]
 ```
 
 However, note that this scheme is dispersive and easily leads to instabilities at higher resolution, where a more advanced vertical advection scheme becomes necessary. For convenience, we may write ``W(T)`` to denote the vertical advection term ``\dot{\sigma}\partial_\sigma T``, without specifying which schemes is used.
@@ -368,7 +368,7 @@ Similarly, the conservation of mass for layer ``k`` can be expressed as
 (setting ``T=1`` in the advection equation in section [Vertical advection](@ref))
 ```math
 \frac{\partial \Delta p_k}{\partial t} = -\nabla \cdot (\mathbf{u}_k \Delta p_k)
-- (M_{k+\tfrac{1}{2}} - M_{k-\tfrac{1}{2}})
+- \left(M_{k+\tfrac{1}{2}} - M_{k-\tfrac{1}{2}}\right)
 ```
 Meaning that the pressure thickness ``\Delta p_k`` of layer ``k`` changes with
 a horizontal divergence ``-\nabla \cdot (\mathbf{u}_k \Delta p_k)`` if not
@@ -457,7 +457,7 @@ In vorticity-divergence formulation of the momentum equations the ``\nabla_\sigm
 drops out in the vorticity equation (``\nabla \times \nabla \Phi = 0``),
 but becomes a ``-\nabla^2 \Phi`` in the divergence equation,
 which is therefore combined with the kinetic energy term
-``-\nabla^2(\tfrac{1}{2}(u^2 + v^2))`` similar as it is done in the [Shallow water equations](@ref).
+``-\nabla^2[\tfrac{1}{2}(u^2 + v^2)]`` similar as it is done in the [Shallow water equations](@ref).
 You can think of ``\tfrac{1}{2}(u^2 + v^2) + \Phi`` as the Bernoulli potential in
 the primitive equations. However, due to the change into sigma coordinates the surface pressure
 gradient also has to be accounted for. Now highlighting only the pressure gradient force, we
@@ -679,7 +679,7 @@ So what is ``G`` in the [Primitive equation model](@ref primitive_equation_model
 
 ```math
 \begin{aligned}
-G_\mathcal{D} &= N^E_\mathcal{D} - \nabla^2(\Phi^{i-1} + R_dT_k^v (\ln p_s)^{i-1})
+G_\mathcal{D} &= N^E_\mathcal{D} - \nabla^2[\Phi^{i-1} + R_dT_k^v (\ln p_s)^{i-1}]
 = N^E_\mathcal{D} - \nabla^2( \mathbf{R}T^{i-1} + \mathbf{U}\ln p_s^{i-1}) \\
 G_{\ln p_s} &= N_{\ln p_s}^E - \overline{\mathcal{D}^{i-1}}
 = N_{\ln p_s}^E + \mathbf{W}\mathcal{D}^{i-1} \\
@@ -751,7 +751,7 @@ via
 ```
 (``\mathbf{UW}`` is a matrix of size ``N \times N``) yields
 ```math
-\delta D = \left( 1 + \xi^2\nabla^2(\mathbf{RL + UW})  \right)^{-1}G = \mathbf{S}^{-1}G
+\delta D = \left[ 1 + \xi^2\nabla^2(\mathbf{RL + UW}) \right]^{-1}G = \mathbf{S}^{-1}G
 ```
 The other tendencies ``\delta T`` and ``\delta \ln p_s`` are then obtained
 through insertion above. We may call the operator to be inverted ``\mathbf{S}``

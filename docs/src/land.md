@@ -37,11 +37,12 @@ The default `LandModel` in SpeedyWeather contains
 (at the moment other than 2 soil layers are not supported or experimental)
 
 ```@example land
-spectral_grid = SpectralGrid(trunc=31, nlayers=8, nlayers_soil=2)
-land = LandModel(spectral_grid)
+spectral_grid = SpectralGrid(trunc=31, nlayers=8)
+geometry = LandGeometry(spectral_grid, nlayers=2) # that's also the default, therefore it's optional here
+land = LandModel(spectral_grid; geometry)
 ```
 
-With `land.geometry` currently used to define the layer thickness
+With `LandGeometry` currently used to define the number of soil layers and their layer thickness
 
 ```@example land
 land.geometry
@@ -55,7 +56,7 @@ other components of the land surface model `land`.
 land.thermodynamics
 ```
 
-To change these you can either mutate the fields or create a new model component `thermodynamics` 
+To change these you can either mutate the fields or create a new model component `thermodynamics`
 passed on to the land model constructor
 
 ```@example land
@@ -80,6 +81,12 @@ model.land
 ```
 
 is now the land defined above used when integrating a SpeedyWeather `model`.
+
+In case a non-default number of soil layers is used, the `LandGeometry` also needs to be passed to the `NetCDFOutput` constructor to allocate the correct dimensions of the output variables, when an output is desired:
+
+```julia
+output = NetCDFOutput("output.nc", model, land_geometry)
+```
 
 ### DryLandModel
 
@@ -134,7 +141,7 @@ retain thermal energy and release this back to the atmosphere either
 in the form of longwave radiative fluxes or sensible heat fluxes
 (latent heat fluxes depend on soil moisture, see [Surface fluxes](@ref)).
 It is a bucket model such that interaction between neighbouring
-grid cells ("buckets") of the land surface only interact through the 
+grid cells ("buckets") of the land surface only interact through the
 atmosphere with another, there are no direct horizontal fluxes
 between cells. In the sense of soil moisture, you can fill a bucket
 from above with rainfall, it may leak/drain at the bottom but buckets
@@ -215,7 +222,7 @@ The equations are
 for soil moistures ``W_1, W_2`` in the respective layers (1 top, 2 below)
 defined as ratio of available water to field capacity, ``f_i = \gamma \Delta z_i``
 with ``\gamma = 0.24`` the field capacity per meter soil and
-``\Delta z_1 = 0.1~m`` the top layer thickness by default, and 
+``\Delta z_1 = 0.1~m`` the top layer thickness by default, and
 ``\Delta z_2 = 4.0~m`` the layer below. The top layer is forced by precipitation
 ``P`` minus evaporation ``E`` minus river runoff ``R``. The second term is a
 diffusion term of soil moisture between the two layers, acting on a time scale
@@ -245,17 +252,16 @@ Greenland and Antarctic ice sheets.
 ### LandSnowModel
 
 `SnowModel` stores a single snow bucket with depth ``S`` in units of equivalent liquid water height
-(`prognostic_variables.land.snow_depth`) and solves the following equation
+(`variables.prognostic.land.snow_depth`) and solves the following equation
 
 ```math
-\frac{dS}{dt} = P - M - R
+\frac{dS}{dt} = P - M
 ```
-with precipitation ``P``, melting ``M`` and runoff ``R``.
+with precipitation ``P`` and melting ``M``.
 Snow accumulates from the column-integrated large-scale
 (currently not from convection) snow precipitation rate ``P``, `snow_rate` (``kg/m²/s``),
 and melts once the top soil layer exceeds the melt threshold ``T_{melt}`` (default ``275~K``)
-through the term ``M`` and the runoff is implemented as a weak relaxation term
-back to 0 with a multi-year time scale.
+through the term ``M``.
 
 The available melt energy in the top
 layer of thickness ``z₁`` uses the dry-soil heat capacity ``cₛ``:
@@ -275,24 +281,20 @@ this formulation allows to melt more snow than there actually is, so we need
 to cap the amount to not end up with negative snow. We implement this constrain
 not for terms individually but for the sum of all terms, see below.
 
-A slow runoff/relaxation term prevents perennial snow packs from growing without bound,
+Snowfall and melt form a raw tendency ``\text{d}S_{max}`` that is further limited 
+so we never remove more snow than is present (including what falls during the current 
+step). The actual removal is reported as
 
 ```math
-\text{runoff}_{rate_{max}} = \frac{S}{\tau_{runoff}},
+\text{snow\_melt\_rate} = \text{melt}_{rate_{max}} + \text{excess},
 ```
 
-controlled by `runoff_time_scale` (default ``4`` years). Snowfall, melt and runoff form a raw
-tendency ``\text{d}S_{max}`` that is further limited so we never remove more snow than is present
-(including what falls during the current step). The actual removal is reported as
-
-```math
-\text{snow\_melt\_rate} = \text{melt}_{rate_{max}} + \text{runoff}_{rate_{max}} + \text{excess},
-```
-
-in ``kg/m²/s``, where the `excess` term (negative for melting/runoff trying to remove more snow than there is)
+in ``kg/m²/s``, where the `excess` term (negative for melting trying to remove more snow than there is)
 only appears when the naive tendency would overdraw the bucket.
-`snow_melt_rate` therefore combines true melt with the runoff leak and is zero over ocean points.
-Snow depth is clipped to zero and stored as equivalent liquid water height, not physical snow thickness.
+`snow_melt_rate` is zero over ocean points. Negative snow depth is clamped to zero (technically redundant given the conserving excess term above) and stored 
+as equivalent liquid water height, not physical snow thickness. The accumulation is 
+capped at 10m equivalent liquid water height, following how permanent snow area is treated 
+in [IFS Cycle 49r1](https://www.ecmwf.int/en/elibrary/81626-ifs-documentation-cy49r1-part-iv-physical-processes). In reality very large accumulation of snow would form glaciers and eventually ice sheets that we do not simulate here.
 
 The snow budget links into other surface schemes:
 
@@ -318,12 +320,11 @@ so snow depth from the snow bucket immediately brightens land grid cells.
 The total albedo is higher over already brighter areas (low vegetation cover)
 and lower over darker areas. This somewhat reflects that in forests the
 snow cover is broken up and snow lies in between trees.
-`DefaultAlbedo` uses `LandSnowAlbedo`; there is currently no time-evolving snow albedo.
 
 ## Albedo
 
 Albedo is the surface reflectivity to downward solar shortwave radiation.
-A value of 1 indicates that all of the radiative flux is reflected at 
+A value of 1 indicates that all of the radiative flux is reflected at
 the Earth's surface and sent back up through the atmospheric column.
 In contrast, a value of 0 means no reflection and all of that radiative
 flux is absorbed, typically heating ocean or land surface.
@@ -351,7 +352,7 @@ land but being treated with an albedo that comes from 90% ocean.
 Not very realistic. The default albedo can be created with
 
 ```@example land
-albedo = DefaultAlbedo(spectral_grid)
+albedo = OceanLandAlbedo(spectral_grid)
 ```
 
 and inspected with
@@ -393,7 +394,7 @@ model.albedo
 
 The albedo in the `model` is now the one defined just in the lines above,
 using a globally constant albedo of 0.1 for the ocean but a higher albedo
-over land which also increases to 0.5 towards the poles. 
+over land which also increases to 0.5 towards the poles.
 
 You can always output the land-sea mask weighted albedo with
 `add!(model, SpeedyWeather.AlbedoOutput())` or inspect it as follows
@@ -403,7 +404,7 @@ simulation = initialize!(model)
 run!(simulation, steps=1)   # run for a step to "diagnose" albedo = ocean/land weighted
 
 using CairoMakie
-(; albedo) = simulation.diagnostic_variables.physics
+(; albedo) = simulation.variables.parameterizations
 heatmap(albedo, title="Custom albedo, separately defined for ocean/land")
 save("ocean_land_albedo.png", ans) # hide
 nothing # hide

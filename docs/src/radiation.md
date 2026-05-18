@@ -31,11 +31,10 @@ Jeevanjee and Zhou [^JZ22] (eq. 2) define a longwave radiative flux ``F`` for at
 as (following Seeley and Wordsworth [^SW23], eq. 1)
 
 ```math
-\frac{dF}{dT} = α*(T_t - T)
+\frac{dF}{dT} = α (T_t - T)
 ```
 
-The flux ``F`` (in ``W/m^2/K``) is a vertical upward flux between two layers (vertically adjacent)
-of temperature difference ``dT``. The change of this flux across layers depends on the temperature
+The flux ``F`` (in ``W/m^2/K``) is a vertical upward flux between two layers (vertically adjacent) of temperature difference ``dT``. The change of this flux across layers depends on the temperature
 ``T`` and is a relaxation term towards a prescribed stratospheric temperature ``T_t = 200~K`` with
 a radiative forcing constant ``\alpha = 0.025 W/m^2/K^2``. Two layers of identical temperatures
 ``T_1 = T_2`` would have no net flux between them, but a layer below at higher temperature would
@@ -73,7 +72,7 @@ using optical depth ``\tau`` as vertical coordinate. Longwave emittance is
 are ``U = \sigma T_s^4`` at the surface, i.e. the surface emitting with its surface
 temperature ``T_s`` (sea surface temperature, skin or soil temperature); and
 ``D = 0`` at the top (no longwave radiation from space). Instead of optical depth
-we solve these equations using the transmissivity ``t = exp(-\tau)``.
+we solve these equations using the transmissivity ``t = \exp(-\tau)``.
 
 ```math
 U_{k-1} = t_k U_k + (1-t_k) σ T_k^4
@@ -110,7 +109,7 @@ FriersonLongwaveTransmissivity(spectral_grid)
 to compute
 
 ```math
-\tau_0 = \tau_{0e} + (\tau_{0p} - \tau_{0e}) \sin^2(\theta)
+\tau_0 = \tau_{0e} + (\tau_{0p} - \tau_{0e}) \sin^2 \theta
 ```
 
 with surface values of optical depth at the equator ``\tau_{0e}`` and
@@ -134,9 +133,6 @@ subtypes(SpeedyWeather.AbstractShortwave)
 ```
 
 ## OneBandShortwave: Single-band shortwave radiation with diagnostic clouds
-
-!!! warn "OneBandShortwave currently not available"
-    With internal structure change for GPU acceleration this parameterization is currently unavailable.
 
 The `OneBandShortwave` scheme provides a single-band (broadband) shortwave radiation parameterization,
 including diagnostic cloud effects following [^KMB06]. For dry models without water vapor, use
@@ -187,15 +183,7 @@ Over land, the stratocumulus cover $\mathrm{CLS}$ is further modified to be prop
 where $\mathrm{RH}_N$ is the surface (lowest model layer) relative humidity.
 
 **Radiative transfer:**
-The incoming solar flux at the top of the atmosphere is computed from astronomical formulae. Ozone absorption in the
-lower and upper stratosphere is subtracted, yielding the downward flux into the first model layer:
-
-```math
-F_{h}^{\downarrow, SR} = F_{0}^{\downarrow, sol} - \Delta F_{ust}^{ozone} - \Delta F_{lst}^{ozone}
-```
-
-Shortwave radiation is then propagated downward through each layer using a transmissivity $\tau_{k}^{SR}$,
-which depends on zenith angle, layer depth, humidity, and cloud properties:
+The incoming solar flux at the top of the atmosphere is computed from astronomical formulae. Shortwave radiation is propagated downward through each layer using a transmissivity $\tau_{k}^{SR}$, which depends on zenith angle, layer depth, humidity, and cloud properties:
 
 ```math
 F_{k+h}^{\downarrow, SR} = F_{k-h}^{\downarrow, SR} \, \tau_k^{SR}
@@ -206,6 +194,14 @@ In the cloud-top layer, cloud reflection is included:
 ```math
 F_{k+h}^{\downarrow, SR} = F_{k-h}^{\downarrow, SR} (1 - A_{cl} \, \mathrm{CLC}) \, \tau_{k}^{SR}
 ```
+
+Ozone absorption in the upper ($k=1$) and lower ($k=2$) stratosphere is applied inside the layer loop, depositing the absorbed energy as a temperature tendency in those layers:
+
+```math
+F_{k+h}^{\downarrow, SR} = (F_{k-h}^{\downarrow, SR} - \Delta F_k^{ozone}) \, \tau_{k}^{SR}, \quad k \in \{1, 2\}
+```
+
+where $\Delta F_k^{ozone}$ is a prescribed fraction of the TOA solar flux $F_0^{\downarrow, sol}$.
 
 At the surface, stratocumulus reflection and surface albedo are applied:
 
@@ -225,8 +221,7 @@ and is propagated upward as
 F_{k-h}^{\uparrow, SR} =  F_{k+h}^{\uparrow, SR} \, \tau_{k}^{SR}
 ```
 
-with cloud reflection added at the cloud-top layer. The upward part is only modeled for the visible band,
-as near-infrared is mostly absorbed downward.
+Cloud reflection $F^{\uparrow, cloud}$ is re-added to the upward beam at the cloud-top layer. The final upward flux leaving the atmosphere is stored as `outgoing_shortwave` (OSR) and represents the **total** TOA-outgoing SW: cloud reflection + stratocumulus reflection + surface albedo reflection, all after partial attenuation by water vapor on the return path.
 
 **Key features:**
 
@@ -242,49 +237,50 @@ To use the OneBandShortwave scheme, construct your model as follows and run as u
 
 **For wet models (with water vapor and clouds):**
 
-```julia
-using SpeedyWeather
-using CairoMakie
+```@example radiation
+using SpeedyWeather, CairoMakie
 spectral_grid = SpectralGrid(trunc=31, nlayers=8)
 model = PrimitiveWetModel(spectral_grid; shortwave_radiation=OneBandShortwave(spectral_grid))
 simulation = initialize!(model)
 run!(simulation, period=Week(1))
 
 # get surface shortwave radiation down
-ssrd = simulation.diagnostic_variables.physics.surface_shortwave_down
+ssrd = simulation.variables.parameterizations.surface_shortwave_down
 heatmap(ssrd,title="Surface shortwave radiation down [W/m^2]")
 save("ssrd.png", ans) # hide
 nothing # hide
-# show ![Surface shortwave radiation down](ssrd.png)
 ```
 
+![Surface shortwave radiation down](ssrd.png)
 
-```julia
-osr = simulation.diagnostic_variables.physics.outgoing_shortwave_radiation
+```@example radiation
+osr = simulation.variables.parameterizations.outgoing_shortwave
 heatmap(osr,title="Outgoing shortwave radiation [W/m^2]")
 save("osr.png", ans) # hide
 nothing # hide
-# show ![Outgoing shortwave radiation](osr.png)
 ```
+
+![Outgoing shortwave radiation](osr.png)
 
 **For dry models (no water vapor or clouds):**
 
 Use `OneBandGreyShortwave` instead, which automatically uses `NoClouds` and `TransparentShortwaveTransmissivity`:
 
-```julia
-using SpeedyWeather
+```@example radiation
+using SpeedyWeather, CairoMakie
 spectral_grid = SpectralGrid(trunc=31, nlayers=8)
 model = PrimitiveDryModel(spectral_grid; shortwave_radiation=OneBandGreyShortwave(spectral_grid))
 simulation = initialize!(model)
 run!(simulation, period=Week(1))
 
 # The shortwave fluxes can be visualised
-ssrd = simulation.diagnostic_variables.physics.surface_shortwave_down
+ssrd = simulation.variables.parameterizations.surface_shortwave_down
 heatmap(ssrd, title="Surface shortwave radiation (dry model) [W/m^2]")
 save("ssrd_dry.png", ans) # hide
 nothing # hide
-# show ![Surface shortwave radiation (dry model)](ssrd_dry.png)
 ```
+
+![Surface shortwave radiation (dry model)](ssrd_dry.png)
 
 ### Parameterization options
 
@@ -304,7 +300,7 @@ The atmospheric transmissivity can be calculated using:
 - `BackgroundShortwaveTransmissivity(spectral_grid)` (default): Fortran SPEEDY-based transmissivity with zenith correction and absorption by aerosols, water vapor, and clouds
 - `TransparentShortwaveTransmissivity(spectral_grid)`: Transparent atmosphere (used in `OneBandGreyShortwave`)
 
-##### BackgroundShortwaveTransmissivity 
+##### BackgroundShortwaveTransmissivity
 
 For each layer ``k``, the transmissivity is
 
@@ -322,7 +318,7 @@ with
 - ``a_{wv}`` water-vapor absorptivity (`absorptivity_water_vapor`) times specific humidity ``q_k``
 - ``a_{cl}(q_\mathrm{base}) = \min(a_{cl,base} q_\mathrm{base}, a_{cl,limit})`` cloud absorptivity added below the diagnosed cloud top, scaled by cloud cover ``\mathrm{CLC}``
 
-All absorptivity coefficients are per ``10^5`` Pa. The resulting ``\tau_k^{SR}`` values are stored in `column.transmissivity_shortwave[:, band]` and reused for both the downward and upward sweeps in `OneBandShortwaveRadiativeTransfer`.
+All absorptivity coefficients are per ``10^5`` Pa. The resulting ``\tau_k^{SR}`` values are computed once per column and reused for both the downward and upward sweeps in `OneBandShortwaveRadiativeTransfer`.
 
 ##### TransparentShortwaveTransmissivity details
 
@@ -332,7 +328,7 @@ Sets ``\tau_k^{SR} = 1`` for all layers and bands, effectively skipping atmosphe
 
 The `DiagnosticClouds` scheme includes a `use_stratocumulus` flag (default: `true`) that enables the diagnostic stratocumulus cloud parameterization over oceans:
 
-```julia
+```@example radiation
 using SpeedyWeather, CairoMakie
 
 spectral_grid = SpectralGrid()
@@ -341,12 +337,47 @@ sw_no_sc = OneBandShortwave(spectral_grid, clouds = DiagnosticClouds(spectral_gr
 model = PrimitiveWetModel(spectral_grid; shortwave_radiation=sw_no_sc)
 sim = initialize!(model)
 run!(sim, period=Day(5))
-ssrd = sim.diagnostic_variables.physics.surface_shortwave_down
+ssrd = sim.variables.parameterizations.surface_shortwave_down
 heatmap(ssrd, title="No stratocumulus clouds [W/m^2]")
 save("oneband_no_stratocumulus.png", ans) # hide
 nothing # hide
-# show ![No stratocumulus clouds](oneband_no_stratocumulus.png)
 ```
+
+![No stratocumulus clouds](oneband_no_stratocumulus.png)
+
+## Greenhouse gases
+
+Greenhouse gas concentrations can be prescribed as time-varying scalar quantities and are
+tracked as prognostic variables. For example, an `ExponentialCO2`
+concentration is fitted to the Keeling curve. To customise or add greenhouse gases, pass a
+`NamedTuple` of gas objects to `greenhouse_gases`. The key of the named tuple will be used for the variable name, so `co2 = ..., carbon_dioxide = ...` can co-exist.
+
+```@example radiation
+spectral_grid = SpectralGrid(trunc=31, nlayers=8)
+
+# constant CO2 at 420 ppm
+model = PrimitiveWetModel(spectral_grid; greenhouse_gases = (; co2 = CO2(spectral_grid, 420)))
+simulation = initialize!(model)
+simulation.variables.prognostic.greenhouse_gases.co2[]
+```
+
+A CO2 concentration that increases exponentially over time:
+
+```@example radiation
+co2 = ExponentialCO2(spectral_grid)
+```
+
+Step-change scenarios are also available: `TwoTimesCO2` and `FourTimesCO2` double or
+quadruple the preindustrial CO2 at a given date (default: year 2000). Any callable
+`f(t::DateTime) -> concentration_in_ppm` can be wrapped in `CO2(f)` for a fully
+custom trajectory.
+
+!!! warning "Radiation schemes not yet CO2-aware"
+    The greenhouse gas concentrations are tracked as prognostic variables and evolve
+    correctly in time, but the radiation schemes (`OneBandLongwave`
+    etc.) have not yet been updated to use them. Changing CO2 therefore has no effect
+    on the radiative fluxes or temperature tendencies at this stage. This is work in
+    progress.
 
 ## References
 

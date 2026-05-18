@@ -1,0 +1,190 @@
+using Dates
+
+@testset "Sec, min, hrs arguments" begin
+    SG = SpectralGrid(trunc = 42, nlayers = 1)
+    L1 = Leapfrog(SG, Δt_at_T31 = 30)
+    L2 = Leapfrog(SG, Δt_at_T31 = Second(30))
+    @test L1.Δt == L2.Δt
+
+    L3 = Leapfrog(SG, Δt_at_T31 = Second(300))
+    L4 = Leapfrog(SG, Δt_at_T31 = Minute(5))
+    @test L3.Δt == L4.Δt
+
+    L4 = Leapfrog(SG, Δt_at_T31 = Minute(60))
+    L5 = Leapfrog(SG, Δt_at_T31 = Hour(1))
+    @test L4.Δt == L5.Δt
+
+    # without adjustment
+    L1 = Leapfrog(SG, Δt_at_T31 = 30, adjust_with_output = false)
+    L2 = Leapfrog(SG, Δt_at_T31 = Second(30), adjust_with_output = false)
+    @test L1.Δt == L2.Δt
+
+    L3 = Leapfrog(SG, Δt_at_T31 = Second(300), adjust_with_output = false)
+    L4 = Leapfrog(SG, Δt_at_T31 = Minute(5), adjust_with_output = false)
+    @test L3.Δt == L4.Δt
+
+    L4 = Leapfrog(SG, Δt_at_T31 = Minute(60), adjust_with_output = false)
+    L5 = Leapfrog(SG, Δt_at_T31 = Hour(1), adjust_with_output = false)
+    @test L4.Δt == L5.Δt
+
+    # clock tests
+    c1 = SpeedyWeather.Clock()
+    SG2 = SpectralGrid(trunc = 31, nlayers = 1)
+    L6 = Leapfrog(SG2, Δt_at_T31 = Hour(1), adjust_with_output = false)
+
+    # set period
+    SpeedyWeather.initialize!(c1, L6, Hour(10))
+    @test c1.n_timesteps == 10
+    SpeedyWeather.initialize!(c1, L6, Day(2))
+    @test c1.n_timesteps == 48
+
+    # set n_timesteps
+    SpeedyWeather.initialize!(c1, L6, 10)
+    @test c1.n_timesteps == 10
+end
+
+@testset "Set clock" begin
+    spectral_grid = SpectralGrid(nlayers = 1)
+    time_stepping = Leapfrog(spectral_grid)
+    Δt = time_stepping.Δt_at_T31
+
+    # set n_timesteps
+    clock = Clock()
+    n_timesteps = 100
+    initialize!(clock, time_stepping, n_timesteps)
+    @test clock.n_timesteps == 100
+    @test clock.period == Second(100 * Δt)
+
+    # set period
+    clock = Clock()
+    period = Day(10)
+    initialize!(clock, time_stepping, period)
+    @test clock.period == period
+    @test clock.n_timesteps == ceil(Int, Millisecond(period).value / time_stepping.Δt_millisec.value)
+
+    model = BarotropicModel(spectral_grid)
+    simulation = initialize!(model)
+    run!(simulation, steps = 1)
+    run!(simulation, period = Hour(1))
+    @test_throws AssertionError run!(simulation, steps = 1, period = Day(1))
+end
+
+@testset "time conversions" begin
+    # Conversions from integer/float types
+    @test convert(Second, 1) == Second(1)
+    @test convert(Second, 1.4) == Second(1)
+    @test convert(Second, 1.5) == Second(2)
+
+    # Conversions for month and year
+    @test Second(Year(1)) == Second(365 * 24 * 60 * 60)
+    @test Day(Year(1)) == Day(365)
+    @test Hour(Year(1)) == Hour(Second(Year(1)))
+    @test Minute(Year(1)) == Minute(Second(Year(1)))
+    @test Second(Month(1)) == Second(30 * 24 * 60 * 60)
+    @test Millisecond(Year(1)) == Millisecond(Second(Year(1)))
+    @test Day(Month(1)) == Day(30)
+    @test Minute(Month(1)) == Minute(Second(Month(1)))
+    @test Millisecond(Month(1)) == Millisecond(Second(Month(1)))
+    @test_throws MethodError Week(Month(1))
+
+    # Century
+    @test convert(Year, Century(1)) == Year(100)
+    @test Century(1) == Year(100)
+    @test Second(Century(1)) == Second(100 * 365 * 24 * 60 * 60)
+    @test Millisecond(Century(1)) == Millisecond(Second(Century(1)))
+    @test_throws MethodError Week(Century(1))
+
+    # Millenium
+    @test convert(Year, Millenium(1)) == Year(1000)
+    @test convert(Century, Millenium(1)) == Century(10)
+    @test Millenium(1) == Year(1000)
+    @test Millenium(1) == Century(10)
+    @test Second(Millenium(1)) == Second(1000 * 365 * 24 * 60 * 60)
+    @test Millisecond(Millenium(1)) == Millisecond(Second(Millenium(1)))
+    @test_throws MethodError Week(Millenium(1))
+
+    # Type promotion rules
+    @test promote(Year(1), Century(1)) == (Year(1), Year(100))
+    @test promote(Year(1), Millenium(1)) == (Year(1), Year(1000))
+    @test promote(Century(1), Millenium(1)) == (Century(1), Century(10))
+end
+
+@testset "Century and Millenium" begin
+
+    @testset "Parametric construction" begin
+        c = Century(1)
+        @test c isa Century{Int64}
+        @test Dates.value(c) == 1
+
+        c32 = Century(Int32(2))
+        @test c32 isa Century{Int32}
+        @test Dates.value(c32) == Int32(2)
+
+        m = Millenium(1)
+        @test m isa Millenium{Int64}
+        @test Dates.value(m) == 1
+
+        m32 = Millenium(Int32(3))
+        @test m32 isa Millenium{Int32}
+        @test Dates.value(m32) == Int32(3)
+    end
+
+    @testset "Promotion rules" begin
+        @test promote_type(Century, Year) == Year
+        @test promote_type(Century, Month) == Month
+        @test promote_type(Century, Day) == Day
+        @test promote_type(Century, Hour) == Hour
+        @test promote_type(Century, Second) == Second
+
+        @test promote_type(Millenium, Century) == Century
+        @test promote_type(Millenium, Year) == Year
+        @test promote_type(Millenium, Month) == Month
+        @test promote_type(Millenium, Day) == Day
+        @test promote_type(Millenium, Hour) == Hour
+        @test promote_type(Millenium, Second) == Second
+    end
+
+    @testset "coarserperiod" begin
+        @test Dates.coarserperiod(Year) == (Century, 100)
+        @test Dates.coarserperiod(Century) == (Millenium, 10)
+    end
+
+    @testset "printing" begin
+        @test Dates._units(Century(1)) == " century"
+        @test Dates._units(Century(2)) == " centuries"
+        @test Dates._units(Millenium(1)) == " millenium"
+        @test Dates._units(Millenium(2)) == " millenia"
+    end
+
+    @testset "Period constructor from Period" begin
+        @test Century(Millenium(1)) == Century(10)
+    end
+end
+
+@testset "copy!(::Clock, ::Clock)" begin
+    clock1 = Clock(
+        time = DateTime(2020, 6, 15), start = DateTime(2020, 6, 1),
+        period = Day(14), timestep_counter = 5, n_timesteps = 10,
+        Δt = Millisecond(3600_000)
+    )
+
+    clock2 = Clock()
+
+    # before copy, clock2 has default values
+    @test clock2.time == SpeedyWeather.DEFAULT_DATE
+    @test clock2.timestep_counter == 0
+    @test clock2.n_timesteps == 0
+
+    copy!(clock2, clock1)
+
+    @test clock2.time == clock1.time
+    @test clock2.start == clock1.start
+    @test clock2.period == clock1.period
+    @test clock2.timestep_counter == clock1.timestep_counter
+    @test clock2.n_timesteps == clock1.n_timesteps
+    @test clock2.Δt == clock1.Δt
+
+    # mutating clock1 after copy should not affect clock2
+    clock1.timestep_counter = 99
+    @test clock2.timestep_counter == 5
+end

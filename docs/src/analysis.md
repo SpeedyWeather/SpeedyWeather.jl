@@ -10,7 +10,7 @@ Often this also avoids the two-language problem that you will face if you
 run a simulation with a model in one language but then do the data
 analysis in another, treating the model as a blackbox although it likely
 has many of the functions you will need for analysis already defined.
-With SpeedyWeather we try to avoid this and are working towards a 
+With SpeedyWeather we try to avoid this and are working towards a
 more unified approach in atmospheric modelling where simulation
 and analysis are done interactively with the same library: SpeedyWeather.jl.
 
@@ -77,7 +77,7 @@ Now we check ``\eta_{0,0}`` the ``l = m = 0`` coefficent of the inital condition
 of that simulation with
 
 ```@example analysis
-simulation.prognostic_variables.pres[1, 1]
+simulation.variables.prognostic.η[1, 1]
 ```
 
 `[1, 1]` the first element of the underlying
@@ -90,7 +90,7 @@ by which you have to divide to get your mean value in the original units
 
 ```@example analysis
 a = model.spectral_transform.norm_sphere    # = 2√π = 3.5449078
-η_mean = real(simulation.prognostic_variables.pres[1, 1]) / a
+η_mean = real(simulation.variables.prognostic.η[1, 1]) / a
 ```
 
 So the initial conditions in this simulation are such that the global mean interface displacement
@@ -105,10 +105,10 @@ Let's check what happens after the simulation ran for some days
 run!(simulation, period=Day(10))
 
 # now we check η_mean again
-η_mean_later = real(simulation.prognostic_variables.pres[1, 1]) / a
+η_mean_later = real(simulation.variables.prognostic.η[1, 1]) / a
 ```
 
-which is _exactly_ the same. So mass is conserved, woohoo. 
+which is _exactly_ the same. So mass is conserved, woohoo.
 
 Insight from a numerical perspective: The tendency of ``\eta`` is
 ``\partial_t \eta = -\nabla \cdot (\mathbf{u} h)`` which is a divergence of a flux.
@@ -125,11 +125,12 @@ total volume (times ``h=\eta+H-H_b`` for the vertical then integrated over the s
 
 ```math
 \begin{align}
-E & = \iint \left[ \int_{H_b}^{\eta}\frac{1}{2}\left(u^2 + v^2 + gz\right)dz \right]dA \\
-  & = \iint \frac{1}{2}\left(u^2 + v^2 + gh\right)h dA
+E & = \iint \left[ \int_{H_b}^{H_b+h}\frac{1}{2}\left(u^2 + v^2 + 2gz\right)dz \right]dA \\
+  & = E_0 + \iint \frac{1}{2}\left(u^2 + v^2 + gh\right)h dA
 \end{align}
 ```
 
+where ``E_0`` is a constant energy shift that does not play a role when considering energy differences.
 In contrast to the [Mass conservation](@ref) which, with respect to the
 spectral transform, is a linear calculation, here we need to multiply
 variables, which has to be done in grid-point space. Then we can transform to spectral
@@ -141,9 +142,9 @@ function total_energy(u, v, η, model)
     H = model.atmosphere.layer_thickness
     Hb = model.orography.orography
     g = model.planet.gravity
-    
+
     h = @. η + H - Hb               # layer thickness between the bottom and free surface
-    E = @. h/2*(u^2 + v^2) + g*h^2  # vertically-integrated mechanical energy
+    E = @. h/2*(u^2 + v^2) + (1/2)*g*h^2  # vertically-integrated mechanical energy
 
     # transform to spectral, take l=m=0 mode at [1] and normalize for mean
     return E_mean = real(transform(E)[1]) / model.spectral_transform.norm_sphere
@@ -155,9 +156,9 @@ So at the current state of our simulation we have a total energy
 
 ```@example analysis
 # flat copies for convenience
-u = simulation.diagnostic_variables.grid.u_grid[:, 1]
-v = simulation.diagnostic_variables.grid.v_grid[:, 1]
-η = simulation.diagnostic_variables.grid.pres_grid
+u = simulation.variables.grid.u[:, 1]
+v = simulation.variables.grid.v[:, 1]
+η = simulation.variables.grid.η
 
 TE = total_energy(u, v, η, model)
 ```
@@ -165,8 +166,8 @@ TE = total_energy(u, v, η, model)
 with units of ``m^3 s^{-2}`` (multiplying by surface area of the sphere
 and density of the fluid would turn it into joule = ``kg \, m^2 s^{-2}``).
 To know in general where to find the respective variables ``u, v, \eta`` inside our
-simulation object see [Prognostic variables](@ref) and [Diagnostic variables](@ref).
-Now let us continue the simulation
+simulation object see [Variables](@ref). Now let us continue the simulation
+
 ```@example analysis
 run!(simulation, period=Day(10))
 
@@ -179,6 +180,7 @@ So the total energy has somewhat changed, it decreased to
 ```@example analysis
 TE_later/TE
 ```
+
 of its previous value over 10 days.
 
 !!! note "Energy conservation"
@@ -202,18 +204,18 @@ is defined as
 q = \frac{f + \zeta}{h}
 ```
 
-with ``f`` the Coriolis parameter, ``\zeta`` the relative vorticity, 
+with ``f`` the Coriolis parameter, ``\zeta`` the relative vorticity,
 and ``h`` the layer thickness as before. We can calculate this
 conveniently directly on the model grid (whichever you chose)
 as
 
 ```@example analysis
 # vorticity
-ζ = simulation.diagnostic_variables.grid.vor_grid[:,1]
+ζ = simulation.variables.grid.vorticity[:,1]
 f = coriolis(ζ)     # create f on that grid
 
 # layer thickness
-η = simulation.diagnostic_variables.grid.pres_grid
+η = simulation.variables.grid.η
 H = model.atmosphere.layer_thickness
 Hb = model.orography.orography
 h = @. η + H - Hb
@@ -223,7 +225,7 @@ q = @. (f + ζ) / h
 nothing # hide
 ```
 
-and we can compare the relative vorticity field to
+and we can compare the relative vorticity field
 ```@example analysis
 using CairoMakie
 heatmap(ζ, title="Relative vorticity [1/s]")
@@ -232,8 +234,7 @@ nothing # hide
 ```
 ![Relative vorticity](analysis_vor.png)
 
-
-the potential vorticity
+to the potential vorticity
 ```@example analysis
 heatmap(q, title="Potential vorticity [1/m/s]")
 save("analysis_pv.png", ans) # hide
@@ -266,7 +267,7 @@ function total_angular_momentum(u, η, model)
     Ω = model.planet.rotation
 
     r = R * cos.(model.geometry.lats)       # momentum arm for every grid point
-    
+
     h = @. η + H - Hb           # layer thickness between the bottom and free surface
     Λ = @. (u*r + Ω*r^2) * h    # vertically-integrated AAM
 
@@ -331,7 +332,7 @@ Q = \iint \frac{1}{2}q^2 dA
 In the absence of source and sink for potential vorticiy,
 this quantity should also conserve during the integration.
 
-We define a function ``total_enstrophy`` for this
+We define a function `total_enstrophy` for this
 
 ```@example analysis
 function total_enstrophy(ζ, η, model)
@@ -339,13 +340,14 @@ function total_enstrophy(ζ, η, model)
     H = model.atmosphere.layer_thickness
     Hb = model.orography.orography
     f = coriolis(ζ)     # create f on the grid
-    
+
     h = @. η + H - Hb   # thickness
     q = @. (ζ + f) / h  # Potential vorticity
     Q = @. q^2 / 2      # Potential enstrophy
 
     # transform to spectral, take l=m=0 mode at [1] and normalize for mean
-    return Q_mean = real(transform(Q)[1]) / model.spectral_transform.norm_sphere
+    Q_mean = real(transform(Q)[1]) / model.spectral_transform.norm_sphere
+    return Q_mean
 end
 ```
 
@@ -356,12 +358,12 @@ check how ``Q`` is changing over time.
 Q = total_enstrophy(ζ, η, model)
 run!(simulation, period=Day(10))
 Q_later = total_enstrophy(ζ, η, model)
-Q_later/Q
+Q_later / Q
 ```
 
 !!! note "Less conservative enstrophy"
     Note that the turbulent nature of the [shallow water model](@ref shallow_water_model)
-    (or generally 2D turbulence) cascades enstrophy to smaller scales where it 
+    (or generally 2D turbulence) cascades enstrophy to smaller scales where it
     is removed by [Horizontal diffusion](@ref diffusion) for numerical stability.
     As a result, it is decreasing more quickly than energy.
 
@@ -398,7 +400,7 @@ Now the `global_diagnostics` function is defined as
 
 ```@example analysis
 function global_diagnostics(u, v, ζ, η, model)
-    
+
     # constants from model
     NF = model.spectral_grid.NF     # number format used
     H = model.atmosphere.layer_thickness
@@ -409,7 +411,7 @@ function global_diagnostics(u, v, ζ, η, model)
 
     r = NF.(R * cos.(model.geometry.lats))  # create r on that grid
     f = coriolis(u)                         # create f on that grid
-    
+
     h = @. η + H - Hb           # thickness
     q = @. (ζ + f) / h          # potential vorticity
     λ = @. u * r + Ω * r^2      # angular momentum (in the right number format NF)
@@ -428,14 +430,14 @@ function global_diagnostics(u, v, ζ, η, model)
 end
 
 # unpack diagnostic variables and call global_diagnostics from above
-function global_diagnostics(diagn::DiagnosticVariables, model::AbstractModel)
-    u = diagn.grid.u_grid[:, 1]
-    v = diagn.grid.v_grid[:, 1]
-    ζR = diagn.grid.vor_grid[:, 1]
-    η = diagn.grid.pres_grid
-    
+function global_diagnostics(vars::Variables, model::AbstractModel)
+    u = vars.grid.u[:, 1]
+    v = vars.grid.v[:, 1]
+    ζR = vars.grid.vorticity[:, 1]
+    η = vars.grid.η
+
     # vorticity during simulation is scaled by radius R, unscale here
-    ζ = ζR ./ diagn.scale[]
+    ζ = ζR ./ vars.prognostic.scale[]
 
     return global_diagnostics(u, v, ζ, η, model)
 end
@@ -449,7 +451,7 @@ end
     before the time integration and is undone directly after it. However, because
     now we are accessing the vorticity _during_ the simulation we need to unscale
     the vorticity (and divergence) manually. General recommendation is to divide
-    by `diagn.scale[]` (and not `radius`) as `diagn.scale[]` always reflects whether
+    by `vars.prognostic.scale[]` (and not `radius`) as `vars.prognostic.scale[]` always reflects whether
     a vorticity and divergence are currently scaled (scale = radius) or not (scale = 1).
 
 Then we define a new callback `GlobalDiagnostics` subtype of SpeedyWeather's
@@ -459,9 +461,9 @@ details)
 
 ```@example analysis
 # define a GlobalDiagnostics callback and the fields it needs
-Base.@kwdef mutable struct GlobalDiagnostics <: SpeedyWeather.AbstractCallback
+@kwdef mutable struct GlobalDiagnostics <: SpeedyWeather.AbstractCallback
     timestep_counter::Int = 0
-    
+
     time::Vector{DateTime} = []
     M::Vector{Float64} = []  # mean mass per time step
     C::Vector{Float64} = []  # mean circulation per time step
@@ -474,12 +476,11 @@ end
 # define how to initialize a GlobalDiagnostics callback
 function SpeedyWeather.initialize!(
     callback::GlobalDiagnostics,
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
+    vars::Variables,
     model::AbstractModel,
 )
     # replace with vector of correct length
-    n = progn.clock.n_timesteps + 1    # +1 for initial conditions
+    n = vars.prognostic.clock.n_timesteps + 1    # +1 for initial conditions
     callback.time = zeros(DateTime, n)
     callback.M = zeros(n)
     callback.C = zeros(n)
@@ -487,58 +488,52 @@ function SpeedyWeather.initialize!(
     callback.K = zeros(n)
     callback.P = zeros(n)
     callback.Q = zeros(n)
-    
-    M, C, Λ, K, P, Q = global_diagnostics(diagn, model)
-    
-    callback.time[1] = progn.clock.time
+
+    M, C, Λ, K, P, Q = global_diagnostics(vars, model)
+
+    callback.time[1] = vars.prognostic.clock.time
     callback.M[1] = M  # set initial conditions
     callback.C[1] = C  # set initial conditions
     callback.Λ[1] = Λ  # set initial conditions
     callback.K[1] = K  # set initial conditions
     callback.P[1] = P  # set initial conditions
     callback.Q[1] = Q  # set initial conditions
-    
+
     callback.timestep_counter = 1  # (re)set counter to 1
-    
+
     return nothing
 end
 
 # define what a GlobalDiagnostics callback does on every time step
 function SpeedyWeather.callback!(
     callback::GlobalDiagnostics,
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
+    vars::Variables,
     model::AbstractModel,
 )
-    callback.timestep_counter += 1  
+    callback.timestep_counter += 1
     i = callback.timestep_counter
-    
-    M, C, Λ, K, P, Q = global_diagnostics(diagn, model)
-    
+
+    M, C, Λ, K, P, Q = global_diagnostics(vars, model)
+
     # store current time and diagnostics for timestep i
-    callback.time[i] = progn.clock.time
-    callback.M[i] = M 
-    callback.C[i] = C 
-    callback.Λ[i] = Λ 
-    callback.K[i] = K 
-    callback.P[i] = P 
-    callback.Q[i] = Q 
+    callback.time[i] = vars.prognostic.clock.time
+    callback.M[i] = M
+    callback.C[i] = C
+    callback.Λ[i] = Λ
+    callback.K[i] = K
+    callback.P[i] = P
+    callback.Q[i] = Q
 end
 
 using NCDatasets
 
 # define how to finalize a GlobalDiagnostics callback after simulation finished
-function SpeedyWeather.finalize!(
-    callback::GlobalDiagnostics,
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
-    model::AbstractModel,
-)
+function SpeedyWeather.finalize!(callback::GlobalDiagnostics, args...)
     n_timesteps = callback.timestep_counter
 
     # create a netCDF file in current path
     ds = NCDataset(joinpath(pwd(), "global_diagnostics.nc"), "c")
-    
+
     # save diagnostics variables within
     defDim(ds, "time", n_timesteps)
     defVar(ds, "time",                  callback.time,  ("time",))
@@ -548,7 +543,7 @@ function SpeedyWeather.finalize!(
     defVar(ds, "kinetic energy",        callback.K,     ("time",))
     defVar(ds, "potential energy",      callback.P,     ("time",))
     defVar(ds, "potential enstrophy",   callback.Q,     ("time",))
-    
+
     close(ds)
 
     return nothing

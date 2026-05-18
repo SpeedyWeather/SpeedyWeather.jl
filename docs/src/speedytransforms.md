@@ -22,7 +22,7 @@ the maximum degree ``l`` and order ``m`` of the spherical harmonics (e.g. ``l_{m
 or the size of the lower triangular matrix, e.g. 32x32. In this example, they are all equivalent.
 We often use the truncation, i.e. T31, for brevity but sometimes it is important to describe
 degree and order independently (see for example [One more degree for spectral fields](@ref)).
-Note also how truncation, degree and order are 0-based, but matrix sizes are 1-based. 
+Note also how truncation, degree and order are 0-based, but matrix sizes are 1-based.
 
 
 ## Example transform
@@ -68,7 +68,7 @@ Now let's go back to spectral space with `transform`
 alms2 = transform(map)
 ```
 Comparing with `alms` from above you can see that the transform is exact up to a typical rounding error
-from `Float64`. 
+from `Float64`.
 ```@example speedytransforms
 alms ≈ alms2
 ```
@@ -112,7 +112,7 @@ More on that now.
 
 The function `transform` only with arguments as shown above,
 will create an instance of `SpectralTransform` under the hood.
-This object contains all precomputed information that is required for the transform, either way: 
+This object contains all precomputed information that is required for the transform, either way:
 The Legendre polynomials, pre-planned Fourier transforms, precomputed gradient, divergence and
 curl operators, the spherical harmonic eigenvalues among others. Maybe the most intuitive way to
 create a `SpectralTransform` is to start with a `SpectralGrid`, which already defines
@@ -214,15 +214,17 @@ docstrings at `?SpectralTransform`.
 How to take some data and compute a power spectrum with SpeedyTransforms you may ask.
 Say you have some global data in a matrix `m` that looks, for example, like
 ```@example speedytransforms2
-using RingGrids # hide
-using LowerTriangularArrays # hide
-using SpeedyTransforms # hide
-alms = randn(LowerTriangularMatrix{Complex{Float32}}, 32, 32) # hide
-spectral_truncation!(alms, 10) # hide
-map = transform(alms, Grid=FullClenshawGrid) # hide
-m = Matrix(map) # hide
-m
+using RingGrids
+using LowerTriangularArrays
+using SpeedyTransforms
+alms = randn(LowerTriangularMatrix{Complex{Float32}}, 32, 32)
+spectral_truncation!(alms, 10)
+map = transform(alms, Grid=FullClenshawGrid)
+m = Matrix(map)
 ```
+We have created `m` from some random data here in spectral space, truncated it and transformed it,
+and applied `Matrix` to drop the grid information. You can ignore these steps
+and simply assume you have some data in some matrix.
 You hopefully know which grid this data comes on, let us assume it is a regular
 latitude-longitude grid, which we call the `FullClenshawGrid` (in analogy to the Gaussian grid based
 on the Gaussian quadrature). Note that for the spectral transform this should not include the poles,
@@ -260,7 +262,8 @@ lineplot(k, power, yscale=:log10, ylim=(1e-15, 10), xlim=extrema(k),
 ```
 
 The power spectrum of our data is about 1 up to wavenumber 10 and then close to zero for
-higher wavenumbers (which is in fact how we constructed this fake data). Let us
+higher wavenumbers (which is in fact how we constructed this fake data, see the code
+example in the beginning which led to the definition of our data matrix `m`). Let us
 turn this around and use SpeedyTransforms to create random noise in spectral space
 to be used in grid-point space!
 
@@ -283,9 +286,20 @@ We first create a Julia `Matrix` so that the matrix-vector broadcasting `.*= k`
 is correctly applied across dimensions of `A` and then convert to a
 `LowerTriangularMatrix`.
 
-Awesome. For higher degrees and orders the amplitude clearly decreases!
+```@setup speedytransforms2a
+using RingGrids
+using LowerTriangularArrays
+using SpeedyTransforms
+using CairoMakie
+k = 1:32
+A = randn(Complex{Float32}, 32, 32)
+A .*= k.^-2
+alms = LowerTriangularArray(A)
+```
+
+Awesome. For higher degrees and orders the amplitude is clearly lower!
 Now to grid-point space and let us visualize the result
-```@example speedytransforms2
+```@example speedytransforms2a
 map = transform(alms)
 
 using CairoMakie
@@ -317,26 +331,26 @@ You get information about the size of that memory (both polynomials and required
 in the terminal "show" of a `SpectralTransform` object, e.g. at T127 resolution
 with 8 layers these are
 
-```@example speedytransforms2
+```@example speedytransforms3
 using SpeedyWeather
 spectral_grid = SpectralGrid(trunc=127, nlayers=8)
 SpectralTransform(spectral_grid)
 ```
 
-## Batched Transforms 
+## Batched Transforms
 
 SpeedyTransforms also supports batched transforms. With batched input data the `transform`
 is performed along the leading dimension, and all further dimensions are interpreted as
-batch dimensions. Take for example 
+batch dimensions. Take for example
 
-```@example speedytransforms2
-alms = randn(LowerTriangularArray{Complex{Float32}}, 32, 32, 5) 
+```@example speedytransforms3
+alms = randn(LowerTriangularArray{Complex{Float32}}, 32, 32, 5)
 grids = transform(alms)
 ```
 
 In this case we first randomly generated five (32x32) `LowerTriangularArray` that hold the
-coefficients and then transformed all five matrices batched to the grid space with the 
-transform command, yielding 5 `RingGrids` with each 48-rings. 
+coefficients and then transformed all five matrices batched to the grid space with the
+transform command, yielding 5 `RingGrids` with each 48-rings.
 
 ## Batched power spectra
 
@@ -345,17 +359,143 @@ to the leading spherical harmonic dimension (it is unravelled as a vector so the
 only, not the first two...). But the power spectrum is always calculated along that
 first spherical-harmonic dimension. For example
 
-```@example speedytransforms2 
-alms = randn(LowerTriangularArray{Complex{Float32}}, 5, 5, 2) 
+```@example speedytransforms3
+alms = randn(LowerTriangularArray{Complex{Float32}}, 5, 5, 2)
 power_spectrum(alms)
 ```
 returns the power spectrum for `[..., 1]` in the first column and `[..., 2]` in the second.
 This avoids to loop over these additional dimensions, but the result would be the same:
 
-```@example speedytransforms2
+```@example speedytransforms3
 power_spectrum(alms[:, 1])
 ```
 
+## MatrixSpectralTransform
+
+SpeedyTransforms also provides a `MatrixSpectralTransform`, an alternative spectral transform
+that replaces the ring-by-ring FFT + Legendre recursion of `SpectralTransform` with a single
+dense matrix-matrix multiply. Concretely, the forward (grid → spectral) transform becomes
+
+```math
+\text{coeffs} = F \cdot \text{field}
+```
+
+and the backward (spectral → grid) transform is split into two real-valued multiplications
+
+```math
+\text{field} = B_{\Re} \cdot \Re(\text{coeffs}) - B_{\Im} \cdot \Im(\text{coeffs})
+```
+
+where ``F``, ``B_{\Re}``, ``B_{\Im}`` are dense real/complex matrices precomputed at construction
+time by probing the existing `SpectralTransform` with unit vectors.
+
+### When to use it
+
+The `MatrixSpectralTransform` is worth considering when:
+
+- **Working at low to mid resolution.** The dense matrices scale as
+  ``O(N_{\text{grid}} \times N_{\text{harmonics}})``, so at high resolutions they
+  can require many GB of memory and become impractical.
+- **Using Reactant.** The current Reactant/XLA-based model execution in SpeedyWeather
+  is limited to `MatrixSpectralTransform`, since XLA can compile a `GEMM` directly.
+- **GPU performance is critical.** On modern GPUs a single large matrix multiply
+  (cuBLAS / rocBLAS / MPS) is often faster than many smaller FFTs and Legendre loops.
+
+### Construction
+
+When working with SpeedyTransforms standalone, construct from a `Spectrum` and grid:
+
+```@example speedytransforms4
+using RingGrids, LowerTriangularArrays, SpeedyTransforms
+
+spectrum = Spectrum(31)
+grid = FullGaussianGrid(SpeedyTransforms.get_nlat_half(31))
+M = MatrixSpectralTransform(spectrum, grid; NF = Float32)
+```
+
+When working at the SpeedyWeather level, pass a `SpectralGrid` directly — the same
+convenience constructor that `SpectralTransform` uses:
+
+```@example speedytransforms5
+using SpeedyWeather
+
+spectral_grid = SpectralGrid(trunc=31, nlayers=8)
+M_sg = MatrixSpectralTransform(spectral_grid)
+```
+
+The constructor prints a progress bar while precomputing the forward and backward matrices.
+The `show` output summarises the resolution and memory footprint of the matrices.
+
+### Usage: drop-in replacement for `SpectralTransform`
+
+`MatrixSpectralTransform` implements the same `transform` interface as `SpectralTransform`,
+so it can be used as a drop-in replacement:
+
+```@example speedytransforms4
+# spectral → grid
+alms = randn(LowerTriangularMatrix{ComplexF32}, 32, 32)
+field = transform(alms, M)
+```
+
+```@example speedytransforms4
+# grid → spectral
+alms2 = transform(field, M)
+alms ≈ alms2
+```
+
+3D (multi-layer) transforms work the same way — just pass a `nlayers` keyword at construction:
+
+```@example speedytransforms4
+nlayers = 8
+M3D = MatrixSpectralTransform(spectrum, grid; NF = Float32, nlayers)
+
+alms3D = randn(LowerTriangularArray{ComplexF32}, 32, 32, nlayers)
+field3D = transform(alms3D, M3D)
+alms3D_rt = transform(field3D, M3D)
+field3D ≈ transform(alms3D_rt, M3D)
+```
+
+### Agreement with `SpectralTransform`
+
+The matrix-based and the FFT/Legendre-based transforms agree to within floating-point
+rounding error:
+
+```@example speedytransforms4
+S = SpectralTransform(spectrum, grid; NF = Float32)
+
+field_S = transform(alms, S)
+field_M = transform(alms, M)
+field_S ≈ field_M
+```
+
+### Using within a model
+
+Pass a `MatrixSpectralTransform` to any model constructor via the `spectral_transform`
+keyword to use it in place of the default `SpectralTransform`:
+
+```@example speedytransforms5
+M_sg = MatrixSpectralTransform(spectral_grid)
+model = PrimitiveWetModel(spectral_grid; spectral_transform = M_sg)
+simulation = initialize!(model)
+```
+
+The model then uses dense matrix multiplications for every grid ↔ spectral transform
+during the time integration. This is otherwise identical to the default setup —
+the same `run!` interface applies. Currently the regular `SpectralTransform` is always 
+used as the default in model construction. However, that may change in the future. 
+
+### Memory considerations
+
+The forward matrix ``F`` is of size `(nharmonics × npoints)` and the backward matrices
+``B_{\Re}, B_{\Im}`` are of size `(npoints × nharmonics)`, all in `NF`.
+At T127 resolution on a `FullGaussianGrid` this amounts to several hundred MB,
+compared to the Legendre polynomials of `SpectralTransform` which only store one latitude
+ring at a time. The `show` output prints the total matrix memory:
+
+```@example speedytransforms5
+spectral_grid = SpectralGrid(trunc=63, nlayers=8)
+MatrixSpectralTransform(spectral_grid)
+```
 
 ## Functions and type index
 
