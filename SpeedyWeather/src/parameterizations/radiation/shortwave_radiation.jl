@@ -16,6 +16,8 @@ function variables(::AbstractShortwave)
         ParameterizationVariable(:surface_shortwave_up, Grid2D(), desc = "Surface shortwave radiation up over ocean", units = "W/m^2", namespace = :ocean),
         ParameterizationVariable(:surface_shortwave_up, Grid2D(), desc = "Surface shortwave radiation up over land", units = "W/m^2", namespace = :land),
         ParameterizationVariable(:outgoing_shortwave, Grid2D(), desc = "TOA Shortwave radiation up", units = "W/m^2"),
+        ParameterizationVariable(:direct_radiation_fraction, Grid2D(), desc = "Fraction of direct radiation at surface", units = "1"),
+        ParameterizationVariable(:diffuse_radiation_fraction, Grid2D(), desc = "Fraction of diffuse radiation at surface", units = "1"),
         ParameterizationVariable(:cos_zenith, Grid2D(), desc = "Cos zenith angle", units = "1"),
         ParameterizationVariable(:albedo, Grid2D(), desc = "Albedo", units = "1"),
         ParameterizationVariable(:albedo, Grid2D(), desc = "Albedo over ocean", units = "1", namespace = :ocean),
@@ -50,6 +52,10 @@ initialize!(::TransparentShortwave, ::PrimitiveEquation) = nothing
     albedo = (1 - land_fraction) * albedo_ocean + land_fraction * albedo_land
     vars.parameterizations.surface_shortwave_up[ij] = albedo * D
     vars.parameterizations.albedo[ij] = albedo   # store weighted albedo
+
+    # Transparent atmosphere == 100% direct beam
+    vars.parameterizations.direct_radiation_fraction[ij] = 1.0
+    vars.parameterizations.diffuse_radiation_fraction[ij] = 0.0
 
     # transparent also for reflected shortwave radiation travelling up
     vars.parameterizations.outgoing_shortwave[ij] = vars.parameterizations.surface_shortwave_up[ij]
@@ -210,6 +216,19 @@ One-band shortwave radiative transfer with cloud reflection and ozone absorption
     vars.parameterizations.surface_shortwave_down[ij] = D_surface
     vars.parameterizations.ocean.surface_shortwave_down[ij] = D_surface
     vars.parameterizations.land.surface_shortwave_down[ij] = D_surface
+
+    # Calculate direct/diffuse radiation fractions at the surface
+    mu = max(cos_zenith, 0.05)
+    
+    # Baseline Rayleigh scattering increases at lower solar angles (longer path)
+    clear_sky_diffuse = clamp(0.15 + 0.1 / mu, 0.0, 1.0)
+    
+    # Linearly scale between clear sky diffuse and 100% diffuse based on cloud cover
+    fraction_diffuse = clear_sky_diffuse * (1 - cloud_cover) + 1.0 * cloud_cover
+    fraction_direct = 1.0 - fraction_diffuse
+
+    vars.parameterizations.direct_radiation_fraction[ij] = fraction_direct
+    vars.parameterizations.diffuse_radiation_fraction[ij] = fraction_diffuse
 
     # Surface albedo reflections
     up_ocean = albedo_ocean * D_surface

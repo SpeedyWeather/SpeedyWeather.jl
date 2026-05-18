@@ -14,11 +14,98 @@ end
 Adapt.@adapt_structure ConstantDrag
 ConstantDrag(SG::SpectralGrid; kwargs...) = ConstantDrag{SG.NF}(; kwargs...)
 initialize!(::ConstantDrag, ::PrimitiveEquation) = nothing
-@propagate_inbounds parameterization!(ij, diagn, progn, drag::ConstantDrag, model) =
-    boundary_layer_drag!(ij, diagn, drag)
+@propagate_inbounds parameterization!(ij, vars, drag::ConstantDrag, model) =
+    boundary_layer_drag!(ij, vars, drag)
 
-@propagate_inbounds function boundary_layer_drag!(ij, diagn, scheme::ConstantDrag)
-    return diagn.physics.boundary_layer_drag[ij] = scheme.drag
+@propagate_inbounds function boundary_layer_drag!(ij, vars, scheme::ConstantDrag)
+    return vars.parameterizations.boundary_layer_drag[ij] = scheme.drag
+end
+
+abstract type AbstractSurfaceRoughness <: AbstractParameterization end
+
+export ConstantSurfaceRoughness
+@kwdef struct ConstantSurfaceRoughness{NF} <: AbstractSurfaceRoughness
+    "[OPTION] constant roughness length over land [m]"
+    roughness_length_land::NF = 0.5
+
+    "[OPTION] constant roughness length over ocean [m]"
+    roughness_length_ocean::NF = 1.0e-4
+end
+
+export LearnedSurfaceRoughness
+@kwdef struct LearnedSurfaceRoughness{NF, LNN, LP, LS} <: AbstractSurfaceRoughness
+    "[OPTION] filename of land weights"
+    file::String = "z0_land.npz"
+
+    "[OPTION] path to the folder containing the neural network weights"
+    path::String = joinpath("data", "weights", file)
+
+    "[OPTION] flag to check for weights in SWA or locally"
+    from_assets::Bool = true
+
+    "[OPTION] SpeedyWeatherAssets version number"
+    version::VersionNumber = DEFAULT_ASSETS_VERSION
+
+    # Ocean normalisation parameters
+    ocean_input_means::Vector{NF} = Float32[0.19490805, 0.11980359, 7.7569385]
+    ocean_input_stds::Vector{NF} = Float32[6.6221075, 5.4018555, 3.5962458]
+    ocean_output_mean::NF = -9.1571865f0
+    ocean_output_std::NF = 1.0090618f0
+
+    # Land normalisation parameters
+    land_input_means::Vector{NF} = Float32[
+        7.4566591e-1, 1.0025085e-1, 1.5397815e-1, 1.6788273e+4,
+        6.3441253e+0, 6.3426518e+0, 2.5690454e+2, 1.8242287e+2,
+        2.9126474e+1, 1.4939866e+3, 5.4704014e+1, 2.1826939e-1,
+        3.3305537e-2,
+    ]
+    land_input_stds::Vector{NF} = Float32[
+        4.23785776e-1, 2.76675612e-1, 3.28937173e-1, 1.16441348e+4,
+        4.8089776e+0, 4.81200314e+0, 3.01283646e+1, 1.04803604e+2,
+        8.05910187e+1, 1.13503149e+3, 3.34448814e+1, 1.26479045e-1,
+        9.95290726e-2,
+    ]
+    land_output_mean::NF = -5.031811f0
+    land_output_std::NF = 2.4447718f0
+
+    land_input_buffer::Vector{Float32} = zeros(Float32, 13)
+
+    land_nn::LNN
+    land_params::LP
+    land_states::LS
+end
+
+function Base.show(io::IO, scheme::LearnedSurfaceRoughness)
+    print(io, "LearnedSurfaceRoughness{$(eltype(scheme.ocean_output_mean))}")
+    println(io)
+    println(io, "├ Ocean: Empirically derived analytical model")
+    n_layers = length(keys(scheme.land_params))
+    return println(io, "└ Land:  Neural network ($n_layers layers)")
+end
+
+Adapt.@adapt_structure ConstantSurfaceRoughness
+ConstantSurfaceRoughness(SG::SpectralGrid, kwargs...) = ConstantSurfaceRoughness{SG.NF}(; kwargs...)
+initialize!(::ConstantSurfaceRoughness, ::PrimitiveEquation) = nothing
+
+@propagate_inbounds function parameterization!(ij, vars, scheme::AbstractSurfaceRoughness, model)
+    surface_roughness!(ij, vars, scheme, model.land_sea_mask)
+    return nothing
+end
+
+variables(::AbstractSurfaceRoughness) = (
+    ParameterizationVariable(:surface_roughness, Grid2D(), desc = "Surface roughness length", units = "m"),
+    ParameterizationVariable(:surface_roughness, Grid2D(), desc = "Land surface roughness length", units = "m", namespace = :land),
+    ParameterizationVariable(:surface_roughness, Grid2D(), desc = "Ocean surface roughness length", units = "m", namespace = :ocean),
+)
+
+@propagate_inbounds function surface_roughness!(ij, vars, scheme::ConstantSurfaceRoughness, land_sea_mask)
+    land_fraction = land_sea_mask.mask[ij]
+
+    vars.parameterizations.land.surface_roughness[ij] = land_fraction > 0 ? scheme.roughness_length_land : zero(land_fraction)
+    vars.parameterizations.ocean.surface_roughness[ij] = land_fraction < 1 ? scheme.roughness_length_ocean : zero(land_fraction)
+
+    vars.parameterizations.surface_roughness[ij] = land_fraction * vars.parameterizations.land.surface_roughness[ij] + (1 - land_fraction) * vars.parameterizations.ocean.surface_roughness[ij]
+    return nothing
 end
 
 export BulkRichardsonDrag
@@ -29,12 +116,6 @@ $(TYPEDFIELDS)"""
 @kwdef struct BulkRichardsonDrag{NF} <: AbstractBoundaryLayer
     "[OPTION] von Kármán constant [1]"
     von_Karman::NF = 0.4
-
-    "[OPTION] roughness length over land [m]"
-    roughness_length_land::NF = 0.5
-
-    "[OPTION] roughness length over ocean [m]"
-    roughness_length_ocean::NF = 1.0e-4
 
     "[OPTION] Critical Richardson number for stable mixing cutoff [1]"
     critical_Richardson::NF = 10
@@ -49,19 +130,16 @@ initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
 
 # function barrier
 @propagate_inbounds parameterization!(ij, vars, drag::BulkRichardsonDrag, model) =
-    boundary_layer_drag!(ij, vars, drag, model.land_sea_mask, model.atmosphere, model.planet, model.orography)
+    boundary_layer_drag!(ij, vars, drag, model.atmosphere, model.planet, model.orography)
 
 @propagate_inbounds function boundary_layer_drag!(
         ij,
         vars,
         drag::BulkRichardsonDrag,
-        land_sea_mask,
         atmosphere,
         planet,
         orography,
     )
-    land_fraction = land_sea_mask.mask[ij]
-
     # Height z [m] of lowermost layer above ground
     surface = size(vars.grid.geopotential, 2)    # surface index = nlayers
     (; gravity) = planet
@@ -70,7 +148,9 @@ initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
     # maximum drag Cmax from that height, stable conditions would decrease Cmax towards 0
     # Frierson 2006, eq (12)
     κ = drag.von_Karman
-    z₀ = land_fraction * drag.roughness_length_land + (1 - land_fraction) * drag.roughness_length_ocean
+
+    # Get surface roughness length
+    z₀ = vars.parameterizations.surface_roughness[ij]
 
     # should be z > z₀, z=z₀ means an infinitely high drag
     # 0 < z < z₀ doesn't make sense so cap here
