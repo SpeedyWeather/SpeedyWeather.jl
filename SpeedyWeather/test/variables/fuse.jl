@@ -302,8 +302,6 @@ end
 end
 
 @testset "FusedParent: vars.fused.<sym> is the FusedParent (after model construction)" begin
-    # No model variables currently declare `fuse=`, so build a synthetic fuse group via
-    # build_fuse_parents and then ensure build_fused_namespace passes the FusedParent through.
     model = _testmodel(nlayers = 4)
     vars = AbstractVariable[
         TendencyVariable(:u, Grid3D(), namespace = :grid, fuse = :probe),
