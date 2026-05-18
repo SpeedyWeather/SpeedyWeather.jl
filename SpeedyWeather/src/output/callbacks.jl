@@ -135,7 +135,7 @@ function initialize!(
     nlayers = model.geometry.nlayers
     callback.temperature[1] = vars.grid.temp_average[nlayers]       # set initial conditions
     callback.timestep_counter = 1                                   # (re)set counter to 1
-    return nothing 
+    return nothing
 end
 
 """

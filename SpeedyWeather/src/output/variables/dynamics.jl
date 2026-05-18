@@ -139,7 +139,7 @@ end
 path(::MeanSeaLevelPressureOutput, simulation) = simulation.variables.grid.pressure
 
 function output!(
-        output::NetCDFOutput,
+        output::AbstractOutput,
         variable::MeanSeaLevelPressureOutput,
         simulation::AbstractSimulation,
     )
@@ -187,9 +187,7 @@ function output!(
         round!(mslp_output, variable.keepbits)
     end
 
-    i = output.output_counter               # output time step i to write
-    indices = get_indices(i, variable)      # returns (:, :, i) for example, depending on dims
-    output.netcdf_file[variable.name][indices...] = mslp_output     # actually write to file
+    write_array!(output, variable, mslp_output)
     return nothing
 end
 

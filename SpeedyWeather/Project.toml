@@ -1,7 +1,7 @@
 name = "SpeedyWeather"
 uuid = "9e226e20-d153-4fed-8a5b-493def4f21a9"
-version = "0.19"
 authors = ["SpeedyWeather contributors"]
+version = "0.20.1+DEV"
 
 [deps]
 AbstractFFTs = "621f4979-c628-5d54-868e-fcf4e3e8185c"
@@ -14,7 +14,6 @@ ComponentArrays = "b0b7db55-cfe3-40fc-9ded-d10e2dbeff66"
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
 DocStringExtensions = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
 DomainSets = "5b8099bc-c8ec-5219-889f-1d9e522a28bf"
-Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
 FFTW = "7a1cc6ca-52ef-59f5-83cd-3a7055c09341"
 FastGaussQuadrature = "442a2c76-b920-505d-bb47-c5924d526838"
 GPUArrays = "0c68f7d7-f131-5f86-a1c3-88cf8149b2d7"
@@ -37,12 +36,14 @@ StyledStrings = "f489334b-da3d-4c2e-b8f0-e476e12c162b"
 TOML = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
 
 [weakdeps]
+Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
 FiniteDifferences = "26cc04aa-876d-5657-8c51-4c34ba976000"
 GeoMakie = "db073c08-6b98-4ee5-b6a4-5efafb3259c6"
 Lux = "b2108857-7c20-44ae-9111-449ecde12c47"
 NPZ = "15e1cf62-19b3-5cfa-8e77-841668bca605"
 Reactant = "3c362404-f566-11ee-1572-e11a4b42c853"
 UnicodePlots = "b8865327-cd53-5732-bb35-84acbb429228"
+Zarr = "0a941bbe-ad1d-11e8-39d9-ab76183a1d99"
 
 [sources]
 LowerTriangularArrays = {path = "../LowerTriangularArrays"}
@@ -57,6 +58,7 @@ SpeedyWeatherGeoMakieExt = "GeoMakie"
 SpeedyWeatherLuxExt = ["Lux", "NPZ"]
 SpeedyWeatherReactantExt = ["Reactant", "Dates"]
 SpeedyWeatherUnicodePlotsExt = "UnicodePlots"
+SpeedyWeatherZarrExt = "Zarr"
 
 [compat]
 AbstractFFTs = "1"
@@ -93,4 +95,5 @@ Statistics = "1.10"
 StyledStrings = "1"
 TOML = "1"
 UnicodePlots = "3.3"
+Zarr = "0.10"
 julia = "1.10"

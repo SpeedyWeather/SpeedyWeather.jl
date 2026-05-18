@@ -53,7 +53,7 @@ nothing # hide
 using SpeedyWeather
 spectral_grid = SpectralGrid(trunc = 31, nlayers = 8)
 
-# construct model with only Held-Suarez forcing, no other physics
+# construct model with only Held-Suarez forcing
 model = PrimitiveDryModel(
     spectral_grid,
 

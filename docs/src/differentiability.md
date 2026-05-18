@@ -54,7 +54,7 @@ dmodel.planet.gravity
 
 ## Differentiating longer trajectories and checkpointing 
 
-In a very similar fashion as for the single timestep, we can also differentiate longer trajectories. For this, we need to use checkpointing to avoid storing all intermediate states in memory. This will also at the same time keep the compile time of the gradient still manageable. For a full example on how to do this for a sensitivity analysis, see the [sensitivity example](https://github.com/SpeedyWeather/SpeedyWeather.jl/blob/main/SpeedyWeather/test/differentiatibility/sensitivity_examples/).
+In a very similar fashion as for the single timestep, we can also differentiate longer trajectories. For this, we need to use checkpointing to avoid storing all intermediate states in memory. This will also at the same time keep the compile time of the gradient still manageable. For a full example on how to do this for a sensitivity analysis, see the [sensitivity example](https://github.com/SpeedyWeather/SpeedyWeather.jl/tree/main/SpeedyWeather/test/differentiability/sensitivity_examples/).
 
 
 ## Parameter handling
@@ -97,7 +97,7 @@ Parameters:
 └───────┴──────────────────────────┴──────────┴────────────┴──────────────────────────────┴─────────────────────────────────────┴──────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-The returned `SpeedyParams` object implements the `Model` interface from ModelParmaeters.jl which allows you to interact with the parameter metadata in tablar form. For example, we could extract the values of the parameters with `params[:,:val]` or the bounds with `params[:,:bounds]`. Subsets of parameters can also be extracted by indexing `params` with one or more `String` variable names (or prefxes), e.g:
+The returned `ParameterTable` object implements the `Model` interface from ModelParmaeters.jl which allows you to interact with the parameter metadata in tabular form. For example, we could extract the values of the parameters with `params[:,:val]` or the bounds with `params[:,:bounds]`. Subsets of parameters can also be extracted by indexing `params` with one or more `String` variable names (or prefxes), e.g:
 
 ```julia
 param_subset = params[["planet.gravity", "atmosphere.heat_capacity"]]
@@ -116,7 +116,7 @@ Parameters:
 
 ## Vectorizing parameters
 
-Many sensitivity analysis, optimization, or uncertainty quantification algorithms require the parameters to be supplied as one or more vectors of values. `SpeedyParams` provides a dispatch for `Base.vec` that flattens the model parameters into a [ComponentVector](https://docs.sciml.ai/ComponentArrays/stable/quickstart/):
+Many sensitivity analysis, optimization, or uncertainty quantification algorithms require the parameters to be supplied as one or more vectors of values. `ParameterTable` provides a dispatch for `Base.vec` that flattens the model parameters into a [ComponentVector](https://docs.sciml.ai/ComponentArrays/stable/quickstart/):
 
 ```julia
 param_vec = vec(params)

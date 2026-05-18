@@ -112,7 +112,7 @@ a dictionary dimension.
 
 ```@example variable_system
 struct MyDictDim <: SpeedyWeather.AbstractVariableDim end
-Base.zero(::SpeedyWeather.AbstractVariable{MyDictDim}, model::AbstractModel) = Dict()
+SpeedyWeather.allocate(::SpeedyWeather.AbstractVariable{MyDictDim}, model::AbstractModel) = Dict()
 ```
 
 and use like

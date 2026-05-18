@@ -9,7 +9,7 @@ const baseTemp = {
   base: 'REPLACE_ME_DOCUMENTER_VITEPRESS',
 }
 
-const navTemp = {
+const navTemp: { nav: any } = {
   nav: 'REPLACE_ME_DOCUMENTER_VITEPRESS',
 }
 
@@ -19,6 +19,21 @@ const nav = [
     component: 'VersionPicker',
   }
 ]
+
+// Build a per-section sidebar: each page maps to only its own section's items
+function buildSidebar(nav: any[]): Record<string, any[]> {
+  const result: Record<string, any[]> = {}
+  for (const section of nav) {
+    if (!section.items) continue  // skip flat items like Home, API, VersionPicker
+    const sectionSidebar = [{ text: section.text, collapsed: false, items: section.items }]
+    for (const page of section.items) {
+      if (page.link) {
+        result[page.link] = sectionSidebar
+      }
+    }
+  }
+  return result
+}
 
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
@@ -88,7 +103,7 @@ export default defineConfig({
       },
     },
     nav,
-    sidebar: 'REPLACE_ME_DOCUMENTER_VITEPRESS',
+    sidebar: buildSidebar(navTemp.nav),
     editLink: {
       pattern: 'https://github.com/SpeedyWeather/SpeedyWeather.jl/edit/main/docs/src/:path',
     },
@@ -96,7 +111,7 @@ export default defineConfig({
       { icon: 'github', link: 'https://github.com/SpeedyWeather/SpeedyWeather.jl' },
     ],
     footer: {
-      message: 'Made with <a href="https://documenter.juliadocs.org/stable/" target="_blank"><strong>Documenter.jl</strong></a>, <a href="https://vitepress.dev" target="_blank"><strong>VitePress</strong></a> and <a href="https://luxdl.github.io/DocumenterVitepress.jl/stable" target="_blank"><strong>DocumenterVitepress.jl</strong></a><br>Released under the MIT License. Powered by the <a href="https://www.julialang.org">Julia Programming Language</a>.<br>',
+      message: 'Made with <a href="https://documenter.juliadocs.org/stable/" target="_blank"><strong>Documenter.jl</strong></a>, <a href="https://vitepress.dev" target="_blank"><strong>VitePress</strong></a> and <a href="https://luxdl.github.io/DocumenterVitepress.jl/stable" target="_blank"><strong>DocumenterVitepress.jl</strong></a><br>Released under the <a href="https://github.com/SpeedyWeather/SpeedyWeather.jl/blob/main/LICENSE" target="_blank"><strong>EUPL License</strong></a>. Powered by the <a href="https://www.julialang.org">Julia Programming Language</a>.<br>',
       copyright: `© Copyright ${new Date().getUTCFullYear()}.`,
     },
   },

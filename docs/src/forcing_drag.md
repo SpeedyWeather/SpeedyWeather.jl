@@ -7,14 +7,14 @@ as defined in [Vallis et al., 2004](https://doi.org/10.1175/1520-0469(2004)061%3
 
 ```math
 \begin{aligned}
-\frac{\partial \zeta}{\partial t} &+ \nabla \cdot (\mathbf{u}(\zeta + f)) =
+\frac{\partial \zeta}{\partial t} &+ \nabla \cdot [\mathbf{u}(\zeta + f)] =
 S - r\zeta - \nu\nabla^{4}\zeta \\
-S_{l, m}^i &= A(1-\exp(-2\tfrac{\Delta t}{\tau}))Q^i_{l, m} + \exp(-\tfrac{dt}{\tau})S_{l, m}^{i-1} \\
+S_{l, m}^i &= A\left[1-\exp\left(-2\tfrac{\Delta t}{\tau}\right)\right]Q^i_{l, m} + \exp\left(-\tfrac{\Delta t}{\tau}\right)S_{l, m}^{i-1} \\
 \end{aligned}
 ```
 
-So there is a term `S` that is supposed to force the vorticity equation in the
-[Barotropic vorticity model]. However, this term is also stochastically
+So there is a term ``S`` that is supposed to force the vorticity equation in the
+[Barotropic vorticity model](@ref barotropic_vorticity_model). However, this term is also stochastically
 evolving in time, meaning we have to store the previous time steps, ``i-1``,
 in spectral space, because that's where the forcing is defined: for degree
 ``l`` and order ``m`` of the spherical harmonics. ``A`` is a real amplitude.
@@ -66,7 +66,7 @@ using SpeedyWeather
 end
 ```
 
-So, first the scalar parameters, are added as fields of type `NF` (you could harcode `Float64` too)
+So, first the scalar parameters, are added as fields of type `NF` (you could hardcode `Float64` too)
 with some default values as suggested in the
 [Vallis et al., 2004](https://doi.org/10.1175/1520-0469(2004)061%3C0264:AMASDM%3E2.0.CO;2) paper.
 In order to be able to define the default values, we add the `@kwdef` macro
@@ -81,7 +81,7 @@ field, which does not have a default but will be initialised with the help of a 
 as explained later. So once we call `StochasticStirring{NF}(trunc=31)` then `S` will automatically
 have the right size.
 
-Then we also see in the definition of `S` that there are prefactors ``A(1-\exp(-2\tfrac{\Delta t}{\tau}))``
+Then we also see in the definition of `S` that there are prefactors ``A[1-\exp(-2\tfrac{\Delta t}{\tau})]``
 which depend on the forcing's parameters but also on the time step, which, at the time of the creation
 of `StochasticStirring` we might not know about! And definitely do not want to hardcode in.
 So to illustrate what you can do in this case we define two additional parameters `a, b` that
@@ -101,7 +101,7 @@ zero. For this we want to define a latitudinal mask `lat_mask` that is a vector 
 the number of latitude rings. Similar to `S`, we want to allocate it with zeros (or any other
 value for that matter), but then precompute this mask in the `initialize!` step. For this
 we need to know `nlat` at creation time meaning we add this field similar as to how we added
-`trunc`. This mask requires the parameters `latitude` (it's position) and a `width` which
+`trunc`. This mask requires the parameters `latitude` (its position) and a `width` which
 are therefore also added to the definition of `StochasticStirring`.
 
 ## Custom forcing: generator function
@@ -171,7 +171,7 @@ use parameters from other components. For example, the definition of the `S` ter
 includes the time step ``\Delta t``, which should be pulled from the `model.time_stepping`.
 We also pull the `Grid` and its resolution parameter `nlat_half` (see [Grids](@ref))
 to get the latitudes with `get_latd` from the `RingGrids` module. Alternatively,
-we could have used `model.geometry.latd` which is contains a bunch of similar arrays
+we could have used `model.geometry.latd` which contains a bunch of similar arrays
 describing the geometry of the grid we use and at its given resolution.
 
 Note that `initialize!` is expected to be read and write on the `forcing` argument
@@ -211,18 +211,16 @@ considered read-only when applying a forcing.
 `vars.tendencies` contains the tendencies (in grid and spectral space) and
 `vars.prognostic` contains the prognostic variables in spectral space, including
 `vars.prognostic.clock.time` the current time for time-dependent forcing.
-The third argument has to be of the type of our new custom forcing, here `StochasticStirring`,
-so that multiple dispatch calls the correct method of `forcing!`. The forth argument is of type
+The second argument has to be of the type of our new custom forcing, here `StochasticStirring`,
+so that multiple dispatch calls the correct method of `forcing!`. The third argument is the leapfrog index `lf` which after the first time step will
+be `lf=2` to denote that tendencies are evaluated at the current time not at the previous time (how leapfrogging works). Unless you want to read the prognostic variables, for which
+you need to know whether to read `lf=1` or `lf=2`, you can ignore this (but need to include it as argument). The forth argument is of type
 `AbstractModel`, so that the forcing can also make use of anything inside `model`, e.g.
 `model.geometry` or `model.planet` etc. But you can be more restrictive to define a forcing only
 for the `BarotropicModel` for example, use `model::Barotropic` in that case.
 Or you could define two methods, one for `Barotropic` one for all other models with
 `AbstractModel` (not `Barotropic` as a more specific method is prioritised with multiple
-dispatch). The 5th argument is the leapfrog index `lf` which after the first time step will
-be `lf=2` to denote that tendencies are evaluated at the current time not at the previous time
-(how leapfrogging works). Unless you want to read the prognostic variables, for which
-you need to know whether to read `lf=1` or `lf=2`, you can ignore this (but need to include
-it as argument).
+dispatch). 
 
 As you can see, for now not much is actually happening inside this function,
 this is what is often called a function barrier, the only thing we do in here
@@ -293,7 +291,7 @@ For details, please see [Declare variables](@ref).
 
 Scratch arrays have an undefined state as any component is free to use
 them and write data into it. In that sense, they should be treated as
-write-before-read for example to store and intermediate result. You also
+write-before-read for example to store an intermediate result. You also
 should expect them to be overwritten momentarily once the function concludes
 and no information will remain. The only exception are situations where
 a model component implements two functions that are directly called

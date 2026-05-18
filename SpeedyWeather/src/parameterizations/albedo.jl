@@ -2,7 +2,7 @@
 Albedo structs should be defined as MyAlbedo <: AbstractAlbedo and implement the following interface:
 
 - `initialize!(albedo::MyAlbedo, model)`
-- `albedo!(ij, vars::Variables, albedo::MyAlbedo, model)`
+- `albedo!(ij, albedofield, vars::Variables, albedo::MyAlbedo, model)`
 
 `initialize!` is as for every model component but in contrast to other parameterizations albedos
 should not implement `parameterization!` but rather `albedo!`, which is called from within `parameterization!`.

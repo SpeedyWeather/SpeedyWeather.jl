@@ -6,7 +6,7 @@ using JLD2
     spectral_grid = SpectralGrid(trunc = 5, nlayers = 1)
 
     # write-restart false is important to not mutate the final state in the simulation object
-    output = JLD2Output(output_dt = Hour(6), path = tmp_output_path, id = "jld2-test", write_restart = false)
+    output = JLD2Output(interval = Hour(6), path = tmp_output_path, id = "jld2-test", write_restart = false)
     model = BarotropicModel(; spectral_grid, output)
     simulation = initialize!(model)
     run!(simulation, period = Day(1), output = true)
@@ -48,7 +48,7 @@ end
 
     # only save prognostic and grid groups
     output = JLD2Output(
-        output_dt = Hour(6),
+        interval = Hour(6),
         path = tmp_output_path,
         id = "jld2-groups",
         write_restart = false,
@@ -76,7 +76,7 @@ end
 @testset "ArrayOutput" begin
     spectral_grid = SpectralGrid(trunc = 5, nlayers = 1)
 
-    output = ArrayOutput(output_dt = Hour(6))
+    output = ArrayOutput(interval = Hour(6))
     model = BarotropicModel(; spectral_grid, output)
     simulation = initialize!(model)
     run!(simulation, period = Day(1), output = true)
@@ -114,7 +114,7 @@ end
     spectral_grid = SpectralGrid(trunc = 5, nlayers = 1)
 
     # only save prognostic group
-    output = ArrayOutput(output_dt = Hour(6), groups = (:prognostic,))
+    output = ArrayOutput(interval = Hour(6), groups = (:prognostic,))
     model = BarotropicModel(; spectral_grid, output)
     simulation = initialize!(model)
     run!(simulation, period = Day(1), output = true)

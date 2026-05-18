@@ -48,8 +48,8 @@ velocity at departure time ``i`` and location ``\mathbf{x}_i`` and at a
 ```math
 \begin{aligned}
 \mathbf{x}^\star_{i+1} &= \mathbf{x}_i + \Delta t~\mathbf{u}_i (\mathbf{x}_i) \\
-\mathbf{x}_{i+1} &= \mathbf{x}_i + \frac{\Delta t}{2}~\left(
-    \mathbf{u}_i (\mathbf{x}_i) + \mathbf{u}_{i+1} (\mathbf{x}^\star_{i+1})\right)
+\mathbf{x}_{i+1} &= \mathbf{x}_i + \frac{\Delta t}{2} \left[
+    \mathbf{u}_i (\mathbf{x}_i) + \mathbf{u}_{i+1} (\mathbf{x}^\star_{i+1})\right]
 \end{aligned}
 ```
 
@@ -69,8 +69,8 @@ on the time step that goes from ``i-1`` to ``i``.
 ```math
 \begin{aligned}
 \mathbf{x}^\star_{i+1} &= \mathbf{x}_i + \Delta t~\mathbf{u}_i (\mathbf{x}_i) \\
-\mathbf{x}_{i+1} &= \mathbf{x}_i + \frac{\Delta t}{2}~\left(
-    \mathbf{u}_i (\mathbf{x}_i) + \mathbf{u}_{i+1} [\mathbf{x}^\star_{i+1}]\right) \\
+\mathbf{x}_{i+1} &= \mathbf{x}_i + \frac{\Delta t}{2} \left[
+    \mathbf{u}_i (\mathbf{x}_i) + \mathbf{u}_{i+1} [\mathbf{x}^\star_{i+1}]\right] \\
 \mathbf{u}_{i+1} (\mathbf{x}_{i+1}) &=  \mathbf{u}_{i+1} [\mathbf{x}_{i+1}]
 \end{aligned}
 ```

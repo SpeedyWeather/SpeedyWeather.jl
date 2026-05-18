@@ -171,6 +171,6 @@ end
 
         # Conservation of mass is violated here by removing excess snow above the depth cap,
         # but we do it at the end here to avoid that excess adding to the melt rate
-        snow_depth[ij] = min(snow_depth_forward, snow_depth_cap) 
+        snow_depth[ij] = min(snow_depth_forward, snow_depth_cap)
     end
 end
