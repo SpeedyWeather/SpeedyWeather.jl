@@ -107,8 +107,6 @@ function SpeedyTransforms.transform!(
         initialize::Bool = false,
     )
 
-    vor_grid = vars.grid.vorticity
-    div_grid = vars.grid.divergence
     pres_grid = vars.grid.pressure
     u_grid = vars.grid.u
     v_grid = vars.grid.v
@@ -122,12 +120,10 @@ function SpeedyTransforms.transform!(
     vor = get_step(vars.prognostic.vorticity, lf)         # relative vorticity at leapfrog step lf
     div = get_step(vars.prognostic.divergence, lf)         # divergence at leapfrog step lf
     temp = get_step(vars.prognostic.temperature, lf)       # temperature at leapfrog step lf
-    pres = get_step(vars.prognostic.pressure, lf)       # logarithm of surface pressure at leapfrog step lf
 
     if model isa PrimitiveWet                       # dry model don't have humidity variables
         humid_grid = vars.grid.humidity
         humid_grid_prev = vars.grid.humidity_prev
-        humid = get_step(vars.prognostic.humidity, lf) # humidity at leapfrog step lf
     end
 
     scratch_memory = vars.scratch.transform_memory
@@ -155,13 +151,15 @@ function SpeedyTransforms.transform!(
         end
     end
 
-    transform!(vor_grid, vor, scratch_memory, S)    # get vorticity on grid from spectral vor
-    transform!(div_grid, div, scratch_memory, S)    # get divergence on grid from spectral div
-    transform!(temp_grid, temp, scratch_memory, S)  # -- temperature --
-    transform!(pres_grid, pres, scratch_memory, S)  # -- pressure --
+    # Mega-batched spec→grid for the prognostic state: one call covers vorticity, divergence,
+    # temperature, pressure (and humidity for PrimitiveWet). The fused parents pack their
+    # members along axis 2 in matching declaration order, so slot k of `vars.fused.prognostic`
+    # maps to slot k of `vars.fused.grid` (enforced by `_assert_fuse_alignment` at construction).
+    prog_parent = parent(vars.fused.prognostic)
+    grid_parent = parent(vars.fused.grid)
+    transform!(grid_parent, get_step(prog_parent, lf), scratch_memory, S)
 
     if model isa PrimitiveWet
-        transform!(humid_grid, humid, scratch_memory, S)
         hole_filling!(humid_grid, model.hole_filling, model)  # remove negative humidity
     end
 
