@@ -225,7 +225,7 @@ CairoMakie or GtkMakie to be loaded at the time of calling this function.
 Takes the same keyword arguments as [`SpeedyWeather.animate`](@ref).
 """
 function SpeedyWeather.animate(simulation::Simulation; kwargs...)
-    DatasetType = SpeedyWeather.dataset_type(simulation.output)
+    DatasetType = SpeedyWeather.dataset_type(simulation.model.output)
     return animate(DatasetType, SpeedyWeather.get_output_path(simulation); kwargs...)
 end
 
