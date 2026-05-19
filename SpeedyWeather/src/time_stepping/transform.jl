@@ -96,6 +96,44 @@ function SpeedyTransforms.transform!(
 end
 
 """$(TYPEDSIGNATURES)
+Save the current grid-space state into the `_prev` snapshots used by vertical advection and
+parameterizations, uses the fused variables."""
+function save_prev!(vars::Variables, model::PrimitiveEquation)
+    uv_grid = vars.fused.uv_grid
+    grid = vars.fused.grid
+    grid_prev = vars.fused.grid_prev
+
+    uv_grid_data = parent(uv_grid).data
+    grid_data = parent(grid).data
+    grid_prev_data = parent(grid_prev).data
+
+    # (u, v) → (u_prev, v_prev)
+    uv_range = first(uv_grid.slot_map.u):last(uv_grid.slot_map.v)
+    uv_prev_range = first(grid_prev.slot_map.u_prev):last(grid_prev.slot_map.v_prev)
+    copyto!(view(grid_prev_data, :, uv_prev_range),
+            view(uv_grid_data,   :, uv_range))
+
+    # (temperature, [pressure], [humidity]) → (temperature_prev, [pressure_prev], [humidity_prev]).
+    tail_range = first(grid.slot_map.temperature):size(grid_data, 2)
+    tail_prev_range = first(grid_prev.slot_map.temperature_prev):size(grid_prev_data, 2)
+    copyto!(view(grid_prev_data, :, tail_prev_range),
+            view(grid_data,      :, tail_range))
+
+    # pres_prev is stored in Pa (linear), not log(Pa)
+    @. vars.grid.pressure_prev = exp(vars.grid.pressure)
+
+    # Tracers are not part of the fuse — keep per-variable broadcasts.
+    for (name, tracer) in model.tracers
+        if tracer.active
+            name_prev = Symbol(name, :_prev)
+            vars.grid.tracers[name_prev] .= vars.grid.tracers[name]
+        end
+    end
+
+    return nothing
+end
+
+"""$(TYPEDSIGNATURES)
 Propagate the spectral state of the prognostic variables of `vars` to the
 grid variables in `vars` for primitive equation models. Updates grid vorticity,
 grid divergence, grid temperature, pressure (`pres_grid`) and the velocities
@@ -107,23 +145,12 @@ function SpeedyTransforms.transform!(
         initialize::Bool = false,
     )
 
-    pres_grid = vars.grid.pressure
-    u_grid = vars.grid.u
-    v_grid = vars.grid.v
-    temp_grid = vars.grid.temperature
-
-    pres_grid_prev = vars.grid.pressure_prev
-    u_grid_prev = vars.grid.u_prev
-    v_grid_prev = vars.grid.v_prev
-    temp_grid_prev = vars.grid.temperature_prev
-
     vor = get_step(vars.prognostic.vorticity, lf)         # relative vorticity at leapfrog step lf
     div = get_step(vars.prognostic.divergence, lf)         # divergence at leapfrog step lf
     temp = get_step(vars.prognostic.temperature, lf)       # temperature at leapfrog step lf
 
     if model isa PrimitiveWet                       # dry model don't have humidity variables
         humid_grid = vars.grid.humidity
-        humid_grid_prev = vars.grid.humidity_prev
     end
 
     scratch_memory = vars.scratch.transform_memory
@@ -132,23 +159,11 @@ function SpeedyTransforms.transform!(
     V = vars.scratch.b                              # U = u*coslat, V=v*coslat
     S = model.spectral_transform
 
-    # retain previous time step for vertical advection and parameterizations
-    if initialize == false                          # only store prev after initial step
-        @. u_grid_prev = u_grid
-        @. v_grid_prev = v_grid
-        @. temp_grid_prev = temp_grid
-        @. pres_grid_prev = exp(pres_grid)
-
-        if model isa PrimitiveWet
-            @. humid_grid_prev = humid_grid
-        end
-
-        for (name, tracer) in model.tracers
-            if tracer.active
-                name_prev = Symbol(name, :_prev)
-                vars.grid.tracers[name_prev] .= vars.grid.tracers[name]
-            end
-        end
+    # retain previous time step for vertical advection and parameterizations.
+    # On the initial step there is no "previous" state yet — defer until after the spec→grid
+    # below so the snapshot captures the *current* grid state.
+    if !initialize
+        save_prev!(vars, model)
     end
 
     # Mega-batched spec→grid for the prognostic state: one call covers vorticity, divergence,
@@ -180,21 +195,7 @@ function SpeedyTransforms.transform!(
     geopotential!(vars, model)                  # calculate geopotential
 
     if initialize   # at initial step store prev <- current
-        @. u_grid_prev = u_grid
-        @. v_grid_prev = v_grid
-        @. temp_grid_prev = temp_grid
-        @. pres_grid_prev = exp(pres_grid)      # store pressure in Pa not log(Pa) for parameterizations
-
-        if model isa PrimitiveWet
-            @. humid_grid_prev = humid_grid
-        end
-
-        for (name, tracer) in model.tracers
-            if tracer.active
-                name_prev = Symbol(name, :_prev)
-                vars.grid.tracers[name_prev] .= vars.grid.tracers[name]
-            end
-        end
+        save_prev!(vars, model)
     end
 
     for (name, tracer) in model.tracers
