@@ -34,7 +34,7 @@ struct SpectralTransform{
 
     # GRID
     grid::GridType                  # grid used, including nlat_half for resolution, indices for rings, etc.
-    nlayers::IntType                # number of layers in the vertical (for scratch memory size)
+    nlayers::IntType                # max number of layers in the vertical (= maximum(keys(rfft_plans)); for scratch memory size)
 
     # CORRESPONDING GRID SIZE
     nlon_max::IntType               # Maximum number of longitude points (at Equator)
@@ -50,13 +50,13 @@ struct SpectralTransform{
     # NORMALIZATION
     norm_sphere::NF                 # normalization of the l=0, m=0 mode
 
-    # FFT plans, one plan for each latitude ring, batched in the vertical
-    rfft_plans::Vector{AbstractFFTs.Plan}   # FFT plan for grid to spectral transform
-    brfft_plans::Vector{AbstractFFTs.Plan}  # spectral to grid transform (inverse)
-
-    # FFT plans, but unbatched
-    rfft_plans_1D::Vector{AbstractFFTs.Plan}
-    brfft_plans_1D::Vector{AbstractFFTs.Plan}
+    # FFT plans keyed by batch size K. For each planned K, value is a length-nlat_half vector
+    # of per-ring plans. K=1 entry is the per-layer fallback (used by `_fourier_serial!`).
+    # FFTW/cuFFT plans bake K into the plan at construction, so a single K-plan cannot be reused
+    # for a different K. Hot K values (mega-batched dycore transforms, prognostic spec→grid, U/V,
+    # single-layer) are pre-planned; everything else falls back to the K=1 plan in a loop.
+    rfft_plans::Dict{Int, Vector{AbstractFFTs.Plan}}   # grid → spectral (forward) FFT plans
+    brfft_plans::Dict{Int, Vector{AbstractFFTs.Plan}}  # spectral → grid (inverse) FFT plans
 
     # LEGENDRE POLYNOMIALS, for all latitudes, precomputed
     legendre_polynomials::LowerTriangularArrayType
@@ -91,9 +91,13 @@ function SpectralTransform(
         spectrum::AbstractSpectrum,                     # Spectral truncation
         grid::AbstractGrid;                             # grid used and resolution, e.g. FullGaussianGrid
         NF::Type{<:Real} = DEFAULT_NF,                                                  # Number format NF
-        nlayers::Integer = DEFAULT_NLAYERS,                                             # number of layers in the vertical (for scratch memory size)
+        nlayers::Integer = DEFAULT_NLAYERS,                                             # max layer count (scratch sizing); kept as kwarg for back-compat
+        transform_batch::AbstractVector{<:Integer} = Int[1, nlayers],                   # list of batch sizes K to pre-plan FFTs for
         LegendreShortcut::Type{<:AbstractLegendreShortcut} = LegendreShortcutLinear,    # shorten Legendre loop over order m
     )
+    # Normalize the batch list: dedup, sort, always include 1 (the serial fallback needs it).
+    planned_K = sort!(unique!(Int[1; transform_batch; nlayers]))
+    nlayers = maximum(planned_K)   # scratch is sized for the largest planned batch
     (; lmax, mmax, architecture) = spectrum                       # 1-based spectral truncation order and degree
 
     ArrayType = array_type(architecture)
@@ -140,16 +144,14 @@ function SpectralTransform(
     # SCRATCH MEMORY FOR FOURIER NOT YET LEGENDRE TRANSFORMED AND VICE VERSA
     scratch_memory = ScratchMemory(NF, architecture, grid, nlayers)
 
-    rfft_plans = Vector{AbstractFFTs.Plan}(undef, nlat_half)
-    brfft_plans = Vector{AbstractFFTs.Plan}(undef, nlat_half)
-    rfft_plans_1D = Vector{AbstractFFTs.Plan}(undef, nlat_half)
-    brfft_plans_1D = Vector{AbstractFFTs.Plan}(undef, nlat_half)
+    rfft_plans = Dict{Int, Vector{AbstractFFTs.Plan}}()
+    brfft_plans = Dict{Int, Vector{AbstractFFTs.Plan}}()
 
     fake_grid_data = on_architecture(architecture, zeros(NF, grid, nlayers))
 
-    # PLAN THE FFTs
+    # PLAN THE FFTs for each batch size K in `planned_K`
     plan_FFTs!(
-        rfft_plans, brfft_plans, rfft_plans_1D, brfft_plans_1D,
+        rfft_plans, brfft_plans, planned_K,
         fake_grid_data, scratch_memory.north, rings, nlons
     )
 
@@ -200,7 +202,7 @@ function SpectralTransform(
         nlon_max, nlons, nlat, rings,
         coslat, coslat⁻¹, lon_offsets,
         norm_sphere,
-        rfft_plans, brfft_plans, rfft_plans_1D, brfft_plans_1D,
+        rfft_plans, brfft_plans,
         legendre_polynomials,
         scratch_memory,
         jm_index_size, kjm_indices,

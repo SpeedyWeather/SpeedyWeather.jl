@@ -1,21 +1,22 @@
-# function barrier for batched or serial transforms as FFTW plans cannot be reused for fewer vertical layers
+# Function barrier for batched or serial transforms. FFTW/cuFFT plans bake the batch dim K
+# into the plan, so we look up a pre-planned bundle by K = size(field, 2) and fall back to
+# the serial path (K=1 plan, looped) when no batched plan exists for that K.
 function _fourier!(f_north, f_south, field::AbstractField, S::SpectralTransform)
-    _fourier! = if size(field, 2) == S.nlayers > 1
-        _fourier_batched!
+    K = size(field, 2)
+    if K > 1 && haskey(S.rfft_plans, K)
+        return _fourier_batched!(f_north, f_south, field, S)
     else
-        _fourier_serial!
+        return _fourier_serial!(f_north, f_south, field, S)
     end
-    return _fourier!(f_north, f_south, field, S)
 end
 
-# function barrier for batched or serial transforms as FFTW plans cannot be reused for fewer vertical layers
 function _fourier!(field::AbstractField, f_north, f_south, S::SpectralTransform)
-    _fourier! = if size(field, 2) == S.nlayers > 1
-        _fourier_batched!
+    K = size(field, 2)
+    if K > 1 && haskey(S.brfft_plans, K)
+        return _fourier_batched!(field, f_north, f_south, S)
     else
-        _fourier_serial!
+        return _fourier_serial!(field, f_north, f_south, S)
     end
-    return _fourier!(field, f_north, f_south, S)
 end
 
 """$(TYPEDSIGNATURES)
@@ -31,9 +32,8 @@ function _apply_batched_fft!(
         ilons::UnitRange{Int};
         not_equator::Bool = true
     )
-    (; rfft_plans) = S              # pre-planned transforms
-    rfft_plan = rfft_plans[j]       # FFT planned wrt nlon on ring
     nlayers = size(field, 2)        # number of vertical layers
+    rfft_plan = S.rfft_plans[nlayers][j]  # plan pre-built for this K and this ring
 
     # Perform the FFT
     if not_equator # skip FFT, redundant when north already did that latitude
@@ -62,9 +62,8 @@ function _apply_batched_fft!(
         ilons::UnitRange{Int};
         not_equator::Bool = true
     )
-    (; brfft_plans) = S             # pre-planned transforms
-    brfft_plan = brfft_plans[j]     # FFT planned wrt nlon on ring
     nlayers = size(field, 2)        # number of vertical layers
+    brfft_plan = S.brfft_plans[nlayers][j]  # plan pre-built for this K and this ring
     nfreq = nlon ÷ 2 + 1
 
     if not_equator  # skip FFT, redundant when north already did that latitude
@@ -73,7 +72,7 @@ function _apply_batched_fft!(
     return nothing
 end
 
-# Forward FFT Application Function for serial FFT
+# Forward FFT Application Function for serial FFT (K=1 plans, applied per layer)
 function _apply_serial_fft!(
         f_out::AbstractArray{<:Complex, 3},
         field::AbstractField,
@@ -84,9 +83,8 @@ function _apply_serial_fft!(
         ilons::UnitRange{Int};
         not_equator::Bool = true
     )
-    (; rfft_plans_1D) = S           # pre-planned transforms
-    rfft_plan = rfft_plans_1D[j]    # FFT planned wrt nlon on ring
-    k_grid = eachlayer(field)[k]    # Precomputed ring index (as a Cartesian index)
+    rfft_plan = S.rfft_plans[1][j]   # K=1 plan, FFT planned wrt nlon on ring
+    k_grid = eachlayer(field)[k]     # Precomputed ring index (as a Cartesian index)
 
     if not_equator
         view(f_out, 1:nfreq, k, j) .= rfft_plan * view(field.data, ilons, k_grid)
@@ -96,7 +94,7 @@ function _apply_serial_fft!(
     return nothing
 end
 
-# Inverse FFT Application Function for serial FFT
+# Inverse FFT Application Function for serial FFT (K=1 plans, applied per layer)
 function _apply_serial_fft!(
         field::AbstractField,
         g_in::AbstractArray{<:Complex, 3},
@@ -107,9 +105,8 @@ function _apply_serial_fft!(
         ilons::UnitRange{Int};
         not_equator::Bool = true
     )
-    (; brfft_plans_1D) = S              # pre-planned transforms
-    brfft_plan = brfft_plans_1D[j]      # FFT planned wrt nlon on ring
-    k_grid = eachlayer(field)[k]        # Precomputed ring index (as a Cartesian index)
+    brfft_plan = S.brfft_plans[1][j]   # K=1 plan, FFT planned wrt nlon on ring
+    k_grid = eachlayer(field)[k]       # Precomputed ring index (as a Cartesian index)
 
     if not_equator
         view(field.data, ilons, k_grid) .= brfft_plan * view(g_in, 1:nfreq, k, j)
@@ -134,7 +131,7 @@ function _fourier_batched!(                 # GRID TO SPECTRAL
 
     @assert eltype(field) == eltype(S) "Number format of grid $(eltype(field)) and SpectralTransform $(eltype(S)) need too match."
     @boundscheck ismatching(S, field) || throw(DimensionMismatch(S, field))
-    @boundscheck nlayers == S.nlayers || throw(DimensionMismatch(S, field))
+    @boundscheck haskey(S.rfft_plans, nlayers) || throw(DimensionMismatch(S, field))
     @boundscheck size(f_north) == size(f_south) == (S.nfreq_max, S.nlayers, nlat_half) || throw(DimensionMismatch(S, field))
 
     return @inbounds for j_north in 1:nlat_half    # symmetry: loop over northern latitudes only
@@ -209,7 +206,7 @@ function _fourier_batched!(                 # SPECTRAL TO GRID
     nlayers = size(field, 2)                # number of vertical layers
 
     @boundscheck ismatching(S, field) || throw(DimensionMismatch(S, field))
-    @boundscheck nlayers == S.nlayers || throw(DimensionMismatch(S, field))     # otherwise FFTW complains
+    @boundscheck haskey(S.brfft_plans, nlayers) || throw(DimensionMismatch(S, field))   # otherwise FFTW complains
     @boundscheck size(g_north) == size(g_south) == (S.nfreq_max, S.nlayers, nlat_half) || throw(DimensionMismatch(S, field))
 
     return @inbounds for j_north in 1:nlat_half    # symmetry: loop over northern latitudes only
@@ -268,33 +265,47 @@ function _fourier_serial!(                  # SPECTRAL TO GRID
 end
 
 """$(TYPEDSIGNATURES)
-Util function to generate FFT plans based on the array type of the fake Grid 
-data provided. Uses views, which is less allocate-y than indexing but breaks 
-when using CuArrays (see CUDA extension for alternative implementation for 
-CuArrays)."""
+Generate per-ring FFT plans for each batch size K in `planned_K` and store them in
+`rfft_plans[K]` / `brfft_plans[K]`. FFTW/cuFFT plans bake K into the plan at construction;
+a plan built for one K cannot be reused for a different K, so one plan-vector per hot
+K is needed. The K=1 entry is the per-layer fallback used by `_fourier_serial!`.
+
+`fake_grid_data` must have `size(_, 2) ≥ maximum(planned_K)` so that the per-K views below
+into its data array are valid; in practice the caller sizes it to the max K (= `S.nlayers`)."""
 function plan_FFTs!(
-        rfft_plans::Vector{AbstractFFTs.Plan},
-        brfft_plans::Vector{AbstractFFTs.Plan},
-        rfft_plans_1D::Vector{AbstractFFTs.Plan},
-        brfft_plans_1D::Vector{AbstractFFTs.Plan},
+        rfft_plans::Dict{Int, Vector{AbstractFFTs.Plan}},
+        brfft_plans::Dict{Int, Vector{AbstractFFTs.Plan}},
+        planned_K::AbstractVector{<:Integer},
         fake_grid_data::AbstractField{NF, N, <:AbstractArray{NF}},
         scratch_memory_north::AbstractArray{Complex{NF}},
         rings,
         nlons::Vector{<:Int}
     ) where {NF <: AbstractFloat, N}
 
-    # For each ring generate an FFT plan (for all layers and for a single layer)
-    for (j, nlon) in enumerate(nlons)
-        real_matrix_input = view_only_on_cpu(fake_grid_data.data, rings[j], :)
-        complex_matrix_input = view_only_on_cpu(scratch_memory_north, 1:(nlon ÷ 2 + 1), :, j)
-        real_vector_input = view_only_on_cpu(fake_grid_data.data, rings[j], 1)
-        complex_vector_input = view_only_on_cpu(scratch_memory_north, 1:(nlon ÷ 2 + 1), 1, j)
+    nlat_half = length(nlons)
 
-        rfft_plans[j] = AbstractFFTs.plan_rfft(real_matrix_input, 1)
-        brfft_plans[j] = AbstractFFTs.plan_brfft(complex_matrix_input, nlon, 1)
-        rfft_plans_1D[j] = AbstractFFTs.plan_rfft(real_vector_input, 1)
-        brfft_plans_1D[j] = AbstractFFTs.plan_brfft(complex_vector_input, nlon, 1)
+    for K in planned_K
+        rfft_K = Vector{AbstractFFTs.Plan}(undef, nlat_half)
+        brfft_K = Vector{AbstractFFTs.Plan}(undef, nlat_half)
+
+        for (j, nlon) in enumerate(nlons)
+            if K == 1
+                # 1D plans: a single layer (vector input), no batch dim
+                real_input = view_only_on_cpu(fake_grid_data.data, rings[j], 1)
+                complex_input = view_only_on_cpu(scratch_memory_north, 1:(nlon ÷ 2 + 1), 1, j)
+            else
+                # batched plans for K layers (matrix input, batched over the trailing dim)
+                real_input = view_only_on_cpu(fake_grid_data.data, rings[j], 1:K)
+                complex_input = view_only_on_cpu(scratch_memory_north, 1:(nlon ÷ 2 + 1), 1:K, j)
+            end
+
+            rfft_K[j] = AbstractFFTs.plan_rfft(real_input, 1)
+            brfft_K[j] = AbstractFFTs.plan_brfft(complex_input, nlon, 1)
+        end
+
+        rfft_plans[K] = rfft_K
+        brfft_plans[K] = brfft_K
     end
 
-    return rfft_plans, brfft_plans, rfft_plans_1D, brfft_plans_1D
+    return rfft_plans, brfft_plans
 end

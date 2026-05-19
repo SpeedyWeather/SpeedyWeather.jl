@@ -107,9 +107,11 @@ struct SpectralGrid{
     nlayers::IntType
 
     # TRANSFORM BATCHING
-    "[OPTION] absolute number of layer slots the SpectralTransform scratch is sized for 
-    The maximum total slot count any single batched `transform!` call may carry. Defaults to `4*nlayers + 1`."
-    transform_batch::IntType
+    "[OPTION] list of batch sizes K to pre-plan FFTs for. Each distinct K requires its own
+    FFTW/cuFFT plan (plans bake the batch dim at construction). The K=1 entry (always added)
+    is the per-layer fallback. The Legendre / column scratch is
+    sized to `maximum(transform_batch)`. Default: `[1, nlayers, 2*nlayers, 4*nlayers + 1]`"
+    transform_batch::Vector{Int}
 end
 
 function Base.show(io::IO, SG::SpectralGrid)
@@ -149,7 +151,7 @@ function SpectralGrid(;
         Grid::Type{<:AbstractGrid} = DEFAULT_GRID,
         dealiasing::Real = 2,
         nlayers::Int = DEFAULT_NLAYERS,
-        transform_batch::Int = default_transform_batch(nlayers),
+        transform_batch::AbstractVector{<:Integer} = default_transform_batch(nlayers),
     )
 
     # Convert architecture to instance if it is a type
@@ -180,7 +182,7 @@ function SpectralGrid(
         NF::Type{<:AbstractFloat} = DEFAULT_NF,
         dealiasing::Real = 2,
         nlayers::Int = DEFAULT_NLAYERS,
-        transform_batch::Int = default_transform_batch(nlayers),
+        transform_batch::AbstractVector{<:Integer} = default_transform_batch(nlayers),
     )
     architecture = grid.architecture
     trunc = SpeedyTransforms.get_truncation(grid, dealiasing)
@@ -195,7 +197,7 @@ function SpectralGrid(
         grid::AbstractGrid,
         dealiasing,
         nlayers::Int,
-        transform_batch::Int = 1,
+        transform_batch::AbstractVector{<:Integer} = Int[1],
     )
     @assert spectrum.architecture == grid.architecture "Architecture of grid and spectrum must match"
 
@@ -234,6 +236,10 @@ function SpectralGrid(
     # use Nothing as a dummy type, it's not actually working
     ParticleVectorType = typeof(architecture) <: ReactantDevice ? Nothing : array_type(architecture, Particle{NF}, 1)
 
+    # Normalize transform_batch: always include 1 (serial fallback) and the model's nlayers,
+    # dedup and sort.
+    transform_batch = sort!(unique!(Int[1; nlayers; transform_batch]))
+
     # Create the SpectralGrid with all fields
     return SpectralGrid{typeof(architecture), typeof(spectrum), typeof(grid), typeof(nlat_half), Float32}(
         NF,
@@ -269,27 +275,30 @@ end
 (M::Type{<:AbstractModel})(SG::SpectralGrid; kwargs...) = M(; spectral_grid = SG, kwargs...)
 
 """$(TYPEDSIGNATURES)
-Generator function for a SpectralTransform struct pulling in parameters from a SpectralGrid struct."""
+Generator function for a SpectralTransform struct pulling in parameters from a SpectralGrid struct.
+The list of batch sizes `transform_batch` is forwarded directly so the SpectralTransform
+pre-plans FFTs for each K (see `plan_FFTs!`)."""
 function (::Type{S})(
         spectral_grid::SpectralGrid;
         one_more_degree::Bool = true,
-        transform_batch::Integer = spectral_grid.transform_batch,
+        transform_batch::AbstractVector{<:Integer} = spectral_grid.transform_batch,
         kwargs...
     ) where {S <: SpeedyTransforms.AbstractSpectralTransform}
     (; NF, spectrum, grid) = spectral_grid
     (; lmax, mmax, architecture) = spectrum
     spectrum = one_more_degree == false ? Spectrum(lmax - 1, mmax; architecture) : spectrum
-    # Size the SpectralTransform scratch to fit the largest single batched call.
-    # `transform_batch` is the absolute number of layer slots to allocate scratch for.
-    return S(spectrum, grid; NF, nlayers = transform_batch, kwargs...)
+    # Pre-plan FFTs for every batch size K in the list. The largest K also sizes the
+    # Legendre / column scratch via `nlayers = maximum(transform_batch)` inside the
+    # SpectralTransform constructor.
+    return S(spectrum, grid; NF, nlayers = maximum(transform_batch), transform_batch, kwargs...)
 end
 
 """$(TYPEDSIGNATURES)
-Default `transform_batch` for a `SpectralGrid`: enough layer slots to fit the mega-batched
-prognostic spec→grid transform of PrimitiveEquation models (4 4D variables — vorticity,
-divergence, temperature, humidity — plus 1 3D variable, pressure).
+Default `transform_batch` for a `SpectralGrid`: the list of FFT batch sizes K to pre-plan.
+Covers single-layer fallback (`1`), one variable (`L`), two variables
+(`2L`), and all prognostic variables together (`4L + 1`). 
 """
-default_transform_batch(nlayers::Integer) = 4 * nlayers + 1
+default_transform_batch(nlayers::Integer) = Int[1, nlayers, 2 * nlayers, 4 * nlayers + 1]
 
 function variables(::SpeedyTransforms.AbstractSpectralTransform)
     return (

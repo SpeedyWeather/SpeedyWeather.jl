@@ -18,9 +18,11 @@ import SpeedyTransforms: _fourier!
 
 # Computes the scale for the adjoint/pullback of all discrete Fourier transforms.
 function adjoint_scale(S::SpectralTransform)
-    (; nlons, rfft_plans) = S
+    (; nlons) = S
     (; nlat_half) = S.grid
-    nfreqs = [rfft_plan.osz[1] for rfft_plan in rfft_plans] # TODO: This works with FFTW, but does it with cuFFT as well?
+    # The K=1 plan vector (always built) is sufficient to read each ring's nfreq.
+    rfft_plans_1D = S.rfft_plans[1]
+    nfreqs = [rfft_plan.osz[1] for rfft_plan in rfft_plans_1D] # TODO: This works with FFTW, but does it with cuFFT as well?
 
     scale = zeros(Int, maximum(nfreqs), 1, nlat_half) # the scratch memory is (Freq x lvl x lat), so we insert
     # an additional dimension here for easier matrix multiply
