@@ -109,11 +109,25 @@ function output!(output::JLD2Output, simulation::AbstractSimulation)
     return output_jld2!(output, simulation)
 end
 
+# Fused tendency/scratch fields share storage via SubArray views. JLD2 cannot
+# round-trip a Field/LTA whose data is a SubArray (the on-disk schema captures
+# the view's parent indirectly, which is brittle). Materialize any view-backed
+# array into an independent copy before handing the snapshot to JLD2.
+materialize_views(x) = x
+materialize_views(nt::NamedTuple) = NamedTuple{keys(nt)}(map(materialize_views, values(nt)))
+materialize_views(vars::Variables) = isempty(vars.fused) ? vars : Variables(;
+    (k => materialize_views(getfield(vars, k)) for k in fieldnames(Variables))...
+)
+materialize_views(f::Field) = f.data isa SubArray ? Field(Array(f.data), f.grid) : f
+function materialize_views(L::LowerTriangularArray)
+    return L.data isa SubArray ? LowerTriangularArray(Array(L.data), L.spectrum) : L
+end
+
 function output_jld2!(output::JLD2Output, simulation::AbstractSimulation)
     output.output_counter += 1
     i = output.output_counter
     snapshot = filter_groups(simulation.variables, output)
-    output.jld2_file["$i"] = on_architecture(CPU(), snapshot)
+    output.jld2_file["$i"] = materialize_views(on_architecture(CPU(), snapshot))
     return nothing
 end
 
