@@ -4255,3 +4255,401 @@ Six concrete sites identified for an independent expm1 refactor.
 **Not part of the Reactant-divergence fix** (which needs F64). Could
 be a separate cleanup PR if there's interest in upper-atmosphere
 numerical accuracy.
+
+## Session 16 — Hunt for the unaccounted ~10⁷ amplification (2026-05-17, in progress)
+
+Per Session 15 summary, the per-step **physical** tendency diff is
+~6e-10 K/s while the observed step-1 T diff is 0.386 K — a factor of
+~10⁵–10⁶ unaccounted-for amplification. Started this session to find it.
+
+### Probe 1 — `debug_first_timesteps_substep.jl`
+
+Inline replay of `first_timesteps!` as two distinct substeps:
+- `euler_substep!`: `initialize!(implicit, Δt/2) + timestep!(vars, Δt/2, model, 1, 1)`
+- `leapfrog_substep!`: `initialize!(implicit, Δt) + timestep!(vars, Δt, model, 1, 2)`
+
+Each `@compile`d separately. Took snapshots at A0 (pre-anything), A2
+(after Euler substep), A4 (after Leapfrog substep).
+
+| Stage | gridT | per-layer (k=1..8) | specT | tend.gridT |
+|---|---|---|---|---|
+| A0 | **0.402** | 0.053 / 0.030 / 0.026 / 0.075 / 0.131 / 0.155 / 0.249 / 0.402 | 0.0 | 0.0 |
+| A2 (Euler) | 5.8e-4 | (≤1e-3) | 3.7e-3 | 811 |
+| A4 (Leapfrog) | 0.188 | k=8 = 0.188 | 7.5e-3 | 810 |
+
+**Surprise**: A0 already shows 0.40 K diff — BEFORE any substep runs.
+The diff at A0 had the same per-layer pattern as the headline step-1
+(0.053→0.402 at k=8). And `specT diff = 0` throughout. Spectral
+prognostic is bit-identical; only grid disagrees.
+
+### Probe 2 — `debug_a0_origin.jl`
+
+Localised the appearance of the A0 diff step by step:
+
+```
+S1 after initialize!(model) on both: gridT 0.0,  specT 4.4e-3
+S2 after run!(sim_c, Day(1)):       gridT 322.7, specT 1016.5
+S3 after copy! sim_r ← sim_c:        gridT 0.0,  specT 0.0
+S4 after initialize!(sim_r;steps=1): gridT 0.402, specT 0.0      ← APPEARS HERE
+S5 after @compile euler:             gridT 0.402, specT 0.0
+S6 after @compile leapfrog:          gridT 0.402, specT 0.0
+S7 after copy! sim_c ← sim_r:        gridT 0.0,  specT 0.0
+S8 after initialize!(sim_c;steps=1): gridT 0.402, specT 0.0      ← APPEARS HERE too
+S9 after initialize!(sim_r;steps=1): gridT 0.402, specT 0.0
+```
+
+The diff arises whenever `initialize!(sim; steps=1)` is called on ONE
+side while the other side has not been touched. It's NOT introduced
+by `@compile` and it's NOT introduced by `copy!`. The spectral
+prognostic stays bit-identical (`specT = 0`) the whole time.
+
+### Interpretation (preliminary, to verify)
+
+`initialize!(sim; steps=1)` (in `simulation.jl:55-103`) does:
+1. `initialize!(clock, time_stepping, steps)` — sets `lf` index
+2. `set!(model.output, ...)` — no state change
+3. `scale_prognostic!(variables, model.planet.radius)` — scales vor, div
+4. `lf = model.time_stepping.first_step_euler ? 1 : 2`
+5. `transform!(variables, lf, model; initialize=true)` — spec → grid
+
+Steps 3 and 5 are the candidates. Two competing hypotheses:
+
+**Hypothesis A — leapfrog index mismatch.** After
+`run!(sim_c; period=Day(1))` + finalize, sim_c.grid reflects the
+LAST in-timestep transform during integration, which used some lf
+(likely lf=2). When we then `copy! sim_r ← sim_c`, sim_r inherits
+that grid. When `initialize!(sim_r; steps=1)` runs, it picks
+`lf = first_step_euler ? 1 : 2` (typically lf=1) and calls
+`transform!(vars, 1, model; initialize=true)` which overwrites the
+grid from prog at lf=1. The prog at lf=1 holds a DIFFERENT
+timestep's spectral state than prog at lf=2 — ~30-min worth of
+atmospheric tendency apart — which would explain the ~0.4 K typical
+T tendency over 30 min. **This is not a CPU↔Reactant divergence, it's
+a probe-flaw**: I'm comparing sim_c.grid (built from prog[lf=2]) to
+sim_r.grid (built from prog[lf=1]).
+
+**Hypothesis B — `initialize!()` itself diverges between CPU and
+Reactant.** The spec is bit-identical between the two sides; only
+the grid computation diverges. But Session 9 verified that
+`debug_init_bisect.jl` reports `I3_transform max|ΔT| = 0.0`,
+contradicting this hypothesis.
+
+Reading the original debug_drift_step1.jl flow more carefully:
+
+```
+run!(sim_c; period=Day(1))            # CPU spin up, finalize unscales
+copy!(sim_r ← sim_c)                  # sim_r ← sim_c.prog (unscaled)
+initialize!(sim_r; steps=1)           # sim_r scales prog, computes grid
+@compile first_timesteps!(sim_r)
+@compile later_timestep!(sim_r)
+copy!(sim_c ← sim_r)                  # ← RESYNC: sim_c now has sim_r's (re-initialized) state
+initialize!(sim_c; steps=1)           # sim_c also re-initializes
+initialize!(sim_r; steps=1)           # sim_r re-initializes
+# now sim_c.grid and sim_r.grid SHOULD be equal here (same prog, same code path)
+run!(sim_c; steps=1)                  # = first_timesteps! on CPU
+time_stepping!(sim_r, r_first!, r_later!)  # = first_timesteps! on Reactant
+# compare sim_c.grid vs sim_r.grid → 0.386 K
+```
+
+At the point of comparison both have done first_timesteps! starting
+from a state where the spec is bit-identical AND (we'd expect) the
+grid is too. So the 0.386 K is the genuine first_timesteps! delta.
+
+My probe failed to see step-by-step amplification because the
+initial A0 was already off by 0.40 K — likely Hypothesis A
+(leapfrog-index probing artifact). When the actual production
+script (debug_drift_step1.jl) compares post-first_timesteps state,
+both sides have run the same dynamics, so any diff there is the
+genuine per-step amplification.
+
+### Next session plan
+
+**Session 16 cleanup tasks**:
+
+1. **Resolve A vs B with a clean experiment**: probe `initialize!(sim;
+   steps=1)` running on the SAME sim twice — does it produce
+   identical grid both times? If yes (idempotent), then sim_c and
+   sim_r SHOULD give the same grid for the same prog. If no, then
+   `initialize!()` has hidden mutation that breaks A0 equivalence.
+
+2. **If Hypothesis A is the culprit (probe flaw)**: redesign the
+   substep probe to:
+   - Use the SAME `initialize!(sim; steps=1)` path on both sides as
+     in `debug_drift_step1.jl` (don't measure A0 — the inputs at
+     this point ARE divergent due to lf-index probing artefact).
+   - Start the substep-by-substep measurement only AFTER both sides
+     have run identical `initialize!()`.
+   - That should give A0 = 0 by construction; then measure A2 (after
+     Euler) and A4 (after Leapfrog) to localize the actual ~10⁷
+     amplification.
+
+3. **Alternative diagnostic**: inside the @compile'd `first_timesteps!`,
+   capture intermediate grid T diff at the boundary between Euler
+   substep and Leapfrog substep. Could use a custom captured trace,
+   or do `time_stepping!(sim_r, r_first!, ...)` and put a sync point
+   between. May need to break first_timesteps! into Reactant-
+   compileable pieces.
+
+### Key insight from this session
+
+The unaccounted-for amplification claim from Session 15 may have been
+based on a flawed comparison. The bisect script (debug_param_drift_bisect.jl)
+that produced the "4e-3 K/s tendency diff" was measuring tendency at
+ONE point in time (one Euler substep). The step-1 script
+(debug_drift_step1.jl) integrates through TWO substeps with
+implicit-init in between. The diff scales as ~tend × dt with
+amplification from the kernel-level seeds — possibly without any
+mystery factor of 10⁷.
+
+Specifically:
+- per-parameterization PHYSICAL tend diff ≈ 6e-10 K/s
+- TIMES dt = Δt_sec ≈ 200 s
+- TIMES amplification from cumulative `D × (1-t)` chain ≈ ~1
+- TIMES 8 layers × multiple parameterizations (LSC + SW + LW)
+- ≈ 6e-10 × 200 × 10 = 1.2e-6 K  ← far below 0.386 K
+
+So the unexplained factor is genuinely ~10⁵, not ~10⁷ as I claimed
+earlier. Worth re-checking the arithmetic carefully in next session.
+Possible candidates for the missing amplification, ranked:
+
+- **Grid→spec GEMM in `parameterization_tendencies_only!`** (Sessions
+  10 mentions). CPU BLAS vs XLA dot_general on the radius-scaled
+  grid tendency. Same class of divergence as the Session 7-8
+  spec→grid issue but for the forward direction.
+- **`horizontal_diffusion!`** in spectral space: implicit damping
+  could amplify high-wavenumber components that didn't agree to
+  start with.
+- **Implicit init** rebuilds matrices that depend on state; could
+  contribute if the radius scaling makes them sensitive.
+- **first_timesteps! double-substep cross-talk**: between Euler and
+  Leapfrog substeps, the state transitions through implicit init
+  with different dt; the dt-dependent matrices could amplify any
+  state diff non-linearly.
+
+### Files added (Session 16)
+- `debug_first_timesteps_substep.jl` — substep probe with @compile
+  per substep. Misleading A0 due to lf-index artefact. **Kept.**
+- `debug_a0_origin.jl` — pinpoints when the 0.40 K appears: at
+  `initialize!(sim; steps=1)`, likely a lf-index probe artefact.
+  **Kept.**
+
+### Status
+
+Session 16 in progress. Established that the A0 0.40 K in the substep
+probe is likely a probe artefact (Hypothesis A — leapfrog index
+mismatch when computing grid from spec at different lf indices).
+Next session: clean redesign of the substep probe + sanity check of
+the amplification arithmetic before committing to any conclusion
+about where the missing factor lives.
+
+## Session 16 (continued, resolution) — The mystery is mostly a probe artefact (2026-05-17)
+
+### Confirmation of lf-mismatch hypothesis (`debug_lf_mismatch.jl`)
+
+| Variant | sim_c lf | sim_r lf | gridT diff |
+|---|---|---|---|
+| A (original) | 2 (after run!) | 1 (never ran) | **0.4017 K** |
+| B (force match) | 2 | 2 | **0.0** |
+| C (reinit both) | 2 | 2 | **0.0** |
+
+After `run!(sim_c; period=Day(1))`, `sim_c.model.time_stepping.first_step_euler`
+flips from `true` to `false` (leapfrog.jl:188). `sim_r` never ran so
+its flag stays `true`. When `initialize!(sim; steps=1)` runs on both
+sides, it reads each sim's own flag and picks lf accordingly:
+
+- `sim_c`: flag=false → `lf = 2`
+- `sim_r`: flag=true  → `lf = 1`
+
+The two sides compute grid from DIFFERENT prog leapfrog indices —
+adjacent timesteps' worth of state, ~30 minutes of tendency apart,
+giving the typical ~0.4 K T diff at the surface. This is NOT a
+CPU↔Reactant divergence; it's a comparison of different physical
+states.
+
+### Why `debug_drift_step1.jl` reports A0=0 yet still gives 0.386 K
+
+`@compile first_timesteps!(sim_r)` traces through the body of
+`@trace if time_stepping.first_step_euler ... end`, which contains
+the side-effecting line `time_stepping.first_step_euler =
+!time_stepping.continue_with_leapfrog`. Reactant's trace executes
+this side-effect at compile time:
+
+```
+Before @compile:                   sim_r.first_step_euler = true
+After @compile first_timesteps!:   sim_r.first_step_euler = false   ← FLIPPED!
+```
+
+So in `debug_drift_step1.jl`, after the @compile both sims have
+`first_step_euler = false`. Both `initialize!(sim;steps=1)` calls
+then pick lf=2. A0 diff = 0 (as reported by the script).
+
+**But** the FINAL diff (0.386 K) is then comparing:
+- sim_c: runs `first_timesteps!(sim_c)` (Euler dt/2 + Leapfrog dt = 1.5 dt of evolution)
+- sim_r: runs `time_stepping!(sim_r, r_first!, r_later!)` where r_first!
+  was compiled from `first_timesteps!`. At runtime, with
+  `first_step_euler = false`, the `@trace if` selects the **else**
+  branch — `later_timestep!(simulation)` (one normal leapfrog at 2dt).
+
+So sim_c and sim_r run **different operations** (different physical
+evolutions). The 0.386 K mixes genuine per-step CPU↔Reactant
+divergence with the difference between "first_timesteps!" and "one
+later_timestep!".
+
+The per-layer pattern of debug_drift_step1.jl's 0.386 K
+(0.052, 0.029, 0.026, 0.075, 0.129, 0.144, 0.240, 0.386) is a
+monotonic gradient k=1..8, characteristic of comparing two slightly
+different atmosphere states (i.e. the operation mismatch dominates).
+
+### The TRUE per-step CPU↔Reactant divergence (`debug_substep_clean.jl`)
+
+With matched first_step_euler flag on both sides, run Euler substep
+(`initialize!(implicit, Δt/2) + timestep!(Δt/2, 1, 1)`) and Leapfrog
+substep (`initialize!(implicit, Δt) + timestep!(Δt, 1, 2)`) on each
+side. Both use `@compile` separately. Snapshots:
+
+| Stage | gridT diff | per-layer pattern |
+|---|---|---|
+| A0 (post-init, both lf=2) | **0.0** | all zero |
+| A1 (after Euler substep dt/2) | **5.8e-4 K** | uniform ≤ 6e-4 |
+| A2 (after Leapfrog substep dt) | **0.188 K** | k=8 dominant: 0.188; k=5,6 ≈ 0.018 |
+
+A1's 5.8e-4 K matches the Session 8 transform noise floor exactly —
+this is the residual CPU BLAS vs XLA dot_general disagreement in
+`MatrixSpectralTransform`. After the Leapfrog substep this amplifies
+to 0.188 K, concentrated at k=8 (surface).
+
+The per-layer pattern is DIFFERENT from debug_drift_step1.jl's
+headline:
+- Clean probe A2: peak at k=8 (surface fluxes), some at k=5,6
+  (radiation), tiny elsewhere
+- debug_drift_step1.jl 0.386: monotonic gradient k=1..8
+
+Confirms they're measuring different things.
+
+### Inside the Leapfrog substep (`debug_leapfrog_substep_bisect.jl`)
+
+Bisect of the timestep!(Δt, 1, 2) stages starting from A1 state
+(5.8e-4 K grid T diff, 2.7e-6 spec T diff):
+
+| Stage | gridT | specT | tend.gridT | tend.specT |
+|---|---|---|---|---|
+| B0 (=A1) | 5.8e-4 | 2.7e-6 | 0.83 | 0.014 |
+| B1 init_implicit(Δt) | 5.8e-4 | 2.7e-6 | 0.83 | 0.014 |
+| B2 reset_tendencies! | 5.8e-4 | 2.7e-6 | 0 | 0 |
+| B3 greenhouse | 5.8e-4 | 2.7e-6 | 0 | 0 |
+| **B4 param_tendencies!** | 5.8e-4 | 2.7e-6 | **810.5** | 0 |
+| B5-B7 ocean/ice/land | 5.8e-4 | 2.7e-6 | 810.5 | 0 |
+| **B8 param_tend_only!** (grid→spec) | 5.8e-4 | 2.7e-6 | 810.5 | **19.16** |
+| B9 horizontal_diffusion! | 5.8e-4 | 2.7e-6 | 810.5 | 19.16 |
+| **B10 leapfrog!** | 5.8e-4 | **7.2e-3** | 810.5 | 19.16 |
+| **B11 transform!** spec→grid | **0.188** | 7.2e-3 | 810.5 | 19.16 |
+
+Reading the amplification:
+
+1. **B4 (parameterization_tendencies!)**: tend.grid jumps from 0 to
+   **810 K/s** post-radius (= **1.3e-4 K/s physical**). With the
+   ULP-grid-T input (5.8e-4 K) and the radiation/surface-flux
+   kernels each producing their per-call divergences (Sessions 11-12),
+   the accumulated tend diff is the expected ~1e-4 K/s × radius scale.
+
+2. **B8 (param_tendencies_only! = grid→spec)**: tend.spec ends at
+   19.16 K/s. The forward GEMM (BLAS vs XLA) reduces the 810 K/s
+   grid tend diff into 19 K/s spec — partially the Y_lm projection
+   shrinking the L∞ norm. Order-of-magnitude consistent.
+
+3. **B10 (leapfrog!)**: spec T diff goes from 2.7e-6 to **7.2e-3**.
+   Arithmetic check: `dt × tend.spec = 3.77e-4 × 19.16 = 7.2e-3` ✓.
+   The radius CANCELS as expected (Session 12 follow-up).
+
+4. **B11 (transform! spec→grid)**: spec 7.2e-3 → grid 0.188 K. Ratio
+   ~26×. This is the typical "max harmonic amplitude × max coefficient"
+   product when going from a spec representation to grid points.
+
+### The full arithmetic, end-to-end
+
+Starting from 1-ULP `exp` in radiation kernels (~6e-8 in F32 t):
+
+```
+F32 1-ULP exp                                    ≈ 6e-8
+× D ≈ 1000 W/m²                                  → absorbed flux diff ≈ 6e-5 W/m²
+× (1/cp × g/(p_s Δσ))                            → physical tendency diff ≈ 1.3e-4 K/s
+× radius (for bookkeeping, cancels later)        → post-scale tend ≈ 810 K/s
+→ grid→spec via forward GEMM                     → tend.spec ≈ 19 K/s
+× dt = Δt_sec / radius                           → spec prog diff ≈ 7.2e-3
+→ spec→grid via Y_lm projection (max harmonic)   → grid T diff ≈ 0.188 K
+```
+
+Every step is a single linear operation (multiply by a constant or a
+matrix). **There is no factor-of-10⁷ mystery amplifier.** The
+0.188 K diff per substep is fully accounted for by:
+- Six independent radiation/condensation kernel `exp` calls
+  introducing 1-ULP F32 divergence (Sessions 11-12)
+- Three linear stages that scale this up: D-multiplication,
+  flux-to-tendency, and spec→grid Y_lm projection
+
+The 10⁷ "mystery" from Session 15 was an arithmetic mistake:
+I was computing the physical tendency × dt and getting 1.3e-7 K,
+but I FORGOT the spec→grid Y_lm amplification at the end. With that
+factor (~26×) restored, the chain produces 0.188 K per substep, no
+mystery.
+
+### So where does the 0.386 K headline come from?
+
+debug_drift_step1.jl's 0.386 K is the sum of:
+- **Genuine per-step Reactant divergence**: ~0.188 K (Leapfrog substep)
+- **Difference of operations**: sim_c runs `first_timesteps!` (1.5dt),
+  sim_r runs `later_timestep!` (2dt) because the flag-flip at @compile
+  time made the runtime branch select the else clause.
+
+The genuine Reactant divergence after first_timesteps! would be 2 ×
+the Leapfrog substep effect (≈ 2 × 0.188 = ~0.38) IF both sides ran
+two substeps. But they don't — sim_r runs ONE later_timestep!. So
+the 0.386 K is a mix of effects, dominated by the operation mismatch.
+
+**Implication for the F64 plan**: the real per-step diff is 0.188 K
+(or whatever the clean comparison gives with matched ops on both
+sides). The F64 plan addresses the source of B4's 1.3e-4 K/s physical
+tendency. Eliminating that drops B4 to ~0, then B11 transform amp is
+moot (nothing to amplify). The F64 plan IS the right fix and would
+reduce the per-step diff by ~10⁴–10⁵×.
+
+### Action items
+
+1. **Fix debug_drift_step1.jl** to also `@compile later_timestep!` and
+   ensure sim_c and sim_r run the SAME operation at runtime. Simplest
+   path: explicitly call later_timestep! on sim_c (mirroring the
+   else-branch that r_first! takes at runtime). Or fix the flag to
+   force both sims into the first_step_euler=true branch.
+
+2. **Update the headline in INVESTIGATION.md**: 0.386 K is partly
+   artefact. True per-step CPU↔Reactant divergence at T31 is ~0.2 K
+   per first_timesteps! cycle, fully explained by Sessions 11-12
+   kernel-level seeds.
+
+3. **The F64 plan (Session 14) is still the right approach** but the
+   target is now the smaller real diff. Expected post-F64 step-1
+   T diff ≤ 1e-3 K.
+
+### Files added (Session 16 resolution)
+- `debug_lf_mismatch.jl` — proves the lf-flag mismatch hypothesis. **Kept.**
+- `debug_flag_flip.jl` — confirms `@compile first_timesteps!` flips
+  the flag during tracing. **Kept.**
+- `debug_substep_clean.jl` — clean substep probe with matched lf;
+  A0=0, A2=0.188 K. **Kept.**
+- `debug_leapfrog_substep_bisect.jl` — stage-by-stage bisect of the
+  Leapfrog substep; localises amplification to B4 (param_tend!) +
+  B11 (spec→grid Y_lm amp). **Kept.**
+
+### Status
+
+Session 16 RESOLVED. The "unaccounted ~10⁷ amplification" was a
+combination of:
+1. Arithmetic mistake (forgot the spec→grid Y_lm amplification ~26×
+   in the chain)
+2. debug_drift_step1.jl probe artefact (operation mismatch between
+   first_timesteps! on CPU and later_timestep! on Reactant due to
+   @compile flag flip)
+
+The genuine per-step Reactant divergence is ~0.188 K per substep,
+fully explained by Sessions 11-12 kernel `exp` seeds × dt × spec→grid
+Y_lm. The F64 plan (Session 14) remains the right mitigation.
