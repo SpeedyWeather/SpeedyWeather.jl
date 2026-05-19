@@ -168,9 +168,12 @@ function SpeedyTransforms.transform!(
     # V = v*coslat =  coslat*∂ϕ/∂lat + ∂Ψ/dlon
     UV_from_vordiv!(U, V, vor, div, S)
 
-    # transform from U, V in spectral to u, v on grid (U, V = u, v*coslat)
-    transform!(u_grid, U, scratch_memory, S, unscale_coslat = true)
-    transform!(v_grid, V, scratch_memory, S, unscale_coslat = true)
+    # Batched spec→grid for the velocities: the general-purpose `:spectral_scratch` fuse packs
+    # `(:a, :b)` (here holding U, V) into one Spectral3D parent, and `:uv_grid` packs `(:u, :v)`
+    # TODO: theoretically we could merge this with the other big transform and then unscale coslat
+    # seperately, shall we do that?
+    transform!(parent(vars.fused.uv_grid), parent(vars.fused.spectral_scratch), scratch_memory, S;
+               unscale_coslat = true)
 
     # include humidity effect into temp for everything stability-related
     temperature_average!(vars, temp, S)

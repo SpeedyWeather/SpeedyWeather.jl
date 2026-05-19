@@ -77,11 +77,12 @@ function variables(::Type{<:Barotropic}, nsteps)
         TendencyVariable(:v, Grid3D(), namespace = :grid, desc = "Tendency of meridional wind on the grid", units = "m/s²"),
 
         GridVariable(:vorticity, Grid3D(), desc = "Relative vorticity", units = "1/s", fuse = :grid),
-        GridVariable(:u, Grid3D(), desc = "Zonal wind", units = "m/s"),
-        GridVariable(:v, Grid3D(), desc = "Meridional wind", units = "m/s"),
+        GridVariable(:u, Grid3D(), desc = "Zonal wind", units = "m/s", fuse = :uv_grid),
+        GridVariable(:v, Grid3D(), desc = "Meridional wind", units = "m/s", fuse = :uv_grid),
 
-        ScratchVariable(:a, Spectral3D(), desc = "Scratch array", units = "?"),
-        ScratchVariable(:b, Spectral3D(), desc = "Scratch array", units = "?"),
+
+        ScratchVariable(:a, Spectral3D(), desc = "Scratch array", units = "?", fuse = :spectral_scratch),
+        ScratchVariable(:b, Spectral3D(), desc = "Scratch array", units = "?", fuse = :spectral_scratch),
     )
 end
 
