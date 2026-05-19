@@ -11,12 +11,12 @@ RingGrids.globe(geometry::Geometry; kwargs...) = globe(geometry.grid; kwargs...)
 
 """
 $(TYPEDSIGNATURES)
-Create an animation from a SpeedyWeather simulation NetCDF output file. Using 
+Create an animation from a SpeedyWeather simulation output file/store. Using 
 `GeoMakie.surface!` or `GeoMakie.heatmap!` or `GeoMakie.meshimage!` for plotting. Needs a backend like 
 CairoMakie or GtkMakie to be loaded at the time of calling this function.
 
 # Arguments
-- `nc_file::NCDataset`: NetCDF dataset containing SpeedyWeather simulation data
+- `ds::Any`: NCDataset or Zarr dataset containing SpeedyWeather simulation data
 - `variable::String = "temp"`: Variable to animate (e.g., "temp", "pres", "vorticity", "u", "v", "humid")
 - `level::Int = 1`: Vertical level to plot (for 3D variables)
 - `transient_timesteps::Int = 0`: Number of timesteps to skip at the beginning of the animation
@@ -50,14 +50,14 @@ animate(nc_file, variable="temp", projection="+proj=ortho +lon_0=0 +lat_0=30")
 ```
 """
 function SpeedyWeather.animate(
-        ds::NCDataset;
+        ds::Any;        # NCDataset or Zarr dataset
         variable::String = "temp",
-        level::Int = 1,
-        transient_timesteps::Int = 0,
+        layer::Integer = 1,
+        transient_timesteps::Integer = 0,
         output_file::String = "animation.mp4",
         plot_func = :meshimage,
         colormap = :viridis,
-        framerate::Int = 15,
+        framerate::Integer = 15,
         title::String = "",
         colorrange = nothing,
         projection = "+proj=robin",
@@ -121,7 +121,7 @@ function SpeedyWeather.animate(
 
     data = lift(fig.scene, tsteps) do tstep
         raw_slice = if is_3d
-            view(ds[variable], :, :, level, tstep)
+            view(ds[variable], :, :, layer, tstep)
         else
             view(ds[variable], :, :, tstep)
         end
@@ -141,7 +141,7 @@ function SpeedyWeather.animate(
         # Sample data to determine a good color range
         sample_indices = min(10, length(time))
 
-        sample_data = is_3d ? ds[variable].var[:, :, level, 1:sample_indices] : ds[variable].var[:, :, 1:sample_indices]
+        sample_data = is_3d ? ds[variable].var[:, :, layer, 1:sample_indices] : ds[variable].var[:, :, 1:sample_indices]
 
         # Calculate min and max across samples
         sample_data = filter(!isnan, sample_data)
@@ -205,11 +205,12 @@ CairoMakie or GtkMakie to be loaded at the time of calling this function.
 Takes the same keyword arguments as [`SpeedyWeather.animate`](@ref).
 """
 function SpeedyWeather.animate(
-        file_path::String;
+        ::Type{<:NCDataset},
+        path::String;
         kwargs...
     )
 
-    file = NCDataset(file_path)
+    file = NCDataset(path)
     output_file = animate(file; kwargs...)
     close(file)
 
@@ -223,30 +224,12 @@ Needs the output of a simulation with NetCDF output enabled and a backend like
 CairoMakie or GtkMakie to be loaded at the time of calling this function.
 Takes the same keyword arguments as [`SpeedyWeather.animate`](@ref).
 """
-function SpeedyWeather.animate(
-        simulation::Simulation;
-        kwargs...
-    )
-    # Extract the NetCDF file path from the simulation object
-    if simulation.model.output.active
-        nc_file = joinpath(simulation.model.output.run_path, simulation.model.output.filename)
-    else
-        error("NetCDF output is not active. Make sure the simulation has been run with NetCDF output enabled.")
-    end
-
-    # Check if the NetCDF file exists
-    if !isfile(nc_file)
-        error("NetCDF file $(nc_file) not found. Make sure the simulation has been run with NetCDF output enabled.")
-    end
-
-    # Call animate with the extracted file path
-    return animate(
-        nc_file;
-        kwargs...
-    )
+function SpeedyWeather.animate(simulation::Simulation; kwargs...)
+    DatasetType = SpeedyWeather.dataset_type(simulation.output)
+    return animate(DatasetType, SpeedyWeather.get_output_path(simulation); kwargs...)
 end
 
-# pragmetic longitude conversion from 0-360 to -180-180
+# pragmatic longitude conversion from 0-360 to -180-180
 function longitude_shift_180(lon::AbstractVector)
     if maximum(lon) > 185 # sometimes due to rounding we might get a value slightly above 180
         return lon .- 180

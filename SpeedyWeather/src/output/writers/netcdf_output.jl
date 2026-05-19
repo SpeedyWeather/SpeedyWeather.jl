@@ -68,6 +68,8 @@ $(TYPEDFIELDS)"""
     const field3Dland::Field3D
 end
 
+dataset_type(::NetCDFOutput) = NCDataset
+
 """
 $(TYPEDSIGNATURES)
 Constructor for NetCDFOutput based on `S::SpectralGrid` and optionally
