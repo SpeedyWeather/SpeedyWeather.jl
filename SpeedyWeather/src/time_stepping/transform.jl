@@ -167,9 +167,7 @@ function SpeedyTransforms.transform!(
     end
 
     # Mega-batched spec→grid for the prognostic state: one call covers vorticity, divergence,
-    # temperature, pressure (and humidity for PrimitiveWet). The fused parents pack their
-    # members along axis 2 in matching declaration order, so slot k of `vars.fused.prognostic`
-    # maps to slot k of `vars.fused.grid` (enforced by `_assert_fuse_alignment` at construction).
+    # temperature, pressure (and humidity for PrimitiveWet). 
     prog_parent = parent(vars.fused.prognostic)
     grid_parent = parent(vars.fused.grid)
     transform!(grid_parent, get_step(prog_parent, lf), scratch_memory, S)
