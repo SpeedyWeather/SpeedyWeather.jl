@@ -110,9 +110,9 @@ time_stepping = Leapfrog(spectral_grid, start_with_euler=true)
 and with `?Leapfrog` you see a summary of the fields, only manually change those marked `[OPTION]`.
 We will discuss some options in the following.
 
-```@example leapfrog
-@doc Leapfrog
-```
+````@docs; canonical=false
+Leapfrog
+````
 
 ## Change the time step
 

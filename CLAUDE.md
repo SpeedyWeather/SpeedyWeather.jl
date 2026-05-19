@@ -329,3 +329,23 @@ Every PR **must** add a line to `CHANGELOG.md` under the `## Unreleased` section
 ```
 
 Add it as the first bullet under `## Unreleased`.
+
+## Submodule Versioning
+
+Each of the 5 packages (`LowerTriangularArrays`, `RingGrids`, `SpeedyTransforms`,
+`SpeedyWeatherInternals`, `SpeedyWeather`) has its own `version = "..."` line in
+its `Project.toml`. When a PR modifies the source of a submodule, the version of
+that submodule must be bumped according to its size:
+
+- **Minor change** (bug fix, internal refactor, additive non-breaking feature):
+  append `+DEV` to the current version, e.g. `0.20.1` → `0.20.1+DEV`. The `+DEV`
+  tag accumulates until the next release, signalling "there are unreleased
+  changes on top of `0.20.1`".
+- **Bigger change** (breaking API change, new public type, major feature):
+  bump the version according to standard semantic versioning *and* append `-DEV`
+  e.g. `0.20.1` → `0.21.0-DEV`. The `-DEV` tag marks the new version as in-progress until
+  release.
+
+Bump the version of every submodule whose source you actually touched in the PR.
+A change confined to `SpeedyWeather/` does not require bumping
+`LowerTriangularArrays`, etc.

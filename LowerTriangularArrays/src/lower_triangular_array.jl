@@ -663,8 +663,14 @@ function Base.similar(L::LowerTriangularArray{S, N, ArrayType, SP}, ::Type{T}) w
     return LowerTriangularArray{T, N, ArrayType_{T, N}, SP}(similar(L.data, T), L.spectrum)
 end
 
-Base.similar(L::LowerTriangularArray{T, N, ArrayType, SP}, ::Type{T}) where {T, N, ArrayType, SP} =
-    LowerTriangularArray{T, N, ArrayType, SP}(similar(L.data, T), L.spectrum)
+function Base.similar(L::LowerTriangularArray{T, N, ArrayType, SP}, ::Type{T}) where {T, N, ArrayType, SP}
+    # If L.data is a SubArray (e.g. L is a view obtained through a fused parent), the
+    # fresh storage returned by `similar(L.data, T)` is a plain Array/CuArray — not a
+    # SubArray. Strip the parameters off ArrayType so the new LTA's type tag matches
+    # the actual array we hold.
+    ArrayType_ = nonparametric_type(ArrayType)
+    return LowerTriangularArray{T, N, ArrayType_{T, N}, SP}(similar(L.data, T), L.spectrum)
+end
 Base.similar(L::LowerTriangularArray{T}) where {T} = similar(L, T)
 
 Architectures.array_type(::Type{<:LowerTriangularArray{T, N, ArrayType}}) where {T, N, ArrayType} = ArrayType

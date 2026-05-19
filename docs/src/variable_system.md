@@ -131,3 +131,7 @@ simulation.variables.scratch.my_dict
 ```
 
 a dictionary as a variable!
+
+## Variable fusion 
+
+Variables can be "fused" together to be allocated as one block of contiguous memory. This is done primarly with GPU-optimiziation in mind, so that e.g. `transform!` calls can be batched together not just across levels, but also across different variables. All variables that are defined with the same `fuse = :fuse_name` keyword argument are allocated together. At the same time a `view` is defined that allows for the variable to be used as it would without the variable fusion. As this is primarily a performance optimization, it is not required to run basic custom parameterizations or model components. 

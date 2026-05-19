@@ -99,13 +99,36 @@ The bibtex entry for the paper is:
 }
 ```
 
+If you are using the differentiability of our model, please cite additionally 
+
+Moses, W. S., Cheng, G., Churavy, V., Gelbrecht, M., Klöwer, M., Kump, J., et al. (2026). DJ4Earth: Differentiable, and performance-portable Earth system modeling via program transformations. Journal of Advances in Modeling Earth Systems, 18, e2025MS005615. https://doi.org/10.1029/2025MS005615
+
+with the bibtex entry 
+
+```bibtex 
+@article{DJ4EarthJAMES,
+author = {Moses, William S. and Cheng, Gong and Churavy, Valentin and Gelbrecht, Maximilian and Klöwer, Milan and Kump, Joseph and Morlighem, Mathieu and Williamson, Sarah and Apte, Dhruv and Berg, Paul and Giordano, Mosè and Hill, Christopher and Loose, Nora and Montoison, Alexis and Narayanan, Sri Hari Krishna and Pal, Avik and Schanen, Michel and Silvestri, Simone and Wagner, Greg and Heimbach, Patrick},
+title = {DJ4Earth: Differentiable, and Performance-Portable Earth System Modeling via Program Transformations},
+journal = {Journal of Advances in Modeling Earth Systems},
+volume = {18},
+number = {5},
+pages = {e2025MS005615},
+keywords = {DJ4Earth, reverse-mode automatic differentiation, Earth system modeling, online learning, differentiable programming, hybrid data assimilation/machine learning},
+doi = {https://doi.org/10.1029/2025MS005615},
+url = {https://agupubs.onlinelibrary.wiley.com/doi/abs/10.1029/2025MS005615},
+eprint = {https://agupubs.onlinelibrary.wiley.com/doi/pdf/10.1029/2025MS005615},
+note = {e2025MS005615 2025MS005615},
+year = {2026}
+}
+```
+
 ## Funding
 
 MK received funding by the European Research Council under Horizon 2020 within the ITHACA project,
 grant agreement number 741112 from 2021-2022. From 2022-2024 this project was funded by the
 National Science Foundation NSF. From 2024-2025, the funding came from Schmidt Sciences LLC through
 MK's Eric & Wendy Schmidt AI in Science Fellowship. Since 2025, MK's funding is provided through
-a NERC Independent Research Fellowship under grant number UKRI191.
+a NERC Independent Research Fellowship under grant number UKRI191. MG acknowledges funding from the Volkswagen Foundation and the European Union’s Horizon Europe research and innovation programme ClimTip (grant agreement no. 101137601). 
 
 All other contributors bring in their own funding from various national and international
 grants which is highly acknowledged.

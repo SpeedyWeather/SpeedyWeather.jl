@@ -57,6 +57,9 @@ export spectral_truncation,
 # ANALYSIS
 export power_spectrum
 
+# UTILS 
+export wrapped_view
+
 include("aliasing.jl")
 include("legendre_shortcuts.jl")
 include("scratch_memory.jl")

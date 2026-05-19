@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Updated citations and funding information [#1100](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1100)
+- Allow for variables to be fused together (prelimnary work for GPU optiminization) [#1083](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1083)
+- Fixed docs broken layout due to `NetCDFOutput` by using @docs instead of @doc [#1098](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1098)
+- Enzyme is a weakdep again instead of dep (this was a mistake) [#1097](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1097)
 - Fixed several typos in the documentation [#1094](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1094)
 - Fixed a wrong reference in the documentation [#1092](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1092)
 - Variable system: rename function that allocates new variables from `Base.zero` to `allocate` [#1087](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1087)
