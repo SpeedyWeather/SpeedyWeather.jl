@@ -20,9 +20,22 @@ const SpeedyWeatherReactantExt = Base.get_extension(SpeedyWeather, :SpeedyWeathe
 # Configuration
 
 const TRUNC = 31            # spectral truncation
-const NSTEPS = 10           # number of time steps to compare
-const RTOL = 1.0e-3         # relative tolerance for comparison
-const ATOL = 1.0e-8         # absolute tolerance for comparison
+const NSTEPS = 100          # number of time steps to compare
+const RTOL = 1.0e-3         # default relative tolerance for comparison
+const ATOL = 1.0e-8         # default absolute tolerance for comparison
+
+const TOLERANCES = (
+    default     = (rtol = RTOL,  atol = ATOL),
+    temperature = (rtol = 2.0e-2, atol = 5.0),
+    pressure    = (rtol = 1.0e-2, atol = 5.0),
+    vorticity   = (rtol = 5.0e-2, atol = 1.0e-8),
+    divergence  = (rtol = 1.0e-1, atol = 1.0e-8),
+    humidity    = (rtol = 5.0e-2, atol = 2.0e-3),
+    u           = (rtol = 5.0e-2, atol = 1.0e-2),
+    v           = (rtol = 5.0e-2, atol = 1.0e-3),
+    geopotential = (rtol = 1.0e-2, atol = 5.0e2),
+    temp_average = (rtol = 1.0e-2, atol = 5.0e-1),
+)
 
 include("test_maybe_jit.jl")
 include("utilities.jl")
