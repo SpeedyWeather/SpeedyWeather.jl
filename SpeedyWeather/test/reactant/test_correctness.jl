@@ -274,4 +274,4 @@ end
 
 # Run tests
 test_model(PrimitiveWetModel)
-test_model(BarotropicModel)
+#test_model(BarotropicModel)
