@@ -260,10 +260,10 @@ function Variables(model::AbstractModel)
     end
 
     # Same requirement for the tendency-side fuse pair: a future mega-batched grid→spec
-    # transform of dycore tendencies will map slot k of `:tend_grid` to slot k of `:tend_spec`.
-    if haskey(fused, :tend_spec) && haskey(fused, :tend_grid)
-        _assert_fuse_alignment(fused.tend_spec, fused.tend_grid;
-                               name_a = :tend_spec, name_b = :tend_grid)
+    # transform of dycore tendencies will map slot k of `:grid_tendencies` to slot k of `:spectral_tendencies`.
+    if haskey(fused, :spectral_tendencies) && haskey(fused, :grid_tendencies)
+        _assert_fuse_alignment(fused.spectral_tendencies, fused.grid_tendencies;
+                               name_a = :spectral_tendencies, name_b = :grid_tendencies)
     end
 
     return Variables(; prognostic, grid, tendencies, dynamics, parameterizations, particles, scratch, fused)

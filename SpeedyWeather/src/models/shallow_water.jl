@@ -73,10 +73,13 @@ function variables(model::ShallowWater)
         GridVariable(:η, Grid2D(), desc = "Interface displacement", units = "m", fuse = :grid),
         GridVariable(:geopotential, Grid2D(), desc = "Geopotential", units = "m²/s²"),
 
-        TendencyVariable(:divergence, Spectral3D(), desc = "Tendency of divergence", units = "1/s²", fuse = :tend_spec),
-        TendencyVariable(:η, Spectral2D(), desc = "Tendency of interface displacement", units = "m/s", fuse = :tend_spec),
-        TendencyVariable(:divergence, Grid3D(), namespace = :grid, desc = "Tendency of divergence on the grid", units = "1/s²", fuse = :tend_grid),
-        TendencyVariable(:η, Grid2D(), namespace = :grid, desc = "Tendency of interface displacement on the grid", units = "m/s", fuse = :tend_grid),
+        TendencyVariable(:divergence, Spectral3D(), desc = "Tendency of divergence", units = "1/s²"),
+        TendencyVariable(:η, Spectral2D(), desc = "Tendency of interface displacement", units = "m/s"),
+        TendencyVariable(:divergence, Grid3D(), namespace = :grid, desc = "Tendency of divergence on the grid", units = "1/s²"),
+        TendencyVariable(:η, Grid2D(), namespace = :grid, desc = "Tendency of interface displacement on the grid", units = "m/s"),
+
+        DynamicsVariable(:kinetic_energy, Grid3D(), desc = "Kinetic energy intermediate, ½(u²+v²)+Φ", namespace = :grid, fuse = :grid_tendencies),
+        DynamicsVariable(:kinetic_energy, Spectral3D(), desc = "Kinetic energy intermediate in spectral space", fuse = :spectral_tendencies),
 
         ScratchVariable(:a, Grid3D(), desc = "Scratch array", namespace = :grid),
         ScratchVariable(:b, Grid3D(), desc = "Scratch array", namespace = :grid),

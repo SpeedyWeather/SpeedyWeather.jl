@@ -71,15 +71,17 @@ function variables(::Type{<:Barotropic}, nsteps)
         PrognosticVariable(:scale, ScalarDim(1), desc = "Scaling of vor and div in the dynamical core", units = "m"),
         PrognosticVariable(:vorticity, Spectral4D(nsteps), desc = "Relative vorticity", units = "1/s", fuse = :prognostic),
 
-        TendencyVariable(:vorticity, Spectral3D(), desc = "Tendency of relative vorticity", units = "1/s²", fuse = :tend_spec),
-        TendencyVariable(:vorticity, Grid3D(), namespace = :grid, desc = "Tendency of relative vorticity on the grid", units = "1/s²", fuse = :tend_grid),
-        TendencyVariable(:u, Grid3D(), namespace = :grid, desc = "Tendency of zonal wind on the grid", units = "m/s²"),
-        TendencyVariable(:v, Grid3D(), namespace = :grid, desc = "Tendency of meridional wind on the grid", units = "m/s²"),
+        TendencyVariable(:vorticity, Spectral3D(), desc = "Tendency of relative vorticity", units = "1/s²"), # tendencies are unfused as they are directly computed by a curl op
+        TendencyVariable(:vorticity, Grid3D(), namespace = :grid, desc = "Tendency of relative vorticity on the grid", units = "1/s²"),
+        TendencyVariable(:u, Grid3D(), namespace = :grid, desc = "Tendency of zonal wind on the grid", units = "m/s²", fuse = :grid_tendencies),
+        TendencyVariable(:v, Grid3D(), namespace = :grid, desc = "Tendency of meridional wind on the grid", units = "m/s²", fuse = :grid_tendencies),
+
+        TendencyVariable(:u, Spectral3D(), desc = "Tendency of zonal wind", units = "m/s²", fuse = :spectral_tendencies),
+        TendencyVariable(:v, Spectral3D(), desc = "Tendency of meridional wind", units = "m/s²", fuse = :spectral_tendencies),
 
         GridVariable(:vorticity, Grid3D(), desc = "Relative vorticity", units = "1/s", fuse = :grid),
         GridVariable(:u, Grid3D(), desc = "Zonal wind", units = "m/s", fuse = :uv_grid),
         GridVariable(:v, Grid3D(), desc = "Meridional wind", units = "m/s", fuse = :uv_grid),
-
 
         ScratchVariable(:a, Spectral3D(), desc = "Scratch array", units = "?", fuse = :spectral_scratch),
         ScratchVariable(:b, Spectral3D(), desc = "Scratch array", units = "?", fuse = :spectral_scratch),

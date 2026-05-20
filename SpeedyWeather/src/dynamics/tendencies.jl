@@ -470,8 +470,8 @@ function vordiv_tendencies!(
     # divergence and curl of that u, v_tend vector for vor, div tendencies
     vor_tend = vars.tendencies.vorticity
     div_tend = vars.tendencies.divergence
-    u_tend = vars.scratch.a
-    v_tend = vars.scratch.b
+    u_tend = vars.tendencies.u
+    v_tend = vars.tendencies.v
 
     transform!(u_tend, u_tend_grid, scratch_memory, S)
     transform!(v_tend, v_tend_grid, scratch_memory, S)
@@ -535,8 +535,8 @@ function parameterization_tendencies_only!(
     vor_tend = vars.tendencies.vorticity
     div_tend = vars.tendencies.divergence
     temp_tend = vars.tendencies.temperature
-    u_tend = vars.scratch.a
-    v_tend = vars.scratch.b
+    u_tend = vars.tendencies.u        # spec u-tendency (in :spectral_tendencies fuse, Phase B2)
+    v_tend = vars.tendencies.v        # spec v-tendency (in :spectral_tendencies fuse, Phase B2)
 
     transform!(u_tend, u_tend_grid, scratch_memory, S)
     transform!(v_tend, v_tend_grid, scratch_memory, S)
@@ -609,8 +609,12 @@ function temperature_tendency!(
 
     transform!(temp_tend, temp_tend_grid, scratch_memory, S)
 
-    # now add the -∇⋅((u, v)*T') term
-    flux_divergence!(temp_tend, temp, vars, G, S, add = true, flipsign = true)
+    # now add the -∇⋅((u, v)*T') term, using the named uT_anomaly/vT_anomaly slots (in the
+    # :spectral_tendencies/:grid_tendencies fuse) so the intermediates land in the dycore
+    # mega-batch backing array (Phase B3 will collapse all these transforms into one batched call).
+    flux_divergence!(temp_tend, temp, vars, G, S; add = true, flipsign = true,
+                     uA = vars.dynamics.uT_anomaly, vA = vars.dynamics.vT_anomaly,
+                     uA_grid = vars.dynamics.grid.uT_anomaly, vA_grid = vars.dynamics.grid.vT_anomaly)
     return nothing
 end
 
@@ -660,8 +664,12 @@ function humidity_tendency!(
     humid_tend_grid = vars.tendencies.grid.humidity
     humid = vars.grid.humidity
 
-    # add horizontal advection to parameterization + vertical advection tendencies
-    horizontal_advection!(humid_tend, humid_tend_grid, humid, vars, G, S, add = true)
+    # add horizontal advection to parameterization + vertical advection tendencies; pass uq/vq
+    # named slots (in :tend_spec/:tend_grid) so the flux_divergence! intermediates land in the
+    # mega-batch backing array.
+    horizontal_advection!(humid_tend, humid_tend_grid, humid, vars, G, S; add = true,
+                          uA = vars.dynamics.uq, vA = vars.dynamics.vq,
+                          uA_grid = vars.dynamics.grid.uq, vA_grid = vars.dynamics.grid.vq)
 
     return nothing
 end
@@ -698,6 +706,13 @@ function horizontal_advection!(
         G::Geometry,
         S::AbstractSpectralTransform;
         add::Bool = true,                   # add/overwrite A_tend_grid?
+        # Forwarded to `flux_divergence!`; named callers (humidity_tendency!) pass uq/vq slots
+        # from the :tend_spec/:tend_grid fuse. Defaults fall through to scratch.{a,b} for
+        # tracer_advection! and volume_flux_divergence!.
+        uA = vars.scratch.a,
+        vA = vars.scratch.b,
+        uA_grid = vars.scratch.grid.a,
+        vA_grid = vars.scratch.grid.b,
     )
 
     # barotropic model doesn't have divergence, the +A*div term is then zero
@@ -718,7 +733,8 @@ function horizontal_advection!(
     transform!(A_tend, A_tend_grid, scratch_memory, S)  # for +A*div in spectral space
 
     # now add the -∇⋅((u, v)*A) term
-    flux_divergence!(A_tend, A_grid, vars, G, S, add = true, flipsign = true)
+    flux_divergence!(A_tend, A_grid, vars, G, S; add = true, flipsign = true,
+                     uA, vA, uA_grid, vA_grid)
 
     return nothing
 end
@@ -752,16 +768,19 @@ function flux_divergence!(
         S::AbstractSpectralTransform;
         add::Bool = true,               # add result to A_tend or overwrite for false
         flipsign::Bool = true,          # compute -∇⋅((u, v)*A) (true) or ∇⋅((u, v)*A)?
+        # Named slots for the spec/grid intermediates u*A and v*A. Default to the unfused
+        # :a/:b scratches (used by tracer_advection!, volume_flux_divergence! for η);
+        # named callers (temperature_tendency!, humidity_tendency!) pass slots from the
+        # :spectral_tendencies/:grid_tendencies fuse parents (uT_anomaly/vT_anomaly, uq/vq)
+        # so the intermediates land in the mega-batch backing array.
+        uA = vars.scratch.a,            # = u*A in spectral
+        vA = vars.scratch.b,            # = v*A in spectral
+        uA_grid = vars.scratch.grid.a,  # = u*A on grid
+        vA_grid = vars.scratch.grid.b,  # = v*A on grid
     )
     (; u, v) = vars.grid
     scratch_memory = vars.scratch.transform_memory
     (; coslat⁻¹) = G
-
-    # reuse general work arrays a, b, a_grid, b_grid
-    uA = vars.scratch.a                 # = u*A in spectral
-    vA = vars.scratch.b                 # = v*A in spectral
-    uA_grid = vars.scratch.grid.a       # = u*A on grid
-    vA_grid = vars.scratch.grid.b       # = v*A on grid
 
     # Launch kernel to compute u*A and v*A with coslat scaling
     (; whichring) = A_grid.grid         # precomputed ring indices
@@ -840,8 +859,8 @@ function vorticity_flux_curldiv!(
 
     # divergence and curl of that u, v_tend vector for vor, div tendencies
     vor_tend = vars.tendencies.vorticity
-    u_tend = vars.scratch.a
-    v_tend = vars.scratch.b
+    u_tend = vars.tendencies.u        # spec u-tendency (in :spectral_tendencies fuse, Phase B2)
+    v_tend = vars.tendencies.v        # spec v-tendency (in :spectral_tendencies fuse, Phase B2)
 
     transform!(u_tend, u_tend_grid, scratch_memory, S)
     transform!(v_tend, v_tend_grid, scratch_memory, S)
@@ -912,8 +931,8 @@ function bernoulli_potential!(vars::Variables, model::ShallowWater)
     scratch_memory = vars.scratch.transform_memory
     (; u, v) = vars.grid
     Φ = vars.grid.geopotential
-    bernoulli = vars.scratch.a                                  # reuse work arrays a, a_grid
-    bernoulli_grid = vars.scratch.grid.a
+    bernoulli = vars.dynamics.kinetic_energy                    # named slot in :spectral_tendencies
+    bernoulli_grid = vars.dynamics.grid.kinetic_energy          # named slot in :grid_tendencies
     div_tend = vars.tendencies.divergence
 
     half = convert(eltype(bernoulli_grid), 0.5)
@@ -940,8 +959,8 @@ function bernoulli_potential!(
     (; u, v) = vars.grid
     scratch_memory = vars.scratch.transform_memory
     geopot = vars.dynamics.geopotential
-    bernoulli = vars.scratch.a                              # reuse work arrays a, a_grid
-    bernoulli_grid = vars.scratch.grid.a
+    bernoulli = vars.dynamics.kinetic_energy                # named slot in :spectral_tendencies
+    bernoulli_grid = vars.dynamics.grid.kinetic_energy      # named slot in :grid_tendencies
     div_tend = vars.tendencies.divergence
 
     # TODO
@@ -963,6 +982,8 @@ function bernoulli_potential!(
     ∇²!(div_tend, bernoulli, S, add = true, flipsign = true)    # add -∇²(½(u² + v²) + ϕ)
     return nothing
 end
+
+
 
 """$(TYPEDSIGNATURES)
 Computes the (negative) divergence of the volume fluxes `uh, vh` for the continuity equation, -∇⋅(uh, vh)."""
