@@ -109,8 +109,8 @@ struct SpectralGrid{
     # TRANSFORM BATCHING
     "[OPTION] list of batch sizes K to pre-plan FFTs for. Each distinct K requires its own
     FFTW/cuFFT plan (plans bake the batch dim at construction). The K=1 entry (always added)
-    is the per-layer fallback. The Legendre / column scratch is
-    sized to `maximum(transform_batch)`. Default: `[1, nlayers, 2*nlayers, 4*nlayers + 1]`"
+    is the per-layer fallback. The Legendre / column scratch is sized to
+    `maximum(transform_batch)`. Architecture-dependent default [`default_transform_batch`](@ref)."
     transform_batch::Vector{Int}
 end
 
@@ -151,7 +151,7 @@ function SpectralGrid(;
         Grid::Type{<:AbstractGrid} = DEFAULT_GRID,
         dealiasing::Real = 2,
         nlayers::Int = DEFAULT_NLAYERS,
-        transform_batch::AbstractVector{<:Integer} = default_transform_batch(nlayers),
+        transform_batch::AbstractVector{<:Integer} = default_transform_batch(architecture, nlayers),
     )
 
     # Convert architecture to instance if it is a type
@@ -182,7 +182,7 @@ function SpectralGrid(
         NF::Type{<:AbstractFloat} = DEFAULT_NF,
         dealiasing::Real = 2,
         nlayers::Int = DEFAULT_NLAYERS,
-        transform_batch::AbstractVector{<:Integer} = default_transform_batch(nlayers),
+        transform_batch::AbstractVector{<:Integer} = default_transform_batch(grid.architecture, nlayers),
     )
     architecture = grid.architecture
     trunc = SpeedyTransforms.get_truncation(grid, dealiasing)
@@ -276,29 +276,35 @@ end
 
 """$(TYPEDSIGNATURES)
 Generator function for a SpectralTransform struct pulling in parameters from a SpectralGrid struct.
-The list of batch sizes `transform_batch` is forwarded directly so the SpectralTransform
-pre-plans FFTs for each K (see `plan_FFTs!`)."""
+`transform_batch` is forwarded as the list of FFT batch sizes K to pre-plan."""
 function (::Type{S})(
         spectral_grid::SpectralGrid;
         one_more_degree::Bool = true,
         transform_batch::AbstractVector{<:Integer} = spectral_grid.transform_batch,
         kwargs...
     ) where {S <: SpeedyTransforms.AbstractSpectralTransform}
-    (; NF, spectrum, grid) = spectral_grid
+    (; NF, spectrum, grid, nlayers) = spectral_grid
     (; lmax, mmax, architecture) = spectrum
     spectrum = one_more_degree == false ? Spectrum(lmax - 1, mmax; architecture) : spectrum
-    # Pre-plan FFTs for every batch size K in the list. The largest K also sizes the
-    # Legendre / column scratch via `nlayers = maximum(transform_batch)` inside the
-    # SpectralTransform constructor.
-    return S(spectrum, grid; NF, nlayers = maximum(transform_batch), transform_batch, kwargs...)
+    # Scratch sized to the largest K the dycore can emit (PrimitiveWet's mega-batch) so any
+    # call ≤ this K works through `_fourier_serial!` even if K isn't pre-planned. `transform_batch`
+    # is independent — it just lists which Ks get a batched FFT plan.
+    scratch_nlayers = max(maximum(transform_batch), 4 * nlayers + 1)
+    return S(spectrum, grid; NF, nlayers = scratch_nlayers, transform_batch, kwargs...)
 end
 
 """$(TYPEDSIGNATURES)
-Default `transform_batch` for a `SpectralGrid`: the list of FFT batch sizes K to pre-plan.
-Covers single-layer fallback (`1`), one variable (`L`), two variables
-(`2L`), and all prognostic variables together (`4L + 1`). 
+Default `transform_batch` for a `SpectralGrid`. Architecture-dependent because:
+
+- On CPU, batched FFT plans give negligible speedup, default: `[1, nlayers]` — matches the pre-multiplexing system.
+
+- On GPU, batched plans are essential, default:
+  `[1, nlayers, 2*nlayers, 4*nlayers + 1]` — covers single-layer (`1`), one variable (`L`),
+  U/V together (`2L`), and the prognostic mega-batch (`4L + 1`).
 """
-default_transform_batch(nlayers::Integer) = Int[1, nlayers, 2 * nlayers, 4 * nlayers + 1]
+default_transform_batch(arch::AbstractArchitecture, nlayers::Integer) = default_transform_batch(typeof(arch), nlayers)
+default_transform_batch(::Type{<:AbstractCPU}, nlayers::Integer) = Int[1, nlayers]
+default_transform_batch(::Type{<:AbstractArchitecture}, nlayers::Integer) = Int[1, nlayers, 2 * nlayers, 4 * nlayers + 1]
 
 function variables(::SpeedyTransforms.AbstractSpectralTransform)
     return (
