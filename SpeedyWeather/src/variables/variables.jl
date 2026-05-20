@@ -253,10 +253,17 @@ function Variables(model::AbstractModel)
     # If both the spectral prognostic parent and its grid-snapshot parent exist, they
     # must declare members in matching order so a mega-batched spec→grid transform can
     # map slot k of `prognostic` to slot k of `grid`.
-    # TODO: Maybe just move this to unit tests? Do we need to test this every time? 
+    # TODO: Maybe just move this to unit tests? Do we need to test this every time?
     if haskey(fused, :prognostic) && haskey(fused, :grid)
         _assert_fuse_alignment(fused.prognostic, fused.grid;
                                name_a = :prognostic, name_b = :grid)
+    end
+
+    # Same requirement for the tendency-side fuse pair: a future mega-batched grid→spec
+    # transform of dycore tendencies will map slot k of `:tend_grid` to slot k of `:tend_spec`.
+    if haskey(fused, :tend_spec) && haskey(fused, :tend_grid)
+        _assert_fuse_alignment(fused.tend_spec, fused.tend_grid;
+                               name_a = :tend_spec, name_b = :tend_grid)
     end
 
     return Variables(; prognostic, grid, tendencies, dynamics, parameterizations, particles, scratch, fused)

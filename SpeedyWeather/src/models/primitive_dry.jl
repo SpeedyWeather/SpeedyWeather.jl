@@ -160,12 +160,12 @@ function variables(::Type{<:PrimitiveDry}, nsteps)
         GridVariable(:temperature_prev, Grid3D(), desc = "Temperature at previous time step", units = "K", fuse = :grid_prev),
         GridVariable(:pressure_prev, Grid2D(), desc = "Logarithm of surface pressure at previous time step", units = "", fuse = :grid_prev),
 
-        TendencyVariable(:divergence, Spectral3D(), desc = "Tendency of divergence", units = "1/s²"),
-        TendencyVariable(:temperature, Spectral3D(), desc = "Tendency of temperature", units = "K/s"),
-        TendencyVariable(:pressure, Spectral2D(), desc = "Tendency of surface pressure", units = "log(Pa)/s"),
-        TendencyVariable(:divergence, Grid3D(), namespace = :grid, desc = "Tendency of divergence on the grid", units = "1/s²"),
-        TendencyVariable(:temperature, Grid3D(), namespace = :grid, desc = "Tendency of temperature on the grid", units = "K/s"),
-        TendencyVariable(:pressure, Grid2D(), namespace = :grid, desc = "Tendency of surface pressure on the grid", units = "log(Pa)/s"),
+        TendencyVariable(:divergence, Spectral3D(), desc = "Tendency of divergence", units = "1/s²", fuse = :tend_spec),
+        TendencyVariable(:temperature, Spectral3D(), desc = "Tendency of temperature", units = "K/s", fuse = :tend_spec),
+        TendencyVariable(:pressure, Spectral2D(), desc = "Tendency of surface pressure", units = "log(Pa)/s", fuse = :tend_spec),
+        TendencyVariable(:divergence, Grid3D(), namespace = :grid, desc = "Tendency of divergence on the grid", units = "1/s²", fuse = :tend_grid),
+        TendencyVariable(:temperature, Grid3D(), namespace = :grid, desc = "Tendency of temperature on the grid", units = "K/s", fuse = :tend_grid),
+        TendencyVariable(:pressure, Grid2D(), namespace = :grid, desc = "Tendency of surface pressure on the grid", units = "log(Pa)/s", fuse = :tend_grid),
 
         DynamicsVariable(:dpres_dx, Grid2D(), desc = "Zonal gradient of the logarithm of surface pressure"),
         DynamicsVariable(:dpres_dy, Grid2D(), desc = "Meridional gradient of the logarithm of surface pressure"),
