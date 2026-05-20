@@ -166,8 +166,17 @@ function SpeedyTransforms.transform!(
         save_prev!(vars, model)
     end
 
+    # get spectral U, V from vorticity and divergence via stream function Ψ and vel potential ϕ
+    # U = u*coslat = -coslat*∂Ψ/∂lat + ∂ϕ/dlon
+    # V = v*coslat =  coslat*∂ϕ/∂lat + ∂Ψ/dlon
+    UV_from_vordiv!(U, V, vor, div, S)
+
+    # layer-mean temperature from the l=m=0 harmonic; consumed later by `linear_virtual_temperature!`
+    # in `dynamics_tendencies!`. Not used by `geopotential!` here.
+    temperature_average!(vars, temp, S)
+
     # Mega-batched spec→grid for the prognostic state: one call covers vorticity, divergence,
-    # temperature, pressure (and humidity for PrimitiveWet). 
+    # temperature, pressure (and humidity for PrimitiveWet).
     prog_parent = parent(vars.fused.prognostic)
     grid_parent = parent(vars.fused.grid)
     transform!(grid_parent, get_step(prog_parent, lf), scratch_memory, S)
@@ -176,20 +185,13 @@ function SpeedyTransforms.transform!(
         hole_filling!(humid_grid, model.hole_filling, model)  # remove negative humidity
     end
 
-    # get spectral U, V from vorticity and divergence via stream function Ψ and vel potential ϕ
-    # U = u*coslat = -coslat*∂Ψ/∂lat + ∂ϕ/dlon
-    # V = v*coslat =  coslat*∂ϕ/∂lat + ∂Ψ/dlon
-    UV_from_vordiv!(U, V, vor, div, S)
-
     # Batched spec→grid for the velocities: the general-purpose `:spectral_scratch` fuse packs
     # `(:a, :b)` (here holding U, V) into one Spectral3D parent, and `:uv_grid` packs `(:u, :v)`
     # TODO: theoretically we could merge this with the other big transform and then unscale coslat
-    # seperately, shall we do that?
+    # seperately, shall we do that?    
     transform!(parent(vars.fused.uv_grid), parent(vars.fused.spectral_scratch), scratch_memory, S;
                unscale_coslat = true)
 
-    # include humidity effect into temp for everything stability-related
-    temperature_average!(vars, temp, S)
     geopotential!(vars, model)                  # calculate geopotential
 
     if initialize   # at initial step store prev <- current
