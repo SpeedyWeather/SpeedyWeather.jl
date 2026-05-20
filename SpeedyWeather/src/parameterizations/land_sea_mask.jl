@@ -109,7 +109,7 @@ Generator function pulling the resolution information from `spectral_grid`."""
 function (L::Type{<:AbstractLandSeaMask})(spectral_grid::SpectralGrid; kwargs...)
     (; NF, GridVariable2D, grid) = spectral_grid
     mask = zeros(GridVariable2D, grid)
-    return L{NF, GridVariable2D, Bool}(; mask, kwargs...)
+    return L{NF, GridVariable2D}(; mask, kwargs...)
 end
 
 function EarthLandSeaMask(spectral_grid::SpectralGrid; kwargs...)
