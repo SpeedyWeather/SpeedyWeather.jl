@@ -349,10 +349,13 @@ _scratch_nlayers(::AbstractArchitecture, nlayers::Integer, ::AbstractVector{<:In
 # (consecutive scratch columns can have differing alignment when `nfreq_max * sizeof(Complex{NF})`
 # GPU doesn't need any of that. 
 @inline function _needs_chunking(K::Integer, S::SpectralTransform{NF, <:AbstractCPU}) where {NF}
-    K > 1 || return false
-    haskey(S.rfft_plans, K) && return false          # K is directly planned
-    # only chunk if a batched plan (K > 1) exists in the dict
-    return any(k -> k > 1, keys(S.rfft_plans))
+    K > 1 || return false                            # K=1 always handled directly
+    haskey(S.rfft_plans, K) && return false          # K is directly planned, no chunking needed
+    # K > 1 and not directly planned: chunk through whichever planned K is largest (≤ K_total).
+    # Note this includes the degenerate case `keys(rfft_plans) == [1]`: chunks then have K=1
+    # and route to the K=1 plan one layer at a time. Scratch (sized to maximum(planned_K))
+    # is guaranteed to fit each chunk in all cases.
+    return true
 end
 
 @inline _needs_chunking(::Integer, ::SpectralTransform) = false
