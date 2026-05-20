@@ -340,14 +340,16 @@ end
                     )
 
                     # Convert GPU to CPU for comparison, result is stored in the
-                    # scratch memory
+                    # scratch memory. Only the first `nlayers` columns are filled by
+                    # `_legendre!`; CPU and GPU scratch may differ in capacity (dim 2),
+                    # so slice to the meaningful range.
                     result_gpu = on_architecture(cpu_arch, S_gpu.scratch_memory.north)
                     result_cpu = S_cpu.scratch_memory.north
-                    @test result_cpu ≈ result_gpu rtol = sqrt(eps(Float32))   # GPU error tolerance always Float32
+                    @test result_cpu[:, 1:nlayers, :] ≈ result_gpu[:, 1:nlayers, :] rtol = sqrt(eps(Float32))   # GPU error tolerance always Float32
 
                     result_gpu = on_architecture(cpu_arch, S_gpu.scratch_memory.south)
                     result_cpu = S_cpu.scratch_memory.south
-                    @test result_cpu ≈ result_gpu rtol = sqrt(eps(Float32))
+                    @test result_cpu[:, 1:nlayers, :] ≈ result_gpu[:, 1:nlayers, :] rtol = sqrt(eps(Float32))
                 end
             end
         end
