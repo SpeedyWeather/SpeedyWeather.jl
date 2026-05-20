@@ -13,3 +13,10 @@ run!(simulation, nsteps = 10)
 
 # TODO: fix GPU reactant in follow up when initial conditions are easier to handle
 @test_broken !any(isnan.(simulation.prognostic_variables.vorticity))
+
+# also test the PrimitiveWetModel (currentlty convection isn't adjusted yet)
+spectral_grid = SpectralGrid(architecture = arch)
+spectral_transform = MatrixSpectralTransform(spectral_grid)
+model = PrimitiveWetModel(spectral_grid = spectral_grid, spectral_transform = spectral_transform, convection=nothing, feedback = nothing)
+simulation = initialize!(model)
+run!(simulation, nsteps = 10)
