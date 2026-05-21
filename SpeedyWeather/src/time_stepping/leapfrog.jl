@@ -149,10 +149,6 @@ function leapfrog!(
     (; prognostic, tendencies) = vars
 
     for varname in keys(tendencies)
-        # Skip nested namespaces (e.g. tendencies.grid) and spec-side tendencies that have
-        # no prognostic counterpart to step (e.g. tendencies.u/.v are dycore intermediates
-        # used as inputs to curl!/divergence! into vor_tend/div_tend; they're not themselves
-        # leapfrog'd because there's no prognostic.u/.v).
         if !(tendencies[varname] isa NamedTuple) && hasfield(typeof(prognostic), varname)
             var = getfield(prognostic, varname)
             var_old, var_new = get_steps(var)
