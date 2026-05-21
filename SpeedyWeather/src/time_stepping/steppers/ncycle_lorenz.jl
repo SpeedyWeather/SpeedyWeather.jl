@@ -55,7 +55,7 @@ mutable struct NCycleLorenz{NF, V, IntType, S, MS, B} <: AbstractNCycleLorenz
     Δt::NF
 end
 
-Adapt.adapt_structure(to, L::NCycleLorenz) = NCycleLorenzCore(L.Δt_millisec, L.Δt_sec, L.Δt)
+Adapt.adapt_structure(to, L::NCycleLorenz) = Adapt.adapt_structure(to, NCycleLorenzCore(L.Δt_millisec, L.Δt_sec, L.Δt))
 
 prognostic_steps(::NCycleLorenz) = 1
 tendency_grid_steps(::NCycleLorenz) = 1     # the grid tendencies are only for F though, the G term only needs storing in spectral space
@@ -86,7 +86,7 @@ function NCycleLorenz(
         spectral_grid::SpectralGrid;
         steps = 3,
         variant = NCycleLorenzA(),
-        Δt_at_T31 = Minute(40),
+        Δt_at_T31 = Minute(30),
         adjust_with_output = true,
         radius = DEFAULT_RADIUS,
     )
