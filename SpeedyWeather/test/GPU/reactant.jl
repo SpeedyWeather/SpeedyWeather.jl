@@ -9,7 +9,7 @@ spectral_grid = SpectralGrid(architecture = arch, nlayers = 1)
 spectral_transform = MatrixSpectralTransform(spectral_grid)
 model = BarotropicModel(spectral_grid = spectral_grid, spectral_transform = spectral_transform)
 simulation = initialize!(model)
-run!(simulation, nsteps = 10)
+run!(simulation, steps = 10)
 
 @test !any(isnan.(simulation.prognostic_variables.vorticity))
 
@@ -20,6 +20,6 @@ longwave_radiation = OneBandLongwave(spectral_grid, transmissivity = ConstantLon
 
 model = PrimitiveWetModel(spectral_grid = spectral_grid, spectral_transform = spectral_transform, convection=nothing, feedback = nothing)
 simulation = initialize!(model)
-run!(simulation, nsteps = 10)
+run!(simulation, steps = 10)
 
 @test !any(isnan.(simulation.prognostic_variables.vorticity))
