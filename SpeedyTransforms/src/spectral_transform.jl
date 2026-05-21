@@ -439,20 +439,21 @@ function transform!(                        # SPECTRAL TO GRID
         S::SpectralTransform;               # precomputed transform
         unscale_coslat::Bool = false,       # unscale with cos(lat) on the fly?
     )
-    # catch incorrect sizes early
-    @boundscheck ismatching(S, field) || throw(DimensionMismatch(S, field))
-    @boundscheck ismatching(S, coeffs) || throw(DimensionMismatch(S, coeffs))
-
     # On CPU, an unplanned K would route the FFT through `_fourier_serial!`, which on x86
     # crashes with an FFTW alignment mismatch when the scratch column-stride is not a multiple
     # of the SIMD width (consecutive columns have differing alignment). Split into chunks
     # matching the largest available batched plan; each chunk uses the batched FFT path
     # against scratch starting at column 1 (always SIMD-aligned). `_needs_chunking` is
     # statically false on GPU/others, so this branch elides there.
+    # Checked **before** the boundscheck below so chunking can handle K > S.nlayers
     K = size(field, 2)
     if _needs_chunking(K, S)
         return _transform_chunked!(field, coeffs, scratch_memory, S; unscale_coslat)
     end
+
+    # catch incorrect sizes early
+    @boundscheck ismatching(S, field) || throw(DimensionMismatch(S, field))
+    @boundscheck ismatching(S, coeffs) || throw(DimensionMismatch(S, coeffs))
 
     # use scratch memory for Legendre but not yet Fourier-transformed data
     g_north = scratch_memory.north    # phase factors for northern latitudes
@@ -486,14 +487,16 @@ function transform!(                                    # GRID TO SPECTRAL
         scratch_memory::ScratchMemory,                  # explicit scratch memory to use
         S::SpectralTransform,                           # precomputed spectral transform
     )
-    # catch incorrect sizes early
-    @boundscheck ismatching(S, field) || throw(DimensionMismatch(S, field))
-    @boundscheck ismatching(S, coeffs) || throw(DimensionMismatch(S, coeffs))
-
+    # Same chunking-before-boundscheck pattern as the spec→grid `transform!` above —
+    # see comment there.
     K = size(field, 2)
     if _needs_chunking(K, S)
         return _transform_chunked!(coeffs, field, scratch_memory, S)
     end
+
+    # catch incorrect sizes early
+    @boundscheck ismatching(S, field) || throw(DimensionMismatch(S, field))
+    @boundscheck ismatching(S, coeffs) || throw(DimensionMismatch(S, coeffs))
 
     # use scratch memory for Fourier but not yet Legendre-transformed data
     f_north = scratch_memory.north    # phase factors for northern latitudes

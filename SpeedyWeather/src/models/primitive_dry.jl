@@ -162,10 +162,10 @@ function variables(::Type{<:PrimitiveDry}, nsteps)
 
         TendencyVariable(:divergence, Spectral3D(), desc = "Tendency of divergence", units = "1/s²"), # not fused because computed directly by divergence op
         TendencyVariable(:temperature, Spectral3D(), desc = "Tendency of temperature", units = "K/s", fuse = :spectral_tendencies),
-        TendencyVariable(:pressure, Spectral2D(), desc = "Tendency of surface pressure", units = "log(Pa)/s"),
+        TendencyVariable(:pressure, Spectral2D(), desc = "Tendency of surface pressure", units = "log(Pa)/s", fuse = :spectral_tendencies),
         TendencyVariable(:divergence, Grid3D(), namespace = :grid, desc = "Tendency of divergence on the grid", units = "1/s²"),
         TendencyVariable(:temperature, Grid3D(), namespace = :grid, desc = "Tendency of temperature on the grid", units = "K/s", fuse = :grid_tendencies),
-        TendencyVariable(:pressure, Grid2D(), namespace = :grid, desc = "Tendency of surface pressure on the grid", units = "log(Pa)/s"),
+        TendencyVariable(:pressure, Grid2D(), namespace = :grid, desc = "Tendency of surface pressure on the grid", units = "log(Pa)/s", fuse = :grid_tendencies),
 
         DynamicsVariable(:uT_anomaly, Grid3D(), desc = "u*T anomaly intermediate on grid", namespace = :grid, fuse = :grid_tendencies),
         DynamicsVariable(:vT_anomaly, Grid3D(), desc = "v*T anomaly intermediate on grid", namespace = :grid, fuse = :grid_tendencies),
