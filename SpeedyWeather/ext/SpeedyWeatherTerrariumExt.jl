@@ -103,8 +103,7 @@ end
 """$(TYPEDSIGNATURES)
 
 Construct a [`TerrariumLand`](@ref) from a Terrarium land model and a
-SpeedyWeather spectral grid. The single effective land layer thickness is
-derived from the bottom-most layer of the Terrarium grid."""
+SpeedyWeather spectral grid."""
 function TerrariumLand(
         spectral_grid::SpectralGrid,
         model::Terrarium.AbstractModel{NF};
@@ -118,7 +117,8 @@ function TerrariumLand(
     field_grid = Terrarium.get_field_grid(model.grid)
     Δz_arr = Terrarium.on_architecture(Terrarium.CPU(), field_grid.z.Δᵃᵃᶜ)
     # The Oceananigans vertical spacing is an OffsetArray; take the last entry
-    # as the bottom-most layer thickness for the SpeedyWeather LandGeometry.
+    # as the layer thickness for the SpeedyWeather LandGeometry. It's not actually used, but 
+    # we set it here for consistency. 
     geometry = LandGeometry(1, NF[Δz_arr[end]])
     return TerrariumLand(
         spectral_grid, geometry, model, timestepper,
