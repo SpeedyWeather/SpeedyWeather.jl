@@ -189,13 +189,16 @@ function pressure_gradient_flux!(
 
     # PRESSURE GRADIENT
     pres = get_step(progn.pressure, lf)             # log of surface pressure at leapfrog step lf
-    dpres_dx_spec = vars.scratch.a_2D           # reuse 2D work arrays for gradients
-    dpres_dy_spec = vars.scratch.b_2D           # in spectral space
-    (; dpres_dx, dpres_dy) = vars.dynamics      # but store in grid space
+    dpres_dx_spec = vars.dynamics.dpres_dx_spec     # view of slot 1 in :dpres_grad_spec parent
+    dpres_dy_spec = vars.dynamics.dpres_dy_spec     # view of slot 2 in :dpres_grad_spec parent
+    (; dpres_dx, dpres_dy) = vars.dynamics          # views of slot 1 / 2 in :dpres_grad parent
 
-    ∇!(dpres_dx_spec, dpres_dy_spec, pres, S)                                       # CALCULATE ∇ln(pₛ)
-    transform!(dpres_dx, dpres_dx_spec, scratch_memory, S, unscale_coslat = true)   # transform to grid: zonal gradient
-    transform!(dpres_dy, dpres_dy_spec, scratch_memory, S, unscale_coslat = true)   # meridional gradient
+    ∇!(dpres_dx_spec, dpres_dy_spec, pres, S)       # CALCULATE ∇ln(pₛ)
+
+    # One batched spectral→grid transform for both gradients 
+    transform!(parent(vars.fused.dpres_grad),
+               parent(vars.fused.dpres_grad_spec),
+               scratch_memory, S, unscale_coslat = true)
 
     (; u, v) = vars.grid
     uv∇lnp = vars.dynamics.pres_flux

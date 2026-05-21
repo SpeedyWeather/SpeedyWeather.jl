@@ -175,8 +175,10 @@ function variables(::Type{<:PrimitiveDry}, nsteps)
         DynamicsVariable(:kinetic_energy, Grid3D(), desc = "Kinetic energy intermediate, ½(u²+v²)", namespace = :grid, fuse = :grid_tendencies),
         DynamicsVariable(:kinetic_energy, Spectral3D(), desc = "Kinetic energy intermediate in spectral space", fuse = :spectral_tendencies),
 
-        DynamicsVariable(:dpres_dx, Grid2D(), desc = "Zonal gradient of the logarithm of surface pressure"),
-        DynamicsVariable(:dpres_dy, Grid2D(), desc = "Meridional gradient of the logarithm of surface pressure"),
+        DynamicsVariable(:dpres_dx, Grid2D(), desc = "Zonal gradient of the logarithm of surface pressure", fuse = :dpres_grad),
+        DynamicsVariable(:dpres_dy, Grid2D(), desc = "Meridional gradient of the logarithm of surface pressure", fuse = :dpres_grad),
+        DynamicsVariable(:dpres_dx_spec, Spectral2D(), desc = "Zonal gradient of lnpₛ in spectral space", fuse = :dpres_grad_spec),
+        DynamicsVariable(:dpres_dy_spec, Spectral2D(), desc = "Meridional gradient of lnpₛ in spectral space", fuse = :dpres_grad_spec),
         DynamicsVariable(:pres_flux, Grid3D(), desc = "Pressure gradient flux, (u, v) ⋅ ∇lnp_s"),
         DynamicsVariable(:virtual_temperature, Spectral3D(), desc = "Virtual temperature", units = "K"),
         DynamicsVariable(:u_mean_grid, Grid2D(), desc = "Vertically integrated zonal velocity", units = "m/s"),
