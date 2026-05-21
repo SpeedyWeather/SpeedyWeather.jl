@@ -279,7 +279,6 @@ function output!(
         output::NetCDFOutput,
         time::DateTime,
     )
-    output.output_counter += 1      # output counter increases when writing time
     i = output.output_counter
 
     (; netcdf_file, startdate) = output

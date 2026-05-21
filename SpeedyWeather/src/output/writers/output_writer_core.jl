@@ -22,6 +22,9 @@ Fields are $(TYPEDFIELDS)"""
     "[DERIVED] output frequency in time steps, computed at initialize!"
     output_every_n_steps::Int = 0
 
+    "[DERIVED] time step counter, incremented every time step to determine when to output"
+    time_step_counter::Int = 0
+
     "[DERIVED] output step counter, incremented every time output is written"
     output_counter::Int = 0
 end
@@ -71,7 +74,8 @@ function initialize!(
     core.output_every_n_steps = max(1, f)
     output.interval = Second(round(Int, core.output_every_n_steps * model.time_stepping.Δt_sec))
 
-    # RESET COUNTER
+    # RESET COUNTERS
+    core.time_step_counter = 0
     core.output_counter = 0
 
     # CALLBACKS
@@ -85,16 +89,19 @@ end
 """$(TYPEDSIGNATURES)
 Increment the timestep counter and return `true` if output should be written on
 this step (i.e. `active` is true and the counter is a multiple of `output_every_n_steps`)."""
-function output!(core::OutputWriterCore, output::AbstractOutput, clock::Clock)
-    return do_output =
+function do_output!(core::OutputWriterCore, output::AbstractOutput)
+    core.time_step_counter += 1         # always increment time step counter
+    do_output =                         # boolean whether to output this time step
         output.active &&                # output must be active
-        clock.time_step_counter > 0 &&  # don't store initial conditions again (leapfrog has spin up step that doesn't count)
-        clock.time_step_counter % core.output_every_n_steps == 0    # and multiple of output frequency
+        core.time_step_counter > 0 &&   # don't store initial conditions again (leapfrog has spin up step that doesn't count)
+        core.time_step_counter % core.output_every_n_steps == 0    # and multiple of output interval
+    core.output_counter += do_output    # increment output counter if output is written
+    return do_output
 end
 
 """$(TYPEDSIGNATURES)
-Reset the output frequency `interval` of `output` and re-initialize its `OutputWriterCore`
-so that the output frequency is recomputed from the model time step. If the requested 
+Reset the output `interval` of `output` and re-initialize its `OutputWriterCore`
+so that the output interval is recomputed from the model time step. If the requested 
 `interval` is not an integer multiple of the model time step, it is rounded to
 the nearest multiple."""
 function set!(output::AbstractOutput, model::AbstractModel; interval::Period)
