@@ -218,8 +218,13 @@ function initialize!(
     u_data = on_architecture(architecture(grid), rand(RNG, NF, npoints))
     v_data = on_architecture(architecture(grid), rand(RNG, NF, npoints))
 
-    u = 2A .* Field(u_data, grid) .- A
-    v = 2A .* Field(v_data, grid) .- A
+    # broadcast on the raw data, then wrap as Field — on Reactant backends `Field`s
+    # are unwrapped to their `.data` by `broadcastable`, so the broadcast result of
+    # `2A .* Field(u_data, grid) .- A` is a plain array and breaks downstream `transform`.
+    u_data .= 2A .* u_data .- A
+    v_data .= 2A .* v_data .- A
+    u = Field(u_data, grid)
+    v = Field(v_data, grid)
 
     u_spectral = transform(u, model.spectral_transform)
     v_spectral = transform(v, model.spectral_transform)
@@ -231,8 +236,11 @@ function initialize!(
 
     @allowscalar ξ[1] = 0  # remove mean
 
-    # repeat over vertical layers
-    ξks = repeat(ξ, 1, nlayers)
+    # repeat over vertical layers (broadcast-assign instead of `repeat` because
+    # `repeat(::ConcretePJRTArray, …)` falls back to scalar indexing on Reactant)
+    ξks_data = similar(ξ.data, size(ξ.data, 1), nlayers)
+    ξks_data .= ξ.data
+    ξks = LowerTriangularArray(ξks_data, ξ.spectrum)
     set!(vars, model; vorticity = ξks, lf = 1)
 
     return nothing
