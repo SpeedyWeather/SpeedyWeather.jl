@@ -571,24 +571,22 @@ end
 
 # TODO: Might rename this just to u, v spectral tendencies? Because that's what it does, but 
 # then it's also nice to always have the symmetric with *_grid_tendencies! _spectral_tendencies!
+
 """$(TYPEDSIGNATURES)
 
 Tendencies for vorticity and divergence, here just the gridded u and v tendencies are computed. 
-Excluding Bernoulli potential with geopotential and linear pressure gradient inside the Laplace 
-operator, which are added later in spectral space. 
 
-    u_tend +=  v*(f+ζ) - RTᵥ'*∇lnpₛ_x
-    v_tend += -u*(f+ζ) - RTᵥ'*∇lnpₛ_y
+Launches `_vordiv_tendencies_kernel!` to add the vorticity flux and pressure gradient terms to `u_tend_grid, v_tend_grid` (which already contain forcing,
+drag, and vertical advection contributions); Excludes Bernoulli potential with geopotential
+and linear pressure gradient inside the Laplace operator, which are added later in spectral
+space:
+
+    u_tend_grid += v·(f + ζ) - R·Tᵥ'·∂lnpₛ/∂x
+    v_tend_grid += -u·(f + ζ) - R·Tᵥ'·∂lnpₛ/∂y
 
 `+=` because the tendencies already contain the parameterizations and vertical advection.
-`f` is coriolis, `ζ` relative vorticity, `R` the gas constant `Tᵥ'` the virtual temperature
-anomaly, `∇lnpₛ` the gradient of surface pressure and `_x` and `_y` its zonal/meridional
-components. """
-"""
-Grid half of `vordiv_tendencies!`. Launches `_vordiv_tendencies_kernel!` to add the vorticity
-flux and pressure gradient terms to `u_tend_grid, v_tend_grid` (which already contain forcing,
-drag, and vertical advection contributions). No transform — the mega-batched grid→spec turns
-these into `u_tend, v_tend` on the spec side."""
+`f` is coriolis, `ζ` relative vorticity, `R` the gas constant, `Tᵥ'` the virtual temperature
+anomaly, `∇lnpₛ` the gradient of surface pressure and `_x`, `_y` its zonal/meridional components."""
 function vordiv_grid_tendencies!(
         vars::Variables,
         coriolis::AbstractCoriolis,
