@@ -272,7 +272,7 @@ function SpeedyWeather.initialize!(
     # which was set from the `time` kwarg of `initialize!(model; time=...)`.
     state.clock.time = vars.prognostic.clock.time
 
-    vars.prognostic.land.soil_temperature .= interior(state.temperature)[:, 1, end] .+ NF(273.15)
+    vars.prognostic.land.soil_temperature .= @view(interior(state.temperature)[:, 1, end]) .+ NF(273.15)
     return nothing
 end
 
