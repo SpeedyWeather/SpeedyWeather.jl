@@ -36,7 +36,7 @@ mutable struct Leapfrog{NF, S, B, MS} <: AbstractLeapfrog
     Δt::NF
 end
 
-Adapt.adapt_structure(to, L::Leapfrog) = LeapfrogCore(L.Δt_millisec, L.Δt_sec, L.Δt, L.step_counter)
+Adapt.adapt_structure(to, L::Leapfrog) = Adapt.structure(to, LeapfrogCore(L.Δt_millisec, L.Δt_sec, L.Δt, L.step_counter))
 
 # HOW MANY STEPS DO VARIABLES NEED?
 # leapfrogging always needs 2 steps in spectral
@@ -49,10 +49,20 @@ prognostic_grid_steps(::AbstractLeapfrog, ::PrimitiveEquation) = 2
 tendency_steps(::AbstractLeapfrog) = 1
 
 # WHICH STEP TO READ WHEN
+# in Leapfrog use the current (=2nd) step to do the transforms
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::SpeedyTransforms.AbstractSpectralTransform) = 2
+
+# but in Barotropc/ShallowWater models the 2nd one doesn't exist on the grid and the 1st is considered to be the current step
+@inline which_prognostic_step(var::AbstractField, ::AbstractLeapfrog, ::SpeedyTransforms.AbstractSpectralTransform, ::Union{<:Barotropic, <:ShallowWater}) = 1
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractForcing) = 2
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractDrag) = 2
+
+# in Leapfrog use the current (=2nd) in the dynamical core
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractDynamicalCoreComponent) = 2
+
+# but in Barotropc/ShallowWater models the 2nd one doesn't exist on the grid and the 1st is considered to be the current step
+@inline which_prognostic_step(var::AbstractField, ::AbstractLeapfrog, ::AbstractDynamicalCoreComponent, ::Union{<:Barotropic, <:ShallowWater}) = 1
+
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractHorizontalDiffusion) = 1
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::DiffusiveVerticalAdvection) = 1
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::DispersiveVerticalAdvection) = 2

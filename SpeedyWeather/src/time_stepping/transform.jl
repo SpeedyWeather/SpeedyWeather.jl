@@ -15,9 +15,9 @@ function SpeedyTransforms.transform!(
     initialize && initialize!(vars, time_stepping, model)
 
     S = model.spectral_transform
-    u_grid = get_prognostic_step(vars.grid.u, time_stepping, S)
-    v_grid = get_prognostic_step(vars.grid.v, time_stepping, S)
-    vor_grid = get_prognostic_step(vars.grid.vorticity, time_stepping, S)
+    u_grid = get_prognostic_step(vars.grid.u, time_stepping, S, model)
+    v_grid = get_prognostic_step(vars.grid.v, time_stepping, S, model)
+    vor_grid = get_prognostic_step(vars.grid.vorticity, time_stepping, S, model)
 
     # U = u*coslat, V=v*coslat
     U = vars.scratch.a      # reuse scratch arrays for velocities in spectral

@@ -827,11 +827,11 @@ function vorticity_flux_curldiv!(
     (; f) = model.coriolis
     (; coslat⁻¹) = model.geometry
 
-    u_tend_grid = get_tendency_step(vars.tendencies.grid.u, model.time_stepping, DynamicalCore())
-    v_tend_grid = get_tendency_step(vars.tendencies.grid.v, model.time_stepping, DynamicalCore())
-    u = get_prognostic_step(vars.grid.u, model.time_stepping, DynamicalCore())
-    v = get_prognostic_step(vars.grid.v, model.time_stepping, DynamicalCore())
-    vor = get_prognostic_step(vars.grid.vorticity, model.time_stepping, DynamicalCore())
+    u_tend_grid = get_tendency_step(vars.tendencies.grid.u, model.time_stepping, DynamicalCore(), model)
+    v_tend_grid = get_tendency_step(vars.tendencies.grid.v, model.time_stepping, DynamicalCore(), model)
+    u = get_prognostic_step(vars.grid.u, model.time_stepping, DynamicalCore(), model)
+    v = get_prognostic_step(vars.grid.v, model.time_stepping, DynamicalCore(), model)
+    vor = get_prognostic_step(vars.grid.vorticity, model.time_stepping, DynamicalCore(), model)
 
     (; whichring) = u.grid                              # precomputed ring indices
     scratch_memory = vars.scratch.transform_memory      # scratch memory for transforms

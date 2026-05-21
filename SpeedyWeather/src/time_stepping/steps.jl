@@ -82,11 +82,22 @@ This method is for a 3D field (horizontal + vertical) with steps in the 4rd dime
 # anything that can decide which variable step to get
 const STEP_COMPONENT = Union{AbstractModelComponent, SpeedyTransforms.AbstractSpectralTransform}
 
+# methods independent of model
 @inline get_step(var, TS::AbstractTimeStepper, C::STEP_COMPONENT) = get_step(var, which_step(var, TS, C))
 @inline get_prognostic_step(var, TS::AbstractTimeStepper, C::STEP_COMPONENT) = get_step(var, which_prognostic_step(var, TS, C))
 @inline get_tendency_step(var, TS::AbstractTimeStepper, C::STEP_COMPONENT) = get_step(var, which_tendency_step(var, TS, C))
 
-# fallbacks to extend by every time stepper and model component
-@inline which_step(var, ::AbstractTimeStepper, ::STEP_COMPONENT) = 1
-@inline which_prognostic_step(var, ::AbstractTimeStepper, ::STEP_COMPONENT) = 1
-@inline which_tendency_step(var, ::AbstractTimeStepper, ::STEP_COMPONENT) = 1
+# methods dependent on model
+@inline get_step(var, TS::AbstractTimeStepper, C::STEP_COMPONENT, M::AbstractModel) = get_step(var, which_step(var, TS, C, M))
+@inline get_prognostic_step(var, TS::AbstractTimeStepper, C::STEP_COMPONENT, M::AbstractModel) = get_step(var, which_prognostic_step(var, TS, C, M))
+@inline get_tendency_step(var, TS::AbstractTimeStepper, C::STEP_COMPONENT, M::AbstractModel) = get_step(var, which_tendency_step(var, TS, C, M))
+
+# if dispatch over model is not defined then fallback to dispatch without model
+@inline which_step(var, TS::AbstractTimeStepper, C::STEP_COMPONENT, ::AbstractModel) = which_step(var, TS, C)
+@inline which_prognostic_step(var, TS::AbstractTimeStepper, C::STEP_COMPONENT, ::AbstractModel) = which_prognostic_step(var, TS, C)
+@inline which_tendency_step(var, TS::AbstractTimeStepper, C::STEP_COMPONENT, ::AbstractModel) = which_tendency_step(var, TS, C)
+
+# fallback to 1 if not defined
+@inline which_step(var, TS::AbstractTimeStepper, C::STEP_COMPONENT) = 1
+@inline which_prognostic_step(var, TS::AbstractTimeStepper, C::STEP_COMPONENT) = 1
+@inline which_tendency_step(var, TS::AbstractTimeStepper, C::STEP_COMPONENT) = 1
