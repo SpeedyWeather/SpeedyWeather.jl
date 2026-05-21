@@ -16,7 +16,7 @@ model = BarotropicModel(
 simulation = initialize!(model)
 run!(simulation, steps = 10)
 
-@test !any(isnan.(simulation.variables.prognostic.vorticity))
+@test !any(isnan, Array(simulation.variables.prognostic.vorticity))
 
 # also test the PrimitiveWetModel (currentlty convection isn't adjusted yet)
 spectral_grid = SpectralGrid(architecture = arch)
@@ -34,4 +34,4 @@ model = PrimitiveWetModel(
 simulation = initialize!(model)
 run!(simulation, steps = 10)
 
-@test !any(isnan.(simulation.variables.prognostic.vorticity))
+@test !any(isnan, Array(simulation.variables.prognostic.vorticity))
