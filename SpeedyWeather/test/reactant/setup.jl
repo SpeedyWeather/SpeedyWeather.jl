@@ -32,17 +32,3 @@ function create_reactant_model(ModelType::Type; trunc = TRUNC, kwargs...)
 
     return ModelType(spectral_grid; spectral_transform = M, feedback = nothing, longwave_radiation, initial_conditions, convection=nothing, kwargs...)
 end
-
-"""Creat a (regular) GPU model of the given type."""
-function create_gpu_model(ModelType::Type; trunc = TRUNC, kwargs...)
-     nlayers = nlayers_for_model(ModelType)
-    arch = SpeedyWeather.GPU()
-    spectral_grid = SpectralGrid(; architecture = arch, nlayers, trunc)
-    M = MatrixSpectralTransform(spectral_grid)
-    initial_conditions = InitialConditions(spectral_grid, ModelType)
-    #longwave_radiation = UniformCooling(spectral_grid)
-    #longwave_radiation = OneBandLongwave(spectral_grid)
-    longwave_radiation = OneBandLongwave(spectral_grid, transmissivity = ConstantLongwaveTransmissivity(spectral_grid))
-
-    return ModelType(spectral_grid; spectral_transform = M, feedback = nothing, dynamics=false, longwave_radiation, dynamics_only=false, initial_conditions, convection=nothing, kwargs...)
-end

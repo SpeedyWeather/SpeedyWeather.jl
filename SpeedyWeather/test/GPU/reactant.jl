@@ -11,12 +11,15 @@ model = BarotropicModel(spectral_grid = spectral_grid, spectral_transform = spec
 simulation = initialize!(model)
 run!(simulation, nsteps = 10)
 
-# TODO: fix GPU reactant in follow up when initial conditions are easier to handle
-@test_broken !any(isnan.(simulation.prognostic_variables.vorticity))
+@test !any(isnan.(simulation.prognostic_variables.vorticity))
 
 # also test the PrimitiveWetModel (currentlty convection isn't adjusted yet)
 spectral_grid = SpectralGrid(architecture = arch)
 spectral_transform = MatrixSpectralTransform(spectral_grid)
+longwave_radiation = OneBandLongwave(spectral_grid, transmissivity = ConstantLongwaveTransmissivity(spectral_grid))
+
 model = PrimitiveWetModel(spectral_grid = spectral_grid, spectral_transform = spectral_transform, convection=nothing, feedback = nothing)
 simulation = initialize!(model)
 run!(simulation, nsteps = 10)
+
+@test !any(isnan.(simulation.prognostic_variables.vorticity))
