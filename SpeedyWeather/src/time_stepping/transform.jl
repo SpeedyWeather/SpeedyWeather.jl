@@ -15,6 +15,8 @@ function SpeedyTransforms.transform!(
     initialize && initialize!(vars, time_stepping, model)
 
     S = model.spectral_transform
+    # model is passed on to get_prognostic_step as for 2D models Leapfrog choses the 1st step
+    # not the non-existing 2nd step though both represent the current time step (not the previous one)
     u_grid = get_prognostic_step(vars.grid.u, time_stepping, S, model)
     v_grid = get_prognostic_step(vars.grid.v, time_stepping, S, model)
     vor_grid = get_prognostic_step(vars.grid.vorticity, time_stepping, S, model)
@@ -63,11 +65,13 @@ function SpeedyTransforms.transform!(
     initialize && initialize!(vars, time_stepping, model)
 
     S = model.spectral_transform
-    u_grid = get_prognostic_step(vars.grid.u, time_stepping, S)
-    v_grid = get_prognostic_step(vars.grid.v, time_stepping, S)
-    vor_grid = get_prognostic_step(vars.grid.vorticity, time_stepping, S)
-    div_grid = get_prognostic_step(vars.grid.divergence, time_stepping, S)
-    η_grid = get_prognostic_step(vars.grid.η, time_stepping, S)
+    # model is passed on to get_prognostic_step as for 2D models Leapfrog choses the 1st step
+    # not the non-existing 2nd step though both represent the current time step (not the previous one)
+    u_grid = get_prognostic_step(vars.grid.u, time_stepping, S, model)
+    v_grid = get_prognostic_step(vars.grid.v, time_stepping, S, model)
+    vor_grid = get_prognostic_step(vars.grid.vorticity, time_stepping, S, model)
+    div_grid = get_prognostic_step(vars.grid.divergence, time_stepping, S, model)
+    η_grid = get_prognostic_step(vars.grid.η, time_stepping, S, model)
 
     vor = get_prognostic_step(vars.prognostic.vorticity, time_stepping, S)
     div = get_prognostic_step(vars.prognostic.divergence, time_stepping, S)

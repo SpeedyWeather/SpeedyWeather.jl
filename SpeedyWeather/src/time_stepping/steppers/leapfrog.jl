@@ -48,12 +48,14 @@ prognostic_grid_steps(::AbstractLeapfrog, ::PrimitiveEquation) = 2
 # always only one step for tendencies
 tendency_steps(::AbstractLeapfrog) = 1
 
+const TwoDModels = Union{<:Barotropic, <:ShallowWater}
+
 # WHICH STEP TO READ WHEN
 # in Leapfrog use the current (=2nd) step to do the transforms
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::SpeedyTransforms.AbstractSpectralTransform) = 2
 
 # but in Barotropc/ShallowWater models the 2nd one doesn't exist on the grid and the 1st is considered to be the current step
-@inline which_prognostic_step(var::AbstractField, ::AbstractLeapfrog, ::SpeedyTransforms.AbstractSpectralTransform, ::Union{<:Barotropic, <:ShallowWater}) = 1
+@inline which_prognostic_step(var::AbstractField, ::AbstractLeapfrog, ::SpeedyTransforms.AbstractSpectralTransform, ::TwoDModels) = 1
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractForcing) = 2
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractDrag) = 2
 
@@ -61,7 +63,7 @@ tendency_steps(::AbstractLeapfrog) = 1
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractDynamicalCoreComponent) = 2
 
 # but in Barotropc/ShallowWater models the 2nd one doesn't exist on the grid and the 1st is considered to be the current step
-@inline which_prognostic_step(var::AbstractField, ::AbstractLeapfrog, ::AbstractDynamicalCoreComponent, ::Union{<:Barotropic, <:ShallowWater}) = 1
+@inline which_prognostic_step(var::AbstractField, ::AbstractLeapfrog, ::AbstractDynamicalCoreComponent, ::TwoDModels) = 1
 
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractHorizontalDiffusion) = 1
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::DiffusiveVerticalAdvection) = 1

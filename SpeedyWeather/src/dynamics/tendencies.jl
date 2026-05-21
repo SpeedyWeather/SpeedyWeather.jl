@@ -554,18 +554,6 @@ function parameterization_tendencies_only!(
     return nothing
 end
 
-# function barrier
-function temperature_tendency!(
-        vars::Variables,
-        model::PrimitiveEquation,
-    )
-    (; adiabatic_conversion, atmosphere, implicit, geometry, spectral_transform, time_stepping) = model
-    return temperature_tendency!(
-        vars, adiabatic_conversion, atmosphere, implicit,
-        geometry, spectral_transform, time_stepping
-    )
-end
-
 """$(TYPEDSIGNATURES)
 Compute the temperature tendency.
 
@@ -576,13 +564,11 @@ Compute the temperature tendency.
 temperature used in the adiabatic term κTᵥ*Dlnp/Dt."""
 function temperature_tendency!(
         vars::Variables,
-        adiabatic_conversion::AbstractAdiabaticConversion,
-        atmosphere::AbstractAtmosphere,
-        implicit::AbstractImplicit,
-        G::Geometry,
-        S::AbstractSpectralTransform,
-        time_stepping::AbstractTimeStepper,
+        model::PrimitiveEquation,
     )
+
+    (; adiabatic_conversion, atmosphere, implicit, spectral_transform, time_stepping) = model
+
     temp_tend = get_tendency_step(vars.tendencies.temperature, time_stepping, DynamicalCore())
     temp_tend_grid = get_tendency_step(vars.tendencies.grid.temperature, time_stepping, DynamicalCore())
     div_grid = get_prognostic_step(vars.grid.divergence, time_stepping, DynamicalCore())
@@ -608,10 +594,10 @@ function temperature_tendency!(
         pres_flux, temp_profile, adiabatic_conversion.σ_lnp_A, adiabatic_conversion.σ_lnp_B, atmosphere
     )
 
-    transform!(temp_tend, temp_tend_grid, scratch_memory, S)
+    transform!(temp_tend, temp_tend_grid, scratch_memory, spectral_transform)
 
     # now add the -∇⋅((u, v)*T') term
-    flux_divergence!(temp_tend, temp, vars, G, time_stepping, S, add = true, flipsign = true)
+    flux_divergence!(temp_tend, temp, vars, model, add = true, flipsign = true)
     return nothing
 end
 
@@ -654,16 +640,12 @@ function humidity_tendency!(
         vars::Variables,
         model::PrimitiveWet
     )
-    G = model.geometry
-    S = model.spectral_transform
-    TS = model.time_stepping
-
     humid_tend = get_tendency_step(vars.tendencies.humidity, model.time_stepping, DynamicalCore())
     humid_tend_grid = get_tendency_step(vars.tendencies.grid.humidity, model.time_stepping, DynamicalCore())
     humid = get_prognostic_step(vars.grid.humidity, model.time_stepping, DynamicalCore())
 
     # add horizontal advection to parameterization + vertical advection tendencies
-    horizontal_advection!(humid_tend, humid_tend_grid, humid, vars, G, S, TS, add = true)
+    horizontal_advection!(humid_tend, humid_tend_grid, humid, vars, model, add = true)
 
     return nothing
 end
@@ -675,8 +657,6 @@ function tracer_advection!(
         vars::Variables,
         model::AbstractModel,
     )
-    G = model.geometry
-    S = model.spectral_transform
     TS = model.time_stepping
 
     for (name, tracer) in model.tracers
@@ -686,7 +666,7 @@ function tracer_advection!(
         tracer_grid = get_prognostic_step(vars.grid.tracers[name], TS)
 
         # add horizontal advection to parameterization + vertical advection + forcing/drag tendencies
-        tracer.active && horizontal_advection!(tracer_tend, tracer_tend_grid, tracer_grid, vars, G, S, TS, add = true)
+        tracer.active && horizontal_advection!(tracer_tend, tracer_tend_grid, tracer_grid, vars, model, add = true)
     end
     return nothing
 end
@@ -698,15 +678,14 @@ function horizontal_advection!(
         A_tend_grid::AbstractField,         # Input: tendency incl prev terms
         A_grid::AbstractField,              # Input: grid field to be advected
         vars::Variables,
-        G::Geometry,
-        S::AbstractSpectralTransform,
-        TS::AbstractTimeStepper;
+        model::AbstractModel;
         add::Bool = true,                   # add/overwrite A_tend_grid?
     )
+    (; spectral_transform, time_stepping) = model
 
     # barotropic model doesn't have divergence, the +A*div term is then zero
     if haskey(vars.grid, :divergence)
-        div_grid = get_prognostic_step(vars.grid.divergence, TS, DynamicalCore())
+        div_grid = get_prognostic_step(vars.grid.divergence, time_stepping, DynamicalCore(), model)
 
         kernel_func = add ? muladd : @inline (a, b, c) -> a * b
 
@@ -719,11 +698,10 @@ function horizontal_advection!(
     end
 
     scratch_memory = vars.scratch.transform_memory
-    transform!(A_tend, A_tend_grid, scratch_memory, S)  # for +A*div in spectral space
+    transform!(A_tend, A_tend_grid, scratch_memory, spectral_transform)  # for +A*div in spectral space
 
     # now add the -∇⋅((u, v)*A) term
-    flux_divergence!(A_tend, A_grid, vars, G, TS, S, add = true, flipsign = true)
-
+    flux_divergence!(A_tend, A_grid, vars, model, add = true, flipsign = true)
     return nothing
 end
 
@@ -752,14 +730,14 @@ function flux_divergence!(
         A_tend::LowerTriangularArray,   # Output: tendency to write into
         A_grid::AbstractField,          # Input: grid field to be advected
         vars::Variables,                # for u,v on grid and scratch memory
-        geometry::Geometry,
-        time_stepping::AbstractTimeStepper,
-        S::AbstractSpectralTransform;
+        model::AbstractModel;
         add::Bool = true,               # add result to A_tend or overwrite for false
         flipsign::Bool = true,          # compute -∇⋅((u, v)*A) (true) or ∇⋅((u, v)*A)?
     )
-    u = get_prognostic_step(vars.grid.u, time_stepping, DynamicalCore())
-    v = get_prognostic_step(vars.grid.v, time_stepping, DynamicalCore())
+    (; time_stepping, geometry, spectral_transform) = model
+
+    u = get_prognostic_step(vars.grid.u, time_stepping, DynamicalCore(), model)
+    v = get_prognostic_step(vars.grid.v, time_stepping, DynamicalCore(), model)
     scratch_memory = vars.scratch.transform_memory
     (; coslat⁻¹) = geometry
 
@@ -777,25 +755,25 @@ function flux_divergence!(
         uA_grid, vA_grid, A_grid, u, v, coslat⁻¹, whichring
     )
 
-    transform!(uA, uA_grid, scratch_memory, S)
-    transform!(vA, vA_grid, scratch_memory, S)
+    transform!(uA, uA_grid, scratch_memory, spectral_transform)
+    transform!(vA, vA_grid, scratch_memory, spectral_transform)
 
-    divergence!(A_tend, uA, vA, S; add, flipsign)
+    divergence!(A_tend, uA, vA, spectral_transform; add, flipsign)
     return nothing
 end
 
 @kernel inbounds = true function _flux_divergence_kernel!(
-        uA_grid,                # Output: u*A on grid
-        vA_grid,                # Output: v*A on grid
-        A_grid,                 # Input: field to be advected
-        u_grid,                 # Input: zonal velocity
-        v_grid,                 # Input: meridional velocity
+        uA_grid,        # Output: u*A on grid
+        vA_grid,        # Output: v*A on grid
+        A_grid,         # Input: field to be advected
+        u_grid,         # Input: zonal velocity
+        v_grid,         # Input: meridional velocity
         coslat⁻¹,       # Input: 1/cos(latitude) for scaling
         whichring,      # Input: mapping from grid point to latitude ring
     )
     I = @index(Global, Cartesian)
 
-    j = whichring[I[1]]               # latitude ring index for this grid point
+    j = whichring[I[1]]             # latitude ring index for this grid point
     coslat⁻¹j = coslat⁻¹[j]         # get coslat⁻¹ for this latitude
     Acoslat⁻¹j = A_grid[I] * coslat⁻¹j
     uA_grid[I] = u_grid[I] * Acoslat⁻¹j
@@ -914,9 +892,9 @@ vorticity_flux!(vars::Variables, model::Barotropic) =
 function bernoulli_potential!(vars::Variables, model::ShallowWater)
     S = model.spectral_transform
     scratch_memory = vars.scratch.transform_memory
-    u = get_prognostic_step(vars.grid.u, model.time_stepping, BernoulliPotential())
-    v = get_prognostic_step(vars.grid.v, model.time_stepping, BernoulliPotential())
-    Φ = get_prognostic_step(vars.grid.geopotential, model.time_stepping, BernoulliPotential())
+    u = get_prognostic_step(vars.grid.u, model.time_stepping, BernoulliPotential(), model)
+    v = get_prognostic_step(vars.grid.v, model.time_stepping, BernoulliPotential(), model)
+    Φ = get_prognostic_step(vars.grid.geopotential, model.time_stepping, BernoulliPotential(), model)
     bernoulli = vars.scratch.a                                  # reuse work arrays a, a_grid
     bernoulli_grid = vars.scratch.grid.a
     div_tend = get_tendency_step(vars.tendencies.divergence, model.time_stepping, BernoulliPotential())
@@ -979,7 +957,7 @@ function volume_flux_divergence!(
         model::ShallowWater,
     )
 
-    η = get_prognostic_step(vars.grid.η, model.time_stepping, ContinuityEquation())
+    η = get_prognostic_step(vars.grid.η, model.time_stepping, ContinuityEquation(), model)
     η_tend = get_tendency_step(vars.tendencies.η, model.time_stepping, ContinuityEquation())
     (; orography) = model.orography
     H = model.atmosphere.layer_thickness
@@ -992,11 +970,7 @@ function volume_flux_divergence!(
     η .+= H .- orography
 
     # now do -∇⋅(uh, vh) and store in η_tend
-    G = model.geometry
-    TS = model.time_stepping
-    S = model.spectral_transform
-
-    flux_divergence!(η_tend, η, vars, G, TS, S, add = true, flipsign = true)
+    flux_divergence!(η_tend, η, vars, model, add = true, flipsign = true)
     return nothing
 end
 
