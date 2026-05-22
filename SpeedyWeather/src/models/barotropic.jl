@@ -76,8 +76,8 @@ function variables(::Type{<:Barotropic}, nsteps)
         TendencyVariable(:u, Grid3D(), namespace = :grid, desc = "Tendency of zonal wind on the grid", units = "m/s²", fuse = :grid_tendencies),
         TendencyVariable(:v, Grid3D(), namespace = :grid, desc = "Tendency of meridional wind on the grid", units = "m/s²", fuse = :grid_tendencies),
 
-        TendencyVariable(:u, Spectral3D(), desc = "Tendency of zonal wind", units = "m/s²", fuse = :spectral_tendencies),
-        TendencyVariable(:v, Spectral3D(), desc = "Tendency of meridional wind", units = "m/s²", fuse = :spectral_tendencies),
+        DynamicsVariable(:u_tendency, Spectral3D(), desc = "Tendency of zonal wind", units = "m/s²", fuse = :spectral_tendencies),
+        DynamicsVariable(:v_tendency, Spectral3D(), desc = "Tendency of meridional wind", units = "m/s²", fuse = :spectral_tendencies),
 
         GridVariable(:vorticity, Grid3D(), desc = "Relative vorticity", units = "1/s", fuse = :grid),
         GridVariable(:u, Grid3D(), desc = "Zonal wind", units = "m/s", fuse = :uv_grid),

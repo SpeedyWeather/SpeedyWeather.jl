@@ -561,8 +561,8 @@ function vordiv_tendencies!(
 
     u_tend_grid = vars.tendencies.grid.u
     v_tend_grid = vars.tendencies.grid.v
-    u_tend = vars.tendencies.u
-    v_tend = vars.tendencies.v
+    u_tend = vars.dynamics.u_tendency
+    v_tend = vars.dynamics.v_tendency
     scratch_memory = vars.scratch.transform_memory
     transform!(u_tend, u_tend_grid, scratch_memory, S)
     transform!(v_tend, v_tend_grid, scratch_memory, S)
@@ -640,8 +640,8 @@ curled/dived to get the tendencies for vorticity/divergence in spectral space
 function vordiv_spectral_tendencies!(vars::Variables, S::AbstractSpectralTransform)
     vor_tend = vars.tendencies.vorticity
     div_tend = vars.tendencies.divergence
-    u_tend = vars.tendencies.u
-    v_tend = vars.tendencies.v
+    u_tend = vars.dynamics.u_tendency
+    v_tend = vars.dynamics.v_tendency
     curl!(vor_tend, u_tend, v_tend, S, add = true)
     divergence!(div_tend, u_tend, v_tend, S, add = true)
     return nothing
@@ -711,8 +711,8 @@ function parameterization_tendencies_only!(
     vor_tend = vars.tendencies.vorticity
     div_tend = vars.tendencies.divergence
     temp_tend = vars.tendencies.temperature
-    u_tend = vars.tendencies.u        # spec u-tendency (in :spectral_tendencies fuse, Phase B2)
-    v_tend = vars.tendencies.v        # spec v-tendency (in :spectral_tendencies fuse, Phase B2)
+    u_tend = vars.dynamics.u_tendency        # spectral u-tendency 
+    v_tend = vars.dynamics.v_tendency        # spectral v-tendency
 
     transform!(u_tend, u_tend_grid, scratch_memory, S)
     transform!(v_tend, v_tend_grid, scratch_memory, S)
@@ -1235,8 +1235,8 @@ function vorticity_flux_curldiv!(
 
     u_tend_grid = vars.tendencies.grid.u
     v_tend_grid = vars.tendencies.grid.v
-    u_tend = vars.tendencies.u
-    v_tend = vars.tendencies.v
+    u_tend = vars.dynamics.u_tendency
+    v_tend = vars.dynamics.v_tendency
     scratch_memory = vars.scratch.transform_memory
     transform!(u_tend, u_tend_grid, scratch_memory, S)
     transform!(v_tend, v_tend_grid, scratch_memory, S)
@@ -1309,8 +1309,8 @@ function vorticity_flux_spectral_tendencies!(
         add::Bool = false,
     )
     vor_tend = vars.tendencies.vorticity
-    u_tend = vars.tendencies.u
-    v_tend = vars.tendencies.v
+    u_tend = vars.dynamics.u_tendency
+    v_tend = vars.dynamics.v_tendency
 
     curl!(vor_tend, u_tend, v_tend, S; add)                   # ∂ζ/∂t = ∇×(u_tend, v_tend)
 
