@@ -48,9 +48,11 @@ function pick_architecture(arg::AbstractString)
     if arg == "gpu"
         return (SpeedyWeather.GPU(), "gpu-nvidia")
     elseif arg == "reactant-cpu"
-        return (SpeedyWeather.ReactantDevice(), "reactant-cpu")
+        return error("Reactant benchmarks are not yet supported. Sorry")
+        #return (SpeedyWeather.ReactantDevice(), "reactant-cpu")
     elseif arg == "reactant-gpu"
-        return (SpeedyWeather.ReactantDevice(), "reactant-gpu")
+        return error("Reactant benchmarks are not yet supported. Sorry")
+        #return (SpeedyWeather.ReactantDevice(), "reactant-gpu")
     elseif arg == "cpu" || isempty(arg)
         arch_str = String(Sys.ARCH)
         label = (startswith(arch_str, "aarch") || arch_str == "arm64") ? "cpu-arm" : "cpu-x86"
