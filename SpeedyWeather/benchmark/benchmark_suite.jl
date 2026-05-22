@@ -102,7 +102,7 @@ function write_results(md, suite::BenchmarkSuite)
     column_header *= "| Δt | SYPD | Memory|"
 
     ncolumns = length(findall('|', column_header)) - 1
-    second_row = repeat("| - ", ncolumns) * "|"
+    second_row = repeat("| --- ", ncolumns) * "|"
 
     write(md, "$column_header\n")
     write(md, "$second_row\n")
@@ -262,7 +262,7 @@ function write_results(md, suite::AbstractBenchmarkSuiteTimed)
         column_header *= "| Allocations |"
 
         ncolumns = length(findall('|', column_header)) - 1
-        second_row = repeat("| - ", ncolumns) * "|"
+        second_row = repeat("| --- ", ncolumns) * "|"
 
         write(md, "$column_header\n")
         write(md, "$second_row\n")

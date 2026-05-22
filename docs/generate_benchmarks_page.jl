@@ -99,7 +99,7 @@ function write_overview_table(io, all_results, labels)
     sort!(rows; by = r -> (r[1], r[2]))
 
     header = "| T | L | " * join(labels, " | ") * " |"
-    sep = "| - | - | " * join(fill("-", length(labels)), " | ") * " |"
+    sep = "| --- | --- | " * join(fill("---", length(labels)), " | ") * " |"
     write(io, header * "\n")
     write(io, sep * "\n")
     for (t, l) in rows
@@ -126,18 +126,31 @@ end
 
 # Suffix every `### ` and `#### ` heading line with " — <label>" so the slug
 # is unique across the docs and Documenter's @ref resolver isn't confused by
-# generic suite titles (e.g. "Grids" or "Models").
-function disambiguate_headings(md::AbstractString, label::AbstractString)
+# generic suite titles (e.g. "Grids" or "Models"). Also rewrites any
+# single-dash table separators (`| - | - |`) into triple-dash form
+# (`| --- | --- |`), which Julia's Markdown parser actually recognises as a
+# table — older JSON dumps may still contain the single-dash form.
+function rewrite_arch_markdown(md::AbstractString, label::AbstractString)
     io = IOBuffer()
     for line in eachline(IOBuffer(md), keep = true)
         stripped = chomp(line)
         if startswith(stripped, "### ") || startswith(stripped, "#### ")
             write(io, stripped, " — ", label, "\n")
+        elseif is_table_separator(stripped)
+            write(io, normalize_separator(stripped), "\n")
         else
             write(io, line)
         end
     end
     return String(take!(io))
+end
+
+is_table_separator(s::AbstractString) =
+    startswith(s, "|") && !isempty(s) && all(c -> c in ('|', '-', ':', ' '), s)
+
+# Expand each isolated `-` (between pipes/spaces/colons) to `---`.
+function normalize_separator(s::AbstractString)
+    return replace(s, r"(?<![-])-(?![-])" => "---")
 end
 
 function write_empty_page(path)
@@ -205,7 +218,7 @@ function generate_benchmarks_page()
             write(io, "### Machine details — $label\n\n")
             write(io, meta["machine_info"])
             write(io, "\n")
-            write(io, disambiguate_headings(record["markdown"], label))
+            write(io, rewrite_arch_markdown(record["markdown"], label))
             write(io, "\n")
         end
     end

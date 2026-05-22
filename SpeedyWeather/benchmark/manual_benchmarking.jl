@@ -231,7 +231,7 @@ function write_overview(md, all_results, labels)
     sort!(rows; by = r -> (r[1], r[2]))
 
     header = "| T | L | " * join(labels, " | ") * " |"
-    sep = "| - | - | " * join(fill("-", length(labels)), " | ") * " |"
+    sep = "| --- | --- | " * join(fill("---", length(labels)), " | ") * " |"
     write(md, header * "\n")
     write(md, sep * "\n")
 
