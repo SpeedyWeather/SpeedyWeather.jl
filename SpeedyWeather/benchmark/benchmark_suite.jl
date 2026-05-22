@@ -1,10 +1,6 @@
 using BenchmarkTools
 using SpeedyWeather: synchronize, _jit, ReactantDevice, MatrixSpectralTransform
 
-# For Reactant we can't use the FFT-based default transform, and we want a
-# warmup run so the @compile cost is excluded from the timing.
-is_reactant(arch) = arch isa ReactantDevice
-
 # Build the model with the right spectral transform for `arch`.
 # Reactant requires MatrixSpectralTransform; everything else uses the default.
 function build_model(Model, spectral_grid, arch; kwargs...)
@@ -14,15 +10,6 @@ function build_model(Model, spectral_grid, arch; kwargs...)
     else
         return Model(spectral_grid; kwargs...)
     end
-end
-
-# A tiny warmup run that triggers Reactant's @compile so the real measurement
-# loop excludes compilation. No-op on CPU/GPU.
-function warmup_if_reactant!(simulation, arch)
-    is_reactant(arch) || return
-    run!(simulation; steps = 2)
-    synchronize(arch)
-    return
 end
 
 abstract type AbstractBenchmarkSuite end
@@ -79,9 +66,6 @@ function run_benchmark_suite!(suite::BenchmarkSuite)
 
         simulation = initialize!(model)
         suite.memory[i] = Base.summarysize(simulation)
-
-        # Reactant compiles on first call — burn that off before timing.
-        warmup_if_reactant!(simulation, architecture)
 
         nsteps = n_timesteps(trunc, nlayers)
         period = Second(round(Int, model.time_stepping.Δt_sec * (nsteps + 1)))
@@ -210,16 +194,11 @@ function run_benchmark_suite!(suite::BenchmarkSuiteDynamics)
 
         simulation = initialize!(model)
 
-        # For Reactant we need to warm up the model so `time_stepping!` compiles
-        # before we benchmark the individual functions (some share compiled artifacts).
-        warmup_if_reactant!(simulation, arch)
-
         vars, model = SpeedyWeather.unpack(simulation)
         lf = 2
         (; orography, geometry, spectral_transform, geopotential, atmosphere, implicit) = model
         lf_implicit = implicit.α == 0 ? lf : 1
 
-        # `_jit(arch, f, args...)` is a no-op on CPU/GPU and `@jit`s on Reactant.
         # Each benchmark sample also calls `synchronize(arch)` to wait for the device.
         safe_benchmark!(suite, i, 1) do
             @benchmark (_jit($arch, SpeedyWeather.pressure_gradient_flux!, $vars, $lf, $spectral_transform); synchronize($arch))
