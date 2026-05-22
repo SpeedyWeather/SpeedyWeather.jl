@@ -336,7 +336,7 @@ end
 figure_names = Tuple{Int, String}[]
 for L in overview_nlayers(all_results, labels)
     fname = "benchmark_primitivewet_L$(L).png"
-    res = write_overview_figure(all_results, labels, L, joinpath(@__DIR__, fname))
+    res = write_overview_figure(all_results, labels, L, joinpath(ASSETS_DIR, fname))
     res === nothing || push!(figure_names, (L, fname))
 end
 
