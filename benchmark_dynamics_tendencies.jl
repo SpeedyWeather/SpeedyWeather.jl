@@ -1,10 +1,5 @@
 # Benchmark for SpeedyWeather.dynamics_tendencies!(vars, lf, model::PrimitiveEquation)
 #
-# This is the function restructured in Phase B3+B4 of the dycore GPU optimization plan:
-# all grid→spec transforms inside the dycore (u/v/T/[q] tendencies, uT_anomaly/vT_anomaly,
-# [uq/vq], kinetic_energy, pressure) are collapsed into a single mega-batched call at
-# K = 6L+1 (PrimitiveDry) / 9L+1 (PrimitiveWet) targeting :grid_tendencies → :spectral_tendencies.
-#
 # Usage:
 #   julia --project=SpeedyWeather benchmark_dynamics_tendencies.jl              # CPU
 #   julia --project=SpeedyWeather benchmark_dynamics_tendencies.jl gpu          # GPU (loads CUDA)
