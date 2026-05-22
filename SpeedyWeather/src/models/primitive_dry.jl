@@ -117,20 +117,17 @@ $(TYPEDFIELDS)"""
     )
 
     parameterizations::TS2 = (
-        # orbit or external forcing
-        :solar_zenith,
-
-        # mixing
-        :vertical_diffusion, :convection,
-
-        # radiation
-        :albedo, :shortwave_radiation, :longwave_radiation,
-
-        # surface fluxes
-        :boundary_layer_drag, :surface_condition, :surface_momentum_flux, :surface_heat_flux,
-
-        # perturbations
-        :stochastic_physics,
+        :solar_zenith,              # orbit or external forcing
+        :vertical_diffusion,        # mixing
+        :convection,
+        :albedo,                    # radiation
+        :shortwave_radiation,
+        :longwave_radiation,
+        :surface_condition,         # surface fluxes
+        :boundary_layer_drag,       
+        :surface_momentum_flux,
+        :surface_heat_flux,
+        :stochastic_physics,        # perturbations
     )
 
     # DERIVED
@@ -161,7 +158,8 @@ function variables(::Type{<:PrimitiveDry}, nsteps = DEFAULT_NSTEPS)
         
         GridVariable(:divergence, Grid4D(pg), desc = "Divergence", units = "1/s"),
         GridVariable(:temperature, Grid4D(pg), desc = "Temperature", units = "K"),
-        GridVariable(:pressure, Grid3D(pg), desc = "Logarithm of surface pressure", units = ""),
+        GridVariable(:pressure, Grid3D(pg), desc = "Logarithm of surface pressure", units = "log(Pa)"),
+        ParameterizationVariable(:surface_pressure, Grid2D(), desc = "Surface pressure", units = "Pa"),
 
         DynamicsVariable(:dpres_dx, Grid2D(), desc = "Zonal gradient of the logarithm of surface pressure"),
         DynamicsVariable(:dpres_dy, Grid2D(), desc = "Meridional gradient of the logarithm of surface pressure"),
