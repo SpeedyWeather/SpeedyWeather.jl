@@ -14,7 +14,7 @@ top of Mt Everest, or to paint the Sahara black and moving
 it below sea-level. The first one of these bullet points is
 discussed below for the others see the respective sections.
 
-It's also possible to us a land model from [Terrarium.jl](https://github.com/NumericalEarth/Terrarium.jl.git) within SpeeyWeather.jl. This is particularly relevant for higher complexity climate simulations as Terrarium features many more processes as our own build-in land models, see [Terrarium coupling](@ref).
+It's also possible to use a land model from [Terrarium.jl](https://github.com/NumericalEarth/Terrarium.jl.git) within SpeeyWeather.jl. This is particularly relevant for higher complexity climate simulations as Terrarium features many more processes as our own build-in land models, see [Terrarium coupling](@ref).
 
 ## Dry vs wet land
 
