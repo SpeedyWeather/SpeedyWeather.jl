@@ -35,9 +35,9 @@ Each run updates only its own architecture's section in this `README.md`; result
 
 Simulated years per wallclock day (SYPD) for the `PrimitiveWetModel` resolution sweep, one column per architecture. Empty cells mean the architecture has not yet been benchmarked or that suite was skipped.
 
-![PrimitiveWet L=8 across architectures](benchmark_primitivewet_L8.png)
+![PrimitiveWet L=8 across architectures](assets/benchmark_primitivewet_L8.png)
 
-![PrimitiveWet L=16 across architectures](benchmark_primitivewet_L16.png)
+![PrimitiveWet L=16 across architectures](assets/benchmark_primitivewet_L16.png)
 
 | T | L | cpu-arm |
 | - | - | - |
