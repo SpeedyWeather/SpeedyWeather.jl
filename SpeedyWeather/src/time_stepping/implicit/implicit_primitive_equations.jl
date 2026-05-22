@@ -1,4 +1,3 @@
-
 export ImplicitPrimitiveEquation
 
 """
@@ -244,6 +243,7 @@ Apply the implicit corrections to dampen gravity waves in the primitive equation
 function implicit_correction!(
         vars::Variables,
         implicit::ImplicitPrimitiveEquation,
+        time_stepping::AbstractLeapfrog,
         model::PrimitiveEquation,
     )
 
@@ -256,9 +256,9 @@ function implicit_correction!(
     Δt = time_step(time_stepping, vars.prognostic.clock)       
     ξ = implicit.centering * Δt
 
-    temp_tend = vars.tendencies.temperature
-    pres_tend = vars.tendencies.pressure
-    div_tend = vars.tendencies.divergence
+    temp_tend = get_tendency_step(vars.tendencies.temperature, time_stepping, implicit)
+    pres_tend = get_tendency_step(vars.tendencies.pressure, time_stepping, implicit)
+    div_tend = get_tendency_step(vars.tendencies.divergence, time_stepping, implicit)
     div_old, div_new = get_steps(vars.prognostic.divergence)
     G = vars.scratch.a                  # reuse work arrays, used for combined tendency G
     geopotential = vars.scratch.b       # used for geopotential

@@ -178,4 +178,6 @@ function SpeedyTransforms.transform!(
     return nothing
 end
 
+# only needed for Leapfrog to retain a copy of the current time step moved to the previous
+# fallback is nothing for other time steppers
 move_prognostic_grid_variables_back!(::Variables, ::AbstractTimeStepper, ::AbstractModel) = nothing

@@ -297,34 +297,34 @@ function horizontal_diffusion!(
         vars::Variables,
         diffusion::AbstractHorizontalDiffusion,
         model::PrimitiveEquation,
-        lf::Integer = 1,    # leapfrog index used (2 is unstable)
     )
-    # use stronger diffusion operators that taper and change power with height for divergence
-    (; expl_div, impl_div) = diffusion
+    (; expl, expl_div) = diffusion
 
-    # and those for all other variables
-    (; expl, impl) = diffusion
+    # apply diffusion explicitly by passing on nothing for the precomputed implicit array
+    do_implicitly = implicit_diffusion(diffusion, model.implicit, model.time_stepping)
+    impl = do_implicitly ? diffusion.impl : nothing
+    impl_div = do_implicitly ? diffusion.impl_div : nothing
 
     # Primitive equation models diffuse vorticity, divergence, temp (and humidity for wet core)
-    vor = get_step(vars.prognostic.vorticity, lf)
-    div = get_step(vars.prognostic.divergence, lf)
-    temp = get_step(vars.prognostic.temperature, lf)
-    vor_tend = vars.tendencies.vorticity
-    div_tend = vars.tendencies.divergence
-    temp_tend = vars.tendencies.temperature
+    vor = get_prognostic_step(vars.prognostic.vorticity, model.time_stepping, diffusion)
+    vor_tend = get_tendency_step(vars.tendencies.vorticity, model.time_stepping, diffusion)
+    div = get_prognostic_step(vars.prognostic.divergence, model.time_stepping, diffusion)
+    div_tend = get_tendency_step(vars.tendencies.divergence, model.time_stepping, diffusion)
+    temp = get_prognostic_step(vars.prognostic.temperature, model.time_stepping, diffusion)
+    temp_tend = get_tendency_step(vars.tendencies.temperature, model.time_stepping, diffusion)
     horizontal_diffusion!(vor_tend, vor, expl, impl)
     horizontal_diffusion!(div_tend, div, expl_div, impl_div)
     horizontal_diffusion!(temp_tend, temp, expl, impl)
 
     if haskey(vars.tendencies, :humidity)
-        humid = get_step(vars.prognostic.humidity, lf)
-        humid_tend = vars.tendencies.humidity
+        humid = get_prognostic_step(vars.prognostic.humidity, model.time_stepping, diffusion)
+        humid_tend = get_tendency_step(vars.tendencies.humidity, model.time_stepping, diffusion)
         horizontal_diffusion!(humid_tend, humid, expl, impl)
     end
 
     for (name, tracer) in model.tracers
-        tracer_var = get_step(vars.prognostic.tracers[name], lf)      # lta_view for leapfrog index
-        tracer_tend = vars.tendencies.tracers[name]
+        tracer_var = get_prognostic_step(vars.prognostic.tracers[name], model.time_stepping, diffusion)
+        tracer_tend = get_tendency_step(vars.tendencies.tracers[name], model.time_stepping, diffusion)
         tracer.active && horizontal_diffusion!(tracer_tend, tracer_var, expl, impl)
     end
 
