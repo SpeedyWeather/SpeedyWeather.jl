@@ -60,16 +60,19 @@ function geopotential!(
         vars::Variables,
         model::PrimitiveEquation,
     )
-    T = vars.grid.temperature
+    TS = model.time_stepping
+    G = model.geopotential
+    T = get_prognostic_step(vars.grid.temperature, TS, G)
     Φ = vars.grid.geopotential
 
     # use zero scratch for humidity in dry models to not distinguish in kernels below
     vars.scratch.grid.a .= 0
-    q = haskey(vars.grid, :humidity) ? vars.grid.humidity : vars.scratch.grid.a
+    q = haskey(vars.grid, :humidity) ?  get_prognostic_step(vars.grid.humidity, TS, G) : vars.scratch.grid.a
+    
+    @boundscheck size(T) == size(Φ) == size(q) || throw(BoundsError)
 
     (; orography) = model.orography
     g = model.planet.gravity
-    G = model.geopotential
     (; orography) = model.orography
     (; atmosphere) = model
 
