@@ -16,7 +16,8 @@ function SpeedyTransforms.transform!(
     transform!(pattern_grid, pattern, scratch_memory, spectral_transform)
 
     if :clamp in fieldnames(typeof(random_process))
-        clamp!(pattern_grid, random_process.clamp...)
+        lo, hi = random_process.clamp
+        @. pattern_grid = clamp(pattern_grid, lo, hi)
     end
     return nothing
 end
