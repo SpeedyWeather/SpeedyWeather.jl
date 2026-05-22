@@ -124,6 +124,22 @@ function write_overview_table(io, all_results, labels)
     return
 end
 
+# Suffix every `### ` and `#### ` heading line with " — <label>" so the slug
+# is unique across the docs and Documenter's @ref resolver isn't confused by
+# generic suite titles (e.g. "Grids" or "Models").
+function disambiguate_headings(md::AbstractString, label::AbstractString)
+    io = IOBuffer()
+    for line in eachline(IOBuffer(md), keep = true)
+        stripped = chomp(line)
+        if startswith(stripped, "### ") || startswith(stripped, "#### ")
+            write(io, stripped, " — ", label, "\n")
+        else
+            write(io, line)
+        end
+    end
+    return String(take!(io))
+end
+
 function write_empty_page(path)
     open(path, "w") do io
         write(io, "# Benchmarks\n\n")
@@ -178,15 +194,18 @@ function generate_benchmarks_page()
         write_overview_table(io, results, labels)
 
         # Per-architecture sections — reuse the markdown blob stored in JSON.
+        # Disambiguate the per-arch sub-headings so Documenter's @ref resolver
+        # can't confuse them with top-level pages (e.g. the `### Grids` suite
+        # heading would otherwise collide with the `# Grids` page).
         for label in labels
             record = results[label]
             meta = record["meta"]
             write(io, "## Architecture: `$label`\n\n")
             write(io, "Created for SpeedyWeather.jl v$(meta["speedyweather_version"]) on $(meta["timestamp"]).\n\n")
-            write(io, "### Machine details\n\n")
+            write(io, "### Machine details — $label\n\n")
             write(io, meta["machine_info"])
             write(io, "\n")
-            write(io, record["markdown"])
+            write(io, disambiguate_headings(record["markdown"], label))
             write(io, "\n")
         end
     end
