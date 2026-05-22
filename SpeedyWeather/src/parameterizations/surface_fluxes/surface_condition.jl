@@ -53,10 +53,9 @@ end
     # Surface air density
     (; surface_air_density) = vars.parameterizations
     temperature = get_prognostic_step(vars.grid.temperature, model.time_stepping, surface_condition)
-    pressure = get_prognostic_step(vars.grid.pressure, model.time_stepping, surface_condition)
+    pₛ = vars.parameterizations.surface_pressure[ij]       # surface pressure [Pa]
     (; R_dry, κ) = model.atmosphere
     σ = model.geometry.σ_levels_full[nlayers]       # σ vertical coordinate at lowest model level
-    pₛ = pressure[ij]                               # surface pressure [Pa]
     T = temperature[ij, nlayers]                    # virtual temperature at lowest model level [K]
     q = haskey(vars.grid, :humidity) ?              # specific humidity at lowest model level [kg/kg]
         get_prognostic_step(vars.grid.humidity, model.time_stepping, surface_condition)[ij, nlayers] : zero(T)  

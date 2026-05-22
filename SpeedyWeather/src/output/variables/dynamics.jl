@@ -116,10 +116,11 @@ Fields are: $(TYPEDFIELDS)"""
     compression_level::Int = 3
     shuffle::Bool = true
     keepbits::Int = 12
-    transform::F = (x) -> exp(x) / 100     # log(Pa) to hPa
+    transform::F = (x) -> x / 100     # Pa to hPa
 end
 
-path(::SurfacePressureOutput, simulation) = simulation.variables.grid.pressure
+# use from parameterizations as already converted to Pa there to avoid exp in multiple places
+path(::SurfacePressureOutput, simulation) = simulation.variables.parameterizations.surface_pressure
 
 """Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""

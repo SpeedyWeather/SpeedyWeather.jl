@@ -92,9 +92,9 @@ initialize!(::JeevanjeeRadiation, ::PrimitiveEquation) = nothing
 # function barrier
 @propagate_inbounds function parameterization!(ij, vars, longwave::JeevanjeeRadiation, model)
 
-    T = vars.grid.temperature                                  # to match Seeley, 2023 notation
+    T = get_prognostic_step(vars.grid.temperature, model.time_stepping, longwave)
     dTdt = get_tendency_step(vars.tendencies.grid.temperature, model.time_stepping, longwave)
-    pₛ = get_prognostic_step(vars.grid.pressure, model.time_stepping, longwave)[ij]          # surface pressure [Pa]
+    pₛ = vars.parameterizations.surface_pressure[ij]            # surface pressure [Pa]
     nlayers = size(T, 2)
 
     (; α) = longwave
@@ -228,7 +228,7 @@ initialize!(::OneBandLongwaveRadiativeTransfer, ::PrimitiveEquation) = nothing
     T = get_prognostic_step(vars.grid.temperature, model.time_stepping, longwave)
     NF = eltype(T)
     dTdt = get_tendency_step(vars.tendencies.grid.temperature, model.time_stepping, longwave)
-    pₛ = get_prognostic_step(vars.grid.pressure, model.time_stepping, longwave)[ij]          # surface pressure [Pa]
+    pₛ = vars.parameterizations.surface_pressure[ij]                    # surface pressure [Pa]
     nlayers = size(T, 2)
 
     ϵ_ocean = longwave.emissivity_ocean

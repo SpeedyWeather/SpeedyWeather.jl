@@ -144,6 +144,7 @@ function SpeedyTransforms.transform!(
     # if not initial step do before transforms i.e before that step is overwritten
     initialize || move_prognostic_grid_variables_back!(vars, time_stepping, model)
 
+
     transform!(vor_grid, vor, scratch_memory, S)    # get vorticity on grid from spectral vor
     transform!(div_grid, div, scratch_memory, S)    # get divergence on grid from spectral div
     transform!(temp_grid, temp, scratch_memory, S)  # -- temperature --
@@ -165,13 +166,17 @@ function SpeedyTransforms.transform!(
     transform!(u_grid, U, scratch_memory, S, unscale_coslat = true)
     transform!(v_grid, V, scratch_memory, S, unscale_coslat = true)
 
+    # at initial step copy 2nd step (current) to 1st (prev) to retain those fields
+    # only do after transforms to avoid copying 
+    initialize && move_prognostic_grid_variables_back!(vars, time_stepping, model)
+
     # include humidity effect into temp for everything stability-related
     temperature_average!(vars, temp, S)
     geopotential!(vars, model)                  # calculate geopotential
 
-    # at initial step copy 2nd step (current) to 1st (prev) to retain those fields
-    # only do after transforms to avoid copying 
-    initialize && move_prognostic_grid_variables_back!(vars, time_stepping, model)
+    # convert the logarithm of surface pressure to actual surface pressure in Pascal for parameterizations
+    log_pₛ = get_prognostic_step(vars.grid.pressure, time_stepping, DummyParameterization())    # log Pa
+    vars.parameterizations.surface_pressure .= exp.(log_pₛ)                                     # in Pa
 
     # transform random pattern for random process unless random_process=nothing
     transform!(vars, model.random_process, S)

@@ -96,7 +96,7 @@ Returns (cloud_cover, cloud_top, stratocumulus_cover) tuple."""
     NF = eltype(temp)
     nlayers = size(temp, 2)
 
-    pₛ = get_prognostic_step(vars.grid.pressure, model.time_stepping, clouds)[ij]
+    pₛ = vars.parameterizations.surface_pressure[ij]          # surface pressure [Pa]
     sigma_levels = model.geometry.σ_levels_full
     land_fraction = model.land_sea_mask.mask[ij]
     cₚ = model.atmosphere.heat_capacity

@@ -68,20 +68,19 @@ large-scale precipitation vertically for output."""
     humid_tend = get_tendency_step(vars.tendencies.grid.humidity, time_stepping, condensation)      # specific humidity tendency [kg/kg/s]
     nlayers = size(temp, 2)
 
-    # precompute scaling constants to minimize divisions (used to convert between humidity [kg/kg] and precipitation [m])
-    pressure = get_prognostic_step(vars.grid.pressure, time_stepping, condensation)                 
-    pₛ = pressure[ij]                               # surface pressure [Pa]
-    (; Δt_sec) = time_stepping                      # time step [s]
-    σ = geometry.σ_levels_full                      # vertical sigma coordinate [1]
-    Δσ = geometry.σ_levels_thick                    # layer thickness in sigma coordinates
-    ρ = atmosphere.water_density                    # air density [kg/m³]
-    pₛ_gρ = pₛ / (planet.gravity * ρ)               # [Pa / (m/s² * kg/m³)] = [Pa m² * s² / kg] = [m]
+    # precompute scaling constants to minimize divisions (used to convert between humidity [kg/kg] and precipitation [m])           
+    pₛ = vars.parameterizations.surface_pressure[ij]    # surface pressure [Pa]
+    (; Δt_sec) = time_stepping                          # time step [s]
+    σ = geometry.σ_levels_full                          # vertical sigma coordinate [1]
+    Δσ = geometry.σ_levels_thick                        # layer thickness in sigma coordinates
+    ρ = atmosphere.water_density                        # air density [kg/m³]
+    pₛ_gρ = pₛ / (planet.gravity * ρ)                   # [Pa / (m/s² * kg/m³)] = [Pa m² * s² / kg] = [m]
 
     # thermodynamics
-    Lᵥ = atmosphere.latent_heat_condensation        # latent heat of vaporization
-    Lᵢ = atmosphere.latent_heat_fusion              # latent heat of fusion
-    cₚ = atmosphere.heat_capacity                   # heat capacity
-    Rᵥ = atmosphere.R_vapor                         # gas constant for water vapor
+    Lᵥ = atmosphere.latent_heat_condensation            # latent heat of vaporization
+    Lᵢ = atmosphere.latent_heat_fusion                  # latent heat of fusion
+    cₚ = atmosphere.heat_capacity                       # heat capacity
+    Rᵥ = atmosphere.R_vapor                             # gas constant for water vapor
     Lᵥ_cₚ = Lᵥ / cₚ
     Lᵢ_cₚ = Lᵢ / cₚ
     cₚ_Lᵢ = cₚ / Lᵢ

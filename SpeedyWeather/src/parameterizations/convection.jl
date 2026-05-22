@@ -45,7 +45,7 @@ and relaxes current vertical profiles to the adjusted references."""
     geopotential = vars.grid.geopotential
     temp_tend = get_tendency_step(vars.tendencies.grid.temperature, time_stepping, convection)
     humid_tend = get_tendency_step(vars.tendencies.grid.humidity, time_stepping, convection)
-    pₛ = get_prognostic_step(vars.grid.pressure, time_stepping, convection)[ij]          # surface pressure [Pa]
+    pₛ = vars.parameterizations.surface_pressure[ij]          # surface pressure [Pa]
     NF = eltype(temp)
 
     # thermodynamics
@@ -429,7 +429,7 @@ end
         model,
     )
     time_stepping = model.time_stepping
-    pₛ = get_prognostic_step(vars.grid.pressure, time_stepping, scheme)
+    pₛ = vars.parameterizations.surface_pressure[ij]          # surface pressure [Pa]
     temp_tend = get_tendency_step(vars.tendencies.grid.temperature, time_stepping, scheme)
     nlayers = size(temp_tend, 2)
     NF = eltype(temp_tend)
@@ -445,7 +445,7 @@ end
     cos²θ_term = scheme.lat_mask[j]
 
     for k in 1:nlayers
-        p = pₛ[ij] * σ[k]      # Pressure in Pa on layer k
+        p = pₛ * σ[k]       # Pressure in Pa on layer k
 
         # Lee and Kim, 2003, eq. 2
         temp_tend[ij, k] += Qmax * exp(-((p - p₀) / σₚ)^2 / 2) * cos²θ_term

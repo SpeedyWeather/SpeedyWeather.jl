@@ -77,7 +77,7 @@ variables(::SurfaceOceanHumidityFlux) = (
     SST = vars.prognostic.ocean.sea_surface_temperature[ij]
 
     # SATURATION HUMIDITY OVER OCEAN
-    pₛ = get_prognostic_step(vars.grid.pressure, model.time_stepping, humidity_flux)[ij]   # surface pressure [Pa]
+    pₛ = vars.parameterizations.surface_pressure[ij]                    # surface pressure [Pa]
     sat_humid_ocean = saturation_humidity(SST, pₛ, model.atmosphere)
 
     ρ = vars.parameterizations.surface_air_density[ij]
@@ -140,13 +140,13 @@ variables(::SurfaceLandHumidityFlux) = (
     α = vars.parameterizations.land.soil_moisture_availability[ij]
 
     # SATURATION HUMIDITY OVER LAND
-    pₛ = get_prognostic_step(vars.grid.pressure, model.time_stepping, humidity_flux)[ij]   # surface pressure [Pa]
+    pₛ = vars.parameterizations.surface_pressure[ij]                    # surface pressure [Pa]
     sat_humid_land = saturation_humidity(T, pₛ, model.atmosphere)
 
     ρ = vars.parameterizations.surface_air_density[ij]
     V₀ = vars.parameterizations.surface_wind_speed[ij]
     land_fraction = model.land_sea_mask.mask[ij]
-    surface = model.geometry.nlayers            # indexing top to bottom
+    surface = model.geometry.nlayers                    # indexing top to bottom
     surface_humid = get_prognostic_step(vars.grid.humidity, model.time_stepping, humidity_flux)[ij, surface]
 
     # drag coefficient either from SurfaceLandHumidityFlux or from a central drag coefficient
@@ -188,7 +188,7 @@ variables(::PrescribedOceanHumidityFlux) = (
 
 @propagate_inbounds function surface_humidity_flux!(ij, vars, humidity_flux::PrescribedOceanHumidityFlux, model)
     land_fraction = model.land_sea_mask.mask[ij]
-    pₛ = get_prognostic_step(vars.grid.pressure, model.time_stepping, humidity_flux)[ij]   # surface pressure [Pa]
+    pₛ = vars.parameterizations.surface_pressure[ij]    # surface pressure [Pa]
     surface = model.geometry.nlayers
 
     # read in a prescribed flux
@@ -196,7 +196,7 @@ variables(::PrescribedOceanHumidityFlux) = (
 
     # store without weighting by land fraction for coupling
     vars.parameterizations.ocean.surface_humidity_flux[ij] = flux_ocean
-    flux_ocean *= (1 - land_fraction)             # weight by ocean fraction of land-sea mask
+    flux_ocean *= (1 - land_fraction)                   # weight by ocean fraction of land-sea mask
 
     # output/diagnose: ocean sets flux (=), land accumulates (+=)
     vars.parameterizations.surface_humidity_flux[ij] = flux_ocean
@@ -222,7 +222,7 @@ variables(::PrescribedLandHumidityFlux) = (
 
 @propagate_inbounds function surface_humidity_flux!(ij, vars, humidity_flux::PrescribedLandHumidityFlux, model)
     land_fraction = model.land_sea_mask.mask[ij]
-    pₛ = get_prognostic_step(vars.grid.pressure, model.time_stepping, humidity_flux)[ij]   # surface pressure [Pa]
+    pₛ = vars.parameterizations.surface_pressure[ij]       # surface pressure [Pa]
     surface = model.geometry.nlayers
 
     # read in a prescribed flux

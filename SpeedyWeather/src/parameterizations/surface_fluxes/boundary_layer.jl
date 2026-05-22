@@ -73,14 +73,14 @@ initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
     κ = drag.von_Karman
     z₀ = land_fraction * drag.roughness_length_land + (1 - land_fraction) * drag.roughness_length_ocean
 
-    # should be z > z₀, z=z₀ means an infinitely high drag
+    # should be z > z₀, z=z₀ means an infinitely high drag, choose one order higher than roughness length at least
     # 0 < z < z₀ doesn't make sense so cap here
-    z = max(z, z₀)
+    z = max(z, 10z₀)
     drag_max = (κ / log(z / z₀))^2
 
     # bulk Richardson number at lowermost layer from Frierson, 2006, eq. (15)
     # they call it Ri_a = Ri here
-    ΔΦ₀ = gravity * z     # geopotential high relative to surface
+    ΔΦ₀ = gravity * z     # geopotential height relative to surface
     Ri = bulk_richardson_surface(ij, ΔΦ₀, vars, atmosphere, drag, time_stepping)
     Ri_c = drag.critical_Richardson
     (; drag_min) = drag

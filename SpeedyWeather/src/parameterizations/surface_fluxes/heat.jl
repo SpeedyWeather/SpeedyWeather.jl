@@ -82,7 +82,7 @@ variables(::SurfaceOceanHeatFlux) = (
     SST = vars.prognostic.ocean.sea_surface_temperature[ij]
     T = vars.parameterizations.surface_air_temperature[ij]
     land_fraction = model.land_sea_mask.mask[ij]
-    pₛ = get_prognostic_step(vars.grid.pressure, model.time_stepping, heat_flux)[ij]
+    pₛ = vars.parameterizations.surface_pressure[ij]            # surface pressure [Pa]
 
     # drag coefficient
     d = vars.parameterizations.boundary_layer_drag[ij]
@@ -140,12 +140,12 @@ variables(::SurfaceLandHeatFlux) = (
 
     surface = model.geometry.nlayers
     cₚ = model.atmosphere.heat_capacity
-    pₛ = get_prognostic_step(vars.grid.pressure, model.time_stepping, heat_flux)[ij]   # surface pressure [Pa]
+    pₛ = vars.parameterizations.surface_pressure[ij]                # surface pressure [Pa]
     ρ = vars.parameterizations.surface_air_density[ij]
     V₀ = vars.parameterizations.surface_wind_speed[ij]
 
     # TODO actually implement skin temperature?
-    T_skin_land = vars.prognostic.land.soil_temperature[ij, 1]    # uppermost land layer with index 1
+    T_skin_land = vars.prognostic.land.soil_temperature[ij, 1]      # uppermost land layer with index 1
     T = vars.parameterizations.surface_air_temperature[ij]
     land_fraction = model.land_sea_mask.mask[ij]
     snow_depth = haskey(vars.prognostic.land, :snow_depth) ? vars.prognostic.land.snow_depth[ij] : zero(T)
@@ -193,7 +193,7 @@ variables(::PrescribedOceanHeatFlux) = (
 
 @propagate_inbounds function surface_heat_flux!(ij, vars, heat_flux::PrescribedOceanHeatFlux, model)
     land_fraction = model.land_sea_mask.mask[ij]
-    pₛ = get_prognostic_step(vars.grid.pressure, model.time_stepping, heat_flux)[ij]   # surface pressure [Pa]
+    pₛ = vars.parameterizations.surface_pressure[ij]                    # surface pressure [Pa]
     cₚ = model.atmosphere.heat_capacity
     surface = model.geometry.nlayers
 
@@ -233,9 +233,9 @@ variables(::PrescribedLandHeatFlux) = (
 
 @propagate_inbounds function surface_heat_flux!(ij, vars, heat_flux::PrescribedLandHeatFlux, model)
     land_fraction = model.land_sea_mask.mask[ij]
-    pₛ = get_prognostic_step(vars.grid.pressure, model.time_stepping, heat_flux)[ij]   # surface pressure [Pa]
+    pₛ = vars.parameterizations.surface_pressure[ij]    # surface pressure [Pa]
     cₚ = model.atmosphere.heat_capacity
-    surface = model.geometry.nlayers             # indexing top to bottom
+    surface = model.geometry.nlayers                    # indexing top to bottom
 
     # read in a prescribed flux
     flux_land = vars.prognostic.land.sensible_heat_flux[ij]

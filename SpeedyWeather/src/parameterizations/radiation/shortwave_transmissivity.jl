@@ -96,8 +96,8 @@ initialize!(::BackgroundShortwaveTransmissivity, ::AbstractModel) = nothing
 
     sigma_levels = model.geometry.σ_levels_half
     sigma_levels_full = model.geometry.σ_levels_full
-    pressure = get_prognostic_step(vars.grid.pressure, model.time_stepping, transmissivity)
-    normalized_surface_pressure = pressure[ij] / 100000
+    pₛ = vars.parameterizations.surface_pressure[ij]          # surface pressure [Pa]
+    normalized_surface_pressure = pₛ / 100000
 
     # Zenith angle correction factor
     azen = transmissivity.zenith_amplitude

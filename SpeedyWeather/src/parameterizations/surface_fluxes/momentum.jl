@@ -64,7 +64,7 @@ end
     flux_v_upward = -ρ * drag * V₀ * f * v[ij, surface]
 
     # convert fluxes to tendencies
-    pₛ = get_prognostic_step(vars.grid.pressure, model.time_stepping, momentum_flux)[ij]   # surface pressure [Pa]
+    pₛ = vars.parameterizations.surface_pressure[ij]       # surface pressure [Pa]
     u_tend = get_tendency_step(vars.tendencies.grid.u, model.time_stepping, momentum_flux)
     v_tend = get_tendency_step(vars.tendencies.grid.v, model.time_stepping, momentum_flux)
     u_tend[ij, surface] += surface_flux_to_tendency(flux_u_upward, pₛ, model)
