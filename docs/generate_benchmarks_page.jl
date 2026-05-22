@@ -5,7 +5,7 @@ before `makedocs` so the page is a regular static markdown file by the time
 Documenter sees it.
 
 The page is structured as:
-  - intro
+  - introduction
   - cross-architecture overview table (PrimitiveWet resolution sweep)
   - one comparison figure per L value (SYPD vs T, one line per arch)
   - one section per architecture mirroring the per-arch markdown stored in JSON
