@@ -4,7 +4,7 @@ using SpeedyWeather: synchronize, _jit, ReactantDevice, MatrixSpectralTransform
 # Build the model with the right spectral transform for `arch`.
 # Reactant requires MatrixSpectralTransform; everything else uses the default.
 function build_model(Model, spectral_grid, arch; kwargs...)
-    if is_reactant(arch)
+    if arch isa ReactantDevice
         M = MatrixSpectralTransform(spectral_grid)
         return Model(spectral_grid; spectral_transform = M, kwargs...)
     else

@@ -16,11 +16,12 @@ and `Reactant.set_default_backend("cpu" | "gpu")`; for those archs the suites
 fall back to `MatrixSpectralTransform` since the FFT-based default is not yet
 covered by Reactant's MLIR pipeline.
 
-Per-architecture results are persisted to `assets/benchmark_results.json`,
-and the cross-architecture comparison figures to `assets/*.png`. The
-`README.md` (kept at the benchmark root) is then regenerated from all stored
-architectures: each gets its own section, plus a cross-architecture overview
-table of the PrimitiveWet resolution sweep.
+Per-architecture results are persisted to `assets/benchmark_results.json`.
+The `README.md` (kept at the benchmark root) is then regenerated from all
+stored architectures: each gets its own section, plus a cross-architecture
+overview table of the PrimitiveWet resolution sweep. The docs page
+`docs/src/benchmarks.md` is generated at doc-build time from the same JSON
+and additionally renders comparison figures — see `docs/make.jl`.
 =#
 
 import Pkg
@@ -41,7 +42,7 @@ if ARCH_ARG == "reactant-cpu" || ARCH_ARG == "reactant-gpu"
     Reactant.set_default_backend(ARCH_ARG == "reactant-gpu" ? "gpu" : "cpu")
 end
 
-using SpeedyWeather, Dates, Printf, InteractiveUtils, JSON3, CairoMakie
+using SpeedyWeather, Dates, Printf, InteractiveUtils, JSON3
 import SpeedyWeather.SpeedyTransforms: prettymemory
 
 function pick_architecture(arg::AbstractString)
@@ -209,14 +210,11 @@ function write_preamble(md)
     return
 end
 
-function write_overview(md, all_results, labels, figure_names)
+function write_overview(md, all_results, labels)
     write(md, "## Overview: PrimitiveWet resolution across architectures\n\n")
     write(md, "Simulated years per wallclock day (SYPD) for the `PrimitiveWetModel` resolution sweep, ")
-    write(md, "one column per architecture. Empty cells mean the architecture has not yet been benchmarked or that suite was skipped.\n\n")
-
-    for (nlayers, fname) in figure_names
-        write(md, "![PrimitiveWet L=$nlayers across architectures](assets/$fname)\n\n")
-    end
+    write(md, "one column per architecture. Empty cells mean the architecture has not yet been benchmarked or that suite was skipped. ")
+    write(md, "Comparison figures across architectures are available on the documentation's `Benchmarks` page.\n\n")
 
     # Pick the union of (trunc, nlayers) rows from all archs.
     rows = Tuple{Int, Int}[]
@@ -277,77 +275,11 @@ end
 const README_PATH = joinpath(@__DIR__, "README.md")
 labels = sorted_arch_labels(all_results)
 
-"""
-    overview_nlayers(all_results, labels)
-
-Collect the union of `nlayers` values that appear across the stored
-PrimitiveWet resolution sweeps so we can render one comparison figure per L.
-"""
-function overview_nlayers(all_results, labels)
-    s = Set{Int}()
-    for label in labels
-        ov = get(all_results[label], "overview", nothing)
-        ov === nothing && continue
-        for l in ov["nlayers"]
-            push!(s, Int(l))
-        end
-    end
-    return sort!(collect(s))
-end
-
-"""
-    write_overview_figure(all_results, labels, nlayers_target, png_path)
-
-Render an SYPD-vs-truncation comparison across `labels` for rows whose
-`nlayers == nlayers_target`. Returns the path, or `nothing` if nothing to plot.
-"""
-function write_overview_figure(all_results, labels, nlayers_target, png_path)
-    fig = Figure(size = (720, 480))
-    ax = Axis(
-        fig[1, 1];
-        xlabel = "Spectral truncation T",
-        ylabel = "SYPD (simulated years per wallclock day)",
-        title = "PrimitiveWetModel, L=$nlayers_target",
-        yscale = log10,
-    )
-    plotted_anything = false
-    for label in labels
-        ov = get(all_results[label], "overview", nothing)
-        ov === nothing && continue
-        xs = Int[]
-        ys = Float64[]
-        for i in eachindex(ov["trunc"])
-            Int(ov["nlayers"][i]) == nlayers_target || continue
-            s = ov["sypd"][i]
-            (s isa Number && isfinite(s) && s > 0) || continue
-            push!(xs, Int(ov["trunc"][i]))
-            push!(ys, Float64(s))
-        end
-        isempty(xs) && continue
-        order = sortperm(xs)
-        scatterlines!(ax, xs[order], ys[order]; label = label, marker = :circle, linewidth = 2, markersize = 10)
-        plotted_anything = true
-    end
-    plotted_anything || return nothing
-    axislegend(ax; position = :rt)
-    save(png_path, fig)
-    return png_path
-end
-
-# Build the comparison figures and remember the basenames for the README link.
-figure_names = Tuple{Int, String}[]
-for L in overview_nlayers(all_results, labels)
-    fname = "benchmark_primitivewet_L$(L).png"
-    res = write_overview_figure(all_results, labels, L, joinpath(ASSETS_DIR, fname))
-    res === nothing || push!(figure_names, (L, fname))
-end
-
 open(README_PATH, "w") do md
     write_preamble(md)
-    write_overview(md, all_results, labels, figure_names)
+    write_overview(md, all_results, labels)
     for label in labels
         write_arch_section(md, label, all_results[label])
     end
 end
 @info "Regenerated $README_PATH for architectures: $(join(labels, ", "))"
-isempty(figure_names) || @info "Wrote comparison figures: $(join(last.(figure_names), ", "))"
