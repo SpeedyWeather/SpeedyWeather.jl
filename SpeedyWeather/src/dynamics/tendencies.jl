@@ -16,10 +16,9 @@ end
 """$(TYPEDSIGNATURES)
 Calculate tendencies in grid space for the PrimitiveEquation model."""
 function grid_tendencies!(vars::Variables, model::PrimitiveEquation)
-    vordiv_grid_tendencies!(vars, model)             # u_tend_grid, v_tend_grid
-    temperature_grid_tendency!(vars, model)          # temp_tend_grid + uT_anomaly_grid, vT_anomaly_grid
-    humidity_grid_tendency!(vars, model)             # humid_tend_grid + uq_grid, vq_grid (no-op for dry)
-    bernoulli_grid_potential!(vars, model)           # kinetic_energy_grid = ½(u²+v²)
+    vordiv_grid_tendencies!(vars, model)             # u/v_tend_grid + kinetic_energy_grid (fused: ½(u²+v²))
+    temperature_grid_tendency!(vars, model)          # temp_tend_grid + uT_anomaly_grid, vT_anomaly_grid (fused)
+    humidity_grid_tendency!(vars, model)             # humid_tend_grid + uq_grid, vq_grid (fused; no-op for dry)
     surface_pressure_grid_tendency!(vars, model)     # pres_tend_grid += (ū,v̄)·∇lnpₛ
     return nothing
 end
@@ -577,7 +576,8 @@ end
 
 """$(TYPEDSIGNATURES)
 
-Tendencies for vorticity and divergence, here just the gridded u and v tendencies are computed. 
+Tendencies for vorticity and divergence, here just the gridded u and v tendencies are computed.
+Additionally computes the kinetic energy on the fly as well taht is saved for later computations.  
 
 Launches `_vordiv_tendencies_kernel!` to add the vorticity flux and pressure gradient terms to `u_tend_grid, v_tend_grid` (which already contain forcing,
 drag, and vertical advection contributions); Excludes Bernoulli potential with geopotential
@@ -589,7 +589,10 @@ space:
 
 `+=` because the tendencies already contain the parameterizations and vertical advection.
 `f` is coriolis, `ζ` relative vorticity, `R` the gas constant, `Tᵥ'` the virtual temperature
-anomaly, `∇lnpₛ` the gradient of surface pressure and `_x`, `_y` its zonal/meridional components."""
+anomaly, `∇lnpₛ` the gradient of surface pressure and `_x`, `_y` its zonal/meridional components.
+
+The kinetic energy is computed on fly according to `1/2(u^2 + v^2)` and added to the `kinetic_energy_grid`.
+"""
 function vordiv_grid_tendencies!(
         vars::Variables,
         coriolis::AbstractCoriolis,
@@ -610,12 +613,13 @@ function vordiv_grid_tendencies!(
     vars.scratch.grid.a .= 0
     humid = haskey(vars.grid, :humidity) ? vars.grid.humidity : vars.scratch.grid.a
     (; dpres_dx, dpres_dy) = vars.dynamics
+    kinetic_energy_grid = vars.dynamics.grid.kinetic_energy
 
     (; whichring) = u_tend_grid.grid
     arch = architecture(u_tend_grid)
     launch!(
-        arch, RingGridWorkOrder, size(u_tend_grid), _vordiv_tendencies_kernel!,
-        u_tend_grid, v_tend_grid, u, v, vor, temp, humid,
+        arch, RingGridWorkOrder, size(u_tend_grid), _vordiv_tendencies_bernoulli_kernel!,
+        u_tend_grid, v_tend_grid, kinetic_energy_grid, u, v, vor, temp, humid,
         dpres_dx, dpres_dy, Tₖ, f, coslat⁻¹, whichring, atmosphere,
     )
     return nothing
@@ -646,20 +650,21 @@ end
 vordiv_spectral_tendencies!(vars::Variables, model::PrimitiveEquation) =
     vordiv_spectral_tendencies!(vars, model.spectral_transform)
 
-@kernel inbounds = true function _vordiv_tendencies_kernel!(
+@kernel inbounds = true function _vordiv_tendencies_bernoulli_kernel!(
         u_tend_grid,            # Input/Output: zonal wind tendency
         v_tend_grid,            # Input/Output: meridional wind tendency
+        kinetic_energy_grid,    # Output: kinetic energy ½(u²+v²)
         u_grid,                 # Input: zonal velocity
         v_grid,                 # Input: meridional velocity
         vor_grid,               # Input: relative vorticity
         temp_grid,              # Input: temperature anomaly
         humid_grid,             # Input: humidity
-        dpres_dx,                 # Input: zonal gradient of log surface pressure
-        dpres_dy,                 # Input: meridional gradient of log surface pressure
+        dpres_dx,               # Input: zonal gradient of log surface pressure
+        dpres_dy,               # Input: meridional gradient of log surface pressure
         Tₖ,                     # Input: reference temperature profile
-        f,              # Input: coriolis parameter
-        coslat⁻¹,       # Input: 1/cos(latitude) for scaling
-        whichring,      # Input: mapping from grid point to latitude ring
+        f,                      # Input: coriolis parameter
+        coslat⁻¹,               # Input: 1/cos(latitude) for scaling
+        whichring,              # Input: mapping from grid point to latitude ring
         atmosphere,             # Input: atmosphere for R_dry and μ_virt_temp
     )
     ij, k = @index(Global, NTuple)
@@ -667,14 +672,20 @@ vordiv_spectral_tendencies!(vars::Variables, model::PrimitiveEquation) =
     coslat⁻¹j = coslat⁻¹[j]     # get coslat⁻¹ for this latitude
     f_j = f[j]                  # coriolis parameter for this latitude
 
+    u_ij = u_grid[ij, k]        # shared load
+    v_ij = v_grid[ij, k]        # shared load
     ω = vor_grid[ij, k] + f_j   # absolute vorticity
 
     # compute virtual temperature on the fly, temp_grid is anomaly
     (; R_dry) = atmosphere
     Tᵥ = virtual_temperature(temp_grid[ij, k] + Tₖ[k], humid_grid[ij, k], atmosphere)
     RTᵥ = R_dry * (Tᵥ - Tₖ[k])    # dry gas constant * virtual temperature anomaly
-    u_tend_grid[ij, k] = (u_tend_grid[ij, k] + v_grid[ij, k] * ω - RTᵥ * dpres_dx[ij]) * coslat⁻¹j
-    v_tend_grid[ij, k] = (v_tend_grid[ij, k] - u_grid[ij, k] * ω - RTᵥ * dpres_dy[ij]) * coslat⁻¹j
+    u_tend_grid[ij, k] = (u_tend_grid[ij, k] + v_ij * ω - RTᵥ * dpres_dx[ij]) * coslat⁻¹j
+    v_tend_grid[ij, k] = (v_tend_grid[ij, k] - u_ij * ω - RTᵥ * dpres_dy[ij]) * coslat⁻¹j
+
+    # kinetic energy ½(u²+v²); KE-only here, geopotential is added in spectral space for PrimEq
+    half = convert(eltype(kinetic_energy_grid), 0.5)
+    kinetic_energy_grid[ij, k] = half * (u_ij * u_ij + v_ij * v_ij)
 end
 
 """$(TYPEDSIGNATURES)
@@ -777,9 +788,9 @@ Compute the temperature tendency.
 `T'` is the anomaly with respect to the reference/average temperature. Tᵥ is the virtual
 temperature used in the adiabatic term κTᵥ*Dlnp/Dt.
 
-Here, the gridded tendency contributions are computed:
-* adds the adiabatic + T'D terms to the temperature tendency 
-* and computes `flux_grid_divergence!` to write `(uT_anomaly_grid, vT_anomaly_grid) = (u·T', v·T')`."""
+Here, the gridded tendency contributions are computed in a single fused kernel that:
+* adds the adiabatic + T'D terms to the temperature tendency
+* writes `(uT_anomaly_grid, vT_anomaly_grid) = coslat⁻¹·(u·T', v·T')` for the flux divergence."""
 function temperature_grid_tendency!(
         vars::Variables,
         adiabatic_conversion::AbstractAdiabaticConversion,
@@ -790,27 +801,31 @@ function temperature_grid_tendency!(
     temp_tend_grid = vars.tendencies.grid.temperature
     div_grid = vars.grid.divergence
     temp = vars.grid.temperature
+    (; u, v) = vars.grid
 
     vars.scratch.grid.a .= 0
     humid = haskey(vars.grid, :humidity) ? vars.grid.humidity : vars.scratch.grid.a
 
     (; pres_flux, pres_flux_sum_above, div_sum_above) = vars.dynamics
+    uT_anomaly_grid = vars.dynamics.grid.uT_anomaly
+    vT_anomaly_grid = vars.dynamics.grid.vT_anomaly
     (; temp_profile) = implicit
+    (; coslat⁻¹) = G
+    (; whichring) = temp_tend_grid.grid
 
     # semi-implicit: terms here are explicit+implicit evaluated at time step i
     # implicit_correction! then calculated the implicit terms from Vi-1 minus Vi
     # to move the implicit terms to i-1 which is cheaper then the alternative below
 
-    # Launch kernel to compute temperature tendency with adiabatic conversion
+    # Fused: adiabatic + T'D term on temp_tend_grid, plus (uT, vT) = coslat⁻¹·(u·T', v·T')
     arch = architecture(temp_tend_grid)
     launch!(
-        arch, RingGridWorkOrder, size(temp_tend_grid), _temperature_tendency_kernel!,
-        temp_tend_grid, temp, div_grid, humid, div_sum_above, pres_flux_sum_above,
-        pres_flux, temp_profile, adiabatic_conversion.σ_lnp_A, adiabatic_conversion.σ_lnp_B, atmosphere
+        arch, RingGridWorkOrder, size(temp_tend_grid), _temperature_tendency_flux_kernel!,
+        temp_tend_grid, uT_anomaly_grid, vT_anomaly_grid,
+        temp, u, v, div_grid, humid, div_sum_above, pres_flux_sum_above, pres_flux,
+        temp_profile, adiabatic_conversion.σ_lnp_A, adiabatic_conversion.σ_lnp_B,
+        coslat⁻¹, whichring, atmosphere
     )
-
-    # write uT_anomaly_grid, vT_anomaly_grid (= u·T', v·T') for the flux divergence
-    flux_grid_divergence!(vars.dynamics.grid.uT_anomaly, vars.dynamics.grid.vT_anomaly, temp, vars, G)
     return nothing
 end
 
@@ -840,9 +855,13 @@ end
 temperature_spectral_tendency!(vars::Variables, model::PrimitiveEquation) =
     temperature_spectral_tendency!(vars, model.spectral_transform)
 
-@kernel inbounds = true function _temperature_tendency_kernel!(
+@kernel inbounds = true function _temperature_tendency_flux_kernel!(
         temp_tend_grid,             # Input/Output: temperature tendency
+        uT_anomaly_grid,            # Output: coslat⁻¹·u·T' for flux divergence
+        vT_anomaly_grid,            # Output: coslat⁻¹·v·T' for flux divergence
         temp_grid,                  # Input: temperature anomaly
+        u_grid,                     # Input: zonal velocity
+        v_grid,                     # Input: meridional velocity
         div_grid,                   # Input: divergence
         humid_grid,                 # Input: humidity
         div_sum_above,              # Input: sum of div from layers above
@@ -851,28 +870,38 @@ temperature_spectral_tendency!(vars::Variables, model::PrimitiveEquation) =
         temp_profile,               # Input: reference temperature profile
         σ_lnp_A,                    # Input: adiabatic conversion coefficient A
         σ_lnp_B,                    # Input: adiabatic conversion coefficient B
+        coslat⁻¹,                   # Input: 1/cos(latitude) for scaling
+        whichring,                  # Input: mapping from grid point to latitude ring
         atmosphere,                 # Input: atmosphere for κ and μ_virt_temp
     )
 
     ij, k = @index(Global, NTuple)
+    j = whichring[ij]
+    coslat⁻¹j = coslat⁻¹[j]
     Tₖ = temp_profile[k]    # average layer temperature from reference profile
 
     # coefficients from Simmons and Burridge 1981
     σ_lnp_A_k = σ_lnp_A[k]   # eq. 3.12, -1/Δσₖ*ln(σ_k+1/2/σ_k-1/2)
     σ_lnp_B_k = σ_lnp_B[k]   # eq. 3.12 -αₖ
 
+    T = temp_grid[ij, k]    # shared load: anomaly T'
+
     # Adiabatic conversion term following Simmons and Burridge 1981 but for σ coordinates
     # += as tend already contains parameterizations + vertical advection
-    Tᵥ = virtual_temperature(temp_grid[ij, k] + Tₖ, humid_grid[ij, k], atmosphere)
+    Tᵥ = virtual_temperature(T + Tₖ, humid_grid[ij, k], atmosphere)
     (; κ) = atmosphere
     temp_tend_grid[ij, k] +=
-        temp_grid[ij, k] * div_grid[ij, k] +                # +T'D term of hori advection
+        T * div_grid[ij, k] +                               # +T'D term of hori advection
         κ * Tᵥ * (                                          # +κTᵥ*Dlnp/Dt, adiabatic term
         σ_lnp_A_k * (div_sum_above[ij, k] + pres_flux_sum_above[ij, k]) +  # eq. 3.12 1st term
             σ_lnp_B_k * (div_grid[ij, k] + pres_flux[ij, k]) +             # eq. 3.12 2nd term
             pres_flux[ij, k]
     )                                                        # eq. 3.13
 
+    # (uT_anomaly, vT_anomaly) = coslat⁻¹·(u·T', v·T') — shares T load with adiabatic block
+    Tcoslat⁻¹j = T * coslat⁻¹j
+    uT_anomaly_grid[ij, k] = u_grid[ij, k] * Tcoslat⁻¹j
+    vT_anomaly_grid[ij, k] = v_grid[ij, k] * Tcoslat⁻¹j
 end
 
 #TODO: OLD VERSION / SEQUENTIAL VERSION: MIGHT BE DELETED
@@ -905,19 +934,55 @@ humidity_tendency!(::Variables, ::PrimitiveDry) = nothing
 
 """$(TYPEDSIGNATURES)
 
-Computes the gridded contributation to the humidity tendency `humid_tend_grid` via the `horizontal_grid_advection!`
-Grid half of `humidity_tendency!`. Adds the `+q·div` advection term to `humid_tend_grid` and
-writes the `(uq, vq)` flux intermediates to the grid-side named slots — no transform."""
+Computes the gridded contribution to the humidity tendency `humid_tend_grid`. Adds the
+`+q·div` advection term to `humid_tend_grid` and writes the `(uq, vq)` flux intermediates
+to the grid-side named slots — fused into a single kernel that shares the `humid_grid` load."""
 function humidity_grid_tendency!(vars::Variables, model::PrimitiveWet)
     G = model.geometry
     humid_tend_grid = vars.tendencies.grid.humidity
     humid_grid = vars.grid.humidity
-    horizontal_grid_advection!(humid_tend_grid, humid_grid, vars, G; add = true,
-                               uA_grid = vars.dynamics.grid.uq,
-                               vA_grid = vars.dynamics.grid.vq)
+    div_grid = vars.grid.divergence
+    (; u, v) = vars.grid
+    uq_grid = vars.dynamics.grid.uq
+    vq_grid = vars.dynamics.grid.vq
+    (; coslat⁻¹) = G
+    (; whichring) = humid_tend_grid.grid
+
+    arch = architecture(humid_tend_grid)
+    launch!(
+        arch, RingGridWorkOrder, size(humid_tend_grid), _humidity_advection_flux_kernel!,
+        humid_tend_grid, uq_grid, vq_grid,
+        humid_grid, u, v, div_grid, coslat⁻¹, whichring
+    )
     return nothing
 end
 humidity_grid_tendency!(::Variables, ::PrimitiveDry) = nothing
+
+@kernel inbounds = true function _humidity_advection_flux_kernel!(
+        humid_tend_grid,            # Input/Output: humidity tendency, accumulates +q·D
+        uq_grid,                    # Output: coslat⁻¹·u·q
+        vq_grid,                    # Output: coslat⁻¹·v·q
+        humid_grid,                 # Input: humidity
+        u_grid,                     # Input: zonal velocity
+        v_grid,                     # Input: meridional velocity
+        div_grid,                   # Input: divergence
+        coslat⁻¹,                   # Input: 1/cos(latitude) for scaling
+        whichring,                  # Input: mapping from grid point to latitude ring
+    )
+    ij, k = @index(Global, NTuple)
+    j = whichring[ij]
+    coslat⁻¹j = coslat⁻¹[j]
+
+    q = humid_grid[ij, k]   # shared load
+
+    # += q·D term of the advection operator (tend already contains parameterizations + vertical advection)
+    humid_tend_grid[ij, k] = muladd(q, div_grid[ij, k], humid_tend_grid[ij, k])
+
+    # (uq, vq) = coslat⁻¹·(u·q, v·q)
+    qcoslat⁻¹j = q * coslat⁻¹j
+    uq_grid[ij, k] = u_grid[ij, k] * qcoslat⁻¹j
+    vq_grid[ij, k] = v_grid[ij, k] * qcoslat⁻¹j
+end
 
 """$(TYPEDSIGNATURES)
 
