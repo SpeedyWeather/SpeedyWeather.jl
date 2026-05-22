@@ -118,6 +118,7 @@ function SpeedyTransforms.transform!(
         model::PrimitiveEquation;
         initialize::Bool = false,
     )
+
     # used to copy 1st step to 2nd step for leapfrog to always transform
     # the 2nd step to grid
     initialize && initialize!(vars, time_stepping, model)

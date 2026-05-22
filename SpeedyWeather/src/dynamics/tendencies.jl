@@ -525,16 +525,16 @@ function parameterization_tendencies_only!(
     TS = model.time_stepping
 
     # already contain parameterizations
-    u_tend_grid = get_tendency_step(vars.tendencies.grid.u, TS)
-    v_tend_grid = get_tendency_step(vars.tendencies.grid.v, TS)
-    temp_tend_grid = get_tendency_step(vars.tendencies.grid.temperature, TS)
+    u_tend_grid = get_tendency_step(vars.tendencies.grid.u, TS, DummyParameterization())
+    v_tend_grid = get_tendency_step(vars.tendencies.grid.v, TS, DummyParameterization())
+    temp_tend_grid = get_tendency_step(vars.tendencies.grid.temperature, TS, DummyParameterization())
     RingGrids._scale_lat!(u_tend_grid, coslat⁻¹)
     RingGrids._scale_lat!(v_tend_grid, coslat⁻¹)
 
     # divergence and curl of that u, v_tend vector for vor, div tendencies
-    vor_tend = get_tendency_step(vars.tendencies.vorticity, TS)
-    div_tend = get_tendency_step(vars.tendencies.divergence, TS)
-    temp_tend = get_tendency_step(vars.tendencies.temperature, TS)
+    vor_tend = get_tendency_step(vars.tendencies.vorticity, TS, DynamicalCore())
+    div_tend = get_tendency_step(vars.tendencies.divergence, TS, DynamicalCore())
+    temp_tend = get_tendency_step(vars.tendencies.temperature, TS, DynamicalCore())
     u_tend = vars.scratch.a
     v_tend = vars.scratch.b
 
@@ -544,8 +544,8 @@ function parameterization_tendencies_only!(
 
     # humidity only for models that have humidity
     if haskey(vars.tendencies, :humidity)
-        humid_tend = get_tendency_step(vars.tendencies.humidity, TS)
-        humid_tend_grid = get_tendency_step(vars.tendencies.grid.humidity, TS)
+        humid_tend_grid = get_tendency_step(vars.tendencies.grid.humidity, TS, DummyParameterization())
+        humid_tend = get_tendency_step(vars.tendencies.humidity, TS, DynamicalCore())
         transform!(humid_tend, humid_tend_grid, scratch_memory, S)
     end
 

@@ -103,13 +103,13 @@ function move_prognostic_grid_variables_back!(
     for varname in keys(grid)
         if grid[varname] isa AbstractField
             var_old, var_new = get_steps(getfield(grid, varname))
-            var_new .= var_old
+            var_old .= var_new
         elseif grid[varname] isa NamedTuple
             nt = grid[varname]
             for varname2 in keys(nt)
                 if getfield(nt, varname2) isa AbstractField
                     var_old, var_new = get_steps(getfield(nt, varname2))
-                    var_new .= var_old
+                    var_old .= var_new
                 end
             end
         end

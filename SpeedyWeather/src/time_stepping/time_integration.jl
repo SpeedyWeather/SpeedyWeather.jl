@@ -73,7 +73,7 @@ function time_step!(
     (!isnothing(model.feedback) && model.feedback.nans_detected) && return nothing
     reset_tendencies!(vars, time_stepping)  # set the tendencies back to zero for accumulation
 
-    if ~model.dynamics_only             # switch on/off all physics parameterizations
+    if ~model.dynamics_only                 # switch on/off all physics parameterizations
         greenhouse_gases_time_step!(vars, model)
         parameterization_tendencies!(vars, model)
         ocean_timestep!(vars, model)
@@ -101,8 +101,8 @@ update_prognostic!(var::Variables, model::AbstractModel) =
     update_prognostic!(var, model.time_stepping, model)
 
 """$(TYPEDSIGNATURES)
-Leapfrog time stepping for all prognostic variables in `vars` using their tendencies.
-Depending on `model` decides which variables to time step."""
+Time stepping for all prognostic variables in `vars` using their tendencies.
+Decides on which variables to time step based on the presence of their tendencies in `vars.tendencies`."""
 function update_prognostic!(
         vars::Variables,
         time_stepping::AbstractTimeStepper,

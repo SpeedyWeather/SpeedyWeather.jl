@@ -15,19 +15,19 @@ allocate(::AbstractVariable{Grid2D}, model::AbstractModel) = zeros(model.spectra
 
 """Dimension for 3D grid variables on the horizontal grid with vertical levels."""
 @kwdef struct Grid3D <: AbstractVariableDim
-    n::Int = 0                                                  # length of 3rd dimension, use nlayers for 0
+    n::Int = 0                                                  # length of 3rd dimension, use 0 for nlayers
 end
 allocate(v::AbstractVariable{Grid3D}, model::AbstractModel) = zeros(model.spectral_grid.GridVariable3D, model.spectral_grid.grid, v.dims.n == 0 ? get_nlayers(model) : v.dims.n)
 
 """Dimension for 3D land surface variables."""
 @kwdef struct Land3D <: AbstractVariableDim
-    n::Int = 0                                                  # length of 3rd dimension, use nlayers for 0
+    n::Int = 0                                                  # length of 3rd dimension, use 0 for nlayers
 end
 allocate(v::AbstractVariable{Land3D}, model::AbstractModel) = zeros(model.spectral_grid.GridVariable3D, model.spectral_grid.grid, v.dims.n == 0 ? get_nlayers(model.land) : v.dims.n)
 
 """Dimension for 3D ocean variables."""
 @kwdef struct Ocean3D <: AbstractVariableDim
-    n::Int = 0                                                  # length of 3rd dimension, use nlayers for 0
+    n::Int = 0                                                  # length of 3rd dimension, use 0 for nlayers
 end
 allocate(v::AbstractVariable{Ocean3D}, model::AbstractModel) = zeros(model.spectral_grid.GridVariable3D, model.spectral_grid.grid, v.dims.n == 0 ? get_nlayers(model.ocean) : v.dims.n)
 
@@ -37,7 +37,7 @@ allocate(::AbstractVariable{Spectral2D}, model::AbstractModel) = zeros(model.spe
 
 """Dimension for 3D spectral variables with e.g. `n` vertical levels."""
 @kwdef struct Spectral3D <: AbstractVariableDim
-    n::Int = 0                                                  # length of 3rd dimension, use nlayers for 0
+    n::Int = 0                                                  # length of 3rd dimension, use 0 for nlayers
 end
 allocate(v::AbstractVariable{Spectral3D}, model::AbstractModel) = zeros(model.spectral_grid.SpectralVariable3D, model.spectral_grid.spectrum, v.dims.n == 0 ? get_nlayers(model) : v.dims.n)
 
