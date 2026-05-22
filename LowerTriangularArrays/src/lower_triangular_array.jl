@@ -599,7 +599,10 @@ function Base.copyto!(
         M::AbstractArray
     ) where {T}    # copy from M
     @boundscheck size(L, as = Matrix) == size(M) || throw(BoundsError)
-    L.data .= convert.(T, M[lowertriangle_indices(M)])
+    # Skip `convert.()` when eltypes match — Reactant can't trace
+    # `convert(T, ::TracedRNumber{T})`.
+    M_lt = M[lowertriangle_indices(M)]
+    L.data .= eltype(M_lt) == T ? M_lt : convert.(T, M_lt)
     return L
 end
 
@@ -614,7 +617,11 @@ function Base.copyto!(
     upper_triangle_indices = @. ~lower_triangle_indices # upper triangle without main diagonal
 
     M[upper_triangle_indices] .= zero(T)
-    M[lower_triangle_indices] = convert.(T, L.data)
+    # Bring L.data to host when M is a host Array — masked `setindex!(::Array, x, mask)`
+    # falls back to scalar `getindex(x, k)` which forbids GPU/Reactant arrays. Skip
+    # `convert.()` when eltypes match (Reactant can't trace it).
+    L_data = M isa Array && !(L.data isa Array) ? Array(L.data) : L.data
+    M[lower_triangle_indices] = eltype(L_data) == T ? L_data : convert.(T, L_data)
 
     return M
 end
@@ -625,7 +632,7 @@ function Base.copyto!(
         V::AbstractArray{S, N}
     ) where {T, S, N} # copy from V
     @boundscheck size(L, as = Vector) == size(V) || throw(BoundsError)
-    L.data .= convert.(T, V)
+    L.data .= eltype(V) == T ? V : convert.(T, V)
     return L
 end
 

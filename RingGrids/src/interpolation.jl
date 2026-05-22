@@ -239,9 +239,13 @@ function interpolator(
         kwargs...
     )
     I = interpolator(grid_in, get_npoints(grid_out); kwargs...)
+    NF = eltype(I)
     londs, latds = get_londlatds(grid_out)
-    londs = on_architecture(architecture(grid_out), londs)
-    latds = on_architecture(architecture(grid_out), latds)
+    # Convert on host (Float64 → NF) before the device transfer so the kernel sees
+    # the same eltype as `lon_offsets`; otherwise `find_grid_indices!` falls into
+    # its `convert.(NF, λs)` branch which Reactant cannot trace.
+    londs = on_architecture(architecture(grid_out), convert(Vector{NF}, londs))
+    latds = on_architecture(architecture(grid_out), convert(Vector{NF}, latds))
 
     @inbounds update_locator!(I, londs, latds, unsafe = false)
     return I
