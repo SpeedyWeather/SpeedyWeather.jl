@@ -1,0 +1,91 @@
+{
+    "cpu-arm": {
+        "meta": {
+            "machine_info": "```julia\njulia> versioninfo()\nJulia Version 1.11.7\nCommit f2b3dbda30a (2025-09-08 12:10 UTC)\nBuild Info:\n  Official https://julialang.org/ release\nPlatform Info:\n  OS: macOS (arm64-apple-darwin24.0.0)\n  CPU: 8 × Apple M3\n  WORD_SIZE: 64\n  LLVM: libLLVM-16.0.6 (ORCJIT, apple-m2)\nThreads: 1 default, 0 interactive, 1 GC (on 4 virtual cores)\n```\n",
+            "arch_type": "CPU{KernelAbstractions.CPU}",
+            "speedyweather_version": "0.20.1+DEV",
+            "timestamp": "Fri, 22 May 2026 15:08:39"
+        },
+        "overview": {
+            "sypd": [
+                1320.7201287323148,
+                662.7595368130135,
+                130.29813201101976,
+                46.55216121931585,
+                11.376755554811627,
+                6.537441941028893,
+                1.735858828705216,
+                38.28062218113197,
+                8.872197596999577,
+                3.5467368012095264,
+                0.8409296325450732
+            ],
+            "nlayers": [
+                8,
+                8,
+                8,
+                8,
+                8,
+                8,
+                8,
+                16,
+                16,
+                16,
+                16
+            ],
+            "trunc": [
+                31,
+                42,
+                63,
+                85,
+                127,
+                170,
+                255,
+                85,
+                127,
+                170,
+                255
+            ],
+            "memory": [
+                4842684,
+                8179632,
+                17422460,
+                30347440,
+                67025916,
+                119246128,
+                272265980,
+                51651568,
+                113217148,
+                200003824,
+                450631036
+            ],
+            "dt": [
+                2400,
+                1800,
+                1200,
+                900,
+                600,
+                450,
+                300,
+                900,
+                600,
+                450,
+                300
+            ],
+            "nlat": [
+                48,
+                64,
+                96,
+                128,
+                192,
+                256,
+                384,
+                128,
+                192,
+                256,
+                384
+            ]
+        },
+        "markdown": "\n### Models, default setups\n\n| Model | T | L | Physics | Δt | SYPD | Memory|\n| - | - | - | - | - | - | - |\n| BarotropicModel | 31 | 1 | false | 2400 | 39140 | 688.34 KB |\n| ShallowWaterModel | 31 | 1 | false | 2400 | 23924 | 822.86 KB |\n| PrimitiveDryModel | 31 | 8 | true | 2400 | 1371 | 4.16 MB |\n| PrimitiveWetModel | 31 | 8 | true | 2400 | 1308 | 4.84 MB |\n\n### Shallow water model, resolution\n\n| Model | T | L | Rings | Δt | SYPD | Memory|\n| - | - | - | - | - | - | - |\n| ShallowWaterModel | 31 | 1 | 48 | 2400 | 25950 | 822.86 KB |\n| ShallowWaterModel | 42 | 1 | 64 | 1800 | 10033 | 1.44 MB |\n| ShallowWaterModel | 63 | 1 | 96 | 1200 | 3578 | 3.25 MB |\n| ShallowWaterModel | 85 | 1 | 128 | 900 | 1420 | 5.94 MB |\n| ShallowWaterModel | 127 | 1 | 192 | 600 | 228 | 14.14 MB |\n| ShallowWaterModel | 170 | 1 | 256 | 450 | 116 | 26.86 MB |\n| ShallowWaterModel | 255 | 1 | 384 | 300 | 27 | 68.30 MB |\n\n### Primitive wet model, resolution\n\n| Model | T | L | Rings | Δt | SYPD | Memory|\n| - | - | - | - | - | - | - |\n| PrimitiveWetModel | 31 | 8 | 48 | 2400 | 1321 | 4.84 MB |\n| PrimitiveWetModel | 42 | 8 | 64 | 1800 | 663 | 8.18 MB |\n| PrimitiveWetModel | 63 | 8 | 96 | 1200 | 130 | 17.42 MB |\n| PrimitiveWetModel | 85 | 8 | 128 | 900 | 47 | 30.35 MB |\n| PrimitiveWetModel | 127 | 8 | 192 | 600 | 11 | 67.03 MB |\n| PrimitiveWetModel | 170 | 8 | 256 | 450 | 7 | 119.25 MB |\n| PrimitiveWetModel | 255 | 8 | 384 | 300 | 2 | 272.27 MB |\n| PrimitiveWetModel | 85 | 16 | 128 | 900 | 38 | 51.65 MB |\n| PrimitiveWetModel | 127 | 16 | 192 | 600 | 9 | 113.22 MB |\n| PrimitiveWetModel | 170 | 16 | 256 | 450 | 4 | 200.00 MB |\n| PrimitiveWetModel | 255 | 16 | 384 | 300 | 1 | 450.63 MB |\n\n### Primitive Equation, Float32 vs Float64\n\n| Model | NF | T | L | Δt | SYPD | Memory|\n| - | - | - | - | - | - | - |\n| PrimitiveWetModel | Float32 | 31 | 8 | 2400 | 1131 | 4.84 MB |\n| PrimitiveWetModel | Float64 | 31 | 8 | 2400 | 1196 | 9.00 MB |\n\n### Grids\n\n| Model | T | L | Grid | Rings | Δt | SYPD | Memory|\n| - | - | - | - | - | - | - | - |\n| PrimitiveWetModel | 63 | 8 | FullGaussianGrid | 96 | 1200 | 87 | 25.36 MB |\n| PrimitiveWetModel | 63 | 8 | FullClenshawGrid | 95 | 1200 | 117 | 25.14 MB |\n| PrimitiveWetModel | 63 | 8 | OctahedralGaussianGrid | 96 | 1200 | 149 | 17.42 MB |\n| PrimitiveWetModel | 63 | 8 | OctahedralClenshawGrid | 95 | 1200 | 95 | 17.18 MB |\n| PrimitiveWetModel | 63 | 8 | HEALPixGrid | 95 | 1200 | 254 | 12.73 MB |\n| PrimitiveWetModel | 63 | 8 | OctaHEALPixGrid | 95 | 1200 | 97 | 15.50 MB |\n\n### Number of vertical layers\n\n| Model | T | L | Δt | SYPD | Memory|\n| - | - | - | - | - | - |\n| PrimitiveWetModel | 31 | 4 | 2400 | 2158 | 3.11 MB |\n| PrimitiveWetModel | 31 | 8 | 2400 | 1345 | 4.84 MB |\n| PrimitiveWetModel | 31 | 12 | 2400 | 963 | 6.58 MB |\n| PrimitiveWetModel | 31 | 16 | 2400 | 788 | 8.33 MB |\n\n### PrimitiveDryModel: Physics or dynamics only\n\n| Model | T | L | Dynamics | Physics | Δt | SYPD | Memory|\n| - | - | - | - | - | - | - | - |\n| PrimitiveDryModel | 31 | 8 | true | true | 2400 | 2259 | 4.16 MB |\n| PrimitiveDryModel | 31 | 8 | true | false | 2400 | 4498 | 4.16 MB |\n| PrimitiveDryModel | 31 | 8 | false | true | 2400 | 3366 | 4.16 MB |\n\n### PrimitiveWetModel: Physics or dynamics only\n\n| Model | T | L | Dynamics | Physics | Δt | SYPD | Memory|\n| - | - | - | - | - | - | - | - |\n| PrimitiveWetModel | 31 | 8 | true | true | 2400 | 1485 | 4.84 MB |\n| PrimitiveWetModel | 31 | 8 | true | false | 2400 | 2710 | 4.84 MB |\n| PrimitiveWetModel | 31 | 8 | false | true | 2400 | 1925 | 4.84 MB |\n\n### Individual dynamics functions\n\n\n#### PrimitiveWetModel | Float32 | T31 L8 | OctahedralGaussianGrid | 48 Rings\n\n| Function | Time | Memory | Allocations |\n| - | - | - | - |\n| pressure_gradient_flux! | 41.000 μs| 100.28 KiB| 790 |\n| linear_virtual_temperature! | 1.754 μs| 0 bytes| 0 |\n| geopotential! | 6.242 μs| 5.61 KiB| 23 |\n| vertical_integration! | 14.042 μs| 0 bytes| 0 |\n| surface_pressure_tendency! | 15.333 μs| 24.66 KiB| 288 |\n| vertical_velocity! | 48.125 μs| 384.31 KiB| 12 |\n| linear_pressure_gradient! | 1.750 μs| 0 bytes| 0 |\n| vertical_advection! | 71.167 μs| 8.62 KiB| 100 |\n| vordiv_tendencies! | 296.541 μs| 259.66 KiB| 724 |\n| temperature_tendency! | 312.334 μs| 381.95 KiB| 1027 |\n| humidity_tendency! | 288.083 μs| 380.59 KiB| 1017 |\n| bernoulli_potential! | 99.166 μs| 510.22 KiB| 345 |\n"
+    }
+}

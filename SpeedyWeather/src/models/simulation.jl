@@ -108,5 +108,6 @@ function finalize!(simulation::AbstractSimulation)
     unscale!(variables)                             # undo radius-scaling for vor, div in the dynamical core
     finalize!(model.output, simulation)             # possibly post-process output, then close netCDF file
     finalize!(model.callbacks, variables, model)    # any callbacks to finalize?
+    synchronize(model.architecture)                 # synchronize the device in the end (e.g. for benchmarks)
     return simulation
 end

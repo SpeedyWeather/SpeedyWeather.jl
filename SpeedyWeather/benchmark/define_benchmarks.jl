@@ -17,11 +17,14 @@ benchmarks[:benchmark200] = BenchmarkSuite(
 )
 
 ## Primitive WET MODELS RESOLUTION
+# Resolution sweep: L=8 from T31 → T255, plus L=16 at the three highest truncations
+# so that the L=8 vs L=16 comparison plots have enough overlap.
 benchmarks[:benchmark201] = BenchmarkSuite(
     title = "Primitive wet model, resolution",
-    nruns = 6,
-    model = fill(PrimitiveWetModel, 6),
-    trunc = [31, 42, 63, 85, 127, 170],
+    nruns = 11,
+    model = fill(PrimitiveWetModel, 11),
+    trunc =   [31, 42, 63, 85, 127, 170, 255, 85, 127, 170, 255],
+    nlayers = [ 8,  8,  8,  8,   8,   8,   8, 16, 16,  16,  16],
 )
 
 ## NUMBER FORMATS

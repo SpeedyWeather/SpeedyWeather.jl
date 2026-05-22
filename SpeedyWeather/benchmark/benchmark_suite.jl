@@ -1,4 +1,29 @@
 using BenchmarkTools
+using SpeedyWeather: synchronize, _jit, ReactantDevice, MatrixSpectralTransform
+
+# For Reactant we can't use the FFT-based default transform, and we want a
+# warmup run so the @compile cost is excluded from the timing.
+is_reactant(arch) = arch isa ReactantDevice
+
+# Build the model with the right spectral transform for `arch`.
+# Reactant requires MatrixSpectralTransform; everything else uses the default.
+function build_model(Model, spectral_grid, arch; kwargs...)
+    if is_reactant(arch)
+        M = MatrixSpectralTransform(spectral_grid)
+        return Model(spectral_grid; spectral_transform = M, kwargs...)
+    else
+        return Model(spectral_grid; kwargs...)
+    end
+end
+
+# A tiny warmup run that triggers Reactant's @compile so the real measurement
+# loop excludes compilation. No-op on CPU/GPU.
+function warmup_if_reactant!(simulation, arch)
+    is_reactant(arch) || return
+    run!(simulation; steps = 2)
+    synchronize(arch)
+    return
+end
 
 abstract type AbstractBenchmarkSuite end
 @kwdef mutable struct BenchmarkSuite <: AbstractBenchmarkSuite
@@ -15,6 +40,7 @@ abstract type AbstractBenchmarkSuite end
     SYPD::Vector{Float64} = fill(0.0, nruns)
     Δt::Vector{Float64} = fill(0.0, nruns)
     memory::Vector{Int} = fill(0, nruns)
+    architecture::Any = SpeedyWeather.CPU()
 end
 
 default_nlayers(::Type{<:Barotropic}) = 1
@@ -37,11 +63,12 @@ function run_benchmark_suite!(suite::BenchmarkSuite)
         Grid = suite.Grid[i]
         dynamics = suite.dynamics[i]
         physics = suite.physics[i]
+        architecture = suite.architecture
 
-        spectral_grid = SpectralGrid(; NF, trunc, Grid, nlayers)
+        spectral_grid = SpectralGrid(; NF, trunc, Grid, nlayers, architecture)
         suite.nlat[i] = spectral_grid.nlat
 
-        model = Model(spectral_grid; feedback = Feedback(verbose = true))
+        model = build_model(Model, spectral_grid, architecture; feedback = Feedback(verbose = true))
         if Model <: PrimitiveEquation
             model.dynamics = dynamics
             model.dynamics_only = !physics
@@ -53,9 +80,13 @@ function run_benchmark_suite!(suite::BenchmarkSuite)
         simulation = initialize!(model)
         suite.memory[i] = Base.summarysize(simulation)
 
+        # Reactant compiles on first call — burn that off before timing.
+        warmup_if_reactant!(simulation, architecture)
+
         nsteps = n_timesteps(trunc, nlayers)
         period = Second(round(Int, model.time_stepping.Δt_sec * (nsteps + 1)))
         run!(simulation; period)
+        synchronize(architecture)
 
         time_elapsed = model.feedback.progress_meter.tlast - model.feedback.progress_meter.tinit
         sypd = model.time_stepping.Δt_sec * nsteps / (time_elapsed * 365.25)
@@ -68,7 +99,7 @@ end
 
 function write_results(md, suite::BenchmarkSuite)
 
-    write(md, "\n## $(suite.title)\n\n")
+    write(md, "\n### $(suite.title)\n\n")
 
     print_NF = any(suite.NF .!= suite.NF[1])
     print_Grid = any(suite.Grid .!= suite.Grid[1])
@@ -129,6 +160,7 @@ abstract type AbstractBenchmarkSuiteTimed <: AbstractBenchmarkSuite end
     time::Vector{Vector{Float64}} = [fill(0.0, length(function_names)) for i in 1:nruns]
     memory::Vector{Vector{Int}} = [fill(0, length(function_names)) for i in 1:nruns]
     allocs::Vector{Vector{Int}} = [fill(0, length(function_names)) for i in 1:nruns]
+    architecture::Any = SpeedyWeather.CPU()
 end
 
 default_function_names() = ["pressure_gradient_flux!", "linear_virtual_temperature!", "geopotential!", "vertical_integration!", "surface_pressure_tendency!", "vertical_velocity!", "linear_pressure_gradient!", "vertical_advection!", "vordiv_tendencies!", "temperature_tendency!", "humidity_tendency!", "bernoulli_potential!"]
@@ -144,7 +176,25 @@ function add_results!(suite::AbstractBenchmarkSuiteTimed, trial::BenchmarkTools.
     return suite
 end
 
+# Run one @benchmark and store the result. On failure, record NaN/0 and warn
+# (used for individual function benchmarks that may not be GPU-compatible).
+function safe_benchmark!(f, suite::AbstractBenchmarkSuiteTimed, i_run::Integer, i_func::Integer)
+    name = suite.function_names[i_func]
+    try
+        trial = f()
+        add_results!(suite, trial, i_run, i_func)
+    catch err
+        @warn "Benchmark for $name failed on $(suite.architecture); recording N/A" exception = (err, catch_backtrace())
+        suite.time[i_run][i_func] = NaN
+        suite.memory[i_run][i_func] = 0
+        suite.allocs[i_run][i_func] = 0
+    end
+    return suite
+end
+
 function run_benchmark_suite!(suite::BenchmarkSuiteDynamics)
+    arch = suite.architecture
+
     for i in 1:suite.nruns
 
         Model = suite.model[i]
@@ -153,53 +203,60 @@ function run_benchmark_suite!(suite::BenchmarkSuiteDynamics)
         nlayers = suite.nlayers[i]
         Grid = suite.Grid[i]
 
-        spectral_grid = SpectralGrid(; NF, trunc, Grid, nlayers)
+        spectral_grid = SpectralGrid(; NF, trunc, Grid, nlayers, architecture = arch)
         suite.nlat[i] = spectral_grid.nlat
 
-        model = Model(spectral_grid)
+        model = build_model(Model, spectral_grid, arch)
 
         simulation = initialize!(model)
+
+        # For Reactant we need to warm up the model so `time_stepping!` compiles
+        # before we benchmark the individual functions (some share compiled artifacts).
+        warmup_if_reactant!(simulation, arch)
 
         vars, model = SpeedyWeather.unpack(simulation)
         lf = 2
         (; orography, geometry, spectral_transform, geopotential, atmosphere, implicit) = model
         lf_implicit = implicit.α == 0 ? lf : 1
 
-        b = @benchmark SpeedyWeather.pressure_gradient_flux!($vars, $lf, $spectral_transform)
-        add_results!(suite, b, i, 1)
-
-        b = @benchmark SpeedyWeather.linear_virtual_temperature!($vars, $lf_implicit, $model)
-        add_results!(suite, b, i, 2)
-
-        b = @benchmark SpeedyWeather.geopotential!($vars, $geopotential, $orography)
-        add_results!(suite, b, i, 3)
-
-        b = @benchmark SpeedyWeather.vertical_integration!($vars, $lf_implicit, $geometry)
-        add_results!(suite, b, i, 4)
-
-        b = @benchmark SpeedyWeather.surface_pressure_tendency!($vars, $spectral_transform)
-        add_results!(suite, b, i, 5)
-
-        b = @benchmark SpeedyWeather.vertical_velocity!($vars, $geometry)
-        add_results!(suite, b, i, 6)
-
-        b = @benchmark SpeedyWeather.linear_pressure_gradient!($vars, $lf_implicit, $atmosphere, $implicit)
-        add_results!(suite, b, i, 7)
-
-        b = @benchmark SpeedyWeather.vertical_advection!($vars, $model)
-        add_results!(suite, b, i, 8)
-
-        b = @benchmark SpeedyWeather.vordiv_tendencies!($vars, $model)
-        add_results!(suite, b, i, 9)
-
-        b = @benchmark SpeedyWeather.temperature_tendency!($vars, $model)
-        add_results!(suite, b, i, 10)
-
-        b = @benchmark SpeedyWeather.humidity_tendency!($vars, $model)
-        add_results!(suite, b, i, 11)
-
-        b = @benchmark SpeedyWeather.bernoulli_potential!($vars, $spectral_transform)
-        add_results!(suite, b, i, 12)
+        # `_jit(arch, f, args...)` is a no-op on CPU/GPU and `@jit`s on Reactant.
+        # Each benchmark sample also calls `synchronize(arch)` to wait for the device.
+        safe_benchmark!(suite, i, 1) do
+            @benchmark (_jit($arch, SpeedyWeather.pressure_gradient_flux!, $vars, $lf, $spectral_transform); synchronize($arch))
+        end
+        safe_benchmark!(suite, i, 2) do
+            @benchmark (_jit($arch, SpeedyWeather.linear_virtual_temperature!, $vars, $lf_implicit, $model); synchronize($arch))
+        end
+        safe_benchmark!(suite, i, 3) do
+            @benchmark (_jit($arch, SpeedyWeather.geopotential!, $vars, $geopotential, $orography); synchronize($arch))
+        end
+        safe_benchmark!(suite, i, 4) do
+            @benchmark (_jit($arch, SpeedyWeather.vertical_integration!, $vars, $lf_implicit, $geometry); synchronize($arch))
+        end
+        safe_benchmark!(suite, i, 5) do
+            @benchmark (_jit($arch, SpeedyWeather.surface_pressure_tendency!, $vars, $spectral_transform); synchronize($arch))
+        end
+        safe_benchmark!(suite, i, 6) do
+            @benchmark (_jit($arch, SpeedyWeather.vertical_velocity!, $vars, $geometry); synchronize($arch))
+        end
+        safe_benchmark!(suite, i, 7) do
+            @benchmark (_jit($arch, SpeedyWeather.linear_pressure_gradient!, $vars, $lf_implicit, $atmosphere, $implicit); synchronize($arch))
+        end
+        safe_benchmark!(suite, i, 8) do
+            @benchmark (_jit($arch, SpeedyWeather.vertical_advection!, $vars, $model); synchronize($arch))
+        end
+        safe_benchmark!(suite, i, 9) do
+            @benchmark (_jit($arch, SpeedyWeather.vordiv_tendencies!, $vars, $model); synchronize($arch))
+        end
+        safe_benchmark!(suite, i, 10) do
+            @benchmark (_jit($arch, SpeedyWeather.temperature_tendency!, $vars, $model); synchronize($arch))
+        end
+        safe_benchmark!(suite, i, 11) do
+            @benchmark (_jit($arch, SpeedyWeather.humidity_tendency!, $vars, $model); synchronize($arch))
+        end
+        safe_benchmark!(suite, i, 12) do
+            @benchmark (_jit($arch, SpeedyWeather.bernoulli_potential!, $vars, $spectral_transform); synchronize($arch))
+        end
     end
 
     return suite
@@ -207,7 +264,7 @@ end
 
 function write_results(md, suite::AbstractBenchmarkSuiteTimed)
 
-    write(md, "\n## $(suite.title)\n\n")
+    write(md, "\n### $(suite.title)\n\n")
 
     for i_run in 1:suite.nruns
 
@@ -218,7 +275,7 @@ function write_results(md, suite::AbstractBenchmarkSuiteTimed)
         title_row *= "| $(suite.Grid[i_run]) "
         title_row *= "| $(suite.nlat[i_run]) Rings"
 
-        write(md, "\n### $title_row\n\n")
+        write(md, "\n#### $title_row\n\n")
 
         column_header = "| Function "
         column_header *= "| Time "
@@ -233,13 +290,21 @@ function write_results(md, suite::AbstractBenchmarkSuiteTimed)
 
         for i_func in 1:length(suite.function_names)
 
-            time = BenchmarkTools.prettytime(suite.time[i_run][i_func])
-            memory = BenchmarkTools.prettymemory(suite.memory[i_run][i_func])
+            t = suite.time[i_run][i_func]
+            if isnan(t)
+                time = "N/A"
+                memory = "N/A"
+                allocs = "N/A"
+            else
+                time = BenchmarkTools.prettytime(t)
+                memory = BenchmarkTools.prettymemory(suite.memory[i_run][i_func])
+                allocs = string(suite.allocs[i_run][i_func])
+            end
 
             row = "| $(suite.function_names[i_func]) "
             row *= "| $time"
             row *= "| $memory"
-            row *= "| $(suite.allocs[i_run][i_func]) |"
+            row *= "| $allocs |"
 
             write(md, "$row\n")
         end
