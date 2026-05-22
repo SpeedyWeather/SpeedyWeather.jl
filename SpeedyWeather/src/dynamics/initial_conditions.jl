@@ -342,7 +342,7 @@ function initialize!(
     # compute the -∇²(u^2/2) term, add to div, divide by gravity
     RingGrids.scale_coslat!(u_grid)     # remove coslat scaling
     u_grid .*= radius                   # no radius scaling as we'll apply ∇⁻²(∇²) (would cancel)
-    @. u_grid = 1 // 2 * u_grid^2
+    u_grid = (1 // 2) .* u_grid .^2
     u²_half = transform!(u, u_grid, model.spectral_transform)
     ∇²!(div, u²_half, model.spectral_transform, flipsign = true, add = true)
     div .*= inv(gravity)
