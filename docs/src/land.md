@@ -469,6 +469,6 @@ simulation = initialize!(model)
 Then the model can be run as any other `Simulation`. Terarrium's state variales are owned by SpeedyWeather's `Variables` and can be accessed via 
 
 ```@example terrarium
-sim.variables.prognostic.land.terrarium
+simulation.variables.prognostic.land.terrarium
 ```
 
