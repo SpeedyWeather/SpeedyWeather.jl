@@ -6,7 +6,6 @@ struct GridGeometry{
         Grid,
         VectorType,
         VectorIntType,
-        VectorRange,
         IntType,
     } <: AbstractGridGeometry
     grid::Grid                  # grid, e.g. FullGaussianGrid
@@ -20,8 +19,11 @@ struct GridGeometry{
     nlons::VectorIntType        # number of longitudinal points per ring
     lon_offsets::VectorType     # longitude offsets of first grid point per ring
 
-    # rings, GPU/architecture copy (if needed) of grid.rings
-    rings::VectorRange
+    # First grid-point index of each ring, so `rings[j][i] = ring_starts[j] + i - 1`.
+    # Stored as a flat Int array on the architecture so kernels can use plain integer
+    # arithmetic rather than indexing into a vector/tuple of UnitRanges (which breaks
+    # PTX codegen for Reactant on GPU and is awkward on plain GPU).
+    ring_starts::VectorIntType
 end
 
 GridGeometry(field::AbstractField; kwargs...) = GridGeometry(field.grid; NF = eltype(field), kwargs...)
@@ -57,16 +59,14 @@ function GridGeometry(
     # RINGS and LONGITUDE OFFSETS
     nlons = get_nlons(grid)                                 # number of longitude per ring, pole to pole
     lon_offsets = [londs[ring[1]] for ring in eachring(grid)]   # offset of the first point from 0˚E
+    ring_starts = Int[first(ring) for ring in eachring(grid)]   # first ij of each ring
 
     # vector type
     VectorType = array_type(architecture, NF, 1)
     VectorIntType = array_type(architecture, Int, 1)
 
-    # Tuple{UnitRange} is with Reactant compatible, otherwise copy to architecture
-    device_rings = typeof(architecture) <: ReactantDevice ? Tuple(grid.rings) : on_architecture(architecture, grid.rings)
-
-    return GridGeometry{typeof(grid), VectorType, VectorIntType, typeof(device_rings), typeof(nlat_half)}(
-        grid, nlat_half, nlat, npoints, londs, latd_poles, nlons, lon_offsets, device_rings
+    return GridGeometry{typeof(grid), VectorType, VectorIntType, typeof(nlat_half)}(
+        grid, nlat_half, nlat, npoints, londs, latd_poles, nlons, lon_offsets, ring_starts
     )
 end
 
@@ -596,7 +596,7 @@ end
         lon_offsets,   # longitude offsets for each ring
         nlons,         # number of longitude points per ring
         nlat,          # number of latitude rings
-        rings          # ring indices
+        ring_starts    # first ij of each ring; rings[j][i] = ring_starts[j] + i - 1
     )
     k = @index(Global, Linear)
 
@@ -612,9 +612,9 @@ end
         # and b the next grid point to the right, such that
         # λ ∈ [a, b); while in most cases i_a + 1 = i_b, across 0˚E this is not the case
         i_a, i_b, Δ = find_lon_indices(λ, lon_offsets[j], nlons[j])
-        ij_as[k] = rings[j][i_a]    # index ij for a
-        ij_bs[k] = rings[j][i_b]    # index ij for b
-        Δabs[k] = Δ                 # distance fraction of λ between a, b
+        ij_as[k] = ring_starts[j] + i_a - 1     # index ij for a
+        ij_bs[k] = ring_starts[j] + i_b - 1     # index ij for b
+        Δabs[k] = Δ                             # distance fraction of λ between a, b
     end
 
     # SOUTHERN POINTS c, d
@@ -624,9 +624,9 @@ end
     else
         # as above but for one ring further down
         i_c, i_d, Δ = find_lon_indices(λ, lon_offsets[j + 1], nlons[j + 1])
-        ij_cs[k] = rings[j + 1][i_c]  # index ij for c
-        ij_ds[k] = rings[j + 1][i_d]  # index ij for d
-        Δcds[k] = Δ                 # distance fraction of λ between c, d
+        ij_cs[k] = ring_starts[j + 1] + i_c - 1   # index ij for c
+        ij_ds[k] = ring_starts[j + 1] + i_d - 1   # index ij for d
+        Δcds[k] = Δ                                # distance fraction of λ between c, d
     end
 end
 
@@ -645,11 +645,12 @@ function find_grid_indices!(
 
     (; js, ij_as, ij_bs, ij_cs, ij_ds) = locator
     (; Δabs, Δcds) = locator
-    (; nlons, lon_offsets, nlat) = geometry
-    (; rings) = geometry # architecture version (GPU if needed)
+    (; nlons, lon_offsets, nlat, ring_starts) = geometry
 
-    # Convert λs to the same type as lon_offsets if needed
-    λs_converted = convert.(eltype(lon_offsets), λs)
+    # Skip the broadcast convert when eltypes already match: `convert.(T, λs)` is
+    # incompatible with Reactant tracing, so we only run it when truly needed.
+    T = eltype(lon_offsets)
+    λs_converted = eltype(λs) == T ? λs : convert.(T, λs)
 
     launch!(
         architecture,
@@ -664,25 +665,29 @@ function find_grid_indices!(
         lon_offsets,
         nlons,
         nlat,
-        rings
+        ring_starts,
     )
     return nothing
 end
 
-@inline function find_lon_indices(
-        λ::NF,     # longitude to find incides for (0˚...360˚E)
-        λ₀::NF,     # offset of the first longitude point on ring
-        nlon::Int   # number of longitude points on ring
-    ) where {NF <: AbstractFloat}
+# Branchless longitude index lookup, valid for `λ ∈ [0, 360)` and `λ₀ ∈ [0, 360)`.
+# Avoids `mod`/`floor` because those emit Julia type-object references in PTX under
+# Reactant. Uses `unsafe_trunc` (matches `floor` for non-negative inputs) and arithmetic
+# wrap-around. Inputs are untyped so the function also works on Reactant `TracedRNumber`s.
+@inline function find_lon_indices(λ, λ₀, nlon)
+    NF = typeof(λ)
+    Δλ = NF(360) / NF(nlon)                 # longitude spacing
+    # shift by +360 so (λ - λ₀)/Δλ is non-negative and `unsafe_trunc == floor`;
+    # ix lands in [0, 2*nlon).
+    ix = (λ - λ₀ + NF(360)) / Δλ
+    i = unsafe_trunc(Int, ix)               # 0-based grid index to the left, shifted
+    Δ = ix - NF(i)                          # distance fraction from i to i+1
+    i = ifelse(i >= nlon, i - nlon, i)      # undo the +360 shift; i ∈ [0, nlon)
 
-    Δλ = NF(360) / nlon                     # longitude spacing
-    ix = (λ - λ₀) / Δλ                      # grid index i but with fractional part
-    i = floor(Int, ix)                  # 0-based grid index to the left
-    Δ = ix - i                            # distance fraction from i to i+1
-
-    # λ ∈ [λa, λb), i.e. a is the next grid point to the left, b to the right
-    i_a = mod(i, nlon) + 1              # convert to 1-based index
-    i_b = mod(i + 1, nlon) + 1            # use mod for periodicity
+    # λ ∈ [λa, λb), a is the next grid point to the left, b to the right (1-based)
+    i_a = i + 1
+    i_b = i + 2
+    i_b = ifelse(i_b > nlon, i_b - nlon, i_b)   # periodic wrap across 0˚E
     return i_a, i_b, Δ
 end
 
@@ -690,12 +695,15 @@ end
 $(TYPEDSIGNATURES)
 Computes the average at the North and South pole from a given grid `A` and it's precomputed
 ring indices `rings`. The North pole average is an equally weighted average of all grid points
-on the northern-most ring. Similar for the South pole."""
+on the northern-most ring. Similar for the South pole.
+
+`@allowscalar` lets this work on Reactant arrays (where slicing iterates scalars); using
+`sum / length` rather than `mean` avoids `mean`'s internal scalar fallbacks. Called once
+per interpolator setup, so any scalar-fallback cost on GPU is negligible."""
 @inline function average_on_poles(A::AbstractVector, rings)
-    # TODO: doing the computation below causes allocations, doing it with views causes scalarindexing on GPU
-    A_northpole = mean(A[rings[1]])     # average of all grid points around the north pole
-    A_southpole = mean(A[rings[end]])   # same for south pole
-    return A_northpole, A_southpole
+    north = GPUArrays.@allowscalar A[rings[1]]
+    south = GPUArrays.@allowscalar A[rings[end]]
+    return sum(north) / length(north), sum(south) / length(south)
 end
 
 """
@@ -703,10 +711,9 @@ $(TYPEDSIGNATURES)
 Method for `A::Abstract{T<:Integer}` which rounds the averaged values
 to return the same number format `NF`."""
 @inline function average_on_poles(A::AbstractVector{NF}, rings) where {NF <: Integer}
-    # TODO: doing the computation below causes allocations, doing it with views causes scalarindexing on GPU
-    A_northpole = mean(A[rings[1]])    # average of all grid points around the north pole
-    A_southpole = mean(A[rings[end]])  # same for south pole
-    return round(NF, A_northpole), round(NF, A_southpole)
+    north = GPUArrays.@allowscalar A[rings[1]]
+    south = GPUArrays.@allowscalar A[rings[end]]
+    return round(NF, sum(north) / length(north)), round(NF, sum(south) / length(south))
 end
 
 """
