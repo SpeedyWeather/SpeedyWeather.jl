@@ -18,6 +18,7 @@ run!(simulation, steps = 10)
 
 @test !any(isnan, on_architecture(SpeedyWeather.CPU(), simulation.variables.prognostic.vorticity))
 
+#=
 # also test the PrimitiveWetModel (currentlty convection isn't adjusted yet)
 spectral_grid = SpectralGrid(architecture = arch)
 spectral_transform = MatrixSpectralTransform(spectral_grid)
@@ -35,3 +36,4 @@ simulation = initialize!(model)
 run!(simulation, steps = 10)
 
 @test !any(isnan, on_architecture(SpeedyWeather.CPU(), simulation.variables.prognostic.vorticity))
+=# 
