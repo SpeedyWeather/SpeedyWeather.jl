@@ -37,8 +37,9 @@ SpeedyWeather.finalize!(simulation)
 ```
 """
 function SpeedyWeather.time_stepping!(simulation::ReactantSimulation, r_first_timesteps! = nothing, r_later_timestep! = nothing, enable_checkpointing = true)
-    
+
     clock = simulation.variables.prognostic.clock
+    output = simulation.model.output
 
     if isnothing(r_first_timesteps!)
         @info "Reactant compiling first_timesteps!"
@@ -49,8 +50,12 @@ function SpeedyWeather.time_stepping!(simulation::ReactantSimulation, r_first_ti
     #@trace checkpointing = enable_checkpointing for _ in clock.timestep_counter:clock.n_timesteps
     #    r_later_timestep!(simulation)
     #end
-    
+
     r_first_timesteps!(simulation)
+    # Output is a no-op inside the compiled function (see overrides below); call it
+    # explicitly here on the now-concrete simulation state so file-writing actually
+    # happens for Reactant simulations.
+    SpeedyWeather.output!(output, simulation)
 
     if isnothing(r_later_timestep!)
         @info "Reactant compiling later_timestep!"
@@ -59,6 +64,7 @@ function SpeedyWeather.time_stepping!(simulation::ReactantSimulation, r_first_ti
 
     for i in (Int(clock.timestep_counter) + 1):Int(clock.n_timesteps)
         r_later_timestep!(simulation)
+        SpeedyWeather.output!(output, simulation)
     end
     return
 end
@@ -248,5 +254,41 @@ function SpeedyWeather.WhichZenith(SG::SpectralGrid{<:ReactantDevice}, P::Speedy
 end
 
 Base.convert(::Type{Base.RefValue{ReactantDatesExt.ReactantDateTime}}, dt::Base.RefValue{DateTime}) = Base.RefValue{ReactantDatesExt.ReactantDateTime}(ReactantDatesExt.ReactantDateTime(dt[]))
+
+# OUTPUT HANDLING FOR REACTANT
+#
+# Reactant cannot trace through the output! pipeline: `output!` interpolates onto
+# CPU scratch fields and writes to disk, both of which are runtime side effects
+# the tracer can't (and shouldn't) capture. We split the behaviour by tracing
+# context:
+#   - Inside `@compile` (`within_compile()` == true): every output! method is a
+#     hard no-op. Nothing gets baked into the compiled `first_timesteps!` /
+#     `later_timestep!` graphs, so the compiled functions only do numerics.
+#   - Outside `@compile`: `time_stepping!` (above) explicitly invokes
+#     `output!(output, simulation)` after each compiled step. The simulation's
+#     data is now ConcretePJRTArrays, which the standard CPU output path can
+#     consume via `on_architecture(CPU(), …)` and the `ConcretePJRT → Array`
+#     transfer rules in SpeedyWeatherInternalsReactantExt.
+#
+# We need overrides for both 2-arg variants of `output!` (the per-simulation
+# dispatcher and the time-write helper); the 3-arg per-variable method does not
+# need an override because it's only called from the 2-arg simulation method,
+# which already gates on the tracing context.
+
+# 2-arg: output!(output, simulation::ReactantSimulation)
+# Inside trace → skip; outside trace → run the standard AbstractSimulation path.
+function SpeedyWeather.output!(output::SpeedyWeather.AbstractOutput, simulation::ReactantSimulation)
+    Reactant.ReactantCore.within_compile() && return nothing
+    return @invoke SpeedyWeather.output!(output::SpeedyWeather.AbstractOutput, simulation::SpeedyWeather.AbstractSimulation)
+end
+
+# 2-arg: output!(output, time::ReactantDateTime)
+# Inside trace → skip; outside trace → materialise into a plain DateTime and
+# forward to the backend-specific DateTime method (NetCDF, Zarr, …).
+function SpeedyWeather.output!(output::SpeedyWeather.AbstractOutput, time::ReactantDatesExt.ReactantDateTime)
+    Reactant.ReactantCore.within_compile() && return nothing
+    dt = DateTime(Dates.UTInstant(Millisecond(Dates.value(time))))
+    return SpeedyWeather.output!(output, dt)
+end
 
 end

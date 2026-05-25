@@ -41,5 +41,6 @@ include("test_maybe_jit.jl")
 include("utilities.jl")
 include("setup.jl")
 include("test_correctness.jl")
+include("test_output.jl")
 
 #include("differentation.jl")
