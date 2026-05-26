@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.20.2
+
 - Coupling to the Terrarium.jl land model via an SpeedyWeatherTerrariumExt [#1090](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1090)
 - The `ShallowWaterModel` is now GPU compatible [#1104](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1104)
 - Updated citations and funding information [#1100](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1100)
