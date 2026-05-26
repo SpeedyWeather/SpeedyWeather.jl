@@ -342,7 +342,7 @@ function initialize!(
     # compute the -∇²(u^2/2) term, add to div, divide by gravity
     RingGrids.scale_coslat!(u_grid)     # remove coslat scaling
     u_grid .*= radius                   # no radius scaling as we'll apply ∇⁻²(∇²) (would cancel)
-    @. u_grid = 1 // 2 * u_grid^2
+    u_grid = (1 // 2) .* u_grid .^2
     u²_half = transform!(u, u_grid, model.spectral_transform)
     ∇²!(div, u²_half, model.spectral_transform, flipsign = true, add = true)
     div .*= inv(gravity)
@@ -554,14 +554,12 @@ function initialize!(
     haskey(vars.prognostic, :divergence) && set!(vars, geometry, divergence = 0)  # technically not needed, but set to zero for completeness
     haskey(vars.prognostic, :η) && set!(vars, geometry, η = η, static_func = false)
 
-    # filter low values below cutoff amplitude c
+    # filter low values below cutoff amplitude c (broadcast for GPU compatibility)
     vor = get_step(vars.prognostic.vorticity, 1)    # 1 = first leapfrog timestep
-    low_values = abs.(vor) .< c
-    vor[low_values] .= 0
+    @. vor = ifelse(abs(vor) < c, zero(vor), vor)
     if haskey(vars.prognostic, :η)
         η = get_step(vars.prognostic.η, 1)
-        low_value = abs.(η) .< c
-        η[low_value] .= 0
+        @. η = ifelse(abs(η) < c, zero(η), η)
     end
 
     return nothing
