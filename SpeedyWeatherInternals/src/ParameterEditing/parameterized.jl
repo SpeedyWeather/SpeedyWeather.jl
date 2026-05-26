@@ -60,7 +60,6 @@ macro parameterized(expr)
     lastdoc = nothing
     typedef = nothing
     has_kwdef = false
-    # defval = nothing
     ## prewalk (top-down) over expression tree; note that there is some danger of infinite
     ## recursion with prewalk since it will descend into the returned expression. However,
     ## this is not a problem here since we only deconstruct/reduce the @param expressions.
@@ -123,8 +122,16 @@ macro parameterized(expr)
     end
     # construct final expression block
     block = Expr(:block)
+    struct_block = Expr(:block)
     ## 1. struct definition
-    push!(block.args, esc(new_expr))
+    # emit the interpolation placeholder $(Expr(:meta, :doc)) so Julia's doc system
+    # will attach any source docstring to the generated struct (same as Base.@kwdef);
+    # for some reason, we need to use a dedicated block for the struct def otherwise it won't work
+    if !has_kwdef
+        push!(struct_block.args, Expr(:meta, :doc))
+    end
+    push!(struct_block.args, esc(new_expr))
+    push!(block.args, struct_block)
     ## 2. parameters method dispatch
     push!(block.args, esc(:(ParameterEditing.parameters(obj::$(typename); kwargs...) = ParameterEditing.ParameterTable((; $(param_constructors...))))))
     ## 3. override ConstructionBase.setproperties if @kwdef is used; we do this so that internal logic in the keyword defaults gets preserved
