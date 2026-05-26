@@ -76,6 +76,21 @@ end
     @test vec(ps) == ComponentVector(x = 1.0, y = 2.0, z = 3.0)
     @test ps[:desc] == ("parameter 1", "parameter 2", "")
 
+    # test multiple parameters with heterogeneous attributes
+    """Docstring for `TestType5`"""
+    ParameterEditing.@parameterized @kwdef struct TestType5{T1, T2}
+        @param x::T1 = 1.0 (a = 1,)
+        @param y::T1 = 2.0 (b = 2,)
+        @param z::T2 = 3.0 (b = 3,)
+        date::DateTime = DateTime(0)
+    end
+    ps = parameters(TestType5());
+    @test haskey(ps, :a)
+    @test haskey(ps, :b)
+    @test !haskey(ps, :c)
+    @test length(ps) == 3
+    @test vec(ps) == ComponentVector(x = 1.0, y = 2.0, z = 3.0)
+
     # test parameters for nested type
     ParameterEditing.@parameterized @kwdef struct MyModel{T}
         @param component::T = TestType4() (group = :group1,)
