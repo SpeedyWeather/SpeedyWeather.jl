@@ -248,7 +248,8 @@ function _set_function_3d_broadcast!(
     # reshape σ for broadcasting: londs/latds are (npoints,), σ_row is (1, nlayers)
     NF = eltype(var)
     σ_row = reshape(σ_levels_full, 1, :)
-    val = NF.(f.(londs, latds, σ_row))
+    val_raw = f.(londs, latds, σ_row)
+    val = eltype(val_raw) === NF ? val_raw : NF.(val_raw)
     if add
         var.data .= var.data .+ val
     else

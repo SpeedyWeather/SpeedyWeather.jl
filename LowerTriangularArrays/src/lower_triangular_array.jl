@@ -650,7 +650,8 @@ function Base.convert(
 end
 
 function Base.convert(::Type{LowerTriangularMatrix{T}}, L::LowerTriangularMatrix) where {T}
-    return LowerTriangularArray(T.(L.data), L.spectrum)
+    data = eltype(L.data) === T ? L.data : T.(L.data)
+    return LowerTriangularArray(data, L.spectrum)
 end
 
 function Base.similar(L::LowerTriangularArray{T, N, ArrayType, SP}, I::Integer...) where {T, N, ArrayType, SP}

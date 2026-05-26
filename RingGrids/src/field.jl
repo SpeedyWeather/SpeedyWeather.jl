@@ -23,7 +23,8 @@ const Field4D = Field{T, 3} where {T}
 # default constructors
 Field(grid::AbstractGrid, k...) = zeros(grid, k...)
 Field(::Type{T}, grid::AbstractGrid, k...) where {T} = zeros(T, grid, k...)
-(::Type{<:Field{T}})(data::AbstractArray, grid::AbstractGrid) where {T} = Field(T.(data), grid)
+(::Type{<:Field{T}})(data::AbstractArray, grid::AbstractGrid) where {T} =
+    Field(eltype(data) === T ? data : T.(data), grid)
 
 # TYPES
 Architectures.nonparametric_type(::Type{<:Field}) = Field

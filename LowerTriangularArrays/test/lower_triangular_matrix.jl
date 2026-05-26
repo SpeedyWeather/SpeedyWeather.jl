@@ -391,6 +391,21 @@ end
     end
 end
 
+@testset "convert(LowerTriangularMatrix{T}, L) skips no-op cast" begin
+    # Regression: under Reactant, `T.(L.data)` with `eltype(L.data) === T` traces as a
+    # self-recursive `copy(::Broadcasted)` that blows the Julia stack. Same-eltype convert
+    # must pass `L.data` through identity-ically.
+    spectrum = Spectrum(8, 8)
+    L = randn(LowerTriangularMatrix{ComplexF32}, spectrum)
+
+    L_same = convert(LowerTriangularMatrix{ComplexF32}, L)
+    @test L_same.data === L.data   # identity, no broadcast/copy
+
+    L_cast = convert(LowerTriangularMatrix{ComplexF64}, L)
+    @test eltype(L_cast) === ComplexF64
+    @test L_cast.data !== L.data
+end
+
 @testset "LowerTriangularMatrix: fill, copy, randn, convert" begin
     @testset for NF in (Float32, Float64)
         mmax = 32
