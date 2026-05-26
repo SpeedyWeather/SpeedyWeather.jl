@@ -134,7 +134,7 @@ macro parameterized(expr)
     push!(block.args, struct_block)
     ## 2. parameters method dispatch
     parameters_func = quote
-        function ParameterEditing.parameters(::Type{PT}, obj::$(typename); kwargs...) where {PT <: AbstractParam}
+        function ParameterEditing.parameters(::Type{PT}, obj::$(typename); kwargs...) where {PT <: ParameterEditing.AbstractParam}
             param_nt = (; $(param_constructors...))
             nonempty_keys = filter(name -> !isempty(param_nt[name]), keys(param_nt))
             return ParameterEditing.ParameterTable(NamedTuple{nonempty_keys}(map(name -> param_nt[name], nonempty_keys)))
