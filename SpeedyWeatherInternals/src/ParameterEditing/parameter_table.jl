@@ -87,11 +87,13 @@ Base.setindex!(ps::ParameterTable, x, nm::Symbol) = setindex!(ps, x, :, nm)
     end
 end
 
-Base.keys(params::ParameterTable) = (:idx, :fieldname, union(map(keys, params)...)...)
+# Workaround for https://github.com/rafaqz/ModelParameters.jl/issues/70
+# Need to iterate over params directly, not the ParameterTable itself
+Base.keys(ps::ParameterTable) = (:idx, :fieldname, union(map(keys, ModelParameters.params(parent(ps)))...)...)
 
-function Base.vec(params::ParameterTable)
+function Base.vec(ps::ParameterTable)
     # recursively unpack params and build component vector
-    return ComponentArray(unpack_params(params))
+    return ComponentArray(stripparams(ps))
 end
 
 # Override internal ModelParameters method _columntypes to condense type names in table schema (just to look nicer)
