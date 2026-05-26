@@ -70,7 +70,7 @@ Convenience method that creates a model parameter from its property with the giv
 A parameter attribute `copmonenttype` is automatically added with value `T`.
 """
 parameterof(obj::T, ::Val{propname}; kwargs...) where {T, propname} = parameterof(NumberParam, obj, Val{propname}(); kwargs...)
-parameterof(::Type{PT}, obj::T, ::Val{propname}; kwargs...) where {PT <: AbstractParam, T, propname} = parameters(PT, getproperty(obj, propname); merge((; kwargs...), (componentttype = T,))...)
+parameterof(::Type{PT}, obj::T, ::Val{propname}; kwargs...) where {PT <: AbstractParam, T, propname} = parameters(PT, getproperty(obj, propname); merge((; kwargs...), (component_type = T,))...)
 
 # reconstruct
 
