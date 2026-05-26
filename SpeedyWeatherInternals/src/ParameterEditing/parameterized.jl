@@ -118,7 +118,7 @@ macro parameterized(expr)
     typesig = typedef2sig(typedef)
     # emit parameterof calls for each parsed parameter
     param_constructors = map(params) do info
-        :($(QuoteNode(info.name)) => ParameterEditing.parameterof(obj, Val{$(QuoteNode(info.name))}(); desc = $(info.desc), $(info.attrs)..., kwargs...))
+        :($(QuoteNode(info.name)) => ParameterEditing.parameterof(PT, obj, Val{$(QuoteNode(info.name))}(); desc = $(info.desc), $(info.attrs)..., kwargs...))
     end
     # construct final expression block
     block = Expr(:block)
@@ -134,7 +134,7 @@ macro parameterized(expr)
     push!(block.args, struct_block)
     ## 2. parameters method dispatch
     parameters_func = quote
-        function ParameterEditing.parameters(obj::$(typename); kwargs...)
+        function ParameterEditing.parameters(::Type{PT}, obj::$(typename); kwargs...) where {PT <: AbstractParam}
             param_nt = (; $(param_constructors...))
             nonempty_keys = filter(name -> !isempty(param_nt[name]), keys(param_nt))
             return ParameterEditing.ParameterTable(NamedTuple{nonempty_keys}(map(name -> param_nt[name], nonempty_keys)))

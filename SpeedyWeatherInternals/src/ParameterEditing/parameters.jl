@@ -56,10 +56,10 @@ attributes(param::NumberParam) = getfield(param, :attrs)
 Extract parameters from the given `obj` as (possibly nested) named-tuple of `NumberParam`s or some other
 `AbstractParam` type. If `obj`
 """
-parameters(obj; kwargs...) = (;)
+parameters(obj; kwargs...) = parameters(NumberParam, obj; kwargs...)
 parameters(param::PT; kwargs...) where {PT <: AbstractParam} = parameters(PT, param; kwargs...)
 parameters(param::Union{Number, AbstractArray}; kwargs...) = parameters(NumberParam, param; kwargs...)
-parameters(::Type{PT}, obj; kwargs...) where {PT <: AbstractParam} = parameters(obj; kwargs...)
+parameters(::Type{PT}, obj; kwargs...) where {PT <: AbstractParam} = (;)
 parameters(::Type{PT}, param::AbstractParam; kwargs...) where {PT <: AbstractParam} = PT(merge(parent(param), kwargs))
 parameters(::Type{PT}, x::Union{Number, AbstractArray}; kwargs...) where {PT <: AbstractParam} = PT(x; kwargs...)
 
