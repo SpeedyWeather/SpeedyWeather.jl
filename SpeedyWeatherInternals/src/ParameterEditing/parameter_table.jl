@@ -59,8 +59,12 @@ Base.getindex(ps::ParameterTable, nm::Symbol) = getindex(ps, :, nm)
         1:length(ps)
     elseif nm == :fieldname
         ModelParameters.paramfieldnames(ps)
+    elseif any(map(p -> hasproperty(p, nm), ModelParameters.params(ps)))
+        map(ModelParameters.params(ps)) do p
+            hasproperty(p, nm) ? getproperty(p, nm) : nothing
+        end
     else
-        map(p -> getindex(p, nm), ModelParameters.params(ps))
+        error("$nm is not a property of any parameter")
     end
 end
 
@@ -83,7 +87,7 @@ Base.setindex!(ps::ParameterTable, x, nm::Symbol) = setindex!(ps, x, :, nm)
     end
 end
 
-Base.keys(params::ParameterTable) = (:idx, :fieldname, keys(first(params))...)
+Base.keys(params::ParameterTable) = (:idx, :fieldname, union(map(keys, params)...)...)
 
 function Base.vec(params::ParameterTable)
     # recursively unpack params and build component vector
