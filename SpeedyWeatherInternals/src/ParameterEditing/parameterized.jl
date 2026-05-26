@@ -133,7 +133,14 @@ macro parameterized(expr)
     push!(struct_block.args, esc(new_expr))
     push!(block.args, struct_block)
     ## 2. parameters method dispatch
-    push!(block.args, esc(:(ParameterEditing.parameters(obj::$(typename); kwargs...) = ParameterEditing.ParameterTable((; $(param_constructors...))))))
+    parameters_func = quote
+        function ParameterEditing.parameters(obj::$(typename); kwargs...)
+            param_nt = (; $(param_constructors...))
+            nonempty_keys = filter(name -> !isempty(param_nt[name]), keys(param_nt))
+            return ParameterEditing.ParameterTable(NamedTuple{nonempty_keys}(map(name -> param_nt[name], nonempty_keys)))
+        end
+    end
+    push!(block.args, esc(parameters_func))
     ## 3. override ConstructionBase.setproperties if @kwdef is used; we do this so that internal logic in the keyword defaults gets preserved
     if has_kwdef && typesig.head == :curly
         # handle type arguments; first extract argument names (discarding upper type bounds)
