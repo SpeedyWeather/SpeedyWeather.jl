@@ -85,6 +85,7 @@ the nested structure must match that of `obj`. This function is used to reconstr
 @inline reconstruct(obj::NamedTuple{keys, V}, values::NamedTuple{keys, V}) where {keys, V <: Tuple} = values
 @inline reconstruct(obj, values::ParameterTable) = reconstruct(obj, stripparams(values))
 @inline reconstruct(obj, values::AbstractArray) = isempty(values) ? obj : error("Cannot reconstruct $(typeof(obj)) from non-empty array of type $(typeof(values))")
+@inline reconstruct(obj, ::NamedTuple{()}) = obj # return obj if named tuple is empty
 @generated function reconstruct(obj, values::Union{NamedTuple, ComponentArray})
     keysof(::Type{<:NamedTuple{keys}}) where {keys} = keys
     keysof(::Type{<:ComponentArray{T, N, A, Tuple{Axis{coords}}}}) where {T, N, A, coords} = keys(coords)

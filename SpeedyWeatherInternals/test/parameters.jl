@@ -21,6 +21,29 @@ import ModelParameters: ModelParameters, Model, Param, params, update
     @test stripparams(p) == 42.0
 end
 
+@testset "reconstruct" begin
+    # primitive identity reconstruction
+    @test reconstruct(1, 1) == 1
+
+    # reconstruct a NamedTuple from a ParameterTable (stripparams path)
+    ps = ParameterTable(a = NumberParam(3.0), b = NumberParam(4.0))
+    obj = (a = 0.0, b = 0.0)
+    @test reconstruct(obj, ps) == (a = 3.0, b = 4.0)
+
+    # reconstruct an AbstractParam (NumberParam) from a scalar value
+    p = NumberParam(1.5)
+    p2 = reconstruct(p, 2.5)
+    @test isa(p2, NumberParam)
+    @test value(p2) == 2.5
+
+    # empty array/named-tuple should return the original object
+    @test reconstruct(obj, Float64[]) === obj
+    @test reconstruct(obj, (;)) === obj
+
+    # non-empty array should throw
+    @test_throws ErrorException reconstruct(obj, [1.0])
+end
+
 @testset "@parameterized" begin
     # test single parameter, no kwdef
     ParameterEditing.@parameterized struct TestType1{T}
