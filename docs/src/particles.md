@@ -235,28 +235,27 @@ The callback is then added after the model is created
 ```@example particle_tracker
 particle_advection = ParticleAdvection2D(spectral_grid, nparticles = 100)
 model = ShallowWaterModel(spectral_grid; particle_advection)
-add!(model.callbacks, particle_tracker)
+callbacks = CallbackDict(:particle_tracker => particle_tracker)
+simulation = initialize!(model; callbacks)
 ```
 
-which will give it a random key too in case you need to remove it again (more on this in
-[Callbacks](@ref)). If you now run the simulation the particle tracker is called on
-`particle_tracker.every_n_timesteps` and it continuously writes into `particle_tracker.netcdf_file`
-which is placed in the run folder similar to other [NetCDF output](@ref). For example,
-the run folder can be obtained after the simulation by `model.output.run_folder`.
+If you now run the simulation the particle tracker is called on
+`particle_tracker.every_n_timesteps` and it continuously writes into `particle_tracker.netcdf_file`.
+If a `NetCDFOutput` is attached to the simulation, the tracker shares its run folder; otherwise
+it writes into the current working directory (or whatever `path` you set when constructing
+the `ParticleTracker`). After the simulation, `particle_tracker.path` tells you where
+the file ended up.
 
 ```@example particle_tracker
-simulation = initialize!(model)
 run!(simulation, period = Day(10))
-model.output.run_folder
+particle_tracker.path
 ```
 
-As we don't have `output = true`, by default, the `particles.nc` file will be written
-the to current working directory. You can read the netCDF file with
+You can read the netCDF file with
 
 ```@example particle_tracker
 using NCDatasets
-run_folder = model.output.run_folder                    # if output = true the run_???? string with run number
-path = joinpath(run_folder, particle_tracker.filename)  # "particles.nc" by default if output = false
+path = joinpath(particle_tracker.path, particle_tracker.filename)
 ds = NCDataset(path)
 ds["lon"]
 ds["lat"]

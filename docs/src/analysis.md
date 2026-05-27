@@ -565,8 +565,8 @@ initial conditions.
 ```@example analysis
 # don't name it global_diagnostics because that's a function already!
 diagnostics_recorder = GlobalDiagnostics()
-add!(model.callbacks, :diagnostics_recorder => diagnostics_recorder)
-simulation = initialize!(model)
+callbacks = CallbackDict(:diagnostics_recorder => diagnostics_recorder)
+simulation = initialize!(model; callbacks)
 
 run!(simulation, period=Day(20))
 nothing # hide
@@ -580,8 +580,8 @@ as we do here
 using CairoMakie
 
 # unpack callback
-(; M, C, Λ, K, P, Q)  = model.callbacks[:diagnostics_recorder]
-t = model.callbacks[:diagnostics_recorder].time
+(; M, C, Λ, K, P, Q)  = simulation.callbacks[:diagnostics_recorder]
+t = simulation.callbacks[:diagnostics_recorder].time
 days = [Second(ti - t[1]).value/3600/24 for ti in t]
 
 fig = Figure();

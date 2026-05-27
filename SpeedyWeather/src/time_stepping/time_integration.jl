@@ -75,9 +75,6 @@ function timestep!(
         lf1::Integer = 2,               # leapfrog index 1 (dis/enables Robert+Williams filter)
         lf2::Integer = 2,               # leapfrog index 2 (time step used for tendencies)
     )
-    # exit immediately if NaNs/Infs already present
-    (!isnothing(model.feedback) && model.feedback.nans_detected) && return nothing
-
     reset_tendencies!(vars)             # set the tendencies back to zero for accumulation
 
     # TENDENCIES, DIFFUSION, LEAPFROGGING AND TRANSFORM SPECTRAL STATE TO GRID
@@ -103,8 +100,6 @@ function timestep!(
         lf1::Integer = 2,               # leapfrog index 1 (dis/enables Robert+Williams filter)
         lf2::Integer = 2,               # leapfrog index 2 (time step used for tendencies)
     )
-    # exit immediately if NaNs/Infs already present
-    (!isnothing(model.feedback) && model.feedback.nans_detected) && return nothing
     reset_tendencies!(vars)             # set the tendencies back to zero for accumulation
 
     # GET TENDENCIES, CORRECT THEM FOR SEMI-IMPLICIT INTEGRATION
@@ -133,8 +128,6 @@ function timestep!(
         lf1::Integer = 2,               # leapfrog index 1 (dis/enables Robert+Williams filter)
         lf2::Integer = 2,               # leapfrog index 2 (time step used for tendencies)
     )
-    # exit immediately if NaNs/Infs already present
-    (!isnothing(model.feedback) && model.feedback.nans_detected) && return nothing
     reset_tendencies!(vars)             # set the tendencies back to zero for accumulation
 
     if ~model.dynamics_only             # switch on/off all physics parameterizations
@@ -165,8 +158,10 @@ function timestep!(
 end
 
 """$(TYPEDSIGNATURES)
-Perform one single time step of `simulation` including
-possibly output and callbacks."""
+Advance the prognostic state of `simulation` by one model time step. Routes to
+`first_timesteps!` on the very first call (Euler+leapfrog warm-up) and to
+`later_timestep!` afterwards. Output, callbacks and the progress meter are dispatched
+from [`time_stepping!`](@ref), not here."""
 function timestep!(simulation::AbstractSimulation)
     (; clock) = simulation.variables.prognostic
     @trace if clock.timestep_counter == 0
@@ -179,28 +174,43 @@ function timestep!(simulation::AbstractSimulation)
 end
 
 """$(TYPEDSIGNATURES)
-Perform one single "normal" time step of `simulation`, after `first_timesteps!`."""
+Perform one single "normal" time step of `simulation`, after `first_timesteps!`. Pure
+time stepping only — output, callbacks and progress reporting are dispatched from
+[`time_stepping!`](@ref)."""
 function later_timestep!(simulation::AbstractSimulation)
     (; variables, model) = simulation
-    (; feedback, output) = model
     (; Δt, Δt_millisec) = model.time_stepping
     (; clock) = variables.prognostic
 
     timestep!(variables, 2Δt, model)                # calculate tendencies and leapfrog forward
     timestep!(clock, Δt_millisec)                   # time of lf=2 and variables after timestep!
-
-    progress!(feedback, variables)                  # updates the progress meter bar
-    output!(output, simulation)                     # do output?
-    callback!(model.callbacks, variables, model)    # any callbacks?
     return nothing
 end
 
 """$(TYPEDSIGNATURES)
-Main time loop that loops over all time steps."""
+Main time loop that loops over all time steps and dispatches output, callbacks and the
+progress meter from a single place. `timestep!(simulation)` itself only advances the
+prognostic state; everything else lives here."""
 function time_stepping!(simulation::AbstractSimulation)
     (; clock) = simulation.variables.prognostic
+    (; feedback, callbacks) = simulation
     for _ in 1:clock.n_timesteps        # MAIN LOOP
+        # exit immediately if NaNs/Infs were detected on the previous iteration
+        feedback.nans_detected && break
+
+        # advance the prognostic state (Euler+leapfrog on the very first iteration via
+        # first_timesteps!, plain leapfrog Δt afterwards via later_timestep!)
         timestep!(simulation)
+
+        # progress meter is initialized inside first_timesteps! to exclude compilation
+        # time, so we only start reporting from the second main-loop iteration onward
+        clock.timestep_counter > 1 && progress!(feedback, simulation.variables)
+
+        # all output writers and callbacks fire after the time step
+        for writer in simulation.output
+            output!(writer, simulation)
+        end
+        callback!(callbacks, simulation)
     end
     return simulation
 end

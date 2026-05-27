@@ -68,9 +68,10 @@ And we'll go through them one by one.
 ```@example callbacks
 function SpeedyWeather.initialize!(
     callback::StormChaser,
-    vars::Variables,
-    model::AbstractModel,
+    simulation::SpeedyWeather.AbstractSimulation,
 )
+    vars, model = simulation.variables, simulation.model
+
     # allocate recorder: number of time steps (incl initial conditions) in simulation
     callback.maximum_surface_wind_speed = zeros(vars.prognostic.clock.n_timesteps + 1)
 
@@ -87,10 +88,10 @@ function SpeedyWeather.initialize!(
 end
 ```
 The `initialize!` function has to be extended for the new callback `::StormChaser` as first
-argument, then followed by `vars::Variables` (all model variables) and `model`. For correct
-multiple dispatch it is important to restrict the first argument to the new `StormChaser` type
-(to not call another callback instead), but the other type declarations are for clarity only.
-`initialize!(::AbstractCallback, args...)` is called once just before the main time loop,
+argument, followed by `simulation::AbstractSimulation` from which we destructure `variables`
+and `model`. For correct multiple dispatch it is important to restrict the first argument to
+the new `StormChaser` type (to not call another callback instead).
+`initialize!(::AbstractCallback, ::AbstractSimulation)` is called once just before the main time loop,
 meaning after the initial conditions are set and after all other components are initialized.
 We replace the vector inside our storm chaser with a vector of the correct length so that
 we have a "recorder" allocated, a vector that can store the maximum surface wind speed on
@@ -117,9 +118,10 @@ Then we need to extend the `callback!` function as follows
 ```@example callbacks
 function SpeedyWeather.callback!(
     callback::StormChaser,
-    vars::Variables,
-    model::AbstractModel,
+    simulation::SpeedyWeather.AbstractSimulation,
 )
+    vars, model = simulation.variables, simulation.model
+
     # increase counter
     callback.timestep_counter += 1
     i = callback.timestep_counter
@@ -134,10 +136,11 @@ function SpeedyWeather.callback!(
 end
 ```
 The function signature for `callback!` is the same as for `initialize!`. You may
-access anything from `vars` or `model`, although for a purely diagnostic
-callback this should be read-only. While you could change other model components like the
-land sea mask in `model.land_sea_mask` or orography etc. then you interfere with the
-simulation which is more advanced and will be discussed in [Intrusive callbacks](@ref) below.
+access anything from `simulation.variables` or `simulation.model`, although for a
+purely diagnostic callback this should be read-only. While you could change other
+model components like the land-sea mask in `simulation.model.land_sea_mask` or
+orography etc. then you interfere with the simulation which is more advanced and
+will be discussed in [Intrusive callbacks](@ref) below.
 
 Lastly, we extend the `finalize!` function which is called once after the last time step.
 This could be used, for example, to save the `maximum_surface_wind_speed` vector to
@@ -158,12 +161,13 @@ SpeedyWeather.finalize!(::StormChaser, args...) = nothing
 
 ## Adding a callback
 
-Every model has a field `callbacks::Dict{Symbol, AbstractCallback}` such that the `callbacks`
-keyword can be used to create a model with a dictionary of callbacks. Callbacks are identified
-with a `Symbol` key inside such a dictionary. We have a convenient `CallbackDict` generator function
-which can be used like `Dict` but the key-value pairs have to be of type `Symbol`-`AbstractCallback`.
-Let us illustrate this with the dummy callback `NoCallback` (which is a callback that returns `nothing`
-on `initialize!`, `callback!` and `finalize!`)
+Callbacks live on the `Simulation` returned by `initialize!(model, …)`, in a
+`callbacks::Dict{Symbol, AbstractCallback}`. You can hand a dictionary of callbacks to
+`initialize!` via the `callbacks` keyword. Callbacks are identified with a `Symbol` key
+inside such a dictionary. We have a convenient `CallbackDict` generator function which can
+be used like `Dict` but the key-value pairs have to be of type `Symbol`-`AbstractCallback`.
+Let us illustrate this with the dummy callback `NoCallback` (which is a callback that returns
+`nothing` on `initialize!`, `callback!` and `finalize!`)
 
 ```@example callbacks
 callbacks = CallbackDict()                                  # empty dictionary
@@ -185,26 +189,26 @@ And you can chain them too
 add!(callbacks, NoCallback(), NoCallback())                     # random keys
 add!(callbacks, :key1 => NoCallback(), :key2 => NoCallback())   # keys provided
 ```
-Meaning that callbacks can be added before and after model construction
+Meaning that callbacks can be passed in to `initialize!`, and added before/after model construction:
 
 ```@example callbacks
 spectral_grid = SpectralGrid()
 callbacks = CallbackDict(:callback_added_before => NoCallback())
-model = PrimitiveWetModel(spectral_grid; callbacks)
-add!(model.callbacks, :callback_added_afterwards => NoCallback())
-add!(model, :callback_added_afterwards2 => NoCallback())
+model = PrimitiveWetModel(spectral_grid)
+simulation = initialize!(model; callbacks)
+add!(simulation.callbacks, :callback_added_afterwards => NoCallback())
+add!(simulation, :callback_added_afterwards2 => NoCallback())
 ```
 
-Note how the first argument can be `model.callbacks` as outlined in the sections above
-because this is the callbacks dictionary, but also simply
-`model`, which will add the callback to `model.callbacks`. It's equivalent.
+Note how the first argument can be `simulation.callbacks` (the callbacks dictionary) or just
+`simulation`, which forwards to `simulation.callbacks`. Both are equivalent.
 Let us add two more meaningful callbacks
 
 ```@example callbacks
 storm_chaser = StormChaser(spectral_grid)
 record_surface_temperature = GlobalSurfaceTemperatureCallback(spectral_grid)
-add!(model.callbacks, :storm_chaser => storm_chaser)
-add!(model.callbacks, :temperature => record_surface_temperature)
+add!(simulation.callbacks, :storm_chaser => storm_chaser)
+add!(simulation.callbacks, :temperature => record_surface_temperature)
 ```
 
 which means that now in the calls to `callback!` first the two dummy `NoCallback`s are called
@@ -215,9 +219,8 @@ only at the frequency of the model output, which for every time step would creat
 and considerably slow down the simulation. Let's run the simulation and check the callbacks
 
 ```@example callbacks
-simulation = initialize!(model)
 run!(simulation, period=Day(3))
-v = model.callbacks[:storm_chaser].maximum_surface_wind_speed
+v = simulation.callbacks[:storm_chaser].maximum_surface_wind_speed
 maximum(v)      # highest surface wind speeds in simulation [m/s]
 ```
 Cool, our `StormChaser` callback with the key `:storm_chaser` has been recording maximum
@@ -225,7 +228,7 @@ surface wind speeds in [m/s]. And the `:temperature` callback a time series of
 global mean surface temperatures in Kelvin on every time step while the model ran for 3 days.
 
 ```@example callbacks
-model.callbacks[:temperature].temperature
+simulation.callbacks[:temperature].temperature
 ```
 
 ## Intrusive callbacks
@@ -307,20 +310,19 @@ end
 
 function SpeedyWeather.initialize!(
     callback::MyScheduledCallback,
-    vars::Variables,
-    args...
+    simulation::SpeedyWeather.AbstractSimulation,
 )
     # when initializing a scheduled callback also initialize its schedule!
-    initialize!(callback.schedule, vars.prognostic.clock)
+    initialize!(callback.schedule, simulation.variables.prognostic.clock)
 
     # initialize other things in your callback here
 end
 
 function SpeedyWeather.callback!(
     callback::MyScheduledCallback,
-    vars::Variables,
-    model::AbstractModel,
+    simulation::SpeedyWeather.AbstractSimulation,
 )
+    vars = simulation.variables
     # scheduled callbacks start with this line to execute only when scheduled!
     # else escape immediately
     isscheduled(callback.schedule, vars.prognostic.clock) || return nothing
@@ -338,7 +340,7 @@ SpeedyWeather.finalize!(::MyScheduledCallback, args...) = nothing
 
 So in summary
 - add a field `schedule::Schedule` to your callback
-- add the line `initialize!(callback.schedule, vars.prognostic.clock)` when initializing your callback
+- add the line `initialize!(callback.schedule, simulation.variables.prognostic.clock)` when initializing your callback
 - start your `callback!` method with `isscheduled(callback.schedule, vars.prognostic.clock) || return nothing` to execute only when scheduled
 
 A `Schedule` is a field inside a callback as this allows you the set the callbacks
@@ -354,10 +356,10 @@ for events that are scheduled. Now let's create a primitive equation model with 
 ```@example schedule
 spectral_grid = SpectralGrid(trunc=31, nlayers=5)
 model = PrimitiveWetModel(spectral_grid)
-add!(model.callbacks, north_pole_temp_at_noon_jan9)
+callbacks = CallbackDict(:north_pole_temp_at_noon_jan9 => north_pole_temp_at_noon_jan9)
 
 # start simulation 7 days earlier
-simulation = initialize!(model, time = DateTime(2000,1,2,12))
+simulation = initialize!(model; time = DateTime(2000,1,2,12), callbacks)
 run!(simulation, period=Day(10))
 nothing # hide
 ```
@@ -369,7 +371,7 @@ we could also schedule for once a day. As illustrated in the following
 
 ```@example schedule
 north_pole_temp_daily = MyScheduledCallback(Schedule(every=Day(1)))
-add!(model.callbacks, north_pole_temp_daily)
+add!(simulation.callbacks, north_pole_temp_daily)
 
 # resume simulation, start time is now 2000-1-12 noon
 run!(simulation, period=Day(5))
@@ -419,7 +421,7 @@ will be thrown if that is the case
 
 ```@example schedule
 odd_schedule = MyScheduledCallback(Schedule(every = Minute(70)))
-add!(model.callbacks, odd_schedule)
+add!(simulation.callbacks, odd_schedule)
 
 # resume simulation for 4 hours
 run!(simulation, period=Hour(4))

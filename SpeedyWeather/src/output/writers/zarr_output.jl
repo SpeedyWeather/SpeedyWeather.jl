@@ -8,7 +8,9 @@ extension and is only available once `Zarr.jl` is loaded:
 ```julia
 using Zarr
 using SpeedyWeather
-output = ZarrOutput(spectral_grid)
+model = PrimitiveWetModel(spectral_grid)
+output = ZarrOutput(model)
+simulation = initialize!(model, output=output)
 ```
 
 Type parameters: `Field2D`, `Field3D` are the scratch field types, `Interpolator`
@@ -101,7 +103,7 @@ end
 Stub constructor for [`ZarrOutput`](@ref). Errors with a helpful message until the
 `Zarr.jl` extension is loaded, at which point the extension installs the real
 constructor."""
-function ZarrOutput(SG::SpectralGrid, args...; kwargs...)
+function ZarrOutput(::AbstractModel, args...; kwargs...)
     Base.get_extension(@__MODULE__, :SpeedyWeatherZarrExt) === nothing && error(
         "ZarrOutput requires Zarr.jl to be loaded. Add `using Zarr` (or " *
             "`import Zarr`) before constructing a ZarrOutput."
@@ -109,7 +111,22 @@ function ZarrOutput(SG::SpectralGrid, args...; kwargs...)
     # When the extension is loaded its `ZarrOutput` method takes precedence and
     # this fallback is unreachable; the throw guards against being called via a
     # generic dispatch path before the extension has registered its method.
-    throw(MethodError(ZarrOutput, (SG, args...)))
+    throw(MethodError(ZarrOutput, (args...,)))
+end
+
+"""$(TYPEDSIGNATURES)
+Deprecated stub: the old `ZarrOutput(spectral_grid, ModelType)` constructor has
+been replaced by `ZarrOutput(model::AbstractModel)`. Construct the model first,
+then pass it to `ZarrOutput`."""
+function ZarrOutput(::SpectralGrid, args...; kwargs...)
+    error(
+        "`ZarrOutput(spectral_grid, ...)` has been removed. Construct the model " *
+            "first and call `ZarrOutput(model)` instead, e.g.\n" *
+            "    using Zarr\n" *
+            "    model = PrimitiveWetModel(spectral_grid)\n" *
+            "    output = ZarrOutput(model)\n" *
+            "    simulation = initialize!(model, output=output)"
+    )
 end
 
 function Base.show(io::IO, output::ZarrOutput{F}) where {F}

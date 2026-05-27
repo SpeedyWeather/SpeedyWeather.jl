@@ -6,14 +6,11 @@ on the last time step as jld2 file. Options are $(TYPEDFIELDS)"""
     "[OPTION] File name for restart file, should end with .jld2"
     filename::String = "restart.jld2"
 
-    "[OPTION] Path for restart file, uses model.output.run_path if not specified"
+    "[OPTION/DERIVED] Path for restart file. Set by the output writer at initialize!."
     path::String = ""
 
     "[OPTION] Apply lossless compression in JLD2?"
     compress::Bool = true
-
-    "[OPTION] Only write with model.output.active = true?"
-    write_only_with_output::Bool = true
 
     "[DERIVED] package version to track possible incompatibilities"
     pkg_version::VersionNumber = isnothing(pkgversion(SpeedyWeather)) ? v"0.0.0" : pkgversion(SpeedyWeather)
@@ -30,18 +27,13 @@ to the output folder (or current path) that can be used to restart the model.
 Variables in restart file are not scaled."""
 function finalize!(
         restart::WriteVariablesRestartFile,
-        vars::Variables,
-        model::AbstractModel,
+        simulation::AbstractSimulation,
     )
-    # escape in case of no output
-    restart.write_only_with_output && (model.output.active || return nothing)
+    isempty(restart.path) && return nothing
 
-    (; compress, filename) = restart
-
-    # use output run path if not specified
-    path = restart.path == "" ? model.output.run_path : restart.path
+    (; compress, filename, path) = restart
+    vars = simulation.variables
     mkpath(path)
-    restart.path = path     # update path in case it was empty before
 
     jldopen(joinpath(path, filename), "w"; compress) do f
         f["variables.prognostic"] = vars.prognostic
@@ -49,7 +41,7 @@ function finalize!(
         f["description"] = "Restart file created by SpeedyWeather.jl"
     end
 
-    return model.output.active || @info "Restart file written to $(joinpath(path, filename)) although output=false"
+    return nothing
 end
 
 export WriteModelComponentFile
@@ -61,14 +53,11 @@ component at the end of the simulation. Options are $(TYPEDFIELDS)"""
     "[OPTION] File name for model component restart file, should end with .jld2"
     filename::String = "model_component.jld2"
 
-    "[OPTION] Path for restart file, uses model.output.run_path if not specified"
+    "[OPTION/DERIVED] Path for restart file. If left empty, writes to current directory."
     path::String = ""
 
     "[OPTION] Apply lossless compression in JLD2?"
     compress::Bool = true
-
-    "[OPTION] Only write with model.output.active = true?"
-    write_only_with_output::Bool = true
 
     "[OPTION] Model component to write, to be passed on as keyword argument to the callback"
     component::C
@@ -86,18 +75,17 @@ to the output folder (or current path) that can be used to restart the model.
 With the `component` field in `WriteModelComponentFile` as at the end of the simulation."""
 function finalize!(
         restart::WriteModelComponentFile,
-        ::Variables,
-        model::AbstractModel,
+        simulation::AbstractSimulation,
     )
-    # escape in case of no output
-    restart.write_only_with_output && (model.output.active || return nothing)
-
     (; compress, filename) = restart
 
-    # use output run path if not specified
-    path = restart.path == "" ? model.output.run_path : restart.path
+    # use first active output writer's run path if no path specified
+    if isempty(restart.path)
+        active_output = first_active_output(simulation)
+        restart.path = isnothing(active_output) ? pwd() : active_output.run_path
+    end
+    path = restart.path
     mkpath(path)
-    restart.path = path     # update path in case it was empty before
 
     jldopen(joinpath(path, filename), "w"; compress) do f
         f["component"] = restart.component
@@ -105,7 +93,7 @@ function finalize!(
         f["description"] = "Model component file created by SpeedyWeather.jl"
     end
 
-    return model.output.active || @info "Model component file written to $(joinpath(path, filename)) although output=false"
+    return nothing
 end
 
 load_model_component(callback::WriteModelComponentFile) =

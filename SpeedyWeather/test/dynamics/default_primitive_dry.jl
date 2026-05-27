@@ -3,5 +3,5 @@
     model = PrimitiveDryModel(spectral_grid)
     simulation = initialize!(model)
     run!(simulation, period = Year(1))
-    @test simulation.model.feedback.nans_detected == false
+    @test simulation.feedback.nans_detected == false
 end

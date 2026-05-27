@@ -31,9 +31,9 @@ end
 
     function SpeedyWeather.initialize!(
             callback::StormChaser,
-            vars::Variables,
-            model::AbstractModel,
+            simulation::SpeedyWeather.AbstractSimulation,
         )
+        vars, model = simulation.variables, simulation.model
         # allocate recorder: number of time steps (incl initial conditions) in simulation
         callback.maximum_surface_wind_speed = zeros(vars.prognostic.clock.n_timesteps + 1)
 
@@ -60,9 +60,9 @@ end
 
     function SpeedyWeather.callback!(
             callback::StormChaser,
-            vars::Variables,
-            model::AbstractModel,
+            simulation::SpeedyWeather.AbstractSimulation,
         )
+        vars, model = simulation.variables, simulation.model
 
         # increase counter
         callback.timestep_counter += 1
@@ -81,20 +81,20 @@ end
 
     spectral_grid = SpectralGrid()
     callbacks = CallbackDict(NoCallback())
-    model = PrimitiveWetModel(spectral_grid; callbacks)
+    model = PrimitiveWetModel(spectral_grid)
 
     storm_chaser = StormChaser(spectral_grid)
     key = :storm_chaser
-    add!(model.callbacks, key => storm_chaser)      # with :storm_chaser key
-    add!(model.callbacks, NoCallback())             # add dummy too
-    add!(model, NoCallback())                       # add dummy with ::AbstractModel interface
+    add!(callbacks, key => storm_chaser)            # with :storm_chaser key
+    add!(callbacks, NoCallback())                   # add dummy too
 
-    simulation = initialize!(model)
+    simulation = initialize!(model; callbacks)
+    add!(simulation, NoCallback())                  # add dummy with ::AbstractSimulation interface
     run!(simulation, period = Day(1))
 
     # maximum wind speed should always be non-negative
-    @test all(model.callbacks[key].maximum_surface_wind_speed .>= 0)
+    @test all(simulation.callbacks[key].maximum_surface_wind_speed .>= 0)
 
     # highest wind speed across all time steps should be positive
-    @test maximum(model.callbacks[key].maximum_surface_wind_speed) > 0
+    @test maximum(simulation.callbacks[key].maximum_surface_wind_speed) > 0
 end

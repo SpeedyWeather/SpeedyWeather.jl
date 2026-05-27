@@ -6,50 +6,48 @@ There are many options to this available.
 
 ## Creating `NetCDFOutput`
 
+The `NetCDFOutput` writer is constructed from a fully-built model — it inspects the model
+to set up the interpolator, scratch fields and the default output variables for the model
+class (e.g. `BarotropicModel` outputs vorticity and the velocity components; primitive models
+also include temperature and humidity).
+
 ```@example netcdf
 using SpeedyWeather
 spectral_grid = SpectralGrid()
-output = NetCDFOutput(spectral_grid)
-```
-
-With `NetCDFOutput(::SpectralGrid, ...)` one creates a `NetCDFOutput` writer with several options,
-which are explained in the following. By default, the `NetCDFOutput` is created when constructing
-the model, i.e.
-
-```@example netcdf
 model = ShallowWaterModel(spectral_grid)
-model.output
+output = NetCDFOutput(model)
 ```
 
-The output writer is a component of every Model, i.e. `BarotropicModel`, `ShallowWaterModel`, `PrimitiveDryModel`
-and `PrimitiveWetModel`, and they only differ in their default `output.variables` (e.g. the primitive
-models would by default output temperature which does not exist in the 2D models `BarotropicModel` or `ShallowWaterModel`).
-But any `NetCDFOutput` can be passed onto the model constructor with the `output` keyword argument.
+The output writer is then attached to the simulation by passing it as the `output` keyword
+argument to `initialize!(model)`:
 
 ```@example netcdf
-output = NetCDFOutput(spectral_grid, Barotropic)
-model = ShallowWaterModel(spectral_grid, output=output)
-nothing # hide
+simulation = initialize!(model; output)
+simulation
 ```
 
-Here, we created `NetCDFOutput` for the model class `Barotropic` (2nd positional argument, outputting only vorticity and velocity)
-but use it in the `ShallowWaterModel`. By default the `NetCDFOutput` is set to inactive, i.e.
-`output.active` is `false`. It is only turned on (and initialized) with `run!(simulation, output=true)`.
-So you may change the `NetCDFOutput` as you like but only calling `run!(simulation)` will not
-trigger it as `output=false` is the default here.
+A `Simulation` carries its output writers, callbacks and runtime feedback (they no longer
+live on the model itself). The writer is inactive at construction; it is only turned on
+(and the run folder created) when you call `run!(simulation, output=true)`.
+
+You can attach multiple writers at the same time — pass a tuple of writers to `initialize!`:
+
+```julia
+simulation = initialize!(model; output = (NetCDFOutput(model), ZarrOutput(model)))
+```
+
+Both writers will share the simulation's clock and write into their own run folders.
 
 ## Output frequency
 
 If we want to increase the frequency of the output we can choose `interval` (default `=Hour(6)`) like so
 ```@example netcdf
-output = NetCDFOutput(spectral_grid, ShallowWater, interval=Hour(1))
-model = ShallowWaterModel(spectral_grid, output=output)
-model.output
+output = NetCDFOutput(model, interval=Hour(1))
+simulation = initialize!(model; output)
+simulation
 ```
-which will now output every hour. It is important to pass on the new output writer `output` to the
-model constructor, otherwise it will not be part of your model and the default is used instead.
-Note that the choice of `interval` can affect the actual time step that is used for the model
-integration, which is explained in the following.
+which will now output every hour. Note that the choice of `interval` can affect the actual
+time step that is used for the model integration, which is explained in the following.
 Example, we run the model at a resolution of T42 and the time step is going to be
 ```@example netcdf
 spectral_grid = SpectralGrid(trunc=42, nlayers=1)
@@ -59,9 +57,9 @@ time_stepping.Δt_sec
 seconds. Depending on the output frequency (we chose `interval = Hour(1)` above)
 this will be slightly adjusted during model initialization:
 ```@example netcdf
-output = NetCDFOutput(spectral_grid, ShallowWater, interval=Hour(1))
-model = ShallowWaterModel(spectral_grid; time_stepping, output)
-simulation = initialize!(model)
+model = ShallowWaterModel(spectral_grid; time_stepping)
+output = NetCDFOutput(model, interval=Hour(1))
+simulation = initialize!(model; output)
 model.time_stepping.Δt_sec
 ```
 The shorter the output interval the more the model time step needs to be adjusted
@@ -75,27 +73,26 @@ time_stepping.Δt_sec
 and a little info will be printed to explain that even though you wanted
 `interval = Hour(1)` you will not actually get this upon initialization:
 ```@example netcdf
-model = ShallowWaterModel(spectral_grid; time_stepping, output)
-simulation = initialize!(model)
+model = ShallowWaterModel(spectral_grid; time_stepping)
+output = NetCDFOutput(model, interval=Hour(1))
+simulation = initialize!(model; output)
 ```
 
 The time axis of the NetCDF output will now look like
 ```@example netcdf
 using NCDatasets
 run!(simulation, period=Day(1), output=true)
-run_folder = model.output.run_folder
-ds = NCDataset("$run_folder/output.nc")
+ds = NCDataset(joinpath(output.run_path, output.filename))
 ds["time"][:]
 ```
 which is a bit ugly, that's why `adjust_with_output=true` is the default. In that case we would have
 ```@example netcdf
 time_stepping = Leapfrog(spectral_grid, adjust_with_output=true)
-output = NetCDFOutput(spectral_grid, ShallowWater, interval=Hour(1))
-model = ShallowWaterModel(spectral_grid; time_stepping, output)
-simulation = initialize!(model)
+model = ShallowWaterModel(spectral_grid; time_stepping)
+output = NetCDFOutput(model, interval=Hour(1))
+simulation = initialize!(model; output)
 run!(simulation, period=Day(1), output=true)
-run_folder = model.output.run_folder
-ds = NCDataset("$run_folder/output.nc")
+ds = NCDataset(joinpath(output.run_path, output.filename))
 ds["time"][:]
 ```
 very neatly hourly output in the NetCDF file!
@@ -109,7 +106,7 @@ So for example `output_grid=FullClenshawGrid(48)` would interpolate onto a
 regular 192x95 longitude-latitude grid of 1.875˚ resolution, regardless the grid and resolution used
 for the model integration.
 ```@example netcdf
-my_output_writer = NetCDFOutput(spectral_grid, output_grid=FullClenshawGrid(48))
+my_output_writer = NetCDFOutput(model, output_grid=FullClenshawGrid(48))
 ```
 Note that by default the output is on the corresponding full type of the grid type used in the dynamical core
 so that interpolation only happens at most in the zonal direction as they share the location of the
@@ -160,15 +157,12 @@ is discussed in [Customizing netCDF output](@ref).
 We can add new output variables with `add!`
 
 ```@example netcdf
-output = NetCDFOutput(spectral_grid)            # default variables
+output = NetCDFOutput(model)                    # default variables
 add!(output, SpeedyWeather.DivergenceOutput())  # output also divergence
 output
 ```
 
-If you didn't create a `NetCDFOutput` separately, you can also apply this directly to `model`,
-either `add!(model, SpeedyWeather.DivergenceOutput())` or `add!(model.output, args...)`,
-which technically also just forwards to `add!(model.output.variables, args...)`.
-`output.variables` is a dictionary were the variable names (as `Symbol`s) are used as keys,
+`output.variables` is a dictionary where the variable names (as `Symbol`s) are used as keys,
 so `output.variables[:div]` just returns the `SpeedyWeather.DivergenceOutput()` we have
 just created using `:div` as key. With those keys one can also `delete!` a variable
 from netCDF output
@@ -233,7 +227,9 @@ SpeedyWeather.AllOutputVariabesl()
 each of can but doesn't have to be splatted e.g.
 
 ```@example netcdf
-add!(model, SpeedyWeather.SurfaceFluxesOutput())
+model = PrimitiveWetModel(spectral_grid)
+output = NetCDFOutput(model)
+add!(output, SpeedyWeather.SurfaceFluxesOutput())
 ```
 
 or `SpeedyWeather.SurfaceFluxesOutput()...` are equivalent.
@@ -255,18 +251,19 @@ Otherwise (`overwrite=false`) we (re)set the run number to 1, check whether the 
 already exists and count the run number up until no folder of that same name already exists.
 
 ```@example netcdf
+model = BarotropicModel(spectral_grid)
+
 # default naming run_0001, run_0002, ...
-output = NetCDFOutput(spectral_grid)
+output = NetCDFOutput(model)
 
 # provide an id, would yield run_test_0001, run_test_0002, ...
-output = NetCDFOutput(spectral_grid, id="test")
+output = NetCDFOutput(model, id="test")
 
 # write into run_forrest_run_01234 potentially ovewriting it
-output = NetCDFOutput(spectral_grid, id="forrest_run", run_number=1234, run_digits=5, overwrite=true)
+output = NetCDFOutput(model, id="forrest_run", run_number=1234, run_digits=5, overwrite=true)
 
 # let us test the last one
-model = BarotropicModel(spectral_grid; output)
-simulation = initialize!(model)
+simulation = initialize!(model; output)
 run!(simulation, steps=1, output=true)
 
 # what is the run folder?
@@ -296,11 +293,12 @@ The saved NetCDF files can be visualized with a wide range of tools, both in Jul
 using SpeedyWeather, GeoMakie, CairoMakie
 spectral_grid = SpectralGrid()
 model = PrimitiveWetModel(spectral_grid)
-simulation = initialize!(model)
+output = NetCDFOutput(model)
 
 # Add mean sea-level pressure for visualisation
-add!(model, SpeedyWeather.MeanSeaLevelPressureOutput())
+add!(output, SpeedyWeather.MeanSeaLevelPressureOutput())
 
+simulation = initialize!(model; output)
 run!(simulation, period=Day(3), output=false) # some spin-up
 run!(simulation, period=Day(5), output=true)
 

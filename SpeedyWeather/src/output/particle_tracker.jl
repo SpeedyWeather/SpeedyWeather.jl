@@ -4,7 +4,7 @@ export ParticleTracker
 A ParticleTracker is implemented as a callback to output the trajectories
 of particles from particle advection. To be added like
 
-    add!(model.callbacks, ParticleTracker(spectral_grid; kwargs...))
+    add!(simulation, ParticleTracker(spectral_grid; kwargs...))
 
 Output done via netCDF. Fields and options are
 $(TYPEDFIELDS)"""
@@ -15,7 +15,7 @@ $(TYPEDFIELDS)"""
     "[OPTION] File name for netCDF file"
     filename::String = "particles.nc"
 
-    "[OPTION] Path for netCDF file, uses model.output.run_path if not specified"
+    "[OPTION] Path for netCDF file. Falls back to the first active output writer's run_path."
     path::String = ""
 
     "[OPTION] lossless compression level; 1=low but fast, 9=high but slow"
@@ -47,18 +47,23 @@ end
 
 function initialize!(
         particle_tracker::ParticleTracker,
-        vars::Variables,
-        model::AbstractModel,
+        simulation::AbstractSimulation,
     )
+    (; model) = simulation
+    vars = simulation.variables
 
     (; clock) = vars.prognostic
     initialize!(particle_tracker.schedule, clock)
 
     # CREATE NETCDF FILE, vector of NcVars for output
     (; filename) = particle_tracker
-    path = particle_tracker.path == "" ? model.output.run_path : particle_tracker.path
+    if isempty(particle_tracker.path)
+        active_output = first_active_output(simulation)
+        particle_tracker.path = isnothing(active_output) ? pwd() : active_output.run_path
+    end
+    path = particle_tracker.path
     mkpath(path)
-    model.output.active || @info "ParticleTracker writes to $(joinpath(path, filename)) as output=false"
+    any_output_active(simulation) || @info "ParticleTracker writes to $(joinpath(path, filename)) as output=false"
 
     dataset = NCDataset(joinpath(path, filename), "c")
     particle_tracker.netcdf_file = dataset
@@ -134,9 +139,9 @@ end
 
 function callback!(
         particle_tracker::ParticleTracker,
-        vars::Variables,
-        model::AbstractModel,
+        simulation::AbstractSimulation,
     )
+    vars = simulation.variables
     isscheduled(particle_tracker.schedule, vars.prognostic.clock) || return nothing   # else escape immediately
     i = particle_tracker.schedule.counter + 1     # +1 for initial conditions (not scheduled)
 

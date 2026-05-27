@@ -109,16 +109,17 @@ no insulation (i.e. no impact) in the case of no ice.
 
 ## Output
 
-And output is added like
+And output is added to the `NetCDFOutput` writer like
 
 ```@example sea_ice
-add!(model, SpeedyWeather.SeaIceConcentrationOutput())
+output = NetCDFOutput(model)
+add!(output, SpeedyWeather.SeaIceConcentrationOutput())
 ```
 
 or as part of `SpeedyWeather.OceanOutput()`
 
 ```@example sea_ice
-add!(model, SpeedyWeather.OceanOutput())
+add!(output, SpeedyWeather.OceanOutput())
 ```
 
 For more information see [Output variables](@ref).

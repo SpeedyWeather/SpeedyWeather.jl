@@ -47,8 +47,6 @@ $(TYPEDFIELDS)"""
         IM,     # <:AbstractImplicit,
         HD,     # <:AbstractHorizontalDiffusion,
         VA,     # <:AbstractVerticalAdvection,
-        OU,     # <:AbstractOutput,
-        FB,     # <:AbstractFeedback,
         TS1,    # <:Tuple{Symbol}
         TS2,    # <:Tuple{Symbol}
         PV,     # <:Val
@@ -104,11 +102,6 @@ $(TYPEDFIELDS)"""
     horizontal_diffusion::HD = HyperDiffusion(spectral_grid)
     vertical_advection::VA = CenteredVerticalAdvection(spectral_grid)
 
-    # OUTPUT
-    output::OU = NetCDFOutput(spectral_grid, PrimitiveDry)
-    callbacks::Dict{Symbol, AbstractCallback} = Dict{Symbol, AbstractCallback}()
-    feedback::FB = Feedback()
-
     # Tuples with symbols pointing at the core components needed to be adapted
     # for availability within the parameterizations
     core_components::TS1 = (
@@ -136,6 +129,21 @@ $(TYPEDFIELDS)"""
     # DERIVED
     # used to infer parameterizations at compile-time
     params::PV = Val(parameterizations)
+end
+
+"""$(TYPEDSIGNATURES)
+Outer constructor that intercepts the deprecated `output`, `callbacks` and
+`feedback` kwargs. They now live on `Simulation` (pass to `initialize!(model, ...)`)
+and emit a deprecation warning here for backward-compatibility."""
+function PrimitiveDryModel(
+        spectral_grid::SpectralGrid;
+        output = nothing,
+        callbacks = nothing,
+        feedback = nothing,
+        kwargs...,
+    )
+    _warn_deprecated_model_kwargs(:PrimitiveDryModel; output, callbacks, feedback)
+    return PrimitiveDryModel(; spectral_grid, kwargs...)
 end
 
 function variables(model::PrimitiveDry)
@@ -190,13 +198,22 @@ end
 
 """
 $(TYPEDSIGNATURES)
-Calls all `initialize!` functions for components of `model`,
-except for `model.output` and `model.feedback` which are always called
-at in `time_stepping!` and `model.implicit` which is done in `first_timesteps!`."""
-function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
+Calls all `initialize!` functions for components of `model`. The output writers,
+callbacks and feedback live on the returned `Simulation` and are initialized just
+before the first time step inside `time_stepping!`. `model.implicit` is initialized
+in `first_timesteps!`."""
+function initialize!(
+        model::PrimitiveDry;
+        time::DateTime = DEFAULT_DATE,
+        output = (),
+        callbacks::CALLBACK_DICT = CallbackDict(),
+        feedback::AbstractFeedback = Feedback(),
+    )
+    outputs = output_collection(output)
+
     # NUMERICS (implicit is initialized later)
     initialize!(model.geometry, model)
-    initialize!(model.time_stepping, model)
+    initialize!(model.time_stepping, model; interval = combined_output_interval(outputs))
     initialize!(model.horizontal_diffusion, model)
 
     # DYNAMICS
@@ -239,7 +256,7 @@ function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
     # set all initial conditions for the ocean, seaice, land then atmosphere
     initialize!(variables, model)
 
-    return Simulation(variables, model)
+    return Simulation(variables, model, outputs, callbacks, feedback)
 end
 
 """$(TYPEDSIGNATURES)

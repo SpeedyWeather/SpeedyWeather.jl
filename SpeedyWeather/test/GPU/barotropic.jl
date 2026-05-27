@@ -6,7 +6,7 @@ using JLD2
     simulation = initialize!(model)
     run!(simulation, steps = 4)
 
-    @test simulation.model.feedback.nans_detected == false
+    @test simulation.feedback.nans_detected == false
 end
 
 @testset "GPU Barotropic with JLD2Output" begin
@@ -17,7 +17,7 @@ end
     simulation = initialize!(model)
     run!(simulation, steps = 3, output = true)
 
-    @test simulation.model.feedback.nans_detected == false
+    @test simulation.feedback.nans_detected == false
 
     # JLD2Output should have transferred data to CPU before writing
     f = jldopen(joinpath(output.run_path, output.filename), "r")
@@ -37,7 +37,7 @@ end
     simulation = initialize!(model)
     run!(simulation, steps = 3, output = true)
 
-    @test simulation.model.feedback.nans_detected == false
+    @test simulation.feedback.nans_detected == false
 
     # check IC snapshot (transfer to CPU first to avoid scalar indexing on GPU)
     ic = output.output[1].prognostic

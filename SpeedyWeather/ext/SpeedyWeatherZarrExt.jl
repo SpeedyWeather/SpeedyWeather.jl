@@ -9,10 +9,10 @@ import SpeedyWeather: ZarrOutput, AbstractOutput, AbstractOutputVariable,
     OUTPUT_VARIABLES_DICT, OutputVariablesDict, DEFAULT_NLAYERS_SOIL,
     DEFAULT_OUTPUT_NF, DEFAULT_OUTPUT_INTERVAL, DEFAULT_MISSING_VALUE,
     DEFAULT_COMPRESSION_LEVEL, DEFAULT_KEEPBITS,
-    Variables, Simulation, SpectralGrid, Field,
+    Variables, Simulation, SpectralGrid, Field, CALLBACK_DICT, CallbackDict,
     initialize!, finalize!, output!, write_array!, set!, add!, add_default!,
-    is3D, is_land, hastime, get_indices, scale!, get_soil_layers,
-    get_lond, get_latd, on_architecture, CPU,
+    is3D, is_land, hastime, get_indices, scale!, get_soil_layers, get_nlayers,
+    get_lond, get_latd, on_architecture, CPU, model_class,
     AbstractFullGrid
 
 import SpeedyWeather.RingGrids
@@ -30,19 +30,27 @@ resolve_compressor(::Nothing) = default_zarr_compressor()
 Constructor for [`ZarrOutput`](@ref) (extension version, available once `Zarr.jl`
 is loaded). Behaves like the [`SpeedyWeather.NetCDFOutput`](@ref) constructor:
 builds the output grid, the interpolator, scratch fields and pre-fills the
-`output.variables` dictionary with the defaults for `Model`."""
+`output.variables` dictionary with the defaults for the model's class.
+
+```julia
+using Zarr
+model = PrimitiveWetModel(spectral_grid)
+output = ZarrOutput(model)
+simulation = initialize!(model, output=output)
+```"""
 function ZarrOutput(
-        SG::SpectralGrid,
-        Model::Type{<:AbstractModel} = Barotropic;
-        nlayers_soil = DEFAULT_NLAYERS_SOIL,
+        model::AbstractModel;
         output_grid::AbstractFullGrid = on_architecture(
-            CPU(), RingGrids.full_grid_type(SG.grid)(SG.grid.nlat_half)
+            CPU(), RingGrids.full_grid_type(model.spectral_grid.grid)(model.spectral_grid.grid.nlat_half)
         ),
         output_NF::DataType = DEFAULT_OUTPUT_NF,
+        nlayers_soil::Int = get_soil_layers(model),
         interval::Period = Second(DEFAULT_OUTPUT_INTERVAL),
         compressor = nothing,
         kwargs...
     )
+
+    SG = model.spectral_grid
 
     # INPUT GRID (but on CPU)
     input_grid = on_architecture(CPU(), SG.grid)
@@ -80,7 +88,7 @@ function ZarrOutput(
         kwargs...
     )
 
-    add_default!(output.variables, Model)
+    add_default!(output.variables, model_class(model))
     return output
 end
 
@@ -93,18 +101,12 @@ function initialize!(
         output::ZarrOutput,
         vars::Variables,
         model::AbstractModel,
+        callbacks::CALLBACK_DICT = CallbackDict(),
     )
     output.active || return nothing
 
-    # only checked for models that have a land component
-    if hasfield(typeof(model), :land) && !isnothing(model.land)
-        @assert SpeedyWeather.get_nlayers(model.land) == size(output.field3Dland, 2) "$(size(output.field3Dland, 2))" *
-            " soil layers initialized for output, but $(SpeedyWeather.get_nlayers(model.land)) soil layers initialized for model." *
-            " Please construct ZarrOutput with the same `nlayers_soil` as the model."
-    end
-
     # SHARED INITIALIZATION (run folder, output frequency, counters, callbacks)
-    initialize!(output.core, output, model)
+    initialize!(output.core, output, model, callbacks)
 
     # Total number of output snapshots: IC + one per `output_every_n_steps`.
     n_outputs = vars.prognostic.clock.n_timesteps ÷ output.output_every_n_steps + 1

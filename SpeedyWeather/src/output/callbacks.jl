@@ -28,12 +28,12 @@ initialize!(::NoCallback, args...) = nothing     # executed once before the main
 callback!(::NoCallback, args...) = nothing       # executed after every time step
 finalize!(::NoCallback, args...) = nothing       # executed after main time loop finishes
 
-# simply loop over dict of callbacks
+# simply loop over dict of callbacks, passing the simulation through to each callback
 for func in (:initialize!, :callback!, :finalize!)
     @eval begin
-        function $func(callbacks::CALLBACK_DICT, args...)
+        function $func(callbacks::CALLBACK_DICT, simulation::AbstractSimulation)
             for key in keys(callbacks)
-                $func(callbacks[key], args...)
+                $func(callbacks[key], simulation)
             end
             return
         end
@@ -45,8 +45,8 @@ export add!
 $(TYPEDSIGNATURES)
 Add a or several callbacks to a Dict{String, AbstractCallback} dictionary. To be used like
 
-    add!(model.callbacks, :my_callback => callback)
-    add!(model.callbacks, :my_callback1 => callback, :my_callback2 => other_callback)
+    add!(simulation.callbacks, :my_callback => callback)
+    add!(simulation.callbacks, :my_callback1 => callback, :my_callback2 => other_callback)
 """
 function add!(D::CALLBACK_DICT, key_callbacks::Pair{Symbol, <:AbstractCallback}...)
     for key_callback in key_callbacks
@@ -59,16 +59,12 @@ end
 
 """
 $(TYPEDSIGNATURES)
-Add a or several callbacks to a model::AbstractModel. To be used like
-
-    add!(model, :my_callback => callback)
-    add!(model, :my_callback1 => callback, :my_callback2 => other_callback)
-"""
-add!(model::AbstractModel, key_callbacks::Pair{Symbol, <:AbstractCallback}...) =
-    add!(model.callbacks, key_callbacks...)
+Add a or several callbacks to a `simulation::AbstractSimulation`."""
+add!(sim::AbstractSimulation, key_callbacks::Pair{Symbol, <:AbstractCallback}...) =
+    add!(sim.callbacks, key_callbacks...)
 add!(D::CALLBACK_DICT, key::Symbol, callback::AbstractCallback) = add!(D, Pair(key, callback))
-add!(model::AbstractModel, key::Symbol, callback::AbstractCallback) =
-    add!(model.callbacks, Pair(key, callback))
+add!(sim::AbstractSimulation, key::Symbol, callback::AbstractCallback) =
+    add!(sim.callbacks, Pair(key, callback))
 
 
 # also with string but flag conversion
@@ -83,8 +79,8 @@ $(TYPEDSIGNATURES)
 Add a or several callbacks to a Dict{Symbol, AbstractCallback} dictionary without specifying the
 key which is randomly created like callback_????. To be used like
 
-    add!(model.callbacks, callback)
-    add!(model.callbacks, callback1, callback2)."""
+    add!(simulation.callbacks, callback)
+    add!(simulation.callbacks, callback1, callback2)."""
 function add!(D::CALLBACK_DICT, callbacks::AbstractCallback...; verbose = true)
     for callback in callbacks
         key = Symbol("callback_" * Random.randstring(4))
@@ -96,16 +92,16 @@ end
 
 """
 $(TYPEDSIGNATURES)
-Add a or several callbacks to a mdoel without specifying the
+Add a or several callbacks to a `simulation::AbstractSimulation` without specifying the
 key which is randomly created like callback_????. To be used like
 
-    add!(model.callbacks, callback)
-    add!(model.callbacks, callback1, callback2)."""
-add!(model::AbstractModel, callbacks::AbstractCallback...) =
-    add!(model.callbacks, callbacks..., verbose = model.feedback.verbose)
+    add!(simulation, callback)
+    add!(simulation, callback1, callback2)."""
+add!(sim::AbstractSimulation, callbacks::AbstractCallback...) =
+    add!(sim.callbacks, callbacks..., verbose = sim.feedback.verbose)
 
 # adding via tuple splats the tuple
-add!(model::AbstractModel, tuple::Tuple) = add!(model, tuple...)
+add!(sim::AbstractSimulation, tuple::Tuple) = add!(sim, tuple...)
 
 # delete!(dict, key) already defined in Base
 
@@ -128,9 +124,9 @@ Allocates vector of correct length (number of elements = total time steps plus o
 global surface temperature of the initial conditions"""
 function initialize!(
         callback::GlobalSurfaceTemperatureCallback{NF},
-        vars::Variables,
-        model::AbstractModel,
+        simulation::AbstractSimulation,
     ) where {NF}
+    vars, model = simulation.variables, simulation.model
     callback.temperature = Vector{NF}(undef, vars.prognostic.clock.n_timesteps + 1)    # replace with vector of correct length
     nlayers = model.geometry.nlayers
     callback.temperature[1] = vars.grid.temp_average[nlayers]       # set initial conditions
@@ -144,9 +140,9 @@ Pulls the average temperature from the lowermost layer and stores it in the next
 element of the callback.temperature vector."""
 function callback!(
         callback::GlobalSurfaceTemperatureCallback,
-        vars::Variables,
-        model::AbstractModel,
+        simulation::AbstractSimulation,
     )
+    vars, model = simulation.variables, simulation.model
     callback.timestep_counter += 1
     i = callback.timestep_counter
     nlayers = model.geometry.nlayers

@@ -166,9 +166,9 @@ would then have this `MilleniumFlood` take place
 ```@example landseamask
 land_sea_mask = LandSeaMask(spectral_grid)      # start with Earth's land-sea mask
 model = PrimitiveWetModel(spectral_grid; land_sea_mask)
-add!(model, MilleniumFlood())   # or MilleniumFlood(::DateTime) for any non-default date
+callbacks = CallbackDict(:millenium_flood => MilleniumFlood())   # or MilleniumFlood(::DateTime) for any non-default date
 
-simulation = initialize!(model, time=DateTime(1999,12,29))
+simulation = initialize!(model; time=DateTime(1999,12,29), callbacks)
 run!(simulation, period=Day(5))
 heatmap(model.land_sea_mask.mask, title="Land-sea mask after MilleniumFlood callback")
 save("land-sea_mask2.png", ans) # hide

@@ -18,8 +18,7 @@
             if ~(Convection == BettsMillerConvection && Model == PrimitiveDryModel)
                 convection = Convection(spectral_grid)
                 model = Model(spectral_grid; convection)
-                model.feedback.verbose = false
-                simulation = initialize!(model)
+                simulation = initialize!(model; feedback = Feedback(verbose = false))
 
                 run!(simulation, steps = 36)
             end

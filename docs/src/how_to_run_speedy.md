@@ -194,15 +194,21 @@ zenith angle calculation.
 
 After this step you can continue to tweak your model setup but note that
 some model components are immutable, or that your changes may not be
-propagated to other model components that rely on it. But you can, for
-example, change the output interval like so
+propagated to other model components that rely on it. Output writers are
+attached to the `Simulation` itself, not the model. To get NetCDF output
+every hour, build the writer and pass it to `initialize!(model)`:
 ```@example howto
-set!(model.output, model, interval=Hour(1))
+output = NetCDFOutput(model, interval=Hour(1))
+simulation = initialize!(model; output)
 ```
-Now, if there's output, it will be every hour. Furthermore the initial
-conditions can be set with the `initial_conditions` model component
-which are then set during `initialize!(::AbstractModel)`, but you can also
-change them now, before the model runs 
+If an output writer already exists, you can also retune its `interval`
+on the fly:
+```@example howto
+set!(output, model, simulation.callbacks; interval=Hour(1))
+```
+Furthermore the initial conditions can be set with the `initial_conditions`
+model component which are then set during `initialize!(::AbstractModel)`, but
+you can also change them now, before the model runs
 ```@example howto
 # harmonic x layer x leapfrog steps
 simulation.variables.prognostic.vorticity[1, 1, 1] = 0
@@ -223,7 +229,7 @@ run!(simulation)
 By default this runs for 10 days without output and returns the updated `simulation`.
 Now `period` and `output` are the only options to change, so with
 ```@example howto
-model.output.id = "test" # hide
+output.id = "test" # hide
 run!(simulation, period=Day(5), output=true)
 ```
 You would continue this simulation (the previous `run!` call already integrated

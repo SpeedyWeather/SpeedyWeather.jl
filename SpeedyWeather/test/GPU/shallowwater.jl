@@ -4,5 +4,5 @@
     simulation = initialize!(model)
     run!(simulation, steps = 4)
 
-    @test simulation.model.feedback.nans_detected == false
+    @test simulation.feedback.nans_detected == false
 end
