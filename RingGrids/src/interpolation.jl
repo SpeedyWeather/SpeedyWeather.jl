@@ -373,7 +373,7 @@ Base.@propagate_inbounds function interpolate!(
     )
     fields_match(Aout, A) && return copyto!(Aout.data, A.data)
     @assert ismatching(architecture(A), architecture(Aout)) "Interpolation is only supported between fields on the same architecture, got $(architecture(A)) and $(architecture(Aout))"
-    return _interpolate!(Aout.data, A.data, locator, geometry, architecture(A))
+    return @inbounds _interpolate!(Aout.data, A.data, locator, geometry, architecture(A))
 end
 
 # version for 2D field and vector
