@@ -119,7 +119,7 @@ function initialize!(ocean::SeasonalOceanClimatology, model::PrimitiveEquation)
 
     # create interpolator from grid in file to grid used in model
     interp = RingGrids.interpolator(monthly_temperature, sst, NF = Float32)
-    interpolate!(monthly_temperature, sst, interp)
+    @maybe_jit model.architecture interpolate!(monthly_temperature, sst, interp)
     return nothing
 end
 

@@ -21,8 +21,8 @@ Architectures.array_type(::ReactantDevice) = ConcreteRArray
 Architectures.array_type(::Type{<:ReactantDevice}) = ConcreteRArray
 Architectures.array_type(::ReactantDevice, NF::Type, N::Int) = ConcretePJRTArray{NF, N, 1}
 
-Architectures.compatible_array_types(::ReactantDevice) = (ConcreteRArray, AnyConcreteReactantArray)
-Architectures.compatible_array_types(::Type{<:ReactantDevice}) = (ConcreteRArray, AnyConcreteReactantArray)
+Architectures.compatible_array_types(::ReactantDevice) = (ConcreteRArray, AnyConcreteReactantArray, Reactant.AnyTracedRArray)
+Architectures.compatible_array_types(::Type{<:ReactantDevice}) = (ConcreteRArray, AnyConcreteReactantArray, Reactant.AnyTracedRArray)
 
 Architectures.nonparametric_type(::Type{<:ConcreteRArray}) = ConcreteRArray
 

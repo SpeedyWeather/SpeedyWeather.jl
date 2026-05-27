@@ -71,7 +71,7 @@ function initialize!(land::SeasonalLandTemperature, model::PrimitiveEquation)
 
     # create interpolator from grid in file to grid used in model
     interp = RingGrids.interpolator(monthly_temperature, lst, NF = Float32)
-    interpolate!(monthly_temperature, lst, interp)
+    @maybe_jit model.architecture interpolate!(monthly_temperature, lst, interp)
 
     # mask ocean points to fallback ocean temperature
     # set ocean "land" temperature points (100% ocean only)

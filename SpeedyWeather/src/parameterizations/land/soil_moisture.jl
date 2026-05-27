@@ -89,7 +89,7 @@ function initialize!(soil::SeasonalSoilMoisture, model::PrimitiveEquation)
 
     # create interpolator from grid in file to grid used in model
     interp = RingGrids.interpolator(monthly_soil_moisture, soil_moisture_file, NF = Float32)
-    interpolate!(monthly_soil_moisture, soil_moisture_file, interp)
+    @maybe_jit model.architecture interpolate!(monthly_soil_moisture, soil_moisture_file, interp)
     return nothing
 end
 
