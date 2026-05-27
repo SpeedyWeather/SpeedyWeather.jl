@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.20.2
+
 - Handle heterogeneous parameter attributes in `ParameterEditing` [#1106](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1106)
 - Coupling to the Terrarium.jl land model via an SpeedyWeatherTerrariumExt [#1090](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1090)
 - The `ShallowWaterModel` is now GPU compatible [#1104](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1104)
