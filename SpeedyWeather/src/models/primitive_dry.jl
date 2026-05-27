@@ -146,7 +146,47 @@ end
 """($TYPEDSIGNATURES) All variables needed for the primitive dry model itself (components excluded)."""
 function variables(::Type{<:PrimitiveDry}, nsteps)
     return (
-        variables(BarotropicModel, nsteps)...,
+        # ============================================================================
+        # FUSE :spectral_tendencies — slot order: vor, div, T, pres, u, v, uT, vT, KE → 8L+1
+        # ============================================================================
+        TendencyVariable(:vorticity, Spectral3D(), desc = "Tendency of relative vorticity", units = "1/s²", fuse = :spectral_tendencies),
+        TendencyVariable(:divergence, Spectral3D(), desc = "Tendency of divergence", units = "1/s²", fuse = :spectral_tendencies),
+        TendencyVariable(:temperature, Spectral3D(), desc = "Tendency of temperature", units = "K/s", fuse = :spectral_tendencies),
+        TendencyVariable(:pressure, Spectral2D(), desc = "Tendency of surface pressure", units = "log(Pa)/s", fuse = :spectral_tendencies),
+        TendencyVariable(:u, Spectral3D(), desc = "Tendency of zonal wind", units = "m/s²", fuse = :spectral_tendencies),
+        TendencyVariable(:v, Spectral3D(), desc = "Tendency of meridional wind", units = "m/s²", fuse = :spectral_tendencies),
+        DynamicsVariable(:uT_anomaly, Spectral3D(), desc = "u*T anomaly intermediate in spectral space", fuse = :spectral_tendencies),
+        DynamicsVariable(:vT_anomaly, Spectral3D(), desc = "v*T anomaly intermediate in spectral space", fuse = :spectral_tendencies),
+        DynamicsVariable(:kinetic_energy, Spectral3D(), desc = "Kinetic energy intermediate in spectral space", fuse = :spectral_tendencies),
+
+        # ============================================================================
+        # FUSE :grid_tendencies — slot order: T, pres, u, v, uT, vT, KE → 6L+1
+        # (matches the trailing subview of :spectral_tendencies)
+        # ============================================================================
+        TendencyVariable(:temperature, Grid3D(), namespace = :grid, desc = "Tendency of temperature on the grid", units = "K/s", fuse = :grid_tendencies),
+        TendencyVariable(:pressure, Grid2D(), namespace = :grid, desc = "Tendency of surface pressure on the grid", units = "log(Pa)/s", fuse = :grid_tendencies),
+        TendencyVariable(:u, Grid3D(), namespace = :grid, desc = "Tendency of zonal wind on the grid", units = "m/s²", fuse = :grid_tendencies),
+        TendencyVariable(:v, Grid3D(), namespace = :grid, desc = "Tendency of meridional wind on the grid", units = "m/s²", fuse = :grid_tendencies),
+        DynamicsVariable(:uT_anomaly, Grid3D(), desc = "u*T anomaly intermediate on grid", namespace = :grid, fuse = :grid_tendencies),
+        DynamicsVariable(:vT_anomaly, Grid3D(), desc = "v*T anomaly intermediate on grid", namespace = :grid, fuse = :grid_tendencies),
+        DynamicsVariable(:kinetic_energy, Grid3D(), desc = "Kinetic energy intermediate, ½(u²+v²)", namespace = :grid, fuse = :grid_tendencies),
+
+        # ============================================================================
+        # Barotropic-shared scaffolding (duplicated rather than inherited — see docstring)
+        # ============================================================================
+        PrognosticVariable(:clock, ClockDim(), desc = "Clock", units = "s"),
+        PrognosticVariable(:scale, ScalarDim(1), desc = "Scaling of vor and div in the dynamical core", units = "m"),
+        PrognosticVariable(:vorticity, Spectral4D(nsteps), desc = "Relative vorticity", units = "1/s", fuse = :prognostic),
+        TendencyVariable(:vorticity, Grid3D(), namespace = :grid, desc = "Tendency of relative vorticity on the grid", units = "1/s²"),
+        GridVariable(:vorticity, Grid3D(), desc = "Relative vorticity", units = "1/s", fuse = :grid),
+        GridVariable(:u, Grid3D(), desc = "Zonal wind", units = "m/s", fuse = :uv_grid),
+        GridVariable(:v, Grid3D(), desc = "Meridional wind", units = "m/s", fuse = :uv_grid),
+        ScratchVariable(:a, Spectral3D(), desc = "Scratch array", units = "?", fuse = :spectral_scratch),
+        ScratchVariable(:b, Spectral3D(), desc = "Scratch array", units = "?", fuse = :spectral_scratch),
+
+        # ============================================================================
+        # PrimitiveDry prognostic, grid, prev
+        # ============================================================================
         PrognosticVariable(:divergence, Spectral4D(nsteps), desc = "Divergence", units = "1/s", fuse = :prognostic),
         PrognosticVariable(:temperature, Spectral4D(nsteps), desc = "Temperature", units = "K", fuse = :prognostic),
         PrognosticVariable(:pressure, Spectral3D(nsteps), desc = "Logarithm of surface pressure", units = "log(Pa)", fuse = :prognostic),
@@ -154,27 +194,19 @@ function variables(::Type{<:PrimitiveDry}, nsteps)
         GridVariable(:divergence, Grid3D(), desc = "Divergence", units = "1/s", fuse = :grid),
         GridVariable(:temperature, Grid3D(), desc = "Temperature", units = "K", fuse = :grid),
         GridVariable(:pressure, Grid2D(), desc = "Logarithm of surface pressure", units = "", fuse = :grid),
+
         GridVariable(:divergence_prev, Grid3D(), desc = "Divergence at previous time step", units = "1/s"),
         GridVariable(:u_prev, Grid3D(), desc = "Zonal wind at previous time step", units = "m/s", fuse = :grid_prev),
         GridVariable(:v_prev, Grid3D(), desc = "Meridional wind at previous time step", units = "m/s", fuse = :grid_prev),
         GridVariable(:temperature_prev, Grid3D(), desc = "Temperature at previous time step", units = "K", fuse = :grid_prev),
         GridVariable(:pressure_prev, Grid2D(), desc = "Logarithm of surface pressure at previous time step", units = "", fuse = :grid_prev),
 
-        TendencyVariable(:divergence, Spectral3D(), desc = "Tendency of divergence", units = "1/s²"), # not fused because computed directly by divergence op
-        TendencyVariable(:temperature, Spectral3D(), desc = "Tendency of temperature", units = "K/s", fuse = :spectral_tendencies),
-        TendencyVariable(:pressure, Spectral2D(), desc = "Tendency of surface pressure", units = "log(Pa)/s", fuse = :spectral_tendencies),
+        # Unfused divergence tendency on the grid (kept for compat; never written by the dycore)
         TendencyVariable(:divergence, Grid3D(), namespace = :grid, desc = "Tendency of divergence on the grid", units = "1/s²"),
-        TendencyVariable(:temperature, Grid3D(), namespace = :grid, desc = "Tendency of temperature on the grid", units = "K/s", fuse = :grid_tendencies),
-        TendencyVariable(:pressure, Grid2D(), namespace = :grid, desc = "Tendency of surface pressure on the grid", units = "log(Pa)/s", fuse = :grid_tendencies),
 
-        DynamicsVariable(:uT_anomaly, Grid3D(), desc = "u*T anomaly intermediate on grid", namespace = :grid, fuse = :grid_tendencies),
-        DynamicsVariable(:vT_anomaly, Grid3D(), desc = "v*T anomaly intermediate on grid", namespace = :grid, fuse = :grid_tendencies),
-        DynamicsVariable(:uT_anomaly, Spectral3D(), desc = "u*T anomaly intermediate in spectral space", fuse = :spectral_tendencies),
-        DynamicsVariable(:vT_anomaly, Spectral3D(), desc = "v*T anomaly intermediate in spectral space", fuse = :spectral_tendencies),
-
-        DynamicsVariable(:kinetic_energy, Grid3D(), desc = "Kinetic energy intermediate, ½(u²+v²)", namespace = :grid, fuse = :grid_tendencies),
-        DynamicsVariable(:kinetic_energy, Spectral3D(), desc = "Kinetic energy intermediate in spectral space", fuse = :spectral_tendencies),
-
+        # ============================================================================
+        # Other DynamicsVariable / ScratchVariable
+        # ============================================================================
         DynamicsVariable(:dpres_dx, Grid2D(), desc = "Zonal gradient of the logarithm of surface pressure", fuse = :dpres_grad),
         DynamicsVariable(:dpres_dy, Grid2D(), desc = "Meridional gradient of the logarithm of surface pressure", fuse = :dpres_grad),
         DynamicsVariable(:dpres_dx_spec, Spectral2D(), desc = "Zonal gradient of lnpₛ in spectral space", fuse = :dpres_grad_spec),

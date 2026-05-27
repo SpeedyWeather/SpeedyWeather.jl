@@ -259,11 +259,15 @@ function Variables(model::AbstractModel)
                                name_a = :prognostic, name_b = :grid)
     end
 
-    # Same requirement for the tendency-side fuse pair: a future mega-batched grid→spec
-    # transform of dycore tendencies will map slot k of `:grid_tendencies` to slot k of `:spectral_tendencies`.
+    # Same requirement for the tendency-side fuse pair, with one relaxation: in the unified
+    # tendency layout `:spectral_tendencies` carries extra prognostic-tendency members
+    # (vorticity, divergence) at the front that are NOT transformed grid→spec — instead,
+    # `:grid_tendencies`'s member set must match a contiguous suffix of `:spectral_tendencies`
+    # (slot-aligned), so that the mega-batched grid→spec transform can write into the trailing
+    # subview `view(spec_parent, :, dest_start:end)`.
     if haskey(fused, :spectral_tendencies) && haskey(fused, :grid_tendencies)
-        _assert_fuse_alignment(fused.spectral_tendencies, fused.grid_tendencies;
-                               name_a = :spectral_tendencies, name_b = :grid_tendencies)
+        _assert_fuse_suffix_alignment(fused.spectral_tendencies, fused.grid_tendencies;
+                                      name_a = :spectral_tendencies, name_b = :grid_tendencies)
     end
 
     return Variables(; prognostic, grid, tendencies, dynamics, parameterizations, particles, scratch, fused)
@@ -333,6 +337,49 @@ function _assert_fuse_alignment(a::FusedParent, b::FusedParent; name_a = :a, nam
             "Fuse parents `$name_a` and `$name_b` disagree on slot range for `$k`: " *
             "$ra vs $rb. The two parents must declare members in matching order " *
             "so that mega-batched transforms map slot k of one to slot k of the other."
+        )
+    end
+    return nothing
+end
+
+"""$(TYPEDSIGNATURES)
+Assert that `b`'s members are a contiguous suffix of `a`'s members in matching order —
+i.e. `b` has fewer members than `a`, but the names align starting at some `dest_start`
+slot of `a`, and `b`'s slot ranges equal `a`'s shifted by `dest_start - 1`.
+
+This is what enables mega-batched transforms where `a` (e.g. `:spectral_tendencies`)
+carries extra leading members (`vor_tend`, `div_tend`) that aren't transform outputs,
+and the trailing subview `view(parent(a), :, dest_start:end)` is slot-aligned with the
+full `b` parent (e.g. `:grid_tendencies`).
+
+`name_a` / `name_b` are used purely for the error message."""
+function _assert_fuse_suffix_alignment(a::FusedParent, b::FusedParent; name_a = :a, name_b = :b)
+    a_keys = keys(a.slot_map)
+    b_keys = keys(b.slot_map)
+    # b's member set must be a contiguous SUFFIX of a's member set
+    n_b = length(b_keys)
+    n_a = length(a_keys)
+    n_b <= n_a || error(
+        "Fuse parent `$name_b` has more members than `$name_a` ($n_b > $n_a); " *
+        "`$name_b` must be a contiguous suffix of `$name_a`."
+    )
+    a_suffix = a_keys[(n_a - n_b + 1):n_a]
+    a_suffix == b_keys || error(
+        "Fuse parent `$name_b`'s members do not match the trailing $n_b members of `$name_a`: " *
+        "`$name_a` trailing = $a_suffix vs `$name_b` = $b_keys. " *
+        "The two parents must declare shared members in matching order so the mega-batched " *
+        "transform can write into the trailing slot range of `$name_a`."
+    )
+    # Slot offsets in a are shifted by `dest_start - 1`; verify ranges agree
+    first_shared = b_keys[1]
+    dest_start = first(a.slot_map[first_shared])
+    offset = dest_start - 1
+    for k in b_keys
+        ra, rb = a.slot_map[k], b.slot_map[k]
+        expected = (first(rb) + offset):(last(rb) + offset)
+        ra == expected || error(
+            "Fuse parents `$name_a` / `$name_b` disagree on slot range for `$k`: " *
+            "`$name_a` says $ra, `$name_b` says $rb (expected $expected after shift by $offset)."
         )
     end
     return nothing

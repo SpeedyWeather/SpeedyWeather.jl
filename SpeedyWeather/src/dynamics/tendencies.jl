@@ -157,10 +157,17 @@ function dynamics_tendencies!(
     # compute tendencies in grid space: u, v, temperature, pressure, u·T'·coslat⁻¹, v·T'·coslat⁻¹, kinetic energy, (wet model: humidity, u·q·coslat⁻¹, v·q·coslat⁻¹)
     grid_tendencies!(vars, model)
 
-    
-    # batched transform of grid tendencies to spectral space
-    transform!(parent(vars.fused.spectral_tendencies),
-               parent(vars.fused.grid_tendencies),
+
+    # batched transform of grid tendencies to spectral space.
+    # PrimitiveEquation's :spectral_tendencies has extra leading slots (vor, div) that aren't
+    # transformed from grid space — vor_tend and div_tend are computed in pure spectral kernels
+    # (curl!, divergence!) inside spectral_tendencies!. So the mega-batched grid→spec writes
+    # into the trailing subview starting at the temperature slot, which is slot-aligned with
+    # the full :grid_tendencies parent (see _assert_fuse_suffix_alignment).
+    spec_full = parent(vars.fused.spectral_tendencies)
+    dest_start = first(vars.fused.spectral_tendencies.slot_map.temperature)
+    spec_dest = lta_view(spec_full, :, dest_start:size(spec_full, 2))
+    transform!(spec_dest, parent(vars.fused.grid_tendencies),
                vars.scratch.transform_memory, spectral_transform)
 
     # accumulates into final spectral tendencies: vorticity, divergence, temperature, divergence, pressure (, humidity)
