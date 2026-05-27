@@ -308,29 +308,53 @@ function horizontal_diffusion!(
 end
 
 """$(TYPEDSIGNATURES)
-Apply horizontal diffusion to vorticity, divergence, temperature, and humidity
+Apply horizontal diffusion to vorticity, divergence, temperature, pressure, and humidity
 (PrimitiveWet only) in the PrimitiveEquation models.
 
-Architecture-dispatched: on GPU, a single batched kernel reads from the `:prognostic`
-fuse parent and writes to the scattered final tendency arrays in one launch, using the
-pre-tiled `expl_all` / `impl_all` damping matrices that carry the right per-variable
-damping at each slot. On CPU, the per-launch overhead is negligible while the wider
-inner-loop memory footprint of the batched kernel measurably hurts at higher resolutions
-(see `benchmark_horizontal_diffusion.jl`), so CPU stays on the per-variable code path.
+The unified `:spectral_tendencies` fuse parent shares its leading slot layout with the
+`:prognostic` fuse parent (both have `vor, div, T, pres, [humid]` at slots 1..K_diff),
+so the kernel can iterate uniformly over `(lm, k)` for `k=1..K_diff`, reading from a
+single 2D view of the prognostic state and writing to a single 2D view of the spectral
+tendencies. The pre-tiled `expl_all` / `impl_all` damping matrices carry the right
+per-variable damping at each slot (vor/T/humid use `expl/impl`; div uses
+`expl_div/impl_div`; pres is no-op). Collapses 3 (dry) / 4 (wet) per-variable launches
+into 1.
 
-Tracers stay on the single-variable code path regardless (one launch per active tracer)."""
+Tracers stay on the single-variable code path (one launch per active tracer)."""
 function horizontal_diffusion!(
         vars::Variables,
         diffusion::AbstractHorizontalDiffusion,
         model::PrimitiveEquation,
         lf::Integer = 1,    # leapfrog index used (2 is unstable)
     )
-    arch = architecture(vars.tendencies.vorticity)
-    if arch isa Architectures.AbstractCPU
-        _horizontal_diffusion_primeq_serial!(vars, diffusion, model, lf)
-    else
-        _horizontal_diffusion_primeq_batched!(vars, diffusion, model, lf)
-    end
+    (; expl_all, impl_all) = diffusion
+
+    # Source: :prognostic at step lf (contiguous (lm, K_prog) covering vor, div, T, pres, [humid])
+    prog_parent = parent(vars.fused.prognostic)
+    prog_step = get_step(prog_parent, lf)
+
+    # Destination: diffusion view = slots 1..K_diff of :spectral_tendencies, where K_diff
+    # is the last slot of the last diffusion-affected member (pres for dry; humid for wet).
+    # By construction (see variables(::Type{<:PrimitiveDry/Wet})) the leading slots match
+    # the :prognostic layout, so the kernel can share offsets between the two views.
+    spec_parent = parent(vars.fused.spectral_tendencies)
+    slot_map = vars.fused.spectral_tendencies.slot_map
+    K_diff = haskey(slot_map, :humidity) ? last(slot_map.humidity) : last(slot_map.pressure)
+    spec_diff = lta_view(spec_parent, :, 1:K_diff)
+
+    lmax, _ = size(spec_diff, OneBased, as = Matrix)
+    @boundscheck size(spec_diff, 2) <= size(prog_step, 2) ||
+        throw(BoundsError(prog_step, K_diff))
+    @boundscheck lmax <= size(expl_all, 1) == size(impl_all, 1) ||
+        throw(BoundsError(expl_all, lmax))
+    @boundscheck K_diff <= size(expl_all, 2) || throw(BoundsError(expl_all, K_diff))
+
+    l_indices = spec_diff.spectrum.l_indices
+    arch = architecture(spec_diff)
+    launch!(
+        arch, SpectralWorkOrder, size(spec_diff), _horizontal_diffusion_primeq_kernel!,
+        spec_diff, prog_step, expl_all, impl_all, l_indices,
+    )
 
     # tracers all use the standard (expl, impl) damping; one launch per active tracer
     (; expl, impl) = diffusion
@@ -343,116 +367,14 @@ function horizontal_diffusion!(
     return nothing
 end
 
-"""$(TYPEDSIGNATURES)
-CPU code path: one `horizontal_diffusion!(tendency, var, expl, impl)` launch per
-prognostic variable. The per-launch cost on CPU is negligible while the smaller inner
-loop (one read + one write per `(lm, k)`) vectorizes well — at T127–T255 this is
-~1.4–2× faster than the batched code path."""
-function _horizontal_diffusion_primeq_serial!(vars, diffusion, model, lf)
-    (; expl, impl, expl_div, impl_div) = diffusion
-    vor   = get_step(vars.prognostic.vorticity,   lf)
-    div   = get_step(vars.prognostic.divergence,  lf)
-    temp  = get_step(vars.prognostic.temperature, lf)
-    horizontal_diffusion!(vars.tendencies.vorticity,   vor,  expl,     impl)
-    horizontal_diffusion!(vars.tendencies.divergence,  div,  expl_div, impl_div)
-    horizontal_diffusion!(vars.tendencies.temperature, temp, expl,     impl)
-    if haskey(vars.tendencies, :humidity)
-        humid = get_step(vars.prognostic.humidity, lf)
-        horizontal_diffusion!(vars.tendencies.humidity, humid, expl, impl)
-    end
-    return nothing
-end
-
-"""$(TYPEDSIGNATURES)
-GPU code path: a single batched kernel reads sources from the `:prognostic` fuse parent
-at leapfrog step `lf` (one contiguous buffer covering `vor, div, T, pres, [q]`) and
-writes to the scattered final tendency arrays. The pre-tiled `expl_all` / `impl_all`
-matrices (slot-aligned with `:prognostic`) carry the right per-variable damping at each
-slot, so the kernel uses uniform indexing. Collapses 3 (dry) / 4 (wet) launches into 1."""
-function _horizontal_diffusion_primeq_batched!(vars, diffusion, model, lf)
-    (; expl_all, impl_all) = diffusion
-    prog_parent = parent(vars.fused.prognostic)
-    prog_step = get_step(prog_parent, lf)               # 2D LTA, (lm, total_slots)
-    slot_map = vars.fused.prognostic.slot_map
-
-    vor_tend  = vars.tendencies.vorticity
-    div_tend  = vars.tendencies.divergence
-    temp_tend = vars.tendencies.temperature
-
-    lmax, _ = size(vor_tend, OneBased, as = Matrix)
-    @boundscheck size(vor_tend) == size(div_tend) == size(temp_tend) ||
-        throw(BoundsError(vor_tend))
-    @boundscheck lmax <= size(expl_all, 1) == size(impl_all, 1) ||
-        throw(BoundsError(expl_all, lmax))
-
-    vor_offset  = first(slot_map.vorticity)   - 1
-    div_offset  = first(slot_map.divergence)  - 1
-    temp_offset = first(slot_map.temperature) - 1
-    l_indices = vor_tend.spectrum.l_indices
-    arch = architecture(vor_tend)
-
-    if haskey(vars.tendencies, :humidity)
-        humid_tend = vars.tendencies.humidity
-        humid_offset = first(slot_map.humidity) - 1
-        @boundscheck size(humid_tend) == size(vor_tend) || throw(BoundsError(humid_tend))
-        launch!(
-            arch, SpectralWorkOrder, size(vor_tend), _horizontal_diffusion_primeq_wet_kernel!,
-            vor_tend, div_tend, temp_tend, humid_tend,
-            prog_step, expl_all, impl_all, l_indices,
-            vor_offset, div_offset, temp_offset, humid_offset,
-        )
-    else
-        launch!(
-            arch, SpectralWorkOrder, size(vor_tend), _horizontal_diffusion_primeq_dry_kernel!,
-            vor_tend, div_tend, temp_tend,
-            prog_step, expl_all, impl_all, l_indices,
-            vor_offset, div_offset, temp_offset,
-        )
-    end
-    return nothing
-end
-
-@kernel inbounds = true function _horizontal_diffusion_primeq_dry_kernel!(
-        vor_tend, div_tend, temp_tend,
-        prog_step, expl_all, impl_all, l_indices,
-        vor_offset, div_offset, temp_offset,
+@kernel inbounds = true function _horizontal_diffusion_primeq_kernel!(
+        spec_diff, prog_step, expl_all, impl_all, l_indices,
     )
     I = @index(Global, Cartesian)
     lm = I[1]
     k  = I[2]
     l  = l_indices[lm]
-
-    s = vor_offset + k
-    vor_tend[lm, k]  = (vor_tend[lm, k]  + expl_all[l, s] * prog_step[lm, s]) * impl_all[l, s]
-
-    s = div_offset + k
-    div_tend[lm, k]  = (div_tend[lm, k]  + expl_all[l, s] * prog_step[lm, s]) * impl_all[l, s]
-
-    s = temp_offset + k
-    temp_tend[lm, k] = (temp_tend[lm, k] + expl_all[l, s] * prog_step[lm, s]) * impl_all[l, s]
-end
-
-@kernel inbounds = true function _horizontal_diffusion_primeq_wet_kernel!(
-        vor_tend, div_tend, temp_tend, humid_tend,
-        prog_step, expl_all, impl_all, l_indices,
-        vor_offset, div_offset, temp_offset, humid_offset,
-    )
-    I = @index(Global, Cartesian)
-    lm = I[1]
-    k  = I[2]
-    l  = l_indices[lm]
-
-    s = vor_offset + k
-    vor_tend[lm, k]   = (vor_tend[lm, k]   + expl_all[l, s] * prog_step[lm, s]) * impl_all[l, s]
-
-    s = div_offset + k
-    div_tend[lm, k]   = (div_tend[lm, k]   + expl_all[l, s] * prog_step[lm, s]) * impl_all[l, s]
-
-    s = temp_offset + k
-    temp_tend[lm, k]  = (temp_tend[lm, k]  + expl_all[l, s] * prog_step[lm, s]) * impl_all[l, s]
-
-    s = humid_offset + k
-    humid_tend[lm, k] = (humid_tend[lm, k] + expl_all[l, s] * prog_step[lm, s]) * impl_all[l, s]
+    spec_diff[lm, k] = (spec_diff[lm, k] + expl_all[l, k] * prog_step[lm, k]) * impl_all[l, k]
 end
 
 export SpectralFilter
