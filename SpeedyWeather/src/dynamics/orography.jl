@@ -220,11 +220,6 @@ function initialize!(
     orography_highres = on_architecture(S.architecture, field)
 
     # Interpolate/coarsen to desired resolution.
-    # Build the interpolator OUTSIDE `@maybe_jit` so its internal arrays are concrete
-    # (not traced); the 2-arg `interpolate!` builds one internally, which triggers
-    # `find_rings_unsafe!(::ReactantDevice)` to launch its KA kernel from inside the
-    # trace — that combination compiles via GPUCompiler with ConcretePJRTArray inputs
-    # and produces invalid LLVM IR.
     interp = RingGrids.interpolator(orography, orography_highres)
     @maybe_jit S.architecture interpolate!(orography, orography_highres, interp)
     orography .*= scale                     # scale orography (default 1)
