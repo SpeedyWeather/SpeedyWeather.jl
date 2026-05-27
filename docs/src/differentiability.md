@@ -69,7 +69,7 @@ params = parameters(model)
 # output (truncated)
 Parameters:
 ┌───────┬──────────────────────────┬──────────┬────────────┬──────────────────────────────┬─────────────────────────────────────┬──────────────────────────────────────────────────────────────────────────────────────────┐
-│   idx │                fieldname │      val │  component │               componentttype │                              bounds │                                                                                     desc │
+│   idx │                fieldname │      val │  component │               component_type │                              bounds │                                                                                     desc │
 │ Int64 │                   Symbol │  Float32 │     Symbol │                     DataType │ IntervalSets.TypedEndpointsInterval │                                                                                   String │
 ├───────┼──────────────────────────┼──────────┼────────────┼──────────────────────────────┼─────────────────────────────────────┼──────────────────────────────────────────────────────────────────────────────────────────┤
 │     1 │                 rotation │  7.29e-5 │     planet │               Earth{Float32} │       -Inf .. Inf (open) (RealLine) │                                            angular frequency of Earth's rotation [rad/s] │
@@ -106,7 +106,7 @@ param_subset = params[["planet.gravity", "atmosphere.heat_capacity"]]
 
 Parameters:
 ┌───────┬───────────────┬─────────┬────────────┬──────────────────────────┬───────────────────────────────────────┬────────────────────────────────────────────────┐
-│   idx │     fieldname │     val │  component │           componentttype │                                bounds │                                           desc │
+│   idx │     fieldname │     val │  component │           component_type │                                bounds │                                           desc │
 │ Int64 │        Symbol │ Float32 │     Symbol │                 DataType │ DomainSets.HalfLine{Float64, :closed} │                                         String │
 ├───────┼───────────────┼─────────┼────────────┼──────────────────────────┼───────────────────────────────────────┼────────────────────────────────────────────────┤
 │     1 │       gravity │    9.81 │     planet │           Earth{Float32} │   0.0 .. Inf (closed-open) (HalfLine) │             gravitational acceleration [m/s^2] │
