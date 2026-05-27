@@ -77,8 +77,11 @@ current_substep(L::NCycleLorenz, clock) = mod(clock.timestep_counter, L.cycles)
 
 """$(TYPEDSIGNATURES)
 Initialize NCycleLorenz time stepper."""
-function initialize!(L::NCycleLorenz, model::AbstractModel)
-    (; interval) = model.output
+function initialize!(
+        L::NCycleLorenz,
+        model::AbstractModel;
+        interval::Period = Second(DEFAULT_OUTPUT_INTERVAL),
+    )
     (; radius) = model.planet
 
     # Validate compatibility - runs ONCE, not every timestep

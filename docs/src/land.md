@@ -398,8 +398,9 @@ The albedo in the `model` is now the one defined just in the lines above,
 using a globally constant albedo of 0.1 for the ocean but a higher albedo
 over land which also increases to 0.5 towards the poles.
 
-You can always output the land-sea mask weighted albedo with
-`add!(model, SpeedyWeather.AlbedoOutput())` or inspect it as follows
+You can always output the land-sea mask weighted albedo by building a
+`NetCDFOutput` and `add!(output, SpeedyWeather.AlbedoOutput())`, or inspect
+it as follows
 
 ```@example land
 simulation = initialize!(model)

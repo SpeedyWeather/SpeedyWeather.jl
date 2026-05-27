@@ -61,13 +61,16 @@ function Leapfrog(spectral_grid::SpectralGrid; kwargs...)
 end
 
 """$(TYPEDSIGNATURES)
-Initialize leapfrogging `L` by recalculating the time step given the output
-`interval` from `model.output`. Recalculating will slightly adjust the time step to
-be a divisor such that an integer number of time steps matches exactly with the output
-interval."""
-function initialize!(L::Leapfrog, model::AbstractModel)
+Initialize leapfrogging `L` by recalculating the time step given an output `interval`.
+Recalculating will slightly adjust the time step to be a divisor such that an integer
+number of time steps matches exactly with the output interval. The `interval` defaults
+to `DEFAULT_OUTPUT_INTERVAL` (used when no output writers are attached to the simulation)."""
+function initialize!(
+        L::Leapfrog,
+        model::AbstractModel;
+        interval::Period = Second(DEFAULT_OUTPUT_INTERVAL),
+    )
     (; radius) = model.planet
-    interval = get_interval(model.output)
 
     # take radius from planet and recalculate time step and possibly adjust with output dt
     L.Δt_millisec = get_Δt_millisec(L.Δt_at_T31, L.trunc, radius, L.adjust_with_output, interval)
@@ -176,7 +179,8 @@ end
 """$(TYPEDSIGNATURES)
 First 1 or 2 time steps of `simulation`. If `model.time_stepping.start_with_euler` is true,
 then start with one Euler step with dt/2, followed by one Leapfrog step with dt.
-If false, continue with leapfrog steps at 2Δt (e.g. restart)."""
+If false, continue with leapfrog steps at 2Δt (e.g. restart). Pure time stepping only —
+output, callbacks and progress reporting are dispatched from [`time_stepping!`](@ref)."""
 function first_timesteps!(simulation::AbstractSimulation)
     (; variables, model) = simulation
     (; time_stepping) = model
@@ -194,8 +198,7 @@ function first_timesteps!(simulation::AbstractSimulation)
     end
 
     # only now initialise feedback for benchmark accuracy
-    (; clock) = variables.prognostic
-    initialize!(model.feedback, clock, model)
+    initialize!(simulation.feedback, simulation)
     return nothing
 end
 
@@ -236,9 +239,9 @@ function first_timesteps!(
     timestep!(clock, -Δt_millisec_half, increase_counter = false)
     timestep!(clock, Δt_millisec)
 
-    # do output and callbacks after the first proper (from i=0 to i=1) time step
-    callback!(model.callbacks, vars, model)
-    output!(model.output, Simulation(vars, model))
+    # output and callbacks for the first proper time step are dispatched by the
+    # caller `first_timesteps!(::AbstractSimulation)` which has access to the
+    # simulation-level callbacks/output writers
 
     # from now on precomputed implicit terms with 2Δt
     initialize!(implicit, 2Δt, vars, model)

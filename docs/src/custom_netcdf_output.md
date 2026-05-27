@@ -48,7 +48,8 @@ You can now add this variable to the `NetCDFOutput` as already described in
 
 ```@example netcdf_custom
 spectral_grid = SpectralGrid()
-output = NetCDFOutput(spectral_grid)
+model = PrimitiveDryModel(spectral_grid)
+output = NetCDFOutput(model)
 add!(output, VerticalVelocityOutput())
 ```
 
@@ -73,23 +74,20 @@ SpeedyWeather.path(::VerticalVelocityOutput, simulation) =
 
 ## Reading the new variable
 
-Now let's try this in a primitive dry model
+Now let's try this in a primitive dry model — the output writer above already
+knows about `w` because we added it before constructing the simulation.
 
 ```@example netcdf_custom
-model = PrimitiveDryModel(spectral_grid; output)
-model.output.variables[:w]
+output.variables[:w]
 ```
 
-By passing on `output` to the model constructor the output variables
-now contain `w` and we see it here as we have defined it earlier.
-
 ```@example netcdf_custom
-simulation = initialize!(model)
+simulation = initialize!(model; output)
 run!(simulation, period=Day(5), output=true)
 
 # read netcdf data
 using NCDatasets
-path = joinpath(model.output.run_path, model.output.filename)
+path = joinpath(simulation.output[1].run_path, simulation.output[1].filename)
 ds = NCDataset(path)
 ds["w"]
 ```

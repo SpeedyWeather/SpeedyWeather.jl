@@ -51,7 +51,10 @@ end
 """
 $(TYPEDSIGNATURES)
 Initializes the a `Feedback` struct."""
-function initialize!(feedback::Feedback, clock::Clock, model::AbstractModel)
+function initialize!(feedback::Feedback, simulation::AbstractSimulation)
+    (; model) = simulation
+    (; clock) = simulation.variables.prognostic
+
     # set to false to recheck for NaNs
     feedback.nans_detected = false
 
@@ -65,10 +68,14 @@ function initialize!(feedback::Feedback, clock::Clock, model::AbstractModel)
     FEEDBACK_TMIN[] = -1
     FEEDBACK_TMAX[] = -300  # in °C
 
+    # description includes the run folder of the first active output writer, if any
+    active_output = first_active_output(simulation)
+    run_folder_str = isnothing(active_output) ? " " : " $(active_output.run_folder) "
+
     # reinitalize progress meter, minus one to exclude first_timesteps! which contain compilation
     # only do now for benchmark accuracy
     (; showspeed, description, verbose, feedback_dt) = feedback
-    desc = description * (model.output.active ? " $(model.output.run_folder) " : " ")
+    desc = description * run_folder_str
     feedback.progress_meter = ProgressMeter.Progress(
         clock.n_timesteps - 1;
         enabled = verbose,
@@ -84,7 +91,26 @@ function initialize!(feedback::Feedback, clock::Clock, model::AbstractModel)
 end
 
 # fallback if feedback is set to nothing
-initialize!(::Nothing, clock::Clock, model::AbstractModel) = nothing
+initialize!(::Nothing, simulation::AbstractSimulation) = nothing
+
+"""$(TYPEDSIGNATURES)
+Returns the first active output writer attached to `simulation`, or `nothing` if
+no writer is active."""
+function first_active_output(simulation::AbstractSimulation)
+    for writer in simulation.output
+        writer.active && return writer
+    end
+    return nothing
+end
+
+"""$(TYPEDSIGNATURES)
+Returns `true` if any output writer in `simulation.output` is active."""
+function any_output_active(simulation::AbstractSimulation)
+    for writer in simulation.output
+        writer.active && return true
+    end
+    return false
+end
 
 progress!(feedback::Feedback) = ProgressMeter.next!(feedback.progress_meter)
 
@@ -194,25 +220,19 @@ export ParametersTxt
 """ParametersTxt callback. Writes a parameters.txt file with all model parameters.
 Options are $(TYPEDFIELDS)"""
 @kwdef mutable struct ParametersTxt <: AbstractCallback
-    "[OPTION] Path for parameters.txt file, uses model.output.run_path if not specified"
+    "[OPTION/DERIVED] Path for parameters.txt file. Set by the output writer at initialize!."
     path::String = ""
 
     "[OPTION] File name for parameters.txt file"
     filename::String = "parameters.txt"
-
-    "[OPTION] Only write with model.output.active = true?"
-    write_only_with_output::Bool = true
 end
 
 """$(TYPEDSIGNATURES)
 Initialize ParametersTxt by writing the model parameters (via defined show of model components) into a text file."""
-function initialize!(parameters_txt::ParametersTxt, vars, model)
-
-    # escape in case of no output
-    parameters_txt.write_only_with_output && (model.output.active || return nothing)
-
-    (; filename) = parameters_txt
-    path = parameters_txt.path == "" ? model.output.run_path : parameters_txt.path
+function initialize!(parameters_txt::ParametersTxt, simulation::AbstractSimulation)
+    (; model) = simulation
+    (; filename, path) = parameters_txt
+    isempty(path) && return nothing
     mkpath(path)
 
     # also export parameters into run????/parameters.txt
@@ -222,8 +242,6 @@ function initialize!(parameters_txt::ParametersTxt, vars, model)
         println(file, getfield(model, property), "\n")
     end
     close(file)
-
-    model.output.active || @info "Parameter summary written to $(joinpath(path, filename)) although output=false"
     return nothing
 end
 
@@ -236,14 +254,11 @@ export ProgressTxt
 """ProgressTxt callback. Writes a progress.txt file with time stepping progress.
 Options are $(TYPEDFIELDS)"""
 @kwdef mutable struct ProgressTxt <: AbstractCallback
-    "[OPTION] Path for progress.txt file, uses model.output.run_path if not specified"
+    "[OPTION/DERIVED] Path for progress.txt file. Set by the output writer at initialize!."
     path::String = ""
 
     "[OPTION] File name for progress.txt file"
     filename::String = "progress.txt"
-
-    "[OPTION] Only write with model.output.active = true?"
-    write_only_with_output::Bool = true
 
     "[OPTION] Every n% of time steps write to progress.txt, default is 5%"
     every_n_percent::Int = 5
@@ -254,15 +269,16 @@ end
 
 """$(TYPEDSIGNATURES)
 Initializes the ProgressTxt callback by creating a progress.txt file and writing some initial information to it."""
-function initialize!(progress_txt::ProgressTxt, vars, model)
-    # escape in case of no output
-    progress_txt.write_only_with_output && (model.output.active || return nothing)
+function initialize!(progress_txt::ProgressTxt, simulation::AbstractSimulation)
+    (; model) = simulation
+    vars = simulation.variables
 
-    (; filename) = progress_txt
-    path = progress_txt.path == "" ? model.output.run_path : progress_txt.path
+    (; filename, path) = progress_txt
+    isempty(path) && return nothing
     mkpath(path)
 
-    (; run_folder, run_path) = model.output
+    active_output = first_active_output(simulation)
+    run_folder = isnothing(active_output) ? "" : active_output.run_folder
     SG = model.spectral_grid
     L = model.time_stepping
     days = Second(vars.prognostic.clock.period).value / (3600 * 24)
@@ -275,22 +291,21 @@ function initialize!(progress_txt::ProgressTxt, vars, model)
     write(file, "Integrating:\n")
     write(file, "$SG\n")
     write(file, "Time: $days days at Δt = $(L.Δt_sec)s\n")
-    model.output.active && write(file, "\nAll data will be stored in $run_path\n")
-    model.output.active || write(file, "\nNo output will be written (output=false)\n")
+    if !isnothing(active_output)
+        write(file, "\nAll data will be stored in $(active_output.run_path)\n")
+    end
     progress_txt.file = file
-
-    model.output.active || @info "Progress is being written to $(joinpath(path, filename)) although output=false"
     return nothing
 end
 
 """$(TYPEDSIGNATURES)
 Writes the time stepping progress to the progress.txt file every `every_n_percent` % of time steps."""
-function callback!(progress_txt::ProgressTxt, vars, model)
-    # escape in case of no output
-    progress_txt.write_only_with_output && (model.output.active || return nothing)
-    isnothing(model.feedback) && return nothing
+function callback!(progress_txt::ProgressTxt, simulation::AbstractSimulation)
+    isempty(progress_txt.path) && return nothing
+    feedback = simulation.feedback
+    isnothing(feedback) && return nothing
 
-    (; progress_meter, nans_detected) = model.feedback
+    (; progress_meter, nans_detected) = feedback
     (; counter, n) = progress_meter
     (; file, every_n_percent) = progress_txt
 
@@ -315,13 +330,13 @@ end
 
 """$(TYPEDSIGNATURES)
 Finalizes the ProgressTxt callback by writing the total time taken to the progress.txt file and closing it."""
-function finalize!(progress_txt::ProgressTxt, vars, model)
-    # escape in case of no output
-    progress_txt.write_only_with_output && (model.output.active || return nothing)
-    isnothing(model.feedback) && return nothing
+function finalize!(progress_txt::ProgressTxt, simulation::AbstractSimulation)
+    isempty(progress_txt.path) && return nothing
+    feedback = simulation.feedback
+    isnothing(feedback) && return nothing
 
     (; file) = progress_txt
-    (; progress_meter) = model.feedback
+    (; progress_meter) = feedback
 
     time_elapsed = progress_meter.tlast - progress_meter.tinit
     s = "\nIntegration done in $(readable_secs(time_elapsed))."

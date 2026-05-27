@@ -2,7 +2,8 @@ using Zarr, Dates
 
 @testset "ZarrOutput type and defaults" begin
     spectral_grid = SpectralGrid(trunc = 5, nlayers = 1)
-    output = ZarrOutput(spectral_grid)
+    model = BarotropicModel(spectral_grid)
+    output = ZarrOutput(model)
     @test output isa SpeedyWeather.ZarrOutput
     @test output.active == false
     @test output.filename == "output.zarr"
@@ -13,16 +14,16 @@ end
     period = Day(1)
 
     spectral_grid = SpectralGrid(trunc = 5, nlayers = 1)
+    model = ShallowWaterModel(spectral_grid)
     output = ZarrOutput(
-        spectral_grid, ShallowWater;
+        model;
         path = tmp_output_path, write_restart = false,
     )
-    model = ShallowWaterModel(spectral_grid; output)
-    simulation = initialize!(model)
+    simulation = initialize!(model; output)
     run!(simulation, output = true; period)
-    @test simulation.model.feedback.nans_detected == false
+    @test simulation.feedback.nans_detected == false
 
-    g = Zarr.zopen(joinpath(model.output.run_path, model.output.filename))
+    g = Zarr.zopen(joinpath(output.run_path, output.filename))
 
     # all declared output variables made it into the store
     for var in values(output.variables)
@@ -54,16 +55,16 @@ end
     period = Day(1)
 
     spectral_grid = SpectralGrid(trunc = 5, nlayers = 4)
+    model = PrimitiveWetModel(spectral_grid)
     output = ZarrOutput(
-        spectral_grid, PrimitiveWet;
+        model;
         path = tmp_output_path, write_restart = false,
     )
-    model = PrimitiveWetModel(spectral_grid; output)
-    simulation = initialize!(model)
+    simulation = initialize!(model; output)
     run!(simulation, output = true; period)
-    @test simulation.model.feedback.nans_detected == false
+    @test simulation.feedback.nans_detected == false
 
-    g = Zarr.zopen(joinpath(model.output.run_path, model.output.filename))
+    g = Zarr.zopen(joinpath(output.run_path, output.filename))
     @test haskey(g.arrays, "temp")
     @test haskey(g.arrays, "humid")
     @test haskey(g.arrays, "soil_layer")    # soil dim coordinate
@@ -90,8 +91,9 @@ end
     period = Day(1)
 
     spectral_grid = SpectralGrid(trunc = 5, nlayers = 4)
+    model = PrimitiveWetModel(spectral_grid)
     output = ZarrOutput(
-        spectral_grid, PrimitiveWet;
+        model;
         path = tmp_output_path, write_restart = false,
     )
     add!(
@@ -100,12 +102,11 @@ end
         SpeedyWeather.ZonalVelocity10mOutput(),
         SpeedyWeather.MeridionalVelocity10mOutput(),
     )
-    model = PrimitiveWetModel(spectral_grid; output)
-    simulation = initialize!(model)
+    simulation = initialize!(model; output)
     run!(simulation, output = true; period)
-    @test simulation.model.feedback.nans_detected == false
+    @test simulation.feedback.nans_detected == false
 
-    g = Zarr.zopen(joinpath(model.output.run_path, model.output.filename))
+    g = Zarr.zopen(joinpath(output.run_path, output.filename))
     nx, ny = RingGrids.matrix_size(output.field2D)
     nt = Int(period / output.interval) + 1
 
@@ -121,8 +122,9 @@ end
     period = Day(1)
 
     spectral_grid = SpectralGrid(trunc = 5, nlayers = 1)
+    model = ShallowWaterModel(spectral_grid)
     output = ZarrOutput(
-        spectral_grid, ShallowWater;
+        model;
         path = tmp_output_path, write_restart = false,
     )
 
@@ -131,10 +133,9 @@ end
     add!(output, div_output)
     @test haskey(output.variables, Symbol(div_output.name))
 
-    model = ShallowWaterModel(spectral_grid; output)
-    simulation = initialize!(model)
+    simulation = initialize!(model; output)
     run!(simulation, output = true; period)
-    g = Zarr.zopen(joinpath(model.output.run_path, model.output.filename))
+    g = Zarr.zopen(joinpath(output.run_path, output.filename))
     @test haskey(g.arrays, div_output.name)
 
     # delete!: variable is removed from the dict (Zarr arrays from the previous
@@ -152,15 +153,15 @@ end
     period = Day(1)
 
     spectral_grid = SpectralGrid(trunc = 5, nlayers = 1)
+    model = ShallowWaterModel(spectral_grid)
     output = ZarrOutput(
-        spectral_grid, ShallowWater;
+        model;
         path = tmp_output_path, write_restart = false,
     )
-    model = ShallowWaterModel(spectral_grid; output)
-    simulation = initialize!(model)
+    simulation = initialize!(model; output)
     run!(simulation, output = true; period)
 
-    g = Zarr.zopen(joinpath(model.output.run_path, model.output.filename))
+    g = Zarr.zopen(joinpath(output.run_path, output.filename))
 
     # 4D variable: shape (time, layer, lat, lon) on disk and dims
     # attribute in matching order
@@ -186,18 +187,18 @@ end
     period = Day(1)
 
     spectral_grid = SpectralGrid(trunc = 5, nlayers = 1)
+    model = ShallowWaterModel(spectral_grid)
     output = ZarrOutput(
-        spectral_grid, ShallowWater;
+        model;
         path = tmp_output_path,
         write_restart = false,
         time_chunk = 3,
         compressor = Zarr.BloscCompressor(clevel = 5),
     )
-    model = ShallowWaterModel(spectral_grid; output)
-    simulation = initialize!(model)
+    simulation = initialize!(model; output)
     run!(simulation, output = true; period)
 
-    g = Zarr.zopen(joinpath(model.output.run_path, model.output.filename))
+    g = Zarr.zopen(joinpath(output.run_path, output.filename))
     z_vor = g["vor"]
     # chunk along the time axis matches `time_chunk`
     @test z_vor.metadata.chunks[end] == 3
@@ -210,16 +211,16 @@ end
     period = Day(1)
 
     spectral_grid = SpectralGrid(trunc = 5, nlayers = 4)
+    model = PrimitiveDryModel(spectral_grid)
     output = ZarrOutput(
-        spectral_grid, PrimitiveDry;
+        model;
         path = tmp_output_path, write_restart = false,
         lon_chunk = 4, lat_chunk = 4, vertical_chunk = 2,
     )
-    model = PrimitiveDryModel(spectral_grid; output)
-    simulation = initialize!(model)
+    simulation = initialize!(model; output)
     run!(simulation, output = true; period)
 
-    g = Zarr.zopen(joinpath(model.output.run_path, model.output.filename))
+    g = Zarr.zopen(joinpath(output.run_path, output.filename))
 
     # 4D variable: chunks come back in Julia (column-major) order: (lon, lat, layer, time)
     z_temp = g["temp"]
@@ -246,16 +247,16 @@ end
     period = Day(1)
 
     spectral_grid = SpectralGrid(trunc = 5, nlayers = 1)
+    model = ShallowWaterModel(spectral_grid)
     output = ZarrOutput(
-        spectral_grid, ShallowWater;
+        model;
         path = tmp_output_path, write_restart = false,
         lon_chunk = 100_000, lat_chunk = 100_000, vertical_chunk = 100_000,
     )
-    model = ShallowWaterModel(spectral_grid; output)
-    simulation = initialize!(model)
+    simulation = initialize!(model; output)
     run!(simulation, output = true; period)
 
-    g = Zarr.zopen(joinpath(model.output.run_path, model.output.filename))
+    g = Zarr.zopen(joinpath(output.run_path, output.filename))
     z_vor = g["vor"]
     nlon, nlat = RingGrids.matrix_size(output.field2D)
     @test z_vor.metadata.chunks[1] == nlon
@@ -268,19 +269,19 @@ end
     period = Day(1)
 
     spectral_grid = SpectralGrid(trunc = 5, nlayers = 1)
+    model = ShallowWaterModel(spectral_grid)
     output = ZarrOutput(
-        spectral_grid, ShallowWater;
+        model;
         path = tmp_output_path, write_restart = false, id = "rerun",
     )
-    model = ShallowWaterModel(spectral_grid; output)
-    simulation = initialize!(model)
+    simulation = initialize!(model; output)
 
     run!(simulation, output = true; period)
-    first_path = model.output.run_path
+    first_path = output.run_path
     n_first = length(Zarr.zopen(joinpath(first_path, output.filename))["time"][:])
 
     run!(simulation, output = true; period)
-    second_path = model.output.run_path
+    second_path = output.run_path
 
     # paths differ (new run folder) and the old store wasn't grown by the
     # second run

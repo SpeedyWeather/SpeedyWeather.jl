@@ -193,11 +193,13 @@ nothing # hide
 ## Output tracers
 
 This follows equivalent to other [Output variables](@ref) but the
-tracer name as `Symbol` has to be provided
+tracer name as `Symbol` has to be provided. Add it to a `NetCDFOutput`
+writer:
 
 ```@example tracers
-add!(model, SpeedyWeather.TracerOutput(:abc))
+output = NetCDFOutput(model)
+add!(output, SpeedyWeather.TracerOutput(:abc))
 ```
 
 and other keyword arguments like `long_name::String` and `units::String`
-can be passed on too. 
+can be passed on too.

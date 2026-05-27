@@ -4,7 +4,7 @@ export OutputWriterCore
 and step/output counters. Embed as `core::OutputWriterCore` in every output writer.
 Option fields (path, id, overwrite, interval, …) stay as flat fields on the writer itself.
 
-Call `initialize!(core, output, model)` inside the writer's `initialize!` method to
+Call `initialize!(core, output, model, callbacks)` inside the writer's `initialize!` method to
 populate all derived fields from the writer's option fields and the model time step.
 Call `output!(core, output)` each time step to check if output should be written.
 Fields are $(TYPEDFIELDS)"""
@@ -49,12 +49,13 @@ end
 Initialize the `OutputWriterCore` from the option fields of `output` and `model`:
 determine the run folder (skipped for in-memory writers when `create_folder=false`),
 compute the output frequency from `model.time_stepping`, reset counters, and add
-standard callbacks (parameters txt, progress txt, restart file) if enabled.
-Returns `true` if output is active, `false` otherwise."""
+standard callbacks (parameters txt, progress txt, restart file) to `callbacks` if
+enabled. Returns `true` if output is active, `false` otherwise."""
 function initialize!(
         core::OutputWriterCore,
         output::AbstractOutput,
-        model::AbstractModel;
+        model::AbstractModel,
+        callbacks::CALLBACK_DICT;
         create_folder::Bool = true,
     )
     output.active || return false
@@ -78,10 +79,10 @@ function initialize!(
     core.timestep_counter = 0
     core.output_counter = 0
 
-    # CALLBACKS
-    output.write_parameters_txt && add!(model.callbacks, :parameters_txt => ParametersTxt())
-    output.write_progress_txt && add!(model.callbacks, :progress_txt => ProgressTxt())
-    output.write_restart && add!(model.callbacks, :variables_restart_file => WriteVariablesRestartFile())
+    # CALLBACKS: pre-fill the writer's run_path so callbacks know where to write
+    output.write_parameters_txt && add!(callbacks, :parameters_txt => ParametersTxt(path = output.run_path))
+    output.write_progress_txt && add!(callbacks, :progress_txt => ProgressTxt(path = output.run_path))
+    output.write_restart && add!(callbacks, :variables_restart_file => WriteVariablesRestartFile(path = output.run_path))
 
     return true
 end
@@ -98,10 +99,15 @@ end
 
 """$(TYPEDSIGNATURES)
 Reset the output frequency `interval` of `output` and re-initialize its `OutputWriterCore`
-so that the output frequency is recomputed from the model time step. If the requested 
+so that the output frequency is recomputed from the model time step. If the requested
 `interval` is not an integer multiple of the model time step, it is rounded to
 the nearest multiple."""
-function set!(output::AbstractOutput, model::AbstractModel; interval::Period)
+function set!(
+        output::AbstractOutput,
+        model::AbstractModel,
+        callbacks::CALLBACK_DICT = CallbackDict();
+        interval::Period,
+    )
     Δt_ms = model.time_stepping.Δt_millisec.value
     interval_ms = Millisecond(interval).value
     n = max(1, round(Int, interval_ms / Δt_ms))
@@ -111,6 +117,6 @@ function set!(output::AbstractOutput, model::AbstractModel; interval::Period)
             "Δt = $(Δt_ms)ms, rounding to $(rounded_ms)ms (= $(rounded_ms / 1000)s)."
     end
     output.interval = Second(round(Int, rounded_ms / 1000))
-    initialize!(output.core, output, model; create_folder = false)
+    initialize!(output.core, output, model, callbacks; create_folder = false)
     return nothing
 end

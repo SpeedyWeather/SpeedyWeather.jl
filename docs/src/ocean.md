@@ -130,16 +130,17 @@ nothing # hide
 
 ## Output
 
-Sea surface temperature output is added like
+Sea surface temperature output is added to the `NetCDFOutput` writer like
 
 ```@example ocean
-add!(model, SpeedyWeather.SeaSurfaceTemperatureOutput())
+output = NetCDFOutput(model)
+add!(output, SpeedyWeather.SeaSurfaceTemperatureOutput())
 ```
 
 or collectively with sea ice concentration
 
 ```@example ocean
-add!(model, SpeedyWeather.OceanOutput())
+add!(output, SpeedyWeather.OceanOutput())
 ```
 
 All output variable groups are defined as tuples which are implicitly splatted (`...`).

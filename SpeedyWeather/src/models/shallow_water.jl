@@ -27,8 +27,6 @@ $(TYPEDFIELDS)"""
         ST,     # <:SpectralTransform{NF},
         IM,     # <:AbstractImplicit,
         HD,     # <:AbstractHorizontalDiffusion,
-        OU,     # <:AbstractOutput,
-        FB,     # <:AbstractFeedback,
     } <: ShallowWater
 
     spectral_grid::SG
@@ -54,11 +52,21 @@ $(TYPEDFIELDS)"""
     spectral_transform::ST = SpectralTransform(spectral_grid)
     implicit::IM = ImplicitShallowWater(spectral_grid)
     horizontal_diffusion::HD = HyperDiffusion(spectral_grid)
+end
 
-    # OUTPUT
-    output::OU = NetCDFOutput(spectral_grid, ShallowWater)
-    callbacks::Dict{Symbol, AbstractCallback} = Dict{Symbol, AbstractCallback}()
-    feedback::FB = Feedback()
+"""$(TYPEDSIGNATURES)
+Outer constructor that intercepts the deprecated `output`, `callbacks` and
+`feedback` kwargs. They now live on `Simulation` (pass to `initialize!(model, ...)`)
+and emit a deprecation warning here for backward-compatibility."""
+function ShallowWaterModel(
+        spectral_grid::SpectralGrid;
+        output = nothing,
+        callbacks = nothing,
+        feedback = nothing,
+        kwargs...,
+    )
+    _warn_deprecated_model_kwargs(:ShallowWaterModel; output, callbacks, feedback)
+    return ShallowWaterModel(; spectral_grid, kwargs...)
 end
 
 """($TYPEDSIGNATURES) All variables needed for the shallow water model itself (components excluded)."""
@@ -83,20 +91,29 @@ function variables(model::ShallowWater)
     )
 end
 
-""" 
+"""
 $(TYPEDSIGNATURES)
-Calls all `initialize!` functions for most components (=fields) of `model`,
-except for `model.output` and `model.feedback` which are always initialized
-in `time_stepping!` and `model.implicit` which is done in `first_timesteps!`."""
-function initialize!(model::ShallowWater; time::DateTime = DEFAULT_DATE)
+Calls all `initialize!` functions for most components (=fields) of `model`.
+The output writers, callbacks and feedback live on the returned `Simulation` and
+are initialized just before the first time step inside `time_stepping!`.
+`model.implicit` is initialized in `first_timesteps!`."""
+function initialize!(
+        model::ShallowWater;
+        time::DateTime = DEFAULT_DATE,
+        output = (),
+        callbacks::CALLBACK_DICT = CallbackDict(),
+        feedback::AbstractFeedback = Feedback(),
+    )
     (; spectral_grid) = model
 
     spectral_grid.nlayers > 1 && @error "Only nlayers=1 supported for ShallowWaterModel, \
                                 SpectralGrid with nlayers=$(spectral_grid.nlayers) provided."
 
+    outputs = output_collection(output)
+
     # initialize components
     initialize!(model.geometry, model)
-    initialize!(model.time_stepping, model)
+    initialize!(model.time_stepping, model; interval = combined_output_interval(outputs))
     initialize!(model.coriolis, model)
     initialize!(model.orography, model)
     initialize!(model.forcing, model)
@@ -116,5 +133,5 @@ function initialize!(model::ShallowWater; time::DateTime = DEFAULT_DATE)
     # now set initial conditions
     initialize!(variables, model)
 
-    return Simulation(variables, model)
+    return Simulation(variables, model, outputs, callbacks, feedback)
 end

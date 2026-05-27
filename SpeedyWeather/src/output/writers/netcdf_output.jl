@@ -48,7 +48,7 @@ $(TYPEDFIELDS)"""
     write_progress_txt::Bool = true
 
     # WHAT/WHEN OPTIONS
-    "[DERIVD] start date of the simulation, used for time dimension in netcdf file"
+    "[DERIVED] start date of the simulation, used for time dimension in netcdf file"
     startdate::DT = DateTime(2000, 1, 1)
 
     "[OPTION] output frequency, time step"
@@ -70,21 +70,28 @@ end
 
 """
 $(TYPEDSIGNATURES)
-Constructor for NetCDFOutput based on `S::SpectralGrid` and optionally
-the `Model` type (e.g. `ShallowWater`, `PrimitiveWet`) as second positional argument. In case a 
-non-default number of soil layers is used, it also needs the respective `nlayers_soil` to allocate those outputs.
-The output grid is optionally determined by keyword arguments `output_Grid` (its type, full grid required),
-`nlat_half` (resolution) and `output_NF` (number format). By default, uses the full grid
-equivalent of the grid and resolution used in `SpectralGrid` `S`."""
+Construct a [`NetCDFOutput`](@ref) from a fully constructed `model::AbstractModel`,
+inferring spectral grid, number of soil layers and default output variables from
+the model. Optional keyword arguments control output grid/resolution, output number
+format, output interval and per-file options.
+
+```julia
+model = PrimitiveWetModel(spectral_grid)
+output = NetCDFOutput(model)
+simulation = initialize!(model, output=output)
+```"""
 function NetCDFOutput(
-        SG::SpectralGrid,
-        Model::Type{<:AbstractModel} = Barotropic;
-        nlayers_soil = DEFAULT_NLAYERS_SOIL,
-        output_grid::AbstractFullGrid = on_architecture(CPU(), RingGrids.full_grid_type(SG.grid)(SG.grid.nlat_half)),
+        model::AbstractModel;
+        output_grid::AbstractFullGrid = on_architecture(
+            CPU(), RingGrids.full_grid_type(model.spectral_grid.grid)(model.spectral_grid.grid.nlat_half)
+        ),
         output_NF::DataType = DEFAULT_OUTPUT_NF,
-        interval::Period = Second(DEFAULT_OUTPUT_INTERVAL),  # only needed for dispatch
+        nlayers_soil::Int = get_soil_layers(model),
+        interval::Period = Second(DEFAULT_OUTPUT_INTERVAL),
         kwargs...
     )
+
+    SG = model.spectral_grid
 
     # INPUT GRID (but on CPU)
     input_grid = on_architecture(CPU(), SG.grid)
@@ -94,7 +101,6 @@ function NetCDFOutput(
 
     # CREATE FULL FIELDS TO INTERPOLATE ONTO BEFORE WRITING DATA OUT
     (; nlayers) = SG
-
     field2D = Field(output_NF, output_grid)
     field3D = Field(output_NF, output_grid, nlayers)
     field3Dland = Field(output_NF, output_grid, nlayers_soil)
@@ -108,8 +114,25 @@ function NetCDFOutput(
         kwargs...
     )
 
-    add_default!(output.variables, Model)
+    # fill the default output variables for this model class if no variables provided
+    if isempty(output.variables)
+        add_default!(output.variables, model_class(model))
+    end
     return output
+end
+
+"""$(TYPEDSIGNATURES)
+Deprecated stub: the old `NetCDFOutput(spectral_grid, ModelType)` constructor has
+been replaced by `NetCDFOutput(model::AbstractModel)`. Construct the model first,
+then pass it to `NetCDFOutput`."""
+function NetCDFOutput(::SpectralGrid, args...; kwargs...)
+    error(
+        "`NetCDFOutput(spectral_grid, ...)` has been removed. Construct the model " *
+            "first and call `NetCDFOutput(model)` instead, e.g.\n" *
+            "    model = PrimitiveWetModel(spectral_grid)\n" *
+            "    output = NetCDFOutput(model)\n" *
+            "    simulation = initialize!(model, output=output)"
+    )
 end
 
 function Base.show(io::IO, output::NetCDFOutput{F}) where {F}
@@ -143,18 +166,12 @@ function initialize!(
         output::NetCDFOutput,
         vars::Variables,
         model::AbstractModel,
+        callbacks::CALLBACK_DICT = CallbackDict(),
     )
     output.active || return nothing             # exit immediately for no output
 
-    # only checked for models that have a land component
-    if hasfield(typeof(model), :land) && !isnothing(model.land)
-        @assert get_nlayers(model.land) == size(output.field3Dland, 2) "$(size(output.field3Dland, 2))" *
-            " soil layers initialized for output, but $(get_nlayers(model.land)) soil layers initialized for model." *
-            " Please construct NetCDFOutput with the same `nlayers_soil` as the model."
-    end
-
     # SHARED INITIALIZATION (run folder, output frequency, counters, callbacks)
-    initialize!(output.core, output, model)
+    initialize!(output.core, output, model, callbacks)
 
     # CREATE NETCDF FILE, vector of NcVars for output
     (; run_path, filename) = output

@@ -30,13 +30,6 @@ function add!(output::AbstractOutput, outputvariables::AbstractOutputVariable...
 end
 
 """$(TYPEDSIGNATURES)
-Add `outputvariables` to the dictionary in `output::NetCDFOutput` of `model`, i.e. at `model.output.variables`."""
-function add!(model::AbstractModel, outputvariables::AbstractOutputVariable...)
-    add!(model.output, outputvariables...)
-    return model.output
-end
-
-"""$(TYPEDSIGNATURES)
 Delete output variables from `output` by their (short name) (Symbol or String), corresponding
 to the keys in the dictionary."""
 function Base.delete!(output::AbstractOutput, keys::Union{String, Symbol}...)
@@ -99,9 +92,6 @@ end
 
 # fallback for nothing output
 set!(::Nothing; active, reset_path = true) = nothing
-
-# fallback for nothing output
-initialize!(::Nothing, ::Union{AbstractFeedback, Nothing}, ::Variables, ::AbstractModel) = nothing
 
 # in case of no output nothing to close
 Base.close(::Nothing) = nothing
@@ -211,24 +201,26 @@ Returns the full path of the output file after it was created."""
 get_full_output_file_path(output::AbstractOutput) = joinpath(output.run_path, output.filename)
 
 """$(TYPEDSIGNATURES)
-Returns the full path of the output file for a `simulation`. Throws an error if output is not active."""
+Returns the full path of the first active output writer attached to `simulation`.
+Throws an error if no writer is active."""
 function get_output_path(simulation::AbstractSimulation)
-    output = simulation.model.output
-    output.active || error("Output is not active")
+    output = first_active_output(simulation)
+    isnothing(output) && error("Output is not active")
     return joinpath(output.run_path, output.filename)
 end
 
 """$(TYPEDSIGNATURES)
-Loads a `var_name` trajectory of the model `M` that has been saved in
-a netCDF file during the time stepping."""
-function load_trajectory(var_name::Union{Symbol, String}, model::AbstractModel)
-    @assert model.output.active "Output is turned off"
-    return Array(NCDataset(get_full_output_file_path(model.output))[string(var_name)])
+Loads a `var_name` trajectory of `simulation` that has been saved in
+a netCDF file during the time stepping. Reads from the first active NetCDFOutput."""
+function load_trajectory(var_name::Union{Symbol, String}, simulation::AbstractSimulation)
+    output = first_active_output(simulation)
+    @assert !isnothing(output) "Output is turned off"
+    return Array(NCDataset(get_full_output_file_path(output))[string(var_name)])
 end
 
 """
 $(TYPEDSIGNATURES)
-Returns the output time step of the model `M`."""
+Returns the output time step of `output`."""
 function get_interval(output::AbstractOutput)
     return output.interval
 end

@@ -10,6 +10,6 @@
     simulation = initialize!(model)
     run!(simulation, steps = 3, output = true)
 
-    @test simulation.model.feedback.nans_detected == false
+    @test simulation.feedback.nans_detected == false
     @test isfile(joinpath(output.run_path, output.filename))
 end

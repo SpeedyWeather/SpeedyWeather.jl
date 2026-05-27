@@ -23,11 +23,10 @@
             albedo = OceanLandAlbedo(ocean = OceanSeaIceAlbedo(spectral_grid), land = AlbedoClimatology(spectral_grid))
 
             model = PrimitiveDryModel(spectral_grid; ocean, sea_ice, albedo)
-            model.feedback.verbose = false
-            simulation = initialize!(model, time = DateTime(2000, 5, 1))
+            simulation = initialize!(model, time = DateTime(2000, 5, 1), feedback = Feedback(verbose = false))
             run!(simulation, period = Day(3))
 
-            @test simulation.model.feedback.nans_detected == false
+            @test simulation.feedback.nans_detected == false
             @test haskey(simulation.variables.prognostic.ocean, :sea_surface_temperature)
 
             # Some SSTs may contain NaNs
@@ -51,11 +50,10 @@
         ocean = PrescribedOcean(spectral_grid)
         sea_ice = PrescribedSeaIce(spectral_grid)
         model = PrimitiveWetModel(spectral_grid; ocean, sea_ice)
-        model.feedback.verbose = false
-        simulation = initialize!(model)
+        simulation = initialize!(model; feedback = Feedback(verbose = false))
         run!(simulation, steps = 2)
 
-        @test simulation.model.feedback.nans_detected == false
+        @test simulation.feedback.nans_detected == false
         @test haskey(simulation.variables.prognostic.ocean, :sea_surface_temperature)
         @test haskey(simulation.variables.prognostic.ocean, :sea_ice_concentration)
     end

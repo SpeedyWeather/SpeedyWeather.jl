@@ -119,7 +119,7 @@ The progress bar tells us that the simulation run got the identification "run_00
 (which just counts up, so yours might be higher), meaning that
 data is stored in the folder `run_0001`. In general we can check this also via
 ```@example galewsky_setup
-model.output.run_folder
+simulation.output[1].run_folder
 ```
 more on this in [Output path, identification and number](@ref).
 
@@ -130,8 +130,8 @@ by default this would be "run_0001/output.nc" but the run number increases when 
 before
 ```@example galewsky_setup
 using NCDatasets
-run_folder = model.output.run_folder
-filename = model.output.filename
+run_folder = simulation.output[1].run_folder
+filename = simulation.output[1].filename
 ds = NCDataset(joinpath(run_folder, filename))
 ds["vor"]
 ```
@@ -245,9 +245,9 @@ run!(simulation, period=Day(12), output=true)
 
 This time the run got a new `run_number`, which you see in the progress bar, but can again always check
 after the `run!` call (the automatic `run_number` is only determined just before the main time loop starts)
-with `model.output.run_folder`, but otherwise we do as before.
+with `simulation.output[1].run_folder`, but otherwise we do as before.
 ```@example galewsky_setup2
-run_folder = model.output.run_folder
+run_folder = simulation.output[1].run_folder
 ```
 
 ```@example galewsky_setup2
