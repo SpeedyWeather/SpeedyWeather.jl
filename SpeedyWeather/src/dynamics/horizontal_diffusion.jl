@@ -309,16 +309,14 @@ end
 
 """$(TYPEDSIGNATURES)
 Apply horizontal diffusion to vorticity, divergence, temperature, pressure, and humidity
-(PrimitiveWet only) in the PrimitiveEquation models.
-
-The unified `:spectral_tendencies` fuse parent shares its leading slot layout with the
-`:prognostic` fuse parent (both have `vor, div, T, pres, [humid]` at slots 1..K_diff),
-so the kernel can iterate uniformly over `(lm, k)` for `k=1..K_diff`, reading from a
-single 2D view of the prognostic state and writing to a single 2D view of the spectral
-tendencies. The pre-tiled `expl_all` / `impl_all` damping matrices carry the right
-per-variable damping at each slot (vor/T/humid use `expl/impl`; div uses
-`expl_div/impl_div`; pres is no-op). Collapses 3 (dry) / 4 (wet) per-variable launches
-into 1.
+(PrimitiveWet only) in the PrimitiveEquation models. Architecture-dispatched: GPU uses
+the unified-fuse batched kernel (one launch over the diffusion view of
+`:spectral_tendencies`); CPU stays on the per-variable launches (which still write
+through to the same fuse parent via the per-variable view aliases — only the loop
+structure differs). CPU stays per-variable because the unified kernel's larger inner
+loop + SubArray indirection measurably regresses at T127+ on CPU
+(see `benchmark_horizontal_diffusion.jl`), while on GPU per-launch overhead dominates
+and the unified path is faster.
 
 Tracers stay on the single-variable code path (one launch per active tracer)."""
 function horizontal_diffusion!(
@@ -327,16 +325,62 @@ function horizontal_diffusion!(
         model::PrimitiveEquation,
         lf::Integer = 1,    # leapfrog index used (2 is unstable)
     )
+    arch = architecture(vars.tendencies.vorticity)
+    if arch isa Architectures.AbstractCPU
+        _horizontal_diffusion_primeq_serial!(vars, diffusion, model, lf)
+    else
+        _horizontal_diffusion_primeq_batched!(vars, diffusion, model, lf)
+    end
+
+    # tracers all use the standard (expl, impl) damping; one launch per active tracer
+    (; expl, impl) = diffusion
+    for (name, tracer) in model.tracers
+        tracer_var = get_step(vars.prognostic.tracers[name], lf)
+        tracer_tend = vars.tendencies.tracers[name]
+        tracer.active && horizontal_diffusion!(tracer_tend, tracer_var, expl, impl)
+    end
+
+    return nothing
+end
+
+"""$(TYPEDSIGNATURES)
+CPU code path: one `horizontal_diffusion!(tendency, var, expl, impl)` launch per
+prognostic variable. The per-launch cost on CPU is negligible while the smaller inner
+loop (one read + one write per `(lm, k)`) vectorizes well — at T127–T255 this is
+~2–3× faster than the unified-kernel path.
+
+The per-variable tendencies (`vars.tendencies.vorticity`, etc.) are themselves slot
+views of `:spectral_tendencies`, so writes still land in the same fuse parent."""
+function _horizontal_diffusion_primeq_serial!(vars, diffusion, _model, lf)
+    (; expl, impl, expl_div, impl_div) = diffusion
+    vor   = get_step(vars.prognostic.vorticity,   lf)
+    div   = get_step(vars.prognostic.divergence,  lf)
+    temp  = get_step(vars.prognostic.temperature, lf)
+    horizontal_diffusion!(vars.tendencies.vorticity,   vor,  expl,     impl)
+    horizontal_diffusion!(vars.tendencies.divergence,  div,  expl_div, impl_div)
+    horizontal_diffusion!(vars.tendencies.temperature, temp, expl,     impl)
+    if haskey(vars.tendencies, :humidity)
+        humid = get_step(vars.prognostic.humidity, lf)
+        horizontal_diffusion!(vars.tendencies.humidity, humid, expl, impl)
+    end
+    return nothing
+end
+
+"""$(TYPEDSIGNATURES)
+GPU code path: a single batched kernel iterates over the diffusion view of
+`:spectral_tendencies` (slots `1..K_diff` covering vor, div, T, pres, [humid]) reading
+from the slot-aligned `:prognostic` step view. Both parents share the same leading slot
+layout (see `variables(::Type{<:PrimitiveDry/Wet})`), so the kernel uses uniform
+indexing — no per-variable offsets. Collapses 3 (dry) / 4 (wet) launches into 1."""
+function _horizontal_diffusion_primeq_batched!(vars, diffusion, _model, lf)
     (; expl_all, impl_all) = diffusion
 
-    # Source: :prognostic at step lf (contiguous (lm, K_prog) covering vor, div, T, pres, [humid])
+    # Source: :prognostic at step lf, contiguous (lm, K_prog) covering vor, div, T, pres, [humid]
     prog_parent = parent(vars.fused.prognostic)
     prog_step = get_step(prog_parent, lf)
 
-    # Destination: diffusion view = slots 1..K_diff of :spectral_tendencies, where K_diff
-    # is the last slot of the last diffusion-affected member (pres for dry; humid for wet).
-    # By construction (see variables(::Type{<:PrimitiveDry/Wet})) the leading slots match
-    # the :prognostic layout, so the kernel can share offsets between the two views.
+    # Destination: diffusion view = slots 1..K_diff of :spectral_tendencies. K_diff is the
+    # last slot of the last diffusion-affected member (pres for dry; humid for wet).
     spec_parent = parent(vars.fused.spectral_tendencies)
     slot_map = vars.fused.spectral_tendencies.slot_map
     K_diff = haskey(slot_map, :humidity) ? last(slot_map.humidity) : last(slot_map.pressure)
@@ -355,15 +399,6 @@ function horizontal_diffusion!(
         arch, SpectralWorkOrder, size(spec_diff), _horizontal_diffusion_primeq_kernel!,
         spec_diff, prog_step, expl_all, impl_all, l_indices,
     )
-
-    # tracers all use the standard (expl, impl) damping; one launch per active tracer
-    (; expl, impl) = diffusion
-    for (name, tracer) in model.tracers
-        tracer_var = get_step(vars.prognostic.tracers[name], lf)
-        tracer_tend = vars.tendencies.tracers[name]
-        tracer.active && horizontal_diffusion!(tracer_tend, tracer_var, expl, impl)
-    end
-
     return nothing
 end
 
