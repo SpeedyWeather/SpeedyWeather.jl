@@ -36,5 +36,11 @@ initial_conditions = InitialConditions(spectral_grid, PrimitiveWetModel)
 longwave_radiation = OneBandLongwave(spectral_grid, transmissivity = ConstantLongwaveTransmissivity(spectral_grid))
 model = PrimitiveWetModel(spectral_grid; spectral_transform = M, feedback = nothing, longwave_radiation, initial_conditions, convection=nothing, output=nothing)
 simulation = initialize!(model)
-run!(simulation, steps=10)
-#include("differentation.jl")
+
+# full model run, stops at the problematic kernel
+#run!(simulation, steps=10)
+
+# Just the problematic kernel by itself 
+initialize!(simulation, steps=10)
+SpeedyWeather.column_parameterizations!(simulation.variables, simulation.model)
+
