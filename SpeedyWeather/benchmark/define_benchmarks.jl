@@ -24,7 +24,7 @@ benchmarks[:benchmark200] = BenchmarkSuite(
 let truncs   = [31, 42, 63, 85, 127, 170, 255, 85, 127, 170, 255, 85, 127, 170, 255],
     nlayers  = [ 8,  8,  8,  8,   8,   8,   8, 16, 16,  16,  16, 24, 24, 24, 24]
 
-    matrix_idx = findall(t -> t != 255, truncs) # no matrix transform for T255 (it's too large)
+    matrix_idx = findall(t -> t < 150, truncs) # no matrix transform for T > 150 (it's too large)
     truncs_matrix  = truncs[matrix_idx]
     nlayers_matrix = nlayers[matrix_idx]
 
