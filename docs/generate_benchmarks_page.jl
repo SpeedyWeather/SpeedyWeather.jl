@@ -67,6 +67,10 @@ function write_overview_figure(all_results, labels, nlayers_target, png_path)
     )
     palette = Makie.wong_colors()
     plotted_anything = false
+    # Build legend entries manually so each series shows its actual line style
+    # AND marker (scatterlines' auto-legend entry only renders as a solid line).
+    legend_elems = Any[]
+    legend_labels = String[]
     for (j, label) in enumerate(labels)
         ov = get(all_results[label], "overview", nothing)
         ov === nothing && continue
@@ -90,14 +94,19 @@ function write_overview_figure(all_results, labels, nlayers_target, png_path)
             isempty(xs) && continue
             order = sortperm(xs)
             scatterlines!(ax, xs[order], ys[order];
-                label = "$label ($short)", color = color, marker = marker,
-                linestyle = linestyle, linewidth = 2, markersize = 10,
+                color = color, marker = marker, linestyle = linestyle,
+                linewidth = 2, markersize = 10,
             )
+            push!(legend_elems, [
+                LineElement(color = color, linestyle = linestyle, linewidth = 2),
+                MarkerElement(color = color, marker = marker, markersize = 10),
+            ])
+            push!(legend_labels, "$label ($short)")
             plotted_anything = true
         end
     end
     plotted_anything || return nothing
-    axislegend(ax; position = :rt)
+    axislegend(ax, legend_elems, legend_labels; position = :rt)
     save(png_path, fig)
     return png_path
 end
