@@ -107,7 +107,7 @@ function write_overview_figure(all_results, labels, nlayers_target, png_path)
     end
     plotted_anything || return nothing
     # `patchsize` widens the swatch so the dash pattern reads clearly.
-    axislegend(ax, legend_elems, legend_labels; position = :rt, patchsize = (50, 15))
+    axislegend(ax, legend_elems, legend_labels; position = :rt, patchsize = (70, 15))
     save(png_path, fig)
     return png_path
 end
