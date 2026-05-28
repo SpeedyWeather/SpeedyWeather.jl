@@ -211,32 +211,40 @@ function write_preamble(md)
     return
 end
 
+# Map the stored transform symbol ("default"/"matrix") to the short label used
+# in user-facing tables and figures.
+transform_short_label(s) = String(s) == "matrix" ? "MT" : "LT+FFT"
+
 function write_overview(md, all_results, labels)
     write(md, "## Overview: PrimitiveWet resolution across architectures\n\n")
     write(md, "Simulated years per wallclock day (SYPD) for the `PrimitiveWetModel` resolution sweep, ")
-    write(md, "one column per architecture. Empty cells mean the architecture has not yet been benchmarked or that suite was skipped. ")
+    write(md, "one column per architecture. Each (T, L) configuration is reported for both the standard ")
+    write(md, "Legendre transform and fast Fourier transform (LT+FFT) and the single matrix transform (MT). ")
+    write(md, "Empty cells mean the architecture has not yet been benchmarked or that suite was skipped. ")
     write(md, "Comparison figures across architectures are available on the documentation's `Benchmarks` page.\n\n")
 
-    # Pick the union of (trunc, nlayers) rows from all archs.
-    rows = Tuple{Int, Int}[]
+    # Pick the union of (trunc, nlayers, transform) rows from all archs.
+    rows = Tuple{Int, Int, String}[]
     for label in labels
         ov = get(all_results[label], "overview", nothing)
         ov === nothing && continue
         truncs = ov["trunc"]
         nlayers = ov["nlayers"]
-        for (t, l) in zip(truncs, nlayers)
-            r = (Int(t), Int(l))
+        transforms = get(ov, "spectral_transform", fill("default", length(truncs)))
+        for i in eachindex(truncs)
+            r = (Int(truncs[i]), Int(nlayers[i]), String(transforms[i]))
             r in rows || push!(rows, r)
         end
     end
-    sort!(rows; by = r -> (r[1], r[2]))
+    # LT+FFT (default) before MT (matrix) within the same (T, L) group.
+    sort!(rows; by = r -> (r[1], r[2], r[3] == "default" ? 0 : 1))
 
-    header = "| T | L | " * join(labels, " | ") * " |"
-    sep = "| --- | --- | " * join(fill("---", length(labels)), " | ") * " |"
+    header = "| T | L | Transform | " * join(labels, " | ") * " |"
+    sep = "| --- | --- | --- | " * join(fill("---", length(labels)), " | ") * " |"
     write(md, header * "\n")
     write(md, sep * "\n")
 
-    for (t, l) in rows
+    for (t, l, tr) in rows
         cells = String[]
         for label in labels
             ov = get(all_results[label], "overview", nothing)
@@ -247,7 +255,7 @@ function write_overview(md, all_results, labels)
                 sypd = ov["sypd"]
                 transforms = get(ov, "spectral_transform", fill("default", length(truncs)))
                 for i in eachindex(truncs)
-                    if Int(truncs[i]) == t && Int(nlayers[i]) == l && String(transforms[i]) == "default"
+                    if Int(truncs[i]) == t && Int(nlayers[i]) == l && String(transforms[i]) == tr
                         s = sypd[i]
                         cell = (s isa Number && isfinite(s)) ? format_sypd(s) : "—"
                         break
@@ -256,7 +264,7 @@ function write_overview(md, all_results, labels)
             end
             push!(cells, cell)
         end
-        write(md, "| $t | $l | " * join(cells, " | ") * " |\n")
+        write(md, "| $t | $l | $(transform_short_label(tr)) | " * join(cells, " | ") * " |\n")
     end
     write(md, "\n")
     return

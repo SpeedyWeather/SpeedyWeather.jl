@@ -52,7 +52,10 @@ function overview_nlayers(all_results, labels)
 end
 
 # Render one SYPD-vs-T comparison figure for a given `nlayers_target`.
-# Returns the path saved to, or `nothing` if no architecture had data at that L.
+# Each architecture contributes two lines: standard Legendre+FFT (LT+FFT, solid
+# circles) and the matrix transform (MT, dashed diamonds). Lines for the same
+# architecture share a colour. Returns the path saved to, or `nothing` if no
+# architecture had data at that L.
 function write_overview_figure(all_results, labels, nlayers_target, png_path)
     fig = Figure(size = (720, 480))
     ax = Axis(
@@ -62,25 +65,36 @@ function write_overview_figure(all_results, labels, nlayers_target, png_path)
         title = "PrimitiveWetModel, L=$nlayers_target",
         yscale = log10,
     )
+    palette = Makie.wong_colors()
     plotted_anything = false
-    for label in labels
+    for (j, label) in enumerate(labels)
         ov = get(all_results[label], "overview", nothing)
         ov === nothing && continue
-        xs = Int[]
-        ys = Float64[]
+        color = palette[mod1(j, length(palette))]
         transforms = get(ov, "spectral_transform", fill("default", length(ov["trunc"])))
-        for i in eachindex(ov["trunc"])
-            Int(ov["nlayers"][i]) == nlayers_target || continue
-            String(transforms[i]) == "default" || continue
-            s = ov["sypd"][i]
-            (s isa Number && isfinite(s) && s > 0) || continue
-            push!(xs, Int(ov["trunc"][i]))
-            push!(ys, Float64(s))
+
+        for (kind, short, marker, linestyle) in (
+                ("default", "LT+FFT", :circle, :solid),
+                ("matrix",  "MT",     :diamond, :dash),
+            )
+            xs = Int[]
+            ys = Float64[]
+            for i in eachindex(ov["trunc"])
+                Int(ov["nlayers"][i]) == nlayers_target || continue
+                String(transforms[i]) == kind || continue
+                s = ov["sypd"][i]
+                (s isa Number && isfinite(s) && s > 0) || continue
+                push!(xs, Int(ov["trunc"][i]))
+                push!(ys, Float64(s))
+            end
+            isempty(xs) && continue
+            order = sortperm(xs)
+            scatterlines!(ax, xs[order], ys[order];
+                label = "$label ($short)", color = color, marker = marker,
+                linestyle = linestyle, linewidth = 2, markersize = 10,
+            )
+            plotted_anything = true
         end
-        isempty(xs) && continue
-        order = sortperm(xs)
-        scatterlines!(ax, xs[order], ys[order]; label = label, marker = :circle, linewidth = 2, markersize = 10)
-        plotted_anything = true
     end
     plotted_anything || return nothing
     axislegend(ax; position = :rt)
@@ -89,24 +103,27 @@ function write_overview_figure(all_results, labels, nlayers_target, png_path)
 end
 
 format_sypd_cell(s) = s < 10 ? string(round(s; digits = 1)) : string(round(Int, s))
+transform_short_label(s) = String(s) == "matrix" ? "MT" : "LT+FFT"
 
 function write_overview_table(io, all_results, labels)
-    rows = Tuple{Int, Int}[]
+    rows = Tuple{Int, Int, String}[]
     for label in labels
         ov = get(all_results[label], "overview", nothing)
         ov === nothing && continue
-        for (t, l) in zip(ov["trunc"], ov["nlayers"])
-            r = (Int(t), Int(l))
+        transforms = get(ov, "spectral_transform", fill("default", length(ov["trunc"])))
+        for i in eachindex(ov["trunc"])
+            r = (Int(ov["trunc"][i]), Int(ov["nlayers"][i]), String(transforms[i]))
             r in rows || push!(rows, r)
         end
     end
-    sort!(rows; by = r -> (r[1], r[2]))
+    # LT+FFT (default) before MT (matrix) within the same (T, L) group.
+    sort!(rows; by = r -> (r[1], r[2], r[3] == "default" ? 0 : 1))
 
-    header = "| T | L | " * join(labels, " | ") * " |"
-    sep = "| --- | --- | " * join(fill("---", length(labels)), " | ") * " |"
+    header = "| T | L | Transform | " * join(labels, " | ") * " |"
+    sep = "| --- | --- | --- | " * join(fill("---", length(labels)), " | ") * " |"
     write(io, header * "\n")
     write(io, sep * "\n")
-    for (t, l) in rows
+    for (t, l, tr) in rows
         cells = String[]
         for label in labels
             ov = get(all_results[label], "overview", nothing)
@@ -114,7 +131,7 @@ function write_overview_table(io, all_results, labels)
             if ov !== nothing
                 transforms = get(ov, "spectral_transform", fill("default", length(ov["trunc"])))
                 for i in eachindex(ov["trunc"])
-                    if Int(ov["trunc"][i]) == t && Int(ov["nlayers"][i]) == l && String(transforms[i]) == "default"
+                    if Int(ov["trunc"][i]) == t && Int(ov["nlayers"][i]) == l && String(transforms[i]) == tr
                         s = ov["sypd"][i]
                         cell = (s isa Number && isfinite(s)) ? format_sypd_cell(s) : "—"
                         break
@@ -123,7 +140,7 @@ function write_overview_table(io, all_results, labels)
             end
             push!(cells, cell)
         end
-        write(io, "| $t | $l | " * join(cells, " | ") * " |\n")
+        write(io, "| $t | $l | $(transform_short_label(tr)) | " * join(cells, " | ") * " |\n")
     end
     write(io, "\n")
     return
@@ -203,6 +220,8 @@ function generate_benchmarks_page()
 
         write(io, "## Overview: PrimitiveWet resolution across architectures\n\n")
         write(io, "Simulated years per wallclock day (SYPD) for the `PrimitiveWetModel` resolution sweep, one column per architecture. ")
+        write(io, "Each (T, L) configuration is reported for both the standard Legendre transform and fast Fourier transform (LT+FFT) ")
+        write(io, "and the single matrix transform (MT). ")
         write(io, "Empty cells (—) mean the architecture has either not been benchmarked yet or did not run that specific configuration.\n\n")
 
         for (L, link) in figure_links
