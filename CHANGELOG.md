@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Revised benchmark suite to make it compare between different architectures [#1103](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1103)
+
 ## v0.20.2
 
 - Handle heterogeneous parameter attributes in `ParameterEditing` [#1106](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1106)
