@@ -18,19 +18,25 @@ benchmarks[:benchmark200] = BenchmarkSuite(
 
 ## Primitive WET MODELS RESOLUTION
 # Resolution sweep: L=8 from T31 → T255, plus L=16 and L=24 at the four highest
-# truncations — each configuration is run twice, once with the default
-# (FFT + Legendre) SpectralTransform and once with MatrixSpectralTransform.
+# truncations. Each configuration is run with the default (FFT + Legendre)
+# SpectralTransform and additionally with MatrixSpectralTransform — except for
+# T255 which is too large for the dense matrix transform (memory + speed).
 let truncs   = [31, 42, 63, 85, 127, 170, 255, 85, 127, 170, 255, 85, 127, 170, 255],
     nlayers  = [ 8,  8,  8,  8,   8,   8,   8, 16, 16,  16,  16, 24, 24, 24, 24]
 
-    n = length(truncs)
+    matrix_idx = findall(t -> t != 255, truncs) # no matrix transform for T255 (it's too large)
+    truncs_matrix  = truncs[matrix_idx]
+    nlayers_matrix = nlayers[matrix_idx]
+
+    n_default = length(truncs)
+    n_matrix  = length(truncs_matrix)
     benchmarks[:benchmark201] = BenchmarkSuite(
         title = "Primitive wet model, resolution",
-        nruns = 2n,
-        model = fill(PrimitiveWetModel, 2n),
-        trunc = vcat(truncs, truncs),
-        nlayers = vcat(nlayers, nlayers),
-        spectral_transform = vcat(fill(:default, n), fill(:matrix, n)),
+        nruns = n_default + n_matrix,
+        model = fill(PrimitiveWetModel, n_default + n_matrix),
+        trunc = vcat(truncs, truncs_matrix),
+        nlayers = vcat(nlayers, nlayers_matrix),
+        spectral_transform = vcat(fill(:default, n_default), fill(:matrix, n_matrix)),
     )
 end
 
