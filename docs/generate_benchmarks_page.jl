@@ -98,7 +98,7 @@ function write_overview_figure(all_results, labels, nlayers_target, png_path)
                 linewidth = 2, markersize = 10,
             )
             push!(legend_elems, [
-                LineElement(color = color, linestyle = linestyle, linewidth = 2),
+                LineElement(color = color, linestyle = linestyle, linewidth = 5),
                 MarkerElement(color = color, marker = marker, markersize = 10),
             ])
             push!(legend_labels, "$label ($short)")
@@ -106,7 +106,8 @@ function write_overview_figure(all_results, labels, nlayers_target, png_path)
         end
     end
     plotted_anything || return nothing
-    axislegend(ax, legend_elems, legend_labels; position = :rt)
+    # `patchsize` widens the swatch so the dash pattern reads clearly.
+    axislegend(ax, legend_elems, legend_labels; position = :rt, patchsize = (50, 15))
     save(png_path, fig)
     return png_path
 end
