@@ -2,14 +2,39 @@ using BenchmarkTools
 using SpeedyWeather: synchronize, _jit, ReactantDevice, MatrixSpectralTransform
 
 # Build the model with the right spectral transform for `arch`.
-# Reactant requires MatrixSpectralTransform; everything else uses the default.
-function build_model(Model, spectral_grid, arch; kwargs...)
+# Reactant requires MatrixSpectralTransform; otherwise honour `transform_kind`
+# (`:default` for FFT+Legendre, `:matrix` for MatrixSpectralTransform).
+function build_model(Model, spectral_grid, arch; transform_kind::Symbol = :default, kwargs...)
     if arch isa ReactantDevice
         M = MatrixSpectralTransform(spectral_grid)
+        return Model(spectral_grid; spectral_transform = M, feedback = nothing, output = nothing, kwargs...)
+    elseif transform_kind == :matrix
+        M = MatrixSpectralTransform(spectral_grid)
         return Model(spectral_grid; spectral_transform = M, kwargs...)
-    else
+    elseif transform_kind == :default
         return Model(spectral_grid; kwargs...)
+    else
+        error("Unknown transform_kind = $transform_kind. Use :default or :matrix.")
     end
+end
+
+# Format SYPD: one decimal digit if < 10, integer otherwise. Used by both the
+# per-arch tables and the cross-arch overview so the column reads consistently.
+function format_sypd(s)
+    (s isa Number && isfinite(s)) || return "0"
+    return s < 10 ? string(round(s; digits = 1)) : string(round(Int, s))
+end
+
+# Resolve a NamedTuple of per-run model kwargs against `spectral_grid`.
+# Convention: a `Type` value is instantiated with `spectral_grid` (every
+# component has a `T(spectral_grid)` constructor); a
+# `Function` value is called with `spectral_grid` (for parameterised cases
+# like `sg -> WhichZenith(sg, my_planet)`); everything else is passed through.
+_resolve_kwarg_value(v::Type, sg) = v(sg)
+_resolve_kwarg_value(v::Function, sg) = v(sg)
+_resolve_kwarg_value(v, _) = v
+function resolve_model_kwargs(nt::NamedTuple, spectral_grid)
+    return NamedTuple{keys(nt)}(map(v -> _resolve_kwarg_value(v, spectral_grid), values(nt)))
 end
 
 abstract type AbstractBenchmarkSuite end
@@ -24,6 +49,12 @@ abstract type AbstractBenchmarkSuite end
     nlat::Vector{Int} = fill(0, nruns)
     dynamics::Vector{Bool} = fill(true, nruns)
     physics::Vector{Bool} = fill(true, nruns)
+    spectral_transform::Vector{Symbol} = fill(:default, nruns)
+    # Per-run extra kwargs to splat into the model constructor. Values that
+    # are `Type` or `Function` are resolved against `spectral_grid` first;
+    # Use this to vary arbitrary model components, e.g.
+    # `model_kwargs = [(convection = NoConvection,), (convection = BettsMillerConvection,)]`.
+    model_kwargs::Vector = fill(NamedTuple(), nruns)
     SYPD::Vector{Float64} = fill(0.0, nruns)
     Δt::Vector{Float64} = fill(0.0, nruns)
     memory::Vector{Int} = fill(0, nruns)
@@ -50,12 +81,14 @@ function run_benchmark_suite!(suite::BenchmarkSuite)
         Grid = suite.Grid[i]
         dynamics = suite.dynamics[i]
         physics = suite.physics[i]
+        transform_kind = suite.spectral_transform[i]
         architecture = suite.architecture
 
         spectral_grid = SpectralGrid(; NF, trunc, Grid, nlayers, architecture)
         suite.nlat[i] = spectral_grid.nlat
 
-        model = build_model(Model, spectral_grid, architecture; feedback = Feedback(verbose = true))
+        extra_components = resolve_model_kwargs(suite.model_kwargs[i], spectral_grid)
+        model = build_model(Model, spectral_grid, architecture; transform_kind, extra_components..., feedback = Feedback(verbose = true))
         if Model <: PrimitiveEquation
             model.dynamics = dynamics
             model.dynamics_only = !physics
@@ -90,6 +123,7 @@ function write_results(md, suite::BenchmarkSuite)
     print_nlat = any(suite.nlat .!= suite.nlat[1])
     print_dynamics = any(suite.dynamics .!= suite.dynamics[1])
     print_physics = any(suite.physics .!= suite.physics[1])
+    print_transform = any(suite.spectral_transform .!= suite.spectral_transform[1])
 
     column_header = "| Model "
     column_header *= print_NF ? "| NF " : ""
@@ -99,6 +133,7 @@ function write_results(md, suite::BenchmarkSuite)
     column_header *= print_nlat ? "| Rings " : ""
     column_header *= print_dynamics ? "| Dynamics " : ""
     column_header *= print_physics ? "| Physics " : ""
+    column_header *= print_transform ? "| Transform " : ""
     column_header *= "| Δt | SYPD | Memory|"
 
     ncolumns = length(findall('|', column_header)) - 1
@@ -117,10 +152,10 @@ function write_results(md, suite::BenchmarkSuite)
         row *= print_nlat ? "| $(suite.nlat[i]) " : ""
         row *= print_dynamics ? "| $(suite.dynamics[i]) " : ""
         row *= print_physics ? "| $(suite.physics[i]) " : ""
+        row *= print_transform ? "| $(suite.spectral_transform[i]) " : ""
 
         Δt = round(Int, suite.Δt[i])
-        sypd = suite.SYPD[i]
-        SYPD = isfinite(sypd) ? round(Int, sypd) : 0
+        SYPD = format_sypd(suite.SYPD[i])
         memory = prettymemory(suite.memory[i])
         row *= "| $Δt | $SYPD | $memory |"
 

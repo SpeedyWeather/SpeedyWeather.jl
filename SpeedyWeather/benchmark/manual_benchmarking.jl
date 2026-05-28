@@ -122,6 +122,7 @@ function overview_data()
         "sypd" => collect(suite.SYPD),
         "memory" => collect(suite.memory),
         "dt" => collect(suite.Δt),
+        "spectral_transform" => string.(suite.spectral_transform),
     )
 end
 
@@ -244,10 +245,11 @@ function write_overview(md, all_results, labels)
                 truncs = ov["trunc"]
                 nlayers = ov["nlayers"]
                 sypd = ov["sypd"]
+                transforms = get(ov, "spectral_transform", fill("default", length(truncs)))
                 for i in eachindex(truncs)
-                    if Int(truncs[i]) == t && Int(nlayers[i]) == l
+                    if Int(truncs[i]) == t && Int(nlayers[i]) == l && String(transforms[i]) == "default"
                         s = sypd[i]
-                        cell = (s isa Number && isfinite(s)) ? string(round(Int, s)) : "—"
+                        cell = (s isa Number && isfinite(s)) ? format_sypd(s) : "—"
                         break
                     end
                 end

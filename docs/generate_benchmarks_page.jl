@@ -68,8 +68,10 @@ function write_overview_figure(all_results, labels, nlayers_target, png_path)
         ov === nothing && continue
         xs = Int[]
         ys = Float64[]
+        transforms = get(ov, "spectral_transform", fill("default", length(ov["trunc"])))
         for i in eachindex(ov["trunc"])
             Int(ov["nlayers"][i]) == nlayers_target || continue
+            String(transforms[i]) == "default" || continue
             s = ov["sypd"][i]
             (s isa Number && isfinite(s) && s > 0) || continue
             push!(xs, Int(ov["trunc"][i]))
@@ -85,6 +87,8 @@ function write_overview_figure(all_results, labels, nlayers_target, png_path)
     save(png_path, fig)
     return png_path
 end
+
+format_sypd_cell(s) = s < 10 ? string(round(s; digits = 1)) : string(round(Int, s))
 
 function write_overview_table(io, all_results, labels)
     rows = Tuple{Int, Int}[]
@@ -108,10 +112,11 @@ function write_overview_table(io, all_results, labels)
             ov = get(all_results[label], "overview", nothing)
             cell = "—"
             if ov !== nothing
+                transforms = get(ov, "spectral_transform", fill("default", length(ov["trunc"])))
                 for i in eachindex(ov["trunc"])
-                    if Int(ov["trunc"][i]) == t && Int(ov["nlayers"][i]) == l
+                    if Int(ov["trunc"][i]) == t && Int(ov["nlayers"][i]) == l && String(transforms[i]) == "default"
                         s = ov["sypd"][i]
-                        cell = (s isa Number && isfinite(s)) ? string(round(Int, s)) : "—"
+                        cell = (s isa Number && isfinite(s)) ? format_sypd_cell(s) : "—"
                         break
                     end
                 end

@@ -17,15 +17,22 @@ benchmarks[:benchmark200] = BenchmarkSuite(
 )
 
 ## Primitive WET MODELS RESOLUTION
-# Resolution sweep: L=8 from T31 → T255, plus L=16 at the three highest truncations
-# so that the L=8 vs L=16 comparison plots have enough overlap.
-benchmarks[:benchmark201] = BenchmarkSuite(
-    title = "Primitive wet model, resolution",
-    nruns = 11,
-    model = fill(PrimitiveWetModel, 11),
-    trunc =   [31, 42, 63, 85, 127, 170, 255, 85, 127, 170, 255],
-    nlayers = [ 8,  8,  8,  8,   8,   8,   8, 16, 16,  16,  16],
-)
+# Resolution sweep: L=8 from T31 → T255, plus L=16 and L=24 at the four highest
+# truncations — each configuration is run twice, once with the default
+# (FFT + Legendre) SpectralTransform and once with MatrixSpectralTransform.
+let truncs   = [31, 42, 63, 85, 127, 170, 255, 85, 127, 170, 255, 85, 127, 170, 255],
+    nlayers  = [ 8,  8,  8,  8,   8,   8,   8, 16, 16,  16,  16, 24, 24, 24, 24]
+
+    n = length(truncs)
+    benchmarks[:benchmark201] = BenchmarkSuite(
+        title = "Primitive wet model, resolution",
+        nruns = 2n,
+        model = fill(PrimitiveWetModel, 2n),
+        trunc = vcat(truncs, truncs),
+        nlayers = vcat(nlayers, nlayers),
+        spectral_transform = vcat(fill(:default, n), fill(:matrix, n)),
+    )
+end
 
 ## NUMBER FORMATS
 benchmarks[:benchmark300] = BenchmarkSuite(
