@@ -98,7 +98,7 @@ function write_overview_figure(all_results, labels, nlayers_target, png_path)
                 linewidth = 2, markersize = 10,
             )
             push!(legend_elems, [
-                LineElement(color = color, linestyle = linestyle, linewidth = 5),
+                LineElement(color = color, linestyle = linestyle, linewidth = 2),
                 MarkerElement(color = color, marker = marker, markersize = 10),
             ])
             push!(legend_labels, "$label ($short)")
