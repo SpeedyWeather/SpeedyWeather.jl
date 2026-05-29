@@ -187,6 +187,49 @@ end
     end
 end
 
+@testset "fourier_batched: CUDA Graphs equivalence and replay" begin
+    # the CUDA-Graphs acceleration lives in SpeedyTransformsCUDAExt; only test it when
+    # the CUDA backend (and hence the extension) is actually loaded
+    ext = Base.get_extension(SpeedyWeather.SpeedyTransforms, :SpeedyTransformsCUDAExt)
+    if ext !== nothing
+        @testset for Grid in grid_list
+            spectral_grid = SpectralGrid(; trunc = 31, nlayers = 8, Grid, architecture = GPU(), dealiasing = 3)
+            S = SpectralTransform(spectral_grid)
+            field = rand(Float32, spectral_grid.grid, spectral_grid.nlayers)
+            coeffs = rand(ComplexF32, spectral_grid.spectrum, spectral_grid.nlayers)
+
+            # reference: generic (allocating) GPU path with graphs disabled
+            ext.clear_fourier_graph_cache!()
+            ext.FOURIER_GRAPHS_ENABLED[] = false
+            spec_off = transform(field, S)      # grid -> spectral
+            grid_off = transform(coeffs, S)      # spectral -> grid
+
+            # CUDA-Graphs path (default)
+            ext.clear_fourier_graph_cache!()
+            ext.FOURIER_GRAPHS_ENABLED[] = true
+            spec_on = transform(field, S)
+            grid_on = transform(coeffs, S)
+
+            # graphs path must match the generic path (forward differs only at the level
+            # of the non-deterministic atomic Legendre transform, hence the tolerance)
+            @test Array(spec_on.data) ≈ Array(spec_off.data) rtol = sqrt(eps(Float32))
+            @test Array(grid_on.data) ≈ Array(grid_off.data) rtol = sqrt(eps(Float32))
+
+            # a graph was actually captured and cached
+            @test !isempty(ext.GRAPH_CACHES)
+
+            # replaying into the same buffers across repeated calls stays correct
+            spec_repeat = similar(spec_on)
+            for _ in 1:3
+                transform!(spec_repeat, field, S)
+            end
+            @test Array(spec_repeat.data) ≈ Array(spec_off.data) rtol = sqrt(eps(Float32))
+
+            ext.clear_fourier_graph_cache!()
+        end
+    end
+end
+
 @testset "fourier_batched: compare backward pass to CPU" begin
     @testset for trunc in spectral_resolutions
         @testset for nlayers in nlayers_list

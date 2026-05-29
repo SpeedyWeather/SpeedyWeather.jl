@@ -77,11 +77,12 @@ Clear all cached CUDA-Graphs Fourier buffers and graphs (frees the associated GP
 Mainly useful for tests/benchmarks."""
 clear_fourier_graph_cache!() = (empty!(GRAPH_CACHES); nothing)
 
-# =====================================================================================
+# 
 # Allocation-free per-ring loops (capturable). These reproduce exactly the regions that
 # the generic `_fourier_batched!` writes (rows 1:nfreq of each ring's scratch slice;
 # the full ring rows of `field` for the inverse).
-# =====================================================================================
+# The main difference to the forward and inverse loop in the main code is that this is 
+# that this has absolutely zero allocations, no allocations in CUDA Graphs are allowed
 
 """$(TYPEDSIGNATURES)
 Allocation-free forward (grid → spectral) batched Fourier loop using pre-allocated dense
@@ -196,10 +197,6 @@ function run_graph!(execs::IdDict, key, loop!::F) where {F}
     return nothing
 end
 
-# =====================================================================================
-# Method overrides: dispatch on CuArray scratch (more specific than the generic
-# AbstractArray{<:Complex,3} methods in fourier.jl)
-# =====================================================================================
 
 """$(TYPEDSIGNATURES)
 CUDA-Graphs accelerated forward (grid → spectral) batched Fourier transform.
@@ -218,7 +215,10 @@ function _fourier_batched!(
         )
     end
     cache = get_cache(S)
-    run_graph!(cache.forward_execs, field.data, () -> forward_loop!(cache, f_north, f_south, field, S))
+    # key on the varying field buffer AND the scratch actually used (the latter is normally
+    # S.scratch_memory.north, but the 4-arg transform! allows a different scratch)
+    key = (field.data, f_north)
+    run_graph!(cache.forward_execs, key, () -> forward_loop!(cache, f_north, f_south, field, S))
     return nothing
 end
 
@@ -238,7 +238,8 @@ function _fourier_batched!(
         )
     end
     cache = get_cache(S)
-    run_graph!(cache.inverse_execs, field.data, () -> inverse_loop!(cache, field, g_north, g_south, S))
+    key = (field.data, g_north)
+    run_graph!(cache.inverse_execs, key, () -> inverse_loop!(cache, field, g_north, g_south, S))
     return nothing
 end
 
