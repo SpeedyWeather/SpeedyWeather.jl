@@ -34,10 +34,11 @@ import SpeedyTransforms.RingGrids: AbstractField
 #     from ~6*nlat_half nodes to ~2*nlat_half + 4 and is the bulk of the speedup.
 #
 # The captured graph bakes in the device pointers of `field.data`, the scratch buffers
-# (`S.scratch_memory.north/.south`, stable for the lifetime of `S`) and the packed work
+# (`scratch_memory.north/.south`, stable for the lifetime of `S`) and the packed work
 # buffer. In the SpeedyWeather time loop the same variable buffers are reused every
 # timestep, so a graph captured for a given `field` is replayed on all subsequent steps.
-# Graphs are cached per `SpectralTransform` and keyed by the `field.data` object.
+# Caches are held per transform SIZE (keyed by the scratch buffer, so an `S` that batches
+# several layer counts gets one cache each); within a cache, graphs are keyed by `field.data`.
 # =====================================================================================
 
 """Toggle for the CUDA-Graphs accelerated batched Fourier transform. Set to `false` to
@@ -48,7 +49,7 @@ const FOURIER_GRAPHS_ENABLED = Ref(true)
 unbounded growth (and host-side capture cost) when the transform is called with a stream
 of freshly-allocated `field` buffers (e.g. the allocating `transform(field, S)`). Beyond
 this many distinct buffers the allocation-free loop is run directly without capturing."""
-const MAX_GRAPHS = 128
+const MAX_GRAPHS = 64
 
 # =====================================================================================
 # Fused gather/scatter kernels — move all rings at once between the strided grid/scratch
@@ -99,15 +100,18 @@ end
 # =====================================================================================
 
 """$(TYPEDSIGNATURES)
-Cache (one per `SpectralTransform`) holding the pre-allocated packed work buffers, the
-per-ring reshaped views used by the FFTs, the device gather/scatter index metadata, and
-the instantiated CUDA graphs (one per distinct `field` buffer and direction). A graph
-value of `nothing` marks a buffer for which capture failed (fall back to direct loop)."""
+Cache (one per transform SIZE, i.e. per scratch buffer) holding the pre-allocated packed
+work buffers, the per-ring reshaped views and FFT plans used by the transforms, the device
+gather/scatter index metadata, and the instantiated CUDA graphs (one per distinct `field`
+buffer and direction). A graph value of `nothing` marks a buffer for which capture failed
+(fall back to direct loop)."""
 mutable struct GPUFourierGraphCache
     packed_real                 # CuVector{NF}        — all rings' dense real blocks
     packed_cplx                 # CuVector{Complex{NF}} — all rings' dense complex blocks
     real_view::Vector           # per-ring reshaped (nlon_j × nlayers) view into packed_real
     cplx_view::Vector           # per-ring reshaped (nfreq_j × nlayers) view into packed_cplx
+    rfft_plans                  # forward FFT plans for THIS size (nlayers batches), per ring
+    brfft_plans                 # inverse FFT plans for THIS size, per ring
     roff                        # CuVector{Int} — 0-based real-block offset per ring
     coff                        # CuVector{Int} — 0-based complex-block offset per ring
     nlon                        # CuVector{Int} — longitudes per ring
@@ -126,14 +130,30 @@ mutable struct GPUFourierGraphCache
     inverse_execs::IdDict{Any, Union{Nothing, CuGraphExec}}
 end
 
-# one cache per SpectralTransform, keyed by the (stable, unique) north scratch array
+# One cache per (SpectralTransform, transform size), keyed by the *scratch buffer actually
+# used* (`scratch_memory.north`) — NOT by `S` itself. A single `S` may hold several FFT-plan
+# sets and scratch buffers of different layer counts (variable-batching, branch
+# `mg/gpu-mega-transform`); each size has its own scratch, so keying by the scratch yields
+# one independent cache (packed buffers, views, metadata, plans, graphs) per size. In the
+# single-size case the scratch is just `S.scratch_memory.north`, so behaviour is unchanged.
+#
+# An IdDict (identity-hashed) is required: the key is a CuArray, and a WeakKeyDict hashes keys
+# *by value* (`hash(::AbstractArray)` iterates elements → GPU scalar indexing, which errors).
+# IdDict holds keys strongly, so caches persist until `clear_fourier_graph_cache!()`;
+# transforms are long-lived (a handful per model), so this is a non-issue for the time loop.
 const GRAPH_CACHES = IdDict{Any, GPUFourierGraphCache}()
 
-function build_cache(S::SpectralTransform)
+# EXTENSION POINT for variable-batching (branch `mg/gpu-mega-transform`): return the
+# (forward, inverse) per-ring FFT plan sets for a transform of `nlayers` layers. The default
+# assumes a single size; override this for an `S` that stores several plan sets (e.g. keyed
+# by layer count) and the rest — caches, packing, capture, replay — follows automatically.
+fft_plans(S::SpectralTransform, nlayers::Integer) = (S.rfft_plans, S.brfft_plans)
+
+function build_cache(S::SpectralTransform, nlayers::Integer)
     NF = eltype(S)
     nlat = S.nlat
     nlat_half = S.grid.nlat_half
-    nlayers = S.nlayers
+    rfft_plans, brfft_plans = fft_plans(S, nlayers)
     rings = S.rings
     nlons = collect(Int, S.nlons[1:nlat_half])
     nfreqs = nlons .÷ 2 .+ 1
@@ -159,6 +179,7 @@ function build_cache(S::SpectralTransform)
     dev(x) = CuArray(x)
     return GPUFourierGraphCache(
         packed_real, packed_cplx, real_view, cplx_view,
+        rfft_plans, brfft_plans,
         dev(roff), dev(coff), dev(nlons), dev(nfreqs),
         dev(rstart_n), dev(rstart_s), dev(nlon_s),
         S.nlon_max, S.nfreq_max, nlat_half, nlayers, has_equator, jeq,
@@ -168,7 +189,9 @@ function build_cache(S::SpectralTransform)
     )
 end
 
-get_cache(S::SpectralTransform) = get!(() -> build_cache(S), GRAPH_CACHES, S.scratch_memory.north)::GPUFourierGraphCache
+# keyed by the scratch buffer (= the per-size resource); its layer count sizes the cache
+get_cache(S::SpectralTransform, scratch_north) =
+    get!(() -> build_cache(S, size(scratch_north, 2)), GRAPH_CACHES, scratch_north)::GPUFourierGraphCache
 
 """$(TYPEDSIGNATURES)
 Clear all cached CUDA-Graphs Fourier buffers and graphs (frees the associated GPU memory).
@@ -192,10 +215,12 @@ function forward_loop!(cache::GPUFourierGraphCache, f_north, f_south, field::Abs
     real_view = cache.real_view
     cplx_view = cache.cplx_view
 
+    rfft_plans = cache.rfft_plans
+
     # northern rings
     gather_real_kernel!(b)(cache.packed_real, field.data, cache.roff, cache.nlon, cache.rstart_n; ndrange = (cache.nlon_max, nlh, L))
     @inbounds for j in 1:nlh
-        mul!(cplx_view[j], S.rfft_plans[j], real_view[j])
+        mul!(cplx_view[j], rfft_plans[j], real_view[j])
     end
     scatter_cplx_kernel!(b)(f_north, cache.packed_cplx, cache.coff, cache.nfreq; ndrange = (cache.nfreq_max, nlh, L))
 
@@ -205,7 +230,7 @@ function forward_loop!(cache::GPUFourierGraphCache, f_north, f_south, field::Abs
         if cache.has_equator && j == cache.jeq
             fill!(cplx_view[j], 0)
         else
-            mul!(cplx_view[j], S.rfft_plans[j], real_view[j])
+            mul!(cplx_view[j], rfft_plans[j], real_view[j])
         end
     end
     scatter_cplx_kernel!(b)(f_south, cache.packed_cplx, cache.coff, cache.nfreq; ndrange = (cache.nfreq_max, nlh, L))
@@ -223,10 +248,12 @@ function inverse_loop!(cache::GPUFourierGraphCache, field::AbstractField, g_nort
     real_view = cache.real_view
     cplx_view = cache.cplx_view
 
+    brfft_plans = cache.brfft_plans
+
     # northern rings
     gather_cplx_kernel!(b)(cache.packed_cplx, g_north, cache.coff, cache.nfreq; ndrange = (cache.nfreq_max, nlh, L))
     @inbounds for j in 1:nlh
-        mul!(real_view[j], S.brfft_plans[j], cplx_view[j])
+        mul!(real_view[j], brfft_plans[j], cplx_view[j])
     end
     scatter_real_kernel!(b)(field.data, cache.packed_real, cache.roff, cache.nlon, cache.rstart_n; ndrange = (cache.nlon_max, nlh, L))
 
@@ -234,7 +261,7 @@ function inverse_loop!(cache::GPUFourierGraphCache, field::AbstractField, g_nort
     gather_cplx_kernel!(b)(cache.packed_cplx, g_south, cache.coff, cache.nfreq; ndrange = (cache.nfreq_max, nlh, L))
     @inbounds for j in 1:nlh
         (cache.has_equator && j == cache.jeq) && continue
-        mul!(real_view[j], S.brfft_plans[j], cplx_view[j])
+        mul!(real_view[j], brfft_plans[j], cplx_view[j])
     end
     scatter_real_kernel!(b)(field.data, cache.packed_real, cache.roff, cache.nlon_s, cache.rstart_s; ndrange = (cache.nlon_max, nlh, L))
     return nothing
@@ -309,11 +336,10 @@ function _fourier_batched!(
             field::AbstractField, S::SpectralTransform,
         )
     end
-    cache = get_cache(S)
-    # key on the varying field buffer AND the scratch actually used (the latter is normally
-    # S.scratch_memory.north, but the 4-arg transform! allows a different scratch)
-    key = (field.data, f_north)
-    run_graph!(cache.forward_execs, key, () -> forward_loop!(cache, f_north, f_south, field, S))
+    # the cache is selected by (and sized for) the scratch of this transform size; within it
+    # the only thing that varies between calls is the field buffer, so that is the graph key
+    cache = get_cache(S, f_north)
+    run_graph!(cache.forward_execs, field.data, () -> forward_loop!(cache, f_north, f_south, field, S))
     return nothing
 end
 
@@ -333,9 +359,8 @@ function _fourier_batched!(
             g_south::AbstractArray{<:Complex, 3}, S::SpectralTransform,
         )
     end
-    cache = get_cache(S)
-    key = (field.data, g_north)
-    run_graph!(cache.inverse_execs, key, () -> inverse_loop!(cache, field, g_north, g_south, S))
+    cache = get_cache(S, g_north)
+    run_graph!(cache.inverse_execs, field.data, () -> inverse_loop!(cache, field, g_north, g_south, S))
     return nothing
 end
 
