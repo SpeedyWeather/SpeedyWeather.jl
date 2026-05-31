@@ -83,6 +83,7 @@ SpeedyWeather.secondofday(dt::ReactantDatesExt.ReactantDateTime) = Dates.second(
 @inline SpeedyWeather.solar_hour_angle(::Type{T}, time::ReactantDatesExt.ReactantDateTime, λ, length_of_day::Second) where {T} = SpeedyWeather._solar_hour_angle(T, time, λ, length_of_day)
 @inline SpeedyWeather.solar_hour_angle(::Type{T}, time::ReactantDatesExt.ReactantDateTime, λ, length_of_day::ReactantDatesExt.ReactantSecond) where {T} = SpeedyWeather._solar_hour_angle(T, time, λ, length_of_day)
 
+#=
 #TODO: move those the the ReactantDatesExt once I am sure it's all additional functionality I need to add
 Dates.firstdayofmonth(dt::ReactantDatesExt.ReactantDate{I}) where {I} =
     ReactantDatesExt.ReactantDate{I}(Date(Dates.year(dt), Dates.month(dt)))
@@ -205,13 +206,6 @@ function Dates.dayofyear(dt::Union{ReactantDatesExt.ReactantDate, ReactantDatesE
     return Dates.dayofyear(y, m, d)
 end
 
-# These function extend those defined in SpeedyWeather/src/dynamics/clock.jl
-# They will not move to ReactantDatesExt as they aren't part of stdlib Dates.jl
-Dates.second(x::ReactantDatesExt.ReactantNanosecond) = round(Int, x.value * 1.0e-9)
-Dates.second(x::ReactantDatesExt.ReactantMicrosecond) = round(Int, x.value * 1.0e-6)
-Dates.second(x::ReactantDatesExt.ReactantMillisecond) = round(Int, x.value * 1.0e-3)
-
-
 # _units is defined per concrete Period type in Dates with singular/plural logic.
 # For Reactant period types the value is a traced number so we can't branch on it;
 # always return the plural form which is the common case.
@@ -228,6 +222,14 @@ for (T, unit) in (
 )
     @eval Dates._units(::ReactantDatesExt.$T) = " " * $unit
 end
+
+=#
+
+# These function extend those defined in SpeedyWeather/src/dynamics/clock.jl
+# They will not move to ReactantDatesExt as they aren't part of stdlib Dates.jl
+Dates.second(x::ReactantDatesExt.ReactantNanosecond) = round(Int, x.value * 1.0e-9)
+Dates.second(x::ReactantDatesExt.ReactantMicrosecond) = round(Int, x.value * 1.0e-6)
+Dates.second(x::ReactantDatesExt.ReactantMillisecond) = round(Int, x.value * 1.0e-3)
 
 # construct components with ReactantDates types
 SpeedyWeather.Clock(architecture::ReactantDevice) = Reactant.to_rarray(SpeedyWeather.Clock(), track_numbers = true)
