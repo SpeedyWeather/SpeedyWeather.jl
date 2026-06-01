@@ -133,15 +133,18 @@ mutable struct GPUFourierGraphCache
     inverse_execs::IdDict{Any, Union{Nothing, CuGraphExec}}
 end
 
-# One cache per (SpectralTransform, transform size), keyed by the *scratch buffer actually
-# used* (`scratch_memory.north`) — NOT by `S` itself. A single `S` may hold several FFT-plan
-# sets and scratch buffers of different layer counts (variable-batching, branch
-# `mg/gpu-mega-transform`); each size has its own scratch, so keying by the scratch yields
-# one independent cache (packed buffers, views, metadata, plans, graphs) per size. In the
-# single-size case the scratch is just `S.scratch_memory.north`, so behaviour is unchanged.
+# One cache per (SpectralTransform, transform size), keyed by the *forward FFT plan set*
+# (`fft_plans(S, nlayers)[1]`) — NOT by `S` itself. A single `S` may hold several FFT-plan
+# sets of different layer counts (variable-batching, branch `mg/gpu-mega-transform`); the
+# plan set is the canonical per-size resource (one-to-one with a size, stable for the lifetime
+# of `S`), so keying on it yields one independent cache (packed buffers, views, metadata,
+# plans, graphs) per size. Unlike the scratch buffer, this stays a valid key when a single
+# `scratch_memory` is shared across sizes. In the single-size case the plan set is just
+# `S.rfft_plans`, so behaviour is unchanged (one cache per `S`).
 #
-# An IdDict (identity-hashed) is required: the key is a CuArray, and a WeakKeyDict hashes keys
-# *by value* (`hash(::AbstractArray)` iterates elements → GPU scalar indexing, which errors).
+# An IdDict (identity-hashed) is required: the key is a `Vector{<:AbstractFFTs.Plan}`, and a
+# value-hashing `Dict` would `hash` each (CUFFT) plan — undefined/expensive, same class of
+# problem as hashing a CuArray. IdDict compares by `===`/`objectid`, never touching contents.
 # IdDict holds keys strongly, so caches persist until `clear_fourier_graph_cache!()`;
 # transforms are long-lived (a handful per model), so this is a non-issue for the time loop.
 const GRAPH_CACHES = IdDict{Any, GPUFourierGraphCache}()
@@ -192,9 +195,16 @@ function build_cache(S::SpectralTransform, nlayers::Integer)
     )
 end
 
-# keyed by the scratch buffer (= the per-size resource); its layer count sizes the cache
-get_cache(S::SpectralTransform, scratch_north) =
-    get!(() -> build_cache(S, size(scratch_north, 2)), GRAPH_CACHES, scratch_north)::GPUFourierGraphCache
+"""$(TYPEDSIGNATURES)
+The per-size resource that identifies a graph cache. The forward FFT plan set is unique per
+transform size and stable for the lifetime of `S`, so it remains a valid key even when a
+single `scratch_memory` is shared across sizes (variable-batching). Must return *the stored*
+plan object (not a fresh allocation) so the identity is stable across calls."""
+cache_key(S::SpectralTransform, nlayers::Integer) = fft_plans(S, nlayers)[1]
+
+# keyed by the forward FFT plan set (= the per-size resource); `nlayers` sizes the cache
+get_cache(S::SpectralTransform, nlayers::Integer) =
+    get!(() -> build_cache(S, nlayers), GRAPH_CACHES, cache_key(S, nlayers))::GPUFourierGraphCache
 
 """$(TYPEDSIGNATURES)
 Clear all cached CUDA-Graphs Fourier buffers and graphs (frees the associated GPU memory).
@@ -339,9 +349,9 @@ function _fourier_batched!(
             field::AbstractField, S::SpectralTransform,
         )
     end
-    # the cache is selected by (and sized for) the scratch of this transform size; within it
-    # the only thing that varies between calls is the field buffer, so that is the graph key
-    cache = get_cache(S, f_north)
+    # the cache is selected by (and sized for) this transform size (= its FFT plan set); within
+    # it the only thing that varies between calls is the field buffer, so that is the graph key
+    cache = get_cache(S, size(field, 2))
     run_graph!(cache.forward_execs, field.data, () -> forward_loop!(cache, f_north, f_south, field, S))
     return nothing
 end
@@ -362,7 +372,7 @@ function _fourier_batched!(
             g_south::AbstractArray{<:Complex, 3}, S::SpectralTransform,
         )
     end
-    cache = get_cache(S, g_north)
+    cache = get_cache(S, size(field, 2))
     run_graph!(cache.inverse_execs, field.data, () -> inverse_loop!(cache, field, g_north, g_south, S))
     return nothing
 end
