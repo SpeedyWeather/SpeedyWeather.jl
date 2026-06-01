@@ -14,6 +14,9 @@ using SpeedyTransforms.LowerTriangularArrays
 import SpeedyTransforms: SpectralTransform, _fourier_batched!
 import SpeedyTransforms.RingGrids: AbstractField
 
+import SpeedyWeatherInternals.KernelLaunching: launch!, Array3DWorkOrder
+import SpeedyWeatherInternals.Architectures: architecture
+
 # =====================================================================================
 # CUDA GRAPHS ACCELERATION OF THE BATCHED FOURIER TRANSFORM
 #
@@ -125,7 +128,7 @@ mutable struct GPUFourierGraphCache
     nlayers::Int
     has_equator::Bool
     jeq::Int
-    backend
+    arch                        # SpeedyWeather GPU architecture (for launch!)
     forward_execs::IdDict{Any, Union{Nothing, CuGraphExec}}
     inverse_execs::IdDict{Any, Union{Nothing, CuGraphExec}}
 end
@@ -183,7 +186,7 @@ function build_cache(S::SpectralTransform, nlayers::Integer)
         dev(roff), dev(coff), dev(nlons), dev(nfreqs),
         dev(rstart_n), dev(rstart_s), dev(nlon_s),
         S.nlon_max, S.nfreq_max, nlat_half, nlayers, has_equator, jeq,
-        CUDA.CUDABackend(),
+        architecture(packed_real),
         IdDict{Any, Union{Nothing, CuGraphExec}}(),
         IdDict{Any, Union{Nothing, CuGraphExec}}(),
     )
@@ -209,7 +212,7 @@ Allocation-free, fused forward (grid → spectral) batched Fourier loop: one gat
 packs all rings, per-ring in-place cuFFTs run on reshaped views, one scatter kernel writes
 the scratch. Suitable for CUDA-graph capture."""
 function forward_loop!(cache::GPUFourierGraphCache, f_north, f_south, field::AbstractField, S::SpectralTransform)
-    b = cache.backend
+    arch = cache.arch
     nlh = cache.nlat_half
     L = cache.nlayers
     real_view = cache.real_view
@@ -218,14 +221,14 @@ function forward_loop!(cache::GPUFourierGraphCache, f_north, f_south, field::Abs
     rfft_plans = cache.rfft_plans
 
     # northern rings
-    gather_real_kernel!(b)(cache.packed_real, field.data, cache.roff, cache.nlon, cache.rstart_n; ndrange = (cache.nlon_max, nlh, L))
+    launch!(arch, Array3DWorkOrder, (cache.nlon_max, nlh, L), gather_real_kernel!, cache.packed_real, field.data, cache.roff, cache.nlon, cache.rstart_n)
     @inbounds for j in 1:nlh
         mul!(cplx_view[j], rfft_plans[j], real_view[j])
     end
-    scatter_cplx_kernel!(b)(f_north, cache.packed_cplx, cache.coff, cache.nfreq; ndrange = (cache.nfreq_max, nlh, L))
+    launch!(arch, Array3DWorkOrder, (cache.nfreq_max, nlh, L), scatter_cplx_kernel!, f_north, cache.packed_cplx, cache.coff, cache.nfreq)
 
     # southern rings (the equator ring, if any, is zeroed rather than transformed)
-    gather_real_kernel!(b)(cache.packed_real, field.data, cache.roff, cache.nlon, cache.rstart_s; ndrange = (cache.nlon_max, nlh, L))
+    launch!(arch, Array3DWorkOrder, (cache.nlon_max, nlh, L), gather_real_kernel!, cache.packed_real, field.data, cache.roff, cache.nlon, cache.rstart_s)
     @inbounds for j in 1:nlh
         if cache.has_equator && j == cache.jeq
             fill!(cplx_view[j], 0)
@@ -233,7 +236,7 @@ function forward_loop!(cache::GPUFourierGraphCache, f_north, f_south, field::Abs
             mul!(cplx_view[j], rfft_plans[j], real_view[j])
         end
     end
-    scatter_cplx_kernel!(b)(f_south, cache.packed_cplx, cache.coff, cache.nfreq; ndrange = (cache.nfreq_max, nlh, L))
+    launch!(arch, Array3DWorkOrder, (cache.nfreq_max, nlh, L), scatter_cplx_kernel!, f_south, cache.packed_cplx, cache.coff, cache.nfreq)
     return nothing
 end
 
@@ -242,7 +245,7 @@ Allocation-free, fused inverse (spectral → grid) batched Fourier loop: one gat
 packs all rings from the scratch, per-ring in-place inverse cuFFTs run on reshaped views,
 one scatter kernel writes the grid field. Suitable for CUDA-graph capture."""
 function inverse_loop!(cache::GPUFourierGraphCache, field::AbstractField, g_north, g_south, S::SpectralTransform)
-    b = cache.backend
+    arch = cache.arch
     nlh = cache.nlat_half
     L = cache.nlayers
     real_view = cache.real_view
@@ -251,19 +254,19 @@ function inverse_loop!(cache::GPUFourierGraphCache, field::AbstractField, g_nort
     brfft_plans = cache.brfft_plans
 
     # northern rings
-    gather_cplx_kernel!(b)(cache.packed_cplx, g_north, cache.coff, cache.nfreq; ndrange = (cache.nfreq_max, nlh, L))
+    launch!(arch, Array3DWorkOrder, (cache.nfreq_max, nlh, L), gather_cplx_kernel!, cache.packed_cplx, g_north, cache.coff, cache.nfreq)
     @inbounds for j in 1:nlh
         mul!(real_view[j], brfft_plans[j], cplx_view[j])
     end
-    scatter_real_kernel!(b)(field.data, cache.packed_real, cache.roff, cache.nlon, cache.rstart_n; ndrange = (cache.nlon_max, nlh, L))
+    launch!(arch, Array3DWorkOrder, (cache.nlon_max, nlh, L), scatter_real_kernel!, field.data, cache.packed_real, cache.roff, cache.nlon, cache.rstart_n)
 
     # southern rings (the equator ring, if any, is skipped: north already wrote those rows)
-    gather_cplx_kernel!(b)(cache.packed_cplx, g_south, cache.coff, cache.nfreq; ndrange = (cache.nfreq_max, nlh, L))
+    launch!(arch, Array3DWorkOrder, (cache.nfreq_max, nlh, L), gather_cplx_kernel!, cache.packed_cplx, g_south, cache.coff, cache.nfreq)
     @inbounds for j in 1:nlh
         (cache.has_equator && j == cache.jeq) && continue
         mul!(real_view[j], brfft_plans[j], cplx_view[j])
     end
-    scatter_real_kernel!(b)(field.data, cache.packed_real, cache.roff, cache.nlon_s, cache.rstart_s; ndrange = (cache.nlon_max, nlh, L))
+    launch!(arch, Array3DWorkOrder, (cache.nlon_max, nlh, L), scatter_real_kernel!, field.data, cache.packed_real, cache.roff, cache.nlon_s, cache.rstart_s)
     return nothing
 end
 
