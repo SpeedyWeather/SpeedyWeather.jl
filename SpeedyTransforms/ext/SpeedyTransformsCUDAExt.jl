@@ -1,6 +1,6 @@
 module SpeedyTransformsCUDAExt
 
-import CUDA: CUDA, CUFFT, CuArray, CuGraphExec, capture, instantiate, launch
+import CUDA: CUDA, CUFFT, CuArray, CuVector, CuGraphExec, capture, instantiate, launch
 import AbstractFFTs
 import LinearAlgebra
 import LinearAlgebra: mul!
@@ -115,13 +115,13 @@ mutable struct GPUFourierGraphCache
     cplx_view::Vector           # per-ring reshaped (nfreq_j × nlayers) view into packed_cplx
     rfft_plans                  # forward FFT plans for THIS size (nlayers batches), per ring
     brfft_plans                 # inverse FFT plans for THIS size, per ring
-    roff                        # CuVector{Int} — 0-based real-block offset per ring
-    coff                        # CuVector{Int} — 0-based complex-block offset per ring
-    nlon                        # CuVector{Int} — longitudes per ring
-    nfreq                       # CuVector{Int} — Fourier frequencies per ring
-    rstart_n                    # CuVector{Int} — first grid row of each northern ring
-    rstart_s                    # CuVector{Int} — first grid row of each southern ring
-    nlon_s                      # CuVector{Int} — like nlon but 0 at the equator ring (south skip)
+    roff::CuVector{Int}         # 0-based real-block offset per ring
+    coff::CuVector{Int}         # 0-based complex-block offset per ring
+    nlon::CuVector{Int}         # longitudes per ring
+    nfreq::CuVector{Int}        # Fourier frequencies per ring
+    rstart_n::CuVector{Int}     # first grid row of each northern ring
+    rstart_s::CuVector{Int}     # first grid row of each southern ring
+    nlon_s::CuVector{Int}       # like nlon but 0 at the equator ring (south skip)
     nlon_max::Int
     nfreq_max::Int
     nlat_half::Int
