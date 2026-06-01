@@ -429,12 +429,17 @@ using Terrarium
 ring_grid     = SpeedyWeather.RingGrids.FullGaussianGrid(12)
 spectral_grid = SpectralGrid(ring_grid)
 
+# load and sync the land sea mask for both SpeedyWeather and Terrarium
+land_sea_mask = EarthLandSeaMask(spectral_grid)
+SpeedyWeather.load_mask!(land_sea_mask)
+
 Nz       = 4
 Δz_min   = 0.05
 column_grid = Terrarium.ColumnRingGrid(
     Terrarium.CPU(), Float32,
     Terrarium.ExponentialSpacing(; N = Nz, Δz_min),
     ring_grid,
+    land_sea_mask.mask
 )
 
 # Soil column + initial state, matching `LandModel: Soil, no vegetation`
@@ -457,7 +462,7 @@ land = SpeedyWeather.LandModel(spectral_grid, terrarium_model; Δt = 300.0)
 model = PrimitiveWetModel(
     spectral_grid;
     land,
-    land_sea_mask         = RockyPlanetMask(spectral_grid),
+    land_sea_mask,
     surface_heat_flux     = SurfaceHeatFlux(spectral_grid, land = PrescribedLandHeatFlux()),
     surface_humidity_flux = SurfaceHumidityFlux(spectral_grid, land = PrescribedLandHumidityFlux()),
     time_stepping         = Leapfrog(spectral_grid, Δt_at_T31 = Minute(15)),
