@@ -31,9 +31,9 @@ import SpeedyTransforms.RingGrids: AbstractField
 #  2. Few graph nodes. Instead of two `copyto!` per ring (~4*nlat_half tiny copies), a
 #     single KernelAbstractions gather/scatter kernel moves ALL rings between the strided
 #     grid/scratch layout and the packed buffer in one launch. This collapses the graph
-#     from ~6*nlat_half nodes to ~2*nlat_half + 4 and is the bulk of the speedup.
+#     from ~6*nlat_half nodes to ~2*nlat_half + 4.
 #
-# The captured graph bakes in the device pointers of `field.data`, the scratch buffers
+# The captured graph bakes in the device pointers of the input `field.data`, the scratch buffers
 # (`scratch_memory.north/.south`, stable for the lifetime of `S`) and the packed work
 # buffer. In the SpeedyWeather time loop the same variable buffers are reused every
 # timestep, so a graph captured for a given `field` is replayed on all subsequent steps.
