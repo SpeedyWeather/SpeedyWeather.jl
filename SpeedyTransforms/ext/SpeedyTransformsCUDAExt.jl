@@ -103,7 +103,7 @@ end
 # =====================================================================================
 
 """$(TYPEDSIGNATURES)
-Cache (one per transform SIZE, i.e. per scratch buffer) holding the pre-allocated packed
+Cache (one per transform SIZE, i.e. per FFT plan) holding the pre-allocated packed
 work buffers, the per-ring reshaped views and FFT plans used by the transforms, the device
 gather/scatter index metadata, and the instantiated CUDA graphs (one per distinct `field`
 buffer and direction). A graph value of `nothing` marks a buffer for which capture failed
@@ -135,21 +135,13 @@ end
 
 # One cache per (SpectralTransform, transform size), keyed by the *forward FFT plan set*
 # (`fft_plans(S, nlayers)[1]`) — NOT by `S` itself. A single `S` may hold several FFT-plan
-# sets of different layer counts (variable-batching, branch `mg/gpu-mega-transform`); the
-# plan set is the canonical per-size resource (one-to-one with a size, stable for the lifetime
+# sets of different layer counts (batching to fuse transform);
+# the plan set is the canonical per-size resource (one-to-one with a size, stable for the lifetime
 # of `S`), so keying on it yields one independent cache (packed buffers, views, metadata,
-# plans, graphs) per size. Unlike the scratch buffer, this stays a valid key when a single
-# `scratch_memory` is shared across sizes. In the single-size case the plan set is just
-# `S.rfft_plans`, so behaviour is unchanged (one cache per `S`).
-#
-# An IdDict (identity-hashed) is required: the key is a `Vector{<:AbstractFFTs.Plan}`, and a
-# value-hashing `Dict` would `hash` each (CUFFT) plan — undefined/expensive, same class of
-# problem as hashing a CuArray. IdDict compares by `===`/`objectid`, never touching contents.
-# IdDict holds keys strongly, so caches persist until `clear_fourier_graph_cache!()`;
-# transforms are long-lived (a handful per model), so this is a non-issue for the time loop.
+# plans, graphs) per size. 
 const GRAPH_CACHES = IdDict{Any, GPUFourierGraphCache}()
 
-# EXTENSION POINT for variable-batching (branch `mg/gpu-mega-transform`): return the
+# EXTENSION POINT for batching: return the
 # (forward, inverse) per-ring FFT plan sets for a transform of `nlayers` layers. The default
 # assumes a single size; override this for an `S` that stores several plan sets (e.g. keyed
 # by layer count) and the rest — caches, packing, capture, replay — follows automatically.
