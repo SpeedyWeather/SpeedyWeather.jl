@@ -42,7 +42,7 @@ $(TYPEDFIELDS)"""
     time_scale::S = Hour(4)
 
     "[OPTION] diffusion time scale for divergence"
-    time_scale_div::S = Hour(4)
+    time_scale_div::S = Hour(1)
 
     "[OPTION] stronger diffusion with resolution? 0: constant with trunc, 1: (inverse) linear with trunc, etc"
     resolution_scaling::NF = 1

@@ -8,7 +8,12 @@ function linear_virtual_temperature!(
         model::PrimitiveDry,
     )
     Tᵥ = vars.dynamics.virtual_temperature
-    T = get_prognostic_step(vars.prognostic.temperature, model.time_stepping, DynamicalCore())
+
+    # For Leapfrog this term has to be evaluted on the previous time step
+    # as the implicit corrections will move it to the current as done for 
+    # all linear gravity-wave related terms, just denote this with `LinearDynamicalCore`
+    # here, the time stepper then decides which step to return
+    T = get_prognostic_step(vars.prognostic.temperature, model.time_stepping, LinearDynamicalCore())
     Tᵥ .= T
     return nothing
 end
@@ -32,8 +37,13 @@ function linear_virtual_temperature!(
     Tᵥ = vars.dynamics.virtual_temperature
     μ = model.atmosphere.μ_virt_temp
     Tₖ = vars.dynamics.average_temperature_profile
-    T = get_prognostic_step(vars.prognostic.temperature, model.time_stepping, DynamicalCore())
-    q = get_prognostic_step(vars.prognostic.humidity, model.time_stepping, DynamicalCore())
+
+    # For Leapfrog this term has to be evaluted on the previous time step
+    # as the implicit corrections will move it to the current as done for 
+    # all linear gravity-wave related terms, just denote this with `LinearDynamicalCore`
+    # here, the time stepper then decides which step to return
+    T = get_prognostic_step(vars.prognostic.temperature, model.time_stepping, LinearDynamicalCore())
+    q = get_prognostic_step(vars.prognostic.humidity, model.time_stepping, LinearDynamicalCore())
 
     # TODO check that doing a non-linear virtual temperature in grid-point space
     # but a linear virtual temperature in spectral space to avoid another transform

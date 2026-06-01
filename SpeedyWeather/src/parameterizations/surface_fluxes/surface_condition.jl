@@ -53,7 +53,7 @@ end
     # Surface air density
     (; surface_air_density) = vars.parameterizations
     temperature = get_prognostic_step(vars.grid.temperature, model.time_stepping, surface_condition)
-    pₛ = vars.parameterizations.surface_pressure[ij]       # surface pressure [Pa]
+    pₛ = vars.parameterizations.surface_pressure[ij] # surface pressure [Pa]
     (; R_dry, κ) = model.atmosphere
     σ = model.geometry.σ_levels_full[nlayers]       # σ vertical coordinate at lowest model level
     T = temperature[ij, nlayers]                    # virtual temperature at lowest model level [K]

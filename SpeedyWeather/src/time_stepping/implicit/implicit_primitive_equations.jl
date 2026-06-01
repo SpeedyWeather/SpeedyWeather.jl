@@ -272,7 +272,7 @@ function implicit_correction!(
     # Single kernel: All implicit correction steps for each spectral mode
     launch!(
         arch, LinearWorkOrder, (size(pres_tend, 1),),
-        implicit_primitive_single_kernel!,
+        implicit_primitive_leapfrog_kernel!,
         temp_tend, pres_tend, div_tend, G, geopotential,
         div_old, div_new, S⁻¹, R, U, L, W, l_indices, ξ, nlayers
     )
@@ -283,7 +283,7 @@ function implicit_correction!(
 end
 
 # Single kernel that does all steps for one spectral mode
-@kernel inbounds = true function implicit_primitive_single_kernel!(
+@kernel inbounds = true function implicit_primitive_leapfrog_kernel!(
         temp_tend, pres_tend, div_tend, G, geopotential,
         div_old, div_new, S⁻¹, R, U, L, W, l_indices,
         ξ, nlayers

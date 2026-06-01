@@ -82,6 +82,25 @@ This method is for a 3D field (horizontal + vertical) with steps in the 4rd dime
 # anything that can decide which variable step to get
 const STEP_COMPONENT = Union{AbstractModelComponent, SpeedyTransforms.AbstractSpectralTransform}
 
+"""Time steppers control on which step (index of the step dimension, typically used to store two time steps, e.g. t-dt, t)
+a variable is evaluated for a given term or in a given computation of the dynamical core.
+Two types of variables have step dimensions: Prognostic variables and tendencies.
+Leapfrog uses 2 steps for the prognostic variables but one tendency;
+Adams-Bashforth is a multi-step method storing one step for the prognostic variables and multiple steps for the tendencies.
+
+This is implemented in the dynamical core via calling `get_step`, and particularly
+`get_prognostic_step`, `get_tendency_step` which dispatch on the time stepper and the component for which the step is needed.
+Dispatch in these functions has to be
+
+    var::Any, ::AbstractTimeStepper, ::STEP_COMPONENT, ::AbstractModel
+
+whereby the model can be left out. Default is to return step index 1.
+This means that every time stepper can define which step to call in the `get_..._step` methods
+by implementing `which_step`, `which_prognostic_step`, or `which_tendency_step`.
+With that function signature. So dispatch allows to distinguish the step between model components,
+between models but also whether a variable is spectral or a grid variable."""
+which_step
+
 # methods independent of model
 @inline get_step(var, TS::AbstractTimeStepper, C::STEP_COMPONENT) = get_step(var, which_step(var, TS, C))
 @inline get_prognostic_step(var, TS::AbstractTimeStepper, C::STEP_COMPONENT) = get_step(var, which_prognostic_step(var, TS, C))

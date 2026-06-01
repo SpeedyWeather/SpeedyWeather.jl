@@ -161,7 +161,7 @@ function vertical_integration!(
     div_grid = get_prognostic_step(vars.grid.divergence, time_stepping, DynamicalCore())
     (; u_mean_grid, v_mean_grid, div_mean_grid, div_mean) = vars.dynamics
     (; div_sum_above, pres_flux_sum_above) = vars.dynamics
-    div = get_prognostic_step(vars.prognostic.divergence, time_stepping, DynamicalCore())
+    div = get_prognostic_step(vars.prognostic.divergence, time_stepping, LinearDynamicalCore())
 
     fill!(u_mean_grid, 0)                   # reset accumulators from previous vertical average
     fill!(v_mean_grid, 0)
@@ -210,7 +210,7 @@ function vertical_integration!(
     div_grid = get_prognostic_step(vars.grid.divergence, time_stepping, DynamicalCore())
     (; u_mean_grid, v_mean_grid, div_mean_grid, div_mean) = vars.dynamics
     (; div_sum_above, pres_flux_sum_above) = vars.dynamics
-    div = get_prognostic_step(vars.prognostic.divergence, time_stepping, DynamicalCore())
+    div = get_prognostic_step(vars.prognostic.divergence, time_stepping, LinearDynamicalCore())
 
     fill!(u_mean_grid, 0)           # reset accumulators from previous vertical average
     fill!(v_mean_grid, 0)
@@ -280,8 +280,8 @@ end
 @kernel inbounds = true function _vertical_integration_spectral_kernel!(
         div_mean,               # Output: vertically averaged divergence (spectral)
         div,                    # Input: divergence (spectral)
-        σ_levels_thick, # Input: layer thicknesses
-        nlayers,       # Input: number of layers
+        σ_levels_thick,         # Input: layer thicknesses
+        nlayers,                # Input: number of layers
     )
     lm = @index(Global, Linear)  # global index: harmonic lm
 
@@ -391,7 +391,10 @@ function linear_pressure_gradient!(
     )
     (; R_dry) = atmosphere                      # dry gas constant
     Tₖ = implicit.temp_profile                  # reference profile at layer k
-    lnpₛ = get_prognostic_step(vars.prognostic.pressure, time_stepping, DynamicalCore())
+
+    # for Leapfrog this term is evaluated at the previous time step and the
+    # implicit corrections will move it to the current as done for all linear gravity-wave related terms
+    lnpₛ = get_prognostic_step(vars.prognostic.pressure, time_stepping, LinearDynamicalCore())
     Φ = vars.dynamics.geopotential
 
     # -R_dry*Tₖ*∇²lnpₛ, linear part of the ∇⋅RTᵥ∇lnpₛ pressure gradient term

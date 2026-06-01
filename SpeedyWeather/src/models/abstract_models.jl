@@ -8,6 +8,8 @@ abstract type PrimitiveEquation <: AbstractModel end
 abstract type PrimitiveDry <: PrimitiveEquation end
 abstract type PrimitiveWet <: PrimitiveEquation end
 
+const TwoDModels = Union{<:Barotropic, <:ShallowWater}
+
 abstract type AbstractModelComponent end
 
 # any model component set to nothing needs no initialization or finalize!

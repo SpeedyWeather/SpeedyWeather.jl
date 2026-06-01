@@ -48,8 +48,6 @@ prognostic_grid_steps(::AbstractLeapfrog, ::PrimitiveEquation) = 2
 # always only one step for tendencies
 tendency_steps(::AbstractLeapfrog) = 1
 
-const TwoDModels = Union{<:Barotropic, <:ShallowWater}
-
 # WHICH STEP TO READ WHEN
 # in Leapfrog use the current (=2nd) step to do the transforms
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::SpeedyTransforms.AbstractSpectralTransform) = 2
@@ -61,6 +59,11 @@ const TwoDModels = Union{<:Barotropic, <:ShallowWater}
 
 # in Leapfrog use the current (=2nd) in the dynamical core
 @inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractDynamicalCoreComponent) = 2
+@inline which_prognostic_step(var, ::AbstractLeapfrog, ::AbstractGeopotential) = 2
+
+# the linear terms in the dynamical core have to be evaluated at the previous time step
+# they are then moved forward within the implicit corrections
+@inline which_prognostic_step(var, ::AbstractLeapfrog, ::LinearDynamicalCore) = 1
 
 # but in Barotropc/ShallowWater models the 2nd one doesn't exist on the grid and the 1st is considered to be the current step
 @inline which_prognostic_step(var::AbstractField, ::AbstractLeapfrog, ::AbstractDynamicalCoreComponent, ::TwoDModels) = 1

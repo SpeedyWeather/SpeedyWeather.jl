@@ -11,6 +11,7 @@ abstract type AbstractDynamicalCoreComponent <: AbstractModelComponent end
 struct DummyTimeStepper <: AbstractTimeStepper end
 struct DummyParameterization <: AbstractParameterization end
 struct DynamicalCore <: AbstractDynamicalCoreComponent end
+struct LinearDynamicalCore <: AbstractDynamicalCoreComponent end
 struct BernoulliPotential <: AbstractDynamicalCoreComponent end
 struct ContinuityEquation <: AbstractDynamicalCoreComponent end
 struct ResetTendencies <: AbstractDynamicalCoreComponent end
