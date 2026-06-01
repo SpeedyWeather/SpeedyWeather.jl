@@ -47,6 +47,9 @@ function initialize!(vars::Variables, model::AbstractModel)
     # green house gases are function of time only, just do one "timestep"
     greenhouse_gases_time_step!(vars, model)
 
+    # precompute state-independent parameterization fields (e.g. longwave transmissivity)
+    hasproperty(model, :longwave_radiation) && initialize!(vars, model.longwave_radiation, model)
+
     # then atmosphere as this may include initial conditions like StartFromFile
     # which would contain ocean/land initial conditions that should overwrite the above if they are included
     initialize!(vars, model.initial_conditions, model)

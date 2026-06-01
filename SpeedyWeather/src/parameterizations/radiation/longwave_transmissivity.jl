@@ -69,3 +69,39 @@ initialize!(::FriersonLongwaveTransmissivity, ::AbstractModel) = nothing
     # return so the radiative_trasfer uses the right scratch array
     return t
 end
+
+"""$(TYPEDSIGNATURES)
+Precompute the (state-independent) longwave transmissivity once into
+a `nlayers × nlat` matrix `t` (one column per latitude ring). Computing on the
+host with libm `exp` and transferring the SAME array to the device makes the
+transmissivity bit-identical across CPU/GPU/Reactant."""
+function fill_longwave_transmissivity!(t::AbstractMatrix, CLT::ConstantLongwaveTransmissivity, model)
+    nlayers, nlat = size(t)
+    # pull geometry to host (Vector) so the loop runs host libm `exp`, not device/XLA
+    # `exp`; on CPU this is a no-op, under Reactant it transfers ConcretePJRTArray → Vector
+    dσ = on_architecture(CPU(), model.geometry.σ_levels_thick)
+    τ = -log(CLT.transmissivity)            # total optical depth of the atmosphere
+    for j in 1:nlat, k in 1:nlayers
+        t[k, j] = exp(-τ * dσ[k])           # transmissivity through layer k (lat-independent)
+    end
+    return t
+end
+
+function fill_longwave_transmissivity!(t::AbstractMatrix, transmissivity::FriersonLongwaveTransmissivity, model)
+    nlayers, nlat = size(t)
+    NF = eltype(t)
+    (; τ₀_equator, τ₀_pole, fₗ) = transmissivity
+    # pull geometry to host (Vector) so the loop runs host libm `exp`, not device/XLA `exp`
+    σ = on_architecture(CPU(), model.geometry.σ_levels_half)
+    sinlat = on_architecture(CPU(), model.geometry.sinlat)          # sin(latitude) per ring
+    for j in 1:nlat
+        τ_above = zero(NF)
+        τ₀ = τ₀_equator + (τ₀_pole - τ₀_equator) * sinlat[j]^2
+        for k in 2:(nlayers + 1)
+            τ_below = τ₀ * (fₗ * σ[k] + (1 - fₗ) * σ[k]^4)
+            t[k - 1, j] = exp(-(τ_below - τ_above))
+            τ_above = τ_below
+        end
+    end
+    return t
+end
