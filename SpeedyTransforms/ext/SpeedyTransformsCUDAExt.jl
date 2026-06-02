@@ -31,16 +31,15 @@ import SpeedyWeatherInternals.Architectures: architecture
 #     temporary per ring via `field.data[ilons, :]` and `plan * x`). We therefore pre-
 #     allocate one contiguous packed buffer that holds every ring's dense block, and use
 #     in-place `mul!` reading/writing reshaped views into it.
-#  2. Few graph nodes. Instead of two `copyto!` per ring (~4*nlat_half tiny copies), a
-#     single KernelAbstractions gather/scatter kernel moves ALL rings between the strided
-#     grid/scratch layout and the packed buffer in one launch. This collapses the graph
-#     from ~6*nlat_half nodes to ~2*nlat_half + 4.
+#  2. Few graph nodes. A single KernelAbstractions gather/scatter kernel moves ALL rings
+#     between the strided grid/scratch layout and the packed buffer in one launch. 
+#     This collapses the graph from ~6*nlat_half nodes to ~2*nlat_half + 4.
 #
-# The captured graph bakes in the device pointers of the input `field.data`, the scratch buffers
-# (`scratch_memory.north/.south`, stable for the lifetime of `S`) and the packed work
-# buffer. In the SpeedyWeather time loop the same variable buffers are reused every
+# The captured graph bakes in the device pointers of the input `field.data`,  and the 
+# scratch buffers (`scratch_memory.north/.south`) and the packed work
+# buffer `GPUFourierGraphCache`. In the SpeedyWeather time loop the same variable buffers are reused every
 # timestep, so a graph captured for a given `field` is replayed on all subsequent steps.
-# Caches are held per transform SIZE (keyed by the scratch buffer, so an `S` that batches
+# Caches are held per transform SIZE (keyed by the FFT plan, so an `S` that batches
 # several layer counts gets one cache each); within a cache, graphs are keyed by `field.data`.
 # =====================================================================================
 
@@ -129,24 +128,25 @@ mutable struct GPUFourierGraphCache
     has_equator::Bool
     jeq::Int
     arch                        # SpeedyWeather GPU architecture (for launch!)
-    forward_execs::IdDict{Any, Union{Nothing, CuGraphExec}}
-    inverse_execs::IdDict{Any, Union{Nothing, CuGraphExec}}
+    forward_execs::IdDict{Any, Union{Nothing, CuGraphExec}} # the actual graphs forward transforms
+    inverse_execs::IdDict{Any, Union{Nothing, CuGraphExec}} # the actual graphs inverse transforms
 end
 
 # One cache per (SpectralTransform, transform size), keyed by the *forward FFT plan set*
-# (`fft_plans(S, nlayers)[1]`) — NOT by `S` itself. A single `S` may hold several FFT-plan
-# sets of different layer counts (batching to fuse transform);
-# the plan set is the canonical per-size resource (one-to-one with a size, stable for the lifetime
-# of `S`), so keying on it yields one independent cache (packed buffers, views, metadata,
-# plans, graphs) per size. 
+# (`fft_plans(S, nlayers)[1]`)
+# this is saved here directly as a global variable and not as a field of `S` because 
+# it would be very hard to make `S` a concrete type again otherwise, and this seems to work
+# without problems and performance mali
 const GRAPH_CACHES = IdDict{Any, GPUFourierGraphCache}()
 
 # EXTENSION POINT for batching: return the
 # (forward, inverse) per-ring FFT plan sets for a transform of `nlayers` layers. The default
 # assumes a single size; override this for an `S` that stores several plan sets (e.g. keyed
 # by layer count) and the rest — caches, packing, capture, replay — follows automatically.
+# gets called by `cache_key` when accessing the different caches and graphs
 fft_plans(S::SpectralTransform, nlayers::Integer) = (S.rfft_plans, S.brfft_plans)
 
+# build/allocate the cache for a transform of `nlayers` layers
 function build_cache(S::SpectralTransform, nlayers::Integer)
     NF = eltype(S)
     nlat = S.nlat
@@ -189,8 +189,7 @@ end
 
 """$(TYPEDSIGNATURES)
 The per-size resource that identifies a graph cache. The forward FFT plan set is unique per
-transform size and stable for the lifetime of `S`, so it remains a valid key even when a
-single `scratch_memory` is shared across sizes (variable-batching). Must return *the stored*
+transform size and stable for the lifetime of `S`. Must return *the stored*
 plan object (not a fresh allocation) so the identity is stable across calls."""
 cache_key(S::SpectralTransform, nlayers::Integer) = fft_plans(S, nlayers)[1]
 
@@ -282,11 +281,11 @@ replaying a cached CUDA graph keyed by `key`, or — on first use — by warming
 instantiating and caching a graph. Falls back to running `loop!` directly if capture fails
 or the per-direction cache is full."""
 function run_graph!(execs::IdDict, key, loop!::F) where {F}
-    exec = get(execs, key, missing)
+    exec = get(execs, key, missing)          # `missing` is fallback value that gets return when there's no cached exec yet
     if exec isa CuGraphExec
         launch(exec)                         # hot path: pure replay
         return nothing
-    elseif exec === nothing
+    elseif exec === nothing                  # fallback (`nothing` -> tried to capture, but failed (e.g. because MAX_GRAPHS reached))
         loop!()                              # known non-capturable buffer
         return nothing
     end
@@ -297,11 +296,14 @@ function run_graph!(execs::IdDict, key, loop!::F) where {F}
         return nothing
     end
 
+    # if we haven't exited yet, so far we know we have to capture
+
     # warm up so that one-time work (cuFFT init, kernel JIT, memory-pool growth) happens
     # OUTSIDE the capture, where it is allowed
     loop!()
     CUDA.synchronize()
 
+    # do the capture
     graph = capture(throw_error = false) do
         loop!()
     end
@@ -313,8 +315,11 @@ function run_graph!(execs::IdDict, key, loop!::F) where {F}
         return nothing
     end
 
+    # save the graph 
     exec = instantiate(graph)
     execs[key] = exec
+
+    # run the graph
     launch(exec)                             # produce the result via the graph
     return nothing
 end
