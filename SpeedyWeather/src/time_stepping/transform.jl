@@ -151,8 +151,8 @@ function SpeedyTransforms.transform!(
     transform!(pres_grid, pres, scratch_memory, S)  # -- pressure --
 
     if model isa PrimitiveWet
-        humid = get_prognostic_step(vars.prognostic.temperature, time_stepping, S)
-        humid_grid = get_prognostic_step(vars.grid.temperature, time_stepping, S)
+        humid = get_prognostic_step(vars.prognostic.humidity, time_stepping, S)
+        humid_grid = get_prognostic_step(vars.grid.humidity, time_stepping, S)
         transform!(humid_grid, humid, scratch_memory, S)
         hole_filling!(humid_grid, model.hole_filling, model)  # clamp negative humidity to zero
     end
@@ -175,6 +175,7 @@ function SpeedyTransforms.transform!(
     geopotential!(vars, model)                  # calculate geopotential
 
     # convert the logarithm of surface pressure to actual surface pressure in Pascal for parameterizations
+    # dispatch over DummyParameterization (= any parameterization) to let time steppers decide the step
     log_pₛ = get_prognostic_step(vars.grid.pressure, time_stepping, DummyParameterization())    # log Pa
     vars.parameterizations.surface_pressure .= exp.(log_pₛ)                                     # in Pa
 

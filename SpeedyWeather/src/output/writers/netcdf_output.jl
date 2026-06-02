@@ -187,9 +187,16 @@ function initialize!(
     defVar(dataset, "soil_layer", soil_indices, ("soil_layer",), attrib = Dict("units" => "1", "long_name" => "soil layer index"))
 
     # VARIABLES, define every output variable in the netCDF file and write initial conditions
+    simulation = Simulation(vars, model)
+    nonexisting_vars = [key for (key, var) in output.variables if isnothing(path_or_nothing(var, simulation))]
+    if !isempty(nonexisting_vars)
+        @warn "Output variables requested but not existing. Skipping output for: $(join(nonexisting_vars, ", "))"
+    end
     for (key, var) in output.variables
-        define_variable!(dataset, var, eltype(output.field2D))
-        output!(output, var, Simulation(vars, model))
+        if ~isnothing(path_or_nothing(var, simulation))
+            define_variable!(dataset, var, eltype(output.field2D))
+            output!(output, var, simulation)
+        end
     end
 
     return nothing

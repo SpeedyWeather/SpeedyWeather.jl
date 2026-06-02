@@ -148,8 +148,9 @@ function output!(
     ~hastime(variable) && output.output_counter > 1 && return nothing
 
     # get log(surface pressure) field
-    lnpₛ = path_or_nothing(variable, simulation)
-    isnothing(lnpₛ) && return nothing                # silently escape early if variable is not defined in
+    var = path_or_nothing(variable, simulation)
+    isnothing(var) && return nothing       # silently escape early if variable is not defined
+    lnpₛ = get_prognostic_step(var, simulation.model.time_stepping, output)
     h = simulation.model.orography.orography
     (; R_dry, κ) = simulation.model.atmosphere
     g = simulation.model.planet.gravity
@@ -170,14 +171,13 @@ function output!(
         T .*= σ⁻ᵏ       # lower to surface assuming dry adiabatic lapse rate
     end
 
-    has_humid = haskey(simulation.variables.grid, :humidity)
-    q = if has_humid
+    q = if haskey(simulation.variables.grid, :humidity)
         humid = get_prognostic_step(simulation.variables.grid.humidity, TS, output)
-        return field_view(humid, :, nlayers)
+        field_view(humid, :, nlayers)
     else
         # reuse scratch array b which is free to be used for mslp after the virtual temperature calculation
         # set to zero as q=0 in dry atmosphere
-        return simulation.variables.scratch.grid.b_2D .= 0     
+        simulation.variables.scratch.grid.b_2D .= 0     
     end
     Tᵥ = simulation.variables.scratch.grid.a_2D
 
@@ -187,14 +187,14 @@ function output!(
     # calculate mean sea-level pressure on model grid
     mslp = simulation.variables.scratch.grid.b_2D
     (; transform) = variable                            # to change units from log(Pa) to hPa
-    @. mslp = transform(g * h / R_dry / Tᵥ + lnpₛ)      # Pa to hPa
+    @. mslp = transform(g * h / R_dry / Tᵥ + lnpₛ)      # log Pa to hPa
 
     # interpolate 2D/3D variables
     mslp_output = output.field2D
     mslp_grid = on_architecture(CPU(), mslp)
     RingGrids.interpolate!(mslp_output, mslp_grid, output.interpolator)
 
-    if hasproperty(variable, :keepbits)     # round mantissabits for compression
+    if hasproperty(variable, :keepbits)                 # round mantissabits for compression
         round!(mslp_output, variable.keepbits)
     end
 
