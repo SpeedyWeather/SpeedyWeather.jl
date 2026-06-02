@@ -286,7 +286,7 @@ function run_graph!(execs::IdDict, key, loop!::F) where {F}
         launch(exec)                         # hot path: pure replay
         return nothing
     elseif exec === nothing                  # fallback (`nothing` -> tried to capture, but failed (e.g. because MAX_GRAPHS reached))
-        loop!()                              # known non-capturable buffer
+        loop!()                              # fallback to non-graph direct loop for unknown non-capturable buffer
         return nothing
     end
 
