@@ -20,7 +20,7 @@ $(TYPEDFIELDS)"""
     "Counting all steps the time stepper takes during simulation"
     step_counter::I = 0
 
-    "Counting all time steps of size Δt, ignoring spin-up steps"
+    "Counting all time steps of size Δt, ignoring additional spin-up steps"
     time_step_counter::I = 0
 
     "Number of time stepper steps, regardless their step size"

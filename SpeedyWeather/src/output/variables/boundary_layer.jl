@@ -46,7 +46,9 @@ function output!(
     ~hastime(variable) && output.output_counter > 1 && return nothing
 
     # Retrieve u_bottom
-    u_or_v_grid = path(variable, simulation)
+    var = path_or_nothing(variable, simulation)
+    isnothing(var) && return nothing                # silently escape early if variable is not defined in the simulation
+    u_or_v_grid = get_prognostic_step(var, simulation.model.time_stepping, output)
     nlayers = size(u_or_v_grid, 2)
     u_or_v_bottom = field_view(u_or_v_grid, :, nlayers)
 
@@ -55,7 +57,8 @@ function output!(
 
     # Compute z_bottom as z_surf + T_bottom * Δp_geopot / g, start with z_surf
     z_bottom .= max.(simulation.model.orography.orography, 0)   # [m] set negative values to zero
-    T_bottom = field_view(simulation.variables.grid.temperature, :, nlayers)
+    T = get_prognostic_step(simulation.variables.grid.temperature, simulation.model.time_stepping, output) 
+    T_bottom = field_view(T, :, nlayers)
     Δp_geopot = simulation.model.geopotential.Δp_geopot_full[end]
 
     # accumulate the second term in
@@ -107,7 +110,9 @@ function output!(
     Ts = simulation.variables.scratch.grid.a_2D
 
     # Retrieve T_bottom
-    T_grid = path(variable, simulation)
+    var = path_or_nothing(variable, simulation)
+    isnothing(var) && return nothing                # silently escape early if variable is not defined in
+    T_grid = get_prognostic_step(var, simulation.model.time_stepping, output)
     nlayers = size(T_grid, 2)
     T_bottom = field_view(T_grid, :, nlayers)
 

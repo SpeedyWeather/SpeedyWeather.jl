@@ -148,10 +148,12 @@ function output!(
     ~hastime(variable) && output.output_counter > 1 && return nothing
 
     # get log(surface pressure) field
-    lnpₛ = path(variable, simulation)
+    lnpₛ = path_or_nothing(variable, simulation)
+    isnothing(lnpₛ) && return nothing                # silently escape early if variable is not defined in
     h = simulation.model.orography.orography
     (; R_dry, κ) = simulation.model.atmosphere
     g = simulation.model.planet.gravity
+    TS = simulation.model.time_stepping     # used to determine step of variables to write to file
 
     # compute virtual temperature on the fly
     nlayers = size(simulation.variables.grid.temperature, 2)
@@ -160,7 +162,8 @@ function output!(
     if simulation.model.dynamics_only    # otherwise this has been computed already
         # calculate the surface air temperature from lowest model level temperature
         # via dry adiabatic lapse rate
-        T .= field_view(simulation.variables.grid.temperature, :, nlayers)
+        temp = get_prognostic_step(simulation.variables.grid.temperature, TS, output)
+        T .= field_view(temp, :, nlayers)
         # σ vertical coordinate at lowest model level
         GPUArrays.@allowscalar σ = simulation.model.geometry.σ_levels_full[nlayers]
         σ⁻ᵏ = σ^(-κ)    # precalculate adiabatic descent factor
@@ -168,7 +171,14 @@ function output!(
     end
 
     has_humid = haskey(simulation.variables.grid, :humidity)
-    q = has_humid ? field_view(simulation.variables.grid.humidity, :, nlayers) : zero(T)
+    q = if has_humid
+        humid = get_prognostic_step(simulation.variables.grid.humidity, TS, output)
+        return field_view(humid, :, nlayers)
+    else
+        # reuse scratch array b which is free to be used for mslp after the virtual temperature calculation
+        # set to zero as q=0 in dry atmosphere
+        return simulation.variables.scratch.grid.b_2D .= 0     
+    end
     Tᵥ = simulation.variables.scratch.grid.a_2D
 
     (; atmosphere) = simulation.model
@@ -176,8 +186,8 @@ function output!(
 
     # calculate mean sea-level pressure on model grid
     mslp = simulation.variables.scratch.grid.b_2D
-    (; transform) = variable                    # to change units from log(Pa) to hPa
-    @. mslp = transform(g * h / R_dry / Tᵥ + lnpₛ)    # Pa to hPa
+    (; transform) = variable                            # to change units from log(Pa) to hPa
+    @. mslp = transform(g * h / R_dry / Tᵥ + lnpₛ)      # Pa to hPa
 
     # interpolate 2D/3D variables
     mslp_output = output.field2D

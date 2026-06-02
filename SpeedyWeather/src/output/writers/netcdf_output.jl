@@ -217,48 +217,6 @@ function define_variable!(
 end
 
 """$(TYPEDSIGNATURES)
-Output a `variable` into `output`. Interpolates onto the output grid and resolution
-as specified in `output`. Method used for all output variables `<: AbstractOutputVariable`
-with dispatch over the second argument. Interpolates, scales, custom transform,
-bitrounding and writes via the backend-specific [`write_array!`](@ref)."""
-function output!(
-        output::AbstractOutput,
-        variable::AbstractOutputVariable,
-        simulation::AbstractSimulation,
-    )
-    # escape immediately after first call if variable doesn't have a time dimension
-    ~hastime(variable) && output.output_counter > 1 && return nothing
-
-    # interpolate 2D/3D variables
-    var = is3D(variable) ? (is_land(variable) ? output.field3Dland : output.field3D) : output.field2D
-
-    try
-        raw = on_architecture(CPU(), path(variable, simulation))
-        RingGrids.interpolate!(var, raw, output.interpolator)
-    catch FieldError
-        var .= variable.missing_value
-    end
-
-    # unscale if variable.unscale == true and exists
-    if hasproperty(variable, :unscale)
-        if variable.unscale
-            scale!(var, inv(simulation.variables.prognostic.scale[]))
-        end
-    end
-
-    if hasproperty(variable, :transform)    # transform (e.g. scale, offset, exp, etc) if defined
-        @. var = variable.transform(var)
-    end
-
-    if hasproperty(variable, :keepbits)     # round mantissabits for compression
-        round!(var, variable.keepbits)
-    end
-
-    write_array!(output, variable, var)
-    return nothing
-end
-
-"""$(TYPEDSIGNATURES)
 Backend-specific write of an interpolated, post-processed field `field` for `variable`
 into `output`. Implementations exist for [`NetCDFOutput`](@ref) and `ZarrOutput`."""
 function write_array!(

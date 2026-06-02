@@ -76,7 +76,7 @@ function initialize!(
 
     # RESET COUNTERS
     core.time_step_counter = 0
-    core.output_counter = 0
+    core.output_counter = 1         # start at 1 for writing the initial conditions
 
     # CALLBACKS
     output.write_parameters_txt && add!(model.callbacks, :parameters_txt => ParametersTxt())
