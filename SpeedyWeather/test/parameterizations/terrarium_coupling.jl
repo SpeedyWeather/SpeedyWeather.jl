@@ -19,13 +19,19 @@ end
     # test runs in seconds even on CI.
     ring_grid = SpeedyWeather.RingGrids.FullGaussianGrid(12)
     spectral_grid = SpectralGrid(ring_grid)
+    land_sea_mask = EarthLandSeaMask(spectral_grid)
+    SpeedyWeather.load_mask!(land_sea_mask)
 
     Nz = 4
     Δz_min = 0.05
+    # Terrarium needs a boolean land mask: a column is allocated wherever there is
+    # any land. Derive it from the fractional SpeedyWeather land-sea mask.
+    land_mask = land_sea_mask.mask .> 0
     column_grid = Terrarium.ColumnRingGrid(
         Terrarium.CPU(), Float32,
         Terrarium.ExponentialSpacing(; N = Nz, Δz_min),
         ring_grid,
+        land_mask,
     )
 
     soil_initializer = Terrarium.SoilInitializer(eltype(column_grid))
@@ -45,7 +51,6 @@ end
     @test land isa SpeedyWeather.AbstractLand
     @test SpeedyWeather.get_nlayers(land) == 1
 
-    land_sea_mask = RockyPlanetMask(land.spectral_grid)
     surface_heat_flux = SurfaceHeatFlux(land.spectral_grid, land = PrescribedLandHeatFlux())
     surface_humidity_flux = SurfaceHumidityFlux(land.spectral_grid, land = PrescribedLandHumidityFlux())
     time_stepping = Leapfrog(land.spectral_grid, Δt_at_T31 = Minute(15))
