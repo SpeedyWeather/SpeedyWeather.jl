@@ -100,7 +100,7 @@ function drag!(
     # note that while the equations (with prognostic variable vorticity) are scaled
     # with radius R squared, one R will go into the curl operator applied to forcing of u, v
     # to yield a tendency for vorticity, so only one R is needed here in the drag coefficient scaling
-    c = scheme.drag / model.atmosphere.layer_thickness * diagn.scale[]
+    c = scheme.drag / model.atmosphere.layer_thickness * vars.prognostic.scale[]
 
     launch!(
         architecture(Fu), LinearWorkOrder, (size(Fu, 1),), quadratic_drag_kernel!,
