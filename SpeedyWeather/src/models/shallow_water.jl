@@ -1,15 +1,13 @@
 export ShallowWaterModel
 
-"""
-The ShallowWaterModel contains all model components needed for the simulation of the
-shallow water equations. To be constructed like
+"""The ShallowWaterModel contains all model components needed for the simulation
+of the shallow water equations. To be constructed like
 
     model = ShallowWaterModel(spectral_grid; kwargs...)
 
 with `spectral_grid::SpectralGrid` used to initalize all non-default components
-passed on as keyword arguments, e.g. `planet=Earth(spectral_grid)`. Fields, representing
-model components, are
-$(TYPEDFIELDS)"""
+passed on as keyword arguments, e.g. `planet = Earth(spectral_grid)`.
+Fields, representing model components, are $(TYPEDFIELDS)"""
 @parameterized @kwdef mutable struct ShallowWaterModel{
         SG,     # <:SpectralGrid
         AR,     # <:AbstractArchitecture,
@@ -80,7 +78,7 @@ function variables(model::ShallowWater)
 
         GridVariable(:divergence, Grid4D(pg), desc = "Divergence", units = "1/s"),
         GridVariable(:η, Grid3D(pg), desc = "Interface displacement", units = "m"),
-        GridVariable(:geopotential, Grid3D(pg), desc = "Geopotential", units = "m²/s²"),
+        DynamicsVariable(:geopotential, Grid3D(), desc = "Geopotential", units = "m²/s²"),
         
         ScratchVariable(:a, Grid3D(), desc = "Scratch array", namespace = :grid),
         ScratchVariable(:b, Grid3D(), desc = "Scratch array", namespace = :grid),

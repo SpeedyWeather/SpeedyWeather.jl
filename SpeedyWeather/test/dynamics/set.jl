@@ -134,7 +134,7 @@
 
     # groups
     set!(simulation, geopotential = 1, group = :grid)
-    @test all(simulation.variables.grid.geopotential .== 1)
+    @test all(simulation.variables.dynamics.geopotential .== 1)
 end
 
 @testset "Set! grids" begin

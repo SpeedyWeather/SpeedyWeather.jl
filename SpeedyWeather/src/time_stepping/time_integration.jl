@@ -16,7 +16,8 @@ function time_step!(simulation::AbstractSimulation, time_stepping::AbstractTimeS
     (; feedback, output) = model
     (; clock) = variables.prognostic
 
-    # TODO add a possible initialize implicit step here that defaults to nothing
+    # re-initialize model components if needed, e.g. implicit with changing time step
+    reinitialize!(model, variables)                      
 
     time_step!(variables, time_stepping, model)     # calculate tendencies and step forward
     time_step!(clock, time_stepping)                # then step the clock forward

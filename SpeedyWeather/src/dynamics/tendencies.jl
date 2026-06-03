@@ -395,7 +395,7 @@ function linear_pressure_gradient!(
     # for Leapfrog this term is evaluated at the previous time step and the
     # implicit corrections will move it to the current as done for all linear gravity-wave related terms
     lnpₛ = get_prognostic_step(vars.prognostic.pressure, time_stepping, LinearDynamicalCore())
-    Φ = vars.dynamics.geopotential
+    Φ = vars.dynamics.spectral_geopotential
 
     # -R_dry*Tₖ*∇²lnpₛ, linear part of the ∇⋅RTᵥ∇lnpₛ pressure gradient term
     # Tₖ being the reference temperature profile, the anomaly term T' = Tᵥ - Tₖ is calculated
@@ -897,7 +897,7 @@ function bernoulli_potential!(vars::Variables, model::ShallowWater)
     scratch_memory = vars.scratch.transform_memory
     u = get_prognostic_step(vars.grid.u, model.time_stepping, BernoulliPotential(), model)
     v = get_prognostic_step(vars.grid.v, model.time_stepping, BernoulliPotential(), model)
-    Φ = get_prognostic_step(vars.grid.geopotential, model.time_stepping, BernoulliPotential(), model)
+    Φ = vars.dynamics.geopotential
     bernoulli = vars.scratch.a                                  # reuse work arrays a, a_grid
     bernoulli_grid = vars.scratch.grid.a
     div_tend = get_tendency_step(vars.tendencies.divergence, model.time_stepping, BernoulliPotential())
@@ -928,7 +928,7 @@ function bernoulli_potential!(
     v = get_prognostic_step(vars.grid.v, TS, BernoulliPotential())
 
     scratch_memory = vars.scratch.transform_memory
-    geopot = vars.dynamics.geopotential
+    Φ = vars.dynamics.spectral_geopotential
     bernoulli = vars.scratch.a                              # reuse work arrays a, a_grid
     bernoulli_grid = vars.scratch.grid.a
     div_tend = get_tendency_step(vars.tendencies.divergence, TS, BernoulliPotential())
@@ -948,7 +948,7 @@ function bernoulli_potential!(
 
     bernoulli_grid .= 1 // 2 .* (u .^ 2 + v .^ 2)               # = ½(u² + v²) on grid
     transform!(bernoulli, bernoulli_grid, scratch_memory, S)    # to spectral space
-    bernoulli .+= geopot                                        # add geopotential Φ
+    bernoulli .+= Φ                                             # add geopotential Φ
     ∇²!(div_tend, bernoulli, S, add = true, flipsign = true)    # add -∇²(½(u² + v²) + ϕ)
     return nothing
 end

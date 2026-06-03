@@ -23,11 +23,8 @@ $(TYPEDFIELDS)"""
     "[OPTION] Time-step coefficient: 0=explicit, 0.5=centred implicit, 1=backward implicit"
     centering::NF = 0.5
 
-    "[OPTION] Reinitialize at restart when initialized=true"
-    reinitialize::Bool = true
-
-    "[DERIVED] Flag automatically set to true when initialize! has been called"
-    initialized::Bool = false
+    "[DERIVED] (Scaled) time step used to initialize. Used to check whether time step has changed and reinitialization is needed."
+    Δt::Base.RefValue{NF} = Ref(zero(NF))
 
     # PRECOMPUTED ARRAYS, to be initialized with initialize!
     "[DERIVED] vertical temperature profile, obtained from diagn on first time step"
@@ -42,7 +39,7 @@ $(TYPEDFIELDS)"""
     "[DERIVED] temperature: operator for the TₖD + κTₖD(ln pₛ)/Dt term"
     L::MatrixType = zeros(NF, nlayers, nlayers)
 
-    "[DERIVED] pressure: vertical averaging of the -D̄ term in the log surface pres equation"
+    "[DERIVED] pressure: vertical averaging of the -D̄ term in the log surface pressure equation"
     W::VectorType = zeros(NF, nlayers)
 
     "[DERIVED] components to construct L, 1/ 2Δσ"
@@ -82,17 +79,16 @@ function variables(implicit::ImplicitPrimitiveEquation)
     )
 end
 
-# function barrier to unpack the constants struct for primitive eq models
-function initialize!(
-        I::ImplicitPrimitiveEquation,
-        vars::Variables,
+function reinitialize!(
+        implicit::ImplicitPrimitiveEquation,
         model::PrimitiveEquation,
+        vars::Variables,
     )
-    model.dynamics || return nothing    # escape immediately if no dynamics
-    (; geometry, time_stepping, geopotential, atmosphere, adiabatic_conversion) = model
+    (; time_stepping, geometry, geopotential, atmosphere, adiabatic_conversion) = model
     Δt = time_step(time_stepping, vars.prognostic.clock) 
+    implicit.Δt[] == Δt && return nothing                   # if time step has not changed no need to reinitialize
     Tₖ = vars.dynamics.average_temperature_profile
-    initialize!(I, Δt, Tₖ, geometry, geopotential, atmosphere, adiabatic_conversion)
+    initialize!(implicit, Δt, Tₖ, geometry, geopotential, atmosphere, adiabatic_conversion)
     return nothing
 end
 
@@ -109,9 +105,6 @@ function initialize!(
     )
 
     NF = eltype(temp_average)
-
-    # option to skip reinitialization at restart
-    (implicit.initialized && !implicit.reinitialize) && return nothing
 
     (; trunc, nlayers) = implicit
     (; σ_levels_full, σ_levels_thick) = geometry
@@ -161,7 +154,10 @@ function initialize!(
     # R, U, L, W are linear operators that are therefore defined here and inverted
     # to obtain δD first, and then δT and δlnps through substitution
 
+    @info Δt * 6371e3
+    @assert 0.5 <= implicit.centering <= 1 "Centering coefficient must be between 0.5 (centred implicit) and 1 (backward implicit)"
     ξ = implicit.centering * Δt                 # 2Δt for leapfrog, but = Δt, Δ/2 in first_timesteps!
+    implicit.Δt[] = Δt                          # store the time step used for initialization to check for changes later
 
     # DIVERGENCE OPERATORS (called g in Hoskins and Simmons 1975, eq 11 and Appendix 1)
     @inbounds for k in 1:nlayers                # vertical geopotential integration as matrix operator
@@ -235,8 +231,6 @@ function initialize!(
     # runic: on
     return nothing
 end
-
-set_initialized!(implicit::ImplicitPrimitiveEquation) = (implicit.initialized = true)
 
 """$(TYPEDSIGNATURES)
 Apply the implicit corrections to dampen gravity waves in the primitive equation models."""

@@ -114,7 +114,7 @@ end
         dry_static_energy = vars.scratch.grid.a
         cₚ = atmosphere.heat_capacity
         T = get_prognostic_step(vars.grid.temperature, time_stepping, diffusion)
-        Φ = vars.grid.geopotential
+        Φ = vars.dynamics.geopotential
 
         for k in 1:size(T, 2)
             dry_static_energy[ij, k] = cₚ * T[ij, k] + Φ[ij, k]
@@ -157,7 +157,7 @@ end
 
     u = get_prognostic_step(vars.grid.u, time_stepping, diffusion)
     v = get_prognostic_step(vars.grid.v, time_stepping, diffusion)
-    geopotential = vars.grid.geopotential
+    geopotential = vars.dynamics.geopotential
     (; orography) = orog
 
     # Boundary layer depth is highest layer for which Ri < Ri_c (the "critical" threshold)
@@ -271,7 +271,7 @@ For vertical stability in the boundary layer."""
 
     u = get_prognostic_step(vars.grid.u, time_stepping, diffusion)
     v = get_prognostic_step(vars.grid.v, time_stepping, diffusion)
-    Φ = vars.grid.geopotential
+    Φ = vars.dynamics.geopotential
     T = get_prognostic_step(vars.grid.temperature, time_stepping, diffusion)
 
     # for dry models, use scratch array to bypass access to non-existing humidity variable

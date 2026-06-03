@@ -42,7 +42,7 @@ and relaxes current vertical profiles to the adjusted references."""
     # use previous time step for more stable calculations
     temp = get_prognostic_step(vars.grid.temperature, time_stepping, convection)
     humid = get_prognostic_step(vars.grid.humidity, time_stepping, convection)
-    geopotential = vars.grid.geopotential
+    geopotential = vars.dynamics.geopotential
     temp_tend = get_tendency_step(vars.tendencies.grid.temperature, time_stepping, convection)
     humid_tend = get_tendency_step(vars.tendencies.grid.humidity, time_stepping, convection)
     pₛ = vars.parameterizations.surface_pressure[ij]          # surface pressure [Pa]

@@ -22,12 +22,12 @@ Geopotential(SG::SpectralGrid) = Geopotential(
     on_architecture(SG.architecture, zeros(SG.NF, SG.nlayers))
 )
 
-function variables(::Geopotential)
+function variables(::Geopotential, )
     return (
-        GridVariable(:geopotential, Grid3D(), desc = "Geopotential", units = "m^2/s^2"),
+        DynamicsVariable(:geopotential, Grid3D(), desc = "Geopotential", units = "m^2/s^2"),
         # TODO only the grid should be necessary, remove this when adapting the geopotential calculation
         # in the dynamical core to only need grid geopotential
-        DynamicsVariable(:geopotential, Spectral3D(), desc = "Geopotential", units = "m^2/s^2"),
+        DynamicsVariable(:spectral_geopotential, Spectral3D(), desc = "Geopotential", units = "m^2/s^2"),
     )
 end
 
@@ -63,7 +63,7 @@ function geopotential!(
     TS = model.time_stepping
     G = model.geopotential
     T = get_prognostic_step(vars.grid.temperature, TS, G)
-    Φ = vars.grid.geopotential
+    Φ = vars.dynamics.geopotential
 
     # use zero scratch for humidity in dry models to not distinguish in kernels below
     vars.scratch.grid.a .= 0
@@ -130,7 +130,7 @@ function geopotential!(
         orography::AbstractOrography,
     )
     Tᵥ = vars.dynamics.virtual_temperature
-    Φ = vars.dynamics.geopotential              # spectral geopotential to fill
+    Φ = vars.dynamics.spectral_geopotential     # spectral geopotential to fill
     Φₛ = orography.surface_geopotential         # = orography*gravity
     (; Δp_geopot_half, Δp_geopot_full) = G      # = R*Δlnp either on half or full levels
     nlayers = size(Φ, 2)                        # number of vertical levels
@@ -179,7 +179,8 @@ i.e. gravity times the interface displacement (field `pres`)"""
 function geopotential!(vars::Variables, planet::AbstractPlanet)
     # note this only works in 2D models with nlayers=1 otherwise gepotential is actually 3D and not just 2D x 1
     # one would need to use lta/field_view(gepotential, :, nlayers) to make it 2D again
-    (; geopotential, η) = vars.grid
-    geopotential .= planet.gravity .* η
-    return geopotential
+    η = vars.grid.η
+    Φ = vars.dynamics.geopotential
+    Φ .= planet.gravity .* η
+    return Φ
 end

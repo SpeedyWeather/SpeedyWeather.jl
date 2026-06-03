@@ -33,6 +33,12 @@ function initialize!(nt::NamedTuple, model::AbstractModel)
     return nothing
 end
 
+# some components may need to be reinitialized, e.g. implicit with changing time step
+# fall back to nothing, models can implement their own reinitialize! method if needed
+reinitialize!(model::AbstractModel, vars::AbstractVariables) = nothing
+reinitialize!(::Nothing, ::AbstractModel, ::AbstractVariables) = nothing
+reinitialize!(::AbstractModelComponent, ::AbstractModel, ::AbstractVariables) = nothing
+
 function Base.show(io::IO, P::AbstractModelComponent; values = true)
     type_str = split("$(typeof(P))", "{", limit = 2)
     type_itself = type_str[1]

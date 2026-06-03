@@ -92,7 +92,7 @@ Returns (cloud_cover, cloud_top, stratocumulus_cover) tuple."""
 
     temp = get_prognostic_step(vars.grid.temperature, model.time_stepping, clouds)
     humid = get_prognostic_step(vars.grid.humidity, model.time_stepping, clouds)
-    geopotential = vars.grid.geopotential
+    geopotential = vars.dynamics.geopotential
     NF = eltype(temp)
     nlayers = size(temp, 2)
 

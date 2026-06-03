@@ -236,6 +236,11 @@ function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
     return Simulation(variables, model)
 end
 
+function reinitialize!(model::PrimitiveDryModel, vars::AbstractVariables)
+    reinitialize!(model.implicit, model, vars)
+    return nothing
+end
+
 """$(TYPEDSIGNATURES)
 A `model` is adapted to the GPU or CPU by wrapping some (but not all!)
 of its fields (determined by `model.core_components`) into a NamedTuple.

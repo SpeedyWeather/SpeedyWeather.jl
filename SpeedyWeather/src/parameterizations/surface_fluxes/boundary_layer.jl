@@ -64,9 +64,9 @@ initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
     land_fraction = land_sea_mask.mask[ij]
 
     # Height z [m] of lowermost layer above ground
-    surface = size(vars.grid.geopotential, 2)    # surface index = nlayers
+    surface = size(vars.dynamics.geopotential, 2)    # surface index = nlayers
     (; gravity) = planet
-    z = vars.grid.geopotential[ij, surface] / gravity - orography.orography[ij]
+    z = vars.dynamics.geopotential[ij, surface] / gravity - orography.orography[ij]
 
     # maximum drag Cmax from that height, stable conditions would decrease Cmax towards 0
     # Frierson 2006, eq (12)
