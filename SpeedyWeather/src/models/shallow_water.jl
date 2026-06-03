@@ -48,7 +48,7 @@ Fields, representing model components, are $(TYPEDFIELDS)"""
     tracers::TRACER_DICT = TRACER_DICT()
 
     # NUMERICS
-    time_stepping::TS = Leapfrog(spectral_grid)
+    time_stepping::TS = NCycleLorenz(spectral_grid)
     spectral_transform::ST = SpectralTransform(spectral_grid)
     implicit::IM = ImplicitShallowWater(spectral_grid)
     horizontal_diffusion::HD = HyperDiffusion(spectral_grid)

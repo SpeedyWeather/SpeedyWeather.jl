@@ -67,7 +67,7 @@ function initialize!(
         @assert period == DEFAULT_PERIOD "Period and steps cannot be set simultaneously"
         initialize!(clock, time_stepping, steps)
     else
-        # set period = how long to integrate for, tore the start date, reset counter
+        # set period = how long to integrate for, store the start date, reset counter
         initialize!(clock, time_stepping, period)
     end
 
