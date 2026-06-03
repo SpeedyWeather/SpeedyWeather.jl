@@ -10,8 +10,12 @@ scale_coslat²(field::AbstractField) = scale_coslat²!(deepcopy(field))
 scale_coslat⁻¹(field::AbstractField) = scale_coslat⁻¹!(deepcopy(field))
 scale_coslat⁻²(field::AbstractField) = scale_coslat⁻²!(deepcopy(field))
 
-# powers the cosine of latitude
-_scale_coslat!(field::AbstractField; power = 1) = _scale_lat!(field, cos.(get_lat(field)) .^ power)
+# powers the cosine of latitude; `get_lat` returns a CPU vector by design so far,
+# so move it onto the field's architecture before launching the kernel.
+function _scale_coslat!(field::AbstractField; power = 1)
+    coslat_pow = cos.(get_lat(field)) .^ power
+    return _scale_lat!(field, on_architecture(architecture(field), coslat_pow))
+end
 
 """
 $(TYPEDSIGNATURES)

@@ -145,8 +145,14 @@ function set!(
     # all elements are zero except for the 0,0 one
     var_new = zero(var)
 
-    for k in eachmatrix(var_new)
-        var_new[1, k] = norm_sphere * s
+    # set the [1, :] row in a GPU-safe way via a view on the underlying data
+    data = var_new.data
+    norm_s = convert(eltype(data), norm_sphere * s)
+    if ndims(data) == 1
+        # 1D LTA: data is a Vector, only one matrix, so a single element
+        view(data, 1:1) .= norm_s
+    else
+        view(data, 1, ntuple(_ -> :, ndims(data) - 1)...) .= norm_s
     end
 
     return set!(var, var_new, geometry, S; add, kwargs...)
