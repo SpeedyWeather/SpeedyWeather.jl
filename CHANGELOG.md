@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fixed punctuation in spectral transform docs [#1112](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1112)
+
 ## v0.20.3
 
 - Terrarium extension now handles land sea masks correctly [#1110](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1110)
