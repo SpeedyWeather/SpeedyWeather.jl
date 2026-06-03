@@ -66,7 +66,10 @@ function output!(
 
     # Compute u10, TODO should this be the same z₀ as in vertical diffusion or surface fluxes?
     z₀ = simulation.model.vertical_diffusion.roughness_length
-    @. u_or_v10 = u_or_v_bottom .* log(10 / z₀) ./ log.(z_bottom / z₀)
+
+    # include a max here as this will throw an error if the model blows up and have negative temperatures
+    # if the max case is hit we divide by zero which yields inf so clearly flagged in any case
+    @. u_or_v10 = u_or_v_bottom .* log(10 / z₀) ./ log.(max.(z_bottom, z₀) / z₀)
 
     # interpolate 2D/3D variables
     u_or_v10_output = output.field2D

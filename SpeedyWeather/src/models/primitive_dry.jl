@@ -154,7 +154,7 @@ function variables(::Type{<:PrimitiveDry}, nsteps = DEFAULT_NSTEPS)
         TendencyVariable(:pressure, Spectral3D(ts), desc = "Tendency of surface pressure", units = "log(Pa)/s"),
         TendencyVariable(:divergence, Grid4D(tg), namespace = :grid, desc = "Tendency of divergence on the grid", units = "1/s²"),
         TendencyVariable(:temperature, Grid4D(tg), namespace = :grid, desc = "Tendency of temperature on the grid", units = "K/s"),
-        TendencyVariable(:pressure, Grid4D(tg), namespace = :grid, desc = "Tendency of surface pressure on the grid", units = "log(Pa)/s"),
+        TendencyVariable(:pressure, Grid3D(tg), namespace = :grid, desc = "Tendency of surface pressure on the grid", units = "log(Pa)/s"),
         
         GridVariable(:divergence, Grid4D(pg), desc = "Divergence", units = "1/s"),
         GridVariable(:temperature, Grid4D(pg), desc = "Temperature", units = "K"),

@@ -21,7 +21,7 @@ $(TYPEDFIELDS)"""
 
     # PARAMETERS
     "[OPTION] Time-step coefficient: 0=explicit, 0.5=centred implicit, 1=backward implicit"
-    centering::NF = 0.5
+    centering::NF = 1
 
     "[DERIVED] (Scaled) time step used to initialize. Used to check whether time step has changed and reinitialization is needed."
     Δt::Base.RefValue{NF} = Ref(zero(NF))
@@ -154,7 +154,6 @@ function initialize!(
     # R, U, L, W are linear operators that are therefore defined here and inverted
     # to obtain δD first, and then δT and δlnps through substitution
 
-    @info Δt * 6371e3
     @assert 0.5 <= implicit.centering <= 1 "Centering coefficient must be between 0.5 (centred implicit) and 1 (backward implicit)"
     ξ = implicit.centering * Δt                 # 2Δt for leapfrog, but = Δt, Δ/2 in first_timesteps!
     implicit.Δt[] = Δt                          # store the time step used for initialization to check for changes later
