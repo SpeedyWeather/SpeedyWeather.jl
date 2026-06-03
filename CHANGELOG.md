@@ -3,6 +3,18 @@
 ## Unreleased
 
 - Prognostic and grid variables are now fused together and the `transform!(::Variables, ::PrimitveEquation)` is batched together to make it more efficient on GPU. For this purposes new routines for flexible FFTs on CPU and GPU had to be introduced and the fused variables are now a new type `FusedParents` [#1099](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1099/)
+- Fixed punctuation in spectral transform docs [#1112](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1112)
+
+## v0.20.3
+
+- Terrarium extension now handles land sea masks correctly [#1110](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1110)
+- Revised benchmark suite to make it compare between different architectures [#1103](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1103)
+
+## v0.20.2
+
+- Handle heterogeneous parameter attributes in `ParameterEditing` [#1106](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1106)
+- Coupling to the Terrarium.jl land model via an SpeedyWeatherTerrariumExt [#1090](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1090)
+- The `ShallowWaterModel` is now GPU compatible [#1104](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1104)
 - Updated citations and funding information [#1100](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1100)
 - Allow for variables to be fused together (prelimnary work for GPU optiminization) [#1083](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1083)
 - Fixed docs broken layout due to `NetCDFOutput` by using @docs instead of @doc [#1098](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1098)
