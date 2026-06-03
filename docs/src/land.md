@@ -14,6 +14,8 @@ top of Mt Everest, or to paint the Sahara black and moving
 it below sea-level. The first one of these bullet points is
 discussed below for the others see the respective sections.
 
+It's also possible to use a land model from [Terrarium.jl](https://github.com/NumericalEarth/Terrarium.jl.git) within SpeedyWeather.jl. This is particularly relevant for higher complexity climate simulations as Terrarium features many more processes as our own build-in land models, see [Terrarium coupling](@ref).
+
 ## Dry vs wet land
 
 The type hierarchy of theactual land surface model is defined as
@@ -410,3 +412,68 @@ save("ocean_land_albedo.png", ans) # hide
 nothing # hide
 ```
 ![Ocean-land albedo](ocean_land_albedo.png)
+
+## Terrarium coupling
+
+We can also use a [Terrarium](https://github.com/NumericalEarth/Terrarium.jl) model within SpeedyWeather! For a detailed introduction to Terrarium please consult its [own documentation](https://numericalearth.github.io/Terrarium.jl/dev/). Here, we will only demonstrate the coupling.
+
+### Example
+
+We first have to construct our Terrarium model, before we can wrap it into a `SpeedyWeather.LandModel` and construct a `PrimitiveWetModel` with it: 
+
+```@example terrarium 
+using SpeedyWeather
+using Terrarium                       
+
+# SpeedyWeather grid + matching Terrarium column ring grid
+ring_grid     = SpeedyWeather.RingGrids.FullGaussianGrid(12)
+spectral_grid = SpectralGrid(ring_grid)
+
+# load and sync the land sea mask for both SpeedyWeather and Terrarium
+land_sea_mask = EarthLandSeaMask(spectral_grid)
+SpeedyWeather.load_mask!(land_sea_mask)
+
+Nz       = 4
+Δz_min   = 0.05
+column_grid = Terrarium.ColumnRingGrid(
+    Terrarium.CPU(), Float32,
+    Terrarium.ExponentialSpacing(; N = Nz, Δz_min),
+    ring_grid,
+    land_sea_mask.mask .> 0
+)
+
+# Soil column + initial state, matching `LandModel: Soil, no vegetation`
+soil_initializer = Terrarium.SoilInitializer(eltype(column_grid))
+soil = Terrarium.SoilEnergyWaterCarbon(
+    eltype(column_grid);
+    hydrology = Terrarium.SoilHydrology(eltype(column_grid)),
+)
+terrarium_model = Terrarium.LandModel(
+    column_grid;
+    initializer = soil_initializer,
+    vegetation  = nothing,
+    soil,
+)
+
+# Wrap as a SpeedyWeather land component (time step Δt = 300 s)
+land = SpeedyWeather.LandModel(spectral_grid, terrarium_model; Δt = 300.0)
+
+# Assemble the wet primitive model around `land`
+model = PrimitiveWetModel(
+    spectral_grid;
+    land,
+    land_sea_mask,
+    surface_heat_flux     = SurfaceHeatFlux(spectral_grid, land = PrescribedLandHeatFlux()),
+    surface_humidity_flux = SurfaceHumidityFlux(spectral_grid, land = PrescribedLandHumidityFlux()),
+    time_stepping         = Leapfrog(spectral_grid, Δt_at_T31 = Minute(15)),
+)
+
+simulation = initialize!(model)
+```
+
+Then the model can be run as any other `Simulation`. Terarrium's state variales are owned by SpeedyWeather's `Variables` and can be accessed via 
+
+```@example terrarium
+simulation.variables.prognostic.land.terrarium
+```
+
