@@ -79,6 +79,7 @@ function variables(implicit::ImplicitPrimitiveEquation)
     )
 end
 
+# function barrier to decide whether to initialize or not based on time step
 function reinitialize!(
         implicit::ImplicitPrimitiveEquation,
         model::PrimitiveEquation,

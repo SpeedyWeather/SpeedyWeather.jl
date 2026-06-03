@@ -167,7 +167,7 @@ function SpeedyTransforms.transform!(
     transform!(v_grid, V, scratch_memory, S, unscale_coslat = true)
 
     # at initial step copy 2nd step (current) to 1st (prev) to retain those fields
-    # only do after transforms to avoid copying 
+    # only do after transforms to avoid copying uninitialized zeros
     initialize && move_prognostic_grid_variables_back!(vars, time_stepping, model)
 
     # include humidity effect into temp for everything stability-related
