@@ -282,6 +282,13 @@ function horizontal_diffusion!(
     horizontal_diffusion!(vor_tend, vor, expl, impl)
     horizontal_diffusion!(div_tend, div, expl_div, impl_div)
 
+    # horizontal diffusion is also responsible to set a tendency's last degree to zero
+    # all variables carry this degree but it's not used for the scalar quantities that
+    # all our prognostic variables are, so set to zero now for those variables that
+    # aren't subject to diffusion
+    η_tend = get_tendency_step(vars.tendencies.η, model.time_stepping, diffusion)
+    zero_last_degree!(η_tend)
+
     for (name, tracer) in model.tracers
         tracer_var = get_prognostic_step(vars.prognostic.tracers[name], model.time_stepping, diffusion)
         tracer_tend = get_tendency_step(vars.tendencies.tracers[name], model.time_stepping, diffusion)
@@ -315,6 +322,15 @@ function horizontal_diffusion!(
     horizontal_diffusion!(vor_tend, vor, expl, impl)
     horizontal_diffusion!(div_tend, div, expl_div, impl_div)
     horizontal_diffusion!(temp_tend, temp, expl, impl)
+
+    # horizontal diffusion is also responsible to set a tendency's last degree to zero
+    # all variables carry this degree but it's not used for the scalar quantities that
+    # all our prognostic variables are, so set to zero now for those variables that
+    # aren't subject to diffusion
+    pres_tend = get_tendency_step(vars.tendencies.pressure, model.time_stepping, diffusion)
+    zero_last_degree!(pres_tend)
+
+    pres_tend.data[1:1] .= 0    # mass conservation
 
     if haskey(vars.tendencies, :humidity)
         humid = get_prognostic_step(vars.prognostic.humidity, model.time_stepping, diffusion)

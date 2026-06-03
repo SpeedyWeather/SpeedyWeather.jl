@@ -271,8 +271,6 @@ function implicit_correction!(
         div_old, div_new, S⁻¹, R, U, L, W, l_indices, ξ, nlayers
     )
 
-    pres_tend.data[1:1] .= 0    # mass conservation
-
     return nothing
 end
 

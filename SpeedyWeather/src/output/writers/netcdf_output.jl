@@ -190,8 +190,9 @@ function initialize!(
     simulation = Simulation(vars, model)
     nonexisting_vars = [key for (key, var) in output.variables if isnothing(path_or_nothing(var, simulation))]
     if !isempty(nonexisting_vars)
-        @warn "Output variables requested but not existing. Skipping output for: $(join(nonexisting_vars, ", "))"
+        @warn "Some output.variables do not exist in simulation. Deleting: $(join(nonexisting_vars, ", "))"
     end
+    delete!(output, nonexisting_vars...)
     for (key, var) in output.variables
         if ~isnothing(path_or_nothing(var, simulation))
             define_variable!(dataset, var, eltype(output.field2D))
