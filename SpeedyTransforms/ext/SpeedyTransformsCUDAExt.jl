@@ -112,11 +112,11 @@ mutable struct GPUFourierGraphCache
     brfft_plans                 # inverse FFT plans for THIS size, per ring
     roff::CuVector{Int}         # 0-based real-block offset per ring
     coff::CuVector{Int}         # 0-based complex-block offset per ring
-    nlon::CuVector{Int}         # longitudes per ring
+    nlons::CuVector{Int}        # longitudes per ring
     nfreq::CuVector{Int}        # Fourier frequencies per ring
     rstart_n::CuVector{Int}     # first grid row of each northern ring
     rstart_s::CuVector{Int}     # first grid row of each southern ring
-    nlon_s::CuVector{Int}       # like nlon but 0 at the equator ring (south skip)
+    nlons_s::CuVector{Int}      # like nlon but 0 at the equator ring (south skip)
     nlon_max::Int
     nfreq_max::Int
     nlat_half::Int
@@ -162,7 +162,7 @@ function build_cache(S::SpectralTransform, nlayers::Integer)
 
     has_equator = isodd(nlat)
     jeq = (nlat + 1) ÷ 2
-    nlon_s = copy(nlons)
+    nlons_s = copy(nlons)
     has_equator && (nlon_s[jeq] = 0)        # south pass skips the equator ring
 
     packed_real = CUDA.zeros(NF, sum(block_r))
@@ -175,7 +175,7 @@ function build_cache(S::SpectralTransform, nlayers::Integer)
         packed_real, packed_cplx, real_view, cplx_view,
         rfft_plans, brfft_plans,
         dev(roff), dev(coff), dev(nlons), dev(nfreqs),
-        dev(rstart_n), dev(rstart_s), dev(nlon_s),
+        dev(rstart_n), dev(rstart_s), dev(nlons_s),
         S.nlon_max, S.nfreq_max, nlat_half, nlayers, has_equator, jeq,
         architecture(packed_real),
         IdDict{Any, Union{Nothing, CuGraphExec}}(),
@@ -218,14 +218,14 @@ function forward_loop!(cache::GPUFourierGraphCache, f_north, f_south, field::Abs
     rfft_plans = cache.rfft_plans
 
     # northern rings
-    launch!(arch, Array3DWorkOrder, (cache.nlon_max, nlh, L), gather_real_kernel!, cache.packed_real, field.data, cache.roff, cache.nlon, cache.rstart_n)
+    launch!(arch, Array3DWorkOrder, (cache.nlon_max, nlh, L), gather_real_kernel!, cache.packed_real, field.data, cache.roff, cache.nlons, cache.rstart_n)
     @inbounds for j in 1:nlh
         mul!(cplx_view[j], rfft_plans[j], real_view[j])
     end
     launch!(arch, Array3DWorkOrder, (cache.nfreq_max, nlh, L), scatter_cplx_kernel!, f_north, cache.packed_cplx, cache.coff, cache.nfreq)
 
     # southern rings (the equator ring, if any, is zeroed rather than transformed)
-    launch!(arch, Array3DWorkOrder, (cache.nlon_max, nlh, L), gather_real_kernel!, cache.packed_real, field.data, cache.roff, cache.nlon, cache.rstart_s)
+    launch!(arch, Array3DWorkOrder, (cache.nlon_max, nlh, L), gather_real_kernel!, cache.packed_real, field.data, cache.roff, cache.nlons, cache.rstart_s)
     @inbounds for j in 1:nlh
         if cache.has_equator && j == cache.jeq
             fill!(cplx_view[j], 0)
@@ -255,7 +255,7 @@ function inverse_loop!(cache::GPUFourierGraphCache, field::AbstractField, g_nort
     @inbounds for j in 1:nlh
         mul!(real_view[j], brfft_plans[j], cplx_view[j])
     end
-    launch!(arch, Array3DWorkOrder, (cache.nlon_max, nlh, L), scatter_real_kernel!, field.data, cache.packed_real, cache.roff, cache.nlon, cache.rstart_n)
+    launch!(arch, Array3DWorkOrder, (cache.nlon_max, nlh, L), scatter_real_kernel!, field.data, cache.packed_real, cache.roff, cache.nlons, cache.rstart_n)
 
     # southern rings (the equator ring, if any, is skipped: north already wrote those rows)
     launch!(arch, Array3DWorkOrder, (cache.nfreq_max, nlh, L), gather_cplx_kernel!, cache.packed_cplx, g_south, cache.coff, cache.nfreq)
@@ -263,7 +263,7 @@ function inverse_loop!(cache::GPUFourierGraphCache, field::AbstractField, g_nort
         (cache.has_equator && j == cache.jeq) && continue
         mul!(real_view[j], brfft_plans[j], cplx_view[j])
     end
-    launch!(arch, Array3DWorkOrder, (cache.nlon_max, nlh, L), scatter_real_kernel!, field.data, cache.packed_real, cache.roff, cache.nlon_s, cache.rstart_s)
+    launch!(arch, Array3DWorkOrder, (cache.nlon_max, nlh, L), scatter_real_kernel!, field.data, cache.packed_real, cache.roff, cache.nlons_s, cache.rstart_s)
     return nothing
 end
 
