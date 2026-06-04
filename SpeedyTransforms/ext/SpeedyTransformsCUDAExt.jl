@@ -103,27 +103,27 @@ work buffers, the per-ring reshaped views and FFT plans used by the transforms, 
 gather/scatter index metadata, and the instantiated CUDA graphs (one per distinct `field`
 buffer and direction). A graph value of `nothing` marks a buffer for which capture failed
 (fall back to direct loop)."""
-mutable struct GPUFourierGraphCache
-    packed_real                 # CuVector{NF}        — all rings' dense real blocks
-    packed_cplx                 # CuVector{Complex{NF}} — all rings' dense complex blocks
-    real_view::Vector           # per-ring reshaped (nlon_j × nlayers) view into packed_real
-    cplx_view::Vector           # per-ring reshaped (nfreq_j × nlayers) view into packed_cplx
-    rfft_plans                  # forward FFT plans for THIS size (nlayers batches), per ring
-    brfft_plans                 # inverse FFT plans for THIS size, per ring
-    roff::CuVector{Int}         # 0-based real-block offset per ring
-    coff::CuVector{Int}         # 0-based complex-block offset per ring
-    nlons::CuVector{Int}        # longitudes per ring
-    nfreq::CuVector{Int}        # Fourier frequencies per ring
-    rstart_n::CuVector{Int}     # first grid row of each northern ring
-    rstart_s::CuVector{Int}     # first grid row of each southern ring
-    nlons_s::CuVector{Int}      # like nlon but 0 at the equator ring (south skip)
+struct GPUFourierGraphCache{PR, PC, RV, CV, IV, A}
+    packed_real::PR             # CuVector{NF}          — all rings' dense real blocks
+    packed_cplx::PC             # CuVector{Complex{NF}} — all rings' dense complex blocks
+    real_view::RV               # Vector of per-ring reshaped (nlon_j × nlayers) views into packed_real
+    cplx_view::CV               # Vector of per-ring reshaped (nfreq_j × nlayers) views into packed_cplx
+    rfft_plans::Vector{AbstractFFTs.Plan}   # forward FFT plans for THIS size (nlayers batches), per ring
+    brfft_plans::Vector{AbstractFFTs.Plan}  # inverse FFT plans for THIS size, per ring
+    roff::IV                    # 0-based real-block offset per ring
+    coff::IV                    # 0-based complex-block offset per ring
+    nlons::IV                   # longitudes per ring
+    nfreq::IV                   # Fourier frequencies per ring
+    rstart_n::IV                # first grid row of each northern ring
+    rstart_s::IV                # first grid row of each southern ring
+    nlons_s::IV                 # like nlons but 0 at the equator ring (south skip)
     nlon_max::Int
     nfreq_max::Int
     nlat_half::Int
     nlayers::Int
     has_equator::Bool
     jeq::Int
-    arch                        # SpeedyWeather GPU architecture (for launch!)
+    arch::A                     # SpeedyWeather GPU architecture (for launch!)
     forward_execs::IdDict{Any, Union{Nothing, CuGraphExec}} # the actual graphs forward transforms
     inverse_execs::IdDict{Any, Union{Nothing, CuGraphExec}} # the actual graphs inverse transforms
 end
