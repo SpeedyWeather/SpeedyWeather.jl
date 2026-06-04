@@ -49,6 +49,7 @@ include("vertical_integration.jl")
 
 # FULL MODELS
 include("barotropic.jl")
+include("shallowwater.jl")
 include("primitive_wet.jl")
 
 if gpu_backend === :CUDA

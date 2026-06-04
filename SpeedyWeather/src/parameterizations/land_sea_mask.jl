@@ -131,7 +131,17 @@ end
 $(TYPEDSIGNATURES)
 Reads a high-resolution land-sea mask from file and interpolates (grid-cell average)
 onto the model grid for a fractional sea mask."""
-function initialize!(land_sea_mask::EarthLandSeaMask{NF}, model::PrimitiveEquation) where NF
+initialize!(land_sea_mask::EarthLandSeaMask, model::PrimitiveEquation) = load_mask!(land_sea_mask)
+
+"""
+$(TYPEDSIGNATURES)
+
+Loads the land-sea mask from the path set in `land_sea_mask`, interpolates (grid-cell average) 
+onto the model grid for a fractional sea mask and saves it to the field `land_sea_mask.mask`.
+"""
+function load_mask!(land_sea_mask::EarthLandSeaMask)
+
+    arch = architecture(land_sea_mask.mask)
 
     # LOAD NETCDF FILE
     lsm_highres = NF.(get_asset(
@@ -146,7 +156,7 @@ function initialize!(land_sea_mask::EarthLandSeaMask{NF}, model::PrimitiveEquati
     # average onto grid cells of the model
     cpu_mask = on_architecture(CPU(), land_sea_mask.mask)
     RingGrids.grid_cell_average!(cpu_mask, lsm_highres)
-    land_sea_mask.mask .= on_architecture(model.spectral_grid.architecture, cpu_mask)
+    land_sea_mask.mask .= on_architecture(arch, cpu_mask)
 
     if land_sea_mask.quantization > 0
         q = land_sea_mask.quantization

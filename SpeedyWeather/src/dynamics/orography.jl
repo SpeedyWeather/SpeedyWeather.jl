@@ -100,7 +100,7 @@ end
 
 """
 $(TYPEDSIGNATURES)
-Initialize the arrays `orography`, `surface_geopotential` in `orog` following 
+Initialize the arrays `orography`, `surface_geopotential` in `orog` following
 Jablonowski and Williamson, 2006."""
 function initialize!(
         orog::ZonalRidge,
@@ -113,22 +113,30 @@ function initialize!(
     φ = G.latds                         # latitude for each grid point [˚N]
 
     (; orography, surface_geopotential, η₀, u₀) = orog
-
-    ηᵥ = (1 - η₀) * π / 2                     # ηᵥ-coordinate of the surface [1]
-    A = u₀ * cos(ηᵥ)^(3 / 2)                # amplitude [m/s]
-    RΩ = radius * rotation                # [m/s]
-    g⁻¹ = inv(gravity)                  # inverse gravity [s²/m]
-
     NF = eltype(orography)
-    sinφ = sin.(φ .* NF(π) / 180)
-    cosφ = cos.(φ .* NF(π) / 180)
-    # Jablonowski & Williamson, 2006, eq. (7)
-    orography.data .= g⁻¹ .* A .* (A .* (-2 .* sinφ .^ 6 .* (cosφ .^ 2 .+ 1 / 3) .+ 10 / 63) .+ (8 / 5 .* cosφ .^ 3 .* (sinφ .^ 2 .+ 2 / 3) .- π / 4) .* RΩ)
 
-    transform!(surface_geopotential, orography, S)   # to grid-point space
+    ηᵥ = (1 - η₀) * π / 2                   # ηᵥ-coordinate of the surface [1]
+    A = NF(u₀ * cos(ηᵥ)^(3 / 2))            # amplitude [m/s]
+    RΩ = NF(radius * rotation)              # [m/s]
+    g⁻¹ = NF(inv(gravity))                  # inverse gravity [s²/m]
+
+    arch = architecture(orography)
+    worksize = (length(orography), 1)
+    launch!(arch, RingGridWorkOrder, worksize, zonal_ridge_orography_kernel!, orography, φ, A, RΩ, g⁻¹)
+
+    transform!(surface_geopotential, orography, S)   # to spectral space
     surface_geopotential .*= gravity                 # turn orography into surface geopotential
     SpeedyTransforms.spectral_truncation!(surface_geopotential)       # set the lmax+1 harmonics to zero
     return nothing
+end
+
+@kernel inbounds = true function zonal_ridge_orography_kernel!(orography, latds, A, RΩ, g⁻¹)
+    ij, _ = @index(Global, NTuple)
+    sinφ = sind(latds[ij])
+    cosφ = cosd(latds[ij])
+
+    # Jablonowski & Williamson, 2006, eq. (7)
+    orography[ij] = g⁻¹ * A * (A * (-2 * sinφ^6 * (cosφ^2 + 1 / 3) + 10 / 63) + (8 / 5 * cosφ^3 * (sinφ^2 + 2 / 3) - π / 4) * RΩ)
 end
 
 export EarthOrography
