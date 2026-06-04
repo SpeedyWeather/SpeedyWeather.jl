@@ -43,10 +43,6 @@ import SpeedyWeatherInternals.Architectures: architecture
 # several layer counts gets one cache each); within a cache, graphs are keyed by `field.data`.
 # =====================================================================================
 
-"""Toggle for the CUDA-Graphs accelerated batched Fourier transform. Set to `false` to
-fall back to the generic (allocating) per-ring GPU path, e.g. for benchmarking."""
-const FOURIER_GRAPHS_ENABLED = Ref(true)
-
 """Maximum number of cached graphs per direction per `SpectralTransform`. Prevents
 unbounded growth (and host-side capture cost) when the transform is called with a stream
 of freshly-allocated `field` buffers (e.g. the allocating `transform(field, S)`). Beyond
@@ -340,7 +336,7 @@ function _fourier_batched!(
         S::SpectralTransform,
     )
     @assert eltype(field) == eltype(S) "Number format of grid $(eltype(field)) and SpectralTransform $(eltype(S)) need to match."
-    if !FOURIER_GRAPHS_ENABLED[]
+    if !S.cuda_graphs
         return Base.@invoke _fourier_batched!(
             f_north::AbstractArray{<:Complex, 3}, f_south::AbstractArray{<:Complex, 3},
             field::AbstractField, S::SpectralTransform,
@@ -363,7 +359,7 @@ function _fourier_batched!(
         g_south::CuArray{<:Complex, 3},
         S::SpectralTransform,
     )
-    if !FOURIER_GRAPHS_ENABLED[]
+    if !S.cuda_graphs
         return Base.@invoke _fourier_batched!(
             field::AbstractField, g_north::AbstractArray{<:Complex, 3},
             g_south::AbstractArray{<:Complex, 3}, S::SpectralTransform,

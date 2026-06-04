@@ -7,8 +7,7 @@
 @testset "CUDA Graphs: bounded graph cache over a GPU model run" begin
     ext = Base.get_extension(SpeedyWeather.SpeedyTransforms, :SpeedyTransformsCUDAExt)
     if ext !== nothing
-        ext.FOURIER_GRAPHS_ENABLED[] = true
-
+        # CUDA-Graphs path is on by default (SpectralTransform's cuda_graphs = true)
         spectral_grid = SpectralGrid(; trunc = 31, nlayers = 8, architecture = GPU())
         model = PrimitiveWetModel(spectral_grid)
         simulation = initialize!(model)
