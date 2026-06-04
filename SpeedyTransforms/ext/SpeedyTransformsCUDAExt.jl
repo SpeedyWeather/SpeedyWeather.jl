@@ -210,7 +210,7 @@ packs all rings, per-ring in-place cuFFTs run on reshaped views, one scatter ker
 the scratch. Suitable for CUDA-graph capture."""
 function forward_loop!(cache::GPUFourierGraphCache, f_north, f_south, field::AbstractField, S::SpectralTransform)
     arch = cache.arch
-    nlh = cache.nlat_half
+    nlat_half = cache.nlat_half
     L = cache.nlayers
     real_view = cache.real_view
     cplx_view = cache.cplx_view
@@ -218,22 +218,22 @@ function forward_loop!(cache::GPUFourierGraphCache, f_north, f_south, field::Abs
     rfft_plans = cache.rfft_plans
 
     # northern rings
-    launch!(arch, Array3DWorkOrder, (cache.nlon_max, nlh, L), gather_real_kernel!, cache.packed_real, field.data, cache.roff, cache.nlons, cache.rstart_n)
-    @inbounds for j in 1:nlh
+    launch!(arch, Array3DWorkOrder, (cache.nlon_max, nlat_half, L), gather_real_kernel!, cache.packed_real, field.data, cache.roff, cache.nlons, cache.rstart_n)
+    @inbounds for j in 1:nlat_half
         mul!(cplx_view[j], rfft_plans[j], real_view[j])
     end
-    launch!(arch, Array3DWorkOrder, (cache.nfreq_max, nlh, L), scatter_cplx_kernel!, f_north, cache.packed_cplx, cache.coff, cache.nfreq)
+    launch!(arch, Array3DWorkOrder, (cache.nfreq_max, nlat_half, L), scatter_cplx_kernel!, f_north, cache.packed_cplx, cache.coff, cache.nfreq)
 
     # southern rings (the equator ring, if any, is zeroed rather than transformed)
-    launch!(arch, Array3DWorkOrder, (cache.nlon_max, nlh, L), gather_real_kernel!, cache.packed_real, field.data, cache.roff, cache.nlons, cache.rstart_s)
-    @inbounds for j in 1:nlh
+    launch!(arch, Array3DWorkOrder, (cache.nlon_max, nlat_half, L), gather_real_kernel!, cache.packed_real, field.data, cache.roff, cache.nlons, cache.rstart_s)
+    @inbounds for j in 1:nlat_half
         if cache.has_equator && j == cache.jeq
             fill!(cplx_view[j], 0)
         else
             mul!(cplx_view[j], rfft_plans[j], real_view[j])
         end
     end
-    launch!(arch, Array3DWorkOrder, (cache.nfreq_max, nlh, L), scatter_cplx_kernel!, f_south, cache.packed_cplx, cache.coff, cache.nfreq)
+    launch!(arch, Array3DWorkOrder, (cache.nfreq_max, nlat_half, L), scatter_cplx_kernel!, f_south, cache.packed_cplx, cache.coff, cache.nfreq)
     return nothing
 end
 
@@ -243,7 +243,7 @@ packs all rings from the scratch, per-ring in-place inverse cuFFTs run on reshap
 one scatter kernel writes the grid field. Suitable for CUDA-graph capture."""
 function inverse_loop!(cache::GPUFourierGraphCache, field::AbstractField, g_north, g_south, S::SpectralTransform)
     arch = cache.arch
-    nlh = cache.nlat_half
+    nlat_half = cache.nlat_half
     L = cache.nlayers
     real_view = cache.real_view
     cplx_view = cache.cplx_view
@@ -251,19 +251,19 @@ function inverse_loop!(cache::GPUFourierGraphCache, field::AbstractField, g_nort
     brfft_plans = cache.brfft_plans
 
     # northern rings
-    launch!(arch, Array3DWorkOrder, (cache.nfreq_max, nlh, L), gather_cplx_kernel!, cache.packed_cplx, g_north, cache.coff, cache.nfreq)
-    @inbounds for j in 1:nlh
+    launch!(arch, Array3DWorkOrder, (cache.nfreq_max, nlat_half, L), gather_cplx_kernel!, cache.packed_cplx, g_north, cache.coff, cache.nfreq)
+    @inbounds for j in 1:nlat_half
         mul!(real_view[j], brfft_plans[j], cplx_view[j])
     end
-    launch!(arch, Array3DWorkOrder, (cache.nlon_max, nlh, L), scatter_real_kernel!, field.data, cache.packed_real, cache.roff, cache.nlons, cache.rstart_n)
+    launch!(arch, Array3DWorkOrder, (cache.nlon_max, nlat_half, L), scatter_real_kernel!, field.data, cache.packed_real, cache.roff, cache.nlons, cache.rstart_n)
 
     # southern rings (the equator ring, if any, is skipped: north already wrote those rows)
-    launch!(arch, Array3DWorkOrder, (cache.nfreq_max, nlh, L), gather_cplx_kernel!, cache.packed_cplx, g_south, cache.coff, cache.nfreq)
-    @inbounds for j in 1:nlh
+    launch!(arch, Array3DWorkOrder, (cache.nfreq_max, nlat_half, L), gather_cplx_kernel!, cache.packed_cplx, g_south, cache.coff, cache.nfreq)
+    @inbounds for j in 1:nlat_half
         (cache.has_equator && j == cache.jeq) && continue
         mul!(real_view[j], brfft_plans[j], cplx_view[j])
     end
-    launch!(arch, Array3DWorkOrder, (cache.nlon_max, nlh, L), scatter_real_kernel!, field.data, cache.packed_real, cache.roff, cache.nlons_s, cache.rstart_s)
+    launch!(arch, Array3DWorkOrder, (cache.nlon_max, nlat_half, L), scatter_real_kernel!, field.data, cache.packed_real, cache.roff, cache.nlons_s, cache.rstart_s)
     return nothing
 end
 
