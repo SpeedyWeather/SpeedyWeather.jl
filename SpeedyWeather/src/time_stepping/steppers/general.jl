@@ -94,4 +94,4 @@ end
 
 # extend in case time steppers want to initialize variables differently before the first
 # simulation is run, e.g. Leapfrog may want to copy prognostic steps
-initialize!(::Variables, ::AbstractTimeStepper, ::AbstractModel) = nothing
+@inline initialize!(::Variables, ::AbstractTimeStepper, ::AbstractModel) = nothing

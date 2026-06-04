@@ -13,16 +13,16 @@ const TwoDModels = Union{<:Barotropic, <:ShallowWater}
 abstract type AbstractModelComponent end
 
 # any model component set to nothing needs no initialization or finalize!
-initialize!(::Nothing, ::AbstractModel) = nothing
-finalize!(::Nothing, ::AbstractModel) = nothing
+@inline initialize!(::Nothing, ::AbstractModel) = nothing
+@inline finalize!(::Nothing, ::AbstractModel) = nothing
 
 # some model components (like particle advection or feedback) need variables to be passed on too
 # allow them to by nothing as well
-initialize!(::Nothing, ::AbstractVariables, ::AbstractModel) = nothing
+@inline initialize!(::Nothing, ::AbstractVariables, ::AbstractModel) = nothing
 
 # fallback for model components: nothing to initialize
-initialize!(::AbstractModelComponent, ::AbstractModel) = nothing
-finalize!(::AbstractModelComponent, ::AbstractModel) = nothing
+@inline initialize!(::AbstractModelComponent, ::AbstractModel) = nothing
+@inline finalize!(::AbstractModelComponent, ::AbstractModel) = nothing
 
 # model components that are named tuples of other components,
 # e.g. `greenhouse_gases`, can just call `initialize!` on the elements of the named tuple
@@ -35,9 +35,9 @@ end
 
 # some components may need to be reinitialized, e.g. implicit with changing time step
 # fall back to nothing, models can implement their own reinitialize! method if needed
-reinitialize!(model::AbstractModel, vars::AbstractVariables) = nothing
-reinitialize!(::Nothing, ::AbstractModel, ::AbstractVariables) = nothing
-reinitialize!(::AbstractModelComponent, ::AbstractModel, ::AbstractVariables) = nothing
+@inline reinitialize!(model::AbstractModel, vars::AbstractVariables) = nothing
+@inline reinitialize!(::Nothing, ::AbstractModel, ::AbstractVariables) = nothing
+@inline reinitialize!(::AbstractModelComponent, ::AbstractModel, ::AbstractVariables) = nothing
 
 function Base.show(io::IO, P::AbstractModelComponent; values = true)
     type_str = split("$(typeof(P))", "{", limit = 2)

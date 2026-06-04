@@ -185,7 +185,9 @@ end
     # before copy, clock2 has default values
     @test clock2.time == SpeedyWeather.DEFAULT_DATE
     @test clock2.time_step_counter == 0
+    @test clock2.step_counter == 0
     @test clock2.n_time_steps == 0
+    @test clock2.n_steps == 0
 
     copy!(clock2, clock1)
 
