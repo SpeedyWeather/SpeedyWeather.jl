@@ -456,8 +456,12 @@ function vordiv_tendencies!(
     v = get_prognostic_step(vars.grid.v, time_stepping, DynamicalCore())
     vor = get_prognostic_step(vars.grid.vorticity, time_stepping, DynamicalCore())
     temp = get_prognostic_step(vars.grid.temperature, time_stepping, DynamicalCore())
-    vars.scratch.grid.a .= 0
-    humid = haskey(vars.grid, :humidity) ? get_prognostic_step(vars.grid.humidity, time_stepping, DynamicalCore()) : vars.scratch.grid.a
+    
+    # if no humidity, pass a zero scratch array to the kernel
+    humid = haskey(vars.grid, :humidity) ?
+        get_prognostic_step(vars.grid.humidity, time_stepping, DynamicalCore()) :
+        fill!(vars.scratch.grid.a, 0)                   
+
     (; dpres_dx, dpres_dy) = vars.dynamics              # zonal/meridional gradient of logarithm of surface pressure
     scratch_memory = vars.scratch.transform_memory
 
@@ -578,8 +582,9 @@ function temperature_tendency!(
     temp = get_prognostic_step(vars.grid.temperature, time_stepping, DynamicalCore())
 
     # use scratch array with zeros in case humidity doesn't exist
-    vars.scratch.grid.a .= 0
-    humid = haskey(vars.grid, :humidity) ? get_prognostic_step(vars.grid.humidity, time_stepping, DynamicalCore()) : vars.scratch.grid.a
+    humid = haskey(vars.grid, :humidity) ?
+        get_prognostic_step(vars.grid.humidity, time_stepping, DynamicalCore()) : 
+        fill!(vars.scratch.grid.a, 0)
 
     (; pres_flux, pres_flux_sum_above, div_sum_above) = vars.dynamics
     scratch_memory = vars.scratch.transform_memory

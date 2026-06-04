@@ -66,8 +66,9 @@ function geopotential!(
     Φ = vars.dynamics.geopotential
 
     # use zero scratch for humidity in dry models to not distinguish in kernels below
-    vars.scratch.grid.a .= 0
-    q = haskey(vars.grid, :humidity) ?  get_prognostic_step(vars.grid.humidity, TS, G) : vars.scratch.grid.a
+    q = haskey(vars.grid, :humidity) ?
+        get_prognostic_step(vars.grid.humidity, TS, G) :
+        fill!(vars.scratch.grid.a, 0)
     
     @boundscheck size(T) == size(Φ) == size(q) || throw(BoundsError)
 

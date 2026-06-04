@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- reinitialize! logic to allow for model.implicit to be reinitialized [#1035](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1035)
+- get_prognostic_step, get_tendency_step in dycore and parameterizations [#1035](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1035)
+- time stepping modularised [#1035](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1035)
+- NCycleLorenz time stepping for 2D models [#1035](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1035) [#937](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/937)
 - Fixed punctuation in spectral transform docs [#1112](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1112)
 
 ## v0.20.3
@@ -34,8 +38,6 @@
 - `set!(output, model; interval)` to change output frequency after model initialization [#1075](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1075)
 - Documentation hero page and docs rendering [#1071](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1071) [#1072](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1072)
 - Bump julia-actions/cache and setup-julia v2 to v3 [#1073](ttps://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1073)
-
-- NCycleLorenz time stepping [#1035](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1035) [#937](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/937)
 
 ## v0.19.0
 
