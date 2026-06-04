@@ -163,7 +163,7 @@ function build_cache(S::SpectralTransform, nlayers::Integer)
     has_equator = isodd(nlat)
     jeq = (nlat + 1) ÷ 2
     nlons_s = copy(nlons)
-    has_equator && (nlon_s[jeq] = 0)        # south pass skips the equator ring
+    has_equator && (nlons_s[jeq] = 0)        # south pass skips the equator ring
 
     packed_real = CUDA.zeros(NF, sum(block_r))
     packed_cplx = CUDA.zeros(Complex{NF}, sum(block_c))
