@@ -57,38 +57,38 @@ const MAX_GRAPHS = 64
 # =====================================================================================
 
 # grid field (npoints × nlayers) ring rows  ->  packed real buffer  (forward gather)
-@kernel inbounds = true function gather_real_kernel!(packed, src, roff, nlon, rstart)
-    r, j, k = @index(Global, NTuple)
-    nl = nlon[j]
-    if r <= nl
-        packed[roff[j] + (k - 1) * nl + r] = src[rstart[j] + r - 1, k]
+@kernel inbounds = true function gather_real_kernel!(packed, src, real_offset, nlons, istart)
+    i, j, k = @index(Global, NTuple)
+    nlon = nlons[j]
+    if i <= nlon
+        packed[real_offset[j] + (k - 1) * nlon + i] = src[istart[j] + i - 1, k]
     end
 end
 
 # packed complex buffer  ->  scratch (nfreq_max × nlayers × nlat_half)  (forward scatter)
-@kernel inbounds = true function scatter_cplx_kernel!(dst, packed, coff, nfreq)
+@kernel inbounds = true function scatter_complex_kernel!(dst, packed, complex_offset, nfreqs)
     m, j, k = @index(Global, NTuple)
-    nf = nfreq[j]
-    if m <= nf
-        dst[m, k, j] = packed[coff[j] + (k - 1) * nf + m]
+    nfreq = nfreqs[j]
+    if m <= nfreq
+        dst[m, k, j] = packed[complex_offset[j] + (k - 1) * nfreq + m]
     end
 end
 
 # scratch  ->  packed complex buffer  (inverse gather)
-@kernel inbounds = true function gather_cplx_kernel!(packed, src, coff, nfreq)
+@kernel inbounds = true function gather_complex_kernel!(packed, src, complex_offset, nfreqs)
     m, j, k = @index(Global, NTuple)
-    nf = nfreq[j]
-    if m <= nf
-        packed[coff[j] + (k - 1) * nf + m] = src[m, k, j]
+    nfreq = nfreqs[j]
+    if m <= nfreq
+        packed[complex_offset[j] + (k - 1) * nfreq + m] = src[m, k, j]
     end
 end
 
 # packed real buffer  ->  grid field ring rows  (inverse scatter)
-@kernel inbounds = true function scatter_real_kernel!(dst, packed, roff, nlon, rstart)
-    r, j, k = @index(Global, NTuple)
-    nl = nlon[j]
-    if r <= nl
-        dst[rstart[j] + r - 1, k] = packed[roff[j] + (k - 1) * nl + r]
+@kernel inbounds = true function scatter_real_kernel!(dst, packed, real_offset, nlons, istart)
+    i, j, k = @index(Global, NTuple)
+    nlon = nlons[j]
+    if i <= nlon
+        dst[istart[j] + i - 1, k] = packed[real_offset[j] + (k - 1) * nlon + i]
     end
 end
 
@@ -105,24 +105,24 @@ buffer and direction). A graph value of `nothing` marks a buffer for which captu
 (fall back to direct loop)."""
 struct GPUFourierGraphCache{PR, PC, RV, CV, IV, A}
     packed_real::PR             # CuVector{NF}          — all rings' dense real blocks
-    packed_cplx::PC             # CuVector{Complex{NF}} — all rings' dense complex blocks
+    packed_complex::PC          # CuVector{Complex{NF}} — all rings' dense complex blocks
     real_view::RV               # Vector of per-ring reshaped (nlon_j × nlayers) views into packed_real
-    cplx_view::CV               # Vector of per-ring reshaped (nfreq_j × nlayers) views into packed_cplx
+    complex_view::CV            # Vector of per-ring reshaped (nfreq_j × nlayers) views into packed_complex
     rfft_plans::Vector{AbstractFFTs.Plan}   # forward FFT plans for THIS size (nlayers batches), per ring
     brfft_plans::Vector{AbstractFFTs.Plan}  # inverse FFT plans for THIS size, per ring
-    roff::IV                    # 0-based real-block offset per ring
-    coff::IV                    # 0-based complex-block offset per ring
+    real_offset::IV             # 0-based real-block offset per ring
+    complex_offset::IV          # 0-based complex-block offset per ring
     nlons::IV                   # longitudes per ring
-    nfreq::IV                   # Fourier frequencies per ring
-    rstart_n::IV                # first grid row of each northern ring
-    rstart_s::IV                # first grid row of each southern ring
+    nfreqs::IV                  # Fourier frequencies per ring
+    istart_n::IV                # first grid row of each northern ring
+    istart_s::IV                # first grid row of each southern ring
     nlons_s::IV                 # like nlons but 0 at the equator ring (south skip)
-    nlon_max::Int
-    nfreq_max::Int
-    nlat_half::Int
-    nlayers::Int
-    has_equator::Bool
-    jeq::Int
+    nlon_max::Int               # maximum number of longitudes across all rings (for launch size)
+    nfreq_max::Int              # maximum number of frequencies across all rings (for launch size)
+    nlat_half::Int              # number of rings on one hemisphere, equator included
+    nlayers::Int                # number of vertical layers (for launch size)
+    has_equator::Bool           # whether the grid has a ring on the equator that needs special handling
+    j_equator::Int              # latitude index of the equator ring (if any)
     arch::A                     # SpeedyWeather GPU architecture (for launch!)
     forward_execs::IdDict{Any, Union{Nothing, CuGraphExec}} # the actual graphs forward transforms
     inverse_execs::IdDict{Any, Union{Nothing, CuGraphExec}} # the actual graphs inverse transforms
@@ -152,31 +152,32 @@ function build_cache(S::SpectralTransform, nlayers::Integer)
     nlons = collect(Int, S.nlons[1:nlat_half])
     nfreqs = nlons .÷ 2 .+ 1
 
-    block_r = nlons .* nlayers
-    block_c = nfreqs .* nlayers
-    roff = [0; cumsum(block_r)[1:(end - 1)]]
-    coff = [0; cumsum(block_c)[1:(end - 1)]]
+    # packed buffer block offset
+    block_real = nlons .* nlayers
+    block_complex = nfreqs .* nlayers
+    real_offset = [0; cumsum(block_real)[1:(end - 1)]]
+    complex_offset = [0; cumsum(block_complex)[1:(end - 1)]]
 
-    rstart_n = [rings[j].start for j in 1:nlat_half]
-    rstart_s = [rings[nlat - j + 1].start for j in 1:nlat_half]
+    istart_n = [rings[j].start for j in 1:nlat_half]
+    istart_s = [rings[nlat - j + 1].start for j in 1:nlat_half]
 
     has_equator = isodd(nlat)
-    jeq = (nlat + 1) ÷ 2
+    j_equator = (nlat + 1) ÷ 2
     nlons_s = copy(nlons)
-    has_equator && (nlons_s[jeq] = 0)        # south pass skips the equator ring
+    has_equator && (nlons_s[j_equator] = 0)        # south pass skips the equator ring
 
-    packed_real = CUDA.zeros(NF, sum(block_r))
-    packed_cplx = CUDA.zeros(Complex{NF}, sum(block_c))
-    real_view = [reshape(view(packed_real, roff[j] + 1:roff[j] + block_r[j]), nlons[j], nlayers) for j in 1:nlat_half]
-    cplx_view = [reshape(view(packed_cplx, coff[j] + 1:coff[j] + block_c[j]), nfreqs[j], nlayers) for j in 1:nlat_half]
+    packed_real = CUDA.zeros(NF, sum(block_real))
+    packed_complex = CUDA.zeros(Complex{NF}, sum(block_complex))
+    real_view = [reshape(view(packed_real, real_offset[j] + 1:real_offset[j] + block_real[j]), nlons[j], nlayers) for j in 1:nlat_half]
+    complex_view = [reshape(view(packed_complex, complex_offset[j] + 1:complex_offset[j] + block_complex[j]), nfreqs[j], nlayers) for j in 1:nlat_half]
 
     dev(x) = CuArray(x)
     return GPUFourierGraphCache(
-        packed_real, packed_cplx, real_view, cplx_view,
+        packed_real, packed_complex, real_view, complex_view,
         rfft_plans, brfft_plans,
-        dev(roff), dev(coff), dev(nlons), dev(nfreqs),
-        dev(rstart_n), dev(rstart_s), dev(nlons_s),
-        S.nlon_max, S.nfreq_max, nlat_half, nlayers, has_equator, jeq,
+        dev(real_offset), dev(complex_offset), dev(nlons), dev(nfreqs),
+        dev(istart_n), dev(istart_s), dev(nlons_s),
+        S.nlon_max, S.nfreq_max, nlat_half, nlayers, has_equator, j_equator,
         architecture(packed_real),
         IdDict{Any, Union{Nothing, CuGraphExec}}(),
         IdDict{Any, Union{Nothing, CuGraphExec}}(),
@@ -209,31 +210,32 @@ Allocation-free, fused forward (grid → spectral) batched Fourier loop: one gat
 packs all rings, per-ring in-place cuFFTs run on reshaped views, one scatter kernel writes
 the scratch. Suitable for CUDA-graph capture."""
 function forward_loop!(cache::GPUFourierGraphCache, f_north, f_south, field::AbstractField, S::SpectralTransform)
-    arch = cache.arch
-    nlat_half = cache.nlat_half
-    L = cache.nlayers
-    real_view = cache.real_view
-    cplx_view = cache.cplx_view
+    (; arch ) = cache
+    (; nlat_half, nlayers) = cache
+    (; nlon_max, nfreq_max, nlons, nfreqs, j_equator) = cache
+    (; real_view, complex_view, packed_real, packed_complex, rfft_plans) = cache
+    (; real_offset, complex_offset, istart_n, istart_s) = cache
 
-    rfft_plans = cache.rfft_plans
+    real_size = (nlon_max, nlat_half, nlayers)          # launch scatter/gather kernels over 
+    complex_size = (nfreq_max, nlat_half, nlayers)
 
-    # northern rings
-    launch!(arch, Array3DWorkOrder, (cache.nlon_max, nlat_half, L), gather_real_kernel!, cache.packed_real, field.data, cache.roff, cache.nlons, cache.rstart_n)
+    # northern rings, 
+    launch!(arch, Array3DWorkOrder, real_size, gather_real_kernel!, packed_real, field.data, real_offset, nlons, istart_n)
     @inbounds for j in 1:nlat_half
-        mul!(cplx_view[j], rfft_plans[j], real_view[j])
+        mul!(complex_view[j], rfft_plans[j], real_view[j])
     end
-    launch!(arch, Array3DWorkOrder, (cache.nfreq_max, nlat_half, L), scatter_cplx_kernel!, f_north, cache.packed_cplx, cache.coff, cache.nfreq)
+    launch!(arch, Array3DWorkOrder, complex_size, scatter_complex_kernel!, f_north, packed_complex, complex_offset, nfreqs)
 
     # southern rings (the equator ring, if any, is zeroed rather than transformed)
-    launch!(arch, Array3DWorkOrder, (cache.nlon_max, nlat_half, L), gather_real_kernel!, cache.packed_real, field.data, cache.roff, cache.nlons, cache.rstart_s)
+    launch!(arch, Array3DWorkOrder, real_size, gather_real_kernel!, packed_real, field.data, real_offset, nlons, istart_s)
     @inbounds for j in 1:nlat_half
-        if cache.has_equator && j == cache.jeq
-            fill!(cplx_view[j], 0)
+        if cache.has_equator && j == j_equator
+            fill!(complex_view[j], 0)
         else
-            mul!(cplx_view[j], rfft_plans[j], real_view[j])
+            mul!(complex_view[j], rfft_plans[j], real_view[j])
         end
     end
-    launch!(arch, Array3DWorkOrder, (cache.nfreq_max, nlat_half, L), scatter_cplx_kernel!, f_south, cache.packed_cplx, cache.coff, cache.nfreq)
+    launch!(arch, Array3DWorkOrder, complex_size, scatter_complex_kernel!, f_south, packed_complex, complex_offset, nfreqs)
     return nothing
 end
 
@@ -242,28 +244,29 @@ Allocation-free, fused inverse (spectral → grid) batched Fourier loop: one gat
 packs all rings from the scratch, per-ring in-place inverse cuFFTs run on reshaped views,
 one scatter kernel writes the grid field. Suitable for CUDA-graph capture."""
 function inverse_loop!(cache::GPUFourierGraphCache, field::AbstractField, g_north, g_south, S::SpectralTransform)
-    arch = cache.arch
-    nlat_half = cache.nlat_half
-    L = cache.nlayers
-    real_view = cache.real_view
-    cplx_view = cache.cplx_view
+    (; arch) = cache
+    (; nlat_half, nlayers) = cache
+    (; nlon_max, nfreq_max, nlons, nlons_s, nfreqs, j_equator) = cache
+    (; real_view, complex_view, packed_real, packed_complex, brfft_plans) = cache
+    (; real_offset, complex_offset, istart_n, istart_s) = cache
 
-    brfft_plans = cache.brfft_plans
+    real_size = (nlon_max, nlat_half, nlayers)
+    complex_size = (nfreq_max, nlat_half, nlayers)
 
     # northern rings
-    launch!(arch, Array3DWorkOrder, (cache.nfreq_max, nlat_half, L), gather_cplx_kernel!, cache.packed_cplx, g_north, cache.coff, cache.nfreq)
+    launch!(arch, Array3DWorkOrder, complex_size, gather_complex_kernel!, packed_complex, g_north, complex_offset, nfreqs)
     @inbounds for j in 1:nlat_half
-        mul!(real_view[j], brfft_plans[j], cplx_view[j])
+        mul!(real_view[j], brfft_plans[j], complex_view[j])
     end
-    launch!(arch, Array3DWorkOrder, (cache.nlon_max, nlat_half, L), scatter_real_kernel!, field.data, cache.packed_real, cache.roff, cache.nlons, cache.rstart_n)
+    launch!(arch, Array3DWorkOrder, real_size, scatter_real_kernel!, field.data, packed_real, real_offset, nlons, istart_n)
 
     # southern rings (the equator ring, if any, is skipped: north already wrote those rows)
-    launch!(arch, Array3DWorkOrder, (cache.nfreq_max, nlat_half, L), gather_cplx_kernel!, cache.packed_cplx, g_south, cache.coff, cache.nfreq)
+    launch!(arch, Array3DWorkOrder, complex_size, gather_complex_kernel!, packed_complex, g_south, complex_offset, nfreqs)
     @inbounds for j in 1:nlat_half
-        (cache.has_equator && j == cache.jeq) && continue
-        mul!(real_view[j], brfft_plans[j], cplx_view[j])
+        (cache.has_equator && j == j_equator) && continue
+        mul!(real_view[j], brfft_plans[j], complex_view[j])
     end
-    launch!(arch, Array3DWorkOrder, (cache.nlon_max, nlat_half, L), scatter_real_kernel!, field.data, cache.packed_real, cache.roff, cache.nlons_s, cache.rstart_s)
+    launch!(arch, Array3DWorkOrder, real_size, scatter_real_kernel!, field.data, packed_real, real_offset, nlons_s, istart_s)
     return nothing
 end
 
