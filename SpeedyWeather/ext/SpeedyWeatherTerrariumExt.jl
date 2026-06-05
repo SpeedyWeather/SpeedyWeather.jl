@@ -62,6 +62,13 @@ abstract type AbstractTerrariumLandModel <: SpeedyWeather.AbstractLand end
 
 @inline SpeedyWeather.get_nlayers(land::AbstractTerrariumLandModel) = land.geometry.nlayers
 
+"""$(TYPEDSIGNATURES)
+
+Boolean land mask of the underlying Terrarium [`ColumnRingGrid`](@ref). Terrarium
+only allocates columns where this mask is `true`, so every Terrarium state field
+has length `sum(mask)` (the number of land columns)."""
+@inline land_mask(land::AbstractTerrariumLandModel) = land.model.grid.mask.data
+
 """$(TYPEDEF)
 
 The canonical [`AbstractTerrariumLandModel`](@ref) implementation for wet
@@ -172,10 +179,11 @@ end
 function SpeedyWeather.initialize!(
         vars::Variables,
         land::AbstractTerrariumLandModel,
-        ::PrimitiveWetModel,
+        model::PrimitiveWetModel,
     )
     state = vars.prognostic.land.terrarium
     NF = eltype(vars.prognostic.land.soil_temperature)
+    mask = land_mask(land)
 
     # Sync the Terrarium clock's initial time with the SpeedyWeather clock,
     # which was set from the `time` kwarg of `initialize!(model; time=...)`.
@@ -190,8 +198,11 @@ function SpeedyWeather.initialize!(
 
     Tsoil = interior(state.temperature)[:, 1, end] .+ NF(273.15)
     sat = interior(state.saturation_water_ice)[:, 1, end]
-    vars.prognostic.land.soil_temperature .= Tsoil
-    vars.prognostic.land.soil_moisture .= sat
+
+    @assert length(mask) == length(vars.prognostic.land.soil_temperature) "Terrarium land mask (length = $(length(mask))) does not span the full SpeedyWeather ring grid (length = $(length(vars.prognostic.land.soil_temperature)))."
+    @assert count(mask) == length(Tsoil) "Number of Terrarium land columns (length = $(length(Tsoil))) does not match the number of land points in the mask (count = $(count(mask)))."
+    vars.prognostic.land.soil_temperature[mask] .= Tsoil
+    vars.prognostic.land.soil_moisture[mask] .= sat
     return nothing
 end
 
@@ -204,16 +215,19 @@ function SpeedyWeather.timestep!(
     tmodel = land.model
     consts = tmodel.constants
     NF = eltype(state)
+    # Boolean land mask: SpeedyWeather fields span the full ring grid, Terrarium
+    # only the land columns.
+    mask = land_mask(land)
 
     # Atmospheric forcings on the lowest model level / surface
-    Tair = @view vars.grid.temperature[:, end]
-    humid = @view vars.grid.humidity[:, end]
-    pres = vars.grid.pressure                                # log surface pressure
-    wind = vars.parameterizations.surface_wind_speed
-    rain = vars.parameterizations.rain_rate
-    snow = vars.parameterizations.snow_rate
-    Rsd = vars.parameterizations.surface_shortwave_down
-    Rld = vars.parameterizations.surface_longwave_down
+    Tair = vars.grid.temperature[mask, end]
+    humid = vars.grid.humidity[mask, end]
+    pres = vars.grid.pressure[mask]                          # log surface pressure
+    wind = vars.parameterizations.surface_wind_speed[mask]
+    rain = vars.parameterizations.rain_rate[mask]
+    snow = vars.parameterizations.snow_rate[mask]
+    Rsd = vars.parameterizations.surface_shortwave_down[mask]
+    Rld = vars.parameterizations.surface_longwave_down[mask]
 
     # Push forcings into Terrarium inputs (set! avoids allocating new fields)
     inputs = state.inputs
@@ -242,19 +256,19 @@ function SpeedyWeather.timestep!(
     # The Terrarium state itself is mutated in place above and remains in
     # `vars.prognostic.land.terrarium`; the soil mirrors are refreshed so
     # SpeedyWeather radiation / surface flux components see current values.
-    vars.prognostic.land.soil_temperature .= state.skin_temperature .+ NF(273.15)
-    vars.prognostic.land.soil_moisture .= @view interior(state.saturation_water_ice)[:, 1, end]
+    vars.prognostic.land.soil_temperature[mask] .= interior(state.skin_temperature) .+ NF(273.15)
+    vars.prognostic.land.soil_moisture[mask] .= @view interior(state.saturation_water_ice)[:, 1, end]
     if haskey(vars.prognostic.land, :sensible_heat_flux)
-        vars.prognostic.land.sensible_heat_flux .= state.sensible_heat_flux
+        vars.prognostic.land.sensible_heat_flux[mask] .= interior(state.sensible_heat_flux)
     end
     if haskey(vars.prognostic.land, :surface_humidity_flux)
-        vars.prognostic.land.surface_humidity_flux .= state.latent_heat_flux ./ consts.thermodynamics.latent_heat_vaporization
+        vars.prognostic.land.surface_humidity_flux[mask] .= interior(state.latent_heat_flux) ./ consts.thermodynamics.latent_heat_vaporization
     end
     if haskey(vars.parameterizations, :surface_longwave_up)
-        vars.parameterizations.surface_longwave_up .= state.surface_longwave_up
+        vars.parameterizations.surface_longwave_up[mask] .= interior(state.surface_longwave_up)
     end
     if haskey(vars.parameterizations, :surface_shortwave_up)
-        vars.parameterizations.surface_shortwave_up .= state.surface_shortwave_up
+        vars.parameterizations.surface_shortwave_up[mask] .= interior(state.surface_shortwave_up)
     end
     return nothing
 end
@@ -267,12 +281,13 @@ function SpeedyWeather.initialize!(
     )
     state = vars.prognostic.land.terrarium
     NF = eltype(vars.prognostic.land.soil_temperature)
+    mask = land_mask(land)
 
     # Sync the Terrarium clock's initial time with the SpeedyWeather clock,
     # which was set from the `time` kwarg of `initialize!(model; time=...)`.
     state.clock.time = vars.prognostic.clock.time
 
-    vars.prognostic.land.soil_temperature .= @view(interior(state.temperature)[:, 1, end]) .+ NF(273.15)
+    vars.prognostic.land.soil_temperature[mask] .= @view(interior(state.temperature)[:, 1, end]) .+ NF(273.15)
     return nothing
 end
 
@@ -284,9 +299,10 @@ function SpeedyWeather.timestep!(
     state = vars.prognostic.land.terrarium
     tmodel = land.model
     NF = eltype(state)
+    mask = land_mask(land)
 
     # Only air temperature is needed; convert K -> °C
-    Tair = @view vars.grid.temperature[:, end]
+    Tair = vars.grid.temperature[mask, end]
     inputs = state.inputs
     Terrarium.set!(inputs.air_temperature, Tair)
     Terrarium.set!(inputs.air_temperature, inputs.air_temperature - NF(273.15))
@@ -300,7 +316,7 @@ function SpeedyWeather.timestep!(
     Terrarium.run!(integrator; period = vars.prognostic.clock.Δt, Δt = land.Δt)
 
     # Surface soil temperature from the bottom of the column (last z-index)
-    vars.prognostic.land.soil_temperature .= @view(interior(state.temperature)[:, 1, end]) .+ NF(273.15)
+    vars.prognostic.land.soil_temperature[mask] .= @view(interior(state.temperature)[:, 1, end]) .+ NF(273.15)
     return nothing
 end
 
