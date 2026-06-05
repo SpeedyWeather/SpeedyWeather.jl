@@ -31,6 +31,7 @@ $(TYPEDFIELDS)"""
         LA,     # <:AbstractLand,
         ZE,     # <:AbstractZenith,
         AL,     # <:AbstractAlbedo,
+        SR,     # <:AbstractSurfaceRoughness,
         BL,     # <:AbstractBoundaryLayer,
         VD,     # <:AbstractVerticalDiffusion,
         SC,     # <:AbstractSurfaceCondition,
@@ -88,6 +89,7 @@ $(TYPEDFIELDS)"""
     # PHYSICS/PARAMETERIZATIONS
     @component solar_zenith::ZE = WhichZenith(spectral_grid, planet)
     @component albedo::AL = OceanLandAlbedo(spectral_grid)
+    @component surface_roughness::SR = ConstantSurfaceRoughness(spectral_grid)
     @component boundary_layer_drag::BL = BulkRichardsonDrag(spectral_grid)
     @component vertical_diffusion::VD = BulkRichardsonDiffusion(spectral_grid)
     @component surface_condition::SC = SurfaceCondition(spectral_grid)
@@ -134,7 +136,7 @@ $(TYPEDFIELDS)"""
         :albedo, :shortwave_radiation, :longwave_radiation,
 
         # surface fluxes
-        :boundary_layer_drag, :surface_condition,
+        :surface_roughness, :boundary_layer_drag, :surface_condition,
         :surface_momentum_flux, :surface_heat_flux, :surface_humidity_flux,
 
         # perturbations
@@ -194,6 +196,7 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
     initialize!(model.albedo, model)
 
     # parameterizations
+    initialize!(model.surface_roughness, model)
     initialize!(model.boundary_layer_drag, model)
     initialize!(model.vertical_diffusion, model)
     initialize!(model.large_scale_condensation, model)

@@ -21,6 +21,47 @@ initialize!(::ConstantDrag, ::PrimitiveEquation) = nothing
     return diagn.physics.boundary_layer_drag[ij] = scheme.drag
 end
 
+abstract type AbstractSurfaceRoughness <: AbstractParameterization end
+
+export ConstantSurfaceRoughness
+@kwdef struct ConstantSurfaceRoughness{NF} <: AbstractSurfaceRoughness
+    "[OPTION] constant roughness length over land [m]"
+    roughness_length_land::NF = 0.5
+
+    "[OPTION] constant roughness length over ocean [m]"
+    roughness_length_ocean::NF = 1.0e-4
+end
+
+Adapt.@adapt_structure ConstantSurfaceRoughness
+ConstantSurfaceRoughness(SG::SpectralGrid, kwargs...) = ConstantSurfaceRoughness{SG.NF}(; kwargs...)
+initialize!(::ConstantSurfaceRoughness, ::PrimitiveEquation) = nothing
+
+@propagate_inbounds parameterization!(ij, vars, scheme::AbstractSurfaceRoughness, model) = 
+    surface_roughness!(ij, vars, scheme, model.land_sea_mask)
+
+variables(::AbstractSurfaceRoughness) = (
+    ParameterizationVariable(name = :surface_roughness, dims = Grid2D(), desc = "Surface roughness length", units = "m"),
+    ParameterizationVariable(name = :surface_roughness, dims = Grid2D(), desc = "Land surface roughness length", units = "m", namespace = :land),
+    ParameterizationVariable(name = :surface_roughness, dims = Grid2D(), desc = "Ocean surface roughness length", units = "m", namespace = :ocean),
+)
+
+@propagate_inbounds function surface_roughness!(ij, vars, scheme::ConstantSurfaceRoughness, land_sea_mask)
+    land_fraction = land_sea_mask.mask[ij]
+
+    vars.parameterizations.land.surface_roughness[ij] = ifelse(land_fraction > 0, scheme.roughness_length_land, zero(land_fraction))    
+    vars.parameterizations.ocean.surface_roughness[ij] = ifelse(land_fraction < 1, scheme.roughness_length_ocean, zero(land_fraction))  
+
+    vars.parameterizations.surface_roughness[ij] = land_fraction * vars.parameterizations.land.surface_roughness[ij] + (1 - land_fraction) * vars.parameterizations.ocean.surface_roughness[ij]
+    return nothing
+end
+
+function Base.show(io::IO, scheme::ConstantSurfaceRoughness{NF}) where NF
+    print(io, "ConstantSurfaceRoughness{$NF}")
+    println(io)
+    println(io, "├ Ocean: $(scheme.roughness_length_ocean) m")
+    return println(io, "└ Land: $(scheme.roughness_length_land) m")
+end
+
 export BulkRichardsonDrag
 
 """Boundary layer drag coefficient from the bulk Richardson number,
@@ -29,12 +70,6 @@ $(TYPEDFIELDS)"""
 @kwdef struct BulkRichardsonDrag{NF} <: AbstractBoundaryLayer
     "[OPTION] von Kármán constant [1]"
     von_Karman::NF = 0.4
-
-    "[OPTION] roughness length over land [m]"
-    roughness_length_land::NF = 0.5
-
-    "[OPTION] roughness length over ocean [m]"
-    roughness_length_ocean::NF = 1.0e-4
 
     "[OPTION] Critical Richardson number for stable mixing cutoff [1]"
     critical_Richardson::NF = 10
@@ -49,18 +84,16 @@ initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
 
 # function barrier
 @propagate_inbounds parameterization!(ij, vars, drag::BulkRichardsonDrag, model) =
-    boundary_layer_drag!(ij, vars, drag, model.land_sea_mask, model.atmosphere, model.planet, model.orography)
+    boundary_layer_drag!(ij, vars, drag, model.atmosphere, model.planet, model.orography)
 
 @propagate_inbounds function boundary_layer_drag!(
         ij,
         vars,
         drag::BulkRichardsonDrag,
-        land_sea_mask,
         atmosphere,
         planet,
         orography,
     )
-    land_fraction = land_sea_mask.mask[ij]
 
     # Height z [m] of lowermost layer above ground
     surface = size(vars.grid.geopotential, 2)    # surface index = nlayers
@@ -70,7 +103,9 @@ initialize!(::BulkRichardsonDrag, ::PrimitiveEquation) = nothing
     # maximum drag Cmax from that height, stable conditions would decrease Cmax towards 0
     # Frierson 2006, eq (12)
     κ = drag.von_Karman
-    z₀ = land_fraction * drag.roughness_length_land + (1 - land_fraction) * drag.roughness_length_ocean
+
+    # Get surface roughness length (computed by the surface_roughness parameterization)
+    z₀ = vars.parameterizations.surface_roughness[ij]
 
     # should be z > z₀, z=z₀ means an infinitely high drag
     # 0 < z < z₀ doesn't make sense so cap here
