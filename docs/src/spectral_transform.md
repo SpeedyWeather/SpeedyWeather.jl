@@ -46,10 +46,10 @@ For an interactive visualisation of the spherical harmonics, see
 
 The synthesis (or inverse transform) takes the spectral coefficients ``a_{lm}`` and transforms them to grid-point values
 ``f(\phi, \theta)`` (for the sake of simplicity first regarded as continuous). The synthesis is a linear combination of
-the spherical harmonics ``Y_{lm}`` with non-zero coefficients.
+the spherical harmonics ``Y_{lm}`` with non-zero coefficients:
 
 ```math
-f(\phi, \theta) = \sum_{l=0}^{\infty} \sum_{m=-l}^l a_{lm} Y_{lm}(\phi, \theta)
+f(\phi, \theta) = \sum_{l=0}^{\infty} \sum_{m=-l}^l a_{lm} Y_{lm}(\phi, \theta).
 ```
 
 We obtain an approximation with a finite set of ``a_{l, m}`` by truncating the series in both degree ``l``
@@ -82,17 +82,18 @@ rotate them around the Earth's axis, which, well, doesn't actually change a real
 
 Following the notation of [^Willmert2020] we can therefore write the truncated synthesis as
 ```math
-f(\phi, \theta) = \sum_{l=0}^{l_{max}} \sum_{m=0}^l (2-\delta_{m0}) a_{lm} Y_{lm}(\phi, \theta)
+f(\phi, \theta) = \sum_{l=0}^{l_{max}} \sum_{m=0}^l (2-\delta_{m0}) a_{lm} Y_{lm}(\phi, \theta).
 ```
+
 The ``(2-\delta_{m0})`` factor using the Kronecker ``\delta`` is used here because of the symmetry we have
 to count both the ``m, -m`` order pairs (hence the ``2``) except for the zonal harmonics which do not have
 a pair.
 
 Another symmetry arises from the fact that the spherical harmonics are either symmetric or anti-symmetric
 around the Equator. There is an even/odd combination of degrees and orders so that the sign flips like a
-checkerboard
+checkerboard: 
 ```math
-Y_{l, m}(\phi, \pi-\theta) = (-1)^{l+m}Y_{lm}(\phi, \theta)
+Y_{l, m}(\phi, \pi-\theta) = (-1)^{l+m}Y_{lm}(\phi, \theta).
 ```
 This means that one only has to compute the Legendre polynomials for one hemisphere and the other one
 follows with this equality.
@@ -102,20 +103,21 @@ follows with this equality.
 Starting in grid-point space we can transform a field ``f(\lambda, \theta)`` into the spectral space of the spherical harmonics by
 
 ```math
-a_{l, m} = \int_0^{2\pi} \int_{0}^\pi f(\phi, \theta) Y_{l, m}(\phi, \theta) \sin \theta d\theta d\phi
+a_{l, m} = \int_0^{2\pi} \int_{0}^\pi f(\phi, \theta) Y_{l, m}(\phi, \theta) \sin \theta d\theta d\phi.
 ```
+
 Note that this notation again uses colatitudes ``\theta``, for latitudes the ``\sin\theta`` becomes a ``\cos\theta`` and the
 bounds have to be changed accordingly to ``(-\frac{\pi}{2}, \frac{\pi}{2})``. A discretization with ``N``
 grid points at location ``(\phi_i, \theta_i)``, indexed by ``i`` can be written as [^Willmert2020]
 ```math
-\hat{a}_{l, m} = \sum_i f(\phi_i, \theta_i) Y_{l, m}(\phi_i, \theta_i) \sin \theta_i \Delta\theta \Delta\phi
+\hat{a}_{l, m} = \sum_i f(\phi_i, \theta_i) Y_{l, m}(\phi_i, \theta_i) \sin \theta_i \Delta\theta \Delta\phi.
 ```
 The hat on ``a`` just means that it is an approximation, or an estimate of the true ``a_{lm} \approx \hat{a}_{lm}``.
 We can essentially make use of the same symmetries as already discussed in [Synthesis](@ref synthesis).
 Splitting into the Fourier modes ``e^{im\phi}`` and the Legendre polynomials ``\lambda_l^m(\cos\theta)``
 (which are defined over ``[-1, 1]`` so the ``\cos\theta`` argument maps them to colatitudes) we have
 ```math
-\hat{a}_{l, m} = \sum_j \left[ \sum_i f(\phi_i, \theta_j) e^{-im\phi_i} \right] \lambda_{l, m}(\theta_j) \sin \theta_j \Delta\theta \Delta\phi
+\hat{a}_{l, m} = \sum_j \left[ \sum_i f(\phi_i, \theta_j) e^{-im\phi_i} \right] \lambda_{l, m}(\theta_j) \sin \theta_j \Delta\theta \Delta\phi.
 ```
 So the term in brackets can be separated out as long as the latitude ``\theta_j`` is constant,
 which motivates us to restrict the spectral transform to grids with iso-latitude rings, see [Grids](@ref).
