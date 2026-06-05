@@ -139,7 +139,7 @@ $(TYPEDSIGNATURES)
 Loads the land-sea mask from the path set in `land_sea_mask`, interpolates (grid-cell average) 
 onto the model grid for a fractional sea mask and saves it to the field `land_sea_mask.mask`.
 """
-function load_mask!(land_sea_mask::EarthLandSeaMask)
+function load_mask!(land_sea_mask::EarthLandSeaMask{NF}) where NF
 
     arch = architecture(land_sea_mask.mask)
 
