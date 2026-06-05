@@ -509,3 +509,37 @@ function warn_undefvar(vars::Variables, key::Symbol, group::Symbol = :prognostic
     @warn "Variable $key not defined in variables.$path. Defined are: $defined_vars"
     return true # return true to allow for short-circuiting with && return nothing to skip exit the following code early
 end
+
+"""$(TYPEDSIGNATURES)
+Names (Tuple of Symbols) of the tendencies in `::Variables`. Used to define which (atmopsheric) variables are time stepped.
+Ignores any other names spaces."""
+@generated function tendency_names(::Variables{Po, G, T}) where {Po, G, T}
+    names = Symbol[k for (i, k) in enumerate(fieldnames(T)) if !(fieldtype(T, i) <: NamedTuple)]
+    return Expr(:tuple, QuoteNode.(names)...)
+end
+
+"""$(TYPEDSIGNATURES)
+Like `tendency_names`, but adds `:u` and `:v` if `:vorticity` is present."""
+@generated function tendency_and_uv_names(::Variables{Po, G, T}) where {Po, G, T}
+    names = Symbol[k for (i, k) in enumerate(fieldnames(T)) if !(fieldtype(T, i) <: NamedTuple)]
+    names = :vorticity in names ? vcat(names, [:u, :v]) : names
+    return Expr(:tuple, QuoteNode.(names)...)
+end
+
+"""$(TYPEDSIGNATURES)
+Names (Tuple of Symbols) of the land tendencies in `::Variables`. Used to define which land variables are time stepped.
+Ignores any other names spaces."""
+@generated function land_tendency_names(::Variables{Po, G, T}) where {Po, G, T}
+    :land in fieldnames(T) || return :(())
+    names = collect(fieldnames(fieldtype(T, :land)))
+    return Expr(:tuple, QuoteNode.(names)...)
+end
+
+"""$(TYPEDSIGNATURES)
+Names (Tuple of Symbols) of the ocean tendencies in `::Variables`. Used to define which ocean variables are time stepped.
+Ignores any other names spaces."""
+@generated function ocean_tendency_names(::Variables{Po, G, T}) where {Po, G, T}
+    :ocean in fieldnames(T) || return :(())
+    names = collect(fieldnames(fieldtype(T, :ocean)))
+    return Expr(:tuple, QuoteNode.(names)...)
+end

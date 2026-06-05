@@ -78,50 +78,46 @@ tendency_steps(::AbstractLeapfrog) = 1
 
 # copy prognostic variables' 1st step to 2nd, that way which_prognostic_step can always be 2
 function initialize!(vars::Variables, ::AbstractLeapfrog, ::AbstractModel)
+    # time step variables are dynamically defined by existence in tendencies
+    # but statically compiled into the tendency_names function 
     (; prognostic) = vars
-    for varname in keys(prognostic)
-        if prognostic[varname] isa AbstractArray
-            var_old, var_new = get_steps(getfield(prognostic, varname))
-            var_new .= var_old
-        # TODO this requires also all land and ocean variables to be set up with the steps
-        # elseif prognostic[varname] isa NamedTuple
-        #     namespace = prognostic[varname]
-        #     for varname2 in keys(namespace)
-        #         if getfield(namespace, varname2) isa AbstractArray
-        #             var_old, var_new = get_steps(getfield(namespace, varname2))
-        #             var_new .= var_old
-        #         end
-        #     end
-        end
+    for varname in tendency_names(vars)
+        var_old, var_new = get_steps(getfield(prognostic, varname))
+        var_new .= var_old
     end
+    for varname in ocean_tendency_names(vars)
+        var_old, var_new = get_steps(getfield(prognostic.ocean, varname))
+        var_new .= var_old
+    end
+    for varname in land_tendency_names(vars)
+        var_old, var_new = get_steps(getfield(prognostic.land, varname))
+        var_new .= var_old
+    end
+    return nothing
 end
 
 # copy grid prognostics from 2nd to 1st step to retain these fields for the previous time step
 function move_prognostic_grid_variables_back!(
-    vars::Variables,
-    time_stepping::AbstractLeapfrog,
-    model::AbstractModel,
-)
+        vars::Variables,
+        time_stepping::AbstractLeapfrog,
+        model::AbstractModel,
+    )
+    # time step variables are dynamically defined by existence in tendencies
+    # but statically compiled into the tendency_names function 
     (; grid) = vars
-
-    # Note that this automatically loops over every entry in variables.grid
-    # therefore each is assumed to have a step dimension, do not add a
-    # variable to variables.grid that does not have steps
-    for varname in keys(grid)
-        if grid[varname] isa AbstractField
-            var_old, var_new = get_steps(getfield(grid, varname))
-            var_old .= var_new
-        # TODO this requires also all land and ocean variables to be set up with the steps
-        # elseif grid[varname] isa NamedTuple
-        #     nt = grid[varname]
-        #     for varname2 in keys(nt)
-        #         if getfield(nt, varname2) isa AbstractField
-        #             var_old, var_new = get_steps(getfield(nt, varname2))
-        #             var_old .= var_new
-        #         end
-        #     end
-        end
+    for varname in tendency_and_uv_names(vars)      # includes uv if vorticity exists
+        var_old, var_new = get_steps(getfield(grid, varname))
+        var_old .= var_new
     end
+    for varname in ocean_tendency_names(vars)
+        var_old, var_new = get_steps(getfield(grid.ocean, varname))
+        var_old .= var_new
+    end
+    for varname in land_tendency_names(vars)
+        var_old, var_new = get_steps(getfield(grid.land, varname))
+        var_old .= var_new
+    end
+    return nothing
 end
 
 # for leapfrog do first semi-implicit corrections then horizontal diffusion
@@ -189,7 +185,7 @@ function initialize!(L::Leapfrog, model::AbstractModel)
 end
 
 """$(TYPEDSIGNATURES) Leapfrog is spun up with 1 Euler forward step that doesn't count for clock + output"""
-spin_up_steps(::Leapfrog) = 1
+spin_up_steps(::AbstractLeapfrog) = 1
 
 function time_step!(clock::Clock, time_stepping::Leapfrog)
     Δt = time_stepping.Δt_millisec  # ::Millisecond, integer based hence ÷ not / below
@@ -208,7 +204,7 @@ function time_step!(clock::Clock, time_stepping::Leapfrog)
     return nothing
 end
 
-default_time_step(L::Leapfrog) = 2*L.Δt
+default_time_step(L::Leapfrog) = 2 * L.Δt
 function time_step(L::Leapfrog, clock::Clock)
     (; Δt) = L
     clock.step_counter == 0 && return Δt / 2    # first step Euler with Δt/2

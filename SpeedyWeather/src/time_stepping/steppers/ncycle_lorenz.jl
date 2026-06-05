@@ -61,6 +61,10 @@ prognostic_steps(::NCycleLorenz) = 1
 tendency_grid_steps(::NCycleLorenz) = 1     # the grid tendencies are only for F though, the G term only needs storing in spectral space
 tendency_spectral_steps(::NCycleLorenz) = 2 # to store F, G in Hotta et al. 2016, Eqs 5 & 6
 
+# Most components just use the 1st tendency step and only the timestepping itself needs the 2nd so the default step 1 is used throughout
+# Exceptions here to be explicit: While two tendencies F, G are used, only G retains memory to the next time step, therefore reset F to zero for accumulation
+@inline which_tendency_step(var, ::AbstractNCycleLorenz, ::ResetTendencies) = 1
+
 # dispatch over timestepper to decide between implicit or explicit diffusion
 @inline implicit_diffusion(::AbstractHorizontalDiffusion, ::Nothing, ::AbstractNCycleLorenz) = true
 @inline implicit_diffusion(::AbstractHorizontalDiffusion, ::AbstractImplicit, ::AbstractNCycleLorenz) = true

@@ -112,12 +112,10 @@ function update_prognostic!(
     (; prognostic, tendencies) = vars
 
     # atmospheric variables
-    for varname in keys(tendencies)
-        if !(tendencies[varname] isa NamedTuple)
-            var = getfield(prognostic, varname)
-            tendency = getfield(tendencies, varname)
-            update_prognostic!(var, tendency, vars, time_stepping, model.implicit, model)
-        end
+    for varname in tendency_names(vars)
+        var = getfield(prognostic, varname)
+        tendency = getfield(tendencies, varname)
+        update_prognostic!(var, tendency, vars, time_stepping, model.implicit, model)
     end
 
     # and time stepping for tracers if active
@@ -130,21 +128,17 @@ function update_prognostic!(
     end
 
     # ocean variables
-    if haskey(tendencies, :ocean) && tendencies.ocean isa NamedTuple
-        for varname in keys(tendencies.ocean)
-            var = getfield(prognostic.ocean, varname)
-            tendency = getfield(tendencies.ocean, varname)
-            update_prognostic!(var, tendency, vars, time_stepping, model.implicit, model)
-        end
+    for varname in ocean_tendency_names(vars)
+        var = getfield(prognostic.ocean, varname)
+        tendency = getfield(tendencies.ocean, varname)
+        update_prognostic!(var, tendency, vars, time_stepping, model.implicit, model)
     end
 
     # land variables
-    if haskey(tendencies, :land) && tendencies.land isa NamedTuple
-        for varname in keys(tendencies.land)
-            var = getfield(prognostic.land, varname)
-            tendency = getfield(tendencies.land, varname)
-            update_prognostic!(var, tendency, vars, time_stepping, model.implicit, model)
-        end
+    for varname in land_tendency_names(vars)
+        var = getfield(prognostic.land, varname)
+        tendency = getfield(tendencies.land, varname)
+        update_prognostic!(var, tendency, vars, time_stepping, model.implicit, model)
     end
 
     # evolve the random pattern in time
