@@ -24,6 +24,10 @@ end
 abstract type AbstractSurfaceRoughness <: AbstractParameterization end
 
 export ConstantSurfaceRoughness
+
+"""
+Surface roughness length parameterization with constant roughness length
+over land and ocean. Fields are $(TYPEDFIELDS)"""
 @kwdef struct ConstantSurfaceRoughness{NF} <: AbstractSurfaceRoughness
     "[OPTION] constant roughness length over land [m]"
     roughness_length_land::NF = 0.5
