@@ -20,9 +20,7 @@ struct GridGeometry{
     lon_offsets::VectorType     # longitude offsets of first grid point per ring
 
     # First grid-point index of each ring, so `rings[j][i] = ring_starts[j] + i - 1`.
-    # Stored as a flat Int array on the architecture so kernels can use plain integer
-    # arithmetic rather than indexing into a vector/tuple of UnitRanges (which breaks
-    # PTX codegen for Reactant on GPU and is awkward on plain GPU).
+    # Stored as a flat Int array for better Reactant and GPU compat
     ring_starts::VectorIntType
 end
 
@@ -675,9 +673,6 @@ function find_grid_indices!(
 end
 
 # Branchless longitude index lookup, valid for `λ ∈ [0, 360)` and `λ₀ ∈ [0, 360)`.
-# Avoids `mod`/`floor` because those emit Julia type-object references in PTX under
-# Reactant. Uses `unsafe_trunc` (matches `floor` for non-negative inputs) and arithmetic
-# wrap-around. Inputs are untyped so the function also works on Reactant `TracedRNumber`s.
 @inline function find_lon_indices(λ, λ₀, nlon)
     NF = typeof(λ)
     Δλ = NF(360) / NF(nlon)                 # longitude spacing

@@ -172,7 +172,6 @@ Calls all `initialize!` functions for components of `model`,
 except for `model.output` and `model.feedback` which are always called
 at in `time_stepping!` and `model.implicit` which is done in `first_timesteps!`."""
 function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
-    arch = model.architecture
 
     # NUMERICS (implicit is initialized later)
     initialize!(model.geometry, model)

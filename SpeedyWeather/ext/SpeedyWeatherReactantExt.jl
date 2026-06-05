@@ -117,6 +117,9 @@ Base.convert(::Type{Base.RefValue{ReactantDatesExt.ReactantDateTime}}, dt::Base.
 
 # OUTPUT HANDLING FOR REACTANT
 #
+# TODO: This is a hacky solution that we might revise if we take output out of the model
+# and into the `Simulation`
+# 
 # Reactant cannot trace through the output! pipeline: `output!` interpolates onto
 # CPU scratch fields and writes to disk, both of which are runtime side effects
 # the tracer can't (and shouldn't) capture. We split the behaviour by tracing
