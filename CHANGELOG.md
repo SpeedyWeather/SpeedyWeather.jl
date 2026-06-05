@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `MLDataDevices.get_device` extension mapping SpeedyWeather architectures to MLDataDevices devices [#1115](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1107)
 - Revised benchmark suite to make it compare between different architectures [#1103](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1103)
 
 ## v0.20.2
