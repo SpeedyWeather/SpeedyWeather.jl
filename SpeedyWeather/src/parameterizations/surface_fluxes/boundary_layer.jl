@@ -6,64 +6,52 @@ variables(::AbstractBoundaryLayer) = (
 
 export ConstantDrag
 """Constant boundary layer drag coefficient. Fields are $(TYPEDFIELDS)"""
-@kwdef struct ConstantDrag{NF} <: AbstractBoundaryLayer
+@parameterized @kwdef struct ConstantDrag{NF} <: AbstractBoundaryLayer
     "[OPTION] Constant drag coefficient [1]"
-    drag::NF = 1.0e-3
+    @param drag::NF = 1.0e-3
 end
 
 Adapt.@adapt_structure ConstantDrag
 ConstantDrag(SG::SpectralGrid; kwargs...) = ConstantDrag{SG.NF}(; kwargs...)
 initialize!(::ConstantDrag, ::PrimitiveEquation) = nothing
-@propagate_inbounds parameterization!(ij, diagn, progn, drag::ConstantDrag, model) =
-    boundary_layer_drag!(ij, diagn, drag)
+@propagate_inbounds parameterization!(ij, vars, drag::ConstantDrag, model) =
+    boundary_layer_drag!(ij, vars, drag)
 
-@propagate_inbounds function boundary_layer_drag!(ij, diagn, scheme::ConstantDrag)
-    return diagn.physics.boundary_layer_drag[ij] = scheme.drag
+@propagate_inbounds function boundary_layer_drag!(ij, vars, scheme::ConstantDrag)
+    vars.parameterizations.boundary_layer_drag[ij] = scheme.drag
 end
 
-abstract type AbstractSurfaceRoughness <: AbstractParameterization end
-
-export ConstantSurfaceRoughness
-
-"""
-Surface roughness length parameterization with constant roughness length
-over land and ocean. Fields are $(TYPEDFIELDS)"""
-@kwdef struct ConstantSurfaceRoughness{NF} <: AbstractSurfaceRoughness
-    "[OPTION] constant roughness length over land [m]"
-    roughness_length_land::NF = 0.5
-
-    "[OPTION] constant roughness length over ocean [m]"
-    roughness_length_ocean::NF = 1.0e-4
+export BoundaryLayer
+"""Composite type, containing surface roughness computation
+and drag coefficient computation. Fields are $(TYPEDFIELDS)"""
+@parameterized @kwdef struct BoundaryLayer{SR, D} <: AbstractBoundaryLayer
+    @component surface_roughness::SR
+    @component drag::D
 end
 
-Adapt.@adapt_structure ConstantSurfaceRoughness
-ConstantSurfaceRoughness(SG::SpectralGrid, kwargs...) = ConstantSurfaceRoughness{SG.NF}(; kwargs...)
-initialize!(::ConstantSurfaceRoughness, ::PrimitiveEquation) = nothing
+Adapt.@adapt_structure BoundaryLayer
+function BoundaryLayer(SG::SpectralGrid;
+        surface_roughness = ConstantSurfaceRoughness(SG),
+        drag = BulkRichardsonDrag(SG),
+    )
+    return BoundaryLayer(surface_roughness, drag)
+end
 
-@propagate_inbounds parameterization!(ij, vars, scheme::AbstractSurfaceRoughness, model) = 
-    surface_roughness!(ij, vars, scheme, model.land_sea_mask)
+function initialize!(BL::BoundaryLayer)
+    initialize!(BL.surface_roughness)
+    initialize!(BL.drag)
+end
 
-variables(::AbstractSurfaceRoughness) = (
-    ParameterizationVariable(name = :surface_roughness, dims = Grid2D(), desc = "Surface roughness length", units = "m"),
-    ParameterizationVariable(name = :surface_roughness, dims = Grid2D(), desc = "Land surface roughness length", units = "m", namespace = :land),
-    ParameterizationVariable(name = :surface_roughness, dims = Grid2D(), desc = "Ocean surface roughness length", units = "m", namespace = :ocean),
+# variables of boundary layer are the union of surface roughness and drag variables
+variables(BL::BoundaryLayer) = (
+    variables(BL.surface_roughness)...,
+    variables(BL.drag)...,
 )
 
-@propagate_inbounds function surface_roughness!(ij, vars, scheme::ConstantSurfaceRoughness, land_sea_mask)
-    land_fraction = land_sea_mask.mask[ij]
-
-    vars.parameterizations.land.surface_roughness[ij] = ifelse(land_fraction > 0, scheme.roughness_length_land, zero(land_fraction))    
-    vars.parameterizations.ocean.surface_roughness[ij] = ifelse(land_fraction < 1, scheme.roughness_length_ocean, zero(land_fraction))  
-
-    vars.parameterizations.surface_roughness[ij] = land_fraction * vars.parameterizations.land.surface_roughness[ij] + (1 - land_fraction) * vars.parameterizations.ocean.surface_roughness[ij]
-    return nothing
-end
-
-function Base.show(io::IO, scheme::ConstantSurfaceRoughness{NF}) where NF
-    print(io, "ConstantSurfaceRoughness{$NF}")
-    println(io)
-    println(io, "├ Ocean: $(scheme.roughness_length_ocean) m")
-    return println(io, "└ Land: $(scheme.roughness_length_land) m")
+# just call the sub-paramterizations one after another
+@propagate_inbounds function parameterization!(ij, vars, BL::BoundaryLayer, model)
+    parameterization!(ij, vars, BL.surface_roughness, model)
+    parameterization!(ij, vars, BL.drag, model)
 end
 
 export BulkRichardsonDrag
@@ -71,15 +59,15 @@ export BulkRichardsonDrag
 """Boundary layer drag coefficient from the bulk Richardson number,
 following Frierson, 2006, Journal of the Atmospheric Sciences.
 $(TYPEDFIELDS)"""
-@kwdef struct BulkRichardsonDrag{NF} <: AbstractBoundaryLayer
+@parameterized @kwdef struct BulkRichardsonDrag{NF} <: AbstractBoundaryLayer
     "[OPTION] von Kármán constant [1]"
-    von_Karman::NF = 0.4
+    @param von_Karman::NF = 0.4 (bounds = 0 .. 1,)
 
     "[OPTION] Critical Richardson number for stable mixing cutoff [1]"
-    critical_Richardson::NF = 10
+    @param critical_Richardson::NF = 10 (bounds = Positive,)
 
     "[OPTION] Drag minimum to avoid zero surface fluxes in stable conditions [1]"
-    drag_min::NF = 1.0e-5
+    @param drag_min::NF = 1.0e-5 (bounds = Nonnegative,)
 end
 
 Adapt.@adapt_structure BulkRichardsonDrag

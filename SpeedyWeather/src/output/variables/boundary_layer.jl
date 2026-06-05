@@ -204,6 +204,4 @@ BoundaryLayerOutput() = (
     SurfaceTemperatureOutput(),
     BoundaryLayerDragOutput(),
     SurfaceRoughnessOutput(),
-    LandSurfaceRoughnessOutput(),
-    OceanSurfaceRoughnessOutput(),
 )

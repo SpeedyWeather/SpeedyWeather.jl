@@ -31,7 +31,6 @@ $(TYPEDFIELDS)"""
         LA,     # <:AbstractLand,
         ZE,     # <:AbstractZenith,
         AL,     # <:AbstractAlbedo,
-        SR,     # <:AbstractSurfaceRoughness,
         BL,     # <:AbstractBoundaryLayer,
         VD,     # <:AbstractVerticalDiffusion,
         SC,     # <:AbstractSurfaceCondition,
@@ -86,8 +85,7 @@ $(TYPEDFIELDS)"""
     # PHYSICS/PARAMETERIZATIONS
     @component solar_zenith::ZE = WhichZenith(spectral_grid, planet)
     @component albedo::AL = OceanLandAlbedo(spectral_grid)
-    @component surface_roughness::SR = ConstantSurfaceRoughness(spectral_grid)
-    @component boundary_layer_drag::BL = BulkRichardsonDrag(spectral_grid)
+    @component boundary_layer::BL = BulkRichardsonDrag(spectral_grid)
     @component vertical_diffusion::VD = BulkRichardsonDiffusion(spectral_grid)
     @component surface_condition::SC = SurfaceCondition(spectral_grid)
     @component surface_momentum_flux::SM = SurfaceMomentumFlux(spectral_grid)
@@ -119,20 +117,17 @@ $(TYPEDFIELDS)"""
     )
 
     parameterizations::TS2 = (
-        # orbit or external forcing
-        :solar_zenith,
-
-        # mixing
-        :vertical_diffusion, :convection,
-
-        # radiation
-        :albedo, :shortwave_radiation, :longwave_radiation,
-
-        # surface fluxes
-        :surface_roughness, :boundary_layer_drag, :surface_condition, :surface_momentum_flux, :surface_heat_flux,
-
-        # perturbations
-        :stochastic_physics,
+        :solar_zenith,# orbit or external forcing
+        :vertical_diffusion,# mixing
+        :convection,
+        :albedo,                    # radiation
+        :shortwave_radiation,
+        :longwave_radiation,
+        :boundary_layer,            # surface fluxes
+        :surface_condition,
+        :surface_momentum_flux,
+        :surface_heat_flux,
+        :stochastic_physics,        # perturbations
     )
 
     # DERIVED
@@ -219,7 +214,6 @@ function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
     initialize!(model.albedo, model)
 
     # parameterizations
-    initialize!(model.surface_roughness, model)
     initialize!(model.boundary_layer_drag, model)
     initialize!(model.vertical_diffusion, model)
     initialize!(model.convection, model)
