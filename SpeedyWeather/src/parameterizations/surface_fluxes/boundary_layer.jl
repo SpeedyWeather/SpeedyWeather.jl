@@ -19,6 +19,7 @@ initialize!(::ConstantDrag, ::PrimitiveEquation) = nothing
 
 @propagate_inbounds function boundary_layer_drag!(ij, vars, scheme::ConstantDrag)
     vars.parameterizations.boundary_layer_drag[ij] = scheme.drag
+    return nothing
 end
 
 export BoundaryLayer
@@ -30,7 +31,8 @@ and drag coefficient computation. Fields are $(TYPEDFIELDS)"""
 end
 
 Adapt.@adapt_structure BoundaryLayer
-function BoundaryLayer(SG::SpectralGrid;
+function BoundaryLayer(
+        SG::SpectralGrid;
         surface_roughness = ConstantSurfaceRoughness(SG),
         drag = BulkRichardsonDrag(SG),
     )
@@ -40,6 +42,7 @@ end
 function initialize!(BL::BoundaryLayer)
     initialize!(BL.surface_roughness)
     initialize!(BL.drag)
+    return nothing
 end
 
 # variables of boundary layer are the union of surface roughness and drag variables
@@ -52,6 +55,7 @@ variables(BL::BoundaryLayer) = (
 @propagate_inbounds function parameterization!(ij, vars, BL::BoundaryLayer, model)
     parameterization!(ij, vars, BL.surface_roughness, model)
     parameterization!(ij, vars, BL.drag, model)
+    return nothing
 end
 
 export BulkRichardsonDrag

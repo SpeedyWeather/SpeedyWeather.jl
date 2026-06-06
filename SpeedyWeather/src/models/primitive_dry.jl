@@ -85,7 +85,7 @@ $(TYPEDFIELDS)"""
     # PHYSICS/PARAMETERIZATIONS
     @component solar_zenith::ZE = WhichZenith(spectral_grid, planet)
     @component albedo::AL = OceanLandAlbedo(spectral_grid)
-    @component boundary_layer::BL = BulkRichardsonDrag(spectral_grid)
+    @component boundary_layer::BL = BoundaryLayer(spectral_grid)
     @component vertical_diffusion::VD = BulkRichardsonDiffusion(spectral_grid)
     @component surface_condition::SC = SurfaceCondition(spectral_grid)
     @component surface_momentum_flux::SM = SurfaceMomentumFlux(spectral_grid)
@@ -117,8 +117,8 @@ $(TYPEDFIELDS)"""
     )
 
     parameterizations::TS2 = (
-        :solar_zenith,# orbit or external forcing
-        :vertical_diffusion,# mixing
+        :solar_zenith,              # orbit or external forcing
+        :vertical_diffusion,        # mixing
         :convection,
         :albedo,                    # radiation
         :shortwave_radiation,

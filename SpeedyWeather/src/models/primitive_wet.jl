@@ -124,16 +124,13 @@ $(TYPEDFIELDS)"""
         :planet, :geometry, :land_sea_mask,
     )
     parameterizations::TS2 = (
-        
         :solar_zenith,              # external forcing
         :vertical_diffusion,        # mixing and precipitation
         :large_scale_condensation,
         :convection,
-
-        :albedo,# radiation
+        :albedo,                    # radiation
         :shortwave_radiation,
         :longwave_radiation,
-
         :boundary_layer,            # surface fluxes
         :surface_condition,
         :surface_momentum_flux,

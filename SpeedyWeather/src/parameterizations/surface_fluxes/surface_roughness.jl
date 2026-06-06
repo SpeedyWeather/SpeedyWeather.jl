@@ -17,7 +17,7 @@ Adapt.@adapt_structure ConstantSurfaceRoughness
 ConstantSurfaceRoughness(SG::SpectralGrid; kwargs...) = ConstantSurfaceRoughness{SG.NF}(; kwargs...)
 initialize!(::ConstantSurfaceRoughness, ::PrimitiveEquation) = nothing
 
-@propagate_inbounds parameterization!(ij, vars, scheme::AbstractSurfaceRoughness, model) = 
+@propagate_inbounds parameterization!(ij, vars, scheme::AbstractSurfaceRoughness, model) =
     surface_roughness!(ij, vars, scheme, model.land_sea_mask)
 
 variables(::AbstractSurfaceRoughness) = (
@@ -31,11 +31,11 @@ variables(::AbstractSurfaceRoughness) = (
     z₀_land = scheme.roughness_length_land
     z₀_ocean = scheme.roughness_length_ocean
     (; land, ocean) = vars.parameterizations
-    
-    land.surface_roughness[ij] = ifelse(land_fraction > 0, z₀_land, zero(z₀_land))      
-    ocean.surface_roughness[ij] = ifelse(land_fraction < 1, z₀_ocean, zero(z₀_ocean))  
+
+    land.surface_roughness[ij] = ifelse(land_fraction > 0, z₀_land, zero(z₀_land))
+    ocean.surface_roughness[ij] = ifelse(land_fraction < 1, z₀_ocean, zero(z₀_ocean))
 
     vars.parameterizations.surface_roughness[ij] = land_fraction * land.surface_roughness[ij] +
-                                                (1 - land_fraction) * ocean.surface_roughness[ij]
+        (1 - land_fraction) * ocean.surface_roughness[ij]
     return nothing
 end
