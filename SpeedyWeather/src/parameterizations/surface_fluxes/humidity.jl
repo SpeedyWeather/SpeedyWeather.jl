@@ -51,7 +51,7 @@ end
 export SurfaceOceanHumidityFlux
 """Humidity flux parameterization over ocean surfaces. Fields are $(TYPEDFIELDS)"""
 @parameterized @kwdef struct SurfaceOceanHumidityFlux{NF} <: AbstractSurfaceHumidityFlux
-    "[OPTION] Use drag coefficient from calculated following model.boundary_layer_drag"
+    "[OPTION] Use drag coefficient from calculated following model.boundary_layer.drag"
     use_boundary_layer_drag::Bool = true
 
     "[OPTION] Or fixed drag coefficient for humidity flux over ocean"
@@ -113,7 +113,7 @@ end
 export SurfaceLandHumidityFlux
 """Humidity flux parameterization over land surfaces. Fields are $(TYPEDFIELDS)"""
 @parameterized @kwdef struct SurfaceLandHumidityFlux{NF} <: AbstractSurfaceHumidityFlux
-    "[OPTION] Use column.boundary_layer_drag coefficient"
+    "[OPTION] Use drag coefficient from calculated following model.boundary_layer.drag"
     use_boundary_layer_drag::Bool = true
 
     "[OPTION] Or fixed drag coefficient for humidity flux over land"

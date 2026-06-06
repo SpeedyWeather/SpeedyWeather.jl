@@ -214,7 +214,7 @@ function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
     initialize!(model.albedo, model)
 
     # parameterizations
-    initialize!(model.boundary_layer_drag, model)
+    initialize!(model.boundary_layer, model)
     initialize!(model.vertical_diffusion, model)
     initialize!(model.convection, model)
     initialize!(model.shortwave_radiation, model)

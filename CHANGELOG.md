@@ -2,7 +2,8 @@
 
 ## Unreleased
 
-- Introduced surface roughness as a new parameterization component `AbstractSurfaceRoughness` with implementation `ConstantSurfaceRoughness` and output writers defined [#1114](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1114)
+- [BREAKING] `model.boundary_layer` introduced to group surface roughness and drag computations [#1114](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1114)
+- Surface roughness modularised with `ConstantSurfaceRoughness default [#1114](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1114)
 - Fixed `SolarZenithSeason` kernel: uninitialized typed variables and `acos` domain error [#1113](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1113)
 - Fixed punctuation in spectral transform docs [#1112](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1112)
 
