@@ -318,7 +318,12 @@ larger regressions should be reported to the user.
 
 ## Code Style
 
-The project uses [Runic.jl](https://github.com/fredrikekre/Runic.jl) for formatting.
+* The project uses [Runic.jl](https://github.com/fredrikekre/Runic.jl) for formatting.
+* Prefer descriptive variable names that spell words out in full rather than abbreviating
+  them, e.g. `temperature` not `temp`, `surface_pressure` not `surf_pres`,
+  `layer_thickness` not `lyr_thk`, `spectral_grid` not `sg`. Established physics/maths
+  shorthand that is itself the conventional name (e.g. `coslat`, `vor`, `div`) is fine.
+
 
 ## Pull Request Convention
 
