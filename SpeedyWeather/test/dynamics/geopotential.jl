@@ -45,7 +45,7 @@ end
         SpeedyWeather.transform!(vars, model)
         SpeedyWeather.linear_virtual_temperature!(vars, model)
         SpeedyWeather.geopotential!(vars, model.geopotential, model.orography)
-        SpeedyWeather.bernoulli_potential!(vars, model.spectral_transform)
+        SpeedyWeather.bernoulli_potential!(vars, model.spectral_transform, model.time_stepping)
     end
 end
 
