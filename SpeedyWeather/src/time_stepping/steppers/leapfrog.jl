@@ -213,8 +213,8 @@ function time_step(L::Leapfrog, clock::Clock)
 end
 
 function prognostic_step(::Leapfrog, clock::Clock)
-    clock.step_counter == 0 && return 1         # first Euler step disable filters
-    clock.step_counter == 1 && return 1         # 2nd step: Leapfrog also disable filters
+    clock.step_counter == 0 && return 1         # first Euler step, disable filters
+    clock.step_counter == 1 && return 1         # 2nd step: Leapfrog, also disable filters
     return 2                                    # later steps: with RAW filters
 end
 

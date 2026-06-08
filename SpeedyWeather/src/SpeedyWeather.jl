@@ -134,7 +134,7 @@ include("variables/dimensions.jl")
 include("variables/variables.jl")
 include("dynamics/tracers.jl")
 include("dynamics/particles.jl")
-include("dynamics/clock.jl")
+include("time_stepping/clock.jl")
 include("variables/set.jl")
 
 # MODEL COMPONENTS
