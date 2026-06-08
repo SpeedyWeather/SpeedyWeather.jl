@@ -315,6 +315,14 @@ _pretty_size(fp::FusedParent) = _pretty_size(fp.parent)
 Base.copyto!(dest::FusedParent, src::FusedParent) = (copyto!(dest.parent, src.parent); dest)
 _copy_entry!(dest::FusedParent, src::FusedParent) = _copy_entry!(dest.parent, src.parent)
 
+# The grid-side dycore wind tendencies `u`/`v` (`TendencyVariable`s in `:grid_tendencies`)
+# and their spectral counterparts `u_tendency`/`v_tendency` (`DynamicsVariable`s in
+# `:spectral_tendencies`) are the same physical slot under different category-specific names:
+# a grid→spec `transform!` maps the `u` slot onto the `u_tendency` slot. Canonicalise
+# both to a common name so `_assert_fuse_alignment` pairs them up instead of rejecting the mismatch.
+_canonical_fuse_member(name::Symbol) =
+    name === :u_tendency ? :u : name === :v_tendency ? :v : name
+
 """$(TYPEDSIGNATURES)
 Assert that two fuse parents `a` and `b` declare members in matching order — i.e. they
 agree both on which member names exist and on each member's layer-axis slot range. This
@@ -323,14 +331,15 @@ is what lets a mega-batched `transform!` map slot k of one parent to slot k of t
 
 `name_a` / `name_b` are used purely for the error message."""
 function _assert_fuse_alignment(a::FusedParent, b::FusedParent; name_a = :a, name_b = :b)
-    keys(a.slot_map) == keys(b.slot_map) || error(
+    keys_a, keys_b = keys(a.slot_map), keys(b.slot_map)
+    map(_canonical_fuse_member, keys_a) == map(_canonical_fuse_member, keys_b) || error(
         "Fuse parents `$name_a` and `$name_b` have different members: " *
-        "$(keys(a.slot_map)) vs $(keys(b.slot_map))."
+        "$(keys_a) vs $(keys_b)."
     )
-    for k in keys(a.slot_map)
-        ra, rb = a.slot_map[k], b.slot_map[k]
+    for i in eachindex(keys_a)
+        ra, rb = a.slot_map[i], b.slot_map[i]
         ra == rb || error(
-            "Fuse parents `$name_a` and `$name_b` disagree on slot range for `$k`: " *
+            "Fuse parents `$name_a` and `$name_b` disagree on slot range for `$(keys_a[i])`/`$(keys_b[i])`: " *
             "$ra vs $rb. The two parents must declare members in matching order " *
             "so that mega-batched transforms map slot k of one to slot k of the other."
         )
