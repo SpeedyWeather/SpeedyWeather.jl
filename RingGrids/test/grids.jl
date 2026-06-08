@@ -575,6 +575,12 @@ end
     end
 end
 
+@testset "Field unaliascopy" begin
+    field = rand(FullGaussianField, 4)
+    field_copy = Base.unaliascopy(field)
+    @test field_copy == field && field_copy.data !== field.data
+end
+
 @testset "nonparametric types" begin
     @test RingGrids.nonparametric_type(Array) == Array
     @test RingGrids.nonparametric_type(Array{Float32}) == Array

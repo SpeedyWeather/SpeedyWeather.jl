@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added `Base.unaliascopy` for `LowerTriangularArray` and `Fild` [#1119](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1119)
 - [BREAKING] `model.boundary_layer` introduced (and `model.boundary_layer_drag` removed) to group surface roughness and drag computations [#1114](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1114)
 - Surface roughness modularised with `ConstantSurfaceRoughness default [#1114](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1114)
 - Restrict Enzyme compat to `0.13 - 0.13.153` (cap at v0.13.153) [#1116](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1116)
