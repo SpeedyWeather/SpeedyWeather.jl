@@ -21,6 +21,7 @@ struct SpectralTransform{
         ScratchType,                # <: ScratchMemory{ArrayComplexType, VectorComplexType},
         GradientType,               # <: NamedTuple for gradients
         IntType,                    # <: Integer
+        B,                          # <: Bool
     } <: AbstractSpectralTransform{NF, AR}
 
     # Architecture
@@ -53,7 +54,7 @@ struct SpectralTransform{
     # FFT plans keyed by batch size K. For each planned K, value is a length-nlat_half vector
     # of per-ring plans. K=1 entry is the per-layer fallback (used by `_fourier_serial!`).
     # FFTW/cuFFT plans bake K into the plan at construction, so a single K-plan cannot be reused
-    # for a different K. Hot K values (mega-batched dycore transforms, prognostic spec→grid, U/V,
+    # for a different K. Hot K values (batched dycore transforms, prognostic spec→grid, U/V,
     # single-layer) are pre-planned; everything else falls back to the K=1 plan in a loop.
     rfft_plans::Dict{Int, Vector{AbstractFFTs.Plan}}   # grid → spectral (forward) FFT plans
     brfft_plans::Dict{Int, Vector{AbstractFFTs.Plan}}  # spectral → grid (inverse) FFT plans
@@ -74,6 +75,12 @@ struct SpectralTransform{
     solid_angles::VectorType                    # = ΔΩ = sinθ Δθ Δϕ (solid angle of grid point)
 
     gradients::GradientType                     # precomputed gradient and integration matrices
+
+    # CUDA GRAPHS
+    # toggle for the CUDA-Graphs accelerated batched Fourier transform
+    # Set to `false` to fall back to the generic (allocating) per-ring GPU
+    # Meaningless for non-CUDA architectures.
+    cuda_graphs::B
 end
 
 # eltype of a transform is the number format used within
@@ -94,6 +101,7 @@ function SpectralTransform(
         nlayers::Integer = DEFAULT_NLAYERS,                                             # scratch size — max layer count any single transform call may carry
         transform_batch::AbstractVector{<:Integer} = Int[1, nlayers],                   # list of batch sizes K to pre-plan FFTs for (independent of scratch size)
         LegendreShortcut::Type{<:AbstractLegendreShortcut} = LegendreShortcutLinear,    # shorten Legendre loop over order m
+        cuda_graphs::Bool = true,                                            # use CUDA-Graphs accelerated Fourier path (CUDA only)
     )
     # planned_K controls which Ks get pre-built FFT plans. K=1 is always planned (it is the
     # per-layer fallback used by `_fourier_serial!`).
@@ -144,7 +152,7 @@ function SpectralTransform(
 
     # SCRATCH MEMORY FOR FOURIER NOT YET LEGENDRE TRANSFORMED AND VICE VERSA
     # CPU always chunks unplanned K down to the largest planned batch, so scratch only needs
-    # to hold one such chunk. GPU/others can't chunk and must fit the full input K.
+    # to hold one such chunk. GPU shouldn't chunk and must fit the full input K.
     scratch_memory = ScratchMemory(NF, architecture, grid, _scratch_nlayers(architecture, nlayers, planned_K))
 
     rfft_plans = Dict{Int, Vector{AbstractFFTs.Plan}}()
@@ -197,6 +205,7 @@ function SpectralTransform(
         typeof(scratch_memory),
         typeof(gradients),
         typeof(nlayers),
+        typeof(cuda_graphs),
     }(
         architecture,
         spectrum, nfreq_max,
@@ -211,6 +220,7 @@ function SpectralTransform(
         jm_index_size, kjm_indices,
         solid_angles,
         gradients,
+        cuda_graphs,
     )
 end
 
@@ -336,9 +346,9 @@ function Base.DimensionMismatch(S::AbstractSpectralTransform, F::AbstractField)
 end
 
 # Layer size of scratch memory (north/south columns in `ScratchMemory`).
-# On CPU we typically use `nlayers` only (largest allocated plan)
+# On CPU we typically use `nlayers` only (largest allocated plan and physical layers of the model)
 # On GPU we batch transforms much more, and need to use a scratch memory in 
-# accordance with the largest batch 
+# accordance with the largest batch which is `nlayers` in this case and ISN'T equal to the physical layers of the model
 _scratch_nlayers(::AbstractCPU, ::Integer, planned_K::AbstractVector{<:Integer}) = maximum(planned_K)
 _scratch_nlayers(::AbstractArchitecture, nlayers::Integer, ::AbstractVector{<:Integer}) = nlayers
 
@@ -346,8 +356,7 @@ _scratch_nlayers(::AbstractArchitecture, nlayers::Integer, ::AbstractVector{<:In
 # executed sequentially. 
 # Architecture-dispatched: 
 # CPU chunks to avoid FFTW's alignment-mismatch on x86 (no problem on ARM)
-# (consecutive scratch columns can have differing alignment when `nfreq_max * sizeof(Complex{NF})`
-# GPU doesn't need any of that. 
+# GPU doesn't need any of that we have seperate plans for each K 
 @inline function _needs_chunking(K::Integer, S::SpectralTransform{NF, <:AbstractCPU}) where {NF}
     K > 1 || return false                            # K=1 always handled directly
     haskey(S.rfft_plans, K) && return false          # K is directly planned, no chunking needed
@@ -376,11 +385,12 @@ end
 # on the sub-views routes through the regular batched path. The trailing remainder
 # (size < K_batched) goes through the K=1 serial path one layer at a time.
 #
-# Why this matters on CPU: FFTW plans bake their batch dim K, and on x86 the
+# Why this matters on CPU: FFT plans bake their batch dim K into the plan, and on x86 the
 # scratch column-stride (= nfreq_max * sizeof(Complex{NF})) is generally not a multiple
 # of the SIMD width, so the K=1 plan can't be applied to columns other than column 1
-# without an alignment-mismatch error. Chunking sidesteps that path for the bulk of
-# the layers.
+# without an alignment-mismatch error. Chunking with the sequential execution sidesteps 
+# that path for the bulk of the layers and effectively restores the previous behavior before 
+# fusion/batching without performance penalties. 
 function _transform_chunked!(                       # SPECTRAL TO GRID
         field::AbstractField, coeffs::LowerTriangularArray,
         scratch_memory::ScratchMemory, S::SpectralTransform;

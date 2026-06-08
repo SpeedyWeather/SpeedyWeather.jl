@@ -1,6 +1,6 @@
 name = "LowerTriangularArrays"
 uuid = "ed20b33f-a660-45d0-a353-9c8c20bb5814"
-version = "0.1.4"
+version = "0.1.4+DEV"
 authors = ["LowerTriangularArrays contributors"]
 
 [deps]
