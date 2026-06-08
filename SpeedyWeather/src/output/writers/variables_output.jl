@@ -103,7 +103,7 @@ end
 Base.close(output::JLD2Output) = close(output.jld2_file)
 
 function output!(output::JLD2Output, simulation::AbstractSimulation)
-    output!(output.core, output) || return nothing
+    do_output!(output.core, output) || return nothing
     return output_jld2!(output, simulation)
 end
 
