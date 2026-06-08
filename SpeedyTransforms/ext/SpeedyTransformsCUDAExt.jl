@@ -140,7 +140,7 @@ const GRAPH_CACHES = IdDict{Any, GPUFourierGraphCache}()
 # assumes a single size; override this for an `S` that stores several plan sets (e.g. keyed
 # by layer count) and the rest — caches, packing, capture, replay — follows automatically.
 # gets called by `cache_key` when accessing the different caches and graphs
-fft_plans(S::SpectralTransform, nlayers::Integer) = (S.rfft_plans, S.brfft_plans)
+fft_plans(S::SpectralTransform, nlayers::Integer) = (S.rfft_plans[nlayers], S.brfft_plans[nlayers])
 
 # build/allocate the cache for a transform of `nlayers` layers
 function build_cache(S::SpectralTransform, nlayers::Integer)
