@@ -54,7 +54,7 @@ struct SpectralTransform{
     # FFT plans keyed by batch size K. For each planned K, value is a length-nlat_half vector
     # of per-ring plans. K=1 entry is the per-layer fallback (used by `_fourier_serial!`).
     # FFTW/cuFFT plans bake K into the plan at construction, so a single K-plan cannot be reused
-    # for a different K. Hot K values (mega-batched dycore transforms, prognostic spec→grid, U/V,
+    # for a different K. Hot K values (batched dycore transforms, prognostic spec→grid, U/V,
     # single-layer) are pre-planned; everything else falls back to the K=1 plan in a loop.
     rfft_plans::Dict{Int, Vector{AbstractFFTs.Plan}}   # grid → spectral (forward) FFT plans
     brfft_plans::Dict{Int, Vector{AbstractFFTs.Plan}}  # spectral → grid (inverse) FFT plans
