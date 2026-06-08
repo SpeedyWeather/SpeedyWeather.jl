@@ -112,7 +112,8 @@ Simply escapes for no netcdf output or if output shouldn't be written on this ti
 Interpolates onto output grid and resolution as specified in `output`, converts to output
 number format, truncates the mantissa for higher compression and applies lossless compression."""
 function output!(output::AbstractOutput, simulation::AbstractSimulation)
-    do_output!(output.core, output) || return nothing   # decide whether to output this time step
+    (; clock) = simulation.variables.prognostic
+    do_output!(output.core, clock, output) || return nothing   # decide whether to output this time step
 
     (; clock) = simulation.variables.prognostic
     output!(output, clock.time)                         # increase counter, write time

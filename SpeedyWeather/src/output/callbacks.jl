@@ -115,7 +115,7 @@ export GlobalSurfaceTemperatureCallback
 Callback that records the global mean surface temperature on every time step.
 $(TYPEDFIELDS)"""
 @kwdef mutable struct GlobalSurfaceTemperatureCallback{NF} <: AbstractCallback
-    time_step_counter::Int = 0
+    step_counter::Int = 0
     temperature::Vector{NF} = zeros(DEFAULT_NF, 0)
 end
 
@@ -129,12 +129,12 @@ global surface temperature of the initial conditions"""
 function initialize!(
         callback::GlobalSurfaceTemperatureCallback{NF},
         vars::Variables,
-        model::AbstractModel,
+        model::PrimitiveEquation,
     ) where {NF}
-    callback.temperature = Vector{NF}(undef, vars.prognostic.clock.n_time_steps + 1)    # replace with vector of correct length
+    callback.temperature = Vector{NF}(undef, vars.prognostic.clock.n_steps + 1)     # replace with vector of correct length
     nlayers = model.geometry.nlayers
-    callback.temperature[1] = vars.grid.temp_average[nlayers]       # set initial conditions
-    callback.time_step_counter = 1                                  # (re)set counter to 1
+    callback.temperature[1] = vars.dynamics.average_temperature_profile[nlayers]    # set initial conditions
+    callback.step_counter = 1                                                       # (re)set counter to 1
     return nothing 
 end
 
@@ -145,12 +145,12 @@ element of the callback.temperature vector."""
 function callback!(
         callback::GlobalSurfaceTemperatureCallback,
         vars::Variables,
-        model::AbstractModel,
+        model::PrimitiveEquation,
     )
-    callback.time_step_counter += 1
-    i = callback.time_step_counter
+    callback.step_counter += 1
+    i = callback.step_counter
     nlayers = model.geometry.nlayers
-    callback.temperature[i] = vars.grid.temp_average[nlayers]
+    callback.temperature[i] = vars.dynamics.average_temperature_profile[nlayers]
     return nothing
 end
 

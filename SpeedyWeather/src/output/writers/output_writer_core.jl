@@ -22,9 +22,6 @@ Fields are $(TYPEDFIELDS)"""
     "[DERIVED] output frequency in time steps, computed at initialize!"
     output_every_n_steps::Int = 0
 
-    "[DERIVED] time step counter, incremented every time step to determine when to output"
-    time_step_counter::Int = 0
-
     "[DERIVED] output step counter, incremented every time output is written"
     output_counter::Int = 0
 end
@@ -75,8 +72,7 @@ function initialize!(
     output.interval = Second(round(Int, core.output_every_n_steps * model.time_stepping.Δt_sec))
 
     # RESET COUNTERS
-    core.time_step_counter = 0
-    core.output_counter = 1         # start at 1 for writing the initial conditions
+    core.output_counter = 1             # start at 1 for writing the initial conditions
 
     # CALLBACKS
     output.write_parameters_txt && add!(model.callbacks, :parameters_txt => ParametersTxt())
@@ -89,12 +85,12 @@ end
 """$(TYPEDSIGNATURES)
 Increment the timestep counter and return `true` if output should be written on
 this step (i.e. `active` is true and the counter is a multiple of `output_every_n_steps`)."""
-function do_output!(core::OutputWriterCore, output::AbstractOutput)
-    core.time_step_counter += 1         # always increment time step counter
+function do_output!(core::OutputWriterCore, clock::Clock, output::AbstractOutput)
     do_output =                         # boolean whether to output this time step
         output.active &&                # output must be active
-        core.time_step_counter > 0 &&   # don't store initial conditions again (leapfrog has spin up step that doesn't count)
-        core.time_step_counter % core.output_every_n_steps == 0    # and multiple of output interval
+        clock.time_step_counter > 0 &&  # don't store initial conditions again and skip spin up steps
+                                        # by using `time_step_counter` not `step_counter` (which counts those too)
+        clock.time_step_counter % core.output_every_n_steps == 0    # and multiple of output interval
     core.output_counter += do_output    # increment output counter if output is written
     return do_output
 end
