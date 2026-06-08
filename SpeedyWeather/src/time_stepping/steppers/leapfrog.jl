@@ -36,7 +36,7 @@ mutable struct Leapfrog{NF, S, B, MS} <: AbstractLeapfrog
     Δt::NF
 end
 
-Adapt.adapt_structure(to, L::Leapfrog) = Adapt.structure(to, LeapfrogCore(L.Δt_millisec, L.Δt_sec, L.Δt, L.step_counter))
+Adapt.adapt_structure(to, L::Leapfrog) = Adapt.adapt_structure(to, LeapfrogCore(L.Δt_millisec, L.Δt_sec, L.Δt))
 
 # HOW MANY STEPS DO VARIABLES NEED?
 # leapfrogging always needs 2 steps in spectral
