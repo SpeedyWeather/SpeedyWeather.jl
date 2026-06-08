@@ -13,11 +13,10 @@
         temp[1, :] .= temp0 * model.spectral_transform.norm_sphere
         humid .= 0
 
-        lf = 1      # leapfrog time step
-        SpeedyWeather.transform!(simulation.variables, lf, model)
-        SpeedyWeather.linear_virtual_temperature!(simulation.variables, lf, model)
+        SpeedyWeather.transform!(simulation.variables, model)
+        SpeedyWeather.linear_virtual_temperature!(simulation.variables, model)
         SpeedyWeather.geopotential!(simulation.variables, model.geopotential, model.orography)
-        geopot_grid = transform(simulation.variables.dynamics.geopotential, model.spectral_transform)
+        geopot_grid = transform(simulation.variables.dynamics.spectral_geopotential, model.spectral_transform)
 
         # approximate heights [m] for this setup
         heights = [27000, 18000, 13000, 9000, 6000, 3700, 1800, 700]
@@ -43,9 +42,8 @@ end
         temp[1, :] .= temp0 * model.spectral_transform.norm_sphere
         humid .= 0
 
-        lf = 1      # leapfrog time step
-        SpeedyWeather.transform!(vars, lf, model)
-        SpeedyWeather.linear_virtual_temperature!(vars, lf, model)
+        SpeedyWeather.transform!(vars, model)
+        SpeedyWeather.linear_virtual_temperature!(vars, model)
         SpeedyWeather.geopotential!(vars, model.geopotential, model.orography)
         SpeedyWeather.bernoulli_potential!(vars, model.spectral_transform)
     end
