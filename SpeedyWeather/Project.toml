@@ -1,7 +1,7 @@
 name = "SpeedyWeather"
 uuid = "9e226e20-d153-4fed-8a5b-493def4f21a9"
 authors = ["SpeedyWeather contributors"]
-version = "0.20.3"
+version = "0.20.3+DEV"
 
 [deps]
 AbstractFFTs = "621f4979-c628-5d54-868e-fcf4e3e8185c"
@@ -69,7 +69,7 @@ CodecZlib = "0.7"
 ComponentArrays = "0.15"
 DocStringExtensions = "0.9"
 DomainSets = "0.7, 0.8"
-Enzyme = "0.13"
+Enzyme = "0.13 - 0.13.153"
 FFTW = "1"
 FastGaussQuadrature = "0.4, 0.5, 1"
 FiniteDifferences = "0.12"

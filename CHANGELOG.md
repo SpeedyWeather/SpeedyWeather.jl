@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Restrict Enzyme compat to `0.13 - 0.13.153` (cap at v0.13.153) [#1116](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1116)
 - Optimised CUDA GPU transforms with CUDA graphs [#1109](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1109)
 - `MLDataDevices.get_device` extension mapping SpeedyWeather architectures to MLDataDevices devices [#1115](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1107)
 - Fixed `SolarZenithSeason` kernel: uninitialized typed variables and `acos` domain error [#1113](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1113)
