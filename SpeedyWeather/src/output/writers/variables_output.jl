@@ -122,7 +122,8 @@ function materialize_views(L::LowerTriangularArray)
 end
 
 function output_jld2!(output::JLD2Output, simulation::AbstractSimulation)
-    output.output_counter += 1
+    # output_counter is advanced by do_output! (and set to 1 for the IC in initialize!),
+    # so here we only read it as the snapshot index
     i = output.output_counter
     snapshot = filter_groups(simulation.variables, output)
     output.jld2_file["$i"] = materialize_views(on_architecture(CPU(), snapshot))
@@ -248,7 +249,7 @@ Base.close(::ArrayOutput) = nothing
 
 function output!(output::ArrayOutput, simulation::AbstractSimulation)
     do_output!(output.core, output) || return nothing
-    output.output_counter += 1
+    # output_counter is advanced by do_output! (and set to 1 for the IC in initialize!)
     i = output.output_counter
     getfield(output, :output)[i] = deepcopy(filter_groups(simulation.variables, output))
     return nothing
