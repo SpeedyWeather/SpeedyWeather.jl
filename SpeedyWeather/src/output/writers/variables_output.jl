@@ -247,8 +247,7 @@ end
 Base.close(::ArrayOutput) = nothing
 
 function output!(output::ArrayOutput, simulation::AbstractSimulation)
-    (; clock) = simulation.prognostic
-    output!(output.core, output, clock) || return nothing
+    do_output!(output.core, output) || return nothing
     output.output_counter += 1
     i = output.output_counter
     getfield(output, :output)[i] = deepcopy(filter_groups(simulation.variables, output))
