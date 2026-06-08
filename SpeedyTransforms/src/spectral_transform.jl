@@ -21,6 +21,7 @@ struct SpectralTransform{
         ScratchType,                # <: ScratchMemory{ArrayComplexType, VectorComplexType},
         GradientType,               # <: NamedTuple for gradients
         IntType,                    # <: Integer
+        B,                          # <: Bool
     } <: AbstractSpectralTransform{NF, AR}
 
     # Architecture
@@ -74,6 +75,12 @@ struct SpectralTransform{
     solid_angles::VectorType                    # = ΔΩ = sinθ Δθ Δϕ (solid angle of grid point)
 
     gradients::GradientType                     # precomputed gradient and integration matrices
+
+    # CUDA GRAPHS
+    # toggle for the CUDA-Graphs accelerated batched Fourier transform
+    # Set to `false` to fall back to the generic (allocating) per-ring GPU
+    # Meaningless for non-CUDA architectures.
+    cuda_graphs::B
 end
 
 # eltype of a transform is the number format used within
@@ -94,6 +101,7 @@ function SpectralTransform(
         nlayers::Integer = DEFAULT_NLAYERS,                                             # scratch size — max layer count any single transform call may carry
         transform_batch::AbstractVector{<:Integer} = Int[1, nlayers],                   # list of batch sizes K to pre-plan FFTs for (independent of scratch size)
         LegendreShortcut::Type{<:AbstractLegendreShortcut} = LegendreShortcutLinear,    # shorten Legendre loop over order m
+        cuda_graphs::Bool = true,                                            # use CUDA-Graphs accelerated Fourier path (CUDA only)
     )
     # planned_K controls which Ks get pre-built FFT plans. K=1 is always planned (it is the
     # per-layer fallback used by `_fourier_serial!`).
@@ -197,6 +205,7 @@ function SpectralTransform(
         typeof(scratch_memory),
         typeof(gradients),
         typeof(nlayers),
+        typeof(cuda_graphs),
     }(
         architecture,
         spectrum, nfreq_max,
@@ -211,6 +220,7 @@ function SpectralTransform(
         jm_index_size, kjm_indices,
         solid_angles,
         gradients,
+        cuda_graphs,
     )
 end
 
