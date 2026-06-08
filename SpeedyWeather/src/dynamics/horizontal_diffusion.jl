@@ -403,18 +403,15 @@ function SpectralFilter(spectral_grid::SpectralGrid; kwargs...)
     return SpectralFilter{NF, MatrixType, typeof(trunc)}(; trunc, nlayers, kwargs...)
 end
 
-function initialize!(diffusion::SpectralFilter, model::AbstractModel)
-    return initialize!(diffusion, model.time_stepping)
-end
-
 function initialize!(
         diffusion::SpectralFilter,
-        L::AbstractTimeStepper,
+        model::AbstractModel,
     )
     (; trunc, nlayers) = diffusion
     (; expl, impl, expl_div, impl_div) = diffusion
     (; scale, shift, power, power_div, resolution_scaling) = diffusion
-    (; Δt, radius) = L
+    Δt = default_time_step(model.time_stepping)
+    (; radius) = model.planet
 
     # times 1/radius because time step Δt is scaled with 1/radius
     time_scale = Second(diffusion.time_scale).value / radius * (32 / (trunc + 1))^resolution_scaling
