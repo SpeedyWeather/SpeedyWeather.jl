@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- [BREAKING] `model.boundary_layer` introduced (and `model.boundary_layer_drag` removed) to group surface roughness and drag computations [#1114](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1114)
+- Surface roughness modularised with `ConstantSurfaceRoughness default [#1114](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1114)
 - Restrict Enzyme compat to `0.13 - 0.13.153` (cap at v0.13.153) [#1116](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1116)
 - Optimised CUDA GPU transforms with CUDA graphs [#1109](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1109)
 - `MLDataDevices.get_device` extension mapping SpeedyWeather architectures to MLDataDevices devices [#1115](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1107)
