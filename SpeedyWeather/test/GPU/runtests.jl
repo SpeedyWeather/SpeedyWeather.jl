@@ -55,6 +55,10 @@ include("primitive_wet.jl")
 if gpu_backend === :CUDA
 
     include("CUDA/architecture.jl")
+
+    # CUDA-GRAPHS ACCELERATED FOURIER TRANSFORM (CUDA-only feature)
+    include("cuda_graphs.jl")
+
     # REACTANT ON GPU (currently only works tested with CUDA)
     #include("reactant.jl")
 
