@@ -102,19 +102,11 @@ function run_benchmark_suite!(suite::BenchmarkSuite)
 
         nsteps = n_timesteps(trunc, nlayers)
         period = Second(round(Int, model.time_stepping.Δt_sec * (nsteps + 1)))
+        run!(simulation; period)
+        synchronize(architecture)
 
-        # Measure wall time directly (including the GPU sync). The previous timing read
-        # `progress_meter.tlast - tinit`, but the progress meter only refreshes every `dt`
-        # seconds, so any run that finishes within one refresh interval reports 0 — which now
-        # happens for fast (e.g. CUDA-graph-accelerated) configs and produced an Inf SYPD that
-        # crashed the JSON writer. `@elapsed` is independent of the meter's update cadence.
-        time_elapsed = @elapsed begin
-            run!(simulation; period)
-            synchronize(architecture)
-        end
-        # A NaN-aborted/unstable run has no meaningful speed → record NaN (rendered as "—").
-        sypd = (model.feedback.nans_detected || !(time_elapsed > 0)) ? NaN :
-            model.time_stepping.Δt_sec * nsteps / (time_elapsed * 365.25)
+        time_elapsed = model.feedback.progress_meter.tlast - model.feedback.progress_meter.tinit
+        sypd = model.time_stepping.Δt_sec * nsteps / (time_elapsed * 365.25)
 
         suite.Δt[i] = model.time_stepping.Δt_sec
         suite.SYPD[i] = sypd
