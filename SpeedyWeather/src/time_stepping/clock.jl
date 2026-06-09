@@ -75,20 +75,24 @@ Initialize the clock with the time step `Δt` and `period` to integrate for.
 `n_time_steps` is for the clock only, spin up steps (e.g. Leapfrog with 1 Euler to start)
 are not counted for the clock."""
 function initialize!(clock::Clock, time_stepping::AbstractTimeStepper, period::Period)
-    clock.Δt = time_stepping.Δt_millisec
+    Δt = time_stepping.Δt_millisec
+    n_time_steps = ceil(Int, Millisecond(period).value / Millisecond(Δt).value)
+    clock.Δt = Δt
     clock.period = period
-    clock.n_time_steps = ceil(Int, Millisecond(period).value / Millisecond(clock.Δt).value)
-    clock.n_steps = clock.n_time_steps + spin_up_steps(time_stepping)
+    clock.n_time_steps = n_time_steps
+    clock.n_steps = n_time_steps + spin_up_steps(time_stepping)
     return initialize!(clock)      # set start time, reset counter
 end
 
 """$(TYPEDSIGNATURES)
 Initialize the clock with the time step `Δt` and the number of time stepper steps `n_steps`."""
 function initialize!(clock::Clock, time_stepping::AbstractTimeStepper, n_steps::Integer)
-    clock.Δt = time_stepping.Δt_millisec
+    Δt = time_stepping.Δt_millisec
+    n_time_steps = max(0, n_steps - spin_up_steps(time_stepping)) # in case there is spin up the clock may not advance
+    clock.Δt = Δt
     clock.n_steps = n_steps     # number of steps the time stepper should take, regardless step size
-    clock.n_time_steps = max(0, n_steps - spin_up_steps(time_stepping)) # in case there is spin up the clock may not advance
-    clock.period = clock.Δt * clock.n_time_steps    # therefore calculate period from n_time_steps not n_steps
+    clock.n_time_steps = n_time_steps
+    clock.period = Δt * n_time_steps    # therefore calculate period from n_time_steps not n_steps
     return initialize!(clock)
 end
 
