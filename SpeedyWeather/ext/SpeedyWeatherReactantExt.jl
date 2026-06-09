@@ -30,9 +30,8 @@ Example usage:
 ```julia
 simulation = initialize!(model) 
 initialize!(simulation; steps=10) # don't forget this! 
-r_first! = @compile SpeedyWeather.first_timesteps!(simulation)
-r_later! = @compile SpeedyWeather.later_timestep!(simulation)
-SpeedyWeather.time_stepping!(simulation, r_first!, r_later!)
+r_time_step! = @compile SpeedyWeather.time_step!(simulation)
+SpeedyWeather.time_stepping!(simulation, r_time_step!)
 SpeedyWeather.finalize!(simulation)
 ```
 """
