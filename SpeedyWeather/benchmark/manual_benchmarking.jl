@@ -115,13 +115,17 @@ end
 # from the PrimitiveWet resolution suite (:benchmark201).
 function overview_data()
     suite = benchmarks[:benchmark201]
+    # JSON has no Inf/NaN literal — emit `null` for any non-finite metric (e.g. the SYPD of an
+    # unstable config) so JSON3 can write the file instead of erroring. The README generator
+    # already renders missing/non-finite entries as "—".
+    json_safe(x) = (x isa Number && isfinite(x)) ? x : nothing
     return Dict(
         "trunc" => collect(suite.trunc),
         "nlayers" => collect(suite.nlayers),
         "nlat" => collect(suite.nlat),
-        "sypd" => collect(suite.SYPD),
-        "memory" => collect(suite.memory),
-        "dt" => collect(suite.Δt),
+        "sypd" => map(json_safe, suite.SYPD),
+        "memory" => map(json_safe, suite.memory),
+        "dt" => map(json_safe, suite.Δt),
         "spectral_transform" => string.(suite.spectral_transform),
     )
 end
