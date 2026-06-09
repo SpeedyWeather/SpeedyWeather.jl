@@ -190,7 +190,7 @@ spin_up_steps(::AbstractLeapfrog) = 1
 function time_step!(clock::Clock, time_stepping::Leapfrog)
     Δt = time_stepping.Δt_millisec  # ::Millisecond, integer based hence ÷ not / below
     i = clock.step_counter          # 0-based as the clock is only stepped below
-    if i == 0                       # first Euler step at Δt/2
+    @trace if i == 0                       # first Euler step at Δt/2
         # i counts every time step, for the clock the first Euler step does not count
         # hence after this the time_stepping will be 1 ahead of clock step counter
         time_step!(clock, Δt ÷ 2, increase_counter = false)
