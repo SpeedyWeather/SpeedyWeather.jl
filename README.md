@@ -292,18 +292,18 @@ with the bibtex entry
 
 ```bibtex 
 @article{DJ4EarthJAMES,
-author = {Moses, William S. and Cheng, Gong and Churavy, Valentin and Gelbrecht, Maximilian and Klöwer, Milan and Kump, Joseph and Morlighem, Mathieu and Williamson, Sarah and Apte, Dhruv and Berg, Paul and Giordano, Mosè and Hill, Christopher and Loose, Nora and Montoison, Alexis and Narayanan, Sri Hari Krishna and Pal, Avik and Schanen, Michel and Silvestri, Simone and Wagner, Greg and Heimbach, Patrick},
-title = {DJ4Earth: Differentiable, and Performance-Portable Earth System Modeling via Program Transformations},
-journal = {Journal of Advances in Modeling Earth Systems},
-volume = {18},
-number = {5},
-pages = {e2025MS005615},
-keywords = {DJ4Earth, reverse-mode automatic differentiation, Earth system modeling, online learning, differentiable programming, hybrid data assimilation/machine learning},
-doi = {https://doi.org/10.1029/2025MS005615},
-url = {https://agupubs.onlinelibrary.wiley.com/doi/abs/10.1029/2025MS005615},
-eprint = {https://agupubs.onlinelibrary.wiley.com/doi/pdf/10.1029/2025MS005615},
-note = {e2025MS005615 2025MS005615},
-year = {2026}
+    author = {Moses, William S. and Cheng, Gong and Churavy, Valentin and Gelbrecht, Maximilian and Klöwer, Milan and Kump, Joseph and Morlighem, Mathieu and Williamson, Sarah and Apte, Dhruv and Berg, Paul and Giordano, Mosè and Hill, Christopher and Loose, Nora and Montoison, Alexis and Narayanan, Sri Hari Krishna and Pal, Avik and Schanen, Michel and Silvestri, Simone and Wagner, Greg and Heimbach, Patrick},
+    title = {{DJ4Earth}: Differentiable, and Performance-Portable Earth System Modeling via Program Transformations},
+    journal = {Journal of Advances in Modeling Earth Systems},
+    volume = {18},
+    number = {5},
+    pages = {e2025MS005615},
+    keywords = {DJ4Earth, reverse-mode automatic differentiation, Earth system modeling, online learning, differentiable programming, hybrid data assimilation/machine learning},
+    doi = {https://doi.org/10.1029/2025MS005615},
+    url = {https://agupubs.onlinelibrary.wiley.com/doi/abs/10.1029/2025MS005615},
+    eprint = {https://agupubs.onlinelibrary.wiley.com/doi/pdf/10.1029/2025MS005615},
+    note = {e2025MS005615 2025MS005615},
+    year = {2026}
 }
 ```
 
