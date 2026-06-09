@@ -400,8 +400,12 @@ function Base.convert(
     return F(field.data, field.grid)
 end
 
-# to allow one_field .= another_field
-Base.copyto!(field_a::AbstractField, field_b::AbstractField) = copyto!(field_a.data, field_b.data)
+# to allow one_field .= another_field; return the destination field (copyto! convention),
+# not its underlying data, so copy/copymutable/similar-based fallbacks preserve the Field type
+function Base.copyto!(field_a::AbstractField, field_b::AbstractField)
+    copyto!(field_a.data, field_b.data)
+    return field_a
+end
 
 # equality and comparison, somehow needed as not covered by broadcasting
 Base.:(==)(F1::AbstractField, F2::AbstractField) = fields_match(F1, F2) && F1.data == F2.data
