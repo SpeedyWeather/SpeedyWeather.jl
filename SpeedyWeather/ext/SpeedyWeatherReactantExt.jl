@@ -5,7 +5,7 @@ using Reactant
 using DocStringExtensions
 using Dates
 
-using SpeedyWeather: ReactantDevice, scale!, get_step, unpack, timestep!, first_timesteps!, later_timestep!
+using SpeedyWeather: ReactantDevice, scale!, get_step, unpack, time_step!
 
 const ReactantDatesExt = Base.get_extension(
     Reactant, :ReactantDatesExt
@@ -44,11 +44,13 @@ function SpeedyWeather.time_stepping!(simulation::ReactantSimulation, r_time_ste
     clock = simulation.variables.prognostic.clock
 
     #TODO: reenable @trace once Reactant issues fixed
-    #@trace checkpointing = enable_checkpointing for _ in clock.time_step_counter:clock.n_timesteps
-    #    r_later_timestep!(simulation)
+    #@trace checkpointing = enable_checkpointing for _ in 1:clock.n_steps
+    #    r_time_step!(simulation)
     #end
 
-    for _ in 1:Int(clock.n_time_steps)
+    # n_steps (not n_time_steps) to match time_stepping!(::AbstractSimulation),
+    # it includes time stepper spin-up steps (e.g. initial Euler step for Leapfrog)
+    for _ in 1:Int(clock.n_steps)
         r_time_step!(simulation)
     end
     return

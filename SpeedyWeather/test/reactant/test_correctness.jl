@@ -67,7 +67,7 @@ function test_tendencies!(sim_cpu, sim_reactant, model_name, r_timestep! = nothi
     # as a side effect, so compile first, then finalize + sync to restore clean state)
     if isnothing(r_timestep!)
         initialize!(sim_reactant; steps = nsteps)
-        r_timestep! = @compile SpeedyWeather.time_step!(sim_reactant, sim_reactant.model.time_stepping)
+        r_timestep! = @compile SpeedyWeather.time_step!(sim_reactant)
         SpeedyWeather.finalize!(sim_reactant)
     end
 
@@ -123,7 +123,7 @@ function test_time_stepping!(sim_cpu, sim_reactant, model_name, r_timestep! = no
     # Pre-compile Reactant functions if needed (this may mutate sim_reactant as a side effect)
     if isnothing(r_timestep!)
         initialize!(sim_reactant; steps = nsteps)
-        r_timestep! = @compile SpeedyWeather.time_step!(sim_reactant, sim_reactant.model.time_stepping)
+        r_timestep! = @compile SpeedyWeather.time_step!(sim_reactant)
     end
 
     # Sync after @compile to undo any side effects on sim_reactant
@@ -215,7 +215,7 @@ function test_model(ModelType::Type; trunc = TRUNC, nsteps = NSTEPS, rtol = RTOL
     if precompile
         println("\n[4/4] Pre-compiling Reactant functions...")
         initialize!(simulation_reactant; steps = nsteps)
-        r_timestep! = @compile SpeedyWeather.time_step!(sim_reactant, sim_reactant.model.time_stepping)
+        r_timestep! = @compile SpeedyWeather.time_step!(simulation_reactant)
         println("  ✓ Reactant functions compiled")
     else
         r_timestep! = nothing
