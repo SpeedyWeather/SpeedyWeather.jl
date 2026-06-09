@@ -83,6 +83,21 @@ SpeedyWeather.secondofday(dt::ReactantDatesExt.ReactantDateTime) = Dates.second(
 @inline SpeedyWeather.solar_hour_angle(::Type{T}, time::ReactantDatesExt.ReactantDateTime, λ, length_of_day::Second) where {T} = SpeedyWeather._solar_hour_angle(T, time, λ, length_of_day)
 @inline SpeedyWeather.solar_hour_angle(::Type{T}, time::ReactantDatesExt.ReactantDateTime, λ, length_of_day::ReactantDatesExt.ReactantSecond) where {T} = SpeedyWeather._solar_hour_angle(T, time, λ, length_of_day)
 
+# midnight of the first day of dt's month, expressed as ms elapsed and subtracted from dt
+function Dates.firstdayofmonth(dt::ReactantDatesExt.ReactantDateTime)
+    elapsed = ReactantDatesExt.ReactantMillisecond(
+        Dates.value(dt) - (Dates.days(dt) - Dates.day(dt) + 1) * 86_400_000
+    )
+    return dt - elapsed
+end
+
+# DateTime difference as a (traced) period, mirroring `Dates.(-)(::DateTime, ::DateTime)`
+Base.:-(x::ReactantDatesExt.ReactantDateTime, y::ReactantDatesExt.ReactantDateTime) =
+    ReactantDatesExt.ReactantMillisecond(Dates.value(x) - Dates.value(y))
+
+# whole days in a ReactantMillisecond, mirroring `Dates.days(::Millisecond)`
+Dates.days(c::ReactantDatesExt.ReactantMillisecond) = div(Dates.value(c), 86_400_000)
+
 # These function extend those defined in SpeedyWeather/src/dynamics/clock.jl
 # They will not move to ReactantDatesExt as they aren't part of stdlib Dates.jl
 Dates.second(x::ReactantDatesExt.ReactantNanosecond) = round(Int, x.value * 1.0e-9)
