@@ -107,7 +107,7 @@ function initialize!(
     initialize!(output.core, output, model)
 
     # Total number of output snapshots: IC + one per `output_every_n_steps`.
-    n_outputs = vars.prognostic.clock.n_timesteps ÷ output.output_every_n_steps + 1
+    n_outputs = vars.prognostic.clock.n_time_steps ÷ output.output_every_n_steps + 1
 
     # CREATE ZARR GROUP (the Zarr store is a *directory*, not a single file)
     (; run_path, filename) = output
