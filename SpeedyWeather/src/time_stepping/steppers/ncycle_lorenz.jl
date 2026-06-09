@@ -127,15 +127,15 @@ function weight_coefficient(L::NCycleLorenz{NF}, clock::Clock) where {NF}
 end
 
 """$(TYPEDSIGNATURES) Weight coefficient of the A-variant of the N-Cycle Lorenz time stepping scheme."""
-@inline function weight_coefficient(::Type{NF}, V::NCycleLorenzA, i::Integer, N::Integer) where {NF}
+@inline function weight_coefficient(::Type{NF}, V::NCycleLorenzA, i, N::Integer) where {NF}
     k = mod(i, subcycles(V) * N)   # current substep
-    return k == 0 ? one(NF) : convert(NF, N) / convert(NF, N - k)
+    return ifelse(k == 0, one(NF), convert(NF, N) / convert(NF, N - k))
 end
 
-"""$(TYPEDSIGNATURES) Weight coefficient of the A-variant of the N-Cycle Lorenz time stepping scheme."""
-@inline function weight_coefficient(::Type{NF}, V::NCycleLorenzB, i::Integer, N::Integer) where {NF}
+"""$(TYPEDSIGNATURES) Weight coefficient of the B-variant of the N-Cycle Lorenz time stepping scheme."""
+@inline function weight_coefficient(::Type{NF}, V::NCycleLorenzB, i, N::Integer) where {NF}
     k = mod(i, subcycles(V) * N)   # current substep
-    return k == 0 ? one(NF) : convert(NF, N) / convert(NF, k)
+    return ifelse(k == 0, one(NF), convert(NF, N) / convert(NF, k))
 end
 
 """$(TYPEDSIGNATURES) Weight coefficient of the A-variant of the N-Cycle Lorenz time stepping scheme."""
