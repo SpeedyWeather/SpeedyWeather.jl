@@ -89,6 +89,7 @@ Evaluate whether (e.g. a callback) should be scheduled at the timestep given
 in clock. Returns true for scheduled executions, false for no execution on
 this time step."""
 function isscheduled(S::Schedule, clock::Clock)
+    clock.time_step_counter == 0 && return false
     is_scheduled = S.schedule[clock.time_step_counter]
     S.counter += is_scheduled
     return is_scheduled

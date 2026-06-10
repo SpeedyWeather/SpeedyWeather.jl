@@ -111,14 +111,16 @@ function initialize!(
     length(particles) == 0 && return nothing
 
     k = particle_advection.layer
-    u_grid = field_view(vars.grid.u, :, k)
-    v_grid = field_view(vars.grid.v, :, k)
+    TS = model.time_stepping
+
+    u_grid = field_view(get_prognostic_step(vars.grid.u, TS, particle_advection), :, k)
+    v_grid = field_view(get_prognostic_step(vars.grid.v, TS, particle_advection), :, k)
     (; locator) = vars.particles
     (; geometry) = particle_advection
 
     # interpolate initial velocity on initial locations
-    lats = vars.particles.u    # reuse u,v arrays as only used for u, v
-    lons = vars.particles.v    # after update_locator!
+    lons = vars.particles.u    # reuse u,v arrays as only used for u, v
+    lats = vars.particles.v    # after update_locator!
     σ = Vector(model.geometry.σ_levels_full)[k] # explicitly on CPU
 
     # modulo particles and extract their coordinates
@@ -150,7 +152,7 @@ end
 
 # function barrier, unpack what's needed
 function particle_advection!(vars, adv::ParticleAdvection2D, model::AbstractModel)
-    return particle_advection!(vars.prognostic.particles, vars, vars.prognostic.clock, adv)
+    return particle_advection!(vars.prognostic.particles, vars, vars.prognostic.clock, adv, model.time_stepping)
 end
 
 function particle_advection!(
@@ -158,6 +160,7 @@ function particle_advection!(
         vars::Variables,
         clock::Clock,
         particle_advection::ParticleAdvection2D,
+        time_stepping::AbstractTimeStepper,         # used to decide which u, v step to use
     ) where {P <: Particle}
 
     # escape immediately for no particles
@@ -201,8 +204,8 @@ function particle_advection!(
 
     # CORRECTOR STEP, use u, v at new location and new time step
     k = particle_advection.layer
-    u_grid = field_view(vars.grid.u, :, k)
-    v_grid = field_view(vars.grid.v, :, k)
+    u_grid = field_view(get_prognostic_step(vars.grid.u, time_stepping, particle_advection), :, k)
+    v_grid = field_view(get_prognostic_step(vars.grid.v, time_stepping, particle_advection), :, k)
     RingGrids.update_locator!(locator, geometry, lons, lats)
 
     # interpolate new velocity on predicted new locations
