@@ -79,7 +79,7 @@ tendency_steps(::AbstractLeapfrog) = 1
 # copy prognostic variables' 1st step to 2nd, that way which_prognostic_step can always be 2
 function initialize!(vars::Variables, ::AbstractLeapfrog, ::AbstractModel)
     # time step variables are dynamically defined by existence in tendencies
-    # but statically compiled into the tendency_names function 
+    # but statically compiled into the tendency_names function
     (; prognostic) = vars
     for varname in tendency_names(vars)
         var_old, var_new = get_steps(getfield(prognostic, varname))
@@ -103,7 +103,7 @@ function move_prognostic_grid_variables_back!(
         model::AbstractModel,
     )
     # time step variables are dynamically defined by existence in tendencies
-    # but statically compiled into the tendency_names function 
+    # but statically compiled into the tendency_names function
     (; grid) = vars
     for varname in tendency_and_uv_names(vars)      # includes uv if vorticity exists
         var_old, var_new = get_steps(getfield(grid, varname))
@@ -207,16 +207,18 @@ end
 default_time_step(L::Leapfrog) = 2 * L.Δt
 function time_step(L::Leapfrog, clock::Clock)
     (; Δt) = L
-    clock.step_counter == 0 && return Δt / 2    # first step Euler with Δt/2
-    clock.step_counter == 1 && return Δt        # 2nd step leapfrog with Δt
-    return default_time_step(L)                 # later steps leapfrog with 2Δt
+    return ifelse(
+        clock.step_counter == 0, Δt / 2,        # first step Euler with Δt/2
+        ifelse(
+            clock.step_counter == 1, Δt,        # 2nd step leapfrog with Δt
+            default_time_step(L)                # later steps leapfrog with 2Δt
+        )
+    )
+
 end
 
-function prognostic_step(::Leapfrog, clock::Clock)
-    clock.step_counter == 0 && return 1         # first Euler step, disable filters
-    clock.step_counter == 1 && return 1         # 2nd step: Leapfrog, also disable filters
-    return 2                                    # later steps: with RAW filters
-end
+# on 1st Euler step + 2nd Leapfrog step disable filters; with RAW filters afterwards
+prognostic_step(::Leapfrog, clock::Clock) = ifelse(clock.step_counter <= 1, 1, 2)
 
 function update_prognostic!(
         var::AbstractArray,
