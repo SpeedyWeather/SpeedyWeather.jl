@@ -1,6 +1,6 @@
 name = "SpeedyTransforms"
 uuid = "ed023a3f-7a3c-42dd-bab6-68c21c8c3105"
-version = "0.1.4"
+version = "0.1.5"
 authors = ["SpeedyTransforms contributors"]
 
 [deps]
@@ -47,7 +47,7 @@ AssociatedLegendrePolynomials = "1.0.1"
 Atomix = "1"
 CUDA = "4, 5, 6.0"
 DocStringExtensions = "0.9.5"
-Enzyme = "0.13"
+Enzyme = "0.13 - 0.13.153"
 FFTW = "1.9.0"
 FastGaussQuadrature = "1.0.2"
 GPUArrays = "11.2.3"

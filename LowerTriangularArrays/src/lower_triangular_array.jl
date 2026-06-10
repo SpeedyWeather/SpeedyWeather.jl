@@ -663,8 +663,14 @@ function Base.similar(L::LowerTriangularArray{S, N, ArrayType, SP}, ::Type{T}) w
     return LowerTriangularArray{T, N, ArrayType_{T, N}, SP}(similar(L.data, T), L.spectrum)
 end
 
-Base.similar(L::LowerTriangularArray{T, N, ArrayType, SP}, ::Type{T}) where {T, N, ArrayType, SP} =
-    LowerTriangularArray{T, N, ArrayType, SP}(similar(L.data, T), L.spectrum)
+function Base.similar(L::LowerTriangularArray{T, N, ArrayType, SP}, ::Type{T}) where {T, N, ArrayType, SP}
+    # If L.data is a SubArray (e.g. L is a view obtained through a fused parent), the
+    # fresh storage returned by `similar(L.data, T)` is a plain Array/CuArray — not a
+    # SubArray. Strip the parameters off ArrayType so the new LTA's type tag matches
+    # the actual array we hold.
+    ArrayType_ = nonparametric_type(ArrayType)
+    return LowerTriangularArray{T, N, ArrayType_{T, N}, SP}(similar(L.data, T), L.spectrum)
+end
 Base.similar(L::LowerTriangularArray{T}) where {T} = similar(L, T)
 
 Architectures.array_type(::Type{<:LowerTriangularArray{T, N, ArrayType}}) where {T, N, ArrayType} = ArrayType
@@ -718,6 +724,10 @@ Base.all(L::LowerTriangularArray) = all(L.data)
 Base.any(L::LowerTriangularArray) = any(L.data)
 
 Base.repeat(L::LowerTriangularArray, counts...) = LowerTriangularArray(repeat(L.data, counts...), L.spectrum)
+
+# needed for Enzyme 
+Base.unaliascopy(A::LowerTriangularArray) =
+       LowerTriangularArray(Base.unaliascopy(A.data), A.spectrum)
 
 # Views that return a LowerTriangularArray again (need to retain all horizontal grid points, hence `:, 1` for example)
 # view(array, :) unravels like array[:] does hence "::Colon, i, args..." used to enforce one argument after :

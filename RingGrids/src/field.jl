@@ -448,6 +448,10 @@ field_view(field::AbstractField, c::Colon, i, args...) = Field(view(field.data, 
 field_view(field::AbstractField2D, c::Colon) = Field(view(field.data, c), field.grid)
 field_view(field::AbstractField, args...) = view(field, args...)   # fallback to normal view
 
+# needed for Enzyme 
+Base.unaliascopy(A::Field) =
+       Field(Base.unaliascopy(A.data), A.grid)
+
 ## BROADCASTING
 # following https://docs.julialang.org/en/v1/manual/interfaces/#man-interfaces-broadcasting
 import Base.Broadcast: BroadcastStyle, Broadcasted, DefaultArrayStyle
