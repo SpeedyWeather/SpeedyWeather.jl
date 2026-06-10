@@ -386,6 +386,9 @@ end
                 L_rep = repeat(L, 1, [2 for i in 1:length(idims)]...)
                 @test typeof(L_rep) <: LowerTriangularArray
                 @test size(L_rep, as = Vector) == (size(L, 1), [10 for i in 1:length(idims)]...) # 10 = 2 * 5 = 2*idims[i]
+
+                Lu = Base.unaliascopy(L)
+                @test Lu == L && Lu.data !== L.data
             end
         end
     end

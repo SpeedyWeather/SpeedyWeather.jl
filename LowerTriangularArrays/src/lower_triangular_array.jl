@@ -736,6 +736,10 @@ Base.any(L::LowerTriangularArray) = any(L.data)
 
 Base.repeat(L::LowerTriangularArray, counts...) = LowerTriangularArray(repeat(L.data, counts...), L.spectrum)
 
+# needed for Enzyme 
+Base.unaliascopy(A::LowerTriangularArray) =
+       LowerTriangularArray(Base.unaliascopy(A.data), A.spectrum)
+
 # Views that return a LowerTriangularArray again (need to retain all horizontal grid points, hence `:, 1` for example)
 # view(array, :) unravels like array[:] does hence "::Colon, i, args..." used to enforce one argument after :
 # exception is view(vector, :) which preserves the vector structure, equivalent here is the LowerTriangularMatrix

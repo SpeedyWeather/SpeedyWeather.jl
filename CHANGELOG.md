@@ -3,6 +3,13 @@
 ## Unreleased
 
 - Most of the `PrimitiveWetModel` is now Reactant compatible, this includes a revision to make most structs fully parametric [#985](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/985)
+- Fix bibtex entry formatting alignment for DJ4Earth article [#1121](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1121)
+- Added `Base.unaliascopy` for `LowerTriangularArray` and `Fild` [#1119](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1119)
+- [BREAKING] `model.boundary_layer` introduced (and `model.boundary_layer_drag` removed) to group surface roughness and drag computations [#1114](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1114)
+- Surface roughness modularised with `ConstantSurfaceRoughness default [#1114](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1114)
+- Restrict Enzyme compat to `0.13 - 0.13.153` (cap at v0.13.153) [#1116](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1116)
+- Optimised CUDA GPU transforms with CUDA graphs [#1109](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1109)
+- `MLDataDevices.get_device` extension mapping SpeedyWeather architectures to MLDataDevices devices [#1115](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1107)
 - Fixed `SolarZenithSeason` kernel: uninitialized typed variables and `acos` domain error [#1113](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1113)
 - Fixed punctuation in spectral transform docs [#1112](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1112)
 
