@@ -1,6 +1,6 @@
 name = "RingGrids"
 uuid = "d1845624-ad4f-453b-8ff4-a8db365bf3a7"
-version = "0.1.6+DEV"
+version = "0.1.7"
 authors = ["RingGrids contributors"]
 
 [deps]
