@@ -6,6 +6,9 @@
 - get_prognostic_step, get_tendency_step in dycore and parameterizations [#1035](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1035)
 - time stepping modularised [#1035](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1035)
 - NCycleLorenz time stepping for 2D models [#1035](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1035) [#937](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/937)
+
+## v0.21.0
+
 - Fix bibtex entry formatting alignment for DJ4Earth article [#1121](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1121)
 - Added `Base.unaliascopy` for `LowerTriangularArray` and `Fild` [#1119](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1119)
 - [BREAKING] `model.boundary_layer` introduced (and `model.boundary_layer_drag` removed) to group surface roughness and drag computations [#1114](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1114)
