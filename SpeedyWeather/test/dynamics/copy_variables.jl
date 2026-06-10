@@ -93,6 +93,7 @@
     @testset "copy! returns dest" begin
         spectral_grid = SpectralGrid(trunc = 31, nlayers = 1)
         model = BarotropicModel(spectral_grid)
+        model.feedback.verbose = false
         simulation = initialize!(model)
 
         vars = simulation.variables
