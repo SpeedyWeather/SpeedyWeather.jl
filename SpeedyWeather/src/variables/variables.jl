@@ -543,3 +543,12 @@ Ignores any other names spaces."""
     names = collect(fieldnames(fieldtype(T, :ocean)))
     return Expr(:tuple, QuoteNode.(names)...)
 end
+
+"""$(TYPEDSIGNATURES)
+Names (Tuple of Symbols) of the ocean tendencies in `::Variables`. Used to define which ocean variables are time stepped.
+Ignores any other names spaces."""
+@generated function tracer_tendency_names(::Variables{Po, G, T}) where {Po, G, T}
+    :tracers in fieldnames(T) || return :(())
+    names = collect(fieldnames(fieldtype(T, :tracers)))
+    return Expr(:tuple, QuoteNode.(names)...)
+end

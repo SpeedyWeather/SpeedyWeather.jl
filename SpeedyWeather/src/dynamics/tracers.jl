@@ -61,10 +61,10 @@ function variables(T::Tracer, model::AbstractModel)
     tg = nsteps.tendency_grid
     ts = nsteps.tendency_spectral
     return (
-        PrognosticVariable(T.name, Spectral4D(ps), desc = "$(T.name)", namespace = :tracers),    # 2 for 2 leapfrog steps
+        PrognosticVariable(T.name, Spectral4D(ps), desc = "$(T.name)", namespace = :tracers),
         GridVariable(T.name, Grid4D(pg), desc = "$(T.name)", namespace = :tracers),
         TendencyVariable(T.name, Spectral4D(ts), desc = "Tendency of $(T.name)", namespace = :tracers),
-        TendencyVariable(Symbol(T.name, :_grid), Grid4D(tg), desc = "Tendency of $(T.name)", namespace = :tracers),
+        TendencyVariable(T.name, Grid4D(tg), desc = "Tendency of $(T.name)", namespace = :grid_tracers),
         ScratchVariable(:a, Grid3D(), desc = "Scratch array", namespace = :grid),
         ScratchVariable(:b, Grid3D(), desc = "Scratch array", namespace = :grid),
     )

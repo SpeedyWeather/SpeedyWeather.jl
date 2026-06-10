@@ -106,13 +106,15 @@ To satisfy this flexibility a prognostic variable that is subject to time steppi
 the existence of a tendency field (grid or spectral) in
 
 - `simulation.tendencies`
-- or `simulation.tendencies.ocean`, `simulation.tendencies.land`
+- `simulation.tendencies.tracers`
+- `simulation.tendencies.ocean`
+- `simulation.tendencies.land`
 
 Other namespace (e.g. `grid`) are ignored. This means that if you define a new prognostic variable `var` and you want
 it to be time stepped then also define `simulation.tendencies.var`. Or choose namespaces `ocean` or `land` for both,
 other namespaces are ignored.
-A prognostic variable ignored by the general time stepper should not have a tendency defined (e.g. in-place updates)
-or in another namespace that is ignored. For example,
+A prognostic variable ignored by the general time stepper should not have a tendency defined.
+Use a for example in-place updates instead or another namespace that is ignored. For example,
 
 ```julia
 function SpeedyWeather.variables(::MyComponent)

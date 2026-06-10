@@ -41,7 +41,8 @@ function SpeedyTransforms.transform!(
 
     for (name, tracer) in model.tracers
         tracer_var = get_prognostic_step(vars.prognostic.tracers[name], time_stepping, S)
-        tracer.active && transform!(vars.grid.tracers[name], tracer_var, scratch_memory, S)
+        tracer_grid = get_prognostic_step(vars.grid.tracers[name], time_stepping, S)
+        tracer.active && transform!(tracer_grid, tracer_var, scratch_memory, S)
     end
 
     # transform random pattern for random process unless random_process=nothing
@@ -98,7 +99,8 @@ function SpeedyTransforms.transform!(
 
     for (name, tracer) in model.tracers
         tracer_var = get_prognostic_step(vars.prognostic.tracers[name], time_stepping, S)
-        tracer.active && transform!(vars.grid.tracers[name], tracer_var, scratch_memory, S)
+        tracer_grid = get_prognostic_step(vars.grid.tracers[name], time_stepping, S)
+        tracer.active && transform!(tracer_grid, tracer_var, scratch_memory, S)
     end
 
     # transform random pattern for random process unless random_process=nothing
@@ -144,7 +146,6 @@ function SpeedyTransforms.transform!(
     # if not initial step do before transforms i.e before that step is overwritten
     initialize || move_prognostic_grid_variables_back!(vars, time_stepping, model)
 
-
     transform!(vor_grid, vor, scratch_memory, S)    # get vorticity on grid from spectral vor
     transform!(div_grid, div, scratch_memory, S)    # get divergence on grid from spectral div
     transform!(temp_grid, temp, scratch_memory, S)  # -- temperature --
@@ -178,6 +179,12 @@ function SpeedyTransforms.transform!(
     # dispatch over DummyParameterization (= any parameterization) to let time steppers decide the step
     log_pₛ = get_prognostic_step(vars.grid.pressure, time_stepping, DummyParameterization())    # log Pa
     vars.parameterizations.surface_pressure .= exp.(log_pₛ)                                     # in Pa
+
+    for (name, tracer) in model.tracers
+        tracer_var = get_prognostic_step(vars.prognostic.tracers[name], time_stepping, S)
+        tracer_grid = get_prognostic_step(vars.grid.tracers[name], time_stepping, S)
+        tracer.active && transform!(tracer_grid, tracer_var, scratch_memory, S)
+    end
 
     # transform random pattern for random process unless random_process=nothing
     transform!(vars, model.random_process, S)

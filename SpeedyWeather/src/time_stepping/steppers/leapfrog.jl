@@ -88,6 +88,10 @@ function initialize!(vars::Variables, ::AbstractLeapfrog, ::AbstractModel)
         var_old, var_new = get_steps(getfield(prognostic, varname))
         var_new .= var_old
     end
+    for varname in tracer_tendency_names(vars)
+        var_old, var_new = get_steps(getfield(prognostic.tracers, varname))
+        var_new .= var_old
+    end
     for varname in ocean_tendency_names(vars)
         var_old, var_new = get_steps(getfield(prognostic.ocean, varname))
         var_new .= var_old
@@ -110,6 +114,10 @@ function move_prognostic_grid_variables_back!(
     (; grid) = vars
     for varname in tendency_and_uv_names(vars)      # includes uv if vorticity exists
         var_old, var_new = get_steps(getfield(grid, varname))
+        var_old .= var_new
+    end
+    for varname in tracer_tendency_names(vars)
+        var_old, var_new = get_steps(getfield(grid.tracers, varname))
         var_old .= var_new
     end
     for varname in ocean_tendency_names(vars)
