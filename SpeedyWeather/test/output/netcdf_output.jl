@@ -270,14 +270,12 @@ end
     model = PrimitiveDryModel(spectral_grid; output, time_stepping)
     model.feedback.verbose = false
     simulation = initialize!(model)
-    # model.implicit.initialized = true     # bypass implicit initialization with this insanely large timestep (threw SingularException)
-    # model.implicit.reinitialize = false
     run!(simulation, output = true, period = Day(365000))
 
     progn = simulation.variables.prognostic
     tmp_read_path = joinpath(model.output.run_path, model.output.filename)
     t = NCDataset(tmp_read_path)["time"][:]
-    @test t == manual_time_axis(model.output.startdate, model.time_stepping.Δt_millisec, progn.clock.n_steps)
+    @test t == manual_time_axis(model.output.startdate, model.time_stepping.Δt_millisec, progn.clock.n_time_steps)
     @test t == SpeedyWeather.load_trajectory("time", model)
 end
 
