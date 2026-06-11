@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Allow for tuples of output variables in add! [#1122](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1122)
 - Browzarr extension, Zarr.jl compatibilty includes `v0.9` [#1093](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1093) [#1096](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1096)
 
 ## v0.21.0

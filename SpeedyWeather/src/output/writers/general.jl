@@ -36,6 +36,9 @@ function add!(model::AbstractModel, outputvariables::AbstractOutputVariable...)
     return model.output
 end
 
+# also allow for tuples by splatting, similar to add!(::AbstractModel, ::Tuple)
+add!(output::AbstractOutput, tuple::Tuple) = add!(output, tuple...)
+
 """$(TYPEDSIGNATURES)
 Delete output variables from `output` by their (short name) (Symbol or String), corresponding
 to the keys in the dictionary."""
