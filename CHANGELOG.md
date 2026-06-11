@@ -3,6 +3,10 @@
 ## Unreleased
 
 - Most of the `PrimitiveWetModel` is now Reactant compatible, this includes a revision to make most structs fully parametric [#985](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/985)
+- Browzarr extension, Zarr.jl compatibilty includes `v0.9` [#1093](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1093) [#1096](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1096)
+
+## v0.21.0
+
 - Fix bibtex entry formatting alignment for DJ4Earth article [#1121](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1121)
 - Added `Base.unaliascopy` for `LowerTriangularArray` and `Fild` [#1119](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1119)
 - [BREAKING] `model.boundary_layer` introduced (and `model.boundary_layer_drag` removed) to group surface roughness and drag computations [#1114](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1114)
