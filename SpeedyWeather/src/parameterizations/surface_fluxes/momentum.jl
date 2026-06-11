@@ -11,7 +11,7 @@ different surface roughness characteristics. Fields are $(TYPEDFIELDS)"""
     "[OPTION] Near-surface wind slowdown"
     @param wind_slowdown::NF = 0.95 (bounds = 0 .. 1,)
 
-    "[OPTION] Use drag coefficient from calculated following model.boundary_layer_drag"
+    "[OPTION] Use drag coefficient from calculated following model.boundary_layer.drag"
     use_boundary_layer_drag::Bool = true
 
     "[OPTION] Or fixed drag coefficient for momentum fluxes over ocean"

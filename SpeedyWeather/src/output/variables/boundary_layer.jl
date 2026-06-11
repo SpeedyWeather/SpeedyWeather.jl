@@ -149,10 +149,59 @@ end
 path(::BoundaryLayerDragOutput, simulation) =
     simulation.variables.parameterizations.boundary_layer_drag
 
+"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+Fields are: $(TYPEDFIELDS)"""
+@kwdef mutable struct LandSurfaceRoughnessOutput <: AbstractOutputVariable
+    name::String = "lsr"
+    unit::String = "m"
+    long_name::String = "Land surface roughness length"
+    dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
+    missing_value::Float64 = NaN
+    compression_level::Int = 3
+    shuffle::Bool = true
+    keepbits::Int = 7
+end
+
+path(::LandSurfaceRoughnessOutput, simulation) =
+    simulation.variables.parameterizations.land.surface_roughness
+
+"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+Fields are: $(TYPEDFIELDS)"""
+@kwdef mutable struct OceanSurfaceRoughnessOutput <: AbstractOutputVariable
+    name::String = "osr"
+    unit::String = "m"
+    long_name::String = "Ocean surface roughness length"
+    dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
+    missing_value::Float64 = NaN
+    compression_level::Int = 3
+    shuffle::Bool = true
+    keepbits::Int = 7
+end
+
+path(::OceanSurfaceRoughnessOutput, simulation) =
+    simulation.variables.parameterizations.ocean.surface_roughness
+
+"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+Fields are: $(TYPEDFIELDS)"""
+@kwdef mutable struct SurfaceRoughnessOutput <: AbstractOutputVariable
+    name::String = "sr"
+    unit::String = "m"
+    long_name::String = "Surface roughness length"
+    dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
+    missing_value::Float64 = NaN
+    compression_level::Int = 3
+    shuffle::Bool = true
+    keepbits::Int = 7
+end
+
+path(::SurfaceRoughnessOutput, simulation) =
+    simulation.variables.parameterizations.surface_roughness
+
 # collect all in one for convenience
 BoundaryLayerOutput() = (
     ZonalVelocity10mOutput(),
     MeridionalVelocity10mOutput(),
     SurfaceTemperatureOutput(),
     BoundaryLayerDragOutput(),
+    SurfaceRoughnessOutput(),
 )
