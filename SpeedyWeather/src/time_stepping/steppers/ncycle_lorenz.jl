@@ -147,7 +147,7 @@ end
 
 @inline function weight_coefficient(::Type{NF}, V::NCycleLorenzABBA, i::Integer, N::Integer) where {NF}
     k = mod(i, subcycles(V) * N)   # current substep across all subcycles
-    variant = ifelse(k < N | k >= (subcycles(V) - 1) * N, NCycleLorenzA(), NCycleLorenzB())
+    variant = ifelse((k < N) | (k >= (subcycles(V) - 1) * N), NCycleLorenzA(), NCycleLorenzB())
     return weight_coefficient(NF, variant, i, N)
 end
 

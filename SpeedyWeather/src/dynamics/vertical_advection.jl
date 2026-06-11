@@ -26,13 +26,12 @@ function vertical_advection!(vars::Variables, model)
     advection_scheme = model.vertical_advection
     (; w) = vars.dynamics
 
-    for var in (:u, :v, :temperature, :humidity)
-        if haskey(vars.tendencies.grid, var)
-            ξ_tend = get_tendency_step(vars.tendencies.grid[var], model.time_stepping, advection_scheme)
-            ξ = get_prognostic_step(vars.grid[var], model.time_stepping, advection_scheme)
-            _vertical_advection!(ξ_tend, w, ξ, Δσ, advection_scheme)
-        end
-    end
+    # unrolled over compile-time variable names (instead of a loop over runtime symbols)
+    # to avoid Union-typed variables which Enzyme cannot differentiate
+    vertical_advection!(Val(:u), vars, w, Δσ, advection_scheme, model)
+    vertical_advection!(Val(:v), vars, w, Δσ, advection_scheme, model)
+    vertical_advection!(Val(:temperature), vars, w, Δσ, advection_scheme, model)
+    vertical_advection!(Val(:humidity), vars, w, Δσ, advection_scheme, model)
 
     for (name, tracer) in model.tracers
         if tracer.active
@@ -42,6 +41,15 @@ function vertical_advection!(vars::Variables, model)
         end
     end
     return nothing
+end
+
+# var is a compile-time constant so that haskey and getproperty constant-fold to
+# concrete variables (type-stable, required for Enzyme differentiability)
+@inline function vertical_advection!(::Val{var}, vars::Variables, w, Δσ, advection_scheme, model) where {var}
+    haskey(vars.tendencies.grid, var) || return nothing
+    ξ_tend = get_tendency_step(vars.tendencies.grid[var], model.time_stepping, advection_scheme)
+    ξ = get_prognostic_step(vars.grid[var], model.time_stepping, advection_scheme)
+    return _vertical_advection!(ξ_tend, w, ξ, Δσ, advection_scheme)
 end
 
 function _vertical_advection!(
@@ -80,8 +88,9 @@ end
     w⁻ = w[ij, k⁻]
     w⁺ = w[ij, k⁺]
 
-    ξᶠ⁺ = reconstructed_at_face(ξ, ij, k_stencil[2:end], w⁺, adv)
-    ξᶠ⁻ = reconstructed_at_face(ξ, ij, k_stencil[1:(end - 1)], w⁻, adv)
+    # tail/front instead of [2:end]/[1:end-1] as tuple-range indexing is not type-stable
+    ξᶠ⁺ = reconstructed_at_face(ξ, ij, Base.tail(k_stencil), w⁺, adv)
+    ξᶠ⁻ = reconstructed_at_face(ξ, ij, Base.front(k_stencil), w⁻, adv)
 
     # -= as the tendencies already contain the parameterizations
     ξ_tend[ij, k] -= Δσₖ⁻¹ * (w⁺ * ξᶠ⁺ - w⁻ * ξᶠ⁻ - ξ[ij, k] * (w⁺ - w⁻))
