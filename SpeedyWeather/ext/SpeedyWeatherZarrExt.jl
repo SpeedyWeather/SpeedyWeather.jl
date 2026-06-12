@@ -271,7 +271,6 @@ end
 """$(TYPEDSIGNATURES)
 Write the current time `time::DateTime` to the Zarr store in `output`."""
 function output!(output::ZarrOutput, time::DateTime)
-    output.output_counter += 1
     i = output.output_counter
 
     (; startdate) = output
