@@ -206,7 +206,7 @@ nothing # hide
 Which is the interface displacement assuming geostrophy.
 The actual interface displacement contains also ageostrophy
 ```@example gradient
-η_grid2 = simulation.variables.grid.η
+η_grid2 = get_step(simulation.variables.grid.η)
 heatmap(η_grid2, title="Interface displacement η [m] with ageostrophy")
 save("eta_ageostrophic.png", ans) # hide
 nothing # hide

@@ -219,7 +219,7 @@ Note that we chose a lower resolution here (T42) as we are simulating
 (`[:, 8]` is the lowermost layer)
 
 ```@example haurwitz
-vor = simulation.variables.grid.vorticity[:, 8]
+vor = get_step(simulation.variables.grid.vorticity)[:, 8]
 heatmap(vor, title="Relative vorticity [1/s], primitive Rossby-Haurwitz wave")
 
 save("haurwitz_primitive.png", ans) # hide

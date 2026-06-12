@@ -216,7 +216,7 @@ as
 f = coriolis(ζ)     # create f on that grid
 
 # layer thickness
-η = simulation.variables.grid.η
+η = get_step(simulation.variables.grid.η)
 H = model.atmosphere.layer_thickness
 Hb = model.orography.orography
 h = @. η + H - Hb

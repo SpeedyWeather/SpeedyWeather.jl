@@ -316,7 +316,7 @@ using SpeedyWeather
 spectral_grid = SpectralGrid(trunc=127, nlayers=1)
 
 # model components
-implicit = ImplicitShallowWater(spectral_grid, α=0.5)
+implicit = ImplicitShallowWater(spectral_grid, centering=0.5)
 orography = EarthOrography(spectral_grid, smoothing=false)
 initial_conditions = RandomWaves(spectral_grid, lmin=10, lmax=30)      # between wavenumber 10 and 30
 
