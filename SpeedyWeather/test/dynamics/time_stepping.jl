@@ -137,6 +137,8 @@ end
                             SpeedyWeather.NCycleLorenzAB,
                             SpeedyWeather.NCycleLorenzABBA,
                             )
+            s = 4      # run longer? As testing for approximate below, s can't be too large
+
             spectral_grid = SpectralGrid(nlayers = 1)
             time_stepping = NCycleLorenz(spectral_grid; steps, variant = Variant())
             planet = Earth(spectral_grid, radius = 2^22)  # use radius that is power of 2 to avoid rounding errors in scaling
@@ -145,14 +147,14 @@ end
             model = BarotropicModel(spectral_grid; time_stepping, initial_conditions = ic)
 
             simulation = initialize!(model)
-            run!(simulation, steps = 16*steps)
+            run!(simulation, steps = 2*s*8*steps)
 
             vor_restarted = deepcopy(simulation.variables.prognostic.vorticity)
             time_restarted = simulation.variables.prognostic.clock.time
 
             # do a new simulation from same model
             simulation = initialize!(model)
-            run!(simulation, steps = 16*steps)
+            run!(simulation, steps = 2*s*8*steps)
             @test vor_restarted == simulation.variables.prognostic.vorticity
             @test time_restarted == simulation.variables.prognostic.clock.time
 
@@ -164,8 +166,8 @@ end
 
             # with restart half way
             simulation = initialize!(model)
-            run!(simulation, steps = 8*steps)
-            run!(simulation, steps = 8*steps)
+            run!(simulation, steps = s*8*steps)
+            run!(simulation, steps = s*8steps)
 
             # this test is only approximate as bit reproducibility is close but not perfect
             # not sure exactly why, needs further investigation if deemed important
