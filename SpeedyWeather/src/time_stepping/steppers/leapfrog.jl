@@ -11,15 +11,6 @@ mutable struct Leapfrog{NF, S, B, MS} <: AbstractLeapfrog
     "[OPTION] Adjust `Δt_at_T31` with the `interval` to reach `interval` exactly in integer time steps"
     adjust_with_output::B
 
-    "[OPTION] Start integration with (1) Euler step with dt/2, (2) Leapfrog step with dt"
-    start_with_euler::B
-
-    "[OPTION] Sets `first_step_euler=false` after first step to continue with leapfrog after 1st `run!` call"
-    continue_with_leapfrog::B
-
-    "[DERIVED] Use Euler on first time step? (controlled by `start_with_euler` and `continue_with_leapfrog`)"
-    first_step_euler::B
-
     "[OPTION] Robert (1966) time filter coefficient to suppress the computational mode"
     robert_filter::NF
 
@@ -160,8 +151,6 @@ function Leapfrog(
         spectral_grid::SpectralGrid;
         Δt_at_T31 = Minute(40),
         adjust_with_output = true,
-        start_with_euler = true,
-        continue_with_leapfrog = true,
         robert_filter = 0.1,
         williams_filter = 0.53,
         radius = DEFAULT_RADIUS,
@@ -173,12 +162,8 @@ function Leapfrog(
     Δt_sec::NF = Δt_millisec.value / 1000
     Δt::NF = Δt_sec / radius
 
-    # derived and mutated, controlled by start_with_euler and continue_with_leapfrog
-    first_step_euler = start_with_euler
-
     return Leapfrog(
-        Second(Δt_at_T31), adjust_with_output, start_with_euler, continue_with_leapfrog, first_step_euler,
-        NF(robert_filter), NF(williams_filter), Δt_millisec, Δt_sec, Δt,
+        Second(Δt_at_T31), adjust_with_output, NF(robert_filter), NF(williams_filter), Δt_millisec, Δt_sec, Δt,
     )
 end
 
@@ -188,10 +173,7 @@ Initialize leapfrogging `L` by recalculating the time step given the output time
 be a divisor such that an integer number of time steps matches exactly with the output
 time step."""
 function initialize!(L::Leapfrog, model::AbstractModel)
-    calculate_Δt!(L, model)  # common among several time steppers
-    if L.start_with_euler
-        L.first_step_euler = true
-    end
+    calculate_Δt!(L, model)         # common among several time steppers
     return nothing
 end
 
@@ -225,7 +207,6 @@ function time_step(L::Leapfrog, clock::Clock)
             default_time_step(L)                # later steps leapfrog with 2Δt
         )
     )
-
 end
 
 # on 1st Euler step + 2nd Leapfrog step disable filters; with RAW filters afterwards
@@ -234,12 +215,11 @@ prognostic_step(::Leapfrog, clock::Clock) = ifelse(clock.step_counter <= 1, 1, 2
 function update_prognostic!(
         var::AbstractArray,
         tendency::AbstractArray,
-        vars::Variables,
+        clock::Clock,
         time_stepping::Leapfrog,
         implicit::Union{Nothing, AbstractImplicit},
         ::AbstractModel,
     )
-    (; clock) = vars.prognostic
     Δt = time_step(time_stepping, clock)
     lf = prognostic_step(time_stepping, clock)  # leapfrog prognostic step index
     var_old, var_new = get_steps(var)
@@ -260,8 +240,8 @@ function update_prognostic!(
     w2 = (lf - 1) * robert_filter * (1 - williams_filter) / 2   # = ν(1-α)/2 in Williams (2009, Eq. 9)
 
     launch!(
-        architecture(tendency), SpectralWorkOrder, size(tendency), leapfrog_kernel!,
-        var_old, var_new, var_lf, tendency, Δt, w1, w2
+        architecture(var_tend), SpectralWorkOrder, size(var_tend), leapfrog_kernel!,
+        var_old, var_new, var_lf, var_tend, Δt, w1, w2
     )
     return nothing
 end
