@@ -83,11 +83,13 @@ function calculate_Δt!(L::AbstractTimeStepper, model::AbstractModel)
     L.Δt = L.Δt_sec / radius
 
     # check how time steps from time integration and output align
-    n = round(Int, Millisecond(interval).value / L.Δt_millisec.value)
-    nΔt = n * L.Δt_millisec
-    if nΔt != interval
-        @warn "$n steps of Δt = $(L.Δt_millisec.value)ms yield output every " *
-            "$(nΔt.value)ms (=$(nΔt.value / 1000)s), but interval = $(interval.value)s"
+    if L.adjust_with_output
+        n = round(Int, Millisecond(interval).value / L.Δt_millisec.value)
+        nΔt = n * L.Δt_millisec
+        if nΔt != interval
+            @warn "$n steps of Δt = $(L.Δt_millisec.value)ms yield output every " *
+                "$(nΔt.value)ms (=$(nΔt.value / 1000)s), but interval = $(interval.value)s"
+        end
     end
     return nothing
 end

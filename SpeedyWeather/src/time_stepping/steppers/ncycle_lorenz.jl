@@ -111,10 +111,6 @@ Get current substep within N-cycle (0 to N-1) from the clock."""
 """$(TYPEDSIGNATURES)
 Initialize NCycleLorenz time stepper."""
 function initialize!(L::NCycleLorenz, model::AbstractModel)
-    if L.variant isa NCycleLorenzABBA && L.steps != 4          # Validate compatibility
-        @warn "N-Cycle Lorenz with ABBA variant is for N=4 (4th order accurate), but N=$(L.steps). Consider steps=4 or variant A/B/AB."
-    end
-
     calculate_Δt!(L, model)
     return nothing
 end
@@ -154,13 +150,13 @@ end
 function update_prognostic!(
         var::AbstractArray,
         tendency::AbstractArray,
-        vars::Variables,
+        clock::Clock,
         time_stepping::NCycleLorenz,
         implicit::Union{Nothing, AbstractImplicit},
         ::AbstractModel,
     )
     (; Δt) = time_stepping
-    w = weight_coefficient(time_stepping, vars.prognostic.clock)
+    w = weight_coefficient(time_stepping, clock)
 
     # with an implicit solver the tendency_average_kernel! has to be computed
     # before the implicit solver, so the responsibility is left therein

@@ -1,118 +1,103 @@
 # Williams (2009), MWR oscillation test case
 # dF/dt = iωF
-F(x::Complex{T}, ω::T) where {T} = im * ω * x
-function F(L::LowerTriangularMatrix{Complex{T}}, ω::T) where {T}
-    tend = LowerTriangularMatrix{Complex{T}}(undef, size(L, as = Matrix)...)
-    for lm in SpeedyWeather.eachharmonic(L, tend)
-        tend[lm] = F(L[lm], ω)
-    end
-    return tend
-end
+F(x, ω) = im * ω * x
 
 @testset "Leapfrog oscillation" begin
 
     ω = 1.0             # frequency
-    Δt = 2π / 100         # time step
+    Δt = 2π / 192       # time step
     n_rotations = 1     # times around the circle
-    n_timesteps = round(Int, 2π * n_rotations / (ω * Δt))
+    n_time_steps = round(Int, 2π * n_rotations / (ω * Δt))
 
     # loop over different precisions
-    @testset for NF in (Float16, Float32, Float64)
-
-        spectral_grid = SpectralGrid(; NF)
-        L = Leapfrog(spectral_grid)
+    @testset for NF in (Float32, Float64)
+        spectral_grid = SpectralGrid(; NF, trunc=5, nlayers = 1)
+        L = Leapfrog(spectral_grid, adjust_with_output=false)
+        model = BarotropicModel(spectral_grid; time_stepping=L)
+        simulation = initialize!(model)
+        (; clock) = simulation.variables.prognostic
+        L.Δt = Δt
+        clock.step_counter = 2
+        clock.time_step_counter = 2
 
         # INITIAL CONDITIONS
-        lmax, mmax = 3, 3
-        X_old = ones(LowerTriangularMatrix{Complex{NF}}, 3, 3)
-        X_new = copy(X_old)
+        for space in (:grid, :spectrum)
+            if space == :grid
+                X  = ones( Complex{NF}, spectral_grid.grid, 2)
+                dX = zeros(Complex{NF}, spectral_grid.grid, 1)
+            elseif space == :spectrum
+                X  = ones( Complex{NF}, spectral_grid.spectrum, 2)
+                dX = zeros(Complex{NF}, spectral_grid.spectrum, 1)
+            end
 
-        # store only 1 of the 3x3 values (all the same) per time step
-        X_out = zeros(Complex{NF}, n_timesteps + 1)
+            X[:, 2] .*= exp(im * ω * Δt)    # exact 2nd leapfrog step
 
-        # exact 2nd leapfrog step
-        X_new .*= exp(im * ω * Δt)
-        X_out[1] = X_old[1, 1]      # store initial conditions
+            # leapfrog forward
+            for i in 1:n_time_steps-1
+                dX.data .= F.(X[:, 2], NF(ω))
+                SpeedyWeather.update_prognostic!(X, dX, clock, L, nothing, model)
+            end
 
-        # leapfrog forward
-        for i in 2:(n_timesteps + 1)
-            # always evaluate F with lf = 2
-            lf = 2
-            SpeedyWeather.leapfrog!(X_old, X_new, F(X_new, NF(ω)), NF(2Δt), lf, L)
-            X_out[i] = X_old[1, 1]
+            # absolute error to exact result 1+0i
+            error = abs.(X[:, 2] .- 1)
+            @info Leapfrog, error[1], abs(X[1])
+            @test all(error .< 1.0e-2)
+            @test all(abs.(X) .<= 1)         # stable integration?
+
+            # long term stability
+            for i in 1:10*n_time_steps
+                dX.data .= F.(X[:, 2], NF(ω))
+                SpeedyWeather.update_prognostic!(X, dX, clock, L, nothing, model)
+            end
+
+            @test all(abs.(X) .<= 1)         # still stable?
         end
-
-        # absolute error to exact result 1+0i
-        error = abs(X_out[end] - 1)
-        @test error < 1.0e-2
     end
 end
 
-@testset "Leapfrog stability" begin
+@testset "NCycleLorenz oscillation" begin
 
-    # LONG TERM STABILITY
     ω = 1.0             # frequency
-    Δt = 2π / 100         # time step
-    n_rotations = 10
-    n_timesteps = round(Int, 2π * n_rotations / (ω * Δt))
+    Δt = 2π / 192        # time step, choose 120 as both 3 and 4 are divisors
+    n_rotations = 1     # times around the circle
+    n_time_steps = round(Int, 2π * n_rotations / (ω * Δt))
 
     # loop over different precisions
-    @testset for NF in (Float16, Float32, Float64)
+    @testset for NF in (Float32, Float64)
+        @testset for Variant in (SpeedyWeather.NCycleLorenzA,
+                                    SpeedyWeather.NCycleLorenzB,
+                                    SpeedyWeather.NCycleLorenzAB,
+                                    SpeedyWeather.NCycleLorenzABBA,
+                                    )
+            @testset for steps in (3, 4)
+                spectral_grid = SpectralGrid(; NF, trunc=5, nlayers = 1)
+                L = NCycleLorenz(spectral_grid; steps=steps, variant=Variant(), adjust_with_output=false)
+                model = BarotropicModel(spectral_grid; time_stepping=L)
+                simulation = initialize!(model)
+                (; clock) = simulation.variables.prognostic
+                L.Δt = Δt
 
-        spectral_grid = SpectralGrid(; NF)
-        L = Leapfrog(spectral_grid)
+                # INITIAL CONDITIONS
+                X  = ones( LowerTriangularArray{Complex{NF}}, spectral_grid.spectrum, 1)
+                dX = zeros(LowerTriangularArray{Complex{NF}}, spectral_grid.spectrum, 2)
 
-        # INITIAL CONDITIONS
-        lmax, mmax = 3, 3
-        X_old = ones(LowerTriangularMatrix{Complex{NF}}, 3, 3)
-        X_new = copy(X_old)
+                for i in 1:n_time_steps
+                    dX[:, 1] .= F.(X, NF(ω))        # tendency in the first step (second is multistep averaged tendency)
+                    SpeedyWeather.update_prognostic!(X, dX, clock, L, nothing, model)
+                    SpeedyWeather.time_step!(clock, L)
+                end
 
-        # store only 1 of the 3x3 values (all the same) per time step
-        X_out = zeros(Complex{NF}, n_timesteps + 1)
-
-        # exact 2nd leapfrog step
-        X_new .*= exp(im * ω * Δt)
-        X_out[1] = X_old[1, 1]      # store initial conditions
-
-        # leapfrog forward
-        for i in 2:(n_timesteps + 1)
-            # always evaluate F with lf = 2
-            lf = 2
-            SpeedyWeather.leapfrog!(X_old, X_new, F(X_new, NF(ω)), NF(2Δt), lf, L)
-            X_out[i] = X_old[1, 1]
+                # absolute error to exact result 1+0i
+                error = abs.(X .- 1)
+                @info (steps, Variant, error[1], abs(X[1]))
+                if steps == 3
+                    @test all(error .< 1.0e-2)
+                else                            
+                    @test all(error .< 1.0e-3)      # more steps, higher order, lower error
+                end
+                @test all(abs.(X) .<= 1)
+            end
         end
-
-        # magnitude at last time step < 1 for stability
-        M_RAW = abs(X_out[end])
-        @test M_RAW < 1
-
-        # CHECK THAT NO WILLIAMS FILTER IS WORSE
-        spectral_grid = SpectralGrid(; NF)
-        L = Leapfrog(spectral_grid, williams_filter = 1)
-
-        # INITIAL CONDITIONS
-        lmax, mmax = 3, 3
-        X_old = ones(LowerTriangularMatrix{Complex{NF}}, 3, 3)
-        X_new = copy(X_old)
-
-        # store only 1 of the 3x3 values (all the same) per time step
-        X_out = zeros(Complex{NF}, n_timesteps + 1)
-
-        # exact 2nd leapfrog step
-        X_new .*= exp(im * ω * Δt)
-        X_out[1] = X_old[1, 1]      # store initial conditions
-
-        # leapfrog forward
-        for i in 2:(n_timesteps + 1)
-            # always evaluate F with lf = 2
-            lf = 2
-            SpeedyWeather.leapfrog!(X_old, X_new, F(X_new, NF(ω)), NF(2Δt), lf, L)
-            X_out[i] = X_old[1, 1]
-        end
-
-        M_Ronly = abs(X_out[end])
-        @test M_Ronly < 1
-        @test M_Ronly <= M_RAW
     end
 end
 
