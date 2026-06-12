@@ -141,6 +141,12 @@ end
         #         SpeedyWeather.SurfacePressureOutput(),        # don't output surface pressure too
     )
 
+    # add tuples of output variables through various interfaces to model/output w/out splatting ...
+    add!(model, SpeedyWeather.PrecipitationOutput())            
+    add!(model, SpeedyWeather.PrecipitationOutput()...)
+    add!(model.output, SpeedyWeather.PrecipitationOutput())
+    add!(model.output, SpeedyWeather.PrecipitationOutput()...)
+
     simulation = initialize!(model)
     run!(simulation, output = true; period)
 
