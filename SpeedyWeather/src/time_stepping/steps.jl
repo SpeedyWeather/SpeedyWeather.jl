@@ -45,6 +45,16 @@ get_steps(var::AbstractArray{T, 3}) where {T} = ntuple(step -> get_step(var, ste
 
 export get_step
 
+# Plain Arrays
+# Inside GPU kernels `Adapt.adapt_structure(to, field::AbstractField) = adapt(to, field.data)`
+# unwraps a Field to its bare device array, so `get_step` must also work on plain arrays
+# (otherwise the device-side MethodError aborts kernel compilation). Same semantics as the
+# Field/LowerTriangularArray methods below: `step` indexes the last dimension; for arrays
+# without an explicit step dimension `step` must be 1 (trailing singleton dimension).
+@inline get_step(var::AbstractArray{T, 1}, step::Integer) where {T} = view(var, :, step)
+@inline get_step(var::AbstractArray{T, 2}, step::Integer) where {T} = view(var, :, step)
+@inline get_step(var::AbstractArray{T, 3}, step::Integer) where {T} = view(var, :, :, step)
+
 # LowerTriangularArrays
 # for 2D spectral variables step can be 1 that'll be the ignored additional singleton dimension
 # otherwise an error is thrown

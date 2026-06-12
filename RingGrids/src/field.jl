@@ -158,6 +158,7 @@ end
 #TODO: This is a bit of a stop-gap solution here while we work on the GPU column parametrization. This might be removed again
 @inline eachlayer(array_field::AbstractArray{T, 2}) where {T} = 1:size(array_field, 2)
 @inline eachlayer(array_field::AbstractArray{T, 2}, array_fields::AbstractArray{T, 2}...) where {T} = 1:size(array_field, 2)
+@inline eachlayer(array_field::AbstractArray{T, 3}) where {T} = CartesianIndices((size(array_field, 2), size(array_field, 3)))
 
 """$(TYPEDSIGNATURES)
 Iterator over all 2D grid points of a field (or fields), i.e. the horizontal dimension only.

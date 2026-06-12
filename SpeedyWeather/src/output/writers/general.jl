@@ -259,8 +259,9 @@ get_full_output_file_path(output::AbstractOutput) = joinpath(output.run_path, ou
 
 """$(TYPEDSIGNATURES)
 Returns the full path of the output file for a `simulation`. Throws an error if output is not active."""
-function get_output_path(simulation::AbstractSimulation)
-    output = simulation.model.output
+get_output_path(simulation::AbstractSimulation) = get_output_path(simulation.model)
+get_output_path(model::AbstractModel) = get_output_path(model.output)
+function get_output_path(output::AbstractOutput)
     output.active || error("Output is not active")
     return joinpath(output.run_path, output.filename)
 end
