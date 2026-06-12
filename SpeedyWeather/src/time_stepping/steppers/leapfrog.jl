@@ -5,10 +5,10 @@ abstract type AbstractLeapfrog <: AbstractTimeStepper end
 """Leapfrog time stepping defined by the following fields
 $(TYPEDFIELDS)"""
 mutable struct Leapfrog{NF, S, B, MS} <: AbstractLeapfrog
-    "[OPTION] Time step in minutes for T31, scale linearly to `trunc`"
+    "[OPTION] Time step for T31, scale linearly to spectral resolution `trunc`"
     Δt_at_T31::S
 
-    "[OPTION] Adjust `Δt_at_T31` with the `interval` to reach `interval` exactly in integer time steps"
+    "[OPTION] Adjust `Δt_at_T31` with the output `interval` to output exactly after integer time steps"
     adjust_with_output::B
 
     "[OPTION] Robert (1966) time filter coefficient to suppress the computational mode"

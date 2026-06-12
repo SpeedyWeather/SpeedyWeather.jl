@@ -51,17 +51,25 @@ end
 
 """$(TYPEDSIGNATURES)
 Change time step of timestepper `L` to `Δt` (unscaled)
-and disables adjustment to output frequency."""
+and disables adjustment to output frequency.
+`set!` can be used before or after `initialize!(model)`."""
 function set!(
         L::AbstractTimeStepper,
-        Δt::Period,                         # unscaled time step in Second, Minute, ...
+        Δt::Period;                         # unscaled time step in Second, Minute, ...
+        radius = L.Δt_sec/L.Δt              # get radius from scaled time step
     )
+    # if set! is used before `initialize!(model)` then the recalculation of
+    # Δt_at_T31 will make sure the desired time step is used when initialize!(model.time_stepping, ...) happens
+    # if set! is used after `initialize!(model)` then all fields are set consistently
+
+    # get truncation/resolution factor implicitly from Δt at this resolution vs default T31 resolution
+    resolution_factor = L.Δt_sec / Second(L.Δt_at_T31).value
+
     L.Δt_millisec = Millisecond(Δt)         # recalculate all Δt fields
-    L.Δt_sec = L.Δt_millisec.value / 1000
-    L.Δt = L.Δt_sec / L.radius
+    L.Δt_sec = Millisecond(L.Δt_millisec).value / 1000
+    L.Δt = L.Δt_sec / radius
 
     # recalculate the default time step at resolution T31 to be consistent
-    resolution_factor = (L.trunc + 1) / (DEFAULT_TRUNC + 1)
     L.Δt_at_T31 = Second(round(Int, L.Δt_sec * resolution_factor))
 
     # given Δt was manually set disallow adjustment to output frequency
@@ -70,7 +78,7 @@ function set!(
 end
 
 # also allow for keyword arguments
-set!(L::AbstractTimeStepper; Δt::Period) = set!(L, Δt)
+set!(L::AbstractTimeStepper; Δt::Period, kwargs...) = set!(L, Δt; kwargs...)
 
 function calculate_Δt!(L::AbstractTimeStepper, model::AbstractModel)
     (; trunc) = model.spectral_grid

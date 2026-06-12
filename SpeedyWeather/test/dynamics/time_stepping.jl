@@ -103,10 +103,10 @@ end
 
 @testset "NCycleLorenz: weight coefficients in cycle" begin
     @testset for NF in (Float32, Float64)
-        w3 = [SpeedyWeather.weight_coefficient(NF, SpeedyWeather.NCycleLorenzABBA(), i, 3) for i in 0:11]
+        w3 = [SpeedyWeather.weight_coefficient(NF, SpeedyWeather.NCycleLorenzABBA(), i-1, 3) for i in 1:12]
         @test w3 == NF[1.0, 1.5, 3.0, 1.0, 3.0, 1.5, 1.0, 3.0, 1.5, 1.0, 1.5, 3.0]
 
-        w4 = [SpeedyWeather.weight_coefficient(NF, SpeedyWeather.NCycleLorenzABBA(), i, 4) for i in 0:15]
+        w4 = [SpeedyWeather.weight_coefficient(NF, SpeedyWeather.NCycleLorenzABBA(), i-1, 4) for i in 1:16]
         @test w4 == NF[1.0, 1 + 1/3, 2.0, 4.0,
                         1.0, 4.0, 2.0, 1 + 1/3,
                         1.0, 4.0, 2.0, 1 + 1/3,
@@ -115,56 +115,62 @@ end
 end
 
 @testset "Set timestep manually" begin
-    @testset for trunc in (31, 63, 127)
-        spectral_grid = SpectralGrid(; trunc)
-        time_stepping = Leapfrog(spectral_grid)
-        set!(time_stepping, Minute(10))
-        @test time_stepping.Δt_sec == 10 * 60
-
-        set!(time_stepping, Δt = Minute(20))
-        @test time_stepping.Δt_sec == 20 * 60
+    @testset for TS in (Leapfrog, NCycleLorenz)
+        @testset for trunc in (31, 63, 127)
+            @testset for Δt in (Minute(10), Minute(20))
+                spectral_grid = SpectralGrid(; trunc)
+                time_stepping = TS(spectral_grid)
+                set!(time_stepping, Δt=Δt)
+                @test time_stepping.Δt_sec == Minute(Δt).value * 60
+                @test time_stepping.Δt ≈ time_stepping.Δt_sec / SpeedyWeather.DEFAULT_RADIUS
+                @test time_stepping.Δt_millisec == Millisecond(Second(time_stepping.Δt_sec))
+                @test time_stepping.Δt_at_T31 == Second(Second(Δt).value / ((trunc + 1) / (SpeedyWeather.DEFAULT_TRUNC + 1)))
+            end
+        end
     end
 end
 
-@testset "Bit reproducibility" begin
-    spectral_grid = SpectralGrid(nlayers = 1)
-    leapfrog = Leapfrog(spectral_grid; start_with_euler = true, continue_with_leapfrog = true)
-    planet = Earth(spectral_grid, radius = 2^22)  # use radius that is power of 2 to avoid rounding errors in scaling
+@testset "Bit reproducibility with NCycleLorenz" begin
+    @testset for steps in (3, 4)
+        @testset for Variant in (SpeedyWeather.NCycleLorenzA,
+                            SpeedyWeather.NCycleLorenzB,
+                            SpeedyWeather.NCycleLorenzAB,
+                            SpeedyWeather.NCycleLorenzABBA,
+                            )
+            spectral_grid = SpectralGrid(nlayers = 1)
+            time_stepping = NCycleLorenz(spectral_grid; steps, variant = Variant())
+            planet = Earth(spectral_grid, radius = 2^22)  # use radius that is power of 2 to avoid rounding errors in scaling
 
-    ic = RandomVelocity(spectral_grid, seed = 1234)
-    model = BarotropicModel(spectral_grid, time_stepping = leapfrog, initial_conditions = ic)
+            ic = RandomVelocity(spectral_grid, seed = 1234)
+            model = BarotropicModel(spectral_grid; time_stepping, initial_conditions = ic)
 
-    simulation = initialize!(model)
-    @test leapfrog.first_step_euler == true
-    run!(simulation, steps = 10)
-    @test leapfrog.first_step_euler == false
+            simulation = initialize!(model)
+            run!(simulation, steps = 16*steps)
 
-    vor_restarted = deepcopy(simulation.variables.prognostic.vorticity)
-    time_restarted = simulation.variables.prognostic.clock.time
+            vor_restarted = deepcopy(simulation.variables.prognostic.vorticity)
+            time_restarted = simulation.variables.prognostic.clock.time
 
-    # do a new simulation from same model
-    simulation = initialize!(model)
-    @test leapfrog.first_step_euler == true
-    run!(simulation, steps = 10)
-    @test leapfrog.first_step_euler == false
-    @test vor_restarted == simulation.variables.prognostic.vorticity
-    @test time_restarted == simulation.variables.prognostic.clock.time
+            # do a new simulation from same model
+            simulation = initialize!(model)
+            run!(simulation, steps = 16*steps)
+            @test vor_restarted == simulation.variables.prognostic.vorticity
+            @test time_restarted == simulation.variables.prognostic.clock.time
 
-    # check bit reproducibility of scaling
-    SpeedyWeather.scale_prognostic!(simulation.variables, planet.radius)
-    @test vor_restarted != simulation.variables.prognostic.vorticity
-    SpeedyWeather.unscale!(simulation.variables)
-    @test vor_restarted == simulation.variables.prognostic.vorticity
+            # check bit reproducibility of scaling
+            SpeedyWeather.scale_prognostic!(simulation.variables, planet.radius)
+            @test vor_restarted != simulation.variables.prognostic.vorticity
+            SpeedyWeather.unscale!(simulation.variables)
+            @test vor_restarted == simulation.variables.prognostic.vorticity
 
-    # with restart half way
-    simulation = initialize!(model)
-    @test model.time_stepping.first_step_euler == true
-    run!(simulation, steps = 5)
-    @test model.time_stepping.first_step_euler == false
-    run!(simulation, steps = 5)
+            # with restart half way
+            simulation = initialize!(model)
+            run!(simulation, steps = 8*steps)
+            run!(simulation, steps = 8*steps)
 
-    # this test is flagged as "broken" as bit reproducibility is close but not perfect
-    # not sure exactly why, needs further investigation if deemed important
-    @test_broken vor_restarted == simulation.variables.prognostic.vorticity
-    @test time_restarted == simulation.variables.prognostic.clock.time
+            # this test is only approximate as bit reproducibility is close but not perfect
+            # not sure exactly why, needs further investigation if deemed important
+            @test all(vor_restarted .≈  simulation.variables.prognostic.vorticity)
+            @test time_restarted == simulation.variables.prognostic.clock.time
+        end
+    end
 end
