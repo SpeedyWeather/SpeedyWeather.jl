@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Kernel fusion and batching for horizontal diffusion and timestepping [#1108](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1108)
 - Fused kernels in the dynamical core for better GPU efficiency [#1102](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1102)
 - Dynamical reordered and transformed batched for improved GPU performance. The majority of the dycore now follows the scheme: `grid_tendencies!`, `transform!`, `spectral_tendencies!` to batch together all grid -> spectral transforms of tendencies and auxiliary tendencies [#1101](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1101)
 - Prognostic and grid variables are now fused together and the `transform!(::Variables, ::PrimitveEquation)` is batched together to make it more efficient on GPU (uses the system introduced firsti in [#1083]). For this purposes new routines for flexible FFTs on CPU and GPU had to be introduced and the fused variables are now a new type `FusedParents` [#1099](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1099/)

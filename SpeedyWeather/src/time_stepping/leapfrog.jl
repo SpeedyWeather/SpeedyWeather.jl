@@ -139,7 +139,13 @@ tendency_names(model::AbstractModel) = tuple((Symbol(var, :_tend) for var in pro
 
 """$(TYPEDSIGNATURES)
 Leapfrog time stepping for all prognostic variables in `vars` using their tendencies.
-Depending on `model` decides which variables to time step."""
+Depending on `model` decides which variables to time step.
+
+This generic method iterates each prognostic variable separately — truncate then leapfrog.
+PrimitiveEquation models override this on GPU with a batched version that handles all
+prognostic-variable tendencies (vor, div, T, pres, [humid]) in a single truncation +
+single leapfrog kernel via the unified `:spectral_tendencies` / `:prognostic` fuse parents;
+see `leapfrog!(::Variables, ::Real, ::Int, ::PrimitiveEquation)`."""
 function leapfrog!(
         vars::Variables,
         dt::Real,               # time step (mostly =2Δt, but for init steps =Δt, Δt/2)
@@ -159,6 +165,19 @@ function leapfrog!(
     end
 
     # and time stepping for tracers if active
+    leapfrog_tracers!(vars, dt, lf, model)
+
+    # evolve the random pattern in time
+    random_process!(vars, model.random_process)
+    return nothing
+end
+
+"""$(TYPEDSIGNATURES)
+Tracer leapfrog (shared between the generic per-variable code path and the
+PrimitiveEquation batched path) — tracers stay on the per-variable code path because
+their count varies and they aren't part of the `:spectral_tendencies` fuse."""
+function leapfrog_tracers!(vars::Variables, dt::Real, lf::Int, model::AbstractModel)
+    (; prognostic, tendencies) = vars
     for (name, tracer) in model.tracers
         if tracer.active
             var_old, var_new = get_steps(prognostic.tracers[name])
@@ -167,8 +186,50 @@ function leapfrog!(
             leapfrog!(var_old, var_new, var_tend, dt, lf, model.time_stepping)
         end
     end
+    return nothing
+end
 
-    # evolve the random pattern in time
+"""$(TYPEDSIGNATURES)
+Leapfrog for PrimitiveEquation models. Architecture-dispatched:
+
+- **GPU**: a single truncation + single leapfrog kernel acting on the leapfrog view of
+  `:spectral_tendencies` (slots `1..K_diff` covering vor, div, T, pres, [humid]) and the
+  slot-aligned leading slots of `:prognostic` (at lf=1 and lf=2 step slices). Collapses
+  the 4 (dry) / 5 (wet) per-variable truncation+leapfrog launches into 1+1.
+- **CPU**: falls through to the generic per-variable path via `invoke`. The per-launch
+  cost on CPU is negligible while the batched-kernel inner loop is wider, so per-variable
+  launches are at parity or faster on CPU (same trade-off as `horizontal_diffusion!`).
+
+Tracers and random process delegate to `leapfrog_tracers!` / `random_process!`."""
+function leapfrog!(
+        vars::Variables,
+        dt::Real,
+        lf::Int,
+        model::PrimitiveEquation,
+    )
+    arch = architecture(vars.tendencies.vorticity)
+    if arch isa Architectures.AbstractCPU
+        # CPU: fall through to the generic per-variable path (faster on CPU than the batched form)
+        return invoke(leapfrog!, Tuple{Variables, Real, Int, AbstractModel}, vars, dt, lf, model)
+    end
+
+    # GPU: batched truncation + leapfrog over the leapfrog view of :spectral_tendencies.
+    # By construction, the leading slots of :spectral_tendencies are slot-aligned with the
+    # leading slots of :prognostic (both: vor, div, T, pres, [humid] at slots 1..K_diff).
+    spec_parent = parent(vars.fused.spectral_tendencies)
+    prog_parent = parent(vars.fused.prognostic)
+    slot_map = vars.fused.spectral_tendencies.slot_map
+    K_diff = haskey(slot_map, :humidity) ? last(slot_map.humidity) : last(slot_map.pressure)
+
+    tend_view = lta_view(spec_parent, :, 1:K_diff)
+    prog_old  = lta_view(prog_parent, :, 1:K_diff, 1)
+    prog_new  = lta_view(prog_parent, :, 1:K_diff, 2)
+
+    SpeedyTransforms.spectral_truncation!(tend_view)
+    leapfrog!(prog_old, prog_new, tend_view, dt, lf, model.time_stepping)
+
+    # Tracers stay on the per-variable path; random process unchanged.
+    leapfrog_tracers!(vars, dt, lf, model)
     random_process!(vars, model.random_process)
     return nothing
 end

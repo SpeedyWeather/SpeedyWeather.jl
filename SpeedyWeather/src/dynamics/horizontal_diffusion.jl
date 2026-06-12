@@ -54,6 +54,21 @@ $(TYPEDFIELDS)"""
     # ARRAYS using time_scale_div
     expl_div::MatrixType = zeros(NF, trunc + 2, nlayers)    # explicit part
     impl_div::MatrixType = ones(NF, trunc + 2, nlayers)     # implicit part
+
+    # Pre-tiled damping matrices matched to the :prognostic fuse parent slot layout
+    # `(vor, div, T, pres, [humid])`. Sized for PrimitiveWet (`4·nlayers + 1`); PrimitiveDry
+    # uses the leading `3·nlayers + 1` slots. Slot order matches `vars.fused.prognostic.slot_map`:
+    #
+    #   slots 1..L            : vorticity   — `expl, impl`
+    #   slots L+1..2L         : divergence  — `expl_div, impl_div`  (stronger damping)
+    #   slots 2L+1..3L        : temperature — `expl, impl`
+    #   slot  3L+1            : pressure    — no-op damping (0 / 1)
+    #   slots 3L+2..4L+1      : humidity    — `expl, impl`          (wet only)
+    #
+    # Used by the batched `horizontal_diffusion!(::Variables, …, ::PrimitiveEquation, lf)`
+    # kernel which reads from the prognostic fuse parent at the corresponding slots.
+    expl_all::MatrixType = zeros(NF, trunc + 2, 4 * nlayers + 1)
+    impl_all::MatrixType = ones(NF, trunc + 2, 4 * nlayers + 1)
 end
 
 """$(TYPEDSIGNATURES)
@@ -117,6 +132,7 @@ function initialize!(
         time_scale, time_scale_div, Δt, largest_eigenvalue
     )
 
+    _tile_diffusion_all!(diffusion)
     return nothing
 end
 
@@ -164,6 +180,42 @@ end
         ∇²ⁿ_implicit[l_plus_1, k] = 1 / (1 - 2Δt * ∇²ⁿ[l_plus_1, k])
         ∇²ⁿ_div_implicit[l_plus_1, k] = 1 / (1 - 2Δt * ∇²ⁿ_div[l_plus_1, k])
     end
+end
+
+"""
+$(TYPEDSIGNATURES)
+Tile `diffusion.expl_all`, `diffusion.impl_all` (shape `(lmax, 4·nlayers + 1)`) from the
+per-variable matrices so that they line up slot-for-slot with the `:prognostic` fuse
+parent. The actual declaration order on PrimitiveDry/Wet places members as
+`(vor, div, T, pres, [humid])` (pressure before humidity because pressure is declared
+in PrimitiveDry and humidity is appended by PrimitiveWet), so slot ranges are:
+
+- `1..L`            = vorticity     → `expl, impl`
+- `L+1..2L`         = divergence    → `expl_div, impl_div`  (stronger damping)
+- `2L+1..3L`        = temperature   → `expl, impl`
+- `3L+1`            = pressure      → no-op damping (0 / 1) — diffusion never touches pressure
+- `3L+2..4L+1`      = humidity      → `expl, impl`  (only consumed by PrimitiveWet)
+"""
+function _tile_diffusion_all!(diffusion::AbstractHorizontalDiffusion)
+    L = diffusion.nlayers
+    expl_all = diffusion.expl_all
+    impl_all = diffusion.impl_all
+    fill!(expl_all, 0)
+    fill!(impl_all, 1)
+    # vorticity (slots 1..L)
+    copyto!(view(expl_all, :, 1:L),                diffusion.expl)
+    copyto!(view(impl_all, :, 1:L),                diffusion.impl)
+    # divergence (slots L+1..2L) — stronger damping
+    copyto!(view(expl_all, :, (L + 1):(2L)),       diffusion.expl_div)
+    copyto!(view(impl_all, :, (L + 1):(2L)),       diffusion.impl_div)
+    # temperature (slots 2L+1..3L)
+    copyto!(view(expl_all, :, (2L + 1):(3L)),      diffusion.expl)
+    copyto!(view(impl_all, :, (2L + 1):(3L)),      diffusion.impl)
+    # pressure (slot 3L+1) — stays no-op (expl=0, impl=1) from the fill above
+    # humidity (slots 3L+2..4L+1) — only used by PrimitiveWet, harmless for dry
+    copyto!(view(expl_all, :, (3L + 2):(4L + 1)),  diffusion.expl)
+    copyto!(view(impl_all, :, (3L + 2):(4L + 1)),  diffusion.impl)
+    return nothing
 end
 
 """$(TYPEDSIGNATURES)
@@ -256,44 +308,108 @@ function horizontal_diffusion!(
 end
 
 """$(TYPEDSIGNATURES)
-Apply horizontal diffusion applied to vorticity, divergence, temperature, and
-humidity (PrimitiveWet only) in the PrimitiveEquation models."""
+Apply horizontal diffusion to vorticity, divergence, temperature, pressure, and humidity
+(PrimitiveWet only) in the PrimitiveEquation models. Architecture-dispatched: GPU uses
+the unified-fuse batched kernel (one launch over the diffusion view of
+`:spectral_tendencies`); CPU stays on the per-variable launches (which still write
+through to the same fuse parent via the per-variable view aliases — only the loop
+structure differs). CPU stays per-variable because the unified kernel's larger inner
+loop + SubArray indirection measurably regresses at T127+ on CPU
+(see `benchmark_horizontal_diffusion.jl`), while on GPU per-launch overhead dominates
+and the unified path is faster.
+
+Tracers stay on the single-variable code path (one launch per active tracer)."""
 function horizontal_diffusion!(
         vars::Variables,
         diffusion::AbstractHorizontalDiffusion,
         model::PrimitiveEquation,
         lf::Integer = 1,    # leapfrog index used (2 is unstable)
     )
-    # use stronger diffusion operators that taper and change power with height for divergence
-    (; expl_div, impl_div) = diffusion
-
-    # and those for all other variables
-    (; expl, impl) = diffusion
-
-    # Primitive equation models diffuse vorticity, divergence, temp (and humidity for wet core)
-    vor = get_step(vars.prognostic.vorticity, lf)
-    div = get_step(vars.prognostic.divergence, lf)
-    temp = get_step(vars.prognostic.temperature, lf)
-    vor_tend = vars.tendencies.vorticity
-    div_tend = vars.tendencies.divergence
-    temp_tend = vars.tendencies.temperature
-    horizontal_diffusion!(vor_tend, vor, expl, impl)
-    horizontal_diffusion!(div_tend, div, expl_div, impl_div)
-    horizontal_diffusion!(temp_tend, temp, expl, impl)
-
-    if haskey(vars.tendencies, :humidity)
-        humid = get_step(vars.prognostic.humidity, lf)
-        humid_tend = vars.tendencies.humidity
-        horizontal_diffusion!(humid_tend, humid, expl, impl)
+    arch = architecture(vars.tendencies.vorticity)
+    if arch isa Architectures.AbstractCPU
+        _horizontal_diffusion_primeq_serial!(vars, diffusion, model, lf)
+    else
+        _horizontal_diffusion_primeq_batched!(vars, diffusion, model, lf)
     end
 
+    # tracers all use the standard (expl, impl) damping; one launch per active tracer
+    (; expl, impl) = diffusion
     for (name, tracer) in model.tracers
-        tracer_var = get_step(vars.prognostic.tracers[name], lf)      # lta_view for leapfrog index
+        tracer_var = get_step(vars.prognostic.tracers[name], lf)
         tracer_tend = vars.tendencies.tracers[name]
         tracer.active && horizontal_diffusion!(tracer_tend, tracer_var, expl, impl)
     end
 
     return nothing
+end
+
+"""$(TYPEDSIGNATURES)
+CPU code path: one `horizontal_diffusion!(tendency, var, expl, impl)` launch per
+prognostic variable. The per-launch cost on CPU is negligible while the smaller inner
+loop (one read + one write per `(lm, k)`) vectorizes well — at T127–T255 this is
+~2–3× faster than the unified-kernel path.
+
+The per-variable tendencies (`vars.tendencies.vorticity`, etc.) are themselves slot
+views of `:spectral_tendencies`, so writes still land in the same fuse parent."""
+function _horizontal_diffusion_primeq_serial!(vars, diffusion, _model, lf)
+    (; expl, impl, expl_div, impl_div) = diffusion
+    vor   = get_step(vars.prognostic.vorticity,   lf)
+    div   = get_step(vars.prognostic.divergence,  lf)
+    temp  = get_step(vars.prognostic.temperature, lf)
+    horizontal_diffusion!(vars.tendencies.vorticity,   vor,  expl,     impl)
+    horizontal_diffusion!(vars.tendencies.divergence,  div,  expl_div, impl_div)
+    horizontal_diffusion!(vars.tendencies.temperature, temp, expl,     impl)
+    if haskey(vars.tendencies, :humidity)
+        humid = get_step(vars.prognostic.humidity, lf)
+        horizontal_diffusion!(vars.tendencies.humidity, humid, expl, impl)
+    end
+    return nothing
+end
+
+"""$(TYPEDSIGNATURES)
+GPU code path: a single batched kernel iterates over the diffusion view of
+`:spectral_tendencies` (slots `1..K_diff` covering vor, div, T, pres, [humid]) reading
+from the slot-aligned `:prognostic` step view. Both parents share the same leading slot
+layout (see `variables(::Type{<:PrimitiveDry/Wet})`), so the kernel uses uniform
+indexing — no per-variable offsets. Collapses 3 (dry) / 4 (wet) launches into 1."""
+function _horizontal_diffusion_primeq_batched!(vars, diffusion, _model, lf)
+    (; expl_all, impl_all) = diffusion
+
+    # Source: :prognostic at step lf, contiguous (lm, K_prog) covering vor, div, T, pres, [humid]
+    prog_parent = parent(vars.fused.prognostic)
+    prog_step = get_step(prog_parent, lf)
+
+    # Destination: diffusion view = slots 1..K_diff of :spectral_tendencies. K_diff is the
+    # last slot of the last diffusion-affected member (pres for dry; humid for wet).
+    spec_parent = parent(vars.fused.spectral_tendencies)
+    slot_map = vars.fused.spectral_tendencies.slot_map
+    K_diff = haskey(slot_map, :humidity) ? last(slot_map.humidity) : last(slot_map.pressure)
+    spec_diff = lta_view(spec_parent, :, 1:K_diff)
+
+    lmax, _ = size(spec_diff, OneBased, as = Matrix)
+    @boundscheck size(spec_diff, 2) <= size(prog_step, 2) ||
+        throw(BoundsError(prog_step, K_diff))
+    @boundscheck lmax <= size(expl_all, 1) == size(impl_all, 1) ||
+        throw(BoundsError(expl_all, lmax))
+    @boundscheck K_diff <= size(expl_all, 2) || throw(BoundsError(expl_all, K_diff))
+
+    l_indices = spec_diff.spectrum.l_indices
+    arch = architecture(spec_diff)
+    launch!(
+        arch, SpectralWorkOrder, size(spec_diff), _horizontal_diffusion_primeq_kernel!,
+        spec_diff, prog_step, expl_all, impl_all, l_indices,
+    )
+    return nothing
+end
+
+@kernel inbounds = true function _horizontal_diffusion_primeq_kernel!(
+        spec_diff, prog_step, expl_all, impl_all, l_indices,
+    )
+    I = @index(Global, Cartesian)
+    lm = I[1]
+    k  = I[2]
+    l  = l_indices[lm]
+    spec_diff[lm, k] = (spec_diff[lm, k] + expl_all[l, k] * prog_step[lm, k]) * impl_all[l, k]
 end
 
 export SpectralFilter
@@ -341,6 +457,10 @@ export SpectralFilter
     # ARRAYS using time_scale_div for divergence
     expl_div::MatrixType = zeros(NF, trunc + 2, nlayers)  # explicit part
     impl_div::MatrixType = ones(NF, trunc + 2, nlayers)   # implicit part
+
+    # Pre-tiled damping aligned with the :prognostic fuse parent — see HyperDiffusion comment.
+    expl_all::MatrixType = zeros(NF, trunc + 2, 4 * nlayers + 1)
+    impl_all::MatrixType = ones(NF, trunc + 2, 4 * nlayers + 1)
 end
 
 """$(TYPEDSIGNATURES)
@@ -387,5 +507,7 @@ function initialize!(
         expl_div[trunc + 2, k] = 0
         impl_div[trunc + 2, k] = 0
     end
+
+    _tile_diffusion_all!(diffusion)
     return
 end
