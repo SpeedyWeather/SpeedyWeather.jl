@@ -117,7 +117,7 @@ end
 
 # Weight coefficient functions (Hotta et al. 2016, Eqs 2-3, 7-8)
 """$(TYPEDSIGNATURES)
-Compute weight coefficient w for current substep."""
+Compute weight coefficient w for current substep in the NCycleLorenz time stepping scheme."""
 function weight_coefficient(L::NCycleLorenz{NF}, clock::Clock) where {NF}
     return weight_coefficient(NF, L.variant, clock.step_counter, L.steps)
 end
@@ -134,13 +134,14 @@ end
     return ifelse(k == 0, one(NF), NF(N) / k)
 end
 
-"""$(TYPEDSIGNATURES) Weight coefficient of the A-variant of the N-Cycle Lorenz time stepping scheme."""
+"""$(TYPEDSIGNATURES) Weight coefficient of the AB-variant of the N-Cycle Lorenz time stepping scheme."""
 @inline function weight_coefficient(::Type{NF}, V::NCycleLorenzAB, i::Integer, N::Integer) where {NF}
     k = mod(i, subcycles(V) * N)   # current substep
     variant = ifelse(k < N, NCycleLorenzA(), NCycleLorenzB())
     return weight_coefficient(NF, variant, i, N)
 end
 
+"""$(TYPEDSIGNATURES) Weight coefficient of the ABBA-variant of the N-Cycle Lorenz time stepping scheme."""
 @inline function weight_coefficient(::Type{NF}, V::NCycleLorenzABBA, i::Integer, N::Integer) where {NF}
     k = mod(i, subcycles(V) * N)   # current substep across all subcycles
     variant = ifelse((k < N) | (k >= (subcycles(V) - 1) * N), NCycleLorenzA(), NCycleLorenzB())

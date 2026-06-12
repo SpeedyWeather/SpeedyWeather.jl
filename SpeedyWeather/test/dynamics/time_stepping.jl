@@ -12,7 +12,7 @@ F(x, ω) = im * ω * x
     # loop over different precisions
     @testset for NF in (Float32, Float64)
         spectral_grid = SpectralGrid(; NF, trunc=5, nlayers = 1)
-        L = Leapfrog(spectral_grid, adjust_with_output=false)
+        L = Leapfrog(spectral_grid, adjust_with_output=false, robert_filter=0.05, williams_filter=0.51)
         model = BarotropicModel(spectral_grid; time_stepping=L)
         simulation = initialize!(model)
         (; clock) = simulation.variables.prognostic
@@ -98,6 +98,19 @@ end
                 @test all(abs.(X) .<= 1)
             end
         end
+    end
+end
+
+@testset "NCycleLorenz: weight coefficients in cycle" begin
+    @testset for NF in (Float32, Float64)
+        w3 = [SpeedyWeather.weight_coefficient(NF, SpeedyWeather.NCycleLorenzABBA(), i, 3) for i in 0:11]
+        @test w3 == NF[1.0, 1.5, 3.0, 1.0, 3.0, 1.5, 1.0, 3.0, 1.5, 1.0, 1.5, 3.0]
+
+        w4 = [SpeedyWeather.weight_coefficient(NF, SpeedyWeather.NCycleLorenzABBA(), i, 4) for i in 0:15]
+        @test w4 == NF[1.0, 1 + 1/3, 2.0, 4.0,
+                        1.0, 4.0, 2.0, 1 + 1/3,
+                        1.0, 4.0, 2.0, 1 + 1/3,
+                        1.0, 1 + 1/3, 2.0, 4.0]
     end
 end
 
