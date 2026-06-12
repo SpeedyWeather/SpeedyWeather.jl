@@ -53,7 +53,8 @@ function drag!(
         drag::LinearDrag,
         model::AbstractModel,
     )
-    (; u, v) = vars.grid
+    u = get_prognostic_step(vars.grid.u, model.time_stepping, drag)
+    v = get_prognostic_step(vars.grid.v, model.time_stepping, drag)
     Fu = get_tendency_step(vars.tendencies.grid.u, model.time_stepping, drag)
     Fv = get_tendency_step(vars.tendencies.grid.v, model.time_stepping, drag)
 
