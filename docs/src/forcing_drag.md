@@ -354,7 +354,7 @@ run!(simulation)
 
 # visualisation
 using CairoMakie
-vor = simulation.variables.grid.vorticity[:, 1]
+vor = get_step(simulation.variables.grid.vorticity)[:, 1]
 heatmap(vor, title="Stochastically stirred vorticity")
 save("stochastic_stirring.png", ans) # hide
 nothing # hide

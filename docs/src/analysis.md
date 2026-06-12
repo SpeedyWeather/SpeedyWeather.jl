@@ -155,10 +155,11 @@ So at the current state of our simulation we have a total energy
 (per square meter as we haven't multiplied by the surface area of the planet).
 
 ```@example analysis
-# flat copies for convenience
-u = simulation.variables.grid.u[:, 1]
-v = simulation.variables.grid.v[:, 1]
-η = simulation.variables.grid.η
+# get_step to select the step dimension all prognostic/tendency variables have
+# [:, 1] for all horizontal points and 1 to select the one and only vertical layer
+u = get_step(simulation.variables.grid.u)[:, 1]
+v = get_step(simulation.variables.grid.v)[:, 1]
+η = get_step(simulation.variables.grid.η)
 
 TE = total_energy(u, v, η, model)
 ```
@@ -211,7 +212,7 @@ as
 
 ```@example analysis
 # vorticity
-ζ = simulation.variables.grid.vorticity[:,1]
+ζ = get_step(simulation.variables.grid.vorticity)[:, 1]
 f = coriolis(ζ)     # create f on that grid
 
 # layer thickness
@@ -431,10 +432,10 @@ end
 
 # unpack diagnostic variables and call global_diagnostics from above
 function global_diagnostics(vars::Variables, model::AbstractModel)
-    u = vars.grid.u[:, 1]
-    v = vars.grid.v[:, 1]
-    ζR = vars.grid.vorticity[:, 1]
-    η = vars.grid.η
+    u  = get_step(vars.grid.u)[:, 1]
+    v  = get_step(vars.grid.v)[:, 1]
+    ζR = get_step(vars.grid.vorticity)[:, 1]
+    η  = get_step(vars.grid.η)
 
     # vorticity during simulation is scaled by radius R, unscale here
     ζ = ζR ./ vars.prognostic.scale[]

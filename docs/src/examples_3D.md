@@ -40,7 +40,7 @@ off a wave propagating eastward. This wave becomes obvious when visualised with
 ```@example jablonowski
 using CairoMakie
 
-vor = simulation.variables.grid.vorticity[:, end]
+vor = simulation.variables.grid.vorticity[:, end, 1]
 heatmap(vor, title="Surface relative vorticity")
 save("jablonowski.png", ans) # hide
 nothing # hide
@@ -88,7 +88,7 @@ Visualising surface temperature with
 ```@example heldsuarez
 using CairoMakie
 
-temp = simulation.variables.grid.temperature[:, end]
+temp = simulation.variables.grid.temperature[:, end, 1]
 heatmap(temp, title="Surface temperature [K]", colormap=:thermal)
 
 save("heldsuarez.png", ans) # hide
@@ -137,7 +137,7 @@ of the convection scheme, causing updrafts and downdrafts in both humidity and t
 ```@example aquaplanet
 using CairoMakie
 
-humid = simulation.variables.grid.humidity[:, end]
+humid = simulation.variables.grid.humidity[:, end, 1]
 heatmap(humid, title="Surface specific humidity [kg/kg]", colormap=:oslo)
 
 save("aquaplanet.png", ans) # hide
@@ -167,7 +167,7 @@ model = PrimitiveWetModel(spectral_grid; ocean, land_sea_mask, orography, convec
 simulation = initialize!(model)
 run!(simulation, period=Day(20))
 
-humid = simulation.variables.grid.humidity[:, end]
+humid = simulation.variables.grid.humidity[:, end, 1]       # end: surface layer, 1: step dimension
 heatmap(humid, title="No deep convection: Surface specific humidity [kg/kg]", colormap=:oslo)
 save("aquaplanet_nodeepconvection.png", ans) # hide
 nothing # hide
@@ -186,7 +186,7 @@ model = PrimitiveWetModel(spectral_grid; ocean, land_sea_mask, orography, convec
 simulation = initialize!(model)
 run!(simulation, period=Day(20))
 
-humid = simulation.variables.grid.humidity[:, end]
+humid = simulation.variables.grid.humidity[:, end, 1]       # end: surface layer, 1: step dimension
 heatmap(humid, title="No convection: Surface specific humidity [kg/kg]", colormap=:oslo)
 save("aquaplanet_noconvection.png", ans) # hide
 nothing # hide

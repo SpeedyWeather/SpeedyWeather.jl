@@ -76,8 +76,8 @@ function SpeedyWeather.initialize!(
 
     # where surface (=lowermost model layer) u, v on the grid are stored
     nlayers = model.geometry.nlayers
-    u_grid = vars.grid.u[:, nlayers]
-    v_grid = vars.grid.v[:, nlayers]
+    u_grid = RingGrids.field_view(vars.grid.u, :, nlayers, 1)
+    v_grid = RingGrids.field_view(vars.grid.v, :, nlayers, 1)
 
     # maximum wind speed of initial conditions
     callback.maximum_surface_wind_speed[1] = max_2norm(u_grid, v_grid)
@@ -126,8 +126,8 @@ function SpeedyWeather.callback!(
 
     # where surface (=lowermost model layer) u, v on the grid are stored
     nlayers = model.geometry.nlayers
-    u_grid = vars.grid.u[:, nlayers]
-    v_grid = vars.grid.v[:, nlayers]
+    u_grid = RingGrids.field_view(vars.grid.u, :, nlayers, 1)
+    v_grid = RingGrids.field_view(vars.grid.v, :, nlayers, 1)
 
     # maximum wind speed at current time step
     callback.maximum_surface_wind_speed[i] = max_2norm(u_grid, v_grid)
@@ -327,7 +327,7 @@ function SpeedyWeather.callback!(
 
     # Just print the North Pole surface temperature to screen
     (;time) = vars.prognostic.clock
-    temp_at_north_pole = vars.grid.temperature[1, end]
+    temp_at_north_pole = vars.grid.temperature[1, end, 1]   # last 1: step index 1
 
     @info "North pole has a temperature of $temp_at_north_pole on $time."
 end

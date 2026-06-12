@@ -182,10 +182,10 @@ we will use `heatmap` to plot data on our grids directly, without storing output
 So for our current simulation, that means at time = 12 days, vorticity on the grid
 is stored in the diagnostic variables and can be visualised with
 (`[:, 1]` is horizontal x vertical dimension, so all grid points on the first and
-only vertical layer)
+only vertical layer, see [Step dimension](@ref))
 
 ```@example galewsky_setup
-vor = simulation.variables.grid.vorticity[:, 1]
+vor = get_step(simulation.variables.grid.vorticity)[:, 1]
 heatmap(vor, title="Relative vorticity [1/s]")
 save("galewsky2.png", ans) # hide
 nothing # hide
@@ -261,7 +261,7 @@ the Makie extension
 
 ```@example galewsky_setup2
 using CairoMakie
-vor = simulation.variables.grid.vorticity[:, 1]   # 1 to index surface
+vor = get_step(simulation.variables.grid.vorticity)[:, 1]   # 1 to index surface
 heatmap(vor, title="Relative vorticity [1/s]")
 save("galewsky3.png", ans) # hide
 nothing # hide
@@ -298,7 +298,7 @@ a `LinearVorticityDrag` and use the default drag coefficient. Then visualize zon
 ```@example jet_stream_setup
 using CairoMakie
 
-u = simulation.variables.grid.u[:, 1]
+u = get_step(simulation.variables.grid.u)[:, 1]
 heatmap(u, title="Zonal wind [m/s]")
 save("polar_jets.png", ans) # hide
 nothing # hide

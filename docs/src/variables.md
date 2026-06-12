@@ -102,3 +102,53 @@ set!(simulation, sea_surface_temperature=300, namespace=:ocean)
 ```
 
 For another example, see [Set tracers](@ref).
+
+## Step dimension
+
+As you'll notice when inspecting `simulation.variables` is that many prognostic and tendency variables
+will have one more dimension than you may think they should have. This is the step dimension as
+many time stepping schemes require either several steps in the prognostic variables (think Leapfrog)
+or several tendency steps (think multi-step methods). In many cases this additional dimension
+will just be a trailing singleton dimension and you can drop it by selecting it, e.g. `[:, 1]`.
+As the step dimension essentially contains several "versions" of the same variable the error you
+will make by selecting the wrong one is generally small. In Leapfrog, you would simply select
+the previous time step for example. So prognostic and tendency variables have the following dimensions
+in that order:
+
+- horizontal dimension (unravalled longitude and latitude, or degree/order of spherical harmonics)
+- vertical (optional, many 2D variables will drop this)
+- step (all [Time stepped variables](@ref) and tendencies have this)
+
+So a conceptually 2D horizontal-only variable may use an array of
+
+- one dimesion (unravelled horizontal dimension),
+- two dimensions (trailing singleton dimension for the vertical),
+- two dimensions (trailing dimension for the step),
+- or three dimesions (singleton dimension for the vertical, and dimension for step)
+
+and similar with 3D variables (but the vertical dimension isn't singleton then).
+Whether the step dimension is singleton or not depends on the time stepping scheme in use.
+
+To ease the selection of the step dimension you can use the `get_step` function without any argument
+which will automatically create a view onto the array selecting the last step as this
+in many cases represents the "current" step and not any previous ones.
+But this depends on your time stepping scheme (which the variable itself does not know about).
+For example
+
+```julia
+size(simulation.variables.grid.u)
+```
+
+is a 3D array representing a 3D variable. The array has one more dimension (the last) for the step
+but one less because horizontal dimensions are unravelled into one. The step dimension
+here has two steps which represent with Leapfrog time stepping the previous and current step,
+so to not select the previous time step, you should index `[ij, k, 2]` here.
+This is what the `get_step` function will do for you
+
+```julia
+get_step(simulation.variables.grid.u)       # selects the last step index automatically
+get_step(simulation.variables.grid.u, 1)    # select first step
+get_steP(simulation.variables.grid.u, 2)    # select 2nd step
+```
+
+Then you can use `[ij, k]` indexing afterwards again. 

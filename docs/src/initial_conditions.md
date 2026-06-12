@@ -107,7 +107,7 @@ run!(simulation, period=Day(3))
 # a running simulation always transforms spectral variables
 # so we don't have to do the transform manually but just pull
 # layer 1 (there's only 1) from the diagnostic variables
-vor = simulation.variables.grid.vorticity[:, 1]
+vor = get_step(simulation.variables.grid.vorticity)[:, 1]
 
 heatmap(vor, title="Relative vorticity [1/s], Rossby Haurwitz wave after 3 days")
 save("haurwitz_day10.png", ans) # hide
@@ -167,7 +167,7 @@ model = ShallowWaterModel(spectral_grid; forcing, drag, initial_conditions, orog
 simulation = initialize!(model)
 run!(simulation, period=Day(8))
 
-vor = simulation.variables.grid.vorticity[:, 1]
+vor = get_step(simulation.variables.grid.vorticity)[:, 1]
 heatmap(vor, title="Relative vorticity [1/s], shallow water Rossby Haurwitz wave after 8 days")
 save("haurwitz_sw.png", ans) # hide
 nothing # hide

@@ -121,8 +121,8 @@ nothing # hide
 Now pretend you only have `u, v` to get vorticity (which is actually the prognostic variable in the model,
 so calculated anyway...).
 ```@example gradient
-u = simulation.variables.grid.u[:, 1]   # [:, 1] for 1st layer
-v = simulation.variables.grid.v[:, 1]
+u = get_step(simulation.variables.grid.u)[:, 1]   # [:, 1] for 1st layer
+v = get_step(simulation.variables.grid.v)[:, 1]
 vor = curl(u, v, radius = model.planet.radius)
 nothing # hide
 ```

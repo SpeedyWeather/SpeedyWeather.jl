@@ -45,6 +45,12 @@ get_steps(var::AbstractArray{T, 3}) where {T} = ntuple(step -> get_step(var, ste
 
 export get_step
 
+"""$(TYPEDSIGNATURES)
+Select step dimension from variable, when no step as 2nd argument provided select las index
+as this typically presents the "current" step (and not any previous ones). But this depends
+on the time stepping a variable with step dimension was created for."""
+get_step(var) = get_step(var, size(var, ndims(var)))
+
 # Plain Arrays
 # Inside GPU kernels `Adapt.adapt_structure(to, field::AbstractField) = adapt(to, field.data)`
 # unwraps a Field to its bare device array, so `get_step` must also work on plain arrays
