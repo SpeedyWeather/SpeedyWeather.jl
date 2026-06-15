@@ -199,7 +199,7 @@ function SpeedyWeather.forcing!(
     model::AbstractModel,
 )
     # function barrier only
-    forcing!(vars, forcing, model.spectral_transform)
+    forcing!(vars, forcing, model.spectral_transform, model.time_stepping)
 end
 ```
 
@@ -232,7 +232,8 @@ So we define the actual `forcing!` function that's then called as follows
 function forcing!(
     vars::Variables,
     forcing::StochasticStirring{NF},
-    spectral_transform::SpectralTransform
+    spectral_transform::SpectralTransform,
+    time_stepping::AbstractTimeStepper,
 ) where NF
 
     # noise and auto-regressive factors
@@ -253,8 +254,9 @@ function forcing!(
     # mask everything but mid-latitudes
     RingGrids._scale_lat!(S_grid, forcing.lat_mask)
 
-    # back to spectral space
-    vor_tend = get_step(vars.tendencies.vorticity, model.time_stepping, forcing)
+    # back to spectral space; tendencies may hold several steps (e.g. to accumulate
+    # weighted tendencies), get_tendency_step returns the one to write into
+    vor_tend = SpeedyWeather.get_tendency_step(vars.tendencies.vorticity, time_stepping, forcing)
     transform!(vor_tend, S_grid, spectral_transform)
 
     return nothing
