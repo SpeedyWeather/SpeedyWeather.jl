@@ -55,7 +55,7 @@ m = 4
 K = 7.848e-6
 
 ζ(λ, θ, σ) = 2ω*sind(θ) - K*sind(θ)*cosd(θ)^m*(m^2 + 3m + 2)*cosd(m*λ)
-set!(simulation, vorticity=ζ)
+set!(simulation, vorticity=ζ, step=1)
 ```
 
 with only two difference from the mathematical notation. (1) SpeedyWeather's
@@ -64,6 +64,10 @@ and (2) To generalise to vertical coordinates, the function `ζ(λ, θ, σ)` tak
 *exactly* three arguments, with `σ` denoting the vertical [Sigma coordinates](@ref).
 This is important so that we can use the same definition of initial conditions
 for the 2D barotropic vorticity model also for the 3D primitive equations.
+Furthermore we explicitly set here step 1, as, depending on the time stepper,
+prognostic variables may have more than 1 step, see [Step dimension](@ref)
+for more details. Leapfrog for example has 2 steps but it's important to set
+the initial conditions for step 1 here, not step 2.
 
 One may filter out low values of spectral vorticity with some cut-off amplitude
 ``c = 10^{-10}``, just to illustrate how you would do this (example for method 1)
@@ -71,8 +75,8 @@ One may filter out low values of spectral vorticity with some cut-off amplitude
 ```@example haurwitz
 c = 1e-10       # cut-off amplitude
 
-# 1 = first leapfrog timestep of spectral vorticity
-vor = get_step(simulation.variables.prognostic.vorticity, 1)      # get the first leapfrog step
+# get_step to view the correct step index
+vor = get_step(simulation.variables.prognostic.vorticity, 1)
 low_values = abs.(vor) .< c
 vor[low_values] .= 0
 nothing # hide
@@ -85,9 +89,8 @@ in grid coordinates. So to show vorticity again in grid space we transform
 back
 
 ```@example haurwitz
-# [:, 1, 1] for all values on first layer and first leapfrog step
-vor = simulation.variables.prognostic.vorticity[:, 1, 1]
-vor_grid = transform(vor)
+# use [:, 1] to read out all horizontal point but only the first and only vertical layer
+vor_grid = transform(vor[:, 1])
 
 using CairoMakie
 heatmap(vor_grid, title="Relative vorticity [1/s] of Rossby-Haurwitz wave")

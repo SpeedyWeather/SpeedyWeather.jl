@@ -38,7 +38,7 @@ function initialize!(drag::LinearDrag, model::PrimitiveEquation)
 
     (; σ_levels_full) = model.geometry
     (; σb, time_scale, drag_coefs) = drag
-    kf = 1 / time_scale.value
+    kf = 1 / Second(time_scale).value
 
     # drag only below σb, lin increasing to kf at σ=1
     @. drag_coefs = kf * max(0, (σ_levels_full - σb) / (1 - σb))
@@ -69,7 +69,7 @@ end
 export QuadraticDrag
 @parameterized @kwdef struct QuadraticDrag{NF} <: AbstractDrag
     "[OPTION] drag coefficient [1]"
-    @param drag::NF = 1.0e-5 (bounds = Nonnegative,)    # TODO is this a good default?
+    @param drag::NF = 1.0e-5 (bounds = Nonnegative,)
 end
 
 QuadraticDrag(SG::SpectralGrid; kwargs...) = QuadraticDrag{SG.NF}(; kwargs...)

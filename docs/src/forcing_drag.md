@@ -233,7 +233,7 @@ function forcing!(
     vars::Variables,
     forcing::StochasticStirring{NF},
     spectral_transform::SpectralTransform,
-    time_stepping::AbstractTimeStepper,
+    time_stepping,
 ) where NF
 
     # noise and auto-regressive factors
