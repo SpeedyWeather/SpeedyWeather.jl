@@ -64,3 +64,6 @@ default.profraw
 # vs code
 .vscode
 settings.json
+
+# claude
+.claude

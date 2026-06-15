@@ -127,7 +127,7 @@ more on this in [Output path, identification and number](@ref).
 
 So let's plot that data. `joinpath(...)` in the following just joins folder and filename together,
 by default this would be "run_0001/output.nc" but the run number increases when you ran other simulations
-before
+before. You can use `SpeedyWeather.get_output_path(model)` for brevity too
 ```@example galewsky_setup
 using NCDatasets
 run_folder = model.output.run_folder
@@ -316,12 +316,13 @@ using SpeedyWeather
 spectral_grid = SpectralGrid(trunc=127, nlayers=1)
 
 # model components
-implicit = ImplicitShallowWater(spectral_grid, α=0.5)
+implicit = ImplicitShallowWater(spectral_grid, centering=0.5)
 orography = EarthOrography(spectral_grid, smoothing=false)
 initial_conditions = RandomWaves(spectral_grid, lmin=10, lmax=30)      # between wavenumber 10 and 30
+time_stepping = Leapfrog(spectral_grid)
 
 # construct, initialize, run
-model = ShallowWaterModel(spectral_grid; orography, initial_conditions, implicit)
+model = ShallowWaterModel(spectral_grid; orography, initial_conditions, implicit, time_stepping)
 simulation = initialize!(model)
 run!(simulation, period=Day(2))
 nothing # hide
@@ -329,9 +330,10 @@ nothing # hide
 
 How are gravity waves propagating around the globe? We want to use the shallow water model
 to start with some random perturbations of the interface displacement (the "sea surface height")
-but zero velocity and let them propagate around the globe. We set the ``\alpha`` parameter
+but zero velocity and let them propagate around the globe. We set the `centering` parameter
 of the [semi-implicit time integration](@ref implicit_swm) to ``0.5`` to have a centred
-implicit scheme which dampens the gravity waves less than a backward implicit scheme would do.
+implicit scheme (Crank-Nicolson) which dampens the gravity waves less than a
+backward implicit scheme (`centering = 1`) would do.
 But we also want to keep orography, and particularly no smoothing on it, to have the orography
 as rough as possible. The initial conditions are set to `RandomWaves` which set the spherical
 harmonic coefficients of ``\eta`` to between given wavenumbers to some random values
@@ -358,7 +360,7 @@ using CairoMakie
 
 H = model.atmosphere.layer_thickness
 Hb = model.orography.orography
-η = simulation.variables.grid.η
+η = get_step(simulation.variables.grid.η)
 h = @. η + H - Hb   # @. to broadcast grid + scalar - grid
 
 heatmap(h, title="Dynamic layer thickness h", colormap=:oslo)

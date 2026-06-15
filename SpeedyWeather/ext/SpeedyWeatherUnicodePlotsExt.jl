@@ -50,6 +50,16 @@ function UnicodePlots.heatmap(L::LowerTriangularMatrix{T}; mode::Function = abs)
     return UnicodePlots.heatmap(Lplot; plot_kwargs...)
 end
 
+function UnicodePlots.heatmap(
+        field::RingGrids.AbstractField;
+        title::String = default_title(field),
+        kwargs...   # pass on to UnicodePlots.heatmap
+    )
+    @warn "Field of size $(size(field)) provided, 2D horizontal Field{T, 1} expected, selecting first indices of additional dimensions."
+    inds = (Colon(), ntuple(_ -> 1, ndims(field) - 1)...)
+    return heatmap(RingGrids.field_view(field, inds...); title, kwargs...)
+end
+
 """$(TYPEDSIGNATURES)
 A UnicodePlots heatmap visualising the data of an `AbstractField`.
 General method that interpolates (from a reduced grid) onto a full grid

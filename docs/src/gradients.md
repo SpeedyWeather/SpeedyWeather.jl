@@ -120,6 +120,7 @@ nothing # hide
 
 Now pretend you only have `u, v` to get vorticity (which is actually the prognostic variable in the model,
 so calculated anyway...).
+See [Step dimension](@ref) for more explanation of how to read prognostic/tendency variables with an additional step dimension.
 ```@example gradient
 u = get_step(simulation.variables.grid.u)[:, 1]   # [:, 1] for 1st layer
 v = get_step(simulation.variables.grid.v)[:, 1]
@@ -206,7 +207,7 @@ nothing # hide
 Which is the interface displacement assuming geostrophy.
 The actual interface displacement contains also ageostrophy
 ```@example gradient
-η_grid2 = simulation.variables.grid.η
+η_grid2 = get_step(simulation.variables.grid.η)
 heatmap(η_grid2, title="Interface displacement η [m] with ageostrophy")
 save("eta_ageostrophic.png", ans) # hide
 nothing # hide

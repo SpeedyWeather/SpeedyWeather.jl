@@ -216,7 +216,7 @@ as
 f = coriolis(ζ)     # create f on that grid
 
 # layer thickness
-η = simulation.variables.grid.η
+η = get_step(simulation.variables.grid.η)
 H = model.atmosphere.layer_thickness
 Hb = model.orography.orography
 h = @. η + H - Hb
@@ -481,7 +481,7 @@ function SpeedyWeather.initialize!(
     model::AbstractModel,
 )
     # replace with vector of correct length
-    n = vars.prognostic.clock.n_time_steps + 1    # +1 for initial conditions
+    n = vars.prognostic.clock.n_steps + 1    # +1 for initial conditions
     callback.time = zeros(DateTime, n)
     callback.M = zeros(n)
     callback.C = zeros(n)
