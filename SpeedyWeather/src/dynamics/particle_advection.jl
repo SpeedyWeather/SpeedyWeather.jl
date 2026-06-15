@@ -111,10 +111,12 @@ function initialize!(
     length(particles) == 0 && return nothing
 
     k = particle_advection.layer
-    TS = model.time_stepping
+    (; time_stepping) = model
 
-    u_grid = field_view(get_prognostic_step(vars.grid.u, TS, particle_advection), :, k)
-    v_grid = field_view(get_prognostic_step(vars.grid.v, TS, particle_advection), :, k)
+    # index the step dimension according to time stepper 
+    l = which_prognostic_step(vars.grid.u, time_stepping, particle_advection)
+    u_grid = field_view(vars.grid.u, :, k, l)
+    v_grid = field_view(vars.grid.v, :, k, l)
     (; locator) = vars.particles
     (; geometry) = particle_advection
 
@@ -204,8 +206,9 @@ function particle_advection!(
 
     # CORRECTOR STEP, use u, v at new location and new time step
     k = particle_advection.layer
-    u_grid = field_view(get_prognostic_step(vars.grid.u, time_stepping, particle_advection), :, k)
-    v_grid = field_view(get_prognostic_step(vars.grid.v, time_stepping, particle_advection), :, k)
+    l = which_prognostic_step(vars.grid.u, time_stepping, particle_advection)
+    u_grid = field_view(vars.grid.u, :, k, l)
+    v_grid = field_view(vars.grid.v, :, k, l)
     RingGrids.update_locator!(locator, geometry, lons, lats)
 
     # interpolate new velocity on predicted new locations
@@ -229,15 +232,15 @@ function particle_advection!(
 end
 
 @inline function advect_2D(
-        particle::Particle{NF},         # particle to advect
-        u::NF,                          # zonal velocity [m/s]
-        v::NF,                          # meridional velocity [m/s]
-        dt::NF,                         # scaled time step [s*˚/m]
+        particle::Particle{NF},                 # particle to advect
+        u::NF,                                  # zonal velocity [m/s]
+        v::NF,                                  # meridional velocity [m/s]
+        dt::NF,                                 # scaled time step [s*˚/m]
     ) where {NF}
 
     dlat = v * dt                               # increment in latitude [˚N]
     coslat = max(cosd(particle.lat), eps(NF))   # prevents division by zero
-    dlon = u * dt / coslat                        # increment in longitude [˚E]
+    dlon = u * dt / coslat                      # increment in longitude [˚E]
     return mod(move(particle, dlon, dlat))      # move, mod back to [0, 360˚E], [-90, 90˚N]
 end
 
