@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.21.1
+
 - Update usage of Terrarium input APIs in extension module [#1117](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1117)
 - Update Buildkite pipeline for the new JuliaGPU cluster [#1124](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1124)
 - Allow for tuples of output variables in add! [#1122](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1122)
