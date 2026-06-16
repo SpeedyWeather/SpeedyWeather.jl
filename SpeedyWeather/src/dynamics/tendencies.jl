@@ -670,7 +670,7 @@ function tracer_advection!(
     for (name, tracer) in model.tracers
         tracer_tend = get_tendency_step(vars.tendencies.tracers[name], TS, DynamicalCore())
         tracer_tend_grid = get_tendency_step(vars.tendencies.grid_tracers[name], TS, DynamicalCore())
-        tracer_grid = get_prognostic_step(vars.grid.tracers[name], TS, DynamicalCore())
+        tracer_grid = get_prognostic_step(vars.grid.tracers[name], TS, DynamicalCore(), model)
 
         # add horizontal advection to parameterization + vertical advection + forcing/drag tendencies
         tracer.active && horizontal_advection!(tracer_tend, tracer_tend_grid, tracer_grid, vars, model, add = true)

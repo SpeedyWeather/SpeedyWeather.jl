@@ -40,8 +40,8 @@ function SpeedyTransforms.transform!(
     transform!(v_grid, V, scratch_memory, S, unscale_coslat = true)
 
     for (name, tracer) in model.tracers
-        tracer_var = get_prognostic_step(vars.prognostic.tracers[name], time_stepping, S)
-        tracer_grid = get_prognostic_step(vars.grid.tracers[name], time_stepping, S)
+        tracer_var = get_prognostic_step(vars.prognostic.tracers[name], time_stepping, S, model)
+        tracer_grid = get_prognostic_step(vars.grid.tracers[name], time_stepping, S, model)
         tracer.active && transform!(tracer_grid, tracer_var, scratch_memory, S)
     end
 
@@ -98,8 +98,8 @@ function SpeedyTransforms.transform!(
     transform!(v_grid, V, scratch_memory, S, unscale_coslat = true)
 
     for (name, tracer) in model.tracers
-        tracer_var = get_prognostic_step(vars.prognostic.tracers[name], time_stepping, S)
-        tracer_grid = get_prognostic_step(vars.grid.tracers[name], time_stepping, S)
+        tracer_var = get_prognostic_step(vars.prognostic.tracers[name], time_stepping, S, model)
+        tracer_grid = get_prognostic_step(vars.grid.tracers[name], time_stepping, S, model)
         tracer.active && transform!(tracer_grid, tracer_var, scratch_memory, S)
     end
 

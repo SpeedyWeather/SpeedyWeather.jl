@@ -36,7 +36,7 @@ function vertical_advection!(vars::Variables, model)
     for (name, tracer) in model.tracers
         if tracer.active
             ξ_tend = get_tendency_step(vars.tendencies.grid_tracers[name], model.time_stepping, advection_scheme)
-            ξ = get_prognostic_step(vars.grid.tracers[name], model.time_stepping, advection_scheme)
+            ξ = get_prognostic_step(vars.grid.tracers[name], model.time_stepping, advection_scheme, model)
             _vertical_advection!(ξ_tend, w, ξ, Δσ, advection_scheme)
         end
     end
