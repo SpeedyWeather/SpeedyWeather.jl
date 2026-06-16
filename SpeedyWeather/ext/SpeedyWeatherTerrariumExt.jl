@@ -211,7 +211,7 @@ end
 function SpeedyWeather.timestep!(
         vars::Variables,
         land::AbstractTerrariumLandModel,
-        ::PrimitiveWetModel,
+        model::PrimitiveWetModel,
     )
     state = vars.prognostic.land.terrarium
     tmodel = land.model
@@ -296,7 +296,7 @@ end
 function SpeedyWeather.timestep!(
         vars::Variables,
         land::TerrariumLand,
-        ::PrimitiveDryModel,
+        model::PrimitiveDryModel,
     )
     state = vars.prognostic.land.terrarium
     land_model = land.model
