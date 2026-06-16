@@ -168,6 +168,7 @@ include("quadrature_weights.jl")
 include("interpolation.jl")
 include("vertices.jl")
 include("statistics.jl")
+include("masked_copy.jl")
 
 # ASSET DOWNLOADING
 export get_asset, load_asset, ASSETS_URL, DEFAULT_ASSETS_VERSION
