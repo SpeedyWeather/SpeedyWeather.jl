@@ -70,6 +70,10 @@ tendency_steps(::AbstractLeapfrog) = 1
 @inline implicit_diffusion(::AbstractHorizontalDiffusion, ::Nothing, ::AbstractLeapfrog) = true
 @inline implicit_diffusion(::AbstractHorizontalDiffusion, ::AbstractImplicit, ::AbstractLeapfrog) = true
 
+# particle advection reads u, v, use 1st and only step in 2D models, but 2nd and current step in 3D models
+@inline which_prognostic_step(var::AbstractField, ::AbstractLeapfrog, ::AbstractParticleAdvection) = 2
+@inline which_prognostic_step(var::AbstractField, ::AbstractLeapfrog, ::AbstractParticleAdvection, ::TwoDModels) = 1
+
 # copy prognostic variables' 1st step to 2nd, that way which_prognostic_step can always be 2
 function initialize!(vars::Variables, ::AbstractLeapfrog, ::AbstractModel)
     # time step variables are dynamically defined by existence in tendencies

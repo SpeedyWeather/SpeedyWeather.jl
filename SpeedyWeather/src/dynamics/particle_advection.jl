@@ -114,7 +114,7 @@ function initialize!(
     (; time_stepping) = model
 
     # index the step dimension according to time stepper 
-    l = which_prognostic_step(vars.grid.u, time_stepping, particle_advection)
+    l = which_prognostic_step(vars.grid.u, time_stepping, particle_advection, model)
     u_grid = field_view(vars.grid.u, :, k, l)
     v_grid = field_view(vars.grid.v, :, k, l)
     (; locator) = vars.particles
@@ -152,24 +152,20 @@ end
     lats[i] = particles[i].lat
 end
 
-# function barrier, unpack what's needed
-function particle_advection!(vars, adv::ParticleAdvection2D, model::AbstractModel)
-    return particle_advection!(vars.prognostic.particles, vars, vars.prognostic.clock, adv, model.time_stepping)
-end
-
 function particle_advection!(
-        particles::AbstractVector{P},
         vars::Variables,
-        clock::Clock,
         particle_advection::ParticleAdvection2D,
-        time_stepping::AbstractTimeStepper,         # used to decide which u, v step to use
-    ) where {P <: Particle}
+        model::AbstractModel,
+    )
+
+    (; particles, clock) = vars.prognostic
 
     # escape immediately for no particles
     length(particles) == 0 && return nothing
 
     (; locator) = vars.particles
     (; geometry) = particle_advection
+    (; time_stepping) = model
 
     # decide whether to execute on this time step:
     # execute always on last time step *before* time step is divisible by
@@ -206,7 +202,7 @@ function particle_advection!(
 
     # CORRECTOR STEP, use u, v at new location and new time step
     k = particle_advection.layer
-    l = which_prognostic_step(vars.grid.u, time_stepping, particle_advection)
+    l = which_prognostic_step(vars.grid.u, time_stepping, particle_advection, model)
     u_grid = field_view(vars.grid.u, :, k, l)
     v_grid = field_view(vars.grid.v, :, k, l)
     RingGrids.update_locator!(locator, geometry, lons, lats)
