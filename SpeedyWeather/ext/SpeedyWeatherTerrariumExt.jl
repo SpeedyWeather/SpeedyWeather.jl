@@ -222,7 +222,9 @@ function SpeedyWeather.timestep!(
     mask = land_mask(land)
 
     # Atmospheric forcings on the lowest model level / surface
-    l = which_prognostic_step(vars.grid.temperature, model.time_stepping, SpeedyWeather.DummyParameterization())
+    # choose step dimension depending on atmospheric time stepper
+    # and read like parameterization via DummyParameterization
+    l = SpeedyWeather.which_prognostic_step(vars.grid.temperature, model.time_stepping, SpeedyWeather.DummyParameterization())
     Tair = vars.grid.temperature[mask, end, l]
     humid = vars.grid.humidity[mask, end, l]
     pres = vars.parameterizations.surface_pressure[mask]
@@ -304,7 +306,9 @@ function SpeedyWeather.timestep!(
     mask = land_mask(land)
 
     # Only air temperature is needed; convert K -> °C
-    l = which_prognostic_step(vars.grid.temperature, model.time_stepping, SpeedyWeather.DummyParameterization())
+    # choose step dimension depending on atmospheric time stepper
+    # and read like parameterization via DummyParameterization
+    l = SpeedyWeather.which_prognostic_step(vars.grid.temperature, model.time_stepping, SpeedyWeather.DummyParameterization())
     Tair = vars.grid.temperature[mask, end, l]
     inputs = state.inputs
     Terrarium.set!(inputs.air_temperature, Tair)
