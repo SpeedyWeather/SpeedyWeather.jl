@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Relax Enzyme compatability again to allow recent Enzyme versions [#1126](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1126)
+
 ## v0.21.1
 
 - Update usage of Terrarium input APIs in extension module [#1117](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1117)
