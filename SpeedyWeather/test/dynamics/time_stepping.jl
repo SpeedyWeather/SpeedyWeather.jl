@@ -55,6 +55,100 @@ F(x, ω) = im * ω * x
     end
 end
 
+@testset "Leapfrog spinup" begin
+
+    spectral_grid = SpectralGrid(trunc=5, nlayers = 1)
+
+    # disable RAW filters
+    time_stepping = Leapfrog(spectral_grid, adjust_with_output=false, robert_filter=0, williams_filter=1)
+    model = BarotropicModel(spectral_grid; time_stepping)
+    simulation = initialize!(model)
+    (; clock) = simulation.variables.prognostic
+    (; NF) = spectral_grid
+
+    Δt = 1
+    time_stepping.Δt = Δt
+
+    # initial conditions in step 1, 0 in step 2
+    X  = simulation.variables.prognostic.vorticity
+    X1 = get_step(X, 1)
+    X2 = get_step(X, 2)
+
+    X0 = rand(Complex{NF}, spectral_grid.spectrum, 1)      # initial conditions
+    X1 .= X0        # set the first time step
+    X2 .= 0         # 2nd step is always 0 at start
+    @test all(X1 .!= X2)
+
+    steps = 10
+    initialize!(clock, time_stepping, steps)
+    transform!(simulation.variables, model, initialize = true)
+    
+    # test that initial conditions have been copied to step 2
+    @test all(X2 .== X1)
+
+    # random tendencies
+    dX = rand(Complex{NF}, spectral_grid.spectrum, 1, 1)
+    dX .= real.(dX)             # make them real only to better tell them apart
+    dX1 = get_step(dX, 1)
+    SpeedyWeather.update_prognostic!(X, dX, clock, time_stepping, model.implicit, model)
+    SpeedyWeather.time_step!(clock, time_stepping)
+
+    # this Euler step does not count as time step but as step
+    @test clock.step_counter == 1
+    @test clock.time_step_counter == 0
+
+    # do Euler step manually and compare
+    @test all(X2 .== X0 .+ (Δt // 2)*dX1)
+    @test all(X1 .== X0)         # previous time step still initial conditions
+
+    # X2old = deepcopy(X2)
+
+    # new time step, new random tendencies
+    dX .= rand(Complex{NF}, spectral_grid.spectrum, 1, 1)
+    dX .= im*imag.(dX)          # make them imaginary only to better tell them apart
+    SpeedyWeather.update_prognostic!(X, dX, clock, time_stepping, model.implicit, model)
+    SpeedyWeather.time_step!(clock, time_stepping)
+
+    # this Leapfrog step does count!
+    @test clock.step_counter == 2
+    @test clock.time_step_counter == 1
+
+    # with Δt step size
+    @test all(X2 .== X1 .+ Δt*dX1)
+    @test all(X1 .== X0)       # first step still unchanged
+
+    X2old = deepcopy(X2)
+
+    # new time step, new random tendencies
+    dX .= rand(Complex{NF}, spectral_grid.spectrum, 1, 1)
+    SpeedyWeather.update_prognostic!(X, dX, clock, time_stepping, model.implicit, model)
+    SpeedyWeather.time_step!(clock, time_stepping)
+
+    # this Leapfrog step does count!
+    @test clock.step_counter == 3
+    @test clock.time_step_counter == 2
+
+    # with 2Δt step size
+    @test X1 == X2old
+    @test all(X2 .== X0 .+ 2Δt*dX1)
+
+    X2old = deepcopy(X2)
+    X1old = deepcopy(X1)
+
+    # new time step, new random tendencies
+    dX .= rand(Complex{NF}, spectral_grid.spectrum, 1, 1)
+    SpeedyWeather.update_prognostic!(X, dX, clock, time_stepping, model.implicit, model)
+    SpeedyWeather.time_step!(clock, time_stepping)
+
+    # this Leapfrog step does count!
+    @test clock.step_counter == 4
+    @test clock.time_step_counter == 3
+
+    # with 2Δt step size
+    @test X1 == X2old
+    @test all(X2 .== X1old .+ 2Δt*dX1)
+end
+
 @testset "NCycleLorenz oscillation" begin
 
     ω = 1.0             # frequency
