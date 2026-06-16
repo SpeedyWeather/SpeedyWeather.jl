@@ -21,7 +21,7 @@ $(TYPEDFIELDS)"""
 
     # PARAMETERS
     "[OPTION] Time-step coefficient: 0.5 = Crank-Nicolson, 1=backward Euler"
-    centering::NF = 0.5
+    centering::NF = 1.0
 
     "[DERIVED] (Scaled) time step used to initialize. Used to check whether time step has changed and reinitialization is needed."
     Δt::Base.RefValue{NF} = Ref(zero(NF))
