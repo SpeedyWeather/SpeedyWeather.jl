@@ -112,8 +112,8 @@ or several tendency steps (think multi-step methods). In many cases this additio
 will just be a trailing singleton dimension and you can drop it by selecting it, e.g. `[:, 1]`.
 As the step dimension essentially contains several "versions" of the same variable the error you
 will make by selecting the wrong one is generally small. In Leapfrog, you would simply select
-the previous time step for example. So prognostic and tendency variables have the following dimensions
-in that order:
+the previous time step for example, see [Time steppers](@ref steps).
+So prognostic and tendency variables have the following dimensions in that order:
 
 - horizontal dimension (unravalled longitude and latitude, or degree/order of spherical harmonics)
 - vertical (optional, many 2D variables will drop this)

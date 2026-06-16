@@ -202,7 +202,7 @@ Different time integration schemes need to store a different number of past stat
 prognostic variables and/or tendencies. Leapfrog needs the two spectral steps ``i-1`` and ``i``;
 the Lorenz N-cycle needs only one prognostic step but a second tendency to accumulate weighted
 tendencies. SpeedyWeather handles this generically: prognostic variables and tendencies carry an
-extra *step dimension* (the last dimension of their underlying array), and the time stepper
+extra [Step dimension](@ref) (the last dimension of their underlying array), and the time stepper
 decides how many steps to allocate and which step each model component should read or write.
 
 The number of steps is requested by the time stepper through `prognostic_steps` and
