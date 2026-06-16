@@ -22,11 +22,12 @@
         ntracers = 2
         @test length(simulation.variables.prognostic.tracers) == ntracers
         @test length(simulation.variables.grid.tracers) == ntracers
-        @test length(simulation.variables.tendencies.tracers) == 2 * ntracers   # 2 for each, one grid one spectral
+        @test length(simulation.variables.tendencies.tracers) == ntracers       # spectral tracers
+        @test length(simulation.variables.tendencies.grid_tracers) == ntracers  # grid tracers
         
         @test ndims(simulation.variables.prognostic.tracers.abc) == 3           # horizontal x vertical x steps
         @test ndims(simulation.variables.tendencies.tracers.abc) == 3           # horizontal x vertical x steps
-        @test ndims(simulation.variables.tendencies.tracers.abc_grid) == 3      # horizontal x vertical x steps
+        @test ndims(simulation.variables.tendencies.grid_tracers.abc) == 3      # horizontal x vertical x steps
         @test size(simulation.variables.prognostic.tracers.abc) == size(simulation.variables.prognostic.vorticity)
     end
 end
