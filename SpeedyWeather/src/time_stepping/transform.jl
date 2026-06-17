@@ -110,44 +110,6 @@ function SpeedyTransforms.transform!(
 end
 
 """$(TYPEDSIGNATURES)
-Save the current grid-space state into the `_prev` snapshots used by vertical advection and
-parameterizations, uses the fused variables."""
-function save_prev!(vars::Variables, model::PrimitiveEquation)
-    uv_grid = vars.fused.uv_grid
-    grid = vars.fused.grid
-    grid_prev = vars.fused.grid_prev
-
-    uv_grid_data = parent(uv_grid).data
-    grid_data = parent(grid).data
-    grid_prev_data = parent(grid_prev).data
-
-    # (u, v) → (u_prev, v_prev)
-    uv_range = first(uv_grid.slot_map.u):last(uv_grid.slot_map.v)
-    uv_prev_range = first(grid_prev.slot_map.u_prev):last(grid_prev.slot_map.v_prev)
-    copyto!(view(grid_prev_data, :, uv_prev_range),
-            view(uv_grid_data,   :, uv_range))
-
-    # (temperature, [pressure], [humidity]) → (temperature_prev, [pressure_prev], [humidity_prev]).
-    tail_range = first(grid.slot_map.temperature):size(grid_data, 2)
-    tail_prev_range = first(grid_prev.slot_map.temperature_prev):size(grid_prev_data, 2)
-    copyto!(view(grid_prev_data, :, tail_prev_range),
-            view(grid_data,      :, tail_range))
-
-    # pres_prev is stored in Pa (linear), not log(Pa)
-    @. vars.grid.pressure_prev = exp(vars.grid.pressure)
-
-    # Tracers are not part of the fuse — keep per-variable broadcasts.
-    for (name, tracer) in model.tracers
-        if tracer.active
-            name_prev = Symbol(name, :_prev)
-            vars.grid.tracers[name_prev] .= vars.grid.tracers[name]
-        end
-    end
-
-    return nothing
-end
-
-"""$(TYPEDSIGNATURES)
 Propagate the spectral state of the prognostic variables of `vars` to the
 grid variables in `vars` for primitive equation models. Updates grid vorticity,
 grid divergence, grid temperature, pressure (`pres_grid`) and the velocities
@@ -198,7 +160,7 @@ function SpeedyTransforms.transform!(
     # temperature, pressure (and humidity for PrimitiveWet).
     prog_parent = parent(vars.fused.prognostic)
     grid_parent = parent(vars.fused.grid)
-    transform!(grid_parent, get_step(prog_parent, lf), scratch_memory, S)
+    transform!(get_prognostic_step(grid_parent, time_stepping, S), get_prognostic_step(prog_parent, time_stepping, S), scratch_memory, S)
 
     if model isa PrimitiveWet
         hole_filling!(humid_grid, model.hole_filling, model)  # remove negative humidity
@@ -208,7 +170,8 @@ function SpeedyTransforms.transform!(
     # `(:a, :b)` (here holding U, V) into one Spectral3D parent, and `:uv_grid` packs `(:u, :v)`
     # TODO: theoretically we could merge this with the other big transform and then unscale coslat
     # seperately, but the dimensions don't quite aling, shall we still do that in a hacky way?    
-    transform!(parent(vars.fused.uv_grid), parent(vars.fused.spectral_scratch), scratch_memory, S;
+    transform!(get_prognostic_step(parent(vars.fused.uv_grid), time_stepping, S),
+               parent(vars.fused.spectral_scratch), scratch_memory, S;
                unscale_coslat = true)
 
     geopotential!(vars, model)                  # calculate geopotential
