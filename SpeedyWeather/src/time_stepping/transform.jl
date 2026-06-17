@@ -167,7 +167,6 @@ function SpeedyTransforms.transform!(
 
     vor = get_prognostic_step(vars.prognostic.vorticity, time_stepping, S)
     div = get_prognostic_step(vars.prognostic.divergence, time_stepping, S)
-    pres = get_prognostic_step(vars.prognostic.pressure, time_stepping, S)
     temp = get_prognostic_step(vars.prognostic.temperature, time_stepping, S)
 
     scratch_memory = vars.scratch.transform_memory
@@ -179,7 +178,6 @@ function SpeedyTransforms.transform!(
     initialize || move_prognostic_grid_variables_back!(vars, time_stepping, model)
 
     if model isa PrimitiveWet
-        humid = get_prognostic_step(vars.prognostic.humidity, time_stepping, S)
         humid_grid = get_prognostic_step(vars.grid.humidity, time_stepping, S)
         hole_filling!(humid_grid, model.hole_filling, model)  # clamp negative humidity to zero
     end
@@ -196,7 +194,7 @@ function SpeedyTransforms.transform!(
     # include humidity effect into temp for everything stability-related
     temperature_average!(vars, temp, S)
 
-    # Mega-batched spec→grid for the prognostic state: one call covers vorticity, divergence,
+    # Batched spec→grid for the prognostic state: one call covers vorticity, divergence,
     # temperature, pressure (and humidity for PrimitiveWet).
     prog_parent = parent(vars.fused.prognostic)
     grid_parent = parent(vars.fused.grid)
