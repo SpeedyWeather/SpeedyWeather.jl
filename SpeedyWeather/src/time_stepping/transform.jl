@@ -144,9 +144,6 @@ function SpeedyTransforms.transform!(
     # V = v*coslat =  coslat*∂ϕ/∂lat + ∂Ψ/dlon
     UV_from_vordiv!(U, V, vor, div, S)
 
-    # include humidity effect into temp for everything stability-related
-    temperature_average!(vars, temp, S)
-
     # Batched spec→grid for the prognostic state: one call covers vorticity, divergence,
     # temperature, pressure (and humidity for PrimitiveWet).
     prog_parent = parent(vars.fused.prognostic)
@@ -169,7 +166,9 @@ function SpeedyTransforms.transform!(
     # at initial step copy 2nd step (current) to 1st (prev) to retain those fields
     # only do after transforms to avoid copying uninitialized zeros
     initialize && move_prognostic_grid_variables_back!(vars, time_stepping, model)
-
+    
+    # include humidity effect into temp for everything stability-related
+    temperature_average!(vars, temp, S)
     geopotential!(vars, model)                  # calculate geopotential
 
     # convert the logarithm of surface pressure to actual surface pressure in Pascal for parameterizations
