@@ -127,7 +127,7 @@ more on this in [Output path, identification and number](@ref).
 
 So let's plot that data. `joinpath(...)` in the following just joins folder and filename together,
 by default this would be "run_0001/output.nc" but the run number increases when you ran other simulations
-before
+before. You can use `SpeedyWeather.get_output_path(model)` for brevity too
 ```@example galewsky_setup
 using NCDatasets
 run_folder = model.output.run_folder
@@ -182,10 +182,10 @@ we will use `heatmap` to plot data on our grids directly, without storing output
 So for our current simulation, that means at time = 12 days, vorticity on the grid
 is stored in the diagnostic variables and can be visualised with
 (`[:, 1]` is horizontal x vertical dimension, so all grid points on the first and
-only vertical layer)
+only vertical layer, see [Step dimension](@ref))
 
 ```@example galewsky_setup
-vor = simulation.variables.grid.vorticity[:, 1]
+vor = get_step(simulation.variables.grid.vorticity)[:, 1]
 heatmap(vor, title="Relative vorticity [1/s]")
 save("galewsky2.png", ans) # hide
 nothing # hide
@@ -261,7 +261,7 @@ the Makie extension
 
 ```@example galewsky_setup2
 using CairoMakie
-vor = simulation.variables.grid.vorticity[:, 1]   # 1 to index surface
+vor = get_step(simulation.variables.grid.vorticity)[:, 1]   # 1 to index surface
 heatmap(vor, title="Relative vorticity [1/s]")
 save("galewsky3.png", ans) # hide
 nothing # hide
@@ -298,7 +298,7 @@ a `LinearVorticityDrag` and use the default drag coefficient. Then visualize zon
 ```@example jet_stream_setup
 using CairoMakie
 
-u = simulation.variables.grid.u[:, 1]
+u = get_step(simulation.variables.grid.u)[:, 1]
 heatmap(u, title="Zonal wind [m/s]")
 save("polar_jets.png", ans) # hide
 nothing # hide
@@ -316,12 +316,13 @@ using SpeedyWeather
 spectral_grid = SpectralGrid(trunc=127, nlayers=1)
 
 # model components
-implicit = ImplicitShallowWater(spectral_grid, α=0.5)
+implicit = ImplicitShallowWater(spectral_grid, centering=0.5)
 orography = EarthOrography(spectral_grid, smoothing=false)
 initial_conditions = RandomWaves(spectral_grid, lmin=10, lmax=30)      # between wavenumber 10 and 30
+time_stepping = Leapfrog(spectral_grid)
 
 # construct, initialize, run
-model = ShallowWaterModel(spectral_grid; orography, initial_conditions, implicit)
+model = ShallowWaterModel(spectral_grid; orography, initial_conditions, implicit, time_stepping)
 simulation = initialize!(model)
 run!(simulation, period=Day(2))
 nothing # hide
@@ -329,9 +330,10 @@ nothing # hide
 
 How are gravity waves propagating around the globe? We want to use the shallow water model
 to start with some random perturbations of the interface displacement (the "sea surface height")
-but zero velocity and let them propagate around the globe. We set the ``\alpha`` parameter
+but zero velocity and let them propagate around the globe. We set the `centering` parameter
 of the [semi-implicit time integration](@ref implicit_swm) to ``0.5`` to have a centred
-implicit scheme which dampens the gravity waves less than a backward implicit scheme would do.
+implicit scheme (Crank-Nicolson) which dampens the gravity waves less than a
+backward implicit scheme (`centering = 1`) would do.
 But we also want to keep orography, and particularly no smoothing on it, to have the orography
 as rough as possible. The initial conditions are set to `RandomWaves` which set the spherical
 harmonic coefficients of ``\eta`` to between given wavenumbers to some random values
@@ -358,7 +360,7 @@ using CairoMakie
 
 H = model.atmosphere.layer_thickness
 Hb = model.orography.orography
-η = simulation.variables.grid.η
+η = get_step(simulation.variables.grid.η)
 h = @. η + H - Hb   # @. to broadcast grid + scalar - grid
 
 heatmap(h, title="Dynamic layer thickness h", colormap=:oslo)

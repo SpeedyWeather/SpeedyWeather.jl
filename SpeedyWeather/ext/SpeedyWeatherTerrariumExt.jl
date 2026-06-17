@@ -10,8 +10,10 @@ $(TYPEDSIGNATURES)
 Construct a [`TerrariumLand`](@ref) from a pre-built Terrarium model for usage 
 as a SpeedyWeather land model. Based on the SpeedyWeather model type either a 
 dry or wet land model is used."""
-SpeedyWeather.LandModel(spectral_grid::SpectralGrid,
-        model::Terrarium.AbstractModel{NF}; kwargs...) where {NF} =
+SpeedyWeather.LandModel(
+    spectral_grid::SpectralGrid,
+    model::Terrarium.AbstractModel{NF}; kwargs...
+) where {NF} =
     TerrariumLand(spectral_grid, model; kwargs...)
 
 """$(TYPEDEF)
@@ -124,8 +126,8 @@ function TerrariumLand(
     field_grid = Terrarium.get_field_grid(model.grid)
     Δz_arr = Terrarium.on_architecture(Terrarium.CPU(), field_grid.z.Δᵃᵃᶜ)
     # The Oceananigans vertical spacing is an OffsetArray; take the last entry
-    # as the layer thickness for the SpeedyWeather LandGeometry. It's not actually used, but 
-    # we set it here for consistency. 
+    # as the layer thickness for the SpeedyWeather LandGeometry. It's not actually used, but
+    # we set it here for consistency.
     geometry = LandGeometry(1, NF[Δz_arr[end]])
     return TerrariumLand(
         spectral_grid, geometry, model, timestepper,
@@ -175,7 +177,7 @@ function SpeedyWeather.variables(::AbstractTerrariumLandModel)
     )
 end
 
-# wet land model 
+# wet land model
 function SpeedyWeather.initialize!(
         vars::Variables,
         land::AbstractTerrariumLandModel,
@@ -191,7 +193,7 @@ function SpeedyWeather.initialize!(
 
     # initialize the "ModelIntegrator"
     integrator = ModelIntegrator(
-        state.clock, land.model, InputSources(),
+        state.clock, land.model, InputSources(NF),
         state, land.initializers, land.timestepper,
     )
     Terrarium.initialize!(integrator)
@@ -209,7 +211,7 @@ end
 function SpeedyWeather.timestep!(
         vars::Variables,
         land::AbstractTerrariumLandModel,
-        ::PrimitiveWetModel,
+        model::PrimitiveWetModel,
     )
     state = vars.prognostic.land.terrarium
     tmodel = land.model
@@ -220,9 +222,12 @@ function SpeedyWeather.timestep!(
     mask = land_mask(land)
 
     # Atmospheric forcings on the lowest model level / surface
-    Tair = vars.grid.temperature[mask, end]
-    humid = vars.grid.humidity[mask, end]
-    pres = vars.grid.pressure[mask]                          # log surface pressure
+    # choose step dimension depending on atmospheric time stepper
+    # and read like parameterization via DummyParameterization
+    l = SpeedyWeather.which_prognostic_step(vars.grid.temperature, model.time_stepping, SpeedyWeather.DummyParameterization())
+    Tair = vars.grid.temperature[mask, end, l]
+    humid = vars.grid.humidity[mask, end, l]
+    pres = vars.parameterizations.surface_pressure[mask]
     wind = vars.parameterizations.surface_wind_speed[mask]
     rain = vars.parameterizations.rain_rate[mask]
     snow = vars.parameterizations.snow_rate[mask]
@@ -234,7 +239,6 @@ function SpeedyWeather.timestep!(
     Terrarium.set!(inputs.air_temperature, Tair)
     Terrarium.set!(inputs.air_temperature, inputs.air_temperature - NF(273.15))   # K -> °C
     Terrarium.set!(inputs.air_pressure, pres)
-    Terrarium.set!(inputs.air_pressure, exp(inputs.air_pressure))                  # log(Pa) -> Pa
     Terrarium.set!(inputs.specific_humidity, humid)
     Terrarium.set!(inputs.rainfall, rain)
     Terrarium.set!(inputs.snowfall, snow)
@@ -243,11 +247,11 @@ function SpeedyWeather.timestep!(
     Terrarium.set!(inputs.surface_longwave_down, Rld)
 
     # Constructing ModelIntegrator is allocation-free: it is an immutable struct
-    # of references so no data is copied.  InputSources() is empty intentionally:
+    # of references so no data is copied.  `InputSources` is empty intentionally:
     # we own the input-update cycle above (via set!) and do not want Terrarium's
     # update_inputs! to overwrite those values during the substeps.
     integrator = ModelIntegrator(
-        state.clock, tmodel, InputSources(),
+        state.clock, tmodel, InputSources(NF),
         state, land.initializers, land.timestepper,
     )
     Terrarium.run!(integrator; period = vars.prognostic.clock.Δt, Δt = land.Δt)
@@ -294,23 +298,26 @@ end
 function SpeedyWeather.timestep!(
         vars::Variables,
         land::TerrariumLand,
-        ::PrimitiveDryModel,
+        model::PrimitiveDryModel,
     )
     state = vars.prognostic.land.terrarium
-    tmodel = land.model
+    land_model = land.model
     NF = eltype(state)
     mask = land_mask(land)
 
     # Only air temperature is needed; convert K -> °C
-    Tair = vars.grid.temperature[mask, end]
+    # choose step dimension depending on atmospheric time stepper
+    # and read like parameterization via DummyParameterization
+    l = SpeedyWeather.which_prognostic_step(vars.grid.temperature, model.time_stepping, SpeedyWeather.DummyParameterization())
+    Tair = vars.grid.temperature[mask, end, l]
     inputs = state.inputs
     Terrarium.set!(inputs.air_temperature, Tair)
     Terrarium.set!(inputs.air_temperature, inputs.air_temperature - NF(273.15))
 
     # Same reasoning as in TerrariumLand.timestep!: free to construct, empty
-    # InputSources() so SpeedyWeather owns the input-update cycle.
+    # InputSources(NF) so SpeedyWeather owns the input-update cycle.
     integrator = ModelIntegrator(
-        state.clock, tmodel, InputSources(),
+        state.clock, land_model, InputSources(NF),
         state, land.initializers, land.timestepper,
     )
     Terrarium.run!(integrator; period = vars.prognostic.clock.Δt, Δt = land.Δt)

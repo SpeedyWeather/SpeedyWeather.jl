@@ -1,25 +1,34 @@
+# dispatch over time stepping to decide which prognostic steps to transform to grid space
+SpeedyTransforms.transform!(vars::Variables, model::AbstractModel; kwargs...) =
+    transform!(vars, model.time_stepping, model; kwargs...)
+
 """$(TYPEDSIGNATURES)
 Propagate the spectral state of the prognostic variables of `vars` to the
 grid variables `vars` for the barotropic vorticity model.
 Updates grid vorticity, spectral stream function and spectral and grid velocities u, v."""
 function SpeedyTransforms.transform!(
         vars::Variables,
-        lf::Integer,
+        time_stepping::AbstractTimeStepper,
         model::Barotropic;
-        kwargs...
+        initialize::Bool = false,
     )
-    u_grid = vars.grid.u
-    v_grid = vars.grid.v
-    vor_grid = vars.grid.vorticity
+    initialize && initialize!(vars, time_stepping, model)
+
+    S = model.spectral_transform
+    # model is passed on to get_prognostic_step as for 2D models Leapfrog choses the 1st step
+    # not the non-existing 2nd step though both represent the current time step (not the previous one)
+    u_grid = get_prognostic_step(vars.grid.u, time_stepping, S, model)
+    v_grid = get_prognostic_step(vars.grid.v, time_stepping, S, model)
+    vor_grid = get_prognostic_step(vars.grid.vorticity, time_stepping, S, model)
 
     # U = u*coslat, V=v*coslat
-    U = vars.scratch.a                          # reuse work arrays for velocities in spectral
-    V = vars.scratch.b                          # reuse work arrays for velocities in spectral
-    vor = get_step(vars.prognostic.vorticity, lf)     # relative vorticity at leapfrog step lf
+    U = vars.scratch.a      # reuse scratch arrays for velocities in spectral
+    V = vars.scratch.b      # reuse scratch arrays for velocities in spectral
+    vor = get_prognostic_step(vars.prognostic.vorticity, time_stepping, S)
 
+    # get vorticity on grid from spectral vor
     scratch_memory = vars.scratch.transform_memory
-    S = model.spectral_transform
-    transform!(vor_grid, vor, scratch_memory, S)    # get vorticity on grid from spectral vor
+    transform!(vor_grid, vor, scratch_memory, S)
 
     # get spectral U, V from spectral vorticity via stream function Ψ
     # U = u*coslat = -coslat*∂Ψ/∂lat
@@ -31,12 +40,13 @@ function SpeedyTransforms.transform!(
     transform!(v_grid, V, scratch_memory, S, unscale_coslat = true)
 
     for (name, tracer) in model.tracers
-        tracer_var = get_step(vars.prognostic.tracers[name], lf)  # tracer at leapfrog step lf
-        tracer.active && transform!(vars.grid.tracers[name], tracer_var, scratch_memory, S)
+        tracer_var = get_prognostic_step(vars.prognostic.tracers[name], time_stepping, S, model)
+        tracer_grid = get_prognostic_step(vars.grid.tracers[name], time_stepping, S, model)
+        tracer.active && transform!(tracer_grid, tracer_var, scratch_memory, S)
     end
 
     # transform random pattern for random process unless random_process=nothing
-    transform!(vars, lf, model.random_process, S)
+    transform!(vars, model.random_process, S)
 
     return nothing
 end
@@ -49,27 +59,30 @@ grid divergence, grid interface displacement (`pres_grid`) and the velocities
 u, v."""
 function SpeedyTransforms.transform!(
         vars::Variables,
-        lf::Integer,
+        time_stepping::AbstractTimeStepper,
         model::ShallowWater;
-        kwargs...
+        initialize::Bool = false,
     )
+    initialize && initialize!(vars, time_stepping, model)
 
-    vor_grid = vars.grid.vorticity
-    u_grid = vars.grid.u
-    v_grid = vars.grid.v
-    div_grid = vars.grid.divergence
-    η_grid = vars.grid.η
+    S = model.spectral_transform
+    # model is passed on to get_prognostic_step as for 2D models Leapfrog choses the 1st step
+    # not the non-existing 2nd step though both represent the current time step (not the previous one)
+    u_grid = get_prognostic_step(vars.grid.u, time_stepping, S, model)
+    v_grid = get_prognostic_step(vars.grid.v, time_stepping, S, model)
+    vor_grid = get_prognostic_step(vars.grid.vorticity, time_stepping, S, model)
+    div_grid = get_prognostic_step(vars.grid.divergence, time_stepping, S, model)
+    η_grid = get_prognostic_step(vars.grid.η, time_stepping, S, model)
 
-    vor = get_step(vars.prognostic.vorticity, lf)     # relative vorticity at leapfrog step lf
-    div = get_step(vars.prognostic.divergence, lf)     # divergence at leapfrog step lf
-    η = get_step(vars.prognostic.η, lf)         # interface displacement η at leapfrog step lf
+    vor = get_prognostic_step(vars.prognostic.vorticity, time_stepping, S)
+    div = get_prognostic_step(vars.prognostic.divergence, time_stepping, S)
+    η = get_prognostic_step(vars.prognostic.η, time_stepping, S)
 
     # U = u*coslat, V=v*coslat
     U = vars.scratch.a
     V = vars.scratch.b
 
     scratch_memory = vars.scratch.transform_memory
-    S = model.spectral_transform
 
     transform!(vor_grid, vor, scratch_memory, S)    # get vorticity on grid from spectral vor
     transform!(div_grid, div, scratch_memory, S)    # get divergence on grid from spectral div
@@ -85,12 +98,13 @@ function SpeedyTransforms.transform!(
     transform!(v_grid, V, scratch_memory, S, unscale_coslat = true)
 
     for (name, tracer) in model.tracers
-        tracer_var = get_step(vars.prognostic.tracers[name], lf)  # tracer at leapfrog step lf
-        tracer.active && transform!(vars.grid.tracers[name], tracer_var, scratch_memory, S)
+        tracer_var = get_prognostic_step(vars.prognostic.tracers[name], time_stepping, S, model)
+        tracer_grid = get_prognostic_step(vars.grid.tracers[name], time_stepping, S, model)
+        tracer.active && transform!(tracer_grid, tracer_var, scratch_memory, S)
     end
 
     # transform random pattern for random process unless random_process=nothing
-    transform!(vars, lf, model.random_process, S)
+    transform!(vars, model.random_process, S)
 
     return nothing
 end
@@ -140,30 +154,34 @@ grid divergence, grid temperature, pressure (`pres_grid`) and the velocities
 u, v."""
 function SpeedyTransforms.transform!(
         vars::Variables,
-        lf::Integer,
+        time_stepping::AbstractTimeStepper,
         model::PrimitiveEquation;
         initialize::Bool = false,
     )
 
-    vor = get_step(vars.prognostic.vorticity, lf)         # relative vorticity at leapfrog step lf
-    div = get_step(vars.prognostic.divergence, lf)         # divergence at leapfrog step lf
-    temp = get_step(vars.prognostic.temperature, lf)       # temperature at leapfrog step lf
+    # used to copy 1st step to 2nd step for leapfrog to always transform
+    # the 2nd step to grid
+    initialize && initialize!(vars, time_stepping, model)
 
-    if model isa PrimitiveWet                       # dry model don't have humidity variables
-        humid_grid = vars.grid.humidity
-    end
-
-    scratch_memory = vars.scratch.transform_memory
-
-    U = vars.scratch.a                              # reuse work arrays
-    V = vars.scratch.b                              # U = u*coslat, V=v*coslat
     S = model.spectral_transform
 
-    # retain previous time step for vertical advection and parameterizations.
-    # On the initial step there is no "previous" state yet — defer until after the spec→grid
-    # below so the snapshot captures the *current* grid state.
-    if !initialize
-        save_prev!(vars, model)
+    vor = get_prognostic_step(vars.prognostic.vorticity, time_stepping, S)
+    div = get_prognostic_step(vars.prognostic.divergence, time_stepping, S)
+    pres = get_prognostic_step(vars.prognostic.pressure, time_stepping, S)
+    temp = get_prognostic_step(vars.prognostic.temperature, time_stepping, S)
+
+    scratch_memory = vars.scratch.transform_memory
+    U = vars.scratch.a                              # reuse work arrays
+    V = vars.scratch.b                              # U = u*coslat, V=v*coslat
+
+    # retain previous time step for vertical advection and parameterizations
+    # if not initial step do before transforms i.e before that step is overwritten
+    initialize || move_prognostic_grid_variables_back!(vars, time_stepping, model)
+
+    if model isa PrimitiveWet
+        humid = get_prognostic_step(vars.prognostic.humidity, time_stepping, S)
+        humid_grid = get_prognostic_step(vars.grid.humidity, time_stepping, S)
+        hole_filling!(humid_grid, model.hole_filling, model)  # clamp negative humidity to zero
     end
 
     # get spectral U, V from vorticity and divergence via stream function Ψ and vel potential ϕ
@@ -171,8 +189,11 @@ function SpeedyTransforms.transform!(
     # V = v*coslat =  coslat*∂ϕ/∂lat + ∂Ψ/dlon
     UV_from_vordiv!(U, V, vor, div, S)
 
-    # layer-mean temperature from the l=m=0 harmonic; consumed later by `linear_virtual_temperature!`
-    # in `dynamics_tendencies!`. Not used by `geopotential!` here.
+    # at initial step copy 2nd step (current) to 1st (prev) to retain those fields
+    # only do after transforms to avoid copying uninitialized zeros
+    initialize && move_prognostic_grid_variables_back!(vars, time_stepping, model)
+
+    # include humidity effect into temp for everything stability-related
     temperature_average!(vars, temp, S)
 
     # Mega-batched spec→grid for the prognostic state: one call covers vorticity, divergence,
@@ -188,23 +209,29 @@ function SpeedyTransforms.transform!(
     # Batched spec→grid for the velocities: the general-purpose `:spectral_scratch` fuse packs
     # `(:a, :b)` (here holding U, V) into one Spectral3D parent, and `:uv_grid` packs `(:u, :v)`
     # TODO: theoretically we could merge this with the other big transform and then unscale coslat
-    # seperately, shall we do that?    
+    # seperately, but the dimensions don't quite aling, shall we still do that in a hacky way?    
     transform!(parent(vars.fused.uv_grid), parent(vars.fused.spectral_scratch), scratch_memory, S;
                unscale_coslat = true)
 
     geopotential!(vars, model)                  # calculate geopotential
 
-    if initialize   # at initial step store prev <- current
-        save_prev!(vars, model)
-    end
+    # convert the logarithm of surface pressure to actual surface pressure in Pascal for parameterizations
+    # dispatch over DummyParameterization (= any parameterization) to let time steppers decide the step
+    log_pₛ = get_prognostic_step(vars.grid.pressure, time_stepping, DummyParameterization())    # log Pa
+    vars.parameterizations.surface_pressure .= exp.(log_pₛ)                                     # in Pa
 
     for (name, tracer) in model.tracers
-        tracer_var = get_step(vars.prognostic.tracers[name], lf)  # tracer at leapfrog step lf
-        tracer.active && transform!(vars.grid.tracers[name], tracer_var, scratch_memory, S)
+        tracer_var = get_prognostic_step(vars.prognostic.tracers[name], time_stepping, S)
+        tracer_grid = get_prognostic_step(vars.grid.tracers[name], time_stepping, S)
+        tracer.active && transform!(tracer_grid, tracer_var, scratch_memory, S)
     end
 
     # transform random pattern for random process unless random_process=nothing
-    transform!(vars, lf, model.random_process, S)
+    transform!(vars, model.random_process, S)
 
     return nothing
 end
+
+# only needed for Leapfrog to retain a copy of the current time step moved to the previous
+# fallback is nothing for other time steppers
+move_prognostic_grid_variables_back!(::Variables, ::AbstractTimeStepper, ::AbstractModel) = nothing

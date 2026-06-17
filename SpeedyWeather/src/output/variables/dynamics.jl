@@ -116,10 +116,11 @@ Fields are: $(TYPEDFIELDS)"""
     compression_level::Int = 3
     shuffle::Bool = true
     keepbits::Int = 12
-    transform::F = (x) -> exp(x) / 100     # log(Pa) to hPa
+    transform::F = (x) -> x / 100     # Pa to hPa
 end
 
-path(::SurfacePressureOutput, simulation) = simulation.variables.grid.pressure
+# use from parameterizations as already converted to Pa there to avoid exp in multiple places
+path(::SurfacePressureOutput, simulation) = simulation.variables.parameterizations.surface_pressure
 
 """Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
 Fields are: $(TYPEDFIELDS)"""
@@ -147,10 +148,13 @@ function output!(
     ~hastime(variable) && output.output_counter > 1 && return nothing
 
     # get log(surface pressure) field
-    lnpₛ = path(variable, simulation)
+    var = path_or_nothing(variable, simulation)
+    isnothing(var) && return nothing       # silently escape early if variable is not defined
+    lnpₛ = get_prognostic_step(var, simulation.model.time_stepping, output)
     h = simulation.model.orography.orography
     (; R_dry, κ) = simulation.model.atmosphere
     g = simulation.model.planet.gravity
+    TS = simulation.model.time_stepping     # used to determine step of variables to write to file
 
     # compute virtual temperature on the fly
     nlayers = size(simulation.variables.grid.temperature, 2)
@@ -159,15 +163,22 @@ function output!(
     if simulation.model.dynamics_only    # otherwise this has been computed already
         # calculate the surface air temperature from lowest model level temperature
         # via dry adiabatic lapse rate
-        T .= field_view(simulation.variables.grid.temperature, :, nlayers)
+        temp = get_prognostic_step(simulation.variables.grid.temperature, TS, output)
+        T .= field_view(temp, :, nlayers)
         # σ vertical coordinate at lowest model level
         GPUArrays.@allowscalar σ = simulation.model.geometry.σ_levels_full[nlayers]
         σ⁻ᵏ = σ^(-κ)    # precalculate adiabatic descent factor
         T .*= σ⁻ᵏ       # lower to surface assuming dry adiabatic lapse rate
     end
 
-    has_humid = haskey(simulation.variables.grid, :humidity)
-    q = has_humid ? field_view(simulation.variables.grid.humidity, :, nlayers) : zero(T)
+    q = if haskey(simulation.variables.grid, :humidity)
+        humid = get_prognostic_step(simulation.variables.grid.humidity, TS, output)
+        field_view(humid, :, nlayers)
+    else
+        # reuse scratch array b which is free to be used for mslp after the virtual temperature calculation
+        # set to zero as q=0 in dry atmosphere
+        simulation.variables.scratch.grid.b_2D .= 0     
+    end
     Tᵥ = simulation.variables.scratch.grid.a_2D
 
     (; atmosphere) = simulation.model
@@ -175,15 +186,15 @@ function output!(
 
     # calculate mean sea-level pressure on model grid
     mslp = simulation.variables.scratch.grid.b_2D
-    (; transform) = variable                    # to change units from log(Pa) to hPa
-    @. mslp = transform(g * h / R_dry / Tᵥ + lnpₛ)    # Pa to hPa
+    (; transform) = variable                            # to change units from log(Pa) to hPa
+    @. mslp = transform(g * h / R_dry / Tᵥ + lnpₛ)      # log Pa to hPa
 
     # interpolate 2D/3D variables
     mslp_output = output.field2D
     mslp_grid = on_architecture(CPU(), mslp)
     RingGrids.interpolate!(mslp_output, mslp_grid, output.interpolator)
 
-    if hasproperty(variable, :keepbits)     # round mantissabits for compression
+    if hasproperty(variable, :keepbits)                 # round mantissabits for compression
         round!(mslp_output, variable.keepbits)
     end
 

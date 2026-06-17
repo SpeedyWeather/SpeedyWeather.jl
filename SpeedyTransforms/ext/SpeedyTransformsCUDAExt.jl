@@ -35,12 +35,14 @@ import SpeedyWeatherInternals.Architectures: architecture
 #     between the strided grid/scratch layout and the packed buffer in one launch. 
 #     This collapses the graph from ~6*nlat_half nodes to ~2*nlat_half + 4.
 #
-# The captured graph bakes in the device pointers of the input `field.data`,  and the 
+# The captured graph bakes in the device pointers of the input `field.data`,  and the
 # scratch buffers (`scratch_memory.north/.south`) and the packed work
 # buffer `GPUFourierGraphCache`. In the SpeedyWeather time loop the same variable buffers are reused every
 # timestep, so a graph captured for a given `field` is replayed on all subsequent steps.
 # Caches are held per transform SIZE (keyed by the FFT plan, so an `S` that batches
-# several layer counts gets one cache each); within a cache, graphs are keyed by `field.data`.
+# several layer counts gets one cache each); within a cache, graphs are keyed by the device
+# pointer of `field.data` (see `graph_key`), keying on the wrapper object identity wouldn't
+# work as a view on a CuArray is again a CuArray and not a SubArray which causes problems here.
 # =====================================================================================
 
 """Maximum number of cached graphs per direction per `SpectralTransform`. Prevents
@@ -124,8 +126,8 @@ struct GPUFourierGraphCache{PR, PC, RV, CV, IV, A}
     has_equator::Bool           # whether the grid has a ring on the equator that needs special handling
     j_equator::Int              # latitude index of the equator ring (if any)
     arch::A                     # SpeedyWeather GPU architecture (for launch!)
-    forward_execs::IdDict{Any, Union{Nothing, CuGraphExec}} # the actual graphs forward transforms
-    inverse_execs::IdDict{Any, Union{Nothing, CuGraphExec}} # the actual graphs inverse transforms
+    forward_execs::Dict{UInt, Union{Nothing, CuGraphExec}} # forward graphs
+    inverse_execs::Dict{UInt, Union{Nothing, CuGraphExec}} # inverse graphs
 end
 
 # One cache per (SpectralTransform, transform size), keyed by the *forward FFT plan set*
@@ -179,8 +181,8 @@ function build_cache(S::SpectralTransform, nlayers::Integer)
         dev(istart_n), dev(istart_s), dev(nlons_s),
         S.nlon_max, S.nfreq_max, nlat_half, nlayers, has_equator, j_equator,
         architecture(packed_real),
-        IdDict{Any, Union{Nothing, CuGraphExec}}(),
-        IdDict{Any, Union{Nothing, CuGraphExec}}(),
+        Dict{UInt, Union{Nothing, CuGraphExec}}(),
+        Dict{UInt, Union{Nothing, CuGraphExec}}(),
     )
 end
 
@@ -279,7 +281,7 @@ Run `loop!` (a `() -> ...` closure over the allocation-free batched FFT) either 
 replaying a cached CUDA graph keyed by `key`, or — on first use — by warming up, capturing,
 instantiating and caching a graph. Falls back to running `loop!` directly if capture fails
 or the per-direction cache is full."""
-function run_graph!(execs::IdDict, key, loop!::F) where {F}
+function run_graph!(execs::AbstractDict, key, loop!::F) where {F}
     exec = get(execs, key, missing)          # `missing` is fallback value that gets return when there's no cached exec yet
     if exec isa CuGraphExec
         launch(exec)                         # hot path: pure replay
@@ -323,6 +325,18 @@ function run_graph!(execs::IdDict, key, loop!::F) where {F}
     return nothing
 end
 
+# Stable per-buffer graph-cache key: the device address of `field.data`.
+#
+# The time stepping fetches the grid field for each transform via `get_prognostic_step` /
+# `get_tendency_step`, i.e. a `field_view`/`get_step` on a step-dimensioned grid variable. On
+# the GPU `view(::CuArray, :, :, step)` returns again a fresh `CuArray` wrapper each call
+# , so keying the cache on the wrapper's object identity would capture a
+# new graph every timestep and the cache would grow without bound. The wrapper churns but it
+# always aliases the same device memory at the same offset, so the device pointer — exactly what
+# the captured graph bakes in — is stable; we key on that instead. (Safe because model buffers live
+# for the whole run, so an address is never freed and recycled under a stale graph.)
+@inline graph_key(data) = reinterpret(UInt, pointer(data))
+
 # =====================================================================================
 # Method overrides: dispatch on CuArray scratch (more specific than the generic
 # AbstractArray{<:Complex,3} methods in fourier.jl)
@@ -348,7 +362,7 @@ function _fourier_batched!(
     # the cache is selected by (and sized for) this transform size (= its FFT plan set); within
     # it the only thing that varies between calls is the field buffer, so that is the graph key
     cache = get_cache(S, size(field, 2))
-    run_graph!(cache.forward_execs, field.data, () -> forward_loop!(cache, f_north, f_south, field, S))
+    run_graph!(cache.forward_execs, graph_key(field.data), () -> forward_loop!(cache, f_north, f_south, field, S))
     return nothing
 end
 
@@ -369,7 +383,7 @@ function _fourier_batched!(
         )
     end
     cache = get_cache(S, size(field, 2))
-    run_graph!(cache.inverse_execs, field.data, () -> inverse_loop!(cache, field, g_north, g_south, S))
+    run_graph!(cache.inverse_execs, graph_key(field.data), () -> inverse_loop!(cache, field, g_north, g_south, S))
     return nothing
 end
 
