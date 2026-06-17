@@ -81,7 +81,6 @@ function variables(::Type{<:Barotropic}, nsteps = DEFAULT_NSTEPS)
         GridVariable(:u, Grid4D(pg), desc = "Zonal wind", units = "m/s", fuse = :uv_grid),
         GridVariable(:v, Grid4D(pg), desc = "Meridional wind", units = "m/s", fuse = :uv_grid),
 
-
         ScratchVariable(:a, Spectral3D(), desc = "Scratch array", units = "?", fuse = :spectral_scratch),
         ScratchVariable(:b, Spectral3D(), desc = "Scratch array", units = "?", fuse = :spectral_scratch),
     )
