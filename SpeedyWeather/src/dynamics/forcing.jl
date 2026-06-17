@@ -1,13 +1,7 @@
 abstract type AbstractForcing <: AbstractModelComponent end
 
 # function barrier for all forcings to unpack model.forcing
-function forcing!(
-        vars::Variables,
-        lf::Integer,
-        model::AbstractModel,
-    )
-    return forcing!(vars, model.forcing, lf, model)
-end
+forcing!(vars::Variables, model::AbstractModel) = forcing!(vars, model.forcing, model)
 
 # NO FORCING
 forcing!(vars, forcing::Nothing, args...) = nothing
@@ -85,13 +79,8 @@ function initialize!(
 end
 
 # function barrier
-function forcing!(
-        vars::Variables,
-        forcing::JetStreamForcing,
-        lf::Integer,
-        model::AbstractModel,
-    )
-    return forcing!(vars, forcing)
+function forcing!(vars::Variables, forcing::JetStreamForcing, model::AbstractModel)
+    return forcing!(vars, forcing, model.time_stepping)
 end
 
 """$(TYPEDSIGNATURES)
@@ -100,10 +89,11 @@ in the momentum equations following the JetStreamForcing.
 The forcing is precomputed in `initialize!(::JetStreamForcing, ::AbstractModel)`."""
 function forcing!(
         vars::Variables,
-        forcing::JetStreamForcing
+        forcing::JetStreamForcing,
+        time_stepping::AbstractTimeStepper,
     )
 
-    Fu = vars.tendencies.grid.u
+    Fu = get_tendency_step(vars.tendencies.grid.u, time_stepping, forcing)
 
     (; amplitude, tapering) = forcing
     (; whichring) = Fu.grid
@@ -170,20 +160,16 @@ function initialize!(
     return nothing
 end
 
-function forcing!(
-        vars::Variables,
-        forcing::StochasticStirring,
-        lf::Integer,
-        model::AbstractModel,
-    )
-    return forcing!(vars, forcing, model.spectral_transform)
+function forcing!(vars::Variables, forcing::StochasticStirring, model::AbstractModel)
+    return forcing!(vars, forcing, model.spectral_transform, model.time_stepping)
 end
 
 
 function forcing!(
         vars::Variables,
         forcing::StochasticStirring,
-        spectral_transform::SpectralTransform
+        spectral_transform::SpectralTransform,
+        time_stepping::AbstractTimeStepper,
     )
     # get random values from random process
     S_grid = vars.scratch.grid.a_2D
@@ -200,7 +186,7 @@ function forcing!(
     S_masked .*= (vars.prognostic.scale[]^2 * forcing.strength)
 
     # force every layer
-    vor_tend = vars.tendencies.vorticity
+    vor_tend = get_tendency_step(vars.tendencies.vorticity, time_stepping, forcing)
     arch = architecture(vor_tend)
     launch!(
         arch, SpectralWorkOrder, size(vor_tend), stochastic_stirring_kernel!,
@@ -242,7 +228,6 @@ initialize!(::KolmogorovFlow, ::AbstractModel) = nothing
 function forcing!(
         vars::Variables,
         forcing::KolmogorovFlow,
-        lf::Integer,
         model::AbstractModel,
     )
     (; latds) = model.geometry
@@ -250,7 +235,7 @@ function forcing!(
     s = forcing.strength * vars.prognostic.scale[]
     k = forcing.wavenumber
 
-    Fu = vars.tendencies.grid.u
+    Fu = get_tendency_step(vars.tendencies.grid.u, model.time_stepping, forcing)
     launch!(
         architecture(Fu), RingGridWorkOrder, size(Fu), kolmogorov_flow_kernel!,
         Fu, s, k, latds
@@ -358,12 +343,13 @@ Apply temperature relaxation following Held and Suarez 1996, BAMS."""
 function forcing!(
         vars::Variables,
         forcing::HeldSuarez,
-        lf::Integer,
         model::AbstractModel,
     )
-    temp = vars.grid.temperature
-    log_pₛ = vars.grid.pressure     # logarithm of surface pressure, precomputed in geopotential module as log(pₛ/p₀) to save memory and time in the kernel
-    temp_tend = vars.tendencies.grid.temperature
+    temp = get_prognostic_step(vars.grid.temperature, model.time_stepping, forcing)
+    temp_tend = get_tendency_step(vars.tendencies.grid.temperature, model.time_stepping, forcing)
+    
+    # logarithm of surface pressure
+    log_pₛ = get_prognostic_step(vars.grid.pressure, model.time_stepping, forcing)
 
     (; Tmin, log_σ, temp_relax_freq, temp_equil_a, temp_equil_b) = forcing
     (; κ) = model.atmosphere

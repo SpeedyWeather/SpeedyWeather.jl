@@ -129,7 +129,8 @@ function initialize!(
     particle_tracker.netcdf_file["lon"][:, 1] = particle_tracker.lon
     particle_tracker.netcdf_file["lat"][:, 1] = particle_tracker.lat
     particle_tracker.netcdf_file["sigma"][:, 1] = particle_tracker.σ
-    return NCDatasets.sync(particle_tracker.netcdf_file)
+    NCDatasets.sync(particle_tracker.netcdf_file)
+    return nothing
 end
 
 function callback!(
@@ -137,7 +138,8 @@ function callback!(
         vars::Variables,
         model::AbstractModel,
     )
-    isscheduled(particle_tracker.schedule, vars.prognostic.clock) || return nothing   # else escape immediately
+    (; clock) = vars.prognostic
+    isscheduled(particle_tracker.schedule, clock) || return nothing     # else escape immediately
     i = particle_tracker.schedule.counter + 1     # +1 for initial conditions (not scheduled)
 
     # pull particle locations into output work arrays
@@ -160,7 +162,8 @@ function callback!(
     particle_tracker.netcdf_file["lon"][:, i] = particle_tracker.lon
     particle_tracker.netcdf_file["lat"][:, i] = particle_tracker.lat
     particle_tracker.netcdf_file["sigma"][:, i] = particle_tracker.σ
-    return NCDatasets.sync(particle_tracker.netcdf_file)
+    NCDatasets.sync(particle_tracker.netcdf_file)
+    return nothing
 end
 
 finalize!(particle_tracker::ParticleTracker, args...) = NCDatasets.close(particle_tracker.netcdf_file)

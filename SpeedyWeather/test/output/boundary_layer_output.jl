@@ -7,6 +7,7 @@ using NCDatasets
     spectral_grid = SpectralGrid(trunc = 31, nlayers = 8)
     output = NetCDFOutput(spectral_grid, path = tmp_output_path)
     model = PrimitiveWetModel(spectral_grid; output)
+    model.feedback.verbose = false
 
     # the three surface roughness output writers under test
     add!(
